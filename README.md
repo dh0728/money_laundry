@@ -43,6 +43,15 @@ master ← dev ← 작업별 브랜치
 - **dev**: 통합 개발 브랜치. 작업 브랜치를 PR로 병합.
 - **작업별 브랜치**: 기능/작업 단위로 dev에서 분기해서 사용 (예: `docs`, `feature/eda`, `feature/gnn-model`)
 
+### 브랜치 보호 규칙 (master·dev 공통)
+
+> GitHub branch protection 설정 적용 예정. 설정 전에도 아래 규칙을 반드시 지킵니다.
+
+- **직접 push 금지** — master·dev에는 커밋을 직접 올리지 않고, 반드시 PR로만 병합합니다.
+- **PR 승인 1명 필수** — 본인 외 팀원 1명 이상의 리뷰 승인 후 병합합니다.
+- **force push 금지** — `git push --force`는 모든 공유 브랜치에서 금지합니다.
+- **브랜치 삭제 금지** — master·dev 브랜치는 삭제하지 않습니다.
+
 ### 작업 흐름
 
 1. dev에서 새 브랜치 생성
