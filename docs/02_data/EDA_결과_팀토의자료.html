@@ -1,0 +1,1253 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자금세탁 탐지 프로젝트 — 데이터 분석 결과와 논의 화두</title>
+<style>
+:root{
+  --bg:#f9f9f7; --surface:#fcfcfb; --surface-2:#f1efe8;
+  --ink:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --line:#e1e0d9; --line-2:#c3c2b7;
+  --hi:#2a78d6; --li:#eb6834; --accent:#4a3aa7; --aqua:#1baf7a;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948; --s9:#888780;
+  --topic-bg:#f4f2fb; --topic-line:#7f77dd; --topic-ink:#3c3489;
+  --key-bg:#e6f1fb; --key-line:#378add; --key-ink:#0c447c;
+  --warn-bg:#faeeda; --warn-line:#ba7517; --warn-ink:#633806;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0d0d0d; --surface:#1a1a19; --surface-2:#222220;
+    --ink:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+    --line:#2c2c2a; --line-2:#383835;
+    --hi:#3987e5; --li:#d95926; --accent:#9085e9; --aqua:#199e70;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --s9:#898781;
+    --topic-bg:#1b1830; --topic-line:#7f77dd; --topic-ink:#afa9ec;
+    --key-bg:#0e2135; --key-line:#378add; --key-ink:#85b7eb;
+    --warn-bg:#2a2010; --warn-line:#ba7517; --warn-ink:#fac775;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:16px;line-height:1.75;-webkit-text-size-adjust:100%}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px 80px}
+header{border-bottom:1px solid var(--line);margin-bottom:8px;padding:40px 0 24px}
+h1{font-size:27px;font-weight:500;margin:0 0 8px;letter-spacing:-.01em}
+h2{font-size:21px;font-weight:500;margin:54px 0 4px;padding-top:20px;border-top:1px solid var(--line);scroll-margin-top:20px}
+h3{font-size:17px;font-weight:500;margin:30px 0 8px}
+h4{font-size:15px;font-weight:500;margin:20px 0 6px;color:var(--ink-2)}
+p{margin:10px 0}
+.sub{color:var(--ink-2);font-size:14px;margin:0}
+.lead{color:var(--ink-2);font-size:15px}
+nav{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:24px 0 8px}
+nav ol{margin:0;padding-left:20px;columns:2;column-gap:32px;font-size:14px}
+nav li{margin:3px 0}
+nav a{color:var(--ink-2);text-decoration:none}
+nav a:hover{color:var(--hi);text-decoration:underline}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:14px 0}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+th,td{border-bottom:1px solid var(--line);padding:7px 10px;text-align:left;white-space:nowrap}
+th{color:var(--ink-2);font-weight:500;background:var(--surface-2)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td.w{white-space:normal}
+tr:last-child td{border-bottom:none}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+.bars{margin:14px 0}
+.bar-row{display:grid;grid-template-columns:minmax(96px,158px) 1fr minmax(78px,auto);gap:10px;align-items:center;margin:5px 0;font-size:13px}
+.bar-lab{color:var(--ink-2);text-align:right;overflow:hidden;text-overflow:ellipsis}
+.bar-track{background:var(--surface-2);border-radius:4px;height:16px;overflow:hidden}
+.bar-fill{height:100%;border-radius:0 4px 4px 0}
+.bar-val{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.legend{display:flex;flex-wrap:wrap;gap:18px;font-size:13px;color:var(--ink-2);margin:12px 0 6px}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:16px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin:18px 0}
+.kpi{background:var(--surface-2);border-radius:8px;padding:14px 16px}
+.kpi .k{font-size:12.5px;color:var(--ink-2);margin:0 0 2px}
+.kpi .v{font-size:25px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.25}
+.kpi .n{font-size:12.5px;color:var(--ink-3);margin:2px 0 0}
+.finding{border-left:3px solid var(--key-line);background:var(--key-bg);padding:12px 18px;margin:18px 0}
+.finding .t{font-weight:500;color:var(--key-ink);margin:0 0 4px;font-size:15px}
+.finding p{margin:4px 0;font-size:14.5px}
+.gap{border-left:3px solid var(--warn-line);background:var(--warn-bg);padding:12px 18px;margin:18px 0}
+.gap .t{font-weight:500;color:var(--warn-ink);margin:0 0 4px;font-size:15px}
+.gap p{margin:4px 0;font-size:14.5px}
+.topic{background:var(--topic-bg);border:1px solid var(--topic-line);border-radius:12px;padding:14px 20px 16px;margin:18px 0}
+.topic .q{font-weight:500;color:var(--topic-ink);margin:0 0 10px;font-size:15.5px;line-height:1.55}
+.topic .lbl{font-size:12.5px;color:var(--ink-3);margin:12px 0 2px;letter-spacing:.02em}
+.topic p.d{margin:2px 0;font-size:14.5px}
+.topic ul{margin:4px 0;padding-left:20px;font-size:14.5px}
+.topic li{margin:3px 0}
+.src{font-size:12.5px;color:var(--ink-3);margin:8px 0 0}
+.pats{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin:18px 0}
+.pat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.pat h4{margin:0 0 2px;font-size:15px;color:var(--ink)}
+.pat .st{font-size:12.5px;color:var(--ink-3);font-family:ui-monospace,Consolas,monospace;margin:0 0 8px}
+.pat p{font-size:13.5px;margin:8px 0 0;color:var(--ink-2);line-height:1.6}
+.pat svg{display:block;width:100%;height:auto;color:var(--ink-2)}
+.donutrow{display:flex;gap:26px;align-items:center;flex-wrap:wrap;margin:16px 0 4px}
+.donut{width:168px;height:168px;flex:none}
+.dlegend{list-style:none;margin:0;padding:0;font-size:13.5px;columns:2;column-gap:30px;flex:1;min-width:250px}
+.dlegend li{margin:5px 0;break-inside:avoid;white-space:nowrap;color:var(--ink-2)}
+.dlegend .sw{margin-right:7px;vertical-align:1px}
+.dlegend b{font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink)}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:18px 0}
+.fig svg{display:block;width:100%;height:auto}
+.fig .cap{font-size:13px;color:var(--ink-3);margin:10px 0 0;text-align:center}
+.note{font-size:13.5px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:10px 14px;margin:12px 0}
+ul.plain{padding-left:20px}
+ul.plain li{margin:6px 0}
+ol.plain{padding-left:20px}
+ol.plain li{margin:6px 0}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+.tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:20px;background:var(--surface-2);color:var(--ink-2);margin-left:6px;vertical-align:2px}
+.tag.pending{background:var(--warn-bg);color:var(--warn-ink)}
+@media (max-width:640px){
+  nav ol{columns:1}
+  .bar-row{grid-template-columns:minmax(78px,108px) 1fr auto;font-size:12px}
+  h1{font-size:22px} h2{font-size:19px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+<h1>자금세탁 탐지 프로젝트 — 데이터 분석 결과와 논의 화두</h1>
+<p class="sub">IBM AML 데이터셋 EDA 1~2단계 결과 · 팀 논의용 · 2026-08-05</p>
+</header>
+
+<p class="lead">이 문서는 두 가지 역할을 합니다. 앞부분(1~7장)은 <strong>데이터가 실제로 어떻게 생겼는지</strong>를 검증된 수치로 설명하고, 뒷부분(8장)은 그 결과로 드러난 <strong>팀이 논의해야 할 화두 42가지</strong>를 정리합니다.</p>
+<p class="lead">8장의 화두에는 <strong>답을 적어두지 않았습니다.</strong> 각 화두마다 관련된 데이터 상황과 논의에서 갈리는 지점만 제시하니, 선택은 논의를 통해 정하면 됩니다. 8.6절에는 분석을 진행하기 위해 <strong>임의로 정해둔 값</strong>들도 공개했습니다.</p>
+
+<nav>
+<ol>
+<li><a href="#s1">우리가 만드는 것과 서비스 시나리오</a></li>
+<li><a href="#s2">데이터셋 소개</a></li>
+<li><a href="#s3">"세탁 0.1%"가 세는 것</a></li>
+<li><a href="#s4">세탁 패턴 8가지</a></li>
+<li><a href="#s5">라벨 구조 검증 결과</a></li>
+<li><a href="#s6">금액·통화, 그래프 구조, 데이터 품질</a></li>
+<li><a href="#s7">서비스 시나리오가 만드는 제약</a></li>
+<li><a href="#s8">논의 화두 42가지</a></li>
+</ol>
+</nav>
+
+<div class="note"><strong>수치의 범위:</strong> 3~6장의 검증은 <strong>6종 세트 전체</strong>에서 수행했습니다. 표에 세트가 일부만 적힌 경우는 지면상 대표값이며, 각 결론이 규모에 따라 유지되는지는 <strong>6.6절 일반화 판정</strong>에 전부 정리했습니다.</div>
+
+<h2 id="s1">1. 우리가 만드는 것과 서비스 시나리오</h2>
+
+<h3>1.1 목표</h3>
+<p>거래 내역을 보고 <strong>자금세탁 의심거래를 탐지하는 모델</strong>과, 그 결과를 은행 담당자가 확인하는 <strong>웹 모니터링 대시보드</strong>입니다. 모델은 그래프 신경망(GNN)을 사용합니다.</p>
+
+<h3>1.2 서비스 시나리오 — 이 문서의 출발점</h3>
+<p class="lead">데이터 분석의 모든 항목은 아래 시나리오에서 역산했습니다. "데이터가 어떻게 생겼나"가 아니라 <strong>"이 시나리오를 구현하려면 무엇을 알아야 하나"</strong>가 기준입니다.</p>
+
+<div class="card">
+<p style="margin:0"><strong>거래 한 건이 들어오면, 그 거래가 의심거래인지 판정한다.</strong></p>
+</div>
+
+<p>이 한 문장이 만드는 핵심 제약은 <strong>"판정 시점에 존재하는 정보만 쓸 수 있다"</strong>는 것입니다. 미래 거래를 볼 수 없다는 당연한 사실인데, 모델 설계 전체를 규정합니다.</p>
+
+<p>그리고 거래 한 건만 넣으면 그래프 신경망이 쓸 정보가 없으므로, 실제 입력은 <strong>"그 거래 + 양쪽 계좌의 과거 이웃 그래프"</strong>가 됩니다. 서비스 흐름을 그리면 이렇습니다.</p>
+
+<div class="fig">
+<svg viewBox="0 0 940 220" role="img" aria-label="거래 도착부터 판정까지의 추론 흐름도. 거래 도착, 이웃 조회, 서브그래프 구성, GNN 추론, 판정, 대시보드 순으로 이어지고 판정 결과가 그래프 저장소로 되돌아간다">
+<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 1 L8 4.5 L0 8 z" fill="currentColor"/></marker></defs>
+<g style="color:var(--ink-3)" stroke="currentColor" stroke-width="1.6" fill="none" marker-end="url(#ar)">
+<path d="M124 62 L162 62"/><path d="M290 62 L328 62"/><path d="M456 62 L494 62"/><path d="M622 62 L660 62"/>
+<path d="M232 96 L232 132"/>
+<path d="M760 90 L760 150 L232 150 L232 132" stroke-dasharray="5 4"/>
+</g>
+<g font-family="system-ui,sans-serif" font-size="13.5" text-anchor="middle">
+  <g style="color:var(--hi)"><rect x="8" y="42" width="116" height="40" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="66" y="67" fill="var(--ink)">거래 도착</text></g>
+  <rect x="162" y="42" width="128" height="40" rx="8" fill="var(--surface-2)"/><text x="226" y="67" fill="var(--ink)">이웃 조회</text>
+  <rect x="328" y="42" width="128" height="40" rx="8" fill="var(--surface-2)"/><text x="392" y="67" fill="var(--ink)">서브그래프 구성</text>
+  <g style="color:var(--accent)"><rect x="494" y="42" width="128" height="40" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="558" y="67" fill="var(--ink)">GNN 추론</text></g>
+  <rect x="660" y="42" width="200" height="40" rx="8" fill="var(--surface-2)"/><text x="760" y="67" fill="var(--ink)">의심 점수 → 판정 → 대시보드</text>
+  <g style="color:var(--aqua)"><rect x="150" y="132" width="164" height="40" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="232" y="157" fill="var(--ink)">그래프 저장소</text></g>
+</g>
+<text x="770" y="128" font-family="system-ui,sans-serif" font-size="12" fill="var(--ink-3)" text-anchor="middle">판정한 거래를 그래프에 반영</text>
+</svg>
+<p class="cap">거래 한 건의 판정 흐름 — 모델 가중치뿐 아니라 <strong>그래프 저장소</strong>가 서비스의 일부가 됩니다.</p>
+</div>
+
+<p class="lead">이 흐름에서 곧바로 나오는 질문들이 8장 화두의 상당수를 이룹니다. 이웃을 몇 단계까지 볼 것인가, 얼마나 과거까지 볼 것인가, 조회가 응답 시간 안에 끝나는가, 처음 보는 계좌가 오면 어떻게 하는가 같은 것들입니다.</p>
+
+<div class="note"><strong>데이터 형식에 대한 확인 하나.</strong> 실제 은행 시스템에서는 동일 은행 이체가 출금·입금 두 건으로 기록되기도 하지만, <strong>우리 데이터셋은 한 행에 보내는 쪽과 받는 쪽이 모두 들어 있어 거래 1건 = 1행입니다.</strong> 금액이 두 개(보낸 금액·받은 금액)인 것은 환전 때문이며, 같은 통화면 두 값이 완전히 일치함을 500만 건 전수로 확인했습니다.</p></div>
+
+
+<h2 id="s2">2. 데이터셋 소개</h2>
+
+<p>IBM이 공개한 자금세탁 <strong>합성 데이터셋</strong>(캐글)입니다. 실제 은행 데이터가 아니라 시뮬레이터로 만든 데이터이며, 그 덕분에 "어느 거래가 세탁인지" 정답이 붙어 있습니다.</p>
+<p>세트가 6종입니다. <strong>HI / LI</strong>는 세탁 밀도(High Illicit / Low Illicit), <strong>Small / Medium / Large</strong>는 규모입니다. 세트마다 파일 3개, 총 18개 파일 약 38.8GB입니다.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>파일</th><th>내용</th><th>그래프에서의 역할</th></tr></thead>
+<tbody>
+<tr><td><code>*_Trans.csv</code></td><td>거래 내역 (11개 컬럼)</td><td><strong>엣지</strong> — 계좌에서 계좌로 가는 송금</td></tr>
+<tr><td><code>*_accounts.csv</code></td><td>계좌 정보 (5개 컬럼)</td><td><strong>노드</strong> — 계좌와 소유 주체</td></tr>
+<tr><td><code>*_Patterns.txt</code></td><td>세탁 패턴별 거래 묶음</td><td><strong>정답 해설</strong> — 어떤 거래들이 하나의 세탁 수법을 이루는지</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4>6종 세트 비교</h4>
+<div class="scroll">
+<table>
+<thead><tr><th>세트</th><th class="n">거래 건수</th><th class="n">계좌 수</th><th class="n">세탁 라벨 비율</th><th class="n">패턴 블록</th><th>기간</th></tr></thead>
+<tbody>
+<tr><td>HI-Small</td><td class="n">5,078,345</td><td class="n">518,581</td><td class="n">0.1019%</td><td class="n">370</td><td>2022/09/01 ~ 09/18</td></tr>
+<tr><td>HI-Medium</td><td class="n">31,898,238</td><td class="n">2,087,786</td><td class="n">0.1104%</td><td class="n">2,756</td><td>2022/09/01 ~ 09/28</td></tr>
+<tr><td>HI-Large</td><td class="n">179,702,229</td><td class="n">2,126,855</td><td class="n">0.1255%</td><td class="n">16,467</td><td>2022/08/01 ~ 2023/01/12</td></tr>
+<tr><td>LI-Small</td><td class="n">6,924,049</td><td class="n">712,688</td><td class="n">0.0515%</td><td class="n">117</td><td>2022/09/01 ~ 09/17</td></tr>
+<tr><td>LI-Medium</td><td class="n">31,251,483</td><td class="n">2,040,823</td><td class="n">0.0513%</td><td class="n">456</td><td>2022/09/01 ~ 09/27</td></tr>
+<tr><td>LI-Large</td><td class="n">176,066,557</td><td class="n">2,079,627</td><td class="n">0.0571%</td><td class="n">2,218</td><td>2022/08/01 ~ 2023/01/12</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="legend"><span><i class="sw" style="background:var(--hi)"></i>HI (세탁 밀도 높음)</span><span><i class="sw" style="background:var(--li)"></i>LI (세탁 밀도 낮음)</span></div>
+<div class="bars">
+  <div class="bar-row"><div class="bar-lab">HI-Small</div><div class="bar-track"><div class="bar-fill" style="width:81.2%;background:var(--hi)"></div></div><div class="bar-val">0.1019%</div></div>
+  <div class="bar-row"><div class="bar-lab">HI-Medium</div><div class="bar-track"><div class="bar-fill" style="width:88.0%;background:var(--hi)"></div></div><div class="bar-val">0.1104%</div></div>
+  <div class="bar-row"><div class="bar-lab">HI-Large</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--hi)"></div></div><div class="bar-val">0.1255%</div></div>
+  <div class="bar-row"><div class="bar-lab">LI-Small</div><div class="bar-track"><div class="bar-fill" style="width:41.0%;background:var(--li)"></div></div><div class="bar-val">0.0515%</div></div>
+  <div class="bar-row"><div class="bar-lab">LI-Medium</div><div class="bar-track"><div class="bar-fill" style="width:40.9%;background:var(--li)"></div></div><div class="bar-val">0.0513%</div></div>
+  <div class="bar-row"><div class="bar-lab">LI-Large</div><div class="bar-track"><div class="bar-fill" style="width:45.5%;background:var(--li)"></div></div><div class="bar-val">0.0571%</div></div>
+</div>
+
+<h4>거래 파일의 11개 컬럼</h4>
+<p><code>Timestamp</code>, <code>From Bank</code>, <code>Account</code>(송금), <code>To Bank</code>, <code>Account</code>(수취), <code>Amount Received</code>, <code>Receiving Currency</code>, <code>Amount Paid</code>, <code>Payment Currency</code>, <code>Payment Format</code>, <code>Is Laundering</code></p>
+<p class="lead">마지막 <code>Is Laundering</code>이 0/1 정답 라벨입니다. 컬럼명 <code>Account</code>가 두 번 등장하므로 코드에서는 이름이 아니라 위치로 다뤄야 합니다.</p>
+
+<div class="kpis">
+  <div class="kpi"><p class="k">6종 세트 스키마</p><p class="v">전부 동일</p><p class="n">컬럼명·순서·중복 위치까지</p></div>
+  <div class="kpi"><p class="k">결측값</p><p class="v">0건</p><p class="n">18개 파일 전수</p></div>
+  <div class="kpi"><p class="k">파싱 실패 행</p><p class="v">0건</p><p class="n">18개 파일 전수</p></div>
+  <div class="kpi"><p class="k">패턴 파일 구조 오류</p><p class="v">0건</p><p class="n">블록 시작/종료 쌍 검증</p></div>
+</div>
+
+<p class="src">출처: <code>worktable/eda/01_structure.md</code> (18개 파일 전수 검증, 교차검수 통과)</p>
+
+
+<h2 id="s3">3. "세탁 0.1%"가 세는 것</h2>
+<p class="lead">이 숫자의 정의를 정확히 해두지 않으면 이후 논의가 어긋납니다.</p>
+
+<div class="card">
+<p style="margin:0 0 8px"><strong>세탁 라벨 비율 = 라벨이 1인 거래 건수 ÷ 전체 거래 건수</strong></p>
+<ul class="plain" style="margin:0">
+<li><strong>단위는 "거래 1건"</strong>입니다. CSV 한 줄이 거래 하나이고, 정답 라벨도 거래마다 붙습니다.</li>
+<li>계좌 단위도, 금액 단위도 아닙니다.</li>
+<li>시간으로 끊지 않고 <strong>전체 기간을 누적</strong>한 값입니다.</li>
+</ul>
+</div>
+
+<h4>같은 데이터를 네 가지 단위로 보면 숫자가 달라집니다</h4>
+<div class="scroll">
+<table>
+<thead><tr><th>기준</th><th class="n">HI-Small</th><th class="n">LI-Small</th><th class="w">비고</th></tr></thead>
+<tbody>
+<tr><td><strong>거래</strong> 기준</td><td class="n">0.1019%</td><td class="n">0.0515%</td><td class="w">5,177 / 3,565건</td></tr>
+<tr><td><strong>계좌</strong> 기준 (송신·수신 합집합)</td><td class="n">1.23%</td><td class="n">0.74%</td><td class="w">6,357 / 5,304개 계좌 — Large에서는 10.46% / 6.22%</td></tr>
+<tr><td><strong>사건</strong> 기준 (패턴 블록)</td><td class="n">370건</td><td class="n">117건</td><td class="w">시나리오 1개당 평균 8.7건의 거래</td></tr>
+<tr><td><strong>금액</strong> 기준</td><td class="n" colspan="2">통화마다 다름 — 아래 참조</td><td class="w">통화 15종이 섞여 있어 합계는 산출하지 않음</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4>금액 기준으로 보면 세탁 비중이 훨씬 큽니다</h4>
+<p>통화 환산 기준이 미정이라(화두 8) 합산하지 않고 <strong>통화별로</strong> "그 통화의 전체 거래 금액 중 세탁이 차지하는 비중"을 측정했습니다. 결과는 <strong>대부분의 통화에서 금액 비중이 건수 비중보다 큽니다</strong> — 6종 세트 전부에서 그런 통화가 과반이고, Large 세트에서는 15종 전부가 그렇습니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>세트</th><th class="n">금액 비중 &gt; 건수 비중인 통화</th><th class="w">가장 극단적인 사례</th></tr></thead>
+<tbody>
+<tr><td>HI-Small</td><td class="n">15종 중 11종</td><td class="w">Canadian Dollar — 건수 0.0906% vs <strong>금액 27.28%</strong> (301배)</td></tr>
+<tr><td>HI-Medium</td><td class="n">15종 중 13종</td><td class="w">—</td></tr>
+<tr><td>HI-Large</td><td class="n">15종 <strong>전부</strong></td><td class="w">Canadian Dollar — 건수 0.0575% vs 금액 0.7898% (13.7배)</td></tr>
+<tr><td>LI-Small</td><td class="n">15종 중 8종</td><td class="w">—</td></tr>
+<tr><td>LI-Medium</td><td class="n">15종 <strong>전부</strong></td><td class="w">—</td></tr>
+<tr><td>LI-Large</td><td class="n">15종 <strong>전부</strong></td><td class="w">—</td></tr>
+</tbody>
+</table>
+</div>
+<div class="finding">
+<p class="t">"0.1%짜리 문제"가 금액 관점에서는 다른 크기입니다</p>
+<p>건수로 세면 극히 드문 사건이지만, 돈의 흐름으로 보면 비중이 훨씬 큽니다. HI-Small의 캐나다 달러는 거래 1만 건 중 9건이 세탁인데 <strong>금액으로는 4분의 1 이상</strong>이 세탁입니다. 손실 가중치나 평가 지표를 건수 기준으로만 두면 "큰 세탁 한 건"과 "작은 세탁 한 건"을 같게 취급하게 됩니다.</p>
+</div>
+
+<h4>세탁 "사건" 수가 아닙니다</h4>
+<p>세탁 하나는 보통 여러 거래로 이뤄집니다. 라벨 1이 5,177건이라고 해서 세탁 사건이 5,177개인 게 아닙니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>구분</th><th class="n">HI-Small</th><th class="n">LI-Small</th></tr></thead>
+<tbody>
+<tr><td>세탁 라벨이 붙은 <strong>거래</strong></td><td class="n">5,177</td><td class="n">3,565</td></tr>
+<tr><td>└ 패턴(세탁 시나리오)에 묶인 거래</td><td class="n">3,209</td><td class="n">1,023</td></tr>
+<tr><td>└ 패턴 밖 거래</td><td class="n">1,968</td><td class="n">2,542</td></tr>
+<tr><td>세탁 <strong>시나리오</strong> 개수 (패턴 블록)</td><td class="n">370</td><td class="n">117</td></tr>
+</tbody>
+</table>
+</div>
+<p class="lead">"몇 건을 맞혔나"와 "몇 개의 세탁 사건을 적발했나"는 다른 질문이며, 실무에서 의미가 큰 쪽은 대개 후자입니다.</p>
+
+<h4>계좌 기준으로 보면 불균형이 훨씬 덜 극단적입니다</h4>
+<p>세탁에 연루된 계좌(보낸 쪽·받은 쪽 합집합, 중복 제거)의 비율은 거래 기준 비율보다 훨씬 높고, <strong>세트가 클수록 격차가 벌어집니다.</strong></p>
+<div class="scroll">
+<table>
+<thead><tr><th>세트</th><th class="n">거래 기준</th><th class="n">계좌 기준 (합집합)</th><th class="n">배율</th><th class="w">세탁 관련 계좌 수</th></tr></thead>
+<tbody>
+<tr><td>HI-Small</td><td class="n">0.1019%</td><td class="n">1.23%</td><td class="n">12.0배</td><td class="w">6,357 / 518,581</td></tr>
+<tr><td>HI-Medium</td><td class="n">0.1104%</td><td class="n">2.00%</td><td class="n">18.2배</td><td class="w">41,857 / 2,087,786</td></tr>
+<tr><td>HI-Large</td><td class="n">0.1255%</td><td class="n"><strong>10.46%</strong></td><td class="n">83.4배</td><td class="w">222,522 / 2,126,855</td></tr>
+<tr><td>LI-Small</td><td class="n">0.0515%</td><td class="n">0.74%</td><td class="n">14.5배</td><td class="w">5,304 / 712,688</td></tr>
+<tr><td>LI-Medium</td><td class="n">0.0513%</td><td class="n">1.15%</td><td class="n">22.4배</td><td class="w">23,510 / 2,040,823</td></tr>
+<tr><td>LI-Large</td><td class="n">0.0571%</td><td class="n"><strong>6.22%</strong></td><td class="n">108.8배</td><td class="w">129,263 / 2,079,627</td></tr>
+</tbody>
+</table>
+</div>
+<div class="finding">
+<p class="t">노드(계좌)를 분류 대상으로 삼으면 불균형 문제가 크게 완화됩니다</p>
+<p>거래 기준으로는 1,000건 중 1건꼴이지만, HI-Large를 계좌 기준으로 보면 <strong>10개 중 1개</strong>가 세탁에 연루된 계좌입니다. 판정 단위(화두 1)와 거래 표현 방식(화두 14)을 정할 때 이 차이가 불균형 대응(화두 22)의 난이도를 좌우합니다.</p>
+</div>
+
+<p class="src">출처: <code>worktable/eda/02_verification.md</code> A2~A4 (Small 세트 기준, 교차검수 통과)</p>
+
+
+<h2 id="s4">4. 세탁 패턴 8가지 — 무엇을 탐지하려는 것인가</h2>
+<p class="lead">패턴 파일에는 세탁 거래들이 <strong>수법별로 묶여</strong> 있습니다. 8가지 유형의 공통점은 <strong>거래 한 건만 보면 정상 같지만 계좌들 사이 연결의 "모양"을 봐야 이상함이 드러난다</strong>는 것입니다. 원은 계좌, 화살표는 송금입니다.</p>
+
+<div class="pats">
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="한 계좌에서 여러 계좌로 뻗어나가는 그림">
+<g stroke="currentColor" stroke-width="1.5" fill="none"><path d="M34 39 L112 16"/><path d="M34 39 L112 39"/><path d="M34 39 L112 62"/></g>
+<g fill="currentColor"><circle cx="26" cy="39" r="8"/><circle cx="120" cy="16" r="6"/><circle cx="120" cy="39" r="6"/><circle cx="120" cy="62" r="6"/></g>
+</svg>
+<h4>FAN-OUT</h4><p class="st">1 → N</p>
+<p>한 계좌가 짧은 기간에 여러 계좌로 돈을 쪼개서 보냅니다. 큰돈을 잘게 나눠 추적을 어렵게 하는 "분산" 단계의 전형입니다.</p>
+</div>
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="여러 계좌에서 한 계좌로 모이는 그림">
+<g stroke="currentColor" stroke-width="1.5" fill="none"><path d="M48 16 L126 39"/><path d="M48 39 L126 39"/><path d="M48 62 L126 39"/></g>
+<g fill="currentColor"><circle cx="40" cy="16" r="6"/><circle cx="40" cy="39" r="6"/><circle cx="40" cy="62" r="6"/><circle cx="134" cy="39" r="8"/></g>
+</svg>
+<h4>FAN-IN</h4><p class="st">N → 1</p>
+<p>여러 계좌의 돈이 한 계좌로 모입니다. 흩어져 있던 자금을 회수·집결하는 단계로, FAN-OUT의 반대 방향입니다.</p>
+</div>
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="한 계좌에서 여러 계좌를 거쳐 다시 한 계좌로 모이는 그림">
+<g stroke="currentColor" stroke-width="1.5" fill="none"><path d="M20 39 L68 16"/><path d="M20 39 L68 39"/><path d="M20 39 L68 62"/><path d="M84 16 L132 39"/><path d="M84 39 L132 39"/><path d="M84 62 L132 39"/></g>
+<g fill="currentColor"><circle cx="14" cy="39" r="7"/><circle cx="76" cy="16" r="5.5"/><circle cx="76" cy="39" r="5.5"/><circle cx="76" cy="62" r="5.5"/><circle cx="140" cy="39" r="7"/></g>
+</svg>
+<h4>SCATTER-GATHER</h4><p class="st">1 → N → 1</p>
+<p>여러 경유 계좌로 뿌린 뒤 다른 계좌 하나로 다시 모읍니다. 중간 계좌들은 잠깐 거쳐가는 통로(자금 운반책) 역할입니다.</p>
+</div>
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="여러 계좌가 하나의 허브로 모였다가 다시 여러 계좌로 흩어지는 그림">
+<g stroke="currentColor" stroke-width="1.5" fill="none"><path d="M26 16 L74 39"/><path d="M26 39 L74 39"/><path d="M26 62 L74 39"/><path d="M86 39 L134 16"/><path d="M86 39 L134 39"/><path d="M86 39 L134 62"/></g>
+<g fill="currentColor"><circle cx="20" cy="16" r="5.5"/><circle cx="20" cy="39" r="5.5"/><circle cx="20" cy="62" r="5.5"/><circle cx="80" cy="39" r="8"/><circle cx="140" cy="16" r="5.5"/><circle cx="140" cy="39" r="5.5"/><circle cx="140" cy="62" r="5.5"/></g>
+</svg>
+<h4>GATHER-SCATTER</h4><p class="st">N → 1 → M</p>
+<p>여러 계좌의 돈을 허브 계좌 하나에 모았다가 다시 여러 계좌로 분산합니다. 허브가 세탁의 중계소 역할을 합니다.</p>
+</div>
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="네 계좌가 고리 모양으로 연결되어 돈이 돌아오는 그림">
+<g stroke="currentColor" stroke-width="1.5" fill="none"><path d="M68 18 L92 18"/><path d="M102 28 L102 50"/><path d="M92 60 L68 60"/><path d="M58 50 L58 28"/></g>
+<g fill="currentColor"><circle cx="60" cy="18" r="7"/><circle cx="100" cy="18" r="7"/><circle cx="100" cy="60" r="7"/><circle cx="60" cy="60" r="7"/></g>
+</svg>
+<h4>CYCLE</h4><p class="st">A → B → … → A</p>
+<p>돈이 여러 계좌를 고리 모양으로 돌아 출발점으로 되돌아옵니다. 순환 거래로 자금 출처를 흐리는 수법이며, 그래프에서 "닫힌 고리"로 보입니다.</p>
+</div>
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="세 계좌 집단과 세 계좌 집단이 여러 갈래로 얽혀 연결된 그림">
+<g stroke="currentColor" stroke-width="1.2" fill="none" opacity=".85"><path d="M48 16 L112 16"/><path d="M48 16 L112 39"/><path d="M48 39 L112 16"/><path d="M48 39 L112 62"/><path d="M48 62 L112 39"/><path d="M48 62 L112 62"/></g>
+<g fill="currentColor"><circle cx="40" cy="16" r="6"/><circle cx="40" cy="39" r="6"/><circle cx="40" cy="62" r="6"/><circle cx="120" cy="16" r="6"/><circle cx="120" cy="39" r="6"/><circle cx="120" cy="62" r="6"/></g>
+</svg>
+<h4>BIPARTITE</h4><p class="st">그룹 ↔ 그룹</p>
+<p>송신 계좌 집단과 수신 계좌 집단이 다대다로 얽힌 이체망입니다. 특정 허브 없이 집단 대 집단으로 돈이 오갑니다.</p>
+</div>
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="계좌 집단이 세 개 층으로 쌓여 순차적으로 연결된 그림">
+<g stroke="currentColor" stroke-width="1.2" fill="none" opacity=".85"><path d="M28 20 L72 20"/><path d="M28 20 L72 55"/><path d="M28 55 L72 20"/><path d="M28 55 L72 55"/><path d="M88 20 L132 20"/><path d="M88 20 L132 55"/><path d="M88 55 L132 20"/><path d="M88 55 L132 55"/></g>
+<g fill="currentColor"><circle cx="20" cy="20" r="5.5"/><circle cx="20" cy="55" r="5.5"/><circle cx="80" cy="20" r="5.5"/><circle cx="80" cy="55" r="5.5"/><circle cx="140" cy="20" r="5.5"/><circle cx="140" cy="55" r="5.5"/></g>
+</svg>
+<h4>STACK</h4><p class="st">그룹 → 그룹 → 그룹</p>
+<p>BIPARTITE를 여러 층으로 쌓은 형태입니다. 자금이 계좌 집단을 층층이 거치며 이동하는 다단계 레이어링의 전형입니다.</p>
+</div>
+
+<div class="pat">
+<svg viewBox="0 0 160 78" aria-label="정형 구조 없이 무작위로 연결된 계좌들 그림">
+<g stroke="currentColor" stroke-width="1.3" fill="none" opacity=".85"><path d="M34 24 L74 14"/><path d="M74 14 L118 30"/><path d="M34 24 L60 52"/><path d="M60 52 L104 60"/><path d="M118 30 L104 60"/><path d="M74 14 L60 52"/></g>
+<g fill="currentColor"><circle cx="28" cy="24" r="6"/><circle cx="76" cy="12" r="6"/><circle cx="124" cy="31" r="6"/><circle cx="58" cy="55" r="6"/><circle cx="102" cy="63" r="6"/></g>
+</svg>
+<h4>RANDOM</h4><p class="st">무작위</p>
+<p>정형 구조 없이 무작위로 얽힌 세탁 거래입니다. 뚜렷한 모양이 없어 규칙 기반으로는 잡기 어려운 케이스입니다.</p>
+</div>
+
+</div>
+
+<div class="finding">
+<p class="t">그래프 신경망을 쓰는 근거</p>
+<p>고리(CYCLE), 깔때기(FAN-IN), 다단계(STACK) 같은 구조는 <strong>거래를 한 건씩 따로 보면 보이지 않습니다.</strong> 계좌를 노드로, 거래를 엣지로 놓은 그래프에서만 드러나는 특징입니다.</p>
+</div>
+
+<h4>패턴 유형별 분포 — 8종이 고르게 나타납니다</h4>
+<div class="donutrow">
+<svg class="donut" viewBox="0 0 160 160" role="img" aria-label="세탁 패턴 8유형의 블록 수 비중 도넛 차트. 10.8퍼센트에서 14.6퍼센트 사이로 고르게 분포">
+<g transform="rotate(-90 80 80)" fill="none" stroke-width="21">
+<circle cx="80" cy="80" r="60" stroke="var(--s1)" stroke-dasharray="53.0 377" stroke-dashoffset="0"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s2)" stroke-dasharray="50.0 377" stroke-dashoffset="-55.0"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s3)" stroke-dasharray="47.9 377" stroke-dashoffset="-107.0"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s4)" stroke-dasharray="46.9 377" stroke-dashoffset="-156.9"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s5)" stroke-dasharray="42.8 377" stroke-dashoffset="-205.8"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s6)" stroke-dasharray="41.8 377" stroke-dashoffset="-250.6"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s7)" stroke-dasharray="39.8 377" stroke-dashoffset="-294.4"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s8)" stroke-dasharray="38.8 377" stroke-dashoffset="-336.2"/>
+</g>
+<text x="80" y="76" text-anchor="middle" font-family="system-ui,sans-serif" font-size="19" font-weight="500" fill="var(--ink)">8종</text>
+<text x="80" y="94" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11.5" fill="var(--ink-3)">패턴 유형</text>
+</svg>
+<ul class="dlegend">
+<li><span class="sw" style="background:var(--s1)"></span>CYCLE <b>14.6%</b></li>
+<li><span class="sw" style="background:var(--s2)"></span>GATHER-SCATTER <b>13.8%</b></li>
+<li><span class="sw" style="background:var(--s3)"></span>BIPARTITE <b>13.2%</b></li>
+<li><span class="sw" style="background:var(--s4)"></span>FAN-OUT <b>13.0%</b></li>
+<li><span class="sw" style="background:var(--s5)"></span>SCATTER-GATHER <b>11.9%</b></li>
+<li><span class="sw" style="background:var(--s6)"></span>STACK <b>11.6%</b></li>
+<li><span class="sw" style="background:var(--s7)"></span>RANDOM <b>11.1%</b></li>
+<li><span class="sw" style="background:var(--s8)"></span>FAN-IN <b>10.8%</b></li>
+</ul>
+</div>
+<p class="lead">HI-Small의 370개 블록 기준입니다. 최다 유형과 최소 유형의 차이가 <strong>14.6% vs 10.8%</strong>로 크지 않아, 특정 수법에 치우치지 않은 데이터입니다. 유형별 성능을 나눠 평가할 수 있다는 뜻이기도 합니다.</p>
+
+<h4>HI와 LI의 유형별 블록 수 비교</h4>
+<div class="legend"><span><i class="sw" style="background:var(--hi)"></i>HI-Small (합계 370)</span><span><i class="sw" style="background:var(--li)"></i>LI-Small (합계 117)</span></div>
+<div class="bars">
+  <div class="bar-row"><div class="bar-lab">CYCLE</div><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--hi)"></div></div><div class="bar-val">54 / 12</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:22.2%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+  <div class="bar-row"><div class="bar-lab">GATHER-SCATTER</div><div class="bar-track"><div class="bar-fill" style="width:94.4%;background:var(--hi)"></div></div><div class="bar-val">51 / 12</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:22.2%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+  <div class="bar-row"><div class="bar-lab">BIPARTITE</div><div class="bar-track"><div class="bar-fill" style="width:90.7%;background:var(--hi)"></div></div><div class="bar-val">49 / 16</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:29.6%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+  <div class="bar-row"><div class="bar-lab">FAN-OUT</div><div class="bar-track"><div class="bar-fill" style="width:88.9%;background:var(--hi)"></div></div><div class="bar-val">48 / 19</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:35.2%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+  <div class="bar-row"><div class="bar-lab">SCATTER-GATHER</div><div class="bar-track"><div class="bar-fill" style="width:81.5%;background:var(--hi)"></div></div><div class="bar-val">44 / 13</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:24.1%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+  <div class="bar-row"><div class="bar-lab">STACK</div><div class="bar-track"><div class="bar-fill" style="width:79.6%;background:var(--hi)"></div></div><div class="bar-val">43 / 18</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:33.3%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+  <div class="bar-row"><div class="bar-lab">RANDOM</div><div class="bar-track"><div class="bar-fill" style="width:75.9%;background:var(--hi)"></div></div><div class="bar-val">41 / 15</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:27.8%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+  <div class="bar-row"><div class="bar-lab">FAN-IN</div><div class="bar-track"><div class="bar-fill" style="width:74.1%;background:var(--hi)"></div></div><div class="bar-val">40 / 12</div></div>
+  <div class="bar-row"><div class="bar-lab"></div><div class="bar-track"><div class="bar-fill" style="width:22.2%;background:var(--li)"></div></div><div class="bar-val"></div></div>
+</div>
+<p class="lead">HI가 LI보다 패턴 수가 3배 이상 많지만(370 vs 117), <strong>유형별 구성 비율은 두 세트가 비슷합니다</strong> — 세탁 밀도가 달라도 수법의 분포는 같다는 뜻입니다.</p>
+
+<p class="src">출처: <code>worktable/eda/01_structure.md</code>, <code>02_verification.md</code> F4</p>
+
+
+<h2 id="s5">5. 라벨 구조 검증 결과</h2>
+
+<h3>5.1 패턴 파일은 신뢰할 수 있습니다</h3>
+<div class="kpis">
+  <div class="kpi"><p class="k">패턴 거래가 거래 파일에 존재</p><p class="v">100%</p><p class="n">HI 3,209건 / LI 1,023건 전부 매칭</p></div>
+  <div class="kpi"><p class="k">패턴 거래의 라벨</p><p class="v">전부 1</p><p class="n">라벨 0인 패턴 거래 0건</p></div>
+</div>
+<p>패턴 파일의 거래는 전부 거래 파일에서 정확히 찾을 수 있고 예외 없이 세탁 라벨입니다. <strong>패턴 유형을 보조 라벨로 쓸 수 있다</strong>는 뜻입니다 — "이 거래는 CYCLE 패턴에 속한 세탁"처럼 세분화된 학습·평가가 가능합니다.</p>
+
+<h3>5.2 그런데 세탁 라벨의 다수는 패턴 밖에 있습니다</h3>
+<div class="legend"><span><i class="sw" style="background:var(--accent)"></i>패턴에 속한 세탁</span><span><i class="sw" style="background:var(--li)"></i>패턴 밖 세탁</span></div>
+<div class="bars">
+  <div class="bar-row"><div class="bar-lab">HI-Small</div>
+    <div class="bar-track" style="display:flex;gap:2px">
+      <div class="bar-fill" style="width:62.0%;background:var(--accent);border-radius:4px 0 0 4px"></div>
+      <div class="bar-fill" style="width:38.0%;background:var(--li)"></div>
+    </div><div class="bar-val">38.0% 밖</div></div>
+  <div class="bar-row"><div class="bar-lab">LI-Small</div>
+    <div class="bar-track" style="display:flex;gap:2px">
+      <div class="bar-fill" style="width:28.7%;background:var(--accent);border-radius:4px 0 0 4px"></div>
+      <div class="bar-fill" style="width:71.3%;background:var(--li)"></div>
+    </div><div class="bar-val">71.3% 밖</div></div>
+</div>
+
+<div class="scroll">
+<table>
+<thead><tr><th>세트</th><th class="n">패턴 밖 세탁 비율</th><th class="n">패턴 밖 / 세탁 전체</th></tr></thead>
+<tbody>
+<tr><td>HI-Small</td><td class="n">38.01%</td><td class="n">1,968 / 5,177</td></tr>
+<tr><td>HI-Medium</td><td class="n">35.44%</td><td class="n">12,487 / 35,230</td></tr>
+<tr><td>HI-Large</td><td class="n">38.84%</td><td class="n">87,610 / 225,546</td></tr>
+<tr><td>LI-Small</td><td class="n">71.30%</td><td class="n">2,542 / 3,565</td></tr>
+<tr><td>LI-Medium</td><td class="n">75.63%</td><td class="n">12,132 / 16,041</td></tr>
+<tr><td>LI-Large</td><td class="n"><strong>80.66%</strong></td><td class="n">81,143 / 100,604</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="finding">
+<p class="t">"세탁 = 8가지 패턴"이 아닙니다 — 6종 세트 모두에서</p>
+<p>LI 계열에서는 세탁 거래의 <strong>71~81%가 정형 패턴 밖</strong>이고, 규모가 커질수록 그 비율이 올라갑니다. 이 거래들은 체인이 없어 그래프 구조로 잡기 어려울 수 있고, 평가를 패턴 기준으로만 설계하면 이들을 보지 못하게 됩니다.</p>
+</div>
+
+<h4>패턴 안팎은 성격이 다릅니다</h4>
+<p><strong>패턴에 속한 세탁은 거의 전부 ACH(계좌이체)</strong>인 반면, 패턴 밖 세탁은 수단이 다양합니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>결제 수단</th><th class="n">HI 패턴 내</th><th class="n">HI 패턴 밖</th><th class="n">LI 패턴 내</th><th class="n">LI 패턴 밖</th></tr></thead>
+<tbody>
+<tr><td>ACH (계좌이체)</td><td class="n">3,208</td><td class="n">1,275</td><td class="n">1,022</td><td class="n">1,589</td></tr>
+<tr><td>Cheque (수표)</td><td class="n">0</td><td class="n">324</td><td class="n">0</td><td class="n">459</td></tr>
+<tr><td>Credit Card</td><td class="n">0</td><td class="n">206</td><td class="n">0</td><td class="n">261</td></tr>
+<tr><td>Cash (현금)</td><td class="n">0</td><td class="n">108</td><td class="n">0</td><td class="n">124</td></tr>
+<tr><td>Bitcoin</td><td class="n">1</td><td class="n">55</td><td class="n">1</td><td class="n">109</td></tr>
+</tbody>
+</table>
+</div>
+<p>금액도 다릅니다. 미국 달러 거래의 중앙값이 패턴 내 <strong>10,264달러</strong>, 패턴 밖 <strong>2,466달러</strong>로 4배 이상 차이납니다(HI 기준). 기간도 패턴 내 세탁은 18일에 걸쳐 있는 반면 패턴 밖은 앞쪽 10일에 몰려 있습니다.</p>
+<p class="lead">종합하면 패턴 밖 세탁은 <strong>더 작고, 더 다양한 수단으로, 단발성에 가깝게</strong> 일어납니다.</p>
+
+<h3>5.3 라벨의 편중과 중복</h3>
+<p>세탁 라벨의 상위 1% 송신 계좌가 전체 세탁의 <strong>19.1%(HI) / 27.6%(LI)</strong>를 차지합니다. 사전에 정한 "강한 편중" 기준(50%)에는 못 미치지만 군집은 존재합니다. 완전히 동일한 거래 행은 HI 9건, LI 8건뿐입니다.</p>
+
+<p class="src">출처: <code>worktable/eda/02_verification.md</code> A1~A5 (Small 세트 기준)</p>
+
+
+<h2 id="s6">6. 금액·통화, 그래프 구조, 데이터 품질</h2>
+
+<h3>6.1 통화와 결제 수단</h3>
+<p>통화는 <strong>15종</strong>입니다 — 법정통화 14종에 비트코인 1종. 6종 세트 모두 동일합니다. 다만 종류가 15개라고 해서 고르게 쓰이는 건 아닙니다.</p>
+
+<div class="donutrow">
+<svg class="donut" viewBox="0 0 160 160" role="img" aria-label="통화별 거래 비중 도넛 차트. 미국 달러 37퍼센트, 유로 23.1퍼센트, 나머지 13종이 39.9퍼센트">
+<g transform="rotate(-90 80 80)" fill="none" stroke-width="21">
+<circle cx="80" cy="80" r="60" stroke="var(--s1)" stroke-dasharray="137.5 377" stroke-dashoffset="0"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s2)" stroke-dasharray="85.0 377" stroke-dashoffset="-139.5"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s3)" stroke-dasharray="15.6 377" stroke-dashoffset="-226.5"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s4)" stroke-dasharray="13.3 377" stroke-dashoffset="-244.2"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s5)" stroke-dasharray="12.5 377" stroke-dashoffset="-259.5"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s6)" stroke-dasharray="12.3 377" stroke-dashoffset="-274.0"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s7)" stroke-dasharray="11.5 377" stroke-dashoffset="-288.2"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s9)" stroke-dasharray="73.3 377" stroke-dashoffset="-301.7"/>
+</g>
+<text x="80" y="76" text-anchor="middle" font-family="system-ui,sans-serif" font-size="19" font-weight="500" fill="var(--ink)">15종</text>
+<text x="80" y="94" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11.5" fill="var(--ink-3)">통화</text>
+</svg>
+<ul class="dlegend">
+<li><span class="sw" style="background:var(--s1)"></span>US Dollar <b>37.0%</b></li>
+<li><span class="sw" style="background:var(--s2)"></span>Euro <b>23.1%</b></li>
+<li><span class="sw" style="background:var(--s3)"></span>Swiss Franc <b>4.7%</b></li>
+<li><span class="sw" style="background:var(--s4)"></span>Yuan <b>4.1%</b></li>
+<li><span class="sw" style="background:var(--s5)"></span>Shekel <b>3.8%</b></li>
+<li><span class="sw" style="background:var(--s6)"></span>Rupee <b>3.8%</b></li>
+<li><span class="sw" style="background:var(--s7)"></span>UK Pound <b>3.6%</b></li>
+<li><span class="sw" style="background:var(--s9)"></span>기타 8종 <b>20.0%</b></li>
+</ul>
+</div>
+<p class="lead">기타 8종은 Ruble 3.1% · Yen 3.1% · <strong>Bitcoin 2.9%</strong> · Canadian Dollar 2.8% · Australian Dollar 2.7% · Mexican Peso 2.2% · Saudi Riyal 1.8% · Brazil Real 1.4%입니다. <strong>달러와 유로만으로 전체의 60%</strong>를 차지하고, 나머지 13종이 40%를 나눠 갖습니다. 유일한 암호화폐인 비트코인은 2.9%입니다.</p>
+
+<h4>결제 수단 7종</h4>
+<div class="donutrow">
+<svg class="donut" viewBox="0 0 160 160" role="img" aria-label="결제 수단별 거래 비중 도넛 차트. 수표 36.7퍼센트, 신용카드 26.1퍼센트, 계좌이체 11.8퍼센트 순">
+<g transform="rotate(-90 80 80)" fill="none" stroke-width="21">
+<circle cx="80" cy="80" r="60" stroke="var(--s1)" stroke-dasharray="136.4 377" stroke-dashoffset="0"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s2)" stroke-dasharray="96.2 377" stroke-dashoffset="-138.4"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s3)" stroke-dasharray="42.6 377" stroke-dashoffset="-236.6"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s4)" stroke-dasharray="34.5 377" stroke-dashoffset="-281.2"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s5)" stroke-dasharray="33.7 377" stroke-dashoffset="-317.7"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s6)" stroke-dasharray="10.7 377" stroke-dashoffset="-353.4"/>
+<circle cx="80" cy="80" r="60" stroke="var(--s7)" stroke-dasharray="8.9 377" stroke-dashoffset="-366.1"/>
+</g>
+<text x="80" y="76" text-anchor="middle" font-family="system-ui,sans-serif" font-size="19" font-weight="500" fill="var(--ink)">7종</text>
+<text x="80" y="94" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11.5" fill="var(--ink-3)">결제 수단</text>
+</svg>
+<ul class="dlegend">
+<li><span class="sw" style="background:var(--s1)"></span>Cheque 수표 <b>36.7%</b></li>
+<li><span class="sw" style="background:var(--s2)"></span>Credit Card <b>26.1%</b></li>
+<li><span class="sw" style="background:var(--s3)"></span>ACH 계좌이체 <b>11.8%</b></li>
+<li><span class="sw" style="background:var(--s4)"></span>Cash 현금 <b>9.7%</b></li>
+<li><span class="sw" style="background:var(--s5)"></span>Reinvestment <b>9.5%</b></li>
+<li><span class="sw" style="background:var(--s6)"></span>Wire 전신송금 <b>3.4%</b></li>
+<li><span class="sw" style="background:var(--s7)"></span>Bitcoin <b>2.9%</b></li>
+</ul>
+</div>
+<div class="finding">
+<p class="t">세탁은 전체 분포와 정반대로 ACH에 몰려 있습니다</p>
+<p>전체 거래에서 ACH는 11.8%에 불과한데, <strong>패턴에 속한 세탁 거래는 99.97%가 ACH</strong>입니다(5.2절). 가장 흔한 수단인 수표(36.7%)·신용카드(26.1%)는 패턴 세탁에 <strong>0건</strong>입니다. 결제 수단이 강한 신호가 될 수 있다는 뜻입니다.</p>
+</div>
+<p class="lead"><strong>결제 수단으로 통화가 결정되지는 않습니다</strong> — Bitcoin 수단 거래에도 6개 통화가 섞여 있습니다(비트코인이 99.9%지만 100%는 아님). 두 컬럼을 독립 피처로 다뤄야 합니다.</p>
+
+<h3>6.2 환율 — 고정 환율 + 소수의 이탈 거래</h3>
+<p>거래의 약 <strong>1.4%</strong>가 보낸 통화와 받은 통화가 다른 거래입니다. 두 금액의 비율로 이 데이터 세계의 환율을 역산할 수 있습니다. 검증 결과 <strong>통화쌍마다 기간 내내 변하지 않는 고정 환율이 하나씩 존재</strong>하며, 일부 거래만 거기서 크게 벗어나 있습니다.</p>
+
+<h4>근거 1 — 날짜가 바뀌어도 환율이 움직이지 않습니다</h4>
+<div class="scroll">
+<table>
+<thead><tr><th>통화쌍</th><th class="n">관측 일수</th><th>일별 중앙값 범위</th><th class="n">날짜에 따른 변동</th></tr></thead>
+<tbody>
+<tr><td>Euro → US Dollar</td><td class="n">14일</td><td>0.853400 ~ 0.853400</td><td class="n"><strong>0.0000%</strong></td></tr>
+<tr><td>US Dollar → Euro</td><td class="n">18일</td><td>1.171783 ~ 1.171784</td><td class="n"><strong>0.0000%</strong></td></tr>
+<tr><td>US Dollar → Yuan</td><td class="n">15일</td><td>0.149307 ~ 0.149307</td><td class="n"><strong>0.0002%</strong></td></tr>
+<tr><td>Yuan → US Dollar</td><td class="n">13일</td><td>6.697600 ~ 6.697623</td><td class="n"><strong>0.0003%</strong></td></tr>
+<tr><td><strong>Bitcoin → Yen</strong></td><td class="n">6일</td><td>—</td><td class="n"><strong>46.28%</strong></td></tr>
+</tbody>
+</table>
+</div>
+<p class="lead">법정통화 쌍은 2~3주 내내 일별 중앙값이 소수점 여섯째 자리까지 사실상 동일합니다(남은 미세 차이는 원본 금액이 소수 2자리로 반올림된 데서 오는 계산 오차). 두 방향의 중앙값도 정확히 역수 관계라(1 ÷ 0.1493072 = 6.69760) <strong>바탕에 하나의 고정 환율</strong>이 있음을 확인해줍니다. <strong>비트코인만 예외</strong>로 일별 중앙값 자체가 46% 움직이는 진짜 시간 변동입니다 — 암호화폐라 자연스럽습니다.</p>
+
+<h4>근거 2 — 통화쌍의 74%는 벗어난 거래가 한 건도 없습니다</h4>
+<div class="kpis">
+  <div class="kpi"><p class="k">검증한 통화쌍 (HI-Small)</p><p class="v">201개</p><p class="n">보낸 통화 → 받은 통화 방향 구분</p></div>
+  <div class="kpi"><p class="k">모든 거래가 고정 환율을 따르는 쌍</p><p class="v">149개</p><p class="n">74% — 편차 0.5% 이내</p></div>
+  <div class="kpi"><p class="k">이탈 거래가 있는 쌍</p><p class="v">52개</p><p class="n">26% — 최소 1건이 0.5% 초과</p></div>
+</div>
+<div class="note"><strong>"26%"를 오해하기 쉽습니다.</strong> 이건 <strong>이탈 거래의 비율이 아니라, 이탈 거래를 한 건이라도 가진 통화쌍의 비율</strong>입니다. 예를 들어 달러→유로는 거래가 15,838건인데 그중 <strong>단 1건</strong>만 벗어나도 이 52개에 포함됩니다. 실제 이탈 <strong>거래</strong>가 몇 건인지는 아직 모릅니다 — 하한이 52건일 뿐 상한은 미측정입니다.</div>
+
+<h4>그래서 "최대 편차"라는 숫자를 조심해야 합니다</h4>
+<div class="scroll">
+<table>
+<thead><tr><th>통화쌍</th><th class="n">거래 수</th><th class="n">고정 환율(중앙값)</th><th class="n">최대 편차</th><th class="w">의미</th></tr></thead>
+<tbody>
+<tr><td>US Dollar → Euro</td><td class="n">15,838</td><td class="n">1.1718</td><td class="n">28.01%</td><td class="w">환율은 고정, 일부 거래가 이탈</td></tr>
+<tr><td>Euro → US Dollar</td><td class="n">11,060</td><td class="n">0.8534</td><td class="n">2.53%</td><td class="w">환율은 고정, 일부 거래가 이탈</td></tr>
+<tr><td>Yuan → US Dollar</td><td class="n">6,675</td><td class="n">6.6976</td><td class="n">40.28%</td><td class="w">환율은 고정, 일부 거래가 이탈</td></tr>
+<tr><td>US Dollar → Yuan</td><td class="n">2,547</td><td class="n">0.1493</td><td class="n">0.25%</td><td class="w">이탈 거래 없음</td></tr>
+<tr><td>US Dollar → Swiss Franc</td><td class="n">2,507</td><td class="n">1.0929</td><td class="n">0.13%</td><td class="w">이탈 거래 없음</td></tr>
+</tbody>
+</table>
+</div>
+<p class="lead">위 표의 "최대 편차"는 <strong>가장 멀리 벗어난 거래 한 건</strong>과의 거리일 뿐입니다. 달러→위안 0.25%와 위안→달러 40.28%가 극단적으로 달라 보이지만 <strong>두 쌍의 환율은 서로 역수인 같은 값</strong>이고, 차이는 이탈 거래가 어느 방향에 끼어 있느냐에서 옵니다. 이 지표만 보고 "환율이 불안정하다"고 읽으면 안 됩니다.</p>
+
+<h4>이탈 거래의 규모와 세탁 라벨 — 측정 결과</h4>
+<p>고정 환율이 존재하는데 크게 벗어난 거래가 있다는 건 그 자체로 이상 거래이고, <strong>비정상 환율로 가치를 이전하는 것은 실제 자금세탁 수법</strong>이기도 합니다. 그래서 이탈 거래가 몇 건이고 거기에 세탁이 몰려 있는지를 측정했습니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>항목</th><th class="n">HI-Small</th><th class="n">LI-Small</th></tr></thead>
+<tbody>
+<tr><td>통화가 다른 거래 (분모)</td><td class="n">72,170</td><td class="n">98,876</td></tr>
+<tr><td>이탈 거래 (기준값 대비 0.5% 초과)</td><td class="n">1,691 (2.34%)</td><td class="n">3,332 (3.37%)</td></tr>
+<tr><td><strong>이탈 거래 중 세탁 라벨</strong></td><td class="n"><strong>0건</strong></td><td class="n"><strong>0건</strong></td></tr>
+<tr><td>비교 기준선 — 통화가 다른 거래 전체의 세탁 라벨</td><td class="n"><strong>0건</strong></td><td class="n"><strong>0건</strong></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="finding">
+<p class="t">세탁 거래 중 통화가 다른 것은 한 건도 없습니다</p>
+<p>이탈 거래에 세탁이 없는 건 표본이 부족해서가 아닙니다. <strong>Small 두 세트 모두, 세탁 라벨이 붙은 거래는 예외 없이 보낸 통화와 받은 통화가 같습니다.</strong> HI 5,177건·LI 3,565건 전부가 그렇습니다(원천 파일 독립 재계산으로 확인). 통화가 다른 거래는 17만 건이나 있는데 그중 세탁은 0건입니다.</p>
+<p>따라서 "이탈 거래에 세탁이 몰려 있는가"라는 질문은 <strong>판정 자체가 불가능</strong>합니다 — 비교할 세탁 거래가 양쪽 모두 0이기 때문입니다. 환율 이탈은 실재하지만(2.3~3.4%) 세탁 탐지의 신호는 아닙니다.</p>
+</div>
+
+<div class="gap">
+<p class="t">이건 합성 데이터의 특성으로 보이며, 현실과 정반대입니다</p>
+<p>실제 자금세탁은 국제 송금과 환전을 적극적으로 활용합니다. 그런데 이 데이터에서는 <strong>"통화가 다르면 100% 정상"</strong>이 성립합니다. 모델은 이 규칙을 즉시 학습할 것이고, 그렇게 학습된 모델은 <strong>현실에서 국제 세탁을 통째로 놓치게</strong> 됩니다.</p>
+<p>데이터 생성기가 세탁 시나리오를 단일 통화 안에서만 만든 결과로 보입니다. 이 괴리를 어떻게 다룰지는 팀 논의 사항입니다(화두 42).</p>
+<p class="src">HI-Small·LI-Small 기준. Medium·Large는 이번 측정 범위 밖입니다.</p>
+</div>
+
+<h4>고정·시변 판정 결과</h4>
+<div class="scroll">
+<table>
+<thead><tr><th>분류</th><th class="n">HI-Small</th><th class="n">LI-Small</th><th class="w">의미</th></tr></thead>
+<tbody>
+<tr><td><strong>고정</strong></td><td class="n">78쌍</td><td class="n">79쌍</td><td class="w">일별 중앙값이 기간 내내 안정 — 기준 환율표에 수록</td></tr>
+<tr><td><strong>시변</strong></td><td class="n">1쌍</td><td class="n">3쌍</td><td class="w">비트코인 관련 쌍</td></tr>
+<tr><td>판정 유보</td><td class="n">122쌍</td><td class="n">113쌍</td><td class="w">거래가 너무 적어 일별 중앙값을 신뢰할 수 없음 — 억지로 분류하지 않음</td></tr>
+<tr><td>합계</td><td class="n">201쌍</td><td class="n">195쌍</td><td class="w">방향 구분</td></tr>
+</tbody>
+</table>
+</div>
+<p class="lead">거래가 충분해 판정이 가능한 쌍은 <strong>거의 전부 고정</strong>입니다(HI 78/79, LI 79/82). 시변으로 판정된 것은 비트코인 관련 쌍뿐입니다. 나머지는 판정을 미룬 것이지 "불안정하다"는 뜻이 아닙니다.</p>
+
+<h4>금액 데이터의 성질</h4>
+<ul class="plain">
+<li><strong>0원·마이너스 금액이 한 건도 없습니다.</strong> 로그 변환을 바로 적용할 수 있습니다.</li>
+<li><strong>수수료 개념이 없습니다.</strong> 통화가 같은 거래는 보낸 금액과 받은 금액이 100% 일치합니다(전수 확인).</li>
+<li><strong>극단적 롱테일입니다.</strong> 중앙값은 약 1,400인데 상위 0.1%는 4억을 넘고 최대값은 조 단위입니다(통화 혼합 참고값).</li>
+<li><strong>소수점 정밀도는 비트코인만 6자리</strong>, 나머지는 2자리입니다. 금액 계산은 부동소수점이 아닌 decimal로 처리해야 손실이 없습니다.</li>
+</ul>
+
+<h3>6.3 그래프 구조</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>항목</th><th class="n">HI-Small</th><th class="n">LI-Small</th><th class="w">의미</th></tr></thead>
+<tbody>
+<tr><td>계좌 참조 무결성</td><td class="n" colspan="2">누락 0건</td><td class="w">거래의 모든 계좌가 계좌 파일에 존재 — 계좌 파일을 노드 집합으로 쓸 수 있음</td></tr>
+<tr><td>계좌번호가 여러 은행에 등장</td><td class="n">8건</td><td class="n">4건</td><td class="w">노드 키는 계좌번호 단독이 아니라 <strong>(은행, 계좌) 복합 키</strong>여야 함</td></tr>
+<tr><td>계좌를 2개 이상 가진 엔티티</td><td class="n">38.2%</td><td class="n">35.4%</td><td class="w">최대 7,820개 — 노드를 계좌로 둘지 엔티티로 둘지가 결정 사항</td></tr>
+<tr><td>자기 자신에게 보내는 거래</td><td class="n">11.6%</td><td class="n">11.6%</td><td class="w">Reinvestment 수단은 전부 여기 해당하지만 역은 아님</td></tr>
+<tr><td>HI ↔ LI 계좌 겹침</td><td class="n" colspan="2">4건</td><td class="w">두 세트를 학습·평가로 나눠 쓸 때 이 4개만 처리하면 누수 없음</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="gap">
+<p class="t">계좌 파일에는 실질적인 속성 정보가 없습니다</p>
+<p>계좌 파일의 컬럼은 은행명·은행 ID·계좌번호·엔티티 ID·엔티티명 <strong>전부 식별자</strong>입니다. 나이·계좌 종류·개설일·잔액 같은 속성이 하나도 없습니다. 따라서 <strong>노드 피처를 거래 이력에서 직접 만들어야 합니다</strong> — 그리고 그 집계에 미래 데이터가 섞이면 정보 누수가 됩니다(7장 참조).</p>
+</div>
+
+<h3>6.4 반드시 처리해야 할 데이터 문제</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>발견</th><th>수치</th><th class="w">대응</th></tr></thead>
+<tbody>
+<tr><td><strong>은행 ID에 선행 0이 섞임</strong></td><td class="n">표기 30,528 → 실제 30,470</td><td class="w">같은 은행이 <code>10</code>, <code>010</code>, <code>0010</code>으로 등장. 정규화하지 않으면 계좌–은행 대조가 100% 실패</td></tr>
+<tr><td><strong>파일이 시간순 정렬이 아님</strong></td><td class="n">인접 쌍의 47.6% 역전</td><td class="w">최대 12,156분(약 8.4일) 뒤집힘. 시간 기반 처리 전 명시적 정렬 필수</td></tr>
+<tr><td><strong>시각이 분 단위, 동시각 거래 대량</strong></td><td class="n">전체의 99.99%</td><td class="w">한 시각에 최대 11,193건. 분 단위 안에서 거래 순서는 복원 불가</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>6.5 세트 사이의 관계 — 예상과 달랐던 부분</h3>
+<p>Small이 Medium의 일부이고 Medium이 Large의 일부일 것이라 예상했지만 <strong>사실이 아니었습니다.</strong></p>
+<div class="scroll">
+<table>
+<thead><tr><th>비교</th><th class="n">HI</th><th class="n">LI</th></tr></thead>
+<tbody>
+<tr><td>Small 계좌 중 Medium에 없는 것</td><td class="n">518,562 / 518,581</td><td class="n">712,671 / 712,688</td></tr>
+<tr><td>Small 거래 표본 10만 건 중 Medium에 없는 것</td><td class="n">100,000 (100%)</td><td class="n">100,000 (100%)</td></tr>
+<tr><td>Medium 거래 표본 10만 건 중 Large에 없는 것</td><td class="n">99,943 (99.9%)</td><td class="n">99,951 (100%)</td></tr>
+</tbody>
+</table>
+</div>
+<div class="finding">
+<p class="t">"작게 시작해서 키우기"가 성립하지 않습니다</p>
+<p>세 세트는 크기만 다른 같은 데이터가 아니라 <strong>각각 독립적으로 생성된 별개 데이터</strong>입니다. "Small에서 실험하고 Large로 확장"은 데이터를 늘리는 게 아니라 다른 데이터로 갈아타는 것이며, 어느 세트를 쓸지가 그 자체로 설계 결정입니다.</p>
+</div>
+
+<h4>그런데 계좌 명부는 Medium과 Large가 거의 같습니다</h4>
+<p>거래는 완전히 다른데 <strong>계좌 키는 99.99%가 겹칩니다.</strong> 6종을 15개 쌍으로 전부 교차 비교한 결과입니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>관계</th><th class="n">계좌 키 겹침</th><th class="n">같은 키의 소유자 일치</th><th class="w">해석</th></tr></thead>
+<tbody>
+<tr><td>Medium ↔ Large (같은 계열)</td><td class="n">99.99%</td><td class="n">0%</td><td class="w">같은 계좌 명부에서 생성했지만 소유자와 거래는 새로 만듦</td></tr>
+<tr><td>HI 계열 ↔ LI 계열</td><td class="n">최대 0.71%</td><td class="n">0%</td><td class="w">사실상 무관 — 겹치는 건 우연한 키 충돌</td></tr>
+<tr><td>Small ↔ 나머지</td><td class="n">0.01% 미만</td><td class="n">0%</td><td class="w">사실상 무관</td></tr>
+</tbody>
+</table>
+</div>
+<div class="finding">
+<p class="t">계좌 키가 같아도 같은 계좌가 아닙니다</p>
+<p>겹치는 계좌 키의 <strong>소유자(엔티티) 일치율이 15개 쌍 전부 0%</strong>입니다. 세트를 합치면 서로 무관한 계좌가 같은 키를 가졌다는 이유로 하나로 뭉쳐집니다. HI 계열과 LI 계열에 동시에 등장하는 계좌 키는 <strong>14,663개</strong>이며, 이들을 분리하려면 계좌 키에 세트 구분을 붙여야 합니다(화두 7).</p>
+</div>
+
+<h3>6.6 Small 결론이 큰 세트에서도 성립하는가</h3>
+<p class="lead">3~6장의 결론 하나하나에 대해 판정 기준을 <strong>미리 고정한 뒤</strong> 6종 세트에 적용해 검증했습니다. 28개 항목의 결과입니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th class="n">개수</th><th>판정</th><th class="w">해당 항목</th></tr></thead>
+<tbody>
+<tr><td class="n">20</td><td><strong>성립</strong></td><td class="w">패턴 매칭 100%, 패턴 밖 세탁 존재, 환율 비상수, 수수료 없음, 0·음수 없음, 참조 무결성, 계좌번호 은행 간 중복, 세탁의 은행 경계 통과, 단일 은행 완결 패턴 희소, 금액 비중 &gt; 건수 비중 등</td></tr>
+<tr><td class="n">4</td><td><strong>경향 차이</strong><br>(판정은 같으나 값이 규모에 따라 이동)</td><td class="w">세탁 관련 계좌 비율(1.2%→10.5%), 자기 송금 비율(11.6%→6.1%), 시간 역전 폭, 세탁 0건 은행 비율(95.9%→94.8%)</td></tr>
+<tr><td class="n">2</td><td><strong>비교 제한</strong><br>(규모가 달라 직접 비교 불가)</td><td class="w">은행 집중도 지표, 상위 3개 은행 관점 규모 — 은행 수가 3만에서 12만으로 바뀌어 같은 잣대로 우열을 논할 수 없음</td></tr>
+<tr><td class="n">1</td><td><strong>불성립</strong></td><td class="w"><strong>"LI가 HI보다 데이터가 크다"</strong> — Small에서만 사실이고 Medium·Large에서는 역전</td></tr>
+<tr><td class="n">1</td><td>인용</td><td class="w">세트 포함 관계(6.5절) — 이전 단계 검증 결과 재사용</td></tr>
+</tbody>
+</table>
+</div>
+<div class="finding">
+<p class="t">모델 설계에 영향을 주는 결론은 규모와 무관하게 유지됩니다</p>
+<p>세탁이 은행 경계를 넘는 비율(98.0~99.3%), 단일 은행에서 끝나는 패턴의 희소성(0~1.1%), 패턴 밖 세탁의 존재는 6종 전부에서 같은 방향입니다. 반면 <strong>"LI가 더 크다"는 Small 한정 사실</strong>이므로 세트 선택 논의(화두 6)에서 근거로 쓰면 안 됩니다.</p>
+</div>
+
+<p class="src">출처: <code>worktable/eda/02_verification.md</code>(Small 26항목), <code>03_scale.md</code>(6종 × 28항목 교차 검증 + 통합 세트 검토) — 둘 다 독립 재계산 교차검수 통과</p>
+
+
+<h2 id="s7">7. 서비스 시나리오가 만드는 제약</h2>
+<p class="lead">1.2절의 시나리오를 구현하려 할 때 걸리는 제약들입니다. 데이터 자체의 성질이 아니라 <strong>"거래 한 건이 들어와 판정된다"는 요구에서 논리적으로 따라 나오는 것</strong>이며, 모델 설계 화두(8.3절)의 전제가 됩니다.</p>
+
+<h3>7.1 판정 시점의 벽</h3>
+<div class="fig">
+<svg viewBox="0 0 940 200" role="img" aria-label="시간축 위에서 판정 시점을 기준으로 왼쪽은 사용 가능한 과거 정보, 오른쪽은 사용할 수 없는 미래 정보로 나뉘고, 세탁 체인이 그 경계를 가로지르는 그림">
+<g font-family="system-ui,sans-serif" font-size="13">
+<rect x="30" y="46" width="440" height="46" rx="6" fill="var(--surface-2)"/>
+<rect x="470" y="46" width="440" height="46" rx="6" fill="var(--warn-bg)"/>
+<line x1="470" y1="26" x2="470" y2="150" stroke="var(--ink)" stroke-width="2"/>
+<text x="470" y="20" text-anchor="middle" fill="var(--ink)" font-size="13.5">판정 시점 t</text>
+<text x="250" y="74" text-anchor="middle" fill="var(--ink-2)">과거 — 쓸 수 있는 정보</text>
+<text x="690" y="74" text-anchor="middle" fill="var(--warn-ink)">미래 — 쓰면 안 되는 정보</text>
+<line x1="30" y1="120" x2="910" y2="120" stroke="var(--line-2)" stroke-width="1.5"/>
+<g fill="var(--accent)">
+  <circle cx="150" cy="120" r="7"/><circle cx="300" cy="120" r="7"/><circle cx="470" cy="120" r="9"/>
+  <circle cx="600" cy="120" r="7" opacity=".38"/><circle cx="730" cy="120" r="7" opacity=".38"/><circle cx="850" cy="120" r="7" opacity=".38"/>
+</g>
+<g stroke="var(--accent)" stroke-width="1.6" fill="none">
+  <path d="M157 120 L293 120"/><path d="M307 120 L461 120"/>
+  <path d="M479 120 L593 120" opacity=".38" stroke-dasharray="4 4"/><path d="M607 120 L723 120" opacity=".38" stroke-dasharray="4 4"/><path d="M737 120 L843 120" opacity=".38" stroke-dasharray="4 4"/>
+</g>
+<text x="470" y="152" text-anchor="middle" fill="var(--ink)" font-size="12.5">지금 판정할 거래</text>
+<text x="228" y="152" text-anchor="middle" fill="var(--ink-3)" font-size="12.5">같은 체인의 앞선 거래</text>
+<text x="725" y="152" text-anchor="middle" fill="var(--ink-3)" font-size="12.5">같은 체인의 이후 거래 (아직 없음)</text>
+<text x="470" y="184" text-anchor="middle" fill="var(--ink-2)" font-size="13">정답 라벨은 체인 전체를 본 뒤 붙었지만, 판정은 왼쪽 절반만 보고 해야 합니다</text>
+</g>
+</svg>
+<p class="cap">세탁 체인은 시간에 걸쳐 벌어지고, 판정은 그 중간에 이뤄집니다.</p>
+</div>
+
+<p>데이터의 <code>Is Laundering</code> 라벨은 시뮬레이터가 <strong>체인 전체를 만들어놓고 사후에 붙인 것</strong>입니다. 패턴에 속한 거래는 첫 거래부터 전부 라벨 1입니다. 그런데 실제 판정 시점에는 뒤따를 거래를 알 수 없습니다.</p>
+<p>여기서 두 가지가 따라 나옵니다.</p>
+<ul class="plain">
+<li><strong>학습도 추론과 같은 조건이어야 합니다.</strong> 거래 t를 학습 샘플로 쓸 때 t 이전 데이터로만 그래프와 노드 피처를 만들어야 합니다. 전체 기간으로 계좌 통계를 미리 계산해두면 미래가 새어 들어가고, 그 모델은 배포하면 무너집니다.</li>
+<li><strong>모델이 처음 보는 계좌를 다룰 수 있어야 합니다.</strong> 전체 그래프를 한 번에 학습해 계좌마다 임베딩을 외우는 방식은 새 계좌가 오면 쓸 수 없습니다. 이웃 정보로 그 자리에서 임베딩을 만들어내는 계열이어야 합니다.</li>
+</ul>
+
+<h3>7.2 처리량 요건</h3>
+<p>데이터의 거래량을 시간으로 나누면 서비스가 감당해야 할 유입 속도가 나옵니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>세트</th><th class="n">기간</th><th class="n">하루 평균 거래</th><th class="n">초당 평균</th></tr></thead>
+<tbody>
+<tr><td>HI-Small</td><td class="n">약 17.7일</td><td class="n">약 287,000건</td><td class="n">약 3.3건</td></tr>
+<tr><td>HI-Large</td><td class="n">약 165일</td><td class="n">약 1,089,000건</td><td class="n">약 12.6건</td></tr>
+</tbody>
+</table>
+</div>
+<p class="lead">평균값이며 피크는 이보다 높습니다. 이 정도 유입에서 거래마다 그래프를 조회하고 추론까지 돌릴 수 있는지가 실시간 판정 가능 여부를 가릅니다.</p>
+
+<h3>7.3 아직 확인하지 못한 것 <span class="tag pending">측정 진행 중</span></h3>
+<p class="lead">지금까지의 분석은 "데이터가 어떻게 생겼나"를 봤습니다. 아래는 <strong>서비스 시나리오에서 역산한 항목</strong>으로, 현재 측정이 진행 중입니다. 모델 설계 화두 중 상당수가 이 수치 없이는 결정하기 어렵습니다.</p>
+<p class="lead">같은 목록에 있던 <strong>환율 이탈 거래</strong>와 <strong>계좌 통화 일관성</strong>은 측정이 끝나 6.2절과 화두 8에 반영했습니다.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>확인할 것</th><th class="w">왜 필요한가</th><th class="w">관련 화두</th></tr></thead>
+<tbody>
+<tr><td><strong>거래 시점에 계좌가 가진 과거 이력의 분포</strong></td><td class="w">첫 거래(이력 0)인 비율이 크면 그래프 신경망이 쓸 이웃이 없어 무력해집니다. 특히 세탁 거래의 계좌가 그 시점에 이력을 갖고 있는지가 핵심입니다 — 세탁용 계좌가 만들어지자마자 쓰인다면 그래프 접근의 전제가 흔들립니다.</td><td class="w">13, 14, 18</td></tr>
+<tr><td><strong>계좌별 차수와 2단계 이웃 크기 분포</strong></td><td class="w">허브 계좌(거래의 8.9%를 차지하는 은행 등)에 걸리면 2단계 이웃이 수만 개로 폭발할 수 있습니다. 이 분포가 응답 시간의 상한을 결정합니다.</td><td class="w">2, 19, 20, 28</td></tr>
+<tr><td><strong>패턴 블록의 시작~끝 시간 폭</strong></td><td class="w">세탁 체인이 몇 시간에 걸치는지 며칠인지에 따라 조회 시간 창이 정해집니다. 창이 짧으면 패턴을 못 보고, 길면 그래프가 커집니다. 현재 "패턴당 평균 8.7건"은 알지만 그게 얼마 동안 벌어지는지는 모릅니다.</td><td class="w">17, 19</td></tr>
+<tr><td><strong>세탁 거래가 자기 체인에서 몇 번째인지</strong></td><td class="w">첫 번째 거래라면 판정 시점에 앞선 단서가 하나도 없습니다. 이 분포가 "얼마나 일찍 잡을 수 있는가"의 상한입니다.</td><td class="w">3, 23, 24</td></tr>
+<tr><td><strong>패턴 밖 세탁이 거래 속성만으로 구분되는가</strong></td><td class="w">세탁의 38~71%인 이 거래들은 체인이 없어 이웃 정보가 도움이 안 될 수 있습니다. 금액·수단·시간만으로 구분이 안 되면 어떤 모델로도 잡기 어렵다는 뜻이고, 목표 성능을 현실적으로 잡는 근거가 됩니다.</td><td class="w">23, 24, 26</td></tr>
+<tr><td><strong>같은 계좌쌍의 반복 거래 비율</strong></td><td class="w">반복이 많으면 "이 상대와 처음 거래한다"가 강력한 신호가 됩니다.</td><td class="w">15, 16</td></tr>
+</tbody>
+</table>
+</div>
+
+
+<h2 id="s8">8. 논의 화두 42가지</h2>
+<p class="lead">각 화두에 <strong>답을 정해두지 않았습니다.</strong> 관련된 데이터 상황과 논의에서 갈리는 지점만 적었으니, 선택은 팀 논의로 정하면 됩니다. 화두들은 서로 연결돼 있어 하나를 정하면 다른 것의 선택지가 좁아지기도 합니다.</p>
+
+<h3>8.1 서비스를 무엇으로 정의할 것인가</h3>
+
+<div class="topic">
+<p class="q">화두 1 — 판정의 단위는 무엇인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">라벨은 거래 1건마다 붙어 있습니다. 하지만 세탁 시나리오 하나는 평균 8.7건의 거래로 이뤄지고, 세탁 계좌는 전체의 0.65~0.77%입니다. 즉 거래·사건·계좌 세 가지 단위가 모두 성립합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>거래 하나씩 판정할 것인가</li><li>연관 거래를 묶어 하나의 케이스로 낼 것인가</li><li>계좌 단위 위험도를 함께 낼 것인가</li></ul>
+<p class="lbl">영향</p><p class="d">평가 지표(화두 23~24), 대시보드 화면(화두 29), 모델 구조(화두 14)가 여기에 따라 달라집니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 2 — 판정 시점과 응답 시간을 어떻게 잡을 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">유입은 초당 3~13건 수준입니다(7.2절). 다만 그래프 신경망은 이웃 조회가 필요해 거래마다 즉시 응답하기가 까다롭고, 이웃 크기 분포는 아직 측정하지 않았습니다(7.3절).</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>거래 도착 즉시 판정</li><li>수 분~수 시간 지연 허용</li><li>하루 단위 배치</li><li>실시간 규칙 + 배치 그래프 분석의 조합</li></ul>
+<p class="lbl">영향</p><p class="d">데모 방식, 인프라 요구사항, 그래프 저장소 설계(화두 28)가 달라집니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 3 — "이미 벌어진 세탁"을 찾을 것인가, "벌어지려는 세탁"을 예측할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">라벨은 체인 전체를 본 뒤 사후에 붙었고, 체인의 첫 거래도 이미 라벨 1입니다(7.1절). 그대로 학습하면 모델이 답하는 질문은 "이 거래가 세탁인가"입니다. 전조 예측을 하려면 라벨을 다시 정의해야 합니다 — 예컨대 블록의 앞부분만 양성으로 삼는 식입니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>기존 라벨 그대로 사후 탐지</li><li>라벨을 재정의해 전조 예측</li><li>기본 탐지를 먼저 만들고 전조를 확장 과제로</li></ul>
+<p class="lbl">영향</p><p class="d">타깃 정의(화두 23), 평가 설계(화두 24~25), 일정 전체에 영향을 줍니다. 세탁의 38~71%는 체인이 없어 전조 개념이 적용되지 않는다는 점도 고려 대상입니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 4 — 제품 범위를 어디까지로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">현업 조사 결과 실제 AML 시스템은 탐지 → 경보 검토 → 케이스 조사 → 보고(STR)로 이어집니다. 우리 데이터는 탐지 단계까지만 지원합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>탐지와 경보 확인까지</li><li>케이스 조사 기능 포함</li><li>STR(의심거래보고) 작성까지</li></ul>
+<p class="lbl">영향</p><p class="d">중간발표 MVP 범위(화두 40)와 직결됩니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 5 — 사용자 역할별 화면과 권한을 어디까지 구현할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">상정 사용자는 모니터링팀·분석팀·관리자·보고책임자입니다. 현업 조사에 따르면 역할마다 볼 수 있는 데이터 범위와 수행 가능한 행위가 다릅니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>단일 화면으로 시작</li><li>역할별 화면 분리</li><li>권한 체계까지 구현</li></ul>
+</div>
+
+<h3>8.2 학습 데이터를 어떻게 준비할 것인가</h3>
+
+<div class="topic">
+<p class="q">화두 6 — 어느 세트로 학습할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">6종은 서로 부분집합이 아니라 독립 생성 데이터입니다(6.5절). 따라서 "나중에 키우기"가 안 되고 처음부터 골라야 합니다. HI는 세탁 밀도가 LI의 약 2배이며 이 관계는 3개 크기 모두에서 유지됩니다. <strong>다만 "LI가 데이터가 더 많다"는 Small에서만 사실입니다</strong> — Medium·Large에서는 HI가 더 큽니다(6.6절 불성립 항목). Large는 파일 하나가 16GB에 1.8억 건입니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>세탁 밀도(HI)를 우선할 것인가 — 규모 우위는 크기에 따라 뒤집히므로 단순한 밀도↔규모 트레이드오프가 아님</li><li>다루기 쉬운 Small vs 규모가 큰 Medium·Large</li><li>두 세트를 학습·평가 트랙으로 분리 (HI-Small ↔ LI-Small은 겹치는 계좌 4개만 처리하면 누수 없음)</li><li>Medium과 Large는 계좌 명부를 99.99% 공유하므로(6.4절) 이 둘을 학습·평가로 나누면 계좌 누수가 발생함</li></ul>
+<p class="lbl">영향</p><p class="d">인프라 요구, 일정, 이후 모든 전처리가 여기서 시작됩니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 7 — 6종을 전부 합친 통합 세트를 쓸 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">6종을 합치면 거래 <strong>4.31억 건</strong>, 세탁 라벨 <strong>386,163건</strong>(비율 0.0896%)이 됩니다. 계좌는 단순 합 957만이 아니라 <strong>실제 합집합 542만</strong>이고, 엔티티는 세트 간 ID가 호환되지 않아 <strong>304만</strong>(세트별 합)이 정본입니다. 15개 쌍 전수 조사 결과:</p>
+<ul>
+<li><strong>HI 계열 ↔ LI 계열은 사실상 분리</strong> — 겹침 최대 0.71%. 합쳐도 메시지 전파가 두 계열을 넘지 못하므로 "더 큰 그래프"가 아니라 <strong>"여러 그래프를 함께 학습"</strong>하는 것이며, 효과는 표본 증가에 한정됩니다.</li>
+<li><strong>Medium ↔ Large는 성격이 다름</strong> — 계좌 키를 99.99% 공유하지만 소유자 배정과 거래는 새로 생성됐습니다. 합치면 같은 계좌에 <strong>서로 다른 세계의 거래 이력이 섞입니다.</strong></li>
+<li><strong>겹치는 키의 소유자 일치율은 15개 쌍 전부 0%</strong> — HI↔LI에 동시 등장하는 계좌 키 14,663개는 무관한 계좌의 우연한 충돌입니다.</li>
+</ul>
+<p class="lbl">갈리는 지점</p>
+<ul><li>통합해서 학습 표본을 늘릴 것인가 — 얻는 것이 "표본 증가"뿐이라는 점을 감안해서</li><li>합칠 경우 계좌 키에 세트 구분을 붙일 것인가 (안 붙이면 무관한 계좌 14,663쌍이 가짜로 연결됨)</li><li>Medium과 Large를 같이 쓸 것인가 — 같은 계좌에 다른 시나리오의 이력을 합성하는 것이 타당한가</li></ul>
+<p class="lbl">아직 모르는 것</p>
+<p class="d">가짜로 연결될 <strong>거래 건수</strong>는 산출하지 않았습니다 — 계좌 파일만으로는 계산할 수 없고 거래 파일 재스캔이 필요해, 병합을 결정한 뒤 별도로 측정해야 합니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 8 — 모델에 "통화를 통합한 환산 금액" 피처가 진짜 필요한가?</p>
+<p class="lbl">먼저 기록해둘 결정</p>
+<p class="d">서비스 화면 표시용 통화 환산은 <strong>하지 않기로 결정</strong>했습니다(2026-08-05). 따라서 이 화두는 <strong>모델 차원만</strong> 다룹니다.</p>
+<p class="lbl">데이터 상황</p>
+<p class="d"><strong>고정 환율표를 만들 수 있습니다.</strong> 판정 가능한 통화쌍은 거의 전부 기간 내내 환율이 고정이며(HI 78/79), 비트코인 관련 쌍만 시변입니다(6.2절). 기준 환율표는 이미 산출돼 있습니다.</p>
+<p class="d"><strong>그런데 세탁 탐지 관점에서는 환산의 필요성이 크게 낮아졌습니다.</strong> 세탁 라벨이 붙은 거래는 <strong>전부 동일 통화</strong>이고(6.2절), 통화가 다른 거래 17만 건 중 세탁은 0건입니다. 즉 여러 통화에 걸친 금액 비교가 세탁 신호와 직결되지 않습니다. 또 계좌의 <strong>98.2~98.4%는 단일 통화로만 거래</strong>하므로(아래), 계좌 집계 피처도 통화별로 나눠 만들면 대부분 해결됩니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>계좌 통화 일관성</th><th class="n">HI-Small</th><th class="n">LI-Small</th></tr></thead>
+<tbody>
+<tr><td>단일 통화로만 거래하는 계좌</td><td class="n">98.19%</td><td class="n">98.41%</td></tr>
+<tr><td>2종 이상 통화를 쓰는 계좌</td><td class="n">9,298 (1.81%)</td><td class="n">11,214 (1.59%)</td></tr>
+<tr><td>└ 최대 사용 통화 수</td><td class="n">10종</td><td class="n">6종</td></tr>
+<tr><td>다통화 계좌가 관여한 거래</td><td class="n">9.38%</td><td class="n">8.79%</td></tr>
+</tbody>
+</table>
+</div>
+<p class="d">환산값이 쓰일 곳을 분해해보면 필요성이 사용처마다 다릅니다.</p>
+<ul>
+<li><strong>거래 금액 피처</strong> — 통화별 로그 변환 + 표준화로 "그 통화에서 이상한 크기"를 만들면 단위 문제가 사라집니다. 환산 없이 목적 달성이 가능하고, GNN이 이웃 금액을 집계할 때도 표준화된 값은 단위가 없어 섞을 수 있습니다.</li>
+<li><strong>계좌 집계 피처(총 유출입 규모)</strong> — 계좌의 98% 이상이 단일 통화로만 거래하므로 통화별 집계로 대부분 해결됩니다. 환산이 필요한 계좌는 1.6~1.8%, 그 계좌들이 관여한 거래는 8.8~9.4%로 한정됩니다.</li>
+<li><strong>세탁 체인 추적(받은 만큼 내보냈나)</strong> — 같은 통화 구간은 금액이 보존되고(수수료 0건 확인), 환전 구간은 그 거래 자체가 실제 적용 환율(보낸 금액 ÷ 받은 금액)을 담고 있어 외부 환율이 필요 없습니다. 오히려 외부 환율을 끼우면 데이터의 실제 값과 어긋난 잔차가 생깁니다.</li>
+</ul>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li>통화별 표준화만으로 갈 것인가 (환산 피처 없음)</li>
+<li>환산 금액 피처를 추가할 것인가 — 추가한다면 산출된 고정 환율표를 쓸 것인가, 비트코인은 어떻게 예외 처리할 것인가</li>
+<li>다통화 계좌 1.6~1.8%만을 위해 환산 체계를 도입할 가치가 있는가</li>
+<li>이 선택을 논의로 정할 것인가, 두 모델을 비교하는 실험으로 정할 것인가</li>
+</ul>
+<p class="lbl">폐기된 선택지</p>
+<p class="d"><strong>"환율 이탈을 피처로 쓴다"는 안은 근거가 사라졌습니다</strong> — 이탈 거래에 세탁이 0건이기 때문입니다(6.2절). 다만 Small 한정 결과이며, 세탁이 전부 동일 통화라는 사실 자체는 별도 논점입니다(화두 42).</p>
+<p class="lbl">영향</p><p class="d">극단값 처리(화두 9)와 금액 관련 피처 설계(화두 15·16)의 전제입니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 9 — 극단값을 어떻게 다룰 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">금액이 극단적 롱테일입니다. 중앙값 약 1,400, 상위 0.1%는 4억 초과, 최대는 조 단위입니다(통화 혼합 참고값).</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>로그 변환만으로 충분한가</li><li>분위수 클리핑을 추가할 것인가</li><li>비정상적으로 큰 금액 자체가 탐지 신호일 수 있다는 점을 어떻게 반영할 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 10 — 시간 정렬과 시간 단위를 어떻게 처리할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">파일이 시간순이 아니고(인접 쌍의 47.6% 역전, 최대 8.4일 뒤집힘), 시각은 분 단위인데 거래의 99.99%가 다른 거래와 같은 시각입니다(한 시각에 최대 11,193건).</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>정렬을 어느 단계에서 수행할 것인가</li><li>시간 피처를 시(hour) 단위로 만들 것인가 일 단위로 만들 것인가</li><li>분 단위 안의 순서를 복원할 수 없다는 제약을 어떻게 다룰 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 11 — 중복 거래와 자기 송금을 어떻게 처리할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">완전히 동일한 거래 행은 HI 9건, LI 8건으로 매우 적습니다. 자기 자신에게 보내는 거래는 전체의 11.6%이며, Reinvestment 수단은 전부 여기 해당하지만 역은 아닙니다(HI 기준 11만 건은 재투자가 아닌 자기 송금).</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>중복 행을 남길 것인가 제거할 것인가</li><li>자기 송금을 그래프에 유지할 것인가, 별도 엣지 타입으로 둘 것인가, 제거할 것인가 (제거하면 Reinvestment 수단이 통째로 사라짐)</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 12 — 데이터 저장 형식과 처리 도구를 무엇으로 통일할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">원본은 CSV이며 Large는 파일 하나가 16GB입니다. 팀 5명이 같은 전처리 결과를 공유해야 합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>CSV 유지 / Parquet 등으로 변환 / 분석용 DB 적재</li><li>중간 산출물의 저장 위치와 공유 방식</li></ul>
+</div>
+
+<h3>8.3 그래프와 모델을 어떻게 설계할 것인가</h3>
+
+<div class="topic">
+<p class="q">화두 13 — 무엇을 노드로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">계좌번호가 여러 은행에 등장하므로(HI 8건) 계좌를 노드로 삼는다면 키는 (은행, 계좌) 복합 키여야 합니다. 엔티티의 38.2%가 계좌를 2개 이상 보유하며 최대 7,820개입니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>계좌를 노드로</li><li>엔티티(사람·기업)를 노드로</li><li>둘 다 노드로 두는 이종 그래프</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 14 — 거래를 어떻게 표현할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">우리가 분류하려는 대상은 거래인데, 그래프 신경망은 일반적으로 노드를 분류합니다. 이 간극을 메우는 방식이 여러 가지입니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>거래를 엣지로 두고 엣지를 분류</li><li>거래를 노드로 변환하고 계좌를 공유하는 거래끼리 연결 (그래프가 훨씬 커짐)</li><li>계좌를 분류한 뒤 그 계좌의 거래로 매핑</li></ul>
+<p class="lbl">영향</p><p class="d">아키텍처 선택(화두 18)의 후보를 크게 좁힙니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 15 — 노드 피처를 어떻게 만들 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">계좌 파일에는 식별자밖에 없습니다(6.3절). 나이·계좌 종류·잔액 같은 속성이 전혀 없어 피처를 거래 이력에서 직접 집계해야 합니다. 집계 후보로는 거래 건수, 금액 통계, 거래 상대 수, 입출금 비율, 사용 통화·수단 분포, 활동 시간대 등이 있습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>어떤 집계를 피처로 삼을 것인가</li><li>집계 기준 시점을 어떻게 고정할 것인가 (미래 데이터가 섞이면 정보 누수 — 7.1절)</li><li>엔티티 정보(같은 사람의 다른 계좌)를 피처로 쓸 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 16 — 엣지 피처와 그래프의 방향을 어떻게 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">거래에는 금액·통화·결제 수단·시각·환전 여부가 있습니다. 같은 계좌쌍이 여러 번 거래할 수 있습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>어떤 속성을 엣지 피처로 넣을 것인가</li><li>같은 계좌쌍의 거래를 하나의 가중치 엣지로 합칠 것인가, 개별 엣지로 남길 것인가</li><li>방향 그래프로 둘 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 17 — 시간을 어떻게 다룰 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">Small은 관측 기간이 2~3주뿐이고 Large는 5.5개월입니다. 하루 중 0시와 목요일에 거래가 몰리는 주기성이 있습니다. 패턴 체인이 얼마 동안 벌어지는지는 아직 측정하지 않았습니다(7.3절).</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>전체 기간을 하나의 정적 그래프로</li><li>일·주 단위 스냅샷 여러 개로 (버킷 크기를 정해야 함)</li><li>엣지에 시각을 부여해 시간 순서를 모델이 학습</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 18 — 아키텍처와 프레임워크를 무엇으로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">서비스 시나리오상 처음 보는 계좌도 판정할 수 있어야 하므로(7.1절), 계좌마다 임베딩을 외우는 방식보다 이웃 정보로 임베딩을 생성하는 계열이 요건에 맞습니다. 팀 5명이 같은 프레임워크를 써야 합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>아키텍처 후보 (GCN, GraphSAGE, GAT, 이종 그래프용 RGCN·HGT 등)</li><li>프레임워크 (PyTorch Geometric, DGL 등)</li><li>학습 환경 (로컬 GPU, 클라우드, Colab)</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 19 — 이웃을 어디까지, 얼마나 과거까지 볼 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">판정할 때 조회하는 이웃의 범위가 곧 응답 시간입니다. 허브 계좌가 존재해(가장 큰 은행이 거래의 4.8%) 2단계 이웃이 폭발할 가능성이 있으나 그 분포는 아직 측정하지 않았습니다(7.3절).</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>1단계 이웃까지 / 2단계 이상</li><li>시간 창을 며칠로 잡을 것인가</li><li>이웃이 너무 많을 때 샘플링할 것인가 잘라낼 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 20 — 그래프 크기를 어떻게 감당할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">Small만 해도 계좌 50~70만 개, 거래 500~700만 건입니다. Medium·Large는 계좌 200만 개, 거래 1.8억 건입니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>전체 그래프를 한 번에 올릴 것인가</li><li>이웃 샘플링·서브그래프 배치로 나눌 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 21 — 은행 관점을 어떻게 다룰 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">실제 은행은 자행이 관련된 거래만 볼 수 있고 타행↔타행은 볼 수 없습니다. 반면 학습 데이터에는 모든 은행이 들어 있습니다. 측정 결과는 아래와 같습니다.</p>
+<div class="kpis" style="margin:10px 0">
+  <div class="kpi"><p class="k">세탁 거래 중 은행 경계를 넘는 비율</p><p class="v">98.0~99.3%</p><p class="n">6종 세트 전부</p></div>
+  <div class="kpi"><p class="k">세탁 패턴 중 한 은행에서 끝나는 비율</p><p class="v">0~1.1%</p><p class="n">6종 세트 전부</p></div>
+  <div class="kpi"><p class="k">세탁 사례가 하나도 없는 은행</p><p class="v">94.8~96.5%</p><p class="n">규모가 클수록 소폭 감소</p></div>
+</div>
+<p class="d">은행은 Small 3~4만 개, Medium·Large 12만 개로 분산돼 있고, Small 기준 상위 3개 은행 관점으로 잘라도 거래의 13%만 남습니다. 같은 사람이 여러 은행에 계좌를 가진 비율은 38.1%입니다.</p>
+<p class="d">규모가 커질수록 은행 간 거래가 더 늘어납니다 — 전체 거래 중 같은 은행 안에서 끝나는 비율이 Small 13.6%에서 Large 6.8%로 줄어듭니다. 즉 <strong>큰 세트일수록 한 은행이 보는 그림이 더 조각납니다.</strong></p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>전체 그래프로 통합 학습</li><li>은행별 개별 모델 (세탁 사례가 있는 은행이 4% 미만이므로 대상 은행 선정이 필요)</li><li>전체로 학습하되 배치를 은행 관점으로 잘라 학습 조건과 배포 조건을 맞추기</li><li>어느 방식이든 평가를 어떤 뷰로 통일할 것인가 — 전체 뷰로 잰 성능은 실제 배포 성능과 다릅니다</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 22 — 극단적 불균형에 어떻게 대응할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">세탁이 거래 기준 0.05~0.13%입니다. 다만 계좌 기준으로 보면 0.33~0.77%로 6~7배 높습니다(3장).</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>클래스 가중치 / 손실 함수 변경 / 음성 축소 / 양성 증강 중 무엇을 쓸 것인가</li><li>샘플링으로 비율을 바꾸면 그래프 구조가 훼손된다는 점을 어떻게 다룰 것인가 (엣지를 지우면 이웃 관계가 사라짐)</li></ul>
+</div>
+
+<h3>8.4 무엇을 맞히고 어떻게 평가할 것인가</h3>
+
+<div class="topic">
+<p class="q">화두 23 — 모델의 타깃을 무엇으로 정의할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">기본 라벨은 거래 단위 0/1입니다. 패턴에 속한 거래는 100% 라벨 1이므로 패턴 유형을 보조 라벨로 쓸 수 있습니다(5.1절). 계좌 단위 위험도로 바꾸는 것도 가능합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>거래 단위 이진 분류</li><li>패턴 유형을 보조 과제로 함께 학습</li><li>계좌 단위 위험도를 함께 산출</li><li>전조 예측용으로 라벨 재정의 (화두 3과 연결)</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 24 — 평가 지표를 무엇으로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">불균형이 극단적이라 전부 정상이라고 답해도 정확도가 99.87%가 나옵니다. 또 세탁의 38~71%가 패턴 밖이므로 패턴 기준 지표만 보면 그 부분을 놓칩니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>어떤 지표를 주 지표로 삼을 것인가 (PR-AUC, 특정 재현율에서의 정밀도, 상위 N건 정밀도 등)</li><li>패턴 안/밖을 분리 평가할 것인가</li><li>패턴 유형별 재현율을 볼 것인가</li><li>거래 단위와 사건 단위 중 무엇으로 셀 것인가 (3장의 단위 문제)</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 25 — 학습·검증·평가를 어떻게 나눌 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">서비스 시나리오상 시간 분할이 배포 조건과 맞지만, Small은 관측 기간이 2~3주뿐이라 뒤쪽 데이터가 적습니다. 라벨의 상위 1% 계좌 점유율은 19~28%로 군집이 존재합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>시간 분할 / 계좌 분할 / 혼합</li><li>계좌 겹침으로 인한 누수를 어떻게 점검할 것인가</li><li>노드 피처 집계의 기준 시점을 어떻게 고정할 것인가 (화두 15와 연결)</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 26 — 베이스라인을 무엇으로 둘 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">그래프를 쓰지 않는 분류기와 비교해야 그래프 신경망이 실제로 그래프 덕을 보는지 알 수 있습니다. 패턴 밖 세탁(38~71%)은 그래프 정보가 도움이 안 될 수 있어 이 비교가 특히 의미가 있습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>베이스라인을 만들 것인가, 만든다면 언제</li><li>단순 분류기(그래디언트 부스팅 등) / 규칙 기반 / 둘 다</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 27 — 판정 임계값을 어떻게 정할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">모델은 점수를 내지만 "몇 점 이상을 알림으로 띄울지"는 별도 결정입니다. 실무에서는 담당자가 하루에 검토할 수 있는 건수가 사실상의 상한입니다. 유입은 하루 28만~109만 건입니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>고정 임계값 / 상위 N건 / 재현율 목표 기준</li><li>운영 제약(검토 가능 건수)을 어떻게 반영할 것인가</li></ul>
+</div>
+
+<h3>8.5 서비스를 어떻게 구현할 것인가</h3>
+
+<div class="topic">
+<p class="q">화두 28 — 그래프를 어디에 어떻게 유지할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">판정마다 이웃 조회가 필요하므로 그래프 저장소가 서비스의 일부가 됩니다(1.2절). 계좌 50~70만 개(Small) 또는 200만 개(Large) 규모이며, 판정한 거래를 계속 반영해야 합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>관계형 DB / 그래프 DB / 메모리 구조 / 인접 리스트 파일</li><li>그래프를 실시간 갱신할 것인가 주기적으로 재구축할 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 29 — 모델 출력을 어떤 형태로 보여줄 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">세탁 시나리오 하나가 평균 8.7건의 거래로 이뤄지므로, 거래를 하나씩 나열하면 같은 사건이 여러 알림으로 쪼개질 수 있습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>거래 단위 목록 / 연관 거래를 묶은 케이스 단위</li><li>탐지된 패턴의 그래프를 시각화할 것인가</li><li>계좌 단위 위험도를 함께 보여줄 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 30 — 왜 의심스러운지 어떻게 설명할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">현업 조사에 따르면 담당자는 근거 없이 판단할 수 없고, 종결 시에도 사유 코드와 코멘트가 필수입니다. 모델이 점수만 내면 대시보드가 실무적으로 성립하지 않습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>영향이 큰 이웃 계좌·거래를 표시 / 탐지된 패턴 유형을 제시 / 어텐션 가중치 시각화</li><li>설명 방식이 아키텍처 선택(화두 18)을 제약할 수 있다는 점을 어떻게 볼 것인가</li></ul>
+</div>
+
+<div class="topic">
+<p class="q">화두 31 — 웹 서비스 기술 스택을 무엇으로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">중간발표까지 10주이며 팀원들의 경험이 학습 곡선을 좌우합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>프론트엔드·백엔드 프레임워크</li><li>모델 서빙 방식</li><li>배포 환경</li></ul>
+</div>
+
+<h3>8.6 분석 과정에서 임의로 정해둔 것 — 재검토 대상</h3>
+<p class="lead">분석을 진행하려면 값을 정해야만 하는 지점들이 있었고, 팀 논의 없이 정한 상태입니다. <strong>결과 해석이 이 값들에 의존합니다.</strong></p>
+
+<div class="topic">
+<p class="q">화두 32 — 환율 "상수" 판정 기준을 0.5%로 둔 것</p>
+<p class="d">통화쌍별 환율이 중앙값에서 0.5% 이내로만 흔들리면 상수로 간주했고, 이 기준에서 201쌍 중 149쌍이 통과했습니다. <strong>더 근본적인 문제는 "최대 편차"를 지표로 쓴 것입니다</strong> — 이상치 한 건에 좌우되는 지표라, 6.1절에서 드러났듯 "고정 환율 + 소수 이탈"인 경우에도 "상수 아님"으로 판정됩니다. 판정 지표를 최대값이 아니라 분위수(예: 상위 1% 제외 후의 편차)로 바꾸면 결론이 뒤집힐 수 있습니다. <strong>어떤 지표로, 어느 정도 흔들림까지 고정 환율로 볼 것인가</strong>가 화두 8과 직결됩니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 33 — 은행 ID의 선행 0을 제거해 같은 은행으로 합친 것</p>
+<p class="d">같은 은행이 <code>10</code>, <code>010</code>, <code>0010</code>으로 등장해 앞의 0을 떼고 동일 은행으로 처리했습니다. 이렇게 해야 계좌 파일과 대조가 되고(안 하면 100% 실패) 은행별 집계가 쪼개지지 않습니다. 교차검수에서 원천 데이터 확인으로 타당성은 검증됐지만 데이터 해석을 바꾸는 판단입니다. 한편 <strong>계좌번호는 정규화하지 않았습니다</strong> — 이 비대칭도 확인 대상입니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 34 — 라벨 "강한 편중" 판정 기준을 상위 1% 점유율 50%로 둔 것</p>
+<p class="d">이 기준으로는 "강한 편중 아님"(HI 19.1%, LI 27.6%)입니다. 기준을 20%로 잡았다면 두 세트 모두 "편중 있음"이 됩니다. 이 판정이 학습·평가 분할 방식(화두 25)의 근거가 됩니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 35 — 세트 포함관계 확인을 표본 10만 건으로 한 것</p>
+<p class="d">16GB 파일을 전수 대조하지 않고 고정 시드로 10만 건을 뽑아 확인했습니다. 결과가 100% 불일치라 "서로 다른 데이터"라는 결론 자체는 뒤집히지 않지만, 표본 기반 결론임을 인지해야 합니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 36 — 은행 관점 실험 대상을 상위 3개 은행으로 본 것</p>
+<p class="d">은행 관점 서브그래프의 규모를 잴 때 거래량 상위 3개를 봤고, 그 결과 거래의 13%가 남았습니다. K를 10이나 50으로 늘리면 다른 그림이 나옵니다. 화두 21과 함께 정해야 합니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 37 — 은행 관점의 정의를 "자행이 한쪽 끝에 있는 거래 전부"로 한 것</p>
+<p class="d">은행 서브그래프를 자를 때 자행이 송신이거나 수신인 거래를 모두 포함했습니다. 대안은 자행 계좌끼리의 거래만 포함하는 방식입니다. 또한 은행 간 거래는 송신·수신 은행 양쪽에 각각 집계했습니다. 실제 은행이 보는 화면과 어느 쪽이 가까운지 확인이 필요합니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 38 — 패턴 개수를 세는 방식과 EDA 범위를 Small로 한정한 것</p>
+<p class="d">패턴 1개 = 시작·종료 표시가 온전한 블록 1개로 셌고, 유형명에서 부가 설명(예: "최대 16차 FAN-OUT")을 제거해 8개 유형으로 묶었습니다. 세부 유형을 살릴지 판단이 필요합니다. 검증은 6종 세트 전체로 확장했지만, <strong>검증 항목 28개의 선정 자체와 일반화 판정 규칙(성립/불성립/경향 차이/비교 제한의 경계)도 임의로 정한 것</strong>입니다. 추가하거나 기준을 바꾸고 싶은 것이 있으면 반영할 수 있습니다.</p>
+</div>
+
+<h3>8.7 프로젝트를 어떻게 운영할 것인가</h3>
+
+<div class="topic">
+<p class="q">화두 39 — 5명의 역할을 어떻게 나눌 것인가?</p>
+<p class="d">데이터·전처리 / 모델링 / 백엔드 / 프론트엔드 / 기획·문서 같은 축이 가능합니다. 모델과 서비스를 병렬로 진행하려면 둘 사이의 인터페이스(모델 출력 형식)를 일찍 정해야 합니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 40 — 중간발표 MVP의 범위를 어디까지로 할 것인가?</p>
+<p class="d">10주 안에 어디까지 완성할지 — 모델 성능 목표, 대시보드 화면 수, 데이터 규모. "작동하는 것"과 "완성도 높은 것"의 경계를 미리 합의해두면 이후 2개월 계획이 명확해집니다.</p>
+</div>
+
+<div class="topic">
+<p class="q">화두 41 — 실험 관리와 협업 방식을 어떻게 할 것인가?</p>
+<p class="d">여러 명이 여러 모델을 돌리면 어떤 설정에서 어떤 결과가 나왔는지 추적이 필요합니다. 코드·데이터·모델 파일의 공유 방식, 재현성(시드 고정 등)도 결정 사항입니다.</p>
+</div>
+
+<h3>8.8 합성 데이터와 현실의 괴리</h3>
+
+<div class="topic">
+<p class="q">화두 42 — 이 데이터로 배운 규칙이 현실과 어긋나는 지점을 어떻게 다룰 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">이 데이터셋은 시뮬레이터가 만든 합성 데이터라, 정답 라벨이 있다는 큰 장점이 있는 대신 <strong>현실과 다른 규칙이 섞여 있습니다.</strong> 검증 과정에서 확인된 것들:</p>
+<ul>
+<li><strong>세탁 거래는 100% 동일 통화</strong> — 통화가 다른 거래 17만 건 중 세탁이 0건입니다(6.2절). 현실의 자금세탁은 국제 송금·환전을 적극 활용하므로 정반대입니다. 모델은 "통화가 다르면 정상"을 즉시 학습할 것이고, 그렇게 학습되면 현실에서 국제 세탁을 통째로 놓칩니다.</li>
+<li><strong>패턴 세탁은 99.97%가 ACH</strong> — 전체 거래에서 ACH는 11.8%뿐인데, 정형 패턴에 속한 세탁은 거의 전부 ACH이고 수표·신용카드·현금은 0건입니다(6.1절).</li>
+<li><strong>시간 분포의 인위성</strong> — 0시와 목요일에 거래가 몰립니다. 생성기의 스케줄링 특성으로 보입니다.</li>
+<li><strong>수수료가 존재하지 않습니다</strong> — 동일 통화 거래에서 보낸 금액과 받은 금액이 100% 일치합니다.</li>
+</ul>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li>이런 규칙을 모델이 학습하도록 둘 것인가, 해당 피처를 <strong>의도적으로 배제</strong>할 것인가 (성능은 떨어지지만 현실성은 올라감)</li>
+<li>발표·보고서에서 이 한계를 어떻게 서술할 것인가 — 성능 수치의 해석 범위를 어디까지로 볼 것인가</li>
+<li>합성 데이터의 한계를 프로젝트의 <strong>약점으로 볼 것인가, 분석 역량을 보여주는 지점으로 볼 것인가</strong></li>
+<li>현실성 검증을 위해 별도 조치를 할 것인가 (현업 조사 결과와의 대조 등)</li>
+</ul>
+<p class="lbl">영향</p><p class="d">피처 설계(화두 15·16), 평가 해석(화두 24), 베이스라인 비교(화두 26)에 모두 걸칩니다. 특히 <strong>"모델이 잘 맞힌다"가 "현실에서 통한다"를 뜻하지 않을 수 있다</strong>는 점이 이 화두의 핵심입니다.</p>
+</div>
+
+<h3>8.9 화두들의 의존 관계</h3>
+<p class="lead">41개를 한 번에 정할 필요는 없습니다. 아래는 <strong>어떤 결정이 다른 결정의 전제가 되는지</strong>를 정리한 것으로, 우선순위 제안이 아니라 순서상의 제약입니다.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>이것을 정해야</th><th class="w">이것을 정할 수 있습니다</th></tr></thead>
+<tbody>
+<tr><td>화두 1 (판정 단위)</td><td class="w">23·24 (타깃·지표), 29 (출력 형태)</td></tr>
+<tr><td>화두 6·7 (학습 세트)</td><td class="w">12 (저장 형식), 20 (그래프 크기 대응), 전처리 착수</td></tr>
+<tr><td>화두 8 (금액 환산)</td><td class="w">9 (극단값), 15·16 (금액 관련 피처)</td></tr>
+<tr><td>화두 13·14 (노드·거래 표현)</td><td class="w">15·16 (피처), 18 (아키텍처), 20 (크기 대응)</td></tr>
+<tr><td>화두 2 (응답 시간)</td><td class="w">19 (이웃 범위), 28 (그래프 저장소)</td></tr>
+<tr><td>화두 3 (사후 탐지 / 전조 예측)</td><td class="w">23·24·25 (타깃·평가 전체)</td></tr>
+<tr><td>화두 23 (타깃)</td><td class="w">24·25·27 (지표·분할·임계값)</td></tr>
+<tr><td>모델 출력 형식 (1·23·29)</td><td class="w">31 (기술 스택) — 이후 서비스 개발을 병렬로 진행 가능</td></tr>
+</tbody>
+</table>
+</div>
+<p class="lead">7.3절의 미측정 항목들은 화두 13·14·17·18·19·23·24·26의 판단 재료가 됩니다.</p>
+
+
+<footer>
+<p><strong>수치 출처</strong> — 이 문서의 모든 수치는 아래 분석 결과이며, 각각 독립 재계산을 통한 교차검수를 통과했습니다.</p>
+<p>· 데이터 구조 검증: <code>worktable/eda/01_structure.md</code> (18개 파일 전수)<br>
+· 데이터 성질 검증: <code>worktable/eda/02_verification.md</code> (26개 항목, Small 세트)<br>
+· 6종 확장 검증: <code>worktable/eda/03_scale.md</code> (28개 항목 × 6종 교차 비교, 금액 기준 세탁 비중, 세탁 관련 계좌 합집합, 통합 세트 검토)</p>
+<p>일반화 판정은 판정 기준을 사전에 고정한 뒤 6종에 적용한 결과입니다(6.6절). 규모·기간이 다른 세트를 직접 비교할 수 없는 항목은 "비교 제한"으로 분류하고 억지로 우열을 매기지 않았습니다. 데이터 원본은 읽기 전용으로 보존되어 있고 분석 스크립트로 모든 수치를 재현할 수 있습니다.</p>
+</footer>
+
+</div>
+</body>
+</html>
