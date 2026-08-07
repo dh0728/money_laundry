@@ -1,0 +1,29 @@
+# 원천 데이터 (용량 문제로 Git 제외 — README의 데이터 항목 참고)
+data/
+
+# 개인 작업 공간 (팀 공유 대상 아님)
+worktable/
+
+# AI 협업 파일 (개인 도구 — 팀 공유 대상 아님)
+collab/
+CLAUDE.md
+AGENTS.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# 문서 임시파일 (Office)
+~$*
