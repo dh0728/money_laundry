@@ -137,13 +137,9 @@
       <line x1="1025" y1="335" x2="878" y2="317"/>
     </g>
 
-    <!-- include / extend -->
-    <path d="M770,342 L770,386" fill="none" stroke="#5e6c84" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#uah)"/>
-    <text x="782" y="368" font-size="10.5" font-style="italic" fill="#5e6c84">«include» 결과 기록 시</text>
-    <path d="M435,232 L435,266" fill="none" stroke="#5e6c84" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#uah)"/>
-    <text x="447" y="253" font-size="10.5" font-style="italic" fill="#5e6c84">«extend» 분석팀 이관 시</text>
-    <path d="M660,205 L549,205" fill="none" stroke="#5e6c84" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#uah)"/>
-    <text x="604" y="193" text-anchor="middle" font-size="10.5" font-style="italic" fill="#5e6c84">«include» 알림 조회</text>
+    <!-- extend: 임계값 충족 시에만 알림 생성 -->
+    <path d="M770,388 L770,344" fill="none" stroke="#5e6c84" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#uah)"/>
+    <text x="782" y="368" font-size="10.5" font-style="italic" fill="#5e6c84">«extend» 임계값 충족 시</text>
 
     <!-- 범례 -->
     <g font-size="11">
@@ -153,7 +149,7 @@
     </g>
   </svg>
   </div>
-  <p class="small">UC-10(알림 자동 생성)이 UC-02의 앞단이지만, 액터가 사람이 아니라 시스템(추론 결과 기록의 원자적 부수효과, 결정 A-1)이므로 오른쪽 열에 배치. UC-11·UC-12는 기획서의 "팀 결정 필요" 항목과 1:1 대응.</p>
+  <p class="small">UC-10(알림 자동 생성)은 추론 결과가 임계값을 충족할 때만 UC-09에 확장되는 시스템 유스케이스(결정 A-1·A-2). UC-02의 분석팀 이관과 UC-03의 사건 조사는 유스케이스 포함·확장 관계가 아니라 선후 업무 흐름이므로 S4에서 표현한다. UC-11·UC-12는 기획서의 "팀 결정 필요" 항목과 1:1 대응.</p>
 
   <!-- ================================================================ -->
   <h2>2. 유스케이스 명세</h2>
@@ -161,19 +157,45 @@
     <thead><tr><th style="width:60px">ID</th><th style="width:110px">액터</th><th style="width:150px">사전조건</th><th>기본 흐름</th><th>대안·예외 흐름</th><th style="width:120px">관련 결정</th></tr></thead>
     <tbody>
       <tr><th>UC-01</th><td>모니터링팀</td><td>로그인·역할 보유</td><td>대시보드 접속 → SPA가 2~5초 주기 커서 polling → 신규 거래 "판정 대기" 즉시 표시 → 판정 완료 시 같은 행이 정상/이상(패턴)으로 갱신</td><td>추론 지연·중단 시: 행이 "판정 대기"로 유지 (숨기지 않음 — 정직 표시 원칙)</td><td>§5.1, G-3</td></tr>
-      <tr><th>UC-02</th><td>모니터링팀</td><td>알림 존재(NEW)</td><td>알림 큐 조회(위험도 정렬·상태/기간/위험도 필터) → 알림 선택 → 1차 검토(NEW→검토중) → 오탐이면 종결(사유 필수), 아니면 <strong>분석팀 이관(상태: 조사중)</strong> — 이관되면 모니터링 큐에서 제외(상태 필터)</td><td>이관 시 UC-03으로 «extend». 이관 알림의 최종 종결은 분석팀이 조사 결과 입력과 함께 수행</td><td>A-4, S4</td></tr>
+      <tr><th>UC-02</th><td>모니터링팀</td><td>알림 존재(NEW)</td><td>알림 큐 조회(위험도 정렬·상태/기간/위험도 필터) → 알림 선택 → 1차 검토(NEW→검토중) → 오탐이면 종결(사유 필수), 아니면 <strong>분석팀 이관(상태: 조사중)</strong> — 이관되면 모니터링 큐에서 제외(상태 필터)</td><td>이관 후 UC-03이 별도 업무로 시작. 이관 알림의 최종 종결은 분석팀이 조사 결과 입력과 함께 수행</td><td>A-4, S4</td></tr>
       <tr><th>UC-03</th><td>분석팀</td><td>이관(조사중) 알림 존재</td><td>분석 큐에서 이관 알림 확인 → 사건 생성(알림 N개 참조) → 조사 진행 → 소견 작성·계좌 첨부 → <strong>조사 결과 입력으로 알림 종결</strong> → 사건 종결</td><td>조사 중 UC-04 병행 사용</td><td>A-4, D-3, 토픽 4</td></tr>
       <tr><th>UC-04</th><td>분석팀</td><td>대상 계좌 존재</td><td>계좌 선택 → k-hop 이웃 그래프 조회(fan-out 상한) → 관계·거래 흐름 시각화 탐색</td><td><strong>허브 계좌 선택 시: 펼치지 않고 이웃 수 요약만 표시(허브 가드)</strong></td><td>D-2, §10</td></tr>
       <tr><th>UC-05</th><td>관리자</td><td>관리자 역할</td><td>운영 지표 패널 조회: 큐 적체량, DLQ 건수, 판정 대기 최고 시간, 에이전트 최근 접속</td><td>지표 이상 시(DLQ&gt;0, 에이전트 무응답) 강조 표시</td><td>I-4</td></tr>
       <tr><th>UC-06</th><td>관리자</td><td>관리자 역할</td><td>임계값 키-값 설정 조회·수정 → 즉시 반영(재배포 없음)</td><td>—</td><td>A-2</td></tr>
       <tr><th>UC-07</th><td>관리자</td><td>관리자 역할</td><td>사용자 역할(모니터링/분석/관리자) 부여·회수</td><td>—</td><td>토픽 5, D-3</td></tr>
-      <tr><th>UC-08</th><td>은행 거래 API</td><td>—</td><td>HTTPS 단건 전송(10필드+tx_id) → 형식 검증 → 큐 투입 → 202 ACK → 수집 워커가 소비·멱등 적재(PENDING)·계좌 등록 → 쓰기 성공 후 큐 ACK</td><td>형식 실패: 400 즉시 거절+로그 / 의미 이상: 격리 플래그 저장 / 중복 tx_id: DB 유니크 제약이 무시 / 워커 3회 실패: DLQ 격리</td><td>§6, Q-1~5</td></tr>
-      <tr><th>UC-09</th><td>추론 에이전트</td><td>토큰 보유, 아웃바운드 가능</td><td>배치 워커가 5분마다 작업 준비(선점→서브그래프→저장) → 에이전트가 작업 API 폴링 → 작업 수령 → 1단계 이진분류 → 양성만 2단계 패턴분류 → 결과 제출(모델 버전 포함)</td><td>에이전트 사망: INFERENCING 타임아웃 회수→PENDING 복귀 / 클러스터 다운: 작업 적체, 수집·조회는 정상</td><td>G-1~3</td></tr>
+      <tr><th>UC-08</th><td>은행 거래 API</td><td>—</td><td>HTTPS 단건 전송(10필드+<code>transaction_id</code>) → 형식 검증·<code>ingest_id</code> 발급 → 큐 투입 → 202 ACK(<code>ingest_id</code> 반환) → 수집 워커가 소비·멱등 적재(PENDING)·수신결과 기록·계좌 등록 → 쓰기 성공 후 큐 ACK</td><td>형식 실패: 400 즉시 거절+로그 / 의미 이상: 격리 플래그 저장 / 같은 거래번호·같은 내용: 기존 원장 연결+중복 수신 기록 / 같은 거래번호·다른 내용: <code>ID_CONFLICT</code> 격리·운영 지표 / 워커 3회 실패: DLQ 격리</td><td>§6, Q-1~5</td></tr>
+      <tr><th>UC-09</th><td>추론 에이전트</td><td>토큰 보유, 아웃바운드 가능</td><td>배치 워커가 5분마다 작업 준비(선점→서브그래프→저장) → 에이전트가 작업 API 폴링 → <code>attempt_id</code>·lease와 함께 작업 수령 → 1단계 이진분류 → 양성만 2단계 패턴분류 → 결과 제출(작업·시도·모델 버전 포함)</td><td>에이전트 사망: lease 만료 후 PENDING 회수·새 <code>attempt_id</code> 발급 / 이전 시도의 늦은 결과: 상태·lease 불일치로 거절 / 클러스터 다운: 작업 적체, 수집·조회는 정상</td><td>G-1~3</td></tr>
       <tr><th>UC-10</th><td>시스템</td><td>추론 결과 도착</td><td>결과 기록과 같은 DB 트랜잭션에서 발생 기준 충족 시 알림 생성(NEW)</td><td>기준 미충족: 결과만 기록</td><td>A-1, A-2</td></tr>
       <tr><th>UC-11 <span class="badge b-open">미확정</span></th><td>모니터링팀</td><td>판정 결과 축적</td><td>계좌별 이상거래 비율 집계 → 임계값 초과 계좌를 의심계좌 목록으로 표시</td><td>—</td><td>A-3 (파생 계층)</td></tr>
       <tr><th>UC-12 <span class="badge b-open">미확정</span></th><td>분석팀</td><td>사건 존재</td><td>STR 경계 확정 후 정의</td><td>—</td><td>기획서 §3 STR 항목</td></tr>
     </tbody>
   </table></div>
+
+  <h3>2.1 식별자·멱등·커서 계약</h3>
+  <p class="small"><code>transaction_id</code>는 전송 요청 ID가 아니라 원천 거래내역의 거래번호다. 전송·추론·화면 갱신 식별자를 분리해 서로 다른 재시도 의미가 섞이지 않게 한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:150px">식별자</th><th style="width:190px">의미·발급 주체</th><th>계약</th></tr></thead>
+    <tbody>
+      <tr><th><code>transaction_id</code></th><td>원천 시스템의 거래번호</td><td>거래 원장의 업무 식별자. 전송 시도 횟수를 세는 ID가 아니다. 동일 공급원에서 같은 거래번호·같은 표준화 payload면 같은 거래의 재전송으로 흡수하고, 내용이 다르면 조용히 무시하지 않고 <code>ID_CONFLICT</code>로 격리한다. 다중 공급원 도입 시 유일 키는 <code>(source_id, transaction_id)</code>.</td></tr>
+      <tr><th><code>ingest_id</code></th><td>수신 관문이 전송 시도마다 발급</td><td>202 ACK·큐 메시지·수신결과 로그를 잇는 UUID. 같은 거래의 재전송도 서로 다른 <code>ingest_id</code>를 가진다. 수신 회계는 거래 행 수가 아니라 <code>ingest_id</code> 상태 합계로 검증한다.</td></tr>
+      <tr><th><code>payload_hash</code></th><td>수신 관문이 표준화 payload에서 계산</td><td>같은 거래번호의 정상 재전송과 ID 충돌을 구분한다. 해시는 업무 데이터의 대체키가 아니라 충돌 탐지 보조값.</td></tr>
+      <tr><th><code>job_id</code></th><td>배치 워커가 추론 작업마다 발급</td><td>작업 자체의 식별자. 결과 멱등 키 <code>(job_id, model_version)</code>의 구성요소.</td></tr>
+      <tr><th><code>attempt_id</code>·lease</th><td>작업 선점 때마다 발급</td><td>타임아웃 재선점과 이전 실행을 구분. 결과 제출은 현재 INFERENCING 상태이고 lease가 유효하며 <code>attempt_id</code>가 일치할 때만 수락한다.</td></tr>
+      <tr><th><code>change_seq</code></th><td>DB가 변경 때 단조 증가 발급</td><td>피드 커서. 변경시각 단독 커서의 동률 누락을 피하며 <code>change_seq &gt; cursor</code>로 신규·판정 갱신을 함께 조회한다.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>2.2 알림 상태 전환·감사 계약</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:130px">현재 상태</th><th style="width:160px">허용 전환</th><th style="width:150px">권한</th><th>필수 기록</th></tr></thead>
+    <tbody>
+      <tr><th>NEW</th><td>검토중</td><td>모니터링팀</td><td rowspan="4">모든 전환을 append-only 이력으로 기록: 알림 ID, 이전·새 상태, 행위자, 시각, 사유, 요청 ID. 상태 갱신은 버전 조건부 갱신으로 동시 수정 충돌을 감지한다.</td></tr>
+      <tr><th>검토중</th><td>조사중(이관) / 종결(오탐)</td><td>모니터링팀<br>오탐 종결은 사유 필수</td></tr>
+      <tr><th>조사중</th><td>종결(조사 결과)</td><td>분석팀<br>조사 결과 필수</td></tr>
+      <tr><th>종결</th><td>없음</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note"><strong>팀 결정 필요 — 사건 종결 조건</strong>: 사건 1건이 알림 N건을 참조할 때 사건 종결이 가능한 조건(연결 알림 전부 종결 / 일부 종결 허용)과 알림 1건의 복수 사건 연결 허용 여부는 구현 전에 확정한다.</p>
 
   <!-- ================================================================ -->
   <h2>3. 유저 스토리</h2>
@@ -187,7 +209,8 @@
         <li><b>Given</b> 대시보드가 열려 있을 때</li>
         <li><b>When</b> 새 거래가 수집·적재되면</li>
         <li><b>Then</b> 다음 폴링 주기(≤5초) 안에 "판정 대기" 상태로 목록에 나타난다</li>
-        <li><b>Then</b> 판정 완료 시 같은 행이 정상/이상(패턴명)으로 갱신된다 (행 중복 생성 금지, event_id 기준)</li></ul></td><td>UC-01<br>§5.1</td></tr>
+        <li><b>Then</b> 판정 완료 시 같은 행이 정상/이상(패턴명)으로 갱신된다 (행 중복 생성 금지, <code>transaction_id</code> 기준)</li>
+        <li><b>Then</b> 커서는 단조 증가 <code>change_seq</code>라 같은 시각에 여러 행이 바뀌어도 누락되지 않는다</li></ul></td><td>UC-01<br>§5.1</td></tr>
       <tr><th>US-02 <span class="badge b-fix">MVP</span></th><td><strong>모니터링 담당자</strong>로서, 알림을 <strong>위험도 순으로 정렬·필터</strong>해서 보고 싶다. 한정된 시간에 위험한 것부터 검토해야 하기 때문이다.</td><td><ul class="gwt">
         <li><b>Given</b> 알림이 여러 건 쌓여 있을 때</li>
         <li><b>When</b> 알림 큐를 열면</li>
@@ -198,7 +221,7 @@
         <li><b>When</b> 검토를 시작하면 → <b>Then</b> 상태가 검토중으로 바뀐다</li>
         <li><b>When</b> 오탐으로 종결하면 → <b>Then</b> 사유 없이는 종결되지 않는다</li>
         <li><b>When</b> 분석팀에 이관하면 → <b>Then</b> 상태가 조사중이 되고 내 큐에서 사라지며 분석 큐에 나타난다 — 최종 종결은 분석팀이 조사 결과 입력과 함께</li>
-        <li><b>Then</b> 상태 전환 이력이 남는다</li></ul></td><td>UC-02<br>A-4</td></tr>
+        <li><b>Then</b> 상태 전환 이력에 이전·새 상태, 행위자, 시각, 사유가 변경 불가 기록으로 남는다</li></ul></td><td>UC-02<br>A-4</td></tr>
       <tr><th>US-04 <span class="badge b-open">결정 필요</span></th><td><strong>모니터링 담당자</strong>로서, <strong>이상거래 비율이 높은 계좌</strong>를 모아 보고 싶다. 거래 단위 알림만으로는 반복 위험 계좌가 안 보이기 때문이다.</td><td><ul class="gwt">
         <li>MVP 편입 여부 팀 결정 대기 (기획서 §3 "위험도별 계좌 분포" 카드와 세트)</li>
         <li>확정 시: 계좌별 최근 기간 이상 비율 ≥ 임계값 목록 표시 (읽기 전용 파생 계층 — 파이프라인 무변경)</li></ul></td><td>UC-11<br>A-3</td></tr>
@@ -223,7 +246,7 @@
         <li><b>Then</b> 같은 계좌를 다시 조회하면 과거 소견이 함께 표시된다</li></ul></td><td>UC-03<br>D-2, D-3</td></tr>
       <tr><th>US-08 <span class="badge b-fix">MVP</span></th><td><strong>분석가</strong>로서, 알림의 <strong>판단 근거</strong>를 보고 싶다. 모델 결과를 맹신하지 않고 스스로 판단해야 하기 때문이다.</td><td><ul class="gwt">
         <li><b>Given</b> 알림 상세에서</li>
-        <li><b>Then</b> 위험 점수·1단계 판정·2단계 패턴 분류·모델 버전이 표시된다</li>
+        <li><b>Then</b> 위험 점수·1단계 판정·2단계 패턴 분류·모델 버전·적용 임계값 버전이 표시된다</li>
         <li><b>Then</b> "모델 결과는 조사 지원 정보이며 확정 판정이 아님"이 화면에 명시된다 (기획서 §2.5)</li>
         <li>규칙 히트·유사 사례 표시는 팀 결정 대기</li></ul></td><td>UC-02<br>D-1</td></tr>
     </tbody>
@@ -255,18 +278,21 @@
     <tbody>
       <tr><th>US-12 <span class="badge b-fix">MVP</span></th><td><strong>시스템</strong>은 <strong>ACK한 거래를 유실하지 않는다</strong>. 금융 모니터링에서 유실은 복구 불가능한 실패이기 때문이다.</td><td><ul class="gwt">
         <li><b>Given</b> 수집 워커·DB를 임의 시점에 강제 종료해도</li>
-        <li><b>When</b> 복구되면 → <b>Then</b> 202 ACK된 모든 거래가 결국 DB에 존재한다 (쓰기→ACK 불변식 + 큐 재전달)</li>
-        <li><b>Then</b> ACK 건수 = 적재 건수 대조가 운영 지표로 확인 가능하다</li></ul></td><td>UC-08<br>Q-1</td></tr>
+        <li><b>When</b> 복구되면 → <b>Then</b> 202 ACK된 모든 <code>ingest_id</code>가 적재·동일내용 중복·ID 충돌·DLQ 중 하나의 추적 가능한 상태를 가진다</li>
+        <li><b>Then</b> 수신 회계는 <code>ACK = 처리대기 + 신규적재 + 동일내용중복 + ID충돌 + DLQ</code>로 대조되고 미분류 유실은 0건이다</li>
+        <li><b>Then</b> 정상 운영 성공 기준은 미분류 유실 0건과 별개로 ID 충돌·DLQ 0건이다</li></ul></td><td>UC-08<br>Q-1</td></tr>
       <tr><th>US-13 <span class="badge b-fix">MVP</span></th><td><strong>시스템</strong>은 <strong>중복 수신을 무해하게 흡수한다</strong>. 재시도·재전달은 정상 동작이지 오류가 아니기 때문이다.</td><td><ul class="gwt">
-        <li><b>Given</b> 같은 transaction_id가 몇 번 도착하든</li>
-        <li><b>Then</b> DB에는 정확히 1건만 존재한다 (유니크 제약 + 충돌 무시 삽입 — 애플리케이션 코드 아닌 DB 제약이 보장)</li></ul></td><td>UC-08<br>§6</td></tr>
+        <li><b>Given</b> 원천 거래번호 <code>transaction_id</code>와 표준화 payload가 모두 같은 거래가 몇 번 도착하든</li>
+        <li><b>Then</b> 거래 원장에는 정확히 1건만 존재하고 각 전송 시도는 별도 <code>ingest_id</code> 수신결과로 남는다</li>
+        <li><b>When</b> 같은 거래번호에 다른 payload가 도착하면 → <b>Then</b> 기존 거래를 덮어쓰거나 조용히 무시하지 않고 <code>ID_CONFLICT</code>로 격리·노출한다</li></ul></td><td>UC-08<br>§6</td></tr>
       <tr><th>US-14 <span class="badge b-fix">MVP</span></th><td><strong>시스템</strong>은 <strong>추론 장애를 수집·조회와 격리한다</strong>. GPU 클러스터는 우리 통제 밖이기 때문이다.</td><td><ul class="gwt">
         <li><b>Given</b> 쿠버스피어 클러스터가 다운되어도</li>
         <li><b>Then</b> 거래 수집·피드 표시·조사 화면은 정상 동작한다 (해당 거래는 "판정 대기" 유지)</li>
-        <li><b>When</b> 복구되면 → <b>Then</b> 적체 작업이 순서대로 처리되고 화면이 따라잡는다</li></ul></td><td>UC-09<br>G-3, §5.1</td></tr>
+        <li><b>When</b> 복구되면 → <b>Then</b> 순서 보장을 새로 약속하지 않으면서 적체 작업이 유실 없이 전량 처리되고 화면이 따라잡는다</li>
+        <li><b>When</b> 타임아웃 전 시도의 결과가 늦게 도착하면 → <b>Then</b> 현재 <code>attempt_id</code>·lease 불일치로 거절되어 새 시도의 결과를 덮어쓰지 않는다</li></ul></td><td>UC-09<br>G-3, §5.1</td></tr>
       <tr><th>US-15 <span class="badge b-fix">MVP</span></th><td><strong>시스템</strong>은 <strong>모든 판정에 모델 버전을 남긴다</strong>. 모델 교체·재판정 후에도 "누가 판정했나"를 추적해야 하기 때문이다.</td><td><ul class="gwt">
         <li><b>Given</b> 어떤 판정 결과든</li>
-        <li><b>Then</b> 모델 버전이 함께 기록되어 있다</li>
+        <li><b>Then</b> 모델 버전과 알림 판정에 사용한 임계값·설정 버전이 함께 기록되어 있다</li>
         <li><b>When</b> 새 모델로 재판정하면 → <b>Then</b> 이전 판정이 덮어써지지 않고 결과가 누적된다 (거래 1 : 결과 N)</li></ul></td><td>UC-09<br>D-1</td></tr>
       <tr><th>US-16 <span class="badge b-str">스트레치</span></th><td><strong>시스템</strong>은 <strong>유입 폭증을 유실 없이 흡수한다</strong>. 실무 기준 설계의 핵심 검증 장면이기 때문이다.</td><td><ul class="gwt">
         <li><b>Given</b> 생성기 유입 속도를 평시의 수 배로 올렸을 때</li>
@@ -281,7 +307,7 @@
 
   <h3>S1. 거래 수신·적재 (UC-08) — 관문 검증, 최소 1회 전달, 멱등 적재</h3>
   <div class="diagram-wrap">
-  <svg viewBox="0 0 1150 690" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="거래 수신 적재 시퀀스: 생성기가 관문을 거쳐 큐에 투입되고(투입 확인 후 ACK), 수집 워커가 폴링으로 소비해 DB에 멱등 적재 후 ACK하는 흐름">
+  <svg viewBox="0 0 1150 690" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="거래 수신 적재 시퀀스: 원천 거래번호 transaction_id와 전송 시도 ingest_id를 분리하고, 생성기가 관문을 거쳐 큐에 투입된 뒤 수집 워커가 DB에 멱등 적재하는 흐름">
     <defs>
       <marker id="sa1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#42526e"/></marker>
       <marker id="sa1o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#42526e" stroke-width="1.5"/></marker>
@@ -308,11 +334,11 @@
     <line x1="468" y1="230" x2="102" y2="230" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa1o)"/>
     <text x="285" y="222" text-anchor="middle" font-size="10.5" fill="#42526e">④ 400 즉시 거절 + 거절 로그 (파이프라인 미진입)</text>
     <line x1="470" y1="272" x2="658" y2="272" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa1)"/>
-    <text x="565" y="264" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑤ 큐 투입 (전체 페이로드)</text>
+    <text x="565" y="264" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑤ 큐 투입 (payload + ingest_id)</text>
     <line x1="658" y1="298" x2="472" y2="298" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa1o)"/>
     <text x="565" y="290" text-anchor="middle" font-size="10.5" fill="#42526e">투입 확인</text>
     <line x1="468" y1="326" x2="102" y2="326" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa1o)"/>
-    <text x="285" y="318" text-anchor="middle" font-size="10.5" fill="#42526e">⑥ 202 수신 ACK — 투입 확인 후에만 발급</text>
+    <text x="285" y="318" text-anchor="middle" font-size="10.5" fill="#42526e">⑥ 202 + ingest_id (투입 확인 후)</text>
     <rect x="70" y="344" width="480" height="52" fill="none" stroke="#d73027" stroke-width="1.2" stroke-dasharray="6 4"/>
     <text x="80" y="359" font-size="10.5" font-weight="800" fill="#a50026">alt [큐 투입 실패]</text>
     <line x1="468" y1="386" x2="102" y2="386" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa1o)"/>
@@ -322,10 +348,10 @@
     <line x1="662" y1="450" x2="838" y2="450" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa1o)"/>
     <text x="750" y="442" text-anchor="middle" font-size="10.5" fill="#42526e">메시지 전달 (최소 1회)</text>
     <line x1="840" y1="500" x2="1038" y2="500" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa1)"/>
-    <text x="940" y="472" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑧ 멱등 적재(PENDING)</text>
-    <text x="940" y="488" text-anchor="middle" font-size="10" fill="#42526e">+ 신규 계좌 등록</text>
+    <text x="940" y="472" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑧ 거래 멱등 적재(PENDING)</text>
+    <text x="940" y="488" text-anchor="middle" font-size="10" fill="#42526e">+ ingest 결과·신규 계좌 기록</text>
     <line x1="1038" y1="530" x2="842" y2="530" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa1o)"/>
-    <text x="940" y="522" text-anchor="middle" font-size="10.5" fill="#42526e">성공 (중복 tx_id = 무시)</text>
+    <text x="940" y="522" text-anchor="middle" font-size="10.5" fill="#42526e">성공 / 동일내용 중복 연결 / ID 충돌 격리</text>
     <line x1="840" y1="562" x2="662" y2="562" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa1)"/>
     <text x="750" y="554" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑨ ACK — 쓰기 성공 후에만</text>
     <rect x="580" y="586" width="350" height="60" fill="none" stroke="#d73027" stroke-width="1.2" stroke-dasharray="6 4"/>
@@ -335,9 +361,10 @@
   </svg>
   </div>
   <ul>
-    <li>⑥ ACK는 <strong>투입 확인이 돌아온 뒤에만</strong> 나간다 — "접수했다"의 약속 범위가 큐 보존까지이기 때문 (§6). 투입 실패면 ACK 대신 5xx가 나가고, 생성기 재시도가 유실을 막는다 (ACK 안 준 것 = 아직 책임 이전 안 됨).</li>
+    <li>⑥ ACK는 <strong>투입 확인이 돌아온 뒤에만</strong> 나가며 수신 시도 식별자 <code>ingest_id</code>를 반환한다. 원천 거래번호 <code>transaction_id</code>는 ACK 횟수나 큐 전달 횟수를 세는 ID가 아니다. 투입 실패면 ACK 대신 5xx가 나가고, 생성기 재시도가 유실을 막는다.</li>
     <li>⑦은 큐가 밀어주는 게 아니라 <strong>워커가 가져가는 pull</strong> — SQS의 실제 소비 방식이자, S2 에이전트 폴링과 같은 주도권 방향.</li>
-    <li>⑨의 순서(쓰기→ACK)가 유실 방지의 핵심 불변식 (Q-1). 워커가 ⑧과 ⑨ 사이에서 죽으면 같은 메시지가 재전달되고, ⑧의 유니크 제약이 중복을 무시한다.</li>
+    <li>⑨의 순서(쓰기→ACK)가 유실 방지의 핵심 불변식 (Q-1). 워커가 ⑧과 ⑨ 사이에서 죽으면 같은 큐 메시지가 재전달되고, 거래 업무키와 <code>payload_hash</code>가 동일내용 재전송과 ID 충돌을 구분한다.</li>
+    <li>수신 회계는 <code>transaction_id</code> 행 수와 202 응답 횟수를 직접 비교하지 않는다. <code>ingest_id</code>별 처리대기·신규적재·동일내용중복·ID충돌·DLQ 합계가 ACK 합계와 맞는지 검증한다.</li>
     <li>관련 결정: §6 수집 경계, Q-1~5. 의미 이상(형식은 유효) 거래는 ④가 아니라 ⑤~⑧ 경로로 가되 격리 플래그를 달고 저장된다.</li>
   </ul>
 
@@ -365,7 +392,7 @@
     <line x1="338" y1="166" x2="127" y2="166" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
     <text x="232" y="158" text-anchor="middle" font-size="10.5" fill="#42526e">③ 서브그래프·특징</text>
     <line x1="125" y1="196" x2="338" y2="196" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="232" y="188" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">④ 추론 작업(페이로드) 저장</text>
+    <text x="232" y="188" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">④ job·attempt·lease 저장</text>
     <!-- loop: 2분 간격 폴링 -->
     <rect x="255" y="222" width="660" height="180" fill="none" stroke="#4f78a3" stroke-width="1.2" stroke-dasharray="6 4"/>
     <text x="265" y="238" font-size="10.5" font-weight="800" fill="#2e5a86">loop [2분 간격 — 배치 주기(5분)와 독립]</text>
@@ -375,7 +402,7 @@
     <text x="455" y="282" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑥ 대기 작업 조회</text>
     <line x1="342" y1="315" x2="568" y2="315" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
     <line x1="570" y1="340" x2="798" y2="340" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
-    <text x="685" y="332" text-anchor="middle" font-size="10.5" fill="#42526e">⑦ 작업 페이로드</text>
+    <text x="685" y="332" text-anchor="middle" font-size="10.5" fill="#42526e">⑦ payload + attempt·lease</text>
     <rect x="545" y="352" width="360" height="48" fill="none" stroke="#8f9bad" stroke-width="1.1" stroke-dasharray="5 4"/>
     <text x="555" y="366" font-size="10" font-weight="800" fill="#5e6c84">alt [대기 작업 없음 — 대부분의 폴링]</text>
     <line x1="572" y1="392" x2="798" y2="392" stroke="#8f9bad" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
@@ -391,7 +418,7 @@
     <text x="910" y="506" text-anchor="middle" font-size="10.5" fill="#42526e">⑪ 패턴 분류 결과</text>
     <!-- 결과 제출 -->
     <line x1="800" y1="550" x2="572" y2="550" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="685" y="542" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑫ 결과 제출 (작업 ID·모델 버전)</text>
+    <text x="685" y="542" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑫ 결과 제출 (job·attempt·model)</text>
     <line x1="570" y1="580" x2="342" y2="580" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
     <text x="455" y="572" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑬ 결과+알림 원자 기록</text>
     <line x1="572" y1="610" x2="798" y2="610" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
@@ -400,14 +427,14 @@
     <rect x="240" y="636" width="440" height="62" fill="none" stroke="#d73027" stroke-width="1.2" stroke-dasharray="6 4"/>
     <text x="250" y="651" font-size="10.5" font-weight="800" fill="#a50026">alt [작업 타임아웃 — 에이전트 무응답]</text>
     <path d="M340,664 h42 v16 h-40" fill="none" stroke="#d73027" stroke-width="1.5" marker-end="url(#sa2)"/>
-    <text x="392" y="672" font-size="10.5" fill="#a50026">⑮ INFERENCING 초과분 → PENDING 회수</text>
+    <text x="392" y="672" font-size="10.5" fill="#a50026">⑮ lease 만료 → 회수·새 attempt 발급</text>
   </svg>
   </div>
   <ul>
     <li><strong>타이머 소유권</strong>: "5분"의 의미는 배치 워커의 선점 타이머(①) 한 곳에만 있다 — 토픽 2의 구현 지점. 에이전트의 2분 폴링은 배치 의미가 없는 전송 간격이며, 짧을수록 픽업 지연만 줄어든다 (판정 지연 = 배치 대기 0~5분 + 픽업 ≤2분 + 추론 + 제출).</li>
     <li>①~④(준비)와 ⑤~⑭(실행)은 <strong>직접 연결되지 않는다</strong> — 접점은 DB에 저장된 작업뿐. pull 방식(G-1)이라 클러스터 쪽에서만 접속을 시작하며, 작업이 DB에 남아 있어 어느 쪽이 죽어도 증발하지 않는다.</li>
     <li>⑨의 반환이 있어야 ⑩의 "양성만" 필터가 성립한다 — 1단계 결과를 에이전트가 받아 2단계 입력을 구성.</li>
-    <li>⑭는 ⑬(기록) <strong>완료 후에</strong> 나간다 — 수집 경로의 "쓰기→ACK"와 동일 원리. 응답이 유실되면 에이전트는 재제출하고, <strong>(작업 ID, 모델 버전) 유니크 제약이 중복 결과·중복 알림을 흡수</strong>한다 (결과 제출 멱등 — 설계안 §8 불변식).</li>
+    <li>⑭는 ⑬(기록) <strong>완료 후에</strong> 나간다. 응답이 유실되면 같은 시도의 재제출은 <strong>(작업 ID, 모델 버전) 유니크 제약</strong>이 중복 결과·중복 알림을 흡수한다. 타임아웃 뒤 이전 시도가 늦게 제출한 결과는 현재 상태·<code>attempt_id</code>·lease 조건부 갱신이 거절한다.</li>
     <li>⑬은 결과 기록과 알림 생성이 <strong>같은 DB 트랜잭션</strong> (A-1). 상태는 COMPLETED로 전환.</li>
     <li>클러스터 전체가 다운되면 ⑤가 멈출 뿐 — 작업은 적체되고 수집·조회는 정상 (G-3, US-14).</li>
   </ul>
@@ -433,27 +460,28 @@
     <text x="670" y="120" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">② 최근 구간 조회 (시간 조건 규율)</text>
     <line x1="838" y1="152" x2="502" y2="152" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa3o)"/>
     <line x1="498" y1="180" x2="162" y2="180" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa3o)"/>
-    <text x="330" y="172" text-anchor="middle" font-size="10.5" fill="#42526e">③ 초기 목록 + 커서 발급</text>
+    <text x="330" y="172" text-anchor="middle" font-size="10.5" fill="#42526e">③ 초기 목록 + high-watermark change_seq</text>
     <rect x="70" y="204" width="860" height="212" fill="none" stroke="#4f78a3" stroke-width="1.2" stroke-dasharray="6 4"/>
     <text x="80" y="220" font-size="10.5" font-weight="800" fill="#2e5a86">loop [2~5초 주기]</text>
     <line x1="160" y1="252" x2="498" y2="252" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa3)"/>
-    <text x="330" y="244" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">④ GET /feed?since=커서</text>
+    <text x="330" y="244" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">④ GET /feed?since=change_seq</text>
     <line x1="500" y1="280" x2="838" y2="280" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa3)"/>
-    <text x="670" y="272" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑤ 커서 이후 신규+변경 조회</text>
+    <text x="670" y="272" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑤ change_seq &gt; cursor 신규+변경 조회</text>
     <line x1="838" y1="306" x2="502" y2="306" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa3o)"/>
     <line x1="498" y1="334" x2="162" y2="334" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa3o)"/>
-    <text x="330" y="326" text-anchor="middle" font-size="10.5" fill="#42526e">⑥ 신규 거래(판정 대기) + 판정 갱신분 + 새 커서</text>
+    <text x="330" y="326" text-anchor="middle" font-size="10.5" fill="#42526e">⑥ 신규·판정 갱신분 + next change_seq</text>
     <path d="M160,362 h42 v16 h-40" fill="none" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa3)"/>
-    <text x="212" y="370" font-size="10.5" font-weight="700" fill="#172b4d">⑦ event_id로 기존 행 갱신 (중복 행 금지)</text>
+    <text x="212" y="370" font-size="10.5" font-weight="700" fill="#172b4d">⑦ transaction_id로 기존 행 갱신</text>
     <rect x="120" y="440" width="760" height="70" fill="#f7f8fa" stroke="#aeb8c6" stroke-width="1"/>
     <text x="500" y="461" text-anchor="middle" font-size="11" fill="#42526e">거래 1건은 두 번 내려온다: 적재 직후 "판정 대기" → 5분 배치+추론 후 같은 행이 "정상/이상(패턴)"</text>
-    <text x="500" y="479" text-anchor="middle" font-size="11" fill="#42526e">커서는 생성 시각이 아니라 <tspan font-weight="700">변경 시각 기준</tspan> — 판정 갱신(기존 행 수정)이 커서 이후 변경으로 잡혀야 한다</text>
+    <text x="500" y="479" text-anchor="middle" font-size="11" fill="#42526e">커서는 시간값이 아닌 <tspan font-weight="700">단조 증가 change_seq</tspan> — 동시 변경·페이지 경계에서도 누락을 막는다</text>
     <text x="500" y="497" text-anchor="middle" font-size="11" fill="#42526e">판정 지연은 배치 설계의 귀결이므로 UI가 명시적 상태로 정직하게 표시한다 (§5.1)</text>
   </svg>
   </div>
   <ul>
     <li>①~③(최초 접속)이 없으면 새 세션은 빈 화면에서 새 이벤트만 기다리게 된다 — 스냅숏 + 커서 발급이 진입점.</li>
-    <li>하나의 엔드포인트가 "신규 도착"과 "판정 갱신"을 모두 나른다 — 프론트는 event_id로 행을 찾아 갱신만 하면 된다. <strong>커서가 변경 시각 기준이어야 갱신을 놓치지 않는다</strong> (구현 시 가장 틀리기 쉬운 지점).</li>
+    <li>하나의 엔드포인트가 "신규 도착"과 "판정 갱신"을 모두 나른다 — 프론트는 원천 거래번호 <code>transaction_id</code>로 행을 찾아 갱신한다. 서버 커서는 별도의 단조 증가 <code>change_seq</code>라 같은 시각의 다중 변경과 페이지 경계에서도 누락되지 않는다.</li>
+    <li>페이지 응답은 조회 시작 시점의 high-watermark를 고정하고, <code>next_cursor</code>가 그 범위를 모두 소진한 뒤에만 다음 high-watermark로 전진한다.</li>
     <li>실시간 푸시(WebSocket)는 스트레치 — 이 API 구조를 바꾸지 않고 병렬 채널로 추가 가능 (부착점 원칙).</li>
   </ul>
 
@@ -503,22 +531,22 @@
     <line x1="340" y1="538" x2="618" y2="538" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa4)"/>
     <text x="480" y="530" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑪ 소견 저장 (사건·계좌에 첨부)</text>
     <line x1="340" y1="570" x2="618" y2="570" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa4)"/>
-    <text x="480" y="562" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑫ 조사 결과 입력 → 알림 종결</text>
+    <text x="480" y="562" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑫ 조사 결과 → 대상 알림별 종결</text>
     <line x1="340" y1="598" x2="618" y2="598" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa4)"/>
-    <text x="480" y="590" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑬ 사건 종결</text>
+    <text x="480" y="590" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑬ 사건 종결 (조건 팀 결정 필요)</text>
     <rect x="90" y="624" width="860" height="68" fill="#f7f8fa" stroke="#aeb8c6" stroke-width="1"/>
     <text x="520" y="645" text-anchor="middle" font-size="11" fill="#42526e">큐 가시성 = 상태 필터: 이관되면 모니터링 큐(NEW·검토중)에서 사라지고 분석 큐(조사중)에 나타난다 — 삭제가 아니라 필터.</text>
-    <text x="520" y="663" text-anchor="middle" font-size="11" fill="#42526e">상태 전환 권한 — 모니터링: 검토중·오탐 종결·이관 / 분석: 이관 알림의 결과 입력·종결. 모든 호출은 역할 권한 검사 (US-09).</text>
+    <text x="520" y="663" text-anchor="middle" font-size="11" fill="#42526e">모든 상태 전환은 역할 검사 + 버전 조건부 갱신 + append-only 감사이력 기록 (행위자·시각·사유).</text>
     <text x="520" y="681" text-anchor="middle" font-size="11" fill="#42526e">알림은 기계가 만들고(S2-⑬) 사건은 사람이 만든다(⑦) — 책임 경계 불변식.</text>
   </svg>
   </div>
   <ul>
     <li><strong>알림 생명주기 = 4상태</strong>: NEW → 검토중 → 조사중(이관) → 종결. 종결 경로는 둘 — 오탐(모니터링, 검토 단계 조기 종결) / 조사 결과(분석, 결과 입력과 함께). 이관은 업무 구두 절차가 아니라 <strong>시스템 상태 전환</strong>이라, 큐 가시성(누구 화면에 뜨는가)이 상태로 자동 결정된다.</li>
-    <li>⑬으로 사건도 명시적으로 닫힌다 (UC-03 명세의 사건 종결과 정합).</li>
+    <li>⑫는 사건에 연결된 대상 알림을 각각 종결한다. ⑬ 사건 종결의 허용 조건과 알림 1건의 복수 사건 연결 허용 여부는 팀 결정 전까지 미확정으로 둔다.</li>
     <li>⑨의 허브 가드: 허브 계좌(세트당 15개, 2-hop 폭발 유발)는 이웃을 펼치지 않고 요약만 반환 (§10, US-06).</li>
   </ul>
 
-  <p class="note"><strong>문서 상태</strong>: 유스케이스 UC-01~10, 유저 스토리, 시퀀스 4종은 확정 아키텍처(§5~9)에서 직접 도출. UC-11·12와 US-04, US-08 일부 표시 항목(규칙 히트·유사 사례)은 기획서 §11 팀 협의 대기와 연동 — 결정 후 확정. 폴링 주기·타임아웃 등 수치는 구현 시 확정. STR·의심계좌 뷰 관련 시퀀스는 팀 결정 후 추가.</p>
+  <p class="note"><strong>문서 상태</strong>: 유스케이스 UC-01~10, 유저 스토리, 시퀀스 4종은 확정 아키텍처(§5~9)에서 직접 도출. 식별자 계약은 원천 거래번호 <code>transaction_id</code>와 전송 시도 <code>ingest_id</code>를 분리하고, 추론 재선점은 <code>attempt_id</code>·lease, 피드 커서는 <code>change_seq</code>를 사용한다. UC-11·12와 US-04, US-08 일부 표시 항목(규칙 히트·유사 사례), 사건 종결 조건은 팀 협의 대기. 폴링 주기·타임아웃 등 수치는 구현 시 확정. STR·의심계좌 뷰 관련 시퀀스는 팀 결정 후 추가.</p>
 </main>
 </body>
 </html>
