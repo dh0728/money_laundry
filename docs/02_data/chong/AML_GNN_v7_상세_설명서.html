@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AML GNN v7 (7_research_grade) 상세 설명서 — 데이터·전처리·모델·학습</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --hairline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --accent: #2a78d6;
+    --accent-soft: #e8f1fc;
+    --warn-soft: #fdf3e4;
+    --warn-ink: #8a5a00;
+    --good-ink: #006300;
+    --code-bg: #f4f3f0;
+    --border-ring: rgba(11,11,11,0.10);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "NanumGothic", sans-serif;
+    font-size: 15.5px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 28px 80px; }
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--border-ring);
+    border-radius: 14px;
+    padding: 44px 52px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 720px) { .sheet { padding: 28px 20px; } }
+
+  h1 { font-size: 30px; line-height: 1.35; margin: 8px 0 10px; letter-spacing: -0.01em; }
+  h2 { font-size: 21.5px; margin: 0 0 18px; padding-bottom: 12px; border-bottom: 2px solid var(--ink); letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 30px 0 10px; color: var(--ink); }
+  h4 { font-size: 15.5px; margin: 22px 0 8px; color: var(--ink-2); }
+  p { margin: 10px 0; }
+  strong { font-weight: 700; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .doc-label { font-size: 12.5px; font-weight: 700; letter-spacing: 0.14em; color: var(--accent); text-transform: uppercase; }
+  .subtitle { font-size: 16px; color: var(--ink-2); margin-top: 4px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--hairline); font-size: 13.5px; color: var(--ink-2); }
+  .meta-row b { color: var(--ink); font-weight: 600; }
+
+  .badge {
+    display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 9px; border-radius: 999px; vertical-align: 2px; margin-left: 8px;
+    background: var(--accent-soft); color: #1c5cab; border: 1px solid #b7d3f6;
+  }
+  .badge.gray { background: #f0efec; color: var(--ink-2); border-color: var(--hairline); }
+
+  .file-chip {
+    font-family: ui-monospace, "SF Mono", Consolas, "D2Coding", monospace;
+    font-size: 12.5px; background: var(--code-bg); border: 1px solid var(--hairline);
+    border-radius: 6px; padding: 1px 7px; white-space: nowrap;
+  }
+
+  /* callouts */
+  .callout { border-radius: 10px; padding: 14px 18px; margin: 16px 0; font-size: 14.5px; }
+  .callout.simple { background: var(--accent-soft); border: 1px solid #b7d3f6; }
+  .callout.simple .tag { color: #1c5cab; }
+  .callout.warn { background: var(--warn-soft); border: 1px solid #f0d9ae; }
+  .callout.warn .tag { color: var(--warn-ink); }
+  .callout .tag { display: block; font-size: 11.5px; font-weight: 800; letter-spacing: 0.1em; margin-bottom: 4px; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 18px; font-size: 13.5px; }
+  th { text-align: left; font-weight: 700; color: var(--ink); background: #f4f3ef; border-top: 1.5px solid var(--ink); border-bottom: 1px solid var(--baseline); padding: 8px 10px; }
+  td { border-bottom: 1px solid var(--hairline); padding: 8px 10px; vertical-align: top; color: var(--ink); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hl td { background: #f2f7fd; }
+  .small { font-size: 12.5px; color: var(--muted); }
+  caption { caption-side: bottom; font-size: 12px; color: var(--muted); text-align: left; padding-top: 6px; }
+
+  /* code */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--hairline); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 12.6px; line-height: 1.6;
+    font-family: ui-monospace, "SF Mono", Consolas, "D2Coding", monospace; margin: 12px 0;
+  }
+  code { font-family: ui-monospace, "SF Mono", Consolas, "D2Coding", monospace; font-size: 0.92em; background: var(--code-bg); border-radius: 4px; padding: 1px 5px; }
+  pre code { background: none; padding: 0; }
+  .code-cap { font-size: 12px; color: var(--muted); margin: -6px 0 14px 4px; }
+  .cmt { color: #6a7f57; }
+  .kw { color: #1c5cab; font-weight: 600; }
+  .st { color: #a0522d; }
+
+  /* pipeline flow */
+  .flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; margin: 20px 0; }
+  .flow-node {
+    flex: 1 1 116px; min-width: 112px; background: var(--surface);
+    border: 1.5px solid var(--baseline); border-radius: 10px; padding: 10px 12px; position: relative;
+  }
+  .flow-node.main { border-color: var(--accent); background: #f6faff; }
+  .flow-node .step { font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; color: var(--accent); }
+  .flow-node .name { font-size: 13px; font-weight: 700; line-height: 1.35; margin: 2px 0; }
+  .flow-node .desc { font-size: 11.5px; color: var(--ink-2); line-height: 1.45; }
+  .flow-arrow { align-self: center; color: var(--muted); font-size: 16px; flex: 0 0 auto; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 18px 0; }
+  .tile { background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; padding: 14px 16px; }
+  .tile .k { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+  .tile .v { font-size: 26px; font-weight: 750; letter-spacing: -0.01em; margin: 2px 0; }
+  .tile .d { font-size: 12px; color: var(--muted); }
+  .tile .up { color: var(--good-ink); font-weight: 700; }
+
+  /* charts */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 18px 0 6px; }
+  @media (max-width: 720px) { .chart-grid { grid-template-columns: 1fr; } }
+  figure.chart { margin: 0; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; padding: 16px 16px 10px; }
+  figure.chart figcaption { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  figure.chart .sub { display: block; font-weight: 400; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+
+  /* TOC */
+  .toc { columns: 2; column-gap: 40px; font-size: 14px; }
+  @media (max-width: 720px) { .toc { columns: 1; } }
+  .toc a { display: block; padding: 4px 0; color: var(--ink); border-bottom: 1px dotted var(--hairline); break-inside: avoid; }
+  .toc a:hover { color: var(--accent); text-decoration: none; }
+  .toc .n { color: var(--accent); font-weight: 700; margin-right: 8px; font-variant-numeric: tabular-nums; }
+
+  /* section header block for each notebook */
+  .nb-head { background: #f4f6f9; border: 1px solid var(--hairline); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 4px 0 20px; font-size: 13.5px; }
+  .nb-head .row { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .nb-head b { font-weight: 700; }
+
+  .kv { display: grid; grid-template-columns: 130px 1fr; gap: 4px 14px; font-size: 13.5px; margin: 10px 0; }
+  .kv dt { color: var(--ink-2); font-weight: 600; }
+  .kv dd { margin: 0; }
+
+  .footer-note { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 10px; }
+  @media print {
+    body { background: #fff; }
+    .wrap { padding: 0; max-width: none; }
+    .sheet { border: none; border-radius: 0; padding: 24px 8px; margin-bottom: 8px; break-inside: avoid-page; }
+  }
+
+  .split-bar { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-ring); margin: 14px 0 4px; height: 58px; }
+  .split-seg { display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; font-size: 12.5px; font-weight: 700; line-height: 1.3; }
+  .split-seg small { font-weight: 400; font-size: 10.5px; opacity: .92; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<!-- ============================== 표지 ============================== -->
+<section class="sheet">
+  <span class="doc-label">AI 개발 보고서 · 단일 노트북 심층 설명서</span>
+  <h1>AML GNN v7 — strict-causal 연구 프로토콜 상세 해부</h1>
+  <p class="subtitle">데이터를 어디까지 포함시켰는지, 전처리와 피처를 어떻게 만들었는지, 어떤 모델을 어떻게 학습시켰는지를 <b>설계 이유와 함께</b> 설명하는 문서입니다. 노트북 7종 종합 설명서(별도 문서)의 §8을 코드 수준으로 확장한 심화편입니다.</p>
+  <div class="meta-row">
+    <span><b>대상 파일</b> <span class="file-chip">AML_GNN_edge_classification_7_research_gradeeee.ipynb</span> (34셀)</span>
+    <span><b>작성</b> AI 파트 (모델 개발 담당)</span>
+    <span><b>작성일</b> 2026-08-10</span>
+    <span><b>실행 상태</b> 코드 완성 · 업로드본에는 스윕 파일럿 1행까지만 출력 기록</span>
+  </div>
+</section>
+
+<!-- ============================== 목차 ============================== -->
+<section class="sheet">
+  <h2>목차</h2>
+  <nav class="toc">
+    <a href="#sec-why"><span class="n">0</span>v7은 무엇이고 왜 만들었습니까</a>
+    <a href="#sec-data"><span class="n">1</span>데이터 — 무엇을, 어디까지 포함시켰는가</a>
+    <a href="#sec-feat"><span class="n">2</span>전처리·피처 구조 (42차원의 내역과 이유)</a>
+    <a href="#sec-window"><span class="n">3</span>그래프 구성 — 누수 없는 causal window</a>
+    <a href="#sec-model"><span class="n">4</span>모델 — CausalMegaGNN의 구조와 이유</a>
+    <a href="#sec-train"><span class="n">5</span>학습 절차 — 스윕 → 본학습 → 앙상블</a>
+    <a href="#sec-eval"><span class="n">6</span>보정·평가·운영 장치</a>
+    <a href="#sec-status"><span class="n">7</span>실행 상태와 해석 원칙 (반드시 읽으십쇼)</a>
+    <a href="#sec-diff"><span class="n">8</span>v6 대비 변경 총정리표</a>
+    <a href="#sec-src"><span class="n">9</span>출처</a>
+  </nav>
+</section>
+
+<!-- ============================== 0. 왜 ============================== -->
+<section class="sheet" id="sec-why">
+  <h2>0. v7은 무엇이고 왜 만들었습니까</h2>
+  <p>v7의 목표는 점수를 더 올리는 것이 아니라 <strong>"지금까지의 점수를 믿어도 되는가"를 보장하는 것</strong>입니다. v6까지의 성능(test PR-AUC 0.57대)은 좋아 보이지만, 코드에는 점수를 은근히 부풀릴 수 있는 관행 세 가지가 남아 있었습니다. v7은 이 셋을 제거하는 것에서 출발합니다.</p>
+  <table>
+    <tr><th style="width:34%">v6까지 남아 있던 문제</th><th>왜 문제인가</th><th style="width:30%">v7의 해결</th></tr>
+    <tr><td>① 대상 거래가 <b>자기 자신이 포함된 그래프</b> 위에서 판정됨</td><td>같은 윈도우 안의 대상 거래·미래 거래의 구조(차수, 병렬 엣지 등)가 메시지 전달에 섞입니다. 실전에서는 판정 시점에 존재하지 않는 정보입니다</td><td>strict-causal window — 메시지 그래프에는 <b>과거 컨텍스트만</b> (§3)</td></tr>
+    <tr><td>② 확률 보정·임계값 결정 전용 데이터가 없음</td><td>검증셋 하나로 모델 선택과 임계값 튜닝을 겸하면, 임계값이 검증셋에 과적합됩니다</td><td>train/val/<b>calibration</b>/test 4분할 (§1-3)</td></tr>
+    <tr><td>③ 경보 예산 임계값을 <b>테스트 분위수</b>로 계산</td><td>테스트 분포를 미리 본 셈 — 미래 데이터의 통계를 운영 파라미터에 사용한 누수입니다</td><td>모든 임계값·온도를 calibration에서만 결정하고 test에 <b>고정</b> (§6-1)</td></tr>
+  </table>
+  <p>노트북 서두에는 해석의 자세도 못박혀 있습니다 — <em>"외부 세트 결과가 나오기 전에는 '일반화 성능 향상'을 확정하지 않습니다. IBM 데이터는 합성 데이터이므로 실데이터 이관 성능도 별도 검증 대상입니다."</em> 연구 근거로는 IBM AML-Data, MEGA-GNN(병렬 엣지 2단계 집계), GroupDRO(최악 환경 학습), temperature scaling(확률 보정), LineMVGNN(방향별 multi-view·거래 중심 readout)을 인용하되, "그대로 복제하지 않고 대규모 방향 멀티그래프에서 실행 가능한 strict-causal MEGA형 edge classifier로 조합했다"고 명시합니다.</p>
+
+  <h3>전체 파이프라인 한 장 요약</h3>
+  <div class="flow">
+    <div class="flow-node"><span class="step">A</span><div class="name">적재·표준화</div><div class="desc">parquet/CSV/zip 자동 탐색 → 9컬럼 canonicalize</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node"><span class="step">B</span><div class="name">4분할</div><div class="desc">55/15/15/15, 분 경계 정렬</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node"><span class="step">C</span><div class="name">피처 42차원</div><div class="desc">로버스트 z + 해시 24 + 시간 12 (train만 적합)</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node"><span class="step">D</span><div class="name">causal window</div><div class="desc">과거만 메시지 그래프, 대상은 readout만</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node main"><span class="step">E</span><div class="name">학습</div><div class="desc">cap 스윕 → 시드 3개 본학습 (GroupDRO·shortcut dropout·보조 head)</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node"><span class="step">F</span><div class="name">보정·평가</div><div class="desc">앙상블 → 온도·임계값(calib 고정) → test 1회 + CI</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node"><span class="step">G</span><div class="name">운영·연구</div><div class="desc">계좌 판정·드리프트·zero-shot 세트 간·manifest</div></div>
+  </div>
+
+  <div class="callout simple">
+    <span class="tag">용어 미니 사전 — 이 문서를 읽는 데 필요한 여섯 개</span>
+    <b>노드/엣지</b>: 계좌 = 점(노드), 거래 1건 = 화살표(엣지). 같은 계좌쌍의 여러 거래는 화살표 여러 개(병렬 엣지)로 유지합니다. · <b>메시지 전달</b>: 각 계좌가 이웃 엣지의 정보를 반복해 받아 자신의 표현 벡터를 갱신하는 GNN의 기본 연산. · <b>readout</b>: 메시지 전달로 만들어진 표현들을 꺼내 모아 최종 판정을 계산하는 마지막 단계. · <b>causal window</b>: "과거 컨텍스트 + 판정 대상" 묶음으로 데이터를 자르되, 정보가 과거→현재로만 흐르게 강제한 처리 단위. · <b>stable hashing</b>: 카테고리 문자열을 해시 함수로 고정 개수의 버킷에 결정적으로 배정하는 인코딩 — 어떤 세트가 와도 입력 차원이 같아집니다. · <b>A/B (ablation)</b>: 조건 하나만 다른 두 버전을 동일 조건에서 학습해 그 조건의 기여도를 재는 비교 실험.
+  </div>
+</section>
+
+<!-- ============================== 1. 데이터 ============================== -->
+<section class="sheet" id="sec-data">
+  <h2>1. 데이터 — 무엇을, 어디까지 포함시켰는가</h2>
+
+  <h3>1-1. 입력 소스와 탐색 순서</h3>
+  <p>학습 세트는 <code>Config.source_dataset = "HI-Small"</code>이고, 로더(<code>locate_dataset()</code>)의 우선순위는 다음과 같습니다: <strong>① 전처리 노트북의 산출물</strong> <code>processed/transactions_clean.parquet</code>이 있으면 그것을 사용(불필요한 파생 컬럼은 읽지 않도록 <code>columns=REQUIRED</code>로 9개 컬럼만 로드) → ② 없으면 <code>IBM_AML_dataset/</code>, <code>_to_delete/</code>, <code>aml/data/</code>, 현재 폴더에서 CSV/parquet 탐색 → ③ 그것도 없으면 zip 내부 멤버 탐색. 이렇게 만든 이유는 두 가지입니다: 전처리 파이프라인과의 <strong>연결 고리를 공식화</strong>하면서도, 어떤 실행 환경에서든(파일이 어디에 있든) 노트북이 자기완결적으로 돌게 하기 위함입니다.</p>
+  <p><code>_canonicalize()</code>는 어떤 소스로 들어와도 동일한 표준 형태로 만듭니다 — 필수 9컬럼(<code>timestamp, src, dst, amount_paid, amount_received, payment_currency, receiving_currency, payment_format, is_laundering</code>)만 남기고, 계좌 키를 <code>은행|계좌번호</code>로 합성하고, 필수 9컬럼 기준 중복을 제거(keep first)하고, <code>timestamp</code>+원본 행번호로 <strong>안정 정렬</strong>한 뒤, 계좌 문자열을 정수 ID로 factorize하고, 첫 거래 기준 경과 <strong>분(minute)</strong> 컬럼을 만듭니다. 누락 컬럼이 있으면 즉시 <code>ValueError</code>를 던집니다 — 이후 세트 간(zero-shot) 평가에서 LI-Small 등 다른 세트도 <strong>같은 함수 하나로</strong> 표준화하기 위한 세트 독립 설계입니다.</p>
+
+  <h3>1-2. 포함 범위: 꼬리 절단 없이 전 구간 사용</h3>
+  <p>실행 기록 기준 적재 결과는 <strong>5,078,336건, 양성 5,177건(0.1019%)</strong>입니다. 원본 5,078,345건에서 중복 9건만 빠진 수치로, ②~⑥ 노트북들이 수행하던 <strong>꼬리 절단(2022-09-11 이후 라벨 급증 구간 제거)이 v7에는 없습니다</strong>. 코드 경로로 보면: 기록된 실행에서는 parquet이 없어 원본 CSV 폴백으로 들어왔고, <code>_canonicalize()</code>는 세트 독립 함수라 특정 세트의 수동 절단 규칙을 포함하지 않기 때문입니다(전처리 노트북의 parquet을 입력으로 쓰면 그쪽에서 절단된 데이터가 들어옵니다). 결과적으로 <strong>라벨이 급증하는 이상 구간이 테스트에 포함되어</strong> 테스트 양성률이 0.2048%로 올라간, 더 어렵고 보수적인 평가 조건이 됩니다 — 노트북이 "v6 수치와 직접 비교 금지"를 명시한 이유 중 하나입니다(§7).</p>
+
+  <h3>1-3. 4분할: train / val / calibration / test</h3>
+  <p><code>chronological_splits()</code>가 시간순으로 55/15/15/15를 자릅니다. 이때 비율 지점을 그대로 자르지 않고 <code>searchsorted(minute, ...)</code>로 <strong>분(minute) 경계에 스냅</strong>합니다 — 같은 분에 속한 거래가 두 분할에 걸쳐 찢어지면 "동일 분 거래는 서로 못 본다"는 인과 규칙(§2-3)과 충돌하기 때문입니다. 분할 비율 합이 1이 아니거나 빈 분할이 생기면 예외를 던지는 방어 코드도 있습니다.</p>
+  <div class="split-bar">
+    <div class="split-seg" style="flex:55; background:#2a78d6">train<small>2,792,892건 · 양성 2,013 (0.072%)</small></div>
+    <div class="split-seg" style="flex:15; background:#5598e7">val<small>761,755 · 843 (0.111%)</small></div>
+    <div class="split-seg" style="flex:15; background:#86b6ef">calib<small>761,590 · 760 (0.100%)</small></div>
+    <div class="split-seg" style="flex:15; background:#1c5cab">test<small>762,099 · 1,561 (0.205%)</small></div>
+  </div>
+  <p class="small">노트북 §0 실행 출력의 분할표 그대로. test 양성률(0.205%)이 train(0.072%)의 약 2.8배인 것은 꼬리 구간 포함의 결과입니다.</p>
+  <table>
+    <tr><th style="width:16%">분할</th><th>역할</th><th>이 분할만 쓸 수 있는 것</th></tr>
+    <tr><td>train (55%)</td><td>모델 가중치 학습, 피처 통계 적합</td><td>손실 계산, FeatureState(중앙값/IQR) 적합</td></tr>
+    <tr><td>val (15%)</td><td>모델 선택</td><td>조기종료, POS_WEIGHT_CAP 스윕 선택, ablation 비교</td></tr>
+    <tr><td>calib (15%)</td><td><b>보정 전용 (v7 신설)</b></td><td>temperature scaling, F1 임계값, 경보 예산 임계값 결정</td></tr>
+    <tr><td>test (15%)</td><td>최종 평가</td><td>고정된 임계값으로 <b>1회</b> 보고 (설계 변경 시 새 experiment id)</td></tr>
+  </table>
+  <div class="callout simple">
+    <span class="tag">왜 분할을 하나 더 만들었습니까</span>
+    v6까지는 검증셋이 "어느 모델이 좋은가"(모델 선택)와 "몇 점부터 경보인가"(임계값)를 겸했습니다. 같은 데이터로 두 결정을 하면 임계값이 그 데이터의 우연한 특성에 맞춰지고, 테스트 성능이 낙관적으로 나옵니다. 시험 문제로 비유하면 <b>"모의고사(val)로 공부 방향을 정하고, 별도 모의고사(calib)로 커트라인을 정한 뒤, 수능(test)은 딱 한 번 본다"</b>는 구조입니다.
+  </div>
+</section>
+
+<!-- ============================== 2. 피처 ============================== -->
+<section class="sheet" id="sec-feat">
+  <h2>2. 전처리·피처 구조 — 42차원의 내역과 이유</h2>
+  <p>v7 피처의 설계 목표는 <strong>"세트 독립 + 엄격 인과"</strong> 두 가지입니다. v6의 68차원에서 42차원으로 오히려 줄었는데, 줄인 것 자체가 설계입니다 — 학습 세트의 어휘(통화 이름 목록 등)에 묶인 피처를 없애야 다른 세트에 재학습 없이 이식(zero-shot)할 수 있기 때문입니다. 실행 출력: <code>features=(5078336, 42), time=12, shortcut=25</code>.</p>
+
+  <h3>2-1. 기본 피처 6차원 — 로버스트 정규화</h3>
+  <table>
+    <tr><th style="width:30%">피처</th><th>정의</th><th style="width:34%">이유</th></tr>
+    <tr><td><code>paid_robust_z</code>, <code>received_robust_z</code></td><td>통화별 log1p 금액을 <b>train에서 적합한 중앙값/IQR</b>로 표준화, ±8로 클리핑. 표본 50건 미만인 통화는 전역 통계로 폴백</td><td>평균/표준편차 대신 중앙값/IQR — 초고액 이상치에 통계가 휘둘리지 않게(로버스트). 전처리 노트북①의 방식이 여기서 복귀했습니다</td></tr>
+    <tr><td><code>log_amount_gap</code></td><td><code>tanh((log지급 − log수취)/4)</code></td><td>지급·수취 금액 차이(수수료·환전)를 유계(-1~1) 값으로</td></tr>
+    <tr><td><code>currency_mismatch</code>, <code>amount_mismatch</code>, <code>self_loop</code></td><td>통화 불일치 / 금액 불일치(1e-9 초과) / 자기송금 0·1 플래그</td><td>화두 8·11의 규칙 유지</td></tr>
+  </table>
+
+  <h3>2-2. 카테고리 24차원 — 원-핫을 버리고 해시 인코딩</h3>
+  <pre><code><span class="kw">def</span> _hash_matrix(values, namespace, buckets):
+    ids = blake2b(<span class="st">f"{namespace}|{값}"</span>) % buckets   <span class="cmt"># 문자열 → 고정 8버킷 중 하나</span>
+    ...</code></pre>
+  <p><code>payment_currency</code>·<code>receiving_currency</code>·<code>payment_format</code> 3개 컬럼을 각각 blake2b 해시로 <strong>8버킷 원-핫(3×8=24차원)</strong>에 매핑합니다. 이유: v6까지의 원-핫은 "train에 등장한 카테고리 목록"에 차원이 묶여 있어, 통화 구성이 다른 세트에 모델을 그대로 가져가면 입력 차원부터 어긋납니다. 해시는 <strong>어떤 세트가 와도 차원이 고정</strong>이고 같은 문자열은 항상 같은 버킷에 떨어집니다(결정적). 대신 서로 다른 값이 같은 버킷에 충돌할 수 있다는 정보 손실을 감수합니다 — 일반화를 위해 표현력을 일부 내준 명시적 트레이드오프입니다.</p>
+  <p>중요한 부수 장치로, 이 해시 24차원 + <code>currency_mismatch</code>를 <strong>shortcut_idx(지름길 피처 목록, 총 25개)</strong>로 지정해 둡니다 — §4-3의 shortcut dropout이 학습 중 이 피처들을 통째로 지워 "결제수단 몇 번이면 세탁"식의 암기를 방해합니다.</p>
+
+  <h3>2-3. 상대 시간 12차원 — "같은 분은 서로 못 본다"</h3>
+  <p>v6의 시간 피처 16종을 12종으로 정리하고, 인과 규칙을 한 단계 조입니다. <code>_prior_stats()</code>는 (계좌 또는 계좌쌍, 분) 복합 키를 정렬해 두고 <code>searchsorted(side="left")</code>로 <strong>자기 자신뿐 아니라 같은 분(minute)의 모든 거래를 제외한 과거만</strong> 집계합니다. out(송금 계좌)·in(수취 계좌)·pair(계좌쌍) 3개 관점 × (직전 이벤트까지의 Δt, 첫 등장 여부, 최근 60분 건수, 최근 1,440분 건수) 4종 = 12차원입니다. Δt는 log1p 후 1주(7×24×60분) 상수로, 건수는 log1p 후 log(101)로 정규화합니다.</p>
+  <div class="callout simple">
+    <span class="tag">왜 "같은 분"까지 제외합니까</span>
+    데이터의 시간 해상도가 분 단위라, 같은 분에 찍힌 거래들은 실제 선후 관계를 알 수 없습니다. v6는 정렬 순서상 앞에 있으면 "과거"로 취급했지만, 이는 우연한 정렬 순서에 기대는 것입니다. v7은 애매한 경우를 전부 "못 본 것"으로 처리하는 보수적 선택을 했고, 같은 이유로 분할 경계와 윈도우 경계도 분 단위로 스냅합니다(§1-3, §3-1). 정수 오버플로 가드(<code>OverflowError</code>)와 피처 행렬의 NaN/Inf 전수 검사(<code>ValueError</code>)도 이 단계에 들어 있습니다.
+  </div>
+  <p class="small">참고: v6에서 단변량 판별력이 가장 높던 <code>pair_dt</code>(ROC-AUC 0.8147) 계열이 유지되되, v7은 이 피처들이 합성 생성기 패턴에 과적합됐을 가능성을 검사하는 <code>no_relative_time</code> ablation(시간 12차원 전체를 0으로 마스킹)을 §6-5에 준비해 두었습니다.</p>
+</section>
+
+<!-- ============================== 3. causal window ============================== -->
+<section class="sheet" id="sec-window">
+  <h2>3. 그래프 구성 — 누수 없는 causal window</h2>
+
+  <h3>3-1. 윈도우 나누기: make_ranges()</h3>
+  <p>정렬된 거래를 <strong>대상 5만 건</strong> 단위로 자르되(<code>target_edges=50_000</code>), 각 윈도우 앞에 <strong>과거 10만 건</strong>을 컨텍스트로 붙입니다(<code>context_edges=100_000</code>). 윈도우 끝은 <code>searchsorted</code>로 분(minute) 경계에 스냅합니다 — 같은 분의 거래가 두 윈도우로 찢어지지 않게 하기 위함입니다(실제로 실행 출력의 첫 윈도우가 50,000이 아니라 54,740에서 잘린 것이 이 스냅의 흔적입니다). 각 윈도우에는 <strong>시간 환경 번호(env 0~3)</strong>도 부여됩니다 — train 구간을 시간순 4등분한 것으로, §5-3의 GroupDRO가 사용합니다.</p>
+
+  <h3>3-2. 핵심: 대상 거래를 메시지 그래프에서 뺀다</h3>
+  <p>v7 그래프 구성의 본질은 <code>build_causal_window(ctx_lo, lo, hi)</code> 한 함수에 있습니다. <strong>메시지 전달 그래프에 들어가는 엣지는 과거 컨텍스트 [ctx_lo, lo) 뿐</strong>이고, 판정 대상 [lo, hi)의 거래들은 그래프에 넣지 않습니다. 대상 거래는 ① 자기 자신의 피처 벡터(<code>target_edge_x</code>)와 ② 양끝 계좌의 노드 인덱스만 readout 단계로 전달됩니다. 노드 피처 9종(출/입 차수, 평균 송·수금액, 고유 상대방 수, 팬아웃-팬인 비대칭, 상대방당 거래수)도 <strong>전부 과거 컨텍스트에서만</strong> 계산합니다.</p>
+  <pre><code><span class="cmt"># 메시지 엣지 = 컨텍스트 구간만 (정방향 + 역방향)</span>
+ei = np.concatenate([np.stack([sl, dl]), np.stack([dl, sl])], axis=1)
+...
+<span class="cmt"># 누수 단위 테스트 — 대상 엣지가 그래프에 섞이면 즉시 사망</span>
+<span class="kw">assert</span> ei.shape[1] == 2 * (lo - ctx_lo), <span class="st">"target edge가 message graph에 섞였습니다"</span></code></pre>
+  <p class="code-cap">§2 셀. "규칙을 지켰는지"를 주석이 아니라 assert로 검증합니다. 실행 출력의 probe: <code>bounds (0, 54740, 100000) / message_edges 109480 / targets 45260</code> — 메시지 엣지 수가 정확히 컨텍스트 54,740건 × 2(역방향 포함)임을 확인할 수 있습니다.</p>
+  <div class="callout simple">
+    <span class="tag">왜 이렇게까지 합니까</span>
+    v6까지는 대상 거래도 그래프 안에 있었습니다. 그러면 모델이 "이 거래가 존재함으로써 생기는 구조"(예: 이 거래 때문에 늘어난 병렬 엣지 수, 같은 윈도우 안 미래 거래들의 차수)를 보고 판정할 수 있습니다. 실전 운영에서 거래를 판정하는 순간에는 그 거래가 만들 미래 구조를 알 수 없으므로, 이는 <b>평가 점수만 올려주고 실전에서는 재현되지 않는 정보</b>입니다. v7은 "판정 시점에 실제로 알 수 있는 것"만 입력이 되도록 그래프 구성 단계에서 원천 차단했습니다.
+  </div>
+  <p>이 밖에 병렬 엣지 그룹 정보(<code>pair_inv, pair_dst, pair_count</code> — §4의 2단계 집계용)와 계좌 보조 라벨(<code>node_y</code> = 대상 구간에서 양성 거래에 연루된 계좌, <code>node_mask</code> = 대상 구간에 등장한 계좌)도 이 함수에서 함께 만들어집니다.</p>
+</section>
+
+<!-- ============================== 4. 모델 ============================== -->
+<section class="sheet" id="sec-model">
+  <h2>4. 모델 — CausalMegaGNN의 구조와 이유</h2>
+
+  <h3>4-1. 전체 구조</h3>
+  <table>
+    <tr><th style="width:26%">구성 요소</th><th>내용</th><th style="width:32%">이유</th></tr>
+    <tr><td>입력 인코더 3개</td><td><code>node_in</code>(9→128), <code>context_edge_in</code>(42+방향2 → 128), <code>target_edge_in</code>(42→128) — 각각 Linear+LayerNorm+SiLU</td><td>컨텍스트 엣지(방향 플래그 포함)와 대상 엣지(그래프 밖)는 <b>역할이 달라 인코더를 분리</b></td></tr>
+    <tr><td><code>CausalMegaLayer</code> × 3</td><td>병렬 엣지 2단계 <b>평균</b> 집계 + 노드/엣지 갱신 + 잔차 + LayerNorm (아래 4-2)</td><td>MEGA-GNN 계열, degree shortcut 억제형으로 변형</td></tr>
+    <tr><td>JK readout</td><td>입력층 포함 4개 층의 노드 표현을 연결(concat) 후 압축</td><td>얕은 층(국소 패턴)과 깊은 층(광역 패턴) 정보를 모두 보존 (Jumping Knowledge)</td></tr>
+    <tr><td>거래 head</td><td><code>[h_src ‖ h_dst ‖ h_src·h_dst ‖ |h_src−h_dst| ‖ 대상엣지표현]</code> 5×128 → 2-hidden MLP → 위험도 로짓</td><td>곱(상호작용)·절대차(대칭 비교) 항을 명시적으로 제공 — 송금·수취 계좌의 "관계"를 읽기 쉽게. LineMVGNN의 거래 중심 readout 참고</td></tr>
+    <tr><td>계좌 보조 head</td><td>노드 표현 → 128→64→1, 보조 손실 가중 0.2</td><td>화두 1의 근본 위험("개별 거래 라벨은 노이즈가 크다") 대응 — 계좌 수준 신호로 표현 학습을 보강 (아래 4-4)</td></tr>
+  </table>
+
+  <h3>4-2. CausalMegaLayer: 합이 아니라 평균으로 집계하는 이유</h3>
+  <pre><code><span class="kw">def</span> forward(self, h, ei, e, pair_inv, pair_dst, pair_count):
+    msg  = self.msg(torch.cat([h[ei[0]], e], dim=1))
+    pair = index_mean(msg, pair_inv, len(pair_dst))          <span class="cmt"># ① 같은 계좌쌍의 병렬 엣지끼리 "평균"</span>
+    pair = pair * (1.0 + torch.log1p(pair_count) / 5.0)      <span class="cmt"># 거래량은 명시적 항으로 따로</span>
+    agg  = index_mean(pair, pair_dst, h.size(0))             <span class="cmt"># ② 이웃(계좌쌍) 단위 "평균"</span>
+    h2 = self.node_norm(h + self.node(torch.cat([h, agg], 1)))   <span class="cmt"># 잔차 연결</span>
+    e2 = self.edge_norm(e + self.edge(torch.cat([h2[ei[0]], h2[ei[1]], e], 1)))
+    <span class="kw">return</span> h2, e2</code></pre>
+  <p>v6의 <code>MegaConv</code>는 두 단계 모두 <strong>합(sum)</strong> 집계였습니다. 합 집계는 이웃이 많을수록 값이 커지므로, 모델이 패턴이 아니라 <strong>"거래량이 많다 = 의심"이라는 지름길(degree shortcut)</strong>을 배우기 쉽습니다 — 합성 데이터에서는 통하지만 거래량 분포가 다른 세트로 가면 무너지는 전형적 과적합 경로입니다. v7은 두 단계를 모두 <strong>평균(index_mean)</strong>으로 바꾸고, 거래량 정보가 정말 필요할 때를 위해 <code>log1p(병렬 엣지 수)/5</code>라는 <strong>통제된 명시 항</strong>으로만 남겼습니다. 활성함수는 ReLU 대신 SiLU(부드러운 기울기), 잔차 연결은 ③ 2stage에서 시도했다가 빠졌던 것이 3층 안정화를 위해 복귀했습니다.</p>
+
+  <h3>4-3. shortcut dropout — 지름길 피처를 일부러 지운다</h3>
+  <pre><code><span class="kw">def</span> _drop_shortcuts(self, x):
+    <span class="kw">if</span> torch.rand(()) &gt;= self.shortcut_dropout:   <span class="cmt"># 학습 스텝의 35%에서만 발동</span>
+        <span class="kw">return</span> x
+    x = x.clone(); x[:, self.shortcut_idx] = 0.0   <span class="cmt"># 해시 24 + currency_mismatch를 통째로 0</span>
+    <span class="kw">return</span> x</code></pre>
+  <p>학습 스텝의 35%에서 카테고리 해시·통화 불일치 피처를 <strong>배치 전체에서 통째로 0으로</strong> 지웁니다(추론 시에는 항상 켜짐). 이유: "ACH면 의심" 같은 표 피처 암기는 GBT도 할 수 있는 일이고, 세트가 바뀌면 무너집니다. 그 피처가 사라진 상황을 강제로 만들어 모델이 <strong>그래프 구조(관계 패턴)에서도 판단 근거를 찾도록</strong> 압박하는 정칙화입니다.</p>
+
+  <h3>4-4. 계좌 보조 head</h3>
+  <p>거래 위험도와 별도로, 대상 구간에 등장한 계좌 각각에 대해 "이 계좌가 양성 거래에 연루되는가"를 예측하는 보조 손실(가중 0.2)을 둡니다. 개별 거래 라벨은 노이즈가 크지만(세탁 시나리오의 일부 거래만 라벨됨) 계좌 수준 신호는 더 안정적이라, 노드 표현 학습을 보강합니다. 단, 이 보조 출력을 거래 확률과 <strong>강제로 합치지 않고</strong>, 운영에서는 §6-3의 별도 계좌 위험 집계로만 사용합니다 — "계좌 라벨은 거래 라벨의 집계일 뿐 진짜 KYC/SAR 정답이 아니다"라는 한계를 노트북이 명시하기 때문입니다.</p>
+</section>
+
+<!-- ============================== 5. 학습 ============================== -->
+<section class="sheet" id="sec-train">
+  <h2>5. 학습 절차 — 스윕 → 본학습 → 앙상블</h2>
+
+  <h3>5-1. 학습 기본 설정과 그 이유</h3>
+  <table>
+    <tr><th style="width:34%">설정</th><th>이유</th></tr>
+    <tr><td>AdamW lr 1.5e-3, weight_decay 1e-4, 최대 50에폭, 조기종료 patience 7, dropout 0.20</td><td>v6(60에폭·wd 1e-5·dropout 0.15)보다 정칙화를 강화 — 일반화 우선 방침. LR은 ReduceLROnPlateau(선택 점수 정체 시 절반, min 1e-5)</td></tr>
+    <tr><td>손실 = 거래 BCE(pos_weight) + 0.2 × 계좌 BCE</td><td>극단 불균형 보정 + 보조 신호. pos_weight 상한은 스윕으로 선택(5-2)</td></tr>
+    <tr><td>혼합정밀 <b>bf16 우선</b> (지원 GPU에서), fp16이면 GradScaler</td><td>bf16은 fp16보다 수치 범위가 넓어 overflow에 강함. 그래도 non-finite logit이 나오면 <b>같은 창을 fp32로 재시도 → 그래도 실패하면 손상 파라미터 목록과 함께 예외</b>를 던지는 3단 방어 코드가 학습·평가 루프 양쪽에 있습니다. 기울기도 non-finite면 즉시 중단</td></tr>
+    <tr><td>모델 선택 점수 = 0.70 × val PR-AUC + 0.30 × <b>최악 시간환경 PR-AUC</b></td><td>평균만 보면 특정 시기에 무너지는 모델이 선택될 수 있음 — 검증 구간을 시간순 4조각 내 최악 조각 성능을 30% 반영해 <b>"어느 시기에도 무너지지 않는 모델"</b>을 선택</td></tr>
+  </table>
+
+  <h3>5-2. POS_WEIGHT_CAP 스윕 — ④부터 미뤄온 숙제의 해결</h3>
+  <p>양성 가중 상한 {5, 15, 30} 세 후보를 <strong>동일 시드(0)·12에폭 파일럿</strong>으로 각각 학습해, 위의 선택 점수가 가장 높은 값을 고릅니다. 핵심 규율은 <strong>"cap 선택에는 validation만 사용하고 calibration/test는 관여하지 않는다"</strong>입니다 — 하이퍼파라미터 선택까지도 누수 관리 대상으로 본 것입니다. ④ 노트북이 "5/15/30 스윕 권장(이번엔 고정)"이라고 미뤄둔 과제가 여기서 절차로 구현됐습니다. 업로드본에는 첫 후보의 파일럿 결과(cap=5: val AP 0.2851, 최악 시간환경 AP 0.1708, 선택 점수 0.2508, 7.2분)까지 기록되어 있습니다.</p>
+
+  <h3>5-3. GroupDRO — 최악의 시기를 잘하도록 학습</h3>
+  <pre><code>q[env] *= torch.exp(0.05 * raw_loss)   <span class="cmt"># 손실이 큰 시간환경의 가중치를 지수적으로 키움</span>
+q /= q.sum()
+loss = raw_loss * q[env] * 4           <span class="cmt"># 그 환경의 손실을 더 무겁게 반영</span></code></pre>
+  <p>train 구간을 시간순 4개 "환경"으로 나누고, 학습 중 <strong>손실이 큰(못하는) 환경의 가중치를 키워 그 시기를 집중 학습</strong>합니다(Sagawa et al., ICLR 2020). 거래 데이터는 시기마다 분포가 달라지는 비정상(non-stationary) 데이터라, 평균 손실만 낮추면 특정 시기에 취약한 모델이 나올 수 있다는 문제의식입니다. 모델 선택 점수의 "최악 시간환경 30%"와 짝을 이루는 학습 측 장치입니다.</p>
+
+  <h3>5-4. 본학습과 앙상블</h3>
+  <p>선택된 cap으로 <strong>시드 3개(0, 1, 2)</strong>를 각각 본학습(최대 50에폭)하고, 평가 시에는 3개 모델의 <strong>로짓을 평균</strong>해 앙상블합니다(v6의 4시드 확률 평균과 달리 로짓 평균 — 이후 temperature scaling이 로짓 단위에서 동작하기 때문입니다). 매 학습은 <code>seed_everything()</code>으로 random/numpy/torch 시드를 함께 고정해 재현 가능합니다.</p>
+</section>
+
+<!-- ============================== 6. 평가 ============================== -->
+<section class="sheet" id="sec-eval">
+  <h2>6. 보정·평가·운영 장치</h2>
+
+  <h3>6-1. temperature scaling과 임계값 — 전부 calibration에서, 한 번만</h3>
+  <p>3시드 앙상블 로짓을 calibration 분할에서 <strong>temperature scaling</strong>합니다 — 로짓을 단일 상수 T로 나눠(<code>sigmoid(z/T)</code>) 출력 확률이 실제 적중률과 맞도록 보정하는 후처리로, T는 LBFGS로 calibration BCE를 최소화해 학습합니다(Guo et al., ICML 2017). 순위를 바꾸지 않으므로 PR-AUC는 그대로이고, <strong>"위험도 0.9"라는 숫자가 실제로 90% 확률을 의미하게</strong> 만들어 조사역·경보 예산 계산이 신뢰할 수 있는 확률 위에서 돌게 합니다. F1 최적 임계값과 경보 예산 임계값(calibration 확률의 상위 0.1% 분위수)도 <strong>모두 calibration에서 정한 뒤 test에 고정</strong>합니다 — "test 분위수로 경보 임계값을 정했던 v6 방식은 test 분포를 미리 사용하므로 제거했다"고 노트북이 명시합니다.</p>
+
+  <h3>6-2. 최종 지표: 점수에 불확실성과 신뢰도를 붙인다</h3>
+  <p>test에서는 PR-AUC 한 점만 보고하지 않습니다. <strong>시간 블록 부트스트랩 95% 신뢰구간</strong>(하루 단위 블록을 300회 복원추출 — 거래는 시간적으로 상관되어 있어 개별 행 단위 부트스트랩은 CI를 과소평가하기 때문에 블록 단위로 뽑습니다), <strong>ECE</strong>(보정 오차 — 출력 확률과 실제 적중률의 괴리), 고정 임계값 2종에서의 Precision/Recall/F1/경보 건수를 함께 산출합니다.</p>
+
+  <h3>6-3. 계좌 단위 보조 판정</h3>
+  <p>거래 점수를 계좌로 투영해 <code>계좌 위험도 = 0.7 × 최대 점수 + 0.3 × 평균 점수</code>로 집계합니다 — 최대값(가장 위험한 거래 한 건)을 주로 보되 평균으로 일회성 스파이크를 완충하는 가중입니다. 계좌 정답은 "해당 평가 구간에서 양성 거래에 한 번이라도 연루됐는가"로 정의하는데, 이것이 진짜 KYC/SAR 계좌 라벨이 아니라 거래 라벨의 집계일 뿐이므로 <strong>보조 triage(조사 우선순위 참고)로만 보고</strong>한다고 한계를 명시합니다. 상위 1,000개 계좌는 <code>top_accounts.csv</code>로 저장됩니다.</p>
+
+  <h3>6-4. 드리프트 모니터 — 라벨이 늦게 오는 운영 현실 대비</h3>
+  <p>실제 운영에서는 정답(세탁 여부 확정)이 수개월 늦게 도착합니다. 그래서 <strong>라벨 없이도 모델 열화를 감지</strong>하는 신호를 준비했습니다: score PSI(점수 분포 이동), 42개 피처 각각의 PSI, 경보율 비율(임계값이 calibration에 고정되어 있으므로 test 경보율 변화 자체가 드리프트 신호), 그리고 라벨 도착 후의 PR-AUC 하락·ECE. 각 신호에 WARN/CRITICAL 임계(예: PSI 0.10/0.25, 경보율 비율 1.5/2.0)를 부여해 표로 출력합니다 — 백엔드 대시보드의 모니터링 지표로 그대로 옮길 수 있는 형태입니다.</p>
+
+  <h3>6-5. 필수 ablation 5종과 zero-shot 세트 간 평가</h3>
+  <p>ablation은 <strong>"한 번에 하나만 제거"</strong> 원칙으로 5종을 정의합니다: <code>full_v7</code>(기준) / <code>no_relative_time</code>(시간 12차원을 0으로 마스킹 — 합성 시간 패턴 과적합 검사) / <code>no_group_dro</code> / <code>no_account_aux</code> / <code>no_shortcut_dropout</code>. 계산비용 때문에 기본 OFF이며 "논문 표를 만들 때 반드시 켜라"고 적혀 있습니다. 세트 간 평가는 <strong>zero-shot 프로토콜</strong>입니다 — source(HI-Small)에서 학습한 모델·금액 통계·온도·임계값을 <strong>전부 고정</strong>한 채 대상 세트(LI-Small 등)의 마지막 20%를 채점하고, 앞 80%는 <strong>라벨 없이 과거 그래프 컨텍스트로만</strong> 사용합니다. "대상 세트에서 재학습한 성능"과 혼동하지 말라는 주석과 함께, 파일이 없으면 스킵하고 확보 후 해당 셀만 재실행하도록 만들어져 있습니다.</p>
+
+  <h3>6-6. 대조군과 재현성</h3>
+  <p>그래프의 기여를 분리하기 위해 <strong>동일 42차원 피처·동일 분할·동일 calibration 임계값 절차</strong>로 HistGradientBoosting(테이블 모델, 그래프 없음)을 학습하는 strict-causal 베이스라인이 포함되어 있고(<code>gnn_minus_tabular_test_ap</code>로 차이를 직접 기록), 실험 전체의 설정·피처 통계·분할 경계·임계값·인과 계약("메시지 엣지와 노드 통계는 엄격히 target_start 이전, 동일 분 제외")을 <code>manifest.json</code>으로 저장합니다. "test를 여러 번 보며 설계를 바꾸지 마라, 변경이 생기면 새 experiment id를 만들라"는 운영 규율도 §10에 명문화되어 있습니다.</p>
+</section>
+
+<!-- ============================== 7. 실행 상태 ============================== -->
+<section class="sheet" id="sec-status">
+  <h2>7. 실행 상태와 해석 원칙 (반드시 읽으십쇼)</h2>
+  <div class="callout warn">
+    <span class="tag">업로드본 실행 상태</span>
+    코드는 전 구간 완성되어 있으나, 업로드된 사본에 기록된 실행 출력은 <b>데이터 적재·분할표·피처 구성·causal probe·스윕의 첫 후보(cap=5 파일럿: val AP 0.2851, 12에폭, 7.2분)까지</b>입니다. 시드 3개 본학습, calibration/test 최종 지표, GBT 대조, 드리프트 표, zero-shot 결과는 <b>기록되어 있지 않습니다</b>. 따라서 v7의 최종 성능 수치는 아직 없으며, 본 문서도 결과가 아닌 <b>설계와 절차</b>를 설명합니다.
+  </div>
+  <p>노트북 §11이 명시한 해석 원칙 다섯 가지는 그대로 옮길 가치가 있습니다. 첫째, <strong>v6의 test PR-AUC 0.5742와 v7 수치를 그대로 우열 비교하면 안 됩니다</strong> — v7은 더 엄격한 인과 그래프, 별도 calibration 분할, 꼬리 포함 테스트(양성률 0.205%)를 쓰므로, 공정 비교에는 v6 구조를 v7 프로토콜로 재실행해야 합니다. 둘째, zero-shot 세트 간 성능이 개선되지 않으면 "일반화 모델" 주장을 철회하고 어떤 shortcut ablation이 실패했는지 보고합니다. 셋째, 상대 시간 제거(A/B)가 외부 세트에서 더 좋으면 실데이터 기본 모델은 time-off로 정합니다. 넷째, 계좌 보조 라벨은 거래 라벨의 집계일 뿐 KYC/SAR ground truth가 아닙니다. 다섯째, 실배포 전에는 entity resolution, 지연 라벨, 조사자 피드백 편향, 공정성, 비용 기반 임계값을 별도 검증합니다.</p>
+</section>
+
+<!-- ============================== 8. v6 대비 ============================== -->
+<section class="sheet" id="sec-diff">
+  <h2>8. v6 대비 변경 총정리표</h2>
+  <table>
+    <tr><th style="width:20%">항목</th><th style="width:36%">v6 (6_generalized_fixed)</th><th>v7 (7_research_grade)</th></tr>
+    <tr><td>데이터 범위</td><td>꼬리 절단(주 기간 09-01~10), 5,077,228건</td><td><b>절단 없음</b> 5,078,336건 — 라벨 급증 꼬리가 test에 포함 (전처리① parquet 입력 시에는 절단본 사용 가능)</td></tr>
+    <tr><td>분할</td><td>60/20/20 (train/val/test)</td><td><b>55/15/15/15</b> (calibration 신설), 분 경계 스냅</td></tr>
+    <tr><td>대상 거래와 그래프</td><td>대상 거래가 그래프 안에 포함</td><td><b>메시지 그래프에서 제외</b> — readout 재료로만 사용, assert로 검증</td></tr>
+    <tr><td>동일 시각 처리</td><td>정렬 순서상 앞이면 과거로 취급</td><td><b>같은 분 전체를 서로 차단</b></td></tr>
+    <tr><td>카테고리 인코딩</td><td>train 어휘 기반 원-핫 (세트 의존)</td><td><b>stable hashing 8버킷×3</b> (세트 독립, 고정 차원)</td></tr>
+    <tr><td>금액 정규화</td><td>통화별 평균/표준편차</td><td>통화별 <b>중앙값/IQR</b>(로버스트, ±8 클리핑, 50건 미만 폴백)</td></tr>
+    <tr><td>집계 방식</td><td>2단계 <b>합</b>(sum)</td><td>2단계 <b>평균</b> + log 거래량 명시 항 — degree shortcut 억제</td></tr>
+    <tr><td>모델 구조</td><td>MegaConv, ReLU, 잔차 없음</td><td>CausalMegaLayer, SiLU, <b>잔차 + JK + 곱/절대차 readout + 계좌 보조 head</b></td></tr>
+    <tr><td>정칙화</td><td>dropout 0.15, wd 1e-5</td><td>dropout 0.20, wd 1e-4, <b>shortcut dropout 0.35, GroupDRO</b></td></tr>
+    <tr><td>불균형 가중</td><td>cap 15 고정</td><td><b>{5,15,30} 스윕</b> (val만 사용, 파일럿 12에폭)</td></tr>
+    <tr><td>임계값·확률</td><td>val F1 튜닝 + <b>test 분위수</b> 경보 예산</td><td>전부 <b>calibration에서 결정·고정</b> + temperature scaling</td></tr>
+    <tr><td>시드·앙상블</td><td>4시드, 확률 평균</td><td>3시드, <b>로짓 평균</b>(보정과의 정합)</td></tr>
+    <tr><td>불확실성·신뢰도</td><td>—</td><td>시간 블록 부트스트랩 95% CI, ECE</td></tr>
+    <tr><td>세트 간 평가</td><td>세트별 재학습 스캐폴드</td><td><b>zero-shot transfer</b> (모델·통계·임계값 전부 고정)</td></tr>
+    <tr><td>운영 장치</td><td>경보 예산, STR 초안</td><td>드리프트 모니터(PSI·경보율·ECE, WARN/CRITICAL), 계좌 위험 집계, manifest</td></tr>
+    <tr><td>혼합정밀</td><td>fp16 + 집계 fp32</td><td><b>bf16 우선</b> + non-finite 3단 방어(fp32 재시도→파라미터 진단)</td></tr>
+  </table>
+</section>
+
+<!-- ============================== 9. 출처 ============================== -->
+<section class="sheet" id="sec-src">
+  <h2>9. 출처</h2>
+  <p>본 문서의 모든 코드 인용·수치·설계 서술은 <span class="file-chip">AML_GNN_edge_classification_7_research_gradeeee.ipynb</span>(34셀)의 코드와 저장된 실행 출력을 근거로 하며, v6 비교 항목은 <span class="file-chip">AML_GNN_edge_classification_6_generalized_fixed.ipynb</span>의 실행 출력을 근거로 합니다. 결과가 기록되지 않은 부분은 본문에 "미기록"으로 명시했고 추정치를 쓰지 않았습니다.</p>
+  <p style="font-size:13.5px; line-height:2">
+    노트북이 §1 "연구 근거"에서 인용한 문헌:<br>
+    IBM AML-Data — <a href="https://github.com/IBM/AML-Data">github.com/IBM/AML-Data</a> (합성 multi-agent 거래 데이터)<br>
+    MEGA-GNN — <a href="https://arxiv.org/abs/2412.00241">arXiv:2412.00241</a> (병렬 엣지의 관계 단위 → 노드 단위 2단계 집계)<br>
+    Sagawa et al., GroupDRO, ICLR 2020 — <a href="https://openreview.net/pdf?id=ryxGuJrFvS">openreview.net</a> (사전 정의 환경의 최악 손실 최소화)<br>
+    Guo et al., Temperature Scaling, ICML 2017 — <a href="https://proceedings.mlr.press/v70/guo17a.html">proceedings.mlr.press</a> (별도 보정 세트의 단일 온도 후처리)<br>
+    LineMVGNN — <a href="https://arxiv.org/abs/2603.23584">arXiv:2603.23584</a> (지급/수취 방향 multi-view, 거래 중심 readout)
+  </p>
+</section>
+
+<p class="footer-note">자금세탁소 프로젝트 · AI 파트 · v7 노트북 심층 설명서 · 2026-08-10 · 종합 편은 "AML GNN 노트북 7종 코드 설명서"를 참조하십쇼.</p>
+</div>
+</body>
+</html>
