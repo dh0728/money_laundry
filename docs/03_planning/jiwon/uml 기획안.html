@@ -333,7 +333,7 @@
 
   <h3>S2. 5분 배치 추론 (UC-09·10) — pull 방식 원격 추론과 원자적 결과 기록</h3>
   <div class="diagram-wrap">
-  <svg viewBox="0 0 1150 650" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="배치 추론 시퀀스: 배치 워커가 작업을 준비해 DB에 저장하고, 쿠버스피어 추론 에이전트가 작업 API를 폴링해 GNN 2단계 추론 후 결과를 제출하는 흐름">
+  <svg viewBox="0 0 1150 750" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="배치 추론 시퀀스: 배치 워커가 5분마다 작업을 준비해 DB에 저장하고, 쿠버스피어 추론 에이전트가 2분 간격으로 작업 API를 폴링해 GNN 2단계 추론 후 결과를 제출하고 제출 확인을 받는 흐름">
     <defs>
       <marker id="sa2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#42526e"/></marker>
       <marker id="sa2o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#42526e" stroke-width="1.5"/></marker>
@@ -346,7 +346,7 @@
       <rect x="945" y="20" width="150" height="44" rx="5" fill="#fdf3e7" stroke="#c07f3a" stroke-width="1.5"/><text x="1020" y="47" text-anchor="middle" fill="#172b4d">GNN 모델 (GPU)</text>
     </g>
     <g stroke="#b6bfcc" stroke-width="1.2" stroke-dasharray="4 4">
-      <line x1="125" y1="64" x2="125" y2="615"/><line x1="340" y1="64" x2="340" y2="615"/><line x1="570" y1="64" x2="570" y2="615"/><line x1="800" y1="64" x2="800" y2="615"/><line x1="1020" y1="64" x2="1020" y2="615"/>
+      <line x1="125" y1="64" x2="125" y2="715"/><line x1="340" y1="64" x2="340" y2="715"/><line x1="570" y1="64" x2="570" y2="715"/><line x1="800" y1="64" x2="800" y2="715"/><line x1="1020" y1="64" x2="1020" y2="715"/>
     </g>
     <line x1="125" y1="105" x2="338" y2="105" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
     <text x="232" y="97" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">① PENDING 선점 → INFERENCING</text>
@@ -356,32 +356,49 @@
     <text x="232" y="158" text-anchor="middle" font-size="10.5" fill="#42526e">③ 서브그래프·특징</text>
     <line x1="125" y1="196" x2="338" y2="196" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
     <text x="232" y="188" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">④ 추론 작업(페이로드) 저장</text>
-    <line x1="800" y1="235" x2="572" y2="235" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="685" y="227" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑤ 작업 pull (토큰 · 5분 폴링)</text>
-    <line x1="570" y1="265" x2="342" y2="265" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="455" y="257" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑥ 대기 작업 조회</text>
-    <line x1="342" y1="292" x2="568" y2="292" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
-    <line x1="570" y1="318" x2="798" y2="318" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
-    <text x="685" y="310" text-anchor="middle" font-size="10.5" fill="#42526e">⑦ 작업 페이로드</text>
-    <line x1="800" y1="352" x2="1018" y2="352" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="910" y="344" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑧ 1단계 이진분류 (전체)</text>
-    <line x1="800" y1="382" x2="1018" y2="382" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="910" y="374" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑨ 2단계 패턴분류 (양성만)</text>
-    <line x1="1018" y1="408" x2="802" y2="408" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
-    <text x="910" y="400" text-anchor="middle" font-size="10.5" fill="#42526e">점수·패턴</text>
-    <line x1="800" y1="442" x2="572" y2="442" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="685" y="434" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑩ 결과 제출 (모델 버전 포함)</text>
-    <line x1="570" y1="472" x2="342" y2="472" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
-    <text x="455" y="464" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑪ 결과+알림 원자 기록</text>
-    <rect x="240" y="500" width="440" height="62" fill="none" stroke="#d73027" stroke-width="1.2" stroke-dasharray="6 4"/>
-    <text x="250" y="515" font-size="10.5" font-weight="800" fill="#a50026">alt [작업 타임아웃 — 에이전트 무응답]</text>
-    <path d="M340,528 h42 v16 h-40" fill="none" stroke="#d73027" stroke-width="1.5" marker-end="url(#sa2)"/>
-    <text x="392" y="536" font-size="10.5" fill="#a50026">⑫ INFERENCING 초과분 → PENDING 회수</text>
+    <!-- loop: 2분 간격 폴링 -->
+    <rect x="255" y="222" width="660" height="180" fill="none" stroke="#4f78a3" stroke-width="1.2" stroke-dasharray="6 4"/>
+    <text x="265" y="238" font-size="10.5" font-weight="800" fill="#2e5a86">loop [2분 간격 — 배치 주기(5분)와 독립]</text>
+    <line x1="800" y1="262" x2="572" y2="262" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
+    <text x="685" y="254" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑤ 작업 pull (토큰 인증)</text>
+    <line x1="570" y1="290" x2="342" y2="290" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
+    <text x="455" y="282" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑥ 대기 작업 조회</text>
+    <line x1="342" y1="315" x2="568" y2="315" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
+    <line x1="570" y1="340" x2="798" y2="340" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
+    <text x="685" y="332" text-anchor="middle" font-size="10.5" fill="#42526e">⑦ 작업 페이로드</text>
+    <rect x="545" y="352" width="360" height="48" fill="none" stroke="#8f9bad" stroke-width="1.1" stroke-dasharray="5 4"/>
+    <text x="555" y="366" font-size="10" font-weight="800" fill="#5e6c84">alt [대기 작업 없음 — 대부분의 폴링]</text>
+    <line x1="572" y1="392" x2="798" y2="392" stroke="#8f9bad" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
+    <text x="685" y="386" text-anchor="middle" font-size="10" fill="#5e6c84">빈 응답 — 다음 주기까지 대기</text>
+    <!-- GNN 추론 -->
+    <line x1="800" y1="432" x2="1018" y2="432" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
+    <text x="910" y="424" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑧ 1단계 이진분류 (전체)</text>
+    <line x1="1018" y1="458" x2="802" y2="458" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
+    <text x="910" y="450" text-anchor="middle" font-size="10.5" fill="#42526e">⑨ 1단계 결과 (양성 목록)</text>
+    <line x1="800" y1="488" x2="1018" y2="488" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
+    <text x="910" y="480" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑩ 2단계 패턴분류 (양성만)</text>
+    <line x1="1018" y1="514" x2="802" y2="514" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
+    <text x="910" y="506" text-anchor="middle" font-size="10.5" fill="#42526e">⑪ 패턴 분류 결과</text>
+    <!-- 결과 제출 -->
+    <line x1="800" y1="550" x2="572" y2="550" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
+    <text x="685" y="542" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑫ 결과 제출 (작업 ID·모델 버전)</text>
+    <line x1="570" y1="580" x2="342" y2="580" stroke="#42526e" stroke-width="1.6" marker-end="url(#sa2)"/>
+    <text x="455" y="572" text-anchor="middle" font-size="10.5" font-weight="700" fill="#172b4d">⑬ 결과+알림 원자 기록</text>
+    <line x1="572" y1="610" x2="798" y2="610" stroke="#42526e" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#sa2o)"/>
+    <text x="685" y="602" text-anchor="middle" font-size="10.5" fill="#42526e">⑭ 제출 확인 200 — 기록 완료 후 응답</text>
+    <!-- alt 타임아웃 -->
+    <rect x="240" y="636" width="440" height="62" fill="none" stroke="#d73027" stroke-width="1.2" stroke-dasharray="6 4"/>
+    <text x="250" y="651" font-size="10.5" font-weight="800" fill="#a50026">alt [작업 타임아웃 — 에이전트 무응답]</text>
+    <path d="M340,664 h42 v16 h-40" fill="none" stroke="#d73027" stroke-width="1.5" marker-end="url(#sa2)"/>
+    <text x="392" y="672" font-size="10.5" fill="#a50026">⑮ INFERENCING 초과분 → PENDING 회수</text>
   </svg>
   </div>
   <ul>
-    <li>①~④(준비)와 ⑤~⑪(실행)은 <strong>직접 연결되지 않는다</strong> — 접점은 DB에 저장된 작업뿐. pull 방식(G-1)이라 클러스터 쪽에서만 접속을 시작하며, 작업이 DB에 남아 있어 어느 쪽이 죽어도 증발하지 않는다.</li>
-    <li>⑪은 결과 기록과 알림 생성이 <strong>같은 DB 트랜잭션</strong> (A-1) — "결과는 있는데 알림 누락" 틈이 구조적으로 없다. 상태는 COMPLETED로 전환.</li>
+    <li><strong>타이머 소유권</strong>: "5분"의 의미는 배치 워커의 선점 타이머(①) 한 곳에만 있다 — 토픽 2의 구현 지점. 에이전트의 2분 폴링은 배치 의미가 없는 전송 간격이며, 짧을수록 픽업 지연만 줄어든다 (판정 지연 = 배치 대기 0~5분 + 픽업 ≤2분 + 추론 + 제출).</li>
+    <li>①~④(준비)와 ⑤~⑭(실행)은 <strong>직접 연결되지 않는다</strong> — 접점은 DB에 저장된 작업뿐. pull 방식(G-1)이라 클러스터 쪽에서만 접속을 시작하며, 작업이 DB에 남아 있어 어느 쪽이 죽어도 증발하지 않는다.</li>
+    <li>⑨의 반환이 있어야 ⑩의 "양성만" 필터가 성립한다 — 1단계 결과를 에이전트가 받아 2단계 입력을 구성.</li>
+    <li>⑭는 ⑬(기록) <strong>완료 후에</strong> 나간다 — 수집 경로의 "쓰기→ACK"와 동일 원리. 응답이 유실되면 에이전트는 재제출하고, <strong>(작업 ID, 모델 버전) 유니크 제약이 중복 결과·중복 알림을 흡수</strong>한다 (결과 제출 멱등 — 설계안 §8 불변식).</li>
+    <li>⑬은 결과 기록과 알림 생성이 <strong>같은 DB 트랜잭션</strong> (A-1). 상태는 COMPLETED로 전환.</li>
     <li>클러스터 전체가 다운되면 ⑤가 멈출 뿐 — 작업은 적체되고 수집·조회는 정상 (G-3, US-14).</li>
   </ul>
 
