@@ -1,0 +1,54 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HTTPS와 TLS 인증서 기본 개념</title><link rel="stylesheet" href="../assets/style.css"></head><body><div class="layout"><header class="top"><a href="../index.html"><small>AML INFRASTRUCTURE GUIDE</small><br><strong>인프라 아키텍처 문서</strong></a></header><div class="content"><aside><strong>개념 문서</strong><a  href="01-cloud.html">01. 클라우드</a>
+<a  href="02-server.html">02. 서버</a>
+<a  href="03-operating-system.html">03. 운영체제</a>
+<a  href="04-container-runtime.html">04. 컨테이너와 Docker</a>
+<a  href="05-source-repository.html">05. Git과 소스 저장소</a>
+<a  href="06-ci.html">06. CI</a>
+<a  href="07-image-registry.html">07. 컨테이너 이미지 저장소</a>
+<a  href="08-cd.html">08. CD</a>
+<a  href="09-reverse-proxy.html">09. Reverse Proxy</a>
+<a class="current" href="10-https-certificate.html">10. HTTPS와 TLS 인증서</a>
+<a  href="11-frontend-deployment.html">11. 프론트엔드 배포</a>
+<a  href="12-backend.html">12. 백엔드</a>
+<a  href="13-database-type.html">13. 데이터베이스</a>
+<a  href="14-database-location.html">14. 데이터베이스 실행 위치</a>
+<a  href="15-file-storage.html">15. 파일 저장</a>
+<a  href="16-async-jobs.html">16. 비동기 작업</a>
+<a  href="17-cache.html">17. 캐시</a>
+<a  href="18-secrets.html">18. 비밀정보 관리</a>
+<a  href="19-observability.html">19. 로그·모니터링</a>
+<a  href="20-dns.html">20. DNS</a>
+<a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>HTTPS와 TLS 인증서 기본 개념</h1><h2 id="s-1">HTTPS란?</h2>
+<p>HTTPS는 HTTP 통신을 TLS로 암호화하는 방식이다. 네트워크 중간에서 요청과 응답이 노출되거나 변조되는 위험을 줄이고, 사용자가 올바른 서버에 접속했는지 확인하게 한다.</p>
+<h2 id="s-5">TLS 인증서란?</h2>
+<p>TLS 인증서는 특정 공개 키와 도메인의 관계를 인증기관(CA)이 확인한 전자 문서다. 서버는 연결 과정에서 인증서를 제시하고 브라우저는 발급 기관, 도메인과 유효기간을 검사한다.</p>
+<pre class="diagram"><code>mermaid
+sequenceDiagram
+    participant U as 사용자 브라우저
+    participant S as 서비스
+    U-&gt;&gt;S: HTTPS 연결 요청
+    S--&gt;&gt;U: 인증서 제시
+    U-&gt;&gt;U: 발급 기관·도메인·유효기간 확인
+    U&lt;&lt;-&gt;&gt;S: 암호화된 통신</code></pre>
+<h2 id="s-19">기본 용어</h2>
+<ul>
+<li><strong>CA(Certificate Authority)</strong>: 인증서를 발급하고 서명하는 신뢰 기관</li>
+<li><strong>Public key</strong>: 외부에 공개할 수 있는 암호화 키</li>
+<li><strong>Private key</strong>: 서버만 보관해야 하는 비밀 키</li>
+<li><strong>CSR</strong>: 인증서 발급에 필요한 정보를 담아 CA에 보내는 요청</li>
+<li><strong>Domain validation</strong>: 요청자가 도메인을 통제하는지 확인하는 절차</li>
+<li><strong>Certificate chain</strong>: 서버 인증서부터 신뢰할 수 있는 루트 CA까지 이어지는 서명 관계</li>
+<li><strong>Renewal</strong>: 만료 전에 새 인증서를 발급하고 교체하는 작업</li>
+<li><strong>ACME</strong>: 인증서 발급과 갱신을 자동화하는 표준 프로토콜</li>
+</ul>
+<p>인증서가 만료되거나 도메인 이름이 일치하지 않으면 브라우저에 보안 경고가 표시된다. 인증서 자동 갱신을 구성했더라도 실패를 감지하는 모니터링이 필요하다.</p>
+<p>외부 인터넷이 차단된 조직 내부 서비스는 공개 CA 대신 조직이 운영하는 사내 CA와 내부 신뢰 체계를 사용할 수 있다.</p>
+<h2 id="s-34">주요 인증서 발급·관리 방식</h2>
+<h3 id="s-36">Let's Encrypt</h3>
+<p>Let's Encrypt는 도메인 소유를 자동으로 검증하고 공개 TLS 인증서를 무료로 발급하는 인증기관이다. ACME 클라이언트가 HTTP 또는 DNS 검증을 수행하고 만료 전에 인증서를 다시 발급할 수 있다.</p>
+<h3 id="s-40">Certbot</h3>
+<p>Certbot은 ACME 프로토콜을 사용해 Let's Encrypt 인증서 발급과 갱신을 자동화하는 클라이언트다. 웹 서버 설정을 직접 변경하거나 인증서 파일만 발급하는 방식으로 사용할 수 있다.</p>
+<h3 id="s-44">AWS Certificate Manager</h3>
+<p>ACM은 AWS가 TLS 인증서 발급과 갱신을 관리하는 서비스다. 발급한 인증서는 Application Load Balancer, CloudFront 등 지원되는 AWS 서비스에 연결한다. 인증서가 사용되는 위치와 유형에 따라 내보내기 가능 여부와 적용 방식이 다르다.</p>
+<h3 id="s-48">상용 인증기관의 유료 인증서</h3>
+<p>상용 CA가 계약과 검증 절차를 통해 발급하는 인증서다. 도메인 소유만 확인하는 인증서 외에 조직 정보를 확인하는 상품, 기술 지원과 보증 조건 등이 포함될 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../10-https-certificate.md">10-https-certificate.md</a></footer></div></body></html>
