@@ -95,6 +95,11 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(
 .okmark{border-left:3px solid var(--key-line);background:var(--key-bg);border-radius:0 8px 8px 0;padding:10px 16px 12px;margin:12px 0 0}
 .okmark .rt{font-weight:500;color:var(--key-ink);margin:0 0 4px;font-size:14px}
 .okmark p{margin:4px 0;font-size:14px}
+.agentop{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);border-radius:0 8px 8px 0;padding:10px 16px 12px;margin:12px 0 0}
+.agentop .rt{font-weight:500;color:var(--accent);margin:0 0 4px;font-size:13px;letter-spacing:.01em}
+.agentop p{margin:4px 0;font-size:14px}
+.agentop ul{margin:4px 0;padding-left:20px;font-size:14px}
+.topic a,td a,.note a{color:var(--accent)}
 .badge{display:inline-block;font-size:11.5px;padding:1px 9px;border-radius:20px;background:var(--aqua);color:#fff;margin-left:8px;vertical-align:2.5px;font-weight:400;letter-spacing:.02em;white-space:nowrap}
 .badge.open{background:var(--surface-2);color:var(--ink-3)}
 .pats{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin:18px 0}
@@ -133,10 +138,10 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 
 <header>
 <h1>자금세탁 탐지 프로젝트 — 데이터 분석 결과와 논의 화두</h1>
-<p class="sub">IBM AML 데이터셋 EDA 1~7단계 결과 + 데이터셋 제작자 공식 답변 · 팀 논의용 · 2026-08-07 갱신</p>
+<p class="sub">IBM AML 데이터셋 EDA 1~7단계 결과 + 데이터셋 제작자 공식 답변 · 팀 논의용 · 2026-08-09 갱신</p>
 </header>
 
-<p class="lead">이 문서는 두 가지 역할을 합니다. 앞부분(1~7장)은 <strong>데이터가 실제로 어떻게 생겼는지</strong>를 검증된 수치로 설명하고, 뒷부분(8장)은 그 결과로 드러난 <strong>팀이 논의해야 할 화두 42가지</strong>를 정리합니다.</p>
+<p class="lead">이 문서는 두 가지 역할을 합니다. 앞부분(1~7장)은 <strong>데이터가 실제로 어떻게 생겼는지</strong>를 검증된 수치로 설명하고, 뒷부분(8장)은 그 결과로 드러난 <strong>팀이 논의해야 할 화두 48가지</strong>를 정리합니다.</p>
 
 <div class="gap">
 <p class="t">이번 갱신에서 가장 크게 바뀐 것 — 데이터에는 "주 기간"이 따로 있습니다</p>
@@ -144,7 +149,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <p><strong>원인은 확인됐습니다 — 데이터셋 제작자가 직접 답한 의도된 구조입니다.</strong> 정상 거래는 공식 "주 기간"(Small 9/1~9/10, Medium 9/1~9/16, Large 8/1~11/5)에 집중 생성되고, 그 이후 며칠은 <strong>진행 중이던 세탁 패턴이 완결까지 이어지는</strong> 꼬리입니다. 우리가 라벨을 보지 않고 탐지한 변화점이 <strong>공식 종료일과 3/3 정확히 일치</strong>했습니다.</p>
 <p><strong>다만 꼬리가 "전부 세탁"인 것은 아닙니다</strong> — 정상 거래가 마지막 관측일까지 소량 이어져 <strong>꼬리의 약 41%는 정상 거래</strong>입니다(7.4절 전수 표). 자세한 내용은 <strong>7.4절</strong>이며, 화두 6·17·22·24·25·42가 이 결과로 전제가 바뀌었습니다.</p>
 </div>
-<p class="lead">8장의 화두는 <strong>질문과 갈리는 지점만 제시</strong>하는 형식으로 작성됐습니다. <strong>2026-08-07 첫 논의에서 화두 1~17이 결정</strong>됐고, 결정된 항목에는 질문을 지우지 않고 <strong>팀 결정 블록을 덧붙였습니다.</strong> 나머지 25개는 아직 열려 있습니다. 8.6절에는 분석을 진행하기 위해 <strong>임의로 정해둔 값</strong>들도 공개했습니다.</p>
+<p class="lead">8장의 화두는 <strong>질문과 갈리는 지점만 제시</strong>하는 형식으로 작성됐습니다. <strong>2026-08-07 첫 논의에서 화두 1~17이 결정</strong>됐고, 결정된 항목에는 질문을 지우지 않고 <strong>팀 결정 블록을 덧붙였습니다.</strong> 나머지 31개는 아직 열려 있습니다(2026-08-09 신규 화두 43~48 포함). 8.4절에는 분석을 진행하기 위해 <strong>임의로 정해둔 값</strong>들도 공개했습니다.</p>
 
 <nav>
 <ol>
@@ -155,11 +160,11 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <li><a href="#s5">라벨 구조 검증 결과</a></li>
 <li><a href="#s6">금액·통화, 그래프 구조, 데이터 품질</a></li>
 <li><a href="#s7">서비스 시나리오가 만드는 제약과 "주 기간" 구조</a></li>
-<li><a href="#s8">논의 화두 42가지</a></li>
+<li><a href="#s8">논의 화두 48가지</a></li>
 </ol>
 </nav>
 
-<div class="note"><strong>수치의 범위:</strong> 3~7장의 검증은 <strong>6종 세트 전체</strong>에서 수행했습니다. 예외는 세 가지입니다 — 계좌 차수·2-hop 분포(7.3절)는 <strong>Small·Medium 4종</strong>까지만 산출했고(Large는 자원 문제로 범위에서 제외), 은행 식별자 구조 감사(6.4절)는 <strong>Small 2종 한정 + 제3자 미검증</strong>이며, 특수 허브 계좌 15개(6.4·7.3절)는 <strong>Small 2종 스팟 체크 + 교차검수 미통과</strong>입니다(6종 정식 확인은 ML-08 예정). 표에 세트가 일부만 적힌 경우는 지면상 대표값이며, 각 결론이 규모에 따라 유지되는지는 <strong>6.6절 일반화 판정</strong>에 정리했습니다.</div>
+<div class="note"><strong>수치의 범위:</strong> 3~7장의 검증은 <strong>6종 세트 전체</strong>에서 수행했습니다. 예외는 세 가지입니다 — 계좌 차수·2-hop 분포(7.3절)는 <strong>Small·Medium 4종</strong>까지만 산출했고(Large는 자원 문제로 범위에서 제외), 은행 식별자 구조 감사(6.4절)는 <strong>Small 2종 한정 + 제3자 미검증</strong>이며, 특수 허브 계좌 15개(6.4·7.3절)는 <strong>ML-08에서 6종 전부 정식 확인</strong>됐습니다(2026-08-07 실행 완료 — R-11 교차검수 대기, 수치는 잠정). 표에 세트가 일부만 적힌 경우는 지면상 대표값이며, 각 결론이 규모에 따라 유지되는지는 <strong>6.6절 일반화 판정</strong>에 정리했습니다.</div>
 
 <h2 id="s1">1. 우리가 만드는 것과 서비스 시나리오</h2>
 
@@ -788,16 +793,16 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <thead><tr><th>항목</th><th class="w">내용</th></tr></thead>
 <tbody>
 <tr><td><strong>식별 방법</strong></td><td class="w"><strong>계좌번호 첫 글자가 <code>8</code>이 아닌 계좌.</strong> 일반 계좌는 전부 <code>8</code>로 시작하고 특수 계좌만 <code>1</code>로 시작합니다. 계좌번호 길이는 6종 모두 9자로 동일하므로 <strong>한 줄로 기계적 식별이 가능</strong>합니다</td></tr>
-<tr><td>개수·소속</td><td class="w">세트당 15개, <strong>전부 같은 은행 하나</strong>(HI-Small 기준 Bank ID <code>70</code>)</td></tr>
+<tr><td>개수·소속</td><td class="w">세트당 <strong>정확히 15개(통화당 1개)</strong>, <strong>전부 같은 은행 하나</strong>(Bank ID <code>70</code>) — ML-08 6종 확인(R-11 교차검수 대기·잠정)</td></tr>
 <tr><td>규모</td><td class="w">HI-Small 452,751행(8.92%) / LI-Small 614,232행(8.87%). 최대 계좌 하나가 169,756행(3.34%)</td></tr>
 <tr><td>성격</td><td class="w">극단적 <strong>일방 송신</strong> — 최대 계좌 기준 보낸 상대 14,230개 vs 받은 상대 545개. 세탁 비율 0.14%는 세트 평균 0.10%와 같은 자릿수라 <strong>세탁이 몰린 계좌가 아닙니다</strong></td></tr>
 <tr><td>이름으로는 못 찾음</td><td class="w">소유자명이 <code>Corporation #29514</code> 같은 평범한 형태라 <strong>이름 기준 필터로는 걸러지지 않습니다.</strong> 계좌번호로만 식별하십시오</td></tr>
-<tr><td>왜 생겼나</td><td class="w">계좌번호가 16진수로 <strong>72(0x48)씩 증가</strong>하는 연속 배열이라, 생성기 내부 객체가 그대로 노출된 것으로 보입니다</td></tr>
+<tr><td>왜 생겼나</td><td class="w">계좌번호가 16진수로 <strong>72(0x48)씩 증가</strong>하는 연속 배열이라, 생성기 내부 객체가 그대로 노출된 것으로 보입니다. 정체는 제작자 Erik Altman이 Kaggle 답변에서 <strong>"quasi central banks"(통화별 준중앙은행격 초대형 실체)</strong>로 직접 확인했습니다(ML-08, R-11 대기)</td></tr>
 </tbody>
 </table>
 </div>
 <div class="note"><strong>왜 "데이터 문제"로 분류했는가.</strong> 데이터가 틀린 것은 아닙니다. 다만 <strong>이 15개를 모른 채 전처리하면 차수·2-hop·중심성 계열 피처가 전부 "허브와 몇 홉 떨어졌나"를 재는 값이 됩니다</strong>(7.3절 ②). 알고 시작하는 것과 모르고 시작하는 것의 차이가 커서 여기 넣었습니다. 처리 방법(제거·마스킹·별도 노드 타입·유지)은 화두 13·19·20·28의 논의 대상입니다.</div>
-<p class="src">출처: <strong>PM 원천 CSV 스팟 체크 (HI-Small·LI-Small 2종 한정) — 교차검수 미통과, Medium·Large 미확인.</strong> 6종 정식 확인은 <strong>ML-08</strong>에서 예정돼 있습니다. 이 표의 수치를 6종으로 일반화하지 마십시오. 다만 최대 차수 14,775가 ML-04의 교차검수 통과값과 일치한다는 점은 독립 재계산으로 확인됐습니다.</p>
+<p class="src">출처: PM 원천 CSV 스팟 체크(HI-Small·LI-Small)로 최초 발견 → <strong>ML-08이 6종 전부 정식 확인 (2026-08-07 실행 완료, <code>worktable/eda/08_hub_audit.md</code>)</strong> — 세트당 정확히 15개(통화당 1개), 거래행의 8.9~9.6% 점유, 제작자가 quasi central banks로 문서화. <strong>R-11 교차검수 대기 — ML-08 수치는 잠정입니다.</strong> 최대 차수 14,775가 ML-04의 교차검수 통과값과 일치한다는 점은 독립 재계산으로 확인됐습니다.</p>
 
 <h3>6.5 세트 사이의 관계 — 예상과 달랐던 부분</h3>
 <p>Small이 Medium의 일부이고 Medium이 Large의 일부일 것이라 예상했지만 <strong>사실이 아니었습니다.</strong></p>
@@ -877,7 +882,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 
 
 <h2 id="s7">7. 서비스 시나리오가 만드는 제약과 "주 기간" 구조</h2>
-<p class="lead">1.2절의 시나리오를 구현하려 할 때 걸리는 제약들(7.1~7.3)과, 데이터의 시간축이 <strong>주 기간과 꼬리로 나뉜다는 구조</strong>(7.4)입니다. 모델 설계 화두(8.3절)와 평가 화두(8.4절)의 전제가 됩니다.</p>
+<p class="lead">1.2절의 시나리오를 구현하려 할 때 걸리는 제약들(7.1~7.3)과, 데이터의 시간축이 <strong>주 기간과 꼬리로 나뉜다는 구조</strong>(7.4)입니다. 모델 설계 화두(18~20·43)와 평가 화두(23~25)의 전제가 됩니다.</p>
 
 <h3>7.1 판정 시점의 벽</h3>
 <div class="fig">
@@ -1012,9 +1017,9 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 
 <div class="gap">
-<p class="t">이 항목의 검증 상태 — 다른 수치와 다릅니다</p>
-<p>바로 위의 15개 계좌 관련 내용은 <strong>HI-Small·LI-Small 2종에서만 확인한 PM 스팟 체크</strong>입니다. <strong>Medium·Large는 미확인</strong>이고, <strong>교차검수를 거치지 않았습니다.</strong> 6종 정식 확인은 <strong>ML-08</strong>에서 수행할 예정입니다. 이 절의 다른 수치(차수·2-hop 분위수 표)는 교차검수 통과본입니다.</p>
-<p>다만 <strong>계좌번호 길이가 6종 모두 9자로 동일</strong>하다는 것은 확인된 사실이므로, 같은 식별 규칙(<strong>첫 글자가 <code>8</code>이 아닌 계좌</strong>)을 다른 세트에도 기계적으로 적용해볼 수 있습니다.</p>
+<p class="t">이 항목의 검증 상태 — ML-08 실행 완료, R-11 교차검수 대기</p>
+<p>15개 계좌 관련 내용은 PM 스팟 체크(HI-Small·LI-Small)로 발견된 뒤 <strong>ML-08이 6종 전부에서 정식 확인을 완료했습니다</strong>(2026-08-07). 같은 식별 규칙(<strong>첫 글자가 <code>8</code>이 아닌 계좌</strong>)으로 <strong>6종 모두 세트당 정확히 15개(통화당 1개)</strong>가 확인됐고, 제작자 Erik Altman이 Kaggle 답변에서 <strong>"quasi central banks"</strong>(통화별 준중앙은행격 초대형 실체)로 직접 확인했습니다. 거래행 점유는 8.9~9.6%이고 <strong>8대 패턴 블록 관여는 6종 전부 0개</strong>입니다.</p>
+<p><strong>ML-08 수치는 R-11 교차검수 대기 상태라 잠정입니다.</strong> 이 절의 다른 수치(차수·2-hop 분위수 표)는 교차검수 통과본입니다.</p>
 </div>
 
 <h4 style="margin-top:26px">2단계 이웃 크기의 분포 — 로그 스케일</h4>
@@ -1056,7 +1061,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <rect x="330" y="228" width="11" height="11" rx="2" fill="var(--s4)"/><text x="348" y="238" fill="var(--ink-2)">HI-Medium (계좌 2,077,023개)</text>
 </g>
 </svg>
-<p class="cap">2단계 이웃 크기의 분위수 (가로축 로그 스케일). 계좌의 절반은 이웃이 <strong>10개 미만</strong>인데 상위 1%는 <strong>1.5만~5.8만 개</strong>입니다. <strong>중앙값~P90 구간과 P99~최대 구간은 성격이 다릅니다</strong> — 앞은 실제 거래 이웃이고, 뒤는 소수 허브 계좌의 이웃 목록이 복사된 것입니다(바로 위 절). 출처: <code>04_service.md</code> S4 · <code>05_scale_service.md</code> §4, 허브 해석은 PM 스팟 체크(Small 2종·미검수)</p>
+<p class="cap">2단계 이웃 크기의 분위수 (가로축 로그 스케일). 계좌의 절반은 이웃이 <strong>10개 미만</strong>인데 상위 1%는 <strong>1.5만~5.8만 개</strong>입니다. <strong>중앙값~P90 구간과 P99~최대 구간은 성격이 다릅니다</strong> — 앞은 실제 거래 이웃이고, 뒤는 소수 허브 계좌의 이웃 목록이 복사된 것입니다(바로 위 절). 출처: <code>04_service.md</code> S4 · <code>05_scale_service.md</code> §4, 허브 해석은 ML-08 6종 확인(R-11 교차검수 대기·잠정)</p>
 </div>
 <div class="finding">
 <p class="t">"2단계까지 볼 것인가"는 평균이 아니라 꼬리로 정해야 하고, 그 꼬리는 허브에서 옵니다</p>
@@ -1289,24 +1294,414 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 
 
-<h2 id="s8">8. 논의 화두 42가지 — 17개 결정 완료</h2>
-<p class="lead">각 화두는 <strong>질문 + 데이터 상황 + 갈리는 지점 + 영향</strong> 구조로 적혀 있습니다. <strong>2026-08-07 첫 논의에서 화두 1~17이 결정</strong>됐고, 결정된 화두에는 <strong>팀 결정 블록</strong>이 붙었습니다. 나머지는 여전히 열려 있습니다.</p>
+<h2 id="s8">8. 논의 화두 48가지 — 결정 17 · 미결 31</h2>
+<p class="lead">각 화두는 <strong>질문 + 데이터 상황 + 갈리는 지점 + 영향</strong> 구조로 적혀 있습니다. <strong>2026-08-07 첫 논의에서 화두 1~17이 결정</strong>됐고(8.5절에 전문 보존), <strong>2026-08-09에 그 결정들에서 파생된 신규 화두 43~48</strong>이 추가됐습니다. 나머지 31개는 여전히 열려 있습니다.</p>
 
 <div class="kpis">
   <div class="kpi"><p class="k">결정 완료</p><p class="v">17개</p><p class="n">화두 1~17 · 2026-08-07</p></div>
-  <div class="kpi"><p class="k">미결</p><p class="v">25개</p><p class="n">화두 18~42</p></div>
+  <div class="kpi"><p class="k">미결</p><p class="v">31개</p><p class="n">화두 18~48</p></div>
   <div class="kpi"><p class="k">결정에 붙은 확인 사항</p><p class="v">7건</p><p class="n">측정에서 나온 주의점</p></div>
 </div>
 
-<div class="note"><strong>미결 25개가 덜 중요한 것이 아닙니다.</strong> 팀은 화두를 <strong>앞에서부터 순서대로</strong> 논의했고 <strong>17번에서 시간이 다 됐습니다.</strong> 18번 이후가 우선순위가 낮아서 남은 것이 아니라 아직 차례가 오지 않은 것입니다 — 예컨대 화두 25(학습·평가 분할)는 이후 모든 성능 수치의 해석 범위를 규정하는 항목입니다.</div>
+<div class="note"><strong>2026-08-09 재편 — 번호순이 아니라 우선순위순입니다.</strong> 화두를 <strong>개발 착수를 막는 것부터</strong> 우선순위 그룹(8.1~8.4)으로 다시 묶었습니다. <strong>화두 번호는 식별자이므로 그대로 유지</strong>되며 표시 순서와 묶음만 바뀌었습니다. 신규 화두 43~48은 결정 1~17이 만든 후속 질문이고, 각 원 결정에 파생 링크를 표시했습니다.</div>
+
+<div class="note"><strong>"에이전트 참고 의견" 블록이 도입됐습니다(2026-08-09 사용자 지시).</strong> 신규 화두에 붙은 보라색 테두리 블록은 에이전트의 추천 의견으로, <strong>참고용이며 팀 결정을 대체하지 않습니다.</strong> 이 블록 밖의 본문(데이터 상황·갈리는 지점·영향)은 종전과 같이 추천 없이 사실만 서술합니다.</div>
+
+<div class="note"><strong>미결 31개가 덜 중요한 것이 아닙니다.</strong> 화두 18~42는 첫 논의에서 <strong>아직 차례가 오지 않아</strong> 남은 것이고(팀은 앞에서부터 순서대로 논의했고 17번에서 시간이 다 됐습니다), 화두 43~48은 결정 1~17이 만든 후속 질문입니다 — 예컨대 화두 25(학습·평가 분할)는 이후 모든 성능 수치의 해석 범위를 규정하는 항목입니다.</div>
 
 <div class="note"><strong>결정 블록을 읽는 법.</strong> <span class="badge">결정</span> 표시가 붙은 화두는 <strong>질문과 논의 기록을 그대로 두고</strong> 결정을 덧붙인 것입니다. 나중에 다시 논의할 때 "왜 그렇게 정했는지"가 남아 있어야 하기 때문에 지우지 않았습니다. 결정 아래에 붙은 <strong>주황색 상자는 "이 결정대로 가면 무엇이 발생하는가"를 측정 근거와 함께 적은 것</strong>이고, <strong>파란색 상자는 결정을 뒷받침하는 측정 결과</strong>입니다. 둘 다 사실 전달이며 결정을 바꾸라는 뜻이 아닙니다.</div>
 
-<p class="lead">화두들은 서로 연결돼 있어 하나를 정하면 다른 것의 선택지가 좁아지기도 합니다(8.9절).</p>
+<p class="lead">화두들은 서로 연결돼 있어 하나를 정하면 다른 것의 선택지가 좁아지기도 합니다(8.6절).</p>
 
-<h3>8.1 서비스를 무엇으로 정의할 것인가</h3>
+<h3>8.1 지금 결정해야 개발이 시작되는 것 (착수 차단)</h3>
 
-<div class="topic">
+<p class="lead">이 결정들 위에 구현이 섭니다 — 정해지기 전에는 학습 파이프라인·실험 설계를 시작할 수 없거나, 시작해도 되돌리게 됩니다.</p>
+
+<div class="topic" id="t39">
+<p class="q">화두 39 — 5명의 역할을 어떻게 나눌 것인가?</p>
+<p class="d">데이터·전처리 / 모델링 / 백엔드 / 프론트엔드 / 기획·문서 같은 축이 가능합니다. 모델과 서비스를 병렬로 진행하려면 둘 사이의 인터페이스(모델 출력 형식)를 일찍 정해야 합니다.</p>
+</div>
+
+<div class="topic" id="t40">
+<p class="q">화두 40 — 중간발표 MVP의 범위를 어디까지로 할 것인가?</p>
+<p class="d">10주 안에 어디까지 완성할지 — 모델 성능 목표, 대시보드 화면 수, 데이터 규모. "작동하는 것"과 "완성도 높은 것"의 경계를 미리 합의해두면 이후 2개월 계획이 명확해집니다.</p>
+</div>
+
+<div class="topic" id="t43">
+<p class="q">화두 43 — 특수 허브 계좌 15개를 그래프에서 어떻게 처리할 것인가?</p>
+<p class="src" style="margin:0 0 8px"><strong>파생 출처:</strong> <a href="#t13">화두 13</a>에서 "추후 재논의"로 유보한 항목이 독립된 화두입니다.</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">화두 13에서 유보한 사이 <strong>ML-08이 6종 정식 확인을 완료했습니다</strong>(2026-08-07, <strong>R-11 교차검수 대기 — 아래 수치는 잠정</strong>). 세트당 <strong>정확히 15개(통화당 1개)</strong>, 전부 Bank ID <code>70</code>이며, 제작자 Erik Altman이 Kaggle 답변에서 <strong>"quasi central banks"(통화별 준중앙은행격 초대형 실체)</strong>로 직접 확인했습니다. 거래행의 <strong>8.9~9.6%</strong>가 허브를 경유하고, 세탁 라벨 행 기준으로는 <strong>HI 10.8~12.2% / LI 23.5~25.6%</strong>가 허브 경유입니다. 반면 <strong>8대 패턴 블록 관여는 6종 전부 0개</strong>입니다.</p>
+<p class="d">15개 제거 시 길이-2 경로 비용(sum(deg²)) 잔존은 <strong>0.79~4.13%</strong>이고, Small exact 2-hop P99는 <strong>14,785 → 70</strong>으로 떨어집니다. <strong>시간창으로는 해소되지 않습니다</strong> — 비허브 일별 P99가 4인데 허브 일별 최대는 58,260으로(시간축과 차수축은 직교), 창을 좁혀도 허브는 여전히 허브입니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li><strong>① 학습 그래프에서 제거</strong> — 계산·메모리 문제 즉시 해소, 패턴 블록 무손상(관여 0) / 허브 경유 라벨 1 거래(10~26%)의 그래프 신호가 소실되므로 해당 거래는 피처 기반 판정 경로가 필요해집니다</li>
+<li><strong>② 노드 유지 + 이웃 확장 차단(expansion-stop) 또는 recent-K 캡</strong> — 그래프를 보존하면서 비용 통제 / K 민감도 관리가 필요합니다 — ML-08이 K∈{8,16,32,64} 민감도표(라벨 1 절단·패턴 절단 비율 포함)를 보유하고 있습니다</li>
+<li><strong>③ 별도 노드 타입(이종 그래프)</strong> — 정보 최대 보존 / 아키텍처 복잡도가 오르고 화두 18의 후보를 제약합니다</li>
+<li><strong>④ 유지 + 균일 이웃 샘플링</strong> — 구현 최소 / 배치가 허브를 물면 크기가 수백 배 변동하고 허브 이웃이 샘플을 포화시킵니다</li>
+</ul>
+<p class="lbl">실무 참고</p>
+<p class="d">실제 은행 모니터링에서도 정산·기관성 계좌는 고객 행동 모니터링과 분리 취급하는 것이 일반적이며, GNN 사기탐지 실무·연구에서는 고차수 노드에 고정 크기 이웃 샘플링·차수 제한을 표준적으로 사용합니다(GraphSAGE류 fixed-size sampling; 이 데이터셋의 공개 레퍼런스 IBM Multi-GNN도 hop당 100개 샘플링). <code>https://developer.nvidia.com/blog/optimizing-fraud-detection-in-financial-services-with-graph-neural-networks-and-nvidia-gpus/</code> · <code>https://github.com/IBM/Multi-GNN/</code></p>
+<div class="agentop">
+<p class="rt">에이전트 참고 의견 (2026-08-09 사용자 지시로 도입) — 참고용이며 팀 결정을 대체하지 않습니다</p>
+<p><strong>①+② 조합 검토를 추천합니다</strong> — 기본 학습 그래프에서는 15개를 제외하고(제작자가 합성 인프라 계좌로 확인한 집단이므로 정보 손실이라기보다 인공물 통제에 가깝고, 길이-2 비용이 96~99% 절감됩니다), 허브 경유 라벨 1 거래의 <strong>피처 기반 판정 경로와 대시보드 표시는 유지</strong>하는 조합입니다. 전제: R-11 통과.</p>
+</div>
+<p class="lbl">영향</p><p class="d">화두 18(아키텍처)·19(이웃)·20(크기)·28(저장소)·2(응답시간)·케이스 조사 UI 전부가 이 결정을 기다립니다. <strong>화두 18보다 먼저 결정해야 합니다.</strong></p>
+</div>
+
+<div class="topic" id="t25">
+<p class="q">화두 25 — 학습·검증·평가를 어떻게 나눌 것인가?<span class="badge open">미결</span></p>
+<div class="note" style="margin:0 0 10px"><strong>화두 17이 이 화두의 절반을 이미 정했습니다.</strong> 꼬리를 잘라내고 주 기간만 쓰기로 했으므로 <strong>아래 표의 "일 단위 60/20/20" 문제는 상당 부분 사라집니다</strong> — test가 꼬리에 잠기는 일이 없어지기 때문입니다. 남은 것은 <strong>주 기간 안에서 어떻게 나눌 것인가</strong>와 <strong>절단 기준일을 어디로 둘 것인가</strong>입니다.</div>
+<p class="lbl">데이터 상황</p>
+<p class="d">서비스 시나리오상 시간 분할이 배포 조건과 맞습니다. 그런데 <strong>데이터에는 "주 기간"과 "꼬리"가 따로 있습니다</strong>(2·7.4절). 주 기간(Small 10일 / Medium 16일 / Large 97일)이 끝나면 정상 거래가 약 1,000배 급감하고 세탁 완결분이 이어져, 그 구간의 세탁 비율이 <strong>0.05~0.11%에서 56~60%로</strong> 뜁니다(위험비 532~1,211배). 아무 생각 없이 뒤쪽을 test로 자르면 <strong>test의 클래스 비율이 train과 500배 이상 다릅니다.</strong></p>
+
+<p class="lbl">제작자가 제시한 두 가지 (사실 전달 — 우리 권고가 아닙니다)</p>
+<ul>
+<li><strong>"시간순 60% / 20% / 20% (train / validate / test) 분할이 효과적이었고 이를 따를 것을 권한다"</strong> — 데이터카드.</li>
+<li><strong>"첫 9일을 쓰고, 테스트는 11일 대신 10일을 쓰라"</strong> — Small에 대한 제작자 Erik Altman의 Discussion 답변.</li>
+</ul>
+
+<p class="lbl">두 제안이 충돌하는 지점 — 여기가 실제로 갈리는 곳입니다</p>
+<p class="d"><strong>60/20/20을 무엇의 60%로 자르느냐에 따라 결과가 완전히 달라집니다.</strong></p>
+<div class="scroll">
+<table>
+<thead><tr><th>자르는 기준</th><th class="w">HI-Small에서 test 구간이 어떻게 되는가</th><th class="w">결과</th></tr></thead>
+<tbody>
+<tr><td><strong>일(day) 단위 60/20/20</strong><br>관측 18일 기준</td><td class="w">test = 뒤쪽 3.6일 ≈ 09-15~09-18 — <strong>전부 꼬리 구간</strong>(주 기간은 09-10에 끝남)</td><td class="w">test의 세탁 비율이 약 60%이고 <strong>test 전체가 126건</strong>(09-15~09-18 합계)뿐입니다. 분포도 train과 다르고 표본도 극소라 <strong>평가가 성립하지 않습니다</strong></td></tr>
+<tr><td><strong>거래 건수 기준 60/20/20</strong><br>508만 건 기준</td><td class="w">꼬리 전체가 약 1,100건(전체의 <strong>0.02%</strong>)이라 test 약 102만 건 안에서 꼬리는 반올림 오차 수준</td><td class="w">클래스 비율이 유지돼 평가가 성립합니다. 대신 <strong>test가 사실상 마지막 사흘(09-08 일부~09-10)</strong>에 몰려 시간 일반화 폭이 좁습니다</td></tr>
+<tr><td><strong>제작자 제안(첫 9일 / 10일)</strong></td><td class="w">train 09-01~09-09, test 09-10 하루(약 20.8만 건). 꼬리는 통째로 제외</td><td class="w">경계 문제는 사라지지만 <strong>validate 구간이 없고</strong> test가 하루뿐이며, 꼬리의 세탁 완결분을 전부 버립니다</td></tr>
+</tbody>
+</table>
+</div>
+<p class="d">Medium·Large에서는 양상이 또 다릅니다 — Large는 관측 165일 중 주 기간이 97일이라 <strong>일 단위 60/20/20의 test(뒤쪽 33일)가 통째로 꼬리</strong>에 들어가고, Medium(28일 중 16일)도 마찬가지입니다. 즉 <strong>일 단위 비율 분할은 6종 전부에서 test가 꼬리에 잠깁니다.</strong> 제작자는 Small 외의 규모에 대해서는 구체적 일수를 제시하지 않았습니다.</p>
+
+<p class="d">그 밖의 전제도 그대로입니다 — 라벨의 상위 1% 계좌 점유율은 19~28%로 군집이 존재합니다. 계좌 분할을 택하면 <strong>패턴 블록이 train과 test에 걸치는 문제</strong>가 새로 생깁니다(블록 하나가 평균 8.7건, 계좌 여러 개에 걸침).</p>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li><strong>60/20/20을 일 단위로 자를 것인가, 거래 건수 기준으로 자를 것인가</strong> — 위 표에서 결과가 갈립니다</li>
+<li>제작자 제안대로 꼬리를 통째로 버릴 것인가, 세탁 완결분을 살릴 방법을 찾을 것인가</li>
+<li>Small 외의 규모에는 어떤 기준을 적용할 것인가 (제작자가 제시하지 않은 영역)</li>
+<li>시간 분할 / 계좌 분할 / 혼합 — 시간 분할을 택한다면 경계를 어떻게 다룰 것인가(7.4절의 다섯 가지 처리 방침)</li>
+<li>계좌 겹침으로 인한 누수를 어떻게 점검할 것인가</li>
+<li>계좌·블록 분할을 택하면 시간 일반화 성능을 측정하지 못한다는 점을 감수할 것인가</li>
+<li>노드 피처 집계의 기준 시점을 어떻게 고정할 것인가 (화두 15와 연결)</li>
+<li>분할 방식이 다른 실험 결과를 서로 비교할 수 있게 하려면 무엇을 고정해야 하는가</li>
+</ul>
+<p class="lbl">영향</p><p class="d">이 화두는 이번 갱신에서 전제가 가장 크게 바뀐 항목입니다. 화두 24(평가 지표)·화두 17(시간 처리)·화두 15(피처 기준 시점)와 함께 정해야 하며, 여기서 정한 것이 <strong>이후 모든 성능 수치의 해석 범위</strong>를 규정합니다.</p>
+</div>
+
+<div class="topic" id="t44">
+<p class="q">화두 44 — "순서만 입력"에서 Δt(거래 간격)를 살릴 것인가?</p>
+<p class="src" style="margin:0 0 8px"><strong>파생 출처:</strong> <a href="#t10">화두 10</a>·<a href="#t17">화두 17</a>(절대시간 제거·순서만 입력) 결정의 후속 질문입니다.</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">화두 10·17의 결정 취지는 "거래 사이 벌어진 시간 같은 시계열성 패턴 학습"인데, 순서 인덱스만 입력하면 간격(Δt) 정보가 사라져 <strong>취지와 결정 문면 사이에 긴장</strong>이 있습니다. 타임스탬프는 분 정밀도입니다. 세탁 라벨과 간격의 관계(라벨별 Δt 분포, 수신→다음 송신 간격)는 <strong>ML-09에서 측정 진행 중입니다(R-12 예정)</strong>. 부수 확인: "순서"는 파일 행 순서가 아니라 <strong>타임스탬프 정렬 기준</strong>이어야 합니다 — 파일은 시간순이 아닙니다(ML-03).</p>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li><strong>① 순서 인덱스만</strong>(결정 문면 그대로) — 가장 단순하나 Δt 신호를 포기합니다</li>
+<li><strong>② 절대시간 제거 + Δt를 상대 피처로 유지</strong> — 결정 취지(시계열성 학습)와 양립합니다</li>
+<li><strong>③ Δt 구간화(분/시간/일 버킷) 입력</strong> — 극단값을 완화합니다</li>
+<li><strong>④ 시간 인코딩 아키텍처(TGN/TGAT류)</strong> — 표현력 최대 / 복잡도가 오르고 화두 18을 제약합니다</li>
+</ul>
+<p class="lbl">실무 참고</p>
+<p class="d">"자금의 급속 이동(rapid movement of funds)"은 FATF·FFIEC 계열의 표준 레드플래그로, 실무 모니터링 규칙은 "수 분 내 입금 후 출금", 체류 잔액이 거의 없는 통과(pass-through) 계좌 등 <strong>속도(velocity) 지표</strong>를 핵심으로 사용합니다. 간격 정보를 완전히 버리는 입력 설계는 실무 표준 신호 하나를 스스로 끄는 셈입니다. <code>https://bsaaml.ffiec.gov/manual/Appendices/07</code> · <code>https://sumsub.com/blog/aml-red-flags-guide/</code></p>
+<div class="agentop">
+<p class="rt">에이전트 참고 의견 (2026-08-09 사용자 지시로 도입) — 참고용이며 팀 결정을 대체하지 않습니다</p>
+<p><strong>② 또는 ③을 추천합니다</strong> — 절대시간 제거(관측창 누수 방지)와 Δt 유지(속도 신호 보존)는 서로 충돌하지 않으므로 둘 다 취할 수 있습니다. 최종 확정은 ML-09의 라벨별 Δt 분리도 측정 결과를 본 뒤가 적절합니다.</p>
+</div>
+<p class="lbl">영향</p><p class="d">화두 15·16(피처 설계)·18(아키텍처)·25(분할)와 연동됩니다.</p>
+</div>
+
+<div class="topic" id="t23">
+<p class="q">화두 23 — 모델의 타깃을 무엇으로 정의할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">기본 라벨은 거래 단위 0/1입니다. 패턴에 속한 거래는 100% 라벨 1이므로 패턴 유형을 보조 라벨로 쓸 수 있습니다(5.1절). 계좌 단위 위험도로 바꾸는 것도 가능합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>거래 단위 이진 분류</li><li>패턴 유형을 보조 과제로 함께 학습</li><li>계좌 단위 위험도를 함께 산출</li><li>전조 예측용으로 라벨 재정의 (화두 3과 연결)</li></ul>
+</div>
+
+<div class="topic" id="t24">
+<p class="q">화두 24 — 평가 지표를 무엇으로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">불균형이 극단적이라 전부 정상이라고 답해도 정확도가 99.87%가 나옵니다. 또 세탁의 <strong>35~81%</strong>가 패턴 밖이므로 패턴 기준 지표만 보면 그 부분을 놓칩니다.</p>
+<p class="d"><strong>평가 구간이 꼬리에 걸리면 수치가 직접 왜곡됩니다</strong>(7.4절). 평가 구간을 데이터 뒤쪽에서 일(day) 기준으로 잡으면 6종 전부에서 그 구간이 꼬리에 잠기고, 세탁 비율이 <strong>56~60%</strong>가 되어 같은 모델이라도 주 기간에서 잰 것과 완전히 다른 값이 나옵니다. 정밀도 계열 지표는 양성 비율에 직접 좌우되므로 <strong>"어느 구간에서 쟀는가"를 명시하지 않은 성능 수치는 비교할 수 없습니다.</strong> 제작자도 Small에 대해 <strong>"테스트는 11일 대신 10일을 쓰라"</strong>고 답한 바 있습니다(사실 전달 — 화두 25에서 다룹니다).</p>
+<p class="d">패턴 밖 세탁도 거래 속성만으로 정상과 구분된다는 점(7.3절 ⑤, 분포 거리 0.51~0.58)은 <strong>패턴 밖을 별도로 평가할 근거</strong>가 됩니다 — 잡을 수 있는 신호가 있는데 못 잡는 것인지, 신호 자체가 없는 것인지를 구분할 수 있습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>어떤 지표를 주 지표로 삼을 것인가 (PR-AUC, 특정 재현율에서의 정밀도, 상위 N건 정밀도 등)</li><li>패턴 안/밖을 분리 평가할 것인가</li><li>패턴 유형별 재현율을 볼 것인가</li><li>거래 단위와 사건 단위 중 무엇으로 셀 것인가 (3장의 단위 문제)</li><li><strong>평가 구간을 시간축의 어디로 잡을 것인가</strong> — 꼬리 구간을 평가에 넣을지, 뺄지, 별도 지표로 분리할지 (화두 25와 함께)</li></ul>
+</div>
+
+<div class="topic" id="t46">
+<p class="q">화두 46 — 세트 선정 기준을 결과를 보기 전에 고정할 것인가?</p>
+<p class="src" style="margin:0 0 8px"><strong>파생 출처:</strong> <a href="#t6">화두 6</a>("일단 다 시도해보고 추후 결정") 결정의 후속 질문입니다.</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">"다 해보고 추후 결정"은 선정 기준이 없으면 <strong>결과를 본 뒤 고르는 사후 선택</strong>이 됩니다 — 이 프로젝트의 ML-06이 정확히 이 사유("결과를 보고 임계를 고른 것과 구별되지 않는다")로 교차검수 반려된 전례가 있습니다. 판단 재료는 이미 측정돼 있습니다: 주 기간 길이(Small 약 10일, Large 약 97일 — 시간순 train/validate/test 분할 실험은 Large만 여유), 파일 크기·자원 한계(ML-01), HI/LI 라벨 밀도 차. ML-09 근거 공백 감사에서 이 항목은 <strong>"신규 EDA 불필요, 절차 공백 열림(선정 규칙 사전 등록)"</strong>으로 분류됐습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li><strong>① 선정 규칙을 실험 전에 문서로 고정</strong> — 예: 데모용 세트와 본실험 세트를 기준과 함께 명시</li>
+<li><strong>② 기준 없이 진행하되 보고서에 사후 선택 한계를 명시</strong></li>
+<li><strong>③ 발표용 세트와 실험용 세트를 분리 운영</strong></li>
+</ul>
+<p class="lbl">실무 참고</p>
+<p class="d">ML 실험 방법론에서 사전 등록(pre-registration)·고정 프로토콜은 선택적 보고 편향을 막는 표준 장치이며, 벤치마크 비교는 분할·지표를 먼저 고정하는 것이 관례입니다.</p>
+<div class="agentop">
+<p class="rt">에이전트 참고 의견 (2026-08-09 사용자 지시로 도입) — 참고용이며 팀 결정을 대체하지 않습니다</p>
+<p><strong>①을 추천합니다</strong> — 비용이 문서 한 절 수준이고, 중간발표에서 "왜 이 세트를 썼는가"에 대한 방어가 됩니다.</p>
+</div>
+<p class="lbl">영향</p><p class="d">화두 25(분할)·38(EDA 범위)·40(MVP 범위)과 연동됩니다.</p>
+</div>
+
+<div class="topic" id="t41">
+<p class="q">화두 41 — 실험 관리와 협업 방식을 어떻게 할 것인가?</p>
+<p class="d">여러 명이 여러 모델을 돌리면 어떤 설정에서 어떤 결과가 나왔는지 추적이 필요합니다. 코드·데이터·모델 파일의 공유 방식, 재현성(시드 고정 등)도 결정 사항입니다.</p>
+</div>
+
+<h3>8.2 트랙 착수 전 결정 — 모델과 병렬 가능</h3>
+
+<p class="lead">모델 작업과 병렬로 진행할 수 있으나, 해당 트랙(서비스·백엔드)을 시작하기 전에는 정해야 하는 항목입니다.</p>
+
+<div class="topic" id="t47">
+<p class="q">화두 47 — "분 단위 배치"의 운영 정의와 배치 내부 가시성을 어떻게 정할 것인가?</p>
+<p class="src" style="margin:0 0 8px"><strong>파생 출처:</strong> <a href="#t2">화두 2</a>(분 단위 배치·응답시간 정의) 결정의 후속 질문입니다.</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">화두 2는 분 단위 배치와 응답시간 정의(배치 첫 도착 기준)를 정했지만 두 가지가 미정입니다: (1) <strong>배치 경계</strong> — 정각 정렬(tumbling minute)인가, 첫 도착 기준 60초(micro-batch)인가 (2) <strong>같은 배치 안의 거래들이 서로의 이웃으로 보이는가.</strong> 원천 타임스탬프가 분 정밀도라 <strong>첫 도착 기준 배치의 실제 구성은 데이터에서 재현이 불가능합니다</strong> — 정각 정렬 분 버킷만 데이터로 검증할 수 있습니다(ML-09가 이 식별 한계 자체를 화두 전제로 보고할 예정입니다). 분당 유입량 분포·같은 분 안 동일 계좌 동시출현율은 <strong>ML-09 측정 진행 중입니다(R-12 예정)</strong>.</p>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li><strong>배치 경계</strong> — ① 정각 정렬(데이터로 검증 가능, 구현 단순) ② 첫 도착 60초(대기시간 최소화에 유리하나 데이터로 재현 불가)</li>
+<li><strong>내부 가시성</strong> — ① 배치 내 상호 불가시(각 거래는 과거만 봄 — 학습-서빙 일관성이 가장 단순) ② 상호 가시(정보 증가 / 학습 때 같은 조건을 재현해야 합니다)</li>
+</ul>
+<p class="lbl">실무 참고</p>
+<p class="d">실무 AML 거래 모니터링은 전통적으로 T+1 야간 배치 중심이었고, 즉시결제 확산으로 실시간·마이크로배치 스코어링이 병행되는 추세입니다(500ms 내 스코어링 사례, 배치 전용 모니터링을 불충분하다고 보는 규제 흐름). "분 단위 마이크로배치"는 그 중간 지점으로 실무적으로 자연스러운 위치입니다. <code>https://www.amlrightsource.com/resources/transaction-monitoring-for-real-time-payments-designing-controls-for-speed</code> · <code>https://www.tookitaki.com/compliance-hub/real-time-transaction-monitoring</code></p>
+<div class="agentop">
+<p class="rt">에이전트 참고 의견 (2026-08-09 사용자 지시로 도입) — 참고용이며 팀 결정을 대체하지 않습니다</p>
+<p><strong>MVP는 "정각 정렬 + 배치 내 상호 불가시"를 추천합니다</strong> — 데이터 정밀도 제약상 학습·서빙·평가를 같은 정의로 맞출 수 있는 유일한 조합이며, 화두 2의 응답시간 정의와 충돌하지 않습니다.</p>
+</div>
+<p class="lbl">영향</p><p class="d">화두 19(이웃 범위)·28(그래프 저장소)·백엔드 파이프라인 설계와 연동됩니다.</p>
+</div>
+
+<div class="topic" id="t28">
+<p class="q">화두 28 — 그래프를 어디에 어떻게 유지할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">판정마다 이웃 조회가 필요하므로 그래프 저장소가 서비스의 일부가 됩니다(1.2절). 계좌 50~70만 개(Small) 또는 200만 개(Large) 규모이며, 판정한 거래를 계속 반영해야 합니다.</p>
+<p class="d">조회 규모의 실제 분포는 7.3절 ②에 있습니다 — <strong>중앙값 6~10개, 상위 1% 1.5만~5.9만 개, 최대 12만 개.</strong> 저장소 선택은 이 꼬리를 감당할 수 있는지로 갈립니다. 계좌쌍의 53~55%가 반복 거래이므로(7.3절 ⑥) 인접 관계를 쌍 단위로 접으면 저장 크기를 절반 가까이 줄일 수 있으나, 반복 횟수·시각 정보를 따로 보관해야 합니다.</p>
+<p class="d"><strong>꼬리가 소수 허브에서 온다는 점이 저장소 설계에 직접 걸립니다</strong>(6.4·7.3절, ML-08 6종 확인 — R-11 교차검수 대기·잠정). 인접 리스트를 계좌별로 만들면 <strong>15개 계좌의 리스트만 1만~2만 항목</strong>이고 나머지 50만 개는 한 자릿수입니다. 즉 크기 분포가 균일하지 않아 <strong>단일 저장 구조로는 양쪽 모두에 비효율적</strong>일 수 있습니다. 허브는 계좌번호 첫 글자로 사전 식별되므로 <strong>저장 층에서 분리 취급하는 것이 기술적으로는 가능</strong>합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>관계형 DB / 그래프 DB / 메모리 구조 / 인접 리스트 파일</li><li>그래프를 실시간 갱신할 것인가 주기적으로 재구축할 것인가</li><li>허브 계좌에 대한 조회 상한을 저장소 층에서 둘 것인가 모델 층에서 둘 것인가</li><li>허브 15개를 별도 저장 구조로 분리할 것인가, 단일 구조로 통일할 것인가</li></ul>
+</div>
+
+<div class="topic" id="t29">
+<p class="q">화두 29 — 모델 출력을 어떤 형태로 보여줄 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">세탁 시나리오 하나가 평균 8.25~8.77건의 거래로 이뤄지므로, 거래를 하나씩 나열하면 같은 사건이 여러 알림으로 쪼개질 수 있습니다. 게다가 <strong>체인 하나가 며칠에 걸쳐 벌어집니다</strong>(7.3절 ③: 중앙값 3.1일~28.0일) — 같은 사건의 알림이 여러 날에 흩어져 뜬다는 뜻입니다.</p>
+<p class="d">대시보드에 은행명을 표시할 때는 <strong>동명 은행이 존재</strong>한다는 점을 감안해야 합니다(6.4절) — 이름만 보여주면 담당자가 다른 은행을 같은 은행으로 오인할 수 있습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>거래 단위 목록 / 연관 거래를 묶은 케이스 단위</li><li>며칠에 걸친 체인을 하나의 케이스로 유지할 것인가, 알림이 뜰 때마다 갱신할 것인가</li><li>탐지된 패턴의 그래프를 시각화할 것인가</li><li>계좌 단위 위험도를 함께 보여줄 것인가</li><li>은행명을 그대로 표시할 것인가, ID를 병기할 것인가</li></ul>
+</div>
+
+<div class="topic" id="t31">
+<p class="q">화두 31 — 웹 서비스 기술 스택을 무엇으로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">중간발표까지 10주이며 팀원들의 경험이 학습 곡선을 좌우합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>프론트엔드·백엔드 프레임워크</li><li>모델 서빙 방식</li><li>배포 환경</li></ul>
+</div>
+
+<div class="topic" id="t48">
+<p class="q">화두 48 — 케이스 조사 산출물의 데이터 모델을 무엇으로 할 것인가?</p>
+<p class="src" style="margin:0 0 8px"><strong>파생 출처:</strong> <a href="#t4">화두 4</a>(MVP 범위 = 케이스 조사까지) 결정의 후속 질문입니다.</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">MVP 범위는 "조사 결과 텍스트를 계좌에 연결해 저장"까지로 결정됐으나 <strong>저장 구조가 미정입니다</strong>: 케이스-계좌-거래 연결, 모니터링→조사 이관 이력, 케이스 상태 전이, 작성자·시각. MVP 이후 STR 초안 LLM을 만들 경우 <strong>이 저장 구조가 그 입력이 됩니다</strong> — 지금의 스키마가 나중 범위를 제약합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li><strong>① 최소 스키마만 지금 확정</strong> — 케이스↔계좌 연결 + 조사 텍스트 + 타임스탬프</li>
+<li><strong>② 상태 워크플로우(접수→조사→종결)와 감사 추적(모든 행위 로그)까지 스키마에 포함</strong></li>
+<li><strong>③ 화두 29~31과 묶어 서비스 설계 라운드에서 일괄 결정</strong></li>
+</ul>
+<p class="lbl">실무 참고</p>
+<p class="d">실무 케이스 관리 시스템(NICE Actimize, goAML 연동 솔루션 등)의 공통 골격은 alert→case 승격, 증거 첨부, 조사 노트, 상태 워크플로우, 그리고 <strong>모든 단계의 감사 추적</strong>(규제 심사 대응의 필수 요소) + STR/SAR 전자 제출 연동입니다. 감사 추적은 나중에 소급해 붙이기 어려운 대표적 요소로 꼽힙니다. <code>https://www.unit21.ai/blog/aml-case-management-system-metrics-and-kpis</code> · <code>https://seon.io/resources/aml-case-management/</code></p>
+<div class="agentop">
+<p class="rt">에이전트 참고 의견 (2026-08-09 사용자 지시로 도입) — 참고용이며 팀 결정을 대체하지 않습니다</p>
+<p><strong>②의 골격(상태 필드 + 행위 로그 필드)을 처음부터 스키마에 두는 것을 추천합니다</strong> — 필드 몇 개 수준의 비용으로 MVP 이후 STR 단계와 "실무 규제 요건을 반영했다"는 발표 서사를 동시에 대비합니다. 구현 자체는 MVP 후반이어도 스키마는 선행할 수 있습니다.</p>
+</div>
+<p class="lbl">영향</p><p class="d">화두 29(출력 형태)·31(스택)·40(MVP 범위), MVP 이후 STR LLM과 연동됩니다.</p>
+</div>
+
+<div class="topic" id="t21">
+<p class="q">화두 21 — 은행 관점을 어떻게 다룰 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">실제 은행은 자행이 관련된 거래만 볼 수 있고 타행↔타행은 볼 수 없습니다. 반면 학습 데이터에는 모든 은행이 들어 있습니다. 측정 결과는 아래와 같습니다.</p>
+<div class="kpis" style="margin:10px 0">
+  <div class="kpi"><p class="k">세탁 거래 중 은행 경계를 넘는 비율</p><p class="v">98.0~99.3%</p><p class="n">6종 세트 전부</p></div>
+  <div class="kpi"><p class="k">세탁 패턴 중 한 은행에서 끝나는 비율</p><p class="v">0~1.1%</p><p class="n">6종 세트 전부</p></div>
+  <div class="kpi"><p class="k">세탁 사례가 하나도 없는 은행</p><p class="v">94.8~96.5%</p><p class="n">규모가 클수록 소폭 감소</p></div>
+</div>
+<p class="d">은행은 Small 3~4만 개, Medium·Large 12만 개로 분산돼 있고, Small 기준 상위 3개 은행 관점으로 잘라도 거래의 13%만 남습니다. 같은 사람이 여러 은행에 계좌를 가진 비율은 38.1%입니다.</p>
+<p class="d"><strong>은행 수를 셀 때는 반드시 Bank ID를 쓰십시오</strong>(6.4절). 은행 이름으로 세면 HI-Small이 30,470개가 아니라 20,053개로 나옵니다 — 이름 468개가 서로 다른 은행 ID 여러 개(최대 48개)에 공유되기 때문입니다. 위 수치는 전부 Bank ID 기준이라 영향이 없지만, <strong>은행별 모델·은행별 화면을 만들 때 이름을 키로 쓰면 무관한 은행이 하나로 합쳐집니다.</strong></p>
+<p class="d">규모가 커질수록 은행 간 거래가 더 늘어납니다 — 전체 거래 중 같은 은행 안에서 끝나는 비율이 Small 13.6%에서 Large 6.8%로 줄어듭니다. 즉 <strong>큰 세트일수록 한 은행이 보는 그림이 더 조각납니다.</strong></p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>전체 그래프로 통합 학습</li><li>은행별 개별 모델 (세탁 사례가 있는 은행이 4% 미만이므로 대상 은행 선정이 필요)</li><li>전체로 학습하되 배치를 은행 관점으로 잘라 학습 조건과 배포 조건을 맞추기</li><li>어느 방식이든 평가를 어떤 뷰로 통일할 것인가 — 전체 뷰로 잰 성능은 실제 배포 성능과 다릅니다</li></ul>
+</div>
+
+<h3>8.3 개발 중 실험으로 결정 가능 — 후보만 정하고 시작해도 되는 것</h3>
+
+<p class="lead">착수를 막지 않습니다 — 후보를 정해 시작하고 실험 결과로 확정할 수 있는 항목입니다.</p>
+
+<div class="topic" id="t18">
+<p class="q">화두 18 — 아키텍처와 프레임워크를 무엇으로 할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">서비스 시나리오상 처음 보는 계좌도 판정할 수 있어야 하므로(7.1절), 계좌마다 임베딩을 외우는 방식보다 이웃 정보로 임베딩을 생성하는 계열이 요건에 맞습니다. 팀 5명이 같은 프레임워크를 써야 합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>아키텍처 후보 (GCN, GraphSAGE, GAT, 이종 그래프용 RGCN·HGT 등)</li><li>프레임워크 (PyTorch Geometric, DGL 등)</li><li>학습 환경 (로컬 GPU, 클라우드, Colab)</li></ul>
+</div>
+
+<div class="topic" id="t19">
+<p class="q">화두 19 — 이웃을 어디까지, 얼마나 과거까지 볼 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">판정할 때 조회하는 이웃의 범위가 곧 응답 시간입니다. <strong>분포가 측정됐습니다</strong>(7.3절 ②).</p>
+<div class="kpis" style="margin:10px 0">
+  <div class="kpi"><p class="k">2단계 이웃 — 중앙값</p><p class="v">6~10개</p><p class="n">계좌의 절반은 이 정도</p></div>
+  <div class="kpi"><p class="k">2단계 이웃 — 상위 1%</p><p class="v">1.5만~5.9만</p><p class="n">대부분 허브 하나의 이웃 목록</p></div>
+  <div class="kpi"><p class="k">2단계 이웃 — 최대</p><p class="v">12.3만</p><p class="n">HI-Medium 기준</p></div>
+</div>
+<p class="d">즉 <strong>평균적으로는 싸지만 소수의 요청이 1,000배 이상 비쌉니다.</strong> 상한을 두지 않으면 그 소수가 응답 시간 SLA를 결정합니다. Large 세트의 분포는 자원 문제로 산출하지 않았으므로(범위 결정) Small·Medium 값에서 Large를 추정하지 않습니다.</p>
+<p class="d"><strong>그런데 그 "비싼 소수"의 정체가 확인되면서 요건 해석이 달라집니다</strong>(6.4·7.3절, ML-08 6종 확인 — R-11 교차검수 대기·잠정). P99의 14,785는 <strong>1만 4천 명의 서로 다른 이웃</strong>이 아니라 <strong>특수 허브 계좌 하나의 이웃 목록(14,775개)이 그대로 비친 것</strong>입니다. 그래서 "P99에서 1.5만 건 조회"를 일반 운영 요건으로 잡는 것과, <strong>"허브 15개에 걸리는 요청만 별도 경로로 처리"</strong>하는 것은 필요한 인프라가 완전히 다릅니다. 허브는 계좌번호 첫 글자로 사전 식별이 가능하므로 <strong>조회 전에 분기할 수 있습니다.</strong></p>
+<p class="d">시간 창은 패턴 폭 분포(7.3절 ③)와 맞물립니다 — Small에서 창을 3일로 잡으면 블록의 절반가량이, 8.4일로 잡으면 거의 전부가 창 안에 들어옵니다. 창을 넓히면 조회 규모가 커지므로 위 꼬리 분포와 함께 봐야 합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>1단계 이웃까지 / 2단계 이상</li><li>시간 창을 며칠로 잡을 것인가 — 패턴을 다 담을 것인가, 조회비용을 줄이는 쪽으로 갈 것인가</li><li>이웃이 너무 많을 때 샘플링할 것인가 잘라낼 것인가</li><li><strong>허브 계좌를 이웃 조회에서 어떻게 다룰 것인가</strong> — 이웃 확장을 허브에서 멈출 것인가, 허브 경유 경로를 아예 빼고 셀 것인가, 그대로 둘 것인가. 이 선택이 P99 조회 규모를 결정합니다</li></ul>
+</div>
+
+<div class="topic" id="t20">
+<p class="q">화두 20 — 그래프 크기를 어떻게 감당할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">Small만 해도 계좌 50~70만 개, 거래 500~700만 건입니다. Medium·Large는 계좌 200만 개, 거래 1.8억 건입니다. 무방향 단순 그래프로 접으면 엣지는 Small 64~88만 개, Medium 289~297만 개입니다(7.3절 ②).</p>
+<p class="d"><strong>규모 자체보다 꼬리가 문제입니다</strong> — 2단계 이웃이 최대 12만 개인 계좌가 존재하므로, 서브그래프 배치를 쓰더라도 배치 하나의 크기가 균일하지 않습니다. 참고로 Large의 2-hop 분포는 <strong>전수 계산이 자원 한계를 넘어 산출하지 못했습니다</strong> — 학습에서도 같은 벽에 부딪힐 수 있다는 신호로 읽을 수 있습니다.</p>
+<p class="d"><strong>그 벽의 정체도 좁혀졌습니다</strong>(6.4·7.3절, ML-08 6종 확인 — R-11 교차검수 대기·잠정). 계좌 15개가 거래의 9%를 쥐고 있어, <strong>이웃 샘플링을 하면 대부분의 배치가 이 허브를 물게 됩니다.</strong> 배치 크기가 균일하지 않은 이유도, 2-hop 전수 계산이 폭발하는 이유도 상당 부분 여기서 옵니다. 거꾸로 말하면 <strong>허브 처리 방침 하나가 자원 문제의 상당 부분을 좌우</strong>합니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>전체 그래프를 한 번에 올릴 것인가</li><li>이웃 샘플링·서브그래프 배치로 나눌 것인가 (배치 크기가 균일하지 않다는 점을 어떻게 다룰 것인가)</li><li>허브 15개를 배치 구성 단계에서 특별 취급할 것인가 — 취급 방식에 따라 필요 자원이 달라집니다(화두 13과 함께)</li></ul>
+</div>
+
+<div class="topic" id="t22">
+<p class="q">화두 22 — 극단적 불균형에 어떻게 대응할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">세탁이 거래 기준 0.05~0.13%입니다. 다만 <strong>계좌 기준으로 보면 0.74~10.46%로 12~109배 높습니다</strong>(3장) — HI-Large는 계좌 10개 중 1개가 세탁에 연루돼 있어 불균형이 거의 문제가 되지 않는 수준입니다. 즉 <strong>판정 단위(화두 1)를 무엇으로 두느냐가 불균형의 난이도를 먼저 결정합니다.</strong></p>
+<p class="d"><strong>구간에 따라서도 크게 달라집니다</strong>(7.4절). 주 기간의 세탁 비율은 0.05~0.11%인데 꼬리 구간은 <strong>56~60%</strong>입니다 — 정상 거래가 약 1,000배 급감한 결과라 꼬리는 <strong>거의 균형에 가까운 구간</strong>이 됩니다(HI-Small 기준 세탁 655건 대 정상 453건). 어느 구간을 학습에 쓰느냐에 따라 불균형 대응이 필요할 수도, 오히려 반대 방향의 문제가 될 수도 있습니다.</p>
+<p class="d"><strong>다만 꼬리는 절대량이 매우 작습니다</strong> — HI-Small 전체 1,108건(전체 거래의 0.02%)이고 그중 세탁이 655건입니다. 양성 증강 재료로 쓰려 해도 <strong>얻을 수 있는 양성이 655건뿐</strong>이며(세트의 세탁 5,177건 중 12.7%), 그마저 <strong>정상 453건이 딸려 옵니다</strong> — "꼬리 = 순수 양성 풀"로 가정하면 어긋납니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>클래스 가중치 / 손실 함수 변경 / 음성 축소 / 양성 증강 중 무엇을 쓸 것인가</li><li>샘플링으로 비율을 바꾸면 그래프 구조가 훼손된다는 점을 어떻게 다룰 것인가 (엣지를 지우면 이웃 관계가 사라짐)</li><li>불균형 대응을 거래 단위로 할 것인가, 계좌 단위 판정으로 옮겨 문제 자체를 완화할 것인가</li><li>꼬리 구간을 학습에 포함할 것인가 — 세탁 655건을 얻는 대신 <strong>거래량이 1,000배 다른 구간</strong>을 학습에 섞게 됩니다</li></ul>
+</div>
+
+<div class="topic" id="t26">
+<p class="q">화두 26 — 베이스라인을 무엇으로 둘 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">그래프를 쓰지 않는 분류기와 비교해야 그래프 신경망이 실제로 그래프 덕을 보는지 알 수 있습니다. 패턴 밖 세탁(<strong>35~81%</strong>)은 체인이 없어 그래프 정보가 도움이 안 될 수 있어 이 비교가 특히 의미가 있습니다.</p>
+<p class="d"><strong>비그래프 베이스라인의 기대치가 측정됐습니다</strong>(7.3절 ⑤). 패턴 밖 세탁조차 <strong>거래 자체의 속성만으로 정상과 구분됩니다</strong> — 결제 수단의 분포 거리가 0.51~0.58, 패턴 내 세탁은 0.88입니다. 즉 <strong>단순 분류기도 상당한 성능을 낼 가능성이 높고</strong>, 그래프 신경망은 그 위에서 얼마나 더 올리는지로 평가받게 됩니다. 다만 이 수치는 속성을 하나씩 본 단변량 통계이므로 성능의 상한·하한으로 읽으면 안 됩니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>베이스라인을 만들 것인가, 만든다면 언제</li><li>단순 분류기(그래디언트 부스팅 등) / 규칙 기반 / 둘 다</li><li>결제 수단처럼 강한 단일 신호가 합성 데이터의 인공물일 때(화두 42) 베이스라인 성능을 어떻게 해석할 것인가</li></ul>
+</div>
+
+<div class="topic" id="t27">
+<p class="q">화두 27 — 판정 임계값을 어떻게 정할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">모델은 점수를 내지만 "몇 점 이상을 알림으로 띄울지"는 별도 결정입니다. 실무에서는 담당자가 하루에 검토할 수 있는 건수가 사실상의 상한입니다. 주 기간 기준 유입은 하루 평균 51만~199만 건이며 <strong>최대 건수일은 111만~538만 건</strong>입니다(7.2절). 하루 알림 수를 고정하면 유입이 2~3배 뛰는 날에는 같은 임계값이 전혀 다른 재현율을 냅니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>고정 임계값 / 상위 N건 / 재현율 목표 기준</li><li>운영 제약(검토 가능 건수)을 어떻게 반영할 것인가</li></ul>
+</div>
+
+<div class="topic" id="t30">
+<p class="q">화두 30 — 왜 의심스러운지 어떻게 설명할 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">현업 조사에 따르면 담당자는 근거 없이 판단할 수 없고, 종결 시에도 사유 코드와 코멘트가 필수입니다. 모델이 점수만 내면 대시보드가 실무적으로 성립하지 않습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul><li>영향이 큰 이웃 계좌·거래를 표시 / 탐지된 패턴 유형을 제시 / 어텐션 가중치 시각화</li><li>설명 방식이 아키텍처 선택(화두 18)을 제약할 수 있다는 점을 어떻게 볼 것인가</li></ul>
+</div>
+
+<div class="topic" id="t45">
+<p class="q">화두 45 — 이웃이 없는 계좌(자기송금 전용, 약 18%)를 어떻게 다룰 것인가?</p>
+<p class="src" style="margin:0 0 8px"><strong>파생 출처:</strong> <a href="#t11">화두 11</a>(자기송금 유지 + 팀원 1인 심층분석) 결정의 후속 질문입니다.</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">자기송금만 있는 계좌는 GNN 메시지 패싱에서 <strong>이웃 신호가 0</strong>입니다. 규모 약 18%는 재검증 대상 수치이고, 이 집단의 세탁 라벨 관여도(coverage·prevalence)는 <strong>ML-09 측정 진행 중입니다(R-12 예정)</strong>. 화두 11에서 자기송금 유지 + 팀원 1인 심층분석이 이미 결정돼 있습니다.</p>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li><strong>① self-loop 엣지로 표현</strong> — 선택한 아키텍처가 self-loop를 어떻게 취급하는지 확인이 필요합니다</li>
+<li><strong>② 노드 피처(자기송금 통계)로 흡수</strong></li>
+<li><strong>③ 평가를 이웃 유무로 분리 보고</strong> — 이 집단은 그래프 신호 없이 판정된다는 사실을 드러냅니다</li>
+<li><strong>④ 별도 판정 경로(비-GNN 분류기)</strong></li>
+</ul>
+<p class="lbl">실무 참고</p>
+<p class="d">실무 모니터링에서 본인 계좌 간 이체(me-to-me)는 통상 별도 시나리오로 다루고 위험 가중을 달리 두되, 자기 계좌망이 구조화(structuring)에 쓰이는 사례가 있어 완전 제외는 하지 않는 것이 통례로 알려져 있습니다(공개 규정 문서로 단정하기 어려운 일반 관행 수준의 서술임을 병기합니다).</p>
+<div class="agentop">
+<p class="rt">에이전트 참고 의견 (2026-08-09 사용자 지시로 도입) — 참고용이며 팀 결정을 대체하지 않습니다</p>
+<p><strong>③은 즉시 채택을 추천합니다</strong> — 다른 어떤 선택과도 병행 가능하고 비용이 거의 없으며, 실패 모드를 평가에서 드러내는 안전장치가 됩니다. ①/②의 선택은 ML-09 결과와 담당 팀원의 심층분석 후가 적절합니다.</p>
+</div>
+<p class="lbl">영향</p><p class="d">화두 24(평가 지표)·15(피처)와 연동됩니다. 아키텍처 선택을 막지 않으므로 착수 차단 항목은 아닙니다.</p>
+</div>
+
+<div class="topic" id="t42">
+<p class="q">화두 42 — 이 데이터로 배운 규칙이 현실과 어긋나는 지점을 어떻게 다룰 것인가?</p>
+<p class="lbl">데이터 상황</p>
+<p class="d">이 데이터셋은 시뮬레이터가 만든 합성 데이터라, 정답 라벨이 있다는 큰 장점이 있는 대신 <strong>현실과 다른 규칙이 섞여 있습니다.</strong> 검증 과정에서 확인된 것들:</p>
+<ul>
+<li><strong>세탁 거래는 100% 동일 통화</strong> — 통화가 다른 거래 <strong>662만 건 중 세탁이 0건</strong>이며, 이는 <strong>6종 세트 전부</strong>에서 성립합니다(6.2절). 현실의 자금세탁은 국제 송금·환전을 적극 활용하므로 정반대입니다. 모델은 "통화가 다르면 정상"을 즉시 학습할 것이고, 그렇게 학습되면 현실에서 국제 세탁을 통째로 놓칩니다.</li>
+<li><strong>패턴 세탁은 99.97%가 ACH</strong> — 전체 거래에서 ACH는 11.8%뿐인데, 정형 패턴에 속한 세탁은 거의 전부 ACH이고 수표·신용카드·현금은 0건입니다(6.1절). 결제 수단이 세 집단을 가르는 가장 강한 단일 속성이라는 것도 측정으로 확인됐습니다(7.3절 ⑤).</li>
+<li><strong>시간 분포의 인위성</strong> — 하루 중 00시에 거래가 몰리는 것은 6종 공통(10.4~12.6%)이고, 요일 집중은 세트에 따라 다릅니다(Small·Medium은 목요일, Large는 금요일). 생성기의 스케줄링 특성으로 보입니다.</li>
+<li><strong>주 기간이 끝나면 거래량이 약 1,000배 급감합니다</strong> — 6종 전부에서 주 기간 종료일 다음 날부터 남은 구간의 세탁 비율이 56~60%가 됩니다(2·7.4절). <strong>제작자가 밝힌 의도된 생성 구조</strong>이며, 짧은 데이터에서 세탁 패턴의 완결을 관찰할 수 있게 하려고 넣은 것입니다. 그러나 <strong>현실의 거래 스트림에는 이런 구간이 없습니다.</strong> 그대로 학습·평가에 쓰면 현실에 존재하지 않는 규칙을 배우고, 성능 수치도 그만큼 부풀려집니다.</li>
+<li><strong>수수료가 존재하지 않습니다</strong> — 동일 통화 거래에서 보낸 금액과 받은 금액이 100% 일치합니다.</li>
+</ul>
+<p class="lbl">갈리는 지점</p>
+<ul>
+<li>이런 규칙을 모델이 학습하도록 둘 것인가, 해당 피처를 <strong>의도적으로 배제</strong>할 것인가 (성능은 떨어지지만 현실성은 올라감)</li>
+<li>발표·보고서에서 이 한계를 어떻게 서술할 것인가 — 성능 수치의 해석 범위를 어디까지로 볼 것인가</li>
+<li>합성 데이터의 한계를 프로젝트의 <strong>약점으로 볼 것인가, 분석 역량을 보여주는 지점으로 볼 것인가</strong></li>
+<li>현실성 검증을 위해 별도 조치를 할 것인가 (현업 조사 결과와의 대조 등)</li>
+</ul>
+<p class="lbl">영향</p><p class="d">피처 설계(화두 15·16), 학습·평가 분할(화두 25), 평가 해석(화두 24), 베이스라인 비교(화두 26)에 모두 걸칩니다. 특히 <strong>"모델이 잘 맞힌다"가 "현실에서 통한다"를 뜻하지 않을 수 있다</strong>는 점이 이 화두의 핵심입니다.</p>
+</div>
+
+<h3>8.4 판정 기준 재검토 — 에이전트 임의 선택 검증 (여유 있을 때)</h3>
+
+<p class="lead">분석을 진행하려면 값을 정해야만 하는 지점들이 있었고, 팀 논의 없이 정한 상태입니다. <strong>결과 해석이 이 값들에 의존합니다.</strong></p>
+
+<div class="topic" id="t32">
+<p class="q">화두 32 — 환율 "상수" 판정 기준을 0.5%로 둔 것</p>
+<p class="d">통화쌍별 환율이 중앙값에서 0.5% 이내로만 흔들리면 상수로 간주했고, 이 기준에서 201쌍 중 149쌍이 통과했습니다. <strong>더 근본적인 문제는 초기 분석이 "최대 편차"를 지표로 쓴 것이었습니다</strong> — 이상치 한 건에 좌우되는 지표라, 6.2절에서 드러났듯 "고정 환율 + 소수 이탈"인 경우에도 "상수 아님"으로 판정됩니다. 이후 분석은 지표를 <strong>일별 중앙값의 P90 상대편차</strong>로 바꿔 6종을 다시 판정했고, 그 결과가 6.2절의 "판정 가능한 쌍의 96~99%가 고정"입니다. 남은 임의 선택은 <strong>임계 0.5%와 "판정 가능"의 조건</strong>(일별 5건 이상 버킷이 3일 이상)입니다. 이 둘을 바꾸면 고정/시변/유보의 구성이 달라집니다.</p>
+</div>
+
+<div class="topic" id="t33">
+<p class="q">화두 33 — 은행 ID의 선행 0을 제거해 같은 은행으로 합친 것</p>
+<p class="d">같은 은행이 <code>10</code>, <code>010</code>, <code>0010</code>으로 등장해 앞의 0을 떼고 동일 은행으로 처리했습니다. 이렇게 해야 계좌 파일과 대조가 되고(안 하면 100% 실패) 은행별 집계가 쪼개지지 않습니다. 교차검수에서 원천 데이터 확인으로 타당성은 검증됐지만 데이터 해석을 바꾸는 판단입니다. 한편 <strong>계좌번호는 정규화하지 않았습니다</strong> — 이 비대칭도 확인 대상입니다.</p>
+<p class="d">추가로 확인된 사실: <strong>선행 0 문제는 거래 파일 쪽에서만 발생하고 계좌 파일 내부는 원문 ID = 정규화 ID</strong>입니다(6.4절). 즉 정규화는 두 파일을 잇기 위한 조치이며 계좌 파일 자체의 해석은 바꾸지 않습니다. <span class="src" style="display:inline">(ML-06R 실행자 산출 — R-9 재검수 미실행, 제3자 미검증)</span></p>
+</div>
+
+<div class="topic" id="t34">
+<p class="q">화두 34 — 라벨 "강한 편중" 판정 기준을 상위 1% 점유율 50%로 둔 것</p>
+<p class="d">이 기준으로는 "강한 편중 아님"(HI 19.1%, LI 27.6%)입니다. 기준을 20%로 잡았다면 두 세트 모두 "편중 있음"이 됩니다. 이 판정이 학습·평가 분할 방식(화두 25)의 근거가 됩니다.</p>
+</div>
+
+<div class="topic" id="t35">
+<p class="q">화두 35 — 세트 포함관계 확인을 표본 10만 건으로 한 것</p>
+<p class="d">16GB 파일을 전수 대조하지 않고 고정 시드로 10만 건을 뽑아 확인했습니다. 결과가 100% 불일치라 "서로 다른 데이터"라는 결론 자체는 뒤집히지 않지만, 표본 기반 결론임을 인지해야 합니다.</p>
+</div>
+
+<div class="topic" id="t36">
+<p class="q">화두 36 — 은행 관점 실험 대상을 상위 3개 은행으로 본 것</p>
+<p class="d">은행 관점 서브그래프의 규모를 잴 때 거래량 상위 3개를 봤고, 그 결과 거래의 13%가 남았습니다. K를 10이나 50으로 늘리면 다른 그림이 나옵니다. 화두 21과 함께 정해야 합니다.</p>
+</div>
+
+<div class="topic" id="t37">
+<p class="q">화두 37 — 은행 관점의 정의를 "자행이 한쪽 끝에 있는 거래 전부"로 한 것</p>
+<p class="d">은행 서브그래프를 자를 때 자행이 송신이거나 수신인 거래를 모두 포함했습니다. 대안은 자행 계좌끼리의 거래만 포함하는 방식입니다. 또한 은행 간 거래는 송신·수신 은행 양쪽에 각각 집계했습니다. 실제 은행이 보는 화면과 어느 쪽이 가까운지 확인이 필요합니다.</p>
+</div>
+
+<div class="topic" id="t38">
+<p class="q">화두 38 — 패턴 개수를 세는 방식과 EDA 범위를 Small로 한정한 것</p>
+<p class="d">패턴 1개 = 시작·종료 표시가 온전한 블록 1개로 셌고, 유형명에서 부가 설명(예: "최대 16차 FAN-OUT")을 제거해 8개 유형으로 묶었습니다. 세부 유형을 살릴지 판단이 필요합니다. 검증은 6종 세트 전체로 확장했지만, <strong>검증 항목의 선정 자체와 일반화 판정 규칙(성립/불성립/경향 차이/비교 제한의 경계)도 임의로 정한 것</strong>입니다. 추가하거나 기준을 바꾸고 싶은 것이 있으면 반영할 수 있습니다.</p>
+<p class="d">현재까지의 EDA는 <strong>7단계</strong>입니다 — 구조(1) → 성질 26항목(2) → 6종 확장 28항목(3) → 서비스 시나리오 8항목(4) → 그 6종 확장(5) → 데이터 구조 전수 감사(6) → 시간축·관측창 경계(7). <strong>6단계는 Small 2종 한정이며 재검수를 받지 않은 상태</strong>라 이 문서에서도 그 사실을 병기해 인용했습니다(6.4절). 재검수를 돌릴지 여부도 결정 사항입니다.</p>
+<p class="d"><strong>7단계에서 드러난 방법론적 교훈:</strong> 1~6단계는 전부 마크다운 표로만 진행돼 <strong>그래프를 한 장도 만들지 않았고</strong>, 그 결과 6라운드 동안 주 기간·꼬리 구조를 놓쳤습니다(7.4절). <strong>게다가 이 구조는 제작자가 데이터카드와 토론 답변에 이미 적어둔 것이었습니다</strong> — 원천 문서를 먼저 읽었다면 6라운드가 필요 없었습니다. 앞으로의 분석에서 <strong>① 원천 문서·공식 FAQ를 먼저 읽고 ② 분포·시계열을 눈으로 확인한 뒤</strong> 정량 검증에 들어갈 것인지도 팀이 정할 작업 방식입니다.</p>
+</div>
+
+<h3>8.5 결정 완료 (화두 1~17) — 기록 보존</h3>
+
+<p class="lead">2026-08-07 첫 논의에서 결정된 17개입니다. 질문·데이터 상황·갈리는 지점을 <strong>그대로 보존</strong>했고(재논의 때 "왜 그렇게 정했는지"가 남아야 하므로), 이번 재편에서는 각 결정에서 파생된 신규 화두로 가는 <strong>링크만 추가</strong>했습니다.</p>
+
+<div class="topic" id="t1">
 <p class="q">화두 1 — 판정의 단위는 무엇인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">라벨은 거래 1건마다 붙어 있습니다. 하지만 세탁 시나리오 하나는 평균 8.25~8.77건의 거래로 이뤄지고(6종 공통), 세탁에 연루된 계좌는 세트에 따라 전체의 <strong>0.74~10.46%</strong>입니다(3장). 즉 거래·사건·계좌 세 가지 단위가 모두 성립하며, <strong>어느 단위를 쓰느냐에 따라 "문제의 크기"가 14배까지 달라집니다.</strong></p>
@@ -1327,7 +1722,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t2">
 <p class="q">화두 2 — 판정 시점과 응답 시간을 어떻게 잡을 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">주 기간 기준 평균 유입은 초당 5.9~23.1건이지만 <strong>이 평균은 실제 부하를 대표하지 않습니다</strong> — 최대 건수일이 하루 평균의 약 2~3배이고, 주 기간이 끝나면 거의 0으로 떨어집니다(7.2·7.4절). 이웃 크기 분포도 측정됐습니다(7.3절 ②): 계좌 절반은 2단계 이웃이 10개 미만이라 조회가 사실상 공짜인데, <strong>상위 1%는 1.5만~5.8만 개, 최대 12만 개</strong>입니다. 즉 응답 시간은 평균이 아니라 <strong>꼬리에 걸린 소수의 요청</strong>이 결정합니다. 그 꼬리는 <strong>특수 허브 계좌 15개에서 오며 계좌번호로 사전 식별이 가능</strong>하므로(6.4절), 요청 도착 시점에 분기해 다른 경로로 보낼 여지가 있습니다.</p>
@@ -1349,9 +1744,10 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <p>배치 안에 <strong>특수 허브 계좌 15개</strong>가 관여한 거래가 하나라도 들어가면 그 배치의 이웃 조회 규모가 수만 건으로 뜁니다(7.3절 ②, ML-08). 거래의 약 9%가 이 15개에 걸려 있으므로 <strong>분 단위 배치 대부분이 허브를 최소 한 건 포함할 가능성이 높습니다.</strong> 배치 응답 시간의 상한은 그 조회가 정합니다.</p>
 </div>
 </div>
+<p class="src"><strong>파생 화두:</strong> 배치 경계의 운영 정의와 배치 내부 가시성이 <a href="#t47">화두 47</a>(8.2절)로 독립됐습니다.</p>
 </div>
 
-<div class="topic">
+<div class="topic" id="t3">
 <p class="q">화두 3 — "이미 벌어진 세탁"을 찾을 것인가, "벌어지려는 세탁"을 예측할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">라벨은 체인 전체를 본 뒤 사후에 붙었고, 체인의 첫 거래도 이미 라벨 1입니다(7.1절). 그대로 학습하면 모델이 답하는 질문은 "이 거래가 세탁인가"입니다. 전조 예측을 하려면 라벨을 다시 정의해야 합니다 — 예컨대 블록의 앞부분만 양성으로 삼는 식입니다.</p>
@@ -1373,7 +1769,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t4">
 <p class="q">화두 4 — 제품 범위를 어디까지로 할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">현업 조사 결과 실제 AML 시스템은 탐지 → 경보 검토 → 케이스 조사 → 보고(STR)로 이어집니다. 우리 데이터는 탐지 단계까지만 지원합니다.</p>
@@ -1398,9 +1794,10 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <p>세탁 시나리오 하나는 평균 <strong>8.25~8.77건</strong>의 거래로 이뤄지고 <strong>며칠에 걸쳐</strong>(중앙값 3.1일~28.0일) 벌어집니다(7.3절 ③). 거래를 하나씩 나열하면 같은 사건이 여러 날에 흩어져 뜨므로, 조사 단계에서 묶어 보는 구조가 이 분포와 정합합니다.</p>
 </div>
 </div>
+<p class="src"><strong>파생 화두:</strong> 케이스 조사 산출물의 저장 구조가 <a href="#t48">화두 48</a>(8.2절)로 독립됐습니다.</p>
 </div>
 
-<div class="topic">
+<div class="topic" id="t5">
 <p class="q">화두 5 — 사용자 역할별 화면과 권한을 어디까지 구현할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">상정 사용자는 모니터링팀·분석팀·관리자·보고책임자입니다. 현업 조사에 따르면 역할마다 볼 수 있는 데이터 범위와 수행 가능한 행위가 다릅니다.</p>
@@ -1418,9 +1815,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<h3>8.2 학습 데이터를 어떻게 준비할 것인가</h3>
-
-<div class="topic">
+<div class="topic" id="t6">
 <p class="q">화두 6 — 어느 세트로 학습할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">6종은 서로 부분집합이 아니라 독립 생성 데이터입니다(6.5절). 따라서 "나중에 키우기"가 안 되고 처음부터 골라야 합니다. HI는 세탁 밀도가 LI의 약 2배이며 이 관계는 3개 크기 모두에서 유지됩니다. <strong>다만 "LI가 데이터가 더 많다"는 Small에서만 사실입니다</strong> — Medium·Large에서는 HI가 더 큽니다(6.6절 불성립 항목). Large는 파일 하나가 16GB에 1.8억 건입니다.</p>
@@ -1451,9 +1846,10 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <p>비교를 어렵게 만드는 조건도 이미 측정돼 있습니다. 세트마다 <strong>주 기간이 10일 / 16일 / 97일</strong>로 달라(2장) 시간 분할의 여유가 다르고, <strong>다통화 계좌 비율이 1.59%→5.44%</strong>로 달라져(화두 8) 전처리 부담도 달라집니다. 즉 "같은 조건에서 성능만 비교"가 되지 않습니다.</p>
 </div>
 </div>
+<p class="src"><strong>파생 화두:</strong> 세트 선정 기준의 사전 고정 여부가 <a href="#t46">화두 46</a>(8.1절)로 독립됐습니다.</p>
 </div>
 
-<div class="topic">
+<div class="topic" id="t7">
 <p class="q">화두 7 — 6종을 전부 합친 통합 세트를 쓸 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">6종을 합치면 거래 <strong>4.31억 건</strong>, 세탁 라벨 <strong>386,163건</strong>(비율 0.0896%)이 됩니다. 계좌는 단순 합 957만이 아니라 <strong>실제 합집합 542만</strong>이고, 엔티티는 세트 간 ID가 호환되지 않아 <strong>304만</strong>(세트별 합)이 정본입니다. 15개 쌍 전수 조사 결과:</p>
@@ -1478,7 +1874,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t8">
 <p class="q">화두 8 — 모델에 "통화를 통합한 환산 금액" 피처가 진짜 필요한가?<span class="badge">결정</span></p>
 <p class="lbl">먼저 기록해둘 결정</p>
 <p class="d">서비스 화면 표시용 통화 환산은 <strong>하지 않기로 결정</strong>했습니다(2026-08-05). 따라서 이 화두는 <strong>모델 차원만</strong> 다룹니다.</p>
@@ -1531,7 +1927,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t9">
 <p class="q">화두 9 — 극단값을 어떻게 다룰 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">금액이 극단적 롱테일입니다. 중앙값 약 1,400, 상위 0.1%는 4억 초과, 최대는 조 단위입니다(통화 혼합 참고값).</p>
@@ -1554,7 +1950,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t10">
 <p class="q">화두 10 — 시간 정렬과 시간 단위를 어떻게 처리할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">파일이 시간순이 아니고(인접 쌍의 47.6% 역전 — 6종 공통), 시각은 분 단위인데 거래의 99.99%가 다른 거래와 같은 시각입니다(한 시각에 최대 11,193건). <strong>최대 역전 폭은 세트마다 크게 다릅니다</strong> — Small 12,156분(8.4일), Medium 18,281분(12.7일), Large <strong>101,474분(70.5일)</strong>. 정렬 없이 스트리밍 처리하면 Large에서는 두 달 넘게 뒤섞인 순서를 그대로 쓰게 됩니다.</p>
@@ -1579,9 +1975,10 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <p>덧붙여 두 가지가 더 걸립니다. <strong>순서 인덱스 자체가 위치를 재인코딩합니다</strong> — 전역 순번을 쓰면 "인덱스가 크다 = 데이터 끝쪽"이 되어 지우려던 신호가 되살아납니다(계좌별 상대 순서가 이 문제에서 더 안전합니다). 그리고 <strong>"순서"의 기준은 파일 행 순서가 아니라 Timestamp 정렬</strong>이어야 합니다 — 파일은 인접 쌍의 <strong>47.6%가 시간 역전</strong>이고 최대 역전 폭이 Large에서 <strong>70.5일</strong>입니다(6.4절, ML-03 D2).</p>
 </div>
 </div>
+<p class="src"><strong>파생 화두:</strong> "순서만 입력"에서 Δt(거래 간격)를 살릴지가 <a href="#t44">화두 44</a>(8.1절)로 독립됐습니다(화두 17과 공동).</p>
 </div>
 
-<div class="topic">
+<div class="topic" id="t11">
 <p class="q">화두 11 — 중복 거래와 자기 송금을 어떻게 처리할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">완전히 동일한 거래 행은 HI 9건, LI 8건으로 매우 적습니다. 자기 자신에게 보내는 거래는 <strong>Small 11.6%, Medium 8.0%, Large 6.0%</strong>로 세트가 클수록 줄어듭니다(6.6절 "경향 차이"). Reinvestment 수단은 전부 여기 해당하지만 역은 아닙니다(HI-Small 기준 11만 건은 재투자가 아닌 자기 송금).</p>
@@ -1604,9 +2001,10 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <p>따라서 이 18%에 대해서는 GNN이 사실상 <strong>거래 속성만 보는 분류기</strong>로 동작합니다. 학습·평가에서 이들을 어떻게 취급할지(별도 집계, 별도 평가, 가중치)가 정해지지 않았습니다 — 화두 13·15와 함께 걸립니다.</p>
 </div>
 </div>
+<p class="src"><strong>파생 화두:</strong> 이웃이 없는 계좌(자기송금 전용)의 취급이 <a href="#t45">화두 45</a>(8.3절)로 독립됐습니다.</p>
 </div>
 
-<div class="topic">
+<div class="topic" id="t12">
 <p class="q">화두 12 — 데이터 저장 형식과 처리 도구를 무엇으로 통일할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">원본은 CSV이며 Large는 파일 하나가 16GB입니다. 팀 5명이 같은 전처리 결과를 공유해야 합니다.</p>
@@ -1624,14 +2022,12 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<h3>8.3 그래프와 모델을 어떻게 설계할 것인가</h3>
-
-<div class="topic">
+<div class="topic" id="t13">
 <p class="q">화두 13 — 무엇을 노드로 할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">계좌번호가 여러 은행에 등장하므로(HI 8건) 계좌를 노드로 삼는다면 키는 (은행, 계좌) 복합 키여야 합니다. 엔티티의 38.2%가 계좌를 2개 이상 보유하며 최대 7,820개입니다. <strong>엔티티는 ID와 이름이 완전 1:1</strong>이라 어느 쪽을 키로 써도 같습니다 — 반면 <strong>은행은 이름이 식별자가 아니므로</strong>(6.4절) 은행을 키에 넣을 때는 반드시 Bank ID를 써야 합니다.</p>
 <p class="d">노드를 계좌로 두었을 때의 실측 규모도 나와 있습니다(7.3절 ②): 계좌 51만~208만 개, 차수 중앙값 2, 그러나 <strong>계좌의 15~18%는 차수 0</strong>(자기 송금만 존재해 다른 계좌와 연결이 없음)입니다. 이 계좌들은 메시지 전파가 일어나지 않습니다.</p>
-<p class="d"><strong>반대쪽 끝에는 특수 허브 계좌 15개가 있습니다</strong>(6.4·7.3절, Small 2종 한정·미검수). 계좌 15개가 거래의 9%에 관여하고 그중 하나는 1만 4천 개 상대와 직접 연결됩니다. 노드를 계좌로 두면 <strong>이 15개가 그래프의 허리를 이루어 메시지 패싱이 사실상 이들을 통해 거의 모든 노드를 연결</strong>하게 됩니다. 즉 그래프가 "느슨하게 연결된 50만 노드"가 아니라 <strong>"소수 허브에 매달린 50만 노드"</strong>에 가깝습니다.</p>
+<p class="d"><strong>반대쪽 끝에는 특수 허브 계좌 15개가 있습니다</strong>(6.4·7.3절, ML-08 6종 확인 — R-11 교차검수 대기·잠정). 계좌 15개가 거래의 9%에 관여하고 그중 하나는 1만 4천 개 상대와 직접 연결됩니다. 노드를 계좌로 두면 <strong>이 15개가 그래프의 허리를 이루어 메시지 패싱이 사실상 이들을 통해 거의 모든 노드를 연결</strong>하게 됩니다. 즉 그래프가 "느슨하게 연결된 50만 노드"가 아니라 <strong>"소수 허브에 매달린 50만 노드"</strong>에 가깝습니다.</p>
 <p class="lbl">갈리는 지점</p>
 <ul><li>계좌를 노드로 — 차수 0 계좌 15~18%를 어떻게 다룰 것인가</li><li>엔티티(사람·기업)를 노드로 — 같은 사람의 계좌를 묶으면 차수 0 문제가 줄어드는지</li><li>둘 다 노드로 두는 이종 그래프</li><li><strong>특수 허브 15개를 어떻게 둘 것인가</strong> — 그래프에서 제거 / 메시지 패싱에서만 마스킹 / 별도 노드 타입으로 분리 / 그대로 유지. 각각 무엇이 사라지고 무엇이 남는지가 갈리는 지점입니다</li></ul>
 
@@ -1649,12 +2045,13 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <li><strong>노드 피처</strong>(화두 15) — 차수·중심성이 사실상 "허브와 몇 홉 떨어졌나"가 됩니다</li>
 <li><strong>화두 4의 케이스 조사 UI</strong> — 조사관이 허브 계좌를 열면 직접 연결이 14,775개입니다</li>
 </ul>
-<p><span class="src" style="display:inline">※ 허브 15개의 식별·규모는 <strong>HI-Small·LI-Small 2종 스팟 체크</strong>였고, 위 경로 비용·차수 수치는 <strong>ML-08 실행자 산출값</strong>입니다. ML-08은 진행 중이며 교차검수 상태는 완료 시 확정됩니다. Medium·Large 일반화는 아직 확정되지 않았습니다.</span></p>
+<p><span class="src" style="display:inline">※ 허브 15개의 식별·규모는 PM 스팟 체크로 발견된 뒤 <strong>ML-08이 6종 전부 정식 확인했습니다</strong>(2026-08-07 실행 완료). 위 경로 비용·차수 수치는 ML-08 산출값이며 <strong>R-11 교차검수 대기 — 잠정</strong>입니다.</span></p>
 </div>
 </div>
+<p class="src"><strong>파생 화두:</strong> "추후 재논의"로 유보한 특수 허브 계좌 15개의 처리가 <a href="#t43">화두 43</a>(8.1절)로 독립됐습니다.</p>
 </div>
 
-<div class="topic">
+<div class="topic" id="t14">
 <p class="q">화두 14 — 거래를 어떻게 표현할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">우리가 분류하려는 대상은 거래인데, 그래프 신경망은 일반적으로 노드를 분류합니다. 이 간극을 메우는 방식이 여러 가지입니다.</p>
@@ -1678,13 +2075,13 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t15">
 <p class="q">화두 15 — 노드 피처를 어떻게 만들 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">계좌 파일에는 식별자밖에 없습니다(6.3절). 나이·계좌 종류·잔액 같은 속성이 전혀 없어 피처를 거래 이력에서 직접 집계해야 합니다. 집계 후보로는 거래 건수, 금액 통계, 거래 상대 수, 입출금 비율, 사용 통화·수단 분포, 활동 시간대 등이 있습니다.</p>
 <p class="d">집계에 쓸 이력이 실제로 얼마나 있는지는 측정됐습니다(7.3절 ①): 판정 시점 기준으로 <strong>전체 거래의 4.2~6.6%는 양쪽 계좌 모두 과거 이력이 0</strong>이라 집계 피처가 전부 결측이 됩니다. 반면 세탁 거래에서는 그 비율이 <strong>0.01~0.22%</strong>에 불과합니다.</p>
 <p class="d"><strong>"처음 거래하는 상대인가"도 후보입니다</strong>(7.3절 ⑥) — 전체 거래는 80~95%가 이미 거래해본 상대인데 세탁 거래는 18~55%에 그칩니다. 다만 이 값은 관측 기간에 크게 의존하므로(비교 제한) 어느 세트로 학습하느냐에 따라 신호 강도가 달라집니다.</p>
-<p class="d"><strong>차수·중심성 계열 피처에는 함정이 있습니다</strong>(6.4·7.3절, Small 2종 한정·미검수). 계좌 15개가 거래의 9%를 쥐고 있어, 차수나 2-hop 크기를 그대로 피처로 쓰면 <strong>사실상 "이 계좌가 허브에서 몇 홉 떨어져 있나"를 재는 값</strong>이 됩니다. 그 값이 세탁과 상관을 보이더라도 그것이 <strong>행동 특성인지 생성기 배치의 산물인지 구분되지 않습니다.</strong></p>
+<p class="d"><strong>차수·중심성 계열 피처에는 함정이 있습니다</strong>(6.4·7.3절, ML-08 6종 확인 — R-11 교차검수 대기·잠정). 계좌 15개가 거래의 9%를 쥐고 있어, 차수나 2-hop 크기를 그대로 피처로 쓰면 <strong>사실상 "이 계좌가 허브에서 몇 홉 떨어져 있나"를 재는 값</strong>이 됩니다. 그 값이 세탁과 상관을 보이더라도 그것이 <strong>행동 특성인지 생성기 배치의 산물인지 구분되지 않습니다.</strong></p>
 <p class="lbl">갈리는 지점</p>
 <ul><li>어떤 집계를 피처로 삼을 것인가</li><li>집계 기준 시점을 어떻게 고정할 것인가 (미래 데이터가 섞이면 정보 누수 — 7.1절)</li><li>이력 0인 계좌(전체의 4~7%)의 결측을 어떻게 채울 것인가</li><li>경과일·최근성 같은 시간 파생 피처를 넣을 것인가 — 관측창 경계 때문에 라벨과 인위적으로 상관됩니다(7.4절)</li><li>엔티티 정보(같은 사람의 다른 계좌)를 피처로 쓸 것인가</li></ul>
 
@@ -1704,7 +2101,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t16">
 <p class="q">화두 16 — 엣지 피처와 그래프의 방향을 어떻게 할 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">거래에는 금액·통화·결제 수단·시각·환전 여부가 있습니다. 같은 계좌쌍이 여러 번 거래할 수 있으며, <strong>고유 계좌쌍의 53~55%는 2회 이상 등장</strong>합니다(7.3절 ⑥). 합치면 엣지 수가 그만큼 줄지만, 반복 횟수 자체가 정보입니다 — 쌍별 반복 횟수는 중앙값 2회, P90 15~70회, 최대 89~877회로 꼬리가 깁니다.</p>
@@ -1723,7 +2120,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <p class="rt">이 문서의 차수·2-hop 수치를 그대로 쓰면 크게 빗나갑니다</p>
 <p>우리가 산출한 계좌 차수·2단계 이웃 분포(6.3·7.3절, ML-04 S4)는 <strong>무방향·단순 그래프</strong> 기준입니다 — 방향을 무시하고 <strong>같은 계좌쌍의 여러 거래를 1개 엣지로 접은</strong> 값입니다.</p>
 <p>팀 결정은 <strong>방향·다중 그래프</strong>이므로 기준이 다릅니다. 같은 허브 계좌를 두 기준으로 재면 <strong>고유 이웃 14,775개 vs 엣지 168,672개</strong>로 <strong>약 11배</strong> 차이 납니다. 메모리·배치 크기·조회 비용을 기존 수치로 산정하면 그만큼 과소 추정됩니다.</p>
-<p><span class="src" style="display:inline">※ 엣지 수 168,672는 <strong>ML-08 실행자 산출값</strong>이며 교차검수 상태는 ML-08 완료 시 확정됩니다.</span></p>
+<p><span class="src" style="display:inline">※ 엣지 수 168,672는 <strong>ML-08 산출값</strong>입니다(2026-08-07 실행 완료) — R-11 교차검수 대기, 잠정.</span></p>
 </div>
 <div class="okmark">
 <p class="rt">개별 엣지 유지는 반복 정보를 살립니다</p>
@@ -1732,7 +2129,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </div>
 </div>
 
-<div class="topic">
+<div class="topic" id="t17">
 <p class="q">화두 17 — 시간을 어떻게 다룰 것인가?<span class="badge">결정</span></p>
 <p class="lbl">데이터 상황</p>
 <p class="d">Small은 관측 기간이 2~3주뿐이고 Large는 5.5개월입니다. <strong>하루 중 0시 집중은 6종 공통</strong>입니다(전체 거래의 10.4~12.6%가 00시). 요일 집중은 세트에 따라 다릅니다 — Small·Medium은 목요일이 최다인데 Large는 금요일이며, 관측 주 수가 2~4주뿐인 Small·Medium은 요일 프로파일의 안정성을 Large와 같은 의미로 비교할 수 없습니다(ML-03 "비교 제한").</p>
@@ -1762,266 +2159,11 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </ul>
 </div>
 </div>
+<p class="src"><strong>파생 화두:</strong> Δt(거래 간격) 취급이 <a href="#t44">화두 44</a>(8.1절)로 독립됐습니다(화두 10과 공동).</p>
 </div>
 
-<div class="topic">
-<p class="q">화두 18 — 아키텍처와 프레임워크를 무엇으로 할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">서비스 시나리오상 처음 보는 계좌도 판정할 수 있어야 하므로(7.1절), 계좌마다 임베딩을 외우는 방식보다 이웃 정보로 임베딩을 생성하는 계열이 요건에 맞습니다. 팀 5명이 같은 프레임워크를 써야 합니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>아키텍처 후보 (GCN, GraphSAGE, GAT, 이종 그래프용 RGCN·HGT 등)</li><li>프레임워크 (PyTorch Geometric, DGL 등)</li><li>학습 환경 (로컬 GPU, 클라우드, Colab)</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 19 — 이웃을 어디까지, 얼마나 과거까지 볼 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">판정할 때 조회하는 이웃의 범위가 곧 응답 시간입니다. <strong>분포가 측정됐습니다</strong>(7.3절 ②).</p>
-<div class="kpis" style="margin:10px 0">
-  <div class="kpi"><p class="k">2단계 이웃 — 중앙값</p><p class="v">6~10개</p><p class="n">계좌의 절반은 이 정도</p></div>
-  <div class="kpi"><p class="k">2단계 이웃 — 상위 1%</p><p class="v">1.5만~5.9만</p><p class="n">대부분 허브 하나의 이웃 목록</p></div>
-  <div class="kpi"><p class="k">2단계 이웃 — 최대</p><p class="v">12.3만</p><p class="n">HI-Medium 기준</p></div>
-</div>
-<p class="d">즉 <strong>평균적으로는 싸지만 소수의 요청이 1,000배 이상 비쌉니다.</strong> 상한을 두지 않으면 그 소수가 응답 시간 SLA를 결정합니다. Large 세트의 분포는 자원 문제로 산출하지 않았으므로(범위 결정) Small·Medium 값에서 Large를 추정하지 않습니다.</p>
-<p class="d"><strong>그런데 그 "비싼 소수"의 정체가 확인되면서 요건 해석이 달라집니다</strong>(6.4·7.3절, Small 2종 한정·미검수). P99의 14,785는 <strong>1만 4천 명의 서로 다른 이웃</strong>이 아니라 <strong>특수 허브 계좌 하나의 이웃 목록(14,775개)이 그대로 비친 것</strong>입니다. 그래서 "P99에서 1.5만 건 조회"를 일반 운영 요건으로 잡는 것과, <strong>"허브 15개에 걸리는 요청만 별도 경로로 처리"</strong>하는 것은 필요한 인프라가 완전히 다릅니다. 허브는 계좌번호 첫 글자로 사전 식별이 가능하므로 <strong>조회 전에 분기할 수 있습니다.</strong></p>
-<p class="d">시간 창은 패턴 폭 분포(7.3절 ③)와 맞물립니다 — Small에서 창을 3일로 잡으면 블록의 절반가량이, 8.4일로 잡으면 거의 전부가 창 안에 들어옵니다. 창을 넓히면 조회 규모가 커지므로 위 꼬리 분포와 함께 봐야 합니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>1단계 이웃까지 / 2단계 이상</li><li>시간 창을 며칠로 잡을 것인가 — 패턴을 다 담을 것인가, 조회비용을 줄이는 쪽으로 갈 것인가</li><li>이웃이 너무 많을 때 샘플링할 것인가 잘라낼 것인가</li><li><strong>허브 계좌를 이웃 조회에서 어떻게 다룰 것인가</strong> — 이웃 확장을 허브에서 멈출 것인가, 허브 경유 경로를 아예 빼고 셀 것인가, 그대로 둘 것인가. 이 선택이 P99 조회 규모를 결정합니다</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 20 — 그래프 크기를 어떻게 감당할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">Small만 해도 계좌 50~70만 개, 거래 500~700만 건입니다. Medium·Large는 계좌 200만 개, 거래 1.8억 건입니다. 무방향 단순 그래프로 접으면 엣지는 Small 64~88만 개, Medium 289~297만 개입니다(7.3절 ②).</p>
-<p class="d"><strong>규모 자체보다 꼬리가 문제입니다</strong> — 2단계 이웃이 최대 12만 개인 계좌가 존재하므로, 서브그래프 배치를 쓰더라도 배치 하나의 크기가 균일하지 않습니다. 참고로 Large의 2-hop 분포는 <strong>전수 계산이 자원 한계를 넘어 산출하지 못했습니다</strong> — 학습에서도 같은 벽에 부딪힐 수 있다는 신호로 읽을 수 있습니다.</p>
-<p class="d"><strong>그 벽의 정체도 좁혀졌습니다</strong>(6.4·7.3절, Small 2종 한정·미검수). 계좌 15개가 거래의 9%를 쥐고 있어, <strong>이웃 샘플링을 하면 대부분의 배치가 이 허브를 물게 됩니다.</strong> 배치 크기가 균일하지 않은 이유도, 2-hop 전수 계산이 폭발하는 이유도 상당 부분 여기서 옵니다. 거꾸로 말하면 <strong>허브 처리 방침 하나가 자원 문제의 상당 부분을 좌우</strong>합니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>전체 그래프를 한 번에 올릴 것인가</li><li>이웃 샘플링·서브그래프 배치로 나눌 것인가 (배치 크기가 균일하지 않다는 점을 어떻게 다룰 것인가)</li><li>허브 15개를 배치 구성 단계에서 특별 취급할 것인가 — 취급 방식에 따라 필요 자원이 달라집니다(화두 13과 함께)</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 21 — 은행 관점을 어떻게 다룰 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">실제 은행은 자행이 관련된 거래만 볼 수 있고 타행↔타행은 볼 수 없습니다. 반면 학습 데이터에는 모든 은행이 들어 있습니다. 측정 결과는 아래와 같습니다.</p>
-<div class="kpis" style="margin:10px 0">
-  <div class="kpi"><p class="k">세탁 거래 중 은행 경계를 넘는 비율</p><p class="v">98.0~99.3%</p><p class="n">6종 세트 전부</p></div>
-  <div class="kpi"><p class="k">세탁 패턴 중 한 은행에서 끝나는 비율</p><p class="v">0~1.1%</p><p class="n">6종 세트 전부</p></div>
-  <div class="kpi"><p class="k">세탁 사례가 하나도 없는 은행</p><p class="v">94.8~96.5%</p><p class="n">규모가 클수록 소폭 감소</p></div>
-</div>
-<p class="d">은행은 Small 3~4만 개, Medium·Large 12만 개로 분산돼 있고, Small 기준 상위 3개 은행 관점으로 잘라도 거래의 13%만 남습니다. 같은 사람이 여러 은행에 계좌를 가진 비율은 38.1%입니다.</p>
-<p class="d"><strong>은행 수를 셀 때는 반드시 Bank ID를 쓰십시오</strong>(6.4절). 은행 이름으로 세면 HI-Small이 30,470개가 아니라 20,053개로 나옵니다 — 이름 468개가 서로 다른 은행 ID 여러 개(최대 48개)에 공유되기 때문입니다. 위 수치는 전부 Bank ID 기준이라 영향이 없지만, <strong>은행별 모델·은행별 화면을 만들 때 이름을 키로 쓰면 무관한 은행이 하나로 합쳐집니다.</strong></p>
-<p class="d">규모가 커질수록 은행 간 거래가 더 늘어납니다 — 전체 거래 중 같은 은행 안에서 끝나는 비율이 Small 13.6%에서 Large 6.8%로 줄어듭니다. 즉 <strong>큰 세트일수록 한 은행이 보는 그림이 더 조각납니다.</strong></p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>전체 그래프로 통합 학습</li><li>은행별 개별 모델 (세탁 사례가 있는 은행이 4% 미만이므로 대상 은행 선정이 필요)</li><li>전체로 학습하되 배치를 은행 관점으로 잘라 학습 조건과 배포 조건을 맞추기</li><li>어느 방식이든 평가를 어떤 뷰로 통일할 것인가 — 전체 뷰로 잰 성능은 실제 배포 성능과 다릅니다</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 22 — 극단적 불균형에 어떻게 대응할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">세탁이 거래 기준 0.05~0.13%입니다. 다만 <strong>계좌 기준으로 보면 0.74~10.46%로 12~109배 높습니다</strong>(3장) — HI-Large는 계좌 10개 중 1개가 세탁에 연루돼 있어 불균형이 거의 문제가 되지 않는 수준입니다. 즉 <strong>판정 단위(화두 1)를 무엇으로 두느냐가 불균형의 난이도를 먼저 결정합니다.</strong></p>
-<p class="d"><strong>구간에 따라서도 크게 달라집니다</strong>(7.4절). 주 기간의 세탁 비율은 0.05~0.11%인데 꼬리 구간은 <strong>56~60%</strong>입니다 — 정상 거래가 약 1,000배 급감한 결과라 꼬리는 <strong>거의 균형에 가까운 구간</strong>이 됩니다(HI-Small 기준 세탁 655건 대 정상 453건). 어느 구간을 학습에 쓰느냐에 따라 불균형 대응이 필요할 수도, 오히려 반대 방향의 문제가 될 수도 있습니다.</p>
-<p class="d"><strong>다만 꼬리는 절대량이 매우 작습니다</strong> — HI-Small 전체 1,108건(전체 거래의 0.02%)이고 그중 세탁이 655건입니다. 양성 증강 재료로 쓰려 해도 <strong>얻을 수 있는 양성이 655건뿐</strong>이며(세트의 세탁 5,177건 중 12.7%), 그마저 <strong>정상 453건이 딸려 옵니다</strong> — "꼬리 = 순수 양성 풀"로 가정하면 어긋납니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>클래스 가중치 / 손실 함수 변경 / 음성 축소 / 양성 증강 중 무엇을 쓸 것인가</li><li>샘플링으로 비율을 바꾸면 그래프 구조가 훼손된다는 점을 어떻게 다룰 것인가 (엣지를 지우면 이웃 관계가 사라짐)</li><li>불균형 대응을 거래 단위로 할 것인가, 계좌 단위 판정으로 옮겨 문제 자체를 완화할 것인가</li><li>꼬리 구간을 학습에 포함할 것인가 — 세탁 655건을 얻는 대신 <strong>거래량이 1,000배 다른 구간</strong>을 학습에 섞게 됩니다</li></ul>
-</div>
-
-<h3>8.4 무엇을 맞히고 어떻게 평가할 것인가</h3>
-
-<div class="topic">
-<p class="q">화두 23 — 모델의 타깃을 무엇으로 정의할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">기본 라벨은 거래 단위 0/1입니다. 패턴에 속한 거래는 100% 라벨 1이므로 패턴 유형을 보조 라벨로 쓸 수 있습니다(5.1절). 계좌 단위 위험도로 바꾸는 것도 가능합니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>거래 단위 이진 분류</li><li>패턴 유형을 보조 과제로 함께 학습</li><li>계좌 단위 위험도를 함께 산출</li><li>전조 예측용으로 라벨 재정의 (화두 3과 연결)</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 24 — 평가 지표를 무엇으로 할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">불균형이 극단적이라 전부 정상이라고 답해도 정확도가 99.87%가 나옵니다. 또 세탁의 <strong>35~81%</strong>가 패턴 밖이므로 패턴 기준 지표만 보면 그 부분을 놓칩니다.</p>
-<p class="d"><strong>평가 구간이 꼬리에 걸리면 수치가 직접 왜곡됩니다</strong>(7.4절). 평가 구간을 데이터 뒤쪽에서 일(day) 기준으로 잡으면 6종 전부에서 그 구간이 꼬리에 잠기고, 세탁 비율이 <strong>56~60%</strong>가 되어 같은 모델이라도 주 기간에서 잰 것과 완전히 다른 값이 나옵니다. 정밀도 계열 지표는 양성 비율에 직접 좌우되므로 <strong>"어느 구간에서 쟀는가"를 명시하지 않은 성능 수치는 비교할 수 없습니다.</strong> 제작자도 Small에 대해 <strong>"테스트는 11일 대신 10일을 쓰라"</strong>고 답한 바 있습니다(사실 전달 — 화두 25에서 다룹니다).</p>
-<p class="d">패턴 밖 세탁도 거래 속성만으로 정상과 구분된다는 점(7.3절 ⑤, 분포 거리 0.51~0.58)은 <strong>패턴 밖을 별도로 평가할 근거</strong>가 됩니다 — 잡을 수 있는 신호가 있는데 못 잡는 것인지, 신호 자체가 없는 것인지를 구분할 수 있습니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>어떤 지표를 주 지표로 삼을 것인가 (PR-AUC, 특정 재현율에서의 정밀도, 상위 N건 정밀도 등)</li><li>패턴 안/밖을 분리 평가할 것인가</li><li>패턴 유형별 재현율을 볼 것인가</li><li>거래 단위와 사건 단위 중 무엇으로 셀 것인가 (3장의 단위 문제)</li><li><strong>평가 구간을 시간축의 어디로 잡을 것인가</strong> — 꼬리 구간을 평가에 넣을지, 뺄지, 별도 지표로 분리할지 (화두 25와 함께)</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 25 — 학습·검증·평가를 어떻게 나눌 것인가?<span class="badge open">미결</span></p>
-<div class="note" style="margin:0 0 10px"><strong>화두 17이 이 화두의 절반을 이미 정했습니다.</strong> 꼬리를 잘라내고 주 기간만 쓰기로 했으므로 <strong>아래 표의 "일 단위 60/20/20" 문제는 상당 부분 사라집니다</strong> — test가 꼬리에 잠기는 일이 없어지기 때문입니다. 남은 것은 <strong>주 기간 안에서 어떻게 나눌 것인가</strong>와 <strong>절단 기준일을 어디로 둘 것인가</strong>입니다.</div>
-<p class="lbl">데이터 상황</p>
-<p class="d">서비스 시나리오상 시간 분할이 배포 조건과 맞습니다. 그런데 <strong>데이터에는 "주 기간"과 "꼬리"가 따로 있습니다</strong>(2·7.4절). 주 기간(Small 10일 / Medium 16일 / Large 97일)이 끝나면 정상 거래가 약 1,000배 급감하고 세탁 완결분이 이어져, 그 구간의 세탁 비율이 <strong>0.05~0.11%에서 56~60%로</strong> 뜁니다(위험비 532~1,211배). 아무 생각 없이 뒤쪽을 test로 자르면 <strong>test의 클래스 비율이 train과 500배 이상 다릅니다.</strong></p>
-
-<p class="lbl">제작자가 제시한 두 가지 (사실 전달 — 우리 권고가 아닙니다)</p>
-<ul>
-<li><strong>"시간순 60% / 20% / 20% (train / validate / test) 분할이 효과적이었고 이를 따를 것을 권한다"</strong> — 데이터카드.</li>
-<li><strong>"첫 9일을 쓰고, 테스트는 11일 대신 10일을 쓰라"</strong> — Small에 대한 제작자 Erik Altman의 Discussion 답변.</li>
-</ul>
-
-<p class="lbl">두 제안이 충돌하는 지점 — 여기가 실제로 갈리는 곳입니다</p>
-<p class="d"><strong>60/20/20을 무엇의 60%로 자르느냐에 따라 결과가 완전히 달라집니다.</strong></p>
-<div class="scroll">
-<table>
-<thead><tr><th>자르는 기준</th><th class="w">HI-Small에서 test 구간이 어떻게 되는가</th><th class="w">결과</th></tr></thead>
-<tbody>
-<tr><td><strong>일(day) 단위 60/20/20</strong><br>관측 18일 기준</td><td class="w">test = 뒤쪽 3.6일 ≈ 09-15~09-18 — <strong>전부 꼬리 구간</strong>(주 기간은 09-10에 끝남)</td><td class="w">test의 세탁 비율이 약 60%이고 <strong>test 전체가 126건</strong>(09-15~09-18 합계)뿐입니다. 분포도 train과 다르고 표본도 극소라 <strong>평가가 성립하지 않습니다</strong></td></tr>
-<tr><td><strong>거래 건수 기준 60/20/20</strong><br>508만 건 기준</td><td class="w">꼬리 전체가 약 1,100건(전체의 <strong>0.02%</strong>)이라 test 약 102만 건 안에서 꼬리는 반올림 오차 수준</td><td class="w">클래스 비율이 유지돼 평가가 성립합니다. 대신 <strong>test가 사실상 마지막 사흘(09-08 일부~09-10)</strong>에 몰려 시간 일반화 폭이 좁습니다</td></tr>
-<tr><td><strong>제작자 제안(첫 9일 / 10일)</strong></td><td class="w">train 09-01~09-09, test 09-10 하루(약 20.8만 건). 꼬리는 통째로 제외</td><td class="w">경계 문제는 사라지지만 <strong>validate 구간이 없고</strong> test가 하루뿐이며, 꼬리의 세탁 완결분을 전부 버립니다</td></tr>
-</tbody>
-</table>
-</div>
-<p class="d">Medium·Large에서는 양상이 또 다릅니다 — Large는 관측 165일 중 주 기간이 97일이라 <strong>일 단위 60/20/20의 test(뒤쪽 33일)가 통째로 꼬리</strong>에 들어가고, Medium(28일 중 16일)도 마찬가지입니다. 즉 <strong>일 단위 비율 분할은 6종 전부에서 test가 꼬리에 잠깁니다.</strong> 제작자는 Small 외의 규모에 대해서는 구체적 일수를 제시하지 않았습니다.</p>
-
-<p class="d">그 밖의 전제도 그대로입니다 — 라벨의 상위 1% 계좌 점유율은 19~28%로 군집이 존재합니다. 계좌 분할을 택하면 <strong>패턴 블록이 train과 test에 걸치는 문제</strong>가 새로 생깁니다(블록 하나가 평균 8.7건, 계좌 여러 개에 걸침).</p>
-<p class="lbl">갈리는 지점</p>
-<ul>
-<li><strong>60/20/20을 일 단위로 자를 것인가, 거래 건수 기준으로 자를 것인가</strong> — 위 표에서 결과가 갈립니다</li>
-<li>제작자 제안대로 꼬리를 통째로 버릴 것인가, 세탁 완결분을 살릴 방법을 찾을 것인가</li>
-<li>Small 외의 규모에는 어떤 기준을 적용할 것인가 (제작자가 제시하지 않은 영역)</li>
-<li>시간 분할 / 계좌 분할 / 혼합 — 시간 분할을 택한다면 경계를 어떻게 다룰 것인가(7.4절의 다섯 가지 처리 방침)</li>
-<li>계좌 겹침으로 인한 누수를 어떻게 점검할 것인가</li>
-<li>계좌·블록 분할을 택하면 시간 일반화 성능을 측정하지 못한다는 점을 감수할 것인가</li>
-<li>노드 피처 집계의 기준 시점을 어떻게 고정할 것인가 (화두 15와 연결)</li>
-<li>분할 방식이 다른 실험 결과를 서로 비교할 수 있게 하려면 무엇을 고정해야 하는가</li>
-</ul>
-<p class="lbl">영향</p><p class="d">이 화두는 이번 갱신에서 전제가 가장 크게 바뀐 항목입니다. 화두 24(평가 지표)·화두 17(시간 처리)·화두 15(피처 기준 시점)와 함께 정해야 하며, 여기서 정한 것이 <strong>이후 모든 성능 수치의 해석 범위</strong>를 규정합니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 26 — 베이스라인을 무엇으로 둘 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">그래프를 쓰지 않는 분류기와 비교해야 그래프 신경망이 실제로 그래프 덕을 보는지 알 수 있습니다. 패턴 밖 세탁(<strong>35~81%</strong>)은 체인이 없어 그래프 정보가 도움이 안 될 수 있어 이 비교가 특히 의미가 있습니다.</p>
-<p class="d"><strong>비그래프 베이스라인의 기대치가 측정됐습니다</strong>(7.3절 ⑤). 패턴 밖 세탁조차 <strong>거래 자체의 속성만으로 정상과 구분됩니다</strong> — 결제 수단의 분포 거리가 0.51~0.58, 패턴 내 세탁은 0.88입니다. 즉 <strong>단순 분류기도 상당한 성능을 낼 가능성이 높고</strong>, 그래프 신경망은 그 위에서 얼마나 더 올리는지로 평가받게 됩니다. 다만 이 수치는 속성을 하나씩 본 단변량 통계이므로 성능의 상한·하한으로 읽으면 안 됩니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>베이스라인을 만들 것인가, 만든다면 언제</li><li>단순 분류기(그래디언트 부스팅 등) / 규칙 기반 / 둘 다</li><li>결제 수단처럼 강한 단일 신호가 합성 데이터의 인공물일 때(화두 42) 베이스라인 성능을 어떻게 해석할 것인가</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 27 — 판정 임계값을 어떻게 정할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">모델은 점수를 내지만 "몇 점 이상을 알림으로 띄울지"는 별도 결정입니다. 실무에서는 담당자가 하루에 검토할 수 있는 건수가 사실상의 상한입니다. 주 기간 기준 유입은 하루 평균 51만~199만 건이며 <strong>최대 건수일은 111만~538만 건</strong>입니다(7.2절). 하루 알림 수를 고정하면 유입이 2~3배 뛰는 날에는 같은 임계값이 전혀 다른 재현율을 냅니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>고정 임계값 / 상위 N건 / 재현율 목표 기준</li><li>운영 제약(검토 가능 건수)을 어떻게 반영할 것인가</li></ul>
-</div>
-
-<h3>8.5 서비스를 어떻게 구현할 것인가</h3>
-
-<div class="topic">
-<p class="q">화두 28 — 그래프를 어디에 어떻게 유지할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">판정마다 이웃 조회가 필요하므로 그래프 저장소가 서비스의 일부가 됩니다(1.2절). 계좌 50~70만 개(Small) 또는 200만 개(Large) 규모이며, 판정한 거래를 계속 반영해야 합니다.</p>
-<p class="d">조회 규모의 실제 분포는 7.3절 ②에 있습니다 — <strong>중앙값 6~10개, 상위 1% 1.5만~5.9만 개, 최대 12만 개.</strong> 저장소 선택은 이 꼬리를 감당할 수 있는지로 갈립니다. 계좌쌍의 53~55%가 반복 거래이므로(7.3절 ⑥) 인접 관계를 쌍 단위로 접으면 저장 크기를 절반 가까이 줄일 수 있으나, 반복 횟수·시각 정보를 따로 보관해야 합니다.</p>
-<p class="d"><strong>꼬리가 소수 허브에서 온다는 점이 저장소 설계에 직접 걸립니다</strong>(6.4·7.3절, Small 2종 한정·미검수). 인접 리스트를 계좌별로 만들면 <strong>15개 계좌의 리스트만 1만~2만 항목</strong>이고 나머지 50만 개는 한 자릿수입니다. 즉 크기 분포가 균일하지 않아 <strong>단일 저장 구조로는 양쪽 모두에 비효율적</strong>일 수 있습니다. 허브는 계좌번호 첫 글자로 사전 식별되므로 <strong>저장 층에서 분리 취급하는 것이 기술적으로는 가능</strong>합니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>관계형 DB / 그래프 DB / 메모리 구조 / 인접 리스트 파일</li><li>그래프를 실시간 갱신할 것인가 주기적으로 재구축할 것인가</li><li>허브 계좌에 대한 조회 상한을 저장소 층에서 둘 것인가 모델 층에서 둘 것인가</li><li>허브 15개를 별도 저장 구조로 분리할 것인가, 단일 구조로 통일할 것인가</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 29 — 모델 출력을 어떤 형태로 보여줄 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">세탁 시나리오 하나가 평균 8.25~8.77건의 거래로 이뤄지므로, 거래를 하나씩 나열하면 같은 사건이 여러 알림으로 쪼개질 수 있습니다. 게다가 <strong>체인 하나가 며칠에 걸쳐 벌어집니다</strong>(7.3절 ③: 중앙값 3.1일~28.0일) — 같은 사건의 알림이 여러 날에 흩어져 뜬다는 뜻입니다.</p>
-<p class="d">대시보드에 은행명을 표시할 때는 <strong>동명 은행이 존재</strong>한다는 점을 감안해야 합니다(6.4절) — 이름만 보여주면 담당자가 다른 은행을 같은 은행으로 오인할 수 있습니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>거래 단위 목록 / 연관 거래를 묶은 케이스 단위</li><li>며칠에 걸친 체인을 하나의 케이스로 유지할 것인가, 알림이 뜰 때마다 갱신할 것인가</li><li>탐지된 패턴의 그래프를 시각화할 것인가</li><li>계좌 단위 위험도를 함께 보여줄 것인가</li><li>은행명을 그대로 표시할 것인가, ID를 병기할 것인가</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 30 — 왜 의심스러운지 어떻게 설명할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">현업 조사에 따르면 담당자는 근거 없이 판단할 수 없고, 종결 시에도 사유 코드와 코멘트가 필수입니다. 모델이 점수만 내면 대시보드가 실무적으로 성립하지 않습니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>영향이 큰 이웃 계좌·거래를 표시 / 탐지된 패턴 유형을 제시 / 어텐션 가중치 시각화</li><li>설명 방식이 아키텍처 선택(화두 18)을 제약할 수 있다는 점을 어떻게 볼 것인가</li></ul>
-</div>
-
-<div class="topic">
-<p class="q">화두 31 — 웹 서비스 기술 스택을 무엇으로 할 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">중간발표까지 10주이며 팀원들의 경험이 학습 곡선을 좌우합니다.</p>
-<p class="lbl">갈리는 지점</p>
-<ul><li>프론트엔드·백엔드 프레임워크</li><li>모델 서빙 방식</li><li>배포 환경</li></ul>
-</div>
-
-<h3>8.6 분석 과정에서 임의로 정해둔 것 — 재검토 대상</h3>
-<p class="lead">분석을 진행하려면 값을 정해야만 하는 지점들이 있었고, 팀 논의 없이 정한 상태입니다. <strong>결과 해석이 이 값들에 의존합니다.</strong></p>
-
-<div class="topic">
-<p class="q">화두 32 — 환율 "상수" 판정 기준을 0.5%로 둔 것</p>
-<p class="d">통화쌍별 환율이 중앙값에서 0.5% 이내로만 흔들리면 상수로 간주했고, 이 기준에서 201쌍 중 149쌍이 통과했습니다. <strong>더 근본적인 문제는 초기 분석이 "최대 편차"를 지표로 쓴 것이었습니다</strong> — 이상치 한 건에 좌우되는 지표라, 6.2절에서 드러났듯 "고정 환율 + 소수 이탈"인 경우에도 "상수 아님"으로 판정됩니다. 이후 분석은 지표를 <strong>일별 중앙값의 P90 상대편차</strong>로 바꿔 6종을 다시 판정했고, 그 결과가 6.2절의 "판정 가능한 쌍의 96~99%가 고정"입니다. 남은 임의 선택은 <strong>임계 0.5%와 "판정 가능"의 조건</strong>(일별 5건 이상 버킷이 3일 이상)입니다. 이 둘을 바꾸면 고정/시변/유보의 구성이 달라집니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 33 — 은행 ID의 선행 0을 제거해 같은 은행으로 합친 것</p>
-<p class="d">같은 은행이 <code>10</code>, <code>010</code>, <code>0010</code>으로 등장해 앞의 0을 떼고 동일 은행으로 처리했습니다. 이렇게 해야 계좌 파일과 대조가 되고(안 하면 100% 실패) 은행별 집계가 쪼개지지 않습니다. 교차검수에서 원천 데이터 확인으로 타당성은 검증됐지만 데이터 해석을 바꾸는 판단입니다. 한편 <strong>계좌번호는 정규화하지 않았습니다</strong> — 이 비대칭도 확인 대상입니다.</p>
-<p class="d">추가로 확인된 사실: <strong>선행 0 문제는 거래 파일 쪽에서만 발생하고 계좌 파일 내부는 원문 ID = 정규화 ID</strong>입니다(6.4절). 즉 정규화는 두 파일을 잇기 위한 조치이며 계좌 파일 자체의 해석은 바꾸지 않습니다. <span class="src" style="display:inline">(ML-06R 실행자 산출 — R-9 재검수 미실행, 제3자 미검증)</span></p>
-</div>
-
-<div class="topic">
-<p class="q">화두 34 — 라벨 "강한 편중" 판정 기준을 상위 1% 점유율 50%로 둔 것</p>
-<p class="d">이 기준으로는 "강한 편중 아님"(HI 19.1%, LI 27.6%)입니다. 기준을 20%로 잡았다면 두 세트 모두 "편중 있음"이 됩니다. 이 판정이 학습·평가 분할 방식(화두 25)의 근거가 됩니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 35 — 세트 포함관계 확인을 표본 10만 건으로 한 것</p>
-<p class="d">16GB 파일을 전수 대조하지 않고 고정 시드로 10만 건을 뽑아 확인했습니다. 결과가 100% 불일치라 "서로 다른 데이터"라는 결론 자체는 뒤집히지 않지만, 표본 기반 결론임을 인지해야 합니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 36 — 은행 관점 실험 대상을 상위 3개 은행으로 본 것</p>
-<p class="d">은행 관점 서브그래프의 규모를 잴 때 거래량 상위 3개를 봤고, 그 결과 거래의 13%가 남았습니다. K를 10이나 50으로 늘리면 다른 그림이 나옵니다. 화두 21과 함께 정해야 합니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 37 — 은행 관점의 정의를 "자행이 한쪽 끝에 있는 거래 전부"로 한 것</p>
-<p class="d">은행 서브그래프를 자를 때 자행이 송신이거나 수신인 거래를 모두 포함했습니다. 대안은 자행 계좌끼리의 거래만 포함하는 방식입니다. 또한 은행 간 거래는 송신·수신 은행 양쪽에 각각 집계했습니다. 실제 은행이 보는 화면과 어느 쪽이 가까운지 확인이 필요합니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 38 — 패턴 개수를 세는 방식과 EDA 범위를 Small로 한정한 것</p>
-<p class="d">패턴 1개 = 시작·종료 표시가 온전한 블록 1개로 셌고, 유형명에서 부가 설명(예: "최대 16차 FAN-OUT")을 제거해 8개 유형으로 묶었습니다. 세부 유형을 살릴지 판단이 필요합니다. 검증은 6종 세트 전체로 확장했지만, <strong>검증 항목의 선정 자체와 일반화 판정 규칙(성립/불성립/경향 차이/비교 제한의 경계)도 임의로 정한 것</strong>입니다. 추가하거나 기준을 바꾸고 싶은 것이 있으면 반영할 수 있습니다.</p>
-<p class="d">현재까지의 EDA는 <strong>7단계</strong>입니다 — 구조(1) → 성질 26항목(2) → 6종 확장 28항목(3) → 서비스 시나리오 8항목(4) → 그 6종 확장(5) → 데이터 구조 전수 감사(6) → 시간축·관측창 경계(7). <strong>6단계는 Small 2종 한정이며 재검수를 받지 않은 상태</strong>라 이 문서에서도 그 사실을 병기해 인용했습니다(6.4절). 재검수를 돌릴지 여부도 결정 사항입니다.</p>
-<p class="d"><strong>7단계에서 드러난 방법론적 교훈:</strong> 1~6단계는 전부 마크다운 표로만 진행돼 <strong>그래프를 한 장도 만들지 않았고</strong>, 그 결과 6라운드 동안 주 기간·꼬리 구조를 놓쳤습니다(7.4절). <strong>게다가 이 구조는 제작자가 데이터카드와 토론 답변에 이미 적어둔 것이었습니다</strong> — 원천 문서를 먼저 읽었다면 6라운드가 필요 없었습니다. 앞으로의 분석에서 <strong>① 원천 문서·공식 FAQ를 먼저 읽고 ② 분포·시계열을 눈으로 확인한 뒤</strong> 정량 검증에 들어갈 것인지도 팀이 정할 작업 방식입니다.</p>
-</div>
-
-<h3>8.7 프로젝트를 어떻게 운영할 것인가</h3>
-
-<div class="topic">
-<p class="q">화두 39 — 5명의 역할을 어떻게 나눌 것인가?</p>
-<p class="d">데이터·전처리 / 모델링 / 백엔드 / 프론트엔드 / 기획·문서 같은 축이 가능합니다. 모델과 서비스를 병렬로 진행하려면 둘 사이의 인터페이스(모델 출력 형식)를 일찍 정해야 합니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 40 — 중간발표 MVP의 범위를 어디까지로 할 것인가?</p>
-<p class="d">10주 안에 어디까지 완성할지 — 모델 성능 목표, 대시보드 화면 수, 데이터 규모. "작동하는 것"과 "완성도 높은 것"의 경계를 미리 합의해두면 이후 2개월 계획이 명확해집니다.</p>
-</div>
-
-<div class="topic">
-<p class="q">화두 41 — 실험 관리와 협업 방식을 어떻게 할 것인가?</p>
-<p class="d">여러 명이 여러 모델을 돌리면 어떤 설정에서 어떤 결과가 나왔는지 추적이 필요합니다. 코드·데이터·모델 파일의 공유 방식, 재현성(시드 고정 등)도 결정 사항입니다.</p>
-</div>
-
-<h3>8.8 합성 데이터와 현실의 괴리</h3>
-
-<div class="topic">
-<p class="q">화두 42 — 이 데이터로 배운 규칙이 현실과 어긋나는 지점을 어떻게 다룰 것인가?</p>
-<p class="lbl">데이터 상황</p>
-<p class="d">이 데이터셋은 시뮬레이터가 만든 합성 데이터라, 정답 라벨이 있다는 큰 장점이 있는 대신 <strong>현실과 다른 규칙이 섞여 있습니다.</strong> 검증 과정에서 확인된 것들:</p>
-<ul>
-<li><strong>세탁 거래는 100% 동일 통화</strong> — 통화가 다른 거래 <strong>662만 건 중 세탁이 0건</strong>이며, 이는 <strong>6종 세트 전부</strong>에서 성립합니다(6.2절). 현실의 자금세탁은 국제 송금·환전을 적극 활용하므로 정반대입니다. 모델은 "통화가 다르면 정상"을 즉시 학습할 것이고, 그렇게 학습되면 현실에서 국제 세탁을 통째로 놓칩니다.</li>
-<li><strong>패턴 세탁은 99.97%가 ACH</strong> — 전체 거래에서 ACH는 11.8%뿐인데, 정형 패턴에 속한 세탁은 거의 전부 ACH이고 수표·신용카드·현금은 0건입니다(6.1절). 결제 수단이 세 집단을 가르는 가장 강한 단일 속성이라는 것도 측정으로 확인됐습니다(7.3절 ⑤).</li>
-<li><strong>시간 분포의 인위성</strong> — 하루 중 00시에 거래가 몰리는 것은 6종 공통(10.4~12.6%)이고, 요일 집중은 세트에 따라 다릅니다(Small·Medium은 목요일, Large는 금요일). 생성기의 스케줄링 특성으로 보입니다.</li>
-<li><strong>주 기간이 끝나면 거래량이 약 1,000배 급감합니다</strong> — 6종 전부에서 주 기간 종료일 다음 날부터 남은 구간의 세탁 비율이 56~60%가 됩니다(2·7.4절). <strong>제작자가 밝힌 의도된 생성 구조</strong>이며, 짧은 데이터에서 세탁 패턴의 완결을 관찰할 수 있게 하려고 넣은 것입니다. 그러나 <strong>현실의 거래 스트림에는 이런 구간이 없습니다.</strong> 그대로 학습·평가에 쓰면 현실에 존재하지 않는 규칙을 배우고, 성능 수치도 그만큼 부풀려집니다.</li>
-<li><strong>수수료가 존재하지 않습니다</strong> — 동일 통화 거래에서 보낸 금액과 받은 금액이 100% 일치합니다.</li>
-</ul>
-<p class="lbl">갈리는 지점</p>
-<ul>
-<li>이런 규칙을 모델이 학습하도록 둘 것인가, 해당 피처를 <strong>의도적으로 배제</strong>할 것인가 (성능은 떨어지지만 현실성은 올라감)</li>
-<li>발표·보고서에서 이 한계를 어떻게 서술할 것인가 — 성능 수치의 해석 범위를 어디까지로 볼 것인가</li>
-<li>합성 데이터의 한계를 프로젝트의 <strong>약점으로 볼 것인가, 분석 역량을 보여주는 지점으로 볼 것인가</strong></li>
-<li>현실성 검증을 위해 별도 조치를 할 것인가 (현업 조사 결과와의 대조 등)</li>
-</ul>
-<p class="lbl">영향</p><p class="d">피처 설계(화두 15·16), 학습·평가 분할(화두 25), 평가 해석(화두 24), 베이스라인 비교(화두 26)에 모두 걸칩니다. 특히 <strong>"모델이 잘 맞힌다"가 "현실에서 통한다"를 뜻하지 않을 수 있다</strong>는 점이 이 화두의 핵심입니다.</p>
-</div>
-
-<h3>8.9 화두들의 의존 관계</h3>
-<p class="lead">42개를 한 번에 정할 필요는 없습니다. 아래는 <strong>어떤 결정이 다른 결정의 전제가 되는지</strong>를 정리한 것으로, 순위 제안이 아니라 순서상의 제약입니다.</p>
+<h3>8.6 화두들의 의존 관계</h3>
+<p class="lead">48개를 한 번에 정할 필요는 없습니다. 아래는 <strong>어떤 결정이 다른 결정의 전제가 되는지</strong>를 정리한 것으로, 순위 제안이 아니라 순서상의 제약입니다.</p>
 <div class="scroll">
 <table>
 <thead><tr><th>이것을 정해야</th><th class="w">이것을 정할 수 있습니다</th></tr></thead>
@@ -2035,6 +2177,11 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <tr><td>화두 23 (타깃)</td><td class="w">24·25·27 (지표·분할·임계값)</td></tr>
 <tr><td>모델 출력 형식 (1·23·29)</td><td class="w">31 (기술 스택) — 이후 서비스 개발을 병렬로 진행 가능</td></tr>
 <tr><td><strong>꼬리 구간 처리와 분할 기준 (7.4절 → 화두 25)</strong></td><td class="w">17 (시간 처리), 15 (시간 파생 피처), 24 (평가 지표와 그 해석 범위) — <strong>정하지 않으면 이후 모든 성능 수치를 비교할 수 없습니다</strong></td></tr>
+<tr><td><strong>화두 43 (허브 처리)</strong></td><td class="w">15 (노드 피처), 19 (이웃 범위), 20 (크기 대응), 28 (저장소), 2 (응답 시간 상한), 18 (아키텍처) — <strong>화두 18보다 먼저 정해야 합니다</strong></td></tr>
+<tr><td>화두 44 (Δt 취급)</td><td class="w">15·16 (피처), 18 (아키텍처)</td></tr>
+<tr><td>화두 46 (세트 선정 기준)</td><td class="w">25 (분할), 38 (EDA 범위)</td></tr>
+<tr><td>화두 47 (배치 운영 정의)</td><td class="w">19 (이웃 범위), 28 (저장소)</td></tr>
+<tr><td>화두 48 (케이스 데이터 모델)</td><td class="w">29 (출력 형태), 31 (스택)</td></tr>
 </tbody>
 </table>
 </div>
@@ -2046,13 +2193,13 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 <thead><tr><th>상태</th><th class="w">항목</th></tr></thead>
 <tbody>
 <tr><td><strong>풀린 것</strong></td><td class="w">화두 1·13·14가 정해져 <strong>15·16·18·20의 전제가 확정</strong>됐습니다(계좌 노드 + 엣지 분류 + 방향·다중 그래프). 화두 6·7이 정해져 <strong>12(저장 형식)</strong>가 착수 가능해졌고, 화두 8이 정해져 <strong>9·15·16의 금액 처리 전제</strong>가 확정됐습니다. 화두 17의 꼬리 절단으로 <strong>25의 큰 갈림 하나가 줄었습니다.</strong></td></tr>
-<tr><td><strong>새로 생긴 의존</strong></td><td class="w"><strong>화두 13의 허브 처리(재논의 보류)</strong> → 15(노드 피처)·19(이웃 범위)·20(그래프 크기)·28(저장소)·2(응답 시간)·<strong>4(케이스 조사 UI)</strong>가 전부 이것을 기다립니다. 결정을 미뤘지만 <strong>의존은 미뤄지지 않았습니다.</strong><br><strong>화두 10·17의 "순서" 정의</strong>(순서 인덱스만 vs 순서+Δt) → 15·16의 피처 설계와 18의 아키텍처가 여기에 걸립니다.<br><strong>화두 17의 절단 기준일</strong> → 25(분할)와 함께 정해야 합니다.</td></tr>
-<tr><td><strong>다음 논의의 출발점</strong></td><td class="w">순서상 <strong>화두 18</strong>이 다음입니다. 다만 위의 "새로 생긴 의존" 세 건은 번호와 무관하게 이미 다른 결정들을 막고 있습니다.</td></tr>
+<tr><td><strong>새로 생긴 의존</strong></td><td class="w"><strong>화두 13의 허브 처리(재논의 보류) — <a href="#t43">화두 43</a>으로 독립됐습니다(8.1절)</strong> → 15(노드 피처)·19(이웃 범위)·20(그래프 크기)·28(저장소)·2(응답 시간)·<strong>4(케이스 조사 UI)</strong>가 전부 이것을 기다립니다. 결정을 미뤘지만 <strong>의존은 미뤄지지 않았습니다.</strong><br><strong>화두 10·17의 "순서" 정의</strong>(순서 인덱스만 vs 순서+Δt) — <a href="#t44">화두 44</a>로 독립됐습니다(8.1절) → 15·16의 피처 설계와 18의 아키텍처가 여기에 걸립니다.<br><strong>화두 17의 절단 기준일</strong> → 25(분할)와 함께 정해야 합니다.</td></tr>
+<tr><td><strong>다음 논의의 출발점</strong></td><td class="w"><strong>번호순이 아니라 8.1절(착수 차단)부터</strong>입니다 — 39·40·43·25·44·23·24·46·41 순서로 배치돼 있습니다. 특히 <strong>화두 43(허브 처리)은 화두 18(아키텍처)보다 먼저</strong> 정해야 합니다.</td></tr>
 </tbody>
 </table>
 </div>
-<p class="lead">7.3절의 측정 결과는 화두 1·2·3·13·14·15·16·19·20·23·24·26·28·29의 판단 재료이고, <strong>7.4절의 주 기간·꼬리 구조는 화두 6·10·15·17·22·24·25·42의 전제</strong>이며, <strong>특수 허브 계좌 15개(6.4절)는 화두 2·13·15·19·20·28의 전제</strong>입니다.</p>
-<div class="note"><strong>순서상 앞에 두면 좋은 것 하나.</strong> 허브 처리 방침(화두 13)은 그래프·피처·조회·자원(화두 15·19·20·28)에 동시에 걸립니다. 다만 이 항목은 아직 <strong>Small 2종 스팟 체크 단계</strong>라, 6종 정식 확인(ML-08) 결과를 보고 논의할지 지금 논의할지도 팀이 정할 사항입니다.</div>
+<p class="lead">7.3절의 측정 결과는 화두 1·2·3·13·14·15·16·19·20·23·24·26·28·29의 판단 재료이고, <strong>7.4절의 주 기간·꼬리 구조는 화두 6·10·15·17·22·24·25·42의 전제</strong>이며, <strong>특수 허브 계좌 15개(6.4절)는 화두 43으로 독립됐고 화두 2·13·15·19·20·28의 전제</strong>입니다.</p>
+<div class="note"><strong>허브 처리는 논의 재료가 준비됐습니다.</strong> 허브 처리 방침(<a href="#t43">화두 43</a>)은 그래프·피처·조회·자원(화두 15·19·20·28)에 동시에 걸립니다. <strong>ML-08이 6종 정식 확인을 완료</strong>했으므로(2026-08-07) 판단 재료는 준비돼 있습니다 — 남은 것은 <strong>R-11 교차검수</strong>이며, 그 전까지 ML-08 수치는 잠정입니다.</div>
 
 
 <footer>
@@ -2063,7 +2210,8 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 · 서비스 시나리오 검증: <code>worktable/eda/04_service.md</code> (환율 2항목 + 서비스 6항목, Small 세트) — 교차검수 조건부 통과<br>
 · 서비스 항목 6종 확장: <code>worktable/eda/05_scale_service.md</code> (8항목 × 6종, 4범주 일반화 판정) — 교차검수 조건부 통과<br>
 · 데이터 구조 전수 감사: <code>worktable/eda/06_structure_audit.md</code> (Small 2종 한정) — <strong>재검수 미실행, 제3자 미검증.</strong> 이 문서에서는 6.4절 은행 식별자와 엔티티 1:1 사실에만 인용했고, 인용한 자리마다 미검증 사실을 병기했습니다<br>
-· 특수 허브 계좌 15개: <strong>PM의 원천 CSV 스팟 체크 (HI-Small·LI-Small 2종) — 교차검수 미통과, Medium·Large 미확인.</strong> 6종 정식 확인은 <strong>ML-08</strong> 예정입니다. 6.3·6.4·7.3절과 화두 2·13·15·19·20·28에 인용했고, 인용한 자리마다 범위와 검증 상태를 병기했습니다<br>
+· 특수 허브 계좌 15개: PM의 원천 CSV 스팟 체크(HI-Small·LI-Small)로 최초 발견 → <strong>ML-08 6종 정식 확인 실행 완료 (2026-08-07, <code>worktable/eda/08_hub_audit.md</code>)</strong> — 세트당 정확히 15개(통화당 1개), 제작자가 quasi central banks로 문서화. <strong>R-11 교차검수 대기 — 수치는 잠정.</strong> 6.3·6.4·7.3절과 화두 2·13·15·19·20·28·43에 인용했고, 인용한 자리마다 검증 상태를 병기했습니다<br>
+· Δt·고립 계좌·분 단위 배치 측정: <strong>ML-09 실행 중 — R-12 교차검수 예정.</strong> 수치가 아직 없어 이 문서는 "측정 진행 중"으로만 표기합니다(화두 44·45·46·47)<br>
 · 시간축·주 기간과 꼬리: <code>worktable/eda/07_timeline.md</code> (6종 전수 + 그림 32장) — <strong>관측 수치는 교차검수 통과, 우리가 시도한 원인 판정(가설 H1~H5)은 전면 철회.</strong> 7.4절의 원인 서술은 우리 판정이 아니라 아래 외부 출처입니다</p>
 <p><strong>외부 출처 (데이터셋 제작 측)</strong> — 7.4절의 원인 서술, 2장 Date Range 표, 화두 25의 분할 제안은 전부 아래에서 왔습니다. 팀원이 직접 확인할 수 있습니다.</p>
 <p>· <strong>제작자 답변</strong> — Kaggle Discussion "Too many launderers in a specific time step", 질문 Marco Pianta, 답변 <strong>Erik Altman (DATASET CREATOR)</strong>, 2022<br>
@@ -2076,9 +2224,10 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 · 2026-08-05 초판 (EDA 1~3단계)<br>
 · <strong>2026-08-06 전면 갱신</strong> — 7.3절을 미측정 목록에서 측정 결과로 전환, 7.4절 신설(그래프 3장 인라인), 6.2절 환율 결과를 6종으로 확장, 6.4절 은행 식별자 항목 추가, 6.6절 서비스 8항목 일반화 판정 추가, 화두 25개 전제 갱신.<br>
 · <strong>2026-08-07 제작자 공식 답변 반영</strong> — 관측창 경계의 <strong>원인이 확인</strong>되어 "원인 미결" 서술을 전부 교체. 2장에 공식 Date Range 표 신설, 7.2절 처리량을 주 기간 기준으로 재계산, 7.4절을 "주 기간과 꼬리"로 개편(제작자 답변 인용 + 우리 <code>C</code>와의 3/3 일치 + 처리 선택지에 제작자 제안 추가), 화두 6·17·22·24·25·42 갱신(특히 <strong>화두 25에 60/20/20과 "첫 9일/10일"의 충돌</strong>을 표로 정리).<br>
-· <strong>2026-08-07 팀 첫 논의 결과 반영 — 화두 1~17 결정</strong>. 결정된 화두는 <strong>질문·데이터 상황·갈리는 지점을 그대로 두고 "팀 결정" 블록을 덧붙였습니다</strong>(나중에 재논의할 때 "왜 그렇게 정했는지"가 남아야 하므로 지우지 않습니다). 측정에서 나온 확인 사항 7건을 해당 화두에 붙였고(가장 큰 것은 화두 8의 "교차통화 = 세탁 아님" 공짜 규칙과 화두 13의 허브 결정 보류), 결정을 뒷받침하는 측정 결과도 함께 표시했습니다. §8 머리에 결정 현황(17/25)과 <strong>"미결 25개는 우선순위가 낮은 것이 아니라 순서대로 논의하다 시간이 다 된 것"</strong>이라는 사실을 넣었고, 8.9절에 "결정 이후 무엇이 풀리고 무엇이 남았는가" 표를 추가했습니다.<br>
+· <strong>2026-08-07 팀 첫 논의 결과 반영 — 화두 1~17 결정</strong>. 결정된 화두는 <strong>질문·데이터 상황·갈리는 지점을 그대로 두고 "팀 결정" 블록을 덧붙였습니다</strong>(나중에 재논의할 때 "왜 그렇게 정했는지"가 남아야 하므로 지우지 않습니다). 측정에서 나온 확인 사항 7건을 해당 화두에 붙였고(가장 큰 것은 화두 8의 "교차통화 = 세탁 아님" 공짜 규칙과 화두 13의 허브 결정 보류), 결정을 뒷받침하는 측정 결과도 함께 표시했습니다. §8 머리에 결정 현황(당시 17/25)과 <strong>"미결 화두는 우선순위가 낮은 것이 아니라 순서대로 논의하다 시간이 다 된 것"</strong>이라는 사실을 넣었고, 8.9절(현 8.6절)에 "결정 이후 무엇이 풀리고 무엇이 남았는가" 표를 추가했습니다.<br>
 · <strong>2026-08-07 정정 — "꼬리에는 정상 거래가 없다"는 서술 철회</strong>. 제작자 문장을 검증 없이 옮긴 <strong>우리(PM) 오류</strong>였고 ML-08 실행자의 회귀 점검에서 발견됐습니다. 원천 CSV 전수 확인 결과 <strong>정상 거래는 관측 마지막 날까지 이어지며</strong>(HI-Small 꼬리 453건 = 세트의 0.0089%), 일어난 것은 소멸이 아니라 <strong>약 1,000배 붕괴</strong>이고 <strong>꼬리의 약 41%는 정상 거래</strong>입니다. 7.4절에 일자별 전수 표를 추가하고 관련 서술 10여 곳을 정정했습니다. 제작자 설명의 <strong>메커니즘 부분은 그대로 유효</strong>합니다.<br>
-· <strong>2026-08-07 특수 허브 계좌 15개 발견 반영</strong> — 2-hop 분포의 꼬리가 <strong>계좌 15개(거래의 약 9%)가 만든 그림자</strong>임이 원천 CSV 스팟 체크로 확인됨. 6.3절 표에 행 추가, 6.4절에 데이터 문제 항목 + 식별 방법(<strong>계좌번호 첫 글자 ≠ <code>8</code></strong>) 신설, 7.3절 ②에 "꼬리의 정체" 절과 검증 상태 경고 추가, 로그 스케일 그림 캡션·해석 수정, 화두 2·13·15·19·20·28 갱신. <strong>Small 2종 한정·교차검수 미통과 — ML-08에서 6종 정식 확인 예정.</strong></p>
+· <strong>2026-08-07 특수 허브 계좌 15개 발견 반영</strong> — 2-hop 분포의 꼬리가 <strong>계좌 15개(거래의 약 9%)가 만든 그림자</strong>임이 원천 CSV 스팟 체크로 확인됨. 6.3절 표에 행 추가, 6.4절에 데이터 문제 항목 + 식별 방법(<strong>계좌번호 첫 글자 ≠ <code>8</code></strong>) 신설, 7.3절 ②에 "꼬리의 정체" 절과 검증 상태 경고 추가, 로그 스케일 그림 캡션·해석 수정, 화두 2·13·15·19·20·28 갱신. <strong>당시 Small 2종 한정·교차검수 미통과 상태 — 이후 ML-08이 6종 정식 확인을 완료했습니다(아래 2026-08-09 항목).</strong><br>
+· <strong>2026-08-09 전면 갱신 — 신규 화두 43~48, §8 우선순위 재편</strong> — 결정 1~17에서 파생된 후속 질문 6건을 신규 화두로 추가했습니다(43 허브 처리 ← 화두 13, 44 Δt ← 화두 10·17, 45 고립 계좌 ← 화두 11, 46 세트 선정 기준 ← 화두 6, 47 배치 운영 정의 ← 화두 2, 48 케이스 데이터 모델 ← 화두 4). 화두는 48가지(결정 17 / 미결 31)가 됐고, §8을 번호순에서 <strong>우선순위 그룹</strong>(8.1 착수 차단 / 8.2 트랙 착수 전 / 8.3 개발 중 실험 / 8.4 판정 기준 재검토 / 8.5 결정 기록 보존 / 8.6 의존 관계)으로 재편했습니다 — 화두 번호는 유지하고 표시 순서만 바꿨습니다. 신규 화두에 <strong>실무 참고</strong>와 <strong>"에이전트 참고 의견" 블록</strong>(사용자 지시로 도입 — 참고용, 팀 결정 대체 아님)을 추가했습니다. <strong>ML-08 상태 갱신</strong>: 6종 정식 확인 실행 완료(세트당 정확히 15개·통화당 1개, 제작자가 quasi central banks로 문서화 — R-11 교차검수 대기, 수치 잠정)를 문서 전체 인용부에 반영했습니다. <strong>ML-09 착수</strong>: Δt·고립 계좌·분 단위 배치 측정 진행 중(R-12 예정) — 수치는 아직 인용하지 않습니다.</p>
 </footer>
 
 </div>
