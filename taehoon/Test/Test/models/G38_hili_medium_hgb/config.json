@@ -1,0 +1,19 @@
+{
+  "exp_name": "G38_hili_medium_hgb",
+  "type": "hgb_tov_ensemble",
+  "dataset": "hili",
+  "ds_suffix": "medium",
+  "n_seeds": 3,
+  "gbt_neg": 400000,
+  "booster": "hgb",
+  "features": {
+    "time_freq": false,
+    "curr_z": false,
+    "curr_usd": false,
+    "pattern": false,
+    "cycle": false,
+    "passthru": false,
+    "pairagg": false
+  },
+  "train_on_valid": true
+}

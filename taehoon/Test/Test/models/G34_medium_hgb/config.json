@@ -1,0 +1,19 @@
+{
+  "exp_name": "G34_medium_hgb",
+  "type": "hgb_tov_ensemble",
+  "dataset": "hi",
+  "ds_suffix": "medium",
+  "n_seeds": 3,
+  "gbt_neg": 400000,
+  "booster": "hgb",
+  "features": {
+    "time_freq": true,
+    "curr_z": true,
+    "curr_usd": true,
+    "pattern": true,
+    "cycle": true,
+    "passthru": true,
+    "pairagg": true
+  },
+  "train_on_valid": true
+}
