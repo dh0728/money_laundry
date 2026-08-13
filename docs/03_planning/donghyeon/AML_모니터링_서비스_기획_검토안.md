@@ -1,8 +1,5 @@
 # AML 모니터링 서비스 기획 검토안
 
-> 문서 목적: 실제 AML 솔루션 조사 결과를 바탕으로 현재 프로젝트의 역할, 업무 흐름, Alert·Case 구조와 UI 정보 구조를 검토하기 위한 초안  
-> 문서 상태: 검토 중 — 아직 최종 확정안이 아님  
-> 주요 참고 자료: SAS AML Transaction Monitoring, Lucinity Case Manager 분석 자료
 
 ## 1. 현재 우선 검토할 항목
 
