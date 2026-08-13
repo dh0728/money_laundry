@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AML 의심거래 탐지 모델 — FINAL 종합 보고서</title>
+<style>
+  body { font-family: 'Pretendard', 'Malgun Gothic', -apple-system, sans-serif;
+         max-width: 1000px; margin: 0 auto; padding: 32px 24px; color: #1a1a2e;
+         line-height: 1.7; background: #fafbfc; }
+  h1 { font-size: 1.7em; border-bottom: 3px solid #2d4a7a; padding-bottom: 12px; color: #2d4a7a; }
+  h2 { font-size: 1.3em; margin-top: 2em; border-left: 5px solid #2d4a7a; padding-left: 12px; color: #2d4a7a; }
+  h3 { font-size: 1.1em; color: #3a5a8c; margin-top: 1.6em; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; background: #fff;
+          box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: .93em; }
+  th { background: #2d4a7a; color: #fff; padding: 9px 10px; text-align: left; }
+  td { border-bottom: 1px solid #e3e8ef; padding: 8px 10px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f4f7fb; }
+  code { background: #eef1f5; padding: 2px 6px; border-radius: 4px; font-size: .9em; }
+  pre { background: #23272e; color: #d7dae0; padding: 14px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; color: inherit; padding: 0; }
+  strong { color: #b32d2e; }
+  ul, ol { padding-left: 1.5em; }
+  blockquote { border-left: 4px solid #c9d4e4; margin: 12px 0; padding: 4px 16px; color: #555; background: #f0f4f9; }
+  hr { border: none; border-top: 1px solid #d5dce6; margin: 28px 0; }
+</style>
+</head>
+<body>
+<h1>AML 의심거래 탐지 모델 — FINAL 종합 보고서</h1>
+<ul>
+<li>작성일: 2026-08-13</li>
+<li>대상 실험: G31 ~ G40 + MVP 마이크로배치 시뮬레이션</li>
+<li>데이터: IBM AML 합성 벤치마크 (HI/LI, Small/Medium)</li>
+<li>관련 문서: <code>preprocessing_spec.md</code>(전처리), <code>feature_spec.md</code>(피처), <code>hub_subgraph_spec.md</code>(허브), <code>mvp_microbatch_worklog.md</code>(작업기록)</li>
+</ul>
+<h2>0. 요약 (Executive Summary)</h2>
+<ul>
+<li><strong>최종 채택 1단계 모델: G31</strong> — HI-Small 학습 HGB 3시드 앙상블, test AP 0.7570 / F1 0.7471</li>
+<li>MVP 5분 마이크로배치 시뮬레이션 통과 (최대 배치 스코어링 0.9초, 5분의 0.3%)</li>
+<li>Medium 학습·LI 전이·HI+LI 합성·GNN·허브 피처 등 G31을 넘으려던 모든 대안은 실험으로 기각 — 각각의 실패 원인까지 확보</li>
+<li>알려진 한계 3개: 허브 경유 세탁 12.2% 탐지 사각 / LI 도메인 미지원 / test 반복 참조 선택 편향(실성능 0.70~0.75 추정)</li>
+<li>기획서 성공지표 기준 종합 평가: <strong>6.3 / 10</strong> (채점표는 §7)</li>
+</ul>
+<h2>1. 공통 파이프라인 (모든 모델 공유)</h2>
+<h3>1.1 전처리 방식과 이유</h3>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>방식</th>
+<th>이유</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>분할</td>
+<td>타임스탬프 순 60/20/20 (train/valid/test), 셔플 없음</td>
+<td>미래 정보가 과거로 새는 데이터 누수를 구조적으로 차단. 금융 시계열에서 랜덤 분할은 성능을 부풀림</td>
+</tr>
+<tr>
+<td>피처 통계</td>
+<td>표준화·원핫 범주·USD 환산율 전부 <strong>train 분할만</strong>으로 계산 후 고정</td>
+<td>valid/test 분포를 미리 보는 누수 방지</td>
+</tr>
+<tr>
+<td>롤링 피처</td>
+<td>타깃 시각 <strong>이전</strong> 거래만 집계 (24h·1주 윈도우)</td>
+<td>당해 거래 이후 정보 사용 금지</td>
+</tr>
+<tr>
+<td>쌍 집계</td>
+<td>train 구간 고정 집계 → valid/test에 고정 매핑</td>
+<td>롤링이 아니라 시간 드리프트·누수가 없고 서빙 재현이 쉬움</td>
+</tr>
+<tr>
+<td>임계값</td>
+<td>valid에서 F1 최적 교차 임계값 결정, test는 1회만 평가</td>
+<td>test로 운영점을 맞추는 선택 편향 방지</td>
+</tr>
+<tr>
+<td>입력</td>
+<td>엣지 81 + 노드 9×2 = 99차원 (상세: <code>feature_spec.md</code>)</td>
+<td>개별 거래 속성 + 관계형(사이클·자금통과·쌍집계) + 계좌 행동을 한 벡터로</td>
+</tr>
+</tbody>
+</table>
+<h3>1.2 학습 프레임 공통 사항</h3>
+<ul>
+<li>1단계 과업: 거래 단위 이진분류 (세탁=1, 양성 비율 0.08~0.16%의 극심한 불균형)</li>
+<li>평가 지표: PR-AUC(AP) 중심 + Precision/Recall/F1 쌍 — ROC-AUC는 극심한 불균형에서 부풀려져 참고만</li>
+<li>공통 하드웨어 제약: 컨테이너 cgroup 메모리 27.3GB (OOM 대응이 여러 설계를 바꿈, §6-4)</li>
+</ul>
+<h2>2. G31 — 최종 채택 모델 (HI-Small HGB)</h2>
+<h3>전처리·피처 (방식 → 이유)</h3>
+<ul>
+<li>HI-Small v2 (5,078,345거래, 2022-09-01~18), 공통 파이프라인 99차원</li>
+<li>세탁 전수(2,297건) + 정상 40만 건 다운샘플로 학습셋 구성 → 전수 학습(500만) 대비 12배 빠르면서 양성 신호 보존. 다운샘플 시드 3개로 분산 흡수</li>
+</ul>
+<h3>학습 방식 (방식 → 이유)</h3>
+<ul>
+<li>HistGradientBoosting (scikit-learn, CPU): LR 0.005 / 최대 8,000트리 / 63리프 / 조기종료(30)</li>
+<li><strong>3시드 앙상블 (42/1042/2042)</strong>: 시드별 A모델(train-only→valid 교차 임계값), B모델(train+valid 재학습→test), 예측 평균 → 단일 시드 분산과 다운샘플 우연을 평균으로 상쇄</li>
+<li>GPU 미사용 이유: XGBoost CUDA는 SM75+ 전용, 보유 GPU는 V100(SM70). HGB CPU가 프로토콜 재현성도 확보</li>
+</ul>
+<h3>TEST 데이터셋과 결과</h3>
+<ul>
+<li><strong>HI-Small v2 test 1,015,882건 (세탁 1,798, 0.177%)</strong> — 학습과 같은 도메인, 시간상 미래 구간</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>지표</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AP (PR-AUC)</td>
+<td><strong>0.7570</strong></td>
+</tr>
+<tr>
+<td>F1 (임계값 0.368)</td>
+<td><strong>0.7471</strong></td>
+</tr>
+<tr>
+<td>Precision / Recall</td>
+<td>0.907 / 0.635</td>
+</tr>
+<tr>
+<td>시드별 F1</td>
+<td>0.7372~0.7442 (분산 작음)</td>
+</tr>
+</tbody>
+</table>
+<h3>장단점·문제·해결</h3>
+<ul>
+<li>장점: 현재 전 실험 최고 성능, CPU만으로 서빙 가능, MVP 지연 검증 완료</li>
+<li>문제 ① 허브 관여 세탁 129건 전량 누락 (AP 0.0017) → 원인 진단 완료(피처 희석), 해결은 허브 전용 피처 공학 과제로 분리</li>
+<li>문제 ② test를 50+ 실험에서 반복 참조한 선택 편향 → 실성능 0.70~0.75로 보수 추정, 운영 데이터 재검증 필요</li>
+<li>문제 ③ 리콜 0.635 — 세탁의 36% 미탐. 패턴 외 세탁(35~81%)이 구조적 한계</li>
+</ul>
+<h2>3. G34/G35 — Medium 학습 + Small 전이 (기각)</h2>
+<h3>방식과 이유</h3>
+<ul>
+<li>사용자 지시 &quot;Medium으로 학습 → Small 테스트 경로 검증&quot;에 대응. HI-Medium(3,189만 거래, small의 6.3배)으로 데이터를 늘려 일반화를 노림</li>
+<li>전처리: G31과 동일 파이프라인이나 3,200만 행이라 메모리 초과 → <strong>memmap 피처 행렬 + 청크 스트리밍</strong>(prep_feat_matrix.py, gbt_final_gpu.py) 신규 개발. 학습은 G31 프로토콜 그대로</li>
+<li>G35 전이 평가: 원핫 컬럼을 medium train 기준으로 정렬해 small에 적용, 임계값 2종(순수 전이 / small valid 재조정)</li>
+</ul>
+<h3>TEST와 결과</h3>
+<ul>
+<li>G34 자체: HI-Medium test 12,411,112건 — AP 0.6756 / F1 0.6328 (시드 0.6115~0.6510)</li>
+<li>G35 전이: <strong>HI-Small test</strong> — AP 0.6261 / F1 0.6081 (small valid 임계값 0.672), 순수 전이 F1 0.4494</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>비교</th>
+<th>G31 (small 직접)</th>
+<th>G34→small</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>small test F1</td>
+<td><strong>0.7471</strong></td>
+<td>0.6081 (-0.139)</td>
+</tr>
+</tbody>
+</table>
+<h3>장단점·기각 사유</h3>
+<ul>
+<li>장점: 같은 도메인(HI)이라 전이가 부분 성립함을 확인, Precision 0.94의 보수적 운영점 가능</li>
+<li>기각: 양성 +6배에도 스케일 시프트(계좌 분포·금액 스케일·임계값 어긋남)로 small 성능 열위. &quot;데이터 증가 이득 &gt; 스케일 시프트 손실&quot; 불성립 — 이후 Large(5.7배) 검토도 같은 논리로 보류</li>
+</ul>
+<h2>4. G33 — LI-Small 전이 (기각)</h2>
+<ul>
+<li>방식: G31(HI 학습)을 LI-Small에 그대로 적용 → &quot;HI 모델이 저은행권역(LI)에 통하는가&quot; 검증</li>
+<li>TEST: LI-Small test 1,385,052건 (세탁 925, 0.067%)</li>
+<li>결과: <strong>AP 0.0599 / F1 0.1620 — 탐지 불능</strong></li>
+<li>교훈: HI와 LI는 세탁 패턴·거래 특성이 다른 별개 과업. 이 결과가 이후 모든 작업을 HI로 집중시킨 근거. LI 지원은 LI 전용 학습이 별도 과제로 필요</li>
+</ul>
+<h2>5. G36m/G37m — GNN (PNA) Medium 학습 (기획서 검증 축, 현재 열위)</h2>
+<h3>방식과 이유</h3>
+<ul>
+<li>기획서의 핵심 검증 질문 &quot;GNN 관계형 탐지가 기존 거래 단위 분석을 보완하는가&quot;에 대응</li>
+<li>모델: PyG PNAConv 2층 메시지패싱 (degree-scaler 집계로 허브 차수 대응 의도), 120에포크, GPU V100</li>
+<li>G36m: T3 피처(시간·빈도+통화z) / G37m: 전체 81피처 — 피처 기여도 비교</li>
+</ul>
+<h3>TEST와 결과 (HI-Medium test)</h3>
+<table>
+<thead>
+<tr>
+<th>모델</th>
+<th>피처</th>
+<th>test AP</th>
+<th>test F1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G37m</td>
+<td>전체 81</td>
+<td><strong>0.2905</strong></td>
+<td><strong>0.3362</strong></td>
+</tr>
+<tr>
+<td>G36m</td>
+<td>T3</td>
+<td>0.2379</td>
+<td>0.2883</td>
+</tr>
+<tr>
+<td>(참고) G34 HGB</td>
+<td>전체 81</td>
+<td>0.6756</td>
+<td>0.6328</td>
+</tr>
+</tbody>
+</table>
+<h3>장단점·문제·해결방안</h3>
+<ul>
+<li>장점: 그래프 구조를 직접 학습, 기획서 2단계(관계 그래프)와 아키텍처 정합</li>
+<li>문제: 같은 데이터의 HGB 대비 AP 절반 이하 — 현재 PNA 2층 구성으로는 관계형 이득 미확인. v1 소규모 시절 최고치(AP 0.326)와 같은 수준에서 정체</li>
+<li>해결방안(후보): 레이어 확장·이웃 샘플링(NeighborLoader)·학습 스케줄러 개선 / HGB 점수를 노드 피처로 주는 하이브리드 / 2단계 패턴 분류에서 GNN 역할 재탐색</li>
+<li>운영 이슈: medium 그래프 구축 시 OOM 1회 — 체인 감시 껍데기만 남는 좀비 상태를 수동 재시작으로 해결</li>
+</ul>
+<h2>6. G38/G39 — HI+LI Medium 합성 (기각) / G40 — 허브 피처 (효과 없음)</h2>
+<h3>G38/G39 합성</h3>
+<ul>
+<li>방식: 양성 +54%(17,534건)를 노려 HI+LI medium 합성. 계좌 ID 충돌(14,414개, 라벨 모순 2,521개) → <strong>LI 노드 +오프셋 분리</strong>, <code>is_li</code> 도메인 플래그, split 재분할 금지 (설계: <code>hili_combine_design.md</code>)</li>
+<li>TEST: G38 자체 = 합성 test 24.5M (AP 0.5040/F1 0.4493) → G39 = <strong>HI-Small test</strong> (AP 0.6010 / F1 0.5790)</li>
+<li>기각 사유: 비교 기준 G35(0.6081) 대비 F1 -0.029 — 도메인 결정경계 차이를 is_li 플래그로는 상쇄 불가. G33과 일관된 결론</li>
+<li>부산물: featmat 63M행 OOM 2회 → <strong>단계별 프로세스 분리</strong> 해결, 학습 OOM 1회 → GBT_LOW_MEM 모드 추가</li>
+</ul>
+<h3>G40 허브 피처</h3>
+<ul>
+<li>방식: G31 + hub_src/hub_dst 플래그 2개(101차원) — 허브 탐지 구멍(H-2 발견) 회복 시도</li>
+<li>TEST: HI-Small test — <strong>G31과 모든 지표가 소수점까지 동일</strong> (전체 0.7570/0.7471, 허브 AP 0.0017)</li>
+<li>진단: train에 허브 세탁 359건 있음에도 3시드 전부 플래그 미사용 — 피처 부재가 아니라 <strong>허브 세탁이 모든 피처에서 허브 정상과 불구분</strong>(17만 이웃 희석)</li>
+<li>해결방안: 허브 입출금을 금액·시간으로 짝짓는 가상 경유 피처(허브 투명화) — 별도 과제(3~5시간 추정), MVP에선 &quot;알려진 한계&quot;로 명문화</li>
+</ul>
+<h2>7. 최종 점수 평가 (기획서 성공지표 기준)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>평가 영역 (기획서 §4)</th>
+<th>결과</th>
+<th>점수</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1단계 모델 정밀·재현·PR-AUC</td>
+<td>달성</td>
+<td><strong>8.5/10</strong></td>
+<td>AP 0.757, P 0.907/R 0.635 쌍 보고. 실성능 보수 추정 0.70~0.75 감안</td>
+</tr>
+<tr>
+<td>2</td>
+<td>패턴 내부/외부·허브 분리 평가</td>
+<td>부분 달성</td>
+<td><strong>7/10</strong></td>
+<td>허브 분리 완료(구멍 발견). 패턴 내부/외부 분리는 산출 예정</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2단계 패턴 다중분류</td>
+<td>미착수</td>
+<td><strong>0/10</strong></td>
+<td>1단계 확정이 선행이라 보류. 다음 과제</td>
+</tr>
+<tr>
+<td>4</td>
+<td>5분 마이크로배치·판정 지연</td>
+<td>달성</td>
+<td><strong>9/10</strong></td>
+<td>시뮬레이션: 배치 1,162개, p50 295ms/max 876ms — 5분의 0.3%. 실환경 미검증 잔여</td>
+</tr>
+<tr>
+<td>5</td>
+<td>관계형(GNN) 탐지 검증</td>
+<td>미달</td>
+<td><strong>4/10</strong></td>
+<td>검증 자체는 수행했으나 HGB의 절반 — 개선 실험 필요</td>
+</tr>
+<tr>
+<td>6</td>
+<td>커버리지·무결성</td>
+<td>부분</td>
+<td><strong>5/10</strong></td>
+<td>허브 12.2% 사각 명문화, 누수 4중 장치 완비. 허브 해결 과제 잔여</td>
+</tr>
+<tr>
+<td>7</td>
+<td>재현성·문서화</td>
+<td>달성</td>
+<td><strong>9/10</strong></td>
+<td>전 실험 스크립트·설정·지표 보존, 명세서 5종</td>
+</tr>
+</tbody>
+</table>
+<p><strong>가중 종합: 6.3 / 10</strong> — 1단계 탐지와 운영 실현성은 실용 수준, 2단계·GNN·허브가 남은 과제</p>
+<h3>MVP 마이크로배치 시뮬레이션 (운영 검증)</h3>
+<ul>
+<li>HI-small test 1,015,882건을 5분 배치 1,162개로 리플레이 (배치당 평균 874건/최대 4,725건)</li>
+<li>G31: 공식 지표와 정확히 일치(F1 0.7471) — 파이프라인 정합성 확인. 최대 배치 876ms ≪ 300초</li>
+<li>설계안의 판정 지연 구조(배치 대기 0~5분 + 픽업 ≤2분 + 추론)에서 추론 자체는 병목이 아님을 확인</li>
+</ul>
+<h2>8. 종합 결론과 다음 과제</h2>
+<ol>
+<li><strong>1단계 모델은 G31로 확정 종료</strong> — 대안 6종(Medium·Large·LI·합성·GNN·허브플래그)을 실험으로 전부 기각, 실패 원인 문서화 완료</li>
+<li>다음 우선순위 (기획서 설계안 기준 모델팀 과제):
+<ul>
+<li>2단계 패턴 다중분류기 (양성 거래 → 8패턴+패턴외, macro-F1) — 점수표의 최대 공백</li>
+<li>패턴 내부/외부 분리 평가 (성공지표 요구사항 잔여분)</li>
+<li>허브 가상 경유 피처 (12.2% 사각 해소 시도, 3~5시간)</li>
+<li>GNN 개선 실험 (레이어·샘플링·하이브리드)</li>
+</ul>
+</li>
+<li>운영 투입 전 필요: 실데이터 유사 환경에서의 재검증(선택 편향 해소), 허브 사각의 대시보드 명시</li>
+</ol>
+<h2>부록. 실험 전체 요약표</h2>
+<table>
+<thead>
+<tr>
+<th>실험</th>
+<th>학습 데이터</th>
+<th>모델</th>
+<th>TEST 데이터</th>
+<th>test AP</th>
+<th>test F1</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>G31</strong></td>
+<td>HI-Small</td>
+<td>HGB 3시드</td>
+<td>HI-Small test</td>
+<td><strong>0.7570</strong></td>
+<td><strong>0.7471</strong></td>
+<td><strong>채택</strong></td>
+</tr>
+<tr>
+<td>G34</td>
+<td>HI-Medium</td>
+<td>HGB 3시드</td>
+<td>HI-Medium test</td>
+<td>0.6756</td>
+<td>0.6328</td>
+<td>medium 대표</td>
+</tr>
+<tr>
+<td>G35</td>
+<td>(G34 전이)</td>
+<td>—</td>
+<td>HI-Small test</td>
+<td>0.6261</td>
+<td>0.6081</td>
+<td>기각</td>
+</tr>
+<tr>
+<td>G33</td>
+<td>(G31 전이)</td>
+<td>—</td>
+<td>LI-Small test</td>
+<td>0.0599</td>
+<td>0.1620</td>
+<td>기각</td>
+</tr>
+<tr>
+<td>G37m</td>
+<td>HI-Medium</td>
+<td>PNA GNN</td>
+<td>HI-Medium test</td>
+<td>0.2905</td>
+<td>0.3362</td>
+<td>GNN 최고(열위)</td>
+</tr>
+<tr>
+<td>G36m</td>
+<td>HI-Medium</td>
+<td>PNA GNN(T3)</td>
+<td>HI-Medium test</td>
+<td>0.2379</td>
+<td>0.2883</td>
+<td>기각</td>
+</tr>
+<tr>
+<td>G38</td>
+<td>HI+LI Medium</td>
+<td>HGB 3시드</td>
+<td>합성 test</td>
+<td>0.5040</td>
+<td>0.4493</td>
+<td>—</td>
+</tr>
+<tr>
+<td>G39</td>
+<td>(G38 전이)</td>
+<td>—</td>
+<td>HI-Small test</td>
+<td>0.6010</td>
+<td>0.5790</td>
+<td>기각</td>
+</tr>
+<tr>
+<td>G40</td>
+<td>HI-Small+hub플래그</td>
+<td>HGB 3시드</td>
+<td>HI-Small test</td>
+<td>0.7570</td>
+<td>0.7471</td>
+<td>효과 없음</td>
+</tr>
+</tbody>
+</table>
+
+<hr>
+<p style="color:#888; font-size:.85em">생성: 2026-08-13 · 원본: FINAL_REPORT.md · 실험 환경: /workspace/kimi/src_extracted</p>
+</body>
+</html>
