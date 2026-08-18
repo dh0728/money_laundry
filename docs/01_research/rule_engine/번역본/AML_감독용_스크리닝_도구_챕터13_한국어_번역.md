@@ -7,33 +7,21 @@
 
 > **번역 범위:** PDF 뷰어 기준 248-266쪽 (문서 인쇄면 233-251쪽), Chapter 13 전체
 
-> **번역 안내:** 본문은 문단 전체의 문맥을 기준으로 한국어로 옮겼습니다. AML·규칙 엔진·전문가 시스템 관련 용어를 통일했으며, 수식·코드·참고문헌은 정확성을 위해 원문 표기를 유지했습니다. 각 페이지의 그림·표·원래 배치는 해당 번역 구간에 놓인 원문 페이지 이미지에서 확인할 수 있습니다.
+> **번역 안내:** 본문은 문단 전체의 문맥을 기준으로 한국어로 옮겼습니다. AML·규칙 엔진·전문가 시스템 관련 용어를 통일했으며, 수식·코드·참고문헌은 정확성을 위해 원문 표기를 유지했습니다. 원문의 그림과 표는 각각 잘라 해당 본문 위치에 바로 배치했습니다.
 
 ---
 
 <!-- PDF 248쪽 / 원문 233쪽 -->
 
-<details>
-<summary>PDF 248쪽 (원문 233쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 248쪽(원문 233쪽)](assets/screening_tool_ch13/page-01.jpg)
-
-</details>
-
 ## 1 서론
 
 자금세탁방지 및 테러 자금 조달 방지(AML/CTF) 분야의 활동은 안정적인 금융 및 경제 부문을 제공하는 데 중요한 부분입니다. 전국적인 자율 규제 기관인 슬로베니아 은행(BOS)은 개별 은행의 규정 준수를 감독하고 검사를 실시하며 규정 [1]를 작성할 때 컨설팅 기관 역할을 합니다. 세계가 점점 더 상호 연결되고 국가 및 지리적 경계가 모호해짐에 따라 국가와 기업 간의 대량 송금이 그 어느 때보다 보편화되고 있습니다. 전 세계와 EU 지역 내에서 금융 이체를 위한 시스템의 상호 연결과 손쉬운 사용으로 인해 효율적이고 시기적절한 감독이 그 어느 때보다 필요합니다.
 
-악의적 행위자들이 더 빠르게 움직이며 기존 탐지·예방 체계를 앞질러 가는 상황에서, 데이터가 폭증하는 디지털 시대에는 수동·인력 기반 탐지 방식만으로 방대한 거래 건수와 처리에 필요한 추가 데이터 규모를 감당할 수 없다는 점이 분명해지고 있습니다. 이는 얼마 전 발생한 사건 [2]에서도 확인할 수 있으며, 위험 거래 패턴을 조기에 경고하기 위한 추가 데이터와 자동 탐지 체계를 은행과 감독기관 양쪽에 마련해야 함을 보여 줍니다. 이러한 시스템은 감독기관이 개별 은행을 더 폭넓고 효율적으로 감독할 수 있게 하고, 은행에는 문제가 되는 시나리오를 조기에 발견해 보고할 수 있는 도구를 제공하므로 양측 모두에 도움이 됩니다.
+악의적인 엔터티가 더 빠르게 움직이고 현재의 탐지 및 예방 메커니즘을 능가함에 따라 데이터가 확장되는 디지털 시대에 수동 및 인간 기반 탐지 방법으로는 엄청난 양의 거래과 처리에 필요한 추가 데이터의 양을 처리할 수 없다는 것이 분명해지고 있습니다. 이는 위험한 거래 패턴에 대한 특정 조기 경고 시스템의 추가 데이터와 자동 감지가 은행 수준과 감독 기관 수준 모두에서 시행되어야 함을 명확하게 보여주는 최근 사건 [2]로 예시될 수 있습니다. 이러한 시스템은 문제가 있는 시나리오를 조기에 발견하고 보고할 수 있는 도구를 제공함으로써 개별 은행에 대한 감독 수준을 높이고 효율적으로 관리함으로써 두 감독 기관 모두에게 도움이 될 것입니다.
 
 <!-- PDF 249쪽 / 원문 234쪽 -->
 
-<details>
-<summary>PDF 249쪽 (원문 234쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 249쪽(원문 234쪽)](assets/screening_tool_ch13/page-02.jpg)
-
-</details>
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.1](assets/screening_tool_ch13/figures/figure-13-1.png)
 
 **그림 13.1 스크리닝 도구 파이프라인 개요**
 
@@ -42,13 +30,6 @@
 스크리닝 도구 파이프라인은 그림 13.1에 나와 있습니다. 파이프라인은 Infinitech 구현 방식에 따라 컨테이너에 깔끔하게 포장된 여러 개별적이고 대부분 독립적인 구성 요소로 구성됩니다. 이러한 방식으로 전체 도구 모음을 현장에 쉽게 배포할 수 있으며 유연성과 원활한 통합이 가능합니다. Infinitech 철학에 따라 추가 도구와 검출기를 쉽게 포함할 수 있으며 맞춤형 수정 없이 검사 도구 제품군과 통합할 수 있습니다. 이 도구 모음은 대용량 데이터의 성능을 위해 구축되었으며 거의 ​​실시간으로 사용할 수 있으며 기록 데이터 탐색 및 시나리오 모델링을 위한 배치 모드도 제공합니다.
 
 <!-- PDF 250쪽 / 원문 235쪽 -->
-
-<details>
-<summary>PDF 250쪽 (원문 235쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 250쪽(원문 235쪽)](assets/screening_tool_ch13/page-03.jpg)
-
-</details>
 
 ## 2 관련 연구
 
@@ -65,13 +46,6 @@
 또한 Mastercard의 Brighterion은 AML 제품 [5]에 비지도 학습을 사용한다고 주장합니다.
 
 <!-- PDF 251쪽 / 원문 236쪽 -->
-
-<details>
-<summary>PDF 251쪽 (원문 236쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 251쪽(원문 236쪽)](assets/screening_tool_ch13/page-04.jpg)
-
-</details>
 
 [6]에서는 거래(엔티티가 아님)에서 직접 작동하는 지도 학습 기술이 제시됩니다. Gradient Boosting 모델은 과거 SAR(의심 활동 보고서)을 기반으로 의심 거래를 예측하도록 훈련되었습니다. 훈련에 사용되는 특징 벡터는 엔터티 전체와 개별 거래에 대한 정보를 모두 포함합니다. 이러한 기능에는 거래 유형별로 그룹화된 지난 2개월 동안의 법인, 회사 부문 유형, 활동 수준 및 거래 금액과 관련된 이전 파산 표시가 포함됩니다. 저자는 모델이 정확하고 효율적이며 은행의 규칙 기반 접근 방식을 능가한다는 것을 보여줍니다.
 
@@ -93,13 +67,6 @@ GCN(Graph Convolutional Networks) [12]는 노드 기능을 활용하여 메시�
 
 <!-- PDF 252쪽 / 원문 237쪽 -->
 
-<details>
-<summary>PDF 252쪽 (원문 237쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 252쪽(원문 237쪽)](assets/screening_tool_ch13/page-05.jpg)
-
-</details>
-
 T-GCN이라고 불리는 GCN의 시간적 변형이 [15]로 제안되었습니다. 저자는 먼저 각 시간 단계에서 개별적으로 GCN 레이어로 공간 정보를 집계한 다음 시간 단계를 GRU(Gated Recurrent Unit)와 연결하여 최종적으로 예측을 산출하는 모델을 제안합니다. 이러한 모델은 공간적 및 시간적 정보를 모두 집계하여 실제 도시 교통 데이터셋에 대한 교통 예측 작업에서 다른 최첨단 기술(SVR 및 GRU 포함)보다 성능이 뛰어납니다. 또한, 동적 그래프 [16]에 대한 유도적 표현 학습을 위한 대안으로 최근 TGAT(temporal graph attention) 계층이 제안되었습니다.
 
 ### 2.3 AML을 위한 그래프 구조 데이터 머신러닝
@@ -111,13 +78,6 @@ T-GCN이라고 불리는 GCN의 시간적 변형이 [15]로 제안되었습니�
 GraphSMOTE라는 그래프용 SMOTE 적용이 [18]에서 제안되었습니다. GraphSMOTE는 그래프에 삽입되는 소수 클래스의 합성 노드([17]에 설명된 합성 임베딩뿐만 아니라)를 생성하여 훈련을 직접 수행할 수 있습니다. 저자는 GraphSMOTE의 변형이 가중 손실 및 SMOTE의 변형을 포함하여 불균형 데이터셋에 대한 기존 교육 기술보다 성능이 뛰어나며 다양한 불균형 비율에 걸쳐 잘 일반화된다는 것을 보여줍니다.
 
 <!-- PDF 253쪽 / 원문 238쪽 -->
-
-<details>
-<summary>PDF 253쪽 (원문 238쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 253쪽(원문 238쪽)](assets/screening_tool_ch13/page-06.jpg)
-
-</details>
 
 [19]에서 저자는 ICIJ Offshore Leaks Database에 게시된 4개의 별도 지향 네트워크에서 의심스러운 엔터티를 예측하는 실험을 수행합니다. 일부 노드는 국제 제재 목록과 일치하여 블랙리스트로 표시됩니다. 데이터셋는 블랙리스트에 등록된 노드의 0.05% 미만을 포함하여 매우 불균형합니다. 첫 번째 부분에서는 임베딩 알고리즘이 [17]와 비슷한 방식으로 사용됩니다. 여기서는 O-SVM(One-class SVM)을 사용하여 오버샘플링과 달리 의심스러운 엔터티를 예측합니다. 그런 다음 모델은 실제 데이터의 비율에 대해서만 평가됩니다. Struc2vec은 AUC 점수 측면에서 대부분 node2vec보다 성능이 뛰어납니다. 하지만 그 차이는 데이터베이스의 4개 데이터셋에 따라 크게 다릅니다. 또한 정도 중심성 측정값(PageRank, 고유 벡터 중심성, 로컬 클러스터링 계수 및 정도 중심성)이 네트워크에서 노드의 중요성을 설명하는 기능으로 사용됩니다. 이들 중 PageRank만으로도 대부분 최고의 성능을 발휘하며 struc2vec도 능가하며 이러한 작업에서 노드 중심성의 역할을 강조합니다. 또한 모든 실험은 무방향, 방향 및 역방향 그래프 버전에서 수행되었습니다. 결과는 데이터세트에 따라 크게 다르지만 일반적으로 역방향 네트워크를 사용하여 최상의 결과를 얻었습니다.
 
@@ -131,13 +91,6 @@ PageRank 알고리즘에서 영감을 받은 SRBF(Suspiciousness Rank Back and F
 
 <!-- PDF 254쪽 / 원문 239쪽 -->
 
-<details>
-<summary>PDF 254쪽 (원문 239쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 254쪽(원문 239쪽)](assets/screening_tool_ch13/page-07.jpg)
-
-</details>
-
 [21]에서는 로지스틱 회귀 대신 GCN의 마지막 계층에서 [22]가 제안한 미분 가능한 버전의 의사 결정 트리를 사용하여 Random Forest와 GCN의 기능을 결합하는 향후 작업 아이디어가 지적되었습니다.
 
 그래프의 이상 탐지는 비정상적인 활동을 탐지하는 데에도 사용될 수 있습니다. [23]에서는 그래프에서 비정상적인 에지를 감지하기 위한 완전 비지도 방식이 제시됩니다. 분류자는 두 노드 사이에 에지가 존재하는지 여부를 예측하기 위해 동일한 수의 기존 및 존재하지 않는 에지에 대해 훈련됩니다. 존재하지 않는 것으로 분류된 가장자리를 가진 노드는 변칙적인 것으로 볼 수 있습니다. 이 접근 방식은 온라인 소셜 네트워크와 같은 실제 데이터셋에서 테스트되었습니다.
@@ -148,16 +101,11 @@ PageRank 알고리즘에서 영감을 받은 SRBF(Suspiciousness Rank Back and F
 
 스크리닝 도구의 핵심은 효율적인 데이터 수집, 저장 및 두 가지 거래 데이터 소스의 대규모 다중 그래프 거래 데이터 표현입니다. 순수한 거래 데이터 그래프는 가치가 있으며 추가 분석을 위한 백본을 제공할 뿐만 아니라, 데이터도 강화되어 획득한 결과를 더 깊이 탐색하고 더 쉽게 이해할 수 있습니다. 자금세탁방지 시나리오에 맞게 특별히 맞춤화된 추가 정보가 함께 수집(및 자동 업데이트)됩니다. 거래 데이터의 높은 민감도, 개인 정보 보호 문제 및 법적 고려 사항으로 인해 수집 파이프라인은 매우 구체적이고 특별히 맞춤화된 의사 익명화 및 강화 파이프라인을 따릅니다. 일반적인 데이터 흐름은 그림 13.2에 나와 있습니다.
 
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.2](assets/screening_tool_ch13/figures/figure-13-2.png)
+
 **그림 13.2 데이터 수집 및 준비 개요**
 
 <!-- PDF 255쪽 / 원문 240쪽 -->
-
-<details>
-<summary>PDF 255쪽 (원문 240쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 255쪽(원문 240쪽)](assets/screening_tool_ch13/page-08.jpg)
-
-</details>
 
 다양한 소스의 거래 데이터는 공공 사업자 등기소에서 제공하는 회사별 정보로 강화됩니다. 추가 회사 관련 정보는 특히 자금세탁 및 테러자금 조달 정보뿐만 아니라 비정상적인 행동 패턴을 발견하기 위한 일반적인 특징을 대상으로 합니다. 회사 규모, 자본화 유형, 소유권 구조, 회사 등록 날짜, 회사 폐쇄 가능 날짜, 자본 출처 등 계정 정보 데이터는 eRTR(공용 계정 등록부)에서 제공되며 AML 시나리오에 필요한 정보가 추가됩니다: 계정 등록, 가능한 계정 폐쇄, 계정 소유자 등. 중요한 정보는 계정 유형입니다. 계정은 개인이 사용할 수도 있고 특정 회사와 연결될 수도 있으며 어떤 경우에는 둘 다일 수도 있습니다. 의심스러운 패턴을 보다 효율적으로 식별하는 데 관련된 메타 매개변수는 정기적으로 수집됩니다. EU의 고위험 제3국 목록은 목록에 있는 국가의 고위험 수준을 분류합니다.
 
@@ -168,13 +116,6 @@ PageRank 알고리즘에서 영감을 받은 SRBF(Suspiciousness Rank Back and F
 프로젝트 중에 개발된 의사 익명화 장치는 이전 호출의 솔트 정보를 재사용하여 들어오는 데이터 스트림을 성공적으로 익명화할 수 있습니다. 이를 통해 그래프 구조 및 연결에 대한 많은 정보를 계속 유지하면서 새로운 데이터 및 다양한 플랫폼의 수집과 결합하여 이후 단계에서 데이터를 더 쉽게 수집할 수 있습니다. 많은 양의 데이터와 자동 수집의 필요성으로 인해 개발된 의사 익명화 서비스는 실시간으로 데이터를 마스킹할 수 있는 독립형 Kubernetes 서비스로 Infinitech 구성 요소의 일부로 제공됩니다.
 
 <!-- PDF 256쪽 / 원문 241쪽 -->
-
-<details>
-<summary>PDF 256쪽 (원문 241쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 256쪽(원문 241쪽)](assets/screening_tool_ch13/page-09.jpg)
-
-</details>
 
 ### 3.2 데이터 저장
 
@@ -192,13 +133,6 @@ BOS는 감독 기관의 역할을 하며 금융 기관 수준과 금융 부문 �
 
 <!-- PDF 257쪽 / 원문 242쪽 -->
 
-<details>
-<summary>PDF 257쪽 (원문 242쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 257쪽(원문 242쪽)](assets/screening_tool_ch13/page-10.jpg)
-
-</details>
-
 새로 설립된 회사나 설립 후 바로 문을 닫는 회사는 해외계좌에서 거액의 자금을 수취하고 개인계좌에서도 비슷한 금액을 지불하는 위험이 높습니다. 회사의 위험은 지급인/수취인 국가의 위험 수준에 따라 증가합니다.
 
 규칙 기반 시나리오의 주요 장점은 간단한 설명 가능성, 구성 가능성 및 기존 자금세탁방지 규정과의 쉬운 대응입니다. 감독 기관으로서 신고 및 추가 처리에 대한 명확한 설명을 제공하면 청구를 추구하는 능력이 향상되고 조사 결과의 실행 가능성도 향상됩니다. 또한 설명 가능한 규칙 기반 필터는 현장 점검 시 쉽게 구현할 수 있습니다. 위험한 행동을 평가하고 표시하기 위한 기존 규칙과 관련하여 전문가와의 협력이 직접적으로 기여한 것은 특수 매개변수화된 일반 규칙의 개발이었습니다. 이는 일반적인 자금세탁 및 테러 자금 조달 거래 패턴을 자동으로 포함하고 Sect.에 제시된 추가 조사를 위해 이를 데이터베이스 쿼리에 매핑합니다. 6.
@@ -215,12 +149,7 @@ BOS는 감독 기관의 역할을 하며 금융 기관 수준과 금융 부문 �
 
 <!-- PDF 258쪽 / 원문 243쪽 -->
 
-<details>
-<summary>PDF 258쪽 (원문 243쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 258쪽(원문 243쪽)](assets/screening_tool_ch13/page-11.jpg)
-
-</details>
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.3](assets/screening_tool_ch13/figures/figure-13-3.png)
 
 **그림 13.3 대규모 거래 전달**
 
@@ -228,12 +157,7 @@ BOS는 감독 기관의 역할을 하며 금융 기관 수준과 금융 부문 �
 
 <!-- PDF 259쪽 / 원문 244쪽 -->
 
-<details>
-<summary>PDF 259쪽 (원문 244쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 259쪽(원문 244쪽)](assets/screening_tool_ch13/page-12.jpg)
-
-</details>
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.4](assets/screening_tool_ch13/figures/figure-13-4.png)
 
 **그림 13.4 거래 붕괴**
 
@@ -251,12 +175,7 @@ BOS는 감독 기관의 역할을 하며 금융 기관 수준과 금융 부문 �
 
 <!-- PDF 260쪽 / 원문 245쪽 -->
 
-<details>
-<summary>PDF 260쪽 (원문 245쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 260쪽(원문 245쪽)](assets/screening_tool_ch13/page-13.jpg)
-
-</details>
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.5](assets/screening_tool_ch13/figures/figure-13-5.png)
 
 **그림 13.5 여러 개인 계정으로 거래 분산**
 
@@ -268,14 +187,9 @@ BOS는 감독 기관의 역할을 하며 금융 기관 수준과 금융 부문 �
 
 <!-- PDF 261쪽 / 원문 246쪽 -->
 
-<details>
-<summary>PDF 261쪽 (원문 246쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 261쪽(원문 246쪽)](assets/screening_tool_ch13/page-14.jpg)
-
-</details>
-
 **그림. FFT 클러스터의 13.6 Barycentre 스펙트럼. 괄호 안에 표시된 각 클러스터의 대략적인 구성원 수**
+
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.6](assets/screening_tool_ch13/figures/figure-13-6.png)
 
 ```text
 0
@@ -283,65 +197,6 @@ BOS는 감독 기관의 역할을 하며 금융 기관 수준과 금융 부문 �
 40μ
 60μ
 80μ
-```
-
-```text
-0
-50μ
-100μ
-150μ
-```
-
-```text
-20μ
-```
-
-```text
-40μ
-```
-
-```text
-60μ
-```
-
-```text
-20μ
-```
-
-```text
-40μ
-```
-
-```text
-60μ
-```
-
-```text
-100μ
-```
-
-```text
-200μ
-```
-
-```text
-300μ
-```
-
-```text
-0.1
-0.2
-0.3
-0.4
-0
-```
-
-```text
-50μ
-```
-
-```text
-100μ
 ```
 
 유클리드 바리센터 클러스터 1(140) 클러스터 2(230) 클러스터 3(930) 클러스터 4(50) 클러스터 5 (40) 엔터티 χj의 벡터 표현. 마지막으로 각 χj는 |ψj | t=1 Φj(t).
@@ -352,13 +207,6 @@ k = 5를 사용한 K-평균 클러스터링과 주어진 특징 벡터에 대해
 
 <!-- PDF 262쪽 / 원문 247쪽 -->
 
-<details>
-<summary>PDF 262쪽 (원문 247쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 262쪽(원문 247쪽)](assets/screening_tool_ch13/page-15.jpg)
-
-</details>
-
 ## 6 활용 사례
 
 자금세탁방지 및 감독을 위한 전체 작업 플랫폼은 간단하고 직관적인 플랫폼에 결합된 이전에 설명된 모든 세그먼트를 포함합니다. 플랫폼은 데이터 수집, 의사 익명화, 데이터 강화, 자동 이상 탐지 및 패턴 플래그 지정을 처리합니다. 그래프 탐색을 위해 현재 개발된 웹 기반 그래픽 사용자 인터페이스와 결합된 Neo4j Bloom 도구를 사용하면 감독 및 규정 준수 전문가가 더 넓은 맥락에서 플래그가 지정된 시나리오를 수동으로 검사할 수 있습니다.
@@ -367,30 +215,13 @@ k = 5를 사용한 K-평균 클러스터링과 주어진 특징 벡터에 대해
 
 **그림 13.7a는 자동 감지가 제안하는 사용 가능한 시나리오의 매개변수화된 쿼리 예를 보여줍니다. 이 경우 사용자는 관심 있는 상대 시간을 수동으로 구성할 수 있습니다. 그림 13.7b는 이러한 쿼리에 의해 생성된 예제 결과를 보여줍니다. 세분성 및 선택한 기간에 따라 특정 기능이 더 두드러집니다. 예제 시나리오는 거래 이웃이 그래프의 절반 이상을 제어하는 ​​큰 구성 요소와 많은 작은 구성 요소로 고도로 분할된 그래프를 형성한다는 것을 잘 보여줍니다. 작은 구성 요소는 일반적으로 불규칙한 동작을 나타내기 때문에 특히 중요합니다.**
 
-```text
-(a)
-```
-
-```text
-(b)
-```
-
-```text
-(c)
-```
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.7](assets/screening_tool_ch13/figures/figure-13-7.png)
 
 **그림. 13.7 결과 그래프 구조가 포함된 매개변수화된 쿼리. (a) 매개변수화된 쿼리 예. (b) 매개변수화된 쿼리에 해당하는 거래 그래프. (c) 중간 수준 클러스터 클로즈업**
 
 <!-- PDF 263쪽 / 원문 248쪽 -->
 
-<details>
-<summary>PDF 263쪽 (원문 248쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 263쪽(원문 248쪽)](assets/screening_tool_ch13/page-16.jpg)
-
-</details>
-
-(a) 계층적 뷰 클로즈업 (b) 계층적 뷰 클로즈업
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.8](assets/screening_tool_ch13/figures/figure-13-8.png)
 
 **그림 13.8 (a) 및 (b) 계층적 뷰 클로즈업**
 
@@ -404,37 +235,13 @@ k = 5를 사용한 K-평균 클러스터링과 주어진 특징 벡터에 대해
 
 <!-- PDF 264쪽 / 원문 249쪽 -->
 
-<details>
-<summary>PDF 264쪽 (원문 249쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 264쪽(원문 249쪽)](assets/screening_tool_ch13/page-17.jpg)
-
-</details>
-
-```text
-(a)
-```
-
-```text
-(b)
-```
-
-```text
-(c)
-```
+![Screening Tool for Anti-money Laundering Supervision - 그림 13.9](assets/screening_tool_ch13/figures/figure-13-9.png)
 
 **그림 13.9 정보 및 클로즈업 예시. (a) 추가 거래 정보. (b) 회사 계좌 간 송금. (c) 개인에 대한 거래를 포함한 시작 유형 유형**
 
 일부 회사의 매우 구체적인 성격과 다른 회사(공익사업 회사, 지자체, 외국 자회사가 있는 대기업)의 이상한 거래 패턴으로 인해 특별 화이트리스트가 시행되고 있습니다. 모든 데이터는 가익명화되므로 특정 특수 사례를 수동으로 추론하는 것은 거의 불가능합니다. 외부에서 제공되는 화이트리스트는 완전히 익명화되어 두 가지 시나리오에서 사용될 수 있습니다. 이상 탐지 알고리즘의 계산에서 화이트리스트에 있는 회사를 완전히 포함하거나 전체 데이터셋에 대한 모든 계산을 수행하고 프레젠테이션 및 수동 탐색 중에만 필터링할 수 있습니다. 두 번째 옵션은 화이트리스트를 정교하게 작성하고 제외할 수 있지만 여전히 볼 수 있으므로 추가로 유용합니다. 중요한 예는 개인 계정에서 많은 거래를 처리하지만 여전히 해외 거래에 대한 위험 점수를 계산하고 제시하는 유틸리티 회사를 화이트리스트에 추가하는 것입니다.
 
 <!-- PDF 265쪽 / 원문 250쪽 -->
-
-<details>
-<summary>PDF 265쪽 (원문 250쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 265쪽(원문 250쪽)](assets/screening_tool_ch13/page-18.jpg)
-
-</details>
 
 ## 7 요약
 
@@ -447,13 +254,6 @@ k = 5를 사용한 K-평균 클러스터링과 주어진 특징 벡터에 대해
 1. Yearly report 2020 (2021), Bank of Slovenia. 2. Expert tells NLB Irangate commission good system was not implemented (2017). https://english.sta.si/2441615/expert-tells-nlb-irangate-commission-good-system-wasnot-implemented 3. Sudjianto, A., Yuan, M., Kern, D., Nair, S., Zhang, A., & Cela-Díaz, F. (2010). Technometrics, 52(1), 5. 4. Alexandre, C., & Balsa, J. (2016). https://arxiv.org/abs/1510.00878. 5. Next generation anti-money laundering and compliance powered by artificial intelligence and machine learning (2017). https://brighterion.com/anti-money-laundering-compliancerequires-unsupervised-machine-learning/ 6. Jullum, M., Løland, A., Huseby, R. B., Ånonsen, G., & Lorentzen, J. (2020). Journal of Money Laundering Control 23(1). https://doi.org/10.1108/JMLC-07-2019-0055. https://www. emerald.com/insight/1368-5201.htm 7. Perozzi, B., Al-Rfou, R., & Skiena, S. (2014). Proceedings of the ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (pp. 701–710). Association for Computing Machinery. https://doi.org/10.1145/2623330.2623732 8. Grover, A., & Leskovec, J. (2016). Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (pp. 855–864). http://arxiv.org/abs/ 1607.00653
 
 <!-- PDF 266쪽 / 원문 251쪽 -->
-
-<details>
-<summary>PDF 266쪽 (원문 251쪽) 이미지 보기</summary>
-
-![Screening Tool for Anti-money Laundering Supervision - PDF 266쪽(원문 251쪽)](assets/screening_tool_ch13/page-19.jpg)
-
-</details>
 
 9. Yue, X., Wang, Z., Huang, J., Parthasarathy, S., Moosavinasab, S., Huang, Y., Lin, S. M., Zhang, W., Zhang, P., & Sun, H. (2020). Bioinformatics, 36(4), 1241. https://doi.org/10. 1093/bioinformatics/btz718 10. Chen, J., Wu, Y., Fan, L., Lin, X., Zheng, H., Yu, S., & Xuan, Q. (2019). arXiv:1904.12605. http://arxiv.org/abs/1904.12605 11. Ribeiro, L. F. R., Savarese, P. H. P., & Figueiredo, D. R. (2017). KDD '17: Proceedings of the 23rd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining. https://doi.org/10.1145/3097983.3098061. https://arxiv.org/abs/1704.03165 12. Kipf, T. N., & Welling, M. (2017). arXiv:1609.02907 [cs, stat]. http://arxiv.org/abs/1609.02907 13. Hamilton, W. L., Ying, R., & Leskovec, J. (2017). arXiv:1706.02216 [cs, stat]. http://arxiv.org/ abs/1706.02216 14. Kipf, T. N., & Welling, M. (2016). Variational Graph Auto-Encoders. Technical Report. https:// arxiv.org/abs/1611.07308 15. Zhao, L., Song, Y., Zhang, C., Liu, Y., Wang, P., Lin, T., Deng, M., & Li, H. (2020). IEEE Transactions on Intelligent Transportation Systems, 21(9), 3848. https://doi.org/10.1109/TITS. 2019.2935152. http://arxiv.org/abs/1811.05320 16. Xu, D., Ruan, C., Korpeoglu, E., Kumar, S., & Achan, K. (2020). arXiv:2002.07962 [cs, stat]. http://arxiv.org/abs/2002.07962 17. D. Wagner, (2019). In M. Becke (Ed.), SKILL 2019 – Studierendenkonferenz Informatik (pp. 143–154). Gesellschaft für Informatik e.V. 18. Zhao, T., Zhang, X., & Wang, S. (2021). Proceedings of the 14th ACM International Conference on Web Search and Data Mining. https://doi.org/10.1145/3437963.3441720 19. Joaristi, M., Serra, E., & Spezzano, F. (2019). Social Network Analysis and Mining, 9(1), 1. Springer Vienna. https://doi.org/10.1007/s13278-019-0607-5 20. Winiecki, D., Kappelman, K., Hay, B., Joaristi, M., Serra, E., & Spezzano, F. (2020). Proceedings of the 2020 IEEE/ACM International Conference on Advances in Social Networks Analysis and Mining, ASONAM 2020 pp. 752–759. https://doi.org/10.1109/ASONAM49781. 2020.9381389 21. Weber, M., Domeniconi, G., Chen, J., Karl Weidele, D. I., Bellei, C., Robinson, T., & Leiserson, C. E. (2019). Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics. Technical Report. 22. Kontschieder, P., Fiterau, M., Criminisi, A., & Bulò, S. R. (2015). 2015 IEEE International Conference on Computer Vision (ICCV) (pp. 1467–1475). ISSN: 2380-7504. https://doi.org/ 10.1109/ICCV.2015.172. 23. Kagan, D., Elovichi, Y., & Fire, M. (2018). Social Network Analysis and Mining, 8(1), 27. https://doi.org/10.1007/s13278-018-0503-4. 24. Cooley, J. W., & Tukey, J. W. (1965). Mathematics of Computation, 19, 297. 25. Zhao, J., Lui, H., McLean, D., & Zeng, H. (2007). Applied Spectroscopy, 61, 1225. https://doi. org/10.1366/000370207782597003
 
