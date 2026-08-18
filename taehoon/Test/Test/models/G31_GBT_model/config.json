@@ -1,0 +1,18 @@
+{
+  "exp_name": "G31_lr0005_lv63",
+  "type": "gbt_tov_ensemble",
+  "dataset": "hi",
+  "ds_suffix": "v2",
+  "n_seeds": 3,
+  "gbt_neg": 400000,
+  "features": {
+    "time_freq": true,
+    "curr_z": true,
+    "curr_usd": true,
+    "pattern": true,
+    "cycle": true,
+    "passthru": true,
+    "pairagg": true
+  },
+  "train_on_valid": true
+}

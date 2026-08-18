@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G31 최종 모델 상세 설명서</title>
+<style>
+  :root { --accent:#1a56db; --bg:#f6f8fb; --card:#ffffff; --line:#e3e8f0; --txt:#1f2937; --dim:#6b7280; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif; background:var(--bg); color:var(--txt); line-height:1.65; }
+  .wrap { max-width:1040px; margin:0 auto; padding:32px 20px 80px; }
+  header.hero { background:linear-gradient(135deg,#1a56db,#0b3aa5); color:#fff; border-radius:14px; padding:34px 36px; margin-bottom:28px; }
+  header.hero h1 { margin:0 0 8px; font-size:1.7rem; }
+  header.hero p { margin:4px 0; opacity:.92; font-size:.95rem; }
+  .badges { margin-top:14px; }
+  .badge { display:inline-block; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:3px 13px; font-size:.8rem; margin-right:8px; }
+  h2 { font-size:1.28rem; margin:38px 0 12px; padding-left:12px; border-left:5px solid var(--accent); }
+  h3 { font-size:1.05rem; margin:22px 0 8px; color:var(--accent); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px 24px; margin:14px 0; }
+  table { width:100%; border-collapse:collapse; font-size:.88rem; margin:10px 0; background:#fff; }
+  th, td { border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top; }
+  th { background:#eef3fd; font-weight:600; }
+  tr:nth-child(even) td { background:#fafbfe; }
+  .metric-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:14px 0; }
+  .metric { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; text-align:center; }
+  .metric .v { font-size:1.5rem; font-weight:700; color:var(--accent); }
+  .metric .k { font-size:.8rem; color:var(--dim); margin-top:2px; }
+  code { background:#eef1f6; border-radius:5px; padding:1px 6px; font-size:.85em; }
+  .why { color:#0e7490; font-size:.86rem; }
+  .note { background:#fff8e6; border:1px solid #f0d78c; border-radius:10px; padding:12px 16px; font-size:.88rem; margin:12px 0; }
+  .ok { color:#15803d; font-weight:600; }
+  .bad { color:#b91c1c; font-weight:600; }
+  .flow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:12px 0; font-size:.85rem; }
+  .flow .step { background:#eef3fd; border:1px solid #c8d8f5; border-radius:8px; padding:8px 13px; }
+  .flow .arr { color:var(--dim); }
+  footer { margin-top:44px; font-size:.8rem; color:var(--dim); text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>G31 — 최종 채택 모델 상세 설명서</h1>
+  <p>IBM AML 벤치마크 HI-Small 기반 자금세탁 의심거래 탐지 모델 (거래 단위 이진분류)</p>
+  <p>작성일 2026-08-17 · 모델 산출물: <code style="background:rgba(255,255,255,.15);color:#fff">results/experiments/G31_lr0005_lv63/checkpoint_gbt_ens3.joblib</code></p>
+  <div class="badges">
+    <span class="badge">HistGradientBoosting 3-Seed 앙상블</span>
+    <span class="badge">입력 99차원</span>
+    <span class="badge">test AP 0.7570 / F1 0.7471</span>
+  </div>
+</header>
+
+<h2>0. 한눈에 보기</h2>
+<div class="metric-grid">
+  <div class="metric"><div class="v">0.7570</div><div class="k">test AP (PR-AUC)</div></div>
+  <div class="metric"><div class="v">0.7471</div><div class="k">test F1</div></div>
+  <div class="metric"><div class="v">0.907</div><div class="k">Precision</div></div>
+  <div class="metric"><div class="v">0.635</div><div class="k">Recall</div></div>
+  <div class="metric"><div class="v">0.9899</div><div class="k">ROC-AUC (참고)</div></div>
+  <div class="metric"><div class="v">0.3682</div><div class="k">운용 임계값</div></div>
+</div>
+<div class="card">
+  <b>왜 G31이 최종인가.</b> 이후 모든 대안 실험 — 데이터 규모 확대(G34 Medium 0.6756, G44 Large 0.6983),
+  도메인 전이(전 방향 네이티브 미달), HI+LI 합성, GNN(vanilla E1/E2, 논문 재현 G50 Multi-PNA+EU 0.3962) — 이
+  G31을 넘지 못하고 기각됐다. MVP 5분 마이크로배치 시뮬레이션(최대 배치 스코어링 0.9초)도 통과한 유일한 모델이다.
+</div>
+
+<h2>1. 데이터셋 — IBM AMLSim HI-Small (v2 분할)</h2>
+<div class="card">
+  <p><b>원천:</b> IBM AMLSim 합성 자금세탁 벤치마크, <b>HI-Small</b> (HI = 고은행권역/High-income bank 그룹 내 다계좌 패턴).
+     계좌를 노드, 거래를 엣지로 보는 directed multigraph 형태의 거래 로그.</p>
+  <table>
+    <tr><th>구분</th><th>거래 수</th><th>세탁(양성) 수</th><th>양성 비율</th><th>기간</th></tr>
+    <tr><td>train</td><td>3,046,861</td><td>2,297</td><td>0.075%</td><td>2022-09-01 ~ 09-06 13:35</td></tr>
+    <tr><td>valid</td><td>1,015,602</td><td>1,082</td><td>0.107%</td><td>2022-09-06 13:36 ~ 09-08 16:11</td></tr>
+    <tr><td>test</td><td>1,015,882</td><td>1,798</td><td>0.177%</td><td>2022-09-08 16:12 ~ 09-18 16:18</td></tr>
+    <tr><td><b>합계</b></td><td><b>5,078,345</b></td><td><b>5,177</b></td><td>—</td><td>약 18일</td></tr>
+  </table>
+  <p class="why">▶ 분할은 <b>타임스탬프 순 60/20/20, 셔플 없음</b>. 미래 정보가 과거로 새는 데이터 누수를 구조적으로 차단하기 위함이다.
+     금융 시계열에서 랜덤 분할은 성능을 부풀린다. v2 = 이 원칙으로 재분할(resplit_602020)한 버전.</p>
+  <p class="why">▶ 양성 비율 0.08~0.18%의 극심한 불균형이므로 ROC-AUC 대신 <b>PR-AUC(AP)</b>를 주 지표로 쓴다.</p>
+</div>
+
+<h2>2. 전처리 파이프라인 — 5가지 누수 방지 원칙</h2>
+<div class="flow">
+  <span class="step">원시 거래 로그</span><span class="arr">→</span>
+  <span class="step">시간순 60/20/20 분할</span><span class="arr">→</span>
+  <span class="step">피처 산출 (과거만)</span><span class="arr">→</span>
+  <span class="step">train 통계로 표준화</span><span class="arr">→</span>
+  <span class="step">99차원 벡터 캐시</span>
+</div>
+<div class="card">
+  <table>
+    <tr><th>단계</th><th>방식</th><th>이유</th></tr>
+    <tr><td>① 분할</td><td>타임스탬프 순 60/20/20</td><td>미래→과거 누수를 구조적으로 차단</td></tr>
+    <tr><td>② 피처 통계</td><td>표준화·원핫 범주·USD 환산율 전부 <b>train 분할만</b>으로 계산 후 고정</td><td>valid/test 분포를 미리 보는 누수 방지</td></tr>
+    <tr><td>③ 롤링 피처</td><td>타깃 시각 <b>이전</b> 거래만 집계 (1h·24h·1주 윈도우)</td><td>당해 거래 이후 정보 사용 금지</td></tr>
+    <tr><td>④ 쌍 집계</td><td>train 구간 고정 집계 → valid/test에 고정 매핑</td><td>롤링이 아니므로 드리프트·누수 없고 서빙 재현이 쉬움</td></tr>
+    <tr><td>⑤ 임계값</td><td>valid에서 F1 최적 <b>교차 임계값</b> 결정, test는 최종 1회만 평가</td><td>test로 운영점을 맞추는 선택 편향 방지 (in-sample 임계값 적용 시 F1 0.71로 붕괴 확인)</td></tr>
+  </table>
+  <p>검증: 전 구간 데이터 누수 감사(작업기록 §16)에서 누수 없음 확인. 과정에서 발견·수정된 결함 —
+     passthru 캐시 교차 오염(18.4% 엣지 정정), pairagg#4 퇴화 컬럼, float32 표준화 오차(→ float64 스트리밍 파이프라인으로 정확화).</p>
+</div>
+
+<h2>3. 입력 피처 99차원 — 엣지 81 + 노드 9×2</h2>
+<div class="card">
+  <p>모든 표준화는 train 통계, 모든 시계열 집계는 타깃 시각 이전만 사용. 상세는 <code>docs/feature_spec.md</code>.</p>
+
+  <h3>3-1. 엣지 피처 81개 (8개 블록)</h3>
+  <table>
+    <tr><th>블록</th><th>개수</th><th>내용</th><th>설계 의도</th></tr>
+    <tr><td>A. 기본 엣지</td><td>43</td><td>수치 6(log금액, 환전·자기이체 여부, 시각 sin/cos, 요일) + 원핫 37(결제형식 7종, 송금·수취 통화 15종씩)</td><td>개별 거래의 기본 속성. 범주는 train 기준 고정</td></tr>
+    <tr><td>B. 시간/빈도</td><td>10</td><td>동일 쌍 과거 횟수·간격·1h/24h 수, 송금자 출금 간격·빈도, 수취자 입금 간격·빈도</td><td>단기 반복·급증 패턴 포착</td></tr>
+    <tr><td>C. 통화 robust z</td><td>1</td><td>통화별 중앙값/IQR 기반 robust z-score (±8 클립)</td><td>통화마다 다른 금액 스케일을 이상치에 강건하게 정규화</td></tr>
+    <tr><td>D. USD 환산</td><td>1</td><td>train 환전 거래의 중앙값 비율 → BFS로 전 통화 USD 환산율, log1p(금액×환산율)</td><td>통화가 달라도 금액 크기 비교 가능</td></tr>
+    <tr><td>E. 패턴 근사</td><td>8</td><td>역방향 이력(왕복), 송금자 신규 상대 수(fan-out), 수취자 신규 상대 수(fan-in), 양방향 공존(2-hop 사이클)</td><td>scatter/gather/왕복 등 AMLSim 패턴 근사</td></tr>
+    <tr><td>F. 사이클 모티프</td><td>8</td><td>윈도우 2종(24h·1주) × 모티프 4종(3노드 순환, 공통 수취처/송금처/매개)</td><td>순환 자금 흐름 탐지 (GPU 산출)</td></tr>
+    <tr><td>G. 자금통과</td><td>4</td><td>직전 입금과의 시간 간격, 금액/직전입금액 비율, 24h 유출/유입 비율 등</td><td><b>레이어링 핵심 신호</b> — 받은 즉시 전달하는가</td></tr>
+    <tr><td>H. 쌍 집계</td><td>6</td><td>train 고정 집계: 쌍 거래 횟수·합계·최대·역방향 횟수·최종 시각·신규쌍 플래그</td><td>베이스라인 최대 중요도 피처(pair_prior_count) 계열. 서빙 재현 용이</td></tr>
+  </table>
+
+  <h3>3-2. 노드 피처 9개 × 2 (송금 계좌 + 수취 계좌)</h3>
+  <table>
+    <tr><th>피처</th><th>의미</th></tr>
+    <tr><td>입금/출금 차수 (log1p)</td><td>계좌의 연결 규모</td></tr>
+    <tr><td>총 송금액 / 총 수취액 (log1p)</td><td>계좌의 자금 규모</td></tr>
+    <tr><td>거래 수 (log1p)</td><td>활동량</td></tr>
+    <tr><td>자기이체 수 (log1p)</td><td>자금 순환 위장 신호</td></tr>
+    <tr><td>사용 통화 종류 수 / 결제형식 수</td><td>다채널 사용 — 레이어링 계좌 특성</td></tr>
+    <tr><td>순자금 흐름 (부호보존 log)</td><td>유입-유출 균형 — 통과 계좌는 ≈0</td></tr>
+  </table>
+  <p class="why">▶ 노드 피처는 노드×split 3행 구조 — 각 split 구간의 계좌 행동만으로 집계해 구간 간 누수를 막는다.
+     test용 노드 피처도 train+valid 기간까지만 집계.</p>
+  <p class="why">▶ 실험으로 확인: 전체 81개가 최적(부분집합 대비 우위, G37m vs G36m). 허브 계좌 관여 거래는 그래프 계열 피처(E·F·G)가 17만 이웃에 희석되는 한계가 있다(§6 참조).</p>
+</div>
+
+<h2>4. 학습 모델과 학습 방식 — gbt_tov_ensemble</h2>
+<div class="card">
+  <h3>4-1. 모델: HistGradientBoostingClassifier (scikit-learn, CPU)</h3>
+  <table>
+    <tr><th>하이퍼파라미터</th><th>값</th><th>선정 근거</th></tr>
+    <tr><td>learning_rate</td><td><b>0.005</b></td><td>학습률 하향이 최대 레버. LR 0.05에서는 조기종료로 31~71트리에서 과소수렴했고, 0.005로 1,000개+ 확보 시 F1 +0.10 (G29 실험)</td></tr>
+    <tr><td>max_leaf_nodes</td><td><b>63</b></td><td>저LR 환경에서 31리프 대비 소폭 우위 (G30 실험). G31 = G29+G30 우승 조합</td></tr>
+    <tr><td>max_iter (트리 상한)</td><td>8,000</td><td>상한은 넉넉히 두고 조기종료에 맡김 — 실제 수렴 1,058~1,499트리</td></tr>
+    <tr><td>early_stopping</td><td>validation_fraction 0.1, n_iter_no_change 30</td><td>과적합 자동 방지</td></tr>
+    <tr><td>GPU 미사용</td><td>CPU HGB</td><td>XGBoost CUDA는 SM75+ 전용인데 보유 GPU가 V100(SM70). CPU HGB가 프로토콜 재현성도 확보</td></tr>
+  </table>
+
+  <h3>4-2. 학습셋 구성: 양성 전수 + 음성 40만 다운샘플</h3>
+  <p>학습셋 = 세탁 전수(train 2,297건) + 정상 40만 건 무작위 다운샘플.
+  <span class="why">▶ 전수 학습(500만 건) 대비 12배 빠르면서 양성 신호는 보존. 다운샘플 우연은 3개 시드로 분산 흡수.</span></p>
+
+  <h3>4-3. 3시드 앙상블 + train+valid 재학습(TOV) + 교차 임계값</h3>
+  <div class="flow">
+    <span class="step">시드 42 / 1042 / 2042</span><span class="arr">→</span>
+    <span class="step">A모델: train-only 학습</span><span class="arr">→</span>
+    <span class="step">valid 예측으로 F1 최적 임계값(교차)</span><span class="arr">→</span>
+    <span class="step">B모델: train+valid 재학습</span><span class="arr">→</span>
+    <span class="step">test 확률 3개 평균</span>
+  </div>
+  <table>
+    <tr><th>장치</th><th>방식</th><th>이유</th></tr>
+    <tr><td>시드 앙상블</td><td>3개 시드의 B모델 test 확률 평균</td><td>단일 시드 분산·다운샘플 우연을 평균으로 상쇄. 시드별 F1 0.737~0.744로 분산 작음. (9모델 확장 G32는 동률이라 3시드 유지)</td></tr>
+    <tr><td>TOV 재학습</td><td>B모델은 train+valid 합쳐 재학습</td><td>valid 구간(시간상 최신) 정보까지 흡수해 test(미래) 적응력 향상 — F1 +0.10 규모의 핵심 장치 (G20 0.6505 달성 요인)</td></tr>
+    <tr><td>교차 임계값</td><td>임계값은 A모델의 valid 예측으로만 결정, B모델 test에 적용</td><td>B모델은 valid를 학습에 썼으므로 valid 인샘플 임계값은 부풀려진다(적용 시 0.7111로 붕괴 확인). 교차 방식이 정직한 추정치</td></tr>
+  </table>
+  <p>구현: <code>src/gnn/gbt_final.py</code> · 학습 시간 약 23분(CPU) · 저장: <code>checkpoint_gbt_ens3.joblib</code> (HGB 3개)</p>
+</div>
+
+<h2>5. TEST 결과 상세</h2>
+<div class="card">
+  <p><b>평가 데이터:</b> HI-Small v2 test 1,015,882건 (세탁 1,798건, 0.177%) — 학습과 같은 도메인, 시간상 미래 구간. test는 최종 1회만 평가.</p>
+  <table>
+    <tr><th>시드</th><th>B모델 트리 수</th><th>교차 임계값</th><th>test AP</th><th>test F1</th><th>Precision</th><th>Recall</th></tr>
+    <tr><td>42</td><td>1,249</td><td>0.3623</td><td>0.7509</td><td>0.7372</td><td>0.896</td><td>0.626</td></tr>
+    <tr><td>1042</td><td>1,499</td><td>0.4141</td><td>0.7482</td><td>0.7373</td><td>0.912</td><td>0.619</td></tr>
+    <tr><td>2042</td><td>1,058</td><td>0.3283</td><td>0.7518</td><td>0.7442</td><td>0.888</td><td>0.641</td></tr>
+    <tr><td><b>앙상블(평균)</b></td><td>—</td><td><b>0.3682</b></td><td><b>0.7570</b></td><td><b>0.7471</b></td><td><b>0.907</b></td><td><b>0.635</b></td></tr>
+  </table>
+  <p><b>혼동 행렬(앙상블):</b> TN 1,013,967 / FP 117 / FN 656 / TP 1,142 —
+     정상 100만 건 중 오탐 117건(0.01%), 세탁 1,798건 중 1,142건 탐지.</p>
+  <table>
+    <tr><th>신규쌍 분해 (pa_new 기준)</th><th>세탁 수</th><th>Recall</th><th>Precision</th></tr>
+    <tr><td>신규 거래쌍 (train에 없던 쌍)</td><td>1,548 (86%)</td><td>0.7035</td><td>0.9144</td></tr>
+    <tr><td>기존 거래쌍 (정상 이력 있는 쌍)</td><td>250 (14%)</td><td class="bad">0.2120</td><td>0.7794</td></tr>
+  </table>
+  <p class="why">▶ 진짜 취약 구간은 신규쌍이 아니라 <b>기존쌍</b> — 정상 거래 이력이 있는 계좌쌍 사이의 세탁은 정상으로 위장돼 잘 안 잡힌다.</p>
+</div>
+
+<h2>6. 장단점 · 알려진 한계</h2>
+<div class="card">
+  <p><span class="ok">장점</span></p>
+  <ul>
+    <li>전 실험 최고 성능 (대안 전부 기각: 규모 확대·전이·합성·GNN·논문 재현)</li>
+    <li>CPU만으로 서빙 가능, MVP 5분 마이크로배치 지연 검증 완료(최대 배치 0.9초)</li>
+    <li>시드 분산 작음(0.737~0.744), 교차 임계값으로 정직한 운영점 확보</li>
+  </ul>
+  <p><span class="bad">한계</span></p>
+  <ul>
+    <li><b>허브 사각:</b> 초대형 허브 계좌 경유 세탁 129건 전량 누락(해당 부분 AP 0.0017) — 그래프 피처가 17만 이웃에 희석. 허브 전용 가상 경유 피처 과제로 분리(<code>hub_subgraph_spec.md</code>)</li>
+    <li><b>선택 편향:</b> test를 50+ 실험에서 반복 참조 — 실성능은 F1 0.70~0.75로 보수 추정, 운영 데이터 재검증 필요</li>
+    <li><b>리콜 0.635:</b> 세탁의 36% 미탐. FN은 기존쌍·소액·비ACH에 집중 — 학습 데이터에 유사 신호가 희박해 현 피처셋의 구조적 한계 (oracle 상한 F1 0.7502)</li>
+    <li><b>LI 도메인 미지원:</b> HI→LI 전이 AP 0.0599로 실패 확정. LI 대응은 LI 네이티브 학습 필요</li>
+  </ul>
+</div>
+
+<h2>7. 산출물 · 관련 문서</h2>
+<div class="card">
+  <table>
+    <tr><th>항목</th><th>경로</th></tr>
+    <tr><td>최종 모델 체크포인트</td><td><code>results/experiments/G31_lr0005_lv63/checkpoint_gbt_ens3.joblib</code></td></tr>
+    <tr><td>성능 지표 / 설정</td><td><code>results/experiments/G31_lr0005_lv63/metrics_hi.json</code> · <code>config.json</code></td></tr>
+    <tr><td>학습 코드</td><td><code>src/gnn/gbt_final.py</code> (피처 파이프라인: <code>src/gnn/train_gnn_exp.py</code>)</td></tr>
+    <tr><td>피처 명세</td><td><code>docs/feature_spec.md</code></td></tr>
+    <tr><td>전처리 명세</td><td><code>docs/preprocessing_spec.md</code> · <code>docs/preprocessing_design.md</code></td></tr>
+    <tr><td>종합 보고서</td><td><code>docs/FINAL_REPORT.md/.html</code> · <code>docs/interim_report_20260816.md</code></td></tr>
+    <tr><td>전체 작업기록</td><td><code>docs/mvp_microbatch_worklog.md</code> · <code>docs/gnn_feature_experiments_worklog.md</code></td></tr>
+  </table>
+</div>
+
+<footer>G31 최종 모델 상세 설명서 — AML 의심거래 탐지 프로젝트 · 2026-08-17</footer>
+</div>
+</body>
+</html>
