@@ -5,18 +5,11 @@
 > **게재 정보:** Proceedings of IAAI-95, pp. 156-170  
 > **DOI:** 별도 표기 없음
 
-> **번역 안내:** 본문은 문단 전체의 문맥을 기준으로 한국어로 옮겼습니다. AML·규칙 엔진·전문가 시스템 관련 용어를 통일했으며, 수식·코드·참고문헌은 정확성을 위해 원문 표기를 유지했습니다. 각 페이지의 그림·표·원래 배치는 해당 번역 구간에 놓인 원문 페이지 이미지에서 확인할 수 있습니다.
+> **번역 안내:** 본문은 문단 전체의 문맥을 기준으로 한국어로 옮겼습니다. AML·규칙 엔진·전문가 시스템 관련 용어를 통일했으며, 수식·코드·참고문헌은 정확성을 위해 원문 표기를 유지했습니다. 원문의 그림과 표는 각각 잘라 해당 본문 위치에 바로 배치했습니다.
 
 ---
 
 <!-- 원문 1쪽 -->
-
-<details>
-<summary>원문 1쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 1쪽](assets/fincen_ais/page-01.jpg)
-
-</details>
 
 ## 초록
 
@@ -34,18 +27,13 @@ FAIS의 고유한 분석 능력은 주로 현재 주소: FC Business Systems, 52
 
 <!-- 원문 2쪽 -->
 
-<details>
-<summary>원문 2쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 2쪽](assets/fincen_ais/page-02.jpg)
-
-</details>
-
 ## 과업 설명
 
 범죄 행위의 가장 일반적인 동기는 이익입니다. 범죄 조직이 클수록 이익도 커집니다. 법 집행 기관은 이익 창출 능력을 방해함으로써 대규모 범죄 조직의 취약한 측면에 집중할 수 있습니다. 자금세탁은 자금의 출처, 소유권 또는 사용을 모호하게 할 목적으로 불법 활동으로 얻은 이익(보통 현금)을 합법적인 금융 시스템에 투입하는 복잡한 과정입니다. 이전에는 부수적인 범죄로 여겨졌던 자금세탁이 오늘날에는 그 자체로 주요 범죄가 되었습니다. 자금세탁을 통해 마약 거래자, 테러리스트, 무기 거래자 및 기타 사람들이 범죄 사업을 운영하고 확장할 수 있습니다. 이를 방치하면 금융기관의 건전성이 훼손될 수 있습니다. 자금세탁은 일반적으로 서로 다른 개인이 서로 다른 은행 및 기타 금융 기관에서 서로 다른 소유자의 여러 계좌로 다수의 거래를 수행하는 것을 의미합니다. 대규모 자금세탁 계획을 탐지하려면 잠재적으로 관련된 거래를 서로 연결하여 이러한 거래 패턴을 재구성한 다음 합법적인 거래 집합과 불법적인 거래 집합을 구별할 수 있는 능력이 필요합니다. 링크 분석이라고 불리는 정보 요소 간의 관계를 찾는 이 기술은 법 집행 정보에 사용되는 주요 분석 기술입니다(Andrews 및 Peterson 1990).
 
 자금세탁을 방지하기 위해 BSA는 $10,000를 초과하는 현금 거래에 대한 보고를 요구합니다. 이러한 기록 보관을 통해 조사관이 따라갈 수 있는 금융 추적이 유지되고 정부가 대규모 현금 거래를 체계적으로 조사할 수 있습니다. 이러한 거래는 금융 기관, 카지노, 국가에 입국하거나 출국하는 ​​개인에 의해 보고됩니다. 은행과 같은 전통적인 기관과 Casas de Cambio와 같은 비전통적인 기관을 포함하는 금융 기관에서의 거래는 국세청(IRS) 양식 4789, 통화 거래 보고서(CTR)에 부분적으로 복제되어 보고됩니다.
+
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 1](assets/fincen_ais/figures/figure-1.png)
 
 **그림 1: CTR 양식**
 
@@ -68,21 +56,6 @@ more widely available to law enforcement
 
 <!-- 원문 3쪽 -->
 
-<details>
-<summary>원문 3쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 3쪽](assets/fincen_ais/page-03.jpg)
-
-</details>
-
-> **주:** 달러(단위: 수십억, 단위: 수천)
-
-CTR Fled 1985-l 994
-
-> **주:** 달러(단위: 수십억)
-
-> **주:** 양식(수천 단위) WJO
-
 ```text
 6,000
 ```
@@ -95,14 +68,7 @@ CTR Fled 1985-l 994
 2,~
 ```
 
-```text
-1986 
-1986 1907 1988 1989 
-1990 
-1991 1992 
-1993 
-1994
-```
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 2](assets/fincen_ais/figures/figure-2.png)
 
 **그림 2: CTR 파일링**
 
@@ -114,22 +80,7 @@ FAIS의 주요 작업은 잠재적인 리드를 생성하기 위해 모든 BSA �
 
 <!-- 원문 4쪽 -->
 
-<details>
-<summary>원문 4쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 4쪽](assets/fincen_ais/page-04.jpg)
-
-</details>
-
-```text
-TRANSACTKIN
-```
-
-## FAIS 데이터베이스
-
-## 대화형 질의 인터페이스
-
-,^.... 나는 inwnacej에 참여한다
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 3](assets/fincen_ais/figures/figure-3.png)
 
 **그림 3: FAIS 아키텍처**
 
@@ -147,13 +98,6 @@ FAIS는 데이터 기반 모드와 사용자 지향 모드의 두 가지 모드�
 
 <!-- 원문 5쪽 -->
 
-<details>
-<summary>원문 5쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 5쪽](assets/fincen_ais/page-05.jpg)
-
-</details>
-
 사용자는 사용자 중심 분석이나 데이터 기반 분석을 선택하는 기본 메뉴를 통해 시스템에 들어갑니다. 사용자 주도 모드에서 사용자는 거래 집합에 대한 특정 기준을 설정하고 시스템은 지정된 기준을 충족하는 모든 거래를 검색합니다. 데이터 기반 모드에서 사용자는 데이터 기반 의심 점수를 기반으로 거래 세트를 검색합니다. 계속해서 이러한 주제 또는 계정에 대한 다른 모든 거래를 찾거나 지정된 주제 또는 계정에 연결된 다른 주제 및 계정을 찾아 연결 추적을 수행할 수 있습니다. 분석가가 연결된 주제, 계정 및 거래의 추적을 따르기 때문에 이 프로세스는 반복적으로 계속될 수 있습니다. 어느 단계에서나 사용자는 추가 분석을 위해 일련의 거래를 NetMap 링크 분석 도구에 로드할 수 있습니다. 사용자는 시스템 식별 주제를 결합하여 새 주제를 생성할 수도 있습니다. 이는 시스템이 사용자가 동일하다고 생각하는 두 주제를 통합하지 않았거나 두 주제가 단일 개체(예: 남편과 아내)로 비즈니스를 수행하는 경우 유용하며 이러한 사용자 생성 주제에 대한 의심을 재평가할 수 있습니다. 사용자는 의심스러운 평가에 직접 액세스하여 특정 주제나 계정에 대해 어떤 규칙이 적용되는지 결정하고, 본질적으로 해당 주제나 계정에 대한 의심 점수에 대한 설명을 얻을 수 있습니다. 마지막으로 사용자는 Nexpert 그래픽 모드를 활용하고 값이나 규칙을 변경하여 관심 있는 가상 상황을 분석할 수도 있습니다.
 
 ## 아키텍처
@@ -164,18 +108,15 @@ FAIS는 데이터 기반 모드와 사용자 지향 모드의 두 가지 모드�
 
 Sybase는 표준 FinCEN 데이터베이스 관리 시스템(DBMS)입니다. 평가 없음 FAIS 데이터 모델은 거래, 주제 및 계정이라는 세 가지 기본 개념을 기반으로 합니다. 여기에는 모든 BSA 양식 유형의 모든 필드가 포함되어 있으며 여러 양식 유형에 공통된 해당 필드를 통합합니다. 대략 120 필드가 있으며 그 중 약 절반이 특정 양식에 채워져 있습니다. 이는 다양한 모듈이 공유 데이터 저장소에서 비동기적으로 읽고 쓰는 블랙보드 시스템 아키텍처를 지원하도록 설계되었습니다. FAIS 데이터 모델은 또한 그림 4에 표시된 것처럼 데이터 액세스 및 제어의 세 가지 다른 수준에 해당하는 "보고된", "수락된" 및 "가정화된" 세 가지 수준의 믿음을 지원합니다.
 
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 4](assets/fincen_ais/figures/figure-4.png)
+
 **그림 4: 믿음의 수준**
 
 거래은 FAIS의 데이터 해석 없이 보고되는 대로 데이터베이스에 직접 입력됩니다. 그러나 데이터는 거래만을 기반으로 하는 모델에서 거래, 주제 및 계정을 기반으로 하는 FAIS 모델로 재구성됩니다. 주제와 계정은 유사한 식별 정보를 사용하여 거래를 "클러스터"로 그룹화하는 통합 프로세스의 결과로 생성된 추상화입니다(Goldberg 및 Senator 1995). 거래에서 클러스터로의 변환은 거래에 보고된 식별 정보를 기반으로 합니다. 여러 주체가 거래에 나타날 수 있으므로 거래은 여러 클러스터의 일부일 수 있습니다. 거래에서 주제 또는 계정으로의 변환은 그림 5에 개념적으로 설명되어 있습니다. 데이터 기반 처리는 거래에서 주제 및 계정으로의 이러한 보기 변환을 편집하여 사용자 요청 시 모든 데이터에 대해 이 보기를 사용할 수 있도록 하는 것으로 볼 수 있습니다. 이 두 가지 보기를 모두 사용할 수 있음
 
 <!-- 원문 6쪽 -->
 
-<details>
-<summary>원문 6쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 6쪽](assets/fincen_ais/page-06.jpg)
-
-</details>
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 5](assets/fincen_ais/figures/figure-5.png)
 
 **그림 5: 관점의 변환**
 
@@ -191,50 +132,7 @@ Swpiciousnm 평가. FAIS의 의심 평가 모듈에는 시스템의 주요 전�
 
 <!-- 원문 7쪽 -->
 
-<details>
-<summary>원문 7쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 7쪽](assets/fincen_ais/page-07.jpg)
-
-</details>
-
-```text
-Target Mgmt 
-Y’r I’ Display Filters 
-_~..._.._.______-...------ 
-Y> ?Jw_ 
-: 
-J ,.~..............--.......__~~-- _ __ _.j
-```
-
-> **주:** 사례: -dwnez __n____rr_
-
-> **주:** j&사람
-
-> **주:** 한계점:
-
-> **주:** &j 조직
-
-```text
-135 
-r-.
-```
-
-> **주:** 반환된 행: _._
-
-> **주:** Flllngs: 25 --
-
-```text
-Susp. Transactlons: 
-!? ____._ 
-___.... 
-I
-```
-
-```text
-~:~~~~ 
--
-```
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 6](assets/fincen_ais/figures/figure-6.png)
 
 **그림 6: 데이터 기반 모드**
 
@@ -242,73 +140,7 @@ FAIS의 의심성 평가의 초기 구현은 CAIS에서 개발된 규칙 기반�
 
 각 규칙 세트는 자금세탁과 관련된 금융 활동의 다양한 징후를 찾습니다. 또한 양식에서 자유 텍스트 직업 및 비즈니스 유형 필드를 해석하는 데에도 경험적 지식이 사용됩니다. 이러한 휴리스틱은 이 분야에서 관찰된 실제 값을 기반으로 개발되었습니다. 다른 규칙은 다음의 패턴을 검색합니다.
 
-```text
-Target Mgmt 
-Y? :’ Display Fitters 
-r ‘: ’ View 
-5.: 
-.;;: _.__.__. _.._ . . . . .../ 
-..;;.....................‘, 
-._.........,
-```
-
-> **주:** 까우: done>
-
-> **주:** :q CTR +I CMIR f4 카지노 -:i 8300
-
-```text
-..:::::.\ 
-.>:.:.:z 
-..:~:-) 
-Citizenship
-```
-
-```text
-..:.:.:. 
-..::..* 
-.:s 
-Occupations 
-,.:.:.:.j 
-:;:y::;s 
-~.i;’ 
-ldenttllcallon
-```
-
-```text
-,.:.:.:. 
-<& 
-Other
-```
-
-```text
-. . . . . . . . . .._......
-```
-
-```text
-View Query > 
-.--.-. _.._.__ 
-.__..’
-```
-
-```text
-. . . . . . . . . . . . . . . . 
-~iEc.QUe!v 
-:
-```
-
-```text
-. . . . . . . . . . . . . . . . . 
-Y 
-View Results ‘: 
-.-..-..._... 
-._._. ,’
-```
-
-```text
-QUIT 
-.: 
-. . ..__________...(
-```
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 7](assets/fincen_ais/figures/figure-7.png)
 
 **그림 7: 사용자 주도 모드**
 
@@ -319,13 +151,6 @@ CTR 신고를 피하기 위해 $10,000 보고 기준액 바로 아래에 있는 
 대화형 쿼리 인터페이스는 데이터베이스에서 잠재적인 리드를 검색하는 동안 서로 분리되어 있지만 관련된 데이터셋를 동시에 확인하려는 사용자의 요구에 부응하여 설계되었습니다. 화면 양식은 데이터베이스에 대한 쿼리를 공식화하는 데 사용됩니다. 데이터베이스에서 검색된 데이터 사용자는 기본 메뉴에서 데이터 기반 또는 사용자 주도 모드를 선택하여 시스템에 들어갑니다. 데이터 기반 모드는 그림 6에 표시된 창을 불러옵니다. 사용자는 과목을 검사할 점수 임계값을 선택합니다. 개인 또는 조직 주제 유형을 지정할 수 있습니다. 주제별 제출 건수나 거래 수와 같은 다른 기준을 사용하여 목록에서 주제를 제거할 수도 있습니다. 데이터베이스의 플래그를 사용하는 디스플레이의 필터를 통해 사용자는 이전에 검사했거나 알려진 적법한 주제를 무시할 수 있습니다. 대안으로, 그림 7에 표시된 것처럼 사용자 주도 모드를 사용하면 사용자가 양식 유형을 포함하여 거래의 정보 항목을 기반으로 쿼리를 구성할 수 있습니다. 실제 SQL 쿼리는 증분적으로 구성되는 것처럼 볼 수 있습니다. 쿼리는 사용자가 "보기" 메뉴에서 선택하는 주제 또는 계정별로 구성된 일련의 거래를 반환합니다.
 
 <!-- 원문 8쪽 -->
-
-<details>
-<summary>원문 8쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 8쪽](assets/fincen_ais/page-08.jpg)
-
-</details>
 
 어느 모드에서나 사용자는 여러 창에서 쿼리 결과를 검사하고 그림 8에 표시된 대로 관심 사항과 분석 결과에 따라 그 창 사이를 이동합니다. (그림 8에서는 실제 주체의 개인 정보를 보호하기 위해 모든 식별 정보가 일반 식별자로 대체되었습니다.) 이 예에서 데이터 기반 쿼리는 주체 목록을 반환하며, 여기에서 사용자는 높은 의심 점수(예: 150)를 받고 129를 갖는 기업인 주체 5338를 선택합니다. CTR의 총액은 1 12월 1993로 끝나는 연도에 3,600만 달러가 넘습니다. "협회" 메뉴에서 사용자는 원래 BUSINESS-5338 및 BUSINESS-5338와 함께 모든 거래에 나타나는 10 추가 비즈니스 및 사람을 포함하는 BUSINESS-5338와 관련된 모든 주제를 다른 창에서 봅니다. 다음으로 사용자는 이 목록에서 세 가지 주제를 선택합니다. PERSON - 트레일이 완료되거나 소진될 때까지 주제나 계정을 통해 이 링크 추적 프로세스를 무기한 계속합니다. 사용자는 연결된 창 집합에서 자신이 어디에 있는지 추적할 책임이 있지만 모든 활성 창의 계층적 표시를 포함하면 이 작업이 더 쉬워집니다.
 
@@ -339,206 +164,7 @@ Alta Analytics의 NetMap 링크 분석 패키지(Davidson 1993)가 선택되어 
 
 <!-- 원문 9쪽 -->
 
-<details>
-<summary>원문 9쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 9쪽](assets/fincen_ais/page-09.jpg)
-
-</details>
-
-```text
-5-l 
-Data Driven 
-. . . .._....................
-```
-
-```text
-larget Mgml 
-., ..__.._.._................. 
-_ ..__.......... 
-r); 
-Display Filters 
-c:):+ view 
-c)
-```
-
-```text
-..,
-```
-
-```text
-I 
-Case: 
-<none>
-```
-
-> **주:** 사람
-
-> **주:** 한계점:
-
-> **주:** 반환된 행: __.____.
-
-```text
-Flllngs: 
-25 
-. . . . . . . .
-```
-
-```text
-.-J
-```
-
-```text
-3 ’
-```
-
-```text
-I
-```
-
-```text
-\-
-```
-
-> **주:** .-_ J 주제 클러스터
-
-```text
-Info 
-c i :” Associations 
-‘c : f Tools r : 1. Display 
-$ ;.TU?!...$ 
--.=.........J 
-4.~.....................J 
-‘..-.A.........-* 
-~.Y....-........
-```
-
-```text
-Data Dlrected Subject Llst 
-Count: 
-33 
-. . . . . . . . . .._......._.._............................~...............~.~....~.................. 
-. . . . . .._.__........
-```
-
-```text
-1 Cluster Id CTR SC Date 
-UIIR SI @ati 
-Comb 5 Date 
-Total Cnt 
-Total Ant Last Name 
-Fl
-```
-
-> **주:** 주제 클러스터
-
-> **주:** 연관 주제 또는 클러스터: 5338 개수: 11
-
-> **주:** 클러스터 ID CTR SC 날짜 OUR SI 날짜 조합 '2 날짜 합계 Cnt 합계 Elmt 성
-
-```text
-5338 
-150 931201 
-129 
-36676 BUSINESS-5338
-```
-
-```text
-21975 
-72 931201 
-3 
-58 PERSON-21975
-```
-
-```text
-21974 
-72 931201 
-3 
-58 PERSON-21974
-```
-
-```text
-21977 
-90 931201 
-3 
-692 PERSON-21977 
-21973 
-90 931201 
-2 
-99 PERSON-21973 
-I
-```
-
-```text
-i
-```
-
-> **주:** IL 일랄
-
-```text
-32 
-13524 PERSON-6728
-```
-
-```text
-73 
-11110 BUSINESS-2651
-```
-
-```text
-40 
-10234 BUSINESS-S98
-```
-
-```text
-75 
-9949 BUSINESS-518
-```
-
-```text
-267 
-8334 BUSINESS-1
-```
-
-```text
-167 
-8057 BUSINESS-63
-```
-
-```text
-88 
-7382 BUSINESS-2381
-```
-
-> **주:** nsactions 목록
-
-```text
-Tmnsactlons 
-for Cluster(s): 
-21976,30185,30186 
-. . . . . . . . . . . . . . . . . . . . ..~....~............._..................~.~.~...........~..~................~...
-```
-
-```text
-93R9334773440
-```
-
-```text
-93R9335474957
-```
-
-```text
-;_ . . , . . . . . . . . . _ . . . 
-. . . . . . . . . . . . . . . . . . . 
-More 
-: 
-: 
-uorbe \ 
-’ . . . . . . . . . . . . . . . . . . . . 
-. .._....__ 
-_ __._...__ 
-_.*.
-```
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 8](assets/fincen_ais/figures/figure-8.png)
 
 **그림 8: 대화형 쿼리 인터페이스로 결과 조사**
 
@@ -552,12 +178,7 @@ FAIS는 288MB 메모리, 20 1.3GB 디스크 및 5개의 컨트롤러를 갖춘 S
 
 <!-- 원문 10쪽 -->
 
-<details>
-<summary>원문 10쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 10쪽](assets/fincen_ais/page-10.jpg)
-
-</details>
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 9](assets/fincen_ais/figures/figure-9.png)
 
 **그림 9: 왜건 휠 링크 분석 디스플레이**
 
@@ -575,12 +196,7 @@ FAIS 데이터베이스의 블랙보드 특성이 위에서 논의되었지만 (
 
 <!-- 원문 11쪽 -->
 
-<details>
-<summary>원문 11쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 11쪽](assets/fincen_ais/page-11.jpg)
-
-</details>
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 그림 10](assets/fincen_ais/figures/figure-10.png)
 
 **그림 10: 링크 및 에지(Anacapa) 디스플레이**
 
@@ -592,41 +208,11 @@ FAIS 데이터베이스의 블랙보드 특성이 위에서 논의되었지만 (
 
 이 시스템을 개발하는 동안 사례 기반 추론(CBR) 및 기타 기계 학습 기술이 탐구되었습니다. 5 이러한 노력은 주요 시스템 개발 노력을 보완하고 5로 추진되었습니다. 이 작업은 각각 Cognitive Systems, Inc. 및 Ascent Technology, Inc.에서 수행되었습니다.
 
-```text
-LEGEND
-```
-
-```text
-0 
-PERSON
-```
-
-```text
-0 
-BUSINESS
-```
-
-```text
-I3 
-ACCOUNT
-```
-
-```text
-LOCATION
-```
-
 성공할 경우 전체 시스템에 추가하려는 의도입니다. 현재 운영 체제에는 포함되어 있지 않지만 이러한 노력 중에 확인된 문제가 해결되면 향후 버전에서 사용할 수 있을 것으로 예상됩니다. 이러한 노력은 특정 애플리케이션에 대한 AI 기술의 유용성에 대한 통찰력을 제공하기 때문에 여기서 논의됩니다.
 
 상용 CBR 쉘을 활용하려는 시도에서 몇 가지 문제가 발생했습니다. CBR은 사례를 표현하기 위해 적절한 특성 집합을 정의하도록 요구했습니다. 지식 공학이 후보 세트를 식별했지만 이러한 특성은 FAIS 데이터베이스에 명시적으로 표시되지 않습니다. 모든 거래에서 데이터 기반 모드로 이러한 기능을 파생시키는 계산 능력은 아직 우리에게 제공되지 않습니다. 평가 목적으로 일부 거래에 대해 이러한 기능을 도출하는 것조차 어려웠습니다. 기능이 데이터 측면에서 명확하게 지정되지 않았기 때문입니다. 일부는 추가 도메인 지식이 필요합니다. CBR 쉘은 플랫 기능 벡터를 기반으로 합니다. 그들은 자금세탁 계획을 나타내는 데 필요한 더 복잡한 데이터 구조를 설명할 수 없었습니다. CBR의 기본 아이디어(즉, 가장 가까운 이웃 일치 및 귀납적 검색)는 작업의 일부에 유용해 보였지만 상업용 CBR 셸에서 "제거"할 수 없었고 상업용 CBR 셸을 통합하는 데 관련된 오버헤드가 상당했습니다. 당시 이 작업.
 
 <!-- 원문 12쪽 -->
-
-<details>
-<summary>원문 12쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 12쪽](assets/fincen_ais/page-12.jpg)
-
-</details>
 
 최근접 이웃 검색 및 의사 결정 트리의 귀납적 구축에 대한 기계 학습 아이디어를 적용하는 보다 직접적인 접근 방식도 탐구되었습니다. 레이블이 지정된 예제가 없다는 점이 이러한 기술을 사용하는 데 가장 큰 장애물이었습니다. 비지도 학습 알고리즘이 고려되었지만 작동할 적절한 기능을 도출하는 것이 어렵기 때문에 이러한 기술은 실행 불가능했습니다. 이러한 어려움은 열악한 데이터 품질과 추가적인 배경 지식의 필요성으로 인해 더욱 악화되었습니다. 이러한 기술은 데이터 실험을 수행하기 위한 지식 공학 보조 수단으로 잠재적으로 유용하다는 것이 발견되었습니다. 한 테스트에서는 귀납법을 사용하여 지식 엔지니어링 중에 식별된 40 기능을 기반으로 제한된 데이터셋로 의사결정 트리를 만들었습니다. 그런 다음 분석가는 의사결정 트리를 조사하여 다양한 경험적 기능이 의심의 지표로서 얼마나 유용한지 확인했습니다.
 
@@ -636,18 +222,13 @@ FAIS는 3월 1993부터 운영에 사용되었습니다. 1월 1995를 기준으�
 
 분석가들이 시스템에 대한 경험을 쌓으면서 생산성이 더욱 높아졌습니다. 표 1에는 생성된 보고서 수와 식별된 주제 수를 기준으로 연도별(4월 1995까지) 보고서가 요약되어 있습니다. 이 보고서는 잠재적 세탁 자금으로 $1 billion 이상에 해당합니다.
 
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 표 1](assets/fincen_ais/tables/table-1.png)
+
 **테이블 1: FAIS에서 발생하는 리드**
 
 피드백과 고객과의 연락은 중요한 역할을 합니다. 우리가 수집하는 정보는 지식 기반 평가에 매우 유용합니다. 이전에 법 집행 기관에 알려지지 않은 단서로 인해 공개된 조사는 동일한 유형의 행동을 보이는 다른 대상을 찾는 것이 가치가 있음을 시사합니다. 1993, FinCEN은 3월부터 내부 조사의 피드백 외에도 외부 기관으로부터 109 피드백 양식을 받았습니다. 피드백의 90% 이상이 새로운 케이스가 열렸거나 진행 중인 조사와 관련이 있음을 나타냅니다. 최근 피드백 양식을 통해 시스템과 후속 조사, 기소 및 유죄 판결에 의해 생성된 단서로 인해 첫 번째 종결된 사건이 ​​통보되었습니다. 피드백을 받지 못한 사례에 대한 적절한 후속 조치는 전파된 리드의 가치에 대한 보다 정확한 그림을 얻기 위해 향후 수행될 것입니다.
 
 <!-- 원문 13쪽 -->
-
-<details>
-<summary>원문 13쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 13쪽](assets/fincen_ais/page-13.jpg)
-
-</details>
 
 FAIS의 또 다른 이점은 분석가가 이전에 볼 수 없었던 BSA 데이터를 볼 수 있다는 것입니다. FAIS 데이터베이스에 대한 쿼리를 통해 BSA 정책 결정, 양식 재설계 및 필수 규정 준수 조치 식별에 유용한 통찰력을 얻었습니다. 분석가들은 조사 지원 기능에 매우 유용한 데이터 요소와 그렇지 않은 데이터를 판단할 수 있었습니다. 결과적으로 합법적인 거래와 연결된 기업을 식별하는 것은 BSA 규정 준수 프로그램을 지원하는 재무부에 매우 유용합니다. 이들 사업체는 금융기관의 면제 대상자 명단에 등재될 가능성이 매우 높은 것으로 판단된다.
 
@@ -659,7 +240,7 @@ FAIS의 또 다른 이점은 분석가가 이전에 볼 수 없었던 BSA 데이
 
 **표 2에는 주요 FAIS 개발 마일스톤이 나열되어 있습니다.**
 
-Jan 1991 Mav 1991 초기 설계 및 계획; BSA 데이터 전송 및 데이터 모델 설계 진행 중 데이터 모델 확정
+![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 표 2](assets/fincen_ais/tables/table-2.png)
 
 **표 2: 개발 마일스톤**
 
@@ -695,13 +276,6 @@ software packages.
 
 <!-- 원문 14쪽 -->
 
-<details>
-<summary>원문 14쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 14쪽](assets/fincen_ais/page-14.jpg)
-
-</details>
-
 ## 유지보수
 
 초기 관리 방향은 가능한 한 빨리 운영 능력을 제공하는 것이었습니다. 이 목표를 달성하기 위해 CAIS의 일부였던 의심성 평가 규칙 기반을 다시 구현하고 전체 시스템에 개발 자원을 집중하기로 결정했습니다. 대부분의 개발 노력은 대규모 FAIS 데이터베이스를 처리하기 위한 도구를 구축하는 데 집중되었습니다. 지식공학은 초기 단계에서는 사용자 중심 모드, 관련 거래의 연결, 데이터 불확실성 해석에 필요한 절차적 지식을 습득하는 데 중점을 두었습니다.
@@ -721,13 +295,6 @@ FAIS 유지 관리의 주요 측면에는 시스템에서 생성된 잠재적 �
 Anand, T. and Kahn, G. 1992 Making Sense of Gigabytes: A System for Knowledge-Based Market Analysis, in Innovative Applications of Artijicial Intelligence 4, Scott, AC. and Klahr, P. eds. Menlo Park, CA: AAAI Press.
 
 <!-- 원문 15쪽 -->
-
-<details>
-<summary>원문 15쪽 이미지 보기</summary>
-
-![The FinCEN Artificial Intelligence System: Identifying Potential Money Laundering from Reports of Large Cash Transactions - 원문 15쪽](assets/fincen_ais/page-15.jpg)
-
-</details>
 
 Andrews, I? P. and Peterson, M. B. eds. 1990. Criwlinal Intelligence Analysis. Loomis, CA: Palmer Enterprises.
 
