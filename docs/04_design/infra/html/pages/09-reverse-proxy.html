@@ -21,11 +21,10 @@
 <a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>Reverse Proxy 기본 개념</h1><h2 id="s-1">Proxy란?</h2>
 <p>Proxy는 통신하는 두 대상 사이에서 요청과 응답을 중계하는 구성 요소다. Forward Proxy는 사용자를 대신해 외부 서버에 접근하고, Reverse Proxy는 서버들을 대신해 사용자 요청을 받는다.</p>
 <h2 id="s-5">Reverse Proxy의 역할</h2>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     User[사용자] --&gt; Proxy[Reverse Proxy]
     Proxy --&gt; API[Backend API]
-    Proxy --&gt; Front[Frontend]</code></pre>
+    Proxy --&gt; Front[Frontend]</pre>
 <ul>
 <li>하나의 도메인과 포트에서 요청을 받는다.</li>
 <li>경로나 도메인에 따라 다른 내부 서비스로 전달한다.</li>
@@ -54,4 +53,4 @@ flowchart LR
 <h3 id="s-44">Traefik</h3>
 <p>Traefik은 컨테이너와 동적 인프라를 대상으로 설계된 Reverse Proxy다. Docker, Kubernetes 같은 Provider에서 실행 중인 서비스 정보를 읽고 라우팅 구성을 동적으로 갱신할 수 있다.</p>
 <h3 id="s-48">AWS Application Load Balancer</h3>
-<p>ALB는 HTTP와 HTTPS 요청을 여러 대상에 전달하는 AWS 관리형 Layer 7 로드밸런서다. Listener가 연결을 받고 Rule이 요청 조건을 판단해 Target Group의 EC2, IP 또는 다른 지원 대상으로 전달한다.</p></main></div><footer class="footer">원본 문서: <a href="../../09-reverse-proxy.md">09-reverse-proxy.md</a></footer></div></body></html>
+<p>ALB는 HTTP와 HTTPS 요청을 여러 대상에 전달하는 AWS 관리형 Layer 7 로드밸런서다. Listener가 연결을 받고 Rule이 요청 조건을 판단해 Target Group의 EC2, IP 또는 다른 지원 대상으로 전달한다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/09-reverse-proxy.md">09-reverse-proxy.md</a></footer></div></body></html>

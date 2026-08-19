@@ -20,12 +20,11 @@
 <a  href="20-dns.html">20. DNS</a>
 <a class="current" href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>인프라 코드 기본 개념</h1><h2 id="s-1">IaC란?</h2>
 <p>IaC(Infrastructure as Code)는 서버, 네트워크, 권한과 클라우드 자원을 관리 화면에서 수동으로 만드는 대신 코드 파일로 정의하고 생성·변경하는 방식이다.</p>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     Code[IaC 코드] --&gt; Review[코드 리뷰]
     Review --&gt; Plan[변경 계획 확인]
     Plan --&gt; Apply[인프라 적용]
-    Apply --&gt; Infra[실제 인프라]</code></pre>
+    Apply --&gt; Infra[실제 인프라]</pre>
 <h2 id="s-13">IaC의 목적</h2>
 <ul>
 <li>같은 구성을 반복해서 생성한다.</li>
@@ -59,4 +58,4 @@ flowchart LR
 <h3 id="s-49">AWS CDK</h3>
 <p>AWS CDK(Cloud Development Kit)는 TypeScript, Python, Java 같은 프로그래밍 언어의 Construct로 AWS 자원을 정의하는 프레임워크다. 작성한 코드는 CloudFormation Template으로 변환되고 CloudFormation Stack으로 배포된다.</p>
 <h3 id="s-53">수동 구성과 재현 문서</h3>
-<p>관리 콘솔이나 CLI에서 사람이 직접 자원을 만들고 모든 단계와 값을 문서로 기록하는 방식이다. 별도 IaC State는 없으며 실제 환경이 문서와 일치하는지는 변경 절차와 점검을 통해 관리한다.</p></main></div><footer class="footer">원본 문서: <a href="../../21-infrastructure-as-code.md">21-infrastructure-as-code.md</a></footer></div></body></html>
+<p>관리 콘솔이나 CLI에서 사람이 직접 자원을 만들고 모든 단계와 값을 문서로 기록하는 방식이다. 별도 IaC State는 없으며 실제 환경이 문서와 일치하는지는 변경 절차와 점검을 통해 관리한다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/21-infrastructure-as-code.md">21-infrastructure-as-code.md</a></footer></div></body></html>

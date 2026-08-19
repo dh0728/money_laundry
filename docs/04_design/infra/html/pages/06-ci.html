@@ -20,12 +20,11 @@
 <a  href="20-dns.html">20. DNS</a>
 <a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>CI 기본 개념</h1><h2 id="s-1">CI란?</h2>
 <p>CI(Continuous Integration, 지속적 통합)는 개발자가 코드를 자주 합치고 변경할 때마다 검사와 테스트를 자동으로 실행하는 개발 방식이다. 문제가 있는 변경을 빠르게 발견하고 코드가 항상 빌드 가능한 상태인지 확인하는 것이 목적이다.</p>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     Push[코드 변경] --&gt; Lint[정적 검사]
     Lint --&gt; Test[자동 테스트]
     Test --&gt; Build[빌드]
-    Build --&gt; Image[Docker 이미지 생성]</code></pre>
+    Build --&gt; Image[Docker 이미지 생성]</pre>
 <h2 id="s-13">기본 용어</h2>
 <ul>
 <li><strong>Workflow/Pipeline</strong>: 자동화할 작업과 실행 순서를 정의한 전체 흐름</li>
@@ -49,4 +48,4 @@ flowchart LR
 <h3 id="s-42">GitHub Actions Self-hosted Runner</h3>
 <p>팀이 소유하거나 임대한 서버에 설치하는 GitHub Actions 실행 프로그램이다. GitHub로부터 Job을 받아 로컬 환경에서 수행하므로 내부 시스템이나 특정 하드웨어에 접근할 수 있다. Runner 서버의 패치, 격리와 보안은 운영 주체가 담당한다.</p>
 <h3 id="s-46">Jenkins</h3>
-<p>Jenkins는 조직이 직접 설치해 사용하는 오픈소스 자동화 서버다. Controller가 Job과 실행 상태를 관리하고 같은 서버 또는 별도 Agent가 실제 명령을 실행한다. Pipeline은 Jenkinsfile 또는 관리 화면에서 정의할 수 있으며 플러그인으로 여러 도구와 연결한다.</p></main></div><footer class="footer">원본 문서: <a href="../../06-ci.md">06-ci.md</a></footer></div></body></html>
+<p>Jenkins는 조직이 직접 설치해 사용하는 오픈소스 자동화 서버다. Controller가 Job과 실행 상태를 관리하고 같은 서버 또는 별도 Agent가 실제 명령을 실행한다. Pipeline은 Jenkinsfile 또는 관리 화면에서 정의할 수 있으며 플러그인으로 여러 도구와 연결한다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/06-ci.md">06-ci.md</a></footer></div></body></html>

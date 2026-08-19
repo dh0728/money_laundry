@@ -34,14 +34,13 @@
 <li><strong>Pull/Merge Request</strong>: 변경을 기본 브랜치에 합치기 전에 검토를 요청하는 절차</li>
 <li><strong>Merge conflict</strong>: 같은 부분의 서로 다른 변경을 Git이 자동으로 합치지 못한 상태</li>
 </ul>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     Work[개발자 작업] --&gt; Branch[작업 브랜치]
     Branch --&gt; Review[변경 검토]
-    Review --&gt; Main[기본 브랜치 병합]</code></pre>
+    Review --&gt; Main[기본 브랜치 병합]</pre>
 <p>Git 자체는 특정 호스팅 서비스에 종속되지 않는다. 다만 이슈, 전용 CI 문법, 권한과 앱 연동 같은 호스팅 서비스 고유 기능은 저장소를 이전할 때 별도로 옮겨야 할 수 있다.</p>
 <h2 id="s-30">주요 Git 저장소 서비스</h2>
 <h3 id="s-32">GitHub</h3>
 <p>GitHub는 Git 원격 저장소 호스팅, Pull Request, Issues, 권한 관리와 자동화 기능을 제공하는 서비스다. GitHub.com을 관리형 SaaS로 사용하거나 별도의 기업용 구성을 사용할 수 있다.</p>
 <h3 id="s-36">GitLab</h3>
-<p>GitLab은 Git 저장소, Merge Request, Issues, 패키지 저장소와 CI/CD 기능을 하나의 플랫폼에서 제공한다. 관리형 SaaS와 조직이 직접 설치해 운영하는 Self-Managed 형태가 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../05-source-repository.md">05-source-repository.md</a></footer></div></body></html>
+<p>GitLab은 Git 저장소, Merge Request, Issues, 패키지 저장소와 CI/CD 기능을 하나의 플랫폼에서 제공한다. 관리형 SaaS와 조직이 직접 설치해 운영하는 Self-Managed 형태가 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/05-source-repository.md">05-source-repository.md</a></footer></div></body></html>

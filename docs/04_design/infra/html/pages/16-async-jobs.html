@@ -21,13 +21,12 @@
 <a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>비동기 작업 기본 개념</h1><h2 id="s-1">동기와 비동기 처리</h2>
 <p>동기 처리에서는 요청을 보낸 사용자가 작업이 끝날 때까지 응답을 기다린다. 비동기 처리에서는 서버가 작업 접수를 먼저 알리고 실제 처리는 별도 Worker가 나중에 수행한다.</p>
 <p>AI 추론, 대용량 파일 처리, 이메일 발송과 외부 API 호출처럼 오래 걸리거나 실패 후 재시도가 필요한 작업에 비동기 구조를 사용할 수 있다.</p>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     User[사용자] --&gt; API[Backend API]
     API --&gt; Queue[작업 큐]
     Queue --&gt; Worker[Worker]
     Worker --&gt; External[GPU·외부 시스템]
-    Worker --&gt; Result[(결과 저장)]</code></pre>
+    Worker --&gt; Result[(결과 저장)]</pre>
 <h2 id="s-16">기본 구성 요소</h2>
 <ul>
 <li><strong>Producer</strong>: 처리할 메시지나 작업을 생성해 큐에 넣는 애플리케이션</li>
@@ -54,4 +53,4 @@ flowchart LR
 <h3 id="s-51">Apache Kafka</h3>
 <p>Kafka는 이벤트를 Topic의 Partition에 순서대로 추가하고 정해진 보존 기간 동안 유지하는 분산 Event Streaming 플랫폼이다. Consumer는 Offset으로 읽은 위치를 관리하고 이전 Offset으로 돌아가 이벤트를 다시 처리할 수 있다. 여러 독립 Consumer가 같은 이벤트 흐름을 각자의 목적으로 읽을 수 있다.</p>
 <h3 id="s-55">작업 큐와 Event Stream의 차이</h3>
-<p>전통적인 작업 큐는 하나의 작업을 Consumer 중 하나가 처리하고 완료 후 제거하는 흐름에 초점을 둔다. Event Stream은 이벤트를 일정 기간 보존하면서 여러 Consumer가 각자의 읽기 위치로 반복 처리하는 흐름에 초점을 둔다. 실제 제품은 두 기능을 일부 함께 제공할 수 있지만 중심 사용 방식이 다르다.</p></main></div><footer class="footer">원본 문서: <a href="../../16-async-jobs.md">16-async-jobs.md</a></footer></div></body></html>
+<p>전통적인 작업 큐는 하나의 작업을 Consumer 중 하나가 처리하고 완료 후 제거하는 흐름에 초점을 둔다. Event Stream은 이벤트를 일정 기간 보존하면서 여러 Consumer가 각자의 읽기 위치로 반복 처리하는 흐름에 초점을 둔다. 실제 제품은 두 기능을 일부 함께 제공할 수 있지만 중심 사용 방식이 다르다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/16-async-jobs.md">16-async-jobs.md</a></footer></div></body></html>
