@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AML 의심거래 탐지 서비스 — 기획서 · 아키텍처 설계안</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #1f2937;
+      background: #fff;
+      font-family: Pretendard, "Noto Sans KR", "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+      word-break: keep-all;
+    }
+    main { width: min(1400px, calc(100% - 40px)); margin: 36px auto 70px; }
+    h1 { margin: 0; color: #172b4d; font-size: 32px; letter-spacing: -.03em; }
+    h2 { margin: 44px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #172b4d; color: #172b4d; font-size: 23px; }
+    h3 { margin: 28px 0 9px; color: #253858; font-size: 18px; }
+    h4 { margin: 20px 0 6px; color: #253858; font-size: 15px; }
+    p { margin: 8px 0; }
+    ul { margin: 6px 0 10px; padding-left: 22px; }
+    li { margin: 3px 0; }
+    .subtitle { color: #5e6c84; }
+    .meta { margin-top: 14px; color: #5e6c84; font-size: 13px; }
+    .small { color: #5e6c84; font-size: 12px; }
+    .table-wrap { overflow-x: auto; margin-bottom: 18px; }
+    table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 9px 11px; border: 1px solid #aeb8c6; vertical-align: top; text-align: left; }
+    thead th { color: #fff; background: #253858; text-align: center; vertical-align: middle; }
+    tbody th { color: #172b4d; background: #eef1f5; vertical-align: middle; white-space: nowrap; }
+    .note { padding: 10px 12px; border: 1px solid #aeb8c6; background: #f7f8fa; font-size: 13px; margin: 10px 0; }
+    .diagram-wrap { overflow-x: auto; margin: 14px 0 24px; border: 1px solid #dfe3ea; background: #fcfdfe; padding: 8px; }
+    .diagram-wrap svg { display: block; min-width: 1180px; width: 100%; height: auto; }
+    code { font-family: Consolas, monospace; font-size: 0.95em; }
+
+    .badge { display: inline-block; padding: 1px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; vertical-align: 1px; white-space: nowrap; }
+    .b-fix   { color: #145c43; background: #e8f2ec; border: 1px solid #54866f; }   /* 확정 */
+    .b-open  { color: #8a4b00; background: #fdf3e7; border: 1px solid #c07f3a; }   /* 팀 결정 필요 */
+    .b-block { color: #a50026; background: #fdecea; border: 1px solid #d73027; }   /* 최우선 확인 */
+    .b-dele  { color: #4a3d8f; background: #efedfa; border: 1px solid #7a6fc4; }   /* 모델팀 위임 */
+    .b-str   { color: #33475b; background: #eef1f5; border: 1px solid #8f9bad; }   /* 스트레치 */
+
+    .agentop { margin: 12px 0; padding: 12px 14px; border: 1px dashed #7a6fc4; background: #f8f7fd; font-size: 13px; }
+    .agentop::before { content: "에이전트 제안 (팀 확정 전 — 판단 재료)"; display: block; margin-bottom: 6px; color: #4a3d8f; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+
+    .workflow-wrap { overflow-x: auto; margin: 14px 0 24px; }
+    .workflow { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 28px; min-width: 900px; }
+    .workflow-step { position: relative; min-height: 84px; padding: 13px 11px; border: 1px solid #8f9bad; background: #f7f8fa; text-align: center; }
+    .workflow-step:not(:last-child)::after { content: "→"; position: absolute; top: 50%; right: -23px; color: #5e6c84; font-size: 22px; font-weight: 700; transform: translateY(-50%); }
+    .workflow-step strong { display: block; color: #172b4d; font-size: 14px; }
+    .workflow-step span { display: block; margin-top: 5px; color: #42526e; font-size: 12px; line-height: 1.4; }
+
+    @media (max-width: 700px) {
+      main { width: calc(100% - 20px); margin-top: 22px; }
+      h1 { font-size: 25px; } h2 { font-size: 20px; }
+    }
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      main { width: 100%; margin: 0; }
+      h2, h3 { break-after: avoid; }
+      table { font-size: 8.5pt; } th, td { padding: 6px; }
+      .table-wrap, .diagram-wrap { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>그래프 신경망 기반 자금세탁방지(AML) 의심거래 탐지<br>기획서 · 서비스 아키텍처 설계안</h1>
+  <p class="subtitle">실시간 거래 수집 · 5분 추론 마이크로배치 · 2단계 GNN 추론 · 웹 조사 대시보드</p>
+  <p class="meta">작성일: 2026-08-10 · 개정: 2026-08-12 · 상태: <strong>설계 확정안 — 구조 확정, 수치·운영값 미정</strong> · MVP 범위·기술 스택 팀 결정 반영
+    &nbsp;|&nbsp; 범례: <span class="badge b-fix">확정</span> <span class="badge b-open">팀 결정 필요</span> <span class="badge b-block">최우선 확인</span> <span class="badge b-dele">모델팀 위임</span> <span class="badge b-str">스트레치</span></p>
+
+  <!-- ================================================================ -->
+  <h2>1. 기획 배경</h2>
+  <p>금융기관은 이미 AML 거래 모니터링 시스템을 활용하여 사전에 정의된 시나리오, 고객 위험 정보, 거래 패턴과 분석 모델을 기반으로 의심 거래를 탐지하고 있다. 최근 상용 AML 솔루션은 규칙 기반 탐지뿐 아니라 행동 분석, 머신러닝, 거래 네트워크 분석, 경보 우선순위와 조사 업무 관리 기능까지 제공하는 방향으로 발전하고 있다.</p>
+  <p>그러나 자금세탁 탐지 모델의 효과는 기관이 보유한 데이터, 탐지 시나리오, 모델 구조와 운영 방식에 따라 달라진다. 특히 여러 계좌와 거래가 연결된 패턴을 분석하는 관계 기반 모델이 기존 거래 단위 분석을 어느 정도 보완할 수 있는지, 탐지 결과를 AML 담당자의 조사 과정에서 활용할 수 있는 형태로 제공할 수 있는지는 데이터와 비교 기준을 통한 검증이 필요하다.</p>
+  <p>본 프로젝트는 기존 AML 모니터링 시스템 전체를 대체하는 것을 목표로 하지 않는다. IBM AML 합성 벤치마크 데이터셋을 이용하여 계좌와 거래 관계를 그래프로 구성하고, GNN 기반 모델이 관계형 자금세탁 패턴을 탐지하는 데 활용될 수 있는지 검증한다. 또한 모델이 산출한 위험 점수와 관련 거래 정보를 AML 담당자가 확인할 수 있는 모니터링 흐름을 MVP로 구현한다.</p>
+
+  <!-- ================================================================ -->
+  <h2>2. 해결하려는 문제</h2>
+  <h3>2.1 개별 거래만으로 파악하기 어려운 관계형 자금세탁 패턴</h3>
+  <p>자금세탁 의심 행위는 여러 계좌와 거래가 연결된 형태로 나타날 수 있다. 하나의 거래만 조회해서는 자금의 순환, 다단계 이동, 다수 계좌로의 분산 등 전체적인 흐름을 파악하기 어렵다. 본 프로젝트는 거래와 계좌의 연결 관계를 그래프로 구성하고 GNN 모델로 분석하여, 개별 거래 조건만으로 발견하기 어려운 관계형 이상 패턴을 탐지하고자 한다.</p>
+  <h3>2.2 대량의 거래 중 우선 조사 대상을 선정하기 어려운 문제</h3>
+  <p>AML 담당자가 모든 거래를 동일한 수준으로 검토하는 것은 현실적으로 어렵다. 본 프로젝트는 거래별 위험 점수와 탐지 결과를 제공하여 담당자가 위험도가 높은 거래부터 확인할 수 있도록 하고, 한정된 조사 자원을 중요한 의심 거래에 우선적으로 투입할 수 있게 한다.</p>
+  <h3>2.3 의심 거래와 연관된 거래 흐름을 확인하기 어려운 문제</h3>
+  <p>의심 거래가 발견되더라도 해당 거래만 확인해서는 판단에 필요한 맥락이 부족할 수 있다. 본 프로젝트는 의심 거래의 기본 정보와 위험 점수뿐 아니라 관련 계좌 및 주변 거래 흐름을 함께 확인할 수 있는 기능을 제공하여 상세 조사를 지원한다.</p>
+  <h3>2.4 거래 수집부터 탐지 결과 조회까지의 처리 과정이 단절되는 문제</h3>
+  <p>거래 데이터 수집, 정제, 모델 분석과 결과 조회가 각각 분리되어 있으면 거래가 어느 단계까지 처리되었는지 확인하기 어렵고, 분석 실패나 지연이 발생했을 때 원인을 추적하기 어렵다. 본 프로젝트는 거래 접수, 데이터 저장, 모델 추론, 결과 저장과 사용자 조회를 하나의 처리 흐름으로 연결하고, 각 거래의 처리 상태와 모델 버전을 기록하여 분석 진행 상황과 실패 여부를 추적할 수 있도록 한다. <span class="small">(→ §5 상태 머신, §7 결정 D-1이 이 요구를 구조로 보장)</span></p>
+  <h3>2.5 모델 결과를 업무 판단에 활용하기 어려운 문제</h3>
+  <p>모델이 단순히 의심 여부만 반환하면 담당자는 해당 결과를 어떤 순서로 검토해야 하는지 판단하기 어렵고, 모델의 결과가 곧바로 자금세탁 확정을 의미하는 것으로 오해될 가능성도 있다. 본 프로젝트는 모델 결과를 최종 판정이 아닌 조사 지원 정보로 제공한다. 위험 점수, 탐지 여부, 관련 거래 정보와 사용된 모델 버전을 함께 제공하여 담당자가 추가 조사 필요성을 판단할 수 있도록 한다. <span class="small">(→ §7 알림 블록: 알림은 기계가 만들고, 사건은 사람이 만든다)</span></p>
+
+  <h3>핵심 문제 정의</h3>
+  <p class="note"><strong>AML 담당자는 대량의 금융 거래에서 여러 계좌와 거래가 연결된 의심 패턴을 신속하게 식별하고, 우선 조사할 거래와 관련 거래 흐름을 효율적으로 확인하기 어렵다.</strong></p>
+
+  <h3>핵심 목표</h3>
+  <ul>
+    <li>계좌 간 거래의 GNN 분석으로 관계형 이상 패턴 자동 검출 (1단계 이상거래 이진분류 → 2단계 패턴 다중분류)</li>
+    <li>거래 수집 → 저장 → 추론 → 결과 조회를 단절 없이 잇는 거래 데이터 파이프라인 구축 (유실 없는 수집, 처리 상태 추적)</li>
+    <li>거래별 위험 점수·탐지 결과·모델 버전을 담당자 조사 업무에 활용 가능한 형태로 제공</li>
+    <li>탐지 결과·계좌 관계 그래프를 시각화하고 알림-사건 조사 업무 흐름을 지원하는 웹 대시보드 구현</li>
+  </ul>
+
+  <!-- ================================================================ -->
+  <h2>3. MVP 범위</h2>
+  <h3>포함</h3>
+  <ul>
+    <li><strong>메인 대시보드 (모니터링팀)</strong>: 오늘 처리된 거래 수, 신규 알림 건수 등 핵심 지표 카드/차트. 로그인 후 첫 화면.
+      <ul>
+        <li>위험도별 계좌 분포 카드 <span class="badge b-fix">확정</span> <span class="small">— 의심계좌 집계 뷰(파생 계층)를 MVP에 포함. A-3·D-2에 부착점이 있어 비용은 집계 쿼리 1개 수준</span></li>
+        <li>실시간 거래 피드는 <strong>요약 + 이상 강조</strong> 방식 <span class="badge b-fix">확정</span> <span class="small">— 전체 롤링을 흘리지 않고 집계 지표와 이상 판정 거래만 표시. 폭증 시에도 화면 부하가 일정</span></li>
+      </ul>
+    </li>
+    <li><strong>심층분석 대시보드 (분석팀)</strong> <span class="badge b-fix">확정</span>: 사건 생성·소견·관계 그래프·알림 종결을 <strong>케이스 상세와 분리된 별도 화면</strong>으로 제공. 모니터링팀의 1차 확인 동선과 분석팀의 조사 동선을 화면 단위로 나눈다</li>
+    <li><strong>알림/케이스 큐</strong>: 시스템이 플래그한 이상거래가 쌓이는 목록. 위험도 정렬, 상태(신규/검토중/조사중/종결)·기간·위험도 필터. <span class="small">(§7 알림 생명주기 NEW→검토중→조사중→종결과 1:1 대응. 모니터링 큐 기본값은 신규·검토중 — 분석팀 이관분은 분석 큐로 이동)</span></li>
+    <li><strong>케이스 상세 화면</strong>: 알림 클릭 시 진입.
+      <ul>
+        <li>계좌/거래 기본 정보 <span class="badge b-fix">확정</span></li>
+        <li>관계 네트워크 그래프 시각화 <span class="badge b-fix">확정</span> <span class="small">— 허브 계좌는 펼치지 않고 요약 표시(허브 가드, 모든 허브 처리안에서 공통 필수)</span></li>
+        <li>판단 근거: <strong>AI 모델 점수 · 패턴 분류 · 모델 버전 · 관련 거래 흐름</strong> <span class="badge b-fix">확정</span> <span class="small">— 규칙 엔진은 두지 않는다. "왜 걸렸는가"는 2단계 패턴 다중분류와 관계 그래프가 답한다</span></li>
+        <li>처리 액션(종결/에스컬레이션) <span class="badge b-fix">확정</span></li>
+      </ul>
+    </li>
+    <li><strong>사건 조사 기록</strong>: 분석가 소견 작성, 계좌에 첨부 <span class="badge b-fix">확정</span></li>
+    <li><strong>역할 분리 화면 + 권한 관리</strong> (모니터링/분석/관리자) <span class="badge b-fix">확정</span></li>
+    <li><strong>운영 지표 패널 (관리자)</strong>: 큐 적체량, DLQ 건수, 판정 대기 최고 시간, 추론 에이전트 최근 접속 <span class="badge b-fix">확정</span></li>
+  </ul>
+  <h3>제외</h3>
+  <ul>
+    <li><strong>STR 기능 전체</strong> — 제출 현황 카드·제출 버튼·상태 관리 모두 MVP에서 제외 <span class="badge b-fix">확정</span> <span class="small">— 버튼만 두고 동작이 없는 공백을 만들지 않는다</span></li>
+    <li><strong>규칙 엔진·규칙 히트 내역</strong> — 판단 근거는 모델 점수·패턴 분류·관련 거래로 완결 <span class="badge b-fix">확정</span> <span class="small">— §1의 기획 취지가 "규칙 기반을 GNN 관계 분석이 보완할 수 있는지 검증"이므로 규칙 엔진 자체를 구현 대상으로 두지 않는다</span></li>
+    <li><strong>유사 과거 사례 참고</strong> — 유사도 기준·저장·조회 설계가 별도로 필요 <span class="badge b-fix">확정</span></li>
+    <li>STR 문서 초안 작성 (LLM) — MVP 이후 여유 시 <span class="badge b-str">스트레치</span> <span class="small">— MVP에 STR 상태를 담는 그릇이 없으므로 착수 시 화면·DB·상태 전이가 함께 생긴다</span></li>
+    <li>실시간 푸시(WebSocket) — <code>change_seq</code> polling으로 시작. 추후 같은 변경분 계약을 재사용하되 서버 push 발행기·연결 관리·재접속 보완이 필요한 스트레치 <span class="badge b-str">스트레치</span></li>
+    <li>Kafka 전환 — 공통 큐 어댑터로 호출부 변경 반경을 줄이되 의미 차이 검토·회귀시험·운영 설정이 필요한 전환 <span class="badge b-str">스트레치</span></li>
+  </ul>
+
+  <!-- ================================================================ -->
+  <h2>4. 성공 지표</h2>
+  <p>모델 품질·파이프라인 무결성·서비스 지연을 서로 다른 지표로 관리한다. 목표 수치는 모델 실험과 EC2·GPU 통신 실측 후 팀에서 확정한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:180px">영역</th><th>측정 정의</th><th style="width:180px">초안 성공 조건</th></tr></thead>
+    <tbody>
+      <tr><th>1단계 모델</th><td>거래 단위 precision·recall·PR-AUC를 함께 보고, 패턴 내부/외부와 허브 관여 여부를 분리 평가</td><td><span class="badge b-open">목표 수치 팀 결정</span></td></tr>
+      <tr><th>2단계 모델</th><td>양성 거래의 패턴 다중분류 macro-F1·클래스별 recall. 1단계 오류와 분리한 조건부 지표도 병기</td><td><span class="badge b-open">목표 수치 팀 결정</span></td></tr>
+      <tr><th>수신 회계</th><td><code>ACK ingest_id = 처리대기 + 신규적재 + 동일내용중복 + ID충돌 + DLQ</code>. 원천 거래번호 <code>transaction_id</code>는 전송 시도 수가 아님</td><td>미분류 유실 0건<br>ID 충돌·DLQ 0건</td></tr>
+      <tr><th>판정 지연</th><td>수신시각→화면 판정 갱신. 예상 구성은 배치 대기 0~5분 + 작업 픽업 ≤2분 + 추론 + 결과 제출·다음 화면 polling</td><td>p50·p95·p99 실측<br><span class="badge b-open">SLO 팀 결정</span></td></tr>
+      <tr><th>추론 무결성</th><td>타임아웃 이전 시도의 늦은 결과 수락, 동일 결과·알림 중복 생성, 모델·설정 버전 누락</td><td>모두 0건</td></tr>
+      <tr><th>장애 격리</th><td>GPU 클러스터 중단 중에도 거래 수집·판정 대기 표시·기존 조사 화면이 동작하고, 복구 후 적체분 전량 처리</td><td>데모 시나리오 통과</td></tr>
+    </tbody>
+  </table></div>
+  <div class="agentop">
+    <ul>
+      <li><strong>모델 지표</strong>: 정밀도 단독은 재현율 희생으로 쉽게 오르는 지표 — 정밀도·재현율 쌍(또는 PR-AUC)으로 관리 권장. EDA 확인 사실(세탁의 35~81%가 8개 명명 패턴 밖)에 따라 <strong>패턴 내부/외부 분리 평가</strong>를 별도 축으로 둘 것.</li>
+      <li><strong>서비스 지표</strong>: 평균 하나로 숨기지 말고 p50·p95·p99와 처리대기 최고 시간을 함께 표시. 폭증 시나리오는 처리량뿐 아니라 수신 회계 불변식과 복구 후 적체 소진까지 검증.</li>
+    </ul>
+  </div>
+
+  <!-- ================================================================ -->
+  <h2>5. 서비스 아키텍처 — 전체 구조 <span class="badge b-fix">확정</span></h2>
+  <p class="small">설계 순서: 구조(역할 블록) 먼저 확정 → 프레임워크 후행 매핑(§9). 배치 원칙 — 동기 백엔드는 외부에 즉시 응답을 약속하는 경계면에, 큐는 생산·소비 속도 차가 실재하는 곳에만, 비동기 워커는 아무도 기다리지 않는 자리에, DB는 진실의 원천으로 중앙에.</p>
+
+  <div class="diagram-wrap">
+  <svg viewBox="0 0 1520 840" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AML 서비스 아키텍처: 외부에서 AWS 관리형 SQS와 EC2 단일 호스트의 API·워커·PostgreSQL을 거쳐 쿠버스피어 GPU 클러스터가 pull 방식으로 통신하는 전체 구조">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#42526e"/>
+      </marker>
+      <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#d73027"/>
+      </marker>
+      <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#7a6fc4"/>
+      </marker>
+    </defs>
+
+    <!-- 구역 -->
+    <rect x="20" y="52" width="205" height="700" rx="8" fill="none" stroke="#8f9bad" stroke-dasharray="7 5"/>
+    <text x="122" y="80" text-anchor="middle" font-size="15" font-weight="800" fill="#5e6c84">외부</text>
+
+    <rect x="252" y="52" width="800" height="700" rx="8" fill="#fbfcfe" stroke="#4f78a3" stroke-dasharray="7 5"/>
+    <text x="652" y="80" text-anchor="middle" font-size="15" font-weight="800" fill="#2e5a86">AWS 계정·리전 — 관리형 SQS + EC2</text>
+
+    <rect x="270" y="232" width="680" height="500" rx="8" fill="none" stroke="#7a5fa8" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <text x="286" y="252" font-size="11" font-weight="800" fill="#4a3d8f">EC2 단일 호스트 · Docker Compose</text>
+
+    <rect x="1080" y="52" width="420" height="700" rx="8" fill="#fffdf9" stroke="#c07f3a" stroke-dasharray="7 5"/>
+    <text x="1290" y="80" text-anchor="middle" font-size="15" font-weight="800" fill="#8a4b00">쿠버스피어 GPU 클러스터 (모델팀 소유)</text>
+
+    <!-- 외부 박스 -->
+    <rect x="40" y="150" width="166" height="84" rx="6" fill="#f4f5f7" stroke="#8f9bad" stroke-width="1.5"/>
+    <text x="123" y="184" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">목업 거래 생성기</text>
+    <text x="123" y="203" text-anchor="middle" font-size="11" fill="#42526e">은행 API 시뮬레이터</text>
+    <text x="123" y="219" text-anchor="middle" font-size="11" fill="#42526e">유입 속도 조절·폭증 재현</text>
+
+    <rect x="40" y="600" width="166" height="84" rx="6" fill="#f4f5f7" stroke="#8f9bad" stroke-width="1.5"/>
+    <text x="123" y="634" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">사용자 브라우저</text>
+    <text x="123" y="653" text-anchor="middle" font-size="11" fill="#42526e">SPA 실행 (조사 대시보드)</text>
+    <text x="123" y="669" text-anchor="middle" font-size="11" fill="#42526e">모니터링·분석·관리자</text>
+
+    <!-- Nginx -->
+    <rect x="286" y="360" width="150" height="110" rx="6" fill="#eef6f1" stroke="#54866f" stroke-width="1.5"/>
+    <text x="361" y="390" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">리버스 프록시</text>
+    <text x="361" y="409" text-anchor="middle" font-size="11" fill="#42526e">TLS(443) 단일 진입점</text>
+    <text x="361" y="425" text-anchor="middle" font-size="11" fill="#42526e">/ → 정적 SPA 번들</text>
+    <text x="361" y="441" text-anchor="middle" font-size="11" fill="#42526e">/api/* → 동기 백엔드</text>
+
+    <!-- 동기 백엔드 -->
+    <rect x="486" y="330" width="190" height="170" rx="6" fill="#eef4fa" stroke="#4f78a3" stroke-width="1.5"/>
+    <text x="581" y="356" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">동기 백엔드 (API)</text>
+    <line x1="500" y1="366" x2="662" y2="366" stroke="#b9cbdd"/>
+    <text x="581" y="384" text-anchor="middle" font-size="11.5" fill="#2e5a86">수신 관문 — 검증·ingest_id·202</text>
+    <text x="581" y="402" text-anchor="middle" font-size="11" fill="#42526e">형식 실패 거절 · 의미 이상 격리</text>
+    <text x="581" y="422" text-anchor="middle" font-size="11" fill="#2e5a86">조회 API — 알림·사건·권한 조회</text>
+    <text x="581" y="444" text-anchor="middle" font-size="11.5" fill="#2e5a86">작업 API — GPU pull 전용 (토큰 인증)</text>
+    <text x="581" y="466" text-anchor="middle" font-size="11" fill="#42526e">임계값 등 키-값 설정 관리</text>
+    <text x="581" y="488" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2e5a86">단일 동기 프로세스 · 짧은 요청-응답</text>
+
+    <!-- SQS -->
+    <rect x="740" y="110" width="150" height="90" rx="6" fill="#fdeef4" stroke="#c2527e" stroke-width="1.5"/>
+    <text x="815" y="140" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">메시지 큐 (SQS)</text>
+    <text x="815" y="159" text-anchor="middle" font-size="11" fill="#42526e">AWS 관리형 · 최소 1회 전달</text>
+    <text x="815" y="175" text-anchor="middle" font-size="11" fill="#42526e">어댑터 계층 (→Kafka 교체점)</text>
+
+    <!-- DLQ -->
+    <rect x="946" y="110" width="104" height="90" rx="6" fill="#fdecea" stroke="#d73027" stroke-width="1.5"/>
+    <text x="998" y="145" text-anchor="middle" font-size="13" font-weight="700" fill="#a50026">DLQ</text>
+    <text x="998" y="164" text-anchor="middle" font-size="11" fill="#42526e">독성 메시지</text>
+    <text x="998" y="180" text-anchor="middle" font-size="11" fill="#42526e">격리 보관</text>
+
+    <!-- 수집 워커 -->
+    <rect x="740" y="262" width="150" height="96" rx="6" fill="#f3eefa" stroke="#7a5fa8" stroke-width="1.5"/>
+    <text x="815" y="290" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">수집 워커</text>
+    <text x="815" y="309" text-anchor="middle" font-size="11" fill="#42526e">소비 → 적재 → 큐 ACK</text>
+    <text x="815" y="325" text-anchor="middle" font-size="11" fill="#42526e">신규 계좌 등록</text>
+    <text x="815" y="345" text-anchor="middle" font-size="10.5" font-weight="700" fill="#4a3d8f">비동기 상주 루프 · HTTP 없음</text>
+
+    <!-- PostgreSQL -->
+    <rect x="732" y="408" width="166" height="120" rx="6" fill="#eef6f1" stroke="#54866f" stroke-width="2"/>
+    <text x="815" y="436" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">PostgreSQL</text>
+    <text x="815" y="455" text-anchor="middle" font-size="11" fill="#42526e">진실의 원천 · 상태 머신</text>
+    <text x="815" y="471" text-anchor="middle" font-size="11" fill="#42526e">거래 원장 / 판정 결과(1:N)</text>
+    <text x="815" y="487" text-anchor="middle" font-size="11" fill="#42526e">수신이력·계좌·알림·사건·감사·설정</text>
+    <text x="815" y="507" text-anchor="middle" font-size="10.5" fill="#145c43" font-weight="700">거래 업무키 + payload hash = 멱등·충돌 구분</text>
+
+    <!-- 배치 워커 -->
+    <rect x="740" y="592" width="150" height="112" rx="6" fill="#f3eefa" stroke="#7a5fa8" stroke-width="1.5"/>
+    <text x="815" y="618" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">추론 배치 워커</text>
+    <text x="815" y="637" text-anchor="middle" font-size="11" fill="#42526e">5분 주기 PENDING 선점</text>
+    <text x="815" y="653" text-anchor="middle" font-size="11" fill="#42526e">서브그래프·특징 구성</text>
+    <text x="815" y="669" text-anchor="middle" font-size="11" fill="#42526e">(fan-out 상한 = 페이로드 예산)</text>
+    <text x="815" y="689" text-anchor="middle" font-size="10.5" font-weight="700" fill="#4a3d8f">비동기 상주 루프 · 5분 타이머</text>
+
+    <!-- 쿠버스피어 -->
+    <rect x="1120" y="330" width="170" height="100" rx="6" fill="#fdf3e7" stroke="#c07f3a" stroke-width="1.5"/>
+    <text x="1205" y="360" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">추론 에이전트</text>
+    <text x="1205" y="379" text-anchor="middle" font-size="11" fill="#42526e">EC2 작업 API 폴링 (2분 간격)</text>
+    <text x="1205" y="395" text-anchor="middle" font-size="11" fill="#42526e">(pull — 아웃바운드만 사용)</text>
+    <text x="1205" y="411" text-anchor="middle" font-size="11" fill="#42526e">결과·모델 버전 회신</text>
+
+    <rect x="1120" y="490" width="170" height="96" rx="6" fill="#fdf3e7" stroke="#c07f3a" stroke-width="1.5"/>
+    <text x="1205" y="518" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">GNN 모델 (GPU)</text>
+    <text x="1205" y="537" text-anchor="middle" font-size="11" fill="#42526e">1단계: 이상거래 이진분류</text>
+    <text x="1205" y="553" text-anchor="middle" font-size="11" fill="#42526e">2단계: 패턴 다중분류</text>
+    <text x="1205" y="569" text-anchor="middle" font-size="11" fill="#42526e">(양성 거래만 2단계)</text>
+
+    <rect x="1318" y="490" width="164" height="96" rx="6" fill="#fff" stroke="#c07f3a" stroke-dasharray="4 3" stroke-width="1.5"/>
+    <text x="1400" y="522" text-anchor="middle" font-size="13" font-weight="700" fill="#8a4b00">학습 환경</text>
+    <text x="1400" y="541" text-anchor="middle" font-size="11" fill="#42526e">학습·서빙 동거</text>
+    <text x="1400" y="557" text-anchor="middle" font-size="11" fill="#42526e">모델 교체는</text>
+    <text x="1400" y="573" text-anchor="middle" font-size="11" fill="#42526e">클러스터 내부에서</text>
+
+    <!-- ===== 화살표 ===== -->
+    <!-- 1 생성기 -> nginx -->
+    <path d="M206,192 C260,192 300,300 336,356" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)"/>
+    <text x="262" y="166" font-size="11.5" font-weight="700" fill="#172b4d">① HTTPS 단건 거래</text>
+    <text x="262" y="182" font-size="10.5" fill="#5e6c84">10필드 + 원천 transaction_id</text>
+
+    <!-- 2 nginx -> api -->
+    <path d="M436,405 L486,405" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)"/>
+    <text x="461" y="394" text-anchor="middle" font-size="11.5" font-weight="700" fill="#172b4d">②</text>
+
+    <!-- 3 api -> sqs -->
+    <path d="M640,330 C670,240 700,190 738,166" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)"/>
+    <text x="650" y="248" text-anchor="end" font-size="11.5" font-weight="700" fill="#172b4d">③ payload + ingest_id 투입</text>
+
+    <!-- sqs -> dlq -->
+    <path d="M890,155 L944,155" fill="none" stroke="#d73027" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ahr)"/>
+    <text x="917" y="143" text-anchor="middle" font-size="10.5" font-weight="700" fill="#a50026">3회 실패</text>
+
+    <!-- 4 sqs -> ingest -->
+    <path d="M815,200 L815,260" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)"/>
+    <text x="826" y="234" font-size="11.5" font-weight="700" fill="#172b4d">④ 소비</text>
+
+    <!-- 5 ingest -> pg -->
+    <path d="M815,358 L815,406" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)"/>
+    <text x="826" y="378" font-size="11.5" font-weight="700" fill="#172b4d">⑤ 거래·ingest 결과 적재</text>
+    <text x="826" y="394" font-size="10.5" fill="#5e6c84">쓰기 성공 후 큐 ACK (불변식)</text>
+
+    <!-- 6 pg <-> batch -->
+    <path d="M815,528 L815,590" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)" marker-start="url(#ah)"/>
+    <text x="826" y="548" font-size="11.5" font-weight="700" fill="#172b4d">⑥ 5분 선점·이웃 조회</text>
+    <text x="826" y="564" font-size="10.5" fill="#5e6c84">PENDING→INFERENCING</text>
+    <text x="826" y="580" font-size="10.5" fill="#5e6c84">→ job·attempt·lease DB 저장</text>
+
+    <!-- 7 agent -> api (pull) -->
+    <path d="M1118,380 C960,368 800,398 676,415" fill="none" stroke="#7a6fc4" stroke-width="1.8" stroke-dasharray="7 4" marker-end="url(#ahb)" marker-start="url(#ahb)"/>
+    <text x="1005" y="410" text-anchor="middle" font-size="11.5" font-weight="700" fill="#4a3d8f">⑦ 작업 pull / 결과 제출</text>
+    <text x="1005" y="426" text-anchor="middle" font-size="10.5" fill="#4a3d8f">(토큰 인증 · 2분 · attempt 검증)</text>
+
+    <!-- 8 api -> pg 결과기록 -->
+    <path d="M676,470 C700,470 715,462 730,455" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)"/>
+    <text x="726" y="522" text-anchor="end" font-size="11.5" font-weight="700" fill="#172b4d">⑧ 결과 기록(COMPLETED)</text>
+    <text x="726" y="538" text-anchor="end" font-size="10.5" fill="#5e6c84">+ 알림 생성 (같은 트랜잭션, 원자적)</text>
+
+    <!-- agent -> gnn -->
+    <path d="M1205,430 L1205,488" fill="none" stroke="#42526e" stroke-width="1.6" marker-end="url(#ah)" marker-start="url(#ah)"/>
+    <!-- train -> gnn -->
+    <path d="M1318,538 L1292,538" fill="none" stroke="#c07f3a" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+
+    <!-- 9 browser -> nginx -->
+    <path d="M206,642 C270,640 310,520 348,472" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah)" marker-start="url(#ah)"/>
+    <text x="256" y="664" font-size="11.5" font-weight="700" fill="#172b4d">⑨ 최초 1회 SPA 번들</text>
+    <text x="256" y="681" font-size="11.5" font-weight="700" fill="#172b4d">이후 change_seq polling(2~5초)</text>
+    <text x="256" y="698" font-size="10.5" fill="#5e6c84">신규 거래 + 판정 갱신 한 번에</text>
+
+    <!-- 범례 (구역 바깥 하단) -->
+    <g font-size="11">
+      <rect x="286" y="786" width="14" height="14" fill="#eef4fa" stroke="#4f78a3"/><text x="306" y="797" fill="#42526e">동기 프로세스 (요청-응답)</text>
+      <rect x="486" y="786" width="14" height="14" fill="#f3eefa" stroke="#7a5fa8"/><text x="506" y="797" fill="#42526e">비동기 프로세스 (상주 루프)</text>
+      <rect x="696" y="786" width="14" height="14" fill="#fdeef4" stroke="#c2527e"/><text x="716" y="797" fill="#42526e">큐 (완충)</text>
+      <rect x="806" y="786" width="14" height="14" fill="#eef6f1" stroke="#54866f"/><text x="826" y="797" fill="#42526e">저장·프록시</text>
+      <rect x="926" y="786" width="14" height="14" fill="#fdf3e7" stroke="#c07f3a"/><text x="946" y="797" fill="#42526e">GPU 클러스터</text>
+      <line x1="1056" y1="793" x2="1096" y2="793" stroke="#7a6fc4" stroke-width="1.8" stroke-dasharray="7 4"/><text x="1102" y="797" fill="#42526e">pull 통신 (DB 비노출)</text>
+      <line x1="1256" y1="793" x2="1296" y2="793" stroke="#d73027" stroke-width="1.6" stroke-dasharray="5 4"/><text x="1302" y="797" fill="#42526e">실패 경로</text>
+    </g>
+  </svg>
+  </div>
+
+  <h3>5.1 두 개의 독립 경로 — DB에서만 만난다</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:170px">경로</th><th>주체·성격</th><th>흐름</th><th>장애 격리</th></tr></thead>
+    <tbody>
+      <tr><th>A. 거래 파이프라인</th><td>기계 · 비동기 · 사용자가 없어도 계속 돈다</td><td>① 수신 → ③ 큐 → ⑤ 적재 → ⑥ 배치 → ⑦ 추론 → ⑧ 결과·알림</td><td>추론이 죽어도 수집·표시는 계속 (판정 대기 상태로 정직하게 표시)</td></tr>
+      <tr><th>B. 조사 워크플로우</th><td>사람 · 동기 · 요청-응답</td><td>⑨ 조회(<code>change_seq</code> polling) / 사건 기록·알림 상태 변경·권한 관리 쓰기</td><td>대시보드 장애가 파이프라인에 영향 없음</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">거래 1건은 대시보드에 두 번 나타난다: 적재 직후 "판정 대기" 행으로 즉시, 추론 완료 후 같은 행이 "정상/이상(패턴)"으로 갱신. 행 업무키는 원천 거래번호 <code>transaction_id</code>, 변경분 커서는 별도 단조 증가 <code>change_seq</code>. 판정 지연은 배치 대기 0~5분 + 작업 픽업 ≤2분 + 추론·제출 + 다음 화면 polling의 합이며 UI가 명시적 상태로 보여준다.</p>
+
+  <h3>5.2 거래 상태 머신 — 시스템의 중심축</h3>
+  <div class="diagram-wrap">
+  <svg viewBox="0 0 1180 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="거래 상태 머신: PENDING에서 INFERENCING으로 배치 선점, 성공 시 COMPLETED, 실패 재시도 초과 시 FAILED, 타임아웃 시 PENDING으로 회수">
+    <defs>
+      <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#42526e"/>
+      </marker>
+    </defs>
+    <rect x="30" y="60" width="190" height="60" rx="6" fill="#fdf3e7" stroke="#c07f3a" stroke-width="1.5"/>
+    <text x="125" y="86" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">PENDING</text>
+    <text x="125" y="105" text-anchor="middle" font-size="11" fill="#42526e">적재 완료 · 판정 대기</text>
+
+    <rect x="360" y="60" width="210" height="60" rx="6" fill="#eef4fa" stroke="#4f78a3" stroke-width="1.5"/>
+    <text x="465" y="86" text-anchor="middle" font-size="13.5" font-weight="700" fill="#172b4d">INFERENCING</text>
+    <text x="465" y="105" text-anchor="middle" font-size="11" fill="#42526e">attempt lease 선점 · 판정 중</text>
+
+    <rect x="720" y="20" width="200" height="60" rx="6" fill="#e8f2ec" stroke="#54866f" stroke-width="1.5"/>
+    <text x="820" y="46" text-anchor="middle" font-size="13.5" font-weight="700" fill="#145c43">COMPLETED</text>
+    <text x="820" y="65" text-anchor="middle" font-size="11" fill="#42526e">결과·모델 버전 기록</text>
+
+    <rect x="720" y="110" width="200" height="60" rx="6" fill="#fdecea" stroke="#d73027" stroke-width="1.5"/>
+    <text x="820" y="136" text-anchor="middle" font-size="13.5" font-weight="700" fill="#a50026">FAILED</text>
+    <text x="820" y="155" text-anchor="middle" font-size="11" fill="#42526e">재시도 한도 초과 · 운영 지표 노출</text>
+
+    <path d="M220,90 L358,90" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah2)"/>
+    <text x="289" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#172b4d">5분 배치 선점</text>
+
+    <path d="M570,76 L718,52" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah2)"/>
+    <text x="640" y="52" text-anchor="middle" font-size="11" font-weight="700" fill="#172b4d">추론 성공</text>
+
+    <path d="M570,104 L718,134" fill="none" stroke="#42526e" stroke-width="1.8" marker-end="url(#ah2)"/>
+    <text x="640" y="138" text-anchor="middle" font-size="11" font-weight="700" fill="#172b4d">재시도 초과</text>
+
+    <path d="M465,120 C465,165 260,165 165,122" fill="none" stroke="#42526e" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah2)"/>
+    <text x="315" y="178" text-anchor="middle" font-size="11" fill="#5e6c84">lease 만료 회수 · 새 attempt 발급 (→ PENDING)</text>
+
+    <text x="1050" y="85" text-anchor="middle" font-size="11.5" fill="#42526e">상태 = UI 뱃지 그대로:</text>
+    <text x="1050" y="103" text-anchor="middle" font-size="11.5" fill="#42526e">판정 대기 / 판정 중 /</text>
+    <text x="1050" y="121" text-anchor="middle" font-size="11.5" fill="#42526e">정상·이상(패턴) / 실패</text>
+  </svg>
+  </div>
+  <p class="small">큐가 아니라 <strong>DB의 상태·lease가 진실의 원천</strong>이다. 결과 제출은 현재 INFERENCING 상태이고 lease가 유효하며 <code>attempt_id</code>가 일치할 때만 수락한다. 타임아웃 이전 시도의 늦은 결과는 거절된다. 알림 생명주기는 별도 축: NEW → 검토중 → 조사중(이관) → 종결(오탐 조기 종결 / 조사 결과 입력). 알림은 기계가 만들고, 사건은 사람이 만든다.</p>
+
+  <h3>5.3 백엔드 프로세스 편성 — 동기/비동기 구분 <span class="badge b-fix">확정</span></h3>
+  <p class="small">동기/비동기의 경계선은 "엔드포인트가 어디 있냐"가 아니라 <strong>"요청-응답 프로세스냐, 상주 루프 프로세스냐"</strong>다. 이 편성은 언어 선택과 무관하게 성립하며, 배포 단위(컨테이너)로는 3개 프로세스다 — 동기 API 서버 1개(Java), 비동기 워커 2개(Python).</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:200px">프로세스 (컨테이너)</th><th style="width:110px">성격</th><th>하는 일</th><th style="width:130px">구조도 번호</th></tr></thead>
+    <tbody>
+      <tr><th>API 서버 (Spring Boot)</th><td><strong>동기</strong> — 엔드포인트별 SLO 안에서 응답, 장기 작업 없음</td><td>수신 관문(<code>POST /transactions</code>: 검증·<code>ingest_id</code> 발급→큐 투입→202) · 조회 API(<code>change_seq</code> polling, 알림·사건·권한) · 작업 API(GPU 에이전트의 작업 수령/결과 제출)</td><td>①②③⑦⑧⑨</td></tr>
+      <tr><th>수집 워커 (Python)</th><td><strong>비동기</strong> — HTTP 없음, 상주 루프</td><td>큐 소비 → 거래·수신결과 DB 적재 → 큐 ACK, 신규 계좌 등록. 아무도 호출하지 않는다 — 스스로 돈다</td><td>④⑤</td></tr>
+      <tr><th>추론 배치 워커 (Python)</th><td><strong>비동기</strong> — HTTP 없음, 5분 타이머 루프</td><td>PENDING 선점 → 서브그래프·특징 구성 → 추론 작업 준비</td><td>⑥</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="small" style="font-size:13px; color:#42526e;">
+    <li><strong>수신 관문은 동기다</strong> — HTTP 호출 자체는 검증·<code>ingest_id</code> 발급→큐 투입 확인→202 응답으로 끝나고, 적재·판정은 응답과 무관하게 나중에 일어난다. 작업 API(⑦)도 호출은 동기지만 실어 나르는 파이프라인은 비동기다.</li>
+    <li><strong>워커를 API 서버와 분리하는 이유</strong>: 한 프로세스에 기술적으로 함께 둘 수는 있지만, 상주 루프의 부하·장애·재시작 주기를 요청-응답 서버와 격리하기 위해 배포 프로세스를 나눈다. 배치 작업이 API 응답을 막고 워커 장애가 대시보드까지 죽이는 결합을 피한다.</li>
+    <li><strong>API를 둘로 쪼개지 않는 이유</strong>: 수신·조회 모두 "짧게 응답하는 HTTP"로 성격이 같음. 트래픽이 커지면 라우팅 분리만으로 쪼갤 수 있는 부착점 확보. Spring MVC의 요청당 스레드 풀은 프로세스 내부 동시성이라는 별개 층위 — 이 구분과 무관.</li>
+    <li><strong>언어 경계가 생기는 자리</strong>: API 서버는 Java, 워커 2개는 Python이다. 두 언어는 <strong>DB 스키마와 큐 페이로드</strong>라는 두 계약에서만 만나며, 이 계약은 §8 불변식으로 관리한다. 실행 중 객체나 코드를 공유하지 않으므로 언어 경계가 런타임 결합으로 번지지 않는다.</li>
+    <li>쿠버스피어의 추론 에이전트도 비동기 폴링 루프지만 모델팀 소유의 별도 환경(§7 G-2).</li>
+  </ul>
+
+  <h3>5.4 식별자·동시성·변경분 계약 <span class="badge b-fix">확정</span></h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:170px">식별자·버전</th><th style="width:210px">의미</th><th>저장·검증 계약</th></tr></thead>
+    <tbody>
+      <tr><th><code>transaction_id</code></th><td>원천 거래내역의 거래번호</td><td>전송 요청 ID가 아니다. 현재 공급원 안에서 거래 업무키로 사용하며 다중 공급원 도입 시 <code>(source_id, transaction_id)</code>로 범위를 확장한다. DB 내부 PK는 별도로 둘 수 있다.</td></tr>
+      <tr><th><code>ingest_id</code></th><td>수신 관문이 전송 시도마다 발급하는 UUID</td><td>202 응답·큐 메시지·수신결과를 연결. 같은 거래 재전송도 서로 다른 값. ACK 회계는 이 ID의 상태 합계로 검증한다.</td></tr>
+      <tr><th><code>payload_hash</code></th><td>표준화한 원천 거래 내용의 해시</td><td>같은 거래 업무키의 동일내용 재전송과 다른 내용 충돌을 구분. 충돌은 <code>ID_CONFLICT</code>로 격리하며 기존 거래를 덮어쓰지 않는다.</td></tr>
+      <tr><th><code>job_id</code></th><td>추론 작업 식별자</td><td>결과 멱등 키 <code>(job_id, model_version)</code>의 구성요소.</td></tr>
+      <tr><th><code>attempt_id</code>·lease</th><td>작업을 선점할 때마다 새로 발급</td><td>결과 제출 시 상태·시도·lease를 조건부 갱신. 타임아웃 이전 시도의 늦은 결과는 거절한다.</td></tr>
+      <tr><th><code>model_version</code>·<code>config_version</code></th><td>모델과 알림 임계값 설정 버전</td><td>판정 결과에 함께 각인해 재판정·임계값 변경 뒤에도 당시 판단 조건을 재현한다.</td></tr>
+      <tr><th><code>change_seq</code></th><td>거래 피드 변경 때 DB가 발급하는 단조 증가값</td><td><code>change_seq &gt; cursor</code>로 신규·판정 갱신을 조회. 페이지 조회 시작 시 high-watermark를 고정해 동률·페이지 경계 누락을 막는다.</td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ================================================================ -->
+  <h2>6. 수집 경계 설계 — 중복·검증 실패 처리 <span class="badge b-fix">확정</span></h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:190px">항목</th><th>확정 설계</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><th>수신 형태</th><td>HTTPS 단건, 거래 10필드 + 원천 거래번호 <code>transaction_id</code>. 관문이 전송 시도별 <code>ingest_id</code>를 발급하고 큐 투입 확인 후 202와 함께 반환</td><td><code>transaction_id</code>는 거래내역의 번호값이고 전송 횟수를 세는 ID가 아님. 수신 관문은 기존 백엔드의 엔드포인트 1개 — 새 배포 단위 0개</td></tr>
+      <tr><th>중복·ID 충돌</th><td><strong>출구(DB)에서 멱등 흡수</strong>: 같은 거래 업무키·같은 <code>payload_hash</code>는 기존 원장에 연결하고 수신결과만 추가. 같은 업무키·다른 내용은 <code>ID_CONFLICT</code>로 격리하며 덮어쓰기·조용한 무시 금지</td><td>큐가 최소 1회 전달이라 중복은 정상. DB 제약과 같은 트랜잭션의 수신결과 기록이 경합에서도 한 번만 원장을 만든다</td></tr>
+      <tr><th>수신 회계</th><td><code>ACK ingest_id = 처리대기 + 신규적재 + 동일내용중복 + ID충돌 + DLQ</code></td><td>202 응답 횟수와 거래 원장 행 수를 직접 비교하면 정상 재전송 때문에 반드시 어긋남. 미분류 차이를 유실로 판단</td></tr>
+      <tr><th>형식 실패</th><td>수신 관문에서 즉시 거절(400) + 거절 로그. 파이프라인 미진입</td><td>보낸 쪽이 실패를 즉시 알게 됨. 독성 메시지의 큐 유입 원천 차단</td></tr>
+      <tr><th>의미 이상</th><td>수용 후 격리 플래그 저장 (미지 통화, 음수 금액 등)</td><td>모니터링 도메인에서 "이상한 거래일수록 버리면 안 되는 데이터"</td></tr>
+      <tr><th>관문의 존재 이유</th><td>검증 즉시 통보 + <code>ingest_id</code>가 있는 수신 확인(202) 책임 경계 + 큐 비노출</td><td>중복 제거는 관문의 이유가 아님(위 참조). 은행은 HTTPS 엔드포인트 하나만 알면 됨</td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ================================================================ -->
+  <h2>7. 블록별 확정 설계 결정 <span class="badge b-fix">확정</span></h2>
+
+  <h3>큐 블록 (Q-1~5)</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:60px">ID</th><th style="width:190px">결정</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><th>Q-1</th><th>전달 보장</th><td>최소 1회 전달. <strong>불변식: 거래·수신결과 DB 쓰기 성공 후에만 큐 ACK</strong>. 중복은 거래 업무키와 <code>payload_hash</code>로 흡수·분류하고, 모든 202 수신은 <code>ingest_id</code>로 추적</td></tr>
+      <tr><th>Q-2</th><th>보존 모델</th><td>소비-삭제형. 재처리·재생은 큐가 아니라 DB(진실의 원천)에서. 요구는 "미소비 메시지의 재시작 내구성"뿐 — 장기 로그 보존은 요구에서 제외</td></tr>
+      <tr><th>Q-3</th><th>실패 처리</th><td>일시 장애(DB 순단)는 재시도·적체(정상 동작) / 독성 메시지는 3회 실패 시 DLQ 격리 + 건수 운영 지표화. 수동 재투입은 반자동 절차</td></tr>
+      <tr><th>Q-4</th><th>순서 보장</th><td><strong>요구하지 않음</strong> — 타임스탬프가 데이터에 실려 있고 5분 배치가 어차피 모아서 처리. 병렬 소비 확장·프레임워크 선택 자유 확보</td></tr>
+      <tr><th>Q-5</th><th>페이로드</th><td>자기완결 전체 페이로드(10필드+원천 <code>transaction_id</code>+<code>ingest_id</code>+<code>payload_hash</code>+수신시각, 건당 1KB 미만). 현재는 단일 공급원이며, 다중 공급원 도입 시 <code>source_id</code>를 추가한다. 워커가 큐만 보고 적재·수신결과 기록을 완결</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>DB 블록 (D-1~4)</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:60px">ID</th><th style="width:190px">결정</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><th>D-1</th><th>원장·결과 분리</th><td>거래 원장의 업무 필드는 적재 후 불변(처리 상태·<code>change_seq</code>만 가변), 판정 결과는 별도 테이블 <strong>거래 1 : 결과 N</strong>. 결과에 모델·설정 버전을 각인해 재판정과 임계값 변경 뒤에도 당시 조건을 보존</td></tr>
+      <tr><th>D-2</th><th>계좌 등록부</th><td>수집 워커가 처음 보는 계좌를 등록. 그래프 노드·소견 첨부·의심계좌 집계 뷰가 모두 여기에 붙는다. 허브 플래그 컬럼의 부착점</td></tr>
+      <tr><th>D-3</th><th>테이블 골격</th><td>transactions / ingest_attempts / inference_jobs·inference_results / accounts / alerts·alert_transitions / cases·case_alerts·findings / users·roles / config·config_versions / audit_events. 형식 거절은 rejects에 별도 기록</td></tr>
+      <tr><th>D-4</th><th>증가 대응</th><td>인덱스: 시간·상태·양쪽 계좌·<code>change_seq</code>·업무키. 거래 범위 조회는 시간 조건, 변경분 피드는 <code>change_seq</code> 조건을 갖는다 — 파티셔닝·외부 보관의 부착점</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>알림 블록 (A-1~4)</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:60px">ID</th><th style="width:190px">결정</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><th>A-1</th><th>생성 주체</th><td>결과 기록과 <strong>같은 DB 트랜잭션에서 원자적 생성</strong>. 전용 알림 워커 없음 — "결과는 있는데 알림 누락" 틈이 구조적으로 없음</td></tr>
+      <tr><th>A-2</th><th>발생 기준</th><td>임계값은 모델이 아닌 서비스 설정 — <strong>버전 있는 키-값 설정</strong>(관리자 조절 가능, 패턴별 차등 키의 부착점). 결과·알림에 적용 <code>config_version</code> 기록. <strong>시작 기준은 "1단계 양성 = 알림 1건"</strong> <span class="badge b-fix">확정</span> — 점수 임계값 방식으로의 전환은 설정 키 교체만으로 가능하다</td></tr>
+      <tr><th>A-3</th><th>홍수 억제</th><td>쓰기 억제 없음 — 알림은 거래 단위 원천 그대로, 묶어 보기는 조회 계층·의심계좌 파생 뷰가 담당. (의심계좌 뷰 = 결과 테이블 위 읽기 전용 집계. MVP 포함 확정 — §3 위험도별 계좌 분포 카드의 데이터 원천)</td></tr>
+      <tr><th>A-4</th><th>생명주기</th><td><strong>NEW → 검토중 → 조사중(이관) → 종결</strong>. 검토중→종결(오탐) 분기도 허용. 모든 전환은 역할 검사·버전 조건부 갱신·append-only 이력(이전/새 상태·행위자·시각·사유·요청 ID)을 같은 트랜잭션에 기록. <strong>사건 1 : 알림 N 고정</strong> — 알림 1건은 사건 1개에만 연결하며, <strong>연결된 알림이 모두 종결되어야 사건을 종결</strong>할 수 있다 <span class="badge b-fix">확정</span>. 두 조건 모두 DB 제약과 종결 시 조건부 갱신으로 강제한다</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>원격 추론 블록 (G-1~3)</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:60px">ID</th><th style="width:190px">결정</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><th>G-1</th><th>통신 방향</th><td><strong>쿠버스피어 → EC2 pull</strong> (아웃바운드만 사용). DB는 외부 비노출 — 에이전트가 보는 건 인증 토큰 걸린 작업 수령/결과 제출 API뿐. 작업에는 <code>job_id</code>·<code>attempt_id</code>·lease 포함. <strong>폴링 주기 2분</strong>은 배치 주기(5분)와 독립인 전송 간격</td></tr>
+      <tr><th>G-2</th><th>경계 분담</th><td>서브그래프·특징 구성은 EC2 배치 워커(백엔드 소관), 추론은 클러스터. 학습·서빙 동거로 모델 배포는 클러스터 내부에서 완결 — EC2와는 데이터만 오간다. 결과에 모델 버전 각인</td></tr>
+      <tr><th>G-3</th><th>장애 내성</th><td>클러스터 다운 시 작업이 EC2에 적체될 뿐 수집·대시보드 정상("판정 대기" 정직 표시). lease 만료 시 PENDING 회수·새 <code>attempt_id</code> 발급. 이전 시도의 늦은 결과는 상태·시도·lease 불일치로 거절</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>인프라 블록 (I-1~5)</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:60px">ID</th><th style="width:190px">결정</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><th>I-1</th><th>직접 운영</th><td>EC2 한 대에는 프록시/API/워커 2/DB 컨테이너만 두고, SQS·DLQ는 EC2 밖의 AWS 관리형 서비스. DB 볼륨 영속화와 외부 백업 필수. 백업 보유기간·RPO/RTO·복원 연습은 <span class="badge b-open">팀 결정 필요</span></td></tr>
+      <tr><th>I-2</th><th>자동 배포</th><td>dev→master PR 검수 후 이미지 빌드·푸시·EC2 반영. 배포 순서에 DB 마이그레이션 사전검사·컨테이너 health check·실패 시 이전 이미지 rollback을 포함. <strong>DB 스키마와 마이그레이션은 API 서버(Java)가 단독 소유하며 Flyway로 관리</strong>한다 — Python 워커는 확정된 테이블을 읽고 쓸 뿐 스키마를 변경하지 않으므로, 배포 순서는 "마이그레이션 → API 서버 → 워커"가 된다. 발표 직전만 수동 전환</td></tr>
+      <tr><th>I-3</th><th>인증·시크릿</th><td>SQS 권한은 장기 액세스키 대신 EC2 IAM Role 사용. DB 비밀번호·에이전트 토큰 등 앱 시크릿은 런타임 환경변수로 주입하되 저장소 커밋 금지, 토큰은 최소 권한·회전 가능하게 관리. 사용자 인증 방식과 수신 API 인증은 <span class="badge b-open">팀 결정 필요</span>. TLS는 자동갱신 인증서</td></tr>
+      <tr><th>I-4</th><th>관측·감사</th><td>관리자 화면: 큐 적체·DLQ·ID 충돌·수신 회계 차이·판정 대기 최고 시간·에이전트 최근 접속. 구조화 로그는 <code>ingest_id</code>→<code>transaction_id</code>→<code>job_id</code>→알림·사건의 상관관계 ID를 포함. 역할·설정·상태 변경은 append-only 감사 이벤트로 분리</td></tr>
+      <tr><th>I-5</th><th>개발 환경</th><td>공유 EC2를 쓰되 개발·데모의 Compose project, DB/schema, 큐 이름 prefix를 분리해 충돌과 데모 데이터 오염을 막는다. 데모 전 초기화·시드·복원 절차 1개 필요</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>CI/CD 흐름</h3>
+  <div class="workflow-wrap"><div class="workflow">
+    <div class="workflow-step"><strong>dev 브랜치</strong><span>기능 개발 · PR 생성</span></div>
+    <div class="workflow-step"><strong>PR 검수 → master 병합</strong><span>품질 게이트는 여기<br>master = 검수 완료</span></div>
+    <div class="workflow-step"><strong>이미지 빌드 · 푸시</strong><span>CI가 컨테이너 이미지 생성</span></div>
+    <div class="workflow-step"><strong>EC2 자동 반영</strong><span>마이그레이션 검사 · 재기동<br>health check · 실패 rollback</span></div>
+  </div></div>
+
+  <!-- ================================================================ -->
+  <h2>8. 설계 불변식 · 부착점 원칙 <span class="badge b-fix">확정</span></h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:230px">불변식</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><th>쓰기 → ACK 순서</th><td>수집 워커는 거래와 <code>ingest_id</code> 수신결과를 같은 DB 트랜잭션에 기록한 뒤에만 큐 ACK. 거래 업무키·<code>payload_hash</code>가 동일내용 중복과 ID 충돌을 구분</td></tr>
+      <tr><th>두 경로는 DB에서만 만남</th><td>사용자 요청이 추론을 기다리지 않고, 추론 장애가 대시보드를 죽이지 않는다</td></tr>
+      <tr><th>조회 커서·시간 규율</th><td>범위 조회는 시간 조건, 화면 변경분 조회는 단조 증가 <code>change_seq</code>. 페이지 시작 high-watermark를 고정해 동시 변경·페이지 경계 누락 방지</td></tr>
+      <tr><th>큐 어댑터 계약</th><td>관문(Java)·워커(Python)는 <code>publish/consume/ack/fail</code> 추상 동작만 사용. <strong>어댑터는 두 언어에 하나씩 존재하므로 전환 시 두 벌을 함께 바꾼다.</strong> SQS→Kafka 전환 시 호출부 반경을 줄이되, 소비자 그룹·offset·보존·재시도·DLQ·순서 의미가 달라 <strong>어댑터 구현과 운영 설정·회귀시험이 필요</strong>하다. 환경변수 변경만으로 끝난다고 보장하지 않는다</td></tr>
+      <tr><th>언어 경계 계약</th><td>API 서버(Java)와 워커(Python)는 <strong>DB 스키마와 큐 페이로드</strong> 두 지점에서만 만난다. 두 계약은 어느 한쪽 언어에서만 바꾸지 않으며, 변경 시 양쪽 직렬화·역직렬화와 왕복 시험을 함께 갱신한다. <strong>스키마의 단일 소유자는 API 서버(Flyway)</strong>이고 워커는 확정된 테이블을 사용할 뿐 마이그레이션을 발행하지 않는다. 실행 중 객체·코드는 공유하지 않는다 — 언어 경계가 런타임 결합이 되지 않게 하는 조건</td></tr>
+      <tr><th>부착점 증명 원칙</th><td>미루는 항목은 재사용할 계약·교체 인터페이스·예상 변경 파일과 회귀시험을 지금 명시한다. "기존 코드 무수정"을 과장해 약속하지 않으며, 핵심 데이터 모델을 바꾸는 항목은 지금 반영</td></tr>
+      <tr><th>결과 제출 멱등·lease</th><td><strong>(job_id, model_version) 유니크</strong>로 같은 결과 재제출을 흡수하고, 상태·<code>attempt_id</code>·lease 조건부 갱신으로 타임아웃 이전 시도의 늦은 결과를 거절. 결과·작업 COMPLETED·알림을 한 트랜잭션에 기록하고 알림은 <code>inference_result_id</code> 유니크로 중복 방지</td></tr>
+      <tr><th>버전·감사 보존</th><td>판정에 모델·설정 버전을 각인. 알림 상태, 사건·소견, 임계값, 역할 변경은 행위자·시각·사유·요청 ID가 있는 append-only 감사 이벤트를 남긴다</td></tr>
+      <tr><th>알림은 기계, 사건은 사람</th><td>모델 결과는 조사 지원 정보이지 확정 판정이 아니다 — §2.5 요구의 구조적 표현</td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ================================================================ -->
+  <h2>9. 프레임워크 매핑 <span class="badge b-fix">확정</span></h2>
+  <p class="small">구조를 요구 명세로 확정한 뒤 기술스택 후보군 평가(별도 문서)를 재검토하고, 그 과정에서 발견한 채점 결함을 교정해 평가 문서를 개정(2026-08-12)한 결과다. 개정 내용은 세 가지 — ① Backend 표에서 <strong>Java에만 언어 학습 비용을 계상한 비대칭 채점</strong> 교정, ② 6개 분야 전체에 <strong>학습·포트폴리오 가치</strong> 기준(10%) 신설, ③ 큐 기준을 Q-1~5 실제 요구로 재설계하고 <strong>후보군에 없던 SQS를 추가</strong>. 아래 점수는 모두 개정판 기준이다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:150px">분야</th><th style="width:240px">선택</th><th>구조와의 정합</th></tr></thead>
+    <tbody>
+      <tr><th>Frontend</th><td>React (TypeScript·Vite·MUI·Cytoscape.js) <span class="badge b-fix">확정</span></td><td><code>change_seq</code> polling·관계 그래프 화면. 개정 평가에서 92.3점 1위이며 2위 Vue(88.0)와 격차가 4.3점으로 벌어져 근접 후보 구간을 벗어났다 — POC 비교 없이 확정</td></tr>
+      <tr><th>Backend</th><td><strong>Spring Boot + Python Worker</strong> <span class="small">(동기 API 서버 1 + 비동기 워커 2 — §5.3)</span></td><td>"동기 2역할(수신·조회) 한 프로세스 + 비동기 워커 분리"가 이 구조 그 자체. <strong>개정 평가 88.6점 2위</strong>로, 1위 FastAPI(89.3)와 0.7점차라 평가 문서의 근접 후보 기준(3점 이내) 안이다 — 사실상 동률 구간에서 팀이 <strong>학습·포트폴리오 가치</strong>를 우선해 채택했다. 감점 사유인 Java↔Python 언어 경계는 §8 「언어 경계 계약」 불변식으로 관리한다</td></tr>
+      <tr><th>메시지 큐</th><td><strong>SQS</strong> (+ 어댑터 계층 필수) → Kafka <span class="badge b-str">스트레치</span></td><td>개정 평가 94.3점 1위. DLQ 네이티브(Q-3), 관리형 운영, 최소 1회 전달(Q-1) 충족. Kafka의 우위축이던 보존·재처리와 순서는 Q-2·Q-4로 요구에서 빠졌다. 어댑터는 호출부 변경 반경을 줄이는 장치이며 Kafka 전환에는 의미 차이 검토·회귀시험·운영 설정이 별도로 필요</td></tr>
+      <tr><th>Database</th><td>PostgreSQL</td><td>개정 평가 90.1점 1위. 거래 업무키·결과·알림 유니크 제약, lease 조건부 갱신, <code>change_seq</code>, append-only 감사이력, fan-out 상한 그래프 조회를 표준 기능으로 구현. Java(JDBC·JPA·Flyway)와 Python(SQLAlchemy) 양쪽 연결이 모두 표준적이라 언어 경계와 무관</td></tr>
+      <tr><th>AI·Model</th><td>PyTorch + scikit-learn <span class="small">(PyG 사용 여부는 모델팀이 개발하며 조정)</span></td><td>PyG 포함 조합이 개정 평가 92.7점 1위다. PyG를 쓰면 이웃 샘플러(NeighborLoader)가 허브 처리안 B/C의 표준 도구가 되고, 쓰지 않으면 동등한 상한 있는 이웃 조회를 직접 구현해야 한다 — 어느 쪽이든 §10이 고정한 페이로드 예산·상한 계약은 동일하다. 클러스터 내부는 모델팀 소관</td></tr>
+      <tr><th>실행·배포</th><td>Docker Compose (EC2 단일 호스트)</td><td>개정 평가 88.9점 1위. I-1·I-2와 정합. 포트폴리오 기준을 넣어도 Kubernetes(80.2)를 앞서는데, 초심자 학습량과 단일 데모 PC 적합성에서의 격차가 포트폴리오 우위를 상쇄하지 못하기 때문</td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ================================================================ -->
+  <h2>10. 허브 계좌 처리 — 모델팀 위임 패키지 <span class="badge b-dele">모델팀 위임</span></h2>
+  <p class="small">배경: 세트당 15개 준중앙은행 계좌(통화당 1개, 창작자 공식 확인)가 행의 8.9~9.6%, 2-hop 탐색 비용의 97.7~99.2%를 차지 (ML-08, R-11 교차검수 대기 중 — 인용 시 단서 필요). 검토 결과 <strong>허브 결정은 아키텍처 골격을 바꾸지 않는다</strong> — 어느 안이든 "상한 있는 이웃 조회기 + 화면 허브 가드"라는 구조는 공통.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:200px">구분</th><th>내용</th><th style="width:180px">결정 주체</th></tr></thead>
+    <tbody>
+      <tr><th>지금 고정 (서비스)</th><td>추론 페이로드 예산 상한 · 이웃 조회 상한의 존재 · 조사 화면 허브 가드(펼치지 않고 요약 표시) · 계좌 등록부의 허브 플래그 컬럼 부착점</td><td>아키텍처 확정 사항</td></tr>
+      <tr><th>위임 (모델팀)</th><td>처리안 선택 — A 완전 제거(단독 자격 미달: 판정 커버리지 구멍) / B 샘플링 상한 / C 허브 플래그 특징 + 상한 / D 메시지 전달만 차단. 상한 값·특징 구성 포함. <strong>PyG 사용 여부</strong>도 여기 포함된다 — PyG의 NeighborLoader를 쓸지 동등한 이웃 조회를 직접 구현할지는 서비스 계약(페이로드 예산·상한)을 바꾸지 않는다</td><td>모델팀 (예산 내 자유)</td></tr>
+      <tr><th>결정 기한</th><td>백엔드가 서브그래프 조회기를 구현하기 전 — 모델팀이 "서브그래프 명세서"(hop 수·상한·허브 취급) 1장을 백엔드에 전달하는 형태</td><td>일정에서 역산</td></tr>
+    </tbody>
+  </table></div>
+  <div class="agentop">C(허브 플래그 + 샘플링 상한)로 시작하고 B/D를 비교 실험 항목으로 등록하는 것을 권장 — 허브 정체가 추정이 아닌 창작자 확인 사실이라 특징화가 정당하고, 상한만으로는(B) 그 정보를 버리는 셈이기 때문. 제약 2개는 어느 안이든 준수: ① 허브 거래도 판정 커버리지에 포함(전체 행의 8.9~9.6%, 세탁 라벨 점유 10.8~25.6%) ② 시간창은 해결책이 아님(시간축·차수축 직교, 허브 하루 최대 58,260건).</div>
+
+  <!-- ================================================================ -->
+  <h2>11. 검토·의사결정이 필요한 항목</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:70px">우선순위</th><th style="width:280px">항목</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><th rowspan="2"><span class="badge b-block">구현 전 확인</span></th><td>쿠버스피어 → EC2 아웃바운드 HTTPS 가능 여부</td><td>pull 방식(G-1)의 배포 경로 전제. 인증서·방화벽·DNS를 포함한 실제 통신 테스트 1회 — 막혀 있으면 원격 추론 설계를 다시 연다</td></tr>
+      <tr><td>백엔드↔모델 작업 계약 dry-run</td><td><code>job_id</code>·<code>attempt_id</code>·lease·모델/설정 버전, 서브그래프 schema와 최대 payload를 작은 샘플로 왕복 검증. 백엔드 조회기 구현 전 모델팀 명세서 필요</td></tr>
+      <tr><th rowspan="3"><span class="badge b-open">팀 협의</span></th><td>사용자·수신 API 인증 방식</td><td>사용자 로그인 공급자/세션 방식과 목업 생성기의 수신 API 인증(API key·서명 등) 확정. RBAC 서버 검사는 확정</td></tr>
+      <tr><td>성공 지표 목표값</td><td>모델 precision·recall·PR-AUC·macro-F1과 서비스 지연 p95·p99, 복구 목표의 통과선 확정</td></tr>
+      <tr><td>백업·복구 목표</td><td>DB 백업 보유기간, RPO/RTO, 복원 연습 주기 확정</td></tr>
+      <tr><th rowspan="3"><span class="badge b-str">사실 확인</span></th><td>EC2 사양·예산</td><td>프록시+백엔드+워커2+DB 동시 상주 메모리 확인, 비용 한도</td></tr>
+      <tr><td>도메인 확보 방식</td><td>확정 시 인증서 방식(Let's Encrypt vs Cloudflare 프록시) 결정</td></tr>
+      <tr><td>SQS 과금 확인</td><td>프리 티어 월 100만 요청 — 목업 유입량 설계가 한도 내인지 계산</td></tr>
+      <tr><th><span class="badge b-dele">위임</span></th><td>허브 계좌 처리안 (§10)</td><td>모델팀이 예산 내에서 실험으로 결정, 서브그래프 명세서로 백엔드에 전달</td></tr>
+      <tr><th rowspan="2">구현 시</th><td>수치 파라미터</td><td>lease·작업 타임아웃, 재시도 백오프, 배치 선점 상한, 피드 페이지 크기·high-watermark, 생성기 유입 속도·시간 압축 (에이전트 폴링 2분은 확정)</td></tr>
+      <tr><td>운영 절차</td><td>초기화·시드, DLQ·ID 충돌 재처리, DB 마이그레이션·health check·rollback, 백업 복원 연습, Kafka 전환 판단 시점</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="note"><strong>문서 상태 — 설계 확정안</strong>: 구조(§5~§8), MVP 범위(§3), 기술 스택(§9)이 모두 확정됐다. 아키텍처 구조와 UML 식별자·멱등·동시성 계약을 동기화했으며, <code>transaction_id</code>는 원천 거래번호, 전송은 <code>ingest_id</code>, 추론 재선점은 <code>attempt_id</code>·lease, 피드 커서는 <code>change_seq</code>를 사용한다.</p>
+  <p class="note"><strong>2026-08-12 개정에서 확정된 항목</strong>: STR 기능 전체 MVP 제외(문서 초안은 스트레치 유지) · 규칙 엔진 미도입 · 유사 과거 사례 미포함 · 분석팀 조사 기능을 <strong>별도 심층분석 대시보드</strong>로 분리 · 거래 피드는 <strong>요약 + 이상 강조</strong> · 위험도별 계좌 분포 카드와 의심계좌 집계 뷰 MVP 포함 · 알림 발생 기준 "1단계 양성 = 알림 1건"(A-2) · 사건 1:알림 N 고정과 연결 알림 전량 종결이 사건 종결 조건(A-4) · DB 스키마 단독 소유자는 API 서버(Flyway, I-2) · 기술 스택은 React / <strong>Spring Boot + Python Worker</strong> / SQS / PostgreSQL / PyTorch + scikit-learn / Docker Compose.</p>
+  <p class="note"><strong>남은 미결</strong>: 이 문서는 <strong>구조를 확정하되 수치와 운영값은 비워 둔</strong> 상태다. 인증 방식, 성공 지표 목표값, 백업 RPO/RTO, EC2 사양·예산, 도메인·인증서, SQS 과금 한도, 허브 처리안(모델팀 위임), 그리고 구현 전 통신 테스트 2건이 §11에 남아 있다. 이 항목들은 실측·실험·팀 협의로만 정할 수 있어 설계 확정을 막지 않는다. EDA 수치 인용은 ML-08 기준이며 R-11 완료 전까지 검수 전 단서를 유지한다.</p>
+</main>
+</body>
+</html>
