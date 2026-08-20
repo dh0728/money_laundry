@@ -67,7 +67,7 @@
     .slide {
       position: absolute;
       inset: 0;
-      padding: 54px 72px 62px;
+      padding: 54px 72px 92px;
       display: grid;
       grid-template-rows: auto 1fr auto;
       gap: 22px;
@@ -171,8 +171,17 @@
       align-items: center;
       justify-content: flex-end;
       gap: 20px;
+      min-width: 0;
+      min-height: 28px;
       color: var(--muted);
       font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .slide-footer > span:last-child {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
 
     .slide-footer .brand {
@@ -518,6 +527,7 @@
 
     .flow-step {
       position: relative;
+      min-width: 0;
       min-height: 112px;
       padding: 18px 16px;
       border: 1px solid rgba(18, 50, 84, .15);
@@ -545,9 +555,13 @@
     }
 
     .flow-step span {
+      display: block;
+      min-width: 0;
       color: var(--muted);
       font-size: 12px;
       line-height: 1.5;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
     }
 
     .parallel {
@@ -652,12 +666,42 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) 315px;
       gap: 20px;
+      height: auto;
+      min-height: 100%;
+    }
+
+    .arch-slide {
+      padding-top: 34px;
+      gap: 14px;
+    }
+
+    .arch-slide .eyebrow { margin-bottom: 4px; }
+
+    .arch-slide .slide-header h2 {
+      font-size: clamp(30px, 2.35vw, 42px);
+    }
+
+    .arch-slide .architecture-layout {
+      grid-template-columns: minmax(0, 1fr) 470px;
+      grid-template-rows: minmax(0, 1fr);
       height: 100%;
       min-height: 0;
     }
 
+    .slide.keep-footer-clear .slide-body {
+      overflow: auto;
+      padding: 0 6px 10px 0;
+      scrollbar-gutter: stable;
+    }
+
+    .arch-slide .slide-body {
+      overflow: hidden;
+      padding-bottom: 0;
+    }
+
     .architecture-frame {
       min-height: 0;
+      height: 100%;
       display: grid;
       place-items: center;
       padding: 10px;
@@ -666,11 +710,15 @@
       background: white;
       box-shadow: 0 12px 34px rgba(7, 31, 56, .07);
       cursor: zoom-in;
+      overflow: hidden;
     }
 
     .architecture-frame img {
+      display: block;
+      width: auto;
+      height: auto;
       max-width: 100%;
-      max-height: calc(100vh - 230px);
+      max-height: 100%;
       object-fit: contain;
     }
 
@@ -678,6 +726,9 @@
       display: grid;
       gap: 11px;
       align-content: start;
+      min-height: max-content;
+      overflow: visible;
+      padding-right: 4px;
     }
 
     .arch-point {
@@ -698,6 +749,21 @@
       color: var(--muted);
       font-size: 12px;
       line-height: 1.45;
+    }
+
+    .arch-slide .arch-points {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      min-height: 0;
+      overflow: hidden;
+      gap: 9px;
+    }
+
+    .arch-slide .arch-point {
+      padding: 11px 13px;
+    }
+
+    .arch-slide .arch-point:last-child {
+      grid-column: 1 / -1;
     }
 
     table {
@@ -995,20 +1061,42 @@
     .source-links a:hover { text-decoration: underline; }
 
     @media (max-width: 1050px) {
-      .slide { padding: 45px 35px 72px; }
+      .slide { padding: 45px 35px 92px; }
+      .arch-slide { padding-top: 32px; }
       .cover-content { grid-template-columns: 1fr; gap: 24px; }
       .decision-board { display: none; }
       .grid-3, .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .flow { grid-template-columns: 1fr; gap: 10px; }
       .flow-step { min-height: auto; }
       .flow-step:not(:last-child)::after { display: none; }
-      .architecture-layout { grid-template-columns: 1fr; }
-      .arch-points { grid-template-columns: repeat(2, 1fr); }
+      .architecture-layout,
+      .arch-slide .architecture-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        height: auto;
+        min-height: 100%;
+      }
+      .arch-points {
+        grid-template-columns: repeat(2, 1fr);
+        overflow: visible;
+      }
+      .arch-slide .slide-body {
+        overflow: auto;
+      }
+      .arch-slide .arch-points {
+        overflow: visible;
+      }
+      .arch-slide .architecture-frame {
+        height: auto;
+      }
+      .arch-slide .architecture-frame img {
+        height: auto;
+      }
       .timeline { grid-template-columns: repeat(3, 1fr); }
     }
 
     @media (max-width: 720px) {
-      .slide { padding: 38px 18px 82px; }
+      .slide { padding: 38px 18px 84px; }
       .grid-2, .grid-3, .grid-4, .scope-wrap, .fact-grid, .info-matrix, .question-grid { grid-template-columns: 1fr; }
       .check-list, .info-list { grid-template-columns: 1fr; }
       .entity-strip { grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -1213,7 +1301,6 @@
       </div>
       <footer class="slide-footer">
         <span class="brand">MVP BOUNDARY</span>
-        <span>실시간 차단이 아닌 사후 모니터링 · STR은 ‘작성 필요’ 표시까지만</span>
       </footer>
     </section>
 
@@ -1309,11 +1396,11 @@
       </footer>
     </section>
 
-    <section class="slide" data-title="배치 아키텍처">
+    <section class="slide keep-footer-clear arch-slide" data-title="배치 아키텍처">
       <header class="slide-header">
         <div>
           <p class="eyebrow">06 · DAILY BATCH ARCHITECTURE</p>
-          <h2>원본은 S3, 작업은 SQS,<br />판정은 Worker와 외부 GPU가 분담합니다</h2>
+          <h2>원본은 S3, 작업은 SQS, 판정은 Worker와 외부 GPU가 분담합니다</h2>
         </div>
         <div class="slide-no">06</div>
       </header>
@@ -1337,7 +1424,7 @@
       </footer>
     </section>
 
-    <section class="slide" data-title="데이터셋과 평가">
+    <section class="slide keep-footer-clear" data-title="데이터셋과 평가">
       <header class="slide-header">
         <div>
           <p class="eyebrow">07 · DATASET & EVALUATION</p>
@@ -1428,57 +1515,47 @@
       </footer>
     </section>
 
-    <section class="slide" data-title="멘토 질문">
+    <section class="slide" data-title="멘토 질문 1">
       <header class="slide-header">
         <div>
-          <p class="eyebrow">09 · MENTOR QUESTIONS</p>
-          <h2>오늘 결정하고 싶은<br />여섯 가지 질문</h2>
+          <p class="eyebrow">09 · MENTOR QUESTIONS 1/2</p>
+          <h2>운영·조사·모델 구조에 대해<br />확인받고 싶은 내용</h2>
         </div>
         <div class="slide-no">09</div>
       </header>
       <div class="slide-body question-grid">
-        <article class="question"><div class="q-no">1</div><div><strong>일일 배치가 적절한가?</strong><p>사후 모니터링 관점에서 거래량·업무시간·조사 SLA 중 무엇으로 처리 주기를 결정해야 할까요?</p></div></article>
-        <article class="question"><div class="q-no">2</div><div><strong>2단계 분류가 적절한가?</strong><p>정상/의심 이진분류 후 패턴을 분류할 때 오류 전파를 어떻게 보완하고, 단일·멀티태스크와 비교해야 할까요?</p></div></article>
-        <article class="question"><div class="q-no">3</div><div><strong>L1의 최소 판단 정보는?</strong><p>거래·그래프·Rule Hit·모델 점수·Alert 위험도·처리 이력 중 필수와 보조 정보를 어떻게 나눌까요?</p></div></article>
-        <article class="question"><div class="q-no">4</div><div><strong>패턴이 없을 때 무엇을 설명할까?</strong><p>주요 Feature, 주변 고위험 거래, 서브그래프, 유사 사례, 불확실성 중 실무적으로 유용한 근거는 무엇인가요?</p></div></article>
-        <article class="question"><div class="q-no">5</div><div><strong>실무 평가의 핵심 지표는?</strong><p>PR-AUC, Recall, Precision, F1, Precision@K 중 무엇을 우선하고 미탐·오탐 비용으로 임계값을 어떻게 정할까요?</p></div></article>
-        <article class="question"><div class="q-no">6</div><div><strong>5분 → 1일이 탐지에 주는 영향은?</strong><p>날짜 경계를 넘는 분할·순환 거래를 위해 어느 기간의 Lookback을 유지하고 임계값을 어떻게 재조정해야 할까요?</p></div></article>
+        <article class="question"><div class="q-no">1</div><div><strong>일일 배치가 적절한가?</strong><p>사후 모니터링에서 거래량·업무시간·조사 SLA 등 어떤 기준으로 처리 주기를 정해야 할까요?</p></div></article>
+        <article class="question"><div class="q-no">2</div><div><strong>2단계 분류 구조가 적절한가?</strong><p>정상·의심 이진분류 후 의심거래의 패턴을 분류하는 방식이 적절한지 궁금합니다.</p></div></article>
+        <article class="question"><div class="q-no">3</div><div><strong>L1 화면의 필수 정보는?</strong><p>거래·관계 그래프·룰·모델 점수·Alert 위험도·패턴·이력 중 추가하거나 제외할 정보가 있을까요?</p></div></article>
+        <article class="question"><div class="q-no">4</div><div><strong>패턴이 없을 때 무엇을 설명할까?</strong><p>GNN 점수만 높다면 Feature 기여도·주변 위험 거래·유사 사례·위험 서브그래프 중 무엇이 유용할까요?</p></div></article>
+        <article class="question"><div class="q-no">5</div><div><strong>실무에서 어떤 지표를 우선하는가?</strong><p>Precision·Recall·F1·PR-AUC·Precision@K 중 핵심 지표와 미탐·오탐 비용의 반영 방법이 궁금합니다.</p></div></article>
+        <article class="question"><div class="q-no">6</div><div><strong>5분 → 1일이 탐지에 주는 영향은?</strong><p>패턴 탐지율과 Alert 수는 어떻게 달라지며, 날짜 경계를 위해 과거 며칠을 함께 조회해야 할까요?</p></div></article>
       </div>
       <footer class="slide-footer">
         <span class="brand">DECISIONS, NOT GENERAL FEEDBACK</span>
-        <span>각 질문별 권장안 · 위험 · 다음 실험을 기록</span>
+        <span>운영 주기 · 분류 구조 · L1 정보 · 설명 가능성 · 평가 지표 · Lookback</span>
       </footer>
     </section>
 
-    <section class="slide" data-title="결정 기록">
+    <section class="slide keep-footer-clear" data-title="멘토 질문 2">
       <header class="slide-header">
         <div>
-          <p class="eyebrow">10 · DECISION LOG</p>
-          <h2>미팅이 끝나면<br />이 표만 확정하면 됩니다</h2>
+          <p class="eyebrow">10 · MENTOR QUESTIONS 2/2</p>
+          <h2>금융 데이터와 학습 방법에 대해<br />확인받고 싶은 내용</h2>
         </div>
         <div class="slide-no">10</div>
       </header>
-      <div class="slide-body">
-        <table class="decision-table" aria-label="멘토 미팅 결정 기록">
-          <thead><tr><th>결정 항목</th><th>현재 검토안</th><th>미팅 후 확정할 내용</th></tr></thead>
-          <tbody>
-            <tr><td>배치 주기</td><td>일일 1회 사후 처리</td><td>실행 시각·처리 SLA·재처리 기준</td></tr>
-            <tr><td>시간 조회 범위</td><td>당일 + 과거 Lookback 필요</td><td>7일/30일/패턴별 차등 적용</td></tr>
-            <tr><td>모델 구조</td><td>이진분류 후 패턴분류</td><td>2단계 유지·멀티태스크·패턴분류 후순위</td></tr>
-            <tr><td>L1 정보</td><td>그래프·룰·점수·버전·이력</td><td>필수 노출 항목과 상세 화면 우선순위</td></tr>
-            <tr><td>설명 방식</td><td>명시 패턴 + Feature·주변 위험</td><td>패턴 미분류 시 최소 설명 기준</td></tr>
-            <tr><td>핵심 평가 지표</td><td>PR-AUC·Recall·Precision@K</td><td>운영 임계값과 허용 Alert 발생량</td></tr>
-          </tbody>
-        </table>
-        <div class="grid-3" style="height:auto;margin-top:16px">
-          <article class="card cyan"><h3>바로 반영</h3><p>요구사항 정의서 · 모델 실험 계획 · 화면 설계서</p></article>
-          <article class="card"><h3>후속 검증</h3><p>아키텍처 · 배치 Lookback · Alert 집계 평가</p></article>
-          <article class="card orange"><h3>범위 잠금</h3><p>MVP와 추후 확장을 구분해 24주 일정 보호</p></article>
-        </div>
+      <div class="slide-body question-grid">
+        <article class="question"><div class="q-no">7</div><div><strong>금융기관은 어떤 데이터를 학습에 쓰는가?</strong><p>자체 거래만 사용하는지, 고객정보도 결합하는지, 연합학습 모델을 실제 활용하는지 궁금합니다.</p></div></article>
+        <article class="question"><div class="q-no">8</div><div><strong>판정 임계값은 무엇을 기준으로 정하는가?</strong><p>Precision·Recall뿐 아니라 조사 인력과 허용 Alert 수까지 반영해 누가 기준을 결정해야 할까요?</p></div></article>
+        <article class="question"><div class="q-no">9</div><div><strong>시간 데이터는 어떻게 분할해야 하는가?</strong><p>시간순 비율 분할과 일·주 단위 분할 중 무엇이 적절하며, 그래프 데이터 누수는 어떻게 막아야 할까요?</p></div></article>
+        <article class="question"><div class="q-no">10</div><div><strong>14종 통화와 비트코인은 어떻게 처리할까?</strong><p>통화별 스케일링 외에 거래 시점 환율로 기준통화 환산값을 함께 Feature로 넣는 것이 적절할까요?</p></div></article>
+        <article class="question" style="grid-column:1/-1"><div class="q-no">11</div><div><strong>그래프를 유지하며 클래스 불균형을 어떻게 완화할까?</strong><p>자금세탁 거래를 증강하면 왜곡될 수 있고 정상 거래를 제거하면 연결 관계가 끊깁니다. 어떤 학습·샘플링 전략이 적절할까요?</p></div></article>
+        <article class="question" style="grid-column:1/-1"><div class="q-no">12</div><div><strong>허브 계좌의 과도한 연결을 어떻게 다룰까?</strong><p>연결 계좌가 매우 많은 허브 노드는 GNN 입력과 조사 그래프를 비대하게 만듭니다. 이웃 샘플링·Hop 제한·위험도 기반 우선순위 중 어떤 방식이 적절할까요?</p></div></article>
       </div>
-      <footer class="slide-footer source-links">
-        <span class="brand">NEXT ACTIONS</span>
-        <span><a href="./프로젝트기획서_실전(기획발표용)_초안.pdf" target="_blank">기획서 초안 열기</a> · 좌우 화살표로 이동 · M키로 메모</span>
+      <footer class="slide-footer">
+        <span class="brand">DATA & MODEL QUESTIONS</span>
+        <span>데이터 활용 · 임계값 · 시간 분할 · 통화 Feature · 클래스 불균형 · 허브 노드</span>
       </footer>
     </section>
   </main>
