@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IBM AML EDA 시각화 보고서</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-2: #eef2f8;
+      --text: #172033;
+      --muted: #5d687c;
+      --line: #d8dfeb;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --orange: #e87922;
+      --orange-soft: #ffedd5;
+      --green: #16845b;
+      --red: #c2414c;
+      --purple: #7656c9;
+      --shadow: 0 8px 25px rgba(32, 49, 80, .08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101521;
+        --surface: #171e2c;
+        --surface-2: #222b3c;
+        --text: #eef3fc;
+        --muted: #acb7ca;
+        --line: #344057;
+        --blue: #6ea2ff;
+        --blue-soft: #253a63;
+        --orange: #ffad66;
+        --orange-soft: #5a3925;
+        --green: #55c99a;
+        --red: #ff8491;
+        --purple: #b7a0ff;
+        --shadow: 0 10px 28px rgba(0, 0, 0, .25);
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--blue); }
+    header {
+      background: linear-gradient(135deg, #142b54, #234b88 60%, #23636f);
+      color: #fff;
+      padding: 54px 24px 44px;
+    }
+    .wrap { width: min(1180px, calc(100% - 36px)); margin: 0 auto; }
+    header .eyebrow { margin: 0 0 6px; font-size: 13px; letter-spacing: .1em; opacity: .78; }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); line-height: 1.2; font-weight: 700; }
+    header p { max-width: 800px; margin: 14px 0 0; color: #dce8ff; }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    nav .wrap { display: flex; gap: 18px; overflow-x: auto; padding: 11px 0; }
+    nav a { color: var(--muted); text-decoration: none; white-space: nowrap; font-size: 14px; }
+    nav a:hover { color: var(--blue); }
+    main { padding: 30px 0 64px; }
+    section { margin: 36px 0 56px; scroll-margin-top: 68px; }
+    h2 { margin: 0 0 8px; font-size: 25px; line-height: 1.35; }
+    h3 { margin: 0 0 8px; font-size: 18px; }
+    .lead { color: var(--muted); max-width: 900px; margin: 0 0 22px; }
+    .grid { display: grid; gap: 18px; }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .metric-label { color: var(--muted); font-size: 13px; }
+    .metric-value { margin-top: 4px; font-size: 29px; line-height: 1.25; font-weight: 700; }
+    .metric-note { margin-top: 7px; color: var(--muted); font-size: 13px; }
+    .tag {
+      display: inline-block;
+      margin-left: 5px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 11px;
+      vertical-align: middle;
+    }
+    .concept-flow {
+      display: grid;
+      grid-template-columns: 1fr 48px 1fr 48px 1fr;
+      align-items: center;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .concept-node { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+    .concept-node b { display: block; margin-bottom: 4px; }
+    .concept-node span { color: var(--muted); font-size: 13px; }
+    .arrow { color: var(--blue); text-align: center; font-size: 25px; }
+    .warning {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--orange);
+      background: var(--orange-soft);
+      color: var(--text);
+      border-radius: 0 10px 10px 0;
+    }
+    .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+    .chart-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 18px; }
+    .chart-note { color: var(--muted); font-size: 12px; max-width: 500px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+    .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+    .chart { display: grid; gap: 13px; }
+    .chart-row { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 12px; align-items: center; }
+    .row-label { text-align: right; color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .bars { display: grid; gap: 6px; }
+    .bar-line { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 9px; align-items: center; }
+    .track { position: relative; height: 15px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+    .bar { height: 100%; min-width: 2px; border-radius: 4px; }
+    .bar.blue { background: var(--blue); }
+    .bar.orange { background: var(--orange); }
+    .bar.green { background: var(--green); }
+    .bar.purple { background: var(--purple); }
+    .bar-value { font-size: 12px; font-variant-numeric: tabular-nums; }
+    .stack { display: flex; height: 29px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+    .stack > div { display: flex; align-items: center; justify-content: center; min-width: 2px; color: #fff; font-size: 11px; font-weight: 600; }
+    .inside { background: var(--blue); }
+    .outside { background: var(--orange); }
+    .axis { display: flex; justify-content: space-between; margin: 5px 92px 0 106px; color: var(--muted); font-size: 11px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 13px; }
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th { position: sticky; top: 0; background: var(--surface-2); color: var(--muted); font-weight: 600; }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:hover { background: var(--surface-2); }
+    .correction { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .correction:last-child { border-bottom: 0; }
+    .number { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+    .correction p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+    .file-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .file-card { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--blue); border-radius: 14px; padding: 18px; }
+    .file-card:nth-child(2) { border-top-color: var(--green); }
+    .file-card:nth-child(3) { border-top-color: var(--purple); }
+    .file-card code { display: inline-block; margin-bottom: 8px; }
+    .file-card p { margin: 0; color: var(--muted); font-size: 13px; }
+    .erd {
+      display: grid;
+      grid-template-columns: minmax(210px, 1fr) 90px minmax(260px, 1.2fr) 90px minmax(210px, 1fr);
+      align-items: center;
+      gap: 10px;
+      margin: 22px 0;
+    }
+    .entity-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .entity-title { padding: 10px 13px; background: var(--surface-2); font-weight: 700; }
+    .entity-field { padding: 6px 13px; border-top: 1px solid var(--line); font-size: 12px; }
+    .entity-field b { color: var(--blue); }
+    .relation { text-align: center; color: var(--muted); font-size: 12px; }
+    .relation strong { display: block; color: var(--blue); font-size: 22px; line-height: 1; }
+    .schema-table { min-width: 820px; }
+    .schema-table th:nth-child(1), .schema-table td:nth-child(1) { width: 21%; }
+    .schema-table th:nth-child(2), .schema-table td:nth-child(2) { width: 13%; text-align: left; }
+    .schema-table th:nth-child(3), .schema-table td:nth-child(3) { text-align: left; white-space: normal; }
+    .schema-table th:nth-child(4), .schema-table td:nth-child(4) { width: 26%; text-align: left; white-space: normal; }
+    .pattern-block { background: #111827; color: #e5edf9; border-radius: 12px; padding: 15px; overflow-x: auto; font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.7; }
+    .pattern-block .begin { color: #93c5fd; }
+    .pattern-block .row { color: #d1fae5; }
+    .pattern-block .end { color: #c4b5fd; }
+    .mini-patterns { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; margin-top: 18px; }
+    .mini-pattern { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+    .mini-pattern svg { width: 100%; height: 150px; display: block; }
+    .mini-pattern circle { fill: var(--blue-soft); stroke: var(--blue); stroke-width: 2; }
+    .mini-pattern line, .mini-pattern path { stroke: var(--orange); stroke-width: 2.3; fill: none; marker-end: url(#arrowhead); }
+    .mini-pattern text { fill: var(--text); font-size: 11px; text-anchor: middle; }
+    .mini-pattern h3 { margin-bottom: 2px; }
+    .mini-pattern p { min-height: 36px; margin: 0 0 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .definition-list { display: grid; grid-template-columns: 150px 1fr; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .definition-list dt, .definition-list dd { margin: 0; padding: 10px 13px; border-bottom: 1px solid var(--line); }
+    .definition-list dt { background: var(--surface-2); font-weight: 700; }
+    .definition-list dd { background: var(--surface); color: var(--muted); }
+    .section-sub { margin-top: 30px; }
+    footer { padding: 26px 0 44px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+    code { background: var(--surface-2); padding: 2px 5px; border-radius: 4px; }
+    @media (max-width: 1100px) {
+      .mini-patterns { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 850px) {
+      .grid-3, .grid-2, .file-grid { grid-template-columns: 1fr; }
+      .concept-flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+      .erd { grid-template-columns: 1fr; }
+      .relation strong { transform: rotate(90deg); margin: 8px; }
+    }
+    @media (max-width: 560px) {
+      .mini-patterns { grid-template-columns: 1fr; }
+      .wrap { width: min(100% - 24px, 1180px); }
+      header { padding: 38px 12px 32px; }
+      .chart-row { grid-template-columns: 70px minmax(0, 1fr); gap: 8px; }
+      .bar-line { grid-template-columns: minmax(0, 1fr) 75px; }
+      .row-label { font-size: 11px; }
+      .axis { margin-left: 78px; margin-right: 75px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">IBM TRANSACTIONS FOR ANTI MONEY LAUNDERING</p>
+      <h1>AML EDA 시각화 보고서</h1>
+      <p>자금세탁 라벨 거래를 거래·계좌·사건·금액 단위로 나눠 보고, 원본 스키마와 Patterns 구조부터 전체 수치까지 시각적으로 재검증한 결과입니다.</p>
+    </div>
+  </header>
+
+  <nav aria-label="보고서 목차">
+    <div class="wrap">
+      <a href="#structure">데이터 구조</a>
+      <a href="#overview">핵심 요약</a>
+      <a href="#units">측정 단위</a>
+      <a href="#pattern-coverage">Patterns 안/밖</a>
+      <a href="#incidents">사건과 거래</a>
+      <a href="#small-details">Small 상세 수치</a>
+      <a href="#currency">통화·금액</a>
+      <a href="#banks">Bank ID와 Name</a>
+      <a href="#degree">Degree</a>
+      <a href="#table">전체 수치</a>
+      <a href="#corrections">문서 교정</a>
+      <a href="#training-considerations">학습 전 고민사항</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <section id="structure">
+      <h2>1. 데이터 구조부터 이해하기</h2>
+      <p class="lead">IBM AML 한 세트는 거래, 계좌 메타데이터, 자금세탁 패턴 블록의 세 파일로 구성됩니다. 실제 파일명은 <code>Patterns.csv</code>가 아니라 <code>Patterns.txt</code>입니다.</p>
+
+      <div class="file-grid">
+        <article class="file-card"><code>HI-Small_Trans.csv</code><p>거래 한 건당 한 행. 송·수신 은행/계좌, 두 통화의 금액, 결제수단, 자금세탁 라벨을 가집니다.</p></article>
+        <article class="file-card"><code>HI-Small_accounts.csv</code><p>계좌 한 개당 한 행. Bank ID와 Account Number의 조합으로 거래 파일의 계좌를 설명합니다.</p></article>
+        <article class="file-card"><code>HI-Small_Patterns.txt</code><p>자금세탁 attempt별 BEGIN–거래행–END 블록. Trans 자금세탁 거래의 일부만 포함합니다.</p></article>
+      </div>
+
+      <div class="erd" aria-label="Accounts, Transactions, Patterns 관계도">
+        <div class="entity-box">
+          <div class="entity-title">accounts.csv</div>
+          <div class="entity-field"><b>PK</b> Bank ID + Account Number</div>
+          <div class="entity-field">Bank Name</div>
+          <div class="entity-field">Entity ID</div>
+          <div class="entity-field">Entity Name</div>
+        </div>
+        <div class="relation"><strong>↔</strong>송신·수신 계좌<br>1:N</div>
+        <div class="entity-box">
+          <div class="entity-title">Trans.csv</div>
+          <div class="entity-field">Timestamp</div>
+          <div class="entity-field"><b>FK</b> From Bank + From Account</div>
+          <div class="entity-field"><b>FK</b> To Bank + To Account</div>
+          <div class="entity-field">Amount / Currency / Format</div>
+          <div class="entity-field">Is Laundering</div>
+        </div>
+        <div class="relation"><strong>↔</strong>전체 행 값으로 대응<br>부분집합</div>
+        <div class="entity-box">
+          <div class="entity-title">Patterns.txt</div>
+          <div class="entity-field">attempt 순번</div>
+          <div class="entity-field">pattern type</div>
+          <div class="entity-field">description</div>
+          <div class="entity-field">Trans와 동일한 11개 필드</div>
+        </div>
+      </div>
+
+      <div class="warning"><b>중요:</b> Trans에는 명시적인 Transaction ID가 없고 Patterns에도 외래키가 없습니다. 따라서 Timestamp·송수신 계좌·금액·통화·결제수단·라벨을 묶은 전체 행 키와 중복 횟수로 대응해야 합니다.</div>
+
+      <h3 class="section-sub">Trans.csv 컬럼 사전</h3>
+      <div class="table-wrap">
+        <table class="schema-table">
+          <thead><tr><th>원본 컬럼</th><th>권장 자료형</th><th>의미</th><th>해석·처리 주의사항</th></tr></thead>
+          <tbody>
+            <tr><td>Timestamp</td><td>datetime</td><td>거래 발생 시각. 예: <code>2022/09/01 00:06</code></td><td>분 단위이며 timezone 표기가 없다. 시간 특징은 현재 거래 이전 기록만 사용한다.</td></tr>
+            <tr><td>From Bank</td><td>string</td><td>송신 계좌가 속한 Bank ID</td><td>선행 0 보존을 위해 문자열로 읽는다. 계산용 정규화와 원본 문자열을 함께 보존한다.</td></tr>
+            <tr><td>Account</td><td>string</td><td>송신 계좌 번호</td><td>헤더에 Account가 두 번 나오므로 pandas에서는 <code>Account</code>, Polars에서는 첫 Account로 읽힌다.</td></tr>
+            <tr><td>To Bank</td><td>string</td><td>수신 계좌가 속한 Bank ID</td><td>From Bank와 동일하게 문자열로 관리한다.</td></tr>
+            <tr><td>Account.1</td><td>string</td><td>수신 계좌 번호</td><td>원본 헤더는 두 번째 <code>Account</code>. pandas가 <code>Account.1</code>, Polars가 <code>Account_duplicated_0</code>으로 바꾼다.</td></tr>
+            <tr><td>Amount Received</td><td>float64</td><td>수신 통화 기준으로 받은 금액</td><td>Payment Currency와 다르면 Amount Paid와 숫자가 달라질 수 있다. 극단값이 있어 log 변환이 필요하다.</td></tr>
+            <tr><td>Receiving Currency</td><td>category/string</td><td>수신 금액의 통화 또는 자산 단위</td><td>US Dollar, Euro, Bitcoin 등이 존재한다. 서로 다른 통화 금액을 그대로 합산하지 않는다.</td></tr>
+            <tr><td>Amount Paid</td><td>float64</td><td>송신 통화 기준으로 지급한 금액</td><td>거래의 송신 측 경제량. 실환율 적용 여부는 별도 검증 없이 단정할 수 없다.</td></tr>
+            <tr><td>Payment Currency</td><td>category/string</td><td>지급 금액의 통화 또는 자산 단위</td><td>금액 통계는 이 통화 안에서 계산하거나 명시적 환산 기준을 써야 한다.</td></tr>
+            <tr><td>Payment Format</td><td>category/string</td><td>ACH, Wire, Cash, Cheque, Credit Card, Bitcoin, Reinvestment</td><td>IBM 생성기에서 자금세탁 라벨과 강하게 결합할 수 있어 shortcut 검증이 필요하다.</td></tr>
+            <tr><td>Is Laundering</td><td>int8/bool</td><td><b>1 = 자금세탁 거래, 0 = 정상 거래</b></td><td>한 행의 거래 라벨이다. 1의 개수가 자금세탁 사건 개수는 아니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="section-sub">accounts.csv 컬럼 사전</h3>
+      <div class="table-wrap">
+        <table class="schema-table">
+          <thead><tr><th>원본 컬럼</th><th>권장 자료형</th><th>의미</th><th>해석·처리 주의사항</th></tr></thead>
+          <tbody>
+            <tr><td>Bank Name</td><td>string</td><td>생성된 은행 표시 이름</td><td>고유 식별자가 아니다. 같은 이름이 여러 Bank ID에 재사용된다.</td></tr>
+            <tr><td>Bank ID</td><td>string</td><td>계좌 소속 은행 식별자</td><td>거래 파일의 From/To Bank와 연결한다. 선행 0을 보존한다.</td></tr>
+            <tr><td>Account Number</td><td>string</td><td>은행 내 계좌 번호</td><td>단독 사용하지 않고 Bank ID와 조합해야 한다.</td></tr>
+            <tr><td>Entity ID</td><td>string</td><td>여러 계좌가 속할 수 있는 생성 엔티티 식별자</td><td>실서비스에서 같은 수준의 엔티티 정합성이 제공된다고 가정할 수 없다.</td></tr>
+            <tr><td>Entity Name</td><td>category/string</td><td>Partnership, Corporation, Sole Proprietorship, Country, Individual, Direct 등 엔티티 유형</td><td>컬럼명은 Name이지만 실제 값은 주로 엔티티 분류에 가깝다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="section-sub">Patterns.txt는 어떻게 구성되고 어떻게 봐야 하나?</h3>
+      <div class="grid grid-2">
+        <div>
+          <div class="pattern-block" aria-label="Patterns 텍스트 예시">
+            <div class="begin">BEGIN LAUNDERING ATTEMPT - FAN-OUT: Max 16-degree Fan-Out</div>
+            <div class="row">2022/09/01 00:06,021174,800737690,012,80011F990,2848.96,Euro,2848.96,Euro,ACH,1</div>
+            <div class="row">2022/09/01 04:33,021174,800737690,020,80020C5B0,8630.40,Euro,8630.40,Euro,ACH,1</div>
+            <div class="row">... 같은 attempt에 포함된 거래 행 ...</div>
+            <div class="end">END LAUNDERING ATTEMPT - FAN-OUT</div>
+          </div>
+        </div>
+        <dl class="definition-list">
+          <dt>BEGIN</dt><dd>새 자금세탁 attempt 시작. 패턴 유형과 설명을 담는다.</dd>
+          <dt>거래 행</dt><dd>헤더 없이 Trans.csv와 같은 11개 값을 쉼표로 기록한다.</dd>
+          <dt>END</dt><dd>해당 attempt 종료. 다음 BEGIN 전까지 하나의 사건으로 묶는다.</dd>
+          <dt>attempt_id</dt><dd>파일에 별도 열은 없으므로 파서가 BEGIN 순서대로 1, 2, 3…을 부여한다.</dd>
+          <dt>그래프 변환</dt><dd>각 거래를 From Account → To Account 방향 edge로 만들고 attempt별 색 또는 그룹을 준다.</dd>
+        </dl>
+      </div>
+
+      <div class="mini-patterns">
+        <article class="mini-pattern"><h3>FAN-OUT</h3><p>한 계좌에서 여러 계좌로 분산</p><svg viewBox="0 0 260 150" role="img" aria-label="한 계좌에서 여러 계좌로 보내는 팬아웃"><defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="var(--orange)" stroke="none"/></marker></defs><line x1="65" y1="75" x2="177" y2="30"/><line x1="65" y1="75" x2="177" y2="75"/><line x1="65" y1="75" x2="177" y2="120"/><circle cx="52" cy="75" r="20"/><circle cx="196" cy="26" r="18"/><circle cx="196" cy="75" r="18"/><circle cx="196" cy="124" r="18"/><text x="52" y="79">출발</text><text x="196" y="30">A</text><text x="196" y="79">B</text><text x="196" y="128">C</text></svg></article>
+        <article class="mini-pattern"><h3>FAN-IN</h3><p>여러 계좌에서 한 계좌로 집중</p><svg viewBox="0 0 260 150" role="img" aria-label="여러 계좌에서 한 계좌로 모으는 팬인"><line x1="66" y1="30" x2="178" y2="68"/><line x1="66" y1="75" x2="178" y2="75"/><line x1="66" y1="120" x2="178" y2="82"/><circle cx="48" cy="26" r="18"/><circle cx="48" cy="75" r="18"/><circle cx="48" cy="124" r="18"/><circle cx="198" cy="75" r="20"/><text x="48" y="30">A</text><text x="48" y="79">B</text><text x="48" y="128">C</text><text x="198" y="79">도착</text></svg></article>
+        <article class="mini-pattern"><h3>GATHER-SCATTER</h3><p>여러 곳에서 모은 뒤 다시 분산</p><svg viewBox="0 0 260 150" role="img" aria-label="여러 계좌가 한곳에 모은 뒤 다시 흩뿌리는 패턴"><line x1="52" y1="38" x2="114" y2="69"/><line x1="52" y1="112" x2="114" y2="81"/><line x1="146" y1="69" x2="207" y2="38"/><line x1="146" y1="81" x2="207" y2="112"/><circle cx="36" cy="30" r="17"/><circle cx="36" cy="120" r="17"/><circle cx="130" cy="75" r="20"/><circle cx="224" cy="30" r="17"/><circle cx="224" cy="120" r="17"/><text x="36" y="34">A</text><text x="36" y="124">B</text><text x="130" y="79">허브</text><text x="224" y="34">C</text><text x="224" y="124">D</text></svg></article>
+        <article class="mini-pattern"><h3>SCATTER-GATHER</h3><p>분산한 자금을 다른 계좌로 재집중</p><svg viewBox="0 0 260 150" role="img" aria-label="한 계좌에서 분산한 뒤 다른 계좌로 재집중하는 패턴"><line x1="54" y1="75" x2="106" y2="32"/><line x1="54" y1="75" x2="106" y2="75"/><line x1="54" y1="75" x2="106" y2="118"/><line x1="140" y1="32" x2="205" y2="68"/><line x1="140" y1="75" x2="205" y2="75"/><line x1="140" y1="118" x2="205" y2="82"/><circle cx="36" cy="75" r="18"/><circle cx="123" cy="25" r="16"/><circle cx="123" cy="75" r="16"/><circle cx="123" cy="125" r="16"/><circle cx="224" cy="75" r="19"/><text x="36" y="79">출발</text><text x="123" y="29">A</text><text x="123" y="79">B</text><text x="123" y="129">C</text><text x="224" y="79">도착</text></svg></article>
+        <article class="mini-pattern"><h3>CYCLE</h3><p>여러 계좌를 거쳐 최초 계좌로 복귀</p><svg viewBox="0 0 260 150" role="img" aria-label="계좌들이 순환하는 사이클"><path d="M82 42 L174 42"/><path d="M193 57 L145 114"/><path d="M116 116 L66 58"/><circle cx="62" cy="42" r="19"/><circle cx="195" cy="42" r="19"/><circle cx="130" cy="121" r="19"/><text x="62" y="46">A</text><text x="195" y="46">B</text><text x="130" y="125">C</text></svg></article>
+        <article class="mini-pattern"><h3>RANDOM</h3><p>통제 계좌 사이의 비정형 경로</p><svg viewBox="0 0 260 150" role="img" aria-label="여러 계좌를 불규칙하게 거치는 무작위 경로"><path d="M45 104 L91 39"/><path d="M115 38 L151 74"/><path d="M172 81 L213 40"/><path d="M163 94 L116 119"/><circle cx="35" cy="118" r="17"/><circle cx="104" cy="27" r="17"/><circle cx="164" cy="84" r="17"/><circle cx="226" cy="27" r="17"/><circle cx="100" cy="128" r="17"/><text x="35" y="122">A</text><text x="104" y="31">B</text><text x="164" y="88">C</text><text x="226" y="31">D</text><text x="100" y="132">E</text></svg></article>
+        <article class="mini-pattern"><h3>BIPARTITE</h3><p>입력 집합에서 출력 집합으로 다대다 이동</p><svg viewBox="0 0 260 150" role="img" aria-label="두 계좌 집합 사이의 다대다 이분형 패턴"><line x1="58" y1="42" x2="198" y2="32"/><line x1="58" y1="42" x2="198" y2="118"/><line x1="58" y1="108" x2="198" y2="32"/><line x1="58" y1="108" x2="198" y2="118"/><circle cx="40" cy="38" r="18"/><circle cx="40" cy="112" r="18"/><circle cx="218" cy="28" r="18"/><circle cx="218" cy="122" r="18"/><text x="40" y="42">A</text><text x="40" y="116">B</text><text x="218" y="32">C</text><text x="218" y="126">D</text></svg></article>
+        <article class="mini-pattern"><h3>STACK</h3><p>여러 이분 계층을 연속으로 통과</p><svg viewBox="0 0 260 150" role="img" aria-label="입력 중간 출력의 여러 계층을 거치는 스택 패턴"><line x1="48" y1="42" x2="112" y2="32"/><line x1="48" y1="42" x2="112" y2="118"/><line x1="48" y1="108" x2="112" y2="32"/><line x1="48" y1="108" x2="112" y2="118"/><line x1="144" y1="32" x2="208" y2="42"/><line x1="144" y1="32" x2="208" y2="108"/><line x1="144" y1="118" x2="208" y2="42"/><line x1="144" y1="118" x2="208" y2="108"/><circle cx="32" cy="38" r="16"/><circle cx="32" cy="112" r="16"/><circle cx="128" cy="28" r="16"/><circle cx="128" cy="122" r="16"/><circle cx="224" cy="38" r="16"/><circle cx="224" cy="112" r="16"/><text x="32" y="42">A</text><text x="32" y="116">B</text><text x="128" y="32">C</text><text x="128" y="126">D</text><text x="224" y="42">E</text><text x="224" y="116">F</text></svg></article>
+      </div>
+      <div class="warning"><b>Patterns.txt 자체가 그래프 그림은 아닙니다.</b> 텍스트 블록을 파싱한 뒤 계좌를 node, 거래를 directed edge로 변환해야 합니다. Patterns 밖 자금세탁 거래에는 attempt ID가 없으므로 사건별 색칠이나 사건 recall 계산이 불가능합니다.</div>
+    </section>
+
+    <section id="overview">
+      <h2>핵심 요약</h2>
+      <p class="lead"><code>Is Laundering = 1</code>은 <b>자금세탁 거래</b>, <code>0</code>은 정상 거래입니다. 자금세탁 거래 수와 자금세탁 사건 수는 서로 다릅니다.</p>
+      <div class="grid grid-3">
+        <article class="card">
+          <div class="metric-label">HI-Small 자금세탁 거래</div>
+          <div class="metric-value">5,177건</div>
+          <div class="metric-note">Patterns 사건은 370개 — 거래 5,177건이 사건 5,177개라는 뜻은 아님</div>
+        </article>
+        <article class="card">
+          <div class="metric-label">LI-Small Patterns 밖 자금세탁 거래</div>
+          <div class="metric-value">2,542건</div>
+          <div class="metric-note">전체 자금세탁 거래의 71.30%로, Patterns만 보면 대부분을 놓침</div>
+        </article>
+        <article class="card">
+          <div class="metric-label">반복되는 Bank Name 풀</div>
+          <div class="metric-value">468개</div>
+          <div class="metric-note">지역형 216개 + 브랜드형 252개 조합이 여러 Bank ID에서 재사용</div>
+        </article>
+      </div>
+      <div class="warning"><b>데이터셋 독립성:</b> HI-Small, HI-Medium, HI-Large, LI-Small, LI-Medium, LI-Large는 독립 생성 세트로 취급합니다. 같은 문자열 Bank ID나 Account Number가 다른 세트에 있어도 같은 실체라고 간주하거나 그래프를 합치지 않습니다.</div>
+    </section>
+
+    <section id="units">
+      <h2>같은 세탁 데이터도 보는 단위에 따라 비율이 달라진다</h2>
+      <p class="lead">거래 라벨은 매우 희소하지만 한 세탁 체인이 여러 계좌를 거치기 때문에, 연루 계좌 비율은 훨씬 높아집니다. 아래 막대는 로그 눈금입니다.</p>
+      <div class="concept-flow" aria-label="사건, 거래, 계좌 관계">
+        <div class="concept-node"><b>자금세탁 사건 1개</b><span>Patterns의 BEGIN–END 블록 하나</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="concept-node"><b>여러 자금세탁 거래</b><span>하나의 attempt가 여러 거래로 구성</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="concept-node"><b>여러 연루 계좌</b><span>송신·수신 계좌 합집합</span></div>
+      </div>
+      <div class="chart-card" style="margin-top:18px">
+        <div class="chart-head">
+          <div><h3>자금세탁 거래 비율과 계좌 연루율</h3><div class="chart-note">계좌 분모는 accounts의 고유 (Bank ID, Account Number)</div></div>
+        </div>
+        <div class="legend"><span><i style="background:var(--blue)"></i>자금세탁 거래 비율</span><span><i style="background:var(--orange)"></i>자금세탁 연루 계좌 비율</span></div>
+        <div id="unit-rate-chart" class="chart" role="img" aria-label="6개 데이터셋의 자금세탁 거래 비율과 연루 계좌 비율 로그 비교"></div>
+        <div class="axis"><span>0.05%</span><span>0.5%</span><span>5%</span><span>11%</span></div>
+      </div>
+      <h3 class="section-sub">측정 단위별 세탁 비율 비교</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>데이터셋</th><th>거래 단위 세탁 비율</th><th>계좌 단위 연루율</th><th>계좌 연루율 ÷ 거래 비율</th><th>연루 계좌 / 전체 계좌</th></tr></thead>
+          <tbody>
+            <tr><td>HI-Small</td><td>0.1019%</td><td>1.23%</td><td>12.0배</td><td>6,357 / 518,581</td></tr>
+            <tr><td>HI-Medium</td><td>0.1104%</td><td>2.00%</td><td>18.2배</td><td>41,857 / 2,087,786</td></tr>
+            <tr><td>HI-Large</td><td>0.1255%</td><td><b>10.46%</b></td><td>83.4배</td><td>222,522 / 2,126,855</td></tr>
+            <tr><td>LI-Small</td><td>0.0515%</td><td>0.74%</td><td>14.5배</td><td>5,304 / 712,688</td></tr>
+            <tr><td>LI-Medium</td><td>0.0513%</td><td>1.15%</td><td>22.4배</td><td>23,510 / 2,040,823</td></tr>
+            <tr><td>LI-Large</td><td>0.0571%</td><td><b>6.22%</b></td><td>108.8배</td><td>129,263 / 2,079,627</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lead" style="margin-top:14px"><b>거래 단위</b>는 전체 거래 중 <code>Is Laundering=1</code>인 행의 비율이고, <b>계좌 단위</b>는 세탁 거래의 송신 또는 수신에 한 번이라도 등장한 계좌가 전체 계좌에서 차지하는 비율입니다. 세탁 사건 하나가 여러 거래와 여러 계좌를 거치므로 계좌 연루율이 거래 비율보다 12.0~108.8배 높게 나타납니다. 이 배수는 탐지 성능의 향상을 뜻하는 것이 아니라 분자와 분모가 다른 두 측정 단위의 차이를 보여줍니다.</p>
+      <div class="warning"><b>해석:</b> HI-Large는 자금세탁 거래 비율이 0.1255%지만 자금세탁 연루 계좌 비율은 10.4625%입니다. 거래 불균형과 계좌 불균형을 같은 숫자로 설명하면 안 됩니다.</div>
+    </section>
+
+    <section id="pattern-coverage">
+      <h2>Patterns 안 거래와 Patterns 밖 거래</h2>
+      <p class="lead">파란색은 <code>Patterns.txt</code>의 attempt에 묶인 자금세탁 거래, 주황색은 <code>Is Laundering=1</code>이지만 Patterns에 없는 자금세탁 거래입니다.</p>
+      <div class="chart-card">
+        <div class="legend"><span><i style="background:var(--blue)"></i>Patterns 안</span><span><i style="background:var(--orange)"></i>Patterns 밖</span></div>
+        <div id="pattern-coverage-chart" class="chart" role="img" aria-label="6개 데이터셋의 Patterns 안팎 자금세탁 거래 비율"></div>
+      </div>
+      <div class="warning"><b>핵심:</b> LI-Large에서는 Patterns가 자금세탁 거래의 19.34%만 포함합니다. Patterns만 정답으로 사용하면 자금세탁 거래 81,143건을 평가에서 제외하게 됩니다.</div>
+    </section>
+
+    <section id="incidents">
+      <h2>몇 건을 맞혔나와 몇 개 사건을 적발했나는 다르다</h2>
+      <p class="lead">패턴 유형별 막대는 Small 세트에서 거래 수와 attempt 수가 얼마나 다른지 보여줍니다.</p>
+      <div class="grid grid-2">
+        <div class="chart-card">
+          <div class="chart-head"><div><h3>HI-Small 패턴별 거래 / attempt</h3></div></div>
+          <div class="legend"><span><i style="background:var(--blue)"></i>거래 수</span><span><i style="background:var(--purple)"></i>attempt 수</span></div>
+          <div id="hi-pattern-chart" class="chart" role="img" aria-label="HI-Small 패턴 유형별 거래와 사건 수"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><div><h3>LI-Small 패턴별 거래 / attempt</h3></div></div>
+          <div class="legend"><span><i style="background:var(--blue)"></i>거래 수</span><span><i style="background:var(--purple)"></i>attempt 수</span></div>
+          <div id="li-pattern-chart" class="chart" role="img" aria-label="LI-Small 패턴 유형별 거래와 사건 수"></div>
+        </div>
+      </div>
+      <div class="warning"><b>예시:</b> HI-Small GATHER-SCATTER는 716거래/51사건이고 CYCLE은 287거래/54사건입니다. 거래 수로는 전자가 크지만 사건 수는 후자가 더 많습니다.</div>
+    </section>
+
+    <section id="small-details">
+      <h2>Small 데이터셋 상세 수치</h2>
+      <p class="lead">기존 <code>IBM_AML_Small_EDA_Report.docx</code>에 있던 수치표를 축약하지 않고 다시 수록하고, v3에서 확인한 Bank ID·엔티티·attempt 수를 함께 표시했습니다.</p>
+
+      <h3>기본 정보와 데이터 품질</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>HI-Small</th><th>LI-Small</th><th>해석</th></tr></thead>
+          <tbody>
+            <tr><td>거래 건수</td><td>5,078,345</td><td>6,924,049</td><td>Trans.csv 행 수</td></tr>
+            <tr><td>정상 거래</td><td>5,073,168</td><td>6,920,484</td><td><code>Is Laundering=0</code></td></tr>
+            <tr><td>자금세탁 거래</td><td>5,177</td><td>3,565</td><td><code>Is Laundering=1</code></td></tr>
+            <tr><td>자금세탁 거래 비율</td><td>0.1019%</td><td>0.0515%</td><td>정상:자금세탁 = 980:1 / 1,941:1</td></tr>
+            <tr><td>결측치</td><td>0</td><td>0</td><td>원본 11개 거래 컬럼 기준</td></tr>
+            <tr><td>완전 중복행</td><td>9</td><td>8</td><td>원본 11개 컬럼 전체가 같은 행</td></tr>
+            <tr><td>관측 기간</td><td>2022-09-01 00:00<br>~ 09-18 16:18</td><td>2022-09-01 00:00<br>~ 09-17 15:28</td><td>timezone 확인 불가</td></tr>
+            <tr><td>고유 From Account</td><td>496,995</td><td>681,281</td><td>원문 수치; Account 문자열 단독 기준</td></tr>
+            <tr><td>고유 To Account</td><td>420,636</td><td>576,176</td><td>원문 수치; Account 문자열 단독 기준</td></tr>
+            <tr><td>accounts 행/고유 복합 계좌</td><td>518,581</td><td>712,688</td><td>Bank ID + Account Number 기준</td></tr>
+            <tr><td>고유 Bank ID</td><td>30,470</td><td>41,815</td><td>그래프·조인 식별자로 사용</td></tr>
+            <tr><td>고유 Bank Name</td><td>20,053</td><td>27,652</td><td>표시 이름; ID가 아님</td></tr>
+            <tr><td>고유 Entity ID</td><td>166,207</td><td>224,931</td><td>accounts 메타데이터</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="section-sub">일별 거래량과 자금세탁 거래 비율</h3>
+      <div class="chart-card">
+        <div class="chart-head"><div><h3>일별 거래량</h3><div class="chart-note">두 세트 모두 9월 11일부터 정상 배경 거래가 급격히 줄어듭니다. 막대는 로그 눈금입니다.</div></div></div>
+        <div class="legend"><span><i style="background:var(--blue)"></i>HI-Small</span><span><i style="background:var(--orange)"></i>LI-Small</span></div>
+        <div id="daily-volume-chart" class="chart" role="img" aria-label="HI와 LI Small의 일별 거래량"></div>
+      </div>
+      <div class="table-wrap" style="margin-top:18px">
+        <table>
+          <thead><tr><th>날짜</th><th>HI 거래</th><th>HI 자금세탁</th><th>HI 비율</th><th>LI 거래</th><th>LI 자금세탁</th><th>LI 비율</th></tr></thead>
+          <tbody>
+            <tr><td>2022-09-01</td><td>1,114,921</td><td>322</td><td>0.03%</td><td>1,524,807</td><td>310</td><td>0.02%</td></tr>
+            <tr><td>2022-09-02</td><td>754,449</td><td>408</td><td>0.05%</td><td>1,027,758</td><td>350</td><td>0.03%</td></tr>
+            <tr><td>2022-09-03</td><td>207,382</td><td>391</td><td>0.19%</td><td>283,326</td><td>292</td><td>0.10%</td></tr>
+            <tr><td>2022-09-04</td><td>207,430</td><td>407</td><td>0.20%</td><td>282,476</td><td>291</td><td>0.10%</td></tr>
+            <tr><td>2022-09-05</td><td>482,650</td><td>471</td><td>0.10%</td><td>657,397</td><td>370</td><td>0.06%</td></tr>
+            <tr><td>2022-09-06</td><td>482,089</td><td>531</td><td>0.11%</td><td>657,170</td><td>380</td><td>0.06%</td></tr>
+            <tr><td>2022-09-07</td><td>482,751</td><td>497</td><td>0.10%</td><td>658,504</td><td>368</td><td>0.06%</td></tr>
+            <tr><td>2022-09-08</td><td>482,773</td><td>539</td><td>0.11%</td><td>657,938</td><td>402</td><td>0.06%</td></tr>
+            <tr><td>2022-09-09</td><td>654,467</td><td>514</td><td>0.08%</td><td>891,573</td><td>367</td><td>0.04%</td></tr>
+            <tr><td>2022-09-10</td><td>208,325</td><td>442</td><td>0.21%</td><td>282,877</td><td>301</td><td>0.11%</td></tr>
+            <tr><td>2022-09-11</td><td>396</td><td>232</td><td>58.59%</td><td>77</td><td>47</td><td>61.04%</td></tr>
+            <tr><td>2022-09-12</td><td>281</td><td>170</td><td>60.50%</td><td>48</td><td>27</td><td>56.25%</td></tr>
+            <tr><td>2022-09-13</td><td>184</td><td>106</td><td>57.61%</td><td>48</td><td>29</td><td>60.42%</td></tr>
+            <tr><td>2022-09-14</td><td>121</td><td>70</td><td>57.85%</td><td>31</td><td>18</td><td>58.06%</td></tr>
+            <tr><td>2022-09-15</td><td>46</td><td>28</td><td>60.87%</td><td>9</td><td>6</td><td>66.67%</td></tr>
+            <tr><td>2022-09-16</td><td>46</td><td>26</td><td>56.52%</td><td>7</td><td>5</td><td>71.43%</td></tr>
+            <tr><td>2022-09-17</td><td>23</td><td>15</td><td>65.22%</td><td>3</td><td>2</td><td>66.67%</td></tr>
+            <tr><td>2022-09-18</td><td>11</td><td>8</td><td>72.73%</td><td>–</td><td>–</td><td>–</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="warning"><b>시간 분할 주의:</b> 9월 11일 이후 높은 비율은 자금세탁 자체가 갑자기 늘었다기보다 정상 배경 거래 생성이 먼저 끝난 영향입니다. 이 구간만 test로 두면 실서비스와 다른 평가가 될 수 있습니다.</div>
+      <p class="lead" style="margin-top:14px"><b>시간대 패턴:</b> 원문 EDA에서는 정상 거래가 0시에 다른 시간대보다 약 3배 몰리고, 자금세탁 거래는 0시 스파이크 없이 8~20시에 완만하게 분포했습니다. 생성기 시간 아티팩트일 가능성이 있으므로 hour 특징만으로 성능이 과대평가되는지 확인해야 합니다.</p>
+
+      <h3 class="section-sub">Amount Paid 분포</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>통계</th><th>HI-Small</th><th>LI-Small</th></tr></thead>
+          <tbody>
+            <tr><td>평균</td><td>4,509,273.37</td><td>4,676,035.97</td></tr>
+            <tr><td>표준편차</td><td>869,772,745.28</td><td>1,544,098,395.18</td></tr>
+            <tr><td>최솟값</td><td>0.000001</td><td>0.000001</td></tr>
+            <tr><td>1사분위수 Q1</td><td>184.48</td><td>175.38</td></tr>
+            <tr><td>중앙값 Q2</td><td>1,414.54</td><td>1,399.44</td></tr>
+            <tr><td>3사분위수 Q3</td><td>12,297.84</td><td>12,226.87</td></tr>
+            <tr><td>최댓값</td><td>1,046,302,363,293.48</td><td>3,644,853,662,746.95</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="warning"><b>단위 주의:</b> 위 표는 서로 다른 Payment Currency를 함께 기술한 분포 진단값입니다. 경제 가치의 합계로 해석하지 말고, 모델에서는 통화별 <code>log1p</code>·robust scaling을 사용해야 합니다.</div>
+
+      <h3 class="section-sub">Payment Format별 자금세탁 거래 비율</h3>
+      <div class="grid grid-2">
+        <div class="chart-card"><div class="legend"><span><i style="background:var(--blue)"></i>HI-Small</span><span><i style="background:var(--orange)"></i>LI-Small</span></div><div id="payment-format-chart" class="chart" role="img" aria-label="결제수단별 자금세탁 거래 비율"></div></div>
+        <div class="table-wrap">
+          <table style="min-width:520px"><thead><tr><th>Payment Format</th><th>HI</th><th>LI</th></tr></thead><tbody>
+            <tr><td>ACH</td><td>0.746%</td><td>0.328%</td></tr><tr><td>Bitcoin</td><td>0.038%</td><td>0.036%</td></tr>
+            <tr><td>Cash</td><td>0.022%</td><td>0.019%</td></tr><tr><td>Cheque</td><td>0.017%</td><td>0.018%</td></tr>
+            <tr><td>Credit Card</td><td>0.016%</td><td>0.015%</td></tr><tr><td>Reinvestment</td><td>0%</td><td>0%</td></tr><tr><td>Wire</td><td>0%</td><td>0%</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <div class="warning"><b>Shortcut 위험:</b> ACH가 다른 수단보다 자금세탁 비율이 현저히 높고 Wire/Reinvestment는 0%입니다. 생성기 규칙을 모델이 그대로 암기하는지 해당 컬럼 제외 실험이 필요합니다.</div>
+
+      <h3 class="section-sub">자금 흐름 유형</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>흐름 유형</th><th>HI 거래 수</th><th>HI 자금세탁 비율</th><th>LI 거래 수</th><th>LI 자금세탁 비율</th></tr></thead>
+          <tbody>
+            <tr><td>동일 계좌 셀프이체</td><td>591,212</td><td>0.0019%</td><td>804,477</td><td>0.0004%</td></tr>
+            <tr><td>동일 은행·다른 계좌</td><td>100,120</td><td>0.0919%</td><td>107,526</td><td>0.0651%</td></tr>
+            <tr><td>타 은행 간</td><td>4,387,013</td><td>0.1157%</td><td>6,012,046</td><td>0.0581%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="section-sub">은행명 스타일 계좌 수 Top 6</h3>
+      <div class="grid grid-2">
+        <div class="table-wrap"><table style="min-width:520px"><thead><tr><th>이름상 국가/그룹</th><th>HI 계좌</th><th>LI 계좌</th></tr></thead><tbody>
+          <tr><td>China</td><td>23,489</td><td>48,647</td></tr><tr><td>Germany</td><td>32,733</td><td>39,838</td></tr>
+          <tr><td>France</td><td>21,416</td><td>33,482</td></tr><tr><td>India</td><td>19,359</td><td>32,825</td></tr>
+          <tr><td>Crytpo</td><td>14,358</td><td>30,450</td></tr><tr><td>Italy</td><td>17,433</td><td>26,527</td></tr>
+        </tbody></table></div>
+        <div class="card"><h3>왜 “이름상”이라고 하나?</h3><p class="lead" style="margin:0"><code>China Bank #번호</code> 같은 Bank Name을 정규식으로 집계한 결과입니다. <code>Crytpo</code>는 실제 국가가 아니라 원본 오탈자 이름 그룹이므로 지리 정보로 단정하면 안 됩니다.</p></div>
+      </div>
+
+      <h3 class="section-sub">Entity Name 분포</h3>
+      <div class="table-wrap"><table><thead><tr><th>Entity Name</th><th>HI-Small</th><th>LI-Small</th></tr></thead><tbody>
+        <tr><td>Partnership</td><td>189,683</td><td>225,814</td></tr><tr><td>Corporation</td><td>172,351</td><td>268,892</td></tr>
+        <tr><td>Sole Proprietorship</td><td>149,048</td><td>217,131</td></tr><tr><td>Country</td><td>6,692</td><td>0</td></tr>
+        <tr><td>Individual</td><td>740</td><td>851</td></tr><tr><td>Direct</td><td>67</td><td>0</td></tr>
+      </tbody></table></div>
+
+      <h3 class="section-sub">패턴 유형별 거래 수와 attempt 수</h3>
+      <div class="table-wrap"><table><thead><tr><th>패턴</th><th>HI 거래</th><th>HI attempt</th><th>LI 거래</th><th>LI attempt</th></tr></thead><tbody>
+        <tr><td>GATHER-SCATTER</td><td>716</td><td>51</td><td>150</td><td>12</td></tr><tr><td>SCATTER-GATHER</td><td>626</td><td>44</td><td>182</td><td>13</td></tr>
+        <tr><td>STACK</td><td>466</td><td>43</td><td>180</td><td>18</td></tr><tr><td>FAN-OUT</td><td>342</td><td>48</td><td>149</td><td>19</td></tr>
+        <tr><td>FAN-IN</td><td>318</td><td>40</td><td>73</td><td>12</td></tr><tr><td>CYCLE</td><td>287</td><td>54</td><td>83</td><td>12</td></tr>
+        <tr><td>BIPARTITE</td><td>263</td><td>49</td><td>129</td><td>16</td></tr><tr><td>RANDOM</td><td>191</td><td>41</td><td>77</td><td>15</td></tr>
+        <tr><td><b>합계</b></td><td><b>3,209</b></td><td><b>370</b></td><td><b>1,023</b></td><td><b>117</b></td></tr>
+      </tbody></table></div>
+      <details class="card" style="margin-top:18px">
+        <summary><b>6개 데이터셋 × 8개 패턴 전체 상세표 펼치기</b></summary>
+        <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>데이터셋</th><th>패턴</th><th>거래 수</th><th>attempt 수</th><th>attempt당 거래</th></tr></thead><tbody>
+          <tr><td>HI-Small</td><td>BIPARTITE</td><td>263</td><td>49</td><td>5.37</td></tr><tr><td>HI-Small</td><td>CYCLE</td><td>287</td><td>54</td><td>5.31</td></tr><tr><td>HI-Small</td><td>FAN-IN</td><td>318</td><td>40</td><td>7.95</td></tr><tr><td>HI-Small</td><td>FAN-OUT</td><td>342</td><td>48</td><td>7.12</td></tr><tr><td>HI-Small</td><td>GATHER-SCATTER</td><td>716</td><td>51</td><td>14.04</td></tr><tr><td>HI-Small</td><td>RANDOM</td><td>191</td><td>41</td><td>4.66</td></tr><tr><td>HI-Small</td><td>SCATTER-GATHER</td><td>626</td><td>44</td><td>14.23</td></tr><tr><td>HI-Small</td><td>STACK</td><td>466</td><td>43</td><td>10.84</td></tr>
+          <tr><td>HI-Medium</td><td>BIPARTITE</td><td>2,135</td><td>369</td><td>5.79</td></tr><tr><td>HI-Medium</td><td>CYCLE</td><td>2,235</td><td>367</td><td>6.09</td></tr><tr><td>HI-Medium</td><td>FAN-IN</td><td>2,315</td><td>355</td><td>6.52</td></tr><tr><td>HI-Medium</td><td>FAN-OUT</td><td>2,128</td><td>345</td><td>6.17</td></tr><tr><td>HI-Medium</td><td>GATHER-SCATTER</td><td>4,289</td><td>322</td><td>13.32</td></tr><tr><td>HI-Medium</td><td>RANDOM</td><td>1,667</td><td>331</td><td>5.04</td></tr><tr><td>HI-Medium</td><td>SCATTER-GATHER</td><td>3,988</td><td>331</td><td>12.05</td></tr><tr><td>HI-Medium</td><td>STACK</td><td>3,986</td><td>336</td><td>11.86</td></tr>
+          <tr><td>HI-Large</td><td>BIPARTITE</td><td>12,174</td><td>2,109</td><td>5.77</td></tr><tr><td>HI-Large</td><td>CYCLE</td><td>12,340</td><td>2,086</td><td>5.92</td></tr><tr><td>HI-Large</td><td>FAN-IN</td><td>13,287</td><td>2,014</td><td>6.60</td></tr><tr><td>HI-Large</td><td>FAN-OUT</td><td>13,554</td><td>2,040</td><td>6.64</td></tr><tr><td>HI-Large</td><td>GATHER-SCATTER</td><td>26,361</td><td>2,054</td><td>12.83</td></tr><tr><td>HI-Large</td><td>RANDOM</td><td>9,618</td><td>2,001</td><td>4.81</td></tr><tr><td>HI-Large</td><td>SCATTER-GATHER</td><td>26,978</td><td>2,067</td><td>13.05</td></tr><tr><td>HI-Large</td><td>STACK</td><td>23,624</td><td>2,096</td><td>11.27</td></tr>
+          <tr><td>LI-Small</td><td>BIPARTITE</td><td>129</td><td>16</td><td>8.06</td></tr><tr><td>LI-Small</td><td>CYCLE</td><td>83</td><td>12</td><td>6.92</td></tr><tr><td>LI-Small</td><td>FAN-IN</td><td>73</td><td>12</td><td>6.08</td></tr><tr><td>LI-Small</td><td>FAN-OUT</td><td>149</td><td>19</td><td>7.84</td></tr><tr><td>LI-Small</td><td>GATHER-SCATTER</td><td>150</td><td>12</td><td>12.50</td></tr><tr><td>LI-Small</td><td>RANDOM</td><td>77</td><td>15</td><td>5.13</td></tr><tr><td>LI-Small</td><td>SCATTER-GATHER</td><td>182</td><td>13</td><td>14.00</td></tr><tr><td>LI-Small</td><td>STACK</td><td>180</td><td>18</td><td>10.00</td></tr>
+          <tr><td>LI-Medium</td><td>BIPARTITE</td><td>488</td><td>72</td><td>6.78</td></tr><tr><td>LI-Medium</td><td>CYCLE</td><td>283</td><td>46</td><td>6.15</td></tr><tr><td>LI-Medium</td><td>FAN-IN</td><td>329</td><td>47</td><td>7.00</td></tr><tr><td>LI-Medium</td><td>FAN-OUT</td><td>489</td><td>69</td><td>7.09</td></tr><tr><td>LI-Medium</td><td>GATHER-SCATTER</td><td>541</td><td>43</td><td>12.58</td></tr><tr><td>LI-Medium</td><td>RANDOM</td><td>278</td><td>49</td><td>5.67</td></tr><tr><td>LI-Medium</td><td>SCATTER-GATHER</td><td>886</td><td>63</td><td>14.06</td></tr><tr><td>LI-Medium</td><td>STACK</td><td>615</td><td>67</td><td>9.18</td></tr>
+          <tr><td>LI-Large</td><td>BIPARTITE</td><td>1,807</td><td>274</td><td>6.59</td></tr><tr><td>LI-Large</td><td>CYCLE</td><td>1,871</td><td>298</td><td>6.28</td></tr><tr><td>LI-Large</td><td>FAN-IN</td><td>1,935</td><td>278</td><td>6.96</td></tr><tr><td>LI-Large</td><td>FAN-OUT</td><td>1,985</td><td>274</td><td>7.24</td></tr><tr><td>LI-Large</td><td>GATHER-SCATTER</td><td>3,857</td><td>284</td><td>13.58</td></tr><tr><td>LI-Large</td><td>RANDOM</td><td>1,458</td><td>275</td><td>5.30</td></tr><tr><td>LI-Large</td><td>SCATTER-GATHER</td><td>3,694</td><td>276</td><td>13.38</td></tr><tr><td>LI-Large</td><td>STACK</td><td>2,854</td><td>259</td><td>11.02</td></tr>
+        </tbody></table></div>
+      </details>
+    </section>
+
+    <section id="currency">
+      <h2>통화와 금액을 어떻게 비교해야 하나?</h2>
+      <p class="lead"><code>Amount Paid</code>는 지급 통화 기준, <code>Amount Received</code>는 수취 통화 기준 금액입니다. 통화가 다르면 두 숫자의 단순 차이를 손실이나 수수료로 해석하면 안 됩니다.</p>
+      <div class="grid grid-3">
+        <article class="card"><div class="metric-label">원 통화 특징</div><div class="metric-value">우선 사용</div><div class="metric-note">Payment/Receiving Currency, 두 금액의 log1p, 환전 여부, 통화쌍</div></article>
+        <article class="card"><div class="metric-label">암묵적 환율</div><div class="metric-value">검증용</div><div class="metric-note">Amount Received ÷ Amount Paid를 통화쌍·일별로 중앙값과 분산 확인</div></article>
+        <article class="card"><div class="metric-label">외부 역사 환율</div><div class="metric-value">IBM에는 비추천</div><div class="metric-note">합성 생성기가 만든 내부 금액 관계를 오히려 훼손할 수 있음</div></article>
+      </div>
+      <h3 class="section-sub">통화별 자금세탁 금액 점유율이 가장 높은 통화</h3>
+      <div class="table-wrap"><table><thead><tr><th>데이터셋</th><th>Payment Currency</th><th>전체 거래 수</th><th>자금세탁 거래 수</th><th>자금세탁 거래 비율</th><th>자금세탁 Amount Paid 점유율</th></tr></thead><tbody>
+        <tr><td>HI-Small</td><td>Canadian Dollar</td><td>140,042</td><td>128</td><td>0.0914%</td><td>28.1952%</td></tr>
+        <tr><td>HI-Medium</td><td>Yuan</td><td>2,330,638</td><td>2,775</td><td>0.1191%</td><td>5.2011%</td></tr>
+        <tr><td>HI-Large</td><td>Rupee</td><td>4,160,681</td><td>5,249</td><td>0.1262%</td><td>5.7381%</td></tr>
+        <tr><td>LI-Small</td><td>Australian Dollar</td><td>211,155</td><td>77</td><td>0.0365%</td><td>1.3891%</td></tr>
+        <tr><td>LI-Medium</td><td>Saudi Riyal</td><td>646,832</td><td>267</td><td>0.0413%</td><td>2.6846%</td></tr>
+        <tr><td>LI-Large</td><td>Shekel</td><td>3,560,737</td><td>1,840</td><td>0.0517%</td><td>3.6384%</td></tr>
+      </tbody></table></div>
+      <div class="warning"><b>왜 거래 비율과 금액 비율이 다른가?</b> HI-Small Canadian Dollar는 자금세탁 거래가 0.0914%뿐인데 금액 점유율은 28.20%입니다. 소수의 극단적으로 큰 거래가 금액 기준을 지배할 수 있으므로 거래·계좌·사건·금액 지표를 따로 보고해야 합니다.</div>
+    </section>
+
+    <section id="banks">
+      <h2>고유 Bank ID와 Bank Name은 왜 이렇게 차이가 날까?</h2>
+      <p class="lead">각 Bank ID는 이름 하나에 대응하지만, 조합형 Bank Name이 여러 Bank ID에서 반복됩니다. 막대는 동일 축으로 비교합니다.</p>
+      <div class="chart-card">
+        <div class="legend"><span><i style="background:var(--blue)"></i>고유 Bank ID</span><span><i style="background:var(--orange)"></i>고유 Bank Name</span></div>
+        <div id="bank-chart" class="chart" role="img" aria-label="6개 데이터셋의 고유 Bank ID와 이름 수"></div>
+      </div>
+      <div class="table-wrap" style="margin-top:18px"><table><thead><tr><th>데이터셋</th><th>고유 Bank ID</th><th>고유 Bank Name</th><th>여러 ID에 재사용된 이름</th><th>한 이름의 최대 ID 수</th><th>한 ID에 여러 이름</th></tr></thead><tbody>
+        <tr><td>HI-Small</td><td>30,470</td><td>20,053</td><td>468</td><td>48</td><td>0</td></tr>
+        <tr><td>HI-Medium</td><td>122,333</td><td>80,180</td><td>468</td><td>161</td><td>0</td></tr>
+        <tr><td>HI-Large</td><td>122,333</td><td>80,180</td><td>468</td><td>165</td><td>0</td></tr>
+        <tr><td>LI-Small</td><td>41,815</td><td>27,652</td><td>468</td><td>65</td><td>0</td></tr>
+        <tr><td>LI-Medium</td><td>119,617</td><td>76,636</td><td>468</td><td>159</td><td>0</td></tr>
+        <tr><td>LI-Large</td><td>119,619</td><td>76,637</td><td>468</td><td>169</td><td>0</td></tr>
+      </tbody></table></div>
+      <div class="grid grid-2" style="margin-top:18px">
+        <div class="card"><div class="metric-label">지역형 이름</div><div class="metric-value">4 × 54 = 216</div><div class="metric-note">Bank of / First Bank of / National Bank of / Savings Bank of × 지역명</div></div>
+        <div class="card"><div class="metric-label">브랜드형 이름</div><div class="metric-value">28 × 9 = 252</div><div class="metric-note">브랜드 어근 × Bank, Bancorp, Credit Union, Thrift 등 기관 유형</div></div>
+      </div>
+      <div class="warning"><b>주의:</b> 같은 Bank Name의 여러 Bank ID를 같은 법적 금융기관이나 지점으로 병합할 근거는 없습니다. 그래프 식별자는 Bank ID를 사용해야 합니다.</div>
+    </section>
+
+    <section id="degree">
+      <h2>Out-degree와 In-degree를 쉽게 읽기</h2>
+      <p class="lead"><b>Out-degree</b>는 한 계좌에서 밖으로 나간 송신 연결의 크기, <b>In-degree</b>는 그 계좌로 들어온 수신 연결의 크기입니다. 다만 여기서는 반복 거래를 모두 센 <b>거래 건수</b>와 중복을 제거한 <b>고유 상대 계좌 수</b>를 반드시 구분해야 합니다. 아래 그래프는 로그 눈금입니다.</p>
+      <div class="grid grid-2">
+        <div class="chart-card"><h3>HI-Small</h3><div id="hi-degree-chart" class="chart" role="img" aria-label="HI-Small degree 정의별 최대값"></div></div>
+        <div class="chart-card"><h3>LI-Small</h3><div id="li-degree-chart" class="chart" role="img" aria-label="LI-Small degree 정의별 최대값"></div></div>
+      </div>
+      <div class="warning"><b>예시:</b> A가 B에게 100번, C에게 1번 보냈다면 A의 송신 거래 수는 101이지만 고유 수신 상대는 2입니다. 기존 “최대 Out-degree 168,672”는 반복 거래를 포함한 값입니다.</div>
+      <div class="card" style="margin-top:18px">
+        <h3>최댓값은 전체 계좌를 대표하는가?</h3>
+        <p class="lead"><b>아닙니다.</b> 계좌별 송신 거래 수의 중앙값은 HI·LI 모두 2건이고, 99백분위도 모두 92건입니다. 그런데 최댓값은 각각 168,672건과 222,037건으로 급격히 튑니다. 즉 이 값은 일반적인 계좌의 활동량이 아니라 극소수 초대형 허브의 존재를 보여주는 꼬리 지표입니다.</p>
+        <div class="table-wrap"><table><thead><tr><th>데이터셋</th><th>중앙값</th><th>90백분위</th><th>99백분위</th><th>최댓값</th><th>최대 계좌의 전체 거래 점유율</th><th>최대 계좌의 세탁 라벨</th></tr></thead><tbody>
+          <tr><td>HI-Small</td><td>2건</td><td>29건</td><td>92건</td><td>168,672건</td><td>3.32%</td><td>243건 / 0.1441%</td></tr>
+          <tr><td>LI-Small</td><td>2건</td><td>29건</td><td>92건</td><td>222,037건</td><td>3.21%</td><td>314건 / 0.1414%</td></tr>
+        </tbody></table></div>
+        <p class="lead" style="margin-top:14px">두 최대 송신 계좌는 각각 14,230개와 18,942개의 고유 계좌로 송금했고, 거래 형식은 Cheque·Credit Card·Cash에 집중되어 있습니다. 전체 거래의 99.85% 이상은 정상 라벨이지만 세탁 거래도 일부 섞여 있습니다. 따라서 최대 거래 수는 일반적인 계좌의 거래 행동을 나타내는 값이 아니라, 소수의 초대형 거래 계좌가 존재한다는 것을 보여주는 값입니다. 다만 해당 계좌가 실제로 어떤 업무를 수행하는지는 이 데이터만으로 확인할 수 없습니다.</p>
+      </div>
+    </section>
+
+    <section id="table">
+      <h2>6개 데이터셋 핵심 수치</h2>
+      <p class="lead">현재 작업공간 원본 파일을 batch scan하여 직접 확인한 결과입니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>데이터셋</th><th>전체 거래</th><th>자금세탁 거래</th><th>자금세탁 거래 비율</th><th>고유 계좌</th><th>자금세탁 연루 계좌</th><th>연루 계좌 비율</th><th>attempt</th><th>Patterns 안</th><th>Patterns 밖</th></tr></thead>
+          <tbody id="summary-table"></tbody>
+        </table>
+      </div>
+      <h3 class="section-sub">기간·사건·패턴 커버리지 상세</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>데이터셋</th><th>관측 시작</th><th>관측 종료</th><th>attempt</th><th>Patterns 거래</th><th>Patterns 밖</th><th>커버리지</th><th>attempt당 거래 중앙값</th><th>지속시간 중앙값</th></tr></thead>
+          <tbody>
+            <tr><td>HI-Small</td><td>2022-09-01 00:00</td><td>2022-09-18 16:18</td><td>370</td><td>3,209</td><td>1,968</td><td>61.99%</td><td>6.5</td><td>74.73시간</td></tr>
+            <tr><td>HI-Medium</td><td>2022-09-01 00:00</td><td>2022-09-28 15:58</td><td>2,756</td><td>22,743</td><td>12,487</td><td>64.56%</td><td>6.0</td><td>110.52시간</td></tr>
+            <tr><td>HI-Large</td><td>2022-08-01 00:00</td><td>2023-01-12 16:49</td><td>16,467</td><td>137,936</td><td>87,610</td><td>61.16%</td><td>6.0</td><td>655.02시간</td></tr>
+            <tr><td>LI-Small</td><td>2022-09-01 00:00</td><td>2022-09-17 15:28</td><td>117</td><td>1,023</td><td>2,542</td><td>28.70%</td><td>7.0</td><td>75.55시간</td></tr>
+            <tr><td>LI-Medium</td><td>2022-09-01 00:00</td><td>2022-09-27 14:58</td><td>456</td><td>3,909</td><td>12,132</td><td>24.37%</td><td>7.0</td><td>107.74시간</td></tr>
+            <tr><td>LI-Large</td><td>2022-08-01 00:00</td><td>2023-01-12 10:18</td><td>2,218</td><td>19,461</td><td>81,143</td><td>19.34%</td><td>7.0</td><td>673.19시간</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="warning"><b>7일 window 가능 여부:</b> Small의 attempt 지속시간 중앙값은 약 75시간이지만 일부 장기 패턴은 7일을 넘을 수 있습니다. Large의 중앙 지속시간은 약 27~28일이므로 1시간·24시간·7일 window를 모두 비교할 근거가 있습니다.</div>
+    </section>
+
+    <section id="corrections">
+      <h2>기존 DOCX에서 교정한 핵심 표현</h2>
+      <div class="card">
+        <div class="correction"><div class="number">1</div><div><b>20,053/27,652는 은행 수가 아니라 고유 Bank Name 수</b><p>HI/LI-Small의 실제 고유 Bank ID는 30,470/41,815입니다.</p></div></div>
+        <div class="correction"><div class="number">2</div><div><b>Patterns와 전체 자금세탁 거래는 “비슷하다”라고 하기 어려움</b><p>Patterns의 자금세탁 거래 커버리지는 HI-Small 61.99%, LI-Small 28.70%입니다.</p></div></div>
+        <div class="correction"><div class="number">3</div><div><b>최대 degree는 고유 상대방 수가 아니라 반복 거래 포함 건수</b><p>HI-Small 최대 송신 168,672건, 최대 고유 수신 상대는 14,230개입니다.</p></div></div>
+        <div class="correction"><div class="number">4</div><div><b>현재 HI-Large는 179,702,229건</b><p>이전 노트북에 저장된 157,851,757건은 현재 원본 파일과 일치하지 않는 stale/부분 집계 결과입니다.</p></div></div>
+      </div>
+    </section>
+
+    <section id="training-considerations">
+      <h2>학습에 사용하기 전 고민해야 할 문제들</h2>
+      <p class="lead">이 데이터는 GNN 기반 AML 모델을 시험하기에는 유용합니다. 다만 실제 자금세탁 행동이 아니라 <b>합성 데이터를 만든 방식의 특징</b>을 모델이 외울 수 있습니다. 그러면 테스트 점수는 높아도 실제 금융회사에서는 잘 작동하지 않을 수 있습니다. 아래에서는 문제가 무엇인지와 실제 처리 방법을 함께 설명합니다.</p>
+
+      <h3 class="section-sub">1. 정상 배경 거래가 먼저 끝나는 시간 꼬리</h3>
+      <div class="warning"><b>Small만의 문제가 아닙니다.</b> Medium과 Large에서도 정상 거래가 대량으로 발생하다가 특정 날짜부터 거의 사라집니다. 반면 이전부터 시작되어 여러 날 동안 이어진 자금세탁 거래는 뒤쪽 날짜까지 남아 있습니다. 그 결과 정상 거래가 사라진 이후에는 전체 거래의 약 56~60%가 자금세탁으로 표시됩니다. 실제 은행에서는 보기 어려운 인위적인 구간입니다.</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>규모</th><th>정상 배경 급감일</th><th>기본 학습·평가 권장 구간</th><th>급감 이후 양성률</th><th>판단</th></tr></thead>
+          <tbody>
+            <tr><td>Small</td><td>2022-09-11</td><td>2022-09-01 ~ 09-10</td><td>HI 59.1% / LI 60.1%</td><td>후반부를 일반 테스트에서 제외</td></tr>
+            <tr><td>Medium</td><td>2022-09-17</td><td>2022-09-01 ~ 09-16</td><td>HI 58.5% / LI 56.3%</td><td>후반부 결과를 별도로 확인</td></tr>
+            <tr><td>Large</td><td>2022-11-06</td><td>2022-08-01 ~ 11-05</td><td>HI 59.6% / LI 58.3%</td><td>후반부 결과를 별도로 확인</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid grid-3" style="margin-top:18px">
+        <article class="card"><div class="metric-label">기본 학습과 테스트</div><h3>정상 거래가 충분한 기간</h3><p>정상 거래가 대량으로 존재하는 기간 안에서 날짜순으로 학습·검증·테스트 데이터를 나눕니다. 모델의 주 성능은 이 결과로 판단합니다.</p></article>
+        <article class="card"><div class="metric-label">추가 확인용</div><h3>정상 거래가 끝난 이후 기간</h3><p>이 기간은 기본 성능 계산에서는 제외합니다. 대신 정상 거래가 거의 없는 특수한 상황에서도 모델이 어떤 결과를 내는지 참고용으로 따로 확인합니다. 이것을 여기서 ‘보조 시험’이라고 부릅니다.</p></article>
+        <article class="card"><div class="metric-label">기간 경계에 걸친 사건</div><h3>시작과 끝이 서로 다른 구간에 있는 사건</h3><p>예를 들어 자금세탁 사건이 9월 9일에 시작해 9월 12일에 끝났다면, 9월 11일을 기준으로 앞부분은 기본 기간에 있고 뒷부분은 제외 기간에 있습니다. 이런 사건은 일부 거래만 보이므로 완전한 사건과 분리해 결과를 확인합니다.</p></article>
+      </div>
+      <div class="card">
+        <h3>날짜를 그대로 모델에 넣으면 왜 문제가 되나?</h3>
+        <p>예를 들어 Small 데이터에서는 9월 11일부터 정상 거래가 거의 사라집니다. 모델에 날짜를 그대로 주면 자금 흐름을 분석하지 않고도 <b>“9월 11일 이후 거래는 자금세탁일 가능성이 높다”</b>는 규칙을 외울 수 있습니다. 이것은 자금세탁 패턴을 배운 것이 아니라 합성 데이터가 끝나는 날짜를 외운 것입니다.</p>
+        <p><b>처리 방법:</b> 달력 날짜, 데이터 시작 후 며칠째인지, 데이터 종료일까지 며칠 남았는지는 입력 변수로 사용하지 않습니다. 대신 예측 시점 이전 1시간·24시간·7일의 거래 횟수, 직전 거래 후 지난 시간처럼 실제 운영에서도 알 수 있는 과거 정보만 사용합니다. 시간대와 요일은 사용할 수 있지만, 이 두 변수를 뺀 모델도 다시 학습해 성능이 크게 떨어지는지 비교합니다.</p>
+      </div>
+
+      <h3 class="section-sub">2. 시간 분할과 동일 timestamp 처리</h3>
+      <div class="card">
+        <p><b>문제:</b> 원본 CSV는 시간순으로 정렬되어 있지 않고 같은 분에 발생한 거래도 많습니다. 거래를 무작위로 학습용과 테스트용으로 나누거나 전체 기간의 계좌 연결 수를 미리 계산하면, 모델이 예측 시점보다 나중에 발생한 거래를 보게 됩니다.</p>
+        <p><b>처리 방법:</b> 먼저 거래를 시간순으로 정렬한 뒤 과거는 학습, 그다음 기간은 검증, 가장 나중 기간은 테스트로 나눕니다. 같은 시각의 거래는 먼저 모두 예측하고, 예측이 끝난 뒤에 계좌의 거래 이력과 그래프 연결 정보를 갱신합니다.</p>
+      </div>
+
+      <h3 class="section-sub">3. 거래·계좌·사건의 정답 단위를 분리</h3>
+      <div class="warning"><b>고민해야 할 핵심:</b> 모델이 거래 한 건을 맞히는 것과 위험 계좌를 찾는 것, 자금세탁 사건 전체를 적발하는 것은 서로 다른 문제입니다. 무엇을 탐지할 모델인지 먼저 정하지 않으면 정답 라벨과 성능 지표가 뒤섞입니다. 예를 들어 한 사건의 거래 20건 중 10건을 찾아 거래 재현율이 50%여도, 사건 관점에서는 이미 그 사건을 적발한 것이므로 사건 적발률은 100%일 수 있습니다.</div>
+      <div class="table-wrap"><table><thead><tr><th>무엇을 찾는가?</th><th>정답은 무엇인가?</th><th>주요 지표명</th><th>쉽게 읽는 질문</th><th>주의점</th></tr></thead><tbody>
+        <tr><td>의심 거래</td><td>Trans의 <code>Is Laundering=1</code>인 거래</td><td>PR-AUC<br>Recall@alert budget<br>Precision@K</td><td>실제 세탁 거래를 얼마나 찾았나?<br>모델이 올린 경보 중 실제 세탁은 얼마나 되나?</td><td>Patterns 밖 양성 거래도 포함</td></tr>
+        <tr><td>위험 계좌</td><td>정해진 시점까지 세탁 거래에 연루됐거나, 이후 정해진 기간 안에 연루될 계좌</td><td>Account PR-AUC<br>Account Recall@K</td><td>위험도가 높은 상위 K개 계좌를 조사했을 때 실제 위험 계좌를 얼마나 찾았나?</td><td>미래 거래를 미리 보고 계좌를 위험하다고 표시하면 안 됨</td></tr>
+        <tr><td>자금세탁 사건</td><td>Patterns의 BEGIN~END로 묶인 attempt 하나</td><td>Incident Recall@1<br>Time-to-first-alert</td><td>사건을 구성하는 거래 중 하나라도 경보를 냈나?<br>사건 시작 후 첫 경보까지 얼마나 걸렸나?</td><td>Patterns 밖 양성은 사건 번호가 없어 계산 불가</td></tr>
+      </tbody></table></div>
+      <h3 class="section-sub">평가 지표를 쉽게 읽기</h3>
+      <div class="grid grid-2">
+        <article class="card"><h3>재현율(Recall)</h3><p>실제 자금세탁 거래 중 모델이 경보로 찾아낸 비율입니다. 실제 세탁 거래가 100건이고 60건을 찾았다면 재현율은 60%입니다. 높을수록 놓친 세탁 거래가 적습니다.</p></article>
+        <article class="card"><h3>정밀도(Precision)</h3><p>모델이 의심스럽다고 경보를 낸 거래 중 실제 자금세탁인 비율입니다. 경보 1,000건 중 실제 세탁이 60건이면 정밀도는 6%입니다. 높을수록 조사해야 할 불필요한 경보가 적습니다.</p></article>
+        <article class="card"><h3>정해진 경보 수에서의 재현율</h3><p>조사팀이 하루에 확인할 수 있는 경보 수를 먼저 정하고, 그 범위 안에서 실제 세탁을 얼마나 찾는지 봅니다. 예를 들어 상위 1,000건만 조사할 때 실제 세탁 100건 중 60건이 들어 있다면 <code>Recall@1,000 = 60%</code>입니다.</p></article>
+        <article class="card"><h3>상위 K건의 정밀도</h3><p>위험 점수가 높은 상위 K건 중 실제 세탁이 얼마나 되는지 봅니다. 위 예시에서 상위 1,000건 중 실제 세탁이 60건이면 <code>Precision@1,000 = 6%</code>입니다. K는 조사 가능한 경보 수입니다.</p></article>
+        <article class="card"><h3>PR-AUC</h3><p>경보 기준점을 느슨하게 또는 엄격하게 바꿨을 때 재현율과 정밀도가 함께 어떻게 변하는지를 하나의 값으로 요약합니다. 0에 가까울수록 나쁘고 1에 가까울수록 좋습니다. 정상 거래가 압도적으로 많은 AML 데이터에서 모델 전체 성능을 비교할 때 유용합니다.</p></article>
+        <article class="card"><h3>사건 적발률(Incident Recall@1)</h3><p>자금세탁 사건을 구성하는 여러 거래 중 한 건이라도 경보를 냈으면 해당 사건을 적발했다고 봅니다. 사건 50개 중 35개에서 한 번 이상 경보가 발생했다면 사건 적발률은 70%입니다.</p></article>
+        <article class="card"><h3>첫 경보까지 걸린 시간</h3><p>자금세탁 사건의 첫 거래가 시작된 뒤 모델이 처음 경보를 낼 때까지 걸린 시간입니다. 같은 사건을 찾더라도 2시간 뒤 경보한 모델이 3일 뒤 경보한 모델보다 대응에 유리합니다. 짧을수록 좋습니다.</p></article>
+        <article class="card"><h3>계좌 상위 K개 재현율</h3><p>위험 점수가 높은 계좌 K개를 조사할 때 실제 위험 계좌가 얼마나 포함되는지 봅니다. 거래가 아니라 계좌를 조사 대상으로 삼는 경우에 사용합니다.</p></article>
+      </div>
+      <p class="lead">Patterns 커버리지는 HI 약 61~65%, LI 19~29%입니다. Patterns에 없는 <code>Is Laundering=1</code> 거래를 정상으로 취급하면 안 되며, 거래 평가는 전체 양성으로, 사건 평가는 attempt가 있는 부분집합으로 각각 보고해야 합니다.</p>
+
+      <h3 class="section-sub">4. 모델이 미래 정보나 볼 수 없는 정보를 사용하지 않도록 하기</h3>
+      <div class="table-wrap"><table><thead><tr><th>문제</th><th>잘못된 사용</th><th>권장 처리</th></tr></thead><tbody>
+        <tr><td>미래 거래 사용</td><td>전체 기간의 연결 수·PageRank·그래프 표현을 미리 계산</td><td>각 거래를 예측하는 시점보다 이전에 발생한 거래만 사용</td></tr>
+        <tr><td>실제 은행이 볼 수 없는 정보 사용</td><td>외부 은행끼리의 거래와 외부 고객정보까지 사용</td><td>전체 그래프 모델은 참고용 최고 성능으로만 두고, 실제 평가는 한 은행이 볼 수 있는 범위로 제한</td></tr>
+        <tr><td>계좌번호 암기</td><td>Account ID와 Bank ID를 입력 변수로 직접 사용</td><td>ID는 계좌 연결에만 사용하고, ID를 입력에서 뺀 모델과 성능 비교</td></tr>
+        <tr><td>데이터셋 혼합</td><td>HI/LI 또는 크기 간 같은 문자열 ID를 동일 계좌로 연결</td><td><code>dataset_id + canonical_bank_id + account_number</code>로 namespace 분리</td></tr>
+      </tbody></table></div>
+
+      <h3 class="section-sub">5. 모델이 합성 데이터의 쉬운 규칙만 외우는지 확인</h3>
+      <div class="grid grid-2">
+        <article class="card"><h3>결제수단</h3><p>ACH에 자금세탁 라벨이 집중되고 Wire·Reinvestment에는 양성이 거의 없습니다. 모델이 계좌 관계를 분석하지 않고 결제수단만 외우는지 확인하기 위해 결제수단을 뺀 모델도 다시 학습해 비교합니다.</p></article>
+        <article class="card"><h3>통화와 금액</h3><p>달러 100과 엔화 100은 같은 가치가 아니므로 서로 다른 통화의 금액을 그대로 더하지 않습니다. 통화별로 금액 분포를 조정하고, 환율이 필요한 경우 예측 시점 이전 정보만 사용합니다.</p></article>
+        <article class="card"><h3>시간대와 요일</h3><p>특정 시간대에 라벨이 몰리는 현상도 합성 데이터를 만든 방식 때문일 수 있습니다. 시간대·요일을 사용한 모델과 뺀 모델을 모두 만들어 성능 차이를 확인합니다.</p></article>
+        <article class="card"><h3>은행·엔티티 이름</h3><p>Bank Name은 제한된 합성 이름 풀이 반복됩니다. 이름 문자열을 직접 넣으면 생성 템플릿을 암기할 수 있으므로 구조화된 최소 정보만 사용합니다.</p></article>
+      </div>
+
+      <h3 class="section-sub">6. 거래가 매우 많은 계좌를 GNN에서 처리하는 방법</h3>
+      <p class="lead">송신 거래 수 중앙값은 2건, 99백분위는 92건이지만 최대는 168,672~222,037건입니다. GNN이 이런 계좌의 모든 거래 상대를 한꺼번에 불러오면 필요한 메모리와 계산량이 급격히 늘고, 소수의 대량 거래 계좌가 모델 판단에 지나치게 큰 영향을 줄 수 있습니다.</p>
+      <div class="card">
+        <h3>“거래 상대를 불러온다”는 뜻</h3>
+        <p>현재 <code>A → B</code> 거래가 자금세탁인지 판단한다고 가정합니다. 최종 결과는 이 거래의 자금세탁 확률 하나이지만, GNN은 그 확률을 계산하기 전에 A와 B가 과거에 누구와 어떤 거래를 했는지 참고합니다. 주변 계좌와 과거 거래 정보를 모아 A와 B의 특징을 숫자 벡터로 만든 뒤, 현재 거래의 금액·통화·결제수단과 결합해 위험 점수를 계산합니다.</p>
+        <div class="concept-flow" aria-label="주변 거래를 이용한 GNN 거래 판정 흐름">
+          <div class="concept-node"><b>A·B의 과거 거래 조회</b><span>주변 계좌와 과거 거래 정보</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="concept-node"><b>계좌 표현 계산</b><span>주변 정보를 고정 길이 숫자 벡터로 요약</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="concept-node"><b>A→B 거래 판정</b><span>자금세탁 확률 0~1 출력</span></div>
+        </div>
+      </div>
+
+      <div class="warning"><b>왜 일부만 선택하나?</b> 예를 들어 A의 과거 송신 거래가 168,672건이고 고유 상대 계좌가 14,230개라면, A와 연결된 정보를 모두 읽는 것만으로도 계산량이 매우 커집니다. 여기에 상대 계좌들의 거래까지 한 단계 더 따라가면 참고해야 할 거래 수가 수십만~수백만 건으로 늘어날 수 있습니다. 거래 하나를 판단할 때마다 이 작업을 반복하는 것은 학습과 실시간 탐지 모두에서 비효율적입니다.</div>
+
+      <h3 class="section-sub">일부 거래와 상대 계좌를 선택하는 방법</h3>
+      <div class="table-wrap"><table><thead><tr><th>선택 방법</th><th>예시</th><th>의도</th><th>주의점</th></tr></thead><tbody>
+        <tr><td>최근 시간만 사용</td><td>예측 시점 이전 24시간 거래</td><td>최근의 급격한 자금 이동에 집중</td><td>며칠에 걸친 장기 패턴을 놓칠 수 있음</td></tr>
+        <tr><td>최근 N건만 사용</td><td>A와 B 각각 최근 100건</td><td>계좌마다 계산량을 일정하게 제한</td><td>거래가 많은 계좌에서는 중요한 과거 거래가 빠질 수 있음</td></tr>
+        <tr><td>상대 계좌 수 제한</td><td>고유 상대 14,230개 중 최대 100개</td><td>GNN이 읽을 주변 계좌 수를 제한</td><td>선택 기준에 따라 그래프 구조가 달라짐</td></tr>
+        <tr><td>중요 거래 우선 선택</td><td>최근 거래, 큰 금액, 반복 상대, 신규 상대, 기존 위험 점수가 높은 상대</td><td>무작위 선택보다 의심 신호를 보존</td><td>선택 규칙 자체가 편향을 만들 수 있음</td></tr>
+      </tbody></table></div>
+      <p class="lead">이처럼 현재 거래를 판단할 때 참고할 주변 계좌와 과거 거래 중 일부를 선택하는 과정을 <b>이웃 샘플링(neighbor sampling)</b>이라고 합니다. “양성·음성 결과 중 일부만 고른다”는 뜻이 아니라, <b>결과 하나를 계산하기 위해 참고할 그래프의 범위를 줄인다</b>는 뜻입니다.</p>
+
+      <div class="card">
+        <h3>프로젝트에서 비교할 후보</h3>
+        <ul>
+          <li>최근 1시간·24시간·7일 거래 사용</li>
+          <li>계좌당 최근 20건·50건·100건 사용</li>
+          <li>고유 상대 계좌 최대 20개·50개·100개 사용</li>
+          <li>무작위 선택과 최근성·금액·신규 상대 우선 선택 비교</li>
+          <li>직접 거래 상대만 볼 때와 상대의 상대까지 볼 때 비교</li>
+        </ul>
+        <p><b>함께 확인할 것:</b> 계산시간과 메모리뿐 아니라 자금세탁 탐지율, 정상 대량 거래 계좌의 오탐률, 8개 패턴별 탐지율을 같이 봅니다. 너무 적게 선택하면 여러 계좌에 걸친 세탁 흐름이 중간에서 잘려 보일 수 있기 때문입니다.</p>
+      </div>
+
+      <h3 class="section-sub">7. 어떤 평가 숫자를 볼 것인가</h3>
+      <div class="grid grid-2">
+        <article class="card"><h3>정확도만 사용하지 않음</h3><p>정상 거래가 99.9% 이상이므로 모든 거래를 정상이라고 예측해도 정확도가 매우 높습니다. 정해진 경보 수 안에서 실제 세탁을 얼마나 찾는지, 경보 중 실제 세탁이 얼마나 되는지, 하루에 경보가 몇 건 발생하는지를 봅니다.</p></article>
+        <article class="card"><h3>조건별 결과를 따로 확인</h3><p>Patterns 안/밖, 8개 패턴 유형, 정상 대량 처리 계좌, 은행별, 결제수단별, 시간 구간별 성능을 분리해 어떤 조건에서 놓치거나 오탐하는지 확인합니다.</p></article>
+        <article class="card"><h3>데이터 규모별 역할</h3><p>Small은 코드와 데이터 처리 검증, Medium은 여러 모델과 입력 변수 비교, Large는 최종 성능·메모리·처리시간 확인에 사용합니다.</p></article>
+        <article class="card"><h3>HI/LI 강건성</h3><p>HI에서 선택한 모델과 임계값을 더 희소한 LI에서 검증합니다. 두 세트는 독립 세계이므로 동일 계좌 추적에는 사용하지 않습니다.</p></article>
+      </div>
+
+      <h3 class="section-sub">8. 서비스에서 무엇을 입력하고 무엇을 판정할 것인가</h3>
+      <div class="warning"><b>먼저 구분할 것:</b> 여러 거래를 한 번에 모델에 넣는 <b>처리 단위</b>와 모델이 무엇에 대해 결과를 내는 <b>판정 단위</b>는 서로 다릅니다. 거래 1,000건을 묶어서 한 번에 처리해도, 결과는 거래마다 하나씩 총 1,000개를 받을 수 있습니다.</div>
+
+      <h3 class="section-sub">8.1 판정 단위는 무엇인가?</h3>
+      <p class="lead">IBM 데이터의 원래 라벨은 거래 한 건마다 붙어 있으므로 첫 모델은 <b>거래별 자금세탁 확률을 출력하는 거래 판정 모델</b>로 두는 것이 가장 자연스럽습니다. 계좌 위험도와 조사 사건은 거래별 결과를 모아 그 다음 단계에서 만들 수 있습니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>구분</th><th>단위</th><th>서비스에서 하는 일</th><th>이 프로젝트의 권장안</th></tr></thead><tbody>
+        <tr><td>모델 처리 단위</td><td>여러 거래의 묶음</td><td>GPU·서버 병목을 줄이기 위해 거래를 배치로 계산</td><td>거래 수 또는 최대 대기시간 기준의 작은 배치</td></tr>
+        <tr><td>모델 판정 단위</td><td>거래 1건</td><td>각 거래에 0~1 위험 점수와 정상·의심 판정 부여</td><td>기본 출력으로 사용</td></tr>
+        <tr><td>계좌 위험 단위</td><td>계좌 1개</td><td>최근 거래 점수와 행동을 모아 계좌 위험도 계산</td><td>거래 결과를 집계한 보조 출력</td></tr>
+        <tr><td>조사 케이스 단위</td><td>연관 거래·계좌 묶음</td><td>같은 자금 흐름으로 보이는 경보를 묶어 조사자에게 제공</td><td>최종 운영 경보 형태</td></tr>
+      </tbody></table></div>
+      <div class="card">
+        <h3>예시</h3>
+        <p>거래 1,000건을 한 번에 입력하면 모델은 <code>[0.03, 0.87, 0.42, …]</code>처럼 거래별 위험 점수 1,000개를 출력합니다. 이후 A 계좌에서 높은 점수의 거래가 반복되면 A의 계좌 위험도를 높이고, <code>A → B → C</code>처럼 연결된 의심 거래들은 하나의 조사 케이스로 묶을 수 있습니다.</p>
+      </div>
+
+      <h3 class="section-sub">8.2 거래 한 건의 점수는 어떻게 계산하는가?</h3>
+      <p class="lead">현재 <code>A → B</code> 거래를 판단할 때 GNN은 A와 B의 과거 행동을 요약한 계좌 표현과 현재 거래의 특징을 결합합니다.</p>
+      <div class="concept-flow" aria-label="계좌 표현과 현재 거래를 이용한 거래별 판정">
+        <div class="concept-node"><b>A·B의 계좌 표현</b><span>과거 행동과 주변 관계의 숫자 요약</span></div>
+        <div class="arrow" aria-hidden="true">+</div>
+        <div class="concept-node"><b>현재 A→B 거래 특징</b><span>금액·통화·결제수단·시간</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="concept-node"><b>현재 거래 위험 점수</b><span>예: 0.87 → 의심</span></div>
+      </div>
+      <div class="grid grid-2">
+        <article class="card"><h3>모델 파라미터</h3><p>모든 계좌에 공통으로 적용되는 계산 규칙입니다. 과거 행동을 어떻게 요약하고 현재 거래 점수를 어떻게 계산할지를 학습합니다.</p></article>
+        <article class="card"><h3>계좌 임베딩·상태</h3><p>각 계좌의 과거 행동을 고정 길이 숫자 벡터로 요약한 값입니다. 계좌마다 별도로 저장할 수 있고, 새로운 거래가 처리되면 달라질 수 있습니다.</p></article>
+      </div>
+
+      <h3 class="section-sub">8.3 임베딩이 저장돼 있다면 과거 거래도 다시 넣어야 하나?</h3>
+      <p class="lead"><b>일반 GNN도 과거 거래 전체를 항상 다시 넣는 것은 아닙니다.</b> 보통 예측 대상 계좌 주변에서 최근 일정 기간 또는 일부 이웃만 조회해 작은 그래프를 만들고 임베딩을 계산합니다. 방식의 차이는 과거 전체 사용 여부가 아니라, <b>예측할 때 주변 그래프를 다시 조회해 임베딩을 계산하는가</b>, 아니면 <b>미리 저장하고 갱신해 둔 계좌 상태를 바로 읽는가</b>입니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>방식</th><th>예측할 때 필요한 정보</th><th>상태를 만들거나 갱신할 때</th><th>장점</th><th>주의점</th></tr></thead><tbody>
+        <tr><td>주변 그래프 조회형 GNN</td><td>현재 거래 + A·B 주변의 최근 거래 또는 선택된 이웃</td><td>예측할 때마다 작은 주변 그래프에서 임베딩을 계산</td><td>예측 시점의 최신 주변 구조를 직접 반영</td><td>과거 전체를 쓰지는 않지만 매번 그래프 조회와 계산이 필요</td></tr>
+        <tr><td>저장 임베딩 사용</td><td>현재 거래 + 미리 저장한 A·B 임베딩</td><td>별도 작업으로 주기적으로 다시 계산하거나 새 거래를 반영해 갱신</td><td>예측할 때 과거 거래를 다시 읽지 않아 빠름</td><td>저장 값이 오래되면 최근 행동을 반영하지 못함</td></tr>
+        <tr><td>시간 변화형 GNN(TGN)</td><td>현재 거래 + 저장된 A·B 상태, 필요하면 최근 이웃 일부</td><td>각 거래를 예측한 뒤 해당 거래로 A·B 상태를 갱신</td><td>과거를 상태에 요약해 실시간 처리에 적합</td><td>거래 순서와 상태 저장·복구를 정확히 관리해야 함</td></tr>
+      </tbody></table></div>
+      <div class="card">
+        <h3>세 방식을 한 문장으로 구분하면</h3>
+        <ul>
+          <li><b>주변 그래프 조회형 GNN:</b> 예측할 때 관련 과거 거래와 주변 계좌 일부가 필요합니다.</li>
+          <li><b>저장 임베딩 방식:</b> 예측할 때 과거 거래를 다시 조회하지 않지만, 임베딩을 만드는 작업과 최신 상태로 갱신하는 작업이 별도로 필요합니다.</li>
+          <li><b>TGN:</b> 저장된 계좌 상태와 현재 거래가 기본 입력입니다. 과거 거래 전체는 다시 넣지 않으며, 최근 이웃 일부는 모델 설계에 따라 추가할 수 있습니다.</li>
+        </ul>
+        <p>따라서 저장 임베딩 방식과 TGN이 과거 정보가 전혀 필요 없다는 뜻은 아닙니다. <b>과거 정보가 이미 저장 상태에 요약되어 있기 때문에 예측할 때 전체 이력을 다시 읽지 않는 것</b>입니다.</p>
+      </div>
+      <div class="card"><h3>왜 상태를 갱신해야 하나?</h3><p>임베딩은 고정된 계좌번호가 아니라 해당 시점까지의 행동 요약입니다. A가 새로운 계좌들에 연속 송금하면 A의 행동과 주변 연결이 달라지므로 저장된 상태도 바뀌어야 합니다. 오래된 임베딩을 계속 사용하면 최근의 급격한 행동 변화를 놓칠 수 있습니다.</p></div>
+
+      <h3 class="section-sub">8.4 여러 거래를 한 번에 처리하는 순서</h3>
+      <div class="concept-flow" aria-label="저장된 계좌 상태를 이용한 배치 예측 흐름">
+        <div class="concept-node"><b>거래 1,000건 도착</b><span>배치에 등장한 고유 계좌 추출</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="concept-node"><b>계좌 상태 일괄 조회</b><span>중복 계좌는 한 번만 조회</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="concept-node"><b>위험 점수 1,000개 출력</b><span>입력 거래마다 개별 판정</span></div>
+      </div>
+      <div class="card">
+        <ol>
+          <li>배치에 포함된 송신·수신 계좌의 저장 상태를 한 번에 가져옵니다.</li>
+          <li>각 거래의 송신 상태, 수신 상태, 금액·통화·결제수단을 결합합니다.</li>
+          <li>입력 거래 수와 같은 개수의 자금세탁 위험 점수를 계산합니다.</li>
+          <li>거래별 경보를 반환한 뒤 배치 거래로 관련 계좌 상태를 갱신합니다.</li>
+          <li>높은 거래 점수를 계좌별로 모으고 연관된 거래를 조사 케이스로 묶습니다.</li>
+        </ol>
+        <p><b>중요:</b> 현재 거래를 계좌 상태에 먼저 반영한 뒤 같은 거래를 예측하면 판단 대상 거래를 이미 본 것이 됩니다. 반드시 <b>거래별 점수 계산 → 결과 반환 → 상태 갱신</b> 순서를 지켜야 합니다.</p>
+      </div>
+
+      <h3 class="section-sub">8.5 저장 상태와 최근 이웃을 함께 쓰는 이유</h3>
+      <p class="lead">저장 상태만 사용하면 빠르지만 최근의 중요한 연결을 충분히 기억하지 못할 수 있습니다. 반대로 과거 그래프 전체를 매번 조회하면 너무 느립니다. 따라서 저장된 계좌 상태에 최근 이웃 20개나 100개만 추가하는 절충 방식을 비교할 수 있습니다.</p>
+      <div class="card">
+        <p><b>권장 비교:</b> 저장 상태만 사용 / 저장 상태+최근 20개 이웃 / 저장 상태+최근 100개 이웃을 비교합니다. 처리시간·메모리와 함께 거래 탐지율, 정상 대량 거래 계좌의 오탐률, 8개 패턴별 탐지율을 확인합니다.</p>
+        <p><b>현재 서비스 구상의 기본안:</b> 여러 거래를 작은 배치로 입력하고, 저장된 송·수신 계좌 상태와 현재 거래 특징으로 거래별 위험 점수를 출력합니다. 필요한 경우 최근 이웃 일부를 보완 정보로 사용하며, 거래별 결과를 계좌 위험도와 조사 케이스로 다시 묶습니다.</p>
+      </div>
+
+      <h3 class="section-sub">8.6 모델 종류와 임베딩 사용 방식을 구분하기</h3>
+      <div class="warning"><b>핵심:</b> LightGBM 같은 테이블 모델, GraphSAGE 같은 GNN, TGN 같은 시간 그래프 모델은 서로 다른 모델입니다. 반면 <b>주변 그래프 조회형</b>과 <b>저장 임베딩 사용</b>은 특정 모델 이름이 아니라, GNN이 계좌 임베딩을 언제 계산하고 서비스에서 어떻게 사용할지에 관한 방식입니다.</div>
+
+      <div class="card">
+        <h3>전체 관계</h3>
+        <div class="pattern-block" aria-label="테이블 모델과 그래프 모델의 관계">
+          <div class="begin">일반 테이블 모델</div>
+          <div class="row">├─ Logistic Regression / Random Forest</div>
+          <div class="row">├─ LightGBM / XGBoost / CatBoost</div>
+          <div class="row">└─ MLP</div>
+          <div class="begin" style="margin-top:8px">그래프 신경망</div>
+          <div class="row">├─ 일반 GNN: GCN / GraphSAGE / GAT / GIN</div>
+          <div class="row">├─ 시간 그래프 모델: TGAT / TGN / DyRep</div>
+          <div class="row">└─ 사용 방식: 주변 그래프 조회 / 임베딩 저장·재사용</div>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <article class="card"><h3>일반 테이블 모델</h3><p>거래 한 건을 표의 한 행으로 보고 학습합니다. 현재 거래 특징과 과거 집계 특징을 입력해 거래별 위험 점수를 냅니다. 그래프 연결 자체를 입력하지는 않습니다.</p><p><b>예:</b> LightGBM, XGBoost, CatBoost, MLP</p></article>
+        <article class="card"><h3>일반 GNN</h3><p>계좌 연결 구조와 거래 간선을 직접 사용해 계좌 임베딩을 만드는 별도 신경망 모델입니다. 자금세탁 분류가 목적이면 송·수신 계좌 임베딩과 거래 특징을 위험 점수로 바꾸는 출력층을 뒤에 붙이며, 보통 GNN과 작은 MLP를 하나의 모델로 함께 학습합니다.</p><p><b>예:</b> GraphSAGE, GAT, GIN + 거래 분류 출력층</p></article>
+        <article class="card"><h3>주변 그래프 조회형</h3><p>특정 모델명이 아니라 GNN을 사용하는 방식입니다. 예측 시 A·B 주변의 최근 거래와 선택된 계좌를 조회하고, GraphSAGE 등의 GNN으로 임베딩을 계산합니다.</p></article>
+        <article class="card"><h3>저장된 고정 임베딩</h3><p>특정 모델명이 아니라 GNN 등으로 미리 계산한 계좌 임베딩을 저장하고 재사용하는 방식입니다. 새로운 거래를 예측할 때 GNN으로 주변 그래프를 다시 계산하지 않고 저장소에서 송·수신 계좌 임베딩을 조회합니다.</p></article>
+        <article class="card"><h3>시간 그래프 모델과 TGN</h3><p>TGN은 시간에 따라 계좌 상태를 갱신하는 별도의 그래프 신경망 모델입니다. LightGBM으로 TGN을 구현하는 것은 아니며, 계좌별 상태·시간 정보·현재 거래를 이용해 점수와 다음 상태를 계산합니다.</p></article>
+        <article class="card"><h3>저장 임베딩으로 거래를 판정하는 방법</h3><p>저장소에서 가져온 송신 계좌 임베딩과 수신 계좌 임베딩을 현재 거래의 금액·통화·결제수단과 합칩니다. 이렇게 만든 한 행을 MLP나 LightGBM에 입력해 현재 거래의 위험 점수를 계산할 수 있습니다.</p></article>
+      </div>
+
+      <div class="table-wrap"><table><thead><tr><th>구분</th><th>모델 자체인가?</th><th>대표 예시 또는 의미</th></tr></thead><tbody>
+        <tr><td>테이블 모델</td><td>예</td><td>LightGBM, XGBoost, CatBoost</td></tr>
+        <tr><td>일반 GNN</td><td>예</td><td>GraphSAGE, GAT, GIN</td></tr>
+        <tr><td>Temporal GNN</td><td>예, 모델 계열</td><td>TGAT, TGN, DyRep</td></tr>
+        <tr><td>TGN</td><td>예, 구체적인 모델 구조</td><td>Temporal Graph Network</td></tr>
+        <tr><td>주변 그래프 조회형</td><td>아니요</td><td>예측할 때 주변 그래프를 조회하여 GNN을 실행하는 방식</td></tr>
+        <tr><td>저장 임베딩 사용</td><td>아니요</td><td>미리 계산한 계좌 임베딩을 저장해 예측에 재사용하는 방식</td></tr>
+      </tbody></table></div>
+
+      <h3 class="section-sub">9. 현재 가장 적합해 보이는 모델·서비스 방식</h3>
+      <div class="warning"><b>현재 권장안:</b> 거래를 작은 배치로 입력하고, 저장된 계좌 상태를 사용하는 <b>TGN 계열 모델</b>로 거래마다 위험 점수를 출력합니다. 저장 상태만으로 부족한 최신 그래프 관계는 최근 이웃 일부로 보완하고, 거래별 결과는 계좌 위험도와 조사 케이스로 다시 묶습니다.</div>
+
+      <div class="concept-flow" aria-label="권장 AML 거래 탐지 서비스 구조">
+        <div class="concept-node"><b>거래 마이크로배치</b><span>거래 수 또는 최대 대기시간 기준</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="concept-node"><b>TGN 계좌 상태+최근 이웃</b><span>송·수신 계좌의 과거 행동 요약</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="concept-node"><b>거래별 점수와 케이스</b><span>개별 판정 후 계좌·사건 단위 집계</span></div>
+      </div>
+
+      <h3 class="section-sub">왜 이 방식이 적합해 보이나?</h3>
+      <div class="grid grid-2">
+        <article class="card"><h3>시간에 따라 변하는 거래 그래프</h3><p>거래가 발생할 때마다 계좌의 행동과 연결 관계가 달라집니다. TGN은 거래 순서에 따라 계좌 상태를 갱신하므로 이 특성을 직접 반영할 수 있습니다.</p></article>
+        <article class="card"><h3>대량 거래 계좌 처리</h3><p>최대 송신 거래가 16만~22만 건인 계좌가 있어 주변 그래프를 매번 크게 만드는 방식은 부담이 큽니다. 저장 상태를 사용하면 과거 전체를 다시 계산하지 않아도 됩니다.</p></article>
+        <article class="card"><h3>배치 처리와 거래별 출력</h3><p>여러 거래를 한 번에 계산해 서버·GPU 사용 효율을 높이면서도 입력 거래마다 개별 위험 점수를 반환할 수 있습니다.</p></article>
+        <article class="card"><h3>최신 그래프 정보 보완</h3><p>저장 상태가 기억하지 못한 최근 연결은 최근 이웃 20~50개를 추가해 보완할 수 있습니다. 최근 이웃이 실제 성능을 높이는지는 실험으로 결정합니다.</p></article>
+      </div>
+
+      <h3 class="section-sub">후보 방식 비교</h3>
+      <div class="table-wrap"><table><thead><tr><th>방식</th><th>예상 탐지 성능</th><th>서비스 속도</th><th>구현 난이도</th><th>권장 역할</th></tr></thead><tbody>
+        <tr><td>일반 테이블 모델</td><td>기준 성능</td><td>매우 빠름</td><td>낮음</td><td>반드시 구축할 비교 기준</td></tr>
+        <tr><td>저장된 고정 임베딩</td><td>중간</td><td>매우 빠름</td><td>낮음~중간</td><td>빠른 서비스 후보, 상태 노후화 확인</td></tr>
+        <tr><td>주변 그래프 조회형 GNN</td><td>높을 가능성</td><td>상대적으로 느림</td><td>중간</td><td>그래프 구조의 추가 가치 확인</td></tr>
+        <tr><td>TGN 상태만 사용</td><td>높을 가능성</td><td>빠름</td><td>높음</td><td>실서비스 주 모델 후보</td></tr>
+        <tr><td>TGN+최근 이웃 일부</td><td>가장 높을 가능성</td><td>중간~빠름</td><td>가장 높음</td><td>성능 향상이 충분할 때 최종 후보</td></tr>
+      </tbody></table></div>
+      <p class="lead"><b>주의:</b> 복잡한 GNN이 반드시 더 좋은 것은 아닙니다. TGN+최근 이웃의 성능 향상이 작고 처리시간이나 운영 복잡도가 크게 늘어난다면 TGN 상태만 사용하거나 일반 테이블 모델을 선택하는 편이 더 나을 수 있습니다.</p>
+
+      <h3 class="section-sub">단계적으로 구현하는 이유</h3>
+      <div class="card">
+        <ol>
+          <li><b>테이블 기준 모델:</b> 현재 거래와 과거 1시간·24시간·7일 집계 특징으로 빠른 기준 성능을 만듭니다.</li>
+          <li><b>주변 그래프 조회형 GNN:</b> 최근 이웃을 이용했을 때 계좌 관계가 실제로 추가 성능을 주는지 확인합니다.</li>
+          <li><b>TGN 상태 기반 모델:</b> 그래프 조회 비용을 줄이면서 성능을 유지할 수 있는지 확인합니다.</li>
+          <li><b>TGN+최근 이웃:</b> 상태만으로 부족할 때 최근 이웃 20~50개를 추가하고 성능 향상과 비용을 비교합니다.</li>
+        </ol>
+      </div>
+
+      <h3 class="section-sub">최종 모델을 고를 때 함께 볼 것</h3>
+      <div class="table-wrap"><table><thead><tr><th>구분</th><th>확인 항목</th></tr></thead><tbody>
+        <tr><td>탐지 성능</td><td>PR-AUC, 정해진 경보 수에서의 재현율·정밀도, 사건 적발률, 첫 경보까지 걸린 시간</td></tr>
+        <tr><td>오탐</td><td>정상 대량 거래 계좌를 잘못 경보하는 비율, 은행·결제수단·시간대별 오탐</td></tr>
+        <tr><td>서비스 성능</td><td>거래 또는 배치당 추론시간, 초당 처리량, 최대 대기시간, 메모리 사용량</td></tr>
+        <tr><td>운영 안정성</td><td>계좌 상태 저장 용량, 장애 후 복구, 늦게 도착한 거래 처리, 모델 교체 시 상태 초기화</td></tr>
+        <tr><td>일반화</td><td>새 계좌, LI 데이터, 더 큰 데이터셋에서도 성능이 유지되는지 확인</td></tr>
+      </tbody></table></div>
+      <div class="card"><b>현재 결론:</b> 최종 목표는 <b>거래별 판정 + 마이크로배치 + TGN 계좌 상태 + 선택적인 최근 이웃 + 계좌·케이스 집계</b>입니다. 다만 TGN의 추가 성능이 구현·운영 비용을 정당화하는지는 반드시 단순 모델과 같은 조건에서 비교한 뒤 결정합니다.</div>
+
+      <h3 class="section-sub">권장 실험 순서</h3>
+      <div class="card">
+        <ol>
+          <li>Small로 적재·키 정규화·시간 재생·그래프 생성 코드를 검증합니다.</li>
+          <li>Medium에서 정상 거래가 충분한 기간만 사용해 시간순으로 데이터를 나누고, 입력 변수를 하나씩 뺀 모델도 비교합니다.</li>
+          <li>일반 머신러닝 모델, 한 은행이 볼 수 있는 그래프만 사용한 GNN, 전체 그래프를 사용한 참고용 GNN을 같은 기준으로 비교합니다.</li>
+          <li>Large의 정상 거래가 충분한 기간에서 최종 성능·메모리·처리시간을 평가합니다.</li>
+          <li>정상 거래가 끝난 이후 구간은 특수 상황에 대한 보조 시험으로 따로 보고합니다.</li>
+          <li>거래를 얼마나 찾았는지와 자금세탁 사건을 얼마나 찾았는지, 조건별 결과를 함께 제시합니다.</li>
+        </ol>
+      </div>
+      <div class="warning"><b>핵심 원칙:</b> 정상 거래가 충분한 기간을 기본 학습·테스트에 사용합니다. 정상 거래가 거의 사라진 이후 기간은 기본 성능에 섞지 않고, 특수한 상황에서 모델이 어떻게 반응하는지 확인하는 보조 시험으로 따로 봅니다.</div>
+    </section>
+  </main>
+
+  <footer><div class="wrap">근거 파일: IBM_AML_Small_EDA_Report.docx · eda_small_v3.ipynb · six_dataset_unit_summary.csv · six_dataset_pattern_breakdown.csv</div></footer>
+
+  <script>
+    const datasets = [
+      {id:'HI-Small', tx:5078345, pos:5177, txRate:0.101943, accounts:518581, involved:6357, accountRate:1.225845, attempts:370, inside:3209, outside:1968, bankIds:30470, bankNames:20053},
+      {id:'HI-Medium', tx:31898238, pos:35230, txRate:0.110445, accounts:2087786, involved:41857, accountRate:2.004851, attempts:2756, inside:22743, outside:12487, bankIds:122333, bankNames:80180},
+      {id:'HI-Large', tx:179702229, pos:225546, txRate:0.125511, accounts:2126855, involved:222522, accountRate:10.462490, attempts:16467, inside:137936, outside:87610, bankIds:122333, bankNames:80180},
+      {id:'LI-Small', tx:6924049, pos:3565, txRate:0.051487, accounts:712688, involved:5304, accountRate:0.744225, attempts:117, inside:1023, outside:2542, bankIds:41815, bankNames:27652},
+      {id:'LI-Medium', tx:31251483, pos:16041, txRate:0.051329, accounts:2040823, involved:23510, accountRate:1.151986, attempts:456, inside:3909, outside:12132, bankIds:119617, bankNames:76636},
+      {id:'LI-Large', tx:176066557, pos:100604, txRate:0.057140, accounts:2079627, involved:129263, accountRate:6.215682, attempts:2218, inside:19461, outside:81143, bankIds:119619, bankNames:76637}
+    ];
+    const hiPatterns = [
+      ['GATHER-SCATTER',716,51],['SCATTER-GATHER',626,44],['STACK',466,43],['FAN-OUT',342,48],
+      ['FAN-IN',318,40],['CYCLE',287,54],['BIPARTITE',263,49],['RANDOM',191,41]
+    ];
+    const liPatterns = [
+      ['GATHER-SCATTER',150,12],['SCATTER-GATHER',182,13],['STACK',180,18],['FAN-OUT',149,19],
+      ['FAN-IN',73,12],['CYCLE',83,12],['BIPARTITE',129,16],['RANDOM',77,15]
+    ];
+    const daily = [
+      ['09-01',1114921,1524807],['09-02',754449,1027758],['09-03',207382,283326],['09-04',207430,282476],
+      ['09-05',482650,657397],['09-06',482089,657170],['09-07',482751,658504],['09-08',482773,657938],
+      ['09-09',654467,891573],['09-10',208325,282877],['09-11',396,77],['09-12',281,48],
+      ['09-13',184,48],['09-14',121,31],['09-15',46,9],['09-16',46,7],['09-17',23,3],['09-18',11,0]
+    ];
+    const paymentFormats = [
+      ['ACH',.746,.328],['Bitcoin',.038,.036],['Cash',.022,.019],['Cheque',.017,.018],
+      ['Credit Card',.016,.015],['Reinvestment',0,0],['Wire',0,0]
+    ];
+    const fmt = new Intl.NumberFormat('ko-KR');
+
+    function row(label, bars) {
+      const outer = document.createElement('div'); outer.className = 'chart-row';
+      const lab = document.createElement('div'); lab.className = 'row-label'; lab.textContent = label; outer.appendChild(lab);
+      const barsEl = document.createElement('div'); barsEl.className = 'bars';
+      bars.forEach(b => {
+        const line = document.createElement('div'); line.className = 'bar-line';
+        const track = document.createElement('div'); track.className = 'track';
+        const fill = document.createElement('div'); fill.className = `bar ${b.color}`; fill.style.width = `${Math.max(.35, b.width)}%`; fill.title = `${b.label}: ${b.text}`;
+        track.appendChild(fill);
+        const value = document.createElement('div'); value.className = 'bar-value'; value.textContent = b.text;
+        line.append(track, value); barsEl.appendChild(line);
+      });
+      outer.appendChild(barsEl); return outer;
+    }
+
+    const minRate = .05, maxRate = 11;
+    const logWidth = v => 100 * (Math.log10(v) - Math.log10(minRate)) / (Math.log10(maxRate) - Math.log10(minRate));
+    const unitChart = document.getElementById('unit-rate-chart');
+    datasets.forEach(d => unitChart.appendChild(row(d.id, [
+      {label:'자금세탁 거래 비율', text:`${d.txRate.toFixed(4)}%`, width:logWidth(d.txRate), color:'blue'},
+      {label:'계좌 연루율', text:`${d.accountRate.toFixed(4)}%`, width:logWidth(d.accountRate), color:'orange'}
+    ])));
+
+    const coverageChart = document.getElementById('pattern-coverage-chart');
+    datasets.forEach(d => {
+      const total = d.inside + d.outside, insidePct = d.inside / total * 100, outsidePct = 100 - insidePct;
+      const outer = document.createElement('div'); outer.className = 'chart-row';
+      const lab = document.createElement('div'); lab.className = 'row-label'; lab.textContent = d.id;
+      const stack = document.createElement('div'); stack.className = 'stack';
+      const inside = document.createElement('div'); inside.className = 'inside'; inside.style.width = `${insidePct}%`; inside.textContent = insidePct >= 22 ? `${insidePct.toFixed(1)}%` : '';
+      inside.title = `Patterns 안: ${fmt.format(d.inside)}건 (${insidePct.toFixed(2)}%)`;
+      const outside = document.createElement('div'); outside.className = 'outside'; outside.style.width = `${outsidePct}%`; outside.textContent = outsidePct >= 22 ? `${outsidePct.toFixed(1)}%` : '';
+      outside.title = `Patterns 밖: ${fmt.format(d.outside)}건 (${outsidePct.toFixed(2)}%)`;
+      stack.append(inside, outside); outer.append(lab, stack); coverageChart.appendChild(outer);
+    });
+
+    function drawPatterns(targetId, data) {
+      const max = Math.max(...data.flatMap(d => [d[1], d[2]]));
+      const target = document.getElementById(targetId);
+      data.forEach(d => target.appendChild(row(d[0], [
+        {label:'거래 수', text:fmt.format(d[1]), width:d[1]/max*100, color:'blue'},
+        {label:'attempt 수', text:fmt.format(d[2]), width:d[2]/max*100, color:'purple'}
+      ])));
+    }
+    drawPatterns('hi-pattern-chart', hiPatterns); drawPatterns('li-pattern-chart', liPatterns);
+
+    const dailyTarget = document.getElementById('daily-volume-chart');
+    const dailyMax = Math.max(...daily.flatMap(d => [d[1], d[2]]));
+    const dailyWidth = v => v <= 0 ? 0 : 100 * Math.log10(v + 1) / Math.log10(dailyMax + 1);
+    daily.forEach(d => dailyTarget.appendChild(row(d[0], [
+      {label:'HI-Small', text:fmt.format(d[1]), width:dailyWidth(d[1]), color:'blue'},
+      {label:'LI-Small', text:d[2] ? fmt.format(d[2]) : '–', width:dailyWidth(d[2]), color:'orange'}
+    ])));
+
+    const payTarget = document.getElementById('payment-format-chart');
+    const payMax = Math.max(...paymentFormats.flatMap(d => [d[1], d[2]]));
+    paymentFormats.forEach(d => payTarget.appendChild(row(d[0], [
+      {label:'HI-Small', text:`${d[1].toFixed(3)}%`, width:d[1]/payMax*100, color:'blue'},
+      {label:'LI-Small', text:`${d[2].toFixed(3)}%`, width:d[2]/payMax*100, color:'orange'}
+    ])));
+
+    const bankMax = Math.max(...datasets.map(d => d.bankIds));
+    const bankChart = document.getElementById('bank-chart');
+    datasets.forEach(d => bankChart.appendChild(row(d.id, [
+      {label:'고유 Bank ID', text:fmt.format(d.bankIds), width:d.bankIds/bankMax*100, color:'blue'},
+      {label:'고유 Bank Name', text:fmt.format(d.bankNames), width:d.bankNames/bankMax*100, color:'orange'}
+    ])));
+
+    function drawDegree(targetId, values) {
+      const max = Math.max(...values.map(v => v[1]));
+      const target = document.getElementById(targetId);
+      values.forEach(v => target.appendChild(row(v[0], [
+        {label:v[0], text:fmt.format(v[1]), width:100*Math.log10(v[1]+1)/Math.log10(max+1), color:v[2]}
+      ])));
+    }
+    drawDegree('hi-degree-chart', [['송신 거래 수',168672,'blue'],['수신 거래 수',1084,'orange'],['고유 수신 상대',14230,'green'],['고유 송신 상대',545,'purple']]);
+    drawDegree('li-degree-chart', [['송신 거래 수',222037,'blue'],['수신 거래 수',1553,'orange'],['고유 수신 상대',18942,'green'],['고유 송신 상대',785,'purple']]);
+
+    const tbody = document.getElementById('summary-table');
+    datasets.forEach(d => {
+      const tr = document.createElement('tr');
+      [d.id,fmt.format(d.tx),fmt.format(d.pos),`${d.txRate.toFixed(4)}%`,fmt.format(d.accounts),fmt.format(d.involved),`${d.accountRate.toFixed(4)}%`,fmt.format(d.attempts),fmt.format(d.inside),fmt.format(d.outside)]
+        .forEach(v => { const td=document.createElement('td'); td.textContent=v; tr.appendChild(td); });
+      tbody.appendChild(tr);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>비동기 작업 기본 개념</title><link rel="stylesheet" href="../assets/style.css"></head><body><div class="layout"><header class="top"><a href="../index.html"><small>AML INFRASTRUCTURE GUIDE</small><br><strong>인프라 아키텍처 문서</strong></a></header><div class="content"><aside><strong>개념 문서</strong><a  href="01-cloud.html">01. 클라우드</a>
+<a  href="02-server.html">02. 서버</a>
+<a  href="03-operating-system.html">03. 운영체제</a>
+<a  href="04-container-runtime.html">04. 컨테이너와 Docker</a>
+<a  href="05-source-repository.html">05. Git과 소스 저장소</a>
+<a  href="06-ci.html">06. CI</a>
+<a  href="07-image-registry.html">07. 컨테이너 이미지 저장소</a>
+<a  href="08-cd.html">08. CD</a>
+<a  href="09-reverse-proxy.html">09. Reverse Proxy</a>
+<a  href="10-https-certificate.html">10. HTTPS와 TLS 인증서</a>
+<a  href="11-frontend-deployment.html">11. 프론트엔드 배포</a>
+<a  href="12-backend.html">12. 백엔드</a>
+<a  href="13-database-type.html">13. 데이터베이스</a>
+<a  href="14-database-location.html">14. 데이터베이스 실행 위치</a>
+<a  href="15-file-storage.html">15. 파일 저장</a>
+<a class="current" href="16-async-jobs.html">16. 비동기 작업</a>
+<a  href="17-cache.html">17. 캐시</a>
+<a  href="18-secrets.html">18. 비밀정보 관리</a>
+<a  href="19-observability.html">19. 로그·모니터링</a>
+<a  href="20-dns.html">20. DNS</a>
+<a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>비동기 작업 기본 개념</h1><h2 id="s-1">동기와 비동기 처리</h2>
+<p>동기 처리에서는 요청을 보낸 사용자가 작업이 끝날 때까지 응답을 기다린다. 비동기 처리에서는 서버가 작업 접수를 먼저 알리고 실제 처리는 별도 Worker가 나중에 수행한다.</p>
+<p>AI 추론, 대용량 파일 처리, 이메일 발송과 외부 API 호출처럼 오래 걸리거나 실패 후 재시도가 필요한 작업에 비동기 구조를 사용할 수 있다.</p>
+<pre class="diagram"><code>mermaid
+flowchart LR
+    User[사용자] --&gt; API[Backend API]
+    API --&gt; Queue[작업 큐]
+    Queue --&gt; Worker[Worker]
+    Worker --&gt; External[GPU·외부 시스템]
+    Worker --&gt; Result[(결과 저장)]</code></pre>
+<h2 id="s-16">기본 구성 요소</h2>
+<ul>
+<li><strong>Producer</strong>: 처리할 메시지나 작업을 생성해 큐에 넣는 애플리케이션</li>
+<li><strong>Queue</strong>: 아직 처리하지 않은 작업을 보관하는 공간</li>
+<li><strong>Consumer/Worker</strong>: 큐에서 작업을 가져와 실행하는 프로세스</li>
+<li><strong>Acknowledgement</strong>: 작업 처리가 끝났음을 큐에 알리는 응답</li>
+<li><strong>Retry</strong>: 일시적 실패가 발생한 작업을 다시 시도하는 정책</li>
+<li><strong>Dead-letter queue</strong>: 반복해서 실패한 메시지를 분리해 보관하는 큐</li>
+<li><strong>Visibility timeout</strong>: 한 Worker가 처리 중인 메시지를 다른 Worker에게 잠시 숨기는 시간</li>
+<li><strong>Backpressure</strong>: 생산 속도가 처리 속도보다 빠를 때 시스템 과부하를 제어하는 방법</li>
+</ul>
+<h2 id="s-27">중복 처리와 멱등성</h2>
+<p>네트워크 오류나 Worker 장애로 같은 작업이 두 번 전달될 수 있다. 멱등성은 같은 작업을 여러 번 수행해도 결과가 한 번 수행한 것과 같게 만드는 성질이다. 고유 작업 ID, DB 제약조건과 처리 상태 기록 등을 이용해 중복 결과를 방지할 수 있다.</p>
+<p>비동기 처리를 도입하면 작업 상태 조회, 오류 표시, 재시도 한도와 장기 실행 작업의 취소 정책도 함께 설계해야 한다.</p>
+<h2 id="s-33">주요 처리 방식과 큐</h2>
+<h3 id="s-35">별도 메시지 큐 없는 처리</h3>
+<p>HTTP 요청을 받은 Backend가 작업을 바로 실행하거나 같은 프로세스의 내부 작업 실행기에 넘기는 방식이다. 외부 큐 서비스가 없으며 작업 상태와 재시도를 애플리케이션 프로세스 및 DB 등의 수단으로 직접 관리한다.</p>
+<h3 id="s-39">Amazon SQS</h3>
+<p>SQS(Simple Queue Service)는 Producer가 보낸 메시지를 AWS가 보관하고 Consumer가 Polling으로 가져가는 관리형 메시지 큐다. 처리 완료 후 메시지를 삭제하며 Visibility Timeout, 재시도와 Dead-letter queue 구성을 제공한다.</p>
+<h3 id="s-43">Redis 기반 작업 큐</h3>
+<p>Redis의 List, Sorted Set, Stream 같은 자료 구조와 언어별 Queue 라이브러리를 이용해 작업을 전달하는 방식이다. 라이브러리가 작업 직렬화, 예약 실행, 재시도와 Worker 관리를 제공할 수 있으며 Redis 서버가 메시지 상태를 저장한다.</p>
+<h3 id="s-47">RabbitMQ</h3>
+<p>RabbitMQ는 Producer가 보낸 메시지를 Exchange와 Binding 규칙에 따라 Queue로 전달하는 Message Broker다. Consumer Acknowledgement, Publisher Confirm, 재전달과 Dead-letter Exchange 등을 구성할 수 있으며 Broker 서버의 저장 공간, Cluster와 업데이트를 운영 주체가 관리한다.</p>
+<h3 id="s-51">Apache Kafka</h3>
+<p>Kafka는 이벤트를 Topic의 Partition에 순서대로 추가하고 정해진 보존 기간 동안 유지하는 분산 Event Streaming 플랫폼이다. Consumer는 Offset으로 읽은 위치를 관리하고 이전 Offset으로 돌아가 이벤트를 다시 처리할 수 있다. 여러 독립 Consumer가 같은 이벤트 흐름을 각자의 목적으로 읽을 수 있다.</p>
+<h3 id="s-55">작업 큐와 Event Stream의 차이</h3>
+<p>전통적인 작업 큐는 하나의 작업을 Consumer 중 하나가 처리하고 완료 후 제거하는 흐름에 초점을 둔다. Event Stream은 이벤트를 일정 기간 보존하면서 여러 Consumer가 각자의 읽기 위치로 반복 처리하는 흐름에 초점을 둔다. 실제 제품은 두 기능을 일부 함께 제공할 수 있지만 중심 사용 방식이 다르다.</p></main></div><footer class="footer">원본 문서: <a href="../../16-async-jobs.md">16-async-jobs.md</a></footer></div></body></html>
