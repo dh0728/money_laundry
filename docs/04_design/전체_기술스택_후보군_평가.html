@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AML 이상거래 탐지 서비스 기술 스택 후보군 평가</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #1f2937;
+      background: #fff;
+      font-family: Pretendard, "Noto Sans KR", "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+    main { width: min(1400px, calc(100% - 40px)); margin: 36px auto 70px; }
+    h1 { margin: 0; color: #172b4d; font-size: 32px; letter-spacing: -.03em; }
+    h2 { margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #172b4d; color: #172b4d; font-size: 23px; }
+    h3 { margin: 28px 0 9px; color: #253858; font-size: 18px; }
+    p { margin: 8px 0; }
+    .subtitle { color: #5e6c84; }
+    .meta { margin-top: 14px; color: #5e6c84; font-size: 13px; }
+    .table-wrap { overflow-x: auto; margin-bottom: 18px; }
+    table { width: 100%; min-width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+    th, td { padding: 10px 11px; border: 1px solid #aeb8c6; vertical-align: top; }
+    thead th { color: #fff; background: #253858; text-align: center; vertical-align: middle; }
+    thead th:first-child { width: 155px; }
+    thead th small { display: block; margin-top: 4px; color: #dfe6f0; font-weight: 400; line-height: 1.35; }
+    tbody th { color: #172b4d; background: #eef1f5; text-align: left; vertical-align: middle; }
+    td b.score { display: block; margin-top: 7px; color: #172b4d; text-align: right; white-space: nowrap; }
+    td.score-cell { position: relative; padding-bottom: 16px; }
+    td.score-cell::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 2px;
+      width: 100%;
+      height: 4px;
+      background: #e7ebef;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    td.score-cell::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 2px;
+      width: var(--score-width);
+      height: 4px;
+      background: var(--score-color);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    td.s100 { --score-width: 100%; --score-color: #006837; }
+    td.s90  { --score-width: 90%;  --score-color: #1a9850; }
+    td.s80  { --score-width: 80%;  --score-color: #66bd63; }
+    td.s70  { --score-width: 70%;  --score-color: #a6d96a; }
+    td.s60  { --score-width: 60%;  --score-color: #d9ef8b; }
+    td.s50  { --score-width: 50%;  --score-color: #fee08b; }
+    td.s40  { --score-width: 40%;  --score-color: #fdae61; }
+    td.s30  { --score-width: 30%;  --score-color: #f46d43; }
+    td.s20  { --score-width: 20%;  --score-color: #d73027; }
+    td.s10  { --score-width: 10%;  --score-color: #a50026; }
+    .color-scale td { padding: 8px 3px; text-align: center; font-weight: 800; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .color-scale .c10  { color: #fff; background: #a50026; }
+    .color-scale .c20  { color: #fff; background: #d73027; }
+    .color-scale .c30  { color: #fff; background: #f46d43; }
+    .color-scale .c40  { color: #4b2d19; background: #fdae61; }
+    .color-scale .c50  { color: #443d20; background: #fee08b; }
+    .color-scale .c60  { color: #344024; background: #d9ef8b; }
+    .color-scale .c70  { color: #263b20; background: #a6d96a; }
+    .color-scale .c80  { color: #153a20; background: #66bd63; }
+    .color-scale .c90  { color: #fff; background: #1a9850; }
+    .color-scale .c100 { color: #fff; background: #006837; }
+    tr.total th, tr.total td { background: #e8f2ec; vertical-align: middle; }
+    tr.total td { text-align: center; }
+    tr.total strong { display: block; color: #145c43; font-size: 17px; }
+    tr.total small { color: #3f5f54; }
+    tr.total td.selected { outline: 2px solid #21825f; outline-offset: -2px; }
+    .simple th, .simple td { vertical-align: middle; }
+    .simple td { text-align: left; }
+    a { color: inherit; text-underline-offset: 3px; }
+    .note { padding: 10px 12px; border: 1px solid #aeb8c6; background: #f7f8fa; font-size: 13px; }
+    .small { color: #5e6c84; font-size: 12px; }
+    .workflow-wrap { overflow-x: auto; margin: 14px 0 24px; }
+    .workflow-board { min-width: 1280px; }
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(145px, 1fr));
+      gap: 28px;
+      align-items: stretch;
+    }
+    .workflow.implementation { grid-template-columns: repeat(9, minmax(110px, 1fr)); }
+    .workflow-step {
+      position: relative;
+      min-height: 104px;
+      padding: 13px 11px;
+      border: 1px solid #8f9bad;
+      background: #f7f8fa;
+      text-align: center;
+    }
+    .workflow-step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -23px;
+      color: #5e6c84;
+      font-size: 22px;
+      font-weight: 700;
+      transform: translateY(-50%);
+    }
+    .workflow-step strong { display: block; color: #172b4d; font-size: 14px; }
+    .workflow-step span { display: block; margin-top: 5px; color: #42526e; font-size: 12px; line-height: 1.4; }
+    .workflow-step.model { border-color: #4f78a3; background: #eef4fa; }
+    .workflow-step.store { border-color: #54866f; background: #eef6f1; }
+    code { font-family: Consolas, monospace; }
+    @media (max-width: 700px) {
+      main { width: calc(100% - 20px); margin-top: 22px; }
+      h1 { font-size: 25px; }
+      h2 { font-size: 20px; }
+    }
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      main { width: 100%; margin: 0; }
+      h2, h3 { break-after: avoid; }
+      table { font-size: 8.5pt; }
+      th, td { padding: 6px; }
+      .table-wrap { overflow: visible; }
+      a { text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>AML 이상거래 탐지 서비스 기술 스택 후보군 평가</h1>
+  <p class="subtitle">Python 입문 수준 5인 팀 · 약 4개월 · 실시간 거래 수집 · 추론 마이크로배치 · 2단계 GNN 추론 · 웹 조사 대시보드</p>
+  <p class="meta">평가일: 2026-08-10 · 원점수는 10점 단위 · 최종 총점 = Σ(원점수 × 가중치) ÷ 100 · 하단 막대 길이·색상 = 원점수</p>
+  
+  <h2>구현 업무·데이터 흐름</h2>
+  <p class="small">거래 원본과 AI 예측 결과는 같은 Database에 저장하며, Backend는 저장된 결과를 조회한다.</p>
+  <div class="workflow-wrap">
+    <div class="workflow-board" role="img" aria-label="목업 데이터 생성, 실시간 거래 내역 전달, 배치 처리, Database 원본 저장, 그래프 구성과 특징 생성, AI 모델 추론, 같은 Database에 예측 결과 저장, Backend 조회, Frontend 표시 순서의 구현 업무 데이터 흐름">
+      <div class="workflow implementation">
+        <div class="workflow-step"><strong>목업 데이터 생성기</strong><span>신규 거래를<br>지속적으로 생성</span></div>
+        <div class="workflow-step"><strong>실시간 메시지 전달</strong><span>거래 내역 수집<br>보존·재처리</span></div>
+        <div class="workflow-step"><strong>배치 처리</strong><span>거래를 배치 단위로<br>묶어서 전달</span></div>
+        <div class="workflow-step store"><strong>Database</strong><span>거래·계좌 원본과<br>처리 상태 저장</span></div>
+        <div class="workflow-step model"><strong>그래프 구성·특징 생성</strong><span>과거·현재 거래로<br>서브그래프·특징 생성</span></div>
+        <div class="workflow-step model"><strong>AI·Model</strong><span>생성된 그래프 입력으로<br>이상 여부·패턴 예측</span></div>
+        <div class="workflow-step store"><strong>Database</strong><span>같은 DB에<br>예측 결과 저장</span></div>
+        <div class="workflow-step"><strong>Backend</strong><span>DB의 거래·예측·알림<br>조회 기능 제공</span></div>
+        <div class="workflow-step"><strong>Frontend</strong><span>조사 대시보드에<br>결과 표시</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>1. 프로젝트 성격 및 평가 기준</h2>
+  <div class="table-wrap">
+    <table class="simple">
+      <thead><tr><th>구분</th><th>분석 결과</th></tr></thead>
+      <tbody>
+        <tr><th>팀 구성</th><td>Frontend 1명, Backend 1명, DB·Data Pipeline·Infra 1명, AI·Model 2명. 거의 전원이 Python 기초 입문 수준이며 나머지 기술은 새로 학습해야 한다.</td></tr>
+        <tr><th>서비스 범위</th><td>목업 거래 생성기 → 실시간 메시지 수집 → 배치 구성 → 2단계 모델 추론 → 저장 → API → 웹 조사 화면.</td></tr>
+        <tr><th>모델 구조</th><td>1단계 이상거래 여부 이진분류, 2단계 이상거래 패턴 다중클래스 분류. 신규 계좌와 계속 증가하는 거래 그래프를 처리해야 한다.</td></tr>
+        <tr><th>핵심 제약</th><td>약 4개월 내 종단간 MVP 완성이 우선이다. 따라서 새 언어와 운영 컴포넌트를 동시에 과도하게 늘리면 안 된다.</td></tr>
+        <tr><th>AI 경험</th><td>PyTorch와 TensorFlow/Keras 모두 예제 코드를 몇 차례 따라 한 동일한 초심자 수준이다. 기반 프레임워크 친숙도에는 차등을 주지 않는다.</td></tr>
+        <tr><th>평가 분야</th><td>Frontend, Backend, 실시간 메시지 전달, Database, AI·Model, 실행·배포의 6개 대분류만 사용한다.</td></tr>
+        <tr><th>후보 단위</th><td>각 후보는 해당 분야의 전체 업무 범위를 맡는 완성형 선택지다. 여러 기술을 함께 쓰는 후보는 기능 이점과 운영·학습 복잡성을 같은 표에서 함께 평가한다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-wrap">
+    <table class="simple">
+      <thead><tr><th>평가 원칙</th><th>적용 방식</th></tr></thead>
+      <tbody>
+        <tr><th>분야별 기준</th><td>모든 분야에 같은 기준을 강제하지 않고, 그 분야의 실제 완료 조건에 맞는 기준과 가중치를 사용한다.</td></tr>
+        <tr><th>전체 범위 비교</th><td>일부 작업에만 강한 기술을 다른 표에서 별도로 추천하지 않는다. 해당 분야 전체를 단독 또는 조합으로 맡겼을 때의 기능 누락과 장점을 함께 채점한다.</td></tr>
+        <tr><th>조합 비용 반영</th><td>프로세스·DB·언어·운영 컴포넌트가 늘어나는 후보는 학습량, 통합, 장애 지점, 배포 복잡성에 직접 감점을 받는다.</td></tr>
+        <tr><th>학습 비용 대칭</th><td>팀은 Python 기초 입문 수준이고 그 위의 프레임워크는 어느 후보든 새로 학습한다. 따라서 <strong>특정 언어·프레임워크에만 "새로 배워야 한다"는 이유로 감점하지 않는다.</strong> 감점 대상은 언어 자체가 아니라 <strong>동시에 관리할 도구체인·런타임·프로세스의 개수</strong>다. AI 분야에 적용한 "기반 프레임워크 친숙도에 차등을 주지 않는다"와 같은 원칙을 전 분야에 적용한다.</td></tr>
+        <tr><th>포트폴리오 축 분리</th><td>학습·포트폴리오 가치는 취업 시장 수요만 보는 <strong>독립 기준</strong>으로 두고, 구현 난이도에 영향을 주는 "자료·실무 설명력"(학습 자료의 양)과 분리해 이중 계상을 막는다.</td></tr>
+        <tr><th>결과 계산 순서</th><td>후보와 분야별 기준·가중치를 먼저 고정하고 기준별 원점수를 입력한 뒤에만 최종 총점과 순위를 계산한다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-wrap">
+    <table class="simple">
+      <thead><tr><th>원점수</th><th>고정 판정 기준</th></tr></thead>
+      <tbody>
+        <tr><th>100점</th><td>요구를 직접 충족하고 현재 범위에서 의미 있는 약점이나 추가 복잡성이 없다.</td></tr>
+        <tr><th>90점</th><td>매우 적합하며 작은 학습·설정 부담만 있다.</td></tr>
+        <tr><th>80점</th><td>적합하지만 관리 가능한 약점 또는 추가 작업 하나가 있다.</td></tr>
+        <tr><th>70점</th><td>사용 가능하지만 일정·통합·기능 중 하나에 뚜렷한 부담이 있다.</td></tr>
+        <tr><th>60점</th><td>구현은 가능하나 중요한 조건부 제약이나 큰 학습 부담이 있다.</td></tr>
+        <tr><th>50점</th><td>핵심 요구와 일부 충돌하여 선택 근거가 약하다.</td></tr>
+        <tr><th>40점</th><td>핵심 요구와 크게 어긋나거나 초심자 일정 위험이 높다.</td></tr>
+        <tr><th>30점</th><td>기술적으로 가능하더라도 이번 범위에서는 비현실적이다.</td></tr>
+        <tr><th>20점</th><td>핵심 요구 대부분을 충족하지 못한다.</td></tr>
+        <tr><th>10점</th><td>현재 프로젝트에는 사실상 적용할 수 없다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-wrap">
+    <table class="color-scale">
+      <tbody><tr><th><a href="https://d3js.org/d3-scale-chromatic">색상 기준</a></th><td class="c10">10</td><td class="c20">20</td><td class="c30">30</td><td class="c40">40</td><td class="c50">50</td><td class="c60">60</td><td class="c70">70</td><td class="c80">80</td><td class="c90">90</td><td class="c100">100</td></tr></tbody>
+    </table>
+  </div>
+  <p class="note"><strong>평가 절차:</strong> 기존 순위는 입력값으로 사용하지 않았다. 6개 대분류별 전체 업무 범위, 완성형 후보, 전용 기준과 가중치를 먼저 고정하고 기준별 원점수를 입력한 뒤에만 최종 총점과 순위를 계산했다. 색상은 표준 ColorBrewer <code>RdYlGn</code> 10단계 배열을 낮은 점수의 적색부터 높은 점수의 녹색 순서로 사용한다. 점수는 공식 문서에 근거한 구조화된 판단이며, 실측 POC나 팀원 독립 채점 전까지 통계적 객관성을 의미하지는 않는다.</p>
+
+  <h2>2. Frontend</h2>
+  <p class="small">범위: 조사 대시보드, 거래·알림 표와 폼, 계좌 관계 그래프, REST·WebSocket 연동, 브라우저 배포.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>평가 기준</th><th><a href="https://react.dev/">React 스택</a><small>TypeScript·Vite·MUI·Cytoscape.js</small></th><th><a href="https://vuejs.org/guide/introduction.html">Vue 스택</a><small>TypeScript·Vite·Vuetify·Cytoscape.js</small></th><th><a href="https://angular.dev/overview">Angular 스택</a><small>TypeScript·Angular Material·Cytoscape.js</small></th><th><a href="https://doc.qt.io/qtforpython-6/">Qt 스택</a><small>Python·PySide6·Qt 6</small></th></tr></thead>
+    <tbody>
+      <tr><th>전체 화면 범위 충족<br>22%</th><td class="score-cell s100">웹 조사 화면, 업무용 UI와 관계 그래프를 한 조합에서 모두 제공한다.<b class="score">100점</b></td><td class="score-cell s90">전체 범위는 충족하지만 AML형 복합 화면 사례 폭이 React보다 조금 좁다.<b class="score">90점</b></td><td class="score-cell s90">전체 기능은 충족하지만 이번 규모에 비해 구조가 크다.<b class="score">90점</b></td><td class="score-cell s30">데스크톱 앱이므로 브라우저 서비스라는 핵심 범위를 바꿔야 한다.<b class="score">30점</b></td></tr>
+      <tr><th>초심자 MVP 속도<br>18%</th><td class="score-cell s70">자료는 많지만 TypeScript, React 상태와 컴포넌트 방식을 함께 배워야 한다.<b class="score">70점</b></td><td class="score-cell s90">공식 Vite·TypeScript 구성이 준비되어 있고 템플릿 문법이 비교적 직관적이다.<b class="score">90점</b></td><td class="score-cell s50">프레임워크 규칙, DI와 RxJS까지 학습 범위가 넓다.<b class="score">50점</b></td><td class="score-cell s60">Python은 재사용하지만 Qt 위젯·시그널과 데스크톱 배포를 새로 배워야 한다.<b class="score">60점</b></td></tr>
+      <tr><th>업무 UI 완성도<br>14%</th><td class="score-cell s90">MUI와 Cytoscape.js로 표·폼·대화상자·그래프를 안정적으로 구성한다.<b class="score">90점</b></td><td class="score-cell s90">Vuetify와 Cytoscape.js로 필요한 업무 화면을 충분히 만든다.<b class="score">90점</b></td><td class="score-cell s100">Angular Material과 일관된 프레임워크 구조가 대형 업무 UI에 강하다.<b class="score">100점</b></td><td class="score-cell s80">네이티브 위젯은 풍부하지만 웹 조사 화면 공유에는 불리하다.<b class="score">80점</b></td></tr>
+      <tr><th>그래프·API 연동<br>14%</th><td class="score-cell s100">Cytoscape.js, REST와 WebSocket의 React 예제와 통합 선택지가 풍부하다.<b class="score">100점</b></td><td class="score-cell s90">동일 기능을 구현할 수 있으나 React 전용 예제보다 선택 폭이 좁다.<b class="score">90점</b></td><td class="score-cell s80">연동은 가능하지만 Angular 생명주기와 외부 그래프 라이브러리를 맞춰야 한다.<b class="score">80점</b></td><td class="score-cell s40">FastAPI와 연결할 수 있어도 웹용 그래프 라이브러리와 배포 경로를 재설계해야 한다.<b class="score">40점</b></td></tr>
+      <tr><th>자료·생태계<br>13%</th><td class="score-cell s100">공식 문서, 강의, UI·그래프 라이브러리 자료가 가장 풍부하다.<b class="score">100점</b></td><td class="score-cell s90">공식 문서와 입문 자료가 충분하다.<b class="score">90점</b></td><td class="score-cell s90">공식 문서와 기업형 사례가 풍부하다.<b class="score">90점</b></td><td class="score-cell s70">자료는 많지만 웹 서비스보다 데스크톱 중심이다.<b class="score">70점</b></td></tr>
+      <tr><th>유지보수·배포<br>9%</th><td class="score-cell s90">TypeScript와 컴포넌트 생태계로 화면 확장과 브라우저 배포가 안정적이다.<b class="score">90점</b></td><td class="score-cell s90">중대형 화면 확장과 브라우저 배포에 충분하다.<b class="score">90점</b></td><td class="score-cell s90">일관된 구조는 강하지만 소규모 팀에도 같은 규칙 비용이 든다.<b class="score">90점</b></td><td class="score-cell s50">사용자별 데스크톱 패키징과 업데이트 경로가 별도로 필요하다.<b class="score">50점</b></td></tr>
+      <tr><th>학습·포트폴리오 가치<br>10%</th><td class="score-cell s100">프론트엔드 채용에서 가장 많이 요구되는 스택이다.<b class="score">100점</b></td><td class="score-cell s70">국내 수요가 있지만 React보다 공고 수가 적다.<b class="score">70점</b></td><td class="score-cell s60">대기업·SI 일부에서 쓰지만 신규 채용 비중이 낮다.<b class="score">60점</b></td><td class="score-cell s30">웹 프론트엔드 직군 경력으로 인정받기 어렵다.<b class="score">30점</b></td></tr>
+      <tr class="total"><th>최종 총점</th><td class="selected"><strong>92.3점</strong><small>1위</small></td><td><strong>88.0점</strong><small>2위</small></td><td><strong>79.8점</strong><small>3위</small></td><td><strong>50.8점</strong><small>4위</small></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>3. Backend</h2>
+  <p class="small">범위: Frontend용 API, 큐 지속 소비, 배치 구성, 2단계 추론 호출, 결과 저장과 장애 복구.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>평가 기준</th><th><a href="https://fastapi.tiangolo.com/tutorial/background-tasks/#caveat">FastAPI + Python Worker</a><small>API와 지속 작업을 별도 프로세스로 분리</small></th><th><a href="https://spring.io/projects/spring-boot">Spring Boot + Python Worker</a></th><th><a href="https://www.django-rest-framework.org/">Django + DRF + Python Worker</a></th><th><a href="https://fastapi.tiangolo.com/">FastAPI</a><small>API·소비·배치·추론을 한 프로세스에서 수행</small></th><th>Python Worker<small>소비·배치·추론만 수행</small></th></tr></thead>
+    <tbody>
+      <tr><th>전체 범위 충족<br>22%</th><td class="score-cell s100">API와 지속 소비·배치·추론을 분리해 전체 범위를 충족한다.<b class="score">100점</b></td><td class="score-cell s100">Java API와 Python 추론 Worker가 전체 범위를 충족한다.<b class="score">100점</b></td><td class="score-cell s100">Django API와 Python 추론 Worker가 전체 범위를 충족한다.<b class="score">100점</b></td><td class="score-cell s100">한 프로세스가 API부터 추론까지 모두 맡아 기능 누락은 없다.<b class="score">100점</b></td><td class="score-cell s30">지속 소비와 추론은 하지만 Frontend가 사용할 API가 없다.<b class="score">30점</b></td></tr>
+      <tr><th>초심자 MVP 속도<br>18%</th><td class="score-cell s70">두 프로세스의 공통 스키마와 실행 순서를 관리해야 한다.<b class="score">70점</b></td><td class="score-cell s60">두 프로세스에 더해 빌드 도구·런타임·의존성 관리를 두 벌 운영해야 한다.<b class="score">60점</b></td><td class="score-cell s50">Django의 큰 프레임워크 규칙과 별도 Worker를 함께 익혀야 한다.<b class="score">50점</b></td><td class="score-cell s90">실행 프로세스가 하나라 가장 빠르게 연결한다.<b class="score">90점</b></td><td class="score-cell s80">Worker 자체는 단순하지만 누락된 API를 다른 방식으로 보완해야 한다.<b class="score">80점</b></td></tr>
+      <tr><th>지속 소비·추론 적합성<br>16%</th><td class="score-cell s100">지속 작업을 전용 Worker가 맡아 API 요청 처리와 충돌하지 않는다.<b class="score">100점</b></td><td class="score-cell s100">전용 Python Worker가 지속 작업을 안정적으로 맡는다.<b class="score">100점</b></td><td class="score-cell s100">전용 Python Worker가 지속 작업을 안정적으로 맡는다.<b class="score">100점</b></td><td class="score-cell s50">무거운 지속 작업이 API 생명주기와 같은 프로세스에 묶인다.<b class="score">50점</b></td><td class="score-cell s100">Kafka 소비와 배치·추론에만 집중한다.<b class="score">100점</b></td></tr>
+      <tr><th>모델·DB 통합<br>14%</th><td class="score-cell s90">두 프로세스가 스키마를 공유하고 DB를 연결점으로 사용할 수 있다.<b class="score">90점</b></td><td class="score-cell s70">큐 페이로드 직렬화 계약과 오류 추적 경계가 언어를 넘는다. 다만 확정 구조가 "두 경로는 DB에서만 만난다"이므로 객체 공유 이점 자체를 쓰지 않는다.<b class="score">70점</b></td><td class="score-cell s70">Django 모델 계층과 Worker의 데이터 계약을 별도로 맞춰야 한다.<b class="score">70점</b></td><td class="score-cell s100">모델, Pydantic와 DB 코드를 같은 경계에서 직접 공유한다.<b class="score">100점</b></td><td class="score-cell s90">모델과 DB 연동은 쉽지만 API 데이터 계약이 없다.<b class="score">90점</b></td></tr>
+      <tr><th>장애 격리·복구<br>11%</th><td class="score-cell s100">API와 Worker를 독립 재시작하고 큐 재전달로 재처리할 수 있다.<b class="score">100점</b></td><td class="score-cell s100">서비스별 장애 격리와 독립 확장이 가능하다.<b class="score">100점</b></td><td class="score-cell s100">API와 Worker 장애를 분리할 수 있다.<b class="score">100점</b></td><td class="score-cell s50">소비·추론 오류나 장시간 작업이 API 전체에 직접 영향을 준다.<b class="score">50점</b></td><td class="score-cell s70">Worker 재시작은 쉽지만 API 가용성이라는 비교 대상이 없다.<b class="score">70점</b></td></tr>
+      <tr><th>자료·실무 설명력<br>9%</th><td class="score-cell s90">Python API와 비동기 추론 책임 분리를 명확히 설명할 수 있다.<b class="score">90점</b></td><td class="score-cell s100">기업형 Java·Python 서비스 분리 사례가 풍부하다.<b class="score">100점</b></td><td class="score-cell s100">Django와 Worker 운영 사례가 풍부하다.<b class="score">100점</b></td><td class="score-cell s100">FastAPI와 Python AI 연동 자료가 매우 많다.<b class="score">100점</b></td><td class="score-cell s80">Python 소비자 예제는 많지만 완성형 Backend 구조 설명은 약하다.<b class="score">80점</b></td></tr>
+      <tr><th>학습·포트폴리오 가치<br>10%</th><td class="score-cell s70">Python 백엔드 수요는 늘고 있으나 공고 수는 Spring보다 적다.<b class="score">70점</b></td><td class="score-cell s100">국내 백엔드 채용의 사실상 표준이며 금융권 수요가 특히 크다.<b class="score">100점</b></td><td class="score-cell s70">Python 백엔드 포지션에서 통용된다.<b class="score">70점</b></td><td class="score-cell s60">같은 Python 백엔드지만 단일 프로세스라 구조 설명력이 약하다.<b class="score">60점</b></td><td class="score-cell s40">API가 없어 백엔드 포지션 산출물로 불완전하다.<b class="score">40점</b></td></tr>
+      <tr class="total"><th>최종 총점</th><td><strong>89.3점</strong><small>1위</small></td><td class="selected"><strong>88.6점</strong><small>2위</small></td><td><strong>83.8점</strong><small>3위</small></td><td><strong>80.7점</strong><small>4위</small></td><td><strong>68.5점</strong><small>5위</small></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>4. 실시간 메시지 전달</h2>
+  <p class="small">범위: 목업 거래의 지속 수신, 유실 없는 전달, 독성 메시지 격리, 배치 입력 제공.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>평가 기준</th><th><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html">Amazon SQS</a><small>AWS 관리형 큐 + 네이티브 DLQ</small></th><th><a href="https://kafka.apache.org/documentation/">Kafka</a></th><th><a href="https://www.rabbitmq.com/docs">RabbitMQ</a></th><th><a href="https://redis.io/docs/latest/develop/data-types/streams/">Redis Streams</a></th><th>API / DB Polling</th></tr></thead>
+    <tbody>
+      <tr><th>전달 보장·재시작 내구성<br>22%<span class="small"> (Q-1·Q-2)</span></th><td class="score-cell s100">최소 1회 전달을 서비스가 보장하고 미소비 메시지의 내구성은 AWS가 책임진다.<b class="score">100점</b></td><td class="score-cell s100">디스크 로그 기반이라 재시작 내구성이 가장 강하다.<b class="score">100점</b></td><td class="score-cell s90">durable queue와 persistent message 설정으로 충족한다.<b class="score">90점</b></td><td class="score-cell s70">AOF·RDB 지속화를 직접 설정해야 하고 기본 구성에서는 유실 여지가 있다.<b class="score">70점</b></td><td class="score-cell s40">DB 상태에 의존해 전달 보장 계약 자체가 없다.<b class="score">40점</b></td></tr>
+      <tr><th>실패 격리·DLQ<br>18%<span class="small"> (Q-3)</span></th><td class="score-cell s100">DLQ가 네이티브 기능이라 maxReceiveCount 설정만으로 3회 실패 격리를 충족한다.<b class="score">100점</b></td><td class="score-cell s60">DLQ가 내장이 아니라 소비자나 프레임워크에서 직접 구현해야 한다.<b class="score">60점</b></td><td class="score-cell s90">dead letter exchange를 네이티브로 제공한다.<b class="score">90점</b></td><td class="score-cell s50">pending list는 있으나 DLQ 격리와 건수 지표화를 직접 만들어야 한다.<b class="score">50점</b></td><td class="score-cell s30">실패 격리 경로를 애플리케이션에서 전부 구현한다.<b class="score">30점</b></td></tr>
+      <tr><th>초심자 운영·MVP<br>18%</th><td class="score-cell s100">관리형이라 설치·브로커 운영·용량 관리가 없다.<b class="score">100점</b></td><td class="score-cell s50">broker, topic, partition, offset과 운영 설정을 새로 배워야 한다.<b class="score">50점</b></td><td class="score-cell s70">큐 개념은 직관적이지만 exchange, ack와 durability 설정이 필요하다.<b class="score">70점</b></td><td class="score-cell s80">상대적으로 가볍지만 Redis 서버와 Stream 명령을 배워야 한다.<b class="score">80점</b></td><td class="score-cell s100">추가 서버가 없어 초기 구현은 가장 단순하다.<b class="score">100점</b></td></tr>
+      <tr><th>배치 입력 적합성<br>16%</th><td class="score-cell s80">폴링과 visibility timeout으로 묶어 읽지만 배치 경계는 워커가 관리한다.<b class="score">80점</b></td><td class="score-cell s100">지속 유입을 보존하면서 배치 단위 경계로 읽고 offset을 확정하기 좋다.<b class="score">100점</b></td><td class="score-cell s80">작업 전달은 적합하지만 시간창 묶음을 추가 설계해야 한다.<b class="score">80점</b></td><td class="score-cell s90">가벼운 스트림에서 배치 묶음과 pending 처리를 구현하기 좋다.<b class="score">90점</b></td><td class="score-cell s60">구현은 가능하지만 배치 경계·누락·중복 상태를 직접 관리한다.<b class="score">60점</b></td></tr>
+      <tr><th>Java·Python 양방향 연동<br>11%</th><td class="score-cell s100">AWS SDK가 Java·Python 모두 1급 지원이라 API 서버와 워커가 같은 계약을 쓴다.<b class="score">100점</b></td><td class="score-cell s100">JVM 네이티브 클라이언트와 성숙한 Python 클라이언트를 모두 제공한다.<b class="score">100점</b></td><td class="score-cell s90">양쪽 클라이언트가 있으나 직렬화 계약을 직접 고정해야 한다.<b class="score">90점</b></td><td class="score-cell s90">양쪽 클라이언트는 있으나 스트림 규약을 직접 맞춘다.<b class="score">90점</b></td><td class="score-cell s90">기존 DB client만 사용하지만 큐 계약이 없다.<b class="score">90점</b></td></tr>
+      <tr><th>학습·포트폴리오 가치<br>10%</th><td class="score-cell s80">AWS 관리형 서비스 운영 경험으로 인정된다.<b class="score">80점</b></td><td class="score-cell s100">데이터 엔지니어링 채용에서 가장 자주 요구된다.<b class="score">100점</b></td><td class="score-cell s70">전통적인 메시지 큐 경험으로 통용된다.<b class="score">70점</b></td><td class="score-cell s60">캐시 용도 외 스트림 경험은 인지도가 낮다.<b class="score">60점</b></td><td class="score-cell s20">기술 선택으로 설명할 내용이 없다.<b class="score">20점</b></td></tr>
+      <tr><th>자료·실무 설명력<br>5%</th><td class="score-cell s90">AWS 공식 문서와 DLQ·visibility timeout 사례가 충분하다.<b class="score">90점</b></td><td class="score-cell s100">실시간 이벤트 파이프라인의 대표 기술로 자료가 매우 많다.<b class="score">100점</b></td><td class="score-cell s90">성숙한 메시지 큐 자료와 사례가 풍부하다.<b class="score">90점</b></td><td class="score-cell s90">Redis Stream 공식 자료와 사례가 충분하다.<b class="score">90점</b></td><td class="score-cell s60">일반 구현 자료는 많지만 선택으로서 설명력이 낮다.<b class="score">60점</b></td></tr>
+      <tr class="total"><th>최종 총점</th><td class="selected"><strong>94.3점</strong><small>1위</small></td><td><strong>83.8점</strong><small>2위</small></td><td><strong>82.8점</strong><small>3위</small></td><td><strong>73.6점</strong><small>4위</small></td><td><strong>56.7점</strong><small>5위</small></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>5. Database</h2>
+  <p class="small">범위: 거래·계좌·알림·사건의 영구 저장, 그래프 조회, 배치용 최근 상태, 복구와 지속적인 데이터 증가.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>평가 기준</th><th><a href="https://www.postgresql.org/docs/current/">PostgreSQL</a></th><th>PostgreSQL + Redis</th><th><a href="https://dev.mysql.com/doc/refman/8.4/en/">MySQL</a></th><th>PostgreSQL + Neo4j</th><th>PostgreSQL + Redis + Neo4j</th><th><a href="https://neo4j.com/docs/cypher-manual/current/">Neo4j</a></th></tr></thead>
+    <tbody>
+      <tr><th>원장 무결성·단일 기준<br>20%</th><td class="score-cell s100">관계형 제약과 트랜잭션으로 모든 영구 데이터를 한 기준에서 관리한다.<b class="score">100점</b></td><td class="score-cell s100">PostgreSQL을 원장으로 두면 Redis는 파생 상태로 제한할 수 있다.<b class="score">100점</b></td><td class="score-cell s100">관계형 원장과 트랜잭션 요구를 안정적으로 충족한다.<b class="score">100점</b></td><td class="score-cell s80">PostgreSQL 원장은 유지되지만 Neo4j 복제 지연과 불일치 경계가 생긴다.<b class="score">80점</b></td><td class="score-cell s80">원장은 유지되지만 두 파생 저장소와 동기화 경계가 늘어난다.<b class="score">80점</b></td><td class="score-cell s60">그래프 관계에는 강하지만 사건·알림·권한 원장의 관계형 무결성 표현이 약하다.<b class="score">60점</b></td></tr>
+      <tr><th>그래프 조회 적합성<br>18%</th><td class="score-cell s80">재귀 CTE와 인덱스로 제한된 1~2 hop 조사는 충분하지만 깊은 경로는 불리하다.<b class="score">80점</b></td><td class="score-cell s80">Redis 추가는 그래프 경로 조회 능력을 높이지 않는다.<b class="score">80점</b></td><td class="score-cell s70">재귀 조회는 가능하지만 그래프·JSON 분석 기능 폭이 PostgreSQL보다 좁다.<b class="score">70점</b></td><td class="score-cell s100">Cypher로 임의 경로·사이클과 관계 탐색을 직접 지원한다.<b class="score">100점</b></td><td class="score-cell s100">Neo4j가 그래프 탐색을 전담한다.<b class="score">100점</b></td><td class="score-cell s100">그래프 조회 자체에는 가장 직접적으로 맞는다.<b class="score">100점</b></td></tr>
+      <tr><th>온라인 상태<br>14%</th><td class="score-cell s70">최근 상태를 SQL로 조회할 수 있지만 hot state 반복 조회는 병목 가능성이 있다.<b class="score">70점</b></td><td class="score-cell s100">Redis가 최근 시간창과 공유 상태를 빠르게 제공한다.<b class="score">100점</b></td><td class="score-cell s60">구현 가능하지만 복합 최근 상태 조회 여지가 더 좁다.<b class="score">60점</b></td><td class="score-cell s80">관계 상태는 빠르지만 배치 상태 캐시 용도로는 전용 키값 저장소보다 무겁다.<b class="score">80점</b></td><td class="score-cell s100">Redis가 온라인 상태를 전담한다.<b class="score">100점</b></td><td class="score-cell s80">관계 상태는 처리하지만 일반 캐시·checkpoint 용도에는 과하다.<b class="score">80점</b></td></tr>
+      <tr><th>초심자 MVP·운영 복잡성<br>16%</th><td class="score-cell s100">DB 하나와 SQL만 운영하므로 가장 단순하다.<b class="score">100점</b></td><td class="score-cell s70">Redis 서버, 키 만료와 원장 복구 규칙을 추가로 운영한다.<b class="score">70점</b></td><td class="score-cell s90">DB 하나로 단순하지만 프로젝트형 복합 SQL의 추가 작업이 있다.<b class="score">90점</b></td><td class="score-cell s50">두 DB의 모델·client·동기화와 장애 복구를 배워야 한다.<b class="score">50점</b></td><td class="score-cell s30">세 저장소의 배포·동기화·복구를 초심자 한 명이 맡아야 한다.<b class="score">30점</b></td><td class="score-cell s50">Cypher와 그래프 모델을 배우면서 관계형 원장 기능도 직접 보완해야 한다.<b class="score">50점</b></td></tr>
+      <tr><th>Backend 통합<br>11%</th><td class="score-cell s100">Java(JDBC·JPA·Flyway)와 Python(SQLAlchemy) 양쪽 연결이 모두 표준적이다.<b class="score">100점</b></td><td class="score-cell s80">두 client와 상태 직렬화·일관성 규칙이 필요하다.<b class="score">80점</b></td><td class="score-cell s90">Python ORM 연결은 쉽지만 일부 PostgreSQL 기능을 잃는다.<b class="score">90점</b></td><td class="score-cell s60">ORM과 Neo4j client 사이에 별도 조회·동기화 계층이 생긴다.<b class="score">60점</b></td><td class="score-cell s40">세 client와 두 동기화 경계를 함께 관리해야 한다.<b class="score">40점</b></td><td class="score-cell s70">Python client는 있지만 관계형 API 모델과 직접 맞지 않는다.<b class="score">70점</b></td></tr>
+      <tr><th>증가 대응·복구<br>11%</th><td class="score-cell s90">파티셔닝, 인덱스와 백업으로 지속 증가에 대응한다.<b class="score">90점</b></td><td class="score-cell s100">영구 원장과 빠른 파생 상태를 분리하고 Redis를 재생성할 수 있다.<b class="score">100점</b></td><td class="score-cell s90">대규모 운영과 백업 기능이 성숙하다.<b class="score">90점</b></td><td class="score-cell s90">그래프 확장성은 높지만 두 저장소 복구 순서를 관리해야 한다.<b class="score">90점</b></td><td class="score-cell s100">각 역할의 확장성은 높지만 복구 절차 자체는 가장 복잡하다.<b class="score">100점</b></td><td class="score-cell s90">큰 그래프의 확장과 백업 기능이 성숙하다.<b class="score">90점</b></td></tr>
+      <tr><th>학습·포트폴리오 가치<br>10%</th><td class="score-cell s90">백엔드 채용에서 가장 널리 요구되는 관계형 DB다.<b class="score">90점</b></td><td class="score-cell s100">관계형에 캐시 계층 운영 경험이 더해진다.<b class="score">100점</b></td><td class="score-cell s80">수요는 크지만 신규 프로젝트 채택은 PostgreSQL로 기우는 추세다.<b class="score">80점</b></td><td class="score-cell s90">그래프 DB 경험이 차별점이 되지만 요구 빈도는 낮다.<b class="score">90점</b></td><td class="score-cell s90">폭넓은 저장소 경험을 보이지만 과설계로 읽힐 수 있다.<b class="score">90점</b></td><td class="score-cell s70">특화 기술이라 일반 백엔드 채용 요구 빈도가 낮다.<b class="score">70점</b></td></tr>
+      <tr class="total"><th>최종 총점</th><td class="selected"><strong>90.1점</strong><small>1위</small></td><td><strong>89.4점</strong><small>2위</small></td><td><strong>83.2점</strong><small>3위</small></td><td><strong>78.7점</strong><small>4위</small></td><td><strong>77.2점</strong><small>5위</small></td><td><strong>73.8점</strong><small>6위</small></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>6. AI·Model</h2>
+  <p class="small">범위: 전처리, 기준 모델, 1단계 이진분류, 2단계 다중클래스 분류, GNN 샘플링·학습, 모델 저장과 Backend 추론 연동.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>평가 기준</th><th><a href="https://pytorch-geometric.readthedocs.io/en/stable/">PyTorch + PyG + scikit-learn</a></th><th><a href="https://www.dgl.ai/dgl_docs/">PyTorch + DGL + scikit-learn</a></th><th><a href="https://github.com/tensorflow/gnn">TensorFlow/Keras + TF-GNN + scikit-learn</a></th><th><a href="https://pytorch.org/">PyTorch</a></th><th><a href="https://scikit-learn.org/stable/">scikit-learn</a></th></tr></thead>
+    <tbody>
+      <tr><th>2단계·GNN 범위 충족<br>22%</th><td class="score-cell s100">기준 모델과 GNN을 함께 구성해 이진·다중클래스 두 단계를 모두 실험한다.<b class="score">100점</b></td><td class="score-cell s100">동일하게 기준 모델과 두 단계 GNN 범위를 모두 충족한다.<b class="score">100점</b></td><td class="score-cell s90">범위는 충족하지만 TF-GNN의 Keras 버전 제약이 현재 환경 선택을 제한한다.<b class="score">90점</b></td><td class="score-cell s80">두 단계 모델은 가능하지만 그래프 연산·샘플러를 직접 구현해야 한다.<b class="score">80점</b></td><td class="score-cell s40">이진·다중 분류는 가능하지만 GNN 핵심 범위를 충족하지 못한다.<b class="score">40점</b></td></tr>
+      <tr><th>그래프 샘플링·확장<br>18%</th><td class="score-cell s100">NeighborLoader와 mini-batch 도구가 지속 증가 그래프 실험에 직접 맞는다.<b class="score">100점</b></td><td class="score-cell s100">이웃 샘플링과 대규모 그래프 기능을 직접 제공한다.<b class="score">100점</b></td><td class="score-cell s80">대규모 그래프 sampler가 있지만 Beam과 호환 환경까지 학습 범위가 넓다.<b class="score">80점</b></td><td class="score-cell s50">텐서 연산은 가능하지만 그래프 loader와 sampling을 직접 작성해야 한다.<b class="score">50점</b></td><td class="score-cell s10">그래프 구조와 이웃 샘플링을 직접 표현하는 프레임워크가 아니다.<b class="score">10점</b></td></tr>
+      <tr><th>초심자 실험 속도<br>16%</th><td class="score-cell s60">PyTorch와 PyG API, GNN 개념을 함께 익혀야 한다.<b class="score">60점</b></td><td class="score-cell s50">PyTorch에 더해 DGL 전용 graph·block API를 익혀야 한다.<b class="score">50점</b></td><td class="score-cell s40">TensorFlow, TF-GNN, legacy Keras 호환 설정까지 관리해야 한다.<b class="score">40점</b></td><td class="score-cell s40">라이브러리는 하나지만 필요한 GNN 구성 요소를 직접 구현해야 한다.<b class="score">40점</b></td><td class="score-cell s100">표준 분류 모델과 평가를 가장 빠르게 완성한다.<b class="score">100점</b></td></tr>
+      <tr><th>전처리·기준모델·평가<br>14%</th><td class="score-cell s100">scikit-learn 기준 모델과 PyTorch GNN을 같은 Python 파이프라인에서 비교한다.<b class="score">100점</b></td><td class="score-cell s100">scikit-learn 기준 모델과 DGL GNN 비교 구성이 완전하다.<b class="score">100점</b></td><td class="score-cell s100">scikit-learn과 TensorFlow 평가 파이프라인을 함께 구성한다.<b class="score">100점</b></td><td class="score-cell s70">신경망은 다루지만 전처리·전통 모델·평가 도구를 추가 작성해야 한다.<b class="score">70점</b></td><td class="score-cell s100">전처리, 기준 모델과 평가지표가 매우 완성되어 있다.<b class="score">100점</b></td></tr>
+      <tr><th>Backend 추론 통합<br>11%</th><td class="score-cell s100">Python Worker가 PyTorch 모델과 전처리를 그대로 불러온다.<b class="score">100점</b></td><td class="score-cell s90">Python Worker와 자연스럽게 연결되지만 DGL 런타임 의존성이 추가된다.<b class="score">90점</b></td><td class="score-cell s70">Python 연동은 가능하지만 TensorFlow·legacy Keras 호환 환경을 별도로 고정해야 한다.<b class="score">70점</b></td><td class="score-cell s100">Python Worker에서 직접 저장·로딩하고 추론한다.<b class="score">100점</b></td><td class="score-cell s100">joblib 등으로 CPU 추론을 단순하게 연결한다.<b class="score">100점</b></td></tr>
+      <tr><th>자료·생태계<br>9%</th><td class="score-cell s90">PyTorch와 PyG 공식 예제·연구 코드가 풍부하다.<b class="score">90점</b></td><td class="score-cell s80">공식 문서는 충분하지만 PyG보다 입문 예제 폭이 좁다.<b class="score">80점</b></td><td class="score-cell s70">TensorFlow 자료는 많지만 TF-GNN 전용 자료와 최신 호환 사례가 적다.<b class="score">70점</b></td><td class="score-cell s100">대표 딥러닝 프레임워크로 자료가 매우 많다.<b class="score">100점</b></td><td class="score-cell s100">머신러닝 입문 자료와 예제가 매우 많다.<b class="score">100점</b></td></tr>
+      <tr><th>학습·포트폴리오 가치<br>10%</th><td class="score-cell s100">GNN 실무 경험은 희소성이 높고 PyTorch 계열 수요가 가장 크다.<b class="score">100점</b></td><td class="score-cell s90">GNN 경험으로 동일하게 인정되나 PyG보다 인지도가 낮다.<b class="score">90점</b></td><td class="score-cell s70">TensorFlow 수요는 있으나 신규 채용 비중이 줄고 있다.<b class="score">70점</b></td><td class="score-cell s80">딥러닝 일반 역량은 보이지만 그래프 특화 강점이 없다.<b class="score">80점</b></td><td class="score-cell s60">기본 소양으로 간주되어 차별점이 되지 않는다.<b class="score">60점</b></td></tr>
+      <tr class="total"><th>최종 총점</th><td class="selected"><strong>92.7점</strong><small>1위</small></td><td><strong>88.1점</strong><small>2위</small></td><td><strong>75.6점</strong><small>3위</small></td><td><strong>70.8점</strong><small>4위</small></td><td><strong>66.6점</strong><small>5위</small></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>7. 실행·배포</h2>
+  <p class="small">범위: Frontend, API, Worker 2개와 Database를 팀원 PC 및 한 대의 데모 하드웨어에서 동일하게 실행·복구. 큐는 관리형 서비스라 배포 대상에서 제외된다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>평가 기준</th><th><a href="https://docs.docker.com/compose/">Docker Compose</a></th><th><a href="https://kubernetes.io/docs/home/">Kubernetes</a></th><th>로컬 실행</th></tr></thead>
+    <tbody>
+      <tr><th>다중 서비스 재현성<br>22%</th><td class="score-cell s100">한 선언 파일로 모든 서비스·네트워크·볼륨과 실행 순서를 공유한다.<b class="score">100점</b></td><td class="score-cell s100">배포 객체로 모든 서비스를 선언적으로 관리한다.<b class="score">100점</b></td><td class="score-cell s60">문서화는 가능하지만 팀원별 설치와 실행 차이가 남는다.<b class="score">60점</b></td></tr>
+      <tr><th>초심자 MVP 속도<br>18%</th><td class="score-cell s70">Docker 이미지·볼륨·네트워크 기본 개념을 새로 배워야 한다.<b class="score">70점</b></td><td class="score-cell s20">클러스터, Pod, Deployment와 Service까지 학습량이 매우 크다.<b class="score">20점</b></td><td class="score-cell s100">각 프로그램을 터미널에서 직접 실행해 첫 시작이 가장 빠르다.<b class="score">100점</b></td></tr>
+      <tr><th>버전·환경 일치<br>18%</th><td class="score-cell s100">이미지와 환경 변수로 팀원·데모 PC의 실행 환경을 고정한다.<b class="score">100점</b></td><td class="score-cell s100">컨테이너 이미지와 manifest로 환경을 강하게 고정한다.<b class="score">100점</b></td><td class="score-cell s40">OS, 설치 버전과 환경 변수 차이를 수동으로 해결해야 한다.<b class="score">40점</b></td></tr>
+      <tr><th>복구·로그·상태 관리<br>14%</th><td class="score-cell s80">서비스별 로그, 재시작과 영구 볼륨을 한 도구에서 관리한다.<b class="score">80점</b></td><td class="score-cell s100">health check, 자동 복구와 상태 관리 기능이 가장 강하다.<b class="score">100점</b></td><td class="score-cell s30">재시작 순서, 로그와 데이터 경로가 수동 절차에 의존한다.<b class="score">30점</b></td></tr>
+      <tr><th>단일 데모 PC 적합성<br>9%</th><td class="score-cell s90">단일 호스트에서 여러 컨테이너를 실행하는 목적에 직접 맞는다.<b class="score">90점</b></td><td class="score-cell s40">한 대의 데모 PC에는 클러스터 계층과 자원 사용이 과하다.<b class="score">40점</b></td><td class="score-cell s100">추가 가상화 계층 없이 가장 적은 자원으로 실행한다.<b class="score">100점</b></td></tr>
+      <tr><th>자료·실무 설명력<br>9%</th><td class="score-cell s100">공식 문서와 멀티서비스 예제가 풍부하고 실무 설명력이 높다.<b class="score">100점</b></td><td class="score-cell s100">클라우드 운영 대표 기술로 공식 자료와 사례가 매우 많다.<b class="score">100점</b></td><td class="score-cell s50">개별 기술 자료는 많지만 배포 선택으로서 설명력은 낮다.<b class="score">50점</b></td></tr>
+      <tr><th>학습·포트폴리오 가치<br>10%</th><td class="score-cell s80">컨테이너 기반 배포 경험으로 인정되지만 오케스트레이션 경험은 아니다.<b class="score">80점</b></td><td class="score-cell s100">인프라·DevOps 채용에서 사실상 필수로 요구된다.<b class="score">100점</b></td><td class="score-cell s20">배포 역량으로 설명할 내용이 없다.<b class="score">20점</b></td></tr>
+      <tr class="total"><th>최종 총점</th><td class="selected"><strong>88.9점</strong><small>1위</small></td><td><strong>80.2점</strong><small>2위</small></td><td><strong>58.1점</strong><small>3위</small></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>8. 최종 평가 결과와 대안</h2>
+  <div class="table-wrap"><table class="simple">
+    <thead><tr><th>분야</th><th>최종 선택</th><th>차선 대안</th><th>대안 전환 조건</th></tr></thead>
+    <tbody>
+      <tr><th>Frontend</th><td>React 스택 <span class="small">(92.3점 · 1위)</span></td><td>Vue 스택 <span class="small">(88.0점)</span></td><td>격차가 4.3점으로 벌어져 근접 구간을 벗어났다. React로 확정</td></tr>
+      <tr><th>Backend</th><td>Spring Boot + Python Worker <span class="small">(88.6점 · 2위)</span></td><td>FastAPI + Python Worker <span class="small">(89.3점 · 1위)</span></td><td>0.7점 차이로 아래 근접 후보 규칙이 적용되는 구간이다. 동점에 가까운 두 후보 중 팀이 학습·포트폴리오 가치를 우선해 Spring Boot로 확정</td></tr>
+      <tr><th>실시간 메시지 전달</th><td>Amazon SQS <span class="small">(94.3점 · 1위)</span></td><td>Kafka <span class="small">(83.8점)</span></td><td>장기 보존·replay나 키별 순서 보장이 실제 요구로 되살아날 때(현재는 Q-2·Q-4로 요구에서 제외)</td></tr>
+      <tr><th>Database</th><td>PostgreSQL <span class="small">(90.1점 · 1위)</span></td><td>PostgreSQL + Redis <span class="small">(89.4점)</span></td><td>상태 조회 부하를 실측했을 때 PostgreSQL만으로 목표시간을 충족하지 못할 때</td></tr>
+      <tr><th>AI·Model</th><td>PyTorch + scikit-learn <span class="small">(PyG 포함 시 92.7점 · 1위)</span></td><td>PyTorch + DGL + scikit-learn <span class="small">(88.1점)</span></td><td>PyG 사용 여부는 모델팀이 개발하면서 조정한다. 선정한 샘플러·모델을 PyG로 구현하지 못하고 DGL이 해당 병목을 직접 해결할 때 전환</td></tr>
+      <tr><th>실행·배포</th><td>Docker Compose <span class="small">(88.9점 · 1위)</span></td><td>Kubernetes <span class="small">(80.2점)</span></td><td>단일 데모 PC를 넘어 여러 서버의 자동 복구·수평 확장이 실제 필수 범위가 될 때</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">위 결과는 6개 대분류별 완성형 후보를 비교한 평가 결과다. 3점 이내 차이는 근접 후보로 보고 동일 범위 POC 또는 팀 독립 채점으로 결정한다.</p>
+</main>
+</body>
+</html>
