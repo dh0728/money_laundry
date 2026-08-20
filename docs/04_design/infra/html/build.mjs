@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1'));
 const infra = path.resolve(here, '..');
+const markdownDir = path.join(infra, 'markdown');
 const pagesDir = path.join(here, 'pages');
 const assetsDir = path.join(here, 'assets');
 fs.mkdirSync(pagesDir, { recursive: true });
@@ -76,32 +77,32 @@ const css = `
 `;
 if (!draftOnly && !v2Only) fs.writeFileSync(path.join(assetsDir, 'style.css'), css.trim() + '\n');
 
-const docs = fs.readdirSync(infra).filter(name => /^\d{2}-.+\.md$/.test(name)).sort();
+const docs = fs.readdirSync(markdownDir).filter(name => /^\d{2}-.+\.md$/.test(name)).sort();
 const titles = new Map(docs.map(name => {
-  const first = fs.readFileSync(path.join(infra, name), 'utf8').match(/^#\s+(.+)$/m)?.[1] || name;
+  const first = fs.readFileSync(path.join(markdownDir, name), 'utf8').match(/^#\s+(.+)$/m)?.[1] || name;
   return [name, first];
 }));
 const nav = (current) => docs.map(name => `<a ${name === current ? 'class="current"' : ''} href="${name.replace('.md','.html')}">${name.slice(0,2)}. ${esc(titles.get(name).replace(/ 기본 개념$/, ''))}</a>`).join('\n');
 
 for (const name of docs) {
   if (draftOnly || v2Only) break;
-  const source = fs.readFileSync(path.join(infra, name), 'utf8').replace(/^#\s+.+\n/, '').replace(/^\[인프라 결정 기록으로 돌아가기\]\(README\.md\)\s*/m, '');
+  const source = fs.readFileSync(path.join(markdownDir, name), 'utf8').replace(/^#\s+[^\r\n]+\r?\n/, '').replace(/^\[인프라 결정 기록으로 돌아가기\]\(README\.md\)\s*/m, '');
   const title = titles.get(name);
-  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="../assets/style.css"></head><body><div class="layout"><header class="top"><a href="../index.html"><small>AML INFRASTRUCTURE GUIDE</small><br><strong>인프라 아키텍처 문서</strong></a></header><div class="content"><aside><strong>개념 문서</strong>${nav(name)}</aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>${esc(title)}</h1>${markdown(source)}</main></div><footer class="footer">원본 문서: <a href="../../${name}">${name}</a></footer></div></body></html>`;
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="../assets/style.css"></head><body><div class="layout"><header class="top"><a href="../index.html"><small>AML INFRASTRUCTURE GUIDE</small><br><strong>인프라 아키텍처 문서</strong></a></header><div class="content"><aside><strong>개념 문서</strong>${nav(name)}</aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>${esc(title)}</h1>${markdown(source)}</main></div><footer class="footer">원본 문서: <a href="../../markdown/${name}">${name}</a></footer></div></body></html>`;
   fs.writeFileSync(path.join(pagesDir, name.replace('.md', '.html')), html);
 }
 
 const draftName = '아키텍처1차초안.md';
-const draftPath = path.join(infra, draftName);
+const draftPath = path.join(markdownDir, draftName);
 if (fs.existsSync(draftPath) && !v2Only) {
   const rawDraft = fs.readFileSync(draftPath, 'utf8').replace('](자금세탁소drawio.png)', '](../자금세탁소drawio.png)');
   const draftTitle = rawDraft.match(/^#\s+(.+)$/m)?.[1] || 'AML 아키텍처 1차 초안';
-  const draftSource = rawDraft.replace(/^#\s+.+\n/, '');
+  const draftSource = rawDraft.replace(/^#\s+[^\r\n]+\r?\n/, '');
   const toc = draftSource.replace(/\r/g, '').split('\n').map((line, i) => {
     const heading = line.match(/^##\s+(.+)$/);
     return heading ? `<a href="#s-${i}">${inline(heading[1])}</a>` : '';
   }).filter(Boolean).join('\n');
-  const draftHtml = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(draftTitle)}</title><link rel="stylesheet" href="assets/style.css"></head><body><div class="layout wide"><header class="top"><a href="index.html"><small>AML INFRASTRUCTURE ARCHITECTURE</small><br><strong>인프라 아키텍처 1차 초안</strong></a></header><div class="content"><aside class="sticky-nav"><strong>문서 목차</strong>${toc}</aside><main><a class="back" href="index.html">← 인프라 결정 요약으로 돌아가기</a><h1>${esc(draftTitle)}</h1>${markdown(draftSource)}</main></div><footer class="footer">원본 문서: <a href="../${draftName}">${draftName}</a> · 다이어그램을 클릭하면 원본 크기로 볼 수 있습니다.</footer></div></body></html>`;
+  const draftHtml = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(draftTitle)}</title><link rel="stylesheet" href="assets/style.css"></head><body><div class="layout wide"><header class="top"><a href="index.html"><small>AML INFRASTRUCTURE ARCHITECTURE</small><br><strong>인프라 아키텍처 1차 초안</strong></a></header><div class="content"><aside class="sticky-nav"><strong>문서 목차</strong>${toc}</aside><main><a class="back" href="index.html">← 인프라 결정 요약으로 돌아가기</a><h1>${esc(draftTitle)}</h1>${markdown(draftSource)}</main></div><footer class="footer">원본 문서: <a href="../markdown/${draftName}">${draftName}</a> · 다이어그램을 클릭하면 원본 크기로 볼 수 있습니다.</footer></div></body></html>`;
   if (draftOnly) console.log(draftHtml);
   else fs.writeFileSync(path.join(here, 'architecture-draft.html'), draftHtml);
 }
@@ -109,22 +110,22 @@ if (fs.existsSync(draftPath) && !v2Only) {
 if (!draftOnly && !v2Only) {
   let index = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
   index = index.replace(/href="(\d{2}-[^"#]+)\.md"/g, 'href="pages/$1.html"');
-  index = index.replace('href="README.md"', 'href="../README.md"');
+  index = index.replace(/href="(?:README\.md|\.\.\/(?:markdown\/)?README\.md)"/g, 'href="../markdown/README.md"');
   fs.writeFileSync(path.join(here, 'index.html'), index);
 }
 const v2Name = '아키텍처v2.md';
-const v2Path = path.join(infra, v2Name);
+const v2Path = path.join(markdownDir, v2Name);
 if (fs.existsSync(v2Path) && !draftOnly) {
   const rawV2 = fs.readFileSync(v2Path, 'utf8')
     .replace('](아키텍처v2.drawio)', '](../아키텍처v2.drawio)')
     .replace('](아키텍처v2.png)', '](../아키텍처v2.png)');
   const v2Title = rawV2.match(/^#\s+(.+)$/m)?.[1] || 'AML 모니터링 시스템 인프라 아키텍처 V2';
-  const v2Source = rawV2.replace(/^#\s+.+\n/, '');
+  const v2Source = rawV2.replace(/^#\s+[^\r\n]+\r?\n/, '');
   const toc = v2Source.replace(/\r/g, '').split('\n').map((line, i) => {
     const heading = line.match(/^##\s+(.+)$/);
     return heading ? `<a href="#s-${i}">${inline(heading[1])}</a>` : '';
   }).filter(Boolean).join('\n');
-  const v2Html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(v2Title)}</title><link rel="stylesheet" href="assets/style.css"><style>.version{display:inline-flex;margin:0 0 18px;padding:5px 10px;border-radius:999px;background:#eaf1ff;color:#2463eb;font-size:.8rem;font-weight:800}.mermaid{display:flex;justify-content:center;margin:20px 0;padding:20px;overflow:auto;border:1px solid #d3dce9;border-radius:12px;background:#fff;color:#26354e}.mermaid svg{max-width:100%;height:auto}.hero-note{margin:-8px 0 24px;color:#657187}.toc-title{position:sticky;top:0;padding-top:6px;background:#f8fafc;z-index:1}</style></head><body><div class="layout wide"><header class="top"><a href="index.html"><small>AML INFRASTRUCTURE ARCHITECTURE</small><br><strong>인프라 아키텍처 V2</strong></a></header><div class="content"><aside class="sticky-nav"><strong class="toc-title">문서 목차</strong>${toc}</aside><main><span class="version">LATEST · V2</span><h1>${esc(v2Title)}</h1><p class="hero-note">거래 접수부터 비동기 수집, 추론 작업 생성, 외부 GPU 추론, 결과 저장과 운영 가드레일까지 정리한 최신 기준안입니다.</p>${markdown(v2Source)}</main></div><footer class="footer">원본 문서: <a href="../${v2Name}">${v2Name}</a> · 기준 도면: <a href="../아키텍처v2.drawio">아키텍처v2.drawio</a></footer></div><script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose',sequence:{useMaxWidth:true,wrap:true},flowchart:{useMaxWidth:true,htmlLabels:true}});</script></body></html>`;
+  const v2Html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(v2Title)}</title><link rel="stylesheet" href="assets/style.css"><style>.version{display:inline-flex;margin:0 0 18px;padding:5px 10px;border-radius:999px;background:#eaf1ff;color:#2463eb;font-size:.8rem;font-weight:800}.mermaid{display:flex;justify-content:center;margin:20px 0;padding:20px;overflow:auto;border:1px solid #d3dce9;border-radius:12px;background:#fff;color:#26354e}.mermaid svg{max-width:100%;height:auto}.hero-note{margin:-8px 0 24px;color:#657187}.toc-title{position:sticky;top:0;padding-top:6px;background:#f8fafc;z-index:1}</style></head><body><div class="layout wide"><header class="top"><a href="index.html"><small>AML INFRASTRUCTURE ARCHITECTURE</small><br><strong>인프라 아키텍처 V2</strong></a></header><div class="content"><aside class="sticky-nav"><strong class="toc-title">문서 목차</strong>${toc}</aside><main><span class="version">LATEST · V2</span><h1>${esc(v2Title)}</h1><p class="hero-note">거래 접수부터 비동기 수집, 추론 작업 생성, 외부 GPU 추론, 결과 저장과 운영 가드레일까지 정리한 최신 기준안입니다.</p>${markdown(v2Source)}</main></div><footer class="footer">원본 문서: <a href="../markdown/${v2Name}">${v2Name}</a> · 기준 도면: <a href="../아키텍처v2.drawio">아키텍처v2.drawio</a></footer></div><script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose',sequence:{useMaxWidth:true,wrap:true},flowchart:{useMaxWidth:true,htmlLabels:true}});</script></body></html>`;
   fs.writeFileSync(path.join(here, 'architecture-draftv2.html'), v2Html);
 }
 

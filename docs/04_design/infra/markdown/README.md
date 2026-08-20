@@ -2,8 +2,8 @@
 
 이 문서는 인프라 후보 비교, 선택 결과와 선택 근거를 기록한다. 기술 자체의 기초 개념은 각 항목에 연결된 개념 문서에서 설명한다.
 
-- [편집 가능한 Draw.io 아키텍처 다이어그램](architecture.drawio)
-- [확정된 인프라 결정 HTML 문서](html/index.html)
+- [편집 가능한 Draw.io 아키텍처 다이어그램](../architecture.drawio)
+- [확정된 인프라 결정 HTML 문서](../html/index.html)
 
 ## 아키텍처 원칙
 
