@@ -1,0 +1,33 @@
+# money_laundry 저장소용 .gitignore
+# 아래 경로는 모두 저장소 루트(= 이 파일이 있는 위치) 기준이다.
+
+# 원천 데이터와 개인 작업 공간은 저장소 바깥(상위 폴더)에 둔다.
+# 아래 두 줄은 같은 이름이 저장소 안으로 잘못 들어오는 것을 막는 방어용이다.
+data/
+worktable/
+
+# AI 협업 파일 (개인 도구 — 팀 공유 대상 아님)
+collab/
+CLAUDE.md
+AGENTS.md
+
+# Python — tools/mock-generator, 앞으로의 backend/ingest-worker·batch-worker
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Gradle 산출물(build/, .gradle/)은 backend/api-server/.gitignore 가 덮으므로 여기서 다루지 않는다.
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Office 임시파일 (docs 브랜치의 .docx 편집 중 생성)
+~$*
