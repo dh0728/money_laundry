@@ -24,12 +24,11 @@
 <li><strong>Continuous Delivery</strong>: 언제든 배포 가능한 상태를 유지하지만 운영 반영 전에 사람의 승인을 둘 수 있다.</li>
 <li><strong>Continuous Deployment</strong>: 정해진 검증을 통과한 변경을 운영 환경까지 자동으로 반영한다.</li>
 </ul>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     Artifact[검증된 결과물] --&gt; Approval[승인 또는 자동 조건]
     Approval --&gt; Deploy[배포]
     Deploy --&gt; Health[상태 확인]
-    Health --&gt;|실패| Rollback[이전 버전 복구]</code></pre>
+    Health --&gt;|실패| Rollback[이전 버전 복구]</pre>
 <h2 id="s-16">배포 과정의 기본 단계</h2>
 <ol>
 <li>배포할 이미지나 파일의 정확한 버전을 정한다.</li>
@@ -56,4 +55,4 @@ flowchart LR
 <h3 id="s-43">AWS Systems Manager Run Command</h3>
 <p>Run Command는 Systems Manager가 관리하는 서버에서 원격 명령을 실행하는 AWS 기능이다. 서버의 SSM Agent가 AWS 서비스에서 작업을 받아 수행하고 결과를 돌려준다. 실행 주체의 권한은 IAM으로 통제한다.</p>
 <h3 id="s-47">AWS CodeDeploy</h3>
-<p>CodeDeploy는 애플리케이션 배포 단위, 배포 대상과 단계별 Hook을 정의하고 실행 상태를 추적하는 AWS 배포 서비스다. AppSpec 파일을 이용해 파일 배치와 배포 전후 스크립트 실행 순서를 정의할 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../08-cd.md">08-cd.md</a></footer></div></body></html>
+<p>CodeDeploy는 애플리케이션 배포 단위, 배포 대상과 단계별 Hook을 정의하고 실행 상태를 추적하는 AWS 배포 서비스다. AppSpec 파일을 이용해 파일 배치와 배포 전후 스크립트 실행 순서를 정의할 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/08-cd.md">08-cd.md</a></footer></div></body></html>

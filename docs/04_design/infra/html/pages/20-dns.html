@@ -20,8 +20,7 @@
 <a class="current" href="20-dns.html">20. DNS</a>
 <a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>DNS 기본 개념</h1><h2 id="s-1">DNS란?</h2>
 <p>DNS(Domain Name System)는 <code>example.com</code> 같은 도메인 이름을 서버 IP 주소나 다른 서비스 주소에 연결하는 분산 시스템이다. 서버 주소가 바뀌더라도 사용자는 같은 도메인으로 접속할 수 있다.</p>
-<pre class="diagram"><code>mermaid
-sequenceDiagram
+<pre class="mermaid">sequenceDiagram
     participant U as 사용자
     participant R as 재귀 DNS Resolver
     participant A as 권한 DNS
@@ -30,7 +29,7 @@ sequenceDiagram
     R-&gt;&gt;A: 공식 레코드 질의
     A--&gt;&gt;R: 서비스 주소 응답
     R--&gt;&gt;U: 캐시된 주소 응답
-    U-&gt;&gt;S: 서비스 접속</code></pre>
+    U-&gt;&gt;S: 서비스 접속</pre>
 <h2 id="s-18">기본 용어</h2>
 <ul>
 <li><strong>Domain registrar</strong>: 도메인을 등록하고 소유권과 갱신을 관리하는 사업자</li>
@@ -57,4 +56,4 @@ sequenceDiagram
 <h3 id="s-46">Cloudflare DNS</h3>
 <p>Cloudflare DNS는 Cloudflare가 운영하는 권한 DNS 서비스다. 레코드별로 DNS 응답만 제공하거나 Cloudflare Proxy를 통과하도록 설정할 수 있다. Proxy를 사용하면 사용자에게 원본 서버 대신 Cloudflare 주소가 응답된다.</p>
 <h3 id="s-50">도메인 등록기관의 DNS</h3>
-<p>도메인을 구매한 Registrar가 함께 제공하는 권한 DNS 서비스다. Registrar의 관리 화면에서 A, CNAME, MX 등의 레코드를 설정하며 지원 기능과 API는 업체마다 다르다.</p></main></div><footer class="footer">원본 문서: <a href="../../20-dns.md">20-dns.md</a></footer></div></body></html>
+<p>도메인을 구매한 Registrar가 함께 제공하는 권한 DNS 서비스다. Registrar의 관리 화면에서 A, CNAME, MX 등의 레코드를 설정하며 지원 기능과 API는 업체마다 다르다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/20-dns.md">20-dns.md</a></footer></div></body></html>

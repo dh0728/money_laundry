@@ -23,11 +23,10 @@
 <p>컨테이너는 운영체제 전체를 포함하는 가상 머신과 달리 호스트의 운영체제 커널을 공유한다. 따라서 일반적으로 가상 머신보다 가볍고 빠르게 생성된다.</p>
 <h2 id="s-7">Docker란?</h2>
 <p>Docker는 컨테이너 이미지를 만들고 배포하며 실행하는 대표적인 도구다.</p>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     Source[소스 코드] --&gt; Dockerfile[Dockerfile]
     Dockerfile --&gt; Image[Docker 이미지]
-    Image --&gt; Container[실행 중인 컨테이너]</code></pre>
+    Image --&gt; Container[실행 중인 컨테이너]</pre>
 <h2 id="s-18">기본 용어</h2>
 <ul>
 <li><strong>Dockerfile</strong>: 이미지를 만드는 단계와 명령을 적은 파일</li>
@@ -41,11 +40,10 @@ flowchart LR
 </ul>
 <h2 id="s-29">Docker Compose란?</h2>
 <p>Docker Compose는 여러 컨테이너의 이미지, 포트, 네트워크, 볼륨과 환경변수를 하나의 <code>compose.yaml</code> 파일에 정의하고 함께 실행하는 도구다.</p>
-<pre class="diagram"><code>mermaid
-flowchart TB
+<pre class="mermaid">flowchart TB
     Compose[compose.yaml] --&gt; Proxy[Reverse Proxy]
     Compose --&gt; API[Backend API]
-    Compose --&gt; Worker[Worker]</code></pre>
+    Compose --&gt; Worker[Worker]</pre>
 <p>Compose는 주로 한 Docker 호스트의 컨테이너들을 관리한다. 여러 서버 전체의 자동 배치와 확장을 담당하는 클러스터 오케스트레이터와는 역할이 다르다.</p>
 <h2 id="s-42">주요 컨테이너 실행 기술</h2>
 <h3 id="s-44">Docker Compose</h3>
@@ -57,4 +55,4 @@ flowchart TB
 <h3 id="s-56">Kubernetes</h3>
 <p>Kubernetes는 여러 서버로 이루어진 클러스터에서 컨테이너의 배치, 복구, 확장, 네트워크와 설정을 관리하는 오픈소스 오케스트레이션 플랫폼이다. Pod, Deployment, Service 같은 리소스로 원하는 상태를 선언한다.</p>
 <h3 id="s-60">Amazon EKS</h3>
-<p>EKS(Elastic Kubernetes Service)는 AWS가 Kubernetes 제어 영역을 관리하는 서비스다. 애플리케이션은 Kubernetes 리소스로 정의하지만 네트워크, 작업 노드, 권한과 AWS 서비스 연동 구성이 함께 필요하다.</p></main></div><footer class="footer">원본 문서: <a href="../../04-container-runtime.md">04-container-runtime.md</a></footer></div></body></html>
+<p>EKS(Elastic Kubernetes Service)는 AWS가 Kubernetes 제어 영역을 관리하는 서비스다. 애플리케이션은 Kubernetes 리소스로 정의하지만 네트워크, 작업 노드, 권한과 AWS 서비스 연동 구성이 함께 필요하다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/04-container-runtime.md">04-container-runtime.md</a></footer></div></body></html>

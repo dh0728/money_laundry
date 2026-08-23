@@ -25,15 +25,14 @@
 <li><strong>트레이스(Traces)</strong>: 하나의 요청이 여러 서비스와 작업을 거치는 전체 흐름</li>
 </ul>
 <p>Observability는 이 신호들을 이용해 외부에서 시스템 내부 상태를 이해할 수 있는 정도를 의미한다. 모니터링은 알려진 장애 조건을 감시하는 활동이고, Observability는 예상하지 못한 문제의 원인까지 조사할 수 있게 만드는 더 넓은 개념이다.</p>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     App[애플리케이션] --&gt; Logs[로그]
     App --&gt; Metrics[메트릭]
     App --&gt; Traces[트레이스]
     Logs --&gt; View[검색·대시보드]
     Metrics --&gt; View
     Traces --&gt; View
-    View --&gt; Alert[알림]</code></pre>
+    View --&gt; Alert[알림]</pre>
 <h2 id="s-20">기본 용어</h2>
 <ul>
 <li><strong>Dashboard</strong>: 주요 상태와 추세를 시각적으로 모아 보여주는 화면</li>
@@ -56,4 +55,4 @@ flowchart LR
 <h3 id="s-47">Grafana</h3>
 <p>Grafana는 Prometheus, Loki, CloudWatch 같은 데이터 소스에 연결해 쿼리 결과를 대시보드로 시각화하고 알림을 구성하는 도구다. Grafana 자체가 모든 로그와 메트릭의 원본 저장소인 것은 아니다.</p>
 <h3 id="s-51">Loki</h3>
-<p>Loki는 로그 Label을 색인하고 로그 본문을 저장하는 로그 집계 시스템이다. Agent나 수집기가 컨테이너 로그를 Loki로 보내며 Grafana에서 LogQL로 검색할 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../19-observability.md">19-observability.md</a></footer></div></body></html>
+<p>Loki는 로그 Label을 색인하고 로그 본문을 저장하는 로그 집계 시스템이다. Agent나 수집기가 컨테이너 로그를 Loki로 보내며 Grafana에서 LogQL로 검색할 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/19-observability.md">19-observability.md</a></footer></div></body></html>

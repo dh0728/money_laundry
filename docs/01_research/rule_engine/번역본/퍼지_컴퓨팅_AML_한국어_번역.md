@@ -5,18 +5,11 @@
 > **게재 정보:** World Conference on Soft Computing, 2011  
 > **DOI:** 별도 표기 없음
 
-> **번역 안내:** 본문은 문단 전체의 문맥을 기준으로 한국어로 옮겼습니다. AML·규칙 엔진·전문가 시스템 관련 용어를 통일했으며, 수식·코드·참고문헌은 정확성을 위해 원문 표기를 유지했습니다. 각 페이지의 그림·표·원래 배치는 해당 번역 구간에 놓인 원문 페이지 이미지에서 확인할 수 있습니다.
+> **번역 안내:** 본문은 문단 전체의 문맥을 기준으로 한국어로 옮겼습니다. AML·규칙 엔진·전문가 시스템 관련 용어를 통일했으며, 수식·코드·참고문헌은 정확성을 위해 원문 표기를 유지했습니다. 원문의 그림과 표는 각각 잘라 해당 본문 위치에 바로 배치했습니다.
 
 ---
 
 <!-- 원문 1쪽 -->
-
-<details>
-<summary>원문 1쪽 이미지 보기</summary>
-
-![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 원문 1쪽](assets/fuzzy_computing/page-01.jpg)
-
-</details>
 
 ## 초록
 
@@ -43,13 +36,6 @@ Post, Kleene 및 Lukasiewicz의 작업은 고전적인 부울 논리 [1], [2]에
 본 논문에서는 모니터링 및 탐지 분야의 두 가지 퍼지 컴퓨팅 애플리케이션을 연구합니다. 분산 저장 시스템을 위한 퍼지 로드 모니터링과 금융 기관을 위한 퍼지 자금세탁방지 기능이 있습니다. 일반적으로 모니터링은 복잡한 실제 시스템을 이해하는 첫 번째 단계입니다. 모니터링 프로세스 중에 원하지 않는 특정 사례나 시나리오가 발견된 경우 다음 논리 단계는 반복되는 패턴을 감지하고 이후에 문제를 격리하는 것입니다. 마지막으로 문제를 관리하기 위한 제어 전략을 공식화할 수 있습니다.
 
 <!-- 원문 2쪽 -->
-
-<details>
-<summary>원문 2쪽 이미지 보기</summary>
-
-![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 원문 2쪽](assets/fuzzy_computing/page-02.jpg)
-
-</details>
 
 > **주:** 표 I 부하 모니터링을 위한 퍼지 규칙
 
@@ -91,6 +77,8 @@ GFS는 마스터가 병목 현상을 일으키지 않도록 설계되었음에�
 
 오늘날 대부분의 네트워크 모니터링 시스템 [9]는 호스트의 측정값(예: 대기 시간, CPU 사용량, 오류율 등)을 특정 임계값과 비교하고 이메일을 통해 경고하는 방식으로 작동합니다.
 
+![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 그림 1](assets/fuzzy_computing/figures/figure-1.png)
+
 **그림 1. 시스템 데이터 흐름 모니터링**
 
 또는 이벤트의 심각도에 따라 호출기. 이 접근 방식을 대규모 분산 시스템에 적용하려면 기본 시스템에 대한 매우 깊은 이해가 필요하며, 상관된 이벤트의 경우 모든 해석은 운영자에게 맡겨집니다. 퍼지 로드 추론 시스템은 분산 시스템에 대한 더 높은 수준의 보기를 제공할 수 있습니다.
@@ -120,13 +108,6 @@ Python 추론 엔진은 다양한 퍼지화 및 역화 기능 [17]를 제공합�
 - 초기 구현에는 RAM 및 CPU 관련 퍼지 세트만 포함되었습니다. GFS 마스터의 상태와 매우 관련이 있기 때문에 대기 시간 세트를 추가했습니다.
 
 <!-- 원문 3쪽 -->
-
-<details>
-<summary>원문 3쪽 이미지 보기</summary>
-
-![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 원문 3쪽](assets/fuzzy_computing/page-03.jpg)
-
-</details>
 
 - 직사각형 창이 고주파 노이즈에 너무 민감하기 때문에 창 크기를 늘리고 직사각형 창에서 가우스 창으로 전환했습니다.
 
@@ -176,13 +157,6 @@ Python 추론 엔진은 다양한 퍼지화 및 역화 기능 [17]를 제공합�
 
 <!-- 원문 4쪽 -->
 
-<details>
-<summary>원문 4쪽 이미지 보기</summary>
-
-![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 원문 4쪽](assets/fuzzy_computing/page-04.jpg)
-
-</details>
-
 1) 퍼지 규칙: AML 시나리오는 다음과 같습니다. 다음과 같은 경우 계정이 의심됩니다.
 
 - 큰 가치 수신 (>= $10,000)
@@ -219,6 +193,8 @@ b
 
 AML1 점수는 받은 금액과 일치 점수라는 두 가지 인수를 취하는 함수라고 가정합니다. 또한 두 인수의 정의역은 [0,1]로 제한된 실수입니다. 퍼지 채점에 대한 아이디어는 먼저 평균 AML1 점수를 내림차순으로 분리된 하위 영역으로 공간을 분할한 다음 퍼지 추론을 사용하여 영역 간 점수를 평활화/보간하는 것입니다. AML1의 경우 9개의 퍼지 규칙
 
+![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 그림 2](assets/fuzzy_computing/figures/figure-2.png)
+
 **그림 2. 절대 변화율 대 경기 점수**
 
 > **주:** 표 II 각 9 퍼지 규칙에 대한 AML 점수
@@ -244,18 +220,17 @@ respectively.
 
 일부 샘플 계정과 해당 거래에 대해 퍼지 AML1 점수를 테스트했습니다. 점수를 받은 710 계정 중 AML1 중앙값은 0.55였습니다. AML1 점수 > 0.8가 있는 73 계정은 사람의 검토를 위해 AML 대기열로 라우팅되었습니다. 대기열은 AML1 점수의 내림차순으로 작동됩니다.
 
+![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 그림 3](assets/fuzzy_computing/figures/figure-3.png)
+
 **그림 3. 받은 금액 멤버십 기능**
 
 <!-- 원문 5쪽 -->
 
-<details>
-<summary>원문 5쪽 이미지 보기</summary>
-
-![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 원문 5쪽](assets/fuzzy_computing/page-05.jpg)
-
-</details>
+![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 그림 4](assets/fuzzy_computing/figures/figure-4.png)
 
 **그림 4. 수학 점수 멤버십 기능**
+
+![Fuzzy Computing Applications for Anti-Money Laundering and Distributed Storage System Load Monitoring - 그림 5](assets/fuzzy_computing/figures/figure-5.png)
 
 **그림 5. AML1 멤버십 기능**
 

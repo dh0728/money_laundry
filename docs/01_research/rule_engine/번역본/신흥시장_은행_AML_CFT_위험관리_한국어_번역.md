@@ -5,31 +5,17 @@
 > **발행 정보:** Good Practice Note, 2019  
 > **원문 페이지:** 87쪽
 
-> **번역 안내:** 이 문서는 원문의 절·문단·글머리표 순서를 따라 전체 내용을 한국어로 옮긴 번역본입니다. AML/CFT, KYC, CDD, CBR 등 고유 약어는 원문 표기를 유지하고, 은행 자금세탁방지 분야의 용어를 일관되게 적용했습니다. 표·도식·사진과 원래의 세부 배치는 각 번역 구간에 배치한 원문 페이지 이미지에서 확인할 수 있습니다.
+> **번역 안내:** 이 문서는 원문의 절·문단·글머리표 순서를 따라 전체 내용을 한국어로 옮긴 번역본입니다. AML/CFT, KYC, CDD, CBR 등 고유 약어는 원문 표기를 유지하고, 은행 자금세탁방지 분야의 용어를 일관되게 적용했습니다. 원문의 그림과 도식은 각각 잘라 해당 본문 위치에 바로 배치했습니다.
 
 ---
 
 <!-- 원문 1쪽 -->
-
-<details>
-<summary>원문 1쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 1쪽](assets/ifc_aml_cft_risk_management/page-01.jpg)
-
-</details>
 
 모범사례 노트
 
 ### 자금세탁방지(AML) 및 테러자금조달방지(CFT) 신흥시장 은행의 위험관리
 
 <!-- 원문 2쪽 -->
-
-<details>
-<summary>원문 2쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 2쪽](assets/ifc_aml_cft_risk_management/page-02.jpg)
-
-</details>
 
 © 국제금융공사 2019. 모든 권리 보유. 2121 펜실베이니아 애비뉴, N.W. 워싱턴 D.C. 20433 인터넷: www.ifc.org 이 작품의 자료는 저작권으로 보호됩니다. 허가 없이 이 저작물의 일부 또는 전체를 복사 및/또는 전송하는 것은 해당 법률을 위반하는 행위일 수 있습니다. 본 문서의 내용은 신흥시장 은행의 AML/CFT 준법 및 위험관리와 관련된 일반 정보 제공 목적으로만 제공됩니다. IFC는 본 저작물에 포함된 내용의 정확성, 신뢰성 또는 완전성을 보장하지 않으며 여기에 설명된 결론이나 판단에 대해 보증하지 않으며, 내용의 누락이나 오류(인쇄상의 오류 및 기술적 오류를 포함하되 이에 국한되지 않음)에 대해 어떠한 책임도 지지 않습니다. IFC 또는 그 계열사는 여기에 언급될 수 있는 특정 회사 및 당사자에 투자하거나, 다른 조언이나 서비스를 제공하거나, 금전적 이해관계를 가질 수 있습니다. 귀하 또는 이 문서의 다른 사용자가 그러한 정보에 의존하는 데 따른 위험은 전적으로 귀하의 책임입니다.
 
@@ -41,34 +27,13 @@
 
 <!-- 원문 3쪽 -->
 
-<details>
-<summary>원문 3쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 3쪽](assets/ifc_aml_cft_risk_management/page-03.jpg)
-
-</details>
-
 모범사례 노트
 
 ### 자금세탁방지(AML) 및 테러자금조달방지(CFT) 신흥시장 은행의 위험관리
 
 <!-- 원문 4쪽 -->
 
-<details>
-<summary>원문 4쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 4쪽](assets/ifc_aml_cft_risk_management/page-04.jpg)
-
-</details>
-
 <!-- 원문 5쪽 -->
-
-<details>
-<summary>원문 5쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 5쪽](assets/ifc_aml_cft_risk_management/page-05.jpg)
-
-</details>
 
 ### 목차
 
@@ -98,21 +63,7 @@
 
 <!-- 원문 6쪽 -->
 
-<details>
-<summary>원문 6쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 6쪽](assets/ifc_aml_cft_risk_management/page-06.jpg)
-
-</details>
-
 <!-- 원문 7쪽 -->
-
-<details>
-<summary>원문 7쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 7쪽](assets/ifc_aml_cft_risk_management/page-07.jpg)
-
-</details>
 
 ### 서문
 
@@ -137,13 +88,6 @@ AML/CFT 준법의 지속적인 개선에 대한 기대가 글로벌 금융 시�
 > **주:** 1 http://documents.worldbank.org/curated/en/895821510730571841/pdf/121275-WP-IFC-2017-Survey-on-Correspondent-Banking-in-EMs-PUBLIC.pdf
 
 <!-- 원문 8쪽 -->
-
-<details>
-<summary>원문 8쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 8쪽](assets/ifc_aml_cft_risk_management/page-08.jpg)
-
-</details>
 
 ### 감사의 말
 
@@ -180,13 +124,6 @@ IFC는 Yan Liu, IMF 법무 자문위원, Emile J. M. Van Der Does De Willebois, 
 
 <!-- 원문 9쪽 -->
 
-<details>
-<summary>원문 9쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 9쪽](assets/ifc_aml_cft_risk_management/page-09.jpg)
-
-</details>
-
 ## 제1장 서론
 
 ### 배경
@@ -198,13 +135,6 @@ IFC는 Yan Liu, IMF 법무 자문위원, Emile J. M. Van Der Does De Willebois, 
 > **주:** 2 IFC. 2018. 신흥시장 금융 부문의 위험회피(de-risking) 및 기타 과제. 3 세계은행그룹. 2018. 신흥시장의 환거래은행 서비스에 대한 접근 감소: 추세, 영향 및 솔루션.
 
 <!-- 원문 10쪽 -->
-
-<details>
-<summary>원문 10쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 10쪽](assets/ifc_aml_cft_risk_management/page-10.jpg)
-
-</details>
 
 단순화를 위해 이 GPN은 환거래은행을 "한 은행(환거래은행)이 다른 은행(피응답은행)이 소유한 예금을 보유하고 해당 피응답은행에 지급 및 기타 서비스를 제공하는 약정"으로 정의합니다. 4 환거래은행은 은행 서비스를 용이하게 하며 국제 경제 인프라에 중요합니다. 환거래은행 관계 축소로 인해 영향을 받는 일부 은행 서비스 및 상품은 다음 표와 같습니다.
 
@@ -264,13 +194,6 @@ IFC는 Yan Liu, IMF 법무 자문위원, Emile J. M. Van Der Does De Willebois, 
 
 <!-- 원문 11쪽 -->
 
-<details>
-<summary>원문 11쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 11쪽](assets/ifc_aml_cft_risk_management/page-11.jpg)
-
-</details>
-
 지역, 국가, 때로는 하위 국가 수준의 관리 표준은 일관성 없는 기대와 모호함을 증가시켰습니다. 이러한 환경은 선진 시장과 신흥시장 은행이 위험 기반 통제를 적절하게 구현하고 합리적인 위험 성향을 결정하는 데 점점 더 많은 어려움을 겪고 있습니다. 예를 들어, 2016년에는 환거래은행 관계에 대한 고객확인의무에 대한 추가 설명을 제공하기 위해 FATF에서는 은행이 고객의 고객에 대해 고객확인의무(KYCC라고도 함)를 수행할 필요가 없다고 명시했습니다. 고객확인의무 요구 사항을 명확히 하기 위한 이러한 노력에도 불구하고 일부 글로벌 은행은 규제 기대의 명확성과 규제 표준을 완전히 충족하는 자체 AML/CFT 위험관리 시스템 및 프로세스의 실패와 관련된 책임에 대해 여전히 우려하고 있습니다. 고객의 고객에 대한 고객확인의무 범위를 둘러싼 불확실성은 환거래은행이 피응답은행 관련 위험을 평가하기 어렵게 만들었고, 그 결과 일부 관계를 종료하려는 유인도 생겼습니다. 7 증가하는 준법 비용은 환거래은행 관계 제공 및 유지에 대한 위험 보상 계산에도 영향을 미쳤습니다. 운영 비용과 같은 일부 비용은 수량화하기 쉽습니다. 잠재적인 집행 조치의 평판 영향과 같은 기타 비용은 평가하기가 더 어렵습니다. 비즈니스 요구 사항을 인식한 많은 은행은 AML/CFT 위험을 보다 효율적이고 효과적으로 관리하기 위해 글로벌 모범 사례를 도입하고 새로운 프로세스 및 시스템에 투자하고 있습니다. 이러한 투자 중 일부에는 상세한 KYC 데이터베이스, 고객의 거래를 지속적으로 모니터링하고 적절하게 비정상적이고 잠재적으로 의심 거래를 조사할 수 있는 시스템이 포함됩니다.
 
 환거래은행 관계의 감소는 이러한 추세가 무역에 부정적인 영향을 미쳐 중요 상품의 수출입과 궁극적인 경제 성장을 위험에 빠뜨리는 것으로 나타나 한동안 신흥시장 국가의 우려 사항이었습니다. 8 예를 들어 카리브해 국가는 2014에서 카리브해 국가의 대외 무역이 해당 국가 전체 GDP의 94%를 차지할 정도로 무역 및 국경 간 지불에 크게 의존하고 있습니다. 또한 이들 국가는 물품 수입에 크게 의존하고 있습니다.
@@ -286,13 +209,6 @@ IFC는 Yan Liu, IMF 법무 자문위원, Emile J. M. Van Der Does De Willebois, 
 > **주:** 7 CPMI. 2016. 환거래은행. 8 IFC. 2018. 신흥시장 금융 부문의 위험회피(de-risking) 및 기타 과제. 9 세계은행그룹. 2017. 신흥시장의 환거래은행 서비스에 대한 접근 감소: 추세, 영향 및 솔루션.
 
 <!-- 원문 12쪽 -->
-
-<details>
-<summary>원문 12쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 12쪽](assets/ifc_aml_cft_risk_management/page-12.jpg)
-
-</details>
 
 고객의 요청에 부응하고 위험회피(de-risking)를 해결하기 위해 국제 사회가 수행하는 많은 이니셔티브에 추가하면서 위험회피(de-risking)의 부정적인 영향 중 일부를 완화하는 데 도움이 될 수 있는 실용적인 지침이 되는 것을 목표로 합니다.10
 
@@ -334,13 +250,6 @@ IFC는 Yan Liu, IMF 법무 자문위원, Emile J. M. Van Der Does De Willebois, 
 
 <!-- 원문 13쪽 -->
 
-<details>
-<summary>원문 13쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 13쪽](assets/ifc_aml_cft_risk_management/page-13.jpg)
-
-</details>
-
 - 피응답은행이 개선된 AML/CFT 위험관리 프로그램에 투자할 수 있는 비즈니스 사례를 강조합니다.
 
 - 신흥시장 은행 전문가를 위해 FATF, 은행 감독에 관한 바젤 위원회(또는 BCBS) 및 Wolfsberg Group을 포함한 다양한 국제 기관에서 발표한 AML/CFT 지침 원칙 및 표준을 해석합니다.
@@ -379,21 +288,7 @@ AML/CFT 위험관리 프로그램은 신용 위험, 금리 위험, 운영 위험
 
 <!-- 원문 14쪽 -->
 
-<details>
-<summary>원문 14쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 14쪽](assets/ifc_aml_cft_risk_management/page-14.jpg)
-
-</details>
-
 <!-- 원문 15쪽 -->
-
-<details>
-<summary>원문 15쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 15쪽](assets/ifc_aml_cft_risk_management/page-15.jpg)
-
-</details>
 
 ## 제2장 건전한 금융기관 위험관리 프레임워크·거버넌스 구조·문화의 확립
 
@@ -421,13 +316,6 @@ AML/CFT 위험관리 프로그램은 신용 위험, 금리 위험, 운영 위험
 
 <!-- 원문 16쪽 -->
 
-<details>
-<summary>원문 16쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 16쪽](assets/ifc_aml_cft_risk_management/page-16.jpg)
-
-</details>
-
 비용이 많이 드는 소송 또는 수익 감소.
 
 - 준법 위험은 조직이 업계 법률 및 규정, 내부 정책 또는 규정된 모범 사례에 따라 행동하지 않을 경우 법적 처벌, 재정적 몰수 및 물질적 손실에 노출되는 것입니다.
@@ -444,34 +332,9 @@ AML/CFT 위험은 주로 준법 또는 법적 위험 범주에 포함됩니다. 
 
 **그림 1: AML/CFT 위험 관계 차트**
 
-### AML/CFT
-
-### 위험
-
-운영 위험
-
-평판 위험
-
-시장위험
-
-준법 위험
-
-법적 위험 유동성
-
-위험
-
-신용위험
-
-사업/전략적 리스크
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 1](assets/ifc_aml_cft_risk_management/figures/figure-1.png)
 
 <!-- 원문 17쪽 -->
-
-<details>
-<summary>원문 17쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 17쪽](assets/ifc_aml_cft_risk_management/page-17.jpg)
-
-</details>
 
 전사적 준법 위험관리13는 비즈니스 라인, 지원 부서, 법인 및 관할권 내외의 전체 조직에 걸쳐 준법 위험을 관리하는 데 사용되는 프로세스를 의미합니다. 이러한 접근 방식을 통해 준법 위험관리는 법인의 개별 사업 부문 내에서만 발생하는 것보다 더 넓은 맥락에서 수행됩니다.
 
@@ -505,13 +368,6 @@ AML/CFT 위험은 주로 준법 또는 법적 위험 범주에 포함됩니다. 
 
 <!-- 원문 18쪽 -->
 
-<details>
-<summary>원문 18쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 18쪽](assets/ifc_aml_cft_risk_management/page-18.jpg)
-
-</details>
-
 은행 전략 및 운영과 관련하여 경영진이 이러한 위험을 식별, 측정, 모니터링 및 통제하고 은행 운영에 필요한 기술 지식 수준을 유지하며 적절한 문화를 전달하는 데 필요한 조치를 취하고 있는지 확인하는 책임도 있습니다.
 
 고위경영진은 각 전략과 관련된 위험을 관리하고 장기적으로 일상적으로 법률 및 규정을 준수하는 방식으로 전략을 구현할 책임이 있습니다. 따라서 경영진은 해당 기관의 활동에 완전히 참여하고 모든 주요 비즈니스 라인에 대한 충분한 지식을 보유하여 적절한 정책, 통제 및 위험 모니터링 시스템이 마련되고 권한 라인이 명확하게 규정되도록 해야 합니다. 고위경영진은 효과적인 내부 통제와 높은 윤리 기준에 대한 강력한 인식과 필요성을 확립하고 전달하는 책임도 있습니다. 이러한 책임을 충족하려면 은행의 고위 관리자가 은행 및 금융 시장 활동을 철저히 이해하고 관련 위험을 제한하는 데 필요한 내부 통제의 성격을 포함하여 해당 기관이 수행하는 활동에 대한 자세한 지식을 보유해야 합니다.
@@ -538,13 +394,6 @@ AML/CFT 운영 위험관리 운영은 전반적인 은행 위험 평가, 고객 
 
 <!-- 원문 19쪽 -->
 
-<details>
-<summary>원문 19쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 19쪽](assets/ifc_aml_cft_risk_management/page-19.jpg)
-
-</details>
-
 공식적인 권한 라인에 대한 모니터링과 적절한 업무 분리 보장을 포함한 통제는 경영진의 가장 중요한 책임 중 하나입니다.
 
 내부 감사, 준법 및 위험관리 기능 간의 관계는 2008 금융 위기 이후 규제 조사가 더욱 강화되었습니다. 전 세계 규제 기관은 내부 감사의 역할과 내부 감사가 전반적인 위험관리 프레임워크를 어떻게 보완하는지, 비즈니스 라인 관리, 위험관리, 준법 및 기타 통제 기능을 평가하는 방법에 관심을 집중해 왔습니다. 규제 당국은 은행이 효과적인 위험관리 기능, 준법 기능, 내부 감사 기능을 갖추어야 한다고 기대합니다. 은행의 운영 관리와 함께 이러한 각 통제 기능은 기업이 직면한 위험에 대한 방어선을 구성하며 세 가지 방어선이라고 합니다.17 세 가지 방어선은 다음과 같습니다.
@@ -565,42 +414,11 @@ AML/CFT 운영 위험관리 운영은 전반적인 은행 위험 평가, 고객 
 
 **그림 2: 세 가지 방어선**
 
-고위경영진
-
-이사회 또는 이사회 리스크 위원회
-
-외부감사인
-
-리스크 관리/
-
-준법(CCO)
-
-### 두 번째 라인
-
-### 방어의
-
-### 세 번째 방어선
-
-내부감사인
-
-감독 당국
-
-사업부
-
-내부 통제
-
-### 첫 번째 방어선
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 2](assets/ifc_aml_cft_risk_management/figures/figure-2.png)
 
 > **주:** 17 BCBS - 은행의 내부 감사 기능, 12월 2011; 기업 지배구조 강화 원칙, 10월 2010; 준법 및 18 8차 EU 회사법 지침에 대한 유럽 내부 감사 기관 연맹/유럽 위험관리 협회 연맹 지침, 기사 41에서 채택되었습니다.
 
 <!-- 원문 20쪽 -->
-
-<details>
-<summary>원문 20쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 20쪽](assets/ifc_aml_cft_risk_management/page-20.jpg)
-
-</details>
 
 내부 감사 기능. 내부 감사 기능은 내부 통제의 설계 및 실행과 법률, 규칙 및 준법의 효율성을 평가하는 일을 담당합니다. 또한 두 번째 라인이 수행하는 작업을 평가하여 두 라인이 모두 의도한 대로 작동하는지 확인합니다. 내부 감사에서는 통제 테스트 및 해당 법률 준수에 대한 정기적인 서면 평가를 독립적으로 보고하고 제공합니다.
 
@@ -626,13 +444,6 @@ AML/CFT 위험관리의 경우 프론트 오피스 고객 대면 사업부는 �
 
 <!-- 원문 21쪽 -->
 
-<details>
-<summary>원문 21쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 21쪽](assets/ifc_aml_cft_risk_management/page-21.jpg)
-
-</details>
-
 조직 전반에 걸쳐 위험 노출 및 위험 보고를 정의하는 라인 관리입니다. 준법 기능은 법률, 규정 및 표준을 준수하지 않을 위험을 모니터링합니다. 기타 모니터링 기능에는 인사 부서와 법무 부서가 포함될 수 있습니다.
 
 대부분의 은행에서는 2차 방어선의 일부로 최고 AML/CFT 책임자가 은행의 모든 ​​AML/CFT 의무를 지속적으로 이행할 책임이 있습니다. 은행의 규모와 복잡성에 따라 최고 AML/CFT 책임자가 CRO나 CCO 또는 이와 동등한 역할을 수행할 수도 있습니다. 그/그녀는 이사회 또는 이사회가 임명한 위원회에 직접 접근할 수 있어야 합니다. 직무를 분리하는 경우에는 최고책임자들과 각자의 역할 간의 관계가 명확하게 정의되고 잘 이해되어야 합니다.
@@ -655,13 +466,6 @@ AML/CFT 위험관리의 경우 프론트 오피스 고객 대면 사업부는 �
 
 <!-- 원문 22쪽 -->
 
-<details>
-<summary>원문 22쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 22쪽](assets/ifc_aml_cft_risk_management/page-22.jpg)
-
-</details>
-
 건전한 위험관리 원칙은 은행이 직면한 모든 위험에 적용됩니다. 포괄적인 위험 평가를 수행할 때 은행은 국가, 부문, 은행 및 고객 관계 수준에서 관련 내재적 및 잔여 위험 요소를 모두 고려하여 기관의 위험 프로필과 적용할 적절한 완화 수준을 결정해야 합니다.
 
 마찬가지로, 은행은 고객 기반, 제품 제공, 배송 채널 및 서비스 제공(개발 중이거나 출시 예정인 제품 포함)에 존재하는 내재된 ML/FT 위험과 은행이 속한 관할권을 철저히 이해해야 합니다.
@@ -671,13 +475,6 @@ AML/CFT 위험관리의 경우 프론트 오피스 고객 대면 사업부는 �
 > **주:** 19 BCBS. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리.
 
 <!-- 원문 23쪽 -->
-
-<details>
-<summary>원문 23쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 23쪽](assets/ifc_aml_cft_risk_management/page-23.jpg)
-
-</details>
 
 ### 3.1 소개
 
@@ -698,13 +495,6 @@ Wolfsberg가 수행한 유용한 이니셔티브 중 하나는 CBR을 수행, �
 > **주:** 20 자금세탁방지 및 테러자금조달 조치 및 금융포용(2013) 21 FATF. 위험 기반 접근 방식에 대한 지침. 은행 부문. 2014 22 볼프스베르크 그룹의 임무, 타임라인 및 배경은 https://www.wolfsberg-principles.com/ 23에서 확인할 수 있습니다. 볼프스베르크 그룹 환거래은행 실사 설문지는 https://www.wolfsberg-principles.com/sites/default/files/wb/pdfs/Wolfsberg%27s_CBD DQ_220218_v1.2.pdf에서 확인할 수 있습니다.
 
 <!-- 원문 24쪽 -->
-
-<details>
-<summary>원문 24쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 24쪽](assets/ifc_aml_cft_risk_management/page-24.jpg)
-
-</details>
 
 의사결정 과정의 일부로 국제적으로 환거래은행을 운영합니다.
 
@@ -735,13 +525,6 @@ Wolfsberg가 수행한 유용한 이니셔티브 중 하나는 CBR을 수행, �
 > **주:** 24 BCBS. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리. 25 BCBS. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리. 26 BCBS. 2015. 지침: 은행을 위한 기업 지배구조 원칙.
 
 <!-- 원문 25쪽 -->
-
-<details>
-<summary>원문 25쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 25쪽](assets/ifc_aml_cft_risk_management/page-25.jpg)
-
-</details>
 
 ### 고위경영진
 
@@ -795,13 +578,6 @@ Wolfsberg가 수행한 유용한 이니셔티브 중 하나는 CBR을 수행, �
 
 <!-- 원문 26쪽 -->
 
-<details>
-<summary>원문 26쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 26쪽](assets/ifc_aml_cft_risk_management/page-26.jpg)
-
-</details>
-
 ### AML/CFT 책임자:
 
 - AML/CFT 담당자는 은행의 규제 요건과 다양한 사업 부문 및 은행 운영에서 발생하는 ML/FT 위험에 대한 적절한 자격과 지식을 갖추고 있어야 합니다.
@@ -844,13 +620,6 @@ Wolfsberg가 수행한 유용한 이니셔티브 중 하나는 CBR을 수행, �
 
 <!-- 원문 27쪽 -->
 
-<details>
-<summary>원문 27쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 27쪽](assets/ifc_aml_cft_risk_management/page-27.jpg)
-
-</details>
-
 은행은 정기적인 전사적 AML/CFT 위험 평가를 통해 직면한 특정 ML/FT 위험을 철저히 이해해야 합니다. 업계에는 AML/CFT 위험 평가를 수행하는 여러 가지 접근 방식이 있지만 일반적으로 모두 다음 세 단계를 포함합니다.
 
 1. 은행이 직면한 고유한 ML/FT 위험 식별 2. 내부 통제 평가 그리고 3. 은행의 고유 위험에 대한 통제의 효율성/상태를 고려하는 잔여 위험 평가. 결과적으로 발생하는 잔여 위험은 은행의 위험 허용 범위 내에서 측정되어야 합니다.28,29
@@ -873,23 +642,7 @@ Wolfsberg가 수행한 유용한 이니셔티브 중 하나는 CBR을 수행, �
 
 **그림 3: EWRA의 단계**
 
-### 내재된 위험 평가
-
-### 통제 평가
-
-### 잔여 위험 범위 실행 계획 및 보고 평가
-
-### 2단계: 구현
-
-### 3단계: 결과 및 권장 사항
-
-### 1단계: 계획 및
-
-### 범위 지정
-
-### 효과적인 AML/제재 준수 프로그램은
-
-### 심층적이고 전사적인 위험 평가(EWRA)
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 3](assets/ifc_aml_cft_risk_management/figures/figure-3.png)
 
 사업부, 법인, 부서, 국가 및 지역을 포함하여 평가할 사업 영역의 범위와 구조를 정의합니다.
 
@@ -906,13 +659,6 @@ ML/FT 위험 모두에 대한 경험적 데이터 분석 및 분석 기법을 �
 > **주:** 28 볼프스베르크. 2015. 자금세탁, 제재, 뇌물 수수 및 부패에 대한 위험 평가에 대한 볼프스버그 자주 묻는 질문입니다. 29 자금세탁, 제재, 뇌물 수수 및 부패에 대한 위험 평가에 대한 볼프스버그의 자주 묻는 질문(2015)은 내재된 위험, 통제 및 잔여 위험을 다음과 같이 정의합니다. "내재된 위험은 통제 환경이 적용되지 않을 때 자금세탁, 제재 또는 뇌물 수수 및 부패 위험에 대한 노출을 나타냅니다." "통제란 ML 위험의 실현을 방지하거나 잠재적인 위험을 즉시 식별하기 위해 FI가 시행하는 프로그램, 정책 또는 활동입니다. 또한 통제는 조직의 활동을 관리하는 규정을 준수하는 데에도 사용됩니다." "잔여 위험은 내재된 위험에 통제를 적용한 후에도 남아 있는 위험입니다. 이는 내재된 위험 수준과 위험관리 활동/통제의 전반적인 강도 사이의 균형을 맞춰 결정됩니다. 잔여 위험 등급은 FI 내의 ML 위험이 적절하게 관리되고 있는지 여부를 나타내는 데 사용됩니다."
 
 <!-- 원문 28쪽 -->
-
-<details>
-<summary>원문 28쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 28쪽](assets/ifc_aml_cft_risk_management/page-28.jpg)
-
-</details>
 
 은행은 고객과 관련된 위험을 개별적으로 또는 범주별로 이해해야 합니다. 고객 위험을 평가할 때 은행은 고위험 고객을 식별하기 위한 기준을 설정하는 것이 중요합니다. 고객 유형, 소유권, 산업, 직업/비즈니스, 과거 활동, 정치적/정부 역할, 제품 사용, 고객의 거래 활동 등의 요소를 사용하여 고객 위험을 차별화할 수 있습니다. 각 고객은 기준에 따라 위험 등급을 받아야 합니다. 이 정보는 은행에서 고객 기반의 구성(예: 최소한 고위험군, 중간 위험군, 저위험군 인구의 비율)을 결정하는 데 사용됩니다. 은행은 특정 범주의 고객이 더 높은 위험을 초래할 수 있다는 점을 고려해야 합니다. 그러한 고객의 예는 다음과 같습니다.
 
@@ -968,13 +714,6 @@ ML/FT 위험 모두에 대한 경험적 데이터 분석 및 분석 기법을 �
 
 <!-- 원문 29쪽 -->
 
-<details>
-<summary>원문 29쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 29쪽](assets/ifc_aml_cft_risk_management/page-29.jpg)
-
-</details>
-
 FATF30 또는 OECD 국가 위험 분류에서 발표한 고위험 및 기타 감시 관할 구역 목록과 같이 국제 테러를 지원하는 것으로 알려진 경제 제재 대상 국가와 자금세탁 및 테러자금조달방지에 결함이 있는 국가를 식별하는 국제 조직의 국가 보고서 활용을 고려해야 합니다. 31 또한 바젤 AML 지수32는 전 세계적으로 ML/TF의 위험이 있습니다.
 
 ### 기타 질적 요인
@@ -1003,82 +742,11 @@ FATF30 또는 OECD 국가 위험 분류에서 발표한 고위험 및 기타 감
 
 **그림 4: 위험 요소**
 
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
-법적 형태/소유 구조 관계 기간 PEP 상태 산업 고객 위험 등급(CRR)
-
-높은 수준의 익명성 또는 제한된 투명성 자금의 신속한 이동 대량의 통화 또는 이에 상응하는 금액 제3자와의 지급/제3자로부터의 지급
-
-계좌 개설 계좌 서비스
-
-사업장 소재지 고객 소재지 거래의 원산지 또는 목적지
-
-성장 대 안정성 합병 및 인수 전략 변경 새로운 규제 요구 사항 신흥 위험
-
-### 위험 요인
-
-고객 기반
-
-제품/서비스
-
-전달 채널 관할권 정성적
-
-요인
-
-### 예시
-
-### 조치
-
-### 고유한 위험 요소 및 측정 예:
-
-출처: Deloitte Risk and Financial Advisory.
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 4](assets/ifc_aml_cft_risk_management/figures/figure-4.png)
 
 > **주:** 30 http://www.fatf-gafi.org/countries/#high-risk 31 http://www.oecd.org/trade/xcred/crc.htm 32 https://index.baselgovernance.org/sites/index/documents/Basel_AML_Index_Report_2017.pdf
 
 <!-- 원문 30쪽 -->
-
-<details>
-<summary>원문 30쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 30쪽](assets/ifc_aml_cft_risk_management/page-30.jpg)
-
-</details>
 
 포괄적이고 성숙한 통제 위험 평가 방법론 및 프로세스를 개발하기 위한 전문 지식.
 
@@ -1096,112 +764,23 @@ FATF30 또는 OECD 국가 위험 분류에서 발표한 고위험 및 기타 감
 
 **그림 5: 위험 통제 카테고리**
 
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
--
-
-AML/CFT 기업 지배구조, 경영 감독 및 책임 정책 및 절차 고객확인의무(CDD), 강화된 실사(EDD), 단순화된 실사(SDD) 및 정치적 주요인물(PEPs) 이전 기타 위험 평가 관리 정보 시스템(MIS)/보고 기록 보관 및 보유 지정 AML/CFT 책임자 탐지 및 의심 활동 보고서(SAR) 제출 모니터링 및 제어 교육 독립적인 테스트 및 감독 기타 제어
-
-### 시료 관리 카테고리: 예시적인 위험 수준:
-
-만족함: 모든 제어 요구 사항을 실질적으로 충족 91- 100%
-
-개선 필요: 75%와 90%의 제어 요구 사항 충족
-
-```text
-75-
-90%
-```
-
-불만족: 75% 미만의 제어 요구 사항 충족 <75%
-
-출처: Deloitte Risk and Financial Advisory.
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 5](assets/ifc_aml_cft_risk_management/figures/figure-5.png)
 
 > **주:** 33 BCBS. 2015. 지침: 은행을 위한 기업 지배구조 원칙. 34 이 그림은 3단계 등급 척도를 나타냅니다. 일부 기관에서는 "내재적" 위험에 대한 등급(높음, 중간 높음, 중간, 낮음)과 "통제" 평가에 대한 등급(강함, 만족, 개선 필요, 불만족)을 포함하는 4단계 등급 척도를 사용합니다. 잔여 위험 결정 등급에는 높음, 중간 높음, 중간, 낮음이 포함됩니다. 35 Wolfsberg Group의 환거래은행 실사 설문지에서는 전사적 위험 평가의 빈도가 12개월이어야 한다고 제안합니다.
 
 <!-- 원문 31쪽 -->
 
-<details>
-<summary>원문 31쪽 이미지 보기</summary>
+**그림 6**
 
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 31쪽](assets/ifc_aml_cft_risk_management/page-31.jpg)
-
-</details>
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 6](assets/ifc_aml_cft_risk_management/figures/figure-6.png)
 
 기술을 검증하고 그것이 은행의 요구 사항을 충족하는지 확인하는 데 필요한 단계입니다.36 위험 평가 결과, 사용된 방법론 및 식별된 위험을 관리하기 위해 은행이 취한 모든 조치는 종합 보고서에 통합되어 이사회에 전달되어야 합니다.
 
 시기 적절하고 완전하며 정확한 방식으로 이사 및 고위경영진에게 전달됩니다. 이는 이사회뿐만 아니라 고위경영진, CRO 및 AML 최고 책임자가 정보에 입각한 결정을 내리고 은행의 자원, 전문성 및 기술이 위험 완화에 부합하도록 보장하는 데 도움이 될 것입니다.
 
-고유 위험 매체
-
-낮은
-
-중간
-
-높은
-
-높은
-
-중간
-
-높은
-
-높은
-
-낮은
-
-잔여 위험 결정
-
-낮음 91 – 100% 만족 75 – 90% 개선 필요 <75% 불만족
-
-통제 평가 낮음
-
-중간
-
--
-
--
-
--
-
--
-
-잔여 위험은 내재된 위험과 위험관리 활동/통제의 전반적인 강도 사이의 균형을 이루어 결정됩니다. 잔여 위험 등급은 사업부 및 기관 전체의 ML/FT 위험이 적절하게 관리되고 있는지 평가하는 데 사용됩니다. 잔여 위험은 각 사업부 전반에 걸쳐 계산되어야 합니다. 잔여 위험은 시각적 히트맵 형식으로 제공되어야 합니다.
-
-### 예시적인 잔여 위험 접근 방식: 예시적인 잔여 위험 매트릭스:
-
-출처: Deloitte Risk and Financial Advisory.
-
 > **주:** 36 BCBS. 2015. 지침: 은행을 위한 기업 지배구조 원칙.
 
 <!-- 원문 32쪽 -->
-
-<details>
-<summary>원문 32쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 32쪽](assets/ifc_aml_cft_risk_management/page-32.jpg)
-
-</details>
 
 ### 3.4 정책 및 절차
 
@@ -1231,12 +810,9 @@ AML/CFT 정책 및 절차는37,38
 
 <!-- 원문 33쪽 -->
 
-<details>
-<summary>원문 33쪽 이미지 보기</summary>
+**그림 7**
 
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 33쪽](assets/ifc_aml_cft_risk_management/page-33.jpg)
-
-</details>
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 7](assets/ifc_aml_cft_risk_management/figures/figure-7.png)
 
 - 은행 이사회나 이사 또는 고위 위원회의 승인을 받아야 합니다.
 
@@ -1270,54 +846,9 @@ AML/CFT 정책과 절차는 다음과 같습니다.39,40
 
 - 시대에 뒤떨어지고 일관성 없는 정보를 제공합니다.
 
-고객 위험 수준에 따른 활동 – 설명 목적으로만 사용
-
-기본 실사: 고객 식별 프로그램(CIP), CDD
-
-EDD: 추가 정보 수집 및 확증
-
-심층 EDD(예: 추가
-
-### 소유권 수준) 실사
-
-일반 거래 모니터링 규칙
-
-강화된 매개변수를 사용한 보충 및 대상 거래 모니터링 규칙
-
-강화된 매개변수와 빈도를 갖춘 보충적이고 타겟화된 거래 모니터링 규칙입니다. 별도의 거래 모니터링 분석 팀을 통한 추가 조사
-
-### 거래
-
-### 모니터링
-
-모든 고객 및 관련 당사자 심사
-
-낮은 수준의 소유권/통제 심사
-
-고객의 심사
-
-### 고객 심사
-
-리스크 기반 검토(2~5-년 주기) 연간 검토 고객의 고객에 대한 검토,
-
-### 예상 활동과 실제 활동 비교 진행 중 만기
-
-### 근민
-
-### 고위험 최고 위험 낮음/중간 위험
-
-출처: Deloitte Risk and Financial Advisory.
-
 > **주:** 39 BCBS. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리. 40 FATF. 2018. 자금세탁방지와 테러 및 확산 자금 조달에 관한 국제 표준.
 
 <!-- 원문 34쪽 -->
-
-<details>
-<summary>원문 34쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 34쪽](assets/ifc_aml_cft_risk_management/page-34.jpg)
-
-</details>
 
 ### 그룹 전체 및 국경 간 상황에서의 AML/CFT
 
@@ -1342,13 +873,6 @@ EDD: 추가 정보 수집 및 확증
 - 보고된 활동으로 인해 발생하는 잠재적 위험, 특정 고객이나 고객 그룹의 위험, 그리고 다른 지점이나 자회사도 해당 고객에 대한 계정을 보유하고 있는지 여부. 출처: BCBS에서 발췌. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리.
 
 <!-- 원문 35쪽 -->
-
-<details>
-<summary>원문 35쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 35쪽](assets/ifc_aml_cft_risk_management/page-35.jpg)
-
-</details>
 
 ML/FT 위험을 효과적으로 관리하려면 은행은 고객이 누구인지 이해해야 합니다. 이를 달성하기 위해 은행은 신규 고객 온보딩 시 고객 식별 및 고객확인의무를 수행해야 하며 고객과의 은행 관계 전반에 걸쳐 CDD를 업데이트해야 합니다. 다음 표에는 규제 당국이 은행에 CDD를 수행하도록 요구하는 시기, 파트너 환거래은행이 활발한 CDD를 기대하는 시기, 그리고 CDD에서 취해야 할 조치가 나와 있습니다.
 
@@ -1384,13 +908,6 @@ ML/FT 위험을 효과적으로 관리하려면 은행은 고객이 누구인지
 
 <!-- 원문 36쪽 -->
 
-<details>
-<summary>원문 36쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 36쪽](assets/ifc_aml_cft_risk_management/page-36.jpg)
-
-</details>
-
 위험 평가 프로세스와 유사하게, CRR 프로세스에는 포괄적인 CRR 방법론 및 프로세스를 개발하기 위해 상당한 양의 작업, 데이터 수집, 분석 및 전문 지식이 필요합니다.
 
 위험도가 낮다고 판단되는 고객의 경우 단순화된 실사 조치가 허용될 수 있습니다. 고객 위험이 더 높다고 판단되면 은행은 위험을 완화하기 위해 강화된 통제 및 CDD/EDD 조치를 취해야 합니다.
@@ -1399,35 +916,7 @@ ML/FT 위험을 효과적으로 관리하려면 은행은 고객이 누구인지
 
 **그림 8: 고객 위험 등급(설명 목적으로만 사용)**
 
-### 위험 조치의 예
-
-고용 분류 및 직업 비자 상태 PEPs 관계 기간 산업 법인 유형/소유 구조
-
-- • • • • • 고위험 제품/서비스 높은 거래량/가치의 현금/화폐 상품 고위험 국가로/송금되는 높은 거래량/가치
-
-- • •
-
-고객 위치 고객의 운영/자산 위치 법인 설립 국가 국적 시민권
-
-- • • • •
-
-국가/규제 위험 고객의 AML/CFT 프로그램 부정적인 뉴스/규제 조치 이전 준법 내역(경고, 조사, 의심 거래 보고, 내부 감시 목록)
-
-- • • • •
-
-### 기타 요인
-
-### 지리
-
-### 제품/서비스
-
-### /채널
-
-### 고객의 인구통계
-
-### CRR
-
-출처: Deloitte Risk and Financial Advisory.
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 8](assets/ifc_aml_cft_risk_management/figures/figure-8.png)
 
 ### 위험도가 낮은 고객 사례 고위험 고객 사례
 
@@ -1458,13 +947,6 @@ ML/FT 위험을 효과적으로 관리하려면 은행은 고객이 누구인지
 > **주:** 43 FSD 아프리카. 2017. 자금세탁방지, 고객 파악, 테러자금조달 억제
 
 <!-- 원문 37쪽 -->
-
-<details>
-<summary>원문 37쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 37쪽](assets/ifc_aml_cft_risk_management/page-37.jpg)
-
-</details>
 
 고객 승인 및 고객확인의무 정책과 절차를 개발할 때 은행은 PEPs(고객 또는 수익적 소유자)의 대우에 대해 특별히 고려해야 합니다. 외국 PEPs,44와 관련하여 은행은 일반적인 고객확인의무 수행 외에도 다음을 수행해야 합니다.45
 
@@ -1510,13 +992,6 @@ PEP;
 
 <!-- 원문 38쪽 -->
 
-<details>
-<summary>원문 38쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 38쪽](assets/ifc_aml_cft_risk_management/page-38.jpg)
-
-</details>
-
 - 이 직위가 고위험 국가에 있는지 여부;
 
 - PEP에 정부 자금을 이동할 수 있는 능력이 있는지 여부;
@@ -1552,13 +1027,6 @@ CDD 및 관련 고객 위험 등급은 중앙 집중식 데이터베이스 또�
 수많은 금융 기관을 통합한 대규모 통합 또는 국경 간 금융 그룹의 경우 CDD 정책 및 절차를 공유해야 합니다. 그러나 각 비즈니스 부문에 내재된 위험을 기반으로 CDD 조치는 각 특정 그룹에 맞게 조정되어야 합니다.
 
 <!-- 원문 39쪽 -->
-
-<details>
-<summary>원문 39쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 39쪽](assets/ifc_aml_cft_risk_management/page-39.jpg)
-
-</details>
 
 ### 제3자에 대한 의존
 
@@ -1602,13 +1070,6 @@ KYC 유틸리티는 아래 텍스트 상자에 설명된 대로 여러 형식을
 
 <!-- 원문 40쪽 -->
 
-<details>
-<summary>원문 40쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 40쪽](assets/ifc_aml_cft_risk_management/page-40.jpg)
-
-</details>
-
 활동하고 앞서 언급한 문제를 지원합니다.
 
 KYC 유틸리티는 다음을 포함하여 여러 가지 이점을 제공합니다.
@@ -1619,22 +1080,13 @@ KYC 유틸리티는 다음을 포함하여 여러 가지 이점을 제공합니�
 
 **그림 9: KYC 활동 중앙 집중화**
 
-### 유틸리티 이후 상태 유틸리티 이전 상태
-
-공익사업
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 9](assets/ifc_aml_cft_risk_management/figures/figure-9.png)
 
 출처: IFC. 5월 2018. 피응답은행 가이드: 무역에서 환거래은행 관계를 관리하기 위한 필수 KYC 고려 사항.
 
 > **주:** 49 CPMI. 2016. 환거래은행.
 
 <!-- 원문 41쪽 -->
-
-<details>
-<summary>원문 41쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 41쪽](assets/ifc_aml_cft_risk_management/page-41.jpg)
-
-</details>
 
 고객 파악 유틸리티란 무엇입니까? 현재 운영되는 KYC 유틸리티에는 산업 협업 유틸리티, 관할권 유틸리티 및 유틸리티 서비스 제공자의 세 가지 유형이 있습니다. 유틸리티 서비스 제공자의 두 가지 하위 범주는 다음과 같습니다. a) 주로 데이터 서비스 및 식별(ID) 정보 저장인 유틸리티 서비스; b) 기본적으로 아웃소싱 유틸리티 서비스인 관리 서비스에 거래 추적 및 CDD를 더한 것입니다. 각 유틸리티 유형의 예는 다음과 같습니다.
 
@@ -1656,12 +1108,9 @@ BAE Systems는 세계 최대의 방산업체이며 KYC/CDD 솔루션에 대한 �
 
 <!-- 원문 42쪽 -->
 
-<details>
-<summary>원문 42쪽 이미지 보기</summary>
+**그림 10**
 
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 42쪽](assets/ifc_aml_cft_risk_management/page-42.jpg)
-
-</details>
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 10](assets/ifc_aml_cft_risk_management/figures/figure-10.png)
 
 KYC 유틸리티를 사용할 준비를 하려면 은행은 모든 필수 데이터를 정기적으로 입력하고 업데이트할 수 있는 내부 용량과 인프라를 갖추고 있어야 합니다. 이를 위해서는 은행 측에서 상당한 기술 투자가 필요할 수 있습니다. KYC 유틸리티를 채택하기 전에 필요한 특정 내부 인프라와 용량이 있습니다. 필요한 필수 용량의 예는 다음과 같습니다50:
 
@@ -1685,74 +1134,9 @@ KYC 유틸리티 사용을 고려할 때 글로벌 환거래은행이 염두에 
 
 이러한 제한에도 불구하고 KYC 유틸리티는 신흥시장 은행이 환거래은행과 공유하는 KYC/CDD에 접근할 때 활용할 수 있는 매우 귀중한 도구가 될 수 있습니다.
 
-위험
-
-사기
-
-준법
-
-### 명령 및 제어 대시보드와 KPI
-
-은행 시스템 데이터
-
-제3자 케이스 관리
-
-### 결과
-
-### 포착
-
-탑승 및 데이터 수집
-
-복합 위험 점수 KYC EDD/ODD
-
-EIM 경고 및 사례 관리
-
-조사하다 &
-
-대응 지속적인 탐지 및 예방
-
-엔터티 중심 채점
-
-### KYC/CDD
-
-소셜 네트워크 분석
-
-감시 목록 관리
-
-### 실시간 또는 배치
-
-제3자 위험, 사기 또는 준법 엔진
-
-분석 워크벤치 – 모델과 규칙 구성 및 조정
-
-금융범죄 저장소
-
-출처: www.baesystems.com
-
 > **주:** 50 IFC. 2018. 피응답은행 안내: 무역에서 환거래 관계를 관리하기 위한 필수 KYC 고려 사항. 51 IFC. 2018. 피응답은행 가이드: 무역에서 환거래은행 관계를 관리하기 위한 필수 KYC 고려 사항.
 
-> **주:** 고객 애플리케이션 거래
-
-> **주:** 직원 온라인 데이터 제3자 데이터
-
-> **주:** 신청 사기
-
-> **주:** 경고 분류 및 최적화 경고 및 사례 관리 재무 관리 공개 관리
-
-> **주:** AML 거래 모니터링 거래 필터링 제재/ PEP 심사 시장 남용/운영 리스크
-
-> **주:** 결제 사기 온라인 사기 수표 및 입금 사기 직불카드 사기 CPP/MAC 사기
-
-> **주:** 제1자/살인 사기 계좌 탈취 직원/담합 내부자 사기 담보 대출/담보 대출 사기
-
 <!-- 원문 43쪽 -->
-
-<details>
-<summary>원문 43쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 43쪽](assets/ifc_aml_cft_risk_management/page-43.jpg)
-
-</details>
 
 ### 법적 실체 식별자
 
@@ -1790,13 +1174,6 @@ IFC는 특정 KYC 유틸리티를 보증하지 않으며 공급업체의 샘플 
 
 <!-- 원문 44쪽 -->
 
-<details>
-<summary>원문 44쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 44쪽](assets/ifc_aml_cft_risk_management/page-44.jpg)
-
-</details>
-
 LEI 시스템을 전 세계적으로 조정하며, 인증된 LOUs 목록은 GLEIF 웹사이트에서 확인할 수 있습니다. 56 LEI를 획득하는 비용과 서비스가 제공되는 관할권은 LOU에 따라 다릅니다. 따라서 스스로 LEIs를 취득하고 거래하는 모든 법인을 지원하는 데 관심이 있는 은행은 이러한 LEI 발행자의 웹사이트를 방문하여 어떤 발행자가 자신의 요구 사항을 충족하는지 확인해야 합니다.
 
 ### 고급 기술 애플리케이션
@@ -1825,13 +1202,6 @@ Aadhaar는 인도 내 일부 혁신적인 프로젝트의 기초가 되었습니
 
 <!-- 원문 45쪽 -->
 
-<details>
-<summary>원문 45쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 45쪽](assets/ifc_aml_cft_risk_management/page-45.jpg)
-
-</details>
-
 적절하게 말하면, 이 기술은 진양성 탐지 경험을 통해 "학습"함으로써 의심 거래 패턴을 탐지하는 프로세스를 더욱 개선하는 데 사용될 수 있습니다.
 
 - 생체인식: 생체인식 인증 기술은 개인의 고유하고 안정적인 생체인식 특징을 측정하고 이를 동일한 사람의 승인된 생체인식 샘플과 일치시킵니다. 이를 통해 지문, 얼굴, 홍채 패턴, 음성 등 개인 고유의 외부 특징을 통해 해당 개인의 신원을 정확하게 확인할 수 있습니다. 생체인식 인증은 은행과 고객 모두에게 큰 기회가 되지만, 그러한 기술에는 법적, 보안, 평판상의 위험이 따릅니다. 이러한 기술이 AML/CFT 프로그램 내의 위험 평가뿐만 아니라 기관 관할권 내의 법률 및 규정에도 적합하도록 은행은 가능한 모든 위험을 해결하고 현지 법률을 숙지하는 것이 중요합니다.
@@ -1854,13 +1224,6 @@ Aadhaar는 인도 내 일부 혁신적인 프로젝트의 기초가 되었습니
 
 <!-- 원문 46쪽 -->
 
-<details>
-<summary>원문 46쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 46쪽](assets/ifc_aml_cft_risk_management/page-46.jpg)
-
-</details>
-
 은행은 의심 거래를 식별, 조사, 보고하기 위한 절차와 프로세스를 갖추어야 합니다. 이러한 프로세스에는 거래가 의심스러운지 여부를 결정하고 관련 당국에 보고해야 하는지 확인하기 위해 추가 조사가 필요한 비정상적이거나 잠재적으로 의심 거래 활동을 표시하는 데 필요한 자동, 반자동 또는 수동 모니터링 시스템이 포함되어야 합니다.
 
 은행은 필요한 모니터링 시스템을 설계하고 구현하기 위해 충분한 전문 지식과 자원에 접근할 수 있어야 합니다. 모니터링 시스템의 설계 및 구현에서 중요한 부분은 은행의 위험 평가 결과뿐만 아니라 위험 평가 및 CRR 결과 내에서 다루는 제품, 서비스, 고객 및 지역과 관련된 범죄 유형과도 일치하는지 확인하는 것입니다. 성숙한 프로세스에는 거래 모니터링 시스템 출력, 조사 활동, 의심 거래 보고서(STR) 제출 또는 비제출을 추적하고 문서화하는 컴퓨터 기반 케이스 관리 시스템도 포함됩니다.
@@ -1878,13 +1241,6 @@ Aadhaar는 인도 내 일부 혁신적인 프로젝트의 기초가 되었습니
 > **주:** 63 BCBS. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리.
 
 <!-- 원문 47쪽 -->
-
-<details>
-<summary>원문 47쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 47쪽](assets/ifc_aml_cft_risk_management/page-47.jpg)
-
-</details>
 
 고객의 거래를 제한된 수의 제품/서비스로 제한합니다. 위험을 완화할 수 없는 경우,
 
@@ -1944,13 +1300,6 @@ Aadhaar는 인도 내 일부 혁신적인 프로젝트의 기초가 되었습니
 
 <!-- 원문 48쪽 -->
 
-<details>
-<summary>원문 48쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 48쪽](assets/ifc_aml_cft_risk_management/page-48.jpg)
-
-</details>
-
 은행이 외부 조달 거래 모니터링 시스템을 사용하는 경우 시스템이 적절한 매개변수를 갖고 은행의 요구를 충족하는지 확인하기 위해 필요한 조치를 취해야 합니다. 시스템을 외부에서 구매한 경우에도 AML/CFT 준법 및 독립 감사 기능을 통해 시스템 임계값과 매개변수를 정기적으로 평가해야 합니다.
 
 은행이 제3자/대리인을 사용하여 CDD 중 일부를 수행하는 경우 거래 모니터링 시스템은 그러한 제3자/대리인이 수행하는 내용도 다루어야 합니다. 65 거래 모니터링을 지원하는 신기술 새로운 핀테크 및 레그테크의 출현은 의심 거래를 감지하고 보고하는 은행의 능력을 향상시킬 수 있는 큰 잠재력을 제공합니다. IIF(국제 금융 연구소) 실무 그룹은 금융 범죄 방지 Regtech 배포 보고서에서 새로운 기술을 통해 다음을 수행할 수 있다고 밝혔습니다.
@@ -1977,13 +1326,6 @@ Aadhaar는 인도 내 일부 혁신적인 프로젝트의 기초가 되었습니
 
 <!-- 원문 49쪽 -->
 
-<details>
-<summary>원문 49쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 49쪽](assets/ifc_aml_cft_risk_management/page-49.jpg)
-
-</details>
-
 ### 국경 간 거래 및 KYC 유틸리티: 멕시코 사례
 
 멕시코 당국은 국경간 거래용 데이터베이스와 KYC 유틸리티라는 두 가지 데이터베이스를 결합하여 개발하고 있습니다. 국경 간 거래 데이터베이스에는 규모에 관계없이 멕시코에서 발생한 국경 간 전신 송금은 물론 외국 통화로 이루어진 모든 국내 전신 송금이 기록됩니다. 국경을 넘는 모든 금융 거래는 보고되어야 합니다. 각 거래에 대해 은행은 주문 고객, 수취 은행, 송금 수취인, 송금 금액, 송금 통화 등에 대한 기본 정보를 보고합니다. 현재 데이터베이스가 해외에서 발생하는 인바운드 작업을 포착하지 않는다는 점은 주목할 만합니다. 인바운드 거래은 2018 후반에 캡처됩니다.
@@ -1997,13 +1339,6 @@ Aadhaar는 인도 내 일부 혁신적인 프로젝트의 기초가 되었습니
 데이터베이스는 아직 운영되지는 않지만 범위가 넓고 리소스 집약적이며 적절한 정보 기술 인프라에 의존합니다. 이러한 차원을 갖춘 데이터베이스의 유용성은 분명하지만, 이 데이터베이스는 용량이 적은 국가에서는 선택 사항이 아닐 수 있습니다. 안정적이고 널리 분산된 정보 기술 인프라, 시스템을 유지 관리할 수 있는 충분한 용량(BdM은 불일치 및 오류를 모니터링하기 위해 자체 알고리즘을 개발함), 사이버 위협으로부터 보호하기 위한 강력한 보안 시스템을 포함하여 충족해야 할 몇 가지 전제 조건이 있습니다. 출처: World Bank Group의 "신흥시장의 환거래은행 서비스 접근 감소: 추세, 영향 및 솔루션" 2018에서 발췌.
 
 <!-- 원문 50쪽 -->
-
-<details>
-<summary>원문 50쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 50쪽](assets/ifc_aml_cft_risk_management/page-50.jpg)
-
-</details>
 
 모든 은행 관할권의 자금세탁방지 제도의 핵심 부분은 중요한 금융 거래에 대한 보고서를 당국에 제공하는 것입니다. 이러한 은행 규제 요구 사항에는 일반적으로 의심 거래 보고서 및 대규모 통화 거래 보고서가 포함됩니다. 이러한 의무를 이행하기 위해 은행은 적절한 정부 기관에 필요한 보고서(외부 보고)를 제공할 수 있는 적절한 정책, 절차 및 시스템을 갖추고 있어야 합니다. 이러한 보고서의 금융 인텔리전스 가치는 은행이 ML/FT 위험(내부 보고)을 관리할 수 있게 해주는 MIS 보고서를 통해 내부적으로 가장 잘 활용됩니다.
 
@@ -2044,13 +1379,6 @@ AML 운영 성과 및 결과에 대한 내부 보고는 전체 은행 위험관�
 모든 MIS 보고서는 은행 위험 위원회 또는 준법 운영 회의에서 이용 가능하고 일반적으로 논의되어야 하며 고위경영진, 일선 임원, CRO, CCO 및 AML/CFT 임원을 포함한 모든 관련 이해관계자를 포함해야 합니다. 보고서는 AML/CFT 위험 노출 상태에 대한 경영진의 평가를 용이하게 할 수 있도록 충분히 자세하고 주요 핵심 위험 지표(KRIs)를 다루어야 합니다. 더 중요한 것은 보고서가 AML/CFT 제어 환경의 효과적인 운영뿐만 아니라 AML/CFT 운영 내의 모든 문제 또는 사업부의 AML/CFT 요구 사항 실행에 대한 조기 식별을 다루어야 한다는 것입니다. 다음 표는 MIS 보고서에 포함될 정보의 예를 제공합니다.
 
 <!-- 원문 51쪽 -->
-
-<details>
-<summary>원문 51쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 51쪽](assets/ifc_aml_cft_risk_management/page-51.jpg)
-
-</details>
 
 ### 3.8 통신 및 교육
 
@@ -2126,13 +1454,6 @@ EDD/CDD/신원 확인이 뛰어난 고객
 
 <!-- 원문 52쪽 -->
 
-<details>
-<summary>원문 52쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 52쪽](assets/ifc_aml_cft_risk_management/page-52.jpg)
-
-</details>
-
 AML/CFT 준법 담당자가 해당 정보를 필요한 임원에게 자유롭게 전달할 수 있는 데 유용합니다. 이렇게 적시에 정보를 공유하면 더욱 강력하고 통합된 제어 및 위험관리 환경이 조성됩니다. 통제 및 위험관리 환경이 더욱 강력하고 투명할수록 환거래은행은 AML/CFT 프로그램 효율성을 호의적으로 평가할 가능성이 높습니다.
 
 이사회에서 운영 직원에 이르기까지 적절한 은행 직원을 교육하는 것은 AML/CFT 프로그램을 효과적으로 운영하는 핵심 구성 요소입니다. 교육의 범위와 빈도는 은행에 존재하는 위험의 수준과 성격, 직원이 자신의 책임으로 인해 노출되는 위험 요소에 맞게 조정되어야 합니다. 자신의 역할과 책임으로 인해 가장 큰 위험 요소에 노출된 직원은 AML/CFT 위험관리에 대한 전문 과정을 통해 매년 최소 40 시간의 지속적인 전문 교육 훈련을 이수해야 합니다.
@@ -2156,13 +1477,6 @@ AML/CFT 준법 담당자가 해당 정보를 필요한 임원에게 자유롭게
 > **주:** 70 FATF. 2014. 위험 기반 접근 방식에 대한 지침. 은행 부문.
 
 <!-- 원문 53쪽 -->
-
-<details>
-<summary>원문 53쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 53쪽](assets/ifc_aml_cft_risk_management/page-53.jpg)
-
-</details>
 
 ### 3.9 지속적인 개선 및 테스트
 
@@ -2210,13 +1524,6 @@ AML/CFT 준법 위험을 측정하고 모니터링하는 데 사용되는 주요
 
 <!-- 원문 54쪽 -->
 
-<details>
-<summary>원문 54쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 54쪽](assets/ifc_aml_cft_risk_management/page-54.jpg)
-
-</details>
-
 AML/CFT 프로그램의 다음 구성 요소에 대한 평가:
 
 - 거버넌스, 감독 및 조직 구조;
@@ -2253,13 +1560,6 @@ AML/CFT 감사의 빈도, 범위 및 방법론은 은행의 위험 프로필에 
 
 <!-- 원문 55쪽 -->
 
-<details>
-<summary>원문 55쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 55쪽](assets/ifc_aml_cft_risk_management/page-55.jpg)
-
-</details>
-
 ### 환거래은행의 관점 이해
 
 CBRs를 유지하려면 환거래은행의 관점을 이해하고 귀하의 업무 방식을 글로벌 표준에 맞추는 것이 필수적입니다.
@@ -2294,13 +1594,6 @@ CBRs를 유지하려면 환거래은행의 관점을 이해하고 귀하의 업�
 
 <!-- 원문 56쪽 -->
 
-<details>
-<summary>원문 56쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 56쪽](assets/ifc_aml_cft_risk_management/page-56.jpg)
-
-</details>
-
 환거래은행은 국경 간 환거래은행과 관련하여 추가 실사를 수행합니다. 추가 조치에는 다음이 포함됩니다.
 
 - 피응답은행의 AML/CFT 통제를 평가합니다. 그리고
@@ -2333,13 +1626,6 @@ CBRs를 유지하려면 환거래은행의 관점을 이해하고 귀하의 업�
 
 <!-- 원문 57쪽 -->
 
-<details>
-<summary>원문 57쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 57쪽](assets/ifc_aml_cft_risk_management/page-57.jpg)
-
-</details>
-
 앞서 언급한 바와 같이, 환거래은행은 피응답은행에 대한 충분한 정보를 수집하고 유지해야 합니다. CBRs를 관리하는 능력은 품질, 적시성 및 응답자로부터 받는 정보를 얻는 비용에 따라 달라집니다. CBRs를 유지하는 것은 양측 모두에게 어렵고 비용이 많이 듭니다. 따라서 피응답은행은 정보 교환을 촉진하고, 특히 현재 문서 기대치를 충족하며, 양 당사자에게 발생하는 비용 절감을 가능하게 할 수 있는 시스템과 도구를 채택하도록 노력해야 합니다.
 
 자동화는 이러한 방향에서 필요한 단계입니다. 일부 소규모 은행에는 여전히 고객 온보딩 및 지속적인 모니터링을 위한 수동 프로세스가 있습니다. 이는 정보 흐름을 방해하고 때로는 고객 거래 활동에 대한 이해를 방해할 수 있습니다. 그러나 종이 기반 CDD 프로세스가 어떻게 효과적일 수 있는지에 대한 충분한 설명이 없으면 환거래은행은 환거래은행의 ML/FT 위험관리 시스템의 강도에 의문을 제기할 수 있습니다. 이로 인해 CBR 계정이 폐쇄될 수 있습니다.
@@ -2364,13 +1650,6 @@ AML/CFT 준법 담당자가 국제 표준과 모범 사례를 인지하고 교�
 
 <!-- 원문 58쪽 -->
 
-<details>
-<summary>원문 58쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 58쪽](assets/ifc_aml_cft_risk_management/page-58.jpg)
-
-</details>
-
 ### 국내 규제기관 및 국제기구와의 커뮤니케이션
 
 피응답은행의 위험을 평가할 때 환거래인은 피응답은행이 소재한 국가의 위험 프로필을 일상적으로 고려합니다. FATF 표준은 국가가 ML/FT 위험(예: 국가 위험 평가)을 평가하고 식별된 위험을 완화하기 위한 조치를 개발하도록 요구합니다. 피응답은행은 AML/CFT 위험관리에 대한 국가의 의지와 국가 평가가 CBRs에 미칠 수 있는 긍정적인 영향을 입증하기 위해 국가 평가 수행 및 발표의 중요성에 대해 국내 당국과 대화해야 합니다. 또한, 피응답은행은 신흥시장 은행 및 국내 당국에 기술 지원을 제공한 기록이 있는 세계은행과 같은 국제기구에 연락하는 것을 고려해야 합니다. 예를 들어, 세계 은행 그룹은 국가가 국가 ML/FT 위험 평가를 수행하는 데 도움을 주는 도구를 개발했습니다. 이 WBG 도구는 이미 80 이상의 관할권에서 사용되었습니다.76
@@ -2388,13 +1667,6 @@ Standard Chartered는 또한 국가 내 고객 및 규제 기관을 위해 개�
 > **주:** 76 세계은행그룹. 2018. 신흥시장의 환거래은행 서비스에 대한 접근 감소: 추세, 영향 및 솔루션.
 
 <!-- 원문 59쪽 -->
-
-<details>
-<summary>원문 59쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 59쪽](assets/ifc_aml_cft_risk_management/page-59.jpg)
-
-</details>
 
 ### AML/CFT 프로그램에 대한 외부 독립 평가
 
@@ -2414,13 +1686,6 @@ MTO 부문에 대한 규제 체계를 강화하기 위해 세계은행은 소말
 
 <!-- 원문 60쪽 -->
 
-<details>
-<summary>원문 60쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 60쪽](assets/ifc_aml_cft_risk_management/page-60.jpg)
-
-</details>
-
 지속적인 생산적인 대화 수익성 있고 잘 관리된 관계; 성숙한 AML/CFT 위험관리 프로그램을 구현하면 은행이 환거래은행 해고 통지를 받을 가능성이 줄어들 것으로 예상됩니다. 최소한 이러한 방식으로 행동하는 은행에는 환거래은행이 가질 수 있는 심각한 우려 사항을 해결할 수 있는 기회가 주어져야 합니다. 그러나 이러한 일이 발생하지 않는 경우, 피응답은행은 종료 통지를 받았을 때 즉시 대응해야 합니다. 특정 문제나 종료 이유에 대해 환거래은행과 자세한 대화를 시작하면 피응답은행이 확인된 결함을 적시에 해결할 수 있는 실행 계획을 개발하는 데 도움이 될 것입니다. 환거래은행이 시정 조치가 만족스럽지 않고 종료가 불가피하다고 판단하는 경우, 피응답은행은 대체 환거래은행 관계를 찾기 위해 추가 시간을 허용할 수 있는 연장 요청을 고려해야 합니다.
 
 요약하자면, 진화하는 규제, 국제 및 환거래은행 AML/CFT 프로그램 기대치를 따라잡기 위한 귀하의 노력을 지속적으로 전달하면 기대치를 충족하고 CBRs를 유지하는 능력이 향상됩니다.
@@ -2430,13 +1695,6 @@ MTO 부문에 대한 규제 체계를 강화하기 위해 세계은행은 소말
 한 국가에서는 피응답은행의 관행이 글로벌 은행으로부터 관계 종료 의사를 통보받은 후 즉각적인 조치를 취하는 것이 가치 있음을 보여주었습니다. 피응답은행은 즉각 영국 본사에서 환거래은행 고위경영진과의 일대일 면담을 주장했다. 피응답은행은 원래 30일의 종료 통지를 1년으로 연장하는 데 성공했습니다. 그들은 또한 시정 조치 계획에도 동의했습니다. 대상은행이 기간 연장을 결정한 궁극적인 이유는 확인할 수 없으나, 피응답은행은 고객층(주로 영국 정부로부터 국가 연금을 받는 연금 수급자)의 위험성이 낮다는 점을 지적하며 소송을 법정까지 고려할 것이라고 언급했다. 신속한 조치와 부정적인 평판의 위협도 그러한 결정에 영향을 미쳤을 수 있습니다. 출처: 세계은행그룹. 2018. 신흥시장의 환거래은행 서비스에 대한 접근 감소: 추세, 영향 및 솔루션.
 
 <!-- 원문 61쪽 -->
-
-<details>
-<summary>원문 61쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 61쪽](assets/ifc_aml_cft_risk_management/page-61.jpg)
-
-</details>
 
 지속적인 개선 프로세스의 일환으로 은행은 AML/CFT 프로그램의 성숙도 수준을 정기적으로 평가해야 합니다. 이를 통해 은행은 기존 AML/CFT 프로그램의 잠재적인 약점이나 결함을 식별하고 다음 성숙도 수준을 달성하기 위한 시정 조치 계획 개발을 지원할 수 있습니다. 또한 이러한 평가를 환거래은행, 은행 감독관 등 관련 당사자와 공유하고, 귀하의 현황과 개선 계획을 적극적으로 전달하는 것도 도움이 될 것입니다.
 
@@ -2455,13 +1713,6 @@ IFC는 또한 AML/CFT 프로그램의 성숙도를 측정하도록 설계된 소
 ## 제5장 AML/CFT 프로그램 성숙도 프레임워크 자체평가
 
 <!-- 원문 62쪽 -->
-
-<details>
-<summary>원문 62쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 62쪽](assets/ifc_aml_cft_risk_management/page-62.jpg)
-
-</details>
 
 ### 구성 요소 기본 신흥 개발 고급
 
@@ -2501,13 +1752,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 
 <!-- 원문 63쪽 -->
 
-<details>
-<summary>원문 63쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 63쪽](assets/ifc_aml_cft_risk_management/page-63.jpg)
-
-</details>
-
 ### 구성 요소 기본 신흥 개발 고급
 
 위험 식별, 평가 및 완화
@@ -2537,13 +1781,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 은행은 12–18개월마다 전사적 AML/CFT 위험 평가를 수행합니다. 은행의 위험 프로필을 크게 변화시키는 새로운 위험이나 새로운 위험이 식별되면 더 자주 새로 고침이 수행됩니다. 위험 평가 방법론은 은행이 생성한 운영 및 거래 데이터와 같은 내부 정보뿐만 아니라 다양한 국제기구의 국가 보고서 및 국가 위험 평가와 같은 외부 정보를 기반으로 하며 정성적, 정량적 요소(예: 거래 규모 및 가치)를 모두 포함합니다. 이는 정기적으로(최소 1년에 한 번 또는 해당되는 경우 더 자주) 고위경영진에 의해 명확하게 문서화되고 승인됩니다.
 
 <!-- 원문 64쪽 -->
-
-<details>
-<summary>원문 64쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 64쪽](assets/ifc_aml_cft_risk_management/page-64.jpg)
-
-</details>
 
 ### 구성 요소 기본 신흥 개발 고급
 
@@ -2575,13 +1812,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 
 <!-- 원문 65쪽 -->
 
-<details>
-<summary>원문 65쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 65쪽](assets/ifc_aml_cft_risk_management/page-65.jpg)
-
-</details>
-
 ### 구성 요소 기본 신흥 개발 고급
 
 은행의 AML/CFT 정책 및 절차는 위험 기반 접근 방식을 따르지 않습니다.
@@ -2603,13 +1833,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 은행은 (i) 고객, 최종 수익 소유자를 포함한 수익 소유자, 승인된 서명인 및 주요 통제자를 식별하고 확인하기 위한 프로세스를 갖추고 있습니다. (ii) 국제 표준에 따라 수집될 것으로 예상되는 모든 요소(예: 관계의 목적 및 성격, 제품 사용, 예상 활동 및 자금 출처)를 포함하는 CDD/ EDD를 고객에게 수행합니다. 필수 정보는 온보딩 시 또는 그 직후(예: 30 일 이내) 수집되고 확인됩니다. 은행은 해당 절차가 완료될 때까지 계좌를 개설하지 않으며, 정보를 얻거나 확인할 수 없는 경우 고객과 관련된 의심 거래 보고서 제출을 고려할 것입니다. 이러한 요구 사항은 정책과 절차에 공식적으로 문서화되어 있으며 모든 예외 사항은 AML/CFT 준법 부서에서 면밀히 모니터링합니다.
 
 <!-- 원문 66쪽 -->
-
-<details>
-<summary>원문 66쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 66쪽](assets/ifc_aml_cft_risk_management/page-66.jpg)
-
-</details>
 
 ### 구성 요소 기본 신흥 개발 고급
 
@@ -2638,13 +1861,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 은행은 고객 온보딩 시와 그 이후에도 자주(예: 매일 또는 매주) 테러리스트/제재, 부정적인 뉴스, PEP 심사를 실시합니다. 심사 과정은 완전 자동화되어 있습니다. 잠재적 일치 항목은 즉시 검토되고 에스컬레이션됩니다. 은행의 정책과 절차에는 어떤 고객과 관련 당사자를 심사해야 하는지, 그리고 이 과정을 어떻게 수행해야 하는지 명확하게 설명되어 있습니다.
 
 <!-- 원문 67쪽 -->
-
-<details>
-<summary>원문 67쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 67쪽](assets/ifc_aml_cft_risk_management/page-67.jpg)
-
-</details>
 
 ### 구성 요소 기본 신흥 개발 고급
 
@@ -2676,13 +1892,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 
 <!-- 원문 68쪽 -->
 
-<details>
-<summary>원문 68쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 68쪽](assets/ifc_aml_cft_risk_management/page-68.jpg)
-
-</details>
-
 ### 구성 요소 기본 신흥 개발 고급
 
 은행은 거래 모니터링 시스템을 사용하지 않습니다.
@@ -2702,13 +1911,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 은행은 모든 관련 AML/CFT 영역(예: 위험 평가, 고위험 고객, 의심 거래 보고, 거래 모니터링 경고, 탁월한 EDD/CDD/신원 확인 고객)을 다루는 정기적인 관리 보고를 갖추고 있습니다. 보고서는 이사회 및 고위경영진부터 운영 경영진까지 모든 관련 이해관계자에게 정기적으로(예: 월별 또는 분기별) 제공됩니다. 은행에는 AML/CFT 준법(예: 백로그 제거 또는 KYC 수정)와 관련된 특별 프로젝트를 추적, 모니터링 및 보고하기 위한 공식 프로세스가 마련되어 있습니다. 이러한 요구 사항은 은행의 정책 및 절차에 문서화되어 있습니다.
 
 <!-- 원문 69쪽 -->
-
-<details>
-<summary>원문 69쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 69쪽](assets/ifc_aml_cft_risk_management/page-69.jpg)
-
-</details>
 
 ### 구성 요소 기본 신흥 개발 고급
 
@@ -2740,13 +1942,6 @@ AML/CFT 위험 예방에는 이사회 참여가 있지만 산발적이고 제한
 
 <!-- 원문 70쪽 -->
 
-<details>
-<summary>원문 70쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 70쪽](assets/ifc_aml_cft_risk_management/page-70.jpg)
-
-</details>
-
 ### 구성 요소 기본 신흥 개발 고급
 
 은행에는 필수 AML/CFT 교육이 없습니다.
@@ -2774,13 +1969,6 @@ AML/CFT 준법 기능이 존재하며, 이 기능 내의 직원은 독립적이�
 AML/CFT 준법 기능이 존재하며 충분한 리소스(적절한 수의 직원, 필요한 시스템, 정보 및 은행 직원에 대한 액세스)를 갖추고 있습니다. AML/CFT 준법 부서의 직원은 독립적입니다(즉, 준법 책임과 기타 책임 간에 이해 상충이 있는 위치에 있지 않습니다). AML/CFT 준법 부서는 프로세스 및 제어에 대한 정기적인 준법 테스트를 수행하고 결과를 보고하며 이는 정책 및 절차에 통합됩니다.
 
 <!-- 원문 71쪽 -->
-
-<details>
-<summary>원문 71쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 71쪽](assets/ifc_aml_cft_risk_management/page-71.jpg)
-
-</details>
 
 ### 구성 요소 기본 신흥 개발 고급
 
@@ -2814,13 +2002,6 @@ AML/CFT 준법 기능이 존재하며 충분한 리소스(적절한 수의 직�
 
 <!-- 원문 72쪽 -->
 
-<details>
-<summary>원문 72쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 72쪽](assets/ifc_aml_cft_risk_management/page-72.jpg)
-
-</details>
-
 ### 구성 요소 기본 신흥 개발 고급
 
 은행은 AML/CFT 프로그램에 대한 독립적인 감사/테스트를 거의 수행하지 않습니다. 은행의 정책과 절차에서는 이 요구 사항을 다루지 않습니다.
@@ -2832,13 +2013,6 @@ AML/CFT 준법 기능이 존재하며 충분한 리소스(적절한 수의 직�
 은행의 AML/CFT 프로그램은 매년 내부 및/또는 외부 감사자의 포괄적이고 독립적인 감사를 받습니다. 감사 결과는 이사회, 고위경영진 및 AML/CFT 임원과 공유됩니다. 결함이 확인된 경우 공식적인 실행 계획이 개발되고 실행 계획의 진행 상황이 정기적으로 고위경영진에게 보고됩니다. 이러한 요구 사항은 은행의 정책 및 절차에 문서화되어 있습니다.
 
 <!-- 원문 73쪽 -->
-
-<details>
-<summary>원문 73쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 73쪽](assets/ifc_aml_cft_risk_management/page-73.jpg)
-
-</details>
 
 IFC의 사명과 시장 지원을 위한 이니셔티브 개발의 오랜 역사를 뒷받침하는 GPN 개발의 목표는 신흥시장 대응 은행이 필요한 경우 환거래은행 관계를 유지하고 확보할 수 있도록 모범 사례 지침과 실용적인 솔루션을 제공하는 것입니다. GPN 외에도 IFC는 IFC 고객 은행과 파트너가 AML/CFT 프로그램의 성숙도를 평가하는 데 도움이 되는 소프트웨어 기반 진단 도구를 개발하여 시험하고 있습니다. GPN 및 진단 도구는 피응답은행이 위험회피(de-risking) 문제 및 과제에 대응할 수 있는 방법을 제시합니다.
 
@@ -2856,43 +2030,15 @@ AML/CFT 프로그램의 11 구성 요소에 대한 레벨입니다. 2. 대응 �
 
 <!-- 원문 74쪽 -->
 
-<details>
-<summary>원문 74쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 74쪽](assets/ifc_aml_cft_risk_management/page-74.jpg)
-
-</details>
-
 준법 기능을 지원합니다. 비. 위험 평가 및 CRR 프로세스를 설계, 개발 및 구현하여 위험 노출을 식별하고 기업 및 개인 고객 위험을 완화하는 데 필요한 해당 제어 수단을 결정합니다. 기음. 강력한 AML/CFT 프로그램을 설계, 구현하고 궁극적으로 독립적으로 테스트하여 해당 프로그램의 효율성을 환거래은행에 입증합니다. 디. KYC 유틸리티, LEIs 및 STR용 고급 소프트웨어와 같은 기술 및 산업 정보 공유 서비스를 활용하여 피응답은행의 AML/CFT 프로그램 요소의 효과를 증폭시킵니다. 이자형. FIU, 현지 규제 기관, 환거래은행, 동료 은행 및 국제 조직과 협력하여 최신 정보를 확인하세요.
 
 AML/CFT의 임무와 관련된 모든 당사자의 위험관리를 지원하기 위한 정보 공유 그리고 에프. 타사 리소스를 사용하여 AML/CFT 프로그램의 효율성을 검증하고 효율성에 대한 독립적인 평가를 제공합니다. 이 GPN 및 진단 도구는 피응답은행, 특히 신흥시장의 피응답은행이 위험회피(de-risking) 기간 동안 환거래 관계를 획득하고 유지하는 데 있어 실질적인 환경 문제를 효과적으로 해결하도록 지원하도록 설계되었습니다. 제공된 정보를 사용하고 격차를 해소하기 위한 조치를 취하면 환거래은행 관계에 영향을 미치는 외부 영향으로부터 은행을 최대한 보호하고 현지 고객에게 서비스를 제공하는 데 있어 경쟁 우위를 제공할 수 있는 수단을 제공해야 합니다.
 
 <!-- 원문 75쪽 -->
 
-<details>
-<summary>원문 75쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 75쪽](assets/ifc_aml_cft_risk_management/page-75.jpg)
-
-</details>
-
 <!-- 원문 76쪽 -->
 
-<details>
-<summary>원문 76쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 76쪽](assets/ifc_aml_cft_risk_management/page-76.jpg)
-
-</details>
-
 <!-- 원문 77쪽 -->
-
-<details>
-<summary>원문 77쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 77쪽](assets/ifc_aml_cft_risk_management/page-77.jpg)
-
-</details>
 
 ## 부록 1: 국제기구와 시스템적 중요 은행의 위험회피 대응 활동
 
@@ -2919,13 +2065,6 @@ AML/CFT의 임무와 관련된 모든 당사자의 위험관리를 지원하기 
 > **주:** 77 FSB. 2015. 환거래은행 감소를 평가하고 해결하기 위해 취한 조치에 대해 G20에 보고합니다. 78 FSB. 2018. 송금 서비스 제공업체의 은행 서비스 이용 현황 조사. 79 FATF. 2016. 환거래은행 서비스. 80 FATF. 2017. 자금세탁방지 및 테러자금조달 조치 및 금융포용.
 
 <!-- 원문 78쪽 -->
-
-<details>
-<summary>원문 78쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 78쪽](assets/ifc_aml_cft_risk_management/page-78.jpg)
-
-</details>
 
 1월 2014에는 환거래은행(환거래은행의 자금세탁 및 테러자금조달 및 환거래은행의 고객확인의무 요구 사항 포함)에 대한 부록이 포함된 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리 지침이 발표되었습니다.
 
@@ -2962,13 +2101,6 @@ AML/CFT의 임무와 관련된 모든 당사자의 위험관리를 지원하기 
 > **주:** 81 BCBS. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리. 82 CPMI. 2016. 환거래은행. 83 세계은행그룹. 2018. 신흥시장의 환거래은행 서비스에 대한 접근 감소: 추세, 영향 및 솔루션. 84 https://blogs.thomsonreuters.com/answerson/south-africa-leads-way-know-customer-kyc-compliance/
 
 <!-- 원문 79쪽 -->
-
-<details>
-<summary>원문 79쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 79쪽](assets/ifc_aml_cft_risk_management/page-79.jpg)
-
-</details>
 
 ## 부록 2: 환거래은행업의 최근 동향
 
@@ -3010,13 +2142,6 @@ SWIFT에서 예외적으로 제공하는 월별 거래 데이터를 사용하여
 
 <!-- 원문 80쪽 -->
 
-<details>
-<summary>원문 80쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 80쪽](assets/ifc_aml_cft_risk_management/page-80.jpg)
-
-</details>
-
 그리고 북미. 따라서 지역적, 국가적 발전이 크게 다를 수 있기 때문에 전체적인 발전은 그림에 편향을 줄 수 있습니다.
 
 전체 볼륨이 2011에서 2015로 증가했습니다(다음 그래프 참조). 이는 계좌 폐쇄 후 결제가 다른 채널로 전환될 가능성이 높기 때문에 환거래은행의 위험회피(de-risking) 보고서와 일치합니다. 결제가 제3국을 통해 다시 전달될 경우 환거래은행 활동이 증가할 수도 있습니다. 다음 그래프는 지역 전반에 걸쳐 활동적인 환거래은행 수가 확실히 감소하는 추세를 보여줍니다. 이를 종합해보면, 활동하는 환거래은행 수의 감소와 거래량의 증가는 환거래은행 뱅킹의 집중도가 높아졌다는 것을 의미합니다.
@@ -3031,30 +2156,9 @@ SWIFT에서 예외적으로 제공하는 월별 거래 데이터를 사용하여
 
 **그림 11: SWIFT 메시지 수에 따른 거래 볼륨**
 
-수백만
-
-수천
-
-```text
-2011
-2012
-2013
-2014
-2015
-```
-
-거래량(lhs) 활성 통신자(rhs)
-
-출처: Deutsche Bundesbank; SWIFT 시계
+![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 그림 11](assets/ifc_aml_cft_risk_management/figures/figure-11.png)
 
 <!-- 원문 81쪽 -->
-
-<details>
-<summary>원문 81쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 81쪽](assets/ifc_aml_cft_risk_management/page-81.jpg)
-
-</details>
 
 ## 부록 3: 주요 FATF 권고사항 및 바젤 간행물 목록
 
@@ -3104,13 +2208,6 @@ SWIFT에서 예외적으로 제공하는 월별 거래 데이터를 사용하여
 
 <!-- 원문 82쪽 -->
 
-<details>
-<summary>원문 82쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 82쪽](assets/ifc_aml_cft_risk_management/page-82.jpg)
-
-</details>
-
 ## 부록 4: 계좌 개설 일반 지침
 
 이 가이드는 은행이 신규 고객 계좌를 개설할 때 사용할 수 있는 도구로 제작되었습니다. 발생할 수 있는 모든 사례를 다루지는 않지만 은행이 고객 식별 및 확인 프로그램을 개발하는 데 도움이 될 수 있으며 자연인, 87 법인, 88 및 법적 계약에 대한 계좌 개설 시 수집 및 확인되어야 하는 정보가 포함되어 있습니다. 89 선진국 시장에서는 이 정보를 쉽게 사용할 수 있는 경우가 많지만 많은 신흥시장에서는 그렇지 않을 수 있습니다. 증명
@@ -3158,13 +2255,6 @@ SWIFT에서 예외적으로 제공하는 월별 거래 데이터를 사용하여
 > **주:** 87 자연인은 고객, 수익적 소유자 또는 승인된 서명자인 개인입니다. 88 FATF는 "법인"을 은행과 영구적인 고객 관계를 구축하거나 재산을 소유할 수 있는 자연인 이외의 모든 실체로 정의합니다. 여기에는 회사, 법인체, 재단, Anstalt 유형의 구조, 파트너십, 협회 및 기타 관련 유사한 단체가 포함될 수 있습니다. 89 FATF는 "법적 합의"를 명시적 신탁 또는 기타 유사한 합의로 정의합니다. 90 BCBS에서 발췌. 2017. 지침: 자금세탁 및 테러자금조달과 관련된 위험의 건전한 관리.
 
 <!-- 원문 83쪽 -->
-
-<details>
-<summary>원문 83쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 83쪽](assets/ifc_aml_cft_risk_management/page-83.jpg)
-
-</details>
 
 은행은 초기 고객 위험 프로필을 개발하기 위해 다음과 같은 추가 정보를 수집해야 합니다.
 
@@ -3246,13 +2336,6 @@ b 이 정보를 합법적으로 사용할 수 없는 상황이 있습니다. 이
 
 <!-- 원문 84쪽 -->
 
-<details>
-<summary>원문 84쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 84쪽](assets/ifc_aml_cft_risk_management/page-84.jpg)
-
-</details>
-
 본 간행물 이외의 계좌 개설에 대한 추가 지침은 "부록 4: 계좌 개설 일반 지침"을 참조하십시오. (지침: 자금세탁 및 자금조달과 관련된 위험의 건전한 관리
 
 테러리즘, 페이지 33–43. 스위스 바젤: 국제 결제 은행, 은행 감독에 관한 바젤 위원회(BCBS), 2017.)
@@ -3305,13 +2388,6 @@ b 이 정보를 합법적으로 사용할 수 없는 상황이 있습니다. 이
 
 <!-- 원문 85쪽 -->
 
-<details>
-<summary>원문 85쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 85쪽](assets/ifc_aml_cft_risk_management/page-85.jpg)
-
-</details>
-
 ## 부록 5: 볼프스베르크 지침
 
 92 https://www.wolfsberg-principles.com/sites/default/files/wb/Wolfsberg%27s_CBDDQ_140618_v1.2.pdf 93 https://www.wolfsberg-principles.com/sites/default/files/wb/Wolfsberg%20FC%20Country%20Risk%20FAQs%20Mar18.pdf 94 https://www.wolfsberg-principles.com/sites/default/files/wb/pdfs/wolfsberg-standards/1.%20Wolfsberg-Payment-Transparency-Standards-October-2017.pdf 95 https://www.wolfsberg-principles.com/sites/default/files/wb/pdfs/wolfsberg-standards/4.%20Wolfsberg-Guidance-on-PEPs-May-2017.pdf 96 https://www.wolfsberg-principles.com/sites/default/files/wb/pdfs/faqs/17.%20Wolfsberg-Risk-Assessment-FAQs-2015.pdf 97 https://www.wolfsberg-principles.com/sites/default/files/wb/pdfs/wolfsberg-standards/8.%20Wolfsberg-Correspondent-Banking-Principles-2014.pdf 98 https://www.wolfsberg-principles.com/sites/default/files/wb/pdfs/faqs/18.%20Wolfsberg-Correspondent-Banking-FAQ-2014.pdf
@@ -3344,18 +2420,4 @@ b 이 정보를 합법적으로 사용할 수 없는 상황이 있습니다. 이
 
 <!-- 원문 86쪽 -->
 
-<details>
-<summary>원문 86쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 86쪽](assets/ifc_aml_cft_risk_management/page-86.jpg)
-
-</details>
-
 <!-- 원문 87쪽 -->
-
-<details>
-<summary>원문 87쪽 이미지 보기</summary>
-
-![Anti-Money-Laundering (AML) & Countering Financing of Terrorism (CFT) Risk Management in Emerging Market Banks - 원문 87쪽](assets/ifc_aml_cft_risk_management/page-87.jpg)
-
-</details>

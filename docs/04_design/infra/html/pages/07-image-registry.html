@@ -20,11 +20,10 @@
 <a  href="20-dns.html">20. DNS</a>
 <a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>컨테이너 이미지 저장소 기본 개념</h1><h2 id="s-1">이미지 저장소란?</h2>
 <p>컨테이너 이미지 저장소(Container Registry)는 CI나 개발자가 만든 이미지를 보관하고 서버가 필요한 버전을 내려받게 하는 서비스다.</p>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     CI[CI 빌드] --&gt;|push| Registry[이미지 저장소]
     Registry --&gt;|pull| Server[운영 서버]
-    Server --&gt; Container[컨테이너 실행]</code></pre>
+    Server --&gt; Container[컨테이너 실행]</pre>
 <h2 id="s-12">기본 용어</h2>
 <ul>
 <li><strong>Repository</strong>: 같은 애플리케이션의 이미지들을 모아 두는 공간</li>
@@ -44,4 +43,4 @@ flowchart LR
 <h3 id="s-33">Docker Hub</h3>
 <p>Docker Hub는 Docker가 운영하는 컨테이너 이미지 저장소 서비스다. 공개 이미지와 비공개 Repository를 제공하며 Docker CLI로 로그인해 이미지를 Push하거나 Pull한다. 널리 사용하는 오픈소스 소프트웨어의 공식 이미지도 배포된다.</p>
 <h3 id="s-37">GitHub Container Registry</h3>
-<p>GHCR(GitHub Container Registry)은 GitHub Packages의 컨테이너 이미지 저장소다. 이미지 이름은 보통 <code>ghcr.io/소유자/이미지</code> 형태이며 GitHub 계정, 조직, 토큰과 Repository 권한을 이용해 접근을 관리한다.</p></main></div><footer class="footer">원본 문서: <a href="../../07-image-registry.md">07-image-registry.md</a></footer></div></body></html>
+<p>GHCR(GitHub Container Registry)은 GitHub Packages의 컨테이너 이미지 저장소다. 이미지 이름은 보통 <code>ghcr.io/소유자/이미지</code> 형태이며 GitHub 계정, 조직, 토큰과 Repository 권한을 이용해 접근을 관리한다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/07-image-registry.md">07-image-registry.md</a></footer></div></body></html>

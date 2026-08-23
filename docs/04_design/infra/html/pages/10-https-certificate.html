@@ -22,14 +22,13 @@
 <p>HTTPS는 HTTP 통신을 TLS로 암호화하는 방식이다. 네트워크 중간에서 요청과 응답이 노출되거나 변조되는 위험을 줄이고, 사용자가 올바른 서버에 접속했는지 확인하게 한다.</p>
 <h2 id="s-5">TLS 인증서란?</h2>
 <p>TLS 인증서는 특정 공개 키와 도메인의 관계를 인증기관(CA)이 확인한 전자 문서다. 서버는 연결 과정에서 인증서를 제시하고 브라우저는 발급 기관, 도메인과 유효기간을 검사한다.</p>
-<pre class="diagram"><code>mermaid
-sequenceDiagram
+<pre class="mermaid">sequenceDiagram
     participant U as 사용자 브라우저
     participant S as 서비스
     U-&gt;&gt;S: HTTPS 연결 요청
     S--&gt;&gt;U: 인증서 제시
     U-&gt;&gt;U: 발급 기관·도메인·유효기간 확인
-    U&lt;&lt;-&gt;&gt;S: 암호화된 통신</code></pre>
+    U&lt;&lt;-&gt;&gt;S: 암호화된 통신</pre>
 <h2 id="s-19">기본 용어</h2>
 <ul>
 <li><strong>CA(Certificate Authority)</strong>: 인증서를 발급하고 서명하는 신뢰 기관</li>
@@ -51,4 +50,4 @@ sequenceDiagram
 <h3 id="s-44">AWS Certificate Manager</h3>
 <p>ACM은 AWS가 TLS 인증서 발급과 갱신을 관리하는 서비스다. 발급한 인증서는 Application Load Balancer, CloudFront 등 지원되는 AWS 서비스에 연결한다. 인증서가 사용되는 위치와 유형에 따라 내보내기 가능 여부와 적용 방식이 다르다.</p>
 <h3 id="s-48">상용 인증기관의 유료 인증서</h3>
-<p>상용 CA가 계약과 검증 절차를 통해 발급하는 인증서다. 도메인 소유만 확인하는 인증서 외에 조직 정보를 확인하는 상품, 기술 지원과 보증 조건 등이 포함될 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../10-https-certificate.md">10-https-certificate.md</a></footer></div></body></html>
+<p>상용 CA가 계약과 검증 절차를 통해 발급하는 인증서다. 도메인 소유만 확인하는 인증서 외에 조직 정보를 확인하는 상품, 기술 지원과 보증 조건 등이 포함될 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/10-https-certificate.md">10-https-certificate.md</a></footer></div></body></html>

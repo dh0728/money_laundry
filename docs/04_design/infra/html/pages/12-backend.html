@@ -20,11 +20,10 @@
 <a  href="20-dns.html">20. DNS</a>
 <a  href="21-infrastructure-as-code.html">21. 인프라 코드</a></aside><main><a class="back" href="../index.html">← 결정 요약으로 돌아가기</a><h1>백엔드 기본 개념</h1><h2 id="s-1">백엔드란?</h2>
 <p>백엔드는 사용자 화면이나 다른 시스템의 요청을 받아 비즈니스 규칙을 수행하고 데이터베이스와 외부 서비스에 접근하는 서버 애플리케이션이다.</p>
-<pre class="diagram"><code>mermaid
-flowchart LR
+<pre class="mermaid">flowchart LR
     Client[프론트엔드·클라이언트] --&gt;|API 요청| Backend[백엔드]
     Backend --&gt; DB[(데이터베이스)]
-    Backend --&gt; External[외부 서비스]</code></pre>
+    Backend --&gt; External[외부 서비스]</pre>
 <h2 id="s-12">주요 역할</h2>
 <ul>
 <li>사용자 인증과 접근 권한 확인</li>
@@ -54,4 +53,4 @@ flowchart LR
 <h3 id="s-42">FastAPI</h3>
 <p>FastAPI는 Python 타입 힌트를 기반으로 API 요청과 응답을 검증하는 웹 프레임워크다. ASGI 서버에서 실행되며 OpenAPI 명세와 대화형 API 문서를 자동으로 생성할 수 있다.</p>
 <h3 id="s-46">NestJS</h3>
-<p>NestJS는 Node.js와 TypeScript 기반 서버 프레임워크다. Module, Controller, Provider와 의존성 주입 구조를 제공하며 내부적으로 Express 또는 Fastify 같은 HTTP 플랫폼을 사용할 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../12-backend.md">12-backend.md</a></footer></div></body></html>
+<p>NestJS는 Node.js와 TypeScript 기반 서버 프레임워크다. Module, Controller, Provider와 의존성 주입 구조를 제공하며 내부적으로 Express 또는 Fastify 같은 HTTP 플랫폼을 사용할 수 있다.</p></main></div><footer class="footer">원본 문서: <a href="../../markdown/12-backend.md">12-backend.md</a></footer></div></body></html>
