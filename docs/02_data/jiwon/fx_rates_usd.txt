@@ -1,0 +1,15 @@
+Australian Dollar   1.41280000
+Bitcoin             0.00008416
+Brazil Real         5.64649997
+Canadian Dollar     1.31930001
+Euro                0.85340000
+Mexican Peso        21.14310180
+Ruble               77.80399773
+Rupee               73.44397914
+Saudi Riyal         3.75109996
+Shekel              3.37699997
+Swiss Franc         0.91500000
+UK Pound            0.77420000
+US Dollar           1.00000000
+Yen                 105.39995594
+Yuan                6.69760020
