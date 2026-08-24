@@ -1,4 +1,4 @@
-# IBM AML 데이터셋 aml일기
+# IBM AML 데이터셋 분석일기
 - 작성일: 2026-08-23
 
 ## 현재까지 패턴
@@ -34,22 +34,22 @@
 
 #### FAN-OUT
 - 한 계좌가 여러 계좌로 분산 송금
-![alt text](image.png)
+![alt text](img/image.png)
 
 #### FAN-IN
 - 여러 계좌가 한 계좌로 집중 송금
-![alt text](image-1.png)
+![alt text](img/image-1.png)
 
 #### CYCLE 
-![alt text](image-2.png)
+![alt text](img/image-2.png)
 
 #### GATHER-SCATTER
 - 여러 계좌 → 중심 계좌 → 다시 여러 계좌
-![alt text](image-3.png)
+![alt text](img/image-3.png)
 
 #### SCATTER-GATHER
 - 한 계좌 → 여러 중간 계좌 → 한 계좌
-![alt text](image-4.png)
+![alt text](img/image-4.png)
 
 #### BIPARTITLE
 - 여러 입력 계좌에서 여러 출력 계좌로 이동
@@ -69,12 +69,12 @@ HI_0025: B → A
 HI_0059: B → A
 ```
 
-![alt text](image-5.png)
+![alt text](img/image-5.png)
 
 
 #### STACK
 - Bipartite 구조가 여러 층으로 이어짐
-![alt text](image-6.png)
+![alt text](img/image-6.png)
 
 #### 랜덤
 - 통제 계좌 사이를 무작위 경로처럼 이동하고 시작점으로 돌아오지 않음
@@ -202,26 +202,8 @@ LI
 
 클래스 비율은 다음처럼 악화됨  
 
-### 분석4 : 자금세탁시 수령한 금액의 몇 프로를 다음 계좌로 보냈나?
 
-동일 attempt
-+ 동일 중간 계좌
-+ 수령 이후 발생한 출금
-+ Bitcoin 제외
-+ 법정통화 환산 금액
-
-| 분석 | 후속 거래 범위 | 용도 |
-| --- | --- | --- |
-| 패턴 내부 자금 흐름 | 동일 attempt의 자금세탁 거래만 | 패턴이 실제로 자금을 어떻게 전달하는지 확인 |
-| 수령 후 계좌 행동 | 정상·자금세탁 거래 모두 | 자금세탁 수령 후 해당 계좌가 실제로 어떤 행동을 했는지 확인 |
-
-그리고 FAN-OUT의 말단 수취 계좌처럼 구조상 다음 송금이 없어야 하는 계좌는 통과 비율의 분모에서 제외하고, 다음 거래가 가능한 중간 전달 계좌만 계산
-주의할 점은 패턴 외 1,968건(HI), 2,542건(LI)은 attempt 정보가 없어서 동일 attempt 흐름을 계산할 수 없음.
-따라서 패턴 내부 결과와 섞지 말고 별도로 분석
-결론적으로 현재 분석4 결과는 임시 결과로 보고, 다음에는 동일 attempt 자금 흐름과 정상 거래를 포함한 계좌 행동을 분리해 다시 산출
-
-
-### 분석5 : 동일 계좌쌍이 서로 다른 자금세탁 attempt에 반복 사용된 사례
+### 분석4 : 동일 계좌쌍이 서로 다른 자금세탁 attempt에 반복 사용된 사례
 
 같은 계좌쌍의 반대 방향 거래가 서로 다른 attempt에 나뉘어 있는지 전체 Patterns 파일을 대상으로 확인했다.
 
