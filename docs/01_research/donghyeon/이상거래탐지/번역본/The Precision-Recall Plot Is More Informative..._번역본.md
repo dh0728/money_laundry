@@ -99,18 +99,6 @@ PRC: PRC 및 ROC 곡선은 점 사이를 보간할 때 서로 다른 처리가 �
 
 ![The Precision-Recall Plot Is More Informative than the ROC Plot When Evaluating Binary Classifiers on Imbalanced Datasets - 표 2](img/pr_imbalanced/tables/table-2.png)
 
-```text
-F1
-0.6
-0.43
-```
-
-```text
-F2
-0.6
-0.52
-```
-
 두 데이터셋의 참/거짓 긍정 및 부정의 수는 그림 1C를 참조하세요. 는 함수 y = (TPA + x) / {TPA + x + FPA + ((FPB - FPA)로 표현될 수 있습니다. x) / (TPB - TPA)} 여기서 x는 TPA와 TPB [26] 사이의 값일 수 있습니다.
 
 <!-- 원문 8쪽 -->

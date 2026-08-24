@@ -37,25 +37,9 @@
 
 f를 설명할 원래 예측 모델로 설정하고 g를 설명 모델로 설정합니다. 여기서는 LIME [5]에서 제안한 것처럼 단일 입력 x를 기반으로 예측 f(x)를 설명하기 위해 설계된 로컬 방법에 중점을 둡니다. 설명 모델은 매핑 함수 x = hx(x′)를 통해 원래 입력에 매핑되는 단순화된 입력 x′를 사용하는 경우가 많습니다. 로컬 방법은 z′ ≒x′일 때마다 g(z′) ≒f(hx(z′))를 보장하려고 합니다. (hx는 현재 입력 x에 특정하기 때문에 x'가 x보다 적은 정보를 포함할 수 있더라도 hx(x') = x에 유의하세요.) 정의 1 추가 특성 기여 방법에는 이진 변수의 선형 함수인 설명 모델이 있습니다.
 
-```text
-g(z′) = φ0 +
-```
-
-```text
-M
-∑
-```
-
-```text
-i=1
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 1](img/shap/equations/equation-001.png)
 
 ∅iz′
-
-```text
-i,
-(1)
-```
 
 여기서 z′ ∈{0, 1}M, M은 단순화된 입력 특성의 수이고 ψi ∈R.
 
@@ -69,14 +53,7 @@ LIME 방법은 주어진 예측 [5]를 중심으로 모델을 국부적으로 �
 
 ξ = 인수 최소
 
-```text
-g∈G
-```
-
-```text
-L(f, g, πx′) + Ω(g).
-(2)
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 2](img/shap/equations/equation-002.png)
 
 원래 모델 f(hx(z'))에 대한 설명 모델 g(z')의 충실성은 로컬 커널 πx'에 의해 가중치가 부여된 단순화된 입력 공간의 샘플 세트에 대한 손실 L을 통해 시행됩니다. Ω은 g의 복잡성에 불이익을 줍니다. LIME에서 g는 방정식 1를 따르고 L은 제곱 손실이므로 방정식 2는 페널티 선형 회귀를 사용하여 풀 수 있습니다.
 
@@ -88,19 +65,7 @@ DeepLIFT는 최근 딥러닝 [8, 7]를 위한 재귀적 예측 설명 방법으�
 
 DeepLIFT는 다음과 같은 "합계-델타" 속성을 사용합니다.
 
-```text
-n
-∑
-```
-
-```text
-i=1
-```
-
-```text
-C∆xi∆o = ∆o,
-(3)
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 3](img/shap/equations/equation-003.png)
 
 여기서 o = f(x)는 모델 출력, Δo = f(x) −f(r), Δxi = xi −ri, r은 기준 입력입니다. ψi = CΔxiΔo 및 ψ0 = f(r)로 두면 DeepLIFT의 설명 모델은 방정식 1와 일치하므로 또 다른 추가 특성 특성 기여 방법입니다.
 
@@ -114,29 +79,9 @@ C∆xi∆o = ∆o,
 
 Shapley 회귀 값은 다중 공선성이 있는 선형 모델의 특성 중요도입니다. 이 방법을 사용하려면 모든 특성 하위 집합 S ⊆F에 대해 모델을 재교육해야 합니다. 여기서 F는 모든 특성의 집합입니다. 해당 특성을 포함하는 모델 예측에 대한 효과를 나타내는 각 특성에 중요도 값을 할당합니다. 이 효과를 계산하기 위해 모델 fS∪{i}는 해당 특성이 있는 상태로 학습되고, 다른 모델 fS는 해당 특성이 보류된 상태로 학습됩니다. 그런 다음 두 모델의 예측은 현재 입력 fS∪{i}(xS∪{i}) −fS(xS)에서 비교됩니다. 여기서 xS는 집합 S의 입력 특성 값을 나타냅니다. 특성 보류의 효과는 모델의 다른 특성에 따라 달라지므로 이전 차이는 가능한 모든 하위 집합 S ⊆F \ {i}에 대해 계산됩니다. 그런 다음 Shapley 값이 계산되어 특성 속성으로 사용됩니다. 이는 가능한 모든 차이의 가중 평균입니다.
 
-```text
-φi =
-```
-
-```text
-S⊆F \{i}
-```
-
-```text
-|S|!(|F| −|S| −1)!
-```
-
-```text
-|F|!
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 4](img/shap/equations/equation-004.png)
 
 fS∪{i}(xS∪{i}) −fS(xS)
-
-```text
-]
-.
-(4)
-```
 
 Shapley 회귀 값의 경우 hx는 1 또는 0를 원래 입력 공간에 매핑합니다. 여기서 1는 입력이 모델에 포함됨을 나타내고 0는 모델에서 제외됨을 나타냅니다. Φ0 = f∅(∅)를 두면 Shapley 회귀 값은 방정식 1와 일치하므로 추가 특성 귀속 방법이 됩니다.
 
@@ -154,25 +99,9 @@ Shapley 샘플링 값은 (1) 방정식 4에 샘플링 근사치를 적용하고 
 
 ## 속성 1(로컬 정확도)
 
-```text
-f(x) = g(x′) = φ0 +
-```
-
-```text
-M
-∑
-```
-
-```text
-i=1
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 5](img/shap/equations/equation-005.png)
 
 ∨픽스'
-
-```text
-i
-(5)
-```
 
 설명 모델 g(x′)는 x = hx(x′)일 때 원래 모델 f(x)와 일치합니다.
 
@@ -180,14 +109,7 @@ i
 
 ## 속성 2(실종)
 
-```text
-x′
-```
-
-```text
-i = 0 =⇒φi = 0
-(6)
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 6](img/shap/equations/equation-006.png)
 
 누락은 x′ i = 0가 영향을 미치지 않는 특성을 제한합니다.
 
@@ -197,40 +119,13 @@ i = 0 =⇒φi = 0
 
 나는 = 0. 임의의 두 모델 f와 f'에 대해 다음과 같은 경우
 
-```text
-f ′
-```
-
-```text
-x(z′) −f ′
-```
-
-```text
-x(z′ \ i) ≥fx(z′) −fx(z′ \ i)
-(7)
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 7](img/shap/equations/equation-007.png)
 
 모든 입력 z′ ∈{0, 1}M에 대해, Φi(f ′, x) ≥φi(f, x).
 
 ## 정리 1 오직 하나의 가능한 설명 모델 g만이 정의 1를 따르고 속성 1, 2 및 3를 만족합니다.
 
-```text
-φi(f, x) =
-```
-
-```text
-z′⊆x′
-```
-
-```text
-|z′|!(M −|z′| −1)!
-```
-
-```text
-M!
-[fx(z′) −fx(z′ \ i)]
-(8)
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 8](img/shap/equations/equation-008.png)
 
 여기서 |z′| 는 z'에 있는 0이 아닌 항목의 수이고, z' ⊆x'는 0이 아닌 항목이 x'에 있는 0이 아닌 항목의 하위 집합인 모든 z' 벡터를 나타냅니다.
 
@@ -266,36 +161,7 @@ SHAP 값을 정확하게 계산하는 것은 어렵습니다. 그러나 현재�
 
 정리 2(Shapley 커널) 정의 1에 따라 방정식 2의 해를 속성 1부터 3까지와 일치시키는 πx′, L 및 Ω의 특정 형태는 다음과 같습니다.
 
-```text
-Ω(g) = 0,
-```
-
-```text
-πx′(z′) =
-(M −1)
-(M choose |z′|)|z′|(M −|z′|),
-```
-
-```text
-L(f, g, πx′) =
-```
-
-```text
-z′∈Z
-```
-
-```text
-∑
-f(h−1
-```
-
-```text
-x (z′)) −g(z′)
-```
-
-```text
-∑2 πx′(z′),
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 9](img/shap/equations/equation-009.png)
 
 여기서 |z′| z'에 있는 0이 아닌 요소의 개수입니다.
 
@@ -347,9 +213,7 @@ yi -E[yi] (14)
 
 > **주:** myif3 =
 
-```text
-j=1
-```
+![A Unified Approach to Interpreting Model Predictions - 수식 10](img/shap/equations/equation-010.png)
 
 > **주:** myifjmxjf3 체인 규칙(15)
 

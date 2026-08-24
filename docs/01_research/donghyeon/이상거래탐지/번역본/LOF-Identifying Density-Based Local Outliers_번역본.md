@@ -151,50 +151,13 @@ Lemma 1: C를 객체의 컬렉션으로 둡니다. reach-dist-min은 C에서 객
 
 > **주:** o NminPts p () ∈∑
 
-```text
-NMinPts p
-( )
---------------------------------------------------------------------------------
-```
-
-```text
-
-
-
-
-
-
-
-
-
-
-
-
-```
-
-```text
-⁄
-=
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 1](img/lof/equations/equation-001.png)
 
 LOFMinPts p()
 
-```text
-lrdMinPts o
-( )
-lrdMinPts p
-( )
----------------------------
-```
-
 > **주:** o NminPts p () ∈∑
 
-```text
-NMinPts p
-( )
----------------------------------------------------------
-=
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 2](img/lof/equations/equation-002.png)
 
 <!-- 원문 5쪽 -->
 
@@ -210,27 +173,9 @@ NMinPts p
 
 ## 증명(스케치): (a)
 
-```text
-: 
-,
-```
-
 의 정의에 따르면.
 
-```text
-, i.e.
-```
-
-```text
-: 
-,
-```
-
 의 정의에 따르면.
-
-```text
-,i.e.
-```
 
 따라서 (b)도 유사하게 이어집니다. I 그림 3의 예를 사용하여 정리를 설명하기 위해 dmin이 imax의 4 배이고 dmax가 imin의 6 배라고 가정합니다. 그러면 1 정리에 따라 p의 LOF는 4와 6 사이에 있습니다. 또한 정리 1에서 LOF(p)가 이해하기 쉬운 해석을 갖는다는 것이 분명해졌습니다. 이는 단순히 p의 간접 이웃에 대한 p의 직접 이웃에 대한 도달 가능성 거리의 함수입니다.
 
@@ -242,177 +187,33 @@ NMinPts p
 
 **그림 3: 정리 1의 그림**
 
-```text
-directmin p
-( )
-indirectmax p
-( )
----------------------------------
-LOF
-≤
-p
-( )
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 10](img/lof/equations/equation-010.png)
 
-```text
-directmax p
-( )
-indirectmin p
-( )
----------------------------------
-≤
-```
-
-```text
-directmin p
-( )
-indirectmax p
-( )
----------------------------------
-LOF p
-( )
-≤
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 3](img/lof/equations/equation-003.png)
 
 o NminPts p () ∈ ∀ 도달 거리 p o, () directmin p () ≥ directmin p () 도달 거리 p o, ()
 
 > **주:** o NminPts p () ∈∑
 
-```text
-NMinPts p
-( )
--------------------------------------------------------------------
-⁄
-⇒
-1
-directmin p
-( )
-----------------------------
-≤
-```
-
-```text
-lrd p
-( )
-1
-directmin p
-( )
-----------------------------
-≤
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 4](img/lof/equations/equation-004.png)
 
 q NminPts o () ∈ ∀ 도달 거리 o q, () 간접 최대 p () ≤ 간접 최대 p () 도달 거리 o q, ()
 
 > **주:** q NMinPts o () ∈∑
 
-```text
-NMinPts o
-( )
--------------------------------------------------------------------
-⁄
-1
-indirectmax p
-( )
----------------------------------
-≥
-⇒
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 5](img/lof/equations/equation-005.png)
 
-```text
-lrd o
-( )
-1
-indirectmax p
-( )
----------------------------------
-≥
-```
-
-```text
-LOF p
-( )
-```
-
-```text
-lrd o
-( )
-lrd p
-( )
--------------
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 6](img/lof/equations/equation-006.png)
 
 > **주:** o NminPts p () ∈∑
 
-```text
-NMinPts p
-( )
---------------------------------------------
-```
-
-```text
-1
-indirectmax p
-( )
----------------------------------
-
-
-
-
-```
-
-```text
-1
-directmin p
-( )
-----------------------------
-
-
-
-
----------------------------------------
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 8](img/lof/equations/equation-008.png)
 
 > **주:** o NminPts p () ∈∑
 
-```text
-NMinPts p
-( )
-----------------------------------------------------------------------
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 7](img/lof/equations/equation-007.png)
 
-```text
-≥
-```
-
-```text
-directmin p
-( )
-indirectmax p
-( )
----------------------------------
-```
-
-```text
-=
-```
-
-```text
-=
-```
-
-```text
-LOF p
-( )
-```
-
-```text
-directmax p
-( )
-indirectmin p
-( )
----------------------------------
-≤
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 9](img/lof/equations/equation-009.png)
 
 <!-- 원문 6쪽 -->
 
@@ -442,153 +243,9 @@ indirectmin p
 
 ## 다양한 pct 값에 대해 간접적
 
-```text
-LOFmax
-LOFmin
-–
-direct
-indirect
---------------------
-----------------------------------------------
-indirect
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 12](img/lof/equations/equation-012.png)
 
-```text
-direct
---------------------
-```
-
-```text
-direct
-direct pct
-⋅
-100
----------------------------
-+
-```
-
-```text
-indirect
-indirect pct
-⋅
-100
----------------------------------
-–
-------------------------------------------------------------
-```
-
-```text
-direct
-direct pct
-⋅
-100
----------------------------
-–
-```
-
-```text
-indirect
-indirect pct
-⋅
-100
----------------------------------
-+
--------------------------------------------------------------
-–
-```
-
-```text
-
-
-
-
-
-
-
-
-
-
-```
-
-```text
-⋅
-```
-
-```text
-=
-```
-
-```text
-=
-```
-
-```text
-1
-pct
-100
---------
-+
-```
-
-```text
-1
-pct
-100
---------
-–
-------------------
-```
-
-```text
-1
-pct
-100
---------
-–
-```
-
-```text
-1
-pct
-100
---------
-+
-------------------
-–
-```
-
-```text
-
-
-
-
-
-
-
-
-
-
-4
-pct
-100
---------
-×
-```
-
-```text
-1
-pct
-100
---------
-
-
-
-2
-–
--------------------------
-=
-=
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 11](img/lof/equations/equation-011.png)
 
 ![LOF: Identifying Density-Based Local Outliers - 그림 5](img/lof/figures/figure-5.png)
 
@@ -610,18 +267,7 @@ MinPts=6.에 대한 예가 그림 6에 나와 있습니다. 이 경우 객체 p�
 
 게다가 p의 이웃에 있고 역시 Ci에 있는 객체의 백분율을 구해 보겠습니다. 개념을 보자
 
-```text
-, 
-, 
-, 
-and
-```
-
 directmin(p), direct-max(p), indirectmin(p) 및 indirectmax(p)와 유사하게 정의되지만 세트 Ci로 제한됩니다(예를 들어, 세트 Ci에서 p와 MinPts-최근접 이웃 사이의 최소 도달 거리를 나타냄). 그러면 (a)와 (b)가 성립합니다.
-
-```text
-I
-```
 
 부록에는 2 정리의 증명 스케치가 나와 있습니다. 정리 2는 여러 클러스터에서 나오는 MinPts-최근접 이웃의 비율을 고려하여 정리 1를 일반화합니다. 따라서 다음과 같은 결론이 있습니다.
 
@@ -647,138 +293,21 @@ I
 
 ξi Ci NminPts p () ⁄ = directi min p () directi max p () indirecti
 
-```text
-min p
-( )
-```
-
 간접적으로
-
-```text
-max p
-( )
-```
 
 지시
 
-```text
-min p
-( )
-```
-
 LOF p () ξi 방향
-
-```text
-min p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-ξi
-```
 
 간접적으로
 
-```text
-max p
-( )
--------------------------------------
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-⋅
-≥
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 13](img/lof/equations/equation-013.png)
 
 LOF p () ξi 방향
 
-```text
-max p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-ξi
-```
-
 간접적으로
 
-```text
-min p
-( )
-------------------------------------
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-⋅
-≤
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 14](img/lof/equations/equation-014.png)
 
 <!-- 원문 8쪽 -->
 
@@ -916,534 +445,68 @@ Data Clustering Method for Very Large Databases", Proc. ACM SIGMOD Int. Conf. on
 
 집합 Ci에 있는 p의 이웃에 있는 객체의 백분율입니다.,, 및 개념을 directmin(p), directmax(p), indirectmin(p) 및 indirectmax(p)와 유사하게 정의하지만 집합 Ci로 제한합니다.
 
-```text
-(a)
-```
-
 :, 정의에 따르면
-
-```text
-. ⇒
-```
-
-```text
-i.e.
-```
-
-```text
-:
-```
 
 .따라서 다음과 같습니다.
 
-```text
-(b)
-```
-
 : 유사하게. I ξi Ci NminPts p () ⁄ = 방향
-
-```text
-min p
-( )
-```
 
 직접 최대 p() 간접 최소 p() 간접
 
-```text
-max p
-( )
-```
-
 LOF p () ξi 방향
-
-```text
-min p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-ξi
-```
 
 간접적으로
 
-```text
-max p
-( )
--------------------------------------
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-⋅
-≥
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 15](img/lof/equations/equation-015.png)
 
 o Ci ∈ ∀ 도달거리 p o, () directi
 
-```text
-min p
-( )
-≥
-```
-
 지시
-
-```text
-min p
-( )
-```
 
 도달 거리 p o, ()
 
 > **주:** o NminPts p () ∈∑
 
-```text
-NMinPts p
-( )
------------------------------------------------------------------
-⁄
-reach-dist p o
-,
-(
-)
-NMinPts p
-( )
-------------------------------------
-```
-
 > **주:** o Ci ∈∑
 
-```text
-i 1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-1
-–
-```
-
-```text
-=
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 16](img/lof/equations/equation-016.png)
 
 지시
 
-```text
-min p
-( )
-NMinPts p
-( )
--------------------------------
-```
-
 > **주:** o Ci ∈∑
 
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-1
-–
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 17](img/lof/equations/equation-017.png)
 
 Ci directi
 
-```text
-min p
-( )
-⋅
-NMinPts p
-( )
---------------------------------------------
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-1
-–
-```
-
 ξi 방향
-
-```text
-min p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-1
-–
-```
-
-```text
-=
-=
-```
-
-```text
-=
-≤
-```
 
 lrd p () ξi 방향
 
-```text
-min p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-1
-–
-```
-
-```text
-≤
-```
-
 q NminPts o () ∈ ∀ 도달거리 o q, () 간접i
 
-```text
-max p
-( )
-≤
-```
-
-```text
-lrd o
-( )
-⇒
-1
-```
-
 간접적으로
-
-```text
-max p
-( )
--------------------------------------
-≥
-```
-
-```text
-LOF p
-( )
-```
-
-```text
-lrd o
-( )
-lrd p
-( )
--------------
-```
 
 > **주:** o NminPts p () ∈∑
 
-```text
-NMinPts p
-( )
--------------------------------
-1
-lrd p
-( )
--------------
-lrd o
-( )
-NMinPts p
-( )
-----------------------------
-```
-
-```text
-o NMinPts p
-( )
-∈∑
-⋅
-=
-=
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 18](img/lof/equations/equation-018.png)
 
 ξi 방향
 
-```text
-min p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 19](img/lof/equations/equation-019.png)
 
 간접적으로
-
-```text
-max p
-( )
--------------------------------------
-```
-
-```text
-NMinPts p
-( )
--------------------------------------
-```
 
 > **주:** o Ci ∈∑
 
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-
-
-```
-
 ξi 방향
-
-```text
-min p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-ξi
-```
 
 간접적으로
 
-```text
-max p
-( )
--------------------------------------
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-⋅
-=
-```
-
-```text
-⋅
-≥
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 20](img/lof/equations/equation-020.png)
 
 LOF p () ξi 방향
 
-```text
-max p
-( )
-⋅
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-ξi
-```
-
 간접적으로
 
-```text
-min p
-( )
-------------------------------------
-```
-
-```text
-i
-1
-=
-```
-
-```text
-n
-∑
-
-
-
-
-
-
-
-
-⋅
-≤
-```
+![LOF: Identifying Density-Based Local Outliers - 수식 21](img/lof/equations/equation-021.png)

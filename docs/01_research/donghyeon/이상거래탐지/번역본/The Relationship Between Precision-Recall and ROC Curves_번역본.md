@@ -57,17 +57,7 @@ ROC(Receiver Operator Characteristic) 곡선은 일반적으로 기계 학습의
 
 TPR(A) = TPA 총 양성 TPR(B) = TPB 총 양성 이제 TPA = TPB가 있으므로 둘 다 TP로 표시합니다. FPR(A) ≥FPR(B) 및 FPR(A) = FPA 총 음성 FPR(B) = FPB 총 음성 이는 FPA ≥FPB를 의미합니다.
 
-```text
-PRECISION(A) =
-TP
-FPA + TP
-```
-
-```text
-PRECISION(B) =
-TP
-FPB + TP
-```
+![The Relationship Between Precision-Recall and ROC Curves - 수식 1](img/pr_roc/equations/equation-001.png)
 
 이제 PRECISION(A) ≤ PRECISION(B)이 생겼습니다. 그러나 이는 PRECISION(A) > PRECISION(B)이라는 원래 가정과 모순됩니다.
 
@@ -85,17 +75,7 @@ FPB + TP
 
 또한 `RECALL(A) = TP_A / 전체 양성 수`, `RECALL(B) = TP_B / 전체 양성 수`이므로 `TP_A = TP_B`입니다. 두 값을 간단히 TP로 표기하면 다음과 같습니다.
 
-```text
-PRECISION(A) =
-TP
-TP + FPA
-```
-
-```text
-PRECISION(B) =
-TP
-TP + FPB
-```
+![The Relationship Between Precision-Recall and ROC Curves - 수식 2](img/pr_roc/equations/equation-002.png)
 
 `PRECISION(A) ≤ PRECISION(B)`이므로 `FP_A ≥ FP_B`입니다. 한편 `FPR(A) = FP_A / 전체 음성 수`, `FPR(B) = FP_B / 전체 음성 수`이므로 `FPR(A) ≥ FPR(B)`가 됩니다. 이는 처음의 가정인 `FPR(A) < FPR(B)`와 모순됩니다.
 
@@ -136,10 +116,6 @@ ROC 공간에서 볼록 선체를 구축하거나 PR 공간에서 달성 가능�
 Precision-Recall 공간의 모든 지점 A는 기본 참양성(TPA) 및 거짓양성(FPA) 수에서 생성된다는 점을 기억하세요. Precision-Recall 공간에서 멀리 떨어져 있는 두 점 A와 B가 있다고 가정합니다. 일부 중간 값을 찾으려면 해당 개수 TPA와 TPB, FPA와 FPB 사이를 보간해야 합니다. 본 연구에서는 F PB−F PA T PB−T PA 로 정의된 하나의 양수 또는 로컬 스큐와 동일해지려면 얼마나 많은 음수 예가 필요한지 알아봅니다. 이제 1 ≤x ≤TPB−TPA,, 즉 TPA+1, TPA+2,..., TPB−1와 같은 x의 모든 정수 값에 대해 새로운 점 TPA+x를 생성하고 각 새 점에 대한 거짓 긍정을 로컬로 선형적으로 증가시켜 해당 FP를 계산할 수 있습니다. 비뚤어지다. 결과 중간 Precision-Recall 포인트는 TPA + x Total Pos, TPA + x TPA + x + FPA + F PB−F PA입니다.
 
 > **주:** T PB−T PA x
-
-```text
-.
-```
 
 예를 들어 20 긍정적인 예와 2000 부정적인 예가 있는 데이터셋가 있다고 가정합니다. TPA = 5, FPA = 5, TPB = 10 및 FPB = 30를 설정합니다. 표 1는 A와 B 사이의 중간점의 적절한 보간을 보여줍니다.
 
