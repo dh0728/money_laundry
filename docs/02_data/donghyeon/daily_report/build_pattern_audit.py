@@ -82,6 +82,10 @@ PATTERN_EXPECTATIONS = {
     "패턴 외": "Patterns.txt에 선언되지 않은 자금세탁 라벨 거래",
 }
 
+# 정상 거래가 급감하기 시작하는 시점. 경계를 양쪽으로 가로지르는
+# generator attempt의 잘린 구조와 전체 구조를 HTML에서 비교한다.
+BOUNDARY_CUTOFF = pd.Timestamp("2022-09-11 00:00")
+
 
 def node_id(bank: object, account: object) -> str:
     return f"{bank}::{account}"
@@ -435,15 +439,43 @@ def make_pattern_blocks(patterns: pd.DataFrame) -> list[dict[str, object]]:
     blocks: list[dict[str, object]] = []
     for attempt_id, frame in patterns.groupby("Attempt ID", sort=False):
         first = frame.iloc[0]
-        blocks.append(
-            block_from_frame(
-                frame=frame,
-                block_id=str(attempt_id),
-                pattern=str(first["Pattern Type"]),
-                meta=str(first["Pattern Meta"]),
-                source="Patterns.txt",
-            )
+        pattern = str(first["Pattern Type"])
+        block = block_from_frame(
+            frame=frame,
+            block_id=str(attempt_id),
+            pattern=pattern,
+            meta=str(first["Pattern Meta"]),
+            source="Patterns.txt",
         )
+
+        before = frame.loc[frame["Timestamp"].lt(BOUNDARY_CUTOFF)]
+        after = frame.loc[frame["Timestamp"].ge(BOUNDARY_CUTOFF)]
+
+        # 경계를 실제로 가로지르는 attempt에만 비교용 메타데이터를 붙인다.
+        # 엣지는 block["edges"]의 Timestamp로 브라우저에서 나누므로 중복 저장하지 않는다.
+        if len(before) and len(after):
+            before_block = block_from_frame(
+                frame=before,
+                block_id=f"{attempt_id}_BEFORE_CUTOFF",
+                pattern=pattern,
+                meta=str(first["Pattern Meta"]),
+                source="Patterns.txt before cutoff",
+            )
+            block["boundary"] = {
+                "cutoff": iso_minute(BOUNDARY_CUTOFF),
+                "before_count": len(before),
+                "after_count": len(after),
+                "before_ratio_percent": round(len(before) / len(frame) * 100, 2),
+                "after_ratio_percent": round(len(after) / len(frame) * 100, 2),
+                "before_metrics": before_block["metrics"],
+                "full_metrics": block["metrics"],
+                "before_status": before_block["structure_status"],
+                "before_reason": before_block["structure_reason"],
+                "full_status": block["structure_status"],
+                "full_reason": block["structure_reason"],
+            }
+
+        blocks.append(block)
     mark_representatives(blocks)
     return blocks
 
@@ -675,6 +707,7 @@ def build_dataset(
 
     pattern_counts = Counter(block["pattern"] for block in pattern_blocks)
     status_counts = Counter(block["structure_status"] for block in pattern_blocks)
+    boundary_blocks = [block for block in pattern_blocks if "boundary" in block]
     stats = {
         **preprocessing,
         "pattern_rows": matched,
@@ -689,6 +722,14 @@ def build_dataset(
         "context_edges": len(context_edges),
         "pattern_counts": dict(pattern_counts),
         "automatic_status_counts": dict(status_counts),
+        "boundary_cutoff": iso_minute(BOUNDARY_CUTOFF),
+        "boundary_attempts": len(boundary_blocks),
+        "boundary_before_transactions": sum(
+            int(block["boundary"]["before_count"]) for block in boundary_blocks
+        ),
+        "boundary_after_transactions": sum(
+            int(block["boundary"]["after_count"]) for block in boundary_blocks
+        ),
     }
 
     metadata = node_metadata(all_nodes, account_meta)
@@ -721,17 +762,47 @@ HTML_TEMPLATE = r'''<!doctype html>
 <style>
 :root{--bg:#f5f7fb;--panel:#fff;--text:#172033;--muted:#667085;--line:#d8deea;--primary:#2457d6;--danger:#c4314b;--normal:#98a2b3;--context:#64748b;--owner:#7c3aed;--good:#16845b;--warn:#b26400;--shadow:0 8px 24px rgba(24,39,75,.08)}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Pretendard",system-ui,-apple-system,sans-serif}button,input,select,textarea{font:inherit}header{padding:18px 22px;background:#12213f;color:#fff}header h1{font-size:21px;margin:0 0 6px}header p{margin:0;color:#cbd5e1;font-size:13px}.toolbar{display:flex;flex-wrap:wrap;gap:10px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}.field{display:flex;flex-direction:column;gap:4px;min-width:130px}.field.grow{flex:1;min-width:220px}label{font-size:12px;color:var(--muted)}select,input[type=text],textarea{border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--text);padding:7px 9px}button{border:1px solid var(--line);background:#fff;color:var(--text);padding:7px 11px;border-radius:7px;cursor:pointer}button.primary{background:var(--primary);color:#fff;border-color:var(--primary)}button:hover{filter:brightness(.98)}.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;padding:14px}.main,.side{display:flex;flex-direction:column;gap:14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:14px}.stats{display:grid;grid-template-columns:repeat(6,minmax(105px,1fr));gap:8px}.stat{padding:10px;border-left:3px solid var(--primary);background:#f8faff}.stat small{display:block;color:var(--muted);margin-bottom:3px}.stat b{font-size:17px}.title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.title-row h2{font-size:18px;margin:0}.subtitle{color:var(--muted);font-size:12px;margin-top:5px}.tag{display:inline-block;border-radius:999px;padding:3px 8px;font-size:11px;background:#e8eefc;color:#244aa5}.tag.good{background:#e5f5ee;color:var(--good)}.tag.warn{background:#fff1dd;color:var(--warn)}.graph-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0}.graph-controls select{padding:5px 7px}.check{display:flex;gap:5px;align-items:center;color:var(--text)}#graph{width:100%;height:610px;border:1px solid var(--line);background:#fbfcff;border-radius:8px}.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}.legend i{display:inline-block;width:18px;height:3px;margin-right:5px;vertical-align:middle}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.metric{padding:8px;background:#f8faff;border-radius:7px}.metric small{display:block;color:var(--muted)}.metric b{font-size:14px}.ownership{font-size:12px}.owner-group{padding:8px 0;border-bottom:1px solid #edf0f5}.owner-group:last-child{border-bottom:0}.owner-group b{color:var(--owner)}.owner-accounts{color:var(--muted);margin-top:3px;overflow-wrap:anywhere}.expectation{margin:10px 0;padding:10px;background:#f7f8fb;border-left:3px solid var(--primary);font-size:13px}.table-wrap{overflow:auto;max-height:390px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{padding:7px 8px;border-bottom:1px solid #edf0f5;text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#f6f8fc;z-index:1}td.num{text-align:right;font-variant-numeric:tabular-nums}.audit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.audit-grid .full{grid-column:1/-1}textarea{width:100%;min-height:100px;resize:vertical}.status{font-size:12px;color:var(--good);min-height:18px}.empty{padding:40px;text-align:center;color:var(--muted)}.blind .pattern-sensitive{filter:blur(5px);user-select:none}.blind .core-edge{stroke:var(--primary)!important}.blind .core-node{fill:#e7ecf7!important;stroke:var(--primary)!important}.small{font-size:12px;color:var(--muted)}input[type=range]{width:min(520px,100%)}@media(max-width:1050px){.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.layout{padding:8px}.side{display:flex}.stats{grid-template-columns:repeat(2,1fr)}.metrics{grid-template-columns:repeat(2,1fr)}#graph{height:480px}.audit-grid{grid-template-columns:1fr}.audit-grid .full{grid-column:auto}}
+.hidden{display:none!important}
+.view-tabs{display:flex;gap:8px;padding:10px 16px;background:#eaf0fb;border-bottom:1px solid var(--line)}
+.view-tabs button{font-weight:700;background:transparent;border-color:transparent}
+.view-tabs button.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.boundary-wrap{display:flex;flex-direction:column;gap:14px;padding:14px}
+.boundary-intro{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.boundary-intro h2{margin:0 0 6px;font-size:19px}
+.boundary-stats{display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:8px}
+.boundary-stat{padding:10px;background:#f8faff;border-radius:8px;border-top:3px solid var(--primary)}
+.boundary-stat.changed{border-top-color:#e97920;background:#fff7ed}
+.boundary-stat small{display:block;color:var(--muted);margin-bottom:4px}.boundary-stat b{font-size:16px}
+.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.comparison-card{border:1px solid var(--line);border-radius:9px;padding:12px;background:#fbfcff}
+.comparison-card h3{margin:0 0 4px;font-size:15px}.comparison-card p{margin:0 0 9px}
+.boundary-graph{width:100%;height:500px;border:1px solid var(--line);background:#fff;border-radius:8px}
+.boundary-period{display:inline-block;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700}
+.boundary-period.before{color:#a51f3a;background:#fde9ee}.boundary-period.after{color:#9a4b00;background:#ffedd5}
+.boundary-table tr.after{background:#fff9f0}
+.boundary-note{padding:10px 12px;border-left:3px solid #e97920;background:#fff7ed;font-size:13px}
+@media(max-width:1050px){.comparison-grid{grid-template-columns:1fr}.boundary-stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.boundary-wrap{padding:8px}.boundary-stats{grid-template-columns:repeat(2,1fr)}.boundary-intro{display:block}.boundary-graph{height:430px}}
 </style>
 </head>
 <body>
-<header><h1>IBM AML 패턴 구조·판별 근거 감사</h1><p>패턴 이름의 구조적 타당성과 라벨을 보지 않은 사람의 자금세탁 판별 가능성을 분리해 기록합니다.</p></header>
-<div class="toolbar">
+<header><h1>IBM AML 패턴 구조·판별 근거 감사</h1><p>패턴 구조 검토와 2022-09-11 데이터 경계의 그래프 손실을 한 페이지에서 비교합니다.</p></header>
+<nav class="view-tabs" aria-label="분석 섹션">
+  <button id="standardTab" class="active">전체 패턴 감사</button>
+  <button id="boundaryTab">11일 경계 패턴 비교</button>
+</nav>
+<div class="toolbar" id="standardToolbar">
   <div class="field"><label for="dataset">데이터셋</label><select id="dataset"></select></div>
   <div class="field"><label for="pattern">패턴</label><select id="pattern"></select></div>
   <div class="field"><label for="representative">대표 사례</label><select id="representative"><option value="all">전체</option><option value="min">최소 거래 수</option><option value="median">중앙 거래 수</option><option value="max">최대 거래 수</option></select></div>
   <div class="field"><label for="autoStatus">자동 구조검사</label><select id="autoStatus"><option value="all">전체</option><option value="pass">기대 구조 확인</option><option value="review">재검토 필요</option><option value="manual">수동 검토</option></select></div>
   <div class="field grow"><label for="block">Attempt / 패턴 외 블록</label><select id="block"></select></div>
   <div class="field grow"><label for="search">계좌·엔티티 검색</label><input id="search" type="text" placeholder="은행 ID, 계좌번호, 엔티티명"></div>
+</div>
+<div class="toolbar hidden" id="boundaryToolbar">
+  <div class="field"><label for="boundaryDataset">데이터셋</label><select id="boundaryDataset"></select></div>
+  <div class="field"><label for="boundaryPattern">패턴</label><select id="boundaryPattern"></select></div>
+  <div class="field grow"><label for="boundaryAttempt">경계 Attempt</label><select id="boundaryAttempt"></select></div>
 </div>
 <div class="layout" id="app">
   <main class="main">
@@ -768,20 +839,43 @@ HTML_TEMPLATE = r'''<!doctype html>
     </section>
   </aside>
 </div>
+<div class="boundary-wrap hidden" id="boundaryApp">
+  <section class="panel boundary-intro">
+    <div><h2>2022-09-11 경계 패턴 비교</h2><p class="small">왼쪽은 11일 이후 거래를 제거한 기본 평가 화면, 오른쪽은 같은 attempt의 전체 구조입니다. 두 그래프는 같은 노드 좌표를 사용합니다.</p></div>
+    <div class="boundary-note"><b>색상 기준</b><br><span style="color:var(--danger)">● 11일 이전 거래</span> · <span style="color:#e97920">● 11일 이후 추가 거래</span></div>
+  </section>
+  <section class="panel">
+    <div class="title-row"><div><h2 id="boundaryTitle"></h2><div class="subtitle" id="boundarySubtitle"></div></div><div id="boundaryChangeTag"></div></div>
+    <div class="boundary-stats" id="boundaryStats"></div>
+  </section>
+  <section class="comparison-grid">
+    <div class="comparison-card"><h3>기본값 · 11일 이후 제거</h3><p class="small" id="boundaryBeforeReason"></p><svg id="boundaryBeforeGraph" class="boundary-graph" viewBox="0 0 1000 610" role="img" aria-label="11일 이후 거래를 제거한 경계 패턴 그래프"></svg></div>
+    <div class="comparison-card"><h3>전체 attempt</h3><p class="small" id="boundaryFullReason"></p><svg id="boundaryFullGraph" class="boundary-graph" viewBox="0 0 1000 610" role="img" aria-label="11일 전후 전체 경계 패턴 그래프"></svg></div>
+  </section>
+  <section class="panel"><h3>경계 전후 시간순 거래</h3><div class="table-wrap"><table><thead><tr><th>#</th><th>구간</th><th>시각</th><th>송금 노드</th><th>수취 노드</th><th>지급액</th><th>통화</th><th>방식</th></tr></thead><tbody id="boundaryTransactions"></tbody></table></div></section>
+</div>
 <script>
 const AML_DATA=__AML_DATA__;
 const PATTERN_ORDER=["FAN-OUT","FAN-IN","CYCLE","GATHER-SCATTER","SCATTER-GATHER","BIPARTITE","STACK","RANDOM","패턴 외"];
-const els=Object.fromEntries(["dataset","pattern","representative","autoStatus","block","search","stats","blockTitle","blockSubtitle","autoTag","expectation","autoReason","showContext","blindMode","showLabels","labelMode","prevTime","nextTime","allTime","timeLabel","timeSlider","graph","transactions","metrics","ownership","structureJudgment","detectability","suspicionReason","actionDecision","notes","saveReview","exportReviews","saveStatus","graphPanel"].map(id=>[id,document.getElementById(id)]));
+const els=Object.fromEntries(["dataset","pattern","representative","autoStatus","block","search","stats","blockTitle","blockSubtitle","autoTag","expectation","autoReason","showContext","blindMode","showLabels","labelMode","prevTime","nextTime","allTime","timeLabel","timeSlider","graph","transactions","metrics","ownership","structureJudgment","detectability","suspicionReason","actionDecision","notes","saveReview","exportReviews","saveStatus","graphPanel","standardTab","boundaryTab","standardToolbar","boundaryToolbar","app","boundaryApp","boundaryDataset","boundaryPattern","boundaryAttempt","boundaryTitle","boundarySubtitle","boundaryChangeTag","boundaryStats","boundaryBeforeReason","boundaryFullReason","boundaryBeforeGraph","boundaryFullGraph","boundaryTransactions"].map(id=>[id,document.getElementById(id)]));
 let currentDataset=null,currentBlock=null,visibleBlocks=[],timeIndex=0;
+let currentBoundaryDataset=null,boundaryBlocks=[],currentBoundaryBlock=null;
 const reviewKey="ibm-aml-pattern-audit-v1";
 const reviews=JSON.parse(localStorage.getItem(reviewKey)||"{}");
 const fmt=n=>new Intl.NumberFormat("ko-KR",{maximumFractionDigits:4}).format(n??0);
 const esc=s=>String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function fillSelect(el,items,valueFn=x=>x,labelFn=x=>x){el.innerHTML=items.map(x=>`<option value="${esc(valueFn(x))}">${esc(labelFn(x))}</option>`).join("")}
-function init(){fillSelect(els.dataset,AML_DATA,d=>d.ratio,d=>`${d.ratio}-Small`);fillSelect(els.pattern,["전체",...PATTERN_ORDER]);bind();selectDataset()}
-function bind(){els.dataset.onchange=selectDataset;[els.pattern,els.representative,els.autoStatus].forEach(e=>e.onchange=filterBlocks);els.block.onchange=selectBlock;els.search.oninput=filterBlocks;els.showContext.onchange=draw;els.showLabels.onchange=draw;els.labelMode.onchange=draw;els.blindMode.onchange=()=>{els.graphPanel.classList.toggle("blind",els.blindMode.checked);renderTitle();draw()};els.timeSlider.oninput=()=>{timeIndex=+els.timeSlider.value;draw()};els.prevTime.onclick=()=>{timeIndex=Math.max(0,timeIndex-1);syncTime()};els.nextTime.onclick=()=>{timeIndex=Math.min(currentBlock.edges.length,timeIndex+1);syncTime()};els.allTime.onclick=()=>{timeIndex=currentBlock.edges.length;syncTime()};els.saveReview.onclick=saveReview;els.exportReviews.onclick=exportReviews}
+function init(){fillSelect(els.dataset,AML_DATA,d=>d.ratio,d=>`${d.ratio}-Small`);fillSelect(els.pattern,["전체",...PATTERN_ORDER]);fillSelect(els.boundaryDataset,AML_DATA,d=>d.ratio,d=>`${d.ratio}-Small`);bind();selectDataset();selectBoundaryDataset()}
+function bind(){els.standardTab.onclick=()=>switchView("standard");els.boundaryTab.onclick=()=>switchView("boundary");els.dataset.onchange=selectDataset;[els.pattern,els.representative,els.autoStatus].forEach(e=>e.onchange=filterBlocks);els.block.onchange=selectBlock;els.search.oninput=filterBlocks;els.showContext.onchange=draw;els.showLabels.onchange=draw;els.labelMode.onchange=draw;els.blindMode.onchange=()=>{els.graphPanel.classList.toggle("blind",els.blindMode.checked);renderTitle();draw()};els.timeSlider.oninput=()=>{timeIndex=+els.timeSlider.value;draw()};els.prevTime.onclick=()=>{timeIndex=Math.max(0,timeIndex-1);syncTime()};els.nextTime.onclick=()=>{timeIndex=Math.min(currentBlock.edges.length,timeIndex+1);syncTime()};els.allTime.onclick=()=>{timeIndex=currentBlock.edges.length;syncTime()};els.saveReview.onclick=saveReview;els.exportReviews.onclick=exportReviews;els.boundaryDataset.onchange=selectBoundaryDataset;els.boundaryPattern.onchange=filterBoundaryBlocks;els.boundaryAttempt.onchange=selectBoundaryBlock}
 function selectDataset(){currentDataset=AML_DATA.find(d=>d.ratio===els.dataset.value)||AML_DATA[0];renderStats();filterBlocks()}
 function renderStats(){const s=currentDataset.stats;const values=[["전체 거래",s.deduplicated_rows],["자금세탁 거래",s.laundering_rows],["패턴 소속",`${fmt(s.pattern_rows)} (${s.pattern_coverage_percent}%)`],["패턴 외",s.outside_rows],["패턴 attempt",s.pattern_attempts],["패턴 외 블록",s.outside_components]];els.stats.innerHTML=values.map(([k,v])=>`<div class="stat"><small>${k}</small><b>${typeof v==='number'?fmt(v):v}</b></div>`).join("")}
+function switchView(view){const boundary=view==="boundary";els.standardTab.classList.toggle("active",!boundary);els.boundaryTab.classList.toggle("active",boundary);els.standardToolbar.classList.toggle("hidden",boundary);els.app.classList.toggle("hidden",boundary);els.boundaryToolbar.classList.toggle("hidden",!boundary);els.boundaryApp.classList.toggle("hidden",!boundary);if(boundary)renderBoundary()}
+function selectBoundaryDataset(){currentBoundaryDataset=AML_DATA.find(d=>d.ratio===els.boundaryDataset.value)||AML_DATA[0];boundaryBlocks=currentBoundaryDataset.blocks.filter(block=>block.boundary);const patterns=PATTERN_ORDER.filter(pattern=>boundaryBlocks.some(block=>block.pattern===pattern));fillSelect(els.boundaryPattern,["전체",...patterns]);filterBoundaryBlocks()}
+function filterBoundaryBlocks(){const pattern=els.boundaryPattern.value,filtered=boundaryBlocks.filter(block=>pattern==="전체"||block.pattern===pattern);if(!filtered.length){els.boundaryAttempt.innerHTML='<option>경계 attempt 없음</option>';currentBoundaryBlock=null;renderBoundaryEmpty();return}fillSelect(els.boundaryAttempt,filtered,block=>block.id,block=>`${block.id} · ${block.pattern} · 이전 ${block.boundary.before_count} / 이후 ${block.boundary.after_count}건`);currentBoundaryBlock=filtered[0];els.boundaryAttempt.value=currentBoundaryBlock.id;renderBoundary()}
+function selectBoundaryBlock(){currentBoundaryBlock=boundaryBlocks.find(block=>block.id===els.boundaryAttempt.value);renderBoundary()}
+function structureLabel(status){return status==="pass"?"기대 구조 확인":status==="review"?"재검토 필요":"수동 검토"}
+function renderBoundaryEmpty(){els.boundaryTitle.textContent="경계 attempt 없음";els.boundarySubtitle.textContent="필터를 변경하세요.";els.boundaryStats.innerHTML="";els.boundaryBeforeGraph.innerHTML="";els.boundaryFullGraph.innerHTML="";els.boundaryTransactions.innerHTML=""}
+function renderBoundary(){if(!currentBoundaryBlock)return;const block=currentBoundaryBlock,b=block.boundary,cutoff=b.cutoff,beforeEdges=block.edges.filter(edge=>edge.ts<cutoff),changed=b.before_status!==b.full_status;els.boundaryTitle.textContent=`${block.id} · ${block.pattern}`;els.boundarySubtitle.textContent=`경계 ${cutoff} · 전체 기간 ${block.metrics.start} ~ ${block.metrics.end} · ${currentBoundaryDataset.ratio}-Small 경계 attempt ${currentBoundaryDataset.stats.boundary_attempts}개`;els.boundaryChangeTag.innerHTML=`<span class="tag ${changed?'warn':'good'}">${changed?'구조 판정 변화':'구조 판정 유지'}</span>`;const values=[["거래",`${b.before_count} → ${block.metrics.transaction_count}`,b.after_count>0],["11일 이후 숨김",`${b.after_count}건 (${b.after_ratio_percent}%)`,true],["노드",`${b.before_metrics.node_count} → ${b.full_metrics.node_count}`,b.before_metrics.node_count!==b.full_metrics.node_count],["고유 엣지",`${b.before_metrics.unique_edge_count} → ${b.full_metrics.unique_edge_count}`,b.before_metrics.unique_edge_count!==b.full_metrics.unique_edge_count],["연결요소",`${b.before_metrics.component_count} → ${b.full_metrics.component_count}`,b.before_metrics.component_count!==b.full_metrics.component_count],["구조검사",`${structureLabel(b.before_status)} → ${structureLabel(b.full_status)}`,changed]];els.boundaryStats.innerHTML=values.map(([key,value,isChanged])=>`<div class="boundary-stat ${isChanged?'changed':''}"><small>${key}</small><b>${esc(value)}</b></div>`).join("");els.boundaryBeforeReason.textContent=`${structureLabel(b.before_status)} · ${b.before_reason}`;els.boundaryFullReason.textContent=`${structureLabel(b.full_status)} · ${b.full_reason}`;drawBoundaryGraph(els.boundaryBeforeGraph,beforeEdges,block.edges,cutoff,"beforeBoundaryArrow");drawBoundaryGraph(els.boundaryFullGraph,block.edges,block.edges,cutoff,"fullBoundaryArrow");els.boundaryTransactions.innerHTML=block.edges.map((edge,index)=>{const after=edge.ts>=cutoff;return`<tr class="${after?'after':''}"><td>${index+1}</td><td><span class="boundary-period ${after?'after':'before'}">${after?'11일 이후':'11일 이전'}</span></td><td>${edge.ts}</td><td>${esc(edge.s)}</td><td>${esc(edge.t)}</td><td class="num">${fmt(edge.paid)}</td><td>${esc(edge.payment_currency)}</td><td>${esc(edge.format)}</td></tr>`}).join("")}
 function nodeSearchText(block){const q=els.search.value.trim().toLowerCase();if(!q)return true;const nodes=new Set(block.edges.flatMap(e=>[e.s,e.t]));for(const n of nodes){const m=currentDataset.node_meta[n]||{};if(`${n} ${m.bank_name||''} ${m.entity_id||''} ${m.entity_name||''}`.toLowerCase().includes(q))return true}return false}
 function filterBlocks(){const p=els.pattern.value,r=els.representative.value,a=els.autoStatus.value;visibleBlocks=currentDataset.blocks.filter(b=>(p==="전체"||b.pattern===p)&&(r==="all"||b.representative.includes(r))&&(a==="all"||b.structure_status===a)&&nodeSearchText(b));if(!visibleBlocks.length){els.block.innerHTML='<option>조건에 맞는 블록 없음</option>';currentBlock=null;renderEmpty();return}fillSelect(els.block,visibleBlocks,b=>b.id,b=>`${b.id} · ${b.pattern} · ${b.metrics.transaction_count}건${b.representative.length?' · '+b.representative.join('/'):''}`);currentBlock=visibleBlocks[0];els.block.value=currentBlock.id;loadBlock()}
 function selectBlock(){currentBlock=visibleBlocks.find(b=>b.id===els.block.value);loadBlock()}
@@ -795,6 +889,20 @@ function renderTransactions(){els.transactions.innerHTML=currentBlock.edges.map(
 function syncTime(){els.timeSlider.value=timeIndex;draw()}
 function contextFor(coreNodes){const ids=new Set;for(const n of coreNodes){for(const id of currentDataset.context_by_node[n]||[]){ids.add(id);if(ids.size>=120)break}if(ids.size>=120)break}return [...ids].map(id=>currentDataset.context_edges[id])}
 function layout(nodes,coreEdges){const W=1000,H=610,pad=70,core=[...nodes.values()].filter(n=>n.core),context=[...nodes.values()].filter(n=>!n.core);const indeg=new Map(core.map(n=>[n.id,0])),adj=new Map(core.map(n=>[n.id,[]]));for(const e of coreEdges){if(e.s!==e.t&&!adj.get(e.s).includes(e.t)){adj.get(e.s).push(e.t);indeg.set(e.t,(indeg.get(e.t)||0)+1)}}const q=core.filter(n=>indeg.get(n.id)===0).map(n=>n.id),level=new Map(core.map(n=>[n.id,0]));let done=0;while(q.length){const s=q.shift();done++;for(const t of adj.get(s)||[]){level.set(t,Math.max(level.get(t)||0,(level.get(s)||0)+1));indeg.set(t,indeg.get(t)-1);if(indeg.get(t)===0)q.push(t)}}if(done===core.length&&Math.max(...level.values(),0)>0){const groups={};for(const n of core)(groups[level.get(n.id)]??=[]).push(n);const maxL=Math.max(...level.values());for(const [l,group] of Object.entries(groups)){group.forEach((n,i)=>{n.x=pad+(W-2*pad)*(+l/Math.max(1,maxL));n.y=pad+(H-2*pad)*((i+1)/(group.length+1))})}}else{core.forEach((n,i)=>{const a=2*Math.PI*i/Math.max(1,core.length)-Math.PI/2;n.x=W/2+Math.cos(a)*Math.min(300,35*core.length);n.y=H/2+Math.sin(a)*Math.min(220,28*core.length)})}const coreMap=new Map(core.map(n=>[n.id,n]));context.forEach((n,i)=>{const links=n.links.map(id=>coreMap.get(id)).filter(Boolean);const anchor=links[0]||{x:W/2,y:H/2};const a=2*Math.PI*(i/Math.max(1,context.length));n.x=Math.max(28,Math.min(W-28,anchor.x+Math.cos(a)*(85+20*(i%3))));n.y=Math.max(28,Math.min(H-28,anchor.y+Math.sin(a)*(70+18*(i%3))))})}
+function drawBoundaryGraph(svgElement,visibleEdges,allEdges,cutoff,markerId){
+  const nodes=new Map;
+  for(const edge of allEdges){for(const id of [edge.s,edge.t])if(!nodes.has(id))nodes.set(id,{id,core:true,links:[]})}
+  layout(nodes,allEdges);
+  const visibleNodes=new Set(visibleEdges.flatMap(edge=>[edge.s,edge.t]));
+  const beforeNodes=new Set(allEdges.filter(edge=>edge.ts<cutoff).flatMap(edge=>[edge.s,edge.t]));
+  const beforeMarker=`${markerId}Before`,afterMarker=`${markerId}After`;
+  let svg=`<defs><marker id="${beforeMarker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--danger)"/></marker><marker id="${afterMarker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#e97920"/></marker></defs>`;
+  const line=edge=>{const source=nodes.get(edge.s),target=nodes.get(edge.t),after=edge.ts>=cutoff,color=after?'#e97920':'var(--danger)',marker=after?afterMarker:beforeMarker,dash=after?'stroke-dasharray="7 4"':'';if(edge.s===edge.t)return`<path d="M ${source.x-4} ${source.y-13} C ${source.x-35} ${source.y-55}, ${source.x+35} ${source.y-55}, ${source.x+4} ${source.y-13}" fill="none" stroke="${color}" stroke-width="2.6" ${dash} marker-end="url(#${marker})"><title>${esc(edge.ts)} · ${esc(edge.payment_currency)} ${fmt(edge.paid)}</title></path>`;const dx=target.x-source.x,dy=target.y-source.y,length=Math.hypot(dx,dy)||1,x1=source.x+dx/length*15,y1=source.y+dy/length*15,x2=target.x-dx/length*17,y2=target.y-dy/length*17;return`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2.6" ${dash} marker-end="url(#${marker})"><title>${esc(edge.ts)} · ${esc(edge.payment_currency)} ${fmt(edge.paid)}</title></line>`};
+  svg+=visibleEdges.map(line).join('');
+  const showLabels=visibleNodes.size<=50;
+  for(const id of visibleNodes){const node=nodes.get(id),postOnly=!beforeNodes.has(id),fill=postOnly?'#ffedd5':'#fee2e7',stroke=postOnly?'#e97920':'var(--danger)',account=id.split('::')[1]||id;svg+=`<g><circle cx="${node.x}" cy="${node.y}" r="11" fill="${fill}" stroke="${stroke}" stroke-width="2"><title>${esc(id)}</title></circle>${showLabels?`<text x="${node.x}" y="${node.y+25}" text-anchor="middle" font-size="10" fill="var(--text)">${esc(account.slice(-9))}</text>`:''}</g>`}
+  svgElement.innerHTML=svg;
+}
 function nodeLabel(n,m){
   const account=n.id.split('::')[1],owner=m.entity_name||m.entity_id||'소유주 미연결',shortOwner=owner.length>24?owner.slice(0,22)+'…':owner,y=n.y+(n.core?25:19),size=n.core?10:8;
   if(els.labelMode.value==='account')return`<text x="${n.x}" y="${y}" text-anchor="middle" font-size="${size}" fill="var(--text)">${esc(account.slice(-9))}</text>`;
