@@ -25,6 +25,8 @@ BASE = {"objective": "multiclass", "num_class": 10, "learning_rate": 0.1,
         "bagging_fraction": 1.0, "max_bin": 255, "seed": 42,
         "num_threads": 12, "verbosity": -1}  # 실측 최적값 (CLAUDE.md §8)
 NUM_ROUND, ES = 300, 30
+CLS9 = ["FAN-OUT", "FAN-IN", "G-SCATTER", "S-GATHER", "CYCLE",
+        "RANDOM", "BIPARTITE", "STACK", "NONPAT"]  # 라벨 1~9
 
 VARIANTS = [
     # run_002b: run_002와 완전히 동일한 설정. num_threads 변경(32->4)이 결과에
@@ -41,14 +43,25 @@ VARIANTS = [
     ("run_008", "num_boost_round: 300 -> 1000", {"lambda_l2": 100.0}, False, False),
     ("run_009a", "lambda_l2: 100 -> 200 (상한 1000)", {"lambda_l2": 200.0}, False, False),
     ("run_009b", "lambda_l2: 100 -> 500 (상한 1000)", {"lambda_l2": 500.0}, False, False),
+    ("run_011a", "min_sum_hessian_in_leaf: 1e-3 -> 0.1 (λ=100, 상한 1000)",
+     {"lambda_l2": 100.0, "min_sum_hessian_in_leaf": 0.1}, False, False),
+    ("run_011b", "min_sum_hessian_in_leaf: 1e-3 -> 1.0 (λ=100, 상한 1000)",
+     {"lambda_l2": 100.0, "min_sum_hessian_in_leaf": 1.0}, False, False),
+    ("run_012a", "num_leaves: 31 -> 127 (011b 설정)",
+     {"lambda_l2": 100.0, "min_sum_hessian_in_leaf": 1.0, "num_leaves": 127}, False, False),
+    ("run_012b", "num_leaves: 31 -> 512 (011b 설정)",
+     {"lambda_l2": 100.0, "min_sum_hessian_in_leaf": 1.0, "num_leaves": 512}, False, False),
 ]
 
 # run_007* 는 현 기준선 run_002 대비 단일 변인. 미기재는 run_001 대비.
 BASELINES = {"run_007a": "run_002", "run_007b": "run_002", "run_007c": "run_002",
-             "run_008": "run_007c", "run_009a": "run_008", "run_009b": "run_008"}
+             "run_008": "run_007c", "run_009a": "run_008", "run_009b": "run_008",
+             "run_011a": "run_008", "run_011b": "run_008",
+             "run_012a": "run_011b", "run_012b": "run_011b"}
 
 # 라운드 상한이 단일 변인인 run 만 기재. 미기재는 NUM_ROUND.
-ROUNDS = {"run_008": 1000, "run_009a": 1000, "run_009b": 1000}
+ROUNDS = {"run_008": 1000, "run_009a": 1000, "run_009b": 1000,
+          "run_011a": 1000, "run_011b": 1000, "run_012a": 1000, "run_012b": 1000}
 
 # ---------- 데이터 (한 번만 로드) ----------
 df = pd.read_csv(WS / "data" / "HI-Small_Trans.csv",
@@ -127,6 +140,17 @@ def evaluate(model, name, desc, params, weighted, custom_es, secs):
         j = int(idx[-1]) if len(idx) else 0
         met[f"precision_at_recall_{t}"] = float(prec[j])
         met[f"threshold_at_recall_{t}"] = float(thr[j])
+    # 보조 운영점: 패턴 8클래스 recall 0.9 닻 (NONPAT 제외) — 판정은 여전히 P@R0.7
+    pat = (yva >= 1) & (yva <= 8)
+    spat = np.sort(s[pat])[::-1]
+    th_p = spat[int(np.ceil(0.9 * pat.sum())) - 1]
+    hit_p = s >= th_p
+    met["precision_at_pattern_recall_0.9"] = float((hit_p & (yva > 0)).sum() / hit_p.sum())
+    met["n_alarms_at_pattern_recall_0.9"] = int(hit_p.sum())
+    met["threshold_at_pattern_recall_0.9"] = float(th_p)
+    # 클래스별 진단: one-vs-rest PR-AUC (자기 확률 p_k 로 그 클래스만 골라내는 순위 능력)
+    met["ovr_pr_auc"] = {CLS9[k - 1]: float(average_precision_score(
+        (yva == k).astype(int), proba[:, k])) for k in range(1, 10)}
     met["saturation"] = {
         "n_unique_scores": int(len(np.unique(np.round(s, 9)))),
         "frac_mid_range": float(((s > 1e-6) & (s < 0.99)).mean()),
@@ -179,6 +203,9 @@ for name, desc, override, weighted, custom_es in VARIANTS:
           f"P@R0.7 {met['precision_at_recall_0.7']*100:.4f}%", flush=True)
     print(f"  포화진단: 고유점수 {sat['n_unique_scores']:,}개, 중간구간 {sat['frac_mid_range']*100:.3f}% "
           f"(세탁 {sat['n_laundering_in_mid']}건), |리프|최대 {sat['max_abs_leaf_value']:,.1f}", flush=True)
+    print(f"  P@패턴R0.9 {met['precision_at_pattern_recall_0.9']*100:.2f}% "
+          f"(알람 {met['n_alarms_at_pattern_recall_0.9']:,}건)", flush=True)
+    print("  OVR PR-AUC: " + " ".join(f"{n} {v:.3f}" for n, v in met["ovr_pr_auc"].items()), flush=True)
     results.append({"run": name, "변인": desc, "PR-AUC": met["val_pr_auc"],
                     "max-F1%": met["max_f1"] * 100, "P@R0.7%": met["precision_at_recall_0.7"] * 100,
                     "고유점수": sat["n_unique_scores"], "|리프|최대": sat["max_abs_leaf_value"],

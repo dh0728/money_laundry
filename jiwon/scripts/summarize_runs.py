@@ -52,13 +52,14 @@ va = ((df.ts >= pd.Timestamp("2022-09-07")) & (df.ts < pd.Timestamp("2022-09-09"
 Xva, yva, ava = X[va], y[va], aid[va]
 del df, gf, lab, acc, X
 ybin = (yva > 0).astype(int)
+ypat = (yva >= 1) & (yva <= 8)
 cls_cnt = np.bincount(yva, minlength=10)
 CNT_ROW = "| (건수) | " + " | ".join(str(c) for c in np.bincount(yva, minlength=10)) + " |"
 n_attempt = len(set(ava[ava >= 0]))
 print(f"<!-- val={va.sum():,} 세탁={int(ybin.sum()):,} attempt={n_attempt} -->", flush=True)
 
 order = [f.stem.replace("_model", "") for f in sorted(RUNS.glob("run_*_model.txt"))]
-rows_main, rows_cls, rows_cfg, cms = [], {}, [], {}
+rows_main, rows_cls, rows_cfg, cms, rows_ovr = [], {}, [], {}, {}
 for name in order:
     j = json.load(open(RUNS / f"{name}.json", encoding="utf-8"))
     model = lgb.Booster(model_file=str(RUNS / f"{name}_model.txt"))
@@ -83,6 +84,13 @@ for name in order:
         if t == 0.7:
             det = set(ava[(hit) & (ava >= 0)])
             met["attempt@R0.7"] = len(det) / n_attempt * 100
+    spat = np.sort(s[ypat])[::-1]
+    th_p = spat[int(np.ceil(0.9 * ypat.sum())) - 1]
+    hit_p = s >= th_p
+    met["P@패턴R0.9"] = float((hit_p & (ybin == 1)).sum() / hit_p.sum()) * 100
+    met["alarm@패턴R0.9"] = int(hit_p.sum())
+    rows_ovr[name] = [average_precision_score((yva == c).astype(int), proba[:, c]) * 100
+                      for c in range(1, 10)]
     pred = proba.argmax(axis=1)
     cms[name] = np.bincount(yva * 10 + pred, minlength=100).reshape(10, 10)
     met["iter"] = j["metrics"]["best_iteration"]
@@ -105,20 +113,20 @@ for c in mn.columns:
     if mn[c].dtype == float:
         mn[c] = mn[c].round(4 if c == "PR-AUC" else 2)
 print(mn.to_markdown(index=False))
-print("\n## C. 클래스별 recall (%) — 전체 recall 고정점별")
+print("\n## C. 클래스별 탐지율 (%) — 전체 recall 고정점별")
 for t in (0.5, 0.7, 0.9):
     print(f"\n### 전체 recall {t}")
     tbl = pd.DataFrame({r: rows_cls[r][t] for r in order}, index=CLS).T.round(1)
-    print(tbl.to_markdown())
-    print(CNT_ROW)
+    md = tbl.to_markdown().split(chr(10))
+    print(chr(10).join(md[:2] + [CNT_ROW] + md[2:]))
 print()
 print("## D. 10클래스 분류 (argmax 채점)")
 print()
 print("### D-1. 클래스별 분류 recall (%) — 대각선/행합. C 표와 달리 패턴까지 맞혀야 정답")
 diag = pd.DataFrame({r: cms[r].diagonal() / cms[r].sum(axis=1) * 100 for r in order},
                     index=CLS).T.round(1)
-print(diag.to_markdown())
-print(CNT_ROW)
+md = diag.to_markdown().split(chr(10))
+print(chr(10).join(md[:2] + [CNT_ROW] + md[2:]))
 if CM_RUN in cms:
     cm = cms[CM_RUN]
     print()
@@ -128,4 +136,11 @@ if CM_RUN in cms:
     print(f"### D-3. confusion matrix — {CM_RUN} (행 내 비율 %)")
     print(pd.DataFrame(cm / cm.sum(axis=1, keepdims=True) * 100,
                        index=CLS, columns=CLS).round(1).to_markdown())
+
+print()
+print("### D-4. 클래스별 one-vs-rest PR-AUC (x100) — p_k 로 그 클래스만 골라내는 순위 능력, threshold 무관")
+ovr = pd.DataFrame({r: rows_ovr[r] for r in order}, index=CLS[1:]).T.round(1)
+md = ovr.to_markdown().split(chr(10))
+cnt9 = "| (건수) | " + " | ".join(str(c) for c in np.bincount(yva, minlength=10)[1:]) + " |"
+print(chr(10).join(md[:2] + [cnt9] + md[2:]))
 
