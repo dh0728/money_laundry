@@ -1,8 +1,10 @@
 """전 실험 모델을 val 로 재평가해 종합/클래스별 지표를 md 표로 출력.
 
-사용법: python summarize_runs.py <WS루트>
+사용법: python summarize_runs.py <WS루트> [confusion 상세 run=run_007c]
 data_work/runs/ 의 run_*_model.txt 전부를 대상으로 한다. 표준출력만 —
 runs/metrics_summary.md 갱신은 출력을 검토해 수동으로 반영한다.
+E 절: argmax 10클래스 분류 채점. 분류 recall 은 전 run, 전체 confusion matrix 는
+두 번째 인자의 run 하나만 출력한다.
 """
 import json
 import sys
@@ -14,6 +16,7 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, precision_recall_curve
 
 WS = Path(sys.argv[1])
+CM_RUN = sys.argv[2] if len(sys.argv) > 2 else "run_007c"
 RUNS = WS / "data_work" / "runs"
 CLS = ["NORMAL", "FAN-OUT", "FAN-IN", "G-SCATTER", "S-GATHER",
        "CYCLE", "RANDOM", "BIPARTITE", "STACK", "NONPAT"]
@@ -53,7 +56,7 @@ n_attempt = len(set(ava[ava >= 0]))
 print(f"<!-- val={va.sum():,} 세탁={int(ybin.sum()):,} attempt={n_attempt} -->", flush=True)
 
 order = [f.stem.replace("_model", "") for f in sorted(RUNS.glob("run_*_model.txt"))]
-rows_main, rows_cls, rows_cfg = [], {}, []
+rows_main, rows_cls, rows_cfg, cms = [], {}, [], {}
 for name in order:
     j = json.load(open(RUNS / f"{name}.json", encoding="utf-8"))
     model = lgb.Booster(model_file=str(RUNS / f"{name}_model.txt"))
@@ -78,6 +81,8 @@ for name in order:
         if t == 0.7:
             det = set(ava[(hit) & (ava >= 0)])
             met["attempt@R0.7"] = len(det) / n_attempt * 100
+    pred = proba.argmax(axis=1)
+    cms[name] = np.bincount(yva * 10 + pred, minlength=100).reshape(10, 10)
     met["iter"] = j["metrics"]["best_iteration"]
     met["train_s"] = j.get("train_seconds", float("nan"))
     rows_main.append(met)
@@ -103,6 +108,23 @@ for t in (0.5, 0.7, 0.9):
     print(f"\n### 전체 recall {t}")
     tbl = pd.DataFrame({r: rows_cls[r][t] for r in order}, index=CLS).T.round(1)
     print(tbl.to_markdown())
+print()
+print("## E. 10클래스 분류 (argmax 채점)")
+print()
+print("### E-1. 클래스별 분류 recall (%) — 대각선/행합. C 표와 달리 패턴까지 맞혀야 정답")
+diag = pd.DataFrame({r: cms[r].diagonal() / cms[r].sum(axis=1) * 100 for r in order},
+                    index=CLS).T.round(1)
+print(diag.to_markdown())
+if CM_RUN in cms:
+    cm = cms[CM_RUN]
+    print()
+    print(f"### E-2. confusion matrix — {CM_RUN} (행=정답, 열=예측, 건수)")
+    print(pd.DataFrame(cm, index=CLS, columns=CLS).to_markdown())
+    print()
+    print(f"### E-3. confusion matrix — {CM_RUN} (행 내 비율 %)")
+    print(pd.DataFrame(cm / cm.sum(axis=1, keepdims=True) * 100,
+                       index=CLS, columns=CLS).round(1).to_markdown())
+
 print("\n## D. val 클래스 분포")
 cnt = pd.Series(yva).value_counts().sort_index()
 dist = pd.DataFrame({"클래스": CLS, "건수": cnt.values,
