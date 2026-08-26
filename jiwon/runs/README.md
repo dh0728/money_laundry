@@ -51,4 +51,7 @@
    주범이자 D-4 최약(~3) 클래스. train 만 정제, val/test 원본 유지(§6)
 2. (피처 방향) D-4 약체 신호용 피처 — FAN-OUT·FAN-IN(방향·시점), BIPARTITE(양측
    집합), RANDOM. features_v2 후보
+3. purge 검증(개입의 일종): val 로 이어지는 블록의 train 거래 535건 제외 후
+   재학습 — 완전 포함 블록 성능이 유지되면 경계 걸침은 암기 효과가 아님.
+   metrics_summary 관찰 요약의 경계 걸침 편향(+4.7%p/+16.5%p) 후속
 
