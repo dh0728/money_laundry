@@ -3,8 +3,8 @@
 사용법: python summarize_runs.py <WS루트> [confusion 상세 run=run_007c]
 data_work/runs/ 의 run_*_model.txt 전부를 대상으로 한다. 표준출력만 —
 runs/metrics_summary.md 갱신은 출력을 검토해 수동으로 반영한다.
-E 절: argmax 10클래스 분류 채점. 분류 recall 은 전 run, 전체 confusion matrix 는
-두 번째 인자의 run 하나만 출력한다.
+D 절: argmax 10클래스 분류 채점. 분류 recall 은 전 run, 전체 confusion matrix 는
+두 번째 인자의 run 하나만 출력한다. val 클래스 건수는 C·D-1 표 끝 줄에 붙는다.
 """
 import json
 import sys
@@ -52,6 +52,8 @@ va = ((df.ts >= pd.Timestamp("2022-09-07")) & (df.ts < pd.Timestamp("2022-09-09"
 Xva, yva, ava = X[va], y[va], aid[va]
 del df, gf, lab, acc, X
 ybin = (yva > 0).astype(int)
+cls_cnt = np.bincount(yva, minlength=10)
+CNT_ROW = "| (건수) | " + " | ".join(str(c) for c in np.bincount(yva, minlength=10)) + " |"
 n_attempt = len(set(ava[ava >= 0]))
 print(f"<!-- val={va.sum():,} 세탁={int(ybin.sum()):,} attempt={n_attempt} -->", flush=True)
 
@@ -108,25 +110,22 @@ for t in (0.5, 0.7, 0.9):
     print(f"\n### 전체 recall {t}")
     tbl = pd.DataFrame({r: rows_cls[r][t] for r in order}, index=CLS).T.round(1)
     print(tbl.to_markdown())
+    print(CNT_ROW)
 print()
-print("## E. 10클래스 분류 (argmax 채점)")
+print("## D. 10클래스 분류 (argmax 채점)")
 print()
-print("### E-1. 클래스별 분류 recall (%) — 대각선/행합. C 표와 달리 패턴까지 맞혀야 정답")
+print("### D-1. 클래스별 분류 recall (%) — 대각선/행합. C 표와 달리 패턴까지 맞혀야 정답")
 diag = pd.DataFrame({r: cms[r].diagonal() / cms[r].sum(axis=1) * 100 for r in order},
                     index=CLS).T.round(1)
 print(diag.to_markdown())
+print(CNT_ROW)
 if CM_RUN in cms:
     cm = cms[CM_RUN]
     print()
-    print(f"### E-2. confusion matrix — {CM_RUN} (행=정답, 열=예측, 건수)")
+    print(f"### D-2. confusion matrix — {CM_RUN} (행=정답, 열=예측, 건수)")
     print(pd.DataFrame(cm, index=CLS, columns=CLS).to_markdown())
     print()
-    print(f"### E-3. confusion matrix — {CM_RUN} (행 내 비율 %)")
+    print(f"### D-3. confusion matrix — {CM_RUN} (행 내 비율 %)")
     print(pd.DataFrame(cm / cm.sum(axis=1, keepdims=True) * 100,
                        index=CLS, columns=CLS).round(1).to_markdown())
 
-print("\n## D. val 클래스 분포")
-cnt = pd.Series(yva).value_counts().sort_index()
-dist = pd.DataFrame({"클래스": CLS, "건수": cnt.values,
-                     "비율(%)": (cnt.values / len(yva) * 100).round(4)})
-print(dist.to_markdown(index=False))
