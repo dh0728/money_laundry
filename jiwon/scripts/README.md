@@ -1,7 +1,7 @@
 # 스크립트
 
 워크스페이스 루트는 인자로 넘기거나, 생략하면 `__file__`에서 유도한다.
-컨테이너 한도가 CPU 4코어이므로 무거운 작업은 하나씩 실행한다.
+실행 환경(파이썬 env·스레드 수·메모리 여유)은 CLAUDE.md §8을 따른다. 무거운 작업은 하나씩 실행한다.
 
 ## 파이프라인 (순서대로)
 
@@ -21,11 +21,12 @@
 | `eda.py` | 기간·클래스·자기거래 분포, 분할 후보 비교 |
 | `feature_review.py` | 단건 피처 후보별 세탁 비율·리프트 측정 |
 | `train_baseline.py` | run_001을 생성한 학습 스크립트 (이후 `run_ladder.py`로 대체) |
+| `summarize_runs.py` | 전 모델 val 재평가 → 종합/클래스별 지표 md 표 (`runs/metrics_summary.md` 원천) |
 
 ## 새 실험 추가 방법
 
 `run_ladder.py`의 `VARIANTS`에 한 줄 추가 — `(run_id, 변인 설명, 파라미터 override, 가중치 여부, 커스텀 조기종료 여부)`.
-`BASE`(기준선 파라미터)는 건드리지 않는다. 실행: `python3 run_ladder.py <WS> run_007`
+`BASE`(기준선 파라미터)는 건드리지 않는다. 실행: `python run_ladder.py <WS> run_007`
 
 ## 인과성 검증
 

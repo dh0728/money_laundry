@@ -1,6 +1,6 @@
 """기준선 학습 (개입 없음): 확정 피처 61개, LightGBM 10클래스.
 
-사용법: python3 train_baseline.py <WS루트> [run_id=run_001]
+사용법: python train_baseline.py <WS루트> [run_id=run_001]
 
 - 분할: train 09-01~06 / val 09-07~08 (test 미개봉)
 - 평가: val, 세탁점수 = 1 - P(NORMAL), recall 0.5/0.7/0.9 역산 precision
@@ -114,6 +114,6 @@ print((imp.head(15) / imp.sum() * 100).round(2).to_string())
 runs = WS / "data_work" / "runs"
 runs.mkdir(exist_ok=True)
 json.dump({**CONFIG, "metrics": metrics, "status": "keep"},
-          open(runs / f"{RUN_ID}.json", "w"), ensure_ascii=False, indent=2)
+          open(runs / f"{RUN_ID}.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 model.save_model(str(runs / f"{RUN_ID}_model.txt"), num_iteration=model.best_iteration)
 print(f"\n기록: data_work/runs/{RUN_ID}.json (+모델)")

@@ -1,6 +1,6 @@
 """HI-Small 10클래스 라벨 구축.
 
-사용법: python3 build_labels.py <WS루트>
+사용법: python build_labels.py <WS루트>
 
 Patterns.txt의 각 세탁 시도 블록을 파싱해 Trans.csv 행과 전체 라인 일치로
 매칭하고, 거래 단위 라벨(csv 행 순서 그대로)을 data_work/에 저장한다.

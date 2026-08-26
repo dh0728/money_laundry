@@ -1,6 +1,6 @@
 # run_002 — lambda_l2 0 → 10
 
-상태: 완료(keep) — **현 기준선**
+상태: 완료(keep) — 기준선이었음 (run_007c 로 이동)
 기준선: run_001
 단일 변인: `lambda_l2` 0 → 10
 피처: features_v1

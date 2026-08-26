@@ -1,6 +1,6 @@
 """보정 사다리: run_002~006, 각각 run_001 대비 단일 변인만 변경.
 
-사용법: python3 run_ladder.py <WS루트>
+사용법: python run_ladder.py <WS루트>
 
 기준선(run_001) 설정을 BASE에 고정하고, VARIANTS의 각 항목이 딱 하나씩만 바꾼다.
 피처·분할·시드는 전부 동결. 각 run마다 성능 지표 + 포화 진단을 기록한다.
@@ -23,7 +23,7 @@ RUNS.mkdir(exist_ok=True)
 BASE = {"objective": "multiclass", "num_class": 10, "learning_rate": 0.1,
         "num_leaves": 31, "min_data_in_leaf": 20, "feature_fraction": 1.0,
         "bagging_fraction": 1.0, "max_bin": 255, "seed": 42,
-        "num_threads": 4, "verbosity": -1}  # 컨테이너 한도: CPU 4코어
+        "num_threads": 12, "verbosity": -1}  # 실측 최적값 (CLAUDE.md §8)
 NUM_ROUND, ES = 300, 30
 
 VARIANTS = [
@@ -35,7 +35,20 @@ VARIANTS = [
     ("run_004", "min_data_in_leaf: 20 -> 200", {"min_data_in_leaf": 200}, False, False),
     ("run_005", "class weight: none -> inverse frequency", {}, True, False),
     ("run_006", "early stopping metric: multi_logloss -> PR-AUC(세탁점수)", {}, False, True),
+    ("run_007a", "lambda_l2: 10 -> 1", {"lambda_l2": 1.0}, False, False),
+    ("run_007b", "lambda_l2: 10 -> 50", {"lambda_l2": 50.0}, False, False),
+    ("run_007c", "lambda_l2: 10 -> 100", {"lambda_l2": 100.0}, False, False),
+    ("run_008", "num_boost_round: 300 -> 1000", {"lambda_l2": 100.0}, False, False),
+    ("run_009a", "lambda_l2: 100 -> 200 (상한 1000)", {"lambda_l2": 200.0}, False, False),
+    ("run_009b", "lambda_l2: 100 -> 500 (상한 1000)", {"lambda_l2": 500.0}, False, False),
 ]
+
+# run_007* 는 현 기준선 run_002 대비 단일 변인. 미기재는 run_001 대비.
+BASELINES = {"run_007a": "run_002", "run_007b": "run_002", "run_007c": "run_002",
+             "run_008": "run_007c", "run_009a": "run_008", "run_009b": "run_008"}
+
+# 라운드 상한이 단일 변인인 run 만 기재. 미기재는 NUM_ROUND.
+ROUNDS = {"run_008": 1000, "run_009a": 1000, "run_009b": 1000}
 
 # ---------- 데이터 (한 번만 로드) ----------
 df = pd.read_csv(WS / "data" / "HI-Small_Trans.csv",
@@ -120,17 +133,18 @@ def evaluate(model, name, desc, params, weighted, custom_es, secs):
         "n_laundering_in_mid": int(((s > 1e-6) & (s < 0.99) & (yva > 0)).sum()),
         "max_abs_leaf_value": float(max_abs_leaf(model)),
     }
-    rec_json = {"run_id": name, "baseline": "run_001", "single_variable": desc,
+    rec_json = {"run_id": name, "baseline": BASELINES.get(name, "run_001"), "single_variable": desc,
                 "dataset": "HI-Small (ts < 2022-09-11)",
                 "split": {"train": "09-01~06", "val": "09-07~08", "test": "미개봉"},
                 "intervention": "none",
                 "features": "features_v1 61개 (jiwon/features_v1.md)",
-                "params": params, "num_boost_round": NUM_ROUND,
+                "params": params, "num_boost_round": ROUNDS.get(name, NUM_ROUND),
                 "early_stopping_rounds": ES,
                 "class_weight": "inverse frequency" if weighted else "none",
                 "early_stopping_metric": "PR-AUC(1-P(정상))" if custom_es else "multi_logloss",
                 "train_seconds": round(secs, 1), "metrics": met, "status": "keep"}
-    json.dump(rec_json, open(RUNS / f"{name}.json", "w"), ensure_ascii=False, indent=2)
+    json.dump(rec_json, open(RUNS / f"{name}.json", "w", encoding="utf-8"),
+              ensure_ascii=False, indent=2)
     model.save_model(str(RUNS / f"{name}_model.txt"), num_iteration=model.best_iteration)
     return met
 
@@ -153,7 +167,7 @@ for name, desc, override, weighted, custom_es in VARIANTS:
     dtr = lgb.Dataset(Xtr, label=ytr, weight=w, categorical_feature=CATS)
     dva = lgb.Dataset(Xva, label=yva, reference=dtr)
     cbs = [lgb.early_stopping(ES, verbose=False), lgb.log_evaluation(0)]
-    model = lgb.train(params, dtr, num_boost_round=NUM_ROUND, valid_sets=[dva],
+    model = lgb.train(params, dtr, num_boost_round=ROUNDS.get(name, NUM_ROUND), valid_sets=[dva],
                       valid_names=["val"], feval=feval_prauc if custom_es else None,
                       callbacks=cbs)
     secs = time.time() - t0

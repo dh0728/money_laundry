@@ -1,7 +1,7 @@
 """단건 파생 피처 후보 검토용 실측. 읽기 전용.
 
 각 후보 축에 대해 값별 건수와 세탁 비율(꼬리 제외 데이터 기준)을 출력한다.
-사용법: python3 feature_review.py <WS루트>
+사용법: python feature_review.py <WS루트>
 """
 import sys
 from pathlib import Path

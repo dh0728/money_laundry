@@ -1,6 +1,6 @@
 """검증 ①: 무작위 표본 행의 피처를 브루트포스로 재계산해 빌더 결과와 대조.
 
-사용법: python3 verify_features.py <WS루트> [표본수=150]
+사용법: python verify_features.py <WS루트> [표본수=150]
 
 브루트포스 기준: 시간 stable 정렬에서 자기보다 앞선 행 전체를 pandas/numpy
 마스크로 집계 (빌더와 독립된 경로).

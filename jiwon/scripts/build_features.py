@@ -1,6 +1,6 @@
 """그래프 피처 v1 빌더 (확정 명세: Tier1 18 + Tier2 28 + Tier3 6 = 52개).
 
-사용법: python3 build_features.py <WS루트> [출력파일명]
+사용법: python build_features.py <WS루트> [출력파일명]
 
 - 대상: HI-Small, ts < 2022-09-11 (꼬리 제외)
 - 모든 집계는 각 거래 시각 t "미만" 데이터만 사용 (시간순 단일 패스,

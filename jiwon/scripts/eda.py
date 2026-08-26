@@ -1,6 +1,6 @@
 """HI-Small EDA: 시간 분포, 클래스 분포, 시간 분할 후보. 읽기 전용.
 
-사용법: python3 eda.py <WS루트>
+사용법: python eda.py <WS루트>
 """
 import sys
 from pathlib import Path
