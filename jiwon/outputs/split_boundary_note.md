@@ -1,8 +1,8 @@
 # 분할 경계 걸침 편향 노트
 
 작성: 2026-08-27. 근거 실험: run_013(purge). 상세 수치·상설 지표는
-[runs/metrics_summary.md](runs/metrics_summary.md) B 표(탐지@R0.7걸침/포함)와
-[runs/run_013_purge.md](runs/run_013_purge.md).
+[metrics_summary.md](metrics_summary.md) B 표(탐지@R0.7걸침/포함)와
+[../runs/run_013_purge.md](../runs/run_013_purge.md).
 
 ## 1. 문제 정의
 

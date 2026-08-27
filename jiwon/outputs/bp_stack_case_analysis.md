@@ -1,7 +1,7 @@
 # BP↔STACK 혼동 케이스 분석 — 피처 기여도(SHAP)
 
 작성: 2026-08-27. 대상: run_011b, val 의 BIPARTITE 49건·STACK 150건.
-구조 시각화는 [confusion_blocks_011b.html](confusion_blocks_011b.html), 이 노트는
+구조 시각화는 [confusion_case_visualize.html](confusion_case_visualize.html), 이 노트는
 "모델이 실제로 어떤 피처를 보고 표를 던졌는가"를 LightGBM 기여도(pred_contrib)로
 분해한다. STACK 정답은 걸침/포함 블록을 분리했다(걸침 정답 32건은 암기 성분
 포함 — run_013 참고).

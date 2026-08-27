@@ -21,7 +21,7 @@
 | `eda.py` | 기간·클래스·자기거래 분포, 분할 후보 비교 |
 | `feature_review.py` | 단건 피처 후보별 세탁 비율·리프트 측정 |
 | `train_baseline.py` | run_001을 생성한 학습 스크립트 (이후 `run_ladder.py`로 대체) |
-| `summarize_runs.py` | 전 모델 val 재평가 → 종합/클래스별 지표 md 표 (`runs/metrics_summary.md` 원천) |
+| `summarize_runs.py` | 전 모델 val 재평가 → 종합/클래스별 지표 md 표 (`outputs/metrics_summary.md` 원천) |
 
 ## 새 실험 추가 방법
 

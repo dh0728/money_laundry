@@ -40,11 +40,11 @@
 | [014](run_014_9class.md) | 라벨 9클래스(NORMAL+NONPAT 합병) | 패턴PR-AUC 0.958 | — | P@패턴R0.9 92.8%(vs 93.1%) | 완료(keep) — 동률, 1단 후보 유효 |
 
 참고: `../data_notes.md` (데이터 특성, 문헌 벤치마크)
-참고: [metrics_summary.md](metrics_summary.md) (전 실험 종합·클래스별 지표, val 재평가)
-참고: [metrics_board.html](metrics_board.html) (같은 지표의 히트맵 보드 — 브라우저로 연다)
-참고: [bp_stack_case_analysis.md](bp_stack_case_analysis.md) (BP↔STACK 혼동의 피처 기여도 분석 — 가르는 스위치는 수신계좌 기존 활동 유무)
-참고: [../split_boundary_note.md](../split_boundary_note.md) (분할 경계 걸침 편향 — 측정·purge·문헌·정책 종합)
-참고: [confusion_blocks_011b.html](confusion_blocks_011b.html) (run_011b 의 BIPARTITE·STACK·RANDOM 블록별 오분류 뷰어 — BP↔ST 혼동은 경계층 간선의 국소 동일성, RANDOM 은 블록 수준 서명(중계 비율 ~90%)만 존재)
+참고: [../outputs/metrics_summary.md](../outputs/metrics_summary.md) (전 실험 종합·클래스별 지표, val 재평가)
+참고: [../outputs/metrics_board.html](../outputs/metrics_board.html) (같은 지표의 히트맵 보드 — 브라우저로 연다)
+참고: [../outputs/bp_stack_case_analysis.md](../outputs/bp_stack_case_analysis.md) (BP↔STACK 혼동의 피처 기여도 분석 — 가르는 스위치는 수신계좌 기존 활동 유무)
+참고: [../outputs/split_boundary_note.md](../outputs/split_boundary_note.md) (분할 경계 걸침 편향 — 측정·purge·문헌·정책 종합)
+참고: [../outputs/confusion_case_visualize.html](../outputs/confusion_case_visualize.html) (run_011b 의 BIPARTITE·STACK·RANDOM 블록별 오분류 뷰어 — BP↔ST 혼동은 경계층 간선의 국소 동일성, RANDOM 은 블록 수준 서명(중계 비율 ~90%)만 존재)
 
 ## 다음 후보
 

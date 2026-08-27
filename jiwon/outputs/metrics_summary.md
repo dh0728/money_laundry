@@ -2,7 +2,7 @@
 
 작성: 2026-08-25, 재평가 2026-08-26 (run_001~012b, 17개 모델). 저장된 모델 전부를 val(09-07~08)에 재예측해 계산했다.
 세탁점수 `1 - P(NORMAL)`, 고정점 threshold 는 전체 세탁 recall 기준.
-run 판정(keep/discard)의 정본은 [README.md](README.md) 인덱스.
+run 판정(keep/discard)의 정본은 [../runs/README.md](../runs/README.md) 인덱스.
 
 읽는 법:
 - **B 표** `P@R{t}` = 전체 recall t 지점의 precision, `alarm@R{t}` = 그 지점 알람 건수,
