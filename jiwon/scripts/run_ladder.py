@@ -51,17 +51,21 @@ VARIANTS = [
      {"lambda_l2": 100.0, "min_sum_hessian_in_leaf": 1.0, "num_leaves": 127}, False, False),
     ("run_012b", "num_leaves: 31 -> 512 (011b 설정)",
      {"lambda_l2": 100.0, "min_sum_hessian_in_leaf": 1.0, "num_leaves": 512}, False, False),
+    ("run_013", "개입: 경계 걸침 블록 purge (val 로 이어지는 패턴 attempt 의 train 행 제거)",
+     {"lambda_l2": 100.0, "min_sum_hessian_in_leaf": 1.0}, False, False),
 ]
 
 # run_007* 는 현 기준선 run_002 대비 단일 변인. 미기재는 run_001 대비.
 BASELINES = {"run_007a": "run_002", "run_007b": "run_002", "run_007c": "run_002",
              "run_008": "run_007c", "run_009a": "run_008", "run_009b": "run_008",
              "run_011a": "run_008", "run_011b": "run_008",
-             "run_012a": "run_011b", "run_012b": "run_011b"}
+             "run_012a": "run_011b", "run_012b": "run_011b", "run_013": "run_011b"}
 
 # 라운드 상한이 단일 변인인 run 만 기재. 미기재는 NUM_ROUND.
 ROUNDS = {"run_008": 1000, "run_009a": 1000, "run_009b": 1000,
-          "run_011a": 1000, "run_011b": 1000, "run_012a": 1000, "run_012b": 1000}
+          "run_011a": 1000, "run_011b": 1000, "run_012a": 1000, "run_012b": 1000,
+          "run_013": 1000}
+PURGED = {"run_013"}  # train 에서 PURGE_ROWS 제외
 
 # ---------- 데이터 (한 번만 로드) ----------
 df = pd.read_csv(WS / "data" / "HI-Small_Trans.csv",
@@ -95,6 +99,18 @@ tr = (df.ts < pd.Timestamp("2022-09-07")).to_numpy()
 va = ((df.ts >= pd.Timestamp("2022-09-07")) & (df.ts < pd.Timestamp("2022-09-09"))).to_numpy()
 Xtr, Xva, ytr, yva = X[tr], X[va], y[tr], y[va]
 ybin = (yva > 0).astype(int)
+# 경계 걸침 진단·purge: attempt 시작/끝 시각 기준 (09-07 = train/val 경계)
+aid = lab["attempt_id"].to_numpy()[m]
+ava = aid[va]
+B_VAL = np.datetime64("2022-09-07")
+_g = pd.Series(df.ts.to_numpy()).groupby(aid)
+_first, _last = _g.min(), _g.max()
+STRAD_ATT = set(_first[(_first.index >= 0) & (_first.to_numpy() < B_VAL)].index)
+PURGE_ATT = set(_last[(_last.index >= 0) & (_last.to_numpy() >= B_VAL)].index)
+pat_val = (yva >= 1) & (yva <= 8)
+STRAD = pat_val & np.isin(ava, list(STRAD_ATT))
+CONT = pat_val & ~np.isin(ava, list(STRAD_ATT))
+PURGE_ROWS = np.isin(aid, list(PURGE_ATT)) & tr & (y >= 1) & (y <= 8)
 print(f"train={tr.sum():,} val={va.sum():,} 피처={X.shape[1]}", flush=True)
 
 
@@ -148,6 +164,10 @@ def evaluate(model, name, desc, params, weighted, custom_es, secs):
     met["precision_at_pattern_recall_0.9"] = float((hit_p & (yva > 0)).sum() / hit_p.sum())
     met["n_alarms_at_pattern_recall_0.9"] = int(hit_p.sum())
     met["threshold_at_pattern_recall_0.9"] = float(th_p)
+    # 경계 걸침 층화: 패턴 거래 탐지율@R0.7 을 걸침/포함으로 분해
+    hit07 = s >= met["threshold_at_recall_0.7"]
+    met["det_R0.7_straddle_pattern"] = float(hit07[STRAD].mean())
+    met["det_R0.7_contained_pattern"] = float(hit07[CONT].mean())
     # 클래스별 진단: one-vs-rest PR-AUC (자기 확률 p_k 로 그 클래스만 골라내는 순위 능력)
     met["ovr_pr_auc"] = {CLS9[k - 1]: float(average_precision_score(
         (yva == k).astype(int), proba[:, k])) for k in range(1, 10)}
@@ -180,15 +200,21 @@ for name, desc, override, weighted, custom_es in VARIANTS:
         continue
     params = copy.deepcopy(BASE)
     params.update(override)
+    if name in PURGED:
+        trm = tr & ~PURGE_ROWS
+        Xt, yt = X[trm], y[trm]
+        print(f"{name}: purge {int(PURGE_ROWS.sum())}행 제외, train={trm.sum():,}", flush=True)
+    else:
+        Xt, yt = Xtr, ytr
     w = None
     if weighted:
-        cnt = np.bincount(ytr, minlength=10).astype(float)
-        cw = len(ytr) / (10 * np.maximum(cnt, 1))
-        w = cw[ytr]
+        cnt = np.bincount(yt, minlength=10).astype(float)
+        cw = len(yt) / (10 * np.maximum(cnt, 1))
+        w = cw[yt]
     if custom_es:
         params["metric"] = "None"
     t0 = time.time()
-    dtr = lgb.Dataset(Xtr, label=ytr, weight=w, categorical_feature=CATS)
+    dtr = lgb.Dataset(Xt, label=yt, weight=w, categorical_feature=CATS)
     dva = lgb.Dataset(Xva, label=yva, reference=dtr)
     cbs = [lgb.early_stopping(ES, verbose=False), lgb.log_evaluation(0)]
     model = lgb.train(params, dtr, num_boost_round=ROUNDS.get(name, NUM_ROUND), valid_sets=[dva],
@@ -205,6 +231,8 @@ for name, desc, override, weighted, custom_es in VARIANTS:
           f"(세탁 {sat['n_laundering_in_mid']}건), |리프|최대 {sat['max_abs_leaf_value']:,.1f}", flush=True)
     print(f"  P@패턴R0.9 {met['precision_at_pattern_recall_0.9']*100:.2f}% "
           f"(알람 {met['n_alarms_at_pattern_recall_0.9']:,}건)", flush=True)
+    print(f"  탐지@R0.7 걸침 {met['det_R0.7_straddle_pattern']*100:.1f}% / "
+          f"포함 {met['det_R0.7_contained_pattern']*100:.1f}%", flush=True)
     print("  OVR PR-AUC: " + " ".join(f"{n} {v:.3f}" for n, v in met["ovr_pr_auc"].items()), flush=True)
     results.append({"run": name, "변인": desc, "PR-AUC": met["val_pr_auc"],
                     "max-F1%": met["max_f1"] * 100, "P@R0.7%": met["precision_at_recall_0.7"] * 100,

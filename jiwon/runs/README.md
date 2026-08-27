@@ -36,10 +36,14 @@
 | [011b](run_011_lambda_hessian.md) | `min_sum_hessian` 1e-3→1.0 (λ=100) | **0.6652** | **68.98%** | 32.94% | 완료(keep) — **현 기준선** |
 | [012a](run_012_num_leaves.md) | `num_leaves` 31→127 (011b 설정) | 0.6584 | 67.88% | 30.34% | 완료(discard) |
 | [012b](run_012_num_leaves.md) | `num_leaves` 31→512 (011b 설정) | 0.6575 | 67.62% | 31.42% | 완료(discard) |
+| [013](run_013_purge.md) | 개입: 경계 걸침 블록 purge | 0.6264 | 63.80% | 27.67% | 완료(discard) — 진단: 탐지 우위=이력(정당), 분류 우위=암기 |
+| [014](run_014_9class.md) | 라벨 9클래스(NORMAL+NONPAT 합병) | 패턴PR-AUC 0.958 | — | P@패턴R0.9 92.8%(vs 93.1%) | 완료(keep) — 동률, 1단 후보 유효 |
 
 참고: `../data_notes.md` (데이터 특성, 문헌 벤치마크)
 참고: [metrics_summary.md](metrics_summary.md) (전 실험 종합·클래스별 지표, val 재평가)
 참고: [metrics_board.html](metrics_board.html) (같은 지표의 히트맵 보드 — 브라우저로 연다)
+참고: [bp_stack_case_analysis.md](bp_stack_case_analysis.md) (BP↔STACK 혼동의 피처 기여도 분석 — 가르는 스위치는 수신계좌 기존 활동 유무)
+참고: [../split_boundary_note.md](../split_boundary_note.md) (분할 경계 걸침 편향 — 측정·purge·문헌·정책 종합)
 참고: [confusion_blocks_011b.html](confusion_blocks_011b.html) (run_011b 의 BIPARTITE·STACK·RANDOM 블록별 오분류 뷰어 — BP↔ST 혼동은 경계층 간선의 국소 동일성, RANDOM 은 블록 수준 서명(중계 비율 ~90%)만 존재)
 
 ## 다음 후보
@@ -47,11 +51,13 @@
 파라미터 사다리 종결 — λ(100)·H하한(1.0)·리프(31)·라운드(1000)·점수정의(합) 확정.
 현 기준선 run_011b: λ=100, `min_sum_hessian` 1.0, `num_leaves` 31, 상한 1000.
 
-1. 개입 실험 1호: 배경 세탁(NONPAT) train 행 제거 — C 표 분석상 precision 붕괴의
-   주범이자 D-4 최약(~3) 클래스. train 만 정제, val/test 원본 유지(§6)
-2. (피처 방향) D-4 약체 신호용 피처 — FAN-OUT·FAN-IN(방향·시점), BIPARTITE(양측
-   집합), RANDOM. features_v2 후보
-3. purge 검증(개입의 일종): val 로 이어지는 블록의 train 거래 535건 제외 후
-   재학습 — 완전 포함 블록 성능이 유지되면 경계 걸침은 암기 효과가 아님.
-   metrics_summary 관찰 요약의 경계 걸침 편향(+4.7%p/+16.5%p) 후속
+1. run_015: 캐스케이드 2단 검증 — 전용 이진(교차 라우팅, 가중 변형 포함) vs
+   10클래스의 `p_NONPAT`. 지면 캐스케이드 폐기, "평면 + 두 점수 서빙" 확정
+2. 패턴 큐 점수 정의 교체 검토 — Σp_패턴 기준 P@패턴R0.9 (run_014 부수 발견:
+   79.7→93.1%). 지표 정의 변경이라 소급 재계산 필요, §7 합의 사항
+3. 개입 실험 1호: 배경 세탁(NONPAT) train 행 제거 — train 만 정제(§6)
+4. (피처 방향) features_v2 — FAN-OUT·FAN-IN(방향·시점), BIPARTITE(양측 집합),
+   RANDOM, 중계층 후보 신호(bp_stack_case_analysis 참고)
+3. (종결) purge 검증 → run_013: 탐지 우위는 정당(이력 피처), 분류 우위는 암기.
+   purged 학습 미채택, 층화 보고 + 판정 시 포함 지표 교차 확인으로 관리
 

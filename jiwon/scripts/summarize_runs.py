@@ -49,10 +49,15 @@ X["self_account"] = ((df.fb == df.tb) & (df.fa == df.ta)).astype("int8")
 X["from_entity_type"] = (df.fb.str.lstrip("0") + "|" + df.fa).map(et).astype("category")
 X["to_entity_type"] = (df.tb.str.lstrip("0") + "|" + df.ta).map(et).astype("category")
 va = ((df.ts >= pd.Timestamp("2022-09-07")) & (df.ts < pd.Timestamp("2022-09-09"))).to_numpy()
+_g = pd.Series(df.ts.to_numpy()).groupby(aid)
+_first = _g.min()
+STRAD_ATT = set(_first[(_first.index >= 0) & (_first.to_numpy() < np.datetime64("2022-09-07"))].index)
 Xva, yva, ava = X[va], y[va], aid[va]
 del df, gf, lab, acc, X
 ybin = (yva > 0).astype(int)
 ypat = (yva >= 1) & (yva <= 8)
+STRAD = ypat & np.isin(ava, list(STRAD_ATT))
+CONT = ypat & ~np.isin(ava, list(STRAD_ATT))
 cls_cnt = np.bincount(yva, minlength=10)
 CNT_ROW = "| (건수) | " + " | ".join(str(c) for c in np.bincount(yva, minlength=10)) + " |"
 n_attempt = len(set(ava[ava >= 0]))
@@ -64,6 +69,9 @@ for name in order:
     j = json.load(open(RUNS / f"{name}.json", encoding="utf-8"))
     model = lgb.Booster(model_file=str(RUNS / f"{name}_model.txt"))
     proba = model.predict(Xva)
+    if proba.shape[1] != 10:
+        print(f"<!-- {name}: 10클래스 아님(shape {proba.shape[1]}) — 건너뜀 -->")
+        continue
     s = 1 - proba[:, 0]
     prec, rec, thr = precision_recall_curve(ybin, s)
     f1 = 2 * prec * rec / (prec + rec + 1e-12)
@@ -84,6 +92,8 @@ for name in order:
         if t == 0.7:
             det = set(ava[(hit) & (ava >= 0)])
             met["attempt@R0.7"] = len(det) / n_attempt * 100
+            met["탐지@R0.7걸침"] = float(hit[STRAD].mean()) * 100
+            met["탐지@R0.7포함"] = float(hit[CONT].mean()) * 100
     spat = np.sort(s[ypat])[::-1]
     th_p = spat[int(np.ceil(0.9 * ypat.sum())) - 1]
     hit_p = s >= th_p
