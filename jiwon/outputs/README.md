@@ -10,5 +10,8 @@
 | [confusion_case_visualize.html](confusion_case_visualize.html) | run_011b 의 BIPARTITE·STACK·RANDOM 블록별 오분류 그래프 뷰어 |
 | [bp_stack_case_analysis.md](bp_stack_case_analysis.md) | BP↔STACK 혼동의 피처 기여도(SHAP) 분석 — 공유 신호 + 수신계좌 활동 유무 스위치 |
 | [split_boundary_note.md](split_boundary_note.md) | 분할 경계 걸침 편향 — 측정·purge 실험·문헌·채택 정책 종합 |
+| [hi_large_transition.md](hi_large_transition.md) | **HI-Large 전환 계획 — 새 세션 핸드오프** (Phase 0~4, 이월 발견·미결 목록) |
+| [hi_large_phase0_eda.md](hi_large_phase0_eda.md) | HI-Large Phase 0 전환 EDA 실측 — 꼬리 컷 11-05, 블록 span 15배, 매칭 전수 성립, **정렬 안 됨**, 후보 창 포함 블록 수 |
+| [hi_large_phase2_pipeline.md](hi_large_phase2_pipeline.md) | HI-Large Phase 2 파이프라인 — prepare/빌더/검증 스크립트 설계·실측 (정렬 parquet 5GB, 브루트포스 검증 통과) |
 
 웹 게시본(아티팩트): [지표 보드](https://claude.ai/code/artifact/6a6dcc64-3fdd-4693-8ce9-926da0b8c7ae) · [혼동 블록 뷰어](https://claude.ai/code/artifact/fbf621ac-9567-4852-b2ab-85c7942f867a)

@@ -99,6 +99,13 @@ for name in order:
     hit_p = s >= th_p
     met["P@패턴R0.9"] = float((hit_p & (ybin == 1)).sum() / hit_p.sum()) * 100
     met["alarm@패턴R0.9"] = int(hit_p.sum())
+    # 포함(신규 수법) 닻 + 패턴점수(Σp패턴) — 일반화 성능의 정직한 패턴 큐 지표
+    s_pat9 = proba[:, 1:9].sum(axis=1)
+    sc = np.sort(s_pat9[CONT])[::-1]
+    th_c = sc[int(np.ceil(0.9 * CONT.sum())) - 1]
+    hit_c = s_pat9 >= th_c
+    met["P@포함패턴R0.9"] = float((hit_c & (ybin == 1)).sum() / hit_c.sum()) * 100
+    met["alarm@포함패턴R0.9"] = int(hit_c.sum())
     rows_ovr[name] = [average_precision_score((yva == c).astype(int), proba[:, c]) * 100
                       for c in range(1, 10)]
     pred = proba.argmax(axis=1)
@@ -114,6 +121,8 @@ for name in order:
                      "ES 지표": j.get("early_stopping_metric", "multi_logloss"),
                      "threads": p.get("num_threads"), "상태": j.get("status", "?")})
 
+# 건너뛴 run(10클래스 아님)은 이후 표 순회에서 제외
+order = [r for r in order if r in rows_cls]
 pd.set_option("display.width", 250)
 print("\n## A. 설정")
 print(pd.DataFrame(rows_cfg).to_markdown(index=False))

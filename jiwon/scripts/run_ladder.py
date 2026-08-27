@@ -168,6 +168,13 @@ def evaluate(model, name, desc, params, weighted, custom_es, secs):
     hit07 = s >= met["threshold_at_recall_0.7"]
     met["det_R0.7_straddle_pattern"] = float(hit07[STRAD].mean())
     met["det_R0.7_contained_pattern"] = float(hit07[CONT].mean())
+    # 일반화 성능: 패턴점수(Σp패턴) + 포함(신규 수법) 닻 0.9
+    s_pat9 = proba[:, 1:9].sum(axis=1)
+    sc = np.sort(s_pat9[CONT])[::-1]
+    th_c = sc[int(np.ceil(0.9 * CONT.sum())) - 1]
+    hit_c = s_pat9 >= th_c
+    met["precision_at_contained_pattern_recall_0.9"] = float((hit_c & (yva > 0)).sum() / hit_c.sum())
+    met["n_alarms_at_contained_pattern_recall_0.9"] = int(hit_c.sum())
     # 클래스별 진단: one-vs-rest PR-AUC (자기 확률 p_k 로 그 클래스만 골라내는 순위 능력)
     met["ovr_pr_auc"] = {CLS9[k - 1]: float(average_precision_score(
         (yva == k).astype(int), proba[:, k])) for k in range(1, 10)}
@@ -233,6 +240,8 @@ for name, desc, override, weighted, custom_es in VARIANTS:
           f"(알람 {met['n_alarms_at_pattern_recall_0.9']:,}건)", flush=True)
     print(f"  탐지@R0.7 걸침 {met['det_R0.7_straddle_pattern']*100:.1f}% / "
           f"포함 {met['det_R0.7_contained_pattern']*100:.1f}%", flush=True)
+    print(f"  P@포함패턴R0.9 {met['precision_at_contained_pattern_recall_0.9']*100:.2f}% "
+          f"(알람 {met['n_alarms_at_contained_pattern_recall_0.9']:,}건)", flush=True)
     print("  OVR PR-AUC: " + " ".join(f"{n} {v:.3f}" for n, v in met["ovr_pr_auc"].items()), flush=True)
     results.append({"run": name, "변인": desc, "PR-AUC": met["val_pr_auc"],
                     "max-F1%": met["max_f1"] * 100, "P@R0.7%": met["precision_at_recall_0.7"] * 100,
