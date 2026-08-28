@@ -1,0 +1,11 @@
+logging:
+  level:
+    root: INFO
+    com.moneylaundry.api: INFO
+
+spring:
+  web:
+    error:
+      include-message: never
+      include-binding-errors: never
+      include-stacktrace: never
