@@ -1,0 +1,29 @@
+# Windows·Mac·Ubuntu가 함께 작업하면 .gitignore보다 줄바꿈 차이가 더 자주 문제를 일으킵니다.
+# 저장소 최상위에 .gitattributes 파일도 만드는 것을 권장
+
+# 텍스트 파일의 Git 내부 줄바꿈 정규화
+* text=auto
+
+# Linux, Docker, Gradle 실행 파일은 LF
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.properties text eol=lf
+*.gradle text eol=lf
+gradlew text eol=lf
+
+# Windows 실행 파일은 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 바이너리 파일
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.jar binary
