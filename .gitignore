@@ -1,33 +1,146 @@
-# money_laundry 저장소용 .gitignore
-# 아래 경로는 모두 저장소 루트(= 이 파일이 있는 위치) 기준이다.
+# 원천 데이터 (용량 문제로 Git 제외)
+/data/
 
-# 원천 데이터와 개인 작업 공간은 저장소 바깥(상위 폴더)에 둔다.
-# 아래 두 줄은 같은 이름이 저장소 안으로 잘못 들어오는 것을 막는 방어용이다.
-data/
-worktable/
+# 개인 작업 공간
+/worktable/
 
-# AI 협업 파일 (개인 도구 — 팀 공유 대상 아님)
-collab/
-CLAUDE.md
-AGENTS.md
+# AI 협업 파일 (개인 도구)
+/collab/
+/CLAUDE.md
+/AGENTS.md
 
-# Python — tools/mock-generator, 앞으로의 backend/ingest-worker·batch-worker
+# Codex 번역·문서 작업용 스크립트 및 임시 파일
+# 루트 scripts만 제외하며 deploy/scripts는 Git에 포함
+/scripts/
+/tmp/
+
+# Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
+env/
 .ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+.eggs/
+.hypothesis/
 
-# Gradle 산출물(build/, .gradle/)은 backend/api-server/.gitignore 가 덮으므로 여기서 다루지 않는다.
+# Java / Spring Boot / Gradle
+.gradle/
+**/build/
+**/target/
+out/
+*.class
+*.jar
+hs_err_pid*
+replay_pid*
+*.hprof
 
-# OS
+# Gradle Wrapper JAR은 반드시 Git에 포함
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# 로컬·비밀 Spring 설정
+# application.yml, application-dev.yml, application-prod.yml은 Git에 포함
+application-local.properties
+application-local.yml
+application-local.yaml
+application-secret.properties
+application-secret.yml
+application-secret.yaml
+
+# Node.js / React / TypeScript
+node_modules/
+dist/
+.next/
+.vite/
+.parcel-cache/
+coverage/
+*.tsbuildinfo
+.eslintcache
+.turbo/
+storybook-static/
+playwright-report/
+test-results/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 환경변수 및 비밀정보
+.env
+.env.*
+.envrc
+!.env.example
+!.env.*.example
+
+# 인증서·개인 키
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+.aws/
+
+# 로컬 비밀정보 디렉터리
+/secrets/*
+!/secrets/README.md
+!/secrets/*.example
+
+# Docker 로컬 데이터
+.docker-data/
+.local-data/
+.runtime/
+
+# 개인용 Docker Compose 덮어쓰기 파일
+compose.override.yml
+compose.override.yaml
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# 일반 로그와 실행 파일
+*.log
+logs/
+*.pid
+*.tmp
+*.bak
+.cache/
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+
+# Windows
 Thumbs.db
-desktop.ini
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.stackdump
 
 # IDE
 .vscode/
 .idea/
+*.iml
+.classpath
+.project
+.settings/
 
-# Office 임시파일 (docs 브랜치의 .docx 편집 중 생성)
+# 편집기 임시파일
+*.swp
+*.swo
+*~
+
+# Microsoft Office 임시파일
 ~$*
