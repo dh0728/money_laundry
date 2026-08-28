@@ -1,0 +1,98 @@
+name: aml-dev
+
+services:
+  api:
+    image: aml-api:dev
+    pull_policy: build
+    build:
+      context: ../backend/api-server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: "8080"
+    
+      SPRING_DATASOURCE_URL: ${DEV_DB_URL:?DEV_DB_URL is required}
+      SPRING_DATASOURCE_USERNAME: ${DEV_POSTGRES_USER:?DEV_POSTGRES_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${DEV_POSTGRES_PASSWORD:?DEV_POSTGRES_PASSWORD is required}
+    
+      JWT_SECRET: ${DEV_JWT_SECRET:?DEV_JWT_SECRET is required}
+      S3_BUCKET: ${DEV_S3_BUCKET:?DEV_S3_BUCKET is required}
+      S3_PREFIX: ${DEV_S3_PREFIX:?DEV_S3_PREFIX is required}
+      SQS_QUEUE_URL: ${DEV_SQS_URL:?DEV_SQS_URL is required}
+    
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-northeast-2}
+      TZ: Asia/Seoul
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DEV_API_PORT:-8081}:8080"
+    stop_grace_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - dev-network
+
+  web:
+    image: aml-web:dev
+    pull_policy: build
+    build:
+      context: ../frontend/web-app
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${DEV_VITE_API_BASE_URL:-/api}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DEV_WEB_PORT:-3001}:80"
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - dev-network
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DEV_POSTGRES_DB:?DEV_POSTGRES_DB is required}
+      POSTGRES_USER: ${DEV_POSTGRES_USER:?DEV_POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:?DEV_POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - dev-network
+
+networks:
+  dev-network:
+    name: aml-dev-network
+    driver: bridge
+
+volumes:
+  postgres-data:
+    name: aml-dev-postgres-data
