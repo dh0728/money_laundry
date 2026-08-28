@@ -3,8 +3,9 @@ logging:
     root: INFO
     com.moneylaundry.api: INFO
 
-server:
-  error:
-    include-message: never
-    include-binding-errors: never
-    include-stacktrace: never
+spring:
+  web:
+    error:
+      include-message: never
+      include-binding-errors: never
+      include-stacktrace: never

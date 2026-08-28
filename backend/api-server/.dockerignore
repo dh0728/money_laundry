@@ -1,0 +1,44 @@
+# Git 및 IDE
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+*.iml
+
+# Gradle 빌드 결과와 로컬 캐시
+.gradle/
+build/
+out/
+bin/
+
+# Linux 컨테이너 빌드에 필요 없는 Windows용 Gradle Wrapper
+gradlew.bat
+
+# 로컬 환경변수와 Spring 설정
+.env
+.env.*
+src/main/resources/application-local.properties
+src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
+
+# 인증서 및 개인 키
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# 로그와 임시파일
+*.log
+*.tmp
+logs/
+
+# 문서 및 로컬 Compose 파일
+README.md
+HELP.md
+compose.override.yml
+compose.override.yaml
+docker-compose.override.yml
+docker-compose.override.yaml
