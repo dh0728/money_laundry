@@ -108,3 +108,15 @@ jobs:
         run: |
           docker image inspect aml-api:ci-${{ github.sha }} >/dev/null
           docker image inspect aml-web:ci-${{ github.sha }} >/dev/null
+
+  deploy-dev:
+    name: Deploy Dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs:
+      - docker-images
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-dev.yml
+    with:
+      git_sha: ${{ github.sha }}

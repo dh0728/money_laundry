@@ -1,0 +1,73 @@
+name: Deploy Dev
+
+on:
+  workflow_call:
+    inputs:
+      git_sha:
+        description: Full Git commit SHA to deploy
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Authenticate Dev Deployment
+    runs-on: ubuntu-24.04
+    environment: dev
+
+    steps:
+      - name: Validate deployment inputs
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+        run: |
+          [[ "${GIT_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "Invalid full Git SHA." >&2
+            exit 1
+          }
+          [[ "${AWS_REGION}" == "ap-northeast-2" ]] || {
+            echo "AWS_REGION must be ap-northeast-2." >&2
+            exit 1
+          }
+          [[ "${AWS_ROLE_ARN}" =~ ^arn:aws:iam::[0-9]{12}:role/aml-github-dev-deploy-role$ ]] || {
+            echo "AWS_ROLE_ARN is missing or invalid." >&2
+            exit 1
+          }
+          [[ "${EC2_INSTANCE_ID}" =~ ^i-[0-9a-f]{8,17}$ ]] || {
+            echo "EC2_INSTANCE_ID is missing or invalid." >&2
+            exit 1
+          }
+          [[ "${DEPLOY_ARTIFACT_BUCKET}" =~ ^aml-deploy-artifacts-[0-9]{12}$ ]] || {
+            echo "DEPLOY_ARTIFACT_BUCKET is missing or invalid." >&2
+            exit 1
+          }
+
+      - name: Checkout deployment commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.git_sha }}
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: aml-dev-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Verify assumed AWS role
+        run: |
+          aws sts get-caller-identity \
+            --query Arn \
+            --output text >/dev/null
+          echo "GitHub OIDC authentication succeeded."
