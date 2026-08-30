@@ -71,3 +71,190 @@ jobs:
             --query Arn \
             --output text >/dev/null
           echo "GitHub OIDC authentication succeeded."
+
+      - name: Configure ECR image names
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          AWS_ACCOUNT_ID="$(
+            aws sts get-caller-identity \
+              --region "${AWS_REGION}" \
+              --query Account \
+              --output text
+          )"
+
+          [[ "${AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]] || {
+            echo "AWS Account ID is invalid." >&2
+            exit 1
+          }
+
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          IMAGE_TAG="dev-${GIT_SHA}"
+
+          {
+            echo "ECR_REGISTRY=${ECR_REGISTRY}"
+            echo "IMAGE_TAG=${IMAGE_TAG}"
+            echo "DEV_API_IMAGE=${ECR_REGISTRY}/aml-api:${IMAGE_TAG}"
+            echo "DEV_WEB_IMAGE=${ECR_REGISTRY}/aml-web:${IMAGE_TAG}"
+          } >> "${GITHUB_ENV}"
+
+          echo "ECR image names configured for dev-${GIT_SHA:0:7}."
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password \
+            --region "${AWS_REGION}" |
+            docker login \
+              --username AWS \
+              --password-stdin "${ECR_REGISTRY}"
+
+      - name: Check existing ECR images
+        id: check_images
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          check_image() {
+            local repository="$1"
+            local output_name="$2"
+            local error_file
+            error_file="$(mktemp)"
+
+            if aws ecr describe-images \
+              --region "${AWS_REGION}" \
+              --repository-name "${repository}" \
+              --image-ids "imageTag=${IMAGE_TAG}" \
+              >/dev/null 2>"${error_file}"; then
+              echo "${output_name}=true" >> "${GITHUB_OUTPUT}"
+              echo "${repository}: existing image=true"
+            elif grep -q "ImageNotFoundException" "${error_file}"; then
+              echo "${output_name}=false" >> "${GITHUB_OUTPUT}"
+              echo "${repository}: existing image=false"
+            else
+              cat "${error_file}" >&2
+              rm -f "${error_file}"
+              exit 1
+            fi
+
+            rm -f "${error_file}"
+          }
+
+          check_image "aml-api" "api_exists"
+          check_image "aml-web" "web_exists"
+
+      - name: Build and push API image
+        if: steps.check_images.outputs.api_exists != 'true'
+        run: |
+          docker build \
+            --tag "${DEV_API_IMAGE}" \
+            backend/api-server
+          docker push "${DEV_API_IMAGE}"
+
+      - name: Build and push WEB image
+        if: steps.check_images.outputs.web_exists != 'true'
+        run: |
+          docker build \
+            --build-arg VITE_API_BASE_URL=/api \
+            --tag "${DEV_WEB_IMAGE}" \
+            frontend/web-app
+          docker push "${DEV_WEB_IMAGE}"
+
+      - name: Verify deploy images in Amazon ECR
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          aws ecr describe-images \
+            --region "${AWS_REGION}" \
+            --repository-name aml-api \
+            --image-ids "imageTag=${IMAGE_TAG}" \
+            >/dev/null
+          aws ecr describe-images \
+            --region "${AWS_REGION}" \
+            --repository-name aml-web \
+            --image-ids "imageTag=${IMAGE_TAG}" \
+            >/dev/null
+          echo "API and WEB ECR images are ready."
+
+      - name: Create and validate dev deployment bundle
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+        run: |
+          BUNDLE_ROOT="${RUNNER_TEMP}/dev-bundle-${GIT_SHA}"
+          BUNDLE_PATH="${RUNNER_TEMP}/dev-${GIT_SHA}.tar.gz"
+
+          install -D -m 0644 \
+            deploy/compose.dev.yaml \
+            "${BUNDLE_ROOT}/deploy/compose.dev.yaml"
+          install -D -m 0755 \
+            deploy/scripts/deploy-dev.sh \
+            "${BUNDLE_ROOT}/deploy/scripts/deploy-dev.sh"
+          install -D -m 0644 \
+            deploy/nginx/conf.d/dev.conf \
+            "${BUNDLE_ROOT}/deploy/nginx/conf.d/dev.conf"
+
+          test -s "${BUNDLE_ROOT}/deploy/compose.dev.yaml"
+          test -s "${BUNDLE_ROOT}/deploy/scripts/deploy-dev.sh"
+          test -s "${BUNDLE_ROOT}/deploy/nginx/conf.d/dev.conf"
+          bash -n "${BUNDLE_ROOT}/deploy/scripts/deploy-dev.sh"
+
+          tar \
+            -C "${BUNDLE_ROOT}" \
+            -czf "${BUNDLE_PATH}" \
+            deploy
+
+          test -s "${BUNDLE_PATH}"
+
+          EXPECTED_CONTENTS="$({
+            printf '%s\n' \
+              'deploy/compose.dev.yaml' \
+              'deploy/nginx/conf.d/dev.conf' \
+              'deploy/scripts/deploy-dev.sh'
+          } | LC_ALL=C sort)"
+          ACTUAL_CONTENTS="$(
+            tar -tzf "${BUNDLE_PATH}" |
+              sed '/\/$/d' |
+              LC_ALL=C sort
+          )"
+
+          [[ "${ACTUAL_CONTENTS}" == "${EXPECTED_CONTENTS}" ]] || {
+            echo "Deployment bundle contains unexpected files." >&2
+            printf 'Expected:\n%s\n' "${EXPECTED_CONTENTS}" >&2
+            printf 'Actual:\n%s\n' "${ACTUAL_CONTENTS}" >&2
+            exit 1
+          }
+
+          printf 'DEV_BUNDLE_PATH=%s\n' "${BUNDLE_PATH}" >> "${GITHUB_ENV}"
+          echo "Dev deployment bundle created and validated: $(basename "${BUNDLE_PATH}")"
+
+      - name: Upload dev deployment bundle to S3
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+        run: |
+          [[ -n "${DEV_BUNDLE_PATH:-}" ]] || {
+            echo "DEV_BUNDLE_PATH is missing." >&2
+            exit 1
+          }
+          [[ -s "${DEV_BUNDLE_PATH}" ]] || {
+            echo "Deployment bundle is missing or empty." >&2
+            exit 1
+          }
+
+          DEV_BUNDLE_S3_KEY="releases/dev/${GIT_SHA}/deploy-bundle.tar.gz"
+          DEV_BUNDLE_S3_URI="s3://${DEPLOY_ARTIFACT_BUCKET}/${DEV_BUNDLE_S3_KEY}"
+
+          aws s3 cp \
+            "${DEV_BUNDLE_PATH}" \
+            "${DEV_BUNDLE_S3_URI}" \
+            --region "${AWS_REGION}" \
+            --sse AES256 \
+            --content-type application/gzip \
+            --only-show-errors
+
+          {
+            echo "DEV_BUNDLE_S3_KEY=${DEV_BUNDLE_S3_KEY}"
+            echo "DEV_BUNDLE_S3_URI=${DEV_BUNDLE_S3_URI}"
+          } >> "${GITHUB_ENV}"
+
+          echo "Dev deployment bundle uploaded: ${DEV_BUNDLE_S3_KEY}"
