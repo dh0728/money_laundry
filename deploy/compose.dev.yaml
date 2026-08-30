@@ -2,11 +2,8 @@ name: aml-dev
 
 services:
   api:
-    image: aml-api:dev
-    pull_policy: build
-    build:
-      context: ../backend/api-server
-      dockerfile: Dockerfile
+    image: ${DEV_API_IMAGE:?DEV_API_IMAGE is required}
+    pull_policy: always
     restart: unless-stopped
     init: true
     environment:
@@ -42,13 +39,8 @@ services:
       - dev-network
 
   web:
-    image: aml-web:dev
-    pull_policy: build
-    build:
-      context: ../frontend/web-app
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: ${DEV_VITE_API_BASE_URL:-/api}
+    image: ${DEV_WEB_IMAGE:?DEV_WEB_IMAGE is required}
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "127.0.0.1:${DEV_WEB_PORT:-3001}:80"

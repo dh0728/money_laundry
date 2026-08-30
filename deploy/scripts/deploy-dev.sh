@@ -11,10 +11,16 @@ ENV_FILE="${DEPLOY_DIR}/.env.dev"
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 PARAMETER_PREFIX="/aml/dev"
 
+GIT_SHA="${1:-${GIT_SHA:-}}"
+
 fail() {
   echo "ERROR: $*" >&2
   exit 1
 }
+
+[[ "${GIT_SHA}" =~ ^[0-9a-f]{40}$ ]] \
+  || fail "전체 40자리 Git SHA가 필요합니다. 사용법: ./deploy-dev.sh <Git SHA>"
+
 
 get_parameter() {
   local parameter_name="$1"
@@ -44,6 +50,8 @@ cleanup() {
   unset DEV_S3_BUCKET
   unset DEV_S3_PREFIX
   unset DEV_SQS_URL
+  unset DEV_API_IMAGE
+  unset DEV_WEB_IMAGE
 }
 
 trap cleanup EXIT
@@ -63,9 +71,25 @@ docker info >/dev/null 2>&1 \
 [[ -f "${ENV_FILE}" ]] \
   || fail "환경변수 파일이 없습니다: ${ENV_FILE}"
 
-aws sts get-caller-identity \
-  --region "${AWS_REGION}" \
-  >/dev/null
+AWS_ACCOUNT_ID="$(
+  aws sts get-caller-identity \
+    --region "${AWS_REGION}" \
+    --query "Account" \
+    --output text
+)"
+
+[[ "${AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]] \
+  || fail "AWS 계정 ID를 확인하지 못했습니다."
+
+ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+IMAGE_TAG="dev-${GIT_SHA}"
+
+DEV_API_IMAGE="${ECR_REGISTRY}/aml-api:${IMAGE_TAG}"
+DEV_WEB_IMAGE="${ECR_REGISTRY}/aml-web:${IMAGE_TAG}"
+
+export DEV_API_IMAGE
+export DEV_WEB_IMAGE
+
 
 echo "dev Parameter Store 값을 조회합니다."
 
@@ -85,6 +109,14 @@ export DEV_S3_BUCKET
 export DEV_S3_PREFIX
 export DEV_SQS_URL
 
+echo "Amazon ECR에 로그인합니다."
+
+aws ecr get-login-password \
+  --region "${AWS_REGION}" |
+  docker login \
+    --username AWS \
+    --password-stdin "${ECR_REGISTRY}"
+
 echo "dev Compose 설정을 검증합니다."
 
 docker compose \
@@ -92,12 +124,20 @@ docker compose \
   -f "${COMPOSE_FILE}" \
   config --quiet
 
-echo "dev 컨테이너를 빌드하고 실행합니다."
+echo "dev ECR 이미지를 내려받습니다."
 
 docker compose \
   --env-file "${ENV_FILE}" \
   -f "${COMPOSE_FILE}" \
-  up -d --build
+  pull api web
+
+echo "dev 컨테이너를 실행합니다."
+
+docker compose \
+  --env-file "${ENV_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  up -d --no-build --pull never
+
 
 echo "dev 컨테이너 상태를 확인합니다."
 
