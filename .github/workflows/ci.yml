@@ -66,8 +66,9 @@ jobs:
         with:
           version: 11.24.0
           runtime: node@24
-          working-directory: frontend/web-app
           cache: true
+          cache-dependency-path: frontend/web-app/pnpm-lock.yaml
+          package-json-file: frontend/web-app/package.json
           install: false
 
       - name: Install frontend dependencies
