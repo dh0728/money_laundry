@@ -6,7 +6,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 COMPOSE_FILE="${DEPLOY_DIR}/compose.dev.yaml"
-ENV_FILE="${DEPLOY_DIR}/.env.dev"
+LOCAL_ENV_FILE="${DEPLOY_DIR}/.env.dev"
+SHARED_ENV_FILE="/opt/aml/shared/.env.dev"
+
+if [[ -f "${SHARED_ENV_FILE}" ]]; then
+  ENV_FILE="${SHARED_ENV_FILE}"
+else
+  ENV_FILE="${LOCAL_ENV_FILE}"
+fi
 
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 PARAMETER_PREFIX="/aml/dev"

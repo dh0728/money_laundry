@@ -7,7 +7,14 @@ DEPLOY_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 COMPOSE_FILE="${DEPLOY_DIR}/compose.prod.yaml"
 INFRA_COMPOSE_FILE="${DEPLOY_DIR}/compose.prod.infra.yaml"
-ENV_FILE="${DEPLOY_DIR}/.env.prod"
+LOCAL_ENV_FILE="${DEPLOY_DIR}/.env.prod"
+SHARED_ENV_FILE="/opt/aml/shared/.env.prod"
+
+if [[ -f "${SHARED_ENV_FILE}" ]]; then
+  ENV_FILE="${SHARED_ENV_FILE}"
+else
+  ENV_FILE="${LOCAL_ENV_FILE}"
+fi
 
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 PARAMETER_PREFIX="/aml/prod"
