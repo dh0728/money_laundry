@@ -64,6 +64,7 @@ jobs:
       - name: Set up pnpm and Node.js 24
         uses: pnpm/setup@v2
         with:
+          version: 11.24.0
           runtime: node@24
           working-directory: frontend/web-app
           cache: true
