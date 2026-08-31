@@ -1,0 +1,134 @@
+<title>HI-Large 실험 보드 · run_111</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg:#F6F7F9; --surface:#FFFFFF; --ink:#1B2434; --muted:#5C6678; --line:#E3E7EE;
+  --accent:#2D62B0; --heat:#2D62B0; --ink-on-heat:#F5F8FE; --hl:#EEF3FB;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#0E131B; --surface:#161D28; --ink:#E4E9F2; --muted:#8C96A8; --line:#27303E;
+    --accent:#7AA7E8; --heat:#4E7FCB; --ink-on-heat:#0E131B; --hl:#1B2634;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0E131B; --surface:#161D28; --ink:#E4E9F2; --muted:#8C96A8; --line:#27303E;
+  --accent:#7AA7E8; --heat:#4E7FCB; --ink-on-heat:#0E131B; --hl:#1B2634;
+}
+* { box-sizing:border-box; }
+body { background:var(--bg); color:var(--ink); margin:0;
+  font-family:"IBM Plex Sans KR", "Malgun Gothic", sans-serif; line-height:1.55; }
+main { max-width:1080px; margin:0 auto; padding:40px 24px 72px; display:flex;
+  flex-direction:column; gap:36px; }
+header p { color:var(--muted); margin:6px 0 0; font-size:14px; }
+h1 { font-size:26px; margin:0; letter-spacing:-0.01em; text-wrap:balance; }
+h1 .run { color:var(--accent); }
+h2 { font-size:16px; margin:0 0 4px; }
+h2 + p { margin:0 0 12px; color:var(--muted); font-size:13px; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+.tile { background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  padding:14px 16px; }
+.tile .l { font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
+  color:var(--muted); }
+.tile .v { font-family:"IBM Plex Mono",monospace; font-size:24px; font-weight:600;
+  margin-top:2px; }
+.tile .d { font-size:12px; color:var(--accent); font-family:"IBM Plex Mono",monospace; }
+.scroll { overflow-x:auto; background:var(--surface); border:1px solid var(--line);
+  border-radius:8px; }
+table { border-collapse:collapse; width:100%; font-size:13px;
+  font-variant-numeric:tabular-nums; }
+th, td { padding:7px 10px; text-align:right; white-space:nowrap; }
+th { color:var(--muted); font-weight:500; font-size:11.5px; border-bottom:1px solid var(--line);
+  position:sticky; top:0; background:var(--surface); }
+td { border-bottom:1px solid var(--line); font-family:"IBM Plex Mono",monospace; font-size:12.5px; }
+tr:last-child td { border-bottom:none; }
+td.rid { font-weight:600; color:var(--accent); }
+td.var, td.jd { text-align:left; font-family:"IBM Plex Sans KR",sans-serif; font-size:12.5px; }
+td.jd { color:var(--muted); }
+tr.hl td { background:var(--hl); }
+.heat td { text-align:center; }
+.drow { display:flex; align-items:center; gap:12px; padding:3px 0; }
+.dlab { width:110px; font-size:12.5px; text-align:right; color:var(--muted); }
+.dtrack { flex:1; height:14px; }
+.dbar { display:block; height:100%; background:var(--accent); border-radius:0 3px 3px 0; }
+.dval { width:64px; font-family:"IBM Plex Mono",monospace; font-size:12.5px; }
+.card { background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  padding:16px 20px; }
+.note { font-size:12px; color:var(--muted); }
+</style>
+<main>
+<header>
+  <h1>HI-Large 단일 모델 트랙 · 실험 보드 <span class="run">run_111</span></h1>
+  <p>분할 train 08-01~09-23 · val 09-24~10-14 · test 미개봉 │ 전처리 RUS 100:1(시드 42)
+  │ LightGBM 10클래스 (λ=100, H≥1.0) │ 지표는 val 전량 39.17M행 기준</p>
+</header>
+
+<section class="tiles">
+  <div class="tile"><div class="l">PR-AUC</div><div class="v">0.6865</div><div class="d">기준선 run_101 대비 +0.0067</div></div>
+  <div class="tile"><div class="l">P@R0.7 (주지표)</div><div class="v">34.03%</div><div class="d">+0.15pp</div></div>
+  <div class="tile"><div class="l">P@패턴R0.9</div><div class="v">96.45%</div><div class="d">패턴 큐 오염 &lt;4%</div></div>
+  <div class="tile"><div class="l">P@포함패턴R0.9</div><div class="v">95.21%</div><div class="d">일반화 정본 닻</div></div>
+</section>
+
+<section>
+  <h2>실험 요약 (run_101~111)</h2>
+  <p>단일 변인 사다리 — 강조 행이 현 기준선. 걸침/포함 = 패턴 탐지율@R0.7 층화.</p>
+  <div class="scroll"><table>
+  <thead><tr><th>run</th><th style="text-align:left">단일 변인</th><th>PR-AUC</th><th>max-F1%</th>
+  <th>P@R0.5%</th><th>P@R0.7%</th><th>P@R0.9%</th><th>P@패턴R0.9%</th><th>P@포함R0.9%</th>
+  <th>걸침/포함%</th><th>iter</th><th>train</th><th style="text-align:left">판정</th></tr></thead>
+  <tbody><tr><td class="rid">101</td><td class="var">데이터셋 HI-Small -> HI-Large (+ Large 공통 전처리 도입)</td><td>0.6798</td><td>71.77</td><td>97.09</td><td><b>33.88</b></td><td>3.53</td><td>95.17</td><td>93.58</td><td>99.2 / 98.3</td><td>489</td><td>9.82M</td><td class="jd">keep · v1 기준선</td></tr>
+<tr><td class="rid">102</td><td class="var">RUS 시드 42 -> 43 (분산 자)</td><td>0.6798</td><td>71.89</td><td>97.11</td><td><b>33.50</b></td><td>3.49</td><td>95.44</td><td>93.88</td><td>99.1 / 98.2</td><td>480</td><td>9.81M</td><td class="jd">keep · 노이즈 자(시드 43)</td></tr>
+<tr><td class="rid">103</td><td class="var">전처리: CSSMC k15 비례 (cssmc100_k15_prop_seed42)</td><td>0.6795</td><td>71.70</td><td>97.20</td><td><b>33.67</b></td><td>3.49</td><td>95.25</td><td>93.41</td><td>99.2 / 98.2</td><td>365</td><td>9.82M</td><td class="jd">RUS와 알고리즘적 동치</td></tr>
+<tr><td class="rid">104</td><td class="var">전처리: CSSMC k15 균등 할당 (cssmc100_k15_equal_seed42)</td><td>0.6660</td><td>70.08</td><td>95.85</td><td><b>31.59</b></td><td>3.72</td><td>92.09</td><td>92.01</td><td>98.6 / 97.6</td><td>499</td><td>9.40M</td><td class="jd">discard · 모집단 왜곡</td></tr>
+<tr><td class="rid">105</td><td class="var">전처리: K-proto 근사 비례 (kproto100_k15_prop_seed42)</td><td>0.6795</td><td>71.70</td><td>97.20</td><td><b>33.67</b></td><td>3.49</td><td>95.25</td><td>93.41</td><td>99.2 / 98.2</td><td>365</td><td>9.82M</td><td class="jd">표본 103과 동일</td></tr>
+<tr><td class="rid">106</td><td class="var">전처리: RUS 10:1 (rus10_seed42)</td><td>0.6540</td><td>68.81</td><td>93.32</td><td><b>32.63</b></td><td>3.47</td><td>88.54</td><td>90.52</td><td>98.2 / 97.3</td><td>107</td><td>1.07M</td><td class="jd">discard · 균형화 악화</td></tr>
+<tr><td class="rid">107</td><td class="var">전처리: normal_rus200_seed42 (200:1)</td><td>0.6739</td><td>70.85</td><td>93.35</td><td><b>34.17</b></td><td>3.43</td><td>91.22</td><td>94.37</td><td>99.2 / 98.6</td><td>339</td><td>19.53M</td><td class="jd">discard · 무이득, 비용 2배</td></tr>
+<tr><td class="rid">108</td><td class="var">lambda_l2 100 -> 10</td><td>0.6449</td><td>69.45</td><td>93.06</td><td><b>31.27</b></td><td>3.02</td><td>89.34</td><td>92.14</td><td>98.6 / 98.0</td><td>469</td><td>9.82M</td><td class="jd">discard · λ=100 유지</td></tr>
+<tr class="hl"><td class="rid">111</td><td class="var">피처 v1 -> v2 (84개)</td><td>0.6865</td><td>72.17</td><td>98.11</td><td><b>34.03</b></td><td>3.54</td><td>96.45</td><td>95.21</td><td>99.3 / 98.2</td><td>411</td><td>9.82M</td><td class="jd">keep · 현 기준선 (v2)</td></tr></tbody></table></div>
+</section>
+
+<section>
+  <h2>클래스별 OVR PR-AUC</h2>
+  <p>p_k 로 해당 클래스만 골라내는 순위 능력 — 진한 셀일수록 강한 신호. 시드 노이즈 ±0.006.</p>
+  <div class="scroll"><table class="heat">
+  <thead><tr><th>run</th><th>FAN-OUT</th><th>FAN-IN</th><th>G-SCATTER</th><th>S-GATHER</th><th>CYCLE</th><th>RANDOM</th><th>BIPARTITE</th><th>STACK</th><th>NONPAT</th></tr></thead>
+  <tbody><tr><td class="rid">101</td><td style="background:color-mix(in oklab, var(--heat) 41%, var(--surface));color:var(--ink)">0.326</td><td style="background:color-mix(in oklab, var(--heat) 38%, var(--surface));color:var(--ink)">0.304</td><td style="background:color-mix(in oklab, var(--heat) 64%, var(--surface));color:var(--ink-on-heat)">0.505</td><td style="background:color-mix(in oklab, var(--heat) 54%, var(--surface));color:var(--ink)">0.425</td><td style="background:color-mix(in oklab, var(--heat) 26%, var(--surface));color:var(--ink)">0.208</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.155</td><td style="background:color-mix(in oklab, var(--heat) 18%, var(--surface));color:var(--ink)">0.143</td><td style="background:color-mix(in oklab, var(--heat) 40%, var(--surface));color:var(--ink)">0.314</td><td style="background:color-mix(in oklab, var(--heat) 14%, var(--surface));color:var(--ink)">0.111</td></tr>
+<tr><td class="rid">102</td><td style="background:color-mix(in oklab, var(--heat) 42%, var(--surface));color:var(--ink)">0.332</td><td style="background:color-mix(in oklab, var(--heat) 39%, var(--surface));color:var(--ink)">0.310</td><td style="background:color-mix(in oklab, var(--heat) 64%, var(--surface));color:var(--ink-on-heat)">0.510</td><td style="background:color-mix(in oklab, var(--heat) 54%, var(--surface));color:var(--ink)">0.428</td><td style="background:color-mix(in oklab, var(--heat) 26%, var(--surface));color:var(--ink)">0.206</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.159</td><td style="background:color-mix(in oklab, var(--heat) 19%, var(--surface));color:var(--ink)">0.149</td><td style="background:color-mix(in oklab, var(--heat) 40%, var(--surface));color:var(--ink)">0.313</td><td style="background:color-mix(in oklab, var(--heat) 14%, var(--surface));color:var(--ink)">0.112</td></tr>
+<tr><td class="rid">103</td><td style="background:color-mix(in oklab, var(--heat) 40%, var(--surface));color:var(--ink)">0.319</td><td style="background:color-mix(in oklab, var(--heat) 39%, var(--surface));color:var(--ink)">0.308</td><td style="background:color-mix(in oklab, var(--heat) 63%, var(--surface));color:var(--ink-on-heat)">0.503</td><td style="background:color-mix(in oklab, var(--heat) 53%, var(--surface));color:var(--ink)">0.422</td><td style="background:color-mix(in oklab, var(--heat) 26%, var(--surface));color:var(--ink)">0.208</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.157</td><td style="background:color-mix(in oklab, var(--heat) 19%, var(--surface));color:var(--ink)">0.148</td><td style="background:color-mix(in oklab, var(--heat) 40%, var(--surface));color:var(--ink)">0.316</td><td style="background:color-mix(in oklab, var(--heat) 14%, var(--surface));color:var(--ink)">0.109</td></tr>
+<tr><td class="rid">104</td><td style="background:color-mix(in oklab, var(--heat) 41%, var(--surface));color:var(--ink)">0.323</td><td style="background:color-mix(in oklab, var(--heat) 36%, var(--surface));color:var(--ink)">0.283</td><td style="background:color-mix(in oklab, var(--heat) 63%, var(--surface));color:var(--ink-on-heat)">0.496</td><td style="background:color-mix(in oklab, var(--heat) 52%, var(--surface));color:var(--ink)">0.413</td><td style="background:color-mix(in oklab, var(--heat) 26%, var(--surface));color:var(--ink)">0.202</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.156</td><td style="background:color-mix(in oklab, var(--heat) 18%, var(--surface));color:var(--ink)">0.142</td><td style="background:color-mix(in oklab, var(--heat) 38%, var(--surface));color:var(--ink)">0.303</td><td style="background:color-mix(in oklab, var(--heat) 13%, var(--surface));color:var(--ink)">0.100</td></tr>
+<tr><td class="rid">105</td><td style="background:color-mix(in oklab, var(--heat) 40%, var(--surface));color:var(--ink)">0.319</td><td style="background:color-mix(in oklab, var(--heat) 39%, var(--surface));color:var(--ink)">0.308</td><td style="background:color-mix(in oklab, var(--heat) 63%, var(--surface));color:var(--ink-on-heat)">0.503</td><td style="background:color-mix(in oklab, var(--heat) 53%, var(--surface));color:var(--ink)">0.422</td><td style="background:color-mix(in oklab, var(--heat) 26%, var(--surface));color:var(--ink)">0.208</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.157</td><td style="background:color-mix(in oklab, var(--heat) 19%, var(--surface));color:var(--ink)">0.148</td><td style="background:color-mix(in oklab, var(--heat) 40%, var(--surface));color:var(--ink)">0.316</td><td style="background:color-mix(in oklab, var(--heat) 14%, var(--surface));color:var(--ink)">0.109</td></tr>
+<tr><td class="rid">106</td><td style="background:color-mix(in oklab, var(--heat) 36%, var(--surface));color:var(--ink)">0.288</td><td style="background:color-mix(in oklab, var(--heat) 34%, var(--surface));color:var(--ink)">0.273</td><td style="background:color-mix(in oklab, var(--heat) 59%, var(--surface));color:var(--ink-on-heat)">0.465</td><td style="background:color-mix(in oklab, var(--heat) 49%, var(--surface));color:var(--ink)">0.388</td><td style="background:color-mix(in oklab, var(--heat) 24%, var(--surface));color:var(--ink)">0.188</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.157</td><td style="background:color-mix(in oklab, var(--heat) 13%, var(--surface));color:var(--ink)">0.102</td><td style="background:color-mix(in oklab, var(--heat) 34%, var(--surface));color:var(--ink)">0.267</td><td style="background:color-mix(in oklab, var(--heat) 9%, var(--surface));color:var(--ink)">0.072</td></tr>
+<tr><td class="rid">107</td><td style="background:color-mix(in oklab, var(--heat) 43%, var(--surface));color:var(--ink)">0.338</td><td style="background:color-mix(in oklab, var(--heat) 40%, var(--surface));color:var(--ink)">0.318</td><td style="background:color-mix(in oklab, var(--heat) 64%, var(--surface));color:var(--ink-on-heat)">0.508</td><td style="background:color-mix(in oklab, var(--heat) 55%, var(--surface));color:var(--ink)">0.432</td><td style="background:color-mix(in oklab, var(--heat) 27%, var(--surface));color:var(--ink)">0.211</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.162</td><td style="background:color-mix(in oklab, var(--heat) 20%, var(--surface));color:var(--ink)">0.159</td><td style="background:color-mix(in oklab, var(--heat) 41%, var(--surface));color:var(--ink)">0.325</td><td style="background:color-mix(in oklab, var(--heat) 12%, var(--surface));color:var(--ink)">0.096</td></tr>
+<tr><td class="rid">108</td><td style="background:color-mix(in oklab, var(--heat) 33%, var(--surface));color:var(--ink)">0.260</td><td style="background:color-mix(in oklab, var(--heat) 34%, var(--surface));color:var(--ink)">0.271</td><td style="background:color-mix(in oklab, var(--heat) 58%, var(--surface));color:var(--ink-on-heat)">0.460</td><td style="background:color-mix(in oklab, var(--heat) 45%, var(--surface));color:var(--ink)">0.354</td><td style="background:color-mix(in oklab, var(--heat) 21%, var(--surface));color:var(--ink)">0.168</td><td style="background:color-mix(in oklab, var(--heat) 17%, var(--surface));color:var(--ink)">0.135</td><td style="background:color-mix(in oklab, var(--heat) 15%, var(--surface));color:var(--ink)">0.119</td><td style="background:color-mix(in oklab, var(--heat) 31%, var(--surface));color:var(--ink)">0.246</td><td style="background:color-mix(in oklab, var(--heat) 9%, var(--surface));color:var(--ink)">0.071</td></tr>
+<tr><td class="rid">111</td><td style="background:color-mix(in oklab, var(--heat) 55%, var(--surface));color:var(--ink)">0.435</td><td style="background:color-mix(in oklab, var(--heat) 49%, var(--surface));color:var(--ink)">0.385</td><td style="background:color-mix(in oklab, var(--heat) 74%, var(--surface));color:var(--ink-on-heat)">0.588</td><td style="background:color-mix(in oklab, var(--heat) 71%, var(--surface));color:var(--ink-on-heat)">0.562</td><td style="background:color-mix(in oklab, var(--heat) 33%, var(--surface));color:var(--ink)">0.265</td><td style="background:color-mix(in oklab, var(--heat) 25%, var(--surface));color:var(--ink)">0.196</td><td style="background:color-mix(in oklab, var(--heat) 22%, var(--surface));color:var(--ink)">0.176</td><td style="background:color-mix(in oklab, var(--heat) 49%, var(--surface));color:var(--ink)">0.387</td><td style="background:color-mix(in oklab, var(--heat) 14%, var(--surface));color:var(--ink)">0.112</td></tr></tbody></table></div>
+</section>
+
+<section class="card">
+  <h2>features v1 → v2 클래스 개선 (run_101 → run_111)</h2>
+  <p>OVR PR-AUC 변화 — 장주기(감쇠)·중계 축이 설계 의도대로 장span 클래스를 끌어올림.</p>
+  <div class="drow"><span class="dlab">S-GATHER</span><span class="dtrack"><span class="dbar" style="width:100%"></span></span><span class="dval">+0.138</span></div>
+<div class="drow"><span class="dlab">FAN-OUT</span><span class="dtrack"><span class="dbar" style="width:79%"></span></span><span class="dval">+0.109</span></div>
+<div class="drow"><span class="dlab">G-SCATTER</span><span class="dtrack"><span class="dbar" style="width:60%"></span></span><span class="dval">+0.083</span></div>
+<div class="drow"><span class="dlab">FAN-IN</span><span class="dtrack"><span class="dbar" style="width:59%"></span></span><span class="dval">+0.081</span></div>
+<div class="drow"><span class="dlab">STACK</span><span class="dtrack"><span class="dbar" style="width:53%"></span></span><span class="dval">+0.073</span></div>
+<div class="drow"><span class="dlab">CYCLE</span><span class="dtrack"><span class="dbar" style="width:41%"></span></span><span class="dval">+0.057</span></div>
+<div class="drow"><span class="dlab">RANDOM</span><span class="dtrack"><span class="dbar" style="width:29%"></span></span><span class="dval">+0.041</span></div>
+<div class="drow"><span class="dlab">BIPARTITE</span><span class="dtrack"><span class="dbar" style="width:24%"></span></span><span class="dval">+0.033</span></div>
+<div class="drow"><span class="dlab">NONPAT</span><span class="dtrack"><span class="dbar" style="width:2%"></span></span><span class="dval">+0.001</span></div>
+</section>
+
+<section>
+  <h2>OvR 프로브 (전용 이진 vs 파생 p_k)</h2>
+  <div class="scroll"><table>
+  <thead><tr><th>run</th><th>클래스</th><th>이진 PR-AUC</th><th>파생 p_k (run_101)</th>
+  <th style="text-align:left">판정</th></tr></thead>
+  <tbody><tr><td class="rid">109</td><td>FAN-IN</td><td>0.3104</td><td>0.304</td><td class="jd">동률 — OvR 기각</td></tr>
+<tr><td class="rid">110</td><td>BIPARTITE</td><td>0.1449</td><td>0.143</td><td class="jd">동률 — OvR 기각</td></tr></tbody></table></div>
+  <p class="note">두 클래스 모두 시드 노이즈 이내 동률 — 단일 10클래스 유지 (run_109~110).</p>
+</section>
+
+<p class="note">생성: scripts/make_board_large.py · 원자료 data_work/runs/run_1*.json ·
+판정 근거는 각 run md (jiwon/runs/) 참조</p>
+</main>

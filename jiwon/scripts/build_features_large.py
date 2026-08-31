@@ -1,8 +1,12 @@
-"""HI-Large 그래프 피처 v1 빌더 — build_features.py(HI-Small)의 청크 스트리밍 이식.
+"""HI-Large 그래프 피처 v2 빌더 — v1 52개(의미·순서 동일) + 클래스 타깃 23개 = 75개.
 
 사용법: python build_features_large.py <WS루트> [--dryrun]
 
-피처 의미·순서는 HI-Small 빌더와 동일(52개, features_v1.md). 구현만 교체:
+v1 52개는 HI-Small 빌더와 동일 의미·순서(features_v1.md). 신규 23개는
+features_v2.md 명세: 감쇠 카운터(HL 7d/30d)·신규 상대 유입·일회성 간선 비율·
+중계/되돌림·cycle3_30d — 전부 계좌당 O(1) 상태(큐·dict 추가 없음).
+(features_v1.parquet 는 확장 전 버전으로 빌드됨 — v1 52개 정의는 불변이므로
+v2 산출물의 앞 52열이 곧 v1 이다.) 구현 교체 사항:
 - 입력: prepare_hi_large.py 의 trans_sorted.parquet (시간 정렬, 같은 분 내 원본
   파일 순서 = HI-Small 의 stable sort 규약과 동일)
 - 계좌별 파이썬 객체(HI-Small: 계좌당 ~3KB → 213만 계좌 불가) 대신:
@@ -13,7 +17,7 @@
 """
 import sys
 import time
-from math import log, log1p
+from math import exp, log, log1p
 from pathlib import Path
 
 import numpy as np
@@ -24,8 +28,11 @@ import pyarrow.parquet as pq
 WS = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[3]
 DIR = WS / "data_work" / ("HI-Large_dryrun" if "--dryrun" in sys.argv else "HI-Large")
 IN_PATH = DIR / "trans_sorted.parquet"
-OUT_PATH = DIR / "features_v1.parquet"
+OUT_PATH = DIR / "features_v2.parquet"
 W24, W72 = 24 * 60, 72 * 60
+W30D = 30 * 1440
+LAM7 = log(2) / (7 * 1440)    # 감쇠율 (반감기 7일, 분 단위)
+LAM30 = log(2) / (30 * 1440)
 CAP = 50  # recent_sent 캡 (명세 한계)
 BATCH = 2_000_000
 
@@ -58,6 +65,18 @@ edge_cnt = {}  # u*NA+v -> count
 rs_t = np.zeros((NA, CAP), np.int32)
 rs_cp = np.full((NA, CAP), -1, np.int32)
 rs_start = np.zeros(NA, np.int16); rs_len = np.zeros(NA, np.int16)
+# ---- v2 상태 (features_v2.md — 전부 O(1)/계좌) ----
+d7s_c = np.zeros(NA, np.float64); d7s_u = np.zeros(NA, np.float64); d7s_t = np.zeros(NA, np.int64)
+d7r_c = np.zeros(NA, np.float64); d7r_u = np.zeros(NA, np.float64); d7r_t = np.zeros(NA, np.int64)
+d30i_c = np.zeros(NA, np.float64); d30i_t = np.zeros(NA, np.int64)
+d30o_c = np.zeros(NA, np.float64); d30o_t = np.zeros(NA, np.int64)
+in_once = np.zeros(NA, np.int32); out_once = np.zeros(NA, np.int32)
+last_recv_t = np.full(NA, -1, np.int64); last_recv_usd = np.zeros(NA, np.float64)
+last_sent_t = np.full(NA, -1, np.int64); last_sent_usd = np.zeros(NA, np.float64)
+
+def dk(val, lt, t, lam):
+    """감쇠값 읽기 (상태 불변). 값 0이면 exp 생략."""
+    return val * exp(-lam * (t - lt)) if val else 0.0
 
 COLS = []
 for r in ("u", "v"):
@@ -69,6 +88,14 @@ for r in ("u", "v"):
 COLS += ["edge_cnt", "edge_rev_cnt", "edge_rev_cnt_72h", "cycle3_flag_72h",
          "pass_speed_24h", "amt_vs_hist"]
 assert len(COLS) == 52
+# v2 신규 23: 역할별 9×2 + 거래 단위 5 (features_v2.md 순서)
+for r in ("u", "v"):
+    COLS += [f"{r}_{c}" for c in ("dk7_sent_cnt", "dk7_recv_cnt", "dk7_sent_usd_log",
+                                  "dk7_recv_usd_log", "dk7_flow_ratio", "dk30_new_in",
+                                  "dk30_new_out", "once_in_ratio", "once_out_ratio")]
+COLS += ["relay_amt_logratio", "relay_gap_min", "backfill_amt_logratio",
+         "backfill_gap_min", "cycle3_flag_30d"]
+assert len(COLS) == 75
 
 def role_feats(a, t, buf, off):
     buf[off] = sc[a]; buf[off+1] = rc[a]
@@ -86,6 +113,18 @@ def role_feats(a, t, buf, off):
         buf[o+6] = (int(wsc[h][a]) + int(wrc[h][a])) / tot1
         o += 7
 
+def role_feats_v2(a, t, buf, off):
+    su_d = dk(d7s_u[a], d7s_t[a], t, LAM7)
+    ru_d = dk(d7r_u[a], d7r_t[a], t, LAM7)
+    buf[off] = dk(d7s_c[a], d7s_t[a], t, LAM7)
+    buf[off+1] = dk(d7r_c[a], d7r_t[a], t, LAM7)
+    buf[off+2] = log1p(su_d); buf[off+3] = log1p(ru_d)
+    buf[off+4] = log((su_d + 1) / (ru_d + 1))
+    buf[off+5] = dk(d30i_c[a], d30i_t[a], t, LAM30)
+    buf[off+6] = dk(d30o_c[a], d30o_t[a], t, LAM30)
+    buf[off+7] = in_once[a] / (in_deg[a] + 1)
+    buf[off+8] = out_once[a] / (out_deg[a] + 1)
+
 pf = pq.ParquetFile(IN_PATH)
 n_total = pf.metadata.num_rows
 schema = pa.schema([("orig_row", pa.int64()), ("tmin", pa.int32()),
@@ -93,7 +132,7 @@ schema = pa.schema([("orig_row", pa.int64()), ("tmin", pa.int32()),
                    + [(c, pa.float32()) for c in COLS])
 writer = pq.ParquetWriter(OUT_PATH, schema)
 proc = psutil.Process()
-row = np.zeros(52)
+row = np.zeros(75)
 done = 0
 t0 = time.time()
 
@@ -106,7 +145,7 @@ for batch in pf.iter_batches(batch_size=BATCH,
     v_l = batch.column("v_id").to_numpy().tolist()
     up_l = batch.column("usd_paid").to_numpy().tolist()
     ur_l = batch.column("usd_recv").to_numpy().tolist()
-    F = np.zeros((n, 52), np.float32)
+    F = np.zeros((n, 75), np.float32)
     for i in range(n):
         u = u_l[i]; v = v_l[i]; t = t_l[i]; up = up_l[i]; ur = ur_l[i]
         # ---- 전역 만료 (원본 Win.expire 와 동일 조건: t0 <= t - horizon) ----
@@ -146,23 +185,41 @@ for batch in pf.iter_batches(batch_size=BATCH,
         ek = u * NA + v
         row[46] = edge_cnt.get(ek, 0)
         row[47] = edge_cnt.get(v * NA + u, 0)
-        rev72 = 0; cyc = 0.0
-        tlim = t - W72
+        rev72 = 0; cyc = 0.0; cyc30 = 0.0
+        tlim72 = t - W72
+        tlim30 = t - W30D
         m = rs_len[v]
         st = rs_start[v]
-        for j in range(m - 1, -1, -1):  # 최신 → 과거, 만료 시 중단
+        for j in range(m - 1, -1, -1):  # 최신 → 과거, 30d 만료 시 중단
             p = (st + j) % CAP
             t1 = rs_t[v, p]
-            if t1 <= tlim:
+            if t1 <= tlim30:
                 break
             cp = int(rs_cp[v, p])  # numpy int32 * NA 오버플로 방지
             if cp == u:
-                rev72 += 1
+                if t1 > tlim72:
+                    rev72 += 1
             elif cp != v and edge_cnt.get(cp * NA + u, 0):
-                cyc = 1.0
+                cyc30 = 1.0
+                if t1 > tlim72:
+                    cyc = 1.0
         row[48] = rev72; row[49] = cyc
         row[50] = up / (wru[0][u] + 1)
         row[51] = up / ((su[u] / sc[u] + 1) if sc[u] else 1)
+        # ---- v2 (features_v2.md) ----
+        role_feats_v2(u, t, row, 52)
+        role_feats_v2(v, t, row, 61)
+        lr = last_recv_t[u]
+        if lr < 0:
+            row[70] = 0.0; row[71] = -1.0
+        else:
+            row[70] = log((up + 1) / (last_recv_usd[u] + 1)); row[71] = t - lr
+        ls = last_sent_t[v]
+        if ls < 0:
+            row[72] = 0.0; row[73] = -1.0
+        else:
+            row[72] = log((ur + 1) / (last_sent_usd[v] + 1)); row[73] = t - ls
+        row[74] = cyc30
         F[i] = row
         # ---- 상태 갱신 ----
         if first[u] < 0: first[u] = t
@@ -171,9 +228,24 @@ for batch in pf.iter_batches(batch_size=BATCH,
         if first[v] < 0: first[v] = t
         last[v] = t
         rc[v] += 1; ru[v] += ur
+        # v2: 감쇠 7d (u 송신 / v 수신 — last_t 는 쌍 공유)
+        e = exp(-LAM7 * (t - d7s_t[u]))
+        d7s_c[u] = d7s_c[u] * e + 1; d7s_u[u] = d7s_u[u] * e + up; d7s_t[u] = t
+        e = exp(-LAM7 * (t - d7r_t[v]))
+        d7r_c[v] = d7r_c[v] * e + 1; d7r_u[v] = d7r_u[v] * e + ur; d7r_t[v] = t
+        # v2: 중계/되돌림 최근값
+        last_sent_t[u] = t; last_sent_usd[u] = up
+        last_recv_t[v] = t; last_recv_usd[v] = ur
         c = edge_cnt.get(ek, 0)
         if c == 0:
             out_deg[u] += 1; in_deg[v] += 1
+            out_once[u] += 1; in_once[v] += 1
+            e = exp(-LAM30 * (t - d30o_t[u]))
+            d30o_c[u] = d30o_c[u] * e + 1; d30o_t[u] = t
+            e = exp(-LAM30 * (t - d30i_t[v]))
+            d30i_c[v] = d30i_c[v] * e + 1; d30i_t[v] = t
+        elif c == 1:
+            out_once[u] -= 1; in_once[v] -= 1
         edge_cnt[ek] = c + 1
         rk = v * NA + u
         for h in (0, 1):
@@ -214,7 +286,7 @@ for batch in pf.iter_batches(batch_size=BATCH,
             rs_start[u] = (rs_start[u] + 1) % CAP
     arrs = [batch.column("orig_row"), batch.column("tmin"),
             batch.column("label"), batch.column("attempt_id")]
-    arrs += [pa.array(F[:, j]) for j in range(52)]
+    arrs += [pa.array(F[:, j]) for j in range(75)]
     writer.write_table(pa.Table.from_arrays(arrs, schema=schema))
     done += n
     el = time.time() - t0
