@@ -1,0 +1,185 @@
+<title>이상거래 탐지 문헌 계보</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root { --bg:#F6F7F9; --surface:#FFFFFF; --ink:#1B2434; --muted:#5C6678; --line:#E3E7EE;
+  --accent:#2D62B0; --hl:#EEF3FB; --warm:#A8582B; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg:#0E131B; --surface:#161D28; --ink:#E4E9F2;
+    --muted:#8C96A8; --line:#27303E; --accent:#7AA7E8; --hl:#1B2634; --warm:#E0956B; } }
+:root[data-theme="dark"] { --bg:#0E131B; --surface:#161D28; --ink:#E4E9F2;
+  --muted:#8C96A8; --line:#27303E; --accent:#7AA7E8; --hl:#1B2634; --warm:#E0956B; }
+* { box-sizing:border-box; }
+body { background:var(--bg); color:var(--ink); margin:0;
+  font-family:"IBM Plex Sans KR","Malgun Gothic",sans-serif; line-height:1.6; }
+main { max-width:940px; margin:0 auto; padding:44px 24px 80px; }
+.eyebrow { font-size:12px; letter-spacing:0.08em; color:var(--accent); font-weight:500;
+  text-transform:uppercase; }
+h1 { font-size:26px; margin:6px 0 4px; }
+.date { color:var(--muted); font-size:13px; margin-bottom:22px; }
+h2 { font-size:16.5px; margin:36px 0 8px; padding-top:18px; border-top:1px solid var(--line); }
+p { margin:7px 0; max-width:80ch; }
+.scroll { overflow-x:auto; background:var(--surface); border:1px solid var(--line);
+  border-radius:8px; margin:10px 0; }
+table { border-collapse:collapse; width:100%; font-size:12.5px; font-variant-numeric:tabular-nums; }
+th, td { padding:7px 10px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+th { color:var(--muted); font-weight:500; font-size:11.5px; white-space:nowrap; }
+tr:last-child td { border-bottom:none; }
+td.num { text-align:right; font-family:"IBM Plex Mono",monospace; white-space:nowrap; }
+.note { font-size:12px; color:var(--muted); }
+code { font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:var(--hl);
+  padding:1px 5px; border-radius:4px; }
+ul { margin:6px 0; padding-left:20px; max-width:84ch; }
+li { margin:4px 0; }
+figure { margin:12px 0 0; }
+figure svg { max-width:100%; height:auto; display:block; background:var(--surface);
+  border:1px solid var(--line); border-radius:8px; }
+figcaption { font-size:12px; color:var(--muted); margin-top:8px; max-width:96ch; }
+.nb { fill:var(--surface); stroke:var(--ink); stroke-width:1.3; }
+.nt { font-size:13px; font-weight:700; fill:var(--ink); }
+.ns { font-size:10.5px; fill:var(--muted); }
+.tier { font-size:12px; font-weight:700; fill:var(--muted); letter-spacing:0.05em; }
+.ed { stroke:var(--ink); stroke-width:1.3; fill:none; }
+.eb { stroke:var(--warm); stroke-width:1.6; fill:none; }
+.el { font-size:10.5px; fill:var(--muted); }
+</style>
+<main>
+<div class="eyebrow">리서치 근거 조사 · 인용 데이터 검증</div>
+<h1>이상거래 탐지 문헌 계보</h1>
+<div class="date">2026-08-31 · 방법: 팀 보유 문헌(<code>docs/01_research/</code>) 12편을 Semantic Scholar
+API로 해석하고 <b>실제 참고문헌 목록에서 인용 간선을 전수 확인</b> — 아래 화살표는 전부 검증된
+직접 인용(추정 없음)</div>
+
+<h2>1. 핵심 답 — "최신에서 타고 올라가면 근본과 연결되는가?"</h2>
+<ul>
+<li><b>직접 연결은 안 된다.</b> 최신 AML-GNN 계열(AMLworld 2023 · Multi-GNN 2023 · GFP 2024 ·
+Elliptic2 2024)의 참고문헌에는 근본 문헌(Bolton&amp;Hand 2002 · LOF 2000 · Chandola 2009 ·
+Akoglu 2014)이 <b>한 편도 없다</b> (참고문헌 17~73건 전수 확인).</li>
+<li><b>최신 계열의 실질적 뿌리는 Weber et al. 2019</b>(Elliptic 비트코인 GCN, 피인용 517) —
+4편 중 3편이 직접 인용하고, LaundroGraph(2022)를 경유하는 경로까지 합치면 전부 Weber 로
+수렴한다. 즉 AML-GNN 은 고전 이상탐지 전통이 아니라 <b>그래프 표현학습 전통에서 재출발</b>한
+계보다 (Weber 2019 자체도 근본 4편을 인용하지 않음).</li>
+<li><b>두 전통을 잇는 다리는 서베이 2편</b>: ① 그래프 이상탐지 딥러닝 서베이(2021, 피인용 862)가
+LOF·Chandola·Akoglu 를 직접 인용, ② <b>Network Analytics for AML 체계적 문헌고찰(2024)</b>이
+유일하게 <b>전 세대를 관통</b> — Bolton&amp;Hand(2002)부터 Multi-GNN(2023)까지 7편을 한 문서에서
+인용한다. 발표·문서에서 "고전→최신" 논증이 필요하면 이 두 편이 정직한 인용 경로다.</li>
+<li>팀 저장소의 문헌 큐레이션은 이 구조를 이미 정확히 반영하고 있다 — 근본(이상거래탐지 폴더),
+다리(최신동향 폴더의 서베이들), 최신(IBM 후속·서브그래프 폴더).</li>
+</ul>
+
+<h2>2. 검증된 인용 계보도</h2>
+<figure>
+<svg viewBox="0 0 940 560" role="img" aria-label="3세대 문헌 계보: 최신 AML-GNN 논문들은 Weber 2019로 수렴하고, 근본 이상탐지 문헌과는 서베이 두 편을 통해서만 연결된다">
+<text class="tier" x="20" y="40">근본 (2000~2014) — 통계적 이상탐지 전통</text>
+<rect class="nb" x="20" y="55" width="150" height="52" rx="7"/>
+<text class="nt" x="95" y="77" text-anchor="middle">LOF (2000)</text>
+<text class="ns" x="95" y="94" text-anchor="middle">밀도 기반 이상치 · 8,922</text>
+<rect class="nb" x="200" y="55" width="170" height="52" rx="7"/>
+<text class="nt" x="285" y="77" text-anchor="middle">Bolton&amp;Hand (2002)</text>
+<text class="ns" x="285" y="94" text-anchor="middle">통계적 사기 탐지 리뷰 · 1,596</text>
+<rect class="nb" x="400" y="55" width="170" height="52" rx="7"/>
+<text class="nt" x="485" y="77" text-anchor="middle">Chandola (2009)</text>
+<text class="ns" x="485" y="94" text-anchor="middle">이상탐지 서베이 · 12,819</text>
+<rect class="nb" x="600" y="55" width="170" height="52" rx="7"/>
+<text class="nt" x="685" y="77" text-anchor="middle">Akoglu (2014)</text>
+<text class="ns" x="685" y="94" text-anchor="middle">그래프 이상탐지 서베이 · 1,649</text>
+
+<text class="tier" x="20" y="205">다리 — 서베이 (두 전통을 잇는 유일한 연결)</text>
+<rect class="nb" x="130" y="220" width="200" height="52" rx="7"/>
+<text class="nt" x="230" y="242" text-anchor="middle">GAD 딥러닝 서베이 (2021)</text>
+<text class="ns" x="230" y="259" text-anchor="middle">피인용 862</text>
+<rect class="nb" x="560" y="220" width="230" height="52" rx="7"/>
+<text class="nt" x="675" y="242" text-anchor="middle">Network Analytics for AML (2024)</text>
+<text class="ns" x="675" y="259" text-anchor="middle">체계적 문헌고찰 — 전 세대 7편 인용</text>
+
+<text class="tier" x="20" y="345">그래프 표현학습 재출발점</text>
+<rect class="nb" x="330" y="358" width="220" height="52" rx="7"/>
+<text class="nt" x="440" y="380" text-anchor="middle">Weber et al. (2019)</text>
+<text class="ns" x="440" y="397" text-anchor="middle">Elliptic 비트코인 GCN · 517</text>
+<rect class="nb" x="630" y="358" width="180" height="52" rx="7"/>
+<text class="nt" x="720" y="380" text-anchor="middle">LaundroGraph (2022)</text>
+<text class="ns" x="720" y="397" text-anchor="middle">자기지도 AML 표현 · 52</text>
+
+<text class="tier" x="20" y="470">최신 (2023~24) — 우리 벤치마크·데이터 계열</text>
+<rect class="nb" x="20" y="485" width="180" height="52" rx="7"/>
+<text class="nt" x="110" y="507" text-anchor="middle">AMLworld (2023)</text>
+<text class="ns" x="110" y="524" text-anchor="middle">우리 데이터셋 · 145</text>
+<rect class="nb" x="230" y="485" width="180" height="52" rx="7"/>
+<text class="nt" x="320" y="507" text-anchor="middle">Multi-GNN (2023)</text>
+<text class="ns" x="320" y="524" text-anchor="middle">벤치마크 SOTA · 51</text>
+<rect class="nb" x="440" y="485" width="150" height="52" rx="7"/>
+<text class="nt" x="515" y="507" text-anchor="middle">GFP (2024)</text>
+<text class="ns" x="515" y="524" text-anchor="middle">그래프피처+GBT · 17</text>
+<rect class="nb" x="620" y="485" width="160" height="52" rx="7"/>
+<text class="nt" x="700" y="507" text-anchor="middle">Elliptic2 (2024)</text>
+<text class="ns" x="700" y="524" text-anchor="middle">서브그래프 세탁 · 19</text>
+
+<defs><marker id="la" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker></defs>
+<!-- 근본 내부: akoglu → 3편 -->
+<polyline class="ed" points="640,55 640,35 130,35 130,49" marker-end="url(#la)"/>
+<polyline class="ed" points="660,55 660,42 300,42 300,49" marker-end="url(#la)"/>
+<line class="ed" x1="620" y1="55" x2="520" y2="52" marker-end="url(#la)"/>
+<!-- gad_survey → lof, chandola, akoglu -->
+<polyline class="ed" points="180,220 130,220 110,112" marker-end="url(#la)"/>
+<line class="ed" x1="280" y1="220" x2="450" y2="112" marker-end="url(#la)"/>
+<line class="ed" x1="310" y1="220" x2="630" y2="115" marker-end="url(#la)"/>
+<!-- netaml → 전 세대 (강조) -->
+<line class="eb" x1="620" y1="220" x2="330" y2="112" marker-end="url(#la)"/>
+<line class="eb" x1="660" y1="220" x2="530" y2="112" marker-end="url(#la)"/>
+<line class="eb" x1="700" y1="220" x2="700" y2="112" marker-end="url(#la)"/>
+<line class="eb" x1="640" y1="272" x2="500" y2="358" marker-end="url(#la)"/>
+<line class="eb" x1="700" y1="272" x2="712" y2="352" marker-end="url(#la)"/>
+<text class="el" x="795" y="248">← AMLworld·Multi-GNN도 인용</text>
+<!-- laundrograph → weber -->
+<line class="ed" x1="630" y1="384" x2="556" y2="384" marker-end="url(#la)"/>
+<!-- 최신 → weber/laundrograph -->
+<line class="ed" x1="140" y1="485" x2="400" y2="415" marker-end="url(#la)"/>
+<line class="ed" x1="340" y1="485" x2="430" y2="415" marker-end="url(#la)"/>
+<line class="ed" x1="180" y1="485" x2="660" y2="415" marker-end="url(#la)"/>
+<line class="ed" x1="380" y1="485" x2="690" y2="415" marker-end="url(#la)"/>
+<line class="ed" x1="540" y1="485" x2="705" y2="415" marker-end="url(#la)"/>
+<line class="ed" x1="700" y1="485" x2="480" y2="415" marker-end="url(#la)"/>
+<!-- 최신 상호 인용 -->
+<line class="ed" x1="200" y1="511" x2="224" y2="511" marker-end="url(#la)" marker-start="url(#la)"/>
+<line class="ed" x1="440" y1="511" x2="416" y2="511" marker-end="url(#la)"/>
+</svg>
+<figcaption>화살표 = 검증된 직접 인용(아래가 위를 인용). <b>주황 = Network Analytics for AML(2024)</b> —
+근본·재출발점·최신을 모두 인용하는 유일한 문서. 최신 4편에서 근본 4편으로 가는 직접 화살표는
+존재하지 않는다(참고문헌 전수 확인). 숫자 = Semantic Scholar 피인용 수(2026-08 기준).</figcaption>
+</figure>
+
+<h2>3. 검증 간선 전체 (원자료)</h2>
+<div class="scroll"><table>
+<thead><tr><th>인용하는 논문 (참고문헌 수)</th><th>표적 12편 중 실제 인용된 것</th></tr></thead>
+<tbody>
+<tr><td>AMLworld 2023 (45건)</td><td>Weber2019 · LaundroGraph · Multi-GNN</td></tr>
+<tr><td>Multi-GNN 2023 (73건)</td><td>Weber2019 · LaundroGraph · AMLworld</td></tr>
+<tr><td>GFP 2024 (60건)</td><td>LaundroGraph · AMLworld</td></tr>
+<tr><td>Elliptic2 2024 (17건)</td><td>Weber2019</td></tr>
+<tr><td>LaundroGraph 2022 (28건)</td><td>Weber2019</td></tr>
+<tr><td>GAD 딥러닝 서베이 2021 (222건)</td><td>LOF · Chandola · Akoglu</td></tr>
+<tr><td><b>Network Analytics for AML 2024</b> (161건)</td><td><b>Bolton&amp;Hand · Chandola · Akoglu · Weber2019 · LaundroGraph · AMLworld · Multi-GNN</b> (7편)</td></tr>
+<tr><td>Akoglu 2014 (276건)</td><td>Bolton&amp;Hand · LOF · Chandola</td></tr>
+<tr><td>Weber 2019 (22건)</td><td>(근본 4편 중 0)</td></tr>
+<tr><td>Chandola 2009</td><td>참고문헌 데이터가 S2 에 없음(0건 반환) — 부재 증거 아님, 데이터 한계</td></tr>
+</tbody></table></div>
+
+<h2>4. 우리 프로젝트에의 시사점</h2>
+<ul>
+<li><b>인용 경로 권장</b>: 발표·문서에서 "규칙 기반→통계→그래프→GNN" 서사를 쓰려면
+직접 인용 사슬이 성립하는 경로로: 근본(Bolton&amp;Hand·Chandola) →
+<b>Network Analytics for AML(2024)</b> 또는 GAD 서베이(2021) → Weber 2019 → AMLworld·Multi-GNN.
+최신 논문이 고전을 직접 인용한다고 쓰면 사실과 다름.</li>
+<li><b>우리 구조와의 대응</b>(해석): 거래 단위 점수화는 통계적 탐지 전통의 문제이고, 블록/서브그래프
+판정은 Elliptic2·서브그래프 계열(2단계 연구 폴더)의 문제 — 우리 2층 설계(거래 점수 + 블록 판정
+층)는 두 전통에 각각 대응한다. 서브그래프 계열 3편(<code>01_research/donghyeon/2단계…</code>)이
+블록 판정 층의 선행연구 근거로 직결.</li>
+<li><b>다음 조사 후보</b>(원하면 확장): Elliptic2·GFP 의 <b>피인용</b>(파생 논문) 추적 — 2024 이후
+서브그래프 AML 후속을 훑으면 블록 층 설계의 최신 비교 대상이 나옴.</li>
+</ul>
+
+<p class="note">방법·한계: Semantic Scholar Graph API(2026-08 조회). 간선 = 참고문헌 목록의
+paperId 일치(제목 유사 아님). Chandola 2009 는 S2 참고문헌 미제공. 팀 보유 여부는
+<code>docs/01_research/</code> 실측. 원자료: <code>scratchpad/lineage_result.json</code>.</p>
+</main>
