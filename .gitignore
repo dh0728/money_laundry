@@ -31,3 +31,9 @@ desktop.ini
 
 # 문서 임시파일 (Office)
 ~$*
+
+
+/backend
+/deploy
+/frontend
+
