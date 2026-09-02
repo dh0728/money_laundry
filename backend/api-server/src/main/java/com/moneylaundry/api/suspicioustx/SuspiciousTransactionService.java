@@ -1,4 +1,4 @@
-package com.moneylaundry.api.alert;
+package com.moneylaundry.api.suspicioustx;
 
 import com.moneylaundry.api.upload.WorkerScores;
 import java.io.IOException;
@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Service
-public class AlertService {
+public class SuspiciousTransactionService {
 
   private static final String SCORE_FILE_SUFFIX = ".json";
 
@@ -23,20 +23,20 @@ public class AlertService {
   private final Path scoresDir;
   private final double threshold;
 
-  public AlertService(
+  public SuspiciousTransactionService(
       ObjectMapper objectMapper,
       @Value("${app.storage-dir}") String storageDir,
-      @Value("${app.alert.threshold}") double threshold) {
+      @Value("${app.suspicious-tx.threshold}") double threshold) {
     this.objectMapper = objectMapper;
     this.scoresDir = Path.of(storageDir).resolve("scores");
     this.threshold = threshold;
   }
 
-  public List<AlertResponse> list() throws IOException {
+  public List<SuspiciousTransactionResponse> list() throws IOException {
     if (!Files.isDirectory(scoresDir)) {
       return List.of();
     }
-    List<AlertResponse> alerts = new ArrayList<>();
+    List<SuspiciousTransactionResponse> suspicious = new ArrayList<>();
     try (Stream<Path> files = Files.list(scoresDir)) {
       for (Path file :
           files.filter(f -> f.getFileName().toString().endsWith(SCORE_FILE_SUFFIX)).toList()) {
@@ -46,8 +46,8 @@ public class AlertService {
           for (WorkerScores.WorkerScore score :
               objectMapper.readValue(file.toFile(), WorkerScores.class).scores()) {
             if (score.anomalyScore() >= threshold) {
-              alerts.add(
-                  new AlertResponse(
+              suspicious.add(
+                  new SuspiciousTransactionResponse(
                       uploadId,
                       score.txRow(),
                       score.anomalyScore(),
@@ -61,7 +61,8 @@ public class AlertService {
         }
       }
     }
-    alerts.sort(Comparator.comparingDouble(AlertResponse::anomalyScore).reversed());
-    return alerts;
+    suspicious.sort(
+        Comparator.comparingDouble(SuspiciousTransactionResponse::anomalyScore).reversed());
+    return suspicious;
   }
 }

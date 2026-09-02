@@ -1,4 +1,4 @@
-package com.moneylaundry.api.alert;
+package com.moneylaundry.api.suspicioustx;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,20 +20,20 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
-class AlertApiTests {
+class SuspiciousTransactionApiTests {
 
   static Path tempStorage;
 
   @DynamicPropertySource
   static void storageDir(DynamicPropertyRegistry registry) throws IOException {
-    tempStorage = Files.createTempDirectory("alert-test");
+    tempStorage = Files.createTempDirectory("suspicious-tx-test");
     registry.add("app.storage-dir", () -> tempStorage.toString());
   }
 
   @Autowired MockMvc mockMvc;
 
   @Test
-  void 임계값_이상_점수만_높은_순으로_알림_목록에_내려주고_깨진_파일은_건너뛴다() throws Exception {
+  void 임계값_이상_점수만_높은_순으로_의심_거래_목록에_내려주고_깨진_파일은_건너뛴다() throws Exception {
     Path scores = tempStorage.resolve("scores");
     Files.createDirectories(scores);
     Files.writeString(
@@ -47,7 +47,7 @@ class AlertApiTests {
     Files.writeString(scores.resolve("broken.json"), "{\"row_count\":1,\"scores\":[{");
 
     mockMvc
-        .perform(get("/api/alerts"))
+        .perform(get("/api/suspicious-transactions"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(2))
         .andExpect(jsonPath("$[0].uploadId").value("u1"))
