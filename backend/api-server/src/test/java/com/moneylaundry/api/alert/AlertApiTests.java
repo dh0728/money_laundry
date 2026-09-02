@@ -33,7 +33,7 @@ class AlertApiTests {
   @Autowired MockMvc mockMvc;
 
   @Test
-  void 임계값_이상_점수만_높은_순으로_알림_목록에_내려준다() throws Exception {
+  void 임계값_이상_점수만_높은_순으로_알림_목록에_내려주고_깨진_파일은_건너뛴다() throws Exception {
     Path scores = tempStorage.resolve("scores");
     Files.createDirectories(scores);
     Files.writeString(
@@ -44,6 +44,7 @@ class AlertApiTests {
           {"tx_row":1,"anomaly_score":0.7,"type_score":0.1,"type_class":8,"rule_hits":["R1"]},
           {"tx_row":2,"anomaly_score":0.95,"type_score":0.5,"type_class":3,"rule_hits":[]}]}
         """);
+    Files.writeString(scores.resolve("broken.json"), "{\"row_count\":1,\"scores\":[{");
 
     mockMvc
         .perform(get("/api/alerts"))
