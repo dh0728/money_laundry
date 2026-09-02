@@ -36,3 +36,5 @@ app:
   worker:
     python: ${WORKER_PYTHON:python}
     script: ${WORKER_SCRIPT:worker/dummy_worker.py}
+  alert:
+    threshold: ${ALERT_THRESHOLD:0.7}
