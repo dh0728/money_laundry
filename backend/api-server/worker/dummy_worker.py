@@ -7,6 +7,7 @@ W2 [모델 래핑]에서 이 스크립트의 점수 생성부가 실제 추론(�
 import argparse
 import csv
 import json
+import os
 import random
 
 
@@ -32,8 +33,11 @@ def main() -> None:
                 }
             )
 
-    with open(args.output, "w", encoding="utf-8") as f:
+    # 임시 파일에 다 쓴 뒤 교체 — 쓰다 죽어도 반쪽짜리 파일이 남지 않게(원자적 쓰기)
+    tmp = args.output + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump({"row_count": len(scores), "scores": scores}, f)
+    os.replace(tmp, args.output)
     print(len(scores))
 
 

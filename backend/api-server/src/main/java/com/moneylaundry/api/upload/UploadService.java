@@ -33,7 +33,7 @@ public class UploadService {
     Files.createDirectories(scores.getParent());
     file.transferTo(csv);
     scoreWorker.score(csv, scores);
-    int rowCount = objectMapper.readTree(scores.toFile()).path("row_count").asInt();
-    return new UploadResponse(uploadId, rowCount);
+    WorkerScores parsed = objectMapper.readValue(scores.toFile(), WorkerScores.class);
+    return new UploadResponse(uploadId, parsed.rowCount());
   }
 }
