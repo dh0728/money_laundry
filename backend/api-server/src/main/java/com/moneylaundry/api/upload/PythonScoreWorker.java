@@ -3,6 +3,7 @@ package com.moneylaundry.api.upload;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -12,12 +13,15 @@ public class PythonScoreWorker implements ScoreWorker {
 
   private final String pythonExe;
   private final String scriptPath;
+  private final Duration timeout;
 
   public PythonScoreWorker(
       @Value("${app.worker.python}") String pythonExe,
-      @Value("${app.worker.script}") String scriptPath) {
+      @Value("${app.worker.script}") String scriptPath,
+      @Value("${app.worker.timeout}") Duration timeout) {
     this.pythonExe = pythonExe;
     this.scriptPath = scriptPath;
+    this.timeout = timeout;
   }
 
   @Override
@@ -32,9 +36,9 @@ public class PythonScoreWorker implements ScoreWorker {
       builder.redirectErrorStream(true);
       builder.redirectOutput(log.toFile());
       Process process = builder.start();
-      if (!process.waitFor(10, TimeUnit.MINUTES)) {
+      if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
         process.destroyForcibly();
-        throw new WorkerException("워커 시간 초과(10분)");
+        throw new WorkerException("워커 시간 초과(" + timeout + ")");
       }
       if (process.exitValue() != 0) {
         throw new WorkerException(

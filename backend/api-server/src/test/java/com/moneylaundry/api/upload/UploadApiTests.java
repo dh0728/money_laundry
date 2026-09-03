@@ -2,6 +2,7 @@ package com.moneylaundry.api.upload;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -60,5 +61,28 @@ class UploadApiTests {
     try (var saved = Files.list(tempStorage.resolve("uploads"))) {
       assertThat(saved.toList()).hasSize(1);
     }
+  }
+
+  @Test
+  void 파일_파트_없이_보내면_400과_MISSING_PART_코드를_돌려준다() throws Exception {
+    mockMvc
+        .perform(post("/api/uploads"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("MISSING_PART"));
+  }
+
+  @Test
+  void 워커가_실패하면_500과_WORKER_FAILED_코드를_돌려준다() throws Exception {
+    Mockito.doThrow(new WorkerException("워커 실패(종료 코드 1)"))
+        .when(scoreWorker)
+        .score(Mockito.any(), Mockito.any());
+
+    MockMultipartFile file =
+        new MockMultipartFile("file", "tx.csv", "text/csv", "h1,h2\n1,2\n".getBytes());
+
+    mockMvc
+        .perform(multipart("/api/uploads").file(file))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.code").value("WORKER_FAILED"));
   }
 }

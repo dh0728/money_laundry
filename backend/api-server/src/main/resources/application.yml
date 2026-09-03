@@ -36,5 +36,6 @@ app:
   worker:
     python: ${WORKER_PYTHON:python}
     script: ${WORKER_SCRIPT:worker/dummy_worker.py}
+    timeout: ${WORKER_TIMEOUT:PT30M}
   suspicious-tx:
     threshold: ${SUSPICIOUS_TX_THRESHOLD:0.7}
