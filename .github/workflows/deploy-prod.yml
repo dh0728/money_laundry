@@ -1,0 +1,569 @@
+name: Deploy Prod
+
+run-name: Deploy prod ${{ inputs.git_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: Full 40-character Git commit SHA from master to deploy
+        required: true
+        type: string
+      confirmation:
+        description: Type DEPLOY_PROD to confirm the production deployment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Authenticate Prod Deployment
+    runs-on: ubuntu-24.04
+    environment: prod
+
+    steps:
+      - name: Validate deployment inputs
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          WORKFLOW_REF: ${{ github.ref }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          [[ "${WORKFLOW_REF}" == "refs/heads/master" ]] || {
+            echo "Prod deployment workflow must be run from the master branch." >&2
+            exit 1
+          }
+          [[ "${GIT_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "Invalid full Git SHA." >&2
+            exit 1
+          }
+          [[ "${CONFIRMATION}" == "DEPLOY_PROD" ]] || {
+            echo "Type DEPLOY_PROD exactly to confirm the production deployment." >&2
+            exit 1
+          }
+          [[ "${AWS_REGION}" == "ap-northeast-2" ]] || {
+            echo "AWS_REGION must be ap-northeast-2." >&2
+            exit 1
+          }
+          [[ "${AWS_ROLE_ARN}" =~ ^arn:aws:iam::[0-9]{12}:role/aml-github-prod-deploy-role$ ]] || {
+            echo "AWS_ROLE_ARN is missing or invalid." >&2
+            exit 1
+          }
+          [[ "${EC2_INSTANCE_ID}" =~ ^i-[0-9a-f]{8,17}$ ]] || {
+            echo "EC2_INSTANCE_ID is missing or invalid." >&2
+            exit 1
+          }
+          [[ "${DEPLOY_ARTIFACT_BUCKET}" =~ ^aml-deploy-artifacts-[0-9]{12}$ ]] || {
+            echo "DEPLOY_ARTIFACT_BUCKET is missing or invalid." >&2
+            exit 1
+          }
+
+      - name: Checkout deployment commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
+
+      - name: Verify deployment commit belongs to master
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          [[ "$(git rev-parse HEAD)" == "${GIT_SHA}" ]] || {
+            echo "Checked-out commit does not match the requested Git SHA." >&2
+            exit 1
+          }
+
+          git merge-base --is-ancestor "${GIT_SHA}" origin/master || {
+            echo "The requested Git SHA does not belong to the master branch." >&2
+            exit 1
+          }
+
+          echo "Prod deployment commit verified: ${GIT_SHA}"
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: aml-prod-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Verify assumed AWS role
+        run: |
+          set -Eeuo pipefail
+
+          ASSUMED_ROLE_ARN="$(
+            aws sts get-caller-identity \
+              --query Arn \
+              --output text
+          )"
+
+          [[ "${ASSUMED_ROLE_ARN}" == *":assumed-role/aml-github-prod-deploy-role/"* ]] || {
+            echo "Unexpected assumed role: ${ASSUMED_ROLE_ARN}" >&2
+            exit 1
+          }
+
+          echo "GitHub OIDC authentication for prod succeeded."
+
+      - name: Configure ECR image names
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -Eeuo pipefail
+
+          AWS_ACCOUNT_ID="$(
+            aws sts get-caller-identity \
+              --region "${AWS_REGION}" \
+              --query Account \
+              --output text
+          )"
+
+          [[ "${AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]] || {
+            echo "AWS Account ID is invalid." >&2
+            exit 1
+          }
+
+          ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          IMAGE_TAG="prod-${GIT_SHA}"
+
+          {
+            echo "ECR_REGISTRY=${ECR_REGISTRY}"
+            echo "IMAGE_TAG=${IMAGE_TAG}"
+            echo "PROD_API_IMAGE=${ECR_REGISTRY}/aml-api:${IMAGE_TAG}"
+            echo "PROD_WEB_IMAGE=${ECR_REGISTRY}/aml-web:${IMAGE_TAG}"
+          } >> "${GITHUB_ENV}"
+
+          echo "ECR image names configured for prod-${GIT_SHA:0:7}."
+
+      - name: Log in to Amazon ECR
+        run: |
+          set -Eeuo pipefail
+
+          aws ecr get-login-password \
+            --region "${AWS_REGION}" |
+            docker login \
+              --username AWS \
+              --password-stdin "${ECR_REGISTRY}"
+
+      - name: Check existing ECR images
+        id: check_images
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -Eeuo pipefail
+
+          check_image() {
+            local repository="$1"
+            local output_name="$2"
+            local error_file
+            error_file="$(mktemp)"
+
+            if aws ecr describe-images \
+              --region "${AWS_REGION}" \
+              --repository-name "${repository}" \
+              --image-ids "imageTag=${IMAGE_TAG}" \
+              >/dev/null 2>"${error_file}"; then
+              echo "${output_name}=true" >> "${GITHUB_OUTPUT}"
+              echo "${repository}: existing image=true"
+            elif grep -q "ImageNotFoundException" "${error_file}"; then
+              echo "${output_name}=false" >> "${GITHUB_OUTPUT}"
+              echo "${repository}: existing image=false"
+            else
+              cat "${error_file}" >&2
+              rm -f "${error_file}"
+              exit 1
+            fi
+
+            rm -f "${error_file}"
+          }
+
+          check_image "aml-api" "api_exists"
+          check_image "aml-web" "web_exists"
+
+      - name: Build and push API image
+        if: steps.check_images.outputs.api_exists != 'true'
+        run: |
+          set -Eeuo pipefail
+
+          docker build \
+            --tag "${PROD_API_IMAGE}" \
+            backend/api-server
+          docker push "${PROD_API_IMAGE}"
+
+      - name: Build and push WEB image
+        if: steps.check_images.outputs.web_exists != 'true'
+        run: |
+          set -Eeuo pipefail
+
+          docker build \
+            --build-arg VITE_API_BASE_URL=/api \
+            --tag "${PROD_WEB_IMAGE}" \
+            frontend/web-app
+          docker push "${PROD_WEB_IMAGE}"
+
+      - name: Verify prod images in Amazon ECR
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -Eeuo pipefail
+
+          aws ecr describe-images \
+            --region "${AWS_REGION}" \
+            --repository-name aml-api \
+            --image-ids "imageTag=${IMAGE_TAG}" \
+            >/dev/null
+          aws ecr describe-images \
+            --region "${AWS_REGION}" \
+            --repository-name aml-web \
+            --image-ids "imageTag=${IMAGE_TAG}" \
+            >/dev/null
+
+          echo "API and WEB prod ECR images are ready."
+
+      - name: Create and validate prod deployment bundle
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+        run: |
+          set -Eeuo pipefail
+
+          BUNDLE_ROOT="${RUNNER_TEMP}/prod-bundle-${GIT_SHA}"
+          BUNDLE_PATH="${RUNNER_TEMP}/prod-${GIT_SHA}.tar.gz"
+
+          install -D -m 0644 \
+            deploy/compose.prod.yaml \
+            "${BUNDLE_ROOT}/deploy/compose.prod.yaml"
+          install -D -m 0644 \
+            deploy/compose.prod.infra.yaml \
+            "${BUNDLE_ROOT}/deploy/compose.prod.infra.yaml"
+          install -D -m 0755 \
+            deploy/scripts/deploy-prod.sh \
+            "${BUNDLE_ROOT}/deploy/scripts/deploy-prod.sh"
+          install -D -m 0644 \
+            deploy/nginx/conf.d/prod.conf \
+            "${BUNDLE_ROOT}/deploy/nginx/conf.d/prod.conf"
+
+          test -s "${BUNDLE_ROOT}/deploy/compose.prod.yaml"
+          test -s "${BUNDLE_ROOT}/deploy/compose.prod.infra.yaml"
+          test -s "${BUNDLE_ROOT}/deploy/scripts/deploy-prod.sh"
+          test -s "${BUNDLE_ROOT}/deploy/nginx/conf.d/prod.conf"
+          bash -n "${BUNDLE_ROOT}/deploy/scripts/deploy-prod.sh"
+
+          tar \
+            -C "${BUNDLE_ROOT}" \
+            -czf "${BUNDLE_PATH}" \
+            deploy
+
+          test -s "${BUNDLE_PATH}"
+
+          EXPECTED_CONTENTS="$({
+            printf '%s\n' \
+              'deploy/compose.prod.infra.yaml' \
+              'deploy/compose.prod.yaml' \
+              'deploy/nginx/conf.d/prod.conf' \
+              'deploy/scripts/deploy-prod.sh'
+          } | LC_ALL=C sort)"
+          ACTUAL_CONTENTS="$(
+            tar -tzf "${BUNDLE_PATH}" |
+              sed '/\/$/d' |
+              LC_ALL=C sort
+          )"
+
+          [[ "${ACTUAL_CONTENTS}" == "${EXPECTED_CONTENTS}" ]] || {
+            echo "Prod deployment bundle contains unexpected files." >&2
+            printf 'Expected:\n%s\n' "${EXPECTED_CONTENTS}" >&2
+            printf 'Actual:\n%s\n' "${ACTUAL_CONTENTS}" >&2
+            exit 1
+          }
+
+          printf 'PROD_BUNDLE_PATH=%s\n' "${BUNDLE_PATH}" >> "${GITHUB_ENV}"
+          echo "Prod deployment bundle created and validated: $(basename "${BUNDLE_PATH}")"
+
+      - name: Upload prod deployment bundle to S3
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+        run: |
+          set -Eeuo pipefail
+
+          [[ -n "${PROD_BUNDLE_PATH:-}" ]] || {
+            echo "PROD_BUNDLE_PATH is missing." >&2
+            exit 1
+          }
+          [[ -s "${PROD_BUNDLE_PATH}" ]] || {
+            echo "Prod deployment bundle is missing or empty." >&2
+            exit 1
+          }
+
+          PROD_BUNDLE_S3_KEY="releases/prod/${GIT_SHA}/deploy-bundle.tar.gz"
+          PROD_BUNDLE_S3_URI="s3://${DEPLOY_ARTIFACT_BUCKET}/${PROD_BUNDLE_S3_KEY}"
+
+          aws s3 cp \
+            "${PROD_BUNDLE_PATH}" \
+            "${PROD_BUNDLE_S3_URI}" \
+            --region "${AWS_REGION}" \
+            --sse AES256 \
+            --content-type application/gzip \
+            --only-show-errors
+
+          {
+            echo "PROD_BUNDLE_S3_KEY=${PROD_BUNDLE_S3_KEY}"
+            echo "PROD_BUNDLE_S3_URI=${PROD_BUNDLE_S3_URI}"
+          } >> "${GITHUB_ENV}"
+
+          echo "Prod deployment bundle uploaded: ${PROD_BUNDLE_S3_KEY}"
+
+      - name: Send prod deployment command to EC2
+        id: send_ssm_command
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          [[ "${PROD_BUNDLE_S3_KEY:-}" == \
+            "releases/prod/${GIT_SHA}/deploy-bundle.tar.gz" ]] || {
+            echo "PROD_BUNDLE_S3_KEY is missing or invalid." >&2
+            exit 1
+          }
+
+          command -v jq >/dev/null 2>&1 || {
+            echo "jq is required." >&2
+            exit 1
+          }
+
+          REMOTE_SCRIPT="$(cat <<'REMOTE_SCRIPT'
+          set -Eeuo pipefail
+          umask 027
+
+          GIT_SHA="__GIT_SHA__"
+          AWS_REGION="__AWS_REGION__"
+          DEPLOY_ARTIFACT_BUCKET="__DEPLOY_ARTIFACT_BUCKET__"
+          PROD_BUNDLE_S3_KEY="__PROD_BUNDLE_S3_KEY__"
+
+          BUNDLE_PATH="/opt/aml/tmp/prod-${GIT_SHA}.tar.gz"
+          RELEASE_DIR="/opt/aml/releases/prod/${GIT_SHA}"
+          CURRENT_NEXT="/opt/aml/current-prod.next"
+          STATE_TMP="/opt/aml/state/prod-current-sha.tmp"
+
+          cleanup() {
+            rm -f -- "${BUNDLE_PATH}" "${CURRENT_NEXT}" "${STATE_TMP}"
+          }
+
+          trap cleanup EXIT
+
+          install -d -m 0750 \
+            /opt/aml/releases/prod \
+            /opt/aml/state \
+            /opt/aml/tmp \
+            "${RELEASE_DIR}"
+
+          aws s3 cp \
+            "s3://${DEPLOY_ARTIFACT_BUCKET}/${PROD_BUNDLE_S3_KEY}" \
+            "${BUNDLE_PATH}" \
+            --region "${AWS_REGION}" \
+            --only-show-errors
+
+          test -s "${BUNDLE_PATH}"
+          tar -tzf "${BUNDLE_PATH}" >/dev/null
+
+          tar \
+            --no-same-owner \
+            --no-same-permissions \
+            -xzf "${BUNDLE_PATH}" \
+            -C "${RELEASE_DIR}"
+
+          DEPLOY_SCRIPT="${RELEASE_DIR}/deploy/scripts/deploy-prod.sh"
+
+          test -s "${DEPLOY_SCRIPT}"
+          chmod 0755 "${DEPLOY_SCRIPT}"
+          bash -n "${DEPLOY_SCRIPT}"
+
+          AWS_REGION="${AWS_REGION}" \
+            "${DEPLOY_SCRIPT}" "${GIT_SHA}"
+
+          ln -sfn "${RELEASE_DIR}" "${CURRENT_NEXT}"
+          mv -Tf "${CURRENT_NEXT}" /opt/aml/current-prod
+
+          printf '%s\n' "${GIT_SHA}" > "${STATE_TMP}"
+          chmod 0640 "${STATE_TMP}"
+          mv -f "${STATE_TMP}" /opt/aml/state/prod-current-sha
+
+          [[ -L /opt/aml/current-prod ]] || {
+            echo "current-prod symbolic link was not created." >&2
+            exit 1
+          }
+
+          CURRENT_RELEASE="$(readlink -f /opt/aml/current-prod)"
+          RECORDED_SHA="$(
+            tr -d '\r\n' < /opt/aml/state/prod-current-sha
+          )"
+
+          [[ "${CURRENT_RELEASE}" == "${RELEASE_DIR}" ]] || {
+            echo "current-prod points to an unexpected release." >&2
+            echo "Expected: ${RELEASE_DIR}" >&2
+            echo "Actual: ${CURRENT_RELEASE}" >&2
+            exit 1
+          }
+
+          [[ "${RECORDED_SHA}" == "${GIT_SHA}" ]] || {
+            echo "Recorded prod SHA does not match the deployed SHA." >&2
+            echo "Expected: ${GIT_SHA}" >&2
+            echo "Actual: ${RECORDED_SHA}" >&2
+            exit 1
+          }
+
+          echo "Prod release state verified: ${GIT_SHA}"
+          echo "Prod release deployed successfully: ${GIT_SHA}"
+          REMOTE_SCRIPT
+          )"
+
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_SHA__/${GIT_SHA}}"
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__AWS_REGION__/${AWS_REGION}}"
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__DEPLOY_ARTIFACT_BUCKET__/${DEPLOY_ARTIFACT_BUCKET}}"
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__PROD_BUNDLE_S3_KEY__/${PROD_BUNDLE_S3_KEY}}"
+
+          SSM_PARAMETERS="$(
+            jq -cn \
+              --arg command "${REMOTE_SCRIPT}" \
+              '{commands: [("/usr/bin/env bash -c " + ($command | @sh))]}'
+          )"
+
+          COMMAND_ID="$(
+            aws ssm send-command \
+              --region "${AWS_REGION}" \
+              --document-name "AWS-RunShellScript" \
+              --instance-ids "${EC2_INSTANCE_ID}" \
+              --comment "Deploy AML prod ${GIT_SHA}" \
+              --timeout-seconds 900 \
+              --parameters "${SSM_PARAMETERS}" \
+              --query "Command.CommandId" \
+              --output text
+          )"
+
+          [[ "${COMMAND_ID}" =~ ^[0-9a-f-]{36}$ ]] || {
+            echo "SSM Command ID is invalid: ${COMMAND_ID}" >&2
+            exit 1
+          }
+
+          echo "PROD_SSM_COMMAND_ID=${COMMAND_ID}" >> "${GITHUB_ENV}"
+          echo "command_id=${COMMAND_ID}" >> "${GITHUB_OUTPUT}"
+          echo "Prod SSM deployment command sent: ${COMMAND_ID}"
+
+      - name: Wait for prod deployment result
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          [[ "${PROD_SSM_COMMAND_ID:-}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || {
+            echo "PROD_SSM_COMMAND_ID is missing or invalid." >&2
+            exit 1
+          }
+
+          RESULT_FILE="$(mktemp)"
+          ERROR_FILE="$(mktemp)"
+
+          cleanup() {
+            rm -f -- "${RESULT_FILE}" "${ERROR_FILE}"
+          }
+
+          trap cleanup EXIT
+
+          LAST_STATUS=""
+          FINISHED=false
+
+          for ((attempt = 1; attempt <= 180; attempt++)); do
+            if aws ssm get-command-invocation \
+              --region "${AWS_REGION}" \
+              --command-id "${PROD_SSM_COMMAND_ID}" \
+              --instance-id "${EC2_INSTANCE_ID}" \
+              --output json \
+              >"${RESULT_FILE}" 2>"${ERROR_FILE}"; then
+
+              STATUS="$(jq -r '.Status // empty' "${RESULT_FILE}")"
+
+              if [[ "${STATUS}" != "${LAST_STATUS}" ]]; then
+                echo "Prod SSM deployment status: ${STATUS}"
+                LAST_STATUS="${STATUS}"
+              fi
+
+              case "${STATUS}" in
+                Success|Cancelled|TimedOut|Failed|Cancelling)
+                  FINISHED=true
+                  break
+                  ;;
+                Pending|InProgress|Delayed)
+                  ;;
+                *)
+                  echo "Unknown SSM status: ${STATUS}" >&2
+                  exit 1
+                  ;;
+              esac
+            else
+              if grep -q "InvocationDoesNotExist" "${ERROR_FILE}"; then
+                sleep 5
+                continue
+              fi
+
+              cat "${ERROR_FILE}" >&2
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          if [[ "${FINISHED}" != "true" ]]; then
+            echo "Prod SSM deployment did not finish within 15 minutes." >&2
+            exit 1
+          fi
+
+          STATUS="$(jq -r '.Status' "${RESULT_FILE}")"
+          STATUS_DETAILS="$(jq -r '.StatusDetails // empty' "${RESULT_FILE}")"
+          RESPONSE_CODE="$(jq -r '.ResponseCode // -1' "${RESULT_FILE}")"
+          STANDARD_OUTPUT="$(jq -r '.StandardOutputContent // empty' "${RESULT_FILE}")"
+          STANDARD_ERROR="$(jq -r '.StandardErrorContent // empty' "${RESULT_FILE}")"
+
+          echo "Prod SSM final status: ${STATUS}"
+          echo "Prod SSM status details: ${STATUS_DETAILS}"
+          echo "Prod SSM response code: ${RESPONSE_CODE}"
+
+          if [[ -n "${STANDARD_OUTPUT}" ]]; then
+            printf '\n===== EC2 prod deployment output =====\n%s\n' \
+              "${STANDARD_OUTPUT}"
+          fi
+
+          if [[ -n "${STANDARD_ERROR}" ]]; then
+            printf '\n===== EC2 prod deployment error =====\n%s\n' \
+              "${STANDARD_ERROR}" >&2
+          fi
+
+          if [[ "${STATUS}" != "Success" || "${RESPONSE_CODE}" -ne 0 ]]; then
+            echo "Prod deployment failed on EC2." >&2
+            exit 1
+          fi
+
+          echo "Prod deployment command completed successfully."
