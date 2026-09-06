@@ -258,3 +258,244 @@ jobs:
           } >> "${GITHUB_ENV}"
 
           echo "Dev deployment bundle uploaded: ${DEV_BUNDLE_S3_KEY}"
+
+      - name: Send dev deployment command to EC2
+        id: send_ssm_command
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          [[ "${DEV_BUNDLE_S3_KEY:-}" == \
+            "releases/dev/${GIT_SHA}/deploy-bundle.tar.gz" ]] || {
+            echo "DEV_BUNDLE_S3_KEY is missing or invalid." >&2
+            exit 1
+          }
+
+          command -v jq >/dev/null 2>&1 || {
+            echo "jq is required." >&2
+            exit 1
+          }
+
+          REMOTE_SCRIPT="$(cat <<'REMOTE_SCRIPT'
+          set -Eeuo pipefail
+          umask 027
+
+          GIT_SHA="__GIT_SHA__"
+          AWS_REGION="__AWS_REGION__"
+          DEPLOY_ARTIFACT_BUCKET="__DEPLOY_ARTIFACT_BUCKET__"
+          DEV_BUNDLE_S3_KEY="__DEV_BUNDLE_S3_KEY__"
+
+          BUNDLE_PATH="/opt/aml/tmp/dev-${GIT_SHA}.tar.gz"
+          RELEASE_DIR="/opt/aml/releases/dev/${GIT_SHA}"
+          CURRENT_NEXT="/opt/aml/current-dev.next"
+          STATE_TMP="/opt/aml/state/dev-current-sha.tmp"
+
+          cleanup() {
+            rm -f -- "${BUNDLE_PATH}" "${CURRENT_NEXT}"
+          }
+
+          trap cleanup EXIT
+
+          install -d -m 0750 \
+            /opt/aml/releases/dev \
+            /opt/aml/state \
+            /opt/aml/tmp \
+            "${RELEASE_DIR}"
+
+          aws s3 cp \
+            "s3://${DEPLOY_ARTIFACT_BUCKET}/${DEV_BUNDLE_S3_KEY}" \
+            "${BUNDLE_PATH}" \
+            --region "${AWS_REGION}" \
+            --only-show-errors
+
+          test -s "${BUNDLE_PATH}"
+          tar -tzf "${BUNDLE_PATH}" >/dev/null
+
+          tar \
+            --no-same-owner \
+            --no-same-permissions \
+            -xzf "${BUNDLE_PATH}" \
+            -C "${RELEASE_DIR}"
+
+          DEPLOY_SCRIPT="${RELEASE_DIR}/deploy/scripts/deploy-dev.sh"
+
+          test -s "${DEPLOY_SCRIPT}"
+          chmod 0755 "${DEPLOY_SCRIPT}"
+          bash -n "${DEPLOY_SCRIPT}"
+
+          AWS_REGION="${AWS_REGION}" \
+            "${DEPLOY_SCRIPT}" "${GIT_SHA}"
+
+          ln -sfn "${RELEASE_DIR}" "${CURRENT_NEXT}"
+          mv -Tf "${CURRENT_NEXT}" /opt/aml/current-dev
+
+          printf '%s\n' "${GIT_SHA}" >"${STATE_TMP}"
+          chmod 0640 "${STATE_TMP}"
+          mv -f "${STATE_TMP}" /opt/aml/state/dev-current-sha
+
+          [[ -L /opt/aml/current-dev ]] || {
+            echo "current-dev symbolic link was not created." >&2
+            exit 1
+          }
+
+          CURRENT_RELEASE="$(readlink -f /opt/aml/current-dev)"
+          RECORDED_SHA="$(
+            tr -d '\r\n' </opt/aml/state/dev-current-sha
+          )"
+
+          [[ "${CURRENT_RELEASE}" == "${RELEASE_DIR}" ]] || {
+            echo "current-dev points to an unexpected release." >&2
+            echo "Expected: ${RELEASE_DIR}" >&2
+            echo "Actual: ${CURRENT_RELEASE}" >&2
+            exit 1
+          }
+
+          [[ "${RECORDED_SHA}" == "${GIT_SHA}" ]] || {
+            echo "Recorded dev SHA does not match the deployed SHA." >&2
+            echo "Expected: ${GIT_SHA}" >&2
+            echo "Actual: ${RECORDED_SHA}" >&2
+            exit 1
+          }
+
+          echo "Dev release state verified: ${GIT_SHA}"
+          echo "Dev release deployed successfully: ${GIT_SHA}"
+          REMOTE_SCRIPT
+          )"
+
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_SHA__/${GIT_SHA}}"
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__AWS_REGION__/${AWS_REGION}}"
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__DEPLOY_ARTIFACT_BUCKET__/${DEPLOY_ARTIFACT_BUCKET}}"
+          REMOTE_SCRIPT="${REMOTE_SCRIPT//__DEV_BUNDLE_S3_KEY__/${DEV_BUNDLE_S3_KEY}}"
+
+          SSM_PARAMETERS="$(
+            jq -cn \
+              --arg command "${REMOTE_SCRIPT}" \
+              '{commands: [("/usr/bin/env bash -c " + ($command | @sh))]}'
+          )"
+
+          COMMAND_ID="$(
+            aws ssm send-command \
+              --region "${AWS_REGION}" \
+              --document-name "AWS-RunShellScript" \
+              --instance-ids "${EC2_INSTANCE_ID}" \
+              --comment "Deploy AML dev ${GIT_SHA}" \
+              --timeout-seconds 900 \
+              --parameters "${SSM_PARAMETERS}" \
+              --query "Command.CommandId" \
+              --output text
+          )"
+
+          [[ "${COMMAND_ID}" =~ ^[0-9a-f-]{36}$ ]] || {
+            echo "SSM Command ID is invalid: ${COMMAND_ID}" >&2
+            exit 1
+          }
+
+          {
+            echo "SSM_COMMAND_ID=${COMMAND_ID}"
+          } >>"${GITHUB_ENV}"
+
+          echo "command_id=${COMMAND_ID}" >>"${GITHUB_OUTPUT}"
+          echo "SSM deployment command sent: ${COMMAND_ID}"
+
+      - name: Wait for dev deployment result
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          [[ "${SSM_COMMAND_ID:-}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || {
+            echo "SSM_COMMAND_ID is missing or invalid." >&2
+            exit 1
+          }
+
+          RESULT_FILE="$(mktemp)"
+          ERROR_FILE="$(mktemp)"
+
+          cleanup() {
+            rm -f -- "${RESULT_FILE}" "${ERROR_FILE}"
+          }
+
+          trap cleanup EXIT
+
+          LAST_STATUS=""
+          FINISHED=false
+
+          for ((attempt = 1; attempt <= 180; attempt++)); do
+            if aws ssm get-command-invocation \
+              --region "${AWS_REGION}" \
+              --command-id "${SSM_COMMAND_ID}" \
+              --instance-id "${EC2_INSTANCE_ID}" \
+              --output json \
+              >"${RESULT_FILE}" 2>"${ERROR_FILE}"; then
+
+              STATUS="$(jq -r '.Status // empty' "${RESULT_FILE}")"
+
+              if [[ "${STATUS}" != "${LAST_STATUS}" ]]; then
+                echo "SSM deployment status: ${STATUS}"
+                LAST_STATUS="${STATUS}"
+              fi
+
+              case "${STATUS}" in
+                Success|Cancelled|TimedOut|Failed|Cancelling)
+                  FINISHED=true
+                  break
+                  ;;
+                Pending|InProgress|Delayed)
+                  ;;
+                *)
+                  echo "Unknown SSM status: ${STATUS}" >&2
+                  exit 1
+                  ;;
+              esac
+            else
+              if grep -q "InvocationDoesNotExist" "${ERROR_FILE}"; then
+                sleep 5
+                continue
+              fi
+
+              cat "${ERROR_FILE}" >&2
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          if [[ "${FINISHED}" != "true" ]]; then
+            echo "SSM deployment did not finish within 15 minutes." >&2
+            exit 1
+          fi
+
+          STATUS="$(jq -r '.Status' "${RESULT_FILE}")"
+          STATUS_DETAILS="$(jq -r '.StatusDetails // empty' "${RESULT_FILE}")"
+          RESPONSE_CODE="$(jq -r '.ResponseCode // -1' "${RESULT_FILE}")"
+          STANDARD_OUTPUT="$(jq -r '.StandardOutputContent // empty' "${RESULT_FILE}")"
+          STANDARD_ERROR="$(jq -r '.StandardErrorContent // empty' "${RESULT_FILE}")"
+
+          echo "SSM final status: ${STATUS}"
+          echo "SSM status details: ${STATUS_DETAILS}"
+          echo "SSM response code: ${RESPONSE_CODE}"
+
+          if [[ -n "${STANDARD_OUTPUT}" ]]; then
+            printf '\n===== EC2 deployment output =====\n%s\n' \
+              "${STANDARD_OUTPUT}"
+          fi
+
+          if [[ -n "${STANDARD_ERROR}" ]]; then
+            printf '\n===== EC2 deployment error =====\n%s\n' \
+              "${STANDARD_ERROR}" >&2
+          fi
+
+          if [[ "${STATUS}" != "Success" || "${RESPONSE_CODE}" -ne 0 ]]; then
+            echo "Dev deployment failed on EC2." >&2
+            exit 1
+          fi
+
+          echo "Dev deployment completed successfully."

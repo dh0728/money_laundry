@@ -138,13 +138,14 @@ docker compose \
   -f "${COMPOSE_FILE}" \
   pull api web
 
-echo "dev 컨테이너를 실행합니다."
+echo "dev 컨테이너를 실행하고 정상 상태까지 기다립니다."
 
 docker compose \
   --env-file "${ENV_FILE}" \
   -f "${COMPOSE_FILE}" \
-  up -d --no-build --pull never
-
+  up -d --no-build --pull never \
+  --wait \
+  --wait-timeout 180
 
 echo "dev 컨테이너 상태를 확인합니다."
 
@@ -152,3 +153,36 @@ docker compose \
   --env-file "${ENV_FILE}" \
   -f "${COMPOSE_FILE}" \
   ps
+
+command -v curl >/dev/null 2>&1 \
+  || fail "Health Check에 필요한 curl이 설치되어 있지 않습니다."
+
+echo "dev WEB Health Check를 수행합니다."
+
+curl \
+  --fail \
+  --silent \
+  --show-error \
+  --connect-timeout 3 \
+  --max-time 5 \
+  --retry 30 \
+  --retry-delay 2 \
+  --retry-all-errors \
+  http://127.0.0.1:3001/health \
+  >/dev/null
+
+echo "dev API Health Check를 수행합니다."
+
+curl \
+  --fail \
+  --silent \
+  --show-error \
+  --connect-timeout 3 \
+  --max-time 5 \
+  --retry 30 \
+  --retry-delay 2 \
+  --retry-all-errors \
+  http://127.0.0.1:8081/actuator/health \
+  >/dev/null
+
+echo "dev WEB/API Health Check가 모두 성공했습니다."
