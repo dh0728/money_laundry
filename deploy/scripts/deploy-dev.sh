@@ -136,7 +136,7 @@ echo "dev ECR 이미지를 내려받습니다."
 docker compose \
   --env-file "${ENV_FILE}" \
   -f "${COMPOSE_FILE}" \
-  pull api web
+  pull api web postgres
 
 echo "dev 컨테이너를 실행하고 정상 상태까지 기다립니다."
 
