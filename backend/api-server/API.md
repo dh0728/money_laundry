@@ -1,8 +1,8 @@
-# API 계약 v0.3 — 2026-09-04
+# API 계약 v0.4 — 2026-09-08
 
 지위: **BE 결정 통보 + 팀 합의 대상.** 표시 없는 항목은 BE가 정해 통보하는 컨벤션이며, `[미정: X]`만 X의 회신이 필요하다(목록은 §8). 합의 결과는 이 문서를 갱신하고 kickoff §4.5에 기록. 구현된 API의 정본은 Swagger(springdoc)이고 이 문서는 사전 합의·설계 결정 기록이다.
 용어: kickoff §2.5 — `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`. 구 명칭 혼용 금지.
-이 문서는 W2 [DB 설계]의 입력이다. 변경 이력: v0.1(09-02, 층1~4 초안) → v0.2(09-03, 외부 검수 반영 — 배치 상태·추론 파일 계약·전이 표·역할·감사 이력·인증·대시보드·화면별 제공 항목 추가) → **v0.3(09-04, 화면 리서치 반영 — 파생 데이터 원칙: USD 환산·거래 점수 파생(백분위·복합 후보·합의)·거래 편입 역할·Alert 요약·대표 계좌·참여 계좌 표·점수 통계·설명 요인. 근거 `worktable/AML_화면_데이터_리서치_2026-09-04.md` §5·§6)** → **v0.3 추가(09-06, 화면 피드백): Alert·Episode 공통 상태 모델 `OPEN → IN_REVIEW → CLOSED` + `resolution`(Alert만 `ESCALATED` 추가). `CLOSED_NORMAL/CLOSED_FALSE_POSITIVE` → `CLOSED + resolution`, Episode `INVESTIGATING` → `OPEN/IN_REVIEW`, `outcome` → `resolution`, 이력 `REVIEW_START`(§3.1·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): 배정 모델 A — Alert·Episode 생성 시 라운드로빈 자동 배정 + ADMIN 재배정(§3.4 신설, §0·§3.1·§3.2·§4·§5·§6.5·§7). 9/3에 근거 없이 기록됐던 "단일 공용 큐"·"L1이 L2 지정" 폐기** → **v0.3 추가(09-07): 수집 구조 — 은행 API 키 + Presigned PUT + 완료 API + 자동 적재, MVP 편입, 은행 목업 프로그램, 도착 현황 API, 상태 `URL_ISSUED`(§0·§1.1·§1.2·§1.3·§7·§8). 멀티파트 `POST /api/uploads` 폐기** → **v0.3 추가(09-07, 화면 피드백): `IN_REVIEW` 상태 제거 — 배정이 있으면 열람 여부로 상태를 쪼갤 이유가 없음. 열람은 `firstOpenedAt`(미열람 표시)로만 기록(§3.2·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): Alert→Episode 연결은 Alert 화면에서 L1만(`POST /api/episodes/{id}/alerts` [L1]), Episode 화면은 해제만; 재배정 ADMIN 전용 유지(§3.3·§4.2·§4.3·§7)** → **v0.3 추가(09-07): Episode 상세 조사 블록 6종(baseline·flow·patternEvidence·counterparties·accountHistory·accounts) + `/transactions`·`/context-transactions`·`/graph?hops=` — 전부 MVP(§4.1·§7). 리서치 §2.11 근거** → **v0.3 추가(09-07, DB 착수 결정 4건): 컬럼 명명 `tx_id`+팀 이름(§0), 라벨은 평가 스키마 분리(§1.4), 은행 테이블 = 전 코드 + `is_reporting`(§1.1·§1.2), 구성 거래 `UNIQUE(tx_id)` + 처분 거래 재묶음 제외(§3.1)** → **v0.3 추가(09-07): 피처 세트는 모델별로 다르고 구성 변동 — `features_binary/type.parquet`, `feature_version_binary/type`(§1.3·§2.1); 최종 모델 형태는 질문 제외(§8)**.
+V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코드와 같은 커밋으로 갱신. 변경 이력: v0.1(09-02, 층1~4 초안) → v0.2(09-03, 외부 검수 반영 — 배치 상태·추론 파일 계약·전이 표·역할·감사 이력·인증·대시보드·화면별 제공 항목 추가) → **v0.3(09-04, 화면 리서치 반영 — 파생 데이터 원칙: USD 환산·거래 점수 파생(백분위·복합 후보·합의)·거래 편입 역할·Alert 요약·대표 계좌·참여 계좌 표·점수 통계·설명 요인. 근거 `worktable/AML_화면_데이터_리서치_2026-09-04.md` §5·§6)** → **v0.3 추가(09-06, 화면 피드백): Alert·Episode 공통 상태 모델 `OPEN → IN_REVIEW → CLOSED` + `resolution`(Alert만 `ESCALATED` 추가). `CLOSED_NORMAL/CLOSED_FALSE_POSITIVE` → `CLOSED + resolution`, Episode `INVESTIGATING` → `OPEN/IN_REVIEW`, `outcome` → `resolution`, 이력 `REVIEW_START`(§3.1·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): 배정 모델 A — Alert·Episode 생성 시 라운드로빈 자동 배정 + ADMIN 재배정(§3.4 신설, §0·§3.1·§3.2·§4·§5·§6.5·§7). 9/3에 근거 없이 기록됐던 "단일 공용 큐"·"L1이 L2 지정" 폐기** → **v0.3 추가(09-07): 수집 구조 — 은행 API 키 + Presigned PUT + 완료 API + 자동 적재, MVP 편입, 은행 목업 프로그램, 도착 현황 API, 상태 `URL_ISSUED`(§0·§1.1·§1.2·§1.3·§7·§8). 멀티파트 `POST /api/uploads` 폐기** → **v0.3 추가(09-07, 화면 피드백): `IN_REVIEW` 상태 제거 — 배정이 있으면 열람 여부로 상태를 쪼갤 이유가 없음. 열람은 `firstOpenedAt`(미열람 표시)로만 기록(§3.2·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): Alert→Episode 연결은 Alert 화면에서 L1만(`POST /api/episodes/{id}/alerts` [L1]), Episode 화면은 해제만; 재배정 ADMIN 전용 유지(§3.3·§4.2·§4.3·§7)** → **v0.3 추가(09-07): Episode 상세 조사 블록 6종(baseline·flow·patternEvidence·counterparties·accountHistory·accounts) + `/transactions`·`/context-transactions`·`/graph?hops=` — 전부 MVP(§4.1·§7). 리서치 §2.11 근거** → **v0.3 추가(09-07, DB 착수 결정 4건): 컬럼 명명 `tx_id`+팀 이름(§0), 라벨은 평가 스키마 분리(§1.4), 은행 테이블 = 전 코드 + `is_reporting`(§1.1·§1.2), 구성 거래 `UNIQUE(tx_id)` + 처분 거래 재묶음 제외(§3.1)** → **v0.3 추가(09-07): 피처 세트는 모델별로 다르고 구성 변동 — `features_binary/type.parquet`, `feature_version_binary/type`(§1.3·§2.1); 최종 모델 형태는 질문 제외(§8)** → **v0.4(09-08): 미열람 표시 제거 + `first_opened_at` 컬럼 제거(열람은 이력 `REVIEW_START`로만 — §3.2·§3.3·§3.4·§4·§6·§6.5·§7) · 시각 서울 표준시(§0) · 수집 로컬 저장소 구현·결정 A Java 단일 적재 경로·검증 단계·도착 현황 기본 날짜·조회 필드(§1.1~§1.4) · 에러 응답 `id` 확장 필드 제거(§0) · V1 반영(§1.3·§1.4·§2.2·§5)**.
 
 - **파생 데이터 원칙 (2026-09-04 사용자 확정)**: 화면을 현 계약에 맞추지 않는다. 원장·점수·피처·이력에서 계산할 수 있는 항목은 파생해 제공한다. 불가 판정은 원천 부재(실명·KYC 등)일 때만. 모델 형태(전체 GNN / GNN 임베딩 + 후단 모델 / LightGBM)에 의존하는 항목은 **결정 보류**(§8 사용자 ②) — 계약은 어느 모델이든 맞도록 필수 열 + 선택 확장 열로 둔다.
 
@@ -13,7 +13,7 @@
 - **표기**: JSON 필드는 camelCase. Python 파이프라인·S3 산출물은 snake_case — BE가 경계에서 변환. 점수는 전부 0~1 실수. **시각은 ISO-8601에 서울 표준시 오프셋(`+09:00`)을 붙여 낸다**(2026-09-08 사용자 확정, 프로퍼티 `app.zone`). 시간대 표기가 없는 입력 시각(CSV Timestamp)도 서울 시간으로 해석한다.
 - **금액·통화(BE 결정 2026-09-04)**: 통화는 ISO 4217 코드로 정규화해 내보낸다(IBM 통화명 15종 → 코드 매핑표 §1.4, Bitcoin = `BTC`). 모든 금액 필드에 **원 통화 금액 + `…Usd` 환산액**을 병기한다. 환산은 모델 학습에 쓴 고정 환율표(`data_work/fx_rates_usd.txt` 스냅샷 → V1 `fx_rates` 테이블 `fx_rates_usd_v1`, 2026-09-07)로 적재 시 계산. 합계는 `totalAmountUsd` + `amountsByCurrency[{ currency, total }]`. 화면 표기 방식(축약·자릿수)만 FE 소관.
 - **페이지네이션(BE 결정)**: 목록은 `{ content: [], page, size, totalElements, totalPages }`. 쿼리 `page`(0부터)·`size`(기본 20, 최대 200)·`sort=field,asc|desc`(복수 허용). 빈 목록 = 200 + 빈 `content`.
-- **에러 응답(BE 결정)**: RFC 9457 ProblemDetail `{ type, title, status, detail, instance }` + 확장 `code`(문자열 enum, 아래 표)·`id`(관련 uploadId/jobId/alertId, 없으면 생략). 상태 코드: 400 검증·형식, 401 미인증, 403 역할 불가, 404 없음, 409 상태 충돌·중복, 413 파일 한도, 500 서버·워커 실패.
+- **에러 응답(BE 결정)**: RFC 9457 ProblemDetail `{ type, title, status, detail, instance }` + 확장 `code`(문자열 enum, 아래 표). `id` 확장 필드는 두지 않는다(2026-09-08 — 관련 식별자는 경로·`detail`로 충분). 상태 코드: 400 검증·형식, 401 미인증, 403 역할 불가, 404 없음, 409 상태 충돌·중복, 413 파일 한도, 500 서버·워커 실패.
 
 | code | status | 뜻 |
 |---|---|---|
@@ -41,19 +41,19 @@
 
 수집 주체는 **은행 시스템**(실제 서비스) / **은행 목업 프로그램**(시연·테스트, `backend/bank-mock/` Python, BE 소유). 사이트 이용자는 올리지 않고 도착 현황만 본다.
 
-- **은행 테이블(2026-09-07 사용자 확정)**: 원장에 등장하는 **모든 은행 코드**를 담는다(적재 시 자동 upsert, 원장 FK). `name`·`country`는 `HI-Small_accounts.csv` Bank Name에서 채우고 못 채우면 null. **`is_reporting`** = API 키를 가진 보고 은행(도착 현황·시드 대상). 상대방 은행은 `is_reporting=false`로 이름만 보인다.
-- **인증 — 은행 API 키**: 요청 헤더 `X-Api-Key`. 은행 테이블에 키 해시 저장(원문은 발급 시 1회 반환). 키 → `bankId` 해석. 키 없음/불일치 = 401 `UNAUTHENTICATED`. 은행 등록·키 발급 API(`POST /api/banks` [ADMIN] = `is_reporting` 켜기 + 키 발급, `POST /api/banks/{id}/api-keys` [ADMIN])는 10월 [업로드]; **MVP는 보고 은행 3~4곳(시연 CSV 분할 수) + 키를 시드**(환경변수).
-- **POST /api/bank/uploads** [BANK] `{ fileName, sizeBytes, sha256, businessDate? }` → 201 `{ uploadId, url, method: "PUT", expiresAt, headers: { "Content-Type": "text/csv" } }`. S3 키 = `uploads/{bankId}/{uploadId}/{fileName}`, Presigned PUT 유효 15분(프로퍼티). batch_jobs(INGEST) `URL_ISSUED` 생성. 같은 `sha256`가 이미 `COMPLETED`면 409 `DUPLICATE_FILE`(URL 발급 전에 거른다). `sizeBytes` > 200MB면 413.
+- **은행 테이블(2026-09-07 사용자 확정)**: 원장에 등장하는 **모든 은행 코드**를 담는다(적재 시 자동 upsert, 원장 FK). `name`·`country`는 리소스 `ingest/banks_hi_small.csv`(HI-Small_accounts.csv 추출 30,470행 — HI-Small 재생 전용, HI-Large는 같은 코드에 다른 이름)에서 채우고 못 채우면 null(국가는 "<국가> Bank #N" 형식만 추출). **`is_reporting`** = API 키를 가진 보고 은행(도착 현황·시드 대상). 상대방 은행은 `is_reporting=false`로 이름만 보인다.
+- **인증 — 은행 API 키**: 요청 헤더 `X-Api-Key`. 은행 테이블에 키 해시 저장(원문은 발급 시 1회 반환). 키 → `bankId` 해석. 키 없음/불일치 = 401 `UNAUTHENTICATED`. 은행 등록·키 발급 API(`POST /api/banks` [ADMIN] = `is_reporting` 켜기 + 키 발급, `POST /api/banks/{id}/api-keys` [ADMIN])는 10월 [업로드]; **MVP는 보고 은행 3~4곳(시연 CSV 분할 수) + 키를 시드** — 환경변수 `BANK_API_KEYS=bankId:key,…`, 기동 시 upsert(`is_reporting` 켜고 SHA-256 해시 저장).
+- **POST /api/bank/uploads** [BANK] `{ fileName, sizeBytes, sha256, businessDate? }` → 201 `{ uploadId, url, method: "PUT", expiresAt, headers: { "Content-Type": "text/csv" } }`. S3 키 = `uploads/{bankId}/{uploadId}/{fileName}`, Presigned PUT 유효 15분(프로퍼티 `app.ingest.url-ttl`; 로컬 폴더 구현은 서명이 없어 만료를 검증하지 않는다). batch_jobs(INGEST) `URL_ISSUED` 생성. 같은 `sha256`가 이미 `COMPLETED`면 409 `DUPLICATE_FILE`(URL 발급 전에 거른다). `sizeBytes` > 200MB면 413.
 - 은행이 URL로 파일 PUT (BE 미개입).
-- **POST /api/bank/uploads/{uploadId}/complete** [BANK] → BE가 S3 HEAD로 존재·크기 확인(불일치 = 400 `UPLOAD_MISMATCH`) → 상태 `RECEIVED` → 가벼운 검증(§1.4) → 표준화·가명화(Data 진입점) → 원장 적재 → `COMPLETED`. **응답 202** `{ uploadId, status: "RECEIVED" }`, 적재는 비동기(MVP: 완료 API가 워커 프로세스를 직접 호출, 10월: SQS 메시지 발행). 결과는 `GET /api/uploads/{uploadId}`로 조회. 검증 실패는 아무것도 적재하지 않는다(all-or-nothing, `VALIDATION_FAILED` + `errors[]`).
+- **POST /api/bank/uploads/{uploadId}/complete** [BANK] → BE가 S3 HEAD로 존재·크기 확인(불일치 = 400 `UPLOAD_MISMATCH`) → 상태 `RECEIVED` → **응답 202**(§1.2 조회와 같은 모양) → 비동기 적재 `RUNNING`(검증 → 표준화·가명화 → 원장 적재) → `COMPLETED`. **적재 실행 주체 = Java 단일 경로(2026-09-08 사용자 확정, 결정 A)**: 파싱·검증·통화 정규화·환율·은행·계좌 upsert·JdbcTemplate 배치 삽입(1,000행)을 한 트랜잭션으로, 가명화는 Java `Pseudonymizer` 인터페이스(규칙 정의 = Data, 구현 = BE, 규칙 도착 전 항등). MVP는 `@Async` 스레드, 10월 SQS 전환은 실행 트리거만 바뀐다. 결과는 `GET /api/uploads/{uploadId}`로 조회. 검증 실패는 아무것도 적재하지 않는다(all-or-nothing, `VALIDATION_FAILED` + `errors[]`).
 - URL 발급 후 완료 통지 없이 만료된 건은 도착 현황에서 "미도착(URL 발급됨)"으로 보이고, `EXPIRED` 전환 스윕은 10월.
-- **은행 목업 프로그램 계약**: `python bank_mock.py --bank 021174 --file bank_021174_0904.csv [--api-url http://localhost:8080] [--api-key …]` → 위 3단계를 순서대로 수행하고 완료 응답을 출력, 실패 시 0이 아닌 종료 코드. 시연은 은행 3곳을 순서대로 실행.
+- **은행 목업 프로그램 계약**: `python bank_mock.py --bank 021174 --file bank_021174_0904.csv [--api-url http://localhost:8080] [--api-key …]` → 위 3단계를 순서대로 수행하고 완료 응답을 출력, 실패 시 0이 아닌 종료 코드. 서버는 API 키로 은행을 식별하므로 `--bank`는 표기용이며 은행 코드는 정수(`021174` = 21174). `url` 스킴이 `file:`이면 복사, `http(s):`면 PUT. 시연은 은행 3곳을 순서대로 실행.
 - S3 미준비로 **로컬 폴더 구현부터 시작(2026-09-08 사용자 확정)**: `url`은 `file:///…/storage/uploads/{bankId}/{uploadId}/{fileName}` 이고 목업이 파일 복사로 PUT을 대신한다. 저장소 경계는 `UploadStore`(발급·존재/크기 확인·읽기) — S3가 오면 구현체만 추가.
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
-- **GET /api/uploads/{uploadId}** [전 역할·BANK(자기 것만)] — INGEST 작업 1건: `{ uploadId, bankId, fileName, sizeBytes, rowCount, missingCount, duplicateCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }` — `rowCount` = 파일의 데이터 행 수, `duplicateCount` = 파일 안 중복 + 원장에 이미 있던 행(건너뜀), `errors[]`는 최대 100건. 완료 통지 202 응답도 같은 모양.
+- **GET /api/uploads/{uploadId}** [전 역할·BANK(자기 것만) — 사용자 인증이 생기는 W4 [인증]까지는 제한 없이 열림] — INGEST 작업 1건: `{ uploadId, bankId, fileName, sizeBytes, rowCount, missingCount, duplicateCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }` — `rowCount` = 파일의 데이터 행 수, `duplicateCount` = 파일 안 중복 + 원장에 이미 있던 행(건너뜀), `errors[]`는 최대 100건. 완료 통지 202 응답도 같은 모양.
 - **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 보고 은행(`is_reporting`) 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` = 컷오프 기준일: 창은 (D−1 컷오프, D 컷오프], 기본값은 **다음 컷오프의 날짜**(지금 도착하는 파일이 속하는 창). 은행당 창 안 최신 INGEST 작업 1건.
-- **GET /api/batch-jobs** [전 역할] — 목록(페이지네이션). 필터 `type=INGEST|ANALYSIS`, `status`, `from/to`(startedAt). 행: `{ jobId, type, status, attemptCount, analysisDate(ANALYSIS), bankId(INGEST), rowCount, errorCode, errorMessage, startedAt, finishedAt, modelVersionBinary, modelVersionType, featureVersion, thresholdValue }`
+- **GET /api/batch-jobs** [전 역할] — 목록(페이지네이션). 필터 `type=INGEST|ANALYSIS`, `status`, `from/to`(startedAt). 행: `{ jobId, type, status, attemptCount, analysisDate(ANALYSIS), bankId(INGEST), rowCount, errorCode, errorMessage, startedAt, finishedAt, modelVersionBinary, modelVersionType, featureVersionBinary, featureVersionType, thresholdValue }`
 - **GET /api/batch-jobs/{jobId}** [전 역할] — 위 행 + `counters: { suspiciousTxCount, alertCount, missingCount, duplicateCount }`.
 - **POST /api/batch-jobs/analysis** [L1·L2·ADMIN — 시연용 수동 실행] — 요청 `{ analysisDate? }`(기본 오늘). 응답 202 `{ jobId, status: "QUEUED" }`. 같은 analysisDate가 RUNNING이면 409 `JOB_ALREADY_RUNNING`; COMPLETED·FAILED면 같은 job의 재시도(기존 결과 삭제+삽입, OPEN Alert만 재생성). 스케줄러(컷오프 06:00)도 같은 코드를 부른다.
 
@@ -62,10 +62,10 @@
 | job_type | 상태 | 뜻 | 다음 |
 |---|---|---|---|
 | INGEST | `URL_ISSUED` | Presigned URL 발급, 파일 대기(완료 통지 전) | RECEIVED / (10월 EXPIRED) |
-| INGEST | `RECEIVED` | 완료 통지 수신·S3 확인, 검증 중 | RUNNING / VALIDATION_FAILED |
-| INGEST | `RUNNING` | 표준화·가명화·적재 중 | COMPLETED / FAILED |
+| INGEST | `RECEIVED` | 완료 통지 수신·객체 확인, 적재 대기 | RUNNING |
+| INGEST | `RUNNING` | 검증·표준화·가명화·적재 중 | COMPLETED / VALIDATION_FAILED / FAILED |
 | INGEST | `COMPLETED` | 원장 적재 완료 | — |
-| INGEST | `VALIDATION_FAILED` | 가벼운 검증 실패(영구) — 은행이 고쳐 재업로드(새 작업) | — |
+| INGEST | `VALIDATION_FAILED` | 검증 실패(영구, `errors[]` 최대 100건) — 은행이 고쳐 재업로드(새 작업) | — |
 | INGEST | `FAILED` | 적재 중 오류(영구) | — |
 | ANALYSIS | `SCHEDULED` | 스케줄러가 예약(10월; MVP는 생략) | QUEUED |
 | ANALYSIS | `QUEUED` | 실행 대기 | RUNNING |
@@ -74,7 +74,7 @@
 | ANALYSIS | `COMPLETED` | 점수·Alert 적재 완료 | — |
 | ANALYSIS | `FAILED` | 영구 실패 또는 3회 소진 | — (수동 재실행으로 재시도) |
 
-- 공통 컬럼: `attempt_count, claimed_at, heartbeat_at, started_at, finished_at, error_code, error_message`. ANALYSIS 전용: `analysis_date UNIQUE, threshold_value, model_version_binary, model_version_type, feature_version_binary, feature_version_type, suspicious_tx_count, alert_count`. INGEST 전용: `bank_id, file_name, file_hash(sha256), size_bytes, s3_key, url_issued_at, url_expires_at, received_at, row_count, missing_count, duplicate_count`.
+- 공통 컬럼: `attempt_count, claimed_at, heartbeat_at, started_at, finished_at, error_code, error_message`. ANALYSIS 전용: `analysis_date UNIQUE, threshold_value, model_version_binary, model_version_type, feature_version_binary, feature_version_type, suspicious_tx_count, alert_count`. INGEST 전용: `bank_id, business_date, file_name, file_hash(sha256), size_bytes, s3_key, url_issued_at, url_expires_at, received_at, row_count, missing_count, duplicate_count, validation_errors(JSONB errors[])`. `error_code`는 상태와 별개의 원인 코드: INGEST `VALIDATION_FAILED`·`LOAD_FAILED`, ANALYSIS `SCORES_MISMATCH`(§2.1) 등.
 - Claim·heartbeat·재시도 규칙은 kickoff §2.2. MVP(직접 호출)는 QUEUED→RUNNING을 Boot가 즉시 수행.
 
 ### 1.4 원장 입력 CSV 컬럼 표 (IBM AMLworld 헤더 → 표준명)
@@ -82,21 +82,21 @@
 | CSV 헤더 | 표준명(원장 컬럼) | 타입 | 검증 |
 |---|---|---|---|
 | Timestamp | `occurred_at` | timestamptz | 필수. 구현: `yyyy/MM/dd HH:mm[:ss]`(IBM 원본) 또는 ISO 로컬, 서울 시간 해석 `[미정: Data — 시연 CSV 시각 형식이 다르면 추가]` |
-| From Bank | `from_bank` | int | 필수 |
-| Account | `from_account` | text(가명) | 필수 → 가명화 |
-| To Bank | `to_bank` | int | 필수 |
-| Account.1 | `to_account` | text(가명) | 필수 → 가명화 |
-| Amount Received | `amount_received` | numeric(18,2) | 필수, ≥0 |
+| From Bank | `from_account_id` → `accounts(bank_id, account_number)` | int | 필수. 원장에 은행 컬럼은 따로 없고 계좌 FK로 얻는다(V1) |
+| Account | (위 계좌 FK의 `account_number`) | text(가명) | 필수 → 가명화 |
+| To Bank | `to_account_id` → `accounts(bank_id, account_number)` | int | 필수 |
+| Account.1 | (위 계좌 FK의 `account_number`) | text(가명) | 필수 → 가명화 |
+| Amount Received | `amount_received` | numeric(24,6) | 필수, ≥0 |
 | Receiving Currency | `receiving_currency` | text | 필수 |
-| Amount Paid | `amount_paid` | numeric(18,2) | 필수, ≥0 |
+| Amount Paid | `amount_paid` | numeric(24,6) | 필수, ≥0 |
 | Payment Currency | `payment_currency` | text | 필수 |
 | Payment Format | `payment_format` | text | 필수 |
 | Is Laundering | (원장에 저장하지 않음) | bool | 선택. 있으면 평가 스키마 `evaluation.transaction_labels(tx_id, is_laundering, pattern_label, attempt_id)`에만 적재(2026-09-07 사용자 확정). API·화면 비노출 |
 
 - 원장 추가 컬럼: `tx_id`(PK), `bank_id`(업로드 bankId), `row_hash`(표준화 행 해시, `(bank_id,row_hash)` UNIQUE), `ingest_job_id`, `scored_job_id`(NULL = 미채점), **`amount_usd`**(= `amount_paid ÷ fx_rates.units_per_usd[payment_currency]` — 환율표는 "1 USD당 통화 단위"(2026-09-07 정정, V1 `fx_rates` 테이블), 적재 시 계산, `fx_rate_version` 함께), 통화 컬럼은 정규화된 ISO 코드로 저장(원명은 저장하지 않음).
 - 통화명 → ISO 매핑표(고정, 15종): Australian Dollar `AUD` · Bitcoin `BTC` · Brazil Real `BRL` · Canadian Dollar `CAD` · Euro `EUR` · Mexican Peso `MXN` · Ruble `RUB` · Rupee `INR` · Saudi Riyal `SAR` · Shekel `ILS` · Swiss Franc `CHF` · UK Pound `GBP` · US Dollar `USD` · Yen `JPY` · Yuan `CNY`. 표에 없는 값은 행 검증 오류(`errors[]`).
-- **가벼운 검증(완료 API 이후, 적재 프로세스 안)**: S3 객체 존재·크기 일치 / 비어 있지 않음 / CSV 파싱 가능 / 헤더에 위 필수 10개 존재 / 데이터 행 ≥ 1 / 파일 해시 미중복. 행 단위 형식 오류는 적재 단계에서 `errors[]`로 모아 `VALIDATION_FAILED`(조회로 확인).
-- 인코딩·BOM·시각 형식·은행별 분할은 `[미정: Data — 시연 CSV 스펙, 9/7 전]`.
+- **검증 단계(구현 2026-09-08)**: 발급 시 — 파일 해시 미중복(`COMPLETED` 기준, 409)·크기 한도(413)·파일명 경로 문자(400). 완료 통지 시 — 객체 존재·크기 일치(400). 적재 1차 통과 — 비어 있지 않음 / 헤더에 위 필수 10개 존재("Account"는 등장 순서로 송·수신 구분) / 데이터 행 ≥ 1 / 행 단위 형식·통화·환율 오류를 `errors[]`(최대 100건)로 모아 하나라도 있으면 `VALIDATION_FAILED`. 오류가 없을 때만 2차 통과에서 삽입. 파일 안 중복 행과 원장에 이미 있는 행(`(bank_id,row_hash)`)은 건너뛰고 `duplicate_count`에 센다.
+- 현재 구현: UTF-8(BOM 허용), 쉼표 단순 분할(따옴표 없는 IBM 형식 전제), 시각 `yyyy/MM/dd HH:mm[:ss]` 또는 ISO 로컬 → 서울 시간. 은행별 분할·시각 형식·인코딩은 `[미정: Data — 시연 CSV 스펙(9/7 기한 경과·미회신) — 다르면 형식만 추가]`.
 
 ## 2. 층 2 — 추론·거래 점수·의심 거래
 
@@ -121,10 +121,10 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - 폴링: BE가 `results/{jobId}/result.json` 또는 `error.json`을 5초 간격, 최대 30분. 초과 = 일시 실패. 추론 에이전트는 `requests/*/manifest.json`을 폴링(1대만).
 - 검증(BE): 필수 열(`tx_id, p_laundering, p_0..p_8`) 존재·이름, 행 수, tx_id 집합, NaN. 불일치 = 영구 실패(`FAILED`, error_code `SCORES_MISMATCH`). **필수 열 외 추가 열은 허용하되 BE는 무시(WARN 로그)** — 모델 형태 확정 후 확장 열(예: 거래별 기여 요인 `contrib_*`, 임베딩)을 이 계약에 추가한다(§8 사용자 ② 보류 항목).
 - 정리: 성공·실패 확정 후 BE가 `requests/{jobId}/`·`results/{jobId}/` 삭제(보존 여부는 10월 Lifecycle에서).
-- MVP 운반: 실제 AWS S3(9/7). 9/9까지 없으면 로컬 폴더에 같은 경로로 관통 후 클라이언트만 교체.
+- MVP 운반: 실제 AWS S3(9/7 기한 경과·미도착). 수집 저장소와 같은 결정(로컬 폴더 우선)을 [모델 래핑 ②](9/11) 착수 시 확인 후 같은 경로로 관통, 클라이언트만 교체.
 
 ### 2.2 거래별 점수 테이블·파생 규칙
-- 저장: `(job_id, tx_id) PK, p_laundering, p_0..p_8` 그대로. 같은 job 재실행 시 삭제+삽입.
+- 저장: 테이블 `inference_results`(V1) — `(job_id, tx_id) PK, p_laundering, p_0..p_8, score_pct` 그대로. 같은 job 재실행 시 삭제+삽입.
 - 파생(BE, 조회 시 계산): `launderingScore = p_laundering`, `typeClass = argmax(p_0..p_8)`(p_0이 최대면 0 그대로), `typeScore = 그 확률`. 동점 시 낮은 코드.
 - 의심 거래 = `p_laundering >= threshold_value(그 job의 스냅샷)`. 저장 플래그가 아니라 파생. 임계는 프로퍼티 `app.suspicious-tx.threshold`(env `SUSPICIOUS_TX_THRESHOLD`), job 실행 시 batch_jobs에 스냅샷. `threshold_version`은 10월 thresholds 테이블에서.
 - `ruleHits[]`는 룰 기반(향후 확장) 전까지 항상 빈 배열 — 추론 산출물이 아니라 BE 룰 엔진 산출. 점수 테이블에 룰 컬럼을 두지 않는다.
@@ -198,8 +198,8 @@ Alert 테이블(W3 [스키마]):
 - **재실행 규칙**: 같은 job이 다시 돌면 `OPEN` Alert만 삭제·재생성(새로 배정). `ESCALATED`·`CLOSED`는 보존(alertId 유지). 처분된 Alert의 거래는 재묶음 입력에서 **제외**(확정 09-07).
 
 ### 3.2 조회
-- **GET /api/alerts** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`. 정렬 키: `riskScore, createdAt, lastTxAt, txCount, totalAmountUsd, scoreMax, weightedAmountUsd, ageDays`. 필터 `status`, `resolution`, `assigneeId`(`me` 허용), `typeClass`, `bankId`, `from/to`(lastTxAt 기준), `analysisDate`, `episodeId`. L1 기본 뷰 = `assigneeId=me&status=OPEN`. 필터 `unopened=true`(= `firstOpenedAt IS NULL`).
-  행: `{ alertId, riskScore, summary, primaryType: { code, name }, subjectAccount: { bank, account }, accountCount, bankCount, txCount, totalAmountUsd, amountsByCurrency: [{ currency, total }], scoreStats: { mean, max, aboveRatio }, weightedAmountUsd, typeEntropy, firstTxAt, lastTxAt, banks: [int], status, resolution, assignee: { userId, name }, assignedAt, firstOpenedAt, episodeId, analysisDate, createdAt, ageDays }`
+- **GET /api/alerts** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`. 정렬 키: `riskScore, createdAt, lastTxAt, txCount, totalAmountUsd, scoreMax, weightedAmountUsd, ageDays`. 필터 `status`, `resolution`, `assigneeId`(`me` 허용), `typeClass`, `bankId`, `from/to`(lastTxAt 기준), `analysisDate`, `episodeId`. L1 기본 뷰 = `assigneeId=me&status=OPEN`. (미배정·미열람 뷰는 없음 — 생성 즉시 배정되고 열람 여부는 표시하지 않는다.)
+  행: `{ alertId, riskScore, summary, primaryType: { code, name }, subjectAccount: { bank, account }, accountCount, bankCount, txCount, totalAmountUsd, amountsByCurrency: [{ currency, total }], scoreStats: { mean, max, aboveRatio }, weightedAmountUsd, typeEntropy, firstTxAt, lastTxAt, banks: [int], status, resolution, assignee: { userId, name }, assignedAt, episodeId, analysisDate, createdAt, ageDays }`
   - `summary`(2026-09-04 채택): BE 템플릿 한 줄 — `"{typeName} · 계좌 {accountCount} · 은행 {bankCount} · {기간 일수}일 · 총 USD {totalAmountUsd 축약}"` + 묶음 근거 1개(있으면). 저장하지 않고 조회 시 조합. 한글 명칭은 FE 매핑 전이므로 코드명으로 낸다.
   - `ageDays`: `now − createdAt`의 정수 일수(서버 계산 — 정렬·"N일 이상 미처리" 필터용). Episode 행에도 동일.
 - **GET /api/alerts/{alertId}** [전 역할] — 목록 행 + `transactions: [거래 행 §2.4 + role, includedReason, direction]`, `typeDistribution`, `accounts: [{ account, bank, role, inCount, inAmountUsd, outCount, outAmountUsd, maxScore, counterpartyCount, firstSeenAt }]`(§3.1 alert_accounts + 30일 기준선), `scoreTimeline: [{ txAt, score }]`(시각순), `explanation`(§2.2 — 포함 여부는 [W3 API]에서 성능 보고 결정), `groupingBasis: link_basis[]`, `graph`(아래).
@@ -208,31 +208,31 @@ Alert 테이블(W3 [스키마]):
 
 ### 3.3 Alert 상태 전이 표
 
-**공통 상태 모델 (2026-09-06 사용자 확정 — Alert·Episode 통일, 09-07 `IN_REVIEW` 제거)**: 생애는 `OPEN`(담당자에게 배정되어 처리 중) → `CLOSED`(종결). 종결 결과는 상태에 넣지 않고 별도 필드 **`resolution`**(`CLOSED`일 때만 값, 그 외 NULL). Alert만 `ESCALATED`(Episode 귀속, `episodeId != null`과 항상 일치)를 추가로 가진다 — Episode에는 "넘김" 단계가 없다(감독기관형 범위, 보고 단계 없음). 열람은 상태를 바꾸지 않는다: 담당자의 첫 열람은 **`firstOpenedAt`**(nullable, 이력 `REVIEW_START`)에만 기록되고, null이면 화면에 "미열람" 표시. 재배정 시 `firstOpenedAt`은 초기화. dberd 정합 메모 결정 2(`NEW/CLOSED + resolution`) 해소.
+**공통 상태 모델 (2026-09-06 사용자 확정 — Alert·Episode 통일, 09-07 `IN_REVIEW` 제거)**: 생애는 `OPEN`(담당자에게 배정되어 처리 중) → `CLOSED`(종결). 종결 결과는 상태에 넣지 않고 별도 필드 **`resolution`**(`CLOSED`일 때만 값, 그 외 NULL). Alert만 `ESCALATED`(Episode 귀속, `episodeId != null`과 항상 일치)를 추가로 가진다 — Episode에는 "넘김" 단계가 없다(감독기관형 범위, 보고 단계 없음). 열람은 상태를 바꾸지 않는다: 담당자의 첫 열람은 **이력 행 `REVIEW_START`로만** 남긴다(2026-09-08 사용자 확정 — `first_opened_at` 컬럼 없음, 화면 표시 없음). "첫 열람" 판정 = 현재 담당자의 `REVIEW_START`가 마지막 `ASSIGN`(없으면 생성) 이후에 없을 때 기록. 재배정되면 새 담당자의 첫 열람이 다시 기록된다. dberd 정합 메모 결정 2(`NEW/CLOSED + resolution`) 해소.
 
 Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSITIVE`.
 
 | from | to | 액션 / 엔드포인트 | 허용 역할 | 필수 입력 | 이력 action |
 |---|---|---|---|---|---|
-| OPEN | (유지) | `GET /api/alerts/{id}` — 담당 L1(assignee)의 첫 열람이면 `firstOpenedAt` 기록(다른 사용자 열람은 기록 없음) | L1(assignee) | — | `REVIEW_START` |
-| OPEN | OPEN | `POST /api/alerts/{id}/assign` `{ userId, comment }` — 재배정(L1 사용자), `firstOpenedAt` 초기화 | ADMIN | userId, comment | `ASSIGN` |
+| OPEN | (유지) | `GET /api/alerts/{id}` — 담당 L1(assignee)의 첫 열람이면 이력 기록(다른 사용자 열람은 기록 없음) | L1(assignee) | — | `REVIEW_START` |
+| OPEN | OPEN | `POST /api/alerts/{id}/assign` `{ userId, comment }` — 재배정(L1 사용자) | ADMIN | userId, comment | `ASSIGN` |
 | OPEN | CLOSED (`resolution: NORMAL`) | `POST /api/alerts/{id}/close` `{ resolution: NORMAL, comment }` | L1 | resolution, comment | `CLOSE` |
 | OPEN | CLOSED (`resolution: FALSE_POSITIVE`) | 같은 엔드포인트 `{ resolution: FALSE_POSITIVE, comment }` | L1 | resolution, comment | `CLOSE` |
 | OPEN | ESCALATED | `POST /api/episodes` `{ alertIds[], comment }` (신규 Episode — 담당 L2는 라운드로빈 자동 §3.4) | L1 | alertIds ≥1, comment | `ESCALATE` |
 | OPEN | ESCALATED | `POST /api/episodes/{episodeId}/alerts` `{ alertIds[], comment }` (기존 Episode에 연결 — **Alert 화면에서 L1이 수행**, Episode 화면엔 연결 없음 09-07) | L1 | comment | `LINK` |
-| ESCALATED | OPEN | `DELETE /api/episodes/{episodeId}/alerts/{alertId}` `{ comment }` — 해제되면 기존 담당 L1에게 돌아감(`firstOpenedAt` 유지) | L2 | comment; Episode에 Alert가 2개 이상일 때만(빈 Episode 불허) | `UNLINK` |
+| ESCALATED | OPEN | `DELETE /api/episodes/{episodeId}/alerts/{alertId}` `{ comment }` — 해제되면 기존 담당 L1에게 돌아감 | L2 | comment; Episode에 Alert가 2개 이상일 때만(빈 Episode 불허) | `UNLINK` |
 | CLOSED | — | 어떤 액션도 불가 → 409 `INVALID_TRANSITION` | | | |
 | ESCALATED | CLOSED | 불가(Episode 종결로만) → 409 | | | |
 | OPEN | ESCALATED (CLOSED Episode에) | 불가 → 409 | | | |
 
-- 대시보드 처리 흐름은 ① 미처리 Alert(`OPEN`, L1 담당) ② 경과일 ③ L2 조사 중(`ESCALATED` = Episode `OPEN`) ④ 처분(`CLOSED` + resolution). "미열람 n"은 ①·③의 부제(`firstOpenedAt IS NULL`).
+- 대시보드 처리 흐름은 ① **L1 조사 중**(`OPEN`) ② 조사 경과일 ③ L2 조사 중(`ESCALATED` = Episode `OPEN`) ④ 처분(`CLOSED` + resolution). 화면에 "미열람" 표시는 두지 않는다(2026-09-07 사용자 — 배정됐는데 안 열어본 것을 구분해 보여줄 필요 없음). 열람은 이력 `REVIEW_START`로만 남긴다(컬럼 없음).
 - 재실행 규칙(§3.1)과의 관계: 같은 job 재실행 시 삭제·재생성 대상은 `OPEN`만(재생성분은 새로 배정). `ESCALATED`·`CLOSED`는 보존.
 
 ### 3.4 배정 규칙 (Alert·Episode 공통 — 2026-09-07 사용자 확정, 모델 A)
 
 - **생성 시 자동 라운드로빈**: Alert는 일별 분석이 만든 직후 BE가 L1 사용자 중 한 명에게, Episode는 `POST /api/episodes` 직후 L2 사용자 중 한 명에게 배정. 대상 풀 = 해당 역할의 사용자 전원(부재·비활성 처리는 11월 [권한관리]). 선택 규칙 = `users.last_assigned_at`이 가장 오래된 사용자(NULL 우선, 동률이면 `userId` 오름차순), 배정 후 갱신. 한 job이 Alert N건을 만들면 N번 순환한다.
 - **재배정**: `POST /api/alerts/{id}/assign`, `POST /api/episodes/{id}/assign` `{ userId, comment }` — **ADMIN 전용**. 대상은 같은 역할(L1/L2)의 사용자여야 한다(아니면 400). 재배정되면 상태는 `OPEN`으로, 이력 `ASSIGN`(`relatedIds` = 이전·이후 userId). CLOSED는 재배정 불가(409).
-- **행위 제한**: MVP는 담당자가 아니어도 같은 역할이면 처분 가능(§0 범위 제한 없음). "담당자만 처분"은 10월. `firstOpenedAt` 기록은 담당자 열람에만 걸린다.
+- **행위 제한**: MVP는 담당자가 아니어도 같은 역할이면 처분 가능(§0 범위 제한 없음). "담당자만 처분"은 10월. `REVIEW_START` 기록은 담당자 열람에만 걸린다.
 - 실무 근거: Oracle AM 배치 배정(사용자·풀, 규칙 기반)·ECM 자동 할당(개인별 최대 건수·부재 시 중단), Sardine 큐 라운드로빈, Unit21 관리자 재배정(500건 일괄) — 리서치 문서 §2.10. 개인별 보유 상한·부재 규칙은 11월 후보.
 
 - `resolution` `NORMAL` = 정상 거래로 판단, `FALSE_POSITIVE` = 모델 오탐(둘 다 평가 지표 라벨로 쓰인다). 종결 필터는 `status=CLOSED&resolution=…`.
@@ -242,7 +242,7 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
 ## 4. 층 4 — Episode·조사
 
 ### 4.1 조회
-- **GET /api/episodes** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`(riskScore = 소속 Alert riskScore 최대값 `[미정: Data 동의]`). 정렬 키 `riskScore, createdAt, updatedAt, alertCount, ageDays`. 필터 `status`, `resolution`, `assigneeId`, `from/to`(createdAt). "내 담당" 뷰 = `assigneeId=me`, "새로 배정" 뷰 = `status=OPEN&assigneeId=me`.
+- **GET /api/episodes** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`(riskScore = 소속 Alert riskScore 최대값 `[미정: Data 동의]`). 정렬 키 `riskScore, createdAt, updatedAt, alertCount, ageDays`. 필터 `status`, `resolution`, `assigneeId`, `from/to`(createdAt). "내 담당" 뷰 = `assigneeId=me`(§7과 같이 내 담당·전체 두 뷰).
   행: `{ episodeId, riskScore, alertCount, txCount, totalAmountUsd, amountsByCurrency: [{ currency, total }], primaryTypes: [{ code, name }], assignee: { userId, name }, status, resolution, createdBy: { userId, name }, createdAt, updatedAt, closedAt, ageDays }`
 - **GET /api/episodes/{episodeId}** [전 역할] — 행 + `alerts: [Alert 목록 행]`, `history: [§6 행]` + **조사 블록 6종(2026-09-07 사용자 확정, 전부 MVP — 리서치 §2.11)**. 전부 조회 시 원장·점수·피처·이력에서 파생(저장 없음), 대표 계좌 = 소속 Alert 중 riskScore 최대 Alert의 `subjectAccount`:
   - `baseline`: `{ account, bank, windowDays: 30, firstSeenAt, accountAgeDays, metrics: [{ key: IN_USD | IN_COUNT | OUT_USD | OUT_COUNT | NEW_COUNTERPARTIES | MEDIAN_GAP_HOURS, current, baseline, ratio }] }` — current = Episode 기간, baseline = 직전 30일 창(피처 테이블·원장).
@@ -258,7 +258,7 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
 
 ### 4.2 액션
 - **POST /api/episodes** [L1] `{ alertIds[], comment }` → 201 `{ episodeId, assignee }`. Episode `OPEN`, 담당 L2는 **BE가 라운드로빈으로 배정**(§3.4 — L1이 고르지 않는다), Alert들 `ESCALATED`.
-- **GET /api/episodes/{id}** — 담당 L2(assignee)의 첫 열람이면 `firstOpenedAt` 기록, 이력 `REVIEW_START`. 상태 변화 없음. 다른 사용자 열람은 기록 없음.
+- **GET /api/episodes/{id}** — 담당 L2(assignee)의 첫 열람이면 이력 `REVIEW_START`(판정 규칙 §3.3). 상태 변화 없음. 다른 사용자 열람은 기록 없음.
 - **POST /api/episodes/{id}/alerts** [L1] `{ alertIds[], comment }` — `OPEN` Alert만 연결 가능. **진입점은 Alert 상세의 "심층 요청 → 기존 Episode에 연결"뿐**(2026-09-07 사용자 확정). L2는 다른 담당의 Alert를 끌어오지 않는다 — Episode 화면의 "관련 Alert 후보"는 정보 표시만, 연결은 그 Alert의 담당 L1이 한다. 대상 Episode는 `CLOSED`가 아니어야 한다(409).
 - **DELETE /api/episodes/{id}/alerts/{alertId}** [L2] `{ comment }` — 연결 해제. Alert `OPEN` 복귀, 기존 담당 L1 유지. 마지막 Alert면 409.
 - **POST /api/episodes/{id}/assign** [ADMIN] `{ userId, comment }` — 재배정(L2 사용자, §3.4). **재배정되면 Episode는 `OPEN`으로 돌아간다**(새 담당이 아직 안 열었으므로).
@@ -267,20 +267,20 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
 
 ### 4.3 Episode 상태 전이 표
 
-상태: `OPEN`(담당 L2 조사 중) / `CLOSED`. `resolution: NORMAL | SUSPICIOUS`(`CLOSED`일 때만). Alert와 같은 공통 모델(§3.3) — `ESCALATED`만 없다. 미열람 = `firstOpenedAt IS NULL`.
+상태: `OPEN`(담당 L2 조사 중) / `CLOSED`. `resolution: NORMAL | SUSPICIOUS`(`CLOSED`일 때만). Alert와 같은 공통 모델(§3.3) — `ESCALATED`만 없다. 열람은 이력 `REVIEW_START`로만.
 
 | from | to | 액션 | 허용 역할 | 필수 입력 | 이력 action |
 |---|---|---|---|---|---|
 | — | OPEN | `POST /api/episodes` (담당 L2는 라운드로빈 자동) | L1 | alertIds, comment | `ESCALATE`(각 Alert) + `EPISODE_CREATE` + `ASSIGN`(SYSTEM) |
-| OPEN | (유지) | `GET /api/episodes/{id}` — 담당 L2 첫 열람이면 `firstOpenedAt` 기록 | L2(assignee) | — | `REVIEW_START` |
+| OPEN | (유지) | `GET /api/episodes/{id}` — 담당 L2 첫 열람이면 이력 기록 | L2(assignee) | — | `REVIEW_START` |
 | OPEN | (유지) | alerts 추가(Alert 화면에서) | L1 | comment | `LINK` |
 | OPEN | (유지) | alerts 해제 / comments | L2 | comment | `UNLINK` / `COMMENT` |
-| OPEN | OPEN | assign(재배정), `firstOpenedAt` 초기화 | ADMIN | userId, comment | `ASSIGN` |
+| OPEN | OPEN | assign(재배정) | ADMIN | userId, comment | `ASSIGN` |
 | OPEN | CLOSED | `POST /api/episodes/{id}/close` | L2 | resolution, comment | `EPISODE_CLOSE` |
 | CLOSED | — | 모든 변경 불가 → 409 | | | |
 
 - 역할 요약: L1 = Alert 종결·심층 요청(신규 Episode 생성 / 기존 Episode에 연결 — 둘 다 Alert 화면). L2 = Episode 조사(해제·의견·종결; 10월 분리·병합). ADMIN = 배정·재배정 + 전체 조회, 조사 액션 없음.
-- Episode 상태 표시 관점: 대시보드 "L2 조사 중" 칸 = Episode `OPEN`(Alert로는 `ESCALATED`). "새로 배정·미열람" = `OPEN` ∧ `firstOpenedAt IS NULL`.
+- Episode 상태 표시 관점: 대시보드 "L2 조사 중" 칸 = Episode `OPEN`(Alert로는 `ESCALATED`). 미배정 상태는 존재하지 않고(생성 즉시 배정), 열람 여부는 화면에 표시하지 않는다(이력 `REVIEW_START`만).
 
 ## 5. 인증·사용자 (W4 [인증] — 초안, 방식은 미정)
 
@@ -288,7 +288,7 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
 - **POST /api/auth/logout** → 204.
 - **GET /api/me** → `{ userId, name, role }`.
 - **GET /api/users?role=L1|L2** [ADMIN·전 역할 조회] — 재배정 대상 선택용 `[{ userId, name, role, lastAssignedAt }]`. 사용자 생성·수정은 11월 [권한관리].
-- 사용자 테이블에 `last_assigned_at`(§3.4 라운드로빈 포인터). MVP 시드 사용자: **L1 2명, L2 2명**, ADMIN 1명(비밀번호는 환경변수 시드) — 라운드로빈이 시연에서 보이려면 역할당 2명 이상 필요.
+- 사용자 테이블에 `last_assigned_at`(§3.4 라운드로빈 포인터). MVP 시드 사용자: **L1 2명, L2 2명**, ADMIN 1명(V1 시드 `l1a`·`l1b`·`l2a`·`l2b`·`admin`, 비밀번호는 W4에서 환경변수로 채움) — 라운드로빈이 시연에서 보이려면 역할당 2명 이상 필요.
 
 ## 6. 감사 이력
 
@@ -298,14 +298,14 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
   relatedIds: [], from, to, resolution, comment, at }
 ```
 - `from`/`to`는 상태(공통 모델 §3.3), `resolution`은 `CLOSE`·`EPISODE_CLOSE` 행에만 값(그 외 null).
-- `action` enum: `REVIEW_START, CLOSE, ESCALATE, LINK, UNLINK, ASSIGN, COMMENT, EPISODE_CREATE, EPISODE_CLOSE` (10월 예약: `SPLIT, MERGE, MOVE`). `REVIEW_START`는 조회가 만드는 유일한 행 — `comment` 없음(§0 "처분 액션 comment 필수"의 예외), 상태 변화 없음(`from = to = OPEN`), 담당자당 1회(`firstOpenedAt` 기록 시점).
+- `action` enum: `REVIEW_START, CLOSE, ESCALATE, LINK, UNLINK, ASSIGN, COMMENT, EPISODE_CREATE, EPISODE_CLOSE` (10월 예약: `SPLIT, MERGE, MOVE`). `REVIEW_START`는 조회가 만드는 유일한 행 — `comment` 없음(§0 "처분 액션 comment 필수"의 예외), 상태 변화 없음(`from = to = OPEN`), 담당자당 1회(판정 규칙 §3.3 — 마지막 `ASSIGN` 이후 현재 담당자의 행이 없을 때).
 - `relatedIds`: LINK/UNLINK 시 episodeId·alertId 쌍, ASSIGN 시 이전·이후 userId.
 - **GET /api/alerts/{id}/history**, **GET /api/episodes/{id}/history** — Episode 이력은 소속 Alert의 ESCALATE/LINK/UNLINK 행을 포함.
 - **GET /api/history?actor={userId}** [ADMIN·본인] — 사용자별 처리 이력(기획서 요구, 11월 [권한관리]에서 구현, 시그니처 예약).
 
 ## 6.5 대시보드 (W4 [Episode 조사 데이터 ⑥ + 대시보드], 09-29 — 처리 흐름 4칸 + 담당자별)
 
-- **GET /api/dashboard/summary** [전 역할] — `{ alertsByStatus: { OPEN, ESCALATED, CLOSED }, alertsUnopened, alertsByResolution: { NORMAL, FALSE_POSITIVE }, alertsByType: [{ code, name, count }], episodesByStatus: { OPEN, CLOSED }, episodesUnopened, episodesByResolution: { NORMAL, SUSPICIOUS }, alertsByAssignee: [{ userId, name, open, unopened, closedToday, escalatedToday, maxAgeDays }], episodesByAssignee: [{ userId, name, open, unopened, closedLast7Days, maxAgeDays }], latestJob: { jobId, analysisDate, status, suspiciousTxCount, alertCount, finishedAt }, reductionRate }` — `reductionRate = 1 - alertCount / suspiciousTxCount`(최근 job). 지표 추가는 `[미정: FE — 시연 화면]`.
+- **GET /api/dashboard/summary** [전 역할] — `{ alertsByStatus: { OPEN, ESCALATED, CLOSED }, alertsByResolution: { NORMAL, FALSE_POSITIVE }, alertsByType: [{ code, name, count }], episodesByStatus: { OPEN, CLOSED }, episodesByResolution: { NORMAL, SUSPICIOUS }, alertsByAssignee: [{ userId, name, open, closedToday, escalatedToday, maxAgeDays }], episodesByAssignee: [{ userId, name, open, closedLast7Days, maxAgeDays }], latestJob: { jobId, analysisDate, status, suspiciousTxCount, alertCount, finishedAt }, reductionRate }` — `reductionRate = 1 - alertCount / suspiciousTxCount`(최근 job). 지표 추가는 `[미정: FE — 시연 화면]`.
 
 ## 7. 화면별 제공 항목 (FE 통보용 — 회신 요청)
 
@@ -316,18 +316,18 @@ FE는 아래에서 **표시할 항목을 고르고, 빠진 항목을 요구**한
 | 수집·처리현황 (은행별 도착 현황) | §1.1, §1.2 | **은행별 도착 현황**(`GET /api/banks/arrivals`: 은행·상태 7종·파일명·행 수·도착 시각·컷오프 잔여·도착 n/N) / 적재 작업 목록·오류 표(`errors[]`) / 분석 작업 목록(status·attempt·analysisDate·모델 버전·임계·의심 거래·Alert) / "분석 실행" 버튼 = `POST /api/batch-jobs/analysis` / 사이트에 업로드 버튼 없음(은행·목업이 API로 전송) / ADMIN 은행·키 관리는 10월 |
 | Alert 목록 (L1 큐) | §3.2 | 위험도, **요약문**, 대표 유형(코드·명), **대표 계좌·계좌 수·은행 수**, 거래 수, **USD 합계 + 통화별 합계**, **점수 통계(평균·최고·초과 비율)·점수 가중 금액·묶음 순도**, 기간(첫·마지막 거래), 참여 은행, 상태, **담당자(자동 배정)**, 소속 Episode, 분석 날짜, 생성 시각, **경과일** / 정렬 8종 / 필터 7종("내 담당" 기본 뷰) / ADMIN: 재배정 |
 | Alert 상세 (L1) | §3.2, §3.3 | 목록 항목 + 구성 거래 표(§2.4 — 금액 USD·**백분위·임계 배율·의심 여부·복합 유형 후보·두 모델 합의·편입 역할·방향** 포함) + 유형 구성비 + 묶음 근거 + **참여 계좌 표(역할·in/out 건수·USD·최대 점수·상대방 수·첫 거래일)** + **시각순 점수 추이** + **설명 요인(피처 기준선 편차 상위 3, 포함 방식은 W3)** + 관계 그래프(노드 역할·금액·위험 등급, 엣지 id·거래 수·USD·최대 점수·유형·기간) + 이력 / 액션: 종결(정상·오탐, 의견 필수)·심층 요청(신규 Episode — L2 자동 배정 / 기존 Episode 연결) / ADMIN: 재배정 |
-| Episode 목록 (L2 큐) | §4.1 | 위험도·자동 제목·Alert 수·거래 수·USD·유형들·담당자·상태(OPEN/CLOSED)·미열람·결과·요청 L1·경과일 / 뷰: 내 담당·미열람·전체 / 정렬·필터 §4.1 |
+| Episode 목록 (L2 큐) | §4.1 | 위험도·자동 제목·Alert 수·거래 수·USD·유형들·담당자·상태(OPEN/CLOSED)·결과·요청 L1·경과일 / 뷰: 내 담당·전체 / 정렬·필터 §4.1 |
 | Episode 상세 (L2 조사) | §4 | 상세(조사 순서): 소속 Alert 표 → ① 기준선 배율 → ② 자금 흐름 요약 → ③ 패턴 증거 체크 → ④ 상대방 표(다른 Alert 포함) → ⑤ 자금 경로 그래프(hops=0/1) + 연계 거래 → ⑥ 관련 계좌 이력 → ⑦ 의견·이력 → ⑧ 결론(who/what/when/where/why/how 템플릿 + resolution + 서술) / 액션: Alert 해제·조사 의견·종결 — 연결은 Alert 화면(L1) / ADMIN: 재배정 |
 | (관계 그래프) | §3.2 graph · §4.1 graph | 독립 화면이 아니라 Alert 상세·Episode 상세 안의 패널(노드 = 계좌). Alert = 구성 거래 그래프, Episode = 합집합 + Alert 밖 1 hop. 다기관 전체 그래프는 11월 |
-| 대시보드 | §6.5 | 처리 흐름 4칸(미처리 OPEN + 미열람 → 경과일 → L2 조사 ESCALATED/Episode OPEN + 미열람 → 처분 CLOSED + resolution 분포), 유형 분포, 담당자별(L1·L2), 최근 배치, 감소율 |
+| 대시보드 | §6.5 | 처리 흐름 4칸(L1 조사 중 OPEN → 조사 경과일 → L2 조사 중 ESCALATED/Episode OPEN → 처분 CLOSED + resolution 분포), 유형 분포, 담당자별(L1·L2), 최근 배치, 감소율. 미열람 표시 없음 |
 | 로그인 | §5 | 사용자·역할 반환. 역할별 첫 화면(L1 → Alert 목록 "내 담당", L2 → Episode 목록 "내 담당", ADMIN → 대시보드). 시연은 L1·L2 계정 전환 + ADMIN 재배정 1회(선택) |
 | 모델 성능·버전 / 사용자·권한 | — | 시연 이후(10~11월) |
 
 ## 8. 미정 목록 (회신 주체별)
 
 **FE**: ① 금액 **화면 표기 방식**(축약·자릿수 — 데이터 형태는 §0 BE 결정으로 해소) ② 그래프 응답 포함 vs 분리(BE 추천: 분리), 시각화 라이브러리 ③ 유형 한글 표시 명칭·'의심 거래' 표시 명칭(초안: 리서치 문서 §4.6) ④ §7 회신(빠진 항목) ⑤ 인증 방식 결정 기한(로그인 착수 시점) ⑥ 대시보드 추가 지표(후보: 위험 밴드 분해·미결 경과일 중앙/최대·처분 결과 분포·은행별·담당자별 부하·Alert→Episode 전환율).
-**Data**: ① 시연 CSV 시각 형식·인코딩·은행별 분할(9/7 전) ② ~~이진 모델 피처 세트 동일 여부~~ → 다름·구성 변동으로 확정(09-07, §2.1) — 각 세트의 현재 컬럼 목록은 [모델 래핑] 때 피처 빌더에서 읽는다 ③ Σp 보장·dtype ④ `link_basis` 산출 가능 여부(+ 거래별 `role`/허브 계좌 산출 가능 여부) ⑤ ~~처분된 Alert 거래 제외 여부~~ → 제외로 확정(09-07, §3.1) — 알고리즘 입력 = 미소속 거래만 ⑥ Episode 위험도 = max Alert riskScore 동의 ⑦ 점수 적재 스텝에서 job 내 백분위(`score_pct`) 계산 추가 동의 ⑧ 학습 산출물(run json: 검증 PR-AUC, recall별 임계·precision·알람 수, 유형별 OVR PR-AUC, 피처 중요도) 인도 형식·시점 — 10월 [모델 관리] `model_versions` 입력, W2 캘리브레이션에도 사용.
-**Infra**: ① BE IAM 키에 `uploads/` PUT용 Presigned 서명 + HEAD/GET 권한(9/7 항목에 추가) ② 버킷 CORS 불필요(서버 간 PUT) 확인.
+**Data**: ① 시연 CSV 시각 형식·인코딩·은행별 분할(9/7 기한 경과·미회신 — IBM 원본 형식으로 진행 중, §1.4) ② ~~이진 모델 피처 세트 동일 여부~~ → 다름·구성 변동으로 확정(09-07, §2.1) — 각 세트의 현재 컬럼 목록은 [모델 래핑] 때 피처 빌더에서 읽는다 ③ Σp 보장·dtype ④ `link_basis` 산출 가능 여부(+ 거래별 `role`/허브 계좌 산출 가능 여부) ⑤ ~~처분된 Alert 거래 제외 여부~~ → 제외로 확정(09-07, §3.1) — 알고리즘 입력 = 미소속 거래만 ⑥ Episode 위험도 = max Alert riskScore 동의 ⑦ 점수 적재 스텝에서 job 내 백분위(`score_pct`) 계산 추가 동의 ⑧ 학습 산출물(run json: 검증 PR-AUC, recall별 임계·precision·알람 수, 유형별 OVR PR-AUC, 피처 중요도) 인도 형식·시점 — 10월 [모델 관리] `model_versions` 입력, W2 캘리브레이션에도 사용.
+**Infra**: ① BE IAM 키에 `uploads/` PUT용 Presigned 서명 + HEAD/GET 권한(9/7 기한 경과·미도착 — 로컬 폴더 구현으로 진행 중 §1.1, 도착 시 `UploadStore` S3 구현 + AWS SDK 의존성 추가) ② 버킷 CORS 불필요(서버 간 PUT) 확인.
 **Data 추가(09-07)**: ⑨ Episode 조사 블록 패턴 증거 항목·통과 기준 초안 검토(§4.1) ⑩ 시연 CSV 은행별 분할 형식(은행 목업이 파일 단위로 전송).
 **사용자**: ① ~~`is_laundering` 원장 보관 여부~~ → 평가 스키마 분리로 확정(09-07, §1.4) ② **최종 모델 형태 — 지금 답할 수 없음(2026-09-07 사용자)**: 모델 개선 결과에 따라 정해진다. 질문 목록에서 제외하고, 계약은 필수 열 + 무시되는 확장 열 규칙(§2.1)·모델별 피처 파일·`feature_version_*`로 어느 형태든 수용한다. 형태가 정해지면 그때 엣지 파일·`pred_contrib`·run 지표 인도 형식을 추가한다.
 해소됨(v0.2): 점수 필드명, 유형 매핑표, 페이지네이션·정렬, 에러 응답, 배치 상태, 상태 전이, 역할 표, 감사 이력 행, 임계 저장(threshold_value 스냅샷). 해소됨(v0.3): 금액·통화 데이터 형태(USD 환산 병기·ISO 코드), Alert 요약·대표 계좌·참여 계좌·점수 통계·거래 편입 역할·점수 파생 확장.

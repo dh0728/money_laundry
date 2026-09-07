@@ -1,6 +1,6 @@
 # ERD 스케치 — 2026-09-07 ([W2 DB 설계])
 
-지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.3이다.
+지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.4다.
 팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 이 문서는 V1에 든 테이블과 W3·W4에서 추가할 테이블을 한 그림에 둔다.
 
 용어(kickoff §2.5): `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`.
@@ -129,7 +129,6 @@ erDiagram
         bigint episode_id FK "ESCALATED과 항상 일치"
         bigint assignee_id FK "L1, NOT NULL"
         timestamptz assigned_at
-        timestamptz first_opened_at "NULL = 미열람"
     }
     alert_transactions {
         bigint alert_id PK_FK "W3"
@@ -154,7 +153,6 @@ erDiagram
         varchar resolution "NORMAL | SUSPICIOUS"
         bigint assignee_id FK "L2"
         timestamptz assigned_at
-        timestamptz first_opened_at
         bigint created_by FK "L1"
         timestamptz closed_at
     }
@@ -192,13 +190,13 @@ erDiagram
 - **`alerts`** (W3 [스키마]): `job_id` FK, `subject_account_id` FK(nullable), `assignee_id` FK users NOT NULL(라운드로빈), `episode_id` FK episodes(nullable, `status = ESCALATED`와 항상 일치 — CHECK), `status`·`resolution`(CLOSED일 때만 — CHECK). 파생 요약 컬럼(`tx_count`, `total_amount_usd`, `amounts_by_currency`, `account_count`, `bank_count`, `score_*`, `weighted_amount_usd`, `type_entropy`, `first_tx_at`, `last_tx_at`, `link_basis`)은 API.md §3.1. `episodes`를 참조하므로 W3에서 `episodes` 뼈대(id·status)를 먼저 만들거나 W4에서 FK를 추가한다 — W3 [스키마] 때 정한다.
 - **`alert_transactions`** (W3): PK `(alert_id, tx_id)` + **`UNIQUE(tx_id)`**(착수 결정 4). 처분된 Alert의 거래는 재묶음 입력에서 제외.
 - **`alert_accounts`** (W3): PK `(alert_id, account_id)` + `INDEX(account_id)`(관련 Alert·계좌 이력 조회 — V1 필수 목록의 세 번째 인덱스, 테이블이 생기는 W3에서 함께).
-- **`episodes`** (W4 [워크플로]): `assignee_id` FK users(L2), `created_by` FK users(L1), `status`·`resolution`·`first_opened_at`. Alert : Episode = N : 1(`alerts.episode_id`) — dberd `case_alerts` N:M을 채택하지 않음(정합 메모 B).
+- **`episodes`** (W4 [워크플로]): `assignee_id` FK users(L2), `created_by` FK users(L1), `status`·`resolution`. 담당자 첫 열람은 `first_opened_at` 컬럼 없이 이력 `REVIEW_START`로만(2026-09-08 사용자 확정, Alert도 동일). Alert : Episode = N : 1(`alerts.episode_id`) — dberd `case_alerts` N:M을 채택하지 않음(정합 메모 B).
 - **`history`** (W4, 감사 이력 단일 테이블): `actor_type`·`actor_id`·`action`·`target_type`·`target_id`·`related_ids`·`from_status`·`to_status`·`resolution`·`comment`·`created_at`. dberd `alert_events`의 `actor_type`·`details` 채택, `request_id`는 MDC 도입 후.
 - 10월 예약: `thresholds`(threshold_version), `bank_api_keys`(키 회전이 필요해지면 `banks.api_key_hash`를 분리), `model_versions`, `batch_jobs.grouping_version`(Alert 구성 알고리즘 버전 — 정합 메모 A 권장, W3 [스키마]에서 `alerts`와 함께 넣을지 결정).
 
 ## 4. 이 태스크에서 정한 컨벤션 (2026-09-07 사용자 확인 완료)
 
-- **금액 `NUMERIC(24,6)`**(dberd 타입 채택 — API.md §1.4의 `numeric(18,2)`는 Bitcoin 소수 6자리를 잃는다. HI-Small 실측 최대 6자리).
+- **금액 `NUMERIC(24,6)`**(dberd 타입 채택 — 초안의 `numeric(18,2)`는 Bitcoin 소수 6자리를 잃는다. HI-Small 실측 최대 6자리. API.md §1.4 v0.4에서 정정).
 - **확률 `DOUBLE PRECISION`**(scores.parquet float64 그대로, Python 적재에 변환 없음. dberd `NUMERIC(8,7)`과 다름).
 - **환율 의미**: `fx_rates_usd.txt`는 "1 USD당 통화 단위"(EUR 0.8534, JPY 105.4)이므로 `amount_usd = amount_paid / units_per_usd`. API.md §1.4 정정 완료(09-07).
 - **은행 API 키 시드는 V1에 없다**: 키는 환경변수이므로 SQL 시드가 불가 — [원장 적재]에서 기동 시 upsert(보고 은행 3~4곳 + 해시).
