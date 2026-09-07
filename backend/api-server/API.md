@@ -10,7 +10,7 @@
 
 - **식별자**: `uploadId`(INGEST 작업, bigint), `jobId`(ANALYSIS 작업, bigint — 같은 batch_jobs 시퀀스), `txId`(원장 거래, bigint), `alertId`·`episodeId`·`userId`(bigint). 전부 서버 발급. W1의 `uploadId`(uuid)는 W2 [원장 적재]에서 bigint로 교체.
 - **DB 컬럼 명명(2026-09-07 사용자 확정)**: 거래 식별자는 DB·S3 파일 모두 `tx_id`(§2.1 파일 계약과 일치 — Python 파이프라인이 DB를 직접 읽으므로 이름 하나). 그 외는 팀 ERD 이름(`occurred_at`, `amount_paid`, `bank_id INT`). API는 camelCase 경계 변환(`txId`, `txAt`).
-- **표기**: JSON 필드는 camelCase. Python 파이프라인·S3 산출물은 snake_case — BE가 경계에서 변환. 점수는 전부 0~1 실수. 시각은 ISO-8601 UTC.
+- **표기**: JSON 필드는 camelCase. Python 파이프라인·S3 산출물은 snake_case — BE가 경계에서 변환. 점수는 전부 0~1 실수. **시각은 ISO-8601에 서울 표준시 오프셋(`+09:00`)을 붙여 낸다**(2026-09-08 사용자 확정, 프로퍼티 `app.zone`). 시간대 표기가 없는 입력 시각(CSV Timestamp)도 서울 시간으로 해석한다.
 - **금액·통화(BE 결정 2026-09-04)**: 통화는 ISO 4217 코드로 정규화해 내보낸다(IBM 통화명 15종 → 코드 매핑표 §1.4, Bitcoin = `BTC`). 모든 금액 필드에 **원 통화 금액 + `…Usd` 환산액**을 병기한다. 환산은 모델 학습에 쓴 고정 환율표(`data_work/fx_rates_usd.txt` 스냅샷 → V1 `fx_rates` 테이블 `fx_rates_usd_v1`, 2026-09-07)로 적재 시 계산. 합계는 `totalAmountUsd` + `amountsByCurrency[{ currency, total }]`. 화면 표기 방식(축약·자릿수)만 FE 소관.
 - **페이지네이션(BE 결정)**: 목록은 `{ content: [], page, size, totalElements, totalPages }`. 쿼리 `page`(0부터)·`size`(기본 20, 최대 200)·`sort=field,asc|desc`(복수 허용). 빈 목록 = 200 + 빈 `content`.
 - **에러 응답(BE 결정)**: RFC 9457 ProblemDetail `{ type, title, status, detail, instance }` + 확장 `code`(문자열 enum, 아래 표)·`id`(관련 uploadId/jobId/alertId, 없으면 생략). 상태 코드: 400 검증·형식, 401 미인증, 403 역할 불가, 404 없음, 409 상태 충돌·중복, 413 파일 한도, 500 서버·워커 실패.
@@ -48,11 +48,11 @@
 - **POST /api/bank/uploads/{uploadId}/complete** [BANK] → BE가 S3 HEAD로 존재·크기 확인(불일치 = 400 `UPLOAD_MISMATCH`) → 상태 `RECEIVED` → 가벼운 검증(§1.4) → 표준화·가명화(Data 진입점) → 원장 적재 → `COMPLETED`. **응답 202** `{ uploadId, status: "RECEIVED" }`, 적재는 비동기(MVP: 완료 API가 워커 프로세스를 직접 호출, 10월: SQS 메시지 발행). 결과는 `GET /api/uploads/{uploadId}`로 조회. 검증 실패는 아무것도 적재하지 않는다(all-or-nothing, `VALIDATION_FAILED` + `errors[]`).
 - URL 발급 후 완료 통지 없이 만료된 건은 도착 현황에서 "미도착(URL 발급됨)"으로 보이고, `EXPIRED` 전환 스윕은 10월.
 - **은행 목업 프로그램 계약**: `python bank_mock.py --bank 021174 --file bank_021174_0904.csv [--api-url http://localhost:8080] [--api-key …]` → 위 3단계를 순서대로 수행하고 완료 응답을 출력, 실패 시 0이 아닌 종료 코드. 시연은 은행 3곳을 순서대로 실행.
-- S3가 9/9까지 없으면 URL 대신 로컬 폴더 경로를 같은 응답 모양으로 돌려주고 목업이 파일 복사로 PUT을 대신한다(클라이언트만 교체).
+- S3 미준비로 **로컬 폴더 구현부터 시작(2026-09-08 사용자 확정)**: `url`은 `file:///…/storage/uploads/{bankId}/{uploadId}/{fileName}` 이고 목업이 파일 복사로 PUT을 대신한다. 저장소 경계는 `UploadStore`(발급·존재/크기 확인·읽기) — S3가 오면 구현체만 추가.
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
-- **GET /api/uploads/{uploadId}** [전 역할·BANK(자기 것만)] — INGEST 작업 1건: `{ uploadId, bankId, fileName, sizeBytes, rowCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }`
-- **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 보고 은행(`is_reporting`) 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` 기본 오늘(컷오프 기준일).
+- **GET /api/uploads/{uploadId}** [전 역할·BANK(자기 것만)] — INGEST 작업 1건: `{ uploadId, bankId, fileName, sizeBytes, rowCount, missingCount, duplicateCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }` — `rowCount` = 파일의 데이터 행 수, `duplicateCount` = 파일 안 중복 + 원장에 이미 있던 행(건너뜀), `errors[]`는 최대 100건. 완료 통지 202 응답도 같은 모양.
+- **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 보고 은행(`is_reporting`) 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` = 컷오프 기준일: 창은 (D−1 컷오프, D 컷오프], 기본값은 **다음 컷오프의 날짜**(지금 도착하는 파일이 속하는 창). 은행당 창 안 최신 INGEST 작업 1건.
 - **GET /api/batch-jobs** [전 역할] — 목록(페이지네이션). 필터 `type=INGEST|ANALYSIS`, `status`, `from/to`(startedAt). 행: `{ jobId, type, status, attemptCount, analysisDate(ANALYSIS), bankId(INGEST), rowCount, errorCode, errorMessage, startedAt, finishedAt, modelVersionBinary, modelVersionType, featureVersion, thresholdValue }`
 - **GET /api/batch-jobs/{jobId}** [전 역할] — 위 행 + `counters: { suspiciousTxCount, alertCount, missingCount, duplicateCount }`.
 - **POST /api/batch-jobs/analysis** [L1·L2·ADMIN — 시연용 수동 실행] — 요청 `{ analysisDate? }`(기본 오늘). 응답 202 `{ jobId, status: "QUEUED" }`. 같은 analysisDate가 RUNNING이면 409 `JOB_ALREADY_RUNNING`; COMPLETED·FAILED면 같은 job의 재시도(기존 결과 삭제+삽입, OPEN Alert만 재생성). 스케줄러(컷오프 06:00)도 같은 코드를 부른다.
@@ -81,7 +81,7 @@
 
 | CSV 헤더 | 표준명(원장 컬럼) | 타입 | 검증 |
 |---|---|---|---|
-| Timestamp | `tx_at` | timestamp | 필수, 형식 `[미정: Data — 시연 CSV 시각 형식]` |
+| Timestamp | `occurred_at` | timestamptz | 필수. 구현: `yyyy/MM/dd HH:mm[:ss]`(IBM 원본) 또는 ISO 로컬, 서울 시간 해석 `[미정: Data — 시연 CSV 시각 형식이 다르면 추가]` |
 | From Bank | `from_bank` | int | 필수 |
 | Account | `from_account` | text(가명) | 필수 → 가명화 |
 | To Bank | `to_bank` | int | 필수 |

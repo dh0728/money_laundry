@@ -11,10 +11,6 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-  servlet:
-    multipart:
-      max-file-size: 200MB
-      max-request-size: 210MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -33,6 +29,14 @@ management:
 
 app:
   storage-dir: ${STORAGE_DIR:./storage}
+  zone: ${APP_ZONE:Asia/Seoul}
+  bank:
+    api-keys: ${BANK_API_KEYS:}
+  ingest:
+    url-ttl: ${INGEST_URL_TTL:PT15M}
+    max-size-bytes: ${INGEST_MAX_SIZE_BYTES:209715200}
+    cutoff: ${INGEST_CUTOFF:06:00}
+    fx-rate-version: fx_rates_usd_v1
   worker:
     python: ${WORKER_PYTHON:python}
     script: ${WORKER_SCRIPT:worker/dummy_worker.py}
