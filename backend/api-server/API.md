@@ -50,7 +50,7 @@
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
 - **GET /api/uploads/{uploadId}** [전 역할·BANK(자기 것만)] — INGEST 작업 1건: `{ uploadId, bankId, fileName, sizeBytes, rowCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }`
-- **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(업로드·처리현황 화면의 중심): 등록 은행 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` 기본 오늘(컷오프 기준일).
+- **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 등록 은행 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` 기본 오늘(컷오프 기준일).
 - **GET /api/batch-jobs** [전 역할] — 목록(페이지네이션). 필터 `type=INGEST|ANALYSIS`, `status`, `from/to`(startedAt). 행: `{ jobId, type, status, attemptCount, analysisDate(ANALYSIS), bankId(INGEST), rowCount, errorCode, errorMessage, startedAt, finishedAt, modelVersionBinary, modelVersionType, featureVersion, thresholdValue }`
 - **GET /api/batch-jobs/{jobId}** [전 역할] — 위 행 + `counters: { suspiciousTxCount, alertCount, missingCount, duplicateCount }`.
 - **POST /api/batch-jobs/analysis** [L1·L2·ADMIN — 시연용 수동 실행] — 요청 `{ analysisDate? }`(기본 오늘). 응답 202 `{ jobId, status: "QUEUED" }`. 같은 analysisDate가 RUNNING이면 409 `JOB_ALREADY_RUNNING`; COMPLETED·FAILED면 같은 job의 재시도(기존 결과 삭제+삽입, OPEN Alert만 재생성). 스케줄러(컷오프 06:00)도 같은 코드를 부른다.
@@ -300,7 +300,7 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
 - **GET /api/alerts/{id}/history**, **GET /api/episodes/{id}/history** — Episode 이력은 소속 Alert의 ESCALATE/LINK/UNLINK 행을 포함.
 - **GET /api/history?actor={userId}** [ADMIN·본인] — 사용자별 처리 이력(기획서 요구, 11월 [권한관리]에서 구현, 시그니처 예약).
 
-## 6.5 대시보드 (W5 [대시보드·동결] — 최소판)
+## 6.5 대시보드 (W4 [Episode 조사 데이터 ⑥ + 대시보드], 09-29 — 처리 흐름 4칸 + 담당자별)
 
 - **GET /api/dashboard/summary** [전 역할] — `{ alertsByStatus: { OPEN, ESCALATED, CLOSED }, alertsUnopened, alertsByResolution: { NORMAL, FALSE_POSITIVE }, alertsByType: [{ code, name, count }], episodesByStatus: { OPEN, CLOSED }, episodesUnopened, episodesByResolution: { NORMAL, SUSPICIOUS }, alertsByAssignee: [{ userId, name, open, unopened, closedToday, escalatedToday, maxAgeDays }], episodesByAssignee: [{ userId, name, open, unopened, closedLast7Days, maxAgeDays }], latestJob: { jobId, analysisDate, status, suspiciousTxCount, alertCount, finishedAt }, reductionRate }` — `reductionRate = 1 - alertCount / suspiciousTxCount`(최근 job). 지표 추가는 `[미정: FE — 시연 화면]`.
 
@@ -310,13 +310,14 @@ FE는 아래에서 **표시할 항목을 고르고, 빠진 항목을 요구**한
 
 | 화면 | API | 제공 항목 |
 |---|---|---|
-| 업로드·처리현황 (→ 도착 현황) | §1.1, §1.2 | **은행별 도착 현황**(`GET /api/banks/arrivals`: 은행·상태 7종·파일명·행 수·도착 시각·컷오프 잔여·도착 n/N) / 적재 작업 목록·오류 표(`errors[]`) / 분석 작업 목록(status·attempt·analysisDate·모델 버전·임계·의심 거래·Alert) / "분석 실행" 버튼 = `POST /api/batch-jobs/analysis` / 사이트에 업로드 버튼 없음(은행·목업이 API로 전송) / ADMIN 은행·키 관리는 10월 |
+| 수집·처리현황 (은행별 도착 현황) | §1.1, §1.2 | **은행별 도착 현황**(`GET /api/banks/arrivals`: 은행·상태 7종·파일명·행 수·도착 시각·컷오프 잔여·도착 n/N) / 적재 작업 목록·오류 표(`errors[]`) / 분석 작업 목록(status·attempt·analysisDate·모델 버전·임계·의심 거래·Alert) / "분석 실행" 버튼 = `POST /api/batch-jobs/analysis` / 사이트에 업로드 버튼 없음(은행·목업이 API로 전송) / ADMIN 은행·키 관리는 10월 |
 | Alert 목록 (L1 큐) | §3.2 | 위험도, **요약문**, 대표 유형(코드·명), **대표 계좌·계좌 수·은행 수**, 거래 수, **USD 합계 + 통화별 합계**, **점수 통계(평균·최고·초과 비율)·점수 가중 금액·묶음 순도**, 기간(첫·마지막 거래), 참여 은행, 상태, **담당자(자동 배정)**, 소속 Episode, 분석 날짜, 생성 시각, **경과일** / 정렬 8종 / 필터 7종("내 담당" 기본 뷰) / ADMIN: 재배정 |
 | Alert 상세 (L1) | §3.2, §3.3 | 목록 항목 + 구성 거래 표(§2.4 — 금액 USD·**백분위·임계 배율·의심 여부·복합 유형 후보·두 모델 합의·편입 역할·방향** 포함) + 유형 구성비 + 묶음 근거 + **참여 계좌 표(역할·in/out 건수·USD·최대 점수·상대방 수·첫 거래일)** + **시각순 점수 추이** + **설명 요인(피처 기준선 편차 상위 3, 포함 방식은 W3)** + 관계 그래프(노드 역할·금액·위험 등급, 엣지 id·거래 수·USD·최대 점수·유형·기간) + 이력 / 액션: 종결(정상·오탐, 의견 필수)·심층 요청(신규 Episode — L2 자동 배정 / 기존 Episode 연결) / ADMIN: 재배정 |
-| Episode 조사 (L2) | §4 | 목록: 위험도·Alert 수·거래 수·USD 합계·유형들·담당자(자동 배정)·상태(OPEN/CLOSED)·미열람 표시·결과(resolution)·생성자·시각·경과일 / 상세(조사 순서): 소속 Alert 표 → ① 기준선 배율 → ② 자금 흐름 요약 → ③ 패턴 증거 체크 → ④ 상대방 표(다른 Alert 포함) → ⑤ 교차은행 경로 그래프(hops=0/1) + 연계 거래 → ⑥ 관련 계좌 이력 → ⑦ 의견·이력 → ⑧ 결론(who/what/when/where/why/how 템플릿 + resolution + 서술) / 액션: Alert 해제·조사 의견·종결 — 연결은 Alert 화면(L1) / ADMIN: 재배정 |
-| 관계 그래프 | §3.2 graph | Alert 단위 계좌·은행 그래프. 다기관 전체 그래프는 11월 |
+| Episode 목록 (L2 큐) | §4.1 | 위험도·자동 제목·Alert 수·거래 수·USD·유형들·담당자·상태(OPEN/CLOSED)·미열람·결과·요청 L1·경과일 / 뷰: 내 담당·미열람·전체 / 정렬·필터 §4.1 |
+| Episode 상세 (L2 조사) | §4 | 상세(조사 순서): 소속 Alert 표 → ① 기준선 배율 → ② 자금 흐름 요약 → ③ 패턴 증거 체크 → ④ 상대방 표(다른 Alert 포함) → ⑤ 자금 경로 그래프(hops=0/1) + 연계 거래 → ⑥ 관련 계좌 이력 → ⑦ 의견·이력 → ⑧ 결론(who/what/when/where/why/how 템플릿 + resolution + 서술) / 액션: Alert 해제·조사 의견·종결 — 연결은 Alert 화면(L1) / ADMIN: 재배정 |
+| (관계 그래프) | §3.2 graph · §4.1 graph | 독립 화면이 아니라 Alert 상세·Episode 상세 안의 패널(노드 = 계좌). Alert = 구성 거래 그래프, Episode = 합집합 + Alert 밖 1 hop. 다기관 전체 그래프는 11월 |
 | 대시보드 | §6.5 | 처리 흐름 4칸(미처리 OPEN + 미열람 → 경과일 → L2 조사 ESCALATED/Episode OPEN + 미열람 → 처분 CLOSED + resolution 분포), 유형 분포, 담당자별(L1·L2), 최근 배치, 감소율 |
-| 로그인 | §5 | 사용자·역할 반환. L1·L2 계정 전환 시연 |
+| 로그인 | §5 | 사용자·역할 반환. 역할별 첫 화면(L1 → Alert 목록 "내 담당", L2 → Episode 목록 "내 담당", ADMIN → 대시보드). 시연은 L1·L2 계정 전환 + ADMIN 재배정 1회(선택) |
 | 모델 성능·버전 / 사용자·권한 | — | 시연 이후(10~11월) |
 
 ## 8. 미정 목록 (회신 주체별)
@@ -324,5 +325,6 @@ FE는 아래에서 **표시할 항목을 고르고, 빠진 항목을 요구**한
 **FE**: ① 금액 **화면 표기 방식**(축약·자릿수 — 데이터 형태는 §0 BE 결정으로 해소) ② 그래프 응답 포함 vs 분리(BE 추천: 분리), 시각화 라이브러리 ③ 유형 한글 표시 명칭·'의심 거래' 표시 명칭(초안: 리서치 문서 §4.6) ④ §7 회신(빠진 항목) ⑤ 인증 방식 결정 기한(로그인 착수 시점) ⑥ 대시보드 추가 지표(후보: 위험 밴드 분해·미결 경과일 중앙/최대·처분 결과 분포·은행별·담당자별 부하·Alert→Episode 전환율).
 **Data**: ① 시연 CSV 시각 형식·인코딩·은행별 분할(9/7 전) ② 이진 모델 피처 세트 동일 여부 ③ Σp 보장·dtype ④ `link_basis` 산출 가능 여부(+ 거래별 `role`/허브 계좌 산출 가능 여부) ⑤ 처분된 Alert 거래 제외 여부 ⑥ Episode 위험도 = max Alert riskScore 동의 ⑦ 점수 적재 스텝에서 job 내 백분위(`score_pct`) 계산 추가 동의 ⑧ 학습 산출물(run json: 검증 PR-AUC, recall별 임계·precision·알람 수, 유형별 OVR PR-AUC, 피처 중요도) 인도 형식·시점 — 10월 [모델 관리] `model_versions` 입력, W2 캘리브레이션에도 사용.
 **Infra**: ① BE IAM 키에 `uploads/` PUT용 Presigned 서명 + HEAD/GET 권한(9/7 항목에 추가) ② 버킷 CORS 불필요(서버 간 PUT) 확인.
+**Data 추가(09-07)**: ⑨ Episode 조사 블록 패턴 증거 항목·통과 기준 초안 검토(§4.1) ⑩ 시연 CSV 은행별 분할 형식(은행 목업이 파일 단위로 전송).
 **사용자**: ① `is_laundering` 원장 보관 여부 ② **최종 모델 형태 — 결정 보류(2026-09-04)**: 전체 GNN / GNN 임베딩 + 후단 모델 / LightGBM 중 미확정. 보류에 묶인 항목: 거래별 기여 요인(`pred_contrib`) 확장 열, GNN 엣지 파일(features 외), run 지표 인도 형식(⑧의 세부). 계약은 필수 열 + 무시되는 확장 열 규칙(§2.1)으로 어느 쪽이든 수용. 결정 시점은 Data 모델 확정 시.
 해소됨(v0.2): 점수 필드명, 유형 매핑표, 페이지네이션·정렬, 에러 응답, 배치 상태, 상태 전이, 역할 표, 감사 이력 행, 임계 저장(threshold_value 스냅샷). 해소됨(v0.3): 금액·통화 데이터 형태(USD 환산 병기·ISO 코드), Alert 요약·대표 계좌·참여 계좌·점수 통계·거래 편입 역할·점수 파생 확장.
