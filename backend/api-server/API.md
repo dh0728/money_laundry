@@ -2,13 +2,14 @@
 
 지위: **BE 결정 통보 + 팀 합의 대상.** 표시 없는 항목은 BE가 정해 통보하는 컨벤션이며, `[미정: X]`만 X의 회신이 필요하다(목록은 §8). 합의 결과는 이 문서를 갱신하고 kickoff §4.5에 기록. 구현된 API의 정본은 Swagger(springdoc)이고 이 문서는 사전 합의·설계 결정 기록이다.
 용어: kickoff §2.5 — `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`. 구 명칭 혼용 금지.
-이 문서는 W2 [DB 설계]의 입력이다. 변경 이력: v0.1(09-02, 층1~4 초안) → v0.2(09-03, 외부 검수 반영 — 배치 상태·추론 파일 계약·전이 표·역할·감사 이력·인증·대시보드·화면별 제공 항목 추가) → **v0.3(09-04, 화면 리서치 반영 — 파생 데이터 원칙: USD 환산·거래 점수 파생(백분위·복합 후보·합의)·거래 편입 역할·Alert 요약·대표 계좌·참여 계좌 표·점수 통계·설명 요인. 근거 `worktable/AML_화면_데이터_리서치_2026-09-04.md` §5·§6)** → **v0.3 추가(09-06, 화면 피드백): Alert·Episode 공통 상태 모델 `OPEN → IN_REVIEW → CLOSED` + `resolution`(Alert만 `ESCALATED` 추가). `CLOSED_NORMAL/CLOSED_FALSE_POSITIVE` → `CLOSED + resolution`, Episode `INVESTIGATING` → `OPEN/IN_REVIEW`, `outcome` → `resolution`, 이력 `REVIEW_START`(§3.1·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): 배정 모델 A — Alert·Episode 생성 시 라운드로빈 자동 배정 + ADMIN 재배정(§3.4 신설, §0·§3.1·§3.2·§4·§5·§6.5·§7). 9/3에 근거 없이 기록됐던 "단일 공용 큐"·"L1이 L2 지정" 폐기** → **v0.3 추가(09-07): 수집 구조 — 은행 API 키 + Presigned PUT + 완료 API + 자동 적재, MVP 편입, 은행 목업 프로그램, 도착 현황 API, 상태 `URL_ISSUED`(§0·§1.1·§1.2·§1.3·§7·§8). 멀티파트 `POST /api/uploads` 폐기** → **v0.3 추가(09-07, 화면 피드백): `IN_REVIEW` 상태 제거 — 배정이 있으면 열람 여부로 상태를 쪼갤 이유가 없음. 열람은 `firstOpenedAt`(미열람 표시)로만 기록(§3.2·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): Alert→Episode 연결은 Alert 화면에서 L1만(`POST /api/episodes/{id}/alerts` [L1]), Episode 화면은 해제만; 재배정 ADMIN 전용 유지(§3.3·§4.2·§4.3·§7)** → **v0.3 추가(09-07): Episode 상세 조사 블록 6종(baseline·flow·patternEvidence·counterparties·accountHistory·accounts) + `/transactions`·`/context-transactions`·`/graph?hops=` — 전부 MVP(§4.1·§7). 리서치 §2.11 근거**.
+이 문서는 W2 [DB 설계]의 입력이다. 변경 이력: v0.1(09-02, 층1~4 초안) → v0.2(09-03, 외부 검수 반영 — 배치 상태·추론 파일 계약·전이 표·역할·감사 이력·인증·대시보드·화면별 제공 항목 추가) → **v0.3(09-04, 화면 리서치 반영 — 파생 데이터 원칙: USD 환산·거래 점수 파생(백분위·복합 후보·합의)·거래 편입 역할·Alert 요약·대표 계좌·참여 계좌 표·점수 통계·설명 요인. 근거 `worktable/AML_화면_데이터_리서치_2026-09-04.md` §5·§6)** → **v0.3 추가(09-06, 화면 피드백): Alert·Episode 공통 상태 모델 `OPEN → IN_REVIEW → CLOSED` + `resolution`(Alert만 `ESCALATED` 추가). `CLOSED_NORMAL/CLOSED_FALSE_POSITIVE` → `CLOSED + resolution`, Episode `INVESTIGATING` → `OPEN/IN_REVIEW`, `outcome` → `resolution`, 이력 `REVIEW_START`(§3.1·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): 배정 모델 A — Alert·Episode 생성 시 라운드로빈 자동 배정 + ADMIN 재배정(§3.4 신설, §0·§3.1·§3.2·§4·§5·§6.5·§7). 9/3에 근거 없이 기록됐던 "단일 공용 큐"·"L1이 L2 지정" 폐기** → **v0.3 추가(09-07): 수집 구조 — 은행 API 키 + Presigned PUT + 완료 API + 자동 적재, MVP 편입, 은행 목업 프로그램, 도착 현황 API, 상태 `URL_ISSUED`(§0·§1.1·§1.2·§1.3·§7·§8). 멀티파트 `POST /api/uploads` 폐기** → **v0.3 추가(09-07, 화면 피드백): `IN_REVIEW` 상태 제거 — 배정이 있으면 열람 여부로 상태를 쪼갤 이유가 없음. 열람은 `firstOpenedAt`(미열람 표시)로만 기록(§3.2·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): Alert→Episode 연결은 Alert 화면에서 L1만(`POST /api/episodes/{id}/alerts` [L1]), Episode 화면은 해제만; 재배정 ADMIN 전용 유지(§3.3·§4.2·§4.3·§7)** → **v0.3 추가(09-07): Episode 상세 조사 블록 6종(baseline·flow·patternEvidence·counterparties·accountHistory·accounts) + `/transactions`·`/context-transactions`·`/graph?hops=` — 전부 MVP(§4.1·§7). 리서치 §2.11 근거** → **v0.3 추가(09-07, DB 착수 결정 4건): 컬럼 명명 `tx_id`+팀 이름(§0), 라벨은 평가 스키마 분리(§1.4), 은행 테이블 = 전 코드 + `is_reporting`(§1.1·§1.2), 구성 거래 `UNIQUE(tx_id)` + 처분 거래 재묶음 제외(§3.1)**.
 
 - **파생 데이터 원칙 (2026-09-04 사용자 확정)**: 화면을 현 계약에 맞추지 않는다. 원장·점수·피처·이력에서 계산할 수 있는 항목은 파생해 제공한다. 불가 판정은 원천 부재(실명·KYC 등)일 때만. 모델 형태(전체 GNN / GNN 임베딩 + 후단 모델 / LightGBM)에 의존하는 항목은 **결정 보류**(§8 사용자 ②) — 계약은 어느 모델이든 맞도록 필수 열 + 선택 확장 열로 둔다.
 
 ## 0. 공통 규칙
 
 - **식별자**: `uploadId`(INGEST 작업, bigint), `jobId`(ANALYSIS 작업, bigint — 같은 batch_jobs 시퀀스), `txId`(원장 거래, bigint), `alertId`·`episodeId`·`userId`(bigint). 전부 서버 발급. W1의 `uploadId`(uuid)는 W2 [원장 적재]에서 bigint로 교체.
+- **DB 컬럼 명명(2026-09-07 사용자 확정)**: 거래 식별자는 DB·S3 파일 모두 `tx_id`(§2.1 파일 계약과 일치 — Python 파이프라인이 DB를 직접 읽으므로 이름 하나). 그 외는 팀 ERD 이름(`occurred_at`, `amount_paid`, `bank_id INT`). API는 camelCase 경계 변환(`txId`, `txAt`).
 - **표기**: JSON 필드는 camelCase. Python 파이프라인·S3 산출물은 snake_case — BE가 경계에서 변환. 점수는 전부 0~1 실수. 시각은 ISO-8601 UTC.
 - **금액·통화(BE 결정 2026-09-04)**: 통화는 ISO 4217 코드로 정규화해 내보낸다(IBM 통화명 15종 → 코드 매핑표 §1.4, Bitcoin = `BTC`). 모든 금액 필드에 **원 통화 금액 + `…Usd` 환산액**을 병기한다. 환산은 모델 학습에 쓴 고정 환율표(`data_work/fx_rates_usd.txt` 스냅샷, 프로퍼티 또는 `fx_rates` 테이블, 버전 기록)로 적재 시 계산. 합계는 `totalAmountUsd` + `amountsByCurrency[{ currency, total }]`. 화면 표기 방식(축약·자릿수)만 FE 소관.
 - **페이지네이션(BE 결정)**: 목록은 `{ content: [], page, size, totalElements, totalPages }`. 쿼리 `page`(0부터)·`size`(기본 20, 최대 200)·`sort=field,asc|desc`(복수 허용). 빈 목록 = 200 + 빈 `content`.
@@ -40,7 +41,8 @@
 
 수집 주체는 **은행 시스템**(실제 서비스) / **은행 목업 프로그램**(시연·테스트, `backend/bank-mock/` Python, BE 소유). 사이트 이용자는 올리지 않고 도착 현황만 본다.
 
-- **인증 — 은행 API 키**: 요청 헤더 `X-Api-Key`. 은행 테이블에 키 해시 저장(원문은 발급 시 1회 반환). 키 → `bankId` 해석. 키 없음/불일치 = 401 `UNAUTHENTICATED`. 은행 등록·키 발급 API(`POST /api/banks` [ADMIN], `POST /api/banks/{id}/api-keys` [ADMIN])는 10월 [업로드]; **MVP는 은행 3곳 + 키를 시드**(환경변수).
+- **은행 테이블(2026-09-07 사용자 확정)**: 원장에 등장하는 **모든 은행 코드**를 담는다(적재 시 자동 upsert, 원장 FK). `name`·`country`는 `HI-Small_accounts.csv` Bank Name에서 채우고 못 채우면 null. **`is_reporting`** = API 키를 가진 보고 은행(도착 현황·시드 대상). 상대방 은행은 `is_reporting=false`로 이름만 보인다.
+- **인증 — 은행 API 키**: 요청 헤더 `X-Api-Key`. 은행 테이블에 키 해시 저장(원문은 발급 시 1회 반환). 키 → `bankId` 해석. 키 없음/불일치 = 401 `UNAUTHENTICATED`. 은행 등록·키 발급 API(`POST /api/banks` [ADMIN] = `is_reporting` 켜기 + 키 발급, `POST /api/banks/{id}/api-keys` [ADMIN])는 10월 [업로드]; **MVP는 보고 은행 3~4곳(시연 CSV 분할 수) + 키를 시드**(환경변수).
 - **POST /api/bank/uploads** [BANK] `{ fileName, sizeBytes, sha256, businessDate? }` → 201 `{ uploadId, url, method: "PUT", expiresAt, headers: { "Content-Type": "text/csv" } }`. S3 키 = `uploads/{bankId}/{uploadId}/{fileName}`, Presigned PUT 유효 15분(프로퍼티). batch_jobs(INGEST) `URL_ISSUED` 생성. 같은 `sha256`가 이미 `COMPLETED`면 409 `DUPLICATE_FILE`(URL 발급 전에 거른다). `sizeBytes` > 200MB면 413.
 - 은행이 URL로 파일 PUT (BE 미개입).
 - **POST /api/bank/uploads/{uploadId}/complete** [BANK] → BE가 S3 HEAD로 존재·크기 확인(불일치 = 400 `UPLOAD_MISMATCH`) → 상태 `RECEIVED` → 가벼운 검증(§1.4) → 표준화·가명화(Data 진입점) → 원장 적재 → `COMPLETED`. **응답 202** `{ uploadId, status: "RECEIVED" }`, 적재는 비동기(MVP: 완료 API가 워커 프로세스를 직접 호출, 10월: SQS 메시지 발행). 결과는 `GET /api/uploads/{uploadId}`로 조회. 검증 실패는 아무것도 적재하지 않는다(all-or-nothing, `VALIDATION_FAILED` + `errors[]`).
@@ -50,7 +52,7 @@
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
 - **GET /api/uploads/{uploadId}** [전 역할·BANK(자기 것만)] — INGEST 작업 1건: `{ uploadId, bankId, fileName, sizeBytes, rowCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }`
-- **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 등록 은행 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` 기본 오늘(컷오프 기준일).
+- **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 보고 은행(`is_reporting`) 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` 기본 오늘(컷오프 기준일).
 - **GET /api/batch-jobs** [전 역할] — 목록(페이지네이션). 필터 `type=INGEST|ANALYSIS`, `status`, `from/to`(startedAt). 행: `{ jobId, type, status, attemptCount, analysisDate(ANALYSIS), bankId(INGEST), rowCount, errorCode, errorMessage, startedAt, finishedAt, modelVersionBinary, modelVersionType, featureVersion, thresholdValue }`
 - **GET /api/batch-jobs/{jobId}** [전 역할] — 위 행 + `counters: { suspiciousTxCount, alertCount, missingCount, duplicateCount }`.
 - **POST /api/batch-jobs/analysis** [L1·L2·ADMIN — 시연용 수동 실행] — 요청 `{ analysisDate? }`(기본 오늘). 응답 202 `{ jobId, status: "QUEUED" }`. 같은 analysisDate가 RUNNING이면 409 `JOB_ALREADY_RUNNING`; COMPLETED·FAILED면 같은 job의 재시도(기존 결과 삭제+삽입, OPEN Alert만 재생성). 스케줄러(컷오프 06:00)도 같은 코드를 부른다.
@@ -89,7 +91,7 @@
 | Amount Paid | `amount_paid` | numeric(18,2) | 필수, ≥0 |
 | Payment Currency | `payment_currency` | text | 필수 |
 | Payment Format | `payment_format` | text | 필수 |
-| Is Laundering | `is_laundering` | bool | 선택(시연 평가용, 화면 비노출) `[미정: 사용자 — 보관 여부]` |
+| Is Laundering | (원장에 저장하지 않음) | bool | 선택. 있으면 평가 스키마 `evaluation.transaction_labels(tx_id, is_laundering, pattern_label, attempt_id)`에만 적재(2026-09-07 사용자 확정). API·화면 비노출 |
 
 - 원장 추가 컬럼: `tx_id`(PK), `bank_id`(업로드 bankId), `row_hash`(표준화 행 해시, `(bank_id,row_hash)` UNIQUE), `ingest_job_id`, `scored_job_id`(NULL = 미채점), **`amount_usd`**(= `amount_paid × rate[payment_currency]`, 적재 시 계산, `fx_rate_version` 함께), 통화 컬럼은 정규화된 ISO 코드로 저장(원명은 저장하지 않음).
 - 통화명 → ISO 매핑표(고정, 15종): Australian Dollar `AUD` · Bitcoin `BTC` · Brazil Real `BRL` · Canadian Dollar `CAD` · Euro `EUR` · Mexican Peso `MXN` · Ruble `RUB` · Rupee `INR` · Saudi Riyal `SAR` · Shekel `ILS` · Swiss Franc `CHF` · UK Pound `GBP` · US Dollar `USD` · Yen `JPY` · Yuan `CNY`. 표에 없는 값은 행 검증 오류(`errors[]`).
@@ -189,10 +191,10 @@ Alert 테이블(W3 [스키마]):
 | `status`, `resolution`, `episode_id`, `created_at`, `updated_at` | 워크플로 — `status` 4종(§3.3), `resolution`은 `CLOSED`일 때만 `NORMAL|FALSE_POSITIVE`, 그 외 NULL |
 | `assignee_id`, `assigned_at` | 담당 L1 — 생성 직후 BE가 라운드로빈으로 채움(§3.4), NOT NULL. 재생성된 OPEN Alert도 새로 배정 |
 
-구성 거래 테이블: `(alert_id, tx_id, role, included_reason)`. 한 거래는 한 OPEN Alert에만 속한다. `role`·`included_reason` 정의는 §2.4.
+구성 거래 테이블: `(alert_id, tx_id, role, included_reason)`, **`UNIQUE(tx_id)`** — 한 거래는 한 Alert에만 속한다(2026-09-07 사용자 확정, 1:1). 이를 위해 Alert 구성 알고리즘의 입력에서 **처분된(ESCALATED·CLOSED) Alert의 거래는 제외**한다(재실행은 OPEN만 재생성). 복합 위험은 N:M이 아니라 `type_distribution`으로 표현. `role`·`included_reason` 정의는 §2.4.
 
 **참여 계좌 테이블 `alert_accounts` (2026-09-04 채택, dberd 채택분)**: `(alert_id, account_id, role: SUBJECT|SOURCE|DESTINATION|INTERMEDIARY|HUB, in_count, in_amount_usd, out_count, out_amount_usd, max_score, counterparty_count)`. BE가 Alert 생성 직후 구성 거래에서 파생·저장. 역할 규칙: out만 = SOURCE, in만 = DESTINATION, 양쪽 = INTERMEDIARY, 차수 최대 = HUB, 대표 계좌 = SUBJECT. 계좌별 30일 창 기준선(`firstSeenAt`, 30일 in/out 건수·금액, 상대방 수)은 원장 조회로 상세 응답에 붙인다(저장 안 함). 관계 그래프의 노드 원천.
-- **재실행 규칙**: 같은 job이 다시 돌면 `OPEN` Alert만 삭제·재생성(새로 배정). `ESCALATED`·`CLOSED`는 보존(alertId 유지). 처분된 Alert의 거래를 재묶음 입력에서 제외할지 `[미정: Data]`.
+- **재실행 규칙**: 같은 job이 다시 돌면 `OPEN` Alert만 삭제·재생성(새로 배정). `ESCALATED`·`CLOSED`는 보존(alertId 유지). 처분된 Alert의 거래는 재묶음 입력에서 **제외**(확정 09-07).
 
 ### 3.2 조회
 - **GET /api/alerts** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`. 정렬 키: `riskScore, createdAt, lastTxAt, txCount, totalAmountUsd, scoreMax, weightedAmountUsd, ageDays`. 필터 `status`, `resolution`, `assigneeId`(`me` 허용), `typeClass`, `bankId`, `from/to`(lastTxAt 기준), `analysisDate`, `episodeId`. L1 기본 뷰 = `assigneeId=me&status=OPEN`. 필터 `unopened=true`(= `firstOpenedAt IS NULL`).
@@ -323,8 +325,8 @@ FE는 아래에서 **표시할 항목을 고르고, 빠진 항목을 요구**한
 ## 8. 미정 목록 (회신 주체별)
 
 **FE**: ① 금액 **화면 표기 방식**(축약·자릿수 — 데이터 형태는 §0 BE 결정으로 해소) ② 그래프 응답 포함 vs 분리(BE 추천: 분리), 시각화 라이브러리 ③ 유형 한글 표시 명칭·'의심 거래' 표시 명칭(초안: 리서치 문서 §4.6) ④ §7 회신(빠진 항목) ⑤ 인증 방식 결정 기한(로그인 착수 시점) ⑥ 대시보드 추가 지표(후보: 위험 밴드 분해·미결 경과일 중앙/최대·처분 결과 분포·은행별·담당자별 부하·Alert→Episode 전환율).
-**Data**: ① 시연 CSV 시각 형식·인코딩·은행별 분할(9/7 전) ② 이진 모델 피처 세트 동일 여부 ③ Σp 보장·dtype ④ `link_basis` 산출 가능 여부(+ 거래별 `role`/허브 계좌 산출 가능 여부) ⑤ 처분된 Alert 거래 제외 여부 ⑥ Episode 위험도 = max Alert riskScore 동의 ⑦ 점수 적재 스텝에서 job 내 백분위(`score_pct`) 계산 추가 동의 ⑧ 학습 산출물(run json: 검증 PR-AUC, recall별 임계·precision·알람 수, 유형별 OVR PR-AUC, 피처 중요도) 인도 형식·시점 — 10월 [모델 관리] `model_versions` 입력, W2 캘리브레이션에도 사용.
+**Data**: ① 시연 CSV 시각 형식·인코딩·은행별 분할(9/7 전) ② 이진 모델 피처 세트 동일 여부 ③ Σp 보장·dtype ④ `link_basis` 산출 가능 여부(+ 거래별 `role`/허브 계좌 산출 가능 여부) ⑤ ~~처분된 Alert 거래 제외 여부~~ → 제외로 확정(09-07, §3.1) — 알고리즘 입력 = 미소속 거래만 ⑥ Episode 위험도 = max Alert riskScore 동의 ⑦ 점수 적재 스텝에서 job 내 백분위(`score_pct`) 계산 추가 동의 ⑧ 학습 산출물(run json: 검증 PR-AUC, recall별 임계·precision·알람 수, 유형별 OVR PR-AUC, 피처 중요도) 인도 형식·시점 — 10월 [모델 관리] `model_versions` 입력, W2 캘리브레이션에도 사용.
 **Infra**: ① BE IAM 키에 `uploads/` PUT용 Presigned 서명 + HEAD/GET 권한(9/7 항목에 추가) ② 버킷 CORS 불필요(서버 간 PUT) 확인.
 **Data 추가(09-07)**: ⑨ Episode 조사 블록 패턴 증거 항목·통과 기준 초안 검토(§4.1) ⑩ 시연 CSV 은행별 분할 형식(은행 목업이 파일 단위로 전송).
-**사용자**: ① `is_laundering` 원장 보관 여부 ② **최종 모델 형태 — 결정 보류(2026-09-04)**: 전체 GNN / GNN 임베딩 + 후단 모델 / LightGBM 중 미확정. 보류에 묶인 항목: 거래별 기여 요인(`pred_contrib`) 확장 열, GNN 엣지 파일(features 외), run 지표 인도 형식(⑧의 세부). 계약은 필수 열 + 무시되는 확장 열 규칙(§2.1)으로 어느 쪽이든 수용. 결정 시점은 Data 모델 확정 시.
+**사용자**: ① ~~`is_laundering` 원장 보관 여부~~ → 평가 스키마 분리로 확정(09-07, §1.4) ② **최종 모델 형태 — 결정 보류(2026-09-04)**: 전체 GNN / GNN 임베딩 + 후단 모델 / LightGBM 중 미확정. 보류에 묶인 항목: 거래별 기여 요인(`pred_contrib`) 확장 열, GNN 엣지 파일(features 외), run 지표 인도 형식(⑧의 세부). 계약은 필수 열 + 무시되는 확장 열 규칙(§2.1)으로 어느 쪽이든 수용. 결정 시점은 Data 모델 확정 시.
 해소됨(v0.2): 점수 필드명, 유형 매핑표, 페이지네이션·정렬, 에러 응답, 배치 상태, 상태 전이, 역할 표, 감사 이력 행, 임계 저장(threshold_value 스냅샷). 해소됨(v0.3): 금액·통화 데이터 형태(USD 환산 병기·ISO 코드), Alert 요약·대표 계좌·참여 계좌·점수 통계·거래 편입 역할·점수 파생 확장.
