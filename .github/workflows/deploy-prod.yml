@@ -252,17 +252,33 @@ jobs:
           install -D -m 0644 \
             deploy/compose.prod.infra.yaml \
             "${BUNDLE_ROOT}/deploy/compose.prod.infra.yaml"
+          install -D -m 0644 \
+            deploy/compose.prod.blue.yaml \
+            "${BUNDLE_ROOT}/deploy/compose.prod.blue.yaml"
+          install -D -m 0644 \
+            deploy/compose.prod.green.yaml \
+            "${BUNDLE_ROOT}/deploy/compose.prod.green.yaml"
           install -D -m 0755 \
             deploy/scripts/deploy-prod.sh \
             "${BUNDLE_ROOT}/deploy/scripts/deploy-prod.sh"
           install -D -m 0644 \
             deploy/nginx/conf.d/prod.conf \
             "${BUNDLE_ROOT}/deploy/nginx/conf.d/prod.conf"
+          install -D -m 0644 \
+            deploy/nginx/upstreams/prod-blue.conf \
+            "${BUNDLE_ROOT}/deploy/nginx/upstreams/prod-blue.conf"
+          install -D -m 0644 \
+            deploy/nginx/upstreams/prod-green.conf \
+            "${BUNDLE_ROOT}/deploy/nginx/upstreams/prod-green.conf"
 
           test -s "${BUNDLE_ROOT}/deploy/compose.prod.yaml"
           test -s "${BUNDLE_ROOT}/deploy/compose.prod.infra.yaml"
+          test -s "${BUNDLE_ROOT}/deploy/compose.prod.blue.yaml"
+          test -s "${BUNDLE_ROOT}/deploy/compose.prod.green.yaml"
           test -s "${BUNDLE_ROOT}/deploy/scripts/deploy-prod.sh"
           test -s "${BUNDLE_ROOT}/deploy/nginx/conf.d/prod.conf"
+          test -s "${BUNDLE_ROOT}/deploy/nginx/upstreams/prod-blue.conf"
+          test -s "${BUNDLE_ROOT}/deploy/nginx/upstreams/prod-green.conf"
           bash -n "${BUNDLE_ROOT}/deploy/scripts/deploy-prod.sh"
 
           tar \
@@ -274,9 +290,13 @@ jobs:
 
           EXPECTED_CONTENTS="$({
             printf '%s\n' \
+              'deploy/compose.prod.blue.yaml' \
+              'deploy/compose.prod.green.yaml' \
               'deploy/compose.prod.infra.yaml' \
               'deploy/compose.prod.yaml' \
               'deploy/nginx/conf.d/prod.conf' \
+              'deploy/nginx/upstreams/prod-blue.conf' \
+              'deploy/nginx/upstreams/prod-green.conf' \
               'deploy/scripts/deploy-prod.sh'
           } | LC_ALL=C sort)"
           ACTUAL_CONTENTS="$(
@@ -364,10 +384,9 @@ jobs:
           BUNDLE_PATH="/opt/aml/tmp/prod-${GIT_SHA}.tar.gz"
           RELEASE_DIR="/opt/aml/releases/prod/${GIT_SHA}"
           CURRENT_NEXT="/opt/aml/current-prod.next"
-          STATE_TMP="/opt/aml/state/prod-current-sha.tmp"
 
           cleanup() {
-            rm -f -- "${BUNDLE_PATH}" "${CURRENT_NEXT}" "${STATE_TMP}"
+            rm -f -- "${BUNDLE_PATH}" "${CURRENT_NEXT}"
           }
 
           trap cleanup EXIT
@@ -405,19 +424,49 @@ jobs:
           ln -sfn "${RELEASE_DIR}" "${CURRENT_NEXT}"
           mv -Tf "${CURRENT_NEXT}" /opt/aml/current-prod
 
-          printf '%s\n' "${GIT_SHA}" > "${STATE_TMP}"
-          chmod 0640 "${STATE_TMP}"
-          mv -f "${STATE_TMP}" /opt/aml/state/prod-current-sha
-
           [[ -L /opt/aml/current-prod ]] || {
             echo "current-prod symbolic link was not created." >&2
             exit 1
           }
 
+          [[ -L /etc/nginx/upstreams/prod-active.conf ]] || {
+            echo "prod-active.conf symbolic link was not created." >&2
+            exit 1
+          }
+
+          for state_file in \
+            /opt/aml/state/prod-active-color \
+            /opt/aml/state/prod-current-sha \
+            /opt/aml/state/prod-last-success-at; do
+            [[ -s "${state_file}" ]] || {
+              echo "Required prod state file is missing or empty: ${state_file}" >&2
+              exit 1
+            }
+          done
+
           CURRENT_RELEASE="$(readlink -f /opt/aml/current-prod)"
           RECORDED_SHA="$(
             tr -d '\r\n' < /opt/aml/state/prod-current-sha
           )"
+          ACTIVE_COLOR="$(
+            tr -d '\r\n' < /opt/aml/state/prod-active-color
+          )"
+          ACTIVE_UPSTREAM="$(
+            readlink -f /etc/nginx/upstreams/prod-active.conf
+          )"
+
+          case "${ACTIVE_COLOR}" in
+            blue)
+              EXPECTED_UPSTREAM="/etc/nginx/upstreams/prod-blue.conf"
+              ;;
+            green)
+              EXPECTED_UPSTREAM="/etc/nginx/upstreams/prod-green.conf"
+              ;;
+            *)
+              echo "Invalid prod active color: ${ACTIVE_COLOR}" >&2
+              exit 1
+              ;;
+          esac
 
           [[ "${CURRENT_RELEASE}" == "${RELEASE_DIR}" ]] || {
             echo "current-prod points to an unexpected release." >&2
@@ -433,7 +482,17 @@ jobs:
             exit 1
           }
 
-          echo "Prod release state verified: ${GIT_SHA}"
+          [[ "${ACTIVE_UPSTREAM}" == "${EXPECTED_UPSTREAM}" ]] || {
+            echo "Active Nginx upstream does not match the recorded color." >&2
+            echo "Expected: ${EXPECTED_UPSTREAM}" >&2
+            echo "Actual: ${ACTIVE_UPSTREAM}" >&2
+            exit 1
+          }
+
+          echo "Prod release state verified."
+          echo "Git SHA: ${GIT_SHA}"
+          echo "Active color: ${ACTIVE_COLOR}"
+          echo "Active upstream: ${ACTIVE_UPSTREAM}"
           echo "Prod release deployed successfully: ${GIT_SHA}"
           REMOTE_SCRIPT
           )"
