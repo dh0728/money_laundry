@@ -1,5 +1,7 @@
 # ERD 스케치 — 2026-09-07 ([W2 DB 설계])
 
+실행 DB: PostgreSQL 17. 로컬 Compose와 통합 테스트는 `postgres:17`을 사용한다. DB 메이저 버전 변경 자체는 Flyway 스키마 변경이 아니므로 기존 마이그레이션을 수정하지 않는다.
+
 지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.4다.
 팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 이 문서는 V1에 든 테이블과 W3·W4에서 추가할 테이블을 한 그림에 둔다.
 
