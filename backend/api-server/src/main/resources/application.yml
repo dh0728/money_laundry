@@ -3,6 +3,14 @@ spring:
     name: api-server
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/aml}
+    username: ${DB_USERNAME:aml}
+    password: ${DB_PASSWORD:aml}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
 
   jpa:
     open-in-view: false
@@ -32,4 +40,19 @@ management:
       probes:
         enabled: true
 
-
+app:
+  storage-dir: ${STORAGE_DIR:./storage}
+  zone: ${APP_ZONE:Asia/Seoul}
+  bank:
+    api-keys: ${BANK_API_KEYS:}
+  ingest:
+    url-ttl: ${INGEST_URL_TTL:PT15M}
+    max-size-bytes: ${INGEST_MAX_SIZE_BYTES:209715200}
+    cutoff: ${INGEST_CUTOFF:06:00}
+    fx-rate-version: fx_rates_usd_v1
+  worker:
+    python: ${WORKER_PYTHON:python}
+    script: ${WORKER_SCRIPT:worker/dummy_worker.py}
+    timeout: ${WORKER_TIMEOUT:PT30M}
+  suspicious-tx:
+    threshold: ${SUSPICIOUS_TX_THRESHOLD:0.7}

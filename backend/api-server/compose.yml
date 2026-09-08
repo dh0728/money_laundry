@@ -1,0 +1,17 @@
+# 로컬 개발용 PostgreSQL. 기동: docker compose up -d / 종료: docker compose down
+# 접속값은 로컬 전용(시크릿 아님). 운영은 환경변수 주입(kickoff §3).
+services:
+  db:
+    image: postgres:16
+    container_name: aml-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: aml
+      POSTGRES_USER: aml
+      POSTGRES_PASSWORD: aml
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
