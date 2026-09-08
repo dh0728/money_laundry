@@ -37,4 +37,4 @@ out/
 .vscode/
 
 # W1 업로드 산출물(원본 CSV·점수 JSON)
-storage/
+/storage/
