@@ -94,9 +94,13 @@ public class UploadService {
           "UPLOAD_MISMATCH",
           "객체 없음 또는 크기 불일치(선언 " + job.getSizeBytes() + ", 실제 " + size + ")");
     }
+    Instant receivedAt = Instant.now();
+    if (batchJobRepository.markReceived(uploadId, bankId, receivedAt) != 1) {
+      throw ApiException.invalidTransition("이미 완료 통지가 접수됨: " + uploadId);
+    }
+    // 조건부 갱신이 커밋된 뒤 적재를 시작한다. 응답 객체를 다시 저장하지 않는다.
     job.setStatus(JobStatus.RECEIVED);
-    job.setReceivedAt(Instant.now());
-    batchJobRepository.save(job);
+    job.setReceivedAt(receivedAt);
     ledgerLoader.load(job.getId());
     return toResponse(job);
   }

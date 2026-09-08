@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -56,9 +57,10 @@ public class CsvTransactionReader {
   };
   private static final String LABEL = "Is Laundering";
   private static final DateTimeFormatter IBM_TIME =
-      DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm[:ss]");
+      DateTimeFormatter.ofPattern("uuuu/MM/dd HH:mm[:ss]").withResolverStyle(ResolverStyle.STRICT);
   private static final DateTimeFormatter ISO_TIME =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm[:ss]");
+      DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm[:ss]")
+          .withResolverStyle(ResolverStyle.STRICT);
 
   private final BufferedReader reader;
   private final Pseudonymizer pseudonymizer;
