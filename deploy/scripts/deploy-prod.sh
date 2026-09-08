@@ -38,6 +38,16 @@ PROD_DRAIN_SECONDS="${PROD_DRAIN_SECONDS:-30}"
 
 GIT_SHA="${1:-${GIT_SHA:-}}"
 
+# 자동 롤백 판단에 사용하는 배포 상태입니다.
+TRAFFIC_SWITCHED="false"
+DEPLOY_COMMITTED="false"
+ROLLBACK_IN_PROGRESS="false"
+ACTIVE_WEB_PORT=""
+ACTIVE_API_PORT=""
+ORIGINAL_ACTIVE_COLOR_FILE_EXISTS="false"
+ORIGINAL_CURRENT_SHA_FILE_EXISTS="false"
+ORIGINAL_CURRENT_SHA=""
+
 fail() {
   echo "ERROR: $*" >&2
   exit 1
@@ -93,6 +103,172 @@ cleanup() {
   unset PROD_WEB_IMAGE
 }
 
+rollback_to_previous_slot() {
+  local reason="${1:-배포 확정 전 오류}"
+  local rollback_failed="false"
+  local restored_upstream=""
+  local restored_active_color=""
+  local restored_current_sha=""
+  local target_running_services=""
+
+  if [[ "${TRAFFIC_SWITCHED}" != "true" || "${DEPLOY_COMMITTED}" == "true" ]]; then
+    echo "자동 롤백 조건에 해당하지 않습니다: ${reason}" >&2
+    return 0
+  fi
+
+  if [[ "${ROLLBACK_IN_PROGRESS}" == "true" ]]; then
+    echo "자동 롤백이 이미 진행 중입니다." >&2
+    return 1
+  fi
+
+  ROLLBACK_IN_PROGRESS="true"
+
+  echo "배포 확정 전 오류가 발생하여 기존 Slot으로 복구합니다: ${reason}" >&2
+
+  if [[ -z "${PREVIOUS_UPSTREAM:-}" || ! -f "${PREVIOUS_UPSTREAM}" ]]; then
+    echo "복구할 기존 upstream 파일이 없습니다: ${PREVIOUS_UPSTREAM:-없음}" >&2
+    rollback_failed="true"
+  elif ! ln -sfn "${PREVIOUS_UPSTREAM}" "${NEXT_LINK}"; then
+    echo "기존 upstream을 가리키는 임시 링크를 만들지 못했습니다." >&2
+    rollback_failed="true"
+  elif ! mv -Tf "${NEXT_LINK}" "${NGINX_ACTIVE_LINK}"; then
+    echo "기존 upstream으로 활성 링크를 복구하지 못했습니다." >&2
+    rollback_failed="true"
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]] && ! nginx -t; then
+    echo "기존 upstream 복구 후 Nginx 문법 검사가 실패했습니다." >&2
+    rollback_failed="true"
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]] && ! systemctl reload nginx; then
+    echo "기존 upstream으로 Nginx를 Reload하지 못했습니다." >&2
+    rollback_failed="true"
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]]; then
+    restored_upstream="$(readlink -f "${NGINX_ACTIVE_LINK}" || true)"
+
+    if [[ "${restored_upstream}" != "${PREVIOUS_UPSTREAM}" ]]; then
+      echo "복구된 upstream이 기존 upstream과 일치하지 않습니다: ${restored_upstream}" >&2
+      rollback_failed="true"
+    else
+      TRAFFIC_SWITCHED="false"
+    fi
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]]; then
+    if [[ "${ORIGINAL_ACTIVE_COLOR_FILE_EXISTS}" == "true" ]]; then
+      if [[ ! -f "${ACTIVE_COLOR_FILE}" ]]; then
+        echo "롤백 후 활성 Color 상태 파일이 없습니다: ${ACTIVE_COLOR_FILE}" >&2
+        rollback_failed="true"
+      else
+        restored_active_color="$(tr -d '\r\n' < "${ACTIVE_COLOR_FILE}")"
+
+        if [[ "${restored_active_color}" != "${ACTIVE_COLOR}" ]]; then
+          echo "롤백 후 활성 Color가 기존 값과 일치하지 않습니다: ${restored_active_color}" >&2
+          rollback_failed="true"
+        fi
+      fi
+    elif [[ -e "${ACTIVE_COLOR_FILE}" ]]; then
+      echo "롤백 전에는 없던 활성 Color 상태 파일이 생성되었습니다." >&2
+      rollback_failed="true"
+    fi
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]]; then
+    if [[ "${ORIGINAL_CURRENT_SHA_FILE_EXISTS}" == "true" ]]; then
+      if [[ ! -f "${CURRENT_SHA_FILE}" ]]; then
+        echo "롤백 후 현재 SHA 상태 파일이 없습니다: ${CURRENT_SHA_FILE}" >&2
+        rollback_failed="true"
+      else
+        restored_current_sha="$(tr -d '\r\n' < "${CURRENT_SHA_FILE}")"
+
+        if [[ "${restored_current_sha}" != "${ORIGINAL_CURRENT_SHA}" ]]; then
+          echo "롤백 후 현재 SHA가 기존 값과 일치하지 않습니다: ${restored_current_sha}" >&2
+          rollback_failed="true"
+        fi
+      fi
+    elif [[ -e "${CURRENT_SHA_FILE}" ]]; then
+      echo "롤백 전에는 없던 현재 SHA 상태 파일이 생성되었습니다." >&2
+      rollback_failed="true"
+    fi
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]] && ! curl \
+    --fail \
+    --silent \
+    --show-error \
+    --connect-timeout 3 \
+    --max-time 5 \
+    --retry 5 \
+    --retry-delay 1 \
+    --retry-all-errors \
+    "http://127.0.0.1:${ACTIVE_WEB_PORT}/health" \
+    >/dev/null; then
+    echo "복구된 기존 Slot의 WEB Health Check가 실패했습니다." >&2
+    rollback_failed="true"
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]] && ! curl \
+    --fail \
+    --silent \
+    --show-error \
+    --connect-timeout 3 \
+    --max-time 5 \
+    --retry 5 \
+    --retry-delay 1 \
+    --retry-all-errors \
+    "http://127.0.0.1:${ACTIVE_API_PORT}/actuator/health" \
+    >/dev/null; then
+    echo "복구된 기존 Slot의 API Health Check가 실패했습니다." >&2
+    rollback_failed="true"
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]]; then
+    echo "실패한 신규 Slot을 중지합니다: ${TARGET_COLOR}" >&2
+
+    if ! docker compose \
+      --env-file "${ENV_FILE}" \
+      -f "${TARGET_COMPOSE_FILE}" \
+      stop \
+      --timeout 40 \
+      api web; then
+      echo "실패한 신규 Slot을 중지하지 못했습니다: ${TARGET_COLOR}" >&2
+      rollback_failed="true"
+    fi
+  else
+    echo "기존 Slot 복구가 완료되지 않아 신규 Slot은 실행 상태로 유지합니다." >&2
+  fi
+
+  if [[ "${rollback_failed}" == "false" ]]; then
+    if ! target_running_services="$(
+      docker compose \
+        --env-file "${ENV_FILE}" \
+        -f "${TARGET_COMPOSE_FILE}" \
+        ps \
+        --status running \
+        --services
+    )"; then
+      echo "실패한 신규 Slot의 실행 상태를 확인하지 못했습니다." >&2
+      rollback_failed="true"
+    elif [[ -n "${target_running_services}" ]]; then
+      echo "실패한 신규 Slot에 실행 중인 서비스가 남아 있습니다: ${target_running_services}" >&2
+      rollback_failed="true"
+    fi
+  fi
+
+  ROLLBACK_IN_PROGRESS="false"
+
+  if [[ "${rollback_failed}" == "true" ]]; then
+    echo "자동 롤백을 완료하지 못했습니다. 수동 확인이 필요합니다." >&2
+    return 1
+  fi
+
+  echo "기존 ${ACTIVE_COLOR} Slot으로 자동 롤백을 완료했습니다." >&2
+  return 0
+}
+
 trap cleanup EXIT
 
 [[ "${EUID}" -eq 0 ]] \
@@ -142,10 +318,19 @@ docker info >/dev/null 2>&1 \
 
 if [[ -f "${ACTIVE_COLOR_FILE}" ]]; then
   INITIAL_BLUE_GREEN_DEPLOY="false"
+  ORIGINAL_ACTIVE_COLOR_FILE_EXISTS="true"
   ACTIVE_COLOR="$(tr -d '\r\n' < "${ACTIVE_COLOR_FILE}")"
 else
   INITIAL_BLUE_GREEN_DEPLOY="true"
   ACTIVE_COLOR="blue"
+fi
+
+if [[ -f "${CURRENT_SHA_FILE}" ]]; then
+  ORIGINAL_CURRENT_SHA_FILE_EXISTS="true"
+  ORIGINAL_CURRENT_SHA="$(tr -d '\r\n' < "${CURRENT_SHA_FILE}")"
+
+  [[ "${ORIGINAL_CURRENT_SHA}" =~ ^[0-9a-f]{40}$ ]] \
+    || fail "기존 prod Git SHA가 올바르지 않습니다: ${ORIGINAL_CURRENT_SHA}"
 fi
 
 if [[ "${INITIAL_BLUE_GREEN_DEPLOY}" == "true" ]]; then
@@ -156,6 +341,8 @@ fi
 case "${ACTIVE_COLOR}" in
   blue)
     ACTIVE_COMPOSE_FILE="${BLUE_COMPOSE_FILE}"
+    ACTIVE_WEB_PORT="3000"
+    ACTIVE_API_PORT="8080"
     TARGET_COLOR="green"
     TARGET_COMPOSE_FILE="${GREEN_COMPOSE_FILE}"
     TARGET_WEB_PORT="3002"
@@ -163,6 +350,8 @@ case "${ACTIVE_COLOR}" in
     ;;
   green)
     ACTIVE_COMPOSE_FILE="${GREEN_COMPOSE_FILE}"
+    ACTIVE_WEB_PORT="3002"
+    ACTIVE_API_PORT="8082"
     TARGET_COLOR="blue"
     TARGET_COMPOSE_FILE="${BLUE_COMPOSE_FILE}"
     TARGET_WEB_PORT="3000"
@@ -443,11 +632,15 @@ CURRENT_UPSTREAM="$(readlink -f "${NGINX_ACTIVE_LINK}")"
 [[ "${CURRENT_UPSTREAM}" == "${TARGET_UPSTREAM}" ]] \
   || fail "Nginx 활성 upstream 확인에 실패했습니다: ${CURRENT_UPSTREAM}"
 
+TRAFFIC_SWITCHED="true"
+
 echo "Nginx 활성 upstream이 ${TARGET_COLOR}(으)로 전환되었습니다."
+
+EXTERNAL_HEALTH_FAILURE=""
 
 echo "운영 도메인을 통해 WEB Health Check를 수행합니다."
 
-curl \
+if ! curl \
   --fail \
   --silent \
   --show-error \
@@ -458,31 +651,44 @@ curl \
   --retry-all-errors \
   -H "Cache-Control: no-cache" \
   "${PROD_BASE_URL}/health" \
-  >/dev/null
+  >/dev/null; then
+  EXTERNAL_HEALTH_FAILURE="운영 도메인 WEB Health Check 실패"
+fi
 
-echo "운영 도메인을 통해 API Health Check를 수행합니다."
+if [[ -z "${EXTERNAL_HEALTH_FAILURE}" ]]; then
+  echo "운영 도메인을 통해 API Health Check를 수행합니다."
 
-curl \
-  --fail \
-  --silent \
-  --show-error \
-  --connect-timeout 5 \
-  --max-time 10 \
-  --retry 10 \
-  --retry-delay 2 \
-  --retry-all-errors \
-  -H "Cache-Control: no-cache" \
-  "${PROD_BASE_URL}/api/actuator/health" \
-  >/dev/null
+  if ! curl \
+    --fail \
+    --silent \
+    --show-error \
+    --connect-timeout 5 \
+    --max-time 10 \
+    --retry 10 \
+    --retry-delay 2 \
+    --retry-all-errors \
+    -H "Cache-Control: no-cache" \
+    "${PROD_BASE_URL}/api/actuator/health" \
+    >/dev/null; then
+    EXTERNAL_HEALTH_FAILURE="운영 도메인 API Health Check 실패"
+  fi
+fi
+
+if [[ -n "${EXTERNAL_HEALTH_FAILURE}" ]]; then
+  echo "${EXTERNAL_HEALTH_FAILURE}" >&2
+
+  if ! rollback_to_previous_slot "${EXTERNAL_HEALTH_FAILURE}"; then
+    fail "외부 Health Check 실패 후 자동 롤백도 완료하지 못했습니다."
+  fi
+
+  fail "외부 Health Check가 실패하여 기존 ${ACTIVE_COLOR} Slot으로 자동 롤백했습니다."
+fi
 
 echo "운영 도메인의 WEB/API Health Check가 모두 성공했습니다."
 
 
-if [[ -f "${CURRENT_SHA_FILE}" ]]; then
-  PREVIOUS_SHA="$(tr -d '\r\n' < "${CURRENT_SHA_FILE}")"
-
-  [[ "${PREVIOUS_SHA}" =~ ^[0-9a-f]{40}$ ]] \
-    || fail "기존 prod Git SHA가 올바르지 않습니다: ${PREVIOUS_SHA}"
+if [[ "${ORIGINAL_CURRENT_SHA_FILE_EXISTS}" == "true" ]]; then
+  PREVIOUS_SHA="${ORIGINAL_CURRENT_SHA}"
 else
   PREVIOUS_SHA=""
 fi
@@ -523,6 +729,8 @@ mv -Tf \
 mv -Tf \
   "${ACTIVE_COLOR_FILE}.next" \
   "${ACTIVE_COLOR_FILE}"
+
+DEPLOY_COMMITTED="true"
 
 echo "prod 배포 상태 파일 기록을 완료했습니다."
 echo "활성 Slot: ${TARGET_COLOR}"
