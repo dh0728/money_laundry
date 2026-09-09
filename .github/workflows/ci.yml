@@ -122,3 +122,17 @@ jobs:
       git_sha: ${{ github.sha }}
     # 재사용 워크플로에서도 dev Environment Secret을 사용할 수 있도록 전달한다.
     secrets: inherit
+
+  deploy-prod:
+    name: Deploy Prod
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs:
+      - docker-images
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-prod.yml
+    with:
+      git_sha: ${{ github.sha }}
+    # 재사용 워크플로에서도 prod Environment Secret을 사용할 수 있도록 전달한다.
+    secrets: inherit
