@@ -499,17 +499,6 @@ jobs:
           fi
 
           echo "Dev deployment completed successfully."
-      - name: Diagnose dev environment secrets
-        if: ${{ always() }}
-        continue-on-error: true
-        env:
-          DUMMY_SECRET_PRESENT: ${{ secrets.DUMMY_SECRET != '' }}
-          DISCORD_SECRET_PRESENT: ${{ secrets.DISCORD_WEBHOOK_URL != '' }}
-        shell: bash
-        run: |
-          echo "DUMMY_SECRET_PRESENT=${DUMMY_SECRET_PRESENT}"
-          echo "DISCORD_SECRET_PRESENT=${DISCORD_SECRET_PRESENT}"
-
       - name: Notify Discord of dev deployment result
         if: ${{ always() }}
         continue-on-error: true
