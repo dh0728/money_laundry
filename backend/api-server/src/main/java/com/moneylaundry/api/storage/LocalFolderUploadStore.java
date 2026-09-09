@@ -8,17 +8,16 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
 import java.util.OptionalLong;
-import org.springframework.beans.factory.annotation.Value;
 
 /**
- * S3 대안: {@code ${app.storage-dir}} 아래 폴더. url은 file:// 경로이며 은행 목업이 PUT 대신 파일 복사로 올린다(API.md §1.1
- * 마지막 항목). 만료 시각은 저장하지 않는다 — 로컬 폴더에는 서명이 없다.
+ * local/default 환경의 백엔드 테스트용 폴더 저장소. url은 file:// 경로이며 현재 은행 목업은 파일 복사를 지원하지 않는다. 로컬 폴더에는 서명이 없으므로
+ * 만료 시각을 저장하지 않는다.
  */
 public class LocalFolderUploadStore implements UploadStore {
 
   private final Path root;
 
-  public LocalFolderUploadStore(@Value("${app.storage-dir}") String storageDir) {
+  public LocalFolderUploadStore(String storageDir) {
     this.root = Path.of(storageDir).toAbsolutePath();
   }
 

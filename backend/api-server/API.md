@@ -101,6 +101,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 
 - 원장 추가 컬럼: `tx_id`(PK), `bank_id`(업로드 bankId), `row_hash`(표준화 행 해시, `(bank_id,row_hash)` UNIQUE), `ingest_job_id`, `scored_job_id`(NULL = 미채점), **`amount_usd`**(= `amount_paid ÷ fx_rates.units_per_usd[payment_currency]` — 환율표는 "1 USD당 통화 단위"(2026-09-07 정정, V1 `fx_rates` 테이블), 적재 시 계산, `fx_rate_version` 함께), 통화 컬럼은 정규화된 ISO 코드로 저장(원명은 저장하지 않음).
 - 통화명 → ISO 매핑표(고정, 15종): Australian Dollar `AUD` · Bitcoin `BTC` · Brazil Real `BRL` · Canadian Dollar `CAD` · Euro `EUR` · Mexican Peso `MXN` · Ruble `RUB` · Rupee `INR` · Saudi Riyal `SAR` · Shekel `ILS` · Swiss Franc `CHF` · UK Pound `GBP` · US Dollar `USD` · Yen `JPY` · Yuan `CNY`. 표에 없는 값은 행 검증 오류(`errors[]`).
+- 송신·수신 `Account`에 `|`가 있으면 형식 오류로 파일 전체를 `VALIDATION_FAILED` 처리하고 원장은 0건이다. 오류는 해당 행·`Account` 컬럼·송신/수신 사유를 표시하며 필수결측으로 세지 않는다. 일반 계좌의 기존 `row_hash` 계산과 마지막 `Payment Format` 값은 변경하지 않는다.
 - **검증 단계(2026-09-09)**: 발급은 은행별 파일중복·크기·파일명·Base64 체크섬·필수 기준일, 완료 통지는 객체 존재·크기·체크섬. 적재 1차는 헤더·행 형식·필수값·통화·환율·서울 거래날짜와 기준일 일치·파일내/원장 중복을 검사한다. 하나라도 오류면 전체 파일을 거절한다. 오류 없는 파일만 2차에서 원장에 삽입하며 DB unique 충돌도 전체 롤백한다. 선택 라벨이 비어 있는 것은 오류가 아니다. `duplicateCount`는 검수에서 발견한 중복이며 건너뛴 성공 행 수가 아니다.
 - 현재 구현: UTF-8(BOM 허용), 쉼표 단순 분할(따옴표 없는 IBM 형식 전제), 시각 `yyyy/MM/dd HH:mm[:ss]` 또는 ISO 로컬 → 서울 시간. 은행별 분할·시각 형식·인코딩은 `[미정: Data — 시연 CSV 스펙(9/7 기한 경과·미회신) — 다르면 형식만 추가]`.
 

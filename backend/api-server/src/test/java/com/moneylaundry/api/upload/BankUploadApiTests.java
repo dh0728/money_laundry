@@ -472,6 +472,56 @@ class BankUploadApiTests {
     assertThat(awaitTerminal(newId).get("status").asText()).isEqualTo("COMPLETED");
   }
 
+  @Test
+  void 양쪽_계좌의_구분문자는_정상행과_함께_전체거절한다() throws Exception {
+    for (int accountColumn : new int[] {2, 4}) {
+      String normal =
+          "2022/09/01 07:10,070,PIPEOK"
+              + accountColumn
+              + ",010,PIPEDEST,70,US Dollar,70,US Dollar,ACH,0\n";
+      String[] invalid =
+          ("2022/09/01 07:11,070,PIPEFROM,010,PIPETO,71,US Dollar,71,US Dollar,ACH,0").split(",");
+      invalid[accountColumn] += "|EXTRA";
+      long id =
+          issueAndPut(
+              KEY_70,
+              "pipe-" + accountColumn + ".csv",
+              HEADER + normal + String.join(",", invalid) + "\n");
+      mockMvc
+          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Api-Key", KEY_70))
+          .andExpect(status().isAccepted());
+      JsonNode result = awaitTerminal(id);
+      assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
+      assertThat(result.get("missingCount").asInt()).isZero();
+      assertThat(result.get("insertedCount").asInt()).isZero();
+      assertThat(result.get("errors")).hasSize(1);
+      assertThat(result.get("errors").get(0).get("row").asInt()).isEqualTo(3);
+      assertThat(result.get("errors").get(0).get("column").asText()).isEqualTo("Account");
+      assertThat(result.get("errors").get(0).get("reason").asText()).contains("|");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from transactions where ingest_job_id = ?", Integer.class, id))
+          .isZero();
+    }
+  }
+
+  @Test
+  void 일반계좌의_기존해시와_BOM_및_결제형식_구분문자는_유지한다() throws Exception {
+    String csv =
+        "\uFEFF"
+            + HEADER
+            + "2022/09/01 07:20,070,HASH1,010,HASH2,70,US Dollar,70,US Dollar,ACH|CUSTOM,0\n";
+    long id = issueAndPut(KEY_70, "hash-compatible.csv", csv);
+    mockMvc
+        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Api-Key", KEY_70))
+        .andExpect(status().isAccepted());
+    assertThat(awaitTerminal(id).get("status").asText()).isEqualTo("COMPLETED");
+    assertThat(
+            jdbc.queryForObject(
+                "select row_hash from transactions where ingest_job_id = ?", String.class, id))
+        .isEqualTo("52e298b05b4761fa0c47b58a0ef4b60fa00fbc425b768c76354269718c8afb0c");
+  }
+
   private long issueAndPut(String apiKey, String fileName, String csv) throws Exception {
     MvcResult issued =
         mockMvc
