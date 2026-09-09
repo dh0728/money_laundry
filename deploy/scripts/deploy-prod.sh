@@ -42,11 +42,18 @@ GIT_SHA="${1:-${GIT_SHA:-}}"
 TRAFFIC_SWITCHED="false"
 DEPLOY_COMMITTED="false"
 ROLLBACK_IN_PROGRESS="false"
+INTERRUPTION_IN_PROGRESS="false"
+TARGET_SLOT_STARTED="false"
 ACTIVE_WEB_PORT=""
 ACTIVE_API_PORT=""
 ORIGINAL_ACTIVE_COLOR_FILE_EXISTS="false"
 ORIGINAL_CURRENT_SHA_FILE_EXISTS="false"
+ORIGINAL_PREVIOUS_SHA_FILE_EXISTS="false"
+ORIGINAL_LAST_SUCCESS_FILE_EXISTS="false"
+ORIGINAL_ACTIVE_COLOR=""
 ORIGINAL_CURRENT_SHA=""
+ORIGINAL_PREVIOUS_SHA=""
+ORIGINAL_LAST_SUCCESS=""
 
 fail() {
   echo "ERROR: $*" >&2
@@ -101,6 +108,90 @@ cleanup() {
   unset PROD_SQS_URL
   unset PROD_API_IMAGE
   unset PROD_WEB_IMAGE
+}
+
+cleanup_temporary_files() {
+  rm -f -- \
+    "${NGINX_ACTIVE_LINK}.next" \
+    "${ACTIVE_COLOR_FILE}.next" \
+    "${CURRENT_SHA_FILE}.next" \
+    "${PREVIOUS_SHA_FILE}.next" \
+    "${LAST_SUCCESS_FILE}.next"
+}
+
+restore_state_file() {
+  local file_path="$1"
+  local originally_existed="$2"
+  local original_value="$3"
+
+  if [[ "${originally_existed}" == "true" ]]; then
+    printf '%s\n' "${original_value}" \
+      > "${file_path}.next" || return 1
+
+    chmod 0644 "${file_path}.next" || return 1
+    mv -Tf "${file_path}.next" "${file_path}" || return 1
+  else
+    rm -f -- "${file_path}" "${file_path}.next" || return 1
+  fi
+}
+
+restore_original_state_files() {
+  local restore_failed="false"
+
+  restore_state_file \
+    "${ACTIVE_COLOR_FILE}" \
+    "${ORIGINAL_ACTIVE_COLOR_FILE_EXISTS}" \
+    "${ORIGINAL_ACTIVE_COLOR}" \
+    || restore_failed="true"
+
+  restore_state_file \
+    "${CURRENT_SHA_FILE}" \
+    "${ORIGINAL_CURRENT_SHA_FILE_EXISTS}" \
+    "${ORIGINAL_CURRENT_SHA}" \
+    || restore_failed="true"
+
+  restore_state_file \
+    "${PREVIOUS_SHA_FILE}" \
+    "${ORIGINAL_PREVIOUS_SHA_FILE_EXISTS}" \
+    "${ORIGINAL_PREVIOUS_SHA}" \
+    || restore_failed="true"
+
+  restore_state_file \
+    "${LAST_SUCCESS_FILE}" \
+    "${ORIGINAL_LAST_SUCCESS_FILE_EXISTS}" \
+    "${ORIGINAL_LAST_SUCCESS}" \
+    || restore_failed="true"
+
+  [[ "${restore_failed}" == "false" ]]
+}
+
+stop_interrupted_target_slot() {
+  local target_running_services=""
+
+  if [[ "${TARGET_SLOT_STARTED}" != "true" ]]; then
+    return 0
+  fi
+
+  echo "중단된 신규 Slot을 정리합니다: ${TARGET_COLOR}" >&2
+
+  docker compose \
+    --env-file "${ENV_FILE}" \
+    -f "${TARGET_COMPOSE_FILE}" \
+    stop \
+    --timeout 40 \
+    api web \
+    || return 1
+
+  target_running_services="$(
+    docker compose \
+      --env-file "${ENV_FILE}" \
+      -f "${TARGET_COMPOSE_FILE}" \
+      ps \
+      --status running \
+      --services
+  )" || return 1
+
+  [[ -z "${target_running_services}" ]]
 }
 
 rollback_to_previous_slot() {
@@ -269,7 +360,61 @@ rollback_to_previous_slot() {
   return 0
 }
 
+handle_deploy_interruption() {
+  local signal_name="$1"
+  local exit_code="$2"
+  local recovery_failed="false"
+
+  if [[ "${INTERRUPTION_IN_PROGRESS}" == "true" ]]; then
+    return
+  fi
+
+  INTERRUPTION_IN_PROGRESS="true"
+  trap '' INT TERM
+  set +e
+
+  echo "${signal_name} 신호를 받아 prod 배포 중단 복구를 시작합니다." >&2
+
+  if [[ "${TRAFFIC_SWITCHED}" == "true" && "${DEPLOY_COMMITTED}" != "true" ]]; then
+    echo "상태 기록 전 트래픽이 전환되어 기존 배포 상태를 복원합니다." >&2
+
+    if ! restore_original_state_files; then
+      echo "기존 prod 상태 파일을 완전히 복원하지 못했습니다." >&2
+      recovery_failed="true"
+    fi
+
+    if ! rollback_to_previous_slot "${signal_name} 신호로 배포 중단"; then
+      recovery_failed="true"
+    fi
+  elif [[ "${DEPLOY_COMMITTED}" != "true" ]]; then
+    echo "트래픽 전환 전 중단되어 기존 활성 Slot을 유지합니다." >&2
+
+    if ! stop_interrupted_target_slot; then
+      echo "중단된 신규 Slot을 완전히 정리하지 못했습니다." >&2
+      recovery_failed="true"
+    fi
+  else
+    echo "배포 상태 기록이 완료되어 새 활성 Slot을 유지합니다." >&2
+  fi
+
+  if ! cleanup_temporary_files; then
+    echo "배포 중 생성된 임시 .next 파일을 완전히 정리하지 못했습니다." >&2
+    recovery_failed="true"
+  fi
+
+  if [[ "${recovery_failed}" == "true" ]]; then
+    echo "배포 중단 복구가 완전히 끝나지 않았습니다. 수동 확인이 필요합니다." >&2
+  else
+    echo "배포 중단 복구를 완료했습니다." >&2
+  fi
+
+  echo "프로세스 종료 시 flock 잠금이 자동으로 해제됩니다." >&2
+  exit "${exit_code}"
+}
+
 trap cleanup EXIT
+trap 'handle_deploy_interruption "INT" 130' INT
+trap 'handle_deploy_interruption "TERM" 143' TERM
 
 [[ "${EUID}" -eq 0 ]] \
   || fail "Nginx 설정 변경을 위해 root 권한이 필요합니다."
@@ -319,10 +464,24 @@ docker info >/dev/null 2>&1 \
 if [[ -f "${ACTIVE_COLOR_FILE}" ]]; then
   INITIAL_BLUE_GREEN_DEPLOY="false"
   ORIGINAL_ACTIVE_COLOR_FILE_EXISTS="true"
-  ACTIVE_COLOR="$(tr -d '\r\n' < "${ACTIVE_COLOR_FILE}")"
+  ORIGINAL_ACTIVE_COLOR="$(tr -d '\r\n' < "${ACTIVE_COLOR_FILE}")"
+  ACTIVE_COLOR="${ORIGINAL_ACTIVE_COLOR}"
 else
   INITIAL_BLUE_GREEN_DEPLOY="true"
   ACTIVE_COLOR="blue"
+fi
+
+if [[ -f "${PREVIOUS_SHA_FILE}" ]]; then
+  ORIGINAL_PREVIOUS_SHA_FILE_EXISTS="true"
+  ORIGINAL_PREVIOUS_SHA="$(tr -d '\r\n' < "${PREVIOUS_SHA_FILE}")"
+
+  [[ -z "${ORIGINAL_PREVIOUS_SHA}" || "${ORIGINAL_PREVIOUS_SHA}" =~ ^[0-9a-f]{40}$ ]] \
+    || fail "기존 prod 이전 Git SHA가 올바르지 않습니다: ${ORIGINAL_PREVIOUS_SHA}"
+fi
+
+if [[ -f "${LAST_SUCCESS_FILE}" ]]; then
+  ORIGINAL_LAST_SUCCESS_FILE_EXISTS="true"
+  ORIGINAL_LAST_SUCCESS="$(tr -d '\r\n' < "${LAST_SUCCESS_FILE}")"
 fi
 
 if [[ -f "${CURRENT_SHA_FILE}" ]]; then
@@ -469,6 +628,8 @@ docker compose \
   pull api web
 
 echo "prod ${TARGET_COLOR} 컨테이너를 실행하고 정상 상태까지 기다립니다."
+
+TARGET_SLOT_STARTED="true"
 
 docker compose \
   --env-file "${ENV_FILE}" \
