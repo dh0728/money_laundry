@@ -3,6 +3,13 @@ name: Deploy Prod
 run-name: Deploy prod ${{ inputs.git_sha }}
 
 on:
+  workflow_call:
+    inputs:
+      git_sha:
+        description: Full Git commit SHA to deploy
+        required: true
+        type: string
+
   workflow_dispatch:
     inputs:
       git_sha:
@@ -31,6 +38,7 @@ jobs:
     steps:
       - name: Validate deployment inputs
         env:
+          EVENT_NAME: ${{ github.event_name }}
           GIT_SHA: ${{ inputs.git_sha }}
           CONFIRMATION: ${{ inputs.confirmation }}
           WORKFLOW_REF: ${{ github.ref }}
@@ -50,10 +58,12 @@ jobs:
             echo "Invalid full Git SHA." >&2
             exit 1
           }
-          [[ "${CONFIRMATION}" == "DEPLOY_PROD" ]] || {
-            echo "Type DEPLOY_PROD exactly to confirm the production deployment." >&2
-            exit 1
-          }
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            [[ "${CONFIRMATION}" == "DEPLOY_PROD" ]] || {
+              echo "Type DEPLOY_PROD exactly to confirm the production deployment." >&2
+              exit 1
+            }
+          fi
           [[ "${AWS_REGION}" == "ap-northeast-2" ]] || {
             echo "AWS_REGION must be ap-northeast-2." >&2
             exit 1
