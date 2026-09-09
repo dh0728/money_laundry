@@ -1,6 +1,8 @@
 # ERD 스케치 — 2026-09-07 ([W2 DB 설계])
 
-실행 DB: PostgreSQL 17. 로컬 Compose와 통합 테스트는 `postgres:17`을 사용한다. DB 메이저 버전 변경 자체는 Flyway 스키마 변경이 아니므로 기존 마이그레이션을 수정하지 않는다.
+실행 DB: PostgreSQL 17. 인프라·로컬 Compose·통합 테스트의 이미지 태그는 `postgres:17-alpine`이다. DB 이미지 변경 자체는 Flyway 스키마 변경이 아니므로 기존 마이그레이션을 수정하지 않는다.
+
+로컬 Compose는 Alpine에서 초기화한 `pgdata_alpine` 볼륨을 사용한다. 다른 배포판에서 만든 DB 데이터 디렉터리를 직접 연결하지 않고, 기존 데이터가 있다면 논리 백업·복원 후 검증한다.
 
 지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.4다.
 팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 이 문서는 V1에 든 테이블과 W3·W4에서 추가할 테이블을 한 그림에 둔다.
