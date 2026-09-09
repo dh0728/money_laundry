@@ -626,3 +626,70 @@ jobs:
           fi
 
           echo "Prod deployment command completed successfully."
+
+      - name: Notify Discord of prod deployment result
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          GIT_SHA: ${{ inputs.git_sha }}
+          ACTOR: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          [[ -n "${DISCORD_WEBHOOK_URL}" ]] || {
+            echo "DISCORD_WEBHOOK_URL secret is missing." >&2
+            exit 1
+          }
+
+          echo "::add-mask::${DISCORD_WEBHOOK_URL}"
+
+          case "${JOB_STATUS}" in
+            success)
+              ICON="✅"
+              RESULT="성공"
+              ;;
+            failure)
+              ICON="❌"
+              RESULT="실패"
+              ;;
+            cancelled)
+              ICON="⚠️"
+              RESULT="취소"
+              ;;
+            *)
+              ICON="ℹ️"
+              RESULT="${JOB_STATUS}"
+              ;;
+          esac
+
+          SHORT_SHA="${GIT_SHA:0:7}"
+          RUN_URL="${SERVER_URL}/${REPOSITORY}/actions/runs/${RUN_ID}"
+
+          MESSAGE="${ICON} **PROD 배포 ${RESULT}**
+          저장소: \`${REPOSITORY}\`
+          Commit: \`${SHORT_SHA}\`
+          실행자: \`${ACTOR}\`
+          실행 결과: ${RUN_URL}"
+
+          PAYLOAD="$(
+            jq -cn \
+              --arg content "${MESSAGE}" \
+              '{content: $content}'
+          )"
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --header "Content-Type: application/json" \
+            --request POST \
+            --data "${PAYLOAD}" \
+            "${DISCORD_WEBHOOK_URL}"
