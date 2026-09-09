@@ -9,7 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface BatchJobRepository extends JpaRepository<BatchJob, Long> {
 
-  boolean existsByJobTypeAndFileHashAndStatus(JobType jobType, String fileHash, JobStatus status);
+  java.util.List<BatchJob> findByJobTypeAndBankIdAndFileHashOrderByIdDesc(
+      JobType jobType, int bankId, String fileHash);
 
   @Modifying
   @Transactional

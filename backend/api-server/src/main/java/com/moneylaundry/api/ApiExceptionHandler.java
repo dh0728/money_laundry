@@ -17,7 +17,12 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(ApiException.class)
   ProblemDetail api(ApiException e) {
-    return problem(e.status(), e.code(), e.getMessage());
+    ProblemDetail result = problem(e.status(), e.code(), e.getMessage());
+    if (e instanceof com.moneylaundry.api.upload.DuplicateFileException duplicate) {
+      result.setProperty("fileName", duplicate.fileName());
+      result.setProperty("uploadedAt", duplicate.uploadedAt());
+    }
+    return result;
   }
 
   @ExceptionHandler({
@@ -26,7 +31,7 @@ public class ApiExceptionHandler {
     MethodArgumentTypeMismatchException.class
   })
   ProblemDetail invalidBody(Exception e) {
-    return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", e.getMessage());
+    return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 필드와 형식을 확인하세요.");
   }
 
   @ExceptionHandler(WorkerException.class)
@@ -37,7 +42,7 @@ public class ApiExceptionHandler {
   @ExceptionHandler(Exception.class)
   ProblemDetail internal(Exception e) {
     log.error("처리되지 않은 예외", e);
-    return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", e.getMessage());
+    return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", "서버 처리 중 오류가 발생했습니다.");
   }
 
   private static ProblemDetail problem(HttpStatus status, String code, String detail) {

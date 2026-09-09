@@ -30,8 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * INGEST 작업의 적재기(kickoff §4.5 17차 결정 A — Java 단일 경로). 1차 통과: 전 행 검증·중복 판별·계좌 수집(오류가 하나라도 있으면 아무것도
- * 넣지 않음). 2차 통과: 은행·계좌 upsert 뒤 JdbcTemplate 배치 삽입을 한 트랜잭션으로. 상태 전이(RUNNING → COMPLETED |
- * VALIDATION_FAILED | FAILED)는 적재 트랜잭션 밖에서 따로 커밋한다.
+ * 넣지 않음). 2차 통과: 은행·계좌 upsert 뒤 원장 삽입과 COMPLETED 상태를 한 트랜잭션으로 커밋한다. 실패 상태는 롤백 후 따로 커밋한다.
  */
 @Slf4j
 @Service
@@ -40,7 +39,7 @@ public class LedgerLoader {
   private static final int CHUNK = 1000;
   private static final int MAX_ERRORS = 100;
 
-  private record Loaded(int rowCount, int duplicateCount) {}
+  private record Loaded(int rowCount) {}
 
   private record AccountKey(int bankId, String accountNumber) {}
 
@@ -84,27 +83,32 @@ public class LedgerLoader {
     batchJobRepository.save(job);
     log.info("적재 시작 uploadId={} bankId={} file={}", jobId, job.getBankId(), job.getFileName());
     try {
-      Loaded loaded = tx.execute(status -> loadAll(job));
-      job.setStatus(JobStatus.COMPLETED);
-      job.setRowCount(loaded.rowCount());
-      job.setMissingCount(0);
-      job.setDuplicateCount(loaded.duplicateCount());
-      log.info(
-          "적재 완료 uploadId={} rows={} duplicates={}",
-          jobId,
-          loaded.rowCount(),
-          loaded.duplicateCount());
+      tx.executeWithoutResult(
+          status -> {
+            Loaded loaded = loadAll(job);
+            job.setStatus(JobStatus.COMPLETED);
+            job.setRowCount(loaded.rowCount());
+            job.setMissingCount(0);
+            job.setDuplicateCount(0);
+            job.setFinishedAt(Instant.now());
+            batchJobRepository.saveAndFlush(job);
+          });
+      log.info("적재 완료 uploadId={} rows={}", jobId, job.getRowCount());
+      return;
     } catch (ValidationFailedException e) {
       job.setStatus(JobStatus.VALIDATION_FAILED);
       job.setErrorCode("VALIDATION_FAILED");
       job.setErrorMessage(e.getMessage());
       job.setMissingCount(e.missingCount());
+      job.setRowCount(e.rowCount());
+      job.setDuplicateCount(e.duplicateCount());
       job.setValidationErrors(objectMapper.writeValueAsString(e.errors()));
       log.warn("검증 실패 uploadId={} errors={}", jobId, e.errors().size());
     } catch (RuntimeException e) {
       job.setStatus(JobStatus.FAILED);
       job.setErrorCode("LOAD_FAILED");
-      job.setErrorMessage(e.getMessage());
+      job.setRowCount(null);
+      job.setErrorMessage("서버 적재 중 오류가 발생했습니다. 관리자에게 문의하세요.");
       log.error("적재 실패 uploadId={}", jobId, e);
     }
     job.setFinishedAt(Instant.now());
@@ -113,6 +117,11 @@ public class LedgerLoader {
 
   private Loaded loadAll(BatchJob job) {
     try {
+      if (job.getBusinessDate() == null)
+        throw new ValidationFailedException(
+            List.of(new ValidationError(0, "businessDate", "거래 기준일이 필요합니다. 기준일을 지정해 재업로드하세요.")), 0);
+      jdbc.query(
+          "select pg_advisory_xact_lock(17001, ?)", ps -> ps.setInt(1, job.getBankId()), rs -> {});
       Map<String, BigDecimal> unitsPerUsd = loadFxRates();
       // 1차 통과: 검증·중복·계좌 수집
       List<ValidationError> errors = new ArrayList<>();
@@ -120,6 +129,7 @@ public class LedgerLoader {
       int rowCount = 0;
       int duplicateInFile = 0;
       Set<String> hashes = new HashSet<>();
+      Map<String, Integer> fileRows = new HashMap<>();
       Set<AccountKey> accounts = new HashSet<>();
       try (BufferedReader reader = open(job.getS3Key())) {
         CsvTransactionReader csv = new CsvTransactionReader(reader, pseudonymizer, zone);
@@ -130,13 +140,20 @@ public class LedgerLoader {
               break;
             }
             rowCount++;
-            if (!unitsPerUsd.containsKey(row.paymentCurrency())) {
+            if (!unitsPerUsd.containsKey(row.paymentCurrency()) && errors.size() < MAX_ERRORS) {
               errors.add(
                   new ValidationError(
                       row.fileRow(), "Payment Currency", "환율 없음: " + row.paymentCurrency()));
             }
             if (!hashes.add(row.rowHash())) {
               duplicateInFile++;
+              if (errors.size() < MAX_ERRORS)
+                errors.add(new ValidationError(row.fileRow(), "", "파일 내부 중복 거래"));
+            }
+            fileRows.putIfAbsent(row.rowHash(), row.fileRow());
+            if (!row.occurredAt().atZone(zone).toLocalDate().equals(job.getBusinessDate())
+                && errors.size() < MAX_ERRORS) {
+              errors.add(new ValidationError(row.fileRow(), "Timestamp", "거래 기준일과 일치하지 않음"));
             }
             accounts.add(new AccountKey(row.fromBank(), row.fromAccount()));
             accounts.add(new AccountKey(row.toBank(), row.toAccount()));
@@ -151,11 +168,33 @@ public class LedgerLoader {
           }
         }
       }
+      int duplicateInLedger = 0;
+      List<String> allHashes = new ArrayList<>(hashes);
+      for (int from = 0; from < allHashes.size(); from += CHUNK) {
+        String[] part =
+            allHashes
+                .subList(from, Math.min(from + CHUNK, allHashes.size()))
+                .toArray(String[]::new);
+        List<String> existing =
+            jdbc.query(
+                "select row_hash from transactions where bank_id = ? and row_hash = any (?::text[])",
+                ps -> {
+                  ps.setInt(1, job.getBankId());
+                  ps.setArray(2, ps.getConnection().createArrayOf("text", part));
+                },
+                (rs, n) -> rs.getString(1));
+        duplicateInLedger += existing.size();
+        for (String hash : existing) {
+          if (errors.size() < MAX_ERRORS)
+            errors.add(new ValidationError(fileRows.get(hash), "", "원장에 이미 존재하는 거래"));
+        }
+      }
       if (rowCount == 0) {
         errors.add(new ValidationError(1, "", "데이터 행 없음"));
       }
       if (!errors.isEmpty()) {
-        throw new ValidationFailedException(errors, missing);
+        throw new ValidationFailedException(
+            errors, missing, rowCount, duplicateInFile + duplicateInLedger);
       }
       // 2차 통과: 은행·계좌 upsert → 배치 삽입
       upsertBanks(accounts);
@@ -179,8 +218,11 @@ public class LedgerLoader {
           }
         }
       }
-      int duplicateInLedger = hashes.size() - inserted;
-      return new Loaded(rowCount, duplicateInFile + duplicateInLedger);
+      if (inserted != rowCount) throw new IllegalStateException("원장 삽입 행 수 불일치");
+      return new Loaded(rowCount);
+    } catch (org.springframework.dao.DuplicateKeyException e) {
+      throw new ValidationFailedException(
+          List.of(new ValidationError(0, "", "동시에 등록된 중복 거래: 파일을 확인하세요.")), 0);
     } catch (IOException e) {
       throw new IllegalStateException("파일 읽기 실패: " + e.getMessage(), e);
     } catch (CsvTransactionReader.RowException e) {
@@ -207,7 +249,7 @@ public class LedgerLoader {
   }
 
   private void upsertBanks(Set<AccountKey> accounts) {
-    Set<Integer> bankIds = new HashSet<>();
+    Set<Integer> bankIds = new java.util.TreeSet<>();
     for (AccountKey key : accounts) {
       bankIds.add(key.bankId());
     }
@@ -235,7 +277,12 @@ public class LedgerLoader {
   }
 
   private Map<AccountKey, Long> upsertAccounts(Set<AccountKey> accounts) {
-    List<AccountKey> keys = new ArrayList<>(accounts);
+    List<AccountKey> keys =
+        accounts.stream()
+            .sorted(
+                java.util.Comparator.comparingInt(AccountKey::bankId)
+                    .thenComparing(AccountKey::accountNumber))
+            .toList();
     jdbc.batchUpdate(
         "insert into accounts (bank_id, account_number) values (?, ?) on conflict do nothing",
         keys,
@@ -278,8 +325,7 @@ public class LedgerLoader {
             "insert into transactions (bank_id, occurred_at, from_account_id, to_account_id,"
                 + " amount_received, receiving_currency, amount_paid, payment_currency,"
                 + " payment_format, amount_usd, fx_rate_version, row_hash, ingest_job_id)"
-                + " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                + " on conflict (bank_id, row_hash) do nothing",
+                + " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
             rows.size(),
             (ps, r) -> {

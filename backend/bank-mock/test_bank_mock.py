@@ -9,6 +9,9 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
+import io
+import bank_mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -36,8 +39,12 @@ class BankMockTests(unittest.TestCase):
             def do_POST(self):
                 data = self.rfile.read(int(self.headers.get("Content-Length", 0)))
                 owner.events.append((self.path, dict(self.headers), data))
-                body = owner.target if self.path == "/api/v1/bank/uploads" else {}
-                self.respond(owner.issue_status, body)
+                body = owner.target if self.path == "/api/v1/bank/uploads" else owner.result
+                self.respond(owner.issue_status if self.path == "/api/v1/bank/uploads" else 202, body)
+
+            def do_GET(self):
+                owner.events.append((self.path, dict(self.headers), b""))
+                self.respond(200, owner.result)
 
             def do_PUT(self):
                 data = self.rfile.read(int(self.headers.get("Content-Length", 0)))
@@ -62,6 +69,11 @@ class BankMockTests(unittest.TestCase):
         self.thread.start()
         self.addCleanup(self.stop_server)
         self.api_url = f"http://127.0.0.1:{self.server.server_port}"
+        self.result = {"uploadId": 9, "bankId": 70, "fileName": self.source.name,
+                       "businessDate": "2026-09-08", "sizeBytes": self.source.stat().st_size,
+                       "status": "COMPLETED", "rowCount": 1, "insertedCount": 1,
+                       "receivedAt": "2026-09-09T15:00:00+09:00", "finishedAt": "2026-09-09T15:00:01+09:00",
+                       "errors": []}
         self.target = {
             "uploadId": 9, "bankId": 70, "url": self.api_url + "/object?signature=secret",
             "method": "PUT", "expiresAt": "2099-01-01T00:00:00+09:00",
@@ -93,11 +105,11 @@ class BankMockTests(unittest.TestCase):
             env=env, capture_output=True, text=True, encoding="utf-8", timeout=10,
         )
 
-    def test_upload_request_and_bytes_without_complete(self):
+    def test_upload_request_bytes_complete_and_result(self):
         result = self.run_cli()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([e[0] for e in self.events],
-                         ["/api/v1/bank/uploads", "/object?signature=secret"])
+                         ["/api/v1/bank/uploads", "/object?signature=secret", "/api/v1/bank/uploads/9/complete"])
         self.assertEqual(json.loads(self.events[0][2]), {
             "fileName": self.source.name, "businessDate": "2026-09-08",
             "sizeBytes": self.source.stat().st_size, "checksumSha256": self.checksum(),
@@ -109,7 +121,8 @@ class BankMockTests(unittest.TestCase):
         self.assertEqual(headers["x-upload-test"], "signed")
         self.assertEqual(headers["x-amz-checksum-sha256"], self.checksum())
         self.assertNotIn("x-api-key", headers)
-        self.assertIn("S3 업로드 성공", result.stdout)
+        self.assertIn("원장 적재 완료", result.stdout)
+        self.assertIn("적재 행 수: 1", result.stdout)
         self.assertIn("은행 70", result.stdout)
         self.assertNotIn("test-only-key", result.stdout + result.stderr)
         self.assertNotIn("signature=secret", result.stdout + result.stderr)
@@ -199,6 +212,43 @@ class BankMockTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertNotIn("test-only-key", result.stdout + result.stderr)
         self.assertNotIn("signature=secret", result.stdout + result.stderr)
+
+    def test_result_lookup_without_upload(self):
+        env = os.environ.copy()
+        env["BANK_API_KEY"] = "test-only-key"
+        env["PYTHONIOENCODING"] = "utf-8"
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--api-url", self.api_url,
+                                 "--upload-id", "9"], env=env, capture_output=True,
+                                text=True, encoding="utf-8", timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([event[0] for event in self.events], ["/api/v1/bank/uploads/9"])
+        self.assertEqual(self.events[0][1].get("X-Api-Key"), "test-only-key")
+
+    def test_validation_failure_explains_reupload(self):
+        self.result.update(status="VALIDATION_FAILED", insertedCount=0,
+                           errors=[{"row": 2, "column": "Account", "reason": "필수값 없음"}])
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("재업로드", result.stdout)
+        self.assertIn("Account", result.stdout)
+
+    def test_server_failure_does_not_claim_no_inserts(self):
+        self.result.update(status="FAILED", insertedCount=1, errorMessage="secret internal data")
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("관리자", result.stdout)
+        self.assertNotIn("secret internal data", result.stdout + result.stderr)
+
+    def test_polling_and_timeout_use_clock_without_waiting(self):
+        opener = object()
+        args = type("Args", (), {"api_url": self.api_url, "api_key": "test-only-key"})()
+        with patch.object(bank_mock, "request_status", return_value=self.result), patch.object(bank_mock.time, "sleep") as sleep:
+            result = bank_mock.wait_result(opener, args, 9, {"status": "RECEIVED"})
+            self.assertEqual(result["status"], "COMPLETED")
+            sleep.assert_called_once_with(2)
+        with patch.object(bank_mock.time, "monotonic", side_effect=[0, 1801]), patch.object(bank_mock.time, "sleep"):
+            with self.assertRaises(TimeoutError):
+                bank_mock.wait_result(opener, args, 9, {"status": "RUNNING"})
 
     def test_malformed_json_is_protocol_failure(self):
         self.raw_response = b"not JSON"

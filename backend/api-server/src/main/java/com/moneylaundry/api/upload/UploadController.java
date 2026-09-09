@@ -36,6 +36,12 @@ public class UploadController {
     return uploadService.complete(bankId, uploadId);
   }
 
+  @GetMapping("/api/v1/bank/uploads/{uploadId}")
+  public UploadStatusResponse bankStatus(
+      @RequestAttribute(BankApiKeyInterceptor.BANK_ID) int bankId, @PathVariable long uploadId) {
+    return uploadService.status(bankId, uploadId);
+  }
+
   @GetMapping("/api/uploads/{uploadId}")
   public UploadStatusResponse status(@PathVariable long uploadId) {
     return uploadService.status(uploadId);
