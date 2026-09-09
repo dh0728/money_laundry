@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** /api/bank/** 의 X-Api-Key를 banks.api_key_hash로 해석해 요청 속성 {@link #BANK_ID}에 bankId를 넣는다. */
+/** /api/v1/bank/** 의 X-Api-Key를 banks.api_key_hash로 해석해 요청 속성 {@link #BANK_ID}에 bankId를 넣는다. */
 @Component
 public class BankApiKeyInterceptor implements HandlerInterceptor {
 

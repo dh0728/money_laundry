@@ -2,7 +2,7 @@
 # 접속값은 로컬 전용(시크릿 아님). 운영은 환경변수 주입(kickoff §3).
 services:
   db:
-    image: postgres:16
+    image: postgres:17-alpine
     container_name: aml-postgres
     ports:
       - "5432:5432"
@@ -11,7 +11,8 @@ services:
       POSTGRES_USER: aml
       POSTGRES_PASSWORD: aml
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Alpine에서 초기화한 볼륨. 다른 배포판의 기존 볼륨은 논리 백업/복원으로 이관한다.
+      - pgdata_alpine:/var/lib/postgresql/data
 
 volumes:
-  pgdata:
+  pgdata_alpine:
