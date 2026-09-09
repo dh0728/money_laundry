@@ -120,3 +120,5 @@ jobs:
     uses: ./.github/workflows/deploy-dev.yml
     with:
       git_sha: ${{ github.sha }}
+    secrets: inherit
+  
