@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -56,9 +57,10 @@ public class CsvTransactionReader {
   };
   private static final String LABEL = "Is Laundering";
   private static final DateTimeFormatter IBM_TIME =
-      DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm[:ss]");
+      DateTimeFormatter.ofPattern("uuuu/MM/dd HH:mm[:ss]").withResolverStyle(ResolverStyle.STRICT);
   private static final DateTimeFormatter ISO_TIME =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm[:ss]");
+      DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm[:ss]")
+          .withResolverStyle(ResolverStyle.STRICT);
 
   private final BufferedReader reader;
   private final Pseudonymizer pseudonymizer;
@@ -77,7 +79,7 @@ public class CsvTransactionReader {
     if (header == null || header.isBlank()) {
       throw new ValidationFailedException(List.of(new ValidationError(1, "", "빈 파일 또는 헤더 없음")), 0);
     }
-    if (header.startsWith("﻿")) {
+    if (header.startsWith("\uFEFF")) {
       header = header.substring(1);
     }
     String[] cols = header.split(",", -1);
@@ -134,9 +136,9 @@ public class CsvTransactionReader {
     int row = fileRow;
     Instant occurredAt = parseTime(row, "Timestamp", required(row, cols, 0), zone);
     int fromBank = parseBank(row, "From Bank", required(row, cols, 1));
-    String fromAccount = pseudonymizer.pseudonymize(fromBank, required(row, cols, 2));
+    String fromAccount = pseudonymizer.pseudonymize(fromBank, account(row, cols, 2));
     int toBank = parseBank(row, "To Bank", required(row, cols, 3));
-    String toAccount = pseudonymizer.pseudonymize(toBank, required(row, cols, 4));
+    String toAccount = pseudonymizer.pseudonymize(toBank, account(row, cols, 4));
     BigDecimal amountReceived = parseAmount(row, "Amount Received", required(row, cols, 5));
     String receivingCurrency = parseCurrency(row, "Receiving Currency", required(row, cols, 6));
     BigDecimal amountPaid = parseAmount(row, "Amount Paid", required(row, cols, 7));
@@ -171,6 +173,14 @@ public class CsvTransactionReader {
         paymentFormat,
         isLaundering,
         hash);
+  }
+
+  private String account(int row, String[] cols, int r) throws RowException {
+    String value = required(row, cols, r);
+    if (value.contains("|")) {
+      throw new RowException(row, REQUIRED[r], (r == 2 ? "송신" : "수신") + " 계좌번호에 | 사용 불가", false);
+    }
+    return value;
   }
 
   private String required(int row, String[] cols, int r) throws RowException {
