@@ -23,7 +23,7 @@ class ApiExceptionHandlerTests {
   @Test
   void 잘못된_JSON은_400이다() throws Exception {
     mvc.perform(
-            post("/api/bank/uploads")
+            post("/api/v1/bank/uploads")
                 .requestAttr(BankApiKeyInterceptor.BANK_ID, 70)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{"))

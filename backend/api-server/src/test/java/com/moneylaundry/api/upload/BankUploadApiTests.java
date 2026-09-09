@@ -67,7 +67,7 @@ class BankUploadApiTests {
     long uploadId = issueAndPut(KEY_70, "bank70_0901.csv", csv);
 
     mockMvc
-        .perform(post("/api/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.status").value("RECEIVED"));
 
@@ -117,7 +117,7 @@ class BankUploadApiTests {
     // 같은 파일 재발급은 409
     mockMvc
         .perform(
-            post("/api/bank/uploads")
+            post("/api/v1/bank/uploads")
                 .header("X-Api-Key", KEY_70)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(issueBody("again.csv", csv)))
@@ -133,7 +133,7 @@ class BankUploadApiTests {
             + "2022/09/02 01:01,070,A2,010,,10.00,US Dollar,10.00,US Dollar,ACH,0\n";
     long uploadId = issueAndPut(KEY_70, "bank70_bad.csv", csv);
     mockMvc
-        .perform(post("/api/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
         .andExpect(status().isAccepted());
 
     JsonNode done = awaitTerminal(uploadId);
@@ -152,14 +152,14 @@ class BankUploadApiTests {
   void API_키가_없거나_틀리면_401이다() throws Exception {
     mockMvc
         .perform(
-            post("/api/bank/uploads")
+            post("/api/v1/bank/uploads")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(issueBody("x.csv", "a")))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     mockMvc
         .perform(
-            post("/api/bank/uploads")
+            post("/api/v1/bank/uploads")
                 .header("X-Api-Key", "wrong")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(issueBody("x.csv", "a")))
@@ -171,7 +171,7 @@ class BankUploadApiTests {
     MvcResult issued =
         mockMvc
             .perform(
-                post("/api/bank/uploads")
+                post("/api/v1/bank/uploads")
                     .header("X-Api-Key", KEY_12)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(issueBody("bank12.csv", "never-put")))
@@ -180,12 +180,12 @@ class BankUploadApiTests {
     long uploadId =
         objectMapper.readTree(issued.getResponse().getContentAsString()).get("uploadId").asLong();
     mockMvc
-        .perform(post("/api/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_12))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_12))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("UPLOAD_MISMATCH"));
     // 다른 은행의 업로드는 보이지 않는다
     mockMvc
-        .perform(post("/api/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
         .andExpect(status().isNotFound());
   }
 
@@ -195,7 +195,7 @@ class BankUploadApiTests {
         "{\"fileName\":\"big.csv\",\"sizeBytes\":300000000,\"sha256\":\"" + "a".repeat(64) + "\"}";
     mockMvc
         .perform(
-            post("/api/bank/uploads")
+            post("/api/v1/bank/uploads")
                 .header("X-Api-Key", KEY_70)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -224,7 +224,7 @@ class BankUploadApiTests {
     MvcResult issued =
         mockMvc
             .perform(
-                post("/api/bank/uploads")
+                post("/api/v1/bank/uploads")
                     .header("X-Api-Key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(issueBody(fileName, csv)))

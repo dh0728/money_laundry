@@ -8,7 +8,6 @@
 
 | 항목 | 현재 서버 | 이 목업이 요구하는 계약 |
 |---|---|---|
-| 발급 경로 | `/api/bank/uploads` | `/api/v1/bank/uploads` (프록시가 경로를 그대로 백엔드에 전달) |
 | 체크섬 | `sha256`, 64자리 소문자 hex | `checksumSha256`, SHA-256 digest의 Base64 |
 | 기준일 | `businessDate` 선택 | 필수 |
 | 발급 응답 | `bankId` 없음 | 인증된 `bankId` 포함 |
@@ -37,7 +36,7 @@ Remove-Item Env:BANK_API_KEY
 ## 통신 계약
 
 1. 파일 크기와 SHA-256을 계산한다. 파일 전체를 메모리에 올리지 않는다.
-2. `POST /api/v1/bank/uploads`에 `X-Api-Key`와 다음 JSON을 보낸다.
+2. `POST /api/v1/bank/uploads`에 `X-Api-Key`와 다음 JSON을 보낸다. 프록시는 이 경로를 그대로 백엔드에 전달한다.
 
 ```json
 {
