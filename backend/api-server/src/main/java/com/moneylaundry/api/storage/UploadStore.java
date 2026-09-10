@@ -12,7 +12,9 @@ import java.util.OptionalLong;
 public interface UploadStore {
 
   /** 은행이 파일을 올릴 대상을 발급한다. 로컬 구현은 file:// URL, S3 구현은 Presigned PUT URL. */
-  UploadTarget issue(String key, Instant expiresAt);
+  UploadTarget issue(String key, Instant expiresAt, String checksumSha256);
+
+  String checksumOf(String key);
 
   /** 객체가 있으면 크기, 없으면 empty. */
   OptionalLong sizeOf(String key);

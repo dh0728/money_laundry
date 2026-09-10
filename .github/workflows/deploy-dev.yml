@@ -73,6 +73,7 @@ jobs:
           echo "GitHub OIDC authentication succeeded."
 
       - name: Configure ECR image names
+        id: image_names
         env:
           GIT_SHA: ${{ inputs.git_sha }}
           AWS_REGION: ${{ vars.AWS_REGION }}
@@ -98,6 +99,11 @@ jobs:
             echo "DEV_API_IMAGE=${ECR_REGISTRY}/aml-api:${IMAGE_TAG}"
             echo "DEV_WEB_IMAGE=${ECR_REGISTRY}/aml-web:${IMAGE_TAG}"
           } >> "${GITHUB_ENV}"
+
+          {
+            echo "api_image=${ECR_REGISTRY}/aml-api:${IMAGE_TAG}"
+            echo "web_image=${ECR_REGISTRY}/aml-web:${IMAGE_TAG}"
+          } >> "${GITHUB_OUTPUT}"
 
           echo "ECR image names configured for dev-${GIT_SHA:0:7}."
 
@@ -142,22 +148,31 @@ jobs:
           check_image "aml-api" "api_exists"
           check_image "aml-web" "web_exists"
 
+      - name: Set up Docker Buildx
+        if: steps.check_images.outputs.api_exists != 'true' || steps.check_images.outputs.web_exists != 'true'
+        uses: docker/setup-buildx-action@v4
+
       - name: Build and push API image
         if: steps.check_images.outputs.api_exists != 'true'
-        run: |
-          docker build \
-            --tag "${DEV_API_IMAGE}" \
-            backend/api-server
-          docker push "${DEV_API_IMAGE}"
+        uses: docker/build-push-action@v7
+        with:
+          context: backend/api-server
+          push: true
+          tags: ${{ steps.image_names.outputs.api_image }}
+          cache-from: type=gha,scope=aml-api
+          cache-to: type=gha,mode=max,scope=aml-api,ignore-error=true
 
       - name: Build and push WEB image
         if: steps.check_images.outputs.web_exists != 'true'
-        run: |
-          docker build \
-            --build-arg VITE_API_BASE_URL=/api \
-            --tag "${DEV_WEB_IMAGE}" \
-            frontend/web-app
-          docker push "${DEV_WEB_IMAGE}"
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend/web-app
+          push: true
+          tags: ${{ steps.image_names.outputs.web_image }}
+          build-args: |
+            VITE_API_BASE_URL=/api
+          cache-from: type=gha,scope=aml-web
+          cache-to: type=gha,mode=max,scope=aml-web,ignore-error=true
 
       - name: Verify deploy images in Amazon ECR
         env:

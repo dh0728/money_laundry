@@ -1,0 +1,2 @@
+Timestamp,From Bank,Account,To Bank,Account,Amount Received,Receiving Currency,Amount Paid,Payment Currency,Payment Format,Is Laundering
+2022/09/01 09:00,70,MOCK70A,12,MOCK12A,100,US Dollar,100,US Dollar,ACH,0
