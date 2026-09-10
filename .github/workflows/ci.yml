@@ -82,6 +82,7 @@ jobs:
 
   docker-images:
     name: Docker Image Build
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     needs:
       - backend
@@ -113,7 +114,8 @@ jobs:
     name: Deploy Dev
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     needs:
-      - docker-images
+      - backend
+      - frontend
     permissions:
       contents: read
       id-token: write
@@ -127,7 +129,8 @@ jobs:
     name: Deploy Prod
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs:
-      - docker-images
+      - backend
+      - frontend
     permissions:
       contents: read
       id-token: write
