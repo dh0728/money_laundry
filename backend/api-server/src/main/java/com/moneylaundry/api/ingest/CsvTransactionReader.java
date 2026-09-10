@@ -144,7 +144,7 @@ public class CsvTransactionReader {
     String receivingCurrency = parseCurrency(row, "Receiving Currency", required(row, cols, 6));
     BigDecimal amountPaid = parseAmount(row, "Amount Paid", required(row, cols, 7));
     String paymentCurrency = parseCurrency(row, "Payment Currency", required(row, cols, 8));
-    String paymentFormat = required(row, cols, 9);
+    String paymentFormat = bounded(row, "Payment Format", required(row, cols, 9), 30);
     Boolean isLaundering = labelIndex < 0 ? null : parseLabel(row, cols[labelIndex]);
     String hash =
         sha256(
@@ -180,6 +180,16 @@ public class CsvTransactionReader {
     String value = required(row, cols, r);
     if (value.contains("|")) {
       throw new RowException(row, REQUIRED[r], (r == 2 ? "송신" : "수신") + " 계좌번호에 | 사용 불가", false);
+    }
+    if (value.codePointCount(0, value.length()) > 100) {
+      throw new RowException(row, REQUIRED[r], (r == 2 ? "송신" : "수신") + " 계좌번호 최대 100자 초과", false);
+    }
+    return value;
+  }
+
+  private String bounded(int row, String column, String value, int limit) throws RowException {
+    if (value.codePointCount(0, value.length()) > limit) {
+      throw new RowException(row, column, "최대 " + limit + "자 초과", false);
     }
     return value;
   }

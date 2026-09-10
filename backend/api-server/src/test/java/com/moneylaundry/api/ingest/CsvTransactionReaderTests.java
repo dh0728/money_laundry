@@ -94,6 +94,36 @@ class CsvTransactionReaderTests {
     assertThat(same.rowHash()).isEqualTo(base.rowHash());
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {2, 4, 9})
+  void 문자열_길이는_trim후_코드포인트로_검사한다(int column) throws Exception {
+    int limit = column == 9 ? 30 : 100;
+    for (String unit : new String[] {"A", "한", "\uD83D\uDE00"}) {
+      String[] values = "2024/02/29 12:34,70,A,12,B,1,US Dollar,1,US Dollar,ACH".split(",");
+      values[column] = " " + unit.repeat(limit) + " ";
+      var accepted = textReader(String.join(",", values)).next();
+      assertThat(
+              column == 2
+                  ? accepted.fromAccount()
+                  : column == 4 ? accepted.toAccount() : accepted.paymentFormat())
+          .isEqualTo(unit.repeat(limit));
+      values[column] = unit.repeat(limit + 1);
+      var reader = textReader(String.join(",", values));
+      var error = assertThrows(CsvTransactionReader.RowException.class, reader::next);
+      assertThat(error.error().column()).isEqualTo(column == 9 ? "Payment Format" : "Account");
+      assertThat(error.error().reason()).contains(Integer.toString(limit));
+      if (column != 9) assertThat(error.error().reason()).contains(column == 2 ? "송신" : "수신");
+      assertThat(error.missing()).isFalse();
+    }
+  }
+
+  private CsvTransactionReader textReader(String row) throws Exception {
+    return new CsvTransactionReader(
+        new BufferedReader(new StringReader(HEADER + row + "\n")),
+        new IdentityPseudonymizer(),
+        ZoneId.of("Asia/Seoul"));
+  }
+
   private CsvTransactionReader amountReader(String received, String paid) throws Exception {
     return new CsvTransactionReader(
         new BufferedReader(

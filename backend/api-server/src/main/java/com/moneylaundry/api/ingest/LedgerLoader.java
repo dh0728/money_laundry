@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -223,6 +225,9 @@ public class LedgerLoader {
     } catch (org.springframework.dao.DuplicateKeyException e) {
       throw new ValidationFailedException(
           List.of(new ValidationError(0, "", "동시에 등록된 중복 거래: 파일을 확인하세요.")), 0);
+    } catch (CharacterCodingException e) {
+      throw new ValidationFailedException(
+          List.of(new ValidationError(0, "", "UTF-8 인코딩 오류: UTF-8로 다시 저장하여 재업로드하세요.")), 0);
     } catch (IOException e) {
       throw new IllegalStateException("파일 읽기 실패: " + e.getMessage(), e);
     } catch (CsvTransactionReader.RowException e) {
@@ -231,7 +236,13 @@ public class LedgerLoader {
   }
 
   private BufferedReader open(String key) throws IOException {
-    return new BufferedReader(new InputStreamReader(uploadStore.open(key), StandardCharsets.UTF_8));
+    return new BufferedReader(
+        new InputStreamReader(
+            uploadStore.open(key),
+            StandardCharsets.UTF_8
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)));
   }
 
   private Map<String, BigDecimal> loadFxRates() {
