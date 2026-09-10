@@ -106,6 +106,8 @@ cleanup() {
   unset PROD_S3_BUCKET
   unset PROD_S3_PREFIX
   unset PROD_SQS_URL
+  unset CF_ACCESS_CLIENT_ID
+  unset CF_ACCESS_CLIENT_SECRET
   unset PROD_API_IMAGE
   unset PROD_WEB_IMAGE
 }
@@ -553,6 +555,8 @@ PROD_JWT_SECRET="$(get_parameter "jwt/secret")"
 PROD_S3_BUCKET="$(get_parameter "s3/bucket")"
 PROD_S3_PREFIX="$(get_parameter "s3/prefix")"
 PROD_SQS_URL="$(get_parameter "sqs/url")"
+CF_ACCESS_CLIENT_ID="$(get_parameter "cloudflare/access/client-id")"
+CF_ACCESS_CLIENT_SECRET="$(get_parameter "cloudflare/access/client-secret")"
 
 export PROD_DB_URL
 export PROD_POSTGRES_USER
@@ -561,6 +565,8 @@ export PROD_JWT_SECRET
 export PROD_S3_BUCKET
 export PROD_S3_PREFIX
 export PROD_SQS_URL
+export CF_ACCESS_CLIENT_ID
+export CF_ACCESS_CLIENT_SECRET
 
 echo "Amazon ECR에 로그인합니다."
 
