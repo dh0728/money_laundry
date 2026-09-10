@@ -56,6 +56,7 @@ public class CsvTransactionReader {
     "Payment Format"
   };
   private static final String LABEL = "Is Laundering";
+  private static final BigDecimal AMOUNT_UPPER_BOUND = new BigDecimal("1E18");
   private static final DateTimeFormatter IBM_TIME =
       DateTimeFormatter.ofPattern("uuuu/MM/dd HH:mm[:ss]").withResolverStyle(ResolverStyle.STRICT);
   private static final DateTimeFormatter ISO_TIME =
@@ -217,7 +218,14 @@ public class CsvTransactionReader {
       if (amount.signum() < 0) {
         throw new RowException(row, column, "금액은 0 이상: " + value, false);
       }
-      return amount;
+      if (amount.compareTo(AMOUNT_UPPER_BOUND) >= 0) {
+        throw new RowException(row, column, "금액 정수부는 최대 18자리", false);
+      }
+      BigDecimal normalized = amount.stripTrailingZeros();
+      if (normalized.scale() > 6) {
+        throw new RowException(row, column, "금액 소수부는 끝자리 0을 제외하고 최대 6자리", false);
+      }
+      return normalized;
     } catch (NumberFormatException e) {
       throw new RowException(row, column, "금액 형식 오류: " + value, false);
     }

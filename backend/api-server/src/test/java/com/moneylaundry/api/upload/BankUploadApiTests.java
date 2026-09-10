@@ -538,6 +538,96 @@ class BankUploadApiTests {
   }
 
   @Test
+  void 금액_범위초과는_정상행과_함께_파일전체를_거절한다() throws Exception {
+    for (int column : new int[] {5, 7}) {
+      for (String amount : new String[] {"123.1234567", "1000000000000000000"}) {
+        String prefix = "AMTBAD" + column + (amount.contains(".") ? "S" : "I");
+        String normal =
+            "2022/09/01 08:10,070,"
+                + prefix
+                + "OK,010,"
+                + prefix
+                + "DEST,1,US Dollar,1,US Dollar,ACH,0\n";
+        String[] invalid =
+            ("2022/09/01 08:11,070,"
+                    + prefix
+                    + "BAD,010,"
+                    + prefix
+                    + "BADDEST,1,US Dollar,1,US Dollar,ACH,0")
+                .split(",");
+        invalid[column] = amount;
+        long id =
+            issueAndPut(
+                BANK_70, prefix + ".csv", HEADER + normal + String.join(",", invalid) + "\n");
+        mockMvc
+            .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+            .andExpect(status().isAccepted());
+        JsonNode result = awaitTerminal(id);
+        assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
+        assertThat(result.get("rowCount").asInt()).isEqualTo(2);
+        assertThat(result.get("insertedCount").asInt()).isZero();
+        assertThat(result.get("missingCount").asInt()).isZero();
+        assertThat(result.get("errors")).hasSize(1);
+        JsonNode error = result.get("errors").get(0);
+        assertThat(error.get("row").asInt()).isEqualTo(3);
+        assertThat(error.get("column").asText())
+            .isEqualTo(column == 5 ? "Amount Received" : "Amount Paid");
+        assertThat(error.get("reason").asText()).contains(amount.contains(".") ? "6자리" : "18자리");
+        assertThat(
+                jdbc.queryForObject(
+                    "select count(*) from transactions where ingest_job_id = ?", Integer.class, id))
+            .isZero();
+        assertThat(
+                jdbc.queryForObject(
+                    "select count(*) from accounts where account_number like ?",
+                    Integer.class,
+                    prefix + "%"))
+            .isZero();
+      }
+    }
+  }
+
+  @Test
+  void 금액_최댓값과_끝자리0은_USD에서_정확히_저장한다() throws Exception {
+    String maximum = "999999999999999999.999999";
+    String csv =
+        HEADER
+            + "2022/09/01 08:20,070,AMTMAX,010,AMTMAXDEST,"
+            + maximum
+            + ",US Dollar,"
+            + maximum
+            + ",US Dollar,ACH,0\n"
+            + "2022/09/01 08:21,070,AMTZERO,010,AMTZERODEST,123.1234560,US Dollar,1.0000000,US Dollar,ACH,0\n";
+    long id = issueAndPut(BANK_70, "amount-exact.csv", csv);
+    mockMvc
+        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+        .andExpect(status().isAccepted());
+    JsonNode result = awaitTerminal(id);
+    assertThat(result.get("status").asText()).isEqualTo("COMPLETED");
+    assertThat(result.get("insertedCount").asInt()).isEqualTo(2);
+    for (String column : new String[] {"amount_received", "amount_paid", "amount_usd"}) {
+      assertThat(
+              jdbc.queryForObject(
+                  "select max(" + column + ") from transactions where ingest_job_id = ?",
+                  BigDecimal.class,
+                  id))
+          .isEqualByComparingTo(maximum);
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "select min(amount_received) from transactions where ingest_job_id = ?",
+                BigDecimal.class,
+                id))
+        .isEqualByComparingTo("123.123456");
+    assertThat(
+            jdbc.queryForObject(
+                "select min(amount_paid) from transactions where ingest_job_id = ?",
+                BigDecimal.class,
+                id))
+        .isEqualByComparingTo("1");
+  }
+
+  @Test
   void 첫발급은_보고은행을_등록하고_기존_정보와_키값은_보존한다() throws Exception {
     jdbc.update(
         "insert into banks(bank_id, name, country, api_key_hash) values (2000000002, 'existing', 'country', ?)",

@@ -102,6 +102,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | Payment Format | `payment_format` | text | 필수 |
 | Is Laundering | (원장에 저장하지 않음) | bool | 선택. 있으면 평가 스키마 `evaluation.transaction_labels(tx_id, is_laundering, pattern_label, attempt_id)`에만 적재(2026-09-07 사용자 확정). API·화면 비노출 |
 
+- **원본 금액 검증(2026-09-10, AMOUNT-VALIDATION-20260910-v1)**: `Amount Received`·`Amount Paid`는 0 이상, 정수부 최대18자리, 끝자리 0을 제외한 실제 소수부 최대6자리만 허용한다(`NUMERIC(24,6)` 유지). `123.1234560`은 허용하고 `123.1234567`·`0.0000001`·`1000000000000000000`은 거절한다. 최대값은 `999999999999999999.999999`다. 반올림·절삭으로 입력 금액을 보정하지 않는다. 범위 오류는 해시 생성 전에 해당 행·금액 컬럼·사유로 기록하고 파일 전체 `VALIDATION_FAILED`, 원장 0건으로 처리한다. 정상 금액의 기존 정규화 해시는 유지한다. USD 환산 계산 정책은 별도이며 이번 변경 대상이 아니다.
 - 원장 추가 컬럼: `tx_id`(PK), `bank_id`(업로드 bankId), `row_hash`(표준화 행 해시, `(bank_id,row_hash)` UNIQUE), `ingest_job_id`, `scored_job_id`(NULL = 미채점), **`amount_usd`**(= `amount_paid ÷ fx_rates.units_per_usd[payment_currency]` — 환율표는 "1 USD당 통화 단위"(2026-09-07 정정, V1 `fx_rates` 테이블), 적재 시 계산, `fx_rate_version` 함께), 통화 컬럼은 정규화된 ISO 코드로 저장(원명은 저장하지 않음).
 - 통화명 → ISO 매핑표(고정, 15종): Australian Dollar `AUD` · Bitcoin `BTC` · Brazil Real `BRL` · Canadian Dollar `CAD` · Euro `EUR` · Mexican Peso `MXN` · Ruble `RUB` · Rupee `INR` · Saudi Riyal `SAR` · Shekel `ILS` · Swiss Franc `CHF` · UK Pound `GBP` · US Dollar `USD` · Yen `JPY` · Yuan `CNY`. 표에 없는 값은 행 검증 오류(`errors[]`).
 - 송신·수신 `Account`에 `|`가 있으면 형식 오류로 파일 전체를 `VALIDATION_FAILED` 처리하고 원장은 0건이다. 오류는 해당 행·`Account` 컬럼·송신/수신 사유를 표시하며 필수결측으로 세지 않는다. 일반 계좌의 기존 `row_hash` 계산과 마지막 `Payment Format` 값은 변경하지 않는다.
