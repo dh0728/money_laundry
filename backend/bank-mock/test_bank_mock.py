@@ -93,15 +93,14 @@ class BankMockTests(unittest.TestCase):
         with socket.socket() as probe:
             self.assertNotEqual(probe.connect_ex(address), 0, "테스트 포트가 열려 있습니다")
 
-    def run_cli(self, source=None, key="test-only-key", business_date="2026-09-08", extra=()):
+    def run_cli(self, source=None, bank_id="70", business_date="2026-09-08", extra=()):
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         env.pop("BANK_API_KEY", None)
-        if key is not None:
-            env["BANK_API_KEY"] = key
         return subprocess.run(
             [sys.executable, "-B", str(SCRIPT), "--file", str(source or self.source),
-             "--api-url", self.api_url, "--business-date", business_date, *extra],
+             "--api-url", self.api_url, "--business-date", business_date,
+             *(["--bank-id", bank_id] if bank_id is not None else []), *extra],
             env=env, capture_output=True, text=True, encoding="utf-8", timeout=10,
         )
 
@@ -114,13 +113,15 @@ class BankMockTests(unittest.TestCase):
             "fileName": self.source.name, "businessDate": "2026-09-08",
             "sizeBytes": self.source.stat().st_size, "checksumSha256": self.checksum(),
         })
-        self.assertEqual(self.events[0][1].get("X-Api-Key"), "test-only-key")
+        self.assertEqual(self.events[0][1].get("X-Bank-Id"), "70")
         headers = {k.lower(): v for k, v in self.events[1][1].items()}
         self.assertEqual(self.events[1][2], self.source.read_bytes())
         self.assertEqual(headers["content-type"], "text/csv")
         self.assertEqual(headers["x-upload-test"], "signed")
         self.assertEqual(headers["x-amz-checksum-sha256"], self.checksum())
         self.assertNotIn("x-api-key", headers)
+        self.assertNotIn("x-bank-id", headers)
+        self.assertEqual(self.events[2][1].get("X-Bank-Id"), "70")
         self.assertIn("원장 적재 완료", result.stdout)
         self.assertIn("적재 행 수: 1", result.stdout)
         self.assertIn("은행 70", result.stdout)
@@ -165,8 +166,9 @@ class BankMockTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertEqual(self.events, [])
 
-    def test_missing_key_and_invalid_date_are_input_errors(self):
-        self.assertEqual(self.run_cli(key=None).returncode, 2)
+    def test_missing_bank_invalid_bank_and_date_are_input_errors(self):
+        for bank_id in (None, "", "-1", "abc", "2147483648", "1.5"):
+            self.assertEqual(self.run_cli(bank_id=bank_id).returncode, 2)
         for business_date in ("2026-02-30", "20260908", "2026-9-8"):
             self.assertEqual(self.run_cli(business_date=business_date).returncode, 2)
         self.assertEqual(self.events, [])
@@ -182,7 +184,7 @@ class BankMockTests(unittest.TestCase):
     def test_invalid_issue_response_does_not_put(self):
         for field, value in (("url", "file:///object"), ("url", 123), ("url", {}),
                              ("method", "POST"),
-                             ("headers", {}), ("bankId", None), ("uploadId", None),
+                             ("headers", {}), ("bankId", None), ("bankId", 12), ("uploadId", None),
                              ("expiresAt", "invalid")):
             with self.subTest(field=field):
                 old = self.target[field]
@@ -200,7 +202,7 @@ class BankMockTests(unittest.TestCase):
         self.assertEqual(self.run_cli().returncode, 1)
         self.assertEqual(len(self.events), 1)
         self.target["headers"]["x-amz-checksum-sha256"] = self.checksum()
-        self.target["headers"]["X-Api-Key"] = "test-only-key"
+        self.target["headers"]["X-Bank-Id"] = "70"
         self.events.clear()
         self.assertEqual(self.run_cli().returncode, 1)
         self.assertEqual(len(self.events), 1)
@@ -215,14 +217,20 @@ class BankMockTests(unittest.TestCase):
 
     def test_result_lookup_without_upload(self):
         env = os.environ.copy()
-        env["BANK_API_KEY"] = "test-only-key"
+        env.pop("BANK_API_KEY", None)
         env["PYTHONIOENCODING"] = "utf-8"
         result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--api-url", self.api_url,
-                                 "--upload-id", "9"], env=env, capture_output=True,
+                                 "--bank-id", "70", "--upload-id", "9"], env=env, capture_output=True,
                                 text=True, encoding="utf-8", timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([event[0] for event in self.events], ["/api/v1/bank/uploads/9"])
-        self.assertEqual(self.events[0][1].get("X-Api-Key"), "test-only-key")
+        self.assertEqual(self.events[0][1].get("X-Bank-Id"), "70")
+
+    def test_result_bank_mismatch_is_rejected(self):
+        self.result["bankId"] = 12
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("원장 적재 완료", result.stdout)
 
     def test_validation_failure_explains_reupload(self):
         self.result.update(status="VALIDATION_FAILED", insertedCount=0,
@@ -241,7 +249,7 @@ class BankMockTests(unittest.TestCase):
 
     def test_polling_and_timeout_use_clock_without_waiting(self):
         opener = object()
-        args = type("Args", (), {"api_url": self.api_url, "api_key": "test-only-key"})()
+        args = type("Args", (), {"api_url": self.api_url, "bank_id": 70})()
         with patch.object(bank_mock, "request_status", return_value=self.result), patch.object(bank_mock.time, "sleep") as sleep:
             result = bank_mock.wait_result(opener, args, 9, {"status": "RECEIVED"})
             self.assertEqual(result["status"], "COMPLETED")
