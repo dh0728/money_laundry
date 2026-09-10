@@ -54,6 +54,19 @@ def parse_args(argv=None):
     if not re.fullmatch(r"[0-9]+", args.bank_id) or len(args.bank_id) > 10 or int(args.bank_id) > 2147483647:
         parser.error("invalid bank id")
     args.bank_id = int(args.bank_id)
+    client_id = os.environ.get("CF_ACCESS_CLIENT_ID", "")
+    client_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET", "")
+    if bool(client_id) != bool(client_secret):
+        parser.exit(2, "설정 오류: CF_ACCESS_CLIENT_ID와 CF_ACCESS_CLIENT_SECRET을 함께 설정하세요.\n")
+    for value in (client_id, client_secret):
+        try:
+            value.encode("latin-1")
+        except UnicodeEncodeError:
+            parser.exit(2, "설정 오류: Cloudflare Access 환경변수의 헤더 형식을 확인하세요.\n")
+        if value and (not value.strip() or any(ord(char) < 32 or ord(char) == 127 for char in value)):
+            parser.exit(2, "설정 오류: Cloudflare Access 환경변수의 헤더 형식을 확인하세요.\n")
+    args.cf_headers = ({"CF-Access-Client-Id": client_id, "CF-Access-Client-Secret": client_secret}
+                       if client_id else {})
     return args
 
 
@@ -71,7 +84,8 @@ def request_upload(opener, args, size, checksum):
                "sizeBytes": size, "checksumSha256": checksum}
     request = Request(args.api_url.rstrip("/") + "/api/v1/bank/uploads",
                       data=json.dumps(payload).encode("utf-8"), method="POST",
-                      headers={"X-Bank-Id": str(args.bank_id), "Content-Type": "application/json"})
+                      headers={"X-Bank-Id": str(args.bank_id), "Content-Type": "application/json",
+                               "User-Agent": "AML-Bank-Upload-Mock/1.0", **args.cf_headers})
     with opener.open(request, timeout=30) as response:
         if response.status != 201:
             raise ValueError(f"예상하지 못한 HTTP {response.status}")
@@ -94,7 +108,8 @@ def request_upload(opener, args, size, checksum):
     normalized = {k.lower(): v for k, v in headers.items()}
     if (normalized.get("content-type") != "text/csv"
             or normalized.get("x-amz-checksum-sha256") != checksum
-            or "x-api-key" in normalized or "x-bank-id" in normalized or "authorization" in normalized):
+            or any(name in normalized for name in ("x-api-key", "x-bank-id", "authorization", "cookie",
+                                                   "cf-access-client-id", "cf-access-client-secret"))):
         raise ValueError("invalid signed headers")
     return target
 
@@ -109,12 +124,15 @@ def upload_file(opener, source, target, size):
                 raise ValueError(f"예상하지 못한 HTTP {response.status}")
 
 
-def safe_text(value):
+def safe_text(value, secrets=()):
     if value is None:
         return "확인되지 않음"
     if not isinstance(value, (str, int)):
         raise ValueError("invalid output field")
     text = str(value)
+    for secret in sorted(secrets, key=len, reverse=True):
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
     text = re.sub(r"https?://[^\s]+", "[URL REDACTED]", text)
     return " ".join(text.split())[:500]
 
@@ -123,7 +141,8 @@ def request_status(opener, args, upload_id, complete=False):
     url = args.api_url.rstrip("/") + f"/api/v1/bank/uploads/{upload_id}"
     request = Request(url + ("/complete" if complete else ""),
                       data=b"" if complete else None, method="POST" if complete else "GET",
-                      headers={"X-Bank-Id": str(args.bank_id)})
+                      headers={"X-Bank-Id": str(args.bank_id), "User-Agent": "AML-Bank-Upload-Mock/1.0",
+                               **args.cf_headers})
     with opener.open(request, timeout=30) as response:
         if response.status != (202 if complete else 200):
             raise ValueError("invalid status response")
@@ -151,9 +170,9 @@ def wait_result(opener, args, upload_id, result):
     return result
 
 
-def show_result(result):
+def show_result(result, secrets=()):
     def field(name):
-        return safe_text(result.get(name))
+        return safe_text(result.get(name), secrets)
     print(f"파일명: {field('fileName')} / 기준일: {field('businessDate')}\n"
           f"업로드 시각: {field('receivedAt')} / 처리 완료 시각: {field('finishedAt')}\n"
           f"파일 행 수: {field('rowCount')} / 적재 행 수: {field('insertedCount')}")
@@ -163,8 +182,8 @@ def show_result(result):
     if result["status"] == "VALIDATION_FAILED":
         print("결과: 파일 검증 실패 — 아래 오류를 수정하고 재업로드하세요.")
         for error in result.get("errors", [])[:100]:
-            print(f"행 {safe_text(error.get('row'))} / "
-                  f"{safe_text(error.get('column'))}: {safe_text(error.get('reason'))}")
+            print(f"행 {safe_text(error.get('row'), secrets)} / "
+                  f"{safe_text(error.get('column'), secrets)}: {safe_text(error.get('reason'), secrets)}")
     else:
         print("결과: 서버 처리 오류 — uploadId로 관리자에게 처리 상태 확인을 요청하세요.")
     return 1
@@ -172,6 +191,7 @@ def show_result(result):
 
 def main(argv=None):
     args = parse_args(argv)
+    secrets = tuple(args.cf_headers.values())
     opener = build_opener(NoRedirect())
     upload_id = args.upload_id
     stage = "결과 조회" if upload_id is not None else "파일 확인"
@@ -182,12 +202,12 @@ def main(argv=None):
             except (OSError, ValueError):
                 print("파일 확인 실패: 읽을 수 있는 비어 있지 않은 파일을 지정하세요.", file=sys.stderr)
                 return 2
-            print(f"[1/4] 파일 확인 완료: {safe_text(args.file.name)}\n"
+            print(f"[1/4] 파일 확인 완료: {safe_text(args.file.name, secrets)}\n"
                   f"      기준일: {args.business_date} / 크기: {size:,} bytes")
             stage = "URL 발급"
             target = request_upload(opener, args, size, checksum)
             upload_id = target["uploadId"]
-            print(f"[2/4] 업로드 URL 발급 완료: 은행 {target['bankId']} / uploadId {upload_id}")
+            print(f"[2/4] 업로드 URL 발급 완료: 은행 {safe_text(target['bankId'], secrets)} / uploadId {safe_text(upload_id, secrets)}")
             stage = "S3 업로드"
             upload_file(opener, args.file, target, size)
             print("[3/4] S3 업로드 성공")
@@ -196,16 +216,16 @@ def main(argv=None):
         else:
             result = request_status(opener, args, upload_id)
         stage = "결과 조회"
-        print(f"[4/4] 처리 결과 확인: uploadId {upload_id}")
-        return show_result(wait_result(opener, args, upload_id, result))
+        print(f"[4/4] 처리 결과 확인: uploadId {safe_text(upload_id, secrets)}")
+        return show_result(wait_result(opener, args, upload_id, result), secrets)
     except HTTPError as error:
         detail = f"HTTP {error.code} 응답으로 요청이 거절되었습니다."
         if stage == "URL 발급" and error.code == 409:
             try:
                 body = json.load(error)
                 if body.get("code") == "DUPLICATE_FILE":
-                    detail = ("이미 처리된 파일입니다. 파일명: " + safe_text(body.get("fileName"))
-                              + " / 업로드 시각: " + safe_text(body.get("uploadedAt")))
+                    detail = ("이미 처리된 파일입니다. 파일명: " + safe_text(body.get("fileName"), secrets)
+                              + " / 업로드 시각: " + safe_text(body.get("uploadedAt"), secrets))
                 elif body.get("code") == "UPLOAD_IN_PROGRESS":
                     detail = "같은 파일의 업로드가 진행 중입니다. 기존 uploadId로 결과를 확인하세요."
             except (ValueError, TypeError, AttributeError):
@@ -218,7 +238,7 @@ def main(argv=None):
     except (ValueError, KeyError, TypeError, AttributeError):
         detail = "응답 형식 또는 전송 조건이 계약과 일치하지 않습니다."
     job = f" (uploadId {upload_id}; --upload-id {upload_id}로 재조회)" if upload_id is not None else ""
-    print(f"{stage} 실패{job}: {detail}", file=sys.stderr)
+    print(safe_text(f"{stage} 실패{job}: {detail}", secrets), file=sys.stderr)
     return 1
 
 
