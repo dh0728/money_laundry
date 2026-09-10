@@ -44,6 +44,7 @@ public class UploadService {
 
   private record Completion(UploadStatusResponse response, boolean received) {}
 
+  private final java.time.Clock clock;
   private final Duration urlTtl;
   private final long maxSizeBytes;
 
@@ -56,8 +57,10 @@ public class UploadService {
       LedgerLoader ledgerLoader,
       ObjectMapper objectMapper,
       PlatformTransactionManager transactionManager,
+      java.time.Clock clock,
       @Value("${app.ingest.url-ttl}") Duration urlTtl,
       @Value("${app.ingest.max-size-bytes}") long maxSizeBytes) {
+    this.clock = clock;
     this.batchJobRepository = batchJobRepository;
     this.banks = banks;
     this.bankReference = bankReference;
@@ -157,7 +160,11 @@ public class UploadService {
                 return new Completion(toResponse(current), false);
               }
               requireLatestUrl(current);
-              Instant receivedAt = Instant.now();
+              jdbc.query(
+                  "select pg_advisory_xact_lock(?)",
+                  ps -> ps.setLong(1, com.moneylaundry.api.analysis.AnalysisService.RECEIPT_LOCK),
+                  rs -> {});
+              Instant receivedAt = clock.instant();
               if (batchJobRepository.markReceived(uploadId, bankId, receivedAt) != 1) {
                 throw ApiException.invalidTransition("완료 통지 전이 실패");
               }
