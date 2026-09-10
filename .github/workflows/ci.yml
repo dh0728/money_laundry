@@ -38,16 +38,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
-          cache-dependency-path: |
-            backend/api-server/*.gradle
-            backend/api-server/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Set up Gradle build cache
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/master' }}
 
       - name: Grant execute permission to Gradle Wrapper
         run: chmod +x gradlew
 
       - name: Run backend tests and build
-        run: ./gradlew clean build --no-daemon --stacktrace
+        run: ./gradlew clean build --build-cache --no-daemon --stacktrace
 
   frontend:
     name: Frontend Lint and Build
@@ -92,23 +93,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Build backend Docker image
-        run: |
-          docker build \
-            --tag aml-api:ci-${{ github.sha }} \
-            backend/api-server
+        uses: docker/build-push-action@v7
+        with:
+          context: backend/api-server
+          outputs: type=cacheonly
+          cache-from: type=gha,scope=aml-api
+          cache-to: type=gha,mode=max,scope=aml-api,ignore-error=true
 
       - name: Build frontend Docker image
-        run: |
-          docker build \
-            --build-arg VITE_API_BASE_URL=/api \
-            --tag aml-web:ci-${{ github.sha }} \
-            frontend/web-app
-
-      - name: Show built Docker images
-        run: |
-          docker image inspect aml-api:ci-${{ github.sha }} >/dev/null
-          docker image inspect aml-web:ci-${{ github.sha }} >/dev/null
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend/web-app
+          outputs: type=cacheonly
+          build-args: |
+            VITE_API_BASE_URL=/api
+          cache-from: type=gha,scope=aml-web
+          cache-to: type=gha,mode=max,scope=aml-web,ignore-error=true
 
   deploy-dev:
     name: Deploy Dev
