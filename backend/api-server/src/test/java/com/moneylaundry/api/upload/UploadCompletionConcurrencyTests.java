@@ -25,9 +25,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-@SpringBootTest(properties = "app.bank.api-keys=70:concurrent-test-key")
+@SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class UploadCompletionConcurrencyTests {
+  @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  @org.junit.jupiter.api.BeforeEach
+  void reportingBank() {
+    jdbc.update(
+        "insert into banks(bank_id, is_reporting) values (70, true) on conflict do nothing");
+  }
+
   @Autowired UploadService service;
   @Autowired BatchJobRepository repository;
   @MockitoBean UploadStore store;

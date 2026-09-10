@@ -1,4 +1,6 @@
-# API 계약 v0.5 — 2026-09-09
+# API 계약 v0.6 — 2026-09-10
+
+변경 v0.6: BANK-IDENTITY-20260910-v1 — API 키 인증을 dev/local 임시 은행 코드 식별로 교체. 최종 서비스는 로그인한 은행 직원이 파일을 선택해 수동 업로드한다.
 
 변경 v0.5: INGEST-S3-RESULT-20260909-v2 — 실제 S3·체크섬·은행 결과 조회·파일 전체 검수·원장/완료 상태 원자화. 기존 중복 건너뛰기 정책은 폐기한다.
 
@@ -22,6 +24,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | `VALIDATION_FAILED` | 400 | 요청·파일 검증 실패(`errors[]`에 행·컬럼·사유) |
 | `UPLOAD_MISMATCH` | 400 | 완료 통지 시 S3 객체 없음 또는 크기·체크섬 불일치 |
 | `UNAUTHENTICATED` | 401 | |
+| `BANK_IDENTITY_DISABLED` | 403 | dev/local 외 프로파일에서 임시 은행 식별 불가(prod 혼합 포함) |
 | `FORBIDDEN_ROLE` | 403 | 역할이 액션을 허용하지 않음 |
 | `NOT_FOUND` | 404 | |
 | `INVALID_TRANSITION` | 409 | 전이 표에 없는 상태 전이 |
@@ -35,7 +38,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | `INTERNAL` | 500 | 그 외 |
 
 - **역할**: `L1`·`L2`·`ADMIN`. 엔드포인트마다 `[허용 역할]` 표기. ADMIN은 사용자·모델 관리와 **배정·재배정** 전용이며 조사 액션(종결·심층 요청·연결·의견) 불가. MVP는 데이터 범위 제한 없음(모든 역할이 전체 조회, 허용된 액션은 전체에 대해). "담당자만 처분" 강제는 10월.
-- **은행 주체 `BANK`**: 사용자 역할이 아니라 API 키로 인증되는 외부 시스템(§1.1). 수집 API만 호출할 수 있고 조회·조사 화면은 없다.
+- **은행 주체 `BANK`**: 현재 목업의 임시 은행 식별(§1.1). 향후 로그인한 직원의 소속 은행과 업로드 권한으로 교체한다. 직원 로그인·권한 계약은 후속 설계 대상이다.
 - **배정(2026-09-07 사용자 확정, 모델 A)**: Alert·Episode 모두 생성 시 시스템이 라운드로빈으로 담당자를 정한다(§3.4). L1이 L2를 고르지 않는다. 재배정은 ADMIN. 인증 *방식*(세션 vs JWT) `[미정: FE 로그인 착수 전, 늦어도 9/18]`.
 - **감사 이력**: 모든 처분 액션은 §6 이력 행을 부수효과로 기록. 처분 액션의 `comment`는 **필수**(빈 값 400).
 - **유형 코드**: 0~8, 매핑표 §2.3. 명칭은 `{ code, name }` 객체로 내보낸다(한글 표시명은 FE 소관).
@@ -44,20 +47,20 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 
 ### 1.1 은행 수집 API (2026-09-07 사용자 확정 — MVP부터 Presigned+S3+완료 API, 구 멀티파트 `POST /api/uploads`는 폐기)
 
-수집 주체는 **은행 시스템**(실제 서비스) / **은행 목업 프로그램**(시연·테스트, `backend/bank-mock/` Python, BE 소유). 현재는 목업으로 전송한다. 향후 은행 직원 웹 업로드는 별도 인증·권한 설계 후 같은 업로드/결과 흐름을 재사용한다.
+수집 주체는 최종 서비스의 **은행 직원**이며 파일을 선택해 수동으로 업로드한다. 현재는 **은행 목업 프로그램**(`backend/bank-mock/` Python, BE 소유)이 그 동작을 대신한다. 향후 로그인·소속 은행·업로드 권한 확인 후 같은 업로드/결과 흐름을 재사용한다. 자동 업로드 및 API 키 발급·관리 화면은 만들지 않는다.
 
-- **은행 테이블(2026-09-07 사용자 확정)**: 원장에 등장하는 **모든 은행 코드**를 담는다(적재 시 자동 upsert, 원장 FK). `name`·`country`는 리소스 `ingest/banks_hi_small.csv`(HI-Small_accounts.csv 추출 30,470행 — HI-Small 재생 전용, HI-Large는 같은 코드에 다른 이름)에서 채우고 못 채우면 null(국가는 "<국가> Bank #N" 형식만 추출). **`is_reporting`** = API 키를 가진 보고 은행(도착 현황·시드 대상). 상대방 은행은 `is_reporting=false`로 이름만 보인다.
-- **인증 — 은행 API 키**: 요청 헤더 `X-Api-Key`. 은행 테이블에 키 해시 저장(원문은 발급 시 1회 반환). 키 → `bankId` 해석. 키 없음/불일치 = 401 `UNAUTHENTICATED`. 은행 등록·키 발급 API(`POST /api/banks` [ADMIN] = `is_reporting` 켜기 + 키 발급, `POST /api/banks/{id}/api-keys` [ADMIN])는 10월 [업로드]; **MVP는 보고 은행 3~4곳(시연 CSV 분할 수) + 키를 시드** — 환경변수 `BANK_API_KEYS=bankId:key,…`, 기동 시 upsert(`is_reporting` 켜고 SHA-256 해시 저장).
+- **은행 테이블(2026-09-07 사용자 확정)**: 원장에 등장하는 **모든 은행 코드**를 담는다(적재 시 자동 upsert, 원장 FK). `name`·`country`는 리소스 `ingest/banks_hi_small.csv`(HI-Small_accounts.csv 추출 30,470행 — HI-Small 재생 전용, HI-Large는 같은 코드에 다른 이름)에서 채우고 못 채우면 null(국가는 "<국가> Bank #N" 형식만 추출). **`is_reporting`** = 보고 은행(도착 현황 대상). 최초 URL 발급 트랜잭션에서 은행을 upsert하고 true로 설정한다. 기존 은행 이름·국가·키 해시는 보존한다. 전체 명단을 미리 시드하지 않으므로 최초 발급 전에는 도착 현황에 등장하지 않는다. 상대방 은행은 `is_reporting=false`로 이름만 보인다.
+- **임시 은행 식별**: 발급·완료·결과 조회에 `X-Bank-Id` 헤더(0~2147483647, ASCII 숫자 1~10자리)를 전달한다. 누락·빈값·음수·문자·범위 초과는400 `VALIDATION_FAILED`. 실제 인증이 아니며 요청자가 은행 코드를 선택할 수 있다. 활성 프로파일에 `dev` 또는 `local`이 있고 `prod`가 없을 때만 허용한다. 기본/미지정/그외 프로파일과 `prod`(혼합 포함)는403 `BANK_IDENTITY_DISABLED`. 은행 코드는 요청 경계에서 `bankId`로 결정하며 향후 직원 로그인으로 이 부분을 교체한다. API 키 환경변수·기동 시 키 시드는 제거한다. 기존 DB 키 컬럼은 변경하지 않는다.
 - **POST /api/v1/bank/uploads** [BANK] `{ fileName, sizeBytes, checksumSha256, businessDate }` → 201 `{ uploadId, bankId, url, method: "PUT", expiresAt, headers }`. 모든 입력 필드는 필수이며 한 CSV는 하루치다. `checksumSha256`은 파일 바이트의 SHA-256을 Base64로 표현한다. 서버는 decoded digest를 기존 `file_hash CHAR(64)`에 hex로 저장한다. `businessDate`는 서울 거래 기준일, 실제 전송일과 별개다. 파일 크기 최대 200MiB, URL 기본 TTL 15분. 파일명에 경로 문자는 불허한다.
-- **S3 전송**: AWS SDK v2 S3Presigner, DefaultCredentialsProvider(EC2 IAM 역할). `S3_BUCKET`·`S3_PREFIX`·`AWS_REGION`(기본 서울)을 사용하며 객체 키는 `{prefix}uploads/{bankId}/{uploadId}/{fileName}`. 응답 `headers`의 `Content-Type: text/csv`, `x-amz-checksum-sha256` 등 서명 헤더를 은행이 그대로 PUT에 보낸다. Host는 HTTP 클라이언트가 처리하며 은행 API 키는 S3에 보내지 않는다. dev/prod에서 S3 설정이 없으면 기동 실패, local/default만 폴더 저장소를 허용한다. 현 목업은 폴더 복사를 지원하지 않는다.
+- **S3 전송**: AWS SDK v2 S3Presigner, DefaultCredentialsProvider(EC2 IAM 역할). `S3_BUCKET`·`S3_PREFIX`·`AWS_REGION`(기본 서울)을 사용하며 객체 키는 `{prefix}uploads/{bankId}/{uploadId}/{fileName}`. 응답 `headers`의 `Content-Type: text/csv`, `x-amz-checksum-sha256` 등 서명 헤더를 은행이 그대로 PUT에 보낸다. Host는 HTTP 클라이언트가 처리하며 은행 식별·인증 헤더는 S3에 보내지 않는다. dev/prod에서 S3 설정이 없으면 기동 실패, local/default만 폴더 저장소를 허용한다. 현 목업은 폴더 복사를 지원하지 않는다.
 - **동일 파일**: 은행별로 비교한다. 같은 은행에서 이미 COMPLETED인 경우 409 `DUPLICATE_FILE` + 기존 `fileName`·`uploadedAt`(receivedAt)만 확장한다. 업로드·검수 진행중은 409 `UPLOAD_IN_PROGRESS`이며 완료라고 안내하지 않는다. 발급은 은행 행 잠금으로 동시 중복 생성 방지. URL 만료 후 새 발급 전에는 기존 번호로 완료 통지할 수 있다. 새 업로드 번호가 발급되면 이전 URL_ISSUED 번호의 완료는409 UPLOAD_SUPERSEDED로 거절한다. 발급과 수신 전이는 같은 은행 잠금으로 직렬화하며 S3 확인 뒤 잠금 안에서 상태·최신 번호를 다시 확인한다. 완료 선행이면 재발급은 진행중409, 재발급 선행이면 이전 완료는 교체됨409다. 이미 수신·처리·종료된 번호의 중복 완료는 기존 상태를 반환한다.
 - **POST /api/v1/bank/uploads/{uploadId}/complete** [BANK, 자기 은행만] → 객체 존재·크기·실제 체크섬을 확인한 뒤 RECEIVED, 응답 202(§1.2 결과). S3 HEAD `checksumMode=ENABLED`, ETag로 체크섬을 대체하지 않는다. 저장소 권한/통신 장애와 객체 없음은 구분한다. 중복 완료 요청은 현재 상태를 반환하고 적재를 다시 실행하지 않는다.
 - 비동기 Java 적재: `RECEIVED → RUNNING → COMPLETED | VALIDATION_FAILED | FAILED`. 파일 내부 중복·기존 원장 중복·필수결측·형식·기준일 불일치가 하나라도 있으면 파일 전체 VALIDATION_FAILED, 원장 0건. 선택 라벨 결측은 허용한다. 성공은 원장과 COMPLETED를 같은 트랜잭션으로 커밋, 오류는 롤백 후 실패 상태를 별도로 기록한다. 같은 보고 은행의 적재는 advisory transaction lock으로 직렬화하고 공통 은행·계좌 upsert는 정렬 순서로 처리한다. DB UNIQUE는 최종 중복 방어다.
-- **목업**: 필수 `--api-url`, 업로드 모드 `--file`·`--business-date`, 또는 재조회 모드 `--upload-id`. 인증은 `BANK_API_KEY`. URL 요청 → S3 PUT → 완료 통지 → 은행 결과 조회를 2초마다 최대 30분 폴링. 확인 시간 초과는 서버 실패가 아니다. 종료 0은 원장 적재 성공, 입력 오류 2, 실패·시간초과·결과 불명 1. 파일 생성/분할/예약은 별도 작업이다.
+- **목업**: 필수 `--api-url`·`--bank-id`, 업로드 모드 `--file`·`--business-date`, 또는 재조회 모드 `--upload-id`. API 키 설정은 필요 없다. URL 요청 → S3 PUT → 완료 통지 → 은행 결과 조회를 2초마다 최대 30분 폴링. 확인 시간 초과는 서버 실패가 아니다. 종료 0은 원장 적재 성공, 입력 오류 2, 실패·시간초과·결과 불명 1. 파일 생성/분할/예약은 별도 작업이다.
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
-- **GET /api/v1/bank/uploads/{uploadId}** [BANK, 자기 은행만] — API 키가 없으면401, 다른 은행/없는 작업은404. INGEST 결과 `{ uploadId, bankId, fileName, businessDate, sizeBytes, rowCount, insertedCount, missingCount, duplicateCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }`. 완료 통지202도 같은 구조다. `rowCount`는 파일 전체를 읽어 확인한 행 수, 모르면null. 성공은 rowCount=insertedCount. 신규 파일 검증/적재 실패는 전체 롤백, 과거 FAILED 작업 조회는 실제 원장 건수를 반환해 0을 임의 추정하지 않는다. `receivedAt`은 서버 수신 확인 시각, `finishedAt`은 검증/적재 종료 시각. errors 최대100건, `row=0`은 헤더 이전 또는 DB 최종 중복방어 등 정확한 행을 특정할 수 없는 파일 단위 오류다. raw DB 오류·인증값은 노출하지 않는다.
-- **GET /api/uploads/{uploadId}** — 기존 처리현황 조회 경로 유지(사용자 인증은 W4 별도). 은행 목업은 위 인증된 은행별 경로만 사용한다.
+- **GET /api/v1/bank/uploads/{uploadId}** [BANK, 자기 은행만] — 은행코드 누락·오류는400, 허용되지 않은 프로파일은403, 다른 은행/없는 작업은404. INGEST 결과 `{ uploadId, bankId, fileName, businessDate, sizeBytes, rowCount, insertedCount, missingCount, duplicateCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }`. 완료 통지202도 같은 구조다. `rowCount`는 파일 전체를 읽어 확인한 행 수, 모르면null. 성공은 rowCount=insertedCount. 신규 파일 검증/적재 실패는 전체 롤백, 과거 FAILED 작업 조회는 실제 원장 건수를 반환해 0을 임의 추정하지 않는다. `receivedAt`은 서버 수신 확인 시각, `finishedAt`은 검증/적재 종료 시각. errors 최대100건, `row=0`은 헤더 이전 또는 DB 최종 중복방어 등 정확한 행을 특정할 수 없는 파일 단위 오류다. raw DB 오류·인증값은 노출하지 않는다.
+- **GET /api/uploads/{uploadId}** — 기존 처리현황 조회 경로 유지(사용자 인증은 W4 별도). 은행 목업은 위 임시 식별된 은행별 경로만 사용한다.
 - **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 보고 은행(`is_reporting`) 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` = 컷오프 기준일: 창은 (D−1 컷오프, D 컷오프], 기본값은 **다음 컷오프의 날짜**(지금 도착하는 파일이 속하는 창). 은행당 창 안 최신 INGEST 작업 1건.
 - **GET /api/batch-jobs** [전 역할] — 목록(페이지네이션). 필터 `type=INGEST|ANALYSIS`, `status`, `from/to`(startedAt). 행: `{ jobId, type, status, attemptCount, analysisDate(ANALYSIS), bankId(INGEST), rowCount, errorCode, errorMessage, startedAt, finishedAt, modelVersionBinary, modelVersionType, featureVersionBinary, featureVersionType, thresholdValue }`
 - **GET /api/batch-jobs/{jobId}** [전 역할] — 위 행 + `counters: { suspiciousTxCount, alertCount, missingCount, duplicateCount }`.
@@ -320,7 +323,7 @@ FE는 아래에서 **표시할 항목을 고르고, 빠진 항목을 요구**한
 
 | 화면 | API | 제공 항목 |
 |---|---|---|
-| 수집·처리현황 (은행별 도착 현황) | §1.1, §1.2 | **은행별 도착 현황**(`GET /api/banks/arrivals`: 은행·상태 7종·파일명·행 수·도착 시각·컷오프 잔여·도착 n/N) / 적재 작업 목록·오류 표(`errors[]`) / 분석 작업 목록(status·attempt·analysisDate·모델 버전·임계·의심 거래·Alert) / "분석 실행" 버튼 = `POST /api/batch-jobs/analysis` / 사이트에 업로드 버튼 없음(은행·목업이 API로 전송) / ADMIN 은행·키 관리는 10월 |
+| 수집·처리현황 (은행별 도착 현황) | §1.1, §1.2 | **은행별 도착 현황**(`GET /api/banks/arrivals`: 은행·상태 7종·파일명·행 수·도착 시각·컷오프 잔여·도착 n/N) / 적재 작업 목록·오류 표(`errors[]`) / 분석 작업 목록(status·attempt·analysisDate·모델 버전·임계·의심 거래·Alert) / "분석 실행" 버튼 = `POST /api/batch-jobs/analysis` / 현재 목업이 전송 / 향후 은행 직원 로그인·파일 선택·수동 업로드 화면 연결 |
 | Alert 목록 (L1 큐) | §3.2 | 위험도, **요약문**, 대표 유형(코드·명), **대표 계좌·계좌 수·은행 수**, 거래 수, **USD 합계 + 통화별 합계**, **점수 통계(평균·최고·초과 비율)·점수 가중 금액·묶음 순도**, 기간(첫·마지막 거래), 참여 은행, 상태, **담당자(자동 배정)**, 소속 Episode, 분석 날짜, 생성 시각, **경과일** / 정렬 8종 / 필터 7종("내 담당" 기본 뷰) / ADMIN: 재배정 |
 | Alert 상세 (L1) | §3.2, §3.3 | 목록 항목 + 구성 거래 표(§2.4 — 금액 USD·**백분위·임계 배율·의심 여부·복합 유형 후보·두 모델 합의·편입 역할·방향** 포함) + 유형 구성비 + 묶음 근거 + **참여 계좌 표(역할·in/out 건수·USD·최대 점수·상대방 수·첫 거래일)** + **시각순 점수 추이** + **설명 요인(피처 기준선 편차 상위 3, 포함 방식은 W3)** + 관계 그래프(노드 역할·금액·위험 등급, 엣지 id·거래 수·USD·최대 점수·유형·기간) + 이력 / 액션: 종결(정상·오탐, 의견 필수)·심층 요청(신규 Episode — L2 자동 배정 / 기존 Episode 연결) / ADMIN: 재배정 |
 | Episode 목록 (L2 큐) | §4.1 | 위험도·자동 제목·Alert 수·거래 수·USD·유형들·담당자·상태(OPEN/CLOSED)·결과·요청 L1·경과일 / 뷰: 내 담당·전체 / 정렬·필터 §4.1 |
@@ -334,7 +337,7 @@ FE는 아래에서 **표시할 항목을 고르고, 빠진 항목을 요구**한
 
 **FE**: ① 금액 **화면 표기 방식**(축약·자릿수 — 데이터 형태는 §0 BE 결정으로 해소) ② 그래프 응답 포함 vs 분리(BE 추천: 분리), 시각화 라이브러리 ③ 유형 한글 표시 명칭·'의심 거래' 표시 명칭(초안: 리서치 문서 §4.6) ④ §7 회신(빠진 항목) ⑤ 인증 방식 결정 기한(로그인 착수 시점) ⑥ 대시보드 추가 지표(후보: 위험 밴드 분해·미결 경과일 중앙/최대·처분 결과 분포·은행별·담당자별 부하·Alert→Episode 전환율).
 **Data**: ① 시연 CSV 시각 형식·인코딩·은행별 분할(9/7 기한 경과·미회신 — IBM 원본 형식으로 진행 중, §1.4) ② ~~이진 모델 피처 세트 동일 여부~~ → 다름·구성 변동으로 확정(09-07, §2.1) — 각 세트의 현재 컬럼 목록은 [모델 래핑] 때 피처 빌더에서 읽는다 ③ Σp 보장·dtype ④ `link_basis` 산출 가능 여부(+ 거래별 `role`/허브 계좌 산출 가능 여부) ⑤ ~~처분된 Alert 거래 제외 여부~~ → 제외로 확정(09-07, §3.1) — 알고리즘 입력 = 미소속 거래만 ⑥ Episode 위험도 = max Alert riskScore 동의 ⑦ ~~점수 적재 스텝에서 job 내 백분위(`score_pct`) 계산 추가 동의~~ → BE 자체 확정(09-08, §2.2 — 적재 스텝은 BE 소유) ⑧ 학습 산출물(run json: 검증 PR-AUC, recall별 임계·precision·알람 수, 유형별 OVR PR-AUC, 피처 중요도) 인도 형식·시점 — 10월 [모델 관리] `model_versions` 입력, W2 캘리브레이션에도 사용.
-**Infra**: 배포 후 EC2 역할의 환경별 S3 prefix PUT/HEAD/GET 권한·컨테이너 자격증명 접근 확인. SSE-KMS 사용 시 체크섬 HEAD용 추가 KMS 권한 확인. 은행 키 환경변수 공급 및 실제 S3 관통은 배포 후 검증. 웹 업로드 CORS는 향후 별도 구성.
+**Infra**: 배포 후 EC2 역할의 환경별 S3 prefix PUT/HEAD/GET 권한·컨테이너 자격증명 접근 확인. SSE-KMS 사용 시 체크섬 HEAD용 추가 KMS 권한 확인. dev 프로파일 적용 및 실제 S3 관통은 배포 후 검증. 웹 업로드 CORS는 향후 별도 구성.
 **Data 추가(09-07)**: ⑨ Episode 조사 블록 패턴 증거 항목·통과 기준 초안 검토(§4.1) ⑩ 시연 CSV 은행별 분할 형식(은행 목업이 파일 단위로 전송).
 **사용자**: ① ~~`is_laundering` 원장 보관 여부~~ → 평가 스키마 분리로 확정(09-07, §1.4) ② **최종 모델 형태 — 지금 답할 수 없음(2026-09-07 사용자)**: 모델 개선 결과에 따라 정해진다. 질문 목록에서 제외하고, 계약은 필수 열 + 무시되는 확장 열 규칙(§2.1)·모델별 피처 파일·`feature_version_*`로 어느 형태든 수용한다. 형태가 정해지면 그때 엣지 파일·`pred_contrib`·run 지표 인도 형식을 추가한다.
 해소됨(v0.2): 점수 필드명, 유형 매핑표, 페이지네이션·정렬, 에러 응답, 배치 상태, 상태 전이, 역할 표, 감사 이력 행, 임계 저장(threshold_value 스냅샷). 해소됨(v0.3): 금액·통화 데이터 형태(USD 환산 병기·ISO 코드), Alert 요약·대표 계좌·참여 계좌·점수 통계·거래 편입 역할·점수 파생 확장.

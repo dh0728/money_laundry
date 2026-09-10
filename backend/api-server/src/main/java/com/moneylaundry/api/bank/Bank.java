@@ -12,7 +12,9 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** banks 한 행(V1). 원장에 등장하는 모든 은행 코드가 들어오고, 보고 은행만 is_reporting·api_key_hash를 가진다. */
+/**
+ * banks 한 행(V1). 원장에 등장하는 모든 은행 코드가 들어오고, 보고 은행은 is_reporting으로 구분한다. api_key_hash는 기존 스키마 호환용이다.
+ */
 @Entity
 @Table(name = "banks")
 @Getter

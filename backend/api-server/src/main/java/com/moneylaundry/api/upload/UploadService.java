@@ -1,6 +1,7 @@
 package com.moneylaundry.api.upload;
 
 import com.moneylaundry.api.ApiException;
+import com.moneylaundry.api.bank.BankReference;
 import com.moneylaundry.api.bank.BankRepository;
 import com.moneylaundry.api.batchjob.BatchJob;
 import com.moneylaundry.api.batchjob.BatchJobRepository;
@@ -34,6 +35,7 @@ public class UploadService {
 
   private final BatchJobRepository batchJobRepository;
   private final BankRepository banks;
+  private final BankReference bankReference;
   private final org.springframework.jdbc.core.JdbcTemplate jdbc;
   private final UploadStore uploadStore;
   private final LedgerLoader ledgerLoader;
@@ -48,6 +50,7 @@ public class UploadService {
   public UploadService(
       BatchJobRepository batchJobRepository,
       BankRepository banks,
+      BankReference bankReference,
       org.springframework.jdbc.core.JdbcTemplate jdbc,
       UploadStore uploadStore,
       LedgerLoader ledgerLoader,
@@ -57,6 +60,7 @@ public class UploadService {
       @Value("${app.ingest.max-size-bytes}") long maxSizeBytes) {
     this.batchJobRepository = batchJobRepository;
     this.banks = banks;
+    this.bankReference = bankReference;
     this.jdbc = jdbc;
     this.uploadStore = uploadStore;
     this.ledgerLoader = ledgerLoader;
@@ -84,6 +88,16 @@ public class UploadService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "SHA-256 Base64 형식 오류");
     }
     String hash = HexFormat.of().formatHex(digest);
+    BankReference.Entry reference = bankReference.find(bankId).orElse(null);
+    jdbc.update(
+        """
+        INSERT INTO banks (bank_id, name, country, is_reporting)
+        VALUES (?, ?, ?, true)
+        ON CONFLICT (bank_id) DO UPDATE SET is_reporting = true, updated_at = now()
+        """,
+        bankId,
+        reference == null ? null : reference.name(),
+        reference == null ? null : reference.country());
     banks.lockById(bankId).orElseThrow(() -> ApiException.notFound("은행 없음"));
     Instant now = Instant.now();
     for (BatchJob previous :

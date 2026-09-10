@@ -33,13 +33,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** 은행 수집 API 관통(API.md §1.1·§1.2): 발급 → 파일 복사(로컬 저장소의 PUT) → 완료 통지 → 비동기 적재 → 조회. */
-@SpringBootTest
+@SpringBootTest(properties = "spring.profiles.active=local")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class BankUploadApiTests {
 
-  static final String KEY_70 = "test-key-bank-70";
-  static final String KEY_12 = "test-key-bank-12";
+  static final String BANK_70 = "70";
+  static final String BANK_12 = "12";
   static final String HEADER =
       "Timestamp,From Bank,Account,To Bank,Account,Amount Received,Receiving Currency,"
           + "Amount Paid,Payment Currency,Payment Format,Is Laundering\n";
@@ -49,7 +49,6 @@ class BankUploadApiTests {
   static void props(DynamicPropertyRegistry registry) throws IOException {
     tempStorage = Files.createTempDirectory("bank-upload-test");
     registry.add("app.storage-dir", () -> tempStorage.toString());
-    registry.add("app.bank.api-keys", () -> "70:" + KEY_70 + ",12:" + KEY_12);
   }
 
   @Autowired MockMvc mockMvc;
@@ -63,10 +62,10 @@ class BankUploadApiTests {
             + "2022/09/01 00:20,070,8000EBD30,010,8000EBD30,3697.34,US Dollar,3697.34,US Dollar,Reinvestment,0\n"
             + "2022/09/01 00:16,00220,8001C8C51,01420,8003093C1,0.025852,Bitcoin,0.025852,Bitcoin,Bitcoin,0\n"
             + "2022/09/01 00:06,021174,800737690,003,80011F990,100.00,Euro,100.00,Euro,ACH,1\n";
-    long uploadId = issueAndPut(KEY_70, "bank70_0901.csv", csv);
+    long uploadId = issueAndPut(BANK_70, "bank70_0901.csv", csv);
 
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_70))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.status").value("RECEIVED"));
 
@@ -117,7 +116,7 @@ class BankUploadApiTests {
     mockMvc
         .perform(
             post("/api/v1/bank/uploads")
-                .header("X-Api-Key", KEY_70)
+                .header("X-Bank-Id", BANK_70)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(issueBody("again.csv", csv)))
         .andExpect(status().isConflict())
@@ -130,9 +129,9 @@ class BankUploadApiTests {
         HEADER
             + "2022/09/02 01:00,070,A1,010,B1,10.00,US Dollar,10.00,Won,ACH,0\n"
             + "2022/09/02 01:01,070,A2,010,,10.00,US Dollar,10.00,US Dollar,ACH,0\n";
-    long uploadId = issueAndPut(KEY_70, "bank70_bad.csv", csv);
+    long uploadId = issueAndPut(BANK_70, "bank70_bad.csv", csv);
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_70))
         .andExpect(status().isAccepted());
 
     JsonNode done = awaitTerminal(uploadId);
@@ -148,21 +147,21 @@ class BankUploadApiTests {
   }
 
   @Test
-  void API_키가_없거나_틀리면_401이다() throws Exception {
+  void 은행코드가_없거나_틀리면_400이다() throws Exception {
     mockMvc
         .perform(
             post("/api/v1/bank/uploads")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(issueBody("x.csv", "a")))
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     mockMvc
         .perform(
             post("/api/v1/bank/uploads")
-                .header("X-Api-Key", "wrong")
+                .header("X-Bank-Id", "wrong")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(issueBody("x.csv", "a")))
-        .andExpect(status().isUnauthorized());
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -171,7 +170,7 @@ class BankUploadApiTests {
         mockMvc
             .perform(
                 post("/api/v1/bank/uploads")
-                    .header("X-Api-Key", KEY_12)
+                    .header("X-Bank-Id", BANK_12)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(issueBody("bank12.csv", "never-put")))
             .andExpect(status().isCreated())
@@ -179,12 +178,12 @@ class BankUploadApiTests {
     long uploadId =
         objectMapper.readTree(issued.getResponse().getContentAsString()).get("uploadId").asLong();
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_12))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_12))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("UPLOAD_MISMATCH"));
     // 다른 은행의 업로드는 보이지 않는다
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_70))
         .andExpect(status().isNotFound());
   }
 
@@ -197,7 +196,7 @@ class BankUploadApiTests {
     mockMvc
         .perform(
             post("/api/v1/bank/uploads")
-                .header("X-Api-Key", KEY_70)
+                .header("X-Bank-Id", BANK_70)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isPayloadTooLarge())
@@ -206,16 +205,22 @@ class BankUploadApiTests {
 
   @Test
   void 도착_현황은_보고_은행_전부를_돌려주고_과거_날짜는_전부_미도착이다() throws Exception {
+    issueAndPut(BANK_12, "arrival12.csv", "arrival12");
+    issueAndPut(BANK_70, "arrival70.csv", "arrival70");
     MvcResult result =
         mockMvc
             .perform(get("/api/banks/arrivals").param("date", "2000-01-01"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.totalBanks").value(2))
+            .andExpect(
+                jsonPath("$.totalBanks")
+                    .value(
+                        jdbc.queryForObject(
+                            "select count(*) from banks where is_reporting", Integer.class)))
             .andExpect(jsonPath("$.arrivedCount").value(0))
             .andExpect(jsonPath("$.remainingSeconds").value(0))
             .andReturn();
     JsonNode banks = objectMapper.readTree(result.getResponse().getContentAsString()).get("banks");
-    assertThat(banks).hasSize(2);
+    assertThat(banks.size()).isGreaterThanOrEqualTo(2);
     assertThat(banks.get(0).get("bankId").asInt()).isEqualTo(12);
     assertThat(banks.get(0).get("status").asText()).isEqualTo("NOT_ARRIVED");
     assertThat(banks.get(1).get("name").asText()).isEqualTo("Oasis Thrift");
@@ -224,9 +229,9 @@ class BankUploadApiTests {
   @Test
   void 내부중복과_기준일_불일치는_파일전체_실패다() throws Exception {
     String row = "2022/09/01 00:20,070,DU1,010,DU2,10,US Dollar,10,US Dollar,ACH,0\n";
-    long duplicate = issueAndPut(KEY_70, "duplicate.csv", HEADER + row + row);
+    long duplicate = issueAndPut(BANK_70, "duplicate.csv", HEADER + row + row);
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", duplicate).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", duplicate).header("X-Bank-Id", BANK_70))
         .andExpect(status().isAccepted());
     JsonNode result = awaitTerminal(duplicate);
     assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
@@ -238,8 +243,8 @@ class BankUploadApiTests {
                 duplicate))
         .isZero();
     long date =
-        issueAndPut(KEY_70, "wrong-date.csv", HEADER + row.replace("2022/09/01", "2022/09/03"));
-    mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", date).header("X-Api-Key", KEY_70));
+        issueAndPut(BANK_70, "wrong-date.csv", HEADER + row.replace("2022/09/01", "2022/09/03"));
+    mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", date).header("X-Bank-Id", BANK_70));
     assertThat(awaitTerminal(date).get("status").asText()).isEqualTo("VALIDATION_FAILED");
   }
 
@@ -251,7 +256,7 @@ class BankUploadApiTests {
             mockMvc
                 .perform(
                     post("/api/v1/bank/uploads")
-                        .header("X-Api-Key", KEY_70)
+                        .header("X-Bank-Id", BANK_70)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
@@ -259,18 +264,18 @@ class BankUploadApiTests {
                 .getResponse()
                 .getContentAsString());
     long id = issued.get("uploadId").asLong();
-    mockMvc.perform(get("/api/v1/bank/uploads/{id}", id)).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/bank/uploads/{id}", id)).andExpect(status().isBadRequest());
     mockMvc
-        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Api-Key", KEY_12))
+        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Bank-Id", BANK_12))
         .andExpect(status().isNotFound());
     mockMvc
-        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Api-Key", KEY_70))
+        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Bank-Id", BANK_70))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.businessDate").value("2022-09-01"));
     mockMvc
         .perform(
             post("/api/v1/bank/uploads")
-                .header("X-Api-Key", KEY_70)
+                .header("X-Bank-Id", BANK_70)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isConflict())
@@ -278,7 +283,7 @@ class BankUploadApiTests {
     mockMvc
         .perform(
             post("/api/v1/bank/uploads")
-                .header("X-Api-Key", KEY_12)
+                .header("X-Bank-Id", BANK_12)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isCreated());
@@ -287,17 +292,17 @@ class BankUploadApiTests {
   @Test
   void 원장중복이_섞이면_신규행도_롤백한다() throws Exception {
     String row = "2022/09/01 02:20,070,LDU1,010,LDU2,20,US Dollar,20,US Dollar,ACH,\n";
-    long first = issueAndPut(KEY_70, "ledger-first.csv", HEADER + row);
-    mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", first).header("X-Api-Key", KEY_70));
+    long first = issueAndPut(BANK_70, "ledger-first.csv", HEADER + row);
+    mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", first).header("X-Bank-Id", BANK_70));
     assertThat(awaitTerminal(first).get("insertedCount").asInt()).isEqualTo(1);
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", first).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", first).header("X-Bank-Id", BANK_70))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.status").value("COMPLETED"));
     mockMvc
         .perform(
             post("/api/v1/bank/uploads")
-                .header("X-Api-Key", KEY_70)
+                .header("X-Bank-Id", BANK_70)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(issueBody("again.csv", HEADER + row)))
         .andExpect(status().isConflict())
@@ -305,8 +310,9 @@ class BankUploadApiTests {
         .andExpect(jsonPath("$.uploadedAt").isNotEmpty())
         .andExpect(jsonPath("$.uploadId").doesNotExist());
     long second =
-        issueAndPut(KEY_70, "ledger-second.csv", HEADER + row + row.replace("LDU1", "LDU3"));
-    mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", second).header("X-Api-Key", KEY_70));
+        issueAndPut(BANK_70, "ledger-second.csv", HEADER + row + row.replace("LDU1", "LDU3"));
+    mockMvc.perform(
+        post("/api/v1/bank/uploads/{id}/complete", second).header("X-Bank-Id", BANK_70));
     assertThat(awaitTerminal(second).get("status").asText()).isEqualTo("VALIDATION_FAILED");
     assertThat(
             jdbc.queryForObject(
@@ -317,13 +323,13 @@ class BankUploadApiTests {
   @Test
   void 완료상태_저장실패는_원장도_롤백한다() throws Exception {
     String row = "2022/09/01 03:20,070,AT1,010,AT2,30,US Dollar,30,US Dollar,ACH,0\n";
-    long id = issueAndPut(KEY_70, "atomic.csv", HEADER + row);
+    long id = issueAndPut(BANK_70, "atomic.csv", HEADER + row);
     jdbc.execute(
         "create function test_reject_completed() returns trigger language plpgsql as $$ begin if NEW.file_name = 'atomic.csv' and NEW.status = 'COMPLETED' then raise exception 'test secret failure'; end if; return NEW; end $$");
     jdbc.execute(
         "create trigger reject_completed before update on batch_jobs for each row execute function test_reject_completed()");
     try {
-      mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Api-Key", KEY_70));
+      mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70));
       JsonNode result = awaitTerminal(id);
       assertThat(result.get("status").asText()).isEqualTo("FAILED");
       assertThat(result.get("insertedCount").asInt()).isZero();
@@ -342,8 +348,8 @@ class BankUploadApiTests {
   void 교차은행_동시파일은_모두_완료된다() throws Exception {
     String a = HEADER + "2022/09/01 04:20,070,CROSS1,012,CROSS2,40,US Dollar,40,US Dollar,ACH,0\n";
     String b = HEADER + "2022/09/01 04:21,012,CROSS2,070,CROSS1,41,US Dollar,41,US Dollar,ACH,0\n";
-    long first = issueAndPut(KEY_70, "cross-a.csv", a);
-    long second = issueAndPut(KEY_12, "cross-b.csv", b);
+    long first = issueAndPut(BANK_70, "cross-a.csv", a);
+    long second = issueAndPut(BANK_12, "cross-b.csv", b);
     try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
       var x =
           executor.submit(
@@ -351,7 +357,7 @@ class BankUploadApiTests {
                   mockMvc
                       .perform(
                           post("/api/v1/bank/uploads/{id}/complete", first)
-                              .header("X-Api-Key", KEY_70))
+                              .header("X-Bank-Id", BANK_70))
                       .andExpect(status().isAccepted()));
       var y =
           executor.submit(
@@ -359,7 +365,7 @@ class BankUploadApiTests {
                   mockMvc
                       .perform(
                           post("/api/v1/bank/uploads/{id}/complete", second)
-                              .header("X-Api-Key", KEY_12))
+                              .header("X-Bank-Id", BANK_12))
                       .andExpect(status().isAccepted()));
       x.get(20, java.util.concurrent.TimeUnit.SECONDS);
       y.get(20, java.util.concurrent.TimeUnit.SECONDS);
@@ -378,6 +384,10 @@ class BankUploadApiTests {
 
   @Test
   void 동일파일_동시발급은_한건만_생성한다() throws Exception {
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from banks where bank_id=2000000001", Integer.class))
+        .isZero();
     String body = issueBody("issue-race.csv", "issue-race-content");
     var barrier = new java.util.concurrent.CyclicBarrier(2);
     try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
@@ -387,7 +397,7 @@ class BankUploadApiTests {
             return mockMvc
                 .perform(
                     post("/api/v1/bank/uploads")
-                        .header("X-Api-Key", KEY_70)
+                        .header("X-Bank-Id", "2000000001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andReturn()
@@ -402,6 +412,11 @@ class BankUploadApiTests {
                   y.get(20, java.util.concurrent.TimeUnit.SECONDS)))
           .containsExactlyInAnyOrder(201, 409);
     }
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from banks where bank_id=2000000001 and is_reporting",
+                Integer.class))
+        .isEqualTo(1);
   }
 
   @Test
@@ -414,7 +429,7 @@ class BankUploadApiTests {
           .append(i)
           .append(",US Dollar,ACH,0\n");
     }
-    long id = issueAndPut(KEY_70, "unique-race.csv", csv.toString());
+    long id = issueAndPut(BANK_70, "unique-race.csv", csv.toString());
     // 사전검수 이후 마지막 청크에서 경쟁 INSERT의 unique violation을 재현한다.
     jdbc.execute(
         "create function test_unique_race() returns trigger language plpgsql as $$ begin if NEW.ingest_job_id = "
@@ -423,7 +438,7 @@ class BankUploadApiTests {
     jdbc.execute(
         "create trigger unique_race before insert on transactions for each row execute function test_unique_race()");
     try {
-      mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Api-Key", KEY_70));
+      mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70));
       JsonNode result = awaitTerminal(id);
       assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
       assertThat(result.get("insertedCount").asInt()).isZero();
@@ -441,11 +456,11 @@ class BankUploadApiTests {
   @Test
   void 만료후에도_재발급전이면_완료할수_있다() throws Exception {
     String csv = HEADER + "2022/09/01 06:20,070,EX1,010,EX2,60,US Dollar,60,US Dollar,ACH,0\n";
-    long id = issueAndPut(KEY_70, "expired-only.csv", csv);
+    long id = issueAndPut(BANK_70, "expired-only.csv", csv);
     jdbc.update(
         "update batch_jobs set url_expires_at = now() - interval '1 minute' where job_id = ?", id);
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
         .andExpect(status().isAccepted());
     assertThat(awaitTerminal(id).get("status").asText()).isEqualTo("COMPLETED");
   }
@@ -453,13 +468,13 @@ class BankUploadApiTests {
   @Test
   void 재발급후_이전번호는_거절하고_새번호만_적재한다() throws Exception {
     String csv = HEADER + "2022/09/01 06:21,070,EX3,010,EX4,61,US Dollar,61,US Dollar,ACH,0\n";
-    long oldId = issueAndPut(KEY_70, "expired-old.csv", csv);
+    long oldId = issueAndPut(BANK_70, "expired-old.csv", csv);
     jdbc.update(
         "update batch_jobs set url_expires_at = now() - interval '1 minute' where job_id = ?",
         oldId);
-    long newId = issueAndPut(KEY_70, "expired-new.csv", csv);
+    long newId = issueAndPut(BANK_70, "expired-new.csv", csv);
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", oldId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", oldId).header("X-Bank-Id", BANK_70))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("UPLOAD_SUPERSEDED"));
     assertThat(
@@ -467,7 +482,7 @@ class BankUploadApiTests {
                 "select count(*) from transactions where ingest_job_id = ?", Integer.class, oldId))
         .isZero();
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", newId).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", newId).header("X-Bank-Id", BANK_70))
         .andExpect(status().isAccepted());
     assertThat(awaitTerminal(newId).get("status").asText()).isEqualTo("COMPLETED");
   }
@@ -484,11 +499,11 @@ class BankUploadApiTests {
       invalid[accountColumn] += "|EXTRA";
       long id =
           issueAndPut(
-              KEY_70,
+              BANK_70,
               "pipe-" + accountColumn + ".csv",
               HEADER + normal + String.join(",", invalid) + "\n");
       mockMvc
-          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Api-Key", KEY_70))
+          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
           .andExpect(status().isAccepted());
       JsonNode result = awaitTerminal(id);
       assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
@@ -511,9 +526,9 @@ class BankUploadApiTests {
         "\uFEFF"
             + HEADER
             + "2022/09/01 07:20,070,HASH1,010,HASH2,70,US Dollar,70,US Dollar,ACH|CUSTOM,0\n";
-    long id = issueAndPut(KEY_70, "hash-compatible.csv", csv);
+    long id = issueAndPut(BANK_70, "hash-compatible.csv", csv);
     mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Api-Key", KEY_70))
+        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
         .andExpect(status().isAccepted());
     assertThat(awaitTerminal(id).get("status").asText()).isEqualTo("COMPLETED");
     assertThat(
@@ -522,12 +537,46 @@ class BankUploadApiTests {
         .isEqualTo("52e298b05b4761fa0c47b58a0ef4b60fa00fbc425b768c76354269718c8afb0c");
   }
 
-  private long issueAndPut(String apiKey, String fileName, String csv) throws Exception {
+  @Test
+  void 첫발급은_보고은행을_등록하고_기존_정보와_키값은_보존한다() throws Exception {
+    jdbc.update(
+        "insert into banks(bank_id, name, country, api_key_hash) values (2000000002, 'existing', 'country', ?)",
+        "f".repeat(64));
+    issueAndPut("2000000002", "existing.csv", "metadata-preserve");
+    assertThat(jdbc.queryForObject("select name from banks where bank_id=2000000002", String.class))
+        .isEqualTo("existing");
+    assertThat(
+            jdbc.queryForObject("select country from banks where bank_id=2000000002", String.class))
+        .isEqualTo("country");
+    assertThat(
+            jdbc.queryForObject(
+                "select api_key_hash from banks where bank_id=2000000002", String.class))
+        .isEqualTo("f".repeat(64));
+    assertThat(
+            jdbc.queryForObject(
+                "select is_reporting from banks where bank_id=2000000002", Boolean.class))
+        .isTrue();
+    long id = issueAndPut("2000000003", "unknown.csv", "unknown-reference");
+    assertThat(jdbc.queryForObject("select name from banks where bank_id=2000000003", String.class))
+        .isNull();
+    mockMvc
+        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Bank-Id", "2000000004"))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", "2000000004"))
+        .andExpect(status().isNotFound());
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from banks where bank_id=2000000004", Integer.class))
+        .isZero();
+  }
+
+  private long issueAndPut(String bankId, String fileName, String csv) throws Exception {
     MvcResult issued =
         mockMvc
             .perform(
                 post("/api/v1/bank/uploads")
-                    .header("X-Api-Key", apiKey)
+                    .header("X-Bank-Id", bankId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(issueBody(fileName, csv)))
             .andExpect(status().isCreated())
@@ -561,7 +610,7 @@ class BankUploadApiTests {
     for (int i = 0; i < 120; i++) {
       MvcResult result =
           mockMvc
-              .perform(get("/api/v1/bank/uploads/{id}", uploadId).header("X-Api-Key", KEY_70))
+              .perform(get("/api/v1/bank/uploads/{id}", uploadId).header("X-Bank-Id", BANK_70))
               .andExpect(status().isOk())
               .andReturn();
       JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
