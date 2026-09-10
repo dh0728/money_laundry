@@ -22,6 +22,26 @@ python -B backend/bank-mock/bank_mock.py --api-url https://api.example.com --ban
 
 재조회에도 동일한 `--bank-id`를 전달한다. 요청한 은행 코드와 작업의 은행 코드가 다르면404다. 이 검사는 실제 사용자 인증을 대신하지 않는다. 재조회 모드와 파일 업로드 모드는 함께 사용할 수 없다.
 
+## Cloudflare Access가 있는 개발 환경
+
+인프라팀에서 받은 Service Token은 목업을 실행하는 **같은 PowerShell**의 환경변수로 주입한다. 아래 값은 자리표시자이며 실제 값을 코드·명령 인자·문서에 넣지 않는다.
+
+```powershell
+$env:CF_ACCESS_CLIENT_ID = '<redacted>'
+$env:CF_ACCESS_CLIENT_SECRET = '<redacted>'
+python -B backend/bank-mock/bank_mock.py --api-url https://dev.aiaml.co.kr --bank-id 12 --file ./transactions_2026-09-08.csv --business-date 2026-09-08
+Remove-Item Env:CF_ACCESS_CLIENT_ID
+Remove-Item Env:CF_ACCESS_CLIENT_SECRET
+```
+
+API 발급 POST·완료 POST·결과 조회 GET에는 고정 `User-Agent: AML-Bank-Upload-Mock/1.0`을 보낸다. S3 PUT에는 이 API용 User-Agent를 추가하지 않는다.
+
+두 값이 있으면 발급 POST·완료 POST·결과 조회 GET에만 `CF-Access-Client-Id`와 `CF-Access-Client-Secret`을 추가한다. `X-Bank-Id`는 그대로 보낸다. 두 값이 모두 없거나 빈 문자열이면 기존 방식으로 요청한다. 한 값만 있거나 HTTP 헤더로 사용할 수 없는 값이면 어떤 네트워크 요청도 보내지 않고 설정 오류(종료2)를 출력한다. 재조회 모드에도 같은 규칙을 적용한다.
+
+S3 PUT에는 Cloudflare 토큰·은행 식별·Authorization·Cookie를 보내지 않는다. 서버가 이 헤더를 서명 헤더에 포함해도 PUT 전에 거절한다. HTTP 리다이렉트를 따라가지 않으므로 Access 로그인 화면 등으로302가 반환되면 요청 실패로 종료한다. 토큰 값과 원시 오류 본문은 출력하지 않으며 출력할 결과에 토큰이 반사돼도 가린다.
+
+EC2에서 환경변수를 export해 실행할 경우 해당 셸과 자식 프로세스에만 상속된다. 별도 SSH/SSM 세션 또는 로컬 PC에는 자동 전달되지 않으므로 실행하는 환경에 다시 주입해야 한다. 목업은 AWS/SSM에서 토큰을 직접 조회하지 않는다. Cloudflare 인증 추가와 별개로 백엔드의 prod 임시 은행 식별 차단은 유지된다. 실제 Cloudflare 정책·토큰을 통한 연결 검증은 별도로 수행해야 한다.
+
 ## 요청과 결과
 
 1. `POST /api/v1/bank/uploads`: `X-Bank-Id`, JSON `{fileName, businessDate, sizeBytes, checksumSha256}`. 체크섬은 SHA-256 digest의 Base64다.
