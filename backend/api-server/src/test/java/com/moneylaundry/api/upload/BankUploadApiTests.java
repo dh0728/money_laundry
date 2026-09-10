@@ -55,6 +55,9 @@ class BankUploadApiTests {
   @Autowired ObjectMapper objectMapper;
   @Autowired JdbcTemplate jdbc;
 
+  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+  com.moneylaundry.api.storage.UploadStore uploadStore;
+
   @Test
   void 발급_완료_결과조회로_모든_행이_적재된다() throws Exception {
     String csv =
@@ -538,6 +541,96 @@ class BankUploadApiTests {
   }
 
   @Test
+  void 금액_범위초과는_정상행과_함께_파일전체를_거절한다() throws Exception {
+    for (int column : new int[] {5, 7}) {
+      for (String amount : new String[] {"123.1234567", "1000000000000000000"}) {
+        String prefix = "AMTBAD" + column + (amount.contains(".") ? "S" : "I");
+        String normal =
+            "2022/09/01 08:10,070,"
+                + prefix
+                + "OK,010,"
+                + prefix
+                + "DEST,1,US Dollar,1,US Dollar,ACH,0\n";
+        String[] invalid =
+            ("2022/09/01 08:11,070,"
+                    + prefix
+                    + "BAD,010,"
+                    + prefix
+                    + "BADDEST,1,US Dollar,1,US Dollar,ACH,0")
+                .split(",");
+        invalid[column] = amount;
+        long id =
+            issueAndPut(
+                BANK_70, prefix + ".csv", HEADER + normal + String.join(",", invalid) + "\n");
+        mockMvc
+            .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+            .andExpect(status().isAccepted());
+        JsonNode result = awaitTerminal(id);
+        assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
+        assertThat(result.get("rowCount").asInt()).isEqualTo(2);
+        assertThat(result.get("insertedCount").asInt()).isZero();
+        assertThat(result.get("missingCount").asInt()).isZero();
+        assertThat(result.get("errors")).hasSize(1);
+        JsonNode error = result.get("errors").get(0);
+        assertThat(error.get("row").asInt()).isEqualTo(3);
+        assertThat(error.get("column").asText())
+            .isEqualTo(column == 5 ? "Amount Received" : "Amount Paid");
+        assertThat(error.get("reason").asText()).contains(amount.contains(".") ? "6자리" : "18자리");
+        assertThat(
+                jdbc.queryForObject(
+                    "select count(*) from transactions where ingest_job_id = ?", Integer.class, id))
+            .isZero();
+        assertThat(
+                jdbc.queryForObject(
+                    "select count(*) from accounts where account_number like ?",
+                    Integer.class,
+                    prefix + "%"))
+            .isZero();
+      }
+    }
+  }
+
+  @Test
+  void 금액_최댓값과_끝자리0은_USD에서_정확히_저장한다() throws Exception {
+    String maximum = "999999999999999999.999999";
+    String csv =
+        HEADER
+            + "2022/09/01 08:20,070,AMTMAX,010,AMTMAXDEST,"
+            + maximum
+            + ",US Dollar,"
+            + maximum
+            + ",US Dollar,ACH,0\n"
+            + "2022/09/01 08:21,070,AMTZERO,010,AMTZERODEST,123.1234560,US Dollar,1.0000000,US Dollar,ACH,0\n";
+    long id = issueAndPut(BANK_70, "amount-exact.csv", csv);
+    mockMvc
+        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+        .andExpect(status().isAccepted());
+    JsonNode result = awaitTerminal(id);
+    assertThat(result.get("status").asText()).isEqualTo("COMPLETED");
+    assertThat(result.get("insertedCount").asInt()).isEqualTo(2);
+    for (String column : new String[] {"amount_received", "amount_paid", "amount_usd"}) {
+      assertThat(
+              jdbc.queryForObject(
+                  "select max(" + column + ") from transactions where ingest_job_id = ?",
+                  BigDecimal.class,
+                  id))
+          .isEqualByComparingTo(maximum);
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "select min(amount_received) from transactions where ingest_job_id = ?",
+                BigDecimal.class,
+                id))
+        .isEqualByComparingTo("123.123456");
+    assertThat(
+            jdbc.queryForObject(
+                "select min(amount_paid) from transactions where ingest_job_id = ?",
+                BigDecimal.class,
+                id))
+        .isEqualByComparingTo("1");
+  }
+
+  @Test
   void 첫발급은_보고은행을_등록하고_기존_정보와_키값은_보존한다() throws Exception {
     jdbc.update(
         "insert into banks(bank_id, name, country, api_key_hash) values (2000000002, 'existing', 'country', ?)",
@@ -569,6 +662,198 @@ class BankUploadApiTests {
             jdbc.queryForObject(
                 "select count(*) from banks where bank_id=2000000004", Integer.class))
         .isZero();
+  }
+
+  @Test
+  void 잘못된_UTF8_바이트는_파일단위_검증실패다() throws Exception {
+    String row = "2022/09/01 09:10,070,UTFBAD,010,UTFDEST,1,US Dollar,1,US Dollar,ACH,0\n";
+    byte[] valid = (HEADER + row).getBytes(StandardCharsets.UTF_8);
+    for (int variant = 0; variant < 3; variant++) {
+      byte[] bytes;
+      if (variant < 2) {
+        bytes = valid.clone();
+        bytes[variant == 0 ? 0 : HEADER.length() + 24] = (byte) 0xFF;
+      } else {
+        bytes = java.util.Arrays.copyOf(valid, valid.length + 2);
+        bytes[valid.length] = (byte) 0xE2;
+        bytes[valid.length + 1] = (byte) 0x82;
+      }
+      long id = issueAndPutBytes("invalid-utf8-" + variant + ".csv", bytes);
+      mockMvc
+          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+          .andExpect(status().isAccepted());
+      JsonNode result = awaitTerminal(id);
+      assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
+      assertThat(result.get("rowCount").isNull()).isTrue();
+      assertThat(result.get("insertedCount").asInt()).isZero();
+      assertThat(result.get("errors").get(0).get("row").asInt()).isZero();
+      assertThat(result.get("errors").get(0).get("reason").asText()).contains("UTF-8");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from transactions where ingest_job_id=?", Integer.class, id))
+          .isZero();
+    }
+  }
+
+  @Test
+  void 문자열_초과는_정상행도_계좌도_남기지_않는다() throws Exception {
+    for (int column : new int[] {2, 4, 9}) {
+      String prefix = "LENGTH" + column;
+      String normal =
+          "2022/09/01 09:20,070,"
+              + prefix
+              + "OK,010,"
+              + prefix
+              + "DEST,1,US Dollar,1,US Dollar,ACH,0\n";
+      String[] bad =
+          ("2022/09/01 09:21,070,"
+                  + prefix
+                  + "BAD,010,"
+                  + prefix
+                  + "BADDEST,1,US Dollar,1,US Dollar,ACH,0")
+              .split(",");
+      bad[column] = "한".repeat(column == 9 ? 31 : 101);
+      long id =
+          issueAndPut(BANK_70, prefix + ".csv", HEADER + normal + String.join(",", bad) + "\n");
+      mockMvc
+          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+          .andExpect(status().isAccepted());
+      JsonNode result = awaitTerminal(id);
+      assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
+      assertThat(result.get("insertedCount").asInt()).isZero();
+      assertThat(result.get("errors").get(0).get("row").asInt()).isEqualTo(3);
+      assertThat(result.get("errors").get(0).get("column").asText())
+          .isEqualTo(column == 9 ? "Payment Format" : "Account");
+      assertThat(result.get("errors").get(0).get("reason").asText())
+          .contains(column == 9 ? "30" : "100");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from transactions where ingest_job_id=?", Integer.class, id))
+          .isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from accounts where account_number like ?",
+                  Integer.class,
+                  prefix + "%"))
+          .isZero();
+    }
+  }
+
+  @Test
+  void 정상_UTF8_BOM_한글_보충문자_및_대체문자_자체는_보존한다() throws Exception {
+    String from = "한".repeat(99) + "\uFFFD";
+    String to = "\uD83D\uDE00".repeat(100);
+    String format = "\uD83D\uDE00".repeat(30);
+    String csv =
+        "\uFEFF"
+            + HEADER
+            + "2022/09/01 09:30,070,"
+            + from
+            + ",010,"
+            + to
+            + ",1,US Dollar,1,US Dollar,"
+            + format
+            + ",0\n";
+    long id = issueAndPutBytes("unicode-valid.csv", csv.getBytes(StandardCharsets.UTF_8));
+    mockMvc
+        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+        .andExpect(status().isAccepted());
+    assertThat(awaitTerminal(id).get("status").asText()).isEqualTo("COMPLETED");
+    assertThat(
+            jdbc.queryForObject(
+                "select payment_format from transactions where ingest_job_id=?", String.class, id))
+        .isEqualTo(format);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from accounts where account_number in (?, ?)",
+                Integer.class,
+                from,
+                to))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void 이차읽기_UTF8오류도_계좌를_롤백하고_일반IO오류는_LOAD_FAILED다() throws Exception {
+    for (boolean encodingError : new boolean[] {true, false}) {
+      String prefix = encodingError ? "SECONDUTF" : "READIO";
+      String csv =
+          HEADER
+              + "2022/09/01 09:40,070,"
+              + prefix
+              + ",010,"
+              + prefix
+              + "DEST,1,US Dollar,1,US Dollar,ACH,0\n";
+      long id = issueAndPut(BANK_70, prefix + ".csv", csv);
+      String key =
+          jdbc.queryForObject("select s3_key from batch_jobs where job_id=?", String.class, id);
+      java.io.InputStream failed =
+          encodingError
+              ? new java.io.ByteArrayInputStream(new byte[] {(byte) 0xFF})
+              : new java.io.InputStream() {
+                @Override
+                public int read() throws IOException {
+                  throw new IOException("simulated read failure");
+                }
+              };
+      org.mockito.Mockito.doReturn(
+              new java.io.ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)),
+              new java.io.ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)),
+              failed)
+          .when(uploadStore)
+          .open(key);
+      mockMvc
+          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
+          .andExpect(status().isAccepted());
+      JsonNode result = awaitTerminal(id);
+      assertThat(result.get("status").asText())
+          .isEqualTo(encodingError ? "VALIDATION_FAILED" : "FAILED");
+      assertThat(result.get("errorCode").asText())
+          .isEqualTo(encodingError ? "VALIDATION_FAILED" : "LOAD_FAILED");
+      assertThat(result.get("rowCount").isNull()).isTrue();
+      assertThat(result.get("insertedCount").asInt()).isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from transactions where ingest_job_id=?", Integer.class, id))
+          .isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from accounts where account_number like ?",
+                  Integer.class,
+                  prefix + "%"))
+          .isZero();
+      if (encodingError) {
+        assertThat(result.get("errors").get(0).get("row").asInt()).isZero();
+        assertThat(result.get("errors").get(0).get("reason").asText()).contains("UTF-8");
+      }
+    }
+  }
+
+  private long issueAndPutBytes(String fileName, byte[] bytes) throws Exception {
+    String checksum =
+        Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes));
+    String body =
+        objectMapper.writeValueAsString(
+            java.util.Map.of(
+                "fileName",
+                fileName,
+                "sizeBytes",
+                bytes.length,
+                "checksumSha256",
+                checksum,
+                "businessDate",
+                "2022-09-01"));
+    var response =
+        mockMvc
+            .perform(
+                post("/api/v1/bank/uploads")
+                    .header("X-Bank-Id", BANK_70)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andExpect(status().isCreated())
+            .andReturn();
+    JsonNode issued = objectMapper.readTree(response.getResponse().getContentAsString());
+    Files.write(Path.of(URI.create(issued.get("url").asText())), bytes);
+    return issued.get("uploadId").asLong();
   }
 
   private long issueAndPut(String bankId, String fileName, String csv) throws Exception {
