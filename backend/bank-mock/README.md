@@ -1,17 +1,15 @@
 # 은행 목업 프로그램
 
-설계 `INGEST-S3-RESULT-20260909-v2`. 은행의 하루치 거래 CSV를 S3에 올린 뒤 서버의 전체 검수·원장 적재 결과를 확인한다. Python 3.13 표준 라이브러리만 사용한다.
+설계 `BANK-IDENTITY-20260910-v1`(업로드 흐름 `INGEST-S3-RESULT-20260909-v2` 유지). 은행의 하루치 거래 CSV를 S3에 올린 뒤 서버의 전체 검수·원장 적재 결과를 확인한다. Python 3.13 표준 라이브러리만 사용한다.
 
 ## 준비와 실행
 
-서버에 은행별 API 키와 실제 S3 설정이 준비되어 있어야 한다. 은행은 API 키로 식별하며 `--bank`나 `--api-key` 인자는 받지 않는다. PowerShell에서 저장소 루트 기준으로 실행한다.
+서버에 실제 S3 설정과 활성 `dev` 프로파일이 준비되어 있어야 한다. API 키 없이 필수 `--bank-id`로 은행 코드(0~2147483647)를 전달한다. 현재는 해당 은행 직원으로 로그인했다고 가정하는 테스트용 동작이며 누구든 은행 코드를 지정할 수 있다. `local`도 허용하지만 `prod`가 함께 활성화되면 차단한다. 기본/미지정/그외 프로파일도 차단한다. PowerShell에서 저장소 루트 기준으로 실행한다.
 
 ```powershell
 conda activate aml
-$env:BANK_API_KEY = '<은행에 발급된 키>'
-python -B backend/bank-mock/bank_mock.py --api-url https://api.example.com --file ./transactions_2026-09-08.csv --business-date 2026-09-08
+python -B backend/bank-mock/bank_mock.py --api-url https://api.example.com --bank-id 12 --file ./transactions_2026-09-08.csv --business-date 2026-09-08
 $LASTEXITCODE
-Remove-Item Env:BANK_API_KEY
 ```
 
 `--api-url`에는 서버 주소만 넣는다. `/api/v1`은 목업이 붙이며 프록시는 경로를 그대로 백엔드에 전달한다. `--business-date`는 전송일이 아닌 파일의 거래 기준일(`YYYY-MM-DD`)이다. 한 파일은 서울 날짜로 하루치다. 목업은 파일이 읽을 수 있고 비어 있지 않은지 확인하고 크기·체크섬을 계산한다. CSV 내용·중복·거래일 검증은 서버가 한다. 송신·수신 계좌번호에 `|`가 있으면 서버가 파일 전체를 검증 실패로 거절한다. 전송 중 파일을 수정하지 않는다.
@@ -19,17 +17,17 @@ Remove-Item Env:BANK_API_KEY
 기존 업로드 결과만 다시 확인하려면 파일·기준일 없이 실행한다.
 
 ```powershell
-python -B backend/bank-mock/bank_mock.py --api-url https://api.example.com --upload-id 123
+python -B backend/bank-mock/bank_mock.py --api-url https://api.example.com --bank-id 12 --upload-id 123
 ```
 
-재조회에도 같은 은행의 `BANK_API_KEY`가 필요하다. 다른 은행의 작업은 조회할 수 없다. 재조회 모드와 파일 업로드 모드는 함께 사용할 수 없다.
+재조회에도 동일한 `--bank-id`를 전달한다. 요청한 은행 코드와 작업의 은행 코드가 다르면404다. 이 검사는 실제 사용자 인증을 대신하지 않는다. 재조회 모드와 파일 업로드 모드는 함께 사용할 수 없다.
 
 ## 요청과 결과
 
-1. `POST /api/v1/bank/uploads`: `X-Api-Key`, JSON `{fileName, businessDate, sizeBytes, checksumSha256}`. 체크섬은 SHA-256 digest의 Base64다.
-2. 서버의201 응답 `{uploadId, bankId, url, method, expiresAt, headers}`를 받아 CSV 바이트를 S3로 PUT한다. `Content-Type`, `x-amz-checksum-sha256` 및 나머지 서명 헤더를 보내며 은행 키는 넣지 않는다. 파일을 나누어 읽어 전송한다.
-3. S3 성공 응답 후 `POST /api/v1/bank/uploads/{uploadId}/complete`로 완료를 알린다. 서버는 실제 객체 크기·체크섬을 확인하고 비동기 처리를 시작한다. 중복 완료 요청은 현재 상태를 반환한다.
-4. `GET /api/v1/bank/uploads/{uploadId}`로 2초마다 최대30분 처리 결과를 확인한다. 완료 응답이 이미 최종 상태면 추가 조회 없이 결과를 출력한다.
+1. `POST /api/v1/bank/uploads`: `X-Bank-Id`, JSON `{fileName, businessDate, sizeBytes, checksumSha256}`. 체크섬은 SHA-256 digest의 Base64다.
+2. 서버의201 응답 `{uploadId, bankId, url, method, expiresAt, headers}`를 받아 CSV 바이트를 S3로 PUT한다. `Content-Type`, `x-amz-checksum-sha256` 및 나머지 서명 헤더를 보내며 은행 식별·인증 헤더는 넣지 않는다. 파일을 나누어 읽어 전송한다.
+3. 동일한 `X-Bank-Id`로 S3 성공 응답 후 `POST /api/v1/bank/uploads/{uploadId}/complete`로 완료를 알린다. 서버는 실제 객체 크기·체크섬을 확인하고 비동기 처리를 시작한다. 중복 완료 요청은 현재 상태를 반환한다.
+4. 동일한 `X-Bank-Id`로 `GET /api/v1/bank/uploads/{uploadId}`를 호출하여 2초마다 최대30분 처리 결과를 확인한다. 완료 응답이 이미 최종 상태면 추가 조회 없이 결과를 출력한다.
 
 성공 결과 예:
 
@@ -52,14 +50,16 @@ python -B backend/bank-mock/bank_mock.py --api-url https://api.example.com --upl
 
 URL 만료만으로 완료 통지가 차단되지는 않는다. 새 URL을 재발급받았다면 최신 uploadId로 전송·완료해야 한다. 이전 URL_ISSUED 번호의 완료 요청은409 `UPLOAD_SUPERSEDED`로 거절된다. 이미 접수된 작업의 완료 요청을 반복하면 현재 상태를 돌려준다.
 
-API 키·서명 URL 전체·raw 서버 오류 본문은 출력하지 않는다. 허용된 결과 필드만 읽고 키·URL을 가린다. HTTP 요청별 소켓 대기 제한은30초이며 전체 파일 전송 시간의 총 상한은 아니다. 실제 최대파일/네트워크 환경 검증은 배포 후 필요하다.
+서명 URL 전체·raw 서버 오류 본문은 출력하지 않는다. 허용된 결과 필드만 읽고 URL을 가린다. 발급·결과 응답의 은행 코드가 요청과 다르면 실패로 처리한다. HTTP 요청별 소켓 대기 제한은30초이며 전체 파일 전송 시간의 총 상한은 아니다. 실제 최대파일/네트워크 환경 검증은 배포 후 필요하다.
 
 ## 백엔드 S3 설정과 배포 후 확인
 
 서버는 AWS SDK v2의 기본 자격증명 체인을 사용한다. EC2 인스턴스 역할을 사용하며 키·역할 이름을 코드에 넣지 않는다.
 
 - 서버 환경변수: `S3_BUCKET`, 환경별 `S3_PREFIX`(`dev/` 또는 `prod/`), `AWS_REGION`(기본 `ap-northeast-2`). 실제 키는 `{prefix}uploads/{bankId}/{uploadId}/{fileName}`이다.
-- `BANK_API_KEYS=bankId:key,...`는 서버에 별도로 공급해야 한다. 현재 배포 환경에 이 값이 준비됐는지 확인이 필요하다. 실제 키는 커밋하지 않는다.
+- API 키 환경변수는 서버와 목업 모두 필요 없다. 최초 URL 발급에서 보고 은행을 자동 등록하므로 사전 DB 등록도 필요 없다. 최초 발급 전 은행은 도착 현황에 표시되지 않는다.
+- `BANK_IDENTITY_DISABLED`(403)는 허용되지 않은 서버 프로파일, `VALIDATION_FAILED`(400)는 잘못된 은행 코드 등 요청 오류다. 운영에서는 임시 식별을 사용할 수 없다.
+- 향후 직원 로그인과 소속 은행·업로드 권한 확인으로 요청 경계만 교체한다. 직원이 파일을 선택하는 수동 업로드가 최종 흐름이다.
 - dev/prod 프로필에서 S3 설정이 누락되면 기동 실패한다. 기본/local의 로컬 폴더 저장소는 백엔드 테스트용이며 현재 목업은 `file:` 복사를 지원하지 않는다.
 - 배포 후 컨테이너의 IAM 자격증명 접근과 환경별 prefix의 PUT/HEAD/GET 권한을 확인한다. `HeadObject checksumMode=ENABLED`로 체크섬을 확인하며 ETag로 대체하지 않는다. 버킷이 SSE-KMS를 사용하면 추가 KMS 권한이 필요할 수 있다. 실제 암호화 설정은 미확인이다.
 - 실제 AWS·배포 검증은 사용자 commit/push/dev merge 이후 수행한다. 로컬 테스트 통과를 실제 S3 관통 성공으로 해석하지 않는다. 저장 파일 대조·체크섬 거절·권한·만료·전체 적재 결과 확인이 필요하다.

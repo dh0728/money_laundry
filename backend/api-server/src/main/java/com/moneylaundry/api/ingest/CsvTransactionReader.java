@@ -56,6 +56,7 @@ public class CsvTransactionReader {
     "Payment Format"
   };
   private static final String LABEL = "Is Laundering";
+  private static final BigDecimal AMOUNT_UPPER_BOUND = new BigDecimal("1E18");
   private static final DateTimeFormatter IBM_TIME =
       DateTimeFormatter.ofPattern("uuuu/MM/dd HH:mm[:ss]").withResolverStyle(ResolverStyle.STRICT);
   private static final DateTimeFormatter ISO_TIME =
@@ -143,7 +144,7 @@ public class CsvTransactionReader {
     String receivingCurrency = parseCurrency(row, "Receiving Currency", required(row, cols, 6));
     BigDecimal amountPaid = parseAmount(row, "Amount Paid", required(row, cols, 7));
     String paymentCurrency = parseCurrency(row, "Payment Currency", required(row, cols, 8));
-    String paymentFormat = required(row, cols, 9);
+    String paymentFormat = bounded(row, "Payment Format", required(row, cols, 9), 30);
     Boolean isLaundering = labelIndex < 0 ? null : parseLabel(row, cols[labelIndex]);
     String hash =
         sha256(
@@ -179,6 +180,16 @@ public class CsvTransactionReader {
     String value = required(row, cols, r);
     if (value.contains("|")) {
       throw new RowException(row, REQUIRED[r], (r == 2 ? "송신" : "수신") + " 계좌번호에 | 사용 불가", false);
+    }
+    if (value.codePointCount(0, value.length()) > 100) {
+      throw new RowException(row, REQUIRED[r], (r == 2 ? "송신" : "수신") + " 계좌번호 최대 100자 초과", false);
+    }
+    return value;
+  }
+
+  private String bounded(int row, String column, String value, int limit) throws RowException {
+    if (value.codePointCount(0, value.length()) > limit) {
+      throw new RowException(row, column, "최대 " + limit + "자 초과", false);
     }
     return value;
   }
@@ -217,7 +228,14 @@ public class CsvTransactionReader {
       if (amount.signum() < 0) {
         throw new RowException(row, column, "금액은 0 이상: " + value, false);
       }
-      return amount;
+      if (amount.compareTo(AMOUNT_UPPER_BOUND) >= 0) {
+        throw new RowException(row, column, "금액 정수부는 최대 18자리", false);
+      }
+      BigDecimal normalized = amount.stripTrailingZeros();
+      if (normalized.scale() > 6) {
+        throw new RowException(row, column, "금액 소수부는 끝자리 0을 제외하고 최대 6자리", false);
+      }
+      return normalized;
     } catch (NumberFormatException e) {
       throw new RowException(row, column, "금액 형식 오류: " + value, false);
     }

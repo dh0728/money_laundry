@@ -31,6 +31,7 @@ class NoRedirect(HTTPRedirectHandler):
 def parse_args(argv=None):
     parser = SafeArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--api-url", required=True, help="API 서버 주소")
+    parser.add_argument("--bank-id", required=True, help="테스트 은행 코드 (0~2147483647)")
     parser.add_argument("--file", type=Path, help="하루치 거래 CSV")
     parser.add_argument("--business-date", help="거래 기준일 YYYY-MM-DD")
     parser.add_argument("--upload-id", type=int, help="기존 업로드 결과 재조회")
@@ -50,9 +51,9 @@ def parse_args(argv=None):
         address.port
     except ValueError:
         parser.error("invalid input")
-    args.api_key = os.environ.get("BANK_API_KEY", "")
-    if not args.api_key.strip() or "\r" in args.api_key or "\n" in args.api_key:
-        parser.exit(2, "입력 오류: BANK_API_KEY 환경변수가 필요합니다.\n")
+    if not re.fullmatch(r"[0-9]+", args.bank_id) or len(args.bank_id) > 10 or int(args.bank_id) > 2147483647:
+        parser.error("invalid bank id")
+    args.bank_id = int(args.bank_id)
     return args
 
 
@@ -70,13 +71,13 @@ def request_upload(opener, args, size, checksum):
                "sizeBytes": size, "checksumSha256": checksum}
     request = Request(args.api_url.rstrip("/") + "/api/v1/bank/uploads",
                       data=json.dumps(payload).encode("utf-8"), method="POST",
-                      headers={"X-Api-Key": args.api_key, "Content-Type": "application/json"})
+                      headers={"X-Bank-Id": str(args.bank_id), "Content-Type": "application/json"})
     with opener.open(request, timeout=30) as response:
         if response.status != 201:
             raise ValueError(f"예상하지 못한 HTTP {response.status}")
         target = json.load(response)
     if (type(target["uploadId"]) is not int or type(target["bankId"]) is not int
-            or target["method"] != "PUT"):
+            or target["bankId"] != args.bank_id or target["method"] != "PUT"):
         raise ValueError("invalid response")
     if not isinstance(target["url"], str):
         raise ValueError("invalid upload URL")
@@ -93,7 +94,7 @@ def request_upload(opener, args, size, checksum):
     normalized = {k.lower(): v for k, v in headers.items()}
     if (normalized.get("content-type") != "text/csv"
             or normalized.get("x-amz-checksum-sha256") != checksum
-            or "x-api-key" in normalized):
+            or "x-api-key" in normalized or "x-bank-id" in normalized or "authorization" in normalized):
         raise ValueError("invalid signed headers")
     return target
 
@@ -108,12 +109,12 @@ def upload_file(opener, source, target, size):
                 raise ValueError(f"예상하지 못한 HTTP {response.status}")
 
 
-def safe_text(value, api_key):
+def safe_text(value):
     if value is None:
         return "확인되지 않음"
     if not isinstance(value, (str, int)):
         raise ValueError("invalid output field")
-    text = str(value).replace(api_key, "[REDACTED]")
+    text = str(value)
     text = re.sub(r"https?://[^\s]+", "[URL REDACTED]", text)
     return " ".join(text.split())[:500]
 
@@ -122,13 +123,15 @@ def request_status(opener, args, upload_id, complete=False):
     url = args.api_url.rstrip("/") + f"/api/v1/bank/uploads/{upload_id}"
     request = Request(url + ("/complete" if complete else ""),
                       data=b"" if complete else None, method="POST" if complete else "GET",
-                      headers={"X-Api-Key": args.api_key})
+                      headers={"X-Bank-Id": str(args.bank_id)})
     with opener.open(request, timeout=30) as response:
         if response.status != (202 if complete else 200):
             raise ValueError("invalid status response")
         result = json.load(response)
     if type(result.get("uploadId")) is not int or result["uploadId"] != upload_id:
         raise ValueError("invalid upload id")
+    if type(result.get("bankId")) is not int or result["bankId"] != args.bank_id:
+        raise ValueError("invalid bank id")
     return result
 
 
@@ -148,9 +151,9 @@ def wait_result(opener, args, upload_id, result):
     return result
 
 
-def show_result(result, api_key):
+def show_result(result):
     def field(name):
-        return safe_text(result.get(name), api_key)
+        return safe_text(result.get(name))
     print(f"파일명: {field('fileName')} / 기준일: {field('businessDate')}\n"
           f"업로드 시각: {field('receivedAt')} / 처리 완료 시각: {field('finishedAt')}\n"
           f"파일 행 수: {field('rowCount')} / 적재 행 수: {field('insertedCount')}")
@@ -160,8 +163,8 @@ def show_result(result, api_key):
     if result["status"] == "VALIDATION_FAILED":
         print("결과: 파일 검증 실패 — 아래 오류를 수정하고 재업로드하세요.")
         for error in result.get("errors", [])[:100]:
-            print(f"행 {safe_text(error.get('row'), api_key)} / "
-                  f"{safe_text(error.get('column'), api_key)}: {safe_text(error.get('reason'), api_key)}")
+            print(f"행 {safe_text(error.get('row'))} / "
+                  f"{safe_text(error.get('column'))}: {safe_text(error.get('reason'))}")
     else:
         print("결과: 서버 처리 오류 — uploadId로 관리자에게 처리 상태 확인을 요청하세요.")
     return 1
@@ -179,7 +182,7 @@ def main(argv=None):
             except (OSError, ValueError):
                 print("파일 확인 실패: 읽을 수 있는 비어 있지 않은 파일을 지정하세요.", file=sys.stderr)
                 return 2
-            print(f"[1/4] 파일 확인 완료: {safe_text(args.file.name, args.api_key)}\n"
+            print(f"[1/4] 파일 확인 완료: {safe_text(args.file.name)}\n"
                   f"      기준일: {args.business_date} / 크기: {size:,} bytes")
             stage = "URL 발급"
             target = request_upload(opener, args, size, checksum)
@@ -194,15 +197,15 @@ def main(argv=None):
             result = request_status(opener, args, upload_id)
         stage = "결과 조회"
         print(f"[4/4] 처리 결과 확인: uploadId {upload_id}")
-        return show_result(wait_result(opener, args, upload_id, result), args.api_key)
+        return show_result(wait_result(opener, args, upload_id, result))
     except HTTPError as error:
         detail = f"HTTP {error.code} 응답으로 요청이 거절되었습니다."
         if stage == "URL 발급" and error.code == 409:
             try:
                 body = json.load(error)
                 if body.get("code") == "DUPLICATE_FILE":
-                    detail = ("이미 처리된 파일입니다. 파일명: " + safe_text(body.get("fileName"), args.api_key)
-                              + " / 업로드 시각: " + safe_text(body.get("uploadedAt"), args.api_key))
+                    detail = ("이미 처리된 파일입니다. 파일명: " + safe_text(body.get("fileName"))
+                              + " / 업로드 시각: " + safe_text(body.get("uploadedAt")))
                 elif body.get("code") == "UPLOAD_IN_PROGRESS":
                     detail = "같은 파일의 업로드가 진행 중입니다. 기존 uploadId로 결과를 확인하세요."
             except (ValueError, TypeError, AttributeError):
