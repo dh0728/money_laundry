@@ -1,6 +1,5 @@
 package com.moneylaundry.api;
 
-import com.moneylaundry.api.upload.WorkerException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -32,11 +31,6 @@ public class ApiExceptionHandler {
   })
   ProblemDetail invalidBody(Exception e) {
     return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 필드와 형식을 확인하세요.");
-  }
-
-  @ExceptionHandler(WorkerException.class)
-  ProblemDetail workerFailed(WorkerException e) {
-    return problem(HttpStatus.INTERNAL_SERVER_ERROR, "WORKER_FAILED", e.getMessage());
   }
 
   @ExceptionHandler(Exception.class)

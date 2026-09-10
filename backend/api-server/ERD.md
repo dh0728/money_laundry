@@ -4,7 +4,7 @@
 
 로컬 Compose는 Alpine에서 초기화한 `pgdata_alpine` 볼륨을 사용한다. 다른 배포판에서 만든 DB 데이터 디렉터리를 직접 연결하지 않고, 기존 데이터가 있다면 논리 백업·복원 후 검증한다.
 
-지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.6다.
+지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.7다.
 팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 이 문서는 V1에 든 테이블과 W3·W4에서 추가할 테이블을 한 그림에 둔다.
 
 용어(kickoff §2.5): `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`.
@@ -208,3 +208,15 @@ erDiagram
 - **`validation_errors JSONB`**: API.md §1.2 `errors[]`의 저장처(계약에 컬럼명이 없어 추가).
 - **라벨 타입**: `pattern_label SMALLINT`(HI-Small_labels_10class.csv의 10클래스 코드), `attempt_id INTEGER`(-1은 NULL로).
 - **피처 저장 형식 = JSONB 행 저장**(2026-09-07 사용자 확정). 기각 대안: 버전별 wide 테이블 재생성(피처 개선마다 마이그레이션), DB 미저장(설명 요인·기준선이 parquet을 읽어야 함).
+
+
+## V2 일별 분석 실행 (2026-09-10)
+
+컬럼 정본: `V2__analysis_execution.sql`. 기존 V1은 변경하지 않는다.
+
+- `batch_jobs`: analysis_cutoff_at, current_stage, stage_attempt_count, consecutive_failures, retry_at, execution_id, execution_owner, completion_reason 추가.
+- `analysis_uploads`: (job_id, upload_id) PK, upload_id UNIQUE. 최초 수신 대상 고정과 작업 간 중복 편입 방지. excluded는 검증 실패 파일만 표시한다.
+- `analysis_stage_results`: (job_id, stage) PK, execution_id, artifact, completed. 정상 산출물 참조 및 단계 완료 보존. 실제 피처/추론/Alert 연결은 후속 작업이다.
+- `analysis_failures`: failure_id UUID PK, job_id, stage, execution_id, error_code, failed_at, consecutive_count, retry_at, action_required. 명시 재개해도 이력은 남는다.
+- 세션 advisory lock은 동시 활성 실행을 직렬화하고 실행 UUID가 오래된 결과 쓰기를 차단한다. 수신전이/대상등록은 별도 공유 transaction lock을 쓴다. 원장 자체 INGEST 복구는 이번 범위 밖이다.
+- 실제 Python 직접 DB 저장은 토큰 확인·데이터·단계 완료를 Python 자신의 트랜잭션으로 묶어야 한다. Java 테스트 실행기의 트랜잭션은 별도 Python 연결까지 포함하지 않는다.

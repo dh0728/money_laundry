@@ -1,4 +1,6 @@
-# API 계약 v0.6 — 2026-09-10
+# API 계약 v0.7 — 2026-09-10
+
+변경 v0.7: ANALYSIS-ENTRY-20260910-v2 — 일별 대상 고정, 단계별 재시도·복구, 작업 상태 API와 완료된 의심 거래 DB 페이지 조회. 실제 피처/추론/Alert 연결은 후속 태스크.
 
 변경 v0.6: BANK-IDENTITY-20260910-v1 — API 키 인증을 dev/local 임시 은행 코드 식별로 교체. 최종 서비스는 로그인한 은행 직원이 파일을 선택해 수동 업로드한다.
 
@@ -62,9 +64,13 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 - **GET /api/v1/bank/uploads/{uploadId}** [BANK, 자기 은행만] — 은행코드 누락·오류는400, 허용되지 않은 프로파일은403, 다른 은행/없는 작업은404. INGEST 결과 `{ uploadId, bankId, fileName, businessDate, sizeBytes, rowCount, insertedCount, missingCount, duplicateCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }`. 완료 통지202도 같은 구조다. `rowCount`는 파일 전체를 읽어 확인한 행 수, 모르면null. 성공은 rowCount=insertedCount. 신규 파일 검증/적재 실패는 전체 롤백, 과거 FAILED 작업 조회는 실제 원장 건수를 반환해 0을 임의 추정하지 않는다. `receivedAt`은 서버 수신 확인 시각, `finishedAt`은 검증/적재 종료 시각. errors 최대100건, `row=0`은 헤더 이전 또는 DB 최종 중복방어 등 정확한 행을 특정할 수 없는 파일 단위 오류다. raw DB 오류·인증값은 노출하지 않는다.
 - **GET /api/uploads/{uploadId}** — 기존 처리현황 조회 경로 유지(사용자 인증은 W4 별도). 은행 목업은 위 임시 식별된 은행별 경로만 사용한다.
 - **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 보고 은행(`is_reporting`) 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` = 컷오프 기준일: 창은 (D−1 컷오프, D 컷오프], 기본값은 **다음 컷오프의 날짜**(지금 도착하는 파일이 속하는 창). 은행당 창 안 최신 INGEST 작업 1건.
-- **GET /api/batch-jobs** [전 역할] — 목록(페이지네이션). 필터 `type=INGEST|ANALYSIS`, `status`, `from/to`(startedAt). 행: `{ jobId, type, status, attemptCount, analysisDate(ANALYSIS), bankId(INGEST), rowCount, errorCode, errorMessage, startedAt, finishedAt, modelVersionBinary, modelVersionType, featureVersionBinary, featureVersionType, thresholdValue }`
-- **GET /api/batch-jobs/{jobId}** [전 역할] — 위 행 + `counters: { suspiciousTxCount, alertCount, missingCount, duplicateCount }`.
-- **POST /api/batch-jobs/analysis** [L1·L2·ADMIN — 시연·FAILED 재시도용 수동 실행] — 요청 `{ analysisDate? }`(기본 오늘). 응답 202 `{ jobId, status: "QUEUED" }`. **일별 분석은 날짜당 1회(2026-09-08 사용자 확정 — 09-03 "같은 날짜 재실행 = 재시도" 폐기)**: 같은 analysisDate가 QUEUED·RUNNING이면 409 `JOB_ALREADY_RUNNING`, COMPLETED면 409 `JOB_ALREADY_COMPLETED`(재분석 경로는 MVP·10월 범위 밖 — 개발·시연 준비는 DB 초기화, 리허설에서 여러 날 재생은 `analysisDate`를 날짜별로 다르게). FAILED만 같은 job의 재시도(`attempt_count` +1, 그 job 결과 삭제+삽입 — §2.2). **컷오프 자동 실행은 MVP부터**(2026-09-08 사용자 확정): Boot `@Scheduled`(cron, `app.ingest.cutoff` 06:00·`app.zone`)가 같은 서비스 메서드를 부른다 — [W2 일별 분석 진입점].
+- **GET /api/v1/batch-jobs** — 페이지 목록. `type=INGEST|ANALYSIS`, `status`, `from/to`(최초 startedAt) 필터. 행은 기존 작업 메타데이터와 `currentStage, stageAttemptCount, consecutiveFailures, retryAt, actionRequired, cutoffAt, completionReason, counters`를 포함한다. 미완료 분석의 의심 거래·Alert 카운터는0이다.
+- **GET /api/v1/batch-jobs/{jobId}** — 위 행과 `uploads: [{ uploadId, excluded, status, fileName }]`, `failures: [{ stage, errorCode, failedAt, consecutiveCount, retryAt, actionRequired }]`.
+- **POST /api/v1/batch-jobs/analysis** — 본문 없이 서버 Clock 현재 시각을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
+- **POST /api/v1/batch-jobs/{jobId}/resume** — FAILED 작업만 실패 단계부터 새 실패 주기로 재개한다.202 `{ jobId, status: "QUEUED" }`. 이력·정상 산출물·최초 startedAt은 유지한다. 완료 작업 재분석은 허용하지 않는다.
+- 두 POST는 활성 dev/local이 있고 prod가 없을 때만 허용한다. 기본/기타/prod 혼합은403 `ANALYSIS_CONTROL_DISABLED`. 로그인 권한 검증은 후속 작업이다.
+- 운영 등록은 `app.ingest.cutoff`(기본03:00), `app.zone`(기본 Asia/Seoul)의 매일 cron이다. 수신전이와 등록은 공유 advisory transaction lock을 사용하고 잠금 이후 수신 시각을 기록한다. cutoff 이하 수신한 미편입 업로드를 고정한다. 검수 진행중도 대상에 남고 늦은 파일은 다음 날 편입한다. 기동 시 놓친 날짜를 보충 등록하지 않는다. URL 발급만 된 파일은 제외한다.
+- 도착 현황의 창·최신 순서는 수신 후 received_at, 수신 전 created_at을 사용한다.
 
 ### 1.3 배치 상태 (batch_jobs — 테이블 1개 + job_type)
 
@@ -78,13 +84,17 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | INGEST | `FAILED` | 적재 중 오류(영구) | — |
 | ANALYSIS | `SCHEDULED` | 미리 예약된 작업(10월 SQS; MVP는 생략 — 컷오프 `@Scheduled`가 QUEUED로 바로 만든다) | QUEUED |
 | ANALYSIS | `QUEUED` | 실행 대기 | RUNNING |
-| ANALYSIS | `RUNNING` | 파이프라인 실행 중(heartbeat 갱신) | COMPLETED / RETRY_WAIT / FAILED |
-| ANALYSIS | `RETRY_WAIT` | 일시 실패, 재시도 대기(attempt < 3 — 10월 SQS 재전달; MVP는 큐가 없어 일시 실패도 FAILED) | RUNNING |
+| ANALYSIS | `RUNNING` | 실행 토큰을 가진 단계 처리 중 | COMPLETED / RETRY_WAIT / FAILED |
+| ANALYSIS | `RETRY_WAIT` | 적재 완료 또는 retryAt 대기(5초 스캔) | RUNNING |
 | ANALYSIS | `COMPLETED` | 점수·Alert 적재 완료 | — |
-| ANALYSIS | `FAILED` | 영구 실패 또는 3회 소진 | — (수동 실행 API로 재시도 — 재시도가 허용되는 유일한 상태) |
+| ANALYSIS | `FAILED` | 영구 실패 또는 3회 소진 | 명시 resume만 허용 |
 
 - 공통 컬럼: `attempt_count, claimed_at, heartbeat_at, started_at, finished_at, error_code, error_message`. ANALYSIS 전용: `analysis_date UNIQUE, threshold_value, model_version_binary, model_version_type, feature_version_binary, feature_version_type, suspicious_tx_count, alert_count`. INGEST 전용: `bank_id, business_date, file_name, file_hash(sha256), size_bytes, s3_key, url_issued_at, url_expires_at, received_at, row_count, missing_count, duplicate_count, validation_errors(JSONB errors[])`. `error_code`는 상태와 별개의 원인 코드: INGEST `VALIDATION_FAILED`·`LOAD_FAILED`, ANALYSIS `SCORES_MISMATCH`(§2.1) 등.
-- Claim·heartbeat·재시도 규칙은 kickoff §2.2. MVP(직접 호출)는 QUEUED→RUNNING을 Boot가 즉시 수행. MVP에는 heartbeat 스윕이 없으므로 Boot 크래시로 RUNNING에 남은 ANALYSIS 작업은 **기동 시 FAILED(`error_code=INTERRUPTED`)로 정리**한다 — 아니면 그 날짜가 영구히 `JOB_ALREADY_RUNNING`이다(가정, 이의 없으면 확정).
+- 단계는 `WAIT_INGEST → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE`. 검증 실패 파일만 제외한다. 대상 INGEST의 기술적 FAILED는 분석도 `INGEST_FAILED`·조치 필요로 남기고, 원인 조치 뒤 resume에서 재확인한다. INGEST 자체 복구/재실행은 이번 범위 밖이다. 입력0건 또는 전부 검증제외이면 `EMPTY_INPUT`·COMPLETED·모든 건수0이며 모델/피처 버전을 만들지 않는다.
+- 같은 단계·오류 최초 포함3연속 실패에서FAILED. 연결(DB/S3)은30초/2분, 계산은1분/5분 뒤 재시도한다. 설정·계약 오류는 즉시FAILED. 교대 오류 전체 상한은 없다. 정상 단계/명시resume만 연속 실패 주기를 끝내며 이력은 보존한다. 09시 조건은 없다.
+- 단일 BE 기준으로 전용 연결의 DB 세션 advisory lock을 Runner 생존기간 유지하고 소유자만 실행/잔여 RUNNING 복구한다. 종료 시 잠금을 해제하고 연결 상실 시 재획득한다. 실행 UUID 확인과 DB 쓰기로 오래된 실행을 차단한다. 정상 prepare 결과는 실행중 JVM에서 유지하고 DB 복구 시 단계 결과·이력을 저장한다. DB 장애 중 미저장 실패 횟수/산출물은 프로세스까지 종료되면 소실될 수 있다. 정확한 횟수 영속성을 보장하지 않는다.
+- 현재 Python `worker/analysis_entry.py --job-id … --stage … --execution-id …`는 실제 피처/S3 추론/점수/Alert가 미연결이므로78 종료, `PIPELINE_NOT_CONFIGURED`·조치 필요다. W1 무작위 점수 더미는 제거했다. Java 테스트 실행기는 성공·DB 롤백·재사용을 검증하며 실제 Python DB 원자성 검증을 뜻하지 않는다.
+- 후속 Python은 직접 DB 읽기/쓰기를 소유한다. 자신의 트랜잭션에서 실행 토큰 확인·데이터 저장·단계 완료를 원자 처리하고 Runner가 DB로 확인해야 한다. Java JDBC 트랜잭션에 별도 프로세스가 참여하지 않는다. 원격 추론은 고정 job/request 식별자로 실행중/기존 결과를 확인하여 재기동이나 새 executionId가 모델 재실행으로 이어지지 않게 연결해야 한다.
 
 ### 1.4 원장 입력 CSV 컬럼 표 (IBM AMLworld 헤더 → 표준명)
 
@@ -112,7 +122,9 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 
 ## 2. 층 2 — 추론·거래 점수·의심 거래
 
-### 2.1 추론 에이전트 파일 계약 (S3, 확정 2026-09-03)
+### 2.1 추론 에이전트 파일 계약 (S3, 후속 연결)
+
+아래 파일 운반은 아직 연결되지 않았다. 재시도 요청 식별·실행중/기존 결과 재사용·늦은 응답 차단을 [모델 래핑]에서 함께 구현해야 하며 현재 Java fixture 테스트가 이를 검증한 것은 아니다.
 
 경로 접두어와 쓰기 순서(마지막 파일이 "준비/완료" 표식):
 
@@ -132,11 +144,11 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - `error.json`: `{ job_id, code, message, retryable }`. `retryable=true`면 일시 실패(RETRY_WAIT), false면 FAILED.
 - 폴링: BE가 `results/{jobId}/result.json` 또는 `error.json`을 5초 간격, 최대 30분. 초과 = 일시 실패. 추론 에이전트는 `requests/*/manifest.json`을 폴링(1대만).
 - 검증(BE): 필수 열(`tx_id, p_laundering, p_0..p_8`) 존재·이름, 행 수, tx_id 집합, NaN. 불일치 = 영구 실패(`FAILED`, error_code `SCORES_MISMATCH`). **필수 열 외 추가 열은 허용하되 BE는 무시(WARN 로그)** — 모델 형태 확정 후 확장 열(예: 거래별 기여 요인 `contrib_*`, 임베딩)을 이 계약에 추가한다(§8 사용자 ② 보류 항목).
-- 정리: 성공·실패 확정 후 BE가 `requests/{jobId}/`·`results/{jobId}/` 삭제(보존 여부는 10월 Lifecycle에서).
+- 정리: 재시도에 필요한 정상 추론 산출물은 보존한다. 실패 즉시 삭제하지 않는다. 완료 이후 보존기간/Lifecycle은 후속 운영 정책이다.
 - MVP 운반: 실제 AWS S3(9/7 기한 경과·미도착). 추론 운반은 수집 S3 구현과 별개이며 해당 환경을 [모델 래핑 ②](9/11) 착수 시 확인 후 같은 경로로 관통, 클라이언트만 교체.
 
 ### 2.2 거래별 점수 테이블·파생 규칙
-- 저장: 테이블 `inference_results`(V1) — `(job_id, tx_id) PK, p_laundering, p_0..p_8, score_pct` 그대로. FAILED 재시도 시 그 job 결과 삭제+삽입. **분석 대상 원장 행 = `scored_job_id IS NULL OR scored_job_id = :jobId`**(2026-09-08 사용자 확정 — 점수 적재가 커밋된 뒤 Alert 구성에서 실패해도 재시도가 자기 결과를 다시 만든다). 점수 삭제·삽입·`scored_job_id` 갱신은 한 트랜잭션.
+- 저장: 테이블 `inference_results`(V1) — `(job_id, tx_id) PK, p_laundering, p_0..p_8, score_pct`. 고정된 upload 목록 중 **`scored_job_id IS NULL OR scored_job_id = :jobId`**인 원장 행만 사용한다. 점수 정상 완료 후 Alert 단계가 실패하면 점수는 보존하고 Alert 단계만 재개한다. 후속 Python 연결은 점수·`scored_job_id`·단계 완료를 토큰 확인과 함께 한 트랜잭션으로 저장하고, 응답 유실 때 DB 완료 기록을 확인한다. 작업 전체 결과를 무조건 삭제·재생성하지 않는다.
 - 파생(BE, 조회 시 계산): `launderingScore = p_laundering`, `typeClass = argmax(p_0..p_8)`(p_0이 최대면 0 그대로), `typeScore = 그 확률`. 동점 시 낮은 코드.
 - 의심 거래 = `p_laundering >= threshold_value(그 job의 스냅샷)`. 저장 플래그가 아니라 파생. 임계는 프로퍼티 `app.suspicious-tx.threshold`(env `SUSPICIOUS_TX_THRESHOLD`), job 실행 시 batch_jobs에 스냅샷. `threshold_version`은 10월 thresholds 테이블에서.
 - `ruleHits[]`는 룰 기반(향후 확장) 전까지 항상 빈 배열 — 추론 산출물이 아니라 BE 룰 엔진 산출. 점수 테이블에 룰 컬럼을 두지 않는다.
@@ -178,9 +190,9 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - Alert 상세 `transactions[]`에서는 행에 **`role: SEED|SUPPORTING|PATH|PATTERN_MEMBER`, `includedReason`(문자열), `direction: IN|OUT|SELF`(Alert 대표 계좌 기준)** 가 추가된다. MVP 최소판: `role` = isSuspicious ? SEED : SUPPORTING, `includedReason` = 묶음 근거 코드; Data 알고리즘이 PATH/PATTERN_MEMBER를 주면 교체.
 - 상세에서 `explanation: { thresholdValue, factors[] }`(§2.2)를 거래 행에 붙일지 별도 조회로 둘지는 [W3 API]에서 성능 보고 결정(피처 테이블 조인 비용).
 
-### 2.5 GET /api/suspicious-transactions  [전 역할]  (W1 구현됨 — W2 [일별 분석 진입점]에서 DB 조회·페이지네이션으로 교체)
+### 2.5 GET /api/v1/suspicious-transactions (W2 DB 조회)
 - 임계 이상 거래 목록. 기본 정렬 `launderingScore,desc` (2차 `txId,asc`). 필터 `jobId`, `analysisDate`, `typeClass`, `minScore`, `bankId`.
-- 행: §2.4 거래 행. W1 현재 응답(`uploadId, txRow, anomalyScore, typeScore, typeClass, ruleHits`, 맨 배열)은 W2에서 교체.
+- 행: §2.4 거래 행. COMPLETED 분석만 공개한다. `bankId`는 송신 또는 수신 계좌의 은행이며 보고 은행 필터가 아니다. 정렬은 launderingScore 또는 txId의 asc/desc를 지원한다. 타입 동점은 낮은 코드, 후보 차이는 `app.type.ambiguity-delta` 기본0.10 미만일 때 상위2개다. 과거 결과는 유지하고 미완료 날짜 필터는 빈 페이지를 반환한다.
 - 주의: 이건 **의심 거래** 목록이다. Alert(묶음) 목록은 §3.
 
 ## 3. 층 3 — Alert
@@ -207,7 +219,7 @@ Alert 테이블(W3 [스키마]):
 구성 거래 테이블: `(alert_id, tx_id, role, included_reason)`, **`UNIQUE(tx_id)`** — 한 거래는 한 Alert에만 속한다(2026-09-07 사용자 확정, 1:1). 이를 위해 Alert 구성 알고리즘의 입력에서 **처분된(ESCALATED·CLOSED) Alert의 거래는 제외**한다. 복합 위험은 N:M이 아니라 `type_distribution`으로 표현. `role`·`included_reason` 정의는 §2.4.
 
 **참여 계좌 테이블 `alert_accounts` (2026-09-04 채택, dberd 채택분)**: `(alert_id, account_id, role: SUBJECT|SOURCE|DESTINATION|INTERMEDIARY|HUB, in_count, in_amount_usd, out_count, out_amount_usd, max_score, counterparty_count)`. BE가 Alert 생성 직후 구성 거래에서 파생·저장. 역할 규칙: out만 = SOURCE, in만 = DESTINATION, 양쪽 = INTERMEDIARY, 차수 최대 = HUB, 대표 계좌 = SUBJECT. 계좌별 30일 창 기준선(`firstSeenAt`, 30일 in/out 건수·금액, 상대방 수)은 원장 조회로 상세 응답에 붙인다(저장 안 함). 관계 그래프의 노드 원천.
-- **재실행 규칙(2026-09-08 사용자 확정 — 09-03 "OPEN Alert만 삭제·재생성" 폐기)**: 일별 분석은 날짜당 1회라 COMPLETED job의 Alert 구성은 다시 돌지 않는다. FAILED 재시도는 Alert 구성이 마지막 스텝이고 **한 트랜잭션**이므로 그 job의 Alert가 없는 상태에서 시작한다(Boot 크래시로 남은 그 job의 Alert가 있으면 재시도가 먼저 지운다 — COMPLETED가 된 적 없어 아무도 처리하지 않은 행). 구성 입력 = **미소속 거래**(처분된 ESCALATED·CLOSED Alert의 거래 제외 — 확정 09-07 — 와 이전 날짜 OPEN Alert의 거래 제외는 `UNIQUE(tx_id)`의 귀결).
+- **재실행 규칙(2026-09-10)**: 날짜당1회이며 COMPLETED 작업은 다시 실행하지 않는다. 실패한 Alert 단계만 재개하고 정상 완료된 점수/Alert 단계는 보존한다. 후속 Python 연결은 Alert 데이터·단계 완료를 실행 토큰 확인과 함께 한 트랜잭션으로 저장해야 한다. 부분 저장은 롤백하며 완료 응답 유실은 DB로 확인한다. 정상 완료 산출물을 일괄 삭제하는 복구는 하지 않는다. 구성 입력은 미소속 거래이며 이전 Alert에 속한 거래는 `UNIQUE(tx_id)`로 제외한다.
 
 ### 3.2 조회
 - **GET /api/alerts** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`. 정렬 키: `riskScore, createdAt, lastTxAt, txCount, totalAmountUsd, scoreMax, weightedAmountUsd, ageDays`. 필터 `status`, `resolution`, `assigneeId`(`me` 허용), `typeClass`, `bankId`, `from/to`(lastTxAt 기준), `analysisDate`, `episodeId`. L1 기본 뷰 = `assigneeId=me&status=OPEN`. (미배정·미열람 뷰는 없음 — 생성 즉시 배정되고 열람 여부는 표시하지 않는다.)
