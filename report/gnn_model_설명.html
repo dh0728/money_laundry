@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우리 모델 핶부 — Temporal-featured Transformer GNN</title>
+<style>
+  :root {
+    --bg: #0b1220; --panel: #111a2e; --panel2: #16223c; --line: #243352;
+    --txt: #e8edf7; --sub: #9fb0cc; --rose: #f0524d; --amber: #f5b041;
+    --sky: #4aa8f0; --teal: #2dd4bf; --purple: #a06bd8; --gray: #8a97ad;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--txt); font-family: 'Malgun Gothic','Apple SD Gothic Neo',sans-serif; line-height: 1.7; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  header { background: linear-gradient(135deg,#101c36,#1b1030); border-bottom: 1px solid var(--line); padding: 56px 20px 44px; text-align: center; }
+  .kicker { color: var(--rose); font-size: 13px; font-weight: 700; letter-spacing: 3px; margin-bottom: 12px; }
+  h1 { font-size: 30px; font-weight: 800; line-height: 1.35; }
+  header p.sub { color: var(--sub); font-size: 15px; margin-top: 14px; }
+  header .badge { display: inline-block; margin-top: 18px; padding: 6px 16px; border: 1px solid var(--rose); border-radius: 999px; color: var(--rose); font-size: 13px; font-weight: 700; }
+  section { padding: 44px 0 8px; }
+  h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  h2 .no { color: var(--rose); margin-right: 8px; }
+  .lead { color: var(--sub); font-size: 14.5px; margin-bottom: 22px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+  .card { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card h3 { font-size: 15px; margin-bottom: 8px; }
+  .card p, .card li { font-size: 13.5px; color: var(--sub); }
+  .card ul { padding-left: 18px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 8px; }
+  .tag.rose { background: rgba(240,82,77,.15); color: var(--rose); }
+  .tag.sky { background: rgba(74,168,240,.15); color: var(--sky); }
+  .tag.teal { background: rgba(45,212,191,.15); color: var(--teal); }
+  .tag.amber { background: rgba(245,176,65,.15); color: var(--amber); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: var(--panel2); color: var(--txt); font-size: 13px; }
+  td { color: var(--sub); }
+  td b { color: var(--txt); }
+  .yes { color: var(--teal); font-weight: 700; }
+  .no2 { color: var(--rose); font-weight: 700; }
+  .part { color: var(--amber); font-weight: 700; }
+  code, .mono { font-family: Consolas, monospace; background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 5px; font-size: 12.5px; color: #ffd479; }
+  pre { background: #0a0f1d; border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-x: auto; font-size: 13px; line-height: 1.65; color: #cfe0ff; margin-bottom: 18px; }
+  pre .c { color: #5c7299; } pre .k { color: #f0709a; } pre .s { color: #ffd479; }
+  .callout { border-left: 4px solid var(--amber); background: rgba(245,176,65,.08); border-radius: 0 12px 12px 0; padding: 14px 18px; font-size: 13.5px; color: #f3d9a4; margin: 18px 0; }
+  .callout.rose { border-color: var(--rose); background: rgba(240,82,77,.08); color: #f6b8b6; }
+  .callout.sky { border-color: var(--sky); background: rgba(74,168,240,.08); color: #b9d9f6; }
+  svg { display: block; width: 100%; height: auto; }
+  .lbl { font-size: 12px; fill: var(--sub); }
+  p.lbl { color: var(--sub); }
+  .lbld { font-size: 12px; fill: var(--txt); font-weight: 700; }
+  .small { font-size: 11px; }
+  .attn-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+  .attn-controls button { background: var(--panel2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit; }
+  .attn-controls button.on { background: var(--rose); border-color: var(--rose); color: #fff; font-weight: 700; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; font-size: 13px; }
+  .bar-row .nm { width: 130px; color: var(--sub); }
+  .bar-track { flex: 1; height: 16px; background: var(--panel2); border-radius: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 8px; background: linear-gradient(90deg,var(--sky),var(--rose)); transition: width .7s cubic-bezier(.2,.8,.3,1); }
+  .bar-val { width: 46px; text-align: right; font-weight: 700; font-size: 13px; }
+  footer { border-top: 1px solid var(--line); margin-top: 40px; padding: 26px 20px; text-align: center; color: #5c7299; font-size: 12px; }
+  .dl { position: fixed; right: 18px; bottom: 18px; background: var(--rose); color: #fff; border: none; border-radius: 999px; padding: 12px 20px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 24px rgba(240,82,77,.4); font-family: inherit; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kicker">MODEL ANATOMY REPORT</div>
+  <h1>우리 v2 모델 핶부<br>“시간은 피처가 기억하고, 어텐션은 구조를 읽는다”</h1>
+  <p class="sub">KYC-TGNN(final_pipeline.ipynb)의 정체: <b>인과적 시간 피처를 먹인 정적 Transformer GNN</b></p>
+  <div class="badge">KYCTransformerGNN · TransformerConv 2층 · 멀티헤드 어텐션(2) · 엣지 피처 어텐션 주입</div>
+</header>
+
+<div class="wrap">
+
+<!-- ① 분류 축 -->
+<section>
+  <h2><span class="no">01</span>두 개의 분류 축 — “Temporal”과 “Transformer”는 다른 기준이다</h2>
+  <p class="lead">Temporal GNN은 <b>“시간에 따라 변하는 그래프를 다루는가”</b>(문제 축)이고, Transformer GNN은 <b>“이웃을 모을 때 어텐션을 쓰는가”</b>(구조 축)입니다. 배타적 관계가 아니라 조합 가능한 속성입니다.</p>
+  <div class="panel">
+    <svg viewBox="0 0 920 300">
+      <text x="230" y="28" text-anchor="middle" class="lbld" font-size="14">단순 집계 (평균·샘플링)</text>
+      <text x="690" y="28" text-anchor="middle" class="lbld" font-size="14">어텐션 집계 (Transformer)</text>
+      <text x="30" y="105" class="lbld" font-size="14">정적 그래프</text>
+      <text x="30" y="225" class="lbld" font-size="14">동적(시간) 그래프</text>
+      <rect x="120" y="50" width="340" height="100" rx="14" fill="#16223c" stroke="#243352"></rect>
+      <rect x="480" y="50" width="340" height="100" rx="14" fill="#16223c" stroke="#243352"></rect>
+      <rect x="120" y="170" width="340" height="100" rx="14" fill="#16223c" stroke="#243352"></rect>
+      <rect x="480" y="170" width="340" height="100" rx="14" fill="rgba(240,82,77,.12)" stroke="#f0524d" stroke-width="2"></rect>
+      <text x="290" y="95" text-anchor="middle" class="lbld" font-size="16">GCN · GraphSAGE</text>
+      <text x="290" y="120" text-anchor="middle" class="lbl">이웃을 균등 가중으로 합산</text>
+      <text x="650" y="95" text-anchor="middle" class="lbld" font-size="16">GAT · Graphormer</text>
+      <text x="650" y="120" text-anchor="middle" class="lbl">어텐션으로 중요 이웃에 가중</text>
+      <text x="290" y="215" text-anchor="middle" class="lbld" font-size="16">EvolveGCN · Roland</text>
+      <text x="290" y="240" text-anchor="middle" class="lbl">시간축 + 단순 집계</text>
+      <text x="650" y="210" text-anchor="middle" font-size="16" font-weight="800" fill="#f0524d">TGAT · TGN</text>
+      <text x="650" y="235" text-anchor="middle" class="lbl">시간 인코딩 + self-attention</text>
+      <text x="650" y="258" text-anchor="middle" class="lbl small" fill="#f5b041">← 문헌에서 말하는 “진짜 Temporal GNN”</text>
+    </svg>
+  </div>
+  <div class="callout sky">💡 <b>TGAT(Temporal Graph Attention Network)</b>는 이름 그대로 두 축의 교집합입니다 — 시간 인코딩으로 과거 이웃만 모으고, 그 안에서 self-attention으로 중요한 이웃을 고릅니다.</div>
+</section>
+
+<!-- ② 우리 모델 구조 -->
+<section>
+  <h2><span class="no">02</span>우리 모델의 실제 구조 (코드 기준)</h2>
+  <p class="lead">final_pipeline.ipynb의 <code>KYCTransformerGNN</code> 클래스를 그대로 도해했습니다.</p>
+  <pre><span class="c"># final_pipeline.ipynb §6 — 모델 정의 (실제 코드 요약)</span>
+<span class="k">class</span> KYCTransformerGNN(torch.nn.Module):
+    conv1 = TransformerConv(node_dim=<span class="s">24</span>, hidden=<span class="s">128</span>//2, heads=<span class="s">2</span>, edge_dim=<span class="s">16</span>)
+    conv2 = TransformerConv(hidden=<span class="s">128</span>, hidden=<span class="s">128</span>//2, heads=<span class="s">2</span>, edge_dim=<span class="s">16</span>)
+    head  = MLP([ h_src ‖ h_dst ‖ edge_feat ] → hidden → <span class="s">1</span>)  <span class="c"># 거래 단위 이진분류</span>
+
+    <span class="c"># forward: x(노드피처) → conv1 → conv2 → [송신h·수취h·엣지] → sigmoid</span></pre>
+
+  <div class="panel">
+    <svg viewBox="0 0 920 330">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+          <path d="M0,0 L9,4.5 L0,9 z" fill="#4aa8f0"></path>
+        </marker>
+      </defs>
+      <rect x="20" y="60" width="150" height="70" rx="12" fill="#16223c" stroke="#2dd4bf" stroke-width="1.5"></rect>
+      <text x="95" y="88" text-anchor="middle" class="lbld">노드 피처 24종</text>
+      <text x="95" y="110" text-anchor="middle" class="lbl">그래프 14 + KYC 10</text>
+      <rect x="20" y="180" width="150" height="70" rx="12" fill="#16223c" stroke="#f5b041" stroke-width="1.5"></rect>
+      <text x="95" y="208" text-anchor="middle" class="lbld">엣지 피처 16종</text>
+      <text x="95" y="230" text-anchor="middle" class="lbl">lean11 + KYC 5</text>
+      <line x1="170" y1="95" x2="240" y2="130" stroke="#4aa8f0" stroke-width="2" marker-end="url(#ar)"></line>
+      <line x1="170" y1="215" x2="240" y2="170" stroke="#4aa8f0" stroke-width="2" marker-end="url(#ar)"></line>
+      <rect x="245" y="105" width="180" height="100" rx="12" fill="rgba(74,168,240,.1)" stroke="#4aa8f0" stroke-width="2"></rect>
+      <text x="335" y="140" text-anchor="middle" class="lbld" font-size="14">TransformerConv 1</text>
+      <text x="335" y="163" text-anchor="middle" class="lbl">1홉 이웃 어텐션 집계</text>
+      <text x="335" y="183" text-anchor="middle" class="lbl small">엣지 피처 → 어텐션 Key 주입</text>
+      <line x1="425" y1="155" x2="480" y2="155" stroke="#4aa8f0" stroke-width="2" marker-end="url(#ar)"></line>
+      <rect x="485" y="105" width="180" height="100" rx="12" fill="rgba(74,168,240,.18)" stroke="#4aa8f0" stroke-width="2"></rect>
+      <text x="575" y="140" text-anchor="middle" class="lbld" font-size="14">TransformerConv 2</text>
+      <text x="575" y="163" text-anchor="middle" class="lbl">2홉 이웃 어텐션 집계</text>
+      <text x="575" y="183" text-anchor="middle" class="lbl small">사슬 맥락이 노드 상태에 축적</text>
+      <line x1="665" y1="155" x2="720" y2="155" stroke="#4aa8f0" stroke-width="2" marker-end="url(#ar)"></line>
+      <rect x="725" y="105" width="175" height="100" rx="12" fill="rgba(240,82,77,.1)" stroke="#f0524d" stroke-width="2"></rect>
+      <text x="812" y="140" text-anchor="middle" class="lbld" font-size="14">엣지 판정 헤드</text>
+      <text x="812" y="163" text-anchor="middle" class="lbl">[h_송신 ‖ h_수취 ‖ 엣지]</text>
+      <text x="812" y="183" text-anchor="middle" class="lbl small">MLP → sigmoid → 세탁 확률</text>
+      <text x="460" y="290" text-anchor="middle" class="lbl">2층 = 2-Hop: 이웃의 이웃까지 정보가 흐름 → 세탁 사슬(릴리이·순환)의 맥락을 감지</text>
+      <text x="460" y="312" text-anchor="middle" class="lbl" fill="#f5b041">※ 모델 안에 시간 인코딩 레이어는 없음 — 시간 정보는 전부 입력 피처(Δt·1h 윈도우 등)에 요약되어 들어감</text>
+    </svg>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><span class="tag teal">왜 엣지 피처를 어텐션에 넣나</span>
+      <p>어텐션의 Key를 만들 때 엣지 피처를 더하면, 모델이 “<b>어떤 거래로 연결된 이웃인가</b>”를 보고 이웃의 중요도를 정합니다. 세탁 신호가 노드(계좌)보다 엣지(거래 리듬·same_entity·국가 위험도)에 실려 있는 이 문제에 잘 맞는 선택입니다.</p>
+    </div>
+    <div class="card"><span class="tag rose">판정 헤드가 보는 것</span>
+      <p>한 거래(A→B)를 채점할 때 <b>송신 계좌의 상태 + 수취 계좌의 상태 + 거래 자체의 16종 단서</b>를 이어 붙여 MLP에 넣습니다. 즉 “주변 맥락이 섞인 두 계좌”와 “거래 자체”를 동시에 봅니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ③ 입력 피처 명세 -->
+<section>
+  <h2><span class="no">03</span>모델 입력 피처 명세 — 엣지 16종 + 노드 24종</h2>
+  <p class="lead">모델의 실제 입력은 <b>x(노드 피처 [계좌수 × 24])</b>, <b>edge_index(송신·수취)</b>, <b>edge_attr(엣지 피처 [거래수 × 16])</b> 세 가지입니다. 각 피처의 의미와 선택 근거는 다음과 같습니다.</p>
+
+  <h3 style="font-size:16px;margin:18px 0 10px">📦 A. 엣지 피처 16종 = lean 11(시간·금액 이력) + KYC 5(신원)</h3>
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table>
+      <tbody><tr><th style="width:4%">#</th><th style="width:17%">이름</th><th style="width:36%">특징 · 계산 방식</th><th>선택 근거</th></tr>
+      <tr><td>0</td><td><b>쌍 과거 건수</b></td><td>이 (송신→수취) 조합의 과거 거래 수, log1p</td><td>“처음 보는 조합”은 세탁 사슬의 전형. 정상 거래는 반복되는 쌍이 많음</td></tr>
+      <tr><td>1</td><td><b>쌍 Δt</b></td><td>이 쌍의 마지막 거래 후 경과 시간(분), log1p(+2)</td><td>오래 잠들었던 쌍의 갑작스런 재개는 의심 신호</td></tr>
+      <tr><td>2</td><td><b>쌍 1시간 건수</b></td><td>직전 1시간 이 쌍의 거래 수, log1p</td><td>짧은 시간의 연쇄 송금(smurfing·릴리이) 포착</td></tr>
+      <tr><td>3</td><td><b>송신 계좌 Δt</b></td><td>송신 계좌의 마지막 송금 후 경과 시간</td><td rowspan="2">계좌의 “송금 리듬” — 평소와 다른 급격한 송금 빈도는 layering의 신호</td></tr>
+      <tr><td>4</td><td><b>송신 계좌 1시간 건수</b></td><td>직전 1시간 송신 계좌의 송금 수</td></tr>
+      <tr><td>5</td><td><b>수취 계좌 Δt</b></td><td>수취 계좌의 마지막 수금 후 경과 시간</td><td rowspan="2">계좌의 “수금 리듬” — fan-in(돈 모으기) 패턴 감지</td></tr>
+      <tr><td>6</td><td><b>수취 계좌 1시간 건수</b></td><td>직전 1시간 수취 계좌의 입금 수</td></tr>
+      <tr><td>7</td><td><b>통화 z-score</b></td><td>log 금액을 <b>통화별 median/IQR</b>로 정규화(8월 통계만), clip ±8</td><td>원화·달러·코인은 스케일이 달라 생값 비교 불가. 통화 내 이상 금액을 공정하게 측정</td></tr>
+      <tr><td>8</td><td><b>쌍 총건수</b></td><td>쌍의 누적 거래 규모 (pairagg 캐시, 8월 z-표준화)</td><td>관계의 “깊이” — 얕은 관계의 대액 이동은 의심</td></tr>
+      <tr><td>9</td><td><b>쌍 역방향 건수</b></td><td>반대 방향(B→A) 거래 수</td><td>왕복 거래는 자전거래·순환(cycle)의 직접 신호</td></tr>
+      <tr><td>10</td><td><b>쌍 최근성</b></td><td>쌍 관계의 최근 활동도(recency)</td><td>오래된 관계의 재가동 vs 활발한 관계를 구분</td></tr>
+      <tr><td>11</td><td><b>same_entity</b></td><td>송·수취가 같은 엔티티(주인) 소유면 1</td><td>자기 계좌 간 이동 = 세탁의 전형적 첫 단계. <b>무패턴 검출 0.5%→50.1% 개선의 주역</b></td></tr>
+      <tr><td>12</td><td><b>same_country</b></td><td>같은 국가 내 거래면 1</td><td>국경 간 이동은 자금 추적 회피 신호</td></tr>
+      <tr><td>13·14</td><td><b>송·수취 국가 위험도</b></td><td>국가별 세탁 비율을 <b>8월 라벨로만 target-encoding</b>, 스묌딩 200</td><td>조세피난처 등 지리적 위험을 압축. 10월은 매핑만 → 누수 차단</td></tr>
+      <tr><td>15</td><td><b>유형쌍 위험도</b></td><td>계좌 유형 조합(개인→법인 등)의 위험도, 스묌딩 500</td><td>“개인→유령법인” 같은 위험 조합을 포착. 희소 조합은 스묌딩으로 과신 방지</td></tr>
+    </tbody></table>
+  </div>
+  <div class="callout sky">🧹 <b>선정 과정</b> — 초기 81종에서 ablation으로 축약했습니다. 계좌 피처 제거 시 F1이 0.0398→0.0으로 붕괴해 계좌(노드) 피처는 필수로 확인됐고, 중복·무기여 열을 제거해 최종 16종으로 압축했습니다. 표준화는 8월 50만 표본의 mean/std만 사용해 10월에 그대로 적용(clip ±10)합니다.</div>
+
+  <h3 style="font-size:16px;margin:26px 0 10px">🏦 B. 노드(계좌) 피처 24종 = 그래프 14 + KYC 10</h3>
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table>
+      <tbody><tr><th style="width:16%">그룹</th><th style="width:42%">피처</th><th>선택 근거</th></tr>
+      <tr><td><b>그래프 14</b><br><span style="font-size:12px;color:var(--sub)">창(월)별 재집계, 대부분 log1p</span></td>
+          <td>송/수신 건수·총액(4), 고유 송/수신 상대 수(2), 자기이체 수, 왕복 상대 수, 순유출 비율, 평균 송/수취액(2), 상호성 비율, PageRank, log 총송금액</td>
+          <td>계좌의 <b>구조적 역할</b> — 허브(fan-in/out), 중계 계좌(순유출≈0), 순환 참여자(왕복·상호성)를 구분. PageRank는 자금이 모이는 중심을 포착. 8월 프로필은 8월 거래로만, 10월은 10월로만 계산해 상태 누수 차단</td></tr>
+      <tr><td><b>KYC 10</b></td>
+          <td>엔티티 유형 one-hot(7), log 계좌수(1), 엔티티 out/in 다양성(2)</td>
+          <td>계좌 차수가 못 보는 <b>엔티티 레벨 fan-in/out</b> — “이 주인이 서로 다른 몇 명과 거래하나”. 유형(개인/법인 등)은 신원 기반 위험도의 기반. 무패턴 세탁 검출력을 끌어올린 핵심 그룹</td></tr>
+    </tbody></table>
+  </div>
+
+  <h3 style="font-size:16px;margin:26px 0 10px">🧪 C. 모델 입력 예시 — 실제 텐서에 들어가는 값</h3>
+  <p class="lead" style="margin-bottom:10px">의심 거래(3분 릴리이 송금)와 정상 거래(매월 반복되는 급여 이체)의 엣지 피처 16종을 비교합니다. 값은 변환 후(log1p·z·0/1) 기준입니다.</p>
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table>
+      <tbody><tr><th>#</th><th>엣지 피처</th><th style="background:rgba(240,82,77,.1)">⚠️ 의심: 09:15 B→C, ACH $9,850</th><th style="background:rgba(45,212,191,.08)">✅ 정상: 매월 25일 급여, Wire $3,200</th></tr>
+      <tr><td>0</td><td>쌍 과거 건수</td><td><b>0.00</b> (처음 보는 조합)</td><td>3.22 (24회 반복)</td></tr>
+      <tr><td>1</td><td>쌍 Δt</td><td>0.69 (기록 없음)</td><td>10.67 (약 30일 주기)</td></tr>
+      <tr><td>2</td><td>쌍 1시간 건수</td><td>0.00</td><td>0.00</td></tr>
+      <tr><td>3</td><td>송신 Δt</td><td><b>1.61</b> (3분 전에도 송금)</td><td>10.67 (한 달 전 급여 이후 처음)</td></tr>
+      <tr><td>4</td><td>송신 1시간 건수</td><td><b>2.56</b> (1시간에 12건)</td><td>0.69 (1건)</td></tr>
+      <tr><td>5</td><td>수취 Δt</td><td><b>2.48</b> (12분 전 입금)</td><td>9.87</td></tr>
+      <tr><td>6</td><td>수취 1시간 건수</td><td><b>2.20</b> (1시간에 8건 입금)</td><td>0.00</td></tr>
+      <tr><td>7</td><td>통화 z-score</td><td>-0.31 (금액 자체는 평범)</td><td>0.05</td></tr>
+      <tr><td>8</td><td>쌍 총건수 z</td><td>-0.50 (얕은 관계)</td><td>1.82 (깊은 관계)</td></tr>
+      <tr><td>9</td><td>쌍 역방향 건수 z</td><td>-0.20</td><td>0.10</td></tr>
+      <tr><td>10</td><td>쌍 최근성 z</td><td>0.10</td><td>1.15</td></tr>
+      <tr><td>11</td><td>same_entity</td><td>0</td><td>0</td></tr>
+      <tr><td>12</td><td>same_country</td><td>1</td><td>1</td></tr>
+      <tr><td>13</td><td>송신 국가 위험도</td><td>0.003</td><td>0.003</td></tr>
+      <tr><td>14</td><td>수취 국가 위험도</td><td>0.003</td><td>0.003</td></tr>
+      <tr><td>15</td><td>유형쌍 위험도</td><td><b>0.011</b> (개인→개인 경유형)</td><td>0.002 (법인→개인 급여형)</td></tr>
+    </tbody></table>
+  </div>
+  <p class="lbl" style="margin:8px 0 18px">※ 금액(z)과 국가 위험도는 평범해 보여도, <b>굵은 값들(처음 보는 쌍·3분 간격·시간당 다건)</b>이 어텐션에서 이 거래를 증폭시키는 단서가 됩니다.</p>
+
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table>
+      <tbody><tr><th style="width:22%">노드 피처 (계좌 C 예시)</th><th>값 (경유 의심 계좌)</th><th>해석</th></tr>
+      <tr><td>그래프 14 중 일부</td><td>송신 41건 · 수신 39건 · 고유 상대 out 38/in 37 · 순유출 0.02 · 왕복 5 · PageRank 1.2×10⁻⁵</td><td>받은 만큼 바로 남기는 <b>중계(패스스루) 계좌</b>의 프로필</td></tr>
+      <tr><td>KYC 10 중 일부</td><td>유형=개인(one-hot) · log 계좌수 1.10(3개) · out 다양성 3.09 · in 다양성 2.99</td><td>엔티티 레벨에서도 다수와 거래 — 계좌 차수만으론 안 보이던 fan 구조 포착</td></tr>
+    </tbody></table>
+  </div>
+  <pre><span class="c"># 모델에 실제 전달되는 텐서 형태 (HI-Large 기준)</span>
+x          : [2,100,000+ 계좌, 24]  <span class="c"># 노드 피처 (8월/10월 창별 재집계, 8월 통계로 표준화)</span>
+edge_index : [2, 배치 거래수]        <span class="c"># (src_id, dst_id) — 어텐션이 메시지를 흘려보내는 그래프 연결 통로</span>
+edge_attr  : [배치 거래수, 16]       <span class="c"># 위 표의 엣지 피처, 8월 50만 표본으로 표준화, clip ±10</span>
+score      : sigmoid(head([h_src ‖ h_dst ‖ edge_attr]))  <span class="c"># → 거래별 세탁 확률</span></pre>
+</section>
+
+<!-- ④ 어텐션 시각화 -->
+<section>
+  <h2><span class="no">04</span>어텐션은 이웃을 어떻게 고르는가 (인터랙티브)</h2>
+  <p class="lead">계좌 C에 4개의 이웃이 있다고 합시다. 단순 GNN(GCN)은 이웃을 거의 균등하게 합치지만, Transformer GNN은 <b>엣지 피처를 본 뒤</b> 중요한 이웃에 큰 가중치를 줍니다. 버튼을 눌러 비교해 보세요.</p>
+  <div class="panel">
+    <div class="attn-controls">
+      <button id="btnGcn" onclick="setMode('gcn')" class="">GCN 방식 (균등 집계)</button>
+      <button id="btnTf" class="on" onclick="setMode('tf')">TransformerConv 방식 (어텐션)</button>
+    </div>
+    <div id="bars"><div class="bar-row"><div class="nm">A (평범한 이웃)</div>
+      <div class="bar-track"><div class="bar-fill" style="width:8%"></div></div>
+      <div class="bar-val" style="color:#e8edf7">0.08</div></div><div class="bar-row"><div class="nm">B (어제 개설 계좌)</div>
+      <div class="bar-track"><div class="bar-fill" style="width:19%"></div></div>
+      <div class="bar-val" style="color:#e8edf7">0.19</div></div><div class="bar-row"><div class="nm">D (3분 릴리이 송신)</div>
+      <div class="bar-track"><div class="bar-fill" style="width:52%"></div></div>
+      <div class="bar-val" style="color:#f0524d">0.52</div></div><div class="bar-row"><div class="nm">E (같은 엔티티 계좌)</div>
+      <div class="bar-track"><div class="bar-fill" style="width:21%"></div></div>
+      <div class="bar-val" style="color:#e8edf7">0.21</div></div></div>
+    <p id="attnNote" class="lbl" style="margin-top:12px">TransformerConv는 엣지 피처(3분 릴리이·same_entity 등)를 보고 D에 0.52의 가중치를 줍니다 — 세탁 신호가 증폭됩니다.</p>
+    <svg viewBox="0 0 920 210" style="margin-top:10px">
+      <g id="miniGraph"><line x1="460" y1="105" x2="180" y2="40" stroke="#4aa8f0" stroke-width="1.6400000000000001" stroke-opacity="0.85"></line><text x="320" y="66.5" text-anchor="middle" font-size="11" fill="#4aa8f0" font-weight="700">0.08</text><line x1="460" y1="105" x2="180" y2="170" stroke="#4aa8f0" stroke-width="2.52" stroke-opacity="0.85"></line><text x="320" y="131.5" text-anchor="middle" font-size="11" fill="#4aa8f0" font-weight="700">0.19</text><line x1="460" y1="105" x2="740" y2="40" stroke="#f0524d" stroke-width="5.16" stroke-opacity="0.85"></line><text x="600" y="66.5" text-anchor="middle" font-size="11" fill="#f0524d" font-weight="700">0.52</text><line x1="460" y1="105" x2="740" y2="170" stroke="#4aa8f0" stroke-width="2.6799999999999997" stroke-opacity="0.85"></line><text x="600" y="131.5" text-anchor="middle" font-size="11" fill="#4aa8f0" font-weight="700">0.21</text><circle cx="180" cy="40" r="22" fill="#8a97ad" stroke="white" stroke-width="2.5"></circle><text x="180" y="45" text-anchor="middle" font-size="13" font-weight="800" fill="white">A</text><circle cx="180" cy="170" r="22" fill="#8a97ad" stroke="white" stroke-width="2.5"></circle><text x="180" y="175" text-anchor="middle" font-size="13" font-weight="800" fill="white">B</text><circle cx="740" cy="40" r="22" fill="#f0524d" stroke="white" stroke-width="2.5"></circle><text x="740" y="45" text-anchor="middle" font-size="13" font-weight="800" fill="white">D</text><circle cx="740" cy="170" r="22" fill="#8a97ad" stroke="white" stroke-width="2.5"></circle><text x="740" y="175" text-anchor="middle" font-size="13" font-weight="800" fill="white">E</text><circle cx="460" cy="105" r="26" fill="#a06bd8" stroke="white" stroke-width="3"></circle><text x="460" y="110" text-anchor="middle" font-size="14" font-weight="800" fill="white">C</text></g>
+    </svg>
+  </div>
+</section>
+
+<!-- ⑤ 시간 처리 -->
+<section>
+  <h2><span class="no">05</span>시간은 어디서 처리되는가 — 모델이 아니라 피처에서</h2>
+  <p class="lead">문헌의 Temporal GNN(TGAT·TGN)은 모델 안에 시간 장치가 있습니다. 우리 모델에는 없고, 대신 <b>2단계(prep_feat_matrix_stream)가 시간을 피처로 요약</b>해 넣습니다.</p>
+  <div class="panel">
+    <svg viewBox="0 0 920 240">
+      <line x1="60" y1="120" x2="860" y2="120" stroke="#243352" stroke-width="3"></line>
+      <g>
+        <circle cx="150" cy="120" r="8" fill="#2dd4bf"></circle><text x="150" y="150" text-anchor="middle" class="lbl">t-9일</text>
+        <circle cx="260" cy="120" r="8" fill="#2dd4bf"></circle><text x="260" y="150" text-anchor="middle" class="lbl">t-6일</text>
+        <circle cx="370" cy="120" r="8" fill="#2dd4bf"></circle><text x="370" y="150" text-anchor="middle" class="lbl">t-2일</text>
+        <circle cx="480" cy="120" r="8" fill="#2dd4bf"></circle><text x="480" y="150" text-anchor="middle" class="lbl">t-3시간</text>
+        <circle cx="620" cy="120" r="12" fill="#f0524d"></circle><text x="620" y="150" text-anchor="middle" class="lbld">판단 시점 t</text>
+        <circle cx="740" cy="120" r="8" fill="#5c7299"></circle><text x="740" y="150" text-anchor="middle" class="lbl">t+1일</text>
+        <circle cx="830" cy="120" r="8" fill="#5c7299"></circle><text x="830" y="150" text-anchor="middle" class="lbl">t+4일</text>
+      </g>
+      <rect x="70" y="70" width="480" height="24" rx="12" fill="rgba(45,212,191,.15)"></rect>
+      <text x="310" y="87" text-anchor="middle" font-size="12" fill="#2dd4bf" font-weight="700">✓ searchsorted로 이 구간만 집계 → Δt, 과거 건수, 1h 윈도우</text>
+      <rect x="640" y="70" width="220" height="24" rx="12" fill="rgba(240,82,77,.12)"></rect>
+      <text x="750" y="87" text-anchor="middle" font-size="12" fill="#f0524d" font-weight="700">✗ 미래 정보 절대 금지</text>
+      <text x="460" y="205" text-anchor="middle" class="lbl">인과 마스킹을 “모델 구조”가 아니라 “데이터 생성(searchsorted 인과 집계)”에서 강제 — 누수 차단의 심장</text>
+    </svg>
+  </div>
+
+  <table>
+    <tbody><tr><th style="width:34%">장치</th><th>진짜 Temporal GNN (TGAT·TGN)</th><th>우리 v2 모델</th></tr>
+    <tr><td><b>시간 인코딩 레이어</b></td><td class="yes">있음 (Time2Vec 등)</td><td class="no2">없음 — Δt·윈도우 피처로 대체</td></tr>
+    <tr><td><b>시간순 이웃 샘플링</b></td><td class="yes">있음 (최근 이웃 k개)</td><td class="no2">없음 — 배치는 무작위 60개 서로소 그래프</td></tr>
+    <tr><td><b>노드 메모리(상태 갱신)</b></td><td class="yes">있음 (TGN의 memory module)</td><td class="no2">없음</td></tr>
+    <tr><td><b>미래 누수 차단</b></td><td>모델 구조가 강제</td><td class="part">피처 생성 단계(searchsorted)가 강제</td></tr>
+    <tr><td><b>어텐션 집계</b></td><td class="yes">있음</td><td class="yes">있음 (TransformerConv 2층, 2헤드)</td></tr>
+    <tr><td><b>엣지 피처 → 어텐션 주입</b></td><td>모델에 따라 다름</td><td class="yes">있음 (edge_dim)</td></tr>
+  </tbody></table>
+</section>
+
+<!-- ⑥ 평가 -->
+<section>
+  <h2><span class="no">06</span>이 설계의 장단점</h2>
+  <div class="grid2">
+    <div class="card"><span class="tag teal">장점</span>
+      <ul>
+        <li><b>가볍다</b> — 시간축 샘플링·메모리 갱신이 없어 1.8억 엣지 규모에서 현실적</li>
+        <li><b>시간 정보의 해석이 쉽다</b> — Δt·1h 윈도우 등 피처가 명시적이라 디버깅·검증 가능</li>
+        <li><b>엣지 어텐션 주입</b> — 거래 단서 중심의 AML 문제에 구조적으로 적합</li>
+        <li><b>누수 차단이 데이터 단계에서 검증 가능</b> — searchsorted 집계는 코드로 확인 가능</li>
+      </ul>
+    </div>
+    <div class="card"><span class="tag rose">단점</span>
+      <ul>
+        <li><b>피처에 안 잡히는 시간 패턴은 놓침</b> — 요일 주기성, 특정 간격의 암호적 반복 등</li>
+        <li><b>모델이 시간 순서를 구조적으로 추론 못함</b> — “A→B가 B→C보다 먼저”라는 인과 자체는 피처 요약에 의존</li>
+        <li><b>2-Hop 제한</b> — 3단계 이상의 긴 세탁 사슬은 맥락이 옅어짐</li>
+        <li><b>명칭 혼동</b> — “TGNN”이지만 문헌의 Temporal GNN이 아니라 “Temporal-featured Transformer GNN”이 정확</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout rose">⚠️ <b>명칭 정리</b> — 노트북은 “TGNN = Transformer 기반 GNN”이라고 쓰지만, 문헌에서 TGNN은 보통 <b>Temporal</b> GNN(TGAT·TGN 계열)을 가리킵니다. 보고서·논문에 쓸 때는 혼동을 피하기 위해 “시간 인과 피처를 사용하는 정적 그래프 트랜스포머”로 명시하는 것이 안전합니다.</div>
+  <div class="callout">🎯 <b>한 줄 요약</b> — 우리 모델은 <b>어텐션(Transformer)으로 이웃을 골라 읽되, 시간은 모델이 아니라 데이터가 기억하는</b> 실용적 하이브리드입니다. 가벼운 대신 시간 추론 깊이는 피처 설계 품질에 달려 있습니다.</div>
+</section>
+
+</div>
+
+<footer>IBM AMLworld HI-Large · KYC-TGNN v2(final_pipeline.ipynb) 코드 분석 기반 · 생성일 2026-09-11</footer>
+
+<button class="dl" onclick="downloadSelf()">⬇ 이 페이지 저장</button>
+
+<script>
+// ── 어텐션 데모 ──────────────────────────────────
+const NEIGHBORS = [
+  { n: 'A (평범한 이웃)', gcn: 0.25, tf: 0.08 },
+  { n: 'B (어제 개설 계좌)', gcn: 0.25, tf: 0.19 },
+  { n: 'D (3분 릴리이 송신)', gcn: 0.25, tf: 0.52 },
+  { n: 'E (같은 엔티티 계좌)', gcn: 0.25, tf: 0.21 },
+];
+const NOTES = {
+  gcn: 'GCN은 이웃을 거의 균등(0.25씩)하게 합칩니다 — 수상한 이웃 D의 신호가 1/4로 희석됩니다.',
+  tf: 'TransformerConv는 엣지 피처(3분 릴리이·same_entity 등)를 보고 D에 0.52의 가중치를 줍니다 — 세탁 신호가 증폭됩니다.'
+};
+function setMode(m) {
+  document.getElementById('btnGcn').className = m === 'gcn' ? 'on' : '';
+  document.getElementById('btnTf').className = m === 'tf' ? 'on' : '';
+  const bars = document.getElementById('bars');
+  bars.innerHTML = NEIGHBORS.map(nb => {
+    const v = m === 'gcn' ? nb.gcn : nb.tf;
+    return `<div class="bar-row"><div class="nm">${nb.n}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${v * 100}%"></div></div>
+      <div class="bar-val" style="color:${v > 0.4 ? '#f0524d' : '#e8edf7'}">${v.toFixed(2)}</div></div>`;
+  }).join('');
+  document.getElementById('attnNote').textContent = NOTES[m];
+  drawMini(m);
+}
+function drawMini(m) {
+  const pos = { A: [180, 40], B: [180, 170], D: [740, 40], E: [740, 170] };
+  const C = [460, 105];
+  let s = '';
+  Object.entries(pos).forEach(([n, [x, y]]) => {
+    const nb = NEIGHBORS.find(k => k.n.startsWith(n));
+    const w = m === 'gcn' ? nb.gcn : nb.tf;
+    const lw = 1 + w * 8;
+    const col = w > 0.4 ? '#f0524d' : '#4aa8f0';
+    s += `<line x1="${C[0]}" y1="${C[1]}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="${lw}" stroke-opacity="0.85"/>`;
+    s += `<text x="${(C[0] + x) / 2}" y="${(C[1] + y) / 2 - 6}" text-anchor="middle" font-size="11" fill="${col}" font-weight="700">${w.toFixed(2)}</text>`;
+  });
+  Object.entries(pos).forEach(([n, [x, y]]) => {
+    const nb = NEIGHBORS.find(k => k.n.startsWith(n));
+    const w = m === 'gcn' ? nb.gcn : nb.tf;
+    s += `<circle cx="${x}" cy="${y}" r="22" fill="${w > 0.4 ? '#f0524d' : '#8a97ad'}" stroke="white" stroke-width="2.5"/>`;
+    s += `<text x="${x}" y="${y + 5}" text-anchor="middle" font-size="13" font-weight="800" fill="white">${n}</text>`;
+  });
+  s += `<circle cx="${C[0]}" cy="${C[1]}" r="26" fill="#a06bd8" stroke="white" stroke-width="3"/>`;
+  s += `<text x="${C[0]}" y="${C[1] + 5}" text-anchor="middle" font-size="14" font-weight="800" fill="white">C</text>`;
+  document.getElementById('miniGraph').innerHTML = s;
+}
+setMode('tf');
+
+// ── 이 파일 자체를 다운로드 ──────────────────────
+function downloadSelf() {
+  const blob = new Blob(['<!DOCTYPE html>\n' + document.documentElement.outerHTML], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'gnn_model_anatomy.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+
+
+</body></html>

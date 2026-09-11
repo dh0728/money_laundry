@@ -1,0 +1,720 @@
+<title>HI-Large AML 전처리·모델 설계</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{--bg:#f4f6f8;--panel:#fff;--ink:#171a1f;--muted:#5c6672;--line:#e2e7ec;--accent:#0d9488;--accent-soft:#d7f0ec;
+ --good:#0d9488;--bad:#c0392b;--warn:#b7791f;--chip:#eef2f6;--edge:#2f6bed;--barbg:#e7edf2;}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#12151a;--panel:#1b1f27;--ink:#e8ecf1;--muted:#9aa5b1;
+ --line:#2b313b;--accent:#2dd4bf;--accent-soft:#12312e;--good:#2dd4bf;--bad:#ff7a6b;--warn:#e0a458;--chip:#242a33;--edge:#6f9bff;--barbg:#232a33;}}
+:root[data-theme=dark]{--bg:#12151a;--panel:#1b1f27;--ink:#e8ecf1;--muted:#9aa5b1;--line:#2b313b;--accent:#2dd4bf;
+ --accent-soft:#12312e;--good:#2dd4bf;--bad:#ff7a6b;--warn:#e0a458;--chip:#242a33;--edge:#6f9bff;--barbg:#232a33;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR",sans-serif;line-height:1.62;margin:0;padding:40px 20px 90px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto}
+.mono{font-family:"IBM Plex Mono",monospace}
+header.top{border-left:6px solid var(--accent);padding:8px 0 8px 22px;margin-bottom:20px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+h1{font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:6px 0;text-wrap:balance}
+.lede{font-size:15px;color:var(--muted);max-width:72ch}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.pill{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 12px;color:var(--muted)}
+.pill b{color:var(--ink)}
+h2{font-size:21px;font-weight:700;margin:30px 0 6px;padding-bottom:10px;border-bottom:2px solid var(--line);display:flex;align-items:baseline;gap:11px;scroll-margin-top:20px;text-wrap:balance}
+h2 .n{font-family:"IBM Plex Mono",monospace;font-size:13px;color:#fff;background:var(--accent);border-radius:6px;padding:3px 9px;flex:none}
+h3{font-size:16.5px;font-weight:600;margin:24px 0 8px;color:var(--ink)}
+p{margin:9px 0;font-size:14.5px}
+ul,ol{font-size:14.5px;padding-left:22px}li{margin:5px 0}
+.stage{display:flex;align-items:center;gap:14px;margin:52px 0 4px;padding:14px 18px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px}
+.stage .num{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:700;color:var(--accent)}
+.stage .t{font-size:18px;font-weight:700}
+.stage .s{font-size:12.5px;color:var(--muted);font-family:"IBM Plex Mono",monospace}
+.tl{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0}
+.term{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 15px;margin:12px 0;font-size:13.7px}
+.term b{color:var(--accent);font-weight:600}
+.callout{border-radius:10px;padding:13px 16px;margin:14px 0;font-size:13.8px;border:1px solid var(--line);background:var(--panel)}
+.callout.key{border-left:4px solid var(--accent);background:var(--accent-soft)}
+.callout.warn{border-left:4px solid var(--warn)}
+.callout.bad{border-left:4px solid var(--bad)}
+.callout .h{font-weight:600;margin-bottom:3px}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13px}
+.tblwrap{overflow-x:auto}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600;font-size:12.5px}
+td.num,th.num{text-align:right;font-family:"IBM Plex Mono",monospace}
+tr:nth-child(even) td{background:color-mix(in srgb,var(--panel) 55%,var(--bg))}
+.good{color:var(--good);font-weight:600}.bad{color:var(--bad);font-weight:600}.warn{color:var(--warn);font-weight:600}
+code{font-family:"IBM Plex Mono",monospace;background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12.7px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:680px){.grid2{grid-template-columns:1fr}}
+.fcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.fcard .nm{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:13px;color:var(--edge)}
+.fcard .ds{font-size:12.8px;color:var(--muted);margin-top:3px}
+.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:18px 0;font-size:13.3px}
+.toc .grp{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 4px}
+.toc a{color:var(--ink);text-decoration:none;display:block;margin:3px 0;padding-left:10px;border-bottom:1px dotted transparent}
+.toc a:hover{border-bottom-color:var(--accent);color:var(--accent)}
+.flow{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:pre;line-height:1.5}
+.foot{margin-top:60px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+</style>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">IBM AMLworld · HI-Large · KYC-TGNN v2</div>
+  <h1>자금세탁 탐지 — 데이터 전처리와 모델 설계 보고서</h1>
+  <p class="lede">1억 8천만 건 규모의 거래 데이터에서 자금세탁을 찾아내는 GNN 모델을, <b>실제 파이프라인 실행 순서</b>대로 설명한다.
+  이 문서는 <b>이 프로젝트를 처음 보는 사람</b>을 대상으로 낯선 용어를 그때그때 풀어 설명하고, 모든 결정을 실측 수치로 뒷받침한다.</p>
+  <div class="pills">
+    <span class="pill">거래 <b>179,702,229</b></span>
+    <span class="pill">세탁 <b>0.1255%</b> (1:796)</span>
+    <span class="pill">계좌 <b>2,116,168</b></span>
+    <span class="pill">최종 PR-AUC <b>0.6352</b></span>
+    <span class="pill">모델 <b>KYC-TGNN v2</b></span>
+  </div>
+</header>
+
+<div class="term">
+<b>먼저, 자금세탁 탐지가 왜 어려운가.</b> 전체 거래 중 세탁은 <b>0.13%</b>뿐이다(1만 건 중 약 13건).
+게다가 세탁범은 정상 거래처럼 위장한다. "바늘 찾기"가 아니라 <b>"건초더미로 위장한 바늘 찾기"</b>다.
+그래서 ① 극단적으로 적은 정답, ② 정상과 구분이 어려움, ③ 데이터가 너무 커서(17GB) 한 번에 못 올림 — 이 세 가지를 모두 다뤄야 한다.</div>
+
+<div class="flow">파이프라인 한눈에:
+
+  원본 CSV ──▶ [0] 데이터 이해 ──▶ [1] 거래 빌드 ──▶ [2] 피처 생성 ──▶ [3] TGNN 학습·채점·평가 ──▶ 최종 0.6352
+             (컬럼·KYC)      (정제·분할·샘플링)  (featmat·피처)   (그래프·모델·평가)</div>
+
+<div class="toc">
+<b>목차 (파이프라인 순서)</b>
+<div class="grp">0 · 데이터 이해</div>
+<a href="#s01">0-1. 원본 거래·계좌(KYC) 데이터 컬럼</a>
+<div class="grp">1 · 거래 데이터셋 빌드</div>
+<a href="#s11">1-1. 데이터 꼬리(유령 구간) 정제</a>
+<a href="#s12">1-2. 계좌-KYC 복합키 정규화 조인</a>
+<a href="#s13">1-3. train / val / test 시간 분할</a>
+<a href="#s14">1-4. 분할별 패턴 균일성</a>
+<a href="#s15">1-5. 클래스 불균형</a>
+<a href="#s16">1-6. 다운샘플링 시도와 결과</a>
+<a href="#s17">1-7. 다운샘플링은 필요한가</a>
+<div class="grp">2 · 피처 생성</div>
+<a href="#s21">2-1. 엣지 피처행렬(featmat)이란</a>
+<a href="#s22">2-2. 미래 참조(누수) 차단 설계</a>
+<a href="#s23">2-3. 전처리 기법과 전체 피처 목록</a>
+<div class="grp">3 · TGNN 학습·채점·평가</div>
+<a href="#s31">3-1. 그래프 구성(무작위 서로소)과 패턴 깨짐</a>
+<a href="#s32">3-2. TGNN이란 무엇인가</a>
+<a href="#s33">3-3. TGNN의 학습·판정 방식</a>
+<a href="#s34">3-4. 입력 인스턴스 예시</a>
+<a href="#s35">3-5. 장기(월 경계) 세탁 처리</a>
+<a href="#s36">3-6. 단발성 양성·무패턴 세탁 탐지</a>
+<a href="#s38op">3-7. 운영 배치·그래프 구성</a>
+<a href="#s38b">3-8. 기준선 비교(그래프 전파 기여)</a>
+<a href="#s37">3-9. 최종 성능과 전체 파이프라인</a>
+</div>
+
+<!-- ══════════ STAGE 0 ══════════ -->
+<div class="stage"><span class="num">0</span><div><div class="t">데이터 이해</div><div class="s">원본 거래 + 계좌(KYC) 데이터가 무엇인가</div></div></div>
+
+<h2 id="s01"><span class="n">0-1</span> 원본 거래·계좌(KYC) 데이터 컬럼</h2>
+<h3>원본 거래 데이터 <code>HI-Large_Trans.csv</code></h3>
+<div class="tblwrap"><table>
+<tr><th>컬럼</th><th>내용 / 사용</th></tr>
+<tr><td>Timestamp</td><td>거래 시각 → 시간정렬·리듬 피처·시각(sin/cos)</td></tr>
+<tr><td>From/To Bank, Account</td><td>송·수취 (은행,계좌) → node_id 매핑(그래프 노드)</td></tr>
+<tr><td>Amount Paid / Received</td><td>금액 → log 변환·통화별 z-점수·환전 여부(제거됨)</td></tr>
+<tr><td>Payment/Receiving Currency</td><td>통화 → 통화별 금액 정규화</td></tr>
+<tr><td>Payment Format</td><td>결제수단(ACH 등) → <b>제거</b>(2-3 참조)</td></tr>
+<tr><td>Is Laundering</td><td>정답 라벨 — 학습·평가에만, 피처로는 절대 미사용</td></tr>
+</table></div>
+<h3>계좌(KYC) 데이터 <code>HI-Large_accounts.csv</code></h3>
+<div class="term"><b>KYC</b>(Know Your Customer) = "고객 알기" — 계좌의 소유자가 누구인지 기록한 원장. 이 데이터의 유일한 외부 메타데이터이며, 뒤에서 무패턴 탐지의 핵심 레버가 된다.</div>
+<div class="tblwrap"><table>
+<tr><th>컬럼</th><th>내용 / 사용</th></tr>
+<tr><td>Bank ID · Account Number</td><td>계좌 식별 → 거래 데이터와 <b>조인 키</b>(1-2)</td></tr>
+<tr><td>Entity ID</td><td>소유 엔티티(주체) → same_entity·엔티티 계좌수·다양성 피처</td></tr>
+<tr><td>Entity Name</td><td>엔티티 유형(Corporation/Partnership 등) → 유형 피처·유형쌍 위험</td></tr>
+<tr><td>Bank Name</td><td>은행 국가 → 국가 위험도</td></tr>
+</table></div>
+
+<h3>KYC 원장 실제 구조와 통계</h3>
+<div class="flow">실제 예시(HI-Large_accounts.csv):
+  Bank Name           Bank ID  Account Number  Entity ID      Entity Name
+  Portugal Bank #500  240522   82655C500       2AA04EEC5D0    Corporation #82502
+  First Bank of Laramie 339367 8505ED380       2AA06B8AC80    Partnership #15630
+     └ 국가=Portugal    └ 조인키(정규화)         └ 소유주 ID      └ 유형=Corporation</div>
+<div class="tblwrap"><table>
+<tr><th>KYC 통계 (실측)</th><th class="num">값</th></tr>
+<tr><td>등록 계좌</td><td class="num">2,126,855</td></tr>
+<tr><td>고유 엔티티(소유주)</td><td class="num">670,231</td></tr>
+<tr><td>엔티티당 평균 계좌 수</td><td class="num">3.17</td></tr>
+<tr><td>엔티티당 최대 계좌 수</td><td class="num">8,611</td></tr>
+</table></div>
+<p><b>엔티티 유형 분포</b>: Partnership 74.5만 · Corporation 69.3만 · Sole Proprietorship 68.0만 · Country 5,689 · Individual 3,104 · Direct 28. 법인류(Partnership/Corporation/Sole Prop)가 99.6%로, 개인·국가·직접결제는 극소수다.</p>
+<div class="callout key"><div class="h">KYC → 피처 15종 유도 (엣지 5 + 노드 10)</div>
+KYC 원장의 4개 컬럼에서 총 15개 피처가 만들어진다:
+<div class="tblwrap"><table>
+<tr><th>KYC 원천</th><th>파생 피처</th><th>의미</th></tr>
+<tr><td>Entity ID (소유주)</td><td><b>엣지</b> same_entity</td><td>송·수취가 같은 소유주 → 자기 계좌 간 이동(세탁 층화의 흔한 수법)</td></tr>
+<tr><td>Entity ID</td><td><b>노드</b> log 엔티티 계좌수 · 발신/수신 다양성(2)</td><td>"여러 계좌를 굴리는 소유주"·"서로 다른 엔티티와 거래하는 폭"(계좌 차수가 못 보는 엔티티 레벨 fan)</td></tr>
+<tr><td>Entity Name (유형)</td><td><b>노드</b> 유형 one-hot(7) · <b>엣지</b> 유형쌍 위험</td><td>법인↔개인 등 유형 조합의 세탁 위험(8월 라벨로 target-encoding)</td></tr>
+<tr><td>Bank Name (국가)</td><td><b>엣지</b> same_country · 송/수신 국가위험(2)</td><td>국경 간 이동 여부 · 국가별 세탁 위험(8월 인코딩, 다단어 국가명 정확 파싱)</td></tr>
+</table></div>
+위험도(국가·유형쌍)는 <b>8월(train) 라벨로만</b> target-encoding 하고 10월엔 값만 매핑 → 누수 없음. same_entity·다양성은 소유 구조라 시점 무관.</div>
+
+<!-- ══════════ STAGE 1 ══════════ -->
+<div class="stage"><span class="num">1</span><div><div class="t">거래 데이터셋 빌드</div><div class="s">build_dataset — 정제 · 조인 · 분할 · 샘플링</div></div></div>
+
+<h2 id="s11"><span class="n">1-1</span> 데이터 꼬리(유령 구간) 정제</h2>
+<p><b>문제:</b> 합성 생성기가 <b>정상 거래 생성을 2022-11-07에 먼저 멈추고</b> 이후에는 세탁 패턴 잔여만 계속 찍어낸다.
+그 결과 꼬리 구간(22,934건)은 주간 세탁률 <b>~60%</b>의 비현실 구간이 된다(정상 세계는 0.13%).</p>
+<p><b>왜 그냥 못 지우나(패턴 깨짐):</b> 세탁 패턴은 여러 거래가 이어진 <b>구조</b>다. 꼬리를 무작정 자르면 그 구조의 뒷부분이 잘려 패턴이 훼손될 수 있어, "자르되 학습에 해가 되지 않게" 다뤄야 한다.</p>
+<div class="callout key"><div class="h">해결과 근거</div>
+꼬리 유령 구간은 <b>학습·평가 모두에서 제외</b>했다. 근거는 실측 — 유사 데이터(HI-Small)에서 이 구간을 train에 포함하자 PR-AUC가 <b class="bad">0.193 → 0.060</b>으로 급락했다. 인공 구간은 학습에도 독이다. 실제 학습(8월)·평가(10월) 구간은 이 꼬리보다 앞이라 패턴이 온전히 보존된다.</div>
+
+<h2 id="s12"><span class="n">1-2</span> 계좌-KYC 복합키 정규화 조인</h2>
+<p>거래 데이터의 계좌를 accounts.csv의 소유주 정보에 연결하는 단계다. 여기에 함정이 두 개 있다.</p>
+<div class="callout key"><div class="h">복합키 정규화 조인 (핵심 전처리)</div>
+① <b>계좌번호는 전역 유일이 아니다</b> — 같은 번호가 여러 은행에 존재(16,443개가 서로 다른 소유주). 계좌번호만으로 조인하면 <b>0.78%가 오배정</b>된다.
+② 거래 데이터의 은행ID는 선행 0 문자열(<code>0038633</code>), 계좌 데이터는 십진(<code>38633</code>)이라 그대로는 <b class="bad">0% 매칭</b>.
+→ 은행ID를 숫자로 정규화한 뒤 <b>(은행ID, 계좌번호) 복합키</b>로 조인하면 거래계좌 <b class="good">100% 정확 매칭</b>된다. 국가명도 다단어(Saudi Arabia 등)를 `^(.*?) Bank #` 로 정확히 파싱한다.</div>
+
+<h2 id="s13"><span class="n">1-3</span> train / val / test 시간 분할</h2>
+<div class="term"><b>train</b>=학습용, <b>val</b>(validation)=학습 중 성능을 엿보며 언제 멈출지 정하는 검증용, <b>test</b>=한 번도 안 본 최종 시험용. 시간 데이터는 "과거로 배우고 미래를 맞힌다"는 운영 현실에 맞춰 <b>시간순</b>으로 나눈다.</div>
+<div class="tblwrap"><table>
+<tr><th>구간</th><th>용도</th><th>근거</th></tr>
+<tr><td>8월 (5,947만)</td><td>train + val(층화 10%)</td><td>8월 마지막 주 양성이 성능의 최대 지렛대(<b>+0.116</b> 실측)라 train에 남기고, val은 무작위 층화로 떼어 조기중단에만 사용</td></tr>
+<tr><td>9월 (5,614만)</td><td class="warn">gap — 통째 폐기</td><td>train과 test 사이 한 달을 비워 경계 누수를 줄임(8→10월 완충지대). 전체의 <b>31%(5,614만 건)를 버리는</b> 큰 결정</td></tr>
+<tr><td>10월 (5,482만)</td><td>test — 원본 비율(0.137%)</td><td>test 비율을 인위 조정하면 실전 성능을 못 잼. 다운샘플링은 train 전용</td></tr>
+</table></div>
+<p><b>분할 시 패턴 깨짐:</b> 시간으로 자르면 월 경계에 걸친 세탁 작전이 반토막 난다. 이 문제는 3단계의 <b>창별 그래프 설계</b>(3-1, 3-5)로 흡수한다 — 패턴을 복원하는 대신, 잘려도 문제가 안 되게 만든다.</p>
+
+<h2 id="s14"><span class="n">1-4</span> 분할별 패턴 균일성</h2>
+<p>8개 세탁 패턴 유형이 train(8월)과 test(10월)에 <b>모두 존재</b>해, 학습에서 본 유형을 시험에서도 만난다(유형 결손 없음).</p>
+<div class="tblwrap"><table>
+<tr><th>패턴 유형</th><th class="num">train(8월)</th><th class="num">test(10월)</th></tr>
+<tr><td>BIPARTITE</td><td class="num">2,833</td><td class="num">3,931</td></tr>
+<tr><td>CYCLE</td><td class="num">2,158</td><td class="num">4,001</td></tr>
+<tr><td>FAN-IN</td><td class="num">2,287</td><td class="num">4,255</td></tr>
+<tr><td>FAN-OUT</td><td class="num">2,300</td><td class="num">4,525</td></tr>
+<tr><td>GATHER-SCATTER</td><td class="num">2,481</td><td class="num">8,428</td></tr>
+<tr><td>RANDOM</td><td class="num">1,807</td><td class="num">3,038</td></tr>
+<tr><td>SCATTER-GATHER</td><td class="num">4,012</td><td class="num">8,615</td></tr>
+<tr><td>STACK</td><td class="num">3,640</td><td class="num">7,766</td></tr>
+</table></div>
+<p>test에 건수가 더 많은 것은 10월 세탁률(0.137%)이 8월(0.077%)보다 높기 때문이며, <b>모든 유형이 양쪽에 고르게 분포</b>한다.</p>
+
+<h2 id="s15"><span class="n">1-5</span> 클래스 불균형</h2>
+<div class="term"><b>클래스 불균형</b> = 정답(세탁)과 오답(정상)의 비율이 극단적으로 치우친 상태. 여기서는 세탁:정상 = <b>1:796</b>.
+모델이 "전부 정상"이라고만 찍어도 정확도 99.87%가 나오므로, <b>정확도는 무의미</b>하고 별도 지표(PR-AUC·Recall@예산)가 필요하다.</div>
+<p><b>"비율을 고치지 않는다"</b> — 흔한 처방들을 전부 실측 비교한 결과, <b>양성 전량 + 정상 다량(학습 비율 ~4.6%)</b>이 승자였다:</p>
+<p>초기 실험(부스팅 베이스라인)에서 비율을 인위 조정하는 처방들을 대조한 결과, 모두 손해였다:</p>
+<div class="tblwrap"><table>
+<tr><th>시도 (초기 부스팅 베이스라인 기준)</th><th>결과</th><th>판정</th></tr>
+<tr><td>양성 가중치 ×10 (인위 부스트)</td><td class="num">PR-AUC −0.043</td><td class="bad">역효과</td></tr>
+<tr><td>5:5 극단 균형화</td><td class="num">AP −44%</td><td class="bad">기각</td></tr>
+<tr><td>SMOTE (합성 양성 생성)</td><td>—</td><td class="bad">미채택</td></tr>
+</table></div>
+<p>SMOTE 미사용 이유: 세탁은 <b>연결된 거래 구조</b>인데, 보간으로 만든 가짜 거래는 실재하지 않는 관계를 만들어 그래프를 왜곡한다.</p>
+<div class="callout key"><div class="h">최종 TGNN의 불균형 처리 — 다운샘플링 아님</div>
+위 실험이 준 원칙은 <b>"비율을 인위 조정하지 마라"</b>이다. 최종 모델 <b>KYC-TGNN v2는 다운샘플링을 하지 않는다</b> — 8월 전량(5,947만 건)을
+<b>자연 밀도 그대로(0.077%) 60개 서로소 그래프</b>로 나눠 쓰고(3-1), 불균형은 <b>손실 함수의 양성 가중치</b>(<code>pos_weight=300</code>)로 보정한다.
+표본을 조작하지 않고도 희귀 양성을 충분히 학습한다.
+<br><span style="font-size:12.5px;color:var(--muted)">※ 아래 1-6·1-7의 "정상 92만 다운샘플·CSSMC"는 <b>부스팅 베이스라인/초기 탐색</b> 맥락의 결정이며, 최종 TGNN 파이프라인에는 쓰이지 않는다.</span></div>
+<div class="callout key"><div class="h">해석</div>모델이 세탁을 못 배우는 원인은 "세탁이 적어서"가 아니라 "정상의 다양성을 덜 봐서"였다. 세탁을 부풀리는 모든 시도가 손해였다.</div>
+
+<h2 id="s16"><span class="n">1-6</span> 다운샘플링 시도와 결과 <span style="font-size:12px;color:var(--muted);font-weight:400">(부스팅 베이스라인 맥락)</span></h2>
+<div class="callout warn"><div class="h">범위 주의</div>이 절의 다운샘플링 비교는 <b>부스팅 트리 베이스라인</b>과 초기 탐색을 위한 것이다. 최종 TGNN은 다운샘플링 없이 자연 밀도 전량을 쓰므로(1-5, 3-1), 아래는 "왜 정교한 샘플링이 불필요한가"를 보이는 근거로 읽으면 된다.</div>
+<div class="term"><b>다운샘플링</b> = 다수 클래스(정상 거래)를 줄여 학습셋을 만드는 것. 부스팅처럼 전량을 한 번에 올리는 모델에서는 정상을 솎아낸다(세탁은 전량 유지).</div>
+<div class="tblwrap"><table>
+<tr><th>계열</th><th>대표 기법</th><th>원리 / 결과</th></tr>
+<tr><td>① 무작위</td><td>RUS</td><td>정상에서 균등 추첨. 비용 O(n)·단순 → <b class="good">채택</b></td></tr>
+<tr><td>② 경계면 기반</td><td>ENN·Tomek·NearMiss</td><td>경계 근처 표본 삭제. 소수 클래스가 0.13%로 극소라 삭제 대상이 거의 없어 <b class="bad">효과 없음</b></td></tr>
+<tr><td>③ 클러스터 기반</td><td>CSSMC (K-means k=15)</td><td>정상을 군집화해 유형별 층화추출 + 분포차(KLD) 검증. 무작위와 성능차 <b>0.0003</b>(시드 산포 이내) → <b class="bad">미채택</b></td></tr>
+</table></div>
+<p><b>CSSMC 상세:</b> 다수 클래스를 15개 군집으로 나눠 유형별로 골고루 뽑고, 표본과 모집단의 분포 차이(KLD, 0에 가까울수록 닮음)가 최소인 부분집합을 채택하는 정교한 방법이다. 실제 구현해 대조했으나 — CSSMC ≈ 10⁻⁵, 무작위 ≈ 0.000045로 <b>92만 규모에서는 무작위도 이미 사실상 완전한 대표성</b>을 가져 층화 이득이 0이었다(비용만 더 듦).</p>
+
+<h3>그림 — 다운샘플링 3방식이 "어떤 정상 거래를 남기나"</h3>
+<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0;overflow-x:auto">
+<svg viewBox="0 0 860 300" width="100%" style="min-width:680px;font-family:'IBM Plex Sans KR',sans-serif" role="img" aria-label="다운샘플링 3방식 비교">
+  <!-- 공통 설명 -->
+  <text x="10" y="18" style="font-size:12px;fill:var(--muted)">회색=정상(다수, 군집별 크기 다름) · 빨강=세탁(소수) · 진한점=추출된 표본</text>
+
+  <!-- 패널 틀 -->
+  <g>
+  <!-- ① 무작위 -->
+  <text x="30" y="42" style="font-size:13px;font-weight:700;fill:var(--edge)">① 무작위(RUS)</text>
+  <rect x="20" y="50" width="250" height="180" rx="8" fill="none" stroke="var(--line)"/>
+  <!-- 군집 배경(크기 다름) -->
+  <ellipse cx="80" cy="100" rx="42" ry="34" fill="var(--chip)"/>
+  <ellipse cx="180" cy="95" rx="30" ry="26" fill="var(--chip)"/>
+  <ellipse cx="90" cy="175" rx="24" ry="20" fill="var(--chip)"/>
+  <ellipse cx="200" cy="180" rx="14" ry="12" fill="var(--chip)"/>
+  <!-- 남긴 표본: 면적비례(큰 군집에 몰림, 작은 군집 놓칠 위험) -->
+  <g fill="var(--edge)"><circle cx="70" cy="95" r="2.6"/><circle cx="90" cy="110" r="2.6"/><circle cx="85" cy="88" r="2.6"/><circle cx="100" cy="100" r="2.6"/><circle cx="65" cy="108" r="2.6"/><circle cx="175" cy="90" r="2.6"/><circle cx="188" cy="100" r="2.6"/><circle cx="185" cy="88" r="2.6"/><circle cx="88" cy="172" r="2.6"/></g>
+  <circle cx="200" cy="180" r="3" fill="none" stroke="var(--bad)" stroke-dasharray="2 2"/>
+  <text x="150" y="248" style="font-size:10px;fill:var(--muted);text-anchor:middle">균등 추첨 → 큰 군집에 표본 몰림</text>
+  <text x="150" y="262" style="font-size:10px;fill:var(--muted);text-anchor:middle">작은 군집(점선) 놓칠 위험 · 92만↑선 무해</text>
+  </g>
+
+  <!-- ② CSSMC 군집층화 -->
+  <g>
+  <text x="305" y="42" style="font-size:13px;font-weight:700;fill:var(--accent)">② CSSMC(군집 비례층화)</text>
+  <rect x="295" y="50" width="250" height="180" rx="8" fill="none" stroke="var(--accent)"/>
+  <ellipse cx="355" cy="100" rx="42" ry="34" fill="var(--accent-soft)"/>
+  <ellipse cx="455" cy="95" rx="30" ry="26" fill="var(--accent-soft)"/>
+  <ellipse cx="365" cy="175" rx="24" ry="20" fill="var(--accent-soft)"/>
+  <ellipse cx="475" cy="180" rx="14" ry="12" fill="var(--accent-soft)"/>
+  <!-- 남긴 표본: 군집 크기 비례(모든 군집에서 대표 추출) -->
+  <g fill="var(--accent)"><circle cx="345" cy="95" r="2.6"/><circle cx="365" cy="110" r="2.6"/><circle cx="360" cy="88" r="2.6"/><circle cx="335" cy="105" r="2.6"/><circle cx="450" cy="90" r="2.6"/><circle cx="462" cy="100" r="2.6"/><circle cx="360" cy="172" r="2.6"/><circle cx="370" cy="180" r="2.6"/><circle cx="475" cy="180" r="2.6"/></g>
+  <text x="420" y="248" style="font-size:10px;fill:var(--muted);text-anchor:middle">군집 크기 비례 → 유형 구성비 보존</text>
+  <text x="420" y="262" style="font-size:10px;fill:var(--muted);text-anchor:middle">작은 군집도 대표 포함(KLD 최소)</text>
+  </g>
+
+  <!-- ③ 경계면 -->
+  <g>
+  <text x="580" y="42" style="font-size:13px;font-weight:700;fill:var(--warn)">③ 경계면(ENN/NearMiss)</text>
+  <rect x="570" y="50" width="270" height="180" rx="8" fill="none" stroke="var(--line)"/>
+  <ellipse cx="640" cy="105" rx="46" ry="38" fill="var(--chip)"/>
+  <ellipse cx="750" cy="150" rx="40" ry="34" fill="var(--chip)"/>
+  <!-- 세탁(빨강) 몇 개 -->
+  <g fill="var(--bad)"><circle cx="695" cy="128" r="3"/><circle cx="705" cy="140" r="3"/><circle cx="688" cy="118" r="3"/></g>
+  <!-- 남긴 표본: 경계(세탁 근처)만 -->
+  <g fill="var(--warn)"><circle cx="678" cy="125" r="2.6"/><circle cx="672" cy="132" r="2.6"/><circle cx="715" cy="135" r="2.6"/><circle cx="720" cy="145" r="2.6"/><circle cx="700" cy="150" r="2.6"/></g>
+  <text x="705" y="248" style="font-size:10px;fill:var(--muted);text-anchor:middle">세탁 경계 근처 정상만 남김</text>
+  <text x="705" y="262" style="font-size:10px;fill:var(--warn);text-anchor:middle">세탁 0.13%로 극소 → 삭제대상 거의 없어 무효</text>
+  </g>
+</svg>
+</div>
+<p style="font-size:12.5px;color:var(--muted)">세 방식 모두 <b>세탁(빨강)은 전량 유지</b>하고 정상만 줄인다. ①은 단순·빠름(대규모선 대표성 충분), ②는 유형 구성비를 보존(정교하나 대규모선 ①과 동등), ③은 경계 표본만 남기나 이 데이터처럼 양성이 극소(0.13%)면 삭제할 경계 표본이 거의 없어 무효. <b>실측 결론(1-6): 대규모에선 ①≈②, ③ 무효.</b></p>
+
+<h3>다운샘플 대표성 검증 — "표본이 원본을 얼마나 잘 대표하는가"</h3>
+<p>다운샘플 품질은 <b>추출 표본의 분포가 원본(정상 전체)과 얼마나 닮았는지</b>로 검증한다. 세 가지 지표를 피처 16종 각각에 대해 측정하고, CSSMC와 무작위를 대조했다.</p>
+<div class="term">
+<b>KLD (쿨백-라이블러 발산)</b> — 두 분포가 다른 정도. 원본·표본의 피처 분포를 각각 히스토그램(50칸)으로 그려 겹침을 잰다. <b>0에 가까울수록 닮음</b>. 비대칭(원본||표본 방향).<br>
+<b>JS 발산 (옌센-섀넌)</b> — KLD의 <b>대칭·유계(0~1) 버전</b>. 방향에 무관하고 해석이 안정적. 역시 0이면 동일.<br>
+<b>KS 통계 (콜모고로프-스미르노프)</b> — 두 분포의 <b>누적분포 최대 격차</b>. 0이면 완전 일치, "같은 분포에서 나왔나"의 비모수 검정.<br>
+<b>군집 구성비 보존(L1)</b> — 원본의 15개 군집 비율 vs 표본의 군집 비율 차이 합. 층화가 유형 구성을 지켰는지 직접 확인.</div>
+<div class="tblwrap"><table>
+<tr><th>지표 (16피처 평균)</th><th class="num">CSSMC</th><th class="num">무작위</th><th>해석</th></tr>
+<tr><td>KLD (↓)</td><td class="num">0.000151</td><td class="num">0.000153</td><td>둘 다 ≈0, 사실상 동일</td></tr>
+<tr><td>JS 발산 (↓)</td><td class="num">0.000037</td><td class="num">0.000037</td><td>완전 동일</td></tr>
+<tr><td>KS 통계 (↓)</td><td class="num">0.0018</td><td class="num">0.0019</td><td>둘 다 "같은 분포" 수준</td></tr>
+<tr><td>군집 구성비 보존(L1)</td><td class="num">0.0053</td><td>—</td><td>층화 정확(비율 보존)</td></tr>
+</table></div>
+<div class="callout key"><div class="h">검증 결과 — 대표성은 완벽하나 무작위와 차이 없음</div>
+16개 피처 전부 KLD≤0.0004(대부분 0.0001~0.0002), KS≤0.004로 <b>표본이 원본 정상과 거의 완전히 겹친다</b> — CSSMC 다운샘플은 대표성 검증을 통과한다. 군집 구성비도 오차 0.0053으로 층화가 의도대로 작동. 그러나 <b>무작위 추출과 수치가 동률</b>(피처별 우열도 방향성 없는 노이즈)이라, 92만 규모에서는 정교한 층화의 추가 이득이 없다.</div>
+<div class="callout warn"><div class="h">⚠️ 중요 — 이 검증만으로는 GNN 성능을 예측 못 한다</div>
+KLD/JS/KS는 <b>"표본의 분포 품질"</b>만 본다. CSSMC는 이 검증을 모두 통과했지만, <b>GNN 성능은 자연밀도에 −0.07 미달</b>했다(아래). 이유는 이 지표들이 못 보는 <b>밀도 왜곡</b>(train 4.77% vs test 0.14%)과 <b>그래프 연결성 파괴</b>(정상 98.5% 삭제) 때문이다. 즉 <b>GNN 다운샘플 검증은 전통적 대표성 지표에 더해 밀도·연결성(외딴엣지·평균차수·연결성분, 3-1)까지 봐야</b> 진짜 품질이 드러난다.</div>
+
+<h3>CSSMC를 TGNN에 직접 적용한 실측 (다운샘플 후 학습)</h3>
+<p>"부스팅이 아니라 <b>TGNN</b>을 CSSMC 다운샘플셋으로 학습하면?"을 직접 실측했다. 방법을 명시하면:</p>
+<ul>
+<li><b>군집화 기준</b>: 정상 거래를 <b>표준화된 엣지 피처 16종</b>(lean11 리듬·이력 + KYC 5)으로 K-means(k=15) 군집화 — 모델이 실제로 보는 표현공간에서 "거래 유형"(금액·리듬·관계·위험도가 비슷한 거래)을 나눈다. 라벨은 쓰지 않음(비지도).</li>
+<li><b>층화추출 방식</b>: 각 군집에서 <b>군집 크기에 비례</b>해 뽑아 정상 거래의 유형 구성비를 그대로 보존(총 92만). 실측 군집 구성비는 매우 불균등(최대 c3 25.7% ~ 최소 c5 0.7%)이라, 단순 무작위가 놓칠 수 있는 소수 유형까지 비례로 담긴다.</li>
+<li><b>근거</b>: 비례 층화는 표본↔모집단 분포차(KLD)를 최소화해 대표성을 보장한다(CSSMC 논문 방법론). 양성은 전량 유지 → 학습셋 ~96.6만·밀도 4.77%(1:20).</li>
+</ul>
+<p><b>⚠️ 공정 비교를 위한 pos_weight 교정:</b> CSSMC는 양성 비율을 60배(0.077%→4.77%) 높이므로, 자연밀도용 손실 가중치
+<code>pos_weight=300</code>을 그대로 쓰면 양성이 <b>이중으로 과강조</b>돼 랭킹이 부당하게 망가진다(초기 실측 0.34는 이 미조정 탓).
+밀도에 맞춰 <code>pos_weight</code>를 낮추면(≈5) 공정한 값이 나온다:</p>
+<div class="tblwrap"><table>
+<tr><th>학습 방식</th><th class="num">train 밀도</th><th class="num">pos_weight</th><th class="num">무작위 채점</th><th class="num">val AP</th></tr>
+<tr><td>CSSMC 다운샘플 (미조정)</td><td class="num">4.77%</td><td class="num">300</td><td class="num bad">0.343</td><td class="num">0.852</td></tr>
+<tr><td><b>CSSMC 다운샘플 (교정)</b></td><td class="num">4.77%</td><td class="num">5</td><td class="num warn">0.560</td><td class="num">0.870</td></tr>
+<tr><td>CSSMC 다운샘플</td><td class="num">4.77%</td><td class="num">1</td><td class="num">0.529</td><td class="num">0.869</td></tr>
+<tr><td>자연 밀도 전량 (최종)</td><td class="num">0.077%</td><td class="num">300</td><td class="num good">0.635</td><td class="num">0.462</td></tr>
+</table></div>
+<div class="callout warn"><div class="h">결과 — 교정해도 자연밀도에 −0.067 열위 (다운샘플의 구조적 한계)</div>
+pos_weight를 밀도에 맞추자 <b>0.343 → 0.560으로 회복</b>됐다(초기 붕괴는 상당 부분 손실가중 미조정 탓). 그러나 최선(pw=5)으로도
+자연밀도 전량(<b>0.635</b>)보다 <b>약 −0.07 낮다</b>. 원인은 두 가지 다운샘플 부작용이다:
+① <b>밀도 왜곡</b> — train 4.77% vs test 0.14%라, GNN이 학습한 "그래프 속 세탁 밀도"가 실전과 달라 랭킹이 흐트러짐.
+② <b>연결성 파괴</b> — 정상의 98.5%를 지우면 message-passing 그래프가 성겨져 구조 신호가 약해짐.
+<br><b>양성예측률은 세 경우 다 정상(0.001)</b>이라 "양성 과예측"이 아니라 <b>랭킹 품질</b>이 떨어진 것이다. 또한 <b>val AP는 CSSMC가 항상 높지만(0.85+ vs 0.46) test는 낮다</b> — 다운샘플 검증셋(4.77%)이 실전(0.14%)을 과대평가하므로 <b>⚠️ val AP로 판단하면 안 된다.</b>
+<br>정리: <b>"양성 비율을 높이면 더 잘 찾는다"는 GNN 랭킹에선 성립하지 않는다</b> — 손실 가중(pos_weight)이 이미 불균형을 처리하므로 데이터 비율까지 높이는 건 실익이 없고 그래프 밀도·연결성만 왜곡한다.</div>
+
+<h3>튜닝 여지 검증 — 다운샘플 비율 스윕</h3>
+<p>"다운샘플을 완화하면(정상을 더 남기면) 성능이 오를까?"를 실측했다. 각 밀도에서 <b>실효 양성강조(pos_weight)를 자연밀도와 동일하게 스케일</b>하고 <b>그래프 크기도 자연과 같게(~99만) 고정</b>해, '밀도'만 변수로 격리했다. 채점은 무작위순열.</p>
+<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0">
+<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">← 다운샘플 강함(밀도↑) · 오른쪽으로 갈수록 자연밀도에 근접 · 막대=PR-AUC</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+  <div style="display:flex;align-items:center;gap:10px;font-size:12.5px"><span style="width:120px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--muted)">4.77% (정상92만)</span><div style="flex:1;background:var(--barbg);border-radius:5px;height:22px"><div style="width:51.2%;height:100%;background:var(--bad);border-radius:5px"></div></div><span style="width:52px;font-family:'IBM Plex Mono',monospace;font-weight:600">0.512</span></div>
+  <div style="display:flex;align-items:center;gap:10px;font-size:12.5px"><span style="width:120px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--muted)">0.99% (460만)</span><div style="flex:1;background:var(--barbg);border-radius:5px;height:22px"><div style="width:58.3%;height:100%;background:var(--warn);border-radius:5px"></div></div><span style="width:52px;font-family:'IBM Plex Mono',monospace;font-weight:600">0.583</span></div>
+  <div style="display:flex;align-items:center;gap:10px;font-size:12.5px"><span style="width:120px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--muted)">0.40% (1150만)</span><div style="flex:1;background:var(--barbg);border-radius:5px;height:22px"><div style="width:61.5%;height:100%;background:var(--warn);border-radius:5px"></div></div><span style="width:52px;font-family:'IBM Plex Mono',monospace;font-weight:600">0.615</span></div>
+  <div style="display:flex;align-items:center;gap:10px;font-size:12.5px"><span style="width:120px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--muted)">0.20% (2300만)</span><div style="flex:1;background:var(--barbg);border-radius:5px;height:22px"><div style="width:62.7%;height:100%;background:var(--accent);border-radius:5px"></div></div><span style="width:52px;font-family:'IBM Plex Mono',monospace;font-weight:600">0.627</span></div>
+  <div style="display:flex;align-items:center;gap:10px;font-size:12.5px"><span style="width:120px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--accent);font-weight:600">0.077% (전량=자연)</span><div style="flex:1;background:var(--barbg);border-radius:5px;height:22px"><div style="width:62.7%;height:100%;background:var(--accent);border-radius:5px"></div></div><span style="width:52px;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--accent)">0.627</span></div>
+</div>
+</div>
+<div class="callout key"><div class="h">결론 — 자연밀도가 상한. 튜닝으로 넘어설 여지 없음</div>
+PR-AUC는 다운샘플을 완화할수록 <b>0.512 → 0.583 → 0.615 → 0.627(자연밀도와 동률)</b>로 <b>단조 수렴</b>한다. 즉 다운샘플 튜닝은
+성능을 <b>자연밀도에 가깝게 회복</b>시킬 뿐 넘어서지 못하며, 밀도 0.2%까지 완화하면 사실상 자연과 같아진다 — 그런데 그때는 정상을 2,300만이나 남겨야 해
+<b>"데이터 축소"라는 다운샘플의 존재 이유가 사라진다</b>. 우리는 서로소 그래프로 이미 전량을 감당하므로, 결론은 명확하다: <b>다운샘플은 어떻게 튜닝해도 자연밀도 전량 학습을 이길 수 없다.</b></div>
+
+<h3>정리 — CSSMC의 어떤 손잡이도 자연밀도를 못 넘는다 (4종 실측)</h3>
+<p>다운샘플이 성능을 낼 수 있는 네 가지 손잡이(pos_weight·양성비율·군집수·밀도별 pos_weight)를 모두 격리 실측했다:</p>
+<div class="tblwrap"><table>
+<tr><th>조정 손잡이</th><th>실측 결과</th><th>판정</th></tr>
+<tr><td><b>① pos_weight</b> (밀도 4.77% 고정)</td><td>pw1→0.529 · pw5(매칭)→0.560 · pw300(과함)→0.343</td><td class="bad">과하면 역효과</td></tr>
+<tr><td><b>② 양성비율↓ + pos_weight↑(매칭)</b></td><td>0.512 → 0.583 → 0.615 → 0.627로 <b>자연밀도에 수렴</b></td><td class="warn">상한 0.627 못 넘음</td></tr>
+<tr><td><b>③ 군집수 K</b> (밀도·pw 고정)</td><td>K5→0.557 · K15→0.550 · K50→0.547</td><td class="bad">무효(불변)</td></tr>
+<tr><td><b>④ 밀도1%(100:1) + pos_weight 튜닝</b></td><td>pw23→0.571 · pw60(최적)→0.576 · pw150→0.561</td><td class="warn">소폭 개선, 상한 −0.05</td></tr>
+</table></div>
+<div class="callout key"><div class="h">4종 종합 — 자연밀도가 상한</div>
+<b>①</b> pos_weight는 밀도 매칭이 최적, 과하면 역효과. <b>②</b> 양성비율을 낮추고 pos_weight를 맞추면 자연밀도로 수렴하나 못 넘음. <b>③</b> 군집수는 무효(무작위 추출도 이미 대표성 완전, KLD≈0). <b>④</b> 완화 밀도(1%)에서 pos_weight를 약간 올리면 소폭 개선(0.576)되나 여전히 자연밀도(0.635)에 약 −0.06 미달.
+<br>네 손잡이 어느 것도 <b>자연밀도 전량 학습을 넘지 못한다.</b> 근본 원인은 샘플링 품질이 아니라 다운샘플이 만드는 <b>그래프 밀도·연결성 왜곡</b>이며, 이를 없애는 유일한 길은 밀도를 자연으로 되돌리는 것(=다운샘플 안 함)이다. <span style="font-size:12.5px;color:var(--muted)">※ 점수·prior 보정 계열은 단조 변환이라 랭킹 지표(PR-AUC)엔 무효.</span></div>
+
+<h2 id="s17"><span class="n">1-7</span> 다운샘플링은 필요한가</h2>
+<div class="callout key"><div class="h">최종 TGNN에는 불필요 — 자연 밀도 전량 사용</div>
+<b>최종 모델(TGNN)은 train도 다운샘플링하지 않는다.</b> 8월 전량(5,947만)을 60 서로소 그래프로 나눠 자연 밀도 그대로 학습하며(메모리는 그래프 단위로 분할해 해결), 불균형은 <code>pos_weight</code>로 보정한다(3-1). 다운샘플링·CSSMC는 <b>부스팅 베이스라인</b> 맥락이며, 부스팅에선 무작위와 층화 차이가 0(1-6)이었다. 더 결정적으로 <b>TGNN에 CSSMC 다운샘플(1:20)을 직접 적용하면, pos_weight를 밀도에 맞게 교정해도 PR-AUC 0.560으로 자연밀도(0.635)에 약 −0.07 못 미친다</b>(1-6 실측) — 밀도 왜곡 + 연결성 파괴 때문. 즉 TGNN에서는 다운샘플이 불필요할 뿐 아니라 <b>손해</b>다.
+<br>공통 원칙은 하나다 — <b>test는 어느 모델이든 절대 다운샘플링하지 않는다</b>(비율을 인위 조정하면 실전 성능을 못 잼). 자연 비율 100만 표본이 전체 5,482만과 동일 성적임을 3개 모델에서 검증했다.</div>
+
+<!-- ══════════ STAGE 2 ══════════ -->
+<div class="stage"><span class="num">2</span><div><div class="t">피처 생성</div><div class="s">prep featmat — 엣지·노드 피처와 누수 차단</div></div></div>
+
+<h2 id="s21"><span class="n">2-1</span> 엣지 피처행렬(featmat)이란 — 무엇이고 왜 필요한가</h2>
+<div class="term"><b>엣지(edge)</b> = 그래프에서 "거래" 하나(송신 계좌 → 수취 계좌를 잇는 선). <b>피처(feature)</b> = 모델이 읽는 숫자 특징. <b>featmat</b> = 모든 거래(엣지)에 대해 이 숫자 특징들을 미리 계산해 저장한 큰 표(행렬).</div>
+<p><b>왜 필요한가:</b> 리듬·이력 같은 가공 피처는 계산이 무겁다(1.8억 건 정렬+집계). 매 학습 에폭마다 다시 계산하면 시간이 폭발한다. 그래서 <b>한 번 계산해 디스크에 저장</b>해 두고, 학습·채점 때 필요한 행만 꺼내 쓴다.</p>
+<div class="callout"><div class="h">메모리 관리 — memmap</div>
+전체 featmat은 179.7M × 81열 = <b>58GB</b>로 메모리(한도 27GB)에 다 못 올린다. 최종 모델은 필요한 <b>11열만 담은 경량본(7.9GB)</b>을 쓰고, 그것도 <b>memmap</b>(<span class="mono">memory-map</span> — 파일을 배열처럼 열어두고 접근하는 부분만 그때그때 읽는 기법)으로 다뤄 메모리를 아낀다.</div>
+
+<h2 id="s22"><span class="n">2-2</span> 미래 참조(데이터 누수) 차단 설계</h2>
+<div class="term"><b>데이터 누수(leakage)</b> = 예측 시점에 알 수 없는 "미래 정보"가 피처에 몰래 섞여, 시험 성적이 실제보다 부풀려지는 현상. 시험장에서 답안지를 미리 본 것과 같다.</div>
+<p>모든 피처를 <b>"그 거래 시각 이전만 보는 인과 집계"</b>로 설계해 누수를 원천 차단했다:</p>
+<ol>
+<li><b>리듬 피처</b>(직전 거래 간격 Δt, 최근 1시간 거래 수): 자기 자신을 제외한 <b>과거만</b> 집계.</li>
+<li><b>기간 고정 스냅샷</b>(쌍 누적 거래수 pa_cnt): train(8월) 집계를 매핑하고, 9월 gap이 사이를 끊어 test로 새지 않게 함.</li>
+<li><b>위험도 인코딩</b>(국가·유형쌍): <b>8월 라벨로만</b> 계산하고 10월엔 그 값을 매핑만 함.</li>
+</ol>
+<div class="callout key"><div class="h">누수가 없음을 실측으로 확인</div>
+누수가 있었다면 세탁 거래의 pa_cnt가 자기반복으로 <b>높게</b> 나와야 한다. 실제 10월 세탁의 pa_cnt(표준화)는 <b class="good">−2.69</b>로 정상(−0.01)보다 오히려 <b>낮았다</b>(신규 쌍) — 누수 없음의 직접 증거. 절대 날짜(달력) 피처는 train→test 외삽 위험 때문에 아예 배제했다.</div>
+
+<h2 id="s23"><span class="n">2-3</span> 전처리 기법과 전체 피처 목록</h2>
+<p><b>사용한 기법:</b> 2패스 청크 처리(16GB CSV를 메모리 초과 없이 두 번 훑기) · 시간정렬(argsort) · 벡터화 리듬 집계(정렬+이진탐색으로 1.8억 건 처리) · target-encoding(범주를 위험도 숫자로) · PageRank(계좌 중심성) · 창별 재집계(누수 차단) · 복합키 정규화 조인(KYC).</p>
+<p>최종 모델 <b>KYC-TGNN v2</b>는 <b>엣지 피처 16종 + 계좌(노드) 피처 24종</b>을 쓴다.</p>
+<h3>엣지(거래) 피처 16종 = lean 11 + KYC 5</h3>
+<div class="grid2">
+<div class="fcard"><div class="nm">쌍_과거건수</div><div class="ds">이 송금→수취 쌍의 과거 거래 수. 관계의 깊이(되풀이 송금)</div></div>
+<div class="fcard"><div class="nm">쌍_Δt</div><div class="ds">같은 쌍의 직전 거래로부터 흐른 시간. 진행 중 신호</div></div>
+<div class="fcard"><div class="nm">쌍_1h건수</div><div class="ds">같은 쌍의 최근 1시간 거래 수. 몰아치기(burst)</div></div>
+<div class="fcard"><div class="nm">송신_Δt</div><div class="ds">송신 계좌의 직전 발신 간격. 휴면 계좌 급발진</div></div>
+<div class="fcard"><div class="nm">송신_1h건수</div><div class="ds">송신 계좌 최근 1시간 발신 수. FAN-OUT 폭발</div></div>
+<div class="fcard"><div class="nm">수신_Δt</div><div class="ds">수신 계좌의 직전 수신 간격. 수집 개시 신호</div></div>
+<div class="fcard"><div class="nm">수신_1h건수</div><div class="ds">수신 계좌 최근 1시간 수신 수. FAN-IN 폭주</div></div>
+<div class="fcard"><div class="nm">통화_z</div><div class="ds">그 통화의 평소 분포 대비 금액 크기(z-점수). 이상 금액</div></div>
+<div class="fcard"><div class="nm">pa_cnt</div><div class="ds">쌍의 train 누적 거래수(스냅샷). 관계 이력</div></div>
+<div class="fcard"><div class="nm">pa_rev_cnt</div><div class="ds">역방향(B→A) 거래수. CYCLE·왕복 근사</div></div>
+<div class="fcard"><div class="nm">pa_recency</div><div class="ds">쌍의 마지막 거래로부터 경과. 죽은 관계의 부활</div></div>
+<div class="fcard" style="border-color:var(--accent)"><div class="nm">same_entity</div><div class="ds"><b>KYC</b> — 송·수취가 같은 소유주(자기 계좌 간 이동)</div></div>
+<div class="fcard" style="border-color:var(--accent)"><div class="nm">same_country</div><div class="ds"><b>KYC</b> — 같은 국가 내 거래 여부</div></div>
+<div class="fcard" style="border-color:var(--accent)"><div class="nm">송신/수신 국가위험</div><div class="ds"><b>KYC</b> — 국가별 세탁 위험도(8월 인코딩) ×2</div></div>
+<div class="fcard" style="border-color:var(--accent)"><div class="nm">유형쌍_위험</div><div class="ds"><b>KYC</b> — 엔티티 유형 조합(법인↔개인 등)의 위험도</div></div>
+</div>
+<h3>계좌(노드) 피처 24종 = 그래프 14 + KYC 10</h3>
+<p><b>그래프 14</b>: 송/수신 건수·총액, 고유 송/수취 상대 수, 자기이체 수, 왕복 상대 수, 순유출 비율, 평균 송/수취액, 상호성 비율, <b>PageRank</b>(돈이 모이는 중심성 — 수집책 계좌 식별), log 총송금액. 각각 허브·통과·수집 계좌 등을 드러낸다.</p>
+<p><b>KYC 10</b>: 엔티티 유형 one-hot(7) + log 엔티티 계좌수(1) + <b>엔티티 발신/수신 다양성</b>(2, "이 엔티티가 거래한 서로 다른 엔티티 수"). "많은 계좌를 열어두고 일부만 굴리는" 구조를 포착한다.</p>
+<div class="callout warn"><div class="h">데이터 인공물 피처 제거 (payment_format·환전여부)</div>
+결제수단 <b>ACH</b>는 세탁 89% vs 정상 12%(+76.6pp)로 판별력이 컸지만, 이는 생성기가 패턴 세탁을 ACH로 몰아넣은 <b>인공물</b>이다(실제 세탁범은 결제수단을 바꾼다). <b>환전 여부</b>는 세탁 0% vs 정상 1.57%로 근거가 역방향이었다. 두 피처를 제거해 −0.022를 감수하고 <b>일반화</b>를 택했다.</div>
+
+<!-- ══════════ STAGE 3 ══════════ -->
+<div class="stage"><span class="num">3</span><div><div class="t">TGNN 학습·채점·평가</div><div class="s">final_pipeline — 그래프·모델·평가</div></div></div>
+
+<h2 id="s31"><span class="n">3-1</span> 그래프 구성(무작위 서로소)과 패턴 깨짐</h2>
+<div class="term"><b>GNN</b>은 거래 하나를 판정할 때 그 거래만 보지 않고 <b>그래프 속 이웃(연결된 계좌·거래)</b>을 함께 본다. 그래서 학습을 위해 데이터를 조각(<b>미니배치</b>=한 번에 처리하는 묶음)으로 나눌 때, 그 조각이 곧 "모델이 보는 세상"이 된다.</div>
+<div class="term"><b>자연 밀도</b> = 조각 안의 세탁:정상 비율을 실전과 같게(원본 그대로) 두는 것. <b>서로소 분할</b> = 8월 전체를 겹침·누락 없이 60조각으로 나눔.</div>
+<p><b>우려:</b> "무작위로 뽑으면 여러 날에 걸친 패턴 그래프가 조각나지 않는가?" — 실험으로 검증했다.</p>
+<div class="tblwrap"><table>
+<tr><th>그래프 구성 방식(커버리지 통제)</th><th class="num">PR-AUC</th><th>판정</th></tr>
+<tr><td>서로소 <b>무작위</b> 분할</td><td class="num good">0.642</td><td class="good">채택</td></tr>
+<tr><td>달력 일(日) 단위 창(패턴 보존)</td><td class="num">0.600</td><td>기각</td></tr>
+<tr><td>12시간 연속 창(패턴 보존)</td><td class="num">0.592</td><td>기각</td></tr>
+</table></div>
+<div class="callout key"><div class="h">결론</div>
+패턴을 <b>온전히 보존</b>하는 시간 연속 방식이 오히려 <b>더 낮았다</b>. 패턴 문맥은 이미 <b>가공 피처</b>(전체 이력 기반, 2단계)가 공급하므로, 그래프 내 패턴 완전성보다 "여러 시기가 섞인 다양성"이 더 값지다. 대표성도 검증됨(무작위 표본과 원본의 KLD ≈ <b>0.00005</b>, 시드 3반복 산포 ±0.005). 패턴 조각화는 이 설계의 병목이 아니다.</div>
+
+<h2 id="s32"><span class="n">3-2</span> TGNN이란 무엇인가</h2>
+<div class="term"><b>GNN</b>(Graph Neural Network) = 그래프(점=계좌, 선=거래)에서 각 점이 <b>이웃의 정보를 모아</b> 자신의 표현을 갱신하는 신경망. "친구를 보면 그 사람을 안다"를 계산으로 구현한 것.</div>
+<div class="term"><b>TGNN</b> = <b>Transformer 기반 GNN</b>(그래프 트랜스포머, Shi et al. 2021 UniMP). 일반 GNN이 이웃을 <b>균등하게</b> 합치는 것과 달리, <b>어텐션</b>(어느 이웃이 중요한지 가중치를 학습)으로 이웃별 중요도를 다르게 준다. 게다가 <b>엣지 피처(거래의 리듬·위험도)를 어텐션에 직접 주입</b>해, 세탁 신호가 실린 "거래 자체"를 판단에 반영한다.</div>
+<p>우리 모델은 <b>2-Hop(2층)</b>이다 — 각 계좌가 "이웃"뿐 아니라 "이웃의 이웃"까지 2단계 정보를 모은다(수집책→중간책→최종 구조를 보기 위함).</p>
+
+<h3>TGNN vs 일반 GNN — 무엇이 다른가</h3>
+<p>"GNN"은 큰 범주이고 TGNN은 그중 한 종류다. 모든 GNN은 "이웃 정보를 모은다"는 점은 같고, <b>어떻게 모으느냐</b>가 다르다.</p>
+<div class="tblwrap"><table>
+<tr><th>구분</th><th>일반 GNN (GCN·GraphSAGE)</th><th>TGNN (그래프 트랜스포머)</th></tr>
+<tr><td>이웃 가중치</td><td>고정·균등(모든 이웃 같은 비중, 또는 차수 기반)</td><td><b>어텐션으로 학습</b>(중요한 이웃에 더 큰 비중)</td></tr>
+<tr><td>엣지(거래) 피처</td><td>대부분 못 씀(노드 정보만)</td><td><b>어텐션에 직접 주입</b>(거래 리듬·위험도 반영)</td></tr>
+<tr><td>세탁 탐지</td><td>구조만 봄</td><td>구조 + <b>거래 자체의 신호</b></td></tr>
+</table></div>
+<p>비유하면, 일반 GNN은 "이웃 모두의 의견을 똑같이 평균"내고, TGNN은 "누구 말이 중요한지 판단해 가중 평균"한다. 세탁 신호는 <b>거래(엣지)에 실려 있으므로</b>(리듬·금액·관계·위험도), 엣지를 못 쓰는 일반 GNN보다 TGNN이 유리하다. 5개 구조를 실전 비율에서 대조한 결과 TGNN이 최고였다:</p>
+<div class="tblwrap"><table>
+<tr><th>구조</th><th class="num">PR-AUC (초기, 실전 비율)</th></tr>
+<tr><td><b>TGNN</b> (그래프 트랜스포머)</td><td class="num good">0.204 → 개선 후 최종 0.6352</td></tr>
+<tr><td>GATv2</td><td class="num">0.153</td></tr>
+<tr><td>GraphSAGE</td><td class="num">0.135</td></tr>
+<tr><td>GINe</td><td class="num">0.071</td></tr>
+<tr><td>GCN</td><td class="num">0.061</td></tr>
+</table></div>
+<div class="callout key"><div class="h">자연밀도 학습(3-1)은 TGNN 전용이 아니다 — GNN 일반의 성질</div>
+"자연밀도 학습"과 "TGNN 선택"은 <b>서로 다른 축</b>이다. ⑴ <b>TGNN 선택</b>은 "어떤 GNN 구조냐"(어텐션·엣지피처), ⑵ <b>자연밀도</b>는 "학습 그래프를 어떻게 구성하냐"의 문제다.
+프레임 의존성 붕괴(밀도 불일치 시 성능 폭락)는 위 <b>5개 구조 전부에서</b> 나타났다 — 즉 "학습·배포 그래프 밀도를 맞춰야 한다"는 건 <b>모든 GNN에 공통</b>이지 TGNN 전용이 아니다. 어떤 GNN이든 이웃을 모아 판정하므로 그래프 밀도에 민감하다.
+정리: <b>자연밀도는 GNN이라면 다 필요한 처방</b>이고, TGNN은 그와 독립적으로 "엣지 신호를 잘 쓰는 구조"라 채택한 것이다. 두 결정은 orthogonal(독립)하다.</div>
+<span style="font-size:12.5px;color:var(--muted)">※ 용어 주의: 문헌의 "TGNN"은 <b>T=Transformer</b>(우리 경우)와 <b>T=Temporal</b>(시간그래프 전용)의 두 뜻이 있다. 본 프로젝트는 Transformer 기반(TransformerConv)이며, 시간 정보는 별도 리듬 피처로 넣는다.</span>
+
+<h3>TGNN 내부 구조 상세 (KYCTransformerGNN)</h3>
+<p>하이퍼파라미터: 노드 24차원 · 엣지 16차원 · 은닉 128 · 어텐션 헤드 2. 레이어별 흐름은 다음과 같다.</p>
+<div class="flow">입력:
+  x          노드 피처   (계좌수 N × 24)   ← 그래프14 + KYC10
+  edge_index 연결 구조   (2 × 엣지수 E)    ← [송신 node_id ; 수신 node_id]
+  edge_attr  엣지 피처   (E × 16)         ← lean11 + KYC5
+
+① conv1: TransformerConv(24 → 64×2heads = 128, edge_dim=16) → ReLU
+         각 계좌가 1-hop 이웃 정보를 어텐션으로 수집          → h (N × 128)
+② conv2: TransformerConv(128 → 64×2heads = 128, edge_dim=16) → ReLU
+         1-hop 임베딩을 다시 전파 = 2-hop(이웃의 이웃)까지     → h (N × 128)
+③ 판정 헤드 (거래별):
+         concat[ h[송신](128) · h[수신](128) · edge_attr(16) ] = 272
+         → Linear(272→128) → ReLU → Linear(128→1) → sigmoid → 세탁확률</div>
+<p><b>TransformerConv 내부(어텐션)</b> — 각 층에서 거래 j→i마다:</p>
+<ol>
+<li><b>어텐션 점수</b>: 수신의 query와 송신의 key를 비교하되 <b>엣지 피처를 key에 더함</b> — <span class="mono">α = softmax( (W<sub>q</sub>·h<sub>i</sub>)·(W<sub>k</sub>·h<sub>j</sub> + W<sub>e</sub>·e<sub>ij</sub>) / √d )</span></li>
+<li><b>메시지</b>: 값(value)에도 엣지 피처를 더해 전달 — <span class="mono">α · (W<sub>v</sub>·h<sub>j</sub> + W<sub>e</sub>·e<sub>ij</sub>)</span></li>
+<li><b>집계 + self-path</b>: <span class="mono">h<sub>i</sub>' = W<sub>root</sub>·h<sub>i</sub> + Σ α·(메시지)</span> — 이웃이 없어도 자기 정보로 판정 가능(성긴 그래프 대응)</li>
+<li><b>멀티헤드(2)</b>: 위를 2세트 병렬 계산 후 이어붙임(각 64 × 2 = 128)</li>
+</ol>
+<div class="callout key"><div class="h">핵심 — 엣지 피처가 어텐션의 key·value 양쪽에 주입된다</div>
+"거래의 리듬·위험도"(엣지 피처)가 <b>이웃 가중치 계산(key)</b>과 <b>메시지 내용(value)</b> 둘 다에 반영된다 — 일반 GNN이 못 하는 부분이다. 게다가 ③ 판정 헤드에서 <b>edge_attr를 한 번 더 직접 결합</b>해, 그래프 전파로 희석된 "그 거래 자체의 원본 신호"를 판정 직전에 복원한다. 즉 엣지 신호가 <b>세 번</b> 쓰인다(key·value·헤드).</div>
+<div class="tblwrap"><table>
+<tr><th>설계 선택</th><th>근거</th></tr>
+<tr><td>2층(2-Hop)</td><td>수집책→중간책→최종 3단 구조를 보려면 2단계 전파 필요. 3층은 과평활(over-smoothing)·메모리↑로 이득 없음</td></tr>
+<tr><td>어텐션 헤드 2</td><td>이웃을 여러 관점으로 보되, 128차원을 쪼개(64×2) 계산량 억제</td></tr>
+<tr><td>헤드에 edge_attr 재결합</td><td>전파로 희석된 원본 거래 신호를 판정 직전 직접 주입</td></tr>
+<tr><td>self-path(W<sub>root</sub>)</td><td>무작위 그래프의 외딴 엣지(이웃 0)도 피처 기반으로 판정(3-1 성김 대응)</td></tr>
+</table></div>
+
+<h2 id="s33"><span class="n">3-3</span> TGNN의 학습·판정 방식 (쉽게)</h2>
+<h3>정답을 찾아내는 방식</h3>
+<p>한 거래(엣지)가 세탁인지 판정할 때 모델은 세 가지를 이어붙여 본다:</p>
+<div class="flow">판정 = [ 송신계좌의 이웃 반영 표현 ] + [ 수취계좌의 이웃 반영 표현 ] + [ 그 거래 자체의 피처 16종 ]
+          └───────────── 2층 그래프 트랜스포머로 계산 ─────────────┘         └ featmat + KYC ┘
+                                     ↓
+                          작은 신경망(MLP) → 세탁 확률(0~1)</div>
+<p>즉 <b>"양끝 계좌가 그래프에서 어떤 맥락에 있는가" + "이 거래의 리듬·관계·위험이 어떤가"</b>를 합쳐 확률을 낸다.</p>
+<h3>학습 방식</h3>
+<ul>
+<li>8월 거래를 <b>자연 밀도 서로소 그래프 60장</b>으로 나눠, 매 에폭 한 장을 모델에 보여준다(3-1).</li>
+<li>정답(is_laundering)과 예측의 차이를 <b>손실 함수</b>로 재고, 양성 가중치 300으로 희귀 세탁을 강조한다.</li>
+<li>검증셋 성능(PR-AUC)이 더 오르지 않으면 <b>조기중단</b>해 과적합을 막는다.</li>
+<li>채점 때도 학습과 <b>같은 밀도</b>의 무작위 배치로 10월을 훑는다(밀도가 다르면 성능 붕괴 — 프레임 의존성).</li>
+</ul>
+
+<h2 id="s34"><span class="n">3-4</span> 입력 인스턴스 예시</h2>
+<p>모델에 들어가는 "한 판정 단위"의 예시(개념적):</p>
+<div class="flow">거래:  계좌 A(node 10425) ──$14,328, UK파운드, 10:35──▶ 계좌 B(node 88301)
+
+엣지 피처 16종 (이 거래):
+  쌍_과거건수=0(신규쌍)  쌍_Δt=-1  송신_1h건수=7(급증)  통화_z=+2.3(이상금액)
+  same_entity=0  same_country=1  송신국가위험=0.8  유형쌍위험=1.2 ...
+
+노드 피처 24종 (양끝 계좌, 8월 프로필):
+  A: 송신건수=520(허브)  PageRank=높음  엔티티계좌수=9  엔티티발신다양성=40 ...
+  B: 수신건수=3  순유출비율=-0.9(수집형)  엔티티유형=Corporation ...
+
+그래프 맥락:  A·B와 연결된 이웃(이웃의 이웃까지) 거래들이 함께 message passing
+
+        ↓  2층 그래프 트랜스포머 + MLP
+
+출력:   세탁 확률 = 0.97  →  (임계값·예산 기준) 세탁 의심으로 표기</div>
+
+<h3>그림 — 노드·엣지가 TGNN에 들어가 판정되기까지</h3>
+<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0;overflow-x:auto">
+<svg viewBox="0 0 860 470" width="100%" style="min-width:640px;font-family:'IBM Plex Sans KR',sans-serif" role="img" aria-label="TGNN 입력 흐름도">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)"/></marker>
+    <marker id="are" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--edge)"/></marker>
+    <marker id="arp" markerWidth="10" markerHeight="10" refX="8" refY="3.2" orient="auto"><path d="M0,0 L8,3.2 L0,6.4 Z" fill="var(--accent)"/></marker>
+  </defs>
+
+  <!-- STEP 1: 입력 -->
+  <text x="20" y="28" style="font-size:13px;font-weight:700;fill:var(--accent);font-family:'IBM Plex Mono',monospace">① 입력</text>
+
+  <!-- 노드 카드 -->
+  <rect x="20" y="42" width="180" height="96" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="32" y="63" style="font-size:12.5px;font-weight:700;fill:var(--ink)">노드 x — 계좌 프로필</text>
+  <text x="32" y="82" style="font-size:11px;fill:var(--muted)">계좌 N개 × 24차원</text>
+  <circle cx="48" cy="108" r="11" fill="var(--edge)"/><text x="44" y="112" style="font-size:10px;fill:#fff">A</text>
+  <circle cx="92" cy="120" r="9" fill="var(--edge)" opacity="0.7"/>
+  <circle cx="130" cy="102" r="11" fill="var(--edge)"/><text x="126" y="106" style="font-size:10px;fill:#fff">B</text>
+  <circle cx="168" cy="122" r="8" fill="var(--edge)" opacity="0.6"/>
+  <text x="32" y="134" style="font-size:9.5px;fill:var(--muted)">그래프14 + KYC10</text>
+
+  <!-- 엣지 카드 -->
+  <rect x="20" y="152" width="180" height="92" rx="9" fill="var(--panel)" stroke="var(--edge)"/>
+  <text x="32" y="173" style="font-size:12.5px;font-weight:700;fill:var(--ink)">엣지 — 거래(선)</text>
+  <text x="32" y="192" style="font-size:11px;fill:var(--muted)">거래 E개 × 16차원</text>
+  <line x1="40" y1="216" x2="150" y2="216" stroke="var(--edge)" stroke-width="2.5" marker-end="url(#are)"/>
+  <text x="40" y="234" style="font-size:9.5px;fill:var(--muted)">연결구조(누가→누구) + lean11·KYC5</text>
+
+  <!-- STEP 2: 그래프 전파 -->
+  <text x="300" y="28" style="font-size:13px;font-weight:700;fill:var(--accent);font-family:'IBM Plex Mono',monospace">② 2층 그래프 트랜스포머 (message passing)</text>
+  <rect x="300" y="42" width="270" height="202" rx="9" fill="var(--panel)" stroke="var(--line)"/>
+  <!-- 미니 그래프 -->
+  <circle cx="360" cy="95" r="13" fill="var(--edge)"/><text x="356" y="99" style="font-size:11px;fill:#fff">A</text>
+  <circle cx="470" cy="95" r="13" fill="var(--edge)"/><text x="466" y="99" style="font-size:11px;fill:#fff">B</text>
+  <circle cx="330" cy="160" r="10" fill="var(--edge)" opacity="0.65"/>
+  <circle cx="415" cy="185" r="10" fill="var(--edge)" opacity="0.65"/>
+  <circle cx="510" cy="160" r="10" fill="var(--edge)" opacity="0.65"/>
+  <line x1="373" y1="95" x2="457" y2="95" stroke="var(--pos)" stroke-width="2.6" marker-end="url(#are)"/>
+  <text x="392" y="88" style="font-size:9px;fill:var(--pos)">판정대상</text>
+  <line x1="352" y1="107" x2="335" y2="150" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="405" y1="180" x2="368" y2="107" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="478" y1="107" x2="505" y2="150" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="423" y1="178" x2="460" y2="107" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="314" y="228" style="font-size:10.5px;fill:var(--muted)">각 계좌가 이웃(+이웃의 이웃) 정보를 <tspan fill="var(--accent)" font-weight="700">어텐션</tspan>으로 수집</text>
+  <text x="314" y="242" style="font-size:10px;fill:var(--muted)">엣지 피처가 어텐션 가중치·메시지에 주입됨</text>
+
+  <!-- STEP 3: 판정 헤드 -->
+  <text x="620" y="28" style="font-size:13px;font-weight:700;fill:var(--accent);font-family:'IBM Plex Mono',monospace">③ 판정</text>
+  <rect x="620" y="42" width="220" height="202" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"/>
+  <text x="632" y="66" style="font-size:11.5px;fill:var(--ink)">거래 A→B 판정 =</text>
+  <rect x="632" y="76" width="196" height="26" rx="5" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="640" y="93" style="font-size:10px;fill:var(--ink)">h[A]128 · h[B]128 · 엣지16 = 272</text>
+  <text x="700" y="122" style="font-size:16px;fill:var(--muted)">↓</text>
+  <rect x="662" y="130" width="136" height="24" rx="5" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="670" y="146" style="font-size:10px;fill:var(--ink)">MLP 272→128→1</text>
+  <text x="700" y="172" style="font-size:16px;fill:var(--muted)">↓</text>
+  <rect x="648" y="182" width="164" height="46" rx="7" fill="var(--accent)"/>
+  <text x="730" y="202" style="font-size:12px;fill:#fff;font-weight:700;text-anchor:middle">세탁 확률 = 0.97</text>
+  <text x="730" y="219" style="font-size:9.5px;fill:#eafffb;text-anchor:middle">→ 세탁 의심</text>
+
+  <!-- 흐름 화살표 -->
+  <line x1="204" y1="140" x2="296" y2="140" stroke="var(--accent)" stroke-width="2.2" marker-end="url(#arp)"/>
+  <line x1="574" y1="140" x2="616" y2="140" stroke="var(--accent)" stroke-width="2.2" marker-end="url(#arp)"/>
+
+  <!-- 하단 설명 -->
+  <rect x="20" y="290" width="820" height="160" rx="9" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="34" y="314" style="font-size:12.5px;font-weight:700;fill:var(--ink)">핵심 — 노드와 엣지는 이렇게 쓰인다</text>
+  <text x="34" y="338" style="font-size:11.5px;fill:var(--ink)"><tspan font-weight="700" fill="var(--edge)">노드(계좌)</tspan> = 계좌마다 24차원 프로필. 입력 x로 들어가 그래프 전파로 128차원 임베딩이 됨.</text>
+  <text x="34" y="360" style="font-size:11.5px;fill:var(--ink)"><tspan font-weight="700" fill="var(--edge)">엣지(거래)</tspan> = 두 역할. ⑴ <tspan font-weight="700">연결구조</tspan>(누가→누구)로 message passing 통로가 되고,</text>
+  <text x="46" y="378" style="font-size:11.5px;fill:var(--ink)">⑵ <tspan font-weight="700">16차원 피처</tspan>(거래 리듬·위험도)로 어텐션에 주입됨.</text>
+  <text x="34" y="402" style="font-size:11.5px;fill:var(--ink)"><tspan font-weight="700" fill="var(--accent)">엣지 피처는 세 번 쓰인다</tspan> — 어텐션 key + value + 판정 헤드(272에 직접 결합).</text>
+  <text x="34" y="424" style="font-size:11.5px;fill:var(--ink)">판정 단위는 <tspan font-weight="700">거래(엣지)</tspan>지만, 재료는 [양끝 계좌 임베딩 + 그 거래 자체]를 합친 것.</text>
+  <text x="34" y="443" style="font-size:10.5px;fill:var(--muted)">비유: 노드=사람 신상카드, 엣지=사람 사이 송금기록이자 관계선. 둘을 합쳐 "이 송금이 수상한가"를 판단.</text>
+</svg>
+</div>
+
+<h3>모델에 실제로 입력되는 컬럼 — 한 거래의 전체 입력값 예시</h3>
+<p>거래 <b>A→B</b> 한 건을 판정할 때 모델이 받는 값은 <b>엣지 16 + 송신노드 24 + 수신노드 24 = 총 64개 숫자</b>다(개념 예시):</p>
+<div class="tblwrap"><table>
+<tr><th>묶음</th><th>컬럼(피처)</th><th class="num">예시값</th><th>읽는 법</th></tr>
+<tr><td rowspan="6"><b>엣지 16</b><br><span style="font-size:11px;color:var(--muted)">이 거래 자체</span></td><td>쌍_과거건수 / 쌍_Δt / 쌍_1h</td><td class="num">0 / −1 / 0</td><td>A→B 신규 쌍(과거 없음)</td></tr>
+<tr><td>송신_Δt / 송신_1h</td><td class="num">3분 / 7건</td><td>A가 최근 1시간 7건 발신(급증)</td></tr>
+<tr><td>수신_Δt / 수신_1h</td><td class="num">120분 / 1건</td><td>B는 한산</td></tr>
+<tr><td>통화_z</td><td class="num">+2.3</td><td>그 통화 평소보다 큰 금액</td></tr>
+<tr><td>pa_cnt / pa_rev / pa_recency</td><td class="num">0.1 / 0 / −1.2</td><td>8월 쌍 이력 거의 없음</td></tr>
+<tr><td>same_entity / same_country / f_국가위험 / t_국가위험 / 유형쌍위험 <span class="mono">(KYC 5)</span></td><td class="num">0 / 1 / 0.8 / 0.4 / 1.2</td><td>다른 소유주·같은 국가, 송신국가 위험↑</td></tr>
+<tr><td rowspan="3"><b>송신노드 24</b><br><span style="font-size:11px;color:var(--muted)">계좌 A 프로필</span></td><td>그래프14: 송신건수·총액·고유상대·PageRank·순유출…</td><td class="num">520·…·높음</td><td>A=허브(많이 뿌림)</td></tr>
+<tr><td>KYC 유형 one-hot(7)</td><td class="num">Corporation=1</td><td>A 소유주는 법인</td></tr>
+<tr><td>KYC: log계좌수 · 발신/수신 다양성</td><td class="num">9 · 40 / 2</td><td>9계좌 보유, 40개 엔티티에 발신</td></tr>
+<tr><td rowspan="2"><b>수신노드 24</b><br><span style="font-size:11px;color:var(--muted)">계좌 B 프로필</span></td><td>그래프14: 수신건수·순유출비율…</td><td class="num">3 · −0.9</td><td>B=수집형(받기만)</td></tr>
+<tr><td>KYC 유형·계좌수·다양성</td><td class="num">Sole Prop · 2 · …</td><td>B 소유주 프로필</td></tr>
+</table></div>
+<p style="font-size:12.5px;color:var(--muted)">※ 엣지 피처는 이 거래 시각 이전만(인과), 노드 피처는 해당 창(월) 집계, KYC는 소유 원장에서. 이 64개 숫자가 <b>TGNN에서는 그래프 전파를 거친 뒤</b> 판정헤드로, <b>기준선(MLP/부스팅)에서는 그대로</b> 분류기로 들어간다.</p>
+
+<h2 id="s35"><span class="n">3-5</span> 장기(월 경계를 넘는) 세탁 처리</h2>
+<p>세탁 작전은 짧지 않다 — 실측상 지속 기간 <b>중앙값 27일, 최대 70일</b>. 그래서 <b>561개 작전</b>(전체의 3.4%)이 8월과 10월에 걸쳐 있다(9월 gap 관통). "gap이 모든 작전을 분리한다"는 것은 사실이 아니다.</p>
+<div class="callout key"><div class="h">그래도 안전한가 — Ablation 실측</div>
+gap을 넘는 561개 작전(10월 세탁의 2.7%)을 <b>학습·평가에서 전부 제거</b>하고 재학습한 결과, 동일 축소 테스트 기준 PR-AUC는 <b>0.6137 → 0.6068 (−0.007)</b>에 그쳤다. 그마저 절반은 "학습 양성이 줄어든" 일반적 손실이다. 즉 작전이 gap을 넘어도 <b>부정 이득이 미미</b>하다. 경계 누수 차단의 본체는 gap이 아니라, 학습·채점 그래프를 각 기간 안에서 완결시키는 <b>창별 분리 설계</b>(3-1)다.</div>
+
+<h2 id="s36"><span class="n">3-6</span> 단발성 양성·무패턴 세탁 탐지</h2>
+<div class="term"><b>무패턴(비패턴) 세탁</b> = 생성기가 주입한 8개 패턴 어디에도 속하지 않는 세탁(전체 세탁의 약 39%). 대부분 <b>단발성</b>(한 번 오가는 거래)이라 구조·리듬 신호가 희박하다.</div>
+<p><b>왜 안 잡히나(정확한 근거):</b></p>
+<ul>
+<li>무패턴만의 <b>랭킹 AUC는 0.974</b> — "못 잡는" 게 아니라, 단일 임계값으로 정상과 <b>가르기 어려운</b> 정밀도·운영점 문제다.</li>
+<li>정상 거래에 완전히 위장 — 되풀이 쌍의 약 24%는 구조적으로 탐지 한계(floor).</li>
+<li>논문 11편 검토 결과, <b>"정상편차 기반"(자기지도·비지도) 방법은 무패턴에 실패</b>한다("피처 &gt; 임베딩"이 일관된 결론). Isolation Forest 등 이상탐지 앙상블도 실측 이득이 없었다.</li>
+</ul>
+<div class="callout key"><div class="h">돌파구 — KYC(엔티티) 관계 신호</div>
+구조·리듬으로 안 되면 남는 단서는 <b>"누가 보내고 받는가"</b>다. 계좌 소유 엔티티 정보(KYC)를 넣자 무패턴 검출이 단계적으로 개선됐다:
+<div class="tblwrap"><table>
+<tr><th>구성</th><th class="num">PR-AUC</th><th class="num">무패턴 @0.5%</th></tr>
+<tr><td>구조 기반 (KYC 없음)</td><td class="num">0.604</td><td class="num">42.4%</td></tr>
+<tr><td><b>+ KYC(엔티티) — 최종</b></td><td class="num good">0.6352</td><td class="num good">47.7%</td></tr>
+</table></div>
+조사예산 상위 1%에서는 무패턴 <b>65.4%</b>까지 검출. 단발성 양성은 억지로 지우거나 복제하지 않고(왜곡), ① 손실 가중치 ② KYC 관계 신호 ③ 예산(top-K) 운영으로 보완한다.</div>
+
+<h2 id="s38op"><span class="n">3-7</span> 운영 배치·그래프 구성 — 채점 시 배치를 어떻게 나눌 것인가</h2>
+<p>운영에서는 <b>하루치 거래 배치</b>가 매일 들어온다. 그런데 GNN에서는 <b>배치가 곧 message-passing 그래프</b>이므로,
+"어떻게 나누느냐"가 성능을 바꾼다(3-1의 프레임 의존성). 이 절은 실측 3종으로 최적 배치 구성을 정한다.</p>
+
+<h3>① 그래프 연결성 실측 — 무작위 배치는 실제로 성기다</h3>
+<p>무작위로 1/60을 뽑으면 이웃이 같은 배치에 안 뽑혀 연결이 끊긴다. 얼마나 성긴지 측정했다:</p>
+<div class="tblwrap"><table>
+<tr><th>지표</th><th class="num">무작위 1/60</th><th class="num">일별 하루</th><th class="num">8월 전체(참고)</th></tr>
+<tr><td>엣지 수</td><td class="num">751,873</td><td class="num">1,928,907</td><td class="num">45,112,342</td></tr>
+<tr><td>평균 차수(이웃 수)</td><td class="num">2.24</td><td class="num">4.29</td><td class="num">43.26</td></tr>
+<tr><td>외딴 엣지(양끝 이웃 0)</td><td class="num bad">8.6%</td><td class="num">0.5%</td><td class="num">0.0%</td></tr>
+<tr><td>이웃 있는 계좌(차수≥2)</td><td class="num">54.2%</td><td class="num">85.1%</td><td class="num">96.8%</td></tr>
+<tr><td>최대 연결성분</td><td class="num bad">33.7%</td><td class="num">85.2%</td><td class="num">82.4%</td></tr>
+</table></div>
+<p>무작위 1/60 그래프는 확실히 부실하다 — 외딴 엣지 8.6%(양끝 계좌가 이 배치에 다른 거래 없음), 계좌의 46%가 고립, 그래프가 잘게 조각남(최대성분 34%). <b>일별 그래프가 구조적으로 훨씬 온전하다.</b></p>
+
+<h3>② 4조합 실측 — 그런데 성능은 무작위가 더 높다</h3>
+<p>학습·채점 배치 구성을 4가지로 바꿔 같은 조건에서 측정했다:</p>
+<div class="tblwrap"><table>
+<tr><th>학습 배치</th><th>채점 배치</th><th class="num">PR-AUC</th><th>비고</th></tr>
+<tr><td>무작위 서로소</td><td>무작위 서로소</td><td class="num good">0.635</td><td>현재 확정 ✓</td></tr>
+<tr><td>무작위 서로소</td><td class="warn">일별</td><td class="num">0.5698</td><td>밀도 불일치 → 붕괴</td></tr>
+<tr><td>일별</td><td>일별</td><td class="num">0.6067</td><td>밀도 일치, 다양성 손실</td></tr>
+<tr><td>일별</td><td>무작위 서로소</td><td class="num">~0.600</td><td>(과거 실험)</td></tr>
+</table></div>
+<div class="callout key"><div class="h">핵심 — 판별력은 "구조 완전성"이 아니라 "피처 + 시기 다양성"에서 온다</div>
+구조가 온전한 일별(외딴 0.5%·성분 85%)이 성긴 무작위(외딴 8.6%·성분 34%)보다 <b>오히려 낮다</b>(0.6067 vs 0.635). 이유:
+<b>① 판정 재료가 그래프 밖에서 온다</b> — 엣지 16·노드 24 피처는 전체 이력으로 계산돼 외딴 엣지도 정보 충분.
+<b>② self-path</b> — 이웃 0이면 피처 분류기로 동작.
+<b>③ 시기 다양성</b> — 무작위 그래프는 8월 전 기간이 한 배치에 섞여 일반화에 유리(일별은 하루 편향).
+즉 무작위의 다양성 이득(+0.02)이 일별의 구조 온전함을 이긴다.</div>
+
+<h3>③ 왜 "일별 채점"은 붕괴하는가 (밀도 불일치)</h3>
+<p>무작위로 학습한 모델을 그대로 일별 채점하면 0.635 → <b>0.5698로 붕괴</b>한다. 학습 그래프(~99만 엣지, 평균차수 2.24)와
+일별 그래프(~193만 엣지, 평균차수 4.29)의 <b>밀도·크기가 달라</b> 노드가 받는 이웃 메시지 규모가 학습 때와 어긋나기 때문이다.</p>
+
+<div class="callout key"><div class="h">운영 권고 — 무작위 학습 유지 + 일별 배치를 학습 크기로 재분할해 채점</div>
+운영은 "그날 데이터만으로 채점"해야 한다는 요구가 있다. 이를 성능 손실 없이 만족하려면:
+<b>매일 들어온 하루치(~177만) 배치를 학습 그래프 크기(~99만)에 맞춰 무작위로 2조각으로 재분할</b>해 각각 채점한다.
+이러면 ① 그날 데이터만 사용(운영 요구 충족) ② 학습·채점 밀도 일치(0.635 유지)를 동시에 달성한다.
+<br>단순성을 최우선한다면 <b>일별-일별(0.6067, −0.02)</b>도 실용적 대안이다 — 재분할 로직 없이 운영 네이티브.</div>
+
+<h2 id="s38b"><span class="n">3-8</span> 기준선 비교 — 그래프 전파가 실제로 기여하는가</h2>
+<p>"GNN을 쓸 이유가 있는가"를 검증하려면 <b>동일 피처(엣지16 + 송신노드24 + 수신노드24 = 64)</b>로 다른 모델과 대조해야 한다. 각 모델을 <b>제 최선의 학습 레짐</b>에서, 무누수·10월 전체로 비교했다.</p>
+<div class="tblwrap"><table>
+<tr><th>모델</th><th>학습 레짐</th><th class="num">AP(PR-AUC)</th><th class="num">R@1%</th></tr>
+<tr><td>MLP (128-64)</td><td>8월 다운샘플</td><td class="num">0.658</td><td class="num">0.858</td></tr>
+<tr><td>LightGBM</td><td>8월 다운샘플</td><td class="num">0.636</td><td class="num">0.831</td></tr>
+<tr><td><b>TGNN (전파 ON, 자연밀도)</b></td><td>8월 60그래프</td><td class="num good">0.632~0.635</td><td class="num">0.856</td></tr>
+<tr><td>로지스틱 회귀</td><td>8월 다운샘플</td><td class="num bad">0.071</td><td class="num">0.550</td></tr>
+</table></div>
+<div class="callout key"><div class="h">핵심 — 두 축을 분리해야 공정하다 (동일 하네스 ablation)</div>
+표만 보면 MLP(0.658)가 TGNN(0.632)보다 높아 보이나, <b>학습 레짐이 다르다</b>(MLP=다운샘플, TGNN=자연밀도). 완전 동일 하네스(자연밀도 60그래프·9월검증·같은 피처)에서 <b>"그래프 전파만 On/Off"</b> 한 ablation이 정답이다:
+<div class="tblwrap"><table>
+<tr><th>동일 하네스</th><th class="num">PR-AUC</th></tr>
+<tr><td>전파 ON (TGNN)</td><td class="num good">0.632</td></tr>
+<tr><td>전파 OFF (No-Prop, 같은 64피처)</td><td class="num">0.601</td></tr>
+<tr><td>차이 = <b>그래프 전파의 순 기여</b></td><td class="num good">+0.031</td></tr>
+</table></div>
+정리: ⑴ <b>행독립 모델(MLP/부스팅)은 다운샘플이 유리</b>, <b>GNN은 자연밀도가 필수</b>(다른 레짐). ⑵ 같은 조건에서 <b>그래프 전파는 +0.031 실제 기여</b>한다. ⑶ MLP-다운샘플(0.658)은 <b>성능 비슷·인프라 훨씬 가벼운 운영 대안</b>으로 가치가 있으나, "그래프 무용"의 근거는 아니다(레짐 불일치). ⑷ 로지스틱 붕괴(0.07)는 비선형 상호작용이 필수임을 보인다.</div>
+
+<h2 id="s37"><span class="n">3-9</span> 최종 성능과 전체 파이프라인</h2>
+<div class="tblwrap"><table>
+<tr><th class="num">PR-AUC</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1</th><th class="num">Macro-F1</th><th class="num">Recall@1%</th></tr>
+<tr><td class="num good">0.6352</td><td class="num">0.825</td><td class="num">0.548</td><td class="num">0.659</td><td class="num">0.829</td><td class="num">0.856</td></tr>
+</table></div>
+<p>10월 전체 5,482만 건(원본 비율 1:727) 실측. 8대 패턴 검출 78~89%, 무패턴은 조사예산 상위 1%에서 65.4%.</p>
+<div class="flow">[0] 데이터 이해     원본 거래 + accounts(KYC) 컬럼 파악
+       ▼
+[1] 거래 빌드       유령구간 제거 · KYC 복합키 조인(100%) · 시간분할(8/gap/10월) · train 다운샘플링
+       ▼   edges.parquet · node_mapping.parquet · pattern_labels.parquet
+[2] 피처 생성       featmat_lean11(11종, memmap) · 누수차단(인과·train-only) · 엣지16+노드24
+       ▼
+[3] TGNN 학습·평가  자연밀도 그래프 60장 순환학습(조기중단) · 같은밀도 채점 · PR-AUC/예산/패턴별
+       ▼
+최종: KYC-TGNN v2(무누수) · PR-AUC 0.6352 · Recall@1% 0.856 · 무패턴@1% 65.3%</div>
+<div class="callout key"><div class="h">한 줄 요약</div>
+극단 불균형(1:796)과 정상 위장이라는 본질적 난제를, ① 누수를 원천 차단한 인과적 전처리 ② 자연 밀도 그래프 학습 ③ 인공물 대신 구조·<b>KYC 관계 신호</b>에 기대는 설계로 풀었다. 최종 <b>KYC-TGNN v2(무누수)</b>는 10월 전체 5,482만 건에서 <b>PR-AUC 0.6352</b>, 최대 난제인 무패턴도 조사예산 상위 1%에서 65.3%까지 검출한다.</div>
+
+<div class="foot">HI-Large AML · KYC-TGNN v2 · 파이프라인 순서 정렬판 · 모든 수치는 10월 test 원본 양성 비율(1:727)에서 실측 · 2026-09-08</div>
+
+</div>
