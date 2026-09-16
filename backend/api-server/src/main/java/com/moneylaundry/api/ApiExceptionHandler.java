@@ -33,6 +33,11 @@ public class ApiExceptionHandler {
     return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 필드와 형식을 확인하세요.");
   }
 
+  @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+  ProblemDetail missingResource(Exception e) {
+    return problem(HttpStatus.NOT_FOUND, "NOT_FOUND", "요청한 경로가 없습니다.");
+  }
+
   @ExceptionHandler(Exception.class)
   ProblemDetail internal(Exception e) {
     log.error("처리되지 않은 예외", e);

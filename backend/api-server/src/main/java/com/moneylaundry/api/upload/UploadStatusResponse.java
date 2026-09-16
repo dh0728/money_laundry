@@ -24,4 +24,5 @@ public record UploadStatusResponse(
     Instant urlIssuedAt,
     Instant receivedAt,
     Instant startedAt,
-    Instant finishedAt) {}
+    Instant finishedAt,
+    String integrationStatus) {}

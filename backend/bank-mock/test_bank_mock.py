@@ -19,6 +19,14 @@ SCRIPT = Path(__file__).with_name("bank_mock.py")
 
 
 class BankMockTests(unittest.TestCase):
+    def test_integration_states_do_not_claim_analysis_complete(self):
+        import contextlib
+        import io
+        for state, expected in (("VALIDATED_WAITING_INTEGRATION", "거래 통합 대기"), ("PARTIALLY_HELD", "의존 보류"), ("HELD", "파일 전체 보류"), ("ACTIVE", "분석 완료 상태는 별도 확인")):
+            with self.subTest(state=state), contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(bank_mock.show_result({"status": "COMPLETED", "integrationStatus": state}), 0)
+                self.assertIn(expected, output.getvalue())
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="bank-mock-test-")
         self.addCleanup(self.temp.cleanup)
@@ -124,8 +132,8 @@ class BankMockTests(unittest.TestCase):
         self.assertNotIn("x-api-key", headers)
         self.assertNotIn("x-bank-id", headers)
         self.assertEqual(self.events[2][1].get("X-Bank-Id"), "70")
-        self.assertIn("원장 적재 완료", result.stdout)
-        self.assertIn("적재 행 수: 1", result.stdout)
+        self.assertIn("보고 수집 완료", result.stdout)
+        self.assertIn("통합 연결 행 수: 1", result.stdout)
         self.assertIn("은행 70", result.stdout)
         self.assertNotIn("test-only-key", result.stdout + result.stderr)
         self.assertNotIn("signature=secret", result.stdout + result.stderr)
@@ -233,7 +241,7 @@ class BankMockTests(unittest.TestCase):
         self.result["bankId"] = 12
         result = self.run_cli()
         self.assertEqual(result.returncode, 1)
-        self.assertNotIn("원장 적재 완료", result.stdout)
+        self.assertNotIn("보고 수집 완료", result.stdout)
 
     def test_validation_failure_explains_reupload(self):
         self.result.update(status="VALIDATION_FAILED", insertedCount=0,

@@ -50,13 +50,13 @@ public class SuspiciousTransactionService {
     StringBuilder from =
         new StringBuilder(
             """
-        from inference_results i join batch_jobs j on j.job_id=i.job_id
-        join transactions t on t.tx_id=i.tx_id
-        join accounts f on f.account_id=t.from_account_id
-        join accounts r on r.account_id=t.to_account_id
-        cross join lateral (select ordinal-1 as code from unnest(array[i.p_0,i.p_1,i.p_2,i.p_3,i.p_4,i.p_5,i.p_6,i.p_7,i.p_8]) with ordinality as p(probability,ordinal) order by probability desc,ordinal limit 1) winner
-        where j.status='COMPLETED' and j.job_type='ANALYSIS' and i.p_laundering>=j.threshold_value
-        """);
+            from inference_results i join batch_jobs j on j.job_id=i.job_id
+            join transactions t on t.tx_id=i.tx_id
+            join private.accounts f on f.account_id=t.from_account_id
+            join private.accounts r on r.account_id=t.to_account_id
+            cross join lateral (select ordinal-1 as code from unnest(array[i.p_0,i.p_1,i.p_2,i.p_3,i.p_4,i.p_5,i.p_6,i.p_7,i.p_8]) with ordinality as p(probability,ordinal) order by probability desc,ordinal limit 1) winner
+            where j.status='COMPLETED' and j.job_type='ANALYSIS' and i.p_laundering>=j.threshold_value
+            """);
     List<Object> args = new ArrayList<>();
     if (jobId != null) {
       from.append(" and j.job_id=?");
@@ -84,7 +84,8 @@ public class SuspiciousTransactionService {
     args.add((long) page * size);
     var rows =
         jdbc.queryForList(
-            "select t.*,i.*,j.threshold_value,f.bank_id as from_bank,f.account_number as from_account,r.bank_id as to_bank,r.account_number as to_account "
+            "select t.*,i.*,j.threshold_value,f.bank_id as from_bank,f.service_account_id::text as"
+                + " from_account,r.bank_id as to_bank,r.service_account_id::text as to_account "
                 + from
                 + " order by "
                 + order

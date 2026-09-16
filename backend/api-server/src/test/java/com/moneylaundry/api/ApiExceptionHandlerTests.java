@@ -33,7 +33,9 @@ class ApiExceptionHandlerTests {
 
   @Test
   void 숫자가_아닌_업로드_ID는_400이다() throws Exception {
-    mvc.perform(get("/api/uploads/not-a-number"))
+    mvc.perform(
+            get("/api/v1/bank/uploads/not-a-number")
+                .requestAttr(BankIdentityInterceptor.BANK_ID, 70))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
   }

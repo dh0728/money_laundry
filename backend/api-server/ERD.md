@@ -1,4 +1,4 @@
-# ERD 스케치 — 2026-09-07 ([W2 DB 설계])
+# ERD — 거래 통합 V3
 
 실행 DB: PostgreSQL 17. 인프라·로컬 Compose·통합 테스트의 이미지 태그는 `postgres:17-alpine`이다. DB 이미지 변경 자체는 Flyway 스키마 변경이 아니므로 기존 마이그레이션을 수정하지 않는다.
 
@@ -14,11 +14,18 @@
 ```mermaid
 erDiagram
     banks ||--o{ accounts : has
-    banks ||--o{ transactions : reports
+    banks ||--o{ report_sets : reports
+    banks ||--o{ bank_reporting_periods : contract
+    reporting_scopes ||--o{ reporting_scope_banks : fixes
+    report_sets ||--o{ report_versions : versions
+    batch_jobs ||--o| report_versions : upload_id
+    report_versions ||--o{ private_bank_reports : source_rows
+    transactions ||--o{ transaction_reports : provenance
+    private_bank_reports ||--o| transaction_reports : matched_once
+    private_entities ||--o{ accounts : owns
     banks ||--o{ batch_jobs : "INGEST bank_id"
     accounts ||--o{ transactions : "from_account_id"
     accounts ||--o{ transactions : "to_account_id"
-    batch_jobs ||--o{ transactions : "ingest_job_id"
     batch_jobs ||--o{ transactions : "scored_job_id"
     batch_jobs ||--o{ inference_results : "job_id"
     batch_jobs ||--o{ transaction_features : "job_id"
@@ -47,7 +54,11 @@ erDiagram
     accounts {
         bigint account_id PK
         int bank_id FK
-        varchar account_number "가명"
+        uuid service_account_id UK
+        bigint entity_id FK
+        text account_lookup_token "private only"
+        text identity_cipher "private only"
+        text key_version
     }
     fx_rates {
         varchar fx_rate_version PK
@@ -77,7 +88,6 @@ erDiagram
     }
     transactions {
         bigint tx_id PK
-        int bank_id FK "보고 은행"
         timestamptz occurred_at
         bigint from_account_id FK
         bigint to_account_id FK
@@ -88,8 +98,9 @@ erDiagram
         varchar payment_format
         numeric amount_usd
         varchar fx_rate_version
-        char row_hash "UNIQUE(bank_id, row_hash)"
-        bigint ingest_job_id FK
+        date business_date
+        bigint generation
+        text integration_status
         bigint scored_job_id FK "NULL = 미채점"
     }
     inference_results {
@@ -175,19 +186,39 @@ erDiagram
     }
 ```
 
-## 2. V1에 든 것 (2026-09-07)
+## 2. 현재 스키마 (V1~V3)
 
 | 테이블 | 식별자 | 핵심 제약·인덱스 | 근거 |
 |---|---|---|---|
 | `banks` | `bank_id` = IBM 코드 정수 | `api_key_hash` UNIQUE, `is_reporting` | 착수 결정 3 |
-| `accounts` | `account_id` 발급 | `UNIQUE(bank_id, account_number)` | dberd 채택, 가명화 (은행, 계좌) 쌍 전제 |
+| `private.accounts` | 내부 account_id와 별도 service_account_id UUID | UNIQUE(bank_id,account_lookup_token), entity_id FK | 원문 계좌 암호문·소유 개체 분리 |
 | `fx_rates` | `(fx_rate_version, currency)` | 시드 15종 `fx_rates_usd_v1` | API.md §0 금액·통화 |
 | `batch_jobs` | `job_id` (INGEST·ANALYSIS 공용 시퀀스) | `analysis_date` UNIQUE(ANALYSIS 부분 인덱스), `file_hash`·`(bank_id, created_at)` INGEST 부분 인덱스, `status` CHECK | API.md §1.3, kickoff §2.2 |
-| `transactions` | `tx_id` 발급 | `UNIQUE(bank_id, row_hash)`, `(from_account_id, occurred_at)`·`(to_account_id, occurred_at)`(**V1 필수**)·`occurred_at`·미채점 부분 인덱스 | API.md §1.4, 착수 결정 1 |
+| `transactions` | tx_id 발급, business_date/generation/status | 송수신 계좌·시각 인덱스, source 연결은 transaction_reports | 동일 내용 반복도 발생 건별 저장 |
 | `inference_results` | `(job_id, tx_id)` | `p_laundering` 0~1 CHECK, `(job_id, p_laundering DESC)` | API.md §2.2, 정합 메모 B(이름은 팀 것) |
 | `transaction_features` | `(job_id, tx_id, model_kind)` | JSONB 행 저장(2026-09-07 사용자 확정) | kickoff §7 권고안 |
 | `users` | `user_id` 발급 | `username` UNIQUE, `role` CHECK, 시드 L1 2·L2 2·ADMIN 1 | API.md §3.4·§5 |
 | `evaluation.transaction_labels` | `tx_id` | 운영 스키마 밖 | 착수 결정 2 |
+
+### V3 보고와 정상 거래의 분리
+
+| 테이블 | 관계·제약 |
+|---|---|
+| private.entities | 내부 bigint와 별도 서비스 UUID, 원천 Entity ID 검색 토큰 UNIQUE, 원문 ID/이름 암호문·키 버전 |
+| bank_reporting_periods | 은행별 거래 기준일 적용 기간, 같은 은행 기간 중복 거절 |
+| reporting_scopes / reporting_scope_banks | 기준일·revision별 고정 수집 범위. 이미 확정한 빈 범위도 자동 재계산하지 않음 |
+| report_sets | UNIQUE(bank_id,business_date), current_version_id·generation |
+| report_versions | UNIQUE(upload_id), UNIQUE(set_id,version_no), 수신 시각·자체 검수/통합 상태·원인 |
+| private.bank_reports | UNIQUE(version_id,source_row), 암호화 보고 payload·키 버전·매칭 검색 토큰·행 상태 |
+| transaction_reports | tx_id와 report_id 연결, report_id UNIQUE, SENDER/RECEIVER/INTERNAL 역할 |
+| integration_attempts / integration_attempt_versions | cutoff·scope_revision·선택 report version/revision/generation 고정 |
+| evaluation.report_labels | report_id별 원천 평가 라벨. 통합시 일치하는 유효 라벨만 transaction_labels 연결 |
+
+그림의 accounts는 `private.accounts`다. API는 서비스 UUID만 공개하고 원문·검색 토큰·암호문은 공개하지 않는다. private/evaluation의 PUBLIC 접근과 기본 테이블 권한을 제거한다. 후속 분석 역할/analysis.input_transactions는 이번 V3에 생성하지 않는다.
+
+V3는 기존 계좌·거래·작업이 있는 DB에서 실패한다. 기존 DB/볼륨을 보존한 별도 빈 개발 DB에 V1~V3를 적용한다. 원문 보호 키는 실행 환경에서만 공급하며 데이터/문서에 넣지 않는다. 서비스 UUID는 새 개발 데이터셋 내 재사용을 보장하며 기존 DB ID를 추정 복원하지 않는다.
+
+정정 교체·실행 취소·고정 분석 입력 스키마는 후속 태스크다. 현재 서비스 통합 검증은 최초 고정 입력만 처리하며 운영 분석은 새 보고가 있으면 INTEGRATION_NOT_CONNECTED로 우회 실행을 차단한다.
 
 ## 3. W3·W4에서 추가할 것 — 관계·식별자만 지금 확정
 
@@ -203,7 +234,7 @@ erDiagram
 - **금액 `NUMERIC(24,6)`**(dberd 타입 채택 — 초안의 `numeric(18,2)`는 Bitcoin 소수 6자리를 잃는다. HI-Small 실측 최대 6자리. API.md §1.4 v0.4에서 정정).
 - **확률 `DOUBLE PRECISION`**(scores.parquet float64 그대로, Python 적재에 변환 없음. dberd `NUMERIC(8,7)`과 다름).
 - **환율 의미**: `fx_rates_usd.txt`는 "1 USD당 통화 단위"(EUR 0.8534, JPY 105.4)이므로 `amount_usd = amount_paid / units_per_usd`. API.md §1.4 정정 완료(09-07).
-- **은행 식별(2026-09-10)**: dev/local에서 `X-Bank-Id`를 임시 신뢰한다. 최초 URL 발급 트랜잭션에서 은행을 upsert하고 `is_reporting=true`로 설정한다. 기동 시 키 시드는 제거했다. 기존 `api_key_hash` 컬럼·값·매핑은 보존하되 현재 인증에는 사용하지 않는다. 직원 로그인 도입 시 요청 경계의 은행 식별을 교체한다.
+- **은행 식별**: dev/local X-Bank-Id는 테스트 대역이다. banks.is_reporting 및 bank_reporting_periods를 사전 등록해야 수집하며 URL 요청으로 등록하지 않는다. report_format AML17은 서버의 공통 입력 규칙 선택값이다. 은행 웹·로그인은 범위 밖이다.
 - **사용자 시드에 비밀번호 없음**: `password_hash` nullable, W4 [인증]에서 환경변수로 채움. 시드는 W3 라운드로빈에 먼저 필요해서 V1에 둔다.
 - **`validation_errors JSONB`**: API.md §1.2 `errors[]`의 저장처(계약에 컬럼명이 없어 추가).
 - **라벨 타입**: `pattern_label SMALLINT`(HI-Small_labels_10class.csv의 10클래스 코드), `attempt_id INTEGER`(-1은 NULL로).

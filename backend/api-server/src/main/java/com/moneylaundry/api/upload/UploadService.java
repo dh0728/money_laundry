@@ -1,7 +1,6 @@
 package com.moneylaundry.api.upload;
 
 import com.moneylaundry.api.ApiException;
-import com.moneylaundry.api.bank.BankReference;
 import com.moneylaundry.api.bank.BankRepository;
 import com.moneylaundry.api.batchjob.BatchJob;
 import com.moneylaundry.api.batchjob.BatchJobRepository;
@@ -35,7 +34,6 @@ public class UploadService {
 
   private final BatchJobRepository batchJobRepository;
   private final BankRepository banks;
-  private final BankReference bankReference;
   private final org.springframework.jdbc.core.JdbcTemplate jdbc;
   private final UploadStore uploadStore;
   private final LedgerLoader ledgerLoader;
@@ -51,7 +49,6 @@ public class UploadService {
   public UploadService(
       BatchJobRepository batchJobRepository,
       BankRepository banks,
-      BankReference bankReference,
       org.springframework.jdbc.core.JdbcTemplate jdbc,
       UploadStore uploadStore,
       LedgerLoader ledgerLoader,
@@ -63,7 +60,6 @@ public class UploadService {
     this.clock = clock;
     this.batchJobRepository = batchJobRepository;
     this.banks = banks;
-    this.bankReference = bankReference;
     this.jdbc = jdbc;
     this.uploadStore = uploadStore;
     this.ledgerLoader = ledgerLoader;
@@ -91,16 +87,7 @@ public class UploadService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "SHA-256 Base64 형식 오류");
     }
     String hash = HexFormat.of().formatHex(digest);
-    BankReference.Entry reference = bankReference.find(bankId).orElse(null);
-    jdbc.update(
-        """
-        INSERT INTO banks (bank_id, name, country, is_reporting)
-        VALUES (?, ?, ?, true)
-        ON CONFLICT (bank_id) DO UPDATE SET is_reporting = true, updated_at = now()
-        """,
-        bankId,
-        reference == null ? null : reference.name(),
-        reference == null ? null : reference.country());
+    requireReporting(bankId, request.businessDate());
     banks.lockById(bankId).orElseThrow(() -> ApiException.notFound("은행 없음"));
     Instant now = Instant.now();
     for (BatchJob previous :
@@ -138,6 +125,7 @@ public class UploadService {
 
   public UploadStatusResponse complete(int bankId, long uploadId) {
     BatchJob job = findIngest(uploadId, bankId);
+    requireReporting(bankId, job.getBusinessDate());
     if (job.getStatus() != JobStatus.URL_ISSUED) {
       return toResponse(job);
     }
@@ -156,6 +144,7 @@ public class UploadService {
               banks.lockById(bankId).orElseThrow(() -> ApiException.notFound("은행 없음"));
               // S3 확인 중 재발급/다른 완료가 가능하므로 잠금 후 새 영속 컨텍스트에서 다시 읽는다.
               BatchJob current = findIngest(uploadId, bankId);
+              requireReporting(bankId, current.getBusinessDate());
               if (current.getStatus() != JobStatus.URL_ISSUED) {
                 return new Completion(toResponse(current), false);
               }
@@ -191,11 +180,24 @@ public class UploadService {
   }
 
   public UploadStatusResponse status(int bankId, long uploadId) {
-    return toResponse(findIngest(uploadId, bankId));
+    BatchJob job = findIngest(uploadId, bankId);
+    requireReporting(bankId, job.getBusinessDate());
+    return toResponse(job);
   }
 
-  public UploadStatusResponse status(long uploadId) {
-    return toResponse(findIngest(uploadId, null));
+  private void requireReporting(int bankId, java.time.LocalDate date) {
+    Boolean allowed =
+        jdbc.queryForObject(
+            "select exists(select 1 from banks b join bank_reporting_periods p using(bank_id) where"
+                + " bank_id=? and b.is_reporting and p.effective_from_date<=? and"
+                + " (p.effective_to_date is null or p.effective_to_date>=?))",
+            Boolean.class,
+            bankId,
+            date,
+            date);
+    if (!Boolean.TRUE.equals(allowed))
+      throw new ApiException(
+          HttpStatus.FORBIDDEN, "REPORTING_NOT_REGISTERED", "사전 등록된 보고 은행/기준일만 수집합니다.");
   }
 
   private BatchJob findIngest(long uploadId, Integer bankId) {
@@ -211,6 +213,14 @@ public class UploadService {
         job.getValidationErrors() == null
             ? List.of()
             : objectMapper.readValue(job.getValidationErrors(), new TypeReference<>() {});
+    if (errors.isEmpty())
+      errors =
+          jdbc.query(
+              "select r.source_row,r.error_code from private.bank_reports r join report_versions v"
+                  + " using(version_id) where v.upload_id=? and r.error_code is not null order by"
+                  + " r.source_row limit 100",
+              (rs, n) -> new ValidationError(rs.getInt(1), "", rs.getString(2)),
+              job.getId());
     return new UploadStatusResponse(
         job.getId(),
         job.getBankId(),
@@ -218,14 +228,11 @@ public class UploadService {
         job.getBusinessDate(),
         job.getSizeBytes(),
         job.getRowCount(),
-        job.getStatus() == JobStatus.COMPLETED
-            ? job.getRowCount()
-            : (job.getStatus() == JobStatus.VALIDATION_FAILED || job.getStatus() == JobStatus.FAILED
-                ? jdbc.queryForObject(
-                    "select count(*) from transactions where ingest_job_id = ?",
-                    Integer.class,
-                    job.getId())
-                : null),
+        jdbc.queryForObject(
+            "select count(*) from transaction_reports tr join private.bank_reports r"
+                + " using(report_id) join report_versions v using(version_id) where v.upload_id=?",
+            Integer.class,
+            job.getId()),
         job.getMissingCount(),
         job.getDuplicateCount(),
         job.getStatus(),
@@ -235,6 +242,14 @@ public class UploadService {
         job.getUrlIssuedAt(),
         job.getReceivedAt(),
         job.getStartedAt(),
-        job.getFinishedAt());
+        job.getFinishedAt(),
+        jdbc
+            .query(
+                "select stage_status from report_versions where upload_id=?",
+                (rs, n) -> rs.getString(1),
+                job.getId())
+            .stream()
+            .findFirst()
+            .orElse(null));
   }
 }

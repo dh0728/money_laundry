@@ -175,9 +175,16 @@ def show_result(result, secrets=()):
         return safe_text(result.get(name), secrets)
     print(f"파일명: {field('fileName')} / 기준일: {field('businessDate')}\n"
           f"업로드 시각: {field('receivedAt')} / 처리 완료 시각: {field('finishedAt')}\n"
-          f"파일 행 수: {field('rowCount')} / 적재 행 수: {field('insertedCount')}")
+          f"파일 행 수: {field('rowCount')} / 통합 연결 행 수: {field('insertedCount')}")
     if result["status"] == "COMPLETED":
-        print("결과: 원장 적재 완료")
+        states = {
+            "VALIDATED_WAITING_INTEGRATION": "보고 검수·저장 완료, 거래 통합 대기",
+            "ACTIVE": "거래 통합 완료, 분석 완료 상태는 별도 확인",
+            "PARTIALLY_HELD": "일부 거래 의존 보류, 정상 거래만 통합",
+            "HELD": "파일 전체 보류",
+        }
+        print("결과: " + states.get(result.get("integrationStatus"), "보고 수집 완료, 통합 상태 재조회 필요"))
+        print("통합·분석 상태는 업로드 번호로 다시 조회하세요.")
         return 0
     if result["status"] == "VALIDATION_FAILED":
         print("결과: 파일 검증 실패 — 아래 오류를 수정하고 재업로드하세요.")

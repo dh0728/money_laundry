@@ -1,909 +1,644 @@
 package com.moneylaundry.api.upload;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.moneylaundry.api.TestcontainersConfiguration;
-import java.io.IOException;
+import com.moneylaundry.api.*;
+import com.moneylaundry.api.analysis.*;
+import com.moneylaundry.api.ingest.*;
+import com.moneylaundry.api.storage.*;
+import java.io.*;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.time.Instant;
-import java.util.Base64;
-import java.util.Set;
-import org.junit.jupiter.api.Test;
+import java.security.*;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.*;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
-/** 은행 수집 API 관통(API.md §1.1·§1.2): 발급 → 파일 복사(로컬 저장소의 PUT) → 완료 통지 → 비동기 적재 → 조회. */
+/** Real PostgreSQL with byte-preserving storage double. No real S3 connection is claimed. */
 @SpringBootTest(properties = "spring.profiles.active=local")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class BankUploadApiTests {
-
-  static final String BANK_70 = "70";
-  static final String BANK_12 = "12";
+  static final LocalDate DATE = LocalDate.of(2026, 9, 15);
   static final String HEADER =
-      "Timestamp,From Bank,Account,To Bank,Account,Amount Received,Receiving Currency,"
-          + "Amount Paid,Payment Currency,Payment Format,Is Laundering\n";
-  static Path tempStorage;
+      "Timestamp,From Bank,From Account,To Bank,To Account,Amount Received,Receiving"
+          + " Currency,Amount Paid,Payment Currency,Payment Format,From Bank Name,To Bank Name,From"
+          + " Entity ID,From Entity Name,To Entity ID,To Entity Name,Is Laundering\n";
+
+  static String secret() {
+    byte[] bytes = new byte[32];
+    new SecureRandom().nextBytes(bytes);
+    return Base64.getEncoder().encodeToString(bytes);
+  }
+
+  static final String ENC = secret(), SEARCH = secret();
 
   @DynamicPropertySource
-  static void props(DynamicPropertyRegistry registry) throws IOException {
-    tempStorage = Files.createTempDirectory("bank-upload-test");
-    registry.add("app.storage-dir", () -> tempStorage.toString());
+  static void props(DynamicPropertyRegistry r) {
+    r.add("app.ingest.encryption-key", () -> ENC);
+    r.add("app.ingest.search-key", () -> SEARCH);
+    r.add("app.ingest.key-version", () -> "test");
   }
 
-  @Autowired MockMvc mockMvc;
-  @Autowired ObjectMapper objectMapper;
   @Autowired JdbcTemplate jdbc;
+  @Autowired UploadService service;
+  @Autowired TransactionIntegrationService integration;
+  @Autowired PrivateDataProtector protector;
+  @Autowired MockMvc mvc;
+  @MockitoBean UploadStore store;
+  @MockitoBean AnalysisScheduler scheduler;
+  Map<String, byte[]> files = new ConcurrentHashMap<>();
 
-  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
-  com.moneylaundry.api.storage.UploadStore uploadStore;
-
-  @Test
-  void 발급_완료_결과조회로_모든_행이_적재된다() throws Exception {
-    String csv =
-        HEADER
-            + "2022/09/01 00:20,070,8000EBD30,010,8000EBD30,3697.34,US Dollar,3697.34,US Dollar,Reinvestment,0\n"
-            + "2022/09/01 00:16,00220,8001C8C51,01420,8003093C1,0.025852,Bitcoin,0.025852,Bitcoin,Bitcoin,0\n"
-            + "2022/09/01 00:06,021174,800737690,003,80011F990,100.00,Euro,100.00,Euro,ACH,1\n";
-    long uploadId = issueAndPut(BANK_70, "bank70_0901.csv", csv);
-
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted())
-        .andExpect(jsonPath("$.status").value("RECEIVED"));
-
-    JsonNode done = awaitTerminal(uploadId);
-    assertThat(done.get("status").asText()).isEqualTo("COMPLETED");
-    assertThat(done.get("rowCount").asInt()).isEqualTo(3);
-    assertThat(done.get("duplicateCount").asInt()).isZero();
-    assertThat(done.get("finishedAt").asText()).endsWith("+09:00");
-
-    Integer txCount =
-        jdbc.queryForObject(
-            "select count(*) from transactions where ingest_job_id = ?", Integer.class, uploadId);
-    assertThat(txCount).isEqualTo(3);
-    // 2022/09/01 00:06 은 서울 시간 → UTC 전날 15:06
-    assertThat(
-            jdbc.queryForObject(
-                    "select min(occurred_at) from transactions where ingest_job_id = ?",
-                    java.time.OffsetDateTime.class,
-                    uploadId)
-                .toInstant())
-        .isEqualTo(Instant.parse("2022-08-31T15:06:00Z"));
-    BigDecimal eurUsd =
-        jdbc.queryForObject(
-            "select amount_usd from transactions where ingest_job_id = ? and payment_currency = 'EUR'",
-            BigDecimal.class,
-            uploadId);
-    assertThat(eurUsd)
-        .isEqualByComparingTo(
-            new BigDecimal("100.00").divide(new BigDecimal("0.85340000"), 6, RoundingMode.HALF_UP));
-    Integer labels =
-        jdbc.queryForObject(
-            "select count(*) from evaluation.transaction_labels l join transactions t on t.tx_id = l.tx_id"
-                + " where t.ingest_job_id = ? and l.is_laundering",
-            Integer.class,
-            uploadId);
-    assertThat(labels).isEqualTo(1);
-    assertThat(jdbc.queryForObject("select name from banks where bank_id = 3", String.class))
-        .isEqualTo("China Bank #14");
-    assertThat(jdbc.queryForObject("select country from banks where bank_id = 3", String.class))
-        .isEqualTo("China");
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from accounts where bank_id = 220 and account_number = '8001C8C51'",
-                Integer.class))
-        .isEqualTo(1);
-
-    // 같은 파일 재발급은 409
-    mockMvc
-        .perform(
-            post("/api/v1/bank/uploads")
-                .header("X-Bank-Id", BANK_70)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(issueBody("again.csv", csv)))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("DUPLICATE_FILE"));
-  }
-
-  @Test
-  void 행_검증에_실패하면_아무것도_적재하지_않고_오류_목록을_남긴다() throws Exception {
-    String csv =
-        HEADER
-            + "2022/09/02 01:00,070,A1,010,B1,10.00,US Dollar,10.00,Won,ACH,0\n"
-            + "2022/09/02 01:01,070,A2,010,,10.00,US Dollar,10.00,US Dollar,ACH,0\n";
-    long uploadId = issueAndPut(BANK_70, "bank70_bad.csv", csv);
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted());
-
-    JsonNode done = awaitTerminal(uploadId);
-    assertThat(done.get("status").asText()).isEqualTo("VALIDATION_FAILED");
-    assertThat(done.get("missingCount").asInt()).isEqualTo(1);
-    assertThat(done.get("errors")).hasSize(2);
-    assertThat(done.get("errors").get(0).get("row").asInt()).isEqualTo(2);
-    assertThat(done.get("errors").get(0).get("column").asText()).isEqualTo("Payment Currency");
-    Integer txCount =
-        jdbc.queryForObject(
-            "select count(*) from transactions where ingest_job_id = ?", Integer.class, uploadId);
-    assertThat(txCount).isZero();
-  }
-
-  @Test
-  void 은행코드가_없거나_틀리면_400이다() throws Exception {
-    mockMvc
-        .perform(
-            post("/api/v1/bank/uploads")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(issueBody("x.csv", "a")))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
-    mockMvc
-        .perform(
-            post("/api/v1/bank/uploads")
-                .header("X-Bank-Id", "wrong")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(issueBody("x.csv", "a")))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void 파일을_올리지_않고_완료_통지하면_400_UPLOAD_MISMATCH() throws Exception {
-    MvcResult issued =
-        mockMvc
-            .perform(
-                post("/api/v1/bank/uploads")
-                    .header("X-Bank-Id", BANK_12)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(issueBody("bank12.csv", "never-put")))
-            .andExpect(status().isCreated())
-            .andReturn();
-    long uploadId =
-        objectMapper.readTree(issued.getResponse().getContentAsString()).get("uploadId").asLong();
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_12))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("UPLOAD_MISMATCH"));
-    // 다른 은행의 업로드는 보이지 않는다
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", uploadId).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isNotFound());
-  }
-
-  @Test
-  void 한도를_넘는_크기는_413이다() throws Exception {
-    String body =
-        "{\"fileName\":\"big.csv\",\"sizeBytes\":300000000,\"checksumSha256\":\""
-            + Base64.getEncoder().encodeToString(new byte[32])
-            + "\",\"businessDate\":\"2022-09-01\"}";
-    mockMvc
-        .perform(
-            post("/api/v1/bank/uploads")
-                .header("X-Bank-Id", BANK_70)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isPayloadTooLarge())
-        .andExpect(jsonPath("$.code").value("FILE_TOO_LARGE"));
-  }
-
-  @Test
-  void 도착_현황은_보고_은행_전부를_돌려주고_과거_날짜는_전부_미도착이다() throws Exception {
-    issueAndPut(BANK_12, "arrival12.csv", "arrival12");
-    issueAndPut(BANK_70, "arrival70.csv", "arrival70");
-    MvcResult result =
-        mockMvc
-            .perform(get("/api/banks/arrivals").param("date", "2000-01-01"))
-            .andExpect(status().isOk())
-            .andExpect(
-                jsonPath("$.totalBanks")
-                    .value(
-                        jdbc.queryForObject(
-                            "select count(*) from banks where is_reporting", Integer.class)))
-            .andExpect(jsonPath("$.arrivedCount").value(0))
-            .andExpect(jsonPath("$.remainingSeconds").value(0))
-            .andReturn();
-    JsonNode banks = objectMapper.readTree(result.getResponse().getContentAsString()).get("banks");
-    assertThat(banks.size()).isGreaterThanOrEqualTo(2);
-    assertThat(banks.get(0).get("bankId").asInt()).isEqualTo(12);
-    assertThat(banks.get(0).get("status").asText()).isEqualTo("NOT_ARRIVED");
-    assertThat(banks.get(1).get("name").asText()).isEqualTo("Oasis Thrift");
-  }
-
-  @Test
-  void 내부중복과_기준일_불일치는_파일전체_실패다() throws Exception {
-    String row = "2022/09/01 00:20,070,DU1,010,DU2,10,US Dollar,10,US Dollar,ACH,0\n";
-    long duplicate = issueAndPut(BANK_70, "duplicate.csv", HEADER + row + row);
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", duplicate).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted());
-    JsonNode result = awaitTerminal(duplicate);
-    assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
-    assertThat(result.get("insertedCount").asInt()).isZero();
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from transactions where ingest_job_id = ?",
-                Integer.class,
-                duplicate))
-        .isZero();
-    long date =
-        issueAndPut(BANK_70, "wrong-date.csv", HEADER + row.replace("2022/09/01", "2022/09/03"));
-    mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", date).header("X-Bank-Id", BANK_70));
-    assertThat(awaitTerminal(date).get("status").asText()).isEqualTo("VALIDATION_FAILED");
-  }
-
-  @Test
-  void 은행별_조회와_진행중_파일중복을_검사한다() throws Exception {
-    String body = issueBody("pending.csv", "pending-file");
-    JsonNode issued =
-        objectMapper.readTree(
-            mockMvc
-                .perform(
-                    post("/api/v1/bank/uploads")
-                        .header("X-Bank-Id", BANK_70)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString());
-    long id = issued.get("uploadId").asLong();
-    mockMvc.perform(get("/api/v1/bank/uploads/{id}", id)).andExpect(status().isBadRequest());
-    mockMvc
-        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Bank-Id", BANK_12))
-        .andExpect(status().isNotFound());
-    mockMvc
-        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.businessDate").value("2022-09-01"));
-    mockMvc
-        .perform(
-            post("/api/v1/bank/uploads")
-                .header("X-Bank-Id", BANK_70)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("UPLOAD_IN_PROGRESS"));
-    mockMvc
-        .perform(
-            post("/api/v1/bank/uploads")
-                .header("X-Bank-Id", BANK_12)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isCreated());
-  }
-
-  @Test
-  void 원장중복이_섞이면_신규행도_롤백한다() throws Exception {
-    String row = "2022/09/01 02:20,070,LDU1,010,LDU2,20,US Dollar,20,US Dollar,ACH,\n";
-    long first = issueAndPut(BANK_70, "ledger-first.csv", HEADER + row);
-    mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", first).header("X-Bank-Id", BANK_70));
-    assertThat(awaitTerminal(first).get("insertedCount").asInt()).isEqualTo(1);
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", first).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted())
-        .andExpect(jsonPath("$.status").value("COMPLETED"));
-    mockMvc
-        .perform(
-            post("/api/v1/bank/uploads")
-                .header("X-Bank-Id", BANK_70)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(issueBody("again.csv", HEADER + row)))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.fileName").value("ledger-first.csv"))
-        .andExpect(jsonPath("$.uploadedAt").isNotEmpty())
-        .andExpect(jsonPath("$.uploadId").doesNotExist());
-    long second =
-        issueAndPut(BANK_70, "ledger-second.csv", HEADER + row + row.replace("LDU1", "LDU3"));
-    mockMvc.perform(
-        post("/api/v1/bank/uploads/{id}/complete", second).header("X-Bank-Id", BANK_70));
-    assertThat(awaitTerminal(second).get("status").asText()).isEqualTo("VALIDATION_FAILED");
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from transactions where ingest_job_id = ?", Integer.class, second))
-        .isZero();
-  }
-
-  @Test
-  void 완료상태_저장실패는_원장도_롤백한다() throws Exception {
-    String row = "2022/09/01 03:20,070,AT1,010,AT2,30,US Dollar,30,US Dollar,ACH,0\n";
-    long id = issueAndPut(BANK_70, "atomic.csv", HEADER + row);
+  @BeforeEach
+  void setup() throws Exception {
+    reset(store);
+    files.clear();
     jdbc.execute(
-        "create function test_reject_completed() returns trigger language plpgsql as $$ begin if NEW.file_name = 'atomic.csv' and NEW.status = 'COMPLETED' then raise exception 'test secret failure'; end if; return NEW; end $$");
-    jdbc.execute(
-        "create trigger reject_completed before update on batch_jobs for each row execute function test_reject_completed()");
-    try {
-      mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70));
-      JsonNode result = awaitTerminal(id);
-      assertThat(result.get("status").asText()).isEqualTo("FAILED");
-      assertThat(result.get("insertedCount").asInt()).isZero();
-      assertThat(result.get("errorMessage").asText()).doesNotContain("test secret");
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from transactions where ingest_job_id = ?", Integer.class, id))
-          .isZero();
-    } finally {
-      jdbc.execute("drop trigger reject_completed on batch_jobs");
-      jdbc.execute("drop function test_reject_completed()");
+        "truncate banks,batch_jobs,private.entities,reporting_scopes,integration_attempts restart"
+            + " identity cascade");
+    for (int bank : new int[] {10, 20, 30}) {
+      jdbc.update("insert into banks(bank_id,is_reporting) values(?,true)", bank);
+      jdbc.update(
+          "insert into bank_reporting_periods(bank_id,effective_from_date,effective_to_date)"
+              + " values(?,?,?)",
+          bank,
+          DATE.minusDays(1),
+          DATE.plusDays(1));
     }
+    when(store.issue(anyString(), any(), anyString()))
+        .thenAnswer(i -> new UploadTarget(i.getArgument(0), "PUT", Map.of()));
+    when(store.open(anyString()))
+        .thenAnswer(i -> new ByteArrayInputStream(files.get(i.getArgument(0))));
+    when(store.sizeOf(anyString()))
+        .thenAnswer(
+            i ->
+                files.containsKey(i.getArgument(0))
+                    ? OptionalLong.of(files.get(i.getArgument(0)).length)
+                    : OptionalLong.empty());
+    when(store.checksumOf(anyString())).thenAnswer(i -> digest(files.get(i.getArgument(0))));
+  }
+
+  static String digest(byte[] bytes) throws Exception {
+    return Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes));
+  }
+
+  static String row(
+      int from,
+      String a,
+      int to,
+      String b,
+      String received,
+      String rc,
+      String paid,
+      String pc,
+      String format,
+      String e1,
+      String e2) {
+    return "2026/09/15 12:00,"
+        + from
+        + ","
+        + a
+        + ","
+        + to
+        + ","
+        + b
+        + ","
+        + received
+        + ","
+        + inputCurrency(rc)
+        + ","
+        + paid
+        + ","
+        + inputCurrency(pc)
+        + ","
+        + format
+        + ",Bank"
+        + from
+        + ",Bank"
+        + to
+        + ","
+        + e1
+        + ",Name"
+        + e1
+        + ","
+        + e2
+        + ",Name"
+        + e2
+        + ",0\n";
+  }
+
+  static String inputCurrency(String iso) {
+    return Map.of("USD", "US Dollar", "EUR", "Euro", "JPY", "Yen").get(iso);
+  }
+
+  long submit(int bank, String csv) throws Exception {
+    return submit(bank, csv.getBytes(StandardCharsets.UTF_8));
+  }
+
+  long submit(int bank, byte[] bytes) throws Exception {
+    var issued =
+        service.issue(
+            bank,
+            new IssueUploadRequest(UUID.randomUUID() + ".csv", bytes.length, digest(bytes), DATE));
+    String key =
+        jdbc.queryForObject(
+            "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId());
+    files.put(key, bytes);
+    assertThat(service.complete(bank, issued.uploadId()).status().name()).isEqualTo("RECEIVED");
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    while (System.nanoTime() < deadline) {
+      String state = service.status(bank, issued.uploadId()).status().name();
+      if (Set.of("COMPLETED", "VALIDATION_FAILED", "FAILED").contains(state))
+        return issued.uploadId();
+      Thread.sleep(20);
+    }
+    throw new AssertionError("ingestion timeout");
+  }
+
+  TransactionIntegrationService.Outcome integrate(long... ids) {
+    Set<Long> values = new HashSet<>();
+    for (long id : ids) values.add(id);
+    return integration.integrate(DATE, Instant.now().plusSeconds(1), values);
+  }
+
+  int count(String table) {
+    return jdbc.queryForObject("select count(*) from " + table, Integer.class);
   }
 
   @Test
-  void 교차은행_동시파일은_모두_완료된다() throws Exception {
-    String a = HEADER + "2022/09/01 04:20,070,CROSS1,012,CROSS2,40,US Dollar,40,US Dollar,ACH,0\n";
-    String b = HEADER + "2022/09/01 04:21,012,CROSS2,070,CROSS1,41,US Dollar,41,US Dollar,ACH,0\n";
-    long first = issueAndPut(BANK_70, "cross-a.csv", a);
-    long second = issueAndPut(BANK_12, "cross-b.csv", b);
-    try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
-      var x =
-          executor.submit(
-              () ->
-                  mockMvc
-                      .perform(
-                          post("/api/v1/bank/uploads/{id}/complete", first)
-                              .header("X-Bank-Id", BANK_70))
-                      .andExpect(status().isAccepted()));
-      var y =
-          executor.submit(
-              () ->
-                  mockMvc
-                      .perform(
-                          post("/api/v1/bank/uploads/{id}/complete", second)
-                              .header("X-Bank-Id", BANK_12))
-                      .andExpect(status().isAccepted()));
-      x.get(20, java.util.concurrent.TimeUnit.SECONDS);
-      y.get(20, java.util.concurrent.TimeUnit.SECONDS);
-    }
-    assertThat(awaitTerminal(first).get("status").asText()).isEqualTo("COMPLETED");
-    for (int i = 0; i < 120; i++) {
-      String status =
-          jdbc.queryForObject(
-              "select status from batch_jobs where job_id = ?", String.class, second);
-      if (status.equals("COMPLETED")) return;
-      assertThat(status).isNotIn("FAILED", "VALIDATION_FAILED");
-      Thread.sleep(250);
-    }
-    throw new AssertionError("교차은행 처리 시간초과");
-  }
-
-  @Test
-  void 동일파일_동시발급은_한건만_생성한다() throws Exception {
+  void independent_source_multiset_restores_counts_amounts_and_relationships() throws Exception {
+    String ach = row(10, "A", 20, "B", "100", "USD", "100", "USD", "ACH", "E1", "E2");
+    String wire = ach.replace(",ACH,", ",Wire,");
+    String cross = row(20, "C", 30, "D", "11", "USD", "10", "EUR", "ACH", "E1", "E3");
+    String internal = row(10, "A", 10, "Z", "5", "USD", "5", "USD", "ACH", "E1", "E4");
+    String externalIn = row(40, "X", 20, "B", "2", "JPY", "2", "JPY", "ACH", "E5", "E2");
+    String externalOut = row(20, "B", 50, "Y", "3.5", "EUR", "3.5", "EUR", "ACH", "E2", "E6");
+    long a = submit(10, HEADER + ach + wire + ach + internal),
+        b = submit(20, HEADER + wire + ach + cross + ach + externalIn + externalOut),
+        c = submit(30, HEADER + cross);
+    assertThat(count("transactions")).isZero();
+    assertThat(service.status(10, a).integrationStatus())
+        .isEqualTo("VALIDATED_WAITING_INTEGRATION");
+    assertThat(integrate(a, b, c).transactions()).isEqualTo(7);
+    assertThat(count("private.bank_reports")).isEqualTo(11);
+    assertThat(count("transaction_reports")).isEqualTo(11);
+    assertThat(count("private.accounts")).isEqualTo(7);
+    assertThat(count("private.entities")).isEqualTo(6);
+    assertAmounts(
+        "amount_paid", "payment_currency", Map.of("USD", "305", "EUR", "13.5", "JPY", "2"));
+    assertAmounts(
+        "amount_received", "receiving_currency", Map.of("USD", "316", "EUR", "3.5", "JPY", "2"));
+    long e1 =
+        jdbc.queryForObject(
+            "select entity_id from private.entities where entity_lookup_token=?",
+            Long.class,
+            protector.token("entity", "E1"));
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from banks where bank_id=2000000001", Integer.class))
-        .isZero();
-    String body = issueBody("issue-race.csv", "issue-race-content");
-    var barrier = new java.util.concurrent.CyclicBarrier(2);
-    try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
-      java.util.concurrent.Callable<Integer> call =
-          () -> {
-            barrier.await();
-            return mockMvc
-                .perform(
-                    post("/api/v1/bank/uploads")
-                        .header("X-Bank-Id", "2000000001")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andReturn()
-                .getResponse()
-                .getStatus();
-          };
-      var x = executor.submit(call);
-      var y = executor.submit(call);
-      assertThat(
-              java.util.List.of(
-                  x.get(20, java.util.concurrent.TimeUnit.SECONDS),
-                  y.get(20, java.util.concurrent.TimeUnit.SECONDS)))
-          .containsExactlyInAnyOrder(201, 409);
-    }
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from banks where bank_id=2000000001 and is_reporting",
-                Integer.class))
-        .isEqualTo(1);
-  }
-
-  @Test
-  void DB최종_중복방어도_앞서_삽입한_청크까지_롤백한다() throws Exception {
-    StringBuilder csv = new StringBuilder(HEADER);
-    for (int i = 1; i <= 1001; i++) {
-      csv.append("2022/09/01 05:20,070,RACE")
-          .append(i)
-          .append(",010,RACETO,1,US Dollar,")
-          .append(i)
-          .append(",US Dollar,ACH,0\n");
-    }
-    long id = issueAndPut(BANK_70, "unique-race.csv", csv.toString());
-    // 사전검수 이후 마지막 청크에서 경쟁 INSERT의 unique violation을 재현한다.
-    jdbc.execute(
-        "create function test_unique_race() returns trigger language plpgsql as $$ begin if NEW.ingest_job_id = "
-            + id
-            + " and NEW.amount_paid = 1001 then raise unique_violation using message = 'simulated concurrent unique constraint'; end if; return NEW; end $$");
-    jdbc.execute(
-        "create trigger unique_race before insert on transactions for each row execute function test_unique_race()");
-    try {
-      mockMvc.perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70));
-      JsonNode result = awaitTerminal(id);
-      assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
-      assertThat(result.get("insertedCount").asInt()).isZero();
-      assertThat(result.get("errors").get(0).get("row").asInt()).isZero();
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from transactions where ingest_job_id = ?", Integer.class, id))
-          .isZero();
-    } finally {
-      jdbc.execute("drop trigger unique_race on transactions");
-      jdbc.execute("drop function test_unique_race()");
-    }
-  }
-
-  @Test
-  void 만료후에도_재발급전이면_완료할수_있다() throws Exception {
-    String csv = HEADER + "2022/09/01 06:20,070,EX1,010,EX2,60,US Dollar,60,US Dollar,ACH,0\n";
-    long id = issueAndPut(BANK_70, "expired-only.csv", csv);
-    jdbc.update(
-        "update batch_jobs set url_expires_at = now() - interval '1 minute' where job_id = ?", id);
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted());
-    assertThat(awaitTerminal(id).get("status").asText()).isEqualTo("COMPLETED");
-  }
-
-  @Test
-  void 재발급후_이전번호는_거절하고_새번호만_적재한다() throws Exception {
-    String csv = HEADER + "2022/09/01 06:21,070,EX3,010,EX4,61,US Dollar,61,US Dollar,ACH,0\n";
-    long oldId = issueAndPut(BANK_70, "expired-old.csv", csv);
-    jdbc.update(
-        "update batch_jobs set url_expires_at = now() - interval '1 minute' where job_id = ?",
-        oldId);
-    long newId = issueAndPut(BANK_70, "expired-new.csv", csv);
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", oldId).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("UPLOAD_SUPERSEDED"));
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from transactions where ingest_job_id = ?", Integer.class, oldId))
-        .isZero();
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", newId).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted());
-    assertThat(awaitTerminal(newId).get("status").asText()).isEqualTo("COMPLETED");
-  }
-
-  @Test
-  void 양쪽_계좌의_구분문자는_정상행과_함께_전체거절한다() throws Exception {
-    for (int accountColumn : new int[] {2, 4}) {
-      String normal =
-          "2022/09/01 07:10,070,PIPEOK"
-              + accountColumn
-              + ",010,PIPEDEST,70,US Dollar,70,US Dollar,ACH,0\n";
-      String[] invalid =
-          ("2022/09/01 07:11,070,PIPEFROM,010,PIPETO,71,US Dollar,71,US Dollar,ACH,0").split(",");
-      invalid[accountColumn] += "|EXTRA";
-      long id =
-          issueAndPut(
-              BANK_70,
-              "pipe-" + accountColumn + ".csv",
-              HEADER + normal + String.join(",", invalid) + "\n");
-      mockMvc
-          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-          .andExpect(status().isAccepted());
-      JsonNode result = awaitTerminal(id);
-      assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
-      assertThat(result.get("missingCount").asInt()).isZero();
-      assertThat(result.get("insertedCount").asInt()).isZero();
-      assertThat(result.get("errors")).hasSize(1);
-      assertThat(result.get("errors").get(0).get("row").asInt()).isEqualTo(3);
-      assertThat(result.get("errors").get(0).get("column").asText()).isEqualTo("Account");
-      assertThat(result.get("errors").get(0).get("reason").asText()).contains("|");
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from transactions where ingest_job_id = ?", Integer.class, id))
-          .isZero();
-    }
-  }
-
-  @Test
-  void 일반계좌의_기존해시와_BOM_및_결제형식_구분문자는_유지한다() throws Exception {
-    String csv =
-        "\uFEFF"
-            + HEADER
-            + "2022/09/01 07:20,070,HASH1,010,HASH2,70,US Dollar,70,US Dollar,ACH|CUSTOM,0\n";
-    long id = issueAndPut(BANK_70, "hash-compatible.csv", csv);
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted());
-    assertThat(awaitTerminal(id).get("status").asText()).isEqualTo("COMPLETED");
-    assertThat(
-            jdbc.queryForObject(
-                "select row_hash from transactions where ingest_job_id = ?", String.class, id))
-        .isEqualTo("52e298b05b4761fa0c47b58a0ef4b60fa00fbc425b768c76354269718c8afb0c");
-  }
-
-  @Test
-  void 금액_범위초과는_정상행과_함께_파일전체를_거절한다() throws Exception {
-    for (int column : new int[] {5, 7}) {
-      for (String amount : new String[] {"123.1234567", "1000000000000000000"}) {
-        String prefix = "AMTBAD" + column + (amount.contains(".") ? "S" : "I");
-        String normal =
-            "2022/09/01 08:10,070,"
-                + prefix
-                + "OK,010,"
-                + prefix
-                + "DEST,1,US Dollar,1,US Dollar,ACH,0\n";
-        String[] invalid =
-            ("2022/09/01 08:11,070,"
-                    + prefix
-                    + "BAD,010,"
-                    + prefix
-                    + "BADDEST,1,US Dollar,1,US Dollar,ACH,0")
-                .split(",");
-        invalid[column] = amount;
-        long id =
-            issueAndPut(
-                BANK_70, prefix + ".csv", HEADER + normal + String.join(",", invalid) + "\n");
-        mockMvc
-            .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-            .andExpect(status().isAccepted());
-        JsonNode result = awaitTerminal(id);
-        assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
-        assertThat(result.get("rowCount").asInt()).isEqualTo(2);
-        assertThat(result.get("insertedCount").asInt()).isZero();
-        assertThat(result.get("missingCount").asInt()).isZero();
-        assertThat(result.get("errors")).hasSize(1);
-        JsonNode error = result.get("errors").get(0);
-        assertThat(error.get("row").asInt()).isEqualTo(3);
-        assertThat(error.get("column").asText())
-            .isEqualTo(column == 5 ? "Amount Received" : "Amount Paid");
-        assertThat(error.get("reason").asText()).contains(amount.contains(".") ? "6자리" : "18자리");
-        assertThat(
-                jdbc.queryForObject(
-                    "select count(*) from transactions where ingest_job_id = ?", Integer.class, id))
-            .isZero();
-        assertThat(
-                jdbc.queryForObject(
-                    "select count(*) from accounts where account_number like ?",
-                    Integer.class,
-                    prefix + "%"))
-            .isZero();
-      }
-    }
-  }
-
-  @Test
-  void 금액_최댓값과_끝자리0은_USD에서_정확히_저장한다() throws Exception {
-    String maximum = "999999999999999999.999999";
-    String csv =
-        HEADER
-            + "2022/09/01 08:20,070,AMTMAX,010,AMTMAXDEST,"
-            + maximum
-            + ",US Dollar,"
-            + maximum
-            + ",US Dollar,ACH,0\n"
-            + "2022/09/01 08:21,070,AMTZERO,010,AMTZERODEST,123.1234560,US Dollar,1.0000000,US Dollar,ACH,0\n";
-    long id = issueAndPut(BANK_70, "amount-exact.csv", csv);
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted());
-    JsonNode result = awaitTerminal(id);
-    assertThat(result.get("status").asText()).isEqualTo("COMPLETED");
-    assertThat(result.get("insertedCount").asInt()).isEqualTo(2);
-    for (String column : new String[] {"amount_received", "amount_paid", "amount_usd"}) {
-      assertThat(
-              jdbc.queryForObject(
-                  "select max(" + column + ") from transactions where ingest_job_id = ?",
-                  BigDecimal.class,
-                  id))
-          .isEqualByComparingTo(maximum);
-    }
-    assertThat(
-            jdbc.queryForObject(
-                "select min(amount_received) from transactions where ingest_job_id = ?",
-                BigDecimal.class,
-                id))
-        .isEqualByComparingTo("123.123456");
-    assertThat(
-            jdbc.queryForObject(
-                "select min(amount_paid) from transactions where ingest_job_id = ?",
-                BigDecimal.class,
-                id))
-        .isEqualByComparingTo("1");
-  }
-
-  @Test
-  void 첫발급은_보고은행을_등록하고_기존_정보와_키값은_보존한다() throws Exception {
-    jdbc.update(
-        "insert into banks(bank_id, name, country, api_key_hash) values (2000000002, 'existing', 'country', ?)",
-        "f".repeat(64));
-    issueAndPut("2000000002", "existing.csv", "metadata-preserve");
-    assertThat(jdbc.queryForObject("select name from banks where bank_id=2000000002", String.class))
-        .isEqualTo("existing");
-    assertThat(
-            jdbc.queryForObject("select country from banks where bank_id=2000000002", String.class))
-        .isEqualTo("country");
-    assertThat(
-            jdbc.queryForObject(
-                "select api_key_hash from banks where bank_id=2000000002", String.class))
-        .isEqualTo("f".repeat(64));
-    assertThat(
-            jdbc.queryForObject(
-                "select is_reporting from banks where bank_id=2000000002", Boolean.class))
-        .isTrue();
-    long id = issueAndPut("2000000003", "unknown.csv", "unknown-reference");
-    assertThat(jdbc.queryForObject("select name from banks where bank_id=2000000003", String.class))
-        .isNull();
-    mockMvc
-        .perform(get("/api/v1/bank/uploads/{id}", id).header("X-Bank-Id", "2000000004"))
-        .andExpect(status().isNotFound());
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", "2000000004"))
-        .andExpect(status().isNotFound());
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from banks where bank_id=2000000004", Integer.class))
-        .isZero();
-  }
-
-  @Test
-  void 잘못된_UTF8_바이트는_파일단위_검증실패다() throws Exception {
-    String row = "2022/09/01 09:10,070,UTFBAD,010,UTFDEST,1,US Dollar,1,US Dollar,ACH,0\n";
-    byte[] valid = (HEADER + row).getBytes(StandardCharsets.UTF_8);
-    for (int variant = 0; variant < 3; variant++) {
-      byte[] bytes;
-      if (variant < 2) {
-        bytes = valid.clone();
-        bytes[variant == 0 ? 0 : HEADER.length() + 24] = (byte) 0xFF;
-      } else {
-        bytes = java.util.Arrays.copyOf(valid, valid.length + 2);
-        bytes[valid.length] = (byte) 0xE2;
-        bytes[valid.length + 1] = (byte) 0x82;
-      }
-      long id = issueAndPutBytes("invalid-utf8-" + variant + ".csv", bytes);
-      mockMvc
-          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-          .andExpect(status().isAccepted());
-      JsonNode result = awaitTerminal(id);
-      assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
-      assertThat(result.get("rowCount").isNull()).isTrue();
-      assertThat(result.get("insertedCount").asInt()).isZero();
-      assertThat(result.get("errors").get(0).get("row").asInt()).isZero();
-      assertThat(result.get("errors").get(0).get("reason").asText()).contains("UTF-8");
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from transactions where ingest_job_id=?", Integer.class, id))
-          .isZero();
-    }
-  }
-
-  @Test
-  void 문자열_초과는_정상행도_계좌도_남기지_않는다() throws Exception {
-    for (int column : new int[] {2, 4, 9}) {
-      String prefix = "LENGTH" + column;
-      String normal =
-          "2022/09/01 09:20,070,"
-              + prefix
-              + "OK,010,"
-              + prefix
-              + "DEST,1,US Dollar,1,US Dollar,ACH,0\n";
-      String[] bad =
-          ("2022/09/01 09:21,070,"
-                  + prefix
-                  + "BAD,010,"
-                  + prefix
-                  + "BADDEST,1,US Dollar,1,US Dollar,ACH,0")
-              .split(",");
-      bad[column] = "한".repeat(column == 9 ? 31 : 101);
-      long id =
-          issueAndPut(BANK_70, prefix + ".csv", HEADER + normal + String.join(",", bad) + "\n");
-      mockMvc
-          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-          .andExpect(status().isAccepted());
-      JsonNode result = awaitTerminal(id);
-      assertThat(result.get("status").asText()).isEqualTo("VALIDATION_FAILED");
-      assertThat(result.get("insertedCount").asInt()).isZero();
-      assertThat(result.get("errors").get(0).get("row").asInt()).isEqualTo(3);
-      assertThat(result.get("errors").get(0).get("column").asText())
-          .isEqualTo(column == 9 ? "Payment Format" : "Account");
-      assertThat(result.get("errors").get(0).get("reason").asText())
-          .contains(column == 9 ? "30" : "100");
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from transactions where ingest_job_id=?", Integer.class, id))
-          .isZero();
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from accounts where account_number like ?",
-                  Integer.class,
-                  prefix + "%"))
-          .isZero();
-    }
-  }
-
-  @Test
-  void 정상_UTF8_BOM_한글_보충문자_및_대체문자_자체는_보존한다() throws Exception {
-    String from = "한".repeat(99) + "\uFFFD";
-    String to = "\uD83D\uDE00".repeat(100);
-    String format = "\uD83D\uDE00".repeat(30);
-    String csv =
-        "\uFEFF"
-            + HEADER
-            + "2022/09/01 09:30,070,"
-            + from
-            + ",010,"
-            + to
-            + ",1,US Dollar,1,US Dollar,"
-            + format
-            + ",0\n";
-    long id = issueAndPutBytes("unicode-valid.csv", csv.getBytes(StandardCharsets.UTF_8));
-    mockMvc
-        .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-        .andExpect(status().isAccepted());
-    assertThat(awaitTerminal(id).get("status").asText()).isEqualTo("COMPLETED");
-    assertThat(
-            jdbc.queryForObject(
-                "select payment_format from transactions where ingest_job_id=?", String.class, id))
-        .isEqualTo(format);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from accounts where account_number in (?, ?)",
-                Integer.class,
-                from,
-                to))
+                "select count(*) from private.accounts where entity_id=?", Integer.class, e1))
         .isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from transactions t join private.accounts f on"
+                    + " f.account_id=t.from_account_id join private.accounts r on"
+                    + " r.account_id=t.to_account_id where f.account_lookup_token=? and"
+                    + " r.account_lookup_token=?",
+                Integer.class,
+                protector.token("account", "10", "A"),
+                protector.token("account", "20", "B")))
+        .isEqualTo(3);
+    List<String> relationships =
+        jdbc.query(
+            "select f.bank_id as fb,f.identity_cipher as fc,f.key_version as fv,fe.identity_cipher"
+                + " as fec,fe.key_version as fev,r.bank_id as rb,r.identity_cipher as"
+                + " rc,r.key_version as rv,re.identity_cipher as rec,re.key_version as"
+                + " rev,t.payment_format from transactions t join private.accounts f on"
+                + " f.account_id=t.from_account_id join private.entities fe on"
+                + " fe.entity_id=f.entity_id join private.accounts r on"
+                + " r.account_id=t.to_account_id join private.entities re on"
+                + " re.entity_id=r.entity_id",
+            (rs, n) ->
+                rs.getInt("fb")
+                    + ":"
+                    + protector.decrypt(
+                        "account:" + rs.getInt("fb"), rs.getString("fc"), rs.getString("fv"))
+                    + ":"
+                    + protector.decrypt("entity-id", rs.getString("fec"), rs.getString("fev"))
+                    + ">"
+                    + rs.getInt("rb")
+                    + ":"
+                    + protector.decrypt(
+                        "account:" + rs.getInt("rb"), rs.getString("rc"), rs.getString("rv"))
+                    + ":"
+                    + protector.decrypt("entity-id", rs.getString("rec"), rs.getString("rev"))
+                    + ":"
+                    + rs.getString("payment_format"));
+    assertThat(relationships)
+        .containsExactlyInAnyOrder(
+            "10:A:E1>20:B:E2:ACH",
+            "10:A:E1>20:B:E2:ACH",
+            "10:A:E1>20:B:E2:Wire",
+            "20:C:E1>30:D:E3:ACH",
+            "10:A:E1>10:Z:E4:ACH",
+            "40:X:E5>20:B:E2:ACH",
+            "20:B:E2>50:Y:E6:ACH");
+    var ids =
+        jdbc.queryForList(
+            "select service_account_id from private.accounts order by account_id", UUID.class);
+    assertThat(integrate(a, b, c).transactions()).isEqualTo(7);
+    assertThat(count("transactions")).isEqualTo(7);
+    assertThat(
+            jdbc.queryForList(
+                "select service_account_id from private.accounts order by account_id", UUID.class))
+        .isEqualTo(ids);
+    assertThat(jdbc.queryForList("select payload_cipher from private.bank_reports", String.class))
+        .allMatch(v -> !v.contains("NameE"));
+    mvc.perform(get("/api/uploads/{id}", a)).andExpect(status().isNotFound());
+    mvc.perform(get("/api/v1/bank/uploads/{id}", a).header("X-Bank-Id", 20))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/api/v1/bank/uploads/{id}", a).header("X-Bank-Id", 10))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.integrationStatus").value("ACTIVE"));
+  }
+
+  void assertAmounts(String amount, String currency, Map<String, String> expected) {
+    var actual =
+        jdbc.queryForList(
+            "select trim("
+                + currency
+                + ") as currency,sum("
+                + amount
+                + ") as amount from transactions group by "
+                + currency);
+    assertThat(actual).hasSize(expected.size());
+    for (var item : actual)
+      assertThat((BigDecimal) item.get("amount"))
+          .isEqualByComparingTo(expected.get(item.get("currency")));
   }
 
   @Test
-  void 이차읽기_UTF8오류도_계좌를_롤백하고_일반IO오류는_LOAD_FAILED다() throws Exception {
-    for (boolean encodingError : new boolean[] {true, false}) {
-      String prefix = encodingError ? "SECONDUTF" : "READIO";
-      String csv =
-          HEADER
-              + "2022/09/01 09:40,070,"
-              + prefix
-              + ",010,"
-              + prefix
-              + "DEST,1,US Dollar,1,US Dollar,ACH,0\n";
-      long id = issueAndPut(BANK_70, prefix + ".csv", csv);
-      String key =
-          jdbc.queryForObject("select s3_key from batch_jobs where job_id=?", String.class, id);
-      java.io.InputStream failed =
-          encodingError
-              ? new java.io.ByteArrayInputStream(new byte[] {(byte) 0xFF})
-              : new java.io.InputStream() {
-                @Override
-                public int read() throws IOException {
-                  throw new IOException("simulated read failure");
-                }
-              };
-      org.mockito.Mockito.doReturn(
-              new java.io.ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)),
-              new java.io.ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)),
-              failed)
-          .when(uploadStore)
-          .open(key);
-      mockMvc
-          .perform(post("/api/v1/bank/uploads/{id}/complete", id).header("X-Bank-Id", BANK_70))
-          .andExpect(status().isAccepted());
-      JsonNode result = awaitTerminal(id);
-      assertThat(result.get("status").asText())
-          .isEqualTo(encodingError ? "VALIDATION_FAILED" : "FAILED");
-      assertThat(result.get("errorCode").asText())
-          .isEqualTo(encodingError ? "VALIDATION_FAILED" : "LOAD_FAILED");
-      assertThat(result.get("rowCount").isNull()).isTrue();
-      assertThat(result.get("insertedCount").asInt()).isZero();
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from transactions where ingest_job_id=?", Integer.class, id))
-          .isZero();
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from accounts where account_number like ?",
-                  Integer.class,
-                  prefix + "%"))
-          .isZero();
-      if (encodingError) {
-        assertThat(result.get("errors").get(0).get("row").asInt()).isZero();
-        assertThat(result.get("errors").get(0).get("reason").asText()).contains("UTF-8");
+  void old_header_invalid_utf8_missing_and_unrelated_bank_hold_whole_file() throws Exception {
+    String valid = row(10, "A", 40, "B", "1", "USD", "1", "USD", "ACH", "E1", "E2");
+    for (byte[] content :
+        List.of(
+            "Timestamp,From Bank,Account\n2026/09/15,10,A\n".getBytes(StandardCharsets.UTF_8),
+            (HEADER + valid + valid.replace(",E1,", ",,")).getBytes(StandardCharsets.UTF_8),
+            (HEADER + valid.replace("10,A,40,B", "20,A,40,B")).getBytes(StandardCharsets.UTF_8),
+            (HEADER + valid.replace(",A,", ",A\"oops,")).getBytes(StandardCharsets.UTF_8),
+            new byte[] {(byte) 0xc3, 0x28})) {
+      // Separate dates/sets are unnecessary: invalid submissions use a fresh reporting bank DB
+      // fixture.
+      setup();
+      long id = submit(10, content);
+      assertThat(service.status(10, id).status().name()).isEqualTo("VALIDATION_FAILED");
+      assertThat(service.status(10, id).integrationStatus()).isEqualTo("HELD");
+      String text = new String(content, StandardCharsets.UTF_8);
+      if (content.length == 2 || text.contains("Account\n") || text.contains("oops")) {
+        assertThat(service.status(10, id).rowCount()).isNull();
+        assertThat(service.status(10, id).errors()).noneMatch(e -> e.reason().equals("EMPTY_FILE"));
       }
+      assertThat(count("transactions")).isZero();
+      assertThat(count("private.entities")).isZero();
+      assertThat(count("private.accounts")).isZero();
     }
   }
 
-  private long issueAndPutBytes(String fileName, byte[] bytes) throws Exception {
-    String checksum =
-        Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes));
-    String body =
-        objectMapper.writeValueAsString(
-            java.util.Map.of(
-                "fileName",
-                fileName,
-                "sizeBytes",
-                bytes.length,
-                "checksumSha256",
-                checksum,
-                "businessDate",
-                "2022-09-01"));
-    var response =
-        mockMvc
-            .perform(
-                post("/api/v1/bank/uploads")
-                    .header("X-Bank-Id", BANK_70)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(body))
-            .andExpect(status().isCreated())
-            .andReturn();
-    JsonNode issued = objectMapper.readTree(response.getResponse().getContentAsString());
-    Files.write(Path.of(URI.create(issued.get("url").asText())), bytes);
-    return issued.get("uploadId").asLong();
+  @Test
+  void identity_conflict_holds_both_files_without_first_arrival_winner() throws Exception {
+    String a = row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2");
+    String b =
+        row(20, "B", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2").replace("NameE1", "Other");
+    long x = submit(10, HEADER + a), y = submit(20, HEADER + b);
+    assertThat(integrate(y, x).heldFiles()).isEqualTo(2);
+    assertThat(count("transactions")).isZero();
+    assertThat(count("private.entities")).isZero();
   }
 
-  private long issueAndPut(String bankId, String fileName, String csv) throws Exception {
-    MvcResult issued =
-        mockMvc
-            .perform(
-                post("/api/v1/bank/uploads")
-                    .header("X-Bank-Id", bankId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(issueBody(fileName, csv)))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.bankId").isNumber())
-            .andExpect(jsonPath("$.method").value("PUT"))
-            .andExpect(jsonPath("$.url").isNotEmpty())
-            .andReturn();
-    JsonNode json = objectMapper.readTree(issued.getResponse().getContentAsString());
-    Path target = Path.of(URI.create(json.get("url").asText()));
-    Files.write(target, csv.getBytes(StandardCharsets.UTF_8));
-    return json.get("uploadId").asLong();
+  @Test
+  void broken_file_only_blocks_dependent_rows_of_other_file() throws Exception {
+    String ab = row(10, "A", 20, "B", "1", "USD", "1", "USD", "ACH", "E1", "E2");
+    String bc = row(20, "B", 30, "C", "2", "USD", "2", "USD", "ACH", "E2", "E3");
+    long a = submit(10, HEADER + ab + ab.replace(",E1,", ",,")),
+        b = submit(20, HEADER + ab + bc),
+        c = submit(30, HEADER + bc);
+    var result = integrate(a, b, c);
+    assertThat(result.transactions()).isEqualTo(1);
+    assertThat(result.heldFiles()).isEqualTo(1);
+    assertThat(result.dependentReports()).isEqualTo(1);
+    assertThat(service.status(20, b).integrationStatus()).isEqualTo("PARTIALLY_HELD");
+    assertThat(count("private.accounts")).isEqualTo(2);
   }
 
-  private String issueBody(String fileName, String content) throws Exception {
-    byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-    String sha =
-        Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes));
-    return "{\"fileName\":\""
-        + fileName
-        + "\",\"sizeBytes\":"
-        + bytes.length
-        + ",\"checksumSha256\":\""
-        + sha
-        + "\",\"businessDate\":\""
-        + (content.contains("2022/09/02") ? "2022-09-02" : "2022-09-01")
-        + "\"}";
-  }
-
-  private JsonNode awaitTerminal(long uploadId) throws Exception {
-    Set<String> terminal = Set.of("COMPLETED", "VALIDATION_FAILED", "FAILED");
-    for (int i = 0; i < 120; i++) {
-      MvcResult result =
-          mockMvc
-              .perform(get("/api/v1/bank/uploads/{id}", uploadId).header("X-Bank-Id", BANK_70))
-              .andExpect(status().isOk())
-              .andReturn();
-      JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-      if (terminal.contains(json.get("status").asText())) {
-        return json;
-      }
-      Thread.sleep(250);
+  @Test
+  void failure_rolls_back_identity_transaction_and_version_state_then_retry_is_exact()
+      throws Exception {
+    long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
+    jdbc.execute(
+        "create function fail_integration_test() returns trigger language plpgsql as $$ begin raise"
+            + " exception 'test failure'; end $$");
+    jdbc.execute(
+        "create trigger fail_integration_test before insert on transactions for each row execute"
+            + " function fail_integration_test()");
+    try {
+      assertThatThrownBy(() -> integrate(a)).isInstanceOf(RuntimeException.class);
+      assertThat(count("transactions")).isZero();
+      assertThat(count("private.entities")).isZero();
+      assertThat(count("integration_attempts")).isZero();
+      assertThat(service.status(10, a).integrationStatus())
+          .isEqualTo("VALIDATED_WAITING_INTEGRATION");
+    } finally {
+      jdbc.execute("drop trigger fail_integration_test on transactions");
+      jdbc.execute("drop function fail_integration_test()");
     }
-    throw new AssertionError("적재가 30초 안에 끝나지 않음 uploadId=" + uploadId);
+    assertThat(integrate(a).transactions()).isEqualTo(1);
+  }
+
+  @Test
+  void concurrent_confirmation_has_one_atomic_result() throws Exception {
+    long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      var f = pool.submit(() -> integrate(a));
+      var g = pool.submit(() -> integrate(a));
+      assertThat(f.get(20, TimeUnit.SECONDS).transactions()).isEqualTo(1);
+      assertThat(g.get(20, TimeUnit.SECONDS).transactions()).isEqualTo(1);
+    }
+    assertThat(count("transactions")).isEqualTo(1);
+    assertThat(count("integration_attempts")).isEqualTo(1);
+  }
+
+  @Test
+  void unregistered_bank_and_cutoff_violation_do_not_mutate() throws Exception {
+    assertThatThrownBy(
+            () ->
+                service.issue(99, new IssueUploadRequest("x.csv", 1, digest(new byte[] {1}), DATE)))
+        .isInstanceOf(ApiException.class);
+    assertThat(count("batch_jobs")).isZero();
+    long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
+    assertThatThrownBy(() -> integration.integrate(DATE, Instant.EPOCH, Set.of(a)))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(count("transactions")).isZero();
+    assertThat(count("reporting_scopes")).isZero();
+  }
+
+  @Test
+  void empty_frozen_scope_is_not_recomputed_from_later_registration() throws Exception {
+    long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
+    jdbc.update("insert into reporting_scopes(business_date,scope_revision) values(?,7)", DATE);
+    assertThatThrownBy(() -> integrate(a))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("REPORT_OUTSIDE_SCOPE");
+    assertThat(count("reporting_scope_banks")).isZero();
+    assertThat(count("transactions")).isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "select scope_revision from reporting_scopes where business_date=?",
+                Long.class,
+                DATE))
+        .isEqualTo(7);
+  }
+
+  @Test
+  void analysis_does_not_report_empty_success_or_start_features_for_staged_reports()
+      throws Exception {
+    long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
+    Clock clock = Clock.fixed(Instant.now().plusSeconds(1), ZoneId.of("Asia/Seoul"));
+    var analysis =
+        new AnalysisService(
+            jdbc,
+            new org.springframework.transaction.support.TransactionTemplate(transactionManager),
+            clock,
+            "Asia/Seoul",
+            0.7,
+            LocalTime.of(3, 0));
+    long job = analysis.registerNow();
+    // registerNow fixes all current receipts; the staged report is a required input.
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis_uploads where job_id=? and upload_id=?",
+                Integer.class,
+                job,
+                a))
+        .isEqualTo(1);
+    var executor = mock(AnalysisStageExecutor.class);
+    try (var runner = new AnalysisRunner(analysis, executor)) {
+      runner.scan();
+    }
+    verifyNoInteractions(executor);
+    assertThat(
+            jdbc.queryForObject("select status from batch_jobs where job_id=?", String.class, job))
+        .isEqualTo("FAILED");
+    assertThat(
+            jdbc.queryForObject(
+                "select error_code from batch_jobs where job_id=?", String.class, job))
+        .isEqualTo("INTEGRATION_NOT_CONNECTED");
+  }
+
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  @Test
+  void same_number_different_banks_and_next_day_uuid_reuse() throws Exception {
+    String value = row(10, "001", 40, "001", "1", "USD", "1", "USD", "ACH", "E1", "E1");
+    long a = submit(10, HEADER + value);
+    integrate(a);
+    assertThat(count("private.accounts")).isEqualTo(2);
+    assertThat(count("private.entities")).isEqualTo(1);
+    var before =
+        jdbc.queryForList(
+            "select service_account_id from private.accounts order by account_id", UUID.class);
+    var bytes =
+        (HEADER + value.replace("2026/09/15", "2026/09/16")).getBytes(StandardCharsets.UTF_8);
+    var issued =
+        service.issue(
+            10, new IssueUploadRequest("next.csv", bytes.length, digest(bytes), DATE.plusDays(1)));
+    String key =
+        jdbc.queryForObject(
+            "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId());
+    files.put(key, bytes);
+    service.complete(10, issued.uploadId());
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    while (System.nanoTime() < deadline
+        && !service.status(10, issued.uploadId()).status().name().equals("COMPLETED"))
+      Thread.sleep(20);
+    integration.integrate(
+        DATE.plusDays(1), Instant.now().plusSeconds(1), Set.of(issued.uploadId()));
+    assertThat(count("transactions")).isEqualTo(2);
+    assertThat(
+            jdbc.queryForList(
+                "select service_account_id from private.accounts order by account_id", UUID.class))
+        .isEqualTo(before);
+  }
+
+  @Test
+  void existing_normal_ownership_is_not_overwritten_by_bad_next_day_report() throws Exception {
+    String value = row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2");
+    long a = submit(10, HEADER + value);
+    integrate(a);
+    var before =
+        jdbc.queryForList(
+            "select service_account_id,entity_id,identity_cipher from private.accounts order by"
+                + " account_id");
+    byte[] bytes =
+        (HEADER + value.replace("2026/09/15", "2026/09/16").replace("NameE1", "Other"))
+            .getBytes(StandardCharsets.UTF_8);
+    var issued =
+        service.issue(
+            10,
+            new IssueUploadRequest("conflict.csv", bytes.length, digest(bytes), DATE.plusDays(1)));
+    String key =
+        jdbc.queryForObject(
+            "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId());
+    files.put(key, bytes);
+    service.complete(10, issued.uploadId());
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    while (System.nanoTime() < deadline
+        && !service.status(10, issued.uploadId()).status().name().equals("COMPLETED"))
+      Thread.sleep(20);
+    assertThat(
+            integration
+                .integrate(
+                    DATE.plusDays(1), Instant.now().plusSeconds(1), Set.of(issued.uploadId()))
+                .heldFiles())
+        .isEqualTo(1);
+    assertThat(count("transactions")).isEqualTo(1);
+    assertThat(
+            jdbc.queryForList(
+                "select service_account_id,entity_id,identity_cipher from private.accounts order by"
+                    + " account_id"))
+        .isEqualTo(before);
+  }
+
+  @Test
+  void directly_held_file_overrides_dependency_count_and_retry_matches() throws Exception {
+    String ab = row(10, "A", 20, "B", "1", "USD", "1", "USD", "ACH", "E1", "E2");
+    String bc = row(20, "B", 30, "C", "2", "USD", "2", "USD", "ACH", "E2", "E3");
+    long a = submit(10, HEADER + ab + ab.replace(",E1,", ",,")), b = submit(20, HEADER + ab + bc);
+    var first = integrate(a, b);
+    assertThat(first.heldFiles()).isEqualTo(2);
+    assertThat(first.dependentReports()).isZero();
+    assertThat(first.transactions()).isZero();
+    assertThat(integrate(a, b)).isEqualTo(first);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from private.bank_reports where report_status='DEPENDENCY_HELD'",
+                Integer.class))
+        .isZero();
+  }
+
+  @Test
+  void missing_key_and_tampered_report_fail_without_partial_confirmation() throws Exception {
+    long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
+    var noKeys =
+        new TransactionIntegrationService(
+            jdbc,
+            new org.springframework.transaction.support.TransactionTemplate(transactionManager),
+            new PrivateDataProtector("", "", ""),
+            new tools.jackson.databind.ObjectMapper(),
+            "fx_rates_usd_v1");
+    assertThatThrownBy(() -> noKeys.integrate(DATE, Instant.now().plusSeconds(1), Set.of(a)))
+        .isInstanceOf(IllegalStateException.class);
+    jdbc.update("update private.bank_reports set payload_cipher='dGFtcGVyZWQ='");
+    assertThatThrownBy(() -> integrate(a)).isInstanceOf(IllegalStateException.class);
+    assertThat(count("transactions")).isZero();
+    assertThat(count("private.entities")).isZero();
+    assertThat(count("integration_attempts")).isZero();
+    assertThat(service.status(10, a).integrationStatus())
+        .isEqualTo("VALIDATED_WAITING_INTEGRATION");
+  }
+
+  @Test
+  void unsupported_bank_format_and_overlapping_reporting_period_are_rejected() {
+    assertThatThrownBy(
+            () -> jdbc.update("update banks set report_format='UNKNOWN' where bank_id=10"))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "insert into"
+                        + " bank_reporting_periods(bank_id,effective_from_date,effective_to_date)"
+                        + " values(10,?,?)",
+                    DATE,
+                    DATE))
+        .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    assertThat(count("bank_reporting_periods")).isEqualTo(3);
+    assertThat(count("batch_jobs")).isZero();
+  }
+
+  @Test
+  void synthetic_two_thousand_transactions_measure_account_and_entity_queries() throws Exception {
+    StringBuilder body = new StringBuilder(HEADER);
+    for (int n = 0; n < 2000; n++)
+      body.append(row(10, "A" + n, 40, "X" + n, "1", "USD", "1", "USD", "ACH", "E" + n, "F" + n));
+    long started = System.nanoTime();
+    long upload = submit(10, body.toString());
+    var outcome = integrate(upload);
+    assertThat(outcome.transactions()).isEqualTo(2000);
+    assertThat(count("private.accounts")).isEqualTo(4000);
+    assertThat(count("private.entities")).isEqualTo(4000);
+    System.out.println(
+        "SYNTHETIC_PIPELINE transactions=2000 accounts=4000 elapsedMs="
+            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+    // Query-only synthetic expansion, not a claim of 500,000 source reports integrated.
+    jdbc.execute(
+        "insert into"
+            + " transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date)"
+            + " select"
+            + " t.occurred_at,t.from_account_id,t.to_account_id,t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,t.payment_format,t.amount_usd,t.fx_rate_version,t.business_date"
+            + " from transactions t cross join generate_series(1,249)");
+    assertThat(count("transactions")).isEqualTo(500000);
+    jdbc.execute("analyze transactions");
+    jdbc.execute("analyze private.accounts");
+    long account = jdbc.queryForObject("select min(account_id) from private.accounts", Long.class);
+    long entity =
+        jdbc.queryForObject(
+            "select entity_id from private.accounts where account_id=?", Long.class, account);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from transactions where from_account_id=?",
+                Integer.class,
+                account))
+        .isEqualTo(250);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from private.accounts a join transactions t on"
+                    + " t.from_account_id=a.account_id where a.entity_id=?",
+                Integer.class,
+                entity))
+        .isEqualTo(250);
+    System.out.println("QUERY_ONLY_SYNTHETIC_TRANSACTIONS=500000");
+    System.out.println(
+        "ACCOUNT_QUERY_PLAN="
+            + jdbc.queryForList(
+                "explain analyze select tx_id from transactions where from_account_id=? order by"
+                    + " occurred_at",
+                String.class,
+                account));
+    System.out.println(
+        "ENTITY_QUERY_PLAN="
+            + jdbc.queryForList(
+                "explain analyze select a.service_account_id,t.tx_id from private.accounts a join"
+                    + " transactions t on t.from_account_id=a.account_id where a.entity_id=?",
+                String.class,
+                entity));
+  }
+
+  @Test
+  void header_only_csv_has_known_zero_rows() throws Exception {
+    long id = submit(10, HEADER);
+    assertThat(service.status(10, id).rowCount()).isZero();
+    assertThat(service.status(10, id).errors()).anyMatch(e -> e.reason().equals("EMPTY_FILE"));
+    assertThat(count("transactions")).isZero();
   }
 }
