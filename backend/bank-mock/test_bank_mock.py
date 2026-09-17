@@ -339,6 +339,37 @@ class BankMockTests(unittest.TestCase):
         self.assertEqual(len(self.events), 1)
         self.assertNotIn("Traceback", result.stderr)
 
+    def test_explicit_correction_transmits_identity_and_same_bytes(self):
+        submission = "fb46fd01-1ff8-49b7-b058-29f9359ca67c"
+        result = self.run_cli(extra=("--correction-request-id", "7", "--submission-id", submission))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(self.events[0][2])["correctionRequestId"], 7)
+        self.assertEqual(json.loads(self.events[0][2])["correctionSubmissionId"], submission)
+        self.assertEqual(self.events[1][2], self.source.read_bytes())
+        self.assertIn(submission, result.stdout)
+
+    def test_completed_submission_reuse_does_not_put_object_again(self):
+        self.target = {"uploadId": 9, "bankId": 70, "uploadRequired": False}
+        result = self.run_cli(extra=("--correction-request-id", "7"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([e[0] for e in self.events], ["/api/v1/bank/uploads", "/api/v1/bank/uploads/9"])
+
+    def test_correction_list_is_read_only_and_uses_safe_errors(self):
+        self.result = {"content": [{"correctionRequestId": 7, "businessDate": "2026-09-08", "status": "WAITING_COUNTERPART", "uploadId": 9,
+                                  "errors": [{"row": None, "column": "", "code": "COUNTERPART_MISSING", "reason": "대조 대기"}]}], "totalElements": 1}
+        with patch.dict(os.environ, {"CF_ACCESS_CLIENT_ID": "", "CF_ACCESS_CLIENT_SECRET": ""}):
+            with patch("sys.stdout", new_callable=io.StringIO) as out:
+                code = bank_mock.main(["--api-url", self.api_url, "--bank-id", "70", "--corrections"])
+        self.assertEqual(code, 0)
+        self.assertEqual(len(self.events), 1)
+        self.assertIn("WAITING_COUNTERPART", out.getvalue())
+        self.assertTrue(self.events[0][0].startswith("/api/v1/bank/corrections?"))
+
+    def test_submission_id_without_correction_is_rejected_before_network(self):
+        result = self.run_cli(extra=("--submission-id", "fb46fd01-1ff8-49b7-b058-29f9359ca67c"))
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(self.events, [])
+
 
 if __name__ == "__main__":
     unittest.main()

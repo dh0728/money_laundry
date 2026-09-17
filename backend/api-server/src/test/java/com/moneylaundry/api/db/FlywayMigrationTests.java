@@ -153,4 +153,24 @@ class FlywayMigrationTests {
       jdbc.execute("drop role " + role);
     }
   }
+
+ @Test void v4_preserves_populated_v3_report_and_execution_history() throws Exception {
+  String name="migration_v4_preserve_test";jdbc.execute("create database "+name);
+  String url="jdbc:postgresql://"+postgres.getHost()+":"+postgres.getMappedPort(5432)+"/"+name;
+  try {
+    org.flywaydb.core.Flyway.configure().dataSource(url,postgres.getUsername(),postgres.getPassword()).target("3").load().migrate();
+    try(var connection=java.sql.DriverManager.getConnection(url,postgres.getUsername(),postgres.getPassword());var statement=connection.createStatement()) {
+      statement.execute("insert into banks(bank_id,is_reporting) values(10,true)");
+      statement.execute("insert into batch_jobs(job_type,status,bank_id,business_date,received_at) values('INGEST','COMPLETED',10,'2026-09-15',now())");
+      statement.execute("insert into report_sets(bank_id,business_date) values(10,'2026-09-15')");
+      statement.execute("insert into report_versions(set_id,upload_id,version_no,received_at,stage_status,error_code,row_count) select 1,job_id,1,received_at,'HELD','COUNTERPART_MISSING',1 from batch_jobs");
+      statement.execute("insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) values(1,2,'token','cipher','test','HELD')");
+      statement.execute("insert into analysis_stage_results select job_id,'FEATURES',gen_random_uuid(),'preserve-artifact',true from batch_jobs");
+    }
+    org.flywaydb.core.Flyway.configure().dataSource(url,postgres.getUsername(),postgres.getPassword()).load().migrate();
+    try(var connection=java.sql.DriverManager.getConnection(url,postgres.getUsername(),postgres.getPassword());var statement=connection.createStatement()) {
+      try(var rs=statement.executeQuery("select v.self_valid,r.payload_cipher,a.artifact from report_versions v join private.bank_reports r using(version_id) cross join analysis_stage_results a")){assertThat(rs.next()).isTrue();assertThat(rs.getBoolean(1)).isTrue();assertThat(rs.getString(2)).isEqualTo("cipher");assertThat(rs.getString(3)).isEqualTo("preserve-artifact");assertThat(rs.next()).isFalse();}
+    }
+  }finally{jdbc.execute("drop database "+name);}
+ }
 }

@@ -11,7 +11,9 @@ public interface AnalysisStageExecutor {
       AnalysisStage stage,
       UUID executionId,
       List<Long> uploadIds,
-      Map<String, String> artifacts) {}
+      Map<String, String> artifacts, UUID runId) {
+ public Context(long jobId,AnalysisStage stage,UUID executionId,List<Long> uploadIds,Map<String,String> artifacts){this(jobId,stage,executionId,uploadIds,artifacts,null);}
+}
 
   record Result(String artifact) {}
 

@@ -4,7 +4,7 @@
 
 로컬 Compose는 Alpine에서 초기화한 `pgdata_alpine` 볼륨을 사용한다. 다른 배포판에서 만든 DB 데이터 디렉터리를 직접 연결하지 않고, 기존 데이터가 있다면 논리 백업·복원 후 검증한다.
 
-지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.7다.
+지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.8다.
 팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 이 문서는 V1에 든 테이블과 W3·W4에서 추가할 테이블을 한 그림에 둔다.
 
 용어(kickoff §2.5): `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`.
@@ -186,7 +186,7 @@ erDiagram
     }
 ```
 
-## 2. 현재 스키마 (V1~V3)
+## 2. 현재 스키마 (V1~V4)
 
 | 테이블 | 식별자 | 핵심 제약·인덱스 | 근거 |
 |---|---|---|---|
@@ -214,11 +214,11 @@ erDiagram
 | integration_attempts / integration_attempt_versions | cutoff·scope_revision·선택 report version/revision/generation 고정 |
 | evaluation.report_labels | report_id별 원천 평가 라벨. 통합시 일치하는 유효 라벨만 transaction_labels 연결 |
 
-그림의 accounts는 `private.accounts`다. API는 서비스 UUID만 공개하고 원문·검색 토큰·암호문은 공개하지 않는다. private/evaluation의 PUBLIC 접근과 기본 테이블 권한을 제거한다. 후속 분석 역할/analysis.input_transactions는 이번 V3에 생성하지 않는다.
+그림의 accounts는 `private.accounts`다. API는 서비스 UUID만 공개하고 원문·검색 토큰·암호문은 공개하지 않는다. private/evaluation의 PUBLIC 접근과 기본 테이블 권한을 제거한다. V3에는 분석 입력을 생성하지 않았으며 V4가 analysis.input_transactions를 추가한다. 분석 역할에 private/evaluation 접근을 부여하지 않는다.
 
 V3는 기존 계좌·거래·작업이 있는 DB에서 실패한다. 기존 DB/볼륨을 보존한 별도 빈 개발 DB에 V1~V3를 적용한다. 원문 보호 키는 실행 환경에서만 공급하며 데이터/문서에 넣지 않는다. 서비스 UUID는 새 개발 데이터셋 내 재사용을 보장하며 기존 DB ID를 추정 복원하지 않는다.
 
-정정 교체·실행 취소·고정 분석 입력 스키마는 후속 태스크다. 현재 서비스 통합 검증은 최초 고정 입력만 처리하며 운영 분석은 새 보고가 있으면 INTEGRATION_NOT_CONNECTED로 우회 실행을 차단한다.
+정정 교체·실행 취소·고정 분석 입력은 아래 V4로 확장한다. V1~V3 이력은 보존한다. Python 실행측과 실제 S3 관통은 후속 태스크다.
 
 ## 3. W3·W4에서 추가할 것 — 관계·식별자만 지금 확정
 
@@ -251,3 +251,28 @@ V3는 기존 계좌·거래·작업이 있는 DB에서 실패한다. 기존 DB/�
 - `analysis_failures`: failure_id UUID PK, job_id, stage, execution_id, error_code, failed_at, consecutive_count, retry_at, action_required. 명시 재개해도 이력은 남는다.
 - 세션 advisory lock은 동시 활성 실행을 직렬화하고 실행 UUID가 오래된 결과 쓰기를 차단한다. 수신전이/대상등록은 별도 공유 transaction lock을 쓴다. 원장 자체 INGEST 복구는 이번 범위 밖이다.
 - 실제 Python 직접 DB 저장은 토큰 확인·데이터·단계 완료를 Python 자신의 트랜잭션으로 묶어야 한다. Java 테스트 실행기의 트랜잭션은 별도 Python 연결까지 포함하지 않는다.
+
+## V4 정정 및 실행 세대
+
+V1~V3를 변경하지 않는 추가 마이그레이션이다. 기존 보고·거래·분석 이력을 보존한다. 배포 취소는 새 forward migration으로 검토하며 기존 DB를 삭제/초기화하지 않는다.
+
+| 테이블/컬럼 | 계약 |
+|---|---|
+| correction_requests / correction_errors | 은행·기준일·대상 버전/원인 revision별 요청과 정제된 오류. 미도착 version은 null. 제출 이력은 correction_uploads로 보존 |
+| correction_uploads | upload_id PK, correction_id FK, UNIQUE(correction_id,submission_id UUID). 일반 파일 중복과 별개의 업로드 문맥 |
+| report_versions | correction_of_version_id FK, self_valid. 후보 대기/분석 해제 대기/교체 이력 상태 추가 |
+| analysis_runs | run_id UUID PK, job_id FK, input_revision, READY/ACTIVE/CANCEL_REQUESTED/CANCELLED/COMPLETED, cancel 시각/코드. batch_jobs.current_run_id와 구분 |
+| analysis_run_replacements | 새 run/구 run 연결. 여러 취소 실행의 모든 TARGET을 한 후속 입력으로 보존 가능 |
+| analysis.input_transactions | (run_id,tx_id,input_role) PK, TARGET/CONTEXT. 원래 시각/금액/통화/방식/서비스 계좌·개체 UUID/환산 버전의 값 복사. 원문·라벨·검색토큰 없음 |
+| analysis_input_reports | 입력 run·tx와 당시 report_id 출처 고정. 현재 연결 교체가 과거 입력 출처를 바꾸지 않음 |
+| analysis_target_ownership | tx_id PK, run_id FK. 완료 TARGET 및 활성 TARGET의 단일 소유, 취소 TARGET은 대체 연결을 통해서만 재편입 |
+| analysis_run_stage_results | (run_id,stage) PK. 기존 V2 analysis_stage_results 보존 |
+| analysis_model_requests | request_id/회차별 run·model_kind·게시/종료 상태. 취소와 같은 run 잠금으로 등록/게시 fencing |
+| analysis_cancel_outbox | request_id/회차 UNIQUE, cancel_id UUID, 불변 payload·요청 시각, 전달 시도·재시도/확인 상태. 단순 발송은 종료 확인 아님 |
+
+정정·입력 확정은 기존 원문 관계 통합 advisory lock을 공유한다. 보고 set과 job/run을 일정 순서로 잠그고 같은 트랜잭션에서 후보 revision·현재 상태를 검사한다. analysis 스키마 및 테이블의 PUBLIC 권한을 제거하며 Spring은 READY 입력을 트랜잭션으로 고정하고 run 상태와 단계 토큰으로 결과 반영을 차단한다. 실제 Python 입력 조회 역할/뷰와 worker 연결은 후속 범위이며 이 스키마 생성만으로 해당 연결을 완료했다고 주장하지 않는다.
+
+- `analysis_receipts(job_id,upload_id)`는 기존 날짜에 소속된 수신도 포함한 cutoff 고정 전체 수신 집합이다. 검수 지연·이전 날짜 후보를 같은 집합에서 재검사한다.
+- `analysis_selected_versions(job_id,set_id,version_id,generation)`는 통합/입력 고정 사이 revision 확인용이다. 거래 입력의 값·출처는 별도 불변 스냅샷이다.
+- `inference_results.run_id`, `transaction_features.run_id`는 새 산출물 세대 귀속 경계다. 이전 null run 이력은 current_run_id가 없는 완료 작업에서만 기존 의미로 조회한다. 새 작업의 결과는 현재 완료 run과 일치해야 노출한다. 실제 점수 쓰기는 후속 Python 계약이다.
+- 취소된 run의 모든 TARGET 출처 묶음이 준비되기 전에는 그 run과 관련된 새 tx_id도 일반 신규 TARGET으로 우회하지 않는다. 완료 CONTEXT의 과거 값/출처와 취소 run 이력은 보존한다.

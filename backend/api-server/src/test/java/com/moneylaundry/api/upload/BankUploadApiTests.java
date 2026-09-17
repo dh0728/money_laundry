@@ -641,4 +641,255 @@ class BankUploadApiTests {
     assertThat(service.status(10, id).errors()).anyMatch(e -> e.reason().equals("EMPTY_FILE"));
     assertThat(count("transactions")).isZero();
   }
+
+  @Autowired AnalysisRunService runs;
+  @Autowired AnalysisService analysis;
+  @Autowired AnalysisRunner productionRunner;
+  @MockitoBean CancellationScheduler cancellationScheduler;
+
+  long correction(int bank,long original) {
+    long version=jdbc.queryForObject("select version_id from report_versions where upload_id=?",Long.class,original);
+    return com.moneylaundry.api.correction.CorrectionService.open(jdbc,bank,DATE,version,"CHECK_REQUESTED",1);
+  }
+  long replace(int bank,long correction,String csv) throws Exception {
+    byte[] bytes=csv.getBytes(StandardCharsets.UTF_8);
+    var issue=service.issue(bank,new IssueUploadRequest("correction.csv",bytes.length,digest(bytes),DATE,correction,UUID.randomUUID()));
+    String key=jdbc.queryForObject("select s3_key from batch_jobs where job_id=?",String.class,issue.uploadId());
+    files.put(key,bytes);service.complete(bank,issue.uploadId());
+    long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);
+    while(System.nanoTime()<deadline){if(Set.of("COMPLETED","VALIDATION_FAILED","FAILED").contains(service.status(bank,issue.uploadId()).status().name()))return issue.uploadId();Thread.sleep(20);}
+    throw new AssertionError("correction ingestion timeout");
+  }
+  List<Long> activeIds(){return jdbc.queryForList("select tx_id from transactions where integration_status='ACTIVE' order by tx_id",Long.class);}
+  UUID fixtureRun(String role) {
+    long job=jdbc.queryForObject("insert into batch_jobs(job_type,status,current_stage,analysis_cutoff_at) values('ANALYSIS','QUEUED','FEATURES',now()) returning job_id",Long.class);
+    UUID run=UUID.randomUUID();jdbc.update("insert into analysis_runs(run_id,job_id,status) values(?,?,'READY')",run,job);
+    jdbc.update("update batch_jobs set current_run_id=? where job_id=?",run,job);
+    for(long id:activeIds()){runs.snapshot(run,id,role);if(role.equals("TARGET"))jdbc.update("insert into analysis_target_ownership values(?,?)",id,run);}
+    return run;
+  }
+  String x(){return row(10,"A",20,"B","100","USD","100","USD","ACH","E1","E2");}
+  String y(){return row(10,"C",20,"D","50","USD","50","USD","Wire","E3","E4");}
+
+  @Test void correction_preserves_occurrences_and_ids_with_reordered_reports_and_addition() throws Exception {
+    long a=submit(10,HEADER+x()+x()+y()),b=submit(20,HEADER+y()+x()+x());integrate(a,b);
+    var ids=activeIds();assertThat(ids).hasSize(3);
+    long ca=correction(10,a),cb=correction(20,b);
+    long a2=replace(10,ca,HEADER+y()+x()+x()),b2=replace(20,cb,HEADER+x()+y()+x());
+    integrate(a,b,a2,b2);assertThat(activeIds()).isEqualTo(ids);
+    long ca2=correction(10,a2),cb2=correction(20,b2);
+    long a3=replace(10,ca2,HEADER+x()+y()+x()+x()),b3=replace(20,cb2,HEADER+x()+x()+x()+y());
+    integrate(a,b,a2,b2,a3,b3);assertThat(activeIds()).hasSize(4).containsAll(ids);
+    integrate(a,b,a2,b2,a3,b3);assertThat(activeIds()).hasSize(4);
+  }
+
+  @Test void one_candidate_waits_then_joint_correction_replaces_atomically() throws Exception {
+    long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);
+    var old=activeIds();UUID run=fixtureRun("TARGET");long ca=correction(10,a),cb=correction(20,b);
+    String changed=x().replace(",100,",",200,");
+    long a2=replace(10,ca,HEADER+changed);integrate(a,b,a2);
+    assertThat(activeIds()).isEqualTo(old);
+    assertThat(service.status(10,a2).integrationStatus()).isEqualTo("WAITING_COUNTERPART");
+    assertThat(jdbc.queryForObject("select status from analysis_runs where run_id=?",String.class,run)).isEqualTo("CANCELLED");
+    long b2=replace(20,cb,HEADER+changed);integrate(a,b,a2,b2);
+    assertThat(activeIds()).hasSize(1).doesNotContainAnyElementsOf(old);
+    assertThat(jdbc.queryForObject("select amount_paid from transactions where integration_status='ACTIVE'",BigDecimal.class)).isEqualByComparingTo("200");
+    assertThat(jdbc.queryForObject("select count(*) from correction_requests where correction_id in (?,?) and status='RESOLVED'",Integer.class,ca,cb)).isEqualTo(2);
+  }
+
+  @Test void completed_target_deletion_rejects_whole_component() throws Exception {
+    long a=submit(10,HEADER+x()+x()+y()),b=submit(20,HEADER+x()+x()+y());integrate(a,b);
+    var old=activeIds();UUID run=fixtureRun("TARGET");jdbc.update("update analysis_runs set status='COMPLETED' where run_id=?",run);
+    long ca=correction(10,a),cb=correction(20,b);
+    long a2=replace(10,ca,HEADER+x()+y()),b2=replace(20,cb,HEADER+x()+y());integrate(a,b,a2,b2);
+    assertThat(activeIds()).isEqualTo(old);
+    assertThat(jdbc.queryForObject("select error_code from report_versions where upload_id=?",String.class,a2)).isEqualTo("COMPLETED_TARGET_CHANGE_OUT_OF_SCOPE");
+    assertThat(jdbc.queryForObject("select generation from report_sets where bank_id=10",Long.class)).isEqualTo(1);
+  }
+
+  @Test void self_invalid_replacement_preserves_existing_and_does_not_cancel() throws Exception {
+    long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);UUID run=fixtureRun("TARGET");var old=activeIds();
+    long c=correction(10,a);long a2=replace(10,c,HEADER+x().replace(",100,",",-1,"));
+    assertThat(service.status(10,a2).status().name()).isEqualTo("VALIDATION_FAILED");integrate(a,b,a2);
+    assertThat(activeIds()).isEqualTo(old);assertThat(jdbc.queryForObject("select status from analysis_runs where run_id=?",String.class,run)).isEqualTo("READY");
+    assertThat(jdbc.queryForObject("select status from correction_requests where correction_id=?",String.class,c)).isEqualTo("OPEN");
+  }
+
+  @Test void correction_submission_identity_reuses_finished_upload_and_checks_bank_and_file() throws Exception {
+    long a=submit(10,HEADER+x());long c=correction(10,a);byte[] bytes=(HEADER+x()).getBytes(StandardCharsets.UTF_8);UUID submission=UUID.randomUUID();
+    var request=new IssueUploadRequest("same.csv",bytes.length,digest(bytes),DATE,c,submission);
+    var issued=service.issue(10,request);files.put(jdbc.queryForObject("select s3_key from batch_jobs where job_id=?",String.class,issued.uploadId()),bytes);service.complete(10,issued.uploadId());
+    assertThat(service.issue(10,request).uploadId()).isEqualTo(issued.uploadId());assertThat(service.issue(10,request).uploadRequired()).isFalse();
+    assertThatThrownBy(()->service.issue(20,request)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(()->service.issue(10,new IssueUploadRequest("changed.csv",bytes.length,digest(bytes),DATE,c,submission))).isInstanceOf(ApiException.class);
+    mvc.perform(get("/api/v1/bank/corrections/"+c).header("X-Bank-Id","20")).andExpect(status().isNotFound());
+    mvc.perform(get("/api/v1/bank/corrections").header("X-Bank-Id","999")).andExpect(status().isForbidden());
+  }
+
+  @Test void cancellation_fences_all_models_and_waits_for_both_terminal_acknowledgements() throws Exception {
+    long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);UUID run=fixtureRun("TARGET");UUID binary=UUID.randomUUID(),type=UUID.randomUUID();
+    runs.registerRequest(run,binary,1,"BINARY");runs.publishRequest(run,binary,1);runs.registerRequest(run,type,1,"TYPE");runs.publishRequest(run,type,1);
+    runs.cancel(run,"REPORT_CORRECTED");runs.cancel(run,"REPORT_CORRECTED");assertThat(count("analysis_cancel_outbox")).isEqualTo(2);
+    assertThatThrownBy(()->runs.publishRequest(run,binary,1)).hasMessage("RUN_FENCED");
+    long replacementJob=jdbc.queryForObject("insert into batch_jobs(job_type,status) values('ANALYSIS','QUEUED') returning job_id",Long.class);UUID replacement=UUID.randomUUID();
+    jdbc.update("insert into analysis_runs(run_id,job_id,status) values(?,?,'READY')",replacement,replacementJob);jdbc.update("update batch_jobs set current_run_id=? where job_id=?",replacement,replacementJob);jdbc.update("insert into analysis_run_replacements values(?,?)",replacement,run);
+    var cancels=jdbc.queryForList("select cancel_id from analysis_cancel_outbox order by cancel_id",UUID.class);assertThat(runs.canInfer(replacement)).isFalse();
+    runs.acknowledge(cancels.get(0),"STOPPED");assertThat(runs.canInfer(replacement)).isFalse();runs.acknowledge(cancels.get(1),"ALREADY_FINISHED");assertThat(runs.canInfer(replacement)).isTrue();
+    assertThatThrownBy(()->runs.complete(run)).hasMessage("RUN_FENCED");
+  }
+
+  @Test void production_runner_integrates_and_freezes_without_calling_unconfigured_python_early() throws Exception {
+    long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());long job=analysis.registerNow();
+    try {
+      productionRunner.scan();assertThat(analysis.job(job).stage()).isEqualTo(AnalysisStage.INTEGRATE);
+      productionRunner.scan();assertThat(analysis.job(job).stage()).isEqualTo(AnalysisStage.FREEZE_INPUT);
+      productionRunner.scan();assertThat(analysis.job(job).stage()).isEqualTo(AnalysisStage.FEATURES);
+      UUID run=runs.current(job);assertThat(run).isNotNull();assertThat(jdbc.queryForList("select tx_id from analysis.input_transactions where run_id=?",Long.class,run)).containsExactlyElementsOf(activeIds());
+      assertThat(count("analysis_input_reports")).isEqualTo(2);
+    } finally {productionRunner.close();}
+  }
+
+ @Test void completed_context_keeps_old_values_and_allows_current_correction() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);UUID run=fixtureRun("CONTEXT");jdbc.update("update analysis_runs set status='COMPLETED' where run_id=?",run);
+   var old=activeIds();long a2=replace(10,correction(10,a),HEADER+x().replace(",100,",",200,")),b2=replace(20,correction(20,b),HEADER+x().replace(",100,",",200,"));integrate(a,b,a2,b2);
+   assertThat(activeIds()).doesNotContainAnyElementsOf(old);
+   assertThat(jdbc.queryForObject("select amount_paid from analysis.input_transactions where run_id=?",BigDecimal.class,run)).isEqualByComparingTo("100");
+   assertThat(jdbc.queryForObject("select amount_paid from transactions where integration_status='ACTIVE'",BigDecimal.class)).isEqualByComparingTo("200");
+ }
+ @Test void replacement_failure_rolls_back_transactions_accounts_pointers_and_resolution() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);var old=activeIds();
+   long ca=correction(10,a),cb=correction(20,b);long a2=replace(10,ca,HEADER+x()+y()),b2=replace(20,cb,HEADER+x()+y());
+   jdbc.execute("create function correction_test_failure() returns trigger language plpgsql as $$ begin if NEW.bank_id=20 then raise exception 'TEST_ROLLBACK'; end if; return NEW; end $$");
+   jdbc.execute("create trigger correction_test_failure before update on report_sets for each row execute function correction_test_failure()");
+   try {assertThatThrownBy(()->integrate(a,b,a2,b2)).isInstanceOf(org.springframework.dao.DataAccessException.class);}
+   finally {jdbc.execute("drop trigger correction_test_failure on report_sets");jdbc.execute("drop function correction_test_failure()");}
+   assertThat(activeIds()).isEqualTo(old);assertThat(count("private.accounts")).isEqualTo(2);
+   assertThat(jdbc.queryForList("select generation from report_sets order by bank_id",Long.class)).containsExactly(1L,1L);
+   assertThat(jdbc.queryForObject("select count(*) from correction_requests where status='RESOLVED'",Integer.class)).isZero();
+   integrate(a,b,a2,b2);assertThat(activeIds()).hasSize(2);
+ }
+ @Test void canceled_partial_score_targets_all_return_in_explicit_replacement() throws Exception {
+   long a=submit(10,HEADER+x()+y()),b=submit(20,HEADER+x()+y());integrate(a,b);UUID old=fixtureRun("TARGET");
+   long oldJob=jdbc.queryForObject("select job_id from analysis_runs where run_id=?",Long.class,old);
+   jdbc.update("update transactions set scored_job_id=? where tx_id=?",oldJob,activeIds().getFirst());
+   long a2=replace(10,correction(10,a),HEADER+x().replace(",100,",",200,")+y()),b2=replace(20,correction(20,b),HEADER+x().replace(",100,",",200,")+y());integrate(a,b,a2,b2);
+   long job=jdbc.queryForObject("insert into batch_jobs(job_type,status) values('ANALYSIS','QUEUED') returning job_id",Long.class);
+   jdbc.update("insert into analysis_selected_versions select ?,set_id,current_version_id,generation from report_sets",job);
+   UUID fresh=runs.freeze(job,Instant.now().plusSeconds(1));
+   assertThat(jdbc.queryForList("select tx_id from analysis.input_transactions where run_id=? and input_role='TARGET' order by tx_id",Long.class,fresh)).containsExactlyElementsOf(activeIds());
+   assertThat(jdbc.queryForObject("select count(*) from analysis_run_replacements where run_id=? and replaces_run_id=?",Integer.class,fresh,old)).isEqualTo(1);
+   assertThat(jdbc.queryForObject("select count(*) from analysis.input_transactions where run_id=?",Integer.class,old)).isEqualTo(2);
+ }
+ @Test void independent_component_integrates_while_counterpart_correction_waits() throws Exception {
+   String c=row(30,"Q",40,"R","8","USD","8","USD","ACH","E8","E9");
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x()),third=submit(30,HEADER+c);integrate(a,b,third);
+   long a2=replace(10,correction(10,a),HEADER+x().replace(",100,",",200,"));
+   long c2=replace(30,correction(30,third),HEADER+c+c);integrate(a,b,third,a2,c2);
+   assertThat(service.status(10,a2).integrationStatus()).isEqualTo("WAITING_COUNTERPART");assertThat(service.status(30,c2).integrationStatus()).isEqualTo("ACTIVE");assertThat(activeIds()).hasSize(3);
+ }
+ @Test void cutoff_excludes_late_candidate_and_never_rewinds_new_current_version() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);Instant cutoff=Instant.now();
+   long a2=replace(10,correction(10,a),HEADER+x().replace(",100,",",200,")),b2=replace(20,correction(20,b),HEADER+x().replace(",100,",",200,"));
+   integration.integrate(DATE,cutoff,Set.of(a,b));assertThat(jdbc.queryForObject("select amount_paid from transactions where integration_status='ACTIVE'",BigDecimal.class)).isEqualByComparingTo("100");
+   integrate(a,b,a2,b2);var current=activeIds();
+   assertThatThrownBy(()->integration.integrate(DATE,cutoff,Set.of(a,b))).hasMessage("CUTOFF_SUPERSEDED");assertThat(activeIds()).isEqualTo(current);
+ }
+ @Test void cancel_and_completion_are_serialized_in_both_orders() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);
+   for(boolean cancelFirst:List.of(true,false)) {
+     jdbc.update("delete from analysis_target_ownership");UUID run=fixtureRun("TARGET");
+     var pool=Executors.newFixedThreadPool(2);var locked=new CountDownLatch(1);var release=new CountDownLatch(1);
+     try {
+       var first=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(manager()).executeWithoutResult(state->{AnalysisRunService.integrationLock(jdbc);locked.countDown();try{release.await(5,TimeUnit.SECONDS);}catch(InterruptedException e){throw new RuntimeException(e);}if(cancelFirst)runs.cancel(run,"REPORT_CORRECTED");else runs.complete(run);}));
+       assertThat(locked.await(5,TimeUnit.SECONDS)).isTrue();
+       var second=pool.submit(()->{if(cancelFirst)runs.complete(run);else runs.cancel(run,"REPORT_CORRECTED");});release.countDown();first.get(10,TimeUnit.SECONDS);
+       assertThatThrownBy(()->second.get(10,TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class);
+       assertThat(jdbc.queryForObject("select status from analysis_runs where run_id=?",String.class,run)).isEqualTo(cancelFirst?"CANCELLED":"COMPLETED");
+     }finally{release.countDown();pool.shutdownNow();assertThat(pool.awaitTermination(5,TimeUnit.SECONDS)).isTrue();}
+   }
+ }
+ org.springframework.transaction.PlatformTransactionManager manager(){return jdbcTransactionManager;}
+ @Autowired org.springframework.transaction.PlatformTransactionManager jdbcTransactionManager;
+
+ @Test void missing_counterpart_request_targets_missing_bank_not_waiting_sender() throws Exception {
+   long a=submit(10,HEADER+x());integrate(a);
+   assertThat(jdbc.queryForList("select bank_id from correction_requests",Integer.class)).containsExactly(20);
+   mvc.perform(get("/api/v1/bank/corrections").header("X-Bank-Id","20")).andExpect(status().isOk()).andExpect(jsonPath("$.content[0].uploadId").doesNotExist());
+ }
+ @Test void confirmed_identity_conflict_does_not_cancel_normal_run() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);UUID run=fixtureRun("TARGET");var old=activeIds();
+   String conflict=x().replace(",E1,",",E99,");long a2=replace(10,correction(10,a),HEADER+conflict);integrate(a,b,a2);
+   assertThat(activeIds()).isEqualTo(old);assertThat(jdbc.queryForObject("select status from analysis_runs where run_id=?",String.class,run)).isEqualTo("READY");
+   assertThat(jdbc.queryForObject("select error_code from report_versions where upload_id=?",String.class,a2)).isEqualTo("INVALID_SELF_OR_CONFIRMED_IDENTITY");
+ }
+ @Test void durable_cancel_retries_stop_publishing_after_three_but_accept_late_ack() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);UUID run=fixtureRun("TARGET"),request=UUID.randomUUID();runs.registerRequest(run,request,1,"BINARY");runs.publishRequest(run,request,1);runs.cancel(run,"REPORT_CORRECTED");
+   var transport=mock(AnalysisRunService.CancelTransport.class);doThrow(new IllegalStateException("offline")).when(transport).publish(any(),anyString());
+   for(int i=0;i<4;i++){jdbc.update("update analysis_cancel_outbox set retry_at=null");runs.deliverCancellations(transport);}
+   verify(transport,times(3)).publish(any(),anyString());assertThat(jdbc.queryForObject("select attempts from analysis_cancel_outbox",Integer.class)).isEqualTo(3);
+   assertThat(jdbc.queryForObject("select status from analysis_runs where run_id=?",String.class,run)).isEqualTo("CANCEL_REQUESTED");
+   when(transport.acknowledgement(any(),anyString())).thenReturn("STOPPED");jdbc.update("update analysis_cancel_outbox set retry_at=null");runs.deliverCancellations(transport);
+   assertThat(jdbc.queryForObject("select status from analysis_runs where run_id=?",String.class,run)).isEqualTo("CANCELLED");
+ }
+ @Test void next_day_registered_receipts_retain_yesterdays_waiting_candidate() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);
+   long ca=correction(10,a),cb=correction(20,b);long a2=replace(10,ca,HEADER+x().replace(",100,",",200,"));
+   long day1=analysis.registerNow();try {
+     productionRunner.scan();productionRunner.scan();productionRunner.scan();assertThat(service.status(10,a2).integrationStatus()).isEqualTo("WAITING_COUNTERPART");
+     jdbc.update("update batch_jobs set analysis_date=analysis_date-1 where job_id=?",day1);
+     long b2=replace(20,cb,HEADER+x().replace(",100,",",200,"));long day2=analysis.registerNow();
+     assertThat(jdbc.queryForList("select upload_id from analysis_receipts where job_id=?",Long.class,day2)).contains(a2,b2);
+     productionRunner.scan();productionRunner.scan();productionRunner.scan();assertThat(analysis.job(day2).stage()).isEqualTo(AnalysisStage.FEATURES);
+     assertThat(jdbc.queryForObject("select amount_paid from analysis.input_transactions where run_id=?",BigDecimal.class,runs.current(day2))).isEqualByComparingTo("200");
+   }finally{productionRunner.close();}
+ }
+
+ @Test void blocked_canceled_run_cannot_leak_replaced_component_through_new_target_path() throws Exception {
+   jdbc.update("insert into banks(bank_id,is_reporting) values(40,true)");jdbc.update("insert into bank_reporting_periods(bank_id,effective_from_date) values(40,?)",DATE);
+   String other=row(30,"Q",40,"R","8","USD","8","USD","ACH","E8","E9");
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x()),c=submit(30,HEADER+other),d=submit(40,HEADER+other);integrate(a,b,c,d);UUID old=fixtureRun("TARGET");
+   long a2=replace(10,correction(10,a),HEADER+x().replace(",100,",",200,")),b2=replace(20,correction(20,b),HEADER+x().replace(",100,",",200,")),c2=replace(30,correction(30,c),HEADER+other.replace(",8,",",9,"));integrate(a,b,c,d,a2,b2,c2);
+   long job=jdbc.queryForObject("insert into batch_jobs(job_type,status) values('ANALYSIS','QUEUED') returning job_id",Long.class);
+   jdbc.update("insert into analysis_selected_versions select ?,set_id,current_version_id,generation from report_sets where current_version_id is not null",job);jdbc.update("insert into analysis_receipts select ?,job_id from batch_jobs where job_type='INGEST'",job);
+   UUID blocked=runs.freeze(job,Instant.now().plusSeconds(1));assertThat(jdbc.queryForObject("select count(*) from analysis.input_transactions where run_id=?",Integer.class,blocked)).isZero();assertThat(jdbc.queryForObject("select count(*) from analysis_run_replacements where replaces_run_id=?",Integer.class,old)).isZero();
+ }
+ @Test void incomplete_old_receipt_is_waited_for_even_when_already_assigned_to_prior_job() {
+   long old=jdbc.queryForObject("insert into batch_jobs(job_type,status,received_at,business_date) values('INGEST','RUNNING',now(),?) returning job_id",Long.class,DATE);
+   long previous=jdbc.queryForObject("insert into batch_jobs(job_type,status,analysis_date,current_stage) values('ANALYSIS','COMPLETED',current_date-1,'COMPLETE') returning job_id",Long.class);jdbc.update("insert into analysis_uploads(job_id,upload_id) values(?,?)",previous,old);
+   long job=analysis.registerNow();try{productionRunner.scan();assertThat(analysis.job(job).status()).isEqualTo("RETRY_WAIT");assertThat(analysis.job(job).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);assertThat(analysis.job(job).attempts()).isZero();}finally{productionRunner.close();}
+ }
+
+ @Test void late_prepared_result_is_not_committed_after_cancellation() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);UUID run=fixtureRun("TARGET");
+   java.util.concurrent.atomic.AtomicInteger commits=new java.util.concurrent.atomic.AtomicInteger();
+   AnalysisStageExecutor executor=new AnalysisStageExecutor(){public Result prepare(Context c){assertThat(c.runId()).isEqualTo(run);runs.cancel(run,"REPORT_CORRECTED");return new Result("late-artifact");}public void commit(Context c,Result r){commits.incrementAndGet();}};
+   try(var runner=new AnalysisRunner(analysis,executor,runs,integration)){runner.scan();}
+   assertThat(commits).hasValue(0);assertThat(jdbc.queryForObject("select count(*) from analysis_run_stage_results where run_id=?",Integer.class,run)).isZero();
+ }
+
+ @Test void late_old_validation_failure_does_not_overwrite_new_candidate_or_errors() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);long correction=correction(10,a);
+   byte[] invalid=(HEADER+x().replace(",100,",",-1,")).getBytes(StandardCharsets.UTF_8);
+   var old=service.issue(10,new IssueUploadRequest("older.csv",invalid.length,digest(invalid),DATE,correction,UUID.randomUUID()));
+   String key=jdbc.queryForObject("select s3_key from batch_jobs where job_id=?",String.class,old.uploadId());files.put(key,invalid);
+   var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+   when(store.open(eq(key))).thenAnswer(invocation->{entered.countDown();if(!release.await(10,TimeUnit.SECONDS))throw new IOException("test timeout");return new ByteArrayInputStream(invalid);});
+   service.complete(10,old.uploadId());assertThat(entered.await(5,TimeUnit.SECONDS)).isTrue();
+   long latest;
+   try {latest=replace(10,correction,HEADER+x()+y());}finally{release.countDown();}
+   long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(service.status(10,old.uploadId()).status().name().equals("RECEIVED")&&System.nanoTime()<deadline)Thread.sleep(20);
+   assertThat(service.status(10,old.uploadId()).status().name()).isEqualTo("VALIDATION_FAILED");
+   assertThat(jdbc.queryForObject("select v.upload_id from correction_requests c join report_versions v on v.version_id=c.replacement_version_id where c.correction_id=?",Long.class,correction)).isEqualTo(latest);
+   assertThat(jdbc.queryForObject("select status from correction_requests where correction_id=?",String.class,correction)).isEqualTo("WAITING_COUNTERPART");
+   assertThat(jdbc.queryForObject("select count(*) from correction_errors where correction_id=? and code='INVALID_SELF'",Integer.class,correction)).isZero();
+ }
+ @Test void resolving_cutoff_candidate_does_not_resolve_later_submission_context() throws Exception {
+   long a=submit(10,HEADER+x()),b=submit(20,HEADER+x());integrate(a,b);long ca=correction(10,a),cb=correction(20,b);
+   long a2=replace(10,ca,HEADER+x().replace(",100,",",200,")),b2=replace(20,cb,HEADER+x().replace(",100,",",200,"));Instant cutoff=Instant.now();
+   long a3=replace(10,ca,HEADER+x().replace(",100,",",300,"));
+   integration.integrate(DATE,cutoff,Set.of(a,b,a2,b2));
+   assertThat(jdbc.queryForObject("select status from correction_requests where correction_id=?",String.class,ca)).isNotEqualTo("RESOLVED");
+   assertThat(jdbc.queryForObject("select v.upload_id from correction_requests c join report_versions v on v.version_id=c.replacement_version_id where c.correction_id=?",Long.class,ca)).isEqualTo(a3);
+   assertThat(jdbc.queryForObject("select amount_paid from transactions where integration_status='ACTIVE'",BigDecimal.class)).isEqualByComparingTo("200");
+ }
 }

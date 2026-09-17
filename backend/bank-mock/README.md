@@ -78,7 +78,7 @@ EC2에서 환경변수를 export해 실행할 경우 해당 셸과 자식 프로
 | `PARTIALLY_HELD` | 일부 거래 의존 보류, 정상 거래만 통합 |
 | `HELD` | 파일 전체 보류 |
 
-출력의 재조회 안내에 따라 `--upload-id`로 보고의 통합 상태를 확인한다. 업로드 조회 응답은 분석 완료를 보장하지 않으며 분석 완료 상태는 별도로 확인해야 한다. 같은 내용의 반복 행은 중복 오류가 아니라 발생 건수로 보존한다(`duplicateCount=0`). 이는 이미 완료된 동일 파일의 재업로드 거절과 구분한다. 명시적 정정본 접수·교체는 후속 작업이며 현재 업로드가 기존 보고를 임의로 교체하지 않는다.
+출력의 재조회 안내에 따라 `--upload-id`로 보고의 통합 상태를 확인한다. 업로드 조회 응답은 분석 완료를 보장하지 않으며 분석 완료 상태는 별도로 확인해야 한다. 같은 내용의 반복 행은 중복 오류가 아니라 발생 건수로 보존한다(`duplicateCount=0`). 이는 이미 완료된 동일 파일의 재업로드 거절과 구분한다. 일반 업로드는 기존 보고를 임의로 교체하지 않는다. 명시적 정정 옵션으로 정정 요청에 연결한 전체 파일을 제출한다.
 
 응답이 유실되면 저장·처리가 이미 진행됐을 수 있다. 출력된 uploadId로 재조회한다. `URL_ISSUED`는 서버가 수신 확인을 하지 않은 상태다. 재조회는 완료 통지를 자동 재시도하지 않으므로 PUT 응답 유실·완료 통지 전 중단 상태는 서버 담당자가 객체와 작업을 확인해야 한다. 자동 재전송·자동 재발급은 하지 않는다.
 
@@ -110,3 +110,19 @@ python -B -m unittest discover -s backend/bank-mock -p 'test_*.py' -v
 `test_bank_mock.py`는 목업이 제대로 요청하고 결과를 해석하는지 확인하는 개발용 테스트다. 은행 직원이 수행하는 서버 업무 검증이 아니다. 로컬 HTTP 서버·임시 파일·가짜 시계로 발급/PUT/완료/조회/실패/시간초과를 검사하고 자원을 정리한다. 백엔드 검수·트랜잭션은 PostgreSQL Testcontainers, S3 서명 설정은 오프라인 SDK 테스트로 검증한다.
 
 `fixtures/bank_70.csv`, `fixtures/bank_12.csv`, `fixtures/bank_21174.csv`는 새 AML17 양식의 17열 합성 은행 보고다. 거래 기준일은 `2022-09-01`이며 각 파일에 해당 은행 코드를 지정한다. 사용 전에 은행 70·12·21174를 보고 은행으로 등록하고 해당 기준일을 포함하는 적용 기간과 `AML17` 양식을 설정해야 한다. 이 fixture는 별도로 보존된 기존 시연 100CSV와 구분하며 기존 파일이 새 양식으로 바뀌었다고 가정하지 않는다. HI-Small 분할·데이터 생성·예약 전송은 이 프로그램에 포함되지 않는다.
+
+## 정정 요청 확인 및 전체 파일 제출
+
+은행 웹/로그인 대신 목업으로 자기 은행의 요청만 확인한다. `--corrections`는 OPEN뿐 아니라 모든 미해결 상태를 조회하고, `--status`로 특정 상태를 선택한다. `--page`는0부터, `--size`는1~200이다. 상세에는 기준일·원본/수정본 uploadId와 정제된 오류가 표시된다. 미도착 원본의 uploadId는 없을 수 있다.
+
+conda 환경 `aml`을 활성화한 PowerShell에서 실행한다.
+
+```powershell
+& "$env:CONDA_PREFIX/python.exe" -B bank_mock.py --api-url https://example.test --bank-id 70 --corrections
+& "$env:CONDA_PREFIX/python.exe" -B bank_mock.py --api-url https://example.test --bank-id 70 --correction-id 7
+& "$env:CONDA_PREFIX/python.exe" -B bank_mock.py --api-url https://example.test --bank-id 70 --file ./corrected.csv --business-date 2022-09-01 --correction-request-id 7
+```
+
+출력한 제출 UUID를 `--submission-id UUID`로 다시 전달하면 같은 제출의 재시도다. 서버가 이미 수신한 제출이면 PUT/완료 통지를 반복하지 않고 기존 uploadId를 조회한다. 새 후보를 의도적으로 제출할 때는 새 제출 ID를 사용한다. 만료된 미수신 URL의 재시도는 새 ID가 필요하다. 동일 제출 ID로 다른 파일을 보내면 거절한다. 이전 파일과 바이트가 같은 명시 정정도 허용하며 일반 중복 업로드와 구별한다.
+
+수정할 값과 파일은 사용자가 명시한다. 목업은 제출 파일의 위치를 출력하고 원본 바이트·체크섬을 유지한다. 자동 값 수정·자동 재제출·통합 완료까지 자동 폴링하지 않는다. WAITING_COUNTERPART는 상대 후보 대기, WAITING_ANALYSIS_RELEASE는 이전 실행 해제 대기, SUPERSEDED는 교체된 과거 보고다. 수신/검수 완료와 공동 교체 해결·분석 완료는 각각 다르다. `--upload-id` 또는 `--correction-id`로 다시 확인한다.
