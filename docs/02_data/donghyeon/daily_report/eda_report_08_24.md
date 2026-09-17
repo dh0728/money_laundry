@@ -1,71 +1,22 @@
 # IBM AML 데이터셋 분석일기
 - 작성일: 2026-08-24
 
-## 11일 이후 데이터를 끊었을 때 자금 세탁 패턴이 잘려서 패턴이 망가지는 경우가 있는가?
 
-패턴이 살아 있는것
-HI_0116	GATHER-SCATTER
-HI_0119	GATHER-SCATTER
-HI_0148	GATHER-SCATTER
-HI_0156	GATHER-SCATTER
-HI_0177	GATHER-SCATTER
-HI_0215	GATHER-SCATTER
+## 데이터 분석시 확인한 것
 
-HI_0228 SCATTER-GATHER
+- 자금 패턴 건수
+  - HI 전체: 5177 패턴 연결: 3209 패턴 외: 1968
+  - LI 전체: 3565 패턴 연결: 1023 패턴 외: 2542
 
-HI_0236 SCATTER-GATHER
-HI_0231 STACK
-HI_0240 STACK
-HI_0239 STACK
-HI_0240 · STACK
-HI_0247 FAN-OUT
-HI_0251 FAN-IN
-HI_0252 FAN-OUT
+- Trans.csv에서 중복값 확인 HI 9건, LI 8건 -> 중복제거
+- Bank ID가 다른데 Bank Name이 같은 경우 HI 10885건, LI 14631건
+- 11일 이후 정상거래가 끊기면서 발생하는 자금세탁 비율 급증
+- Pattens.txt에 없지만 Is_Laundering == 1인 거래건수는 10일 이후로 없음
+- 반면에 Pattens.txt에 있는 자금 세탁은 11일 패턴이 진행중이라 이어지고 Is_Laundering == 0이지만 자금세탁 송금에 필요한 환전·보조 거래는 남아 있음
+  - 패턴의 직접 송금 엣지가 아니기 때문에 0 라벨을 받은것임
+  - 따라서 11일 이후의 Payment Format은 모두 ACH 임
+    - ACH : Automated Clearing House의 약자로, 은행 계좌 사이에서 전자적으로 돈을 이체하는 방식
 
-HI_0253	FAN-IN	
-HI_0254	FAN-OUT
-HI_0256 · STACK
-HI_0260	STACK
-HI_0262	STACK
-HI_0264	RANDOM
-HI_0266	STACK
-HI_0269 SCATTER-GATHER
-HI_0270 FAN-IN
-
-
-
-망지지는 후보
-
-HI_0181
-GATER-SCATTER 
-![alt text](image.png)
-
-HI_0196
-GATER-SCATTER 
-![alt text](image-1.png)
-
-
-HI_0222 
-GATHER-SCATTER
-![alt text](image-2.png)
-
-HI_0229 
-GATHER-SCATTER
-![alt text](image-3.png)
-
-HI_0232 · CYCLE
-
-![alt text](image-4.png)
-
-HI_0244 · FAN-OUT
-![alt text](image-5.png)
-
-HI_0255	SCATTER-GATHER
-![alt text](image-6.png)
-
-HI_0258	CYCLE
-![alt text](image-8.png)
-
-HI_0259	GATHER-SCATTER
-![alt text](image-7.png)
-
+- Reinvestment는 시뮬레이션 시작 시 계좌에 초기 자금을 설정하는 자기거래이기 때문에 첫날 이후로 0건
+- 정상거래가 9월 3-4일이 급격하게 떨어지는 경향성을 보임 - 주말이라서 떨어지는 것으로 예상
+- 패턴 자금 세탁 거래는 둥근형태의 경향성을 보이나 패턴외 자금세탁 거래는 9월 3일-4일에 감소하고 다시 증가하는 경향을 보임
