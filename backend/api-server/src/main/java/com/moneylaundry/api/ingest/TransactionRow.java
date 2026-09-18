@@ -3,7 +3,7 @@ package com.moneylaundry.api.ingest;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** 표준화·가명화가 끝난 원장 입력 행(API.md §1.4). rowHash는 아래 값 전체의 SHA-256. */
+/** 표준화된 민감 원문 입력. 로그/API에 직접 사용하지 않는다. */
 public record TransactionRow(
     int fileRow,
     Instant occurredAt,
@@ -17,4 +17,15 @@ public record TransactionRow(
     String paymentCurrency,
     String paymentFormat,
     Boolean isLaundering,
-    String rowHash) {}
+    String rowHash,
+    String fromBankName,
+    String toBankName,
+    String fromEntityId,
+    String fromEntityName,
+    String toEntityId,
+    String toEntityName) {
+  @Override
+  public String toString() {
+    return "TransactionRow[redacted]";
+  }
+}

@@ -41,9 +41,4 @@ public class UploadController {
       @RequestAttribute(BankIdentityInterceptor.BANK_ID) int bankId, @PathVariable long uploadId) {
     return uploadService.status(bankId, uploadId);
   }
-
-  @GetMapping("/api/uploads/{uploadId}")
-  public UploadStatusResponse status(@PathVariable long uploadId) {
-    return uploadService.status(uploadId);
-  }
 }

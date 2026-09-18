@@ -11,9 +11,23 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class CsvTransactionReaderTests {
+  @org.junit.jupiter.api.Test
+  void 쿠버스피어_다운로드_검증용_파일의_계좌_헤더와_거래를_읽는다() throws Exception {
+    var fixture = java.nio.file.Path.of("../bank-mock/fixtures/kubesphere_smoke.csv");
+    try (var input = java.nio.file.Files.newBufferedReader(fixture)) {
+      var reader = new CsvTransactionReader(input, ZoneId.of("Asia/Seoul"));
+      var row = reader.next();
+      assertThat(row.fromAccount()).isEqualTo("SMOKE260917A");
+      assertThat(row.toAccount()).isEqualTo("SMOKE260917B");
+      assertThat(row.occurredAt()).isEqualTo(Instant.parse("2022-09-01T03:34:00Z"));
+      assertThat(reader.next()).isNull();
+    }
+  }
+
   private static final String HEADER =
-      "Timestamp,From Bank,Account,To Bank,Account,Amount Received,Receiving Currency,"
-          + "Amount Paid,Payment Currency,Payment Format\n";
+      "Timestamp,From Bank,From Account,To Bank,To Account,Amount Received,Receiving"
+          + " Currency,Amount Paid,Payment Currency,Payment Format,From Bank Name,To Bank Name,From"
+          + " Entity ID,From Entity Name,To Entity ID,To Entity Name\n";
 
   @ParameterizedTest
   @ValueSource(
@@ -110,7 +124,8 @@ class CsvTransactionReaderTests {
       values[column] = unit.repeat(limit + 1);
       var reader = textReader(String.join(",", values));
       var error = assertThrows(CsvTransactionReader.RowException.class, reader::next);
-      assertThat(error.error().column()).isEqualTo(column == 9 ? "Payment Format" : "Account");
+      assertThat(error.error().column())
+          .isEqualTo(column == 9 ? "Payment Format" : column == 2 ? "From Account" : "To Account");
       assertThat(error.error().reason()).contains(Integer.toString(limit));
       if (column != 9) assertThat(error.error().reason()).contains(column == 2 ? "송신" : "수신");
       assertThat(error.missing()).isFalse();
@@ -119,8 +134,7 @@ class CsvTransactionReaderTests {
 
   private CsvTransactionReader textReader(String row) throws Exception {
     return new CsvTransactionReader(
-        new BufferedReader(new StringReader(HEADER + row + "\n")),
-        new IdentityPseudonymizer(),
+        new BufferedReader(new StringReader(HEADER + row + ",Bank70,Bank12,E1,Alice,E2,Bob\n")),
         ZoneId.of("Asia/Seoul"));
   }
 
@@ -133,16 +147,17 @@ class CsvTransactionReaderTests {
                     + received
                     + ",US Dollar,"
                     + paid
-                    + ",US Dollar,ACH\n")),
-        new IdentityPseudonymizer(),
+                    + ",US Dollar,ACH,Bank70,Bank12,E1,Alice,E2,Bob\n")),
         ZoneId.of("Asia/Seoul"));
   }
 
   private CsvTransactionReader reader(String timestamp) throws Exception {
     return new CsvTransactionReader(
         new BufferedReader(
-            new StringReader(HEADER + timestamp + ",70,A,12,B,1,US Dollar,1,US Dollar,ACH\n")),
-        new IdentityPseudonymizer(),
+            new StringReader(
+                HEADER
+                    + timestamp
+                    + ",70,A,12,B,1,US Dollar,1,US Dollar,ACH,Bank70,Bank12,E1,Alice,E2,Bob\n")),
         ZoneId.of("Asia/Seoul"));
   }
 }

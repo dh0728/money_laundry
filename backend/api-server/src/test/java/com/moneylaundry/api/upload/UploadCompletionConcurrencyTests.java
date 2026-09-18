@@ -34,6 +34,10 @@ class UploadCompletionConcurrencyTests {
   void reportingBank() {
     jdbc.update(
         "insert into banks(bank_id, is_reporting) values (70, true) on conflict do nothing");
+    jdbc.update(
+        "insert into bank_reporting_periods(bank_id,effective_from_date) select 70,date"
+            + " '2022-01-01' where not exists(select 1 from bank_reporting_periods where"
+            + " bank_id=70)");
   }
 
   @Autowired UploadService service;
@@ -51,7 +55,7 @@ class UploadCompletionConcurrencyTests {
                 "concurrent.csv",
                 "c".repeat(64),
                 1,
-                null,
+                java.time.LocalDate.of(2022, 9, 1),
                 "uploads/70/concurrent.csv",
                 now,
                 now.plusSeconds(60)));
