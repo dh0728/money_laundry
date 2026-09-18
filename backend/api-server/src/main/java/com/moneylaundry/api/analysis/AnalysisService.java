@@ -107,6 +107,10 @@ public class AnalysisService {
           """,
               id,
               Timestamp.from(cutoff));
+          jdbc.update(
+              "insert into analysis_receipts select ?,job_id from batch_jobs where job_type='INGEST' and received_at<=?",
+              id,
+              Timestamp.from(cutoff));
           return id;
         });
   }
@@ -146,6 +150,12 @@ public class AnalysisService {
           if (!job.status().equals("FAILED"))
             throw conflict(
                 job.status().equals("COMPLETED") ? "JOB_ALREADY_COMPLETED" : "INVALID_TRANSITION");
+          if ("RUN_CANCELLED".equals(job.error())) {
+            jdbc.update(
+                "update analysis_cancel_outbox o set attempts=0,retry_at=null,error_code=null from analysis_model_requests m join analysis_runs r using(run_id) where o.request_id=m.request_id and o.execution_round=m.execution_round and r.job_id=? and o.acknowledged_at is null",
+                id);
+            return;
+          }
           jdbc.update(
               "update batch_jobs set status='QUEUED',consecutive_failures=0,error_code=null,error_message=null,retry_at=null,execution_id=null,execution_owner=null,finished_at=null where job_id=?",
               id);
@@ -153,6 +163,7 @@ public class AnalysisService {
   }
 
   void lock(long id) {
+    AnalysisRunService.integrationLock(jdbc);
     if (jdbc.queryForList("select job_id from batch_jobs where job_id=? for update", Long.class, id)
         .isEmpty()) throw ApiException.notFound("작업 없음");
   }
@@ -160,7 +171,12 @@ public class AnalysisService {
   boolean owns(Job expected) {
     Job actual = job(expected.id());
     return actual.status().equals("RUNNING")
-        && Objects.equals(expected.executionId(), actual.executionId());
+        && Objects.equals(expected.executionId(), actual.executionId())
+        && !Boolean.TRUE.equals(
+            jdbc.queryForObject(
+                "select exists(select 1 from analysis_runs r join batch_jobs b on b.current_run_id=r.run_id where b.job_id=? and r.status in ('CANCEL_REQUESTED','CANCELLED'))",
+                Boolean.class,
+                expected.id()));
   }
 
   public Map<String, Object> detail(long id) {
@@ -180,6 +196,11 @@ public class AnalysisService {
     for (String key : List.of("uploads", "failures"))
       for (Object row : (List<?>) result.get(key))
         ((Map<String, Object>) row).replaceAll((name, value) -> jsonValue(value));
+    result.put(
+        "cancellations",
+        jdbc.queryForList(
+            "select o.cancel_id as \"cancelId\",o.attempts,o.error_code as \"errorCode\",o.acknowledged_at as \"acknowledgedAt\",(o.attempts>=3 and o.acknowledged_at is null) as \"actionRequired\" from analysis_cancel_outbox o join analysis_model_requests m using(request_id,execution_round) join analysis_runs r using(run_id) where r.job_id=?",
+            id));
     return result;
   }
 
@@ -227,6 +248,7 @@ public class AnalysisService {
     Map<String, Object> result = new LinkedHashMap<>();
     String[][] names = {
       {"job_id", "jobId"},
+      {"current_run_id", "runId"},
       {"job_type", "type"},
       {"status", "status"},
       {"analysis_date", "analysisDate"},

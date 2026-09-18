@@ -1,8 +1,10 @@
-# API 계약 v0.7 — 2026-09-10
+# API 계약 v0.8 — 2026-09-17
+
+변경 v0.8: 정정 요청·전체 보고 교체, INTEGRATE/FREEZE_INPUT, 실행 세대·취소 결과 차단. Python 실행측·실 S3 관통은 후속.
 
 변경 v0.7: ANALYSIS-ENTRY-20260910-v2 — 일별 대상 고정, 단계별 재시도·복구, 작업 상태 API와 완료된 의심 거래 DB 페이지 조회. 실제 피처/추론/Alert 연결은 후속 태스크.
 
-변경 v0.6: BANK-IDENTITY-20260910-v1 — API 키 인증을 dev/local 임시 은행 코드 식별로 교체. 최종 서비스는 로그인한 은행 직원이 파일을 선택해 수동 업로드한다.
+변경 v0.6: BANK-IDENTITY-20260910-v1 — API 키 인증을 dev/local 임시 은행 코드 식별로 교체. 은행 측은 데이터 공급 목업을 사용한다.
 
 변경 v0.5: INGEST-S3-RESULT-20260909-v2 — 실제 S3·체크섬·은행 결과 조회·파일 전체 검수·원장/완료 상태 원자화. 기존 중복 건너뛰기 정책은 폐기한다.
 
@@ -40,29 +42,44 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | `INTERNAL` | 500 | 그 외 |
 
 - **역할**: `L1`·`L2`·`ADMIN`. 엔드포인트마다 `[허용 역할]` 표기. ADMIN은 사용자·모델 관리와 **배정·재배정** 전용이며 조사 액션(종결·심층 요청·연결·의견) 불가. MVP는 데이터 범위 제한 없음(모든 역할이 전체 조회, 허용된 액션은 전체에 대해). "담당자만 처분" 강제는 10월.
-- **은행 주체 `BANK`**: 현재 목업의 임시 은행 식별(§1.1). 향후 로그인한 직원의 소속 은행과 업로드 권한으로 교체한다. 직원 로그인·권한 계약은 후속 설계 대상이다.
+- **은행 주체 `BANK`**: 현재 목업의 임시 은행 식별(§1.1). 은행 웹·직원 로그인은 프로젝트 범위 밖이며 실제 인증 연결은 배포 전 별도 과제다.
 - **배정(2026-09-07 사용자 확정, 모델 A)**: Alert·Episode 모두 생성 시 시스템이 라운드로빈으로 담당자를 정한다(§3.4). L1이 L2를 고르지 않는다. 재배정은 ADMIN. 인증 *방식*(세션 vs JWT) `[미정: FE 로그인 착수 전, 늦어도 9/18]`.
 - **감사 이력**: 모든 처분 액션은 §6 이력 행을 부수효과로 기록. 처분 액션의 `comment`는 **필수**(빈 값 400).
 - **유형 코드**: 0~8, 매핑표 §2.3. 명칭은 `{ code, name }` 객체로 내보낸다(한글 표시명은 FE 소관).
 
 ## 1. 층 1 — 수집·배치
 
-### 1.1 은행 수집 API (2026-09-07 사용자 확정 — MVP부터 Presigned+S3+완료 API, 구 멀티파트 `POST /api/uploads`는 폐기)
+### 1.1 은행 수집 API
 
-수집 주체는 최종 서비스의 **은행 직원**이며 파일을 선택해 수동으로 업로드한다. 현재는 **은행 목업 프로그램**(`backend/bank-mock/` Python, BE 소유)이 그 동작을 대신한다. 향후 로그인·소속 은행·업로드 권한 확인 후 같은 업로드/결과 흐름을 재사용한다. 자동 업로드 및 API 키 발급·관리 화면은 만들지 않는다.
+은행 측은 데이터 공급 목업만 제공한다. 은행 직원 웹·로그인·외부 통지는 구현 범위가 아니다. 상위기관 분석팀이 웹에서 결과를 조회한다.
 
-- **은행 테이블(2026-09-07 사용자 확정)**: 원장에 등장하는 **모든 은행 코드**를 담는다(적재 시 자동 upsert, 원장 FK). `name`·`country`는 리소스 `ingest/banks_hi_small.csv`(HI-Small_accounts.csv 추출 30,470행 — HI-Small 재생 전용, HI-Large는 같은 코드에 다른 이름)에서 채우고 못 채우면 null(국가는 "<국가> Bank #N" 형식만 추출). **`is_reporting`** = 보고 은행(도착 현황 대상). 최초 URL 발급 트랜잭션에서 은행을 upsert하고 true로 설정한다. 기존 은행 이름·국가·키 해시는 보존한다. 전체 명단을 미리 시드하지 않으므로 최초 발급 전에는 도착 현황에 등장하지 않는다. 상대방 은행은 `is_reporting=false`로 이름만 보인다.
-- **임시 은행 식별**: 발급·완료·결과 조회에 `X-Bank-Id` 헤더(0~2147483647, ASCII 숫자 1~10자리)를 전달한다. 누락·빈값·음수·문자·범위 초과는400 `VALIDATION_FAILED`. 실제 인증이 아니며 요청자가 은행 코드를 선택할 수 있다. 활성 프로파일에 `dev` 또는 `local`이 있고 `prod`가 없을 때만 허용한다. 기본/미지정/그외 프로파일과 `prod`(혼합 포함)는403 `BANK_IDENTITY_DISABLED`. 은행 코드는 요청 경계에서 `bankId`로 결정하며 향후 직원 로그인으로 이 부분을 교체한다. API 키 환경변수·기동 시 키 시드는 제거한다. 기존 DB 키 컬럼은 변경하지 않는다.
-- **POST /api/v1/bank/uploads** [BANK] `{ fileName, sizeBytes, checksumSha256, businessDate }` → 201 `{ uploadId, bankId, url, method: "PUT", expiresAt, headers }`. 모든 입력 필드는 필수이며 한 CSV는 하루치다. `checksumSha256`은 파일 바이트의 SHA-256을 Base64로 표현한다. 서버는 decoded digest를 기존 `file_hash CHAR(64)`에 hex로 저장한다. `businessDate`는 서울 거래 기준일, 실제 전송일과 별개다. 파일 크기 최대 200MiB, URL 기본 TTL 15분. 파일명에 경로 문자는 불허한다.
-- **S3 전송**: AWS SDK v2 S3Presigner, DefaultCredentialsProvider(EC2 IAM 역할). `S3_BUCKET`·`S3_PREFIX`·`AWS_REGION`(기본 서울)을 사용하며 객체 키는 `{prefix}uploads/{bankId}/{uploadId}/{fileName}`. 응답 `headers`의 `Content-Type: text/csv`, `x-amz-checksum-sha256` 등 서명 헤더를 은행이 그대로 PUT에 보낸다. Host는 HTTP 클라이언트가 처리하며 은행 식별·인증 헤더는 S3에 보내지 않는다. dev/prod에서 S3 설정이 없으면 기동 실패, local/default만 폴더 저장소를 허용한다. 현 목업은 폴더 복사를 지원하지 않는다.
-- **동일 파일**: 은행별로 비교한다. 같은 은행에서 이미 COMPLETED인 경우 409 `DUPLICATE_FILE` + 기존 `fileName`·`uploadedAt`(receivedAt)만 확장한다. 업로드·검수 진행중은 409 `UPLOAD_IN_PROGRESS`이며 완료라고 안내하지 않는다. 발급은 은행 행 잠금으로 동시 중복 생성 방지. URL 만료 후 새 발급 전에는 기존 번호로 완료 통지할 수 있다. 새 업로드 번호가 발급되면 이전 URL_ISSUED 번호의 완료는409 UPLOAD_SUPERSEDED로 거절한다. 발급과 수신 전이는 같은 은행 잠금으로 직렬화하며 S3 확인 뒤 잠금 안에서 상태·최신 번호를 다시 확인한다. 완료 선행이면 재발급은 진행중409, 재발급 선행이면 이전 완료는 교체됨409다. 이미 수신·처리·종료된 번호의 중복 완료는 기존 상태를 반환한다.
-- **POST /api/v1/bank/uploads/{uploadId}/complete** [BANK, 자기 은행만] → 객체 존재·크기·실제 체크섬을 확인한 뒤 RECEIVED, 응답 202(§1.2 결과). S3 HEAD `checksumMode=ENABLED`, ETag로 체크섬을 대체하지 않는다. 저장소 권한/통신 장애와 객체 없음은 구분한다. 중복 완료 요청은 현재 상태를 반환하고 적재를 다시 실행하지 않는다.
-- 비동기 Java 적재: `RECEIVED → RUNNING → COMPLETED | VALIDATION_FAILED | FAILED`. 파일 내부 중복·기존 원장 중복·필수결측·형식·기준일 불일치가 하나라도 있으면 파일 전체 VALIDATION_FAILED, 원장 0건. 선택 라벨 결측은 허용한다. 성공은 원장과 COMPLETED를 같은 트랜잭션으로 커밋, 오류는 롤백 후 실패 상태를 별도로 기록한다. 같은 보고 은행의 적재는 advisory transaction lock으로 직렬화하고 공통 은행·계좌 upsert는 정렬 순서로 처리한다. DB UNIQUE는 최종 중복 방어다.
-- **목업**: 필수 `--api-url`·`--bank-id`, 업로드 모드 `--file`·`--business-date`, 또는 재조회 모드 `--upload-id`. API 키 설정은 필요 없다. URL 요청 → S3 PUT → 완료 통지 → 은행 결과 조회를 2초마다 최대 30분 폴링. 확인 시간 초과는 서버 실패가 아니다. 종료 0은 원장 적재 성공, 입력 오류 2, 실패·시간초과·결과 불명 1. 파일 생성/분할/예약은 별도 작업이다.
+- 보고 은행은 운영자가 `banks.is_reporting=true`와 `bank_reporting_periods`의 거래 기준일 적용 기간을 사전 등록한다. URL 요청으로 자격을 만들지 않는다. 참조 은행과 보고 은행은 별개다. 미등록 은행·기준일은403 `REPORTING_NOT_REGISTERED`다. `banks.report_format=AML17` 설정에 따라 현재 공통 CSV 규칙을 선택한다.
+- `X-Bank-Id`는 dev/local에서만 허용하는 테스트 대역이다. prod 혼합·미지정 프로파일은403 `BANK_IDENTITY_DISABLED`, 잘못된 정수는400이다. 실제 인증 연동을 대체하지 않는다. 모든 은행 경로는 자기 은행 신원을 확인한다.
+- **POST /api/v1/bank/uploads** `{fileName,sizeBytes,checksumSha256,businessDate}` + 정정 시 `{correctionRequestId,correctionSubmissionId}` →201 `{uploadId,bankId,url,method:"PUT",expiresAt,headers,uploadRequired}`. 기본4개 필드는 필수이며 정정2개 필드는 함께 지정한다. 한 파일은 서울 거래 기준일 하루치, 최대200MiB, 기본 URL TTL15분. 체크섬은 실제 파일 바이트 SHA-256 Base64다. 파일명 경로 문자는 거절한다.
+- 은행은 응답의 서명 헤더를 유지해 S3에 PUT한다. 은행 식별 헤더를 S3로 전달하지 않는다. S3 SDK·비공개 객체·IAM 설정 계약은 기존 저장소 설정을 유지하며 실제 배포 권한은 별도 검증한다. dev/prod는 S3 설정 누락시 시작 실패, local/default만 폴더 저장소를 허용한다.
+- **POST /api/v1/bank/uploads/{uploadId}/complete** →202 처리현황. 객체 존재·크기·실제 SHA-256 확인 후 수신을 커밋하고 비동기 검수한다. ETag를 체크섬으로 대체하지 않는다. 은행 행 잠금 후 최신 URL/상태를 다시 확인한다. 같은 번호 완료 재시도는 기존 상태를 반환한다.
+- 일반 동일 파일 완료본은409 `DUPLICATE_FILE`, 진행 중은409 `UPLOAD_IN_PROGRESS`, 새 URL이 발급된 옛 번호는409 `UPLOAD_SUPERSEDED`다. 명시적인 correctionRequestId·correctionSubmissionId 제출만 별도 정정 문맥으로 접수한다. 일반 업로드는 기존 보고를 임의 교체하지 않는다.
+- 검수 성공은 **은행 보고 저장 완료**다. `COMPLETED`를 통합·추론 완료로 해석하지 않는다. 반복 동일 행은 원천 발생 건수로 보존한다. 파일 자체 오류는 전체 보류하고 정상 개체·계좌·거래를 만들지 않는다. 정상 확정은 별도 통합 서비스에서 수행한다.
+- 목업은 업로드 또는 `--upload-id` 재조회, 2초/최대30분 폴링을 유지한다. 종료0은 보고 수신 처리의 종료이며 `integrationStatus`로 통합 대기/정상/보류를 별도 표시한다. 시간초과는 서버 실패로 단정하지 않는다.
+
+### 정정 및 실행 세대 계약 (V4)
+
+- `GET /api/v1/bank/corrections?page=0&size=20&status=OPEN`: 자기 은행만 조회한다. status 생략은 모든 미해결 요청이며 OPEN, REPLACEMENT_RECEIVED, VALIDATING, WAITING_COUNTERPART, WAITING_ANALYSIS_RELEASE, RESOLVED를 선택할 수 있다. 응답은 공통 페이지 형식이다.
+- `GET /api/v1/bank/corrections/{id}`: 자기 은행의 요청만 반환하며 다른 은행/없는 ID는404다. 보고 자격이 없는 은행은403 REPORTING_NOT_REGISTERED다. 각 요청에는 correctionRequestId, businessDate, uploadId(미도착이면 null), reportVersionId, status, revision, replacementUploadId, replacementVersionId, errors가 있다. 오류는 {row,column,code,reason}이며 파일 수준 오류의 row는 null이다. 원문·다른 은행 파일명은 노출하지 않는다.
+- 업로드 URL 요청에 선택 `correctionRequestId`를 추가한다. 같은 은행·기준일의 미해결 요청이어야 하며 정정은 새 전체 보고 버전이다. 일반 중복과 구분하여 과거와 동일 바이트도 제출할 수 있다. 정정 제출은 correctionSubmissionId(UUID)를 반드시 함께 보낸다. 같은 요청/제출 ID는 완료 후에도 같은 upload/version을 반환하며 다른 파일명·크기·체크섬이면409 CORRECTION_SUBMISSION_MISMATCH다. 새 후보는 새 제출 ID다. 이미 수신한 제출 응답은 uploadRequired=false이며 URL/PUT을 재사용하지 않고 uploadId로 조회한다. 미수신 URL 만료는409 UPLOAD_URL_EXPIRED이며 새 제출 ID가 필요하다. 서로 다른 정정 문맥의 URL은 상대를 supersede하지 않는다. RESOLVED 요청은409 CORRECTION_RESOLVED다.
+- 수신만으로 해결하지 않는다. 자체 오류는 OPEN, 정상 후보의 상대 대기는 WAITING_COUNTERPART, 실행 해제 대기는 WAITING_ANALYSIS_RELEASE다. 공동 대조·원자 교체 이후 RESOLVED다. 후보 재제출은 RESOLVED 이외 상태에서 허용한다.
+- 업로드 조회에 reportVersionId, correctionRequired, correctionRequestId, replacementUploadId, nextAnalysisDate를 추가한다. integrationStatus는 WAITING_COUNTERPART/WAITING_ANALYSIS_RELEASE/SUPERSEDED를 포함한다. nextAnalysisDate는 수신시각 기준 예정 컷오프 날짜이며 분석 완료 약속이 아니다.
+- 정정 교체는 고정 cutoff 내 가장 높은 자체 검수 통과 version과 기존 채택본을 대조한다. 구/신 보고의 은행·계좌·개체 영향 묶음을 함께 검증한다. 동일 내용/반복 발생 건은 tx_id를 보존하며 완료 TARGET의 수정·삭제는 COMPLETED_TARGET_CHANGE_OUT_OF_SCOPE로 전체 후보 묶음을 거절한다. 완료 CONTEXT의 구 입력은 값 스냅샷으로 보존한다.
+- 분석은 WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE다. runId UUID는 입력 세대, executionId는 단계 시도다. 정정 취소는 결과/재시도/후속 진입을 차단하고 별도 run으로 대체한다. 취소된 모든 미완료 TARGET을 재검토하며 이전 날짜 TARGET도 누락시키지 않는다. 입력0은 EMPTY_INPUT이다.
+- 결과 완료와 취소는 같은 실행 잠금에서 판정한다. BINARY/TYPE의 모든 게시 가능한 요청/회차를 취소 outbox로 추적하고 STOPPED 또는 ALREADY_FINISHED 확인 전 대체 추론을 대기한다. 전달 실패·미응답을 종료로 취급하지 않는다. cancel_id와 메시지는 재전달에도 불변이다. Python 실행측 연결/실제 S3 관통 검증은 후속 태스크이며 Java의 저장·차단 경계만으로 실제 외부 종료를 주장하지 않는다.
+- 취소 파일 contract_version은 숫자2다. Java 전달 담당은 기존 app.s3.bucket/prefix와 SDK를 재사용해 `requests/{job}/{model}/{request}/rounds/{round}/cancel.json`을 조건부 불변 게시한다. 응답은 `results/.../cancel_ack.json`의 job/run/model/request/round/cancel 전체 식별자를 검사한다. S3 미설정 local은 storage-dir/analysis-transport에 완성한 임시 파일을 hard link로 원자 게시하며 임시 파일을 정리한다. 기존 2스레드 TaskScheduler에서 Python 단계와 별도로 5초 스캔한다.
+- 전달 실패는30초/2분 간격으로 총3회까지 게시를 시도하고 미확인은 계속 대기한다. 3회 후에도 늦은 ack는 조회하며 작업 상세 cancellations의 actionRequired로 게시 재개 필요를 알린다. 취소된 작업의 기존 resume API는 outbox 시도만 재개하고 취소 run을 계산 재개하지 않는다(응답 status는 FAILED 유지). 실제 S3 권한/외부 프로세스 중단은 이 로컬·SDK 대역 검증과 구별한다.
+- 더미 freeze는 TARGET만 요구한다. 실제 피처 CONTEXT 범위는 후속 계약이며 임의 기간을 도입하지 않는다. 현재 Python 단계는 미연결 실패를 유지한다.
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
-- **GET /api/v1/bank/uploads/{uploadId}** [BANK, 자기 은행만] — 은행코드 누락·오류는400, 허용되지 않은 프로파일은403, 다른 은행/없는 작업은404. INGEST 결과 `{ uploadId, bankId, fileName, businessDate, sizeBytes, rowCount, insertedCount, missingCount, duplicateCount, status, errorCode, errorMessage, errors: [{ row, column, reason }], urlIssuedAt, receivedAt, startedAt, finishedAt }`. 완료 통지202도 같은 구조다. `rowCount`는 파일 전체를 읽어 확인한 행 수, 모르면null. 성공은 rowCount=insertedCount. 신규 파일 검증/적재 실패는 전체 롤백, 과거 FAILED 작업 조회는 실제 원장 건수를 반환해 0을 임의 추정하지 않는다. `receivedAt`은 서버 수신 확인 시각, `finishedAt`은 검증/적재 종료 시각. errors 최대100건, `row=0`은 헤더 이전 또는 DB 최종 중복방어 등 정확한 행을 특정할 수 없는 파일 단위 오류다. raw DB 오류·인증값은 노출하지 않는다.
-- **GET /api/uploads/{uploadId}** — 기존 처리현황 조회 경로 유지(사용자 인증은 W4 별도). 은행 목업은 위 임시 식별된 은행별 경로만 사용한다.
+- **GET /api/v1/bank/uploads/{uploadId}** — 자기 은행만 조회. 다른 은행/없는 작업404. 응답은 `{uploadId,bankId,fileName,businessDate,sizeBytes,rowCount,insertedCount,missingCount,duplicateCount,status,errorCode,errorMessage,errors:[{row,column,reason}],urlIssuedAt,receivedAt,startedAt,finishedAt,integrationStatus,reportVersionId,correctionRequired,correctionRequestId,replacementUploadId,nextAnalysisDate}`다. `insertedCount`는 해당 보고에서 정상 통합 거래에 연결된 보고 행 수이며 통합 전에는0이다. 같은 내용 반복은 중복 오류가 아니므로 `duplicateCount=0`이다. `errors`는 자기 파일의 정제된 오류 최대100건이며 원문 식별정보를 포함하지 않는다. `finishedAt`은 보고 저장/검수 종료 시각이다.
+- `integrationStatus`: `null`(보고 저장 전), `VALIDATED_WAITING_INTEGRATION`, `ACTIVE`, `PARTIALLY_HELD`(의존 보류와 독립 정상 행 공존), `HELD`(직접 오류 파일 전체 보류), `WAITING_COUNTERPART`(상대 후보 대기), `WAITING_ANALYSIS_RELEASE`(분석 해제 대기), `SUPERSEDED`(교체된 구 버전). 대표 사유는 `INVALID_SELF`, `IDENTITY_CONFLICT`, `PAYMENT_FORMAT_CONFLICT`, `COUNTERPART_MISSING`, `COUNTERPART_HELD`다. 기존 정상 DB와의 소유 충돌은 `INVALID_SELF_OR_CONFIRMED_IDENTITY`로 보류한다.
+- 익명 우회 조회 **GET /api/uploads/{uploadId}**는 제공하지 않는다.
 - **GET /api/banks/arrivals?date=** [전 역할] — **은행별 도착 현황**(수집·처리현황 화면의 중심): 보고 은행(`is_reporting`) 전부에 대해 `{ bankId, name, country, status: NOT_ARRIVED | URL_ISSUED | RECEIVED | RUNNING | COMPLETED | VALIDATION_FAILED | FAILED, uploadId, fileName, rowCount, receivedAt, finishedAt }` + 헤더 `{ date, cutoffAt, remainingSeconds, arrivedCount, totalBanks }`. `date` = 컷오프 기준일: 창은 (D−1 컷오프, D 컷오프], 기본값은 **다음 컷오프의 날짜**(지금 도착하는 파일이 속하는 창). 은행당 창 안 최신 INGEST 작업 1건.
 - **GET /api/v1/batch-jobs** — 페이지 목록. `type=INGEST|ANALYSIS`, `status`, `from/to`(최초 startedAt) 필터. 행은 기존 작업 메타데이터와 `currentStage, stageAttemptCount, consecutiveFailures, retryAt, actionRequired, cutoffAt, completionReason, counters`를 포함한다. 미완료 분석의 의심 거래·Alert 카운터는0이다.
 - **GET /api/v1/batch-jobs/{jobId}** — 위 행과 `uploads: [{ uploadId, excluded, status, fileName }]`, `failures: [{ stage, errorCode, failedAt, consecutiveCount, retryAt, actionRequired }]`.
@@ -79,7 +96,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | INGEST | `URL_ISSUED` | Presigned URL 발급, 파일 대기(완료 통지 전) | RECEIVED / (10월 EXPIRED) |
 | INGEST | `RECEIVED` | 완료 통지 수신·객체 확인, 적재 대기 | RUNNING |
 | INGEST | `RUNNING` | 검증·표준화·가명화·적재 중 | COMPLETED / VALIDATION_FAILED / FAILED |
-| INGEST | `COMPLETED` | 원장 적재 완료 | — |
+| INGEST | `COMPLETED` | 은행 보고 검수·저장 완료, integrationStatus 별도 | — |
 | INGEST | `VALIDATION_FAILED` | 검증 실패(영구, `errors[]` 최대 100건) — 은행이 고쳐 재업로드(새 작업) | — |
 | INGEST | `FAILED` | 적재 중 오류(영구) | — |
 | ANALYSIS | `SCHEDULED` | 미리 예약된 작업(10월 SQS; MVP는 생략 — 컷오프 `@Scheduled`가 QUEUED로 바로 만든다) | QUEUED |
@@ -90,35 +107,38 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | ANALYSIS | `FAILED` | 영구 실패 또는 3회 소진 | 명시 resume만 허용 |
 
 - 공통 컬럼: `attempt_count, claimed_at, heartbeat_at, started_at, finished_at, error_code, error_message`. ANALYSIS 전용: `analysis_date UNIQUE, threshold_value, model_version_binary, model_version_type, feature_version_binary, feature_version_type, suspicious_tx_count, alert_count`. INGEST 전용: `bank_id, business_date, file_name, file_hash(sha256), size_bytes, s3_key, url_issued_at, url_expires_at, received_at, row_count, missing_count, duplicate_count, validation_errors(JSONB errors[])`. `error_code`는 상태와 별개의 원인 코드: INGEST `VALIDATION_FAILED`·`LOAD_FAILED`, ANALYSIS `SCORES_MISMATCH`(§2.1) 등.
-- 단계는 `WAIT_INGEST → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE`. 검증 실패 파일만 제외한다. 대상 INGEST의 기술적 FAILED는 분석도 `INGEST_FAILED`·조치 필요로 남기고, 원인 조치 뒤 resume에서 재확인한다. INGEST 자체 복구/재실행은 이번 범위 밖이다. 입력0건 또는 전부 검증제외이면 `EMPTY_INPUT`·COMPLETED·모든 건수0이며 모델/피처 버전을 만들지 않는다.
+- `WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE`. 등록 시 `analysis_receipts`에 cutoff 이하의 전체 수신 ID를 고정하여 이전 날짜 대기 후보도 포함하며, 검수중인 고정 수신 대상의 종료를 기다린다. `analysis_uploads`는 기존 최초 수신 귀속 이력으로 유지한다. 기술적 INGEST 실패는 `INGEST_FAILED`이며 입력0 또는 전부 보류이면 `EMPTY_INPUT`으로 종료한다. 실제 Python 미연결 단계는 실패를 유지한다.
+- INTEGRATE의 선택 version/generation은 FREEZE_INPUT에서 재확인한다. cutoff 안의 참조 변경은 같은 receipts로 INTEGRATE부터 재준비한다. 이미 cutoff 밖의 더 최신 현재본으로 교체되면 `CUTOFF_SUPERSEDED`·FAILED/조치 필요로 남긴다. 현재 포인터 역행이나 최신본의 과거 입력 몰래 편입은 없다. 이 경우 운영 확인이 필요하며 과거 cutoff를 자동 확장하지 않는다.
+
 - 같은 단계·오류 최초 포함3연속 실패에서FAILED. 연결(DB/S3)은30초/2분, 계산은1분/5분 뒤 재시도한다. 설정·계약 오류는 즉시FAILED. 교대 오류 전체 상한은 없다. 정상 단계/명시resume만 연속 실패 주기를 끝내며 이력은 보존한다. 09시 조건은 없다.
 - 단일 BE 기준으로 전용 연결의 DB 세션 advisory lock을 Runner 생존기간 유지하고 소유자만 실행/잔여 RUNNING 복구한다. 종료 시 잠금을 해제하고 연결 상실 시 재획득한다. 실행 UUID 확인과 DB 쓰기로 오래된 실행을 차단한다. 정상 prepare 결과는 실행중 JVM에서 유지하고 DB 복구 시 단계 결과·이력을 저장한다. DB 장애 중 미저장 실패 횟수/산출물은 프로세스까지 종료되면 소실될 수 있다. 정확한 횟수 영속성을 보장하지 않는다.
 - 현재 Python `worker/analysis_entry.py --job-id … --stage … --execution-id …`는 실제 피처/S3 추론/점수/Alert가 미연결이므로78 종료, `PIPELINE_NOT_CONFIGURED`·조치 필요다. W1 무작위 점수 더미는 제거했다. Java 테스트 실행기는 성공·DB 롤백·재사용을 검증하며 실제 Python DB 원자성 검증을 뜻하지 않는다.
 - 후속 Python은 직접 DB 읽기/쓰기를 소유한다. 자신의 트랜잭션에서 실행 토큰 확인·데이터 저장·단계 완료를 원자 처리하고 Runner가 DB로 확인해야 한다. Java JDBC 트랜잭션에 별도 프로세스가 참여하지 않는다. 원격 추론은 고정 job/request 식별자로 실행중/기존 결과를 확인하여 재기동이나 새 executionId가 모델 재실행으로 이어지지 않게 연결해야 한다.
 
-### 1.4 원장 입력 CSV 컬럼 표 (IBM AMLworld 헤더 → 표준명)
+### 1.4 거래 보고 CSV와 통합
 
-| CSV 헤더 | 표준명(원장 컬럼) | 타입 | 검증 |
-|---|---|---|---|
-| Timestamp | `occurred_at` | timestamptz | 필수. 구현: `yyyy/MM/dd HH:mm[:ss]`(IBM 원본) 또는 ISO 로컬, 서울 시간 해석 `[미정: Data — 시연 CSV 시각 형식이 다르면 추가]` |
-| From Bank | `from_account_id` → `accounts(bank_id, account_number)` | int | 필수. 송·수신 은행은 원장 컬럼이 아니라 계좌 FK의 `bank_id`로 얻는다(원장 `bank_id`는 보고 은행, V1) |
-| Account | (위 계좌 FK의 `account_number`) | text(가명) | 필수 → 가명화 |
-| To Bank | `to_account_id` → `accounts(bank_id, account_number)` | int | 필수 |
-| Account.1 | (위 계좌 FK의 `account_number`) | text(가명) | 필수 → 가명화 |
-| Amount Received | `amount_received` | numeric(24,6) | 필수, ≥0 |
-| Receiving Currency | `receiving_currency` | text | 필수 |
-| Amount Paid | `amount_paid` | numeric(24,6) | 필수, ≥0 |
-| Payment Currency | `payment_currency` | text | 필수 |
-| Payment Format | `payment_format` | text | 필수 |
-| Is Laundering | (원장에 저장하지 않음) | bool | 선택. 있으면 평가 스키마 `evaluation.transaction_labels(tx_id, is_laundering, pattern_label, attempt_id)`에만 적재(2026-09-07 사용자 확정). API·화면 비노출 |
+헤더 이름으로 필드를 매핑하며 순서는 자유다. 중복 헤더·필수 헤더 누락·구11열은 거절한다. 16개 필수 필드와 선택 평가 라벨을 사용한다.
 
-- **문자열·UTF-8 검증(2026-09-10, INPUT-VALIDATION-20260910-v1)**: trim 이후 송신·수신 `Account`는 최대100자, `Payment Format`은 최대30자다. Unicode code point 수로 세며 정상 한글·보충평면 문자를 허용한다. 초과 시 절삭하지 않고 행·컬럼·사유를 기록하여 파일 전체 `VALIDATION_FAILED`, 원장 0건으로 처리한다. 현재 계좌 가명화는 항등이며 향후 가명화 결과 한도는 교체 계약에서 확인한다. 잘못되거나 잘린 UTF-8 바이트는 헤더·1차·2차 읽기 모두 파일 전체 검증 실패로 처리하고 UTF-8로 다시 저장해 재업로드하도록 안내한다. 디코딩 오류는 파일단위 `row=0`, 빈 column, `rowCount=null`이며 누락·중복 카운트0은 검수가 완료됐음을 뜻하지 않는다. 정상 UTF-8·BOM·실제 U+FFFD 문자는 허용한다. 일반 저장소/IO 읽기 실패는 기존 `FAILED`·`LOAD_FAILED`를 유지한다.
-- **원본 금액 검증(2026-09-10, AMOUNT-VALIDATION-20260910-v1)**: `Amount Received`·`Amount Paid`는 0 이상, 정수부 최대18자리, 끝자리 0을 제외한 실제 소수부 최대6자리만 허용한다(`NUMERIC(24,6)` 유지). `123.1234560`은 허용하고 `123.1234567`·`0.0000001`·`1000000000000000000`은 거절한다. 최대값은 `999999999999999999.999999`다. 반올림·절삭으로 입력 금액을 보정하지 않는다. 범위 오류는 해시 생성 전에 해당 행·금액 컬럼·사유로 기록하고 파일 전체 `VALIDATION_FAILED`, 원장 0건으로 처리한다. 정상 금액의 기존 정규화 해시는 유지한다. USD 환산 계산 정책은 별도이며 이번 변경 대상이 아니다.
-- 원장 추가 컬럼: `tx_id`(PK), `bank_id`(업로드 bankId), `row_hash`(표준화 행 해시, `(bank_id,row_hash)` UNIQUE), `ingest_job_id`, `scored_job_id`(NULL = 미채점), **`amount_usd`**(= `amount_paid ÷ fx_rates.units_per_usd[payment_currency]` — 환율표는 "1 USD당 통화 단위"(2026-09-07 정정, V1 `fx_rates` 테이블), 적재 시 계산, `fx_rate_version` 함께), 통화 컬럼은 정규화된 ISO 코드로 저장(원명은 저장하지 않음).
-- 통화명 → ISO 매핑표(고정, 15종): Australian Dollar `AUD` · Bitcoin `BTC` · Brazil Real `BRL` · Canadian Dollar `CAD` · Euro `EUR` · Mexican Peso `MXN` · Ruble `RUB` · Rupee `INR` · Saudi Riyal `SAR` · Shekel `ILS` · Swiss Franc `CHF` · UK Pound `GBP` · US Dollar `USD` · Yen `JPY` · Yuan `CNY`. 표에 없는 값은 행 검증 오류(`errors[]`).
-- 송신·수신 `Account`에 `|`가 있으면 형식 오류로 파일 전체를 `VALIDATION_FAILED` 처리하고 원장은 0건이다. 오류는 해당 행·`Account` 컬럼·송신/수신 사유를 표시하며 필수결측으로 세지 않는다. 일반 계좌의 기존 `row_hash` 계산과 마지막 `Payment Format` 값은 변경하지 않는다.
-- **검증 단계(2026-09-09)**: 발급은 은행별 파일중복·크기·파일명·Base64 체크섬·필수 기준일, 완료 통지는 객체 존재·크기·체크섬. 적재 1차는 헤더·행 형식·필수값·통화·환율·서울 거래날짜와 기준일 일치·파일내/원장 중복을 검사한다. 하나라도 오류면 전체 파일을 거절한다. 오류 없는 파일만 2차에서 원장에 삽입하며 DB unique 충돌도 전체 롤백한다. 선택 라벨이 비어 있는 것은 오류가 아니다. `duplicateCount`는 검수에서 발견한 중복이며 건너뛴 성공 행 수가 아니다.
-- 현재 구현: UTF-8(BOM 허용), 쉼표 단순 분할(따옴표 없는 IBM 형식 전제), 시각 `yyyy/MM/dd HH:mm[:ss]` 또는 ISO 로컬 → 서울 시간. 은행별 분할·시각 형식·인코딩은 `[미정: Data — 시연 CSV 스펙(9/7 기한 경과·미회신) — 다르면 형식만 추가]`.
+| 헤더 | 검증·저장 의미 |
+|---|---|
+| Timestamp | `yyyy/MM/dd HH:mm[:ss]` 또는 ISO 로컬 시각, 서울 시간·거래 기준일 일치 |
+| From Bank / To Bank | 0 이상 정수 은행 코드. 보고 은행이 양쪽 중 하나여야 함 |
+| From Account / To Account | 문자열·앞자리0 보존, trim후 최대100 Unicode code point, 파이프 문자 불허 |
+| From Bank Name / To Bank Name | 필수 이름 최대100 code point |
+| From Entity ID / To Entity ID | 은행 간 공통 원천 개체 키, 최대100 code point |
+| From Entity Name / To Entity Name | 필수 이름 최대200 code point |
+| Amount Received / Amount Paid | BigDecimal, 0 이상, NUMERIC(24,6), 유효 소수6자리·정수18자리. 반올림·절삭 없음 |
+| Receiving Currency / Payment Currency | 아래 고정 원천 통화명 매핑 |
+| Payment Format | 필수 최대30 code point |
+| Is Laundering | 선택0/1. 비어도 허용. evaluation에만 보관, API·분석 입력 제외 |
+
+- UTF-8/BOM과 CSV 인용 쉼표·이스케이프 따옴표·인용 개행을 지원한다. 오류 행 번호는 논리 레코드가 시작한 물리 행이다. 잘못된 UTF-8은 파일 전체 보류, 저장소 IO 오류는 FAILED다. 헤더 오류·UTF-8 오류·복구 불가 인용 손상으로 전수 검수를 못 끝내면 rowCount는 null이다. 정상 헤더만 있는 파일은 실제0행의 EMPTY_FILE로 구분한다. 오류 사유에는 원문 값을 넣지 않는다. 이름만 바깥 공백 제거와 Unicode NFC를 적용하고 철자·대소문자를 임의 동일시하지 않는다.
+- 통화명→ISO: Australian Dollar AUD, Bitcoin BTC, Brazil Real BRL, Canadian Dollar CAD, Euro EUR, Mexican Peso MXN, Ruble RUB, Rupee INR, Saudi Riyal SAR, Shekel ILS, Swiss Franc CHF, UK Pound GBP, US Dollar USD, Yen JPY, Yuan CNY. 알 수 없는 통화는 오류다.
+- `private.bank_reports`는 version·source_row별 실제 행을 보존한다. `private.entities/accounts`의 서비스 UUID는 정상 확정 때 만들고 동일 개체와 (은행,계좌)에 재사용한다. 원문은 AES-256-GCM, 검색 토큰은 별도 키의 HMAC-SHA256이다. 외부 공급 `app.ingest.encryption-key`, `search-key`는 서로 다른32바이트 Base64이며 `key-version` 필수다. 값은 문서·저장소에 넣지 않는다. 누락·변조·잘못된 버전이면 원문 처리 실패다.
+- 고정 수신 upload ID 집합·cutoff·거래 기준일을 받는 `TransactionIntegrationService.integrate` 서비스 경계에서 정확 매칭한다. 원천 송수신 은행/계좌·시각·양쪽 금액/통화 전체를 대조한다. 해시만 같다고 통합하지 않는다. 같은 키에서는 Payment Format별로 report_id순 대응한다. 1+1→1, 2+2→2이며 은행내 거래와 수집범위 밖 상대는 단독 행 그대로 보존한다.
+- 직접 오류 파일은 전체 HELD, 그 파일에 의존하는 다른 파일의 해당 행만 DEPENDENCY_HELD다. 다른 파일의 독립 정상 행은 확정할 수 있다. 정상 관계는 오류로 덮어쓰지 않는다. 통합 확정과 출처 연결·개체/계좌·상태 전이는 한 트랜잭션이며 중단시 롤백한다.
+- 송수신 통화·원천 금액은 그대로 저장한다. USD 표시는 기존 `amount_paid / units_per_usd`, scale6 HALF_UP과 환율 버전을 사용하며 매칭 기준이 아니다. `transactions`에는 단일 보고 bank_id·row_hash UNIQUE·ingest_job_id를 두지 않고 `transaction_reports`로 출처를 연결한다.
+- 최초 통합·정정 버전 교체·운영03시 통합/입력 고정·Java 실행 취소 전달 경계를 구현한다. Python 실행측 및 실제 S3 추론 연결은 후속이다. 기존 DB는 비우지 않으며 V3는 거래/계좌/작업이 있는 DB 전환을 거절한다.
 
 ## 2. 층 2 — 추론·거래 점수·의심 거래
 
@@ -186,7 +206,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
   launderingScore, scorePercentile, thresholdRatio, isSuspicious,
   typeClass, typeName, typeScore, typeCandidates: [{ code, name, score }], agreement, jobId }
 ```
-- `fromAccount`·`toAccount`는 가명. 통화는 ISO 코드(§0). 파생 필드 정의는 §2.2.
+- `fromAccount`·`toAccount`는 별도 서비스 계좌 UUID 문자열이며 원문 계좌번호가 아니다. 통화는 ISO 코드(§0). 파생 필드 정의는 §2.2.
 - Alert 상세 `transactions[]`에서는 행에 **`role: SEED|SUPPORTING|PATH|PATTERN_MEMBER`, `includedReason`(문자열), `direction: IN|OUT|SELF`(Alert 대표 계좌 기준)** 가 추가된다. MVP 최소판: `role` = isSuspicious ? SEED : SUPPORTING, `includedReason` = 묶음 근거 코드; Data 알고리즘이 PATH/PATTERN_MEMBER를 주면 교체.
 - 상세에서 `explanation: { thresholdValue, factors[] }`(§2.2)를 거래 행에 붙일지 별도 조회로 둘지는 [W3 API]에서 성능 보고 결정(피처 테이블 조인 비용).
 
