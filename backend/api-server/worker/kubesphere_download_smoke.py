@@ -11,6 +11,7 @@ import getpass
 import hashlib
 import io
 import os
+from pathlib import Path
 import socket
 import ssl
 from urllib.error import HTTPError, URLError
@@ -38,11 +39,17 @@ def verify(data: bytes) -> dict:
     return {"status": "OK", "bytes": len(data), "rows": len(rows), "sha256": digest}
 
 
-def download(url: str) -> dict:
+def validate_url(url: str, allow_loopback: bool = False) -> None:
     address = urlsplit(url)
-    if (address.scheme != "https" or not address.hostname
+    local_http = (allow_loopback and address.scheme == "http"
+                  and address.hostname in ("127.0.0.1", "localhost", "::1"))
+    if ((address.scheme != "https" and not local_http) or not address.hostname
             or address.username or address.password or address.fragment):
         raise ValueError("An HTTPS download URL is required")
+
+
+def download(url: str, allow_loopback: bool = False, save_to=None) -> dict:
+    validate_url(url, allow_loopback)
     request = Request(url, method="GET")
     with build_opener(NoRedirect()).open(request, timeout=30) as response:
         if response.status != 200:
@@ -50,7 +57,11 @@ def download(url: str) -> dict:
         data = response.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise ValueError("Smoke input exceeds the 1 MiB limit")
-    return verify(data)
+    result = verify(data)
+    if save_to is not None:
+        with Path(save_to).open("xb") as output:
+            output.write(data)
+    return result
 
 
 def run(url: str | None = None) -> bool:
