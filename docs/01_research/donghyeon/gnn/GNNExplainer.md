@@ -57,16 +57,16 @@ $G$를 엣지 집합 $E$와 노드 집합 $V$로 구성된 그래프라고 하�
 
 계층 $l$에서 GNN 모델 $\Phi$의 갱신은 세 가지 핵심 계산으로 이루어진다 [4, 45, 46].
 
-1. 먼저 모델은 모든 노드 쌍 사이에서 신경 메시지를 계산한다. 노드 쌍 $(v_i,v_j)$의 메시지는 이전 계층에서 두 노드가 갖는 표현 $\mathbf{h}_i^{l-1}$, $\mathbf{h}_j^{l-1}$과 두 노드 사이의 관계 $r_{ij}$를 입력으로 받는 함수 $\operatorname{Msg}$로 정의된다.
+1. 먼저 모델은 모든 노드 쌍 사이에서 신경 메시지를 계산한다. 노드 쌍 $(v_i,v_j)$의 메시지는 이전 계층에서 두 노드가 갖는 표현 $\mathbf{h}_i^{l-1}$, $\mathbf{h}_j^{l-1}$과 두 노드 사이의 관계 $r_{ij}$를 입력으로 받는 함수 $\mathrm{Msg}$로 정의된다.
 
 $$
-m_{ij}^{l}=\operatorname{Msg}\!\left(\mathbf{h}_{i}^{l-1},\mathbf{h}_{j}^{l-1},r_{ij}\right)
+m_{ij}^{l}=\mathrm{Msg}\!\left(\mathbf{h}_{i}^{l-1},\mathbf{h}_{j}^{l-1},r_{ij}\right)
 $$
 
-2. 다음으로 각 노드 $v_i$에 대해 GNN은 $v_i$의 이웃 $\mathcal{N}_{v_i}$에서 온 메시지를 집계하고, 집계 함수 $\operatorname{Agg}$를 사용해 집계 메시지 $M_i$를 계산한다 [16, 35].
+2. 다음으로 각 노드 $v_i$에 대해 GNN은 $v_i$의 이웃 $\mathcal{N}_{v_i}$에서 온 메시지를 집계하고, 집계 함수 $\mathrm{Agg}$를 사용해 집계 메시지 $M_i$를 계산한다 [16, 35].
 
 $$
-M_i^l=\operatorname{Agg}\!\left(\left\{m_{ij}^l\mid v_j\in\mathcal{N}_{v_i}\right\}\right)
+M_i^l=\mathrm{Agg}\!\left(\left\{m_{ij}^l\mid v_j\in\mathcal{N}_{v_i}\right\}\right)
 $$
 
 여기서 $\mathcal{N}_{v_i}$는 노드 $v_i$의 이웃이며, 구체적인 정의는 GNN 변형에 따라 달라진다.
@@ -74,10 +74,10 @@ $$
 3. 마지막으로 GNN은 집계 메시지 $M_i^l$와 이전 계층의 $v_i$ 표현 $\mathbf{h}_i^{l-1}$을 함께 받아 비선형 변환을 적용하고, 계층 $l$에서의 표현 $\mathbf{h}_i^l$을 얻는다.
 
 $$
-\mathbf{h}_i^l=\operatorname{Update}\!\left(M_i^l,\mathbf{h}_i^{l-1}\right)
+\mathbf{h}_i^l=\mathrm{Update}\!\left(M_i^l,\mathbf{h}_i^{l-1}\right)
 $$
 
-$L$개 계산 계층을 거친 뒤 노드 $v_i$의 최종 임베딩은 $\mathbf{z}_i=\mathbf{h}_i^L$이다. GNNExplainer는 $\operatorname{Msg}$, $\operatorname{Agg}$, $\operatorname{Update}$ 계산으로 정식화할 수 있는 모든 GNN을 설명할 수 있다.
+$L$개 계산 계층을 거친 뒤 노드 $v_i$의 최종 임베딩은 $\mathbf{z}_i=\mathbf{h}_i^L$이다. GNNExplainer는 $\mathrm{Msg}$, $\mathrm{Agg}$, $\mathrm{Update}$ 계산으로 정식화할 수 있는 모든 GNN을 설명할 수 있다.
 
 ### 3.2. GNNExplainer: 문제 정식화
 
@@ -418,7 +418,7 @@ $$
 클래스 $c$에 속한 모든 노드의 인접 행렬을 기준 인접 행렬이 정의한 순서에 맞게 정렬한다. 그런 다음 이상치에 강건한 프로토타입을 만들기 위해 중앙값을 사용한다.
 
 $$
-A_{\mathrm{proto}}=\operatorname{median}(A_i)
+A_{\mathrm{proto}}=\mathrm{median}(A_i)
 $$
 
 여기서 $A_i$는 클래스 $c$의 $i$번째 노드에 대한 설명을 나타내는 정렬된 인접 행렬이다. 프로토타입 $A_{\mathrm{proto}}$은 같은 클래스의 노드들이 공유하는 구조적 그래프 패턴을 파악하게 해준다. 사용자는 특정 노드의 설명을 클래스 프로토타입과 비교하여 해당 노드를 조사할 수 있다.
