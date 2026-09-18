@@ -11,6 +11,19 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class CsvTransactionReaderTests {
+  @org.junit.jupiter.api.Test
+  void 쿠버스피어_다운로드_검증용_파일의_계좌_헤더와_거래를_읽는다() throws Exception {
+    var fixture = java.nio.file.Path.of("../bank-mock/fixtures/kubesphere_smoke.csv");
+    try (var input = java.nio.file.Files.newBufferedReader(fixture)) {
+      var reader = new CsvTransactionReader(input, ZoneId.of("Asia/Seoul"));
+      var row = reader.next();
+      assertThat(row.fromAccount()).isEqualTo("SMOKE260917A");
+      assertThat(row.toAccount()).isEqualTo("SMOKE260917B");
+      assertThat(row.occurredAt()).isEqualTo(Instant.parse("2022-09-01T03:34:00Z"));
+      assertThat(reader.next()).isNull();
+    }
+  }
+
   private static final String HEADER =
       "Timestamp,From Bank,From Account,To Bank,To Account,Amount Received,Receiving"
           + " Currency,Amount Paid,Payment Currency,Payment Format,From Bank Name,To Bank Name,From"

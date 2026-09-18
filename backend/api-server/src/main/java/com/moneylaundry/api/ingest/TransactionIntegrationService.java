@@ -43,13 +43,29 @@ public class TransactionIntegrationService {
   public Outcome integrate(LocalDate businessDate, Instant cutoff, Set<Long> fixedUploadIds) {
     if (businessDate == null || cutoff == null || fixedUploadIds == null)
       throw new IllegalArgumentException("FIXED_INPUT_REQUIRED");
-    return tx.execute(status -> {
-      com.moneylaundry.api.analysis.AnalysisRunService.integrationLock(jdbc);
-      boolean correction=jdbc.queryForObject("select count(*) from report_versions v join report_sets s using(set_id) where s.business_date=? and (v.correction_of_version_id is not null or v.version_no>1 or s.generation>0)",Integer.class,businessDate)>0;
-      Outcome outcome=correction?new ReportReplacement(jdbc,protector,mapper,this,new com.moneylaundry.api.analysis.AnalysisRunService(jdbc,tx,Clock.systemUTC(),mapper)).integrate(businessDate,cutoff,fixedUploadIds):integrateLocked(businessDate,cutoff,Set.copyOf(fixedUploadIds));
-      publishCorrections(businessDate);
-      return outcome;
-    });
+    return tx.execute(
+        status -> {
+          com.moneylaundry.api.analysis.AnalysisRunService.integrationLock(jdbc);
+          boolean correction =
+              jdbc.queryForObject(
+                      "select count(*) from report_versions v join report_sets s using(set_id) where s.business_date=? and (v.correction_of_version_id is not null or v.version_no>1 or s.generation>0)",
+                      Integer.class,
+                      businessDate)
+                  > 0;
+          Outcome outcome =
+              correction
+                  ? new ReportReplacement(
+                          jdbc,
+                          protector,
+                          mapper,
+                          this,
+                          new com.moneylaundry.api.analysis.AnalysisRunService(
+                              jdbc, tx, Clock.systemUTC(), mapper))
+                      .integrate(businessDate, cutoff, fixedUploadIds)
+                  : integrateLocked(businessDate, cutoff, Set.copyOf(fixedUploadIds));
+          publishCorrections(businessDate);
+          return outcome;
+        });
   }
 
   private Outcome integrateLocked(LocalDate date, Instant cutoff, Set<Long> uploads) {
@@ -295,35 +311,98 @@ public class TransactionIntegrationService {
   }
 
   void publishCorrections(LocalDate date) {
-    for(var v:jdbc.queryForList("select v.*,s.bank_id from report_versions v join report_sets s using(set_id) where s.business_date=? and v.stage_status in ('HELD','WAITING_COUNTERPART','WAITING_ANALYSIS_RELEASE')",date)) {
-      long version=(Long)v.get("version_id");
-      if(jdbc.queryForObject("select count(*) from correction_uploads where upload_id=?",Integer.class,v.get("upload_id"))>0)continue;
-      String reason=Objects.toString(v.get("error_code"),"COUNTERPART_MISSING");
-      if(!"COUNTERPART_MISSING".equals(reason)&&!"COUNTERPART_HELD".equals(reason))com.moneylaundry.api.correction.CorrectionService.open(jdbc,(Integer)v.get("bank_id"),date,version,reason,1);
-      if("COUNTERPART_MISSING".equals(reason)) {
-        boolean absent=false;
-        for(var report:jdbc.queryForList("select * from private.bank_reports where version_id=?",version)) {
-          TransactionRow row=mapper.readValue(protector.decrypt("report:"+version+":"+report.get("source_row"),(String)report.get("payload_cipher"),(String)report.get("key_version")),TransactionRow.class);
-          int other=(Integer)v.get("bank_id")==row.fromBank()?row.toBank():row.fromBank();
-          if(jdbc.queryForObject("select count(*) from reporting_scope_banks where business_date=? and bank_id=?",Integer.class,date,other)>0 && jdbc.queryForObject("select count(*) from report_versions rv join report_sets rs using(set_id) where rs.bank_id=? and rs.business_date=?",Integer.class,other,date)==0){absent=true;com.moneylaundry.api.correction.CorrectionService.open(jdbc,other,date,null,"REPORT_MISSING",1);}
+    for (var v :
+        jdbc.queryForList(
+            "select v.*,s.bank_id from report_versions v join report_sets s using(set_id) where s.business_date=? and v.stage_status in ('HELD','WAITING_COUNTERPART','WAITING_ANALYSIS_RELEASE')",
+            date)) {
+      long version = (Long) v.get("version_id");
+      if (jdbc.queryForObject(
+              "select count(*) from correction_uploads where upload_id=?",
+              Integer.class,
+              v.get("upload_id"))
+          > 0) continue;
+      String reason = Objects.toString(v.get("error_code"), "COUNTERPART_MISSING");
+      if (!"COUNTERPART_MISSING".equals(reason) && !"COUNTERPART_HELD".equals(reason))
+        com.moneylaundry.api.correction.CorrectionService.open(
+            jdbc, (Integer) v.get("bank_id"), date, version, reason, 1);
+      if ("COUNTERPART_MISSING".equals(reason)) {
+        boolean absent = false;
+        for (var report :
+            jdbc.queryForList("select * from private.bank_reports where version_id=?", version)) {
+          TransactionRow row =
+              mapper.readValue(
+                  protector.decrypt(
+                      "report:" + version + ":" + report.get("source_row"),
+                      (String) report.get("payload_cipher"),
+                      (String) report.get("key_version")),
+                  TransactionRow.class);
+          int other = (Integer) v.get("bank_id") == row.fromBank() ? row.toBank() : row.fromBank();
+          if (jdbc.queryForObject(
+                      "select count(*) from reporting_scope_banks where business_date=? and bank_id=?",
+                      Integer.class,
+                      date,
+                      other)
+                  > 0
+              && jdbc.queryForObject(
+                      "select count(*) from report_versions rv join report_sets rs using(set_id) where rs.bank_id=? and rs.business_date=?",
+                      Integer.class,
+                      other,
+                      date)
+                  == 0) {
+            absent = true;
+            com.moneylaundry.api.correction.CorrectionService.open(
+                jdbc, other, date, null, "REPORT_MISSING", 1);
+          }
         }
-        if(!absent)com.moneylaundry.api.correction.CorrectionService.open(jdbc,(Integer)v.get("bank_id"),date,version,reason,1);
+        if (!absent)
+          com.moneylaundry.api.correction.CorrectionService.open(
+              jdbc, (Integer) v.get("bank_id"), date, version, reason, 1);
       }
     }
   }
 
-  long insertTransaction(LocalDate date,TransactionRow r,Map<List<String>,Long> accounts) {
-    long from=account(r.fromBank(),r.fromBankName(),r.fromAccount(),r.fromEntityId(),r.fromEntityName(),accounts);
-    long to=account(r.toBank(),r.toBankName(),r.toAccount(),r.toEntityId(),r.toEntityName(),accounts);
-    BigDecimal rate=jdbc.queryForObject("select units_per_usd from fx_rates where fx_rate_version=? and currency=?",BigDecimal.class,fxVersion,r.paymentCurrency());
-    if(rate==null||rate.signum()<=0)throw new IllegalStateException("FX_RATE_MISSING");
-    return jdbc.queryForObject("insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(?,?,?,?,?,?,?,?,?,?,?) returning tx_id",Long.class,Timestamp.from(r.occurredAt()),from,to,r.amountReceived(),r.receivingCurrency(),r.amountPaid(),r.paymentCurrency(),r.paymentFormat(),r.amountPaid().divide(rate,6,RoundingMode.HALF_UP),fxVersion,date);
+  long insertTransaction(LocalDate date, TransactionRow r, Map<List<String>, Long> accounts) {
+    long from =
+        account(
+            r.fromBank(),
+            r.fromBankName(),
+            r.fromAccount(),
+            r.fromEntityId(),
+            r.fromEntityName(),
+            accounts);
+    long to =
+        account(
+            r.toBank(), r.toBankName(), r.toAccount(), r.toEntityId(), r.toEntityName(), accounts);
+    BigDecimal rate =
+        jdbc.queryForObject(
+            "select units_per_usd from fx_rates where fx_rate_version=? and currency=?",
+            BigDecimal.class,
+            fxVersion,
+            r.paymentCurrency());
+    if (rate == null || rate.signum() <= 0) throw new IllegalStateException("FX_RATE_MISSING");
+    return jdbc.queryForObject(
+        "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(?,?,?,?,?,?,?,?,?,?,?) returning tx_id",
+        Long.class,
+        Timestamp.from(r.occurredAt()),
+        from,
+        to,
+        r.amountReceived(),
+        r.receivingCurrency(),
+        r.amountPaid(),
+        r.paymentCurrency(),
+        r.paymentFormat(),
+        r.amountPaid().divide(rate, 6, RoundingMode.HALF_UP),
+        fxVersion,
+        date);
   }
 
   void connect(long txId, ReportMatcher.Report report) {
     TransactionRow r = report.row();
-    var connected=jdbc.queryForList("select tx_id from transaction_reports where report_id=?",Long.class,report.id());
-    if(!connected.isEmpty()&&connected.getFirst()!=txId)throw new IllegalStateException("REPORT_ALREADY_LINKED");
+    var connected =
+        jdbc.queryForList(
+            "select tx_id from transaction_reports where report_id=?", Long.class, report.id());
+    if (!connected.isEmpty() && connected.getFirst() != txId)
+      throw new IllegalStateException("REPORT_ALREADY_LINKED");
     jdbc.update(
         "insert into transaction_reports values(?,?,?) on conflict do nothing",
         txId,

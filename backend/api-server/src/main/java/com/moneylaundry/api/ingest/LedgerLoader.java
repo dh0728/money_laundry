@@ -50,7 +50,9 @@ public class LedgerLoader {
               "select count(*) from report_versions where upload_id=?", Integer.class, id)
           > 0) return;
       protector.requireKeys();
-      jdbc.update("update correction_requests c set status='VALIDATING' from correction_uploads u where u.correction_id=c.correction_id and u.upload_id=? and c.status<>'RESOLVED' and not exists(select 1 from correction_uploads newer where newer.correction_id=c.correction_id and newer.upload_id>u.upload_id)",id);
+      jdbc.update(
+          "update correction_requests c set status='VALIDATING' from correction_uploads u where u.correction_id=c.correction_id and u.upload_id=? and c.status<>'RESOLVED' and not exists(select 1 from correction_uploads newer where newer.correction_id=c.correction_id and newer.upload_id>u.upload_id)",
+          id);
       job.setStartedAt(java.time.Instant.now());
       job.setAttemptCount(job.getAttemptCount() + 1);
       List<ValidationError> errors = new ArrayList<>();
@@ -143,20 +145,75 @@ public class LedgerLoader {
                     Long.class,
                     job.getBankId(),
                     job.getBusinessDate());
-            var correctionIds=jdbc.queryForList("select correction_id from correction_uploads where upload_id=?",Long.class,id);
-            int versionNo=jdbc.queryForObject("select count(*) from batch_jobs where job_type='INGEST' and bank_id=? and business_date=? and job_id<=?",Integer.class,job.getBankId(),job.getBusinessDate(),id);
-            if(jdbc.queryForObject("select count(*) from report_versions where set_id=?",Integer.class,setId)>0 && correctionIds.isEmpty()) throw new IllegalStateException("EXPLICIT_CORRECTION_REQUIRED");
-            Long correctionOf=correctionIds.isEmpty()?null:jdbc.queryForObject("select version_id from correction_requests where correction_id=?",Long.class,correctionIds.getFirst());
-            long version = jdbc.queryForObject(
-              "insert into report_versions(set_id,upload_id,version_no,received_at,stage_status,error_code,row_count,correction_of_version_id,self_valid) values(?,?,?,?,?,?,?,?,?) returning version_id",
-              Long.class,setId,id,versionNo,Timestamp.from(job.getReceivedAt()),errors.isEmpty()?"VALIDATED_WAITING_INTEGRATION":"HELD",errors.isEmpty()?null:"INVALID_SELF",preparedCount,correctionOf,errors.isEmpty());
-            if(!correctionIds.isEmpty())jdbc.update("update correction_requests c set replacement_version_id=case when ? then ? else c.replacement_version_id end,status=?,revision=revision+1 where correction_id=? and status<>'RESOLVED' and not exists(select 1 from correction_uploads u where u.correction_id=c.correction_id and u.upload_id>?)",errors.isEmpty(),version,errors.isEmpty()?"WAITING_COUNTERPART":"OPEN",correctionIds.getFirst(),id);
-            if(!errors.isEmpty() && (correctionIds.isEmpty() || jdbc.queryForObject("select count(*) from correction_uploads where correction_id=? and upload_id>?",Integer.class,correctionIds.getFirst(),id)==0)) {
-              long correction=correctionIds.isEmpty()?com.moneylaundry.api.correction.CorrectionService.open(jdbc,job.getBankId(),job.getBusinessDate(),version,"INVALID_SELF",1):correctionIds.getFirst();
-              jdbc.update("delete from correction_errors where correction_id=?",correction);
-              for(int i=0;i<errors.size();i++) {
-                ValidationError error=errors.get(i);
-                jdbc.update("insert into correction_errors values(?,?,?,?,?,?)",correction,i,error.row()==0?null:error.row(),error.column(),"INVALID_SELF",error.reason());
+            var correctionIds =
+                jdbc.queryForList(
+                    "select correction_id from correction_uploads where upload_id=?",
+                    Long.class,
+                    id);
+            int versionNo =
+                jdbc.queryForObject(
+                    "select count(*) from batch_jobs where job_type='INGEST' and bank_id=? and business_date=? and job_id<=?",
+                    Integer.class,
+                    job.getBankId(),
+                    job.getBusinessDate(),
+                    id);
+            if (jdbc.queryForObject(
+                        "select count(*) from report_versions where set_id=?", Integer.class, setId)
+                    > 0
+                && correctionIds.isEmpty())
+              throw new IllegalStateException("EXPLICIT_CORRECTION_REQUIRED");
+            Long correctionOf =
+                correctionIds.isEmpty()
+                    ? null
+                    : jdbc.queryForObject(
+                        "select version_id from correction_requests where correction_id=?",
+                        Long.class,
+                        correctionIds.getFirst());
+            long version =
+                jdbc.queryForObject(
+                    "insert into report_versions(set_id,upload_id,version_no,received_at,stage_status,error_code,row_count,correction_of_version_id,self_valid) values(?,?,?,?,?,?,?,?,?) returning version_id",
+                    Long.class,
+                    setId,
+                    id,
+                    versionNo,
+                    Timestamp.from(job.getReceivedAt()),
+                    errors.isEmpty() ? "VALIDATED_WAITING_INTEGRATION" : "HELD",
+                    errors.isEmpty() ? null : "INVALID_SELF",
+                    preparedCount,
+                    correctionOf,
+                    errors.isEmpty());
+            if (!correctionIds.isEmpty())
+              jdbc.update(
+                  "update correction_requests c set replacement_version_id=case when ? then ? else c.replacement_version_id end,status=?,revision=revision+1 where correction_id=? and status<>'RESOLVED' and not exists(select 1 from correction_uploads u where u.correction_id=c.correction_id and u.upload_id>?)",
+                  errors.isEmpty(),
+                  version,
+                  errors.isEmpty() ? "WAITING_COUNTERPART" : "OPEN",
+                  correctionIds.getFirst(),
+                  id);
+            if (!errors.isEmpty()
+                && (correctionIds.isEmpty()
+                    || jdbc.queryForObject(
+                            "select count(*) from correction_uploads where correction_id=? and upload_id>?",
+                            Integer.class,
+                            correctionIds.getFirst(),
+                            id)
+                        == 0)) {
+              long correction =
+                  correctionIds.isEmpty()
+                      ? com.moneylaundry.api.correction.CorrectionService.open(
+                          jdbc, job.getBankId(), job.getBusinessDate(), version, "INVALID_SELF", 1)
+                      : correctionIds.getFirst();
+              jdbc.update("delete from correction_errors where correction_id=?", correction);
+              for (int i = 0; i < errors.size(); i++) {
+                ValidationError error = errors.get(i);
+                jdbc.update(
+                    "insert into correction_errors values(?,?,?,?,?,?)",
+                    correction,
+                    i,
+                    error.row() == 0 ? null : error.row(),
+                    error.column(),
+                    "INVALID_SELF",
+                    error.reason());
               }
             }
             List<Object[]> reportValues = new ArrayList<>();

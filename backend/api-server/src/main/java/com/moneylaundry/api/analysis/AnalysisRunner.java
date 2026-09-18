@@ -44,8 +44,11 @@ public class AnalysisRunner implements AutoCloseable {
   }
 
   @org.springframework.beans.factory.annotation.Autowired
-  public AnalysisRunner(AnalysisService service, AnalysisStageExecutor executor,
-      AnalysisRunService runs, com.moneylaundry.api.ingest.TransactionIntegrationService integration) {
+  public AnalysisRunner(
+      AnalysisService service,
+      AnalysisStageExecutor executor,
+      AnalysisRunService runs,
+      com.moneylaundry.api.ingest.TransactionIntegrationService integration) {
     this.service = service;
     this.executor = executor;
     this.runs = runs;
@@ -145,7 +148,10 @@ public class AnalysisRunner implements AutoCloseable {
                     Timestamp.from(service.clock.instant()),
                     id);
                 if (job.stage() == AnalysisStage.WAIT_INGEST && waitForIngest(id)) return null;
-                if(runs!=null && job.stage()==AnalysisStage.INFERENCE && runs.current(id)!=null && !runs.canInfer(runs.current(id)))return null;
+                if (runs != null
+                    && job.stage() == AnalysisStage.INFERENCE
+                    && runs.current(id) != null
+                    && !runs.canInfer(runs.current(id))) return null;
                 UUID token = UUID.randomUUID();
                 service.jdbc.update(
                     """
@@ -178,11 +184,22 @@ public class AnalysisRunner implements AutoCloseable {
             artifacts.put(rs.getString(1), rs.getString(2));
           },
           id);
-      UUID currentRun=runs==null?null:runs.current(id);
-      if(currentRun!=null)service.jdbc.query("select stage,artifact from analysis_run_stage_results where run_id=? and completed",rs->{artifacts.put(rs.getString(1),rs.getString(2));},currentRun);
+      UUID currentRun = runs == null ? null : runs.current(id);
+      if (currentRun != null)
+        service.jdbc.query(
+            "select stage,artifact from analysis_run_stage_results where run_id=? and completed",
+            rs -> {
+              artifacts.put(rs.getString(1), rs.getString(2));
+            },
+            currentRun);
       item.context =
           new AnalysisStageExecutor.Context(
-              id, item.job.stage(), item.job.executionId(), uploads, artifacts, runs==null?null:runs.current(id));
+              id,
+              item.job.stage(),
+              item.job.executionId(),
+              uploads,
+              artifacts,
+              runs == null ? null : runs.current(id));
       var saved =
           service.jdbc.queryForList(
               "select artifact from analysis_stage_results where job_id=? and stage=? and not"
@@ -190,11 +207,19 @@ public class AnalysisRunner implements AutoCloseable {
               String.class,
               id,
               item.job.stage().name());
-      if(currentRun!=null)saved=service.jdbc.queryForList("select artifact from analysis_run_stage_results where run_id=? and stage=? and not completed",String.class,currentRun,item.job.stage().name());
+      if (currentRun != null)
+        saved =
+            service.jdbc.queryForList(
+                "select artifact from analysis_run_stage_results where run_id=? and stage=? and not completed",
+                String.class,
+                currentRun,
+                item.job.stage().name());
       item.result =
           saved.isEmpty()
-              ? item.job.stage()==AnalysisStage.INTEGRATE||item.job.stage()==AnalysisStage.FREEZE_INPUT
-                  ? new AnalysisStageExecutor.Result("internal") : executor.prepare(item.context)
+              ? item.job.stage() == AnalysisStage.INTEGRATE
+                      || item.job.stage() == AnalysisStage.FREEZE_INPUT
+                  ? new AnalysisStageExecutor.Result("internal")
+                  : executor.prepare(item.context)
               : new AnalysisStageExecutor.Result(saved.getFirst());
     } catch (AnalysisFailure failure) {
       addFailure(item, failure.code(), failure.kind());
@@ -207,13 +232,23 @@ public class AnalysisRunner implements AutoCloseable {
   }
 
   private boolean waitForIngest(long id) {
-    if(runs==null && service.jdbc.queryForObject("select count(*) from analysis_uploads a join report_versions v on v.upload_id=a.upload_id where a.job_id=?",Integer.class,id)>0) {
-      service.jdbc.update("update batch_jobs set status='FAILED',error_code='INTEGRATION_NOT_CONNECTED',finished_at=? where job_id=?",Timestamp.from(service.clock.instant()),id);
+    if (runs == null
+        && service.jdbc.queryForObject(
+                "select count(*) from analysis_uploads a join report_versions v on v.upload_id=a.upload_id where a.job_id=?",
+                Integer.class,
+                id)
+            > 0) {
+      service.jdbc.update(
+          "update batch_jobs set status='FAILED',error_code='INTEGRATION_NOT_CONNECTED',finished_at=? where job_id=?",
+          Timestamp.from(service.clock.instant()),
+          id);
       return true;
     }
     var states =
         service.jdbc.queryForList(
-            "select b.status from "+(runs==null?"analysis_uploads":"analysis_receipts")+" a join batch_jobs b on b.job_id=a.upload_id"
+            "select b.status from "
+                + (runs == null ? "analysis_uploads" : "analysis_receipts")
+                + " a join batch_jobs b on b.job_id=a.upload_id"
                 + " where a.job_id=?",
             String.class,
             id);
@@ -236,8 +271,10 @@ public class AnalysisRunner implements AutoCloseable {
         "update analysis_uploads a set excluded=true from batch_jobs b where a.upload_id=b.job_id"
             + " and a.job_id=? and b.status='VALIDATION_FAILED'",
         id);
-    if(runs!=null) {
-      service.jdbc.update("update batch_jobs set status='QUEUED',current_stage='INTEGRATE',retry_at=null where job_id=?",id);
+    if (runs != null) {
+      service.jdbc.update(
+          "update batch_jobs set status='QUEUED',current_stage='INTEGRATE',retry_at=null where job_id=?",
+          id);
       return true;
     }
     long rows =
@@ -314,8 +351,14 @@ public class AnalysisRunner implements AutoCloseable {
                 && (item.result == null
                     || last.terminal()
                     || last.kind() != AnalysisFailure.Kind.CONNECTION)) {
-              if(item.result!=null && item.context.runId()!=null)service.jdbc.update("insert into analysis_run_stage_results values(?,?,?,?,false) on conflict(run_id,stage) do nothing",item.context.runId(),item.job.stage().name(),item.job.executionId(),item.result.artifact());
-              if (item.result != null && item.context.runId()==null)
+              if (item.result != null && item.context.runId() != null)
+                service.jdbc.update(
+                    "insert into analysis_run_stage_results values(?,?,?,?,false) on conflict(run_id,stage) do nothing",
+                    item.context.runId(),
+                    item.job.stage().name(),
+                    item.job.executionId(),
+                    item.result.artifact());
+              if (item.result != null && item.context.runId() == null)
                 service.jdbc.update(
                     "insert into"
                         + " analysis_stage_results(job_id,stage,execution_id,artifact,completed)"
@@ -337,35 +380,76 @@ public class AnalysisRunner implements AutoCloseable {
             }
             // Only this in-process fixture commit shares this transaction. Python DB writes need
             // their own fencing transaction.
-            if(item.job.stage()==AnalysisStage.INTEGRATE) {
-              Instant cutoff=service.jdbc.queryForObject("select analysis_cutoff_at from batch_jobs where job_id=?",Timestamp.class,item.job.id()).toInstant();
-              var dates=service.jdbc.queryForList("select distinct b.business_date from analysis_receipts a join batch_jobs b on b.job_id=a.upload_id where a.job_id=? and b.business_date is not null order by b.business_date",java.sql.Date.class,item.job.id());
-              for(var date:dates) {
-                var fixed=new HashSet<>(service.jdbc.queryForList("select a.upload_id from analysis_receipts a join batch_jobs b on b.job_id=a.upload_id where a.job_id=? and b.business_date=?",Long.class,item.job.id(),date));
-                integration.integrate(date.toLocalDate(),cutoff,fixed);
-                service.jdbc.update("insert into analysis_selected_versions select ?,set_id,current_version_id,generation from report_sets where business_date=? and current_version_id is not null on conflict(job_id,set_id) do update set version_id=excluded.version_id,generation=excluded.generation",item.job.id(),date);
+            if (item.job.stage() == AnalysisStage.INTEGRATE) {
+              Instant cutoff =
+                  service
+                      .jdbc
+                      .queryForObject(
+                          "select analysis_cutoff_at from batch_jobs where job_id=?",
+                          Timestamp.class,
+                          item.job.id())
+                      .toInstant();
+              var dates =
+                  service.jdbc.queryForList(
+                      "select distinct b.business_date from analysis_receipts a join batch_jobs b on b.job_id=a.upload_id where a.job_id=? and b.business_date is not null order by b.business_date",
+                      java.sql.Date.class,
+                      item.job.id());
+              for (var date : dates) {
+                var fixed =
+                    new HashSet<>(
+                        service.jdbc.queryForList(
+                            "select a.upload_id from analysis_receipts a join batch_jobs b on b.job_id=a.upload_id where a.job_id=? and b.business_date=?",
+                            Long.class,
+                            item.job.id(),
+                            date));
+                integration.integrate(date.toLocalDate(), cutoff, fixed);
+                service.jdbc.update(
+                    "insert into analysis_selected_versions select ?,set_id,current_version_id,generation from report_sets where business_date=? and current_version_id is not null on conflict(job_id,set_id) do update set version_id=excluded.version_id,generation=excluded.generation",
+                    item.job.id(),
+                    date);
               }
-            } else if(item.job.stage()==AnalysisStage.FREEZE_INPUT) {
-              Instant cutoff=service.jdbc.queryForObject("select analysis_cutoff_at from batch_jobs where job_id=?",Timestamp.class,item.job.id()).toInstant();
-              UUID run=runs.freeze(item.job.id(),cutoff);
-              int count=service.jdbc.queryForObject("select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",Integer.class,run);
-              if(count==0) {
+            } else if (item.job.stage() == AnalysisStage.FREEZE_INPUT) {
+              Instant cutoff =
+                  service
+                      .jdbc
+                      .queryForObject(
+                          "select analysis_cutoff_at from batch_jobs where job_id=?",
+                          Timestamp.class,
+                          item.job.id())
+                      .toInstant();
+              UUID run = runs.freeze(item.job.id(), cutoff);
+              int count =
+                  service.jdbc.queryForObject(
+                      "select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",
+                      Integer.class,
+                      run);
+              if (count == 0) {
                 runs.complete(run);
-                service.jdbc.update("update batch_jobs set status='COMPLETED',current_stage='COMPLETE',completion_reason='EMPTY_INPUT',row_count=0,suspicious_tx_count=0,alert_count=0,finished_at=?,execution_id=null where job_id=?",Timestamp.from(service.clock.instant()),item.job.id());
+                service.jdbc.update(
+                    "update batch_jobs set status='COMPLETED',current_stage='COMPLETE',completion_reason='EMPTY_INPUT',row_count=0,suspicious_tx_count=0,alert_count=0,finished_at=?,execution_id=null where job_id=?",
+                    Timestamp.from(service.clock.instant()),
+                    item.job.id());
                 return;
               }
             } else executor.commit(item.context, item.result);
-            if(item.context.runId()==null) service.jdbc.update(
-                "insert into analysis_stage_results(job_id,stage,execution_id,artifact,completed)"
-                    + " values(?,?,?,?,true) on conflict(job_id,stage) do update set"
-                    + " completed=true,execution_id=excluded.execution_id",
-                item.job.id(),
-                item.job.stage().name(),
-                item.job.executionId(),
-                item.result.artifact());
-            if(item.context.runId()!=null)service.jdbc.update("insert into analysis_run_stage_results(run_id,stage,execution_id,artifact,completed) values(?,?,?,?,true) on conflict(run_id,stage) do update set completed=true,execution_id=excluded.execution_id",item.context.runId(),item.job.stage().name(),item.job.executionId(),item.result.artifact());
+            if (item.context.runId() == null)
+              service.jdbc.update(
+                  "insert into analysis_stage_results(job_id,stage,execution_id,artifact,completed)"
+                      + " values(?,?,?,?,true) on conflict(job_id,stage) do update set"
+                      + " completed=true,execution_id=excluded.execution_id",
+                  item.job.id(),
+                  item.job.stage().name(),
+                  item.job.executionId(),
+                  item.result.artifact());
+            if (item.context.runId() != null)
+              service.jdbc.update(
+                  "insert into analysis_run_stage_results(run_id,stage,execution_id,artifact,completed) values(?,?,?,?,true) on conflict(run_id,stage) do update set completed=true,execution_id=excluded.execution_id",
+                  item.context.runId(),
+                  item.job.stage().name(),
+                  item.job.executionId(),
+                  item.result.artifact());
             boolean complete = item.job.stage() == AnalysisStage.ALERTS;
-            if(complete && item.context.runId()!=null)runs.complete(item.context.runId());
+            if (complete && item.context.runId() != null) runs.complete(item.context.runId());
             service.jdbc.update(
                 "update batch_jobs set"
                     + " status=?,current_stage=?,stage_attempt_count=0,consecutive_failures=0,error_code=null,error_message=null,retry_at=null,execution_id=null,execution_owner=null,finished_at=?"
@@ -384,10 +468,25 @@ public class AnalysisRunner implements AutoCloseable {
     } catch (AnalysisFailure failure) {
       addFailure(item, failure.code(), failure.kind());
     } catch (RuntimeException failure) {
-      if("INPUT_REVISION_CHANGED".equals(failure.getMessage())) {
-        service.tx.executeWithoutResult(status->{service.lock(item.job.id());if(service.owns(item.job))service.jdbc.update("update batch_jobs set status='QUEUED',current_stage='INTEGRATE',execution_id=null,execution_owner=null where job_id=?",item.job.id());});
+      if ("INPUT_REVISION_CHANGED".equals(failure.getMessage())) {
+        service.tx.executeWithoutResult(
+            status -> {
+              service.lock(item.job.id());
+              if (service.owns(item.job))
+                service.jdbc.update(
+                    "update batch_jobs set status='QUEUED',current_stage='INTEGRATE',execution_id=null,execution_owner=null where job_id=?",
+                    item.job.id());
+            });
         pending.remove(item.job.id());
-      } else addFailure(item,"CUTOFF_SUPERSEDED".equals(failure.getMessage())?"CUTOFF_SUPERSEDED":"STAGE_EXECUTION_FAILED","CUTOFF_SUPERSEDED".equals(failure.getMessage())?AnalysisFailure.Kind.PERMANENT:AnalysisFailure.Kind.COMPUTATION);
+      } else
+        addFailure(
+            item,
+            "CUTOFF_SUPERSEDED".equals(failure.getMessage())
+                ? "CUTOFF_SUPERSEDED"
+                : "STAGE_EXECUTION_FAILED",
+            "CUTOFF_SUPERSEDED".equals(failure.getMessage())
+                ? AnalysisFailure.Kind.PERMANENT
+                : AnalysisFailure.Kind.COMPUTATION);
     }
   }
 }
