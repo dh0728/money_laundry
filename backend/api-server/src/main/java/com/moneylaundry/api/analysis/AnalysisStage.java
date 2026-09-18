@@ -2,6 +2,8 @@ package com.moneylaundry.api.analysis;
 
 public enum AnalysisStage {
   WAIT_INGEST,
+  INTEGRATE,
+  FREEZE_INPUT,
   FEATURES,
   INFERENCE,
   SCORES,

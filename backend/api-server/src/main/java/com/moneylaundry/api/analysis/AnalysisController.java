@@ -46,7 +46,7 @@ public class AnalysisController {
   public ResponseEntity<Map<String, Object>> resume(@PathVariable long jobId) {
     guard();
     service.resume(jobId);
-    return ResponseEntity.accepted().body(Map.of("jobId", jobId, "status", "QUEUED"));
+    return ResponseEntity.accepted().body(Map.of("jobId", jobId, "status", service.job(jobId).status()));
   }
 
   private void guard() {

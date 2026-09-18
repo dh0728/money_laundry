@@ -1,0 +1,2 @@
+Timestamp,From Bank,From Account,To Bank,To Account,Amount Received,Receiving Currency,Amount Paid,Payment Currency,Payment Format,From Bank Name,To Bank Name,From Entity ID,From Entity Name,To Entity ID,To Entity Name,Is Laundering
+2022/09/01 12:34,12,SMOKE260917A,12,SMOKE260917B,1,US Dollar,1,US Dollar,ACH,MOCK Bank 12,MOCK Bank 12,SMOKE260917EA,Smoke Sender,SMOKE260917EB,Smoke Receiver,0
