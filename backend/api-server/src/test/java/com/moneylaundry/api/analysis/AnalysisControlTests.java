@@ -14,7 +14,10 @@ class AnalysisControlTests {
     var env = new MockEnvironment();
     env.setActiveProfiles(profile);
     var service = mock(AnalysisService.class);
-    when(service.job(1)).thenReturn(new AnalysisService.Job(1,"QUEUED",AnalysisStage.FEATURES,0,0,0,null,null,null,null));
+    when(service.job(1))
+        .thenReturn(
+            new AnalysisService.Job(
+                1, "QUEUED", AnalysisStage.FEATURES, 0, 0, 0, null, null, null, null));
     var controller = new AnalysisController(service, env);
     assertThat(controller.trigger().getStatusCode().value()).isEqualTo(202);
     assertThat(controller.trigger().getBody().get("status")).isEqualTo("QUEUED");

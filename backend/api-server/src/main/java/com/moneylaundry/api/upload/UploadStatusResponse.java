@@ -25,4 +25,9 @@ public record UploadStatusResponse(
     Instant receivedAt,
     Instant startedAt,
     Instant finishedAt,
-    String integrationStatus, Long reportVersionId, boolean correctionRequired, Long correctionRequestId, Long replacementUploadId, LocalDate nextAnalysisDate) {}
+    String integrationStatus,
+    Long reportVersionId,
+    boolean correctionRequired,
+    Long correctionRequestId,
+    Long replacementUploadId,
+    LocalDate nextAnalysisDate) {}
