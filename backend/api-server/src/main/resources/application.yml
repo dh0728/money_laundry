@@ -35,13 +35,20 @@ app:
   storage-dir: ${STORAGE_DIR:./storage}
   zone: ${APP_ZONE:Asia/Seoul}
   ingest:
+    encryption-key: ${INGEST_ENCRYPTION_KEY:}
+    search-key: ${INGEST_SEARCH_KEY:}
+    key-version: ${INGEST_KEY_VERSION:}
     url-ttl: ${INGEST_URL_TTL:PT15M}
     max-size-bytes: ${INGEST_MAX_SIZE_BYTES:209715200}
     cutoff: ${INGEST_CUTOFF:03:00}
     fx-rate-version: fx_rates_usd_v1
   worker:
+    mode: ${WORKER_MODE:unconfigured}
     python: ${WORKER_PYTHON:python}
     script: ${WORKER_SCRIPT:worker/analysis_entry.py}
     timeout: ${WORKER_TIMEOUT:PT30M}
+  inference:
+    url: ${INFERENCE_API_URL:}
+    token: ${INFERENCE_API_TOKEN:}
   suspicious-tx:
     threshold: ${SUSPICIOUS_TX_THRESHOLD:0.7}
