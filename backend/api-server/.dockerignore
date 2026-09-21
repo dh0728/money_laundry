@@ -34,6 +34,12 @@ src/main/resources/application-local.yaml
 *.log
 *.tmp
 logs/
+storage/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+worker/test_*.py
+worker/*.sqlite3*
 
 # 문서 및 로컬 Compose 파일
 README.md

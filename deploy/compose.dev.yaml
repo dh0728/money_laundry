@@ -17,11 +17,23 @@ services:
       JWT_SECRET: ${DEV_JWT_SECRET:?DEV_JWT_SECRET is required}
       S3_BUCKET: ${DEV_S3_BUCKET:?DEV_S3_BUCKET is required}
       S3_PREFIX: ${DEV_S3_PREFIX:?DEV_S3_PREFIX is required}
+      INGEST_ENCRYPTION_KEY: ${DEV_INGEST_ENCRYPTION_KEY:?DEV_INGEST_ENCRYPTION_KEY is required}
+      INGEST_SEARCH_KEY: ${DEV_INGEST_SEARCH_KEY:?DEV_INGEST_SEARCH_KEY is required}
+      INGEST_KEY_VERSION: ${DEV_INGEST_KEY_VERSION:?DEV_INGEST_KEY_VERSION is required}
       SQS_QUEUE_URL: ${DEV_SQS_URL:?DEV_SQS_URL is required}
+      WORKER_MODE: demo
+      WORKER_PYTHON: /usr/local/bin/python
+      WORKER_SCRIPT: /app/worker/analysis_entry.py
+      WORKER_TIMEOUT: PT30M
+      STORAGE_DIR: /app/storage
+      INFERENCE_API_URL: ${DEV_INFERENCE_API_URL:?DEV_INFERENCE_API_URL is required}
+      INFERENCE_API_TOKEN: ${DEV_INFERENCE_API_TOKEN:?DEV_INFERENCE_API_TOKEN is required}
     
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       AWS_DEFAULT_REGION: ${AWS_REGION:-ap-northeast-2}
       TZ: Asia/Seoul
+    volumes:
+      - api-storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,5 +98,7 @@ networks:
     driver: bridge
 
 volumes:
+  api-storage:
+    name: aml-dev-api-storage
   postgres-data:
     name: aml-dev-postgres-data

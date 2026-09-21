@@ -3,6 +3,7 @@ package com.moneylaundry.api.analysis;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -19,6 +20,20 @@ public class CancellationTransport implements AnalysisRunService.CancelTransport
   private final ObjectMapper mapper;
   private final String bucket, prefix;
   private final Path directory;
+  private final InferenceCancellationClient inference;
+
+  @Autowired
+  public CancellationTransport(
+      S3Client client,
+      ObjectMapper mapper,
+      @Value("${app.s3.bucket}") String bucket,
+      @Value("${app.s3.prefix}") String prefix,
+      @Value("${app.storage-dir}") String directory,
+      @Value("${app.inference.url:}") String inferenceUrl,
+      @Value("${app.inference.token:}") String inferenceToken) {
+    this(client, mapper, bucket, prefix, directory);
+    this.inference.configure(inferenceUrl, inferenceToken);
+  }
 
   public CancellationTransport(
       S3Client client,
@@ -31,6 +46,7 @@ public class CancellationTransport implements AnalysisRunService.CancelTransport
     this.bucket = bucket;
     this.prefix = prefix.isEmpty() || prefix.endsWith("/") ? prefix : prefix + "/";
     this.directory = Path.of(directory).toAbsolutePath().normalize().resolve("analysis-transport");
+    this.inference = new InferenceCancellationClient(mapper);
   }
 
   private String key(String payload, boolean output) {
@@ -67,6 +83,10 @@ public class CancellationTransport implements AnalysisRunService.CancelTransport
 
   @Override
   public void publish(UUID cancel, String payload) {
+    if (inference.enabled()) {
+      inference.publish(cancel, payload);
+      return;
+    }
     var document = mapper.readTree(payload);
     if (!cancel.toString().equals(document.get("cancel_id").asString())
         || document.get("contract_version").asInt() != 2)
@@ -121,6 +141,7 @@ public class CancellationTransport implements AnalysisRunService.CancelTransport
 
   @Override
   public String acknowledgement(UUID cancel, String payload) {
+    if (inference.enabled()) return inference.acknowledgement(cancel, payload);
     byte[] bytes = read(key(payload, true));
     if (bytes == null) return null;
     var actual = mapper.readTree(bytes);

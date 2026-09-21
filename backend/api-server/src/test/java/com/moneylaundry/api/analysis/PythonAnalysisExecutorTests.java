@@ -11,6 +11,18 @@ import org.junit.jupiter.api.io.TempDir;
 class PythonAnalysisExecutorTests {
   @TempDir Path temp;
 
+  @Test
+  void worker_url_preserves_tls_and_removes_only_jdbc_logging() {
+    assertThat(
+            PythonAnalysisExecutor.workerDatabaseUrl(
+                "jdbc:postgresql://localhost:5432/test?loggerLevel=OFF&sslmode=verify-full"))
+        .isEqualTo("postgresql://localhost:5432/test?sslmode=verify-full");
+    assertThat(
+            PythonAnalysisExecutor.workerDatabaseUrl(
+                "jdbc:postgresql://localhost:5432/test?loggerLevel=OFF"))
+        .isEqualTo("postgresql://localhost:5432/test");
+  }
+
   private AnalysisStageExecutor.Context context() {
     return new AnalysisStageExecutor.Context(
         1, AnalysisStage.FEATURES, UUID.randomUUID(), List.of(), Map.of());
