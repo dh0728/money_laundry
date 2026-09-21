@@ -81,7 +81,7 @@
 - 이 논문의 기여는 인코더(TGN). 디코더는 과제에 맞게 갈아 끼움.
 - → 우리 기준: 논문의 디코더는 링크 예측 p((i, j) | t) = "i→j 거래가 일어날 확률". 우리는 디코더를 (z_src(t), z_dst(t), 거래 피처) → 세탁 확률로 바꾸면 됨. 인코더는 그대로 쓸 수 있다는 게 이 구조의 장점.
 
-![alt text](image.png)
+![TGN의 예측 및 메모리 갱신 아키텍처](img/tgn/figure-01-tgn-architecture.png)
 
 ### Figure 1 흐름 (배치: 1→2 at t₁, 2→3 at t₂)
 - 위쪽 (예측): (1) emb가 현재 memory + 시간 그래프로 노드 임베딩 생성 → (2) dec가 엣지 확률 계산 → (3) loss
@@ -159,7 +159,7 @@
 - 원시 메시지 = 메시지 함수의 입력이 되는 원재료(양쪽 memory, Δt, 엣지 피처 등). 저장소는 이미 모델이 처리한 과거 상호작용의 원시 메시지를 보관.
 - 즉 "어떤 상호작용이 memory에 반영되는 시점"을 다음 배치로 미룸.
 
-![alt text](image-1.png)
+![원시 메시지 저장소를 이용한 TGN 학습 흐름](img/tgn/figure-02-memory-update-flow.png)
 
 **Figure 2 흐름**
 1. 저장소의 원시 메시지에서 메시지 계산 (msg)
@@ -214,7 +214,7 @@
 - TGN은 정적 그래프의 Graph Networks(Battaglia 2018)도 일반화함(global block 제외) → 대부분의 메시지 패싱 구조를 포함.
 - → 우리 기준: Multi-GNN 3.2절의 MPNN이 TGN 안에서는 "임베딩 모듈" 자리에 들어감. 즉 TGN = (memory + 시간 인코딩)이라는 시간 껍데기 + 그 안의 MPNN. 두 논문은 서로 직교하므로 reverse MP·포트·ego ID를 TGN 임베딩 모듈 안에 넣는 조합이 원리상 가능함(논문이 말한 건 아니고 우리 아이디어).
 
-![alt text](image-2.png)
+![TGN과 동적 그래프 모델의 모듈 구성 비교](img/tgn/table-01-model-comparison.png)
 
 **Table 1 읽는 법**
 - 열 = 3.1의 모듈 다섯 개: Memory 유무 / Memory Updater / Embedding / Message Aggregator / Message Function.
@@ -247,7 +247,7 @@
 
 ### 5.1 성능
 
-![alt text](image-3.png)
+![미래 엣지 예측 성능 비교](img/tgn/table-02-future-link-prediction-results.png)
 
 **Table 2: 미래 엣지 예측 AP(%)**
 - TGN-attn이 모든 데이터셋, 두 설정 모두 1위.
@@ -258,7 +258,7 @@
 - 정적 모델(*)은 inductive를 지원 못 하는 게 많고, 지원해도 크게 뒤짐.
 
 
-![ㅇ](image-4.png)
+![동적 노드 분류 성능 비교](img/tgn/table-03-node-classification-results.png)
 
 **Table 3: 동적 노드 분류 ROC AUC(%)**
 - Wikipedia 87.81 (2위 JODIE 84.84), Reddit 67.06 (2위 TGAT 65.56). 역시 1위.
@@ -268,7 +268,7 @@
 
 ### 5.2 모듈 선택 (ablation, Wikipedia transductive, Figure 3)
 
-![alt text](image-5.png)
+![TGN 모듈별 제거 실험 결과](img/tgn/figure-03-ablation-study.png)
 
 **Figure 3(a): 정확도(AP) vs epoch 시간**
 - 대략: TGN-nomem ~94.5 (가장 빠름) / Jodie·DyRep ~94 / TGN-id ~95.3 / TGN-sum ~98 / TGN-attn ~98.5 (~25초) / TGN-2l ~98.6 (~50초) / TGN-mean ~98.5 (~135초) / TGAT ~95.3 (~740초)
