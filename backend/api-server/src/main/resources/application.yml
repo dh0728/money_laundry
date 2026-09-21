@@ -11,6 +11,13 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    clean-disabled: true
+    out-of-order: false
+    baseline-on-migrate: false
 
 server:
   port: ${SERVER_PORT:8080}
