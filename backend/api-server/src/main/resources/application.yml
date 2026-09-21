@@ -43,6 +43,7 @@ app:
     cutoff: ${INGEST_CUTOFF:03:00}
     fx-rate-version: fx_rates_usd_v1
   worker:
+    mode: ${WORKER_MODE:unconfigured}
     python: ${WORKER_PYTHON:python}
     script: ${WORKER_SCRIPT:worker/analysis_entry.py}
     timeout: ${WORKER_TIMEOUT:PT30M}

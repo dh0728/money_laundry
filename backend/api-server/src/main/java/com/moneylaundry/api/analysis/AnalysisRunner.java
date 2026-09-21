@@ -330,6 +330,7 @@ public class AnalysisRunner implements AutoCloseable {
     try {
       service.tx.executeWithoutResult(
           status -> {
+            if (runs != null) AnalysisRunService.integrationLock(service.jdbc);
             service.lock(item.job.id());
             if (!service.owns(item.job)) return;
             for (Failure failure : item.failures)
