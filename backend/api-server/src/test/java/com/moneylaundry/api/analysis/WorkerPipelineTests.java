@@ -476,7 +476,7 @@ class WorkerPipelineTests {
         """
             .formatted(
                 "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
-    jdbc.update("update batch_jobs set threshold_value=0.5 where job_id=?", job);
+    jdbc.update("update batch_jobs set threshold_value=1.0 where job_id=?", job);
     try (var runner = new AnalysisRunner(service, executor(script.toString()), runs, integration)) {
       runner.scan(); // FEATURES
       runner.scan(); // PUBLISH
@@ -509,11 +509,9 @@ class WorkerPipelineTests {
                   Boolean.class,
                   run))
           .isTrue();
-      runner.scan(); // ALERTS is not connected; do not claim whole-job completion.
-      assertThat(service.job(job).status()).isEqualTo("FAILED");
-      assertThat(service.job(job).error()).isEqualTo("PIPELINE_NOT_CONFIGURED");
-      service.resume(job);
-      assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.ALERTS);
+      runner.scan(); // No seeds: ALERTS now completes without creating an Alert.
+      assertThat(service.job(job).status()).isEqualTo("COMPLETED");
+      assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.COMPLETE);
       assertThat(
               jdbc.queryForObject(
                   "select count(*) from inference_results where run_id=?", Integer.class, run))

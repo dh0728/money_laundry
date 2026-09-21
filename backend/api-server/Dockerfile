@@ -54,7 +54,7 @@ RUN groupadd --gid 10001 app \
 COPY worker/analysis_entry.py worker/frozen_input.py worker/pipeline.py \
      worker/model_publication.py worker/inference_dispatch.py worker/result_collection.py \
      worker/demo_calculator.py worker/model_contract.py worker/worker_transport.py \
-     worker/alert_builder.py /app/worker/
+     worker/alert_builder.py worker/alert_pipeline.py /app/worker/
 
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 

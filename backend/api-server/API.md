@@ -75,7 +75,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 - 취소 contract_version은 숫자2다. `INFERENCE_API_URL`(HTTPS 기본 주소)과 `INFERENCE_API_TOKEN`(추론 워커 INFERENCE_TOKEN과 같은 전용 토큰)을 함께 설정하면 Java 전달 담당이 `PUT /api/v1/inference-requests/{requestId}/rounds/{round}/cancellation`으로 기존 불변 취소 메시지를 보내고 같은 회차의 `GET`으로 상태를 조회한다. Bearer 인증을 사용하며 리다이렉트를 따르지 않는다. 접수 응답은 중단 완료가 아니다. job/run/model/request/round/cancel 전체 식별자와 contract_version을 대조한 뒤 `cancellation_status=STOPPED`와 `status=STOPPED`, 또는 `cancellation_status=ALREADY_FINISHED`와 `status=COMPLETED` 조합만 종료 확인으로 인정한다. RECOVERY_REQUIRED·미응답·404는 종료 확인이 아니다.
 - 두 API 설정이 모두 없으면 기존 S3/local 취소 파일 전달을 유지한다. S3는 `requests/{job}/{model}/{request}/rounds/{round}/cancel.json` 조건부 불변 게시와 `results/.../cancel_ack.json` 조회를 사용한다. local은 storage-dir/analysis-transport에 원자 게시한다. API 설정 일부 누락은 기동 시 거절하며 API 전달 실패 시 파일 방식으로 우회하지 않는다. 기존 2스레드 TaskScheduler에서 Python 단계와 별도로 5초 스캔하고, outbox의 재시도 정책을 그대로 사용한다. 실제 EC2–KubeSphere HTTPS 통신은 별도 배포 검증 대상이다.
 - 전달 실패는30초/2분 간격으로 총3회까지 게시를 시도하고 미확인은 계속 대기한다. 3회 후에도 늦은 ack는 조회하며 작업 상세 cancellations의 actionRequired로 게시 재개 필요를 알린다. 취소된 작업의 기존 resume API는 outbox 시도만 재개하고 취소 run을 계산 재개하지 않는다(응답 status는 FAILED 유지). 실제 S3 권한/외부 프로세스 중단은 이 로컬·SDK 대역 검증과 구별한다.
-- 더미 freeze는 TARGET만 요구한다. 실제 피처 CONTEXT 범위는 후속 계약이며 임의 기간을 도입하지 않는다. 현재 더미 Python은 FEATURES→INFERENCE→SCORES를 연결하며 ALERTS는 아직 미연결이다.
+- 더미 모델은 TARGET만 입력받고 Alert 구성은 V6의 전후24시간 고정 CONTEXT도 사용한다. Python FEATURES→INFERENCE→SCORES→ALERTS가 연결되어 있으며 구체적인 Alert 정책은 §3.1을 따른다.
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
 - **GET /api/v1/bank/uploads/{uploadId}** — 자기 은행만 조회. 다른 은행/없는 작업404. 응답은 `{uploadId,bankId,fileName,businessDate,sizeBytes,rowCount,insertedCount,missingCount,duplicateCount,status,errorCode,errorMessage,errors:[{row,column,reason}],urlIssuedAt,receivedAt,startedAt,finishedAt,integrationStatus,reportVersionId,correctionRequired,correctionRequestId,replacementUploadId,nextAnalysisDate}`다. `insertedCount`는 해당 보고에서 정상 통합 거래에 연결된 보고 행 수이며 통합 전에는0이다. 같은 내용 반복은 중복 오류가 아니므로 `duplicateCount=0`이다. `errors`는 자기 파일의 정제된 오류 최대100건이며 원문 식별정보를 포함하지 않는다. `finishedAt`은 보고 저장/검수 종료 시각이다.
@@ -86,7 +86,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 - **GET /api/v1/batch-jobs/{jobId}** — 위 행과 `uploads: [{ uploadId, excluded, status, fileName }]`, `failures: [{ stage, errorCode, failedAt, consecutiveCount, retryAt, actionRequired }]`.
   - `models: [{ modelKind, phase, status, requestId, executionRound, remoteStatus, remoteRevision, errorCode, actionRequired, retryAt, nextPollAt, remoteDeadlineAt, modelVersion, featureVersion }]`는 현재 run의 모델별 작업 상태다. 이전 run·토큰·서명 URL·로컬 경로·원격 응답 원문은 반환하지 않는다. 모델별 조치 필요 여부는 상위 작업의 FAILED 여부와 독립적이다.
   - INFERENCE 원격 대기는 상위 `RETRY_WAIT`로 재관측을 예약하며 실패 횟수를 올리지 않는다. 모델 하나가 실패해도 다른 모델의 상태 관측을 계속한다. 원격 대기 기한 초과/종료 불명은 조치 필요로 표시하고 새 요청 회차를 자동 생성하지 않는다.
-  - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→두 모델 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 두 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS 저장과 콜백 수신은 아직 미연결이며 전체 분석 성공을 만들지 않는다.
+  - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→두 모델 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 두 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS는 V6 근거 저장 이후 전체 분석을 완료한다. 콜백 수신은 아직 미연결이며 GET 상태 확인을 사용한다.
 - **POST /api/v1/batch-jobs/analysis** — 본문 없이 서버 Clock 현재 시각을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
 - **POST /api/v1/batch-jobs/{jobId}/resume** — FAILED 작업만 실패 단계부터 새 실패 주기로 재개한다.202 `{ jobId, status: "QUEUED" }`. 이력·정상 산출물·최초 startedAt은 유지한다. 완료 작업 재분석은 허용하지 않는다.
   - 현재 run의 로컬 `PUBLISH/FAILED` 또는 `COLLECT/FAILED` 모델은 같은 요청·회차로 재개한다. 수집 재시도는 모델을 재실행하지 않으며 결과 전송의 일시 오류는30초/120초 간격·총3회 후 명시 재개를 기다린다. 준비/관측 완료된 다른 모델은 초기화하지 않는다. 원격 모델의 최종 실패를 새 회차로 재실행하는 기능은 아직 미연결이며 이 API가 모델 재시작 성공을 보장하지 않는다.
@@ -112,12 +112,12 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | ANALYSIS | `FAILED` | 영구 실패 또는 3회 소진 | 명시 resume만 허용 |
 
 - 공통 컬럼: `attempt_count, claimed_at, heartbeat_at, started_at, finished_at, error_code, error_message`. ANALYSIS 전용: `analysis_date UNIQUE, threshold_value, model_version_binary, model_version_type, feature_version_binary, feature_version_type, suspicious_tx_count, alert_count`. INGEST 전용: `bank_id, business_date, file_name, file_hash(sha256), size_bytes, s3_key, url_issued_at, url_expires_at, received_at, row_count, missing_count, duplicate_count, validation_errors(JSONB errors[])`. `error_code`는 상태와 별개의 원인 코드: INGEST `VALIDATION_FAILED`·`LOAD_FAILED`, ANALYSIS `SCORES_MISMATCH`(§2.1) 등.
-- `WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE`. 등록 시 `analysis_receipts`에 cutoff 이하의 전체 수신 ID를 고정하여 이전 날짜 대기 후보도 포함하며, 검수중인 고정 수신 대상의 종료를 기다린다. `analysis_uploads`는 기존 최초 수신 귀속 이력으로 유지한다. 기술적 INGEST 실패는 `INGEST_FAILED`이며 입력0 또는 전부 보류이면 `EMPTY_INPUT`으로 종료한다. 실제 Python 미연결 단계는 실패를 유지한다.
+- `WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE`. 등록 시 `analysis_receipts`에 cutoff 이하의 전체 수신 ID를 고정하여 이전 날짜 대기 후보도 포함하며, 검수중인 고정 수신 대상의 종료를 기다린다. `analysis_uploads`는 기존 최초 수신 귀속 이력으로 유지한다. 기술적 INGEST 실패는 `INGEST_FAILED`이며 TARGET0이고 후속 Alert 맥락 보완도 없으면 `EMPTY_INPUT`으로 종료한다. 후속 보완이 있으면 모델 실행을 건너뛰고 ALERTS로 진행한다.
 - INTEGRATE의 선택 version/generation은 FREEZE_INPUT에서 재확인한다. cutoff 안의 참조 변경은 같은 receipts로 INTEGRATE부터 재준비한다. 이미 cutoff 밖의 더 최신 현재본으로 교체되면 `CUTOFF_SUPERSEDED`·FAILED/조치 필요로 남긴다. 현재 포인터 역행이나 최신본의 과거 입력 몰래 편입은 없다. 이 경우 운영 확인이 필요하며 과거 cutoff를 자동 확장하지 않는다.
 
 - 같은 단계·오류 최초 포함3연속 실패에서FAILED. 연결(DB/S3)은30초/2분, 계산은1분/5분 뒤 재시도한다. 설정·계약 오류는 즉시FAILED. 교대 오류 전체 상한은 없다. 정상 단계/명시resume만 연속 실패 주기를 끝내며 이력은 보존한다. 09시 조건은 없다.
 - 단일 BE 기준으로 전용 연결의 DB 세션 advisory lock을 Runner 생존기간 유지하고 소유자만 실행/잔여 RUNNING 복구한다. 종료 시 잠금을 해제하고 연결 상실 시 재획득한다. 실행 UUID 확인과 DB 쓰기로 오래된 실행을 차단한다. 정상 prepare 결과는 실행중 JVM에서 유지하고 DB 복구 시 단계 결과·이력을 저장한다. DB 장애 중 미저장 실패 횟수/산출물은 프로세스까지 종료되면 소실될 수 있다. 정확한 횟수 영속성을 보장하지 않는다.
-- 현재 Python `worker/analysis_entry.py --job-id … --stage … --execution-id …`는 실제 피처/S3 추론/점수/Alert가 미연결이므로78 종료, `PIPELINE_NOT_CONFIGURED`·조치 필요다. W1 무작위 점수 더미는 제거했다. Java 테스트 실행기는 성공·DB 롤백·재사용을 검증하며 실제 Python DB 원자성 검증을 뜻하지 않는다.
+- Python `worker/analysis_entry.py`는 FEATURES/INFERENCE/SCORES/ALERTS를 연결한다. 현재 모델은 명시적 demo이며 실제 GNN이 아니다. 설정 없는 모델 실행은 `PIPELINE_NOT_CONFIGURED`이고, Alert 저장에는 원격 추론 설정이 필요하지 않다.
 - 후속 Python은 직접 DB 읽기/쓰기를 소유한다. 자신의 트랜잭션에서 실행 토큰 확인·데이터 저장·단계 완료를 원자 처리하고 Runner가 DB로 확인해야 한다. Java JDBC 트랜잭션에 별도 프로세스가 참여하지 않는다. 원격 추론은 고정 job/request 식별자로 실행중/기존 결과를 확인하여 재기동이나 새 executionId가 모델 재실행으로 이어지지 않게 연결해야 한다.
 
 ### 1.4 거래 보고 CSV와 통합
@@ -212,7 +212,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
   typeClass, typeName, typeScore, typeCandidates: [{ code, name, score }], agreement, jobId }
 ```
 - `fromAccount`·`toAccount`는 별도 서비스 계좌 UUID 문자열이며 원문 계좌번호가 아니다. 통화는 ISO 코드(§0). 파생 필드 정의는 §2.2.
-- Alert 상세 `transactions[]`에서는 행에 **`role: SEED|SUPPORTING|PATH|PATTERN_MEMBER`, `includedReason`(문자열), `direction: IN|OUT|SELF`(Alert 대표 계좌 기준)** 가 추가된다. MVP 최소판: `role` = isSuspicious ? SEED : SUPPORTING, `includedReason` = 묶음 근거 코드; Data 알고리즘이 PATH/PATTERN_MEMBER를 주면 교체.
+- Alert 상세 `transactions[]`에서는 행에 현재 구현은 §3.2의 동결 거래 스키마와 `role: SEED|CONNECTION|CONTEXT`, `includedReasons[]`를 사용한다.
 - 상세에서 `explanation: { thresholdValue, factors[] }`(§2.2)를 거래 행에 붙일지 별도 조회로 둘지는 [W3 API]에서 성능 보고 결정(피처 테이블 조인 비용).
 
 ### 2.5 GET /api/v1/suspicious-transactions (W2 DB 조회)
@@ -222,40 +222,36 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ## 3. 층 3 — Alert
 
-### 3.1 Alert 산출물 (일별 분석 마지막 스텝 — Data 알고리즘이 DB에 직접 적재)
+### 3.1 Alert 산출물 — 고정 맥락·근거 버전
 
-Alert 테이블(W3 [스키마]):
+현재 구현은 V6와 `worker/alert_pipeline.py`다. `analysis_entry.py`의 ALERTS 단계는 SCORES 이후 고정 TARGET·CONTEXT와 동결 점수만 읽어 저장하고 실행 토큰·현재 run을 확인한 트랜잭션 안에서 체크포인트·카운터를 기록한다. 그 후 Spring이 run/job을 COMPLETED로 전환한다. 0개 씨앗은 정상 완료다. L1 사용자가 필요한데 없으면 `ALERT_ASSIGNEE_UNAVAILABLE` 조치 필요 오류이며 가짜 담당자는 만들지 않는다.
 
-| 컬럼 | 내용 |
-|---|---|
-| `alert_id` | PK, DB 발급 |
-| `job_id`, `analysis_date` | 생성한 일별 분석 작업 |
-| `risk_score` | Alert 위험도 0~1 (거래 점수와 별도, 산출식은 Data 소유) |
-| `primary_type` | 대표 유형 코드 0~8 |
-| `type_distribution` | 유형별 구성비 JSON `{ "1": 0.6, "5": 0.4 }` (선택) |
-| `tx_count`, `total_amount_usd`, `amounts_by_currency` | 건수 · USD 환산 합계(§0) · 통화별 합계 JSON `{ "USD": 123.4, "EUR": 56.7 }` — BE가 구성 거래에서 파생 |
-| `first_tx_at`, `last_tx_at` | 작전 기간 |
-| `subject_account_id`, `account_count`, `bank_count` | 대표 계좌(구성 거래 등장 횟수 최대, 동률이면 금액 합 최대; Data가 허브 계좌를 주면 우선) · 참여 계좌 수 · 참여 은행 수 — BE 파생 (2026-09-04 채택) |
-| `score_mean`, `score_max`, `score_above_ratio`, `weighted_amount_usd`, `type_entropy` | 구성 거래 점수 통계 · 임계 초과 비율 · Σ(amount_usd × p) · 유형 구성비 엔트로피(낮을수록 순수한 묶음 — 시연 질문 1 근거) — BE 파생 (2026-09-04 채택) |
-| `link_basis[]` | 묶음 근거 `[{ basis: TIME|ACCOUNT|BANK|PATH, value }]` `[미정: Data — 산출 가능 여부]` |
-| `status`, `resolution`, `episode_id`, `created_at`, `updated_at` | 워크플로 — `status` 3종 `OPEN | ESCALATED | CLOSED`(§3.3), `resolution`은 `CLOSED`일 때만 `NORMAL|FALSE_POSITIVE`, 그 외 NULL |
-| `assignee_id`, `assigned_at` | 담당 L1 — 생성 직후 BE가 라운드로빈으로 채움(§3.4), NOT NULL(후처리 주체·nullable 여부는 kickoff §7 미결) |
+- 씨앗은 TARGET의 `p_laundering >= threshold_value`다. 이전 Alert의 미완료 후속 창은 원래 씨앗·점수를 보존하여 다시 탐색하며 이전 씨앗을 재추론하지 않는다. TARGET이 없어도 후속 맥락이 남으면 ALERTS를 실행한다.
+- 초기 정책 `daily-context-v1`: 씨앗 전후 24시간, 깊이2, 최대100거래, 창 내 계좌 활동100건 초과 시 확장 중지, 일반 공유 맥락 병합은3거래 이상. 씨앗끼리 실제 거래 경로로 연결되면 공유3건 미만이어도 병합 가능하다. 병합 최대100거래/48시간 범위를 유지한다. 패턴 확률은 주석이며 탐색·병합 조건이 아니다.
+- 신규 씨앗별 후보는 실제 공유 거래·연결 씨앗 기준으로 병합한다. 기존 별도 사건은 삭제·합병하지 않으며 같은 거래는 여러 Alert에 속할 수 있다. `alert_transactions`의 PK는 `(alert_id, version, tx_id)`이고 `UNIQUE(tx_id)`는 없다.
+- OPEN은 새 거래·씨앗·연결 이유가 생기면 새 근거 버전을 저장한다. 조사 중 기존 구성은 보존하며 한도를 초과한 추가는 제한으로 표시한다. CLOSED/ESCALATED는 기존 버전을 바꾸지 않고 `parentAlertId`로 연결된 OPEN 후속 Alert를 생성한다. 후속 Alert가 있으면 다음 탐색은 그 사건에서 이어간다. 사건별 사용자 판정·판정 버전 연결과 상태 변경 API는 후속 태스크다.
+- 후속 자료 미수신, 은행 일부 미수신, 확인했지만 새 연결 없음은 구분한다. `analysis.input_coverage`는 날짜별 사전 등록 은행과 cutoff 이전 ACTIVE 보고를 동결한다. 예상 은행0·미수신·PARTIALLY_HELD는 complete가 아니다. 완결 여부는 원장 최대 시각이나 벽시계에서 추정하지 않는다.
+- 새 근거가 없으면 버전을 늘리지 않고 coverage 검사만 기록한다. `forwardComplete`는 해당 씨앗의 미래 탐색 기간 자료 수신 완결이며 모든 거래를 무제한 조사했다는 뜻이 아니다. 탐색 한도는 `coverage[].explorationLimits`에 별도 표시한다. 지연 자료는 미완결 창에서 보완하며 완료된 과거 사건의 정정 후 재조사 정책 전체는 이번 구현 범위가 아니다.
+- 다른 READY/ACTIVE run의 미공개 근거와 충돌하면 `RUN_FENCED`로 차단한다. 동결 시점의 완료 근거 기준선이 달라졌으면 `WORKER_INPUT_INVALID`로 거절한다. 동일 frozen input의 단순 resume으로 해결되지 않으며 경쟁 실행 정리·새 스냅샷이 필요하다. 자동 재동결과 다중 분석의 동일 사건 동시 갱신은 이번 범위 밖이다.
+- 공개 조회는 **run과 job 모두 COMPLETED인 버전만** 사용한다. 저장 뒤 취소·실패한 버전은 공개하지 않고 이전 완료 버전을 유지한다. 점수·계좌 식별자·금액·그래프는 해당 버전에 고정되어 최신 원장으로 과거 근거를 다시 만들지 않는다.
 
-구성 거래 테이블: `(alert_id, tx_id, role, included_reason)`, **`UNIQUE(tx_id)`** — 한 거래는 한 Alert에만 속한다(2026-09-07 사용자 확정, 1:1). 이를 위해 Alert 구성 알고리즘의 입력에서 **처분된(ESCALATED·CLOSED) Alert의 거래는 제외**한다. 복합 위험은 N:M이 아니라 `type_distribution`으로 표현. `role`·`included_reason` 정의는 §2.4.
+### 3.2 현재 Alert 읽기 API
 
-**참여 계좌 테이블 `alert_accounts` (2026-09-04 채택, dberd 채택분)**: `(alert_id, account_id, role: SUBJECT|SOURCE|DESTINATION|INTERMEDIARY|HUB, in_count, in_amount_usd, out_count, out_amount_usd, max_score, counterparty_count)`. BE가 Alert 생성 직후 구성 거래에서 파생·저장. 역할 규칙: out만 = SOURCE, in만 = DESTINATION, 양쪽 = INTERMEDIARY, 차수 최대 = HUB, 대표 계좌 = SUBJECT. 계좌별 30일 창 기준선(`firstSeenAt`, 30일 in/out 건수·금액, 상대방 수)은 원장 조회로 상세 응답에 붙인다(저장 안 함). 관계 그래프의 노드 원천.
-- **재실행 규칙(2026-09-10)**: 날짜당1회이며 COMPLETED 작업은 다시 실행하지 않는다. 실패한 Alert 단계만 재개하고 정상 완료된 점수/Alert 단계는 보존한다. 후속 Python 연결은 Alert 데이터·단계 완료를 실행 토큰 확인과 함께 한 트랜잭션으로 저장해야 한다. 부분 저장은 롤백하며 완료 응답 유실은 DB로 확인한다. 정상 완료 산출물을 일괄 삭제하는 복구는 하지 않는다. 구성 입력은 미소속 거래이며 이전 Alert에 속한 거래는 `UNIQUE(tx_id)`로 제외한다.
+인증·판정 워크플로는 후속 태스크이며 다음 GET은 현행 공통 접근 설정을 따른다.
 
-### 3.2 조회
-- **GET /api/alerts** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`. 정렬 키: `riskScore, createdAt, lastTxAt, txCount, totalAmountUsd, scoreMax, weightedAmountUsd, ageDays`. 필터 `status`, `resolution`, `assigneeId`(`me` 허용), `typeClass`, `bankId`, `from/to`(lastTxAt 기준), `analysisDate`, `episodeId`. L1 기본 뷰 = `assigneeId=me&status=OPEN`. (미배정·미열람 뷰는 없음 — 생성 즉시 배정되고 열람 여부는 표시하지 않는다.)
-  행: `{ alertId, riskScore, summary, primaryType: { code, name }, subjectAccount: { bank, account }, accountCount, bankCount, txCount, totalAmountUsd, amountsByCurrency: [{ currency, total }], scoreStats: { mean, max, aboveRatio }, weightedAmountUsd, typeEntropy, firstTxAt, lastTxAt, banks: [int], status, resolution, assignee: { userId, name }, assignedAt, episodeId, analysisDate, createdAt, ageDays }`
-  - `summary`(2026-09-04 채택): BE 템플릿 한 줄 — `"{typeName} · 계좌 {accountCount} · 은행 {bankCount} · {기간 일수}일 · 총 USD {totalAmountUsd 축약}"` + 묶음 근거 1개(있으면). 저장하지 않고 조회 시 조합. 한글 명칭은 FE 매핑 전이므로 코드명으로 낸다.
-  - `ageDays`: `now − createdAt`의 정수 일수(서버 계산 — 정렬·"N일 이상 미처리" 필터용). Episode 행에도 동일.
-- **GET /api/alerts/{alertId}** [전 역할] — 목록 행 + `transactions: [거래 행 §2.4 + role, includedReason, direction]`, `typeDistribution`, `accounts: [{ account, bank, role, inCount, inAmountUsd, outCount, outAmountUsd, maxScore, counterpartyCount, firstSeenAt }]`(§3.1 alert_accounts + 30일 기준선), `scoreTimeline: [{ txAt, score }]`(시각순), `explanation`(§2.2 — 포함 여부는 [W3 API]에서 성능 보고 결정), `groupingBasis: link_basis[]`, `graph`(아래).
-- **관계 그래프**: `graph: { nodes: [{ id, kind: ACCOUNT|BANK, label, riskLevel: HIGH|MEDIUM|LOW, role, inAmountUsd, outAmountUsd, txCount }], edges: [{ id, from, to, txCount, totalAmountUsd, maxScore, primaryType, direction, firstTxAt, lastTxAt }] }` — 노드 속성은 §3.1 alert_accounts에서, `edges[].id`는 항상 부여(멀티엣지 대비). 상세에 포함 vs `GET /api/alerts/{alertId}/graph` 분리 `[미정: FE 시각화 라이브러리 — BE 추천: 분리]`. `riskLevel` 경계는 BE 프로퍼티(기본 0.9/0.7).
-- **GET /api/alerts/{alertId}/history** [전 역할] — §6 이력 행 목록.
+- `GET /api/v1/alerts?page=0&size=20&status=OPEN&assigneeId=1&jobId=10`: 필터는 선택, size1~200. `jobId`는 **최신 공개 근거 버전을 만든 작업** 기준이다. `summary.scoreMax` 내림차순·alertId 오름차순. 페이지 응답은 batch-jobs와 동일한 content/page/size/totalElements/totalPages다.
+- 목록 항목: `alertId,status,resolution,assigneeId,parentAlertId,createdAt,version,runId,summary`.
+- 작업의 `alertCount`는 신규 사건 생성 수이며 기존 사건의 근거 버전 갱신은 포함하지 않는다. 따라서 최신 버전 생성 작업 기준인 `jobId` 목록 건수와 다를 수 있다. 단계 체크포인트에는 createdAlertCount/updatedAlertCount/checkedAlertCount를 구분해 저장한다.
+- `GET /api/v1/alerts/{alertId}?version=1`: version 생략 시 최신 완료 근거. 존재하지 않거나 미완료 버전은404. 목록 필드에 `policyVersion,seeds,transactions,limits,graph,coverage,forwardComplete`를 추가한다. 명시 버전 조회는 해당 버전을 만든 run의 coverage를 반환하고, 최신 조회는 최신 완료 coverage를 반환한다.
+- `seeds[]`: `txId,occurredAt,score,threshold`. `transactions[]`: `txId,occurredAt,fromAccountId,toAccountId,fromBankId,toBankId,amountReceived,receivingCurrency,amountPaid,paymentCurrency,amountUsd,paymentFormat,role,includedReasons,scores`. 계좌 ID는 서비스용 UUID이며 원문 이름·계좌번호는 반환하지 않는다. role은 SEED/CONNECTION/CONTEXT다. scores는 미채점 맥락에서 null, 그 외 `p_laundering,p_0..p_8,score_pct`다. null을 정상 점수0으로 치환하지 않는다.
+- summary: `txCount,seedCount,totalAmountUsd,scoreMax,firstTxAt,lastTxAt`. scoreMax는 포함 거래 중 관측 점수의 최댓값이며 별도 모델 위험 확률이 아니다.
+- `GET /api/v1/alerts/{alertId}/versions`: 완료 버전의 `version,runId,createdAt` 목록.
+- `GET /api/v1/alerts/{alertId}/graph?version=1`: 동일 근거의 graph. nodes는 가명계좌 `id,kind,bankId,inCount,outCount,inAmountUsd,outAmountUsd`, edges는 거래별 `id,txId,from,to,amountUsd,occurredAt,role,includedReasons`다. 같은 계좌쌍의 반복 거래도 별도 edge로 유지한다.
+- coverage는 씨앗별 `txId,windowStart,windowEnd,days,forwardComplete,explorationLimits`다. days는 `businessDate,expectedBanks,completeBanks,complete,reports`. 한도와 누락이 있는 결과를 완전한 세탁 경로라고 표시하지 않는다.
 
 ### 3.3 Alert 상태 전이 표
+
+아래 상태 변경·판정·열람 이력 표는 **후속 미구현 계약**이다. 이번 `/api/v1/alerts` GET은 읽기 전용이며 REVIEW_START 기록이나 상태 변경을 수행하지 않는다.
 
 **공통 상태 모델 (2026-09-06 사용자 확정 — Alert·Episode 통일, 09-07 `IN_REVIEW` 제거)**: 생애는 `OPEN`(담당자에게 배정되어 처리 중) → `CLOSED`(종결). 종결 결과는 상태에 넣지 않고 별도 필드 **`resolution`**(`CLOSED`일 때만 값, 그 외 NULL). Alert만 `ESCALATED`(Episode 귀속, `episodeId != null`과 항상 일치)를 추가로 가진다 — Episode에는 "넘김" 단계가 없다(감독기관형 범위, 보고 단계 없음). 열람은 상태를 바꾸지 않는다: 담당자의 첫 열람은 **이력 행 `REVIEW_START`로만** 남긴다(2026-09-08 사용자 확정 — `first_opened_at` 컬럼 없음, 화면 표시 없음). "첫 열람" 판정 = 현재 담당자의 `REVIEW_START`가 마지막 `ASSIGN`(없으면 생성) 이후에 없을 때 기록. 재배정되면 새 담당자의 첫 열람이 다시 기록된다. dberd 정합 메모 결정 2(`NEW/CLOSED + resolution`) 해소.
 

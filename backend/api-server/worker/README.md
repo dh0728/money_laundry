@@ -5,9 +5,9 @@
 `demo-calculator-v1` 더미이며 실제 GNN/학습 모델은 포함하지 않는다.
 
 연결 범위는 입력 준비 → S3 게시 → 추론 API → 결과 수집/검증 → 점수 DB 저장이다.
-Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 현재 ALERTS 저장은
-미연결이므로 점수 저장 후 `ALERTS / FAILED / PIPELINE_NOT_CONFIGURED`가 예상된다.
-이를 전체 분석 완료로 해석하지 않는다.
+Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 점수 저장 다음 ALERTS에서
+고정 맥락 기반 근거를 저장한 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
+실제 GNN의 탐지 성능을 검증한 것은 아니다.
 
 ## 1. 이미지 빌드
 
@@ -117,10 +117,12 @@ $detail.models | Format-Table modelKind, phase, status, remoteStatus, errorCode,
 `GET /api/v1/batch-jobs?type=ANALYSIS`로 실제 작업 ID·실패 단계를 확인하고 FAILED 작업만
 `POST /api/v1/batch-jobs/{jobId}/resume`한다. 완료 작업을 다시 분석하지 않는다.
 
-5. 두 모델이 `DONE/SUCCEEDED`이고 상위가 `ALERTS`까지 도달했는지 확인한다. 현재
-   `PIPELINE_NOT_CONFIGURED`가 **ALERTS에서** 나온다면 점수 단계 이후의 미연결 경계다.
-   같은 오류가 FEATURES/INFERENCE/SCORES에서 나오면 구성 실패다. 공개 점수 화면은
-   전체 완료 전 결과를 숨길 수 있으므로 빈 화면으로 점수 저장 실패를 단정하지 않는다.
+5. 두 모델이 `DONE/SUCCEEDED`이고 상위가 `COMPLETE/COMPLETED`까지 도달했는지 확인한다.
+   ALERTS는 고정 맥락에서 근거를 구성·저장한 뒤 완료한다. 의심 씨앗0건은 Alert0건으로 정상 완료한다.
+   `ALERT_ASSIGNEE_UNAVAILABLE`이면 실제 L1 사용자 등록이 필요하다. `PIPELINE_NOT_CONFIGURED`는
+   정상 완료 경계가 아니라 워커 설정 오류다. 공개 점수·Alert API는 전체 완료 전 결과를 숨긴다.
+   완료 후 `GET /api/v1/alerts?jobId={jobId}`, 상세 `/{alertId}`, `/{alertId}/versions`,
+   `/{alertId}/graph`를 확인한다. jobId는 최신 공개 근거 버전의 생성 작업 기준이다.
 6. DB 확인 권한이 있는 담당자는 실제 jobId를 넣어 아래 읽기 전용 SQL로 검증한다.
 
 ```sql
@@ -142,5 +144,27 @@ WHERE job_id = :job_id;
 - 더미는 빠르게 끝나므로 늦은 취소의 `ALREADY_FINISHED`는 정상 응답일 수 있다.
   실행 중 중단 성공을 검증했다고 보고하지 않는다. 결정적 실행 중 취소·재시도 경합은
   기존 로컬 테스트가 다루며 실환경에서는 실제 관찰된 상태를 기록한다.
-- 이번 패키징만으로 Alert 저장, GNN 추론, 콜백, 독립 비동기 실행 슬롯 또는 원격 최종
+- 이번 패키징만으로 GNN 추론, 콜백, 독립 비동기 실행 슬롯 또는 원격 최종
   실패의 새 회차 재개가 완성된 것은 아니다.
+
+
+## 고정 맥락·Alert 단계
+
+`analysis_entry.py --stage ALERTS`는 `alert_pipeline.py`를 호출한다. Spring FREEZE_INPUT이
+TARGET와 씨앗 전후24시간의 CONTEXT·기존 점수·날짜별 수신 범위를 동결하며, Python은 패턴
+확률로 모양을 강제하지 않고 실제 거래 연결로 후보를 구성한다. 초기 한도는 깊이2/100거래/
+계좌 활동100/공유 맥락3건이고 정책 버전은 `daily-context-v1`이다.
+
+OPEN의 추가 근거는 버전으로 보존한다. 종결·이관 사건의 추가 근거는 연결된 후속 Alert이며,
+기존 판정 대상은 변경하지 않는다. 신규 TARGET가0건이어도 이전 씨앗의 미래창 수신이 덜 끝났다면
+모델을 재실행하지 않고 ALERTS에서 보완한다. 하루 마지막 씨앗은 다음 날 보고를 받은 뒤
+후속24시간까지 확인한다. 미등록·미수신·일부 보류와 정상 수신 후 연결 없음을 구분한다.
+
+과거 버전 조회는 고정 거래·점수를 사용한다. 새 연결이 없으면 근거 버전을 복제하지 않고
+coverage 검사만 남긴다. run/job이 모두 COMPLETED인 버전만 공개한다. 실제 GNN 연결,
+사용자 판정·이력·Episode 변경 API는 별도 구현 범위다. 상세 계약은 API.md §3과 V6를 따른다.
+
+동일 사건을 다른 run이 미완료 상태로 쓰고 있으면 `RUN_FENCED`로 차단한다. 동결 후 최신
+완료 근거 버전이 바뀌어도 기존 동결 입력을 그대로 적용하지 않는다. 이 충돌은 같은 입력의
+단순 resume으로 해결되지 않으며 경쟁 실행 정리와 새 스냅샷이 필요하다. 자동 재동결 정책은
+구현하지 않았으므로 여러 분석 실행의 동시 사건 갱신을 정상 지원한다고 간주하지 않는다.
