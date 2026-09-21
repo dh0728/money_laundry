@@ -307,7 +307,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                     WHERE request_id=%s AND execution_round=1''', (body['request_id'],)).fetchone()[0], 'PUBLISHED')
                 if len(bodies) == 1:
                     raise httpx.ReadTimeout('ambiguous response')
-                return httpx.Response(202, json={**body, 'status': 'QUEUED', 'revision': 1})
+                return httpx.Response(202, json={**body, 'status': 'ACCEPTED', 'revision': 1})
             transport = httpx.MockTransport(remote)
             with self.assertRaises(httpx.ReadTimeout):
                 publish_model(self.admin, self.execution, 'BINARY', root, settings, s3, transport=transport)

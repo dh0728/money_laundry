@@ -166,7 +166,7 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
                 if not isinstance(receipt, dict):
                     raise ProtocolError('Invalid inference receipt')
                 request.check(receipt, versions=False)
-                if receipt.get('status') not in ('QUEUED', 'RUNNING', 'RETRY_WAIT', 'COMPLETED',
+                if receipt.get('status') not in ('ACCEPTED', 'QUEUED', 'RUNNING', 'RETRY_WAIT', 'COMPLETED',
                                                   'FAILED', 'RECOVERY_REQUIRED', 'CANCEL_REQUESTED', 'STOPPED'):
                     raise ProtocolError('Invalid inference receipt')
         with connection.transaction():

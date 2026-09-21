@@ -26,6 +26,21 @@ from model_contract import ModelExecutionError, model_failure
 from worker_transport import Request, descriptor, encode
 
 
+class InferenceEntryTests(unittest.TestCase):
+    def test_polling_only_startup_does_not_require_callback_environment(self):
+        from inference_server import main
+        environment = dict(INFERENCE_STATE_DIR="state", INFERENCE_TOKEN="t" * 32,
+                           INFERENCE_OBJECT_BASE_URL="https://objects.example/dev/")
+        with patch.dict("os.environ", environment, clear=True), \
+                patch("inference_server.create_app") as create, patch("uvicorn.run") as run:
+            main()
+        settings = create.call_args.args[0]
+        self.assertIsNone(settings.callback_url)
+        self.assertIsNone(settings.callback_token)
+        self.assertEqual(run.call_args.kwargs['workers'], 1)
+        self.assertEqual(run.call_args.kwargs['host'], '127.0.0.1')
+
+
 class InferenceServerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="aml-inference-test-")
@@ -138,6 +153,16 @@ class InferenceServerTests(unittest.TestCase):
                 self.assertEqual(scores.column("p_laundering").to_pylist(), [0.015, 0.995, 0.005])
             self.assertNotIn("manifest_url", self.state(payload))
         self.assertEqual(len(self.events), 2)
+
+    def test_real_acceptance_response_is_understood_by_backend_observer(self):
+        from inference_compute import request_from
+        from inference_dispatch import normalize
+        payload = self.payload()
+        response = self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()['status'], 'ACCEPTED')
+        observed = normalize(request_from(payload), response.json(), 'dev/', 3)
+        self.assertEqual(observed['status'], 'ACCEPTED')
 
     def test_auth_scope_and_changed_request_are_rejected(self):
         payload = self.payload()

@@ -15,7 +15,7 @@ def normalize(request, view, prefix, expected_rows):
     request.check(view, versions=False)
     revision, status = view.get('revision'), view.get('status')
     if (type(revision) is not int or revision < 1 or status not in (
-            'QUEUED', 'RUNNING', 'RETRY_WAIT', 'COMPLETED', 'FAILED',
+            'ACCEPTED', 'QUEUED', 'RUNNING', 'RETRY_WAIT', 'COMPLETED', 'FAILED',
             'RECOVERY_REQUIRED', 'CANCEL_REQUESTED', 'STOPPED')):
         raise ProtocolError('Invalid remote state')
     normalized = dict(request.identity(), revision=revision, status=status)

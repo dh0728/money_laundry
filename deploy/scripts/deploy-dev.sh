@@ -62,6 +62,7 @@ cleanup() {
   unset DEV_API_IMAGE
   unset DEV_WEB_IMAGE
   unset DEV_INGEST_ENCRYPTION_KEY DEV_INGEST_SEARCH_KEY DEV_INGEST_KEY_VERSION
+  unset DEV_INFERENCE_API_URL DEV_INFERENCE_API_TOKEN
 }
 
 trap cleanup EXIT
@@ -113,6 +114,8 @@ DEV_INGEST_ENCRYPTION_KEY="$(get_parameter "ingest/encryption-key")"
 DEV_INGEST_SEARCH_KEY="$(get_parameter "ingest/search-key")"
 DEV_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
 DEV_SQS_URL="$(get_parameter "sqs/url")"
+DEV_INFERENCE_API_URL="$(get_parameter "inference/url")"
+DEV_INFERENCE_API_TOKEN="$(get_parameter "inference/token")"
 CF_ACCESS_CLIENT_ID="$(get_parameter "cloudflare/access/client-id")"
 CF_ACCESS_CLIENT_SECRET="$(get_parameter "cloudflare/access/client-secret")"
 
@@ -124,6 +127,7 @@ export DEV_S3_BUCKET
 export DEV_S3_PREFIX
 export DEV_INGEST_ENCRYPTION_KEY DEV_INGEST_SEARCH_KEY DEV_INGEST_KEY_VERSION
 export DEV_SQS_URL
+export DEV_INFERENCE_API_URL DEV_INFERENCE_API_TOKEN
 export CF_ACCESS_CLIENT_ID
 export CF_ACCESS_CLIENT_SECRET
 

@@ -150,8 +150,8 @@ def create_app(settings: Settings):
 def main():
     import uvicorn
     settings = Settings(Path(os.environ["INFERENCE_STATE_DIR"]), os.environ["INFERENCE_TOKEN"],
-                        os.environ["INFERENCE_OBJECT_BASE_URL"], os.environ["INFERENCE_CALLBACK_URL"],
-                        os.environ["INFERENCE_CALLBACK_TOKEN"])
+                        os.environ["INFERENCE_OBJECT_BASE_URL"], os.environ.get("INFERENCE_CALLBACK_URL"),
+                        os.environ.get("INFERENCE_CALLBACK_TOKEN"))
     uvicorn.run(create_app(settings), host=os.environ.get("INFERENCE_BIND", "127.0.0.1"),
                 port=int(os.environ.get("INFERENCE_PORT", "8090")), workers=1, access_log=False)
 
