@@ -407,6 +407,121 @@ class WorkerPipelineTests {
   }
 
   @Test
+  void invalid_collected_scores_expose_the_documented_failure_code() throws Exception {
+    var features = claim();
+    executor("worker/analysis_entry.py").prepare(features);
+    jdbc.update("update batch_jobs set current_stage='INFERENCE' where job_id=?", job);
+    jdbc.update(
+        "update analysis_model_tasks set phase='COLLECT',status='FAILED',error_code='RESULT_INVALID' where run_id=? and model_kind='BINARY'",
+        run);
+    Path failed = storage.resolve("failed_collection.py");
+    Files.writeString(failed, "raise SystemExit(77)\n");
+    var context =
+        new AnalysisStageExecutor.Context(
+            job, AnalysisStage.INFERENCE, features.executionId(), List.of(), Map.of(), run);
+    assertThatThrownBy(() -> executor(failed.toString()).prepare(context))
+        .isInstanceOfSatisfying(
+            AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("SCORES_MISMATCH"));
+    jdbc.update("update batch_jobs set status='FAILED' where job_id=?", job);
+    service.resume(job);
+    assertThat(
+            jdbc.queryForObject(
+                "select status from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                String.class,
+                run))
+        .isEqualTo("READY");
+  }
+
+  @Test
+  void runner_collects_real_parquet_and_persists_scores_before_alerts() throws Exception {
+    Path script = storage.resolve("completed_remote_double.py");
+    Files.writeString(
+        script,
+        """
+        import sys, os, json, io
+        sys.path.insert(0, %s)
+        import httpx, psycopg, pyarrow.parquet as pq
+        import model_publication, inference_dispatch
+        from test_frozen_input_postgres import MemoryS3
+        from demo_calculator import build_targets, calculate
+        from worker_transport import Request, descriptor
+        settings = model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
+        os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)
+        def result(request_id):
+            with psycopg.connect(os.environ['WORKER_DB_URL'],user=os.environ['WORKER_DB_USER'],password=os.environ['WORKER_DB_PASSWORD']) as db:
+                run,kind,job,binding = db.execute('select m.run_id,m.model_kind,r.job_id,t.binding from analysis_model_requests m join analysis_runs r using(run_id) join analysis_model_tasks t using(run_id,model_kind) where m.request_id=%%s',(request_id,)).fetchone()
+                ids = [r[0] for r in db.execute("select tx_id from analysis.input_transactions where run_id=%%s and input_role='TARGET'",(run,))]
+            req = Request(job,kind.lower(),request_id,1,binding['model_version'],binding['feature_version'],str(run))
+            stream = io.BytesIO()
+            pq.write_table(calculate(build_targets(ids),req.model_kind,model_version=req.model_version,feature_version=req.feature_version),stream)
+            data = stream.getvalue()
+            metadata = dict(req.identity(),**req.versions(),status='COMPLETED',row_count=len(ids),files=[descriptor('scores','dev/test/'+req.output+'scores.parquet',data)])
+            return req, metadata, data
+        class Results(MemoryS3):
+            def get_object(self, **args):
+                if args['Key'].endswith('/scores.parquet'):
+                    request_id = args['Key'].split('/')[-4]
+                    return {'Body':io.BytesIO(result(request_id)[2])}
+                return super().get_object(**args)
+        model_publication.configured = lambda: (settings, Results())
+        def remote(request):
+            if request.method == 'PUT':
+                return httpx.Response(202,json={**json.loads(request.content),'status':'QUEUED','revision':1})
+            req,metadata,data = result(request.url.path.split('/')[-3])
+            return httpx.Response(200,json={**req.identity(),'status':'COMPLETED','revision':2,'result':metadata})
+        advance = inference_dispatch.advance
+        inference_dispatch.advance = lambda *args: advance(*args, transport=httpx.MockTransport(remote))
+        from analysis_entry import main
+        raise SystemExit(main())
+        """
+            .formatted(
+                "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
+    jdbc.update("update batch_jobs set threshold_value=0.5 where job_id=?", job);
+    try (var runner = new AnalysisRunner(service, executor(script.toString()), runs, integration)) {
+      runner.scan(); // FEATURES
+      runner.scan(); // PUBLISH
+      jdbc.update("update batch_jobs set retry_at=now()-interval '1 second' where job_id=?", job);
+      runner.scan(); // GET + COLLECT
+      assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.SCORES);
+      assertThat(service.job(job).status()).isEqualTo("QUEUED");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis_model_tasks where run_id=? and status='SUCCEEDED'",
+                  Integer.class,
+                  run))
+          .isEqualTo(2);
+      runner.scan(); // SCORES
+      assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.ALERTS);
+      assertThat(service.job(job).status()).isEqualTo("QUEUED");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from inference_results where run_id=? and score_pct=0",
+                  Integer.class,
+                  run))
+          .isEqualTo(1);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from transactions where scored_job_id=?", Integer.class, job))
+          .isEqualTo(1);
+      assertThat(
+              jdbc.queryForObject(
+                  "select completed from analysis_run_stage_results where run_id=? and stage='SCORES'",
+                  Boolean.class,
+                  run))
+          .isTrue();
+      runner.scan(); // ALERTS is not connected; do not claim whole-job completion.
+      assertThat(service.job(job).status()).isEqualTo("FAILED");
+      assertThat(service.job(job).error()).isEqualTo("PIPELINE_NOT_CONFIGURED");
+      service.resume(job);
+      assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.ALERTS);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from inference_results where run_id=?", Integer.class, run))
+          .isEqualTo(1);
+    }
+  }
+
+  @Test
   void explicit_resume_resets_only_failed_local_publication() {
     executor("worker/analysis_entry.py").prepare(claim());
     jdbc.update(

@@ -18,9 +18,10 @@ def main(argv=None):
     publishing = args.stage == "INFERENCE" and args.operation == "PUBLISH" and args.model_kind is not None
     preparing = args.stage == "FEATURES" and args.operation is None and args.model_kind is None
     ticking = args.stage == "INFERENCE" and args.operation is None and args.model_kind is None
-    if ticking and not all(os.environ.get(k) for k in ('INFERENCE_API_URL', 'INFERENCE_API_TOKEN', 'S3_BUCKET')):
+    scoring = args.stage == "SCORES" and args.operation is None and args.model_kind is None
+    if (ticking or scoring) and not all(os.environ.get(k) for k in ('INFERENCE_API_URL', 'INFERENCE_API_TOKEN', 'S3_BUCKET')):
         return 78
-    if (not (preparing or publishing or ticking) or os.environ.get("WORKER_MODE") != "demo"
+    if (not (preparing or publishing or ticking or scoring) or os.environ.get("WORKER_MODE") != "demo"
             or args.run_id is None or not os.environ.get("WORKER_DB_URL")
             or not os.environ.get("WORKER_STORAGE_DIR")):
         return 78  # Unconnected stages must never synthesize success.
@@ -39,10 +40,13 @@ def main(argv=None):
                              password=os.environ.get("WORKER_DB_PASSWORD"),
                              autocommit=True, connect_timeout=10) as connection:
             execution = InputExecution(args.job_id, args.run_id, args.execution_id)
-            if publishing or ticking:
+            if publishing or ticking or scoring:
                 from model_publication import configured, publish_model
                 settings, s3 = configured()
-                if ticking:
+                if scoring:
+                    from result_collection import save_scores
+                    save_scores(connection, execution, os.environ["WORKER_STORAGE_DIR"], settings, s3)
+                elif ticking:
                     from inference_dispatch import advance
                     return advance(connection, execution, os.environ["WORKER_STORAGE_DIR"], settings, s3)
                 else:

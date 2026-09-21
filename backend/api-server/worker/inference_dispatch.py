@@ -153,9 +153,18 @@ def advance(connection, execution, storage_root, settings, s3, *, transport=None
             if isinstance(error, StaleExecution):
                 raise
             _failure(connection, execution, kind, error)
+    from result_collection import collect_model, finish_inference
+    collections = connection.execute('''SELECT model_kind FROM analysis_model_tasks
+        WHERE run_id=%s AND phase='COLLECT' AND status IN ('READY','RETRY_WAIT','ACTIVE')
+          AND (retry_at IS NULL OR retry_at<=now()) ORDER BY model_kind''', (execution.run_id,)).fetchall()
+    for (kind,) in collections:
+        collect_model(connection, execution, kind, storage_root, settings, s3)
     states = connection.execute('SELECT phase,status FROM analysis_model_tasks WHERE run_id=%s',
                                 (execution.run_id,)).fetchall()
     if any(status in ('WAITING', 'RETRY_WAIT', 'ACTIVE') or (phase == 'PUBLISH' and status == 'READY')
            for phase, status in states):
         return 76  # Durable deferred work, not a failed execution.
-    return 77 if any(status == 'FAILED' for phase, status in states) else 80  # COLLECT not connected yet.
+    if any(status == 'FAILED' for phase, status in states):
+        return 77
+    finish_inference(connection, execution)
+    return 0

@@ -75,7 +75,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 - 취소 contract_version은 숫자2다. `INFERENCE_API_URL`(HTTPS 기본 주소)과 `INFERENCE_API_TOKEN`(추론 워커 INFERENCE_TOKEN과 같은 전용 토큰)을 함께 설정하면 Java 전달 담당이 `PUT /api/v1/inference-requests/{requestId}/rounds/{round}/cancellation`으로 기존 불변 취소 메시지를 보내고 같은 회차의 `GET`으로 상태를 조회한다. Bearer 인증을 사용하며 리다이렉트를 따르지 않는다. 접수 응답은 중단 완료가 아니다. job/run/model/request/round/cancel 전체 식별자와 contract_version을 대조한 뒤 `cancellation_status=STOPPED`와 `status=STOPPED`, 또는 `cancellation_status=ALREADY_FINISHED`와 `status=COMPLETED` 조합만 종료 확인으로 인정한다. RECOVERY_REQUIRED·미응답·404는 종료 확인이 아니다.
 - 두 API 설정이 모두 없으면 기존 S3/local 취소 파일 전달을 유지한다. S3는 `requests/{job}/{model}/{request}/rounds/{round}/cancel.json` 조건부 불변 게시와 `results/.../cancel_ack.json` 조회를 사용한다. local은 storage-dir/analysis-transport에 원자 게시한다. API 설정 일부 누락은 기동 시 거절하며 API 전달 실패 시 파일 방식으로 우회하지 않는다. 기존 2스레드 TaskScheduler에서 Python 단계와 별도로 5초 스캔하고, outbox의 재시도 정책을 그대로 사용한다. 실제 EC2–KubeSphere HTTPS 통신은 별도 배포 검증 대상이다.
 - 전달 실패는30초/2분 간격으로 총3회까지 게시를 시도하고 미확인은 계속 대기한다. 3회 후에도 늦은 ack는 조회하며 작업 상세 cancellations의 actionRequired로 게시 재개 필요를 알린다. 취소된 작업의 기존 resume API는 outbox 시도만 재개하고 취소 run을 계산 재개하지 않는다(응답 status는 FAILED 유지). 실제 S3 권한/외부 프로세스 중단은 이 로컬·SDK 대역 검증과 구별한다.
-- 더미 freeze는 TARGET만 요구한다. 실제 피처 CONTEXT 범위는 후속 계약이며 임의 기간을 도입하지 않는다. 현재 Python 단계는 미연결 실패를 유지한다.
+- 더미 freeze는 TARGET만 요구한다. 실제 피처 CONTEXT 범위는 후속 계약이며 임의 기간을 도입하지 않는다. 현재 더미 Python은 FEATURES→INFERENCE→SCORES를 연결하며 ALERTS는 아직 미연결이다.
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
 - **GET /api/v1/bank/uploads/{uploadId}** — 자기 은행만 조회. 다른 은행/없는 작업404. 응답은 `{uploadId,bankId,fileName,businessDate,sizeBytes,rowCount,insertedCount,missingCount,duplicateCount,status,errorCode,errorMessage,errors:[{row,column,reason}],urlIssuedAt,receivedAt,startedAt,finishedAt,integrationStatus,reportVersionId,correctionRequired,correctionRequestId,replacementUploadId,nextAnalysisDate}`다. `insertedCount`는 해당 보고에서 정상 통합 거래에 연결된 보고 행 수이며 통합 전에는0이다. 같은 내용 반복은 중복 오류가 아니므로 `duplicateCount=0`이다. `errors`는 자기 파일의 정제된 오류 최대100건이며 원문 식별정보를 포함하지 않는다. `finishedAt`은 보고 저장/검수 종료 시각이다.
@@ -86,10 +86,10 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 - **GET /api/v1/batch-jobs/{jobId}** — 위 행과 `uploads: [{ uploadId, excluded, status, fileName }]`, `failures: [{ stage, errorCode, failedAt, consecutiveCount, retryAt, actionRequired }]`.
   - `models: [{ modelKind, phase, status, requestId, executionRound, remoteStatus, remoteRevision, errorCode, actionRequired, retryAt, nextPollAt, remoteDeadlineAt, modelVersion, featureVersion }]`는 현재 run의 모델별 작업 상태다. 이전 run·토큰·서명 URL·로컬 경로·원격 응답 원문은 반환하지 않는다. 모델별 조치 필요 여부는 상위 작업의 FAILED 여부와 독립적이다.
   - INFERENCE 원격 대기는 상위 `RETRY_WAIT`로 재관측을 예약하며 실패 횟수를 올리지 않는다. 모델 하나가 실패해도 다른 모델의 상태 관측을 계속한다. 원격 대기 기한 초과/종료 불명은 조치 필요로 표시하고 새 요청 회차를 자동 생성하지 않는다.
-  - 현재 연결은 직접 PUT 게시와 GET 상태 관측→`COLLECT/READY`까지다. 원격 COMPLETED는 결과 파일 검증/점수 저장 완료가 아니다. 수집 단계가 아직 연결되지 않아 준비된 결과만 남으면 `RESULT_COLLECTION_NOT_CONNECTED`로 중단하며 상위 분석 성공을 만들지 않는다. 콜백 수신은 아직 미연결이다.
+  - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→두 모델 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 두 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS 저장과 콜백 수신은 아직 미연결이며 전체 분석 성공을 만들지 않는다.
 - **POST /api/v1/batch-jobs/analysis** — 본문 없이 서버 Clock 현재 시각을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
 - **POST /api/v1/batch-jobs/{jobId}/resume** — FAILED 작업만 실패 단계부터 새 실패 주기로 재개한다.202 `{ jobId, status: "QUEUED" }`. 이력·정상 산출물·최초 startedAt은 유지한다. 완료 작업 재분석은 허용하지 않는다.
-  - 현재 run의 로컬 `PUBLISH/FAILED` 모델은 같은 요청·회차로 재개한다. 준비/관측 완료된 다른 모델은 초기화하지 않는다. 원격 모델의 최종 실패를 새 회차로 재실행하는 기능은 아직 미연결이며 이 API가 모델 재시작 성공을 보장하지 않는다.
+  - 현재 run의 로컬 `PUBLISH/FAILED` 또는 `COLLECT/FAILED` 모델은 같은 요청·회차로 재개한다. 수집 재시도는 모델을 재실행하지 않으며 결과 전송의 일시 오류는30초/120초 간격·총3회 후 명시 재개를 기다린다. 준비/관측 완료된 다른 모델은 초기화하지 않는다. 원격 모델의 최종 실패를 새 회차로 재실행하는 기능은 아직 미연결이며 이 API가 모델 재시작 성공을 보장하지 않는다.
 - 두 POST는 활성 dev/local이 있고 prod가 없을 때만 허용한다. 기본/기타/prod 혼합은403 `ANALYSIS_CONTROL_DISABLED`. 로그인 권한 검증은 후속 작업이다.
 - 운영 등록은 `app.ingest.cutoff`(기본03:00), `app.zone`(기본 Asia/Seoul)의 매일 cron이다. 수신전이와 등록은 공유 advisory transaction lock을 사용하고 잠금 이후 수신 시각을 기록한다. cutoff 이하 수신한 미편입 업로드를 고정한다. 검수 진행중도 대상에 남고 늦은 파일은 다음 날 편입한다. 기동 시 놓친 날짜를 보충 등록하지 않는다. URL 발급만 된 파일은 제외한다.
 - 도착 현황의 창·최신 순서는 수신 후 received_at, 수신 전 created_at을 사용한다.
@@ -173,12 +173,12 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - MVP 운반: 실제 AWS S3(9/7 기한 경과·미도착). 추론 운반은 수집 S3 구현과 별개이며 해당 환경을 [모델 래핑 ②](9/11) 착수 시 확인 후 같은 경로로 관통, 클라이언트만 교체.
 
 ### 2.2 거래별 점수 테이블·파생 규칙
-- 저장: 테이블 `inference_results`(V1) — `(job_id, tx_id) PK, p_laundering, p_0..p_8, score_pct`. 고정된 upload 목록 중 **`scored_job_id IS NULL OR scored_job_id = :jobId`**인 원장 행만 사용한다. 점수 정상 완료 후 Alert 단계가 실패하면 점수는 보존하고 Alert 단계만 재개한다. 후속 Python 연결은 점수·`scored_job_id`·단계 완료를 토큰 확인과 함께 한 트랜잭션으로 저장하고, 응답 유실 때 DB 완료 기록을 확인한다. 작업 전체 결과를 무조건 삭제·재생성하지 않는다.
+- 저장: 테이블 `inference_results`(V1) — `(job_id, tx_id) PK, p_laundering, p_0..p_8, score_pct`. 고정된 upload 목록 중 **`scored_job_id IS NULL OR scored_job_id = :jobId`**인 원장 행만 사용한다. 점수 정상 완료 후 Alert 단계가 실패하면 점수는 보존하고 Alert 단계만 재개한다. 현재 Python은 V4 고정 TARGET과 현재 run을 기준으로 점수·`scored_job_id`·모델/피처 버전·카운터·단계 완료를 토큰 확인과 함께 한 트랜잭션으로 저장하고, 응답 유실 때 DB 완료 기록을 확인한다. CONTEXT는 점수 적재에서 제외한다. 취소된 선행 run의 점수 연결은 명시된 대체 run에 한해서 갱신하며 기존 점수 행은 보존한다. 작업 전체 결과를 무조건 삭제·재생성하지 않는다.
 - 파생(BE, 조회 시 계산): `launderingScore = p_laundering`, `typeClass = argmax(p_0..p_8)`(p_0이 최대면 0 그대로), `typeScore = 그 확률`. 동점 시 낮은 코드.
 - 의심 거래 = `p_laundering >= threshold_value(그 job의 스냅샷)`. 저장 플래그가 아니라 파생. 임계는 프로퍼티 `app.suspicious-tx.threshold`(env `SUSPICIOUS_TX_THRESHOLD`), job 실행 시 batch_jobs에 스냅샷. `threshold_version`은 10월 thresholds 테이블에서.
 - `ruleHits[]`는 룰 기반(향후 확장) 전까지 항상 빈 배열 — 추론 산출물이 아니라 BE 룰 엔진 산출. 점수 테이블에 룰 컬럼을 두지 않는다.
 - **점수 파생 확장 (2026-09-04 채택, 모델 형태와 무관 — 확률 벡터만 사용)**:
-  - `scorePercentile`: 같은 job 안에서 `p_laundering`의 백분위(0~100, 높을수록 상위). job 전체 분포가 필요하므로 **점수 적재 스텝(BE 소유 Python 진입 스크립트)에서 계산해 점수 테이블 `score_pct`에 저장**(2026-09-08 BE 확정 — 적재 스텝이 BE 소유라 Data 동의 불요, 추론 에이전트 산출물과 무관). 화면은 절대값과 백분위를 병기한다(원값은 캘리브레이션되지 않음: run_114 recall 0.5 운영점 임계 0.9938).
+  - `scorePercentile`: 같은 job 안에서 `p_laundering`의 백분위(0~100, 높을수록 상위). job 전체 분포가 필요하므로 **점수 적재 스텝(BE 소유 Python 진입 스크립트)에서 계산해 점수 테이블 `score_pct`에 저장**(2026-09-08 BE 확정 — 적재 스텝이 BE 소유라 Data 동의 불요, 추론 에이전트 산출물과 무관). 현재 계산은 `100 × percent_rank(p_laundering)`이며 동점은 같은 최저 순위를 공유한다. 단일 거래/전부 동점은0, 예를 들어 `[0.5,0.5,0.9]`는 `[0,0,100]`이다. 점수 저장 워커가 임시 적재 데이터에 대해 계산하며 모델 출력 확률을 변경하지 않는다. 화면은 절대값과 백분위를 병기한다(원값은 캘리브레이션되지 않음: run_114 recall 0.5 운영점 임계 0.9938).
   - `thresholdRatio = p_laundering / threshold_value`, `isSuspicious = p_laundering >= threshold_value` (조회 시 계산).
   - `typeCandidates[]`: `p_0..p_8` 상위 2개 `{ code, name, score }`. 1위−2위 차이가 `app.type.ambiguity-delta`(기본 0.10) 미만이면 두 개, 아니면 1개. `typeClass`는 그대로 1위.
   - `agreement`: 두 모델 합의 4분면 — `STRONG`(isSuspicious ∧ typeClass≠0) / `ATYPICAL`(isSuspicious ∧ typeClass=0 — 패턴 외 세탁 의심) / `PATTERN_ONLY`(¬isSuspicious ∧ typeClass≠0) / `WEAK`(둘 다 아님). 조회 시 계산.

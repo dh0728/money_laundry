@@ -51,7 +51,7 @@ def configured():
     return settings, client
 
 
-def _lock(connection, execution):
+def _lock(connection, execution, stage='INFERENCE'):
     connection.execute('SELECT pg_advisory_xact_lock(17004000)')
     connection.execute('SELECT job_id FROM batch_jobs WHERE job_id=%s FOR UPDATE', (execution.job_id,))
     connection.execute('SELECT run_id FROM analysis_runs WHERE run_id=%s FOR UPDATE', (execution.run_id,))
@@ -59,9 +59,9 @@ def _lock(connection, execution):
         SELECT b.execution_id,b.status,b.current_stage,b.current_run_id,r.status
         FROM batch_jobs b LEFT JOIN analysis_runs r ON r.run_id=b.current_run_id WHERE b.job_id=%s
         ''', (execution.job_id,)).fetchone()
-    if row != (execution.execution_id, 'RUNNING', 'INFERENCE', execution.run_id, 'READY') and row != (
-            execution.execution_id, 'RUNNING', 'INFERENCE', execution.run_id, 'ACTIVE'):
-        raise StaleExecution('Publication owner is no longer current')
+    if row != (execution.execution_id, 'RUNNING', stage, execution.run_id, 'READY') and row != (
+            execution.execution_id, 'RUNNING', stage, execution.run_id, 'ACTIVE'):
+        raise StaleExecution('Worker owner is no longer current')
     blocked = connection.execute('''
         WITH RECURSIVE predecessors(run_id) AS (
           SELECT replaces_run_id FROM analysis_run_replacements WHERE run_id=%s
