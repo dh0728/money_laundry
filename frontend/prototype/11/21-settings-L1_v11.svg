@@ -1,0 +1,201 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="Wireframe v11 / Settings / L1" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect id="Background &#xB7; dark" x="0.0" y="0.0" width="1920.0" height="1080.0" rx="0" fill="#09090B" stroke="none"/>
+  <g id="Sidebar &#xB7; collapsible=icon &#xB7; state=collapsed">
+    <rect x="0.0" y="0.0" width="48.0" height="1080.0" rx="0" fill="#18181B" stroke="none"/>
+    <line x1="48.0" y1="0.0" x2="48.0" y2="1080.0" stroke="#27272A" stroke-width="1"/>
+    <g id="SidebarTrigger">
+      <g id="Icon &#xB7; lucide/panel-left">
+        <rect x="18.0" y="18.0" width="12.0" height="12.0" rx="2.0" fill="none" stroke="#FAFAFA" stroke-width="1.5"/>
+        <line x1="22.0" y1="18.0" x2="22.0" y2="30.0" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"/>
+      </g>
+    </g>
+    <g id="Icon &#xB7; lucide/layout-dashboard">
+      <rect x="18.0" y="66.0" width="5.0" height="5.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <rect x="25.0" y="66.0" width="5.0" height="3.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <rect x="18.0" y="73.0" width="5.0" height="5.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <rect x="25.0" y="71.0" width="5.0" height="7.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+    </g>
+    <g id="Icon &#xB7; lucide/siren">
+      <polyline points="20.0,111.0 20.0,108.0 21.0,104.0 24.0,102.0 27.0,104.0 28.0,108.0 28.0,111.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="18.0" y1="113.0" x2="30.0" y2="113.0" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="18.0" y1="106.0" x2="16.5" y2="105.0" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="30.0" y1="106.0" x2="31.5" y2="105.0" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+    <g id="Icon &#xB7; lucide/folder-search">
+      <polyline points="18.0,141.0 18.0,139.0 23.0,139.0 25.0,141.0 30.0,141.0 30.0,149.0 18.0,149.0 18.0,141.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="24.0" cy="145.0" r="2.3" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <line x1="25.7" y1="146.7" x2="27.5" y2="148.5" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+    <g id="Icon &#xB7; lucide/bell">
+      <polyline points="19.0,983.0 21.0,981.0 21.0,978.0 22.0,975.5 24.0,974.5 26.0,975.5 27.0,978.0 27.0,981.0 29.0,983.0 19.0,983.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="22.5,985.0 24.0,986.0 25.5,985.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <rect x="8.0" y="1000.0" width="32.0" height="32.0" rx="6" fill="#27272A" stroke="none"/>
+    <g id="Icon &#xB7; lucide/settings">
+      <path id="GearTeeth" d="M22.7,1010.4 L23.2,1009.0 H24.8 L25.3,1010.4 L26.6,1010.9 L27.9,1010.3 L29.0,1011.4 L28.4,1012.7 L28.9,1014.0 L30.3,1014.5 V1017.5 L28.9,1018.0 L28.4,1019.3 L29.0,1020.6 L27.9,1021.7 L26.6,1021.1 L25.3,1021.6 L24.8,1023.0 H23.2 L22.7,1021.6 L21.4,1021.1 L20.1,1021.7 L19.0,1020.6 L19.6,1019.3 L19.1,1018.0 L17.7,1017.5 V1014.5 L19.1,1014.0 L19.6,1012.7 L19.0,1011.4 L20.1,1010.3 L21.4,1010.9 Z" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="24.0" cy="1016.0" r="2.2" fill="none" stroke="#FAFAFA" stroke-width="1.5"/>
+    </g>
+    <g id="Icon &#xB7; lucide/user">
+      <circle cx="24.0" cy="1049.0" r="3.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <polyline points="18.5,1058.0 19.5,1055.0 22.0,1053.5 26.0,1053.5 28.5,1055.0 29.5,1058.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <g id="Header &#xB7; SidebarInset">
+    <line x1="48.0" y1="48.0" x2="1920.0" y2="48.0" stroke="#27272A" stroke-width="1"/>
+    <rect x="60.0" y="8.0" width="32.0" height="32.0" rx="8" fill="#FAFAFA" stroke="none"/>
+    <g id="Icon &#xB7; lucide/radar">
+      <circle cx="76.0" cy="24.0" r="6.0" fill="none" stroke="#09090B" stroke-width="1.5"/>
+      <circle cx="76.0" cy="24.0" r="3.0" fill="none" stroke="#09090B" stroke-width="1.5"/>
+      <circle cx="76.0" cy="24.0" r="0.8" fill="none" stroke="#09090B" stroke-width="1.5"/>
+      <line x1="76.0" y1="24.0" x2="81.0" y2="19.0" stroke="#09090B" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="80.0" cy="20.0" r="1.0" fill="none" stroke="#09090B" stroke-width="1.5"/>
+    </g>
+    <text x="100" y="29" font-family="Noto Sans KR" font-size="14" font-weight="600" fill="#FAFAFA" text-anchor="start">AML RADAR</text>
+    <g id="CommandDialogTrigger &#xB7; GlobalSearch">
+      <rect x="700.0" y="8.0" width="520.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+      <g id="Icon &#xB7; lucide/search">
+        <circle cx="717.0" cy="23.0" r="5.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+        <line x1="720.8" y1="26.8" x2="724.5" y2="30.5" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+      </g>
+      <text x="734" y="29" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#A1A1AA" text-anchor="start">&#xC804;&#xC5ED; &#xAC80;&#xC0C9;</text>
+    </g>
+    <rect x="1178.0" y="14.0" width="30.0" height="20.0" rx="5" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+    <text x="1193" y="28" font-family="Noto Sans KR" font-size="11" font-weight="600" fill="#A1A1AA" text-anchor="middle">/</text>
+    <rect x="1812.0" y="8.0" width="84.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+    <g id="Icon &#xB7; lucide/maximize">
+      <polyline points="1822.0,22.0 1822.0,18.0 1826.0,18.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="1830.0,18.0 1834.0,18.0 1834.0,22.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="1834.0,26.0 1834.0,30.0 1830.0,30.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="1826.0,30.0 1822.0,30.0 1822.0,26.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <rect x="1846.0" y="14.0" width="38.0" height="20.0" rx="5" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+    <text x="1865" y="28" font-family="Noto Sans KR" font-size="11" font-weight="500" fill="#A1A1AA" text-anchor="middle">F11</text>
+    <text x="1796" y="29" font-family="Noto Sans KR" font-size="14" font-weight="500" fill="#FAFAFA" text-anchor="end">&#xC624;&#xAC80;&#xD1A0;</text>
+    <g id="Avatar">
+      <circle cx="1734.1" cy="24.0" r="14.0" fill="#27272A"/>
+      <text x="1734" y="28" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FAFAFA" text-anchor="middle">&#xC624;</text>
+    </g>
+    <g id="Badge &#xB7; variant=outline &#xB7; L1">
+      <rect x="1678.8" y="14.0" width="27.3" height="20.0" rx="10" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1"/>
+      <text x="1687" y="28" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#18181B" text-anchor="start">L1</text>
+    </g>
+    <text x="1671" y="29" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#A1A1AA" text-anchor="end">&#xC5ED;&#xD560;</text>
+    <g id="Badge &#xB7; variant=default &#xB7; 53">
+      <rect x="1591.9" y="14.0" width="30.9" height="20.0" rx="10" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+      <text x="1600" y="28" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FFFFFF" text-anchor="start">53</text>
+    </g>
+    <text x="1584" y="29" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#A1A1AA" text-anchor="end">&#xB0B4; &#xD560; &#xC77C;</text>
+  </g>
+  <text x="72" y="94" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#A1A1AA" text-anchor="start">SETTINGS</text>
+  <text x="72" y="138" font-family="Noto Sans KR" font-size="27" font-weight="700" fill="#FAFAFA" text-anchor="start">&#xC124;&#xC815;</text>
+  <text x="72" y="165" font-family="Noto Sans KR" font-size="13" font-weight="400" fill="#A1A1AA" text-anchor="start">&#xAC1C;&#xC778; &#xD654;&#xBA74; &#xC124;&#xC815;</text>
+  <g id="Button &#xB7; disabled when unchanged &#xB7; header action">
+    <rect x="1791.7" y="116.0" width="104.3" height="32.0" rx="8" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+    <text x="1802" y="137" font-family="Noto Sans KR" font-size="14" font-weight="500" fill="#FAFAFA" text-anchor="start">&#xBCC0;&#xACBD;&#xC0AC;&#xD56D; &#xC800;&#xC7A5;</text>
+  </g>
+  <g id="SettingsGrid &#xB7; 2x2">
+    <rect x="72.0" y="196.0" width="904.0" height="300.0" rx="10" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+    <text x="90" y="227" font-family="Noto Sans KR" font-size="17" font-weight="650" fill="#FAFAFA" text-anchor="start">&#xC77C;&#xBC18;</text>
+    <text x="90" y="266" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#A1A1AA" text-anchor="start">&#xC2DC;&#xAC04;&#xB300;</text>
+    <g id="Select">
+      <rect x="90.0" y="278.0" width="868.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+      <text x="100" y="299" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">Asia/Seoul (KST, UTC+9)</text>
+      <g id="Icon &#xB7; lucide/chevron-down">
+        <polyline points="936.0,292.0 940.0,296.0 944.0,292.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+    <text x="90" y="334" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#A1A1AA" text-anchor="start">&#xB0A0;&#xC9DC; &#xD615;&#xC2DD;</text>
+    <g id="Select">
+      <rect x="90.0" y="346.0" width="868.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+      <text x="100" y="367" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">YYYY-MM-DD</text>
+      <g id="Icon &#xB7; lucide/chevron-down">
+        <polyline points="936.0,360.0 940.0,364.0 944.0,360.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+    <rect x="992.0" y="196.0" width="904.0" height="300.0" rx="10" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+    <text x="1010" y="227" font-family="Noto Sans KR" font-size="17" font-weight="650" fill="#FAFAFA" text-anchor="start">&#xBAA9;&#xB85D;</text>
+    <text x="1010" y="266" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#A1A1AA" text-anchor="start">&#xD398;&#xC774;&#xC9C0;&#xB2F9; &#xD589;</text>
+    <g id="Select">
+      <rect x="1010.0" y="278.0" width="868.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+      <text x="1020" y="299" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">20</text>
+      <g id="Icon &#xB7; lucide/chevron-down">
+        <polyline points="1856.0,292.0 1860.0,296.0 1864.0,292.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+    <text x="1010" y="334" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#A1A1AA" text-anchor="start">Alert &#xAE30;&#xBCF8; &#xC815;&#xB82C;</text>
+    <g id="Select">
+      <rect x="1010.0" y="346.0" width="868.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+      <text x="1020" y="367" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">&#xC704;&#xD5D8;&#xB3C4; &#xB192;&#xC740; &#xC21C;</text>
+      <g id="Icon &#xB7; lucide/chevron-down">
+        <polyline points="1856.0,360.0 1860.0,364.0 1864.0,360.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+    <rect x="72.0" y="512.0" width="904.0" height="300.0" rx="10" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+    <text x="90" y="543" font-family="Noto Sans KR" font-size="17" font-weight="650" fill="#FAFAFA" text-anchor="start">&#xC54C;&#xB9BC;</text>
+    <text x="90" y="565" font-family="Noto Sans KR" font-size="12" font-weight="400" fill="#A1A1AA" text-anchor="start">&#xC778;&#xC571; &#xC54C;&#xB9BC; &#xC218;&#xC2E0; &#xD56D;&#xBAA9;</text>
+    <g id="SwitchControl &#xB7; thumb-visible &#xB7; kit10">
+      <g id="Switch &#xB7; checked=true">
+        <text x="90" y="593" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">&#xB0B4; Alert &#xBC30;&#xC815;</text>
+        <g id="SwitchTrack">
+          <rect x="926.0" y="580.0" width="32.0" height="18.0" rx="9" fill="#FAFAFA" stroke="#27272A" stroke-width="1"/>
+        </g>
+        <g id="SwitchThumb">
+          <circle cx="949.0" cy="589.0" r="7" fill="#09090B" stroke="#FAFAFA" stroke-width="1"/>
+        </g>
+      </g>
+    </g>
+    <g id="SwitchControl &#xB7; thumb-visible &#xB7; kit10">
+      <g id="Switch &#xB7; checked=true">
+        <text x="90" y="641" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">Alert&#xC758; Episode &#xC5F0;&#xACB0;</text>
+        <g id="SwitchTrack">
+          <rect x="926.0" y="628.0" width="32.0" height="18.0" rx="9" fill="#FAFAFA" stroke="#27272A" stroke-width="1"/>
+        </g>
+        <g id="SwitchThumb">
+          <circle cx="949.0" cy="637.0" r="7" fill="#09090B" stroke="#FAFAFA" stroke-width="1"/>
+        </g>
+      </g>
+    </g>
+    <g id="SwitchControl &#xB7; thumb-visible &#xB7; kit10">
+      <g id="Switch &#xB7; checked=true">
+        <text x="90" y="689" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">&#xC0C8; &#xC758;&#xACAC;</text>
+        <g id="SwitchTrack">
+          <rect x="926.0" y="676.0" width="32.0" height="18.0" rx="9" fill="#FAFAFA" stroke="#27272A" stroke-width="1"/>
+        </g>
+        <g id="SwitchThumb">
+          <circle cx="949.0" cy="685.0" r="7" fill="#09090B" stroke="#FAFAFA" stroke-width="1"/>
+        </g>
+      </g>
+    </g>
+    <g id="SwitchControl &#xB7; thumb-visible &#xB7; kit10">
+      <g id="Switch &#xB7; checked=false">
+        <text x="90" y="737" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#FAFAFA" text-anchor="start">Batch &#xACB0;&#xACFC;</text>
+        <g id="SwitchTrack">
+          <rect x="926.0" y="724.0" width="32.0" height="18.0" rx="9" fill="#3F3F46" stroke="#27272A" stroke-width="1"/>
+        </g>
+        <g id="SwitchThumb">
+          <circle cx="935.0" cy="733.0" r="7" fill="#FAFAFA" stroke="#52525B" stroke-width="1"/>
+        </g>
+      </g>
+    </g>
+    <rect x="992.0" y="512.0" width="904.0" height="300.0" rx="10" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+    <text x="1010" y="543" font-family="Noto Sans KR" font-size="17" font-weight="650" fill="#FAFAFA" text-anchor="start">&#xD14C;&#xB9C8;</text>
+    <text x="1010" y="565" font-family="Noto Sans KR" font-size="12" font-weight="400" fill="#A1A1AA" text-anchor="start">&#xC6B4;&#xC601; &#xCCB4;&#xC81C;&#xC640; &#xD658;&#xACBD;&#xC5D0; &#xB9DE;&#xAC8C; &#xC120;&#xD0DD;</text>
+    <rect x="1010.0" y="580.0" width="868.0" height="44.0" rx="8" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+    <g id="Radio Group Item &#xB7; checked=false">
+      <circle cx="1034.0" cy="602" r="7.5" fill="#09090B" stroke="#3F3F46"/>
+    </g>
+    <text x="1054" y="607" font-family="Noto Sans KR" font-size="14" font-weight="500" fill="#FAFAFA" text-anchor="start">&#xC2DC;&#xC2A4;&#xD15C; &#xC124;&#xC815; &#xB530;&#xB974;&#xAE30;</text>
+    <rect x="1010.0" y="636.0" width="868.0" height="44.0" rx="8" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+    <g id="Radio Group Item &#xB7; checked=false">
+      <circle cx="1034.0" cy="658" r="7.5" fill="#09090B" stroke="#3F3F46"/>
+    </g>
+    <text x="1054" y="663" font-family="Noto Sans KR" font-size="14" font-weight="500" fill="#FAFAFA" text-anchor="start">&#xB77C;&#xC774;&#xD2B8; &#xBAA8;&#xB4DC;</text>
+    <rect x="1010.0" y="692.0" width="868.0" height="44.0" rx="8" fill="#27272A" stroke="#3F3F46" stroke-width="2"/>
+    <g id="Radio Group Item &#xB7; checked=true">
+      <circle cx="1034.0" cy="714" r="7.5" fill="#09090B" stroke="#FAFAFA"/>
+      <circle cx="1034.0" cy="714" r="4" fill="#FAFAFA"/>
+    </g>
+    <text x="1054" y="719" font-family="Noto Sans KR" font-size="14" font-weight="650" fill="#FAFAFA" text-anchor="start">&#xB2E4;&#xD06C; &#xBAA8;&#xB4DC;</text>
+  </g>
+</svg>

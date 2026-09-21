@@ -1,0 +1,106 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+    --sidebar: hsl(0 0% 98%);
+    --sidebar-foreground: hsl(240 5.3% 26.1%);
+    --sidebar-primary: hsl(240 5.9% 10%);
+    --sidebar-primary-foreground: hsl(0 0% 98%);
+    --sidebar-accent: hsl(240 4.8% 95.9%);
+    --sidebar-accent-foreground: hsl(240 5.9% 10%);
+    --sidebar-border: hsl(220 13% 91%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+    --sidebar: hsl(240 5.9% 10%);
+    --sidebar-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-primary: hsl(224.3 76.3% 48%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(240 3.7% 15.9%);
+    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-border: hsl(240 3.7% 15.9%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+@theme inline {
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* shadcn neutral tokens; domain colors are defined separately in domain.ts. */
+:root {
+  --radius: .625rem;
+  --background: oklch(1 0 0); --foreground: oklch(.145 0 0);
+  --card: oklch(1 0 0); --card-foreground: oklch(.145 0 0);
+  --popover: oklch(1 0 0); --popover-foreground: oklch(.145 0 0);
+  --primary: oklch(.205 0 0); --primary-foreground: oklch(.985 0 0);
+  --secondary: oklch(.97 0 0); --secondary-foreground: oklch(.205 0 0);
+  --muted: oklch(.97 0 0); --muted-foreground: oklch(.556 0 0);
+  --accent: oklch(.97 0 0); --accent-foreground: oklch(.205 0 0);
+  --destructive: oklch(.577 .245 27.325); --border: oklch(.922 0 0);
+  --input: oklch(.922 0 0); --ring: oklch(.708 0 0);
+  --chart-1: oklch(.55 0 0); --chart-2: oklch(.72 0 0);
+}
+.dark {
+  --background: oklch(.145 0 0); --foreground: oklch(.985 0 0);
+  --card: oklch(.175 0 0); --card-foreground: oklch(.985 0 0);
+  --popover: oklch(.205 0 0); --popover-foreground: oklch(.985 0 0);
+  --primary: oklch(.922 0 0); --primary-foreground: oklch(.205 0 0);
+  --secondary: oklch(.269 0 0); --secondary-foreground: oklch(.985 0 0);
+  --muted: oklch(.235 0 0); --muted-foreground: oklch(.708 0 0);
+  --accent: oklch(.269 0 0); --accent-foreground: oklch(.985 0 0);
+  --destructive: oklch(.704 .191 22.216); --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%); --ring: oklch(.556 0 0);
+  --sidebar: oklch(.17 0 0); --sidebar-foreground: oklch(.92 0 0);
+  --sidebar-primary: oklch(.92 0 0); --sidebar-primary-foreground: oklch(.205 0 0);
+  --sidebar-accent: oklch(.269 0 0); --sidebar-accent-foreground: oklch(.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%); --sidebar-ring: oklch(.556 0 0);
+  --chart-1: oklch(.88 0 0); --chart-2: oklch(.50 0 0);
+}
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive); --color-border: var(--border);
+  --color-input: var(--input); --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2);
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; margin: 0; font-size: 14px; -webkit-font-smoothing: antialiased; }
+  button, [role=button] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  ::selection { background: #82828260; }
+}
+.underline-tabs { display:flex; justify-content:flex-start; width:100%; border-radius:0; padding:0; gap:25px; height:42px; background:transparent; border-bottom:1px solid var(--border); }
+.underline-tabs [data-slot=tabs-trigger] { flex:none; position:relative; height:42px; border:0; border-radius:0; padding:0 1px; background:transparent!important; box-shadow:none!important; color:var(--muted-foreground); font-weight:400; font-size:13px; }
+.underline-tabs [data-slot=tabs-trigger][data-state=active] { font-weight:650; color:var(--foreground); }
+.underline-tabs [data-slot=tabs-trigger][data-state=active]::after { content:''; opacity:1; position:absolute; height:3px; background:var(--foreground); bottom:-1px; inset-inline:0; }
+[data-slot=sidebar-menu-button][data-active=true] { background:var(--primary); color:var(--primary-foreground); font-weight:600; }
+[data-slot=table-head] { font-size:11px; font-weight:500; color:var(--muted-foreground); background:var(--muted); height:40px; }
+[data-slot=table-cell] { padding-block:15px; }
+.graph-canvas { background-image:radial-gradient(var(--border) .7px,transparent .7px); background-size:17px 17px; }
+.graph-label { fill:var(--foreground); paint-order:stroke; stroke:var(--card); stroke-width:5px; stroke-linejoin:round; pointer-events:none; }
+.graph-node:focus { outline:none; }
+.graph-node:focus-visible circle { stroke:var(--foreground); stroke-width:3px; }
+.graph-dialog { display:block; }
+.agent-sidebar-space { margin-right:380px; }
+@media (max-width:1100px) { .agent-sidebar-space { margin-right:0; } main { padding-inline:20px!important; } }
+@media (max-width:767px) { .login-layout { grid-template-columns:1fr; } .login-layout>div:first-child { display:none; } .grid-cols-3 { grid-template-columns:1fr; } .grid-cols-2 { grid-template-columns:1fr; } main { padding-inline:16px!important; } .graph-layout { overflow:auto; } .graph-layout>[data-slot=resizable-panel-group] { min-width:820px; } .underline-tabs { gap:18px; } }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
