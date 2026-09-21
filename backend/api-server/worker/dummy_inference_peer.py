@@ -17,6 +17,8 @@ class DummyPeer:
         self.executions = 0
 
     def run(self, request, processing=None):
+        if request.run_id is not None:
+            raise ProtocolError("Legacy dummy peer does not implement v2 cancellation")
         # Conditional initial status prevents repeated claims. Crash recovery is not
         # implemented; this demo does not claim distributed exactly-once inference.
         existing = self.store.get(request.output + "result.json")

@@ -3,6 +3,7 @@ import unittest
 import dataclasses
 import io
 import threading
+from uuid import uuid4
 from pathlib import Path
 
 import pyarrow as pa
@@ -319,6 +320,77 @@ class S3AdapterTests(unittest.TestCase):
         self.assertFalse(store.put("x", b"value", absent=True))
         self.assertEqual("*", client.kwargs["IfNoneMatch"])
         self.assertEqual("dev/x", client.kwargs["Key"])
+
+
+class RunContractTests(unittest.TestCase):
+    def setUp(self):
+        from demo_calculator import FEATURE_VERSION, MODEL_VERSION
+        self.temporary = tempfile.TemporaryDirectory(prefix="aml-v2-contract-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.store = LocalStore(self.root / "objects", "dev/")
+        self.request = Request(7, "type", model_version=MODEL_VERSION,
+                               feature_version=FEATURE_VERSION, run_id=str(uuid4()))
+
+    def result(self, request=None, change=None):
+        from demo_calculator import build_targets, calculate
+        request = request or self.request
+        scores = calculate(build_targets([1, 2]), request.model_kind,
+                           model_version=request.model_version, feature_version=request.feature_version)
+        if change:
+            scores = change(scores)
+        stream = io.BytesIO()
+        pq.write_table(scores, stream)
+        data = stream.getvalue()
+        key = request.output + "scores.parquet"
+        self.store.put(key, data)
+        return dict(request.identity(), **request.versions(), status="COMPLETED", row_count=2,
+                    started_at="2026-09-21T00:00:00+00:00", finished_at="2026-09-21T00:00:01+00:00",
+                    files=[descriptor("scores", self.store.object_key(key), data)])
+
+    def test_v2_identity_and_paths_match_spring_cancellation(self):
+        identity = self.request.identity()
+        self.assertEqual(identity["contract_version"], 2)
+        self.assertEqual(identity["model_kind"], "TYPE")
+        self.assertEqual(identity["run_id"], self.request.run_id)
+        self.assertEqual(self.request.output,
+                         f"results/7/TYPE/{self.request.request_id}/rounds/1/")
+        self.assertEqual(Request(7, "type").identity()["contract_version"], 1)
+
+    def test_missing_or_other_run_and_round_are_rejected(self):
+        for changes in (dict(run_id=str(uuid4())), dict(run_id=None),
+                        dict(execution_round=2), dict(contract_version=1), dict(model_kind="type")):
+            with self.subTest(changes=changes), self.assertRaises(ProtocolError):
+                self.request.check(dict(self.request.identity(), **self.request.versions(), **changes))
+
+    def test_same_request_cannot_publish_for_another_run(self):
+        from demo_calculator import build_targets
+        pq.write_table(build_targets([1, 2]), self.root / "targets.parquet")
+        files = [{"name": "targets", "relative_path": "targets.parquet"}]
+        document = publish(self.store, self.request, self.root, files, 2)
+        self.assertEqual(document["run_id"], self.request.run_id)
+        with self.assertRaises(ProtocolError):
+            publish(self.store, dataclasses.replace(self.request, run_id=str(uuid4())), self.root, files, 2)
+
+    def test_demo_result_is_validated_with_type_sum(self):
+        from worker_transport import validate_result
+        validate_result(self.store, self.request, self.result(), {1, 2})
+        bad = self.result(change=lambda scores: scores.set_column(1, "p_0", pa.array([0.9, 0.9])))
+        with self.assertRaises(ProtocolError):
+            validate_result(self.store, self.request, bad, {1, 2})
+
+    def test_v1_cannot_claim_demo_v2_result_support(self):
+        from worker_transport import validate_result
+        request = dataclasses.replace(self.request, run_id=None)
+        with self.assertRaises(ProtocolError):
+            validate_result(self.store, request, self.result(request), {1, 2})
+
+    def test_invalid_run_and_legacy_peer_are_rejected(self):
+        for run in ("invalid", True, ""):
+            with self.subTest(run=run), self.assertRaises(ProtocolError):
+                dataclasses.replace(self.request, run_id=run)
+        with self.assertRaises(ProtocolError):
+            DummyPeer(self.store).run(self.request)
 
 
 if __name__ == "__main__":
