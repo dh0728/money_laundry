@@ -14,7 +14,9 @@ from urllib.parse import unquote, urlsplit
 import httpx
 import pyarrow.parquet as pq
 
-from demo_calculator import calculate, validate_scores
+from demo_calculator import validate_scores
+from model_adapter import run_model
+from model_contract import ModelExecutionError, model_failure
 from worker_transport import Request, ProtocolError, decode, encode, descriptor, tx_ids
 
 
@@ -89,8 +91,11 @@ def execute(directory):
             ids = tx_ids(targets)
             if type(manifest.get("target_row_count")) is not int or len(ids) != manifest["target_row_count"]:
                 raise ProtocolError("TARGET count mismatch")
-            scores = calculate(targets, request.model_kind, **request.versions())
-            validate_scores(scores, ids, request.model_kind, **request.versions())
+            scores = run_model(targets, request.model_kind, **request.versions())
+            try:
+                validate_scores(scores, ids, request.model_kind, **request.versions())
+            except Exception:
+                raise ModelExecutionError("MODEL_OUTPUT_INVALID", "POSTPROCESS") from None
             temporary = directory / "scores.partial"
             pq.write_table(scores, temporary)
             temporary.replace(scores_path)
@@ -114,12 +119,16 @@ def main(directory):
     try:
         result = execute(directory)
         outcome = dict(status="COMPLETED", result=result)
+    except ModelExecutionError as error:
+        outcome = model_failure(error)
     except httpx.HTTPStatusError as error:
         code = error.response.status_code
-        outcome = dict(status="FAILED", error_code="TRANSFER_UNAVAILABLE",
-                       retryable=code in (401, 403, 408, 429) or code >= 500)
+        outcome = dict(status="FAILED", error_code=(
+            "TRANSFER_ACCESS_DENIED" if code in (401, 403) else
+            "TRANSFER_UNAVAILABLE" if code in (408, 429) or code >= 500 else
+            "INPUT_OR_MODEL_INVALID"))
     except httpx.HTTPError:
-        outcome = dict(status="FAILED", error_code="TRANSFER_UNAVAILABLE", retryable=True)
+        outcome = dict(status="FAILED", error_code="TRANSFER_UNAVAILABLE")
     except Exception:
         # Never persist model exceptions or signed URLs in publicly returned state.
         outcome = dict(status="FAILED", error_code="INPUT_OR_MODEL_INVALID", retryable=False)

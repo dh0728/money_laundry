@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -20,6 +21,8 @@ import uvicorn
 from demo_calculator import build_targets, FEATURE_VERSION, MODEL_VERSION
 from inference_server import create_app
 from inference_service import InferenceService, Settings
+from inference_compute import atomic_json
+from model_contract import ModelExecutionError, model_failure
 from worker_transport import Request, descriptor, encode
 
 
@@ -54,7 +57,7 @@ class InferenceServerTests(unittest.TestCase):
                 data = self.rfile.read(int(self.headers["Content-Length"]))
                 if not owner.reject_upload:
                     owner.objects[urlsplit(self.path).path] = data
-                self.send_response(403 if owner.reject_upload else 200)
+                self.send_response(503 if owner.reject_upload else 200)
                 self.end_headers()
 
             def do_POST(self):
@@ -278,6 +281,138 @@ class InferenceServerTests(unittest.TestCase):
             thread.join(10)
             sock.close()
         self.assertFalse(thread.is_alive())
+
+    def failing_processes(self, kind, failure, limit):
+        """Process boundary double; successful attempts still execute the real child."""
+        import subprocess
+        original = subprocess.Popen
+        calls = []
+
+        class Exited:
+            returncode = 0
+            def poll(self):
+                return 0
+
+        def spawn(command, **kwargs):
+            directory = Path(command[-1])
+            body = json.loads((directory / "request.json").read_text())
+            calls.append(body["model_kind"])
+            if body["model_kind"] == kind and calls.count(kind) <= limit:
+                atomic_json(directory / "outcome.json", failure)
+                return Exited()
+            return original(command, **kwargs)
+
+        return patch("inference_service.subprocess.Popen", side_effect=spawn), calls
+
+    def retry_now(self, payload):
+        service = self.app.state.service
+        with service.mutex, service.db:
+            service.db.execute("UPDATE requests SET retry_at=0 WHERE request_id=?", (payload["request_id"],))
+
+    def test_model_retry_keeps_other_model_result_and_only_final_event(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("TYPE", failure, 2)
+        with process_patch:
+            binary, pattern = self.payload("binary"), self.payload("type")
+            self.client.put(self.path(binary), json=binary, headers=self.headers)
+            self.wait_for(lambda: self.state(binary)["status"] == "COMPLETED")
+            completed = self.state(binary)["result"]
+            self.client.put(self.path(pattern), json=pattern, headers=self.headers)
+            for attempt, delay in ((1, 60), (2, 300)):
+                self.wait_for(lambda: self.state(pattern)["status"] == "RETRY_WAIT"
+                              and self.state(pattern)["model_failures"] == attempt)
+                state = self.state(pattern)
+                self.assertAlmostEqual(state["retry_at"] - time.time(), delay, delta=3)
+                self.assertEqual(state["transfer_failures"], 0)
+                self.assertFalse(any(event["request_id"] == pattern["request_id"] for event in self.events))
+                self.retry_now(pattern)
+            self.wait_for(lambda: self.state(pattern)["status"] == "COMPLETED")
+            self.wait_for(lambda: self.state(pattern)["notification_delivered"])
+            self.assertEqual(calls.count("TYPE"), 3)
+            self.assertEqual(calls.count("BINARY"), 1)
+            self.assertEqual(self.state(binary)["result"], completed)
+
+    def test_three_model_failures_stop_and_survive_restart(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("TYPE", failure, 10)
+        with process_patch:
+            payload = self.payload("type")
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            for count in (1, 2):
+                self.wait_for(lambda: self.state(payload)["status"] == "RETRY_WAIT"
+                              and self.state(payload)["model_failures"] == count)
+                self.retry_now(payload)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.wait_for(lambda: self.state(payload)["notification_delivered"])
+            self.assertEqual(self.state(payload)["model_failures"], 3)
+            self.assertEqual(self.state(payload)["failure"]["action"], "CHECK_INFERENCE_ENVIRONMENT")
+            service = self.app.state.service
+            with service.mutex:
+                self.assertEqual(service.db.execute("SELECT count(*) FROM attempt_failures").fetchone()[0], 3)
+            self.client.__exit__(None, None, None)
+            self.app = create_app(self.settings)
+            self.client = TestClient(self.app)
+            self.client.__enter__()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.assertEqual(self.state(payload)["status"], "FAILED")
+            self.assertEqual(calls.count("TYPE"), 3)
+
+    def test_oom_is_environment_failure_not_input_resend(self):
+        failure = model_failure(ModelExecutionError("GPU_OUT_OF_MEMORY", "INFERENCE"))
+        failure["retryable"] = True
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.assertEqual(self.state(payload)["failure"]["action"], "CHECK_INFERENCE_ENVIRONMENT")
+            self.assertEqual(calls, ["BINARY"])
+
+    def test_cancel_during_model_retry_prevents_next_attempt(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "RETRY_WAIT")
+            self.client.put(self.path(payload) + "/cancellation", json=self.cancel(payload), headers=self.headers)
+            self.assertEqual(self.state(payload)["status"], "STOPPED")
+            self.retry_now(payload)
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.assertEqual(self.state(payload)["status"], "STOPPED")
+            self.assertEqual(calls, ["BINARY"])
+
+    def test_invalid_model_error_is_terminal_and_does_not_kill_engine(self):
+        failure = {"status": "FAILED", "error_code": "UNKNOWN", "model_error": {"secret": "private"}}
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.assertEqual(self.state(payload)["error_code"], "MODEL_PROTOCOL_INVALID")
+            self.assertNotIn("private", json.dumps(self.state(payload)))
+            self.assertTrue(self.app.state.service.engine.is_alive())
+
+    def test_retry_wait_restart_preserves_budget_and_schedule(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "RETRY_WAIT")
+            retry_at = self.state(payload)["retry_at"]
+            self.client.__exit__(None, None, None)
+            self.app = create_app(self.settings)
+            self.client = TestClient(self.app)
+            self.client.__enter__()
+            self.assertEqual(self.state(payload)["model_failures"], 1)
+            self.assertEqual(self.state(payload)["retry_at"], retry_at)
+            self.retry_now(payload)
+            self.wait_for(lambda: self.state(payload)["model_failures"] == 2)
+            self.assertEqual(self.state(payload)["status"], "RETRY_WAIT")
+            self.retry_now(payload)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.assertEqual(calls.count("BINARY"), 3)
 
 
 if __name__ == "__main__":

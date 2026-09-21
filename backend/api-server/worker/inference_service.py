@@ -13,6 +13,7 @@ from uuid import uuid4
 import httpx
 
 from inference_compute import atomic_json
+from model_contract import ModelExecutionError, retry_decision
 from worker_transport import encode
 
 
@@ -84,6 +85,19 @@ class InferenceService:
                 retry_at REAL NOT NULL DEFAULT 0, event TEXT, notified INTEGER NOT NULL DEFAULT 0,
                 notify_attempts INTEGER NOT NULL DEFAULT 0, notify_at REAL NOT NULL DEFAULT 0,
                 PRIMARY KEY(request_id,round))""")
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(requests)")}
+            for name, definition in (("model_failures", "INTEGER NOT NULL DEFAULT 0"),
+                                     ("transfer_failures", "INTEGER NOT NULL DEFAULT 0"),
+                                     ("last_failure", "TEXT")):
+                if name not in columns:
+                    self.db.execute(f"ALTER TABLE requests ADD COLUMN {name} {definition}")
+            if "transfer_failures" not in columns:
+                self.db.execute("""UPDATE requests SET transfer_failures=min(attempts,3)
+                    WHERE error='TRANSFER_UNAVAILABLE'""")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS attempt_failures (
+                request_id TEXT NOT NULL, round INTEGER NOT NULL, attempt INTEGER NOT NULL,
+                failure TEXT NOT NULL, recorded_at REAL NOT NULL,
+                PRIMARY KEY(request_id,round,attempt))""")
             # Do not assume an orphaned model process has stopped after a server crash.
             for row in self.db.execute("SELECT * FROM requests WHERE status IN ('RUNNING','CANCEL_REQUESTED')").fetchall():
                 self._finish((row["request_id"], row["round"]), "FAILED", error="RECOVERY_REQUIRED")
@@ -106,7 +120,15 @@ class InferenceService:
 
     def _view(self, row):
         view = dict(json.loads(row["identity"]), status=row["status"], revision=row["revision"],
-                    error_code=row["error"], notification_delivered=bool(row["notified"]))
+                    error_code=row["error"], notification_delivered=bool(row["notified"]),
+                    attempts=row["attempts"], model_failures=row["model_failures"],
+                    transfer_failures=row["transfer_failures"])
+        if row["status"] == "RETRY_WAIT":
+            view["retry_at"] = row["retry_at"]
+        if row["last_failure"] and row["status"] in ("RETRY_WAIT", "FAILED"):
+            failure = json.loads(row["last_failure"])
+            if failure["error_code"] == row["error"]:
+                view["failure"] = failure
         if row["result"]:
             view["result"] = json.loads(row["result"])
         if row["cancel"]:
@@ -187,6 +209,10 @@ class InferenceService:
         row = self._row(key)
         event = dict(json.loads(row["identity"]), event_id=str(uuid4()),
                      status=status, revision=row["revision"] + 1, error_code=error)
+        if status == "FAILED" and row["last_failure"]:
+            failure = json.loads(row["last_failure"])
+            if failure["error_code"] == error:
+                event["failure"] = failure
         if result:
             event["result"] = result
         if row["cancel"]:
@@ -194,6 +220,53 @@ class InferenceService:
         self.db.execute("""UPDATE requests SET status=?,revision=revision+1,result=?,error=?,event=?,
             notified=0,notify_attempts=0,notify_at=0 WHERE request_id=? AND round=?""",
                         (status, json.dumps(result) if result else None, error, json.dumps(event), *key))
+
+    def _record_outcome(self, key, outcome):
+        """Caller owns mutex/transaction and has confirmed the child exited."""
+        row = self._row(key)
+        if row["status"] != "RUNNING":
+            return  # Cancellation or a newer state wins over a late child outcome.
+        if isinstance(outcome, dict) and outcome.get("status") == "COMPLETED":
+            from inference_compute import request_from
+            try:
+                result = outcome["result"]
+                request_from(json.loads(row["payload"])).check(result)
+                if result.get("status") != "COMPLETED":
+                    raise ValueError()
+            except Exception:
+                outcome = {"status": "FAILED", "error_code": "MODEL_PROTOCOL_INVALID"}
+            else:
+                self._finish(key, "COMPLETED", result=result)
+                return
+        try:
+            if not isinstance(outcome, dict) or outcome.get("status") != "FAILED":
+                raise ValueError()
+            if "model_error" in outcome:
+                outcome = dict(outcome, model_error=ModelExecutionError.from_document(outcome["model_error"]).document())
+            elif outcome.get("error_code") not in (
+                    "TRANSFER_UNAVAILABLE", "TRANSFER_ACCESS_DENIED", "INPUT_OR_MODEL_INVALID",
+                    "MODEL_PROCESS_FAILED", "MODEL_PROTOCOL_INVALID", "MODEL_PROCESS_UNAVAILABLE"):
+                raise ValueError()
+            domain, delay, action = retry_decision(outcome, row["model_failures"] + 1,
+                                                  row["transfer_failures"] + 1)
+        except (ValueError, TypeError, KeyError):
+            outcome = {"status": "FAILED", "error_code": "MODEL_PROTOCOL_INVALID"}
+            domain, delay, action = "WORKER", None, "CHECK_MODEL_ADAPTER"
+        failure = {"domain": domain, "error_code": outcome["error_code"],
+                   "action": action, "attempt": row["attempts"]}
+        if "model_error" in outcome:
+            failure["model_error"] = outcome["model_error"]
+        self.db.execute("""UPDATE requests SET model_failures=model_failures+?,
+            transfer_failures=transfer_failures+?,last_failure=? WHERE request_id=? AND round=?""",
+                        (int(domain == "MODEL"), int(domain == "TRANSFER"), json.dumps(failure), *key))
+        self.db.execute("INSERT INTO attempt_failures VALUES(?,?,?,?,?)",
+                        (*key, row["attempts"], json.dumps(failure), time.time()))
+        if delay is not None:
+            self.db.execute("""UPDATE requests SET status='RETRY_WAIT',revision=revision+1,
+                error=?,retry_at=? WHERE request_id=? AND round=?""",
+                            (outcome["error_code"], time.time() + delay, *key))
+        else:
+            self._finish(key, "FAILED", error=outcome["error_code"])
 
     def _run(self):
         while not self.stop.wait(0.1):
@@ -209,18 +282,17 @@ class InferenceService:
                     elif self.process.poll() is not None:
                         directory = self.root / self.active[0] / str(self.active[1])
                         try:
-                            outcome = json.loads((directory / "outcome.json").read_text(encoding="utf-8"))
+                            if self.process.returncode != 0:
+                                raise ValueError()
+                            with (directory / "outcome.json").open("rb") as stream:
+                                data = stream.read(65537)
+                            if len(data) > 65536:
+                                raise ValueError()
+                            outcome = json.loads(data)
                         except (OSError, ValueError):
-                            outcome = dict(status="FAILED", error_code="MODEL_PROCESS_FAILED", retryable=False)
+                            outcome = dict(status="FAILED", error_code="MODEL_PROCESS_FAILED")
                         with self.db:
-                            if outcome["status"] == "COMPLETED":
-                                self._finish(self.active, "COMPLETED", result=outcome["result"])
-                            elif outcome.get("retryable") and row["attempts"] < 3:
-                                self.db.execute("""UPDATE requests SET status='RETRY_WAIT',revision=revision+1,
-                                    error=?,retry_at=? WHERE request_id=? AND round=?""",
-                                    (outcome["error_code"], time.time() + (30 if row["attempts"] == 1 else 120), *self.active))
-                            else:
-                                self._finish(self.active, "FAILED", error=outcome["error_code"])
+                            self._record_outcome(self.active, outcome)
                         self.process = self.active = None
                 if self.process is None:
                     row = self.db.execute("""SELECT * FROM requests WHERE status='ACCEPTED'
@@ -242,7 +314,10 @@ class InferenceService:
                             self.active = key
                         except OSError:
                             with self.db:
-                                self._finish(key, "FAILED", error="MODEL_PROCESS_UNAVAILABLE")
+                                if self._row(key)["status"] == "RUNNING":
+                                    self._record_outcome(key, dict(status="FAILED", error_code="MODEL_PROCESS_UNAVAILABLE"))
+                                else:
+                                    self._finish(key, "FAILED", error="MODEL_PROCESS_UNAVAILABLE")
 
     def _notify(self):
         while not self.stop.wait(0.2):
