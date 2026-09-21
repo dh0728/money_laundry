@@ -92,7 +92,7 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
             raise ProtocolError('Publication destination changed within a run')
         if phase == 'WAIT_REMOTE' and status == 'WAITING':
             return  # Receipt is durable; status observation is a separate operation.
-        if (phase != 'PUBLISH' or artifact is None or status not in ('READY', 'FAILED', 'ACTIVE')
+        if (phase != 'PUBLISH' or artifact is None or status not in ('READY', 'FAILED', 'ACTIVE', 'RETRY_WAIT')
                 or (status == 'ACTIVE' and owner == execution.execution_id)):
             raise StaleExecution('Publication is already owned or fenced')
         request_id, round_id = request_id or uuid4(), round_id or 1

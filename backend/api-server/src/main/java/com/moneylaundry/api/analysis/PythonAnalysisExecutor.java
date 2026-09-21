@@ -23,6 +23,28 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   private final JdbcConnectionDetails database;
   private final String mode;
   private final String storage;
+  private java.util.Map<String, String> remoteEnvironment = java.util.Map.of();
+
+  @Autowired
+  void configureRemote(
+      @Value("${app.inference.url:}") String url,
+      @Value("${app.inference.token:}") String token,
+      @Value("${app.s3.bucket:}") String bucket,
+      @Value("${app.s3.prefix:}") String prefix,
+      @Value("${app.s3.region:ap-northeast-2}") String region) {
+    remoteEnvironment =
+        java.util.Map.of(
+            "INFERENCE_API_URL",
+            url,
+            "INFERENCE_API_TOKEN",
+            token,
+            "S3_BUCKET",
+            bucket,
+            "S3_PREFIX",
+            prefix,
+            "AWS_REGION",
+            region);
+  }
 
   @Autowired
   public PythonAnalysisExecutor(
@@ -112,6 +134,7 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       }
       var builder = new ProcessBuilder(command);
       builder.environment().put("WORKER_MODE", mode);
+      builder.environment().putAll(remoteEnvironment);
       if (database != null) {
         builder.environment().put("WORKER_DB_URL", workerDatabaseUrl(database.getJdbcUrl()));
         builder.environment().put("WORKER_DB_USER", database.getUsername());
@@ -131,6 +154,19 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
         throw new AnalysisFailure("WORKER_TIMEOUT", AnalysisFailure.Kind.COMPUTATION);
       String saved = checkpoint(context);
       if (saved != null) return new Result(saved);
+      if (process.exitValue() == 76
+          && context.stage() == AnalysisStage.INFERENCE
+          && jdbc != null
+          && context.runId() != null
+          && jdbc.queryForObject(
+              "select count(*)=2 and count(*) filter(where status in ('WAITING','RETRY_WAIT','ACTIVE'))>0 from analysis_model_tasks where run_id=?",
+              Boolean.class,
+              context.runId())) throw new AnalysisDeferred();
+      if (process.exitValue() == 77)
+        throw new AnalysisFailure("MODEL_TASK_FAILED", AnalysisFailure.Kind.PERMANENT);
+      if (process.exitValue() == 80)
+        throw new AnalysisFailure(
+            "RESULT_COLLECTION_NOT_CONNECTED", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 78)
         throw new AnalysisFailure("PIPELINE_NOT_CONFIGURED", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 75)

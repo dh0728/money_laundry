@@ -404,6 +404,118 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(s3.objects, {})
             self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis_model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 0)
 
+    def inference_remote(self):
+        import httpx
+        from worker_transport import Request
+        bodies, states = {}, {}
+        def remote(req):
+            key = req.url.path.split('/')[-3]
+            if req.method == 'PUT':
+                bodies[key] = json.loads(req.content)
+            body = bodies[key]
+            status, revision = states.get(body['model_kind'], ('RUNNING', 1))
+            response = {**body, 'status': status, 'revision': revision}
+            if status == 'COMPLETED':
+                logical = Request(body['job_id'], body['model_kind'].lower(), body['request_id'],
+                                  body['execution_round'], body['model_version'], body['feature_version'], body['run_id'])
+                response['result'] = dict(logical.identity(), **logical.versions(), status='COMPLETED',
+                    row_count=3, files=[dict(name='scores',key='dev/test/'+logical.output+'scores.parquet',
+                                            size_bytes=10,sha256='a'*64)])
+            elif status == 'FAILED':
+                response['error_code'] = 'GPU_OUT_OF_MEMORY'
+            return httpx.Response(202 if req.method == 'PUT' else 200, json=response)
+        return httpx.MockTransport(remote), states
+
+    def make_observations_due(self):
+        self.admin.execute("UPDATE analysis_model_tasks SET next_poll_at=now()-interval '1 second',retry_at=now()-interval '1 second' WHERE run_id=%s", (self.run,))
+
+    def test_dispatch_publishes_both_then_observes_without_completing_inference(self):
+        from inference_dispatch import advance
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            remote, states = self.inference_remote()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual(self.admin.execute('SELECT sum(consecutive_failures) FROM analysis_model_tasks WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
+            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 80)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis_model_tasks WHERE run_id=%s AND phase='COLLECT' AND status='READY'", (self.run,)).fetchone()[0], 2)
+            self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis_run_stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
+
+    def test_failed_model_does_not_stop_other_model_observation(self):
+        from inference_dispatch import advance
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            remote, states = self.inference_remote()
+            advance(self.admin, self.execution, root, settings, s3, transport=remote)
+            states['BINARY'] = ('FAILED', 2)
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual(self.admin.execute("SELECT error_code FROM analysis_model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone()[0], 'GPU_OUT_OF_MEMORY')
+            states['TYPE'] = ('COMPLETED', 2)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 77)
+            self.assertEqual(self.admin.execute("SELECT phase FROM analysis_model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], 'COLLECT')
+
+    def test_observation_revision_fences_conflicts_and_deadline_does_not_restart_model(self):
+        from inference_dispatch import advance, observe_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            remote, states = self.inference_remote()
+            advance(self.admin, self.execution, root, settings, s3, transport=remote)
+            states['BINARY'] = ('RUNNING', 4)
+            observe_model(self.admin, self.execution, 'BINARY', settings, transport=remote)
+            states['BINARY'] = ('COMPLETED', 3)
+            observe_model(self.admin, self.execution, 'BINARY', settings, transport=remote)
+            self.assertEqual(self.admin.execute("SELECT phase FROM analysis_model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone()[0], 'WAIT_REMOTE')
+            states['BINARY'] = ('COMPLETED', 4)
+            with self.assertRaisesRegex(ProtocolError, 'Conflicting'):
+                observe_model(self.admin, self.execution, 'BINARY', settings, transport=remote)
+            states['BINARY'] = ('RUNNING', 4)
+            self.admin.execute("UPDATE analysis_model_tasks SET remote_deadline_at=now()-interval '1 second' WHERE run_id=%s", (self.run,))
+            observe_model(self.admin, self.execution, 'BINARY', settings, transport=remote)
+            self.assertEqual(self.admin.execute("SELECT status,error_code,action_required FROM analysis_model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(), ('WAITING', 'REMOTE_WAIT_EXPIRED', True))
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis_model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 2)
+
+    def test_ambiguous_publication_budget_switches_to_observation_without_new_round(self):
+        import httpx
+        from inference_dispatch import advance
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            puts = []
+            def unreachable(request):
+                if request.method == 'PUT':
+                    puts.append(json.loads(request.content))
+                raise httpx.ReadTimeout('test transport unavailable')
+            transport = httpx.MockTransport(unreachable)
+            for attempt in range(3):
+                self.make_observations_due()
+                self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
+            self.assertEqual(len(puts), 6)
+            self.assertEqual(len({b['request_id'] for b in puts}), 2)
+            self.assertEqual({b['execution_round'] for b in puts}, {1})
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis_model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING' AND action_required", (self.run,)).fetchone()[0], 2)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
+            self.assertEqual(len(puts), 6)
+
+    def test_result_metadata_mismatch_cannot_schedule_collection(self):
+        import httpx
+        from inference_dispatch import advance, observe_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            transport, states = self.inference_remote()
+            advance(self.admin, self.execution, root, settings, s3, transport=transport)
+            states['BINARY'] = ('COMPLETED', 2)
+            def incorrect(request):
+                original = transport.handle_request(request)
+                body = json.loads(original.content)
+                body['result']['files'][0]['key'] = 'another-environment/scores.parquet'
+                return httpx.Response(200, json=body)
+            with self.assertRaisesRegex(ProtocolError, 'result object'):
+                observe_model(self.admin, self.execution, 'BINARY', settings, transport=httpx.MockTransport(incorrect))
+            self.assertEqual(self.admin.execute("SELECT phase FROM analysis_model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone()[0], 'WAIT_REMOTE')
+
 
 if __name__ == "__main__":
     unittest.main()

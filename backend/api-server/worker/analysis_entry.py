@@ -17,7 +17,10 @@ def main(argv=None):
         parser.error("job-id must be positive")
     publishing = args.stage == "INFERENCE" and args.operation == "PUBLISH" and args.model_kind is not None
     preparing = args.stage == "FEATURES" and args.operation is None and args.model_kind is None
-    if (not (preparing or publishing) or os.environ.get("WORKER_MODE") != "demo"
+    ticking = args.stage == "INFERENCE" and args.operation is None and args.model_kind is None
+    if ticking and not all(os.environ.get(k) for k in ('INFERENCE_API_URL', 'INFERENCE_API_TOKEN', 'S3_BUCKET')):
+        return 78
+    if (not (preparing or publishing or ticking) or os.environ.get("WORKER_MODE") != "demo"
             or args.run_id is None or not os.environ.get("WORKER_DB_URL")
             or not os.environ.get("WORKER_STORAGE_DIR")):
         return 78  # Unconnected stages must never synthesize success.
@@ -36,11 +39,15 @@ def main(argv=None):
                              password=os.environ.get("WORKER_DB_PASSWORD"),
                              autocommit=True, connect_timeout=10) as connection:
             execution = InputExecution(args.job_id, args.run_id, args.execution_id)
-            if publishing:
+            if publishing or ticking:
                 from model_publication import configured, publish_model
                 settings, s3 = configured()
-                publish_model(connection, execution, args.model_kind,
-                              os.environ["WORKER_STORAGE_DIR"], settings, s3)
+                if ticking:
+                    from inference_dispatch import advance
+                    return advance(connection, execution, os.environ["WORKER_STORAGE_DIR"], settings, s3)
+                else:
+                    publish_model(connection, execution, args.model_kind,
+                                  os.environ["WORKER_STORAGE_DIR"], settings, s3)
             else:
                 prepare_features(connection, execution, os.environ["WORKER_STORAGE_DIR"])
         return 0

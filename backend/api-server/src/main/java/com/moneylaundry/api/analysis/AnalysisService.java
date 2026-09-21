@@ -157,6 +157,14 @@ public class AnalysisService {
             return;
           }
           jdbc.update(
+              """
+              update analysis_model_tasks set status='READY',consecutive_failures=0,error_code=null,
+                action_required=false,retry_at=null,updated_at=now()
+              where run_id=(select current_run_id from batch_jobs where job_id=?)
+                and phase='PUBLISH' and status='FAILED'
+              """,
+              id);
+          jdbc.update(
               "update batch_jobs set status='QUEUED',consecutive_failures=0,error_code=null,error_message=null,retry_at=null,execution_id=null,execution_owner=null,finished_at=null where job_id=?",
               id);
         });
@@ -193,7 +201,21 @@ public class AnalysisService {
         jdbc.queryForList(
             "select stage,error_code as \"errorCode\",failed_at as \"failedAt\",consecutive_count as \"consecutiveCount\",retry_at as \"retryAt\",action_required as \"actionRequired\" from analysis_failures where job_id=? order by failed_at,failure_id",
             id));
-    for (String key : List.of("uploads", "failures"))
+    result.put(
+        "models",
+        jdbc.queryForList(
+            """
+        select m.model_kind as "modelKind",m.phase,m.status,m.request_id as "requestId",
+          m.execution_round as "executionRound",m.remote_snapshot->>'status' as "remoteStatus",
+          m.remote_revision as "remoteRevision",m.error_code as "errorCode",
+          m.action_required as "actionRequired",m.retry_at as "retryAt",m.next_poll_at as "nextPollAt",
+          m.remote_deadline_at as "remoteDeadlineAt",m.binding->>'model_version' as "modelVersion",
+          m.binding->>'feature_version' as "featureVersion"
+        from analysis_model_tasks m join batch_jobs b on b.current_run_id=m.run_id
+        where b.job_id=? order by m.model_kind
+        """,
+            id));
+    for (String key : List.of("uploads", "failures", "models"))
       for (Object row : (List<?>) result.get(key))
         ((Map<String, Object>) row).replaceAll((name, value) -> jsonValue(value));
     result.put(

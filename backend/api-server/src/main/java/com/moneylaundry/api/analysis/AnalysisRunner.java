@@ -32,6 +32,7 @@ public class AnalysisRunner implements AutoCloseable {
     AnalysisStageExecutor.Context context;
     AnalysisStageExecutor.Result result;
     Instant nextFlushAt;
+    boolean deferred;
     final List<Failure> failures = new ArrayList<>();
 
     Pending(AnalysisService.Job job) {
@@ -221,6 +222,8 @@ public class AnalysisRunner implements AutoCloseable {
                   ? new AnalysisStageExecutor.Result("internal")
                   : executor.prepare(item.context)
               : new AnalysisStageExecutor.Result(saved.getFirst());
+    } catch (AnalysisDeferred waiting) {
+      item.deferred = true;
     } catch (AnalysisFailure failure) {
       addFailure(item, failure.code(), failure.kind());
     } catch (DataAccessException failure) {
@@ -333,6 +336,16 @@ public class AnalysisRunner implements AutoCloseable {
             if (runs != null) AnalysisRunService.integrationLock(service.jdbc);
             service.lock(item.job.id());
             if (!service.owns(item.job)) return;
+            if (item.deferred) {
+              service.jdbc.update(
+                  """
+                  update batch_jobs set status='RETRY_WAIT',retry_at=?,execution_id=null,
+                    execution_owner=null where job_id=?
+                  """,
+                  Timestamp.from(service.clock.instant().plusSeconds(5)),
+                  item.job.id());
+              return;
+            }
             for (Failure failure : item.failures)
               service.jdbc.update(
                   """

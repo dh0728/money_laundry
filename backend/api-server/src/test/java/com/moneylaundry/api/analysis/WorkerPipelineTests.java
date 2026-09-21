@@ -332,4 +332,105 @@ class WorkerPipelineTests {
         .isInstanceOfSatisfying(
             AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("WORKER_INPUT_INVALID"));
   }
+
+  @Test
+  void runner_automatically_publishes_and_polls_without_recording_wait_as_failure()
+      throws Exception {
+    Path script = storage.resolve("remote_double.py");
+    Files.writeString(
+        script,
+        """
+        import sys, os, json
+        sys.path.insert(0, %s)
+        import httpx, psycopg
+        import model_publication, inference_dispatch
+        from test_frozen_input_postgres import MemoryS3
+        settings = model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
+        os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)
+        model_publication.configured = lambda: (settings, MemoryS3())
+        def remote(request):
+            if request.method == 'PUT':
+                body = json.loads(request.content)
+            else:
+                request_id = request.url.path.split('/')[-3]
+                with psycopg.connect(os.environ['WORKER_DB_URL'],user=os.environ['WORKER_DB_USER'],password=os.environ['WORKER_DB_PASSWORD']) as db:
+                    run,kind,job = db.execute('select m.run_id,m.model_kind,r.job_id from analysis_model_requests m join analysis_runs r using(run_id) where request_id=%%s',(request_id,)).fetchone()
+                body = dict(contract_version=2,job_id=job,run_id=str(run),model_kind=kind,request_id=request_id,execution_round=1)
+            return httpx.Response(202 if request.method=='PUT' else 200,json={**body,'status':'RUNNING','revision':1})
+        advance = inference_dispatch.advance
+        inference_dispatch.advance = lambda *args: advance(*args, transport=httpx.MockTransport(remote))
+        from analysis_entry import main
+        raise SystemExit(main())
+        """
+            .formatted(
+                "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
+    try (var runner = new AnalysisRunner(service, executor(script.toString()), runs, integration)) {
+      runner.scan();
+      runner.scan();
+      assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.INFERENCE);
+      assertThat(service.job(job).status()).isEqualTo("RETRY_WAIT");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis_model_tasks where run_id=? and phase='WAIT_REMOTE' and status='WAITING'",
+                  Integer.class,
+                  run))
+          .isEqualTo(2);
+      jdbc.update("update batch_jobs set retry_at=now()-interval '1 second' where job_id=?", job);
+      runner.scan();
+      assertThat(service.job(job).status()).isEqualTo("RETRY_WAIT");
+      assertThat(service.job(job).failures()).isZero();
+      var models = (List<?>) service.detail(job).get("models");
+      assertThat(models).hasSize(2);
+      assertThat(models.toString())
+          .contains("remoteStatus=RUNNING")
+          .doesNotContain("https://", "input_artifact", "signature");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis_failures where job_id=?", Integer.class, job))
+          .isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis_model_tasks where run_id=? and remote_snapshot->>'status'='RUNNING'",
+                  Integer.class,
+                  run))
+          .isEqualTo(2);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis_run_stage_results where run_id=? and stage='INFERENCE'",
+                  Integer.class,
+                  run))
+          .isZero();
+      runs.cancel(run, "REPORT_CORRECTED");
+      runner.scan();
+      assertThat(service.job(job).error()).isEqualTo("RUN_CANCELLED");
+    }
+  }
+
+  @Test
+  void explicit_resume_resets_only_failed_local_publication() {
+    executor("worker/analysis_entry.py").prepare(claim());
+    jdbc.update(
+        "update analysis_model_tasks set status='FAILED',action_required=true,consecutive_failures=3 where run_id=? and model_kind='BINARY'",
+        run);
+    jdbc.update(
+        "update analysis_model_tasks set phase='COLLECT' where run_id=? and model_kind='TYPE'",
+        run);
+    jdbc.update(
+        "update batch_jobs set status='FAILED',current_stage='INFERENCE',error_code='MODEL_TASK_FAILED' where job_id=?",
+        job);
+    service.resume(job);
+    assertThat(
+            jdbc.queryForObject(
+                "select status from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                String.class,
+                run))
+        .isEqualTo("READY");
+    assertThat(
+            jdbc.queryForObject(
+                "select phase from analysis_model_tasks where run_id=? and model_kind='TYPE'",
+                String.class,
+                run))
+        .isEqualTo("COLLECT");
+    assertThat(service.job(job).status()).isEqualTo("QUEUED");
+  }
 }
