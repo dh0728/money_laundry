@@ -71,6 +71,8 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
         where b.job_id=? and b.status='RUNNING' and b.current_stage=?
           and b.execution_id=? and s.execution_id=? and s.run_id=?
           and s.stage=? and s.completed and r.status in ('READY','ACTIVE')
+          and (select count(*) from analysis_model_tasks m where m.run_id=r.run_id
+               and m.phase='PUBLISH' and m.status='READY' and m.input_artifact is not null)=2
         """,
             String.class,
             context.jobId(),

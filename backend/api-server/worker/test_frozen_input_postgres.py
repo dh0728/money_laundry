@@ -1,7 +1,7 @@
 """Opt-in PostgreSQL 17 integration tests using an isolated disposable container.
 
 Set AML_TEST_DOCKER to the existing Docker executable. No external DB is accepted.
-The repository's V1-V4 SQL is applied directly; this is not a Flyway runner test.
+The repository's V1-V5 SQL is applied directly; this is not a Flyway runner test.
 """
 import io
 import json
@@ -20,6 +20,25 @@ import pyarrow.parquet as pq
 from frozen_input import FrozenInput, InputExecution, StaleExecution, write_demo_input
 from worker_transport import ProtocolError
 from pipeline import prepare_features
+
+
+class MemoryS3:
+    """Network double; production always uses its configured S3 client."""
+    def __init__(self):
+        self.objects = {}
+
+    def put_object(self, **args):
+        from botocore.exceptions import ClientError
+        key = args['Key']
+        if key in self.objects and args.get('IfNoneMatch') == '*':
+            raise ClientError({'Error': {'Code': 'PreconditionFailed'}}, 'PutObject')
+        self.objects[key] = args['Body']
+
+    def get_object(self, **args):
+        return {'Body': io.BytesIO(self.objects[args['Key']])}
+
+    def generate_presigned_url(self, method, *, Params, ExpiresIn):
+        return 'https://objects.example/' + Params['Key'] + '?signature=not-for-db'
 
 
 @unittest.skipUnless(os.environ.get("AML_TEST_DOCKER"), "AML_TEST_DOCKER is required")
@@ -59,7 +78,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 time.sleep(0.25)
         cls.addClassCleanup(cls.admin.close)
         migrations = Path(__file__).resolve().parents[1] / "src/main/resources/db/migration"
-        for version in range(1, 5):
+        for version in range(1, 6):
             files = list(migrations.glob(f"V{version}__*.sql"))
             if len(files) != 1:
                 raise RuntimeError("Expected exactly one migration per version")
@@ -198,35 +217,192 @@ class FrozenInputPostgresTests(unittest.TestCase):
             saved = self.admin.execute("SELECT artifact FROM analysis_run_stage_results WHERE run_id=%s",
                                        (self.run,)).fetchone()[0]
             artifact = json.loads(saved)
-            self.assertEqual(artifact["row_count"], 3)
-            self.assertEqual(pq.read_table(Path(root) / artifact["path"]).column("tx_id").to_pylist(), self.ids)
+            self.assertEqual(artifact["protocol_version"], 2)
+            self.assertEqual(set(artifact["models"]), {"BINARY", "TYPE"})
+            for kind, model in artifact["models"].items():
+                self.assertEqual(model["model_kind"], kind)
+                self.assertEqual(model["row_count"], 3)
+                self.assertEqual(pq.read_table(Path(root) / model["path"]).column("tx_id").to_pylist(), self.ids)
+            self.assertEqual(self.admin.execute(
+                "SELECT count(*) FROM transaction_features WHERE run_id=%s", (self.run,)).fetchone()[0], 6)
             new_token = uuid4()
             self.admin.execute("UPDATE batch_jobs SET execution_id=%s WHERE job_id=%s", (new_token, self.job))
             retry = prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
             self.assertEqual(retry, saved)
-            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 1)
+            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 2)
             self.assertEqual(list(Path(root).rglob("*.partial")), [])
 
     def test_cancel_before_checkpoint_does_not_complete_stage(self):
         import pipeline
-        original_lock = pipeline._lock
-        def cancel_then_lock(connection, execution):
-            connection.execute("UPDATE analysis_runs SET status='CANCELLED' WHERE run_id=%s", (self.run,))
-            original_lock(connection, execution)
+        original_save = pipeline._save_prepared
+        def cancel_then_save(connection, execution, kind, token, document):
+            # Commit on another connection after the file and staging rows exist.
+            # Cancelling inside the writer's own transaction would roll back the
+            # cancellation itself and would not exercise a real correction race.
+            with self.psycopg.connect(**self.connect_args) as other:
+                other.execute("UPDATE analysis_runs SET status='CANCELLED' WHERE run_id=%s",
+                              (self.run,))
+            original_save(connection, execution, kind, token, document)
         with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
-            with patch.object(pipeline, "_lock", side_effect=cancel_then_lock):
+            with patch.object(pipeline, "_save_prepared", side_effect=cancel_then_save):
                 with self.assertRaises(StaleExecution):
                     prepare_features(self.admin, self.execution, root)
             self.assertIsNone(self.admin.execute(
                 "SELECT 1 FROM analysis_run_stage_results WHERE run_id=%s", (self.run,)).fetchone())
+            self.assertEqual(self.admin.execute(
+                "SELECT status FROM analysis_runs WHERE run_id=%s", (self.run,)).fetchone()[0], "CANCELLED")
+            self.assertEqual(self.admin.execute(
+                "SELECT count(*) FROM transaction_features WHERE run_id=%s", (self.run,)).fetchone()[0], 0)
+            self.assertEqual(self.admin.execute(
+                "SELECT count(*) FROM analysis_model_tasks WHERE run_id=%s AND input_artifact IS NOT NULL",
+                (self.run,)).fetchone()[0], 0)
+            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 1)
             self.assertEqual(list(Path(root).rglob("*.partial")), [])
+
+    def test_replaced_parent_token_cannot_save_an_already_prepared_file(self):
+        import pipeline
+        original_save = pipeline._save_prepared
+        new_token = uuid4()
+        def replace_then_save(connection, execution, kind, token, document):
+            with self.psycopg.connect(**self.connect_args) as other:
+                other.execute("UPDATE batch_jobs SET execution_id=%s WHERE job_id=%s",
+                              (new_token, self.job))
+            original_save(connection, execution, kind, token, document)
+        with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
+            with patch.object(pipeline, "_save_prepared", side_effect=replace_then_save):
+                with self.assertRaises(StaleExecution):
+                    prepare_features(self.admin, self.execution, root)
+            self.assertEqual(self.admin.execute(
+                "SELECT count(*) FROM transaction_features WHERE run_id=%s", (self.run,)).fetchone()[0], 0)
+            self.assertIsNone(self.admin.execute(
+                "SELECT 1 FROM analysis_run_stage_results WHERE run_id=%s", (self.run,)).fetchone())
+            prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
+            self.assertEqual(self.admin.execute(
+                "SELECT count(*) FROM analysis_model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='READY'",
+                (self.run,)).fetchone()[0], 2)
 
     def test_checkpoint_with_changed_file_cannot_be_reused(self):
         with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
             artifact = json.loads(prepare_features(self.admin, self.execution, root))
-            (Path(root) / artifact["path"]).write_bytes(b"changed")
+            (Path(root) / artifact["models"]["BINARY"]["path"]).write_bytes(b"changed")
             with self.assertRaisesRegex(ProtocolError, "changed"):
                 prepare_features(self.admin, self.execution, root)
+
+    def publication_setup(self, root):
+        from model_publication import Settings
+        prepare_features(self.admin, self.execution, root)
+        self.admin.execute("UPDATE batch_jobs SET current_stage='INFERENCE' WHERE job_id=%s", (self.job,))
+        return Settings('https://inference.example', 'x' * 32, 'test-bucket', 'dev/test/', 'ap-northeast-2'), MemoryS3()
+
+    def test_publication_lost_response_reuses_request_and_enters_durable_wait(self):
+        import httpx
+        from model_publication import publish_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            bodies = []
+            def remote(request):
+                body = json.loads(request.content)
+                bodies.append(body)
+                self.assertEqual(self.admin.execute('''SELECT status FROM analysis_model_requests
+                    WHERE request_id=%s AND execution_round=1''', (body['request_id'],)).fetchone()[0], 'PUBLISHED')
+                if len(bodies) == 1:
+                    raise httpx.ReadTimeout('ambiguous response')
+                return httpx.Response(202, json={**body, 'status': 'QUEUED', 'revision': 1})
+            transport = httpx.MockTransport(remote)
+            with self.assertRaises(httpx.ReadTimeout):
+                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3, transport=transport)
+            publish_model(self.admin, self.execution, 'BINARY', root, settings, s3, transport=transport)
+            self.assertEqual(bodies[0], bodies[1])
+            publish_model(self.admin, self.execution, 'BINARY', root, settings, s3, transport=transport)
+            self.assertEqual(len(bodies), 2)
+            task = self.admin.execute('''SELECT phase,status,execution_id,binding::text FROM analysis_model_tasks
+                WHERE run_id=%s AND model_kind='BINARY' ''', (self.run,)).fetchone()
+            self.assertEqual(task[:3], ('WAIT_REMOTE', 'WAITING', None))
+            self.assertNotIn('signature=', task[3])
+            self.assertNotIn(settings.token, task[3])
+            self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis_run_stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
+            self.assertEqual(self.admin.execute("SELECT phase FROM analysis_model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], 'PUBLISH')
+            self.assertEqual(len(s3.objects), 3)
+
+    def test_publication_rejects_wrong_receipt_and_changed_destination(self):
+        import httpx
+        from dataclasses import replace
+        from model_publication import publish_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            def wrong(request):
+                return httpx.Response(202, json={**json.loads(request.content), 'run_id': str(uuid4()), 'status': 'QUEUED'})
+            with self.assertRaises(ProtocolError):
+                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3, transport=httpx.MockTransport(wrong))
+            with self.assertRaisesRegex(ProtocolError, 'destination changed'):
+                publish_model(self.admin, self.execution, 'BINARY', root, replace(settings, prefix='another/'), s3)
+            self.assertEqual(self.admin.execute("SELECT phase,status FROM analysis_model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(), ('PUBLISH', 'FAILED'))
+
+    def test_cancellation_after_s3_upload_prevents_remote_submission(self):
+        import httpx
+        from model_publication import publish_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            def cancel_before_http(*args, **kwargs):
+                with self.psycopg.connect(**self.connect_args) as other:
+                    other.execute("UPDATE analysis_runs SET status='CANCELLED' WHERE run_id=%s", (self.run,))
+                return 'https://objects.example/test'
+            s3.generate_presigned_url = cancel_before_http
+            calls = []
+            with self.assertRaises(StaleExecution):
+                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3,
+                              transport=httpx.MockTransport(lambda request: calls.append(request)))
+            self.assertEqual(calls, [])
+            self.assertEqual(self.admin.execute("SELECT status FROM analysis_model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 'REGISTERED')
+
+    def test_cancellation_after_remote_acceptance_blocks_local_wait_commit(self):
+        import httpx
+        from model_publication import publish_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            def cancelled(request):
+                with self.psycopg.connect(**self.connect_args) as other:
+                    other.execute("UPDATE analysis_runs SET status='CANCEL_REQUESTED' WHERE run_id=%s", (self.run,))
+                return httpx.Response(202, json={**json.loads(request.content), 'status': 'QUEUED'})
+            with self.assertRaises(StaleExecution):
+                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3, transport=httpx.MockTransport(cancelled))
+            self.assertEqual(self.admin.execute("SELECT status FROM analysis_model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 'PUBLISHED')
+            self.assertEqual(self.admin.execute("SELECT phase FROM analysis_model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone()[0], 'PUBLISH')
+
+    def test_single_entry_dispatches_publication_without_completing_inference(self):
+        import httpx
+        from analysis_entry import main
+        from model_publication import publish_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            transport = httpx.MockTransport(lambda request: httpx.Response(
+                202, json={**json.loads(request.content), 'status': 'QUEUED'}))
+            env = dict(WORKER_MODE='demo', WORKER_STORAGE_DIR=root,
+                       WORKER_DB_URL=f"postgresql://127.0.0.1:{self.connect_args['port']}/postgres",
+                       WORKER_DB_USER='postgres', WORKER_DB_PASSWORD=self.connect_args['password'])
+            def dispatch(*args, **kwargs):
+                return publish_model(*args, **kwargs, transport=transport)
+            with patch.dict(os.environ, env), patch('model_publication.configured', return_value=(settings, s3)), patch(
+                    'model_publication.publish_model', side_effect=dispatch):
+                code = main(['--job-id', str(self.job), '--run-id', str(self.run),
+                             '--execution-id', str(self.token), '--stage', 'INFERENCE',
+                             '--operation', 'PUBLISH', '--model-kind', 'TYPE'])
+            self.assertEqual(code, 0)
+            self.assertEqual(self.admin.execute("SELECT phase,status FROM analysis_model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING'))
+            self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis_run_stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
+
+    def test_unstopped_predecessor_blocks_publication_without_side_effects(self):
+        from model_publication import publish_model
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            old = uuid4()
+            self.admin.execute("INSERT INTO analysis_runs(run_id,job_id,status) VALUES(%s,%s,'CANCEL_REQUESTED')", (old, self.job))
+            self.admin.execute("INSERT INTO analysis_run_replacements VALUES(%s,%s)", (self.run, old))
+            self.admin.execute("INSERT INTO analysis_model_requests VALUES(%s,1,%s,'BINARY','PUBLISHED')", (uuid4(), old))
+            with self.assertRaises(StaleExecution):
+                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3)
+            self.assertEqual(s3.objects, {})
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis_model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 0)
 
 
 if __name__ == "__main__":

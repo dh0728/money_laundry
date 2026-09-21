@@ -106,8 +106,19 @@ class WorkerPipelineTests {
           .isTrue();
       try (var paths = Files.walk(storage)) {
         assertThat(paths.filter(p -> p.toString().endsWith("targets.parquet")).count())
-            .isEqualTo(1);
+            .isEqualTo(2);
       }
+      assertThat(
+              jdbc.queryForList(
+                  "select phase from analysis_model_tasks where run_id=? order by model_kind",
+                  String.class,
+                  run))
+          .containsExactly("PUBLISH", "PUBLISH");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from transaction_features where run_id=? and features->>'demo_value'=(tx_id%100)::text",
+                  Integer.class, run))
+          .isEqualTo(2);
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("FAILED");
       assertThat(service.job(job).error()).isEqualTo("PIPELINE_NOT_CONFIGURED");
@@ -136,5 +147,189 @@ class WorkerPipelineTests {
             AnalysisFailure.class,
             e -> assertThat(e.code()).isEqualTo("WORKER_CHECKPOINT_MISSING"));
     assertThat(service.job(job).status()).isEqualTo("FAILED");
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis_model_tasks where run_id=? and status='CANCELLED' and execution_id is null",
+                Integer.class,
+                run))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void retry_reuses_prepared_models_without_rewriting_feature_rows() {
+    var executor = executor("worker/analysis_entry.py");
+    var first = executor.prepare(claim());
+    var before =
+        jdbc.queryForList(
+            "select input_artifact::text,operation_attempts from analysis_model_tasks where run_id=? order by model_kind",
+            run);
+    var second = executor.prepare(claim());
+    assertThat(second.artifact()).isEqualTo(first.artifact());
+    assertThat(
+            jdbc.queryForList(
+                "select input_artifact::text,operation_attempts from analysis_model_tasks where run_id=? order by model_kind",
+                run))
+        .isEqualTo(before);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from transaction_features where run_id=?", Integer.class, run))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void type_failure_preserves_binary_and_next_parent_execution_recovers() throws Exception {
+    Path failType = storage.resolve("fail_type.py");
+    Files.writeString(
+        failType,
+        """
+        import sys
+        sys.path.insert(0, %s)
+        import pipeline
+        from worker_transport import ProtocolError
+        original = pipeline.write_demo_input
+        calls = 0
+        def fail_type(source, output):
+            global calls
+            calls += 1
+            if calls == 2:
+                raise ProtocolError('injected second model failure')
+            return original(source, output)
+        pipeline.write_demo_input = fail_type
+        from analysis_entry import main
+        raise SystemExit(main())
+        """
+            .formatted(
+                "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
+    assertThatThrownBy(() -> executor(failType.toString()).prepare(claim()))
+        .isInstanceOf(AnalysisFailure.class);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from transaction_features where run_id=? and model_kind='BINARY'",
+                Integer.class,
+                run))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis_run_stage_results where run_id=? and stage='FEATURES'",
+                Integer.class,
+                run))
+        .isZero();
+    var binary =
+        jdbc.queryForObject(
+            "select input_artifact::text from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+            String.class,
+            run);
+    executor("worker/analysis_entry.py").prepare(claim());
+    assertThat(
+            jdbc.queryForObject(
+                "select input_artifact::text from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                String.class,
+                run))
+        .isEqualTo(binary);
+    assertThat(
+            jdbc.queryForList(
+                "select operation_attempts from analysis_model_tasks where run_id=? order by model_kind",
+                Integer.class,
+                run))
+        .containsExactly(1, 2);
+  }
+
+  @Test
+  void missing_prepared_file_is_rejected_without_recalculating() throws Exception {
+    var executor = executor("worker/analysis_entry.py");
+    executor.prepare(claim());
+    String path =
+        jdbc.queryForObject(
+            "select input_artifact->>'path' from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+            String.class,
+            run);
+    Files.delete(storage.resolve("worker").resolve(path));
+    assertThatThrownBy(() -> executor.prepare(claim()))
+        .isInstanceOfSatisfying(
+            AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("WORKER_INPUT_INVALID"));
+  }
+
+  @Test
+  void feature_insert_failure_rolls_back_artifact_and_parent_checkpoint() {
+    jdbc.execute(
+        """
+        create function reject_test_features() returns trigger language plpgsql as $$
+        begin raise exception 'injected feature storage failure'; end $$
+        """);
+    jdbc.execute(
+        "create trigger reject_test_features before insert on transaction_features for each row execute function reject_test_features()");
+    try {
+      assertThatThrownBy(() -> executor("worker/analysis_entry.py").prepare(claim()))
+          .isInstanceOfSatisfying(
+              AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("DB_UNAVAILABLE"));
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from transaction_features where run_id=?", Integer.class, run))
+          .isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis_model_tasks where run_id=? and input_artifact is not null",
+                  Integer.class,
+                  run))
+          .isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis_run_stage_results where run_id=?",
+                  Integer.class,
+                  run))
+          .isZero();
+    } finally {
+      jdbc.execute("drop trigger reject_test_features on transaction_features");
+      jdbc.execute("drop function reject_test_features()");
+    }
+    executor("worker/analysis_entry.py").prepare(claim());
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from transaction_features where run_id=?", Integer.class, run))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void abandoned_model_token_is_replaced_and_changed_binding_is_rejected() throws Exception {
+    var context = claim();
+    Path abandon = storage.resolve("abandon.py");
+    Files.writeString(
+        abandon,
+        """
+        import sys
+        sys.path.insert(0, %s)
+        import pipeline
+        def abandon(*args):
+            raise SystemExit(74)
+        pipeline.write_demo_input = abandon
+        from analysis_entry import main
+        raise SystemExit(main())
+        """
+            .formatted(
+                "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
+    assertThatThrownBy(() -> executor(abandon.toString()).prepare(context))
+        .isInstanceOf(AnalysisFailure.class);
+    assertThat(
+            jdbc.queryForObject(
+                "select status from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                String.class,
+                run))
+        .isEqualTo("ACTIVE");
+    assertThatThrownBy(() -> executor("worker/analysis_entry.py").prepare(context))
+        .isInstanceOfSatisfying(
+            AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("RUN_FENCED"));
+    executor("worker/analysis_entry.py").prepare(claim());
+    assertThat(
+            jdbc.queryForObject(
+                "select operation_attempts from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                Integer.class,
+                run))
+        .isEqualTo(2);
+    jdbc.update(
+        "update analysis_model_tasks set binding=jsonb_set(binding,'{model_version}','\"changed\"') where run_id=? and model_kind='TYPE'",
+        run);
+    assertThatThrownBy(() -> executor("worker/analysis_entry.py").prepare(claim()))
+        .isInstanceOfSatisfying(
+            AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("WORKER_INPUT_INVALID"));
   }
 }

@@ -276,3 +276,16 @@ V1~V3를 변경하지 않는 추가 마이그레이션이다. 기존 보고·거
 - `analysis_selected_versions(job_id,set_id,version_id,generation)`는 통합/입력 고정 사이 revision 확인용이다. 거래 입력의 값·출처는 별도 불변 스냅샷이다.
 - `inference_results.run_id`, `transaction_features.run_id`는 새 산출물 세대 귀속 경계다. 이전 null run 이력은 current_run_id가 없는 완료 작업에서만 기존 의미로 조회한다. 새 작업의 결과는 현재 완료 run과 일치해야 노출한다. 실제 점수 쓰기는 후속 Python 계약이다.
 - 취소된 run의 모든 TARGET 출처 묶음이 준비되기 전에는 그 run과 관련된 새 tx_id도 일반 신규 TARGET으로 우회하지 않는다. 완료 CONTEXT의 과거 값/출처와 취소 run 이력은 보존한다.
+
+## V5 모델별 일감
+
+`analysis_model_tasks`는 `(run_id, model_kind)`별 로컬 작업·산출물·원격 관측을 저장한다. V1~V4의 표와 데이터를 변경하지 않으며, 기존 원격 요청 및 취소 이력은 `analysis_model_requests`와 `analysis_cancel_outbox`에 유지한다. 되돌림이 필요하면 후속 forward migration을 사용하며 DB 초기화를 요구하지 않는다.
+
+- phase: PREPARE/PUBLISH/WAIT_REMOTE/COLLECT/DONE. status: READY/ACTIVE/WAITING/RETRY_WAIT/SUCCEEDED/FAILED/CANCELLED. 현재 실행 연결은 PREPARE→PUBLISH/READY까지다. 이후 열거값과 관측 필드는 다음 연결을 위한 스키마이며 구현 완료를 뜻하지 않는다.
+- binding: 실행 동안 고정된 JSONB 모델/피처/입력 계약 버전. 현재 demo 버전만 사용한다. 인증 정보·서명 URL·실제 입력 행을 넣지 않는다. input_artifact/result_artifact는 파일 참조와 검증 메타데이터다.
+- request_id/execution_round는 둘 다 NULL이거나 V4 요청을 참조한다. execution_id/execution_owner는 ACTIVE일 때만 함께 존재한다. 현재 PREPARE의 owner는 상위 FEATURES 실행 토큰이다. operation_attempts는 모델 계산이 아닌 로컬 동작 시도 횟수다.
+- retry_at/next_poll_at/remote_deadline_at, remote_revision/remote_snapshot/last_event_id, error_code/action_required, 생성·갱신·종료 시각을 둔다. 원격 관측 및 예약 실행은 아직 연결 전이다.
+- Python은 모델별 입력 파일을 완성한 후 임시 테이블에 피처를 청크 적재한다. 최종 integration lock→job→run→task 검사와 `transaction_features` 저장·PUBLISH/READY 전이를 하나의 트랜잭션으로 처리한다. 파일 계산·추론 대기 동안 DB 행 잠금을 유지하지 않는다.
+- 먼저 준비된 모델은 다른 모델 실패 후에도 재사용한다. 같은 상위 토큰의 중복 프로세스는 ACTIVE 소유권을 빼앗지 못하고, 새 상위 토큰은 중단된 PREPARE를 회수할 수 있다. 재사용 시 파일 존재·크기·SHA256·버전을 확인한다.
+- 현재 FEATURES 실행은 두 모델을 순차 준비한 뒤 상위 체크포인트를 기록한다. 모델별 즉시 게시·비동기 실행은 후속 연결이며, INFERENCE 이후를 성공으로 넘기지 않는다. 시연 피처는 결과 도착 전 `transaction_features`에 저장되고, 과거 run의 행을 덮어쓰지 않는다.
+- 정정 취소는 같은 트랜잭션에서 모델별 토큰도 무효화한다. 산출물 참조와 피처는 이력으로 보존하며 취소 run의 신규 반영은 거절한다.
