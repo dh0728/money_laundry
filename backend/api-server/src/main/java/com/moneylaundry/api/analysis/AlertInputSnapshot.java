@@ -17,6 +17,7 @@ public class AlertInputSnapshot {
   }
 
   public void freeze(UUID run, Instant cutoff) {
+    freezeManifest(run, cutoff);
     jdbc.update(
         """
         insert into analysis.alert_origins
@@ -25,15 +26,27 @@ public class AlertInputSnapshot {
           join batch_jobs b on b.job_id=r.job_id
           where v.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
           order by v.version desc limit 1) v on true
-        left join lateral (select c.forward_complete from alert_coverage_checks c
+        left join lateral (select c.run_id from alert_coverage_checks c
           join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
           where c.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
-          order by b.analysis_cutoff_at desc, b.job_id desc limit 1) c on true
-        where not coalesce(c.forward_complete,false)
+          order by c.checked_at desc nulls last,b.analysis_cutoff_at desc, b.job_id desc limit 1) c on true
+        where exists (
+          select 1 from (
+            select coalesce(current.business_date,previous.business_date) changed_date
+            from (select business_date,state from analysis.alert_source_manifest where run_id=?) current
+            full join (select business_date,state from analysis.alert_source_manifest
+              where run_id=coalesce(c.run_id,v.run_id)) previous using(business_date)
+            where current.state is distinct from previous.state
+          ) changed
+          where exists (select 1 from jsonb_array_elements(v.evidence->'transactions') member
+            where changed.changed_date between
+              ((member->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date-2
+              and ((member->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date+2))
           and not exists(select 1 from alerts child join alert_versions cv on cv.alert_id=child.alert_id
             join analysis_runs cr on cr.run_id=cv.run_id join batch_jobs cb on cb.job_id=cr.job_id
             where child.parent_alert_id=a.alert_id and cr.status='COMPLETED' and cb.status='COMPLETED')
         """,
+        run,
         run);
     var bounds =
         jdbc.queryForMap(
@@ -134,5 +147,28 @@ public class AlertInputSnapshot {
           Timestamp.from(cutoff),
           day);
     }
+  }
+
+  private void freezeManifest(UUID run, Instant cutoff) {
+    jdbc.update(
+        """
+        insert into analysis.alert_source_manifest(run_id,business_date,state)
+        select ?,d.business_date,jsonb_build_object(
+          'scopeRevision',s.scope_revision,
+          'banks',coalesce((select jsonb_agg(sb.bank_id order by sb.bank_id)
+            from reporting_scope_banks sb where sb.business_date=d.business_date),'[]'::jsonb),
+          'reports',coalesce((select jsonb_agg(jsonb_build_object(
+            'setId',rs.set_id,'bankId',rs.bank_id,'versionId',rv.version_id,
+            'revision',rv.revision,'generation',rs.generation,'status',rv.stage_status)
+            order by rs.set_id) from report_sets rs
+            join report_versions rv on rv.version_id=rs.current_version_id
+            where rs.business_date=d.business_date and rv.received_at<=?),'[]'::jsonb))
+        from (select business_date from reporting_scopes union select business_date from report_sets) d
+        left join reporting_scopes s using(business_date)
+        where d.business_date <= (?::timestamptz at time zone 'Asia/Seoul')::date
+        """,
+        run,
+        Timestamp.from(cutoff),
+        Timestamp.from(cutoff));
   }
 }

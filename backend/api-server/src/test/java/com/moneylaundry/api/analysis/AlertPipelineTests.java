@@ -116,6 +116,104 @@ class AlertPipelineTests {
         "select alert_id from alert_versions where run_id=?", Long.class, run);
   }
 
+  UUID freezeCheck() {
+    long next =
+        jdbc.queryForObject(
+            "insert into batch_jobs(job_type,status,current_stage,threshold_value,analysis_cutoff_at) values('ANALYSIS','QUEUED','FREEZE_INPUT',.7,'2022-09-04 09:00+09') returning job_id",
+            Long.class);
+    UUID checking = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis_runs(run_id,job_id,status) values(?,?,'READY')", checking, next);
+    snapshot.freeze(checking, Instant.parse("2022-09-04T00:00:00Z"));
+    return checking;
+  }
+
+  @Test
+  void unchanged_or_unrelated_sources_do_not_recheck_an_incomplete_future_window() {
+    long alert = firstAlert();
+    jdbc.update("update alert_coverage_checks set forward_complete=false where alert_id=?", alert);
+    jdbc.update("insert into reporting_scopes(business_date) values('2020-01-01'),('2030-01-01')");
+    UUID checking = freezeCheck();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.alert_origins where run_id=?",
+                Integer.class,
+                checking))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.alert_source_manifest where run_id=? and business_date='2030-01-01'",
+                Integer.class,
+                checking))
+        .isZero();
+  }
+
+  @Test
+  void source_revision_rechecks_even_complete_windows_and_failed_checks_do_not_consume_change() {
+    long alert = firstAlert();
+    jdbc.update("update alert_coverage_checks set forward_complete=true where alert_id=?", alert);
+    String frozen =
+        jdbc.queryForObject(
+            "select state::text from analysis.alert_source_manifest where run_id=? and business_date='2022-09-02'",
+            String.class,
+            run);
+    jdbc.update(
+        "update report_versions set revision=revision+1 where set_id in(select set_id from report_sets where business_date='2022-09-02')");
+    UUID failed = freezeCheck();
+    assertThat(
+            jdbc.queryForList(
+                "select alert_id from analysis.alert_origins where run_id=?", Long.class, failed))
+        .containsExactly(alert);
+    assertThat(
+            jdbc.queryForObject(
+                "select state::text from analysis.alert_source_manifest where run_id=? and business_date='2022-09-02'",
+                String.class,
+                run))
+        .isEqualTo(frozen);
+    jdbc.update(
+        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete,checked_at) values(?,?,'[]',true,clock_timestamp())",
+        alert,
+        failed);
+    jdbc.update("update analysis_runs set status='CANCELLED' where run_id=?", failed);
+    UUID retried = freezeCheck();
+    assertThat(
+            jdbc.queryForList(
+                "select alert_id from analysis.alert_origins where run_id=?", Long.class, retried))
+        .containsExactly(alert);
+    jdbc.update(
+        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete,checked_at) values(?,?,'[]',true,clock_timestamp())",
+        alert,
+        retried);
+    jdbc.update("update analysis_runs set status='COMPLETED' where run_id=?", retried);
+    jdbc.update(
+        "update batch_jobs set status='COMPLETED' where job_id=(select job_id from analysis_runs where run_id=?)",
+        retried);
+    UUID unchanged = freezeCheck();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.alert_origins where run_id=?",
+                Integer.class,
+                unchanged))
+        .isZero();
+  }
+
+  @Test
+  void scope_membership_change_rechecks_without_any_new_target_or_report() {
+    long alert = firstAlert();
+    jdbc.update("delete from reporting_scope_banks where business_date='2022-09-02'");
+    UUID checking = freezeCheck();
+    assertThat(
+            jdbc.queryForList(
+                "select alert_id from analysis.alert_origins where run_id=?", Long.class, checking))
+        .containsExactly(alert);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",
+                Integer.class,
+                checking))
+        .isZero();
+  }
+
   @Test
   void check_without_new_evidence_updates_only_check_time_and_hides_pending_checks() {
     long alert = firstAlert();
