@@ -102,20 +102,20 @@ describe('Figma v16 · Detail 헤더 압축', () => {
     expect(tabsIdx).toBeGreaterThan(headerIdx)
   })
 
-  it('제목 행에 record id와 status가 title과 함께 나온다(같은 줄)', () => {
+  it('record id, title, status를 상하 정보 계층으로 보여준다', () => {
     const headerIdx = markup.indexOf('data-testid="detail-header"')
     const tabsIdx = markup.indexOf('underline-tabs')
     const titleIdx = markup.indexOf(`>${alert.title}</h1>`, headerIdx)
-    const idIdx = markup.indexOf(`>${alert.id}</span>`, headerIdx)
+    const idIdx = markup.indexOf(`>${alert.id}</p>`, headerIdx)
     const statusIdx = markup.indexOf(`>${alert.status}<`, headerIdx)
-    expect(titleIdx).toBeGreaterThan(headerIdx)
-    expect(idIdx).toBeGreaterThan(titleIdx)
-    expect(statusIdx).toBeGreaterThan(idIdx)
+    expect(idIdx).toBeGreaterThan(headerIdx)
+    expect(titleIdx).toBeGreaterThan(idIdx)
+    expect(statusIdx).toBeGreaterThan(titleIdx)
     expect(statusIdx).toBeLessThan(tabsIdx)
   })
 
-  // v23: 연결 업무는 2행에서 실제 button으로 유지한다.
+  // v23: 연결 업무는 제목 옆에서 수량 단위를 명시한 button으로 유지한다.
   it('연결된 Episode/Alert 안내는 v17부터 팝오버를 여는 button이다', () => {
-    expect(markup).toMatch(/<button[^>]*>[^<]*<svg[^>]*>.*?<\/svg>연결된 (Episode|Alert) \d+<\/button>/)
+    expect(markup).toMatch(/<button[^>]*>[^<]*<svg[^>]*>.*?<\/svg>연결된 (Episode|Alert) \d+개<\/button>/)
   })
 })

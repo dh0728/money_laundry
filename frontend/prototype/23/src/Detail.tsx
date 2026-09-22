@@ -189,9 +189,6 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
               <SectionTitle title="조사 정보" />
               <dl className="grid grid-cols-[88px_1fr] gap-y-4 text-xs">
                 <dt className="text-muted-foreground">조사 단위</dt><dd>{r.kind === 'Alert' ? '단일 탐지 신호' : '연관 Alert 묶음'}</dd>
-                <dt className="text-muted-foreground">담당자</dt><dd>{r.owner}</dd>
-                <dt className="text-muted-foreground">탐지일</dt><dd>{r.date}</dd>
-                <dt className="text-muted-foreground">경과 기간</dt><dd>{r.age === 0 ? '오늘' : `${r.age}일 경과`}</dd>
                 <dt className="text-muted-foreground">데이터 기준</dt><dd>탐지 시점 거래 데이터</dd>
               </dl>
             </CardContent></Card>

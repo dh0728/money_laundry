@@ -70,7 +70,10 @@ describe('v17 Figma 검수 · 헤더 검색 pill', () => {
   })
 
   it('검색은 헤더 중앙에서 최대 폭을 제한하되 좁은 데스크톱에서도 최소 폭을 보장하고, 결과 popover는 input 폭에 맞춘다', () => {
-    expect(appSource).toMatch(/w-\[clamp\(280px,32vw,420px\)\][^"]*min-w-\[280px\][^"]*max-\[520px\]:w-\[clamp\(180px,46vw,280px\)\][^"]*max-\[520px\]:min-w-\[180px\][^"]*"[^>]*>\s*<GlobalSearch/)
+    expect(appSource).toMatch(/className="header-search-input"[^>]*>\s*<GlobalSearch/)
+    const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
+    expect(css).toMatch(/\.header-search-input\s*\{[^}]*width:\s*clamp\(280px,32vw,420px\)[^}]*min-width:\s*280px/)
+    expect(css).toMatch(/@media \(max-width:900px\)[^{]*\{[\s\S]*?\.header-search-input\s*\{[^}]*width:\s*100%[^}]*max-width:\s*520px/)
     expect(searchSource).toMatch(/PopoverContent[^>]*className="w-\(--radix-popper-anchor-width\)/)
   })
 })

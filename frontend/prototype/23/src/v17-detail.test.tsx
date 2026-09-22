@@ -30,24 +30,26 @@ describe('Figma v17 · Detail 헤더 재배치', () => {
   const alert = records.find(r => r.kind === 'Alert')!
   const markup = html(<Detail record={alert} records={records} user={alert.owner} onUpdate={() => {}} onOpen={() => {}} />)
 
-  it('row1은 제목·ID·상태를 같이 보여준다', () => {
+  it('ID 아래 제목과 연결 업무를 한 행으로 보여준다', () => {
     const headerIdx = markup.indexOf('data-testid="detail-header"')
+    const idIdx = markup.indexOf(`>${alert.id}</p>`, headerIdx)
     const titleIdx = markup.indexOf(`>${alert.title}</h1>`, headerIdx)
-    expect(titleIdx).toBeGreaterThan(headerIdx)
-    const idIdx = markup.indexOf(`>${alert.id}</span>`, titleIdx)
-    const statusIdx = markup.indexOf(`>${alert.status}<`, idIdx)
-    expect(idIdx).toBeGreaterThan(titleIdx)
-    expect(statusIdx).toBeGreaterThan(idIdx)
+    const linkIdx = markup.indexOf('연결된 Episode 1개', titleIdx)
+    expect(idIdx).toBeGreaterThan(headerIdx)
+    expect(titleIdx).toBeGreaterThan(idIdx)
+    expect(linkIdx).toBeGreaterThan(titleIdx)
   })
 
-  it('row2는 위험·Alert 탐지 유형·연결 업무만 담는다', () => {
-    const row2Idx = markup.indexOf('data-testid="detail-row2"')
-    expect(row2Idx).toBeGreaterThan(-1)
-    const row2 = markup.slice(row2Idx, markup.indexOf('</header>', row2Idx))
-    expect(row2).toContain(`모델 판별 · ${alert.pattern} 의심 ${alert.probability}%`)
-    expect(row2).toMatch(/연결된 (Episode|Alert) \d+/)
-    expect(row2).not.toContain(alert.owner)
-    expect(row2).not.toContain(`${alert.age}일 경과`)
+  it('태그 행은 상태·위험·탐지 유형·업무 메타데이터를 담는다', () => {
+    const tagsIdx = markup.indexOf('data-testid="detail-tags"')
+    expect(tagsIdx).toBeGreaterThan(-1)
+    const tags = markup.slice(tagsIdx, markup.indexOf('</header>', tagsIdx))
+    expect(tags).toContain(`모델 판별 · ${alert.pattern} 의심 ${alert.probability}%`)
+    expect(tags).toContain(alert.status)
+    expect(tags).toContain(`담당 ${alert.owner}`)
+    expect(tags).toContain(`탐지 ${alert.date}`)
+    expect(tags).toContain(`${alert.age}일 경과`)
+    expect(tags).not.toContain('연결된 Episode')
   })
 
   it('팝오버는 닫힌 상태에서는 렌더되지 않고(Radix 기본), 목록 항목은 id/title/위험 배지를 보여주며 onOpen으로 연다', () => {

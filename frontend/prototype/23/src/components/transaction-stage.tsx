@@ -22,12 +22,12 @@ export function StageItem({ active, primary, secondary, trailing, mono = false, 
   </button>
 }
 
-export function OrthogonalConnector({ id, sourceIndex, targetCount, targetOffset }: {
-  id: string; sourceIndex: number; targetCount: number; targetOffset: number
+export function OrthogonalConnector({ id, sourceIndex, targetCount, targetOffset, activeTargetIndex = -1 }: {
+  id: string; sourceIndex: number; targetCount: number; targetOffset: number; activeTargetIndex?: number
 }) {
   // Panel border + header + body padding + half of the 64px item.
   const sourceY = 1 + 69 + 8 + 32 + Math.max(0, sourceIndex) * 64
   return <div data-testid={id} aria-hidden="true" className={`transaction-connector ${id}`}>
-    {Array.from({ length: targetCount }, (_, index) => <i key={index} data-testid={`${id}-edge-${index}`} className="transaction-connector-edge" style={{ '--source-y': `${sourceY}px`, '--target-y': `${targetOffset + index * 64}px` } as CSSProperties}><b /></i>)}
+    {Array.from({ length: targetCount }, (_, index) => <i key={index} data-testid={`${id}-edge-${index}`} data-active={index === activeTargetIndex} className="transaction-connector-edge" style={{ '--source-y': `${sourceY}px`, '--target-y': `${targetOffset + index * 64}px` } as CSSProperties}><b /></i>)}
   </div>
 }

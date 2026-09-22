@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { formatGraphMoney, formatMoney, moneyMetrics } from './v23-domain'
 
 const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
+const graphSources = [
+  readFileSync(new URL('./Graph.tsx', import.meta.url), 'utf8'),
+  readFileSync(new URL('./OwnerGraph.tsx', import.meta.url), 'utf8'),
+]
 
 describe('v23 foundation', () => {
   it('deduplicates transactions and derives investigation money metrics', () => {
@@ -26,6 +30,7 @@ describe('v23 foundation', () => {
 
   it('formats graph aggregates in the original currency after the amount', () => {
     expect(formatGraphMoney({ usd: 2_800, currency: 'Euro', transactions: [{ amount: 1_200, currency: 'Euro' }, { amount: 1_387, currency: 'Euro' }] })).toBe('2,587€')
+    expect(graphSources.every(source => source.includes('formatGraphMoney('))).toBe(true)
   })
 
   it('uses theme-opposite foreground for interactive edge glow', () => {

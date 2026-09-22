@@ -57,23 +57,23 @@ describe('Figma v20 · Notifications 카드 분할', () => {
   })
 })
 
-describe('Figma v15b 수정사항 · Settings 섹션 제목', () => {
+describe('v23 Settings 섹션 제목', () => {
   const markup = html(<Settings user="오검토" />)
 
-  it('일반 섹션 제목이 text-lg font-bold tracking-tight를 가진다', () => {
-    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-lg[^"]*font-bold[^"]*tracking-tight[^"]*">일반<\/h2>/)
+  it('일반 섹션 제목이 공용 카드 제목 위계를 가진다', () => {
+    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-base[^"]*font-semibold[^"]*tracking-tight[^"]*">일반<\/h2>/)
     expect(markup).not.toMatch(/class="[^"]*\bshine\b/)
   })
 
-  it('목록 섹션 제목이 text-lg font-bold tracking-tight를 가진다', () => {
-    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-lg[^"]*font-bold[^"]*tracking-tight[^"]*">목록<\/h2>/)
+  it('목록 섹션 제목이 공용 카드 제목 위계를 가진다', () => {
+    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-base[^"]*font-semibold[^"]*tracking-tight[^"]*">목록<\/h2>/)
   })
 
-  it('알림 섹션 제목이 text-lg font-bold tracking-tight를 가진다', () => {
-    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-lg[^"]*font-bold[^"]*tracking-tight[^"]*">알림<\/h2>/)
+  it('알림 섹션 제목이 공용 카드 제목 위계를 가진다', () => {
+    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-base[^"]*font-semibold[^"]*tracking-tight[^"]*">알림<\/h2>/)
   })
 
-  it('테마 섹션 제목이 text-lg font-bold tracking-tight를 가진다', () => {
-    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-lg[^"]*font-bold[^"]*tracking-tight[^"]*">테마<\/h2>/)
+  it('테마 섹션 제목이 공용 카드 제목 위계를 가진다', () => {
+    expect(markup).toMatch(/<h2[^>]*class="[^"]*text-base[^"]*font-semibold[^"]*tracking-tight[^"]*">테마<\/h2>/)
   })
 })

@@ -64,5 +64,6 @@ it('disables all flow particles for reduced motion and otherwise distinguishes s
 it('uses a non-passive native wheel listener so graph zoom does not scroll the page', () => {
   const source = readFileSync(new URL('./OwnerGraph.tsx', import.meta.url), 'utf8')
   expect(source).toContain("addEventListener('wheel', onWheel, { passive: false })")
+  expect(source).toContain("removeEventListener('wheel', onWheel)")
   expect(source).not.toContain('onWheel={')
 })

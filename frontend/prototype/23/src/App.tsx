@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { LayoutDashboard, ArrowLeftRight, Siren, FolderSearch, Bell, Settings as SettingsIcon, ArrowLeft, ListTodo, Maximize2, Minimize2, PanelLeft, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +41,24 @@ export function contentScreenKey(page: Page, selected: string | null, target?: T
 
 export function resetContentScroll(container: Pick<HTMLElement, 'scrollTop'> | null) {
   if (container) container.scrollTop = 0
+}
+
+type FullscreenDocument = {
+  fullscreenElement: unknown
+  exitFullscreen?: () => Promise<void>
+  documentElement: { requestFullscreen?: () => Promise<void> }
+}
+
+export async function toggleDocumentFullscreen(doc: FullscreenDocument, fallbackActive: boolean, setFallback: (active: boolean) => void) {
+  if (doc.fullscreenElement) return void await doc.exitFullscreen?.()
+  if (fallbackActive) return void setFallback(false)
+  try {
+    const request = doc.documentElement.requestFullscreen
+    if (!request) throw new TypeError('Fullscreen API unavailable')
+    await request.call(doc.documentElement)
+  } catch {
+    setFallback(true)
+  }
 }
 
 export function createSidebarNavigation({ isMobile, setOpenMobile, navigate }: { isMobile: boolean; setOpenMobile: (open: boolean) => void; navigate: () => void }) {
@@ -120,7 +138,7 @@ export default function App() {
   const [user, setUser] = useState<string | null>(null), [page, setPage] = useState<Page>('dashboard'), [records, setRecords] = useState(fixtures)
   const [selected, setSelected] = useState<string | null>(null), [logout, setLogout] = useState(false), [state, setState] = useState<DataState>(initialState)
   const [agentOpen, setAgentOpen] = useState(true), [agentMode, setAgentMode] = useState<AgentMode>('sidebar')
-  const [listKey, setListKey] = useState(0), [isFullscreen, setIsFullscreen] = useState(false), [transactionTarget, setTransactionTarget] = useState<TransactionTarget>()
+  const [listKey, setListKey] = useState(0), [nativeFullscreen, setNativeFullscreen] = useState(false), [appFullscreen, setAppFullscreen] = useState(false), [transactionTarget, setTransactionTarget] = useState<TransactionTarget>()
   const mainRef = useRef<HTMLElement>(null)
   const record = records.find(r => r.id === selected), role = user === '오검토' ? 'L1' : 'L2'
   const todo = records.filter(r => r.owner === user && r.status !== '종결').length
@@ -131,7 +149,8 @@ export default function App() {
   const linkSelectedAlerts = (alertIds: string[], target: string) => setRecords(current => linkAlertsToEpisode(current, alertIds, target))
   const openTransaction = (target: TransactionTarget) => { setPage('transactions'); setSelected(null); setTransactionTarget(target) }
   const logoutNow = () => { setUser(null); setLogout(false); setAgentOpen(true); setSelected(null); setPage('dashboard') }
-  const fullscreen = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()
+  const isFullscreen = nativeFullscreen || appFullscreen
+  const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -139,10 +158,10 @@ export default function App() {
       if (e.key === '/' && !typing) { e.preventDefault(); document.querySelector<HTMLInputElement>('[aria-label="전역 검색"]')?.focus() }
       if (e.key === 'F11') { e.preventDefault(); fullscreen() }
     }
-    const screen = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    const screen = () => { const active = Boolean(document.fullscreenElement); setNativeFullscreen(active); if (active) setAppFullscreen(false) }
     window.addEventListener('keydown', key); document.addEventListener('fullscreenchange', screen)
     return () => { window.removeEventListener('keydown', key); document.removeEventListener('fullscreenchange', screen) }
-  }, [])
+  }, [fullscreen])
 
   const screenKey = contentScreenKey(page, selected, transactionTarget)
   useLayoutEffect(() => {
@@ -153,7 +172,7 @@ export default function App() {
 
   const agentSidebar = agentOpen && agentMode === 'sidebar'
   return (
-    <SidebarProvider style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
+    <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
         {/* 로고 자리가 곧 사이드바 여닫기 button이다. 접힘·펼침 모두 nav icon과 같은 축(중심 32px) */}
@@ -216,7 +235,7 @@ export default function App() {
           {/* 로고는 sidebar로 옮겼다. 헤더 중앙에는 전역 검색만 pill 형태로 둔다. RDR 9000은 우하단 FAB */}
           <div className="header-search flex items-center justify-center gap-2 min-[1100px]:gap-3 min-w-0">
             {/* 양옆 칸을 같은 비율로 두어 뒤로가기 유무와 관계없이 검색창이 항상 화면 가운데 같은 자리에 온다 */}
-            <div className="header-search-input w-[clamp(280px,32vw,420px)] min-w-[280px] max-[520px]:w-[clamp(180px,46vw,280px)] max-[520px]:min-w-[180px]">
+            <div className="header-search-input">
               <GlobalSearch records={records} onOpenRecord={openRecord} onOpenTransaction={openTransaction} onNavigate={p => go(p as Page)} />
             </div>
           </div>
@@ -225,7 +244,7 @@ export default function App() {
               <ListTodo className="size-4 hidden max-[1100px]:inline" /><span className="max-[1100px]:hidden">할 일</span><Badge variant="secondary" className="h-5 min-w-5 px-1.5">{todo}</Badge>
             </Button>
             {/* v20 R13: 역할(L1·L2)은 사이드바 계정에 이미 표시되고 버튼도 아니라 헤더에서 뺐다. 할 수 있는 일은 계정 > 권한 */}
-            <Button variant="ghost" size="sm" className="h-8 rounded-full gap-2 px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} onClick={fullscreen}>
+            <Button variant="ghost" size="sm" className="h-8 rounded-full gap-2 px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}<Kbd>F11</Kbd>
             </Button>
           </div>

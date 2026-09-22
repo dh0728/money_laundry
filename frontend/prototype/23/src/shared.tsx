@@ -131,32 +131,37 @@ export function DetailHeading({ record, linkedRecords, onOpen }: { record: Recor
   const linkedLabel = record.kind === 'Alert' ? 'Episode' : 'Alert'
   return (
     <header data-testid="detail-header">
-      <div>
+      <p data-testid="detail-id" className="font-mono text-xs text-muted-foreground">{record.id}</p>
+      <div data-testid="detail-title-row" className="mt-1.5 flex flex-wrap items-center gap-2.5">
+        <h1 className="text-xl font-semibold tracking-tight">{record.title}</h1>
+        {linkedRecords.length > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 rounded-full gap-1.5 px-3 text-xs font-normal"><Link2 className="size-3.5" />연결된 {linkedLabel} {linkedRecords.length}개</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-1.5" align="start">
+              <div className="space-y-1">
+                {linkedRecords.map(linked => (
+                  <button type="button" key={linked.id} onClick={() => onOpen(linked)} className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className="min-w-0"><span className="block font-mono">{linked.id}</span><span className="block text-muted-foreground truncate mt-0.5">{linked.title}</span></span>
+                    <RiskBadge risk={linked.risk} score={linked.score} />
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+      <div data-testid="detail-tags" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">{record.title}</h1>
-          <span className="font-mono text-xs text-muted-foreground">{record.id}</span>
           <Badge variant="outline" className="text-[10px] font-normal">{record.status}</Badge>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 mt-2.5" data-testid="detail-row2">
           <RiskBadge risk={record.risk} score={record.score} />
           {record.kind === 'Alert' && <PatternBadge pattern={record.pattern} probability={record.probability} />}
-          {linkedRecords.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs font-normal"><Link2 className="size-3.5" />연결된 {linkedLabel} {linkedRecords.length}</Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-1.5" align="start">
-                <div className="space-y-1">
-                  {linkedRecords.map(linked => (
-                    <button type="button" key={linked.id} onClick={() => onOpen(linked)} className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <span className="min-w-0"><span className="block font-mono">{linked.id}</span><span className="block text-muted-foreground truncate mt-0.5">{linked.title}</span></span>
-                      <RiskBadge risk={linked.risk} score={linked.score} />
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <span>담당 {record.owner}</span><span aria-hidden>·</span>
+          <span>탐지 {record.date}</span><span aria-hidden>·</span>
+          <span>{record.age === 0 ? '오늘' : `${record.age}일 경과`}</span>
         </div>
       </div>
     </header>

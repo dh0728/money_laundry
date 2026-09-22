@@ -82,7 +82,7 @@ describe('shared moving navigation', () => {
     expect(header).toContain('header-navigation')
     expect(header).toContain('header-search')
     expect(header).toContain('header-search-input')
-    expect(header).toContain('min-w-[180px]')
+    expect(css).toMatch(/\.header-search-input\s*\{[^}]*min-width:\s*280px/)
     const narrow = css.slice(css.indexOf('@media (max-width:520px)'), css.indexOf('@media (max-width:767px)'))
     expect(narrow).toMatch(/\.app-header\s*\{[^}]*height:\s*auto[^}]*grid-template-columns:\s*minmax\(0,1fr\) auto/)
     expect(narrow).toMatch(/\.header-navigation\s*\{[^}]*grid-area:\s*1 \/ 1/)

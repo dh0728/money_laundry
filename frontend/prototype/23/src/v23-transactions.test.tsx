@@ -55,6 +55,24 @@ describe('v23 Transactions four-stage explorer', () => {
     expect(css).toMatch(/\.transaction-stage-item\[aria-pressed="true"\][^{]*\{[^}]*--background:var\(--selection-background\)[^}]*--foreground:var\(--selection-foreground\)/s)
     expect(markup).toContain('data-testid="owner-account-connector-edge-0"')
     expect(markup).toContain('data-testid="account-transaction-connector-edge-0"')
+    expect(markup.match(/data-active="true"/g)).toHaveLength(2)
+    expect(markup).toContain('data-active="false"')
+    expect(css).toMatch(/\.transaction-connector-edge\[data-active="false"\]\s*\{[^}]*color:var\(--muted-foreground\)/s)
+    expect(css).toMatch(/\.transaction-connector-edge\[data-active="true"\]\s*\{[^}]*color:var\(--foreground\)[^}]*z-index:1/s)
+    expect(css).not.toContain('.transaction-connector-edge > b::after')
+  })
+
+  it('surfaces linked records as pill actions at the top of selected transaction details', () => {
+    const transaction = buildTransactionIndex(records).transactions.find(item => item.recordIds.some(id => id.startsWith('ALT-')) && item.recordIds.some(id => id.startsWith('EP-')))!
+    const markup = html(<Transactions records={records} target={{ type: 'transaction', transactionId: transaction.id }} onOpenRecord={() => {}} />)
+    const actions = markup.slice(markup.indexOf('data-testid="linked-record-actions"'), markup.indexOf('data-testid="selected-transaction"'))
+
+    expect(actions).toContain('연결 Alert')
+    expect(actions).toContain('연결 Episode')
+    expect(actions).toContain('rounded-full')
+    expect(actions).toContain('data-variant="outline"')
+    expect(markup.slice(markup.indexOf('data-testid="selected-transaction"'))).not.toContain('연결 Alert')
+    expect(markup.slice(markup.indexOf('data-testid="selected-transaction"'))).not.toContain('연결 Episode')
   })
 
   it('limits internal scrolling to owners and stacks detail below at narrow desktop widths', () => {

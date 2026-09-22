@@ -81,7 +81,8 @@ describe('v22 transaction explorer', () => {
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
     expect(css).toContain('--owner-stage-width: 13.5rem')
     expect(css).toContain('--account-stage-width: 14.5rem')
-    expect(css).toContain('min-width: 180px')
+    expect(css).toContain('.header-search-input { width:clamp(280px,32vw,420px); min-width:280px; }')
+    expect(css).toContain('.header-search-input { width:100%; min-width:180px; max-width:none; }')
   })
 
   it('presents owner, account, and transaction as three explicit sections', () => {

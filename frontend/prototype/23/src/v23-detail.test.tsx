@@ -11,20 +11,27 @@ const renderDetail = (record: (typeof records)[number], initialTab: 'overview' |
 )
 
 describe('v23 detail information hierarchy', () => {
-  it('keeps identity and workflow links in the shared header, and investigation metadata in one section', () => {
+  it('orders the shared header by id, title with linked-record action, then grouped metadata without overview duplication', () => {
     const record = records.find(item => item.kind === 'Alert')!
     const markup = renderDetail(record)
     const header = markup.slice(markup.indexOf('data-testid="detail-header"'), markup.indexOf('underline-tabs'))
     const investigation = markup.slice(markup.indexOf('data-testid="investigation"'), markup.indexOf('처리 이력'))
+    const idPosition = header.indexOf('data-testid="detail-id"')
+    const titlePosition = header.indexOf(`>${record.title}</h1>`)
+    const linkPosition = header.indexOf(`연결된 Episode 1개`)
+    const tagsPosition = header.indexOf('data-testid="detail-tags"')
 
-    expect(header).toContain(record.title)
-    expect(header).toContain(record.id)
+    expect(idPosition).toBeGreaterThan(-1)
+    expect(titlePosition).toBeGreaterThan(idPosition)
+    expect(linkPosition).toBeGreaterThan(titlePosition)
+    expect(tagsPosition).toBeGreaterThan(linkPosition)
     expect(header).toContain(record.status)
-    expect(header).not.toContain(record.owner)
-    expect(header).not.toContain(`${record.age}일 경과`)
-    expect(investigation).toContain(record.owner)
-    expect(investigation).toContain(record.date)
-    expect(investigation).toContain(record.age === 0 ? '오늘' : `${record.age}일 경과`)
+    expect(header).toContain(record.owner)
+    expect(header).toContain(record.date)
+    expect(header).toContain(record.age === 0 ? '오늘' : `${record.age}일 경과`)
+    expect(investigation).not.toContain(record.owner)
+    expect(investigation).not.toContain(record.date)
+    expect(investigation).not.toContain(record.age === 0 ? '오늘' : `${record.age}일 경과`)
   })
 
   it('renders one evidence card per unique Episode pattern without a representative header badge', () => {
