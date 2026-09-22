@@ -79,7 +79,10 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertEqual(self.admin.execute("SELECT count(*) FROM inference_results WHERE run_id=%s",(follow.run_id,)).fetchone()[0],0)
         self.assertTrue(self.admin.execute("SELECT forward_complete FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0])
         # Retry after lost response must not create another evidence version.
+        checked=self.admin.execute("SELECT checked_at FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0]
+        self.assertIsNotNone(checked)
         save_alerts(self.admin,follow)
+        self.assertEqual(self.admin.execute("SELECT checked_at FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0],checked)
         self.assertEqual(self.admin.execute("SELECT count(*) FROM alert_versions WHERE alert_id=%s",(alert,)).fetchone()[0],2)
 
     def test_ten_and_twenty_three_seed_candidates_merge(self):

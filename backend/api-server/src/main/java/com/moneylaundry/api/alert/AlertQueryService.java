@@ -72,7 +72,7 @@ public class AlertQueryService {
     var rows =
         jdbc.queryForList(
             """
-        select a.*,v.version,v.run_id,v.evidence from alerts a join alert_versions v using(alert_id)
+        select a.*,v.version,v.run_id,v.evidence,b.analysis_cutoff_at from alerts a join alert_versions v using(alert_id)
         join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
         where a.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED'
         """
@@ -83,23 +83,42 @@ public class AlertQueryService {
     var coverage =
         jdbc.queryForList(
             """
-        select c.coverage::text,c.forward_complete,c.run_id from alert_coverage_checks c
+        select c.coverage::text,c.checked_at,c.run_id,b.analysis_cutoff_at from alert_coverage_checks c
         join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
         where c.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED'
         """
                 + (version == null
-                    ? " order by b.analysis_cutoff_at desc,b.job_id desc limit 1"
+                    ? " order by c.checked_at desc nulls last,b.analysis_cutoff_at desc,b.job_id desc limit 1"
                     : " and c.run_id=?"),
             version == null ? new Object[] {id} : new Object[] {id, rows.getFirst().get("run_id")});
+    result.put("coverage", coverage.isEmpty() ? List.of() : publicCoverage(coverage.getFirst()));
+    result.put("dataAsOf", instant(rows.getFirst().get("analysis_cutoff_at")));
     result.put(
-        "coverage",
-        coverage.isEmpty()
-            ? List.of()
-            : mapper.readValue(coverage.getFirst().get("coverage").toString(), List.class));
-    result.put(
-        "forwardComplete",
-        !coverage.isEmpty() && Boolean.TRUE.equals(coverage.getFirst().get("forward_complete")));
+        "lastCheckedAt",
+        coverage.isEmpty() ? null : instant(coverage.getFirst().get("checked_at")));
     return result;
+  }
+
+  private Object instant(Object value) {
+    return value == null ? null : ((java.sql.Timestamp) value).toInstant().toString();
+  }
+
+  private List<Object> publicCoverage(Map<String, Object> check) {
+    var cutoff = (java.sql.Timestamp) check.get("analysis_cutoff_at");
+    if (cutoff == null) return List.of();
+    String lastDay =
+        cutoff.toInstant().atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate().toString();
+    Map<String, Object> days = new TreeMap<>();
+    for (Object item : mapper.readValue(check.get("coverage").toString(), List.class)) {
+      var entry = (Map<?, ?>) item;
+      if (!(entry.get("days") instanceof List<?> reportedDays)) continue;
+      for (Object value : reportedDays) {
+        var day = (Map<?, ?>) value;
+        String date = day.get("businessDate").toString();
+        if (date.compareTo(lastDay) <= 0) days.put(date, day);
+      }
+    }
+    return new ArrayList<>(days.values());
   }
 
   public List<Map<String, Object>> versions(long id) {

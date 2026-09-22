@@ -92,7 +92,9 @@ def main():
         params = {} if version == '최신' else {'version': version}
         detail = client.get(f'alerts/{alert_id}', params)
         st.write({'Alert': detail['alertId'], '버전': detail['version'], '상태': detail['status'],
-                  '구성 정책': detail.get('policyVersion')})
+                  '구성 정책': detail.get('policyVersion'),
+                  '데이터 기준 시점': detail.get('dataAsOf'),
+                  '마지막 확인 시각': detail.get('lastCheckedAt')})
         st.caption('저장된 정책의 결과입니다. 논의 중인 날짜별 5일 정책 적용을 뜻하지 않습니다.')
         st.write(detail.get('summary', {}))
         if detail.get('limits'):

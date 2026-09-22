@@ -298,7 +298,7 @@ V1~V3를 변경하지 않는 추가 마이그레이션이다. 기존 보고·거
 - `alerts`: 사건 ID, OPEN/CLOSED/ESCALATED, resolution, L1 assignee FK, parent_alert_id 자기참조, created_at. Episode 연결·판정 변경 API는 후속 구현이다.
 - `alert_versions`: PK(alert_id,version), UNIQUE(alert_id,run_id), run FK, fingerprint, immutable evidence JSONB. 완료 run/job 버전만 공개한다. evidence는 씨앗·가명 거래·동결 점수·요약·그래프·초기 제한을 포함한다.
 - `alert_transactions`: PK(alert_id,version,tx_id), version 복합 FK, 원장 tx FK, SEED/CONNECTION/CONTEXT, reasons JSONB. 한 거래는 여러 사건 및 여러 버전에 존재할 수 있다.
-- `alert_coverage_checks`: PK(alert_id,run_id), 날짜별 수신 현황·탐색 제한 JSONB, forward_complete. 새 연결 없는 재검사는 근거 버전을 만들지 않는다.
+- `alert_coverage_checks`: PK(alert_id,run_id), 날짜별 수신 현황·탐색 제한 JSONB, 내부 대상 선정용 forward_complete, V7의 nullable checked_at(실제 검사 시각). 기존 행의 시각은 추정하지 않는다. 새 연결 없는 재검사는 근거 버전을 만들지 않는다. API는 forward_complete를 공개하지 않고 dataAsOf(근거 run의 cutoff)·lastCheckedAt(성공 검사 checked_at)를 구분한다.
 - `analysis.alert_origins`: run별 기존 공개 Alert 버전·evidence 고정. 아직 미래창이 덜 수신된 사건만 후속 탐색하며 완료 후속 사건이 있으면 그 후속에서 탐색한다.
 - `analysis.input_coverage`: run/날짜별 예상 은행수·완결 보고수·보고 버전/상태 고정. 자료 미수신과 연결 없음은 다르다.
 - `analysis.input_scores`: run별 CONTEXT의 기존 완료 점수 스냅샷. 신규 TARGET 점수는 해당 run inference_results를 사용하고, 미채점 맥락은 null을 유지한다.

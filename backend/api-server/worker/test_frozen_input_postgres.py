@@ -1,7 +1,7 @@
 """Opt-in PostgreSQL 17 integration tests using an isolated disposable container.
 
 Set AML_TEST_DOCKER to the existing Docker executable. No external DB is accepted.
-The repository's V1-V6 SQL is applied directly; this is not a Flyway runner test.
+The repository's V1-V7 SQL is applied directly; this is not a Flyway runner test.
 """
 import io
 import json
@@ -78,7 +78,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 time.sleep(0.25)
         cls.addClassCleanup(cls.admin.close)
         migrations = Path(__file__).resolve().parents[1] / "src/main/resources/db/migration"
-        for version in range(1, 7):
+        for version in range(1, 8):
             files = list(migrations.glob(f"V{version}__*.sql"))
             if len(files) != 1:
                 raise RuntimeError("Expected exactly one migration per version")

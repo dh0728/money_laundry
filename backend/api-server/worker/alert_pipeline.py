@@ -248,8 +248,10 @@ def save_alerts(connection, execution):
                         (alert, version, member['txId'], member['role'], Jsonb(member['includedReasons'])))
                 changed.add(alert)
             for key in {original, alert}:
-                connection.execute('''INSERT INTO alert_coverage_checks VALUES(%s,%s,%s,%s)
-                    ON CONFLICT(alert_id,run_id) DO UPDATE SET coverage=excluded.coverage,forward_complete=excluded.forward_complete''',
+                connection.execute('''INSERT INTO alert_coverage_checks
+                    (alert_id,run_id,coverage,forward_complete,checked_at) VALUES(%s,%s,%s,%s,clock_timestamp())
+                    ON CONFLICT(alert_id,run_id) DO UPDATE SET coverage=excluded.coverage,
+                    forward_complete=excluded.forward_complete,checked_at=excluded.checked_at''',
                     (key, execution.run_id, Jsonb(coverage), all(c['forwardComplete'] for c in coverage)))
         connection.execute('UPDATE batch_jobs SET alert_count=%s WHERE job_id=%s', (len(created), execution.job_id))
         _checkpoint(connection, execution, 'ALERTS', json.dumps(dict(run_id=str(execution.run_id),

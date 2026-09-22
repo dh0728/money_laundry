@@ -117,6 +117,42 @@ class AlertPipelineTests {
   }
 
   @Test
+  void check_without_new_evidence_updates_only_check_time_and_hides_pending_checks() {
+    long alert = firstAlert();
+    jdbc.update(
+        "update alert_coverage_checks set checked_at='2022-09-03 10:00+09' where alert_id=?",
+        alert);
+    var original = alerts.detail(alert, 1);
+    long next =
+        jdbc.queryForObject(
+            "insert into batch_jobs(job_type,status,current_stage,analysis_cutoff_at) values('ANALYSIS','RUNNING','ALERTS','2022-09-04 09:00+09') returning job_id",
+            Long.class);
+    UUID checking = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis_runs(run_id,job_id,status) values(?,?,'ACTIVE')", checking, next);
+    jdbc.update(
+        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete,checked_at) values(?,?,?::jsonb,false,'2022-09-04 10:00+09')",
+        alert,
+        checking,
+        "[{\"txId\":1,\"forwardComplete\":false,\"days\":[{\"businessDate\":\"2022-09-03\",\"complete\":true},{\"businessDate\":\"2022-09-05\",\"complete\":false}]}]");
+    assertThat(alerts.detail(alert, null)).isEqualTo(original);
+    jdbc.update("update analysis_runs set status='COMPLETED' where run_id=?", checking);
+    // A completed run inside an unfinished job is still not public.
+    assertThat(alerts.detail(alert, null)).isEqualTo(original);
+    jdbc.update("update batch_jobs set status='COMPLETED' where job_id=?", next);
+    var latest = alerts.detail(alert, null);
+    assertThat(latest.get("dataAsOf")).isEqualTo(original.get("dataAsOf"));
+    assertThat(latest.get("lastCheckedAt")).isEqualTo("2022-09-04T01:00:00Z");
+    assertThat(latest.get("version")).isEqualTo(original.get("version"));
+    assertThat((List<?>) latest.get("coverage")).hasSize(1);
+    assertThat(latest.get("coverage").toString()).doesNotContain("forwardComplete", "2022-09-05");
+    assertThat(latest).doesNotContainKey("forwardComplete");
+    assertThat(alerts.detail(alert, 1)).isEqualTo(original);
+    jdbc.update("update alert_coverage_checks set checked_at=null where alert_id=?", alert);
+    assertThat(alerts.detail(alert, 1).get("lastCheckedAt")).isNull();
+  }
+
+  @Test
   void actual_freeze_empty_targets_enriches_next_day_and_keeps_old_version() {
     long alert = firstAlert();
     var old = alerts.detail(alert, 1);
@@ -162,7 +198,9 @@ class AlertPipelineTests {
     assertThat(alerts.versions(alert)).hasSize(2);
     assertThat(alerts.detail(alert, 1)).isEqualTo(old);
     assertThat((List<?>) alerts.detail(alert, null).get("transactions")).hasSize(2);
-    assertThat(alerts.detail(alert, null).get("forwardComplete")).isEqualTo(true);
+    assertThat(alerts.detail(alert, null)).doesNotContainKey("forwardComplete");
+    assertThat(alerts.detail(alert, null).get("dataAsOf")).isEqualTo("2022-09-04T00:00:00Z");
+    assertThat(alerts.detail(alert, null).get("lastCheckedAt")).isNotNull();
     assertThat(alerts.list(0, 20, null, null, follow).get("totalElements")).isEqualTo(1L);
   }
 
@@ -191,7 +229,10 @@ class AlertPipelineTests {
         child,
         completed,
         parent);
-    jdbc.update("insert into alert_coverage_checks values(?,?,'[]',false)", child, completed);
+    jdbc.update(
+        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete) values(?,?,'[]',false)",
+        child,
+        completed);
     long next =
         jdbc.queryForObject(
             "insert into batch_jobs(job_type,status,current_stage,threshold_value,analysis_cutoff_at) values('ANALYSIS','QUEUED','FREEZE_INPUT',.7,'2022-09-05 09:00+09') returning job_id",
