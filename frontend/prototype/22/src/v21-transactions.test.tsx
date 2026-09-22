@@ -101,41 +101,37 @@ describe('v22 Transactions three-section hierarchy', () => {
   })
 
   it('applies transaction date, direction, status, and payment filters to transaction rows', async () => {
-    const module = await import('./Transactions') as unknown as {
-      transactionPassesFilters?: (
+    const module = await import('./TransactionsV22') as unknown as {
+      passesFilters?: (
         row: { at?: string; direction?: '송금' | '수취'; suspicious?: boolean; format?: string },
         range: { from?: Date; to?: Date } | undefined,
         filters: Array<{ field: 'direction' | 'status' | 'format'; value: string }>,
       ) => boolean
     }
-    expect(module.transactionPassesFilters).toBeTypeOf('function')
+    expect(module.passesFilters).toBeTypeOf('function')
     const row = { at: '2026-09-08 10:04', direction: '송금' as const, suspicious: true, format: 'ACH' }
-    expect(module.transactionPassesFilters!(row, { from: new Date(2026, 8, 8), to: new Date(2026, 8, 8) }, [
+    expect(module.passesFilters!(row, { from: new Date(2026, 8, 8), to: new Date(2026, 8, 8) }, [
       { field: 'direction', value: '송금' }, { field: 'status', value: '의심' }, { field: 'format', value: 'ACH' },
     ])).toBe(true)
-    expect(module.transactionPassesFilters!(row, { from: new Date(2026, 8, 9), to: new Date(2026, 8, 9) }, [])).toBe(false)
-    expect(module.transactionPassesFilters!(row, undefined, [{ field: 'status', value: '정상' }])).toBe(false)
+    expect(module.passesFilters!(row, { from: new Date(2026, 8, 9), to: new Date(2026, 8, 9) }, [])).toBe(false)
+    expect(module.passesFilters!(row, undefined, [{ field: 'status', value: '정상' }])).toBe(false)
   })
 
-  it('resets local query and sorting while preserving the target owner page', async () => {
-    const module = await import('./Transactions') as unknown as {
-      transactionNavigationState?: (index: ReturnType<typeof buildTransactionIndex>, target: { type: 'owner'; owner: string }, pageSize: number) => {
-        query: string; sorting: unknown[]; pagination: { pageIndex: number; pageSize: number }
-      }
-    }
-    expect(module.transactionNavigationState).toBeTypeOf('function')
+  it('opens the requested owner and account beyond the former owner-page boundary', () => {
     const index = buildTransactionIndex(records)
     const owner = index.owners[42]
-    const next = module.transactionNavigationState!(index, { type: 'owner', owner: owner.name }, 20)
-    expect(next).toEqual(expect.objectContaining({
-      query: '', sorting: [], pagination: { pageIndex: 2, pageSize: 20 },
-    }))
+    const markup = html(<Transactions records={records} target={{ type: 'owner', owner: owner.name }} />)
+    expect(markup).toContain(`${owner.name}의 계좌`)
+    expect(markup).toContain(owner.accountIds[0])
   })
 
-  it('does not re-run target synchronization when only rows per page changes', () => {
-    const source = readFileSync(new URL('./Transactions.tsx', import.meta.url), 'utf8')
-    expect(source).not.toContain('[index, target, pagination.pageSize]')
-    expect(source).toMatch(/useEffect\(\(\) => \{[\s\S]*?transactionNavigationState\(index, target, pageSizeRef\.current\)[\s\S]*?\}, \[index, target\]\)/)
+  it('opens the requested account under its owner with that account’s transactions', () => {
+    const index = buildTransactionIndex(records)
+    const account = index.accounts[42]
+    const markup = html(<Transactions records={records} target={{ type: 'account', account: account.id }} />)
+    expect(markup).toContain(`${account.owner}의 계좌`)
+    expect(markup).toContain(`${account.id}의 거래 내역`)
+    expect(markup).toContain(account.transactionIds[0])
   })
 
   it('activates a table row with Enter only when the row itself owns focus', async () => {

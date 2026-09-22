@@ -4,7 +4,6 @@ import { useLayoutEffect, useMemo, useState } from 'react'
 import { Rnd } from 'react-rnd'
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch'
 import { Minus, PanelRight, PictureInPicture2, Plus, Shrink, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Layer, Rectangle, ResponsiveContainer, Sankey, Tooltip } from 'recharts'
@@ -227,10 +226,10 @@ export function FlowPanel({ model, focus, mode, onModeChange, onClose }: { model
     <div className="flex flex-col h-full min-h-0 bg-card" data-testid="flow-panel" data-shine="surface" data-mode={mode}>
       <div className="flow-panel-handle flex items-center gap-2 border-b px-3 py-2 shrink-0">
         <h3 className="flex-1 min-w-0 truncate text-sm font-semibold" translate="no">{flowLabel(model, focus)}</h3>
-        <Button variant="ghost" size="icon" className="size-7" aria-label={mode === 'dock' ? '떠 있는 창으로 보기' : '오른쪽에 고정'} title={mode === 'dock' ? '떠 있는 창으로 보기' : '오른쪽에 고정'} onClick={() => onModeChange(mode === 'dock' ? 'float' : 'dock')}>
+        <IconButton label={mode === 'dock' ? '떠 있는 창으로 보기' : '오른쪽에 고정'} className="size-7" onClick={() => onModeChange(mode === 'dock' ? 'float' : 'dock')}>
           {mode === 'dock' ? <PictureInPicture2 /> : <PanelRight />}
-        </Button>
-        <Button variant="ghost" size="icon" className="size-7" aria-label="상세 닫기" onClick={onClose}><X /></Button>
+        </IconButton>
+        <IconButton label="상세 닫기" className="size-7" onClick={onClose}><X /></IconButton>
       </div>
       <div className="@container flex-1 min-h-0 overflow-auto p-3"><FlowDetail model={model} focus={focus} /></div>
     </div>

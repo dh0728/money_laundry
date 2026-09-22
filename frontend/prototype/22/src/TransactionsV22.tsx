@@ -37,7 +37,7 @@ function transactionView(transaction: IndexedTransaction, account: IndexedAccoun
   }
 }
 
-function passesFilters(row: TransactionView, range: DateRange | undefined, filters: TransactionFilter[]) {
+export function passesFilters(row: TransactionView, range: DateRange | undefined, filters: TransactionFilter[]) {
   const day = row.at.slice(0, 10)
   if (range?.from && day < dateKey(range.from)) return false
   if (range?.to && day > dateKey(range.to)) return false

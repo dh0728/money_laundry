@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { records, TODAY } from './domain'
@@ -7,6 +8,14 @@ import { Institution, buildInstitutionChartData, dailyFlow } from './Dashboard'
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
 
 describe('v21 institution dashboard', () => {
+  it('has one transactions implementation and one dashboard work-card definition', () => {
+    const transactions = readFileSync(new URL('./Transactions.tsx', import.meta.url), 'utf8')
+    const dashboard = readFileSync(new URL('./Dashboard.tsx', import.meta.url), 'utf8')
+    expect(transactions.trim()).toBe("export { default } from './TransactionsV22'")
+    expect(dashboard.match(/function WorkCard/g)).toHaveLength(1)
+    expect(dashboard.match(/<WorkCard/g)?.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('one date range visibly changes datasets for all three charts, including full history', () => {
     const broad = buildInstitutionChartData(records, undefined)
     const narrow = buildInstitutionChartData(records, { from: new Date(2026, 7, 18), to: TODAY })

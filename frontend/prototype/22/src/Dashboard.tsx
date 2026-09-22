@@ -9,6 +9,19 @@ import { SectionCards, type SectionCardItem } from './blocks/section-cards'
 import { ChartAreaInteractive, dashboardChartTones, type DailyFlow } from './blocks/chart-area-interactive'
 
 const fmt = (n: number) => n.toLocaleString('ko-KR')
+function WorkCard({ record, onOpen, meta }: { record: RecordItem; onOpen: (record: RecordItem) => void; meta?: string }) {
+  return (
+    <button type="button" onClick={() => onOpen(record)} className="work-card w-full text-left grid grid-cols-[1fr_auto] items-center gap-4 rounded-lg border bg-card px-5 py-4 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring outline-none">
+      <span className="min-w-0">
+        <span className="block text-xs font-mono text-muted-foreground">{record.id}</span>
+        <span className="block text-sm mt-1.5 truncate">{record.title}</span>
+        <span className="flex gap-2 mt-2 items-center"><PatternBadge pattern={record.pattern} probability={record.probability} /><span className="text-[11px] text-muted-foreground">{meta ?? `${record.owner} · ${record.age === 0 ? '오늘 탐지' : `${record.age}일 경과`}`}</span></span>
+      </span>
+      <RiskBadge risk={record.risk} score={record.score} />
+    </button>
+  )
+}
+
 function Personal({ records, user, onOpen }: { records: RecordItem[]; user: string; onOpen: (r: RecordItem) => void }) {
   const mine = records.filter(r => r.owner === user && r.status !== '종결')
   const queue = mine.slice().sort((a, b) => b.score - a.score).slice(0, 5)
@@ -36,14 +49,7 @@ function Personal({ records, user, onOpen }: { records: RecordItem[]; user: stri
         {/* 수정안: 바깥 카드 없이 업무마다 독립된 카드를 간격을 두고 나열 */}
         <div className="space-y-2.5" data-testid="work-queue">
           {queue.map(r => (
-            <button type="button" key={r.id} onClick={() => onOpen(r)} className="work-card w-full text-left grid grid-cols-[1fr_auto] items-center gap-4 rounded-lg border bg-card px-5 py-4 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring outline-none">
-              <span className="min-w-0">
-                <span className="block text-xs font-mono text-muted-foreground">{r.id}</span>
-                <span className="block text-sm mt-1.5 truncate">{r.title}</span>
-                <span className="flex gap-2 mt-2 items-center"><PatternBadge pattern={r.pattern} probability={r.probability} /><span className="text-[11px] text-muted-foreground">{r.owner} · {r.age === 0 ? '오늘 탐지' : `${r.age}일 경과`}</span></span>
-              </span>
-              <RiskBadge risk={r.risk} score={r.score} />
-            </button>
+            <WorkCard key={r.id} record={r} onOpen={onOpen} />
           ))}
         </div>
       </section>
@@ -54,11 +60,7 @@ function Personal({ records, user, onOpen }: { records: RecordItem[]; user: stri
         </div>
         <div className="space-y-2.5">
           {records.filter(r => r.owner === user).slice(0, 3).map((r, i) => (
-            <button type="button" key={r.id} onClick={() => onOpen(r)} className="work-card w-full text-left flex gap-4 items-center rounded-lg border bg-card px-5 py-3 text-xs hover:bg-muted/50 outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <span className="text-muted-foreground tabular-nums w-10">{14 - i}:24</span>
-              <span className="font-mono">{r.id}</span>
-              <span className="text-muted-foreground">{r.status === '종결' ? '검토 종결' : '검토 시작'}</span>
-            </button>
+            <WorkCard key={r.id} record={r} onOpen={onOpen} meta={`${14 - i}:24 · ${r.status === '종결' ? '검토 종결' : '검토 시작'}`} />
           ))}
         </div>
       </section>
@@ -181,14 +183,7 @@ export function Institution({ records, onOpen }: { records: RecordItem[]; onOpen
         </div>
         <div className="space-y-2.5">
           {recent.map(r => (
-            <button type="button" key={r.id} onClick={() => onOpen(r)} className="work-card w-full text-left grid grid-cols-[1fr_auto] items-center gap-4 rounded-lg border bg-card px-5 py-4 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring outline-none">
-              <span className="min-w-0">
-                <span className="block text-xs font-mono text-muted-foreground">{r.id}</span>
-                <span className="block text-sm mt-1.5 truncate">{r.title}</span>
-                <span className="flex gap-2 mt-2 items-center"><PatternBadge pattern={r.pattern} probability={r.probability} /><span className="text-[11px] text-muted-foreground">{r.owner} · {r.age === 0 ? '오늘 탐지' : `${r.age}일 경과`}</span></span>
-              </span>
-              <RiskBadge risk={r.risk} score={r.score} />
-            </button>
+            <WorkCard key={r.id} record={r} onOpen={onOpen} />
           ))}
         </div>
       </section>

@@ -20,6 +20,21 @@ const html = (node: React.ReactNode) => renderToStaticMarkup(
 )
 
 describe('v22 top-level page layout', () => {
+  it('keeps settings at two columns and uses shared icon controls', () => {
+    const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
+    const flow = readFileSync(new URL('./FlowDetail.tsx', import.meta.url), 'utf8')
+    expect(css).toMatch(/\.settings-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
+    expect(css).toMatch(/@media\s*\(max-width:\s*760px\)\s*\{\s*\.settings-grid\s*\{\s*grid-template-columns:\s*1fr;/)
+    expect(flow).toContain('<IconButton label="축소"')
+    expect(flow).toContain('<IconButton label="확대"')
+    expect(flow).toContain('<IconButton label="상세 닫기"')
+  })
+
+  it('returns to the first page when a filter chip is removed', () => {
+    const source = readFileSync(new URL('./Lists.tsx', import.meta.url), 'utf8')
+    expect(source).toMatch(/onRemove=\{\(\) => \{\s*setFilters\([^}]+toFirst\(\)/s)
+  })
+
   it.each([
     ['대시보드', <Dashboard records={records} user="오검토" onOpen={() => {}} />],
     ['거래 내역', <Transactions records={records} />],

@@ -106,7 +106,7 @@ export default function Lists({ kind, records, user, onOpen, state, setState }: 
       </div>
       {filters.length > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
-          {filters.map((f, i) => <FilterChip key={`${f.field}-${f.value}`} onRemove={() => setFilters(p => p.filter((_, j) => j !== i))}>{chipLabel(f)}</FilterChip>)}
+          {filters.map((f, i) => <FilterChip key={`${f.field}-${f.value}`} onRemove={() => { setFilters(p => p.filter((_, j) => j !== i)); toFirst() }}>{chipLabel(f)}</FilterChip>)}
           <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={reset}>모든 조건 지우기</Button>
         </div>
       )}

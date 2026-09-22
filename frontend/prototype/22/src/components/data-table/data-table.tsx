@@ -13,9 +13,8 @@ import {
 import { getColumnPinningStyle } from "@/lib/data-table";
 import { cn } from "@/lib/utils";
 
-interface DataTableProps<TData> extends React.ComponentProps<"div"> {
+interface DataTableProps<TData> extends Omit<React.ComponentProps<"div">, "children"> {
   table: TanstackTable<TData>;
-  actionBar?: React.ReactNode;
   tableClassName?: string;
   /** AML RADAR: 행을 누르거나 Enter로 상세를 연다 */
   onRowClick?: (row: TData) => void;
@@ -26,10 +25,8 @@ export const toggleSingleSelectedId = (current: string | null | undefined, click
 
 export function DataTable<TData>({
   table,
-  actionBar,
   tableClassName,
   onRowClick,
-  children,
   className,
   ...props
 }: DataTableProps<TData>) {
@@ -38,7 +35,6 @@ export function DataTable<TData>({
       className={cn("flex w-full flex-col gap-2.5 overflow-visible", className)}
       {...props}
     >
-      {children}
       <div className="glass-surface overflow-hidden rounded-md border">
         <Table className={tableClassName}>
           <TableHeader>
@@ -113,9 +109,6 @@ export function DataTable<TData>({
       </div>
       <div className="flex flex-col gap-2.5">
         <DataTablePagination table={table} />
-        {actionBar &&
-          table.getFilteredSelectedRowModel().rows.length > 0 &&
-          actionBar}
       </div>
     </div>
   );
