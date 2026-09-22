@@ -56,10 +56,16 @@ describe('v19 관계 그래프 · react-force-graph', () => {
     expect(graphSrc).not.toContain('allowed && !allowed.has(key)')
     expect(graphSrc).not.toContain('cooldownTicks')
   })
-  it('화살촉은 도착 계좌 경계, 자기 자신 거래·양방향 쌍은 곡선, 의심 거래는 흐름 입자', () => {
-    expect(graphSrc).toContain('linkDirectionalArrowRelPos={1}')
+  it('계좌·소유주 보기 선택과 공용 시간축을 표시한다', () => {
+    expect(markup).toContain('계좌 보기')
+    expect(markup).toContain('소유주 보기')
+    expect(markup).toContain('aria-label="그래프 보기"')
+    expect(markup).toContain('aria-label="시간축"')
+  })
+  it('화살촉 없이 자기 자신 거래·양방향 곡선과 모션 설정을 따르는 흐름 입자를 쓴다', () => {
+    expect(graphSrc).toContain('linkDirectionalArrowLength={0}')
     expect(graphSrc).toMatch(/linkCurvature=\{l => l\.s === l\.t/)
-    expect(graphSrc).toContain('linkDirectionalParticles={l => l.label === 1 ? 2 : 1}')
+    expect(graphSrc).toContain('linkDirectionalParticles={l => flowParticleCount(l.label, reducedMotion)}')
     expect(graphSrc).toContain('linkDirectionalParticleColor={l => l.label === 1 ? colors.l1 : colors.l0Particle}')
     expect(readFileSync(new URL('./index.css', import.meta.url), 'utf8')).toContain('--graph-l1-edge:#ff000073')
   })

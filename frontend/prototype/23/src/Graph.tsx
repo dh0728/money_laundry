@@ -6,11 +6,14 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Kbd } from '@/components/ui/kbd'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { compactUsd, minutes, neighborhood, stepTimeline, timeLabel, timelineEvents, usd, widthFor, type GraphEdge, type GraphModel, type GraphNode } from './domain'
 import { FlowPanel, type FlowFocus, type PanelMode } from './FlowDetail'
 import { IconButton } from './shared'
+import OwnerGraph, { flowParticleCount, type OwnerGraphControls } from './OwnerGraph'
+import type { GraphViewMode } from './v23-domain'
 
 export const DEFAULT_HOP = 3
 const HOP_MIN = 1, HOP_MAX = 5
@@ -57,6 +60,17 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
   const [showInfo, setShowInfo] = useState(false), [hop, setHop] = useState(DEFAULT_HOP)
   const [selectedNode, setSelectedNode] = useState<string | null>(null), [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [search, setSearch] = useState(''), [fullscreen, setFullscreen] = useState(false)
+  const [viewMode, setViewMode] = useState<GraphViewMode>('account')
+  const ownerGraph = useRef<OwnerGraphControls>(null)
+  const [ownerZoom, setOwnerZoom] = useState({ ratio: 1, fitted: true })
+  const [reducedMotion, setReducedMotion] = useState(false)
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    if (!media) return
+    const update = () => setReducedMotion(media.matches)
+    update(); media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
   // 상세: 오른쪽 도킹(좁으면 아래) 또는 RDR 9000처럼 떠 있는 창
   const [panelMode, setPanelMode] = useState<PanelMode>('dock')
   const [hover, setHover] = useState<{ kind: 'node' | 'edge'; key: string; x: number; y: number } | null>(null)
@@ -137,10 +151,11 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
   // 첫 시뮬레이션이 멈추기 전에는 내부 zoom 상태가 없어 호출하면 오류가 난다
   const ready = useRef(false)
   const fitGraph = useCallback((ms = 400) => {
+    if (viewMode === 'owner') { ownerGraph.current?.fit(); return }
     const g = fg.current; if (!g || !ready.current) return
     g.zoomToFit(ms, PAD)
     window.setTimeout(() => { fitK.current = g.zoom(); setZoomK(g.zoom()); setFitted(true) }, ms + 20)
-  }, [])
+  }, [viewMode])
   // 화면 맞춤 상태에서는 크기·범위가 바뀌어도 계속 맞춘다
 
   // 레이아웃 전환으로 캔버스 요소가 바뀔 때마다 관찰 대상을 다시 잡는다(callback ref)
@@ -175,7 +190,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
   const clearSelection = () => { setSelectedNode(null); setSelectedEdge(null) }
   const selectNode = (key: string) => { setSelectedNode(key); setSelectedEdge(null) }
   const resetGraph = () => { clearSelection(); setHop(DEFAULT_HOP); setSearch(''); setShowInfo(false); setTime(Infinity); setPlaying(false); fitGraph() }
-  const zoomBy = (factor: number) => { const g = fg.current; if (!g || !ready.current) return; setFitted(false); g.zoom(g.zoom() * factor, 200) }
+  const zoomBy = (factor: number) => { if (viewMode === 'owner') { ownerGraph.current?.zoomBy(factor); return } const g = fg.current; if (!g || !ready.current) return; setFitted(false); g.zoom(g.zoom() * factor, 200) }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('input,textarea,[role=slider]')) return
     if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1) }
@@ -240,11 +255,11 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
       // Obsidian처럼 가는 선: 금액 굵기(widthFor 1~12)를 절반 남짓으로 줄인다
       linkWidth={l => widthFor(l.usd, usdMin, usdMax) * .55 * (selectedEdge === l.key ? 1.5 : 1)}
       linkLineDash={l => l.bridgePath ? [4, 3] : null}
-      // 방향: 화살촉은 도착 계좌 경계(9/19 명기: 가운데는 애매). 자기 자신 거래·양방향 쌍은 곡선으로 분리
-      linkDirectionalArrowLength={l => 3 + widthFor(l.usd, usdMin, usdMax) * .5} linkDirectionalArrowRelPos={1}
+      // 방향은 흐름 입자로 표현한다. 자기 자신 거래·양방향 쌍은 곡선으로 분리한다.
+      linkDirectionalArrowLength={0}
       linkCurvature={l => l.s === l.t ? .9 : pairKeys.has(`${l.t}>${l.s}`) ? .18 : 0}
       // 의심 거래는 빨간 점 2개, 정상 거래는 반투명 흰 점 1개로 흐름을 구분한다.
-      linkDirectionalParticles={l => l.label === 1 ? 2 : 1} linkDirectionalParticleWidth={l => l.label === 1 ? Math.max(2, widthFor(l.usd, usdMin, usdMax)) : Math.max(1.5, widthFor(l.usd, usdMin, usdMax) * .65)}
+      linkDirectionalParticles={l => flowParticleCount(l.label, reducedMotion)} linkDirectionalParticleWidth={l => l.label === 1 ? Math.max(2, widthFor(l.usd, usdMin, usdMax)) : Math.max(1.5, widthFor(l.usd, usdMin, usdMax) * .65)}
       linkDirectionalParticleColor={l => l.label === 1 ? colors.l1 : colors.l0Particle}
       linkCanvasObjectMode={() => 'after'}
       linkCanvasObject={(l, ctx, scale) => {
@@ -263,12 +278,22 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
       onEngineStop={() => { ready.current = true; if (!firstFit.current) { firstFit.current = true; fitGraph() } }}
     />
   )
+  const viewToggle = <ToggleGroup type="single" value={viewMode} onValueChange={value => {
+    if (value === 'account' || value === 'owner') {
+      setViewMode(value); setHover(null); firstFit.current = false; ready.current = false
+      setOwnerZoom({ ratio: 1, fitted: true })
+    }
+  }} aria-label="그래프 보기" variant="outline" size="sm">
+    <ToggleGroupItem value="account" className="text-xs">계좌 보기</ToggleGroupItem>
+    <ToggleGroupItem value="owner" className="text-xs">소유주 보기</ToggleGroupItem>
+  </ToggleGroup>
   const settingsFull = (
     <div className="p-4 h-full flex flex-col gap-6">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-sm">그래프 설정</h3>
         <IconButton label="그래프 초기화" onClick={resetGraph}><RotateCcw className="size-3.5" /></IconButton>
       </div>
+      {viewToggle}
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor="graph-info" className="text-xs font-normal leading-5">상시 거래 정보 표시</Label>
         <Switch id="graph-info" checked={showInfo} onCheckedChange={setShowInfo} />
@@ -292,6 +317,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
 
   const settingsCompact = (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2.5 border-b text-xs shrink-0">
+      {viewToggle}
       <div className="flex items-center gap-2">
         <Label htmlFor="graph-info-c" className="text-xs font-normal">거래 정보</Label>
         <Switch id="graph-info-c" checked={showInfo} onCheckedChange={setShowInfo} />
@@ -315,7 +341,12 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
         <IconButton label={fullscreen ? '전체화면 종료' : '전체화면'} onClick={() => setFullscreen(f => !f)}>{fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</IconButton>
       </div>
       <div ref={canvasRef} className="relative flex-1 min-h-0 graph-canvas outline-none" tabIndex={0} role="img" aria-label={`${label} · 계좌 ${nodes.length}개, 연결 ${edges.length}개 · ←/→ 이전·다음 거래, Space 재생`} onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); pointer.current = { x: e.clientX - r.left, y: e.clientY - r.top } }}>
-        <Suspense fallback={null}>{forceGraph}</Suspense>
+        {viewMode === 'account' ? <Suspense fallback={null}>{forceGraph}</Suspense> : <OwnerGraph ref={ownerGraph}
+          model={model} width={size.w} height={size.h} visibleNodes={new Set(nodes.filter(n => (nodeStart.get(n.key) ?? -Infinity) <= current).map(n => n.key))}
+          edges={edges.filter(e => edgeStart(e) <= current)} selectedNode={selectedNode} selectedEdge={selectedEdge}
+          hover={hover} lit={lit} search={q} showInfo={showInfo} reducedMotion={reducedMotion}
+          onHover={setHover} onSelectNode={selectNode} onSelectEdge={key => { setSelectedEdge(key); setSelectedNode(null) }} onClear={clearSelection}
+          onZoom={(ratio, isFitted) => setOwnerZoom({ ratio, fitted: isFitted })} />}
         {hover && (hoverNode || hoverEdge) && (
           <div className="graph-tooltip" style={{ left: Math.min(hover.x + 14, size.w - 260), top: Math.min(hover.y + 14, size.h - 110) }}>
             {hoverNode && <><b>{hoverNode.entity}</b><br />{hoverNode.account} · Bank {hoverNode.bank}<br />{graphNodeRole(hoverNode)}</>}
@@ -325,9 +356,9 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
         <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[11px] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</div>
         <div className="absolute bottom-3 right-3 flex items-center bg-card border rounded-md">
           <IconButton label="축소" onClick={() => zoomBy(1 / 1.2)}><Minus className="size-3.5" /></IconButton>
-          <span className="text-[11px] tabular-nums w-10 text-center">{Math.round(zoomK / (fitK.current || 1) * 100)}%</span>
+          <span className="text-[11px] tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : zoomK / (fitK.current || 1)) * 100)}%</span>
           <IconButton label="확대" onClick={() => zoomBy(1.2)}><Plus className="size-3.5" /></IconButton>
-          <IconButton label="화면 맞춤" disabled={fitted} onClick={() => fitGraph()}><Shrink className="size-3.5" /></IconButton>
+          <IconButton label="화면 맞춤" disabled={viewMode === 'owner' ? ownerZoom.fitted : fitted} onClick={() => fitGraph()}><Shrink className="size-3.5" /></IconButton>
         </div>
       </div>
       <div className="graph-timebar flex items-center gap-3 border-t px-3 py-2 text-xs shrink-0">
