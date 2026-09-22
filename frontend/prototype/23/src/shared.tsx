@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowDown, ArrowUp, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarDays, RotateCcw, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarDays, Link2, RotateCcw, X } from 'lucide-react'
 import { ko } from 'date-fns/locale'
 import { subDays, startOfMonth } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { TableHead } from '@/components/ui/table'
-import { riskTone, topPercent, TODAY, type Risk, type SortDirection } from './domain'
+import { riskTone, topPercent, TODAY, type RecordItem, type Risk, type SortDirection } from './domain'
 
 export function PageHeading({ title, description }: { title: string; description: string }) {
   return (
@@ -125,6 +125,42 @@ export function RiskBadge({ score }: { risk: Risk; score: number }) {
 export function PatternBadge({ pattern, probability }: { pattern: string; probability: number }) {
   // 9/18: 정답처럼 보이지 않게 모델 판별 확률로 표현한다 (예: FAN_OUT 의심 87%)
   return <Badge variant="secondary" className="font-mono font-normal text-xs" title={`모델 판별 · ${pattern} 의심 ${probability}%`}>{pattern}<span className="ml-1.5 font-sans text-muted-foreground">의심 {probability}%</span></Badge>
+}
+
+export function DetailHeading({ record, linkedRecords, onOpen }: { record: RecordItem; linkedRecords: RecordItem[]; onOpen: (record: RecordItem) => void }) {
+  const linkedLabel = record.kind === 'Alert' ? 'Episode' : 'Alert'
+  return (
+    <header data-testid="detail-header">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight">{record.title}</h1>
+          <span className="font-mono text-xs text-muted-foreground">{record.id}</span>
+          <Badge variant="outline" className="text-[10px] font-normal">{record.status}</Badge>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mt-2.5" data-testid="detail-row2">
+          <RiskBadge risk={record.risk} score={record.score} />
+          {record.kind === 'Alert' && <PatternBadge pattern={record.pattern} probability={record.probability} />}
+          {linkedRecords.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs font-normal"><Link2 className="size-3.5" />연결된 {linkedLabel} {linkedRecords.length}</Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-1.5" align="start">
+                <div className="space-y-1">
+                  {linkedRecords.map(linked => (
+                    <button type="button" key={linked.id} onClick={() => onOpen(linked)} className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <span className="min-w-0"><span className="block font-mono">{linked.id}</span><span className="block text-muted-foreground truncate mt-0.5">{linked.title}</span></span>
+                      <RiskBadge risk={linked.risk} score={linked.score} />
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+      </div>
+    </header>
+  )
 }
 
 export function FilterChip({ children, onRemove }: { children: ReactNode; onRemove: () => void }) {

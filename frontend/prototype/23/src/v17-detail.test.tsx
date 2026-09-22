@@ -8,6 +8,7 @@ import PatternGlyph, { type PatternKey } from './PatternGlyph'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
 const detailSource = readFileSync(new URL('./Detail.tsx', import.meta.url), 'utf8')
+const sharedSource = readFileSync(new URL('./shared.tsx', import.meta.url), 'utf8')
 const cssSource = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
 
 describe('Figma v17 · josa(word, 이, 가) 조사 헬퍼', () => {
@@ -29,26 +30,24 @@ describe('Figma v17 · Detail 헤더 재배치', () => {
   const alert = records.find(r => r.kind === 'Alert')!
   const markup = html(<Detail record={alert} records={records} user={alert.owner} onUpdate={() => {}} onOpen={() => {}} />)
 
-  it('row1은 제목만 있고, 연결 레코드가 있으면 그 옆에 팝오버를 여는 링크 버튼이 온다', () => {
+  it('row1은 제목·ID·상태를 같이 보여준다', () => {
     const headerIdx = markup.indexOf('data-testid="detail-header"')
     const titleIdx = markup.indexOf(`>${alert.title}</h1>`, headerIdx)
     expect(titleIdx).toBeGreaterThan(headerIdx)
-    // 연결된 Episode 안내가 svg 아이콘을 포함한 실제 button(팝오버 트리거)으로 title 뒤에 온다
-    const afterTitle = markup.slice(titleIdx)
-    expect(afterTitle).toMatch(/^[^<]*<\/h1>[\s\S]{0,40}<button[^>]*>[^<]*<svg[^>]*>[\s\S]*?<\/svg>연결된 (Episode|Alert) \d+<\/button>/)
+    const idIdx = markup.indexOf(`>${alert.id}</span>`, titleIdx)
+    const statusIdx = markup.indexOf(`>${alert.status}<`, idIdx)
+    expect(idIdx).toBeGreaterThan(titleIdx)
+    expect(statusIdx).toBeGreaterThan(idIdx)
   })
 
-  it('row2는 record id로 시작하고, 이어서 상태·위험·패턴·담당 정보가 온다', () => {
+  it('row2는 위험·Alert 탐지 유형·연결 업무만 담는다', () => {
     const row2Idx = markup.indexOf('data-testid="detail-row2"')
     expect(row2Idx).toBeGreaterThan(-1)
-    const tagEnd = markup.indexOf('>', row2Idx) + 1
-    const rest = markup.slice(tagEnd, tagEnd + 200)
-    expect(rest.startsWith(`<span class="font-mono text-xs text-muted-foreground">${alert.id}</span>`)).toBe(true)
-
-    const idIdx = markup.indexOf(`>${alert.id}</span>`, row2Idx)
-    const statusIdx = markup.indexOf(`>${alert.status}<`, row2Idx)
-    expect(idIdx).toBeGreaterThan(row2Idx)
-    expect(statusIdx).toBeGreaterThan(idIdx)
+    const row2 = markup.slice(row2Idx, markup.indexOf('</header>', row2Idx))
+    expect(row2).toContain(`모델 판별 · ${alert.pattern} 의심 ${alert.probability}%`)
+    expect(row2).toMatch(/연결된 (Episode|Alert) \d+/)
+    expect(row2).not.toContain(alert.owner)
+    expect(row2).not.toContain(`${alert.age}일 경과`)
   })
 
   it('팝오버는 닫힌 상태에서는 렌더되지 않고(Radix 기본), 목록 항목은 id/title/위험 배지를 보여주며 onOpen으로 연다', () => {
@@ -56,8 +55,8 @@ describe('Figma v17 · Detail 헤더 재배치', () => {
     expect(markup).toContain('data-slot="popover-trigger"')
     expect(markup).not.toContain('data-slot="popover-content"')
     // 목록 항목 구조는 소스에서 id·title·RiskBadge와 onOpen 연결을 갖도록 작성돼 있다
-    expect(detailSource).toMatch(/onClick=\{\(\) => onOpen\(x\)\}/)
-    expect(detailSource).toMatch(/<RiskBadge risk=\{x\.risk\} score=\{x\.score\} \/>/)
+    expect(sharedSource).toMatch(/onClick=\{\(\) => onOpen\(linked\)\}/)
+    expect(sharedSource).toMatch(/<RiskBadge risk=\{linked\.risk\} score=\{linked\.score\} \/>/)
   })
 
   it('우측에는 읽기 전용 안내만 남고, 조사(이/가)는 담당자 이름 받침에 맞다', () => {

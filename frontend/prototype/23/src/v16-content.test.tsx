@@ -114,7 +114,7 @@ describe('Figma v16 · Detail 헤더 압축', () => {
     expect(statusIdx).toBeLessThan(tabsIdx)
   })
 
-  // v17: Figma 리뷰로 긴 chip을 대체 — "연결된 Episode/Alert N"을 누르면 팝오버로 연결 목록을 보여주는 실제 button이 됐다.
+  // v23: 연결 업무는 2행에서 실제 button으로 유지한다.
   it('연결된 Episode/Alert 안내는 v17부터 팝오버를 여는 button이다', () => {
     expect(markup).toMatch(/<button[^>]*>[^<]*<svg[^>]*>.*?<\/svg>연결된 (Episode|Alert) \d+<\/button>/)
   })
