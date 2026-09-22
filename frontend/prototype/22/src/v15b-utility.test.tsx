@@ -25,17 +25,17 @@ describe('Figma v20 · Notifications 카드 분할', () => {
     expect(markup).toContain(`${records[0].count}건`)
     expect(markup).not.toContain('요약 · 위험')
     expect(markup).not.toContain('ml-auto shrink-0 self-center')
-    expect(markup).toContain('data-shine="off"')
+    expect(markup).not.toContain('data-shine="off"')
   })
 
   it('점 상태 버튼과 카드 열기 버튼은 형제다', () => {
     expect(markup).toMatch(/data-testid="notification-dot"><span[^>]*><\/span><\/button><button[^>]*aria-label="[^"]+ 알림 열기"/)
   })
 
-  it('호버·키보드 포커스는 내부 버튼이 아닌 카드 전체 테두리를 밝힌다', () => {
-    expect(css).toMatch(/\.notification-card[^}]*transition:/)
-    expect(css).toMatch(/\.notification-card[^}]*:focus-within/)
-    expect(css).toMatch(/\.notification-card-action:is\(:hover, :focus-visible\)[^}]*box-shadow:\s*none/)
+  it('호버·키보드 포커스는 실제 버튼만 밝힌다', () => {
+    expect(css).not.toMatch(/\.notification-card[^}]*:focus-within/)
+    expect(css).not.toMatch(/\.notification-card-action:is\(:hover, :focus-visible\)[^}]*box-shadow:\s*none/)
+    expect(css).toMatch(/:is\([^}]*button[^}]*a\[href\][^}]*\[data-interactive=["']true["']\]\)[^{]*:is\(:hover,\s*:focus-visible\)/s)
   })
 
   it('열 머리글은 목록 표와 같은 정렬 대기 ChevronsUpDown 아이콘을 쓴다', () => {
@@ -62,6 +62,7 @@ describe('Figma v15b 수정사항 · Settings 섹션 제목', () => {
 
   it('일반 섹션 제목이 text-lg font-bold tracking-tight를 가진다', () => {
     expect(markup).toMatch(/<h2[^>]*class="[^"]*text-lg[^"]*font-bold[^"]*tracking-tight[^"]*">일반<\/h2>/)
+    expect(markup).not.toMatch(/class="[^"]*\bshine\b/)
   })
 
   it('목록 섹션 제목이 text-lg font-bold tracking-tight를 가진다', () => {

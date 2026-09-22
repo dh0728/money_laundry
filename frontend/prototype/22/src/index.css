@@ -371,22 +371,17 @@ section[data-mode=full] .agent-history { width:224px; }
   background-image: linear-gradient(to top, color-mix(in oklch, var(--primary) 5%, transparent), transparent);
 }
 
-/* 조작 컨트롤과 명시한 표면만 CSS hover/focus로 밝힌다. 포인터 추적 JS는 사용하지 않는다. */
-:is([data-slot="button"], button, [data-slot="select-trigger"], select, .date-range-control):not([data-variant="link"]):not([role="tab"]):not([data-shine="off"]) { transition: box-shadow .18s ease, background-color .18s ease; }
-:is([data-slot="button"], button, [data-slot="select-trigger"], select, .date-range-control):not([data-variant="link"]):not([role="tab"]):not([data-shine="off"]):is(:hover, :focus-visible):not(:disabled) {
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--foreground) 15%, transparent), 0 0 16px -5px color-mix(in oklch, var(--foreground) 24%, transparent);
-}
-:is([data-slot="button"], button, [data-slot="select-trigger"], select, .date-range-control):not([data-variant="link"]):not([role="tab"]):not([data-shine="off"]):focus-visible:not(:disabled),
-:is([data-slot="input"], input, [data-slot="textarea"], textarea):not([data-shine="off"]):focus-visible {
-  outline: 2px solid var(--ring); outline-offset: 2px;
-}
-:is([data-slot="card"], .work-card, .notification-card, .glass-surface, .graph-layout, [data-shine="surface"]):not([data-shine="off"]) { transition: box-shadow .18s ease, border-color .18s ease; }
-:is([data-slot="card"], .work-card, .notification-card, .glass-surface, .graph-layout, [data-shine="surface"]):not([data-shine="off"]):is(:hover, :focus-within) {
-  border-color: color-mix(in oklch, var(--foreground) 28%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 9%, transparent), 0 0 18px -9px color-mix(in oklch, var(--foreground) 24%, transparent);
+/* 실제 조작 컨트롤과 명시적 interactive 표면만 edge glow를 그린다. */
+:is(button, a[href], input, select, textarea, [data-interactive="true"]):not([data-variant="link"]):not([role="tab"]) { transition: box-shadow .18s ease, background-color .18s ease; }
+:is(button, a[href], input, select, textarea, [data-interactive="true"]):not([data-variant="link"]):not([role="tab"]):is(:hover, :focus-visible):not(:disabled) {
+  box-shadow: var(--interactive-edge-glow);
 }
 
-.notification-card-action:is(:hover, :focus-visible) { background: transparent !important; box-shadow: none !important; }
+:is(button, a[href], input, select, textarea, [data-interactive="true"]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .transactions-explorer-scroll { scrollbar-color:var(--muted-foreground) var(--muted); scrollbar-width:auto; }
 .transactions-explorer-scroll::-webkit-scrollbar { width:12px; height:12px; }
 .transactions-explorer-scroll::-webkit-scrollbar-track { background:var(--muted); }
@@ -394,10 +389,5 @@ section[data-mode=full] .agent-history { width:224px; }
 .transactions-explorer-scroll::-webkit-scrollbar-thumb:hover { background:var(--foreground); }
 .transaction-section [data-slot="table-container"] { overflow-x: visible; }
 @media (prefers-reduced-motion: reduce) {
-  :is([data-slot="button"], button, [data-slot="select-trigger"], select, .date-range-control, [data-slot="input"], input, [data-slot="textarea"], textarea, [data-slot="card"], .work-card, .notification-card, .glass-surface, .graph-layout, [data-shine="surface"]) { transition: none !important; }
-}
-/* 입력란도 배경 합성 대신 가벼운 외곽선만 사용한다. */
-:is([data-slot="input"], input, [data-slot="textarea"], textarea):not([data-shine="off"]):is(:hover, :focus-visible) {
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--foreground) 15%, transparent);
-  transition: box-shadow .18s ease;
+  :is(button, a[href], input, select, textarea, [data-interactive="true"]) { transition: none !important; }
 }

@@ -91,7 +91,7 @@ describe('v22 transaction explorer', () => {
     const markup = html(<Transactions records={records} />)
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
     expect(markup).toContain('transaction-stage-item')
-    expect(markup).toContain('data-shine="off"')
+    expect(markup).not.toContain('data-shine="off"')
     expect(css).toContain('.transactions-explorer-scroll .glass-surface')
     expect(css).toContain('backdrop-filter:none!important')
     expect(css).toContain('content-visibility:auto')

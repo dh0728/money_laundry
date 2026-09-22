@@ -77,13 +77,12 @@ describe('Figma v17 수정사항 · RiskBadge는 outline이 아니라 채움이�
 })
 
 describe('v20 툴바 control 높이·기간 hover', () => {
-  it('기간 버튼은 검색창과 같은 36px이고 Popover data-slot과 무관한 glow class가 있다', () => {
+  it('기간 버튼은 검색창과 같은 36px이고 native button glow 계약을 쓴다', () => {
     const markup = html(<DateRangeButton value={undefined} onChange={noop} />)
     expect(markup).toContain('date-range-control')
     expect(markup).toMatch(/date-range-control[^\"]*h-9/)
     const css = readFileSync(fileURLToPath(new URL('./index.css', import.meta.url)), 'utf-8')
-    expect(css).toMatch(/:is\([^)]*\[data-slot="button"\][^)]*\.date-range-control[^)]*\)/)
-    expect(css).toMatch(/\.date-range-control\)[^{]*:is\(:hover, :focus-visible\)/)
+    expect(css).toMatch(/:is\(button, a\[href\], input, select, textarea, \[data-interactive="true"\]\)[^{]*:is\(:hover, :focus-visible\)/)
   })
 
   it('선택 기간과 초기화는 분리되지 않은 하나의 연결형 control로 렌더링된다', () => {

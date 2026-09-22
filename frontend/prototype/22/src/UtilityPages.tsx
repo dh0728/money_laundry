@@ -55,7 +55,7 @@ export function Account({ user, onLogout }: { user: string; onLogout: () => void
         </div>
         <div className="space-y-3">
           {sessions.map((id, i) => (
-            <div key={id} className="shine flex items-center gap-4 rounded-lg bg-muted/40 p-4">
+            <div key={id} className="flex items-center gap-4 rounded-lg bg-muted/40 p-4">
               <div className="size-10 rounded-md bg-background grid place-items-center">{i === 0 ? <Monitor className="size-4" /> : <Laptop className="size-4" />}</div>
               <div className="flex-1"><p className="text-sm">{i === 0 ? 'Chrome · Windows 11' : i === 1 ? 'Edge · Windows 11' : 'Chrome · Windows 10'} {id === 'current' && <Badge variant="secondary" className="ml-2">현재</Badge>}</p><p className="text-xs text-muted-foreground mt-1">대한민국 서울 · {i === 0 ? '방금 활동' : '오늘 09:14'}</p></div>
               <Button variant="ghost" size="sm" onClick={() => id === 'current' ? onLogout() : setSessions(p => p.filter(x => x !== id))}>{id === 'current' ? '현재 세션 로그아웃' : '로그아웃'}</Button>
@@ -140,7 +140,7 @@ function NotificationColumn({ label, list, order, onToggleOrder, read, onToggleR
                 <Button variant="ghost" size="icon" className="size-7 rounded-full bg-transparent shrink-0 p-0 hover:bg-muted/70 focus-visible:bg-muted/70" aria-label={`${r.id} ${unread ? '읽음으로 표시' : '읽지 않음으로 표시'}`} title={unread ? '읽음으로 표시' : '읽지 않음으로 표시'} data-testid="notification-dot" onClick={e => { e.stopPropagation(); onToggleRead(r.id) }}>
                   <span aria-hidden className={`size-2.5 rounded-full ${unread ? 'bg-destructive' : 'bg-muted-foreground/40'}`} />
                 </Button>
-                <Button variant="ghost" data-shine="off" className="notification-card-action h-auto min-w-0 flex-1 justify-start rounded-none p-0 text-left whitespace-normal hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0" aria-label={`${r.id} 알림 열기`} onClick={() => { onMarkRead(r.id); onOpen(r) }}>
+                <Button variant="ghost" className="notification-card-action h-auto min-w-0 flex-1 justify-start rounded-none p-0 text-left whitespace-normal hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0" aria-label={`${r.id} 알림 열기`} onClick={() => { onMarkRead(r.id); onOpen(r) }}>
                   <div className="min-w-0 flex-1">
                     <p className="text-base font-semibold text-foreground truncate">{r.title}</p>
                     <p className="text-sm text-muted-foreground mt-1.5">{r.owner}님에게 {r.kind}가 배정되었습니다.</p>
