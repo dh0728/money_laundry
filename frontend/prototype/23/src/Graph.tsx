@@ -9,11 +9,11 @@ import { Kbd } from '@/components/ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { compactUsd, minutes, neighborhood, stepTimeline, timeLabel, timelineEvents, usd, widthFor, type GraphEdge, type GraphModel, type GraphNode } from './domain'
+import { minutes, neighborhood, stepTimeline, timeLabel, timelineEvents, widthFor, type GraphEdge, type GraphModel, type GraphNode } from './domain'
 import { FlowPanel, type FlowFocus, type PanelMode } from './FlowDetail'
 import { IconButton } from './shared'
 import OwnerGraph, { flowParticleCount, type OwnerGraphControls } from './OwnerGraph'
-import type { GraphViewMode } from './v23-domain'
+import { formatGraphMoney, type GraphViewMode } from './v23-domain'
 
 export const DEFAULT_HOP = 3
 const HOP_MIN = 1, HOP_MAX = 5
@@ -266,7 +266,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
         if (!(showInfo || hover?.key === l.key || selectedEdge === l.key)) return
         const s = l.source as FNode, t = l.target as FNode; if (typeof s !== 'object' || typeof t !== 'object') return
         ctx.font = `${10 / scale}px ui-sans-serif, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = colors.fg
-        ctx.fillText(`${l.count}건 · ${compactUsd(l.usd)}`, (s.x! + t.x!) / 2, (s.y! + t.y!) / 2 - 4 / scale)
+        ctx.fillText(`${l.count}건 · ${formatGraphMoney(l)}`, (s.x! + t.x!) / 2, (s.y! + t.y!) / 2 - 4 / scale)
       }}
       onNodeHover={n => setHover(n ? { kind: 'node', key: n.key, ...pointer.current } : null)}
       onLinkHover={l => setHover(l ? { kind: 'edge', key: l.key, ...pointer.current } : null)}
@@ -350,7 +350,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
         {hover && (hoverNode || hoverEdge) && (
           <div className="graph-tooltip" style={{ left: Math.min(hover.x + 14, size.w - 260), top: Math.min(hover.y + 14, size.h - 110) }}>
             {hoverNode && <><b>{hoverNode.entity}</b><br />{hoverNode.account} · Bank {hoverNode.bank}<br />{graphNodeRole(hoverNode)}</>}
-            {hoverEdge && <><b>{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? '연결 경로 · 정상 거래' : '정상 거래'}</b> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{usd(hoverEdge.usd)}{hoverEdge.currency !== 'US Dollar' && ` (${hoverEdge.currency})`} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
+            {hoverEdge && <><b>{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? '연결 경로 · 정상 거래' : '정상 거래'}</b> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{formatGraphMoney(hoverEdge)} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
           </div>
         )}
         <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[11px] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</div>

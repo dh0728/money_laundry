@@ -112,7 +112,6 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
   const daily = dailyRaw
   const formats = counts(tx, t => t.format, t => t.usd).slice(0, 5)
   const senders = counts(tx, t => t.from, t => t.usd).slice(0, 5)
-  const patternMix = counts(linkedAlerts, a => a.pattern, () => 1)
   const patternGroups = [...linkedAlerts.reduce((groups, alert) => {
     groups.set(alert.pattern, [...(groups.get(alert.pattern) ?? []), alert])
     return groups
@@ -166,11 +165,7 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
               </ChartContainer>
             </CardContent></Card>
             <Card className="shadow-none"><CardContent><SectionTitle title="상위 송금 계좌" description="자금이 어디서 나갔는지" /><BarList rows={senders} format={value => formatMoney(value, 'USD')} /></CardContent></Card>
-            <Card className="shadow-none"><CardContent>
-              {r.kind === 'Alert'
-                ? <><SectionTitle title="결제 수단 구성" description="어떤 경로가 지배적인지" /><BarList rows={formats} format={value => formatMoney(value, 'USD')} /></>
-                : <><SectionTitle title="연결 Alert 유형" description="묶인 탐지 신호의 구성" /><BarList rows={patternMix} format={v => `${v}건`} /></>}
-            </CardContent></Card>
+            {r.kind === 'Alert' && <Card className="shadow-none"><CardContent><SectionTitle title="결제 수단 구성" description="어떤 경로가 지배적인지" /><BarList rows={formats} format={value => formatMoney(value, 'USD')} /></CardContent></Card>}
           </div>
           <div className="grid gap-4 @5xl:grid-cols-[1fr_1.4fr_1fr]">
             {r.kind === 'Alert' ? <Card className="shadow-none"><CardContent>

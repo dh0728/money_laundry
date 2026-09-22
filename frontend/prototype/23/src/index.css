@@ -218,12 +218,12 @@
 .transaction-connector-edge > b { position:absolute; top:var(--target-y); left:50%; right:0; border-top:1.5px solid; }
 .transaction-connector-edge > b::after { content:""; position:absolute; right:1px; top:-4px; width:7px; height:7px; border-top:1.5px solid; border-right:1.5px solid; transform:rotate(45deg); }
 .transaction-detail { min-width:0; }
-@media (max-width:1100px) {
+@container (max-width:1100px) {
   .transactions-flow { grid-template-columns:minmax(12rem,.8fr) minmax(13rem,.9fr) minmax(16rem,1.2fr); }
   .transaction-detail { grid-column:1 / -1; }
   .transaction-connector { display:none; }
 }
-@media (max-width:760px) {
+@container (max-width:760px) {
   .transactions-flow { grid-template-columns:minmax(0,1fr); }
 }
 .transaction-section .overflow-auto { overflow:visible; }

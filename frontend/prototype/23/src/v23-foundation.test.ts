@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { formatMoney, moneyMetrics } from './v23-domain'
+import { formatGraphMoney, formatMoney, moneyMetrics } from './v23-domain'
 
 const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
 
@@ -22,6 +22,10 @@ describe('v23 foundation', () => {
     [9, 'KRW', '9KRW'],
   ] as const)('formats %s %s with one postfix currency marker', (amount, currency, expected) => {
     expect(formatMoney(amount, currency)).toBe(expected)
+  })
+
+  it('formats graph aggregates in the original currency after the amount', () => {
+    expect(formatGraphMoney({ usd: 2_800, currency: 'Euro', transactions: [{ amount: 1_200, currency: 'Euro' }, { amount: 1_387, currency: 'Euro' }] })).toBe('2,587€')
   })
 
   it('uses theme-opposite foreground for interactive edge glow', () => {

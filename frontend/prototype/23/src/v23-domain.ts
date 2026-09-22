@@ -46,3 +46,10 @@ const currencyMarkers: Record<string, string> = {
 export function formatMoney(amount: number, currency: string) {
   return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(amount)}${currencyMarkers[currency] ?? currency}`
 }
+
+export function formatGraphMoney(edge: { usd: number; currency: string; transactions?: Array<{ amount: number; currency: string }> }) {
+  const currency = edge.transactions?.[0]?.currency ?? edge.currency
+  return edge.transactions?.length && edge.transactions.every(transaction => transaction.currency === currency)
+    ? formatMoney(edge.transactions.reduce((sum, transaction) => sum + transaction.amount, 0), currency)
+    : formatMoney(edge.usd, 'USD')
+}

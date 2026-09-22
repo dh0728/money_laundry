@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GraphModel, GraphNode } from './domain'
 import { accountAtPoint, accountRowAnchor, groupOwners, ownerLinkPath, pointOnOwnerLink, ownerLinkContains, flowParticleCount } from './OwnerGraph'
+import { readFileSync } from 'node:fs'
 
 const node = (key: string, entity: string): GraphNode => ({ key, entity, account: `ACC-${key}`, bank: '004', x: 0, y: 0, core: false, bridge: false, hub: false, hubDegree: 0, hop: 0, synthetic: false })
 const model: GraphModel = { nodes: [node('A', 'Alpha'), node('B', 'Alpha'), node('C', 'Beta'), node('D', ''), node('E', '')], edges: [], blocks: [] }
@@ -58,4 +59,10 @@ it('disables all flow particles for reduced motion and otherwise distinguishes s
   expect(flowParticleCount(0, true)).toBe(0)
   expect(flowParticleCount(1, false)).toBe(2)
   expect(flowParticleCount(0, false)).toBe(1)
+})
+
+it('uses a non-passive native wheel listener so graph zoom does not scroll the page', () => {
+  const source = readFileSync(new URL('./OwnerGraph.tsx', import.meta.url), 'utf8')
+  expect(source).toContain("addEventListener('wheel', onWheel, { passive: false })")
+  expect(source).not.toContain('onWheel={')
 })

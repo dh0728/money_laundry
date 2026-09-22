@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type PointerEvent } from 'react'
-import { compactUsd, widthFor, type GraphEdge, type GraphModel, type GraphNode } from './domain'
+import { widthFor, type GraphEdge, type GraphModel, type GraphNode } from './domain'
+import { formatGraphMoney } from './v23-domain'
 
 type Point = { x: number; y: number }
 type Owner = Point & { key: string; name: string; accounts: GraphNode[]; width: number; height: number }
@@ -96,6 +97,13 @@ export default function OwnerGraph({ ref, model, width, height, visibleNodes, ed
     setCamera({ x: camera.x * ratio / camera.ratio, y: camera.y * ratio / camera.ratio, ratio }); onZoom(ratio, false)
   }
   useImperativeHandle(ref, () => ({ fit, zoomBy }))
+  useEffect(() => {
+    const element = canvas.current
+    if (!element) return
+    const onWheel = (event: WheelEvent) => { event.preventDefault(); zoomBy(event.deltaY < 0 ? 1.2 : 1 / 1.2) }
+    element.addEventListener('wheel', onWheel, { passive: false })
+    return () => element.removeEventListener('wheel', onWheel)
+  }, [camera])
   // Theme changes are independent of React renders; redraw canvas when the root theme changes.
   const [themeVersion, setThemeVersion] = useState(0)
   useEffect(() => {
@@ -131,7 +139,7 @@ export default function OwnerGraph({ ref, model, width, height, visibleNodes, ed
         if (showInfo || hover?.key === edge.key || selectedEdge === edge.key) {
           const point = pointOnOwnerLink(path, .5)
           ctx.fillStyle = colors.fg; ctx.font = '11px ui-sans-serif, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
-          ctx.fillText(`${edge.count}건 · ${compactUsd(edge.usd)}`, point.x, point.y - 5)
+          ctx.fillText(`${edge.count}건 · ${formatGraphMoney(edge)}`, point.x, point.y - 5)
         }
       }
       for (const owner of owners) {
@@ -172,7 +180,6 @@ export default function OwnerGraph({ ref, model, width, height, visibleNodes, ed
     return null
   }
   return <canvas ref={canvas} style={{ width, height, touchAction: 'none' }} aria-label="소유주별 계좌 자금 흐름" data-testid="owner-graph"
-    onWheel={event => { event.preventDefault(); zoomBy(event.deltaY < 0 ? 1.2 : 1 / 1.2) }}
     onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); drag.current = { start: { x: event.clientX, y: event.clientY }, camera, moved: false } }}
     onPointerMove={event => {
       if (drag.current) {
