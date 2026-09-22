@@ -90,10 +90,12 @@ describe('Figma v17 · 모두 읽음 처리 disabled', () => {
   })
 })
 
-describe('Figma v17 · Account 박스 제거 + 역할 표기', () => {
-  it('data-slot="card" 래퍼가 없다', () => {
+describe('Account 시각적 묶음 + 역할 표기', () => {
+  it('프로필·권한·세션을 공통 Card로 구분하되 버튼 glow는 쓰지 않는다', () => {
     const markup = html(<Account user="오검토" onLogout={() => {}} />)
-    expect(markup).not.toContain('data-slot="card"')
+    expect((markup.match(/data-slot="card"/g) ?? []).length).toBe(3)
+    expect(markup).not.toContain('pointer-glow')
+    expect(markup).not.toContain('edge-glow')
   })
 
   it('역할은 "L1"/"L2"만 표기하고 "1차 검토"·"심층 조사" 접미사가 없다', () => {
@@ -111,10 +113,10 @@ describe('Figma v17 · Account 박스 제거 + 역할 표기', () => {
     expect(markup).not.toMatch(/rounded-lg border p-4/)
   })
 
-  it('프로필·권한·세션 관리는 가로 3열, 세로 3행이며 제목 크기가 같다', () => {
+  it('프로필·권한·세션 관리는 기존 반응형 grid 안에 남는다', () => {
     const markup = html(<Account user="오검토" onLogout={() => {}} />)
     expect(markup).toContain('data-testid="account-grid"')
     expect(markup).toContain('account-grid grid')
-    expect(markup).toMatch(/<h2[^>]*text-lg[^>]*>권한<\/h2>/)
+    expect(markup).toMatch(/<h2[^>]*>권한<\/h2>/)
   })
 })

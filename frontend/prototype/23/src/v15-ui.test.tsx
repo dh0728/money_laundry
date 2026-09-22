@@ -74,11 +74,12 @@ describe('Figma v14 수정사항 · 화면별', () => {
     expect(markup).toContain('data-testid="notification-list"')
     expect(markup).not.toContain('data-slot="card"')
   })
-  it('설정: section을 박스로 감싸지 않는다', () => {
+  it('설정: 네 묶음을 공통 Card로 구분한다', () => {
     const markup = html(<Settings user="오검토" />)
     expect(markup).toContain('settings-grid')
-    expect(markup).not.toContain('data-slot="card"')
-    expect(markup).not.toMatch(/rounded-lg border p-3/)
+    expect((markup.match(/data-slot="card"/g) ?? []).length).toBe(4)
+    expect(markup).not.toContain('pointer-glow')
+    expect(markup).not.toContain('edge-glow')
   })
 })
 
