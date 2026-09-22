@@ -67,7 +67,7 @@ class AlertPostgresTests(unittest.TestCase):
     def test_daily_boundary_and_immutable_scores_and_empty_target(self):
         alert=self.first()
         old=self.admin.execute("SELECT evidence FROM alert_versions WHERE alert_id=%s",(alert,)).fetchone()[0]
-        self.assertEqual(old['policyVersion'], 'daily-peer-leaf-v3')
+        self.assertEqual(old['policyVersion'], 'calendar-event-v4')
         self.assertEqual([m['txId'] for m in old['transactions']],[self.ids[0]])
         follow=self.following(alert)
         save_alerts(self.admin,follow)
@@ -77,7 +77,7 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertEqual({m['txId'] for m in versions[1][0]['transactions']},{self.ids[0],self.context})
         self.assertIsNone(next(m for m in versions[1][0]['transactions'] if m['txId']==self.context)['scores'])
         self.assertEqual(self.admin.execute("SELECT count(*) FROM inference_results WHERE run_id=%s",(follow.run_id,)).fetchone()[0],0)
-        self.assertTrue(self.admin.execute("SELECT forward_complete FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0])
+        self.assertNotIn("forwardComplete", self.admin.execute("SELECT coverage FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0][0])
         # Retry after lost response must not create another evidence version.
         checked=self.admin.execute("SELECT checked_at FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0]
         self.assertIsNotNone(checked)
@@ -113,7 +113,8 @@ class AlertPostgresTests(unittest.TestCase):
         alert=self.first()
         follow=self.following(alert,extra=False,complete=False)
         save_alerts(self.admin,follow)
-        self.assertFalse(self.admin.execute("SELECT forward_complete FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0])
+        coverage=self.admin.execute("SELECT coverage FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0]
+        self.assertTrue(any(not d['complete'] for item in coverage for d in item['days']))
         self.assertEqual(self.admin.execute("SELECT count(*) FROM alert_versions WHERE alert_id=%s",(alert,)).fetchone()[0],1)
 
     def test_fenced_run_cannot_save_and_missing_l1_rolls_back(self):
@@ -210,8 +211,8 @@ class AlertExtensionTests(unittest.TestCase):
         self.assertIn('TRANSACTION_COUNT',result['limits'])
         old=self.evidence([1,2],[1],{1:'2022-09-01T00:00:00+09:00',2:'2022-09-02T00:00:00+09:00'})
         result=_extend(old,[self.evidence([2,3],[2],{2:'2022-09-02T00:00:00+09:00',3:'2022-09-03T00:01:00+09:00'})])
-        self.assertEqual([m['txId'] for m in result['transactions']],[1,2])
-        self.assertIn('MERGE_LIMIT',result['limits'])
+        self.assertEqual([m['txId'] for m in result['transactions']],[1,2,3])
+        self.assertNotIn('MERGE_LIMIT',result['limits'])
 
     def test_context_promoted_to_seed_gets_new_score_only_in_new_version(self):
         from alert_pipeline import _extend

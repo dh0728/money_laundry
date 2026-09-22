@@ -48,10 +48,13 @@ public class AlertInputSnapshot {
         """,
         run,
         run);
+    // Calendar radius 2, depth 2: four days reachable plus two days for terminal
+    // neighbor/hub checks. This freezes a bounded superset, not Alert membership.
     var bounds =
         jdbc.queryForMap(
             """
-        select min(t)-interval '24 hours' lo, max(t)+interval '24 hours' hi from (
+        select ((min(t) at time zone 'Asia/Seoul')::date-6)::timestamp at time zone 'Asia/Seoul' lo,
+          ((max(t) at time zone 'Asia/Seoul')::date+7)::timestamp at time zone 'Asia/Seoul' hi from (
           select occurred_at t from analysis.input_transactions where run_id=?
           union all select (s->>'occurredAt')::timestamptz from analysis.alert_origins o,
           jsonb_array_elements(o.evidence->'seeds') s where o.run_id=?) x
@@ -70,13 +73,15 @@ public class AlertInputSnapshot {
         from transactions t join private.accounts a on a.account_id=t.from_account_id
         join private.accounts b on b.account_id=t.to_account_id
         join private.entities e on e.entity_id=a.entity_id join private.entities f on f.entity_id=b.entity_id
-        where t.integration_status='ACTIVE' and t.occurred_at between ? and ?
+        where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<?
+          and t.occurred_at<=?
           and not exists(select 1 from analysis.input_transactions i where i.run_id=? and i.tx_id=t.tx_id)
           and exists(select 1 from (
             select occurred_at moment from analysis.input_transactions where run_id=? and input_role='TARGET'
             union all select (seed->>'occurredAt')::timestamptz from analysis.alert_origins o,
               jsonb_array_elements(o.evidence->'seeds') seed where o.run_id=?) windows
-            where t.occurred_at between moment-interval '24 hours' and moment+interval '24 hours')
+            where t.occurred_at>=(((moment at time zone 'Asia/Seoul')::date-6)::timestamp at time zone 'Asia/Seoul')
+              and t.occurred_at<(((moment at time zone 'Asia/Seoul')::date+7)::timestamp at time zone 'Asia/Seoul'))
           and exists(select 1 from transaction_reports tr join private.bank_reports br using(report_id)
             join report_sets rs on rs.current_version_id=br.version_id
             join report_versions rv using(version_id) where tr.tx_id=t.tx_id and rv.received_at<=?)
@@ -87,6 +92,7 @@ public class AlertInputSnapshot {
         run,
         low,
         high,
+        Timestamp.from(cutoff),
         run,
         run,
         run,
@@ -121,12 +127,13 @@ public class AlertInputSnapshot {
           select occurred_at moment from analysis.input_transactions where run_id=? and input_role='TARGET'
           union all select (s->>'occurredAt')::timestamptz from analysis.alert_origins o,
             jsonb_array_elements(o.evidence->'seeds') s where o.run_id=?) w,
-          lateral generate_series(((moment-interval '24 hours') at time zone 'Asia/Seoul')::date,
-            ((moment+interval '24 hours') at time zone 'Asia/Seoul')::date,interval '1 day') d order by 1
+          lateral generate_series((moment at time zone 'Asia/Seoul')::date-6,
+            least((moment at time zone 'Asia/Seoul')::date+6, (?::timestamptz at time zone 'Asia/Seoul')::date),interval '1 day') d order by 1
         """,
             java.sql.Date.class,
             run,
-            run);
+            run,
+            Timestamp.from(cutoff));
     for (java.sql.Date date : dates) {
       LocalDate day = date.toLocalDate();
       jdbc.update(

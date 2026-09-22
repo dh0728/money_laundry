@@ -128,10 +128,41 @@ class AlertPipelineTests {
     return checking;
   }
 
+  long contextOn(String day) {
+    long id =
+        jdbc.queryForObject(
+            "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(?::timestamptz,?,?,2,'USD',2,'USD','ACH',2,'test',?::date) returning tx_id",
+            Long.class,
+            day + " 10:00+09",
+            account,
+            account,
+            day);
+    report(id, day, "2022-09-03 01:00+09");
+    return id;
+  }
+
+  @Test
+  void frozen_envelope_supports_rolling_paths_but_never_copies_future_transactions() {
+    firstAlert();
+    long distant = contextOn("2022-08-29");
+    long nearby = contextOn("2022-09-01");
+    long future = contextOn("2022-09-05");
+    UUID checking = freezeCheck();
+    var ids =
+        jdbc.queryForList(
+            "select tx_id from analysis.input_transactions where run_id=?", Long.class, checking);
+    assertThat(ids).contains(distant, nearby).doesNotContain(future);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.input_coverage where run_id=? and business_date>'2022-09-04'",
+                Integer.class,
+                checking))
+        .isZero();
+  }
+
   @Test
   void unchanged_or_unrelated_sources_do_not_recheck_an_incomplete_future_window() {
     long alert = firstAlert();
-    jdbc.update("update alert_coverage_checks set forward_complete=false where alert_id=?", alert);
     jdbc.update("insert into reporting_scopes(business_date) values('2020-01-01'),('2030-01-01')");
     UUID checking = freezeCheck();
     assertThat(
@@ -151,7 +182,6 @@ class AlertPipelineTests {
   @Test
   void source_revision_rechecks_even_complete_windows_and_failed_checks_do_not_consume_change() {
     long alert = firstAlert();
-    jdbc.update("update alert_coverage_checks set forward_complete=true where alert_id=?", alert);
     String frozen =
         jdbc.queryForObject(
             "select state::text from analysis.alert_source_manifest where run_id=? and business_date='2022-09-02'",
@@ -171,7 +201,7 @@ class AlertPipelineTests {
                 run))
         .isEqualTo(frozen);
     jdbc.update(
-        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete,checked_at) values(?,?,'[]',true,clock_timestamp())",
+        "insert into alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,'[]',clock_timestamp())",
         alert,
         failed);
     jdbc.update("update analysis_runs set status='CANCELLED' where run_id=?", failed);
@@ -181,7 +211,7 @@ class AlertPipelineTests {
                 "select alert_id from analysis.alert_origins where run_id=?", Long.class, retried))
         .containsExactly(alert);
     jdbc.update(
-        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete,checked_at) values(?,?,'[]',true,clock_timestamp())",
+        "insert into alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,'[]',clock_timestamp())",
         alert,
         retried);
     jdbc.update("update analysis_runs set status='COMPLETED' where run_id=?", retried);
@@ -229,7 +259,7 @@ class AlertPipelineTests {
     jdbc.update(
         "insert into analysis_runs(run_id,job_id,status) values(?,?,'ACTIVE')", checking, next);
     jdbc.update(
-        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete,checked_at) values(?,?,?::jsonb,false,'2022-09-04 10:00+09')",
+        "insert into alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,?::jsonb,'2022-09-04 10:00+09')",
         alert,
         checking,
         "[{\"txId\":1,\"forwardComplete\":false,\"days\":[{\"businessDate\":\"2022-09-03\",\"complete\":true},{\"businessDate\":\"2022-09-05\",\"complete\":false}]}]");
@@ -256,11 +286,11 @@ class AlertPipelineTests {
     var old = alerts.detail(alert, 1);
     long context =
         jdbc.queryForObject(
-            "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2022-09-03 00:15+09',?,?,2,'USD',2,'USD','ACH',2,'test','2022-09-03') returning tx_id",
+            "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2022-09-04 02:54+09',?,?,2,'USD',2,'USD','ACH',2,'test','2022-09-04') returning tx_id",
             Long.class,
             account,
             account);
-    report(context, "2022-09-03", "2022-09-04 00:00+09");
+    report(context, "2022-09-04", "2022-09-04 03:00+09");
     long follow =
         jdbc.queryForObject(
             "insert into batch_jobs(job_type,status,current_stage,threshold_value,analysis_cutoff_at) values('ANALYSIS','QUEUED','FREEZE_INPUT',.7,'2022-09-04 09:00+09') returning job_id",
@@ -328,7 +358,7 @@ class AlertPipelineTests {
         completed,
         parent);
     jdbc.update(
-        "insert into alert_coverage_checks(alert_id,run_id,coverage,forward_complete) values(?,?,'[]',false)",
+        "insert into alert_coverage_checks(alert_id,run_id,coverage) values(?,?,'[]')",
         child,
         completed);
     long next =

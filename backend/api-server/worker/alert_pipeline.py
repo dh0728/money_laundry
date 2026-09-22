@@ -19,7 +19,7 @@ from result_collection import _checkpoint
 from worker_transport import ProtocolError
 
 SEOUL = ZoneInfo('Asia/Seoul')
-POLICY = Policy('daily-peer-leaf-v3', 1, timedelta(hours=24), timedelta(hours=24), 2, 100, 100)
+POLICY = Policy('calendar-event-v4', 1, 2, 2, 100, 100)
 
 
 class AssigneeUnavailable(ProtocolError):
@@ -34,17 +34,8 @@ def _json(value):
 def _coverage(seeds, days):
     result = []
     for seed in seeds:
-        time = datetime.fromisoformat(seed['occurredAt'])
-        low, high = time - POLICY.before, time + POLICY.after
-        date, last = low.astimezone(SEOUL).date(), high.astimezone(SEOUL).date()
-        reports = []
-        while date <= last:
-            reports.append(dict(businessDate=date.isoformat(), **days.get(date.isoformat(),
-                dict(complete=False, expectedBanks=0, completeBanks=0, reports=[]))))
-            date += timedelta(days=1)
-        forward = [d for d in reports if d['businessDate'] >= time.astimezone(SEOUL).date().isoformat()]
-        result.append(dict(txId=seed['txId'], windowStart=low.isoformat(), windowEnd=high.isoformat(),
-                           days=reports, forwardComplete=all(d['complete'] for d in forward)))
+        reports = [dict(businessDate=date, **value) for date, value in sorted(days.items())]
+        result.append(dict(txId=seed['txId'], days=reports))
     return result
 
 
@@ -95,11 +86,6 @@ def _extend(old, additions):
         for item in evidence['transactions']:
             key = item['txId']
             if key not in members:
-                times = [datetime.fromisoformat(m['occurredAt']) for m in members.values()]
-                times.append(datetime.fromisoformat(item['occurredAt']))
-                if max(times)-min(times) > POLICY.before+POLICY.after:
-                    limits.add('MERGE_LIMIT')
-                    continue
                 if len(members) >= POLICY.max_transactions:
                     limits.add('TRANSACTION_COUNT')
                     continue
@@ -226,7 +212,6 @@ def save_alerts(connection, execution):
             for item in coverage:
                 item['explorationLimits'] = evidence['limits']
                 if item['txId'] not in rows:
-                    item['forwardComplete'] = False
                     item['reason'] = 'SEED_NOT_ACTIVE_IN_SNAPSHOT'
             status = connection.execute('SELECT status FROM alerts WHERE alert_id=%s FOR UPDATE', (alert,)).fetchone()[0]
             if latest is not None and latest[1].strip() != fingerprint and status != 'OPEN':
@@ -249,10 +234,10 @@ def save_alerts(connection, execution):
                 changed.add(alert)
             for key in {original, alert}:
                 connection.execute('''INSERT INTO alert_coverage_checks
-                    (alert_id,run_id,coverage,forward_complete,checked_at) VALUES(%s,%s,%s,%s,clock_timestamp())
+                    (alert_id,run_id,coverage,checked_at) VALUES(%s,%s,%s,clock_timestamp())
                     ON CONFLICT(alert_id,run_id) DO UPDATE SET coverage=excluded.coverage,
-                    forward_complete=excluded.forward_complete,checked_at=excluded.checked_at''',
-                    (key, execution.run_id, Jsonb(coverage), all(c['forwardComplete'] for c in coverage)))
+                    checked_at=excluded.checked_at''',
+                    (key, execution.run_id, Jsonb(coverage)))
         connection.execute('UPDATE batch_jobs SET alert_count=%s WHERE job_id=%s', (len(created), execution.job_id))
         _checkpoint(connection, execution, 'ALERTS', json.dumps(dict(run_id=str(execution.run_id),
                     createdAlertCount=len(created), updatedAlertCount=len(changed-created), checkedAlertCount=len(covered))))
