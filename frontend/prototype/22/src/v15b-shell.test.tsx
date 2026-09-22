@@ -7,7 +7,7 @@ const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{n
 
 describe('v15b 셸 정리 · RDR 9000 아이콘', () => {
   it('RadarSweep은 금속 그라디언트 없이 회전 sweep(SMIL)만 쓴다', async () => {
-    const { RadarSweep, RdrEye, AgentToggle, AGENT_NAME } = await import('./Agent')
+    const { RadarSweep, RdrEye, AgentFab, AGENT_NAME } = await import('./Agent')
     const markup = html(<RadarSweep />)
     expect(markup).not.toMatch(/-rim/)
     expect(markup).not.toMatch(/-lens/)
@@ -15,7 +15,7 @@ describe('v15b 셸 정리 · RDR 9000 아이콘', () => {
     expect(markup).toContain('type="rotate"')
     expect(RdrEye).toBe(RadarSweep) // 하위 호환 별칭
     expect(AGENT_NAME).toBe('RDR 9000')
-    const toggle = html(<AgentToggle open={false} onToggle={() => {}} />)
+    const toggle = html(<AgentFab open={false} onToggle={() => {}} />)
     expect(toggle).toContain('RDR 9000')
   })
 })

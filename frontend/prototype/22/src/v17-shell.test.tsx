@@ -51,7 +51,8 @@ describe('v17 Figma 검수 · 로고는 헤더에서 사이드바로', () => {
     expect(brand).toMatch(/onClick=\{event => \{ if \(event\.detail === 0\) toggleSidebar\(\) \}\}/)
     expect(appSource).toMatch(/<SidebarHeader className="h-15[^"\n]*p-0[^"\n]*">/)
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
-    expect(css).toMatch(/\.app-sidebar \[data-slot=sidebar-(?:gap|container)\][\s\S]*transition-duration:\s*120ms/)
+    expect(css).toMatch(/\.app-sidebar \[data-slot=sidebar-(?:gap|container)\][^}]*transition-duration:\s*var\(--motion-fast\)/)
+    expect(css).toMatch(/--motion-fast:\s*120ms/)
   })
 
   it('로그인 화면 좌상단 로고도 RadarMark(브랜드 마크)를 쓴다(예전 lucide Radar 아이콘 아님)', () => {

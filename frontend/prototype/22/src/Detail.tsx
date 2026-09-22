@@ -156,20 +156,20 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
         )}
       </div>
       {r.kind === 'Alert' && r.redetection && (
-        <section data-testid="redetection-banner" aria-labelledby="redetection-title" className="rounded-xl border-2 border-destructive bg-destructive px-5 py-5 text-white shadow-[0_0_28px_-8px_var(--destructive)]">
+        <section data-testid="redetection-banner" aria-labelledby="redetection-title" className="rounded-xl border-2 border-destructive bg-destructive px-5 py-5 text-destructive-foreground shadow-[0_0_28px_-8px_var(--destructive)]">
           <div>
             <div>
-              <Badge className="border-white/70 bg-white text-destructive shadow-sm hover:bg-white">재탐지</Badge>
+              <Badge className="border-destructive-foreground/70 bg-destructive-foreground text-destructive shadow-sm hover:bg-destructive-foreground">재탐지</Badge>
               <h2 id="redetection-title" className="mt-3 text-base font-semibold">종결 이후 동일 계좌에서 새 이상거래가 발견됐습니다.</h2>
-              <p className="mt-1.5 text-xs leading-5 text-white/80">계좌 <span className="font-mono text-white">{r.redetection.account}</span> · 과거 종결 판단은 보존하고 현재 Alert를 별도로 검토합니다.</p>
+              <p className="mt-1.5 text-xs leading-5 text-destructive-foreground/80">계좌 <span className="font-mono text-destructive-foreground">{r.redetection.account}</span> · 과거 종결 판단은 보존하고 현재 Alert를 별도로 검토합니다.</p>
             </div>
           </div>
           <div className="mt-5 grid items-stretch gap-2 @4xl:grid-cols-[1fr_auto_1fr_auto_1fr]" aria-label="종결에서 재탐지까지의 이력">
-            <div className="rounded-lg border border-white/25 bg-black/20 p-3"><History className="size-4" /><p className="mt-2 text-xs font-semibold">과거 Alert 종결</p><p className="mt-1 font-mono text-[11px]">{r.redetection.priorAlertId}</p><p className="mt-1 text-[11px] text-white/75">{r.redetection.priorClosedAt} · {r.redetection.priorOutcome}</p><p className="mt-1 text-[10px] text-white/65">현재 상태 유지: {priorRedetectionAlert?.status ?? '종결'}</p></div>
-            <ArrowRight className="mx-auto size-4 self-center rotate-90 text-white/70 @4xl:rotate-0" aria-hidden />
-            <div className="rounded-lg border border-white/25 bg-black/20 p-3"><CircleDollarSign className="size-4" /><p className="mt-2 text-xs font-semibold">새 이상거래 발견</p><p className="mt-1 font-mono text-[11px]">{r.redetection.newTransactionId}</p><p className="mt-1 text-[11px] text-white/75">{r.redetection.newTransactionAt}</p></div>
-            <ArrowRight className="mx-auto size-4 self-center rotate-90 text-white/70 @4xl:rotate-0" aria-hidden />
-            <div className="rounded-lg border border-white/25 bg-black/20 p-3"><Radar className="size-4" /><p className="mt-2 text-xs font-semibold">현재 Alert 재탐지</p><p className="mt-1 font-mono text-[11px]">{r.id}</p><p className="mt-1 text-[11px] text-white/75">{r.redetection.detectedAt} · 새 업무로 검토 중</p></div>
+            <div className="rounded-lg border border-destructive-foreground/25 bg-redetection-inset p-3"><History className="size-4" /><p className="mt-2 text-xs font-semibold">과거 Alert 종결</p><p className="mt-1 font-mono text-[11px]">{r.redetection.priorAlertId}</p><p className="mt-1 text-[11px] text-destructive-foreground/75">{r.redetection.priorClosedAt} · {r.redetection.priorOutcome}</p><p className="mt-1 text-[10px] text-destructive-foreground/65">현재 상태 유지: {priorRedetectionAlert?.status ?? '종결'}</p></div>
+            <ArrowRight className="mx-auto size-4 self-center rotate-90 text-destructive-foreground/70 @4xl:rotate-0" aria-hidden />
+            <div className="rounded-lg border border-destructive-foreground/25 bg-redetection-inset p-3"><CircleDollarSign className="size-4" /><p className="mt-2 text-xs font-semibold">새 이상거래 발견</p><p className="mt-1 font-mono text-[11px]">{r.redetection.newTransactionId}</p><p className="mt-1 text-[11px] text-destructive-foreground/75">{r.redetection.newTransactionAt}</p></div>
+            <ArrowRight className="mx-auto size-4 self-center rotate-90 text-destructive-foreground/70 @4xl:rotate-0" aria-hidden />
+            <div className="rounded-lg border border-destructive-foreground/25 bg-redetection-inset p-3"><Radar className="size-4" /><p className="mt-2 text-xs font-semibold">현재 Alert 재탐지</p><p className="mt-1 font-mono text-[11px]">{r.id}</p><p className="mt-1 text-[11px] text-destructive-foreground/75">{r.redetection.detectedAt} · 새 업무로 검토 중</p></div>
           </div>
         </section>
       )}

@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 const detailSource = readFileSync(new URL('./Detail.tsx', import.meta.url), 'utf8')
 
 const selectionTokens = (css: string, theme: 'light' | 'dark') => {
-  const neutral = css.match(/\/\* shadcn neutral tokens;[\s\S]*?\*\/\s*:root\s*\{([\s\S]*?)\}\s*\.dark\s*\{([\s\S]*?)\}/)
-  const block = neutral?.[theme === 'light' ? 1 : 2] ?? ''
+  const selector = theme === 'light' ? ':root' : '\\.dark'
+  const block = [...css.matchAll(new RegExp(`(?:^|\\n)${selector}\\s*\\{([^}]+)\\}`, 'g'))].map(match => match[1]).join('\n')
   return Object.fromEntries([...block.matchAll(/(--selection-[\w-]+):\s*([^;]+)/g)].map(([, name, value]) => [name, value.trim()]))
 }
 

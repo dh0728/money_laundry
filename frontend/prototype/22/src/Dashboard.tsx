@@ -36,7 +36,7 @@ function Personal({ records, user, onOpen }: { records: RecordItem[]; user: stri
         {stats.map(s => (
           <Card key={s.label} className="shadow-none"><CardContent>
             <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className="text-3xl font-semibold tracking-tight mt-4 tabular-nums">{s.value}<span className="text-sm font-normal ml-1.5 text-muted-foreground">건</span></p>
+            <p className="type-display font-semibold tracking-tight mt-4 tabular-nums">{s.value}<span className="text-sm font-normal ml-1.5 text-muted-foreground">건</span></p>
             <p className="text-[11px] text-muted-foreground mt-2">{s.sub}</p>
           </CardContent></Card>
         ))}
@@ -148,7 +148,7 @@ export function Institution({ records, onOpen }: { records: RecordItem[]; onOpen
   return (
     <>
       <SectionCards items={cards} />
-      <section data-testid="institution-chart-group" data-shine="surface" aria-labelledby="institution-chart-title" className="min-w-0 max-w-full space-y-4 rounded-xl border bg-card/35 p-3 @3xl:p-4">
+      <section data-testid="institution-chart-group" aria-labelledby="institution-chart-title" className="min-w-0 max-w-full space-y-4 rounded-xl border bg-card/35 p-3 @3xl:p-4">
         <div className="flex flex-wrap items-center justify-between gap-4 px-1">
           <div><h2 id="institution-chart-title" className="text-base font-semibold tracking-tight">기관 탐지 현황</h2><p className="mt-1 text-xs text-muted-foreground">한 기간 선택이 아래 세 그래프에 함께 적용됩니다.</p></div>
           <DateRangeButton value={range} onChange={next => setRange(institutionRangeAfterChange(next))} />

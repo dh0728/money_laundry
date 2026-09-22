@@ -10,8 +10,7 @@ const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
 
 describe('v18 RDR 9000 · Notion-style FAB', () => {
   it('AgentFab는 닫힘일 때만 fixed 우하단 circular FAB를 렌더한다', async () => {
-    const { AgentFab, AgentToggle } = await import('./Agent')
-    expect(AgentToggle).toBe(AgentFab)
+    const { AgentFab } = await import('./Agent')
     const closed = html(<AgentFab open={false} onToggle={() => {}} />)
     expect(closed).toContain('data-testid="agent-toggle"')
     expect(closed).toContain('agent-fab')
@@ -26,7 +25,7 @@ describe('v18 RDR 9000 · Notion-style FAB', () => {
     expect(html(<AgentFab open onToggle={() => {}} />)).toBe('')
   })
 
-  it('App 헤더에는 AgentToggle/AgentFab가 없고 Agent 옆에 FAB가 뜬다', () => {
+  it('App 헤더에는 AgentFab가 없고 Agent 옆에 FAB가 뜬다', () => {
     expect(appSrc).not.toMatch(/header[\s\S]{0,800}<Agent(Toggle|Fab)\b/)
     expect(appSrc).toContain('<AgentFab open={agentOpen}')
     expect(appSrc).toContain('<Agent open={agentOpen}')
@@ -38,10 +37,6 @@ describe('v18 RDR 9000 · Notion-style FAB', () => {
     expect(css).toContain('.agent-fab')
   })
 
-  it('Agent.tsx는 AgentFab를 export하고 AgentToggle 별칭을 유지한다', () => {
-    expect(agentSrc).toContain('export function AgentFab')
-    expect(agentSrc).toContain('export const AgentToggle = AgentFab')
-  })
 })
 
   it('AgentFab source has drag + full-bleed eye', () => {

@@ -84,9 +84,8 @@ describe('Figma v14 수정사항 · 화면별', () => {
 
 describe('RDR 9000 조사 도우미', () => {
   it('닫혀 있을 때 Notion-style FAB(렌즈 아이콘)로 열고, 열리면 FAB는 숨긴다', async () => {
-    const { AgentToggle, AgentFab, AGENT_NAME } = await import('./Agent')
-    expect(AgentToggle).toBe(AgentFab)
-    const closed = html(<AgentToggle open={false} onToggle={() => {}} />), opened = html(<AgentToggle open onToggle={() => {}} />)
+    const { AgentFab, AGENT_NAME } = await import('./Agent')
+    const closed = html(<AgentFab open={false} onToggle={() => {}} />), opened = html(<AgentFab open onToggle={() => {}} />)
     expect(AGENT_NAME).toBe('RDR 9000')
     expect(closed).toContain('data-testid="rdr-eye"')
     expect(closed).toContain('data-testid="agent-toggle"')

@@ -369,8 +369,6 @@ export function AgentFab({ open, onToggle }: { open: boolean; onToggle: () => vo
   )
 }
 
-export const AgentToggle = AgentFab
-
 export default function Agent({ open, setOpen, mode, setMode, record, records }: { open: boolean; setOpen: (o: boolean) => void; mode: AgentMode; setMode: (m: AgentMode) => void; record?: RecordItem; records: RecordItem[] }) {
   const [input, setInput] = useState(''), [messages, setMessages] = useState<Message[]>([])
 
@@ -539,7 +537,6 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
         top: morph.to.top,
         width: morph.to.width,
         height: morph.to.height,
-        transition: 'left 420ms cubic-bezier(0.22,1,0.36,1), top 420ms cubic-bezier(0.22,1,0.36,1), width 420ms cubic-bezier(0.22,1,0.36,1), height 420ms cubic-bezier(0.22,1,0.36,1)',
       }}
       onTransitionEnd={event => controller.transition(morph.generation, 'end', event.target === event.currentTarget)}
       onTransitionCancel={event => controller.transition(morph.generation, 'cancel', event.target === event.currentTarget)}
@@ -551,6 +548,6 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
 
   return <>
     {morphLayer}
-    <section aria-label={AGENT_NAME} inert={closing} data-closing={closing || undefined} data-mode={mode} className={`${shell} flex transition-opacity duration-300 ${closing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={style}>{chat}</section>
+    <section aria-label={AGENT_NAME} inert={closing} data-closing={closing || undefined} data-mode={mode} className={`${shell} flex agent-panel ${closing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={style}>{chat}</section>
     </>
 }

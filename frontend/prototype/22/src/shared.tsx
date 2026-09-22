@@ -15,8 +15,8 @@ import { riskTone, topPercent, TODAY, type Risk, type SortDirection } from './do
 export function PageHeading({ title, description }: { title: string; description: string }) {
   return (
     <header data-testid="page-heading" className="page-heading min-h-[58px]">
-      <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-1.5 text-xs text-muted-foreground">{description}</p>
+      <h1 className="type-title font-semibold tracking-tight">{title}</h1>
+      <p className="mt-1.5 type-caption text-muted-foreground">{description}</p>
     </header>
   )
 }

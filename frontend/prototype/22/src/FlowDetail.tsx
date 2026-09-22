@@ -220,7 +220,7 @@ export function FlowPanel({ model, focus, mode, onModeChange, onClose }: { model
     return () => { observer.disconnect(); window.removeEventListener('resize', reclamp) }
   }, [])
   const body = (
-    <div className="flex flex-col h-full min-h-0 bg-card" data-testid="flow-panel" data-shine="surface" data-mode={mode}>
+    <div className="flex flex-col h-full min-h-0 bg-card" data-testid="flow-panel" data-mode={mode}>
       <div className="flow-panel-handle flex items-center gap-2 border-b px-3 py-2 shrink-0">
         <h3 className="flex-1 min-w-0 truncate text-sm font-semibold" translate="no">{flowLabel(model, focus)}</h3>
         <IconButton label={mode === 'dock' ? '떠 있는 창으로 보기' : '오른쪽에 고정'} className="size-7" onClick={() => onModeChange(mode === 'dock' ? 'float' : 'dock')}>

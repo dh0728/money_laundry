@@ -27,13 +27,17 @@ export default function LoginNetwork() {
     }
     const draw = () => {
       context.clearRect(0, 0, width, height)
+      const theme = getComputedStyle(canvas)
+      context.strokeStyle = theme.getPropertyValue('--login-network-edge').trim()
+      context.fillStyle = theme.getPropertyValue('--login-network-node').trim()
       const limit = Math.min(170, Math.max(120, width * .11))
       for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i], b = nodes[j], distance = Math.hypot((a.x - b.x) * width, (a.y - b.y) * height)
-        if (distance < limit) { context.beginPath(); context.moveTo(a.x * width, a.y * height); context.lineTo(b.x * width, b.y * height); context.strokeStyle = `rgba(255,255,255,${.42 * (1 - distance / limit)})`; context.lineWidth = .9; context.stroke() }
+        if (distance < limit) { context.beginPath(); context.moveTo(a.x * width, a.y * height); context.lineTo(b.x * width, b.y * height); context.globalAlpha = 1 - distance / limit; context.lineWidth = .9; context.stroke() }
       }
+      context.globalAlpha = 1
       for (const node of nodes) {
-        context.beginPath(); context.arc(node.x * width, node.y * height, node.r, 0, Math.PI * 2); context.fillStyle = 'rgba(255,255,255,.9)'; context.fill()
+        context.beginPath(); context.arc(node.x * width, node.y * height, node.r, 0, Math.PI * 2); context.fill()
       }
     }
     resize()

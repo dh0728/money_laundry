@@ -25,13 +25,15 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 describe('browser resource lifetimes', () => {
   it('draws the login canvas on mount, theme change and resize without scheduling frames or pointer listeners', () => {
     let draws = 0, resize!: () => void, disconnected = false
-    const context = { clearRect: () => { draws++ }, setTransform: () => {}, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {}, arc: () => {}, fill: () => {} }
+    const context = { strokeStyle: '', fillStyle: '', globalAlpha: 1, clearRect: () => { draws++ }, setTransform: () => {}, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {}, arc: () => {}, fill: () => {} }
     const canvas = { getContext: () => context, getBoundingClientRect: () => ({ width: 900, height: 600 }) }
     hooks.ref = canvas
     const events: string[] = [], frames: unknown[] = []
     vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), addEventListener: (name: string) => events.push(name) })
     vi.stubGlobal('document', { addEventListener: (name: string) => events.push(name) })
     vi.stubGlobal('devicePixelRatio', 2)
+    const palette: Record<string, string> = { '--login-network-edge': 'rgba(100,110,120,.42)', '--login-network-node': 'rgba(200,210,220,.9)' }
+    vi.stubGlobal('getComputedStyle', () => ({ getPropertyValue: (token: string) => palette[token] ?? '' }))
     vi.stubGlobal('requestAnimationFrame', (frame: unknown) => { frames.push(frame); return 1 })
     vi.stubGlobal('cancelAnimationFrame', () => {})
     vi.stubGlobal('ResizeObserver', class {
@@ -43,8 +45,13 @@ describe('browser resource lifetimes', () => {
     const first = hooks.effects[0]
     const cleanup = first.run()
     expect(draws).toBe(1)
+    expect(context.strokeStyle).toBe('rgba(100,110,120,.42)')
+    expect(context.fillStyle).toBe('rgba(200,210,220,.9)')
+    expect(context.globalAlpha).toBe(1)
+    palette['--login-network-node'] = 'rgba(10,20,30,.9)'
     resize()
     expect(draws).toBe(2)
+    expect(context.fillStyle).toBe('rgba(10,20,30,.9)')
     expect(frames).toEqual([])
     expect(events).toEqual([])
     expect(first.dependencies).toEqual(['light'])

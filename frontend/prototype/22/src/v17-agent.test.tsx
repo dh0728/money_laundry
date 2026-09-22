@@ -71,10 +71,9 @@ describe('v17 RDR 9000 도우미 · 리사이즈 핸들', () => {
 
 describe('v17 RDR 9000 도우미 · 토글 pill 아이콘 여백', () => {
   // v18: 헤더 pill → Notion-style FAB. data-testid는 agent-toggle 유지.
-  it('AgentToggle(AgentFab)은 fixed 우하단 rounded-full FAB이다', async () => {
-    const { AgentToggle, AgentFab } = await import('./Agent')
-    expect(AgentToggle).toBe(AgentFab)
-    const markup = html(<AgentToggle open={false} onToggle={() => {}} />)
+  it('AgentFab은 fixed 우하단 rounded-full FAB이다', async () => {
+    const { AgentFab } = await import('./Agent')
+    const markup = html(<AgentFab open={false} onToggle={() => {}} />)
     expect(markup).toContain('data-testid="agent-toggle"')
     expect(markup).toContain('fixed')
     expect(markup).toContain('bottom-6')
@@ -83,7 +82,7 @@ describe('v17 RDR 9000 도우미 · 토글 pill 아이콘 여백', () => {
     expect(markup).toContain('size-14')
     expect(markup).toContain('z-50')
     expect(markup).toMatch(/size-14 rounded-full/)
-    expect(html(<AgentToggle open onToggle={() => {}} />)).toBe('')
+    expect(html(<AgentFab open onToggle={() => {}} />)).toBe('')
   })
 })
 

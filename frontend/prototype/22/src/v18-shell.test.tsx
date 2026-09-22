@@ -8,7 +8,7 @@ const login = appSource.slice(appSource.indexOf('function Login'), appSource.ind
 describe('v18 Figma 검수 · L1 로그인 우측 frosted glass', () => {
   it('오른쪽 패널은 login-glass-panel + backdrop-blur + 반투명 채움이다', () => {
     expect(login).toMatch(/login-glass-panel[^"]*backdrop-blur/)
-    expect(login).toMatch(/login-glass-panel[^"]*bg-white\/\d/)
+    expect(css).toMatch(/\.login-glass-panel\s*\{[^}]*background:\s*var\(--login-panel-background\)/)
     // 불투명 단색 패널 금지(solid bg-black / opaque hex fill on the glass panel itself)
     const panelClass = login.match(/className="(login-glass-panel[^"]*)"/)?.[1] ?? ''
     expect(panelClass).toBeTruthy()
@@ -27,7 +27,10 @@ describe('v18 Figma 검수 · L1 로그인 우측 frosted glass', () => {
     expect(blockStart).toBeGreaterThan(-1)
     const block = css.slice(blockStart)
     expect(block).toMatch(/\.login-glass-panel\s*\{[^}]*backdrop-filter\s*:/)
-    expect(block).toMatch(/\.login-glass-panel\s*\{[^}]*background\s*:\s*rgba\(255,\s*255,\s*255,\s*0\.0[1-9]/)
+    expect(block).toMatch(/\.login-glass-panel\s*\{[^}]*background\s*:\s*var\(--login-panel-background\)/)
+    const alpha = Number(css.match(/--login-panel-background:\s*rgba\(255,\s*255,\s*255,\s*([\d.]+)\)/)?.[1])
+    expect(alpha).toBeGreaterThan(0)
+    expect(alpha).toBeLessThan(.1)
     // 불투명(alpha 1 / 생략) 단색 배경이 아니어야 한다
     expect(block).not.toMatch(/\.login-glass-panel\s*\{[^}]*background\s*:\s*#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\s*;/)
     expect(block).not.toMatch(/\.login-glass-panel\s*\{[^}]*background\s*:\s*rgb\(\s*\d+\s+\d+\s+\d+\s*\)\s*;/)

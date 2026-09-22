@@ -45,8 +45,9 @@ describe('v24 성능·표 밀도 마감', () => {
     expect(css).toContain('var(--selection-destructive-foreground)')
   })
 
-  it('차트 묶음과 실제 플로우 패널 루트는 명시적으로 조명 표면임을 표시한다', () => {
-    expect(dashboard).toMatch(/data-testid="institution-chart-group"[^>]*data-shine="surface"/)
-    expect(flowDetail).toMatch(/data-testid="flow-panel"[^>]*data-shine="surface"/)
+  it('차트 묶음과 플로우 패널은 정적 표면이며 조명 속성을 갖지 않는다', () => {
+    for (const source of [dashboard, flowDetail]) expect(source).not.toContain('data-shine')
+    expect(dashboard).toMatch(/data-testid="institution-chart-group"/)
+    expect(flowDetail).toMatch(/data-testid="flow-panel"/)
   })
 })

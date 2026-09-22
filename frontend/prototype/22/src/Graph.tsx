@@ -216,7 +216,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
 
   const forceGraph = size.w > 0 && size.h > 0 && (
     <ForceGraph2D<GraphNode & { id: string }, GraphEdge>
-      ref={fg} width={size.w} height={size.h} graphData={graphData} backgroundColor="rgba(0,0,0,0)"
+      ref={fg} width={size.w} height={size.h} graphData={graphData} backgroundColor="transparent"
       nodeRelSize={1} nodeVal={n => radius(n) ** 2} nodeVisibility={nodeVisible} nodeLabel={() => ''}
       nodeCanvasObject={(n, ctx, scale) => {
         const r = radius(n)

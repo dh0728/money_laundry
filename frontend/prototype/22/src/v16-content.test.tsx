@@ -1,4 +1,5 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -11,7 +12,8 @@ const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{n
 
 // oklch(l c h) 문자열을 숫자로 분해
 const parseOklch = (s: string) => {
-  const m = s.match(/oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)/)!
+  const resolved = s.replace(/var\((--risk-\d)\)/, (_, token: string) => readFileSync(new URL('./index.css', import.meta.url), 'utf8').match(new RegExp(`${token}:\\s*([^;]+)`))?.[1] ?? '')
+  const m = resolved.match(/oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)/)!
   return { l: Number(m[1]), c: Number(m[2]), h: Number(m[3]) }
 }
 

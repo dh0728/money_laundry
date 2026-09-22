@@ -11,23 +11,12 @@ export const blockPatterns = ['FAN_OUT', 'FAN_IN', 'CYCLE', 'GATHER-SCATTER', 'S
 
 export const TODAY = new Date(2026, 8, 16)
 
-// 위험도 10단계 스케일: 무채색(회색) → 쨍한 레드(#ff0000, oklch(0.628 0.2577 29.23)). 브랜드 규칙상 red는 이상거래·오류·고위험에만 쓴다.
-// bucket 0(0~9점) 채도 0(순수 회색) → bucket 9(90~100점) 순수 레드. 채도 곡선은 지수 1.6으로 낮은 bucket은 확실히 회색으로 남는다.
-const RISK_RED_L = 0.628, RISK_RED_C = 0.2577, RISK_RED_H = 29.23
-const RISK_GRAY_L = 0.74
-export const riskSteps: string[] = Array.from({ length: 10 }, (_, i) => {
-  const t = i / 9
-  const l = RISK_GRAY_L + (RISK_RED_L - RISK_GRAY_L) * t
-  const c = RISK_RED_C * Math.pow(t, 1.6)
-  return `oklch(${l.toFixed(4)} ${c.toFixed(4)} ${RISK_RED_H})`
-})
+// Risk/age mapping chooses a semantic step; index.css owns the palette.
+export const riskSteps: string[] = Array.from({ length: 10 }, (_, i) => `var(--risk-${i})`)
 export const riskTone = (score: number): string => riskSteps[Math.min(9, Math.max(0, Math.floor(score / 10)))]
 // 경과일(age) 히트: 0일(회색) → 7일 이상(순수 레드), 그 사이는 선형. Alert/Episode 목록 "경과" 셀 색상에 사용.
 // 경과일: 0일 회색 → 5일 이상 순수 빨강. 예시 데이터의 최대 경과가 5일이라 7일 기준이면 끝까지 빨개지지 않는다
 export const ageTone = (days: number): string => riskSteps[Math.min(9, Math.max(0, Math.round(days / 5 * 9)))]
-
-// deprecated-compat: risk 3단계 배지 등 기존 호출부가 계속 컴파일되도록 남겨둔 파생값. 새 코드는 riskTone(score)를 직접 쓸 것.
-export const riskColor: Record<Risk, string> = { '고위험': riskTone(92), '중위험': riskTone(67), '저위험': riskTone(34) }
 
 export type RecordItem = {
   id: string; kind: Kind; risk: Risk; score: number; pattern: Pattern; probability: number

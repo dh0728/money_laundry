@@ -5,9 +5,15 @@ import { riskSteps, riskTone } from './domain'
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 // oklch(l c h) 문자열에서 채도(c) 값만 뽑아낸다
-const chromaOf = (oklch: string) => Number(oklch.match(/oklch\([^\s]+ ([^\s]+) /)?.[1])
+const resolveTone = (tone: string) => tone.replace(/var\((--risk-\d)\)/, (_, token: string) => source('./index.css').match(new RegExp(`${token}:\\s*([^;]+)`))?.[1] ?? '')
+const chromaOf = (tone: string) => Number(resolveTone(tone).match(/oklch\([^\s]+ ([^\s]+) /)?.[1])
 
 describe('위험도 10단계 색상(riskTone)', () => {
+  it('returns semantic risk tokens at clamped score boundaries', () => {
+    expect(riskTone(-1)).toBe('var(--risk-0)')
+    expect(riskTone(50)).toBe('var(--risk-5)')
+    expect(riskTone(101)).toBe('var(--risk-9)')
+  })
   it('0~100점을 정확히 10개의 서로 다른 색으로 매핑한다', () => {
     const outputs = new Set(Array.from({ length: 101 }, (_, score) => riskTone(score)))
     expect(outputs.size).toBe(10)
@@ -40,7 +46,7 @@ describe('위험도 10단계 색상(riskTone)', () => {
   it('색은 red(hue 29.23) 계열이거나 무채색(chroma 0)이며, yellow/green/amber 계열이 아니다', () => {
     for (const step of riskSteps) {
       const chroma = chromaOf(step)
-      if (chroma > 0) expect(step).toMatch(/oklch\([^)]+ 29\.23\)/)
+      if (chroma > 0) expect(resolveTone(step)).toMatch(/oklch\([^)]+ 29\.23\)/)
     }
   })
 })
