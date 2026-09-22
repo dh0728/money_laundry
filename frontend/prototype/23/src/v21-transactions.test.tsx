@@ -31,38 +31,33 @@ describe('v22 Transactions three-section hierarchy', () => {
     }
   })
 
-  it('renders an exact transaction target in an expanded owner/account/transaction table', () => {
+  it('renders an exact transaction target through the four-stage explorer', () => {
     const transaction = buildTransactionIndex(records).transactions[0]
     const markup = html(<Transactions records={records} target={{ type: 'transaction', transactionId: transaction.id }} />)
-    expect(markup).toContain('<table')
-    expect(markup).toContain('>소유주<')
-    expect(markup).toContain('>계좌<')
-    expect(markup).toContain('>거래 ID<')
+    expect(markup.match(/aria-pressed="true"/g)).toHaveLength(3)
+    expect(markup).toContain('data-testid="selected-transaction"')
     expect(markup).toContain(transaction.fromOwner)
     expect(markup).toContain(transaction.fromAccount)
     expect(markup).toContain(transaction.id)
-    expect(markup).toContain('상대 소유주 · 계좌')
-    expect(markup).toContain('방향')
-    expect(markup).toContain('연결 Alert')
-    expect(markup).toContain('연결 Episode')
-    expect(markup).toContain('선택한 거래')
   })
 
-  it('renders the Korean page title and explicit three-section explorer', () => {
+  it('renders the Korean page title and explorer controls', () => {
     const markup = html(<Transactions records={records} />)
     expect(markup).toContain('>거래 내역</h1>')
     expect(markup).toContain('소유주에서 계좌와 거래로 이어지는 구조를 단계별로 확인합니다.')
-    expect(markup).toContain('페이지당 행')
+    expect(markup).toContain('aria-label="거래 내역 검색"')
+    expect(markup).toContain('date-range-control')
+    expect(markup).toContain('transaction-filter-trigger')
     expect(markup).toContain('data-testid="transactions-explorer"')
   })
 
-  it('separates owner, account, and transaction columns and exposes linked AML records', () => {
+  it('separates owner, account, transaction, and detail stages and exposes linked AML records', () => {
     const index = buildTransactionIndex(records)
     const transaction = index.transactions.find(item => item.recordIds.length > 0)!
     const markup = html(<Transactions records={records} target={{ type: 'transaction', transactionId: transaction.id }} />)
-    expect(markup).toContain('>소유주<')
-    expect(markup).toContain('>계좌<')
-    expect(markup).toContain('>거래 ID<')
+    expect(markup.indexOf('data-testid="owner-section"')).toBeLessThan(markup.indexOf('data-testid="account-section"'))
+    expect(markup.indexOf('data-testid="account-section"')).toBeLessThan(markup.indexOf('data-testid="transaction-section"'))
+    expect(markup.indexOf('data-testid="transaction-section"')).toBeLessThan(markup.indexOf('data-testid="transaction-detail"'))
     expect(markup).toContain(`aria-label="${transaction.recordIds[0]} 상세 보기"`)
   })
 
@@ -78,12 +73,12 @@ describe('v22 Transactions three-section hierarchy', () => {
     expect(markup).not.toMatch(/lucide-(user-round|landmark|arrow-up-right|arrow-down-left)/)
   })
 
-  it('uses one viewport-bound native scroll owner', () => {
+  it('keeps native scrolling on the owner list instead of the whole explorer', () => {
     const markup = html(<Transactions records={records} />)
     expect(markup).toContain('data-testid="transactions-explorer"')
-    expect(markup).toContain('max-h-[calc(100dvh-220px)]')
-    expect(markup).toContain('overflow-auto')
-    expect(markup).not.toContain('transactions-explorer-floating-scrollbar')
+    expect(markup).toContain('data-testid="owner-scroll-list"')
+    expect(markup).toContain('transaction-owner-scroll')
+    expect(markup).not.toContain('transactions-explorer-scroll')
   })
 
   it('separates Alert and Episode links and exposes period/filter controls', () => {

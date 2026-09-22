@@ -61,19 +61,18 @@ describe('v22 top-level page layout', () => {
 })
 
 describe('v22 transaction explorer', () => {
-  it('attaches each transaction branch to its row so wrapped links can grow naturally', () => {
+  it('uses a compact transaction list beside a separate detail stage', () => {
     const markup = html(<Transactions records={records} />)
-    expect(markup.match(/data-testid="transaction-row-connector"/g)).toHaveLength(7)
-    const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
-    expect(css).not.toContain('.transaction-section [data-slot="table-body"] > [data-slot="table-row"] { height:64px; }')
+    expect(markup).toContain('data-testid="transaction-list"')
+    expect(markup).toContain('data-testid="transaction-detail"')
+    expect(markup.indexOf('data-testid="transaction-list"')).toBeLessThan(markup.indexOf('data-testid="transaction-detail"'))
+    expect(markup).not.toContain('data-testid="transaction-row-connector"')
   })
 
-  it('uses one native overflow owner and natural-height stages', () => {
+  it('uses one owner-list overflow region and natural-height later stages', () => {
     const source = readFileSync(new URL('./TransactionsV22.tsx', import.meta.url), 'utf8')
-    expect(source.match(/overflow-auto/g)).toHaveLength(1)
-    expect(source).not.toContain('max-h-[610px]')
-    expect(source).not.toContain('overflow-y-auto')
-    expect(source).not.toContain('const height = 610')
+    expect(source.match(/bodyClassName="transaction-owner-scroll"/g)).toHaveLength(1)
+    expect(source).not.toContain('overflow-auto')
     expect(source).toContain('StagePanel')
     expect(source).toContain('OrthogonalConnector')
   })
@@ -98,7 +97,7 @@ describe('v22 transaction explorer', () => {
     expect(markup).toContain('>거래<')
   })
 
-  it('separates all three panes and renders directional connectors between them', () => {
+  it('separates four stages and renders directional connectors without a horizontal minimum width', () => {
     const markup = html(<Transactions records={records} />)
     expect(markup).toContain('data-testid="transactions-flow"')
     expect(markup).toContain('data-testid="owner-account-connector"')
@@ -109,30 +108,28 @@ describe('v22 transaction explorer', () => {
     expect(markup).not.toContain('<svg class="absolute inset-0')
     expect(markup).toContain('gap-3')
     expect(markup).toContain('transactions-flow grid')
-    expect(markup).toContain('min-w-[1156px]')
-    expect(markup).not.toContain('class="min-w-0 border-r"')
+    expect(markup).toContain('data-testid="transaction-detail"')
+    expect(markup).not.toContain('min-w-[1156px]')
   })
 
-  it('uses one native scroll owner with a viewport-bound height', () => {
+  it('keeps viewport-bound scrolling local to the owner list', () => {
     const transactionSource = readFileSync(new URL('./TransactionsV22.tsx', import.meta.url), 'utf8')
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
-    expect(transactionSource).toContain('max-h-[calc(100dvh-220px)]')
-    expect(transactionSource).toContain('overflow-auto')
+    expect(transactionSource).toContain('bodyClassName="transaction-owner-scroll"')
+    expect(transactionSource).not.toContain('overflow-auto')
     expect(transactionSource).not.toContain('type="range"')
     expect(transactionSource).not.toContain('ResizeObserver')
     expect(transactionSource).not.toContain('requestAnimationFrame')
     expect(css).not.toContain('.floating-horizontal-range')
-    expect(css).toContain('overscroll-behavior-inline:contain')
+    expect(css).toMatch(/\.transaction-owner-scroll\s*\{[^}]*max-height:[^;}]+[^}]*overflow-y:auto[^}]*scrollbar-gutter:stable/s)
   })
 
-  it('avoids expensive compositing inside the horizontally moving explorer', () => {
+  it('avoids horizontal-explorer compositing while retaining item rendering containment', () => {
     const markup = html(<Transactions records={records} />)
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
     expect(markup).toContain('transaction-stage-item')
-    expect(markup).not.toContain('data-shine="off"')
-    expect(css).toContain('.transactions-explorer-scroll .glass-surface')
-    expect(css).toContain('backdrop-filter:none!important')
-    expect(css).toContain('content-visibility:auto')
+    expect(css).not.toContain('.transactions-explorer-scroll')
+    expect(css).toMatch(/\.transaction-stage-item\s*\{[^}]*content-visibility:auto[^}]*contain-intrinsic-block-size:64px/s)
   })
 
   it('keeps the TanStack Table data reference stable between unrelated renders', () => {
