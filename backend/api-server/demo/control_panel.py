@@ -83,6 +83,7 @@ class Controls:
         upload = target['uploadId']
         report(f'{day} 은행 {bank}: 전송 중', uploadId=upload, bankId=bank)
         mock.upload_file(opener, file, target, size)
+        report(f'{day} 은행 {bank}: 전송 완료 · 검수 확인 중', uploadId=upload, bankId=bank)
         result = mock.request_status(opener, args, upload, complete=True)
         result = mock.wait_result(opener, args, upload, result)
         if result['status'] != 'COMPLETED':
@@ -115,8 +116,12 @@ class Replay:
         if self.future is not None and not self.future.done():
             raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
         self.pause.clear()
-        self.report('시작', error=None)
-        self.future = self.pool.submit(self._run, list(days), files, analyze, upload, interval)
+        days = sorted(set(days))
+        self.report('시작', error=None, totalDays=len(days),
+                    doneDays=sum(day in self.completed for day in days) if analyze else 0,
+                    currentDay=None, fileDone=0, fileTotal=0,
+                    bankId=None, uploadId=None, jobId=None)
+        self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
 
     def _run(self, days, files, analyze, upload, interval):
         try:
@@ -125,6 +130,10 @@ class Replay:
                     break
                 if analyze and day in self.completed:
                     continue
+                file_done = sum((day, bank, str(file)) in self.sent for bank, file in files[day])
+                self.report(f'{day}: 처리 시작', currentDay=day,
+                            fileDone=file_done, fileTotal=len(files[day]) if upload else 0,
+                            bankId=None, uploadId=None, jobId=None)
                 if upload:
                     for bank, file in files[day]:
                         key = (day, bank, str(file))
@@ -133,6 +142,8 @@ class Replay:
                         self.report(f'{day} 은행 {bank}: 전송 준비')
                         self.controls.upload(day, bank, file, self.report)
                         self.sent.add(key)
+                        file_done += 1
+                        self.report(f'{day} 은행 {bank}: 전송·검수 완료', fileDone=file_done)
                 if analyze:
                     self.report(f'{day}: 분석 시작 요청')
                     if day not in self.jobs:
@@ -142,6 +153,7 @@ class Replay:
                     self.wait_job(job, day)
                     self.completed.add(day)
                 with self.lock:
+                    self.state['doneDays'] += 1
                     self.state['history'].append({'date': day, 'result': '분석 완료' if analyze else '전송·검수 완료'})
                 if self.pause.wait(interval):
                     break
@@ -207,8 +219,17 @@ def render():
             if st.button('현재 날짜 완료 후 일시정지', disabled=not running):
                 replay.pause.set()
             state = replay.snapshot()
+            if state.get('totalDays'):
+                done, total = state['doneDays'], state['totalDays']
+                st.progress(done / total, text=f'전체 날짜 진행률 · {done}/{total}일 완료')
+                if state.get('currentDay'):
+                    st.caption(f'현재 처리 날짜: {state["currentDay"]}')
+                if state.get('fileTotal'):
+                    st.progress(state['fileDone'] / state['fileTotal'],
+                                text=f'현재 날짜 전송·검수 · {state["fileDone"]}/{state["fileTotal"]}개 파일 완료')
+                st.caption('날짜 진행률은 분석 완료 기준입니다. 전송만 실행하면 검수 완료 기준입니다.')
             st.write(state['message'])
-            st.write({key: state[key] for key in ('bankId', 'uploadId', 'jobId') if key in state})
+            st.write({key: state[key] for key in ('bankId', 'uploadId', 'jobId') if state.get(key) is not None})
             if state['error']:
                 st.error(state['error'])
             if state['history']:

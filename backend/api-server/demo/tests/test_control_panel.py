@@ -1,5 +1,6 @@
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -46,6 +47,8 @@ class PanelTests(unittest.TestCase):
                     self.assertFalse(app.exception)
                     app.session_state.replay.future.result(timeout=10)
                     self.assertIsNone(app.session_state.replay.snapshot()['error'])
+                    app.run()
+                    self.assertEqual([item.value for item in app.get('progress')], [100, 100])
                     actual.post.assert_called_once_with('demo/analysis', {'businessDate': '2023-09-01'})
                     app.session_state.replay.close()
 
@@ -59,6 +62,8 @@ class PanelTests(unittest.TestCase):
             control.post.assert_not_called()
             self.assertEqual(control.upload.call_count, 1)
             self.assertNotIn('secret-url', replay.snapshot()['error'])
+            self.assertEqual(replay.snapshot()['doneDays'], 0)
+            self.assertEqual(replay.snapshot()['fileDone'], 0)
         finally:
             replay.close()
 
@@ -76,6 +81,7 @@ class PanelTests(unittest.TestCase):
             replay.future.result(timeout=5)
             self.assertEqual(control.post.call_count, 2)
             self.assertEqual(control.upload.call_count, 2)
+            self.assertEqual(replay.snapshot()['doneDays'], 2)
             self.assertEqual([x['date'] for x in replay.snapshot()['history']], ['d1', 'd2'])
             calls = control.method_calls
             self.assertLess(calls.index(('get', ('batch-jobs/1',), {})),
@@ -111,7 +117,40 @@ class PanelTests(unittest.TestCase):
             self.assertEqual(control.upload.call_count, 1)
             control.post.assert_called_once()
             self.assertEqual(replay.snapshot()['message'], '일시정지')
+            self.assertEqual(replay.snapshot()['doneDays'], 1)
+            self.assertEqual(replay.snapshot()['totalDays'], 2)
         finally:
+            replay.close()
+
+    def test_progress_waits_for_analysis_and_resumes_without_double_counting(self):
+        control = Mock()
+        entered, release = threading.Event(), threading.Event()
+        def result(_):
+            entered.set()
+            if not release.wait(5):
+                raise TimeoutError('test gate')
+            return {'status': 'FAILED'}
+        control.get.side_effect = result
+        control.post.return_value = {'jobId': 3}
+        replay = Replay(control)
+        files = {'d1': [(1, Path('a')), (2, Path('b'))]}
+        try:
+            replay.start(['d1'], files)
+            self.assertTrue(entered.wait(5))
+            state = replay.snapshot()
+            self.assertEqual((state['fileDone'], state['fileTotal'], state['doneDays']), (2, 2, 0))
+            release.set()
+            replay.future.result(timeout=5)
+            self.assertEqual(replay.snapshot()['doneDays'], 0)
+            control.get.side_effect = None
+            control.get.return_value = {'status': 'COMPLETED'}
+            replay.start(['d1'], files)
+            replay.future.result(timeout=5)
+            self.assertEqual(replay.snapshot()['doneDays'], 1)
+            self.assertEqual(replay.snapshot()['fileDone'], 2)
+            self.assertEqual(control.upload.call_count, 2)
+        finally:
+            release.set()
             replay.close()
 
 
