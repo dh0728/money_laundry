@@ -46,6 +46,30 @@ describe('v22 top-level page layout', () => {
 })
 
 describe('v22 transaction explorer', () => {
+  it('attaches each transaction branch to its row so wrapped links can grow naturally', () => {
+    const markup = html(<Transactions records={records} />)
+    expect(markup.match(/data-testid="transaction-row-connector"/g)).toHaveLength(7)
+    const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
+    expect(css).not.toContain('.transaction-section [data-slot="table-body"] > [data-slot="table-row"] { height:64px; }')
+  })
+
+  it('uses one native overflow owner and natural-height stages', () => {
+    const source = readFileSync(new URL('./TransactionsV22.tsx', import.meta.url), 'utf8')
+    expect(source.match(/overflow-auto/g)).toHaveLength(1)
+    expect(source).not.toContain('max-h-[610px]')
+    expect(source).not.toContain('overflow-y-auto')
+    expect(source).not.toContain('const height = 610')
+    expect(source).toContain('StagePanel')
+    expect(source).toContain('OrthogonalConnector')
+  })
+
+  it('keeps compact hierarchy columns and a wide transaction stage', () => {
+    const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
+    expect(css).toContain('--owner-stage-width: 13.5rem')
+    expect(css).toContain('--account-stage-width: 14.5rem')
+    expect(css).toContain('min-width: 180px')
+  })
+
   it('presents owner, account, and transaction as three explicit sections', () => {
     const markup = html(<Transactions records={records} />)
     expect(markup).toContain('data-testid="transactions-explorer"')
@@ -66,12 +90,11 @@ describe('v22 transaction explorer', () => {
     expect(markup).toContain('data-testid="account-transaction-connector"')
     expect(markup).toContain('data-testid="owner-account-connector-edge-0"')
     expect(markup).toContain('data-testid="account-transaction-connector-edge-0"')
-    expect(markup).toMatch(/<path d="M 0 [^"]* H 16 V [^"]* H 37"/)
-    expect(markup).not.toMatch(/<path d="M 0 [^"]* C /)
-    expect(markup).toContain('<circle cx="2"')
+    expect(markup).toContain('transaction-connector-edge')
+    expect(markup).not.toContain('<svg class="absolute inset-0')
     expect(markup).toContain('gap-3')
-    expect(markup).toContain('min-w-[1700px]')
-    expect(markup).toContain('grid-cols-[220px_36px_240px_36px_minmax(1136px,1fr)]')
+    expect(markup).toContain('transactions-flow grid')
+    expect(markup).toContain('min-w-[1156px]')
     expect(markup).not.toContain('class="min-w-0 border-r"')
   })
 

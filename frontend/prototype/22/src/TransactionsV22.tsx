@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DataTable, toggleSingleSelectedId } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
+import { OrthogonalConnector, StageItem, StagePanel } from '@/components/transaction-stage'
 import { compactUsd, usd, type RecordItem } from './domain'
 import { DateRangeButton, FilterChip, PageHeading } from './shared'
 import { buildTransactionIndex, type TransactionIndex, type TransactionTarget } from './transactionIndex'
@@ -66,28 +67,6 @@ function RecordLinks({ ids, records, onOpenRecord }: { ids: string[]; records: M
     const record = records.get(id)
     return <Button key={id} type="button" variant="link" size="sm" className="record-link h-auto p-0 font-mono text-[11px] !text-inherit underline" aria-label={`${id} 상세 보기`} disabled={!record || !onOpenRecord} onClick={event => { event.stopPropagation(); if (record) onOpenRecord?.(record) }}>{id}</Button>
   })}</div>
-}
-
-function SectionHeader({ title, count, description }: { title: string; count: number; description: string }) {
-  return <div className="border-b px-4 py-3"><div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">{title}</h2><Badge variant="secondary" className="font-normal">{count}</Badge></div><p className="mt-1 text-[11px] text-muted-foreground">{description}</p></div>
-}
-
-function StageConnector({ id, sourceIndex, targetCount, targetKind }: { id: string; sourceIndex: number; targetCount: number; targetKind: 'card' | 'table' }) {
-  const height = 610
-  const sourceY = Math.min(height - 30, 32 + Math.max(0, sourceIndex) * 64)
-  const targetStart = targetKind === 'table' ? 76 : 32
-  const targetStep = targetKind === 'table' ? 64 : 64
-  const targetYs = Array.from({ length: Math.min(targetCount, 20) }, (_, index) => Math.min(height - 24, targetStart + index * targetStep))
-
-  return <div data-testid={id} aria-hidden="true" className="relative mt-[69px] h-[610px] text-muted-foreground">
-    <svg className="absolute inset-0 size-full overflow-visible" viewBox={`0 0 44 ${height}`} preserveAspectRatio="none">
-      {targetYs.map((targetY, index) => <g key={index} data-testid={`${id}-edge-${index}`}>
-        <path d={`M 0 ${sourceY} H 16 V ${targetY} H 37`} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        <path d={`M 36 ${targetY - 5} L 43 ${targetY} L 36 ${targetY + 5}`} fill="none" stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-      </g>)}
-      <circle cx="2" cy={sourceY} r="2.5" fill="currentColor" />
-    </svg>
-  </div>
 }
 
 function FloatingExplorer({ children }: { children: ReactNode }) {
@@ -152,7 +131,7 @@ export default function TransactionsV22({ records, target, onOpenRecord }: { rec
   const filterValues = useMemo<Record<TransactionFilterField, string[]>>(() => ({ direction: ['송금', '수취'], status: ['의심', '정상'], format: [...new Set(index.transactions.map(item => item.format))].sort() }), [index.transactions])
 
   const columns = useMemo<ColumnDef<TransactionView>[]>(() => [
-    { id: 'id', accessorKey: 'id', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 ID" />, cell: ({ row }) => <div className="min-w-[165px]"><p className="font-mono text-sm">{row.original.id}</p><p className="mt-1 font-mono text-[11px] text-muted-foreground">{row.original.fromAccount} → {row.original.toAccount}</p></div> },
+    { id: 'id', accessorKey: 'id', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 ID" />, cell: ({ row }) => <div className="min-w-[165px]"><i data-testid="transaction-row-connector" className="transaction-row-connector" aria-hidden="true" /><p className="font-mono text-sm">{row.original.id}</p><p className="mt-1 font-mono text-[11px] text-muted-foreground">{row.original.fromAccount} → {row.original.toAccount}</p></div> },
     { id: 'at', accessorKey: 'at', header: ({ column }) => <DataTableColumnHeader column={column} label="일시" />, cell: ({ row }) => <span className="whitespace-nowrap text-xs tabular-nums">{row.original.at}</span> },
     { id: 'counterparty', accessorKey: 'counterpartyOwner', header: ({ column }) => <DataTableColumnHeader column={column} label="상대 소유주 · 계좌" />, cell: ({ row }) => <div className="min-w-[170px] text-xs"><p>{row.original.counterpartyOwner}</p><p className="mt-1 font-mono text-[11px] text-muted-foreground">{row.original.counterpartyAccount}</p></div> },
     { id: 'direction', accessorKey: 'direction', header: ({ column }) => <DataTableColumnHeader column={column} label="방향" />, cell: ({ row }) => <Badge variant="outline" className="font-normal">{row.original.direction}</Badge> },
@@ -188,12 +167,13 @@ export default function TransactionsV22({ records, target, onOpenRecord }: { rec
     </div>
     {filters.length > 0 && <div className="flex flex-wrap items-center gap-2">{filters.map((filter, index) => <FilterChip key={`${filter.field}-${filter.value}`} onRemove={() => applyControls(query, range, filters.filter((_, current) => current !== index))}>{filterLabels[filter.field]}: {filter.value}</FilterChip>)}</div>}
     <FloatingExplorer>
-      <div data-testid="transactions-flow" className="grid min-w-[1700px] grid-cols-[220px_36px_240px_36px_minmax(1136px,1fr)] items-stretch gap-3">
-        <section data-testid="owner-section" className="glass-surface min-w-0 overflow-hidden rounded-xl border"><SectionHeader title="소유주" count={visibleOwners.length} description="소유주를 선택해 계좌 확인" /><div className="max-h-[610px] overflow-y-auto p-2">{visibleOwners.map(item => <button key={item.name} type="button" aria-pressed={item.name === owner?.name} onClick={() => selectOwner(item)} className={`transaction-stage-item w-full rounded-lg px-3 py-3 text-left transition-colors ${item.name === owner?.name ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60'}`}><span className="block truncate text-sm font-medium">{item.name}</span><span className="mt-1 block text-[11px] text-muted-foreground">계좌 {item.accountIds.length}개 · 거래 {item.transactionIds.length}건</span></button>)}</div></section>
-        <StageConnector id="owner-account-connector" sourceIndex={Math.max(0, visibleOwners.findIndex(item => item.name === owner?.name))} targetCount={ownerAccounts.length} targetKind="card" />
-        <section data-testid="account-section" className="glass-surface min-w-0 overflow-hidden rounded-xl border"><SectionHeader title="계좌" count={ownerAccounts.length} description={owner ? `${owner.name}의 계좌` : '소유주를 선택하세요'} /><div className="max-h-[610px] overflow-y-auto p-2">{ownerAccounts.map(item => <button key={item.id} type="button" aria-pressed={item.id === account?.id} onClick={() => selectAccount(item)} className={`transaction-stage-item w-full rounded-lg px-3 py-3 text-left transition-colors ${item.id === account?.id ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60'}`}><span className="block font-mono text-sm">{item.id}</span><span className="mt-1 block text-[11px] text-muted-foreground">은행 {item.bank} · 거래 {item.transactionIds.length}건</span></button>)}</div></section>
-        <StageConnector id="account-transaction-connector" sourceIndex={Math.max(0, ownerAccounts.findIndex(item => item.id === account?.id))} targetCount={visibleTransactionCount} targetKind="table" />
-        <section data-testid="transaction-section" className="transaction-section glass-surface min-w-0 overflow-hidden rounded-xl border"><SectionHeader title="거래" count={transactionRows.length} description={account ? `${account.id}의 거래 내역` : '계좌를 선택하세요'} /><div className="p-3"><DataTable table={table} tableClassName="min-w-[1156px]" onRowClick={selectTransaction} data-testid="transaction-list-table" /></div></section>
+      <div data-testid="transactions-flow" className="transactions-flow grid items-stretch gap-3">
+        <StagePanel testId="owner-section" title="소유주" count={visibleOwners.length} description="소유주를 선택해 계좌 확인">{visibleOwners.map(item => <StageItem key={item.name} active={item.name === owner?.name} primary={item.name} secondary={`계좌 ${item.accountIds.length}개 · 거래 ${item.transactionIds.length}건`} onSelect={() => selectOwner(item)} />)}</StagePanel>
+        <OrthogonalConnector id="owner-account-connector" sourceIndex={visibleOwners.findIndex(item => item.name === owner?.name)} targetCount={ownerAccounts.length} targetOffset={110} />
+        <StagePanel testId="account-section" title="계좌" count={ownerAccounts.length} description={owner ? `${owner.name}의 계좌` : '소유주를 선택하세요'}>{ownerAccounts.map(item => <StageItem key={item.id} active={item.id === account?.id} primary={item.id} secondary={`은행 ${item.bank} · 거래 ${item.transactionIds.length}건`} mono onSelect={() => selectAccount(item)} />)}</StagePanel>
+        {/* The bridge meets the table body; each row owns its branch so wrapped links can increase its height. */}
+        <OrthogonalConnector id="account-transaction-connector" sourceIndex={ownerAccounts.findIndex(item => item.id === account?.id)} targetCount={visibleTransactionCount ? 1 : 0} targetOffset={121} />
+        <StagePanel testId="transaction-section" title="거래" count={transactionRows.length} description={account ? `${account.id}의 거래 내역` : '계좌를 선택하세요'}><DataTable className="transaction-section" table={table} tableClassName="min-w-[1156px]" onRowClick={selectTransaction} data-testid="transaction-list-table" /></StagePanel>
       </div>
     </FloatingExplorer>
     {selected && <Card className="border-foreground/30" data-testid="selected-transaction"><CardHeader><CardTitle className="text-sm">선택한 거래</CardTitle><CardDescription className="font-mono">{selected.id}</CardDescription></CardHeader><CardContent className="grid gap-5 text-xs @3xl:grid-cols-2 @5xl:grid-cols-4"><div><p className="text-muted-foreground">거래 시각</p><p className="mt-1 tabular-nums">{selected.at}</p></div><div><p className="text-muted-foreground">금액</p><p className="mt-1 font-medium tabular-nums">{usd(selected.usd)}</p></div><div><p className="text-muted-foreground">결제 수단</p><p className="mt-1">{selected.format}</p></div><div><p className="text-muted-foreground">연결 Alert</p><div className="mt-1"><RecordLinks ids={selected.recordIds.filter(id => recordMap.get(id)?.kind === 'Alert')} records={recordMap} onOpenRecord={onOpenRecord} /></div></div><div><p className="text-muted-foreground">연결 Episode</p><div className="mt-1"><RecordLinks ids={selected.recordIds.filter(id => recordMap.get(id)?.kind === 'Episode')} records={recordMap} onOpenRecord={onOpenRecord} /></div></div><div><p className="text-muted-foreground">송금 소유주 · 계좌</p><p className="mt-1">{selected.fromOwner}</p><p className="font-mono text-muted-foreground">{selected.fromAccount}</p></div><div className="flex items-center justify-center"><ArrowRight className="size-4 text-muted-foreground" /><span className="sr-only">{compactUsd(selected.usd)}</span></div><div><p className="text-muted-foreground">수취 소유주 · 계좌</p><p className="mt-1">{selected.toOwner}</p><p className="font-mono text-muted-foreground">{selected.toAccount}</p></div></CardContent></Card>}

@@ -9,6 +9,15 @@ import { buildTransactionIndex } from './transactionIndex'
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
 
 describe('v22 Transactions three-section hierarchy', () => {
+  it('renders every hierarchy stage in one document flow', () => {
+    const markup = html(<Transactions records={records} />)
+    expect(markup).toContain('data-testid="transactions-explorer"')
+    expect(markup).toContain('data-testid="owner-section"')
+    expect(markup).toContain('data-testid="account-section"')
+    expect(markup).toContain('data-testid="transaction-section"')
+    expect(markup).not.toContain('max-h-[610px]')
+  })
+
   it('builds deterministic owner → account → transaction relationships', () => {
     const index = buildTransactionIndex(records)
     expect(index.owners.length).toBeGreaterThan(0)
@@ -87,7 +96,7 @@ describe('v22 Transactions three-section hierarchy', () => {
     expect(markup).not.toContain('>—<')
     expect(markup).toContain('date-range-control')
     expect(markup).toContain('transaction-filter-trigger')
-    expect(markup).toContain('min-w-[1700px]')
+    expect(markup).toContain('transactions-flow')
     expect(markup).toContain('record-link')
   })
 

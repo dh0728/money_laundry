@@ -44,6 +44,8 @@
   --text-body-size: .875rem;
   --text-caption-size: .75rem;
   --text-micro-size: .6875rem;
+  --owner-stage-width: 13.5rem;
+  --account-stage-width: 14.5rem;
   --motion-instant: 0ms;
   --motion-fast: 120ms;
   --motion-normal: 180ms;
@@ -140,7 +142,29 @@
 .transactions-explorer-scroll { overscroll-behavior-inline:contain; scroll-behavior:auto; }
 .transactions-explorer-scroll .glass-surface { background:var(--card); -webkit-backdrop-filter:none!important; backdrop-filter:none!important; }
 .transactions-explorer-scroll .glass-surface::before { display:none!important; }
-.transaction-stage-item { content-visibility:auto; contain-intrinsic-block-size:64px; }
+.transactions-flow {
+  /* Include 16px padding + the panel/table borders and four 12px gaps. */
+  grid-template-columns: var(--owner-stage-width) 2.75rem var(--account-stage-width) 2.75rem minmax(calc(72.25rem + 1.25rem), 1fr);
+  min-width: calc(var(--owner-stage-width) + var(--account-stage-width) + 77.75rem + 1.25rem + 3rem);
+}
+.header-search-input { min-width: 180px; }
+.transaction-stage > header { height:69px; }
+.transaction-stage-item { height:64px; content-visibility:auto; contain-intrinsic-block-size:64px; }
+.transaction-connector { position:relative; color:var(--muted-foreground); pointer-events:none; }
+.transaction-connector-edge { position:absolute; inset:0 -12px; }
+.transaction-connector-edge::before { content:""; position:absolute; top:var(--source-y); left:0; width:50%; border-top:1.5px solid; }
+.transaction-connector-edge::after { content:""; position:absolute; top:min(var(--source-y),var(--target-y)); left:50%; height:calc(max(var(--source-y),var(--target-y)) - min(var(--source-y),var(--target-y))); border-left:1.5px solid; }
+.transaction-connector-edge > b { position:absolute; top:var(--target-y); left:50%; right:0; border-top:1.5px solid; }
+.transaction-connector-edge > b::after { content:""; position:absolute; right:1px; top:-4px; width:7px; height:7px; border-top:1.5px solid; border-right:1.5px solid; transform:rotate(45deg); }
+/* The table rail follows actual row boxes, including multiline Alert/Episode links. */
+.transaction-connector:has(+ .transaction-stage .transaction-section) .transaction-connector-edge > b { display:none; }
+.transaction-stage:has(.transaction-section) { min-width:max-content; overflow:visible; }
+.transaction-section > .glass-surface { overflow:visible; }
+.transaction-section [data-slot="table-row"][data-interactive] > [data-slot="table-cell"]:first-child::before { content:""; position:absolute; left:-44px; top:0; bottom:0; border-left:1.5px solid var(--muted-foreground); pointer-events:none; }
+.transaction-section [data-slot="table-row"]:last-child > [data-slot="table-cell"]:first-child::before { bottom:50%; }
+.transaction-row-connector { position:absolute; left:-44px; right:calc(100% + 10px); top:50%; border-top:1.5px solid var(--muted-foreground); pointer-events:none; }
+.transaction-row-connector::after { content:""; position:absolute; right:1px; top:-4px; width:7px; height:7px; border-top:1.5px solid var(--muted-foreground); border-right:1.5px solid var(--muted-foreground); transform:rotate(45deg); }
+.transaction-section .overflow-auto { overflow:visible; }
 .graph-label { fill:var(--foreground); paint-order:stroke; stroke:var(--card); stroke-width:4px; stroke-linejoin:round; pointer-events:none; }
 .graph-node:focus { outline:none; }
 .graph-node:focus-visible circle { stroke:var(--foreground); stroke-width:3px; }
