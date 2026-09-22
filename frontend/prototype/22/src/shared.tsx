@@ -117,7 +117,7 @@ export function UnderTabs<T extends string>({ value, onChange, items }: { value:
 export function RiskBadge({ score }: { risk: Risk; score: number }) {
   // v20 B4: 채움을 투명하게 낮춰 위험 단계와 관계없이 흰 글씨 대비를 확보한다.
   return (
-    <Badge className="gap-1.5 border-0 font-normal text-white" style={{ backgroundColor: `color-mix(in oklch, ${riskTone(score)} 70%, transparent)` }}>
+    <Badge className="gap-1.5 border-0 font-normal text-selection-destructive-foreground" style={{ backgroundColor: `color-mix(in oklch, ${riskTone(score)} 70%, transparent)` }}>
       <span className="font-mono">{score}</span><span className="text-[10px] opacity-70">상위 {topPercent(score)}%</span>
     </Badge>
   )

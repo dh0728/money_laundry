@@ -58,7 +58,7 @@ function SidebarDestinationButton({ onNavigate, ...props }: Omit<ComponentProps<
 function Login({ onLogin }: { onLogin: () => void }) {
   const [showPassword, setShowPassword] = useState(false)
   return (
-    <div className="login-screen relative min-h-screen overflow-hidden bg-[#070709] text-white">
+    <div className="login-screen relative min-h-screen overflow-hidden bg-[var(--radar-disc)] text-white">
       {/* 화면 전체를 노드 그래프 애니메이션으로 채우고, 오른쪽 절반 전체를 유리 패널로 나눈다 */}
       <div className="absolute inset-0 z-0"><LoginNetwork /></div>
       {/* 왼쪽만 살짝 어둡게 — 오른쪽 유리 영역은 덮지 않음(네트워크가 비쳐야 함) */}

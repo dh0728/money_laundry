@@ -39,6 +39,25 @@
 /* shadcn neutral tokens; domain colors are defined separately in domain.ts. */
 :root {
   --radius: .625rem;
+  --text-display-size: 1.875rem;
+  --text-title-size: 1.25rem;
+  --text-body-size: .875rem;
+  --text-caption-size: .75rem;
+  --text-micro-size: .6875rem;
+  --motion-instant: 0ms;
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-morph: 200ms;
+  --ease-standard: cubic-bezier(.2, .8, .2, 1);
+  --ease-emphasized: cubic-bezier(.16, 1, .3, 1);
+  --interactive-edge-glow: 0 0 0 1px color-mix(in oklch, var(--destructive) 38%, transparent), 0 0 16px color-mix(in oklch, var(--destructive) 18%, transparent);
+  --selection-fill: var(--selection-background);
+  --radar-core-hot: #ff8189;
+  --radar-core-deep: #38050a;
+  --radar-bezel-light: #55555e;
+  --radar-bezel-mid: #0a0a0c;
+  --radar-bezel-dark: #2e2e35;
+  --radar-disc: #08080a;
   --background: oklch(1 0 0); --foreground: oklch(.145 0 0);
   --card: oklch(1 0 0); --card-foreground: oklch(.145 0 0);
   --popover: oklch(1 0 0); --popover-foreground: oklch(.145 0 0);
@@ -83,6 +102,8 @@
   --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive); --color-border: var(--border);
+  --color-selection-foreground: var(--selection-foreground);
+  --color-selection-destructive-foreground: var(--selection-destructive-foreground);
   --color-input: var(--input); --color-ring: var(--ring);
   --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2);
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
@@ -92,16 +113,18 @@
   body { @apply bg-background text-foreground; margin: 0; font-size: 14px; -webkit-font-smoothing: antialiased; }
   button, [role=button] { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
-  ::selection { background: #82828260; }
+  ::selection { background:var(--selection-fill); color:var(--selection-foreground); }
 }
 .underline-tabs { position:relative; display:flex; justify-content:flex-start; width:100%; border-radius:0; padding:0; gap:25px; height:42px; background:transparent; border-bottom:1px solid var(--border); }
 .underline-tabs [data-slot=tabs-trigger] { flex:none; position:relative; height:42px; border:0; border-radius:0; padding:0 1px; background:transparent!important; box-shadow:none!important; color:var(--muted-foreground); font-weight:400; font-size:13px; }
 .underline-tabs [data-slot=tabs-trigger][data-state=active] { font-weight:650; color:var(--foreground); }
 .underline-tabs [data-slot=tabs-trigger]::after { display:none; }
-.tab-indicator { position:absolute; pointer-events:none; left:0; bottom:-1px; height:3px; background:var(--foreground); transition:transform .2s cubic-bezier(.2,.8,.2,1), width .2s cubic-bezier(.2,.8,.2,1); }
+.tab-indicator { position:absolute; pointer-events:none; left:0; bottom:-1px; height:3px; background:var(--foreground); transition-property:transform,width; }
 .app-sidebar-surface { position:relative; isolation:isolate; display:flex; flex-direction:column; width:100%; height:100%; min-height:0; overflow:hidden; }
 .app-sidebar [data-slot=sidebar-gap], .app-sidebar [data-slot=sidebar-container] { transition-duration:120ms; }
-.sidebar-indicator { position:absolute; pointer-events:none; z-index:0; left:0; top:0; border-radius:var(--radius-md); background:var(--primary); transition:transform .2s cubic-bezier(.2,.8,.2,1), width .2s cubic-bezier(.2,.8,.2,1), height .2s cubic-bezier(.2,.8,.2,1); }
+.sidebar-indicator { position:absolute; pointer-events:none; z-index:0; left:0; top:0; border-radius:var(--radius-md); background:var(--primary); transition-property:transform,width,height; }
+.tab-indicator,
+.sidebar-indicator { transition-duration:var(--motion-morph); transition-timing-function:var(--ease-standard); }
 .tab-indicator[data-animate=false], .sidebar-indicator[data-animate=false] { transition:none; }
 .app-sidebar-surface > :not(.sidebar-indicator) { position:relative; z-index:1; }
 .app-sidebar-surface [data-slot=sidebar-menu-button][data-active=true], .app-sidebar-surface [data-slot=sidebar-menu-button][data-active=true]:hover { background:transparent!important; color:var(--primary-foreground); font-weight:600; }

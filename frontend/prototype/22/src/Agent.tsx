@@ -241,19 +241,19 @@ export function RadarSweep({ className = 'size-5', glow = false }: { className?:
     <svg viewBox="0 0 32 32" className={className} aria-hidden data-testid="rdr-eye">
       <defs>
         <radialGradient id={`${id}-core`} cx="16" cy="16" r="5" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#ff8189" />
+          <stop offset="0" stopColor="var(--radar-core-hot)" />
           <stop offset=".4" stopColor="var(--graph-l1)" />
-          <stop offset="1" stopColor="#38050a" />
+          <stop offset="1" stopColor="var(--radar-core-deep)" />
         </radialGradient>
         <linearGradient id={`${id}-bezel`} x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#55555e" />
-          <stop offset=".5" stopColor="#0a0a0c" />
-          <stop offset="1" stopColor="#2e2e35" />
+          <stop offset="0" stopColor="var(--radar-bezel-light)" />
+          <stop offset=".5" stopColor="var(--radar-bezel-mid)" />
+          <stop offset="1" stopColor="var(--radar-bezel-dark)" />
         </linearGradient>
       </defs>
       {/* 근접 흑색 disc + 얇은 금속 bezel */}
-      <circle cx="16" cy="16" r="15" fill="#08080a" stroke={`url(#${id}-bezel)`} strokeWidth="1.5" />
-      <circle cx="16" cy="16" r="14" fill="none" stroke="#000" strokeOpacity=".5" strokeWidth=".5" />
+      <circle cx="16" cy="16" r="15" fill="var(--radar-disc)" stroke={`url(#${id}-bezel)`} strokeWidth="1.5" />
+      <circle cx="16" cy="16" r="14" fill="none" stroke="var(--radar-disc)" strokeOpacity=".5" strokeWidth=".5" />
       {/* 붉은 코어는 작게 두고(HAL의 눈), 그 바깥 어두운 원판 위로 sweep이 돌아 24px에서도 회전이 보이게 한다 */}
       <circle cx="16" cy="16" r="12.5" fill="none" stroke="var(--graph-l1)" strokeOpacity=".3" strokeWidth=".6" />
       <circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--graph-l1)" strokeOpacity=".25" strokeWidth=".5" />
@@ -266,11 +266,11 @@ export function RadarSweep({ className = 'size-5', glow = false }: { className?:
         <path d="M16 16 L27.26 9.50 A13 13 0 0 1 28.36 11.98 Z" fill="var(--graph-l1)" fillOpacity="0.46" />
         <path d="M16 16 L28.36 11.98 A13 13 0 0 1 28.93 14.64 Z" fill="var(--graph-l1)" fillOpacity="0.62" />
         <path d="M16 16 L28.93 14.64 A13 13 0 0 1 28.93 17.36 Z" fill="var(--graph-l1)" fillOpacity="0.82" />
-        <path d="M16 16 L28.93 17.36" stroke="#ff5a5a" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M16 16 L28.93 17.36" stroke="var(--radar-core-hot)" strokeWidth="1.4" strokeLinecap="round" />
         {!reduceMotion && <animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="2.2s" repeatCount="indefinite" />}
       </g>
       <circle cx="16" cy="16" r="5" fill={`url(#${id}-core)`} className={glow ? 'rdr-glow' : undefined} />
-      <circle cx="16" cy="16" r="1.3" fill="#fff" fillOpacity=".85" />
+      <circle cx="16" cy="16" r="1.3" fill="var(--radar-bezel-light)" fillOpacity=".85" />
     </svg>
   )
 }

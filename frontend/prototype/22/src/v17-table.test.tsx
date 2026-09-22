@@ -67,10 +67,10 @@ describe('Figma v17 수정사항 · RiskBadge는 outline이 아니라 채움이�
     expect(markup).not.toMatch(/border-border/)
   })
 
-  it('v20 B4: 위험 색을 투명하게 낮춰 전 구간 흰 글씨를 쓴다', () => {
+  it('v20 B4: 위험 색을 투명하게 낮춰 전 구간 semantic 고대비 글씨를 쓴다', () => {
     for (const score of [92, 58, 12]) {
       const m = html(<RiskBadge risk="중위험" score={score} />)
-      expect(m).toContain('text-white'); expect(m).not.toContain('text-black')
+      expect(m).toContain('text-selection-destructive-foreground'); expect(m).not.toContain('text-black')
       expect(m).toMatch(/background-color:color-mix\(in oklch,/)
     }
   })

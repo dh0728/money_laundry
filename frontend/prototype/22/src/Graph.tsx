@@ -39,7 +39,7 @@ export const graphNodeRole = (node: GraphNode) => node.core
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof import('react-force-graph-2d').default
 type FNode = NodeObject<GraphNode & { id: string }>
 type FLink = LinkObject<GraphNode & { id: string }, GraphEdge>
-const cssVar = (name: string) => typeof window === 'undefined' ? '#888' : getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'
+const cssVar = (name: string) => typeof window === 'undefined' ? 'currentColor' : getComputedStyle(document.documentElement).getPropertyValue(name).trim() || getComputedStyle(document.documentElement).color || 'currentColor'
 const dim = (hex: string) => hex.startsWith('#') && (hex.length === 7 || hex.length === 9) ? `${hex.slice(0, 7)}1f` : hex
 export default function Graph({ model, label }: { model: GraphModel; label: string }) {
   const [showInfo, setShowInfo] = useState(false), [hop, setHop] = useState(DEFAULT_HOP)
