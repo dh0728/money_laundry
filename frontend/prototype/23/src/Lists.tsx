@@ -1,6 +1,6 @@
 // v20: 목록 툴바는 v18 UI(검색 · 기간 · 필터 팝오버 · 조건 칩)로 되돌렸다(명기 R2).
 // 표 본문·열 머리글 정렬 메뉴·페이지는 커뮤니티 표준 data-table(Dice UI · TanStack Table)을 유지한다. 열 숨기기는 되돌릴 경로가 안 보여 뺐다.
-import { useMemo, useState } from 'react'
+import { useMemo, useReducer, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Download, Inbox, ListFilter, RefreshCw, Search, TriangleAlert } from 'lucide-react'
@@ -19,6 +19,37 @@ import { DateRangeButton, FilterChip, PageHeading, PatternBadge, RiskBadge } fro
 import { useMemoryState } from './memory'
 
 export type DataState = 'normal' | 'loading' | 'empty' | 'error' | 'stale'
+export type ListMode = 'browse' | 'episode-link'
+export type EpisodeLinkState = { mode: ListMode; selected: Set<string> }
+type EpisodeLinkAction = { type: 'start' } | { type: 'cancel' } | { type: 'complete' } | { type: 'toggle'; id: string }
+
+export function episodeLinkReducer(state: EpisodeLinkState, action: EpisodeLinkAction): EpisodeLinkState {
+  if (action.type === 'start') return { mode: 'episode-link', selected: new Set() }
+  if (action.type === 'cancel' || action.type === 'complete') return { mode: 'browse', selected: new Set() }
+  const selected = new Set(state.selected)
+  if (selected.has(action.id)) selected.delete(action.id)
+  else selected.add(action.id)
+  return { ...state, selected }
+}
+
+export function EpisodeLinkActionBar({ state, episodes, target, onTargetChange, onComplete, onCancel }: {
+  state: EpisodeLinkState; episodes: RecordItem[]; target: string
+  onTargetChange: (target: string) => void; onComplete: () => void; onCancel: () => void
+}) {
+  if (state.mode === 'browse') return null
+  return (
+    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 px-3 py-2 shadow-sm backdrop-blur" data-testid="episode-link-action-bar">
+      <strong className="mr-auto text-sm">{state.selected.size}건 선택</strong>
+      <label className="sr-only" htmlFor="episode-link-target">Episode 연결 방식</label>
+      <select id="episode-link-target" aria-label="Episode 연결 방식" value={target} onChange={event => onTargetChange(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-xs">
+        {episodes.map(episode => <option key={episode.id} value={episode.id}>기존 Episode · {episode.id}</option>)}
+        <option value="new">새 Episode 생성</option>
+      </select>
+      <Button size="sm" disabled={state.selected.size === 0} onClick={onComplete}>연결 완료</Button>
+      <Button size="sm" variant="outline" onClick={onCancel}>취소</Button>
+    </div>
+  )
+}
 
 // 정렬 상태 hook: 상세 거래 표가 쓴다
 export function useSort<K extends string>(initialKey: K | null, initialDirection: SortDirection) {
@@ -32,7 +63,7 @@ export function useSort<K extends string>(initialKey: K | null, initialDirection
 
 export const fieldNames: Record<FilterField, string> = { risk: '위험도', owner: '담당자', status: '처리 상태', pattern: '탐지 유형', age: '경과일' }
 
-const columns: ColumnDef<RecordItem>[] = [
+const baseColumns: ColumnDef<RecordItem>[] = [
   { id: 'id', accessorKey: 'id', header: ({ column }) => <DataTableColumnHeader column={column} label="ID / 탐지 내용" />,
     cell: ({ row }) => <div className="min-w-0 max-w-[340px]"><p className="text-sm font-mono" translate="no">{row.original.id}</p><p className="text-xs text-muted-foreground mt-1 truncate">{row.original.title}</p></div> },
   { id: 'score', accessorKey: 'score', header: ({ column }) => <DataTableColumnHeader column={column} label="위험도" />,
@@ -50,9 +81,24 @@ const columns: ColumnDef<RecordItem>[] = [
     cell: ({ row }) => { const r = row.original; return <div className="text-sm text-muted-foreground tabular-nums">{r.date.slice(5)}<p className={`mt-1 text-xs ${r.age >= 3 ? 'font-medium' : ''}`} style={{ color: ageTone(r.age) }}>{r.age === 0 ? '오늘' : `${r.age}일 경과`}</p></div> } },
 ]
 
-export default function Lists({ kind, records, user, onOpen, state, setState }: { kind: Kind; records: RecordItem[]; user: string; onOpen: (r: RecordItem) => void; state: DataState; setState: (s: DataState) => void }) {
+export default function Lists({ kind, records, user, onOpen, onLinkEpisode, state, setState }: { kind: Kind; records: RecordItem[]; user: string; onOpen: (r: RecordItem) => void; onLinkEpisode?: (alertIds: string[], target: string) => void; state: DataState; setState: (s: DataState) => void }) {
   const [query, setQuery] = useState(''), [filters, setFilters] = useState<Filter[]>([]), [field, setField] = useState<FilterField>('owner'), [value, setValue] = useState('내 담당'), [filterOpen, setFilterOpen] = useState(false)
   const [range, setRange] = useState<DateRange>()
+  const [linkState, dispatchLink] = useReducer(episodeLinkReducer, { mode: 'browse', selected: new Set<string>() })
+  const episodes = useMemo(() => records.filter(record => record.kind === 'Episode'), [records])
+  const firstEpisodeTarget = episodes[0]?.id ?? 'new'
+  const [episodeTarget, setEpisodeTarget] = useState(firstEpisodeTarget)
+  const columns = useMemo<ColumnDef<RecordItem>[]>(() => kind === 'Episode' ? baseColumns : [
+    ...(linkState.mode === 'episode-link' ? [{
+      id: 'select', header: '선택', enableSorting: false,
+      cell: ({ row }) => <input type="checkbox" aria-label={`${row.original.id} 선택`} checked={linkState.selected.has(row.original.id)} onClick={event => event.stopPropagation()} onChange={() => { row.toggleSelected(); dispatchLink({ type: 'toggle', id: row.original.id }) }} className="size-4 accent-foreground" />,
+    } satisfies ColumnDef<RecordItem>] : []),
+    ...baseColumns,
+    {
+      id: 'episode', header: 'Episode 연결', enableSorting: false,
+      cell: ({ row }) => row.original.episodeId ? <Badge variant="outline" className="font-mono font-normal text-xs">{row.original.episodeId}</Badge> : <span className="text-xs text-muted-foreground">미연결</span>,
+    },
+  ], [kind, linkState])
   const [rowsPerPage] = useMemoryState('settings:rows', '20') // 설정 > 페이지당 행(20/50/100)을 첫 값으로 쓴다
   const base = useMemo(() => records.filter(r => r.kind === kind), [records, kind])
   const result = useMemo(() => state === 'empty' ? [] : base.filter(r => matches(r, filters, query, range?.from, range?.to)), [state, base, filters, query, range])
@@ -102,8 +148,10 @@ export default function Lists({ kind, records, user, onOpen, state, setState }: 
             <Button className="w-full" size="sm" onClick={() => { const f = normalized({ field, value }); setFilters(p => p.some(x => x.field === f.field && x.value === f.value) ? p : [...p, f]); toFirst(); setFilterOpen(false) }}>조건 적용</Button>
           </PopoverContent>
         </Popover>
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={download}><Download className="size-3.5" />다운로드</Button>
+        {kind === 'Alert' && linkState.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => { setEpisodeTarget(firstEpisodeTarget); dispatchLink({ type: 'start' }) }}>Episode로 묶기</Button>}
+        <Button variant="ghost" size="sm" className={kind === 'Alert' && linkState.mode === 'browse' ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />다운로드</Button>
       </div>
+      {kind === 'Alert' && <EpisodeLinkActionBar state={linkState} episodes={episodes} target={episodeTarget} onTargetChange={setEpisodeTarget} onComplete={() => { onLinkEpisode?.([...linkState.selected], episodeTarget); table.resetRowSelection(); dispatchLink({ type: 'complete' }); setEpisodeTarget(firstEpisodeTarget) }} onCancel={() => { table.resetRowSelection(); dispatchLink({ type: 'cancel' }); setEpisodeTarget(firstEpisodeTarget) }} />}
       {filters.length > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
           {filters.map((f, i) => <FilterChip key={`${f.field}-${f.value}`} onRemove={() => { setFilters(p => p.filter((_, j) => j !== i)); toFirst() }}>{chipLabel(f)}</FilterChip>)}
@@ -122,7 +170,7 @@ export default function Lists({ kind, records, user, onOpen, state, setState }: 
         : state === 'error'
           ? <div className="glass-surface rounded-md border py-20 text-center"><TriangleAlert className="size-6 mx-auto mb-4 text-muted-foreground" /><p className="text-sm">목록을 불러오지 못했습니다.</p><p className="text-xs text-muted-foreground mt-2 mb-4">잠시 후 다시 시도해 주세요.</p><Button size="sm" variant="outline" onClick={() => setState('normal')}>다시 시도</Button></div>
           : result.length
-            ? <DataTable table={table} onRowClick={onOpen} data-testid="record-table" />
+            ? <DataTable table={table} onRowClick={linkState.mode === 'episode-link' ? record => { table.getRow(record.id)?.toggleSelected(); dispatchLink({ type: 'toggle', id: record.id }) } : onOpen} data-testid="record-table" />
             : <div className="glass-surface rounded-md border py-20 text-center"><Inbox className="size-7 mx-auto mb-4 text-muted-foreground" /><p className="text-sm">조건에 맞는 {kind}가 없습니다.</p><p className="text-xs text-muted-foreground mt-2 mb-4">검색어와 필터를 확인하세요.</p><Button size="sm" variant="outline" onClick={reset}>전체 목록 보기</Button></div>}
     </div>
   )

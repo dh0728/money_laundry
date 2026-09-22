@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { Bar, BarChart, Cell, Pie, PieChart, XAxis, YAxis } from 'recharts'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { DateRangeButton, PageHeading, UnderTabs, SectionTitle, RiskBadge, PatternBadge } from './shared'
 import { patternOptions, TODAY, type RecordItem } from './domain'
@@ -129,6 +130,18 @@ export function buildInstitutionChartData(records: RecordItem[], range?: DateRan
 
 export const institutionRangeAfterChange = (next: DateRange | undefined) => next
 
+function AiDailyReport({ records, onOpen }: { records: RecordItem[]; onOpen: (record: RecordItem) => void }) {
+  const today = dailyFlow.at(-1)!, yesterday = dailyFlow.at(-2)!
+  const priority = records.filter(record => record.kind === 'Alert' && record.status !== '종결').slice().sort((a, b) => b.age - a.age || b.score - a.score).slice(0, 2)
+  return (
+    <Card data-testid="ai-daily-report" className="min-w-0 shadow-none"><CardContent className="space-y-5">
+      <div><h3 className="text-base font-semibold tracking-tight">AI Daily Report</h3><p className="mt-1 text-[11px] text-muted-foreground">생성 시각 <time dateTime="2026-09-16T15:00:00+09:00">2026-09-16 15:00</time></p></div>
+      <div><p className="text-xs font-medium">변화 해석</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{today.inflow > yesterday.inflow ? '전일보다 신규 유입이 늘어 검토 대기열 확대 여부를 확인해야 합니다.' : '전일보다 신규 유입이 줄었지만 장기 미처리 업무는 계속 확인해야 합니다.'}</p></div>
+      <div><p className="text-xs font-medium">우선 검토</p><ul className="mt-2 space-y-3">{priority.map(record => <li key={record.id} className="rounded-md border px-3 py-2.5"><p className="truncate text-sm">{record.title}</p><Button variant="link" size="sm" className="mt-1 h-auto p-0 text-xs" onClick={() => onOpen(record)}>근거 보기</Button></li>)}</ul></div>
+    </CardContent></Card>
+  )
+}
+
 export function Institution({ records, onOpen }: { records: RecordItem[]; onOpen: (r: RecordItem) => void }) {
   const [range, setRange] = useState<DateRange | undefined>(defaultRange)
   const charts = buildInstitutionChartData(records, range)
@@ -153,7 +166,10 @@ export function Institution({ records, onOpen }: { records: RecordItem[]; onOpen
           <div><h2 id="institution-chart-title" className="text-base font-semibold tracking-tight">기관 탐지 현황</h2><p className="mt-1 text-xs text-muted-foreground">한 기간 선택이 아래 세 그래프에 함께 적용됩니다.</p></div>
           <DateRangeButton value={range} onChange={next => setRange(institutionRangeAfterChange(next))} />
         </div>
-        <ChartAreaInteractive data={charts.flow} />
+        <div data-testid="institution-primary-row" className="grid min-w-0 gap-4 @5xl:grid-cols-[minmax(0,1.8fr)_minmax(18rem,0.8fr)]">
+          <ChartAreaInteractive data={charts.flow} />
+          <AiDailyReport records={records} onOpen={onOpen} />
+        </div>
         <div data-testid="institution-lower-charts" className="grid min-w-0 max-w-full gap-4 @5xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
         <Card className="min-w-0 max-w-full shadow-none" data-testid="laundering-composition-chart"><CardContent className="min-w-0">
           <SectionTitle title="세탁 거래 구성" description={`선택 기간 의심 거래 ${fmt(compositionTotal)}건`} />

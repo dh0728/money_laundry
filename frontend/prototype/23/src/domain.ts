@@ -174,6 +174,36 @@ const episodes: RecordItem[] = Array.from({ length: 10 }, (_, i) => {
 })
 export const records: RecordItem[] = [...alerts, ...episodes]
 
+export function linkAlertsToEpisode(source: RecordItem[], alertIds: string[], target: string): RecordItem[] {
+  const selected = new Set(alertIds)
+  const linkedAlerts = source.filter(record => record.kind === 'Alert' && selected.has(record.id))
+  if (!linkedAlerts.length) return source
+
+  const existing = target === 'new' ? undefined : source.find(record => record.kind === 'Episode' && record.id === target)
+  if (target !== 'new' && !existing) return source
+  const episodeId = existing?.id ?? `EP-2026-${Math.max(0, ...source.filter(record => record.kind === 'Episode').map(record => Number(record.id.match(/\d+$/)?.[0] ?? 0))) + 1}`
+  const next = source.map(record => {
+    if (record.kind === 'Alert' && selected.has(record.id)) return { ...record, episodeId }
+    if (record.kind !== 'Episode') return record
+    const alertIds = (record.alertIds ?? []).filter(id => !selected.has(id))
+    return record.id === episodeId ? { ...record, alertIds: [...new Set([...alertIds, ...selected])] } : { ...record, alertIds }
+  })
+  if (existing) return next
+
+  const lead = linkedAlerts.slice().sort((a, b) => b.score - a.score)[0]
+  const created: RecordItem = {
+    ...lead,
+    id: episodeId,
+    kind: 'Episode',
+    owner: '오검토',
+    status: '신규',
+    title: `새 Episode · Alert ${linkedAlerts.length}건`,
+    alertIds: linkedAlerts.map(alert => alert.id),
+    episodeId: undefined,
+  }
+  return [...next, created]
+}
+
 export const ageOptions = ['1', '3', '7', '14', '30']
 export function matches(r: RecordItem, filters: Filter[], query: string, start?: Date, end?: Date) {
   const day = new Date(r.date + 'T12:00:00')

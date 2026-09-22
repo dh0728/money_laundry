@@ -464,6 +464,7 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
     <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5 select-none cursor-default" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}>
       <div className="flex items-center gap-1.5">
         <div className="text-sm font-semibold font-mono tracking-wide whitespace-nowrap">{AGENT_NAME}</div>
+        <Badge variant="outline" className="text-[10px] font-normal">시연용</Badge>
       </div>
       <div className="flex gap-0.5">
         <IconButton label="새 대화" className="size-8" onClick={() => setMessages([])}><Plus className="size-4" /></IconButton>

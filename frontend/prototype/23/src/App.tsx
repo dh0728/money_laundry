@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { records as fixtures, type RecordItem } from './domain'
+import { linkAlertsToEpisode, records as fixtures, type RecordItem } from './domain'
 import Lists, { type DataState } from './Lists'
 import Dashboard from './Dashboard'
 import Detail from './Detail'
@@ -105,7 +105,7 @@ function SidebarBrandToggle() {
       onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); toggleSidebar() }}
       onClick={event => { if (event.detail === 0) toggleSidebar() }}
       aria-label="사이드바 열기/닫기" aria-expanded={state === 'expanded'} title="사이드바 열기/닫기"
-      className="group/brand absolute inset-0 z-10 flex h-full w-full touch-manipulation cursor-pointer select-none items-center gap-2.5 rounded-none px-[22px] text-sm font-semibold tracking-tight outline-hidden hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!">
+      className="group/brand absolute inset-0 m-2 z-10 flex touch-manipulation cursor-pointer select-none items-center gap-2.5 rounded-md px-3 text-sm font-semibold tracking-tight outline-hidden hover:bg-sidebar-accent active:bg-[var(--selection-background)] active:text-[var(--selection-foreground)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!">
       {/* header 전체가 하나의 버튼이며 접힌 상태에서도 아이콘을 64px 폭 중앙에 둔다. */}
       <span className="relative inline-flex size-5 shrink-0 items-center justify-center">
         <RadarMark className="size-5 transition-opacity group-hover/brand:opacity-0 group-focus-visible/brand:opacity-0" />
@@ -128,6 +128,7 @@ export default function App() {
   // 페이지 이동은 RDR 9000의 열림·표시 방식·위치를 건드리지 않는다. 패널 상태는 사용자 조작만 따른다.
   const go = (p: Page) => { setPage(p); setSelected(null); setTransactionTarget(undefined); setState(initialState); if (p === 'alerts' || p === 'episodes') setListKey(k => k + 1) }
   const openRecord = (r: RecordItem) => { setPage(r.kind === 'Alert' ? 'alerts' : 'episodes'); setSelected(r.id) }
+  const linkSelectedAlerts = (alertIds: string[], target: string) => setRecords(current => linkAlertsToEpisode(current, alertIds, target))
   const openTransaction = (target: TransactionTarget) => { setPage('transactions'); setSelected(null); setTransactionTarget(target) }
   const logoutNow = () => { setUser(null); setLogout(false); setAgentOpen(true); setSelected(null); setPage('dashboard') }
   const fullscreen = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()
@@ -205,9 +206,9 @@ export default function App() {
             폭이 1100px보다 좁아지면(세로 화면 포함) 글자 라벨들이 차례로 사라지고 아이콘만 남아 겹침을 막는다 */}
         <header className="app-header z-40 bg-background h-15 shrink-0 border-b grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] max-[900px]:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 min-[1100px]:gap-5 px-4 min-[1100px]:px-6 min-w-0">
           <div className="header-navigation flex items-center min-w-0 shrink-0">
-            <SidebarTrigger className="md:hidden" aria-label="메뉴 열기" />
+            <SidebarTrigger className="rounded-full md:hidden" aria-label="메뉴 열기" />
             {record && (
-              <Button variant="ghost" size="sm" className="-ml-2 h-8 text-xs gap-1.5" aria-label={`${record.kind} 목록으로 돌아가기`} onClick={() => setSelected(null)}>
+              <Button variant="ghost" size="sm" className="-ml-2 h-8 rounded-full text-xs gap-1.5" aria-label={`${record.kind} 목록으로 돌아가기`} onClick={() => setSelected(null)}>
                 <ArrowLeft className="size-3.5" /><span className="max-[1100px]:hidden">{record.kind} 목록</span>
               </Button>
             )}
@@ -220,11 +221,11 @@ export default function App() {
             </div>
           </div>
           <div className="header-actions justify-self-end flex items-center gap-1 min-[1100px]:gap-1.5 shrink-0" data-testid="header-actions">
-            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 px-2 min-[1100px]:px-3" aria-label={`할 일 ${todo}건`} onClick={() => go(user === '오검토' ? 'alerts' : 'episodes')}>
+            <Button variant="ghost" size="sm" className="h-8 rounded-full text-xs gap-1.5 px-2 min-[1100px]:px-3" aria-label={`할 일 ${todo}건`} onClick={() => go(user === '오검토' ? 'alerts' : 'episodes')}>
               <ListTodo className="size-4 hidden max-[1100px]:inline" /><span className="max-[1100px]:hidden">할 일</span><Badge variant="secondary" className="h-5 min-w-5 px-1.5">{todo}</Badge>
             </Button>
             {/* v20 R13: 역할(L1·L2)은 사이드바 계정에 이미 표시되고 버튼도 아니라 헤더에서 뺐다. 할 수 있는 일은 계정 > 권한 */}
-            <Button variant="ghost" size="sm" className="h-8 gap-2 px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} onClick={fullscreen}>
+            <Button variant="ghost" size="sm" className="h-8 rounded-full gap-2 px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} onClick={fullscreen}>
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}<Kbd>F11</Kbd>
             </Button>
           </div>
@@ -233,7 +234,7 @@ export default function App() {
           {record ? <Detail key={record.id} record={record} records={records} user={user} onUpdate={r => setRecords(p => p.map(x => x.id === r.id ? r : x))} onOpen={openRecord} onOpenTransaction={openTransaction} />
             : page === 'dashboard' ? <Dashboard records={records} user={user} onOpen={openRecord} />
               : page === 'transactions' ? <Transactions records={records} target={transactionTarget} onOpenRecord={openRecord} />
-              : page === 'alerts' || page === 'episodes' ? <Lists key={`${page}-${listKey}`} kind={page === 'alerts' ? 'Alert' : 'Episode'} records={records} user={user} onOpen={openRecord} state={state} setState={setState} />
+              : page === 'alerts' || page === 'episodes' ? <Lists key={`${page}-${listKey}`} kind={page === 'alerts' ? 'Alert' : 'Episode'} records={records} user={user} onOpen={openRecord} onLinkEpisode={linkSelectedAlerts} state={state} setState={setState} />
                 : page === 'account' ? <Account user={user} onLogout={() => setLogout(true)} />
                   : page === 'settings' ? <Settings user={user} />
                     : <Notifications records={records} onOpen={openRecord} />}
