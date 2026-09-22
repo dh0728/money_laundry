@@ -95,10 +95,8 @@ def main():
                   '구성 정책': detail.get('policyVersion'),
                   '데이터 기준 시점': detail.get('dataAsOf'),
                   '마지막 확인 시각': detail.get('lastCheckedAt')})
-        st.caption('저장된 정책의 결과입니다. 논의 중인 날짜별 5일 정책 적용을 뜻하지 않습니다.')
+        st.caption('해당 분석에서 수신·처리한 거래의 연결을 표시합니다.')
         st.write(detail.get('summary', {}))
-        if detail.get('limits'):
-            st.info('탐색 제한: ' + ', '.join(detail['limits']))
         st.subheader('거래 연결')
         graph_view(detail.get('graph', {}))
         table(detail.get('transactions', []), ['txId', 'occurredAt', 'fromBankId', 'toBankId',
