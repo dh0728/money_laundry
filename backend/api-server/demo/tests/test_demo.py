@@ -9,6 +9,7 @@ from streamlit.testing.v1 import AppTest
 DEMO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(DEMO))
 from api_client import ApiClient, ApiError, model_label
+from app import display_times, kst_time
 
 
 def page(rows):
@@ -16,6 +17,20 @@ def page(rows):
 
 
 class ClientTests(unittest.TestCase):
+    def test_kst_day_boundary_and_existing_offset(self):
+        expected = '2023-08-31 00:20:00+09:00 (KST)'
+        for value in ('2023-08-30T15:20:00Z', '2023-08-30T15:20:00+00:00',
+                      '2023-08-31T00:20:00+09:00'):
+            self.assertEqual(kst_time(value), expected)
+        self.assertIsNone(kst_time(None))
+        with self.assertRaises(ValueError):
+            kst_time('2023-08-31T00:20:00')
+        raw = {'analysisDate': '2023-08-31', 'summary': {'firstTxAt': '2023-08-30T15:20:00Z'}}
+        shown = display_times([raw])[0]
+        self.assertEqual(shown['analysisDate'], '2023-08-31')
+        self.assertEqual(shown['summary']['firstTxAt'], expected)
+        self.assertEqual(raw['summary']['firstTxAt'], '2023-08-30T15:20:00Z')
+
     def test_filters_and_read_only_request(self):
         def respond(request):
             self.assertEqual(request.method, 'GET')
@@ -89,20 +104,27 @@ class ScreenTests(unittest.TestCase):
                 return {'status': 'COMPLETED', 'modelVersionBinary': 'demo-v1', 'counters': {'alertCount': 1}}
             if path == 'suspicious-transactions':
                 self.assertEqual(params['jobId'], 7)
-                return page([])
+                return page([{'txId': 1, 'txAt': '2023-08-30T15:20:00Z'}])
             if path == 'alerts':
                 self.assertEqual(params['jobId'], 7)
-                return page([{'alertId': 9}])
+                return page([{'alertId': 9, 'summary': {'firstTxAt': '2023-08-30T15:20:00Z'}}])
             if path.endswith('/versions'):
                 return [{'version': 2}, {'version': 1}]
             return {'alertId': 9, 'version': (params or {}).get('version', 2), 'status': 'OPEN',
+                    'dataAsOf': '2023-08-30T15:20:00Z', 'lastCheckedAt': '2023-08-31T00:20:00+09:00',
+                    'summary': {'lastTxAt': '2023-08-30T15:20:00Z'},
                     'graph': {'nodes': [{'id': 'a'}, {'id': 'b'}],
                               'edges': [{'from': 'a', 'to': 'b', 'txId': 1}]},
-                    'transactions': [{'txId': 1, 'role': 'SEED'}]}
+                    'transactions': [{'txId': 1, 'role': 'SEED', 'occurredAt': '2023-08-30T15:20:00Z'}]}
         with patch('api_client.ApiClient.get', side_effect=get):
             app = self.run_app()
             self.assertFalse(app.exception)
             self.assertEqual(len(app.metric), 2)
+            expected = '2023-08-31 00:20:00+09:00 (KST)'
+            self.assertEqual(app.dataframe[1].value.iloc[0]['txAt'], expected)
+            self.assertEqual(app.dataframe[2].value.iloc[0]['summary.firstTxAt'], expected)
+            self.assertEqual(app.dataframe[3].value.iloc[0]['occurredAt'], expected)
+            self.assertTrue(any(expected in item.value for item in app.json))
             app.selectbox[2].select(1).run()
             self.assertFalse(app.exception)
             self.assertIn(('alerts/9', {'version': 1}), calls)

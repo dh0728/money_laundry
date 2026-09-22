@@ -1,6 +1,7 @@
 """Streamlit reads existing backend results; never reads the database directly."""
 import json
 import os
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import streamlit as st
@@ -8,12 +9,35 @@ import streamlit as st
 from api_client import ApiClient, ApiError, model_label
 
 
+KST = timezone(timedelta(hours=9), 'KST')
+TIME_FIELDS = {'txAt', 'occurredAt', 'firstTxAt', 'lastTxAt', 'dataAsOf', 'lastCheckedAt'}
+
+
+def kst_time(value):
+    if value is None:
+        return None
+    parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if parsed.tzinfo is None:
+        raise ValueError('Timestamp must include its timezone')
+    return parsed.astimezone(KST).isoformat(sep=' ') + ' (KST)'
+
+
+def display_times(value):
+    """Convert only timestamp fields in a copy; business dates and API data stay intact."""
+    if isinstance(value, list):
+        return [display_times(item) for item in value]
+    if isinstance(value, dict):
+        return {key: kst_time(item) if key in TIME_FIELDS else display_times(item)
+                for key, item in value.items()}
+    return value
+
+
 def table(rows, fields=None):
     if not rows:
         st.info('표시할 데이터가 없습니다.')
         return
     selected = [{k: r.get(k) for k in fields} for r in rows] if fields else rows
-    st.dataframe(pd.json_normalize(selected), hide_index=True, width='stretch')
+    st.dataframe(pd.json_normalize(display_times(selected)), hide_index=True, width='stretch')
 
 
 def page_view(client, path, params, key, fields):
@@ -43,6 +67,7 @@ def main():
     st.set_page_config(page_title='AML 시연', layout='wide')
     st.title('거래 분석 · Alert 시연')
     st.caption('백엔드가 공개한 결과를 조회합니다. 사건 판정·거래 이동 기능은 아직 제공하지 않습니다.')
+    st.caption('모든 시각은 한국 표준시 KST(UTC+09:00)로 표시합니다.')
     with st.sidebar:
         base = st.text_input('백엔드 주소', os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080'))
         st.button('새로고침')
@@ -93,10 +118,10 @@ def main():
         detail = client.get(f'alerts/{alert_id}', params)
         st.write({'Alert': detail['alertId'], '버전': detail['version'], '상태': detail['status'],
                   '구성 정책': detail.get('policyVersion'),
-                  '데이터 기준 시점': detail.get('dataAsOf'),
-                  '마지막 확인 시각': detail.get('lastCheckedAt')})
+                  '데이터 기준 시점': kst_time(detail.get('dataAsOf')),
+                  '마지막 확인 시각': kst_time(detail.get('lastCheckedAt'))})
         st.caption('해당 분석에서 수신·처리한 거래의 연결을 표시합니다.')
-        st.write(detail.get('summary', {}))
+        st.write(display_times(detail.get('summary', {})))
         st.subheader('거래 연결')
         graph_view(detail.get('graph', {}))
         table(detail.get('transactions', []), ['txId', 'occurredAt', 'fromBankId', 'toBankId',
