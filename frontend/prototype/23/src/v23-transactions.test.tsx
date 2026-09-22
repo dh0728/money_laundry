@@ -2,13 +2,36 @@ import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import Transactions from './Transactions'
+import Transactions, { visibleAccountsForOwner, type TransactionView } from './TransactionsV22'
 import { records } from './domain'
 import { buildTransactionIndex } from './transactionIndex'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
 
 describe('v23 Transactions four-stage explorer', () => {
+  it('uses the account-query-filtered first account when selecting a multi-account owner', () => {
+    const index = buildTransactionIndex(records)
+    const owner = index.owners.find(item => item.accountIds.length >= 2)!
+    const accountsByOwner = new Map(index.owners.map(item => [item.name, index.accounts.filter(account => item.accountIds.includes(account.id))]))
+    const transactions = new Map(index.transactions.map(item => [item.id, item]))
+    const viewsByAccount = new Map(index.accounts.map(account => [account.id, account.transactionIds.flatMap(id => {
+      const transaction = transactions.get(id)
+      if (!transaction) return []
+      const outgoing = transaction.fromAccount === account.id
+      return [{ ...transaction, contextAccount: account.id, direction: outgoing ? '송금' as const : '수취' as const, counterpartyOwner: outgoing ? transaction.toOwner : transaction.fromOwner, counterpartyAccount: outgoing ? transaction.toAccount : transaction.fromAccount } satisfies TransactionView]
+    })]))
+    const matchingAccount = accountsByOwner.get(owner.name)![1]
+
+    expect(visibleAccountsForOwner(owner, accountsByOwner, viewsByAccount, matchingAccount.id, undefined, [])?.[0]?.id).toBe(matchingAccount.id)
+  })
+
+  it('includes several repeat owners with multiple accounts, including a three-account example', () => {
+    const owners = buildTransactionIndex(records).owners
+
+    expect(owners.filter(owner => owner.accountIds.length >= 2).length).toBeGreaterThanOrEqual(3)
+    expect(owners.some(owner => owner.accountIds.length >= 3)).toBe(true)
+  })
+
   it('renders owner, account, compact transaction list, and adjacent detail without a table', () => {
     const transaction = buildTransactionIndex(records).transactions.find(item => item.recordIds.length > 0)!
     const markup = html(<Transactions records={records} target={{ type: 'transaction', transactionId: transaction.id }} onOpenRecord={() => {}} />)
@@ -25,22 +48,40 @@ describe('v23 Transactions four-stage explorer', () => {
     expect(list).not.toContain('상세 보기')
   })
 
-  it('derives selected-owner-first display order without mutating the transaction index', async () => {
+  it('shows the selected owner in the fixed preview and keeps its active row in original browse order', () => {
     const index = buildTransactionIndex(records)
     const originalOrder = index.owners.map(owner => owner.name)
     const selected = index.owners[42]
     const markup = html(<Transactions records={records} target={{ type: 'owner', owner: selected.name }} />)
-    const firstOwner = markup.slice(markup.indexOf('data-testid="owner-item"'), markup.indexOf('data-testid="owner-item"') + 500)
+    const ownerSection = markup.slice(markup.indexOf('data-testid="owner-section"'), markup.indexOf('data-testid="owner-account-connector"'))
+    const fixed = ownerSection.slice(ownerSection.indexOf('data-testid="selected-owner-item"'), ownerSection.indexOf('data-testid="owner-scroll-list"'))
+    const browse = ownerSection.slice(ownerSection.indexOf('data-testid="owner-scroll-list"'))
+    const firstBrowseOwner = browse.slice(browse.indexOf('data-testid="owner-item"'), browse.indexOf('data-testid="owner-item"') + 500)
 
-    expect(firstOwner).toContain(selected.name)
+    expect(fixed).toContain(selected.name)
+    expect(fixed).toContain('bg-foreground')
+    expect(fixed).toContain('text-background')
+    expect(browse).toContain(selected.name)
+    expect(browse).toContain('aria-pressed="true"')
+    expect(firstBrowseOwner).toContain(originalOrder[0])
+    expect(ownerSection.indexOf('data-testid="selected-owner-item"')).toBeLessThan(ownerSection.indexOf('data-testid="owner-scroll-list"'))
+    expect(ownerSection).not.toContain('선택 소유주는 고정하고 아래 목록을 탐색')
     expect(index.owners.map(owner => owner.name)).toEqual(originalOrder)
+  })
 
-    const module = await import('./TransactionsV22') as unknown as {
-      selectedOwnerFirst?: <T extends { name: string }>(owners: readonly T[], selected?: string) => readonly T[]
-    }
-    expect(module.selectedOwnerFirst).toBeTypeOf('function')
-    expect(module.selectedOwnerFirst!(index.owners, selected.name)[0]).toBe(selected)
-    expect(index.owners.map(owner => owner.name)).toEqual(originalOrder)
+  it('starts with an inactive owner preview before interaction and a stable connector origin', () => {
+    const index = buildTransactionIndex(records)
+    const markup = html(<Transactions records={records} />)
+    const source = readFileSync(new URL('./TransactionsV22.tsx', import.meta.url), 'utf8')
+    const fixed = markup.slice(markup.indexOf('data-testid="selected-owner-item"'), markup.indexOf('data-testid="owner-scroll-list"'))
+
+    expect(fixed).toContain('소유주를 선택해 주세요')
+    expect(fixed).toContain('bg-muted/10')
+    expect(fixed).not.toContain(index.owners[0].name)
+    expect(source).toContain('sourceIndex={0}')
+    expect(source).not.toContain('selectedOwnerFirst')
+    expect(source).not.toContain('scrollIntoView')
+    expect(source).toContain('mt-4 border-t-2 border-border pt-4')
   })
 
   it('uses shared single-selection toggling and semantic inverse selection for every list stage', async () => {
@@ -75,6 +116,38 @@ describe('v23 Transactions four-stage explorer', () => {
     expect(markup.slice(markup.indexOf('data-testid="selected-transaction"'))).not.toContain('연결 Episode')
   })
 
+  it('gives the mini Sankey one figure label while hiding its decorative SVG and preserving text proportions', () => {
+    const transaction = buildTransactionIndex(records).transactions[0]
+    const markup = html(<Transactions records={records} target={{ type: 'transaction', transactionId: transaction.id }} />)
+    const detail = markup.slice(markup.indexOf('data-testid="selected-transaction"'))
+
+    expect(detail).toContain('data-testid="transaction-mini-sankey"')
+    expect(detail).toContain('aria-labelledby="transaction-flow-')
+    expect(detail).toMatch(/<svg[^>]*aria-hidden="true"/)
+    expect(detail).not.toContain('preserveAspectRatio="none"')
+    expect(detail).not.toContain('lucide-arrow-right')
+    expect(detail).toContain(transaction.fromOwner)
+    expect(detail).toContain(transaction.fromAccount)
+    expect(detail).toContain(transaction.toOwner)
+    expect(detail).toContain(transaction.toAccount)
+    const afterSankey = detail.slice(detail.indexOf('</figure>'))
+    expect(afterSankey).not.toContain('송금 소유주 · 계좌')
+    expect(afterSankey).not.toContain('수취 소유주 · 계좌')
+  })
+
+  it('uses the FlowDetail risk color meaning for mini Sankey ribbons', () => {
+    const index = buildTransactionIndex(records)
+    const suspicious = index.transactions.find(item => item.suspicious)!
+    const normal = index.transactions.find(item => !item.suspicious)!
+    const sankey = (transactionId: string) => {
+      const markup = html(<Transactions records={records} target={{ type: 'transaction', transactionId }} />)
+      return markup.slice(markup.indexOf('data-testid="transaction-mini-sankey"'), markup.indexOf('</figure>'))
+    }
+
+    expect(sankey(suspicious.id)).toContain('fill-destructive/35')
+    expect(sankey(normal.id)).toContain('fill-muted-foreground/35')
+  })
+
   it('limits internal scrolling to owners and stacks detail below at narrow desktop widths', () => {
     const source = readFileSync(new URL('./TransactionsV22.tsx', import.meta.url), 'utf8')
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
@@ -83,8 +156,8 @@ describe('v23 Transactions four-stage explorer', () => {
     expect(source).not.toContain('overflow-auto')
     expect(css).toMatch(/\.transactions-flow\s*\{[^}]*grid-template-columns:\s*13\.5rem 14\.5rem minmax\(16rem,1fr\) minmax\(18rem,1fr\)/s)
     expect(css).toMatch(/\.transaction-owner-scroll\s*\{[^}]*overflow-y:auto[^}]*scrollbar-gutter:stable/s)
-    expect(css).toMatch(/@container\s*\(max-width:\s*1100px\)[\s\S]*\.transactions-flow\s*\{[^}]*grid-template-columns:\s*minmax\(12rem,\.8fr\) minmax\(13rem,\.9fr\) minmax\(16rem,1\.2fr\)[^}]*\}[\s\S]*\.transaction-detail\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/s)
-    expect(css).toMatch(/@container\s*\(max-width:\s*760px\)[\s\S]*\.transactions-flow\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s)
+    expect(css).toMatch(/@container\s*\(max-width:\s*1100px\)[\s\S]*\.transactions-flow\s*\{[^}]*grid-template-columns:\s*13\.5rem 14\.5rem minmax\(16rem,1fr\)[^}]*\}[\s\S]*\.transaction-detail\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/s)
+    expect(css).toMatch(/@container\s*\(max-width:\s*760px\)[\s\S]*\.transactions-flow\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)[^}]*\}[\s\S]*\.transaction-connector\s*\{[^}]*display:none/s)
     expect(css).not.toMatch(/\.transactions-flow[^}]*overflow-[xy]?:\s*(auto|scroll)/s)
   })
 })

@@ -1,14 +1,21 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { formatGraphMoney, formatMoney, moneyMetrics } from './v23-domain'
+import { compactUsd, usd } from './domain'
 
 const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
+const mainSource = readFileSync(new URL('./main.tsx', import.meta.url), 'utf8')
 const graphSources = [
   readFileSync(new URL('./Graph.tsx', import.meta.url), 'utf8'),
   readFileSync(new URL('./OwnerGraph.tsx', import.meta.url), 'utf8'),
 ]
 
 describe('v23 foundation', () => {
+  it('places the currency marker after the amount in record lists and compact labels', () => {
+    expect(usd(11_667)).toBe('11,667$')
+    expect(compactUsd(2_587_000)).toBe('2.6M$')
+  })
+
   it('deduplicates transactions and derives investigation money metrics', () => {
     expect(moneyMetrics([
       { id: 'a', from: 'A', to: 'B', usd: 100 },
@@ -23,6 +30,9 @@ describe('v23 foundation', () => {
     [42, 'Pound Sterling', '42£'],
     [1_000, 'JPY', '1,000¥'],
     [55, 'Swiss Franc', '55CHF'],
+    [46_443.8, 'Brazil Real', '46,443.8BRL'],
+    [306_919.49, 'Yuan', '306,919.49CNY'],
+    [38_873.58, 'Ruble', '38,873.58RUB'],
     [9, 'KRW', '9KRW'],
   ] as const)('formats %s %s with one postfix currency marker', (amount, currency, expected) => {
     expect(formatMoney(amount, currency)).toBe(expected)
@@ -36,5 +46,10 @@ describe('v23 foundation', () => {
   it('uses theme-opposite foreground for interactive edge glow', () => {
     expect(css).toMatch(/--interactive-edge-glow:[^;]*var\(--foreground\)/)
     expect(css).not.toMatch(/--interactive-edge-glow:[^;]*var\(--destructive\)/)
+  })
+
+  it('uses the client-native theme provider without rendering an inert script tag', () => {
+    expect(mainSource).toContain("from './ThemeProvider'")
+    expect(mainSource).not.toContain("from 'next-themes'")
   })
 })

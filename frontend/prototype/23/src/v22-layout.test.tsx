@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
-import { ThemeProvider } from 'next-themes'
+import { ThemeProvider } from './ThemeProvider'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -71,7 +71,9 @@ describe('v22 transaction explorer', () => {
 
   it('uses one owner-list overflow region and natural-height later stages', () => {
     const source = readFileSync(new URL('./TransactionsV22.tsx', import.meta.url), 'utf8')
-    expect(source.match(/bodyClassName="transaction-owner-scroll"/g)).toHaveLength(1)
+    expect(source.match(/className="transaction-owner-scroll/g)).toHaveLength(1)
+    expect(source).toContain('data-testid="selected-owner-item"')
+    expect(source).toContain('data-testid="owner-scroll-list"')
     expect(source).not.toContain('overflow-auto')
     expect(source).toContain('StagePanel')
     expect(source).toContain('OrthogonalConnector')
@@ -98,14 +100,13 @@ describe('v22 transaction explorer', () => {
     expect(markup).toContain('>거래<')
   })
 
-  it('separates four stages and renders directional connectors without a horizontal minimum width', () => {
+  it('separates four stages and keeps connector shells inactive until an owner is selected', () => {
     const markup = html(<Transactions records={records} />)
     expect(markup).toContain('data-testid="transactions-flow"')
     expect(markup).toContain('data-testid="owner-account-connector"')
     expect(markup).toContain('data-testid="account-transaction-connector"')
-    expect(markup).toContain('data-testid="owner-account-connector-edge-0"')
-    expect(markup).toContain('data-testid="account-transaction-connector-edge-0"')
-    expect(markup).toContain('transaction-connector-edge')
+    expect(markup).not.toContain('data-testid="owner-account-connector-edge-0"')
+    expect(markup).not.toContain('data-testid="account-transaction-connector-edge-0"')
     expect(markup).not.toContain('<svg class="absolute inset-0')
     expect(markup).toContain('gap-3')
     expect(markup).toContain('transactions-flow grid')
@@ -116,7 +117,7 @@ describe('v22 transaction explorer', () => {
   it('keeps viewport-bound scrolling local to the owner list', () => {
     const transactionSource = readFileSync(new URL('./TransactionsV22.tsx', import.meta.url), 'utf8')
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
-    expect(transactionSource).toContain('bodyClassName="transaction-owner-scroll"')
+    expect(transactionSource).toContain('className="transaction-owner-scroll')
     expect(transactionSource).not.toContain('overflow-auto')
     expect(transactionSource).not.toContain('type="range"')
     expect(transactionSource).not.toContain('ResizeObserver')

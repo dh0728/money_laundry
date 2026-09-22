@@ -41,6 +41,9 @@ const currencyMarkers: Record<string, string> = {
   JPY: '¥',
   'Swiss Franc': 'CHF',
   CHF: 'CHF',
+  'Brazil Real': 'BRL',
+  Yuan: 'CNY',
+  Ruble: 'RUB',
 }
 
 export function formatMoney(amount: number, currency: string) {

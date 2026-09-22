@@ -64,7 +64,7 @@ describe('Figma v18 · R1 저장본 없을 때 비활성', () => {
   })
 })
 
-describe('v20 거래 선택·검토 의견 레이아웃', () => {
+describe('v23 거래 표·검토 의견 레이아웃', () => {
   it('선택된 거래 행은 primitive 반전 대신 semantic selection context를 쓴다', () => {
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
     const selectedRow = css.match(/\[data-slot=table-row\]\[data-state=selected\][\s\S]{0,1200}/)?.[0] ?? ''
@@ -87,18 +87,12 @@ describe('v20 거래 선택·검토 의견 레이아웃', () => {
     expect(contrast(hexLuminance(tokens['--selection-destructive-foreground']), hexLuminance(tokens['--selection-destructive-background']))).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('선택한 거래 카드는 행 위치를 따라가지 않고 상세 영역 상단에 고정된다', () => {
+  it('중복 선택 상세 카드 없이 거래 표 자체가 전체 정보를 제공한다', () => {
     const txTable = readFileSync(new URL('./TxTable.tsx', import.meta.url), 'utf8')
-    expect(detailSource).toContain('selected-transaction-card')
-    expect(txTable).not.toContain('onSelectedIndexChange')
-    expect(detailSource).not.toContain('--selected-row-offset')
-    expect(detailSource).not.toContain('selectedTxIndex')
-  })
-
-  it('같은 상세 거래 행을 다시 선택하면 선택이 해제된다', () => {
-    const txTable = readFileSync(new URL('./TxTable.tsx', import.meta.url), 'utf8')
-    expect(txTable).toContain('toggleSingleSelectedId(selectedId, r.id)')
-    expect(detailSource).toContain('selectedTx === null ? undefined')
+    expect(detailSource).not.toContain('selected-transaction-card')
+    expect(detailSource).toContain('data-testid="detail-transaction-table"')
+    expect(txTable).not.toContain('toggleSingleSelectedId')
+    expect(txTable).not.toContain('onRowClick')
   })
 
   it('검토 의견은 남은 화면 높이를 채우고 textarea 아래 구분선이 없다', () => {

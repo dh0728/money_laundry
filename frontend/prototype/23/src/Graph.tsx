@@ -6,13 +6,12 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Kbd } from '@/components/ui/kbd'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { minutes, neighborhood, stepTimeline, timeLabel, timelineEvents, widthFor, type GraphEdge, type GraphModel, type GraphNode } from './domain'
 import { FlowPanel, type FlowFocus, type PanelMode } from './FlowDetail'
 import { IconButton } from './shared'
-import OwnerGraph, { flowParticleCount, type OwnerGraphControls } from './OwnerGraph'
+import OwnerGraph, { effectiveFlowLabel, flowParticleColor, flowParticleCount, flowParticleRadius, type OwnerGraphControls, type OwnerGraphState } from './OwnerGraph'
 import { formatGraphMoney, type GraphViewMode } from './v23-domain'
 
 export const DEFAULT_HOP = 3
@@ -48,6 +47,33 @@ export function connectedEdgesByNode(edges: GraphEdge[]) {
   return lookup
 }
 
+// Disconnected account components need distinct starting basins. d3-force can then
+// refine each component without first tangling unrelated nodes at the origin.
+export function seedComponentPositions(model: GraphModel): GraphNode[] {
+  const adjacency = new Map(model.nodes.map(node => [node.key, new Set<string>()]))
+  for (const edge of model.edges) {
+    adjacency.get(edge.s)?.add(edge.t)
+    adjacency.get(edge.t)?.add(edge.s)
+  }
+  const byKey = new Map(model.nodes.map(node => [node.key, node]))
+  const seen = new Set<string>(), components: GraphNode[][] = []
+  for (const node of model.nodes) {
+    if (seen.has(node.key)) continue
+    const queue = [node.key]; seen.add(node.key)
+    for (let index = 0; index < queue.length; index++) {
+      for (const next of adjacency.get(queue[index]) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next) }
+    }
+    components.push(queue.flatMap(key => byKey.get(key) ?? []))
+  }
+  const columns = Math.max(1, Math.ceil(Math.sqrt(components.length)))
+  return components.flatMap((component, index) => {
+    const averageX = component.reduce((sum, node) => sum + node.x, 0) / Math.max(1, component.length)
+    const averageY = component.reduce((sum, node) => sum + node.y, 0) / Math.max(1, component.length)
+    const centerX = index % columns * 420, centerY = Math.floor(index / columns) * 320
+    return component.map(node => ({ ...node, x: centerX + (node.x - averageX) * 52, y: centerY + (node.y - averageY) * 52 }))
+  })
+}
+
 // v19: 캔버스 렌더러는 react-force-graph-2d(vasturiano, d3-force 물리 · Obsidian 그래프와 같은 방식)를 쓴다.
 // canvas는 CSS 변수를 못 읽으므로 테마 색을 한 번 풀어서 넘긴다.
 // force-graph는 import 시점에 window를 읽는다 → 실제로 그릴 때만 불러온다(SSR·테스트 안전)
@@ -56,12 +82,14 @@ type FNode = NodeObject<GraphNode & { id: string }>
 type FLink = LinkObject<GraphNode & { id: string }, GraphEdge>
 const cssVar = (name: string) => typeof window === 'undefined' ? 'currentColor' : getComputedStyle(document.documentElement).getPropertyValue(name).trim() || getComputedStyle(document.documentElement).color || 'currentColor'
 const dim = (hex: string) => hex.startsWith('#') && (hex.length === 7 || hex.length === 9) ? `${hex.slice(0, 7)}1f` : hex
+export const resetOwnerGraphState = (_state: OwnerGraphState): OwnerGraphState => ({ positions: {}, camera: null })
 export default function Graph({ model, label }: { model: GraphModel; label: string }) {
   const [showInfo, setShowInfo] = useState(false), [hop, setHop] = useState(DEFAULT_HOP)
   const [selectedNode, setSelectedNode] = useState<string | null>(null), [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [search, setSearch] = useState(''), [fullscreen, setFullscreen] = useState(false)
   const [viewMode, setViewMode] = useState<GraphViewMode>('account')
   const ownerGraph = useRef<OwnerGraphControls>(null)
+  const [ownerState, setOwnerState] = useState<OwnerGraphState>({ positions: {}, camera: null })
   const [ownerZoom, setOwnerZoom] = useState({ ratio: 1, fitted: true })
   const [reducedMotion, setReducedMotion] = useState(false)
   useEffect(() => {
@@ -109,6 +137,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
   const canvas = useRef<HTMLDivElement>(null)
 
   const nodeMap = useMemo(() => new Map(model.nodes.map(n => [n.key, n])), [model])
+  const suspiciousNodes = useMemo(() => new Set(model.nodes.filter(node => node.core).map(node => node.key)), [model.nodes])
   const connectedEdges = useMemo(() => connectedEdgesByNode(model.edges), [model.edges])
   // 연결도(degree) = 전체 모델에서 서로 다른 상대 계좌 수(자기 자신 거래는 제외) → 노드 크기에 반영
   const degreeMap = useMemo(() => {
@@ -126,10 +155,10 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
   const nodes = useMemo(() => allowed ? model.nodes.filter(n => allowed.has(n.key)) : model.nodes, [model, allowed])
   const edges = useMemo(() => allowed ? model.edges.filter(e => allowed.has(e.s) && allowed.has(e.t)) : model.edges, [model, allowed])
   // force-graph는 받은 객체에 x·y·vx를 써넣으므로 복사본을 넘긴다.
-  // 기존 사전 좌표(작은 단위)는 버리고 d3-force가 화면 단위로 새로 배치한다 — 선 굵기가 배율에 끌려 커지지 않도록.
+  // 끊어진 성분은 서로 다른 시작 중심에 두고 d3-force가 각 성분 내부만 자연스럽게 다듬는다.
   // 전체 시뮬레이션 데이터는 고정한다. 선택·hop 변경은 visibility만 바꿔 기존 노드 위치가 움직이지 않게 한다.
   const graphData = useMemo(() => ({
-    nodes: model.nodes.map(({ x: _x, y: _y, ...n }) => ({ ...n, id: n.key })) as unknown as FNode[],
+    nodes: seedComponentPositions(model).map(n => ({ ...n, id: n.key })) as unknown as FNode[],
     links: model.edges.map(e => ({ ...e, source: e.s, target: e.t })) as FLink[],
   }), [model])
   const pairKeys = useMemo(() => new Set(edges.map(e => `${e.s}>${e.t}`)), [edges])
@@ -185,11 +214,17 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
     return map
   }, [edges])
   const step = (direction: 1 | -1) => { setPlaying(false); setTime(stepTimeline(events, current, direction)) }
+  const visibleOwnerNodes = useMemo(() => new Set(nodes.filter(n => (nodeStart.get(n.key) ?? -Infinity) <= current).map(n => n.key)), [nodes, nodeStart, current])
+  const visibleOwnerEdges = useMemo(() => edges.filter(e => edgeStart(e) <= current), [edges, current])
   const togglePlay = () => { if (!playing && current >= last) setTime(firstEvent); setPlaying(p => !p) }
 
   const clearSelection = () => { setSelectedNode(null); setSelectedEdge(null) }
   const selectNode = (key: string) => { setSelectedNode(key); setSelectedEdge(null) }
-  const resetGraph = () => { clearSelection(); setHop(DEFAULT_HOP); setSearch(''); setShowInfo(false); setTime(Infinity); setPlaying(false); fitGraph() }
+  const resetGraph = () => {
+    clearSelection(); setHop(DEFAULT_HOP); setSearch(''); setShowInfo(false); setTime(Infinity); setPlaying(false)
+    if (viewMode === 'owner') { setOwnerState(resetOwnerGraphState); setOwnerZoom({ ratio: 1, fitted: true }) }
+    else fitGraph()
+  }
   const zoomBy = (factor: number) => { if (viewMode === 'owner') { ownerGraph.current?.zoomBy(factor); return } const g = fg.current; if (!g || !ready.current) return; setFitted(false); g.zoom(g.zoom() * factor, 200) }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('input,textarea,[role=slider]')) return
@@ -251,16 +286,16 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
       }}
       nodePointerAreaPaint={(n, color, ctx) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(n.x!, n.y!, radius(n) + 4, 0, 2 * Math.PI); ctx.fill() }}
       linkVisibility={linkVisible} linkLabel={() => ''}
-      linkColor={l => { const c = l.label === 1 ? colors.l1Edge : colors.l0; return linkLit(l) ? c : dim(c) }}
+      linkColor={l => { const c = effectiveFlowLabel(l, suspiciousNodes) === 1 ? colors.l1Edge : colors.l0; return linkLit(l) ? c : dim(c) }}
       // Obsidian처럼 가는 선: 금액 굵기(widthFor 1~12)를 절반 남짓으로 줄인다
       linkWidth={l => widthFor(l.usd, usdMin, usdMax) * .55 * (selectedEdge === l.key ? 1.5 : 1)}
       linkLineDash={l => l.bridgePath ? [4, 3] : null}
       // 방향은 흐름 입자로 표현한다. 자기 자신 거래·양방향 쌍은 곡선으로 분리한다.
       linkDirectionalArrowLength={0}
       linkCurvature={l => l.s === l.t ? .9 : pairKeys.has(`${l.t}>${l.s}`) ? .18 : 0}
-      // 의심 거래는 빨간 점 2개, 정상 거래는 반투명 흰 점 1개로 흐름을 구분한다.
-      linkDirectionalParticles={l => flowParticleCount(l.label, reducedMotion)} linkDirectionalParticleWidth={l => l.label === 1 ? Math.max(2, widthFor(l.usd, usdMin, usdMax)) : Math.max(1.5, widthFor(l.usd, usdMin, usdMax) * .65)}
-      linkDirectionalParticleColor={l => l.label === 1 ? colors.l1 : colors.l0Particle}
+      // 방향은 선 색이 아니라 움직이는 점으로 즉시 읽힌다. 의심 자금은 더 크고 많은 빨간 점을 쓴다.
+      linkDirectionalParticles={l => flowParticleCount(effectiveFlowLabel(l, suspiciousNodes), reducedMotion)} linkDirectionalParticleWidth={l => Math.max(flowParticleRadius(effectiveFlowLabel(l, suspiciousNodes)), widthFor(l.usd, usdMin, usdMax) * (effectiveFlowLabel(l, suspiciousNodes) === 1 ? .8 : .55))}
+      linkDirectionalParticleColor={l => flowParticleColor(effectiveFlowLabel(l, suspiciousNodes), colors.l1, colors.l0Particle)}
       linkCanvasObjectMode={() => 'after'}
       linkCanvasObject={(l, ctx, scale) => {
         if (!(showInfo || hover?.key === l.key || selectedEdge === l.key)) return
@@ -278,15 +313,16 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
       onEngineStop={() => { ready.current = true; if (!firstFit.current) { firstFit.current = true; fitGraph() } }}
     />
   )
-  const viewToggle = <ToggleGroup type="single" value={viewMode} onValueChange={value => {
-    if (value === 'account' || value === 'owner') {
-      setViewMode(value); setHover(null); firstFit.current = false; ready.current = false
-      setOwnerZoom({ ratio: 1, fitted: true })
-    }
-  }} aria-label="그래프 보기" variant="outline" size="sm">
-    <ToggleGroupItem value="account" className="text-xs">계좌 보기</ToggleGroupItem>
-    <ToggleGroupItem value="owner" className="text-xs">소유주 보기</ToggleGroupItem>
-  </ToggleGroup>
+  const selectView = (value: GraphViewMode) => {
+    setViewMode(value); setHover(null); firstFit.current = false; ready.current = false
+  }
+  const viewToggle = (
+    <div data-testid="graph-view-switch" role="group" aria-label="그래프 보기" className="relative grid w-full grid-cols-2 rounded-md border bg-muted/60 p-1">
+      <span aria-hidden="true" className={`graph-view-indicator pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-sm bg-background shadow-sm ${viewMode === 'owner' ? 'translate-x-full' : 'translate-x-0'}`} />
+      <button type="button" aria-pressed={viewMode === 'account'} onClick={() => selectView('account')} className={`graph-view-option relative z-10 min-w-0 rounded-sm px-2 py-1.5 text-xs ${viewMode === 'account' ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>계좌별 보기</button>
+      <button type="button" aria-pressed={viewMode === 'owner'} onClick={() => selectView('owner')} className={`graph-view-option relative z-10 min-w-0 rounded-sm px-2 py-1.5 text-xs ${viewMode === 'owner' ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>소유주별 보기</button>
+    </div>
+  )
   const settingsFull = (
     <div className="p-4 h-full flex flex-col gap-6">
       <div className="flex justify-between items-center">
@@ -342,8 +378,8 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
       </div>
       <div ref={canvasRef} className="relative flex-1 min-h-0 graph-canvas outline-none" tabIndex={0} role="img" aria-label={`${label} · 계좌 ${nodes.length}개, 연결 ${edges.length}개 · ←/→ 이전·다음 거래, Space 재생`} onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); pointer.current = { x: e.clientX - r.left, y: e.clientY - r.top } }}>
         {viewMode === 'account' ? <Suspense fallback={null}>{forceGraph}</Suspense> : <OwnerGraph ref={ownerGraph}
-          model={model} width={size.w} height={size.h} visibleNodes={new Set(nodes.filter(n => (nodeStart.get(n.key) ?? -Infinity) <= current).map(n => n.key))}
-          edges={edges.filter(e => edgeStart(e) <= current)} selectedNode={selectedNode} selectedEdge={selectedEdge}
+          model={model} width={size.w} height={size.h} state={ownerState} onStateChange={setOwnerState} visibleNodes={visibleOwnerNodes}
+          edges={visibleOwnerEdges} selectedNode={selectedNode} selectedEdge={selectedEdge}
           hover={hover} lit={lit} search={q} showInfo={showInfo} reducedMotion={reducedMotion}
           onHover={setHover} onSelectNode={selectNode} onSelectEdge={key => { setSelectedEdge(key); setSelectedNode(null) }} onClear={clearSelection}
           onZoom={(ratio, isFitted) => setOwnerZoom({ ratio, fitted: isFitted })} />}

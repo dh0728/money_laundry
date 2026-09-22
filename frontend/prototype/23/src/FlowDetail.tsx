@@ -24,6 +24,12 @@ export function sankeyLinkLabelLayout({ sourceX, targetX, sourceY, targetY }: { 
   return { x: (sourceX + targetX) / 2, y: (sourceY + targetY) / 2 }
 }
 
+type FlowThroughput = { incoming: number; outgoing: number }
+export function centerSankeyLink({ sourceY, targetY, payload }: { sourceY: number; targetY: number; payload: { source: FlowThroughput & { value: number; dy: number }; target: FlowThroughput & { value: number; dy: number } } }) {
+  const padding = (node: FlowThroughput & { value: number; dy: number }, side: keyof FlowThroughput) => node.value > 0 ? Math.max(0, node.dy * (1 - node[side] / node.value) / 2) : 0
+  return { sourceY: sourceY + padding(payload.source, 'outgoing'), targetY: targetY + padding(payload.target, 'incoming') }
+}
+
 export function flowTipContent(p: Record<string, unknown>) {
   // Recharts wraps Sankey tooltip data more than once
   // (tooltip entry -> searched item -> original link/node payload).
@@ -76,17 +82,17 @@ export const flowLabel = (model: GraphModel, f: FlowFocus) => f.kind === 'node' 
 
 // 거래의 송·수취 계좌는 엣지(s→t) key로 판정한다
 type Row = GraphTransaction & { s: string; t: string }
-type SankeyData = { nodes: { name: string; suspect: boolean }[]; links: { source: number; target: number; value: number; suspect: boolean; count: number; first: string; last: string }[] }
+type SankeyData = { nodes: (FlowThroughput & { name: string; suspect: boolean })[]; links: { source: number; target: number; value: number; suspect: boolean; count: number; first: string; last: string }[] }
 
 // 계좌 focus: 보낸 상대(왼쪽) → 선택 계좌(가운데) → 받은 상대(오른쪽). 같은 상대는 금액을 합친다.
 function sankeyFor(model: GraphModel, focus: FlowFocus, txs: Row[]): SankeyData {
   const center = focus.kind === 'node' ? focus.key : focus.s
-  const nodes: SankeyData['nodes'] = [{ name: accountOf(model, center), suspect: false }]
+  const nodes: SankeyData['nodes'] = [{ name: accountOf(model, center), suspect: false, incoming: 0, outgoing: 0 }]
   const links = new Map<string, SankeyData['links'][number]>()
   const indexOf = (side: 'in' | 'out', key: string) => {
     const name = `${accountOf(model, key)}${side === 'in' ? ' ' : '  '}` // 같은 계좌가 양쪽에 나오면 이름으로 구분
     let i = nodes.findIndex(n => n.name === name)
-    if (i < 0) { nodes.push({ name, suspect: false }); i = nodes.length - 1 }
+    if (i < 0) { nodes.push({ name, suspect: false, incoming: 0, outgoing: 0 }); i = nodes.length - 1 }
     return i
   }
   for (const tx of txs) {
@@ -95,6 +101,7 @@ function sankeyFor(model: GraphModel, focus: FlowFocus, txs: Row[]): SankeyData 
     const other = incoming ? tx.s : tx.t
     const o = indexOf(incoming ? 'in' : 'out', other)
     const [source, target] = incoming ? [o, 0] : [0, o]
+    nodes[source].outgoing += tx.usd; nodes[target].incoming += tx.usd
     const k = `${source}>${target}`
     const link = links.get(k) ?? { source, target, value: 0, suspect: false, count: 0, first: tx.at, last: tx.at }
     link.value += tx.usd; link.suspect ||= tx.label === 1; link.count += 1
@@ -146,7 +153,8 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
                     <div className="h-[340px] w-full">
                       <ResponsiveContainer>
                         <Sankey data={data} nodePadding={18} nodeWidth={10} margin={{ left: 96, right: 96, top: 22, bottom: 10 }}
-                          link={({ sourceX, targetX, sourceY, targetY, sourceControlX, targetControlX, linkWidth, payload }) => {
+                          link={({ sourceX, targetX, sourceY: rawSourceY, targetY: rawTargetY, sourceControlX, targetControlX, linkWidth, payload }) => {
+                            const { sourceY, targetY } = centerSankeyLink({ sourceY: rawSourceY, targetY: rawTargetY, payload: payload as unknown as Parameters<typeof centerSankeyLink>[0]['payload'] })
                             const d = `M${sourceX},${sourceY} C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY}`
                             const l = payload as unknown as { suspect: boolean; value: number; count: number; first: string; last: string }
                             const label = sankeyLinkLabelLayout({ sourceX, targetX, sourceY, targetY })

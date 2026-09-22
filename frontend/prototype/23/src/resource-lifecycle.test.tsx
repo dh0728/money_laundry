@@ -14,7 +14,7 @@ vi.mock('react', async importOriginal => ({
   useRef: () => ({ current: hooks.ref }),
   useState: (initial: unknown) => [hooks.states.length ? hooks.states.shift() : typeof initial === 'function' ? initial() : initial, () => {}],
 }))
-vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: hooks.theme }) }))
+vi.mock('./ThemeProvider', () => ({ useTheme: () => ({ resolvedTheme: hooks.theme }) }))
 import LoginNetwork from './LoginNetwork'
 import { Account } from './UtilityPages'
 import { FlowPanel } from './FlowDetail'
@@ -23,19 +23,19 @@ beforeEach(() => { hooks.effects = []; hooks.ref = null; hooks.states = []; hook
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('browser resource lifetimes', () => {
-  it('draws the login canvas on mount, theme change and resize without scheduling frames or pointer listeners', () => {
+  it('animates the login canvas and releases its frame, resize observer and pointer listeners', () => {
     let draws = 0, resize!: () => void, disconnected = false
     const context = { strokeStyle: '', fillStyle: '', globalAlpha: 1, clearRect: () => { draws++ }, setTransform: () => {}, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {}, arc: () => {}, fill: () => {} }
     const canvas = { getContext: () => context, getBoundingClientRect: () => ({ width: 900, height: 600 }) }
     hooks.ref = canvas
-    const events: string[] = [], frames: unknown[] = []
-    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), addEventListener: (name: string) => events.push(name) })
+    const events: string[] = [], removed: string[] = [], frames: Array<(time: number) => void> = [], cancelled: number[] = []
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), addEventListener: (name: string) => events.push(name), removeEventListener: (name: string) => removed.push(name) })
     vi.stubGlobal('document', { addEventListener: (name: string) => events.push(name) })
     vi.stubGlobal('devicePixelRatio', 2)
     const palette: Record<string, string> = { '--login-network-edge': 'rgba(100,110,120,.42)', '--login-network-node': 'rgba(200,210,220,.9)' }
     vi.stubGlobal('getComputedStyle', () => ({ getPropertyValue: (token: string) => palette[token] ?? '' }))
-    vi.stubGlobal('requestAnimationFrame', (frame: unknown) => { frames.push(frame); return 1 })
-    vi.stubGlobal('cancelAnimationFrame', () => {})
+    vi.stubGlobal('requestAnimationFrame', (frame: (time: number) => void) => { frames.push(frame); return frames.length })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => { cancelled.push(id) })
     vi.stubGlobal('ResizeObserver', class {
       constructor(callback: () => void) { resize = callback }
       observe() {}
@@ -52,11 +52,13 @@ describe('browser resource lifetimes', () => {
     resize()
     expect(draws).toBe(2)
     expect(context.fillStyle).toBe('rgba(10,20,30,.9)')
-    expect(frames).toEqual([])
-    expect(events).toEqual([])
+    expect(frames).toHaveLength(1)
+    expect(events).toEqual(['pointermove', 'pointerleave'])
     expect(first.dependencies).toEqual(['light'])
     if (cleanup) cleanup()
     expect(disconnected).toBe(true)
+    expect(cancelled).toEqual([1])
+    expect(removed).toEqual(['pointermove', 'pointerleave'])
     hooks.theme = 'dark'; hooks.effects = []
     LoginNetwork()
     expect(hooks.effects[0].dependencies).toEqual(['dark'])

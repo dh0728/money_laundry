@@ -27,6 +27,14 @@ describe('v19 목록 · data-table', () => {
     for (const label of ['ID, 탐지 내용, 담당자 검색', '기간', '필터', '다운로드']) expect(m).toContain(label)
     expect(m).not.toContain('border-dashed')
   })
+  it('Alert와 Episode 모두 같은 outline 다운로드 버튼을 쓴다', () => {
+    const alert = html()
+    const episode = renderToStaticMarkup(<NuqsTestingAdapter><TooltipProvider><Lists kind="Episode" records={records} user="김조사" onOpen={noop} state="normal" setState={noop} /></TooltipProvider></NuqsTestingAdapter>)
+    const button = (markup: string) => markup.slice(markup.lastIndexOf('<button', markup.indexOf('다운로드')), markup.indexOf('>', markup.indexOf('다운로드')) + 1)
+
+    expect(button(alert)).toContain('data-variant="outline"')
+    expect(button(episode)).toContain('data-variant="outline"')
+  })
   it('v20 R2: 열 숨기기는 뺐다(되돌릴 경로가 안 보임)', () => {
     expect(readFileSync(new URL('./Lists.tsx', import.meta.url), 'utf8')).toContain('defaultColumn: { enableHiding: false }')
   })

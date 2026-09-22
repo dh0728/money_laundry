@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { records } from './domain'
-import { Account, buildNotifications, Notifications, useUnreadCount } from './UtilityPages'
+import { Account, buildNotifications, Notifications, Settings, useUnreadCount } from './UtilityPages'
 import { useMemoryState } from './memory'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
@@ -88,6 +88,14 @@ describe('Figma v17 · 모두 읽음 처리 disabled', () => {
     expect(button).toContain('<button')
     expect(button).toMatch(/\sdisabled(=""|(?=[\s>]))/)
   })
+
+  it('모두 읽음은 outline 버튼으로 disabled 상태에서도 같은 형태를 유지한다', () => {
+    const source = buildNotifications(records)
+    seedMemory('notifications:read', source.map(record => record.id))
+    const button = openingButtonTagFor(html(<Notifications records={records} onOpen={() => {}} />), '모두 읽음 처리')
+    expect(button).toContain('data-variant="outline"')
+    expect(button).toMatch(/\sdisabled(=""|(?=[\s>]))/)
+  })
 })
 
 describe('Account 시각적 묶음 + 역할 표기', () => {
@@ -107,16 +115,36 @@ describe('Account 시각적 묶음 + 역할 표기', () => {
     expect(l2).not.toContain('심층 조사')
   })
 
-  it('세션은 무거운 border 없이 bg-muted/40 rounded-lg 행이다', () => {
+  it('세션 행은 중첩 카드 없이 divide-y 구분선과 제목 옆 현재 배지를 쓴다', () => {
     const markup = html(<Account user="오검토" onLogout={() => {}} />)
-    expect(markup).toContain('rounded-lg bg-muted/40')
-    expect(markup).not.toMatch(/rounded-lg border p-4/)
+    expect(markup).toContain('divide-y')
+    expect(markup).not.toContain('rounded-lg bg-muted/40')
+    expect(markup).toMatch(/Chrome · Windows 11<\/p><span[^>]*>현재<\/span>/)
   })
 
   it('프로필·권한·세션 관리는 기존 반응형 grid 안에 남는다', () => {
     const markup = html(<Account user="오검토" onLogout={() => {}} />)
-    expect(markup).toContain('data-testid="account-grid"')
-    expect(markup).toContain('account-grid grid')
+    const grid = markup.match(/<div[^>]*data-testid="account-grid"[^>]*>/)?.[0] ?? ''
+    expect(grid).toContain('account-grid grid')
+    expect(grid).toContain('items-stretch')
+    expect((markup.match(/data-slot="card"[^>]*class="[^"]*h-full/g) ?? []).length).toBe(3)
     expect(markup).toMatch(/<h2[^>]*>권한<\/h2>/)
+  })
+})
+
+describe('v23 utility Auto Layout contracts', () => {
+  it('keeps every settings row stretched to its tallest card', () => {
+    const markup = html(<Settings user="오검토" />)
+    const grid = markup.match(/<div[^>]*data-testid="settings-grid"[^>]*>/)?.[0] ?? ''
+    expect(grid).toContain('items-stretch')
+    expect((markup.match(/data-slot="card"[^>]*class="[^"]*h-full/g) ?? []).length).toBe(4)
+  })
+
+  it('keeps both notification columns as full-height children of their shared row', () => {
+    seedMemory('notifications:read', [])
+    const markup = html(<Notifications records={records} onOpen={() => {}} />)
+    const grid = markup.match(/<div[^>]*data-testid="notification-list"[^>]*>/)?.[0] ?? ''
+    expect(grid).toContain('items-stretch')
+    expect((markup.match(/class="notification-column min-w-0 h-full"/g) ?? [])).toHaveLength(2)
   })
 })

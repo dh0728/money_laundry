@@ -1,18 +1,16 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { records } from './domain'
 import { Notifications, Settings } from './UtilityPages'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
-const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
 
 describe('Figma v20 · Notifications 카드 분할', () => {
   const markup = html(<Notifications records={records} onOpen={() => {}} />)
 
   it('각 notification-card는 rail 없이 점 버튼으로 읽음 상태를 바꾼다', () => {
-    expect(markup).toContain('notification-card flex items-center gap-2.5')
+    expect(markup).toMatch(/notification-card[^\"]*flex items-center[^\"]*gap-2\.5/)
     expect(markup).not.toContain('notification-rail')
     expect(markup).toContain('data-testid="notification-dot"')
     expect(markup).toContain('읽음으로 표시')
@@ -28,14 +26,14 @@ describe('Figma v20 · Notifications 카드 분할', () => {
     expect(markup).not.toContain('data-shine="off"')
   })
 
-  it('점 상태 버튼과 카드 열기 버튼은 형제다', () => {
-    expect(markup).toMatch(/data-testid="notification-dot"><span[^>]*><\/span><\/button><button[^>]*aria-label="[^"]+ 알림 열기"/)
+  it('카드 전체 열기 버튼과 점 상태 버튼은 분리된 형제다', () => {
+    expect(markup).toMatch(/notification-card-action[^>]*aria-label="[^"]+ 알림 열기"[^>]*><\/button><button[^>]*data-slot="button"[^>]*data-testid="notification-dot"/)
   })
 
-  it('호버·키보드 포커스는 실제 버튼만 밝힌다', () => {
-    expect(css).not.toMatch(/\.notification-card[^}]*:focus-within/)
-    expect(css).not.toMatch(/\.notification-card-action:is\(:hover, :focus-visible\)[^}]*box-shadow:\s*none/)
-    expect(css).toMatch(/:is\([^}]*button[^}]*a\[href\][^}]*\[data-interactive=["']true["']\]\)[^{]*:is\(:hover,\s*:focus-visible\)/s)
+  it('호버·키보드 포커스는 텍스트 상자가 아니라 카드 블록 전체를 밝힌다', () => {
+    expect(markup).toContain('focus-within:border-ring focus-within:ring-[3px]')
+    expect(markup).toContain('notification-card-action absolute inset-0 rounded-lg')
+    expect(markup).toContain('data-testid="notification-card-content"')
   })
 
   it('열 머리글은 목록 표와 같은 정렬 대기 ChevronsUpDown 아이콘을 쓴다', () => {

@@ -30,8 +30,8 @@ export type RecordItem = {
 export type FilterField = 'risk' | 'owner' | 'status' | 'pattern' | 'age'
 export type Filter = { field: FilterField; value: string }
 
-export const usd = (n: number) => '$' + new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)
-export const compactUsd = (n: number) => n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${Math.round(n)}`
+export const usd = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n) + '$'
+export const compactUsd = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M$` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K$` : `${Math.round(n)}$`
 export const riskFor = (score: number): Risk => score >= 80 ? '고위험' : score >= 50 ? '중위험' : '저위험'
 export const topPercent = (score: number) => Math.max(1, 100 - score)
 

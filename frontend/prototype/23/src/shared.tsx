@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarDays, Link2, RotateCcw, X } from 'lucide-react'
 import { ko } from 'date-fns/locale'
 import { subDays, startOfMonth } from 'date-fns'
@@ -122,12 +122,24 @@ export function RiskBadge({ score }: { risk: Risk; score: number }) {
     </Badge>
   )
 }
-export function PatternBadge({ pattern, probability }: { pattern: string; probability: number }) {
-  // 9/18: 정답처럼 보이지 않게 모델 판별 확률로 표현한다 (예: FAN_OUT 의심 87%)
-  return <Badge variant="secondary" className="font-mono font-normal text-xs" title={`모델 판별 · ${pattern} 의심 ${probability}%`}>{pattern}<span className="ml-1.5 font-sans text-muted-foreground">의심 {probability}%</span></Badge>
+export function StatusBadge({ status }: { status: string }) {
+  const tone = status === '신규' ? 'new' : status === '검토 중' || status === '조사 중' ? 'working' : status === '종결' ? 'closed' : 'neutral'
+  return <Badge variant="outline" data-tone={tone} className="semantic-status-badge font-normal text-xs">{status}</Badge>
 }
 
-export function DetailHeading({ record, linkedRecords, onOpen }: { record: RecordItem; linkedRecords: RecordItem[]; onOpen: (record: RecordItem) => void }) {
+const patternBadgeTones: Record<string, string> = {
+  FAN_OUT: 'var(--dashboard-category-4)', FAN_IN: 'var(--dashboard-category-5)',
+  'GATHER-SCATTER': 'var(--dashboard-category-6)', 'SCATTER-GATHER': 'var(--dashboard-category-7)',
+  CYCLE: 'var(--dashboard-category-8)', RANDOM: 'var(--dashboard-category-9)',
+  BIPARTITE: 'var(--dashboard-category-1)', STACK: 'var(--dashboard-category-2)',
+}
+export function PatternBadge({ pattern, probability }: { pattern: string; probability: number }) {
+  // 9/18: 정답처럼 보이지 않게 모델 판별 확률로 표현한다 (예: FAN_OUT 의심 87%)
+  const tone = patternBadgeTones[pattern]
+  return <Badge variant="outline" className="semantic-pattern-badge font-mono font-normal text-xs" style={tone ? { '--badge-tone': tone } as CSSProperties : undefined} title={`모델 판별 · ${pattern} 의심 ${probability}%`}>{tone && <span data-slot="pattern-dot" aria-hidden="true" className="size-2 rounded-full" />}{pattern}<span className="ml-1 font-sans opacity-75">의심 {probability}%</span></Badge>
+}
+
+export function DetailHeading({ record, linkedRecords, onOpen, notice }: { record: RecordItem; linkedRecords: RecordItem[]; onOpen: (record: RecordItem) => void; notice?: ReactNode }) {
   const linkedLabel = record.kind === 'Alert' ? 'Episode' : 'Alert'
   return (
     <header data-testid="detail-header">
@@ -152,17 +164,14 @@ export function DetailHeading({ record, linkedRecords, onOpen }: { record: Recor
           </Popover>
         )}
       </div>
-      <div data-testid="detail-tags" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="text-[10px] font-normal">{record.status}</Badge>
-          <RiskBadge risk={record.risk} score={record.score} />
-          {record.kind === 'Alert' && <PatternBadge pattern={record.pattern} probability={record.probability} />}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-          <span>담당 {record.owner}</span><span aria-hidden>·</span>
-          <span>탐지 {record.date}</span><span aria-hidden>·</span>
-          <span>{record.age === 0 ? '오늘' : `${record.age}일 경과`}</span>
-        </div>
+      <div data-testid="detail-tags" className="mt-3 flex flex-wrap items-center gap-2">
+        <StatusBadge status={record.status} />
+        <RiskBadge risk={record.risk} score={record.score} />
+        {record.kind === 'Alert' && <PatternBadge pattern={record.pattern} probability={record.probability} />}
+        <Badge data-testid="owner-pill" variant="outline" className="semantic-metadata-badge font-normal">담당 {record.owner}</Badge>
+        <Badge data-testid="detected-pill" variant="outline" className="semantic-metadata-badge font-normal">탐지 {record.date}</Badge>
+        <Badge data-testid="age-pill" variant="outline" className="semantic-metadata-badge font-normal">{record.age === 0 ? '오늘' : `${record.age}일 경과`}</Badge>
+        {notice && <span data-testid="responsibility-note" className="text-[11px] leading-5 text-muted-foreground">{notice}</span>}
       </div>
     </header>
   )

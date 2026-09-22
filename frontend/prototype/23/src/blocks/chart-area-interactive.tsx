@@ -8,7 +8,7 @@ export type DailyFlow = { date: string; inflow: number; closed: number }
 export const dashboardChartTones = {
   primary: 'var(--foreground)',
   secondary: 'var(--muted-foreground)',
-  active: 'var(--destructive)',
+  active: 'var(--foreground)',
 } as const
 
 const chartConfig = {

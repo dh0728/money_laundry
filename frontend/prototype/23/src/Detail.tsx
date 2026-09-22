@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
-import { ArrowRight, Check, CircleDollarSign, ExternalLink, FileClock, History, Radar, Save, UserRound } from 'lucide-react'
+import { ArrowRight, Check, CircleDollarSign, ExternalLink, FileClock, History, Radar, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,14 +9,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogHeader, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { useMemoryState } from './memory'
-import { canClose, graphFor, sortRows, type RecordItem } from './domain'
-import { DetailHeading, UnderTabs, SectionTitle, SortableHead } from './shared'
-import { useSort } from './Lists'
+import { canClose, graphFor, type RecordItem } from './domain'
+import { DetailHeading, UnderTabs, SectionTitle } from './shared'
 import Graph from './Graph'
 import TxTable, { type TxRow } from './TxTable'
 import PatternGlyph from './PatternGlyph'
@@ -25,6 +23,8 @@ import { formatMoney, moneyMetrics } from './v23-domain'
 
 type Draft = { text: string; verdict: string; at: string }
 type Event = { title: string; body: string; at: string; actor: string }
+const overviewCard = 'h-full gap-4 py-4 shadow-none'
+const overviewContent = 'h-full px-4 [&>div:first-child]:mb-4'
 
 // 한글 마지막 글자의 종성 유무로 조사를 고른다: (code - 0xAC00) % 28 !== 0 이면 종성 있음(받침) -> withFinal(이/을/은), 없으면 -> withoutFinal(가/를/는)
 export function josa(word: string, withFinal: string, withoutFinal: string): string {
@@ -66,6 +66,24 @@ function BarList({ rows, format }: { rows: { name: string; v: number }[]; format
     </div>
   )
 }
+function EvidenceCard() {
+  return <Card className={overviewCard}><CardContent className={overviewContent}>
+    <SectionTitle title="탐지 근거" description="탐지 신호를 실제 거래와 대조" />
+    <div className="space-y-5 text-sm">
+      <div className="flex gap-3"><span className="text-muted-foreground font-mono text-xs pt-0.5">01</span><div><p className="font-medium">계좌 관계 확인</p><p className="text-xs text-muted-foreground leading-6 mt-1">자금 원천과 최종 수취 관계를 실제 거래 및 업무 정보와 대조해야 함.</p></div></div>
+      <div className="flex gap-3"><span className="text-muted-foreground font-mono text-xs pt-0.5">02</span><div><p className="font-medium">모델 신호 해석</p><p className="text-xs text-muted-foreground leading-6 mt-1">탐지 신호는 조사 우선순위를 위한 참고이며 그 자체로 의심 거래를 확정하지 않음.</p></div></div>
+    </div>
+  </CardContent></Card>
+}
+function InvestigationCard({ kind }: { kind: RecordItem['kind'] }) {
+  return <Card className={overviewCard} data-testid="investigation"><CardContent className={overviewContent}>
+    <SectionTitle title="조사 정보" />
+    <dl className="grid grid-cols-[88px_1fr] gap-y-4 text-xs">
+      <dt className="text-muted-foreground">조사 단위</dt><dd>{kind === 'Alert' ? '단일 탐지 신호' : '연관 Alert 묶음'}</dd>
+      <dt className="text-muted-foreground">데이터 기준</dt><dd>탐지 시점 거래 데이터</dd>
+    </dl>
+  </CardContent></Card>
+}
 
 export default function Detail({ record: r, records, user, onUpdate, onOpen, onOpenTransaction, initialTab = 'overview' }: { record: RecordItem; records: RecordItem[]; user: string; onUpdate: (r: RecordItem) => void; onOpen: (r: RecordItem) => void; onOpenTransaction?: (target: TransactionTarget) => void; initialTab?: 'overview' | 'graph' | 'transactions' | 'conclusion' }) {
   const model = useMemo(() => graphFor(r, records), [r, records])
@@ -83,7 +101,6 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
   const [target, setTarget] = useMemoryState(`${r.id}:target`, ''), [newTitle, setNewTitle] = useMemoryState(`${r.id}:new-title`, '')
   const [confirm, setConfirm] = useState(false), [draftOpen, setDraftOpen] = useState(false)
   const [drafts, setDrafts] = useMemoryState<Draft[]>(`${r.id}:drafts`, []), [events, setEvents] = useMemoryState<Event[]>(`${r.id}:events`, [])
-  const [selectedTx, setSelectedTx] = useState<string | null | undefined>(undefined)
   const responsible = r.owner === user, closed = r.status === '종결'
   const option = options.find(o => o.value === verdict) ?? options[0]
   const needsTarget = verdict === 'link-episode' && !target, needsTitle = verdict === 'new-episode' && !newTitle.trim()
@@ -92,10 +109,6 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
   const linkedAlerts = (r.alertIds ?? []).map(id => records.find(x => x.id === id)).filter(Boolean) as RecordItem[]
   const linkedRecords = r.kind === 'Alert' ? (linkedEpisode ? [linkedEpisode] : []) : linkedAlerts
   const priorRedetectionAlert = r.redetection ? records.find(record => record.id === r.redetection?.priorAlertId) : undefined
-  const ownerTarget = (account: string): TransactionTarget => {
-    const owner = transactionIndex.accounts.find(item => item.id === account)?.owner
-    return owner ? { type: 'owner', owner } : { type: 'account', account }
-  }
 
   const event = (title: string, body: string) => setEvents(p => [{ title, body, at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }), actor: user }, ...p])
   const save = () => { setDrafts(p => [{ text: reason, verdict, at: new Date().toLocaleTimeString('ko-KR') }, ...p]); event('검토 의견 임시 저장', '확정 전 검토 의견을 저장함'); toast.success('현재 화면에 임시 저장했습니다.') }
@@ -110,6 +123,8 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
   const dailyRaw = counts(tx, t => t.at.slice(5, 10), t => t.usd).sort((a, b) => a.name.localeCompare(b.name)).map(d => ({ day: d.name, USD: Math.round(d.v) }))
   const dailyMaxIndex = dailyRaw.reduce((maxI, d, i, arr) => d.USD > arr[maxI].USD ? i : maxI, 0)
   const daily = dailyRaw
+  const txTimes = tx.map(t => t.at).sort()
+  const txSpan = txTimes.length ? `${txTimes[0].slice(5, 16)} ~ ${txTimes[txTimes.length - 1].slice(5, 16)}` : '—'
   const formats = counts(tx, t => t.format, t => t.usd).slice(0, 5)
   const senders = counts(tx, t => t.from, t => t.usd).slice(0, 5)
   const patternGroups = [...linkedAlerts.reduce((groups, alert) => {
@@ -118,12 +133,20 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
   }, new Map<string, RecordItem[]>()).values()]
   const representativeAccount = model.nodes.find(node => node.hub)?.account ?? model.nodes.find(node => node.core)?.account
   const metrics = moneyMetrics(tx, representativeAccount)
+  const totalUsd = tx.reduce((sum, item) => sum + item.usd, 0)
+  const concentration = totalUsd && daily[dailyMaxIndex] ? Math.round(daily[dailyMaxIndex].USD / totalUsd * 100) : 0
+  const accountFrequency = counts(tx.flatMap(item => [item.from, item.to]), account => account, () => 1)
+  const repeatedAccounts = accountFrequency.filter(item => item.v > 1).length
   const history = [...events, { title: '검토 시작', body: '탐지 근거와 연결 거래를 확인함', at: '13:42', actor: r.owner }, { title: '담당자 자동 배정', body: `${r.owner}에게 배정됨`, at: '13:38', actor: '시스템' }, { title: `${r.kind} 생성`, body: `${r.pattern} ${r.probability}% 탐지`, at: '13:35', actor: '시스템' }]
 
   return (
     <div className="min-h-full flex flex-col gap-5">
-      <DetailHeading record={r} linkedRecords={linkedRecords} onOpen={onOpen} />
-      {!responsible && <p className="self-end text-xs text-muted-foreground rounded-md border px-3 py-2 @5xl:whitespace-nowrap">현재 {user} 계정으로 조회 중입니다. 최종 처리는 담당자 {r.owner}{josa(r.owner, '이', '가')} 수행합니다.</p>}
+      <DetailHeading
+        record={r}
+        linkedRecords={linkedRecords}
+        onOpen={onOpen}
+        notice={!responsible ? <>현재 {user} 계정으로 조회 중입니다. 최종 처리는 담당자 {r.owner}{josa(r.owner, '이', '가')} 수행합니다.</> : undefined}
+      />
       {r.kind === 'Alert' && r.redetection && (
         <section data-testid="redetection-banner" aria-labelledby="redetection-title" className="rounded-xl border-2 border-destructive bg-destructive px-5 py-5 text-destructive-foreground shadow-[0_0_28px_-8px_var(--destructive)]">
           <div>
@@ -145,14 +168,21 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
       <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '자금 흐름' }, { value: 'transactions', label: `거래 ${tx.length}` }, { value: 'conclusion', label: '검토 의견' }]} />
 
       {tab === 'overview' && (
-        <div className="space-y-5" data-testid="overview">
-          <div className="grid gap-4 @3xl:grid-cols-3">
-            <Card className="shadow-none"><CardContent><p className="text-xs text-muted-foreground">투입 원금</p><p className="mt-3 text-2xl font-semibold tabular-nums">{formatMoney(metrics.principal, 'USD')}</p></CardContent></Card>
-            <Card className="shadow-none"><CardContent><p className="text-xs text-muted-foreground">거래 총액</p><p className="mt-3 text-xl font-semibold tabular-nums">{formatMoney(metrics.total, 'USD')}</p></CardContent></Card>
-            <Card className="shadow-none"><CardContent><p className="text-xs text-muted-foreground">순유입</p><p className="mt-3 text-xl font-semibold tabular-nums">{metrics.netInflow === null ? '대표 계좌 선택 필요' : formatMoney(metrics.netInflow, 'USD')}</p></CardContent></Card>
+        <div className="space-y-4" data-testid="overview">
+          <div className={`grid items-stretch gap-3 @3xl:grid-cols-12 ${r.kind === 'Alert' ? '@6xl:grid-cols-6' : '@6xl:grid-cols-5'}`} data-testid="overview-kpi-row">
+            {[
+              { label: '투입 원금', value: formatMoney(metrics.principal, 'USD') },
+              { label: '거래 총액', value: formatMoney(metrics.total, 'USD') },
+              { label: '순유입', value: metrics.netInflow === null ? '대표 계좌 선택 필요' : formatMoney(metrics.netInflow, 'USD') },
+              { label: '근거 거래', value: `${tx.length}건` },
+              ...(r.kind === 'Alert' ? [{ label: '의심 거래 참여 계좌', value: `${model.nodes.filter(node => node.core).length}개` }] : []),
+              { label: '거래 기간', value: txSpan },
+            ].map(stat => <Card key={stat.label} className={`${overviewCard} @3xl:col-span-4 @6xl:col-span-1`} data-testid="overview-kpi-card"><CardContent className="px-4">
+              <p className="text-xs text-muted-foreground">{stat.label}</p><p className="mt-2 text-lg font-semibold tabular-nums">{stat.value}</p>
+            </CardContent></Card>)}
           </div>
-          <div className="grid gap-4 @5xl:grid-cols-[1.3fr_1fr_1fr]">
-            <Card className="shadow-none"><CardContent>
+          <div className="grid items-stretch gap-4 @4xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,1fr)]" data-testid="overview-flow-row">
+            <Card className={overviewCard}><CardContent className={overviewContent}>
               <SectionTitle title="일별 의심 거래 금액" description="언제 집중됐는지 · USD" />
               <ChartContainer config={{ USD: { label: 'USD', color: 'var(--muted-foreground)' } }} className="h-[170px] w-full">
                 <BarChart data={daily} margin={{ left: 0, right: 4, top: 6 }}>
@@ -164,67 +194,38 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
                 </BarChart>
               </ChartContainer>
             </CardContent></Card>
-            <Card className="shadow-none"><CardContent><SectionTitle title="상위 송금 계좌" description="자금이 어디서 나갔는지" /><BarList rows={senders} format={value => formatMoney(value, 'USD')} /></CardContent></Card>
-            {r.kind === 'Alert' && <Card className="shadow-none"><CardContent><SectionTitle title="결제 수단 구성" description="어떤 경로가 지배적인지" /><BarList rows={formats} format={value => formatMoney(value, 'USD')} /></CardContent></Card>}
+            <Card className={overviewCard}><CardContent className={overviewContent}><SectionTitle title="상위 송금 계좌" description="자금이 어디서 나갔는지" /><BarList rows={senders} format={value => formatMoney(value, 'USD')} /></CardContent></Card>
           </div>
-          <div className="grid gap-4 @5xl:grid-cols-[1fr_1.4fr_1fr]">
-            {r.kind === 'Alert' ? <Card className="shadow-none"><CardContent>
+          {r.kind === 'Alert' ? <div data-testid="overview-pattern-row">
+            <Card className={overviewCard}><CardContent className={overviewContent}>
               <SectionTitle title="의심 거래 모양" description={`${r.pattern} 유형 도식 · 도식을 눌러 자금 흐름에서 실제 계좌 확인`} />
-              <button type="button" className="pattern-link w-full rounded-md border bg-background/40 p-2" onClick={() => setTab('graph')} aria-label="자금 흐름 그래프로 이동"><PatternGlyph pattern={r.pattern} className="w-full h-40" /></button>
-            </CardContent></Card> : <div className="grid gap-4">
-              {patternGroups.map(group => <Card key={group[0].pattern} className="shadow-none" data-testid="episode-pattern-card"><CardContent>
-                <SectionTitle title={`${group[0].pattern} · Alert ${group.length}건`} />
-                <button type="button" className="pattern-link w-full rounded-md border bg-background/40 p-2" onClick={() => setTab('graph')} aria-label={`${group[0].pattern} 자금 흐름 그래프로 이동`}><PatternGlyph pattern={group[0].pattern} className="w-full h-32" /></button>
-                <div className="mt-3 flex flex-wrap gap-2">{group.map(alert => <Button key={alert.id} variant="outline" size="sm" className="h-7 gap-2 text-xs" onClick={() => onOpen(alert)}><span className="font-mono">{alert.id}</span><span className="text-muted-foreground">의심 {alert.probability}%</span></Button>)}</div>
-              </CardContent></Card>)}
-            </div>}
-            <Card className="shadow-none"><CardContent>
-              <SectionTitle title="탐지 근거" description="탐지 신호를 실제 거래와 대조" />
-              <div className="space-y-5 text-sm">
-                <div className="flex gap-3"><span className="text-muted-foreground font-mono text-xs pt-0.5">01</span><div><p className="font-medium">계좌 관계 확인</p><p className="text-xs text-muted-foreground leading-6 mt-1">자금 원천과 최종 수취 관계를 실제 거래 및 업무 정보와 대조해야 함.</p></div></div>
-                <div className="flex gap-3"><span className="text-muted-foreground font-mono text-xs pt-0.5">02</span><div><p className="font-medium">모델 신호 해석</p><p className="text-xs text-muted-foreground leading-6 mt-1">탐지 신호는 조사 우선순위를 위한 참고이며 그 자체로 의심 거래를 확정하지 않음.</p></div></div>
-              </div>
+              <button type="button" className="pattern-link w-full rounded-md border bg-background/40 p-2" onClick={() => setTab('graph')} aria-label="자금 흐름 그래프로 이동"><PatternGlyph pattern={r.pattern} className="h-36 w-full" /></button>
             </CardContent></Card>
-            <Card className="shadow-none" data-testid="investigation"><CardContent>
-              <SectionTitle title="조사 정보" />
-              <dl className="grid grid-cols-[88px_1fr] gap-y-4 text-xs">
-                <dt className="text-muted-foreground">조사 단위</dt><dd>{r.kind === 'Alert' ? '단일 탐지 신호' : '연관 Alert 묶음'}</dd>
-                <dt className="text-muted-foreground">데이터 기준</dt><dd>탐지 시점 거래 데이터</dd>
-              </dl>
+          </div> : <div data-testid="overview-pattern-row">
+            <div data-testid="episode-pattern-grid" className="grid auto-rows-fr gap-4 @3xl:grid-cols-3">
+              {patternGroups.map(group => <Card key={group[0].pattern} className={overviewCard} data-testid="episode-pattern-card"><CardContent className={overviewContent}>
+                <SectionTitle title={group[0].pattern} action={<div className="flex flex-wrap justify-end gap-1.5" data-testid="episode-pattern-actions">{group.map(alert => <Button key={alert.id} variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" aria-label={`${alert.id} 상세 보기`} onClick={() => onOpen(alert)}><span className="font-mono">{alert.id}</span><span className="text-muted-foreground">의심 {alert.probability}%</span><ExternalLink className="size-3" /></Button>)}</div>} />
+                <button type="button" className="pattern-link w-full rounded-md border bg-background/40 p-2" onClick={() => setTab('graph')} aria-label={`${group[0].pattern} 자금 흐름 그래프로 이동`}><PatternGlyph pattern={group[0].pattern} className="h-32 w-full" /></button>
+              </CardContent></Card>)}
+            </div>
+          </div>}
+          <div className="grid items-stretch gap-4 @3xl:grid-cols-3" data-testid="overview-context-row">
+            <EvidenceCard />
+            <InvestigationCard kind={r.kind} />
+            <Card className={overviewCard} data-testid="history"><CardContent className={overviewContent}>
+              <SectionTitle title="처리 이력" description="담당자 · 변경 사유 · 시각" />
+              <div className="divide-y">{history.map((e, i) => <div key={i} className="flex gap-2.5 py-2"><span className="w-9 shrink-0 text-[11px] tabular-nums text-muted-foreground">{e.at}</span><span className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" /><div className="min-w-0 flex-1 text-xs"><p>{e.title}<span className="ml-2 text-muted-foreground">{e.actor}</span></p><p className="mt-1 truncate text-muted-foreground">{e.body}</p></div></div>)}</div>
             </CardContent></Card>
           </div>
-          <Card className="shadow-none"><CardContent>
-            <SectionTitle title="처리 이력" description="담당자 · 변경 사유 · 시각" />
-            <div className="divide-y">{history.map((e, i) => <div key={i} className="flex gap-4 py-3.5"><span className="text-[11px] text-muted-foreground tabular-nums w-10">{e.at}</span><span className="size-1.5 rounded-full bg-muted-foreground mt-1.5" /><div className="flex-1 text-xs"><p>{e.title}<span className="text-muted-foreground ml-3">{e.actor}</span></p><p className="text-muted-foreground mt-1.5 leading-5 whitespace-pre-wrap">{e.body}</p></div></div>)}</div>
-          </CardContent></Card>
         </div>
       )}
 
       {tab === 'graph' && <Graph key={r.id} model={model} label={`${r.id} 관계 그래프`} />}
 
-      {tab === 'transactions' && (() => {
-        const picked = selectedTx === null ? undefined : selectedTx ? tx.find(t => t.id === selectedTx) : [...tx].sort((a, b) => a.at.localeCompare(b.at))[0]
-        const senderOwner = picked?.fromOwner
-        return (
-          <div className="grid gap-4 @5xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] items-start">
-            <TxTable rows={tx} selectedId={picked?.id} onSelect={setSelectedTx} />
-            <Card className="selected-transaction-card shadow-none"><CardContent className="space-y-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <SectionTitle title="선택한 거래" description="행을 선택하면 바뀝니다" />
-                {picked && senderOwner && onOpenTransaction && <Button type="button" variant="outline" size="sm" className="ml-auto h-8 max-w-full min-w-0 gap-1.5 text-xs" aria-label={`${senderOwner} 소유주 자세히 보기`} title={`${senderOwner} 소유주 자세히 보기`} onClick={() => onOpenTransaction(ownerTarget(picked.from))}><UserRound className="size-3.5" /><span className="min-w-0 truncate">{senderOwner}</span><ExternalLink className="size-3.5" /></Button>}
-              </div>
-              {picked && <dl className="grid grid-cols-2 gap-5 text-xs">
-                <div><dt className="text-muted-foreground">거래 ID</dt><dd className="mt-1 flex items-center gap-1 font-mono">{picked.id}{onOpenTransaction && <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Transactions에서 거래 ID 보기" title="Transactions에서 거래 ID 보기" onClick={() => onOpenTransaction({ type: 'transaction', transactionId: picked.id })}><ExternalLink className="size-3.5" /></Button>}</dd></div>
-                <div><dt className="text-muted-foreground">송금 계좌</dt><dd className="mt-1 flex items-center gap-1 font-mono">{picked.from}{onOpenTransaction && <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Transactions에서 송금 소유주 보기" title="Transactions에서 송금 소유주 보기" onClick={() => onOpenTransaction(ownerTarget(picked.from))}><ExternalLink className="size-3.5" /></Button>}</dd></div><div><dt className="text-muted-foreground">원 통화 · 수단</dt><dd className="mt-2">{picked.currency} · {picked.format}</dd></div>
-                <div><dt className="text-muted-foreground">수취 계좌</dt><dd className="mt-1 flex items-center gap-1 font-mono">{picked.to}{onOpenTransaction && <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Transactions에서 수취 소유주 보기" title="Transactions에서 수취 소유주 보기" onClick={() => onOpenTransaction(ownerTarget(picked.to))}><ExternalLink className="size-3.5" /></Button>}</dd></div><div><dt className="text-muted-foreground">금액</dt><dd className="mt-2 text-base font-semibold">{formatMoney(picked.amount, picked.currency)}</dd></div>
-              </dl>}
-            </CardContent></Card>
-          </div>
-        )
-      })()}
+      {tab === 'transactions' && <div className="w-full" data-testid="detail-transaction-table"><TxTable rows={tx} onOpenTransaction={onOpenTransaction} /></div>}
 
       {tab === 'conclusion' && (
-        <div className="flex flex-1 items-start">
+        <div className="grid flex-1 items-stretch gap-4 @5xl:grid-cols-[minmax(0,1fr)_320px]" data-testid="review-layout">
           {/* Figma v17/v18: textarea min-h + flex fill; v18 R2는 resize-y로 크기 조절 핸들 제공 */}
           <Card className="w-full shadow-none h-full"><CardContent className="flex flex-col gap-6 h-full">
             <SectionTitle title={closed ? '종결된 검토' : '검토 의견'} description={closed ? '이 화면에서 완료한 처리 결과입니다.' : '최종 판단을 고르고 근거를 작성하세요. 임시 저장은 확정 처리되지 않습니다.'} />
@@ -254,6 +255,21 @@ export default function Detail({ record: r, records, user, onUpdate, onOpen, onO
               <Button variant="ghost" size="sm" disabled={drafts.length === 0} onClick={() => setDraftOpen(true)}><FileClock className="size-3.5" />저장본 목록 {drafts.length > 0 && `(${drafts.length})`}</Button>
               <Button variant="secondary" size="sm" disabled={!responsible || closed || !reason.trim()} onClick={save}><Save className="size-3.5" />임시 저장</Button>
               <Button size="sm" disabled={closed || !ready} onClick={() => setConfirm(true)}><Check className="size-3.5" />{option.action}</Button>
+            </div>
+          </CardContent></Card>
+          <Card className="h-full shadow-none" data-testid="review-reference"><CardContent>
+            <SectionTitle title="참고 정보" description="판단 전에 대조할 조사 요약" />
+            <dl className="space-y-4 text-xs">
+              <div><dt className="text-muted-foreground">검토 범위</dt><dd className="mt-1 font-medium">의심 거래 {tx.length}건 · 소유주 {new Set(tx.flatMap(item => [item.fromOwner, item.toOwner])).size}명 · 계좌 {new Set(tx.flatMap(item => [item.from, item.to])).size}개</dd></div>
+              <div><dt className="text-muted-foreground">최대 집중일</dt><dd className="mt-1 font-medium">{daily[dailyMaxIndex] ? `${daily[dailyMaxIndex].day} · ${formatMoney(daily[dailyMaxIndex].USD, 'USD')}` : '거래 없음'}</dd></div>
+              <div><dt className="text-muted-foreground">일별 집중도</dt><dd className="mt-1 font-medium">최대 집중일이 전체 금액의 {concentration}%</dd></div>
+              <div><dt className="text-muted-foreground">최다 송금 계좌</dt><dd className="mt-1 font-mono">{senders[0] ? `${senders[0].name} · ${formatMoney(senders[0].v, 'USD')}` : '거래 없음'}</dd></div>
+              <div><dt className="text-muted-foreground">반복 등장 계좌</dt><dd className="mt-1 font-medium">2회 이상 등장 {repeatedAccounts}개</dd></div>
+              <div><dt className="text-muted-foreground">주 결제 수단</dt><dd className="mt-1 font-medium">{formats[0]?.name ?? '확인 필요'}</dd></div>
+            </dl>
+            <div className="mt-5 border-t pt-4">
+              <p className="text-xs font-medium">판단 전 확인</p>
+              <ul className="mt-2 list-disc space-y-2 pl-4 text-xs leading-5 text-muted-foreground"><li>거래 목적과 고객 프로필이 일치하는가</li><li>송금·수취 관계를 입증할 자료가 있는가</li><li>고액 집중일의 자금 원천이 확인됐는가</li></ul>
             </div>
           </CardContent></Card>
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { DateRange } from 'react-day-picker'
-import { useTheme } from 'next-themes'
+import { useTheme } from './ThemeProvider'
 import { Camera, Monitor, Laptop, Bell, Check, Sun, Moon, LaptopMinimal, RotateCcw, Search, ChevronDown, ChevronsUpDown, ChevronUp, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -31,8 +31,8 @@ export function Account({ user, onLogout }: { user: string; onLogout: () => void
   return (
     <div className="space-y-6">
       <PageHeading title="계정" description="프로필과 권한, 로그인 세션을 관리합니다." />
-      <div className="account-grid grid gap-8" data-testid="account-grid">
-      <Card className="shadow-none"><CardContent className="space-y-6">
+      <div className="account-grid grid items-stretch gap-8" data-testid="account-grid">
+      <Card className="h-full shadow-none"><CardContent className="space-y-6">
         <SectionTitle title="프로필" />
         <div className="flex items-center gap-5">
           <Avatar className="size-18"><AvatarImage src={picture} /><AvatarFallback className="text-xl">{user[0]}</AvatarFallback></Avatar>
@@ -43,20 +43,20 @@ export function Account({ user, onLogout }: { user: string; onLogout: () => void
           {[['소속', '금융감독원'], ['이메일', 'reviewer@fss.or.kr'], ['역할', role.name], ['가입일', '2026. 08. 05']].map(([k, v]) => <div key={k}><dt className="text-xs text-muted-foreground mb-2">{k}</dt><dd>{v}</dd></div>)}
         </dl>
       </CardContent></Card>
-      <Card className="shadow-none"><CardContent className="space-y-6">
+      <Card className="h-full shadow-none"><CardContent className="space-y-6">
         <SectionTitle title="권한" />
         <div className="space-y-5 text-sm">
           <ul className="space-y-3" aria-label="할 수 있는 일">{role.can.map(x => <li key={x} className="flex gap-2"><Check className="size-4 shrink-0 mt-0.5" />{x}</li>)}</ul>
           <ul className="space-y-3 text-muted-foreground" aria-label="할 수 없는 일">{role.cannot.map(x => <li key={x} className="flex gap-2"><X className="size-4 shrink-0 mt-0.5" />{x}</li>)}</ul>
         </div>
       </CardContent></Card>
-      <Card className="shadow-none"><CardContent className="space-y-6">
+      <Card className="h-full shadow-none"><CardContent className="space-y-6">
         <SectionTitle title="세션 관리" description="현재 계정으로 로그인한 기기" action={<Button variant="outline" size="sm" onClick={() => setSessions(['current'])}>다른 세션 모두 로그아웃</Button>} />
-        <div className="space-y-3">
+        <div className="divide-y">
           {sessions.map((id, i) => (
-            <div key={id} className="flex items-center gap-4 rounded-lg bg-muted/40 p-4">
+            <div key={id} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
               <div className="size-10 rounded-md bg-background grid place-items-center">{i === 0 ? <Monitor className="size-4" /> : <Laptop className="size-4" />}</div>
-              <div className="flex-1"><p className="text-sm">{i === 0 ? 'Chrome · Windows 11' : i === 1 ? 'Edge · Windows 11' : 'Chrome · Windows 10'} {id === 'current' && <Badge variant="secondary" className="ml-2">현재</Badge>}</p><p className="text-xs text-muted-foreground mt-1">대한민국 서울 · {i === 0 ? '방금 활동' : '오늘 09:14'}</p></div>
+              <div className="flex-1"><div className="flex items-center gap-2"><p className="text-sm">{i === 0 ? 'Chrome · Windows 11' : i === 1 ? 'Edge · Windows 11' : 'Chrome · Windows 10'}</p>{id === 'current' && <Badge variant="secondary">현재</Badge>}</div><p className="text-xs text-muted-foreground mt-1">대한민국 서울 · {i === 0 ? '방금 활동' : '오늘 09:14'}</p></div>
               <Button variant="ghost" size="sm" onClick={() => id === 'current' ? onLogout() : setSessions(p => p.filter(x => x !== id))}>{id === 'current' ? '현재 세션 로그아웃' : '로그아웃'}</Button>
             </div>
           ))}
@@ -76,19 +76,19 @@ export function Settings({ user }: { user: string }) {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4"><PageHeading title="설정" description="표시 형식과 업무 알림 환경을 설정합니다." /><Button size="sm" variant="outline" onClick={reset}><RotateCcw className="size-3.5" />설정 초기화</Button></div>
-      <div className="settings-grid grid gap-x-10 gap-y-10" data-testid="settings-grid">
-        <Card className="shadow-none"><CardContent className="space-y-5"><SectionTitle title="일반" />
+      <div className="settings-grid grid items-stretch gap-x-10 gap-y-10" data-testid="settings-grid">
+        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="일반" />
           <div className="space-y-2"><Label>시간대</Label><Select value={zone} onValueChange={setZone}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="seoul">Asia/Seoul (UTC+9)</SelectItem><SelectItem value="utc">UTC</SelectItem></SelectContent></Select></div>
           <div className="space-y-2"><Label>날짜 형식</Label><Select value={dateFormat} onValueChange={setDateFormat}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="iso">YYYY-MM-DD</SelectItem><SelectItem value="dot">YYYY. MM. DD</SelectItem></SelectContent></Select></div>
         </CardContent></Card>
-        <Card className="shadow-none"><CardContent className="space-y-5"><SectionTitle title="목록" />
+        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="목록" />
           <div className="space-y-2"><Label>페이지당 행</Label><Select value={rows} onValueChange={setRows}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{['20', '50', '100'].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
           <div className="space-y-2"><Label>기본 정렬</Label><Select value={sort} onValueChange={setSort}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="risk">위험도 높은 순</SelectItem><SelectItem value="recent">최근 탐지 순</SelectItem></SelectContent></Select></div>
         </CardContent></Card>
-        <Card className="shadow-none"><CardContent className="space-y-5"><SectionTitle title="알림" description="인앱 수신 항목" />
+        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="알림" description="인앱 수신 항목" />
           <div className="space-y-4">{choices.map(([id, label]) => <Label key={id} className="flex items-center gap-3 font-normal"><Checkbox checked={alerts.includes(id)} onCheckedChange={v => setAlerts(p => v ? [...new Set([...p, id])] : p.filter(x => x !== id))} />{label}</Label>)}</div>
         </CardContent></Card>
-        <Card className="shadow-none"><CardContent className="space-y-5"><SectionTitle title="테마" />
+        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="테마" />
           <RadioGroup value={theme ?? 'dark'} onValueChange={setTheme} className="gap-4">
             {[{ id: 'system', label: '시스템 설정', icon: LaptopMinimal }, { id: 'light', label: '라이트 모드', icon: Sun }, { id: 'dark', label: '다크 모드', icon: Moon }].map(t => (
               <Label key={t.id} htmlFor={`theme-${t.id}`} className="flex items-center gap-3 font-normal cursor-pointer"><RadioGroupItem id={`theme-${t.id}`} value={t.id} /><t.icon className="size-4 text-muted-foreground" />{t.label}</Label>
@@ -122,7 +122,7 @@ function NotificationColumn({ label, list, order, onToggleOrder, read, onToggleR
   read: string[]; onToggleRead: (id: string) => void; onOpen: (r: RecordItem) => void; onMarkRead: (id: string) => void
 }) {
   return (
-    <div className="notification-column min-w-0">
+    <div className="notification-column min-w-0 h-full">
       <div className="flex items-center gap-2 mb-3">
         <Button variant="ghost" size="icon" className="size-7 hover:bg-transparent" aria-label={order === 'desc' ? '최신순' : order === 'asc' ? '오래된순' : '정렬 안 함'} title={order === 'desc' ? '최신순' : order === 'asc' ? '오래된순' : '정렬 안 함'} onClick={onToggleOrder}>
           {order === 'desc' ? <ChevronDown /> : order === 'asc' ? <ChevronUp /> : <ChevronsUpDown />}
@@ -135,17 +135,16 @@ function NotificationColumn({ label, list, order, onToggleOrder, read, onToggleR
           {list.map(r => {
             const unread = !read.includes(r.id)
             return (
-              <div key={r.id} data-unread={unread} className="notification-card flex items-center gap-2.5 rounded-lg border px-3.5 py-3 glass-surface">
-                <Button variant="ghost" size="icon" className="size-7 rounded-full bg-transparent shrink-0 p-0 hover:bg-muted/70 focus-visible:bg-muted/70" aria-label={`${r.id} ${unread ? '읽음으로 표시' : '읽지 않음으로 표시'}`} title={unread ? '읽음으로 표시' : '읽지 않음으로 표시'} data-testid="notification-dot" onClick={e => { e.stopPropagation(); onToggleRead(r.id) }}>
+              <div key={r.id} data-unread={unread} className="notification-card flex items-center relative gap-2.5 rounded-lg border px-3.5 py-3 glass-surface transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+                <button type="button" className="notification-card-action absolute inset-0 rounded-lg border-0 bg-transparent outline-none transition-colors hover:bg-muted/40" aria-label={`${r.id} ${r.title} 알림 열기`} onClick={() => { onMarkRead(r.id); onOpen(r) }} />
+                <Button variant="ghost" size="icon" className="relative z-20 size-7 rounded-full bg-transparent shrink-0 p-0 hover:bg-muted/70 focus-visible:bg-muted/70" aria-label={`${r.id} ${unread ? '읽음으로 표시' : '읽지 않음으로 표시'}`} title={unread ? '읽음으로 표시' : '읽지 않음으로 표시'} data-testid="notification-dot" onClick={e => { e.stopPropagation(); onToggleRead(r.id) }}>
                   <span aria-hidden className={`size-2.5 rounded-full ${unread ? 'bg-destructive' : 'bg-muted-foreground/40'}`} />
                 </Button>
-                <Button variant="ghost" className="notification-card-action h-auto min-w-0 flex-1 justify-start rounded-none p-0 text-left whitespace-normal hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0" aria-label={`${r.id} 알림 열기`} onClick={() => { onMarkRead(r.id); onOpen(r) }}>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-base font-semibold text-foreground truncate">{r.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1.5">{r.owner}님에게 {r.kind}가 배정되었습니다.</p>
-                    <div className="flex flex-wrap gap-2 mt-3 items-center text-xs text-muted-foreground"><span className="font-mono">{r.id}</span><PatternBadge pattern={r.pattern} probability={r.probability} /><span>{r.date}</span><span>{r.count}건</span></div>
-                  </div>
-                </Button>
+                <div data-testid="notification-card-content" className="pointer-events-none relative z-10 min-w-0 flex-1">
+                  <p className="text-base font-semibold text-foreground truncate">{r.title}</p>
+                  <p className="text-sm text-muted-foreground mt-1.5">{r.owner}님에게 {r.kind}가 배정되었습니다.</p>
+                  <div className="flex flex-wrap gap-2 mt-3 items-center text-xs text-muted-foreground"><span className="font-mono">{r.id}</span><PatternBadge pattern={r.pattern} probability={r.probability} /><span>{r.date}</span><span>{r.count}건</span></div>
+                </div>
               </div>
             )
           })}
@@ -175,11 +174,11 @@ export function Notifications({ records, onOpen }: { records: RecordItem[]; onOp
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-72"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="알림 검색" className="pl-9 h-9 text-xs" placeholder="알림 내용, Alert·Episode ID 검색" value={query} onChange={e => setQuery(e.target.value)} /></div>
         <DateRangeButton value={range} onChange={setRange} />
-        <Button variant="ghost" size="sm" className="ml-auto" disabled={allRead} onClick={() => setRead(source.map(r => r.id))}><Check className="size-3.5" />모두 읽음 처리</Button>
+        <Button variant="outline" size="sm" className="ml-auto" disabled={allRead} onClick={() => setRead(source.map(r => r.id))}><Check className="size-3.5" />모두 읽음 처리</Button>
       </div>
       {visible.length === 0
         ? <div className="glass-surface rounded-lg border py-16 text-center text-sm text-muted-foreground"><Bell className="mx-auto mb-4 size-7" />조건에 맞는 알림이 없습니다.</div>
-        : <div className="grid gap-6 @5xl:grid-cols-2" data-testid="notification-list">
+        : <div className="grid items-stretch gap-6 @5xl:grid-cols-2" data-testid="notification-list">
           <NotificationColumn label="안 읽음" list={unreadList} order={unreadOrder} onToggleOrder={() => toggleOrder(setUnreadOrder)} read={read} onToggleRead={toggleRead} onOpen={onOpen} onMarkRead={markRead} />
           <NotificationColumn label="읽음" list={readList} order={readOrder} onToggleOrder={() => toggleOrder(setReadOrder)} read={read} onToggleRead={toggleRead} onOpen={onOpen} onMarkRead={markRead} />
         </div>}

@@ -16,10 +16,12 @@ it('keeps exactly one main landmark inside the sidebar inset and scopes responsi
   expect(readFileSync(new URL('./index.css', import.meta.url), 'utf8')).not.toMatch(/(?:^|[;}\s])main\s*\{/)
 })
 
-it('login decoration never follows the pointer or recursively schedules drawing', () => {
+it('login network drifts slowly and brightens the local cluster on hover', () => {
   const source = readFileSync(new URL('./LoginNetwork.tsx', import.meta.url), 'utf8')
-  expect(source).not.toContain("addEventListener('pointermove'")
-  expect(source).not.toContain('requestAnimationFrame(draw)')
+  expect(source).toContain("addEventListener('pointermove'")
+  expect(source).toContain("addEventListener('pointerleave'")
+  expect(source).toContain('requestAnimationFrame(tick)')
+  expect(source).toContain('prefers-reduced-motion: reduce')
 })
 
 describe('v17 Figma 검수 · 로고는 헤더에서 사이드바로', () => {

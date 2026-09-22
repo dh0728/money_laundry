@@ -3,7 +3,7 @@
 import { useMemo, useReducer, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Download, Inbox, ListFilter, RefreshCw, Search, TriangleAlert } from 'lucide-react'
+import { Combine, Download, Inbox, ListFilter, RefreshCw, Search, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import { DataTableColumnHeader } from '@/components/data-table/data-table-column
 import { DataTableSkeleton } from '@/components/data-table/data-table-skeleton'
 import { useDataTable } from '@/hooks/use-data-table'
 import { ageOptions, ageTone, matches, nextSort, patternOptions, usd, type Filter, type FilterField, type Kind, type RecordItem, type SortDirection } from './domain'
-import { DateRangeButton, FilterChip, PageHeading, PatternBadge, RiskBadge } from './shared'
+import { DateRangeButton, FilterChip, PageHeading, PatternBadge, RiskBadge, StatusBadge } from './shared'
 import { useMemoryState } from './memory'
 
 export type DataState = 'normal' | 'loading' | 'empty' | 'error' | 'stale'
@@ -76,7 +76,7 @@ const baseColumns: ColumnDef<RecordItem>[] = [
     cell: ({ row }) => <div className="text-right tabular-nums text-sm">{row.original.count}건</div> },
   { id: 'owner', accessorKey: 'owner', header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" /> },
   { id: 'status', accessorKey: 'status', header: ({ column }) => <DataTableColumnHeader column={column} label="상태" />,
-    cell: ({ row }) => <Badge variant={row.original.status === '신규' ? 'secondary' : 'outline'} className="font-normal text-xs">{row.original.status}</Badge> },
+    cell: ({ row }) => <StatusBadge status={row.original.status} /> },
   { id: 'date', accessorKey: 'date', header: ({ column }) => <DataTableColumnHeader column={column} label="탐지일" />,
     cell: ({ row }) => { const r = row.original; return <div className="text-sm text-muted-foreground tabular-nums">{r.date.slice(5)}<p className={`mt-1 text-xs ${r.age >= 3 ? 'font-medium' : ''}`} style={{ color: ageTone(r.age) }}>{r.age === 0 ? '오늘' : `${r.age}일 경과`}</p></div> } },
 ]
@@ -148,8 +148,8 @@ export default function Lists({ kind, records, user, onOpen, onLinkEpisode, stat
             <Button className="w-full" size="sm" onClick={() => { const f = normalized({ field, value }); setFilters(p => p.some(x => x.field === f.field && x.value === f.value) ? p : [...p, f]); toFirst(); setFilterOpen(false) }}>조건 적용</Button>
           </PopoverContent>
         </Popover>
-        {kind === 'Alert' && linkState.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => { setEpisodeTarget(firstEpisodeTarget); dispatchLink({ type: 'start' }) }}>Episode로 묶기</Button>}
-        <Button variant="ghost" size="sm" className={kind === 'Alert' && linkState.mode === 'browse' ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />다운로드</Button>
+        {kind === 'Alert' && linkState.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => { setEpisodeTarget(firstEpisodeTarget); dispatchLink({ type: 'start' }) }}><Combine className="size-3.5" />Episode로 묶기</Button>}
+        <Button variant="outline" size="sm" className={kind === 'Alert' && linkState.mode === 'browse' ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />다운로드</Button>
       </div>
       {kind === 'Alert' && <EpisodeLinkActionBar state={linkState} episodes={episodes} target={episodeTarget} onTargetChange={setEpisodeTarget} onComplete={() => { onLinkEpisode?.([...linkState.selected], episodeTarget); table.resetRowSelection(); dispatchLink({ type: 'complete' }); setEpisodeTarget(firstEpisodeTarget) }} onCancel={() => { table.resetRowSelection(); dispatchLink({ type: 'cancel' }); setEpisodeTarget(firstEpisodeTarget) }} />}
       {filters.length > 0 && (

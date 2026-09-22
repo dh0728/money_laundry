@@ -2,12 +2,12 @@ import type { CSSProperties, ReactNode, Ref } from 'react'
 import { Badge } from '@/components/ui/badge'
 
 export function StagePanel({ title, count, description, testId, bodyTestId, bodyClassName = '', children }: {
-  title: string; count: number; description: string; testId: string; bodyTestId?: string; bodyClassName?: string; children: ReactNode
+  title: string; count: number; description?: string; testId: string; bodyTestId?: string; bodyClassName?: string; children: ReactNode
 }) {
   return <section data-testid={testId} className="transaction-stage min-w-0 self-start overflow-hidden rounded-xl border bg-card">
     <header className="border-b px-4 py-3">
       <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">{title}</h2><Badge variant="secondary">{count}</Badge></div>
-      <p className="mt-1 truncate text-[var(--text-micro-size)] text-muted-foreground" title={description}>{description}</p>
+      {description && <p className="mt-1 truncate text-[var(--text-micro-size)] text-muted-foreground" title={description}>{description}</p>}
     </header>
     <div data-testid={bodyTestId} className={`p-2 ${bodyClassName}`}>{children}</div>
   </section>

@@ -71,7 +71,7 @@ describe('Figma v20 · 알림 카드 점 버튼 + 안읽음/읽음 2열', () => 
 
   it('카드는 우측 rail 없이, 좌측 dot을 접근 가능한 버튼으로 제공한다', () => {
     const markup = html(<Notifications records={records} onOpen={() => {}} />)
-    expect(markup).toContain('notification-card flex items-center')
+    expect(markup).toMatch(/notification-card[^\"]*flex items-center/)
     expect(markup).not.toContain('notification-rail')
     expect(markup).toMatch(/<button[^>]*aria-label="[^"]+ 읽음으로 표시"[^>]*data-testid="notification-dot"/)
   })

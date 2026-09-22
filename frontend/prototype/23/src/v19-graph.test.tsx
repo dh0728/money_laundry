@@ -3,9 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { graphFor, records, widthFor, type GraphModel, type GraphNode, type GraphTransaction } from './domain'
-import Graph, { DEFAULT_HOP, nodeRadius } from './Graph'
+import Graph, { DEFAULT_HOP, nodeRadius, seedComponentPositions } from './Graph'
 import * as graph from './Graph'
 import FlowDetail, { FlowPanel, flowId, flowLabel, flowLinkLabel, flowTipContent, sankeyLabelLayout, sankeyLinkLabelLayout } from './FlowDetail'
+import * as flowDetail from './FlowDetail'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
 const graphSrc = readFileSync(new URL('./Graph.tsx', import.meta.url), 'utf8')
@@ -50,23 +51,36 @@ describe('v19 관계 그래프 · react-force-graph', () => {
     expect(markup).toContain('data-split="horizontal"')
   })
   it('hop 범위 밖은 숨기되 시뮬레이션 데이터는 고정해 선택 시 배치가 움직이지 않는다', () => {
-    expect(graphSrc).toMatch(/const graphData = useMemo\([\s\S]*?nodes: model\.nodes\.map[\s\S]*?links: model\.edges\.map[\s\S]*?\}\), \[model\]\)/)
+    expect(graphSrc).toMatch(/const graphData = useMemo\([\s\S]*?nodes: seedComponentPositions\(model\)[\s\S]*?links: model\.edges\.map[\s\S]*?\}\), \[model\]\)/)
     expect(graphSrc).toContain('(!allowed || allowed.has(n.key))')
     expect(graphSrc).toContain('allowed.has(l.s) && allowed.has(l.t)')
     expect(graphSrc).not.toContain('allowed && !allowed.has(key)')
     expect(graphSrc).not.toContain('cooldownTicks')
   })
+  it('연결되지 않은 성분은 서로 다른 클러스터 중심에서 시작한다', () => {
+    const disconnected: GraphModel = {
+      nodes: [node('A'), node('B'), node('C'), node('D')],
+      edges: [edge('ab', 'A', 'B', 0, []), edge('cd', 'C', 'D', 0, [])],
+      blocks: [],
+    }
+    const positioned = seedComponentPositions(disconnected)
+    const center = (keys: string[]) => keys.reduce((sum, key) => sum + positioned.find(item => item.key === key)!.x, 0) / keys.length
+    expect(Math.abs(center(['A', 'B']) - center(['C', 'D']))).toBeGreaterThanOrEqual(320)
+  })
   it('계좌·소유주 보기 선택과 공용 시간축을 표시한다', () => {
-    expect(markup).toContain('계좌 보기')
-    expect(markup).toContain('소유주 보기')
+    expect(markup).toContain('계좌별 보기')
+    expect(markup).toContain('소유주별 보기')
     expect(markup).toContain('aria-label="그래프 보기"')
+    expect(markup).toContain('data-testid="graph-view-switch"')
+    expect(markup).toContain('grid w-full grid-cols-2')
+    expect(graphSrc).toContain("viewMode === 'owner' ? 'translate-x-full' : 'translate-x-0'")
     expect(markup).toContain('aria-label="시간축"')
   })
   it('화살촉 없이 자기 자신 거래·양방향 곡선과 모션 설정을 따르는 흐름 입자를 쓴다', () => {
     expect(graphSrc).toContain('linkDirectionalArrowLength={0}')
     expect(graphSrc).toMatch(/linkCurvature=\{l => l\.s === l\.t/)
-    expect(graphSrc).toContain('linkDirectionalParticles={l => flowParticleCount(l.label, reducedMotion)}')
-    expect(graphSrc).toContain('linkDirectionalParticleColor={l => l.label === 1 ? colors.l1 : colors.l0Particle}')
+    expect(graphSrc).toContain('linkDirectionalParticles={l => flowParticleCount(effectiveFlowLabel(l, suspiciousNodes), reducedMotion)}')
+    expect(graphSrc).toContain('linkDirectionalParticleColor={l => flowParticleColor(effectiveFlowLabel(l, suspiciousNodes), colors.l1, colors.l0Particle)}')
     expect(readFileSync(new URL('./index.css', import.meta.url), 'utf8')).toContain('--graph-l1-edge:#ff000073')
   })
   it('화면 맞춤은 확대·축소 묶음에 함께 있다', () => {
@@ -74,6 +88,11 @@ describe('v19 관계 그래프 · react-force-graph', () => {
     const zoomControls = graphSrc.slice(graphSrc.indexOf('className="absolute bottom-3 right-3'))
     expect(toolbar).not.toContain('label="화면 맞춤"')
     expect(zoomControls).toContain('label="화면 맞춤"')
+  })
+  it('초기화는 드래그한 소유주 위치와 카메라를 함께 버린다', () => {
+    expect(graph.resetOwnerGraphState).toBeTypeOf('function')
+    expect(graph.resetOwnerGraphState!({ positions: { moved: { x: 10, y: 20 } }, camera: { x: 3, y: 4, scale: 2, fitScale: 1 } }))
+      .toEqual({ positions: {}, camera: null })
   })
 })
 
@@ -104,6 +123,17 @@ it('indexes incident edges in model order, preserving reciprocal pairs and inclu
 })
 
 describe('v19 상세 · FlowDetail·FlowPanel', () => {
+  it('centers each Sankey link stack using that side’s throughput and keeps relative stacking offsets', () => {
+    expect(flowDetail.centerSankeyLink).toBeTypeOf('function')
+    const source = { dy: 100, value: 1000, outgoing: 400, incoming: 1000 }
+    const target = { dy: 80, value: 800, outgoing: 800, incoming: 200 }
+    const corrected = flowDetail.centerSankeyLink({ sourceY: 55, targetY: 115, payload: { source, target } })
+    expect(corrected).toEqual({ sourceY: 85, targetY: 145 })
+    expect(sankeyLinkLabelLayout({ sourceX: 20, targetX: 180, ...corrected })).toEqual({ x: 100, y: 115 })
+    expect(flowDetail.centerSankeyLink({ sourceY: 65, targetY: 125, payload: { source, target } })).toEqual({ sourceY: 95, targetY: 155 })
+    const empty = { dy: 0, value: 0, outgoing: 0, incoming: 0 }
+    expect(flowDetail.centerSankeyLink({ sourceY: 20, targetY: 30, payload: { source: empty, target: empty } })).toEqual({ sourceY: 20, targetY: 30 })
+  })
   it('Sankey 계좌 라벨은 선택/좌/우 위치와 관계없이 노드 막대 세로 중앙에 맞춘다', () => {
     const selected = sankeyLabelLayout({ x: 200, y: 40, width: 10, height: 32, index: 0 })
     expect(selected).toMatchObject({ y: 56, dominantBaseline: 'middle' })
@@ -114,16 +144,16 @@ describe('v19 상세 · FlowDetail·FlowPanel', () => {
   })
   it('Sankey 링크 tooltip은 날짜/기간을 첫 줄, 금액을 둘째 줄에 두고 단일 거래의 불필요한 건수는 생략한다', () => {
     const range = flowTipContent({ source: { name: 'ACC-A' }, target: { name: 'ACC-B' }, value: 600, count: 2, first: '2026-09-01 10:00', last: '2026-09-02 10:00' })
-    expect(range).toEqual({ primary: '09-01 ~ 09-02', secondary: '$600 · 2건' })
+    expect(range).toEqual({ primary: '09-01 ~ 09-02', secondary: '600$ · 2건' })
     expect(`${range.primary} ${range.secondary}`).not.toContain('ACC-A')
     expect(`${range.primary} ${range.secondary}`).not.toContain('ACC-B')
 
     expect(flowTipContent({ source: { name: 'ACC-A' }, target: { name: 'ACC-B' }, value: 200, count: 1, first: '2026-09-03 10:00', last: '2026-09-03 10:00' }))
-      .toEqual({ primary: '09-03 10:00', secondary: '$200' })
+      .toEqual({ primary: '09-03 10:00', secondary: '200$' })
   })
   it('Sankey 상시 라벨은 날짜·금액만 쓰고 각 흐름선 정중앙에 놓인다', () => {
-    expect(flowLinkLabel({ value: 8_800, count: 1, first: '2026-09-10 07:18', last: '2026-09-10 07:18' })).toBe('$8.8K · 09-10 07:18')
-    expect(flowLinkLabel({ value: 600, count: 2, first: '2026-09-01 10:00', last: '2026-09-02 10:00' })).toBe('$600 · 2건 · 09-01 ~ 09-02')
+    expect(flowLinkLabel({ value: 8_800, count: 1, first: '2026-09-10 07:18', last: '2026-09-10 07:18' })).toBe('8.8K$ · 09-10 07:18')
+    expect(flowLinkLabel({ value: 600, count: 2, first: '2026-09-01 10:00', last: '2026-09-02 10:00' })).toBe('600$ · 2건 · 09-01 ~ 09-02')
     expect(sankeyLinkLabelLayout({ sourceX: 20, targetX: 180, sourceY: 40, targetY: 100 })).toEqual({ x: 100, y: 70 })
   })
   it('Recharts가 감싼 Sankey link payload도 기간과 금액·건수로 표시한다', () => {
@@ -141,11 +171,11 @@ describe('v19 상세 · FlowDetail·FlowPanel', () => {
       value: 1_247_009,
     }
     const content = flowTipContent(browserPayload)
-    expect(content).toEqual({ primary: '09-05 ~ 09-13', secondary: '$1,247,009 · 4건' })
+    expect(content).toEqual({ primary: '09-05 ~ 09-13', secondary: '1,247,009$ · 4건' })
     expect(`${content.primary} ${content.secondary}`).not.toMatch(/80C8966E0|80DADEFF0/)
   })
   it('Sankey node tooltip fallback은 계좌와 금액을 읽을 수 있다', () => {
-    expect(flowTipContent({ name: ' ACC-A ', value: 300 })).toEqual({ primary: 'ACC-A', secondary: '$300' })
+    expect(flowTipContent({ name: ' ACC-A ', value: 300 })).toEqual({ primary: 'ACC-A', secondary: '300$' })
   })
   it('탭 id·이름은 계좌·거래쌍마다 다르다', () => {
     expect(flowId({ kind: 'node', key: 'B' })).toBe('flow:B')
