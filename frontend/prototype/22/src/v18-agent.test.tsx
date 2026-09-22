@@ -27,11 +27,7 @@ describe('Figma v18 · R2 Agent textarea 리사이즈', () => {
 })
 
 describe('Figma v18 · R3 불필요 구분선 제거', () => {
-  it('히스토리·채팅 접합부의 이중 구분선(history right border / shadow-xl)이 없다', async () => {
-    const { default: Agent } = await import('./Agent')
-    const markup = html(<Agent open mode="sidebar" setOpen={() => {}} setMode={() => {}} records={records} />)
-    expect(markup).toMatch(/agent-history[^"]*border-y border-l/)
-    expect(markup).not.toMatch(/agent-history[^"]*shadow-xl/)
+  it('컨텍스트 뱃지 줄에 중복 구분선이 없다', () => {
     // 컨텍스트 뱃지 줄의 중복 border-b 제거(헤더 border-b만 유지)
     expect(source).toMatch(/조사 지원[\s\S]*?대시보드 · 오늘 요약/)
     const badgeLine = source.match(/<div className="flex gap-2 items-center px-4 py-3 text-\[11px\] text-muted-foreground[^"]*"/)?.[0] ?? ''
@@ -75,20 +71,14 @@ describe('Figma v20 · RDR 9000 내비게이션 상태 유지', () => {
   })
 })
 
-describe('Figma v18 · R5 히스토리 슬라이드·너비', () => {
-  it('히스토리 기본·최소·최대 너비가 충분히 넓다', () => {
-    expect(source).toMatch(/HISTORY_DEFAULT = 360/)
-    expect(source).toMatch(/HISTORY_MIN = 280/)
-    expect(source).toMatch(/HISTORY_MAX = 560/)
-  })
-
-  it('히스토리는 본 패널 뒤(z-0 / right-full)에서 슬라이드하고, 열리면 채팅 왼쪽 모서리가 맞붙는다', async () => {
+describe('v22 · RDR 동작 가능한 컨트롤', () => {
+  it('사이드바와 플로팅 모드 모두 새 대화·모드 전환·닫기 컨트롤을 제공한다', async () => {
     const { default: Agent } = await import('./Agent')
-    const markup = html(<Agent open mode="sidebar" setOpen={() => {}} setMode={() => {}} records={records} />)
-    expect(markup).toMatch(/agent-history absolute top-0 bottom-0 right-full z-0/)
-    expect(markup).toContain('data-open="false"')
-    // 닫힌 기본: 채팅은 rounded-lg. 소스에 historyOpen 분기 존재
-    expect(source).toMatch(/historyOpen \? 'rounded-r-lg rounded-l-none' : 'rounded-lg'/)
-    expect(source).toMatch(/agent-chat relative z-10/)
+    for (const mode of ['sidebar', 'floating'] as const) {
+      const markup = html(<Agent open mode={mode} setOpen={() => {}} setMode={() => {}} records={records} />)
+      expect(markup).toContain('aria-label="새 대화"')
+      expect(markup).toContain('aria-label="RDR 9000 닫기"')
+      expect(markup).toContain(mode === 'sidebar' ? '플로팅 패널로 보기' : '우측 사이드바로 보기')
+    }
   })
 })

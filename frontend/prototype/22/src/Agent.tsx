@@ -1,6 +1,6 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ComponentProps } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, PanelRight, PictureInPicture2, X, Plus, Menu } from 'lucide-react'
+import { Send, PanelRight, PictureInPicture2, X, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -61,7 +61,6 @@ export const fabHomeRect = (): FabOrigin => {
 }
 
 const SIDEBAR_DEFAULT = 390, SIDEBAR_MIN = 320, SIDEBAR_MAX = 720
-const HISTORY_DEFAULT = 360, HISTORY_MIN = 280, HISTORY_MAX = 560
 const FLOAT_W_DEFAULT = 400, FLOAT_H_DEFAULT = 620, FLOAT_MIN_W = 320, FLOAT_MIN_H = 360
 /** R4: 세로 뷰포트에서도 플로팅 패널이 화면 밖으로 나가지 않도록 크기·위치를 뷰포트에 맞춤 */
 const fitFloatSize = (size: { width: number; height: number }, vw = globalThis.innerWidth ?? 1440, vh = globalThis.innerHeight ?? 900) => {
@@ -72,26 +71,21 @@ const fitFloatSize = (size: { width: number; height: number }, vw = globalThis.i
     height: clamp(size.height, Math.min(FLOAT_MIN_H, maxH), maxH),
   }
 }
-const fitFloatPosition = (pos: { x: number; y: number }, size: { width: number; height: number }, vw: number, vh: number, historyWidth = 0) => ({
-  x: clamp(pos.x, 8 + historyWidth, Math.max(8 + historyWidth, vw - size.width - 8)),
+const fitFloatPosition = (pos: { x: number; y: number }, size: { width: number; height: number }, vw: number, vh: number) => ({
+  x: clamp(pos.x, 8, Math.max(8, vw - size.width - 8)),
   y: clamp(pos.y, 8, Math.max(8, vh - size.height - 8)),
 })
 
 type FloatGeometry = { size: { width: number; height: number }; position: { x: number; y: number } }
-export function normalizeFloatGeometry({ size, position, viewport, contentRight, historyWidth, historyOpen }: FloatGeometry & {
-  viewport: { width: number; height: number }; contentRight: number; historyWidth: number; historyOpen: boolean
+export function normalizeFloatGeometry({ size, position, viewport, contentRight }: FloatGeometry & {
+  viewport: { width: number; height: number }; contentRight: number
 }) {
   const right = Math.min(viewport.width, contentRight)
   const fitted = fitFloatSize(size, viewport.width, viewport.height)
   fitted.width = Math.min(fitted.width, Math.max(1, right - 16))
-  const room = right - fitted.width - 16
-  // Keep history beside chat where usable; otherwise overlay only its body so header controls remain reachable.
-  const historyPlacement = room >= HISTORY_MIN ? 'side' as const : 'overlay' as const
-  const visibleHistoryWidth = Math.min(historyWidth, historyPlacement === 'side' ? room : fitted.width)
   return {
     size: fitted,
-    position: fitFloatPosition(position, fitted, right, viewport.height, historyOpen && historyPlacement === 'side' ? visibleHistoryWidth : 0),
-    historyWidth: visibleHistoryWidth, historyPlacement,
+    position: fitFloatPosition(position, fitted, right, viewport.height),
   }
 }
 
@@ -139,32 +133,31 @@ export function createMorphLifecycle(onChange: (morph: Morph | null) => void, on
 }
 
 type AgentBounds = { width: number; height: number; contentRight: number; headerBottom?: number }
-type AgentVisual = { morph: Morph | null; avatarVisible: boolean; bodyCovered: boolean }
+type AgentVisual = { morph: Morph | null; avatarVisible: boolean }
 type AgentCommit = {
   open: boolean; mode: AgentMode; bounds: AgentBounds; renderedBounds: AgentBounds
-  layoutKey: string; bodyCovered: boolean; from: () => FabOrigin | null; to?: FabOrigin; reducedMotion: boolean
+  layoutKey: string; from: () => FabOrigin | null; to?: FabOrigin; reducedMotion: boolean
 }
 const sameBounds = (a: AgentBounds, b: AgentBounds) => a.width === b.width && a.height === b.height && a.contentRight === b.contentRight && a.headerBottom === b.headerBottom
 
 /** Component events and layout commits use this same orchestration path. */
 export function createAgentController(callbacks: {
   onVisual: (visual: AgentVisual) => void; onClose: () => void; onMode: (mode: AgentMode) => void
-  onBounds: (bounds: AgentBounds) => void; onCoverBody: () => void; onGeometry: (geometry: FloatGeometry) => void
+  onBounds: (bounds: AgentBounds) => void; onGeometry: (geometry: FloatGeometry) => void
 }) {
   let previous: AgentCommit | null = null
   let open = false
-  let visual: AgentVisual = { morph: null, avatarVisible: false, bodyCovered: false }
+  let visual: AgentVisual = { morph: null, avatarVisible: false }
   const gestures = {
     drag: { current: null as { x: number; y: number; left: number; top: number } | null },
     floatResize: { current: null as { x: number; y: number; width: number; height: number; axis: 'x' | 'y' | 'both' } | null },
     sidebarResize: { current: null as { x: number; width: number } | null },
-    historyResize: { current: null as { x: number; width: number } | null },
   }
   const cancelGestures = () => { for (const ref of Object.values(gestures)) ref.current = null }
-  const publish = (morph = visual.morph, bodyCovered = visual.bodyCovered) => {
-    const avatarVisible = open && !morph && !bodyCovered
-    if (visual.morph === morph && visual.avatarVisible === avatarVisible && visual.bodyCovered === bodyCovered) return
-    visual = { morph, avatarVisible, bodyCovered }
+  const publish = (morph = visual.morph) => {
+    const avatarVisible = open && !morph
+    if (visual.morph === morph && visual.avatarVisible === avatarVisible) return
+    visual = { morph, avatarVisible }
     callbacks.onVisual(visual)
   }
   const lifecycle = createMorphLifecycle(morph => publish(morph), () => {
@@ -183,17 +176,15 @@ export function createAgentController(callbacks: {
       const viewportChanged = previous && (previous.bounds.width !== next.bounds.width || previous.bounds.height !== next.bounds.height)
       const modeChanged = previous && previous.mode !== next.mode
       if (next.open !== wasOpen || modeChanged || viewportChanged) cancelGestures()
-      const changed = previous && (modeChanged || !sameBounds(previous.bounds, next.bounds) || previous.layoutKey !== next.layoutKey || previous.bodyCovered !== next.bodyCovered)
-      const newlyCovered = next.open && next.bodyCovered && !visual.bodyCovered
+      const changed = previous && (modeChanged || !sameBounds(previous.bounds, next.bounds) || previous.layoutKey !== next.layoutKey)
       previous = next
       open = next.open
-      if (!open) { lifecycle.dispose(); publish(null, next.bodyCovered); return }
+      if (!open) { lifecycle.dispose(); publish(null); return }
       if (changed && wasOpen) lifecycle.interrupt()
-      publish(visual.morph, next.bodyCovered)
-      if (newlyCovered) callbacks.onCoverBody()
+      publish()
       if (!wasOpen) {
         const from = next.from()
-        if (from && next.to && next.to.width > 0 && !next.bodyCovered) lifecycle.start('opening', from, next.to, next.reducedMotion)
+        if (from && next.to && next.to.width > 0) lifecycle.start('opening', from, next.to, next.reducedMotion)
         else publish(null)
       }
     },
@@ -224,10 +215,6 @@ export function createAgentController(callbacks: {
     reduceMotion() { lifecycle.interrupt() },
     dispose() { cancelGestures(); lifecycle.dispose(); previous = null; open = false },
   }
-}
-
-export function AgentChatBody({ covered, ...props }: ComponentProps<'div'> & { covered: boolean }) {
-  return <div {...props} inert={covered} aria-hidden={covered} style={{ visibility: covered ? 'hidden' : undefined }} />
 }
 
 /* v16: "레이더가 도는지 안 보이고 섬뜩함이 약해졌다"는 지적으로 다시 그렸다.
@@ -385,12 +372,10 @@ export function AgentFab({ open, onToggle }: { open: boolean; onToggle: () => vo
 export const AgentToggle = AgentFab
 
 export default function Agent({ open, setOpen, mode, setMode, record, records }: { open: boolean; setOpen: (o: boolean) => void; mode: AgentMode; setMode: (m: AgentMode) => void; record?: RecordItem; records: RecordItem[] }) {
-  const [input, setInput] = useState(''), [messages, setMessages] = useState<Message[]>([]), [historyOpen, setHistoryOpen] = useState(false)
+  const [input, setInput] = useState(''), [messages, setMessages] = useState<Message[]>([])
 
   const avatarRef = useRef<HTMLButtonElement>(null)
-  const headerRef = useRef<HTMLDivElement>(null)
-  const bodyHadFocus = useRef(false)
-  const [visual, setVisual] = useState<AgentVisual>({ morph: null, avatarVisible: false, bodyCovered: false })
+  const [visual, setVisual] = useState<AgentVisual>({ morph: null, avatarVisible: false })
   const { morph, avatarVisible } = visual
   const closing = morph?.kind === 'closing'
   const callbacksRef = useRef({ setOpen, setMode })
@@ -403,33 +388,23 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
     onMode: next => callbacksRef.current.setMode(next),
     onBounds: next => setBounds({ ...next, headerBottom: next.headerBottom ?? 60 }),
     onGeometry: next => setGeometry(next),
-    onCoverBody: () => {
-      if (bodyHadFocus.current) headerRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
-      bodyHadFocus.current = false
-    },
   }))
   const [geometry, setGeometry] = useState<FloatGeometry>(() => ({
     size: { width: FLOAT_W_DEFAULT, height: FLOAT_H_DEFAULT },
     position: { x: Math.max(24, (globalThis.innerWidth ?? 1440) - FLOAT_W_DEFAULT - 40), y: 88 },
   }))
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
-  const [historyWidth, setHistoryWidth] = useState(HISTORY_DEFAULT)
-  const normalize = (value: FloatGeometry) => normalizeFloatGeometry({ ...value, viewport: bounds, contentRight: bounds.contentRight, historyOpen, historyWidth })
+  const normalize = (value: FloatGeometry) => normalizeFloatGeometry({ ...value, viewport: bounds, contentRight: bounds.contentRight })
   const fitted = normalize(geometry)
   const { size: floatSize, position } = fitted
-  const visibleSidebarWidth = Math.min(sidebarWidth, bounds.width * 0.92)
-  const sidebarHistoryRoom = bounds.width - visibleSidebarWidth - 8
-  const historyPlacement = mode === 'floating' ? fitted.historyPlacement : sidebarHistoryRoom >= HISTORY_MIN ? 'side' : 'overlay'
-  const visibleHistoryWidth = mode === 'floating' ? fitted.historyWidth : Math.min(historyWidth, historyPlacement === 'side' ? sidebarHistoryRoom : visibleSidebarWidth)
-  const bodyCovered = historyOpen && historyPlacement === 'overlay'
-  const { drag, floatResize, sidebarResize, historyResize } = controller.gestures
+  const { drag, floatResize, sidebarResize } = controller.gestures
   // 사이드바 폭은 CSS 변수로 내보내 App.tsx의 .agent-sidebar-space가 본문 margin을 같은 값으로 맞추게 한다
   useLayoutEffect(() => { document.documentElement.style.setProperty('--agent-width', `${sidebarWidth}px`) }, [sidebarWidth])
   // One commit path reconciles initial bounds before it consumes the opening origin.
   useLayoutEffect(() => {
     controller.commit({
-      open, mode, bounds: readBounds(), renderedBounds: bounds, bodyCovered,
-      layoutKey: [floatSize.width, floatSize.height, position.x, position.y, historyOpen, historyWidth, sidebarWidth].join(':'),
+      open, mode, bounds: readBounds(), renderedBounds: bounds,
+      layoutKey: [floatSize.width, floatSize.height, position.x, position.y, sidebarWidth].join(':'),
       from: takeFabOrigin, to: avatarRef.current?.getBoundingClientRect(),
       reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
     })
@@ -460,15 +435,12 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
   const startSidebarResize = (e: PointerEvent<HTMLDivElement>) => { sidebarResize.current = { x: e.clientX, width: sidebarWidth }; e.currentTarget.setPointerCapture(e.pointerId) }
   const moveSidebarResize = (e: PointerEvent<HTMLDivElement>) => { if (!sidebarResize.current) return; setSidebarWidth(clamp(sidebarResize.current.width + (sidebarResize.current.x - e.clientX), SIDEBAR_MIN, SIDEBAR_MAX)) }
   const endSidebarResize = () => { sidebarResize.current = null }
-  const startHistoryResize = (e: PointerEvent<HTMLDivElement>) => { historyResize.current = { x: e.clientX, width: historyWidth }; e.currentTarget.setPointerCapture(e.pointerId) }
-  const moveHistoryResize = (e: PointerEvent<HTMLDivElement>) => { if (!historyResize.current) return; setHistoryWidth(clamp(historyResize.current.width + (historyResize.current.x - e.clientX), HISTORY_MIN, HISTORY_MAX)) }
-  const endHistoryResize = () => { historyResize.current = null }
   const startFloatResize = (axis: 'x' | 'y' | 'both') => (e: PointerEvent<HTMLDivElement>) => {
     controller.gestureStart()
     floatResize.current = { x: e.clientX, y: e.clientY, width: floatSize.width, height: floatSize.height, axis }; e.currentTarget.setPointerCapture(e.pointerId); e.stopPropagation()
   }
   const moveFloatResize = (e: PointerEvent<HTMLDivElement>) => {
-    controller.resizeTo(e.clientX, e.clientY, { position, size: floatSize, viewport: bounds, contentRight: bounds.contentRight, historyOpen, historyWidth })
+    controller.resizeTo(e.clientX, e.clientY, { position, size: floatSize, viewport: bounds, contentRight: bounds.contentRight })
   }
   const endFloatResize = () => { floatResize.current = null }
   const summary = record
@@ -486,30 +458,17 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
     drag.current = { x: e.clientX, y: e.clientY, left: position.x, top: position.y }; e.currentTarget.setPointerCapture(e.pointerId)
   }
   const moveDrag = (e: PointerEvent<HTMLDivElement>) => {
-    controller.dragTo(e.clientX, e.clientY, { position, size: floatSize, viewport: bounds, contentRight: bounds.contentRight, historyOpen, historyWidth })
+    controller.dragTo(e.clientX, e.clientY, { position, size: floatSize, viewport: bounds, contentRight: bounds.contentRight })
   }
   if (!open) return null
 
-  const conversations = [`현재 조사 · ${record?.id ?? '오늘 요약'}`, '어제 조사 · ALT-2026-1827', '주간 고위험 업무 요약']
-  // 이전 대화 목록: 대화창 뒤에 포개져 있다가 왼쪽으로 스르륵 펼쳐지고, 다시 누르면 뒤로 접힌다. 왼쪽 끝 hairline으로 폭도 조절된다
-  const history = (
-    <aside data-testid="agent-history" data-open={historyOpen} data-placement={historyPlacement} aria-hidden={!historyOpen} inert={!historyOpen} onFocusCapture={() => { bodyHadFocus.current = false }}
-      className={`agent-history absolute top-0 bottom-0 right-full z-0 flex flex-col border-y border-l bg-background rounded-l-lg ${historyOpen ? 'is-open' : ''}`}
-      style={{ width: visibleHistoryWidth, ...(historyPlacement === 'overlay' ? { right: 0, top: 53, zIndex: 30 } : {}) }}>
-      <div role="separator" aria-orientation="vertical" aria-label="이전 대화 너비 조절" className="agent-resize-handle agent-resize-handle-x absolute left-0 top-0 bottom-0 z-10"
-        onPointerDown={startHistoryResize} onPointerMove={moveHistoryResize} onPointerUp={endHistoryResize} onPointerCancel={endHistoryResize} />
-      <div className="p-3"><Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setMessages([])}><Plus className="size-3.5" />새 대화</Button></div>
-      <p className="px-3 pb-2 text-[10px] font-medium text-muted-foreground">이전 대화</p>
-      <div className="px-2 space-y-1">{conversations.map((c, i) => <Button key={c} variant={i === 0 ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start overflow-hidden text-xs"><span className="truncate">{c}</span></Button>)}</div>
-    </aside>
-  )
   const header = (
-    <div ref={headerRef} onFocusCapture={() => { bodyHadFocus.current = false }} className="flex items-center justify-between gap-2 border-b px-3 py-2.5 select-none cursor-default" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}>
+    <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5 select-none cursor-default" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}>
       <div className="flex items-center gap-1.5">
-        <IconButton label={historyOpen ? '이전 대화 접기' : '이전 대화 펼치기'} className="size-8" onClick={() => setHistoryOpen(v => !v)}><Menu className="size-4" /></IconButton>
         <div className="text-sm font-semibold font-mono tracking-wide whitespace-nowrap">{AGENT_NAME}</div>
       </div>
       <div className="flex gap-0.5">
+        <IconButton label="새 대화" className="size-8" onClick={() => setMessages([])}><Plus className="size-4" /></IconButton>
         <IconButton label={mode === 'sidebar' ? '플로팅 패널로 보기' : '우측 사이드바로 보기'} className="size-8" onClick={requestModeChange}>
           {mode === 'sidebar' ? <PictureInPicture2 className="size-4" /> : <PanelRight className="size-4" />}
         </IconButton>
@@ -518,14 +477,13 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
     </div>
   )
   const chat = (
-    <div className={`agent-chat relative z-10 flex flex-col flex-1 min-w-0 min-h-0 h-full overflow-hidden border bg-background shadow-xl ${historyOpen ? 'rounded-r-lg rounded-l-none' : 'rounded-lg'}`}>
+    <div className="agent-chat relative z-10 flex flex-col flex-1 min-w-0 min-h-0 h-full overflow-hidden border bg-background shadow-xl rounded-lg">
       {mode === 'sidebar' && (
         <div role="separator" aria-orientation="vertical" aria-label="도우미 너비 조절" className="agent-resize-handle agent-resize-handle-x absolute left-0 top-0 bottom-0 z-20"
           onPointerDown={startSidebarResize} onPointerMove={moveSidebarResize} onPointerUp={endSidebarResize} onPointerCancel={endSidebarResize} />
       )}
       {header}
-      <AgentChatBody covered={bodyCovered} className="flex flex-col flex-1 min-h-0" onFocusCapture={() => { bodyHadFocus.current = true }}
-        onBlurCapture={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) bodyHadFocus.current = false }}>
+      <div className="flex flex-col flex-1 min-h-0">
       <div className="flex gap-2 items-center px-4 py-3 text-[11px] text-muted-foreground"><Badge variant="outline" className="text-[10px]">조사 지원</Badge>{record?.id ?? '대시보드 · 오늘 요약'}</div>
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-4 space-y-5">
@@ -548,7 +506,7 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
         </div>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">판단과 최종 처리는 조사자가 수행합니다.</p>
       </form>
-      </AgentChatBody>
+      </div>
       {mode === 'floating' && (
         <>
           <div role="separator" aria-orientation="vertical" aria-label="도우미 너비 조절" className="agent-resize-handle agent-resize-handle-x absolute right-0 top-0 bottom-0 z-20"
@@ -593,6 +551,6 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
 
   return <>
     {morphLayer}
-    <section aria-label={AGENT_NAME} inert={closing} data-closing={closing || undefined} data-mode={mode} className={`${shell} flex transition-opacity duration-300 ${closing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={style}>{history}{chat}</section>
+    <section aria-label={AGENT_NAME} inert={closing} data-closing={closing || undefined} data-mode={mode} className={`${shell} flex transition-opacity duration-300 ${closing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={style}>{chat}</section>
     </>
 }

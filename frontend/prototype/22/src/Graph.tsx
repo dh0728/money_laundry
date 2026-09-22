@@ -33,6 +33,18 @@ export const graphNodeRole = (node: GraphNode) => node.core
       ? '연결 경로 경유 계좌'
       : `${node.hop}단계 주변 계좌`
 
+export function connectedEdgesByNode(edges: GraphEdge[]) {
+  const lookup = new Map<string, GraphEdge[]>()
+  for (const edge of edges) {
+    for (const key of edge.s === edge.t ? [edge.s] : [edge.s, edge.t]) {
+      const connected = lookup.get(key) ?? []
+      connected.push(edge)
+      lookup.set(key, connected)
+    }
+  }
+  return lookup
+}
+
 // v19: 캔버스 렌더러는 react-force-graph-2d(vasturiano, d3-force 물리 · Obsidian 그래프와 같은 방식)를 쓴다.
 // canvas는 CSS 변수를 못 읽으므로 테마 색을 한 번 풀어서 넘긴다.
 // force-graph는 import 시점에 window를 읽는다 → 실제로 그릴 때만 불러온다(SSR·테스트 안전)
@@ -83,6 +95,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
   const canvas = useRef<HTMLDivElement>(null)
 
   const nodeMap = useMemo(() => new Map(model.nodes.map(n => [n.key, n])), [model])
+  const connectedEdges = useMemo(() => connectedEdgesByNode(model.edges), [model.edges])
   // 연결도(degree) = 전체 모델에서 서로 다른 상대 계좌 수(자기 자신 거래는 제외) → 노드 크기에 반영
   const degreeMap = useMemo(() => {
     const m = new Map<string, Set<string>>()
@@ -93,7 +106,7 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
       m.get(e.s)!.add(e.t); m.get(e.t)!.add(e.s)
     }
     return m
-  }, [model])
+  }, [model.edges])
   const radius = useCallback((n: GraphNode) => nodeRadius(n, degreeMap.get(n.key)?.size ?? 0), [degreeMap])
   const allowed = useMemo(() => selectedNode ? neighborhood(model, selectedNode, hop) : null, [model, selectedNode, hop])
   const nodes = useMemo(() => allowed ? model.nodes.filter(n => allowed.has(n.key)) : model.nodes, [model, allowed])
@@ -187,9 +200,11 @@ export default function Graph({ model, label }: { model: GraphModel; label: stri
   const lit = useMemo(() => {
     if (!hoverKey) return null
     const set = new Set([hoverKey])
-    for (const e of edges) if (e.s === hoverKey || e.t === hoverKey) { set.add(e.s); set.add(e.t) }
+    for (const e of connectedEdges.get(hoverKey) ?? []) {
+      if (!allowed || (allowed.has(e.s) && allowed.has(e.t))) { set.add(e.s); set.add(e.t) }
+    }
     return set
-  }, [hoverKey, edges])
+  }, [hoverKey, connectedEdges, allowed])
   const pointer = useRef({ x: 0, y: 0 })
   const colors = { l1: cssVar('--graph-l1'), l1Edge: cssVar('--graph-l1-edge'), l0: cssVar('--graph-l0'), l0Particle: cssVar('--graph-l0-particle'), node: cssVar('--graph-l0-node'), fg: cssVar('--foreground'), muted: cssVar('--muted-foreground') }
   const q = search.trim().toLowerCase()

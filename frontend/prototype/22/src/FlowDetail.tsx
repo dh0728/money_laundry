@@ -206,14 +206,11 @@ export function FlowPanel({ model, focus, mode, onModeChange, onClose }: { model
   const fitted = normalizeFlowGeometry(geometry, bounds)
   const limits = normalizeFlowGeometry({ ...geometry, width: Infinity, height: Infinity }, bounds)
   useLayoutEffect(() => {
-    const next = readPanelBounds()
-    if (Object.keys(next).some(key => next[key as keyof typeof next] !== bounds[key as keyof typeof bounds])) setBounds(next)
-  })
-  useLayoutEffect(() => {
     const reclamp = () => {
       const next = readPanelBounds()
       setBounds(prev => Object.keys(next).every(key => next[key as keyof typeof next] === prev[key as keyof typeof prev]) ? prev : next)
     }
+    reclamp()
     const observer = new ResizeObserver(reclamp)
     for (const selector of ['.app-main', '.app-header']) {
       const element = document.querySelector(selector)

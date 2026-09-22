@@ -3,6 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import * as agent from './Agent'
 
+it('offers working chat actions without an inert previous-conversation drawer', () => {
+  const markup = renderToStaticMarkup(<TooltipProvider><agent.default open mode="sidebar" setOpen={() => {}} setMode={() => {}} records={[]} /></TooltipProvider>)
+  expect(markup).not.toContain('이전 대화')
+  expect(markup).toContain('새 대화')
+  expect(markup).toContain('질문 보내기')
+})
+
 // These exercise public geometry/lifecycle behavior, not source-code spelling.
 const normalize = (args: Parameters<typeof agent.normalizeFloatGeometry>[0]) => {
   expect(agent.normalizeFloatGeometry, 'atomic geometry normalization is required').toBeTypeOf('function')
@@ -11,7 +18,6 @@ const normalize = (args: Parameters<typeof agent.normalizeFloatGeometry>[0]) => 
 const fixture = {
   size: { width: 400, height: 620 }, position: { x: 1000, y: 88 },
   viewport: { width: 1440, height: 1000 }, contentRight: 1424,
-  historyWidth: 360, historyOpen: false,
 }
 
 describe('RDR floating geometry', () => {
@@ -21,30 +27,24 @@ describe('RDR floating geometry', () => {
     expect(actual.position).toEqual({ x: 44, y: 8 })
   })
 
-  it('keeps an expanded history drawer entirely reachable after dragging left', () => {
-    const actual = normalize({ ...fixture, position: { x: -900, y: 900 }, historyOpen: true })
-    expect(actual.position).toEqual({ x: 368, y: 372 })
-    expect(actual.historyPlacement).toBe('side')
-    expect(actual.historyWidth).toBe(360)
+  it('keeps the chat reachable after dragging left and below the viewport', () => {
+    const actual = normalize({ ...fixture, position: { x: -900, y: 900 } })
+    expect(actual.position).toEqual({ x: 8, y: 372 })
   })
 
-  it('overlays history inside the chat on narrow screens instead of sending it offscreen', () => {
-    const actual = normalize({ ...fixture, viewport: { width: 480, height: 1200 }, contentRight: 464, historyOpen: true })
+  it('keeps the chat inside narrow screens', () => {
+    const actual = normalize({ ...fixture, viewport: { width: 480, height: 1200 }, contentRight: 464 })
     expect(actual.position).toEqual({ x: 56, y: 88 })
-    expect(actual.historyPlacement).toBe('overlay')
-    expect(actual.historyWidth).toBe(360)
   })
 
   it('fits the panel even when content bounds are narrower than the viewport', () => {
-    const actual = normalize({ ...fixture, contentRight: 350, historyOpen: true })
+    const actual = normalize({ ...fixture, contentRight: 350 })
     expect(actual.size.width).toBe(334)
     expect(actual.position.x).toBe(8)
-    expect(actual.historyWidth).toBe(334)
-    expect(actual.historyPlacement).toBe('overlay')
   })
 
-  it.each([false, true])('repeated normalization is idempotent (history %s)', historyOpen => {
-    const options = { ...fixture, position: { x: -800, y: 1900 }, historyOpen }
+  it('repeated normalization is idempotent', () => {
+    const options = { ...fixture, position: { x: -800, y: 1900 } }
     const first = normalize(options)
     const again = normalize({ ...options, ...first })
     expect(again).toEqual(first)
@@ -62,14 +62,14 @@ describe('Agent event orchestration used by the component', () => {
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(0), 16))
     vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id))
     expect(agent.createAgentController, 'Agent must use one testable event orchestration path').toBeTypeOf('function')
-    const closed: boolean[] = [], modes: agent.AgentMode[] = [], bounds: unknown[] = [], focused: boolean[] = []
+    const closed: boolean[] = [], modes: agent.AgentMode[] = [], bounds: unknown[] = []
     const geometries: Array<{ size: { width: number; height: number }; position: { x: number; y: number } }> = []
-    const controller = agent.createAgentController({ onVisual: () => {}, onClose: () => closed.push(true), onMode: mode => modes.push(mode), onBounds: value => bounds.push(value), onCoverBody: () => focused.push(true), onGeometry: value => geometries.push(value) })
+    const controller = agent.createAgentController({ onVisual: () => {}, onClose: () => closed.push(true), onMode: mode => modes.push(mode), onBounds: value => bounds.push(value), onGeometry: value => geometries.push(value) })
     const commit = (overrides: Partial<Parameters<typeof controller.commit>[0]> = {}) => controller.commit({
       open: true, mode: 'sidebar', bounds: sidebarBounds, renderedBounds: sidebarBounds,
-      layoutKey: 'sidebar-avatar', bodyCovered: false, from: () => from, to, reducedMotion: false, ...overrides,
+      layoutKey: 'sidebar-avatar', from: () => from, to, reducedMotion: false, ...overrides,
     })
-    return { controller, commit, closed, modes, bounds, focused, geometries }
+    return { controller, commit, closed, modes, bounds, geometries }
   }
 
   it('waits for the first desktop sidebar bounds commit before consuming the FAB origin', () => {
@@ -99,14 +99,13 @@ describe('Agent event orchestration used by the component', () => {
     controller.gestures.drag.current = { x: 1, y: 2, left: 600, top: 80 }
     controller.gestures.floatResize.current = { x: 1, y: 2, width: 500, height: 700, axis: 'both' }
     controller.gestures.sidebarResize.current = { x: 1, width: 390 }
-    controller.gestures.historyResize.current = { x: 1, width: 360 }
     controller.changeMode('floating')
-    expect(Object.values(controller.gestures).map(ref => ref.current)).toEqual([null, null, null, null])
+    expect(Object.values(controller.gestures).map(ref => ref.current)).toEqual([null, null, null])
     expect(modes).toEqual(['floating'])
     commit({ mode: 'floating', bounds: closedBounds, renderedBounds: closedBounds, layoutKey: 'float:600:80:500:700' })
     controller.transition(generation, 'cancel', true)
     vi.runAllTimers()
-    expect(controller.visual).toEqual({ morph: null, avatarVisible: true, bodyCovered: false })
+    expect(controller.visual).toEqual({ morph: null, avatarVisible: true })
   })
 
   it('dragged/resized geometry survives mode and closed/open round trips', () => {
@@ -115,10 +114,10 @@ describe('Agent event orchestration used by the component', () => {
     controller.gestureStart()
     controller.gestures.drag.current = { x: 100, y: 100, left: 700, top: 100 }
     expect(controller.dragTo, 'real drag events must share the tested orchestration').toBeTypeOf('function')
-    controller.dragTo(200, 200, { ...fixture, historyOpen: true })
+    controller.dragTo(200, 200, fixture)
     expect(geometries.at(-1)?.position).toEqual({ x: 800, y: 200 })
     controller.gestures.floatResize.current = { x: 100, y: 100, width: 400, height: 620, axis: 'both' }
-    controller.resizeTo(200, 180, { ...fixture, ...geometries.at(-1)!, historyOpen: true })
+    controller.resizeTo(200, 180, { ...fixture, ...geometries.at(-1)! })
     expect(geometries.at(-1)).toMatchObject({ size: { width: 500, height: 700 }, position: { x: 800, y: 200 } })
     const layoutKey = JSON.stringify(geometries.at(-1))
     commit({ mode: 'floating', bounds: closedBounds, renderedBounds: closedBounds, layoutKey })
@@ -132,7 +131,7 @@ describe('Agent event orchestration used by the component', () => {
     commit({ mode: 'floating', bounds: closedBounds, renderedBounds: closedBounds, layoutKey, from: () => null })
     expect(geometries).toHaveLength(2)
     expect(geometries.at(-1)).toMatchObject({ size: { width: 500, height: 700 }, position: { x: 800, y: 200 } })
-    expect(controller.visual).toEqual({ morph: null, avatarVisible: true, bodyCovered: false })
+    expect(controller.visual).toEqual({ morph: null, avatarVisible: true })
   })
 
   it('filters descendant and stale transition targets and falls back when closing emits no native end', () => {
@@ -152,29 +151,6 @@ describe('Agent event orchestration used by the component', () => {
     expect(controller.visual.avatarVisible).toBe(false)
   })
 
-  it('viewport changes into history overlay revoke body access and transfer focus once', () => {
-    const { controller, commit, focused } = setup()
-    commit({ from: () => null })
-    const narrow = { width: 480, height: 1200, contentRight: 464 }
-    commit({ bounds: narrow, renderedBounds: narrow, bodyCovered: true, layoutKey: 'overlay' })
-    expect(controller.visual).toEqual({ morph: null, avatarVisible: false, bodyCovered: true })
-    expect(focused).toEqual([true])
-    commit({ bounds: narrow, renderedBounds: narrow, bodyCovered: true, layoutKey: 'overlay' })
-    expect(focused).toEqual([true])
-    commit({ bounds: narrow, renderedBounds: narrow, bodyCovered: false, layoutKey: 'history-closed' })
-    expect(controller.visual.avatarVisible).toBe(true)
-  })
-})
-
-it('the real chat-body wrapper excludes all covered descendants from focus and accessibility', () => {
-  expect(agent.AgentChatBody, 'overlay coverage needs a semantic body boundary').toBeTypeOf('function')
-  const covered = renderToStaticMarkup(<agent.AgentChatBody covered><button>avatar</button><button>quick action</button><textarea /><button>send</button></agent.AgentChatBody>)
-  expect(covered).toMatch(/^<div[^>]*inert=""/)
-  expect(covered).toMatch(/^<div[^>]*aria-hidden="true"/)
-  expect(covered).toContain('visibility:hidden')
-  const revealed = renderToStaticMarkup(<agent.AgentChatBody covered={false}><button>avatar</button></agent.AgentChatBody>)
-  expect(revealed).not.toContain('inert=""')
-  expect(revealed).not.toContain('visibility:hidden')
 })
 
 describe('RDR morph settlement', () => {

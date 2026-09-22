@@ -98,11 +98,10 @@ describe('RDR 9000 조사 도우미', () => {
     const source = (await import('node:fs')).readFileSync(new URL('./Agent.tsx', import.meta.url), 'utf8')
     expect(source).not.toContain('AgentLauncher')
   })
-  it('이전 대화 목록은 대화창 뒤(오른쪽 기준 바깥)에 포개져 있다가 펼쳐진다', async () => {
+  it('열린 도우미에는 대화 본문과 질문 입력이 있다', async () => {
     const { default: Agent } = await import('./Agent')
     const markup = html(<Agent open mode="sidebar" setOpen={() => {}} setMode={() => {}} records={records} />)
-    expect(markup).toMatch(/data-testid="agent-history" data-open="false"/)
-    expect(markup).toMatch(/agent-history absolute top-0 bottom-0 right-full z-0/)
+    expect(markup).toContain('aria-label="RDR 9000에게 질문"')
     expect(markup).toMatch(/agent-chat relative z-10/)
   })
 })

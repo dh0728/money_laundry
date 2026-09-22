@@ -40,25 +40,22 @@ describe('v17 RDR 9000 도우미 · 사용자 말풍선', () => {
 })
 
 describe('v17 RDR 9000 도우미 · 리사이즈 핸들', () => {
-  it('사이드바 모드: 도우미 너비 조절 + 이전 대화 너비 조절 핸들이 있다', async () => {
+  it('사이드바 모드에는 도우미 너비 조절 핸들이 있다', async () => {
     const { default: Agent } = await import('./Agent')
     const markup = html(<Agent open mode="sidebar" setOpen={() => {}} setMode={() => {}} records={records} />)
     expect(markup).toContain('aria-label="도우미 너비 조절"')
-    expect(markup).toContain('aria-label="이전 대화 너비 조절"')
     expect(markup).not.toContain('aria-label="도우미 높이 조절"')
     expect(markup).not.toContain('aria-label="도우미 크기 조절"')
   })
-  it('플로팅 모드: 너비·높이·모서리(크기) 핸들이 모두 있고 이전 대화 핸들도 유지된다', async () => {
+  it('플로팅 모드에는 너비·높이·모서리(크기) 핸들이 모두 있다', async () => {
     const { default: Agent } = await import('./Agent')
     const markup = html(<Agent open mode="floating" setOpen={() => {}} setMode={() => {}} records={records} />)
     expect(markup).toContain('aria-label="도우미 너비 조절"')
     expect(markup).toContain('aria-label="도우미 높이 조절"')
     expect(markup).toContain('aria-label="도우미 크기 조절"')
-    expect(markup).toContain('aria-label="이전 대화 너비 조절"')
   })
   it('리사이즈 최소·최대값 상수가 스펙대로 설정되어 있다', () => {
     expect(source).toMatch(/SIDEBAR_MIN = 320, SIDEBAR_MAX = 720/)
-    expect(source).toMatch(/HISTORY_MIN = 280, HISTORY_MAX = 560/)
     expect(source).toMatch(/FLOAT_MIN_W = 320, FLOAT_MIN_H = 360/)
   })
   it('플로팅 최대 크기는 뷰포트 비율(약 90vw x 85vh)로 계산된다', () => {

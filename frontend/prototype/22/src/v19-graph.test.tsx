@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { graphFor, records, widthFor, type GraphModel, type GraphNode, type GraphTransaction } from './domain'
 import Graph, { DEFAULT_HOP, nodeRadius } from './Graph'
+import * as graph from './Graph'
 import FlowDetail, { FlowPanel, flowId, flowLabel, flowLinkLabel, flowTipContent, sankeyLabelLayout, sankeyLinkLabelLayout } from './FlowDetail'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
@@ -84,6 +85,17 @@ const model: GraphModel = {
   edges: [edge('e1', 'A', 'B', 0, [tx('tx-01', 'A', 'B', 100), tx('tx-02', 'A', 'B', 500)]), edge('e2', 'B', 'A', 1, [tx('tx-03', 'B', 'A', 200, 1)]), edge('e3', 'B', 'C', 0, [tx('tx-04', 'B', 'C', 300)])],
   blocks: [0],
 }
+
+it('indexes incident edges in model order, preserving reciprocal pairs and including self-transfers once', () => {
+  expect(graph.connectedEdgesByNode).toBeTypeOf('function')
+  const loop = edge('loop', 'A', 'A', 0, [tx('tx-05', 'A', 'A', 50)])
+  const lookup = graph.connectedEdgesByNode([...model.edges, loop])
+  expect(lookup.get('A')?.map(e => e.key)).toEqual(['e1', 'e2', 'loop'])
+  expect(lookup.get('B')?.map(e => e.key)).toEqual(['e1', 'e2', 'e3'])
+  expect(lookup.get('C')?.map(e => e.key)).toEqual(['e3'])
+  expect(lookup.get('missing')).toBeUndefined()
+  expect(lookup.get('A')?.[0]).toBe(model.edges[0])
+})
 
 describe('v19 상세 · FlowDetail·FlowPanel', () => {
   it('Sankey 계좌 라벨은 선택/좌/우 위치와 관계없이 노드 막대 세로 중앙에 맞춘다', () => {

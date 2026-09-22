@@ -2,10 +2,25 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { SidebarInset } from '@/components/ui/sidebar'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
 const appSource = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
 const searchSource = readFileSync(new URL('./GlobalSearch.tsx', import.meta.url), 'utf8')
+
+it('keeps exactly one main landmark inside the sidebar inset and scopes responsive page padding', () => {
+  const markup = html(<SidebarInset><header>Header</header><main className="app-main">Page</main></SidebarInset>)
+  expect(markup.match(/<main\b/g)).toHaveLength(1)
+  expect(markup).toMatch(/^<div data-slot="sidebar-inset"/)
+  expect(appSource.match(/<main\b/g)).toHaveLength(1)
+  expect(readFileSync(new URL('./index.css', import.meta.url), 'utf8')).not.toMatch(/(?:^|[;}\s])main\s*\{/)
+})
+
+it('login decoration never follows the pointer or recursively schedules drawing', () => {
+  const source = readFileSync(new URL('./LoginNetwork.tsx', import.meta.url), 'utf8')
+  expect(source).not.toContain("addEventListener('pointermove'")
+  expect(source).not.toContain('requestAnimationFrame(draw)')
+})
 
 describe('v17 Figma 검수 · 로고는 헤더에서 사이드바로', () => {
   it('헤더 markup에는 로고(BrandLogo·RadarMark)가 없다', () => {

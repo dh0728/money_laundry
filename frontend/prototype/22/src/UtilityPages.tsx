@@ -1,4 +1,4 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { useTheme } from 'next-themes'
 import { Camera, Monitor, Laptop, Bell, Check, Sun, Moon, LaptopMinimal, RotateCcw, Search, ChevronDown, ChevronsUpDown, ChevronUp, X } from 'lucide-react'
@@ -25,6 +25,7 @@ export function Account({ user, onLogout }: { user: string; onLogout: () => void
   const role = ROLES[user === '오검토' ? 'L1' : 'L2']
   const [sessions, setSessions] = useState(['current', 'other-1', 'other-2']), [picture, setPicture] = useState('')
   const file = useRef<HTMLInputElement>(null)
+  useEffect(() => () => { if (picture) URL.revokeObjectURL(picture) }, [picture])
   // 넓은 화면은 프로필·권한·세션 3열, 세로 화면은 자연스럽게 3행이다.
   return (
     <div className="space-y-6">
