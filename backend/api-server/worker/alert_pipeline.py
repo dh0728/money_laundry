@@ -19,7 +19,7 @@ from result_collection import _checkpoint
 from worker_transport import ProtocolError
 
 SEOUL = ZoneInfo('Asia/Seoul')
-POLICY = Policy('daily-context-v1', 1, timedelta(hours=24), timedelta(hours=24), 2, 100, 100, 3)
+POLICY = Policy('daily-seed-link-v2', 1, timedelta(hours=24), timedelta(hours=24), 2, 100, 100)
 
 
 class AssigneeUnavailable(ProtocolError):

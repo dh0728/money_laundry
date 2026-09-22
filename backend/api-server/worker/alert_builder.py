@@ -26,15 +26,13 @@ class Policy:
     max_depth: int
     max_transactions: int
     max_account_transactions: int
-    min_shared_transactions: int
 
     def validate(self):
         if (not self.version or isinstance(self.threshold, bool)
                 or not math.isfinite(self.threshold) or not 0 <= self.threshold <= 1
                 or self.before < timedelta(0) or self.after < timedelta(0)
                 or any(type(value) is not int or value < 1 for value in (
-                    self.max_depth, self.max_transactions, self.max_account_transactions,
-                    self.min_shared_transactions))):
+                    self.max_depth, self.max_transactions, self.max_account_transactions))):
             raise ValueError("Invalid Alert policy")
 
 
@@ -158,9 +156,9 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
         if left == right:
             continue
         a, b = groups[left], groups[right]
-        shared = set(a[1]) & set(b[1])
         linked_seeds = bool(a[0] & set(b[1]) or b[0] & set(a[1]))
-        if not linked_seeds and len(shared - seed_set) < policy.min_shared_transactions:
+        # Shared context alone is not evidence that two seed flows are one block.
+        if not linked_seeds:
             continue
         combined = set(a[1]) | set(b[1])
         times = [rows[key].occurred_at for key in combined]

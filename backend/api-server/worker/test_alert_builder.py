@@ -8,7 +8,7 @@ from alert_builder import Transaction, Policy, build_candidates
 class AlertBuilderTests(unittest.TestCase):
     def setUp(self):
         self.start = datetime(2026, 9, 20, 0, tzinfo=timezone.utc)
-        self.policy = Policy("test-only-v1", .7, timedelta(hours=12), timedelta(hours=12), 4, 20, 20, 2)
+        self.policy = Policy("test-only-v2", .7, timedelta(hours=12), timedelta(hours=12), 4, 20, 20)
 
     def tx(self, number, hour, source, destination):
         return Transaction(number, self.start + timedelta(hours=hour), source, destination)
@@ -53,6 +53,18 @@ class AlertBuilderTests(unittest.TestCase):
         result = self.build(rows, {1: .8, 3: .9})
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].seed_ids, (1, 3))
+
+    def test_shared_nonseed_flow_is_preserved_without_merging_seeds(self):
+        rows = [self.tx(1, 1, "A", "X"), self.tx(2, 1, "B", "Y"),
+                self.tx(3, 2, "X", "Z"), self.tx(4, 2, "Y", "Z")]
+        rows += [self.tx(i, 3, "Z", f"D{i}") for i in range(5, 8)]
+        result = self.build(rows, {1: .9, 2: .9, 5: .1})
+        self.assertEqual([c.seed_ids for c in result], [(1,), (2,)])
+        self.assertEqual(self.ids(result[0]), {1, 3, 5, 6, 7})
+        self.assertEqual(self.ids(result[1]), {2, 4, 5, 6, 7})
+        self.assertTrue(all(r.role == "CONNECTION" for c in result
+                            for r in c.transactions if r.tx_id in (5, 6, 7)))
+        self.assertEqual(result, self.build(list(reversed(rows)), {2: .9, 1: .9, 5: .1}))
 
     def test_hub_does_not_merge_unrelated_seeds(self):
         rows = [self.tx(i, i / 10, f"A{i}", "EXCHANGE") for i in range(1, 7)]

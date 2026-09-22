@@ -6,7 +6,7 @@ import unittest
 from uuid import uuid4
 
 from psycopg.types.json import Jsonb
-from alert_pipeline import save_alerts, AssigneeUnavailable
+from alert_pipeline import save_alerts, AssigneeUnavailable, POLICY
 from frozen_input import InputExecution, StaleExecution
 import test_frozen_input_postgres as fixtures
 
@@ -67,6 +67,7 @@ class AlertPostgresTests(unittest.TestCase):
     def test_daily_boundary_and_immutable_scores_and_empty_target(self):
         alert=self.first()
         old=self.admin.execute("SELECT evidence FROM alert_versions WHERE alert_id=%s",(alert,)).fetchone()[0]
+        self.assertEqual(old['policyVersion'], 'daily-seed-link-v2')
         self.assertEqual([m['txId'] for m in old['transactions']],[self.ids[0]])
         follow=self.following(alert)
         save_alerts(self.admin,follow)
@@ -186,7 +187,7 @@ class AlertExtensionTests(unittest.TestCase):
             amount_received=Decimal(1),receiving_currency='USD',amount_paid=Decimal(1),
             payment_currency='USD',amount_usd=Decimal(1),payment_format='ACH') for key in ids}
         seed_info={key:dict(txId=key,occurredAt=rows[key]['occurred_at'].isoformat(),score=.9,threshold=.7) for key in seeds}
-        return _evidence(Candidate(tuple(seeds),tuple(Membership(k,'SEED' if k in seeds else 'CONTEXT',('SEED',) if k in seeds else ('SHARED_SOURCE',)) for k in ids),(),'daily-context-v1'),rows,
+        return _evidence(Candidate(tuple(seeds),tuple(Membership(k,'SEED' if k in seeds else 'CONTEXT',('SEED',) if k in seeds else ('SHARED_SOURCE',)) for k in ids),(),POLICY.version),rows,
             {key:dict(p_laundering=.9) for key in seeds},seed_info)
 
     def test_split_candidates_extend_one_existing_case_and_keep_prior_members(self):
