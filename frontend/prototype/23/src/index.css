@@ -193,31 +193,39 @@
 [data-slot=table-head] { font-size:11px; font-weight:500; color:var(--muted-foreground); background:var(--muted); height:42px; padding-inline:16px; }
 [data-slot=table-cell] { padding-block:14px; padding-inline:16px; }
 .graph-canvas { background:var(--graph-bg); }
-.transactions-explorer-scroll { overscroll-behavior-inline:contain; scroll-behavior:auto; }
-.transactions-explorer-scroll .glass-surface { background:var(--card); -webkit-backdrop-filter:none!important; backdrop-filter:none!important; }
-.transactions-explorer-scroll .glass-surface::before { display:none!important; }
 .transactions-flow {
-  /* Include 16px padding + the panel/table borders and four 12px gaps. */
-  grid-template-columns: var(--owner-stage-width) 2.75rem var(--account-stage-width) 2.75rem minmax(calc(72.25rem + 1.25rem), 1fr);
-  min-width: calc(var(--owner-stage-width) + var(--account-stage-width) + 77.75rem + 1.25rem + 3rem);
+  position:relative;
+  grid-template-columns:13.5rem 14.5rem minmax(16rem,1fr) minmax(18rem,1fr);
+  align-items:start;
+  min-width:0;
 }
 .header-search-input { min-width: 180px; }
 .transaction-stage > header { height:69px; }
-.transaction-stage-item { height:64px; content-visibility:auto; contain-intrinsic-block-size:64px; }
-.transaction-connector { position:relative; color:var(--muted-foreground); pointer-events:none; }
-.transaction-connector-edge { position:absolute; inset:0 -12px; }
+.transaction-stage-item { min-height:64px; content-visibility:auto; contain-intrinsic-block-size:64px; }
+.transaction-stage-item[aria-pressed="true"] {
+  --background:var(--selection-background); --foreground:var(--selection-foreground);
+  --muted-foreground:var(--selection-muted-foreground); --border:var(--selection-border);
+  background:var(--selection-background); color:var(--selection-foreground);
+}
+.transaction-stage-item[aria-pressed="true"] [data-slot=badge] { border-color:var(--selection-border); color:inherit; }
+.transaction-owner-scroll { max-height:min(32rem,calc(100dvh - 20rem)); overflow-y:auto; scrollbar-gutter:stable; overscroll-behavior:contain; }
+.transaction-connector { position:absolute; top:0; bottom:0; z-index:1; color:var(--muted-foreground); pointer-events:none; }
+.owner-account-connector { left:13.5rem; width:.75rem; }
+.account-transaction-connector { left:calc(13.5rem + .75rem + 14.5rem); width:.75rem; }
+.transaction-connector-edge { position:absolute; inset:0; }
 .transaction-connector-edge::before { content:""; position:absolute; top:var(--source-y); left:0; width:50%; border-top:1.5px solid; }
 .transaction-connector-edge::after { content:""; position:absolute; top:min(var(--source-y),var(--target-y)); left:50%; height:calc(max(var(--source-y),var(--target-y)) - min(var(--source-y),var(--target-y))); border-left:1.5px solid; }
 .transaction-connector-edge > b { position:absolute; top:var(--target-y); left:50%; right:0; border-top:1.5px solid; }
 .transaction-connector-edge > b::after { content:""; position:absolute; right:1px; top:-4px; width:7px; height:7px; border-top:1.5px solid; border-right:1.5px solid; transform:rotate(45deg); }
-/* The table rail follows actual row boxes, including multiline Alert/Episode links. */
-.transaction-connector:has(+ .transaction-stage .transaction-section) .transaction-connector-edge > b { display:none; }
-.transaction-stage:has(.transaction-section) { min-width:max-content; overflow:visible; }
-.transaction-section > .glass-surface { overflow:visible; }
-.transaction-section [data-slot="table-row"][data-interactive] > [data-slot="table-cell"]:first-child::before { content:""; position:absolute; left:-44px; top:0; bottom:0; border-left:1.5px solid var(--muted-foreground); pointer-events:none; }
-.transaction-section [data-slot="table-row"]:last-child > [data-slot="table-cell"]:first-child::before { bottom:50%; }
-.transaction-row-connector { position:absolute; left:-44px; right:calc(100% + 10px); top:50%; border-top:1.5px solid var(--muted-foreground); pointer-events:none; }
-.transaction-row-connector::after { content:""; position:absolute; right:1px; top:-4px; width:7px; height:7px; border-top:1.5px solid var(--muted-foreground); border-right:1.5px solid var(--muted-foreground); transform:rotate(45deg); }
+.transaction-detail { min-width:0; }
+@media (max-width:1100px) {
+  .transactions-flow { grid-template-columns:minmax(12rem,.8fr) minmax(13rem,.9fr) minmax(16rem,1.2fr); }
+  .transaction-detail { grid-column:1 / -1; }
+  .transaction-connector { display:none; }
+}
+@media (max-width:760px) {
+  .transactions-flow { grid-template-columns:minmax(0,1fr); }
+}
 .transaction-section .overflow-auto { overflow:visible; }
 /* 전체화면 다이얼로그: flex column이어야 캔버스가 flex-1 min-h-0으로 남는 높이를 정확히 채우고 시간축이 항상 보인다 */
 .graph-dialog { display:flex; flex-direction:column; overflow:hidden; }
@@ -397,12 +405,11 @@
   outline-offset: 2px;
 }
 
-.transactions-explorer-scroll { scrollbar-color:var(--muted-foreground) var(--muted); scrollbar-width:auto; }
-.transactions-explorer-scroll::-webkit-scrollbar { width:12px; height:12px; }
-.transactions-explorer-scroll::-webkit-scrollbar-track { background:var(--muted); }
-.transactions-explorer-scroll::-webkit-scrollbar-thumb { background:var(--muted-foreground); border:3px solid var(--muted); border-radius:999px; }
-.transactions-explorer-scroll::-webkit-scrollbar-thumb:hover { background:var(--foreground); }
-.transaction-section [data-slot="table-container"] { overflow-x: visible; }
+.transaction-owner-scroll { scrollbar-color:var(--muted-foreground) var(--muted); scrollbar-width:auto; }
+.transaction-owner-scroll::-webkit-scrollbar { width:12px; }
+.transaction-owner-scroll::-webkit-scrollbar-track { background:var(--muted); }
+.transaction-owner-scroll::-webkit-scrollbar-thumb { background:var(--muted-foreground); border:3px solid var(--muted); border-radius:999px; }
+.transaction-owner-scroll::-webkit-scrollbar-thumb:hover { background:var(--foreground); }
 @media (prefers-reduced-motion: reduce) {
   :is(button, a[href], input, select, textarea, [data-interactive="true"]) { transition: none !important; }
 }

@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
-import { getCoreRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef, type RowSelectionState, type SortingState } from '@tanstack/react-table'
 import { ArrowRight, ListFilter, Search, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,12 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DataTable, toggleSingleSelectedId } from '@/components/data-table/data-table'
-import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
+import { toggleSingleSelectedId } from '@/components/data-table/data-table'
 import { OrthogonalConnector, StageItem, StagePanel } from '@/components/transaction-stage'
-import { compactUsd, usd, type RecordItem } from './domain'
+import { type RecordItem } from './domain'
 import { DateRangeButton, FilterChip, PageHeading } from './shared'
 import { buildTransactionIndex, type TransactionIndex, type TransactionTarget } from './transactionIndex'
+import { formatMoney } from './v23-domain'
 
 type IndexedTransaction = TransactionIndex['transactions'][number]
 type IndexedAccount = TransactionIndex['accounts'][number]
@@ -69,16 +68,17 @@ function RecordLinks({ ids, records, onOpenRecord }: { ids: string[]; records: M
   })}</div>
 }
 
-function FloatingExplorer({ children }: { children: ReactNode }) {
-  return <div data-testid="transactions-explorer" className="transactions-explorer-scroll min-h-[420px] max-h-[calc(100dvh-220px)] overflow-auto">{children}</div>
-}
-
 function ownerMatches(owner: IndexedOwner, query: string, accounts: IndexedAccount[], transactions: IndexedTransaction[]) {
   if (!query) return true
   const q = query.toLowerCase()
   return owner.name.toLowerCase().includes(q)
     || accounts.some(account => owner.accountIds.includes(account.id) && `${account.id} ${account.bank}`.toLowerCase().includes(q))
     || transactions.some(transaction => owner.transactionIds.includes(transaction.id) && `${transaction.id} ${transaction.fromOwner} ${transaction.toOwner} ${transaction.fromAccount} ${transaction.toAccount} ${transaction.format}`.toLowerCase().includes(q))
+}
+
+export function selectedOwnerFirst<T extends { name: string }>(owners: readonly T[], selected?: string | null) {
+  const current = owners.find(owner => owner.name === selected)
+  return current ? [current, ...owners.filter(owner => owner !== current)] : owners
 }
 
 export default function TransactionsV22({ records, target, onOpenRecord }: { records: RecordItem[]; target?: TransactionTarget; onOpenRecord?: (record: RecordItem) => void }) {
@@ -94,15 +94,16 @@ export default function TransactionsV22({ records, target, onOpenRecord }: { rec
   const [selectedOwner, setSelectedOwner] = useState(initial.owner)
   const [selectedAccount, setSelectedAccount] = useState(initial.account)
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null | undefined>(initial.transaction)
-  const [selection, setSelection] = useState<RowSelectionState>(initial.transaction ? { [initial.transaction]: true } : {})
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'at', desc: true }])
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
+  const selectedOwnerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const next = targetSelection(index, target)
     setSelectedOwner(next.owner); setSelectedAccount(next.account); setSelectedTransactionId(next.transaction)
-    setSelection(next.transaction ? { [next.transaction]: true } : {}); setPagination(current => ({ ...current, pageIndex: 0 }))
   }, [index, target])
+
+  useEffect(() => {
+    selectedOwnerRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [selectedOwner])
 
   const transactionMap = useMemo(() => new Map(index.transactions.map(transaction => [transaction.id, transaction] as const)), [index])
   const accountsByOwner = useMemo(() => index.owners.reduce((map, owner) => {
@@ -115,13 +116,14 @@ export default function TransactionsV22({ records, target, onOpenRecord }: { rec
   }, new Map<string, TransactionView[]>()), [index.accounts, transactionMap])
   const constrainedAccounts = (owner: IndexedOwner) => (accountsByOwner.get(owner.name) ?? []).filter(account => (viewsByAccount.get(account.id) ?? []).some(view => passesFilters(view, range, filters)))
   const visibleOwners = index.owners.filter(owner => ownerMatches(owner, query.trim(), index.accounts, index.transactions) && (!range?.from && filters.length === 0 || constrainedAccounts(owner).length > 0))
-  const owner = visibleOwners.find(item => item.name === selectedOwner) ?? visibleOwners[0]
+  const displayedOwners = selectedOwnerFirst(visibleOwners, selectedOwner)
+  const owner = visibleOwners.find(item => item.name === selectedOwner)
   const ownerAccounts = owner ? (accountsByOwner.get(owner.name) ?? []).filter(account => {
     const q = query.trim().toLowerCase()
     const textMatch = !q || owner.name.toLowerCase().includes(q) || `${account.id} ${account.bank}`.toLowerCase().includes(q) || (viewsByAccount.get(account.id) ?? []).some(transaction => `${transaction.id} ${transaction.fromOwner} ${transaction.toOwner} ${transaction.fromAccount} ${transaction.toAccount} ${transaction.format}`.toLowerCase().includes(q))
     return textMatch && (viewsByAccount.get(account.id) ?? []).some(view => passesFilters(view, range, filters))
   }) : []
-  const account = ownerAccounts.find(item => item.id === selectedAccount) ?? ownerAccounts[0]
+  const account = ownerAccounts.find(item => item.id === selectedAccount)
   const transactionRows = useMemo(() => account ? (viewsByAccount.get(account.id) ?? []).filter(view => {
     const q = query.trim().toLowerCase()
     const textMatch = !q || owner?.name.toLowerCase().includes(q) || `${account.id} ${account.bank}`.toLowerCase().includes(q) || `${view.id} ${view.fromOwner} ${view.toOwner} ${view.fromAccount} ${view.toAccount} ${view.format}`.toLowerCase().includes(q)
@@ -130,30 +132,15 @@ export default function TransactionsV22({ records, target, onOpenRecord }: { rec
   const selected = index.transactions.find(item => item.id === selectedTransactionId)
   const filterValues = useMemo<Record<TransactionFilterField, string[]>>(() => ({ direction: ['송금', '수취'], status: ['의심', '정상'], format: [...new Set(index.transactions.map(item => item.format))].sort() }), [index.transactions])
 
-  const columns = useMemo<ColumnDef<TransactionView>[]>(() => [
-    { id: 'id', accessorKey: 'id', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 ID" />, cell: ({ row }) => <div className="min-w-[165px]"><i data-testid="transaction-row-connector" className="transaction-row-connector" aria-hidden="true" /><p className="font-mono text-sm">{row.original.id}</p><p className="mt-1 font-mono text-[11px] text-muted-foreground">{row.original.fromAccount} → {row.original.toAccount}</p></div> },
-    { id: 'at', accessorKey: 'at', header: ({ column }) => <DataTableColumnHeader column={column} label="일시" />, cell: ({ row }) => <span className="whitespace-nowrap text-xs tabular-nums">{row.original.at}</span> },
-    { id: 'counterparty', accessorKey: 'counterpartyOwner', header: ({ column }) => <DataTableColumnHeader column={column} label="상대 소유주 · 계좌" />, cell: ({ row }) => <div className="min-w-[170px] text-xs"><p>{row.original.counterpartyOwner}</p><p className="mt-1 font-mono text-[11px] text-muted-foreground">{row.original.counterpartyAccount}</p></div> },
-    { id: 'direction', accessorKey: 'direction', header: ({ column }) => <DataTableColumnHeader column={column} label="방향" />, cell: ({ row }) => <Badge variant="outline" className="font-normal">{row.original.direction}</Badge> },
-    { id: 'amount', accessorKey: 'usd', header: ({ column }) => <DataTableColumnHeader column={column} label="금액 (USD)" className="ml-auto" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{usd(row.original.usd)}</div> },
-    { id: 'format', accessorKey: 'format', header: ({ column }) => <DataTableColumnHeader column={column} label="결제 수단" />, cell: ({ row }) => <span className="text-xs">{row.original.format}</span> },
-    { id: 'risk', accessorFn: row => row.suspicious ? 1 : 0, header: ({ column }) => <DataTableColumnHeader column={column} label="상태" />, cell: ({ row }) => <Badge variant={row.original.suspicious ? 'destructive' : 'outline'}>{row.original.suspicious ? '의심' : '정상'}</Badge> },
-    { id: 'alerts', accessorFn: row => row.recordIds.filter(id => recordMap.get(id)?.kind === 'Alert').length, header: ({ column }) => <DataTableColumnHeader column={column} label="연결 Alert" />, cell: ({ row }) => <RecordLinks ids={row.original.recordIds.filter(id => recordMap.get(id)?.kind === 'Alert')} records={recordMap} onOpenRecord={onOpenRecord} /> },
-    { id: 'episodes', accessorFn: row => row.recordIds.filter(id => recordMap.get(id)?.kind === 'Episode').length, header: ({ column }) => <DataTableColumnHeader column={column} label="연결 Episode" />, cell: ({ row }) => <RecordLinks ids={row.original.recordIds.filter(id => recordMap.get(id)?.kind === 'Episode')} records={recordMap} onOpenRecord={onOpenRecord} /> },
-  ], [recordMap, onOpenRecord])
-
-  const table = useReactTable({
-    data: transactionRows, columns, getRowId: row => row.id,
-    state: { rowSelection: selection, sorting, pagination }, onRowSelectionChange: setSelection, onSortingChange: setSorting, onPaginationChange: setPagination,
-    enableRowSelection: true, autoResetPageIndex: true,
-    getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(),
-  })
-  const visibleTransactionCount = table.getRowModel().rows.length
-
-  const selectOwner = (next: IndexedOwner) => { setSelectedOwner(next.name); const first = constrainedAccounts(next)[0] ?? (accountsByOwner.get(next.name) ?? [])[0]; setSelectedAccount(first?.id); setSelectedTransactionId(null); setSelection({}); setPagination(current => ({ ...current, pageIndex: 0 })) }
-  const selectAccount = (next: IndexedAccount) => { setSelectedAccount(next.id); setSelectedTransactionId(null); setSelection({}); setPagination(current => ({ ...current, pageIndex: 0 })) }
-  const selectTransaction = (next: TransactionView) => { const nextId = toggleSingleSelectedId(selectedTransactionId, next.id); setSelectedTransactionId(nextId); setSelection(nextId ? { [next.id]: true } : {}) }
-  const applyControls = (nextQuery: string, nextRange: DateRange | undefined, nextFilters: TransactionFilter[]) => { setQuery(nextQuery); setRange(nextRange); setFilters(nextFilters); setSelectedTransactionId(null); setSelection({}); setPagination(current => ({ ...current, pageIndex: 0 })) }
+  const selectOwner = (next: IndexedOwner) => {
+    const nextName = toggleSingleSelectedId(selectedOwner, next.name) ?? undefined
+    setSelectedOwner(nextName)
+    const first = nextName ? constrainedAccounts(next)[0] ?? (accountsByOwner.get(next.name) ?? [])[0] : undefined
+    setSelectedAccount(first?.id); setSelectedTransactionId(null)
+  }
+  const selectAccount = (next: IndexedAccount) => { setSelectedAccount(toggleSingleSelectedId(selectedAccount, next.id) ?? undefined); setSelectedTransactionId(null) }
+  const selectTransaction = (next: TransactionView) => setSelectedTransactionId(toggleSingleSelectedId(selectedTransactionId, next.id))
+  const applyControls = (nextQuery: string, nextRange: DateRange | undefined, nextFilters: TransactionFilter[]) => { setQuery(nextQuery); setRange(nextRange); setFilters(nextFilters); setSelectedTransactionId(null) }
   const resetControls = () => applyControls('', undefined, [])
   const addFilter = () => { const next = filters.some(item => item.field === filterField && item.value === filterValue) ? filters : [...filters, { field: filterField, value: filterValue }]; applyControls(query, range, next); setFilterOpen(false) }
 
@@ -166,16 +153,15 @@ export default function TransactionsV22({ records, target, onOpenRecord }: { rec
       {(query || range?.from || filters.length > 0) && <Button type="button" variant="ghost" size="sm" onClick={resetControls}><X className="size-3.5" />전체 보기</Button>}
     </div>
     {filters.length > 0 && <div className="flex flex-wrap items-center gap-2">{filters.map((filter, index) => <FilterChip key={`${filter.field}-${filter.value}`} onRemove={() => applyControls(query, range, filters.filter((_, current) => current !== index))}>{filterLabels[filter.field]}: {filter.value}</FilterChip>)}</div>}
-    <FloatingExplorer>
-      <div data-testid="transactions-flow" className="transactions-flow grid items-stretch gap-3">
-        <StagePanel testId="owner-section" title="소유주" count={visibleOwners.length} description="소유주를 선택해 계좌 확인">{visibleOwners.map(item => <StageItem key={item.name} active={item.name === owner?.name} primary={item.name} secondary={`계좌 ${item.accountIds.length}개 · 거래 ${item.transactionIds.length}건`} onSelect={() => selectOwner(item)} />)}</StagePanel>
-        <OrthogonalConnector id="owner-account-connector" sourceIndex={visibleOwners.findIndex(item => item.name === owner?.name)} targetCount={ownerAccounts.length} targetOffset={110} />
-        <StagePanel testId="account-section" title="계좌" count={ownerAccounts.length} description={owner ? `${owner.name}의 계좌` : '소유주를 선택하세요'}>{ownerAccounts.map(item => <StageItem key={item.id} active={item.id === account?.id} primary={item.id} secondary={`은행 ${item.bank} · 거래 ${item.transactionIds.length}건`} mono onSelect={() => selectAccount(item)} />)}</StagePanel>
-        {/* The bridge meets the table body; each row owns its branch so wrapped links can increase its height. */}
-        <OrthogonalConnector id="account-transaction-connector" sourceIndex={ownerAccounts.findIndex(item => item.id === account?.id)} targetCount={visibleTransactionCount ? 1 : 0} targetOffset={121} />
-        <StagePanel testId="transaction-section" title="거래" count={transactionRows.length} description={account ? `${account.id}의 거래 내역` : '계좌를 선택하세요'}><DataTable className="transaction-section" table={table} tableClassName="min-w-[1156px]" onRowClick={selectTransaction} data-testid="transaction-list-table" /></StagePanel>
+    <div data-testid="transactions-explorer" className="transactions-explorer">
+      <div data-testid="transactions-flow" className="transactions-flow grid gap-3">
+        <StagePanel testId="owner-section" bodyTestId="owner-scroll-list" bodyClassName="transaction-owner-scroll" title="소유주" count={visibleOwners.length} description="소유주를 선택해 계좌 확인">{displayedOwners.map(item => <StageItem key={item.name} testId="owner-item" itemRef={item.name === owner?.name ? selectedOwnerRef : undefined} active={item.name === owner?.name} primary={item.name} secondary={`계좌 ${item.accountIds.length}개 · 거래 ${item.transactionIds.length}건`} onSelect={() => selectOwner(item)} />)}</StagePanel>
+        <OrthogonalConnector id="owner-account-connector" sourceIndex={displayedOwners.findIndex(item => item.name === owner?.name)} targetCount={ownerAccounts.length} targetOffset={110} />
+        <StagePanel testId="account-section" title="계좌" count={ownerAccounts.length} description={owner ? `${owner.name}의 계좌` : '소유주를 선택하세요'}>{ownerAccounts.map(item => <StageItem key={item.id} testId="account-item" active={item.id === account?.id} primary={item.id} secondary={`은행 ${item.bank} · 거래 ${item.transactionIds.length}건`} mono onSelect={() => selectAccount(item)} />)}</StagePanel>
+        <OrthogonalConnector id="account-transaction-connector" sourceIndex={ownerAccounts.findIndex(item => item.id === account?.id)} targetCount={transactionRows.length} targetOffset={110} />
+        <StagePanel testId="transaction-section" title="거래" count={transactionRows.length} description={account ? `${account.id}의 거래 내역` : '계좌를 선택하세요'}><div data-testid="transaction-list">{transactionRows.map(item => <StageItem key={item.id} testId="transaction-item" active={item.id === selectedTransactionId} primary={item.id} secondary={`${item.at} · ${formatMoney(item.amount, item.currency)}`} trailing={<Badge aria-label={item.direction} variant="outline" className="font-normal text-inherit">{item.direction}</Badge>} mono onSelect={() => selectTransaction(item)} />)}</div></StagePanel>
+        <Card className="transaction-detail self-start" data-testid="transaction-detail"><CardHeader><CardTitle className="text-sm">선택 거래 상세</CardTitle><CardDescription className={selected ? 'font-mono' : ''}>{selected?.id ?? '거래를 선택하세요'}</CardDescription></CardHeader>{selected && <CardContent data-testid="selected-transaction" className="grid gap-5 text-xs"><div><p className="text-muted-foreground">거래 시각</p><p className="mt-1 tabular-nums">{selected.at}</p></div><div><p className="text-muted-foreground">금액</p><p className="mt-1 font-medium tabular-nums">{formatMoney(selected.amount, selected.currency)}</p></div><div><p className="text-muted-foreground">송금 소유주 · 계좌</p><p className="mt-1">{selected.fromOwner}</p><p className="font-mono text-muted-foreground">{selected.fromAccount}</p></div><div className="flex items-center gap-2"><ArrowRight className="size-4 text-muted-foreground" /><span className="sr-only">{formatMoney(selected.amount, selected.currency)}</span></div><div><p className="text-muted-foreground">수취 소유주 · 계좌</p><p className="mt-1">{selected.toOwner}</p><p className="font-mono text-muted-foreground">{selected.toAccount}</p></div><div><p className="text-muted-foreground">결제 수단</p><p className="mt-1">{selected.format}</p></div><div><p className="text-muted-foreground">상태</p><Badge className="mt-1" variant={selected.suspicious ? 'destructive' : 'outline'}>{selected.suspicious ? '의심' : '정상'}</Badge></div><div><p className="text-muted-foreground">연결 Alert</p><div className="mt-1"><RecordLinks ids={selected.recordIds.filter(id => recordMap.get(id)?.kind === 'Alert')} records={recordMap} onOpenRecord={onOpenRecord} /></div></div><div><p className="text-muted-foreground">연결 Episode</p><div className="mt-1"><RecordLinks ids={selected.recordIds.filter(id => recordMap.get(id)?.kind === 'Episode')} records={recordMap} onOpenRecord={onOpenRecord} /></div></div></CardContent>}</Card>
       </div>
-    </FloatingExplorer>
-    {selected && <Card className="border-foreground/30" data-testid="selected-transaction"><CardHeader><CardTitle className="text-sm">선택한 거래</CardTitle><CardDescription className="font-mono">{selected.id}</CardDescription></CardHeader><CardContent className="grid gap-5 text-xs @3xl:grid-cols-2 @5xl:grid-cols-4"><div><p className="text-muted-foreground">거래 시각</p><p className="mt-1 tabular-nums">{selected.at}</p></div><div><p className="text-muted-foreground">금액</p><p className="mt-1 font-medium tabular-nums">{usd(selected.usd)}</p></div><div><p className="text-muted-foreground">결제 수단</p><p className="mt-1">{selected.format}</p></div><div><p className="text-muted-foreground">연결 Alert</p><div className="mt-1"><RecordLinks ids={selected.recordIds.filter(id => recordMap.get(id)?.kind === 'Alert')} records={recordMap} onOpenRecord={onOpenRecord} /></div></div><div><p className="text-muted-foreground">연결 Episode</p><div className="mt-1"><RecordLinks ids={selected.recordIds.filter(id => recordMap.get(id)?.kind === 'Episode')} records={recordMap} onOpenRecord={onOpenRecord} /></div></div><div><p className="text-muted-foreground">송금 소유주 · 계좌</p><p className="mt-1">{selected.fromOwner}</p><p className="font-mono text-muted-foreground">{selected.fromAccount}</p></div><div className="flex items-center justify-center"><ArrowRight className="size-4 text-muted-foreground" /><span className="sr-only">{compactUsd(selected.usd)}</span></div><div><p className="text-muted-foreground">수취 소유주 · 계좌</p><p className="mt-1">{selected.toOwner}</p><p className="font-mono text-muted-foreground">{selected.toAccount}</p></div></CardContent></Card>}
+    </div>
   </div>
 }
