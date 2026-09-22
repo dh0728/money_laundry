@@ -128,7 +128,10 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
                     continue
                 members.setdefault(other_id, set()).update(choices[other_id])
                 for reason in sorted(choices[other_id]):
-                    next_direction = "UPSTREAM" if reason in ("UPSTREAM", "SHARED_DESTINATION") else "DOWNSTREAM"
+                    # Peers remain visible, but only a direct flow continues exploration.
+                    if reason not in ("UPSTREAM", "DOWNSTREAM"):
+                        continue
+                    next_direction = reason
                     state = (other_id, next_direction)
                     if state not in visited:
                         visited.add(state)

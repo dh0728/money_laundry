@@ -67,7 +67,7 @@ class AlertPostgresTests(unittest.TestCase):
     def test_daily_boundary_and_immutable_scores_and_empty_target(self):
         alert=self.first()
         old=self.admin.execute("SELECT evidence FROM alert_versions WHERE alert_id=%s",(alert,)).fetchone()[0]
-        self.assertEqual(old['policyVersion'], 'daily-seed-link-v2')
+        self.assertEqual(old['policyVersion'], 'daily-peer-leaf-v3')
         self.assertEqual([m['txId'] for m in old['transactions']],[self.ids[0]])
         follow=self.following(alert)
         save_alerts(self.admin,follow)

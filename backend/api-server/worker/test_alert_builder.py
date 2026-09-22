@@ -42,6 +42,30 @@ class AlertBuilderTests(unittest.TestCase):
         rows.append(self.tx(4, 1.5, "Z", "C"))
         self.assertNotIn(4, self.ids(self.build(rows, {1: .9})[0]))
 
+    def test_peer_context_does_not_expand_but_direct_flow_does(self):
+        rows = [self.tx(1, 1, "A", "B"), self.tx(2, 2, "A", "C"),
+                self.tx(3, 3, "C", "D"), self.tx(4, 3, "B", "E"),
+                self.tx(5, .5, "X", "B"), self.tx(6, .2, "Y", "X")]
+        candidate = self.build(rows, {1: .9, 2: .1})[0]
+        self.assertEqual(self.ids(candidate), {1, 2, 4, 5})
+        self.assertEqual({m.tx_id for m in candidate.transactions if m.role == "CONTEXT"}, {2, 5})
+        self.assertEqual(self.build(rows, {1: .9, 2: .1}),
+                         self.build(list(reversed(rows)), {1: .9, 2: .1}))
+
+    def test_peer_with_its_own_seed_explores_its_flow(self):
+        rows = [self.tx(1, 1, "A", "B"), self.tx(2, 2, "A", "C"),
+                self.tx(3, 3, "C", "D")]
+        candidate = self.build(rows, {1: .9, 2: .9})[0]
+        self.assertEqual(candidate.seed_ids, (1, 2))
+        self.assertEqual(self.ids(candidate), {1, 2, 3})
+
+    def test_direct_reason_still_expands_when_also_a_peer(self):
+        rows = [self.tx(1, 1, "A", "A"), self.tx(2, 2, "A", "B"),
+                self.tx(3, 3, "B", "C")]
+        candidate = self.build(rows, {1: .9})[0]
+        self.assertEqual(self.ids(candidate), {1, 2, 3})
+        self.assertEqual(set(candidate.transactions[1].reasons), {"DOWNSTREAM", "SHARED_SOURCE"})
+
     def test_time_order_and_window_restrict_flow(self):
         rows = [self.tx(1, 2, "A", "B"), self.tx(2, 1, "B", "C"), self.tx(3, 20, "B", "D")]
         result = self.build(rows, {1: .9})[0]
