@@ -1,4 +1,7 @@
-# API 계약 v0.8 — 2026-09-17
+# API 계약 v0.9 — 2026-09-23
+
+변경 v0.9: 네 화면·시연 업무 시각·범위별 판정·단일/복수 이관 설계 반영. **§9는 사용자 승인된 다음 구현 계약이며 아직 서비스에서 호출할 수 있는 API 명세가 아니다.** 기존 §3.2의 Alert GET은 현행 구현이다. 실제 배포 여부는 이 문서로 추정하지 않는다. 경로/DTO/새 상태 enum의 미확정 사항은 §9.8에 모았다.
+
 
 변경 v0.8: 정정 요청·전체 보고 교체, INTEGRATE/FREEZE_INPUT, 실행 세대·취소 결과 차단. Python 실행측·실 S3 관통은 후속.
 
@@ -10,7 +13,7 @@
 
 지위: **BE 결정 통보 + 팀 합의 대상.** 표시 없는 항목은 BE가 정해 통보하는 컨벤션이며, `[미정: X]`만 X의 회신이 필요하다(목록은 §8). 합의 결과는 이 문서를 갱신하고 kickoff §4.5에 기록. 구현된 API의 정본은 Swagger(springdoc)이고 이 문서는 사전 합의·설계 결정 기록이다.
 용어: kickoff §2.5 — `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`. 구 명칭 혼용 금지.
-V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코드와 같은 커밋으로 갱신. 변경 이력: v0.1(09-02, 층1~4 초안) → v0.2(09-03, 외부 검수 반영 — 배치 상태·추론 파일 계약·전이 표·역할·감사 이력·인증·대시보드·화면별 제공 항목 추가) → **v0.3(09-04, 화면 리서치 반영 — 파생 데이터 원칙: USD 환산·거래 점수 파생(백분위·복합 후보·합의)·거래 편입 역할·Alert 요약·대표 계좌·참여 계좌 표·점수 통계·설명 요인. 근거 `worktable/AML_화면_데이터_리서치_2026-09-04.md` §5·§6)** → **v0.3 추가(09-06, 화면 피드백): Alert·Episode 공통 상태 모델 `OPEN → IN_REVIEW → CLOSED` + `resolution`(Alert만 `ESCALATED` 추가). `CLOSED_NORMAL/CLOSED_FALSE_POSITIVE` → `CLOSED + resolution`, Episode `INVESTIGATING` → `OPEN/IN_REVIEW`, `outcome` → `resolution`, 이력 `REVIEW_START`(§3.1·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): 배정 모델 A — Alert·Episode 생성 시 라운드로빈 자동 배정 + ADMIN 재배정(§3.4 신설, §0·§3.1·§3.2·§4·§5·§6.5·§7). 9/3에 근거 없이 기록됐던 "단일 공용 큐"·"L1이 L2 지정" 폐기** → **v0.3 추가(09-07): 수집 구조 — 은행 API 키 + Presigned PUT + 완료 API + 자동 적재, MVP 편입, 은행 목업 프로그램, 도착 현황 API, 상태 `URL_ISSUED`(§0·§1.1·§1.2·§1.3·§7·§8). 멀티파트 `POST /api/uploads` 폐기** → **v0.3 추가(09-07, 화면 피드백): `IN_REVIEW` 상태 제거 — 배정이 있으면 열람 여부로 상태를 쪼갤 이유가 없음. 열람은 `firstOpenedAt`(미열람 표시)로만 기록(§3.2·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): Alert→Episode 연결은 Alert 화면에서 L1만(`POST /api/episodes/{id}/alerts` [L1]), Episode 화면은 해제만; 재배정 ADMIN 전용 유지(§3.3·§4.2·§4.3·§7)** → **v0.3 추가(09-07): Episode 상세 조사 블록 6종(baseline·flow·patternEvidence·counterparties·accountHistory·accounts) + `/transactions`·`/context-transactions`·`/graph?hops=` — 전부 MVP(§4.1·§7). 리서치 §2.11 근거** → **v0.3 추가(09-07, DB 착수 결정 4건): 컬럼 명명 `tx_id`+팀 이름(§0), 라벨은 평가 스키마 분리(§1.4), 은행 테이블 = 전 코드 + `is_reporting`(§1.1·§1.2), 구성 거래 `UNIQUE(tx_id)` + 처분 거래 재묶음 제외(§3.1)** → **v0.3 추가(09-07): 피처 세트는 모델별로 다르고 구성 변동 — `features_binary/type.parquet`, `feature_version_binary/type`(§1.3·§2.1); 최종 모델 형태는 질문 제외(§8)** → **v0.4(09-08): 미열람 표시 제거 + `first_opened_at` 컬럼 제거(열람은 이력 `REVIEW_START`로만 — §3.2·§3.3·§3.4·§4·§6·§6.5·§7) · 시각 서울 표준시(§0) · 수집 로컬 저장소 구현·결정 A Java 단일 적재 경로·검증 단계·도착 현황 기본 날짜·조회 필드(§1.1~§1.4) · 에러 응답 `id` 확장 필드 제거(§0) · V1 반영(§1.3·§1.4·§2.2·§5)** → **v0.4 추가(09-08, 설계 검토): 일별 분석 날짜당 1회 — COMPLETED 재실행 불가·FAILED만 재시도·대상 술어 `scored_job_id IS NULL OR = :jobId`·"OPEN Alert 삭제·재생성" 폐기·MVP `@Scheduled` 컷오프 자동 실행(§0·§1.2·§1.3·§2.2·§3.1·§3.3) · `score_pct` BE 자체 확정(§2.2·§8) · IN_REVIEW 잔재 정리(§1.4·§3.1·§3.4·§4.2)**.
+과거 변경 이력(현행 요구는 각 본문과 §9를 따른다): v0.1(09-02, 층1~4 초안) → v0.2(09-03, 외부 검수 반영 — 배치 상태·추론 파일 계약·전이 표·역할·감사 이력·인증·대시보드·화면별 제공 항목 추가) → **v0.3(09-04, 화면 리서치 반영 — 파생 데이터 원칙: USD 환산·거래 점수 파생(백분위·복합 후보·합의)·거래 편입 역할·Alert 요약·대표 계좌·참여 계좌 표·점수 통계·설명 요인. 근거 `worktable/AML_화면_데이터_리서치_2026-09-04.md` §5·§6)** → **v0.3 추가(09-06, 화면 피드백): Alert·Episode 공통 상태 모델 `OPEN → IN_REVIEW → CLOSED` + `resolution`(Alert만 `ESCALATED` 추가). `CLOSED_NORMAL/CLOSED_FALSE_POSITIVE` → `CLOSED + resolution`, Episode `INVESTIGATING` → `OPEN/IN_REVIEW`, `outcome` → `resolution`, 이력 `REVIEW_START`(§3.1·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): 배정 모델 A — Alert·Episode 생성 시 라운드로빈 자동 배정 + ADMIN 재배정(§3.4 신설, §0·§3.1·§3.2·§4·§5·§6.5·§7). 9/3에 근거 없이 기록됐던 "단일 공용 큐"·"L1이 L2 지정" 폐기** → **v0.3 추가(09-07): 수집 구조 — 은행 API 키 + Presigned PUT + 완료 API + 자동 적재, MVP 편입, 은행 목업 프로그램, 도착 현황 API, 상태 `URL_ISSUED`(§0·§1.1·§1.2·§1.3·§7·§8). 멀티파트 `POST /api/uploads` 폐기** → **v0.3 추가(09-07, 화면 피드백): `IN_REVIEW` 상태 제거 — 배정이 있으면 열람 여부로 상태를 쪼갤 이유가 없음. 열람은 `firstOpenedAt`(미열람 표시)로만 기록(§3.2·§3.3·§4·§6·§6.5·§7)** → **v0.3 추가(09-07): Alert→Episode 연결은 Alert 화면에서 L1만(`POST /api/episodes/{id}/alerts` [L1]), Episode 화면은 해제만; 재배정 ADMIN 전용 유지(§3.3·§4.2·§4.3·§7)** → **v0.3 추가(09-07): Episode 상세 조사 블록 6종(baseline·flow·patternEvidence·counterparties·accountHistory·accounts) + `/transactions`·`/context-transactions`·`/graph?hops=` — 전부 MVP(§4.1·§7). 리서치 §2.11 근거** → **v0.3 추가(09-07, DB 착수 결정 4건): 컬럼 명명 `tx_id`+팀 이름(§0), 라벨은 평가 스키마 분리(§1.4), 은행 테이블 = 전 코드 + `is_reporting`(§1.1·§1.2), 구성 거래 `UNIQUE(tx_id)` + 처분 거래 재묶음 제외(§3.1)** → **v0.3 추가(09-07): 피처 세트는 모델별로 다르고 구성 변동 — `features_binary/type.parquet`, `feature_version_binary/type`(§1.3·§2.1); 최종 모델 형태는 질문 제외(§8)** → **v0.4(09-08): 미열람 표시 제거 + `first_opened_at` 컬럼 제거(열람은 이력 `REVIEW_START`로만 — §3.2·§3.3·§3.4·§4·§6·§6.5·§7) · 시각 서울 표준시(§0) · 수집 로컬 저장소 구현·결정 A Java 단일 적재 경로·검증 단계·도착 현황 기본 날짜·조회 필드(§1.1~§1.4) · 에러 응답 `id` 확장 필드 제거(§0) · V1 반영(§1.3·§1.4·§2.2·§5)** → **v0.4 추가(09-08, 설계 검토): 일별 분석 날짜당 1회 — COMPLETED 재실행 불가·FAILED만 재시도·대상 술어 `scored_job_id IS NULL OR = :jobId`·"OPEN Alert 삭제·재생성" 폐기·MVP `@Scheduled` 컷오프 자동 실행(§0·§1.2·§1.3·§2.2·§3.1·§3.3) · `score_pct` BE 자체 확정(§2.2·§8) · IN_REVIEW 잔재 정리(§1.4·§3.1·§3.4·§4.2)**.
 
 - **파생 데이터 원칙 (2026-09-04 사용자 확정)**: 화면을 현 계약에 맞추지 않는다. 원장·점수·피처·이력에서 계산할 수 있는 항목은 파생해 제공한다. 불가 판정은 원천 부재(실명·KYC 등)일 때만. 모델 형태(전체 GNN / GNN 임베딩 + 후단 모델 / LightGBM)에 의존하는 항목은 **결정 보류**(§8 사용자 ②) — 계약은 어느 모델이든 맞도록 필수 열 + 선택 확장 열로 둔다.
 
@@ -41,7 +44,7 @@ V1·[원장 적재] 반영 완료 — 이후 변경은 마이그레이션·코�
 | `WORKER_FAILED` | 500 | 워커 프로세스 실패·시간 초과 |
 | `INTERNAL` | 500 | 그 외 |
 
-- **역할**: `L1`·`L2`·`ADMIN`. 엔드포인트마다 `[허용 역할]` 표기. ADMIN은 사용자·모델 관리와 **배정·재배정** 전용이며 조사 액션(종결·심층 요청·연결·의견) 불가. MVP는 데이터 범위 제한 없음(모든 역할이 전체 조회, 허용된 액션은 전체에 대해). "담당자만 처분" 강제는 10월.
+- **역할**: `L1`·`L2`·`ADMIN`. 엔드포인트마다 `[허용 역할]` 표기. ADMIN은 사용자·모델 관리와 **배정·재배정** 전용이며 조사 액션(종결·심층 요청·연결·의견) 불가. 조회와 변경 권한을 구분한다. 다음 조사 변경은 §9의 담당자/범위 검증을 따르며 임시 역할 버튼이 운영 인증을 대신하지 않는다.
 - **은행 주체 `BANK`**: 현재 목업의 임시 은행 식별(§1.1). 은행 웹·직원 로그인은 프로젝트 범위 밖이며 실제 인증 연결은 배포 전 별도 과제다.
 - **배정(2026-09-07 사용자 확정, 모델 A)**: Alert·Episode 모두 생성 시 시스템이 라운드로빈으로 담당자를 정한다(§3.4). L1이 L2를 고르지 않는다. 재배정은 ADMIN. 인증 *방식*(세션 vs JWT) `[미정: FE 로그인 착수 전, 늦어도 9/18]`.
 - **감사 이력**: 모든 처분 액션은 §6 이력 행을 부수효과로 기록. 처분 액션의 `comment`는 **필수**(빈 값 400).
@@ -249,85 +252,27 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - summary: `txCount,seedCount,totalAmountUsd,scoreMax,firstTxAt,lastTxAt`. scoreMax는 포함 거래 중 관측 점수의 최댓값이며 별도 모델 위험 확률이 아니다.
 - `GET /api/v1/alerts/{alertId}/versions`: 완료 버전의 `version,runId,createdAt` 목록.
 - `GET /api/v1/alerts/{alertId}/graph?version=1`: 동일 근거의 graph. nodes는 가명계좌 `id,kind,bankId,inCount,outCount,inAmountUsd,outAmountUsd`, edges는 거래별 `id,txId,from,to,amountUsd,occurredAt,role,includedReasons`다. 같은 계좌쌍의 반복 거래도 별도 edge로 유지한다.
-- coverage는 씨앗별 `txId,windowStart,windowEnd,days,forwardComplete,explorationLimits`다. days는 `businessDate,expectedBanks,completeBanks,complete,reports`. 한도와 누락이 있는 결과를 완전한 세탁 경로라고 표시하지 않는다.
+- 현행 coverage는 §3.1의 날짜별 배열이다. V9에서 forwardComplete를 제거했다. 한도 진단은 개발자 확인용이며 시연 화면에 제한 경고를 추가하지 않는다.
 
-### 3.3 Alert 상태 전이 표
+### 3.3 Alert 판정·업무 완료 — 다음 구현 계약
 
-아래 상태 변경·판정·열람 이력 표는 **후속 미구현 계약**이다. 이번 `/api/v1/alerts` GET은 읽기 전용이며 REVIEW_START 기록이나 상태 변경을 수행하지 않는다.
+§9.4의 범위별 처리가 정본이다. 현재 V6 상태 값 OPEN/CLOSED/ESCALATED를 새 업무 결과와 동일시하지 않는다. 일부 이관 후 미처리 범위가 있으면 열린 업무를 유지하며, 모든 조사 대상이 판정·제외·이관되면 업무 완료가 가능하다. 혼합 처리를 전체 NORMAL로 표시하지 않는다.
 
-**공통 상태 모델 (2026-09-06 사용자 확정 — Alert·Episode 통일, 09-07 `IN_REVIEW` 제거)**: 생애는 `OPEN`(담당자에게 배정되어 처리 중) → `CLOSED`(종결). 종결 결과는 상태에 넣지 않고 별도 필드 **`resolution`**(`CLOSED`일 때만 값, 그 외 NULL). Alert만 `ESCALATED`(Episode 귀속, `episodeId != null`과 항상 일치)를 추가로 가진다 — Episode에는 "넘김" 단계가 없다(감독기관형 범위, 보고 단계 없음). 열람은 상태를 바꾸지 않는다: 담당자의 첫 열람은 **이력 행 `REVIEW_START`로만** 남긴다(2026-09-08 사용자 확정 — `first_opened_at` 컬럼 없음, 화면 표시 없음). "첫 열람" 판정 = 현재 담당자의 `REVIEW_START`가 마지막 `ASSIGN`(없으면 생성) 이후에 없을 때 기록. 재배정되면 새 담당자의 첫 열람이 다시 기록된다. dberd 정합 메모 결정 2(`NEW/CLOSED + resolution`) 해소.
+원본 Alert와 이관 시점 범위는 보존한다. `episodeId != null ⇔ ESCALATED`와 단일 Episode 귀속 제약, 연결 해제로 L1에게 자동 반송하는 구 설계는 새 부분 이관/복수 출처/직접 L2 조정 계약에 사용하지 않는다. 상태 enum 및 기존 읽기 API와의 호환은 §9.8에서 정한다. 담당자 열람 이력은 검토 사실이며 업무 상태나 모델 점수를 변경하지 않는다.
 
-Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSITIVE`.
+### 3.4 배정 규칙
 
-| from | to | 액션 / 엔드포인트 | 허용 역할 | 필수 입력 | 이력 action |
-|---|---|---|---|---|---|
-| OPEN | (유지) | `GET /api/alerts/{id}` — 담당 L1(assignee)의 첫 열람이면 이력 기록(다른 사용자 열람은 기록 없음) | L1(assignee) | — | `REVIEW_START` |
-| OPEN | OPEN | `POST /api/alerts/{id}/assign` `{ userId, comment }` — 재배정(L1 사용자) | ADMIN | userId, comment | `ASSIGN` |
-| OPEN | CLOSED (`resolution: NORMAL`) | `POST /api/alerts/{id}/close` `{ resolution: NORMAL, comment }` | L1 | resolution, comment | `CLOSE` |
-| OPEN | CLOSED (`resolution: FALSE_POSITIVE`) | 같은 엔드포인트 `{ resolution: FALSE_POSITIVE, comment }` | L1 | resolution, comment | `CLOSE` |
-| OPEN | ESCALATED | `POST /api/episodes` `{ alertIds[], comment }` (신규 Episode — 담당 L2는 라운드로빈 자동 §3.4) | L1 | alertIds ≥1, comment | `ESCALATE` |
-| OPEN | ESCALATED | `POST /api/episodes/{episodeId}/alerts` `{ alertIds[], comment }` (기존 Episode에 연결 — **Alert 화면에서 L1이 수행**, Episode 화면엔 연결 없음 09-07) | L1 | comment | `LINK` |
-| ESCALATED | OPEN | `DELETE /api/episodes/{episodeId}/alerts/{alertId}` `{ comment }` — 해제되면 기존 담당 L1에게 돌아감 | L2 | comment; Episode에 Alert가 2개 이상일 때만(빈 Episode 불허) | `UNLINK` |
-| CLOSED | — | 어떤 액션도 불가 → 409 `INVALID_TRANSITION` | | | |
-| ESCALATED | CLOSED | 불가(Episode 종결로만) → 409 | | | |
-| OPEN | ESCALATED (CLOSED Episode에) | 불가 → 409 | | | |
+- 일반 생성 시 Alert는 L1, Episode는 L2 자동 라운드로빈 배정을 유지한다. 역할별 `users.last_assigned_at` NULL 우선·오래된 순, 동률 userId 오름차순이다. Alert 생성 배정과 다음 Episode 구현을 구분한다.
+- L2가 본인 조사 범위를 새 Episode로 분리하면 본인 담당으로 이어간다. 일반 생성 라운드로빈과 구분한다.
+- ADMIN 재배정은 같은 역할의 열린 업무에 한정하는 방향을 유지한다. 경로·DTO는 다음 변경 API와 함께 정한다. L2는 다른 담당자의 Episode를 임의 변경할 수 없다.
+- 배정·열람·조사 의견·종결 기록은 보존하며 미열람 전용 상태를 만들지 않는다. 사람 결론을 모델 평가 정답으로 자동 전환하지 않는다.
+- 범위 이동은 §9.4~9.5의 원자 작업이다. 비원자 UNLINK+LINK 두 요청으로 구현하지 않는다.
 
-- 대시보드 처리 흐름은 ① **L1 조사 중**(`OPEN`) ② 조사 경과일 ③ L2 조사 중(`ESCALATED` = Episode `OPEN`) ④ 처분(`CLOSED` + resolution). 화면에 "미열람" 표시는 두지 않는다(2026-09-07 사용자 — 배정됐는데 안 열어본 것을 구분해 보여줄 필요 없음). 열람은 이력 `REVIEW_START`로만 남긴다(컬럼 없음).
-- 재실행 규칙(§3.1)과의 관계: 일별 분석은 날짜당 1회이므로 어떤 상태의 Alert도 재실행으로 삭제·재생성되지 않는다(2026-09-08). Alert id·담당자·이력은 생성 뒤 불변.
+## 4. Episode — 다음 구현 계약
 
-### 3.4 배정 규칙 (Alert·Episode 공통 — 2026-09-07 사용자 확정, 모델 A)
+현재 Episode 컨트롤러/업무 저장 구현은 없다. 승인된 목록·상세·범위 조정·판정·종결 계약은 §9.2~9.5를 따른다. Alert별 이관 범위가 초기 조사 묶음이며 L2는 본인 담당 OPEN Episode에서 제외·분리·이동할 수 있다. 묶음별 판정 후 사건을 종결하며 원래 L1 처리 기록은 덮지 않는다.
 
-- **생성 시 자동 라운드로빈**: Alert는 일별 분석이 만든 직후 BE가 L1 사용자 중 한 명에게, Episode는 `POST /api/episodes` 직후 L2 사용자 중 한 명에게 배정. 대상 풀 = 해당 역할의 사용자 전원(부재·비활성 처리는 11월 [권한관리]). 선택 규칙 = `users.last_assigned_at`이 가장 오래된 사용자(NULL 우선, 동률이면 `userId` 오름차순), 배정 후 갱신. 한 job이 Alert N건을 만들면 N번 순환한다.
-- **재배정**: `POST /api/alerts/{id}/assign`, `POST /api/episodes/{id}/assign` `{ userId, comment }` — **ADMIN 전용**. 대상은 같은 역할(L1/L2)의 사용자여야 한다(아니면 400). `OPEN`에서만 가능하고 상태는 바뀌지 않는다(`OPEN → OPEN`), 이력 `ASSIGN`(`relatedIds` = 이전·이후 userId). CLOSED는 재배정 불가(409).
-- **행위 제한**: MVP는 담당자가 아니어도 같은 역할이면 처분 가능(§0 범위 제한 없음). "담당자만 처분"은 10월. `REVIEW_START` 기록은 담당자 열람에만 걸린다.
-- 실무 근거: Oracle AM 배치 배정(사용자·풀, 규칙 기반)·ECM 자동 할당(개인별 최대 건수·부재 시 중단), Sardine 큐 라운드로빈, Unit21 관리자 재배정(500건 일괄) — 리서치 문서 §2.10. 개인별 보유 상한·부재 규칙은 11월 후보.
-
-- `resolution` `NORMAL` = 정상 거래로 판단, `FALSE_POSITIVE` = 모델 오탐(둘 다 평가 지표 라벨로 쓰인다). 종결 필터는 `status=CLOSED&resolution=…`.
-- 이동(다른 Episode로) = UNLINK + LINK 두 요청(MVP 비원자). 원자적 `move`·분리·병합은 10월: `POST /api/alerts/{id}/split`, `POST /api/alerts/merge`, `POST /api/episodes/{id}/alerts/move`.
-- 재오픈·보류·반려는 MVP·10월 범위 밖.
-
-## 4. 층 4 — Episode·조사
-
-### 4.1 조회
-- **GET /api/episodes** [전 역할] — 목록(페이지네이션). 기본 정렬 `riskScore,desc`(riskScore = 소속 Alert riskScore 최대값 `[미정: Data 동의]`). 정렬 키 `riskScore, createdAt, updatedAt, alertCount, ageDays`. 필터 `status`, `resolution`, `assigneeId`, `from/to`(createdAt). "내 담당" 뷰 = `assigneeId=me`(§7과 같이 내 담당·전체 두 뷰).
-  행: `{ episodeId, riskScore, alertCount, txCount, totalAmountUsd, amountsByCurrency: [{ currency, total }], primaryTypes: [{ code, name }], assignee: { userId, name }, status, resolution, createdBy: { userId, name }, createdAt, updatedAt, closedAt, ageDays }`
-- **GET /api/episodes/{episodeId}** [전 역할] — 행 + `alerts: [Alert 목록 행]`, `history: [§6 행]` + **조사 블록 6종(2026-09-07 사용자 확정, 전부 MVP — 리서치 §2.11)**. 전부 조회 시 원장·점수·피처·이력에서 파생(저장 없음), 대표 계좌 = 소속 Alert 중 riskScore 최대 Alert의 `subjectAccount`:
-  - `baseline`: `{ account, bank, windowDays: 30, firstSeenAt, accountAgeDays, metrics: [{ key: IN_USD | IN_COUNT | OUT_USD | OUT_COUNT | NEW_COUNTERPARTIES | MEDIAN_GAP_HOURS, current, baseline, ratio }] }` — current = Episode 기간, baseline = 직전 30일 창(피처 테이블·원장).
-  - `flow`: `{ periodFrom, periodTo, inflowUsd, inflowCount, inflowBanks, outflowUsd, outflowCount, outflowBanks, netRetainedUsd, passThroughRatio, medianDwellHours, bankBoundaryHops: { in, out }, roundAmountCount, nearThresholdCount, txCount }` — 잔액 원천이 없으므로 `netRetainedUsd = inflow − outflow`. 라운드 = 1,000 단위 나누어떨어짐, 임계 직하 = 프로퍼티 `app.evidence.threshold-usd`(기본 10,000)의 90~100%.
-  - `patternEvidence`: `[{ alertId, typeClass, typeName, checks: [{ key, label, passed, value }] }]` — 유형별 고정 항목: FAN-IN/FAN-OUT = `DISTINCT_COUNTERPARTIES`(≥ k), `TIME_SPAN_DAYS`, `ALL_NEW_COUNTERPARTIES`, `NEAR_THRESHOLD_REPEAT`, `ROUND_AMOUNTS`; CYCLE/RANDOM/STACK/G-SCATTER/S-GATHER/BIPARTITE = `HOPS`, `START_EQUALS_END`, `DECREMENT_PCT_RANGE`, `INTERMEDIARY_REUSE`, `BANK_BOUNDARY_EVERY_HOP`, `MEDIAN_HOP_GAP_HOURS`. `passed`는 BE 규칙(프로퍼티), 항목 정의 근거 = FFIEC App F·FinCEN 퍼널/뮬·FATF PML·AMLworld.
-  - `counterparties`: `{ inbound: [...], outbound: [...] }`, 항목 `{ account, bank, txCount, totalUsd, isNew30d, otherAlerts: [{ alertId, status, resolution, primaryType, assignee }] }` — 상위 10 + 나머지 합계 행.
-  - `accountHistory`: `[{ account, bank, alerts: [{ alertId, status, resolution, episodeId, createdAt }] }]` — Episode 참여 계좌 전부의 전 은행 Alert·Episode 이력.
-  - `accounts`: 소속 Alert `accounts[]` 합집합(역할·in/out·기준선, §3.2와 같은 모양).
-- **GET /api/episodes/{episodeId}/transactions** [전 역할] — 소속 Alert 구성 거래 합집합(§2.4 행 + `alertId`, `role`, `direction`(대표 계좌 기준)). 페이지네이션.
-- **GET /api/episodes/{episodeId}/context-transactions?days=3** [전 역할] — 참여 계좌의 **Alert 밖** 거래(기간 ±days), §2.4 행 + `account`(어느 참여 계좌의 거래인지). 상한 500행.
-- **GET /api/episodes/{episodeId}/graph?hops=0|1** [전 역할] — `hops=0` 소속 Alert 그래프 합집합(§3.2 형식), `hops=1` 참여 계좌의 Alert 밖 1-hop 이웃을 추가(노드 `outside: true`, 엣지 `outside: true`, 상한 노드 150·초과 시 `truncated: true`). 2-hop 이상·다기관 전체 그래프는 11월.
-- **GET /api/episodes/{episodeId}/history** [전 역할].
-
-### 4.2 액션
-- **POST /api/episodes** [L1] `{ alertIds[], comment }` → 201 `{ episodeId, assignee }`. Episode `OPEN`, 담당 L2는 **BE가 라운드로빈으로 배정**(§3.4 — L1이 고르지 않는다), Alert들 `ESCALATED`.
-- **GET /api/episodes/{id}** — 담당 L2(assignee)의 첫 열람이면 이력 `REVIEW_START`(판정 규칙 §3.3). 상태 변화 없음. 다른 사용자 열람은 기록 없음.
-- **POST /api/episodes/{id}/alerts** [L1] `{ alertIds[], comment }` — `OPEN` Alert만 연결 가능. **진입점은 Alert 상세의 "심층 요청 → 기존 Episode에 연결"뿐**(2026-09-07 사용자 확정). L2는 다른 담당의 Alert를 끌어오지 않는다 — Episode 화면의 "관련 Alert 후보"는 정보 표시만, 연결은 그 Alert의 담당 L1이 한다. 대상 Episode는 `CLOSED`가 아니어야 한다(409).
-- **DELETE /api/episodes/{id}/alerts/{alertId}** [L2] `{ comment }` — 연결 해제. Alert `OPEN` 복귀, 기존 담당 L1 유지. 마지막 Alert면 409.
-- **POST /api/episodes/{id}/assign** [ADMIN] `{ userId, comment }` — 재배정(L2 사용자, §3.4). `OPEN`에서만 가능하고 상태는 바뀌지 않는다. 새 담당자의 첫 열람은 `REVIEW_START`로 다시 기록된다(§3.3).
-- **POST /api/episodes/{id}/comments** [L2] `{ comment }` — 조사 의견. 상태 변화 없음, 이력 `COMMENT`.
-- **POST /api/episodes/{id}/close** [L2] `{ resolution: NORMAL | SUSPICIOUS, comment }` — 종결. 소속 Alert는 `ESCALATED` 유지(조회는 Episode 상태로 판단).
-
-### 4.3 Episode 상태 전이 표
-
-상태: `OPEN`(담당 L2 조사 중) / `CLOSED`. `resolution: NORMAL | SUSPICIOUS`(`CLOSED`일 때만). Alert와 같은 공통 모델(§3.3) — `ESCALATED`만 없다. 열람은 이력 `REVIEW_START`로만.
-
-| from | to | 액션 | 허용 역할 | 필수 입력 | 이력 action |
-|---|---|---|---|---|---|
-| — | OPEN | `POST /api/episodes` (담당 L2는 라운드로빈 자동) | L1 | alertIds, comment | `ESCALATE`(각 Alert) + `EPISODE_CREATE` + `ASSIGN`(SYSTEM) |
-| OPEN | (유지) | `GET /api/episodes/{id}` — 담당 L2 첫 열람이면 이력 기록 | L2(assignee) | — | `REVIEW_START` |
-| OPEN | (유지) | alerts 추가(Alert 화면에서) | L1 | comment | `LINK` |
-| OPEN | (유지) | alerts 해제 / comments | L2 | comment | `UNLINK` / `COMMENT` |
-| OPEN | OPEN | assign(재배정) | ADMIN | userId, comment | `ASSIGN` |
-| OPEN | CLOSED | `POST /api/episodes/{id}/close` | L2 | resolution, comment | `EPISODE_CLOSE` |
-| CLOSED | — | 모든 변경 불가 → 409 | | | |
-
-- 역할 요약: L1 = Alert 종결·심층 요청(신규 Episode 생성 / 기존 Episode에 연결 — 둘 다 Alert 화면). L2 = Episode 조사(해제·의견·종결; 10월 분리·병합). ADMIN = 배정·재배정 + 전체 조회, 조사 액션 없음.
-- Episode 상태 표시 관점: 대시보드 "L2 조사 중" 칸 = Episode `OPEN`(Alert로는 `ESCALATED`). 미배정 상태는 존재하지 않고(생성 즉시 배정), 열람 여부는 화면에 표시하지 않는다(이력 `REVIEW_START`만).
+예전 `/api/episodes` 생성과 `/{id}/alerts` 전체 연결 API를 각각 최종 계약으로 사용하지 않는다. 단일·복수 이관은 같은 명령으로 받으며 새 Episode 생성/기존 Episode 추가와 모든 선택 범위의 변경을 한 DB 트랜잭션으로 처리한다. 마지막 범위를 옮겨 빈 사건은 정상 판정 없이 범위 정리로 종료할 수 있다. 상세는 §9.4다.
 
 ## 5. 인증·사용자 (W4 [인증] — 초안, 방식은 미정)
 
@@ -339,7 +284,9 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
 
 ## 6. 감사 이력
 
-행 스키마(단일 테이블):
+아래는 과거 필드 초안이며 아직 구현되지 않았다. 다음 계약의 범위 버전·업무/실제 시각·혼합 처리 감사는 §9.5와 ERD를 따른다.
+
+기존 필드 참고:
 ```
 { id, actor: { userId, name, role }, action, targetType: ALERT|EPISODE, targetId,
   relatedIds: [], from, to, resolution, comment, at }
@@ -350,31 +297,87 @@ Alert 상태: `OPEN` / `ESCALATED` / `CLOSED`. `resolution: NORMAL | FALSE_POSIT
 - **GET /api/alerts/{id}/history**, **GET /api/episodes/{id}/history** — Episode 이력은 소속 Alert의 ESCALATE/LINK/UNLINK 행을 포함.
 - **GET /api/history?actor={userId}** [ADMIN·본인] — 사용자별 처리 이력(기획서 요구, 11월 [권한관리]에서 구현, 시그니처 예약).
 
-## 6.5 대시보드 (W4 [Episode 조사 데이터 ⑥ + 대시보드], 09-29 — 처리 흐름 4칸 + 담당자별)
+## 6.5 대시보드
 
-- **GET /api/dashboard/summary** [전 역할] — `{ alertsByStatus: { OPEN, ESCALATED, CLOSED }, alertsByResolution: { NORMAL, FALSE_POSITIVE }, alertsByType: [{ code, name, count }], episodesByStatus: { OPEN, CLOSED }, episodesByResolution: { NORMAL, SUSPICIOUS }, alertsByAssignee: [{ userId, name, open, closedToday, escalatedToday, maxAgeDays }], episodesByAssignee: [{ userId, name, open, closedLast7Days, maxAgeDays }], latestJob: { jobId, analysisDate, status, suspiciousTxCount, alertCount, finishedAt }, reductionRate }` — `reductionRate = 1 - alertCount / suspiciousTxCount`(최근 job). 지표 추가는 `[미정: FE — 시연 화면]`.
+승인된 개인/기관 지표·집계 범위는 §9.2를 따른다. 예전 처리 흐름 4칸·감소율 중심 응답은 현 화면 계약으로 사용하지 않는다. 새 대시보드 API는 미구현이다.
 
-## 7. 화면별 제공 항목 (FE 통보용 — 회신 요청)
+## 7. 화면별 제공 항목
 
-FE는 아래에서 **표시할 항목을 고르고, 빠진 항목을 요구**한다. 항목 추가는 W3 [스키마]·[API] 전(9/14)까지 회신하면 마이그레이션 없이 반영된다.
+§9.2가 현행 화면 요구다. HTML은 배치 참고이며 사용자 결정이 우선한다. 네 화면의 구현 여부와 계약 확정 여부를 구분한다. 정식 인증·React 연동·학습 모델 연결 완료를 임시 Streamlit 시연과 혼동하지 않는다.
 
-| 화면 | API | 제공 항목 |
-|---|---|---|
-| 수집·처리현황 (은행별 도착 현황) | §1.1, §1.2 | **은행별 도착 현황**(`GET /api/banks/arrivals`: 은행·상태 7종·파일명·행 수·도착 시각·컷오프 잔여·도착 n/N) / 적재 작업 목록·오류 표(`errors[]`) / 분석 작업 목록(status·attempt·analysisDate·모델 버전·임계·의심 거래·Alert) / "분석 실행" 버튼 = `POST /api/batch-jobs/analysis` / 현재 목업이 전송 / 향후 은행 직원 로그인·파일 선택·수동 업로드 화면 연결 |
-| Alert 목록 (L1 큐) | §3.2 | 위험도, **요약문**, 대표 유형(코드·명), **대표 계좌·계좌 수·은행 수**, 거래 수, **USD 합계 + 통화별 합계**, **점수 통계(평균·최고·초과 비율)·점수 가중 금액·묶음 순도**, 기간(첫·마지막 거래), 참여 은행, 상태, **담당자(자동 배정)**, 소속 Episode, 분석 날짜, 생성 시각, **경과일** / 정렬 8종 / 필터 7종("내 담당" 기본 뷰) / ADMIN: 재배정 |
-| Alert 상세 (L1) | §3.2, §3.3 | 목록 항목 + 구성 거래 표(§2.4 — 금액 USD·**백분위·임계 배율·의심 여부·복합 유형 후보·두 모델 합의·편입 역할·방향** 포함) + 유형 구성비 + 묶음 근거 + **참여 계좌 표(역할·in/out 건수·USD·최대 점수·상대방 수·첫 거래일)** + **시각순 점수 추이** + **설명 요인(피처 기준선 편차 상위 3, 포함 방식은 W3)** + 관계 그래프(노드 역할·금액·위험 등급, 엣지 id·거래 수·USD·최대 점수·유형·기간) + 이력 / 액션: 종결(정상·오탐, 의견 필수)·심층 요청(신규 Episode — L2 자동 배정 / 기존 Episode 연결) / ADMIN: 재배정 |
-| Episode 목록 (L2 큐) | §4.1 | 위험도·자동 제목·Alert 수·거래 수·USD·유형들·담당자·상태(OPEN/CLOSED)·결과·요청 L1·경과일 / 뷰: 내 담당·전체 / 정렬·필터 §4.1 |
-| Episode 상세 (L2 조사) | §4 | 상세(조사 순서): 소속 Alert 표 → ① 기준선 배율 → ② 자금 흐름 요약 → ③ 패턴 증거 체크 → ④ 상대방 표(다른 Alert 포함) → ⑤ 자금 경로 그래프(hops=0/1) + 연계 거래 → ⑥ 관련 계좌 이력 → ⑦ 의견·이력 → ⑧ 결론(who/what/when/where/why/how 템플릿 + resolution + 서술) / 액션: Alert 해제·조사 의견·종결 — 연결은 Alert 화면(L1) / ADMIN: 재배정 |
-| (관계 그래프) | §3.2 graph · §4.1 graph | 독립 화면이 아니라 Alert 상세·Episode 상세 안의 패널(노드 = 계좌). Alert = 구성 거래 그래프, Episode = 합집합 + Alert 밖 1 hop. 다기관 전체 그래프는 11월 |
-| 대시보드 | §6.5 | 처리 흐름 4칸(L1 조사 중 OPEN → 조사 경과일 → L2 조사 중 ESCALATED/Episode OPEN → 처분 CLOSED + resolution 분포), 유형 분포, 담당자별(L1·L2), 최근 배치, 감소율. 미열람 표시 없음 |
-| 로그인 | §5 | 사용자·역할 반환. 역할별 첫 화면(L1 → Alert 목록 "내 담당", L2 → Episode 목록 "내 담당", ADMIN → 대시보드). 시연은 L1·L2 계정 전환 + ADMIN 재배정 1회(선택) |
-| 모델 성능·버전 / 사용자·권한 | — | 시연 이후(10~11월) |
+## 8. 미결 목록
 
-## 8. 미정 목록 (회신 주체별)
+현재 화면/조사 계약의 구현 전 미결은 §9.8을 따른다. 실제 모델 피처·확률 합/dtype·설명 정보 계약과 정식 인증은 각 해당 태스크에서 확인한다. 과거 단일 Alert 소속·처분 거래 무조건 제외·부분 이관 불가를 미결 또는 확정 조건으로 되살리지 않는다.
 
-**FE**: ① 금액 **화면 표기 방식**(축약·자릿수 — 데이터 형태는 §0 BE 결정으로 해소) ② 그래프 응답 포함 vs 분리(BE 추천: 분리), 시각화 라이브러리 ③ 유형 한글 표시 명칭·'의심 거래' 표시 명칭(초안: 리서치 문서 §4.6) ④ §7 회신(빠진 항목) ⑤ 인증 방식 결정 기한(로그인 착수 시점) ⑥ 대시보드 추가 지표(후보: 위험 밴드 분해·미결 경과일 중앙/최대·처분 결과 분포·은행별·담당자별 부하·Alert→Episode 전환율).
-**Data**: ① 시연 CSV 시각 형식·인코딩·은행별 분할(9/7 기한 경과·미회신 — IBM 원본 형식으로 진행 중, §1.4) ② ~~이진 모델 피처 세트 동일 여부~~ → 다름·구성 변동으로 확정(09-07, §2.1) — 각 세트의 현재 컬럼 목록은 [모델 래핑] 때 피처 빌더에서 읽는다 ③ Σp 보장·dtype ④ `link_basis` 산출 가능 여부(+ 거래별 `role`/허브 계좌 산출 가능 여부) ⑤ ~~처분된 Alert 거래 제외 여부~~ → 제외로 확정(09-07, §3.1) — 알고리즘 입력 = 미소속 거래만 ⑥ Episode 위험도 = max Alert riskScore 동의 ⑦ ~~점수 적재 스텝에서 job 내 백분위(`score_pct`) 계산 추가 동의~~ → BE 자체 확정(09-08, §2.2 — 적재 스텝은 BE 소유) ⑧ 학습 산출물(run json: 검증 PR-AUC, recall별 임계·precision·알람 수, 유형별 OVR PR-AUC, 피처 중요도) 인도 형식·시점 — 10월 [모델 관리] `model_versions` 입력, W2 캘리브레이션에도 사용.
-**Infra**: 배포 후 EC2 역할의 환경별 S3 prefix PUT/HEAD/GET 권한·컨테이너 자격증명 접근 확인. SSE-KMS 사용 시 체크섬 HEAD용 추가 KMS 권한 확인. dev 프로파일 적용 및 실제 S3 관통은 배포 후 검증. 웹 업로드 CORS는 향후 별도 구성.
-**Data 추가(09-07)**: ⑨ Episode 조사 블록 패턴 증거 항목·통과 기준 초안 검토(§4.1) ⑩ 시연 CSV 은행별 분할 형식(은행 목업이 파일 단위로 전송).
-**사용자**: ① ~~`is_laundering` 원장 보관 여부~~ → 평가 스키마 분리로 확정(09-07, §1.4) ② **최종 모델 형태 — 지금 답할 수 없음(2026-09-07 사용자)**: 모델 개선 결과에 따라 정해진다. 질문 목록에서 제외하고, 계약은 필수 열 + 무시되는 확장 열 규칙(§2.1)·모델별 피처 파일·`feature_version_*`로 어느 형태든 수용한다. 형태가 정해지면 그때 엣지 파일·`pred_contrib`·run 지표 인도 형식을 추가한다.
-해소됨(v0.2): 점수 필드명, 유형 매핑표, 페이지네이션·정렬, 에러 응답, 배치 상태, 상태 전이, 역할 표, 감사 이력 행, 임계 저장(threshold_value 스냅샷). 해소됨(v0.3): 금액·통화 데이터 형태(USD 환산 병기·ISO 코드), Alert 요약·대표 계좌·참여 계좌·점수 통계·거래 편입 역할·점수 파생 확장.
+## 9. 네 화면·시연 시각·범위별 판정 계약 (승인 / 구현 전)
+
+### 9.1 공통 의미와 시간
+
+- 실제 세탁 정답은 입력에 없다. 모델의 의심/정상과 패턴은 예측, 거래 분석은 관측값의 계산, 사람 판정은 사건 범위의 검토 결론이다. SUSPICIOUS는 실제 세탁 확정이 아니다. evaluation 라벨/시나리오를 운영 피처·Alert 구성·유형 요약·설명에 사용하지 않으며 사람 판단도 자동 학습 정답으로 전환하지 않는다.
+- 모델 의심은 기존 `isSuspicious = p_laundering >= threshold_value`; agreement 4분면은 §2의 기존 정의를 유지한다. 사람 판정은 별도 제공한다. 미분석을 점수 0/정상/WEAK로 채우지 않는다.
+- 시연 업무 시각은 로컬 시연에만 적용하며 DB 보존, 패널 KST 설정·다음 날 이동·자동 재생과 연동한다. 자동 재생의 업무일은 거래 기준일 다음 날이다. 처리 중 변경 금지, 처리한 시점보다 뒤로 돌아가려면 시연 데이터 초기화가 필요하다.
+- 업무 시각은 오늘/어제·기간·배정/검토/종결·경과 일수에 사용한다. 실제 시간은 S3 서명/인증 만료·통신/재시도·실행 소요·서버 로그에 사용한다. 실제 수신 cutoff를 시연 시각으로 무조건 대체하지 않는다. 원장의 거래 발생 시각은 그대로다.
+- 달력은 KST 날짜 범위. 시작일 00:00 이상, 종료일 다음 날 00:00 미만이다. 같은 필터 종류 복수 값은 OR, 종류 사이는 AND. 필터 태그 X는 해당 값만 해제한다. 페이지 응답은 §0을 유지한다.
+- 시연 입장은 고정 L1/L2 선택 버튼이다. 정식 인증/다중 계정 권한은 후속이며 클라이언트가 지정한 역할을 운영 인증으로 간주하지 않는다.
+
+### 9.2 조회 책임과 화면별 데이터
+
+아래는 제공해야 할 응답 의미다. 미구현 경로/필드명은 §9.8에서 실제 구현과 대조한 뒤 정한다.
+
+| 화면 | 승인된 조회/표시 계약 |
+|---|---|
+| 개인 대시보드 | 내 미처리 Alert+Episode, 그중 할당 후 3일 경과, 기간 내 내 종결, 위험도순 내 업무, 기간 내 최근 내 활동 |
+| 기관 대시보드 | 오늘 모델 의심 거래 수+전체 거래 대비 탐지율 카드가 먼저, 오늘 신규 Alert 수+전일 대비 증감이 다음. 기간과 무관한 현재 열린 Alert/Episode 및 3일 경과 업무. 30일 처리율·최근 유입 Alert 목록 제외 |
+| 기관 차트 | 기간별 Alert 유입/처리 2개 선, 전체 분석 거래 agreement 4종 건수/비율 도넛(모델 판정 조합 분포), 의심 거래 탐지 유형별 건수 막대. 도넛 분모를 의심 거래로 제한하지 않음 |
+| Transactions | 한 화면에서 소유주→그 소유주의 계좌→그 계좌 송수신 거래 목록 연동. 거래 발생일·모델 의심/정상·결제 수단 등 필터. 조건에 맞는 거래가 있는 상위 목록만 제공, 선택 범위 이탈 시 하위 선택 해제. 전체 조회에는 미분석 포함 |
+| Alerts 목록 | 현재 열린 Alert, 탐지일 필터. ID·위험도·대표 유형/씨앗 비중·금액·거래 수·담당자 이름·상태·탐지일/경과 일수. 위험도/유형은 §9.3 |
+| Alert 상세 | 개요/자금 흐름/거래/검토 의견. 금액 지표·씨앗 수·첫/마지막 거래 시각·일별 모델 의심 거래 건수·상위 송금 계좌·결제 수단 구성·패턴 예시·탐지 근거·처리 이력 |
+| Episodes 목록 | 생성일 필터. 유사 목록 프레임, 연결 Alert 대표 유형들을 태그로 표시하고 단일 대표 유형을 강제하지 않음. 상세 컬럼·기본 상태 필터는 아직 구체화 대상 |
+| Episode 상세 | 같은 4개 탭. 현재 조사 범위의 금액/거래 수/기간, 연결 Alert 수·유형, 일별 모델 의심 거래 금액·상위 송금 계좌·근거·이력, 묶음별 판정과 종결 |
+
+계좌/소유주 서비스 식별자를 사용하며 원문 암호문·검색 토큰을 반환하지 않는다. 소유주 표시명 등 원문 공개 범위는 별도 접근 계약 없이 확대하지 않는다. 소유주 박스에 소속 계좌를 행으로 표시하는 그래프와 계좌 노드 그래프를 전환하고 거래별 시간축을 제공한다. 실제 거래/출처를 유지하며 같은 거래의 다중 Alert 소속 때문에 금액을 중복 합산하지 않는다.
+
+### 9.3 요약과 설명
+
+- Alert 위험도: 씨앗 거래 최대 이진 점수. 현 구현 `summary.scoreMax`는 포함 거래 중 최대 관측 점수이므로 동일 의미로 조용히 재사용하지 않는다. 계약 변경/별도 필드 여부를 구현 전 정한다.
+- 대표 유형: 씨앗 중 typeClass≠0 분류의 최다 유형. typeClass=0(패턴아님)뿐이면 패턴 미특정, 최다 동률이면 혼합. 유형 비중 분모는 전체 씨앗이며 Alert 전체의 패턴 확률이 아니다. 개별 패턴 확률은 거래 상세에 제공한다. 패턴 요약은 Alert 구성 알고리즘을 바꾸지 않는다.
+- 총 거래액: 현재 조사 대상 거래를 txId로 중복 제거해 합산. 반복 발생한 서로 다른 거래는 보존. 경유 거래액 합계를 고유 자금량으로 설명하지 않는다. MVP 지표는 총 거래액·계좌별 수취−송금·상위 3개 수취 계좌 비중이다. 통화별 계산/표시를 기본으로 하며 환산 없는 이종 통화 합산 금지. 기존 명시적 환율 버전의 USD 값은 별도 환산 지표이며 실제 원통화 합계와 구분한다.
+- 외부 유입은 조사 중심 계좌 집합 밖→안이며 등록 은행 여부와 다르다. 중심 범위·유입 후 단시간 유출 산식이 미확정이므로 두 지표는 MVP 우선 구현에서 제외한다. 0으로 임의 표시하지 않는다.
+- 탐지 근거는 모델 점수/씨앗, 관측 거래 연결, 계산 지표, 사람 의견을 구분한다. 별도 룰 엔진 도입 없음. 그래프 모양을 모델 내부 판단 근거로 단정하지 않는다. 패턴 이미지는 예시이며 실제 사건 그래프로 연결한다.
+
+### 9.4 범위 처리·단일/복수 이관
+
+- 조사 대상 SUBJECT, 참고 맥락 CONTEXT, 범위 제외를 구분한다. 자동 탐색의 SEED/CONNECTION/CONTEXT와 사람의 조사 역할은 별도다. 모델 정상 거래도 조사 대상일 수 있다. 이관 시 두 범위 건수를 확인하고 원본 근거 버전/출처를 고정한다.
+- L1: 다중 선택 정상 판정·제외·부분/전체 이관. 미처리 대상이 있으면 Alert 업무를 유지하며 전부 처리하면 완료 가능하다. 혼합 처리 결과를 전체 NORMAL로 축약하지 않는다. 제외/이관은 의심 또는 정상 확정이 아니다.
+- 이관 명령은 단일/복수 모두 같은 API에서 배열을 받는다. 각 항목에는 Alert ID, 근거/조사 범위 버전, 선택 거래 범위가 필요하다. 목적지는 새 Episode 또는 기존 OPEN Episode다. 구체 DTO 이름은 미확정이며 단순 alertIds 배열만으로 부분 범위를 잃지 않아야 한다.
+- 한 요청의 새 Episode 생성(해당 시)·모든 범위 연결·업무 상태·감사 기록은 함께 성공/취소한다. 항목별 일부 성공 방식은 채택하지 않는다. 담당자 권한·목적지 상태·현재 범위를 서버가 확인한다. 신규 일반 Episode는 기존 L2 라운드로빈 배정 원칙을 유지한다.
+- L2: 이관된 Alert별 초기 묶음을 검토하고 필요 시 제외·분리·이동. 이동 목적지는 같은 Episode 묶음, 본인 담당 다른 OPEN Episode, 본인 담당 새 Episode다. 다른 담당자의 사건을 임의 변경하지 않는다. 원본 L1 이관 기록을 수정하지 않는다.
+- Episode 묶음 하나/여러 개의 고정 SUBJECT 범위에 정상/세탁 의심 일괄 판정. CONTEXT나 나중 추가 거래에는 자동 적용하지 않는다. 판정 후 범위 변경 시 현재 범위 재확인이 필요하고 이전 판정은 보존한다.
+- 종결: 미판정 대상이 있으면 거절. 모두 처리한 후 의심 묶음이 하나 이상이면 세탁 의심(적용 범위 명시), 모두 정상이면 정상, 전부 이동/제외면 판정 없는 범위 정리 종료. 원장·모델 점수·다른 사건 상태는 덮지 않는다. 구체 상태/종결 코드 매핑은 §9.8이다.
+
+### 9.5 충돌·재시도·감사
+
+기존 설계의 revision/멱등 경계를 유지한다. 변경 명령에는 요청 식별과 기대 범위 버전이 필요하며, 같은 요청의 재전송은 중복 이관/판정을 생성하지 않아야 한다. 다른 사건 거래 주입·오래된 범위·이미 닫힌 목적지·권한 없는 조정은 거절한다. 정확한 헤더/DTO/error code는 미확정이다. §0의 400/403/404/409 의미와 ProblemDetail 규약을 사용한다.
+
+감사는 행위자·업무 시각·실제 기록 시각·원본/변경 범위·출처·의견·연결 판정을 구분해 보존한다. 같은 거래의 사건별 상반된 판단을 마지막 값으로 덮지 않는다. CLOSED 기록은 바꾸지 않고 새 근거는 후속 사건으로 연결한다. 소속/판정/업무 상태/감사는 같은 변경의 원자 범위이며 외부 통신 성공을 DB 원자 처리와 동일시하지 않는다.
+
+### 9.6 저장 책임
+
+[ERD의 다음 구현 저장 계약](ERD.md#다음-구현-저장-계약--2026-09-23)을 따른다. 이관/범위/판정 이력을 단일 alerts.episode_id나 원장의 정상/의심 boolean으로 대체하지 않는다. 개인 worktable 없이도 본 절에서 팀 계약을 확인할 수 있어야 한다.
+
+### 9.7 구현 전후 수용 기준
+
+- 시연 시각 보존·시간 경계·처리 중/역방향 변경 거절, 실제 URL 만료/재시도 시간 불변.
+- 전체 거래 탐색·모델 필터·미분석·KST 경계·빈 결과, 분석 거래 4분면과 사람 판정 분리.
+- 부분 정상/제외/이관, 다중 이관 중 하나 실패 시 전체 롤백, 재전송·동시 판정/종결 충돌.
+- L2 묶음 분리/이동·맥락 미전파·원본 출처 보존·다중 사건 중복 합산 방지·빈 사건 종료·혼합 결론.
+- 모델 정답 라벨 없이 구성/설명 생성, 개별 확률을 사건 확률로 표시하지 않음.
+- 이번 문서 갱신에서는 위 실행 검증을 수행하지 않았다.
+
+### 9.8 남은 구현 계약과 범위
+
+**확정:** 네 화면의 주요 동작, 통화별 지표 우선 범위, 시간 분리, 필터 의미, 부분 처리/묶음 판정/혼합 결론/빈 사건 종료, 단일·복수 원자 이관.
+
+**구현 전 구체화:** 새 경로/DTO·상태 및 종료 사유 enum·변경 명령의 revision/멱등 전달 방식, 원문 표시 권한, 초기 SUBJECT/CONTEXT 매핑, 정정/재분석 시 조회할 점수 선택, 탐지율 분모의 동일 분석 모집단 및 미완료/분모0/전일0 처리, 기관 경과일의 기준과 개인 최근 활동 포함 행동, 상위 송금 계좌·결제 구성의 건수/금액 기준, 환전 거래의 송수신 통화/금액 적용, Episode 위험도 및 유형 태그 중복 표시, 그래프 시간축 세부 조작, 시연 하루 기본 시각. 이 항목들을 이미 사용자에게 질문한 승인 대기라고 표시하지 않는다. 실제 구현/데이터와 대조해 구체안을 제시한다.
+
+**후속:** 외부 유입·단시간 유출 산식, 정식 계정/인증/권한·React 연결, 실제 모델/GNN 설명·KubeSphere 실환경 통신. 사용자가 채택한 주요 흐름을 이 미결 목록으로 다시 승인 대기로 되돌리지 않는다.

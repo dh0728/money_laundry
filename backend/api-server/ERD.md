@@ -1,15 +1,15 @@
-# ERD — 거래 통합 V3
+# ERD — 적용 스키마 V1~V9와 다음 조사 저장 계약
 
 실행 DB: PostgreSQL 17. 인프라·로컬 Compose·통합 테스트의 이미지 태그는 `postgres:17-alpine`이다. DB 이미지 변경 자체는 Flyway 스키마 변경이 아니므로 기존 마이그레이션을 수정하지 않는다.
 
 로컬 Compose는 Alpine에서 초기화한 `pgdata_alpine` 볼륨을 사용한다. 다른 배포판에서 만든 DB 데이터 디렉터리를 직접 연결하지 않고, 기존 데이터가 있다면 논리 백업·복원 후 검증한다.
 
-지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.8다.
-팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 이 문서는 V1에 든 테이블과 W3·W4에서 추가할 테이블을 한 그림에 둔다.
+지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.9다.
+팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 아래 첫 그림은 과거 개념 모델로 적용 DDL이 아니다. 특히 단일 Episode 귀속 관계는 현재 설계가 아니며, 실제 적용은 V1~V9 절과 Flyway, 다음 조사 구조는 마지막 절을 따른다.
 
 용어(kickoff §2.5): `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`.
 
-## 1. 전체 관계
+## 1. 과거 개념 관계 (적용 DDL 및 다음 조사 계약과 구분)
 
 ```mermaid
 erDiagram
@@ -220,14 +220,9 @@ V3는 기존 계좌·거래·작업이 있는 DB에서 실패한다. 기존 DB/�
 
 정정 교체·실행 취소·고정 분석 입력은 아래 V4로 확장한다. V1~V3 이력은 보존한다. Python 실행측과 실제 S3 관통은 후속 태스크다.
 
-## 3. W3·W4에서 추가할 것 — 관계·식별자만 지금 확정
+## 3. 조사 기능의 현재와 다음 저장 계약
 
-- **`alerts`** (W3 [스키마]): `job_id` FK, `subject_account_id` FK(nullable), `assignee_id` FK users NOT NULL(라운드로빈), `episode_id` FK episodes(nullable, `status = ESCALATED`와 항상 일치 — CHECK), `status`·`resolution`(CLOSED일 때만 — CHECK). 파생 요약 컬럼(`tx_count`, `total_amount_usd`, `amounts_by_currency`, `account_count`, `bank_count`, `score_*`, `weighted_amount_usd`, `type_entropy`, `first_tx_at`, `last_tx_at`, `link_basis`)은 API.md §3.1. `episodes`를 참조하므로 W3에서 `episodes` 뼈대(id·status)를 먼저 만들거나 W4에서 FK를 추가한다 — W3 [스키마] 때 정한다.
-- **`alert_transactions`** (V6): PK `(alert_id, version, tx_id)`. 거래 N:M 소속이며 사건별 판정은 보존한다. 과거 근거는 버전별로 고정한다.
-- **`alert_accounts`** (W3): PK `(alert_id, account_id)` + `INDEX(account_id)`(관련 Alert·계좌 이력 조회 — V1 필수 목록의 세 번째 인덱스, 테이블이 생기는 W3에서 함께).
-- **`episodes`** (W4 [워크플로]): `assignee_id` FK users(L2), `created_by` FK users(L1), `status`·`resolution`. 담당자 첫 열람은 `first_opened_at` 컬럼 없이 이력 `REVIEW_START`로만(2026-09-08 사용자 확정, Alert도 동일). Alert : Episode = N : 1(`alerts.episode_id`) — dberd `case_alerts` N:M을 채택하지 않음(정합 메모 B).
-- **`history`** (W4, 감사 이력 단일 테이블): `actor_type`·`actor_id`·`action`·`target_type`·`target_id`·`related_ids`·`from_status`·`to_status`·`resolution`·`comment`·`created_at`. dberd `alert_events`의 `actor_type`·`details` 채택, `request_id`는 MDC 도입 후.
-- 10월 예약: `thresholds`(threshold_version), `model_versions`, `batch_jobs.grouping_version`(Alert 구성 알고리즘 버전 — 정합 메모 A 권장, W3 [스키마]에서 `alerts`와 함께 넣을지 결정).
+현재 `alerts`/`alert_versions`/`alert_transactions`는 V6~V9에서 구현됐다. 다음 조사 계약의 Episode·조사 범위·부분 이관·사건별 판정·감사·시연 업무 시각은 아직 마이그레이션이 없다. 구 N:1 `alerts.episode_id` 및 상태와 단일 FK의 동치 제약을 다음 스키마로 채택하지 않는다. 아래 '다음 구현 저장 계약'을 따른다.
 
 ## 4. 이 태스크에서 정한 컨벤션 (2026-09-07 사용자 확인 완료)
 
@@ -312,3 +307,26 @@ V1~V3를 변경하지 않는 추가 마이그레이션이다. 기존 보고·거
 ### V9: 미래 수신 완료 상태 제거
 
 `alert_coverage_checks.forward_complete` 삭제. coverage는 실제 고정한 날짜의 수신 현황만 기록한다. 날짜2일 이동·깊이2 탐색에는최대4일 도달 및 마지막 노드의 추가2일 계좌활동/한도 검사가 필요해 입력을 전후6일로 넓게 고정한다. 이는 Alert 소속 범위가 아니며 cutoff 이후 거래/보고·미래 coverage 날짜는 제외한다. 실제 편입에는 방향·깊이·행 수·계좌 활동 조건을 적용한다. 입력 복사량의 Large 최적화는 미검증이다.
+
+
+## 다음 구현 저장 계약 — 2026-09-23
+
+**설계 승인 / DDL 미작성·미적용.** [API.md §9](API.md#9-네-화면시연-시각범위별-판정-계약-승인--구현-전)가 외부 동작 계약이며 아래는 저장해야 할 의미다. 논리 이름은 테이블/컬럼 확정이 아니다. 기존 V1~V9를 수정하거나 문서 갱신만으로 DB가 전환됐다고 간주하지 않는다.
+
+| 논리 데이터 | 필요한 저장 내용·관계 |
+|---|---|
+| 시연 업무 시각 | 로컬 시연 기준 시각, 변경 전후·행위자·실제 기록 시각. 재시작 보존. 진행 중 변경/과거 역행 차단에 필요한 처리 상태와 일관되게 검사 |
+| 사건 업무 | Alert/Episode 담당자·업무 상태·개정·할당/종결 업무 시각·종료 사유. 혼합 결과와 판정 없는 범위 정리 종료를 NORMAL로 압축하지 않음 |
+| 조사 범위 버전·구성원 | 사건/묶음·버전·tx_id·근거 버전·SUBJECT/CONTEXT·제외/이관/판정 처리. 자동 탐색 role과 별도. 당시 목록을 고정 |
+| Episode 조사 묶음 | 초기 Alert별 이관 범위, L2 분리/이동 후 독립 묶음 정체성·버전. 원본 Alert를 조사 묶음 자체로 수정하지 않음 |
+| 이관·출처 연결 | 원본 Alert/근거/선택 범위→Episode/묶음. 한 Alert의 여러 범위가 여러 Episode로 이어질 수 있음. 동일 거래의 복수 출처 보존 |
+| 사건별 판정 | 행위자·근거·의견·결론·적용 범위 버전·명시 대상 tx 목록·업무/실제 기록 시각. 맥락/추가 거래 미전파. 원장/모델 라벨과 별도 |
+| 감사·요청 식별 | 배정·열람·의견·제외·분리·이동·판정·종결의 전후 범위와 요청 식별. 재전송 중복·동시 범위 변경 탐지 |
+
+관계: 원장 거래↔Alert 근거는 기존 N:M이다. Alert 출처↔Episode는 부분 이관·L2 이동 이력을 통해 복수 연결이 가능하다. 현재 Episode 소속과 과거 출처를 구분하며 거래별 전체 사건 이력을 단일 최종 판정으로 덮지 않는다. 화면 건수·금액은 tx_id 중복 제거하되 실제 반복 발생의 서로 다른 tx_id는 보존한다.
+
+원자 경계: 새 Episode 생성(해당 시), 한 요청의 모든 선택 범위 이관, 업무 상태·출처·감사 변경을 동일 DB 트랜잭션으로 처리한다. L2 범위 이동도 출발/목적지 개정·담당자·OPEN 여부를 검사하고 원자적으로 처리한다. 닫힌 사건/과거 판정은 불변이며 변경된 묶음에 과거 판정을 자동 승계하지 않는다.
+
+범위가 전부 이동/제외돼 비면 판정 없는 범위 정리 종료를 표현할 수 있어야 한다. 미판정 조사 대상이 남은 사건은 완료로 처리할 수 없다. 종결 enum과 기존 Alert 상태 호환·정확한 인덱스/제약은 DDL 단계에서 구체화한다.
+
+조회 파생: 위험도·대표 유형·기관/개인 대시보드·통화별 금액은 원장/점수/고정 범위/업무 이력에서 계산한다. 요약 저장 여부는 아직 확정하지 않았으며 원본을 대체하지 않는다. 평가 라벨은 운영 조회·구성·판정의 정답 공급원이 아니다. private 원문 접근 범위도 이 설계로 확대하지 않는다.
