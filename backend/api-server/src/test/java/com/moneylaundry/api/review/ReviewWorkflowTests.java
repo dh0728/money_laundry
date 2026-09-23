@@ -500,6 +500,61 @@ class ReviewWorkflowTests {
   }
 
   @Test
+  void episode_metrics_use_work_time_first_review_and_creation_not_transfer_events() {
+    Instant now = Instant.parse("2023-09-05T00:00:00Z");
+    var dashboard = new DashboardService(jdbc, clock);
+    var empty =
+        dashboard.episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
+    assertThat(object(empty.get("completion")).get("average_seconds")).isNull();
+    long old =
+        jdbc.queryForObject(
+            "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-01 00:00Z','2023-09-02 00:00Z') returning case_id",
+            Long.class,
+            l2);
+    long today =
+        jdbc.queryForObject(
+            "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-04 15:00Z','2023-09-04 15:00Z') returning case_id",
+            Long.class,
+            l2);
+    jdbc.update(
+        "insert into review_cases(kind,assignee_id,status,created_at,assigned_at,closed_at,closed_by,outcome) values('EPISODE',?,'CLOSED','2023-09-03 00:00Z','2023-09-03 00:00Z','2023-09-04 16:00Z',?,'NORMAL')",
+        l2,
+        l2);
+    for (String at : List.of("2023-09-04T16:00:00Z", "2023-09-04T17:00:00Z"))
+      jdbc.update(
+          "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'REVIEW_START','test',?::timestamptz,'{}')",
+          today,
+          l2,
+          at);
+    jdbc.update(
+        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','existing destination','2023-09-04 18:00Z','{}')",
+        today,
+        l1);
+    // Another staff member's opening is not the assignee's first review.
+    jdbc.update(
+        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'REVIEW_START','other staff','2023-09-04 18:00Z','{}')",
+        old,
+        l1);
+    var result =
+        dashboard.episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
+    var current = object(result.get("current"));
+    assertThat(current.get("open")).isEqualTo(2L);
+    assertThat(current.get("aged")).isEqualTo(1L);
+    assertThat(current.get("created_today")).isEqualTo(1L);
+    assertThat(current.get("closed_today")).isEqualTo(1L);
+    assertThat(current.get("unreviewed")).isEqualTo(1L);
+    assertThat(number(object(result.get("firstReview")).get("average_seconds"))).isEqualTo(3600L);
+    assertThat(object(result.get("firstReview")).get("samples")).isEqualTo(1L);
+    assertThat(number(object(result.get("completion")).get("average_seconds")))
+        .isEqualTo(40 * 3600L);
+    assertThat(number(rows(result.get("oldestOpen")).getFirst().get("caseId"))).isEqualTo(old);
+    var otherRange =
+        dashboard.episodeWork(now, LocalDate.parse("2023-08-01"), LocalDate.parse("2023-08-02"));
+    assertThat(object(otherRange.get("current"))).isEqualTo(current);
+    assertThat(object(otherRange.get("firstReview")).get("samples")).isEqualTo(0L);
+  }
+
+  @Test
   void http_contract_serializes_clock_cases_and_validates_missing_actor() throws Exception {
     var controller =
         new ReviewController(

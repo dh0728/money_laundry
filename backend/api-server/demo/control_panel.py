@@ -215,7 +215,7 @@ def render():
         clock = replay.controls.get('demo/clock')
         st.metric('시연 업무 시각 (KST)', clock['businessAt'])
         with st.expander('시연 업무 시각 설정'):
-            st.caption('자동 재생은 거래 기준일 다음 날 09:00 KST로 이동합니다. 실제 통신 시각은 변경하지 않습니다.')
+            st.caption('선택 날짜 전송·자동 재생을 시작할 때 거래 기준일 다음 날 09:00 KST로 자동 설정합니다. 수동 설정이 더 미래이면 유지하며, 실제 통신 시각은 변경하지 않습니다.')
             current = datetime.fromisoformat(clock['businessAt'])
             picked = st.date_input('업무 날짜', current.date())
             picked_time = st.time_input('업무 시간', day_time(9))

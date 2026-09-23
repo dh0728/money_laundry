@@ -448,3 +448,17 @@ Alert/Episode 개요 공통. 총 거래액은 기존 사건 SUBJECT 거래 합�
 X-Demo-User-Id 필수. 본인 담당 OPEN 사건·기대 revision·실재 가명 계좌를 검증한다. accounts는 최대1000개, 빈 배열은 빈 S를 명시한다. 멱등 요청은 기존 review_requests를 사용하고 MONEY_SCOPE 이력·사건 개정과 원자 저장한다. 상태/HTTP 오류 원칙은 §9.8과 같다.
 
 종결할 때 180분 지표를 MONEY_SNAPSHOT 이벤트에 저장하며 이후 수신/원장 정정에도 바꾸지 않는다. CLOSED 조회는 minutes와 무관하게 그 스냅샷을 반환한다. 과거 종결 사건에 기록이 없으면 현재 원장으로 과거를 재구성하지 않는다. 원문 정보/정답 라벨은 조회·계산에 사용하지 않는다.
+
+
+### 9.10 Episode 업무 지표
+
+GET /api/v1/dashboard의 episodeWork에 기관 전체 Episode 업무 집계를 추가한다. 수신/일별 분석을 기다리지 않고 커밋된 조사 행동을 다음 조회에서 반영한다. Streamlit 대시보드는5분마다 재조회한다. 웹소켓/외부 알림은 추가하지 않는다.
+
+- asOf: 이번 집계 업무 시각. 고정 시연 시각에서 실제5분이 지나도 업무 경과시간은 늘지 않는다.
+- current.open: 기간과 무관한 현재 OPEN Episode 수. aged: 그중 assigned_at으로부터72시간 이상. unreviewed: 현 담당자의 배정 이후 REVIEW_START가 없는 OPEN 수.
+- current.created_today/closed_today: KST 오늘00시부터 asOf까지의 생성/종결 사건 수. 기존 Episode에 Alert를 추가하는 TRANSFER/MOVE는 생성 수를 늘리지 않는다. 새 Episode로 분리해 생성한 경우에는1건이다.
+- firstReview.samples/average_seconds: 선택 기간에 현 담당자가 배정 후 최초 REVIEW_START를 기록한 사건 수 및 배정→첫 기록의 산술평균(초). 반복 기록과 타 직원 기록 제외. 미검토는0초로 평균에 넣지 않고 unreviewed로 분리한다.
+- completion.samples/average_seconds: 선택 기간에 종결한 Episode 수 및 생성→종결 산술평균(초). 사건 결과와 무관한 업무 완료시간이며 판정 없는 범위 정리 종료도 포함한다. 표본0이면 평균null(화면 ‘—’).
+- oldestOpen: 배정 오래된 순 최대20건의 caseId,assignee,age_seconds,awaiting_review. 현재 미처리 경과는 배정 기준이며 사건 생성→종결 시간과 구분한다.
+
+조회 기간은 기존 KST from00시 이상/to 다음날00시 미만이다. 현재/오늘 카드에는 기간 필터를 적용하지 않는다. 최초 검토는 실제 브라우저 열람 감지가 아니라 현재 구현의 명시 ‘검토 시작 기록’이다. 임시 직원 식별/local 제한은 기존 API와 동일하며 DB 스키마 변경은 없다.

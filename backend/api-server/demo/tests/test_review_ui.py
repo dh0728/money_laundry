@@ -21,6 +21,7 @@ def response(path, params=None, **kwargs):
         return {'businessAt': CLOCK['businessAt'], 'personal': dict(pending=0, aged=0, closed=0),
                 'institution': dict(alerts=0, episodes=0, aged=0, today=0, yesterday=0),
                 'detection': dict(received=10, analyzed=5, suspicious=2), 'deliveryDate': '2023-09-01',
+                'episodeWork': dict(asOf=CLOCK['businessAt'], current=dict(open=2, created_today=1, closed_today=0, aged=1, unreviewed=1), firstReview=dict(samples=0, average_seconds=None), completion=dict(samples=1, average_seconds=7200), oldestOpen=[]),
                 'daily': [], 'agreements': [], 'types': [], 'activities': [], 'priority': []}
     if path == 'review/payment-formats': return ['ACH', 'Cash']
     return dict(content=[], page=0, size=20, totalElements=0, totalPages=0)
@@ -36,6 +37,8 @@ class ReviewScreens(unittest.TestCase):
             self.assertFalse(app.exception)
             self.assertTrue(any('최종 결과' in x.value for x in app.info))
             self.assertTrue(any(m.label == '오늘 탐지 의심 거래' and '20.0%' in m.delta for m in app.metric))
+            self.assertTrue(any(m.label == '현재 열린 Episode' and m.value == '2' for m in app.metric))
+            self.assertTrue(any(m.label == '배정 → 첫 검토 평균' and m.value == '—' for m in app.metric))
             for name in ['Transactions', 'Alerts', 'Episodes']:
                 next(r for r in app.radio if r.label == '화면').set_value(name).run(timeout=20)
                 self.assertFalse(app.exception, name)

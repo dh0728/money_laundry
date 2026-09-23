@@ -46,6 +46,7 @@ public class DashboardService {
             at(today.plusDays(1)),
             at(today.minusDays(1)),
             at(today)));
+    out.put("episodeWork", episodeWork(now, from, to));
     // Today may include delayed batches; use their delivery dates, not only wall-clock yesterday.
     var deliveryDates =
         jdbc.queryForList(
@@ -113,5 +114,59 @@ public class DashboardService {
             "select case_id,kind,alert_id,created_at,risk from visible_review_cases where assignee_id=? and status='OPEN' order by risk desc,created_at,case_id limit 10",
             user));
     return out;
+  }
+
+  Map<String, Object> episodeWork(Instant now, LocalDate from, LocalDate to) {
+    var today = now.atZone(BusinessTime.KST).toLocalDate();
+    String base =
+        """
+      from review_cases c left join lateral (
+        select min(e.business_at) as first_review from review_events e
+        where e.case_id=c.case_id and e.actor_id=c.assignee_id and e.action='REVIEW_START'
+          and e.business_at>=c.assigned_at and e.business_at<=?
+      ) r on true where c.kind='EPISODE' and c.created_at<=?
+      """;
+    var result = new LinkedHashMap<String, Object>();
+    result.put("asOf", now.toString());
+    result.put(
+        "current",
+        jdbc.queryForMap(
+            "select count(*) filter(where c.status='OPEN') as open,count(*) filter(where c.status='OPEN' and c.assigned_at<=?) as aged,count(*) filter(where c.status='OPEN' and r.first_review is null) as unreviewed,count(*) filter(where c.created_at>=?) as created_today,count(*) filter(where c.status='CLOSED' and c.closed_at>=? and c.closed_at<=?) as closed_today "
+                + base,
+            Timestamp.from(now.minus(Duration.ofDays(3))),
+            at(today),
+            at(today),
+            Timestamp.from(now),
+            Timestamp.from(now),
+            Timestamp.from(now)));
+    result.put(
+        "firstReview",
+        jdbc.queryForMap(
+            "select count(*) as samples,avg(extract(epoch from (r.first_review-c.assigned_at))) as average_seconds "
+                + base
+                + " and r.first_review>=? and r.first_review<?",
+            Timestamp.from(now),
+            Timestamp.from(now),
+            at(from),
+            at(to.plusDays(1))));
+    result.put(
+        "completion",
+        jdbc.queryForMap(
+            "select count(*) as samples,avg(extract(epoch from (c.closed_at-c.created_at))) as average_seconds "
+                + base
+                + " and c.status='CLOSED' and c.closed_at>=? and c.closed_at<? and c.closed_at<=?",
+            Timestamp.from(now),
+            Timestamp.from(now),
+            at(from),
+            at(to.plusDays(1)),
+            Timestamp.from(now)));
+    result.put(
+        "oldestOpen",
+        jdbc.queryForList(
+            "select c.case_id as \"caseId\",u.name as assignee,extract(epoch from (?::timestamptz-c.assigned_at)) as age_seconds,(r.first_review is null) as awaiting_review from review_cases c join users u on u.user_id=c.assignee_id left join lateral (select min(e.business_at) as first_review from review_events e where e.case_id=c.case_id and e.actor_id=c.assignee_id and e.action='REVIEW_START' and e.business_at>=c.assigned_at and e.business_at<=?) r on true where c.kind='EPISODE' and c.status='OPEN' and c.created_at<=? order by c.assigned_at,c.case_id limit 20",
+            Timestamp.from(now),
+            Timestamp.from(now),
+            Timestamp.from(now)));
+    return result;
   }
 }

@@ -106,7 +106,7 @@ def ledger_page(client, today):
             st.info('계좌를 선택하세요.')
 
 
-def chart_map(values, label, amount=False):
+def chart_map(values, label, amount=False, horizontal=False):
     if not values:
         st.info('표시할 데이터가 없습니다.')
         return
@@ -114,6 +114,10 @@ def chart_map(values, label, amount=False):
     if amount:
         frame[['일자', '통화']] = frame['항목'].str.split('|', expand=True)
         st.altair_chart(alt.Chart(frame).mark_bar().encode(x='일자:N', y=alt.Y(label + ':Q'), color='통화:N').facet(row='통화:N'), width='stretch')
+    elif horizontal:
+        st.altair_chart(alt.Chart(frame).mark_bar().encode(
+            x=alt.X(label + ':Q'), y=alt.Y('항목:N', sort=None),
+            tooltip=['항목:N', label + ':Q']), width='stretch')
     else:
         st.bar_chart(frame, x='항목', y=label)
 
@@ -381,6 +385,27 @@ def cases_page(client, user, today, kind):
         case_detail(client, user, choice['caseId'])
 
 
+def episode_work_metrics(work):
+    st.subheader('Episode 업무 현황')
+    current = work['current']
+    columns = st.columns(5)
+    for column, label, key in zip(columns, ['현재 열린 Episode', '오늘 신규 Episode', '오늘 종결 Episode', '배정 후 3일 경과', '검토 시작 전'], ['open', 'created_today', 'closed_today', 'aged', 'unreviewed']):
+        column.metric(label, current[key])
+    columns = st.columns(2)
+    for column, label, key in zip(columns, ['배정 → 첫 검토 평균', '생성 → 종결 평균'], ['firstReview', 'completion']):
+        metric = work[key]
+        seconds = metric['average_seconds']
+        column.metric(label, '—' if seconds is None else f"{float(seconds) / 3600:.1f}시간")
+        column.caption(f"선택 기간의 {'첫 검토' if key == 'firstReview' else '종결'} {metric['samples']}건 기준")
+    st.caption('신규 생성은 Episode 사건 수입니다. 기존 사건에 Alert를 추가해도 신규 건수는 늘지 않습니다. 첫 검토는 담당자의 검토 시작 기록 기준입니다.')
+    st.caption(f"업무 시각 {display(work['asOf'])} 기준 · 화면은 5분마다 갱신 · 고정 시연 시각에서는 경과시간도 고정됩니다.")
+    if work['oldestOpen']:
+        table([{'Episode': r['caseId'], '담당자': r['assignee'], '배정 후 경과(시간)': round(float(r['age_seconds']) / 3600, 1), '검토 시작 전': r['awaiting_review']} for r in work['oldestOpen']])
+    else:
+        st.info('현재 열린 Episode가 없습니다.')
+
+
+@st.fragment(run_every='300s')
 def dashboard_page(client, user, today):
     st.header('대시보드')
     period = dates('dashboard_dates', today)
@@ -409,6 +434,7 @@ def dashboard_page(client, user, today):
             st.info('분석 진행 중입니다. 탐지 건수·비율은 아직 최종 결과가 아닙니다.')
         if data.get('pendingReports'):
             st.info('검수·통합이 끝나지 않은 수신 보고가 있어 전체 거래 수와 최종 탐지율을 아직 확정할 수 없습니다.')
+        episode_work_metrics(data['episodeWork'])
         st.subheader('기관 탐지 현황')
         if data['daily']:
             st.line_chart(pd.DataFrame(data['daily']), x='day', y=['incoming', 'completed'])
@@ -423,7 +449,7 @@ def dashboard_page(client, user, today):
             table(frame.to_dict('records'))
         with cols[1]:
             st.subheader('의심 거래 탐지 유형별 분포')
-            chart_map({TYPE_NAMES[r['type']]: r['count'] for r in data['types']}, '거래 수')
+            chart_map({TYPE_NAMES[r['type']]: r['count'] for r in data['types']}, '거래 수', horizontal=True)
 
 
 def main():
