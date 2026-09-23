@@ -7,6 +7,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import math
+from zoneinfo import ZoneInfo
 
 
 @dataclass(frozen=True)
@@ -21,20 +22,17 @@ class Transaction:
 class Policy:
     version: str
     threshold: float
-    before: timedelta
-    after: timedelta
+    day_radius: int
     max_depth: int
     max_transactions: int
     max_account_transactions: int
-    min_shared_transactions: int
 
     def validate(self):
         if (not self.version or isinstance(self.threshold, bool)
                 or not math.isfinite(self.threshold) or not 0 <= self.threshold <= 1
-                or self.before < timedelta(0) or self.after < timedelta(0)
+                or type(self.day_radius) is not int or self.day_radius < 0
                 or any(type(value) is not int or value < 1 for value in (
-                    self.max_depth, self.max_transactions, self.max_account_transactions,
-                    self.min_shared_transactions))):
+                    self.max_depth, self.max_transactions, self.max_account_transactions))):
             raise ValueError("Invalid Alert policy")
 
 
@@ -81,17 +79,15 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
     groups = []
     for seed_id in seeds:
         seed = rows[seed_id]
-        low, high = seed.occurred_at - policy.before, seed.occurred_at + policy.after
         members = {seed_id: {"SEED"}}
         limits = set()
-        if low < coverage_start:
-            limits.add("SNAPSHOT_START")
-        if high > coverage_end:
-            limits.add("SNAPSHOT_END")
         queue = deque([(seed_id, 0, "BOTH")])
         visited = {(seed_id, "BOTH")}
 
         def neighbours(row, direction):
+            day = row.occurred_at.astimezone(ZoneInfo('Asia/Seoul')).replace(hour=0, minute=0, second=0, microsecond=0)
+            low = day - timedelta(days=policy.day_radius)
+            high = day + timedelta(days=policy.day_radius + 1)
             choices = defaultdict(set)
             directions = [(row.source, incoming, "UPSTREAM", lambda other: other.occurred_at < row.occurred_at),
                           (row.destination, outgoing, "DOWNSTREAM", lambda other: other.occurred_at > row.occurred_at)]
@@ -103,13 +99,13 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
                 directions = [item for item in directions if item[2] == direction]
             for account, index, reason, accepts in directions:
                 activity = {r.tx_id for r in incoming[account] + outgoing[account]
-                            if low <= r.occurred_at <= high}
+                            if low <= r.occurred_at < high}
                 if len(activity) > policy.max_account_transactions:
                     limits.add("ACCOUNT_ACTIVITY")
                     continue
                 for other in index[account]:
                     if other.tx_id != row.tx_id and accepts(other):
-                        if low <= other.occurred_at <= high:
+                        if low <= other.occurred_at < high:
                             choices[other.tx_id].add(reason)
                         else:
                             limits.add("TIME_WINDOW")
@@ -130,7 +126,10 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
                     continue
                 members.setdefault(other_id, set()).update(choices[other_id])
                 for reason in sorted(choices[other_id]):
-                    next_direction = "UPSTREAM" if reason in ("UPSTREAM", "SHARED_DESTINATION") else "DOWNSTREAM"
+                    # Peers remain visible, but only a direct flow continues exploration.
+                    if reason not in ("UPSTREAM", "DOWNSTREAM"):
+                        continue
+                    next_direction = reason
                     state = (other_id, next_direction)
                     if state not in visited:
                         visited.add(state)
@@ -158,13 +157,12 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
         if left == right:
             continue
         a, b = groups[left], groups[right]
-        shared = set(a[1]) & set(b[1])
         linked_seeds = bool(a[0] & set(b[1]) or b[0] & set(a[1]))
-        if not linked_seeds and len(shared - seed_set) < policy.min_shared_transactions:
+        # Shared context alone is not evidence that two seed flows are one block.
+        if not linked_seeds:
             continue
         combined = set(a[1]) | set(b[1])
-        times = [rows[key].occurred_at for key in combined]
-        if (len(combined) > policy.max_transactions or max(times) - min(times) > policy.before + policy.after):
+        if len(combined) > policy.max_transactions:
             a[2].add("MERGE_LIMIT")
             b[2].add("MERGE_LIMIT")
             continue

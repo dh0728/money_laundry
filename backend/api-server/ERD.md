@@ -1,15 +1,15 @@
-# ERD — 거래 통합 V3
+# ERD — 적용 스키마 V1~V10
 
 실행 DB: PostgreSQL 17. 인프라·로컬 Compose·통합 테스트의 이미지 태그는 `postgres:17-alpine`이다. DB 이미지 변경 자체는 Flyway 스키마 변경이 아니므로 기존 마이그레이션을 수정하지 않는다.
 
 로컬 Compose는 Alpine에서 초기화한 `pgdata_alpine` 볼륨을 사용한다. 다른 배포판에서 만든 DB 데이터 디렉터리를 직접 연결하지 않고, 기존 데이터가 있다면 논리 백업·복원 후 검증한다.
 
-지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.8다.
-팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 이 문서는 V1에 든 테이블과 W3·W4에서 추가할 테이블을 한 그림에 둔다.
+지위: 관계·식별자의 확정 기록. 컬럼의 정본은 Flyway 마이그레이션(`src/main/resources/db/migration`)이고, API 계약은 `API.md` v0.10다.
+팀 ERD(`docs_ref/dberd.md`, 송동현)와의 정합 판정은 `worktable/dberd_정합_메모.md`. 아래 첫 그림은 과거 개념 모델로 적용 DDL이 아니다. 특히 단일 Episode 귀속 관계는 현재 설계가 아니며, 실제 적용은 V1~V10 절과 Flyway를 따른다.
 
 용어(kickoff §2.5): `거래 → (임계 선별) 의심 거래 → (자동 묶음) Alert → (조사·연결) Episode`.
 
-## 1. 전체 관계
+## 1. 과거 개념 관계 (적용 DDL 및 다음 조사 계약과 구분)
 
 ```mermaid
 erDiagram
@@ -35,7 +35,7 @@ erDiagram
 
     batch_jobs ||--o{ alerts : "job_id (W3)"
     alerts ||--o{ alert_transactions : "alert_id (W3)"
-    transactions ||--o| alert_transactions : "tx_id UNIQUE (W3)"
+    transactions ||--o{ alert_transactions : "tx_id N:M (V6)"
     alerts ||--o{ alert_accounts : "alert_id (W3)"
     accounts ||--o{ alert_accounts : "account_id (W3)"
     accounts ||--o{ alerts : "subject_account_id (W3)"
@@ -147,7 +147,7 @@ erDiagram
     }
     alert_transactions {
         bigint alert_id PK_FK "W3"
-        bigint tx_id PK_FK "UNIQUE(tx_id) — 한 거래 = 한 Alert"
+        bigint tx_id PK_FK "version별 N:M"
         varchar role "SEED | SUPPORTING | PATH | PATTERN_MEMBER"
         text included_reason
     }
@@ -220,14 +220,9 @@ V3는 기존 계좌·거래·작업이 있는 DB에서 실패한다. 기존 DB/�
 
 정정 교체·실행 취소·고정 분석 입력은 아래 V4로 확장한다. V1~V3 이력은 보존한다. Python 실행측과 실제 S3 관통은 후속 태스크다.
 
-## 3. W3·W4에서 추가할 것 — 관계·식별자만 지금 확정
+## 3. 조사 기능의 현재와 다음 저장 계약
 
-- **`alerts`** (W3 [스키마]): `job_id` FK, `subject_account_id` FK(nullable), `assignee_id` FK users NOT NULL(라운드로빈), `episode_id` FK episodes(nullable, `status = ESCALATED`와 항상 일치 — CHECK), `status`·`resolution`(CLOSED일 때만 — CHECK). 파생 요약 컬럼(`tx_count`, `total_amount_usd`, `amounts_by_currency`, `account_count`, `bank_count`, `score_*`, `weighted_amount_usd`, `type_entropy`, `first_tx_at`, `last_tx_at`, `link_basis`)은 API.md §3.1. `episodes`를 참조하므로 W3에서 `episodes` 뼈대(id·status)를 먼저 만들거나 W4에서 FK를 추가한다 — W3 [스키마] 때 정한다.
-- **`alert_transactions`** (W3): PK `(alert_id, tx_id)` + **`UNIQUE(tx_id)`**(착수 결정 4). 처분된 Alert의 거래는 재묶음 입력에서 제외.
-- **`alert_accounts`** (W3): PK `(alert_id, account_id)` + `INDEX(account_id)`(관련 Alert·계좌 이력 조회 — V1 필수 목록의 세 번째 인덱스, 테이블이 생기는 W3에서 함께).
-- **`episodes`** (W4 [워크플로]): `assignee_id` FK users(L2), `created_by` FK users(L1), `status`·`resolution`. 담당자 첫 열람은 `first_opened_at` 컬럼 없이 이력 `REVIEW_START`로만(2026-09-08 사용자 확정, Alert도 동일). Alert : Episode = N : 1(`alerts.episode_id`) — dberd `case_alerts` N:M을 채택하지 않음(정합 메모 B).
-- **`history`** (W4, 감사 이력 단일 테이블): `actor_type`·`actor_id`·`action`·`target_type`·`target_id`·`related_ids`·`from_status`·`to_status`·`resolution`·`comment`·`created_at`. dberd `alert_events`의 `actor_type`·`details` 채택, `request_id`는 MDC 도입 후.
-- 10월 예약: `thresholds`(threshold_version), `model_versions`, `batch_jobs.grouping_version`(Alert 구성 알고리즘 버전 — 정합 메모 A 권장, W3 [스키마]에서 `alerts`와 함께 넣을지 결정).
+현재 `alerts`/`alert_versions`/`alert_transactions`는 V6~V9에서 구현됐다. 다음 조사 계약의 Episode·조사 범위·부분 이관·사건별 판정·감사·시연 업무 시각은 아직 마이그레이션이 없다. 구 N:1 `alerts.episode_id` 및 상태와 단일 FK의 동치 제약을 다음 스키마로 채택하지 않는다. 아래 '다음 구현 저장 계약'을 따른다.
 
 ## 4. 이 태스크에서 정한 컨벤션 (2026-09-07 사용자 확인 완료)
 
@@ -281,7 +276,7 @@ V1~V3를 변경하지 않는 추가 마이그레이션이다. 기존 보고·거
 
 `analysis_model_tasks`는 `(run_id, model_kind)`별 로컬 작업·산출물·원격 관측을 저장한다. V1~V4의 표와 데이터를 변경하지 않으며, 기존 원격 요청 및 취소 이력은 `analysis_model_requests`와 `analysis_cancel_outbox`에 유지한다. 되돌림이 필요하면 후속 forward migration을 사용하며 DB 초기화를 요구하지 않는다.
 
-- phase: PREPARE/PUBLISH/WAIT_REMOTE/COLLECT/DONE. status: READY/ACTIVE/WAITING/RETRY_WAIT/SUCCEEDED/FAILED/CANCELLED. 현재 실행 연결은 PREPARE→PUBLISH→WAIT_REMOTE→COLLECT→DONE/SUCCEEDED다. 두 모델의 검증된 결과를 SCORES에서 합류 저장한다. ALERTS 저장은 아직 미연결이다.
+- phase: PREPARE/PUBLISH/WAIT_REMOTE/COLLECT/DONE. status: READY/ACTIVE/WAITING/RETRY_WAIT/SUCCEEDED/FAILED/CANCELLED. 현재 실행 연결은 PREPARE→PUBLISH→WAIT_REMOTE→COLLECT→DONE/SUCCEEDED다. 두 모델의 검증된 결과를 SCORES에서 합류 저장한다. ALERTS 저장은 V6에서 연결되었다.
 - binding: 실행 동안 고정된 JSONB 모델/피처/입력 계약 버전. 현재 demo 버전만 사용한다. 인증 정보·서명 URL·실제 입력 행을 넣지 않는다. input_artifact/result_artifact는 파일 참조와 검증 메타데이터다.
 - request_id/execution_round는 둘 다 NULL이거나 V4 요청을 참조한다. execution_id/execution_owner는 ACTIVE일 때만 함께 존재한다. 현재 PREPARE의 owner는 상위 FEATURES 실행 토큰이다. operation_attempts는 모델 계산이 아닌 로컬 동작 시도 횟수다.
 - retry_at/next_poll_at/remote_deadline_at, remote_revision/remote_snapshot/last_event_id, error_code/action_required, 생성·갱신·종료 시각을 둔다. GET 관측은 revision·식별·완료 메타데이터를 검사해 저장하고 예약 시각에 다시 실행한다. 콜백(last_event_id 사용)은 아직 연결 전이다.
@@ -289,3 +284,54 @@ V1~V3를 변경하지 않는 추가 마이그레이션이다. 기존 보고·거
 - 먼저 준비된 모델은 다른 모델 실패 후에도 재사용한다. 같은 상위 토큰의 중복 프로세스는 ACTIVE 소유권을 빼앗지 못하고, 새 상위 토큰은 중단된 PREPARE를 회수할 수 있다. 재사용 시 파일 존재·크기·SHA256·버전을 확인한다.
 - 현재 FEATURES 실행은 두 모델을 순차 준비한 뒤 상위 체크포인트를 기록한다. 모델별 즉시 게시·비동기 실행은 후속 연결이며, INFERENCE/SCORES 완료는 실제 검증·DB 체크포인트에 의존하며 ALERTS를 가짜 성공으로 넘기지 않는다. 시연 피처는 결과 도착 전 `transaction_features`에 저장되고, 과거 run의 행을 덮어쓰지 않는다.
 - 정정 취소는 같은 트랜잭션에서 모델별 토큰도 무효화한다. 산출물 참조와 피처는 이력으로 보존하며 취소 run의 신규 반영은 거절한다.
+
+
+## V6 고정 맥락·Alert 근거
+
+현재 Alert 정본은 V6이며 위 W3/W4 예약 컬럼은 향후 확장 목표다. 기존 V1~V5는 변경하지 않는다.
+
+- `alerts`: 사건 ID, OPEN/CLOSED/ESCALATED, resolution, L1 assignee FK, parent_alert_id 자기참조, created_at. Episode 연결·판정 변경 API는 후속 구현이다.
+- `alert_versions`: PK(alert_id,version), UNIQUE(alert_id,run_id), run FK, fingerprint, immutable evidence JSONB. 완료 run/job 버전만 공개한다. evidence는 씨앗·가명 거래·동결 점수·요약·그래프·초기 제한을 포함한다.
+- `alert_transactions`: PK(alert_id,version,tx_id), version 복합 FK, 원장 tx FK, SEED/CONNECTION/CONTEXT, reasons JSONB. 한 거래는 여러 사건 및 여러 버전에 존재할 수 있다.
+- `alert_coverage_checks`: PK(alert_id,run_id), 날짜별 수신 현황·탐색 제한 JSONB, V7의 nullable checked_at(실제 검사 시각). 기존 행의 시각은 추정하지 않는다. 새 연결 없는 재검사는 근거 버전을 만들지 않는다. API는 forward_complete를 공개하지 않고 dataAsOf(근거 run의 cutoff)·lastCheckedAt(성공 검사 checked_at)를 구분한다.
+- `analysis.alert_origins`: run별 기존 공개 Alert 버전·evidence 고정. V8 보고/수집 범위 변경 날짜가 기존 구성 거래일 전후2일과 겹치는 사건을 고정하며 완료 후속 사건이 있으면 그 후속에서 탐색한다.
+- `analysis.input_coverage`: run/날짜별 예상 은행수·완결 보고수·보고 버전/상태 고정. 자료 미수신과 연결 없음은 다르다.
+- `analysis.input_scores`: run별 CONTEXT의 기존 완료 점수 스냅샷. 신규 TARGET 점수는 해당 run inference_results를 사용하고, 미채점 맥락은 null을 유지한다.
+- FREEZE_INPUT은 각 TARGET/선정 씨앗의 서울 날짜 전후6일 고정 입력 범위 중 cutoff 시각 이하 ACTIVE 거래만 CONTEXT로 복사한다. CONTEXT는 target ownership을 취득하지 않으며 출처는 analysis_input_reports에 연결되어 기존 정정 취소 fence가 적용된다.
+- ALERTS는 기존 통합 advisory lock → job/run 행잠금 순서로 토큰 검증·근거·라운드로빈 배정·카운터·체크포인트를 원자 저장한다. 실패 시 신규 저장을 롤백하고 응답 유실은 같은 run 체크포인트로 복구한다.
+
+### V8: Alert 변경 출처 고정
+
+`analysis.alert_source_manifest`는 PK(run_id,business_date), state JSONB로 scope_revision·정렬된 예상 은행·보고 set/version/revision/generation/status를 기록한다. FREEZE_INPUT의 기존 통합 잠금/트랜잭션에서 cutoff 서울 날짜 이하의 수신 보고만 고정한다. 마지막 성공 검사 run(없으면 근거 run)과 날짜별 전체 비교하며 삭제된 날짜도 감지한다. 미완료/취소 run과 미완료 job은 소비 완료로 보지 않는다. 외부 큐·전역 최대ID watermark는 없다.
+
+### V9: 미래 수신 완료 상태 제거
+
+`alert_coverage_checks.forward_complete` 삭제. coverage는 실제 고정한 날짜의 수신 현황만 기록한다. 날짜2일 이동·깊이2 탐색에는최대4일 도달 및 마지막 노드의 추가2일 계좌활동/한도 검사가 필요해 입력을 전후6일로 넓게 고정한다. 이는 Alert 소속 범위가 아니며 cutoff 이후 거래/보고·미래 coverage 날짜는 제외한다. 실제 편입에는 방향·깊이·행 수·계좌 활동 조건을 적용한다. 입력 복사량의 Large 최적화는 미검증이다.
+
+
+## V10 시연 시각·조사 업무
+
+V10__case_review.sql을 추가했다. 기존 V1~V9는 변경하지 않는다. 외부 계약은 [API §9](API.md#98-구현-http-계약)다.
+
+| 저장소 | 책임 |
+|---|---|
+| demo_business_clock | singleton 업무 시각·revision·실제 updated_at. 미설정은 실제 시각. local에서만 변경 |
+| batch_jobs.business_at | 분석 작업 생성 당시 업무 시각 고정. 기술 started/finished/cutoff와 분리 |
+| review_cases | ALERT/EPISODE, 원본 alert_id, 담당자, OPEN/CLOSED, outcome, revision, 생성/배정/종결 업무 시각·종결자 |
+| review_groups | 사건별 조사 묶음, revision·evidence_version·decision, members JSONB의 고정 거래·점수·SUBJECT/CONTEXT·처리·출처 |
+| review_events | 사건·행위자·action·의견·business_at·실제 recorded_at·변경 범위 snapshot. 이전 판정 보존 |
+| review_requests | (actor_id,request_id) PK, 요청 본문·성공 응답. 재시도 중복 방지 |
+| visible_review_cases | 완료 job/run 근거가 있는 Alert와 Episode만 공개, 씨앗 기반 정렬 위험도 |
+
+Alert 생성 트리거가 조사 사건을 생성한다. 기존 Alert는 업무 시각을 추정하지 않고 기존 created_at으로 이관한다. 새 Episode는 L1 이관 시 L2 라운드로빈, L2 직접 분리는 본인 배정이다. 조회 시 미저장 Alert 범위는 완료 evidence에서 구성하고 첫 변경 때 저장한다. 새 완료 근거의 미편입 거래만 열린 범위에 추가하며 기존 처리 범위·출처를 덮지 않는다.
+
+명령은 수신 advisory lock과 시각 행 잠금을 사용하고 기대 사건 개정을 검사한다. 새 목적지·모든 선택 범위·출처·판정·감사·응답 저장이 동일 DB 트랜잭션이다. 판정은 사건 범위에만 저장하며 원장/추론 점수/다른 사건을 변경하지 않는다. CLOSED 수정은 차단한다. 기존 alerts 상태와 업무 종료는 같은 트랜잭션에서 맞춘다.
+
+초기 조사 대상은 SEED/CONNECTION, 참고 맥락은 CONTEXT다. 같은 거래가 여러 출처로 들어올 수 있으며 집계는 tx_id로 중복 제거한다. 종결 결과는 NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED로 나누며 빈 사건을 정상으로 판정하지 않는다. 가명 계좌/소유주 UUID만 조회하고 원문 암호문·평가 라벨을 반환하지 않는다.
+
+원장 업무일과 최신 점수 조회 인덱스를 추가했다. JSONB 범위/이력 저장은 MVP 구현이며 대규모 운영 조회 최적화 검증은 후속이다.
+
+
+### 조사 자금 지표 저장
+
+추가 마이그레이션 없이 V10 review_events를 사용한다. MONEY_SCOPE는 명시한 가명 계좌 집합 S, MONEY_SNAPSHOT은 종결 당시 S/T·계산 기준·통화별 지표다. 변경 명령은 review_requests의 멱등성과 review_cases.revision을 공유한다. 수신/통합과 동일 advisory lock 아래 원장과 완료 보고를 조회해 한 관측 결과 안의 상태 혼합을 방지한다. 열린 사건은 현재 수신 원장, 닫힌 사건은 저장 지표만 제공한다. 원장/소속/판정은 계좌 범위 변경으로 수정하지 않는다.

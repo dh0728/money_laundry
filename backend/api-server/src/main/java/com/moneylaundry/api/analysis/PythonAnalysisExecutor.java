@@ -84,7 +84,11 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   private String checkpoint(Context context) {
     if (jdbc == null
         || context.runId() == null
-        || !List.of(AnalysisStage.FEATURES, AnalysisStage.INFERENCE, AnalysisStage.SCORES)
+        || !List.of(
+                AnalysisStage.FEATURES,
+                AnalysisStage.INFERENCE,
+                AnalysisStage.SCORES,
+                AnalysisStage.ALERTS)
             .contains(context.stage())) return null;
     var rows =
         jdbc.queryForList(
@@ -95,9 +99,9 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
         where b.job_id=? and b.status='RUNNING' and b.current_stage=?
           and b.execution_id=? and s.execution_id=? and s.run_id=?
           and s.stage=? and s.completed and r.status in ('READY','ACTIVE')
-          and (select count(*) from analysis_model_tasks m where m.run_id=r.run_id
+          and (s.stage='ALERTS' or (select count(*) from analysis_model_tasks m where m.run_id=r.run_id
                and ((s.stage='FEATURES' and m.phase='PUBLISH' and m.status='READY' and m.input_artifact is not null)
-                 or (s.stage in ('INFERENCE','SCORES') and m.phase='DONE' and m.status='SUCCEEDED' and m.result_artifact is not null)))=2
+                 or (s.stage in ('INFERENCE','SCORES') and m.phase='DONE' and m.status='SUCCEEDED' and m.result_artifact is not null)))=2)
         """,
             String.class,
             context.jobId(),
@@ -179,6 +183,8 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       }
       if (process.exitValue() == 78)
         throw new AnalysisFailure("PIPELINE_NOT_CONFIGURED", AnalysisFailure.Kind.PERMANENT);
+      if (process.exitValue() == 80)
+        throw new AnalysisFailure("ALERT_ASSIGNEE_UNAVAILABLE", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 75)
         throw new AnalysisFailure("DB_UNAVAILABLE", AnalysisFailure.Kind.CONNECTION);
       if (process.exitValue() == 79)
