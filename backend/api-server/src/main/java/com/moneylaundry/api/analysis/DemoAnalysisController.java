@@ -15,10 +15,20 @@ import org.springframework.web.bind.annotation.*;
 public class DemoAnalysisController {
   private final AnalysisService service;
   private final Environment environment;
+  private final com.moneylaundry.api.review.BusinessTime businessTime;
 
   public DemoAnalysisController(AnalysisService service, Environment environment) {
+    this(service, environment, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public DemoAnalysisController(
+      AnalysisService service,
+      Environment environment,
+      com.moneylaundry.api.review.BusinessTime businessTime) {
     this.service = service;
     this.environment = environment;
+    this.businessTime = businessTime;
   }
 
   public record Trigger(LocalDate businessDate) {}
@@ -30,6 +40,18 @@ public class DemoAnalysisController {
       throw new ApiException(
           HttpStatus.FORBIDDEN, "DEMO_CONTROL_DISABLED", "로컬 시연 환경에서만 사용할 수 있습니다.");
     return ResponseEntity.accepted()
-        .body(Map.of("jobId", service.registerDemo(input.businessDate()), "status", "QUEUED"));
+        .body(
+            Map.of(
+                "jobId",
+                businessTime == null
+                    ? service.registerDemo(input.businessDate())
+                    : service.registerDemo(
+                        input.businessDate(),
+                        businessTime
+                            .now()
+                            .atZone(com.moneylaundry.api.review.BusinessTime.KST)
+                            .toLocalDate()),
+                "status",
+                "QUEUED"));
   }
 }

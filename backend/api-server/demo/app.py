@@ -133,4 +133,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    from review_ui import main as review_main
+    review_main()

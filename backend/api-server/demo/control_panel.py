@@ -4,7 +4,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime, time as day_time, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.request import build_opener
@@ -57,6 +57,18 @@ class Controls:
 
     def get(self, path):
         return ApiClient(self.base).get(path)
+
+    def set_clock(self, value):
+        clock = self.get('demo/clock')
+        return ApiClient(self.base).post('demo/clock', {'businessAt': value, 'revision': clock['revision']})
+
+    def prepare_day(self, day):
+        clock = self.get('demo/clock')
+        target = datetime.combine(date.fromisoformat(day) + timedelta(days=1), day_time(9),
+                                  timezone(timedelta(hours=9)))
+        if clock['configured'] and datetime.fromisoformat(clock['businessAt']) >= target:
+            return
+        self.set_clock(target.isoformat())
 
     def post(self, path, payload=None):
         try:
@@ -130,6 +142,7 @@ class Replay:
                     break
                 if analyze and day in self.completed:
                     continue
+                self.controls.prepare_day(day)
                 file_done = sum((day, bank, str(file)) in self.sent for bank, file in files[day])
                 self.report(f'{day}: 처리 시작', currentDay=day,
                             fileDone=file_done, fileTotal=len(files[day]) if upload else 0,
@@ -199,6 +212,20 @@ def render():
         if replay.controls.base != base.rstrip('/'):
             st.info('진행 중 작업의 서버를 바꿀 수 없습니다. 새 패널 세션에서 접속하세요.')
             return
+        clock = replay.controls.get('demo/clock')
+        st.metric('시연 업무 시각 (KST)', clock['businessAt'])
+        with st.expander('시연 업무 시각 설정'):
+            st.caption('자동 재생은 거래 기준일 다음 날 09:00 KST로 이동합니다. 실제 통신 시각은 변경하지 않습니다.')
+            current = datetime.fromisoformat(clock['businessAt'])
+            picked = st.date_input('업무 날짜', current.date())
+            picked_time = st.time_input('업무 시간', day_time(9))
+            busy = replay.future is not None and not replay.future.done()
+            if st.button('시각 적용', disabled=busy):
+                replay.controls.set_clock(datetime.combine(picked, picked_time, timezone(timedelta(hours=9))).isoformat())
+                st.rerun()
+            if st.button('다음 날로 이동', disabled=busy or not clock['configured']):
+                replay.controls.set_clock((current + timedelta(days=1)).isoformat())
+                st.rerun()
         days = st.multiselect('진행할 날짜 (날짜순)', list(files), default=[next(iter(files))])
         st.write({day: f'은행 파일 {len(files[day])}개' for day in sorted(days)})
         interval = st.number_input('날짜 사이 대기(초)', min_value=0, max_value=300, value=5)

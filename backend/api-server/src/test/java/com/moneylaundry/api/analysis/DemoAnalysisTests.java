@@ -46,6 +46,21 @@ class DemoAnalysisTests {
   }
 
   @Test
+  void configured_business_clock_controls_demo_date_but_not_receipt_cutoff() {
+    LocalDate future = LocalDate.of(2030, 1, 1);
+    upload(future, "COMPLETED");
+    assertThatThrownBy(() -> service.registerDemo(future)).isInstanceOf(ApiException.class);
+    long id = service.registerDemo(future, future.plusDays(1));
+    assertThat(
+            jdbc.queryForObject(
+                    "select analysis_cutoff_at from batch_jobs where job_id=?",
+                    java.sql.Timestamp.class,
+                    id)
+                .toInstant())
+        .isEqualTo(Instant.parse("2026-09-22T01:00:00Z"));
+  }
+
+  @Test
   void two_days_run_without_changing_wall_clock_and_keep_normal_wait_stage() {
     upload(day, "RUNNING");
     long first = service.registerDemo(day);

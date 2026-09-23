@@ -19,6 +19,25 @@ class ApiClient:
         self.headers = headers or {}
         self.transport = transport
 
+    def post(self, path, payload, user=None):
+        headers = dict(self.headers)
+        if user is not None:
+            headers['X-Demo-User-Id'] = str(user)
+        try:
+            with httpx.Client(timeout=30, follow_redirects=False, headers=headers,
+                              transport=self.transport) as client:
+                response = client.post(self.base_url + '/api/v1/' + path, json=payload)
+            if response.status_code not in (200, 201, 202):
+                messages = {400: '선택 범위와 입력을 확인하세요.', 403: '담당자 또는 실행 환경 권한이 없습니다.',
+                            404: '대상이 없습니다.', 409: '상태가 변경됐거나 처리 조건이 충족되지 않았습니다. 새로 조회하세요.'}
+                raise ApiError(messages.get(response.status_code, '요청이 처리되지 않았습니다.')
+                               + f' (HTTP {response.status_code})')
+            return response.json()
+        except httpx.HTTPError:
+            raise ApiError('응답을 확인하지 못했습니다. 같은 요청으로 재시도하거나 처리 이력을 확인하세요.') from None
+        except ValueError:
+            raise ApiError('JSON 응답을 확인하지 못했습니다.') from None
+
     def get(self, path, params=None, *, page=False):
         try:
             with httpx.Client(timeout=15, follow_redirects=False, headers=self.headers,

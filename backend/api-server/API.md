@@ -1,6 +1,6 @@
-# API 계약 v0.9 — 2026-09-23
+# API 계약 v0.10 — 2026-09-23
 
-변경 v0.9: 네 화면·시연 업무 시각·범위별 판정·단일/복수 이관 설계 반영. **§9는 사용자 승인된 다음 구현 계약이며 아직 서비스에서 호출할 수 있는 API 명세가 아니다.** 기존 §3.2의 Alert GET은 현행 구현이다. 실제 배포 여부는 이 문서로 추정하지 않는다. 경로/DTO/새 상태 enum의 미확정 사항은 §9.8에 모았다.
+변경 v0.10: V10 조사 저장·시연 업무 시각·네 화면 HTTP API와 L1/L2 범위 처리를 로컬 구현했다. §9.8은 구현 경로/DTO이며 실제 배포 여부는 별도다.
 
 
 변경 v0.8: 정정 요청·전체 보고 교체, INTEGRATE/FREEZE_INPUT, 실행 세대·취소 결과 차단. Python 실행측·실 S3 관통은 후속.
@@ -234,7 +234,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - 씨앗은 TARGET의 `p_laundering >= threshold_value`다. 보고 버전·개정·통합 세대·수집 범위가 마지막 성공 검사 이후 바뀌고, 변경 날짜가 기존 구성 거래일 전후2일에 해당하는 Alert는 원래 씨앗·점수를 보존하여 다시 탐색한다. 현재 선정은 날짜 기반 보수적 후보 검색이며 계좌 관련성/실제 편입은 탐색에서 확인한다. TARGET이 없어도 영향 Alert가 있으면 재추론 없이 ALERTS를 실행한다.
 - 정책 `calendar-event-v4`: 서울 업무일 기준 각 탐색 거래일 전2일~후2일 중 cutoff까지 수신·동결된 거래를 조회한다. 최신 거래에서는 사실상 과거2일+당일이며 미래 자료를 기다리는 상태는 없다. 직접 경로를 따라 발견한 거래마다 날짜 창이 이동한다. 깊이2·최대100거래·계좌활동100 한도 유지. 전체 Alert의48시간 상한은 제거했다. 공유 계좌 주변 거래는 포함하되 그 이유만으로 추가 확장하지 않는다. 직접 상류/하류 경로나 별도 씨앗은 탐색한다. 씨앗 교차 포함만 병합하며 패턴 확률은 구성 기준이 아니다.
 - 신규 씨앗별 후보는 실제 공유 거래·연결 씨앗 기준으로 병합한다. 기존 별도 사건은 삭제·합병하지 않으며 같은 거래는 여러 Alert에 속할 수 있다. `alert_transactions`의 PK는 `(alert_id, version, tx_id)`이고 `UNIQUE(tx_id)`는 없다.
-- OPEN은 새 거래·씨앗·연결 이유가 생기면 새 근거 버전을 저장한다. 조사 중 기존 구성은 보존하며 한도를 초과한 추가는 제한으로 표시한다. CLOSED/ESCALATED는 기존 버전을 바꾸지 않고 `parentAlertId`로 연결된 OPEN 후속 Alert를 생성한다. 후속 Alert가 있으면 다음 탐색은 그 사건에서 이어간다. 사건별 사용자 판정·판정 버전 연결과 상태 변경 API는 후속 태스크다.
+- OPEN은 새 거래·씨앗·연결 이유가 생기면 새 근거 버전을 저장한다. 조사 중 기존 구성은 보존하며 한도를 초과한 추가는 제한으로 표시한다. CLOSED/ESCALATED는 기존 버전을 바꾸지 않고 `parentAlertId`로 연결된 OPEN 후속 Alert를 생성한다. 후속 Alert가 있으면 다음 탐색은 그 사건에서 이어간다. 사건별 판정·범위 변경은 §9의 review API에서 제공한다.
 - 후속 자료 미수신, 은행 일부 미수신, 확인했지만 새 연결 없음은 구분한다. `analysis.input_coverage`는 날짜별 사전 등록 은행과 cutoff 이전 ACTIVE 보고를 동결한다. 예상 은행0·미수신·PARTIALLY_HELD는 complete가 아니다. 완결 여부는 원장 최대 시각이나 벽시계에서 추정하지 않는다.
 - 새 근거가 없으면 버전을 늘리지 않고 검사 시각만 갱신한다. 상세의 `dataAsOf`는 선택한 근거 버전을 만든 완료 실행의 수신 cutoff, `lastCheckedAt`은 마지막 완료 실행에서 기록한 검사 시각이다(ISO-8601 UTC). 최신 조회는 최신 성공 검사, version 지정 조회는 해당 근거 생성 run의 검사만 반환한다. 과거 검사 시각이 기록되지 않은 행은 null이며 현재 시각으로 대체하지 않는다. `coverage`는 검사 run cutoff의 서울 날짜 이하 실제 검사 날짜를 중복 제거해 정렬한 배열로, 각 항목은 `businessDate,complete,expectedBanks,completeBanks,reports`다. 수신 완결과 검사 성공은 별개이며 탐색 제한은 상세 `limits`를 사용한다. `forwardComplete`는 최상위와 coverage에서 제거했다. 내부 재검토 대상 선정은 V8의 실행별 보고·수집 범위 스냅샷 차이를 사용한다. forward_complete 값과 무관하며 성공한 run/job의 검사만 비교 기준이다. 실제 탐색도 날짜별 이동 정책을 사용하며 미래 수신 완료 플래그는 V9에서 제거했다.
 - 다른 READY/ACTIVE run의 미공개 근거와 충돌하면 `RUN_FENCED`로 차단한다. 동결 시점의 완료 근거 기준선이 달라졌으면 `WORKER_INPUT_INVALID`로 거절한다. 동일 frozen input의 단순 resume으로 해결되지 않으며 경쟁 실행 정리·새 스냅샷이 필요하다. 자동 재동결과 다중 분석의 동일 사건 동시 갱신은 이번 범위 밖이다.
@@ -242,7 +242,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ### 3.2 현재 Alert 읽기 API
 
-인증·판정 워크플로는 후속 태스크이며 다음 GET은 현행 공통 접근 설정을 따른다.
+다음 기존 GET은 현행 공통 접근 설정을 따른다. 로컬 조사 워크플로는 §9, 정식 인증은 후속이다.
 
 - `GET /api/v1/alerts?page=0&size=20&status=OPEN&assigneeId=1&jobId=10`: 필터는 선택, size1~200. `jobId`는 **최신 공개 근거 버전을 만든 작업** 기준이다. `summary.scoreMax` 내림차순·alertId 오름차순. 페이지 응답은 batch-jobs와 동일한 content/page/size/totalElements/totalPages다.
 - 목록 항목: `alertId,status,resolution,assigneeId,parentAlertId,createdAt,version,runId,summary`.
@@ -254,7 +254,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - `GET /api/v1/alerts/{alertId}/graph?version=1`: 동일 근거의 graph. nodes는 가명계좌 `id,kind,bankId,inCount,outCount,inAmountUsd,outAmountUsd`, edges는 거래별 `id,txId,from,to,amountUsd,occurredAt,role,includedReasons`다. 같은 계좌쌍의 반복 거래도 별도 edge로 유지한다.
 - 현행 coverage는 §3.1의 날짜별 배열이다. V9에서 forwardComplete를 제거했다. 한도 진단은 개발자 확인용이며 시연 화면에 제한 경고를 추가하지 않는다.
 
-### 3.3 Alert 판정·업무 완료 — 다음 구현 계약
+### 3.3 Alert 판정·업무 완료
 
 §9.4의 범위별 처리가 정본이다. 현재 V6 상태 값 OPEN/CLOSED/ESCALATED를 새 업무 결과와 동일시하지 않는다. 일부 이관 후 미처리 범위가 있으면 열린 업무를 유지하며, 모든 조사 대상이 판정·제외·이관되면 업무 완료가 가능하다. 혼합 처리를 전체 NORMAL로 표시하지 않는다.
 
@@ -262,15 +262,15 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ### 3.4 배정 규칙
 
-- 일반 생성 시 Alert는 L1, Episode는 L2 자동 라운드로빈 배정을 유지한다. 역할별 `users.last_assigned_at` NULL 우선·오래된 순, 동률 userId 오름차순이다. Alert 생성 배정과 다음 Episode 구현을 구분한다.
+- 일반 생성 시 Alert는 L1, Episode는 L2 자동 라운드로빈 배정을 유지한다. 역할별 `users.last_assigned_at` NULL 우선·오래된 순, 동률 userId 오름차순이다. Alert와 Episode 모두 생성 시 적용한다.
 - L2가 본인 조사 범위를 새 Episode로 분리하면 본인 담당으로 이어간다. 일반 생성 라운드로빈과 구분한다.
 - ADMIN 재배정은 같은 역할의 열린 업무에 한정하는 방향을 유지한다. 경로·DTO는 다음 변경 API와 함께 정한다. L2는 다른 담당자의 Episode를 임의 변경할 수 없다.
 - 배정·열람·조사 의견·종결 기록은 보존하며 미열람 전용 상태를 만들지 않는다. 사람 결론을 모델 평가 정답으로 자동 전환하지 않는다.
 - 범위 이동은 §9.4~9.5의 원자 작업이다. 비원자 UNLINK+LINK 두 요청으로 구현하지 않는다.
 
-## 4. Episode — 다음 구현 계약
+## 4. Episode — 조사 업무
 
-현재 Episode 컨트롤러/업무 저장 구현은 없다. 승인된 목록·상세·범위 조정·판정·종결 계약은 §9.2~9.5를 따른다. Alert별 이관 범위가 초기 조사 묶음이며 L2는 본인 담당 OPEN Episode에서 제외·분리·이동할 수 있다. 묶음별 판정 후 사건을 종결하며 원래 L1 처리 기록은 덮지 않는다.
+Episode 업무는 V10과 공통 review 컨트롤러로 구현했다. 승인된 목록·상세·범위 조정·판정·종결 계약은 §9.2~9.5를 따른다. Alert별 이관 범위가 초기 조사 묶음이며 L2는 본인 담당 OPEN Episode에서 제외·분리·이동할 수 있다. 묶음별 판정 후 사건을 종결하며 원래 L1 처리 기록은 덮지 않는다.
 
 예전 `/api/episodes` 생성과 `/{id}/alerts` 전체 연결 API를 각각 최종 계약으로 사용하지 않는다. 단일·복수 이관은 같은 명령으로 받으며 새 Episode 생성/기존 Episode 추가와 모든 선택 범위의 변경을 한 DB 트랜잭션으로 처리한다. 마지막 범위를 옮겨 빈 사건은 정상 판정 없이 범위 정리로 종료할 수 있다. 상세는 §9.4다.
 
@@ -299,7 +299,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ## 6.5 대시보드
 
-승인된 개인/기관 지표·집계 범위는 §9.2를 따른다. 예전 처리 흐름 4칸·감소율 중심 응답은 현 화면 계약으로 사용하지 않는다. 새 대시보드 API는 미구현이다.
+승인된 개인/기관 지표·집계 범위는 §9.2를 따른다. 예전 처리 흐름 4칸·감소율 중심 응답은 현 화면 계약으로 사용하지 않는다. GET /api/v1/dashboard의 로컬 시연 응답은 §9.8을 따른다.
 
 ## 7. 화면별 제공 항목
 
@@ -307,9 +307,9 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ## 8. 미결 목록
 
-현재 화면/조사 계약의 구현 전 미결은 §9.8을 따른다. 실제 모델 피처·확률 합/dtype·설명 정보 계약과 정식 인증은 각 해당 태스크에서 확인한다. 과거 단일 Alert 소속·처분 거래 무조건 제외·부분 이관 불가를 미결 또는 확정 조건으로 되살리지 않는다.
+현재 화면/조사 구현 계약과 후속 범위는 §9.8을 따른다. 실제 모델 피처·확률 합/dtype·설명 정보 계약과 정식 인증은 각 해당 태스크에서 확인한다. 과거 단일 Alert 소속·처분 거래 무조건 제외·부분 이관 불가를 미결 또는 확정 조건으로 되살리지 않는다.
 
-## 9. 네 화면·시연 시각·범위별 판정 계약 (승인 / 구현 전)
+## 9. 네 화면·시연 시각·범위별 판정 계약 (로컬 시연 구현)
 
 ### 9.1 공통 의미와 시간
 
@@ -322,7 +322,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ### 9.2 조회 책임과 화면별 데이터
 
-아래는 제공해야 할 응답 의미다. 미구현 경로/필드명은 §9.8에서 실제 구현과 대조한 뒤 정한다.
+아래는 응답 의미이며 구현 경로와 필드는 §9.8을 따른다.
 
 | 화면 | 승인된 조회/표시 계약 |
 |---|---|
@@ -339,10 +339,10 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ### 9.3 요약과 설명
 
-- Alert 위험도: 씨앗 거래 최대 이진 점수. 현 구현 `summary.scoreMax`는 포함 거래 중 최대 관측 점수이므로 동일 의미로 조용히 재사용하지 않는다. 계약 변경/별도 필드 여부를 구현 전 정한다.
+- Alert 위험도: 씨앗 거래 최대 이진 점수. 현 구현 `summary.scoreMax`는 포함 거래 중 최대 관측 점수이므로 동일 의미로 조용히 재사용하지 않는다. review 응답의 summary.riskScore로 제공하고 기존 summary.scoreMax 의미는 유지한다.
 - 대표 유형: 씨앗 중 typeClass≠0 분류의 최다 유형. typeClass=0(패턴아님)뿐이면 패턴 미특정, 최다 동률이면 혼합. 유형 비중 분모는 전체 씨앗이며 Alert 전체의 패턴 확률이 아니다. 개별 패턴 확률은 거래 상세에 제공한다. 패턴 요약은 Alert 구성 알고리즘을 바꾸지 않는다.
-- 총 거래액: 현재 조사 대상 거래를 txId로 중복 제거해 합산. 반복 발생한 서로 다른 거래는 보존. 경유 거래액 합계를 고유 자금량으로 설명하지 않는다. MVP 지표는 총 거래액·계좌별 수취−송금·상위 3개 수취 계좌 비중이다. 통화별 계산/표시를 기본으로 하며 환산 없는 이종 통화 합산 금지. 기존 명시적 환율 버전의 USD 값은 별도 환산 지표이며 실제 원통화 합계와 구분한다.
-- 외부 유입은 조사 중심 계좌 집합 밖→안이며 등록 은행 여부와 다르다. 중심 범위·유입 후 단시간 유출 산식이 미확정이므로 두 지표는 MVP 우선 구현에서 제외한다. 0으로 임의 표시하지 않는다.
+- 총 거래액: 현재 조사 대상 거래를 txId로 중복 제거해 합산. 반복 발생한 서로 다른 거래는 보존. 경유 거래액 합계를 고유 자금량으로 설명하지 않는다. 개요는 사건 총 거래액과 §9.9의 외부 유입·단시간 유출·계좌별 순유입 집중도를 제공한다. 통화별 계산/표시를 기본으로 하며 환산 없는 이종 통화 합산 금지. 기존 명시적 환율 버전의 USD 값은 별도 환산 지표이며 실제 원통화 합계와 구분한다.
+- 외부 유입은 조사 중심 계좌 집합 밖→안이며 등록 은행 여부와 다르다. 중심 범위 S·기간 T와 FIFO 산식은 §9.9를 따른다.
 - 탐지 근거는 모델 점수/씨앗, 관측 거래 연결, 계산 지표, 사람 의견을 구분한다. 별도 룰 엔진 도입 없음. 그래프 모양을 모델 내부 판단 근거로 단정하지 않는다. 패턴 이미지는 예시이며 실제 사건 그래프로 연결한다.
 
 ### 9.4 범위 처리·단일/복수 이관
@@ -357,13 +357,13 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ### 9.5 충돌·재시도·감사
 
-기존 설계의 revision/멱등 경계를 유지한다. 변경 명령에는 요청 식별과 기대 범위 버전이 필요하며, 같은 요청의 재전송은 중복 이관/판정을 생성하지 않아야 한다. 다른 사건 거래 주입·오래된 범위·이미 닫힌 목적지·권한 없는 조정은 거절한다. 정확한 헤더/DTO/error code는 미확정이다. §0의 400/403/404/409 의미와 ProblemDetail 규약을 사용한다.
+기존 설계의 revision/멱등 경계를 유지한다. 변경 명령에는 요청 식별과 기대 범위 버전이 필요하며, 같은 요청의 재전송은 중복 이관/판정을 생성하지 않아야 한다. 다른 사건 거래 주입·오래된 범위·이미 닫힌 목적지·권한 없는 조정은 거절한다. 정확한 헤더/DTO는 §9.8을 따른다. §0의 400/403/404/409 의미와 ProblemDetail 규약을 사용한다.
 
 감사는 행위자·업무 시각·실제 기록 시각·원본/변경 범위·출처·의견·연결 판정을 구분해 보존한다. 같은 거래의 사건별 상반된 판단을 마지막 값으로 덮지 않는다. CLOSED 기록은 바꾸지 않고 새 근거는 후속 사건으로 연결한다. 소속/판정/업무 상태/감사는 같은 변경의 원자 범위이며 외부 통신 성공을 DB 원자 처리와 동일시하지 않는다.
 
 ### 9.6 저장 책임
 
-[ERD의 다음 구현 저장 계약](ERD.md#다음-구현-저장-계약--2026-09-23)을 따른다. 이관/범위/판정 이력을 단일 alerts.episode_id나 원장의 정상/의심 boolean으로 대체하지 않는다. 개인 worktable 없이도 본 절에서 팀 계약을 확인할 수 있어야 한다.
+[ERD의 V10 조사 저장](ERD.md#v10-시연-시각조사-업무)을 따른다. 이관/범위/판정 이력을 단일 alerts.episode_id나 원장의 정상/의심 boolean으로 대체하지 않는다. 개인 worktable 없이도 본 절에서 팀 계약을 확인할 수 있어야 한다.
 
 ### 9.7 구현 전후 수용 기준
 
@@ -372,12 +372,79 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 - 부분 정상/제외/이관, 다중 이관 중 하나 실패 시 전체 롤백, 재전송·동시 판정/종결 충돌.
 - L2 묶음 분리/이동·맥락 미전파·원본 출처 보존·다중 사건 중복 합산 방지·빈 사건 종료·혼합 결론.
 - 모델 정답 라벨 없이 구성/설명 생성, 개별 확률을 사건 확률로 표시하지 않음.
-- 이번 문서 갱신에서는 위 실행 검증을 수행하지 않았다.
+- PostgreSQL 통합 테스트와 Streamlit AppTest로 주요 정상/실패 경로를 검증했다. 최신 100CSV 전체 관통·실제 모델·원격 환경은 별도 검증이다.
 
-### 9.8 남은 구현 계약과 범위
+### 9.8 구현 HTTP 계약
 
-**확정:** 네 화면의 주요 동작, 통화별 지표 우선 범위, 시간 분리, 필터 의미, 부분 처리/묶음 판정/혼합 결론/빈 사건 종료, 단일·복수 원자 이관.
+다음 API는 임시 직원 식별을 사용하는 **local 전용**이다. dev/prod 또는 혼합 프로파일은 403 DEMO_CONTROL_DISABLED다. 정식 프론트엔드 연결에서는 인증 주체를 서버 인증으로 교체해야 하며 헤더 자체를 운영 인증으로 사용하지 않는다. 사건 ID(caseId)는 원본 alertId와 별개다.
 
-**구현 전 구체화:** 새 경로/DTO·상태 및 종료 사유 enum·변경 명령의 revision/멱등 전달 방식, 원문 표시 권한, 초기 SUBJECT/CONTEXT 매핑, 정정/재분석 시 조회할 점수 선택, 탐지율 분모의 동일 분석 모집단 및 미완료/분모0/전일0 처리, 기관 경과일의 기준과 개인 최근 활동 포함 행동, 상위 송금 계좌·결제 구성의 건수/금액 기준, 환전 거래의 송수신 통화/금액 적용, Episode 위험도 및 유형 태그 중복 표시, 그래프 시간축 세부 조작, 시연 하루 기본 시각. 이 항목들을 이미 사용자에게 질문한 승인 대기라고 표시하지 않는다. 실제 구현/데이터와 대조해 구체안을 제시한다.
+| 요청 | 입력 / 응답 |
+|---|---|
+| GET /api/v1/demo/clock | businessAt(오프셋 시각), configured, revision |
+| POST /api/v1/demo/clock | {businessAt,revision}; 현재 개정/진행 작업/역방향을 검사하고 저장. 최초 설정 전에 기존 분석이 있으면 초기화 필요 |
+| GET /api/v1/demo/users | 시연 L1/L2 직원 id,name,role. 화면에서는 역할 선택 후 해당 역할 직원 전환 |
+| GET /api/v1/ledger/owners 또는 accounts 또는 transactions | from,to(KST 거래일),owner/account(UUID),judgement(SUSPICIOUS,NORMAL,UNANALYZED),payments(복수),page,size. content/page/size/totalElements/totalPages |
+| GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),page,size. 위험도 내림차순 |
+| GET /api/v1/review/cases/{caseId} | caseId,kind,alertId,status,outcome,revision,assigneeId/Name,createdAt,assignedAt,closedAt,groups,summary,pendingCount,sourceAlertIds,primaryTypes,history,relatedDecisions |
+| GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 소유주 박스/계좌 노드 연결용; 원문 이름·계좌번호 제외 |
+| GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
+| GET /api/v1/dashboard | from,to와 X-Demo-User-Id 헤더. businessAt,personal,institution,detection,deliveryDate,pendingReports,daily,agreements,types,activities,priority |
+| POST /api/v1/review/commands | X-Demo-User-Id 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
 
-**후속:** 외부 유입·단시간 유출 산식, 정식 계정/인증/권한·React 연결, 실제 모델/GNN 설명·KubeSphere 실환경 통신. 사용자가 채택한 주요 흐름을 이 미결 목록으로 다시 승인 대기로 되돌리지 않는다.
+명령 본문:
+
+```json
+{
+  "requestId": "UUID",
+  "action": "TRANSFER",
+  "selections": [{"caseId": 1, "revision": 1000001, "groupId": 0, "txIds": [101, 102]}],
+  "targetCaseId": null,
+  "targetRevision": null,
+  "targetGroupId": null,
+  "decision": null,
+  "comment": "선택 범위 심층 조사"
+}
+```
+
+- groupId와 revision은 GET 값을 그대로 전달한다. 최초 미저장 Alert 묶음의 0도 유효하다. Alert revision은 업무 개정과 완료 근거 버전을 결합한 불투명 값이다. 재계산하지 않는다.
+- action: SUBJECT,CONTEXT,EXCLUDE,DECIDE,TRANSFER(L1),SPLIT/MOVE/RECONSIDER(L2),COMMENT,REVIEW_START,CLOSE. DECIDE의 decision은 NORMAL/SUSPICIOUS이며 L1은 NORMAL만 가능하다. L2 DECIDE는 선택 묶음의 미판정 SUBJECT 전체가 필요하다. RECONSIDER는 OPEN 묶음의 이전 판정을 이력에 남기고 다시 미판정으로 열어 범위 조정할 때 사용한다.
+- 대상 caseId가 없으면 TRANSFER/MOVE는 새 Episode, 있으면 targetRevision 필수다. 같은 Episode의 다른 묶음으로 MOVE할 때 targetGroupId를 지정한다. SPLIT은 같은 Episode에 새 묶음을 만든다. 부분/복수 이관 모두 같은 명령이며 한 건 실패하면 전체 롤백한다.
+- 초기 SEED/CONNECTION은 SUBJECT, CONTEXT는 참고 맥락이다. members에는 txId,reviewRole,state,decision,transaction(고정 거래/점수),sources(원본 Alert/근거/유형)가 있다. 처리 상태는 PENDING/DECIDED/EXCLUDED/TRANSFERRED이며 자동 탐색 transaction.role과 구분한다.
+- 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED. 사건 종결은 명시 CLOSE이고 미판정 SUBJECT 또는 같은 사건의 상충 판정이 남으면 거절한다. 기존 alerts 상태는 이관 포함 종결 시 ESCALATED, 그 외 CLOSED로 맞춘다. 원본 근거와 다른 사건 판정은 보존한다.
+- 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
+- summary는 중복 제거한 현재 범위의 txCount,seedCount,riskScore,primaryType과 통화별 합계·순유입·집중도·상위 송금·일별 집계를 제공한다. 상세 키는 Swagger/CaseSummary 구현을 따른다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
+- 오늘 탐지율 분모는 **오늘 분석 업무가 다루는 거래일의 수신·통합 원장 거래 전체**다. 양쪽 은행 중복 보고는 한 거래로 세며 실제 반복 거래는 보존한다. 분자는 오늘 완료된 최신 유효 점수 중 임계 이상 거래다. 분석 날짜가 여러 개면 해당 거래일 합집합을 사용한다. 미분석을 분모에서 빼지 않는다. 검수/통합 미완료 보고가 있으면 최종 비율을 표시하지 않으며 분석 진행 중임을 구분한다. 분모 0은 ‘—’, 전일 Alert 0은 증감률 ‘—’다.
+- 최신 유효 점수는 COMPLETED job과 현재 COMPLETED run이 일치하는 결과다. 미완료/취소 결과로 덮지 않는다. 기관 일별 날짜는 KST, 경과는 배정 후 72시간이다. 통화별 상위 송금 10계좌, 결제 구성은 거래 건수다.
+- 자동 재생은 거래일 다음 날 09:00 KST로 업무 시각을 전진시킨다. 수신 cutoff와 기술 타임아웃은 실제 시각이다. 상세 열람 후 ‘검토 시작 기록’은 명시 명령이며 GET은 상태를 변경하지 않는다.
+
+**후속:** 정식 계정/인증/권한·React 연결, 실제 모델/GNN 설명·KubeSphere 실환경 통신. 최신 100CSV 전체 관통·노트북 리허설은 구현 검증과 별도다.
+
+
+### 9.9 조사 계좌 기준 자금 지표
+
+Alert/Episode 개요 공통. 총 거래액은 기존 사건 SUBJECT 거래 합계로 유지하고, 아래 자금 지표는 **S와 T에 해당하는 수신 원장 전체**를 조회한다. 사건 밖 거래를 조회해도 사건 소속/판정에 추가하지 않는다. 기존 summary.netFlows/topReceiverShare는 구 소속 거래 요약이며 새 지표로 해석하지 않는다. 화면은 아래 money 응답만 사용한다.
+
+- S 초기값: 현재 사건에서 제외/이관되지 않은 SEED 거래의 송·수취 계좌. 담당자가 가명 계좌를 추가/제외할 수 있고 직접 설정 후에는 해당 선택을 유지한다. 새 Episode의 자동 초기값도 이관받은 범위의 씨앗 기준이며 씨앗이 없으면 계좌 선택이 필요하다.
+- T: 현재 SUBJECT 거래의 첫날00시~마지막날 다음00시(KST). 사전 등록 은행의 current ACTIVE 보고가 모두 있는 연속 날짜까지만 관측한다. 첫날부터 미완료면 산출 대기, 중간 미완료면 그 전 날짜까지 계산한다. 업무 시각의 당일·미래는 완료 날짜로 보지 않는다. 마지막 거래 시각을 수신 완료 시각으로 추정하지 않는다.
+- 외부 유입=송금 계좌∉S, 수취 계좌∈S의 수취액. 외부 유출=송금 계좌∈S, 수취 계좌∉S의 송금액. 각각 해당 통화 사용. 순유입=외부 유입−외부 유출. S 내부 이체 제외.
+- 계좌 순유입=in−out, 내부 이체 포함. 집중도=max(in−out,0)/같은 통화에서 S 내 양의 순유입 합계×100. 분모0은 null(화면 ‘산출 불가’). 실제 잔액 비중이 아니다.
+- 단시간 유출은 계좌·통화별 FIFO 추정. 출금은 앞선 입금의 잔여액부터 한 번만 소진하며 Δt를 지난 입금도 먼저 소진한다. 대응 입금 중 입금+Δt≤T 종료인 것만 분모/분자에 포함한다. 분자=Δt 이내 대응액, 분모=평가 가능 입금액. 관측 끝의 미성숙 입금은 excludedIn으로 별도 제공한다. 잔액을 모르는 기간 시작점부터의 추정이지 동일 자금 추적 사실이 아니다.
+- 같은 시각의 거래에는 순서 근거가 없어 출금 먼저 처리한다. 자기 계좌 이체는 순유입 집계에는 반영하지만 FIFO 평가에서는 제외한다. 반복 거래는 서로 다른 tx_id면 보존하며 이중 보고/복수 소속은 한 거래로 센다. 환산 없이 통화를 합치지 않는다.
+- 초기 Δt=180분. 비교 선택 5/15/30/60/180/360/1440분. 시연 원장690,519거래의 FIFO 분포를 비교한 탐색용 초기값이며 정상/세탁 판정 임계가 아니다. Small 전체 기간 실측이며 사건별 최적 시간/실제 탐지 성능을 입증하지 않는다.
+
+`GET /api/v1/review/cases/{caseId}/money?minutes=180` (local 전용):
+
+- selectedAccounts,candidateAccounts,customScope,revision,delayMinutes,requestedFrom/To,observedAt(실제 조회시각).
+- available=false이면 reason=EMPTY_SUBJECT_SCOPE/EMPTY_ACCOUNT_SCOPE/WAITING_RECEIPTS/NO_CLOSED_SNAPSHOT이며 비율을0으로 만들지 않는다.
+- available=true이면 start,endExclusive,complete,ledgerCount,method=FIFO_ESTIMATE,external[],accounts[].
+- external 행: currency,in,out,net. accounts 행: accountId,currency,in,out,net,positiveNet,concentrationPercent,eligibleIn,excludedIn,matchedIn,rapidOutflowPercent. 비율은0~100 또는 null이다.
+
+`POST /api/v1/review/cases/{caseId}/money-scope`:
+
+```json
+{"requestId":"UUID","revision":1000001,"accounts":["가명 계좌 UUID"],"comment":"조사 중심 계좌 조정"}
+```
+
+X-Demo-User-Id 필수. 본인 담당 OPEN 사건·기대 revision·실재 가명 계좌를 검증한다. accounts는 최대1000개, 빈 배열은 빈 S를 명시한다. 멱등 요청은 기존 review_requests를 사용하고 MONEY_SCOPE 이력·사건 개정과 원자 저장한다. 상태/HTTP 오류 원칙은 §9.8과 같다.
+
+종결할 때 180분 지표를 MONEY_SNAPSHOT 이벤트에 저장하며 이후 수신/원장 정정에도 바꾸지 않는다. CLOSED 조회는 minutes와 무관하게 그 스냅샷을 반환한다. 과거 종결 사건에 기록이 없으면 현재 원장으로 과거를 재구성하지 않는다. 원문 정보/정답 라벨은 조회·계산에 사용하지 않는다.

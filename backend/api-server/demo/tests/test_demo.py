@@ -75,7 +75,7 @@ class ClientTests(unittest.TestCase):
 
 class ScreenTests(unittest.TestCase):
     def run_app(self):
-        return AppTest.from_file(str(DEMO / 'app.py')).run(timeout=15)
+        return AppTest.from_string('from app import main\nmain()').run(timeout=15)
 
     def test_empty_and_connection_failure(self):
         with patch('api_client.ApiClient.get', return_value=page([])):

@@ -73,7 +73,13 @@ public class AnalysisService {
   }
 
   public long registerDemo(LocalDate businessDay) {
-    if (businessDay == null || !businessDay.isBefore(LocalDate.now(clock.withZone(zone))))
+    return registerDemo(businessDay, LocalDate.now(clock.withZone(zone)));
+  }
+
+  public long registerDemo(LocalDate businessDay, LocalDate currentBusinessDay) {
+    if (businessDay == null
+        || currentBusinessDay == null
+        || !businessDay.isBefore(currentBusinessDay))
       throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DEMO_DATE", "과거 거래 기준일을 선택하세요.");
     return register(null, businessDay);
   }

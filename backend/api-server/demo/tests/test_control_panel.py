@@ -32,7 +32,7 @@ class PanelTests(unittest.TestCase):
             folder.mkdir()
             (folder / 'bank_12_2023-09-01.csv').write_text('header')
             with patch.dict('os.environ', {'AML_DEMO_DATA_DIR': name, 'AML_DEMO_API_URL': 'http://127.0.0.1:8080'}):
-                with patch.object(Controls, 'post') as post, patch.object(Controls, 'upload') as upload:
+                with patch.object(Controls, 'post') as post, patch.object(Controls, 'upload') as upload, patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}), patch.object(Controls, 'prepare_day'):
                     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'control_panel.py')).run(timeout=15)
                     self.assertFalse(app.exception)
                     self.assertFalse(app.error)
@@ -41,8 +41,9 @@ class PanelTests(unittest.TestCase):
                     upload.assert_not_called()
                     actual = app.session_state.replay.controls
                     actual.upload = Mock()
+                    actual.prepare_day = Mock()
                     actual.post = Mock(return_value={'jobId': 5})
-                    actual.get = Mock(return_value={'status': 'COMPLETED'})
+                    actual.get = Mock(side_effect=lambda path: {'status': 'COMPLETED'} if path.startswith('batch-jobs') else {'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1})
                     next(b for b in app.button if b.label == '전송 → 분석 자동 재생').click().run()
                     self.assertFalse(app.exception)
                     app.session_state.replay.future.result(timeout=10)

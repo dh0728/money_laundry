@@ -27,7 +27,8 @@ public class ApiExceptionHandler {
   @ExceptionHandler({
     MethodArgumentNotValidException.class,
     HttpMessageNotReadableException.class,
-    MethodArgumentTypeMismatchException.class
+    MethodArgumentTypeMismatchException.class,
+    org.springframework.web.bind.MissingRequestValueException.class
   })
   ProblemDetail invalidBody(Exception e) {
     return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 필드와 형식을 확인하세요.");
