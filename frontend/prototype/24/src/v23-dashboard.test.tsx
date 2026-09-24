@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import Agent from './Agent'
 import { Institution, buildInstitutionChartData } from './Dashboard'
-import { buildPatternHierarchy } from './Dashboard'
 import { records } from './domain'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>)
@@ -59,40 +58,15 @@ describe('v23 institution dashboard report', () => {
     expect(patternLabel).toContain('font-weight="600"')
     const markup = html(<Institution records={records} onOpen={() => {}} />)
     const hierarchy = markup.slice(markup.indexOf('data-testid="transaction-pattern-hierarchy"'))
-    expect(hierarchy).toContain('aria-label="거래 구성과 패턴 분포 보기"')
-    expect(hierarchy).toContain('>계층 막대</button>')
-    expect(hierarchy).toContain('>이중 도넛</button>')
+    expect(hierarchy).not.toContain('이중 도넛')
+    expect(hierarchy).not.toContain('role="tablist"')
     expect(hierarchy).toContain('data-testid="transaction-pattern-bar"')
     expect(hierarchy).not.toContain('data-testid="transaction-pattern-donut"')
     expect(markup).not.toContain('data-testid="pattern-distribution-chart"')
     expect(markup).not.toContain('data-testid="laundering-composition-chart"')
   })
 
-  it('confines every pattern type to the parent pattern-owned range', () => {
-    const geometry = buildPatternHierarchy(
-      [
-        { name: '패턴 소속', value: 60, fill: 'parent' },
-        { name: '패턴 외 · 다건 묶음', value: 30, fill: 'multi' },
-        { name: '패턴 외 · 단일 거래', value: 10, fill: 'single' },
-      ],
-      [
-        { pattern: 'FAN_OUT', alerts: 3, fill: 'fan' },
-        { pattern: 'CYCLE', alerts: 1, fill: 'cycle' },
-      ],
-    )
-    expect(geometry.patternShare).toBe(0.6)
-    expect(geometry.patternSegments.map(item => item.value)).toEqual([3, 1])
-    expect(geometry.patternSegments.map(item => item.name)).toEqual(['FAN_OUT', 'CYCLE'])
-    expect(geometry.compositionArc).toEqual({ startAngle: 90, endAngle: -270 })
-    expect(geometry.patternArc).toEqual({ startAngle: 90, endAngle: -126 })
-    expect(geometry.nonPatternArc).toEqual({ startAngle: -126, endAngle: -270 })
-    expect(geometry.nonPatternSegments.map(item => item.name)).toEqual(['패턴 외 · 다건 묶음', '패턴 외 · 단일 거래'])
-    expect(geometry.donutOuter).toEqual(geometry.patternSegments)
-    expect(geometry.donutOuter).toHaveLength(2)
-    expect(geometry.donutOuter.some(item => item.fill === 'transparent')).toBe(false)
-  })
-
-  it('uses grayscale only for the three composition categories', () => {
+  it('draws the three composition categories in the single inverse theme color because labels name them', () => {
     expect(buildInstitutionChartData(records).composition.map(item => item.fill)).toEqual([
       'var(--foreground)',
       'var(--foreground)',
@@ -105,7 +79,6 @@ describe('v23 institution dashboard report', () => {
       TransactionPatternHierarchy: (props: {
         composition: Array<{ name: string; value: number; fill: string }>
         distribution: Array<{ pattern: string; alerts: number; fill: string }>
-        view: 'bar' | 'donut'
       }) => React.ReactNode
     }
     const composition = [
@@ -114,74 +87,18 @@ describe('v23 institution dashboard report', () => {
       { name: '패턴 외 · 단일 거래', value: 10, fill: 'light' },
     ]
     const distribution = [{ pattern: 'FAN_OUT', alerts: 3, fill: 'fan' }, { pattern: 'CYCLE', alerts: 1, fill: 'cycle' }]
-    const bar = html(<>{module.TransactionPatternHierarchy({ composition, distribution, view: 'bar' })}</>)
-    const donut = html(<>{module.TransactionPatternHierarchy({ composition, distribution, view: 'donut' })}</>)
-    const compositionBar = bar.indexOf('data-testid="composition-bar"')
-    const patternBar = bar.indexOf('data-testid="pattern-child-range"')
-    expect(compositionBar).toBeGreaterThan(-1)
-    expect(compositionBar).toBeLessThan(patternBar)
-    const hierarchyGrid = bar.match(/<div[^>]*data-testid="hierarchy-bar-grid"[^>]*>/)?.[0] ?? ''
-    const parentCell = bar.match(/<div[^>]*data-testid="pattern-parent-cell"[^>]*>/)?.[0] ?? ''
+    const bar = html(<>{module.TransactionPatternHierarchy({ composition, distribution })}</>)
     const barLayout = bar.match(/<div[^>]*data-testid="transaction-pattern-bar"[^>]*>/)?.[0] ?? ''
     expect(barLayout).toContain('h-full')
-    expect(barLayout).toContain('grid-rows-[24px_minmax(180px,1fr)]')
-    expect(hierarchyGrid).toContain('grid-template-columns:60fr 30fr 10fr')
-    expect(hierarchyGrid).toContain('gap-1.5')
-    expect(hierarchyGrid).toContain('rounded-lg')
-    expect(parentCell).toContain('row-span-2')
-    expect(parentCell).toContain('grid-rows-2')
-    expect((bar.match(/data-testid="composition-sibling-block"/g) ?? [])).toHaveLength(2)
+    expect(bar).toContain('data-testid="relation-total-panel"')
+    expect(bar).toContain('data-testid="relation-pattern-panel"')
+    expect((bar.match(/data-testid="relation-total-segment"/g) ?? [])).toHaveLength(3)
+    expect((bar.match(/data-testid="relation-link"/g) ?? [])).toHaveLength(2)
     expect((bar.match(/data-testid="pattern-child-label"/g) ?? [])).toHaveLength(2)
+    expect(bar).toContain('전체 구성')
+    expect(bar).toContain('패턴별 유형')
     expect(bar).not.toContain('data-testid="composition-legend"')
     expect(bar).not.toContain('data-testid="pattern-legend"')
-    expect(donut).toContain('data-testid="composition-legend"')
-    expect(donut).not.toContain('data-testid="pattern-legend"')
-    expect(donut).toContain('data-testid="transaction-pattern-donut-chart"')
-    expect(donut).not.toContain('data-testid="donut-label-connector"')
-  })
-
-  it('keeps arc-following pattern labels readable on both sides of the donut', async () => {
-    const module = await import('./Dashboard') as unknown as {
-      patternArcLabelPath?: (cx: number, cy: number, radius: number, startAngle: number, endAngle: number) => string
-    }
-    expect(module.patternArcLabelPath).toBeTypeOf('function')
-    expect(module.patternArcLabelPath?.(200, 200, 100, 90, 0)).toBe('M 200 100 A 100 100 0 0 1 300 200')
-    expect(module.patternArcLabelPath?.(200, 200, 100, -90, -180)).toBe('M 100 200 A 100 100 0 0 0 200 300')
-  })
-
-  it('places the patterned child ring directly outside its parent', async () => {
-    const module = await import('./Dashboard') as unknown as {
-      dashboardDonutRadii: {
-        parentInner: number
-        parentOuter: number
-        childInner: number
-        childOuter: number
-      }
-      TransactionPatternHierarchy: (props: {
-        composition: Array<{ name: string; value: number; fill: string }>
-        distribution: Array<{ pattern: string; alerts: number; fill: string }>
-        view: 'bar' | 'donut'
-      }) => React.ReactNode
-    }
-    const radii = module.dashboardDonutRadii
-    expect(radii.childInner).toBe(radii.parentOuter)
-    expect(radii.childOuter).toBeGreaterThan(radii.childInner)
-
-    const donut = html(<>{module.TransactionPatternHierarchy({
-      composition: [
-        { name: '패턴 소속', value: 60, fill: 'dark' },
-        { name: '패턴 외 · 다건 묶음', value: 30, fill: 'mid' },
-        { name: '패턴 외 · 단일 거래', value: 10, fill: 'light' },
-      ],
-      distribution: [{ pattern: 'FAN_OUT', alerts: 3, fill: 'fan' }, { pattern: 'CYCLE', alerts: 1, fill: 'cycle' }],
-      view: 'donut',
-    })}</>)
-    const layout = donut.match(/<div[^>]*data-testid="transaction-pattern-donut"[^>]*>/)?.[0] ?? ''
-    const chart = donut.match(/<div[^>]*data-testid="transaction-pattern-donut-chart"[^>]*>/)?.[0] ?? ''
-    expect(layout).toContain('h-full')
-    expect(layout).toContain('min-h-[320px]')
-    expect(chart).toContain('h-full')
-    expect(chart).toContain('aspect-square')
   })
 
   it('gives the expanded report evidence for three priority reviews without repeating KPI labels', () => {

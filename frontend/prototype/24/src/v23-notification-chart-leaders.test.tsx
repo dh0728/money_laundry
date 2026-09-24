@@ -33,26 +33,13 @@ describe('v23 계층 차트 범례 배치', () => {
     { pattern: 'CYCLE', alerts: 1, fill: 'cycle' },
   ]
 
-  it('막대는 두 좁은 회색 영역만 오른쪽 색점 범례로 표시한다', () => {
-    const markup = html(<TransactionPatternHierarchy composition={composition} distribution={distribution} view="bar" />)
+  it('관계 막대는 세 거래 구성 칸마다 가까운 이름표를 두고 패턴 범례는 쓰지 않는다', () => {
+    const markup = html(<TransactionPatternHierarchy composition={composition} distribution={distribution} />)
 
     expect(markup).not.toContain('data-testid="composition-legend"')
     expect(markup).not.toContain('data-testid="pattern-legend"')
-    expect((markup.match(/data-testid="bar-gray-callout"/g) ?? [])).toHaveLength(2)
-    expect((markup.match(/data-testid="bar-gray-dot"/g) ?? [])).toHaveLength(2)
-    expect(markup).not.toContain('data-testid="bar-gray-leader"')
+    expect((markup.match(/data-testid="relation-total-label"/g) ?? [])).toHaveLength(3)
+    expect((markup.match(/data-testid="relation-label-leader"/g) ?? [])).toHaveLength(3)
     expect((markup.match(/data-testid="pattern-child-label"/g) ?? [])).toHaveLength(2)
-    expect((markup.match(/data-testid="composition-sibling-block"/g) ?? [])).toHaveLength(2)
-    expect(markup).toContain('data-testid="pattern-parent-cell"')
-    expect(markup).toContain('data-testid="pattern-child-range"')
-  })
-
-  it('도넛은 안쪽 거래 구성 범례만 두고 패턴 범례는 쓰지 않는다', () => {
-    const markup = html(<TransactionPatternHierarchy composition={composition} distribution={distribution} view="donut" />)
-
-    expect(markup).toContain('data-testid="composition-legend"')
-    expect(markup).not.toContain('data-testid="pattern-legend"')
-    expect((markup.match(/data-testid="composition-legend-dot"/g) ?? [])).toHaveLength(3)
-    expect(markup).not.toContain('data-testid="donut-label-connector"')
   })
 })
