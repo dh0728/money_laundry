@@ -2,7 +2,8 @@ import { Fragment, useEffect, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { DateRangeButton, PageHeading, UnderTabs, SectionTitle, RiskBadge, PatternBadge } from './shared'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DateRangeButton, PageHeading, UnderTabs, SectionTitle, RiskBadge, PatternBadge, StatusBadge } from './shared'
 import { patternOptions, TODAY, type RecordItem } from './domain'
 import { SectionCards, type SectionCardItem } from './blocks/section-cards'
 import { ChartAreaInteractive, dashboardChartTones, type DailyFlow } from './blocks/chart-area-interactive'
@@ -14,53 +15,75 @@ function WorkCard({ record, onOpen, meta }: { record: RecordItem; onOpen: (recor
       <span className="min-w-0">
         <span className="block text-xs font-mono text-muted-foreground">{record.id}</span>
         <span className="block text-sm mt-1.5 truncate">{record.title}</span>
-        <span className="flex gap-2 mt-2 items-center"><PatternBadge pattern={record.pattern} probability={record.probability} /><span className="text-[11px] text-muted-foreground">{meta ?? `${record.owner} · ${record.age === 0 ? '오늘 탐지' : `${record.age}일 경과`}`}</span></span>
+        <span className="flex flex-wrap gap-x-2 gap-y-1 mt-2 items-center"><PatternBadge pattern={record.pattern} probability={record.probability} /><span className="whitespace-nowrap text-[11px] text-muted-foreground">{meta ?? `${record.owner} · ${record.age === 0 ? '오늘 탐지' : `${record.age}일 경과`}`}</span></span>
       </span>
       <RiskBadge risk={record.risk} score={record.score} />
     </button>
   )
 }
 
+const personalSorts = {
+  risk: { label: '위험 점수 높은 순', compare: (a: RecordItem, b: RecordItem) => b.score - a.score || b.age - a.age },
+  age: { label: '경과일 긴 순', compare: (a: RecordItem, b: RecordItem) => b.age - a.age || b.score - a.score },
+  recent: { label: '최근 탐지 순', compare: (a: RecordItem, b: RecordItem) => b.date.localeCompare(a.date) || b.score - a.score },
+  probability: { label: '의심 확률 높은 순', compare: (a: RecordItem, b: RecordItem) => b.probability - a.probability || b.score - a.score },
+} as const
+export type PersonalSort = keyof typeof personalSorts
+// Alert의 검토 전·검토 중과 Episode의 조사 전·조사 중을 같은 단계로 본다.
+export const personalStatusColumns = [
+  { label: '검토 전', statuses: ['검토 전', '조사 전'] },
+  { label: '검토 중', statuses: ['검토 중', '조사 중'] },
+  { label: '종결', statuses: ['종결'] },
+]
+export const sortPersonalQueue = (records: RecordItem[], sort: PersonalSort) => records.slice().sort(personalSorts[sort].compare)
+
+// 내 담당 업무만 근거로 한 규칙 기반 요약. 실제 LLM 연결 전 mock이다.
+function PersonalAiSummary({ mine, onOpen }: { mine: RecordItem[]; onOpen: (record: RecordItem) => void }) {
+  const stale = mine.filter(r => r.age >= 3), high = mine.filter(r => r.score >= 80)
+  const patternCounts = mine.filter(r => r.pattern !== 'NORMAL').reduce<Record<string, number>>((counts, r) => ({ ...counts, [r.pattern]: (counts[r.pattern] ?? 0) + 1 }), {})
+  const focus = Object.entries(patternCounts).sort(([, a], [, b]) => b - a)[0]
+  const first = sortPersonalQueue(mine, 'age').find(r => r.score >= 80) ?? sortPersonalQueue(mine, 'risk')[0]
+  return <Card data-testid="personal-ai-summary" className="shadow-none"><CardContent>
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-base font-semibold tracking-tight">AI 요약 · 내 담당</h2><p className="text-[11px] text-muted-foreground">담당 미처리 {mine.length}건 기준 · 판단은 조사자가 수행</p></div>
+    <div className="mt-4 grid gap-4 @3xl:grid-cols-3">
+      <div><p className="text-xs font-medium">현재 상황</p><p className="mt-2 text-sm leading-6 text-muted-foreground">미처리 {mine.length}건 중 위험 점수 80 이상 {high.length}건, 3일 이상 경과 {stale.length}건입니다.</p></div>
+      <div><p className="text-xs font-medium">집중 패턴</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{focus ? `${focus[0]} 의심이 ${focus[1]}건으로 가장 많습니다. 같은 소유주·계좌가 반복되는지 함께 보세요.` : '두드러진 패턴이 없습니다.'}</p></div>
+      <div><p className="text-xs font-medium">먼저 볼 업무</p>{first ? <button type="button" data-testid="personal-ai-first" onClick={() => onOpen(first)} className="mt-2 w-full rounded-md border px-3 py-2 text-left hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring outline-none"><span className="block truncate text-sm">{first.title}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{first.id} · 위험 {first.score} · {first.age}일 경과</span></button> : <p className="mt-2 text-sm text-muted-foreground">미처리 업무가 없습니다.</p>}</div>
+    </div>
+  </CardContent></Card>
+}
+
 function Personal({ records, user, onOpen }: { records: RecordItem[]; user: string; onOpen: (r: RecordItem) => void }) {
+  const [sort, setSort] = useState<PersonalSort>('risk')
   const mine = records.filter(r => r.owner === user && r.status !== '종결')
-  const queue = mine.slice().sort((a, b) => b.score - a.score).slice(0, 5)
-  const stats = [
-    { label: '내 담당 미처리', value: mine.length, sub: '검토·조사가 필요한 업무' },
-    { label: '3일 이상 경과', value: mine.filter(r => r.age >= 3).length, sub: '우선 처리가 필요한 업무' },
-    { label: '내 종결', value: records.filter(r => r.owner === user && r.status === '종결').length, sub: '현재 조회 범위 기준' },
+  const owned = records.filter(r => r.owner === user)
+  const columns = personalStatusColumns.map(column => ({ ...column, items: sortPersonalQueue(owned.filter(r => column.statuses.includes(r.status)), sort) }))
+  const cards: SectionCardItem[] = [
+    { label: '내 담당 미처리', value: fmt(mine.length), trend: '현재 조회 범위', note: '검토·조사가 필요한 업무' },
+    { label: '위험 점수 80 이상', value: fmt(mine.filter(r => r.score >= 80).length), trend: '고위험', note: '미처리 중 위험 점수 80 이상' },
+    { label: '3일 이상 경과', value: fmt(mine.filter(r => r.age >= 3).length), trend: '우선 처리 대상', note: '미처리 중 3일 이상 경과' },
+    { label: '내 종결', value: fmt(records.filter(r => r.owner === user && r.status === '종결').length), trend: '현재 조회 범위', note: '담당해 종결한 업무' },
   ]
   return (
     <>
-      <div className="grid grid-cols-3 gap-4">
-        {stats.map(s => (
-          <Card key={s.label} className="shadow-none"><CardContent>
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className="type-display font-semibold tracking-tight mt-4 tabular-nums">{s.value}<span className="text-sm font-normal ml-1.5 text-muted-foreground">건</span></p>
-            <p className="text-[11px] text-muted-foreground mt-2">{s.sub}</p>
-          </CardContent></Card>
-        ))}
-      </div>
+      <SectionCards items={cards} />
+      <PersonalAiSummary mine={mine} onOpen={onOpen} />
       <section aria-labelledby="queue-title">
-        <div className="mb-3">
-          <h2 id="queue-title" className="text-base font-semibold tracking-tight">먼저 확인할 업무</h2>
-          <p className="text-xs text-muted-foreground mt-1.5">위험 점수 높은 순 · 종결 건 제외</p>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="queue-title" className="text-base font-semibold tracking-tight">내 담당 업무</h2>
+            <p className="text-xs text-muted-foreground mt-1.5">상태별 · {personalSorts[sort].label}</p>
+          </div>
+          <Select value={sort} onValueChange={value => setSort(value as PersonalSort)}>
+            <SelectTrigger size="sm" className="w-40" aria-label="업무 정렬 기준"><SelectValue /></SelectTrigger>
+            <SelectContent>{Object.entries(personalSorts).map(([key, option]) => <SelectItem key={key} value={key}>{option.label}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
-        {/* 수정안: 바깥 카드 없이 업무마다 독립된 카드를 간격을 두고 나열 */}
-        <div className="space-y-2.5" data-testid="work-queue">
-          {queue.map(r => (
-            <WorkCard key={r.id} record={r} onOpen={onOpen} />
-          ))}
-        </div>
-      </section>
-      <section aria-labelledby="activity-title">
-        <div className="mb-3">
-          <h2 id="activity-title" className="text-base font-semibold tracking-tight">최근 내 활동</h2>
-          <p className="text-xs text-muted-foreground mt-1.5">현재 조회 범위에서 최근 처리한 업무</p>
-        </div>
-        <div className="space-y-2.5">
-          {records.filter(r => r.owner === user).slice(0, 3).map((r, i) => (
-            <WorkCard key={r.id} record={r} onOpen={onOpen} meta={`${14 - i}:24 · ${r.status === '종결' ? '검토 종결' : '검토 시작'}`} />
-          ))}
+        <div className="grid items-start gap-4 @3xl:grid-cols-3" data-testid="work-queue">
+          {columns.map(column => <div key={column.label} data-testid="work-status-column" className="flex min-w-0 flex-col gap-2.5">
+            <div className="flex items-center gap-2"><StatusBadge status={column.label} /><span className="text-xs tabular-nums text-muted-foreground">{column.items.length}건</span></div>
+            {column.items.length ? column.items.map(r => <WorkCard key={r.id} record={r} onOpen={onOpen} />) : <p className="rounded-lg border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">해당 상태 업무가 없습니다.</p>}
+          </div>)}
         </div>
       </section>
     </>

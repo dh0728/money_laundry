@@ -15,7 +15,7 @@ export function SectionCards({ items }: { items: SectionCardItem[] }) {
           <Card key={item.label} className="@container/card">
             <CardHeader>
               <CardDescription>{item.label}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{item.value}</CardTitle>
+              <CardTitle className="type-display font-semibold tabular-nums">{item.value}</CardTitle>
               {Icon && item.delta !== undefined && (
                 <CardAction>
                   <Badge variant="outline">
