@@ -11,25 +11,21 @@ describe('semantic badges', () => {
     expect(renderToStaticMarkup(<StatusBadge status={label} />)).toContain(`data-tone="${tone}"`)
   })
 
-  it('uses the same eight unique tones as the dashboard patterns', () => {
-    const patterns = ['FAN_OUT', 'FAN_IN', 'GATHER-SCATTER', 'SCATTER-GATHER', 'CYCLE', 'RANDOM', 'BIPARTITE', 'STACK']
+  it('renders every pattern tag in the inverse theme color without a color dot', () => {
+    const patterns = ['FAN_OUT', 'FAN_IN', 'GATHER-SCATTER', 'SCATTER-GATHER', 'CYCLE', 'RANDOM', 'BIPARTITE', 'STACK', 'NON_PATTERN']
     const markup = patterns.map(pattern => renderToStaticMarkup(<PatternBadge pattern={pattern} probability={80} />))
-    const tones = markup.map(item => item.match(/--badge-tone:([^;" ]+)/)?.[1])
-    expect(new Set(tones).size).toBe(8)
-    expect(tones).toEqual([4, 5, 6, 7, 8, 9, 1, 2].map(number => `var(--dashboard-category-${number})`))
-    markup.forEach(item => expect(item).toContain('data-slot="pattern-dot"'))
+    markup.forEach(item => {
+      expect(item).toContain('semantic-pattern-badge')
+      expect(item).not.toContain('pattern-dot')
+      expect(item).not.toContain('--badge-tone')
+    })
+    const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
+    expect(css).toContain('.semantic-pattern-badge { color: var(--background); border-color: var(--foreground); background: var(--foreground); }')
   })
 
-  it('keeps all eight pattern colors in a distinguishable warm anomaly palette in both themes', () => {
+  it('removes chart color tokens left unused by the single inverse color', () => {
     const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
-    const indices = [4, 5, 6, 7, 8, 9, 1, 2]
-    const themes = indices.map(index => [...css.matchAll(new RegExp(`--dashboard-category-${index}:\\s*oklch\\(([^)]+)\\)`, 'g'))])
-    expect(themes.every(matches => matches.length === 2)).toBe(true)
-    for (const themeIndex of [0, 1]) {
-      const hues = themes.map(matches => Number(matches[themeIndex][1].trim().split(/\s+/)[2]))
-      expect(hues.every(hue => hue < 100 || hue >= 340)).toBe(true)
-      expect(hues.every((hue, index) => hues.slice(index + 1).every(other => Math.min(Math.abs(hue - other), 360 - Math.abs(hue - other)) >= 10))).toBe(true)
-    }
+    for (const token of ['--dashboard-category-', '--dashboard-composition-', '--dashboard-label-on-']) expect(css).not.toContain(token)
   })
 
   it('gives owner, detection date, and elapsed time the same neutral filled badge', () => {

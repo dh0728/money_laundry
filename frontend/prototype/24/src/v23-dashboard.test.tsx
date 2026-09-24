@@ -50,20 +50,9 @@ describe('v23 institution dashboard report', () => {
 
   it('combines transaction composition and pattern distribution in one hierarchical chart', async () => {
     const module = await import('./Dashboard') as unknown as {
-      dashboardPatternTones?: readonly string[]
       PatternAxisTick?: (props: { x?: number; y?: number; payload?: { value?: string } }) => React.ReactNode
     }
-    expect(module.dashboardPatternTones).toEqual([
-      'var(--dashboard-category-1)',
-      'var(--dashboard-category-2)',
-      'var(--dashboard-category-3)',
-      'var(--dashboard-category-4)',
-      'var(--dashboard-category-5)',
-      'var(--dashboard-category-6)',
-      'var(--dashboard-category-7)',
-      'var(--dashboard-category-8)',
-      'var(--dashboard-category-9)',
-    ])
+    expect(module).not.toHaveProperty('dashboardPatternTones')
     expect(module.PatternAxisTick).toBeTypeOf('function')
     const patternLabel = html(<>{module.PatternAxisTick!({ x: 20, y: 12, payload: { value: 'FAN_OUT' } })}</>)
     expect(patternLabel).toContain('style="fill:var(--foreground)"')
@@ -105,9 +94,9 @@ describe('v23 institution dashboard report', () => {
 
   it('uses grayscale only for the three composition categories', () => {
     expect(buildInstitutionChartData(records).composition.map(item => item.fill)).toEqual([
-      'var(--dashboard-composition-dark)',
-      'var(--dashboard-composition-mid)',
-      'var(--dashboard-composition-light)',
+      'var(--foreground)',
+      'var(--foreground)',
+      'var(--foreground)',
     ])
   })
 

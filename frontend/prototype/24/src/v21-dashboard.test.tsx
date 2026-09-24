@@ -65,28 +65,16 @@ describe('v21 institution dashboard', () => {
     })
   })
 
-  it('uses dashboard category tokens rather than risk or status colors for categorical charts', async () => {
-    const dashboard = await import('./Dashboard') as unknown as {
-      dashboardPatternTones?: readonly string[]
-    }
+  it('draws composition and pattern charts in the single inverse theme color instead of per-category tokens', async () => {
+    const dashboard = await import('./Dashboard')
     const data = buildInstitutionChartData(records, { from: new Date(2026, 7, 18), to: TODAY })
-    expect(dashboard.dashboardPatternTones).toEqual([
-      'var(--dashboard-category-1)',
-      'var(--dashboard-category-2)',
-      'var(--dashboard-category-3)',
-      'var(--dashboard-category-4)',
-      'var(--dashboard-category-5)',
-      'var(--dashboard-category-6)',
-      'var(--dashboard-category-7)',
-      'var(--dashboard-category-8)',
-      'var(--dashboard-category-9)',
-    ])
+    expect(dashboard).not.toHaveProperty('dashboardPatternTones')
     expect(data.composition.map(item => item.fill)).toEqual([
-      'var(--dashboard-composition-dark)',
-      'var(--dashboard-composition-mid)',
-      'var(--dashboard-composition-light)',
+      'var(--foreground)',
+      'var(--foreground)',
+      'var(--foreground)',
     ])
-    expect(data.distribution.every(item => item.fill.startsWith('var(--dashboard-category-'))).toBe(true)
+    expect(data.distribution.every(item => item.fill === 'var(--foreground)')).toBe(true)
   })
 
   it('renders one inverse-color hover line without active dots and mirrors solid/dashed series in the legend', async () => {

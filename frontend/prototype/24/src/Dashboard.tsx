@@ -79,17 +79,6 @@ export const dailyFlow: DailyFlow[] = Array.from({ length: 91 }, (_, i) => {
   return { date, inflow, closed: Math.max(0, inflow - 6 + Math.round(7 * Math.cos(i / 3))) }
 })
 const analyticalPatterns = patternOptions.filter(pattern => pattern !== 'NORMAL')
-export const dashboardPatternTones = [
-  'var(--dashboard-category-1)',
-  'var(--dashboard-category-2)',
-  'var(--dashboard-category-3)',
-  'var(--dashboard-category-4)',
-  'var(--dashboard-category-5)',
-  'var(--dashboard-category-6)',
-  'var(--dashboard-category-7)',
-  'var(--dashboard-category-8)',
-  'var(--dashboard-category-9)',
-] as const
 
 export function PatternAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
   return <text x={x} y={y} dy=".35em" textAnchor="end" style={{ fill: 'var(--foreground)' }} fontSize={11} fontWeight={600}>{payload?.value}</text>
@@ -137,11 +126,11 @@ export function buildInstitutionChartData(records: RecordItem[], range?: DateRan
   const flow = dailyFlow.filter(item => inRange(item.date, range))
   const analytics = dailyPatternAnalytics(records).filter(item => inRange(item.date, range))
   const composition = [
-    { name: '패턴 소속', value: analytics.reduce((total, item) => total + item.patterned, 0), fill: 'var(--dashboard-composition-dark)' },
-    { name: '패턴 외 · 다건 묶음', value: analytics.reduce((total, item) => total + item.nonPatternMulti, 0), fill: 'var(--dashboard-composition-mid)' },
-    { name: '패턴 외 · 단일 거래', value: analytics.reduce((total, item) => total + item.nonPatternSingle, 0), fill: 'var(--dashboard-composition-light)' },
+    { name: '패턴 소속', value: analytics.reduce((total, item) => total + item.patterned, 0), fill: 'var(--foreground)' },
+    { name: '패턴 외 · 다건 묶음', value: analytics.reduce((total, item) => total + item.nonPatternMulti, 0), fill: 'var(--foreground)' },
+    { name: '패턴 외 · 단일 거래', value: analytics.reduce((total, item) => total + item.nonPatternSingle, 0), fill: 'var(--foreground)' },
   ]
-  const distribution = analyticalPatterns.filter(pattern => pattern !== 'NON_PATTERN').map((pattern, index) => ({ pattern, alerts: analytics.reduce((total, item) => total + item.byPattern[pattern], 0), fill: dashboardPatternTones[(index + 3) % dashboardPatternTones.length] })).sort((a, b) => b.alerts - a.alerts)
+  const distribution = analyticalPatterns.filter(pattern => pattern !== 'NON_PATTERN').map(pattern => ({ pattern, alerts: analytics.reduce((total, item) => total + item.byPattern[pattern], 0), fill: 'var(--foreground)' })).sort((a, b) => b.alerts - a.alerts)
   return { flow, composition, distribution }
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarDays, Link2, RotateCcw, X } from 'lucide-react'
 import { ko } from 'date-fns/locale'
 import { subDays, startOfMonth } from 'date-fns'
@@ -127,16 +127,10 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" data-tone={tone} className="semantic-status-badge font-normal text-xs">{status}</Badge>
 }
 
-const patternBadgeTones: Record<string, string> = {
-  FAN_OUT: 'var(--dashboard-category-4)', FAN_IN: 'var(--dashboard-category-5)',
-  'GATHER-SCATTER': 'var(--dashboard-category-6)', 'SCATTER-GATHER': 'var(--dashboard-category-7)',
-  CYCLE: 'var(--dashboard-category-8)', RANDOM: 'var(--dashboard-category-9)',
-  BIPARTITE: 'var(--dashboard-category-1)', STACK: 'var(--dashboard-category-2)',
-}
 export function PatternBadge({ pattern, probability }: { pattern: string; probability: number }) {
   // 9/18: 정답처럼 보이지 않게 모델 판별 확률로 표현한다 (예: FAN_OUT 의심 87%)
-  const tone = patternBadgeTones[pattern]
-  return <Badge variant="outline" className="semantic-pattern-badge font-mono font-normal text-xs" style={tone ? { '--badge-tone': tone } as CSSProperties : undefined} title={`모델 판별 · ${pattern} 의심 ${probability}%`}>{tone && <span data-slot="pattern-dot" aria-hidden="true" className="size-2 rounded-full" />}{pattern}<span className="ml-1 font-sans opacity-75">의심 {probability}%</span></Badge>
+  // v24: 패턴은 색 대신 테마 반전색(다크=흰 바탕, 라이트=검은 바탕) 하나로 통일한다.
+  return <Badge variant="outline" className="semantic-pattern-badge font-mono font-normal text-xs" title={`모델 판별 · ${pattern} 의심 ${probability}%`}>{pattern}<span className="ml-1 font-sans opacity-75">의심 {probability}%</span></Badge>
 }
 
 export function DetailHeading({ record, linkedRecords, onOpen, notice }: { record: RecordItem; linkedRecords: RecordItem[]; onOpen: (record: RecordItem) => void; notice?: ReactNode }) {
