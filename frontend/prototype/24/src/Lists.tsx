@@ -111,7 +111,7 @@ export default function Lists({ kind, records, user, onOpen, onLinkEpisode, stat
   })
   const fields: Record<FilterField, string[]> = {
     risk: ['고위험', '중위험', '저위험'], owner: ['내 담당', ...new Set(base.map(r => r.owner).filter(x => x !== user))],
-    status: ['신규', kind === 'Alert' ? '검토 중' : '조사 중', '종결'], pattern: [...patternOptions], age: ageOptions,
+    status: [kind === 'Alert' ? '검토 전' : '조사 전', kind === 'Alert' ? '검토 중' : '조사 중', '종결'], pattern: [...patternOptions], age: ageOptions,
   }
   const toFirst = () => table.setPageIndex(0)
   const normalized = (f: Filter): Filter => f.field === 'owner' && f.value === '내 담당' ? { field: 'owner', value: user } : f

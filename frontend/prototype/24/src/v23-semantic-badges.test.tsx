@@ -6,7 +6,7 @@ import { records } from './domain'
 
 describe('semantic badges', () => {
   it.each([
-    ['신규', 'new'], ['검토 중', 'working'], ['조사 중', 'working'], ['종결', 'closed'],
+    ['검토 전', 'pending'], ['조사 전', 'pending'], ['검토 중', 'working'], ['조사 중', 'working'], ['종결', 'closed'],
   ])('%s has a distinct workflow tone', (label, tone) => {
     expect(renderToStaticMarkup(<StatusBadge status={label} />)).toContain(`data-tone="${tone}"`)
   })

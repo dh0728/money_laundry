@@ -25,7 +25,7 @@
     --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 
-.semantic-status-badge[data-tone="new"] { color: var(--badge-new-foreground); border-color: var(--badge-new-border); background: var(--badge-new-background); }
+.semantic-status-badge[data-tone="pending"] { color: var(--badge-pending-foreground); border-color: var(--badge-pending-border); background: var(--badge-pending-background); }
 .semantic-status-badge[data-tone="working"] { color: var(--badge-working-foreground); border-color: var(--badge-working-border); background: var(--badge-working-background); }
 .semantic-status-badge[data-tone="closed"] { color: var(--badge-closed-foreground); border-color: var(--badge-closed-border); background: var(--badge-closed-background); }
 .semantic-pattern-badge { color: var(--badge-tone, var(--foreground)); border-color: color-mix(in oklch, var(--badge-tone, var(--border)) 48%, transparent); background: color-mix(in oklch, var(--badge-tone, var(--background)) 12%, transparent); }
@@ -125,7 +125,7 @@
   --dashboard-category-4: oklch(.66 .16 44); --dashboard-category-5: oklch(.70 .13 348); --dashboard-category-6: oklch(.74 .14 74);
   --dashboard-category-7: oklch(.55 .13 30); --dashboard-category-8: oklch(.68 .15 18); --dashboard-category-9: oklch(.59 .15 60);
   --badge-metadata-foreground: oklch(.43 0 0); --badge-metadata-border: oklch(.83 0 0); --badge-metadata-background: oklch(.93 0 0);
-  --badge-new-foreground: oklch(.38 .15 150); --badge-new-border: oklch(.67 .13 150 / 45%); --badge-new-background: oklch(.76 .13 150 / 18%);
+  --badge-pending-foreground: oklch(.38 .15 150); --badge-pending-border: oklch(.67 .13 150 / 45%); --badge-pending-background: oklch(.76 .13 150 / 18%);
   --badge-working-foreground: oklch(.40 .13 250); --badge-working-border: oklch(.67 .12 250 / 45%); --badge-working-background: oklch(.75 .12 250 / 18%);
   --badge-closed-foreground: oklch(.42 .13 305); --badge-closed-border: oklch(.68 .12 305 / 45%); --badge-closed-background: oklch(.77 .12 305 / 18%);
 }
@@ -156,7 +156,7 @@
   --dashboard-category-4: oklch(.78 .15 44); --dashboard-category-5: oklch(.81 .11 348); --dashboard-category-6: oklch(.86 .13 74);
   --dashboard-category-7: oklch(.69 .13 30); --dashboard-category-8: oklch(.80 .14 18); --dashboard-category-9: oklch(.74 .14 60);
   --badge-metadata-foreground: oklch(.78 0 0); --badge-metadata-border: oklch(.39 0 0); --badge-metadata-background: oklch(.27 0 0);
-  --badge-new-foreground: oklch(.79 .14 150); --badge-new-border: oklch(.67 .13 150 / 45%); --badge-new-background: oklch(.76 .13 150 / 18%);
+  --badge-pending-foreground: oklch(.79 .14 150); --badge-pending-border: oklch(.67 .13 150 / 45%); --badge-pending-background: oklch(.76 .13 150 / 18%);
   --badge-working-foreground: oklch(.80 .12 250); --badge-working-border: oklch(.67 .12 250 / 45%); --badge-working-background: oklch(.75 .12 250 / 18%);
   --badge-closed-foreground: oklch(.81 .12 305); --badge-closed-border: oklch(.68 .12 305 / 45%); --badge-closed-background: oklch(.77 .12 305 / 18%);
 }

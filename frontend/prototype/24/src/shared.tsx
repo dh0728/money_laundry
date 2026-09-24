@@ -123,7 +123,7 @@ export function RiskBadge({ score }: { risk: Risk; score: number }) {
   )
 }
 export function StatusBadge({ status }: { status: string }) {
-  const tone = status === '신규' ? 'new' : status === '검토 중' || status === '조사 중' ? 'working' : status === '종결' ? 'closed' : 'neutral'
+  const tone = status === '검토 전' || status === '조사 전' ? 'pending' : status === '검토 중' || status === '조사 중' ? 'working' : status === '종결' ? 'closed' : 'neutral'
   return <Badge variant="outline" data-tone={tone} className="semantic-status-badge font-normal text-xs">{status}</Badge>
 }
 

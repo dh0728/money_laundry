@@ -139,7 +139,7 @@ function alertAt(i: number): RecordItem {
   const model = blockModel(blockFor(pattern)), tx = laundering(model)
   const lastDay = Math.max(...tx.map(t => Number(t.at.slice(8, 10))))
   const day = Math.min(16, lastDay + (i % 3)), score = [92, 88, 81, 74, 67, 58, 46, 34][i % 8]
-  const status = i % 7 === 6 ? '종결' : i % 4 === 0 ? '신규' : '검토 중'
+  const status = i % 7 === 6 ? '종결' : i % 4 === 0 ? '검토 전' : '검토 중'
   return {
     id: `ALT-2026-${1842 - i}`, kind: 'Alert', risk: riskFor(score), score, pattern, probability: [87, 76, 62, 91, 83, 69][i % 6],
     amount: tx.reduce((s, t) => s + t.usd, 0), count: tx.length, accounts: model.nodes.filter(n => n.core).length,
@@ -168,7 +168,7 @@ const episodes: RecordItem[] = Array.from({ length: 10 }, (_, i) => {
   return {
     id: `EP-2026-${328 - i}`, kind: 'Episode', risk: lead.risk, score: lead.score, pattern: lead.pattern, probability: lead.probability,
     amount: linked.reduce((s, a) => s + a.amount, 0), count: linked.reduce((s, a) => s + a.count, 0), accounts: linked.reduce((s, a) => s + a.accounts, 0),
-    owner: i % 4 === 1 ? '박분석' : '안분석', status: i % 7 === 6 ? '종결' : i % 4 === 0 ? '신규' : '조사 중',
+    owner: i % 4 === 1 ? '박분석' : '안분석', status: i % 7 === 6 ? '종결' : i % 4 === 0 ? '조사 전' : '조사 중',
     date: lead.date, age: lead.age, title: `${titles[lead.pattern]} 외 ${Math.max(0, linked.length - 1)}건`, alertIds: linked.map(a => a.id),
   }
 })
@@ -196,7 +196,7 @@ export function linkAlertsToEpisode(source: RecordItem[], alertIds: string[], ta
     id: episodeId,
     kind: 'Episode',
     owner: '오검토',
-    status: '신규',
+    status: '조사 전',
     title: `새 Episode · Alert ${linkedAlerts.length}건`,
     alertIds: linkedAlerts.map(alert => alert.id),
     episodeId: undefined,
