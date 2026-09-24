@@ -134,10 +134,13 @@ function SidebarBrandToggle() {
   )
 }
 
+// v24: 세로(좁은) 화면에서는 AI 패널이 본문을 덮으므로 처음에는 닫아 둔다.
+export const agentOpenByDefault = () => typeof window === 'undefined' || !window.matchMedia?.('(max-width: 767px)').matches
+
 export default function App() {
   const [user, setUser] = useState<string | null>(null), [page, setPage] = useState<Page>('dashboard'), [records, setRecords] = useState(fixtures)
   const [selected, setSelected] = useState<string | null>(null), [logout, setLogout] = useState(false), [state, setState] = useState<DataState>(initialState)
-  const [agentOpen, setAgentOpen] = useState(true), [agentMode, setAgentMode] = useState<AgentMode>('sidebar')
+  const [agentOpen, setAgentOpen] = useState(agentOpenByDefault), [agentMode, setAgentMode] = useState<AgentMode>('sidebar')
   const [listKey, setListKey] = useState(0), [nativeFullscreen, setNativeFullscreen] = useState(false), [appFullscreen, setAppFullscreen] = useState(false), [transactionTarget, setTransactionTarget] = useState<TransactionTarget>()
   const mainRef = useRef<HTMLElement>(null)
   const record = records.find(r => r.id === selected), role = user === '오검토' ? 'L1' : 'L2'
@@ -148,7 +151,7 @@ export default function App() {
   const openRecord = (r: RecordItem) => { setPage(r.kind === 'Alert' ? 'alerts' : 'episodes'); setSelected(r.id) }
   const linkSelectedAlerts = (alertIds: string[], target: string) => setRecords(current => linkAlertsToEpisode(current, alertIds, target))
   const openTransaction = (target: TransactionTarget) => { setPage('transactions'); setSelected(null); setTransactionTarget(target) }
-  const logoutNow = () => { setUser(null); setLogout(false); setAgentOpen(true); setSelected(null); setPage('dashboard') }
+  const logoutNow = () => { setUser(null); setLogout(false); setAgentOpen(agentOpenByDefault()); setSelected(null); setPage('dashboard') }
   const isFullscreen = nativeFullscreen || appFullscreen
   const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
 
