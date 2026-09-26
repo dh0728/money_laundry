@@ -37,11 +37,10 @@ DuckDB로 전체 원본을 집계하고 pandas·Matplotlib로 표·그래프를 
 | 세탁 여부 원본 | 0 | 0 | 0 | 0 | 2 |
 | 거래 유형 | 0 | 0 | 0 | 0 | 28 |
 
-[전체 CSV](notebook_outputs/column_quality.csv)
 
-![컬럼별 결측·공백 검사: 0이면 해당 검사에서 문제 없음](notebook_outputs/01_quality.png)
+![컬럼별 결측·공백 검사: 0이면 해당 검사에서 문제 없음](01_quality.png)
 
-*컬럼별 결측·공백 검사: 0이면 해당 검사에서 문제 없음* · [PDF](notebook_outputs/01_quality.pdf)
+
 
 
 ## 3. 기본 통계·변환 오류·계좌 ID 형식
@@ -69,7 +68,7 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 송신 | 0 | 0 | 292,715 |
 | 수신 | 0 | 0 | 652,266 |
 
-[전체 CSV](notebook_outputs/id_quality.csv)
+
 
 
 ## 4. 클래스 불균형
@@ -79,11 +78,11 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 0 | 9,494,979 |
 | 1 | 9,873 |
 
-[전체 CSV](notebook_outputs/labels.csv)
 
-![정상·양성 거래 수(로그 축)와 전체 대비 비율](notebook_outputs/02_class_balance.png)
 
-*정상·양성 거래 수(로그 축)와 전체 대비 비율* · [PDF](notebook_outputs/02_class_balance.pdf)
+![정상·양성 거래 수(로그 축)와 전체 대비 비율](02_class_balance.png)
+
+
 
 양성이 약 0.104%인 불균형 데이터다. 정상만 예측해도 높은 정확도가 나올 수 있으므로 향후 모델 평가는 정밀도·재현율·PR-AUC 등을 함께 봐야 한다. 이 보고서는 모델 성능을 측정하지 않았다.
 
@@ -97,7 +96,7 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 2022-10-07 | 20,892 | 27 | 0.1292 | 2022-10-07 10:35:19 | 2022-10-07 23:59:55 |
 | 2023-08-23 | 8,400 | 7 | 0.0833 | 2023-08-23 00:00:01 | 2023-08-23 10:57:12 |
 
-[전체 일별 집계 CSV](notebook_outputs/daily.csv). 일별 표의 모든 행 대신 월별 요약과 전체 시계열을 아래에 제시한다.
+
 
 | 월 | 거래 수 | 양성 거래 수 | 양성 비율(%) |
 | --- | --- | --- | --- |
@@ -113,11 +112,10 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 2023-07 | 902,239 | 983 | 0.109 |
 | 2023-08 | 656,582 | 830 | 0.1264 |
 
-[전체 CSV](notebook_outputs/monthly.csv)
 
-![일별 전체 거래 수·양성 거래 수·양성 비율](notebook_outputs/03_daily.png)
 
-*일별 전체 거래 수·양성 거래 수·양성 비율* · [PDF](notebook_outputs/03_daily.pdf)
+![일별 전체 거래 수·양성 거래 수·양성 비율](03_daily.png)
+
 
 거래 수와 비율은 다른 지표다. 양성 건수가 늘어도 전체 거래량 증가 때문일 수 있으므로 비율을 함께 확인한다.
 
@@ -148,7 +146,7 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 22 | 519,870 | 501 | 0.0964 |
 | 23 | 519,170 | 499 | 0.0961 |
 
-[전체 CSV](notebook_outputs/hourly.csv)
+
 
 | 요일 | 거래 수 | 양성 거래 수 | 양성 비율(%) |
 | --- | --- | --- | --- |
@@ -160,11 +158,11 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 6 | 1,336,623 | 1,310 | 0.098 |
 | 7 | 1,323,028 | 1,296 | 0.098 |
 
-[전체 CSV](notebook_outputs/weekday.csv)
 
-![시간대·요일별 양성 비율: 요일 번호 1은 월요일](notebook_outputs/04_hour_weekday.png)
 
-*시간대·요일별 양성 비율: 요일 번호 1은 월요일* · [PDF](notebook_outputs/04_hour_weekday.pdf)
+![시간대·요일별 양성 비율: 요일 번호 1은 월요일](04_hour_weekday.png)
+
+
 
 
 ## 6. 거래 유형과 이진 라벨
@@ -202,9 +200,9 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 
 유형별 건수는 **거래 건수**이며 독립 사건·작전 개수가 아니다. SAML-D 원본에는 작전 ID가 없어 같은 유형의 거래를 동일 사건이라고 단정할 수 없다. 유형명 한글 번역은 표시용 설명이며 상세 생성 규칙을 확정하는 정의가 아니다.
 
-![정상 유형과 양성 패턴별 거래 건수: 양성 패턴명은 영문 유지](notebook_outputs/05_type_distribution.png)
+![정상 유형과 양성 패턴별 거래 건수: 양성 패턴명은 영문 유지](05_type_distribution.png)
 
-*정상 유형과 양성 패턴별 거래 건수: 양성 패턴명은 영문 유지* · [PDF](notebook_outputs/05_type_distribution.pdf)
+
 
 정상·양성 라벨이 혼재한 유형은 **0개**다. `Is_laundering`과 `Laundering_type`은 정답 성격의 정보이므로 입력 피처에서 제외해야 한다.
 
@@ -231,9 +229,9 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | Stacked Bipartite | 55 | 40 | 31 | 77 | 3 | 24 | 35 | 50 | 53 | 54 | 84 |
 | Structuring | 167 | 165 | 165 | 169 | 182 | 150 | 199 | 119 | 167 | 214 | 173 |
 
-![각 월의 전체 양성 대비 패턴별 구성비(%)](notebook_outputs/06_monthly_types.png)
+![각 월의 전체 양성 대비 패턴별 구성비(%)](06_monthly_types.png)
 
-*각 월의 전체 양성 대비 패턴별 구성비(%)* · [PDF](notebook_outputs/06_monthly_types.pdf)
+
 
 히트맵은 월별 비율, 앞의 표는 건수다. 드문 패턴에서는 작은 건수 차이로도 비율이 변할 수 있다.
 
@@ -258,11 +256,11 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 알바니아 레크 | 24,778 | 64 | 0.2583 |
 | 인도 루피 | 24,657 | 68 | 0.2758 |
 
-[전체 CSV](notebook_outputs/Payment_currency.csv)
 
-![지급 통화별 거래 수와 양성 비율](notebook_outputs/07_Payment_currency.png)
 
-*지급 통화별 거래 수와 양성 비율* · [PDF](notebook_outputs/07_Payment_currency.pdf)
+![지급 통화별 거래 수와 양성 비율](07_Payment_currency.png)
+
+
 
 ### 수취 통화
 
@@ -282,11 +280,11 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 디르함 | 42,797 | 225 | 0.5257 |
 | 튀르키예 리라 | 42,545 | 218 | 0.5124 |
 
-[전체 CSV](notebook_outputs/Received_currency.csv)
 
-![수취 통화별 거래 수와 양성 비율](notebook_outputs/07_Received_currency.png)
 
-*수취 통화별 거래 수와 양성 비율* · [PDF](notebook_outputs/07_Received_currency.pdf)
+![수취 통화별 거래 수와 양성 비율](07_Received_currency.png)
+
+
 
 ### 지급 방식
 
@@ -300,11 +298,10 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 현금 인출 | 300,477 | 1,334 | 0.444 |
 | 현금 입금 | 225,206 | 1,405 | 0.6239 |
 
-[전체 CSV](notebook_outputs/Payment_type.csv)
 
-![지급 방식별 거래 수와 양성 비율](notebook_outputs/07_Payment_type.png)
 
-*지급 방식별 거래 수와 양성 비율* · [PDF](notebook_outputs/07_Payment_type.pdf)
+![지급 방식별 거래 수와 양성 비율](07_Payment_type.png)
+
 
 범주별 비율은 해당 범주의 전체 거래를 분모로 한다. 거래량이 적은 범주의 높은 비율을 그대로 위험 점수나 인과 효과로 해석하지 않는다.
 
@@ -349,11 +346,11 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 미국 달러 | 60 | 1,098.71 | 1,735.0368 | 4,547.355 | 7,641.635 | 13,367.1442 | 43,619.515 | 47,276.3807 | 47,335.5461 | 47,342.12 | 11,610.2253 |
 | 일본 엔 | 65 | 2,608.19 | 2,642.302 | 4,352.05 | 6,791.24 | 12,823.7069 | 30,963.072 | 56,184.5751 | 65,807.6258 | 66,876.8537 | 11,070.9539 |
 
-[전체 금액 분위수 CSV](notebook_outputs/amount_quantiles.csv). p01~p999는 1~99.9백분위수다.
 
-![통화별 log10(1+금액) 분포: 정상 약 1% 표본·양성 전량](notebook_outputs/08_amount_histograms.png)
 
-*통화별 log10(1+금액) 분포: 정상 약 1% 표본·양성 전량* · [PDF](notebook_outputs/08_amount_histograms.pdf)
+![통화별 log10(1+금액) 분포: 정상 약 1% 표본·양성 전량](08_amount_histograms.png)
+
+
 
 히스토그램만 행 ID 해시로 정상 약 1%를 선택하고 양성은 전량 사용했다. 각 클래스의 밀도 면적이 1이므로 그래프 면적은 양성 비율을 뜻하지 않는다. log 변환은 시각화용이며 학습 변환을 확정하지 않았다.
 
@@ -373,7 +370,7 @@ non_digits는 숫자 외 문자가 들어간 ID의 등장 행 수, leading_zero�
 | 미국 달러 | 26,061 | 1,581 | 261 | 0 |
 | 일본 엔 | 25,562 | 1,514 | 256 | 1 |
 
-[전체 CSV](notebook_outputs/amount_tails.csv)
+
 
 IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 의미이며 오류나 세탁 판정이 아니다. 이 기준으로 원본 행을 삭제하지 않았다.
 
@@ -400,11 +397,11 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 영국 파운드 | 튀르키예 리라 | 40,442 | 202 |
 | 튀르키예 리라 | 영국 파운드 | 25,548 | 58 |
 
-거래량 상위 15개 조합 표시. [전체 조합 CSV](notebook_outputs/currency_pairs.csv)
 
-![송수신 통화 조합별 거래 수: 색상은 log10(1+건수)](notebook_outputs/09_currency_pairs.png)
 
-*송수신 통화 조합별 거래 수: 색상은 log10(1+건수)* · [PDF](notebook_outputs/09_currency_pairs.pdf)
+![송수신 통화 조합별 거래 수: 색상은 log10(1+건수)](09_currency_pairs.png)
+
+
 
 ### 송수신 은행 위치
 
@@ -426,11 +423,11 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 영국 | 미국 | 35,410 | 81 |
 | 영국 | 이탈리아 | 34,856 | 120 |
 
-거래량 상위 15개 조합 표시. [전체 조합 CSV](notebook_outputs/location_pairs.csv)
 
-![송수신 은행 위치 조합별 거래 수: 색상은 log10(1+건수)](notebook_outputs/09_location_pairs.png)
 
-*송수신 은행 위치 조합별 거래 수: 색상은 log10(1+건수)* · [PDF](notebook_outputs/09_location_pairs.pdf)
+![송수신 은행 위치 조합별 거래 수: 색상은 log10(1+건수)](09_location_pairs.png)
+
+
 
 | 통화 변경 여부 | 은행 위치 변경 여부 | 거래 수 | 양성 거래 수 | 양성 비율(%) |
 | --- | --- | --- | --- | --- |
@@ -439,7 +436,7 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 통과 | 실패 | 155,692 | 651 | 0.4181 |
 | 통과 | 통과 | 930,170 | 3,006 | 0.3232 |
 
-[전체 CSV](notebook_outputs/cross_currency_location.csv)
+
 
 통화 변경과 위치 변경은 별개다. 은행 위치가 다르다는 사실만으로 불법 거래라고 분류하지 않는다.
 
@@ -450,7 +447,7 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | --- | --- | --- | --- | --- |
 | 855,460 | 89,521 | 6,507 | 12 | 1,498 |
 
-[전체 CSV](notebook_outputs/account_summary.csv)
+
 
 | 관측 위치 수 | 계좌 수 |
 | --- | --- |
@@ -460,7 +457,7 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 4 | 58 |
 | 5 | 7 |
 
-[전체 CSV](notebook_outputs/account_locations.csv)
+
 
 | 구간 | 계좌 수 |
 | --- | --- |
@@ -470,11 +467,11 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 11-100 | 567,242 |
 | 1 | 48,621 |
 
-[전체 CSV](notebook_outputs/account_activity_bins.csv)
 
-![송수신 등장 횟수 구간 및 계좌 ID별 관측 위치 수](notebook_outputs/10_accounts.png)
 
-*송수신 등장 횟수 구간 및 계좌 ID별 관측 위치 수* · [PDF](notebook_outputs/10_accounts.pdf)
+![송수신 등장 횟수 구간 및 계좌 ID별 관측 위치 수](10_accounts.png)
+
+
 
 송신·수신 ID의 합집합으로 고유 계좌 수를 계산했다. 활동도는 양쪽 역할의 등장 횟수이며 자기 거래가 있으면 두 역할을 각각 센다. 동일 ID가 여러 위치에 나타나는 현상은 ID의 전역 유일성 및 위치 컬럼의 의미와 함께 확인해야 한다.
 
@@ -501,7 +498,7 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 6,174,306,361 | 1,440 | 712 | 728 | 7 | 1 |
 | 8,063,440,965 | 1,438 | 733 | 705 | 5 | 1 |
 
-[전체 CSV](notebook_outputs/top_accounts.csv)
+
 
 상위 활동 계좌 표는 탐색 자료이며 활동량만으로 이상 계좌를 판정하지 않는다.
 
@@ -512,7 +509,7 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | --- | --- | --- | --- |
 | 887,497 | 105,866 | 12 | 84 |
 
-[전체 CSV](notebook_outputs/pair_summary.csv)
+
 
 | 같은 초의 거래 수 | 해당 시각 그룹 수 | 거래 수 |
 | --- | --- | --- |
@@ -525,11 +522,11 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 7 | 11 | 77 |
 | 8 | 1 | 8 |
 
-[전체 CSV](notebook_outputs/timestamp_concurrency.csv)
 
-![한 시각에 발생한 거래 수별 시각 그룹 수(로그 축)](notebook_outputs/11_concurrency.png)
 
-*한 시각에 발생한 거래 수별 시각 그룹 수(로그 축)* · [PDF](notebook_outputs/11_concurrency.pdf)
+![한 시각에 발생한 거래 수별 시각 그룹 수(로그 축)](11_concurrency.png)
+
+
 
 송신→수신과 수신→송신은 서로 다른 계좌 쌍이다. 같은 초의 여러 거래는 실제 선후 관계가 확정되지 않을 수 있으므로, 시간 피처를 만들 때 동률 시각 처리 규칙이 필요하다. 일 마감 그래프와 거래 즉시 탐지는 정보 사용 시점이 다르다.
 
@@ -540,13 +537,13 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | --- | --- | --- |
 | 0 | 0 | 0 |
 
-[전체 CSV](notebook_outputs/exact_duplicates.csv)
+
 
 | 반복 입력 그룹 수 | 이진 정답 충돌 그룹 | 유형이 여러 개인 그룹 |
 | --- | --- | --- |
 | 0 | 0 | 0 |
 
-[전체 CSV](notebook_outputs/input_conflicts.csv)
+
 
 완전 중복은 분석용 row_id를 제외한 원본 12개 컬럼 전체가 같은 경우다. 정답 충돌 검사는 라벨·유형을 제외한 입력 컬럼으로 그룹화한다. 실제 값으로 비교했으며 해시 근사 중복 검사가 아니다. 발견 여부와 무관하게 이 EDA는 원본 행을 삭제하지 않는다.
 
@@ -561,7 +558,7 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | 검증 | 2023-04-17 | 2023-06-19 | 64 | 1,899,527 | 1,986 | 0.1046 | 19.9848 |
 | 테스트 | 2023-06-20 | 2023-08-23 | 65 | 1,898,009 | 2,136 | 0.1125 | 19.9688 |
 
-[전체 CSV](notebook_outputs/example_split_summary.csv)
+
 
 | 거래 유형 | 학습 | 검증 | 테스트 |
 | --- | --- | --- | --- |
@@ -583,9 +580,8 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 | Stacked Bipartite | 240 | 100 | 166 |
 | Structuring | 1,129 | 335 | 406 |
 
-![SAML-D 시간순 분할 예시와 일별 양성 비율](notebook_outputs/12_example_split.png)
+![SAML-D 시간순 분할 예시와 일별 양성 비율](12_example_split.png)
 
-*SAML-D 시간순 분할 예시와 일별 양성 비율* · [PDF](notebook_outputs/12_example_split.pdf)
 
 일수는 192/64/65일이며 거래 수 비중은 약 60.05/19.98/19.97%다. 이 탐색 결과를 이용해 테스트 성능이 좋게 경계를 반복 선택하지 않는다. 정규화·피처 선정·임계값 설정은 향후 학습·검증 구간에서만 수행해야 한다.
 
@@ -605,7 +601,6 @@ IQR 상단은 Q3+1.5×IQR이다. 분위수 초과는 분포상 큰 값이라는 
 
 실행 환경: DuckDB 1.5.5, pandas 3.0.3. 기록된 전체 실행 시간은 168.5초다. 시스템 부하에 따라 재실행 시간은 달라질 수 있다.
 
-[실행 노트북](SAML_D_상세_EDA.ipynb)에서 첫 설정 셀의 원본 경로를 확인한 후 위에서부터 실행한다. 한글 글꼴은 `assets/NotoSansKR.ttf`를 사용하며 다른 환경으로 옮길 때 `assets/`도 함께 복사한다. [실행 안내](NOTEBOOK_README_ko.md) · [검증 JSON](notebook_outputs/validation.json) · [실행 요약 JSON](notebook_outputs/run_summary.json).
 
 
 ## 16. 해석 시 주의할 점
