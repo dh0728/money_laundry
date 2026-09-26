@@ -1,0 +1,17 @@
+import unittest
+import analysis_entry
+from unittest.mock import patch
+
+
+class EntryTests(unittest.TestCase):
+    def test_unconnected_stages_never_succeed(self):
+        for stage in ("FEATURES", "INFERENCE", "SCORES", "ALERTS"):
+            with self.subTest(stage=stage), patch.dict("os.environ", {}, clear=True):
+                self.assertEqual(78, analysis_entry.main([
+                    "--job-id", "1", "--stage", stage,
+                    "--execution-id", "00000000-0000-0000-0000-000000000001",
+                ]))
+
+
+if __name__ == "__main__":
+    unittest.main()
