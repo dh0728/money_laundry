@@ -168,6 +168,7 @@ class Request:
     execution_round: int = 1
     model_version: str = "dummy-v1"
     feature_version: str = "dummy-input-v1"
+    run_id: str | None = None
 
     def __post_init__(self):
         if type(self.job_id) is not int or self.job_id < 1 or self.model_kind not in ("binary", "type"):
@@ -179,16 +180,31 @@ class Request:
                 raise ValueError()
         except (ValueError, TypeError, AttributeError) as error:
             raise ProtocolError("Invalid request UUID") from error
+        if self.run_id is not None:
+            try:
+                if str(uuid.UUID(self.run_id)) != self.run_id:
+                    raise ValueError()
+            except (ValueError, TypeError, AttributeError) as error:
+                raise ProtocolError("Invalid run UUID") from error
         if any(not isinstance(value, str) or not value.strip() for value in (self.model_version, self.feature_version)):
             raise ProtocolError("Versions are required")
 
     def identity(self):
-        return dict(contract_version=1, job_id=self.job_id, model_kind=self.model_kind,
-                    request_id=self.request_id, execution_round=self.execution_round)
+        identity = dict(contract_version=1 if self.run_id is None else 2,
+                        job_id=self.job_id, model_kind=self.wire_kind,
+                        request_id=self.request_id, execution_round=self.execution_round)
+        if self.run_id is not None:
+            identity["run_id"] = self.run_id
+        return identity
+
+    @property
+    def wire_kind(self):
+        # V2 matches Spring analysis_model_requests and cancellation object keys.
+        return self.model_kind if self.run_id is None else self.model_kind.upper()
 
     @property
     def base(self):
-        return f"{self.job_id}/{self.model_kind}/{self.request_id}"
+        return f"{self.job_id}/{self.wire_kind}/{self.request_id}"
 
     @property
     def inputs(self):
@@ -255,9 +271,12 @@ def publish(store, request, output_dir, files, target_row_count):
         entries.append(descriptor(name, store.object_key(key), data))
     entries.sort(key=lambda item: item["name"])
     # Shared across rounds: adding/removing files must not silently alter request inputs.
-    immutable(store, f"requests/{request.base}/input-bundle.json", encode(dict(
+    bundle = dict(
         files=entries, target_row_count=target_row_count,
-        model_version=request.model_version, feature_version=request.feature_version)))
+        model_version=request.model_version, feature_version=request.feature_version)
+    if request.run_id is not None:
+        bundle["run_id"] = request.run_id
+    immutable(store, f"requests/{request.base}/input-bundle.json", encode(bundle))
     document = dict(request.identity(), **request.versions(), target_row_count=target_row_count, files=entries)
     immutable(store, request.manifest, encode(document))
     return document
@@ -298,6 +317,12 @@ def validate_result(store, request, document, expected_ids):
         if any(value is None or not math.isfinite(value) or not 0 <= value <= 1
                for value in scores.column(column).to_pylist()):
             raise ProtocolError("Invalid probability")
+    if request.model_version == "demo-calculator-v1":
+        from demo_calculator import validate_scores
+        if request.run_id is None:
+            raise ProtocolError("Demo calculator requires the run-aware v2 contract")
+        validate_scores(scores, expected_ids, request.model_kind,
+                        model_version=request.model_version, feature_version=request.feature_version)
     return document
 
 
