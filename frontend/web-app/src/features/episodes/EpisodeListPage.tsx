@@ -1,12 +1,12 @@
-import './App.css'
-import { mockEpisodes } from './features/episodes/mockEpisodes'
-import { useEpisodeFilters } from './features/episodes/useEpisodeFilters'
+import './EpisodeListPage.css'
+import { mockEpisodes } from './mockEpisodes'
+import { useEpisodeFilters } from './useEpisodeFilters'
 
 const institutions = Array.from(
   new Set(mockEpisodes.flatMap((episode) => episode.institutions)),
 ).sort((left, right) => left.localeCompare(right, 'ko'))
 
-function App() {
+export default function EpisodeListPage() {
   const institution = useEpisodeFilters((state) => state.institution)
   const query = useEpisodeFilters((state) => state.query)
   const setInstitution = useEpisodeFilters((state) => state.setInstitution)
@@ -170,4 +170,3 @@ function App() {
   )
 }
 
-export default App

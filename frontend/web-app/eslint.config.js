@@ -24,4 +24,9 @@ export default defineConfig([
     files: ['src/components/ui/**/*.tsx', 'src/app/ThemeProvider.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
+  {
+    // shadcn/ui 원본(사이드바 skeleton의 Math.random, use-mobile의 첫 측정)은 고치지 않고 둔다
+    files: ['src/components/ui/sidebar.tsx', 'src/hooks/use-mobile.ts'],
+    rules: { 'react-hooks/purity': 'off', 'react-hooks/set-state-in-effect': 'off' },
+  },
 ])

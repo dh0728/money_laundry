@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import App from './App'
-import { useEpisodeFilters } from './features/episodes/useEpisodeFilters'
+import EpisodeListPage from './EpisodeListPage'
+import { useEpisodeFilters } from './useEpisodeFilters'
 
 describe('Episode list', () => {
   beforeEach(() => {
@@ -9,7 +9,7 @@ describe('Episode list', () => {
   })
 
   it('shows each mock Episode as one table row', () => {
-    render(<App />)
+    render(<EpisodeListPage />)
 
     expect(
       screen.getByRole('heading', { name: 'Episode 목록' }),
@@ -19,7 +19,7 @@ describe('Episode list', () => {
   })
 
   it('filters Episodes by identifier search', () => {
-    render(<App />)
+    render(<EpisodeListPage />)
 
     fireEvent.change(screen.getByLabelText('Episode 검색'), {
       target: { value: '0901-003' },
@@ -31,7 +31,7 @@ describe('Episode list', () => {
   })
 
   it('filters Episodes by financial institution', () => {
-    render(<App />)
+    render(<EpisodeListPage />)
 
     fireEvent.change(screen.getByLabelText('Episode 검색'), {
       target: { value: '' },
@@ -46,7 +46,7 @@ describe('Episode list', () => {
   })
 
   it('starts a new render with the default filters', () => {
-    render(<App />)
+    render(<EpisodeListPage />)
 
     expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(5)
   })
