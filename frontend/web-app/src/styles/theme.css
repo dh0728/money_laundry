@@ -1,0 +1,206 @@
+/* v24 시안(frontend/prototype/24/src/index.css)에서 대시보드에 필요한 토큰·기본 규칙만 옮김 */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+    --sidebar: hsl(0 0% 98%);
+    --sidebar-foreground: hsl(240 5.3% 26.1%);
+    --sidebar-primary: hsl(240 5.9% 10%);
+    --sidebar-primary-foreground: hsl(0 0% 98%);
+    --sidebar-accent: hsl(240 4.8% 95.9%);
+    --sidebar-accent-foreground: hsl(240 5.9% 10%);
+    --sidebar-border: hsl(220 13% 91%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+    --sidebar: hsl(240 5.9% 10%);
+    --sidebar-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-primary: hsl(224.3 76.3% 48%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(240 3.7% 15.9%);
+    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-border: hsl(240 3.7% 15.9%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.semantic-status-badge[data-tone="pending"] { color: var(--badge-pending-foreground); border-color: var(--badge-pending-border); background: var(--badge-pending-background); }
+.semantic-status-badge[data-tone="working"] { color: var(--badge-working-foreground); border-color: var(--badge-working-border); background: var(--badge-working-background); }
+.semantic-status-badge[data-tone="closed"] { color: var(--badge-closed-foreground); border-color: var(--badge-closed-border); background: var(--badge-closed-background); }
+.semantic-pattern-badge { color: var(--background); border-color: var(--foreground); background: var(--foreground); }
+.semantic-metadata-badge { color: var(--badge-metadata-foreground); border-color: var(--badge-metadata-border); background: var(--badge-metadata-background); }
+
+@theme inline {
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Semantic product tokens: primitives are owned only by these theme blocks. */
+:root {
+  --radius: .625rem;
+  --destructive-foreground: #fff;
+  --overlay: #000;
+  --login-foreground: #fff;
+  --login-action-background: #fff;
+  --login-action-foreground: #000;
+  --login-shade-start: rgba(7,7,9,.5);
+  --login-shade-end: rgba(7,7,9,.15);
+  --login-badge-background: rgb(0 0 0 / .2);
+  --login-panel-background: rgba(255,255,255,.035);
+  --login-panel-border: rgba(255,255,255,.16);
+  --login-panel-highlight: rgba(255,255,255,.08);
+  --login-panel-fallback: rgba(12,12,18,.55);
+  --login-input-background: rgb(22,22,28);
+  --login-network-edge: rgba(255,255,255,.42);
+  --login-network-node: rgba(255,255,255,.9);
+  --redetection-inset: rgb(0 0 0 / .2);
+  --graph-tooltip-shadow: 0 8px 24px rgb(0 0 0 / .25);
+  --rdr-glow: rgb(239 68 68 / .9);
+  --rdr-fab-shadow: 0 8px 24px rgb(0 0 0 / .22), 0 2px 6px rgb(0 0 0 / .12), 0 0 0 1px rgb(255 255 255 / .06);
+  --rdr-fab-hover-shadow: 0 12px 28px rgb(0 0 0 / .28), 0 4px 10px rgb(0 0 0 / .14), 0 0 0 1px rgb(255 255 255 / .08), 0 0 18px rgb(239 68 68 / .28);
+  --risk-0: oklch(0.7400 0.0000 29.23);
+  --risk-1: oklch(0.7276 0.0077 29.23);
+  --risk-2: oklch(0.7151 0.0232 29.23);
+  --risk-3: oklch(0.7027 0.0444 29.23);
+  --risk-4: oklch(0.6902 0.0704 29.23);
+  --risk-5: oklch(0.6778 0.1006 29.23);
+  --risk-6: oklch(0.6653 0.1347 29.23);
+  --risk-7: oklch(0.6529 0.1724 29.23);
+  --risk-8: oklch(0.6404 0.2134 29.23);
+  --risk-9: oklch(0.6280 0.2577 29.23);
+  --text-display-size: 1.875rem;
+  --text-title-size: 1.25rem;
+  --text-body-size: .875rem;
+  --text-caption-size: .75rem;
+  --text-micro-size: .6875rem;
+  --owner-stage-width: 13.5rem;
+  --account-stage-width: 14.5rem;
+  --motion-instant: 0ms;
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-morph: 200ms;
+  --ease-standard: cubic-bezier(.2, .8, .2, 1);
+  --ease-emphasized: cubic-bezier(.22, 1, .36, 1);
+  --ease-ui: ease;
+  --ease-linear: linear;
+  --ease-panel: cubic-bezier(.4, 0, .2, 1);
+  --motion-table: 150ms;
+  --motion-rdr-morph: 420ms;
+  --motion-panel: 300ms;
+  --motion-sheet-open: 500ms;
+  --motion-flow: 1.1s;
+  --motion-reduced: .01ms;
+  --interactive-edge-glow: 0 0 0 1px color-mix(in oklch, var(--foreground) 38%, transparent), 0 0 16px color-mix(in oklch, var(--foreground) 18%, transparent);
+  --selection-fill: var(--selection-background);
+  --radar-core-hot: #ff8189;
+  --radar-core-deep: #38050a;
+  --radar-bezel-light: #55555e;
+  --radar-bezel-mid: #0a0a0c;
+  --radar-bezel-dark: #2e2e35;
+  --radar-disc: #08080a;
+  --background: oklch(1 0 0); --foreground: oklch(.145 0 0);
+  --card: oklch(1 0 0); --card-foreground: oklch(.145 0 0);
+  --popover: oklch(1 0 0); --popover-foreground: oklch(.145 0 0);
+  --primary: oklch(.205 0 0); --primary-foreground: oklch(.985 0 0);
+  --secondary: oklch(.97 0 0); --secondary-foreground: oklch(.205 0 0);
+  --muted: oklch(.97 0 0); --muted-foreground: oklch(.556 0 0);
+  --accent: oklch(.97 0 0); --accent-foreground: oklch(.205 0 0);
+  --destructive: #e60000; --positive: oklch(.60 .17 145); --border: oklch(.922 0 0);
+  --selection-background: oklch(.205 0 0); --selection-foreground: oklch(.985 0 0);
+  --selection-muted-foreground: oklch(.78 0 0); --selection-border: oklch(1 0 0 / 52%);
+  --selection-destructive-background: #e60000; --selection-destructive-foreground: #fff;
+  --input: oklch(.922 0 0); --ring: oklch(.708 0 0);
+  --chart-1: oklch(.55 0 0); --chart-2: oklch(.72 0 0);
+  --dashboard-segment-divider: oklch(.205 0 0 / 10%);
+  --badge-metadata-foreground: oklch(.43 0 0); --badge-metadata-border: oklch(.83 0 0); --badge-metadata-background: oklch(.93 0 0);
+  --badge-pending-foreground: oklch(.38 .15 150); --badge-pending-border: oklch(.67 .13 150 / 45%); --badge-pending-background: oklch(.76 .13 150 / 18%);
+  --badge-working-foreground: oklch(.40 .13 250); --badge-working-border: oklch(.67 .12 250 / 45%); --badge-working-background: oklch(.75 .12 250 / 18%);
+  --badge-closed-foreground: oklch(.42 .13 305); --badge-closed-border: oklch(.68 .12 305 / 45%); --badge-closed-background: oklch(.77 .12 305 / 18%);
+}
+.dark {
+  --rdr-fab-shadow: 0 10px 28px rgb(0 0 0 / .45), 0 2px 8px rgb(0 0 0 / .3), 0 0 0 1px rgb(255 255 255 / .08), 0 0 16px rgb(239 68 68 / .22);
+  /* The existing dark FAB keeps its resting shadow on hover. */
+  --rdr-fab-hover-shadow: var(--rdr-fab-shadow);
+  --background: oklch(.145 0 0); --foreground: oklch(.985 0 0);
+  --card: oklch(.175 0 0); --card-foreground: oklch(.985 0 0);
+  --popover: oklch(.205 0 0); --popover-foreground: oklch(.985 0 0);
+  --primary: oklch(.922 0 0); --primary-foreground: oklch(.205 0 0);
+  --secondary: oklch(.269 0 0); --secondary-foreground: oklch(.985 0 0);
+  --muted: oklch(.235 0 0); --muted-foreground: oklch(.708 0 0);
+  --accent: oklch(.269 0 0); --accent-foreground: oklch(.985 0 0);
+  --destructive: #ff0000; --positive: oklch(.72 .19 145); --border: oklch(1 0 0 / 10%);
+  --selection-background: oklch(.922 0 0); --selection-foreground: oklch(.205 0 0);
+  --selection-muted-foreground: oklch(.42 0 0); --selection-border: oklch(.205 0 0 / 45%);
+  --selection-destructive-background: #e60000; --selection-destructive-foreground: #fff;
+  --input: oklch(1 0 0 / 15%); --ring: oklch(.556 0 0);
+  --sidebar: oklch(.17 0 0); --sidebar-foreground: oklch(.92 0 0);
+  --sidebar-primary: oklch(.92 0 0); --sidebar-primary-foreground: oklch(.205 0 0);
+  --sidebar-accent: oklch(.269 0 0); --sidebar-accent-foreground: oklch(.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%); --sidebar-ring: oklch(.556 0 0);
+  --chart-1: oklch(.88 0 0); --chart-2: oklch(.50 0 0);
+  --dashboard-segment-divider: oklch(.205 0 0 / 10%);
+  --badge-metadata-foreground: oklch(.78 0 0); --badge-metadata-border: oklch(.39 0 0); --badge-metadata-background: oklch(.27 0 0);
+  --badge-pending-foreground: oklch(.79 .14 150); --badge-pending-border: oklch(.67 .13 150 / 45%); --badge-pending-background: oklch(.76 .13 150 / 18%);
+  --badge-working-foreground: oklch(.80 .12 250); --badge-working-border: oklch(.67 .12 250 / 45%); --badge-working-background: oklch(.75 .12 250 / 18%);
+  --badge-closed-foreground: oklch(.81 .12 305); --badge-closed-border: oklch(.68 .12 305 / 45%); --badge-closed-background: oklch(.77 .12 305 / 18%);
+}
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-overlay: var(--overlay);
+  --color-login-foreground: var(--login-foreground);
+  --color-login-action-background: var(--login-action-background);
+  --color-login-action-foreground: var(--login-action-foreground);
+  --color-login-badge-background: var(--login-badge-background);
+  --color-redetection-inset: var(--redetection-inset);
+  --color-destructive: var(--destructive); --color-border: var(--border);
+  --color-selection-foreground: var(--selection-foreground);
+  --color-selection-destructive-foreground: var(--selection-destructive-foreground);
+  --color-input: var(--input); --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2);
+  --color-dashboard-segment-divider: var(--dashboard-segment-divider);
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; margin: 0; font-size: var(--text-body-size); -webkit-font-smoothing: antialiased; }
+  button, [role=button] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  ::selection { background:var(--selection-fill); color:var(--selection-foreground); }
+}
+.type-display { font-size:var(--text-display-size); line-height:2.25rem; }
+.type-title { font-size:var(--text-title-size); line-height:1.75rem; }
+.type-body { font-size:var(--text-body-size); }
+.type-caption { font-size:var(--text-caption-size); line-height:1rem; }
+.login-shade { background:linear-gradient(90deg,var(--login-shade-start) 0%,var(--login-shade-end) 70%,transparent 100%); }
+.underline-tabs { position:relative; display:flex; justify-content:flex-start; width:100%; border-radius:0; padding:0; gap:25px; height:42px; background:transparent; border-bottom:1px solid var(--border); }
+.underline-tabs [data-slot=tabs-trigger] { flex:none; position:relative; height:42px; border:0; border-radius:0; padding:0 1px; background:transparent!important; box-shadow:none!important; color:var(--muted-foreground); font-weight:400; font-size:13px; }
+.underline-tabs [data-slot=tabs-trigger][data-state=active] { font-weight:650; color:var(--foreground); }
+.underline-tabs [data-slot=tabs-trigger]::after { display:none; }
+.tab-indicator { position:absolute; pointer-events:none; left:0; bottom:-1px; height:3px; background:var(--foreground); transition-property:transform,width; }
+.tab-indicator,
+.sidebar-indicator { transition-duration:var(--motion-morph); transition-timing-function:var(--ease-standard); }
+.tab-indicator[data-animate=false], .sidebar-indicator[data-animate=false] { transition:none var(--motion-instant); }
+@media (prefers-reduced-motion: reduce) {
+  .tab-indicator, .sidebar-indicator { transition:none; }
+  .app-sidebar [data-slot=sidebar-gap], .app-sidebar [data-slot=sidebar-container] { transition-duration:var(--motion-instant); }
+  .graph-view-indicator, .graph-view-option { transition-duration:var(--motion-instant); }
+}
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:var(--motion-reduced)!important; transition-duration:var(--motion-reduced)!important; } }
+.continuous-calendar .rdp-month_caption { position:sticky; top:0; z-index:1; background:var(--popover); }

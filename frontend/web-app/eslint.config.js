@@ -19,4 +19,9 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // shadcn/ui 원본 파일과 테마 provider는 variant·hook을 컴포넌트와 함께 내보낸다
+    files: ['src/components/ui/**/*.tsx', 'src/app/ThemeProvider.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])
