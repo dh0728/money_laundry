@@ -8,9 +8,9 @@ import { Kbd } from '@/components/ui/kbd'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import ComingSoonPage from '@/pages/ComingSoonPage'
 import DashboardPage from '@/pages/DashboardPage'
-import { toast } from 'sonner'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import AccountPage from '@/pages/AccountPage'
+import LoginPage from '@/pages/LoginPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
 import { MOCK_USER, roleInfo } from './session'
@@ -71,6 +71,7 @@ export default function App() {
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
   const [appFullscreen, setAppFullscreen] = useState(false)
   const [logout, setLogout] = useState(false)
+  const [signedIn, setSignedIn] = useState(false)
   const isFullscreen = nativeFullscreen || appFullscreen
   const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
 
@@ -81,6 +82,8 @@ export default function App() {
     document.addEventListener('fullscreenchange', screen)
     return () => { window.removeEventListener('keydown', key); document.removeEventListener('fullscreenchange', screen) }
   }, [fullscreen])
+
+  if (!signedIn) return <LoginPage onLogin={() => { setSignedIn(true); go('dashboard') }} />
 
   return (
     <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
@@ -161,8 +164,7 @@ export default function App() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            {/* 로그인 화면을 옮기면 여기서 로그인 화면으로 보낸다 */}
-            <AlertDialogAction onClick={() => toast('로그인 화면은 아직 준비 중입니다.')}>로그아웃</AlertDialogAction>
+            <AlertDialogAction onClick={() => { setSignedIn(false); go('dashboard') }}>로그아웃</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
