@@ -27,3 +27,19 @@ describe('앱 틀', () => {
     expect(pageFromHash('#upload')).toBe('dashboard')
   })
 })
+
+describe('설정·계정', () => {
+  it('설정에서 테마를 고를 수 있다', async () => {
+    window.history.replaceState({}, '', '/#settings')
+    render(<App />)
+    expect(await screen.findByRole('radio', { name: '라이트 모드' })).toBeInTheDocument()
+  })
+
+  it('계정에서 역할 권한을 보여 주고 로그아웃 확인창을 연다', async () => {
+    window.history.replaceState({}, '', '/#account')
+    render(<App />)
+    expect(screen.getByRole('list', { name: '할 수 있는 일' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '현재 세션 로그아웃' }))
+    expect(await screen.findByText('로그아웃할까요?')).toBeInTheDocument()
+  })
+})

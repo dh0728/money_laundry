@@ -8,10 +8,13 @@ import { Kbd } from '@/components/ui/kbd'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import ComingSoonPage from '@/pages/ComingSoonPage'
 import DashboardPage from '@/pages/DashboardPage'
+import { toast } from 'sonner'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import AccountPage from '@/pages/AccountPage'
+import SettingsPage from '@/pages/SettingsPage'
+import { MOCK_USER, roleInfo } from './session'
 import { mainNav, pageFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 
-// 로그인·인증 방식이 정해지기 전까지 쓰는 가짜 사용자
-const MOCK_USER = { name: '오분석', role: 'L1' }
 
 const pageTitles: Record<Page, string> = {
   dashboard: '대시보드',
@@ -66,6 +69,7 @@ export default function App() {
   const [page, go] = usePage()
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
   const [appFullscreen, setAppFullscreen] = useState(false)
+  const [logout, setLogout] = useState(false)
   const isFullscreen = nativeFullscreen || appFullscreen
   const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
 
@@ -121,7 +125,7 @@ export default function App() {
                   <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{MOCK_USER.name[0]}</AvatarFallback></Avatar>
                   <span className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
                     <span className="block text-xs font-medium">{MOCK_USER.name}</span>
-                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{MOCK_USER.role}</span>
+                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{roleInfo[MOCK_USER.role].label}</span>
                   </span>
                 </SidebarDestinationButton>
               </SidebarMenuItem>
@@ -141,9 +145,25 @@ export default function App() {
           </div>
         </header>
         <main className="app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10" style={{ scrollbarGutter: 'stable' }}>
-          {page === 'dashboard' ? <DashboardPage /> : <ComingSoonPage title={pageTitles[page]} withThemePicker={page === 'settings'} />}
+          {page === 'dashboard' ? <DashboardPage />
+            : page === 'settings' ? <SettingsPage />
+              : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
+                : <ComingSoonPage title={pageTitles[page]} />}
         </main>
       </SidebarInset>
+      <AlertDialog open={logout} onOpenChange={setLogout}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>로그아웃할까요?</AlertDialogTitle>
+            <AlertDialogDescription>현재 세션을 종료하고 로그인 화면으로 돌아갑니다.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            {/* 로그인 화면을 옮기면 여기서 로그인 화면으로 보낸다 */}
+            <AlertDialogAction onClick={() => toast('로그인 화면은 아직 준비 중입니다.')}>로그아웃</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   )
 }
