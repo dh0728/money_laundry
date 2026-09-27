@@ -224,3 +224,39 @@
 /* 계정: 가로 화면 3열, 세로 화면 3행 */
 .account-grid { grid-template-columns:1fr; }
 @media (min-width:1200px) and (orientation:landscape) { .account-grid { grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.25fr); } }
+
+/* 거래 3단 탐색 — v24 index.css */
+.transactions-flow {
+  position:relative;
+  grid-template-columns:13.5rem 14.5rem minmax(16rem,1fr) minmax(18rem,1fr);
+  align-items:start;
+  min-width:0;
+}
+.transaction-stage > header { height:69px; }
+.transaction-stage-item { min-height:64px; content-visibility:auto; contain-intrinsic-block-size:64px; }
+.transaction-stage-item[aria-pressed="true"] {
+  --background:var(--selection-background); --foreground:var(--selection-foreground);
+  --muted-foreground:var(--selection-muted-foreground); --border:var(--selection-border);
+  background:var(--selection-background); color:var(--selection-foreground);
+}
+.transaction-stage-item[aria-pressed="true"] [data-slot=badge] { border-color:var(--selection-border); color:inherit; }
+.transaction-owner-scroll { max-height:min(32rem,calc(100dvh - 20rem)); overflow-y:auto; scrollbar-gutter:stable; overscroll-behavior:contain; }
+.transaction-connector { position:absolute; top:0; bottom:0; z-index:1; color:var(--muted-foreground); pointer-events:none; }
+.owner-account-connector { left:13.5rem; width:.75rem; }
+.account-transaction-connector { left:calc(13.5rem + .75rem + 14.5rem); width:.75rem; }
+.transaction-connector-edge { position:absolute; inset:0; }
+.transaction-connector-edge[data-active="false"] { color:var(--muted-foreground); }
+.transaction-connector-edge[data-active="true"] { color:var(--foreground); z-index:1; }
+.transaction-connector-edge::before { content:""; position:absolute; top:var(--source-y); left:0; width:50%; border-top:1.5px solid; }
+.transaction-connector-edge::after { content:""; position:absolute; top:min(var(--source-y),var(--target-y)); left:50%; height:calc(max(var(--source-y),var(--target-y)) - min(var(--source-y),var(--target-y))); border-left:1.5px solid; }
+.transaction-connector-edge > b { position:absolute; top:var(--target-y); left:50%; right:0; border-top:1.5px solid; }
+.transaction-detail { min-width:0; }
+@container (max-width:1100px) {
+  .transactions-flow { grid-template-columns:13.5rem 14.5rem minmax(16rem,1fr); }
+  .transaction-detail { grid-column:1 / -1; }
+}
+@container (max-width:760px) {
+  .transactions-flow { grid-template-columns:minmax(0,1fr); }
+  .transaction-connector { display:none; }
+}
+.transaction-section .overflow-auto { overflow:visible; }

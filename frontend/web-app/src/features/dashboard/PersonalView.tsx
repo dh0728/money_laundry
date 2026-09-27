@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { fmt } from '@/lib/format'
 import { loadAlerts } from './dataSource'
 import { personalColumns, personalSorts, sortAlerts, type PersonalSort } from './personalQueue'
-import { EmptyBlock, ErrorBlock, LoadingBlock } from './states'
-import { useAsync } from './useAsync'
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
+import { useAsync } from '@/lib/useAsync'
 import { WorkCard } from './WorkCard'
 import { alertSummary } from './alertText'
 

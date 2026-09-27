@@ -13,8 +13,8 @@ import { ChartAreaInteractive } from './AlertFlowChart'
 import { loadAlerts, loadDashboard } from './dataSource'
 import { chartInputs, institutionCards } from './metrics'
 import { TransactionPatternHierarchy } from './PatternRelation'
-import { EmptyBlock, ErrorBlock, LoadingBlock } from './states'
-import { useAsync } from './useAsync'
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
+import { useAsync } from '@/lib/useAsync'
 import { WorkCard } from './WorkCard'
 
 export function InstitutionView({ today }: { today: Date }) {

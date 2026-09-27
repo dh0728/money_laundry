@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import AccountPage from '@/pages/AccountPage'
 import SettingsPage from '@/pages/SettingsPage'
+import TransactionsPage from '@/pages/TransactionsPage'
 import { MOCK_USER, roleInfo } from './session'
 import { mainNav, pageFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 
@@ -146,6 +147,7 @@ export default function App() {
         </header>
         <main className="app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10" style={{ scrollbarGutter: 'stable' }}>
           {page === 'dashboard' ? <DashboardPage />
+            : page === 'transactions' ? <TransactionsPage />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}
