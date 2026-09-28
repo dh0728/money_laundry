@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useTheme } from '@/app/ThemeProvider'
 import { useCurrentUser } from '@/app/session'
 import { PageHeading, SectionTitle } from '@/components/page'
+import { ProvenanceBadge } from '@/components/Provenance'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -22,17 +23,17 @@ export default function SettingsPage() {
   // 설정은 선택 즉시 적용. 각 묶음은 같은 Card/SectionTitle 구조를 쓴다.
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4"><PageHeading title="설정" description="표시 형식과 업무 알림 환경을 설정합니다." /><Button size="sm" variant="outline" onClick={reset}><RotateCcw className="size-3.5" />설정 초기화</Button></div>
+      <div className="flex items-start justify-between gap-4"><PageHeading title="설정" description="테마는 즉시 적용 · 나머지 항목은 시연용이며 다른 화면에 아직 적용되지 않음" /><Button size="sm" variant="outline" onClick={reset}><RotateCcw className="size-3.5" />설정 초기화</Button></div>
       <div className="settings-grid grid items-stretch gap-x-10 gap-y-10" data-testid="settings-grid">
-        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="일반" />
+        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="일반" action={<ProvenanceBadge kind="mock" />} />
           <div className="space-y-2"><Label>시간대</Label><Select value={zone} onValueChange={setZone}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="seoul">Asia/Seoul (UTC+9)</SelectItem><SelectItem value="utc">UTC</SelectItem></SelectContent></Select></div>
           <div className="space-y-2"><Label>날짜 형식</Label><Select value={dateFormat} onValueChange={setDateFormat}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="iso">YYYY-MM-DD</SelectItem><SelectItem value="dot">YYYY. MM. DD</SelectItem></SelectContent></Select></div>
         </CardContent></Card>
-        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="목록" />
+        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="목록" action={<ProvenanceBadge kind="mock" />} />
           <div className="space-y-2"><Label>페이지당 행</Label><Select value={rows} onValueChange={setRows}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{['20', '50', '100'].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
           <div className="space-y-2"><Label>기본 정렬</Label><Select value={sort} onValueChange={setSort}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="risk">위험도 높은 순</SelectItem><SelectItem value="recent">최근 탐지 순</SelectItem></SelectContent></Select></div>
         </CardContent></Card>
-        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="알림" description="인앱 수신 항목" />
+        <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="알림" description="인앱 수신 항목" action={<ProvenanceBadge kind="mock" />} />
           <div className="space-y-4">{choices.map(([id, label]) => <Label key={id} className="flex items-center gap-3 font-normal"><Checkbox checked={alerts.includes(id)} onCheckedChange={v => setAlerts(p => v ? [...new Set([...p, id])] : p.filter(x => x !== id))} />{label}</Label>)}</div>
         </CardContent></Card>
         <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="테마" />

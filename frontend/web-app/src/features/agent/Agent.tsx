@@ -198,13 +198,13 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
       ? `전체 미처리 업무 ${pending.length}건 중 위험 점수 0.80 이상 ${pending.filter(item => item.score >= 0.8).length}건 확인됨.\n담당 조사자는 위험 점수와 경과 기간을 확인하고, 관리자는 지연 현황을 살펴봅니다.`
       : '조사할 Alert 또는 Episode를 선택하면 해당 사건의 근거를 함께 살펴볼 수 있습니다.'
   const send = (text = input) => {
-    if (!text.trim() || live) return
+    if (!text.trim()) return
     setMessages(current => [...current, { role: 'user', text }, { role: 'assistant', text: answer(text, record, summary) }])
     setInput('')
   }
   if (!open) return null
   const header = <div className={`agent-drag-handle flex items-center justify-between gap-2 border-b px-3 py-2.5 ${mode === 'floating' ? 'cursor-move' : ''}`}>
-    <span className="font-mono text-sm font-semibold tracking-wide">{name}</span>
+    <span className="flex items-center gap-2 font-mono text-sm font-semibold tracking-wide">{name}{live && <span className="rounded-full border px-2 py-0.5 font-sans text-[10px] font-normal">mock</span>}</span>
     <div className="agent-action flex gap-0.5">
       <IconButton label="새 대화" className="size-8" onClick={() => setMessages([])}><Plus className="size-4" /></IconButton>
       <IconButton label={mode === 'sidebar' ? '플로팅 패널로 보기' : '우측 사이드바로 보기'} className="size-8" onClick={() => setMode(mode === 'sidebar' ? 'floating' : 'sidebar')}>
@@ -218,13 +218,13 @@ export default function Agent({ open, setOpen, mode, setMode, record, records }:
     <div className="flex items-center gap-2 px-4 py-3 text-[11px] text-muted-foreground"><span>{record?.id ?? '전체 업무 · 오늘 요약'}</span></div>
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
       <div className="space-y-3"><button ref={attachAvatar} type="button" aria-label={`${name} 심볼로 닫기`} onClick={requestClose} disabled={Boolean(morph) || closing} className={`rdr-avatar size-14 rounded-full p-0 ${morph ? 'invisible opacity-0' : ''}`}><RadarSweep /></button><p className="whitespace-pre-wrap text-sm leading-7">{summary}</p>
-        <div className="flex flex-wrap gap-2">{['주요 근거 확인', '검토 우선순위 요약'].map(question => <Button key={question} variant="outline" size="sm" className="text-xs" disabled={live} onClick={() => send(question)}>{question}</Button>)}</div>
+        <div className="flex flex-wrap gap-2">{['주요 근거 확인', '검토 우선순위 요약'].map(question => <Button key={question} variant="outline" size="sm" className="text-xs" onClick={() => send(question)}>{question}</Button>)}</div>
       </div>
       {messages.map((message, index) => <p key={index} className={message.role === 'user' ? 'ml-auto mt-4 w-fit max-w-[80%] rounded-2xl bg-muted px-4 py-2.5 text-sm' : 'mt-4 whitespace-pre-wrap text-sm leading-7'}>{message.text}</p>)}
     </div>
     <form className="border-t p-4" onSubmit={event => { event.preventDefault(); send() }}>
-      <div className="relative"><Textarea aria-label={`${name}에게 질문`} placeholder={live ? 'RDR 9000 서버 API 연결 예정' : '현재 조사에 대해 질문하세요'} className="min-h-24 resize-y pr-12 text-xs" value={input} disabled={live} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} />
-        <Button size="icon" className="absolute bottom-2 right-2 size-7" disabled={live || !input.trim()} aria-label="질문 보내기"><Send className="size-3.5" /></Button></div>
+      <div className="relative"><Textarea aria-label={`${name}에게 질문`} placeholder="현재 조사에 대해 질문하세요" className="min-h-24 resize-y pr-12 text-xs" value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} />
+        <Button size="icon" className="absolute bottom-2 right-2 size-7" disabled={!input.trim()} aria-label="질문 보내기"><Send className="size-3.5" /></Button></div>
       <p className="mt-2 text-center text-[10px] text-muted-foreground">판단과 최종 처리는 조사자가 수행합니다.</p>
     </form>
   </section>

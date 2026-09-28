@@ -6,6 +6,7 @@ import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import { DataModeBadge } from '@/components/Provenance'
 import GlobalSearch from '@/features/search/GlobalSearch'
+import LiveGlobalSearch from '@/features/search/LiveGlobalSearch'
 import Agent, { AgentFab, type AgentMode } from '@/features/agent/Agent'
 import { mockAgentRecords, recordForRoute } from '@/features/agent/agentData'
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
@@ -24,6 +25,9 @@ import LoginPage from '@/pages/LoginPage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
+import LiveDashboardPage from '@/pages/LiveDashboardPage'
+import LiveLedgerPage from '@/pages/LiveLedgerPage'
+import LiveCasesPage from '@/pages/LiveCasesPage'
 import { currentScenario } from '@/mocks/scenario'
 import { CurrentUserContext, MOCK_USER, roleInfo, type CurrentUser } from './session'
 import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
@@ -90,7 +94,7 @@ export default function App() {
   const [logoutError, setLogoutError] = useState('')
   const currentUser = user ?? MOCK_USER
   const fromSession = (session: SessionUser): CurrentUser => ({ ...MOCK_USER, userId: session.id, name: session.name, role: session.role, username: session.username, organization: '—', email: '—', joinedAt: '—' })
-  const [agentOpen, setAgentOpen] = useState(() => !(globalThis.matchMedia?.('(max-width: 767px)').matches ?? false))
+  const [agentOpen, setAgentOpen] = useState(() => !(globalThis.matchMedia?.('(max-width: 1199px)').matches ?? false))
   const [agentMode, setAgentMode] = useState<AgentMode>('sidebar')
   const agentSidebar = agentOpen && agentMode === 'sidebar'
   const agentRecords = live || currentScenario() !== 'normal' ? [] : mockAgentRecords
@@ -99,7 +103,7 @@ export default function App() {
   const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
 
   useEffect(() => {
-    const narrow = window.matchMedia?.('(max-width: 767px)')
+    const narrow = window.matchMedia?.('(max-width: 1199px)')
     const closeOnNarrow = (event: MediaQueryListEvent) => { if (event.matches) setAgentOpen(false) }
     narrow?.addEventListener('change', closeOnNarrow)
     return () => narrow?.removeEventListener('change', closeOnNarrow)
@@ -207,7 +211,7 @@ export default function App() {
           )}
           </div>
           <div className="header-search min-w-0 w-full max-w-[420px] justify-self-center">
-            <GlobalSearch onNavigate={(next, nextId) => go(next, nextId)} onOpenTransaction={target => { setTransactionTarget(target); go('transactions') }} />
+            {live ? <LiveGlobalSearch onNavigate={(next, nextId) => go(next, nextId)} /> : <GlobalSearch onNavigate={(next, nextId) => go(next, nextId)} onOpenTransaction={target => { setTransactionTarget(target); go('transactions') }} />}
           </div>
           <div className="header-actions flex items-center justify-self-end gap-1.5" data-testid="header-actions">
             <DataModeBadge />
@@ -218,17 +222,17 @@ export default function App() {
           </div>
         </header>
         <main className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
-          {page === 'dashboard' ? <DashboardPage />
-            : page === 'transactions' ? <TransactionsPage />
-            : page === 'alerts' ? <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />
-            : page === 'episodes' ? <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />
-            : page === 'notifications' ? <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />
+          {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
+            : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
+            : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
+            : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
+            : page === 'notifications' ? <NotificationsPage onOpen={item => go(item.target.page, live ? undefined : item.target.id)} />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}
         </main>
       </SidebarInset>
-      <AgentFab open={agentOpen} onToggle={() => setAgentOpen(true)} />
+      <AgentFab open={agentOpen} onToggle={() => { if (window.innerWidth < 1200) setAgentMode('floating'); setAgentOpen(true) }} />
       <Agent open={agentOpen} setOpen={setAgentOpen} mode={agentMode} setMode={setAgentMode} record={agentRecord} records={agentRecords} />
       <AlertDialog open={logout} onOpenChange={setLogout}>
         <AlertDialogContent>

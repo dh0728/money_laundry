@@ -40,6 +40,6 @@ export function PlannedBlock({ children }: { children: ReactNode }) {
 /** 앱 머리: 지금 보이는 데이터가 mock인지 실제 API인지 */
 export function DataModeBadge() {
   return live
-    ? <Badge variant="outline" data-provenance="live" className="provenance-badge font-normal" title="Backend API에서 데이터를 불러오는 중입니다.">실제 API</Badge>
+    ? <Badge variant="outline" data-provenance="live" className="provenance-badge font-normal" title="핵심 조회는 Backend API, 알림과 RDR 9000은 mock입니다.">실제 API · mock 포함</Badge>
     : <ProvenanceBadge kind="mock" title="서버 없이 시연용 mock 데이터로 동작합니다. 처리 결과는 새로고침하면 처음 상태로 돌아갑니다." />
 }
