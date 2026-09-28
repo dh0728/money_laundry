@@ -1,5 +1,4 @@
-// v24 GlobalSearch.tsx를 옮김. 헤더 정중앙의 전역 검색: 소유주·계좌·거래·Alert·Episode·화면을 한 번에 찾는다.
-// "/"를 누르면 검색창으로 가고 Esc로 닫는다. 알림 화면은 아직 없어 알림 검색은 빠져 있다.
+// 헤더의 남는 너비를 채우는 전역 검색: 소유주·계좌·거래·Alert·Episode·알림·화면을 한 번에 찾는다.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Search } from 'lucide-react'
 import { fetchAlerts, type AlertRow } from '@/api/alerts'
@@ -13,12 +12,14 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
 import { buildTransactionIndex, searchTransactionIndex, type TransactionIndex, type TransactionTarget } from '@/features/transactions/transactionIndex'
 import { live } from '@/lib/apiMode'
+import { memorySnapshot, writeMemory } from '@/lib/memory'
 import { allAlertsNormal } from '@/mocks/alerts'
 import { loadMockEpisodes } from '@/mocks/episodes'
+import { loadMockNotifications, type NotificationItem } from '@/mocks/notifications'
 import { loadMockTransactionExplorer } from '@/mocks/transactions'
 import { pageLinks, settingItems } from './searchItems'
 
-type SearchData = { alerts: AlertRow[]; episodes: EpisodeRow[]; transactions: TransactionIndex }
+type SearchData = { alerts: AlertRow[]; episodes: EpisodeRow[]; transactions: TransactionIndex; notifications: NotificationItem[] }
 type ResultItem = { key: string; primary: ReactNode; secondary?: string; onSelect: () => void }
 type ResultGroup = { id: string; label: string; items: ResultItem[] }
 
@@ -32,12 +33,12 @@ function Highlight({ text, query }: { text: string; query: string }) {
 async function loadSearchData(overrides: Parameters<typeof withOverride>[1]): Promise<SearchData> {
   if (live) {
     const [alerts, episodes, explorer] = await Promise.all([fetchAlerts({ size: 200 }), fetchEpisodes({ size: 200 }), fetchTransactionExplorer()])
-    return { alerts: alerts.content, episodes: episodes.content, transactions: buildTransactionIndex(explorer) }
+    return { alerts: alerts.content, episodes: episodes.content, transactions: buildTransactionIndex(explorer), notifications: [] }
   }
   // mock은 Alert 화면에서 처리한 결과(연결·판정)를 반영한다
   const alerts = allAlertsNormal.content.map(row => withOverride(row, overrides))
-  const [episodes, explorer] = await Promise.all([loadMockEpisodes(alerts, 'normal'), loadMockTransactionExplorer('normal')])
-  return { alerts, episodes: episodes.content, transactions: buildTransactionIndex(explorer) }
+  const [episodes, explorer, notifications] = await Promise.all([loadMockEpisodes(alerts, 'normal'), loadMockTransactionExplorer('normal'), loadMockNotifications()])
+  return { alerts, episodes: episodes.content, transactions: buildTransactionIndex(explorer), notifications }
 }
 
 type Props = {
@@ -80,13 +81,22 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
   const groups: ResultGroup[] = useMemo(() => {
     if (!q) return [{ id: 'quick', label: '바로가기', items: pageLinks.map(p => ({ key: `quick-${p.page}`, primary: p.label, onSelect: select(() => onNavigate(p.page)) })) }]
     const alerts: ResultItem[] = (data?.alerts ?? [])
-      .filter(a => `A-${a.alertId} ${a.alertId} ${a.summary} ${typeDisplay(a.primaryType.code).label} ${a.assignee.name} ${a.subjectAccount.account}`.toLowerCase().includes(q))
+      .filter(a => `A-${a.alertId} ${a.alertId} ${a.summary} ${typeDisplay(a.primaryType.code).key} ${typeDisplay(a.primaryType.code).label} ${a.assignee.name} ${a.subjectAccount.account}`.toLowerCase().includes(q))
       .slice(0, 5)
       .map(a => ({ key: `alert-${a.alertId}`, primary: <span className="font-mono text-xs"><Highlight text={`A-${a.alertId}`} query={q} /></span>, secondary: `${typeDisplay(a.primaryType.code).label} · ${a.assignee.name}`, onSelect: select(() => onNavigate('alerts', a.alertId)) }))
     const episodes: ResultItem[] = (data?.episodes ?? [])
-      .filter(e => `E-${e.episodeId} ${e.episodeId} ${e.assignee.name} ${e.primaryTypes.map(t => typeDisplay(t.code).label).join(' ')}`.toLowerCase().includes(q))
+      .filter(e => `E-${e.episodeId} ${e.episodeId} ${e.assignee.name} ${e.primaryTypes.flatMap(t => [typeDisplay(t.code).key, typeDisplay(t.code).label]).join(' ')}`.toLowerCase().includes(q))
       .slice(0, 5)
       .map(e => ({ key: `episode-${e.episodeId}`, primary: <span className="font-mono text-xs"><Highlight text={`E-${e.episodeId}`} query={q} /></span>, secondary: `Alert ${e.alertCount}건 · ${e.assignee.name}`, onSelect: select(() => onNavigate('episodes', e.episodeId)) }))
+    const notifications: ResultItem[] = (data?.notifications ?? [])
+      .filter(item => `${item.code} ${item.title} ${item.description} ${item.patternCode === undefined ? '' : `${typeDisplay(item.patternCode).key} ${typeDisplay(item.patternCode).label}`}`.toLocaleLowerCase('ko').includes(q))
+      .slice(0, 5)
+      .map(item => ({ key: `notification-${item.id}`, primary: <Highlight text={item.title} query={q} />, secondary: item.code,
+        onSelect: select(() => {
+          const read = memorySnapshot<string[]>('notifications:read', [])
+          if (!read.includes(item.id)) writeMemory('notifications:read', [...read, item.id])
+          onNavigate(item.target.page, item.target.id)
+        }) }))
     const matches = data ? searchTransactionIndex(data.transactions, q) : []
     const targets = (type: TransactionTarget['type']): ResultItem[] => matches.filter(m => m.target.type === type).map(m => ({
       key: m.key, primary: <span className={type === 'owner' ? '' : 'font-mono text-xs'}><Highlight text={m.label} query={q} /></span>, secondary: m.detail, onSelect: select(() => onOpenTransaction(m.target)),
@@ -101,6 +111,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
       { id: 'transaction', label: '거래', items: targets('transaction') },
       { id: 'alert', label: 'Alert', items: alerts },
       { id: 'episode', label: 'Episode', items: episodes },
+      { id: 'notification', label: '알림', items: notifications },
       { id: 'screen', label: '화면·설정', items: screens },
     ].filter(g => g.items.length > 0)
     // select는 매 렌더 새로 만들지만 결과 목록은 검색어·데이터가 바뀔 때만 다시 만든다
@@ -113,13 +124,13 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
   return (
     <Popover open={open} onOpenChange={next => { setOpen(next); if (!next) setActive(0) }}>
       <PopoverAnchor asChild>
-        <div ref={anchor} className="relative">
+        <div ref={anchor} className="relative min-w-0 w-full">
           <Search className="absolute left-3 top-2.5 size-3.5 text-muted-foreground" />
           <Input
             ref={input}
             aria-label="전역 검색" role="combobox" aria-expanded={open} aria-controls="global-search-listbox" aria-autocomplete="list"
             aria-activedescendant={flat[active] ? `gs-item-${active}` : undefined}
-            placeholder="소유주 · 계좌 · 거래 · Alert · Episode 검색" className="h-9 rounded-full bg-muted/40 pl-9 pr-10" value={query}
+            placeholder="소유주 · 계좌 · 거래 · Alert · Episode · 알림 검색" className="h-9 rounded-full bg-muted/40 pl-9 pr-10" value={query}
             onFocus={() => setOpen(true)}
             onChange={e => { setQuery(e.target.value); setActive(0); setOpen(true) }}
             onKeyDown={e => {

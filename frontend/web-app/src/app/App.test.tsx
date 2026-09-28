@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import App from './App'
 import { pageFromHash } from './navigation'
+import { writeMemory } from '@/lib/memory'
 
 afterEach(() => window.history.replaceState({}, '', '/'))
 
@@ -19,10 +20,10 @@ describe('앱 틀', () => {
     expect(screen.getByRole('tab', { name: '내 담당' })).toBeInTheDocument()
   })
 
-  it('아직 옮기지 않은 메뉴는 준비 중으로 보여 준다', async () => {
+  it('알림 메뉴는 알림 목록을 연다', async () => {
     renderSignedIn()
     fireEvent.click(screen.getByRole('button', { name: '알림' }))
-    expect(await screen.findByText('준비 중인 화면입니다.')).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: '알림 검색' })).toBeInTheDocument()
   })
 
   it('Episodes 메뉴는 Episode 목록을 연다', async () => {
@@ -36,6 +37,9 @@ describe('앱 틀', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Alert 목록' }))
     expect(await screen.findByRole('textbox', { name: 'Alert 검색' })).toBeInTheDocument()
     expect(await screen.findByText('담당자: 내 담당')).toBeInTheDocument()
+    const first = screen.getByRole('row', { name: /A-3000 계좌 3개/ })
+    expect(within(first).getByText('NON_PATTERN')).toBeInTheDocument()
+    expect(within(first).queryByText(/NORMAL ·/)).not.toBeInTheDocument()
   })
 
   it('#alerts/번호 주소는 Alert 상세를 열고 판정 선택지를 보여 준다', async () => {
@@ -54,13 +58,87 @@ describe('앱 틀', () => {
     expect(within(screen.getByTestId('header-actions')).getByText('mock 데이터')).toBeInTheDocument()
   })
 
+  it('RDR 9000을 닫고 다시 열 수 있으며, 화면 이동에도 패널 상태가 유지된다', async () => {
+    renderSignedIn()
+    expect(screen.getByRole('region', { name: 'RDR 9000' })).toHaveAttribute('data-mode', 'sidebar')
+    expect(within(screen.getByRole('region', { name: 'RDR 9000' })).getByText(/전체 미처리 업무/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 닫기' }))
+    expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Alert 목록' }))
+    expect(await screen.findByRole('textbox', { name: 'Alert 검색' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
+    expect(screen.getByRole('region', { name: 'RDR 9000' })).toBeInTheDocument()
+  })
+
+  it('RDR 9000 심볼을 누르면 패널이 닫힌다', () => {
+    renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 심볼로 닫기' }))
+    expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'RDR 9000 열기' })).toBeInTheDocument()
+  })
+
+  it('RDR 9000도 사건 위험 점수를 화면과 같은 0~1 값으로 표시한다', async () => {
+    window.history.replaceState({}, '', '/#alerts/3000')
+    renderSignedIn()
+    window.location.hash = 'alerts/3000'
+    const agent = screen.getByRole('region', { name: 'RDR 9000' })
+    expect(await within(agent).findByText(/위험 점수 0\.99/)).toBeInTheDocument()
+    expect(within(agent).queryByText(/99%/)).not.toBeInTheDocument()
+  })
+
+  it('빈·오류 mock 상태에서는 RDR 9000에 정상 건수를 보여 주지 않는다', () => {
+    for (const scenario of ['empty', 'error']) {
+      window.history.replaceState({}, '', `/?mock=${scenario}`)
+      const view = render(<App />, { wrapper: NuqsTestingAdapter })
+      fireEvent.click(screen.getByRole('button', { name: '로그인' }))
+      expect(within(screen.getByRole('region', { name: 'RDR 9000' })).queryByText(/미처리 업무 25건/)).not.toBeInTheDocument()
+      view.unmount()
+    }
+  })
+
   it('헤더 가운데 전역 검색에서 Alert를 찾아 상세로 간다', async () => {
     renderSignedIn()
     const search = screen.getByRole('combobox', { name: '전역 검색' })
     fireEvent.focus(search)
     fireEvent.change(search, { target: { value: 'A-3001' } })
-    fireEvent.click(await screen.findByRole('option', { name: /A-3001/ }))
+    fireEvent.click((await screen.findAllByRole('option', { name: /A-3001/ }))[0])
     expect(window.location.hash).toBe('#alerts/3001')
+  })
+
+  it('전역 검색에서 화면의 NON_PATTERN 태그로 Alert를 찾는다', async () => {
+    renderSignedIn()
+    const search = screen.getByRole('combobox', { name: '전역 검색' })
+    fireEvent.focus(search)
+    fireEvent.change(search, { target: { value: 'NON_PATTERN' } })
+    expect(await screen.findByRole('option', { name: /^A-3000/ })).toBeInTheDocument()
+  })
+
+  it('알림을 읽음 처리하고 사건으로 이동하며, 전역 검색에서도 찾는다', async () => {
+    writeMemory('notifications:read', [])
+    renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: /^알림$/ }))
+    const first = await screen.findByRole('button', { name: 'A-3000 알림 열기' })
+    expect(within(first).getByText('NON_PATTERN')).toBeInTheDocument()
+    expect(within(first).getByTitle(/모델 위험 점수/)).toHaveTextContent('0.99')
+    expect(within(first).queryByText(/NORMAL ·/)).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'A-3000 읽음으로 표시' }))
+    expect(screen.getByRole('heading', { name: '읽음 1' })).toBeInTheDocument()
+    const search = screen.getByRole('combobox', { name: '전역 검색' })
+    fireEvent.focus(search)
+    fireEvent.change(search, { target: { value: '검수 결과' } })
+    fireEvent.click(await screen.findByRole('option', { name: /Episode 검수 결과/ }))
+    expect(window.location.hash).toBe('#episodes/802')
+  })
+
+  it('알림 빈·오류 화면을 구분한다', async () => {
+    for (const [scenario, message] of [['empty', '표시할 알림이 없습니다.'], ['error', '알림을 불러오지 못했습니다.']]) {
+      window.history.replaceState({}, '', `/?mock=${scenario}`)
+      const view = render(<App />, { wrapper: NuqsTestingAdapter })
+      fireEvent.click(screen.getByRole('button', { name: '로그인' }))
+      fireEvent.click(screen.getByRole('button', { name: /^알림$/ }))
+      expect(await screen.findByText(message)).toBeInTheDocument()
+      view.unmount()
+    }
   })
 
   it('모르는 주소는 대시보드로 보낸다', () => {

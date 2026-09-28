@@ -190,6 +190,7 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   body { @apply bg-background text-foreground; margin: 0; font-size: var(--text-body-size); -webkit-font-smoothing: antialiased; }
+  #root { min-width: 640px; }
   button, [role=button] { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
   ::selection { background:var(--selection-fill); color:var(--selection-foreground); }
@@ -208,7 +209,7 @@
 /* 누를 수 있는 곳은 모두 손가락 모양. 호버 배경은 --accent 하나로 맞춘다 */
 button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [role=option], [role=menuitem], a[href], label[for], summary { cursor:pointer; }
 /* 눌러서 이동하는 카드·목록 행: 배경과 테두리가 함께 진해진다 */
-.interactive-surface { transition:background-color var(--motion-normal) var(--ease-ui), border-color var(--motion-normal) var(--ease-ui); }
+.interactive-surface { transition:border-color var(--motion-normal) var(--ease-ui); }
 .interactive-surface:hover { background-color:var(--hover-surface); border-color:color-mix(in oklch, var(--foreground) 45%, transparent); }
 .tab-indicator { position:absolute; pointer-events:none; left:0; bottom:-1px; height:3px; background:var(--foreground); transition-property:transform,width; }
 .tab-indicator,
@@ -237,6 +238,16 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .app-fullscreen-fallback > [data-slot=sidebar-inset] { position:fixed; inset:0; z-index:40; height:100dvh; }
 .agent-sidebar-space { margin-right:var(--agent-width, 390px); }
 @media (max-width:1100px) { .agent-sidebar-space { margin-right:0; } .app-main { padding-inline:20px!important; } }
+.agent-resize-handle { background:transparent; touch-action:none; user-select:none; }
+.agent-resize-handle:hover, .agent-resize-handle:active { background:var(--border); }
+.agent-resize-handle-x { width:6px; margin-left:-3px; cursor:col-resize; }
+.agent-fab { background:transparent!important; box-shadow:var(--rdr-fab-shadow); }
+.agent-fab:hover { background:transparent!important; box-shadow:var(--rdr-fab-hover-shadow); }
+.rdr-glow { filter:drop-shadow(0 0 2px var(--rdr-glow)); }
+.rdr-morph { will-change:left,top,width,height; transition:left var(--motion-rdr-morph) var(--ease-emphasized),top var(--motion-rdr-morph) var(--ease-emphasized),width var(--motion-rdr-morph) var(--ease-emphasized),height var(--motion-rdr-morph) var(--ease-emphasized); }
+.rdr-avatar { transition:opacity var(--motion-fast) var(--ease-ui); }
+.agent-panel { transition:opacity var(--motion-panel) var(--ease-ui); }
+@media (prefers-reduced-motion:reduce) { .rdr-morph,.rdr-avatar,.agent-panel { transition:none; } }
 
 /* 설정·계정 격자 — v24 index.css */
 .settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }

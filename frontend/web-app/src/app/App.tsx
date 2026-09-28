@@ -3,6 +3,8 @@ import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import { DataModeBadge } from '@/components/Provenance'
 import GlobalSearch from '@/features/search/GlobalSearch'
+import Agent, { AgentFab, type AgentMode } from '@/features/agent/Agent'
+import { mockAgentRecords, recordForRoute } from '@/features/agent/agentData'
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
 import { SidebarSelection } from '@/components/SidebarSelection'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -16,8 +18,11 @@ import AccountPage from '@/pages/AccountPage'
 import AlertsPage from '@/pages/AlertsPage'
 import EpisodesPage from '@/pages/EpisodesPage'
 import LoginPage from '@/pages/LoginPage'
+import NotificationsPage from '@/pages/NotificationsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
+import { live } from '@/lib/apiMode'
+import { currentScenario } from '@/mocks/scenario'
 import { MOCK_USER, roleInfo } from './session'
 import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 
@@ -78,8 +83,20 @@ export default function App() {
   const [appFullscreen, setAppFullscreen] = useState(false)
   const [logout, setLogout] = useState(false)
   const [signedIn, setSignedIn] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(() => !(globalThis.matchMedia?.('(max-width: 767px)').matches ?? false))
+  const [agentMode, setAgentMode] = useState<AgentMode>('sidebar')
+  const agentSidebar = agentOpen && agentMode === 'sidebar'
+  const agentRecords = live || currentScenario() !== 'normal' ? [] : mockAgentRecords
+  const agentRecord = recordForRoute({ page, id }, agentRecords)
   const isFullscreen = nativeFullscreen || appFullscreen
   const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
+
+  useEffect(() => {
+    const narrow = window.matchMedia?.('(max-width: 767px)')
+    const closeOnNarrow = (event: MediaQueryListEvent) => { if (event.matches) setAgentOpen(false) }
+    narrow?.addEventListener('change', closeOnNarrow)
+    return () => narrow?.removeEventListener('change', closeOnNarrow)
+  }, [])
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => { if (event.key === 'F11') { event.preventDefault(); fullscreen() } }
@@ -144,10 +161,9 @@ export default function App() {
         </SidebarSelection>
       </Sidebar>
       <SidebarInset className="flex h-svh min-w-0 flex-col overflow-hidden">
-                {/* 양옆 칸을 같은 비율로 두어 뒤로가기 유무와 관계없이 검색창이 늘 가운데 같은 자리에 온다(v24) */}
-        <header className="app-header z-40 grid h-15 min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b bg-background px-4 min-[1100px]:gap-5 min-[1100px]:px-6">
+        <header className="app-header z-40 grid h-15 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-4 min-[1100px]:gap-5 min-[1100px]:px-6">
           <div className="header-navigation flex min-w-0 items-center">
-          <SidebarTrigger className="rounded-full md:hidden" aria-label="메뉴 열기" />
+          <SidebarTrigger className="size-8 rounded-full md:hidden" aria-label="메뉴 열기" />
           {/* 상세 화면에서는 머리 왼쪽에 목록으로 돌아가는 버튼을 둔다 */}
           {id && (page === 'alerts' || page === 'episodes') && (
             <Button variant="ghost" size="sm" className="h-8 gap-1.5 rounded-full px-3 text-xs" onClick={() => go(page)} data-testid="header-back">
@@ -155,7 +171,7 @@ export default function App() {
             </Button>
           )}
           </div>
-          <div className="header-search w-[clamp(280px,32vw,420px)]">
+          <div className="header-search min-w-0 w-full max-w-[420px] justify-self-center">
             <GlobalSearch onNavigate={(next, nextId) => go(next, nextId)} onOpenTransaction={target => { setTransactionTarget(target); go('transactions') }} />
           </div>
           <div className="header-actions flex items-center justify-self-end gap-1.5" data-testid="header-actions">
@@ -166,16 +182,19 @@ export default function App() {
             </Button>
           </div>
         </header>
-        <main className="app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10" style={{ scrollbarGutter: 'stable' }}>
+        <main className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
           {page === 'dashboard' ? <DashboardPage />
             : page === 'transactions' ? <TransactionsPage />
             : page === 'alerts' ? <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />
             : page === 'episodes' ? <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />
+            : page === 'notifications' ? <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}
         </main>
       </SidebarInset>
+      <AgentFab open={agentOpen} onToggle={() => setAgentOpen(true)} />
+      <Agent open={agentOpen} setOpen={setAgentOpen} mode={agentMode} setMode={setAgentMode} record={agentRecord} records={agentRecords} />
       <AlertDialog open={logout} onOpenChange={setLogout}>
         <AlertDialogContent>
           <AlertDialogHeader>
