@@ -266,7 +266,13 @@ class BankUploadApiTests {
         .isEqualTo(ids);
     assertThat(jdbc.queryForList("select payload_cipher from private.bank_reports", String.class))
         .allMatch(v -> !v.contains("NameE"));
-    mvc.perform(get("/api/uploads/{id}", a)).andExpect(status().isNotFound());
+    mvc.perform(
+            get("/api/uploads/{id}", a)
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.user("test")
+                        .roles("STAFF")))
+        .andExpect(status().isNotFound());
     mvc.perform(get("/api/v1/bank/uploads/{id}", a).header("X-Bank-Id", 20))
         .andExpect(status().isNotFound());
     mvc.perform(get("/api/v1/bank/uploads/{id}", a).header("X-Bank-Id", 10))

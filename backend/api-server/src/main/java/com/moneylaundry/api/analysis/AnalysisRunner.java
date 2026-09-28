@@ -438,6 +438,15 @@ public class AnalysisRunner implements AutoCloseable {
                       Integer.class,
                       run);
               if (count == 0) {
+                if (service.jdbc.queryForObject(
+                    "select exists(select 1 from analysis.alert_origins where run_id=?)",
+                    Boolean.class,
+                    run)) {
+                  service.jdbc.update(
+                      "update batch_jobs set status='QUEUED',current_stage='ALERTS',row_count=0,suspicious_tx_count=0,execution_id=null,execution_owner=null,stage_attempt_count=0 where job_id=?",
+                      item.job.id());
+                  return;
+                }
                 runs.complete(run);
                 service.jdbc.update(
                     "update batch_jobs set status='COMPLETED',current_stage='COMPLETE',completion_reason='EMPTY_INPUT',row_count=0,suspicious_tx_count=0,alert_count=0,finished_at=?,execution_id=null where job_id=?",
