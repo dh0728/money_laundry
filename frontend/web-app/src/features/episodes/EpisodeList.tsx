@@ -2,11 +2,11 @@
 import { useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Download, Inbox, Search } from 'lucide-react'
-import { episodeStatusLabels, typeDisplay, type EpisodeStatus } from '@/api/codes'
+import { typeDisplay, type EpisodeStatus } from '@/api/codes'
 import type { EpisodeRow } from '@/api/episodes'
 import { MOCK_USER } from '@/app/session'
 import { FilterChip } from '@/components/FilterChip'
-import { RiskBadge } from '@/components/badges'
+import { RiskBadge, WorkStatusBadge } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -17,10 +17,10 @@ import { episodeCode } from '@/features/alerts/alertFilters'
 import { usd } from '@/features/alerts/metrics'
 import { useDataTable } from '@/hooks/use-data-table'
 import { useMemoryState } from '@/lib/memory'
+import { episodeWorkStatus, workStatusLabels, type WorkStatus } from '@/lib/workStatus'
 
 export function EpisodeStatusBadge({ status, reviewRequested }: { status: EpisodeStatus; reviewRequested?: boolean }) {
-  if (reviewRequested && status === 'OPEN') return <Badge variant="outline" data-tone="working" className="semantic-status-badge text-xs font-normal" title="FE 제안: 관리자 검수 넘김">검수 요청됨</Badge>
-  return <Badge variant="outline" data-tone={status === 'OPEN' ? 'pending' : 'closed'} className="semantic-status-badge text-xs font-normal">{episodeStatusLabels[status]}</Badge>
+  return <WorkStatusBadge status={episodeWorkStatus(status, reviewRequested)} title={reviewRequested && status === 'OPEN' ? '관리자 검수 요청됨 (FE 제안)' : undefined} />
 }
 
 const columns: ColumnDef<EpisodeRow>[] = [
@@ -51,7 +51,7 @@ const columns: ColumnDef<EpisodeRow>[] = [
   },
 ]
 
-type StatusFilter = 'all' | EpisodeStatus | 'review'
+type StatusFilter = 'all' | WorkStatus
 
 export default function EpisodeList({ rows, onOpen }: { rows: EpisodeRow[]; onOpen: (row: EpisodeRow) => void }) {
   const [query, setQuery] = useState('')
@@ -61,7 +61,7 @@ export default function EpisodeList({ rows, onOpen }: { rows: EpisodeRow[]; onOp
     const text = query.trim().toLocaleLowerCase('ko')
     return rows.filter(row =>
       (!mine || row.assignee.userId === MOCK_USER.userId)
-      && (status === 'all' || (status === 'review' ? Boolean(row.reviewRequestedAt) : row.status === status))
+      && (status === 'all' || episodeWorkStatus(row.status, Boolean(row.reviewRequestedAt)) === status)
       && (!text || [episodeCode(row.episodeId), String(row.episodeId), row.assignee.name, ...row.primaryTypes.map(t => typeDisplay(t.code).label)].join(' ').toLocaleLowerCase('ko').includes(text)))
   }, [rows, query, mine, status])
 
@@ -94,9 +94,8 @@ export default function EpisodeList({ rows, onOpen }: { rows: EpisodeRow[]; onOp
           <SelectTrigger className="h-9 w-40 text-xs" aria-label="상태"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">모든 상태</SelectItem>
-            <SelectItem value="OPEN">{episodeStatusLabels.OPEN}</SelectItem>
-            <SelectItem value="review">검수 요청됨</SelectItem>
-            <SelectItem value="CLOSED">{episodeStatusLabels.CLOSED}</SelectItem>
+            <SelectItem value="IN_PROGRESS">{workStatusLabels.IN_PROGRESS}</SelectItem>
+            <SelectItem value="DONE">{workStatusLabels.DONE}</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" size="sm" className="ml-auto" onClick={download}><Download className="size-3.5" />다운로드</Button>

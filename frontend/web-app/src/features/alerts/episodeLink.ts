@@ -1,7 +1,7 @@
 import type { AlertRow } from '@/api/alerts'
 import type { AlertOverrides } from './alertOverrides'
 
-// v24 Lists.tsx의 "Episode로 묶기" 다중 선택. 검토 전(OPEN) Alert만 고를 수 있다(API.md §4.2).
+// v24 Lists.tsx의 "Episode로 묶기" 다중 선택. 처리 전(OPEN) Alert만 고를 수 있다(API.md §4.2).
 export type EpisodeLinkState = { mode: 'browse' | 'link'; selected: Set<number> }
 export type EpisodeLinkAction = { type: 'start' } | { type: 'cancel' } | { type: 'complete' } | { type: 'toggle'; id: number }
 /** 'new' = 새 Episode 생성, 숫자 = 기존 Episode 연결 */

@@ -106,7 +106,7 @@ export default function EpisodeDetail({ episode, transactions, history, responsi
                 <div key={h.account} className="text-xs">
                   <p className="mb-2 font-mono">{h.account} · 은행 {h.bank}</p>
                   <ul className="space-y-1.5">
-                    {h.alerts.map(a => <li key={a.alertId} className="flex justify-between gap-2"><span className="font-mono">{alertCode(a.alertId)}</span><span className="text-muted-foreground">{a.resolution ? alertResolutionLabels[a.resolution] : a.episodeId != null ? episodeCode(a.episodeId) : '검토 전'}</span></li>)}
+                    {h.alerts.map(a => <li key={a.alertId} className="flex justify-between gap-2"><span className="font-mono">{alertCode(a.alertId)}</span><span className="text-muted-foreground">{a.resolution ? alertResolutionLabels[a.resolution] : a.episodeId != null ? episodeCode(a.episodeId) : '처리 전'}</span></li>)}
                   </ul>
                 </div>
               ))}

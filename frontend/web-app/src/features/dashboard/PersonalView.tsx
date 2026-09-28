@@ -57,10 +57,10 @@ export function PersonalView() {
   const mine = state.data.content
   const open = mine.filter(alert => alert.status === 'OPEN')
   const cards: SectionCardItem[] = [
-    { label: '내 담당 미처리', value: fmt(open.length), trend: '검토 전 상태', note: '검토가 필요한 Alert' },
+    { label: '내 담당 미처리', value: fmt(open.length), trend: '처리 전 상태', note: '판정이 필요한 Alert' },
     { label: `위험 점수 ${formatScore(HIGH_RISK)} 이상`, value: fmt(open.filter(alert => alert.riskScore >= HIGH_RISK).length), trend: '고위험', note: `미처리 중 위험 점수 ${formatScore(HIGH_RISK)} 이상` },
     { label: '3일 이상 경과', value: fmt(open.filter(alert => alert.ageDays >= 3).length), trend: '우선 처리 대상', note: '미처리 중 3일 이상 경과' },
-    { label: '내 종결', value: fmt(mine.filter(alert => alert.status === 'CLOSED').length), trend: '현재 조회 범위', note: '담당해 종결한 Alert' },
+    { label: '내 처리 완료', value: fmt(mine.filter(alert => alert.status === 'CLOSED').length), trend: '현재 조회 범위', note: '담당해 판정을 끝낸 Alert' },
   ]
   return (
     <>

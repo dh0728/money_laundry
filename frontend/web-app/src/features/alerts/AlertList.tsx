@@ -4,7 +4,7 @@ import type { DateRange } from 'react-day-picker'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Combine, Download, Inbox, ListFilter, Search } from 'lucide-react'
 import type { AlertRow } from '@/api/alerts'
-import { alertStatusLabels, typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
+import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 import { MOCK_USER } from '@/app/session'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useDataTable } from '@/hooks/use-data-table'
 import { fmt } from '@/lib/format'
 import { useMemoryState } from '@/lib/memory'
+import { alertWorkStatus, workStatusLabels } from '@/lib/workStatus'
 import { ageOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
 import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget } from './episodeLink'
 
@@ -127,7 +128,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
   const toFirst = () => table.setPageIndex(0)
 
   const valueOptions: Record<AlertFilterField, { value: string; label: string }[]> = {
-    status: statusValues.map(s => ({ value: s, label: alertStatusLabels[s] })),
+    status: statusValues.map(s => ({ value: s, label: workStatusLabels[alertWorkStatus(s)] })),
     type: typeValues.map(code => ({ value: String(code), label: typeDisplay(code).label })),
     assignee: [{ value: String(me), label: '내 담당' }, ...[...assignees].filter(([id]) => id !== me).map(([id, name]) => ({ value: String(id), label: name }))],
     age: ageOptions.map(days => ({ value: String(days), label: `${days}일 이상` })),
@@ -180,7 +181,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
 
       {link.mode === 'link' && (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 px-3 py-2 shadow-sm backdrop-blur" data-testid="episode-link-action-bar">
-          <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">검토 전 Alert만 고를 수 있습니다</span></strong>
+          <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">처리 전 Alert만 고를 수 있습니다</span></strong>
           <Select value={target} onValueChange={setTarget}>
             <SelectTrigger size="sm" className="w-52" aria-label="Episode 연결 방식"><SelectValue /></SelectTrigger>
             <SelectContent>

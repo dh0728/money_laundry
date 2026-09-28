@@ -21,7 +21,7 @@ export function institutionCards(data: DashboardData): SectionCardItem[] {
   return [
     { label: '오늘 유입 Alert', value: fmt(today?.inflow ?? 0), delta: today && yesterday ? pct(today.inflow, yesterday.inflow) : undefined, trend: '전일 대비', note: '모델이 의심으로 판별한 신규 건' },
     { label: '30일 처리율', value: `${rate(last30)}%`, delta: prev30.length ? Math.round((rate(last30) - rate(prev30)) * 10) / 10 : undefined, unit: '%p', trend: '직전 30일 대비', note: '종결 ÷ 유입' },
-    { label: '미처리 Alert', value: fmt(data.alertsByStatus.OPEN), trend: '검토 전 상태', note: '종결·심층 조사로 넘기지 않은 Alert' },
+    { label: '미처리 Alert', value: fmt(data.alertsByStatus.OPEN), trend: '처리 전 상태', note: '아직 판정하지 않은 Alert' },
     { label: '3일 이상 경과', value: fmt(data.openAlertsAgedOver3Days ?? 0), trend: '우선 처리 대상', note: '미처리 중 3일 이상 경과' },
   ]
 }

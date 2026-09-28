@@ -60,3 +60,15 @@ describe('주소와 문구', () => {
     expect(josa('한검토', '이', '가')).toBe('가')
   })
 })
+
+describe('처리 상태 (9/28 표현 통일)', async () => {
+  const { alertWorkStatus, episodeWorkStatus } = await import('@/lib/workStatus')
+  it('Alert는 처리 전·중·완료로, Episode로 보낸 Alert는 처리 중으로 본다', () => {
+    expect(['OPEN', 'ESCALATED', 'CLOSED'].map(s => alertWorkStatus(s as 'OPEN'))).toEqual(['PENDING', 'IN_PROGRESS', 'DONE'])
+  })
+  it('Episode는 조사 중이면 처리 중, 검수를 넘기거나 종결하면 처리 완료다', () => {
+    expect(episodeWorkStatus('OPEN')).toBe('IN_PROGRESS')
+    expect(episodeWorkStatus('OPEN', true)).toBe('DONE')
+    expect(episodeWorkStatus('CLOSED')).toBe('DONE')
+  })
+})

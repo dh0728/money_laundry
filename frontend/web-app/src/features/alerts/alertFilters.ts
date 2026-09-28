@@ -1,5 +1,6 @@
 import type { AlertRow } from '@/api/alerts'
-import { alertStatusLabels, typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
+import { alertWorkStatus, workStatusLabels } from '@/lib/workStatus'
+import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 
 // v24 Lists.tsx의 목록 필터. mock은 전체 행을 가지고 있어 브라우저에서 거른다.
 // 실제 API로 바꿀 때는 같은 조건을 AlertQuery(status·typeClass·assigneeId·from/to)로 넘긴다.
@@ -65,7 +66,7 @@ function matchesOne(row: AlertRow, filter: AlertFilter) {
 export function filterLabel(filter: AlertFilter, assigneeName: (userId: number) => string, meId: number) {
   const name = filterFieldNames[filter.field]
   switch (filter.field) {
-    case 'status': return `${name}: ${alertStatusLabels[filter.value]}`
+    case 'status': return `${name}: ${workStatusLabels[alertWorkStatus(filter.value)]}`
     case 'type': return `${name}: ${typeDisplay(filter.value).label}`
     case 'assignee': return `${name}: ${filter.value === meId ? '내 담당' : assigneeName(filter.value)}`
     case 'age': return `${name}: ${filter.value}일 이상`

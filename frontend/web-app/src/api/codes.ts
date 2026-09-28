@@ -26,11 +26,6 @@ const typeLabels: Record<TypeCode, { key: string; label: string }> = {
 
 export const typeDisplay = (code: TypeCode) => typeLabels[code]
 
-export const alertStatusLabels: Record<AlertStatus, string> = {
-  OPEN: '검토 전',
-  ESCALATED: '심층 조사',
-  CLOSED: '종결',
-}
 
 // 종결 결과의 NORMAL은 "정상 거래로 판단"이라 유형 코드 0과 다르다.
 export const alertResolutionLabels: Record<AlertResolution, string> = {
@@ -41,8 +36,3 @@ export const alertResolutionLabels: Record<AlertResolution, string> = {
 
 /** 모델 점수(0~1)를 소수 둘째 자리까지 표시 */
 export const formatScore = (score: number) => score.toFixed(2)
-
-export const episodeStatusLabels: Record<EpisodeStatus, string> = {
-  OPEN: '조사 중',
-  CLOSED: '종결',
-}

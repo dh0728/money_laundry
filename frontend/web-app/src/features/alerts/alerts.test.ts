@@ -41,7 +41,7 @@ describe('Episode로 묶기', () => {
     expect(episodeLinkReducer(state, { type: 'complete' })).toEqual(initialLinkState)
   })
 
-  it('검토 전 Alert만 연결하고 새 Episode 번호를 겹치지 않게 만든다', () => {
+  it('처리 전 Alert만 연결하고 새 Episode 번호를 겹치지 않게 만든다', () => {
     const closed = rows.find(r => r.status === 'CLOSED')!
     const open = rows.find(r => r.status === 'OPEN')!
     const id = nextEpisodeId(rows)

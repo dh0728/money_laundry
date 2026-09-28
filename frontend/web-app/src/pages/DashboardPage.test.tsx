@@ -13,7 +13,7 @@ describe('대시보드 · 내 담당', () => {
   it('API 상태 3종을 3열로 보여 준다', async () => {
     render(<DashboardPage />)
     const columns = await screen.findAllByTestId('work-status-column')
-    expect(columns.map(column => within(column).getAllByText(/검토 전|심층 조사|종결/)[0].textContent)).toEqual(['검토 전', '심층 조사', '종결'])
+    expect(columns.map(column => within(column).getAllByText(/처리 전|처리 중|처리 완료/)[0].textContent)).toEqual(['처리 전', '처리 중', '처리 완료'])
   })
 
   it('점수를 0~1 소수 둘째 자리로 보여 준다', async () => {

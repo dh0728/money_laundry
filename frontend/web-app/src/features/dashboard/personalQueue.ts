@@ -9,7 +9,7 @@ export const personalSorts = {
 } as const
 export type PersonalSort = keyof typeof personalSorts
 
-// API 상태 3종(OPEN·ESCALATED·CLOSED)을 그대로 3열로 둔다
+// API 상태 3종(OPEN·ESCALATED·CLOSED)을 처리 전·처리 중·처리 완료 3열로 둔다(lib/workStatus.ts)
 export const personalColumns: AlertStatus[] = ['OPEN', 'ESCALATED', 'CLOSED']
 
 export const sortAlerts = (alerts: AlertRow[], sort: PersonalSort) => alerts.slice().sort(personalSorts[sort].compare)
