@@ -69,6 +69,22 @@ public class AnalysisService {
   }
 
   private long register(LocalDate scheduledDay) {
+    return register(scheduledDay, null);
+  }
+
+  public long registerDemo(LocalDate businessDay) {
+    return registerDemo(businessDay, LocalDate.now(clock.withZone(zone)));
+  }
+
+  public long registerDemo(LocalDate businessDay, LocalDate currentBusinessDay) {
+    if (businessDay == null
+        || currentBusinessDay == null
+        || !businessDay.isBefore(currentBusinessDay))
+      throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DEMO_DATE", "과거 거래 기준일을 선택하세요.");
+    return register(null, businessDay);
+  }
+
+  private long register(LocalDate scheduledDay, LocalDate demoBusinessDay) {
     return tx.execute(
         status -> {
           receiptLock();
@@ -76,7 +92,42 @@ public class AnalysisService {
               scheduledDay == null
                   ? clock.instant()
                   : scheduledDay.atTime(this.cutoff).atZone(zone).toInstant();
-          LocalDate day = cutoff.atZone(zone).toLocalDate();
+          LocalDate day =
+              demoBusinessDay == null
+                  ? cutoff.atZone(zone).toLocalDate()
+                  : demoBusinessDay.plusDays(1);
+          if (demoBusinessDay != null) {
+            if (jdbc.queryForObject(
+                    "select count(*) from batch_jobs where job_type='ANALYSIS' and status<>'COMPLETED'",
+                    Integer.class)
+                > 0)
+              throw new ApiException(
+                  HttpStatus.CONFLICT, "DEMO_PREVIOUS_JOB_PENDING", "이전 분석을 완료하거나 실패 작업을 재개하세요.");
+            if (jdbc.queryForObject(
+                    "select count(*) from batch_jobs where job_type='ANALYSIS' and analysis_date>?",
+                    Integer.class,
+                    day)
+                > 0)
+              throw new ApiException(
+                  HttpStatus.CONFLICT, "DEMO_DATE_OUT_OF_ORDER", "이미 처리한 날짜보다 이전으로 돌아갈 수 없습니다.");
+            if (jdbc.queryForObject(
+                    "select count(*) from batch_jobs where job_type='INGEST' and received_at is not null and (business_date>? or business_date is null)",
+                    Integer.class,
+                    demoBusinessDay)
+                > 0)
+              throw new ApiException(
+                  HttpStatus.CONFLICT,
+                  "DEMO_FUTURE_INPUT",
+                  "선택한 날짜보다 뒤의 수신 자료가 있습니다. 날짜순 시연 DB를 사용하세요.");
+            if (jdbc.queryForObject(
+                    "select count(*) from batch_jobs where job_type='INGEST' and business_date=? and received_at<=?",
+                    Integer.class,
+                    demoBusinessDay,
+                    Timestamp.from(cutoff))
+                == 0)
+              throw new ApiException(
+                  HttpStatus.CONFLICT, "DEMO_INPUT_REQUIRED", "선택한 날짜의 파일을 먼저 전송하세요.");
+          }
           var existing =
               jdbc.queryForList(
                   "select status from batch_jobs where job_type='ANALYSIS' and analysis_date=?",

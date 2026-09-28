@@ -345,6 +345,7 @@ public class AnalysisRunService {
                 id,
                 run);
           }
+          new AlertInputSnapshot(jdbc).freeze(run, cutoff);
           jdbc.update(
               "update batch_jobs set current_run_id=?,row_count=? where job_id=?",
               run,

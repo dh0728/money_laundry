@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "spring.profiles.active=local")
+@org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class AnalysisEntryTests {
@@ -21,11 +22,20 @@ class AnalysisEntryTests {
 
   @Test
   void 분석_등록과_날짜중복을_구분한다() throws Exception {
-    mvc.perform(post("/api/v1/batch-jobs/analysis"))
+    mvc.perform(
+            post("/api/v1/batch-jobs/analysis")
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.csrf()))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.jobId").isNumber())
         .andExpect(jsonPath("$.status").value("QUEUED"));
-    mvc.perform(post("/api/v1/batch-jobs/analysis")).andExpect(status().isConflict());
+    mvc.perform(
+            post("/api/v1/batch-jobs/analysis")
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.csrf()))
+        .andExpect(status().isConflict());
   }
 
   @Test
