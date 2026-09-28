@@ -52,9 +52,9 @@ describe('앱 틀', () => {
     expect(await screen.findByRole('combobox', { name: '판정' })).toHaveTextContent('정상 · 종결')
   })
 
-  it('앱 머리에 지금 데이터가 mock인지 보여 준다', () => {
+  it('앱 머리에는 전체 데이터의 출처를 단정하는 배지를 두지 않는다', () => {
     renderSignedIn()
-    expect(within(screen.getByTestId('header-actions')).getByText('mock 데이터')).toBeInTheDocument()
+    expect(within(screen.getByTestId('header-actions')).queryByText(/mock|실제 API/)).not.toBeInTheDocument()
   })
 
   it('RDR 9000을 닫고 다시 열 수 있으며, 화면 이동에도 패널 상태가 유지된다', async () => {
@@ -114,6 +114,8 @@ describe('앱 틀', () => {
   it('알림을 읽음 처리하고 사건으로 이동하며, 전역 검색에서도 찾는다', async () => {
     writeMemory('notifications:read', [])
     renderSignedIn()
+    expect(await screen.findByLabelText('안 읽은 알림 7건 · mock 데이터')).toBeInTheDocument()
+    expect(await screen.findByLabelText(/내 미처리 업무 \d+건 · mock 데이터/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^알림$/ }))
     const first = await screen.findByRole('button', { name: 'A-3000 알림 열기' })
     expect(within(first).getByText('NON_PATTERN')).toBeInTheDocument()
@@ -121,6 +123,7 @@ describe('앱 틀', () => {
     expect(within(first).queryByText(/NORMAL ·/)).not.toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'A-3000 읽음으로 표시' }))
     expect(screen.getByRole('heading', { name: '읽음 1' })).toBeInTheDocument()
+    expect(screen.getByLabelText('안 읽은 알림 6건 · mock 데이터')).toBeInTheDocument()
     const search = screen.getByRole('combobox', { name: '전역 검색' })
     fireEvent.focus(search)
     fireEvent.change(search, { target: { value: '검수 결과' } })

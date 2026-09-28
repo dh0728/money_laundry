@@ -4,7 +4,6 @@
 //   planned  : 준비 중. 설계만 있고 화면이 아직 없다.
 import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { live } from '@/lib/apiMode'
 
 export type Provenance = 'mock' | 'proposal' | 'planned'
 
@@ -35,11 +34,4 @@ export function PlannedBlock({ children }: { children: ReactNode }) {
       <p>{children}</p>
     </div>
   )
-}
-
-/** 앱 머리: 지금 보이는 데이터가 mock인지 실제 API인지 */
-export function DataModeBadge() {
-  return live
-    ? <Badge variant="outline" data-provenance="live" className="provenance-badge font-normal" title="Backend API에서 데이터를 불러오는 중입니다.">실제 API</Badge>
-    : <ProvenanceBadge kind="mock" title="서버 없이 시연용 mock 데이터로 동작합니다. 처리 결과는 새로고침하면 처음 상태로 돌아갑니다." />
 }

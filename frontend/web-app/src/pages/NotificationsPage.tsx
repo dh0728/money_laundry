@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useMemoryState } from '@/lib/memory'
 import { useAsync } from '@/lib/useAsync'
-import { live } from '@/lib/apiMode'
+import { ProvenanceBadge } from '@/components/Provenance'
 import { loadMockNotifications, type NotificationItem } from '@/mocks/notifications'
 
 type SortOrder = 'none' | 'desc' | 'asc'
@@ -47,7 +47,7 @@ function NotificationColumn({ label, items, order, onOrder, onOpen, read, onTogg
 }
 
 export default function NotificationsPage({ onOpen }: { onOpen: (item: NotificationItem) => void }) {
-  const { state, retry } = useAsync(() => live ? Promise.resolve([]) : loadMockNotifications(), [])
+  const { state, retry } = useAsync(() => loadMockNotifications(), [])
   const [read, setRead] = useMemoryState<string[]>('notifications:read', [])
   const [query, setQuery] = useState('')
   const [range, setRange] = useState<DateRange>()
@@ -63,14 +63,14 @@ export default function NotificationsPage({ onOpen }: { onOpen: (item: Notificat
   const open = (item: NotificationItem) => { setRead(current => current.includes(item.id) ? current : [...current, item.id]); onOpen(item) }
 
   return <div className="space-y-4">
-    <PageHeading title="알림" description="배정과 연결, 조사 의견, 검수 결과를 확인합니다." />
+    <PageHeading title="알림" description="배정과 연결, 조사 의견, 검수 결과를 확인합니다." badge={<ProvenanceBadge kind="mock" />} />
     {state.status === 'loading' ? <LoadingBlock label="알림" /> : state.status === 'error' ? <ErrorBlock message={state.message} onRetry={retry} /> : <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-72 max-w-full"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="알림 검색" className="h-9 pl-9 text-xs" placeholder="내용·Alert·Episode ID 검색" value={query} onChange={event => setQuery(event.target.value)} /></div>
         <DateRangeButton value={range} onChange={setRange} today={new Date(2026, 8, 26)} />
         <Button variant="ghost" size="sm" className="ml-auto" disabled={items.every(item => read.includes(item.id))} onClick={() => setRead(items.map(item => item.id))}><Check className="size-3.5" />모두 읽음 처리</Button>
       </div>
-      {visible.length === 0 ? <p className="rounded-lg border py-16 text-center text-sm text-muted-foreground"><Bell className="mx-auto mb-4 size-7" />{live ? '서버 알림 연결 전입니다.' : items.length ? '조건에 맞는 알림이 없습니다.' : '표시할 알림이 없습니다.'}</p>
+      {visible.length === 0 ? <p className="rounded-lg border py-16 text-center text-sm text-muted-foreground"><Bell className="mx-auto mb-4 size-7" />{items.length ? '조건에 맞는 알림이 없습니다.' : '표시할 알림이 없습니다.'}</p>
         : <div className="grid gap-6 @5xl:grid-cols-2" data-testid="notification-list">
           <NotificationColumn label="안 읽음" items={unread} order={unreadOrder} onOrder={() => setUnreadOrder(nextOrder)} onOpen={open} read={false} onToggle={toggle} />
           <NotificationColumn label="읽음" items={readItems} order={readOrder} onOrder={() => setReadOrder(nextOrder)} onOpen={open} read onToggle={toggle} />
