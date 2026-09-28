@@ -195,7 +195,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 | 코드 | 코드명 (정본) | 데이터셋 원명 | 한글 설명 `[미정: FE 표시 명칭 — 초안]` |
 |---|---|---|---|
-| 0 | `NORMAL` | — | 패턴아님 (정상 + 패턴 외 세탁 병합) |
+| 0 | `NORMAL` (현행 wire 이름; §7.2 참조) | — | 패턴아님. 이진 정상 여부·사람 종결과 별개. `NON_PATTERN` 통일 요청은 미구현 |
 | 1 | `FAN-OUT` | FAN-OUT | 분산 송금 (1→N) |
 | 2 | `FAN-IN` | FAN-IN | 집중 수취 (N→1) |
 | 3 | `G-SCATTER` | GATHER-SCATTER | 모아서 뿌리기 (N→1→M) |
@@ -297,15 +297,137 @@ Episode 업무는 V10과 공통 review 컨트롤러로 구현했다. 승인된 �
 - **GET /api/alerts/{id}/history**, **GET /api/episodes/{id}/history** — Episode 이력은 소속 Alert의 ESCALATE/LINK/UNLINK 행을 포함.
 - **GET /api/history?actor={userId}** [ADMIN·본인] — 사용자별 처리 이력(기획서 요구, 11월 [권한관리]에서 구현, 시그니처 예약).
 
-## 6.5 대시보드
+## 6.5 대시보드 — FE 연결용 현행 계약
 
-승인된 개인/기관 지표·집계 범위는 §9.2를 따른다. 예전 처리 흐름 4칸·감소율 중심 응답은 현 화면 계약으로 사용하지 않는다. GET /api/v1/dashboard의 로컬 시연 응답은 §9.8을 따른다.
+2026-09-28 코드 대조 기준. 아래는 로컬 구현 계약이며 dev 배포 완료를 뜻하지 않는다. `GET /api/dashboard/summary`는 현재 구현 경로가 아니다. 화면 요구는 §9.2, Episode 업무 지표 상세는 §9.10을 따른다.
+
+### 요청과 접근 범위
+
+```http
+GET /api/v1/dashboard?from=2023-09-01&to=2023-09-10
+X-Demo-User-Id: 1
+```
+
+- 직원 ID는 `GET /api/v1/demo/users`의 실제 응답에서 선택한다. 예시의 1을 고정 계정으로 가정하지 않는다.
+- **local 전용**. dev/prod 및 혼합 프로파일은 `403 DEMO_CONTROL_DISABLED`. 임시 헤더는 운영 인증이 아니다. web-app의 dev 연결에는 별도 인증·접근 계약과 구현이 필요하다.
+- `from`, `to`: 필수 YYYY-MM-DD. from≤to, to≤from.plusYears(2). KST 시작일00시 이상/종료일 다음00시 미만.
+- 개인 집계의 주체는 헤더 직원. 기관 집계는 전체 직원 기준.
+- ‘오늘’, ‘어제’, 경과시간은 `businessAt`의 시연 업무 시각 기준. FE의 PC 현재 시각으로 대체하지 않는다.
+- §0의 일반 표기와 달리 이 응답 일부 키는 아래와 같이 snake_case다. 시각에는 `Z` 등 오프셋 표현이 포함될 수 있으므로 파싱 후 KST로 표시한다. 문서에서 임의로 필드명을 바꾸지 않는다.
+
+### 응답 필드
+
+아래 경로가 실제 응답 키다. 건수는 number이며 결과 없는 목록은 빈 배열이다.
+
+| 필드 | 타입 / 의미 | 기간 조건 |
+|---|---|---|
+| businessAt | string, 기준 업무 시각 | 해당 없음 |
+| personal.pending | number, 본인 담당 OPEN Alert+Episode | 현재 전체 |
+| personal.aged | number, 위 건 중 배정 후72시간 이상 | 현재 전체 |
+| personal.closed | number, 본인 담당이며 본인이 종결한 사건 | 종결 업무 시각 |
+| institution.alerts / episodes | number, 현재 OPEN Alert / Episode | 현재 전체 |
+| institution.aged | number, OPEN Alert+Episode 중 배정 후72시간 이상 | 현재 전체 |
+| institution.today / yesterday | number, 오늘/어제 생성된 Alert | 선택 기간 무관 |
+| detection.received | number, 오늘 분석 업무 대상 거래일들의 수신·통합 원장 거래 수 | 선택 기간 무관 |
+| detection.analyzed / suspicious | number, 위 거래 중 오늘 완료된 최신 유효 점수가 있는 거래 / 그중 이진 임계 이상 거래 | 선택 기간 무관 |
+| deliveryDate | string, 대상 거래일. 복수이면 쉼표로 연결 | 선택 기간 무관 |
+| pendingReports | number, 대상 거래일의 처리·통합 미완료 보고 집계 | 선택 기간 무관 |
+| daily | array of {day: YYYY-MM-DD, incoming: number, completed: number} | Alert 생성/종결 업무일. 0건 날짜도 포함 |
+| agreements | array of {agreement: string, count: number} | 최신 유효 점수의 탐지 업무일 |
+| types | array of {type: number, count: number} | 최신 유효 점수의 탐지 업무일, 이진 의심 거래만 |
+| activities | array of {event_id: number, case_id: number, action: string, comment: string, business_at: timestamp} | 본인 활동 업무 시각, 최근20건 |
+| priority | array of {case_id: number, kind: ALERT/EPISODE, alert_id: number 또는 null, created_at: timestamp, risk: number} | 본인 현재 OPEN, 위험도 내림차순·생성시각·ID순 최대10건 |
+| episodeWork | object, 아래 구조 및 §9.10 | 항목별 구분 |
+
+`episodeWork` 전체 구조:
+
+- `asOf`: 업무 시각 문자열.
+- `current`: `open`, `aged`, `unreviewed`, `created_today`, `closed_today` 각 number. 현재/오늘 집계이며 기간 필터 미적용.
+- `firstReview`, `completion`: 각각 `{samples: number, average_seconds: number 또는 null}`. 선택 기간의 최초 검토/종결 집계이며 표본0이면 평균null.
+- `oldestOpen`: `[{caseId: number, assignee: string, age_seconds: number, awaiting_review: boolean}]`, 오래된 배정순 최대20건.
+
+`case_id`/`caseId`는 조사 사건 ID이며 원본 `alert_id`/`alertId`와 다르다. priority의 Episode는 alert_id가 null일 수 있다.
+
+### 차트·카드 의미
+
+- `daily.incoming`은 새 Alert 사건 수이고 새 근거 버전 수가 아니다. `completed`는 조사 업무 종결 건수이며 정상 판정만 세는 값이 아니다. 당일 유입 건들이 당일 종결됐다는 뜻도 아니다.
+- `types`는 **의심 거래 건수**다. `alertsByType`이라는 이름으로 Alert 건수처럼 표시하지 않는다. 유형 분포는 가로 막대그래프다.
+- 도넛은 **전체 분석 거래**의 모델 조합 분포다. `STRONG`=이진 의심+패턴 있음, `ATYPICAL`=이진 의심+패턴 없음, `PATTERN_ONLY`=이진 정상+패턴 있음, `WEAK`=이진 정상+패턴 없음. 패턴 없음은 최다 확률 클래스0, 동률이면 작은 코드 우선이다. 미분석은 네 범주에 넣지 않는다.
+- agreements/types는 실제 있는 범주만 반환한다. FE는 누락 범주를0으로 채울 수 있다. 도넛 분모는 agreements의 count 합이며0이면 데이터 없음이다.
+- 오늘 탐지율은 suspicious / received다. 미분석을 분모에서 제외하지 않는다. 분모0 또는 보고 처리 미완료 시 최종 비율을 표시하지 않는다. 상세 수신·점수 기준은 §9.8을 따른다.
+- Alert 전일 대비는 (today−yesterday)/yesterday×100. yesterday=0이면 ‘—’. 기간 밖의 오늘/어제를 daily 배열에서 추정하지 않고 institution을 사용한다.
+- **30일 처리율은 사용자 결정으로 제외했다.** ‘패턴 있음/패턴 외 묶음/패턴 외 단일’ 도넛도 현행 화면 요구가 아니다.
+- `openAlertsAgedOver3Days`는 아직 없다. institution.aged는 Alert+Episode 합계이므로 대신 사용하면 안 된다. Alert만 별도 제공하려면 추가 구현이 필요하다.
 
 ## 7. 화면별 제공 항목
 
 §9.2가 현행 화면 요구다. HTML은 배치 참고이며 사용자 결정이 우선한다. 네 화면의 구현 여부와 계약 확정 여부를 구분한다. 정식 인증·React 연동·학습 모델 연결 완료를 임시 Streamlit 시연과 혼동하지 않는다.
 
+### 7.1 거래 탐색 — FE 연결용 현행 계약
+
+소유주→계좌→거래를 한 화면에 배치하되 선택에 따라 아래 세 목록을 각각 조회한다. `GET /api/v1/transactions/explorer`와 전체 세 배열 일괄 응답은 현재 구현돼 있지 않다.
+
+```http
+GET /api/v1/ledger/owners?from=2023-09-01&to=2023-09-10&page=0&size=20
+GET /api/v1/ledger/accounts?from=2023-09-01&to=2023-09-10&owner={ownerId}&page=0&size=20
+GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId}&page=0&size=20
+```
+
+**local 전용**이며 dev/prod에서는 403 DEMO_CONTROL_DISABLED다. 이 세 GET은 현재 X-Demo-User-Id를 요구하지 않는다. 운영 인증 완료로 해석하지 않는다.
+
+| 쿼리 | 현행 동작 |
+|---|---|
+| from, to | 각각 선택값, YYYY-MM-DD KST 거래 발생일. 둘 다 있으면 from≤to. from00시 이상/to 다음날00시 미만. 서버 최대 기간 제한은 현재 없음 |
+| owner, account | 선택 가명 UUID. 위 예시처럼 선택 단계에 전달 |
+| judgement | 복수 허용: SUSPICIOUS,NORMAL,UNANALYZED. 사람 판정이 아닌 최신 유효 모델 점수 기준 |
+| payments | 복수 결제 수단, 최대30개. `/api/v1/review/payment-formats`의 실제 값 사용 |
+| page, size | page≥0, size1~200. 기본0/20 |
+
+복수값은 `judgement=SUSPICIOUS&judgement=NORMAL`처럼 반복 전달할 수 있다. 같은 종류는 OR, 다른 필터는 AND. 세 목록에 동일 기간·판정·결제 필터를 전달해야 상위 목록도 조건에 맞는 거래가 있는 항목만 보여준다. 서버 필수 기간으로 바뀐 것은 아니지만 FE에서는 기본 기간을 지정해 조회하는 것을 권장한다.
+
+모든 응답은 `{content: [...], page, size, totalElements, totalPages}`다. owners/accounts는 id순, transactions는 occurredAt 내림차순·txId순. §0의 일반 sort 파라미터는 이 API에서 지원하지 않는다. 빈 결과는200+빈 content, totalPages=0이다.
+
+| 목록 | content 항목의 실제 필드 |
+|---|---|
+| owners | `{id: UUID}`. name 필드 없음 |
+| accounts | `{id: UUID, ownerId: UUID, bankId: number}`. 계좌번호·은행 표시명 필드 없음 |
+| transactions | 아래 필드 표 참조 |
+
+| 거래 필드 | 타입·의미 |
+|---|---|
+| txId | number, 거래 ID |
+| occurredAt | timestamp, 거래 시각. txAt이라는 키가 아님. 오프셋을 해석해 KST 표시 |
+| fromAccountId, toAccountId | UUID string, 송·수취 가명 계좌 |
+| fromOwnerId, toOwnerId | UUID string, 송·수취 가명 소유주 |
+| fromBankId, toBankId | number, 은행 코드 |
+| amountPaid, amountReceived | number, 송금액·수취액 |
+| paymentCurrency, receivingCurrency | string, 각 금액의 통화 |
+| paymentFormat | string, 결제 수단 |
+| launderingScore, threshold | number 또는 null, 이진 점수·해당 분석 임계값 |
+| isSuspicious | boolean 또는 null. 미분석은 null이며 false로 바꾸지 않음 |
+| typeClass | number0~8 또는 null, 패턴 최다 확률 코드 |
+| typeName | string, 점수 있을 때 제공. 코드0은 현재 ‘패턴아님’. 미분석에서는 키가 없을 수 있음 |
+| probabilities | 9개 원소 배열, 코드0~8 순서. 미분석은 null 원소 배열이며0점 배열이 아님 |
+| judgement | SUSPICIOUS / NORMAL / UNANALYZED |
+
+최신 유효 점수는 완료된 분석/유효 run 기준이며 미완료 결과를 노출하지 않는다. 수신·통합 ACTIVE 원장의 정상·의심·미분석을 모두 조회한다.
+
+소유주·계좌는 **가명 식별자로 시연**한다. UUID를 원문 이름/계좌번호로 해석하지 않는다. FE는 ‘소유주 …’, ‘계좌 …’ 형태로 표시할 수 있으나 요청 식별자는 전체 UUID를 유지한다. 원문 공개는 별도 권한 계약 대상이다.
+
+**아직 반환하지 않는 요청 필드:** `name`, `amountUsd`, `alertIds`, `episodeIds`. §0의 일반 USD 병기 원칙과 달리 현 원장 조회 응답에는 amountUsd가 없다. 이 목록을 구현 완료로 해석하지 않는다. 소속 ID 추가 시 최초 자동 구성 소속/현재 조사 범위/과거 이관 이력 중 어떤 관계인지, 제외 거래·종결 사건 포함 여부와 caseId/alertId 구분을 확정해야 한다.
+
+### 7.2 유형 코드0의 의미와 현행 이름 차이
+
+코드0은 **패턴 없음**이며 이진 정상 판정이나 사람의 정상 종결과 다르다. 의심 거래 목록에서 이진 의심+코드0이면 ‘패턴 없는 의심 거래’로 표시할 수 있다. 전체 거래에서 코드0만 보고 의심이라고 표시하면 안 된다.
+
+- SuspiciousTransactionService: 현재 `typeName` 및 유형 목록 `name`에 코드0=`NORMAL`을 반환한다.
+- LedgerQueryService/CaseSummary: 코드0 표시명은 현재 `패턴아님`이다.
+- FE 요청의 `NON_PATTERN` 통일은 **미구현 변경 요청**이다. 이번 문서 갱신으로 실제 응답이 바뀌지 않는다. 숫자 코드를 기준으로 표시하고 이름 문자열을 판정 로직에 사용하지 않는다.
+- 사람의 `decision/outcome/resolution: NORMAL`은 별도 업무 판단이며 이름 변경 대상과 혼동하지 않는다.
+
 ## 8. 미결 목록
+
+FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 따른다. 후속 구현 대상은 코드0 이름 통일, Alert만의72시간 경과 집계, 원장 조회 누락 필드와 소속 의미, dev용 인증·접근 계약이다. 기존 결정과 다른 30일 처리율·3분류 도넛은 자동 추가하지 않는다.
 
 현재 화면/조사 구현 계약과 후속 범위는 §9.8을 따른다. 실제 모델 피처·확률 합/dtype·설명 정보 계약과 정식 인증은 각 해당 태스크에서 확인한다. 과거 단일 Alert 소속·처분 거래 무조건 제외·부분 이관 불가를 미결 또는 확정 조건으로 되살리지 않는다.
 
