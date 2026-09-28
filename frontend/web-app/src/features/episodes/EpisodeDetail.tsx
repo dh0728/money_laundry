@@ -53,7 +53,7 @@ export default function EpisodeDetail({ episode, transactions, history, responsi
         </div>
       </header>
 
-      <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '자금 흐름' }, { value: 'transactions', label: `거래 ${transactions.length}` }, { value: 'review', label: '조사 의견' }]} />
+      <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '그래프' }, { value: 'transactions', label: '거래', count: transactions.length }, { value: 'review', label: '조사 의견' }]} />
 
       {tab === 'overview' && (
         <div className="space-y-4" data-testid="overview">

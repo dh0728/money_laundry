@@ -2,12 +2,12 @@ import { ArrowLeftRight, Bell, FolderSearch, LayoutDashboard, Settings, Siren } 
 
 export type Page = 'dashboard' | 'transactions' | 'alerts' | 'episodes' | 'notifications' | 'settings' | 'account'
 
-// v24 App.tsx 메뉴 구성
+// v24 App.tsx 메뉴 구성. 이름은 한국어 화면에 맞춘다(2026-09-28). 화면 안의 큰 제목은 두지 않고 메뉴 이름이 제목 역할을 한다.
 export const mainNav = [
-  { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
-  { id: 'transactions', name: 'Transactions', icon: ArrowLeftRight },
-  { id: 'alerts', name: 'Alerts', icon: Siren },
-  { id: 'episodes', name: 'Episodes', icon: FolderSearch },
+  { id: 'dashboard', name: '대시보드', icon: LayoutDashboard },
+  { id: 'transactions', name: '거래 내역', icon: ArrowLeftRight },
+  { id: 'alerts', name: 'Alert 목록', icon: Siren },
+  { id: 'episodes', name: 'Episode 목록', icon: FolderSearch },
 ] as const
 export const utilityNav = [
   { id: 'notifications', name: '알림', icon: Bell },

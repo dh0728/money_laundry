@@ -22,9 +22,9 @@ import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page
 
 const pageTitles: Record<Page, string> = {
   dashboard: '대시보드',
-  transactions: 'Transactions',
-  alerts: 'Alerts',
-  episodes: 'Episodes',
+  transactions: '거래 내역',
+  alerts: 'Alert 목록',
+  episodes: 'Episode 목록',
   notifications: '알림',
   settings: '설정',
   account: '계정',

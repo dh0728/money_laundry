@@ -53,11 +53,19 @@ export function DataTable<TData>({
     observer.observe(body);
     return () => observer.disconnect();
   }, [tableWidth, topHorizontalScroll]);
+  // AML RADAR: 송금(소유주·계좌)·수취(소유주·계좌)처럼 묶인 열은 묶음이 바뀌는 자리의 왼쪽에 무채색 구분선을 긋는다
+  const leafColumns = table.getVisibleLeafColumns();
+  const groupStarts = new Set(
+    leafColumns
+      .filter((column, i) => i > 0 && (columnGroups?.[column.id] ?? null) !== (columnGroups?.[leafColumns[i - 1].id] ?? null))
+      .map(column => column.id),
+  );
   const columnClass = (columnId: string, index: number) => {
     const group = columnGroups?.[columnId];
-    if (group === "sender") return "bg-muted/15";
-    if (group === "receiver") return "bg-muted/30";
-    return separatedColumns ? cn(index % 2 ? "bg-muted/10" : "bg-card/70") : undefined;
+    const boundary = groupStarts.has(columnId) ? "border-l border-l-foreground/20" : undefined;
+    if (group === "sender") return cn("bg-muted/15", boundary);
+    if (group === "receiver") return cn("bg-muted/30", boundary);
+    return cn(separatedColumns ? (index % 2 ? "bg-muted/10" : "bg-card/70") : undefined, boundary);
   };
   return (
     <div

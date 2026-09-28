@@ -15,7 +15,8 @@ const renderSignedIn = () => {
 describe('앱 틀', () => {
   it('처음에는 대시보드를 연다', () => {
     renderSignedIn()
-    expect(screen.getByRole('heading', { level: 1, name: '대시보드' })).toBeInTheDocument()
+    // 화면 안의 큰 제목 대신 사이드바 메뉴 선택과 대시보드 탭으로 알 수 있다
+    expect(screen.getByRole('tab', { name: '내 담당' })).toBeInTheDocument()
   })
 
   it('아직 옮기지 않은 메뉴는 준비 중으로 보여 준다', async () => {
@@ -26,14 +27,14 @@ describe('앱 틀', () => {
 
   it('Episodes 메뉴는 Episode 목록을 연다', async () => {
     renderSignedIn()
-    fireEvent.click(screen.getByRole('button', { name: 'Episodes' }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Episode 목록' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Episode 목록' }))
+    expect(await screen.findByRole('textbox', { name: 'Episode 검색' })).toBeInTheDocument()
   })
 
   it('Alerts 메뉴는 내 담당 Alert 목록을 연다', async () => {
     renderSignedIn()
-    fireEvent.click(screen.getByRole('button', { name: 'Alerts' }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Alert 목록' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Alert 목록' }))
+    expect(await screen.findByRole('textbox', { name: 'Alert 검색' })).toBeInTheDocument()
     expect(await screen.findByText('담당자: 내 담당')).toBeInTheDocument()
   })
 
@@ -50,11 +51,6 @@ describe('앱 틀', () => {
   it('앱 머리에 지금 데이터가 mock인지 보여 준다', () => {
     renderSignedIn()
     expect(within(screen.getByTestId('header-actions')).getByText('mock 데이터')).toBeInTheDocument()
-  })
-
-  it('예전 Episode 목록 골격은 메뉴에 없다', () => {
-    renderSignedIn()
-    expect(screen.queryByText('Episode 목록')).not.toBeInTheDocument()
   })
 
   it('모르는 주소는 대시보드로 보낸다', () => {

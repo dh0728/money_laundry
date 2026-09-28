@@ -14,11 +14,13 @@ export function StagePanel({ title, count, description, testId, bodyTestId, body
 }
 
 export function StageItem({ active, primary, secondary, trailing, mono = false, testId, itemRef, onSelect }: {
-  active: boolean; primary: string; secondary: string; trailing?: ReactNode; mono?: boolean; testId?: string; itemRef?: Ref<HTMLButtonElement>; onSelect: () => void
+  active: boolean; primary: string; secondary: ReactNode; trailing?: ReactNode; mono?: boolean; testId?: string; itemRef?: Ref<HTMLButtonElement>; onSelect: () => void
 }) {
-  return <button ref={itemRef} data-testid={testId} type="button" aria-pressed={active} onClick={onSelect} className="transaction-stage-item w-full rounded-lg px-3 py-3 text-left hover:bg-muted/60">
+  return <button ref={itemRef} data-testid={testId} type="button" aria-pressed={active} onClick={onSelect} className="transaction-stage-item w-full rounded-lg px-3 py-3 text-left hover:bg-(--hover-surface)">
     <span className="flex items-center justify-between gap-2"><span title={primary} className={mono ? 'block truncate font-mono text-sm' : 'block truncate text-sm font-medium'}>{primary}</span>{trailing}</span>
-    <span className="mt-1 block truncate text-[var(--text-micro-size)] text-muted-foreground" title={secondary}>{secondary}</span>
+    {typeof secondary === 'string'
+      ? <span className="mt-1 block truncate text-[var(--text-micro-size)] text-muted-foreground" title={secondary}>{secondary}</span>
+      : <span className="mt-1.5 flex flex-wrap items-center gap-1">{secondary}</span>}
   </button>
 }
 

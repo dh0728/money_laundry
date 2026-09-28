@@ -8,7 +8,7 @@ import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 import { MOCK_USER } from '@/app/session'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
-import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -19,14 +19,12 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDataTable } from '@/hooks/use-data-table'
-import { fmt } from '@/lib/format'
+import { usd } from '@/lib/format'
 import { useMemoryState } from '@/lib/memory'
 import { alertWorkStatus, workStatusLabels } from '@/lib/workStatus'
 import { ageOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
 import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget } from './episodeLink'
 
-const usd = (n: number) => `$${fmt(Math.round(n))}`
-const ageTone = (age: number) => (age >= 3 ? 'var(--destructive)' : 'var(--muted-foreground)')
 
 const baseColumns: ColumnDef<AlertRow>[] = [
   {
@@ -61,7 +59,7 @@ const baseColumns: ColumnDef<AlertRow>[] = [
       return (
         <div className="text-sm tabular-nums text-muted-foreground">
           {createdAt.slice(5, 10)}
-          <p className={`mt-1 text-xs ${ageDays >= 3 ? 'font-medium' : ''}`} style={{ color: ageTone(ageDays) }}>{ageDays === 0 ? '오늘' : `${ageDays}일 경과`}</p>
+          <p className="mt-1"><AgeBadge days={ageDays} /></p>
         </div>
       )
     },

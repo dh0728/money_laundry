@@ -28,4 +28,4 @@ export function sumBy<T>(items: T[], key: (item: T) => string, value: (item: T) 
   return [...map].map(([name, v]) => ({ name, v })).sort((a, b) => b.v - a.v)
 }
 
-export const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
+export { usd } from '@/lib/format'

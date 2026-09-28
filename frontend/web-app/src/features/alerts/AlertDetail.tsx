@@ -64,7 +64,7 @@ export default function AlertDetail({ alert, history, responsible, assigneeNotic
         {assigneeNotice && <p className="mt-3 text-xs text-muted-foreground">{assigneeNotice}</p>}
       </header>
 
-      <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '자금 흐름' }, { value: 'transactions', label: `거래 ${tx.length}` }, { value: 'review', label: '검토 의견' }]} />
+      <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '그래프' }, { value: 'transactions', label: '거래', count: tx.length }, { value: 'review', label: '검토 의견' }]} />
 
       {tab === 'overview' && (
         <div className="space-y-4" data-testid="overview">
@@ -99,7 +99,7 @@ export default function AlertDetail({ alert, history, responsible, assigneeNotic
           <div className="grid items-stretch gap-4 @3xl:grid-cols-3">
             <Panel title="묶음 근거" description="이 거래들이 한 Alert가 된 이유" testId="grouping">
               <ul className="space-y-2 text-xs">
-                {alert.groupingBasis.map(b => <li key={`${b.basis}-${b.value}`} className="flex gap-2"><Badge variant="outline" className="font-normal">{basisLabels[b.basis]}</Badge><span className="min-w-0 truncate">{b.value}</span></li>)}
+                {alert.groupingBasis.map(b => <li key={`${b.basis}-${b.value}`} className="flex items-center gap-2"><Badge variant="outline" className="font-normal">{basisLabels[b.basis]}</Badge><span className="min-w-0 truncate">{b.value}</span></li>)}
               </ul>
               <p className="mb-2 mt-5 text-xs text-muted-foreground">유형 구성비</p>
               <ul className="space-y-1.5 text-xs">

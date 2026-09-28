@@ -6,7 +6,7 @@ import { typeDisplay, type EpisodeStatus } from '@/api/codes'
 import type { EpisodeRow } from '@/api/episodes'
 import { MOCK_USER } from '@/app/session'
 import { FilterChip } from '@/components/FilterChip'
-import { RiskBadge, WorkStatusBadge } from '@/components/badges'
+import { AgeBadge, RiskBadge, WorkStatusBadge } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -47,7 +47,7 @@ const columns: ColumnDef<EpisodeRow>[] = [
   {
     id: 'createdAt', accessorKey: 'createdAt',
     header: ({ column }) => <DataTableColumnHeader column={column} label="생성일" />,
-    cell: ({ row }) => <div className="text-sm tabular-nums text-muted-foreground">{row.original.createdAt.slice(5, 10)}<p className="mt-1 text-xs">{row.original.ageDays === 0 ? '오늘' : `${row.original.ageDays}일 경과`}</p></div>,
+    cell: ({ row }) => <div className="text-sm tabular-nums text-muted-foreground">{row.original.createdAt.slice(5, 10)}<p className="mt-1"><AgeBadge days={row.original.ageDays} /></p></div>,
   },
 ]
 
