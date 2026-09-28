@@ -36,6 +36,11 @@ describe('표시 규칙', () => {
     expect(alertResolutionLabels.NORMAL).toBe('정상 판단')
   })
 
+  it('모으고 뿌리는 방향을 태그 이름에 모두 적는다', () => {
+    expect(typeDisplay(3).key).toBe('GATHER-SCATTER')
+    expect(typeDisplay(4).key).toBe('SCATTER-GATHER')
+  })
+
   it('점수는 소수 둘째 자리까지 보여 준다', () => {
     expect(formatScore(0.9876)).toBe('0.99')
     expect(formatScore(0.5)).toBe('0.50')

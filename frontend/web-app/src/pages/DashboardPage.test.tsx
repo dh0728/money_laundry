@@ -59,6 +59,18 @@ describe('대시보드 · 내 담당', () => {
 })
 
 describe('대시보드 · 기관 전체', () => {
+  it('우선 검토 대상의 실행 주체를 밝히고 패턴·위험도·경과일을 태그로 보여 준다', async () => {
+    render(<DashboardPage />)
+    openInstitution()
+    const report = await screen.findByTestId('ai-daily-report')
+    expect(within(report).getByRole('heading', { name: '담당 조사자 우선 검토' })).toBeInTheDocument()
+    expect(within(report).getByText(/관리자는 지연과 재배정 여부를 확인/)).toBeInTheDocument()
+    const [first] = within(report).getAllByTestId('ai-priority-item')
+    expect(first.querySelector('.semantic-pattern-badge')).toBeInTheDocument()
+    expect(first.querySelector('[data-testid="age-badge"]')).toBeInTheDocument()
+    expect(first.querySelector('[title^="모델 위험 점수"]')).toBeInTheDocument()
+  })
+
   it('미배정 건수 문구가 없다', async () => {
     render(<DashboardPage />)
     openInstitution()
@@ -100,9 +112,10 @@ describe('대시보드 계산', () => {
 })
 
 describe('요약문', () => {
-  it('코드 0 요약문의 NORMAL을 NON_PATTERN으로 바꾼다', async () => {
+  it('서버 요약문의 유형 이름을 화면 이름으로 맞춘다', async () => {
     const { alertSummary } = await import('@/features/dashboard/alertText')
-    expect(alertSummary({ summary: 'NORMAL · 계좌 3', primaryType: { code: 0, name: 'NORMAL' } })).toBe('NON_PATTERN · 계좌 3')
+    expect(alertSummary({ summary: 'NON_PATTERN · 계좌 3', primaryType: { code: 0, name: 'NON_PATTERN' } })).toBe('NON_PATTERN · 계좌 3')
+    expect(alertSummary({ summary: 'G-SCATTER · 계좌 3', primaryType: { code: 3, name: 'G-SCATTER' } })).toBe('GATHER-SCATTER · 계좌 3')
     expect(alertSummary({ summary: 'CYCLE · 계좌 3', primaryType: { code: 5, name: 'CYCLE' } })).toBe('CYCLE · 계좌 3')
   })
 })

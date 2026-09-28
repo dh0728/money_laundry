@@ -13,6 +13,7 @@ import { live } from '@/lib/apiMode'
 
 
 type Props = { episodeId?: number; onOpen: (episodeId: number) => void; onOpenAlert: (alertId: number) => void }
+const today = () => (live ? new Date() : new Date(2026, 8, 26))
 
 export default function EpisodesPage({ episodeId, onOpen, onOpenAlert }: Props) {
   // mock: Alert 화면에서 연결·생성한 결과(메모리)를 반영해 Episode를 다시 묶는다
@@ -31,7 +32,7 @@ export default function EpisodesPage({ episodeId, onOpen, onOpenAlert }: Props) 
   return (
     <div className="space-y-4">
       
-      <EpisodeList rows={rows} onOpen={row => onOpen(row.episodeId)} />
+      <EpisodeList rows={rows} today={today()} onOpen={row => onOpen(row.episodeId)} />
     </div>
   )
 }

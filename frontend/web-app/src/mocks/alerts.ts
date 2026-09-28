@@ -4,7 +4,7 @@ import type { Page } from '@/api/common'
 import { seoulIso } from './time'
 import { currentScenario, mockFailure, type MockScenario } from './scenario'
 
-const NAMES = ['NORMAL', 'FAN-OUT', 'FAN-IN', 'G-SCATTER', 'S-GATHER', 'CYCLE', 'RANDOM', 'BIPARTITE', 'STACK']
+const NAMES = ['NON_PATTERN', 'FAN-OUT', 'FAN-IN', 'G-SCATTER', 'S-GATHER', 'CYCLE', 'RANDOM', 'BIPARTITE', 'STACK']
 const statuses: AlertStatus[] = ['OPEN', 'OPEN', 'OPEN', 'ESCALATED', 'CLOSED']
 
 // 목록 화면 검수용 다른 담당자. API.md §3.4 라운드로빈이라 한 사람에게만 몰리지 않는다.

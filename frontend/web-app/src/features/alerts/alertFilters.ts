@@ -43,6 +43,7 @@ export function matchesAlert(
       `A-${row.alertId}`,
       row.summary,
       row.assignee.name,
+      typeDisplay(row.primaryType.code).key,
       typeDisplay(row.primaryType.code).label,
       row.subjectAccount.account,
     ].join(' ').toLocaleLowerCase('ko')

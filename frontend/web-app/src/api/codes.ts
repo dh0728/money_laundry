@@ -10,14 +10,14 @@ export type AlertResolution = 'NORMAL' | 'FALSE_POSITIVE' | 'SUSPICIOUS'
 export type EpisodeStatus = 'OPEN' | 'CLOSED'
 export type EpisodeResolution = 'NORMAL' | 'SUSPICIOUS'
 
-// 코드 0은 API 이름이 NORMAL이지만, 의심 거래·Alert에서는 정상이 아니라
-// "패턴 없는 이상거래"다(학습 때 정상과 NONPAT을 한 칸으로 합침). 이름 대신 코드로 표시한다.
+// 코드 0은 API에서 NON_PATTERN이다. 사람의 정상 판정 NORMAL과는 별개이며,
+// 화면 이름은 숫자 코드로 결정한다.
 const typeLabels: Record<TypeCode, { key: string; label: string }> = {
   0: { key: 'NON_PATTERN', label: '패턴 없는 이상거래' },
   1: { key: 'FAN-OUT', label: '분산 송금' },
   2: { key: 'FAN-IN', label: '집중 수취' },
-  3: { key: 'G-SCATTER', label: '모아서 뿌리기' },
-  4: { key: 'S-GATHER', label: '뿌려서 모으기' },
+  3: { key: 'GATHER-SCATTER', label: '모아서 뿌리기' },
+  4: { key: 'SCATTER-GATHER', label: '뿌려서 모으기' },
   5: { key: 'CYCLE', label: '순환 거래' },
   6: { key: 'RANDOM', label: '무작위 경로' },
   7: { key: 'BIPARTITE', label: '그룹 간 교차 송금' },

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { AlertRow } from '@/api/alerts'
-import { formatScore, typeDisplay } from '@/api/codes'
+import { formatScore, type TypeCode } from '@/api/codes'
 import { useCurrentUser } from '@/app/session'
-import { WorkStatusBadge } from '@/components/badges'
+import { PatternBadge, WorkStatusBadge } from '@/components/badges'
 import { ProvenanceBadge } from '@/components/Provenance'
 import { SectionCard, sectionCardSurface } from '@/components/SectionCards'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
@@ -23,8 +23,9 @@ const HIGH_RISK = 0.8
 function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
   const counts = pending.reduce<Record<number, number>>((acc, alert) => ({ ...acc, [alert.primaryType.code]: (acc[alert.primaryType.code] ?? 0) + 1 }), {})
   const focus = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
+  const focusCode = focus ? Number(focus[0]) as TypeCode : null
   return (
-    <Card data-testid="personal-ai-summary" className="h-full shadow-none @5xl:col-span-2">
+    <Card data-testid="personal-ai-summary" className="h-full w-full min-w-0 shadow-none @xl:col-span-2 @5xl:col-span-2">
       <CardContent>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-base font-semibold tracking-tight">AI 요약 · 내 담당</h2>
@@ -33,7 +34,8 @@ function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
         </div>
         <div className="mt-4">
           <p className="text-xs font-medium">집중 패턴</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{focus ? `처리 전 Alert 중 ${typeDisplay(Number(focus[0]) as AlertRow['primaryType']['code']).key} 의심이 ${focus[1]}건으로 가장 많습니다. 같은 소유주·계좌가 반복되는지 함께 보세요.` : '처리 전 Alert가 없습니다.'}</p>
+          {focusCode === null ? <p className="mt-2 text-sm leading-6 text-muted-foreground">처리 전 Alert가 없습니다.</p>
+            : <div className="mt-2 flex flex-wrap items-center gap-2"><PatternBadge code={focusCode} /><p className="text-sm leading-6 text-muted-foreground">처리 전 Alert에서 가장 많은 유형입니다({focus[1]}건). 같은 소유주·계좌가 반복되는지 함께 보세요.</p></div>}
         </div>
       </CardContent>
     </Card>
@@ -91,4 +93,3 @@ export function PersonalView() {
     </>
   )
 }
-

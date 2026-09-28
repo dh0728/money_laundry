@@ -29,11 +29,11 @@ import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type E
 const baseColumns: ColumnDef<AlertRow>[] = [
   {
     id: 'alertId', accessorKey: 'alertId',
-    header: ({ column }) => <DataTableColumnHeader column={column} label="ID / 탐지 내용" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} label="ID / 계좌 구성" />,
     cell: ({ row }) => (
       <div className="min-w-0 max-w-[340px]">
         <p className="font-mono text-sm" translate="no">{alertCode(row.original.alertId)}</p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{row.original.summary}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">계좌 {row.original.accountCount}개 · 은행 {row.original.bankCount}곳</p>
       </div>
     ),
   },
@@ -150,7 +150,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative mr-1 w-64">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-          <Input aria-label="Alert 검색" placeholder="ID, 탐지 내용, 담당자 검색" value={query} onChange={e => { setQuery(e.target.value); toFirst() }} className="h-9 pl-9 text-xs" />
+          <Input aria-label="Alert 검색" placeholder="ID, 탐지 유형, 담당자 검색" value={query} onChange={e => { setQuery(e.target.value); toFirst() }} className="h-9 pl-9 text-xs" />
         </div>
         <DateRangeButton value={range} onChange={r => { setRange(r); toFirst() }} today={today} />
         <Popover open={filterOpen} onOpenChange={setFilterOpen}>

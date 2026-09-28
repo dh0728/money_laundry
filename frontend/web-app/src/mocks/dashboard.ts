@@ -26,7 +26,7 @@ export const dashboardNormal: DashboardData = {
   alertsByStatus: { OPEN: 128, ESCALATED: 21, CLOSED: 3412 },
   alertsByResolution: { NORMAL: 2870, FALSE_POSITIVE: 542 },
   alertsByType: [
-    { code: 0, name: 'NORMAL', count: 612 },
+    { code: 0, name: 'NON_PATTERN', count: 612 },
     { code: 1, name: 'FAN-OUT', count: 845 },
     { code: 2, name: 'FAN-IN', count: 731 },
     { code: 3, name: 'G-SCATTER', count: 402 },
