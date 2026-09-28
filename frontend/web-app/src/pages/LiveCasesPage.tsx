@@ -52,6 +52,7 @@ function CaseDetail({ caseId, kind, onBack }: { caseId: number; kind: ReviewKind
       const result = await submitReviewCommand(command, requestId)
       toast.success(result.targetCaseId ? `Episode E-${result.targetCaseId} 생성` : '조사 결과 저장 완료')
       previousRequest.current = null; setComment(''); setSelected({}); retry()
+      window.dispatchEvent(new Event('review-command-saved'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '저장하지 못했습니다. 사건을 다시 확인해 주세요.')
       if (error instanceof ApiError && error.problem.status === 409) {

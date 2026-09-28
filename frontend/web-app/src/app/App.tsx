@@ -4,7 +4,6 @@ import { ApiError } from '@/api/common'
 import { live } from '@/lib/apiMode'
 import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
-import { DataModeBadge } from '@/components/Provenance'
 import GlobalSearch from '@/features/search/GlobalSearch'
 import LiveGlobalSearch from '@/features/search/LiveGlobalSearch'
 import Agent, { AgentFab, type AgentMode } from '@/features/agent/Agent'
@@ -31,6 +30,7 @@ import LiveCasesPage from '@/pages/LiveCasesPage'
 import { currentScenario } from '@/mocks/scenario'
 import { CurrentUserContext, MOCK_USER, roleInfo, type CurrentUser } from './session'
 import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
+import { PendingWorkCount, UnreadNotificationCount } from './SidebarCounts'
 
 
 const pageTitles: Record<Page, string> = {
@@ -178,6 +178,7 @@ export default function App() {
                         <item.icon className="size-4" />
                         <span>{item.name}</span>
                       </SidebarDestinationButton>
+                      {item.id === 'notifications' && <UnreadNotificationCount />}
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -194,6 +195,7 @@ export default function App() {
                     <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
                   </span>
                 </SidebarDestinationButton>
+                <PendingWorkCount routeKey={`${page}/${id ?? ''}`} />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>
@@ -214,7 +216,6 @@ export default function App() {
             {live ? <LiveGlobalSearch onNavigate={(next, nextId) => go(next, nextId)} /> : <GlobalSearch onNavigate={(next, nextId) => go(next, nextId)} onOpenTransaction={target => { setTransactionTarget(target); go('transactions') }} />}
           </div>
           <div className="header-actions flex items-center justify-self-end gap-1.5" data-testid="header-actions">
-            <DataModeBadge />
             <Button variant="ghost" size="sm" className="h-8 gap-2 rounded-full px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
               <Kbd>F11</Kbd>
