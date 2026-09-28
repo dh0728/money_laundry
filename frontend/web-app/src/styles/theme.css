@@ -26,6 +26,7 @@
     --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 
+:root { --status-pending: oklch(.67 .13 165); --status-working: oklch(.64 .13 250); --status-closed: oklch(.64 .13 305); } /* 처리 전·중·완료 그래프 색(상태 태그와 같은 hue). 처리 전은 위험도 연두(128)와 구분되게 푸른 초록(165) */
 .semantic-status-badge[data-tone="pending"] { color: var(--badge-pending-foreground); border-color: var(--badge-pending-border); background: var(--badge-pending-background); }
 .semantic-status-badge[data-tone="working"] { color: var(--badge-working-foreground); border-color: var(--badge-working-border); background: var(--badge-working-background); }
 .semantic-status-badge[data-tone="closed"] { color: var(--badge-closed-foreground); border-color: var(--badge-closed-border); background: var(--badge-closed-background); }

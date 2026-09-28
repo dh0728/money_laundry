@@ -22,11 +22,28 @@ describe('대시보드 · 내 담당', () => {
     expect(screen.getAllByText('0.99').length).toBeGreaterThan(0)
   })
 
-  it('업무 카드와 먼저 볼 업무는 Alert 상세 주소로 이어진다', async () => {
+  it('업무 카드와 먼저 볼 업무는 해당 Alert·Episode 상세 주소로 이어진다', async () => {
     render(<DashboardPage />)
     const cards = await screen.findAllByTestId('work-card')
-    for (const card of cards) expect(card.getAttribute('href')).toMatch(/^#alerts\/\d+$/)
-    expect(screen.getByTestId('personal-ai-first').getAttribute('href')).toMatch(/^#alerts\/\d+$/)
+    for (const card of cards) expect(card.getAttribute('href')).toMatch(card.dataset.kind === 'Episode' ? /^#episodes\/\d+$/ : /^#alerts\/\d+$/)
+    expect(screen.getByTestId('personal-ai-first').getAttribute('href')).toMatch(/^#(alerts|episodes)\/\d+$/)
+  })
+
+  it('처리 중 열은 내 Episode이고, Episode로 보낸 Alert는 따로 나오지 않는다', async () => {
+    render(<DashboardPage />)
+    const [pending, working] = await screen.findAllByTestId('work-status-column')
+    const kinds = (column: HTMLElement) => within(column).queryAllByTestId('work-card').map(card => card.dataset.kind)
+    expect(kinds(working).length).toBeGreaterThan(0)
+    expect(new Set(kinds(working))).toEqual(new Set(['Episode']))
+    expect(new Set(kinds(pending))).toEqual(new Set(['Alert']))
+  })
+
+  it('윗줄은 중복 카드 없이 고위험·경과 카드와 AI 요약만 둔다', async () => {
+    render(<DashboardPage />)
+    const top = await screen.findByTestId('personal-top')
+    expect(within(top).getAllByTestId('section-card')).toHaveLength(2)
+    expect(within(top).queryByText('내 담당 미처리')).not.toBeInTheDocument()
+    expect(within(top).queryByText('현재 상황')).not.toBeInTheDocument()
   })
 
   it('빈 결과면 상태별 빈 안내를 보여 준다', async () => {
@@ -70,6 +87,16 @@ describe('대시보드 계산', () => {
   it('KPI는 일별 기록 마지막 날을 오늘로 본다', () => {
     const [todayCard] = institutionCards(dashboardNormal)
     expect(todayCard.value).toBe(String(dashboardNormal.dailyAlerts!.at(-1)!.inflow))
+  })
+
+  it('기관 카드는 Alert와 Episode를 모두 다루고 이름에 대상을 적는다', () => {
+    const labels = institutionCards(dashboardNormal).map(card => card.label)
+    expect(labels.some(label => label.includes('Episode'))).toBe(true)
+    for (const label of labels) expect(label).toMatch(/Alert|Episode/)
+  })
+
+  it('일별 처리 상태의 합은 그날 유입 건수와 같다', () => {
+    dashboardNormal.dailyAlertStatus!.forEach((day, i) => expect(day.pending + day.inProgress + day.done).toBe(dashboardNormal.dailyAlerts![i].inflow))
   })
 })
 

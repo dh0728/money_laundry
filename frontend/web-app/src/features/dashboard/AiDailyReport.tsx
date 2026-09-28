@@ -40,7 +40,7 @@ export function AiDailyReport({ summary, openAlerts }: { summary: DashboardData;
               <ul className="mt-2 space-y-3">
                 {priority.map(alert => (
                   <li key={alert.alertId} data-testid="ai-priority-item">
-                    <a href={hrefFor('alerts', alert.alertId)} className="block rounded-md border px-3 py-2.5 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <a href={hrefFor('alerts', alert.alertId)} className="block rounded-md border px-3 py-2.5 interactive-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       <p className="truncate text-sm">{alertSummary(alert)}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">A-{alert.alertId} · 위험 점수 {formatScore(alert.riskScore)} · {alert.ageDays === 0 ? '오늘 탐지' : `${alert.ageDays}일 경과`}</p>
                     </a>

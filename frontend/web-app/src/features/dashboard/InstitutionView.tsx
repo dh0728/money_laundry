@@ -9,13 +9,14 @@ import { SectionCards } from '@/components/SectionCards'
 import { Card, CardContent } from '@/components/ui/card'
 import { isoDate } from '@/lib/format'
 import { AiDailyReport } from './AiDailyReport'
-import { ChartAreaInteractive } from './AlertFlowChart'
+import { AlertStatusChart } from './AlertFlowChart'
 import { loadAlerts, loadDashboard } from './dataSource'
 import { chartInputs, institutionCards } from './metrics'
 import { TransactionPatternHierarchy } from './PatternRelation'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { useAsync } from '@/lib/useAsync'
 import { WorkCard } from './WorkCard'
+import { alertWorkItem } from './workItems'
 
 export function InstitutionView({ today }: { today: Date }) {
   const [range, setRange] = useState<DateRange | undefined>({ from: subDays(today, 29), to: today })
@@ -58,7 +59,7 @@ export function InstitutionView({ today }: { today: Date }) {
         {open.state.status === 'loading' && <LoadingBlock label="최근 Alert" />}
         {open.state.status === 'success' &&
           (openAlerts.length ? (
-            <div className="space-y-2.5">{openAlerts.slice(0, 5).map(alert => <WorkCard key={alert.alertId} alert={alert} />)}</div>
+            <div className="space-y-2.5">{openAlerts.slice(0, 5).flatMap(alert => alertWorkItem(alert) ?? []).map(item => <WorkCard key={item.id} item={item} />)}</div>
           ) : (
             <EmptyBlock>미처리 Alert가 없습니다.</EmptyBlock>
           ))}
@@ -73,7 +74,7 @@ function InstitutionCharts({ data }: { data: DashboardData }) {
   return (
     <>
       <div className="shrink-0">
-        {data.dailyAlerts?.length ? <ChartAreaInteractive data={data.dailyAlerts} /> : <EmptyBlock>선택한 기간에 Alert가 없습니다.</EmptyBlock>}
+        {data.dailyAlertStatus?.length ? <AlertStatusChart data={data.dailyAlertStatus} /> : <EmptyBlock>선택한 기간에 Alert가 없습니다.</EmptyBlock>}
       </div>
       <Card className="h-full min-h-0 min-w-0 max-w-full flex-1 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy">
         <CardContent className="flex min-h-0 flex-1 flex-col px-4">
