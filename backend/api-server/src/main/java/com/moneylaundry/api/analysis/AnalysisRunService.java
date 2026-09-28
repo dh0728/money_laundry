@@ -78,6 +78,16 @@ public class AnalysisRunService {
                 "update batch_jobs set status='FAILED',error_code='RUN_CANCELLED',error_message='정정으로 실행이 취소되었습니다.',execution_id=null,execution_owner=null,retry_at=null where current_run_id=?",
                 run);
           }
+          jdbc.update(
+              """
+              update analysis_model_tasks set status='CANCELLED',execution_id=null,
+                execution_owner=null,retry_at=null,next_poll_at=null,error_code='RUN_CANCELLED',
+                action_required=false,updated_at=?,finished_at=coalesce(finished_at,?)
+              where run_id=? and status<>'CANCELLED'
+              """,
+              Timestamp.from(clock.instant()),
+              Timestamp.from(clock.instant()),
+              run);
           for (var request :
               jdbc.queryForList("select * from analysis_model_requests where run_id=?", run))
             enqueueCancel(r, request, reason);

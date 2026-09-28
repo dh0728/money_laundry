@@ -203,4 +203,58 @@ class FlywayMigrationTests {
       jdbc.execute("drop database " + name);
     }
   }
+
+  @Test
+  void v5_preserves_v4_run_request_and_cancellation_history() throws Exception {
+    String name = "migration_v5_preserve_test";
+    jdbc.execute("create database " + name);
+    String url =
+        "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + name;
+    try {
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .target("4")
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement()) {
+        statement.execute(
+            "insert into batch_jobs(job_type,status,current_stage) values('ANALYSIS','FAILED','INFERENCE')");
+        statement.execute(
+            "insert into analysis_runs(run_id,job_id,status) select gen_random_uuid(),job_id,'CANCEL_REQUESTED' from batch_jobs");
+        statement.execute(
+            "update batch_jobs set current_run_id=(select run_id from analysis_runs)");
+        statement.execute(
+            "insert into analysis_model_requests select gen_random_uuid(),1,run_id,'BINARY','PUBLISHED' from analysis_runs");
+        statement.execute(
+            "insert into analysis_cancel_outbox(cancel_id,request_id,execution_round,payload,requested_at) select gen_random_uuid(),request_id,execution_round,'{\"preserve\":true}'::jsonb,now() from analysis_model_requests");
+      }
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement()) {
+        try (var rows =
+            statement.executeQuery(
+                "select r.status,m.status,o.payload->>'preserve' from batch_jobs b join analysis_runs r on r.run_id=b.current_run_id join analysis_model_requests m using(run_id) join analysis_cancel_outbox o using(request_id,execution_round)")) {
+          assertThat(rows.next()).isTrue();
+          assertThat(rows.getString(1)).isEqualTo("CANCEL_REQUESTED");
+          assertThat(rows.getString(2)).isEqualTo("PUBLISHED");
+          assertThat(rows.getString(3)).isEqualTo("true");
+          assertThat(rows.next()).isFalse();
+        }
+        try (var rows = statement.executeQuery("select count(*) from analysis_model_tasks")) {
+          assertThat(rows.next()).isTrue();
+          assertThat(rows.getInt(1)).isZero();
+        }
+      }
+    } finally {
+      jdbc.execute("drop database " + name);
+    }
+  }
 }

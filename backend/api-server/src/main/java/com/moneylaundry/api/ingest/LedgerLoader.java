@@ -17,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 /** Ingestion stores immutable encrypted bank reports; integration is a separate boundary. */
 @Service
 public class LedgerLoader {
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LedgerLoader.class);
   private final BatchJobRepository jobs;
   private final UploadStore store;
   private final JdbcTemplate jdbc;
@@ -287,6 +288,21 @@ public class LedgerLoader {
             jobs.saveAndFlush(job);
           });
     } catch (RuntimeException e) {
+      // Exception messages and stack traces can contain SQL parameters or source data.
+      String reason =
+          switch (String.valueOf(e.getMessage())) {
+            case "PRIVATE_DATA_KEYS_REQUIRED",
+                "PRIVATE_DATA_KEY_INVALID",
+                "REPORT_READ_FAILED",
+                "REPORT_FORMAT_NOT_CONFIGURED" ->
+                e.getMessage();
+            default -> "LOAD_FAILED";
+          };
+      log.error(
+          "Report load failed uploadId={} reason={} exceptionType={}",
+          id,
+          reason,
+          e.getClass().getName());
       tx.executeWithoutResult(
           status -> {
             BatchJob job = jobs.findById(id).orElseThrow();
