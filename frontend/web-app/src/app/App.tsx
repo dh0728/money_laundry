@@ -15,7 +15,7 @@ import LoginPage from '@/pages/LoginPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
 import { MOCK_USER, roleInfo } from './session'
-import { mainNav, pageFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
+import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 
 
 const pageTitles: Record<Page, string> = {
@@ -29,14 +29,14 @@ const pageTitles: Record<Page, string> = {
 }
 
 function usePage() {
-  const [page, setPage] = useState(() => pageFromHash(window.location.hash))
+  const [route, setRoute] = useState(() => routeFromHash(window.location.hash))
   useEffect(() => {
-    const update = () => setPage(pageFromHash(window.location.hash))
+    const update = () => setRoute(routeFromHash(window.location.hash))
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
   }, [])
-  const go = useCallback((next: Page) => { window.location.hash = next }, [])
-  return [page, go] as const
+  const go = useCallback((next: Page, id?: number) => { window.location.hash = id ? `${next}/${id}` : next }, [])
+  return [route, go] as const
 }
 
 function SidebarDestinationButton({ onNavigate, ...props }: Omit<ComponentProps<typeof SidebarMenuButton>, 'onClick'> & { onNavigate: () => void }) {
@@ -68,7 +68,7 @@ function SidebarBrandToggle() {
 const navButtonClass = 'h-10 px-4 group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-12! group-data-[collapsible=icon]:px-4! group-data-[collapsible=icon]:[&>span]:hidden'
 
 export default function App() {
-  const [page, go] = usePage()
+  const [{ page, id }, go] = usePage()
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
   const [appFullscreen, setAppFullscreen] = useState(false)
   const [logout, setLogout] = useState(false)
@@ -152,7 +152,7 @@ export default function App() {
         <main className="app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10" style={{ scrollbarGutter: 'stable' }}>
           {page === 'dashboard' ? <DashboardPage />
             : page === 'transactions' ? <TransactionsPage />
-            : page === 'alerts' ? <AlertsPage />
+            : page === 'alerts' ? <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onBack={() => go('alerts')} />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}

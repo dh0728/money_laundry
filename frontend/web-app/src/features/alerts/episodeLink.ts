@@ -1,4 +1,5 @@
 import type { AlertRow } from '@/api/alerts'
+import type { AlertOverrides } from './alertOverrides'
 
 // v24 Lists.tsx의 "Episode로 묶기" 다중 선택. 검토 전(OPEN) Alert만 고를 수 있다(API.md §4.2).
 export type EpisodeLinkState = { mode: 'browse' | 'link'; selected: Set<number> }
@@ -23,10 +24,10 @@ export const canLink = (row: AlertRow) => row.status === 'OPEN'
 export const linkableEpisodes = (rows: AlertRow[]) =>
   [...new Set(rows.flatMap(row => (row.status === 'ESCALATED' && row.episodeId != null ? [row.episodeId] : [])))].sort((a, b) => a - b)
 
-/** mock 전용: 서버 응답 대신 화면 행을 바꾼다. 실제 API는 결과를 다시 조회한다. */
-export function applyEpisodeLink(rows: AlertRow[], alertIds: number[], episodeId: number): AlertRow[] {
+/** mock 전용: 연결할 수 있는 Alert만 심층 조사로 바꾼 결과. 실제 API는 결과를 다시 조회한다. */
+export function episodeLinkOverrides(rows: AlertRow[], alertIds: number[], episodeId: number): AlertOverrides {
   const ids = new Set(alertIds)
-  return rows.map(row => (ids.has(row.alertId) && canLink(row) ? { ...row, status: 'ESCALATED', episodeId } : row))
+  return Object.fromEntries(rows.filter(row => ids.has(row.alertId) && canLink(row)).map(row => [row.alertId, { status: 'ESCALATED', resolution: null, episodeId }]))
 }
 
 export const nextEpisodeId = (rows: AlertRow[]) => Math.max(800, ...rows.map(row => row.episodeId ?? 0)) + 1

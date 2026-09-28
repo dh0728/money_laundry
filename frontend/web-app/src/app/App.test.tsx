@@ -31,6 +31,16 @@ describe('앱 틀', () => {
     expect(await screen.findByText('담당자: 내 담당')).toBeInTheDocument()
   })
 
+  it('#alerts/번호 주소는 Alert 상세를 열고 판정 선택지를 보여 준다', async () => {
+    window.history.replaceState({}, '', '/#alerts/3000')
+    renderSignedIn()
+    window.location.hash = 'alerts/3000'
+    expect(await screen.findByTestId('detail-id')).toHaveTextContent('A-3000')
+    fireEvent.mouseDown(screen.getByRole('tab', { name: '검토 의견' }))
+    fireEvent.click(screen.getByRole('tab', { name: '검토 의견' }))
+    expect(await screen.findByRole('combobox', { name: '판정' })).toHaveTextContent('정상 · 종결')
+  })
+
   it('예전 Episode 목록 골격은 메뉴에 없다', () => {
     renderSignedIn()
     expect(screen.queryByText('Episode 목록')).not.toBeInTheDocument()

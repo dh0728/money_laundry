@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { allAlertsNormal, loadMockAlerts } from '@/mocks/alerts'
 import { matchesAlert } from './alertFilters'
-import { applyEpisodeLink, episodeLinkReducer, initialLinkState, linkableEpisodes, nextEpisodeId } from './episodeLink'
+import { episodeLinkOverrides, episodeLinkReducer, initialLinkState, linkableEpisodes, nextEpisodeId } from './episodeLink'
 
 const rows = allAlertsNormal.content
 
@@ -46,8 +46,8 @@ describe('Episode로 묶기', () => {
     const open = rows.find(r => r.status === 'OPEN')!
     const id = nextEpisodeId(rows)
     expect(linkableEpisodes(rows)).not.toContain(id)
-    const next = applyEpisodeLink(rows, [open.alertId, closed.alertId], id)
-    expect(next.find(r => r.alertId === open.alertId)).toMatchObject({ status: 'ESCALATED', episodeId: id })
-    expect(next.find(r => r.alertId === closed.alertId)).toEqual(closed)
+    const next = episodeLinkOverrides(rows, [open.alertId, closed.alertId], id)
+    expect(next[open.alertId]).toEqual({ status: 'ESCALATED', resolution: null, episodeId: id })
+    expect(next[closed.alertId]).toBeUndefined()
   })
 })
