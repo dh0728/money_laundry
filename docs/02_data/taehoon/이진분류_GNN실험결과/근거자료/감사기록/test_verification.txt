@@ -1,0 +1,9 @@
+Verified 2026-09-27T16:19:20.983143+00:00
+
+python experiments/gnn36_latent_oversampling_v1/test_components.py
+Ran 6 tests in 1.708s
+OK
+
+python experiments/gnn36_target_repeat_v1/test_experiment.py
+Ran 5 tests in 0.871s
+OK

@@ -1,0 +1,4 @@
+method,median_nearest_distance_first2048,duplicate_fraction_first2048,median_std_ratio
+repeat,0.0,1.0,1.0006994009017944
+smote,2.0527723243047227,0.0,0.9714081883430481
+wgan_gp,12.966724620205373,0.0,0.47953465580940247

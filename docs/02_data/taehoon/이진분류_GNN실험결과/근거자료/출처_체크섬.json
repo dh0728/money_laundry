@@ -1,0 +1,57 @@
+[
+  {
+    "file": "근거자료/실험결과/원본_다운샘플링_시드요약.csv",
+    "original_source": "experiments/gnn36_distribution_v1/seed_summary.csv",
+    "sha256": "32c22ee5e5765e7807ef890f07420c7a132a9026d5a273e619f9f26d0eeb0a44"
+  },
+  {
+    "file": "근거자료/실험결과/원본_다운샘플링_개별결과.csv",
+    "original_source": "experiments/gnn36_distribution_v1/comparison.csv",
+    "sha256": "9b8a46c8ec11d09b1c7f9639ee5e10feb5ac38fb89372ab1ba0630895275765a"
+  },
+  {
+    "file": "근거자료/실험결과/잠재공간증강_시드요약.csv",
+    "original_source": "experiments/gnn36_latent_oversampling_v1/seed_summary.csv",
+    "sha256": "4e8ab9b12dcf8014573b9d8a909c4f6e02ac56c2fa853ffa96eeed58d26c81d5"
+  },
+  {
+    "file": "근거자료/실험결과/잠재공간증강_개별결과.csv",
+    "original_source": "experiments/gnn36_latent_oversampling_v1/comparison.csv",
+    "sha256": "fcc6c0ff699a0161c110f0acd0b359a48f6fe301864923ca590076b801b5d285"
+  },
+  {
+    "file": "근거자료/감사기록/audit.json",
+    "original_source": "reports/gnn_sampling_tables_2026-09-26/evidence_visuals/audit.json",
+    "sha256": "2045a748f6036b9389cc722132050b013ca8b9536d7fed0f39a0aeaed412fc11"
+  },
+  {
+    "file": "근거자료/감사기록/cluster_68day_checks.csv",
+    "original_source": "reports/gnn_sampling_tables_2026-09-26/evidence_visuals/cluster_68day_checks.csv",
+    "sha256": "492504f64687baa973eb009e9022355b907f8fe3be36f2a79079bd8303b6cfe6"
+  },
+  {
+    "file": "근거자료/감사기록/augmentation_diagnostics.csv",
+    "original_source": "reports/gnn_sampling_tables_2026-09-26/evidence_visuals/augmentation_diagnostics.csv",
+    "sha256": "4e5e36076bbb5664dde00408aa45e5f0e9f61559e09c11db3cb04797d6de9459"
+  },
+  {
+    "file": "근거자료/감사기록/gan_18case_diagnostics.csv",
+    "original_source": "reports/gnn_sampling_tables_2026-09-26/evidence_visuals/gan_18case_diagnostics.csv",
+    "sha256": "e115e1bc34a4b8d882a1959198386391124a49c6e74ba0cf87df9690ccd82d7d"
+  },
+  {
+    "file": "근거자료/감사기록/test_verification.txt",
+    "original_source": "reports/gnn_sampling_tables_2026-09-26/evidence_visuals/test_verification.txt",
+    "sha256": "48eb901f04eba89166df2d0529fa1c798c0c4cda60ebfa8442e98bf196dbfa35"
+  },
+  {
+    "file": "근거자료/감사기록/kld_overview.csv",
+    "original_source": "experiments/cluster_downsample_40_v1/kld_overview.csv",
+    "sha256": "1e5bea1c0f413e6028758eb395f9e111f18e72baf1d8ec998285673e2616eee8"
+  },
+  {
+    "file": "근거자료/참고코드/build_evidence_visuals.py",
+    "original_source": "reports/gnn_sampling_tables_2026-09-26/build_evidence_visuals.py",
+    "sha256": "c443f16aa17e3e3b9b06a69e17074a4c3b5aaf8ddd7573d9fa95608c5e57a5f4"
+  }
+]
