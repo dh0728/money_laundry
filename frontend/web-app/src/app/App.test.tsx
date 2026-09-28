@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import App from './App'
 import { pageFromHash } from './navigation'
 
@@ -7,7 +8,7 @@ afterEach(() => window.history.replaceState({}, '', '/'))
 
 // 로그인 화면을 지나 앱 안으로 들어간다
 const renderSignedIn = () => {
-  render(<App />)
+  render(<App />, { wrapper: NuqsTestingAdapter })
   fireEvent.click(screen.getByRole('button', { name: '로그인' }))
 }
 
@@ -19,8 +20,15 @@ describe('앱 틀', () => {
 
   it('아직 옮기지 않은 메뉴는 준비 중으로 보여 준다', async () => {
     renderSignedIn()
-    fireEvent.click(screen.getByRole('button', { name: 'Alerts' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Episodes' }))
     expect(await screen.findByText('준비 중인 화면입니다.')).toBeInTheDocument()
+  })
+
+  it('Alerts 메뉴는 내 담당 Alert 목록을 연다', async () => {
+    renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: 'Alerts' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Alert 목록' })).toBeInTheDocument()
+    expect(await screen.findByText('담당자: 내 담당')).toBeInTheDocument()
   })
 
   it('예전 Episode 목록 골격은 메뉴에 없다', () => {

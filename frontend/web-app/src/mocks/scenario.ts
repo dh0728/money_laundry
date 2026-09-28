@@ -16,4 +16,4 @@ export const mockServerError: ProblemDetail = {
   code: 'INTERNAL',
 }
 
-export const mockFailure = () => Promise.reject(new ApiError(mockServerError))
+export const mockFailure = (detail = mockServerError.detail) => Promise.reject(new ApiError({ ...mockServerError, detail }))

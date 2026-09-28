@@ -16,6 +16,7 @@ export const roleInfo: Record<Role, { label: string; can: string[]; cannot: stri
 }
 
 export const MOCK_USER = {
+  userId: 11,
   name: '오분석',
   role: 'L1' as Role,
   organization: '금융감독원',

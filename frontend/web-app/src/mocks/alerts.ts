@@ -6,7 +6,10 @@ import { currentScenario, mockFailure, type MockScenario } from './scenario'
 const NAMES = ['NORMAL', 'FAN-OUT', 'FAN-IN', 'G-SCATTER', 'S-GATHER', 'CYCLE', 'RANDOM', 'BIPARTITE', 'STACK']
 const statuses: AlertStatus[] = ['OPEN', 'OPEN', 'OPEN', 'ESCALATED', 'CLOSED']
 
-function alertRow(i: number): AlertRow {
+// 목록 화면 검수용 다른 담당자. API.md §3.4 라운드로빈이라 한 사람에게만 몰리지 않는다.
+const TEAMMATES = [{ userId: 12, name: '한검토' }, { userId: 13, name: '윤조사' }]
+
+function alertRow(i: number, assignee = { userId: 11, name: '오분석' }): AlertRow {
   const code = (i % 9) as TypeCode
   const status = statuses[i % statuses.length]
   const accountCount = 3 + (i % 6)
@@ -36,7 +39,7 @@ function alertRow(i: number): AlertRow {
     banks: Array.from({ length: bankCount }, (_, b) => 10 + ((i + b) % 5)),
     status,
     resolution: status === 'CLOSED' ? (i % 2 ? 'NORMAL' : 'FALSE_POSITIVE') : null,
-    assignee: { userId: 11, name: '오분석' },
+    assignee,
     assignedAt: createdAt,
     episodeId: status === 'ESCALATED' ? 800 + i : null,
     analysisDate: createdAt.slice(0, 10),
@@ -55,4 +58,16 @@ export const myAlertsEmpty: Page<AlertRow> = { content: [], page: 0, size: 200, 
 export function loadMockMyAlerts(scenario: MockScenario = currentScenario()): Promise<Page<AlertRow>> {
   if (scenario === 'error') return mockFailure()
   return Promise.resolve(scenario === 'empty' ? myAlertsEmpty : myAlertsNormal)
+}
+
+// Alert 목록(전 담당자). 앞 24건은 내 담당(대시보드와 같은 행), 뒤 12건은 다른 담당자.
+export const allAlertsNormal: Page<AlertRow> = (() => {
+  const others = Array.from({ length: 12 }, (_, j) => alertRow(24 + j, TEAMMATES[j % TEAMMATES.length]))
+  const content = [...myAlertsNormal.content, ...others]
+  return { content, page: 0, size: 200, totalElements: content.length, totalPages: 1 }
+})()
+
+export function loadMockAlerts(scenario: MockScenario = currentScenario()): Promise<Page<AlertRow>> {
+  if (scenario === 'error') return mockFailure('Alert 목록을 불러오지 못했습니다.')
+  return Promise.resolve(scenario === 'empty' ? myAlertsEmpty : allAlertsNormal)
 }

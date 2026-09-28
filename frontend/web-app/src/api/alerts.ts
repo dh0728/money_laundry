@@ -1,4 +1,4 @@
-import type { AlertResolution, AlertStatus, TypeRef } from './codes'
+import type { AlertResolution, AlertStatus, TypeCode, TypeRef } from './codes'
 import { getJson, type IsoDate, type IsoDateTime, type Page } from './common'
 
 // API.md §3.2 GET /api/alerts 행
@@ -44,7 +44,15 @@ export type AlertQuery = {
   size?: number
   sort?: `${AlertSortKey},${'asc' | 'desc'}`
   status?: AlertStatus
+  resolution?: AlertResolution
   assigneeId?: number | 'me'
+  typeClass?: TypeCode
+  bankId?: number
+  /** lastTxAt 기준 */
+  from?: IsoDate
+  to?: IsoDate
+  analysisDate?: IsoDate
+  episodeId?: number
 }
 
 export const fetchAlerts = (query: AlertQuery = {}) => getJson<Page<AlertRow>>('/api/alerts', query)
