@@ -9,7 +9,7 @@ import { MOCK_USER } from '@/app/session'
 import { FilterChip } from '@/components/FilterChip'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { ProvenanceBadge } from '@/components/Provenance'
-import { AgeBadge, RiskBadge, WorkStatusBadge } from '@/components/badges'
+import { AgeBadge, PatternBadge, RiskBadge, WorkStatusBadge } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -37,14 +37,14 @@ const columns: ColumnDef<EpisodeRow>[] = [
     cell: ({ row }) => (
       <div className="min-w-0 max-w-[340px]">
         <p className="font-mono text-sm" translate="no">{episodeCode(row.original.episodeId)}</p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">Alert {row.original.alertCount}건 · {row.original.primaryTypes.map(t => typeDisplay(t.code).label).join(' · ')}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">Alert {row.original.alertCount}건 · 유형 {row.original.primaryTypes.length}개</p>
       </div>
     ),
   },
   { id: 'riskScore', accessorKey: 'riskScore', header: ({ column }) => <DataTableColumnHeader column={column} label="위험도" />, cell: ({ row }) => <RiskBadge score={row.original.riskScore} /> },
   {
     id: 'types', header: '탐지 유형', enableSorting: false,
-    cell: ({ row }) => <div className="flex flex-wrap gap-1">{row.original.primaryTypes.map(t => <Badge key={t.code} variant="outline" className="semantic-pattern-badge font-mono text-xs font-normal">{typeDisplay(t.code).key}</Badge>)}</div>,
+    cell: ({ row }) => <div className="flex flex-wrap gap-1">{row.original.primaryTypes.map(t => <PatternBadge key={t.code} code={t.code} />)}</div>,
   },
   { id: 'totalAmountUsd', accessorKey: 'totalAmountUsd', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액 (USD)" className="ml-auto" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{usd(row.original.totalAmountUsd)}</div> },
   { id: 'alertCount', accessorKey: 'alertCount', header: ({ column }) => <DataTableColumnHeader column={column} label="Alert" className="ml-auto" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.alertCount}건</div> },

@@ -26,4 +26,8 @@ describe('Episode 목록 조건', () => {
     expect(matchesEpisode(row, [{ field: 'risk', value: 'high' }, { field: 'age', value: 1 }], `E-${row.episodeId}`)).toBe(row.riskScore >= 0.8 && row.ageDays >= 1)
     expect(matchesEpisode(row, [], '존재하지않는검색어')).toBe(false)
   })
+
+  it('화면에 표시된 탐지 유형 태그 코드로도 찾는다', () => {
+    expect(matchesEpisode(row, [], 'NON_PATTERN')).toBe(row.primaryTypes.some(type => type.code === 0))
+  })
 })

@@ -27,7 +27,7 @@ export function matchesEpisode(row: EpisodeRow, filters: EpisodeFilter[], query:
   for (const group of groups.values()) if (!group.some(filter => matchesOne(row, filter))) return false
 
   const text = query.trim().toLocaleLowerCase('ko')
-  if (text && ![`E-${row.episodeId}`, String(row.episodeId), row.assignee.name, ...row.primaryTypes.map(t => typeDisplay(t.code).label)].join(' ').toLocaleLowerCase('ko').includes(text)) return false
+  if (text && ![`E-${row.episodeId}`, String(row.episodeId), row.assignee.name, ...row.primaryTypes.flatMap(t => [typeDisplay(t.code).key, typeDisplay(t.code).label])].join(' ').toLocaleLowerCase('ko').includes(text)) return false
   const created = row.createdAt.slice(0, 10)
   if (range?.from && created < ymd(range.from)) return false
   if (range?.to && created > ymd(range.to)) return false

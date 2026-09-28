@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react'
 import type { HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay } from '@/api/codes'
 import type { EpisodeDetail as EpisodeDetailData, EpisodeTransaction } from '@/api/episodes'
-import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -55,6 +55,7 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
         <div data-testid="detail-tags" className="mt-3 flex flex-wrap items-center gap-2">
           <EpisodeStatusBadge status={episode.status} reviewRequested={Boolean(episode.reviewRequestedAt)} />
           <RiskBadge score={episode.riskScore} />
+          {episode.primaryTypes.map(type => <PatternBadge key={type.code} code={type.code} />)}
           <Badge variant="outline" className="semantic-metadata-badge font-normal">담당 {episode.assignee.name}</Badge>
           <Badge variant="outline" className="semantic-metadata-badge font-normal">생성 {episode.createdAt.slice(0, 10)}</Badge>
         </div>
@@ -83,12 +84,12 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
             <div className="divide-y rounded-md border">
               {episode.alerts.map(alert => (
                 <button key={alert.alertId} type="button" onClick={() => onOpenAlert(alert.alertId)} aria-label={`${alertCode(alert.alertId)} 상세 보기`}
-                  className="grid w-full grid-cols-[88px_72px_120px_minmax(0,1fr)_110px_90px_16px] items-center gap-3 px-3 py-2.5 text-left text-xs outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring">
+                  className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 px-3 py-2.5 text-left text-xs outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring @3xl:grid-cols-[88px_72px_160px_minmax(0,1fr)_110px_90px_16px] @3xl:gap-3">
                   <span className="font-mono">{alertCode(alert.alertId)}</span>
                   <RiskBadge score={alert.riskScore} />
                   <PatternBadge code={alert.primaryType.code} />
-                  <span className="truncate text-muted-foreground">{alert.summary}</span>
-                  <span className="text-right tabular-nums">{usd(alert.totalAmountUsd)}</span>
+                  <span className="col-span-3 flex min-w-0 items-center gap-2 @3xl:col-span-1"><AgeBadge days={alert.ageDays} /><span className="truncate text-muted-foreground">계좌 {alert.accountCount} · 은행 {alert.bankCount} · 거래 {alert.txCount}건</span></span>
+                  <span className="tabular-nums @3xl:text-right">{usd(alert.totalAmountUsd)}</span>
                   <StatusBadge status={alert.status} />
                   <ExternalLink className="size-3.5 text-muted-foreground" />
                 </button>
@@ -101,7 +102,7 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
               <div className="space-y-4">
                 {episode.patternEvidence.map(e => (
                   <div key={e.alertId}>
-                    <p className="mb-1.5 text-xs font-medium"><span className="font-mono">{alertCode(e.alertId)}</span> · {typeDisplay(e.typeClass).label}</p>
+                    <p className="mb-1.5 flex flex-wrap items-center gap-2 text-xs font-medium"><span className="font-mono">{alertCode(e.alertId)}</span><PatternBadge code={e.typeClass} /></p>
                     <ul className="space-y-1 text-xs">
                       {e.checks.map(c => <li key={c.key} className="flex justify-between gap-2"><span className={c.passed ? '' : 'text-muted-foreground'}>{c.passed ? '✓' : '·'} {c.label}</span><span className="tabular-nums text-muted-foreground">{c.value}</span></li>)}
                     </ul>
@@ -114,7 +115,7 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
                 <div key={h.account} className="text-xs">
                   <p className="mb-2 font-mono">{h.account} · 은행 {h.bank}</p>
                   <ul className="space-y-1.5">
-                    {h.alerts.map(a => <li key={a.alertId} className="flex justify-between gap-2"><span className="font-mono">{alertCode(a.alertId)}</span><span className="text-muted-foreground">{a.resolution ? alertResolutionLabels[a.resolution] : a.episodeId != null ? episodeCode(a.episodeId) : '처리 전'}</span></li>)}
+                    {h.alerts.map(a => <li key={a.alertId} className="flex justify-between gap-2"><span className="font-mono">{alertCode(a.alertId)}</span><Badge variant="outline" className="semantic-metadata-badge font-normal">{a.resolution ? alertResolutionLabels[a.resolution] : a.episodeId != null ? episodeCode(a.episodeId) : '처리 전'}</Badge></li>)}
                   </ul>
                 </div>
               ))}

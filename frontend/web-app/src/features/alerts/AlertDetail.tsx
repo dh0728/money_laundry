@@ -110,7 +110,7 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
               </ul>
               <p className="mb-2 mt-5 text-xs text-muted-foreground">유형 구성비</p>
               <ul className="space-y-1.5 text-xs">
-                {distribution.map(d => <li key={d.code} className="flex justify-between"><span>{typeDisplay(d.code).label}</span><span className="tabular-nums">{Math.round(d.ratio * 100)}%</span></li>)}
+                {distribution.map(d => <li key={d.code} className="flex items-center justify-between gap-2"><PatternBadge code={d.code} /><span className="tabular-nums">{Math.round(d.ratio * 100)}%</span></li>)}
               </ul>
             </Panel>
             <Panel title="조사 정보">
