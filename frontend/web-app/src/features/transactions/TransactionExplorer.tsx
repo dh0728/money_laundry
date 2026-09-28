@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
-import { PageHeading } from '@/components/page'
+import { TransactionsHeading } from './TransactionsHeading'
 import { OrthogonalConnector, StageItem, StagePanel } from './transaction-stage'
 import { formatMoney, type TransactionIndex, type TransactionTarget } from './transactionIndex'
 
@@ -158,7 +158,7 @@ export default function TransactionExplorer({ index, target, today }: { index: T
   const addFilter = () => { const next = filters.some(item => item.field === filterField && item.value === filterValue) ? filters : [...filters, { field: filterField, value: filterValue }]; applyControls(query, range, next); setFilterOpen(false) }
 
   return <div className="flex flex-col gap-5" data-testid="transactions-table">
-    <PageHeading title="거래 내역" description="소유주에서 계좌와 거래로 이어지는 구조를 단계별로 확인합니다." />
+    <TransactionsHeading />
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative w-full max-w-sm"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="거래 내역 검색" value={query} onChange={event => applyControls(event.target.value, range, filters)} placeholder="거래 ID, 소유주, 계좌 검색" className="h-9 pl-9 text-xs" /></div>
       <DateRangeButton value={range} onChange={next => applyControls(query, next, filters)} today={today} />

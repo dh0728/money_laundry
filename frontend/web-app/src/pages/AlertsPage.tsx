@@ -11,8 +11,8 @@ import { episodeLinkOverrides, nextEpisodeId, type EpisodeTarget } from '@/featu
 import { useAsync } from '@/lib/useAsync'
 import { loadMockAlerts } from '@/mocks/alerts'
 import AlertDetailPage from './AlertDetailPage'
+import { live, mockSavedNote } from '@/lib/apiMode'
 
-const live = import.meta.env.VITE_API_MODE === 'live'
 // mock Alert는 2026-09-26까지 있다
 const today = () => (live ? new Date() : new Date(2026, 8, 26))
 
@@ -42,7 +42,7 @@ export default function AlertsPage({ alertId, onOpen, onBack, onOpenEpisode }: P
       }
       const episodeId = target === 'new' ? nextEpisodeId(rows) : target
       setOverrides(prev => ({ ...prev, ...episodeLinkOverrides(rows, alertIds, episodeId) }))
-      toast.success(`${alertIds.length}건을 ${episodeCode(episodeId)}에 연결했습니다.`, { description: '시연용 mock이라 서버에는 저장되지 않습니다.' })
+      toast.success(`${alertIds.length}건을 ${episodeCode(episodeId)}에 연결했습니다.`, { description: mockSavedNote })
     } catch {
       toast.error('Episode 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.')
     }

@@ -3,9 +3,9 @@ import type { Page } from '@/api/common'
 import { fetchDashboardSummary, type DashboardData, type DashboardRange } from '@/api/dashboard'
 import { loadMockMyAlerts } from '@/mocks/alerts'
 import { loadMockDashboard } from '@/mocks/dashboard'
+import { live } from '@/lib/apiMode'
 
 // 백엔드가 준비되면 .env에 VITE_API_MODE=live 를 넣어 실제 요청으로 바꾼다. 기본은 mock.
-const live = import.meta.env.VITE_API_MODE === 'live'
 
 const inRange = (date: string, { from, to }: DashboardRange) => (!from || date >= from) && (!to || date <= to)
 

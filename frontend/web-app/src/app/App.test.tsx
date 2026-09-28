@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import App from './App'
@@ -45,6 +45,11 @@ describe('앱 틀', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: '검토 의견' }))
     fireEvent.click(screen.getByRole('tab', { name: '검토 의견' }))
     expect(await screen.findByRole('combobox', { name: '판정' })).toHaveTextContent('정상 · 종결')
+  })
+
+  it('앱 머리에 지금 데이터가 mock인지 보여 준다', () => {
+    renderSignedIn()
+    expect(within(screen.getByTestId('header-actions')).getByText('mock 데이터')).toBeInTheDocument()
   })
 
   it('예전 Episode 목록 골격은 메뉴에 없다', () => {

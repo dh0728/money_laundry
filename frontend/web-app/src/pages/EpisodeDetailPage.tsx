@@ -9,8 +9,8 @@ import EpisodeDetail from '@/features/episodes/EpisodeDetail'
 import { useEpisodeHistory, useReviewRequests } from '@/features/episodes/reviewStore'
 import { useAsync } from '@/lib/useAsync'
 import { loadMockEpisode } from '@/mocks/episodes'
+import { live, mockSavedNote } from '@/lib/apiMode'
 
-const live = import.meta.env.VITE_API_MODE === 'live'
 
 const loadLive = async (episodeId: number) => {
   const [detail, transactions] = await Promise.all([fetchEpisode(episodeId), fetchEpisodeTransactions(episodeId)])
@@ -47,7 +47,7 @@ export default function EpisodeDetailPage({ episodeId, alerts, onBack, onOpenAle
     try {
       if (live) { await commentEpisode(episodeId, text); toast.success('조사 의견을 남겼습니다.'); retry(); return }
       record('COMMENT', text)
-      toast.success('조사 의견을 남겼습니다.', { description: '시연용 mock이라 서버에는 저장되지 않습니다.' })
+      toast.success('조사 의견을 남겼습니다.', { description: mockSavedNote })
     } catch {
       toast.error('의견을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
     }
@@ -58,7 +58,7 @@ export default function EpisodeDetailPage({ episodeId, alerts, onBack, onOpenAle
     if (live) { toast.info('검수 넘김은 Backend 계약 정리 전이라 아직 보낼 수 없습니다.'); return }
     setRequests(prev => ({ ...prev, [episodeId]: new Date().toISOString() }))
     record('REVIEW_REQUEST', text)
-    toast.success(`${episodeCode(episodeId)} · 관리자에게 검수를 넘겼습니다.`, { description: '시연용 mock이라 서버에는 저장되지 않습니다.' })
+    toast.success(`${episodeCode(episodeId)} · 관리자에게 검수를 넘겼습니다.`, { description: mockSavedNote })
   }
 
   return (

@@ -5,6 +5,7 @@ import type { HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay } from '@/api/codes'
 import type { EpisodeDetail as EpisodeDetailData, EpisodeTransaction } from '@/api/episodes'
 import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { PlannedBlock } from '@/components/Provenance'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -129,7 +130,7 @@ export default function EpisodeDetail({ episode, transactions, history, responsi
         </div>
       )}
 
-      {tab === 'graph' && <p className="rounded-lg border border-dashed px-4 py-16 text-center text-sm text-muted-foreground">자금 흐름 그래프는 다음 작업에서 옮깁니다.</p>}
+      {tab === 'graph' && <PlannedBlock>자금 흐름 그래프(계좌 관계도)는 v24 시안에서 옮기는 중입니다.</PlannedBlock>}
       {tab === 'transactions' && <AlertTxTable rows={transactions} />}
       {tab === 'review' && <EpisodeReview episode={episode} responsible={responsible} onComment={onComment} onRequestReview={onRequestReview} />}
     </div>

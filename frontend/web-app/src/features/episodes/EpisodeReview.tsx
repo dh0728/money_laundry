@@ -5,8 +5,8 @@ import { useState } from 'react'
 import { MessageSquare, Send } from 'lucide-react'
 import type { EpisodeDetail } from '@/api/episodes'
 import { SectionTitle } from '@/components/page'
+import { ProvenanceNote } from '@/components/Provenance'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -45,7 +45,7 @@ export default function EpisodeReview({ episode, responsible, onComment, onReque
           <Button variant="secondary" size="sm" disabled={!ready} onClick={() => { onComment(comment.trim()); setComment('') }}><MessageSquare className="size-3.5" />의견만 남기기</Button>
           <Button size="sm" disabled={!ready || requested} onClick={() => setConfirm(true)}><Send className="size-3.5" />관리자 검수 넘기기</Button>
         </div>
-        <p className="text-right text-[11px] text-muted-foreground"><Badge variant="outline" className="mr-1.5 font-normal">FE 제안</Badge>검수 넘김은 API 계약에 아직 없어 시연 화면에서만 저장됩니다.</p>
+        <div className="flex justify-end"><ProvenanceNote kind="proposal">검수 넘김은 API 계약에 아직 없어 시연 화면에서만 저장됩니다.</ProvenanceNote></div>
       </CardContent></Card>
 
       <Card className="h-full shadow-none" data-testid="review-reference"><CardContent>

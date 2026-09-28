@@ -4,8 +4,8 @@ import { Check } from 'lucide-react'
 import type { AlertDetail } from '@/api/alerts'
 import { alertResolutionLabels } from '@/api/codes'
 import { SectionTitle } from '@/components/page'
+import { ProvenanceNote } from '@/components/Provenance'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -70,7 +70,7 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
               ))}
             </SelectContent>
           </Select>
-          {option.proposal && <p className="text-[11px] text-muted-foreground"><Badge variant="outline" className="mr-1.5 font-normal">FE 제안</Badge>API 계약에 아직 없는 판정입니다. 시연 화면에서만 저장됩니다.</p>}
+          {option.proposal && <ProvenanceNote kind="proposal">API 계약에 아직 없는 판정입니다. 시연 화면에서만 저장됩니다.</ProvenanceNote>}
         </div>
         {verdict === 'link-episode' && (
           <div className="space-y-2">

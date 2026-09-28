@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { AlertDetail as AlertDetailData, HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay, type TypeCode } from '@/api/codes'
 import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { PlannedBlock } from '@/components/Provenance'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -131,7 +132,7 @@ export default function AlertDetail({ alert, history, responsible, assigneeNotic
         </div>
       )}
 
-      {tab === 'graph' && <p className="rounded-lg border border-dashed px-4 py-16 text-center text-sm text-muted-foreground">자금 흐름 그래프는 다음 작업에서 옮깁니다.</p>}
+      {tab === 'graph' && <PlannedBlock>자금 흐름 그래프(계좌 관계도)는 v24 시안에서 옮기는 중입니다.</PlannedBlock>}
       {tab === 'transactions' && <AlertTxTable rows={tx} />}
       {tab === 'review' && <AlertReview alert={alert} responsible={responsible} episodes={episodes} onSubmit={onSubmit} />}
     </div>

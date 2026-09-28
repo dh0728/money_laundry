@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ComponentProps, type CSSProperties } from 'react'
 import { Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
+import { DataModeBadge } from '@/components/Provenance'
 import { SidebarSelection } from '@/components/SidebarSelection'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -144,6 +145,7 @@ export default function App() {
         <header className="app-header z-40 flex h-15 min-w-0 shrink-0 items-center justify-between gap-3 border-b bg-background px-4 min-[1100px]:px-6">
           <SidebarTrigger className="rounded-full md:hidden" aria-label="메뉴 열기" />
           <div className="ml-auto flex items-center gap-1.5" data-testid="header-actions">
+            <DataModeBadge />
             <Button variant="ghost" size="sm" className="h-8 gap-2 rounded-full px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
               <Kbd>F11</Kbd>

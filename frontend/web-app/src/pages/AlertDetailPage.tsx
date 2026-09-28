@@ -15,8 +15,8 @@ import { josa } from '@/lib/format'
 import { useMemoryState } from '@/lib/memory'
 import { useAsync } from '@/lib/useAsync'
 import { loadMockAlertDetail } from '@/mocks/alertDetail'
+import { live, mockSavedNote } from '@/lib/apiMode'
 
-const live = import.meta.env.VITE_API_MODE === 'live'
 
 const loadLive = async (alertId: number) => {
   const [detail, history] = await Promise.all([fetchAlert(alertId), fetchAlertHistory(alertId)])
@@ -63,7 +63,7 @@ export default function AlertDetailPage({ alertId, rows, onBack, onOpenEpisode }
         id: Date.now(), actor: { userId: MOCK_USER.userId, name: MOCK_USER.name, role: MOCK_USER.role }, action: resolution ? 'CLOSE' : verdict === 'new-episode' ? 'ESCALATE' : 'LINK',
         targetType: 'ALERT', targetId: alertId, relatedIds: target ? [target] : [], from: 'OPEN', to: override.status, resolution: resolution ?? null, comment, at: new Date().toISOString(),
       }, ...prev])
-      toast.success(`${alertCode(alertId)} · ${option.result}${target && !resolution ? ` (${episodeCode(target)})` : ''}`, { description: '시연용 mock이라 서버에는 저장되지 않습니다.' })
+      toast.success(`${alertCode(alertId)} · ${option.result}${target && !resolution ? ` (${episodeCode(target)})` : ''}`, { description: mockSavedNote })
     } catch {
       toast.error('판정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
     }

@@ -30,6 +30,10 @@
 .semantic-status-badge[data-tone="working"] { color: var(--badge-working-foreground); border-color: var(--badge-working-border); background: var(--badge-working-background); }
 .semantic-status-badge[data-tone="closed"] { color: var(--badge-closed-foreground); border-color: var(--badge-closed-border); background: var(--badge-closed-background); }
 .semantic-pattern-badge { color: var(--background); border-color: var(--foreground); background: var(--foreground); }
+.provenance-badge { color: var(--muted-foreground); border-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent); background: transparent; }
+.provenance-badge[data-provenance="proposal"] { border-style: dashed; }
+.provenance-badge[data-provenance="planned"] { border-style: dotted; }
+.provenance-badge[data-provenance="live"] { color: var(--foreground); border-color: var(--foreground); }
 .semantic-metadata-badge { color: var(--badge-metadata-foreground); border-color: var(--badge-metadata-border); background: var(--badge-metadata-background); }
 
 @theme inline {

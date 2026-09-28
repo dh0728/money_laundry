@@ -5,6 +5,7 @@ import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverride
 import { formatScore, typeDisplay } from '@/api/codes'
 import { StatusBadge } from '@/components/badges'
 import { SectionCards, type SectionCardItem } from '@/components/SectionCards'
+import { ProvenanceBadge } from '@/components/Provenance'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fmt } from '@/lib/format'
@@ -27,7 +28,7 @@ function PersonalAiSummary({ open }: { open: AlertRow[] }) {
     <Card data-testid="personal-ai-summary" className="shadow-none">
       <CardContent>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-semibold tracking-tight">AI 요약 · 내 담당</h2>
+          <div className="flex items-center gap-2"><h2 className="text-base font-semibold tracking-tight">AI 요약 · 내 담당</h2><ProvenanceBadge kind="mock" title="규칙으로 만든 문장입니다. LLM 연결은 발표 뒤 범위입니다." /></div>
           <p className="text-[11px] text-muted-foreground">담당 미처리 {open.length}건 기준 · 판단은 조사자가 수행</p>
         </div>
         <div className="mt-4 grid gap-4 @3xl:grid-cols-3">

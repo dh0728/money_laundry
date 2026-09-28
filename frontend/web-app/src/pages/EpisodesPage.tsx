@@ -9,8 +9,8 @@ import { useAsync } from '@/lib/useAsync'
 import { allAlertsNormal } from '@/mocks/alerts'
 import { loadMockEpisodes } from '@/mocks/episodes'
 import EpisodeDetailPage from './EpisodeDetailPage'
+import { live } from '@/lib/apiMode'
 
-const live = import.meta.env.VITE_API_MODE === 'live'
 
 const heading = <PageHeading title="Episode 목록" description="연결된 Alert를 묶어 조사 진행 상황을 확인합니다." />
 

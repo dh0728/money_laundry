@@ -2,6 +2,7 @@ import type { AlertRow } from '@/api/alerts'
 import { hrefFor } from '@/app/navigation'
 import { formatScore, typeDisplay } from '@/api/codes'
 import type { DashboardData } from '@/api/dashboard'
+import { ProvenanceBadge } from '@/components/Provenance'
 import { Card, CardContent } from '@/components/ui/card'
 import { alertSummary } from './alertText'
 
@@ -23,7 +24,7 @@ export function AiDailyReport({ summary, openAlerts }: { summary: DashboardData;
     <Card data-testid="ai-daily-report" className="h-full min-w-0 overflow-hidden shadow-none">
       <CardContent className="flex h-full min-h-0 flex-col">
         <div>
-          <h3 className="text-base font-semibold tracking-tight">AI Daily Report</h3>
+          <div className="flex items-center gap-2"><h3 className="text-base font-semibold tracking-tight">AI Daily Report</h3><ProvenanceBadge kind="mock" title="규칙으로 만든 문장입니다. LLM 연결은 발표 뒤 범위입니다." /></div>
           <p className="mt-1 text-[11px] text-muted-foreground">
             {generatedAt ? <>최근 분석 <time dateTime={generatedAt}>{generatedAt.slice(0, 16).replace('T', ' ')}</time> 기준</> : '아직 완료된 분석이 없습니다'}
           </p>
