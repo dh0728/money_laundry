@@ -43,6 +43,7 @@ describe('앱 틀', () => {
     renderSignedIn()
     window.location.hash = 'alerts/3000'
     expect(await screen.findByTestId('detail-id')).toHaveTextContent('A-3000')
+    expect(screen.getByTestId('header-back')).toHaveTextContent('Alert 목록')
     fireEvent.mouseDown(screen.getByRole('tab', { name: '검토 의견' }))
     fireEvent.click(screen.getByRole('tab', { name: '검토 의견' }))
     expect(await screen.findByRole('combobox', { name: '판정' })).toHaveTextContent('정상 · 종결')
@@ -51,6 +52,15 @@ describe('앱 틀', () => {
   it('앱 머리에 지금 데이터가 mock인지 보여 준다', () => {
     renderSignedIn()
     expect(within(screen.getByTestId('header-actions')).getByText('mock 데이터')).toBeInTheDocument()
+  })
+
+  it('헤더 가운데 전역 검색에서 Alert를 찾아 상세로 간다', async () => {
+    renderSignedIn()
+    const search = screen.getByRole('combobox', { name: '전역 검색' })
+    fireEvent.focus(search)
+    fireEvent.change(search, { target: { value: 'A-3001' } })
+    fireEvent.click(await screen.findByRole('option', { name: /A-3001/ }))
+    expect(window.location.hash).toBe('#alerts/3001')
   })
 
   it('모르는 주소는 대시보드로 보낸다', () => {

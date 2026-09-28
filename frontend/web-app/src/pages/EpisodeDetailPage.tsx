@@ -1,38 +1,35 @@
 import { toast } from 'sonner'
 import type { AlertRow, HistoryRow } from '@/api/alerts'
+import { fetchEpisodeGraph } from '@/api/graph'
 import { commentEpisode, fetchEpisode, fetchEpisodeTransactions } from '@/api/episodes'
 import { MOCK_USER } from '@/app/session'
 import { ErrorBlock, LoadingBlock } from '@/components/states'
-import { Button } from '@/components/ui/button'
 import { episodeCode } from '@/features/alerts/alertFilters'
 import EpisodeDetail from '@/features/episodes/EpisodeDetail'
 import { useEpisodeHistory, useReviewRequests } from '@/features/episodes/reviewStore'
 import { useAsync } from '@/lib/useAsync'
+import { relabelComment, relabelText, useTxRelabels } from '@/features/graph/relabel'
 import { loadMockEpisode } from '@/mocks/episodes'
 import { live, mockSavedNote } from '@/lib/apiMode'
 
 
 const loadLive = async (episodeId: number) => {
-  const [detail, transactions] = await Promise.all([fetchEpisode(episodeId), fetchEpisodeTransactions(episodeId)])
-  return { detail, transactions: transactions.content }
+  const [detail, transactions, graph] = await Promise.all([fetchEpisode(episodeId), fetchEpisodeTransactions(episodeId), fetchEpisodeGraph(episodeId, 0)])
+  return { detail, transactions: transactions.content, graph }
 }
 
-type Props = { episodeId: number; alerts: AlertRow[]; onBack: () => void; onOpenAlert: (alertId: number) => void }
+type Props = { episodeId: number; alerts: AlertRow[]; onOpenAlert: (alertId: number) => void }
 
-export default function EpisodeDetailPage({ episodeId, alerts, onBack, onOpenAlert }: Props) {
+export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Props) {
   // mock은 목록 화면에서 방금 연결한 결과까지 반영한 Alert로 계산한다
   const alertKey = alerts.map(a => `${a.alertId}:${a.episodeId}`).join()
   const { state, retry } = useAsync(() => (live ? loadLive(episodeId) : loadMockEpisode(episodeId, alerts.length ? alerts : undefined)), [episodeId, alertKey])
   const [requests, setRequests] = useReviewRequests()
   const [extraHistory, setExtraHistory] = useEpisodeHistory(episodeId)
+  const [relabels, setRelabels] = useTxRelabels()
 
   if (state.status === 'loading') return <LoadingBlock label={`${episodeCode(episodeId)} 상세`} />
-  if (state.status === 'error') return (
-    <div className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={onBack}>Episode 목록으로</Button>
-      <ErrorBlock message={state.message} onRetry={retry} />
-    </div>
-  )
+  if (state.status === 'error') return <ErrorBlock message={state.message} onRetry={retry} />
 
   const episode = { ...state.data.detail, reviewRequestedAt: requests[episodeId] ?? state.data.detail.reviewRequestedAt }
   const history = [...extraHistory, ...episode.history]
@@ -61,13 +58,23 @@ export default function EpisodeDetailPage({ episodeId, alerts, onBack, onOpenAle
     toast.success(`${episodeCode(episodeId)} · 관리자에게 검수를 넘겼습니다.`, { description: mockSavedNote })
   }
 
+  // FE 제안: 사람이 거래의 의심/정상 판정을 바꾼다. API가 없어 실제 서버 모드에서는 보내지 않는다.
+  function relabel(txId: number, label: 0 | 1, reason: string) {
+    if (live) { toast.info('거래 판정 전환은 Backend 계약 정리 전이라 아직 보낼 수 없습니다.'); return }
+    setRelabels(prev => ({ ...prev, [txId]: { label, reason, at: new Date().toISOString(), actor: MOCK_USER.name } }))
+    record('TX_RELABEL', relabelComment(txId, label, reason))
+    toast.success(`거래 ${txId}를 ${relabelText(label)}로 전환했습니다.`, { description: mockSavedNote })
+  }
+
   return (
     <EpisodeDetail
+      relabels={relabels}
+      onRelabel={relabel}
       episode={episode}
+      graph={state.data.graph}
       transactions={state.data.transactions}
       history={history}
       responsible={responsible}
-      onBack={onBack}
       onOpenAlert={onOpenAlert}
       onComment={comment}
       onRequestReview={requestReview}

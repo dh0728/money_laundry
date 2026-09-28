@@ -20,3 +20,12 @@ if (!window.matchMedia) {
       dispatchEvent: () => false,
     }) as MediaQueryList
 }
+
+// jsdom에는 ResizeObserver가 없다. 크기 변화를 관찰하는 표·그래프 부품이 테스트에서 멈추지 않게 빈 대체물을 둔다.
+if (!('ResizeObserver' in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}

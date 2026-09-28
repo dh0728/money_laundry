@@ -3,6 +3,7 @@ import type { TypeRef } from '@/api/codes'
 import { ApiError, type Page } from '@/api/common'
 import type { EpisodeDetail, EpisodeRow, EpisodeTransaction } from '@/api/episodes'
 import { detailOf } from './alertDetail'
+import { graphOf } from './graph'
 import { allAlertsNormal } from './alerts'
 import { currentScenario, mockFailure, type MockScenario } from './scenario'
 
@@ -103,5 +104,7 @@ export function loadMockEpisode(episodeId: number, alerts = allAlertsNormal.cont
   if (scenario === 'error') return mockFailure('Episode 상세를 불러오지 못했습니다.')
   const members = scenario === 'empty' ? [] : groupsOf(alerts).get(episodeId) ?? []
   if (!members.length) return Promise.reject(notFound(episodeId))
-  return Promise.resolve({ detail: detailOfEpisode(episodeId, members), transactions: transactionsOf(members) })
+  const details = members.map(detailOf)
+  const graph = graphOf(details.flatMap(d => d.transactions), details.flatMap(d => d.accounts))
+  return Promise.resolve({ detail: detailOfEpisode(episodeId, members), transactions: transactionsOf(members), graph })
 }

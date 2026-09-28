@@ -30,6 +30,17 @@ export default defineConfig([
     rules: { 'react-hooks/purity': 'off', 'react-hooks/set-state-in-effect': 'off' },
   },
   {
+    // v24 시안의 자금 흐름 그래프를 동작 그대로 옮긴 파일이다. 시안의 lint 기준으로 만들어져 아래 규칙만 예외로 둔다.
+    // 고칠 때는 v24 동작(시간순 재생·hop·소유주별 보기·상세 패널)을 화면에서 다시 확인한다.
+    files: ['src/features/graph/v24/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+    },
+  },
+  {
     // TanStack Table 타입 확장(module augmentation)은 제네릭 이름을 원본과 똑같이 둬야 한다
     files: ['src/types/data-table.ts'],
     rules: { '@typescript-eslint/no-unused-vars': 'off' },

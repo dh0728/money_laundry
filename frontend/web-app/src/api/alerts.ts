@@ -105,7 +105,7 @@ export type AlertAccount = {
 
 export type LinkBasis = { basis: 'TIME' | 'ACCOUNT' | 'BANK' | 'PATH'; value: string }
 
-// API.md §3.2 GET /api/alerts/{alertId} (graph·explanation은 자금 흐름 탭을 옮길 때 더한다)
+// API.md §3.2 GET /api/alerts/{alertId} (graph는 api/graph.ts에서 따로 조회, explanation은 미정)
 export type AlertDetail = AlertRow & {
   transactions: AlertTransaction[]
   typeDistribution: Partial<Record<`${TypeCode}`, number>>
@@ -115,8 +115,9 @@ export type AlertDetail = AlertRow & {
 }
 
 // API.md §6 감사 이력 행
-// REVIEW_REQUEST는 FE 제안(API.md에 없음): 9/28 회의의 Episode 관리자 검수 넘김
-export type HistoryAction = 'REVIEW_START' | 'CLOSE' | 'ESCALATE' | 'LINK' | 'UNLINK' | 'ASSIGN' | 'COMMENT' | 'EPISODE_CREATE' | 'EPISODE_CLOSE' | 'REVIEW_REQUEST'
+// FE 제안(API.md에 없음): REVIEW_REQUEST = 9/28 회의의 Episode 관리자 검수 넘김,
+// TX_RELABEL = 사람이 거래의 의심/정상 판정을 바꿈(relatedIds = 거래 ID)
+export type HistoryAction = 'REVIEW_START' | 'CLOSE' | 'ESCALATE' | 'LINK' | 'UNLINK' | 'ASSIGN' | 'COMMENT' | 'EPISODE_CREATE' | 'EPISODE_CLOSE' | 'REVIEW_REQUEST' | 'TX_RELABEL'
 export type HistoryRow = {
   id: number
   actor: { userId: number; name: string; role: string }
@@ -137,3 +138,7 @@ export const fetchAlertHistory = (alertId: number) => getJson<HistoryRow[]>(`/ap
 // API.md §3.3 종결. resolution은 NORMAL만 쓴다(SUSPICIOUS는 FE 제안이라 실제 요청에 싣지 않는다).
 export const closeAlert = (alertId: number, resolution: AlertResolution, comment: string) =>
   postJson<void>(`/api/alerts/${alertId}/close`, { resolution, comment })
+
+/** FE 제안: 사람이 거래의 의심/정상 판정을 바꾼다(API.md에 없음, Backend와 정리 예정). reason 필수 */
+export const relabelTransaction = (txId: number, label: 'SUSPICIOUS' | 'NORMAL', reason: string) =>
+  postJson<void>(`/api/transactions/${txId}/label`, { label, reason })

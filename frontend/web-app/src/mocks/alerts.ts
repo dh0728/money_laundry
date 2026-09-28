@@ -1,6 +1,7 @@
 import type { AlertRow } from '@/api/alerts'
 import type { AlertStatus, TypeCode } from '@/api/codes'
 import type { Page } from '@/api/common'
+import { seoulIso } from './time'
 import { currentScenario, mockFailure, type MockScenario } from './scenario'
 
 const NAMES = ['NORMAL', 'FAN-OUT', 'FAN-IN', 'G-SCATTER', 'S-GATHER', 'CYCLE', 'RANDOM', 'BIPARTITE', 'STACK']
@@ -18,7 +19,7 @@ function alertRow(i: number, assignee = { userId: 11, name: '오분석' }): Aler
   const ageDays = i % 6
   const created = new Date('2026-09-26T09:00:00+09:00')
   created.setDate(created.getDate() - ageDays)
-  const createdAt = created.toISOString().replace('Z', '+00:00')
+  const createdAt = seoulIso(created.getTime())
   const riskScore = Math.round((0.99 - (i % 17) * 0.021) * 100) / 100
   return {
     alertId: 3000 + i,

@@ -213,6 +213,9 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .tab-indicator,
 .sidebar-indicator { transition-duration:var(--motion-morph); transition-timing-function:var(--ease-standard); }
 .tab-indicator[data-animate=false], .sidebar-indicator[data-animate=false] { transition:none var(--motion-instant); }
+/* 계좌별·소유주별 보기 전환: Tailwind v4의 translate-x-*는 transform이 아니라 translate 속성을 쓴다 */
+.graph-view-indicator { transition:translate var(--motion-morph) var(--ease-emphasized); }
+.graph-view-option { transition:color var(--motion-normal) var(--ease-ui); }
 @media (prefers-reduced-motion: reduce) {
   .tab-indicator, .sidebar-indicator { transition:none; }
   .app-sidebar [data-slot=sidebar-gap], .app-sidebar [data-slot=sidebar-container] { transition-duration:var(--motion-instant); }
@@ -300,6 +303,24 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
+
+/* v24 자금 흐름 그래프: 의심 여부 2색(빨강 / 무채색). canvas는 CSS 변수를 직접 못 읽어 Graph에서 풀어 쓴다. */
+:root { --graph-l1:#e60000; --graph-l1-edge:#e6000073; --graph-l0:#0000004d; --graph-l0-particle:#00000080; --graph-l0-node:#3f3f46; --graph-bg:var(--card); --graph-tooltip-shadow: 0 8px 24px rgb(0 0 0 / .12); }
+.dark { --graph-l1:#ff0000; --graph-l1-edge:#ff000073; --graph-l0:#ffffff4d; --graph-l0-particle:#ffffffb3; --graph-l0-node:#e7e7ea; --graph-bg:#070709; --graph-tooltip-shadow: 0 8px 24px rgb(0 0 0 / .25); }
+.graph-canvas { background:var(--graph-bg); }
+.graph-tooltip { position:absolute; z-index:5; max-width:250px; pointer-events:none; background:var(--popover); color:var(--popover-foreground); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:11.5px; line-height:1.55; box-shadow:var(--graph-tooltip-shadow); }
+.legend-line { width:16px; height:3px; border-radius:2px; display:inline-block; }
+.legend-dash { width:16px; height:0; border-top:2.5px dashed var(--graph-l0); display:inline-block; }
+.legend-dot { width:9px; height:9px; border-radius:9px; display:inline-block; }
+.graph-dialog { display:flex; flex-direction:column; overflow:hidden; }
+.legend-dot-sm { width:6px!important; height:6px!important; }
+.graph-legend i { display:inline-block; flex:none; }
+.flow-dash { animation: flow-dash var(--motion-flow) var(--ease-linear) infinite; }
+@keyframes flow-dash { to { stroke-dashoffset: -24; } }
+@media (prefers-reduced-motion: reduce) { .flow-dash { animation: none; } }
+.flow-panel-handle { cursor: default; }
+[data-mode='float'] .flow-panel-handle { cursor: move; }
+@media (max-width:767px) { .graph-layout { overflow:auto; } .graph-layout>[data-slot=resizable-panel-group] { min-width:820px; } }
 
 .dark {
   /* 위험 점수 색(다크): 어두운 색에 흰 글씨 */

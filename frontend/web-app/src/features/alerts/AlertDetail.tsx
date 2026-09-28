@@ -1,10 +1,9 @@
-// v24 Detail.tsx(kind=Alert)를 옮김. 자금 흐름(그래프) 탭은 다음 묶음에서 옮긴다.
+// v24 Detail.tsx(kind=Alert)를 옮김. 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/v24).
+import { useMemo } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
-import { ArrowLeft } from 'lucide-react'
 import type { AlertDetail as AlertDetailData, HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay, type TypeCode } from '@/api/codes'
 import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
-import { PlannedBlock } from '@/components/Provenance'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,6 +15,11 @@ import { card, historyLabels } from './detailText'
 import { alertCode, episodeCode } from './alertFilters'
 import AlertReview, { type VerdictSubmit } from './AlertReview'
 import AlertTxTable from './AlertTxTable'
+import { toGraphModel } from '@/features/graph/adapter'
+import Graph from '@/features/graph/v24/Graph'
+import TxLabelPanel from '@/features/graph/TxLabelPanel'
+import { applyRelabels, type TxRelabels } from '@/features/graph/relabel'
+import type { RelationGraph } from '@/api/graph'
 import { moneyMetrics, sumBy, usd } from './metrics'
 
 export type DetailTab = 'overview' | 'graph' | 'transactions' | 'review'
@@ -24,18 +28,22 @@ const basisLabels = { TIME: '시간', ACCOUNT: '계좌', BANK: '은행', PATH: '
 
 type Props = {
   alert: AlertDetailData
+  graph: RelationGraph
+  relabels: TxRelabels
+  onRelabel: (txId: number, label: 0 | 1, reason: string) => void
   history: HistoryRow[]
   responsible: boolean
   assigneeNotice?: string
   episodes: number[]
-  onBack: () => void
   onOpenEpisode: (episodeId: number) => void
   onSubmit: (submit: VerdictSubmit) => void
 }
 
-export default function AlertDetail({ alert, history, responsible, assigneeNotice, episodes, onBack, onOpenEpisode, onSubmit }: Props) {
+export default function AlertDetail({ alert, graph, relabels, onRelabel, history, responsible, assigneeNotice, episodes, onOpenEpisode, onSubmit }: Props) {
   const [tab, setTab] = useMemoryState<DetailTab>(`alert:${alert.alertId}:tab`, 'overview')
-  const tx = alert.transactions
+  // 사람이 바꾼 거래 판정을 반영한다(표·그래프 공통)
+  const tx = useMemo(() => applyRelabels(alert.transactions, relabels), [alert.transactions, relabels])
+  const graphModel = useMemo(() => toGraphModel(graph, alert.transactions, relabels), [graph, alert.transactions, relabels])
   const metrics = moneyMetrics(tx, alert.subjectAccount.account)
   const daily = sumBy(tx, t => t.txAt.slice(5, 10), t => t.amountUsd).sort((a, b) => a.name.localeCompare(b.name)).map(d => ({ day: d.name, USD: Math.round(d.v) }))
   const peak = daily.reduce((best, d, i) => (d.USD > daily[best].USD ? i : best), 0)
@@ -47,7 +55,6 @@ export default function AlertDetail({ alert, history, responsible, assigneeNotic
   return (
     <div className="flex min-h-full flex-col gap-5">
       <header data-testid="detail-header">
-        <Button variant="ghost" size="sm" className="-ml-2 mb-2 h-7 gap-1 px-2 text-xs text-muted-foreground" onClick={onBack}><ArrowLeft className="size-3.5" />Alert 목록</Button>
         <p data-testid="detail-id" className="font-mono text-xs text-muted-foreground">{alertCode(alert.alertId)}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
           <h1 className="text-xl font-semibold tracking-tight">{typeDisplay(alert.primaryType.code).label} · 대표 계좌 {alert.subjectAccount.account}</h1>
@@ -132,7 +139,8 @@ export default function AlertDetail({ alert, history, responsible, assigneeNotic
         </div>
       )}
 
-      {tab === 'graph' && <PlannedBlock>자금 흐름 그래프(계좌 관계도)는 v24 시안에서 옮기는 중입니다.</PlannedBlock>}
+      {tab === 'graph' && <Graph key={alert.alertId} model={graphModel} label={`${alertCode(alert.alertId)} 관계 그래프`}
+        panelExtra={focus => <TxLabelPanel model={graphModel} focus={focus} editable={responsible && alert.status === 'OPEN'} onRelabel={onRelabel} />} />}
       {tab === 'transactions' && <AlertTxTable rows={tx} />}
       {tab === 'review' && <AlertReview alert={alert} responsible={responsible} episodes={episodes} onSubmit={onSubmit} />}
     </div>

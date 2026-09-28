@@ -16,15 +16,15 @@ import { live, mockSavedNote } from '@/lib/apiMode'
 const today = () => (live ? new Date() : new Date(2026, 8, 26))
 
 
-type Props = { alertId?: number; onOpen: (alertId: number) => void; onBack: () => void; onOpenEpisode: (episodeId: number) => void }
+type Props = { alertId?: number; onOpen: (alertId: number) => void; onOpenEpisode: (episodeId: number) => void }
 
-export default function AlertsPage({ alertId, onOpen, onBack, onOpenEpisode }: Props) {
+export default function AlertsPage({ alertId, onOpen, onOpenEpisode }: Props) {
   const { state, retry } = useAsync(() => (live ? fetchAlerts({ size: 200 }) : loadMockAlerts()), [])
   const [overrides, setOverrides] = useAlertOverrides()
   const rows = useMemo(() => (state.status === 'success' ? state.data.content.map(row => withOverride(row, overrides)) : []), [state, overrides])
 
   // 상세는 목록과 따로 불러온다. 목록은 Episode 연결 대상 고르기에만 쓴다.
-  if (alertId) return <AlertDetailPage alertId={alertId} rows={rows} onBack={onBack} onOpenEpisode={onOpenEpisode} />
+  if (alertId) return <AlertDetailPage alertId={alertId} rows={rows} onOpenEpisode={onOpenEpisode} />
 
   if (state.status === 'loading') return <div className="space-y-4"><LoadingBlock label="Alert 목록" /></div>
   if (state.status === 'error') return <div className="space-y-4"><ErrorBlock message={state.message} onRetry={retry} /></div>
