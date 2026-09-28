@@ -22,6 +22,13 @@ describe('대시보드 · 내 담당', () => {
     expect(screen.getAllByText('0.99').length).toBeGreaterThan(0)
   })
 
+  it('업무 카드와 먼저 볼 업무는 Alert 상세 주소로 이어진다', async () => {
+    render(<DashboardPage />)
+    const cards = await screen.findAllByTestId('work-card')
+    for (const card of cards) expect(card.getAttribute('href')).toMatch(/^#alerts\/\d+$/)
+    expect(screen.getByTestId('personal-ai-first').getAttribute('href')).toMatch(/^#alerts\/\d+$/)
+  })
+
   it('빈 결과면 상태별 빈 안내를 보여 준다', async () => {
     useScenario('empty')
     render(<DashboardPage />)

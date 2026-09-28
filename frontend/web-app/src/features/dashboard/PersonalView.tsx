@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { AlertRow } from '@/api/alerts'
+import { hrefFor } from '@/app/navigation'
+import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
 import { formatScore, typeDisplay } from '@/api/codes'
 import { StatusBadge } from '@/components/badges'
 import { SectionCards, type SectionCardItem } from '@/components/SectionCards'
@@ -34,10 +36,10 @@ function PersonalAiSummary({ open }: { open: AlertRow[] }) {
           <div>
             <p className="text-xs font-medium">먼저 볼 업무</p>
             {first ? (
-              <div data-testid="personal-ai-first" className="mt-2 rounded-md border px-3 py-2">
+              <a href={hrefFor('alerts', first.alertId)} data-testid="personal-ai-first" className="mt-2 block rounded-md border px-3 py-2 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <span className="block truncate text-sm">{alertSummary(first)}</span>
                 <span className="mt-0.5 block text-[11px] text-muted-foreground">A-{first.alertId} · 위험 {formatScore(first.riskScore)} · {first.ageDays}일 경과</span>
-              </div>
+              </a>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">미처리 업무가 없습니다.</p>
             )}
@@ -51,10 +53,12 @@ function PersonalAiSummary({ open }: { open: AlertRow[] }) {
 export function PersonalView() {
   const [sort, setSort] = useState<PersonalSort>('risk')
   const { state, retry } = useAsync(() => loadAlerts({ assigneeId: 'me', size: 200 }), [])
+  // mock: Alert 화면에서 판정·연결한 결과를 보드에도 반영한다(새로고침하면 처음 상태)
+  const [overrides] = useAlertOverrides()
   if (state.status === 'error') return <ErrorBlock message={state.message} onRetry={retry} />
   if (state.status === 'loading') return <LoadingBlock label="내 담당 업무" />
 
-  const mine = state.data.content
+  const mine = state.data.content.map(alert => withOverride(alert, overrides))
   const open = mine.filter(alert => alert.status === 'OPEN')
   const cards: SectionCardItem[] = [
     { label: '내 담당 미처리', value: fmt(open.length), trend: '처리 전 상태', note: '판정이 필요한 Alert' },

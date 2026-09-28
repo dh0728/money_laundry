@@ -1,4 +1,5 @@
 import type { AlertRow } from '@/api/alerts'
+import { hrefFor } from '@/app/navigation'
 import { formatScore, typeDisplay } from '@/api/codes'
 import type { DashboardData } from '@/api/dashboard'
 import { Card, CardContent } from '@/components/ui/card'
@@ -37,9 +38,11 @@ export function AiDailyReport({ summary, openAlerts }: { summary: DashboardData;
             {priority.length ? (
               <ul className="mt-2 space-y-3">
                 {priority.map(alert => (
-                  <li key={alert.alertId} data-testid="ai-priority-item" className="rounded-md border px-3 py-2.5">
-                    <p className="truncate text-sm">{alertSummary(alert)}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">A-{alert.alertId} · 위험 점수 {formatScore(alert.riskScore)} · {alert.ageDays === 0 ? '오늘 탐지' : `${alert.ageDays}일 경과`}</p>
+                  <li key={alert.alertId} data-testid="ai-priority-item">
+                    <a href={hrefFor('alerts', alert.alertId)} className="block rounded-md border px-3 py-2.5 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <p className="truncate text-sm">{alertSummary(alert)}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">A-{alert.alertId} · 위험 점수 {formatScore(alert.riskScore)} · {alert.ageDays === 0 ? '오늘 탐지' : `${alert.ageDays}일 경과`}</p>
+                    </a>
                   </li>
                 ))}
               </ul>

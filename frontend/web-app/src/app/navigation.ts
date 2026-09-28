@@ -19,6 +19,9 @@ const pages: Page[] = ['dashboard', 'transactions', 'alerts', 'episodes', 'notif
 // 라우터를 들이기 전까지 주소의 # 뒤 값으로 화면을 고른다
 export const pageFromHash = (hash: string): Page => routeFromHash(hash).page
 
+/** 화면 주소. 링크(<a href>)에 그대로 쓴다. */
+export const hrefFor = (page: Page, id?: number) => (id ? `#${page}/${id}` : `#${page}`)
+
 // #alerts/3001 처럼 목록 뒤에 번호가 붙으면 상세 화면이다
 export type Route = { page: Page; id?: number }
 export const routeFromHash = (hash: string): Route => {
