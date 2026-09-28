@@ -128,9 +128,9 @@ def _latest(connection, alert):
 
 
 def _new_alert(connection, parent=None):
-    row = connection.execute("SELECT user_id FROM users WHERE role='L1' ORDER BY last_assigned_at NULLS FIRST,user_id LIMIT 1 FOR UPDATE").fetchone()
+    row = connection.execute("SELECT user_id FROM users WHERE role='STAFF' AND password_hash IS NOT NULL AND password_hash<>'' ORDER BY last_assigned_at NULLS FIRST,user_id LIMIT 1 FOR UPDATE").fetchone()
     if row is None:
-        raise AssigneeUnavailable('Register an L1 user before constructing Alerts')
+        raise AssigneeUnavailable('Register a STAFF user before constructing Alerts')
     connection.execute('UPDATE users SET last_assigned_at=clock_timestamp() WHERE user_id=%s', (row[0],))
     return connection.execute('INSERT INTO alerts(assignee_id,parent_alert_id) VALUES(%s,%s) RETURNING alert_id',
                               (row[0], parent)).fetchone()[0]

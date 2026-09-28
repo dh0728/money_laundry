@@ -16,7 +16,7 @@ Docker Desktop을 실행한 뒤 이 디렉터리에서 PowerShell로 시작한�
 
 시작하면 조작패널 http://127.0.0.1:8502 를 연다. 결과 조회는 http://127.0.0.1:8501 이다. API는 localhost:8080이며 EC2·AWS에 연결하지 않는다. 첫 실행은 이미지 빌드 시간이 필요하다. 브라우저 자동 열기를 생략하려면 `-NoBrowser`를 추가한다.
 
-PostgreSQL, S3 호환 MinIO, 더미 추론 워커, Spring, 두 화면을 함께 실행한다. 원본 파일은 읽기 전용으로 연결하고 조작패널에서는 `/data-input`으로 보인다. 첫 준비 단계에서 파일명의 은행 코드·날짜를 기준으로 보고 은행과 제출 기간, 시연 검토자를 등록한다. 은행명은 임의로 만들지 않고 보고 검증 과정에서 저장한다. 기존 등록은 덮어쓰지 않는다.
+PostgreSQL, S3 호환 MinIO, 더미 추론 워커, Spring, 두 화면을 함께 실행한다. 원본 파일은 읽기 전용으로 연결하고 조작패널에서는 `/data-input`으로 보인다. 첫 준비 단계에서 파일명의 은행 코드·날짜를 기준으로 보고 은행과 제출 기간을 등록한다. 은행명은 임의로 만들지 않고 보고 검증 과정에서 저장한다. 기존 등록은 덮어쓰지 않는다.
 
 `stop`은 컨테이너만 내린다. DB, 업로드·입출력 파일, 추론 상태, 작업 파일, 암호화 키는 `aml-demo_` 접두 Docker 볼륨에 보존된다. 같은 명령으로 다시 시작하면 이어서 조회할 수 있다. Docker Desktop에서 이 볼륨을 삭제하면 해당 데이터가 사라지므로 유지한다. 이 구성은 백업을 대신하지 않는다. 조작패널 세션의 진행 이력은 서버 데이터와 달리 재시작 시 초기화된다.
 
@@ -70,7 +70,7 @@ Cloudflare 인증이 있으면 CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET 환�
 이 화면은 example.com이나 미구성 추론 연결을 완성하지 않는다.
 로컬 E2E 실행기는 끝나면 서버를 정리하므로 상시 서버로 사용할 수 없다.
 모델 버전에 demo가 있으면 더미로 표시하고, 그 외는 출처 확인 필요로 표시한다.
-저장된 Alert 근거와 거래별 점수를 표시한다. 탐색 한도는 내부 진단 자료로 유지하고 사용자 경고로 표시하지 않는다. L1/L2 조사·판정은 아래 네 화면에서 제공한다.
+저장된 Alert 근거와 거래별 점수를 표시한다. 탐색 한도는 내부 진단 자료로 유지하고 사용자 경고로 표시하지 않는다. 직원 조사·판정은 아래 네 화면에서 제공한다.
 
 검증: `python -m unittest discover -s tests -v` (이 디렉터리 기준).
 
@@ -78,13 +78,13 @@ Cloudflare 인증이 있으면 CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET 환�
 ## 네 화면·조사 시연
 
 1. 조작패널(8502)에서 전송 전에 업무 시각을 설정한다. 자동 재생은 거래일 다음 날 09:00 KST로 전진한다. 기존 분석을 실제 시각으로 실행했던 DB는 초기화 후 시작해야 날짜가 일관된다. 진행 중/복구 대기 작업이 있거나 과거로 이동하면 거절한다.
-2. 조회 화면(8501)의 L1/L2 버튼으로 입장한다. 사이드바에서 같은 역할의 시연 직원을 바꿀 수 있다. 역할당 두 직원에게 사건이 배정되므로 담당자가 다르면 변경할 수 없다.
+2. 아래 계정 등록 절에 따라 STAFF·ADMIN 테스트 계정을 준비한다. 조회 화면(8501)에서 아이디·비밀번호로 로그인한다. 본인 담당 사건만 변경할 수 있으며 조작패널은 ADMIN 로그인이다.
 3. 대시보드는 개인/기관 탭, Transactions는 소유주→계좌→거래를 한 화면에서 탐색한다. 기간·필터 태그 X를 사용한다. 모델 판정과 사람 결론은 별도다.
-4. L1은 Alerts 상세에서 거래 범위를 선택해 정상·제외·참고/조사 대상 변경·Episode 이관한다. 목록의 여러 Alert도 범위를 확인한 뒤 한 번에 이관할 수 있다. 일부만 처리하면 열린 업무로 남는다.
-5. L2는 Episodes에서 묶음을 분리·이동·제외하고 묶음의 조사 대상 전체에 판정한다. 판정 후 범위를 바꾸려면 재검토로 판정을 열고 조정한다. 모든 조사 대상 처리 후 별도로 종결한다. 이전 결론/범위는 이력으로 남는다.
+4. 담당 직원은 Alerts 상세에서 거래 범위를 선택해 정상·제외·참고/조사 대상 변경·Episode 이관한다. 목록의 여러 Alert도 범위를 확인한 뒤 한 번에 이관할 수 있다. 일부만 처리하면 열린 업무로 남는다.
+5. 같은 팀의 담당 직원은 Episodes에서 묶음을 분리·이동·제외하고 묶음의 조사 대상 전체에 판정한다. 판정 후 범위를 바꾸려면 재검토로 판정을 열고 조정한다. 모든 조사 대상 처리 후 별도로 종결한다. 이전 결론/범위는 이력으로 남는다.
 6. 자금 흐름 탭에서 계좌 그래프/소유주 박스를 전환하고 시간 슬라이더로 거래를 순서대로 확인한다. 실명·실계좌번호는 표시하지 않는다.
 
-새 화면 API는 local 전용이며 임시 직원 헤더를 정식 인증으로 사용하지 않는다. UI는 Spring HTTP API만 호출한다. 실제 모델·원격 연결·실제 탐지 성능 검증은 이번 시연 범위 밖이다.
+새 화면 API는 dev/local의 서버 세션 인증을 사용한다. UI는 Spring HTTP API만 호출한다. 실제 모델·원격 연결·실제 탐지 성능 검증은 이번 시연 범위 밖이다.
 
 업무 시각과 조사 이력은 DB에 보존된다. 기존 stop/start 보존 방식은 같고 새 코드를 반영하려면 start 단계의 이미지 빌드를 완료해야 한다. 데이터 초기화는 기존 reset 명령을 사용하며 여기서 자동으로 삭제하지 않는다.
 
@@ -93,3 +93,51 @@ Cloudflare 인증이 있으면 CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET 환�
 
 
 기관 전체 대시보드의 ‘Episode 업무 현황’에서 현재 열린/오늘 신규/오늘 종결/배정3일 경과/검토 시작 전 건수와 첫 검토·종결 평균시간을 확인한다. 평균은 선택 기간의 해당 행동과 표본 수 기준이다. 대시보드는5분마다 갱신하며 기존 사건에 Alert를 추가해도 신규 건수는 늘지 않는다. 상세의 ‘검토 시작 기록’을 누른 시점으로 첫 검토를 센다. 고정 업무 시각에서는 경과시간도 고정된다.
+
+
+## 서버 세션 로그인·테스트 계정 등록
+
+직원 선택 버튼을 단일 로그인으로 교체했다. 결과 화면은 STAFF 또는 ADMIN으로 로그인하고, 조작패널은 ADMIN으로 로그인한다. 회원가입은 없다. 최초 실행 후 DB에 테스트 계정을 등록해야 하며 비밀번호가 없는 초기 계정은 로그인·신규 자동 배정 대상이 아니다. 기존 담당 사건을 열려면 해당 기존 계정에 비밀번호 해시를 설정한다. 기존 사용자명 l1a/l2a도 역할은 모두 STAFF다.
+
+1. 호스트의 Python 환경에서 `password_hash.py`를 실행한다. 비밀번호를 두 번 숨김 입력하면 Spring 호환 해시만 출력한다. Python이 없으면 실행 중인 로컬 demo UI 컨테이너에서 다음 명령으로 생성할 수 있다(저장소 루트 PowerShell):
+
+```powershell
+docker compose -p aml-demo -f ./backend/api-server/demo/compose.demo.yaml exec -it view python /workspace/backend/api-server/demo/password_hash.py
+```
+
+평문 비밀번호를 SQL이나 명령행 인수에 쓰지 않는다.
+
+2. 관리자 DB 도구에서 사용자명·표시 이름·해시를 대입하여 등록한다. 아래 `<생성한 해시>`는 실제 해시로 교체한다.
+
+```sql
+INSERT INTO users(username,name,role,password_hash)
+VALUES ('demo-staff','시연 직원','STAFF','<생성한 해시>');
+INSERT INTO users(username,name,role,password_hash)
+VALUES ('demo-admin','시연 관리자','ADMIN','<별도로 생성한 해시>');
+-- 기존 계정에 로그인 비밀번호를 설정할 경우 사용자명 하나를 지정한다.
+-- UPDATE users SET password_hash='<생성한 해시>' WHERE username='l1a';
+```
+
+API 연동: API.md §5의 CSRF 조회 → form 로그인 → CSRF 재조회 → 쿠키·CSRF 포함 요청 순서다. dev는 HTTPS 쿠키, local은 loopback HTTP 쿠키다. 서버 재시작·30분 유휴 후 재로그인하며 재생 중 인증 만료가 발생하면 실패를 표시하고 다음 날짜로 넘어가지 않는다. 직접 EC2 배포·FE 프록시 왕복 검증은 로컬 자동 테스트와 별개다.
+
+
+### dev 관리자 API 확인 (PowerShell)
+
+배포와 계정 등록 후 실행한다. HTTPS dev 주소를 사용하며 자격 증명은 대화식으로 입력한다. 아래는 로그인·현재 사용자 확인만 수행하며 데이터는 변경하지 않는다.
+
+```powershell
+$apiBase = 'https://dev.aiaml.co.kr'
+$credential = Get-Credential -Message 'DB에 등록한 시연 계정'
+$csrf = Invoke-RestMethod "$apiBase/api/auth/csrf" -SessionVariable amlSession
+Invoke-RestMethod "$apiBase/api/auth/login" -Method Post -WebSession $amlSession `
+  -ContentType 'application/x-www-form-urlencoded' `
+  -Headers @{'X-CSRF-TOKEN'=$csrf.token} `
+  -Body @{username=$credential.UserName; password=$credential.GetNetworkCredential().Password}
+$csrf = Invoke-RestMethod "$apiBase/api/auth/csrf" -WebSession $amlSession
+Invoke-RestMethod "$apiBase/api/me" -WebSession $amlSession
+Invoke-RestMethod "$apiBase/api/auth/logout" -Method Post -WebSession $amlSession `
+  -Headers @{'X-CSRF-TOKEN'=$csrf.token}
+Remove-Variable credential,csrf,amlSession
+```
+
+변경 API를 실행하려면 로그아웃 전에 같은 WebSession과 새 CSRF 헤더를 사용한다. 관리자의 업무 시각 설정·분석 트리거도 동일한 인증 경계를 사용하며 수신/통합 완료 조건을 우회하지 않는다.

@@ -121,7 +121,7 @@ erDiagram
         bigint user_id PK
         varchar username UK
         varchar name
-        varchar role "L1 | L2 | ADMIN"
+        varchar role "STAFF | ADMIN"
         varchar password_hash "W4 [인증]에서 채움"
         timestamptz last_assigned_at "라운드로빈 포인터"
     }
@@ -142,7 +142,7 @@ erDiagram
         varchar status "OPEN | ESCALATED | CLOSED"
         varchar resolution "NORMAL | FALSE_POSITIVE, CLOSED일 때만"
         bigint episode_id FK "ESCALATED과 항상 일치"
-        bigint assignee_id FK "L1, NOT NULL"
+        bigint assignee_id FK "STAFF, NOT NULL"
         timestamptz assigned_at
     }
     alert_transactions {
@@ -166,9 +166,9 @@ erDiagram
         bigint episode_id PK "W4"
         varchar status "OPEN | CLOSED"
         varchar resolution "NORMAL | SUSPICIOUS"
-        bigint assignee_id FK "L2"
+        bigint assignee_id FK "STAFF"
         timestamptz assigned_at
-        bigint created_by FK "L1"
+        bigint created_by FK "STAFF"
         timestamptz closed_at
     }
     history {
@@ -197,7 +197,7 @@ erDiagram
 | `transactions` | tx_id 발급, business_date/generation/status | 송수신 계좌·시각 인덱스, source 연결은 transaction_reports | 동일 내용 반복도 발생 건별 저장 |
 | `inference_results` | `(job_id, tx_id)` | `p_laundering` 0~1 CHECK, `(job_id, p_laundering DESC)` | API.md §2.2, 정합 메모 B(이름은 팀 것) |
 | `transaction_features` | `(job_id, tx_id, model_kind)` | JSONB 행 저장(2026-09-07 사용자 확정) | kickoff §7 권고안 |
-| `users` | `user_id` 발급 | `username` UNIQUE, `role` CHECK, 시드 L1 2·L2 2·ADMIN 1 | API.md §3.4·§5 |
+| `users` | `user_id` 발급 | `username` UNIQUE, `role` CHECK, V11: STAFF/ADMIN, 기존 ID 보존·비밀번호 수동 등록 | API.md §3.4·§5 |
 | `evaluation.transaction_labels` | `tx_id` | 운영 스키마 밖 | 착수 결정 2 |
 
 ### V3 보고와 정상 거래의 분리
@@ -335,3 +335,8 @@ Alert 생성 트리거가 조사 사건을 생성한다. 기존 Alert는 업무 
 ### 조사 자금 지표 저장
 
 추가 마이그레이션 없이 V10 review_events를 사용한다. MONEY_SCOPE는 명시한 가명 계좌 집합 S, MONEY_SNAPSHOT은 종결 당시 S/T·계산 기준·통화별 지표다. 변경 명령은 review_requests의 멱등성과 review_cases.revision을 공유한다. 수신/통합과 동일 advisory lock 아래 원장과 완료 보고를 조회해 한 관측 결과 안의 상태 혼합을 방지한다. 열린 사건은 현재 수신 원장, 닫힌 사건은 저장 지표만 제공한다. 원장/소속/판정은 계좌 범위 변경으로 수정하지 않는다.
+
+
+## V11 — 단일 조사팀·서버 세션
+
+users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·username·배정·감사 참조를 유지한다. password_hash는 Spring PBKDF2 v5.8 기본 설정(16바이트 salt, SHA256/310000회, 32바이트 파생키, salt+파생키의 96자리 hex). NULL/빈 값 계정은 로그인·신규 자동 배정 불가. 평문·기본 비밀번호를 저장하지 않는다. 회원가입·계정 관리 API 없음. 세션은 DB에 저장하지 않는 단일 API 서버 메모리 세션이며 재기동 시 만료한다. 실제 시간 기준 유휴30분. API §5 참조.

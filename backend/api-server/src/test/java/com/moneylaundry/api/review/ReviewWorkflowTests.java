@@ -37,7 +37,8 @@ class ReviewWorkflowTests {
   void setup() {
     jdbc.execute("truncate alerts,batch_jobs,review_cases,review_requests cascade");
     jdbc.update("update demo_business_clock set business_at=null,revision=0");
-    jdbc.update("update users set last_assigned_at=null");
+    jdbc.update("update users set last_assigned_at=now(),password_hash='test-hash'");
+    jdbc.update("update users set last_assigned_at=null where username='l2a'");
     l1 = jdbc.queryForObject("select user_id from users where username='l1a'", Long.class);
     other = jdbc.queryForObject("select user_id from users where username='l1b'", Long.class);
     l2 = jdbc.queryForObject("select user_id from users where username='l2a'", Long.class);
@@ -581,10 +582,10 @@ class ReviewWorkflowTests {
             UUID.randomUUID(), "DECIDE", List.of(select(id, 1)), null, null, null, "NORMAL", "확인");
     mvc.perform(
             post("/api/v1/review/commands").contentType("application/json").content(encode(cmd)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isUnauthorized());
     mvc.perform(
             post("/api/v1/review/commands")
-                .header("X-Demo-User-Id", l1)
+                .principal(() -> "l1a")
                 .contentType("application/json")
                 .content(encode(cmd)))
         .andExpect(status().isOk());
@@ -592,7 +593,7 @@ class ReviewWorkflowTests {
         .andExpect(status().isBadRequest());
     mvc.perform(
             get("/api/v1/dashboard")
-                .header("X-Demo-User-Id", l1)
+                .principal(() -> "l1a")
                 .param("from", "2023-09-01")
                 .param("to", "2023-09-02"))
         .andExpect(status().isOk());

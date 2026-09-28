@@ -27,7 +27,7 @@ public class ReviewController {
 
   @GetMapping("/demo/clock")
   public Map<String, Object> clock() {
-    time.localOnly();
+    time.demoOnly();
     return time.view();
   }
 
@@ -66,15 +66,14 @@ public class ReviewController {
   @PostMapping("/review/cases/{id}/money-scope")
   public Object moneyScope(
       @PathVariable long id,
-      @RequestHeader("X-Demo-User-Id") long user,
+      java.security.Principal principal,
       @RequestBody ReviewService.MoneyScope input) {
-    return reviews.setMoneyScope(id, user, input);
+    return reviews.setMoneyScope(id, reviews.userId(principal), input);
   }
 
   @PostMapping("/review/commands")
-  public Object command(
-      @RequestHeader("X-Demo-User-Id") long user, @RequestBody ReviewService.Command cmd) {
-    return reviews.command(user, cmd);
+  public Object command(java.security.Principal principal, @RequestBody ReviewService.Command cmd) {
+    return reviews.command(reviews.userId(principal), cmd);
   }
 
   @GetMapping("/ledger/{kind}")
@@ -88,7 +87,7 @@ public class ReviewController {
       @RequestParam(required = false) List<String> payments,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    time.localOnly();
+    time.demoOnly();
     return ledger.query(
         kind,
         new LedgerQueryService.Filter(from, to, owner, account, judgement, payments, page, size));
@@ -96,22 +95,21 @@ public class ReviewController {
 
   @GetMapping("/review/account-nodes")
   public Object nodes(@RequestParam List<String> ids) {
-    time.localOnly();
+    time.demoOnly();
     if (ids.size() > 1000) throw com.moneylaundry.api.analysis.AnalysisService.invalid();
     return ledger.accounts(ids);
   }
 
   @GetMapping("/review/payment-formats")
   public Object payments() {
-    time.localOnly();
+    time.demoOnly();
     return ledger.payments();
   }
 
   @GetMapping("/dashboard")
   public Object dashboard(
-      @RequestHeader("X-Demo-User-Id") long user,
-      @RequestParam LocalDate from,
-      @RequestParam LocalDate to) {
+      java.security.Principal principal, @RequestParam LocalDate from, @RequestParam LocalDate to) {
+    long user = reviews.userId(principal);
     reviews.actor(user);
     return dashboard.view(user, from, to);
   }

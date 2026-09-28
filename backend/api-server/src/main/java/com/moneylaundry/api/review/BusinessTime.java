@@ -24,15 +24,16 @@ public class BusinessTime {
     this.env = env;
   }
 
-  public void localOnly() {
+  public void demoOnly() {
     var p = Arrays.asList(env.getActiveProfiles());
-    if (!p.contains("local") || p.contains("prod") || p.contains("dev"))
-      throw new ApiException(HttpStatus.FORBIDDEN, "DEMO_CONTROL_DISABLED", "로컬 시연 전용 기능입니다.");
+    if (p.contains("prod") || !(p.contains("local") || p.contains("dev")))
+      throw new ApiException(
+          HttpStatus.FORBIDDEN, "DEMO_CONTROL_DISABLED", "dev/local 시연 전용 기능입니다.");
   }
 
   public Instant now() {
     var p = Arrays.asList(env.getActiveProfiles());
-    if (!p.contains("local") || p.contains("prod") || p.contains("dev")) return Instant.now();
+    if (p.contains("prod") || !(p.contains("local") || p.contains("dev"))) return Instant.now();
     Timestamp value =
         jdbc.queryForObject(
             "select business_at from demo_business_clock where id", Timestamp.class);
@@ -53,7 +54,7 @@ public class BusinessTime {
   }
 
   public Map<String, Object> set(Instant value, long expected) {
-    localOnly();
+    demoOnly();
     if (value == null) throw AnalysisService.invalid();
     return tx.execute(
         s -> {

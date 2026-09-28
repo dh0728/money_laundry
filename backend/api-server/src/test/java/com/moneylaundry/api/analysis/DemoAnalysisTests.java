@@ -112,8 +112,8 @@ class DemoAnalysisTests {
   }
 
   @Test
-  void control_is_local_only_even_with_mixed_profiles() {
-    for (String profiles : new String[] {"", "prod", "dev", "local,prod", "local,dev"}) {
+  void control_allows_dev_local_and_rejects_prod_mixed_profiles() {
+    for (String profiles : new String[] {"", "prod", "local,prod", "dev,prod"}) {
       var env = new MockEnvironment();
       if (!profiles.isEmpty()) env.setActiveProfiles(profiles.split(","));
       var mocked = mock(AnalysisService.class);

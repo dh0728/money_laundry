@@ -1,6 +1,6 @@
 # API 계약 v0.10 — 2026-09-23
 
-변경 v0.10: V10 조사 저장·시연 업무 시각·네 화면 HTTP API와 L1/L2 범위 처리를 로컬 구현했다. §9.8은 구현 경로/DTO이며 실제 배포 여부는 별도다.
+변경 v0.10: V10 조사 저장·시연 업무 시각·네 화면 HTTP API와 Alert 담당 직원/Episode 담당 직원 범위 처리를 로컬 구현했다. §9.8은 구현 경로/DTO이며 실제 배포 여부는 별도다.
 
 
 변경 v0.8: 정정 요청·전체 보고 교체, INTEGRATE/FREEZE_INPUT, 실행 세대·취소 결과 차단. Python 실행측·실 S3 관통은 후속.
@@ -44,9 +44,9 @@
 | `WORKER_FAILED` | 500 | 워커 프로세스 실패·시간 초과 |
 | `INTERNAL` | 500 | 그 외 |
 
-- **역할**: `L1`·`L2`·`ADMIN`. 엔드포인트마다 `[허용 역할]` 표기. ADMIN은 사용자·모델 관리와 **배정·재배정** 전용이며 조사 액션(종결·심층 요청·연결·의견) 불가. 조회와 변경 권한을 구분한다. 다음 조사 변경은 §9의 담당자/범위 검증을 따르며 임시 역할 버튼이 운영 인증을 대신하지 않는다.
+- **역할**: `STAFF`·`ADMIN`. 한 조사팀의 일반직원이 본인 담당 Alert/Episode를 처리한다. 관리자 시연 제어와 직원 조사 변경을 구분한다. 서버 세션 인증·권한은 §5, 사건별 범위 검증은 §9를 따른다.
 - **은행 주체 `BANK`**: 현재 목업의 임시 은행 식별(§1.1). 은행 웹·직원 로그인은 프로젝트 범위 밖이며 실제 인증 연결은 배포 전 별도 과제다.
-- **배정(2026-09-07 사용자 확정, 모델 A)**: Alert·Episode 모두 생성 시 시스템이 라운드로빈으로 담당자를 정한다(§3.4). L1이 L2를 고르지 않는다. 재배정은 ADMIN. 인증 *방식*(세션 vs JWT) `[미정: FE 로그인 착수 전, 늦어도 9/18]`.
+- **배정**: Alert·Episode 생성 시 비밀번호 해시가 등록된 STAFF에 공통 라운드로빈(§3.4). 본인 Episode 분리는 담당을 유지한다. 재배정 API는 후속이다.
 - **감사 이력**: 모든 처분 액션은 §6 이력 행을 부수효과로 기록. 처분 액션의 `comment`는 **필수**(빈 값 400).
 - **유형 코드**: 0~8, 매핑표 §2.3. 명칭은 `{ code, name }` 객체로 내보낸다(한글 표시명은 FE 소관).
 
@@ -56,9 +56,9 @@
 
 은행 측은 데이터 공급 목업만 제공한다. 은행 직원 웹·로그인·외부 통지는 구현 범위가 아니다. 상위기관 분석팀이 웹에서 결과를 조회한다.
 
-- 보고 은행은 운영자가 `banks.is_reporting=true`와 `bank_reporting_periods`의 거래 기준일 적용 기간을 사전 등록한다. URL 요청으로 자격을 만들지 않는다. 참조 은행과 보고 은행은 별개다. 미등록 은행·기준일은403 `REPORTING_NOT_REGISTERED`다. `banks.report_format=AML17` 설정에 따라 현재 공통 CSV 규칙을 선택한다.
+- 보고 은행은 운영자가 `banks.is_reporting=true`와 `bank_reporting_periods`의 거래 기준일 적용 기간을 사전 등록한다. URL 요청으로 자격을 만들지 않는다. 참조 은행과 보고 은행은 별개다. 미등록 은행·기준일은403 `REPORTING_NOT_REGISTERED`다. `banks.report_format=AMAlert 담당 직원7` 설정에 따라 현재 공통 CSV 규칙을 선택한다.
 - `X-Bank-Id`는 dev/local에서만 허용하는 테스트 대역이다. prod 혼합·미지정 프로파일은403 `BANK_IDENTITY_DISABLED`, 잘못된 정수는400이다. 실제 인증 연동을 대체하지 않는다. 모든 은행 경로는 자기 은행 신원을 확인한다.
-- **POST /api/v1/bank/uploads** `{fileName,sizeBytes,checksumSha256,businessDate}` + 정정 시 `{correctionRequestId,correctionSubmissionId}` →201 `{uploadId,bankId,url,method:"PUT",expiresAt,headers,uploadRequired}`. 기본4개 필드는 필수이며 정정2개 필드는 함께 지정한다. 한 파일은 서울 거래 기준일 하루치, 최대200MiB, 기본 URL TTL15분. 체크섬은 실제 파일 바이트 SHA-256 Base64다. 파일명 경로 문자는 거절한다.
+- **POST /api/v1/bank/uploads** `{fileName,sizeBytes,checksumSha256,businessDate}` + 정정 시 `{correctionRequestId,correctionSubmissionId}` →201 `{uploadId,bankId,url,method:"PUT",expiresAt,headers,uploadRequired}`. 기본4개 필드는 필수이며 정정2개 필드는 함께 지정한다. 한 파일은 서울 거래 기준일 하루치, 최대200MiB, 기본 URL TTAlert 담당 직원5분. 체크섬은 실제 파일 바이트 SHA-256 Base64다. 파일명 경로 문자는 거절한다.
 - 은행은 응답의 서명 헤더를 유지해 S3에 PUT한다. 은행 식별 헤더를 S3로 전달하지 않는다. S3 SDK·비공개 객체·IAM 설정 계약은 기존 저장소 설정을 유지하며 실제 배포 권한은 별도 검증한다. dev/prod는 S3 설정 누락시 시작 실패, local/default만 폴더 저장소를 허용한다.
 - **POST /api/v1/bank/uploads/{uploadId}/complete** →202 처리현황. 객체 존재·크기·실제 SHA-256 확인 후 수신을 커밋하고 비동기 검수한다. ETag를 체크섬으로 대체하지 않는다. 은행 행 잠금 후 최신 URL/상태를 다시 확인한다. 같은 번호 완료 재시도는 기존 상태를 반환한다.
 - 일반 동일 파일 완료본은409 `DUPLICATE_FILE`, 진행 중은409 `UPLOAD_IN_PROGRESS`, 새 URL이 발급된 옛 번호는409 `UPLOAD_SUPERSEDED`다. 명시적인 correctionRequestId·correctionSubmissionId 제출만 별도 정정 문맥으로 접수한다. 일반 업로드는 기존 보고를 임의 교체하지 않는다.
@@ -229,7 +229,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 ### 3.1 Alert 산출물 — 고정 맥락·근거 버전
 
-현재 구현은 V6와 `worker/alert_pipeline.py`다. `analysis_entry.py`의 ALERTS 단계는 SCORES 이후 고정 TARGET·CONTEXT와 동결 점수만 읽어 저장하고 실행 토큰·현재 run을 확인한 트랜잭션 안에서 체크포인트·카운터를 기록한다. 그 후 Spring이 run/job을 COMPLETED로 전환한다. 0개 씨앗은 정상 완료다. L1 사용자가 필요한데 없으면 `ALERT_ASSIGNEE_UNAVAILABLE` 조치 필요 오류이며 가짜 담당자는 만들지 않는다.
+현재 구현은 V6와 `worker/alert_pipeline.py`다. `analysis_entry.py`의 ALERTS 단계는 SCORES 이후 고정 TARGET·CONTEXT와 동결 점수만 읽어 저장하고 실행 토큰·현재 run을 확인한 트랜잭션 안에서 체크포인트·카운터를 기록한다. 그 후 Spring이 run/job을 COMPLETED로 전환한다. 0개 씨앗은 정상 완료다. 배정 가능한 STAFF 사용자가 필요한데 없으면 `ALERT_ASSIGNEE_UNAVAILABLE` 조치 필요 오류이며 가짜 담당자는 만들지 않는다.
 
 - 씨앗은 TARGET의 `p_laundering >= threshold_value`다. 보고 버전·개정·통합 세대·수집 범위가 마지막 성공 검사 이후 바뀌고, 변경 날짜가 기존 구성 거래일 전후2일에 해당하는 Alert는 원래 씨앗·점수를 보존하여 다시 탐색한다. 현재 선정은 날짜 기반 보수적 후보 검색이며 계좌 관련성/실제 편입은 탐색에서 확인한다. TARGET이 없어도 영향 Alert가 있으면 재추론 없이 ALERTS를 실행한다.
 - 정책 `calendar-event-v4`: 서울 업무일 기준 각 탐색 거래일 전2일~후2일 중 cutoff까지 수신·동결된 거래를 조회한다. 최신 거래에서는 사실상 과거2일+당일이며 미래 자료를 기다리는 상태는 없다. 직접 경로를 따라 발견한 거래마다 날짜 창이 이동한다. 깊이2·최대100거래·계좌활동100 한도 유지. 전체 Alert의48시간 상한은 제거했다. 공유 계좌 주변 거래는 포함하되 그 이유만으로 추가 확장하지 않는다. 직접 상류/하류 경로나 별도 씨앗은 탐색한다. 씨앗 교차 포함만 병합하며 패턴 확률은 구성 기준이 아니다.
@@ -258,29 +258,38 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 §9.4의 범위별 처리가 정본이다. 현재 V6 상태 값 OPEN/CLOSED/ESCALATED를 새 업무 결과와 동일시하지 않는다. 일부 이관 후 미처리 범위가 있으면 열린 업무를 유지하며, 모든 조사 대상이 판정·제외·이관되면 업무 완료가 가능하다. 혼합 처리를 전체 NORMAL로 표시하지 않는다.
 
-원본 Alert와 이관 시점 범위는 보존한다. `episodeId != null ⇔ ESCALATED`와 단일 Episode 귀속 제약, 연결 해제로 L1에게 자동 반송하는 구 설계는 새 부분 이관/복수 출처/직접 L2 조정 계약에 사용하지 않는다. 상태 enum 및 기존 읽기 API와의 호환은 §9.8에서 정한다. 담당자 열람 이력은 검토 사실이며 업무 상태나 모델 점수를 변경하지 않는다.
+원본 Alert와 이관 시점 범위는 보존한다. `episodeId != null ⇔ ESCALATED`와 단일 Episode 귀속 제약, 연결 해제로 Alert 담당 직원에게 자동 반송하는 구 설계는 새 부분 이관/복수 출처/직접 Episode 담당 직원 조정 계약에 사용하지 않는다. 상태 enum 및 기존 읽기 API와의 호환은 §9.8에서 정한다. 담당자 열람 이력은 검토 사실이며 업무 상태나 모델 점수를 변경하지 않는다.
 
 ### 3.4 배정 규칙
 
-- 일반 생성 시 Alert는 L1, Episode는 L2 자동 라운드로빈 배정을 유지한다. 역할별 `users.last_assigned_at` NULL 우선·오래된 순, 동률 userId 오름차순이다. Alert와 Episode 모두 생성 시 적용한다.
-- L2가 본인 조사 범위를 새 Episode로 분리하면 본인 담당으로 이어간다. 일반 생성 라운드로빈과 구분한다.
-- ADMIN 재배정은 같은 역할의 열린 업무에 한정하는 방향을 유지한다. 경로·DTO는 다음 변경 API와 함께 정한다. L2는 다른 담당자의 Episode를 임의 변경할 수 없다.
+- 일반 생성 시 Alert와 Episode 모두 비밀번호 해시가 등록된 STAFF에게 자동 라운드로빈 배정한다. 공통 `users.last_assigned_at` NULL 우선·오래된 순, 동률 userId 오름차순이다. Alert와 Episode 모두 생성 시 적용한다.
+- Episode 담당 직원가 본인 조사 범위를 새 Episode로 분리하면 본인 담당으로 이어간다. 일반 생성 라운드로빈과 구분한다.
+- ADMIN 재배정은 같은 역할의 열린 업무에 한정하는 방향을 유지한다. 경로·DTO는 다음 변경 API와 함께 정한다. Episode 담당 직원는 다른 담당자의 Episode를 임의 변경할 수 없다.
 - 배정·열람·조사 의견·종결 기록은 보존하며 미열람 전용 상태를 만들지 않는다. 사람 결론을 모델 평가 정답으로 자동 전환하지 않는다.
 - 범위 이동은 §9.4~9.5의 원자 작업이다. 비원자 UNLINK+LINK 두 요청으로 구현하지 않는다.
 
 ## 4. Episode — 조사 업무
 
-Episode 업무는 V10과 공통 review 컨트롤러로 구현했다. 승인된 목록·상세·범위 조정·판정·종결 계약은 §9.2~9.5를 따른다. Alert별 이관 범위가 초기 조사 묶음이며 L2는 본인 담당 OPEN Episode에서 제외·분리·이동할 수 있다. 묶음별 판정 후 사건을 종결하며 원래 L1 처리 기록은 덮지 않는다.
+Episode 업무는 V10과 공통 review 컨트롤러로 구현했다. 승인된 목록·상세·범위 조정·판정·종결 계약은 §9.2~9.5를 따른다. Alert별 이관 범위가 초기 조사 묶음이며 Episode 담당 직원는 본인 담당 OPEN Episode에서 제외·분리·이동할 수 있다. 묶음별 판정 후 사건을 종결하며 원래 Alert 담당 직원 처리 기록은 덮지 않는다.
 
 예전 `/api/episodes` 생성과 `/{id}/alerts` 전체 연결 API를 각각 최종 계약으로 사용하지 않는다. 단일·복수 이관은 같은 명령으로 받으며 새 Episode 생성/기존 Episode 추가와 모든 선택 범위의 변경을 한 DB 트랜잭션으로 처리한다. 마지막 범위를 옮겨 빈 사건은 정상 판정 없이 범위 정리로 종료할 수 있다. 상세는 §9.4다.
 
-## 5. 인증·사용자 (W4 [인증] — 초안, 방식은 미정)
+## 5. 인증·사용자 — 서버 세션 (dev/local)
 
-- **POST /api/auth/login** `{ username, password }` → 200 `{ userId, name, role }` / 401. 세션 쿠키 또는 토큰 `[미정: 인증 방식]`.
-- **POST /api/auth/logout** → 204.
-- **GET /api/me** → `{ userId, name, role }`.
-- **GET /api/users?role=L1|L2** [ADMIN·전 역할 조회] — 재배정 대상 선택용 `[{ userId, name, role, lastAssignedAt }]`. 사용자 생성·수정은 11월 [권한관리].
-- 사용자 테이블에 `last_assigned_at`(§3.4 라운드로빈 포인터). MVP 시드 사용자: **L1 2명, L2 2명**, ADMIN 1명(V1 시드 `l1a`·`l1b`·`l2a`·`l2b`·`admin`, 비밀번호는 W4에서 환경변수로 채움) — 라운드로빈이 시연에서 보이려면 역할당 2명 이상 필요.
+직원은 `STAFF`(일반직원)와 `ADMIN`(관리자)다. 일반직원은 본인 담당 Alert와 Episode를 모두 처리한다. 사건 종류별 판정 단위는 §9.8을 유지한다. 회원가입·계정 CRUD·관리자 재배정 API는 제공하지 않는다. 테스트 계정은 DB에 직접 등록하며 비밀번호는 해시로 저장한다. 등록 방법은 demo/README.md를 따른다.
+
+1. `GET /api/auth/csrf` → `{headerName: "X-CSRF-TOKEN", token: "..."}`. 로그인 전에도 호출하며 응답의 세션 쿠키를 보존한다.
+2. `POST /api/auth/login`, `Content-Type: application/x-www-form-urlencoded`, 본문 `username`, `password`. 1번 토큰을 지정된 헤더에 보낸다. 성공200 `{id,username,name,role}`, 실패401 `INVALID_CREDENTIALS`. 비밀번호 미등록 계정도 실패한다. 성공 시 세션 ID와 CSRF 토큰을 교체하므로 1번을 다시 호출한다. JSON 로그인 본문은 받지 않는다.
+3. `GET /api/me` → 동일 사용자 정보. 로그인하지 않았거나 세션이 만료됐으면401 `UNAUTHENTICATED`.
+4. `POST /api/auth/logout` + CSRF 헤더 →204. 서버 세션 무효화·쿠키 삭제. 로그인·로그아웃을 포함한 변경 요청에는 CSRF 헤더가 필요하며 누락·불일치는403이다.
+
+FE는 동일 출처(`/api/...`)로 쿠키를 유지하여 호출한다. `X-Demo-User-Id`로 직원을 지정할 수 없다. dev 쿠키는 HttpOnly·Secure·SameSite=Lax이며 HTTPS에서 사용한다. local은 loopback HTTP 테스트를 위해 Secure=false다. CORS 임의 개방은 하지 않는다. 프록시가 Cookie/Set-Cookie 및 CSRF 헤더를 전달해야 한다. 세션 유휴 만료는 실제 시간30분이며 API 서버 재기동 시 재로그인한다. 업무 시각을 과거로 설정해도 인증 만료 시간이 바뀌지 않는다. 다중 서버 세션 저장소는 시연 범위 밖이다.
+
+- 직원 조회 API는 로그인한 STAFF/ADMIN에게 허용한다. 직접 조사 변경은 STAFF의 본인 담당 OPEN 사건만 허용한다. 기존 Alert 이관 명령의 목적지 편입은 §9.8을 유지하며 다른 담당자의 OPEN Episode에도 편입할 수 있다. 해당 Episode의 판정·이동 권한까지 얻는 것은 아니다.
+- 업무 시각 변경·분석 등록/재개·시연 트리거는 ADMIN 전용이다. 관리자라는 이유로 다른 직원 사건을 수정할 수 없다.
+- dev/local에서만 직원 API를 제공하며 prod가 포함된 프로파일은 차단한다. 은행 업로드 API의 기존 `X-Bank-Id` 경계와 상태 검사 엔드포인트는 직원 세션 인증과 별도다.
+- V11은 기존 Alert 담당 직원/Episode 담당 직원를 STAFF로 바꾸며 사용자 ID·기존 담당·감사 이력과 사용자명은 보존한다. 기존 `l1a` 등 이름은 로그인 아이디일 뿐 직급을 의미하지 않는다. 비밀번호를 새로 만들거나 기본 비밀번호를 제공하지 않는다.
+- 자동 배정은 비밀번호 해시가 등록된 STAFF 중 last_assigned_at NULL 우선·오래된 순·userId 순이다. 새 Episode로 직접 분리하면 기존 담당자가 이어서 처리한다.
 
 ## 6. 감사 이력
 
@@ -305,13 +314,13 @@ Episode 업무는 V10과 공통 review 컨트롤러로 구현했다. 승인된 �
 
 ```http
 GET /api/v1/dashboard?from=2023-09-01&to=2023-09-10
-X-Demo-User-Id: 1
+Cookie: JSESSIONID=<로그인 세션>
 ```
 
-- 직원 ID는 `GET /api/v1/demo/users`의 실제 응답에서 선택한다. 예시의 1을 고정 계정으로 가정하지 않는다.
-- **local 전용**. dev/prod 및 혼합 프로파일은 `403 DEMO_CONTROL_DISABLED`. 임시 헤더는 운영 인증이 아니다. web-app의 dev 연결에는 별도 인증·접근 계약과 구현이 필요하다.
+- 개인 집계 주체는 `GET /api/me`의 로그인 사용자다. 요청으로 다른 직원 ID를 지정하지 않는다.
+- **dev/local 서버 세션 인증 필수**. 접근·권한은 §5를 따른다. prod 포함 프로파일은 차단한다.
 - `from`, `to`: 필수 YYYY-MM-DD. from≤to, to≤from.plusYears(2). KST 시작일00시 이상/종료일 다음00시 미만.
-- 개인 집계의 주체는 헤더 직원. 기관 집계는 전체 직원 기준.
+- 개인 집계의 주체는 로그인 직원. 기관 집계는 전체 직원 기준.
 - ‘오늘’, ‘어제’, 경과시간은 `businessAt`의 시연 업무 시각 기준. FE의 PC 현재 시각으로 대체하지 않는다.
 - §0의 일반 표기와 달리 이 응답 일부 키는 아래와 같이 snake_case다. 시각에는 `Z` 등 오프셋 표현이 포함될 수 있으므로 파싱 후 KST로 표시한다. 문서에서 임의로 필드명을 바꾸지 않는다.
 
@@ -374,7 +383,7 @@ GET /api/v1/ledger/accounts?from=2023-09-01&to=2023-09-10&owner={ownerId}&page=0
 GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId}&page=0&size=20
 ```
 
-**local 전용**이며 dev/prod에서는 403 DEMO_CONTROL_DISABLED다. 이 세 GET은 현재 X-Demo-User-Id를 요구하지 않는다. 운영 인증 완료로 해석하지 않는다.
+**dev/local 로그인 필수**이며 prod 포함 프로파일은 차단한다. 세션 쿠키로 인증하며 X-Demo-User-Id는 사용하지 않는다.
 
 | 쿼리 | 현행 동작 |
 |---|---|
@@ -446,7 +455,7 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 - 시연 업무 시각은 로컬 시연에만 적용하며 DB 보존, 패널 KST 설정·다음 날 이동·자동 재생과 연동한다. 자동 재생의 업무일은 거래 기준일 다음 날이다. 처리 중 변경 금지, 처리한 시점보다 뒤로 돌아가려면 시연 데이터 초기화가 필요하다.
 - 업무 시각은 오늘/어제·기간·배정/검토/종결·경과 일수에 사용한다. 실제 시간은 S3 서명/인증 만료·통신/재시도·실행 소요·서버 로그에 사용한다. 실제 수신 cutoff를 시연 시각으로 무조건 대체하지 않는다. 원장의 거래 발생 시각은 그대로다.
 - 달력은 KST 날짜 범위. 시작일 00:00 이상, 종료일 다음 날 00:00 미만이다. 같은 필터 종류 복수 값은 OR, 종류 사이는 AND. 필터 태그 X는 해당 값만 해제한다. 페이지 응답은 §0을 유지한다.
-- 시연 입장은 고정 L1/L2 선택 버튼이다. 정식 인증/다중 계정 권한은 후속이며 클라이언트가 지정한 역할을 운영 인증으로 간주하지 않는다.
+- 시연 입장은 고정 Alert 담당 직원/Episode 담당 직원 선택 버튼이다. 정식 인증/다중 계정 권한은 후속이며 클라이언트가 지정한 역할을 운영 인증으로 간주하지 않는다.
 
 ### 9.2 조회 책임과 화면별 데이터
 
@@ -476,10 +485,10 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 ### 9.4 범위 처리·단일/복수 이관
 
 - 조사 대상 SUBJECT, 참고 맥락 CONTEXT, 범위 제외를 구분한다. 자동 탐색의 SEED/CONNECTION/CONTEXT와 사람의 조사 역할은 별도다. 모델 정상 거래도 조사 대상일 수 있다. 이관 시 두 범위 건수를 확인하고 원본 근거 버전/출처를 고정한다.
-- L1: 다중 선택 정상 판정·제외·부분/전체 이관. 미처리 대상이 있으면 Alert 업무를 유지하며 전부 처리하면 완료 가능하다. 혼합 처리 결과를 전체 NORMAL로 축약하지 않는다. 제외/이관은 의심 또는 정상 확정이 아니다.
+- Alert 담당 직원: 다중 선택 정상 판정·제외·부분/전체 이관. 미처리 대상이 있으면 Alert 업무를 유지하며 전부 처리하면 완료 가능하다. 혼합 처리 결과를 전체 NORMAL로 축약하지 않는다. 제외/이관은 의심 또는 정상 확정이 아니다.
 - 이관 명령은 단일/복수 모두 같은 API에서 배열을 받는다. 각 항목에는 Alert ID, 근거/조사 범위 버전, 선택 거래 범위가 필요하다. 목적지는 새 Episode 또는 기존 OPEN Episode다. 구체 DTO 이름은 미확정이며 단순 alertIds 배열만으로 부분 범위를 잃지 않아야 한다.
-- 한 요청의 새 Episode 생성(해당 시)·모든 범위 연결·업무 상태·감사 기록은 함께 성공/취소한다. 항목별 일부 성공 방식은 채택하지 않는다. 담당자 권한·목적지 상태·현재 범위를 서버가 확인한다. 신규 일반 Episode는 기존 L2 라운드로빈 배정 원칙을 유지한다.
-- L2: 이관된 Alert별 초기 묶음을 검토하고 필요 시 제외·분리·이동. 이동 목적지는 같은 Episode 묶음, 본인 담당 다른 OPEN Episode, 본인 담당 새 Episode다. 다른 담당자의 사건을 임의 변경하지 않는다. 원본 L1 이관 기록을 수정하지 않는다.
+- 한 요청의 새 Episode 생성(해당 시)·모든 범위 연결·업무 상태·감사 기록은 함께 성공/취소한다. 항목별 일부 성공 방식은 채택하지 않는다. 담당자 권한·목적지 상태·현재 범위를 서버가 확인한다. 신규 일반 Episode는 기존 Episode 담당 직원 라운드로빈 배정 원칙을 유지한다.
+- Episode 담당 직원: 이관된 Alert별 초기 묶음을 검토하고 필요 시 제외·분리·이동. 이동 목적지는 같은 Episode 묶음, 본인 담당 다른 OPEN Episode, 본인 담당 새 Episode다. 다른 담당자의 사건을 임의 변경하지 않는다. 원본 Alert 담당 직원 이관 기록을 수정하지 않는다.
 - Episode 묶음 하나/여러 개의 고정 SUBJECT 범위에 정상/세탁 의심 일괄 판정. CONTEXT나 나중 추가 거래에는 자동 적용하지 않는다. 판정 후 범위 변경 시 현재 범위 재확인이 필요하고 이전 판정은 보존한다.
 - 종결: 미판정 대상이 있으면 거절. 모두 처리한 후 의심 묶음이 하나 이상이면 세탁 의심(적용 범위 명시), 모두 정상이면 정상, 전부 이동/제외면 판정 없는 범위 정리 종료. 원장·모델 점수·다른 사건 상태는 덮지 않는다. 구체 상태/종결 코드 매핑은 §9.8이다.
 
@@ -498,26 +507,26 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 - 시연 시각 보존·시간 경계·처리 중/역방향 변경 거절, 실제 URL 만료/재시도 시간 불변.
 - 전체 거래 탐색·모델 필터·미분석·KST 경계·빈 결과, 분석 거래 4분면과 사람 판정 분리.
 - 부분 정상/제외/이관, 다중 이관 중 하나 실패 시 전체 롤백, 재전송·동시 판정/종결 충돌.
-- L2 묶음 분리/이동·맥락 미전파·원본 출처 보존·다중 사건 중복 합산 방지·빈 사건 종료·혼합 결론.
+- Episode 담당 직원 묶음 분리/이동·맥락 미전파·원본 출처 보존·다중 사건 중복 합산 방지·빈 사건 종료·혼합 결론.
 - 모델 정답 라벨 없이 구성/설명 생성, 개별 확률을 사건 확률로 표시하지 않음.
 - PostgreSQL 통합 테스트와 Streamlit AppTest로 주요 정상/실패 경로를 검증했다. 최신 100CSV 전체 관통·실제 모델·원격 환경은 별도 검증이다.
 
 ### 9.8 구현 HTTP 계약
 
-다음 API는 임시 직원 식별을 사용하는 **local 전용**이다. dev/prod 또는 혼합 프로파일은 403 DEMO_CONTROL_DISABLED다. 정식 프론트엔드 연결에서는 인증 주체를 서버 인증으로 교체해야 하며 헤더 자체를 운영 인증으로 사용하지 않는다. 사건 ID(caseId)는 원본 alertId와 별개다.
+다음 API는 **dev/local 서버 세션 인증**을 사용한다. 접근·권한·CSRF는 §5를 따른다. 직원 식별 헤더는 사용하지 않는다. 사건 ID(caseId)는 원본 alertId와 별개다.
 
 | 요청 | 입력 / 응답 |
 |---|---|
 | GET /api/v1/demo/clock | businessAt(오프셋 시각), configured, revision |
 | POST /api/v1/demo/clock | {businessAt,revision}; 현재 개정/진행 작업/역방향을 검사하고 저장. 최초 설정 전에 기존 분석이 있으면 초기화 필요 |
-| GET /api/v1/demo/users | 시연 L1/L2 직원 id,name,role. 화면에서는 역할 선택 후 해당 역할 직원 전환 |
+| GET /api/v1/demo/users | 로그인 후 직원 id,name,role 조회. 이 목록으로 로그인하거나 직원 신원을 변경할 수 없음 |
 | GET /api/v1/ledger/owners 또는 accounts 또는 transactions | from,to(KST 거래일),owner/account(UUID),judgement(SUSPICIOUS,NORMAL,UNANALYZED),payments(복수),page,size. content/page/size/totalElements/totalPages |
 | GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),page,size. 위험도 내림차순 |
 | GET /api/v1/review/cases/{caseId} | caseId,kind,alertId,status,outcome,revision,assigneeId/Name,createdAt,assignedAt,closedAt,groups,summary,pendingCount,sourceAlertIds,primaryTypes,history,relatedDecisions |
 | GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 소유주 박스/계좌 노드 연결용; 원문 이름·계좌번호 제외 |
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
-| GET /api/v1/dashboard | from,to와 X-Demo-User-Id 헤더. businessAt,personal,institution,detection,deliveryDate,pendingReports,daily,agreements,types,activities,priority |
-| POST /api/v1/review/commands | X-Demo-User-Id 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
+| GET /api/v1/dashboard | from,to와 로그인 세션. businessAt,personal,institution,detection,deliveryDate,pendingReports,daily,agreements,types,activities,priority |
+| POST /api/v1/review/commands | 로그인 세션·CSRF 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
 
 명령 본문:
 
@@ -535,7 +544,7 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 ```
 
 - groupId와 revision은 GET 값을 그대로 전달한다. 최초 미저장 Alert 묶음의 0도 유효하다. Alert revision은 업무 개정과 완료 근거 버전을 결합한 불투명 값이다. 재계산하지 않는다.
-- action: SUBJECT,CONTEXT,EXCLUDE,DECIDE,TRANSFER(L1),SPLIT/MOVE/RECONSIDER(L2),COMMENT,REVIEW_START,CLOSE. DECIDE의 decision은 NORMAL/SUSPICIOUS이며 L1은 NORMAL만 가능하다. L2 DECIDE는 선택 묶음의 미판정 SUBJECT 전체가 필요하다. RECONSIDER는 OPEN 묶음의 이전 판정을 이력에 남기고 다시 미판정으로 열어 범위 조정할 때 사용한다.
+- action: SUBJECT,CONTEXT,EXCLUDE,DECIDE,TRANSFER(Alert),SPLIT/MOVE/RECONSIDER(Episode),COMMENT,REVIEW_START,CLOSE. DECIDE의 decision은 NORMAL/SUSPICIOUS이며 Alert DECIDE는 NORMAL만 가능하다. Episode DECIDE는 선택 묶음의 미판정 SUBJECT 전체가 필요하다. RECONSIDER는 OPEN 묶음의 이전 판정을 이력에 남기고 다시 미판정으로 열어 범위 조정할 때 사용한다.
 - 대상 caseId가 없으면 TRANSFER/MOVE는 새 Episode, 있으면 targetRevision 필수다. 같은 Episode의 다른 묶음으로 MOVE할 때 targetGroupId를 지정한다. SPLIT은 같은 Episode에 새 묶음을 만든다. 부분/복수 이관 모두 같은 명령이며 한 건 실패하면 전체 롤백한다.
 - 초기 SEED/CONNECTION은 SUBJECT, CONTEXT는 참고 맥락이다. members에는 txId,reviewRole,state,decision,transaction(고정 거래/점수),sources(원본 Alert/근거/유형)가 있다. 처리 상태는 PENDING/DECIDED/EXCLUDED/TRANSFERRED이며 자동 탐색 transaction.role과 구분한다.
 - 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED. 사건 종결은 명시 CLOSE이고 미판정 SUBJECT 또는 같은 사건의 상충 판정이 남으면 거절한다. 기존 alerts 상태는 이관 포함 종결 시 ESCALATED, 그 외 CLOSED로 맞춘다. 원본 근거와 다른 사건 판정은 보존한다.
@@ -560,7 +569,7 @@ Alert/Episode 개요 공통. 총 거래액은 기존 사건 SUBJECT 거래 합�
 - 같은 시각의 거래에는 순서 근거가 없어 출금 먼저 처리한다. 자기 계좌 이체는 순유입 집계에는 반영하지만 FIFO 평가에서는 제외한다. 반복 거래는 서로 다른 tx_id면 보존하며 이중 보고/복수 소속은 한 거래로 센다. 환산 없이 통화를 합치지 않는다.
 - 초기 Δt=180분. 비교 선택 5/15/30/60/180/360/1440분. 시연 원장690,519거래의 FIFO 분포를 비교한 탐색용 초기값이며 정상/세탁 판정 임계가 아니다. Small 전체 기간 실측이며 사건별 최적 시간/실제 탐지 성능을 입증하지 않는다.
 
-`GET /api/v1/review/cases/{caseId}/money?minutes=180` (local 전용):
+`GET /api/v1/review/cases/{caseId}/money?minutes=180` (dev/local 로그인 필수):
 
 - selectedAccounts,candidateAccounts,customScope,revision,delayMinutes,requestedFrom/To,observedAt(실제 조회시각).
 - available=false이면 reason=EMPTY_SUBJECT_SCOPE/EMPTY_ACCOUNT_SCOPE/WAITING_RECEIPTS/NO_CLOSED_SNAPSHOT이며 비율을0으로 만들지 않는다.
@@ -573,7 +582,7 @@ Alert/Episode 개요 공통. 총 거래액은 기존 사건 SUBJECT 거래 합�
 {"requestId":"UUID","revision":1000001,"accounts":["가명 계좌 UUID"],"comment":"조사 중심 계좌 조정"}
 ```
 
-X-Demo-User-Id 필수. 본인 담당 OPEN 사건·기대 revision·실재 가명 계좌를 검증한다. accounts는 최대1000개, 빈 배열은 빈 S를 명시한다. 멱등 요청은 기존 review_requests를 사용하고 MONEY_SCOPE 이력·사건 개정과 원자 저장한다. 상태/HTTP 오류 원칙은 §9.8과 같다.
+로그인 세션·CSRF 헤더 필수. 본인 담당 OPEN 사건·기대 revision·실재 가명 계좌를 검증한다. accounts는 최대1000개, 빈 배열은 빈 S를 명시한다. 멱등 요청은 기존 review_requests를 사용하고 MONEY_SCOPE 이력·사건 개정과 원자 저장한다. 상태/HTTP 오류 원칙은 §9.8과 같다.
 
 종결할 때 180분 지표를 MONEY_SNAPSHOT 이벤트에 저장하며 이후 수신/원장 정정에도 바꾸지 않는다. CLOSED 조회는 minutes와 무관하게 그 스냅샷을 반환한다. 과거 종결 사건에 기록이 없으면 현재 원장으로 과거를 재구성하지 않는다. 원문 정보/정답 라벨은 조회·계산에 사용하지 않는다.
 
@@ -589,4 +598,4 @@ GET /api/v1/dashboard의 episodeWork에 기관 전체 Episode 업무 집계를 �
 - completion.samples/average_seconds: 선택 기간에 종결한 Episode 수 및 생성→종결 산술평균(초). 사건 결과와 무관한 업무 완료시간이며 판정 없는 범위 정리 종료도 포함한다. 표본0이면 평균null(화면 ‘—’).
 - oldestOpen: 배정 오래된 순 최대20건의 caseId,assignee,age_seconds,awaiting_review. 현재 미처리 경과는 배정 기준이며 사건 생성→종결 시간과 구분한다.
 
-조회 기간은 기존 KST from00시 이상/to 다음날00시 미만이다. 현재/오늘 카드에는 기간 필터를 적용하지 않는다. 최초 검토는 실제 브라우저 열람 감지가 아니라 현재 구현의 명시 ‘검토 시작 기록’이다. 임시 직원 식별/local 제한은 기존 API와 동일하며 DB 스키마 변경은 없다.
+조회 기간은 기존 KST from00시 이상/to 다음날00시 미만이다. 현재/오늘 카드에는 기간 필터를 적용하지 않는다. 최초 검토는 실제 브라우저 열람 감지가 아니라 현재 구현의 명시 ‘검토 시작 기록’이다. 서버 세션 인증·권한은 §5와 동일하며 DB 스키마 변경은 없다.

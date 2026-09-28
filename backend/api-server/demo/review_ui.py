@@ -360,7 +360,7 @@ def cases_page(client, user, today, kind):
     shown = [dict(선택=False, 사건=r['caseId'], Alert=r.get('alertId'), 위험도=r['summary']['riskScore'], 유형=' · '.join(r['primaryTypes']), 씨앗유형비중=r['summary']['typeShare'], 거래금액=str(r['summary']['amountsByCurrency']), 거래수=r['summary']['txCount'], 담당자=r['assigneeName'], 상태=r['status'], 탐지일=display(r['createdAt']), 경과일=r['ageDays']) for r in rows]
     edited = st.data_editor(pd.DataFrame(shown), hide_index=True, disabled=[k for k in shown[0] if k != '선택'], key=kind + '_selection')
     picked = edited.loc[edited['선택'], '사건'].tolist()
-    if kind == 'ALERT' and user['role'] == 'L1' and picked:
+    if kind == 'ALERT' and user['role'] == 'STAFF' and picked:
         with st.expander('선택 Alert들을 Episode로 이관', expanded=True):
             selections = []
             valid = True
@@ -456,34 +456,21 @@ def main():
     st.set_page_config(page_title='AML RADAR', layout='wide')
     base = os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080')
     try:
-        client = ApiClient(base)
-        users = client.get('demo/users')
+        from api_client import login_panel
+        authenticated = login_panel(base)
+        if authenticated is None:
+            return
+        client, user = authenticated
         clock = client.get('demo/clock')
         today = datetime.fromisoformat(clock['businessAt']).astimezone(KST).date()
-        if 'review_user' not in st.session_state:
-            st.title('AML RADAR')
-            st.caption('시연 직원 선택 · 정식 로그인은 후속 구현입니다.')
-            cols = st.columns(2)
-            for col, role in zip(cols, ['L1', 'L2']):
-                if col.button(role + (' · Alert 검토' if role == 'L1' else ' · Episode 조사'), width='stretch'):
-                    st.session_state['review_user'] = next(u for u in users if u['role'] == role)
-                    st.rerun()
-            return
-        user = st.session_state['review_user']
-        client.headers['X-Demo-User-Id'] = str(user['id'])
         with st.sidebar:
             st.title('AML RADAR')
             st.write(user['name'], user['role'])
-            # Demo seed has multiple staff per role. Switching is explicit and local-only.
-            same_role = [u for u in users if u['role'] == user['role']]
-            selected = st.selectbox('시연 담당자', same_role, index=next(i for i,u in enumerate(same_role) if u['id']==user['id']), format_func=lambda u:u['name'])
-            if selected['id'] != user['id']:
-                st.session_state['review_user'] = selected
-                st.rerun()
             st.caption('업무 시각 ' + display(clock['businessAt']))
             page = st.radio('화면', ['대시보드', 'Transactions', 'Alerts', 'Episodes', '분석 작업'])
-            if st.button('직원 선택으로 돌아가기'):
-                del st.session_state['review_user']
+            if st.button('로그아웃'):
+                client.logout()
+                st.session_state.pop('staff_client', None)
                 st.rerun()
             st.button('새로고침')
         if st.session_state.get('last_action'):

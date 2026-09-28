@@ -78,7 +78,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 time.sleep(0.25)
         cls.addClassCleanup(cls.admin.close)
         migrations = Path(__file__).resolve().parents[1] / "src/main/resources/db/migration"
-        for version in range(1, 10):
+        for version in range(1, 12):
             files = list(migrations.glob(f"V{version}__*.sql"))
             if len(files) != 1:
                 raise RuntimeError("Expected exactly one migration per version")

@@ -36,9 +36,9 @@ public class DemoAnalysisController {
   @PostMapping("/analysis")
   public ResponseEntity<Map<String, Object>> trigger(@RequestBody Trigger input) {
     var profiles = Arrays.asList(environment.getActiveProfiles());
-    if (!profiles.contains("local") || profiles.contains("prod") || profiles.contains("dev"))
+    if (profiles.contains("prod") || !(profiles.contains("local") || profiles.contains("dev")))
       throw new ApiException(
-          HttpStatus.FORBIDDEN, "DEMO_CONTROL_DISABLED", "로컬 시연 환경에서만 사용할 수 있습니다.");
+          HttpStatus.FORBIDDEN, "DEMO_CONTROL_DISABLED", "dev/local 시연 환경에서만 사용할 수 있습니다.");
     return ResponseEntity.accepted()
         .body(
             Map.of(

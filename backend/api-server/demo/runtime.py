@@ -135,7 +135,6 @@ def seed():
                 SELECT %s,%s,%s WHERE NOT EXISTS(SELECT 1 FROM bank_reporting_periods
                 WHERE bank_id=%s AND effective_from_date<=%s AND (effective_to_date IS NULL OR effective_to_date>=%s))''',
                 (bank, day, day, bank, day, day))
-        db.execute("INSERT INTO users(username,name,role) SELECT 'local-demo-reviewer','Demo reviewer','L1' WHERE NOT EXISTS(SELECT 1 FROM users WHERE username='local-demo-reviewer')")
     s3 = boto3.client('s3', config=Config(signature_version='s3v4'))
     try:
         s3.head_bucket(Bucket=BUCKET)
