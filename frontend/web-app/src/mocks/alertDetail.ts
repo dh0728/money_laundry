@@ -68,7 +68,7 @@ export function detailOf(row: AlertRow): AlertDetail {
 function historyOf(row: AlertRow): HistoryRow[] {
   const base = { targetType: 'ALERT' as const, targetId: row.alertId, relatedIds: [], resolution: null, comment: null }
   const system = { userId: 0, name: '시스템', role: 'SYSTEM' }
-  const person = { ...row.assignee, role: 'L1' }
+  const person = { ...row.assignee, role: 'INVESTIGATOR' }
   const rows: HistoryRow[] = [
     { ...base, id: 1, actor: system, action: 'ASSIGN', from: null, to: 'OPEN', at: row.assignedAt, relatedIds: [row.assignee.userId] },
     { ...base, id: 2, actor: person, action: 'REVIEW_START', from: 'OPEN', to: 'OPEN', at: row.assignedAt },

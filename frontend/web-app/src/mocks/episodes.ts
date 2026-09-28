@@ -66,7 +66,7 @@ function detailOfEpisode(episodeId: number, alerts: AlertRow[]): EpisodeDetail {
   const sum = (list: EpisodeTransaction[]) => list.reduce((s, t) => s + t.amountUsd, 0)
   const times = tx.map(t => t.txAt).sort()
   const system = { userId: 0, name: '시스템', role: 'SYSTEM' }
-  const person = { ...row.createdBy, role: 'L1' }
+  const person = { ...row.createdBy, role: 'INVESTIGATOR' }
   const base = { targetType: 'EPISODE' as const, targetId: episodeId, from: null, to: 'OPEN', resolution: null }
   return {
     ...row,

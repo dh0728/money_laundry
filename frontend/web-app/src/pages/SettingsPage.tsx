@@ -16,7 +16,8 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [zone, setZone] = useMemoryState('settings:zone', 'seoul'), [dateFormat, setDateFormat] = useMemoryState('settings:date', 'iso'), [rows, setRows] = useMemoryState('settings:rows', '20'), [sort, setSort] = useMemoryState('settings:sort', 'risk'), [alerts, setAlerts] = useMemoryState('settings:alerts', ['assigned', 'linked', 'comment', 'result'])
   const reset = () => { setZone('seoul'); setDateFormat('iso'); setRows('20'); setSort('risk'); setAlerts(['assigned', 'linked', 'comment', 'result']); setTheme('dark'); toast.success('설정을 초기화했습니다.') }
-  const choices = MOCK_USER.role === 'L1' ? [['assigned', '내 Alert 배정'], ['linked', 'Alert의 Episode 연결'], ['comment', '새 의견'], ['result', 'Batch 결과']] : [['assigned', '내 Episode 배정'], ['linked', 'Episode에 Alert 연결'], ['comment', '새 의견'], ['result', '종결 결과']]
+  // 조사자는 Alert 판정과 Episode 생성을 이어서 하고, 관리자는 Episode 검수를 받는다(9/28)
+  const choices = MOCK_USER.role === 'INVESTIGATOR' ? [['assigned', '내 Alert 배정'], ['linked', 'Episode 연결 · 생성'], ['comment', '새 의견'], ['result', 'Episode 검수 결과']] : [['assigned', 'Episode 검수 요청'], ['linked', 'Episode에 Alert 연결'], ['comment', '새 의견'], ['result', 'Batch 결과']]
   // 설정은 선택 즉시 적용. 각 묶음은 같은 Card/SectionTitle 구조를 쓴다.
   return (
     <div className="space-y-6">

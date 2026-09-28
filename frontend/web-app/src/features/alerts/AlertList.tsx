@@ -87,7 +87,7 @@ type Props = {
 export default function AlertList({ rows, today, onOpen, onLink }: Props) {
   const me = MOCK_USER.userId
   const [query, setQuery] = useState('')
-  // v24처럼 "내 담당" 조건을 켠 채 시작한다(API.md §3.2 L1 기본 뷰)
+  // v24처럼 "내 담당" 조건을 켠 채 시작한다(API.md §3.2 기본 뷰 assigneeId=me)
   const [filters, setFilters] = useState<AlertFilter[]>([{ field: 'assignee', value: me }])
   const [range, setRange] = useState<DateRange>()
   const [filterOpen, setFilterOpen] = useState(false)
