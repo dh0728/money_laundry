@@ -15,12 +15,12 @@ import { useAsync } from '@/lib/useAsync'
 import { workStatuses } from '@/lib/workStatus'
 import { loadAlerts, loadMyEpisodes } from './dataSource'
 import { WorkCard } from './WorkCard'
-import { sortWork, STALE_DAYS, workItems, workSorts, type WorkItem, type WorkSort } from './workItems'
+import { sortWork, STALE_DAYS, workItems, workSorts, type WorkSort } from './workItems'
 
 const HIGH_RISK = 0.8
 
 // 규칙으로 만든 문장이다(LLM 연결 전 mock). 위 카드·아래 보드와 겹치는 "현재 상황"은 두지 않는다.
-function PersonalAiSummary({ pending, first }: { pending: AlertRow[]; first?: WorkItem }) {
+function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
   const counts = pending.reduce<Record<number, number>>((acc, alert) => ({ ...acc, [alert.primaryType.code]: (acc[alert.primaryType.code] ?? 0) + 1 }), {})
   const focus = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
   return (
@@ -31,22 +31,9 @@ function PersonalAiSummary({ pending, first }: { pending: AlertRow[]; first?: Wo
           <ProvenanceBadge kind="mock" title="규칙으로 만든 문장입니다. LLM 연결은 발표 뒤 범위입니다." />
           <p className="ml-auto text-[11px] text-muted-foreground">판단은 조사자가 수행</p>
         </div>
-        <div className="mt-4 grid gap-4 @3xl:grid-cols-2">
-          <div>
-            <p className="text-xs font-medium">집중 패턴</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{focus ? `처리 전 Alert 중 ${typeDisplay(Number(focus[0]) as AlertRow['primaryType']['code']).key} 의심이 ${focus[1]}건으로 가장 많습니다. 같은 소유주·계좌가 반복되는지 함께 보세요.` : '처리 전 Alert가 없습니다.'}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium">먼저 볼 업무</p>
-            {first ? (
-              <a href={first.href} data-testid="personal-ai-first" className="mt-2 block rounded-md border px-3 py-2 interactive-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <span className="block font-mono text-sm">{first.code}</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">{first.kind} · 위험 {formatScore(first.riskScore)} · {first.ageDays}일 경과</span>
-              </a>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">처리할 업무가 없습니다.</p>
-            )}
-          </div>
+        <div className="mt-4">
+          <p className="text-xs font-medium">집중 패턴</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{focus ? `처리 전 Alert 중 ${typeDisplay(Number(focus[0]) as AlertRow['primaryType']['code']).key} 의심이 ${focus[1]}건으로 가장 많습니다. 같은 소유주·계좌가 반복되는지 함께 보세요.` : '처리 전 Alert가 없습니다.'}</p>
         </div>
       </CardContent>
     </Card>
@@ -69,14 +56,13 @@ export function PersonalView() {
   const pending = myAlerts.filter(alert => alert.status === 'OPEN')
   const active = items.filter(item => item.status !== 'DONE')
   const stale = active.filter(item => item.ageDays >= STALE_DAYS)
-  const first = sortWork(active.filter(item => item.riskScore >= HIGH_RISK), 'age')[0] ?? sortWork(active, 'risk')[0]
 
   return (
     <>
       <div className={`grid grid-cols-1 items-stretch gap-4 @xl:grid-cols-2 @5xl:grid-cols-4 ${sectionCardSurface}`} data-testid="personal-top">
         <SectionCard item={{ label: `위험 점수 ${formatScore(HIGH_RISK)} 이상`, value: fmt(pending.filter(alert => alert.riskScore >= HIGH_RISK).length), trend: '처리 전 Alert', note: '판정이 급한 고위험 건' }} />
         <SectionCard item={{ label: `${STALE_DAYS}일 이상 경과`, value: fmt(stale.length), trend: `Alert ${stale.filter(item => item.kind === 'Alert').length} · Episode ${stale.filter(item => item.kind === 'Episode').length}`, note: '처리 전·처리 중 업무 중 오래 머문 건' }} />
-        <PersonalAiSummary pending={pending} first={first} />
+        <PersonalAiSummary pending={pending} />
       </div>
       <section aria-labelledby="queue-title">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">

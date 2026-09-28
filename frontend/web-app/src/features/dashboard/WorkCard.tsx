@@ -1,8 +1,8 @@
 import { AgeBadge, PatternBadge, RiskBadge } from '@/components/badges'
-import { Badge } from '@/components/ui/badge'
 import type { WorkItem } from './workItems'
 
-// 대시보드 업무 카드. 글은 ID와 개수·금액 요약만 두고, 종류·패턴·경과일·위험 점수는 태그로 보인다.
+// 대시보드 업무 카드. ID(A-·E-)가 종류를 알려 주므로 종류 태그는 두지 않는다.
+// 색이 있는 경과일·위험 점수는 ID 줄 오른쪽에, 무채색 패턴 태그는 맨 아래 줄에 따로 묶는다.
 // 누르면 해당 Alert·Episode 상세로 간다.
 export function WorkCard({ item }: { item: WorkItem }) {
   return (
@@ -11,19 +11,18 @@ export function WorkCard({ item }: { item: WorkItem }) {
       aria-label={`${item.code} 상세 보기`}
       data-testid="work-card"
       data-kind={item.kind}
-      className="grid grid-cols-[1fr_auto] items-start gap-x-4 gap-y-2 rounded-lg border bg-card px-5 py-4 interactive-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex flex-col gap-2 rounded-lg border bg-card px-5 py-4 interactive-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="min-w-0">
-        <span className="flex items-center gap-2">
-          <Badge variant="outline" className="semantic-metadata-badge font-normal">{item.kind}</Badge>
-          <span className="font-mono text-sm">{item.code}</span>
+      <span className="flex items-center justify-between gap-3">
+        <span className="font-mono text-sm">{item.code}</span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <AgeBadge days={item.ageDays} />
+          <RiskBadge score={item.riskScore} />
         </span>
-        <span className="mt-1.5 block truncate text-sm text-muted-foreground">{item.summary}</span>
       </span>
-      <RiskBadge score={item.riskScore} />
-      <span className="col-span-2 flex flex-wrap items-center gap-1.5">
+      <span className="block truncate text-sm text-muted-foreground">{item.summary}</span>
+      <span className="flex flex-wrap items-center gap-1.5">
         {item.types.map(code => <PatternBadge key={code} code={code} />)}
-        <AgeBadge days={item.ageDays} />
       </span>
     </a>
   )
