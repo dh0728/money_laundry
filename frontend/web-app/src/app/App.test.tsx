@@ -20,8 +20,14 @@ describe('앱 틀', () => {
 
   it('아직 옮기지 않은 메뉴는 준비 중으로 보여 준다', async () => {
     renderSignedIn()
-    fireEvent.click(screen.getByRole('button', { name: 'Episodes' }))
+    fireEvent.click(screen.getByRole('button', { name: '알림' }))
     expect(await screen.findByText('준비 중인 화면입니다.')).toBeInTheDocument()
+  })
+
+  it('Episodes 메뉴는 Episode 목록을 연다', async () => {
+    renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: 'Episodes' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Episode 목록' })).toBeInTheDocument()
   })
 
   it('Alerts 메뉴는 내 담당 Alert 목록을 연다', async () => {

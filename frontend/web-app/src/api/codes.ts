@@ -41,3 +41,8 @@ export const alertResolutionLabels: Record<AlertResolution, string> = {
 
 /** 모델 점수(0~1)를 소수 둘째 자리까지 표시 */
 export const formatScore = (score: number) => score.toFixed(2)
+
+export const episodeStatusLabels: Record<EpisodeStatus, string> = {
+  OPEN: '조사 중',
+  CLOSED: '종결',
+}

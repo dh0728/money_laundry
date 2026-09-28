@@ -8,7 +8,7 @@ const OWNERS = ['해오름무역', '김세탁', '바다물류', '박환전', '�
 const FORMATS = ['Wire', 'ACH', 'Cheque', 'Cash', 'Bitcoin']
 const REASONS = ['SEED_SCORE', 'SAME_ACCOUNT', 'WITHIN_2_DAYS', 'PATH_HOP']
 
-function detailOf(row: AlertRow): AlertDetail {
+export function detailOf(row: AlertRow): AlertDetail {
   const subject = row.subjectAccount.account
   const others = Array.from({ length: row.accountCount - 1 }, (_, k) => `acc-${(0x5000 + row.alertId * 7 + k).toString(16)}`)
   const accounts = [subject, ...others]

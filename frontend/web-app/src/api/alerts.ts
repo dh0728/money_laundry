@@ -115,7 +115,8 @@ export type AlertDetail = AlertRow & {
 }
 
 // API.md §6 감사 이력 행
-export type HistoryAction = 'REVIEW_START' | 'CLOSE' | 'ESCALATE' | 'LINK' | 'UNLINK' | 'ASSIGN' | 'COMMENT' | 'EPISODE_CREATE' | 'EPISODE_CLOSE'
+// REVIEW_REQUEST는 FE 제안(API.md에 없음): 9/28 회의의 Episode 관리자 검수 넘김
+export type HistoryAction = 'REVIEW_START' | 'CLOSE' | 'ESCALATE' | 'LINK' | 'UNLINK' | 'ASSIGN' | 'COMMENT' | 'EPISODE_CREATE' | 'EPISODE_CLOSE' | 'REVIEW_REQUEST'
 export type HistoryRow = {
   id: number
   actor: { userId: number; name: string; role: string }

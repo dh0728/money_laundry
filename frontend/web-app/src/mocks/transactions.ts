@@ -1,4 +1,5 @@
 import type { ExplorerAccount, ExplorerOwner, ExplorerTransaction, TransactionExplorerData } from '@/api/transactions'
+import { myAlertsNormal } from './alerts'
 import { currentScenario, mockFailure, type MockScenario } from './scenario'
 
 // 소유주 이름은 예시다(실제 소유주 정보는 백엔드 private 영역).
@@ -31,7 +32,8 @@ const transactions: ExplorerTransaction[] = Array.from({ length: 72 }, (_, i) =>
     paymentFormat: formats[i % formats.length],
     isSuspicious: suspicious,
     alertIds: suspicious ? [3000 + (i % 24)] : [],
-    episodeIds: suspicious && i % 4 === 0 ? [800 + (i % 24)] : [],
+    // 연결 Alert가 Episode에 들어가 있으면 그 Episode
+    episodeIds: suspicious && myAlertsNormal.content[i % 24].episodeId != null ? [myAlertsNormal.content[i % 24].episodeId!] : [],
   }
 })
 

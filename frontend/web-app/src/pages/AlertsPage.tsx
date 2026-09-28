@@ -18,15 +18,15 @@ const today = () => (live ? new Date() : new Date(2026, 8, 26))
 
 const heading = <PageHeading title="Alert 목록" description="탐지된 이상 거래를 검토하고 조사 대상을 확인합니다." />
 
-type Props = { alertId?: number; onOpen: (alertId: number) => void; onBack: () => void }
+type Props = { alertId?: number; onOpen: (alertId: number) => void; onBack: () => void; onOpenEpisode: (episodeId: number) => void }
 
-export default function AlertsPage({ alertId, onOpen, onBack }: Props) {
+export default function AlertsPage({ alertId, onOpen, onBack, onOpenEpisode }: Props) {
   const { state, retry } = useAsync(() => (live ? fetchAlerts({ size: 200 }) : loadMockAlerts()), [])
   const [overrides, setOverrides] = useAlertOverrides()
   const rows = useMemo(() => (state.status === 'success' ? state.data.content.map(row => withOverride(row, overrides)) : []), [state, overrides])
 
   // 상세는 목록과 따로 불러온다. 목록은 Episode 연결 대상 고르기에만 쓴다.
-  if (alertId) return <AlertDetailPage alertId={alertId} rows={rows} onBack={onBack} />
+  if (alertId) return <AlertDetailPage alertId={alertId} rows={rows} onBack={onBack} onOpenEpisode={onOpenEpisode} />
 
   if (state.status === 'loading') return <div className="space-y-4">{heading}<LoadingBlock label="Alert 목록" /></div>
   if (state.status === 'error') return <div className="space-y-4">{heading}<ErrorBlock message={state.message} onRetry={retry} /></div>

@@ -11,6 +11,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import AccountPage from '@/pages/AccountPage'
 import AlertsPage from '@/pages/AlertsPage'
+import EpisodesPage from '@/pages/EpisodesPage'
 import LoginPage from '@/pages/LoginPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
@@ -152,7 +153,8 @@ export default function App() {
         <main className="app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10" style={{ scrollbarGutter: 'stable' }}>
           {page === 'dashboard' ? <DashboardPage />
             : page === 'transactions' ? <TransactionsPage />
-            : page === 'alerts' ? <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onBack={() => go('alerts')} />
+            : page === 'alerts' ? <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} />
+            : page === 'episodes' ? <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onBack={() => go('episodes')} onOpenAlert={alertId => go('alerts', alertId)} />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}

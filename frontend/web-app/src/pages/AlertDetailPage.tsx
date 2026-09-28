@@ -23,9 +23,9 @@ const loadLive = async (alertId: number) => {
   return { detail, history }
 }
 
-type Props = { alertId: number; rows: AlertRow[]; onBack: () => void }
+type Props = { alertId: number; rows: AlertRow[]; onBack: () => void; onOpenEpisode: (episodeId: number) => void }
 
-export default function AlertDetailPage({ alertId, rows, onBack }: Props) {
+export default function AlertDetailPage({ alertId, rows, onBack, onOpenEpisode }: Props) {
   const { state, retry } = useAsync(() => (live ? loadLive(alertId) : loadMockAlertDetail(alertId)), [alertId])
   const [overrides, setOverrides] = useAlertOverrides()
   const [extraHistory, setExtraHistory] = useAlertHistory(alertId)
@@ -77,6 +77,7 @@ export default function AlertDetailPage({ alertId, rows, onBack }: Props) {
       assigneeNotice={responsible ? undefined : `현재 ${MOCK_USER.name} 계정으로 조회 중입니다. 판정은 담당자 ${alert.assignee.name}${josa(alert.assignee.name, '이', '가')} 합니다.`}
       episodes={episodes}
       onBack={onBack}
+      onOpenEpisode={onOpenEpisode}
       onSubmit={submit}
     />
   )

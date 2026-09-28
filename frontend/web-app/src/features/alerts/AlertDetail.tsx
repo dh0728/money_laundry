@@ -1,17 +1,17 @@
 // v24 Detail.tsx(kind=Alert)를 옮김. 자금 흐름(그래프) 탭은 다음 묶음에서 옮긴다.
-import type { ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 import { ArrowLeft } from 'lucide-react'
-import type { AlertDetail as AlertDetailData, HistoryAction, HistoryRow } from '@/api/alerts'
+import type { AlertDetail as AlertDetailData, HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay, type TypeCode } from '@/api/codes'
 import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
-import { SectionTitle } from '@/components/page'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { useMemoryState } from '@/lib/memory'
+import { BarList, Panel } from './DetailPanels'
+import { card, historyLabels } from './detailText'
 import { alertCode, episodeCode } from './alertFilters'
 import AlertReview, { type VerdictSubmit } from './AlertReview'
 import AlertTxTable from './AlertTxTable'
@@ -19,33 +19,7 @@ import { moneyMetrics, sumBy, usd } from './metrics'
 
 export type DetailTab = 'overview' | 'graph' | 'transactions' | 'review'
 
-const card = 'h-full gap-4 py-4 shadow-none'
-const content = 'h-full px-4 [&>div:first-child]:mb-4'
-
-const historyLabels: Record<HistoryAction, string> = {
-  REVIEW_START: '검토 시작', CLOSE: '종결', ESCALATE: 'Episode 생성', LINK: 'Episode 연결', UNLINK: 'Episode 연결 해제',
-  ASSIGN: '담당자 배정', COMMENT: '의견', EPISODE_CREATE: 'Episode 생성', EPISODE_CLOSE: 'Episode 종결',
-}
 const basisLabels = { TIME: '시간', ACCOUNT: '계좌', BANK: '은행', PATH: '경로' } as const
-
-function BarList({ rows }: { rows: { name: string; v: number }[] }) {
-  const max = Math.max(...rows.map(r => r.v), 1)
-  return (
-    <div className="space-y-3">
-      {rows.map((r, i) => (
-        <div key={r.name} className="grid grid-cols-[minmax(0,1fr)_72px_minmax(60px,1.1fr)] items-center gap-3 text-xs">
-          <span className="truncate font-mono text-[11px]">{r.name}</span>
-          <span className="text-right tabular-nums">{usd(r.v)}</span>
-          <span className="h-2 overflow-hidden rounded-full bg-muted"><span className={`block h-full rounded-full ${i === 0 ? 'bg-foreground' : 'bg-muted-foreground/60'}`} style={{ width: `${(r.v / max) * 100}%` }} /></span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-const Panel = ({ title, description, children, testId }: { title: string; description?: string; children: ReactNode; testId?: string }) => (
-  <Card className={card} data-testid={testId}><CardContent className={content}><SectionTitle title={title} description={description} />{children}</CardContent></Card>
-)
 
 type Props = {
   alert: AlertDetailData
@@ -54,10 +28,11 @@ type Props = {
   assigneeNotice?: string
   episodes: number[]
   onBack: () => void
+  onOpenEpisode: (episodeId: number) => void
   onSubmit: (submit: VerdictSubmit) => void
 }
 
-export default function AlertDetail({ alert, history, responsible, assigneeNotice, episodes, onBack, onSubmit }: Props) {
+export default function AlertDetail({ alert, history, responsible, assigneeNotice, episodes, onBack, onOpenEpisode, onSubmit }: Props) {
   const [tab, setTab] = useMemoryState<DetailTab>(`alert:${alert.alertId}:tab`, 'overview')
   const tx = alert.transactions
   const metrics = moneyMetrics(tx, alert.subjectAccount.account)
@@ -75,7 +50,7 @@ export default function AlertDetail({ alert, history, responsible, assigneeNotic
         <p data-testid="detail-id" className="font-mono text-xs text-muted-foreground">{alertCode(alert.alertId)}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
           <h1 className="text-xl font-semibold tracking-tight">{typeDisplay(alert.primaryType.code).label} · 대표 계좌 {alert.subjectAccount.account}</h1>
-          {alert.episodeId != null && <Badge variant="outline" className="h-8 rounded-full px-3 font-mono text-xs font-normal">연결된 Episode {episodeCode(alert.episodeId)}</Badge>}
+          {alert.episodeId != null && <Button variant="outline" size="sm" className="h-8 rounded-full px-3 font-mono text-xs font-normal" onClick={() => onOpenEpisode(alert.episodeId!)}>연결된 Episode {episodeCode(alert.episodeId)}</Button>}
         </div>
         <div data-testid="detail-tags" className="mt-3 flex flex-wrap items-center gap-2">
           <StatusBadge status={alert.status} />

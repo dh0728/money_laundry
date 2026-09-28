@@ -9,11 +9,14 @@ import { formatMoney } from '@/features/transactions/transactionIndex'
 
 const roleLabels: Record<AlertTransaction['role'], string> = { SEED: '시작 거래', SUPPORTING: '연결 거래', PATH: '경로', PATTERN_MEMBER: '패턴 구성' }
 
-const header = (column: Column<AlertTransaction, unknown>, label: string) => <DataTableColumnHeader column={column} label={label} className="px-2" />
+// Episode 거래는 어느 Alert에서 왔는지(alertId)를 함께 가진다
+type TxRow = AlertTransaction & { alertId?: number }
+
+const header = (column: Column<TxRow, unknown>, label: string) => <DataTableColumnHeader column={column} label={label} className="px-2" />
 const mono = (text: string) => <span className="block truncate px-1 font-mono text-sm" translate="no" title={text}>{text}</span>
 const plain = (text = '—') => <span className="block truncate px-1 text-sm" title={text}>{text}</span>
 
-const columns: ColumnDef<AlertTransaction>[] = [
+const columns: ColumnDef<TxRow>[] = [
   { accessorKey: 'txId', size: 110, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => mono(String(row.original.txId)) },
   { accessorKey: 'txAt', size: 128, header: ({ column }) => header(column, '일시'), cell: ({ row }) => <span className="px-1 text-sm tabular-nums">{row.original.txAt.slice(5, 16).replace('T', ' ')}</span> },
   { accessorKey: 'amountPaid', size: 120, header: ({ column }) => header(column, '금액'), cell: ({ row }) => <div className="truncate px-1 text-right text-sm tabular-nums">{formatMoney(row.original.amountPaid, row.original.paymentCurrency)}</div> },
@@ -26,12 +29,15 @@ const columns: ColumnDef<AlertTransaction>[] = [
   { accessorKey: 'role', size: 90, header: ({ column }) => header(column, '편입 역할'), cell: ({ row }) => plain(roleLabels[row.original.role]) },
 ]
 
-export default function AlertTxTable({ rows }: { rows: AlertTransaction[] }) {
+const sourceColumn: ColumnDef<TxRow> = { accessorKey: 'alertId', size: 84, header: ({ column }) => header(column, '출처 Alert'), cell: ({ row }) => mono(`A-${row.original.alertId}`) }
+
+export default function AlertTxTable({ rows }: { rows: TxRow[] }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'txAt', desc: false }])
   const data = useMemo(() => rows, [rows])
+  const withSource = rows.some(row => row.alertId != null)
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table은 React Compiler 최적화 대상이 아니다
   const table = useReactTable({
-    data, columns, getRowId: row => String(row.txId),
+    data, columns: withSource ? [sourceColumn, ...columns] : columns, getRowId: row => String(row.txId),
     state: { sorting }, onSortingChange: setSorting, enableHiding: false,
     initialState: { pagination: { pageIndex: 0, pageSize: 20 } },
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(),

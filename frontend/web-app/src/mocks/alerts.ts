@@ -41,7 +41,8 @@ function alertRow(i: number, assignee = { userId: 11, name: '오분석' }): Aler
     resolution: status === 'CLOSED' ? (i % 2 ? 'NORMAL' : 'FALSE_POSITIVE') : null,
     assignee,
     assignedAt: createdAt,
-    episodeId: status === 'ESCALATED' ? 800 + i : null,
+    // 심층 조사 Alert 2~3건씩 Episode 800·801·802로 묶는다
+    episodeId: status === 'ESCALATED' ? 800 + (i % 3) : null,
     analysisDate: createdAt.slice(0, 10),
     createdAt,
     ageDays,
