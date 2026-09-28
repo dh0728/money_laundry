@@ -2,12 +2,12 @@ import { ArrowLeftRight, Bell, FolderSearch, LayoutDashboard, Settings, Siren } 
 
 export type Page = 'dashboard' | 'transactions' | 'alerts' | 'episodes' | 'notifications' | 'settings' | 'account'
 
-// v24 App.tsx 메뉴 구성
+// v24 App.tsx 메뉴 구성. 이름은 한국어 화면에 맞춘다(2026-09-28). 화면 안의 큰 제목은 두지 않고 메뉴 이름이 제목 역할을 한다.
 export const mainNav = [
-  { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
-  { id: 'transactions', name: 'Transactions', icon: ArrowLeftRight },
-  { id: 'alerts', name: 'Alerts', icon: Siren },
-  { id: 'episodes', name: 'Episodes', icon: FolderSearch },
+  { id: 'dashboard', name: '대시보드', icon: LayoutDashboard },
+  { id: 'transactions', name: '거래 내역', icon: ArrowLeftRight },
+  { id: 'alerts', name: 'Alert 목록', icon: Siren },
+  { id: 'episodes', name: 'Episode 목록', icon: FolderSearch },
 ] as const
 export const utilityNav = [
   { id: 'notifications', name: '알림', icon: Bell },
@@ -17,9 +17,18 @@ export const utilityNav = [
 const pages: Page[] = ['dashboard', 'transactions', 'alerts', 'episodes', 'notifications', 'settings', 'account']
 
 // 라우터를 들이기 전까지 주소의 # 뒤 값으로 화면을 고른다
-export const pageFromHash = (hash: string): Page => {
-  const id = hash.replace(/^#/, '')
-  return (pages as string[]).includes(id) ? (id as Page) : 'dashboard'
+export const pageFromHash = (hash: string): Page => routeFromHash(hash).page
+
+/** 화면 주소. 링크(<a href>)에 그대로 쓴다. */
+export const hrefFor = (page: Page, id?: number) => (id ? `#${page}/${id}` : `#${page}`)
+
+// #alerts/3001 처럼 목록 뒤에 번호가 붙으면 상세 화면이다
+export type Route = { page: Page; id?: number }
+export const routeFromHash = (hash: string): Route => {
+  const [head, tail] = hash.replace(/^#/, '').split('/')
+  if (!(pages as string[]).includes(head)) return { page: 'dashboard' }
+  const id = Number(tail)
+  return tail && Number.isInteger(id) && id > 0 ? { page: head as Page, id } : { page: head as Page }
 }
 
 type FullscreenDocument = {

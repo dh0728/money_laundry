@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type ComponentProps, type CSSProperties } from 'react'
-import { Maximize2, Minimize2, PanelLeft } from 'lucide-react'
+import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
+import { DataModeBadge } from '@/components/Provenance'
+import GlobalSearch from '@/features/search/GlobalSearch'
+import { useTransactionTarget } from '@/features/transactions/transactionTarget'
 import { SidebarSelection } from '@/components/SidebarSelection'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -10,32 +13,34 @@ import ComingSoonPage from '@/pages/ComingSoonPage'
 import DashboardPage from '@/pages/DashboardPage'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import AccountPage from '@/pages/AccountPage'
+import AlertsPage from '@/pages/AlertsPage'
+import EpisodesPage from '@/pages/EpisodesPage'
 import LoginPage from '@/pages/LoginPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
 import { MOCK_USER, roleInfo } from './session'
-import { mainNav, pageFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
+import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 
 
 const pageTitles: Record<Page, string> = {
   dashboard: '대시보드',
-  transactions: 'Transactions',
-  alerts: 'Alerts',
-  episodes: 'Episodes',
+  transactions: '거래 내역',
+  alerts: 'Alert 목록',
+  episodes: 'Episode 목록',
   notifications: '알림',
   settings: '설정',
   account: '계정',
 }
 
 function usePage() {
-  const [page, setPage] = useState(() => pageFromHash(window.location.hash))
+  const [route, setRoute] = useState(() => routeFromHash(window.location.hash))
   useEffect(() => {
-    const update = () => setPage(pageFromHash(window.location.hash))
+    const update = () => setRoute(routeFromHash(window.location.hash))
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
   }, [])
-  const go = useCallback((next: Page) => { window.location.hash = next }, [])
-  return [page, go] as const
+  const go = useCallback((next: Page, id?: number) => { window.location.hash = id ? `${next}/${id}` : next }, [])
+  return [route, go] as const
 }
 
 function SidebarDestinationButton({ onNavigate, ...props }: Omit<ComponentProps<typeof SidebarMenuButton>, 'onClick'> & { onNavigate: () => void }) {
@@ -67,7 +72,8 @@ function SidebarBrandToggle() {
 const navButtonClass = 'h-10 px-4 group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-12! group-data-[collapsible=icon]:px-4! group-data-[collapsible=icon]:[&>span]:hidden'
 
 export default function App() {
-  const [page, go] = usePage()
+  const [{ page, id }, go] = usePage()
+  const [, setTransactionTarget] = useTransactionTarget()
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
   const [appFullscreen, setAppFullscreen] = useState(false)
   const [logout, setLogout] = useState(false)
@@ -138,10 +144,22 @@ export default function App() {
         </SidebarSelection>
       </Sidebar>
       <SidebarInset className="flex h-svh min-w-0 flex-col overflow-hidden">
-        {/* 가운데 전역 검색·할 일은 Alert·Episode 화면을 옮길 때 붙인다 */}
-        <header className="app-header z-40 flex h-15 min-w-0 shrink-0 items-center justify-between gap-3 border-b bg-background px-4 min-[1100px]:px-6">
+                {/* 양옆 칸을 같은 비율로 두어 뒤로가기 유무와 관계없이 검색창이 늘 가운데 같은 자리에 온다(v24) */}
+        <header className="app-header z-40 grid h-15 min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b bg-background px-4 min-[1100px]:gap-5 min-[1100px]:px-6">
+          <div className="header-navigation flex min-w-0 items-center">
           <SidebarTrigger className="rounded-full md:hidden" aria-label="메뉴 열기" />
-          <div className="ml-auto flex items-center gap-1.5" data-testid="header-actions">
+          {/* 상세 화면에서는 머리 왼쪽에 목록으로 돌아가는 버튼을 둔다 */}
+          {id && (page === 'alerts' || page === 'episodes') && (
+            <Button variant="ghost" size="sm" className="h-8 gap-1.5 rounded-full px-3 text-xs" onClick={() => go(page)} data-testid="header-back">
+              <ArrowLeft className="size-4" />{page === 'alerts' ? 'Alert 목록' : 'Episode 목록'}
+            </Button>
+          )}
+          </div>
+          <div className="header-search w-[clamp(280px,32vw,420px)]">
+            <GlobalSearch onNavigate={(next, nextId) => go(next, nextId)} onOpenTransaction={target => { setTransactionTarget(target); go('transactions') }} />
+          </div>
+          <div className="header-actions flex items-center justify-self-end gap-1.5" data-testid="header-actions">
+            <DataModeBadge />
             <Button variant="ghost" size="sm" className="h-8 gap-2 rounded-full px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
               <Kbd>F11</Kbd>
@@ -151,6 +169,8 @@ export default function App() {
         <main className="app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10" style={{ scrollbarGutter: 'stable' }}>
           {page === 'dashboard' ? <DashboardPage />
             : page === 'transactions' ? <TransactionsPage />
+            : page === 'alerts' ? <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />
+            : page === 'episodes' ? <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}

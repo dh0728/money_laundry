@@ -51,3 +51,21 @@ const currencyMarkers: Record<string, string> = { USD: '$', EUR: '€', GBP: '£
 
 export const formatMoney = (amount: number, currency: string) =>
   `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(amount)}${currencyMarkers[currency] ?? currency}`
+
+export type TransactionSearchResult = { key: string; label: string; detail: string; target: TransactionTarget }
+
+// v24 transactionIndex.ts: 전역 검색이 소유주·계좌·거래를 찾을 때 쓴다(종류별 최대 5건)
+export function searchTransactionIndex(index: TransactionIndex, query: string): TransactionSearchResult[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  const owners = index.owners.filter(owner => owner.name.toLowerCase().includes(q)).slice(0, 5).map(owner => ({
+    key: `owner-${owner.name}`, label: owner.name, detail: `${owner.accountIds.length}개 계좌 · ${owner.transactionIds.length}건 거래`, target: { type: 'owner', owner: owner.name } as const,
+  }))
+  const accounts = index.accounts.filter(account => `${account.id} ${account.owner} ${account.bank}`.toLowerCase().includes(q)).slice(0, 5).map(account => ({
+    key: `account-${account.id}`, label: account.id, detail: `${account.owner} · 은행 ${account.bank}`, target: { type: 'account', account: account.id } as const,
+  }))
+  const transactions = index.transactions.filter(transaction => `${transaction.id} ${transaction.fromAccount} ${transaction.toAccount} ${transaction.fromOwner} ${transaction.toOwner}`.toLowerCase().includes(q)).slice(0, 5).map(transaction => ({
+    key: `transaction-${transaction.id}`, label: transaction.id, detail: `${transaction.fromAccount} → ${transaction.toAccount}`, target: { type: 'transaction', transactionId: transaction.id } as const,
+  }))
+  return [...owners, ...accounts, ...transactions]
+}

@@ -19,10 +19,11 @@ export function institutionCards(data: DashboardData): SectionCardItem[] {
   const last30 = days.slice(-30)
   const prev30 = days.slice(-60, -30)
   return [
-    { label: '오늘 유입 Alert', value: fmt(today?.inflow ?? 0), delta: today && yesterday ? pct(today.inflow, yesterday.inflow) : undefined, trend: '전일 대비', note: '모델이 의심으로 판별한 신규 건' },
-    { label: '30일 처리율', value: `${rate(last30)}%`, delta: prev30.length ? Math.round((rate(last30) - rate(prev30)) * 10) / 10 : undefined, unit: '%p', trend: '직전 30일 대비', note: '종결 ÷ 유입' },
-    { label: '미처리 Alert', value: fmt(data.alertsByStatus.OPEN), trend: '검토 전 상태', note: '종결·심층 조사로 넘기지 않은 Alert' },
-    { label: '3일 이상 경과', value: fmt(data.openAlertsAgedOver3Days ?? 0), trend: '우선 처리 대상', note: '미처리 중 3일 이상 경과' },
+    // 기관 전체는 Alert와 Episode 현황을 함께 보인다. 모든 카드 이름에 대상(Alert·Episode)을 적는다.
+    { label: '오늘 유입 Alert', value: fmt(today?.inflow ?? 0), delta: today && yesterday ? pct(today.inflow, yesterday.inflow) : undefined, trend: '전일 대비', note: '모델이 의심으로 판별한 신규 Alert' },
+    { label: '처리 전 Alert', value: fmt(data.alertsByStatus.OPEN), trend: `3일 이상 경과 ${fmt(data.openAlertsAgedOver3Days ?? 0)}건`, note: '아직 판정하지 않은 Alert' },
+    { label: '조사 중 Episode', value: fmt(data.episodesByStatus.OPEN), trend: `소속 Alert ${fmt(data.alertsByStatus.ESCALATED)}건`, note: `종결 Episode ${fmt(data.episodesByStatus.CLOSED)}건` },
+    { label: '30일 Alert 처리율', value: `${rate(last30)}%`, delta: prev30.length ? Math.round((rate(last30) - rate(prev30)) * 10) / 10 : undefined, unit: '%p', trend: '직전 30일 대비', note: '처리 완료 ÷ 유입 Alert' },
   ]
 }
 

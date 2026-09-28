@@ -9,7 +9,7 @@
     --sidebar-foreground: hsl(240 5.3% 26.1%);
     --sidebar-primary: hsl(240 5.9% 10%);
     --sidebar-primary-foreground: hsl(0 0% 98%);
-    --sidebar-accent: hsl(240 4.8% 95.9%);
+    --sidebar-accent: hsl(240 4.8% 88%);
     --sidebar-accent-foreground: hsl(240 5.9% 10%);
     --sidebar-border: hsl(220 13% 91%);
     --sidebar-ring: hsl(217.2 91.2% 59.8%);
@@ -20,16 +20,21 @@
     --sidebar-foreground: hsl(240 4.8% 95.9%);
     --sidebar-primary: hsl(224.3 76.3% 48%);
     --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(240 3.7% 15.9%);
+    --sidebar-accent: hsl(240 3.7% 22%);
     --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
     --sidebar-border: hsl(240 3.7% 15.9%);
     --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 
+:root { --status-pending: oklch(.67 .13 165); --status-working: oklch(.64 .13 250); --status-closed: oklch(.64 .13 305); } /* 처리 전·중·완료 그래프 색(상태 태그와 같은 hue). 처리 전은 위험도 연두(128)와 구분되게 푸른 초록(165) */
 .semantic-status-badge[data-tone="pending"] { color: var(--badge-pending-foreground); border-color: var(--badge-pending-border); background: var(--badge-pending-background); }
 .semantic-status-badge[data-tone="working"] { color: var(--badge-working-foreground); border-color: var(--badge-working-border); background: var(--badge-working-background); }
 .semantic-status-badge[data-tone="closed"] { color: var(--badge-closed-foreground); border-color: var(--badge-closed-border); background: var(--badge-closed-background); }
 .semantic-pattern-badge { color: var(--background); border-color: var(--foreground); background: var(--foreground); }
+.provenance-badge { color: var(--muted-foreground); border-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent); background: transparent; }
+.provenance-badge[data-provenance="proposal"] { border-style: dashed; }
+.provenance-badge[data-provenance="planned"] { border-style: dotted; }
+.provenance-badge[data-provenance="live"] { color: var(--foreground); border-color: var(--foreground); }
 .semantic-metadata-badge { color: var(--badge-metadata-foreground); border-color: var(--badge-metadata-border); background: var(--badge-metadata-background); }
 
 @theme inline {
@@ -66,16 +71,17 @@
   --rdr-glow: rgb(239 68 68 / .9);
   --rdr-fab-shadow: 0 8px 24px rgb(0 0 0 / .22), 0 2px 6px rgb(0 0 0 / .12), 0 0 0 1px rgb(255 255 255 / .06);
   --rdr-fab-hover-shadow: 0 12px 28px rgb(0 0 0 / .28), 0 4px 10px rgb(0 0 0 / .14), 0 0 0 1px rgb(255 255 255 / .08), 0 0 18px rgb(239 68 68 / .28);
-  --risk-0: oklch(0.7400 0.0000 29.23);
-  --risk-1: oklch(0.7276 0.0077 29.23);
-  --risk-2: oklch(0.7151 0.0232 29.23);
-  --risk-3: oklch(0.7027 0.0444 29.23);
-  --risk-4: oklch(0.6902 0.0704 29.23);
-  --risk-5: oklch(0.6778 0.1006 29.23);
-  --risk-6: oklch(0.6653 0.1347 29.23);
-  --risk-7: oklch(0.6529 0.1724 29.23);
-  --risk-8: oklch(0.6404 0.2134 29.23);
-  --risk-9: oklch(0.6280 0.2577 29.23);
+  /* 위험 점수 0~1 → 연두(정상 쪽)에서 빨강(이상 쪽). 라이트는 연한 색에 검정 글씨(대비 12 이상), 다크는 어두운 색에 흰 글씨(대비 8.7 이상)다 */
+  --risk-0: oklch(0.930 0.100 128.0); /* #d5f5ad */
+  --risk-1: oklch(0.919 0.101 116.8); /* #dfed9f */
+  --risk-2: oklch(0.908 0.102 105.6); /* #eae594 */
+  --risk-3: oklch(0.897 0.103 94.3); /* #f3dc8c */
+  --risk-4: oklch(0.886 0.104 83.1); /* #fbd387 */
+  --risk-5: oklch(0.874 0.100 71.9); /* #ffcb8c */
+  --risk-6: oklch(0.863 0.091 60.7); /* #fec595 */
+  --risk-7: oklch(0.852 0.088 49.4); /* #febe9b */
+  --risk-8: oklch(0.841 0.089 38.2); /* #feb7a1 */
+  --risk-9: oklch(0.830 0.094 27.0); /* #ffb0a6 */
   --text-display-size: 1.875rem;
   --text-title-size: 1.25rem;
   --text-body-size: .875rem;
@@ -112,7 +118,10 @@
   --primary: oklch(.205 0 0); --primary-foreground: oklch(.985 0 0);
   --secondary: oklch(.97 0 0); --secondary-foreground: oklch(.205 0 0);
   --muted: oklch(.97 0 0); --muted-foreground: oklch(.556 0 0);
-  --accent: oklch(.97 0 0); --accent-foreground: oklch(.205 0 0);
+  /* 호버는 두 단계다(2026-09-28 김명기: 동작의 변화가 잘 보여야 함).
+     --hover-surface = 표 행·카드처럼 넓은 면(중간), --accent = 버튼·선택지(진하게). 행 위에서도 버튼 호버가 한 단계 더 진해 보인다. */
+  --hover-surface: oklch(.935 0 0);
+  --accent: oklch(.83 0 0); --accent-foreground: oklch(.145 0 0);
   --destructive: #e60000; --positive: oklch(.60 .17 145); --border: oklch(.922 0 0);
   --selection-background: oklch(.205 0 0); --selection-foreground: oklch(.985 0 0);
   --selection-muted-foreground: oklch(.78 0 0); --selection-border: oklch(1 0 0 / 52%);
@@ -121,7 +130,7 @@
   --chart-1: oklch(.55 0 0); --chart-2: oklch(.72 0 0);
   --dashboard-segment-divider: oklch(.205 0 0 / 10%);
   --badge-metadata-foreground: oklch(.43 0 0); --badge-metadata-border: oklch(.83 0 0); --badge-metadata-background: oklch(.93 0 0);
-  --badge-pending-foreground: oklch(.38 .15 150); --badge-pending-border: oklch(.67 .13 150 / 45%); --badge-pending-background: oklch(.76 .13 150 / 18%);
+  --badge-pending-foreground: oklch(.38 .15 165); --badge-pending-border: oklch(.67 .13 165 / 45%); --badge-pending-background: oklch(.76 .13 165 / 18%);
   --badge-working-foreground: oklch(.40 .13 250); --badge-working-border: oklch(.67 .12 250 / 45%); --badge-working-background: oklch(.75 .12 250 / 18%);
   --badge-closed-foreground: oklch(.42 .13 305); --badge-closed-border: oklch(.68 .12 305 / 45%); --badge-closed-background: oklch(.77 .12 305 / 18%);
 }
@@ -135,7 +144,8 @@
   --primary: oklch(.922 0 0); --primary-foreground: oklch(.205 0 0);
   --secondary: oklch(.269 0 0); --secondary-foreground: oklch(.985 0 0);
   --muted: oklch(.235 0 0); --muted-foreground: oklch(.708 0 0);
-  --accent: oklch(.269 0 0); --accent-foreground: oklch(.985 0 0);
+  --hover-surface: oklch(.29 0 0);
+  --accent: oklch(.43 0 0); --accent-foreground: oklch(.985 0 0);
   --destructive: #ff0000; --positive: oklch(.72 .19 145); --border: oklch(1 0 0 / 10%);
   --selection-background: oklch(.922 0 0); --selection-foreground: oklch(.205 0 0);
   --selection-muted-foreground: oklch(.42 0 0); --selection-border: oklch(.205 0 0 / 45%);
@@ -143,12 +153,12 @@
   --input: oklch(1 0 0 / 15%); --ring: oklch(.556 0 0);
   --sidebar: oklch(.17 0 0); --sidebar-foreground: oklch(.92 0 0);
   --sidebar-primary: oklch(.92 0 0); --sidebar-primary-foreground: oklch(.205 0 0);
-  --sidebar-accent: oklch(.269 0 0); --sidebar-accent-foreground: oklch(.985 0 0);
+  --sidebar-accent: oklch(.34 0 0); --sidebar-accent-foreground: oklch(.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%); --sidebar-ring: oklch(.556 0 0);
   --chart-1: oklch(.88 0 0); --chart-2: oklch(.50 0 0);
   --dashboard-segment-divider: oklch(.205 0 0 / 10%);
   --badge-metadata-foreground: oklch(.78 0 0); --badge-metadata-border: oklch(.39 0 0); --badge-metadata-background: oklch(.27 0 0);
-  --badge-pending-foreground: oklch(.79 .14 150); --badge-pending-border: oklch(.67 .13 150 / 45%); --badge-pending-background: oklch(.76 .13 150 / 18%);
+  --badge-pending-foreground: oklch(.79 .14 165); --badge-pending-border: oklch(.67 .13 165 / 45%); --badge-pending-background: oklch(.76 .13 165 / 18%);
   --badge-working-foreground: oklch(.80 .12 250); --badge-working-border: oklch(.67 .12 250 / 45%); --badge-working-background: oklch(.75 .12 250 / 18%);
   --badge-closed-foreground: oklch(.81 .12 305); --badge-closed-border: oklch(.68 .12 305 / 45%); --badge-closed-background: oklch(.77 .12 305 / 18%);
 }
@@ -193,10 +203,20 @@
 .underline-tabs [data-slot=tabs-trigger] { flex:none; position:relative; height:42px; border:0; border-radius:0; padding:0 1px; background:transparent!important; box-shadow:none!important; color:var(--muted-foreground); font-weight:400; font-size:13px; }
 .underline-tabs [data-slot=tabs-trigger][data-state=active] { font-weight:650; color:var(--foreground); }
 .underline-tabs [data-slot=tabs-trigger]::after { display:none; }
+/* 선택 안 된 탭에 올리면 글자가 진해지고 밑줄 미리보기가 생긴다 */
+.underline-tabs [data-slot=tabs-trigger][data-state=inactive]:hover { color:var(--foreground); border-bottom:2px solid color-mix(in oklch, var(--foreground) 35%, transparent); }
+/* 누를 수 있는 곳은 모두 손가락 모양. 호버 배경은 --accent 하나로 맞춘다 */
+button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [role=option], [role=menuitem], a[href], label[for], summary { cursor:pointer; }
+/* 눌러서 이동하는 카드·목록 행: 배경과 테두리가 함께 진해진다 */
+.interactive-surface { transition:background-color var(--motion-normal) var(--ease-ui), border-color var(--motion-normal) var(--ease-ui); }
+.interactive-surface:hover { background-color:var(--hover-surface); border-color:color-mix(in oklch, var(--foreground) 45%, transparent); }
 .tab-indicator { position:absolute; pointer-events:none; left:0; bottom:-1px; height:3px; background:var(--foreground); transition-property:transform,width; }
 .tab-indicator,
 .sidebar-indicator { transition-duration:var(--motion-morph); transition-timing-function:var(--ease-standard); }
 .tab-indicator[data-animate=false], .sidebar-indicator[data-animate=false] { transition:none var(--motion-instant); }
+/* 계좌별·소유주별 보기 전환: Tailwind v4의 translate-x-*는 transform이 아니라 translate 속성을 쓴다 */
+.graph-view-indicator { transition:translate var(--motion-morph) var(--ease-emphasized); }
+.graph-view-option { transition:color var(--motion-normal) var(--ease-ui); }
 @media (prefers-reduced-motion: reduce) {
   .tab-indicator, .sidebar-indicator { transition:none; }
   .app-sidebar [data-slot=sidebar-gap], .app-sidebar [data-slot=sidebar-container] { transition-duration:var(--motion-instant); }
@@ -228,7 +248,8 @@
 /* 거래 3단 탐색 — v24 index.css */
 .transactions-flow {
   position:relative;
-  grid-template-columns:13.5rem 14.5rem minmax(16rem,1fr) minmax(18rem,1fr);
+  /* 거래 열은 소유주·계좌처럼 좁게(ID + 태그 2개). 시각·금액은 오른쪽 상세 칸이 보여 준다(2026-09-28) */
+  grid-template-columns:13.5rem 14.5rem 13.5rem minmax(18rem,1fr);
   align-items:start;
   min-width:0;
 }
@@ -252,7 +273,7 @@
 .transaction-connector-edge > b { position:absolute; top:var(--target-y); left:50%; right:0; border-top:1.5px solid; }
 .transaction-detail { min-width:0; }
 @container (max-width:1100px) {
-  .transactions-flow { grid-template-columns:13.5rem 14.5rem minmax(16rem,1fr); }
+  .transactions-flow { grid-template-columns:13.5rem 14.5rem 13.5rem; }
   .transaction-detail { grid-column:1 / -1; }
 }
 @container (max-width:760px) {
@@ -282,4 +303,29 @@
   background-image: none !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+}
+
+/* v24 자금 흐름 그래프: 의심 여부 2색(빨강 / 무채색). canvas는 CSS 변수를 직접 못 읽어 Graph에서 풀어 쓴다. */
+:root { --graph-l1:#e60000; --graph-l1-edge:#e6000073; --graph-l0:#0000004d; --graph-l0-particle:#00000080; --graph-l0-node:#3f3f46; --graph-bg:var(--card); --graph-tooltip-shadow: 0 8px 24px rgb(0 0 0 / .12); }
+.dark { --graph-l1:#ff0000; --graph-l1-edge:#ff000073; --graph-l0:#ffffff4d; --graph-l0-particle:#ffffffb3; --graph-l0-node:#e7e7ea; --graph-bg:#070709; --graph-tooltip-shadow: 0 8px 24px rgb(0 0 0 / .25); }
+.graph-canvas { background:var(--graph-bg); }
+.graph-tooltip { position:absolute; z-index:5; max-width:250px; pointer-events:none; background:var(--popover); color:var(--popover-foreground); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:11.5px; line-height:1.55; box-shadow:var(--graph-tooltip-shadow); }
+.legend-line { width:16px; height:3px; border-radius:2px; display:inline-block; }
+.legend-dash { width:16px; height:0; border-top:2.5px dashed var(--graph-l0); display:inline-block; }
+.legend-dot { width:9px; height:9px; border-radius:9px; display:inline-block; }
+.graph-dialog { display:flex; flex-direction:column; overflow:hidden; }
+.legend-dot-sm { width:6px!important; height:6px!important; }
+.graph-legend i { display:inline-block; flex:none; }
+.flow-dash { animation: flow-dash var(--motion-flow) var(--ease-linear) infinite; }
+@keyframes flow-dash { to { stroke-dashoffset: -24; } }
+@media (prefers-reduced-motion: reduce) { .flow-dash { animation: none; } }
+.flow-panel-handle { cursor: default; }
+[data-mode='float'] .flow-panel-handle { cursor: move; }
+@media (max-width:767px) { .graph-layout { overflow:auto; } .graph-layout>[data-slot=resizable-panel-group] { min-width:820px; } }
+
+.dark {
+  /* 위험 점수 색(다크): 어두운 색에 흰 글씨 */
+  --risk-0: oklch(0.400 0.100 128.0); --risk-1: oklch(0.403 0.092 116.8); --risk-2: oklch(0.407 0.085 105.6);
+  --risk-3: oklch(0.410 0.083 94.3); --risk-4: oklch(0.413 0.084 83.1); --risk-5: oklch(0.417 0.088 71.9);
+  --risk-6: oklch(0.420 0.097 60.7); --risk-7: oklch(0.423 0.111 49.4); --risk-8: oklch(0.427 0.136 38.2); --risk-9: oklch(0.430 0.140 27.0);
 }

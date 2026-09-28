@@ -1,47 +1,39 @@
 import { useState } from 'react'
 import type { AlertRow } from '@/api/alerts'
 import { formatScore, typeDisplay } from '@/api/codes'
-import { StatusBadge } from '@/components/badges'
-import { SectionCards, type SectionCardItem } from '@/components/SectionCards'
+import { MOCK_USER } from '@/app/session'
+import { WorkStatusBadge } from '@/components/badges'
+import { ProvenanceBadge } from '@/components/Provenance'
+import { SectionCard, sectionCardSurface } from '@/components/SectionCards'
+import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
+import { useReviewRequests } from '@/features/episodes/reviewStore'
 import { fmt } from '@/lib/format'
-import { loadAlerts } from './dataSource'
-import { personalColumns, personalSorts, sortAlerts, type PersonalSort } from './personalQueue'
-import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { useAsync } from '@/lib/useAsync'
+import { workStatuses } from '@/lib/workStatus'
+import { loadAlerts, loadMyEpisodes } from './dataSource'
 import { WorkCard } from './WorkCard'
-import { alertSummary } from './alertText'
+import { sortWork, STALE_DAYS, workItems, workSorts, type WorkSort } from './workItems'
 
 const HIGH_RISK = 0.8
 
-function PersonalAiSummary({ open }: { open: AlertRow[] }) {
-  const stale = open.filter(alert => alert.ageDays >= 3)
-  const high = open.filter(alert => alert.riskScore >= HIGH_RISK)
-  const counts = open.reduce<Record<number, number>>((acc, alert) => ({ ...acc, [alert.primaryType.code]: (acc[alert.primaryType.code] ?? 0) + 1 }), {})
+// 규칙으로 만든 문장이다(LLM 연결 전 mock). 위 카드·아래 보드와 겹치는 "현재 상황"은 두지 않는다.
+function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
+  const counts = pending.reduce<Record<number, number>>((acc, alert) => ({ ...acc, [alert.primaryType.code]: (acc[alert.primaryType.code] ?? 0) + 1 }), {})
   const focus = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
-  const first = sortAlerts(open, 'age').find(alert => alert.riskScore >= HIGH_RISK) ?? sortAlerts(open, 'risk')[0]
   return (
-    <Card data-testid="personal-ai-summary" className="shadow-none">
+    <Card data-testid="personal-ai-summary" className="h-full shadow-none @5xl:col-span-2">
       <CardContent>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-base font-semibold tracking-tight">AI 요약 · 내 담당</h2>
-          <p className="text-[11px] text-muted-foreground">담당 미처리 {open.length}건 기준 · 판단은 조사자가 수행</p>
+          <ProvenanceBadge kind="mock" title="규칙으로 만든 문장입니다. LLM 연결은 발표 뒤 범위입니다." />
+          <p className="ml-auto text-[11px] text-muted-foreground">판단은 조사자가 수행</p>
         </div>
-        <div className="mt-4 grid gap-4 @3xl:grid-cols-3">
-          <div><p className="text-xs font-medium">현재 상황</p><p className="mt-2 text-sm leading-6 text-muted-foreground">미처리 {open.length}건 중 위험 점수 {formatScore(HIGH_RISK)} 이상 {high.length}건, 3일 이상 경과 {stale.length}건입니다.</p></div>
-          <div><p className="text-xs font-medium">집중 패턴</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{focus ? `${typeDisplay(Number(focus[0]) as AlertRow['primaryType']['code']).key} 의심이 ${focus[1]}건으로 가장 많습니다. 같은 소유주·계좌가 반복되는지 함께 보세요.` : '두드러진 패턴이 없습니다.'}</p></div>
-          <div>
-            <p className="text-xs font-medium">먼저 볼 업무</p>
-            {first ? (
-              <div data-testid="personal-ai-first" className="mt-2 rounded-md border px-3 py-2">
-                <span className="block truncate text-sm">{alertSummary(first)}</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">A-{first.alertId} · 위험 {formatScore(first.riskScore)} · {first.ageDays}일 경과</span>
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">미처리 업무가 없습니다.</p>
-            )}
-          </div>
+        <div className="mt-4">
+          <p className="text-xs font-medium">집중 패턴</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{focus ? `처리 전 Alert 중 ${typeDisplay(Number(focus[0]) as AlertRow['primaryType']['code']).key} 의심이 ${focus[1]}건으로 가장 많습니다. 같은 소유주·계좌가 반복되는지 함께 보세요.` : '처리 전 Alert가 없습니다.'}</p>
         </div>
       </CardContent>
     </Card>
@@ -49,41 +41,47 @@ function PersonalAiSummary({ open }: { open: AlertRow[] }) {
 }
 
 export function PersonalView() {
-  const [sort, setSort] = useState<PersonalSort>('risk')
-  const { state, retry } = useAsync(() => loadAlerts({ assigneeId: 'me', size: 200 }), [])
-  if (state.status === 'error') return <ErrorBlock message={state.message} onRetry={retry} />
-  if (state.status === 'loading') return <LoadingBlock label="내 담당 업무" />
+  const [sort, setSort] = useState<WorkSort>('risk')
+  const [overrides] = useAlertOverrides()
+  const [reviews] = useReviewRequests()
+  const alerts = useAsync(() => loadAlerts({ assigneeId: 'me', size: 200 }), [])
+  // mock: Alert·Episode 화면에서 처리한 결과가 바뀌면 다시 묶는다(새로고침하면 처음 상태)
+  const episodes = useAsync(() => loadMyEpisodes(MOCK_USER.userId, overrides, reviews), [overrides, reviews])
+  if (alerts.state.status === 'error') return <ErrorBlock message={alerts.state.message} onRetry={alerts.retry} />
+  if (episodes.state.status === 'error') return <ErrorBlock message={episodes.state.message} onRetry={episodes.retry} />
+  if (alerts.state.status === 'loading' || episodes.state.status === 'loading') return <LoadingBlock label="내 담당 업무" />
 
-  const mine = state.data.content
-  const open = mine.filter(alert => alert.status === 'OPEN')
-  const cards: SectionCardItem[] = [
-    { label: '내 담당 미처리', value: fmt(open.length), trend: '검토 전 상태', note: '검토가 필요한 Alert' },
-    { label: `위험 점수 ${formatScore(HIGH_RISK)} 이상`, value: fmt(open.filter(alert => alert.riskScore >= HIGH_RISK).length), trend: '고위험', note: `미처리 중 위험 점수 ${formatScore(HIGH_RISK)} 이상` },
-    { label: '3일 이상 경과', value: fmt(open.filter(alert => alert.ageDays >= 3).length), trend: '우선 처리 대상', note: '미처리 중 3일 이상 경과' },
-    { label: '내 종결', value: fmt(mine.filter(alert => alert.status === 'CLOSED').length), trend: '현재 조회 범위', note: '담당해 종결한 Alert' },
-  ]
+  const myAlerts = alerts.state.data.content.map(alert => withOverride(alert, overrides))
+  const items = workItems(myAlerts, episodes.state.data)
+  const pending = myAlerts.filter(alert => alert.status === 'OPEN')
+  const active = items.filter(item => item.status !== 'DONE')
+  const stale = active.filter(item => item.ageDays >= STALE_DAYS)
+
   return (
     <>
-      <SectionCards items={cards} />
-      <PersonalAiSummary open={open} />
+      <div className={`grid grid-cols-1 items-stretch gap-4 @xl:grid-cols-2 @5xl:grid-cols-4 ${sectionCardSurface}`} data-testid="personal-top">
+        <SectionCard item={{ label: `위험 점수 ${formatScore(HIGH_RISK)} 이상`, value: fmt(pending.filter(alert => alert.riskScore >= HIGH_RISK).length), trend: '처리 전 Alert', note: '판정이 급한 고위험 건' }} />
+        <SectionCard item={{ label: `${STALE_DAYS}일 이상 경과`, value: fmt(stale.length), trend: `Alert ${stale.filter(item => item.kind === 'Alert').length} · Episode ${stale.filter(item => item.kind === 'Episode').length}`, note: '처리 전·처리 중 업무 중 오래 머문 건' }} />
+        <PersonalAiSummary pending={pending} />
+      </div>
       <section aria-labelledby="queue-title">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 id="queue-title" className="text-base font-semibold tracking-tight">내 담당 업무</h2>
-            <p className="mt-1.5 text-xs text-muted-foreground">상태별 · {personalSorts[sort].label}</p>
+            <h2 id="queue-title" className="text-base font-semibold tracking-tight">업무 현황</h2>
+            <p className="mt-1.5 text-xs text-muted-foreground">Alert·Episode 상태별 · {workSorts[sort].label}</p>
           </div>
-          <Select value={sort} onValueChange={value => setSort(value as PersonalSort)}>
+          <Select value={sort} onValueChange={value => setSort(value as WorkSort)}>
             <SelectTrigger size="sm" className="w-40" aria-label="업무 정렬 기준"><SelectValue /></SelectTrigger>
-            <SelectContent>{Object.entries(personalSorts).map(([key, option]) => <SelectItem key={key} value={key}>{option.label}</SelectItem>)}</SelectContent>
+            <SelectContent>{Object.entries(workSorts).map(([key, option]) => <SelectItem key={key} value={key}>{option.label}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="grid items-start gap-4 @3xl:grid-cols-3" data-testid="work-queue">
-          {personalColumns.map(status => {
-            const items = sortAlerts(mine.filter(alert => alert.status === status), sort)
+          {workStatuses.map(status => {
+            const column = sortWork(items.filter(item => item.status === status), sort)
             return (
               <div key={status} data-testid="work-status-column" className="flex min-w-0 flex-col gap-2.5">
-                <div className="flex items-center gap-2"><StatusBadge status={status} /><span className="text-xs tabular-nums text-muted-foreground">{items.length}건</span></div>
-                {items.length ? items.map(alert => <WorkCard key={alert.alertId} alert={alert} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock>}
+                <div className="flex items-center gap-2"><WorkStatusBadge status={status} /><span className="text-xs tabular-nums text-muted-foreground">{column.length}건</span></div>
+                {column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock>}
               </div>
             )
           })}
@@ -92,3 +90,4 @@ export function PersonalView() {
     </>
   )
 }
+

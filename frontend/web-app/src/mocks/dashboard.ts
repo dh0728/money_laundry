@@ -14,6 +14,14 @@ const dailyAlerts = Array.from({ length: 91 }, (_, i) => {
   return { date: isoDate(date), inflow, closed: Math.max(0, inflow - 6 + Math.round(7 * Math.cos(i / 3))) }
 })
 
+// 최근에 들어온 Alert일수록 아직 처리 전이 많다
+const dailyAlertStatus = dailyAlerts.map(({ date, inflow }, i) => {
+  const age = 90 - i
+  const pending = Math.round(inflow * (age < 1 ? .72 : age < 3 ? .45 : age < 7 ? .16 : age < 14 ? .05 : 0))
+  const inProgress = Math.round(inflow * (age < 3 ? .1 : age < 21 ? .08 : .02))
+  return { date, pending, inProgress, done: inflow - pending - inProgress }
+})
+
 export const dashboardNormal: DashboardData = {
   alertsByStatus: { OPEN: 128, ESCALATED: 21, CLOSED: 3412 },
   alertsByResolution: { NORMAL: 2870, FALSE_POSITIVE: 542 },
@@ -50,6 +58,7 @@ export const dashboardNormal: DashboardData = {
   },
   reductionRate: 1 - 61 / 1840,
   dailyAlerts,
+  dailyAlertStatus,
   suspiciousTxComposition: { patterned: 9120, nonPatternGrouped: 2310, nonPatternSingle: 870 },
   openAlertsAgedOver3Days: 23,
 }
@@ -65,6 +74,7 @@ export const dashboardEmpty: DashboardData = {
   latestJob: null,
   reductionRate: null,
   dailyAlerts: [],
+  dailyAlertStatus: [],
   suspiciousTxComposition: { patterned: 0, nonPatternGrouped: 0, nonPatternSingle: 0 },
   openAlertsAgedOver3Days: 0,
 }

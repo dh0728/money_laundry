@@ -56,3 +56,18 @@ export async function getJson<T>(path: string, params?: Record<string, string | 
   }
   return (await response.json()) as T
 }
+
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as ProblemDetail | null
+    throw new ApiError(
+      problem ?? { type: 'about:blank', title: response.statusText, status: response.status, code: 'INTERNAL' },
+    )
+  }
+  return (await response.json().catch(() => undefined)) as T
+}

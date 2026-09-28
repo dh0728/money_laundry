@@ -5,40 +5,42 @@ import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } 
 
 export type SectionCardItem = { label: string; value: string; delta?: number; unit?: string; trend: string; note: string }
 
+export function SectionCard({ item }: { item: SectionCardItem }) {
+  // 비교 기준이 없는 지표(delta 없음)는 증감 배지·아이콘을 숨긴다
+  const Icon = item.delta === undefined ? null : item.delta >= 0 ? TrendingUp : TrendingDown
+  return (
+    <Card className="@container/card" data-testid="section-card">
+      <CardHeader>
+        <CardDescription>{item.label}</CardDescription>
+        <CardTitle className="type-display font-semibold tabular-nums">{item.value}</CardTitle>
+        {Icon && item.delta !== undefined && (
+          <CardAction>
+            <Badge variant="outline">
+              <Icon />
+              {item.delta >= 0 ? '+' : ''}
+              {item.delta}
+              {item.unit ?? '%'}
+            </Badge>
+          </CardAction>
+        )}
+      </CardHeader>
+      <CardFooter className="flex-col items-start gap-1.5 text-sm">
+        <div className="line-clamp-1 flex gap-2 font-medium">
+          {item.trend} {Icon && <Icon className="size-4" />}
+        </div>
+        <div className="text-muted-foreground">{item.note}</div>
+      </CardFooter>
+    </Card>
+  )
+}
+
+/** 카드 묶음의 배경·그림자 모양(SectionCards와 내 담당 윗줄이 같이 쓴다) */
+export const sectionCardSurface = '*:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs dark:*:data-[slot=card]:bg-card'
+
 export function SectionCards({ items }: { items: SectionCardItem[] }) {
   return (
-    <div
-      className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs @xl:grid-cols-2 @5xl:grid-cols-4 dark:*:data-[slot=card]:bg-card"
-      data-testid="section-cards"
-    >
-      {items.map(item => {
-        // 비교 기준이 없는 지표(delta 없음)는 증감 배지·아이콘을 숨긴다
-        const Icon = item.delta === undefined ? null : item.delta >= 0 ? TrendingUp : TrendingDown
-        return (
-          <Card key={item.label} className="@container/card">
-            <CardHeader>
-              <CardDescription>{item.label}</CardDescription>
-              <CardTitle className="type-display font-semibold tabular-nums">{item.value}</CardTitle>
-              {Icon && item.delta !== undefined && (
-                <CardAction>
-                  <Badge variant="outline">
-                    <Icon />
-                    {item.delta >= 0 ? '+' : ''}
-                    {item.delta}
-                    {item.unit ?? '%'}
-                  </Badge>
-                </CardAction>
-              )}
-            </CardHeader>
-            <CardFooter className="flex-col items-start gap-1.5 text-sm">
-              <div className="line-clamp-1 flex gap-2 font-medium">
-                {item.trend} {Icon && <Icon className="size-4" />}
-              </div>
-              <div className="text-muted-foreground">{item.note}</div>
-            </CardFooter>
-          </Card>
-        )
-      })}
+    <div className={`grid grid-cols-1 gap-4 @xl:grid-cols-2 @5xl:grid-cols-4 ${sectionCardSurface}`} data-testid="section-cards">
+      {items.map(item => <SectionCard key={item.label} item={item} />)}
     </div>
   )
 }

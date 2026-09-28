@@ -4,7 +4,9 @@ export type TypeCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 export type TypeRef = { code: TypeCode; name: string }
 
 export type AlertStatus = 'OPEN' | 'ESCALATED' | 'CLOSED'
-export type AlertResolution = 'NORMAL' | 'FALSE_POSITIVE'
+// SUSPICIOUS는 FE 제안이다(API.md에 없음). 9/28 회의에서 Alert 판정에 "이상거래 · Alert 단독"을 두기로 해
+// 담을 값이 필요하다. FALSE_POSITIVE(오탐)는 판정 선택지에서 뺐고 Backend와 정리할 예정이다.
+export type AlertResolution = 'NORMAL' | 'FALSE_POSITIVE' | 'SUSPICIOUS'
 export type EpisodeStatus = 'OPEN' | 'CLOSED'
 export type EpisodeResolution = 'NORMAL' | 'SUSPICIOUS'
 
@@ -24,16 +26,12 @@ const typeLabels: Record<TypeCode, { key: string; label: string }> = {
 
 export const typeDisplay = (code: TypeCode) => typeLabels[code]
 
-export const alertStatusLabels: Record<AlertStatus, string> = {
-  OPEN: '검토 전',
-  ESCALATED: '심층 조사',
-  CLOSED: '종결',
-}
 
 // 종결 결과의 NORMAL은 "정상 거래로 판단"이라 유형 코드 0과 다르다.
 export const alertResolutionLabels: Record<AlertResolution, string> = {
   NORMAL: '정상 판단',
   FALSE_POSITIVE: '오탐',
+  SUSPICIOUS: '이상거래 · Alert 단독',
 }
 
 /** 모델 점수(0~1)를 소수 둘째 자리까지 표시 */
