@@ -385,6 +385,12 @@ class ReviewWorkflowTests {
             20);
     var data = query.query("transactions", filter);
     assertThat(data.get("totalElements")).isEqualTo(2L);
+    for (var row : rows(data.get("content"))) {
+      assertThat(row.get("amountUsd").toString()).startsWith("10");
+      assertThat((Collection<?>) row.get("alertIds")).isEmpty();
+      assertThat((Collection<?>) row.get("episodeIds")).isEmpty();
+      assertThat(row.get("isSuspicious")).isNull();
+    }
     assertThat(encode(data)).doesNotContain("hidden", "is_laundering", "name_cipher");
     assertThat(query.query("owners", filter).get("totalElements")).isEqualTo(1L);
     assertThat(query.query("accounts", filter).get("totalElements")).isEqualTo(2L);
@@ -632,5 +638,97 @@ class ReviewWorkflowTests {
     when(evidence.detail(alertId, null)).thenReturn(old);
     assertThatThrownBy(() -> act(l1, "DECIDE", "NORMAL", stale)).isInstanceOf(ApiException.class);
     assertThat(service.detail(id).get("pendingCount")).isEqualTo(3L);
+  }
+
+  long publishedAlert(long... txIds) {
+    long id =
+        jdbc.queryForObject(
+            "insert into alerts(assignee_id) values(?) returning alert_id", Long.class, l1);
+    var members = Arrays.stream(txIds).mapToObj(n -> Map.of("txId", n)).toList();
+    jdbc.update(
+        "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb)",
+        id,
+        run,
+        "f".repeat(64),
+        encode(Map.of("seeds", List.of(), "transactions", members)));
+    return id;
+  }
+
+  void savedMembers(long caseId, Map<String, Object>... members) {
+    jdbc.update(
+        "insert into review_groups(case_id,label,members) values(?,'test',?::jsonb)",
+        caseId,
+        encode(List.of(members)));
+  }
+
+  @Test
+  void membership_matches_current_scope_and_preserves_closed_cases() {
+    long a = publishedAlert(1, 2, 3, 4);
+    long c =
+        jdbc.queryForObject("select case_id from review_cases where alert_id=?", Long.class, a);
+    savedMembers(
+        c,
+        Map.of("txId", 1, "state", "EXCLUDED"),
+        Map.of("txId", 2, "state", "TRANSFERRED"),
+        Map.of("txId", 3, "state", "DECIDED"));
+    long otherAlert = publishedAlert(1);
+    long ep =
+        jdbc.queryForObject(
+            "insert into review_cases(kind,assignee_id,created_at,assigned_at,status,closed_at) values('EPISODE',?,now(),now(),'CLOSED',now()) returning case_id",
+            Long.class,
+            l2);
+    savedMembers(ep, Map.of("txId", 2, "state", "DECIDED"), Map.of("txId", 1, "state", "EXCLUDED"));
+    savedMembers(ep, Map.of("txId", 2, "state", "DECIDED"));
+    var transactions = new ArrayList<Map<String, Object>>();
+    for (long id = 1; id <= 5; id++) transactions.add(new LinkedHashMap<>(Map.of("txId", id)));
+    new CurrentCaseMembership(jdbc).attach(transactions);
+    assertThat((Collection<?>) transactions.get(0).get("alertIds"))
+        .isEqualTo(new TreeSet<>(List.of(otherAlert)));
+    assertThat((Collection<?>) transactions.get(1).get("alertIds")).isEmpty();
+    assertThat((Collection<?>) transactions.get(1).get("episodeIds"))
+        .isEqualTo(new TreeSet<>(List.of(ep)));
+    assertThat((Collection<?>) transactions.get(2).get("alertIds"))
+        .isEqualTo(new TreeSet<>(List.of(a)));
+    assertThat((Collection<?>) transactions.get(3).get("alertIds"))
+        .isEqualTo(new TreeSet<>(List.of(a)));
+    assertThat((Collection<?>) transactions.get(4).get("episodeIds")).isEmpty();
+    jdbc.update("update review_cases set status='CLOSED',closed_at=now() where case_id=?", c);
+    new CurrentCaseMembership(jdbc).attach(transactions);
+    assertThat((Collection<?>) transactions.get(2).get("alertIds"))
+        .isEqualTo(new TreeSet<>(List.of(a)));
+    assertThat((Collection<?>) transactions.get(3).get("alertIds")).isEmpty();
+    // An unpublished later version must not replace the visible completed evidence.
+    jdbc.update("update analysis_runs set status='ACTIVE' where run_id=?", run);
+    new CurrentCaseMembership(jdbc).attach(transactions);
+    assertThat((Collection<?>) transactions.get(0).get("alertIds")).isEmpty();
+    assertThat((Collection<?>) transactions.get(1).get("episodeIds"))
+        .isEqualTo(new TreeSet<>(List.of(ep)));
+  }
+
+  @Test
+  void aged_alert_count_excludes_episodes_closed_and_just_under_72_hours() {
+    long a = publishedAlert(1), b = publishedAlert(2), c = publishedAlert(3);
+    jdbc.update(
+        "update review_cases set assigned_at=? where alert_id=?",
+        java.sql.Timestamp.from(clock.now().minus(Duration.ofHours(72))),
+        a);
+    jdbc.update(
+        "update review_cases set assigned_at=? where alert_id=?",
+        java.sql.Timestamp.from(clock.now().minus(Duration.ofHours(72)).plusSeconds(1)),
+        b);
+    jdbc.update(
+        "update review_cases set assigned_at=?,status='CLOSED',closed_at=? where alert_id=?",
+        java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))),
+        java.sql.Timestamp.from(clock.now()),
+        c);
+    jdbc.update(
+        "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,?,?)",
+        l2,
+        java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))),
+        java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))));
+    var dashboard = new DashboardService(jdbc, clock);
+    var d = dashboard.view(l1, LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-02"));
+    assertThat(d.get("openAlertsAgedOver3Days")).isEqualTo(1L);
+    assertThat(object(d.get("institution")).get("aged")).isEqualTo(2L);
   }
 }

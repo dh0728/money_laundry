@@ -46,6 +46,12 @@ public class DashboardService {
             at(today.plusDays(1)),
             at(today.minusDays(1)),
             at(today)));
+    out.put(
+        "openAlertsAgedOver3Days",
+        jdbc.queryForObject(
+            "select count(*) from visible_review_cases where kind='ALERT' and status='OPEN' and assigned_at<=?",
+            Long.class,
+            Timestamp.from(now.minus(Duration.ofDays(3)))));
     out.put("episodeWork", episodeWork(now, from, to));
     // Today may include delayed batches; use their delivery dates, not only wall-clock yesterday.
     var deliveryDates =

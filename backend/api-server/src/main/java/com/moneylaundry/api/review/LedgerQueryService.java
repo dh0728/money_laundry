@@ -96,7 +96,7 @@ public class LedgerQueryService {
       f.service_account_id as "fromAccountId",r.service_account_id as "toAccountId",
       fe.service_entity_id as "fromOwnerId",re.service_entity_id as "toOwnerId",
       f.bank_id as "fromBankId",r.bank_id as "toBankId",
-      t.amount_paid as "amountPaid",t.payment_currency as "paymentCurrency",
+      t.amount_paid as "amountPaid",t.payment_currency as "paymentCurrency",t.amount_usd as "amountUsd",
       t.amount_received as "amountReceived",t.receiving_currency as "receivingCurrency",t.payment_format as "paymentFormat",
       s.p_laundering as "launderingScore",s.threshold_value as threshold,
       s.p_laundering>=s.threshold_value as "isSuspicious", w.type_class as "typeClass",
@@ -142,6 +142,7 @@ public class LedgerQueryService {
       if (row.get("typeClass") != null)
         row.put("typeName", CaseSummary.TYPES[((Number) row.get("typeClass")).intValue()]);
     }
+    if ("transactions".equals(kind)) new CurrentCaseMembership(jdbc).attach(rows);
     return Map.of(
         "content",
         rows,

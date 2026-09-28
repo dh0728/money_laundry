@@ -195,7 +195,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 | 코드 | 코드명 (정본) | 데이터셋 원명 | 한글 설명 `[미정: FE 표시 명칭 — 초안]` |
 |---|---|---|---|
-| 0 | `NORMAL` (현행 wire 이름; §7.2 참조) | — | 패턴아님. 이진 정상 여부·사람 종결과 별개. `NON_PATTERN` 통일 요청은 미구현 |
+| 0 | `NON_PATTERN` | — | 패턴아님. 이진 정상 여부·사람 종결과 별개 (§7.2) |
 | 1 | `FAN-OUT` | FAN-OUT | 분산 송금 (1→N) |
 | 2 | `FAN-IN` | FAN-IN | 집중 수취 (N→1) |
 | 3 | `G-SCATTER` | GATHER-SCATTER | 모아서 뿌리기 (N→1→M) |
@@ -327,6 +327,7 @@ X-Demo-User-Id: 1
 | personal.closed | number, 본인 담당이며 본인이 종결한 사건 | 종결 업무 시각 |
 | institution.alerts / episodes | number, 현재 OPEN Alert / Episode | 현재 전체 |
 | institution.aged | number, OPEN Alert+Episode 중 배정 후72시간 이상 | 현재 전체 |
+| openAlertsAgedOver3Days | number, OPEN Alert만 배정 후72시간 이상 | 현재 전체, 선택 기간 무관 |
 | institution.today / yesterday | number, 오늘/어제 생성된 Alert | 선택 기간 무관 |
 | detection.received | number, 오늘 분석 업무 대상 거래일들의 수신·통합 원장 거래 수 | 선택 기간 무관 |
 | detection.analyzed / suspicious | number, 위 거래 중 오늘 완료된 최신 유효 점수가 있는 거래 / 그중 이진 임계 이상 거래 | 선택 기간 무관 |
@@ -357,7 +358,7 @@ X-Demo-User-Id: 1
 - 오늘 탐지율은 suspicious / received다. 미분석을 분모에서 제외하지 않는다. 분모0 또는 보고 처리 미완료 시 최종 비율을 표시하지 않는다. 상세 수신·점수 기준은 §9.8을 따른다.
 - Alert 전일 대비는 (today−yesterday)/yesterday×100. yesterday=0이면 ‘—’. 기간 밖의 오늘/어제를 daily 배열에서 추정하지 않고 institution을 사용한다.
 - **30일 처리율은 사용자 결정으로 제외했다.** ‘패턴 있음/패턴 외 묶음/패턴 외 단일’ 도넛도 현행 화면 요구가 아니다.
-- `openAlertsAgedOver3Days`는 아직 없다. institution.aged는 Alert+Episode 합계이므로 대신 사용하면 안 된다. Alert만 별도 제공하려면 추가 구현이 필요하다.
+- `openAlertsAgedOver3Days`는 Alert만 집계하며 배정 후 정확히72시간인 건도 포함한다. institution.aged는 Alert+Episode 합계이므로 구분한다.
 
 ## 7. 화면별 제공 항목
 
@@ -401,12 +402,15 @@ GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId
 | fromOwnerId, toOwnerId | UUID string, 송·수취 가명 소유주 |
 | fromBankId, toBankId | number, 은행 코드 |
 | amountPaid, amountReceived | number, 송금액·수취액 |
+| amountUsd | number, 원장에 저장된 USD 환산액 |
+| alertIds | number[], 현재 조사 구성에 포함된 원본 Alert ID. 중복 제거·오름차순, 없으면 [] |
+| episodeIds | number[], 현재 조사 구성에 포함된 Episode의 caseId. 중복 제거·오름차순, 없으면 [] |
 | paymentCurrency, receivingCurrency | string, 각 금액의 통화 |
 | paymentFormat | string, 결제 수단 |
 | launderingScore, threshold | number 또는 null, 이진 점수·해당 분석 임계값 |
 | isSuspicious | boolean 또는 null. 미분석은 null이며 false로 바꾸지 않음 |
 | typeClass | number0~8 또는 null, 패턴 최다 확률 코드 |
-| typeName | string, 점수 있을 때 제공. 코드0은 현재 ‘패턴아님’. 미분석에서는 키가 없을 수 있음 |
+| typeName | string, 점수 있을 때 제공. 코드0은 NON_PATTERN. 미분석에서는 키가 없을 수 있음 |
 | probabilities | 9개 원소 배열, 코드0~8 순서. 미분석은 null 원소 배열이며0점 배열이 아님 |
 | judgement | SUSPICIOUS / NORMAL / UNANALYZED |
 
@@ -414,20 +418,22 @@ GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId
 
 소유주·계좌는 **가명 식별자로 시연**한다. UUID를 원문 이름/계좌번호로 해석하지 않는다. FE는 ‘소유주 …’, ‘계좌 …’ 형태로 표시할 수 있으나 요청 식별자는 전체 UUID를 유지한다. 원문 공개는 별도 권한 계약 대상이다.
 
-**아직 반환하지 않는 요청 필드:** `name`, `amountUsd`, `alertIds`, `episodeIds`. §0의 일반 USD 병기 원칙과 달리 현 원장 조회 응답에는 amountUsd가 없다. 이 목록을 구현 완료로 해석하지 않는다. 소속 ID 추가 시 최초 자동 구성 소속/현재 조사 범위/과거 이관 이력 중 어떤 관계인지, 제외 거래·종결 사건 포함 여부와 caseId/alertId 구분을 확정해야 한다.
+**소속 의미:** 조사 구성의 SUBJECT와 CONTEXT를 모두 포함한다. EXCLUDED/TRANSFERRED 거래는 해당 사건의 소속 배열에서 제외한다. 정상·의심 DECIDED 및 CLOSED 사건은 제외하지 않는다. 아직 저장된 조사 범위가 없는 Alert는 최신 완료 근거를 사용한다. OPEN Alert는 저장 범위에 아직 없는 새 근거 거래를 포함하지만 이미 제외·이관한 거래를 자동 재편입하지 않는다. CLOSED의 저장 범위에는 새 근거를 추가하지 않는다. 미완료 분석의 근거는 사용하지 않는다. 원본 Alert 출처 이력과 현재 소속은 다르며 과거 이력 전체를 이 배열에 넣지 않는다.
+
+alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert의 조사 상세 경로에 쓰는 caseId와 alertId를 동일하다고 가정하지 않는다. 소유주 name·원문 계좌번호는 여전히 반환하지 않는다.
 
 ### 7.2 유형 코드0의 의미와 현행 이름 차이
 
 코드0은 **패턴 없음**이며 이진 정상 판정이나 사람의 정상 종결과 다르다. 의심 거래 목록에서 이진 의심+코드0이면 ‘패턴 없는 의심 거래’로 표시할 수 있다. 전체 거래에서 코드0만 보고 의심이라고 표시하면 안 된다.
 
-- SuspiciousTransactionService: 현재 `typeName` 및 유형 목록 `name`에 코드0=`NORMAL`을 반환한다.
-- LedgerQueryService/CaseSummary: 코드0 표시명은 현재 `패턴아님`이다.
-- FE 요청의 `NON_PATTERN` 통일은 **미구현 변경 요청**이다. 이번 문서 갱신으로 실제 응답이 바뀌지 않는다. 숫자 코드를 기준으로 표시하고 이름 문자열을 판정 로직에 사용하지 않는다.
+- SuspiciousTransactionService의 `typeName`과 `typeCandidates[].name`: 코드0은 `NON_PATTERN`.
+- LedgerQueryService/CaseSummary의 코드0 유형 이름도 `NON_PATTERN`이다. FE 한국어 표시는 ‘패턴 없음’ 등으로 별도 처리한다.
+- 기존 코드0의 NORMAL/패턴아님 응답을 NON_PATTERN으로 통일했다. 숫자 코드는 유지하며 이름 문자열을 판정 로직에 사용하지 않는다. 변경 코드가 배포된 환경부터 적용된다.
 - 사람의 `decision/outcome/resolution: NORMAL`은 별도 업무 판단이며 이름 변경 대상과 혼동하지 않는다.
 
 ## 8. 미결 목록
 
-FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 따른다. 후속 구현 대상은 코드0 이름 통일, Alert만의72시간 경과 집계, 원장 조회 누락 필드와 소속 의미, dev용 인증·접근 계약이다. 기존 결정과 다른 30일 처리율·3분류 도넛은 자동 추가하지 않는다.
+FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 따른다. 코드0 이름 통일·Alert만의72시간 집계·amountUsd 및 현재 사건 소속 필드는 구현에 반영했다. dev 접근 정책과 배포 적용은 별도 확인한다. 기존 결정과 다른 30일 처리율·3분류 도넛은 자동 추가하지 않는다.
 
 현재 화면/조사 구현 계약과 후속 범위는 §9.8을 따른다. 실제 모델 피처·확률 합/dtype·설명 정보 계약과 정식 인증은 각 해당 태스크에서 확인한다. 과거 단일 Alert 소속·처분 거래 무조건 제외·부분 이관 불가를 미결 또는 확정 조건으로 되살리지 않는다.
 

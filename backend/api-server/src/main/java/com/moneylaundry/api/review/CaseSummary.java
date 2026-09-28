@@ -8,7 +8,7 @@ public final class CaseSummary {
   private CaseSummary() {}
 
   public static final String[] TYPES = {
-    "패턴아님",
+    "NON_PATTERN",
     "Fan-out",
     "Fan-in",
     "Gather-scatter",
