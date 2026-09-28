@@ -2,6 +2,7 @@ package com.moneylaundry.api.analysis;
 
 import com.moneylaundry.api.ApiException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataAccessException;
@@ -14,6 +15,9 @@ public class AnalysisScheduler {
   private final AnalysisService service;
   private final AnalysisRunner runner;
 
+  @Value("${app.ingest.scheduled-enabled:true}")
+  private boolean scheduledEnabled = true;
+
   public AnalysisScheduler(AnalysisService service, AnalysisRunner runner) {
     this.service = service;
     this.runner = runner;
@@ -21,6 +25,7 @@ public class AnalysisScheduler {
 
   @Scheduled(cron = "#{@analysisService.cron()}", zone = "${app.zone}")
   public void cutoff() {
+    if (!scheduledEnabled) return;
     try {
       service.registerScheduled();
     } catch (ApiException | DataAccessException e) {

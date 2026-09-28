@@ -14,6 +14,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@org.springframework.test.context.ActiveProfiles("local")
+@org.springframework.security.test.context.support.WithMockUser(roles = "STAFF")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
@@ -83,6 +85,8 @@ class SuspiciousTransactionApiTests {
         .andExpect(jsonPath("$.totalElements").value(2))
         .andExpect(jsonPath("$.content[0].launderingScore").value(0.95))
         .andExpect(jsonPath("$.content[0].typeClass").value(0))
+        .andExpect(jsonPath("$.content[0].typeName").value("NON_PATTERN"))
+        .andExpect(jsonPath("$.content[0].typeCandidates[0].name").value("NON_PATTERN"))
         .andExpect(jsonPath("$.content[0].typeCandidates.length()").value(2))
         .andExpect(jsonPath("$.content[0].agreement").value("ATYPICAL"));
     mvc.perform(get("/api/v1/suspicious-transactions").param("bankId", "993"))
@@ -101,6 +105,28 @@ class SuspiciousTransactionApiTests {
     org.assertj.core.api.Assertions.assertThat(
             jdbc.queryForObject("select count(*) from inference_results", Integer.class))
         .isEqualTo(3);
+  }
+
+  @Test
+  void ledger_non_pattern_does_not_imply_suspicious() {
+    var ledger = new com.moneylaundry.api.review.LedgerQueryService(jdbc);
+    var page =
+        ledger.query(
+            "transactions",
+            new com.moneylaundry.api.review.LedgerQueryService.Filter(
+                null, null, null, null, null, null, 0, 200));
+    var rows = (java.util.List<java.util.Map<String, Object>>) page.get("content");
+    org.assertj.core.api.Assertions.assertThat(rows).hasSize(3);
+    for (var row : rows) {
+      org.assertj.core.api.Assertions.assertThat(row.get("typeName")).isEqualTo("NON_PATTERN");
+      org.assertj.core.api.Assertions.assertThat(row.get("amountUsd").toString()).startsWith("1");
+    }
+    org.assertj.core.api.Assertions.assertThat(
+            rows.stream().filter(r -> Boolean.TRUE.equals(r.get("isSuspicious"))).count())
+        .isEqualTo(2);
+    org.assertj.core.api.Assertions.assertThat(
+            rows.stream().filter(r -> Boolean.FALSE.equals(r.get("isSuspicious"))).count())
+        .isEqualTo(1);
   }
 
   @Test

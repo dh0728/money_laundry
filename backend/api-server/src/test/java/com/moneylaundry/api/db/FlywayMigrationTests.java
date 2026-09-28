@@ -31,7 +31,7 @@ class FlywayMigrationTests {
         jdbc.queryForList("select role, count(*) as n from users group by role");
     assertThat(byRole)
         .extracting(r -> r.get("role") + "=" + r.get("n"))
-        .containsExactlyInAnyOrder("L1=2", "L2=2", "ADMIN=1");
+        .containsExactlyInAnyOrder("STAFF=4", "ADMIN=1");
 
     Integer fxCount = jdbc.queryForObject("select count(*) from fx_rates", Integer.class);
     assertThat(fxCount).isEqualTo(15);
