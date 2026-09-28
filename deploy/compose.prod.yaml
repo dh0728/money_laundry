@@ -1,0 +1,58 @@
+name: aml-prod
+
+services:
+  api:
+    image: ${PROD_API_IMAGE:?PROD_API_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "8080"
+    
+      SPRING_DATASOURCE_URL: ${PROD_DB_URL:?PROD_DB_URL is required}
+      SPRING_DATASOURCE_USERNAME: ${PROD_POSTGRES_USER:?PROD_POSTGRES_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${PROD_POSTGRES_PASSWORD:?PROD_POSTGRES_PASSWORD is required}
+    
+      JWT_SECRET: ${PROD_JWT_SECRET:?PROD_JWT_SECRET is required}
+      S3_BUCKET: ${PROD_S3_BUCKET:?PROD_S3_BUCKET is required}
+      S3_PREFIX: ${PROD_S3_PREFIX:?PROD_S3_PREFIX is required}
+      SQS_QUEUE_URL: ${PROD_SQS_URL:?PROD_SQS_URL is required}
+    
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-northeast-2}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:${PROD_API_PORT:-8080}:8080"
+    stop_grace_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - prod-network
+
+  web:
+    image: ${PROD_WEB_IMAGE:?PROD_WEB_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROD_WEB_PORT:-3000}:80"
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - prod-network
+
+networks:
+  prod-network:
+    external: true
+    name: aml-prod-network
+

@@ -1,0 +1,3 @@
+Timestamp,From Bank,From Account,To Bank,To Account,Amount Received,Receiving Currency,Amount Paid,Payment Currency,Payment Format,From Bank Name,To Bank Name,From Entity ID,From Entity Name,To Entity ID,To Entity Name,Is Laundering
+2022/09/01 09:00,70,MOCK70A,12,MOCK12A,100,US Dollar,100,US Dollar,ACH,MOCK Bank 70,MOCK Bank 12,MOCK-E70,MOCK Entity 70,MOCK-E12,MOCK Entity 12,0
+2022/09/01 09:05,12,MOCK12A,21174,MOCK21174A,50,US Dollar,50,US Dollar,ACH,MOCK Bank 12,MOCK Bank 21174,MOCK-E12,MOCK Entity 12,MOCK-E21174,MOCK Entity 21174,1
