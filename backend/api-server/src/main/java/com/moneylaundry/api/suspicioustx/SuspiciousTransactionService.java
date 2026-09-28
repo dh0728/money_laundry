@@ -13,7 +13,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class SuspiciousTransactionService {
   private static final String[] NAMES = {
-    "NORMAL", "FAN-OUT", "FAN-IN", "G-SCATTER", "S-GATHER", "CYCLE", "RANDOM", "BIPARTITE", "STACK"
+    "NON_PATTERN",
+    "FAN-OUT",
+    "FAN-IN",
+    "G-SCATTER",
+    "S-GATHER",
+    "CYCLE",
+    "RANDOM",
+    "BIPARTITE",
+    "STACK"
   };
   private final JdbcTemplate jdbc;
   private final double ambiguityDelta;
