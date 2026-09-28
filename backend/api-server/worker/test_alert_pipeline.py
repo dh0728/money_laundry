@@ -18,7 +18,7 @@ class AlertPostgresTests(unittest.TestCase):
 
     def setUp(self):
         fixtures.FrozenInputPostgresTests.setUp(self)
-        self.admin.execute("INSERT INTO users(username,name,role) VALUES(%s,'Test L1','L1')", (uuid4().hex,))
+        self.admin.execute("INSERT INTO users(username,name,role,password_hash) VALUES(%s,'Test L1','STAFF','test-hash')", (uuid4().hex,))
         self.admin.execute("UPDATE batch_jobs SET current_stage='ALERTS',threshold_value=.7,analysis_cutoff_at='2022-09-03 09:00+09' WHERE job_id=%s", (self.job,))
         self.context = self.admin.execute("SELECT tx_id FROM analysis.input_transactions WHERE run_id=%s AND input_role='CONTEXT'", (self.run,)).fetchone()[0]
         self.a,self.b,self.c,self.d,self.e = [uuid4() for _ in range(5)]
@@ -122,11 +122,11 @@ class AlertPostgresTests(unittest.TestCase):
         with self.assertRaises(StaleExecution): save_alerts(self.admin,self.execution)
         self.assertEqual(self.admin.execute("SELECT count(*) FROM alert_versions WHERE run_id=%s",(self.run,)).fetchone()[0],0)
         self.admin.execute("UPDATE batch_jobs SET execution_id=%s WHERE job_id=%s",(self.token,self.job))
-        self.admin.execute("UPDATE users SET role='L2' WHERE role='L1'")
+        self.admin.execute("UPDATE users SET role='ADMIN' WHERE role='STAFF'")
         try:
             with self.assertRaises(AssigneeUnavailable): save_alerts(self.admin,self.execution)
         finally:
-            self.admin.execute("UPDATE users SET role='L1' WHERE name='Test L1'")
+            self.admin.execute("UPDATE users SET role='STAFF' WHERE name='Test L1'")
         self.assertEqual(self.admin.execute("SELECT count(*) FROM alert_versions WHERE run_id=%s",(self.run,)).fetchone()[0],0)
 
     def test_escalated_case_preserves_previous_version(self):

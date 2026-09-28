@@ -28,11 +28,24 @@ public class ReviewService {
     this.alerts = alerts;
   }
 
+  public long userId(java.security.Principal principal) {
+    if (principal == null)
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "로그인이 필요합니다.");
+    var ids =
+        jdbc.queryForList(
+            "select user_id from users where username=? and role in ('STAFF','ADMIN')",
+            Long.class,
+            principal.getName());
+    if (ids.isEmpty())
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "로그인이 필요합니다.");
+    return ids.getFirst();
+  }
+
   public Map<String, Object> actor(long id) {
-    time.localOnly();
+    time.demoOnly();
     var users =
         jdbc.queryForList(
-            "select user_id as id,name,role from users where user_id=? and role in ('L1','L2')",
+            "select user_id as id,name,role from users where user_id=? and role in ('STAFF','ADMIN')",
             id);
     if (users.isEmpty())
       throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "시연 직원을 선택하세요.");
@@ -40,9 +53,9 @@ public class ReviewService {
   }
 
   public List<Map<String, Object>> users() {
-    time.localOnly();
+    time.demoOnly();
     return jdbc.queryForList(
-        "select user_id as id,name,role from users where role in ('L1','L2') order by user_id");
+        "select user_id as id,name,role from users where role in ('STAFF','ADMIN') order by user_id");
   }
 
   private Map<String, Object> caseRow(long id) {
@@ -56,8 +69,7 @@ public class ReviewService {
 
   private void editable(Map<String, Object> c, long user) {
     var who = actor(user);
-    if (number(c.get("assignee_id")) != user
-        || !("ALERT".equals(c.get("kind")) ? "L1" : "L2").equals(who.get("role")))
+    if (number(c.get("assignee_id")) != user || !"STAFF".equals(who.get("role")))
       throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "담당 직원만 변경할 수 있습니다.");
     if (!"OPEN".equals(c.get("status"))) throw ApiException.invalidTransition("종결 사건은 변경할 수 없습니다.");
   }
@@ -157,7 +169,7 @@ public class ReviewService {
   }
 
   private Map<String, Object> detail(long id, boolean includeHistory) {
-    time.localOnly();
+    time.demoOnly();
     var c = caseRow(id);
     var gs = groups(c);
     var members = all(gs);
@@ -228,7 +240,7 @@ public class ReviewService {
 
   public Map<String, Object> list(
       String kind, String status, Long assignee, LocalDate from, LocalDate to, int page, int size) {
-    time.localOnly();
+    time.demoOnly();
     AnalysisService.validatePage(page, size);
     if (!Set.of("ALERT", "EPISODE").contains(kind)
         || (status != null && !Set.of("OPEN", "CLOSED").contains(status)))
@@ -326,7 +338,7 @@ public class ReviewService {
   }
 
   public Map<String, Object> money(long id, int minutes) {
-    time.localOnly();
+    time.demoOnly();
     if (!Set.of(5, 15, 30, 60, 180, 360, 1440).contains(minutes)) throw AnalysisService.invalid();
     return tx.execute(
         s -> {
@@ -449,18 +461,19 @@ public class ReviewService {
             cases.put(sel.caseId(), c);
             loaded.computeIfAbsent(sel.caseId(), id -> groups(c));
           }
-          String role = actor(user).get("role").toString();
+
           boolean transfer = "TRANSFER".equals(cmd.action()), move = "MOVE".equals(cmd.action());
           Long target = null;
           if (transfer || move) {
-            if (transfer && !role.equals("L1") || move && !role.equals("L2"))
+            if (cases.values().stream()
+                .anyMatch(c -> !(transfer ? "ALERT" : "EPISODE").equals(c.get("kind"))))
               throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "이관 권한이 없습니다.");
             if (cmd.targetCaseId() == null) {
               long assignee =
                   move
                       ? user
                       : jdbc.queryForObject(
-                          "select user_id from users where role='L2' order by last_assigned_at nulls first,user_id limit 1 for update",
+                          "select user_id from users where role='STAFF' and password_hash is not null and password_hash<>'' order by last_assigned_at nulls first,user_id limit 1 for update",
                           Long.class);
               target =
                   jdbc.queryForObject(
@@ -492,6 +505,7 @@ public class ReviewService {
                   : loaded.containsKey(target) ? loaded.get(target) : groups(caseRow(target));
           for (var sel : cmd.selections()) {
             var gs = loaded.get(sel.caseId());
+            boolean episode = "EPISODE".equals(cases.get(sel.caseId()).get("kind"));
             if (Set.of("CLOSE", "COMMENT", "REVIEW_START").contains(cmd.action())) continue;
             var g =
                 gs.stream()
@@ -515,11 +529,10 @@ public class ReviewService {
               throw ApiException.invalidTransition("선택 범위에 이미 처리된 거래가 있습니다.");
             if ("DECIDE".equals(cmd.action())) {
               if (!Set.of("NORMAL", "SUSPICIOUS").contains(Objects.toString(cmd.decision(), ""))
-                  || role.equals("L1") && !"NORMAL".equals(cmd.decision()))
-                throw AnalysisService.invalid();
+                  || !episode && !"NORMAL".equals(cmd.decision())) throw AnalysisService.invalid();
               if (selected.stream().anyMatch(m -> !"SUBJECT".equals(m.get("reviewRole"))))
                 throw AnalysisService.invalid();
-              if (role.equals("L2")
+              if (episode
                   && members.stream()
                           .filter(
                               m ->
@@ -533,9 +546,9 @@ public class ReviewService {
                 m.put("state", "DECIDED");
                 m.put("decision", cmd.decision());
               }
-              if (role.equals("L2")) g.put("decision", cmd.decision());
+              if (episode) g.put("decision", cmd.decision());
             } else if ("RECONSIDER".equals(cmd.action())) {
-              if (!role.equals("L2")) throw AnalysisService.invalid();
+              if (!episode) throw AnalysisService.invalid();
               for (var m : members)
                 if ("DECIDED".equals(m.get("state"))) {
                   m.put("state", "PENDING");
@@ -547,8 +560,7 @@ public class ReviewService {
             else if ("SUBJECT".equals(cmd.action()) || "CONTEXT".equals(cmd.action()))
               selected.forEach(m -> m.put("reviewRole", cmd.action()));
             else if (transfer || move || "SPLIT".equals(cmd.action())) {
-              if ("SPLIT".equals(cmd.action()) && !role.equals("L2"))
-                throw AnalysisService.invalid();
+              if ("SPLIT".equals(cmd.action()) && !episode) throw AnalysisService.invalid();
               var copied = copy(selected);
               selected.forEach(
                   m -> {

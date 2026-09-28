@@ -44,6 +44,7 @@ class WorkerPipelineTests {
   void setup() {
     Assumptions.assumeTrue(System.getenv("AML_TEST_PYTHON") != null);
     jdbc.execute("truncate banks,batch_jobs,private.entities cascade");
+    jdbc.update("update users set password_hash=repeat('0',96) where username='l1a'");
     job =
         jdbc.queryForObject(
             "insert into batch_jobs(job_type,status,current_stage) values('ANALYSIS','QUEUED','FEATURES') returning job_id",

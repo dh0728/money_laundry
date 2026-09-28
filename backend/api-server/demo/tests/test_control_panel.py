@@ -32,7 +32,7 @@ class PanelTests(unittest.TestCase):
             folder.mkdir()
             (folder / 'bank_12_2023-09-01.csv').write_text('header')
             with patch.dict('os.environ', {'AML_DEMO_DATA_DIR': name, 'AML_DEMO_API_URL': 'http://127.0.0.1:8080'}):
-                with patch.object(Controls, 'post') as post, patch.object(Controls, 'upload') as upload, patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}), patch.object(Controls, 'prepare_day'):
+                with patch('api_client.login_panel', return_value=(__import__('api_client').ApiClient('http://127.0.0.1:8080'), {'role':'ADMIN'})), patch.object(Controls, 'post') as post, patch.object(Controls, 'upload') as upload, patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}), patch.object(Controls, 'prepare_day'):
                     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'control_panel.py')).run(timeout=15)
                     self.assertFalse(app.exception)
                     self.assertFalse(app.error)

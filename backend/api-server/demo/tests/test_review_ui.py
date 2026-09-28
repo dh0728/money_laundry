@@ -10,7 +10,7 @@ from api_client import ApiClient, ApiError
 import httpx
 
 DEMO = Path(__file__).resolve().parents[1]
-USERS = [{'id': 1, 'name': 'L1 A', 'role': 'L1'}, {'id': 3, 'name': 'L2 A', 'role': 'L2'}]
+USERS = [{'id': 1, 'name': 'L1 A', 'role': 'STAFF'}, {'id': 3, 'name': 'L2 A', 'role': 'STAFF'}]
 CLOCK = {'businessAt': '2023-09-02T09:00:00+09:00', 'revision': 1, 'configured': True}
 
 
@@ -29,10 +29,10 @@ def response(path, params=None, **kwargs):
 
 class ReviewScreens(unittest.TestCase):
     def test_login_dashboard_and_four_navigation_pages(self):
-        with patch.object(ApiClient, 'get', side_effect=response):
+        with patch.object(ApiClient, 'get', side_effect=response), patch.object(ApiClient, 'login', return_value=USERS[0]), patch.object(ApiClient, 'me', return_value=USERS[0]):
             app = AppTest.from_file(str(DEMO / 'app.py')).run(timeout=20)
             self.assertFalse(app.exception)
-            self.assertEqual([b.label for b in app.button], ['L1 · Alert 검토', 'L2 · Episode 조사'])
+            self.assertEqual([b.label for b in app.button], ['로그인'])
             app.button[0].click().run(timeout=20)
             self.assertFalse(app.exception)
             self.assertTrue(any('최종 결과' in x.value for x in app.info))
@@ -73,7 +73,7 @@ class ReviewScreens(unittest.TestCase):
                 client.post('review/commands', {'action': 'CLOSE'}, user=1)
             self.assertNotIn('SECRET', str(caught.exception))
             self.assertEqual(len(calls), 1)
-            self.assertEqual(calls[0].headers['X-Demo-User-Id'], '1')
+            self.assertNotIn('X-Demo-User-Id', calls[0].headers)
 
     def test_case_tabs_and_explicit_decision_confirmation(self):
         t = dict(txId=10, occurredAt='2023-09-01T01:00:00Z', fromAccountId='a', toAccountId='b',
@@ -93,7 +93,7 @@ class ReviewScreens(unittest.TestCase):
             if path.endswith('/money'): return dict(available=False, reason='WAITING_RECEIPTS', selectedAccounts=['a'], candidateAccounts=['a', 'b'], delayMinutes=180)
             if path == 'review/account-nodes': return [dict(id='a', ownerId='owner-a', bankId=1), dict(id='b', ownerId='owner-b', bankId=2)]
             return detail
-        code = "from review_ui import case_detail\nfrom api_client import ApiClient\ncase_detail(ApiClient('http://localhost:8080'), {'id': 1, 'role': 'L1'}, 1)"
+        code = "from review_ui import case_detail\nfrom api_client import ApiClient\ncase_detail(ApiClient('http://localhost:8080'), {'id': 1, 'role': 'STAFF'}, 1)"
         with patch.object(ApiClient, 'get', side_effect=get), patch.object(ApiClient, 'post', return_value={'caseIds': [1]}) as post:
             for tab in ['개요', '자금 흐름', '거래', '검토 의견']:
                 app = AppTest.from_string(code)

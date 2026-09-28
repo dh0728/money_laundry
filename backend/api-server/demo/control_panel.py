@@ -48,19 +48,20 @@ def bank_module():
 
 
 class Controls:
-    def __init__(self, base):
+    def __init__(self, base, client=None):
         ApiClient(base)  # Apply the existing URL rules before any request.
         from urllib.parse import urlsplit
         if urlsplit(base).hostname not in ('localhost', '127.0.0.1', '::1'):
             raise ValueError('조작패널은 로컬 백엔드 주소만 사용합니다.')
         self.base = base.rstrip('/')
+        self.client = client or ApiClient(base)
 
     def get(self, path):
-        return ApiClient(self.base).get(path)
+        return self.client.get(path)
 
     def set_clock(self, value):
         clock = self.get('demo/clock')
-        return ApiClient(self.base).post('demo/clock', {'businessAt': value, 'revision': clock['revision']})
+        return self.client.post('demo/clock', {'businessAt': value, 'revision': clock['revision']})
 
     def prepare_day(self, day):
         clock = self.get('demo/clock')
@@ -71,19 +72,7 @@ class Controls:
         self.set_clock(target.isoformat())
 
     def post(self, path, payload=None):
-        try:
-            with httpx.Client(timeout=30, follow_redirects=False) as client:
-                response = client.post(self.base + '/api/v1/' + path, json=payload)
-            if response.status_code != 202:
-                try:
-                    code = response.json().get('code', '')
-                except ValueError:
-                    code = ''
-                code = code if re.fullmatch(r'[A-Z_]{1,80}', str(code)) else ''
-                raise ApiError(f'실행 요청 거절: HTTP {response.status_code} {code}')
-            return response.json()
-        except httpx.HTTPError:
-            raise ApiError('실행 응답을 확인하지 못했습니다. 작업 목록 확인 후 재개하세요.') from None
+        return self.client.post(path, payload)
 
     def upload(self, day, bank, file, report):
         mock = bank_module()
@@ -202,16 +191,30 @@ def render():
     base = st.text_input('로컬 백엔드', os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080'))
     root = st.text_input('날짜별 은행 파일 폴더', os.getenv('AML_DEMO_DATA_DIR', ''))
     try:
+        from api_client import login_panel
+        authenticated = login_panel(base, 'control_client')
+        if authenticated is None:
+            return
+        client, user = authenticated
+        if user['role'] != 'ADMIN':
+            st.error('조작패널은 관리자 계정으로 로그인하세요.')
+            if st.button('로그아웃'):
+                client.logout()
+                st.session_state.pop('control_client', None)
+                st.rerun()
+            return
         files = catalog(root) if root else {}
         if not files:
             st.info('준비된 날짜별 은행 파일의 상위 폴더를 지정하세요.')
             return
         if 'replay' not in st.session_state:
-            st.session_state.replay = Replay(Controls(base))
+            st.session_state.replay = Replay(Controls(base, client))
         replay = st.session_state.replay
         if replay.controls.base != base.rstrip('/'):
             st.info('진행 중 작업의 서버를 바꿀 수 없습니다. 새 패널 세션에서 접속하세요.')
             return
+        if replay.future is None or replay.future.done():
+            replay.controls.client = client
         clock = replay.controls.get('demo/clock')
         st.metric('시연 업무 시각 (KST)', clock['businessAt'])
         with st.expander('시연 업무 시각 설정'):
