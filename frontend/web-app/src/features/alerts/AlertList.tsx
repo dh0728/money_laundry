@@ -5,7 +5,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { Combine, Download, Inbox, ListFilter, Search } from 'lucide-react'
 import type { AlertRow } from '@/api/alerts'
 import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
-import { MOCK_USER } from '@/app/session'
+import { useCurrentUser } from '@/app/session'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
 import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
@@ -83,7 +83,8 @@ type Props = {
 }
 
 export default function AlertList({ rows, today, onOpen, onLink }: Props) {
-  const me = MOCK_USER.userId
+  const currentUser = useCurrentUser()
+  const me = currentUser.userId
   const [query, setQuery] = useState('')
   // v24처럼 "내 담당" 조건을 켠 채 시작한다(API.md §3.2 기본 뷰 assigneeId=me)
   const [filters, setFilters] = useState<AlertFilter[]>([{ field: 'assignee', value: me }])
@@ -105,7 +106,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
       cell: ({ row }) => (
         <Checkbox
           aria-label={`${alertCode(row.original.alertId)} 선택`}
-          disabled={!canLink(row.original)}
+          disabled={!canLink(row.original, currentUser)}
           checked={link.selected.has(row.original.alertId)}
           onClick={event => event.stopPropagation()}
           onCheckedChange={() => dispatchLink({ type: 'toggle', id: row.original.alertId })}
@@ -113,7 +114,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
       ),
     },
     ...baseColumns,
-  ], [link])
+  ], [link, currentUser])
 
   const [rowsPerPage] = useMemoryState('settings:rows', '20') // 설정 > 페이지당 행
   const pageSize = Number(rowsPerPage) || 20
@@ -173,7 +174,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
             }}>조건 적용</Button>
           </PopoverContent>
         </Popover>
-        {link.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => dispatchLink({ type: 'start' })}><Combine className="size-3.5" />Episode로 묶기</Button>}
+        {currentUser.role === 'STAFF' && link.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" disabled={!rows.some(row => canLink(row, currentUser))} onClick={() => dispatchLink({ type: 'start' })}><Combine className="size-3.5" />Episode로 묶기</Button>}
         <Button variant="outline" size="sm" className={link.mode === 'browse' ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />다운로드</Button>
       </div>
 
@@ -208,7 +209,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
       )}
 
       {result.length
-        ? <DataTable table={table} onRowClick={link.mode === 'link' ? row => canLink(row) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
+        ? <DataTable table={table} onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
         : (
           <div className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />

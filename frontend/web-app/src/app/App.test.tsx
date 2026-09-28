@@ -6,10 +6,9 @@ import { pageFromHash } from './navigation'
 
 afterEach(() => window.history.replaceState({}, '', '/'))
 
-// 로그인 화면을 지나 앱 안으로 들어간다
+// mock 모드는 로그인 없이 앱 안으로 들어간다
 const renderSignedIn = () => {
   render(<App />, { wrapper: NuqsTestingAdapter })
-  fireEvent.click(screen.getByRole('button', { name: '로그인' }))
 }
 
 describe('앱 틀', () => {
@@ -70,14 +69,13 @@ describe('앱 틀', () => {
 })
 
 describe('로그인', () => {
-  it('처음에는 로그인 화면을 보여 주고, 로그아웃하면 다시 돌아온다', async () => {
+  it('mock 모드는 로그인 없이 열리고 로그아웃 확인 뒤에도 시연을 계속한다', async () => {
     render(<App />)
-    expect(screen.getByLabelText('이메일')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }))
+    expect(screen.getByRole('button', { name: /오분석/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /오분석/ }))
     fireEvent.click(await screen.findByRole('button', { name: '현재 세션 로그아웃' }))
     fireEvent.click(await screen.findByRole('button', { name: '로그아웃' }))
-    expect(await screen.findByLabelText('이메일')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /오분석/ })).toBeInTheDocument()
   })
 })
 

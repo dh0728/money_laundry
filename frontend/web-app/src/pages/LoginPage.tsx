@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ApiError } from '@/api/common'
 import { Eye, EyeOff } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import LoginNetwork from '@/components/LoginNetwork'
@@ -7,9 +8,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-// v24 App.tsx의 로그인 화면. 인증 방식(API.md §5)이 정해지기 전이라 제출하면 가짜 사용자로 들어간다.
-export default function LoginPage({ onLogin }: { onLogin: () => void }) {
+// v24 App.tsx의 로그인 화면.
+export default function LoginPage({ onLogin, message }: { onLogin: (username: string, password: string) => Promise<void>; message?: string }) {
   const [showPassword, setShowPassword] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true); setError('')
+    try { await onLogin(username, password) }
+    catch (cause) { setError(cause instanceof ApiError && cause.problem.status === 401 ? '아이디 또는 비밀번호를 확인해 주세요.' : '로그인 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.') }
+    finally { setBusy(false) }
+  }
   return (
     <div className="login-screen relative min-h-screen overflow-hidden bg-[var(--radar-disc)] text-login-foreground">
       {/* 화면 전체를 노드 그래프 애니메이션으로 채우고, 오른쪽 절반 전체를 유리 패널로 나눈다 */}
@@ -28,19 +39,19 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         </div>
         {/* 오른쪽 절반 = css.glass식 글래스모피즘(반투명+blur). 인풋만 불투명. 제목/화살표 없음 */}
         <div className="login-glass-panel relative flex items-center justify-center p-8 pointer-events-auto backdrop-blur-2xl">
-          <form className="w-full max-w-[360px] space-y-5" onSubmit={e => { e.preventDefault(); onLogin() }}>
-            <div className="space-y-2"><Label htmlFor="email" className="text-login-foreground/80">이메일</Label><Input id="email" type="email" defaultValue="reviewer@fss.or.kr" autoComplete="username" className="h-10 login-input-opaque border-login-foreground/15 text-login-foreground" /></div>
+          <form className="w-full max-w-[360px] space-y-5" onSubmit={submit}>
+            <div className="space-y-2"><Label htmlFor="username" className="text-login-foreground/80">아이디</Label><Input id="username" value={username} onChange={e => setUsername(e.target.value)} required autoComplete="username" className="h-10 login-input-opaque border-login-foreground/15 text-login-foreground" /></div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-login-foreground/80">비밀번호</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? 'text' : 'password'} defaultValue="amlradar" autoComplete="current-password" className="h-10 pr-10 login-input-opaque border-login-foreground/15 text-login-foreground" />
+                <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" className="h-10 pr-10 login-input-opaque border-login-foreground/15 text-login-foreground" />
                 <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-login-foreground/55 hover:text-login-foreground" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} onClick={() => setShowPassword(v => !v)}>
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-11 bg-login-action-background text-login-action-foreground hover:bg-login-action-background/90">로그인</Button>
-            <div className="text-center"><Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs font-normal text-login-foreground/55 hover:text-login-foreground">비밀번호를 잊으셨나요?</Button></div>
+            {(error || message) && <p role="alert" className="text-sm text-login-foreground">{error || message}</p>}
+            <Button type="submit" disabled={busy} className="w-full h-11 bg-login-action-background text-login-action-foreground hover:bg-login-action-background/90">{busy ? '로그인 중…' : '로그인'}</Button>
           </form>
         </div>
       </div>

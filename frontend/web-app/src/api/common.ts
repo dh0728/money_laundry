@@ -36,6 +36,26 @@ export class ApiError extends Error {
   }
 }
 
+let csrf: { headerName: string; token: string } | null = null
+
+export function clearCsrf() { csrf = null }
+
+export async function refreshCsrf() {
+  const response = await fetch('/api/auth/csrf', { credentials: 'include', headers: { Accept: 'application/json' } })
+  if (!response.ok) throw await responseError(response)
+  csrf = await response.json() as { headerName: string; token: string }
+  return csrf
+}
+
+export async function responseError(response: Response, notifyUnauthorized = true) {
+  const problem = (await response.json().catch(() => null)) as ProblemDetail | null
+  if (response.status === 401 && notifyUnauthorized) {
+    clearCsrf()
+    window.dispatchEvent(new Event('auth-expired'))
+  }
+  return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status })
+}
+
 /** 시각은 서울 오프셋(+09:00)이 붙은 ISO-8601 문자열 */
 export type IsoDateTime = string
 /** YYYY-MM-DD */
@@ -47,27 +67,19 @@ export async function getJson<T>(path: string, params?: Record<string, string | 
     if (value !== undefined) query.set(key, String(value))
   }
   const url = query.size ? `${path}?${query}` : path
-  const response = await fetch(url, { headers: { Accept: 'application/json' } })
-  if (!response.ok) {
-    const problem = (await response.json().catch(() => null)) as ProblemDetail | null
-    throw new ApiError(
-      problem ?? { type: 'about:blank', title: response.statusText, status: response.status, code: 'INTERNAL' },
-    )
-  }
+  const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })
+  if (!response.ok) throw await responseError(response, path !== '/api/me')
   return (await response.json()) as T
 }
 
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const token = csrf ?? await refreshCsrf()
   const response = await fetch(path, {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', [token.headerName]: token.token },
     body: JSON.stringify(body),
   })
-  if (!response.ok) {
-    const problem = (await response.json().catch(() => null)) as ProblemDetail | null
-    throw new ApiError(
-      problem ?? { type: 'about:blank', title: response.statusText, status: response.status, code: 'INTERNAL' },
-    )
-  }
+  if (!response.ok) throw await responseError(response)
   return (await response.json().catch(() => undefined)) as T
 }

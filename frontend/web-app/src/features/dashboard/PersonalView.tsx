@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AlertRow } from '@/api/alerts'
 import { formatScore, typeDisplay } from '@/api/codes'
-import { MOCK_USER } from '@/app/session'
+import { useCurrentUser } from '@/app/session'
 import { WorkStatusBadge } from '@/components/badges'
 import { ProvenanceBadge } from '@/components/Provenance'
 import { SectionCard, sectionCardSurface } from '@/components/SectionCards'
@@ -41,12 +41,13 @@ function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
 }
 
 export function PersonalView() {
+  const currentUser = useCurrentUser()
   const [sort, setSort] = useState<WorkSort>('risk')
   const [overrides] = useAlertOverrides()
   const [reviews] = useReviewRequests()
   const alerts = useAsync(() => loadAlerts({ assigneeId: 'me', size: 200 }), [])
   // mock: Alert·Episode 화면에서 처리한 결과가 바뀌면 다시 묶는다(새로고침하면 처음 상태)
-  const episodes = useAsync(() => loadMyEpisodes(MOCK_USER.userId, overrides, reviews), [overrides, reviews])
+  const episodes = useAsync(() => loadMyEpisodes(currentUser.userId, overrides, reviews), [overrides, reviews])
   if (alerts.state.status === 'error') return <ErrorBlock message={alerts.state.message} onRetry={alerts.retry} />
   if (episodes.state.status === 'error') return <ErrorBlock message={episodes.state.message} onRetry={episodes.retry} />
   if (alerts.state.status === 'loading' || episodes.state.status === 'loading') return <LoadingBlock label="내 담당 업무" />

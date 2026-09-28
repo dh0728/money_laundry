@@ -4,7 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { Download, Inbox, Search } from 'lucide-react'
 import { typeDisplay, type EpisodeStatus } from '@/api/codes'
 import type { EpisodeRow } from '@/api/episodes'
-import { MOCK_USER } from '@/app/session'
+import { useCurrentUser } from '@/app/session'
 import { FilterChip } from '@/components/FilterChip'
 import { AgeBadge, RiskBadge, WorkStatusBadge } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
@@ -54,16 +54,17 @@ const columns: ColumnDef<EpisodeRow>[] = [
 type StatusFilter = 'all' | WorkStatus
 
 export default function EpisodeList({ rows, onOpen }: { rows: EpisodeRow[]; onOpen: (row: EpisodeRow) => void }) {
+  const currentUser = useCurrentUser()
   const [query, setQuery] = useState('')
   const [mine, setMine] = useState(true)
   const [status, setStatus] = useState<StatusFilter>('all')
   const result = useMemo(() => {
     const text = query.trim().toLocaleLowerCase('ko')
     return rows.filter(row =>
-      (!mine || row.assignee.userId === MOCK_USER.userId)
+      (!mine || row.assignee.userId === currentUser.userId)
       && (status === 'all' || episodeWorkStatus(row.status, Boolean(row.reviewRequestedAt)) === status)
       && (!text || [episodeCode(row.episodeId), String(row.episodeId), row.assignee.name, ...row.primaryTypes.map(t => typeDisplay(t.code).label)].join(' ').toLocaleLowerCase('ko').includes(text)))
-  }, [rows, query, mine, status])
+  }, [rows, query, mine, status, currentUser.userId])
 
   const [rowsPerPage] = useMemoryState('settings:rows', '20')
   const pageSize = Number(rowsPerPage) || 20

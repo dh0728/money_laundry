@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState, type ComponentProps, type CSSProperties } from 'react'
+import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
+import { ApiError } from '@/api/common'
+import { live } from '@/lib/apiMode'
 import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import { DataModeBadge } from '@/components/Provenance'
@@ -18,7 +21,7 @@ import EpisodesPage from '@/pages/EpisodesPage'
 import LoginPage from '@/pages/LoginPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TransactionsPage from '@/pages/TransactionsPage'
-import { MOCK_USER, roleInfo } from './session'
+import { CurrentUserContext, MOCK_USER, roleInfo, type CurrentUser } from './session'
 import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 
 
@@ -77,9 +80,40 @@ export default function App() {
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
   const [appFullscreen, setAppFullscreen] = useState(false)
   const [logout, setLogout] = useState(false)
-  const [signedIn, setSignedIn] = useState(false)
+  const [user, setUser] = useState<CurrentUser | null>(live ? null : MOCK_USER)
+  const [restoring, setRestoring] = useState(live)
+  const [authMessage, setAuthMessage] = useState('')
+  const [logoutError, setLogoutError] = useState('')
+  const currentUser = user ?? MOCK_USER
+  const fromSession = (session: SessionUser): CurrentUser => ({ ...MOCK_USER, userId: session.id, name: session.name, role: session.role, username: session.username, organization: '—', email: '—', joinedAt: '—' })
   const isFullscreen = nativeFullscreen || appFullscreen
   const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
+
+  useEffect(() => {
+    if (!live) return
+    let active = true
+    restoreSession().then(session => { if (active) setUser(fromSession(session)) }).catch(error => {
+      if (active && !(error instanceof ApiError && error.problem.status === 401)) setAuthMessage('서버에 연결하지 못했습니다. 다시 로그인해 주세요.')
+    }).finally(() => { if (active) setRestoring(false) })
+    const expired = () => { setUser(null); setAuthMessage('로그인 시간이 만료됐습니다. 다시 로그인해 주세요.') }
+    window.addEventListener('auth-expired', expired)
+    return () => { active = false; window.removeEventListener('auth-expired', expired) }
+  }, [])
+
+  async function signIn(username: string, password: string) {
+    if (!live) { setUser(MOCK_USER); go('dashboard'); return }
+    const session = await login(username, password)
+    setUser(fromSession(session)); setAuthMessage(''); go('dashboard')
+  }
+
+  async function signOut() {
+    try {
+      if (live) await logoutSession()
+      setUser(live ? null : MOCK_USER); setLogout(false); setLogoutError(''); go('dashboard')
+    } catch {
+      setLogoutError('로그아웃하지 못했습니다. 다시 시도해 주세요.')
+    }
+  }
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => { if (event.key === 'F11') { event.preventDefault(); fullscreen() } }
@@ -89,9 +123,11 @@ export default function App() {
     return () => { window.removeEventListener('keydown', key); document.removeEventListener('fullscreenchange', screen) }
   }, [fullscreen])
 
-  if (!signedIn) return <LoginPage onLogin={() => { setSignedIn(true); go('dashboard') }} />
+  if (restoring) return <div role="status" className="p-6">로그인 상태 확인 중…</div>
+  if (!user) return <LoginPage onLogin={signIn} message={authMessage} />
 
   return (
+    <CurrentUserContext.Provider value={currentUser}>
     <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
@@ -132,10 +168,10 @@ export default function App() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarDestinationButton data-nav-id="account" size="lg" tooltip="계정" isActive={page === 'account'} data-account-active={page === 'account'} onNavigate={() => go('account')} className="account-button h-12 gap-2.5 px-2 hover:bg-sidebar-accent group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:p-2!">
-                  <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{MOCK_USER.name[0]}</AvatarFallback></Avatar>
+                  <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{currentUser.name[0]}</AvatarFallback></Avatar>
                   <span className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
-                    <span className="block text-xs font-medium">{MOCK_USER.name}</span>
-                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{roleInfo[MOCK_USER.role].label}</span>
+                    <span className="block text-xs font-medium">{currentUser.name}</span>
+                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
                   </span>
                 </SidebarDestinationButton>
               </SidebarMenuItem>
@@ -180,14 +216,16 @@ export default function App() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>로그아웃할까요?</AlertDialogTitle>
-            <AlertDialogDescription>현재 세션을 종료하고 로그인 화면으로 돌아갑니다.</AlertDialogDescription>
+            <AlertDialogDescription>{live ? '현재 세션을 종료하고 로그인 화면으로 돌아갑니다.' : 'mock 시연 화면을 대시보드부터 다시 엽니다.'}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setSignedIn(false); go('dashboard') }}>로그아웃</AlertDialogAction>
+            <AlertDialogAction onClick={() => void signOut()}>로그아웃</AlertDialogAction>
           </AlertDialogFooter>
+          {logoutError && <p role="alert" className="text-sm text-destructive">{logoutError}</p>}
         </AlertDialogContent>
       </AlertDialog>
     </SidebarProvider>
+    </CurrentUserContext.Provider>
   )
 }

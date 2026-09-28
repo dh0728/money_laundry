@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 import type { AlertRow, HistoryRow } from '@/api/alerts'
 import { fetchEpisodeGraph } from '@/api/graph'
 import { commentEpisode, fetchEpisode, fetchEpisodeTransactions } from '@/api/episodes'
-import { MOCK_USER } from '@/app/session'
+import { useCurrentUser, canEditOpen } from '@/app/session'
 import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { episodeCode } from '@/features/alerts/alertFilters'
 import EpisodeDetail from '@/features/episodes/EpisodeDetail'
@@ -21,6 +21,7 @@ const loadLive = async (episodeId: number) => {
 type Props = { episodeId: number; alerts: AlertRow[]; onOpenAlert: (alertId: number) => void }
 
 export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Props) {
+  const currentUser = useCurrentUser()
   // mock은 목록 화면에서 방금 연결한 결과까지 반영한 Alert로 계산한다
   const alertKey = alerts.map(a => `${a.alertId}:${a.episodeId}`).join()
   const { state, retry } = useAsync(() => (live ? loadLive(episodeId) : loadMockEpisode(episodeId, alerts.length ? alerts : undefined)), [episodeId, alertKey])
@@ -33,10 +34,10 @@ export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Pr
 
   const episode = { ...state.data.detail, reviewRequestedAt: requests[episodeId] ?? state.data.detail.reviewRequestedAt }
   const history = [...extraHistory, ...episode.history]
-  const responsible = episode.assignee.userId === MOCK_USER.userId
+  const responsible = canEditOpen(currentUser, episode.assignee.userId, episode.status)
 
   const record = (action: HistoryRow['action'], comment: string) => setExtraHistory(prev => [{
-    id: Date.now(), actor: { userId: MOCK_USER.userId, name: MOCK_USER.name, role: MOCK_USER.role }, action,
+    id: Date.now(), actor: { userId: currentUser.userId, name: currentUser.name, role: currentUser.role }, action,
     targetType: 'EPISODE', targetId: episodeId, relatedIds: [], from: 'OPEN', to: 'OPEN', resolution: null, comment, at: new Date().toISOString(),
   }, ...prev])
 
@@ -61,7 +62,7 @@ export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Pr
   // FE 제안: 사람이 거래의 의심/정상 판정을 바꾼다. API가 없어 실제 서버 모드에서는 보내지 않는다.
   function relabel(txId: number, label: 0 | 1, reason: string) {
     if (live) { toast.info('거래 판정 전환은 Backend 계약 정리 전이라 아직 보낼 수 없습니다.'); return }
-    setRelabels(prev => ({ ...prev, [txId]: { label, reason, at: new Date().toISOString(), actor: MOCK_USER.name } }))
+    setRelabels(prev => ({ ...prev, [txId]: { label, reason, at: new Date().toISOString(), actor: currentUser.name } }))
     record('TX_RELABEL', relabelComment(txId, label, reason))
     toast.success(`거래 ${txId}를 ${relabelText(label)}로 전환했습니다.`, { description: mockSavedNote })
   }
