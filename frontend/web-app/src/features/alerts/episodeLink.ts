@@ -1,4 +1,5 @@
 import type { AlertRow } from '@/api/alerts'
+import { canEditOpen, MOCK_USER, type CurrentUser } from '@/app/session'
 import type { AlertOverrides } from './alertOverrides'
 
 // v24 Lists.tsx의 "Episode로 묶기" 다중 선택. 처리 전(OPEN) Alert만 고를 수 있다(API.md §4.2).
@@ -18,7 +19,7 @@ export function episodeLinkReducer(state: EpisodeLinkState, action: EpisodeLinkA
   return { ...state, selected }
 }
 
-export const canLink = (row: AlertRow) => row.status === 'OPEN'
+export const canLink = (row: AlertRow, user: CurrentUser = MOCK_USER) => canEditOpen(user, row.assignee.userId, row.status)
 
 /** 연결할 수 있는 기존 Episode: 목록에 보이는 심층 조사 Alert의 Episode */
 export const linkableEpisodes = (rows: AlertRow[]) =>

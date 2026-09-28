@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { closeAlert, fetchAlert, fetchAlertHistory, type AlertRow, type HistoryRow } from '@/api/alerts'
 import { createEpisode, linkAlertsToEpisode } from '@/api/episodes'
 import { fetchAlertGraph } from '@/api/graph'
-import { MOCK_USER } from '@/app/session'
+import { useCurrentUser, canEditOpen } from '@/app/session'
 import { ErrorBlock, LoadingBlock } from '@/components/states'
 import AlertDetail from '@/features/alerts/AlertDetail'
 import type { VerdictSubmit } from '@/features/alerts/AlertReview'
@@ -27,6 +27,7 @@ const loadLive = async (alertId: number) => {
 type Props = { alertId: number; rows: AlertRow[]; onOpenEpisode: (episodeId: number) => void }
 
 export default function AlertDetailPage({ alertId, rows, onOpenEpisode }: Props) {
+  const currentUser = useCurrentUser()
   const { state, retry } = useAsync(() => (live ? loadLive(alertId) : loadMockAlertDetail(alertId)), [alertId])
   const [overrides, setOverrides] = useAlertOverrides()
   const [extraHistory, setExtraHistory] = useAlertHistory(alertId)
@@ -38,7 +39,7 @@ export default function AlertDetailPage({ alertId, rows, onOpenEpisode }: Props)
 
   const alert = withOverride(state.data.detail, overrides)
   const history = [...extraHistory, ...state.data.history]
-  const responsible = alert.assignee.userId === MOCK_USER.userId
+  const responsible = canEditOpen(currentUser, alert.assignee.userId, alert.status)
 
   async function submit({ verdict, comment, episodeId }: VerdictSubmit) {
     const option = verdictOption(verdict)
@@ -57,7 +58,7 @@ export default function AlertDetailPage({ alertId, rows, onOpenEpisode }: Props)
       const override = resolution ? { status: 'CLOSED' as const, resolution, episodeId: null } : { status: 'ESCALATED' as const, resolution: null, episodeId: target ?? null }
       setOverrides(prev => ({ ...prev, [alertId]: override }))
       setExtraHistory(prev => [{
-        id: Date.now(), actor: { userId: MOCK_USER.userId, name: MOCK_USER.name, role: MOCK_USER.role }, action: resolution ? 'CLOSE' : verdict === 'new-episode' ? 'ESCALATE' : 'LINK',
+        id: Date.now(), actor: { userId: currentUser.userId, name: currentUser.name, role: currentUser.role }, action: resolution ? 'CLOSE' : verdict === 'new-episode' ? 'ESCALATE' : 'LINK',
         targetType: 'ALERT', targetId: alertId, relatedIds: target ? [target] : [], from: 'OPEN', to: override.status, resolution: resolution ?? null, comment, at: new Date().toISOString(),
       }, ...prev])
       toast.success(`${alertCode(alertId)} · ${option.result}${target && !resolution ? ` (${episodeCode(target)})` : ''}`, { description: mockSavedNote })
@@ -70,9 +71,9 @@ export default function AlertDetailPage({ alertId, rows, onOpenEpisode }: Props)
   function relabel(txId: number, label: 0 | 1, reason: string) {
     if (live) { toast.info('거래 판정 전환은 Backend 계약 정리 전이라 아직 보낼 수 없습니다.'); return }
     const at = new Date().toISOString()
-    setRelabels(prev => ({ ...prev, [txId]: { label, reason, at, actor: MOCK_USER.name } }))
+    setRelabels(prev => ({ ...prev, [txId]: { label, reason, at, actor: currentUser.name } }))
     setExtraHistory(prev => [{
-      id: Date.now(), actor: { userId: MOCK_USER.userId, name: MOCK_USER.name, role: MOCK_USER.role }, action: 'TX_RELABEL',
+      id: Date.now(), actor: { userId: currentUser.userId, name: currentUser.name, role: currentUser.role }, action: 'TX_RELABEL',
       targetType: 'ALERT', targetId: alertId, relatedIds: [txId], from: relabelText(label === 1 ? 0 : 1), to: relabelText(label), resolution: null, comment: relabelComment(txId, label, reason), at,
     }, ...prev])
     toast.success(`거래 ${txId}를 ${relabelText(label)}로 전환했습니다.`, { description: mockSavedNote })
@@ -86,7 +87,7 @@ export default function AlertDetailPage({ alertId, rows, onOpenEpisode }: Props)
       graph={state.data.graph}
       history={history}
       responsible={responsible}
-      assigneeNotice={responsible ? undefined : `현재 ${MOCK_USER.name} 계정으로 조회 중입니다. 판정은 담당자 ${alert.assignee.name}${josa(alert.assignee.name, '이', '가')} 합니다.`}
+      assigneeNotice={responsible ? undefined : `현재 ${currentUser.name} 계정으로 조회 중입니다. 판정은 담당자 ${alert.assignee.name}${josa(alert.assignee.name, '이', '가')} 합니다.`}
       episodes={episodes}
       onOpenEpisode={onOpenEpisode}
       onSubmit={submit}

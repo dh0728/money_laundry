@@ -5,7 +5,7 @@ import type { DateRange } from 'react-day-picker'
 import { Download, Inbox, ListFilter, Search } from 'lucide-react'
 import { typeDisplay, type EpisodeStatus, type TypeCode } from '@/api/codes'
 import type { EpisodeRow } from '@/api/episodes'
-import { MOCK_USER } from '@/app/session'
+import { useCurrentUser } from '@/app/session'
 import { FilterChip } from '@/components/FilterChip'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { ProvenanceBadge } from '@/components/Provenance'
@@ -59,8 +59,9 @@ const columns: ColumnDef<EpisodeRow>[] = [
 ]
 
 export default function EpisodeList({ rows, today, onOpen }: { rows: EpisodeRow[]; today: Date; onOpen: (row: EpisodeRow) => void }) {
+  const currentUser = useCurrentUser()
   const [query, setQuery] = useState('')
-  const me = MOCK_USER.userId
+  const me = currentUser.userId
   const [filters, setFilters] = useState<EpisodeFilter[]>([{ field: 'assignee', value: me }])
   const [range, setRange] = useState<DateRange>()
   const [filterOpen, setFilterOpen] = useState(false)
