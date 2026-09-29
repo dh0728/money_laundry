@@ -195,13 +195,18 @@ class Replay:
             self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
 
     def _run(self, days, files, analyze, upload, interval):
+        stage = '날짜 준비'
+        day = None
         try:
             for day in days:
                 if self.pause.is_set():
                     break
                 if analyze and day in self.completed:
                     continue
+                stage = '업무 시각 준비'
+                self.report(f'{day}: {stage}', currentDay=day, bankId=None, uploadId=None, jobId=None)
                 self.controls.prepare_day(day)
+                stage = '전송 파일 목록 확인'
                 file_done = sum((day, bank, str(file)) in self.sent for bank, file in files[day])
                 self.report(f'{day}: 처리 시작', currentDay=day,
                             fileDone=file_done, fileTotal=len(files[day]) if upload else 0,
@@ -212,16 +217,19 @@ class Replay:
                         if key in self.sent:
                             continue
                         self.report(f'{day} 은행 {bank}: 전송 준비', bankId=bank, uploadId=None)
+                        stage = '은행 파일 전송·검수'
                         self.controls.upload(day, bank, file, self.report)
                         self.sent.add(key)
                         file_done += 1
                         self.report(f'{day} 은행 {bank}: 전송·검수 완료', fileDone=file_done)
                 if analyze:
+                    stage = '분석 시작 요청'
                     self.report(f'{day}: 분석 시작 요청')
                     if day not in self.jobs:
                         self.jobs[day] = self.controls.post('demo/analysis', {'businessDate': day})['jobId']
                     job = self.jobs[day]
                     self.report(f'{day}: 분석 대기', jobId=job)
+                    stage = '분석 결과 조회'
                     self.wait_job(job, day)
                     self.completed.add(day)
                 with self.lock:
@@ -232,7 +240,13 @@ class Replay:
             self.report('일시정지' if self.pause.is_set() else '선택한 작업 완료')
         except Exception as error:
             # Never display signed URLs, raw HTTP responses or file contents.
-            message = str(error) if isinstance(error, ApiError) else '전송 또는 처리 확인 실패. 표시된 ID와 백엔드 작업 목록을 확인하세요.'
+            if isinstance(error, ApiError):
+                message = str(error)
+            else:
+                # A fixed type label is diagnostic; exception text can contain credentials.
+                kind = next((cls.__name__ for cls in (KeyError, TypeError, ValueError, OSError, RuntimeError)
+                             if isinstance(error, cls)), '내부 오류')
+                message = f'{day or "날짜 미확인"} · {stage} 실패 ({kind}). 패널 코드 버전과 API 응답 형식을 확인하세요.'
             self.report('중단', error=message)
 
     def wait_job(self, job, day):

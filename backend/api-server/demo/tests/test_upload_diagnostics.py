@@ -11,6 +11,22 @@ from control_panel import Controls, Replay, upload_failure
 
 
 class UploadDiagnosticsTests(unittest.TestCase):
+    def test_prepare_failure_keeps_date_and_stage_without_disclosing_exception(self):
+        controls = Mock()
+        controls.prepare_day.side_effect = KeyError('secret-token')
+        replay = Replay(controls)
+        try:
+            replay.start(['2023-08-31'], {'2023-08-31': [(10, Path('file.csv'))]})
+            replay.future.result(timeout=5)
+            state = replay.snapshot()
+            self.assertEqual(state['currentDay'], '2023-08-31')
+            self.assertIn('업무 시각 준비 실패 (KeyError)', state['error'])
+            self.assertNotIn('secret', state['error'])
+            controls.upload.assert_not_called()
+            controls.post.assert_not_called()
+        finally:
+            replay.close()
+
     def http_error(self, status, body):
         return HTTPError('https://secret-url?token=secret', status, 'secret', {},
                          io.BytesIO(json.dumps(body).encode()))
