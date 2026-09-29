@@ -1,13 +1,14 @@
 """Launch a loopback panel controlling the deployed dev API with an ADMIN session."""
 import argparse
 import getpass
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
 from api_client import ApiError
 from control_panel import Controls, Replay, catalog
 import operator_session
-from operator_session import AdminClient
+from operator_session import AdminClient, cloudflare_headers
 
 
 def main():
@@ -15,19 +16,28 @@ def main():
     parser.add_argument('--api-url', default='https://dev.aiaml.co.kr')
     parser.add_argument('--data-dir', required=True)
     parser.add_argument('--port', type=int, default=8502)
+    parser.add_argument('--cloudflare', action='store_true', help='Cloudflare 서비스 토큰을 숨김 입력')
     args = parser.parse_args()
     client = replay = None
+    cf_headers = {}
     try:
         if not 1 <= args.port <= 65535:
             raise ValueError('포트는 1~65535 범위여야 합니다.')
         catalog(args.data_dir)
+        if args.cloudflare:
+            cf_headers = cloudflare_headers(
+                getpass.getpass('Cloudflare Client ID (숨김): '),
+                getpass.getpass('Cloudflare Client Secret (숨김): '))
+        else:
+            cf_headers = cloudflare_headers(os.environ.get('CF_ACCESS_CLIENT_ID', ''),
+                                            os.environ.get('CF_ACCESS_CLIENT_SECRET', ''))
         username = input('ADMIN 아이디: ').strip()
         password = getpass.getpass('ADMIN 비밀번호 (숨김): ')
-        client = AdminClient(args.api_url, username, password)
+        client = AdminClient(args.api_url, username, password, cf_headers=cf_headers)
         username = password = None
         client.connect()
         clock = client.get('demo/clock')
-        replay = Replay(Controls(args.api_url, client, allow_remote=True))
+        replay = Replay(Controls(args.api_url, client, allow_remote=True, cf_headers=cf_headers))
         operator_session.runtime = SimpleNamespace(
             base=client.base_url, root=str(Path(args.data_dir).resolve()), replay=replay)
         print(f'연결 서버: {client.base_url} / 업무 시각: {clock["businessAt"]}')
@@ -52,8 +62,10 @@ def main():
         if replay:
             replay.pause.set()
             replay.pool.shutdown(wait=True)
+            replay.controls.cf_headers.clear()
         if client:
             client.close()
+        cf_headers.clear()
         operator_session.runtime = None
 
 

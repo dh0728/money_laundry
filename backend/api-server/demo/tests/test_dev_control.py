@@ -1,4 +1,6 @@
 import sys
+import io
+import json
 import tempfile
 import threading
 import unittest
@@ -11,13 +13,13 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from api_client import ApiError
 from control_panel import Controls, Replay
-from operator_session import AdminClient
+from operator_session import AdminClient, cloudflare_headers
 import dev_control
 import operator_session
 
 
 class DevControlTests(unittest.TestCase):
-    def client(self, responses, *, role='ADMIN', me_status=401):
+    def client(self, responses, *, role='ADMIN', me_status=401, cf_headers=None):
         seen = []
         replies = iter(responses)
 
@@ -42,7 +44,7 @@ class DevControlTests(unittest.TestCase):
             return httpx.Response(reply, json={'jobId': 4})
 
         client = AdminClient('https://dev.example', 'admin', 'secret-password',
-                             transport=httpx.MockTransport(handle))
+                             transport=httpx.MockTransport(handle), cf_headers=cf_headers)
         return client, seen
 
     def test_expired_get_and_post_reauthenticate_once(self):
@@ -173,6 +175,90 @@ class DevControlTests(unittest.TestCase):
             client.get.assert_not_called()
             client.close.assert_called_once()
             self.assertIsNone(operator_session.runtime)
+
+    def test_cloudflare_headers_on_auth_renewal_and_api(self):
+        headers = cloudflare_headers('test-id', 'test-secret')
+        client, seen = self.client([401, 200], cf_headers=headers)
+        client.connect()
+        client.post('demo/analysis', {'businessDate': '2023-09-01'})
+        client.close()
+        for request in seen:
+            self.assertEqual(request.headers['CF-Access-Client-Id'], 'test-id')
+            self.assertEqual(request.headers['CF-Access-Client-Secret'], 'test-secret')
+            self.assertEqual(request.url.host, 'dev.example')
+        self.assertFalse(client._client.headers)
+        self.assertEqual(headers['CF-Access-Client-Id'], 'test-id')
+
+    def test_invalid_cloudflare_tokens_rejected_without_echo(self):
+        self.assertEqual(cloudflare_headers(), {})
+        for pair in [('id', ''), ('', 'secret'), ('id', 'secret\r\ninjected'), ('id', '한글'), ('id', ' ')]:
+            with self.assertRaises(ApiError) as error:
+                cloudflare_headers(*pair)
+            self.assertNotIn('injected', str(error.exception))
+
+    def test_cloudflare_redirect_is_not_followed_and_login_password_not_sent(self):
+        seen = []
+        def handle(request):
+            seen.append(request)
+            return httpx.Response(302, headers={'location': 'https://access.example/login?secret=hidden'})
+        client = AdminClient('https://dev.example', 'admin', 'password', transport=httpx.MockTransport(handle))
+        with self.assertRaisesRegex(ApiError, 'Cloudflare') as error:
+            client.connect()
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0].url.path, '/api/auth/csrf')
+        self.assertNotIn('hidden', str(error.exception))
+        self.assertNotIn(b'password', seen[0].content)
+
+    def test_bank_api_gets_cloudflare_headers_but_s3_does_not(self):
+        seen = []
+        def handle(request, **kwargs):
+            seen.append(request)
+            if request.full_url.endswith('/uploads'):
+                body = json.loads(request.data)
+                result, status = {'uploadId': 1, 'bankId': 12, 'method': 'PUT',
+                                  'url': 'https://bucket.s3.example/input.csv',
+                                  'expiresAt': '2026-09-29T18:00:00+09:00',
+                                  'headers': {'Content-Type': 'text/csv',
+                                              'x-amz-checksum-sha256': body['checksumSha256']}}, 201
+            elif request.get_method() == 'PUT':
+                result, status = {}, 200
+                self.assertEqual(request.data.read(), b'header\nrow\n')
+            else:
+                result = {'uploadId': 1, 'bankId': 12,
+                          'status': 'RUNNING' if request.get_method() == 'POST' else 'COMPLETED'}
+                status = 202 if request.get_method() == 'POST' else 200
+            response = io.BytesIO(json.dumps(result).encode())
+            response.status = status
+            return response
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / 'bank_12.csv'
+            source.write_bytes(b'header\nrow\n')
+            controls = Controls('https://dev.example', allow_remote=True,
+                                cf_headers=cloudflare_headers('test-id', 'test-secret'))
+            with patch('control_panel.build_opener', return_value=Mock(open=handle)), patch('time.sleep'):
+                self.assertEqual(controls.upload('2023-09-01', 12, source, Mock()), 1)
+        self.assertEqual(len(seen), 4)
+        for request in seen:
+            headers = {k.lower(): v for k, v in request.header_items()}
+            if request.get_method() == 'PUT':
+                self.assertFalse(any(k in headers for k in ['cf-access-client-id', 'cf-access-client-secret', 'cookie', 'authorization', 'x-bank-id']))
+            else:
+                self.assertEqual(headers['cf-access-client-secret'], 'test-secret')
+
+    def test_launcher_hidden_cloudflare_input(self):
+        client = Mock(base_url='https://dev.example')
+        client.get.return_value = {'businessAt': '2023-09-02T09:00:00+09:00'}
+        with patch.object(sys, 'argv', ['dev_control.py', '--api-url', client.base_url, '--data-dir', 'unused', '--cloudflare']), \
+                patch.object(dev_control, 'catalog'), patch('builtins.input', return_value='admin'), \
+                patch('getpass.getpass', side_effect=['test-id', 'test-secret', 'test-password']), \
+                patch.object(dev_control, 'AdminClient', return_value=client) as constructor, \
+                patch('streamlit.web.bootstrap.load_config_options'), \
+                patch('streamlit.web.bootstrap.run') as run:
+            captured = []
+            constructor.side_effect = lambda *a, **kw: (captured.append(dict(kw['cf_headers'])), client)[1]
+            self.assertEqual(dev_control.main(), 0)
+            self.assertEqual(captured, [cloudflare_headers('test-id', 'test-secret')])
+            self.assertNotIn('test-secret', str(run.call_args))
 
 
 if __name__ == '__main__':

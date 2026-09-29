@@ -48,7 +48,7 @@ def bank_module():
 
 
 class Controls:
-    def __init__(self, base, client=None, *, allow_remote=False):
+    def __init__(self, base, client=None, *, allow_remote=False, cf_headers=None):
         ApiClient(base)  # Apply the existing URL rules before any request.
         from urllib.parse import urlsplit
         if not allow_remote and urlsplit(base).hostname not in ('localhost', '127.0.0.1', '::1'):
@@ -59,6 +59,7 @@ class Controls:
             raise ValueError('인증 서버와 조작 대상 서버가 다릅니다.')
         self.base = base.rstrip('/')
         self.client = client or ApiClient(base)
+        self.cf_headers = dict(cf_headers or {})
 
     def get(self, path):
         return self.client.get(path)
@@ -81,7 +82,7 @@ class Controls:
     def upload(self, day, bank, file, report):
         mock = bank_module()
         args = SimpleNamespace(api_url=self.base, bank_id=bank, file=file,
-                               business_date=day, correction_request_id=None, cf_headers={})
+                               business_date=day, correction_request_id=None, cf_headers=self.cf_headers)
         opener = build_opener(mock.NoRedirect())
         size, checksum = mock.inspect_file(file)
         target = mock.request_upload(opener, args, size, checksum)

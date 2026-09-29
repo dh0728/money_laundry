@@ -152,6 +152,10 @@ Remove-Variable credential,csrf,amlSession
 & '<AML Python 실행 파일>' -X utf8 -B '.\backend\api-server\demo\dev_control.py' --api-url 'https://dev.aiaml.co.kr' --data-dir '<날짜별 은행 파일의 상위 폴더>'
 ```
 
+Cloudflare Access로 보호된 dev는 실행 명령 끝에 `--cloudflare`를 추가한다. Cloudflare **Service Token의 Client ID·Client Secret**을 먼저 숨김 입력하고, 이어서 ADMIN 계정을 입력한다. 서비스 토큰은 ADMIN 비밀번호나 브라우저 로그인 비밀번호와 다르다. 기존 은행 목업에 사용하던 토큰이 있으면 사용하되, 해당 토큰의 접근 정책이 은행 경로뿐 아니라 `/api/auth/*`, `/api/me`, `/api/v1/demo/*`, `/api/v1/batch-jobs/*`에도 적용되어야 한다.
+
+`--cloudflare`를 생략하면 기존 은행 목업과 같은 `CF_ACCESS_CLIENT_ID`·`CF_ACCESS_CLIENT_SECRET` 환경변수를 읽는다. 두 값 중 하나만 설정되거나 헤더 형식이 잘못되면 요청 전에 거절한다. 숨김 입력 방식은 환경변수를 생성하지 않는다. 토큰은 dev API에만 전달하고 S3 PUT이나 리다이렉트 목적지에는 전달하지 않는다. 브라우저의 Cloudflare 로그인 상태는 Python 프로세스에 공유되지 않는다. 302이면 API 계정 비밀번호를 바꾸기 전에 Access 토큰/접근 정책을 확인한다.
+
 1. 터미널에서 dev DB에 등록한 ADMIN 아이디와 비밀번호를 입력한다. 비밀번호는 숨김 입력한다. 인증과 업무 시각 API 조회가 성공하면 `http://127.0.0.1:8502`를 연다. 포트가 이미 사용 중이면 기존 패널을 종료하거나 `--port 8503`을 지정한다.
 2. 브라우저에는 로그인 창 없이 조작패널이 열린다. 서버·파일 경로는 시작 시 지정한 값으로 고정된다. ADMIN 자격 증명은 해당 Python 프로세스 메모리에서만 유지하며 파일·환경변수·명령행·브라우저 저장소에 보관하지 않는다. 인증 만료 응답이 확인된 경우에만 한 번 재로그인·재요청한다. 네트워크 오류·타임아웃·권한 거절·처리 조건 충돌은 자동 반복하지 않는다.
 3. 날짜를 선택하고 **전송 → 분석 자동 재생**을 누르면 날짜순으로 `업무 시각 설정 → 해당 날짜 모든 은행 파일 전송·검수 → 분석 요청 → 분석 완료 대기 → 다음 날짜`를 실행한다. 날짜·파일 진행률과 uploadId/jobId가 표시된다. 다른 탭에서 열어도 같은 프로세스의 재생 상태를 공유하고 동시에 두 재생 작업을 실행하지 않는다.
