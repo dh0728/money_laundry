@@ -133,7 +133,7 @@ public class ReviewService {
   private List<Map<String, Object>> groups(Map<String, Object> c) {
     var found =
         jdbc.queryForList(
-            "select group_id as \"groupId\",label,revision,evidence_version as \"evidenceVersion\",decision,members::text as members from review_groups where case_id=? order by group_id",
+            "select g.group_id as \"groupId\",g.label,g.revision,g.evidence_version as \"evidenceVersion\",g.decision,g.members::text as members,e.alert_id as \"sourceAlertId\" from review_groups g left join episode_alerts e on e.group_id=g.group_id where g.case_id=? order by g.group_id",
             c.get("case_id"));
     for (var g : found) g.put("members", rows(g.get("members")));
     if ("ALERT".equals(c.get("kind"))) {
@@ -200,7 +200,11 @@ public class ReviewService {
     out.put(
         "pendingCount",
         members.stream()
-            .filter(m -> "SUBJECT".equals(m.get("reviewRole")) && "PENDING".equals(m.get("state")))
+            .filter(
+                m ->
+                    "OPEN".equals(c.get("status"))
+                        && "SUBJECT".equals(m.get("reviewRole"))
+                        && "PENDING".equals(m.get("state")))
             .map(m -> number(m.get("txId")))
             .distinct()
             .count());
@@ -208,6 +212,26 @@ public class ReviewService {
     for (var m : members)
       if (!Set.of("EXCLUDED", "TRANSFERRED").contains(m.get("state")))
         for (var source : rows(m.get("sources"))) sourceIds.add(number(source.get("alertId")));
+    if ("EPISODE".equals(c.get("kind"))) {
+      sourceIds.clear();
+      sourceIds.addAll(
+          jdbc.queryForList(
+              "select alert_id from episode_alerts where episode_case_id=? order by alert_id",
+              Long.class,
+              id));
+    }
+    out.put(
+        "episodeId",
+        "ALERT".equals(c.get("kind"))
+            ? jdbc
+                .queryForList(
+                    "select episode_case_id from episode_alerts where alert_id=?",
+                    Long.class,
+                    c.get("alert_id"))
+                .stream()
+                .findFirst()
+                .orElse(null)
+            : null);
     out.put("sourceAlertIds", sourceIds);
     var types = new TreeSet<String>();
     for (var m : members)
@@ -462,50 +486,33 @@ public class ReviewService {
             loaded.computeIfAbsent(sel.caseId(), id -> groups(c));
           }
 
-          boolean transfer = "TRANSFER".equals(cmd.action()), move = "MOVE".equals(cmd.action());
+          if ("TRANSFER".equals(cmd.action())) return transferWholeAlerts(user, cmd, cases, loaded);
+          if (Set.of("MOVE", "SPLIT").contains(cmd.action()))
+            throw ApiException.invalidTransition("Alert를 분할하거나 다른 Episode로 부분 이동할 수 없습니다.");
           Long target = null;
-          if (transfer || move) {
-            if (cases.values().stream()
-                .anyMatch(c -> !(transfer ? "ALERT" : "EPISODE").equals(c.get("kind"))))
-              throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "이관 권한이 없습니다.");
-            if (cmd.targetCaseId() == null) {
-              long assignee =
-                  move
-                      ? user
-                      : jdbc.queryForObject(
-                          "select user_id from users where role='STAFF' and password_hash is not null and password_hash<>'' order by last_assigned_at nulls first,user_id limit 1 for update",
-                          Long.class);
-              target =
-                  jdbc.queryForObject(
-                      "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,?,?) returning case_id",
-                      Long.class,
-                      assignee,
-                      Timestamp.from(time.now()),
-                      Timestamp.from(time.now()));
-              if (!move)
-                jdbc.update(
-                    "update users set last_assigned_at=? where user_id=?",
-                    Timestamp.from(time.now()),
-                    assignee);
-            } else {
-              target = cmd.targetCaseId();
-              var c = caseRow(target);
-              if (!"EPISODE".equals(c.get("kind"))
-                  || !"OPEN".equals(c.get("status"))
-                  || cmd.targetRevision() == null
-                  || number(c.get("revision")) != cmd.targetRevision())
-                throw ApiException.invalidTransition("목적지 상태/버전이 변경됐습니다.");
-              if (move) editable(c, user);
-            }
-            if (transfer && cases.containsKey(target)) throw AnalysisService.invalid();
-          }
-          var targetGroups =
-              target == null
-                  ? new ArrayList<Map<String, Object>>()
-                  : loaded.containsKey(target) ? loaded.get(target) : groups(caseRow(target));
           for (var sel : cmd.selections()) {
             var gs = loaded.get(sel.caseId());
             boolean episode = "EPISODE".equals(cases.get(sel.caseId()).get("kind"));
+            if ("CLOSE".equals(cmd.action()) && cmd.decision() != null) {
+              if (episode
+                  || !Set.of("NORMAL", "SUSPICIOUS").contains(cmd.decision())
+                  || sel.txIds() == null
+                  || !sel.txIds().isEmpty()
+                  || cases.size() != cmd.selections().size()) throw AnalysisService.invalid();
+              var subjects =
+                  all(gs).stream()
+                      .filter(
+                          m ->
+                              "SUBJECT".equals(m.get("reviewRole"))
+                                  && !Set.of("EXCLUDED", "TRANSFERRED").contains(m.get("state")))
+                      .toList();
+              if (subjects.isEmpty()) throw ApiException.invalidTransition("판정할 조사 대상이 없습니다.");
+              event(sel.caseId(), user, "BEFORE_RESOLUTION", cmd.comment(), gs);
+              for (var m : subjects) {
+                m.put("state", "DECIDED");
+                m.put("decision", cmd.decision());
+              }
+            }
             if (Set.of("CLOSE", "COMMENT", "REVIEW_START").contains(cmd.action())) continue;
             var g =
                 gs.stream()
@@ -528,8 +535,8 @@ public class ReviewService {
                                     && "DECIDED".equals(m.get("state")))))
               throw ApiException.invalidTransition("선택 범위에 이미 처리된 거래가 있습니다.");
             if ("DECIDE".equals(cmd.action())) {
-              if (!Set.of("NORMAL", "SUSPICIOUS").contains(Objects.toString(cmd.decision(), ""))
-                  || !episode && !"NORMAL".equals(cmd.decision())) throw AnalysisService.invalid();
+              if (!Set.of("NORMAL", "SUSPICIOUS").contains(Objects.toString(cmd.decision(), "")))
+                throw AnalysisService.invalid();
               if (selected.stream().anyMatch(m -> !"SUBJECT".equals(m.get("reviewRole"))))
                 throw AnalysisService.invalid();
               if (episode
@@ -559,42 +566,7 @@ public class ReviewService {
               selected.forEach(m -> m.put("state", "EXCLUDED"));
             else if ("SUBJECT".equals(cmd.action()) || "CONTEXT".equals(cmd.action()))
               selected.forEach(m -> m.put("reviewRole", cmd.action()));
-            else if (transfer || move || "SPLIT".equals(cmd.action())) {
-              if ("SPLIT".equals(cmd.action()) && !episode) throw AnalysisService.invalid();
-              var copied = copy(selected);
-              selected.forEach(
-                  m -> {
-                    m.put("state", "TRANSFERRED");
-                    m.put("internalMove", targetCase(cmd, sel.caseId()));
-                  });
-              var destination = target == null ? gs : targetGroups;
-              if (cmd.targetGroupId() != null && target != null) {
-                var dest =
-                    destination.stream()
-                        .filter(x -> number(x.get("groupId")) == cmd.targetGroupId())
-                        .findFirst()
-                        .orElseThrow(AnalysisService::invalid);
-                if (dest == g) throw AnalysisService.invalid();
-                if (dest.get("decision") != null)
-                  throw ApiException.invalidTransition("판정된 묶음에는 추가할 수 없습니다. 새 묶음으로 이동하세요.");
-                merge(rows(dest.get("members")), copied);
-              } else
-                destination.add(
-                    new LinkedHashMap<>(
-                        Map.of(
-                            "groupId",
-                            0L,
-                            "label",
-                            g.get("label"),
-                            "revision",
-                            0L,
-                            "members",
-                            copied)));
-            } else throw AnalysisService.invalid();
-          }
-          if (target != null && !loaded.containsKey(target)) {
-            save(target, targetGroups);
-            event(target, user, cmd.action(), cmd.comment(), targetGroups);
+            else throw AnalysisService.invalid();
           }
           for (var entry : loaded.entrySet()) {
             long id = entry.getKey();
@@ -628,29 +600,108 @@ public class ReviewService {
         });
   }
 
-  private boolean targetCase(Command cmd, long source) {
-    return "SPLIT".equals(cmd.action())
-        || ("MOVE".equals(cmd.action()) && Objects.equals(cmd.targetCaseId(), source));
-  }
-
-  private void merge(List<Map<String, Object>> existing, List<Map<String, Object>> added) {
-    for (var m : added) {
-      var match =
-          existing.stream()
-              .filter(
-                  x ->
-                      number(x.get("txId")) == number(m.get("txId"))
-                          && !Set.of("EXCLUDED", "TRANSFERRED").contains(x.get("state")))
-              .findFirst();
-      if (match.isEmpty()) existing.add(m);
-      else {
-        if (!"PENDING".equals(match.get().get("state")))
-          throw ApiException.invalidTransition("목적지에 판정된 동일 거래가 있습니다.");
-        for (var source : rows(m.get("sources")))
-          if (!rows(match.get().get("sources")).contains(source))
-            rows(match.get().get("sources")).add(source);
-      }
+  private Map<String, Object> transferWholeAlerts(
+      long user,
+      Command cmd,
+      Map<Long, Map<String, Object>> cases,
+      Map<Long, List<Map<String, Object>>> loaded) {
+    if (cmd.targetGroupId() != null
+        || cmd.decision() != null
+        || cases.size() != cmd.selections().size()) throw AnalysisService.invalid();
+    if (cmd.targetCaseId() == null && cases.size() < 2)
+      throw ApiException.invalidTransition("새 Episode에는 서로 다른 Alert가 2개 이상 필요합니다.");
+    for (var sel : cmd.selections()) {
+      var c = cases.get(sel.caseId());
+      if (!"ALERT".equals(c.get("kind"))) throw AnalysisService.invalid();
+      var members = all(loaded.get(sel.caseId()));
+      var ids = new HashSet<Long>();
+      for (var m : members) ids.add(number(m.get("txId")));
+      // Empty selection explicitly means the entire Alert; a supplied list must
+      // contain every member, including context and previously reviewed rows.
+      if (sel.txIds() == null
+          || (!sel.txIds().isEmpty()
+              && (sel.txIds().size() != ids.size() || !ids.equals(new HashSet<>(sel.txIds())))))
+        throw ApiException.invalidTransition("거래 일부가 아닌 Alert 전체를 선택하세요.");
+      if (members.isEmpty()
+          || members.stream().anyMatch(m -> "TRANSFERRED".equals(m.get("state")))
+          || jdbc.queryForObject(
+              "select exists(select 1 from episode_alerts where alert_id=?)",
+              Boolean.class,
+              c.get("alert_id")))
+        throw ApiException.invalidTransition("이미 편입됐거나 이관할 수 없는 Alert입니다.");
     }
+    long target;
+    if (cmd.targetCaseId() == null) {
+      long assignee =
+          jdbc.queryForObject(
+              "select user_id from users where role='STAFF' and password_hash is not null and password_hash<>'' order by last_assigned_at nulls first,user_id limit 1 for update",
+              Long.class);
+      target =
+          jdbc.queryForObject(
+              "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,?,?) returning case_id",
+              Long.class,
+              assignee,
+              Timestamp.from(time.now()),
+              Timestamp.from(time.now()));
+      jdbc.update(
+          "update users set last_assigned_at=? where user_id=?",
+          Timestamp.from(time.now()),
+          assignee);
+    } else {
+      target = cmd.targetCaseId();
+      var dest = caseRow(target);
+      if (!"EPISODE".equals(dest.get("kind"))
+          || !"OPEN".equals(dest.get("status"))
+          || cmd.targetRevision() == null
+          || revision(dest) != cmd.targetRevision())
+        throw ApiException.invalidTransition("목적지 상태/버전이 변경됐습니다.");
+    }
+    var destination = groups(caseRow(target));
+    for (var c : cases.values()) {
+      long id = number(c.get("case_id")), alertId = number(c.get("alert_id"));
+      var source = loaded.get(id);
+      var members = copy(all(source));
+      int version = ((Number) source.getFirst().get("evidenceVersion")).intValue();
+      var group = new LinkedHashMap<String, Object>();
+      group.put("groupId", 0L);
+      group.put("label", "Alert " + alertId);
+      group.put("evidenceVersion", version);
+      group.put("members", members);
+      // Keep the original review snapshot, including context/exclusions/decisions.
+      // Each source Alert remains one group; shared transactions are not merged.
+      save(target, new ArrayList<>(List.of(group)));
+      jdbc.update(
+          "insert into episode_alerts(alert_id,episode_case_id,group_id,alert_version) values(?,?,?,?)",
+          alertId,
+          target,
+          group.get("groupId"),
+          version);
+      destination.add(group);
+      var snapshot = new MoneyQuery(jdbc, time).read(detail(id), moneyScope(id), 180);
+      event(id, user, "MONEY_SNAPSHOT", "Episode 편입 시점 자금 관측 지표", snapshot);
+      // The Alert remains a whole visible block; only its case disposition changes.
+      save(id, source);
+      jdbc.update(
+          "update review_cases set status='CLOSED',outcome='TRANSFERRED',closed_at=?,closed_by=? where case_id=?",
+          Timestamp.from(time.now()),
+          user,
+          id);
+      jdbc.update(
+          "update alerts set status='ESCALATED',resolution='TRANSFERRED' where alert_id=?",
+          alertId);
+      event(id, user, "TRANSFER", cmd.comment(), Map.of("targetCaseId", target, "groups", source));
+    }
+    event(target, user, "TRANSFER", cmd.comment(), destination);
+    var response = new LinkedHashMap<String, Object>();
+    response.put("caseIds", cases.keySet());
+    response.put("targetCaseId", target);
+    jdbc.update(
+        "insert into review_requests values(?,?,?::jsonb,?::jsonb)",
+        user,
+        cmd.requestId(),
+        encode(cmd),
+        encode(response));
+    return response;
   }
 
   private void close(long id, long user, List<Map<String, Object>> gs) {
