@@ -48,11 +48,15 @@ def bank_module():
 
 
 class Controls:
-    def __init__(self, base, client=None):
+    def __init__(self, base, client=None, *, allow_remote=False):
         ApiClient(base)  # Apply the existing URL rules before any request.
         from urllib.parse import urlsplit
-        if urlsplit(base).hostname not in ('localhost', '127.0.0.1', '::1'):
+        if not allow_remote and urlsplit(base).hostname not in ('localhost', '127.0.0.1', '::1'):
             raise ValueError('조작패널은 로컬 백엔드 주소만 사용합니다.')
+        if allow_remote and (urlsplit(base).scheme != 'https' or urlsplit(base).path not in ('', '/')):
+            raise ValueError('dev 주소는 경로 없는 HTTPS 기본 주소여야 합니다.')
+        if client is not None and client.base_url != base.rstrip('/'):
+            raise ValueError('인증 서버와 조작 대상 서버가 다릅니다.')
         self.base = base.rstrip('/')
         self.client = client or ApiClient(base)
 
@@ -97,7 +101,7 @@ class Replay:
     def __init__(self, controls):
         self.controls = controls
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='aml-demo')
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.pause = threading.Event()
         self.future = None
         self.state = {'message': '대기', 'history': [], 'error': None}
@@ -114,15 +118,16 @@ class Replay:
             return dict(self.state, history=list(self.state['history']))
 
     def start(self, days, files, *, analyze=True, upload=True, interval=0):
-        if self.future is not None and not self.future.done():
-            raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
-        self.pause.clear()
-        days = sorted(set(days))
-        self.report('시작', error=None, totalDays=len(days),
-                    doneDays=sum(day in self.completed for day in days) if analyze else 0,
-                    currentDay=None, fileDone=0, fileTotal=0,
-                    bankId=None, uploadId=None, jobId=None)
-        self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
+        with self.lock:
+            if self.future is not None and not self.future.done():
+                raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
+            self.pause.clear()
+            days = sorted(set(days))
+            self.report('시작', error=None, totalDays=len(days),
+                        doneDays=sum(day in self.completed for day in days) if analyze else 0,
+                        currentDay=None, fileDone=0, fileTotal=0,
+                        bankId=None, uploadId=None, jobId=None)
+            self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
 
     def _run(self, days, files, analyze, upload, interval):
         try:
@@ -188,33 +193,43 @@ def render():
     st.set_page_config(page_title='AML 시연 조작패널', layout='wide')
     st.title('시연 조작패널')
     st.caption('예약 시각 대기만 생략합니다. 파일 검수와 실제 분석 완료를 기다린 뒤 다음 날짜로 진행합니다.')
-    base = st.text_input('로컬 백엔드', os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080'))
-    root = st.text_input('날짜별 은행 파일 폴더', os.getenv('AML_DEMO_DATA_DIR', ''))
+    import operator_session
+    runtime = operator_session.runtime
+    if runtime is not None:
+        base, root = runtime.base, runtime.root
+        st.info(f'dev 연결: {base} · ADMIN 세션 자동 갱신')
+        st.caption(f'은행 파일 폴더: {root}')
+    else:
+        base = st.text_input('로컬 백엔드', os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080'))
+        root = st.text_input('날짜별 은행 파일 폴더', os.getenv('AML_DEMO_DATA_DIR', ''))
     try:
-        from api_client import login_panel
-        authenticated = login_panel(base, 'control_client')
-        if authenticated is None:
-            return
-        client, user = authenticated
-        if user['role'] != 'ADMIN':
-            st.error('조작패널은 관리자 계정으로 로그인하세요.')
-            if st.button('로그아웃'):
-                client.logout()
-                st.session_state.pop('control_client', None)
-                st.rerun()
-            return
+        if runtime is not None:
+            replay = runtime.replay
+        else:
+            from api_client import login_panel
+            authenticated = login_panel(base, 'control_client')
+            if authenticated is None:
+                return
+            client, user = authenticated
+            if user['role'] != 'ADMIN':
+                st.error('조작패널은 관리자 계정으로 로그인하세요.')
+                if st.button('로그아웃'):
+                    client.logout()
+                    st.session_state.pop('control_client', None)
+                    st.rerun()
+                return
+            if 'replay' not in st.session_state:
+                st.session_state.replay = Replay(Controls(base, client))
+            replay = st.session_state.replay
+            if replay.controls.base != base.rstrip('/'):
+                st.info('진행 중 작업의 서버를 바꿀 수 없습니다. 새 패널 세션에서 접속하세요.')
+                return
+            if replay.future is None or replay.future.done():
+                replay.controls.client = client
         files = catalog(root) if root else {}
         if not files:
             st.info('준비된 날짜별 은행 파일의 상위 폴더를 지정하세요.')
             return
-        if 'replay' not in st.session_state:
-            st.session_state.replay = Replay(Controls(base, client))
-        replay = st.session_state.replay
-        if replay.controls.base != base.rstrip('/'):
-            st.info('진행 중 작업의 서버를 바꿀 수 없습니다. 새 패널 세션에서 접속하세요.')
-            return
-        if replay.future is None or replay.future.done():
-            replay.controls.client = client
         clock = replay.controls.get('demo/clock')
         st.metric('시연 업무 시각 (KST)', clock['businessAt'])
         with st.expander('시연 업무 시각 설정'):

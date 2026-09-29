@@ -7,6 +7,10 @@ import httpx
 class ApiError(Exception):
     """A safe message that never contains a response body or credentials."""
 
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
 
 class ApiClient:
     def __init__(self, base_url, headers=None, transport=None):
@@ -31,7 +35,8 @@ class ApiClient:
                 response = client.request(method, self.base_url + '/api/' + path, data=data)
                 self.cookies.update(client.cookies)
             if response.status_code not in (200, 204):
-                raise ApiError('로그인 정보 또는 세션을 확인하세요. (HTTP %s)' % response.status_code)
+                raise ApiError('로그인 정보 또는 세션을 확인하세요. (HTTP %s)' % response.status_code,
+                               response.status_code)
             return response.json() if response.status_code != 204 else None
         except (httpx.HTTPError, ValueError):
             raise ApiError('인증 서버 응답을 확인하지 못했습니다.') from None
@@ -65,7 +70,7 @@ class ApiClient:
                 messages = {400: '선택 범위와 입력을 확인하세요.', 403: '담당자 또는 실행 환경 권한이 없습니다.',
                             404: '대상이 없습니다.', 409: '상태가 변경됐거나 처리 조건이 충족되지 않았습니다. 새로 조회하세요.'}
                 raise ApiError(messages.get(response.status_code, '요청이 처리되지 않았습니다.')
-                               + f' (HTTP {response.status_code})')
+                               + f' (HTTP {response.status_code})', response.status_code)
             return response.json()
         except httpx.HTTPError:
             raise ApiError('응답을 확인하지 못했습니다. 같은 요청으로 재시도하거나 처리 이력을 확인하세요.') from None
@@ -84,7 +89,7 @@ class ApiClient:
                 messages = {401: '인증이 필요합니다.', 403: '조회 권한이 없습니다.',
                             404: '해당 API 또는 완료된 결과를 찾을 수 없습니다.'}
                 raise ApiError(messages.get(response.status_code, 'API 요청이 실패했습니다.')
-                               + f' (HTTP {response.status_code})')
+                               + f' (HTTP {response.status_code})', response.status_code)
             data = response.json()
         except httpx.TimeoutException:
             raise ApiError('API 응답 시간이 초과됐습니다. 다시 조회하세요.') from None
