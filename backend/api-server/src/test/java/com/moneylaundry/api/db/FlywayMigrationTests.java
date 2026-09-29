@@ -79,6 +79,66 @@ class FlywayMigrationTests {
   @Autowired org.springframework.transaction.PlatformTransactionManager manager;
 
   @Test
+  void v12_resets_only_investigation_data_and_keeps_alert_evidence_and_accounts() throws Exception {
+    String name = "migration_v12_reset_test";
+    jdbc.execute("create database " + name);
+    String url =
+        "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + name;
+    try {
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .target("11")
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var st = connection.createStatement()) {
+        st.execute("update users set password_hash='preserved-test-hash' where username='l1a'");
+        st.execute("insert into batch_jobs(job_type,status) values('ANALYSIS','COMPLETED')");
+        st.execute(
+            "insert into analysis_runs(run_id,job_id,status) select gen_random_uuid(),job_id,'COMPLETED' from batch_jobs");
+        st.execute(
+            "insert into alerts(assignee_id) select user_id from users where username='l1a'");
+        st.execute(
+            "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) select alert_id,1,run_id,repeat('a',64),'{\"preserved\":true}' from alerts cross join analysis_runs");
+        st.execute("update alerts set status='CLOSED',resolution='NORMAL'");
+        st.execute(
+            "insert into review_cases(kind,assignee_id,created_at,assigned_at) select 'EPISODE',user_id,now(),now() from users where username='l1a'");
+        st.execute(
+            "insert into review_groups(case_id,label) select case_id,'old partial' from review_cases");
+        st.execute(
+            "insert into review_events(case_id,action,comment,business_at,snapshot) select case_id,'TRANSFER','old',now(),'{}' from review_cases");
+        st.execute(
+            "insert into review_requests select user_id,gen_random_uuid(),'{}','{}' from users where username='l1a'");
+      }
+      var flyway =
+          org.flywaydb.core.Flyway.configure()
+              .dataSource(url, postgres.getUsername(), postgres.getPassword())
+              .load();
+      flyway.migrate();
+      assertThat(flyway.migrate().migrationsExecuted).isZero();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var st = connection.createStatement();
+          var r =
+              st.executeQuery(
+                  "select (select count(*) from review_groups)+(select count(*) from review_events)+(select count(*) from review_requests)+(select count(*) from review_cases where kind='EPISODE'), (select count(*) from review_cases where kind='ALERT' and status='OPEN'),(select count(*) from batch_jobs),(select evidence->>'preserved' from alert_versions),(select password_hash from users where username='l1a'),(select status from alerts)")) {
+        assertThat(r.next()).isTrue();
+        assertThat(r.getLong(1)).isZero();
+        assertThat(r.getLong(2)).isEqualTo(1);
+        assertThat(r.getLong(3)).isEqualTo(1);
+        assertThat(r.getString(4)).isEqualTo("true");
+        assertThat(r.getString(5)).isEqualTo("preserved-test-hash");
+        assertThat(r.getString(6)).isEqualTo("OPEN");
+      }
+    } finally {
+      jdbc.execute("drop database " + name);
+    }
+  }
+
+  @Test
   void v3_refuses_populated_legacy_database_without_changing_it() throws Exception {
     String name = "migration_guard_test";
     jdbc.execute("create database " + name);

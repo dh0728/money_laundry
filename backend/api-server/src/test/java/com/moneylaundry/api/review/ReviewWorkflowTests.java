@@ -102,6 +102,148 @@ class ReviewWorkflowTests {
             UUID.randomUUID(), action, List.of(selections), null, null, null, decision, "검토 근거"));
   }
 
+  long rawEpisode(String sql, Object... args) {
+    return tx.execute(
+        status -> {
+          long ep = jdbc.queryForObject(sql, Long.class, args);
+          for (int i = 0; i < 2; i++) {
+            long sourceCase = alert(l1);
+            long source = number(service.detail(sourceCase).get("alertId"));
+            long group =
+                jdbc.queryForObject(
+                    "insert into review_groups(case_id,label) values(?,'fixture') returning group_id",
+                    Long.class,
+                    ep);
+            jdbc.update("insert into episode_alerts values(?,?,?,1)", source, ep, group);
+          }
+          return ep;
+        });
+  }
+
+  @Test
+  void database_rejects_empty_episode_and_duplicate_or_removed_membership() {
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,now(),now())",
+                    l2))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    long ep =
+        number(act(l1, "TRANSFER", null, select(alert(l1)), select(alert(l1))).get("targetCaseId"));
+    long source =
+        jdbc.queryForObject(
+            "select min(alert_id) from episode_alerts where episode_case_id=?", Long.class, ep);
+    assertThatThrownBy(() -> jdbc.update("delete from episode_alerts where alert_id=?", source))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "insert into episode_alerts select * from episode_alerts where alert_id=?",
+                    source))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from episode_alerts where episode_case_id=?", Integer.class, ep))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void standalone_alert_can_close_suspicious_without_creating_episode() {
+    long id = alert(l1);
+    act(l1, "DECIDE", "SUSPICIOUS", select(id, 1, 2));
+    act(l1, "CLOSE", null, select(id));
+    assertThat(service.detail(id).get("status")).isEqualTo("CLOSED");
+    assertThat(service.detail(id).get("outcome")).isEqualTo("SUSPICIOUS");
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from review_cases where kind='EPISODE'", Integer.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "select resolution from alerts where alert_id=?",
+                String.class,
+                service.detail(id).get("alertId")))
+        .isEqualTo("SUSPICIOUS");
+  }
+
+  @Test
+  void final_alert_resolution_is_atomic_and_preserves_context() {
+    for (String decision : List.of("NORMAL", "SUSPICIOUS")) {
+      long id = alert(l1);
+      var command =
+          new ReviewService.Command(
+              UUID.randomUUID(),
+              "CLOSE",
+              List.of(select(id)),
+              null,
+              null,
+              null,
+              decision,
+              "최종 블록 판정");
+      service.command(l1, command);
+      assertThat(service.detail(id).get("outcome")).isEqualTo(decision);
+      assertThat(service.detail(id).get("status")).isEqualTo("CLOSED");
+      assertThat(
+              rows(rows(service.detail(id).get("groups")).getFirst().get("members"))
+                  .get(2)
+                  .get("decision"))
+          .isNull();
+      service.command(l1, command);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from review_events where case_id=? and action='CLOSE'",
+                  Integer.class,
+                  id))
+          .isEqualTo(1);
+    }
+  }
+
+  @Test
+  void competing_whole_alert_transfers_create_only_one_episode() throws Exception {
+    long a = alert(l1), b = alert(l1), c = alert(l1);
+    var first =
+        new ReviewService.Command(
+            UUID.randomUUID(),
+            "TRANSFER",
+            List.of(select(a), select(b)),
+            null,
+            null,
+            null,
+            null,
+            "one");
+    var second =
+        new ReviewService.Command(
+            UUID.randomUUID(),
+            "TRANSFER",
+            List.of(select(a), select(c)),
+            null,
+            null,
+            null,
+            null,
+            "two");
+    var start = new java.util.concurrent.CountDownLatch(1);
+    try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var futures = new ArrayList<java.util.concurrent.Future<Boolean>>();
+      for (var command : List.of(first, second))
+        futures.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  try {
+                    service.command(l1, command);
+                    return true;
+                  } catch (ApiException ex) {
+                    return false;
+                  }
+                }));
+      start.countDown();
+      assertThat(List.of(futures.get(0).get(), futures.get(1).get()))
+          .containsExactlyInAnyOrder(true, false);
+    }
+    assertThat(jdbc.queryForObject("select count(*) from episode_alerts", Integer.class))
+        .isEqualTo(2);
+  }
+
   @Test
   void published_evidence_uses_real_query_for_list_and_review() {
     long id = alert(l1);
@@ -148,26 +290,32 @@ class ReviewWorkflowTests {
   }
 
   @Test
-  void partial_transfer_preserves_context_and_closing_requires_remaining_decision() {
-    long id = alert(l1);
-    long ep = number(act(l1, "TRANSFER", null, select(id, 1, 3)).get("targetCaseId"));
-    assertThat(service.detail(id).get("pendingCount")).isEqualTo(1L);
-    assertThatThrownBy(() -> act(l1, "CLOSE", null, select(id))).isInstanceOf(ApiException.class);
-    act(l1, "DECIDE", "NORMAL", select(id, 2));
-    act(l1, "CLOSE", null, select(id));
-    assertThat(service.detail(id).get("outcome")).isEqualTo("MIXED");
-    act(l2, "DECIDE", "SUSPICIOUS", select(ep, 1));
+  void whole_alert_transfer_closes_sources_and_preserves_context() {
+    long a = alert(l1), b = alert(l1);
+    long ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    assertThat(service.detail(a).get("outcome")).isEqualTo("TRANSFERRED");
+    assertThat(service.detail(a).get("status")).isEqualTo("CLOSED");
+    assertThat(service.detail(a).get("episodeId")).isEqualTo(ep);
+    assertThat(service.detail(a).get("pendingCount")).isEqualTo(0L);
+    assertThat(object(service.detail(a).get("summary")).get("txCount")).isEqualTo(3);
+    var groups = rows(service.detail(ep).get("groups"));
+    assertThat(groups).hasSize(2);
+    assertThat(groups).allMatch(g -> g.get("sourceAlertId") != null);
+    assertThat(rows(groups.getFirst().get("members"))).hasSize(3);
+    for (var g : groups)
+      act(
+          l2,
+          "DECIDE",
+          "SUSPICIOUS",
+          new ReviewService.Selection(
+              ep,
+              number(service.detail(ep).get("revision")),
+              number(g.get("groupId")),
+              List.of(1L, 2L)));
     act(l2, "CLOSE", null, select(ep));
-    var members = rows(rows(service.detail(ep).get("groups")).getFirst().get("members"));
-    assertThat(
-            members.stream()
-                .filter(m -> number(m.get("txId")) == 3)
-                .findFirst()
-                .orElseThrow()
-                .get("decision"))
-        .isNull();
     assertThat(service.detail(ep).get("outcome")).isEqualTo("SUSPICIOUS");
-    assertThatThrownBy(() -> act(l2, "EXCLUDE", null, select(ep, 3)))
+    assertThat((Collection<?>) service.detail(ep).get("sourceAlertIds")).hasSize(2);
+    assertThatThrownBy(() -> act(l1, "TRANSFER", null, select(a), select(alert(l1))))
         .isInstanceOf(ApiException.class);
   }
 
@@ -194,7 +342,7 @@ class ReviewWorkflowTests {
         new ReviewService.Command(
             UUID.randomUUID(),
             "TRANSFER",
-            List.of(select(a, 1, 2, 3)),
+            List.of(select(a, 1, 2, 3), select(alert(l1))),
             null,
             null,
             null,
@@ -262,73 +410,57 @@ class ReviewWorkflowTests {
   }
 
   @Test
-  void split_and_mixed_episode_decisions_preserve_original_transfer() {
-    long id = alert(l1);
-    long ep = number(act(l1, "TRANSFER", null, select(id, 1, 2, 3)).get("targetCaseId"));
-    act(l2, "SPLIT", null, select(ep, 2));
-    var groups = rows(service.detail(ep).get("groups"));
-    var second = groups.get(1);
-    act(
-        l2,
-        "DECIDE",
-        "NORMAL",
-        new ReviewService.Selection(
-            ep,
-            number(service.detail(ep).get("revision")),
-            number(second.get("groupId")),
-            List.of(2L)));
-    act(l2, "DECIDE", "SUSPICIOUS", select(ep, 1));
-    act(l2, "CLOSE", null, select(ep));
-    assertThat(service.detail(ep).get("outcome")).isEqualTo("SUSPICIOUS");
-    assertThat(service.detail(id).get("pendingCount")).isEqualTo(0L);
-    assertThat(rows(rows(service.detail(id).get("groups")).getFirst().get("members")))
-        .allMatch(m -> "TRANSFERRED".equals(m.get("state")));
+  void partial_transfer_and_single_alert_episode_are_rejected_without_writes() {
+    long a = alert(l1), b = alert(l1);
+    assertThatThrownBy(() -> act(l1, "TRANSFER", null, select(a))).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> act(l1, "TRANSFER", null, select(a, 1), select(b)))
+        .isInstanceOf(ApiException.class);
+    assertThat(jdbc.queryForObject("select count(*) from episode_alerts", Integer.class)).isZero();
+    assertThat(service.detail(a).get("status")).isEqualTo("OPEN");
   }
 
   @Test
-  void same_episode_move_and_empty_source_episode_can_be_closed_without_normal_verdict() {
-    long id = alert(l1);
-    long ep = number(act(l1, "TRANSFER", null, select(id, 1, 2, 3)).get("targetCaseId"));
-    act(l2, "SPLIT", null, select(ep, 2));
-    long destGroup = number(rows(service.detail(ep).get("groups")).get(1).get("groupId"));
-    var move =
+  void existing_episode_accepts_whole_alert_and_rejects_stale_target_and_split() {
+    long ep =
+        number(act(l1, "TRANSFER", null, select(alert(l1)), select(alert(l1))).get("targetCaseId"));
+    long a = alert(l1);
+    var request =
         new ReviewService.Command(
             UUID.randomUUID(),
-            "MOVE",
-            List.of(select(ep, 1)),
+            "TRANSFER",
+            List.of(select(a)),
             ep,
             number(service.detail(ep).get("revision")),
-            destGroup,
             null,
-            "같은 사건 묶음 통합");
-    service.command(l2, move);
-    var g = rows(service.detail(ep).get("groups")).get(1);
-    var next =
-        service.command(
-            l2,
-            new ReviewService.Command(
-                UUID.randomUUID(),
-                "MOVE",
-                List.of(
-                    new ReviewService.Selection(
+            null,
+            "추가 블록");
+    service.command(l1, request);
+    assertThat((Collection<?>) service.detail(ep).get("sourceAlertIds")).hasSize(3);
+    long b = alert(l1);
+    assertThatThrownBy(
+            () ->
+                service.command(
+                    l1,
+                    new ReviewService.Command(
+                        UUID.randomUUID(),
+                        "TRANSFER",
+                        List.of(select(b)),
                         ep,
-                        number(service.detail(ep).get("revision")),
-                        number(g.get("groupId")),
-                        List.of(1L, 2L))),
-                null,
-                null,
-                null,
-                null,
-                "사건 분리"));
-    act(l2, "CLOSE", null, select(ep));
-    assertThat(service.detail(ep).get("outcome")).isEqualTo("TRANSFERRED");
-    assertThat(service.detail(number(next.get("targetCaseId"))).get("assigneeId")).isEqualTo(l2);
+                        request.targetRevision(),
+                        null,
+                        null,
+                        "오래된 목적지")))
+        .isInstanceOf(ApiException.class);
+    assertThat(service.detail(b).get("status")).isEqualTo("OPEN");
+    assertThatThrownBy(() -> act(l2, "SPLIT", null, select(ep, 1)))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> act(l2, "MOVE", null, select(ep, 1))).isInstanceOf(ApiException.class);
   }
 
   @Test
   void reconsideration_is_explicit_and_retains_prior_audit() {
     long id = alert(l1);
-    long ep = number(act(l1, "TRANSFER", null, select(id, 1, 2)).get("targetCaseId"));
+    long ep = number(act(l1, "TRANSFER", null, select(id), select(alert(l1))).get("targetCaseId"));
     act(l2, "DECIDE", "NORMAL", select(ep, 1, 2));
     assertThatThrownBy(() -> act(l2, "SPLIT", null, select(ep, 1)))
         .isInstanceOf(ApiException.class);
@@ -514,17 +646,15 @@ class ReviewWorkflowTests {
         dashboard.episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
     assertThat(object(empty.get("completion")).get("average_seconds")).isNull();
     long old =
-        jdbc.queryForObject(
+        rawEpisode(
             "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-01 00:00Z','2023-09-02 00:00Z') returning case_id",
-            Long.class,
             l2);
     long today =
-        jdbc.queryForObject(
+        rawEpisode(
             "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-04 15:00Z','2023-09-04 15:00Z') returning case_id",
-            Long.class,
             l2);
-    jdbc.update(
-        "insert into review_cases(kind,assignee_id,status,created_at,assigned_at,closed_at,closed_by,outcome) values('EPISODE',?,'CLOSED','2023-09-03 00:00Z','2023-09-03 00:00Z','2023-09-04 16:00Z',?,'NORMAL')",
+    rawEpisode(
+        "insert into review_cases(kind,assignee_id,status,created_at,assigned_at,closed_at,closed_by,outcome) values('EPISODE',?,'CLOSED','2023-09-03 00:00Z','2023-09-03 00:00Z','2023-09-04 16:00Z',?,'NORMAL') returning case_id",
         l2,
         l2);
     for (String at : List.of("2023-09-04T16:00:00Z", "2023-09-04T17:00:00Z"))
@@ -674,9 +804,8 @@ class ReviewWorkflowTests {
         Map.of("txId", 3, "state", "DECIDED"));
     long otherAlert = publishedAlert(1);
     long ep =
-        jdbc.queryForObject(
+        rawEpisode(
             "insert into review_cases(kind,assignee_id,created_at,assigned_at,status,closed_at) values('EPISODE',?,now(),now(),'CLOSED',now()) returning case_id",
-            Long.class,
             l2);
     savedMembers(ep, Map.of("txId", 2, "state", "DECIDED"), Map.of("txId", 1, "state", "EXCLUDED"));
     savedMembers(ep, Map.of("txId", 2, "state", "DECIDED"));
@@ -722,8 +851,8 @@ class ReviewWorkflowTests {
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))),
         java.sql.Timestamp.from(clock.now()),
         c);
-    jdbc.update(
-        "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,?,?)",
+    rawEpisode(
+        "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,?,?) returning case_id",
         l2,
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))),
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))));
