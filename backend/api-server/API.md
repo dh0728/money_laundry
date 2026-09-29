@@ -92,7 +92,7 @@
   - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→두 모델 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 두 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS는 V6 근거 저장 이후 전체 분석을 완료한다. 콜백 수신은 아직 미연결이며 GET 상태 확인을 사용한다.
 - **POST /api/v1/batch-jobs/analysis** — 본문 없이 서버 Clock 현재 시각을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
 
-- **POST /api/v1/demo/analysis** — 로컬 날짜순 시연 전용. 본문 `{businessDate:"YYYY-MM-DD"}`는 전송한 과거 거래 기준일이다. 분석 구분 날짜는 그 다음 날, 수신 cutoff는 실제 요청 시각으로 기록한다. PC 시각·수신 시각·파일 내용을 변경하지 않는다. 응답202 `{jobId,status:"QUEUED"}`. 기존 WAIT_INGEST부터 실제 파이프라인을 실행하며 검수·통합·입력 고정·실패/재개를 건너뛰지 않는다. `local` 프로파일만 허용하고 `dev`/`prod`가 함께 활성화돼도403 `DEMO_CONTROL_DISABLED`다. 날짜가 없거나 오늘/미래이면400 `INVALID_DEMO_DATE`. 이전 미완료 분석409 `DEMO_PREVIOUS_JOB_PENDING`, 이전 날짜로 역행409 `DEMO_DATE_OUT_OF_ORDER`, 뒤 날짜 수신 자료409 `DEMO_FUTURE_INPUT`, 해당 날짜 수신 자료 없음409 `DEMO_INPUT_REQUIRED`, 같은 날짜 완료409 `JOB_ALREADY_COMPLETED`. 날짜순으로 파일을 전송하는 별도 로컬 시연 DB에서 사용하며 운영 예약 API의 의미를 변경하지 않는다.
+- **POST /api/v1/demo/analysis** — dev/local 날짜순 시연 전용. ADMIN 서버 세션·CSRF가 필요하다. 본문 `{businessDate:"YYYY-MM-DD"}`는 전송한 과거 거래 기준일이다. 분석 구분 날짜는 그 다음 날, 수신 cutoff는 실제 요청 시각으로 기록한다. PC 시각·수신 시각·파일 내용을 변경하지 않는다. 응답202 `{jobId,status:"QUEUED"}`. 기존 WAIT_INGEST부터 실제 파이프라인을 실행하며 검수·통합·입력 고정·실패/재개를 건너뛰지 않는다. `dev` 또는 `local` 프로파일에서 허용하며 `prod`가 함께 활성화되면403 `DEMO_CONTROL_DISABLED`다. 날짜가 없거나 시연 업무 시각 기준 오늘/미래이면400 `INVALID_DEMO_DATE`. 이전 미완료 분석409 `DEMO_PREVIOUS_JOB_PENDING`, 이전 날짜로 역행409 `DEMO_DATE_OUT_OF_ORDER`, 뒤 날짜 수신 자료409 `DEMO_FUTURE_INPUT`, 해당 날짜 수신 자료 없음409 `DEMO_INPUT_REQUIRED`, 같은 날짜 완료409 `JOB_ALREADY_COMPLETED`. 날짜순으로 파일을 전송하는 시연 DB에서 사용하며 운영 예약 API의 의미를 변경하지 않는다. PC에서 dev를 조작하는 실행 방법은 [조작패널 안내](demo/README.md#배포된-dev-서버-조작패널)를 따른다.
 - **POST /api/v1/batch-jobs/{jobId}/resume** — FAILED 작업만 실패 단계부터 새 실패 주기로 재개한다.202 `{ jobId, status: "QUEUED" }`. 이력·정상 산출물·최초 startedAt은 유지한다. 완료 작업 재분석은 허용하지 않는다.
   - 현재 run의 로컬 `PUBLISH/FAILED` 또는 `COLLECT/FAILED` 모델은 같은 요청·회차로 재개한다. 수집 재시도는 모델을 재실행하지 않으며 결과 전송의 일시 오류는30초/120초 간격·총3회 후 명시 재개를 기다린다. 준비/관측 완료된 다른 모델은 초기화하지 않는다. 원격 모델의 최종 실패를 새 회차로 재실행하는 기능은 아직 미연결이며 이 API가 모델 재시작 성공을 보장하지 않는다.
 - 두 POST는 활성 dev/local이 있고 prod가 없을 때만 허용한다. 기본/기타/prod 혼합은403 `ANALYSIS_CONTROL_DISABLED`. 로그인 권한 검증은 후속 작업이다.
@@ -618,3 +618,36 @@ GET /api/v1/dashboard의 episodeWork에 기관 전체 Episode 업무 집계를 �
 사용자가 승인한 테스트 조사 데이터 초기화를 V12 마이그레이션에서 1회 수행한다. review_cases/groups/events/requests를 초기화하고 기존 alerts의 상태·종결 결과를 OPEN/null로 되돌린 뒤 Alert 조사 사건을 재생성한다. 기존 caseId/groupId/revision/requestId는 재사용하지 말고 로그인 후 목록을 다시 조회한다. 계정·비밀번호, 원장·보고·모델 점수·Alert 생성 근거·업무 시각·업로드 파일은 유지한다. 운영 조사 이력을 보존하는 무손실 변환이 아니다.
 
 FE는 위 4개 최종 선택에 §9.8을 사용하고, 저장 성공 후 사건/자금 지표/목적지 목록을 재조회한다. VITE_API_MODE=live는 프론트 이미지 빌드 시점 설정이다. backend 브랜치에는 FE Dockerfile 및 .github 워크플로가 없어 이 파일들을 새로 만들지 않았다. FE/배포 담당이 Dockerfile ARG/ENV와 dev 이미지 빌드 인자를 함께 반영해야 한다. 컨테이너 실행 환경변수만 추가해서는 빌드된 웹앱 모드가 바뀌지 않는다.
+
+
+## 10. dev/local 시연 데이터 초기화
+
+**ADMIN 서버 세션 전용**, 변경 요청 CSRF 필수. dev/local에서만 허용하고 prod 혼용은403이다. 배포 자체는 데이터를 지우지 않는다. 관리자의 확인된 POST 요청만 삭제를 실행한다.
+
+| 요청 | 계약 |
+|---|---|
+| GET /api/v1/demo/reset/preview | `{counts:{테이블명:건수},snapshot,clock}`. `snapshot`은 초기화 대상 건수·최신 jobId·업무 시각 revision의 확인값 |
+| POST /api/v1/demo/reset | `{requestId:UUID,snapshot,confirmation:"시연 데이터 초기화"}`. 응답200은 **DB 초기화 접수 결과**이며 파일 정리까지 완료했다는 뜻이 아님 |
+| GET /api/v1/demo/reset/latest | 최신 접수 상태. 기록이 없으면 `{status:"NONE"}` |
+| GET /api/v1/demo/reset/{resetId} | 접수 상태 |
+| POST /api/v1/demo/reset/{resetId}/cleanup | 본문 없음. 남은 대상 하나의 파일 정리 실행. 추론 디렉터리는 최대100개 객체씩 삭제하고 다음 호출에서 남은 목록 확인. 응답 상태를 보고 계속/재시도 |
+
+상태 응답: `{resetId,status,databaseReset:true,totalTargets,remainingTargets}`. status는 FILES_PENDING·FILES_FAILED·COMPLETED. targets는 업로드 객체 또는 추론 요청 디렉터리 수이며 개별 파일 수와 다를 수 있다. 진행률은 `(totalTargets-remainingTargets)/totalTargets`. DB 초기화는 완료됐지만 파일 정리가 실패하면 FILES_FAILED이며 성공으로 표시하지 않는다. 파일 정리 API는 멱등이며 새 DB 초기화를 실행하지 않는다.
+
+DB 원자 범위: receipt 잠금·명시 테이블 잠금 → 대상 확인 → 파일 정리 대상/접수 기록 → 허용 목록 TRUNCATE RESTRICT CONTINUE IDENTITY → 업무 시각 null·revision 증가. 예상 밖 FK가 생기면 전체 롤백하며 CASCADE로 범위를 늘리지 않는다. 동일 ADMIN의 같은 requestId 재요청은 기존 결과를 반환하고 이후 들어온 데이터를 삭제하지 않는다. 초기화 접수 기록은 삭제 대상에서 제외한다.
+
+삭제 범위: 보고·정정·통합·가명 계좌/소유주·거래·분석 입력/점수/피처/작업·Alert/조사 사건/이력·평가 라벨. 보존: users, banks, bank_reporting_periods, fx_rates, 스키마·Flyway, 초기화 기록. 원본 CSV는 서버가 접근하지 않으며 변경하지 않는다. ID 시퀀스도 유지한다.
+
+파일은 DB 커밋 후 별도로 정리한다. 현재 설정의 환경 접두어 아래 기록된 `uploads/{bank}/{job}/{file}` 및 `requests|results/{job}/{BINARY|TYPE}/{requestId}/`만 허용한다. 추론 publication 목적지나 파일 정리 재시도 시 저장소가 달라졌으면 삭제하지 않는다. 과거 S3 버전·기록되지 않은 고아 파일·다른 환경은 대상 밖이다. 파일 대상/저장소 경로·원시 S3 오류·토큰은 상태 API에 노출하지 않는다.
+
+| 오류 코드 | HTTP | 의미 |
+|---|---|---|
+| RESET_CONFIRMATION_REQUIRED | 400 | 확인 문구·requestId·snapshot 누락 |
+| RESET_PREVIEW_STALE | 409 | 조회 이후 삭제 대상 확인값 변경; 다시 preview |
+| RESET_BUSY | 409 | 다른 DB 작업 사용 중, 실행/예약/재시도/수신 처리, 종료 미확인 추론 요청 |
+| RESET_UPLOAD_URL_ACTIVE | 409 | 만료되지 않은 업로드 URL 존재; 실제 만료 후 재시도 |
+| RESET_CLEANUP_PENDING | 409 | 이전 초기화 파일 정리 미완료; cleanup 재개 |
+| RESET_STORAGE_CHANGED | 409 | 기존 추론 저장소와 현재 설정 불일치 |
+| RESET_REQUEST_CONFLICT | 409 | 다른 관리자의 requestId 재사용 |
+
+파일 정리 실패는 cleanup 응답의 FILES_FAILED로 구분한다. 새 초기화는 파일 정리가 끝날 때까지 거절한다. 패널도 파일 정리 중 새 전송/분석/시각 변경을 비활성화한다. 다른 클라이언트의 이후 신규 데이터는 이전 초기화에 포함되지 않으며, 기존 요청 재전송이나 cleanup으로 삭제하지 않는다.

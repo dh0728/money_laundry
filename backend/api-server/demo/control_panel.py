@@ -48,13 +48,18 @@ def bank_module():
 
 
 class Controls:
-    def __init__(self, base, client=None):
+    def __init__(self, base, client=None, *, allow_remote=False, cf_headers=None):
         ApiClient(base)  # Apply the existing URL rules before any request.
         from urllib.parse import urlsplit
-        if urlsplit(base).hostname not in ('localhost', '127.0.0.1', '::1'):
+        if not allow_remote and urlsplit(base).hostname not in ('localhost', '127.0.0.1', '::1'):
             raise ValueError('조작패널은 로컬 백엔드 주소만 사용합니다.')
+        if allow_remote and (urlsplit(base).scheme != 'https' or urlsplit(base).path not in ('', '/')):
+            raise ValueError('dev 주소는 경로 없는 HTTPS 기본 주소여야 합니다.')
+        if client is not None and client.base_url != base.rstrip('/'):
+            raise ValueError('인증 서버와 조작 대상 서버가 다릅니다.')
         self.base = base.rstrip('/')
         self.client = client or ApiClient(base)
+        self.cf_headers = dict(cf_headers or {})
 
     def get(self, path):
         return self.client.get(path)
@@ -77,7 +82,7 @@ class Controls:
     def upload(self, day, bank, file, report):
         mock = bank_module()
         args = SimpleNamespace(api_url=self.base, bank_id=bank, file=file,
-                               business_date=day, correction_request_id=None, cf_headers={})
+                               business_date=day, correction_request_id=None, cf_headers=self.cf_headers)
         opener = build_opener(mock.NoRedirect())
         size, checksum = mock.inspect_file(file)
         target = mock.request_upload(opener, args, size, checksum)
@@ -97,7 +102,7 @@ class Replay:
     def __init__(self, controls):
         self.controls = controls
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='aml-demo')
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.pause = threading.Event()
         self.future = None
         self.state = {'message': '대기', 'history': [], 'error': None}
@@ -114,15 +119,16 @@ class Replay:
             return dict(self.state, history=list(self.state['history']))
 
     def start(self, days, files, *, analyze=True, upload=True, interval=0):
-        if self.future is not None and not self.future.done():
-            raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
-        self.pause.clear()
-        days = sorted(set(days))
-        self.report('시작', error=None, totalDays=len(days),
-                    doneDays=sum(day in self.completed for day in days) if analyze else 0,
-                    currentDay=None, fileDone=0, fileTotal=0,
-                    bankId=None, uploadId=None, jobId=None)
-        self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
+        with self.lock:
+            if self.future is not None and not self.future.done():
+                raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
+            self.pause.clear()
+            days = sorted(set(days))
+            self.report('시작', error=None, totalDays=len(days),
+                        doneDays=sum(day in self.completed for day in days) if analyze else 0,
+                        currentDay=None, fileDone=0, fileTotal=0,
+                        bankId=None, uploadId=None, jobId=None)
+            self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
 
     def _run(self, days, files, analyze, upload, interval):
         try:
@@ -181,6 +187,89 @@ class Replay:
         self.pause.set()
         self.pool.shutdown(wait=False)
 
+    def reset_demo(self, payload):
+        with self.lock:
+            if self.future is not None and not self.future.done():
+                raise ApiError('현재 날짜 처리가 끝난 뒤 초기화하세요.')
+            result = self.controls.post('demo/reset', payload)
+            self.clear_after_reset(result['resetId'])
+            return result
+
+    def clear_after_reset(self, reset_id):
+        with self.lock:
+            if self.state.get('resetId') == reset_id:
+                return
+            if self.future is not None and not self.future.done():
+                raise ApiError('재생 중 초기화 이력이 변경됐습니다. 현재 작업 종료 후 다시 조회하세요.')
+            self.sent.clear()
+            self.jobs.clear()
+            self.completed.clear()
+            self.state = {'message': 'DB 초기화 완료', 'history': [], 'error': None, 'resetId': reset_id}
+
+
+def render_reset(replay):
+    import streamlit as st
+    from uuid import uuid4
+    try:
+        latest = replay.controls.get('demo/reset/latest')
+    except ApiError as error:
+        if error.status == 404:
+            st.caption('초기화 기능은 해당 API가 포함된 백엔드 배포 후 사용할 수 있습니다.')
+            return False
+        raise
+    if latest.get('resetId'):
+        replay.clear_after_reset(latest['resetId'])
+    pending = latest.get('status', 'NONE') in ('FILES_PENDING', 'FILES_FAILED')
+    running = replay.future is not None and not replay.future.done()
+    with st.expander('시연 데이터 초기화'):
+        st.warning('거래·업로드·분석·Alert/Episode·조사 이력과 관련 S3 파일을 삭제합니다. PC의 CSV, 직원 계정, 은행 등록, 환율은 보존합니다.')
+        if st.button('초기화 대상 확인', disabled=running or pending):
+            st.session_state.reset_preview = replay.controls.get('demo/reset/preview')
+            st.session_state.reset_request = str(uuid4())
+        preview = st.session_state.get('reset_preview')
+        if preview:
+            counts = preview['counts']
+            st.write({label: counts.get(table, 0) for label, table in (
+                ('거래', 'transactions'), ('업로드·분석 작업', 'batch_jobs'),
+                ('Alert', 'alerts'), ('조사 사건', 'review_cases'), ('은행 보고', 'report_versions'))})
+            confirmation = st.text_input('확인 문구: 시연 데이터 초기화', key='reset_confirmation')
+            if st.button('DB 및 관련 파일 초기화', disabled=running or pending or confirmation != '시연 데이터 초기화'):
+                result = replay.reset_demo({'requestId': st.session_state.reset_request,
+                                            'snapshot': preview['snapshot'], 'confirmation': confirmation})
+                st.session_state.cleanup_reset = result['resetId']
+                st.session_state.pop('reset_preview', None)
+                st.session_state.pop('reset_confirmation', None)
+                st.rerun()
+
+        @st.fragment(run_every='2s')
+        def cleanup_progress():
+            current = replay.controls.get('demo/reset/latest')
+            status = current.get('status', 'NONE')
+            if status == 'NONE':
+                return
+            if status == 'COMPLETED':
+                st.success('DB 및 관련 파일 초기화 완료. 업무 시각을 먼저 설정한 뒤 전송하세요.')
+                return
+            total, remaining = current['totalTargets'], current['remainingTargets']
+            st.progress((total - remaining) / total if total else 1.0,
+                        text=f'DB 초기화 완료 · 파일 정리 대상 {total - remaining}/{total}개 완료')
+            if status == 'FILES_FAILED':
+                st.session_state.pop('cleanup_reset', None)
+                st.error('DB 초기화 완료 / 파일 정리 실패. S3 삭제 권한·저장소 설정을 확인하고 파일 정리만 재시도하세요.')
+            if st.button('파일 정리 계속/재시도'):
+                st.session_state.cleanup_reset = current['resetId']
+            if st.session_state.get('cleanup_reset') == current['resetId']:
+                try:
+                    result = replay.controls.post(f'demo/reset/{current["resetId"]}/cleanup')
+                    if result['status'] in ('COMPLETED', 'FILES_FAILED'):
+                        st.session_state.pop('cleanup_reset', None)
+                        st.rerun()
+                except ApiError as error:
+                    st.session_state.pop('cleanup_reset', None)
+                    st.error(str(error))
+        cleanup_progress()
+    return pending
+
 
 def render():
     import os
@@ -188,41 +277,52 @@ def render():
     st.set_page_config(page_title='AML 시연 조작패널', layout='wide')
     st.title('시연 조작패널')
     st.caption('예약 시각 대기만 생략합니다. 파일 검수와 실제 분석 완료를 기다린 뒤 다음 날짜로 진행합니다.')
-    base = st.text_input('로컬 백엔드', os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080'))
-    root = st.text_input('날짜별 은행 파일 폴더', os.getenv('AML_DEMO_DATA_DIR', ''))
+    import operator_session
+    runtime = operator_session.runtime
+    if runtime is not None:
+        base, root = runtime.base, runtime.root
+        st.info(f'dev 연결: {base} · ADMIN 세션 자동 갱신')
+        st.caption(f'은행 파일 폴더: {root}')
+    else:
+        base = st.text_input('로컬 백엔드', os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080'))
+        root = st.text_input('날짜별 은행 파일 폴더', os.getenv('AML_DEMO_DATA_DIR', ''))
     try:
-        from api_client import login_panel
-        authenticated = login_panel(base, 'control_client')
-        if authenticated is None:
-            return
-        client, user = authenticated
-        if user['role'] != 'ADMIN':
-            st.error('조작패널은 관리자 계정으로 로그인하세요.')
-            if st.button('로그아웃'):
-                client.logout()
-                st.session_state.pop('control_client', None)
-                st.rerun()
-            return
+        if runtime is not None:
+            replay = runtime.replay
+        else:
+            from api_client import login_panel
+            authenticated = login_panel(base, 'control_client')
+            if authenticated is None:
+                return
+            client, user = authenticated
+            if user['role'] != 'ADMIN':
+                st.error('조작패널은 관리자 계정으로 로그인하세요.')
+                if st.button('로그아웃'):
+                    client.logout()
+                    st.session_state.pop('control_client', None)
+                    st.rerun()
+                return
+            if 'replay' not in st.session_state:
+                st.session_state.replay = Replay(Controls(base, client))
+            replay = st.session_state.replay
+            if replay.controls.base != base.rstrip('/'):
+                st.info('진행 중 작업의 서버를 바꿀 수 없습니다. 새 패널 세션에서 접속하세요.')
+                return
+            if replay.future is None or replay.future.done():
+                replay.controls.client = client
         files = catalog(root) if root else {}
         if not files:
             st.info('준비된 날짜별 은행 파일의 상위 폴더를 지정하세요.')
             return
-        if 'replay' not in st.session_state:
-            st.session_state.replay = Replay(Controls(base, client))
-        replay = st.session_state.replay
-        if replay.controls.base != base.rstrip('/'):
-            st.info('진행 중 작업의 서버를 바꿀 수 없습니다. 새 패널 세션에서 접속하세요.')
-            return
-        if replay.future is None or replay.future.done():
-            replay.controls.client = client
         clock = replay.controls.get('demo/clock')
         st.metric('시연 업무 시각 (KST)', clock['businessAt'])
+        reset_pending = render_reset(replay)
         with st.expander('시연 업무 시각 설정'):
             st.caption('선택 날짜 전송·자동 재생을 시작할 때 거래 기준일 다음 날 09:00 KST로 자동 설정합니다. 수동 설정이 더 미래이면 유지하며, 실제 통신 시각은 변경하지 않습니다.')
             current = datetime.fromisoformat(clock['businessAt'])
             picked = st.date_input('업무 날짜', current.date())
             picked_time = st.time_input('업무 시간', day_time(9))
-            busy = replay.future is not None and not replay.future.done()
+            busy = reset_pending or (replay.future is not None and not replay.future.done())
             if st.button('시각 적용', disabled=busy):
                 replay.controls.set_clock(datetime.combine(picked, picked_time, timezone(timedelta(hours=9))).isoformat())
                 st.rerun()
@@ -235,7 +335,7 @@ def render():
 
         @st.fragment(run_every='1s')
         def actions():
-            running = replay.future is not None and not replay.future.done()
+            running = reset_pending or (replay.future is not None and not replay.future.done())
             cols = st.columns(3)
             if cols[0].button('선택 날짜 전송', disabled=running or len(days) != 1):
                 replay.start(sorted(days), files, analyze=False)

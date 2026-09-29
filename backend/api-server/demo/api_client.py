@@ -7,6 +7,50 @@ import httpx
 class ApiError(Exception):
     """A safe message that never contains a response body or credentials."""
 
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
+
+def clock_conflict(response):
+    """Expose only known clock errors, never arbitrary server response text."""
+    try:
+        problem = response.json()
+    except ValueError:
+        return None
+    if not isinstance(problem, dict) or problem.get('code') != 'INVALID_TRANSITION':
+        return None
+    messages = {
+        '시연 시각이 변경됐습니다. 다시 조회하세요.':
+            '다른 요청에서 업무 시각을 변경했습니다. 화면을 새로고침한 뒤 다시 적용하세요.',
+        '진행 중 또는 복구가 필요한 작업이 있습니다.':
+            '진행 중·예약·재시도 대기 작업 또는 실패한 분석 작업이 있어 업무 시각을 변경할 수 없습니다. 분석 작업 상태를 확인하세요.',
+        '과거로 이동하려면 시연 데이터를 초기화하세요.':
+            '이미 설정된 업무 시각보다 과거로 이동할 수 없습니다. 현재 시각을 확인하세요. 과거부터 다시 시연하려면 별도의 데이터 초기화가 필요합니다.',
+        '기존 분석 시연은 초기화 후 업무 시각을 설정하세요.':
+            '업무 시각을 최초 설정하기 전에 생성된 분석 이력이 있어 변경이 차단됐습니다. 기존 데이터 확인 후 시연 초기화 여부를 결정해야 합니다.',
+    }
+    detail = problem.get('detail')
+    return messages.get(detail) if isinstance(detail, str) else None
+
+
+def reset_error(response):
+    try:
+        problem = response.json()
+    except ValueError:
+        return None
+    if not isinstance(problem, dict) or not isinstance(problem.get('code'), str):
+        return None
+    return {
+        'RESET_BUSY': '실행·대기 중인 작업 또는 종료 미확인 추론 요청이 있습니다. 작업 종료 후 초기화하세요.',
+        'RESET_UPLOAD_URL_ACTIVE': '아직 유효한 업로드 URL이 있습니다. 발급된 URL이 만료된 뒤 초기화하세요.',
+        'RESET_PREVIEW_STALE': '데이터가 변경됐습니다. 초기화 대상 확인을 다시 누르세요.',
+        'RESET_CLEANUP_PENDING': '이전 초기화의 파일 정리가 남았습니다. 파일 정리 계속/재시도를 누르세요.',
+        'RESET_STORAGE_CHANGED': '이전 추론의 저장소와 현재 설정이 다릅니다. 관리자에게 저장소 설정 확인을 요청하세요.',
+        'RESET_CONFIRMATION_REQUIRED': '삭제 확인 문구를 정확히 입력하세요.',
+        'RESET_REQUEST_CONFLICT': '다른 관리자의 초기화 요청입니다. 새로 조회하세요.',
+    }.get(problem.get('code'))
+
 
 class ApiClient:
     def __init__(self, base_url, headers=None, transport=None):
@@ -31,7 +75,8 @@ class ApiClient:
                 response = client.request(method, self.base_url + '/api/' + path, data=data)
                 self.cookies.update(client.cookies)
             if response.status_code not in (200, 204):
-                raise ApiError('로그인 정보 또는 세션을 확인하세요. (HTTP %s)' % response.status_code)
+                raise ApiError('로그인 정보 또는 세션을 확인하세요. (HTTP %s)' % response.status_code,
+                               response.status_code)
             return response.json() if response.status_code != 204 else None
         except (httpx.HTTPError, ValueError):
             raise ApiError('인증 서버 응답을 확인하지 못했습니다.') from None
@@ -64,8 +109,11 @@ class ApiClient:
             if response.status_code not in (200, 201, 202):
                 messages = {400: '선택 범위와 입력을 확인하세요.', 403: '담당자 또는 실행 환경 권한이 없습니다.',
                             404: '대상이 없습니다.', 409: '상태가 변경됐거나 처리 조건이 충족되지 않았습니다. 새로 조회하세요.'}
-                raise ApiError(messages.get(response.status_code, '요청이 처리되지 않았습니다.')
-                               + f' (HTTP {response.status_code})')
+                specific = clock_conflict(response) if path == 'demo/clock' and response.status_code == 409 else None
+                if path == 'demo/reset' or path.startswith('demo/reset/'):
+                    specific = reset_error(response)
+                raise ApiError((specific or messages.get(response.status_code, '요청이 처리되지 않았습니다.'))
+                               + f' (HTTP {response.status_code})', response.status_code)
             return response.json()
         except httpx.HTTPError:
             raise ApiError('응답을 확인하지 못했습니다. 같은 요청으로 재시도하거나 처리 이력을 확인하세요.') from None
@@ -84,7 +132,7 @@ class ApiClient:
                 messages = {401: '인증이 필요합니다.', 403: '조회 권한이 없습니다.',
                             404: '해당 API 또는 완료된 결과를 찾을 수 없습니다.'}
                 raise ApiError(messages.get(response.status_code, 'API 요청이 실패했습니다.')
-                               + f' (HTTP {response.status_code})')
+                               + f' (HTTP {response.status_code})', response.status_code)
             data = response.json()
         except httpx.TimeoutException:
             raise ApiError('API 응답 시간이 초과됐습니다. 다시 조회하세요.') from None
