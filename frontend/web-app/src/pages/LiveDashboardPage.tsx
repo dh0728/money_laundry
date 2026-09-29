@@ -1,3 +1,4 @@
+import { RefreshCountdown } from '@/components/RefreshCountdown'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
 import { RefreshStatus } from '@/components/RefreshStatus'
 import { typeDisplay, type TypeCode } from '@/api/codes'
@@ -57,7 +58,7 @@ export default function LiveDashboardPage({ onOpen }: { onOpen: (kind: 'ALERT' |
 
   return <div className="space-y-6">
     <RefreshStatus queries={[dashboard]} />
-    <PageHeading title="대시보드" description={`업무 기준 ${kstDate(data.businessAt)} · 서버 집계`} />
+    <PageHeading title="대시보드" description={<>업무 기준 {kstDate(data.businessAt)} · 서버 집계 · <RefreshCountdown nextRefreshAt={dashboard.nextRefreshAt} refreshing={dashboard.refreshing} /></>} />
     <div className="flex flex-wrap items-center gap-2">
       <Button variant={scope === 'institution' ? 'default' : 'outline'} size="sm" onClick={() => setScope('institution')}>기관 전체</Button>
       <Button variant={scope === 'personal' ? 'default' : 'outline'} size="sm" onClick={() => setScope('personal')}>내 담당</Button>

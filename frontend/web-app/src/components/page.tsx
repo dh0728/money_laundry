@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export function PageHeading({ title, description, badge }: { title: string; description: string; badge?: ReactNode }) {
+export function PageHeading({ title, description, badge }: { title: string; description: ReactNode; badge?: ReactNode }) {
   return (
     <header data-testid="page-heading" className="page-heading min-h-[58px]">
       <div className="flex flex-wrap items-center gap-2.5">
