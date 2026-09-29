@@ -1,8 +1,9 @@
-import type { AlertRow } from '@/api/alerts'
+import type { AlertDetail as AlertDetailData, AlertRow } from '@/api/alerts'
 import type { TypeRef } from '@/api/codes'
 import { ApiError, type Page } from '@/api/common'
 import type { EpisodeDetail, EpisodeRow, EpisodeTransaction } from '@/api/episodes'
 import { detailOf } from './alertDetail'
+import { withoutTransactions, type MockExcludedTransactions } from './transactionScope'
 import { graphOf } from './graph'
 import { allAlertsNormal } from './alerts'
 import { currentScenario, mockFailure, type MockScenario } from './scenario'
@@ -42,23 +43,24 @@ function episodeRow(episodeId: number, alerts: AlertRow[]): EpisodeRow {
   }
 }
 
-const pageOf = (alerts: AlertRow[]): Page<EpisodeRow> => {
-  const content = [...groupsOf(alerts)].map(([id, members]) => episodeRow(id, members))
+const pageOf = (alerts: AlertRow[], excluded: MockExcludedTransactions = {}): Page<EpisodeRow> => {
+  const content = [...groupsOf(alerts)].map(([id, members]) => episodeRow(id,
+    members.map(row => excluded[row.alertId]?.length ? withoutTransactions(detailOf(row), excluded[row.alertId]) : row)))
   return { content, page: 0, size: 200, totalElements: content.length, totalPages: 1 }
 }
 export const episodesNormal = pageOf(allAlertsNormal.content)
 export const episodesEmpty: Page<EpisodeRow> = { content: [], page: 0, size: 200, totalElements: 0, totalPages: 0 }
 
-export function loadMockEpisodes(alerts = allAlertsNormal.content, scenario: MockScenario = currentScenario()): Promise<Page<EpisodeRow>> {
+export function loadMockEpisodes(alerts = allAlertsNormal.content, scenario: MockScenario = currentScenario(), excluded: MockExcludedTransactions = {}): Promise<Page<EpisodeRow>> {
   if (scenario === 'error') return mockFailure('Episode 목록을 불러오지 못했습니다.')
-  return Promise.resolve(scenario === 'empty' ? episodesEmpty : pageOf(alerts))
+  return Promise.resolve(scenario === 'empty' ? episodesEmpty : pageOf(alerts, excluded))
 }
 
-function transactionsOf(alerts: AlertRow[]): EpisodeTransaction[] {
-  return alerts.flatMap(a => detailOf(a).transactions.map(t => ({ ...t, alertId: a.alertId })))
+function transactionsOf(alerts: AlertDetailData[]): EpisodeTransaction[] {
+  return alerts.flatMap(a => a.transactions.map(t => ({ ...t, alertId: a.alertId })))
 }
 
-function detailOfEpisode(episodeId: number, alerts: AlertRow[]): EpisodeDetail {
+function detailOfEpisode(episodeId: number, alerts: AlertDetailData[]): EpisodeDetail {
   const row = episodeRow(episodeId, alerts)
   const tx = transactionsOf(alerts)
   const subject = [...alerts].sort((a, b) => b.riskScore - a.riskScore)[0].subjectAccount
@@ -78,7 +80,7 @@ function detailOfEpisode(episodeId: number, alerts: AlertRow[]): EpisodeDetail {
       { ...base, id: 1, actor: person, action: 'EPISODE_CREATE' as const, relatedIds: [alerts[0].alertId], comment: '여러 Alert에 같은 소유주 흐름이 보여 Episode로 묶음.', at: row.createdAt },
     ],
     flow: {
-      periodFrom: times[0], periodTo: times[times.length - 1],
+      periodFrom: times[0] ?? row.createdAt, periodTo: times[times.length - 1] ?? row.createdAt,
       inflowUsd: sum(inflow), inflowCount: inflow.length, outflowUsd: sum(outflow), outflowCount: outflow.length,
       netRetainedUsd: sum(inflow) - sum(outflow), passThroughRatio: sum(inflow) ? Math.round((sum(outflow) / sum(inflow)) * 100) / 100 : 0,
       medianDwellHours: 9, txCount: tx.length,
@@ -100,11 +102,11 @@ function detailOfEpisode(episodeId: number, alerts: AlertRow[]): EpisodeDetail {
 
 const notFound = (episodeId: number) => new ApiError({ type: 'about:blank', title: 'Not Found', status: 404, code: 'NOT_FOUND', detail: `E-${episodeId} Episode를 찾을 수 없습니다.` })
 
-export function loadMockEpisode(episodeId: number, alerts = allAlertsNormal.content, scenario: MockScenario = currentScenario()) {
+export function loadMockEpisode(episodeId: number, alerts = allAlertsNormal.content, scenario: MockScenario = currentScenario(), excluded: MockExcludedTransactions = {}) {
   if (scenario === 'error') return mockFailure('Episode 상세를 불러오지 못했습니다.')
   const members = scenario === 'empty' ? [] : groupsOf(alerts).get(episodeId) ?? []
   if (!members.length) return Promise.reject(notFound(episodeId))
-  const details = members.map(detailOf)
+  const details = members.map(row => withoutTransactions(detailOf(row), excluded[row.alertId] ?? []))
   const graph = graphOf(details.flatMap(d => d.transactions), details.flatMap(d => d.accounts))
-  return Promise.resolve({ detail: detailOfEpisode(episodeId, members), transactions: transactionsOf(members), graph })
+  return Promise.resolve({ detail: detailOfEpisode(episodeId, details), transactions: transactionsOf(details), graph })
 }

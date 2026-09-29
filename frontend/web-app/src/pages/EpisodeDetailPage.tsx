@@ -5,11 +5,13 @@ import { commentEpisode, fetchEpisode, fetchEpisodeTransactions } from '@/api/ep
 import { useCurrentUser, canEditOpen } from '@/app/session'
 import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { episodeCode } from '@/features/alerts/alertFilters'
+import { useAlertOverrides } from '@/features/alerts/alertOverrides'
 import EpisodeDetail from '@/features/episodes/EpisodeDetail'
 import { useEpisodeHistory, useReviewRequests } from '@/features/episodes/reviewStore'
 import { useAsync } from '@/lib/useAsync'
 import { relabelComment, relabelText, useTxRelabels } from '@/features/graph/relabel'
 import { loadMockEpisode } from '@/mocks/episodes'
+import { useMockExcludedTransactions } from '@/mocks/transactionScope'
 import { live, mockSavedNote } from '@/lib/apiMode'
 
 
@@ -22,9 +24,11 @@ type Props = { episodeId: number; alerts: AlertRow[]; onOpenAlert: (alertId: num
 
 export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Props) {
   const currentUser = useCurrentUser()
+  const [, setAlertOverrides] = useAlertOverrides()
+  const [excludedTransactions] = useMockExcludedTransactions()
   // mock은 목록 화면에서 방금 연결한 결과까지 반영한 Alert로 계산한다
-  const alertKey = alerts.map(a => `${a.alertId}:${a.episodeId}`).join()
-  const { state, retry } = useAsync(() => (live ? loadLive(episodeId) : loadMockEpisode(episodeId, alerts.length ? alerts : undefined)), [episodeId, alertKey])
+  const alertKey = alerts.map(a => `${a.alertId}:${a.episodeId}:${(excludedTransactions[a.alertId] ?? []).join('.')}`).join()
+  const { state, retry } = useAsync(() => (live ? loadLive(episodeId) : loadMockEpisode(episodeId, alerts.length ? alerts : undefined, undefined, excludedTransactions)), [episodeId, alertKey])
   const [requests, setRequests] = useReviewRequests()
   const [extraHistory, setExtraHistory] = useEpisodeHistory(episodeId)
   const [relabels, setRelabels] = useTxRelabels()
@@ -67,6 +71,20 @@ export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Pr
     toast.success(`거래 ${txId}를 ${relabelText(label)}로 전환했습니다.`, { description: mockSavedNote })
   }
 
+  function unlinkAlerts(alertIds: number[], reason: string) {
+    if (live || !responsible || !alertIds.length || !reason.trim() || alertIds.length >= episode.alerts.length) return
+    setAlertOverrides(prev => {
+      const next = { ...prev }
+      for (const alertId of alertIds) next[alertId] = { status: 'OPEN', resolution: null, episodeId: null }
+      return next
+    })
+    setExtraHistory(prev => [{
+      id: Date.now(), actor: { userId: currentUser.userId, name: currentUser.name, role: currentUser.role }, action: 'UNLINK',
+      targetType: 'EPISODE', targetId: episodeId, relatedIds: alertIds, from: 'LINKED', to: 'UNLINKED', resolution: null, comment: reason, at: new Date().toISOString(),
+    }, ...prev])
+    toast.success(`Alert ${alertIds.length}건의 연결을 해제했습니다.`, { description: mockSavedNote })
+  }
+
   return (
     <EpisodeDetail
       relabels={relabels}
@@ -79,6 +97,7 @@ export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Pr
       onOpenAlert={onOpenAlert}
       onComment={comment}
       onRequestReview={requestReview}
+      onUnlinkAlerts={live ? undefined : unlinkAlerts}
     />
   )
 }

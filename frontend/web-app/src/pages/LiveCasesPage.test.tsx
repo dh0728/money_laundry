@@ -44,6 +44,18 @@ it('Alert 단독 의심 종결은 사건 전체 CLOSE로 보낸다', async () =>
   expect(submitReviewCommand.mock.calls[0][0]).toMatchObject({ action: 'CLOSE', decision: 'SUSPICIOUS', selections: [{ caseId: 1, revision: 1001, groupId: 0, txIds: [] }] })
 })
 
+it('Alert 조사 범위의 선택 거래를 EXCLUDE 명령으로 보낸다', async () => {
+  fetchReviewCase.mockResolvedValue(alertCase(1, 3001, { groups: [{ groupId: 4, label: '거래 묶음', members: [member(11), { ...member(12), reviewRole: 'CONTEXT' }] }] }))
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('checkbox', { name: /T-11/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /T-12/ }))
+  fireEvent.change(screen.getByRole('textbox', { name: '거래 제외 사유' }), { target: { value: '조사와 무관한 거래' } })
+  fireEvent.click(screen.getByRole('button', { name: '선택 거래 제외' }))
+  await waitFor(() => expect(submitReviewCommand).toHaveBeenCalledWith(expect.objectContaining({
+    action: 'EXCLUDE', comment: '조사와 무관한 거래', selections: [{ caseId: 1, revision: 1001, groupId: 4, txIds: [11, 12] }],
+  }), expect.any(String)))
+})
+
 it('목록에서 미편입 OPEN Alert 두 개를 골라 새 Episode를 만든다', async () => {
   render(<LiveCasesPage kind="ALERT" onOpen={vi.fn()} onBack={vi.fn()} />)
   expect(await screen.findByLabelText('새 Episode 선택 A-3001')).toBeInTheDocument()

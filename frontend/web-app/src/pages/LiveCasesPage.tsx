@@ -21,6 +21,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
   const user = useCurrentUser()
   const { state, retry, refresh } = useAsync(() => fetchReviewCase(caseId), [caseId])
   const [comment, setComment] = useState('')
+  const [excludeComment, setExcludeComment] = useState('')
   const [busy, setBusy] = useState(false)
   const busyRef = useRef(false)
   const [selected, setSelected] = useState<Record<number, number[]>>({})
@@ -71,6 +72,10 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
     caseId: item.caseId, revision: item.revision, groupId: group.groupId,
     txIds: (selected[group.groupId] ?? []).filter(id => group.members.some(member => member.txId === id && member.state === 'PENDING' && member.reviewRole === 'SUBJECT')),
   })).filter(group => group.txIds.length)
+  const pendingSelections = (item.groups ?? []).map(group => ({
+    caseId: item.caseId, revision: item.revision, groupId: group.groupId,
+    txIds: (selected[group.groupId] ?? []).filter(id => group.members.some(member => member.txId === id && member.state === 'PENDING')),
+  })).filter(group => group.txIds.length)
   const toggleTx = (groupId: number, txId: number) => setSelected(current => {
     if (item.kind === 'EPISODE') {
       const group = item.groups?.find(group => group.groupId === groupId)
@@ -84,11 +89,12 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
   async function execute(action: ReviewAction, decision?: 'NORMAL' | 'SUSPICIOUS') {
     if (!editable || busyRef.current || scopeBusyRef.current) return
     const wholeCase = ['COMMENT', 'REVIEW_START', 'CLOSE'].includes(action)
-    const selections = wholeCase ? [{ caseId: item.caseId, revision: item.revision, groupId: 0, txIds: [] }] : item.kind === 'EPISODE' ? (item.groups ?? []).filter(group => selected[group.groupId]?.length).map(group => episodeGroupSelection(item, group)) : activeSelections
-    if (!comment.trim()) { toast.error('변경 사유를 입력해 주세요.'); return }
+    const selections = wholeCase ? [{ caseId: item.caseId, revision: item.revision, groupId: 0, txIds: [] }] : item.kind === 'EPISODE' ? (item.groups ?? []).filter(group => selected[group.groupId]?.length).map(group => episodeGroupSelection(item, group)) : action === 'EXCLUDE' ? pendingSelections : activeSelections
+    const reason = action === 'EXCLUDE' ? excludeComment.trim() : comment.trim()
+    if (!reason) { toast.error('변경 사유를 입력해 주세요.'); return }
     if (!selections.length) { toast.error('미판정 거래를 선택해 주세요.'); return }
     if (action === 'DECIDE' && selections.some(selection => !selection.txIds.length)) { toast.error('미판정 조사 대상이 없습니다.'); return }
-    await submit({ action, selections, decision: action === 'CLOSE' ? null : decision, comment: comment.trim() }, action === 'CLOSE' ? 'Episode 조사 종결 완료' : '조사 결과 저장 완료')
+    await submit({ action, selections, decision: action === 'CLOSE' ? null : decision, comment: reason }, action === 'EXCLUDE' ? '선택 거래 제외 완료' : action === 'CLOSE' ? 'Episode 조사 종결 완료' : '조사 결과 저장 완료')
   }
   async function finalizeAlert(mode: 'NORMAL' | 'SUSPICIOUS' | 'EXISTING') {
     if (!editable || busyRef.current || scopeBusyRef.current) return
@@ -113,7 +119,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
     setBusy(true)
     try {
       await submitReviewCommand(command, requestId)
-      previousRequest.current = null; setCanRetry(false); setComment(''); setSelected({})
+      previousRequest.current = null; setCanRetry(false); setComment(''); setExcludeComment(''); setSelected({})
       window.dispatchEvent(new Event('review-command-saved'))
       const refreshed = await Promise.allSettled([refresh(), money.refresh(), targets.refresh(), refreshList()])
       toast.success(refreshed.some(result => result.status === 'rejected') ? `${success}. 저장은 완료됐지만 최신 화면을 불러오지 못했습니다. 다시 조회해 주세요.` : success)
@@ -207,7 +213,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
       </>}
     </section>
     <section aria-label="관계 그래프" className="space-y-2"><h2 className="font-semibold">관계 그래프</h2>{graphModel.edges.length ? <Graph model={graphModel} label={(item.kind === 'ALERT' ? `Alert A-${item.alertId}` : `Episode E-${item.caseId}`) + ' 관계 그래프'} nonSuspiciousLabel="의심 판정 없음 · 미분석 포함" /> : <EmptyBlock>표시할 거래가 없습니다.</EmptyBlock>}</section>
-    <section className="space-y-3"><h2 className="font-semibold">조사 범위</h2>{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><div className="mt-3 space-y-2">{group.members.map(member => <label key={member.txId} className="flex min-w-0 items-start gap-2 rounded-md border p-2 text-xs"><input type="checkbox" className="mt-0.5" disabled={!editable || member.state !== 'PENDING' || member.reviewRole !== 'SUBJECT'} checked={selected[group.groupId]?.includes(member.txId) ?? false} onChange={() => toggleTx(group.groupId, member.txId)} /><span className="min-w-0 flex-1"><strong>T-{member.txId}</strong> · {member.reviewRole} · {member.state}{member.decision && ` · ${member.decision}`}<span className="mt-1 block break-all text-muted-foreground">{member.transaction.fromAccountId} → {member.transaction.toAccountId}</span></span><span>{Number(member.transaction.amountPaid).toLocaleString('ko-KR')} {member.transaction.paymentCurrency}</span></label>)}</div></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
+    <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">조사 범위</h2>{item.kind === 'ALERT' && <Button size="sm" variant="outline" disabled={!editable || busy || !pendingSelections.length || !excludeComment.trim()} onClick={() => void execute('EXCLUDE')}>선택 거래 제외</Button>}</div>{item.kind === 'ALERT' && <textarea aria-label="거래 제외 사유" className="min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="선택 거래를 조사 범위에서 제외하는 이유" value={excludeComment} onChange={event => { setExcludeComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} />}{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><div className="mt-3 space-y-2">{group.members.map(member => <label key={member.txId} className="flex min-w-0 items-start gap-2 rounded-md border p-2 text-xs"><input type="checkbox" className="mt-0.5" disabled={!editable || member.state !== 'PENDING' || (item.kind === 'EPISODE' && member.reviewRole !== 'SUBJECT')} checked={selected[group.groupId]?.includes(member.txId) ?? false} onChange={() => toggleTx(group.groupId, member.txId)} /><span className="min-w-0 flex-1"><strong>T-{member.txId}</strong> · {member.reviewRole} · {member.state}{member.decision && ` · ${member.decision}`}<span className="mt-1 block break-all text-muted-foreground">{member.transaction.fromAccountId} → {member.transaction.toAccountId}</span></span><span>{Number(member.transaction.amountPaid).toLocaleString('ko-KR')} {member.transaction.paymentCurrency}</span></label>)}</div></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
     <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">조사 처리</h2><p className="mt-1 text-xs text-muted-foreground">본인 담당 진행 중 사건만 변경 가능 · 변경 뒤 최신 사건 정보 재조회</p><textarea aria-label="변경 사유" className="mt-3 min-h-20 w-full rounded-md border bg-background p-3 text-sm" placeholder="조사 의견 또는 변경 사유" maxLength={4000} value={comment} onChange={event => { setComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('COMMENT')}>의견 저장</Button><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('REVIEW_START')}>검토 시작 기록</Button><Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'NORMAL')}>선택 범위 정상 판정</Button>{item.kind === 'EPISODE' && <Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'SUSPICIOUS')}>선택 범위 이상 판정</Button>}{item.kind === 'EPISODE' && <Button size="sm" variant="outline" disabled={!editable || busy || item.pendingCount > 0} onClick={() => void execute('CLOSE')}>사건 종결</Button>}{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { const previous = previousRequest.current; if (previous) void submit(previous.command, previous.success) }}>같은 요청 재시도</Button>}</div>
       {item.kind === 'ALERT' && <div className="mt-4 space-y-3 border-t pt-4">
         <h3 className="text-sm font-semibold">최종 처리</h3>

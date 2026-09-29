@@ -119,7 +119,7 @@ export type AlertDetail = AlertRow & {
 // API.md §6 감사 이력 행
 // FE 제안(API.md에 없음): REVIEW_REQUEST = 9/28 회의의 Episode 관리자 검수 넘김,
 // TX_RELABEL = 사람이 거래의 의심/정상 판정을 바꿈(relatedIds = 거래 ID)
-export type HistoryAction = 'REVIEW_START' | 'CLOSE' | 'ESCALATE' | 'LINK' | 'UNLINK' | 'ASSIGN' | 'COMMENT' | 'EPISODE_CREATE' | 'EPISODE_CLOSE' | 'REVIEW_REQUEST' | 'TX_RELABEL'
+export type HistoryAction = 'REVIEW_START' | 'CLOSE' | 'ESCALATE' | 'LINK' | 'UNLINK' | 'ASSIGN' | 'COMMENT' | 'EPISODE_CREATE' | 'EPISODE_CLOSE' | 'REVIEW_REQUEST' | 'TX_RELABEL' | 'TX_EXCLUDE'
 export type HistoryRow = {
   id: number
   actor: { userId: number; name: string; role: string }
