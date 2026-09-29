@@ -740,5 +740,62 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute('SELECT count(*) FROM inference_results WHERE job_id=%s', (self.job,)).fetchone()[0], 3)
 
 
+    def placeholder_setup(self, root):
+        from dataclasses import replace
+        import httpx
+        from inference_dispatch import advance as advance_inference
+        settings, s3 = self.publication_setup(root)
+        settings = replace(settings, api_url='https://example.com')
+        advance_inference(self.admin, self.execution, root, settings, s3,
+                          transport=httpx.MockTransport(lambda r: httpx.Response(404)))
+        return settings, s3
+
+    def recover_placeholder(self):
+        sql = Path(__file__).with_name('recover_dev_placeholder.sql').read_text(encoding='utf-8')
+        self.admin.execute(sql.replace(":'job_id'", "'" + str(self.job) + "'"))
+
+    def test_placeholder_recovery_preserves_inputs_and_republishes_same_requests(self):
+        from dataclasses import replace
+        import httpx
+        from inference_dispatch import advance as advance_inference
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.placeholder_setup(root)
+            before = self.admin.execute('SELECT model_kind,request_id,execution_round,input_artifact '
+                                        'FROM analysis_model_tasks WHERE run_id=%s ORDER BY model_kind',
+                                        (self.run,)).fetchall()
+            self.recover_placeholder()
+            self.assertEqual(before, self.admin.execute('SELECT model_kind,request_id,execution_round,input_artifact '
+                             'FROM analysis_model_tasks WHERE run_id=%s ORDER BY model_kind', (self.run,)).fetchall())
+            calls = []
+            def remote(request):
+                calls.append(json.loads(request.content))
+                return httpx.Response(202, json={**calls[-1], 'status': 'ACCEPTED', 'revision': 1})
+            settings = replace(settings, api_url='http://127.0.0.1:8090', allow_loopback=True)
+            advance_inference(self.admin, self.execution, root, settings, s3, transport=httpx.MockTransport(remote))
+            self.assertEqual(len(calls), 2)
+            self.assertEqual({x['request_id'] for x in calls}, {str(x[1]) for x in before})
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis_model_tasks WHERE run_id=%s "
+                             "AND phase='WAIT_REMOTE' AND status='WAITING' AND remote_deadline_at IS NOT NULL "
+                             "AND binding ? 'placeholder_recovery'", (self.run,)).fetchone()[0], 2)
+            with self.assertRaises(self.psycopg.errors.RaiseException):
+                self.recover_placeholder()
+            self.admin.execute('ROLLBACK')
+
+    def test_placeholder_recovery_refuses_other_endpoints_or_accepted_work_atomically(self):
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            self.placeholder_setup(root)
+            for change in ("binding=jsonb_set(binding,'{publication,api_url}','\"https://real.example\"')",
+                           "remote_revision=1", "remote_deadline_at=now()"):
+                self.admin.execute('BEGIN')
+                self.admin.execute("UPDATE analysis_model_tasks SET " + change +
+                                   " WHERE run_id=%s AND model_kind='BINARY'", (self.run,))
+                with self.assertRaises(self.psycopg.errors.RaiseException):
+                    self.recover_placeholder()
+                self.admin.execute('ROLLBACK')
+                self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis_model_tasks WHERE run_id=%s "
+                                 "AND phase='WAIT_REMOTE' AND NOT binding ? 'placeholder_recovery'",
+                                 (self.run,)).fetchone()[0], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

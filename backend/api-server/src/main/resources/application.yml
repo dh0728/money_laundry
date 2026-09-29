@@ -55,6 +55,7 @@ app:
     script: ${WORKER_SCRIPT:worker/analysis_entry.py}
     timeout: ${WORKER_TIMEOUT:PT30M}
   inference:
+    allow-loopback: ${INFERENCE_ALLOW_LOOPBACK:false}
     url: ${INFERENCE_API_URL:}
     token: ${INFERENCE_API_TOKEN:}
   suspicious-tx:
