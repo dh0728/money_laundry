@@ -651,3 +651,32 @@ DB 원자 범위: receipt 잠금·명시 테이블 잠금 → 대상 확인 → 
 | RESET_REQUEST_CONFLICT | 409 | 다른 관리자의 requestId 재사용 |
 
 파일 정리 실패는 cleanup 응답의 FILES_FAILED로 구분한다. 새 초기화는 파일 정리가 끝날 때까지 거절한다. 패널도 파일 정리 중 새 전송/분석/시각 변경을 비활성화한다. 다른 클라이언트의 이후 신규 데이터는 이전 초기화에 포함되지 않으며, 기존 요청 재전송이나 cleanup으로 삭제하지 않는다.
+
+
+## 10. 실제 업무 알림 (dev/local)
+
+세션 STAFF/ADMIN 모두 자기 담당 사건의 알림만 조회한다. ADMIN도 기관 전체 알림으로 확장하지 않는다. 사용자 ID를 요청으로 받지 않는다. 브라우저 목업과 구분하며 실재하지 않는 검수 결과는 생성하지 않는다.
+
+### GET /api/v1/notifications
+
+- 선택 쿼리: `from`, `to`(YYYY-MM-DD, KST 업무 발생일, 양끝 포함), `query`(제목·본문·표시 코드 부분 검색, 최대200자), `page`(0부터), `size`(기본20, 1~100).
+- 기간 생략 시 전체 업무 이력. 날짜 역전·잘못된 페이지/크기는400. 날짜는 조회 시각이 아닌 배정/행동의 업무 시각 기준이다.
+- 응답: `{content, number, size, totalElements, totalPages, unreadCount}`. unreadCount는 같은 검색·기간의 전체 미확인 알림 수이며 현재 페이지에 한정하지 않는다.
+- 행: `{id, kind, title, description, code, count, at, read, caseId, caseKind}`.
+- `id`는 불투명 문자열. `at`은 KST ISO8601. `caseId`는 review_cases.case_id이며 alert_id가 아니다. `caseKind`는 ALERT/EPISODE.
+- 정렬은 업무 시각 내림차순, 동일 시각은 id 내림차순. 알림 하나가 여러 Alert를 나타내면 count>1이며 caseId=null이다. 배정1건도 분석 묶음 알림이므로 caseId=null일 수 있다.
+- ALERT_ASSIGNED: 최초 증거(version1)의 분석 run과 담당자별 묶음. 분석 run·batch가 모두 COMPLETED인 건만 표시. 이후 같은 Alert의 증거 갱신은 새 배정 알림을 만들지 않는다.
+- EPISODE_ASSIGNED: Episode 배정 이력. COMMENT/CLOSE/TRANSFER/UNLINK/DISSOLVE: 기존 조사 이벤트. 본인 행동도 본인 담당 사건 이력으로 표시한다. MONEY_SNAPSHOT 등 내부 저장 이벤트는 제외한다.
+- 배정 표시 코드 ANALYSIS-{jobId}, 사건 코드 A-{alertId}/E-{caseId}. 현재 저장된 업무 이력을 조회하므로 기존 데이터도 제공되며 과거 알림 레코드의 별도 복제/전송은 없다.
+
+### GET /api/v1/notifications/{id}/cases
+
+본인 알림에 연결된 사건 목록. page/size는 위와 동일. 응답 `{content:[{caseId,kind,alertId,status}],number,size,totalElements,totalPages}`. 묶음 알림은 해당 run에서 본인에게 배정된 Alert만 포함한다. 상세 화면 이동은 caseId 사용. 없는 알림과 다른 사용자의 알림은 동일404.
+
+### POST /api/v1/notifications/read
+
+CSRF 필요. `{ids: string[], read: boolean}`. 1~100개, 중복 ID는 한 번 처리. 모든 ID가 자기 알림인지 확인한 후 한 트랜잭션에서 적용한다. 타인/없는 ID 포함 시404, 전체 변경 없음. 응답 `{updated: 중복 제거한 ID 개수}`. 같은 읽음 처리는 멱등, read=false는 안 읽음 복구.
+
+읽음 시각은 실제 서버 시각이며 업무 시각 조작의 영향을 받지 않는다. 로그아웃·브라우저 변경 후에도 계정별로 유지. UI의 일괄 처리는 현재 페이지의 미확인 ID만 전달하며 '현재 페이지 모두 읽음'으로 표시한다. 조회하지 않은 다른 페이지나 신규 도착 알림을 암묵적으로 읽음 처리하지 않는다.
+
+새 V15 notification_reads와 work_notifications 뷰를 사용한다. 시연 초기화는 읽음 기록도 제거하며 계정은 보존한다. FE live에서는 해당 API를 사용하고 mock 모드는 기존 목업을 유지한다. 5분 갱신·수동 갱신, 데이터가 없으면 빈 목록. WebSocket/이메일/푸시 전송은 포함하지 않는다.

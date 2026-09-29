@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fetchNotifications } from '@/api/notifications'
 import { fetchDemoClock, fetchLiveDashboard, daysBefore, kstDate } from '@/api/liveDashboard'
 import { useCurrentUser } from '@/app/session'
 import { SidebarMenuBadge } from '@/components/ui/sidebar'
@@ -17,6 +18,18 @@ import { withOverride } from '@/features/alerts/alertOverrides'
 const badgeClass = 'top-1/2! -translate-y-1/2 rounded-full bg-destructive text-destructive-foreground peer-hover/menu-button:text-destructive-foreground peer-data-[active=true]/menu-button:text-destructive-foreground group-data-[collapsible=icon]:right-0! group-data-[collapsible=icon]:top-0! group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:min-w-4 group-data-[collapsible=icon]:translate-x-1/4 group-data-[collapsible=icon]:translate-y-0 group-data-[collapsible=icon]:px-0.5 group-data-[collapsible=icon]:text-[10px]'
 
 export function UnreadNotificationCount() {
+  return live ? <LiveUnreadCount /> : <MockUnreadCount />
+}
+
+function LiveUnreadCount() {
+  const { state } = useAsync(() => fetchNotifications('', '', '', 0), ['', '', '', 0], { key: 'notifications' })
+  if (state.status !== 'success' || !state.data.unreadCount) return null
+  return <SidebarMenuBadge className={badgeClass} aria-label={`안 읽은 알림 ${state.data.unreadCount}건`} title="서버 집계 · 본인 알림">
+    {state.data.unreadCount}
+  </SidebarMenuBadge>
+}
+
+function MockUnreadCount() {
   const [read] = useMemoryState<string[]>('notifications:read', [])
   const { state } = useAsync(loadMockNotifications, [])
   if (state.status !== 'success') return null

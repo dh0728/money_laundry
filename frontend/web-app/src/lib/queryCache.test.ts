@@ -1,6 +1,19 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { QueryCache } from './queryCache'
 
+it('reading a notification invalidates only notification queries', async () => {
+  const cache = new QueryCache()
+  const dashboard = vi.fn().mockResolvedValue(1)
+  const notifications = vi.fn().mockResolvedValue(2)
+  await cache.fetch('["dashboard"]', dashboard, 300_000)
+  await cache.fetch('["notifications"]', notifications, 300_000)
+  cache.invalidate('notifications')
+  await cache.fetch('["dashboard"]', dashboard, 300_000)
+  await cache.fetch('["notifications"]', notifications, 300_000)
+  expect(dashboard).toHaveBeenCalledTimes(1)
+  expect(notifications).toHaveBeenCalledTimes(2)
+})
+
 afterEach(() => vi.restoreAllMocks())
 
 it('fresh results are reused and expired results stay visible during refresh', async () => {

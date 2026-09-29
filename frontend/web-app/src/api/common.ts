@@ -82,6 +82,6 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   })
   if (!response.ok) throw await responseError(response)
   const result = (await response.json().catch(() => undefined)) as T
-  if (path.startsWith('/api/v1/')) window.dispatchEvent(new Event('live-data-changed'))
+  if (path.startsWith('/api/v1/')) window.dispatchEvent(new Event(path === '/api/v1/notifications/read' ? 'notifications-changed' : 'live-data-changed'))
   return result
 }

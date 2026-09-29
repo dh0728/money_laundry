@@ -8,8 +8,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [store] = useState(() => new WorkspaceState())
   useEffect(() => {
     const changed = () => store.queries.invalidate()
+    const notificationsChanged = () => store.queries.invalidate('notifications')
     window.addEventListener('live-data-changed', changed)
-    return () => window.removeEventListener('live-data-changed', changed)
+    window.addEventListener('notifications-changed', notificationsChanged)
+    return () => { window.removeEventListener('live-data-changed', changed); window.removeEventListener('notifications-changed', notificationsChanged) }
   }, [store])
   return <WorkspaceContext.Provider value={store}>{children}</WorkspaceContext.Provider>
 }

@@ -1,4 +1,5 @@
 import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
+import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
 import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
@@ -232,7 +233,7 @@ export default function App() {
             : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
             : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
-            : page === 'notifications' ? <NotificationsPage onOpen={item => go(item.target.page, live ? undefined : item.target.id)} />
+            : page === 'notifications' ? (live ? <LiveNotificationsPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />)
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}

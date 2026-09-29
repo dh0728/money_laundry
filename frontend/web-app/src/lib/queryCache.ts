@@ -17,8 +17,9 @@ export class QueryCache {
     return () => { listeners.delete(listener); if (!listeners.size) this.listeners.delete(key) }
   }
   private emit(key: string) { this.listeners.get(key)?.forEach(listener => listener()) }
-  invalidate() {
+  invalidate(namespace?: string) {
     for (const [key, entry] of this.entries) {
+      if (namespace && !String(JSON.parse(key)[0]).startsWith(namespace)) continue
       if (key.startsWith('["clock"') || key.startsWith('["payment-formats"')) continue
       entry.updated = 0; entry.generation++; entry.pending = undefined
       entry.snapshot = { ...entry.snapshot, refreshing: false, settledAt: undefined, invalidation: entry.snapshot.invalidation + 1 }

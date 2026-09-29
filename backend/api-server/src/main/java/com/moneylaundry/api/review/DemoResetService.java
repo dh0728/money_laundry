@@ -20,6 +20,7 @@ public class DemoResetService {
       String.join(
           ",",
           "episode_alerts",
+          "notification_reads",
           "review_requests",
           "review_events",
           "review_groups",
