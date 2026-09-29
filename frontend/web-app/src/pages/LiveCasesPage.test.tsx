@@ -31,6 +31,58 @@ beforeEach(() => {
   setReviewMoneyScope.mockResolvedValue({ caseId: 1, revision: 1002 })
 })
 
+const episodeCase = (count: number) => alertCase(50, 0, {
+  kind: 'EPISODE', alertId: null, revision: 7,
+  groups: Array.from({ length: count }, (_, i) => ({ groupId: i + 10, sourceAlertId: i + 3001, label: `Alert ${i + 3001}`, members: [{ ...member(i + 1), state: 'DECIDED', decision: 'NORMAL' }] })),
+})
+
+it('Episode 연결 해제는 사유와 2개 미만 해체 확인 뒤 전체 그룹 UNLINK를 보낸다', async () => {
+  fetchReviewCase.mockResolvedValue(episodeCase(2))
+  render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
+  fireEvent.click(await screen.findByLabelText('연결 해제 Alert A-3001'))
+  expect(screen.getByRole('button', { name: '선택 Alert 연결 해제' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('연결 해제 사유'), { target: { value: '별도 조사 필요' } })
+  fireEvent.click(screen.getByRole('button', { name: '선택 Alert 연결 해제' }))
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('Episode를 해체할까요?')
+  expect(submitReviewCommand).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Episode 해체 확인' }))
+  await waitFor(() => expect(submitReviewCommand).toHaveBeenCalledWith(expect.objectContaining({
+    action: 'UNLINK', comment: '별도 조사 필요', selections: [{ caseId: 50, revision: 7, groupId: 10, txIds: [] }],
+  }), expect.any(String)))
+  await waitFor(() => expect(fetchReviewMoney).toHaveBeenCalledTimes(2))
+})
+
+it('3개 중 하나 해제는 해체로 안내하지 않고 판정 완료 그룹도 선택할 수 있다', async () => {
+  fetchReviewCase.mockResolvedValue(episodeCase(3))
+  render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
+  fireEvent.click(await screen.findByLabelText('연결 해제 Alert A-3001'))
+  fireEvent.change(screen.getByLabelText('연결 해제 사유'), { target: { value: '연결 없음' } })
+  fireEvent.click(screen.getByRole('button', { name: '선택 Alert 연결 해제' }))
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('선택 Alert의 연결을 해제할까요?')
+  fireEvent.click(screen.getByRole('button', { name: '취소' }))
+  expect(submitReviewCommand).not.toHaveBeenCalled()
+})
+
+it('해체 이력은 현재 소속과 구분하고 닫힌 사건에서는 해제할 수 없다', async () => {
+  fetchReviewCase.mockResolvedValue({ ...episodeCase(0), status: 'CLOSED', outcome: 'DISSOLVED', detachments: [{
+    eventId: 1, action: 'DISSOLVE', comment: '독립된 흐름', businessAt: '2023-09-10T09:00:00+09:00',
+    snapshot: { groups: episodeCase(2).groups },
+  }] })
+  render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
+  expect(await screen.findByText(/해체된 Episode입니다/)).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: '연결 해제 이력' })).toHaveTextContent('독립된 흐름')
+  expect(screen.queryByRole('button', { name: '선택 Alert 연결 해제' })).not.toBeInTheDocument()
+})
+
+it('Alert의 이미 판정한 거래도 제외할 수 있다', async () => {
+  fetchReviewCase.mockResolvedValue(alertCase(1, 3001, { groups: [{ groupId: 4, label: '거래 묶음', members: [{ ...member(11), state: 'DECIDED', decision: 'NORMAL' }] }] }))
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('checkbox', { name: /T-11/ }))
+  fireEvent.change(screen.getByLabelText('거래 제외 사유'), { target: { value: '범위 밖' } })
+  fireEvent.click(screen.getByRole('button', { name: '선택 거래 제외' }))
+  await waitFor(() => expect(submitReviewCommand).toHaveBeenCalledWith(expect.objectContaining({ action: 'EXCLUDE', selections: [{ caseId: 1, revision: 1001, groupId: 4, txIds: [11] }] }), expect.any(String)))
+})
+
 const open = async () => {
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   fireEvent.change(await screen.findByLabelText('변경 사유'), { target: { value: '검토 완료' } })

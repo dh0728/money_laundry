@@ -49,11 +49,12 @@ export type ReviewCase = {
   sourceAlertIds: number[]
   primaryTypes: string[]
   groups?: ReviewGroup[]
+  detachments?: { eventId: number; action: 'UNLINK' | 'DISSOLVE'; comment: string; businessAt: string; snapshot: { selectedAlertIds?: number[]; removedAlertIds?: number[]; episodeCaseId?: number; groups: ReviewGroup[] } }[]
   history?: { eventId: number; action: string; comment: string; businessAt: string; recordedAt: string; actor: string | null }[]
 }
 export type ReviewQuery = { kind: ReviewKind; assigneeId?: number; status?: ReviewStatus; from?: string; to?: string; page?: number; size?: number }
 export type ReviewSelection = { caseId: number; revision: number; groupId: number; txIds: number[] }
-export type ReviewAction = 'SUBJECT' | 'CONTEXT' | 'EXCLUDE' | 'DECIDE' | 'TRANSFER' | 'RECONSIDER' | 'COMMENT' | 'REVIEW_START' | 'CLOSE'
+export type ReviewAction = 'SUBJECT' | 'CONTEXT' | 'EXCLUDE' | 'DECIDE' | 'TRANSFER' | 'UNLINK' | 'RECONSIDER' | 'COMMENT' | 'REVIEW_START' | 'CLOSE'
 export type ReviewCommand = { action: ReviewAction; selections: ReviewSelection[]; decision?: 'NORMAL' | 'SUSPICIOUS' | null; targetCaseId?: number | null; targetRevision?: number | null; targetGroupId?: number | null; comment: string }
 export type ReviewMoney = {
   available: boolean
@@ -83,4 +84,5 @@ export const fetchReviewCase = (caseId: number) => getJson<ReviewCase>(`/api/v1/
 export const fetchReviewMoney = (caseId: number, minutes = 180) => getJson<ReviewMoney>(`/api/v1/review/cases/${caseId}/money`, { minutes })
 export const setReviewMoneyScope = (caseId: number, revision: number, accounts: string[], comment: string, requestId: string) =>
   postJson<{ caseId: number; revision: number }>(`/api/v1/review/cases/${caseId}/money-scope`, { requestId, revision, accounts, comment })
-export const submitReviewCommand = (command: ReviewCommand, requestId: string = crypto.randomUUID()) => postJson<{ caseIds: number[]; targetCaseId: number | null }>('/api/v1/review/commands', { requestId, targetCaseId: null, targetRevision: null, targetGroupId: null, decision: null, ...command })
+export type ReviewCommandResult = { caseIds: number[]; targetCaseId: number | null; dissolved?: boolean; reopenedCaseIds?: number[] }
+export const submitReviewCommand = (command: ReviewCommand, requestId: string = crypto.randomUUID()) => postJson<ReviewCommandResult>('/api/v1/review/commands', { requestId, targetCaseId: null, targetRevision: null, targetGroupId: null, decision: null, ...command })

@@ -6,6 +6,7 @@ const seoulMinute = (iso: string) => new Date(iso).toLocaleString('sv-SE', { tim
 export function toReviewGraphModel(item: ReviewCase): GraphModel {
   const members = new Map<number, ReviewMember>()
   for (const group of item.groups ?? []) for (const member of group.members) {
+    if (member.state === 'EXCLUDED' || member.state === 'TRANSFERRED') continue
     const previous = members.get(member.txId)
     if (!previous || (!previous.decision && member.decision)) members.set(member.txId, member)
   }

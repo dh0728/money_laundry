@@ -348,3 +348,13 @@ users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·
 - Episode의 각 review_group은 원본 Alert의 편입 당시 전체 거래·역할·판정 스냅샷이다. 다른 Alert와 공유하는 거래도 출처별로 보존하고 조회 집계에서 중복 제거한다. 이동·분할 API는 차단한다.
 - 전체 편입은 원본 Alert 사건의 CLOSED/TRANSFERRED 및 alerts.ESCALATED와 원자 저장된다. 원본 거래 목록을 제거하지 않는다. 단독 정상/의심 종결은 CLOSE+decision으로 한 번에 처리하고 기존 범위 판정 스냅샷을 감사에 보존한다.
 - **테스트 데이터 초기화 승인에 따른 비가역 마이그레이션:** review_requests 및 기존 review_cases(그룹·이벤트 cascade)를 삭제하고 alerts를 OPEN/null로 되돌려 조사 사건을 재생성한다. 기존 조사 이력은 복원되지 않는다. 사용자·해시·거래·보고·분석·Alert 근거·업로드 파일은 삭제하지 않는다. case_id 시퀀스는 되감지 않는다.
+
+
+## V13 — Episode 연결 해제·해체 이력
+
+- 기존 데이터 초기화 없이 review_cases.outcome에 DISSOLVED를 추가한다. DISSOLVED는 CLOSED EPISODE에만 허용한다.
+- 지연 소속 제약: 일반 Episode는 종결 여부와 관계없이 Alert 2개 이상, DISSOLVED Episode는 소속 0개만 허용한다. 1개짜리 Episode는 저장할 수 없다.
+- UNLINK는 해제 후 남은 소속이 2개 미만이면 전체 해제한다. 해제 review_groups 삭제 시 episode_alerts는 FK cascade로 함께 제거한다. 제거 전 그룹·거래·판정·Alert ID·사용자 사유는 review_events의 UNLINK/DISSOLVE snapshot에 보존한다. review_cases와 과거 사건 이벤트는 삭제하지 않는다.
+- 원본 Alert 조사 사건은 원래 담당자/assigned_at 및 자체 거래 제외·판정을 보존하고 OPEN/outcome null/closed_at null/closed_by null로 복원한다. alerts 상태도 OPEN/resolution null로 복원한다. Episode의 판정은 원본 Alert로 전파하지 않는다.
+- 해체된 사건의 현재 그룹/소속은 비어 있다. 이력 snapshot은 현재 소속 조회에 사용하지 않으며, 해제된 Alert는 다른 Episode에 편입할 수 있다.
+- 사건 변경·모든 Alert 복원·사유 이력·revision·멱등 응답을 기존 advisory lock 아래 한 트랜잭션으로 처리한다. 원장·모델 결과·업로드 파일은 변경하지 않는다.

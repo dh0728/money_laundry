@@ -31,3 +31,16 @@ export const episodeGroupSelection = (item: ReviewCase, group: ReviewGroup): Rev
   caseId: item.caseId, revision: item.revision, groupId: group.groupId,
   txIds: group.members.filter(member => member.reviewRole === 'SUBJECT' && member.state === 'PENDING').map(member => member.txId),
 })
+
+export function buildEpisodeUnlink(item: ReviewCase, groupIds: number[], comment: string): ReviewCommand {
+  if (item.kind !== 'EPISODE' || item.status !== 'OPEN') throw new Error('진행 중 Episode만 연결 해제할 수 있습니다.')
+  if (!groupIds.length || new Set(groupIds).size !== groupIds.length
+      || groupIds.some(id => !item.groups?.some(group => group.groupId === id && group.sourceAlertId != null))) {
+    throw new Error('연결 해제할 Alert를 선택해 주세요.')
+  }
+  if (!comment.trim() || comment.trim().length > 4000) throw new Error('연결 해제 사유를 1~4,000자로 입력해 주세요.')
+  return {
+    action: 'UNLINK', selections: groupIds.map(groupId => ({ caseId: item.caseId, revision: item.revision, groupId, txIds: [] })),
+    targetCaseId: null, targetRevision: null, targetGroupId: null, decision: null, comment: comment.trim(),
+  }
+}

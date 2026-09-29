@@ -239,12 +239,19 @@ public class ReviewService {
         for (var source : rows(m.get("sources")))
           if (source.get("primaryType") != null) types.add(source.get("primaryType").toString());
     out.put("primaryTypes", types);
-    if (includeHistory)
+    if (includeHistory) {
       out.put(
           "history",
           jdbc.queryForList(
               "select e.event_id as \"eventId\",e.action,e.comment,e.business_at as \"businessAt\",e.recorded_at as \"recordedAt\",u.name as actor from review_events e left join users u on u.user_id=e.actor_id where case_id=? order by event_id desc",
               id));
+      var detachments =
+          jdbc.queryForList(
+              "select event_id as \"eventId\",action,comment,business_at as \"businessAt\",snapshot::text as snapshot from review_events where case_id=? and action in ('UNLINK','DISSOLVE') order by event_id desc",
+              id);
+      for (var entry : detachments) entry.put("snapshot", object(entry.get("snapshot")));
+      out.put("detachments", detachments);
+    }
     if (includeHistory && !members.isEmpty()) {
       var ids = members.stream().map(m -> number(m.get("txId"))).distinct().toList();
       var args = new ArrayList<Object>(ids);
@@ -487,6 +494,7 @@ public class ReviewService {
           }
 
           if ("TRANSFER".equals(cmd.action())) return transferWholeAlerts(user, cmd, cases, loaded);
+          if ("UNLINK".equals(cmd.action())) return unlinkAlerts(user, cmd, cases, loaded);
           if (Set.of("MOVE", "SPLIT").contains(cmd.action()))
             throw ApiException.invalidTransition("Alert를 분할하거나 다른 Episode로 부분 이동할 수 없습니다.");
           Long target = null;
@@ -531,7 +539,8 @@ public class ReviewService {
                     .anyMatch(
                         m ->
                             !"PENDING".equals(m.get("state"))
-                                && !("RECONSIDER".equals(cmd.action())
+                                && !(("RECONSIDER".equals(cmd.action())
+                                        || (!episode && "EXCLUDE".equals(cmd.action())))
                                     && "DECIDED".equals(m.get("state")))))
               throw ApiException.invalidTransition("선택 범위에 이미 처리된 거래가 있습니다.");
             if ("DECIDE".equals(cmd.action())) {
@@ -562,9 +571,10 @@ public class ReviewService {
                   m.put("decision", null);
                 }
               g.put("decision", null);
-            } else if ("EXCLUDE".equals(cmd.action()))
+            } else if ("EXCLUDE".equals(cmd.action())) {
+              event(sel.caseId(), user, "BEFORE_EXCLUDE", cmd.comment(), gs);
               selected.forEach(m -> m.put("state", "EXCLUDED"));
-            else if ("SUBJECT".equals(cmd.action()) || "CONTEXT".equals(cmd.action()))
+            } else if ("SUBJECT".equals(cmd.action()) || "CONTEXT".equals(cmd.action()))
               selected.forEach(m -> m.put("reviewRole", cmd.action()));
             else throw AnalysisService.invalid();
           }
@@ -598,6 +608,111 @@ public class ReviewService {
               encode(response));
           return response;
         });
+  }
+
+  private Map<String, Object> unlinkAlerts(
+      long user,
+      Command cmd,
+      Map<Long, Map<String, Object>> cases,
+      Map<Long, List<Map<String, Object>>> loaded) {
+    if (cases.size() != 1
+        || cmd.targetCaseId() != null
+        || cmd.targetRevision() != null
+        || cmd.targetGroupId() != null
+        || cmd.decision() != null) throw AnalysisService.invalid();
+    var c = cases.values().iterator().next();
+    if (!"EPISODE".equals(c.get("kind"))) throw AnalysisService.invalid();
+    long id = number(c.get("case_id"));
+    var current = loaded.get(id);
+    var selectedGroups = new HashSet<Long>();
+    for (var selection : cmd.selections()) {
+      if (selection.txIds() == null
+          || !selection.txIds().isEmpty()
+          || !selectedGroups.add(selection.groupId())
+          || current.stream()
+              .noneMatch(
+                  g ->
+                      number(g.get("groupId")) == selection.groupId()
+                          && g.get("sourceAlertId") != null)) throw AnalysisService.invalid();
+    }
+    boolean dissolve = current.size() - selectedGroups.size() < 2;
+    var removed =
+        current.stream()
+            .filter(g -> dissolve || selectedGroups.contains(number(g.get("groupId"))))
+            .toList();
+    var selectedAlerts =
+        current.stream()
+            .filter(g -> selectedGroups.contains(number(g.get("groupId"))))
+            .map(g -> number(g.get("sourceAlertId")))
+            .toList();
+    var removedAlerts = removed.stream().map(g -> number(g.get("sourceAlertId"))).toList();
+    var reopened = new ArrayList<Long>();
+    // Snapshot before deleting active groups. Past decisions remain in review_events,
+    // and are never copied over the source Alert's own investigation decisions.
+    var snapshot =
+        Map.of(
+            "selectedAlertIds",
+            selectedAlerts,
+            "removedAlertIds",
+            removedAlerts,
+            "groups",
+            removed);
+    if (dissolve) {
+      event(
+          id,
+          user,
+          "MONEY_SNAPSHOT",
+          "Episode 해체 시점 자금 관측 지표",
+          new MoneyQuery(jdbc, time).read(detail(id), moneyScope(id), 180));
+    }
+    event(id, user, dissolve ? "DISSOLVE" : "UNLINK", cmd.comment(), snapshot);
+    for (var group : removed) {
+      long alertId = number(group.get("sourceAlertId"));
+      long source =
+          jdbc.queryForObject(
+              "select case_id from review_cases where alert_id=?", Long.class, alertId);
+      var sourceCase = caseRow(source);
+      if (!"CLOSED".equals(sourceCase.get("status"))
+          || !"TRANSFERRED".equals(sourceCase.get("outcome")))
+        throw ApiException.invalidTransition("원본 Alert 상태가 변경됐습니다. 다시 조회하세요.");
+      jdbc.update(
+          "delete from review_groups where group_id=? and case_id=?", group.get("groupId"), id);
+      jdbc.update(
+          "update review_cases set status='OPEN',outcome=null,closed_at=null,closed_by=null,revision=revision+1 where case_id=?",
+          source);
+      jdbc.update("update alerts set status='OPEN',resolution=null where alert_id=?", alertId);
+      event(
+          source,
+          user,
+          "UNLINK",
+          cmd.comment(),
+          Map.of("episodeCaseId", id, "dissolved", dissolve, "groups", List.of(group)));
+      reopened.add(source);
+    }
+    if (dissolve) {
+      jdbc.update(
+          "update review_cases set status='CLOSED',outcome='DISSOLVED',closed_at=?,closed_by=?,revision=revision+1 where case_id=?",
+          Timestamp.from(time.now()),
+          user,
+          id);
+    } else {
+      jdbc.update("update review_cases set revision=revision+1 where case_id=?", id);
+    }
+    var affected = new ArrayList<Long>();
+    affected.add(id);
+    affected.addAll(reopened);
+    var response = new LinkedHashMap<String, Object>();
+    response.put("caseIds", affected);
+    response.put("targetCaseId", null);
+    response.put("dissolved", dissolve);
+    response.put("reopenedCaseIds", reopened);
+    jdbc.update(
+        "insert into review_requests values(?,?,?::jsonb,?::jsonb)",
+        user,
+        cmd.requestId(),
+        encode(cmd),
+        encode(response));
+    return response;
   }
 
   private Map<String, Object> transferWholeAlerts(

@@ -148,6 +148,219 @@ class ReviewWorkflowTests {
   }
 
   @Test
+  void unlink_from_two_alerts_dissolves_and_preserves_history_and_source_decisions() {
+    long a = alert(l1), b = alert(l1);
+    act(l1, "DECIDE", "NORMAL", select(a, 1));
+    long ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    var before = service.detail(ep);
+    var gs = rows(before.get("groups"));
+    var cmd =
+        new ReviewService.Command(
+            UUID.randomUUID(),
+            "UNLINK",
+            List.of(
+                new ReviewService.Selection(
+                    ep,
+                    number(before.get("revision")),
+                    number(gs.getFirst().get("groupId")),
+                    List.of())),
+            null,
+            null,
+            null,
+            null,
+            "서로 관련 없는 자금 흐름");
+    var result = service.command(l2, cmd);
+    assertThat(result.get("dissolved")).isEqualTo(true);
+    assertThat(result.get("reopenedCaseIds")).isEqualTo(List.of(a, b));
+    var after = service.detail(ep);
+    assertThat(after.get("status")).isEqualTo("CLOSED");
+    assertThat(after.get("outcome")).isEqualTo("DISSOLVED");
+    assertThat(rows(after.get("groups"))).isEmpty();
+    assertThat((Collection<?>) after.get("sourceAlertIds")).isEmpty();
+    var history = rows(after.get("detachments")).getFirst();
+    assertThat(history.get("comment")).isEqualTo("서로 관련 없는 자금 흐름");
+    assertThat(rows(object(history.get("snapshot")).get("groups"))).hasSize(2);
+    for (long source : List.of(a, b)) {
+      var detail = service.detail(source);
+      assertThat(detail.get("status")).isEqualTo("OPEN");
+      assertThat(detail.get("outcome")).isNull();
+      assertThat(detail.get("episodeId")).isNull();
+      assertThat(number(detail.get("assigneeId"))).isEqualTo(l1);
+      assertThat(detail.get("closedAt")).isNull();
+    }
+    assertThat(
+            rows(rows(service.detail(a).get("groups")).getFirst().get("members"))
+                .getFirst()
+                .get("decision"))
+        .isEqualTo("NORMAL");
+    service.command(l2, cmd);
+    assertThat(rows(service.detail(ep).get("detachments"))).hasSize(1);
+    assertThatThrownBy(
+            () ->
+                act(
+                    l2,
+                    "COMMENT",
+                    null,
+                    new ReviewService.Selection(ep, number(after.get("revision")), 0, List.of())))
+        .isInstanceOf(ApiException.class);
+    // Reopened Alerts can join another Episode; the dissolved case retains its history.
+    long next = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    assertThat(next).isNotEqualTo(ep);
+    assertThat(service.detail(a).get("episodeId")).isEqualTo(next);
+    assertThat(rows(service.detail(ep).get("detachments"))).hasSize(1);
+  }
+
+  @Test
+  void unlink_from_three_keeps_two_and_does_not_leak_removed_membership() {
+    long a = alert(l1), b = alert(l1), c = alert(l1);
+    long ep =
+        number(act(l1, "TRANSFER", null, select(a), select(b), select(c)).get("targetCaseId"));
+    var before = service.detail(ep);
+    var group = rows(before.get("groups")).getFirst();
+    var result =
+        act(
+            l2,
+            "UNLINK",
+            null,
+            new ReviewService.Selection(
+                ep, number(before.get("revision")), number(group.get("groupId")), List.of()));
+    assertThat(result.get("dissolved")).isEqualTo(false);
+    assertThat(service.detail(ep).get("status")).isEqualTo("OPEN");
+    assertThat(rows(service.detail(ep).get("groups"))).hasSize(2);
+    assertThat(service.detail(a).get("episodeId")).isNull();
+    assertThat(service.detail(b).get("episodeId")).isEqualTo(ep);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from episode_alerts where episode_case_id=?", Integer.class, ep))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void unlink_checks_owner_revision_reason_and_whole_group_before_writing() {
+    long ep =
+        number(act(l1, "TRANSFER", null, select(alert(l1)), select(alert(l1))).get("targetCaseId"));
+    var selection = select(ep);
+    assertThatThrownBy(() -> act(other, "UNLINK", null, selection))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(
+            () ->
+                service.command(
+                    l2,
+                    new ReviewService.Command(
+                        UUID.randomUUID(),
+                        "UNLINK",
+                        List.of(selection),
+                        null,
+                        null,
+                        null,
+                        null,
+                        " ")))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> act(l2, "UNLINK", null, select(ep, 1)))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> act(l2, "UNLINK", null, selection, selection))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(
+            () ->
+                act(
+                    l2,
+                    "UNLINK",
+                    null,
+                    selection,
+                    new ReviewService.Selection(ep, selection.revision(), -1, List.of())))
+        .isInstanceOf(ApiException.class);
+    act(l2, "COMMENT", null, selection);
+    assertThatThrownBy(() -> act(l2, "UNLINK", null, selection)).isInstanceOf(ApiException.class);
+    assertThat(rows(service.detail(ep).get("groups"))).hasSize(2);
+    assertThat(rows(service.detail(ep).get("detachments"))).isEmpty();
+  }
+
+  @Test
+  void unlink_rolls_back_all_restorations_when_a_source_is_inconsistent() {
+    long a = alert(l1), b = alert(l1);
+    long ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    jdbc.update("update review_cases set outcome='NORMAL' where case_id=?", b);
+    assertThatThrownBy(() -> act(l2, "UNLINK", null, select(ep))).isInstanceOf(ApiException.class);
+    assertThat(service.detail(a).get("status")).isEqualTo("CLOSED");
+    assertThat(rows(service.detail(ep).get("groups"))).hasSize(2);
+    assertThat(rows(service.detail(ep).get("detachments"))).isEmpty();
+  }
+
+  @Test
+  void exclude_decided_and_context_transactions_keeps_evidence_and_audit() {
+    long a = alert(l1);
+    act(l1, "DECIDE", "NORMAL", select(a, 1));
+    act(l1, "EXCLUDE", null, select(a, 1, 3));
+    var detail = service.detail(a);
+    assertThat(object(detail.get("summary")).get("txCount")).isEqualTo(1);
+    var members = rows(rows(detail.get("groups")).getFirst().get("members"));
+    assertThat(members.getFirst().get("state")).isEqualTo("EXCLUDED");
+    assertThat(members.get(2).get("state")).isEqualTo("EXCLUDED");
+    assertThat(
+            jdbc.queryForObject(
+                "select snapshot->0->'members'->0->>'decision' from review_events where case_id=? and action='BEFORE_EXCLUDE'",
+                String.class,
+                a))
+        .isEqualTo("NORMAL");
+    assertThat(rows(evidence.detail(number(detail.get("alertId")), null).get("transactions")))
+        .hasSize(3);
+  }
+
+  @Test
+  void dissolved_episode_must_be_closed_and_empty() {
+    long a = alert(l1);
+    assertThatThrownBy(
+            () -> jdbc.update("update review_cases set outcome='DISSOLVED' where case_id=?", a))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    long ep = number(act(l1, "TRANSFER", null, select(a), select(alert(l1))).get("targetCaseId"));
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "update review_cases set status='CLOSED',outcome='DISSOLVED',closed_at=now() where case_id=?",
+                    ep))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    assertThat(service.detail(ep).get("status")).isEqualTo("OPEN");
+  }
+
+  @Test
+  void concurrent_unlinks_only_one_revision_wins() throws Exception {
+    long ep =
+        number(
+            act(l1, "TRANSFER", null, select(alert(l1)), select(alert(l1)), select(alert(l1)))
+                .get("targetCaseId"));
+    var detail = service.detail(ep);
+    var groups = rows(detail.get("groups"));
+    var start = new java.util.concurrent.CountDownLatch(1);
+    try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var results = new ArrayList<java.util.concurrent.Future<Boolean>>();
+      for (int index = 0; index < 2; index++) {
+        var selection =
+            new ReviewService.Selection(
+                ep,
+                number(detail.get("revision")),
+                number(groups.get(index).get("groupId")),
+                List.of());
+        results.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  try {
+                    act(l2, "UNLINK", null, selection);
+                    return true;
+                  } catch (ApiException conflict) {
+                    return false;
+                  }
+                }));
+      }
+      start.countDown();
+      assertThat(List.of(results.get(0).get(), results.get(1).get()))
+          .containsExactlyInAnyOrder(true, false);
+    }
+    assertThat(rows(service.detail(ep).get("groups"))).hasSize(2);
+    assertThat(rows(service.detail(ep).get("detachments"))).hasSize(1);
+  }
+
+  @Test
   void standalone_alert_can_close_suspicious_without_creating_episode() {
     long id = alert(l1);
     act(l1, "DECIDE", "SUSPICIOUS", select(id, 1, 2));
@@ -751,7 +964,15 @@ class ReviewWorkflowTests {
       assertThat(List.of(a.get(), b.get())).containsExactlyInAnyOrder(true, false);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from review_events where case_id=?", Integer.class, id))
+                  "select count(*) from review_events where case_id=? and action='EXCLUDE'",
+                  Integer.class,
+                  id))
+          .isEqualTo(1);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from review_events where case_id=? and action='BEFORE_EXCLUDE'",
+                  Integer.class,
+                  id))
           .isEqualTo(1);
     }
   }
