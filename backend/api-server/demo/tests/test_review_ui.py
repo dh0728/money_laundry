@@ -114,6 +114,14 @@ class ReviewScreens(unittest.TestCase):
             payload = post.call_args.args[1]
             self.assertEqual(payload['action'], 'DECIDE')
             self.assertEqual(payload['selections'][0]['txIds'], [10])
+            post.reset_mock()
+            next(s for s in app.selectbox if s.label == '처리 선택').set_value('단독 세탁 의심 종결').run()
+            next(b for b in app.button if b.label == '처리 저장').click().run()
+            self.assertFalse(app.exception)
+            post.assert_called_once()
+            self.assertEqual(post.call_args.args[1]['action'], 'CLOSE')
+            self.assertEqual(post.call_args.args[1]['decision'], 'SUSPICIOUS')
+            self.assertEqual(post.call_args.args[1]['selections'][0]['txIds'], [])
 
 
 if __name__ == '__main__':
