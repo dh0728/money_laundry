@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from api_client import ApiError
+from api_client import ApiClient, ApiError
 from control_panel import Controls, Replay
 from operator_session import AdminClient, cloudflare_headers
 import dev_control
@@ -19,6 +19,30 @@ import operator_session
 
 
 class DevControlTests(unittest.TestCase):
+    def test_clock_conflict_shows_known_cause_only(self):
+        reasons = {
+            '시연 시각이 변경됐습니다. 다시 조회하세요.': '다른 요청',
+            '진행 중 또는 복구가 필요한 작업이 있습니다.': '실패한 분석',
+            '과거로 이동하려면 시연 데이터를 초기화하세요.': '과거로 이동',
+            '기존 분석 시연은 초기화 후 업무 시각을 설정하세요.': '최초 설정',
+        }
+        for detail, expected in reasons.items():
+            with self.subTest(detail=detail):
+                client = ApiClient('https://dev.example', transport=httpx.MockTransport(
+                    lambda _: httpx.Response(409, json={'code': 'INVALID_TRANSITION', 'detail': detail})))
+                with self.assertRaisesRegex(ApiError, expected):
+                    client.post('demo/clock', {'businessAt': '2023-09-01T09:00:00+09:00', 'revision': 1})
+
+    def test_clock_unknown_response_remains_redacted(self):
+        for problem in [{'code': 'INVALID_TRANSITION', 'detail': 'secret-url'},
+                        {'code': 'INVALID_TRANSITION', 'detail': ['secret-url']}, ['secret-url']]:
+            client = ApiClient('https://dev.example', transport=httpx.MockTransport(
+                lambda _: httpx.Response(409, json=problem)))
+            with self.assertRaises(ApiError) as error:
+                client.post('demo/clock', {})
+            self.assertNotIn('secret-url', str(error.exception))
+            self.assertEqual(error.exception.status, 409)
+
     def client(self, responses, *, role='ADMIN', me_status=401, cf_headers=None):
         seen = []
         replies = iter(responses)

@@ -12,6 +12,28 @@ class ApiError(Exception):
         self.status = status
 
 
+def clock_conflict(response):
+    """Expose only known clock errors, never arbitrary server response text."""
+    try:
+        problem = response.json()
+    except ValueError:
+        return None
+    if not isinstance(problem, dict) or problem.get('code') != 'INVALID_TRANSITION':
+        return None
+    messages = {
+        '시연 시각이 변경됐습니다. 다시 조회하세요.':
+            '다른 요청에서 업무 시각을 변경했습니다. 화면을 새로고침한 뒤 다시 적용하세요.',
+        '진행 중 또는 복구가 필요한 작업이 있습니다.':
+            '진행 중·예약·재시도 대기 작업 또는 실패한 분석 작업이 있어 업무 시각을 변경할 수 없습니다. 분석 작업 상태를 확인하세요.',
+        '과거로 이동하려면 시연 데이터를 초기화하세요.':
+            '이미 설정된 업무 시각보다 과거로 이동할 수 없습니다. 현재 시각을 확인하세요. 과거부터 다시 시연하려면 별도의 데이터 초기화가 필요합니다.',
+        '기존 분석 시연은 초기화 후 업무 시각을 설정하세요.':
+            '업무 시각을 최초 설정하기 전에 생성된 분석 이력이 있어 변경이 차단됐습니다. 기존 데이터 확인 후 시연 초기화 여부를 결정해야 합니다.',
+    }
+    detail = problem.get('detail')
+    return messages.get(detail) if isinstance(detail, str) else None
+
+
 class ApiClient:
     def __init__(self, base_url, headers=None, transport=None):
         url = urlsplit(base_url)
@@ -69,7 +91,8 @@ class ApiClient:
             if response.status_code not in (200, 201, 202):
                 messages = {400: '선택 범위와 입력을 확인하세요.', 403: '담당자 또는 실행 환경 권한이 없습니다.',
                             404: '대상이 없습니다.', 409: '상태가 변경됐거나 처리 조건이 충족되지 않았습니다. 새로 조회하세요.'}
-                raise ApiError(messages.get(response.status_code, '요청이 처리되지 않았습니다.')
+                specific = clock_conflict(response) if path == 'demo/clock' and response.status_code == 409 else None
+                raise ApiError((specific or messages.get(response.status_code, '요청이 처리되지 않았습니다.'))
                                + f' (HTTP {response.status_code})', response.status_code)
             return response.json()
         except httpx.HTTPError:
