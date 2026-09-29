@@ -33,13 +33,15 @@ function NotificationColumn({ label, items, order, onOrder, onOpen, read, onTogg
           <span className={`size-2.5 rounded-full ${read ? 'bg-muted-foreground/40' : 'bg-destructive'}`} aria-hidden />
         </Button>
         <button type="button" className="min-w-0 flex-1 text-left" aria-label={`${item.code} 알림 열기`} onClick={() => onOpen(item)}>
-          <p className="truncate text-sm font-semibold">{item.title}</p>
+          <span className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-semibold">{item.title}</span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {item.ageDays !== undefined && <AgeBadge days={item.ageDays} />}
+              {item.riskScore !== undefined && <RiskBadge score={item.riskScore} />}
+            </span>
+          </span>
           <p className="mt-1.5 text-xs text-muted-foreground">{item.description}</p>
-          {item.patternCode !== undefined && <span className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <PatternBadge code={item.patternCode} />
-            {item.ageDays !== undefined && <AgeBadge days={item.ageDays} />}
-            {item.riskScore !== undefined && <RiskBadge score={item.riskScore} />}
-          </span>}
+          {item.patternCode !== undefined && <span className="mt-2.5 flex flex-wrap items-center gap-1.5"><PatternBadge code={item.patternCode} /></span>}
           <p className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground"><span className="font-mono">{item.code}</span><span>{item.at.slice(0, 10)}</span></p>
         </button>
       </article>)}</div>}

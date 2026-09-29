@@ -13,18 +13,22 @@ describe('Alert 개요의 패턴 후보', () => {
 
     expect(screen.getByText('선택 거래의 모델 점수이며 Alert 전체 확률이 아닙니다.')).toBeInTheDocument()
     const candidates = within(screen.getByRole('list', { name: '거래 패턴 후보' }))
+    expect(screen.getByTestId('grouping')).not.toContainElement(candidates.getAllByRole('listitem')[0])
+    expect(screen.getByTestId('pattern-candidates')).toContainElement(candidates.getAllByRole('listitem')[0])
     expect(candidates.getAllByRole('listitem').map(item => item.textContent)).toEqual([
-      '1. 패턴 없는 이상거래60.0%', '2. 뿌려서 모으기28.0%', '3. 무작위 경로12.0%',
+      '1.NON_PATTERN60.0%', '2.SCATTER-GATHER28.0%', '3.RANDOM12.0%',
     ])
+    expect(candidates.getAllByText(/NON_PATTERN|SCATTER-GATHER|RANDOM/).every(badge => badge.classList.contains('semantic-pattern-badge'))).toBe(true)
 
     fireEvent.change(screen.getByRole('combobox', { name: '확률을 볼 거래' }), { target: { value: detail.transactions[1].txId } })
     expect(candidates.getAllByRole('listitem').map(item => item.textContent)).toEqual([
-      '1. 패턴 없는 이상거래70.0%', '2. 뿌려서 모으기21.0%', '3. 무작위 경로9.0%',
+      '1.NON_PATTERN70.0%', '2.SCATTER-GATHER21.0%', '3.RANDOM9.0%',
     ])
 
     rerender(<AlertDetail alert={{ ...detail, transactions: detail.transactions.map(row => ({ ...row, typeProbabilities: undefined })) }}
       graph={graph} relabels={{}} onRelabel={() => {}} history={history} responsible episodes={[]}
       onOpenEpisode={() => {}} onSubmit={() => {}} />)
+    expect(screen.getByTestId('pattern-candidates')).toHaveTextContent('표시할 거래별 패턴 후보가 없습니다.')
     expect(screen.queryByRole('list', { name: '거래 패턴 후보' })).not.toBeInTheDocument()
   })
 })

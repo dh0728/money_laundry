@@ -5,6 +5,8 @@ import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { PageHeading } from '@/components/page'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { RadarSweep } from '@/features/agent/RadarSweep'
+import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
 import { useAsync } from '@/lib/useAsync'
 
 const count = (n: number) => n.toLocaleString('ko-KR')
@@ -20,13 +22,13 @@ function LiveAiDailyReport({ data }: { data: LiveDashboard }) {
   const yesterday = data.institution.yesterday
   const change = yesterday > 0 ? today === yesterday ? ' · 전일과 동일' : ` · ${Math.abs((today - yesterday) / yesterday * 100).toFixed(1)}% ${today > yesterday ? '증가' : '감소'}` : ''
   const first = data.priority[0]
-  return <section data-testid="ai-daily-report" aria-label="AI Daily Report" className="rounded-xl border bg-card p-5">
-    <div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">AI Daily Report</h2><Badge variant="outline" className="provenance-badge font-normal" data-provenance="mock">mock · LLM 미연동</Badge></div>
-    <p className="mt-1 text-xs text-muted-foreground">수치는 서버 집계, 문장은 규칙형 시연입니다. AI 분석 결과나 세탁 확정 판정이 아닙니다.</p>
+  return <section data-testid="ai-daily-report" aria-label="RDR 9000 Daily Report" className="rounded-xl border bg-card p-5" style={rdrSummaryBackground}>
+    <div className="flex flex-wrap items-center gap-2"><RadarSweep className="size-5 shrink-0" /><h2 className="font-semibold">RDR 9000 Daily Report</h2><Badge variant="outline" className="provenance-badge font-normal" data-provenance="mock">mock · LLM 미연동</Badge></div>
+    <p className="mt-1 text-xs text-muted-foreground">수치는 서버 집계, 문장은 규칙 기반 시연. AI 분석 결과나 자금세탁 확정 판정 아님.</p>
     <div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
       <div><h3 className="text-xs font-medium">오늘의 변화</h3><p className="mt-2 text-muted-foreground">오늘 신규 Alert {count(today)}건 · 전일 {count(yesterday)}건{change}{yesterday === 0 && ' · 전일 0건으로 증감률 산출 불가'}</p></div>
-      <div><h3 className="text-xs font-medium">탐지 상태</h3><p className="mt-2 text-muted-foreground">{data.pendingReports > 0 ? `미완료 보고 ${count(data.pendingReports)}건으로 오늘 탐지율 확정 전입니다.` : data.detection.received > 0 ? `오늘 대상 원장 ${count(data.detection.received)}건 중 모델 의심 ${count(data.detection.suspicious)}건입니다.` : '오늘 대상 원장 거래가 없어 탐지율을 산출할 수 없습니다.'}</p></div>
-      <div><h3 className="text-xs font-medium">내 우선 검토</h3><p className="mt-2 text-muted-foreground">{first ? `${first.kind === 'ALERT' ? `Alert A-${first.alert_id ?? first.case_id}` : `Episode E-${first.case_id}`} · 위험 점수 ${first.risk.toFixed(2)}` : '우선 검토 사건이 없습니다.'}</p></div>
+      <div><h3 className="text-xs font-medium">탐지 상태</h3><p className="mt-2 text-muted-foreground">{data.pendingReports > 0 ? `미완료 보고 ${count(data.pendingReports)}건 · 오늘 탐지율 확정 전.` : data.detection.received > 0 ? `오늘 대상 원장 ${count(data.detection.received)}건 중 모델 의심 ${count(data.detection.suspicious)}건 확인됨.` : '오늘 대상 원장 거래 없음 · 탐지율 산출 불가.'}</p></div>
+      <div><h3 className="text-xs font-medium">내 우선 검토</h3><p className="mt-2 text-muted-foreground">{first ? `${first.kind === 'ALERT' ? `Alert A-${first.alert_id ?? first.case_id}` : `Episode E-${first.case_id}`} · 위험 점수 ${first.risk.toFixed(2)}` : '우선 검토 사건 없음.'}</p></div>
     </div>
   </section>
 }

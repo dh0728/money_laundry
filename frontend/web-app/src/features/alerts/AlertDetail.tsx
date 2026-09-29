@@ -1,5 +1,6 @@
 // v24 Detail.tsx(kind=Alert)를 옮김. 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/v24).
 import { useMemo, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 import type { AlertDetail as AlertDetailData, HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay, type TypeCode } from '@/api/codes'
@@ -109,17 +110,18 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
             </Panel>
             <Panel title="상위 송금 계좌" description="자금이 어디서 나갔는지"><BarList rows={senders} /></Panel>
           </div>
-          <div className="grid items-stretch gap-4 @3xl:grid-cols-3">
+          <div className="grid items-start gap-4 @3xl:grid-cols-2 @6xl:grid-cols-4 [&>[data-slot=card]]:h-auto [&>[data-slot=card]>[data-slot=card-content]]:h-auto">
             <Panel title="묶음 근거" description="이 거래들이 한 Alert가 된 이유" testId="grouping">
               <ul className="space-y-2 text-xs">
                 {alert.groupingBasis.map(b => <li key={`${b.basis}-${b.value}`} className="flex items-center gap-2"><Badge variant="outline" className="font-normal">{basisLabels[b.basis]}</Badge><span className="min-w-0 truncate">{b.value}</span></li>)}
               </ul>
-              {scoredTx.length > 0 && <div className="mt-5 border-t pt-4">
-                <p className="text-xs font-medium">거래별 패턴 후보 <span className="text-muted-foreground">· mock 예시</span></p>
+            </Panel>
+            <Panel title="거래별 패턴 후보" description="mock 예시" testId="pattern-candidates">
+              {scoredTx.length > 0 ? <>
                 <p className="mt-1 text-xs text-muted-foreground">선택 거래의 모델 점수이며 Alert 전체 확률이 아닙니다.</p>
-                {selectedScoreTx && <select aria-label="확률을 볼 거래" className="mt-2 w-full rounded-md border bg-background p-2 text-xs" value={selectedScoreTx.txId} onChange={event => setScoreTxId(Number(event.target.value))}>{scoredTx.map(row => <option key={row.txId} value={row.txId}>T-{row.txId}{row.role === 'SEED' ? ' · 씨앗 거래' : ''}</option>)}</select>}
-                <ol aria-label="거래 패턴 후보" className="mt-3 space-y-1.5 text-xs">{patternCandidates.map((candidate, index) => <li key={candidate.code} className="flex items-center justify-between gap-2"><span>{index + 1}. {typeDisplay(candidate.code).label}</span><strong className="tabular-nums">{(candidate.score * 100).toFixed(1)}%</strong></li>)}</ol>
-              </div>}
+                {selectedScoreTx && <div className="relative mt-2"><select aria-label="확률을 볼 거래" className="w-full appearance-none rounded-md border bg-background py-2 pl-2 pr-10 text-xs" value={selectedScoreTx.txId} onChange={event => setScoreTxId(Number(event.target.value))}>{scoredTx.map(row => <option key={row.txId} value={row.txId}>T-{row.txId}{row.role === 'SEED' ? ' · 씨앗 거래' : ''}</option>)}</select><ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /></div>}
+                <ol aria-label="거래 패턴 후보" className="mt-3 space-y-1.5 text-xs">{patternCandidates.map((candidate, index) => <li key={candidate.code} className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="w-4 shrink-0 text-muted-foreground">{index + 1}.</span><PatternBadge code={candidate.code} /><strong className="tabular-nums">{(candidate.score * 100).toFixed(1)}%</strong></li>)}</ol>
+              </> : <p className="text-xs text-muted-foreground">표시할 거래별 패턴 후보가 없습니다.</p>}
             </Panel>
             <Panel title="조사 정보">
               <dl className="grid grid-cols-[96px_1fr] gap-y-4 text-xs">

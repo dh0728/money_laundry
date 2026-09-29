@@ -10,6 +10,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
 import { useReviewRequests } from '@/features/episodes/reviewStore'
+import { RadarSweep } from '@/features/agent/RadarSweep'
+import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
 import { fmt } from '@/lib/format'
 import { useAsync } from '@/lib/useAsync'
 import { workStatuses } from '@/lib/workStatus'
@@ -25,17 +27,18 @@ function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
   const focus = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
   const focusCode = focus ? Number(focus[0]) as TypeCode : null
   return (
-    <Card data-testid="personal-ai-summary" className="h-full w-full min-w-0 shadow-none @xl:col-span-2 @5xl:col-span-2">
+    <Card data-testid="personal-ai-summary" className="h-full w-full min-w-0 shadow-none @xl:col-span-2 @5xl:col-span-2" style={rdrSummaryBackground}>
       <CardContent>
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold tracking-tight">AI 요약 · 내 담당</h2>
-          <ProvenanceBadge kind="mock" title="규칙으로 만든 문장입니다. LLM 연결은 발표 뒤 범위입니다." />
+          <RadarSweep className="size-5 shrink-0" />
+          <h2 className="text-base font-semibold tracking-tight">RDR 9000 · 내 담당 요약</h2>
+          <ProvenanceBadge kind="mock" title="규칙 기반 시연 문장. LLM 미연동." />
           <p className="ml-auto text-[11px] text-muted-foreground">판단은 조사자가 수행</p>
         </div>
         <div className="mt-4">
           <p className="text-xs font-medium">집중 패턴</p>
-          {focusCode === null ? <p className="mt-2 text-sm leading-6 text-muted-foreground">처리 전 Alert가 없습니다.</p>
-            : <div className="mt-2 flex flex-wrap items-center gap-2"><PatternBadge code={focusCode} /><p className="text-sm leading-6 text-muted-foreground">처리 전 Alert에서 가장 많은 유형입니다({focus[1]}건). 같은 소유주·계좌가 반복되는지 함께 보세요.</p></div>}
+          {focusCode === null ? <p className="mt-2 text-sm leading-6 text-muted-foreground">처리 전 Alert 없음.</p>
+            : <div className="mt-2 flex flex-wrap items-center gap-2"><PatternBadge code={focusCode} /><p className="text-sm leading-6 text-muted-foreground">처리 전 Alert의 최빈 유형({focus[1]}건). 동일 소유주·계좌의 반복 여부 확인 필요.</p></div>}
         </div>
       </CardContent>
     </Card>

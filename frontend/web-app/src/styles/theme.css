@@ -337,19 +337,23 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .agent-resize-handle:hover, .agent-resize-handle:active { background:var(--border); }
 .agent-resize-handle-x { width:6px; margin-left:-3px; cursor:col-resize; }
 .rdr-glow { filter:drop-shadow(0 0 2px var(--rdr-glow)); }
-.agent-trigger svg { transition:filter var(--motion-fast) var(--ease-ui); }
+.agent-trigger svg { filter:drop-shadow(0 0 0 var(--rdr-glow)); transition:filter var(--motion-fast) var(--ease-ui); }
 .agent-trigger:hover svg, .agent-trigger:focus-visible svg { filter:drop-shadow(0 0 6px var(--rdr-glow)); }
 .rdr-morph { will-change:left,top,width,height; transition:left var(--motion-rdr-morph) var(--ease-emphasized),top var(--motion-rdr-morph) var(--ease-emphasized),width var(--motion-rdr-morph) var(--ease-emphasized),height var(--motion-rdr-morph) var(--ease-emphasized); }
 .rdr-avatar { transition:opacity var(--motion-fast) var(--ease-ui); }
 .agent-panel { transition:opacity var(--motion-panel) var(--ease-ui); }
 @media (prefers-reduced-motion:reduce) { .rdr-morph,.rdr-avatar,.agent-panel { transition:none; } }
 
-/* 설정·계정 격자 — v24 index.css */
-.settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+/* 설정·계정 격자 */
+.theme-segment-thumb { left:4px; width:calc((100% - 8px)/3); transition:transform var(--motion-fast) var(--ease-ui); }
+.theme-segment[data-theme=system] .theme-segment-thumb { transform:translateX(100%); }
+.theme-segment[data-theme=dark] .theme-segment-thumb { transform:translateX(200%); }
+.settings-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+@media (max-width:1100px) { .settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:760px) { .settings-grid { grid-template-columns:1fr; } }
-/* 계정: 가로 화면 3열, 세로 화면 3행 */
+/* 계정: 넓은 가로 화면 3열, 좁은 화면 3행 */
 .account-grid { grid-template-columns:1fr; }
-@media (min-width:1200px) and (orientation:landscape) { .account-grid { grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.25fr); } }
+@media (min-width:1200px) and (orientation:landscape) { .account-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 
 /* 거래 3단 탐색 — v24 index.css */
 .transactions-flow {

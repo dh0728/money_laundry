@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface DataTableProps<TData> extends Omit<React.ComponentProps<"div">, "children"> {
   table: TanstackTable<TData>;
   tableClassName?: string;
+  columnWidths?: Partial<Record<string, string>>;
   topHorizontalScroll?: boolean;
   separatedColumns?: boolean;
   columnGroups?: Partial<Record<string, "sender" | "receiver">>;
@@ -32,6 +33,7 @@ export const syncHorizontalScroll = (source: { scrollLeft: number }, target: { s
 export function DataTable<TData>({
   table,
   tableClassName,
+  columnWidths,
   topHorizontalScroll = false,
   separatedColumns = false,
   columnGroups,
@@ -89,7 +91,7 @@ export function DataTable<TData>({
           containerOnScroll={topHorizontalScroll ? event => syncHorizontalScroll(event.currentTarget, topScrollRef.current) : undefined}
           style={topHorizontalScroll ? { width: tableWidth, minWidth: "100%" } : undefined}
         >
-          {topHorizontalScroll && <colgroup>{table.getVisibleLeafColumns().map(column => <col key={column.id} style={{ width: column.getSize() }} />)}</colgroup>}
+          {(topHorizontalScroll || columnWidths) && <colgroup>{table.getVisibleLeafColumns().map(column => <col key={column.id} style={{ width: columnWidths?.[column.id] ?? (topHorizontalScroll ? column.getSize() : undefined) }} />)}</colgroup>}
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
