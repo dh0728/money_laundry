@@ -59,6 +59,48 @@ class NotificationTests {
   }
 
   @Test
+  void five_alert_transfer_is_one_notification_and_later_transfer_stays_separate() {
+    long episode =
+        jdbc.queryForObject(
+            "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-02T00:00:00Z','2023-09-02T00:00:00Z') returning case_id",
+            Long.class,
+            owner);
+    for (int i = 0; i < 5; i++) {
+      long source = alert(owner);
+      jdbc.update(
+          "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','다섯 건 편입','2023-09-02T00:00:00Z','{}')",
+          source,
+          owner);
+    }
+    long first =
+        jdbc.queryForObject(
+            "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','다섯 건 편입','2023-09-02T00:00:00Z','[]') returning event_id",
+            Long.class,
+            episode,
+            owner);
+    var notifications = rows(service.list(owner, null, null, "편입", 0, 20));
+    assertThat(notifications).hasSize(1);
+    assertThat(notifications.getFirst().get("id")).isEqualTo("event:" + first);
+    assertThat(notifications.getFirst().get("caseId")).isEqualTo(episode);
+    assertThat(rows(service.list(owner, null, null, "Episode 조사가", 0, 20))).isEmpty();
+    service.read(owner, new NotificationService.ReadInput(List.of("event:" + first), true));
+    jdbc.update(
+        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','추가 편입','2023-09-02T00:00:00Z','[]')",
+        episode,
+        owner);
+    var later = service.list(owner, null, null, "편입", 0, 20);
+    assertThat(rows(later)).hasSize(2);
+    assertThat(later.get("unreadCount")).isEqualTo(1L);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from review_events where action='TRANSFER' and actor_id=?",
+                Long.class,
+                owner))
+        .isEqualTo(7L);
+    assertThat(rows(service.list(other, null, null, "편입", 0, 20))).isEmpty();
+  }
+
+  @Test
   void batch_grouping_only_completed_and_current_user_with_real_case_ids() {
     long first = alert(owner), second = alert(owner);
     alert(other);
