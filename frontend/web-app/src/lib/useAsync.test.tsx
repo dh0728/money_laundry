@@ -9,7 +9,8 @@ it('저장 뒤 refresh가 최신 데이터를 표시하고 조회 실패를 호�
   await act(async () => { await result.current.refresh() })
   expect(result.current.state).toEqual({ status: 'success', data: 2 })
   await act(async () => { await expect(result.current.refresh()).rejects.toThrow('offline') })
-  expect(result.current.state.status).toBe('error')
+  expect(result.current.state).toEqual({ status: 'success', data: 2 })
+  expect(result.current.refreshError).toBeTruthy()
 })
 
 it('이전 조회가 늦게 끝나도 refresh 결과를 덮어쓰지 않는다', async () => {

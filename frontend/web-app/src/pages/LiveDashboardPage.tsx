@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
+import { RefreshStatus } from '@/components/RefreshStatus'
 import { typeDisplay, type TypeCode } from '@/api/codes'
 import { fetchDemoClock, fetchLiveDashboard, daysBefore, kstDate, type LiveDashboard } from '@/api/liveDashboard'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
@@ -34,13 +35,11 @@ function LiveAiDailyReport({ data }: { data: LiveDashboard }) {
 }
 
 export default function LiveDashboardPage({ onOpen }: { onOpen: (kind: 'ALERT' | 'EPISODE', id: number) => void }) {
-  const [scope, setScope] = useState<'personal' | 'institution'>('institution')
-  const [range, setRange] = useState<{ from: string; to: string }>()
-  const clock = useAsync(fetchDemoClock, [])
+  const [scope, setScope] = useViewState<'personal' | 'institution'>('dashboard/scope', 'institution')
+  const clock = useAsync(fetchDemoClock, [], { key: 'clock' })
   const businessDate = clock.state.status === 'success' ? kstDate(clock.state.data.businessAt) : ''
-  const from = range?.from ?? (businessDate ? daysBefore(businessDate, 29) : '')
-  const to = range?.to ?? businessDate
-  const dashboard = useAsync(() => from && to ? fetchLiveDashboard(from, to) : Promise.reject(new Error('업무 시각을 확인하지 못했습니다.')), [from, to])
+  const { from, to, setFrom, setTo } = useSharedPeriod({ from: businessDate ? daysBefore(businessDate, 29) : '', to: businessDate })
+  const dashboard = useAsync(() => from && to ? fetchLiveDashboard(from, to) : Promise.reject(new Error('업무 시각을 확인하지 못했습니다.')), [from, to], { key: 'dashboard', enabled: Boolean(from && to) })
 
   if (clock.state.status === 'loading') return <LoadingBlock label="업무 시각" />
   if (clock.state.status === 'error') return <ErrorBlock message={clock.state.message} onRetry={clock.retry} />
@@ -57,14 +56,15 @@ export default function LiveDashboardPage({ onOpen }: { onOpen: (kind: 'ALERT' |
   const maxTypeCount = Math.max(1, ...data.types.map(row => row.count))
 
   return <div className="space-y-6">
+    <RefreshStatus queries={[dashboard]} />
     <PageHeading title="대시보드" description={`업무 기준 ${kstDate(data.businessAt)} · 서버 집계`} />
     <div className="flex flex-wrap items-center gap-2">
       <Button variant={scope === 'institution' ? 'default' : 'outline'} size="sm" onClick={() => setScope('institution')}>기관 전체</Button>
       <Button variant={scope === 'personal' ? 'default' : 'outline'} size="sm" onClick={() => setScope('personal')}>내 담당</Button>
       <label className="ml-auto flex items-center gap-2 text-xs">기간
-        <input aria-label="시작일" type="date" className="rounded-md border bg-background px-2 py-1" value={from} max={to} onChange={event => setRange({ from: event.target.value, to })} />
+        <input aria-label="시작일" type="date" className="rounded-md border bg-background px-2 py-1" value={from} max={to} onChange={event => setFrom(event.target.value)} />
         <span>~</span>
-        <input aria-label="종료일" type="date" className="rounded-md border bg-background px-2 py-1" value={to} min={from} onChange={event => setRange({ from, to: event.target.value })} />
+        <input aria-label="종료일" type="date" className="rounded-md border bg-background px-2 py-1" value={to} min={from} onChange={event => setTo(event.target.value)} />
       </label>
     </div>
     {scope === 'institution' && <section className="grid gap-3 md:grid-cols-2" aria-label="기관 탐지 현황">
