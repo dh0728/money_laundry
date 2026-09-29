@@ -1,90 +1,283 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/common'
-import { fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, type ReviewAction, type ReviewCase, type ReviewKind, type ReviewQuery } from '@/api/liveReview'
+import { fetchReviewCase, fetchReviewCases, fetchReviewMoney, setReviewMoneyScope, submitReviewCommand, type ReviewAction, type ReviewCase, type ReviewCommand, type ReviewKind, type ReviewQuery } from '@/api/liveReview'
 import { PageHeading } from '@/components/page'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { useCurrentUser, canEditOpen } from '@/app/session'
 import { useAsync } from '@/lib/useAsync'
+import { assertEditableAlert, buildAlertClose, buildAlertTransfer, episodeGroupSelection } from '@/api/reviewCommands'
+import { toReviewGraphModel } from '@/features/graph/liveAdapter'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { typeDisplay, type TypeCode } from '@/api/codes'
+import Graph from '@/features/graph/v24/Graph'
 
-function CaseDetail({ caseId, kind, onBack }: { caseId: number; kind: ReviewKind; onBack: () => void }) {
+const moneyIntervals = [5, 15, 30, 60, 180, 360, 1440] as const
+const moneyAmount = (value: number) => Number(value).toLocaleString('ko-KR')
+const moneyPercent = (value: number | null) => value == null ? '산출 불가' : `${value.toFixed(1)}%`
+
+function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { caseId: number; kind: ReviewKind; onBack: () => void; onOpenEpisode: (id: number) => void; refreshList: () => Promise<unknown> }) {
   const user = useCurrentUser()
-  const { state, retry } = useAsync(() => fetchReviewCase(caseId), [caseId])
+  const { state, retry, refresh } = useAsync(() => fetchReviewCase(caseId), [caseId])
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const [selected, setSelected] = useState<Record<number, number[]>>({})
-  const previousRequest = useRef<{ payload: string; id: string } | null>(null)
+  const previousRequest = useRef<{ payload: string; id: string; command: ReviewCommand; success: string } | null>(null)
+  const [canRetry, setCanRetry] = useState(false)
+  const [confirmDecision, setConfirmDecision] = useState<'NORMAL' | 'SUSPICIOUS' | null>(null)
   const [targetCaseId, setTargetCaseId] = useState<number | null>(null)
-  const targets = useAsync(() => kind === 'ALERT' ? fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', size: 100 }) : Promise.resolve({ content: [], page: 0, size: 100, totalElements: 0, totalPages: 0 }), [kind])
-  const money = useAsync(() => fetchReviewMoney(caseId), [caseId])
+  const [scoreTxId, setScoreTxId] = useState<number | null>(null)
+  const [moneyMinutes, setMoneyMinutes] = useState(180)
+  const [scopeDraft, setScopeDraft] = useState<string[] | null>(null)
+  const [scopeComment, setScopeComment] = useState('')
+  const [scopeBusy, setScopeBusy] = useState(false)
+  const scopeBusyRef = useRef(false)
+  const [scopeRetry, setScopeRetry] = useState(false)
+  const scopePrevious = useRef<{ revision: number; accounts: string[]; comment: string; requestId: string } | null>(null)
+  const [targetPage, setTargetPage] = useState(0)
+  const emptyPage = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
+  const targets = useAsync(() => kind === 'ALERT' ? fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', page: targetPage, size: 20 }) : Promise.resolve(emptyPage), [kind, targetPage])
+  const money = useAsync(() => fetchReviewMoney(caseId, moneyMinutes), [caseId, moneyMinutes])
 
   if (state.status === 'loading') return <LoadingBlock label="조사 사건" />
-  if (state.status === 'error') return <ErrorBlock message={state.message} onRetry={retry} />
+  if (state.status === 'error') return <div className="space-y-3">
+    {state.error instanceof ApiError && state.error.problem.status === 404 && <Button variant="outline" size="sm" onClick={onBack}>목록으로</Button>}
+    <ErrorBlock message={state.error instanceof ApiError && state.error.problem.status === 404 ? '이전 사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : state.message} onRetry={retry} />
+  </div>
   const item = state.data
   if (item.kind !== kind) return <ErrorBlock message="요청한 종류와 사건 정보가 다릅니다." onRetry={retry} />
-  const editable = canEditOpen(user, item.assigneeId, item.status)
+  const editable = canEditOpen(user, item.assigneeId, item.status) && (kind !== 'ALERT' || item.episodeId == null) && !scopeBusy
+  const hasSubject = (item.groups ?? []).some(group => group.members.some(member => member.reviewRole === 'SUBJECT' && member.state !== 'EXCLUDED' && member.state !== 'TRANSFERRED'))
+  const graphModel = toReviewGraphModel(item)
+  const scoredMembers = [...new Map((item.groups ?? []).flatMap(group => group.members)
+    .filter(member => member.transaction.scores != null)
+    .map(member => [member.txId, member] as const)).values()]
+    .sort((a, b) => Number(b.transaction.role === 'SEED') - Number(a.transaction.role === 'SEED') || a.txId - b.txId)
+  const scoreMember = scoredMembers.find(member => member.txId === scoreTxId) ?? scoredMembers[0]
+  const patternCandidates = Array.from({ length: 9 }, (_, code) => ({ code: code as TypeCode, score: scoreMember?.transaction.scores?.[`p_${code}`] }))
+    .filter((candidate): candidate is { code: TypeCode; score: number } => typeof candidate.score === 'number' && Number.isFinite(candidate.score) && candidate.score >= 0 && candidate.score <= 1)
+    .sort((a, b) => b.score - a.score || a.code - b.code)
+  const chosenAccounts = scopeDraft ?? (money.state.status === 'success' ? money.state.data.selectedAccounts ?? [] : [])
+  const toggleAccount = (account: string) => {
+    setScopeDraft(current => {
+      const accounts = current ?? (money.state.status === 'success' ? money.state.data.selectedAccounts ?? [] : [])
+      return accounts.includes(account) ? accounts.filter(value => value !== account) : [...accounts, account]
+    })
+    setScopeRetry(false)
+  }
   const activeSelections = (item.groups ?? []).map(group => ({
     caseId: item.caseId, revision: item.revision, groupId: group.groupId,
     txIds: (selected[group.groupId] ?? []).filter(id => group.members.some(member => member.txId === id && member.state === 'PENDING' && member.reviewRole === 'SUBJECT')),
   })).filter(group => group.txIds.length)
   const toggleTx = (groupId: number, txId: number) => setSelected(current => {
+    if (item.kind === 'EPISODE') {
+      const group = item.groups?.find(group => group.groupId === groupId)
+      if (!group) return current
+      const all = episodeGroupSelection(item, group).txIds
+      return { ...current, [groupId]: all.every(id => current[groupId]?.includes(id)) ? [] : all }
+    }
     const ids = current[groupId] ?? []
     return { ...current, [groupId]: ids.includes(txId) ? ids.filter(id => id !== txId) : [...ids, txId] }
   })
   async function execute(action: ReviewAction, decision?: 'NORMAL' | 'SUSPICIOUS') {
-    if (!editable || busy) return
+    if (!editable || busyRef.current || scopeBusyRef.current) return
     const wholeCase = ['COMMENT', 'REVIEW_START', 'CLOSE'].includes(action)
-    const selections = wholeCase ? [{ caseId: item.caseId, revision: item.revision, groupId: item.groups?.[0]?.groupId ?? 0, txIds: [] }] : activeSelections
+    const selections = wholeCase ? [{ caseId: item.caseId, revision: item.revision, groupId: 0, txIds: [] }] : item.kind === 'EPISODE' ? (item.groups ?? []).filter(group => selected[group.groupId]?.length).map(group => episodeGroupSelection(item, group)) : activeSelections
     if (!comment.trim()) { toast.error('변경 사유를 입력해 주세요.'); return }
     if (!selections.length) { toast.error('미판정 거래를 선택해 주세요.'); return }
-    if (action === 'DECIDE' && item.kind === 'EPISODE' && selections.some(selection => {
-      const group = item.groups?.find(group => group.groupId === selection.groupId)
-      return group?.members.filter(member => member.state === 'PENDING' && member.reviewRole === 'SUBJECT').length !== selection.txIds.length
-    })) { toast.error('Episode는 각 묶음의 미판정 조사 거래 전체를 선택해야 합니다.'); return }
+    if (action === 'DECIDE' && selections.some(selection => !selection.txIds.length)) { toast.error('미판정 조사 대상이 없습니다.'); return }
+    await submit({ action, selections, decision: action === 'CLOSE' ? null : decision, comment: comment.trim() }, action === 'CLOSE' ? 'Episode 조사 종결 완료' : '조사 결과 저장 완료')
+  }
+  async function finalizeAlert(mode: 'NORMAL' | 'SUSPICIOUS' | 'EXISTING') {
+    if (!editable || busyRef.current || scopeBusyRef.current) return
+    if (!comment.trim()) { toast.error('변경 사유를 입력해 주세요.'); return }
+    if (comment.trim().length > 4000) { toast.error('변경 사유는 4,000자 이하로 입력해 주세요.'); return }
+    try { assertEditableAlert(item, user) } catch (error) { toast.error((error as Error).message); return }
+    if (mode === 'NORMAL' || mode === 'SUSPICIOUS') {
+      if (!hasSubject) { toast.error('조사 대상 거래가 없어 종결할 수 없습니다.'); return }
+      await submit(buildAlertClose(item, mode, comment), mode === 'NORMAL' ? '정상 종결 완료' : '단독 세탁 의심 종결 완료')
+      return
+    }
     const target = targets.state.status === 'success' ? targets.state.data.content.find(row => row.caseId === targetCaseId) : undefined
-    const command = { action, selections, decision, comment: comment.trim(), ...(action === 'TRANSFER' ? { targetCaseId, targetRevision: target?.revision ?? null } : {}) }
+    if (!target) { toast.error('편입할 Episode를 선택해 주세요.'); return }
+    await submit(buildAlertTransfer([item], target, comment), `Episode E-${target.caseId} 편입 완료`)
+  }
+  async function submit(command: ReviewCommand, success: string) {
+    if (busyRef.current || scopeBusyRef.current) return
     const payload = JSON.stringify(command)
     const requestId = previousRequest.current?.payload === payload ? previousRequest.current.id : crypto.randomUUID()
-    previousRequest.current = { payload, id: requestId }
+    previousRequest.current = { payload, id: requestId, command, success }
+    busyRef.current = true
     setBusy(true)
     try {
-      const result = await submitReviewCommand(command, requestId)
-      toast.success(result.targetCaseId ? `Episode E-${result.targetCaseId} 생성` : '조사 결과 저장 완료')
-      previousRequest.current = null; setComment(''); setSelected({}); retry()
+      await submitReviewCommand(command, requestId)
+      previousRequest.current = null; setCanRetry(false); setComment(''); setSelected({})
       window.dispatchEvent(new Event('review-command-saved'))
+      const refreshed = await Promise.allSettled([refresh(), money.refresh(), targets.refresh(), refreshList()])
+      toast.success(refreshed.some(result => result.status === 'rejected') ? `${success}. 저장은 완료됐지만 최신 화면을 불러오지 못했습니다. 다시 조회해 주세요.` : success)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '저장하지 못했습니다. 사건을 다시 확인해 주세요.')
-      if (error instanceof ApiError && error.problem.status === 409) {
-        previousRequest.current = null; setSelected({}); retry(); targets.retry()
+      if (!(error instanceof ApiError)) {
+        setCanRetry(true)
+        toast.error('처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.')
+      } else {
+        previousRequest.current = null; setCanRetry(false)
+        toast.error(error.problem.status === 403 ? '이 사건을 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 내용을 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
+        if (error.problem.status === 409 || error.problem.status === 404) {
+          setSelected({}); void Promise.allSettled([refresh(), targets.refresh(), refreshList()])
+        }
       }
-    } finally { setBusy(false) }
+    } finally { busyRef.current = false; setBusy(false) }
+  }
+  async function saveMoneyScope(previous?: { revision: number; accounts: string[]; comment: string; requestId: string }) {
+    if (scopeBusyRef.current || busyRef.current) return
+    if (!previous && (!editable || money.state.status !== 'success')) return
+    const commentText = scopeComment.trim()
+    if (!previous && (!commentText || commentText.length > 4000)) { toast.error('계좌 선택 사유를 1~4,000자로 입력해 주세요.'); return }
+    const request = previous ?? {
+      revision: money.state.status === 'success' ? money.state.data.revision ?? item.revision : item.revision,
+      accounts: [...chosenAccounts], comment: commentText, requestId: crypto.randomUUID(),
+    }
+    scopePrevious.current = request
+    scopeBusyRef.current = true; setScopeBusy(true)
+    try {
+      await setReviewMoneyScope(item.caseId, request.revision, request.accounts, request.comment, request.requestId)
+      scopePrevious.current = null; setScopeRetry(false); setScopeDraft(null); setScopeComment('')
+      const refreshed = await Promise.allSettled([refresh(), money.refresh(), refreshList()])
+      toast.success(refreshed.some(result => result.status === 'rejected') ? '계좌 선택 저장 완료. 저장은 완료됐지만 최신 화면을 불러오지 못했습니다. 다시 조회해 주세요.' : '조사 중심 계좌 저장 완료')
+    } catch (error) {
+      if (!(error instanceof ApiError)) { setScopeRetry(true); toast.error('계좌 선택 처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.') }
+      else {
+        scopePrevious.current = null; setScopeRetry(false)
+        toast.error(error.problem.status === 403 ? '이 사건의 계좌 범위를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 계좌 범위를 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
+        if (error.problem.status === 409 || error.problem.status === 404) { setScopeDraft(null); void Promise.allSettled([refresh(), money.refresh(), refreshList()]) }
+      }
+    } finally { scopeBusyRef.current = false; setScopeBusy(false) }
   }
   return <div className="space-y-5">
     <Button variant="outline" size="sm" onClick={onBack}>목록으로</Button>
     <PageHeading title={`${item.kind === 'ALERT' ? `Alert A-${item.alertId ?? item.caseId}` : `Episode E-${item.caseId}`}`} description={`조사 사건 ID ${item.caseId} · ${item.status === 'OPEN' ? '진행 중' : '종결'} · 담당 ${item.assigneeName}`} />
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="사건 요약">
-      {[['위험 점수', item.summary.riskScore?.toFixed(2) ?? '—'], ['거래', String(item.summary.txCount)], ['미판정', String(item.pendingCount)], ['유형', item.summary.primaryType]].map(([label, value]) => <div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold">{value}</p></div>)}
+      {[['씨앗 거래 최대 위험 점수', item.summary.riskScore?.toFixed(2) ?? '—'], ['거래', String(item.summary.txCount)], ['미판정', String(item.pendingCount)], ['유형', item.summary.primaryType]].map(([label, value]) => <div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold">{value}</p></div>)}
     </section>
-    <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">조사 계좌 자금 지표</h2><p className="mt-1 text-xs text-muted-foreground">서버 원장 기준 · 단시간 유출 180분 추정</p>{money.state.status === 'loading' ? <LoadingBlock label="자금 지표" /> : money.state.status === 'error' ? <ErrorBlock message={money.state.message} onRetry={money.retry} /> : !money.state.data.available ? <p className="mt-3 text-sm text-muted-foreground">{({ EMPTY_SUBJECT_SCOPE: '조사 거래 범위가 없습니다.', EMPTY_ACCOUNT_SCOPE: '조사 계좌를 선택해야 합니다.', WAITING_RECEIPTS: '원장 수신 완료를 기다리는 중입니다.', NO_CLOSED_SNAPSHOT: '저장된 종결 시점 지표가 없습니다.' } as Record<string, string>)[money.state.data.reason ?? ''] ?? '현재 산출할 수 없습니다.'}</p> : <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{money.state.data.external?.map(row => <div key={row.currency} className="rounded-lg border p-3 text-xs"><strong>{row.currency}</strong><p className="mt-2">외부 유입 {Number(row.in).toLocaleString('ko-KR')}</p><p>외부 유출 {Number(row.out).toLocaleString('ko-KR')}</p><p>순유입 {Number(row.net).toLocaleString('ko-KR')}</p></div>)}{!money.state.data.complete && <p className="text-xs text-muted-foreground">원장 관측 일부만 완료됨</p>}</div>}</section>
-    <section className="space-y-3"><h2 className="font-semibold">조사 범위</h2>{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{group.label} · 묶음 {group.groupId}</h3><div className="mt-3 space-y-2">{group.members.map(member => <label key={member.txId} className="flex min-w-0 items-start gap-2 rounded-md border p-2 text-xs"><input type="checkbox" className="mt-0.5" disabled={!editable || member.state !== 'PENDING' || member.reviewRole !== 'SUBJECT'} checked={selected[group.groupId]?.includes(member.txId) ?? false} onChange={() => toggleTx(group.groupId, member.txId)} /><span className="min-w-0 flex-1"><strong>T-{member.txId}</strong> · {member.reviewRole} · {member.state}{member.decision && ` · ${member.decision}`}<span className="mt-1 block break-all text-muted-foreground">{member.transaction.fromAccountId} → {member.transaction.toAccountId}</span></span><span>{Number(member.transaction.amountPaid).toLocaleString('ko-KR')} {member.transaction.paymentCurrency}</span></label>)}</div></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
-    <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">조사 처리</h2><p className="mt-1 text-xs text-muted-foreground">본인 담당 진행 중 사건만 변경 가능 · 변경 뒤 최신 사건 정보 재조회</p><textarea aria-label="변경 사유" className="mt-3 min-h-20 w-full rounded-md border bg-background p-3 text-sm" placeholder="조사 의견 또는 변경 사유" value={comment} onChange={event => setComment(event.target.value)} disabled={!editable || busy} /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('COMMENT')}>의견 저장</Button><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('REVIEW_START')}>검토 시작 기록</Button><Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'NORMAL')}>선택 범위 정상 판정</Button>{item.kind === 'EPISODE' && <Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'SUSPICIOUS')}>선택 범위 이상 판정</Button>}{item.kind === 'ALERT' && <><select aria-label="Episode 이관 대상" className="rounded-md border bg-background px-2 text-xs" value={targetCaseId ?? 'new'} onChange={event => setTargetCaseId(event.target.value === 'new' ? null : Number(event.target.value))}><option value="new">새 Episode</option>{targets.state.status === 'success' && targets.state.data.content.map(row => <option key={row.caseId} value={row.caseId}>E-{row.caseId} · {row.assigneeName}</option>)}</select><Button size="sm" variant="outline" disabled={!editable || busy || !activeSelections.length || targets.state.status === 'loading'} onClick={() => void execute('TRANSFER')}>선택 거래 이관</Button></>}<Button size="sm" variant="outline" disabled={!editable || busy || item.pendingCount > 0} onClick={() => void execute('CLOSE')}>사건 종결</Button></div></section>
+    <section className="rounded-xl border bg-card p-4" aria-label="사건 개요">
+      <h2 className="font-semibold">사건 개요</h2>
+      <p className="mt-2 text-sm">조사 대상 {item.summary.subjectCount}건 · 씨앗 거래 {item.summary.seedCount}건</p>
+      {item.summary.typeShare != null && <p className="mt-1 text-sm">대표 유형 비중 {(item.summary.typeShare * 100).toFixed(1)}% <span className="text-xs text-muted-foreground">· 씨앗 거래 중 유형의 비중, 사건 확률 아님</span></p>}
+      <p className="mt-1 text-xs text-muted-foreground">거래 기간 {item.summary.firstTxAt ? new Date(item.summary.firstTxAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—'} ~ {item.summary.lastTxAt ? new Date(item.summary.lastTxAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—'}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div><h3 className="text-xs font-semibold">조사 대상 거래액 · 통화별 합계</h3>{Object.entries(item.summary.amountsByCurrency ?? {}).length ? Object.entries(item.summary.amountsByCurrency).map(([currency, amount]) => <p key={currency} className="mt-1 text-sm">{currency} {moneyAmount(amount)}</p>) : <p className="mt-1 text-xs text-muted-foreground">합계 없음</p>}</div>
+        <div><h3 className="text-xs font-semibold">결제 수단 · 거래 건수</h3>{Object.entries(item.summary.paymentFormats ?? {}).length ? Object.entries(item.summary.paymentFormats ?? {}).map(([format, count]) => <p key={format} className="mt-1 text-sm">{format} {count}건</p>) : <p className="mt-1 text-xs text-muted-foreground">집계 없음</p>}</div>
+      </div>
+      {Object.entries(item.summary.typeDistribution ?? {}).length > 0 && <p className="mt-3 text-xs text-muted-foreground">모델 이상 거래 유형별 건수 {Object.entries(item.summary.typeDistribution ?? {}).map(([type, count]) => `${type} ${count}건`).join(' · ')}</p>}
+    </section>
+    {item.kind === 'ALERT' && <section className="rounded-xl border bg-card p-4" aria-label="패턴 후보 확률">
+      <h2 className="font-semibold">거래별 패턴 후보</h2>
+      <p className="mt-1 text-xs text-muted-foreground">선택한 거래의 모델 유형 점수입니다. Alert 전체 확률이 아닙니다. 위 대표 유형은 씨앗 거래에서 가장 많이 나온 유형입니다.</p>
+      {scoredMembers.length ? <><label className="mt-3 block text-xs">확률을 볼 거래 <select aria-label="확률을 볼 거래" className="ml-2 rounded-md border bg-background p-2" value={scoreMember.txId} onChange={event => setScoreTxId(Number(event.target.value))}>{scoredMembers.map(member => <option key={member.txId} value={member.txId}>T-{member.txId}{member.transaction.role === 'SEED' ? ' · 씨앗 거래' : ''}</option>)}</select></label>
+        <ol aria-label="거래 패턴 후보" className="mt-3 space-y-2">{patternCandidates.map((candidate, index) => <li key={candidate.code} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"><span>{index + 1}. {typeDisplay(candidate.code).label}</span><strong>{(candidate.score * 100).toFixed(1)}%</strong></li>)}</ol>
+        {!patternCandidates.length && <p className="mt-3 text-sm text-muted-foreground">이 거래의 패턴 점수가 없습니다.</p>}</> : <p className="mt-3 text-sm text-muted-foreground">점수가 제공된 거래가 없습니다.</p>}
+    </section>}
+    <section className="rounded-xl border bg-card p-4" aria-label="조사 계좌 자금 지표">
+      <h2 className="font-semibold">조사 계좌 자금 지표</h2>
+      <p className="mt-1 text-xs text-muted-foreground">서버가 수신한 원장 기준 · 계좌 간 자금 흐름의 FIFO 추정</p>
+      <label className="mt-3 inline-flex items-center gap-2 text-xs">단시간 유출 비교 기간
+        <select aria-label="단시간 유출 비교 기간" className="rounded-md border bg-background p-2" value={item.status === 'CLOSED' ? 180 : moneyMinutes} onChange={event => setMoneyMinutes(Number(event.target.value))} disabled={item.status === 'CLOSED'}>
+          {moneyIntervals.map(minutes => <option key={minutes} value={minutes}>{minutes === 1440 ? '24시간' : `${minutes}분`}</option>)}
+        </select>
+      </label>
+      {item.status === 'CLOSED' && <p className="mt-1 text-xs text-muted-foreground">종결 당시 180분 지표가 고정 저장됩니다.</p>}
+      {money.state.status === 'loading' ? <LoadingBlock label="자금 지표" /> : money.state.status === 'error' ? <ErrorBlock message={money.state.message} onRetry={money.retry} /> : <>
+        <p className="mt-3 text-xs text-muted-foreground">조사 중심 계좌 {money.state.data.selectedAccounts?.length ?? 0}개{money.state.data.customScope ? ' · 직접 지정' : ' · 씨앗 거래 기준'}{money.state.data.requestedFrom && money.state.data.requestedTo ? ` · 대상 거래일 ${money.state.data.requestedFrom} ~ ${money.state.data.requestedTo}` : ''}{money.state.data.ledgerCount != null ? ` · 원장 거래 ${money.state.data.ledgerCount}건` : ''}</p>
+        {!money.state.data.available ? <p className="mt-3 text-sm text-muted-foreground">{({ EMPTY_SUBJECT_SCOPE: '조사 거래 범위가 없습니다.', EMPTY_ACCOUNT_SCOPE: '조사 계좌를 선택해야 합니다.', WAITING_RECEIPTS: '원장 수신 완료를 기다리는 중입니다.', NO_CLOSED_SNAPSHOT: '저장된 종결 시점 지표가 없습니다.' } as Record<string, string>)[money.state.data.reason ?? ''] ?? '현재 산출할 수 없습니다.'}</p> : <>
+          {money.state.data.complete === false && <p className="mt-2 text-xs text-muted-foreground">원장 관측 일부만 완료됨 · 표시된 기간까지만 계산</p>}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{money.state.data.external?.map(row => <div key={row.currency} className="rounded-lg border p-3 text-xs"><strong>{row.currency}</strong><p className="mt-2">외부 유입 {moneyAmount(row.in)}</p><p>외부 유출 {moneyAmount(row.out)}</p><p>외부 순유입 {moneyAmount(row.net)}</p></div>)}</div>
+          <h3 className="mt-4 text-sm font-semibold">계좌별 지표</h3>
+          <p className="mt-1 text-xs text-muted-foreground">집중도는 같은 통화의 양의 순유입 비중이며 잔액 비중이 아닙니다. 단시간 유출은 입금 후 선택 기간 내 출금의 추정 비율입니다.</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">{money.state.data.accounts?.length ? money.state.data.accounts.map(row => <div key={`${row.accountId}-${row.currency}`} className="min-w-0 rounded-lg border p-3 text-xs"><strong className="break-all">{row.accountId}</strong><span> · {row.currency}</span><p className="mt-2">유입 {moneyAmount(row.in)} · 유출 {moneyAmount(row.out)} · 순유입 {moneyAmount(row.net)}</p><p className="mt-1">집중도 {moneyPercent(row.concentrationPercent)} · 단시간 유출 {moneyPercent(row.rapidOutflowPercent)}</p><p className="mt-1 text-muted-foreground">평가 가능 입금 {moneyAmount(row.eligibleIn)} · 기간 끝 미성숙 입금 {moneyAmount(row.excludedIn)} · 기간 내 대응액 {moneyAmount(row.matchedIn)}</p></div>) : <p className="text-xs text-muted-foreground">계좌별 지표가 없습니다.</p>}</div>
+        </>}
+        {money.state.data.candidateAccounts && <div className="mt-4 border-t pt-4">
+          <h3 className="text-sm font-semibold">조사 중심 계좌 선택</h3>
+          <p className="mt-1 text-xs text-muted-foreground">선택한 가명 계좌를 기준으로 자금 지표를 다시 계산합니다. 사건 거래의 소속과 판정은 바뀌지 않습니다.</p>
+          <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">{money.state.data.candidateAccounts.length ? money.state.data.candidateAccounts.map(account => <label key={account} className="flex items-center gap-2 text-xs"><input type="checkbox" aria-label={`조사 중심 계좌 ${account}`} checked={chosenAccounts.includes(account)} onChange={() => toggleAccount(account)} disabled={!editable || scopeBusy || busy} /><span className="break-all">{account}</span></label>) : <p className="text-xs text-muted-foreground">선택할 계좌 후보가 없습니다.</p>}</div>
+          <textarea aria-label="계좌 선택 사유" className="mt-3 min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="계좌를 포함하거나 제외한 이유" value={scopeComment} onChange={event => { setScopeComment(event.target.value); setScopeRetry(false) }} disabled={!editable || scopeBusy || busy} />
+          <div className="mt-2 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || scopeBusy || busy} onClick={() => void saveMoneyScope()}>조사 중심 계좌 저장</Button>{scopeRetry && <Button size="sm" variant="outline" disabled={scopeBusy || busy} onClick={() => { if (scopePrevious.current) void saveMoneyScope(scopePrevious.current) }}>같은 계좌 선택 요청 재시도</Button>}</div>
+        </div>}
+      </>}
+    </section>
+    <section aria-label="관계 그래프" className="space-y-2"><h2 className="font-semibold">관계 그래프</h2>{graphModel.edges.length ? <Graph model={graphModel} label={(item.kind === 'ALERT' ? `Alert A-${item.alertId}` : `Episode E-${item.caseId}`) + ' 관계 그래프'} nonSuspiciousLabel="의심 판정 없음 · 미분석 포함" /> : <EmptyBlock>표시할 거래가 없습니다.</EmptyBlock>}</section>
+    <section className="space-y-3"><h2 className="font-semibold">조사 범위</h2>{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><div className="mt-3 space-y-2">{group.members.map(member => <label key={member.txId} className="flex min-w-0 items-start gap-2 rounded-md border p-2 text-xs"><input type="checkbox" className="mt-0.5" disabled={!editable || member.state !== 'PENDING' || member.reviewRole !== 'SUBJECT'} checked={selected[group.groupId]?.includes(member.txId) ?? false} onChange={() => toggleTx(group.groupId, member.txId)} /><span className="min-w-0 flex-1"><strong>T-{member.txId}</strong> · {member.reviewRole} · {member.state}{member.decision && ` · ${member.decision}`}<span className="mt-1 block break-all text-muted-foreground">{member.transaction.fromAccountId} → {member.transaction.toAccountId}</span></span><span>{Number(member.transaction.amountPaid).toLocaleString('ko-KR')} {member.transaction.paymentCurrency}</span></label>)}</div></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
+    <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">조사 처리</h2><p className="mt-1 text-xs text-muted-foreground">본인 담당 진행 중 사건만 변경 가능 · 변경 뒤 최신 사건 정보 재조회</p><textarea aria-label="변경 사유" className="mt-3 min-h-20 w-full rounded-md border bg-background p-3 text-sm" placeholder="조사 의견 또는 변경 사유" maxLength={4000} value={comment} onChange={event => { setComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('COMMENT')}>의견 저장</Button><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('REVIEW_START')}>검토 시작 기록</Button><Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'NORMAL')}>선택 범위 정상 판정</Button>{item.kind === 'EPISODE' && <Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'SUSPICIOUS')}>선택 범위 이상 판정</Button>}{item.kind === 'EPISODE' && <Button size="sm" variant="outline" disabled={!editable || busy || item.pendingCount > 0} onClick={() => void execute('CLOSE')}>사건 종결</Button>}{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { const previous = previousRequest.current; if (previous) void submit(previous.command, previous.success) }}>같은 요청 재시도</Button>}</div>
+      {item.kind === 'ALERT' && <div className="mt-4 space-y-3 border-t pt-4">
+        <h3 className="text-sm font-semibold">최종 처리</h3>
+        {item.episodeId != null && <p className="text-xs text-muted-foreground">Episode E-{item.episodeId}에 편입된 Alert입니다. <Button size="sm" variant="link" onClick={() => onOpenEpisode(item.episodeId!)}>Episode E-{item.episodeId} 보기</Button></p>}
+        {!hasSubject && item.status === 'OPEN' && <p className="text-xs text-destructive-text">조사 대상 거래가 없어 최종 종결할 수 없습니다.</p>}
+        <div className="flex flex-wrap gap-2"><Button size="sm" disabled={!editable || busy || !hasSubject} onClick={() => setConfirmDecision('NORMAL')}>정상 종결</Button><Button size="sm" variant="destructive" disabled={!editable || busy || !hasSubject} onClick={() => setConfirmDecision('SUSPICIOUS')}>단독 세탁 의심 종결</Button></div>
+        <div className="flex flex-wrap items-center gap-2"><select aria-label="편입할 Episode" className="rounded-md border bg-background p-2 text-xs" value={targetCaseId ?? ''} onChange={event => setTargetCaseId(event.target.value ? Number(event.target.value) : null)} disabled={!editable || busy}><option value="">진행 중 Episode 선택</option>{targets.state.status === 'success' && targets.state.data.content.map(row => <option key={row.caseId} value={row.caseId}>E-{row.caseId} · {row.assigneeName}</option>)}</select><Button size="sm" variant="outline" disabled={!editable || busy || targetCaseId == null} onClick={() => void finalizeAlert('EXISTING')}>기존 Episode에 전체 편입</Button></div>
+        {targets.state.status === 'error' && <ErrorBlock message={targets.state.message} onRetry={targets.retry} />}
+        {targets.state.status === 'success' && targets.state.data.totalPages > 1 && <div className="flex items-center gap-2 text-xs"><Button size="sm" variant="outline" aria-label="이전 Episode 목적지" disabled={targetPage === 0} onClick={() => { setTargetCaseId(null); setTargetPage(page => page - 1) }}>이전</Button><span>{targetPage + 1}/{targets.state.data.totalPages}쪽 · 전체 {targets.state.data.totalElements}건</span><Button size="sm" variant="outline" aria-label="다음 Episode 목적지" disabled={targetPage + 1 >= targets.state.data.totalPages} onClick={() => { setTargetCaseId(null); setTargetPage(page => page + 1) }}>다음</Button></div>}
+        <p className="text-xs text-muted-foreground">새 Episode는 본인 담당 Alert를 최소 2개 선택해야 합니다.</p><Button size="sm" variant="outline" onClick={onBack}>목록에서 새 Episode 만들기</Button>
+      </div>}</section>
+    <AlertDialog open={confirmDecision != null} onOpenChange={open => { if (!open) setConfirmDecision(null) }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{confirmDecision === 'NORMAL' ? '정상 종결' : '단독 세탁 의심 종결'}을 확정할까요?</AlertDialogTitle><AlertDialogDescription>제외되지 않은 조사 대상 전체에 최종 판정을 적용합니다. 참고 맥락·제외 거래에는 판정하지 않습니다. 기존 범위 판정은 최종 판정으로 바뀔 수 있으며 이전 내역은 감사 기록에 남습니다. 종결 후 직접 수정할 수 없습니다.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>취소</AlertDialogCancel><AlertDialogAction disabled={busy} onClick={() => { const decision = confirmDecision; setConfirmDecision(null); if (decision) void finalizeAlert(decision) }}>최종 종결 확정</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     {!!item.history?.length && <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">처리 이력</h2>{item.history.map(row => <div key={row.eventId} className="border-b py-2 text-xs"><span className="font-semibold">{row.action}</span> · {row.actor ?? '시스템'} · {new Date(row.businessAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}<p className="mt-1 text-muted-foreground">{row.comment}</p></div>)}</section>}
   </div>
 }
 
-export default function LiveCasesPage({ kind, caseId, onOpen, onBack }: { kind: ReviewKind; caseId?: number; onOpen: (id: number) => void; onBack: () => void }) {
+export default function LiveCasesPage({ kind, caseId, onOpen, onBack, onOpenEpisode }: { kind: ReviewKind; caseId?: number; onOpen: (id: number) => void; onBack: () => void; onOpenEpisode?: (id: number) => void }) {
   const user = useCurrentUser()
   const [status, setStatus] = useState<ReviewQuery['status'] | 'ALL'>('ALL')
   const [mine, setMine] = useState(false)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [page, setPage] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [comment, setComment] = useState('')
+  const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
+  const previousRequest = useRef<{ payload: string; id: string; command: ReviewCommand } | null>(null)
+  const [canRetry, setCanRetry] = useState(false)
   const query: ReviewQuery = { kind, status: status === 'ALL' ? undefined : status, assigneeId: mine ? user.userId : undefined, from: from || undefined, to: to || undefined, page, size: 20 }
-  const { state, retry } = useAsync(() => fetchReviewCases(query), [kind, status, mine, from, to, page])
-  if (caseId) return <CaseDetail caseId={caseId} kind={kind} onBack={onBack} />
+  const { state, retry, refresh } = useAsync(() => fetchReviewCases(query), [kind, status, mine, from, to, page])
+  const selectedRows = state.status === 'success' ? state.data.content.filter(row => selectedIds.includes(row.caseId)) : []
+  const eligible = (row: ReviewCase) => user.role === 'STAFF' && row.kind === 'ALERT' && row.status === 'OPEN' && row.assigneeId === user.userId && row.episodeId == null
+  const clearSelection = () => { setSelectedIds([]); setCanRetry(false); previousRequest.current = null; setPage(0) }
+  async function submitNew(command?: ReviewCommand) {
+    if (busyRef.current) return
+    if (!comment.trim() || comment.trim().length > 4000) { toast.error('변경 사유를 1~4,000자로 입력해 주세요.'); return }
+    let next: ReviewCommand
+    try {
+      if (command) next = command
+      else {
+        selectedRows.forEach(row => assertEditableAlert(row, user))
+        next = buildAlertTransfer(selectedRows, null, comment)
+      }
+    } catch (error) { toast.error((error as Error).message); return }
+    const payload = JSON.stringify(next)
+    const id = previousRequest.current?.payload === payload ? previousRequest.current.id : crypto.randomUUID()
+    previousRequest.current = { payload, id, command: next }
+    busyRef.current = true; setBusy(true)
+    try {
+      const result = await submitReviewCommand(next, id)
+      previousRequest.current = null; setCanRetry(false); setSelectedIds([]); setComment('')
+      window.dispatchEvent(new Event('review-command-saved'))
+      try {
+        await refresh()
+        toast.success(`Episode E-${result.targetCaseId} 생성 완료`)
+      } catch { toast.success('Episode 생성 완료. 저장은 완료됐지만 최신 화면을 불러오지 못했습니다. 다시 조회해 주세요.') }
+    } catch (error) {
+      if (!(error instanceof ApiError)) { setCanRetry(true); toast.error('처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.') }
+      else {
+        previousRequest.current = null; setCanRetry(false)
+        toast.error(error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 목록을 확인한 뒤 다시 제출해 주세요.' : error.problem.status === 403 ? '선택한 Alert를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
+        if (error.problem.status === 409 || error.problem.status === 404) { setSelectedIds([]); void refresh().catch(() => undefined) }
+      }
+    } finally { busyRef.current = false; setBusy(false) }
+  }
+  if (caseId) return <CaseDetail key={`${kind}-${caseId}`} caseId={caseId} kind={kind} onBack={onBack} onOpenEpisode={onOpenEpisode ?? onBack} refreshList={() => { setSelectedIds([]); return refresh() }} />
   return <div className="space-y-5"><PageHeading title={`${kind === 'ALERT' ? 'Alert' : 'Episode'} 목록`} description="서버 조사 사건 · 위험도 높은 순" />
-    <div className="flex flex-wrap items-center gap-2"><label className="text-xs">상태 <select className="ml-1 rounded-md border bg-background p-2" value={status} onChange={event => { setStatus(event.target.value as typeof status); setPage(0) }}><option value="ALL">전체</option><option value="OPEN">진행 중</option><option value="CLOSED">종결</option></select></label><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={mine} onChange={event => { setMine(event.target.checked); setPage(0) }} />내 담당</label><label className="text-xs">시작일 <input type="date" className="ml-1 rounded-md border bg-background p-1" value={from} onChange={event => { setFrom(event.target.value); setPage(0) }} /></label><label className="text-xs">종료일 <input type="date" className="ml-1 rounded-md border bg-background p-1" value={to} onChange={event => { setTo(event.target.value); setPage(0) }} /></label></div>
-    {state.status === 'loading' ? <LoadingBlock label="조사 사건" /> : state.status === 'error' ? <ErrorBlock message={state.message} onRetry={retry} /> : <>{state.data.content.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{state.data.content.map((row: ReviewCase) => <button type="button" key={row.caseId} className="min-w-0 rounded-xl border bg-card p-4 text-left hover:bg-accent" onClick={() => onOpen(row.caseId)}><div className="flex items-center justify-between gap-2"><strong>{kind === 'ALERT' ? `A-${row.alertId ?? row.caseId}` : `E-${row.caseId}`}</strong><span className="text-xs">{row.status === 'OPEN' ? '진행 중' : '종결'}</span></div><p className="mt-2 text-xs text-muted-foreground">담당 {row.assigneeName} · 조사 사건 {row.caseId}</p><p className="mt-3 text-xs">위험 {row.summary.riskScore?.toFixed(2) ?? '—'} · 거래 {row.summary.txCount} · 미판정 {row.pendingCount}</p><p className="mt-2 text-xs text-muted-foreground">{row.summary.primaryType}</p></button>)}</div> : <EmptyBlock>조건에 맞는 조사 사건이 없습니다.</EmptyBlock>}<div className="flex items-center justify-end gap-2 text-xs"><span>전체 {state.data.totalElements}건 · {page + 1}쪽</span><Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>이전</Button><Button size="sm" variant="outline" disabled={(page + 1) * 20 >= state.data.totalElements} onClick={() => setPage(page + 1)}>다음</Button></div></>}
+    <div className="flex flex-wrap items-center gap-2"><label className="text-xs">상태 <select className="ml-1 rounded-md border bg-background p-2" value={status} onChange={event => { setStatus(event.target.value as typeof status); clearSelection() }}><option value="ALL">전체</option><option value="OPEN">진행 중</option><option value="CLOSED">종결</option></select></label><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={mine} onChange={event => { setMine(event.target.checked); clearSelection() }} />내 담당</label><label className="text-xs">시작일 <input type="date" className="ml-1 rounded-md border bg-background p-1" value={from} onChange={event => { setFrom(event.target.value); clearSelection() }} /></label><label className="text-xs">종료일 <input type="date" className="ml-1 rounded-md border bg-background p-1" value={to} onChange={event => { setTo(event.target.value); clearSelection() }} /></label></div>
+    {kind === 'ALERT' && <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">새 Episode 생성</h2><p className="mt-1 text-xs text-muted-foreground">현재 목록에서 본인 담당·진행 중·미편입 Alert를 2개 이상 고르세요. 다른 페이지나 필터로 이동하면 선택이 초기화됩니다.</p><p className="mt-2 text-sm">선택 {selectedRows.length}건: {selectedRows.map(row => `A-${row.alertId ?? row.caseId}`).join(', ') || '없음'}</p><textarea aria-label="새 Episode 생성 사유" className="mt-3 min-h-20 w-full rounded-md border bg-background p-3 text-sm" maxLength={4000} value={comment} onChange={event => { setComment(event.target.value); setCanRetry(false) }} placeholder="Alert를 묶는 근거" disabled={busy} /><div className="mt-2 flex gap-2"><Button size="sm" disabled={selectedRows.length < 2 || busy} onClick={() => void submitNew()}>새 Episode 생성</Button>{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (previousRequest.current) void submitNew(previousRequest.current.command) }}>같은 요청 재시도</Button>}</div></section>}
+    {state.status === 'loading' ? <LoadingBlock label="조사 사건" /> : state.status === 'error' ? <ErrorBlock message={state.message} onRetry={retry} /> : <>{state.data.content.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{state.data.content.map((row: ReviewCase) => <div key={row.caseId} className="min-w-0 rounded-xl border bg-card p-4">{kind === 'ALERT' && <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" aria-label={`새 Episode 선택 A-${row.alertId ?? row.caseId}`} disabled={!eligible(row) || busy} checked={selectedIds.includes(row.caseId)} onChange={() => { setSelectedIds(ids => ids.includes(row.caseId) ? ids.filter(id => id !== row.caseId) : [...ids, row.caseId]); setCanRetry(false) }} />새 Episode 선택</label>}<button type="button" className="w-full text-left hover:text-primary" onClick={() => onOpen(row.caseId)}><div className="flex items-center justify-between gap-2"><strong>{kind === 'ALERT' ? `A-${row.alertId ?? row.caseId}` : `E-${row.caseId}`}</strong><span className="text-xs">{row.status === 'OPEN' ? '진행 중' : '종결'}</span></div><p className="mt-2 text-xs text-muted-foreground">담당 {row.assigneeName} · 조사 사건 {row.caseId}</p><p className="mt-3 text-xs">위험 {row.summary.riskScore?.toFixed(2) ?? '—'} · 거래 {row.summary.txCount} · 미판정 {row.pendingCount}</p><p className="mt-2 text-xs text-muted-foreground">{row.summary.primaryType}</p></button></div>)}</div> : <EmptyBlock>조건에 맞는 조사 사건이 없습니다.</EmptyBlock>}<div className="flex items-center justify-end gap-2 text-xs"><span>전체 {state.data.totalElements}건 · {page + 1}쪽</span><Button size="sm" variant="outline" disabled={page === 0} onClick={() => { setSelectedIds([]); setCanRetry(false); previousRequest.current = null; setPage(page - 1) }}>이전</Button><Button size="sm" variant="outline" disabled={(page + 1) * 20 >= state.data.totalElements} onClick={() => { setSelectedIds([]); setCanRetry(false); previousRequest.current = null; setPage(page + 1) }}>다음</Button></div></>}
   </div>
 }

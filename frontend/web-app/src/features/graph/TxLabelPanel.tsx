@@ -41,7 +41,7 @@ export default function TxLabelPanel({ model, focus, editable, onRelabel }: Prop
               <span className="tabular-nums text-muted-foreground">{t.at.slice(5)}</span>
               <span className="ml-auto tabular-nums">{formatMoney(t.amount, t.currency)}</span>
               <span className="flex w-full items-center gap-1.5">
-                <Badge variant="outline" className={`font-normal ${t.label === 1 ? 'border-destructive/50 text-destructive' : ''}`}>{labelText(t.label)}</Badge>
+                <Badge variant="outline" className={`font-normal ${t.label === 1 ? 'border-destructive/50 text-destructive-text' : ''}`}>{labelText(t.label)}</Badge>
                 {changed && <Badge variant="outline" className="semantic-metadata-badge font-normal" title={`${t.relabel?.actor} · ${t.relabel?.at.slice(0, 16).replace('T', ' ')} · ${t.relabel?.reason}`}>사람 판정 · 모델은 {labelText(t.modelLabel!)}</Badge>}
                 <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" disabled={!editable} onClick={() => { setTarget(t); setReason('') }}>
                   {t.label === 1 ? '정상 거래로 전환하기' : '이상 거래로 전환하기'}

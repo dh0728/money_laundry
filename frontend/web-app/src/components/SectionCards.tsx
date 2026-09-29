@@ -3,11 +3,14 @@ import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
-export type SectionCardItem = { label: string; value: string; delta?: number; unit?: string; trend: string; note: string }
+export type SectionCardItem = { label: string; value: string; delta?: number; unit?: string; favorableDirection?: 'up' | 'down'; trend: string; note: string }
 
 export function SectionCard({ item }: { item: SectionCardItem }) {
   // 비교 기준이 없는 지표(delta 없음)는 증감 배지·아이콘을 숨긴다
   const Icon = item.delta === undefined ? null : item.delta >= 0 ? TrendingUp : TrendingDown
+  const deltaTone = item.delta && item.favorableDirection
+    ? (item.delta > 0) === (item.favorableDirection === 'up') ? 'positive' : 'negative'
+    : null
   return (
     <Card className="@container/card" data-testid="section-card">
       <CardHeader>
@@ -15,7 +18,7 @@ export function SectionCard({ item }: { item: SectionCardItem }) {
         <CardTitle className="type-display font-semibold tabular-nums">{item.value}</CardTitle>
         {Icon && item.delta !== undefined && (
           <CardAction>
-            <Badge variant="outline">
+            <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent text-foreground' : undefined} style={deltaTone ? { backgroundColor: `var(--risk-${deltaTone === 'positive' ? 0 : 9})` } : undefined}>
               <Icon />
               {item.delta >= 0 ? '+' : ''}
               {item.delta}

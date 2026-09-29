@@ -78,6 +78,8 @@ export type AlertTransaction = {
   typeClass: TypeCode
   typeName: string
   typeScore: number
+  /** 시연 데이터의 거래별 유형 후보. 실제 조사 화면은 review/cases의 scores를 사용한다. */
+  typeProbabilities?: Partial<Record<`${TypeCode}`, number>>
   role: 'SEED' | 'SUPPORTING' | 'PATH' | 'PATTERN_MEMBER'
   includedReason: string
   direction: 'IN' | 'OUT' | 'SELF'

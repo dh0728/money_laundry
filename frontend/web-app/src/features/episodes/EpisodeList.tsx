@@ -46,17 +46,22 @@ const columns: ColumnDef<EpisodeRow>[] = [
     id: 'types', header: '탐지 유형', enableSorting: false,
     cell: ({ row }) => <div className="flex flex-wrap gap-1">{row.original.primaryTypes.map(t => <PatternBadge key={t.code} code={t.code} />)}</div>,
   },
-  { id: 'totalAmountUsd', accessorKey: 'totalAmountUsd', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액 (USD)" className="ml-auto" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{usd(row.original.totalAmountUsd)}</div> },
-  { id: 'alertCount', accessorKey: 'alertCount', header: ({ column }) => <DataTableColumnHeader column={column} label="Alert" className="ml-auto" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.alertCount}건</div> },
-  { id: 'txCount', accessorKey: 'txCount', header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="ml-auto" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.txCount}건</div> },
+  { id: 'totalAmountUsd', accessorKey: 'totalAmountUsd', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액 (USD)" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{usd(row.original.totalAmountUsd)}</div> },
+  { id: 'alertCount', accessorKey: 'alertCount', header: ({ column }) => <DataTableColumnHeader column={column} label="Alert" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.alertCount}건</div> },
+  { id: 'txCount', accessorKey: 'txCount', header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.txCount}건</div> },
   { id: 'assignee', accessorFn: row => row.assignee.name, header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" /> },
   { id: 'status', accessorKey: 'status', header: ({ column }) => <DataTableColumnHeader column={column} label="상태" />, cell: ({ row }) => <EpisodeStatusBadge status={row.original.status} reviewRequested={Boolean(row.original.reviewRequestedAt)} /> },
   {
     id: 'createdAt', accessorKey: 'createdAt',
     header: ({ column }) => <DataTableColumnHeader column={column} label="생성일" />,
-    cell: ({ row }) => <div className="text-sm tabular-nums text-muted-foreground">{row.original.createdAt.slice(5, 10)}<p className="mt-1"><AgeBadge days={row.original.ageDays} /></p></div>,
+    cell: ({ row }) => <div className="flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground"><span>{row.original.createdAt.slice(5, 10)}</span><AgeBadge days={row.original.ageDays} /></div>,
   },
 ]
+
+const columnWidths = {
+  episodeId: '12%', riskScore: '8%', types: '18%', totalAmountUsd: '14%',
+  alertCount: '7%', txCount: '7%', assignee: '9%', status: '10%', createdAt: '15%',
+}
 
 export default function EpisodeList({ rows, today, onOpen }: { rows: EpisodeRow[]; today: Date; onOpen: (row: EpisodeRow) => void }) {
   const currentUser = useCurrentUser()
@@ -101,7 +106,7 @@ export default function EpisodeList({ rows, today, onOpen }: { rows: EpisodeRow[
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-[1320px] space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative mr-1 w-64">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -136,7 +141,7 @@ export default function EpisodeList({ rows, today, onOpen }: { rows: EpisodeRow[
         </div>
       )}
       {result.length
-        ? <DataTable table={table} onRowClick={onOpen} data-testid="episode-table" />
+        ? <DataTable table={table} columnWidths={columnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={onOpen} data-testid="episode-table" />
         : (
           <div className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />

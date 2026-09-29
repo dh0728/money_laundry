@@ -49,7 +49,7 @@ export function InstitutionView({ today }: { today: Date }) {
           {charts.state.status === 'loading' && <LoadingBlock label="그래프" />}
           {charts.state.status === 'success' && <InstitutionCharts data={charts.state.data} />}
         </section>
-        <section aria-label="AI Daily Report" className="h-full min-w-0 @6xl:col-span-1">
+        <section aria-label="RDR 9000 Daily Report" className="h-full min-w-0 @6xl:col-span-1">
           <AiDailyReport summary={summary.state.data} openAlerts={openAlerts} />
         </section>
       </div>

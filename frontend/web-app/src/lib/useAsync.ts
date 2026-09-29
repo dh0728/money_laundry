@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/api/common'
 
 export type AsyncState<T> =
   | { status: 'loading' }
   | { status: 'success'; data: T }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; error: unknown }
 
 type Settled<T> = { key: string; state: AsyncState<T> }
 
@@ -13,13 +13,15 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
   const [attempt, setAttempt] = useState(0)
   const key = JSON.stringify([...deps, attempt])
   const [settled, setSettled] = useState<Settled<T> | null>(null)
+  const latestRequest = useRef(0)
   useEffect(() => {
     let active = true
+    const request = ++latestRequest.current
     load().then(
-      data => active && setSettled({ key, state: { status: 'success', data } }),
+      data => active && request === latestRequest.current && setSettled({ key, state: { status: 'success', data } }),
       (error: unknown) =>
-        active &&
-        setSettled({ key, state: { status: 'error', message: error instanceof ApiError ? error.message : '알 수 없는 오류가 발생했습니다.' } }),
+        active && request === latestRequest.current &&
+        setSettled({ key, state: { status: 'error', message: error instanceof ApiError ? error.message : '알 수 없는 오류가 발생했습니다.', error } }),
     )
     return () => {
       active = false
@@ -28,6 +30,17 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
   const retry = useCallback(() => setAttempt(n => n + 1), [])
+  const refresh = async () => {
+    const request = ++latestRequest.current
+    try {
+      const data = await load()
+      if (request === latestRequest.current) setSettled({ key, state: { status: 'success', data } })
+      return data
+    } catch (error) {
+      if (request === latestRequest.current) setSettled({ key, state: { status: 'error', message: error instanceof ApiError ? error.message : '알 수 없는 오류가 발생했습니다.', error } })
+      throw error
+    }
+  }
   const state: AsyncState<T> = settled?.key === key ? settled.state : { status: 'loading' }
-  return { state, retry }
+  return { state, retry, refresh }
 }

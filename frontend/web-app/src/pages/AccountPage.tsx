@@ -8,6 +8,17 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
+const browserName = () => {
+  const agent = navigator.userAgent
+  if (agent.includes('Edg/')) return 'Microsoft Edge'
+  if (agent.includes('OPR/')) return 'Opera'
+  if (agent.includes('Whale/')) return 'Whale'
+  if (agent.includes('Firefox/') || agent.includes('FxiOS/')) return 'Firefox'
+  if (agent.includes('Chrome/') || agent.includes('CriOS/')) return 'Chrome'
+  if (agent.includes('Safari/')) return 'Safari'
+  return '브라우저'
+}
+
 // v24 UtilityPages.tsx의 계정 화면. 서버는 현재 세션만 제공한다.
 export default function AccountPage({ onLogout }: { onLogout: () => void }) {
   const currentUser = useCurrentUser()
@@ -41,10 +52,10 @@ export default function AccountPage({ onLogout }: { onLogout: () => void }) {
       <Card className="h-full shadow-none"><CardContent className="space-y-6">
         <SectionTitle title="세션 관리" description="현재 로그인만 종료할 수 있습니다." />
         <div className="divide-y">
-          <div className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
+          <div className="flex flex-wrap items-center gap-4 py-4 first:pt-0 last:pb-0">
             <div className="size-10 rounded-md bg-background grid place-items-center"><Monitor className="size-4" /></div>
-            <div className="flex-1"><div className="flex items-center gap-2"><p className="text-sm">현재 브라우저</p><Badge variant="secondary">현재</Badge></div><p className="text-xs text-muted-foreground mt-1">이 기기의 로그인 세션</p></div>
-            <Button variant="ghost" size="sm" onClick={onLogout}>현재 세션 로그아웃</Button>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-sm">{browserName()}</p><Badge variant="secondary">현재</Badge></div><p className="text-xs text-muted-foreground mt-1">이 기기의 로그인 세션</p></div>
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={onLogout}>현재 세션 로그아웃</Button>
           </div>
         </div>
       </CardContent></Card>

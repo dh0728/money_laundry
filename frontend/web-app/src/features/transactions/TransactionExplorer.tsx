@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
-import { ListFilter, Search, X } from 'lucide-react'
+import { ArrowRight, ListFilter, Search, X } from 'lucide-react'
+import { hrefFor } from '@/app/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -71,16 +72,15 @@ function TransactionMiniSankey({ transaction }: { transaction: IndexedTransactio
         <path d="M118 38 C176 38 244 38 302 38 L302 74 C244 74 176 74 118 74 Z" className={transaction.suspicious ? 'fill-destructive/35' : 'fill-muted-foreground/35'} />
       </svg>
       <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2"><p className="truncate text-[10px] text-muted-foreground">송금 소유주</p><p className="mt-1 break-words text-[11px] font-medium leading-tight" title={transaction.fromOwner}>{transaction.fromOwner}</p><p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{transaction.fromAccount}</p></div>
-      <p className="relative z-10 min-w-0 truncate rounded-full bg-card/90 px-1 py-1 text-center text-[10px] font-medium tabular-nums" title={amount}>{amount}</p>
+      <p className="relative z-10 flex min-w-0 items-center justify-center gap-1 rounded-full bg-card/90 px-1 py-1 text-center text-[10px] font-medium tabular-nums" title={amount}><span className="truncate">{amount}</span><ArrowRight data-testid="transaction-flow-direction" aria-hidden="true" className="size-3 shrink-0" /></p>
       <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2 text-right"><p className="truncate text-[10px] text-muted-foreground">수취 소유주</p><p className="mt-1 break-words text-[11px] font-medium leading-tight" title={transaction.toOwner}>{transaction.toOwner}</p><p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{transaction.toAccount}</p></div>
     </div>
   </figure>
 }
 
-// Alert·Episode 상세 화면이 생기기 전이라 번호만 보여 준다.
 function RecordLinks({ ids, kind }: { ids: number[]; kind: 'Alert' | 'Episode' }) {
   const prefix = kind === 'Alert' ? 'A' : 'E'
-  return <div className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} variant="outline" className="record-link h-8 rounded-full px-3 font-mono text-xs">{kind} · {prefix}-{id}</Badge>)}</div>
+  return <div className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} asChild variant="outline" className="record-link h-8 rounded-full px-3 font-mono text-xs"><a href={hrefFor(kind === 'Alert' ? 'alerts' : 'episodes', id)} title={`${prefix}-${id} 상세 보기`}>{kind} · {prefix}-{id}</a></Badge>)}</div>
 }
 
 function LinkedRecordActions({ transaction }: { transaction: IndexedTransaction }) {
@@ -171,7 +171,7 @@ export default function TransactionExplorer({ index, target, today }: { index: T
         <OrthogonalConnector id="owner-account-connector" sourceIndex={0} targetCount={ownerAccounts.length} targetOffset={110} activeTargetIndex={ownerAccounts.findIndex(item => item.id === account?.id)} />
         <StagePanel testId="account-section" title="계좌" count={ownerAccounts.length} description={owner ? `${owner.name}의 계좌` : '소유주를 선택하세요'}>{ownerAccounts.map(item => <StageItem key={item.id} testId="account-item" active={item.id === account?.id} primary={item.id} secondary={`은행 ${item.bank} · 거래 ${item.transactionIds.length}건`} mono onSelect={() => selectAccount(item)} />)}</StagePanel>
         <OrthogonalConnector id="account-transaction-connector" sourceIndex={ownerAccounts.findIndex(item => item.id === account?.id)} targetCount={transactionRows.length} targetOffset={110} activeTargetIndex={transactionRows.findIndex(item => item.id === selectedTransactionId)} />
-        <StagePanel testId="transaction-section" title="거래" count={transactionRows.length} description={account ? `${account.id}의 거래 내역` : '계좌를 선택하세요'}><div data-testid="transaction-list">{transactionRows.map(item => <StageItem key={item.id} testId="transaction-item" active={item.id === selectedTransactionId} primary={item.id} secondary={<><Badge variant="outline" className="font-normal text-inherit">{item.direction}</Badge><Badge variant={item.suspicious ? 'destructive' : 'outline'} className="font-normal">{item.suspicious ? '의심' : '정상'}</Badge></>} mono onSelect={() => selectTransaction(item)} />)}</div></StagePanel>
+        <StagePanel testId="transaction-section" title="거래" count={transactionRows.length} description={account ? `${account.id}의 거래 내역` : '계좌를 선택하세요'}><div data-testid="transaction-list">{transactionRows.map(item => <StageItem key={item.id} testId="transaction-item" active={item.id === selectedTransactionId} primary={item.id} secondary={<><Badge variant="ghost" className="bg-foreground !border-transparent !text-background font-normal">{item.direction}</Badge><Badge variant={item.suspicious ? 'destructive' : 'ghost'} className={item.suspicious ? '!border-transparent !text-destructive-foreground font-normal' : 'bg-foreground !border-transparent !text-background font-normal'}>{item.suspicious ? '의심' : '정상'}</Badge></>} mono onSelect={() => selectTransaction(item)} />)}</div></StagePanel>
         <Card className="transaction-detail self-start" data-testid="transaction-detail"><CardHeader><CardTitle className="text-sm">선택 거래 상세</CardTitle><CardDescription className={selected ? 'font-mono' : ''}>{selected?.id ?? '거래를 선택하세요'}</CardDescription>{selected && <LinkedRecordActions transaction={selected}  />}</CardHeader>{selected && <CardContent data-testid="selected-transaction" className="grid gap-5 text-xs"><TransactionMiniSankey transaction={selected} /><div className="grid grid-cols-2 gap-4"><div><p className="text-muted-foreground">거래 시각</p><p className="mt-1 tabular-nums">{selected.at.slice(0, 16).replace('T', ' ')}</p></div><div><p className="text-muted-foreground">결제 수단</p><p className="mt-1">{selected.format}</p></div></div><div><p className="text-muted-foreground">상태</p><Badge className="mt-1" variant={selected.suspicious ? 'destructive' : 'outline'}>{selected.suspicious ? '의심' : '정상'}</Badge></div></CardContent>}</Card>
       </div>
     </div>

@@ -84,7 +84,7 @@ const cssVar = (name: string) => typeof window === 'undefined' ? 'currentColor' 
 const dim = (hex: string) => hex.startsWith('#') && (hex.length === 7 || hex.length === 9) ? `${hex.slice(0, 7)}1f` : hex
 export const resetOwnerGraphState = (): OwnerGraphState => ({ positions: {}, camera: null })
 // web-app: panelExtra = 상세 패널 아래에 붙일 내용(거래 판정 전환)
-export default function Graph({ model, label, panelExtra }: { model: GraphModel; label: string; panelExtra?: (focus: FlowFocus) => ReactNode }) {
+export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '정상 거래' }: { model: GraphModel; label: string; panelExtra?: (focus: FlowFocus) => ReactNode; nonSuspiciousLabel?: string }) {
   const [showInfo, setShowInfo] = useState(false), [hop, setHop] = useState(DEFAULT_HOP)
   const [selectedNode, setSelectedNode] = useState<string | null>(null), [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [search, setSearch] = useState(''), [fullscreen, setFullscreen] = useState(false)
@@ -392,7 +392,7 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
       </div>
       <div className="mt-auto space-y-2.5 border-t pt-4 text-[11px] text-muted-foreground graph-legend">
         <p className="flex items-center gap-2"><i className="legend-line" style={{ background: 'var(--graph-l1)' }} />의심 거래</p>
-        <p className="flex items-center gap-2"><i className="legend-line" style={{ background: 'var(--graph-l0)' }} />정상 거래</p>
+        <p className="flex items-center gap-2"><i className="legend-line" style={{ background: 'var(--graph-l0)' }} />{nonSuspiciousLabel}</p>
         <p className="flex items-center gap-2"><i className="legend-line legend-dash" />연결 경로</p>
         <p className="flex items-center gap-2"><i className="legend-dot" style={{ background: 'var(--graph-l1)' }} />의심 거래 참여 계좌</p>
         <p className="flex items-center gap-2"><i className="legend-dot legend-dot-sm" style={{ background: 'var(--graph-l0-node)' }} />주변 계좌 · 큰 점은 허브</p>
@@ -436,7 +436,7 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
         {hover && (hoverNode || hoverEdge) && (
           <div className="graph-tooltip" style={{ left: Math.min(hover.x + 14, size.w - 260), top: Math.min(hover.y + 14, size.h - 110) }}>
             {hoverNode && <><b>{hoverNode.entity}</b><br />{hoverNode.account} · Bank {hoverNode.bank}<br />{graphNodeRole(hoverNode)}</>}
-            {hoverEdge && <><b>{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? '연결 경로 · 정상 거래' : '정상 거래'}</b> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{formatGraphMoney(hoverEdge)} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
+            {hoverEdge && <><b>{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? `연결 경로 · ${nonSuspiciousLabel}` : nonSuspiciousLabel}</b> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{formatGraphMoney(hoverEdge)} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
           </div>
         )}
         <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[11px] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</div>

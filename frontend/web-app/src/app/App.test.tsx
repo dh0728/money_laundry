@@ -15,8 +15,8 @@ const renderSignedIn = () => {
 describe('앱 틀', () => {
   it('처음에는 대시보드를 연다', () => {
     renderSignedIn()
-    // 화면 안의 큰 제목 대신 사이드바 메뉴 선택과 대시보드 탭으로 알 수 있다
-    expect(screen.getByRole('tab', { name: '내 담당' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '기관 전체' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: '내 담당' })).toHaveAttribute('aria-selected', 'false')
   })
 
   it('알림 메뉴는 알림 목록을 연다', async () => {
@@ -47,6 +47,9 @@ describe('앱 틀', () => {
     window.location.hash = 'alerts/3000'
     expect(await screen.findByTestId('detail-id')).toHaveTextContent('A-3000')
     expect(screen.getByTestId('header-back')).toHaveTextContent('Alert 목록')
+    const candidates = screen.getByRole('list', { name: '거래 패턴 후보' })
+    expect(candidates.children.length).toBeGreaterThan(1)
+    expect(candidates).toHaveTextContent('%')
     fireEvent.mouseDown(screen.getByRole('tab', { name: '검토 의견' }))
     fireEvent.click(screen.getByRole('tab', { name: '검토 의견' }))
     expect(await screen.findByRole('combobox', { name: '판정' })).toHaveTextContent('정상 · 종결')
@@ -59,7 +62,10 @@ describe('앱 틀', () => {
 
   it('RDR 9000을 닫고 다시 열 수 있으며, 화면 이동에도 패널 상태가 유지된다', async () => {
     renderSignedIn()
-    expect(screen.getByRole('region', { name: 'RDR 9000' })).toHaveAttribute('data-mode', 'sidebar')
+    expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
+    const trigger = within(screen.getByTestId('header-search')).getByRole('button', { name: 'RDR 9000 열기' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('region', { name: 'RDR 9000' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'RDR 9000' })).getByText(/전체 미처리 업무/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 닫기' }))
     expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
@@ -71,14 +77,24 @@ describe('앱 틀', () => {
 
   it('RDR 9000 심볼을 누르면 패널이 닫힌다', () => {
     renderSignedIn()
-    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 심볼로 닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
+    const header = screen.getByTestId('agent-header')
+    fireEvent.click(within(header).getByRole('button', { name: 'RDR 9000 심볼로 닫기' }))
     expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'RDR 9000 열기' })).toBeInTheDocument()
+  })
+
+  it('헤더의 RDR 9000 심볼을 다시 누르면 패널이 닫힌다', () => {
+    renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 패널 숨기기' }))
+    expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
   })
 
   it('RDR 9000도 사건 위험 점수를 화면과 같은 0~1 값으로 표시한다', async () => {
     window.history.replaceState({}, '', '/#alerts/3000')
     renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
     window.location.hash = 'alerts/3000'
     const agent = screen.getByRole('region', { name: 'RDR 9000' })
     expect(await within(agent).findByText(/위험 점수 0\.99/)).toBeInTheDocument()
@@ -89,6 +105,7 @@ describe('앱 틀', () => {
     for (const scenario of ['empty', 'error']) {
       window.history.replaceState({}, '', `/?mock=${scenario}`)
       const view = render(<App />, { wrapper: NuqsTestingAdapter })
+      fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
       expect(within(screen.getByRole('region', { name: 'RDR 9000' })).queryByText(/미처리 업무 25건/)).not.toBeInTheDocument()
       view.unmount()
     }
