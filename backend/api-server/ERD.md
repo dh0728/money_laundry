@@ -358,3 +358,15 @@ users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·
 - 원본 Alert 조사 사건은 원래 담당자/assigned_at 및 자체 거래 제외·판정을 보존하고 OPEN/outcome null/closed_at null/closed_by null로 복원한다. alerts 상태도 OPEN/resolution null로 복원한다. Episode의 판정은 원본 Alert로 전파하지 않는다.
 - 해체된 사건의 현재 그룹/소속은 비어 있다. 이력 snapshot은 현재 소속 조회에 사용하지 않으며, 해제된 Alert는 다른 Episode에 편입할 수 있다.
 - 사건 변경·모든 Alert 복원·사유 이력·revision·멱등 응답을 기존 advisory lock 아래 한 트랜잭션으로 처리한다. 원장·모델 결과·업로드 파일은 변경하지 않는다.
+
+
+## V14 — 시연 초기화 접수·파일 정리
+
+배포 시 테이블만 추가하며 기존 데이터를 삭제하지 않는다. 실제 삭제는 ADMIN의 dev/local 초기화 API에서만 수행한다.
+
+| 테이블 | 주요 컬럼·관계 |
+|---|---|
+| demo_resets | reset_id UUID PK(요청 멱등키), actor_id → users, status(FILES_PENDING/FILES_FAILED/COMPLETED), storage_scope, deleted_counts JSONB, created_at, completed_at |
+| demo_reset_files | (reset_id,object_key) 복합 PK, reset_id → demo_resets, is_prefix, done |
+
+두 테이블은 시연 데이터 초기화 대상에서 제외한다. DB 대상 삭제와 파일 정리 대상 기록은 한 트랜잭션으로 커밋한다. S3 작업은 이후 별도 단계이며 실패해도 DB 초기화를 다시 수행하지 않는다. 삭제 경로와 저장소 식별은 서버 내부에만 보관한다. 계정·은행/보고 기간·환율·Flyway와 ID 시퀀스를 보존한다. 업무 시각 행은 유지하고 business_at만 null로 되돌리며 revision을 증가시킨다.

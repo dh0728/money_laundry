@@ -34,6 +34,24 @@ def clock_conflict(response):
     return messages.get(detail) if isinstance(detail, str) else None
 
 
+def reset_error(response):
+    try:
+        problem = response.json()
+    except ValueError:
+        return None
+    if not isinstance(problem, dict) or not isinstance(problem.get('code'), str):
+        return None
+    return {
+        'RESET_BUSY': '실행·대기 중인 작업 또는 종료 미확인 추론 요청이 있습니다. 작업 종료 후 초기화하세요.',
+        'RESET_UPLOAD_URL_ACTIVE': '아직 유효한 업로드 URL이 있습니다. 발급된 URL이 만료된 뒤 초기화하세요.',
+        'RESET_PREVIEW_STALE': '데이터가 변경됐습니다. 초기화 대상 확인을 다시 누르세요.',
+        'RESET_CLEANUP_PENDING': '이전 초기화의 파일 정리가 남았습니다. 파일 정리 계속/재시도를 누르세요.',
+        'RESET_STORAGE_CHANGED': '이전 추론의 저장소와 현재 설정이 다릅니다. 관리자에게 저장소 설정 확인을 요청하세요.',
+        'RESET_CONFIRMATION_REQUIRED': '삭제 확인 문구를 정확히 입력하세요.',
+        'RESET_REQUEST_CONFLICT': '다른 관리자의 초기화 요청입니다. 새로 조회하세요.',
+    }.get(problem.get('code'))
+
+
 class ApiClient:
     def __init__(self, base_url, headers=None, transport=None):
         url = urlsplit(base_url)
@@ -92,6 +110,8 @@ class ApiClient:
                 messages = {400: '선택 범위와 입력을 확인하세요.', 403: '담당자 또는 실행 환경 권한이 없습니다.',
                             404: '대상이 없습니다.', 409: '상태가 변경됐거나 처리 조건이 충족되지 않았습니다. 새로 조회하세요.'}
                 specific = clock_conflict(response) if path == 'demo/clock' and response.status_code == 409 else None
+                if path == 'demo/reset' or path.startswith('demo/reset/'):
+                    specific = reset_error(response)
                 raise ApiError((specific or messages.get(response.status_code, '요청이 처리되지 않았습니다.'))
                                + f' (HTTP {response.status_code})', response.status_code)
             return response.json()

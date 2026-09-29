@@ -187,6 +187,89 @@ class Replay:
         self.pause.set()
         self.pool.shutdown(wait=False)
 
+    def reset_demo(self, payload):
+        with self.lock:
+            if self.future is not None and not self.future.done():
+                raise ApiError('현재 날짜 처리가 끝난 뒤 초기화하세요.')
+            result = self.controls.post('demo/reset', payload)
+            self.clear_after_reset(result['resetId'])
+            return result
+
+    def clear_after_reset(self, reset_id):
+        with self.lock:
+            if self.state.get('resetId') == reset_id:
+                return
+            if self.future is not None and not self.future.done():
+                raise ApiError('재생 중 초기화 이력이 변경됐습니다. 현재 작업 종료 후 다시 조회하세요.')
+            self.sent.clear()
+            self.jobs.clear()
+            self.completed.clear()
+            self.state = {'message': 'DB 초기화 완료', 'history': [], 'error': None, 'resetId': reset_id}
+
+
+def render_reset(replay):
+    import streamlit as st
+    from uuid import uuid4
+    try:
+        latest = replay.controls.get('demo/reset/latest')
+    except ApiError as error:
+        if error.status == 404:
+            st.caption('초기화 기능은 해당 API가 포함된 백엔드 배포 후 사용할 수 있습니다.')
+            return False
+        raise
+    if latest.get('resetId'):
+        replay.clear_after_reset(latest['resetId'])
+    pending = latest.get('status', 'NONE') in ('FILES_PENDING', 'FILES_FAILED')
+    running = replay.future is not None and not replay.future.done()
+    with st.expander('시연 데이터 초기화'):
+        st.warning('거래·업로드·분석·Alert/Episode·조사 이력과 관련 S3 파일을 삭제합니다. PC의 CSV, 직원 계정, 은행 등록, 환율은 보존합니다.')
+        if st.button('초기화 대상 확인', disabled=running or pending):
+            st.session_state.reset_preview = replay.controls.get('demo/reset/preview')
+            st.session_state.reset_request = str(uuid4())
+        preview = st.session_state.get('reset_preview')
+        if preview:
+            counts = preview['counts']
+            st.write({label: counts.get(table, 0) for label, table in (
+                ('거래', 'transactions'), ('업로드·분석 작업', 'batch_jobs'),
+                ('Alert', 'alerts'), ('조사 사건', 'review_cases'), ('은행 보고', 'report_versions'))})
+            confirmation = st.text_input('확인 문구: 시연 데이터 초기화', key='reset_confirmation')
+            if st.button('DB 및 관련 파일 초기화', disabled=running or pending or confirmation != '시연 데이터 초기화'):
+                result = replay.reset_demo({'requestId': st.session_state.reset_request,
+                                            'snapshot': preview['snapshot'], 'confirmation': confirmation})
+                st.session_state.cleanup_reset = result['resetId']
+                st.session_state.pop('reset_preview', None)
+                st.session_state.pop('reset_confirmation', None)
+                st.rerun()
+
+        @st.fragment(run_every='2s')
+        def cleanup_progress():
+            current = replay.controls.get('demo/reset/latest')
+            status = current.get('status', 'NONE')
+            if status == 'NONE':
+                return
+            if status == 'COMPLETED':
+                st.success('DB 및 관련 파일 초기화 완료. 업무 시각을 먼저 설정한 뒤 전송하세요.')
+                return
+            total, remaining = current['totalTargets'], current['remainingTargets']
+            st.progress((total - remaining) / total if total else 1.0,
+                        text=f'DB 초기화 완료 · 파일 정리 대상 {total - remaining}/{total}개 완료')
+            if status == 'FILES_FAILED':
+                st.session_state.pop('cleanup_reset', None)
+                st.error('DB 초기화 완료 / 파일 정리 실패. S3 삭제 권한·저장소 설정을 확인하고 파일 정리만 재시도하세요.')
+            if st.button('파일 정리 계속/재시도'):
+                st.session_state.cleanup_reset = current['resetId']
+            if st.session_state.get('cleanup_reset') == current['resetId']:
+                try:
+                    result = replay.controls.post(f'demo/reset/{current["resetId"]}/cleanup')
+                    if result['status'] in ('COMPLETED', 'FILES_FAILED'):
+                        st.session_state.pop('cleanup_reset', None)
+                        st.rerun()
+                except ApiError as error:
+                    st.session_state.pop('cleanup_reset', None)
+                    st.error(str(error))
+        cleanup_progress()
+    return pending
+
 
 def render():
     import os
@@ -233,12 +316,13 @@ def render():
             return
         clock = replay.controls.get('demo/clock')
         st.metric('시연 업무 시각 (KST)', clock['businessAt'])
+        reset_pending = render_reset(replay)
         with st.expander('시연 업무 시각 설정'):
             st.caption('선택 날짜 전송·자동 재생을 시작할 때 거래 기준일 다음 날 09:00 KST로 자동 설정합니다. 수동 설정이 더 미래이면 유지하며, 실제 통신 시각은 변경하지 않습니다.')
             current = datetime.fromisoformat(clock['businessAt'])
             picked = st.date_input('업무 날짜', current.date())
             picked_time = st.time_input('업무 시간', day_time(9))
-            busy = replay.future is not None and not replay.future.done()
+            busy = reset_pending or (replay.future is not None and not replay.future.done())
             if st.button('시각 적용', disabled=busy):
                 replay.controls.set_clock(datetime.combine(picked, picked_time, timezone(timedelta(hours=9))).isoformat())
                 st.rerun()
@@ -251,7 +335,7 @@ def render():
 
         @st.fragment(run_every='1s')
         def actions():
-            running = replay.future is not None and not replay.future.done()
+            running = reset_pending or (replay.future is not None and not replay.future.done())
             cols = st.columns(3)
             if cols[0].button('선택 날짜 전송', disabled=running or len(days) != 1):
                 replay.start(sorted(days), files, analyze=False)
