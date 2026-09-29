@@ -7,9 +7,10 @@ import httpx
 class ApiError(Exception):
     """A safe message that never contains a response body or credentials."""
 
-    def __init__(self, message, status=None):
+    def __init__(self, message, status=None, *, retryable=False):
         super().__init__(message)
         self.status = status
+        self.retryable = retryable
 
 
 def clock_conflict(response):
@@ -132,10 +133,13 @@ class ApiClient:
                 messages = {401: '인증이 필요합니다.', 403: '조회 권한이 없습니다.',
                             404: '해당 API 또는 완료된 결과를 찾을 수 없습니다.'}
                 raise ApiError(messages.get(response.status_code, 'API 요청이 실패했습니다.')
-                               + f' (HTTP {response.status_code})', response.status_code)
+                               + f' (HTTP {response.status_code})', response.status_code,
+                               retryable=response.status_code in (502, 503, 504, 524))
             data = response.json()
         except httpx.TimeoutException:
-            raise ApiError('API 응답 시간이 초과됐습니다. 다시 조회하세요.') from None
+            raise ApiError('API 응답 시간이 초과됐습니다. 다시 조회하세요.', retryable=True) from None
+        except (httpx.NetworkError, httpx.RemoteProtocolError):
+            raise ApiError('API 연결이 일시적으로 끊겼습니다.', retryable=True) from None
         except httpx.HTTPError:
             raise ApiError('API에 연결하지 못했습니다. 주소와 서버 상태를 확인하세요.') from None
         except ValueError:
