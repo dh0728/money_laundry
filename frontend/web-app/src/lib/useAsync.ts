@@ -1,46 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError } from '@/api/common'
+import { useCallback, useEffect, useEffectEvent, useId, useSyncExternalStore } from 'react'
+import { useWorkspace } from './workspaceState'
+export type { AsyncState } from './queryCache'
 
-export type AsyncState<T> =
-  | { status: 'loading' }
-  | { status: 'success'; data: T }
-  | { status: 'error'; message: string; error: unknown }
-
-type Settled<T> = { key: string; state: AsyncState<T> }
-
-// deps가 바뀌면 다시 불러온다. 결과가 지금 요청의 것이 아니면 loading으로 본다.
-export function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
-  const [attempt, setAttempt] = useState(0)
-  const key = JSON.stringify([...deps, attempt])
-  const [settled, setSettled] = useState<Settled<T> | null>(null)
-  const latestRequest = useRef(0)
+export function useAsync<T>(load: () => Promise<T>, deps: unknown[], options: { key?: string; maxAge?: number; enabled?: boolean } = {}) {
+  const cache = useWorkspace().queries
+  const id = useId()
+  const key = JSON.stringify([options.key ?? id, ...deps])
+  const maxAge = options.maxAge ?? 300_000
+  const enabled = options.enabled ?? true
+  const snapshot = useSyncExternalStore(useCallback(listener => cache.subscribe(key, listener), [cache, key]), () => cache.snapshot<T>(key))
+  const latestLoad = useEffectEvent(() => load)
   useEffect(() => {
-    let active = true
-    const request = ++latestRequest.current
-    load().then(
-      data => active && request === latestRequest.current && setSettled({ key, state: { status: 'success', data } }),
-      (error: unknown) =>
-        active && request === latestRequest.current &&
-        setSettled({ key, state: { status: 'error', message: error instanceof ApiError ? error.message : '알 수 없는 오류가 발생했습니다.', error } }),
-    )
-    return () => {
-      active = false
-    }
-    // key가 deps와 attempt를 모두 담는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
-  const retry = useCallback(() => setAttempt(n => n + 1), [])
-  const refresh = async () => {
-    const request = ++latestRequest.current
-    try {
-      const data = await load()
-      if (request === latestRequest.current) setSettled({ key, state: { status: 'success', data } })
-      return data
-    } catch (error) {
-      if (request === latestRequest.current) setSettled({ key, state: { status: 'error', message: error instanceof ApiError ? error.message : '알 수 없는 오류가 발생했습니다.', error } })
-      throw error
-    }
-  }
-  const state: AsyncState<T> = settled?.key === key ? settled.state : { status: 'loading' }
-  return { state, retry, refresh }
+    if (!enabled) return
+    const ensure = () => { if (document.visibilityState !== 'hidden') void cache.fetch(key, latestLoad(), maxAge).catch(() => undefined) }
+    ensure()
+    const timer = window.setInterval(ensure, maxAge)
+    window.addEventListener('focus', ensure)
+    document.addEventListener('visibilitychange', ensure)
+    return () => { clearInterval(timer); window.removeEventListener('focus', ensure); document.removeEventListener('visibilitychange', ensure) }
+  }, [cache, key, maxAge, enabled, snapshot.invalidation])
+  const refresh = () => cache.fetch(key, load, maxAge, true)
+  const retry = () => { void refresh().catch(() => undefined) }
+  return { state: snapshot.state, refreshing: snapshot.refreshing, refreshError: snapshot.refreshError, retry, refresh }
 }

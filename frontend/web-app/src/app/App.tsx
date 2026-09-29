@@ -1,3 +1,4 @@
+import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
 import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
@@ -149,6 +150,7 @@ export default function App() {
 
   return (
     <CurrentUserContext.Provider value={currentUser}>
+    <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} >
     <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
@@ -224,7 +226,8 @@ export default function App() {
             </Button>
           </div>
         </header>
-        <main className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
+        <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
+          <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
             : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
@@ -233,7 +236,8 @@ export default function App() {
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}
-        </main>
+        </SharedPeriod>
+        </WorkspaceMain>
       </SidebarInset>
       <Agent open={agentOpen} setOpen={setAgentOpen} closeRef={closeAgentRef} mode={agentMode} setMode={setAgentMode} record={agentRecord} records={agentRecords} />
       <AlertDialog open={logout} onOpenChange={setLogout}>
@@ -250,6 +254,7 @@ export default function App() {
         </AlertDialogContent>
       </AlertDialog>
     </SidebarProvider>
+    </WorkspaceProvider>
     </CurrentUserContext.Provider>
   )
 }

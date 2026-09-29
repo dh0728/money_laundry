@@ -1,3 +1,5 @@
+import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
+import { RefreshStatus } from '@/components/RefreshStatus'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/common'
@@ -19,7 +21,8 @@ const moneyPercent = (value: number | null) => value == null ? '산출 불가' :
 
 function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { caseId: number; kind: ReviewKind; onBack: () => void; onOpenEpisode: (id: number) => void; refreshList: () => Promise<unknown> }) {
   const user = useCurrentUser()
-  const { state, retry, refresh } = useAsync(() => fetchReviewCase(caseId), [caseId])
+  const detail = useAsync(() => fetchReviewCase(caseId), [caseId], { key: 'case/detail', maxAge: 60_000 })
+  const { state, retry, refresh } = detail
   const [comment, setComment] = useState('')
   const [excludeComment, setExcludeComment] = useState('')
   const [unlinkComment, setUnlinkComment] = useState('')
@@ -42,8 +45,8 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
   const scopePrevious = useRef<{ revision: number; accounts: string[]; comment: string; requestId: string } | null>(null)
   const [targetPage, setTargetPage] = useState(0)
   const emptyPage = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
-  const targets = useAsync(() => kind === 'ALERT' ? fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', page: targetPage, size: 20 }) : Promise.resolve(emptyPage), [kind, targetPage])
-  const money = useAsync(() => fetchReviewMoney(caseId, moneyMinutes), [caseId, moneyMinutes])
+  const targets = useAsync(() => kind === 'ALERT' ? fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', page: targetPage, size: 20 }) : Promise.resolve(emptyPage), [kind, targetPage], { key: 'case/targets', maxAge: 60_000 })
+  const money = useAsync(() => fetchReviewMoney(caseId, moneyMinutes), [caseId, moneyMinutes], { key: 'case/money', maxAge: 60_000 })
 
   if (state.status === 'loading') return <LoadingBlock label="조사 사건" />
   if (state.status === 'error') return <div className="space-y-3">
@@ -175,7 +178,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
       }
     } finally { scopeBusyRef.current = false; setScopeBusy(false) }
   }
-  return <div className="space-y-5">
+  return <div className="space-y-5"><RefreshStatus queries={[detail, money, targets]} />
     <Button variant="outline" size="sm" onClick={onBack}>목록으로</Button>
     <PageHeading title={`${item.kind === 'ALERT' ? `Alert A-${item.alertId ?? item.caseId}` : `Episode E-${item.caseId}`}`} description={`조사 사건 ID ${item.caseId} · ${item.status === 'OPEN' ? '진행 중' : '종결'} · 담당 ${item.assigneeName}`} />
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="사건 요약">
@@ -266,19 +269,20 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
 
 export default function LiveCasesPage({ kind, caseId, onOpen, onBack, onOpenEpisode }: { kind: ReviewKind; caseId?: number; onOpen: (id: number) => void; onBack: () => void; onOpenEpisode?: (id: number) => void }) {
   const user = useCurrentUser()
-  const [status, setStatus] = useState<ReviewQuery['status'] | 'ALL'>('ALL')
-  const [mine, setMine] = useState(false)
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [page, setPage] = useState(0)
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [status, setStatus] = useViewState<ReviewQuery['status'] | 'ALL'>(`${kind}/status`, 'ALL')
+  const [mine, setMine] = useViewState(`${kind}/mine`, false)
+  const { from, to, setFrom, setTo } = useSharedPeriod()
+  const scope = JSON.stringify([kind, from, to, status, mine])
+  const [page, setPage] = useViewState(`${scope}/page`, 0)
+  const [selectedIds, setSelectedIds] = useViewState<number[]>(`${scope}/${page}/selected`, [])
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
   const busyRef = useRef(false)
   const previousRequest = useRef<{ payload: string; id: string; command: ReviewCommand } | null>(null)
   const [canRetry, setCanRetry] = useState(false)
   const query: ReviewQuery = { kind, status: status === 'ALL' ? undefined : status, assigneeId: mine ? user.userId : undefined, from: from || undefined, to: to || undefined, page, size: 20 }
-  const { state, retry, refresh } = useAsync(() => fetchReviewCases(query), [kind, status, mine, from, to, page])
+  const list = useAsync(() => fetchReviewCases(query), [kind, status, mine, from, to, page], { key: 'cases', maxAge: 60_000 })
+  const { state, retry, refresh } = list
   const selectedRows = state.status === 'success' ? state.data.content.filter(row => selectedIds.includes(row.caseId)) : []
   const eligible = (row: ReviewCase) => user.role === 'STAFF' && row.kind === 'ALERT' && row.status === 'OPEN' && row.assigneeId === user.userId && row.episodeId == null
   const clearSelection = () => { setSelectedIds([]); setCanRetry(false); previousRequest.current = null; setPage(0) }
@@ -315,7 +319,7 @@ export default function LiveCasesPage({ kind, caseId, onOpen, onBack, onOpenEpis
     } finally { busyRef.current = false; setBusy(false) }
   }
   if (caseId) return <CaseDetail key={`${kind}-${caseId}`} caseId={caseId} kind={kind} onBack={onBack} onOpenEpisode={onOpenEpisode ?? onBack} refreshList={() => { setSelectedIds([]); return refresh() }} />
-  return <div className="space-y-5"><PageHeading title={`${kind === 'ALERT' ? 'Alert' : 'Episode'} 목록`} description="서버 조사 사건 · 위험도 높은 순" />
+  return <div className="space-y-5"><RefreshStatus queries={[list]} /><PageHeading title={`${kind === 'ALERT' ? 'Alert' : 'Episode'} 목록`} description="서버 조사 사건 · 위험도 높은 순" />
     <div className="flex flex-wrap items-center gap-2"><label className="text-xs">상태 <select className="ml-1 rounded-md border bg-background p-2" value={status} onChange={event => { setStatus(event.target.value as typeof status); clearSelection() }}><option value="ALL">전체</option><option value="OPEN">진행 중</option><option value="CLOSED">종결</option></select></label><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={mine} onChange={event => { setMine(event.target.checked); clearSelection() }} />내 담당</label><label className="text-xs">시작일 <input type="date" className="ml-1 rounded-md border bg-background p-1" value={from} onChange={event => { setFrom(event.target.value); clearSelection() }} /></label><label className="text-xs">종료일 <input type="date" className="ml-1 rounded-md border bg-background p-1" value={to} onChange={event => { setTo(event.target.value); clearSelection() }} /></label></div>
     {kind === 'ALERT' && <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">새 Episode 생성</h2><p className="mt-1 text-xs text-muted-foreground">현재 목록에서 본인 담당·진행 중·미편입 Alert를 2개 이상 고르세요. 다른 페이지나 필터로 이동하면 선택이 초기화됩니다.</p><p className="mt-2 text-sm">선택 {selectedRows.length}건: {selectedRows.map(row => `A-${row.alertId ?? row.caseId}`).join(', ') || '없음'}</p><textarea aria-label="새 Episode 생성 사유" className="mt-3 min-h-20 w-full rounded-md border bg-background p-3 text-sm" maxLength={4000} value={comment} onChange={event => { setComment(event.target.value); setCanRetry(false) }} placeholder="Alert를 묶는 근거" disabled={busy} /><div className="mt-2 flex gap-2"><Button size="sm" disabled={selectedRows.length < 2 || busy} onClick={() => void submitNew()}>새 Episode 생성</Button>{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (previousRequest.current) void submitNew(previousRequest.current.command) }}>같은 요청 재시도</Button>}</div></section>}
     {state.status === 'loading' ? <LoadingBlock label="조사 사건" /> : state.status === 'error' ? <ErrorBlock message={state.message} onRetry={retry} /> : <>{state.data.content.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{state.data.content.map((row: ReviewCase) => <div key={row.caseId} className="min-w-0 rounded-xl border bg-card p-4">{kind === 'ALERT' && <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" aria-label={`새 Episode 선택 A-${row.alertId ?? row.caseId}`} disabled={!eligible(row) || busy} checked={selectedIds.includes(row.caseId)} onChange={() => { setSelectedIds(ids => ids.includes(row.caseId) ? ids.filter(id => id !== row.caseId) : [...ids, row.caseId]); setCanRetry(false) }} />새 Episode 선택</label>}<button type="button" className="w-full text-left hover:text-primary" onClick={() => onOpen(row.caseId)}><div className="flex items-center justify-between gap-2"><strong>{kind === 'ALERT' ? `A-${row.alertId ?? row.caseId}` : `E-${row.caseId}`}</strong><span className="text-xs">{row.outcome === 'DISSOLVED' ? '해체 종결' : row.status === 'OPEN' ? '진행 중' : '종결'}</span></div><p className="mt-2 text-xs text-muted-foreground">담당 {row.assigneeName} · 조사 사건 {row.caseId}</p><p className="mt-3 text-xs">위험 {row.summary.riskScore?.toFixed(2) ?? '—'} · 거래 {row.summary.txCount} · 미판정 {row.pendingCount}</p><p className="mt-2 text-xs text-muted-foreground">{row.summary.primaryType}</p></button></div>)}</div> : <EmptyBlock>조건에 맞는 조사 사건이 없습니다.</EmptyBlock>}<div className="flex items-center justify-end gap-2 text-xs"><span>전체 {state.data.totalElements}건 · {page + 1}쪽</span><Button size="sm" variant="outline" disabled={page === 0} onClick={() => { setSelectedIds([]); setCanRetry(false); previousRequest.current = null; setPage(page - 1) }}>이전</Button><Button size="sm" variant="outline" disabled={(page + 1) * 20 >= state.data.totalElements} onClick={() => { setSelectedIds([]); setCanRetry(false); previousRequest.current = null; setPage(page + 1) }}>다음</Button></div></>}

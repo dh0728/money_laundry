@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
+import { RefreshStatus } from '@/components/RefreshStatus'
 import { fetchLedgerAccounts, fetchLedgerOwners, fetchLedgerTransactions, fetchPaymentFormats, type LedgerFilters, type LedgerTransaction } from '@/api/liveLedger'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { PageHeading } from '@/components/page'
@@ -14,20 +15,20 @@ function Pager({ page, total, onChange }: { page: number; total: number; onChang
 }
 
 export default function LiveLedgerPage({ onOpen }: { onOpen: (kind: 'ALERT' | 'EPISODE', id: number) => void }) {
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [judgement, setJudgement] = useState<LedgerFilters['judgement']>([])
-  const [payments, setPayments] = useState<string[]>([])
-  const [owner, setOwner] = useState<string | null>(null)
-  const [account, setAccount] = useState<string | null>(null)
-  const [ownerPage, setOwnerPage] = useState(0)
-  const [accountPage, setAccountPage] = useState(0)
-  const [transactionPage, setTransactionPage] = useState(0)
+  const { from, to, setFrom, setTo } = useSharedPeriod()
+  const [judgement, setJudgement] = useViewState<LedgerFilters['judgement']>('ledger/judgement', [])
+  const [payments, setPayments] = useViewState<string[]>('ledger/payments', [])
+  const scope = JSON.stringify([from, to, judgement, payments])
+  const [owner, setOwner] = useViewState<string | null>(`ledger/owner/${scope}`, null)
+  const [account, setAccount] = useViewState<string | null>(`ledger/account/${scope}`, null)
+  const [ownerPage, setOwnerPage] = useViewState(`ledger/ownerPage/${scope}`, 0)
+  const [accountPage, setAccountPage] = useViewState(`ledger/accountPage/${scope}`, 0)
+  const [transactionPage, setTransactionPage] = useViewState(`ledger/transactionPage/${scope}`, 0)
   const base = { from: from || undefined, to: to || undefined, judgement, payments }
-  const formats = useAsync(fetchPaymentFormats, [])
-  const owners = useAsync(() => fetchLedgerOwners({ ...base, page: ownerPage }), [from, to, judgement, payments, ownerPage])
-  const accounts = useAsync(() => owner ? fetchLedgerAccounts({ ...base, page: accountPage }, owner) : Promise.resolve(emptyPage), [from, to, judgement, payments, owner, accountPage])
-  const transactions = useAsync(() => account ? fetchLedgerTransactions({ ...base, page: transactionPage }, account) : Promise.resolve(emptyPage), [from, to, judgement, payments, account, transactionPage])
+  const formats = useAsync(fetchPaymentFormats, [], { key: 'payment-formats' })
+  const owners = useAsync(() => fetchLedgerOwners({ ...base, page: ownerPage }), [from, to, judgement, payments, ownerPage], { key: 'ledger/owners' })
+  const accounts = useAsync(() => owner ? fetchLedgerAccounts({ ...base, page: accountPage }, owner) : Promise.resolve(emptyPage), [from, to, judgement, payments, owner, accountPage], { key: 'ledger/accounts' })
+  const transactions = useAsync(() => account ? fetchLedgerTransactions({ ...base, page: transactionPage }, account) : Promise.resolve(emptyPage), [from, to, judgement, payments, account, transactionPage], { key: 'ledger/transactions' })
   const chooseOwner = (id: string) => { setOwner(id); setAccount(null); setAccountPage(0); setTransactionPage(0) }
   const chooseAccount = (id: string) => { setAccount(id); setTransactionPage(0) }
   const updateJudgement = (value: NonNullable<LedgerFilters['judgement']>[number]) => {
@@ -40,6 +41,7 @@ export default function LiveLedgerPage({ onOpen }: { onOpen: (kind: 'ALERT' | 'E
   }
 
   return <div className="space-y-5">
+    <RefreshStatus queries={[owners, accounts, transactions, formats]} />
     <PageHeading title="거래 내역" description="서버 원장 · 소유주 → 계좌 → 거래 순서로 조회 · 이름과 계좌번호 대신 가명 ID 표시" />
     <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 text-xs">
       <label>시작일 <input type="date" className="ml-1 rounded-md border bg-background px-2 py-1" value={from} max={to || undefined} onChange={event => { setFrom(event.target.value); setOwnerPage(0) }} /></label>
