@@ -1,6 +1,6 @@
 // v24 Detail.tsx(kind=Episode)를 옮김. 연결 Alert·탐지 유형·근거 출처가 중심이다(v23 요구).
 // 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/v24).
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import type { HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay } from '@/api/codes'
@@ -8,6 +8,8 @@ import type { EpisodeDetail as EpisodeDetailData, EpisodeTransaction } from '@/a
 import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Panel } from '@/features/alerts/DetailPanels'
 import { card, historyLabels } from '@/features/alerts/detailText'
@@ -36,16 +38,29 @@ type Props = {
   onOpenAlert: (alertId: number) => void
   onComment: (comment: string) => void
   onRequestReview: (comment: string) => void
+  onUnlinkAlerts?: (alertIds: number[], reason: string) => void
 }
 
-export default function EpisodeDetail({ episode, graph, transactions: modelTransactions, relabels, onRelabel, history, responsible, onOpenAlert, onComment, onRequestReview }: Props) {
+export default function EpisodeDetail({ episode, graph, transactions: modelTransactions, relabels, onRelabel, history, responsible, onOpenAlert, onComment, onRequestReview, onUnlinkAlerts }: Props) {
   const [tab, setTab] = useMemoryState<Tab>(`episode:${episode.episodeId}:tab`, 'overview')
+  const [selectingAlerts, setSelectingAlerts] = useState(false)
+  const [selectedAlertIds, setSelectedAlertIds] = useState<number[]>([])
+  const [unlinkReason, setUnlinkReason] = useState('')
+  const [confirmDissolve, setConfirmDissolve] = useState(false)
   const transactions = useMemo(() => applyRelabels(modelTransactions, relabels), [modelTransactions, relabels])
   const graphModel = useMemo(() => toGraphModel(graph, modelTransactions, relabels), [graph, modelTransactions, relabels])
   // Episode 금액은 거래 ID로 중복을 없애 계산한다(v23)
   const representative = [...episode.alerts].sort((a, b) => b.riskScore - a.riskScore)[0]?.subjectAccount.account
   const metrics = moneyMetrics(transactions, representative)
   const span = `${episode.flow.periodFrom.slice(5, 10)} ~ ${episode.flow.periodTo.slice(5, 10)}`
+  const submitUnlink = () => {
+    if (!selectedAlertIds.length || !unlinkReason.trim()) return
+    onUnlinkAlerts?.(selectedAlertIds, unlinkReason.trim())
+    setConfirmDissolve(false)
+    setSelectingAlerts(false)
+    setSelectedAlertIds([])
+    setUnlinkReason('')
+  }
 
   return (
     <div className="flex min-h-full flex-col gap-5">
@@ -80,11 +95,26 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
             ))}
           </div>
 
-          <Panel title="연결 Alert" description="이 Episode를 이루는 Alert · 눌러서 Alert 상세로 이동" testId="linked-alerts">
+          <Panel title="연결 Alert" description="이 Episode를 이루는 Alert · 눌러서 Alert 상세로 이동" testId="linked-alerts"
+            action={<div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={!responsible || !onUnlinkAlerts}
+                onClick={() => { setSelectingAlerts(value => !value); setSelectedAlertIds([]); setUnlinkReason('') }}>
+                {selectingAlerts ? '선택 취소' : '연결 Alert 선택'}
+              </Button>
+              {selectingAlerts && <Button size="sm" disabled={!selectedAlertIds.length || !unlinkReason.trim()}
+                onClick={() => episode.alerts.length - selectedAlertIds.length < 2 ? setConfirmDissolve(true) : submitUnlink()}>
+                선택 Alert 연결 해제
+              </Button>}
+            </div>}>
+            {selectingAlerts && <div className="mb-3 flex flex-wrap items-end gap-2 rounded-md border bg-card p-3">
+              <label className="min-w-48 flex-1 text-xs">연결 해제 사유
+                <textarea aria-label="연결 해제 사유" className="mt-1 min-h-9 w-full rounded-md border bg-background p-2 text-sm"
+                  maxLength={4000} value={unlinkReason} onChange={event => setUnlinkReason(event.target.value)} placeholder="선택 Alert를 연결 해제하는 이유" />
+              </label>
+            </div>}
             <div className="divide-y rounded-md border">
-              {episode.alerts.map(alert => (
-                <button key={alert.alertId} type="button" onClick={() => onOpenAlert(alert.alertId)} aria-label={`${alertCode(alert.alertId)} 상세 보기`}
-                  className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 px-3 py-2.5 text-left text-xs outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring @3xl:grid-cols-[88px_72px_160px_minmax(0,1fr)_110px_90px_16px] @3xl:gap-3">
+              {episode.alerts.map(alert => {
+                const rowContent = <>
                   <span className="font-mono">{alertCode(alert.alertId)}</span>
                   <RiskBadge score={alert.riskScore} />
                   <PatternBadge code={alert.primaryType.code} />
@@ -92,9 +122,23 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
                   <span className="tabular-nums @3xl:text-right">{usd(alert.totalAmountUsd)}</span>
                   <StatusBadge status={alert.status} />
                   <ExternalLink className="size-3.5 text-muted-foreground" />
-                </button>
-              ))}
+                </>
+                const rowClass = 'grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 text-left text-xs @3xl:grid-cols-[88px_72px_160px_minmax(0,1fr)_110px_90px_16px] @3xl:gap-3'
+                return selectingAlerts ? (
+                  <label key={alert.alertId} className={`flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 interactive-surface ${selectedAlertIds.includes(alert.alertId) ? 'bg-muted/40' : ''}`}>
+                    <input type="checkbox" className="shrink-0" aria-label={`Alert ${alertCode(alert.alertId)} 선택`}
+                      checked={selectedAlertIds.includes(alert.alertId)} onChange={() => setSelectedAlertIds(ids => ids.includes(alert.alertId) ? ids.filter(id => id !== alert.alertId) : [...ids, alert.alertId])} />
+                    <span className={rowClass}>{rowContent}</span>
+                  </label>
+                ) : (
+                  <button key={alert.alertId} type="button" onClick={() => onOpenAlert(alert.alertId)} aria-label={`${alertCode(alert.alertId)} 상세 보기`}
+                    className={`${rowClass} w-full px-3 py-2.5 outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring`}>
+                    {rowContent}
+                  </button>
+                )
+              })}
             </div>
+            {selectingAlerts && <p className="mt-2 text-xs text-muted-foreground">연결 해제 후 Alert가 1건 이하이면 Episode가 해체되고 모든 Alert가 단독으로 전환됩니다.</p>}
           </Panel>
 
           <div className="grid items-stretch gap-4 @3xl:grid-cols-3">
@@ -142,6 +186,18 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
         panelExtra={focus => <TxLabelPanel model={graphModel} focus={focus} editable={responsible && !episode.reviewRequestedAt && episode.status === 'OPEN'} onRelabel={onRelabel} />} />}
       {tab === 'transactions' && <AlertTxTable rows={transactions} />}
       {tab === 'review' && <EpisodeReview episode={episode} responsible={responsible} onComment={onComment} onRequestReview={onRequestReview} />}
+      <AlertDialog open={confirmDissolve} onOpenChange={setConfirmDissolve}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Episode를 해체할까요?</AlertDialogTitle>
+            <AlertDialogDescription>{episodeCode(episode.episodeId)}의 연결 Alert가 1건 이하로 남습니다. Episode가 해체되고 연결된 Alert {episode.alerts.length}건 모두 단독 Alert로 전환됩니다.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>돌아가기</AlertDialogCancel>
+            <AlertDialogAction onClick={submitUnlink}>Episode 해체 확인</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

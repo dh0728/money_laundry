@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildTransactionIndex } from '@/features/transactions/transactionIndex'
 import { transactionExplorerNormal } from '@/mocks/transactions'
+import { writeMemory } from '@/lib/memory'
 import TransactionsPage from './TransactionsPage'
 
 const useScenario = (scenario: string) => window.history.replaceState({}, '', scenario ? `/?mock=${scenario}` : '/')
@@ -15,6 +16,26 @@ describe('거래 내역', () => {
     const accounts = screen.getByTestId('account-section')
     expect(within(accounts).getAllByTestId('account-item').length).toBeGreaterThan(0)
     expect(within(screen.getByTestId('transaction-section')).getAllByRole('button').length).toBeGreaterThan(0)
+  })
+
+  it('거래 배지는 선택 상태에 맞춰 반전되고 상세 금액에 송금 방향이 보인다', async () => {
+    render(<TransactionsPage />)
+    const owners = await screen.findByTestId('owner-section')
+    fireEvent.click(within(owners).getAllByRole('button')[0])
+    const transaction = within(screen.getByTestId('transaction-section')).getAllByTestId('transaction-item')[0]
+    expect(within(transaction).getByText(/송금|수취/)).toHaveClass('bg-foreground', '!border-transparent', '!text-background')
+    fireEvent.click(transaction)
+    expect(transaction).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('transaction-flow-direction')).toBeInTheDocument()
+  })
+
+  it('선택 거래의 연결 Alert를 누르면 해당 Alert 상세 주소로 이동한다', async () => {
+    const transaction = transactionExplorerNormal.transactions.find(item => item.alertIds.includes(3000))!
+    writeMemory('transactions:target', { type: 'transaction', transactionId: String(transaction.txId) })
+    render(<TransactionsPage />)
+    const link = await screen.findByRole('link', { name: 'Alert · A-3000' })
+    fireEvent.click(link)
+    await waitFor(() => expect(window.location.hash).toBe('#alerts/3000'))
   })
 
   it('빈 결과와 오류를 보여 준다', async () => {

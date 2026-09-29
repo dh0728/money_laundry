@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ComponentProps, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
 import { live } from '@/lib/apiMode'
@@ -6,7 +6,7 @@ import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import GlobalSearch from '@/features/search/GlobalSearch'
 import LiveGlobalSearch from '@/features/search/LiveGlobalSearch'
-import Agent, { AgentFab, type AgentMode } from '@/features/agent/Agent'
+import Agent, { AgentTrigger, type AgentMode } from '@/features/agent/Agent'
 import { mockAgentRecords, recordForRoute } from '@/features/agent/agentData'
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
 import { SidebarSelection } from '@/components/SidebarSelection'
@@ -94,7 +94,8 @@ export default function App() {
   const [logoutError, setLogoutError] = useState('')
   const currentUser = user ?? MOCK_USER
   const fromSession = (session: SessionUser): CurrentUser => ({ ...MOCK_USER, userId: session.id, name: session.name, role: session.role, username: session.username, organization: '—', email: '—', joinedAt: '—' })
-  const [agentOpen, setAgentOpen] = useState(() => !(globalThis.matchMedia?.('(max-width: 1199px)').matches ?? false))
+  const [agentOpen, setAgentOpen] = useState(false)
+  const closeAgentRef = useRef<() => void>(() => setAgentOpen(false))
   const [agentMode, setAgentMode] = useState<AgentMode>('sidebar')
   const agentSidebar = agentOpen && agentMode === 'sidebar'
   const agentRecords = live || currentScenario() !== 'normal' ? [] : mockAgentRecords
@@ -192,7 +193,7 @@ export default function App() {
                   <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{currentUser.name[0]}</AvatarFallback></Avatar>
                   <span className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
                     <span className="block text-xs font-medium">{currentUser.name}</span>
-                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
+                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
                   </span>
                 </SidebarDestinationButton>
                 <PendingWorkCount routeKey={`${page}/${id ?? ''}`} />
@@ -204,19 +205,20 @@ export default function App() {
       <SidebarInset className="flex h-svh min-w-0 flex-col overflow-hidden">
         <header className="app-header z-40 grid h-15 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-4 min-[1100px]:gap-5 min-[1100px]:px-6">
           <div className="header-navigation flex min-w-0 items-center">
-          <SidebarTrigger className="size-8 rounded-full md:hidden" aria-label="메뉴 열기" />
+          <SidebarTrigger className="size-9 rounded-full md:hidden" aria-label="메뉴 열기" />
           {/* 상세 화면에서는 머리 왼쪽에 목록으로 돌아가는 버튼을 둔다 */}
           {id && (page === 'alerts' || page === 'episodes') && (
-            <Button variant="ghost" size="sm" className="h-8 gap-1.5 rounded-full px-3 text-xs" onClick={() => go(page)} data-testid="header-back">
+            <Button variant="ghost" size="sm" className="h-9 gap-1.5 rounded-full px-3 text-xs" onClick={() => go(page)} data-testid="header-back">
               <ArrowLeft className="size-4" />{page === 'alerts' ? 'Alert 목록' : 'Episode 목록'}
             </Button>
           )}
           </div>
-          <div className="header-search min-w-0 w-full max-w-[420px] justify-self-center">
+          <div className="header-search flex min-w-0 w-full max-w-[460px] items-center gap-2 justify-self-center" data-testid="header-search">
             {live ? <LiveGlobalSearch onNavigate={(next, nextId) => go(next, nextId)} /> : <GlobalSearch onNavigate={(next, nextId) => go(next, nextId)} onOpenTransaction={target => { setTransactionTarget(target); go('transactions') }} />}
+            <AgentTrigger open={agentOpen} onToggle={() => { if (agentOpen) { closeAgentRef.current(); return } if (window.innerWidth < 1200) setAgentMode('floating'); setAgentOpen(true) }} />
           </div>
           <div className="header-actions flex items-center justify-self-end gap-1.5" data-testid="header-actions">
-            <Button variant="ghost" size="sm" className="h-8 gap-2 rounded-full px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
+            <Button variant="ghost" size="sm" className="h-9 gap-2 rounded-full px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
               <Kbd>F11</Kbd>
             </Button>
@@ -225,7 +227,7 @@ export default function App() {
         <main className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
             : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
-            : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
+            : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
             : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
             : page === 'notifications' ? <NotificationsPage onOpen={item => go(item.target.page, live ? undefined : item.target.id)} />
             : page === 'settings' ? <SettingsPage />
@@ -233,8 +235,7 @@ export default function App() {
                 : <ComingSoonPage title={pageTitles[page]} />}
         </main>
       </SidebarInset>
-      <AgentFab open={agentOpen} onToggle={() => { if (window.innerWidth < 1200) setAgentMode('floating'); setAgentOpen(true) }} />
-      <Agent open={agentOpen} setOpen={setAgentOpen} mode={agentMode} setMode={setAgentMode} record={agentRecord} records={agentRecords} />
+      <Agent open={agentOpen} setOpen={setAgentOpen} closeRef={closeAgentRef} mode={agentMode} setMode={setAgentMode} record={agentRecord} records={agentRecords} />
       <AlertDialog open={logout} onOpenChange={setLogout}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -245,7 +246,7 @@ export default function App() {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction onClick={() => void signOut()}>로그아웃</AlertDialogAction>
           </AlertDialogFooter>
-          {logoutError && <p role="alert" className="text-sm text-destructive">{logoutError}</p>}
+          {logoutError && <p role="alert" className="text-sm text-destructive-text">{logoutError}</p>}
         </AlertDialogContent>
       </AlertDialog>
     </SidebarProvider>

@@ -7,6 +7,7 @@ import { useReviewRequests } from '@/features/episodes/reviewStore'
 import { useAsync } from '@/lib/useAsync'
 import { allAlertsNormal } from '@/mocks/alerts'
 import { loadMockEpisodes } from '@/mocks/episodes'
+import { useMockExcludedTransactions } from '@/mocks/transactionScope'
 import EpisodeDetailPage from './EpisodeDetailPage'
 import { live } from '@/lib/apiMode'
 
@@ -19,8 +20,9 @@ export default function EpisodesPage({ episodeId, onOpen, onOpenAlert }: Props) 
   // mock: Alert 화면에서 연결·생성한 결과(메모리)를 반영해 Episode를 다시 묶는다
   const [overrides] = useAlertOverrides()
   const [requests] = useReviewRequests()
+  const [excludedTransactions] = useMockExcludedTransactions()
   const alerts = useMemo(() => (live ? [] : allAlertsNormal.content.map(row => withOverride(row, overrides))), [overrides])
-  const { state, retry } = useAsync(() => (live ? fetchEpisodes({ size: 200 }) : loadMockEpisodes(alerts)), [overrides])
+  const { state, retry } = useAsync(() => (live ? fetchEpisodes({ size: 200 }) : loadMockEpisodes(alerts, undefined, excludedTransactions)), [overrides, excludedTransactions])
 
   if (episodeId) return <EpisodeDetailPage episodeId={episodeId} alerts={alerts} onOpenAlert={onOpenAlert} />
 

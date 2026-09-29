@@ -19,6 +19,8 @@ export function detailOf(row: AlertRow): AlertDetail {
   const ownerOf = (account: string) => OWNERS[(accounts.indexOf(account) + row.alertId) % OWNERS.length]
   const start = new Date(row.createdAt).getTime() - 3 * 86_400_000
   const share = Math.round(row.totalAmountUsd / row.txCount)
+  const secondType = (row.primaryType.code + 4) % 9
+  const thirdType = (row.primaryType.code + 6) % 9
 
   const transactions: AlertTransaction[] = Array.from({ length: row.txCount }, (_, i) => {
     // 대표 계좌로 모였다가 다른 계좌로 흩어지는 모양. 앞쪽 상대 계좌는 보내기만, 뒤쪽은 받기만 한다.
@@ -33,6 +35,7 @@ export function detailOf(row: AlertRow): AlertDetail {
     // 임계(0.5) 이상이면 의심 거래. 세 건 중 한 건은 임계 아래의 연결 거래다.
     const suspicious = i % 3 !== 2
     const score = suspicious ? Math.max(0.5, Math.round((row.scoreStats.max - (i % 5) * 0.04) * 100) / 100) : Math.round((0.2 + (i % 4) * 0.06) * 100) / 100
+    const topScore = 0.6 + (i % 4) / 10
     return {
       txId: row.alertId * 100 + i,
       txAt: seoulIso(start + i * 9 * 3_600_000),
@@ -41,7 +44,8 @@ export function detailOf(row: AlertRow): AlertDetail {
       paymentFormat: FORMATS[(i + row.alertId) % FORMATS.length],
       launderingScore: score, scorePercentile: Math.round(score * 1000) / 10, thresholdRatio: Math.round((score / 0.5) * 100) / 100,
       isSuspicious: suspicious,
-      typeClass: row.primaryType.code, typeName: row.primaryType.name, typeScore: 0.6 + (i % 4) / 10,
+      typeClass: row.primaryType.code, typeName: row.primaryType.name, typeScore: topScore,
+      typeProbabilities: { [row.primaryType.code]: topScore, [secondType]: (1 - topScore) * 0.7, [thirdType]: (1 - topScore) * 0.3 },
       role: i === 0 ? 'SEED' : 'SUPPORTING', includedReason: REASONS[i % REASONS.length],
       direction: inbound ? 'IN' : 'OUT',
       fromOwnerName: ownerOf(from), toOwnerName: ownerOf(to),
@@ -62,7 +66,6 @@ export function detailOf(row: AlertRow): AlertDetail {
     }
   })
 
-  const secondType = (row.primaryType.code + 4) % 9
   return {
     ...row,
     transactions,

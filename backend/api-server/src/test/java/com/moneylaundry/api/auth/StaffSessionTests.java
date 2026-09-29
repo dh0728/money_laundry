@@ -55,11 +55,12 @@ class StaffSessionTests {
   void caller_header_cannot_change_session_actor() throws Exception {
     login("l1a");
     long other = jdbc.queryForObject("select user_id from users where username='l1b'", Long.class);
+    long alertId =
+        jdbc.queryForObject(
+            "insert into alerts(assignee_id) values(?) returning alert_id", Long.class, other);
     long id =
         jdbc.queryForObject(
-            "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,now(),now()) returning case_id",
-            Long.class,
-            other);
+            "select case_id from review_cases where alert_id=?", Long.class, alertId);
     String body =
         "{\"requestId\":\""
             + java.util.UUID.randomUUID()

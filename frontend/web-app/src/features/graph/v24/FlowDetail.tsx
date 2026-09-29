@@ -153,7 +153,7 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
           </CardHeader>
           <CardContent>
             {/* v20 R16: 표 없이 읽히도록 확대·축소·화면 맞춤(react-zoom-pan-pinch). 글자는 배율과 무관하게 화면 크기 고정 */}
-            <TransformWrapper minScale={0.5} maxScale={6} smooth={false} wheel={{ step: 0.12 }} doubleClick={{ disabled: true }} onTransform={(_, s) => { setZoom(s.scale); setFitted(Math.abs(s.scale - 1) < .001 && Math.abs(s.positionX) < .5 && Math.abs(s.positionY) < .5) }}>
+            <TransformWrapper minScale={0.5} maxScale={6} smooth wheel={{ step: 0.0015 }} doubleClick={{ disabled: true }} onTransform={(_, s) => { setZoom(s.scale); setFitted(Math.abs(s.scale - 1) < .001 && Math.abs(s.positionX) < .5 && Math.abs(s.positionY) < .5) }}>
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <div>
                   <TransformComponent wrapperClass="!w-full rounded-md" contentClass="!w-full">

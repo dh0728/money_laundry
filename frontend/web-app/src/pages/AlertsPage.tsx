@@ -9,6 +9,8 @@ import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverride
 import { episodeLinkOverrides, nextEpisodeId, type EpisodeTarget } from '@/features/alerts/episodeLink'
 import { useAsync } from '@/lib/useAsync'
 import { loadMockAlerts } from '@/mocks/alerts'
+import { detailOf } from '@/mocks/alertDetail'
+import { useMockExcludedTransactions, withoutTransactions } from '@/mocks/transactionScope'
 import AlertDetailPage from './AlertDetailPage'
 import { live, mockSavedNote } from '@/lib/apiMode'
 
@@ -21,7 +23,12 @@ type Props = { alertId?: number; onOpen: (alertId: number) => void; onOpenEpisod
 export default function AlertsPage({ alertId, onOpen, onOpenEpisode }: Props) {
   const { state, retry } = useAsync(() => (live ? fetchAlerts({ size: 200 }) : loadMockAlerts()), [])
   const [overrides, setOverrides] = useAlertOverrides()
-  const rows = useMemo(() => (state.status === 'success' ? state.data.content.map(row => withOverride(row, overrides)) : []), [state, overrides])
+  const [excludedTransactions] = useMockExcludedTransactions()
+  const rows = useMemo(() => (state.status === 'success' ? state.data.content.map(row => {
+    const current = withOverride(row, overrides)
+    const excluded = excludedTransactions[row.alertId] ?? []
+    return !live && excluded.length ? withoutTransactions(detailOf(current), excluded) : current
+  }) : []), [state, overrides, excludedTransactions])
 
   // 상세는 목록과 따로 불러온다. 목록은 Episode 연결 대상 고르기에만 쓴다.
   if (alertId) return <AlertDetailPage alertId={alertId} rows={rows} onOpenEpisode={onOpenEpisode} />

@@ -258,7 +258,7 @@ results/{jobId}/error.json          ← 실패 시 (scores 없이)
 
 §9.4의 범위별 처리가 정본이다. 현재 V6 상태 값 OPEN/CLOSED/ESCALATED를 새 업무 결과와 동일시하지 않는다. 일부 이관 후 미처리 범위가 있으면 열린 업무를 유지하며, 모든 조사 대상이 판정·제외·이관되면 업무 완료가 가능하다. 혼합 처리를 전체 NORMAL로 표시하지 않는다.
 
-원본 Alert와 이관 시점 범위는 보존한다. `episodeId != null ⇔ ESCALATED`와 단일 Episode 귀속 제약, 연결 해제로 Alert 담당 직원에게 자동 반송하는 구 설계는 새 부분 이관/복수 출처/직접 Episode 담당 직원 조정 계약에 사용하지 않는다. 상태 enum 및 기존 읽기 API와의 호환은 §9.8에서 정한다. 담당자 열람 이력은 검토 사실이며 업무 상태나 모델 점수를 변경하지 않는다.
+원본 Alert와 편입 시점 범위는 보존한다. V12부터 Alert는 분할 없이 최대 한 Episode에 소속되며 Episode는 서로 다른 Alert 2개 이상으로 구성한다. 전체 편입과 원자 종결 계약은 §9.8을 따른다. 부분 이동은 지원하지 않는다. 담당자의 명시적 전체 연결 해제·2개 미만 자동 해체는 §9.8 UNLINK를 따른다.
 
 ### 3.4 배정 규칙
 
@@ -427,7 +427,7 @@ GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId
 
 소유주·계좌는 **가명 식별자로 시연**한다. UUID를 원문 이름/계좌번호로 해석하지 않는다. FE는 ‘소유주 …’, ‘계좌 …’ 형태로 표시할 수 있으나 요청 식별자는 전체 UUID를 유지한다. 원문 공개는 별도 권한 계약 대상이다.
 
-**소속 의미:** 조사 구성의 SUBJECT와 CONTEXT를 모두 포함한다. EXCLUDED/TRANSFERRED 거래는 해당 사건의 소속 배열에서 제외한다. 정상·의심 DECIDED 및 CLOSED 사건은 제외하지 않는다. 아직 저장된 조사 범위가 없는 Alert는 최신 완료 근거를 사용한다. OPEN Alert는 저장 범위에 아직 없는 새 근거 거래를 포함하지만 이미 제외·이관한 거래를 자동 재편입하지 않는다. CLOSED의 저장 범위에는 새 근거를 추가하지 않는다. 미완료 분석의 근거는 사용하지 않는다. 원본 Alert 출처 이력과 현재 소속은 다르며 과거 이력 전체를 이 배열에 넣지 않는다.
+**소속 의미:** 조사 구성의 SUBJECT와 CONTEXT를 모두 포함한다. EXCLUDED/TRANSFERRED 거래는 해당 사건의 소속 배열에서 제외한다. V12 전체 편입은 원본 member를 TRANSFERRED로 바꾸지 않으므로 해당 거래는 원본 alertIds와 목적지 episodeIds 양쪽에 나타난다. 정상·의심 DECIDED 및 CLOSED 사건은 제외하지 않는다. 아직 저장된 조사 범위가 없는 Alert는 최신 완료 근거를 사용한다. OPEN Alert는 저장 범위에 아직 없는 새 근거 거래를 포함하지만 이미 제외·이관한 거래를 자동 재편입하지 않는다. CLOSED의 저장 범위에는 새 근거를 추가하지 않는다. 미완료 분석의 근거는 사용하지 않는다. 원본 Alert 출처 이력과 현재 소속은 다르며 과거 이력 전체를 이 배열에 넣지 않는다.
 
 alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert의 조사 상세 경로에 쓰는 caseId와 alertId를 동일하다고 가정하지 않는다. 소유주 name·원문 계좌번호는 여전히 반환하지 않는다.
 
@@ -444,7 +444,7 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert의 �
 
 FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 따른다. 코드0 이름 통일·Alert만의72시간 집계·amountUsd 및 현재 사건 소속 필드는 구현에 반영했다. dev 접근 정책과 배포 적용은 별도 확인한다. 기존 결정과 다른 30일 처리율·3분류 도넛은 자동 추가하지 않는다.
 
-현재 화면/조사 구현 계약과 후속 범위는 §9.8을 따른다. 실제 모델 피처·확률 합/dtype·설명 정보 계약과 정식 인증은 각 해당 태스크에서 확인한다. 과거 단일 Alert 소속·처분 거래 무조건 제외·부분 이관 불가를 미결 또는 확정 조건으로 되살리지 않는다.
+현재 화면/조사 구현 계약과 후속 범위는 §9.8을 따른다. 실제 모델 피처·확률 합/dtype·설명 정보 계약과 정식 인증은 각 해당 태스크에서 확인한다. 거래는 여러 Alert에 포함될 수 있지만 Alert 자체는 한 Episode에만 전체 편입한다. §9.8을 따른다.
 
 ## 9. 네 화면·시연 시각·범위별 판정 계약 (로컬 시연 구현)
 
@@ -482,15 +482,15 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 - 외부 유입은 조사 중심 계좌 집합 밖→안이며 등록 은행 여부와 다르다. 중심 범위 S·기간 T와 FIFO 산식은 §9.9를 따른다.
 - 탐지 근거는 모델 점수/씨앗, 관측 거래 연결, 계산 지표, 사람 의견을 구분한다. 별도 룰 엔진 도입 없음. 그래프 모양을 모델 내부 판단 근거로 단정하지 않는다. 패턴 이미지는 예시이며 실제 사건 그래프로 연결한다.
 
-### 9.4 범위 처리·단일/복수 이관
+### 9.4 Alert 판정·전체 편입
 
-- 조사 대상 SUBJECT, 참고 맥락 CONTEXT, 범위 제외를 구분한다. 자동 탐색의 SEED/CONNECTION/CONTEXT와 사람의 조사 역할은 별도다. 모델 정상 거래도 조사 대상일 수 있다. 이관 시 두 범위 건수를 확인하고 원본 근거 버전/출처를 고정한다.
-- Alert 담당 직원: 다중 선택 정상 판정·제외·부분/전체 이관. 미처리 대상이 있으면 Alert 업무를 유지하며 전부 처리하면 완료 가능하다. 혼합 처리 결과를 전체 NORMAL로 축약하지 않는다. 제외/이관은 의심 또는 정상 확정이 아니다.
-- 이관 명령은 단일/복수 모두 같은 API에서 배열을 받는다. 각 항목에는 Alert ID, 근거/조사 범위 버전, 선택 거래 범위가 필요하다. 목적지는 새 Episode 또는 기존 OPEN Episode다. 구체 DTO 이름은 미확정이며 단순 alertIds 배열만으로 부분 범위를 잃지 않아야 한다.
-- 한 요청의 새 Episode 생성(해당 시)·모든 범위 연결·업무 상태·감사 기록은 함께 성공/취소한다. 항목별 일부 성공 방식은 채택하지 않는다. 담당자 권한·목적지 상태·현재 범위를 서버가 확인한다. 신규 일반 Episode는 기존 Episode 담당 직원 라운드로빈 배정 원칙을 유지한다.
-- Episode 담당 직원: 이관된 Alert별 초기 묶음을 검토하고 필요 시 제외·분리·이동. 이동 목적지는 같은 Episode 묶음, 본인 담당 다른 OPEN Episode, 본인 담당 새 Episode다. 다른 담당자의 사건을 임의 변경하지 않는다. 원본 Alert 담당 직원 이관 기록을 수정하지 않는다.
-- Episode 묶음 하나/여러 개의 고정 SUBJECT 범위에 정상/세탁 의심 일괄 판정. CONTEXT나 나중 추가 거래에는 자동 적용하지 않는다. 판정 후 범위 변경 시 현재 범위 재확인이 필요하고 이전 판정은 보존한다.
-- 종결: 미판정 대상이 있으면 거절. 모두 처리한 후 의심 묶음이 하나 이상이면 세탁 의심(적용 범위 명시), 모두 정상이면 정상, 전부 이동/제외면 판정 없는 범위 정리 종료. 원장·모델 점수·다른 사건 상태는 덮지 않는다. 구체 상태/종결 코드 매핑은 §9.8이다.
+- Alert는 단일 패턴 블록 후보, Episode는 관련 Alert 2개 이상의 시나리오다. 정답 라벨로 구성하거나 세탁 확정으로 해석하지 않는다. 자동 생성 알고리즘 재설계는 별도이며 이번 변경은 조사 처리 계약이다.
+- 직원 최종 선택: 정상 종결, Episode 없이 단독 세탁 의심 종결, 기존 OPEN Episode에 전체 편입, 여러 Alert로 새 Episode 생성.
+- Alert는 분할 없이 최대 한 Episode에 소속된다. 같은 거래가 다른 Alert에도 등장하는 것은 허용한다. Episode 생성 최소 수는 거래/묶음 수가 아닌 서로 다른 Alert 수다.
+- SUBJECT/CONTEXT/제외는 조사 범위 표시이며 Alert 소속을 쪼개지 않는다. 전체 편입 시 모든 구성 거래와 조사 역할·기존 판정을 고정 복사하고 원본 Alert 업무를 TRANSFERRED로 종결한다. 참고 맥락은 자동으로 정상/의심 판정하지 않는다.
+- 새 Episode는 로그인 가능한 STAFF 라운드로빈 배정. 본인 담당 OPEN Alert만 편입 가능하며 기존 OPEN Episode는 다른 담당자의 사건에도 추가할 수 있다. 목적지 조사 권한까지 부여하지 않는다.
+- Episode 내부는 Alert당 한 묶음이다. 묶음의 미판정 SUBJECT 전체를 NORMAL/SUSPICIOUS로 판정하고 명시 CLOSE로 종결한다. 상충 거래 판정·미판정 대상은 종결을 막는다. 부분 분리/이동(SPLIT/MOVE)은 거절하며 전체 Alert 재이관/해제는 이번 범위에서 제공하지 않는다.
+- 소속·종결·감사·멱등 응답은 한 트랜잭션으로 저장한다. 원장/모델 점수/다른 사건 판정은 변경하지 않는다.
 
 ### 9.5 충돌·재시도·감사
 
@@ -506,8 +506,8 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 
 - 시연 시각 보존·시간 경계·처리 중/역방향 변경 거절, 실제 URL 만료/재시도 시간 불변.
 - 전체 거래 탐색·모델 필터·미분석·KST 경계·빈 결과, 분석 거래 4분면과 사람 판정 분리.
-- 부분 정상/제외/이관, 다중 이관 중 하나 실패 시 전체 롤백, 재전송·동시 판정/종결 충돌.
-- Episode 담당 직원 묶음 분리/이동·맥락 미전파·원본 출처 보존·다중 사건 중복 합산 방지·빈 사건 종료·혼합 결론.
+- 정상/단독 의심 종결, 전체 Alert 편입, 최소 2개·단일 소속, 부분 이관 거절, 다중 편입 전체 롤백, 재전송·동시 판정/편입 충돌.
+- Episode의 Alert별 묶음 판정·맥락 미전파·원본 출처 보존·중복 거래 집계 방지·최소 구성 DB 제약.
 - 모델 정답 라벨 없이 구성/설명 생성, 개별 확률을 사건 확률로 표시하지 않음.
 - PostgreSQL 통합 테스트와 Streamlit AppTest로 주요 정상/실패 경로를 검증했다. 최신 100CSV 전체 관통·실제 모델·원격 환경은 별도 검증이다.
 
@@ -534,27 +534,40 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 {
   "requestId": "UUID",
   "action": "TRANSFER",
-  "selections": [{"caseId": 1, "revision": 1000001, "groupId": 0, "txIds": [101, 102]}],
+  "selections": [
+    {"caseId": 1, "revision": 1000001, "groupId": 0, "txIds": []},
+    {"caseId": 2, "revision": 1, "groupId": 0, "txIds": []}
+  ],
   "targetCaseId": null,
   "targetRevision": null,
   "targetGroupId": null,
   "decision": null,
-  "comment": "선택 범위 심층 조사"
+  "comment": "두 Alert가 연관된 시나리오로 판단되어 전체 편입"
 }
 ```
 
 - groupId와 revision은 GET 값을 그대로 전달한다. 최초 미저장 Alert 묶음의 0도 유효하다. Alert revision은 업무 개정과 완료 근거 버전을 결합한 불투명 값이다. 재계산하지 않는다.
-- action: SUBJECT,CONTEXT,EXCLUDE,DECIDE,TRANSFER(Alert),SPLIT/MOVE/RECONSIDER(Episode),COMMENT,REVIEW_START,CLOSE. DECIDE의 decision은 NORMAL/SUSPICIOUS이며 Alert DECIDE는 NORMAL만 가능하다. Episode DECIDE는 선택 묶음의 미판정 SUBJECT 전체가 필요하다. RECONSIDER는 OPEN 묶음의 이전 판정을 이력에 남기고 다시 미판정으로 열어 범위 조정할 때 사용한다.
-- 대상 caseId가 없으면 TRANSFER/MOVE는 새 Episode, 있으면 targetRevision 필수다. 같은 Episode의 다른 묶음으로 MOVE할 때 targetGroupId를 지정한다. SPLIT은 같은 Episode에 새 묶음을 만든다. 부분/복수 이관 모두 같은 명령이며 한 건 실패하면 전체 롤백한다.
-- 초기 SEED/CONNECTION은 SUBJECT, CONTEXT는 참고 맥락이다. members에는 txId,reviewRole,state,decision,transaction(고정 거래/점수),sources(원본 Alert/근거/유형)가 있다. 처리 상태는 PENDING/DECIDED/EXCLUDED/TRANSFERRED이며 자동 탐색 transaction.role과 구분한다.
-- 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED. 사건 종결은 명시 CLOSE이고 미판정 SUBJECT 또는 같은 사건의 상충 판정이 남으면 거절한다. 기존 alerts 상태는 이관 포함 종결 시 ESCALATED, 그 외 CLOSED로 맞춘다. 원본 근거와 다른 사건 판정은 보존한다.
+- action: SUBJECT,CONTEXT,EXCLUDE,DECIDE,TRANSFER,UNLINK,RECONSIDER,COMMENT,REVIEW_START,CLOSE. SPLIT/MOVE는 409로 거절한다.
+- **Alert 정상/단독 의심 종결:** `action=CLOSE`, `decision=NORMAL` 또는 `SUSPICIOUS`, `selections=[{caseId,revision,groupId:0,txIds:[]}]`. 사건의 제외되지 않은 SUBJECT 전체에 최종 판정을 적용하고 같은 요청에서 종결한다. 이전 범위 판정은 BEFORE_RESOLUTION 감사 스냅샷으로 보존한다. CONTEXT/EXCLUDED에는 판정을 전파하지 않는다. 대상이 없으면409.
+- **새 Episode:** 예시처럼 `action=TRANSFER`, 서로 다른 본인 담당 OPEN Alert의 caseId 2개 이상. **기존 Episode:** Alert 1개 이상과 `targetCaseId`, GET에서 받은 `targetRevision`을 보낸다. targetGroupId/decision은 null이다.
+- TRANSFER의 `txIds:[]`는 전체 Alert를 뜻한다. 명시적 거래 목록은 맥락·제외·기존 판정 포함 구성 거래 전체와 정확히 같을 때만 허용한다. 부분 목록은409, 중복 caseId는400. groupId는 전체 편입에서는 사용하지 않으며0으로 보낸다. 편입은 원본 Alert를 CLOSED/TRANSFERRED(기존 alerts는 ESCALATED)로 종결하므로 별도 CLOSE를 보내지 않는다.
+- TRANSFER 성공200: `{caseIds:[원본 조사 사건 ID...], targetCaseId:Episode 사건 ID}`. 일반 명령은 targetCaseId=null. 실패는 전체 롤백, 같은 requestId/본문 재전송은 최초 응답을 반환한다.
+- 상세·목록의 `episodeId`는 Alert가 속한 Episode caseId 또는 null이다. Episode의 `sourceAlertIds`는 거래 제외/판정과 무관한 전체 소속 Alert ID 목록이다. Episode의 각 groups 항목은 하나의 Alert 편입 시점 범위이며 sourceAlertId로 원본 Alert를 식별한다(Alert 자체의 group에는 null일 수 있음). 편입된 원본 Alert도 구성 거래와 요약을 계속 조회할 수 있다.
+- 초기 SEED/CONNECTION은 SUBJECT, CONTEXT는 참고 맥락이다. members에는 txId,reviewRole,state,decision,transaction,sources가 있다. 편입은 사건의 outcome으로 표현하고 원본 member 상태·판정은 보존한다. CLOSED 사건 pendingCount는0이다.
+- **Alert 거래 제외:** `action=EXCLUDE`, `selections=[{caseId,revision,groupId,txIds:[거래 ID...]}]`, 필수 comment. 본인 담당 OPEN Alert의 PENDING 또는 DECIDED 거래를 선택한다(SUBJECT/CONTEXT 모두 가능). 원장·모델 근거를 삭제하지 않고 조사 member를 EXCLUDED로 바꾸며 이전 상태/판정은 BEFORE_EXCLUDE 이력에 보존한다. 제외 거래는 현재 요약·그래프·소속에서 빠진다. 이후 근거 갱신으로 자동 복구하지 않는다.
+- **Episode Alert 연결 해제:** `action=UNLINK`, `selections=[{caseId:Episode caseId,revision,groupId:해제할 Alert 묶음 ID,txIds:[]}, ...]`. 한 요청은 한 Episode만 대상으로 하며 동일 groupId 중복·부분 거래 선택은400. targetCaseId/targetRevision/targetGroupId/decision은 모두 null. comment는 해제 사유(공백 제외 필수, 최대4000자). Episode 담당 STAFF만 요청할 수 있고 소속 Alert 담당자가 달라도 원래 담당자에게 복원한다.
+- 해제 후 Alert 2개 이상이 남으면 선택 Alert만 해제한다. 2개 미만이면 **선택하지 않은 잔여 Alert도 모두 해제**하고 Episode를 `CLOSED / DISSOLVED`로 보존한다. 모든 해제 Alert의 조사 사건은 OPEN/outcome=null/closedAt=null, alerts는 OPEN/resolution=null, episodeId=null로 바뀐다. 원래 담당자·배정 시각·Alert 자신의 거래 제외/판정은 유지하며 Episode 판정을 Alert에 덮어쓰지 않는다.
+- 해제·해체·Alert 복원·revision 증가·사유/구성/판정 스냅샷·멱등 응답은 하나의 트랜잭션이다. 정상·의심 종결된 Episode에서 UNLINK는409. 해체 사건은 다시 편입 목적지가 될 수 없다. 해제된 Alert는 새 Episode에 다시 편입할 수 있다.
+- UNLINK 성공200: `{caseIds:[Episode caseId,복원 Alert caseId...],targetCaseId:null,dissolved:boolean,reopenedCaseIds:[복원 Alert caseId...]}`. 상세의 `detachments`는 `{eventId,action:UNLINK|DISSOLVE,comment,businessAt,snapshot}` 목록이다. Episode snapshot은 selectedAlertIds/removedAlertIds/groups(해제 당시 거래·판정·sourceAlertId)를 포함한다. 복원 Alert snapshot은 episodeCaseId/dissolved/groups다. 이력은 현재 소속이 아니다. 해체 후 groups/sourceAlertIds는 빈 배열이며 summary는 빈 현재 범위다. 자금 지표는 해체 시점 MONEY_SNAPSHOT을 반환한다.
+- DECIDE는 NORMAL/SUSPICIOUS로 범위 판정만 저장한다. Episode는 해당 묶음의 미판정 SUBJECT 전체 선택이 필요하다. RECONSIDER는 OPEN Episode 묶음 판정을 다시 미판정으로 열며 이전 감사 기록은 보존한다.
+- `CLOSE`에 decision이 없으면 기존 범위 판정을 집계해 종결한다. Episode는 이 방식만 허용한다. 미판정 SUBJECT/상충 판정은409. 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED/DISSOLVED. DISSOLVED는 UNLINK에 따른 Episode 해체만 사용한다.
 - 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
 - summary는 중복 제거한 현재 범위의 txCount,seedCount,riskScore,primaryType과 통화별 합계·순유입·집중도·상위 송금·일별 집계를 제공한다. 상세 키는 Swagger/CaseSummary 구현을 따른다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
 - 오늘 탐지율 분모는 **오늘 분석 업무가 다루는 거래일의 수신·통합 원장 거래 전체**다. 양쪽 은행 중복 보고는 한 거래로 세며 실제 반복 거래는 보존한다. 분자는 오늘 완료된 최신 유효 점수 중 임계 이상 거래다. 분석 날짜가 여러 개면 해당 거래일 합집합을 사용한다. 미분석을 분모에서 빼지 않는다. 검수/통합 미완료 보고가 있으면 최종 비율을 표시하지 않으며 분석 진행 중임을 구분한다. 분모 0은 ‘—’, 전일 Alert 0은 증감률 ‘—’다.
 - 최신 유효 점수는 COMPLETED job과 현재 COMPLETED run이 일치하는 결과다. 미완료/취소 결과로 덮지 않는다. 기관 일별 날짜는 KST, 경과는 배정 후 72시간이다. 통화별 상위 송금 10계좌, 결제 구성은 거래 건수다.
 - 자동 재생은 거래일 다음 날 09:00 KST로 업무 시각을 전진시킨다. 수신 cutoff와 기술 타임아웃은 실제 시각이다. 상세 열람 후 ‘검토 시작 기록’은 명시 명령이며 GET은 상태를 변경하지 않는다.
 
-**후속:** 정식 계정/인증/권한·React 연결, 실제 모델/GNN 설명·KubeSphere 실환경 통신. 최신 100CSV 전체 관통·노트북 리허설은 구현 검증과 별도다.
+**후속:** 계정 관리·실제 React 왕복 검증, 실제 모델/GNN 설명·KubeSphere 실환경 통신. 최신 100CSV 전체 관통·노트북 리허설은 구현 검증과 별도다.
 
 
 ### 9.9 조사 계좌 기준 자금 지표
@@ -593,9 +606,15 @@ GET /api/v1/dashboard의 episodeWork에 기관 전체 Episode 업무 집계를 �
 
 - asOf: 이번 집계 업무 시각. 고정 시연 시각에서 실제5분이 지나도 업무 경과시간은 늘지 않는다.
 - current.open: 기간과 무관한 현재 OPEN Episode 수. aged: 그중 assigned_at으로부터72시간 이상. unreviewed: 현 담당자의 배정 이후 REVIEW_START가 없는 OPEN 수.
-- current.created_today/closed_today: KST 오늘00시부터 asOf까지의 생성/종결 사건 수. 기존 Episode에 Alert를 추가하는 TRANSFER/MOVE는 생성 수를 늘리지 않는다. 새 Episode로 분리해 생성한 경우에는1건이다.
+- current.created_today/closed_today: KST 오늘00시부터 asOf까지의 생성/종결 사건 수. 기존 Episode에 Alert를 추가하는 TRANSFER는 생성 수를 늘리지 않는다. 새 Episode 생성은1건이다.
 - firstReview.samples/average_seconds: 선택 기간에 현 담당자가 배정 후 최초 REVIEW_START를 기록한 사건 수 및 배정→첫 기록의 산술평균(초). 반복 기록과 타 직원 기록 제외. 미검토는0초로 평균에 넣지 않고 unreviewed로 분리한다.
 - completion.samples/average_seconds: 선택 기간에 종결한 Episode 수 및 생성→종결 산술평균(초). 사건 결과와 무관한 업무 완료시간이며 판정 없는 범위 정리 종료도 포함한다. 표본0이면 평균null(화면 ‘—’).
 - oldestOpen: 배정 오래된 순 최대20건의 caseId,assignee,age_seconds,awaiting_review. 현재 미처리 경과는 배정 기준이며 사건 생성→종결 시간과 구분한다.
 
 조회 기간은 기존 KST from00시 이상/to 다음날00시 미만이다. 현재/오늘 카드에는 기간 필터를 적용하지 않는다. 최초 검토는 실제 브라우저 열람 감지가 아니라 현재 구현의 명시 ‘검토 시작 기록’이다. 서버 세션 인증·권한은 §5와 동일하며 DB 스키마 변경은 없다.
+
+### 9.11 V12 배포·FE 전환 주의사항
+
+사용자가 승인한 테스트 조사 데이터 초기화를 V12 마이그레이션에서 1회 수행한다. review_cases/groups/events/requests를 초기화하고 기존 alerts의 상태·종결 결과를 OPEN/null로 되돌린 뒤 Alert 조사 사건을 재생성한다. 기존 caseId/groupId/revision/requestId는 재사용하지 말고 로그인 후 목록을 다시 조회한다. 계정·비밀번호, 원장·보고·모델 점수·Alert 생성 근거·업무 시각·업로드 파일은 유지한다. 운영 조사 이력을 보존하는 무손실 변환이 아니다.
+
+FE는 위 4개 최종 선택에 §9.8을 사용하고, 저장 성공 후 사건/자금 지표/목적지 목록을 재조회한다. VITE_API_MODE=live는 프론트 이미지 빌드 시점 설정이다. backend 브랜치에는 FE Dockerfile 및 .github 워크플로가 없어 이 파일들을 새로 만들지 않았다. FE/배포 담당이 Dockerfile ARG/ENV와 dev 이미지 빌드 인자를 함께 반영해야 한다. 컨테이너 실행 환경변수만 추가해서는 빌드된 웹앱 모드가 바뀌지 않는다.

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import App from './App'
@@ -15,8 +15,8 @@ const renderSignedIn = () => {
 describe('앱 틀', () => {
   it('처음에는 대시보드를 연다', () => {
     renderSignedIn()
-    // 화면 안의 큰 제목 대신 사이드바 메뉴 선택과 대시보드 탭으로 알 수 있다
-    expect(screen.getByRole('tab', { name: '내 담당' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '기관 전체' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: '내 담당' })).toHaveAttribute('aria-selected', 'false')
   })
 
   it('알림 메뉴는 알림 목록을 연다', async () => {
@@ -47,9 +47,67 @@ describe('앱 틀', () => {
     window.location.hash = 'alerts/3000'
     expect(await screen.findByTestId('detail-id')).toHaveTextContent('A-3000')
     expect(screen.getByTestId('header-back')).toHaveTextContent('Alert 목록')
+    const candidates = screen.getByRole('list', { name: '거래 패턴 후보' })
+    expect(candidates.children.length).toBeGreaterThan(1)
+    expect(candidates).toHaveTextContent('%')
     fireEvent.mouseDown(screen.getByRole('tab', { name: '검토 의견' }))
     fireEvent.click(screen.getByRole('tab', { name: '검토 의견' }))
     expect(await screen.findByRole('combobox', { name: '판정' })).toHaveTextContent('정상 · 종결')
+  })
+
+  it('mock Episode에서 Alert 연결을 해제하면 상세와 원본 Alert의 연결 상태가 함께 바뀐다', async () => {
+    window.history.replaceState({}, '', '/#episodes/800')
+    renderSignedIn()
+    window.location.hash = 'episodes/800'
+    const linked = await screen.findByTestId('linked-alerts')
+    fireEvent.click(within(linked).getByRole('button', { name: '연결 Alert 선택' }))
+    fireEvent.click(within(linked).getByRole('checkbox', { name: 'Alert A-3003 선택' }))
+    fireEvent.change(within(linked).getByRole('textbox', { name: '연결 해제 사유' }), { target: { value: '별도 조사' } })
+    fireEvent.click(within(linked).getByRole('button', { name: '선택 Alert 연결 해제' }))
+    const updatedLinked = await screen.findByTestId('linked-alerts')
+    expect(await within(updatedLinked).findByRole('button', { name: 'A-3018 상세 보기' })).toBeInTheDocument()
+    expect(within(updatedLinked).queryByRole('button', { name: 'A-3003 상세 보기' })).not.toBeInTheDocument()
+    window.location.hash = 'alerts/3003'
+    await waitFor(() => expect(screen.getByTestId('detail-id')).toHaveTextContent('A-3003'))
+    expect(screen.queryByRole('button', { name: /연결된 Episode E-800/ })).not.toBeInTheDocument()
+  })
+
+  it('Alert가 1건만 남으면 Episode를 해체하고 나머지 Alert도 단독으로 전환한다', async () => {
+    writeMemory('alerts:overrides', {})
+    window.history.replaceState({}, '', '/#episodes/800')
+    renderSignedIn()
+    window.location.hash = 'episodes/800'
+    const linked = await screen.findByTestId('linked-alerts')
+    fireEvent.click(within(linked).getByRole('button', { name: '연결 Alert 선택' }))
+    for (const id of [3003, 3018]) fireEvent.click(within(linked).getByRole('checkbox', { name: `Alert A-${id} 선택` }))
+    fireEvent.change(within(linked).getByRole('textbox', { name: '연결 해제 사유' }), { target: { value: '연관성 없음' } })
+    fireEvent.click(within(linked).getByRole('button', { name: '선택 Alert 연결 해제' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Episode를 해체할까요?')
+    fireEvent.click(screen.getByRole('button', { name: 'Episode 해체 확인' }))
+    await waitFor(() => expect(window.location.hash).toBe('#episodes'))
+    expect(screen.queryByRole('row', { name: /E-800/ })).not.toBeInTheDocument()
+    window.location.hash = 'alerts/3033'
+    await waitFor(() => expect(screen.getByTestId('detail-id')).toHaveTextContent('A-3033'))
+    expect(screen.queryByRole('button', { name: /연결된 Episode E-800/ })).not.toBeInTheDocument()
+  })
+
+  it('mock Alert에서 제외한 거래는 상세와 목록의 건수에 함께 반영된다', async () => {
+    window.history.replaceState({}, '', '/#alerts/3000')
+    renderSignedIn()
+    window.location.hash = 'alerts/3000'
+    await waitFor(() => expect(screen.getByTestId('detail-id')).toHaveTextContent('A-3000'))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /거래/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /거래/ }))
+    fireEvent.click(screen.getByRole('button', { name: '거래 선택' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '거래 T-300000 선택' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '거래 제외 사유' }), { target: { value: '조사 범위 밖' } })
+    fireEvent.click(screen.getByRole('button', { name: '선택 거래 제외' }))
+    fireEvent.click(screen.getByRole('button', { name: '거래 제외 확인' }))
+    expect(screen.queryByRole('button', { name: /300000 거래 거래 내역에서 보기/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /거래/ })).toHaveTextContent('3')
+    fireEvent.click(screen.getByTestId('header-back'))
+    const first = await screen.findByRole('row', { name: /A-3000 계좌/ })
+    expect(first).toHaveTextContent('3건')
   })
 
   it('앱 머리에는 전체 데이터의 출처를 단정하는 배지를 두지 않는다', () => {
@@ -59,7 +117,10 @@ describe('앱 틀', () => {
 
   it('RDR 9000을 닫고 다시 열 수 있으며, 화면 이동에도 패널 상태가 유지된다', async () => {
     renderSignedIn()
-    expect(screen.getByRole('region', { name: 'RDR 9000' })).toHaveAttribute('data-mode', 'sidebar')
+    expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
+    const trigger = within(screen.getByTestId('header-search')).getByRole('button', { name: 'RDR 9000 열기' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('region', { name: 'RDR 9000' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'RDR 9000' })).getByText(/전체 미처리 업무/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 닫기' }))
     expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
@@ -71,14 +132,24 @@ describe('앱 틀', () => {
 
   it('RDR 9000 심볼을 누르면 패널이 닫힌다', () => {
     renderSignedIn()
-    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 심볼로 닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
+    const header = screen.getByTestId('agent-header')
+    fireEvent.click(within(header).getByRole('button', { name: 'RDR 9000 심볼로 닫기' }))
     expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'RDR 9000 열기' })).toBeInTheDocument()
+  })
+
+  it('헤더의 RDR 9000 심볼을 다시 누르면 패널이 닫힌다', () => {
+    renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 패널 숨기기' }))
+    expect(screen.queryByRole('region', { name: 'RDR 9000' })).not.toBeInTheDocument()
   })
 
   it('RDR 9000도 사건 위험 점수를 화면과 같은 0~1 값으로 표시한다', async () => {
     window.history.replaceState({}, '', '/#alerts/3000')
     renderSignedIn()
+    fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
     window.location.hash = 'alerts/3000'
     const agent = screen.getByRole('region', { name: 'RDR 9000' })
     expect(await within(agent).findByText(/위험 점수 0\.99/)).toBeInTheDocument()
@@ -89,6 +160,7 @@ describe('앱 틀', () => {
     for (const scenario of ['empty', 'error']) {
       window.history.replaceState({}, '', `/?mock=${scenario}`)
       const view = render(<App />, { wrapper: NuqsTestingAdapter })
+      fireEvent.click(screen.getByRole('button', { name: 'RDR 9000 열기' }))
       expect(within(screen.getByRole('region', { name: 'RDR 9000' })).queryByText(/미처리 업무 25건/)).not.toBeInTheDocument()
       view.unmount()
     }

@@ -222,7 +222,7 @@ V3는 기존 계좌·거래·작업이 있는 DB에서 실패한다. 기존 DB/�
 
 ## 3. 조사 기능의 현재와 다음 저장 계약
 
-현재 `alerts`/`alert_versions`/`alert_transactions`는 V6~V9에서 구현됐다. 다음 조사 계약의 Episode·조사 범위·부분 이관·사건별 판정·감사·시연 업무 시각은 아직 마이그레이션이 없다. 구 N:1 `alerts.episode_id` 및 상태와 단일 FK의 동치 제약을 다음 스키마로 채택하지 않는다. 아래 '다음 구현 저장 계약'을 따른다.
+현재 Alert 근거 저장은 V6~V9, 조사 사건은 V10, 직원 역할은 V11, 전체 Alert의 Episode 소속은 V12로 구현됐다. 현재 구현 계약은 아래 V10~V12 및 API §9.8을 따른다.
 
 ## 4. 이 태스크에서 정한 컨벤션 (2026-09-07 사용자 확인 완료)
 
@@ -323,7 +323,7 @@ V10__case_review.sql을 추가했다. 기존 V1~V9는 변경하지 않는다. �
 | review_requests | (actor_id,request_id) PK, 요청 본문·성공 응답. 재시도 중복 방지 |
 | visible_review_cases | 완료 job/run 근거가 있는 Alert와 Episode만 공개, 씨앗 기반 정렬 위험도 |
 
-Alert 생성 트리거가 조사 사건을 생성한다. 기존 Alert는 업무 시각을 추정하지 않고 기존 created_at으로 이관한다. 새 Episode는 L1 이관 시 L2 라운드로빈, L2 직접 분리는 본인 배정이다. 조회 시 미저장 Alert 범위는 완료 evidence에서 구성하고 첫 변경 때 저장한다. 새 완료 근거의 미편입 거래만 열린 범위에 추가하며 기존 처리 범위·출처를 덮지 않는다.
+Alert 생성 트리거가 조사 사건을 생성한다. 기존 Alert는 업무 시각을 추정하지 않고 기존 created_at으로 이관한다. 새 Episode는 전체 Alert 2개 이상 편입 시 로그인 가능한 STAFF 라운드로빈 배정이다. 부분 분리/이동은 지원하지 않는다. 조회 시 미저장 Alert 범위는 완료 evidence에서 구성하고 첫 변경 때 저장한다. 새 완료 근거의 미편입 거래만 열린 범위에 추가하며 기존 처리 범위·출처를 덮지 않는다.
 
 명령은 수신 advisory lock과 시각 행 잠금을 사용하고 기대 사건 개정을 검사한다. 새 목적지·모든 선택 범위·출처·판정·감사·응답 저장이 동일 DB 트랜잭션이다. 판정은 사건 범위에만 저장하며 원장/추론 점수/다른 사건을 변경하지 않는다. CLOSED 수정은 차단한다. 기존 alerts 상태와 업무 종료는 같은 트랜잭션에서 맞춘다.
 
@@ -340,3 +340,21 @@ Alert 생성 트리거가 조사 사건을 생성한다. 기존 Alert는 업무 
 ## V11 — 단일 조사팀·서버 세션
 
 users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·username·배정·감사 참조를 유지한다. password_hash는 Spring PBKDF2 v5.8 기본 설정(16바이트 salt, SHA256/310000회, 32바이트 파생키, salt+파생키의 96자리 hex). NULL/빈 값 계정은 로그인·신규 자동 배정 불가. 평문·기본 비밀번호를 저장하지 않는다. 회원가입·계정 관리 API 없음. 세션은 DB에 저장하지 않는 단일 API 서버 메모리 세션이며 재기동 시 만료한다. 실제 시간 기준 유휴30분. API §5 참조.
+
+## V12 — 전체 Alert 단위 Episode 소속
+
+- `episode_alerts`: alert_id PK/FK(alerts), episode_case_id FK(review_cases), group_id UNIQUE, alert_version>0. (group_id,episode_case_id)는 review_groups(group_id,case_id)를 참조한다.
+- Alert당 최대1개 Episode. Episode당 최소2개 Alert는 review_cases·episode_alerts의 DEFERRABLE INITIALLY DEFERRED constraint trigger가 커밋 시 검증한다. 생성 중 임시0개는 같은 트랜잭션 안에서만 허용한다.
+- Episode의 각 review_group은 원본 Alert의 편입 당시 전체 거래·역할·판정 스냅샷이다. 다른 Alert와 공유하는 거래도 출처별로 보존하고 조회 집계에서 중복 제거한다. 이동·분할 API는 차단한다.
+- 전체 편입은 원본 Alert 사건의 CLOSED/TRANSFERRED 및 alerts.ESCALATED와 원자 저장된다. 원본 거래 목록을 제거하지 않는다. 단독 정상/의심 종결은 CLOSE+decision으로 한 번에 처리하고 기존 범위 판정 스냅샷을 감사에 보존한다.
+- **테스트 데이터 초기화 승인에 따른 비가역 마이그레이션:** review_requests 및 기존 review_cases(그룹·이벤트 cascade)를 삭제하고 alerts를 OPEN/null로 되돌려 조사 사건을 재생성한다. 기존 조사 이력은 복원되지 않는다. 사용자·해시·거래·보고·분석·Alert 근거·업로드 파일은 삭제하지 않는다. case_id 시퀀스는 되감지 않는다.
+
+
+## V13 — Episode 연결 해제·해체 이력
+
+- 기존 데이터 초기화 없이 review_cases.outcome에 DISSOLVED를 추가한다. DISSOLVED는 CLOSED EPISODE에만 허용한다.
+- 지연 소속 제약: 일반 Episode는 종결 여부와 관계없이 Alert 2개 이상, DISSOLVED Episode는 소속 0개만 허용한다. 1개짜리 Episode는 저장할 수 없다.
+- UNLINK는 해제 후 남은 소속이 2개 미만이면 전체 해제한다. 해제 review_groups 삭제 시 episode_alerts는 FK cascade로 함께 제거한다. 제거 전 그룹·거래·판정·Alert ID·사용자 사유는 review_events의 UNLINK/DISSOLVE snapshot에 보존한다. review_cases와 과거 사건 이벤트는 삭제하지 않는다.
+- 원본 Alert 조사 사건은 원래 담당자/assigned_at 및 자체 거래 제외·판정을 보존하고 OPEN/outcome null/closed_at null/closed_by null로 복원한다. alerts 상태도 OPEN/resolution null로 복원한다. Episode의 판정은 원본 Alert로 전파하지 않는다.
+- 해체된 사건의 현재 그룹/소속은 비어 있다. 이력 snapshot은 현재 소속 조회에 사용하지 않으며, 해제된 Alert는 다른 Episode에 편입할 수 있다.
+- 사건 변경·모든 Alert 복원·사유 이력·revision·멱등 응답을 기존 advisory lock 아래 한 트랜잭션으로 처리한다. 원장·모델 결과·업로드 파일은 변경하지 않는다.

@@ -16,6 +16,8 @@ COPY . .
 # VITE_ 변수는 빌드 시점에 브라우저 코드에 포함된다.
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ARG VITE_API_MODE=mock
+ENV VITE_API_MODE=$VITE_API_MODE
 
 RUN pnpm run build
 

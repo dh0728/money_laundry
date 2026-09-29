@@ -28,7 +28,7 @@ export function DataTableColumnHeader<TData, TValue>({
       aria-label={`${label} 정렬 · ${sorted === "asc" ? "오름차순" : sorted === "desc" ? "내림차순" : "미정렬"}`}
       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       className={cn(
-        "flex h-full w-full items-center justify-between gap-1.5 px-4 text-left transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&_svg]:size-4 [&_svg]:shrink-0",
+        "flex h-full w-full items-center justify-between gap-1.5 px-0 text-left transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
       {...props}

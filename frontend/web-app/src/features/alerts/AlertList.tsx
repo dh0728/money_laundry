@@ -41,12 +41,12 @@ const baseColumns: ColumnDef<AlertRow>[] = [
   { id: 'type', accessorFn: row => row.primaryType.code, header: ({ column }) => <DataTableColumnHeader column={column} label="탐지 유형" />, cell: ({ row }) => <PatternBadge code={row.original.primaryType.code} /> },
   {
     id: 'totalAmountUsd', accessorKey: 'totalAmountUsd',
-    header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액 (USD)" className="ml-auto" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액 (USD)" className="flex-row-reverse justify-start" />,
     cell: ({ row }) => <div className="text-right text-sm tabular-nums">{usd(row.original.totalAmountUsd)}</div>,
   },
   {
     id: 'txCount', accessorKey: 'txCount',
-    header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="ml-auto" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />,
     cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.txCount}건</div>,
   },
   { id: 'assignee', accessorFn: row => row.assignee.name, header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" /> },
@@ -57,9 +57,9 @@ const baseColumns: ColumnDef<AlertRow>[] = [
     cell: ({ row }) => {
       const { createdAt, ageDays } = row.original
       return (
-        <div className="text-sm tabular-nums text-muted-foreground">
-          {createdAt.slice(5, 10)}
-          <p className="mt-1"><AgeBadge days={ageDays} /></p>
+        <div className="flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
+          <span>{createdAt.slice(5, 10)}</span>
+          <AgeBadge days={ageDays} />
         </div>
       )
     },
@@ -71,6 +71,12 @@ const baseColumns: ColumnDef<AlertRow>[] = [
       : <span className="text-xs text-muted-foreground">미연결</span>,
   },
 ]
+
+const browseColumnWidths = {
+  alertId: '13%', riskScore: '8%', type: '14%', totalAmountUsd: '14%',
+  txCount: '7%', assignee: '9%', status: '9%', createdAt: '15%', episode: '11%',
+}
+const linkColumnWidths = { ...browseColumnWidths, select: '4%', alertId: '12%', type: '13%', totalAmountUsd: '13%', episode: '10%' }
 
 const statusValues: AlertStatus[] = ['OPEN', 'ESCALATED', 'CLOSED']
 const typeValues = Array.from({ length: 9 }, (_, code) => code as TypeCode)
@@ -146,7 +152,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-[1320px] space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative mr-1 w-64">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -209,7 +215,7 @@ export default function AlertList({ rows, today, onOpen, onLink }: Props) {
       )}
 
       {result.length
-        ? <DataTable table={table} onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
+        ? <DataTable table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
         : (
           <div className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />

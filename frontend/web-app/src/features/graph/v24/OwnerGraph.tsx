@@ -389,7 +389,8 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
   const initialCamera = useMemo(() => fitOwnerCamera(owners, paths.flatMap(({ path }) => path.points), width, height), [owners, paths, width, height])
   const camera = state.camera ?? initialCamera
   const scale = camera.scale, offset = camera
-  const fit = () => { onStateChange({ ...state, camera: fitOwnerCamera(owners, paths.flatMap(({ path }) => path.points), width, height) }); onZoom(1, true) }
+  // camera=null이면 크기·배치가 바뀔 때마다 맞춤 카메라를 다시 계산한다(맞춤 상태 유지)
+  const fit = () => { onStateChange({ ...state, camera: null }); onZoom(1, true) }
   const zoomBy = (factor: number) => {
     const ratio = Math.max(.25, Math.min(24, camera.scale / camera.fitScale * factor)), nextScale = camera.fitScale * ratio
     const multiplier = nextScale / camera.scale
@@ -399,7 +400,8 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
   useEffect(() => {
     const element = canvas.current
     if (!element) return
-    const onWheel = (event: WheelEvent) => { event.preventDefault(); zoomBy(event.deltaY < 0 ? 1.2 : 1 / 1.2) }
+    // 계좌별 보기(d3-zoom 기본값)와 같은 휠 감도: 스크롤 양에 비례해 조금씩 바뀐다
+    const onWheel = (event: WheelEvent) => { event.preventDefault(); zoomBy(Math.pow(2, -event.deltaY * (event.deltaMode === 1 ? .05 : event.deltaMode ? 1 : .002))) }
     element.addEventListener('wheel', onWheel, { passive: false })
     return () => element.removeEventListener('wheel', onWheel)
   }, [camera, state, width, height])
