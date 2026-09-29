@@ -70,7 +70,7 @@ export function seedComponentPositions(model: GraphModel): GraphNode[] {
     const averageX = component.reduce((sum, node) => sum + node.x, 0) / Math.max(1, component.length)
     const averageY = component.reduce((sum, node) => sum + node.y, 0) / Math.max(1, component.length)
     const centerX = index % columns * 220, centerY = Math.floor(index / columns) * 180 // web-app: 묶음 시작 간격을 좁힘
-    return component.map(node => ({ ...node, x: centerX + (node.x - averageX) * 52, y: centerY + (node.y - averageY) * 52 }))
+    return component.map(node => ({ ...node, component: index, x: centerX + (node.x - averageX) * 52, y: centerY + (node.y - averageY) * 52 }))
   })
 }
 
@@ -108,7 +108,10 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
   // web-app: 그래프 부품은 늦게 불러온다. 준비된 뒤에 힘 설정이 다시 돌도록 준비 여부를 상태로 둔다.
   const [fgReady, setFgReady] = useState(false)
   // 확대 비율 표시: 화면 맞춤 직후 배율을 100%로 본다
-  const [zoomK, setZoomK] = useState(1), fitK = useRef(1), [fitted, setFitted] = useState(true)
+  // fitted=true면 '맞춤 상태': 인스턴스·크기·토글·보기가 바뀌어도 다시 맞추고, 배율은 100%로 본다
+  const [zoomK, setZoomK] = useState(1), fitK = useRef(1), [fitted, setFittedState] = useState(true)
+  const fittedRef = useRef(true), fitting = useRef(false), fitCenter = useRef<{ x: number; y: number } | null>(null)
+  const setFitted = useCallback((value: boolean) => { fittedRef.current = value; setFittedState(value) }, [])
   const [narrow, setNarrow] = useState(false)
   const layout = useRef<HTMLDivElement>(null), [fillHeight, setFillHeight] = useState(640)
   // 본문 스크롤 영역의 남은 높이를 그래프가 정확히 채운다(하단 여백·넘침 없음)
@@ -177,25 +180,49 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
     // web-app: 밀어내는 힘은 가까운 거리(90)에서만 작용시키고, 약한 중심 인력을 더해
     // 서로 떨어진 묶음이 겹치지 않을 만큼만 가깝게 모이게 한다(사용자가 끌어서 옮길 수 있다)
     const charge = g.d3Force('charge') as unknown as { strength: (v: number) => { distanceMax: (d: number) => void } } | undefined
-    charge?.strength(-160).distanceMax(90)
-    ;(g.d3Force('link') as unknown as { distance: (v: number) => void } | undefined)?.distance(48)
-    let nodes: { x?: number; y?: number; vx?: number; vy?: number }[] = []
-    const gravity = Object.assign((alpha: number) => {
-      for (const node of nodes) { node.vx = (node.vx ?? 0) - (node.x ?? 0) * 0.18 * alpha; node.vy = (node.vy ?? 0) - (node.y ?? 0) * 0.18 * alpha }
+    charge?.strength(-160).distanceMax(70)
+    ;(g.d3Force('link') as unknown as { distance: (v: number) => void } | undefined)?.distance(56)
+    // 떨어진 묶음끼리 가깝게: 노드마다 당기면 묶음 안쪽까지 찌그러지므로 묶음(연결 성분) 무게중심을 원점으로 당기고,
+    // 묶음을 원(무게중심·가장 먼 노드 거리 + 여백)으로 보고 서로 겹치면 밀어낸다 → 가깝게 모이되 섞이지 않는다.
+    let nodes: { x?: number; y?: number; vx?: number; vy?: number; component?: number }[] = []
+    const GROUP_GAP = 36
+    const gather = Object.assign((alpha: number) => {
+      const groups = new Map<number, { x: number; y: number; r: number; members: typeof nodes; dx: number; dy: number }>()
+      for (const node of nodes) { const k = node.component ?? 0; const t = groups.get(k) ?? { x: 0, y: 0, r: 0, members: [], dx: 0, dy: 0 }; t.x += node.x ?? 0; t.y += node.y ?? 0; t.members.push(node); groups.set(k, t) }
+      const list = [...groups.values()]
+      for (const t of list) { t.x /= t.members.length; t.y /= t.members.length; for (const m of t.members) t.r = Math.max(t.r, Math.hypot((m.x ?? 0) - t.x, (m.y ?? 0) - t.y)); t.dx = -t.x * 0.2 * alpha; t.dy = -t.y * 0.2 * alpha }
+      for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, overlap = a.r + b.r + GROUP_GAP - d
+        if (overlap <= 0) continue
+        const push = overlap * 0.5, ux = dx / d, uy = dy / d
+        a.dx -= ux * push; a.dy -= uy * push; b.dx += ux * push; b.dy += uy * push
+      }
+      for (const t of list) for (const m of t.members) { m.vx = (m.vx ?? 0) + t.dx; m.vy = (m.vy ?? 0) + t.dy }
     }, { initialize: (next: typeof nodes) => { nodes = next } })
-    g.d3Force('gravity', gravity as never)
+    g.d3Force('gravity', gather as never)
     g.d3ReheatSimulation()
   }, [graphData, size.w > 0, fgReady])
-  // 화면 맞춤은 첫 배치가 끝났을 때 한 번만 자동으로 한다. 드래그 뒤 멈출 때마다 시점이 튀지 않도록.
-  const firstFit = useRef(false)
+  // 배치가 멈출 때(인스턴스가 새로 생긴 경우 포함) 맞춤 상태면 다시 맞춘다. 노드를 끌면 맞춤 상태를 푼다.
   // 첫 시뮬레이션이 멈추기 전에는 내부 zoom 상태가 없어 호출하면 오류가 난다
   const ready = useRef(false)
+  // 인스턴스가 새로 생기면(크기 0→양수, 좁은 화면 전환) 첫 배치가 멈출 때까지 zoom을 부르지 않는다
+  const setFg = useCallback((instance: ForceGraphMethods<FNode, FLink> | null) => {
+    if (instance !== fg.current) ready.current = false
+    fg.current = instance ?? undefined
+  }, [])
   const fitGraph = useCallback((ms = 400) => {
     if (viewMode === 'owner') { ownerGraph.current?.fit(); return }
     const g = fg.current; if (!g || !ready.current) return
+    fitting.current = true; setFitted(true)
     g.zoomToFit(ms, PAD)
-    window.setTimeout(() => { fitK.current = g.zoom(); setZoomK(g.zoom()); setFitted(true) }, ms + 20)
-  }, [viewMode])
+    window.setTimeout(() => { if (fg.current !== g) return; fitK.current = g.zoom(); fitCenter.current = g.centerAt(); setZoomK(g.zoom()); fitting.current = false }, ms + 20)
+  }, [viewMode, setFitted])
+  // 맞춤 상태에서 크기·토글·보기·배치가 바뀌면 다시 맞춘다
+  useEffect(() => {
+    if (!fittedRef.current || viewMode === 'owner') return
+    const id = window.setTimeout(() => fitGraph(), 60)
+    return () => window.clearTimeout(id)
+  }, [size.w, size.h, showInfo, viewMode, narrow, fullscreen, fitGraph])
   // 화면 맞춤 상태에서는 크기·범위가 바뀌어도 계속 맞춘다
 
   // 레이아웃 전환으로 캔버스 요소가 바뀔 때마다 관찰 대상을 다시 잡는다(callback ref)
@@ -236,7 +263,7 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
     if (viewMode === 'owner') { setOwnerState(resetOwnerGraphState); setOwnerZoom({ ratio: 1, fitted: true }) }
     else fitGraph()
   }
-  const zoomBy = (factor: number) => { if (viewMode === 'owner') { ownerGraph.current?.zoomBy(factor); return } const g = fg.current; if (!g || !ready.current) return; setFitted(false); g.zoom(g.zoom() * factor, 200) }
+  const zoomBy = (factor: number) => { if (viewMode === 'owner') { ownerGraph.current?.zoomBy(factor); return } const g = fg.current; if (!g || !ready.current) return; fitting.current = false; setFitted(false); g.zoom(g.zoom() * factor, 200) }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('input,textarea,[role=slider]')) return
     if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1) }
@@ -277,7 +304,7 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
 
   const forceGraph = size.w > 0 && size.h > 0 && (
     <ForceGraph2D<GraphNode & { id: string }, GraphEdge>
-      ref={fg} width={size.w} height={size.h} graphData={graphData} backgroundColor="transparent"
+      ref={setFg as never} width={size.w} height={size.h} graphData={graphData} backgroundColor="transparent"
       nodeRelSize={1} nodeVal={n => radius(n) ** 2} nodeVisibility={nodeVisible} nodeLabel={() => ''}
       nodeCanvasObject={(n, ctx, scale) => {
         const r = radius(n)
@@ -321,16 +348,23 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
       onBackgroundClick={clearSelection}
       // web-app: force-graph의 React 래퍼가 그리는 도중에 배율 이벤트를 보낸다. 그 자리에서 상태를 바꾸면
       // React 경고(다른 부품을 그리는 중 상태 변경)가 나므로 한 박자 뒤로 미룬다.
-      onZoom={({ k }) => queueMicrotask(() => setZoomK(k))} onZoomEnd={({ k }) => queueMicrotask(() => { if (ready.current && Math.abs(k - fitK.current) > .01) setFitted(false) })}
+      onZoom={({ k }) => queueMicrotask(() => setZoomK(k))} onZoomEnd={({ k }) => queueMicrotask(() => {
+        const g = fg.current, c = fitCenter.current
+        if (!g || !ready.current || fitting.current || !fittedRef.current) return
+        const center = g.centerAt()
+        const panned = !!c && Math.hypot(center.x - c.x, center.y - c.y) * k > 2
+        if (Math.abs(k - fitK.current) > .01 || panned) setFitted(false)
+      })}
       // 시뮬레이션은 기본값(자연 감쇠)으로 끝까지 돈다. 드래그하면 다시 데워져 이웃이 따라 움직인다.
       // web-app: 떨어진 묶음이 여러 개면 기본 15초까지 계산해 첫 화면 맞춤이 늦다. 4초에서 멈추고 맞춘다.
       cooldownTime={4000}
       onEngineTick={() => { if (!fgReady) setFgReady(true) }}
-      onEngineStop={() => { ready.current = true; if (!firstFit.current) { firstFit.current = true; fitGraph() } }}
+      onNodeDragEnd={() => setFitted(false)}
+      onEngineStop={() => { ready.current = true; if (fittedRef.current) fitGraph() }}
     />
   )
   const selectView = (value: GraphViewMode) => {
-    setViewMode(value); setHover(null); firstFit.current = false; ready.current = false
+    setViewMode(value); setHover(null); ready.current = false; setFitted(true)
   }
   const viewToggle = (
     <div data-testid="graph-view-switch" role="group" aria-label="그래프 보기" className="relative grid w-full grid-cols-2 rounded-md border bg-muted/60 p-1">
@@ -408,7 +442,7 @@ export default function Graph({ model, label, panelExtra }: { model: GraphModel;
         <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[11px] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</div>
         <div className="absolute bottom-3 right-3 flex items-center bg-card border rounded-md">
           <IconButton label="축소" onClick={() => zoomBy(1 / 1.2)}><Minus className="size-3.5" /></IconButton>
-          <span className="text-[11px] tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : zoomK / (fitK.current || 1)) * 100)}%</span>
+          <span className="text-[11px] tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : (fitted ? 1 : zoomK / (fitK.current || 1))) * 100)}%</span>
           <IconButton label="확대" onClick={() => zoomBy(1.2)}><Plus className="size-3.5" /></IconButton>
           <IconButton label="화면 맞춤" disabled={viewMode === 'owner' ? ownerZoom.fitted : fitted} onClick={() => fitGraph()}><Shrink className="size-3.5" /></IconButton>
         </div>
