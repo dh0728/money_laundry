@@ -320,39 +320,70 @@ public class AnalysisRunService {
               "insert into analysis_runs(run_id,job_id,status) values(?,?,'READY')", run, job);
           for (UUID old : previous)
             jdbc.update("insert into analysis_run_replacements values(?,?)", run, old);
-          var ids =
-              jdbc.queryForList(
-                  "select t.tx_id from transactions t left join analysis_target_ownership o using(tx_id) left join analysis_runs r on r.run_id=o.run_id where t.integration_status='ACTIVE' and not exists(select 1 from batch_jobs scored where scored.job_id=t.scored_job_id and scored.status='COMPLETED') and (o.run_id is null or exists(select 1 from analysis_run_replacements x where x.run_id=? and x.replaces_run_id=o.run_id)) and exists(select 1 from transaction_reports tr join private.bank_reports br using(report_id) join report_versions v using(version_id) join analysis_selected_versions sv on sv.version_id=v.version_id where tr.tx_id=t.tx_id and sv.job_id=? and v.received_at<=?) order by t.tx_id",
-                  Long.class,
-                  run,
-                  job,
-                  Timestamp.from(cutoff));
-          ids =
-              ids.stream()
-                  .filter(
-                      id ->
-                          Collections.disjoint(
-                              blockedSets,
-                              jdbc.queryForList(
-                                  "select distinct v.set_id from transaction_reports tr join private.bank_reports br using(report_id) join report_versions v using(version_id) where tr.tx_id=?",
-                                  Long.class,
-                                  id)))
-                  .toList();
-          for (long id : ids) {
-            snapshot(run, id, "TARGET");
-            jdbc.update(
-                "insert into analysis_target_ownership values(?,?) on conflict(tx_id) do update set run_id=excluded.run_id",
-                id,
-                run);
-          }
+          int targetCount = freezeTargets(run, job, cutoff, blockedSets);
           new AlertInputSnapshot(jdbc).freeze(run, cutoff);
           jdbc.update(
               "update batch_jobs set current_run_id=?,row_count=? where job_id=?",
               run,
-              ids.size(),
+              targetCount,
               job);
           return run;
         });
+  }
+
+  private int freezeTargets(UUID run, long job, Instant cutoff, Set<Long> blockedSets) {
+    // Keep the same eligibility and transaction boundary without four DB round trips per row.
+    var args = new ArrayList<Object>(List.of(run, run, job, Timestamp.from(cutoff)));
+    String blocked = "";
+    if (!blockedSets.isEmpty()) {
+      blocked =
+          """
+          and not exists(select 1 from transaction_reports tr
+            join private.bank_reports br using(report_id) join report_versions v using(version_id)
+            where tr.tx_id=t.tx_id and v.set_id in (%s))
+          """
+              .formatted(String.join(",", Collections.nCopies(blockedSets.size(), "?")));
+      args.addAll(blockedSets);
+    }
+    int count =
+        jdbc.update(
+            """
+        insert into analysis.input_transactions
+        select ?,t.tx_id,'TARGET',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
+          a.service_account_id,b.service_account_id,e.service_entity_id,f.service_entity_id,
+          t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
+          t.payment_format,t.amount_usd,t.fx_rate_version
+        from transactions t join private.accounts a on a.account_id=t.from_account_id
+        join private.accounts b on b.account_id=t.to_account_id
+        join private.entities e on e.entity_id=a.entity_id join private.entities f on f.entity_id=b.entity_id
+        left join analysis_target_ownership o on o.tx_id=t.tx_id
+        where t.integration_status='ACTIVE'
+          and not exists(select 1 from batch_jobs scored where scored.job_id=t.scored_job_id and scored.status='COMPLETED')
+          and (o.run_id is null or exists(select 1 from analysis_run_replacements x where x.run_id=? and x.replaces_run_id=o.run_id))
+          and exists(select 1 from transaction_reports tr join private.bank_reports br using(report_id)
+            join report_versions v using(version_id) join analysis_selected_versions sv on sv.version_id=v.version_id
+            where tr.tx_id=t.tx_id and sv.job_id=? and v.received_at<=?)
+        """
+                + blocked
+                + " order by t.tx_id",
+            args.toArray());
+    jdbc.update(
+        """
+        insert into analysis_input_reports
+        select i.run_id,tr.tx_id,tr.report_id from analysis.input_transactions i
+        join transaction_reports tr using(tx_id) join private.bank_reports br using(report_id)
+        join report_sets s on s.current_version_id=br.version_id
+        where i.run_id=? and i.input_role='TARGET' on conflict do nothing
+        """,
+        run);
+    jdbc.update(
+        """
+        insert into analysis_target_ownership
+        select tx_id,run_id from analysis.input_transactions where run_id=? and input_role='TARGET'
+        order by tx_id on conflict(tx_id) do update set run_id=excluded.run_id
+        """,
+        run);
+    return count;
   }
 
   public void snapshot(UUID run, long id, String role) {

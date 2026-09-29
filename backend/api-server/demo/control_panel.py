@@ -1,5 +1,6 @@
 """Local operator controls. Uses the bank mock and the real analysis API."""
 import importlib.util
+import json
 import re
 import threading
 import time
@@ -8,6 +9,7 @@ from datetime import date, datetime, time as day_time, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.request import build_opener
+from urllib.error import HTTPError, URLError
 
 import httpx
 
@@ -47,6 +49,54 @@ def bank_module():
     return module
 
 
+def upload_failure(error, bank, stage):
+    """Map known errors without disclosing response bodies, signed URLs or tokens."""
+    prefix = f'은행 {bank} · {stage} 실패: '
+    if isinstance(error, HTTPError):
+        messages = {
+            'REPORTING_NOT_REGISTERED': '해당 은행·거래 기준일·AML17 양식의 사전 등록이 없습니다.',
+            'DUPLICATE_FILE': '이미 처리한 동일 파일입니다. 기존 업로드 상태를 확인하세요.',
+            'UPLOAD_IN_PROGRESS': '동일 파일의 업로드가 이미 진행 중입니다. 기존 업로드 상태를 확인하세요.',
+            'UPLOAD_URL_EXPIRED': '업로드 URL이 만료됐습니다.',
+            'UPLOAD_MISMATCH': 'S3 객체가 없거나 파일 크기·체크섬이 일치하지 않습니다.',
+            'UPLOAD_SUPERSEDED': '새 업로드가 발급됐습니다. 최신 업로드 번호를 확인하세요.',
+            'FILE_TOO_LARGE': '서버가 허용한 파일 크기를 초과했습니다.',
+            'VALIDATION_FAILED': '업로드 요청의 파일명·기준일·체크섬 등 입력을 확인하세요.',
+            'BANK_IDENTITY_DISABLED': '현재 서버 환경에서 목업 은행 식별을 허용하지 않습니다.',
+        }
+        code = None
+        try:
+            body = json.loads(error.read(8192))
+            candidate = body.get('code') if isinstance(body, dict) else None
+            if isinstance(candidate, str) and candidate in messages:
+                code = candidate
+        except (ValueError, OSError):
+            pass
+        finally:
+            error.close()
+        if code:
+            return ApiError(prefix + f'HTTP {error.code} · {code} — {messages[code]}', error.code)
+        if 300 <= error.code < 400:
+            message = '다른 페이지로 이동하는 응답입니다. Cloudflare 접근 정책과 API 주소를 확인하세요.'
+        elif stage == 'S3 전송' and error.code == 403:
+            message = 'S3가 업로드를 거절했습니다. 서명 URL 만료·서명 헤더·저장소 권한을 확인하세요.'
+        elif error.code in (401, 403):
+            message = '접근이 거절됐습니다. 이 요청 경로의 Cloudflare 서비스 토큰 정책과 서버 권한을 확인하세요.'
+        else:
+            message = '서버가 요청을 거절했습니다. 해당 단계의 서버 상태를 확인하세요.'
+        return ApiError(prefix + f'HTTP {error.code} — {message}', error.code)
+    if isinstance(error, (TimeoutError, URLError)):
+        message = '연결·응답 확인에 실패했습니다. 처리 여부를 확인하기 전 재전송을 반복하지 마세요.'
+    elif isinstance(error, OSError) and stage in ('목업 모듈 준비', '파일 확인'):
+        message = '로컬 파일을 읽을 수 없습니다. 파일 존재 여부와 읽기 권한을 확인하세요.'
+    elif isinstance(error, (ValueError, KeyError, TypeError)):
+        message = ('CSV가 비어 있거나 파일을 확인할 수 없습니다.' if stage == '파일 확인'
+                   else '서버 응답이 예상한 업로드 계약과 다릅니다. API 응답 형식을 확인하세요.')
+    else:
+        message = '처리 중 내부 오류가 발생했습니다. 실패 단계와 은행 번호를 전달하세요.'
+    return ApiError(prefix + message)
+
+
 class Controls:
     def __init__(self, base, client=None, *, allow_remote=False, cf_headers=None):
         ApiClient(base)  # Apply the existing URL rules before any request.
@@ -80,21 +130,35 @@ class Controls:
         return self.client.post(path, payload)
 
     def upload(self, day, bank, file, report):
-        mock = bank_module()
-        args = SimpleNamespace(api_url=self.base, bank_id=bank, file=file,
-                               business_date=day, correction_request_id=None, cf_headers=self.cf_headers)
-        opener = build_opener(mock.NoRedirect())
-        size, checksum = mock.inspect_file(file)
-        target = mock.request_upload(opener, args, size, checksum)
-        upload = target['uploadId']
-        report(f'{day} 은행 {bank}: 전송 중', uploadId=upload, bankId=bank)
-        mock.upload_file(opener, file, target, size)
-        report(f'{day} 은행 {bank}: 전송 완료 · 검수 확인 중', uploadId=upload, bankId=bank)
-        result = mock.request_status(opener, args, upload, complete=True)
-        result = mock.wait_result(opener, args, upload, result)
-        if result['status'] != 'COMPLETED':
-            raise ApiError(f'은행 {bank} 검수 실패: uploadId {upload}. 업로드 상태를 확인하세요.')
-        return upload
+        stage = '목업 모듈 준비'
+        def progress(value, **values):
+            nonlocal stage
+            stage = value
+            report(f'{day} 은행 {bank}: {stage}', bankId=bank, **values)
+        try:
+            progress(stage, uploadId=None)
+            mock = bank_module()
+            args = SimpleNamespace(api_url=self.base, bank_id=bank, file=file,
+                                   business_date=day, correction_request_id=None, cf_headers=self.cf_headers)
+            opener = build_opener(mock.NoRedirect())
+            progress('파일 확인')
+            size, checksum = mock.inspect_file(file)
+            progress('업로드 URL 발급')
+            target = mock.request_upload(opener, args, size, checksum)
+            upload = target['uploadId']
+            progress('S3 전송', uploadId=upload)
+            mock.upload_file(opener, file, target, size)
+            progress('업로드 완료 통지', uploadId=upload)
+            result = mock.request_status(opener, args, upload, complete=True)
+            progress('검수 결과 조회', uploadId=upload)
+            result = mock.wait_result(opener, args, upload, result)
+            if result['status'] != 'COMPLETED':
+                raise ApiError(f'은행 {bank} 검수 실패: uploadId {upload}. 업로드 상태를 확인하세요.')
+            return upload
+        except ApiError:
+            raise
+        except Exception as error:
+            raise upload_failure(error, bank, stage) from None
 
 
 class Replay:
@@ -131,13 +195,18 @@ class Replay:
             self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
 
     def _run(self, days, files, analyze, upload, interval):
+        stage = '날짜 준비'
+        day = None
         try:
             for day in days:
                 if self.pause.is_set():
                     break
                 if analyze and day in self.completed:
                     continue
+                stage = '업무 시각 준비'
+                self.report(f'{day}: {stage}', currentDay=day, bankId=None, uploadId=None, jobId=None)
                 self.controls.prepare_day(day)
+                stage = '전송 파일 목록 확인'
                 file_done = sum((day, bank, str(file)) in self.sent for bank, file in files[day])
                 self.report(f'{day}: 처리 시작', currentDay=day,
                             fileDone=file_done, fileTotal=len(files[day]) if upload else 0,
@@ -147,17 +216,20 @@ class Replay:
                         key = (day, bank, str(file))
                         if key in self.sent:
                             continue
-                        self.report(f'{day} 은행 {bank}: 전송 준비')
+                        self.report(f'{day} 은행 {bank}: 전송 준비', bankId=bank, uploadId=None)
+                        stage = '은행 파일 전송·검수'
                         self.controls.upload(day, bank, file, self.report)
                         self.sent.add(key)
                         file_done += 1
                         self.report(f'{day} 은행 {bank}: 전송·검수 완료', fileDone=file_done)
                 if analyze:
+                    stage = '분석 시작 요청'
                     self.report(f'{day}: 분석 시작 요청')
                     if day not in self.jobs:
                         self.jobs[day] = self.controls.post('demo/analysis', {'businessDate': day})['jobId']
                     job = self.jobs[day]
                     self.report(f'{day}: 분석 대기', jobId=job)
+                    stage = '분석 결과 조회'
                     self.wait_job(job, day)
                     self.completed.add(day)
                 with self.lock:
@@ -168,7 +240,13 @@ class Replay:
             self.report('일시정지' if self.pause.is_set() else '선택한 작업 완료')
         except Exception as error:
             # Never display signed URLs, raw HTTP responses or file contents.
-            message = str(error) if isinstance(error, ApiError) else '전송 또는 처리 확인 실패. 표시된 ID와 백엔드 작업 목록을 확인하세요.'
+            if isinstance(error, ApiError):
+                message = str(error)
+            else:
+                # A fixed type label is diagnostic; exception text can contain credentials.
+                kind = next((cls.__name__ for cls in (KeyError, TypeError, ValueError, OSError, RuntimeError)
+                             if isinstance(error, cls)), '내부 오류')
+                message = f'{day or "날짜 미확인"} · {stage} 실패 ({kind}). 패널 코드 버전과 API 응답 형식을 확인하세요.'
             self.report('중단', error=message)
 
     def wait_job(self, job, day):
