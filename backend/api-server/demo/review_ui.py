@@ -212,27 +212,26 @@ def review_tab(client, user, detail):
     options = {'정상 판정': ('DECIDE', 'NORMAL'), '조사 범위 제외': ('EXCLUDE', None),
                '조사 대상으로 변경': ('SUBJECT', None), '참고 맥락으로 변경': ('CONTEXT', None)}
     if detail['kind'] == 'ALERT':
-        options['Episode로 이관'] = ('TRANSFER', None)
+        options.update({'정상 종결': ('CLOSE', 'NORMAL'), '단독 세탁 의심 종결': ('CLOSE', 'SUSPICIOUS'),
+                        'Alert 전체 Episode 편입': ('TRANSFER', None)})
     else:
-        options.update({'세탁 의심 판정': ('DECIDE', 'SUSPICIOUS'), '선택 범위 별도 묶음 분리': ('SPLIT', None),
-                        '다른 Episode로 이동': ('MOVE', None), '같은 Episode 다른 묶음으로 이동': ('MOVE', None),
-                        '묶음 판정 재검토': ('RECONSIDER', None)})
+        options.update({'세탁 의심 판정': ('DECIDE', 'SUSPICIOUS'), '묶음 판정 재검토': ('RECONSIDER', None)})
     options.update({'의견만 저장': ('COMMENT', None), '사건 종결': ('CLOSE', None)})
     label = st.selectbox('처리 선택', list(options))
     action, decision = options[label]
     destination = {}
-    if label == '같은 Episode 다른 묶음으로 이동':
-        target = st.selectbox('이동할 묶음', detail['groups'], format_func=lambda g: f"{g['label']} · {g['groupId']}")
-        destination = dict(targetCaseId=detail['caseId'], targetRevision=detail['revision'], targetGroupId=target['groupId'])
-    elif action in ('MOVE', 'TRANSFER'):
-        destination = target_picker(client, 'detail_target', user['id'] if action == 'MOVE' else None, detail['caseId'])
+    if action == 'TRANSFER':
+        destination = target_picker(client, 'detail_target', exclude=detail['caseId'])
+        if destination is not None and not destination.get('targetCaseId'):
+            st.info('새 Episode는 목록에서 Alert를 2개 이상 선택해 생성하세요.')
+            destination = None
     comment = st.text_area('검토 의견 (필수)', max_chars=4000)
-    if action in ('CLOSE', 'COMMENT'):
+    if action in ('CLOSE', 'COMMENT', 'TRANSFER'):
         selections = [{'caseId': detail['caseId'], 'revision': detail['revision'], 'groupId': 0, 'txIds': []}]
     if action == 'CLOSE':
         st.write(f"미처리 조사 대상: {detail['pendingCount']}건")
     confirmed = st.checkbox('선택 범위와 처리 결과를 확인했습니다.')
-    if st.button('처리 저장', type='primary', disabled=not confirmed or not comment.strip() or not selections or destination is None or (action == 'CLOSE' and detail['pendingCount'] > 0)):
+    if st.button('처리 저장', type='primary', disabled=not confirmed or not comment.strip() or not selections or destination is None or (action == 'CLOSE' and decision is None and detail['pendingCount'] > 0)):
         send_command(client, user, dict(action=action, decision=decision, selections=selections, comment=comment, **destination), 'command')
 
 
@@ -370,15 +369,14 @@ def cases_page(client, user, today, kind):
                     st.info(f'{id}: 본인 담당의 열린 Alert만 이관할 수 있습니다.')
                     valid = False
                     continue
-                for g in d['groups']:
-                    options = [m['txId'] for m in g['members'] if m['state'] == 'PENDING']
-                    ids = st.multiselect(f"Alert {d['alertId']} 이관 범위", options, default=options, key=f'batch_{id}_{g["groupId"]}_{d["revision"]}')
-                    if ids:
-                        selections.append(dict(caseId=id, revision=d['revision'], groupId=g['groupId'], txIds=ids))
+                selections.append(dict(caseId=id, revision=d['revision'], groupId=0, txIds=[]))
             destination = target_picker(client, 'batch_target')
+            if destination is not None and not destination.get('targetCaseId') and len(selections) < 2:
+                st.info('새 Episode는 Alert를 2개 이상 선택해야 합니다.')
+                valid = False
             comment = st.text_area('이관 의견', key='batch_comment')
-            confirmed = st.checkbox('Alert별 선택 범위를 확인했습니다.', key='batch_confirm')
-            if st.button('선택 범위 일괄 이관', disabled=not valid or not confirmed or not comment.strip() or not selections or destination is None):
+            confirmed = st.checkbox('선택한 Alert 전체를 편입함을 확인했습니다.', key='batch_confirm')
+            if st.button('선택 Alert 전체 편입', disabled=not valid or not confirmed or not comment.strip() or not selections or destination is None):
                 send_command(client, user, dict(action='TRANSFER', selections=selections, comment=comment, **destination), 'batch_command')
     choice = st.selectbox('상세 조회할 사건', rows, index=None, format_func=lambda r: f"{kind.title()} {r.get('alertId') or r['caseId']}")
     if choice:
