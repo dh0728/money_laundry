@@ -14,7 +14,7 @@ import { loadMockNotifications } from '@/mocks/notifications'
 import { currentScenario } from '@/mocks/scenario'
 import { withOverride } from '@/features/alerts/alertOverrides'
 
-const badgeClass = 'top-1/2! -translate-y-1/2 rounded-full bg-destructive text-destructive-foreground peer-hover/menu-button:text-destructive-foreground peer-data-[active=true]/menu-button:text-destructive-foreground group-data-[collapsible=icon]:right-0! group-data-[collapsible=icon]:top-0! group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:min-w-4 group-data-[collapsible=icon]:translate-x-1/4 group-data-[collapsible=icon]:translate-y-0 group-data-[collapsible=icon]:px-0.5 group-data-[collapsible=icon]:text-[10px]'
+const badgeClass = 'top-1/2! -translate-y-1/2 rounded-full bg-destructive text-destructive-foreground ring-2 ring-sidebar peer-hover/menu-button:text-destructive-foreground peer-data-[active=true]/menu-button:text-destructive-foreground group-data-[collapsible=icon]:right-0! group-data-[collapsible=icon]:top-0! group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:min-w-4 group-data-[collapsible=icon]:translate-x-1/4 group-data-[collapsible=icon]:translate-y-0 group-data-[collapsible=icon]:px-0.5 group-data-[collapsible=icon]:text-[10px]'
 
 export function UnreadNotificationCount() {
   const [read] = useMemoryState<string[]>('notifications:read', [])
@@ -23,7 +23,7 @@ export function UnreadNotificationCount() {
   const count = state.data.filter(item => !read.includes(item.id)).length
   if (!count) return null
   return <SidebarMenuBadge className={badgeClass} aria-label={`안 읽은 알림 ${count}건 · mock 데이터`} title="시연용 mock 알림 수">
-    {count}<span className="ml-1 text-[9px] text-destructive-foreground/80 group-data-[collapsible=icon]:hidden">mock</span>
+    {count}<span className="ml-1 text-[9px] text-destructive-foreground group-data-[collapsible=icon]:hidden">mock</span>
   </SidebarMenuBadge>
 }
 
