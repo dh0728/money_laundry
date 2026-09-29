@@ -7,6 +7,7 @@ import { alertResolutionLabels, typeDisplay, type TypeCode } from '@/api/codes'
 import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
@@ -38,11 +39,16 @@ type Props = {
   episodes: number[]
   onOpenEpisode: (episodeId: number) => void
   onSubmit: (submit: VerdictSubmit) => void
+  onExcludeTransactions?: (txIds: number[], reason: string) => void
 }
 
-export default function AlertDetail({ alert, graph, relabels, onRelabel, history, responsible, assigneeNotice, episodes, onOpenEpisode, onSubmit }: Props) {
+export default function AlertDetail({ alert, graph, relabels, onRelabel, history, responsible, assigneeNotice, episodes, onOpenEpisode, onSubmit, onExcludeTransactions }: Props) {
   const [tab, setTab] = useMemoryState<DetailTab>(`alert:${alert.alertId}:tab`, 'overview')
   const [scoreTxId, setScoreTxId] = useState<number | null>(null)
+  const [selectingTransactions, setSelectingTransactions] = useState(false)
+  const [selectedTxIds, setSelectedTxIds] = useState<number[]>([])
+  const [excludeReason, setExcludeReason] = useState('')
+  const [confirmExclude, setConfirmExclude] = useState(false)
   // 사람이 바꾼 거래 판정을 반영한다(표·그래프 공통)
   const tx = useMemo(() => applyRelabels(alert.transactions, relabels), [alert.transactions, relabels])
   const graphModel = useMemo(() => toGraphModel(graph, alert.transactions, relabels), [graph, alert.transactions, relabels])
@@ -58,6 +64,14 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
     .map(([code, score]) => ({ code: Number(code) as TypeCode, score }))
     .filter((candidate): candidate is { code: TypeCode; score: number } => candidate.score != null && Number.isFinite(candidate.score))
     .sort((a, b) => b.score - a.score || a.code - b.code)
+  const submitExclude = () => {
+    if (!selectedTxIds.length || !excludeReason.trim()) return
+    onExcludeTransactions?.(selectedTxIds, excludeReason.trim())
+    setConfirmExclude(false)
+    setSelectingTransactions(false)
+    setSelectedTxIds([])
+    setExcludeReason('')
+  }
 
   return (
     <div className="flex min-h-full flex-col gap-5">
@@ -151,8 +165,35 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
 
       {tab === 'graph' && <Graph key={alert.alertId} model={graphModel} label={`${alertCode(alert.alertId)} 관계 그래프`}
         panelExtra={focus => <TxLabelPanel model={graphModel} focus={focus} editable={responsible && alert.status === 'OPEN'} onRelabel={onRelabel} />} />}
-      {tab === 'transactions' && <AlertTxTable rows={tx} />}
+      {tab === 'transactions' && <div className="space-y-3">
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" disabled={!responsible || !onExcludeTransactions}
+            onClick={() => { setSelectingTransactions(value => !value); setSelectedTxIds([]); setExcludeReason('') }}>
+            {selectingTransactions ? '선택 취소' : '거래 선택'}
+          </Button>
+          {selectingTransactions && <Button size="sm" disabled={!selectedTxIds.length || !excludeReason.trim()} onClick={() => setConfirmExclude(true)}>선택 거래 제외</Button>}
+        </div>
+        {selectingTransactions && <div className="flex flex-wrap items-end gap-2 rounded-md border bg-card p-3">
+          <label className="min-w-48 flex-1 text-xs">거래 제외 사유
+            <textarea aria-label="거래 제외 사유" className="mt-1 min-h-9 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000}
+              value={excludeReason} onChange={event => setExcludeReason(event.target.value)} placeholder="선택 거래를 제외하는 이유" />
+          </label>
+        </div>}
+        <AlertTxTable rows={tx} selection={selectingTransactions ? { ids: selectedTxIds, onToggle: id => setSelectedTxIds(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id]) } : undefined} />
+      </div>}
       {tab === 'review' && <AlertReview alert={alert} responsible={responsible} episodes={episodes} onSubmit={onSubmit} />}
+      <AlertDialog open={confirmExclude} onOpenChange={setConfirmExclude}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>선택 거래를 제외할까요?</AlertDialogTitle>
+            <AlertDialogDescription>{alertCode(alert.alertId)}의 조사 대상에서 거래 {selectedTxIds.length}건을 제외합니다. 제외 후 Alert의 거래 건수와 금액이 다시 계산됩니다.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>돌아가기</AlertDialogCancel>
+            <AlertDialogAction onClick={submitExclude}>거래 제외 확인</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

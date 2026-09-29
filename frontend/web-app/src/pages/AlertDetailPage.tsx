@@ -16,6 +16,8 @@ import { useMemoryState } from '@/lib/memory'
 import { useAsync } from '@/lib/useAsync'
 import { relabelComment, relabelText, useTxRelabels } from '@/features/graph/relabel'
 import { loadMockAlertDetail } from '@/mocks/alertDetail'
+import { graphOf } from '@/mocks/graph'
+import { useMockExcludedTransactions, withoutTransactions } from '@/mocks/transactionScope'
 import { live, mockSavedNote } from '@/lib/apiMode'
 
 
@@ -32,12 +34,14 @@ export default function AlertDetailPage({ alertId, rows, onOpenEpisode }: Props)
   const [overrides, setOverrides] = useAlertOverrides()
   const [extraHistory, setExtraHistory] = useAlertHistory(alertId)
   const [relabels, setRelabels] = useTxRelabels()
+  const [excludedTransactions, setExcludedTransactions] = useMockExcludedTransactions()
   const episodes = useMemo(() => linkableEpisodes(rows), [rows])
 
   if (state.status === 'loading') return <LoadingBlock label={`${alertCode(alertId)} 상세`} />
   if (state.status === 'error') return <ErrorBlock message={state.message} onRetry={retry} />
 
-  const alert = withOverride(state.data.detail, overrides)
+  const alert = withoutTransactions(withOverride(state.data.detail, overrides), excludedTransactions[alertId] ?? [])
+  const graph = live ? state.data.graph : graphOf(alert.transactions, alert.accounts, alert.subjectAccount.account)
   const history = [...extraHistory, ...state.data.history]
   const responsible = canEditOpen(currentUser, alert.assignee.userId, alert.status)
 
@@ -79,18 +83,29 @@ export default function AlertDetailPage({ alertId, rows, onOpenEpisode }: Props)
     toast.success(`거래 ${txId}를 ${relabelText(label)}로 전환했습니다.`, { description: mockSavedNote })
   }
 
+  function excludeTransactions(txIds: number[], reason: string) {
+    if (live || !responsible || !txIds.length || !reason.trim()) return
+    setExcludedTransactions(prev => ({ ...prev, [alertId]: [...new Set([...(prev[alertId] ?? []), ...txIds])] }))
+    setExtraHistory(prev => [{
+      id: Date.now(), actor: { userId: currentUser.userId, name: currentUser.name, role: currentUser.role }, action: 'TX_EXCLUDE',
+      targetType: 'ALERT', targetId: alertId, relatedIds: txIds, from: 'INCLUDED', to: 'EXCLUDED', resolution: null, comment: reason, at: new Date().toISOString(),
+    }, ...prev])
+    toast.success(`거래 ${txIds.length}건을 조사 범위에서 제외했습니다.`, { description: mockSavedNote })
+  }
+
   return (
     <AlertDetail
       relabels={relabels}
       onRelabel={relabel}
       alert={alert}
-      graph={state.data.graph}
+      graph={graph}
       history={history}
       responsible={responsible}
       assigneeNotice={responsible ? undefined : `현재 ${currentUser.name} 계정으로 조회 중입니다. 판정은 담당자 ${alert.assignee.name}${josa(alert.assignee.name, '이', '가')} 합니다.`}
       episodes={episodes}
       onOpenEpisode={onOpenEpisode}
       onSubmit={submit}
+      onExcludeTransactions={live ? undefined : excludeTransactions}
     />
   )
 }

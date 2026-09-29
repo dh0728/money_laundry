@@ -68,22 +68,34 @@ const sourceColumn: ColumnDef<TxRow> = {
   ),
 }
 
-export default function AlertTxTable({ rows }: { rows: TxRow[] }) {
+type Selection = { ids: number[]; onToggle: (txId: number) => void }
+
+export default function AlertTxTable({ rows, selection }: { rows: TxRow[]; selection?: Selection }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'txAt', desc: false }])
   const [, setTarget] = useTransactionTarget()
   const data = useMemo(() => rows, [rows])
   const withSource = rows.some(row => row.alertId != null)
   const columns = useMemo(() => {
-    const open: Open = target => { setTarget(target); window.location.hash = 'transactions' }
+    const open: Open = target => { if (selection) return; setTarget(target); window.location.hash = 'transactions' }
     const base = columnsFor(open)
-    return withSource ? [sourceColumn, ...base] : base
-  }, [withSource, setTarget])
+    const visible = withSource ? [sourceColumn, ...base] : base
+    return selection ? [{
+      id: 'select', size: 40,
+      header: () => <span className="sr-only">거래 선택</span>,
+      cell: ({ row }) => <span className="flex w-full justify-center"><input type="checkbox" aria-label={`거래 T-${row.original.txId} 선택`}
+        checked={selection.ids.includes(row.original.txId)} onClick={event => event.stopPropagation()}
+        onChange={() => selection.onToggle(row.original.txId)} /></span>,
+    } as ColumnDef<TxRow>, ...visible] : visible
+  }, [withSource, setTarget, selection])
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table은 React Compiler 최적화 대상이 아니다
   const table = useReactTable({
     data, columns, getRowId: row => String(row.txId),
-    state: { sorting }, onSortingChange: setSorting, enableHiding: false,
+    state: { sorting, rowSelection: Object.fromEntries((selection?.ids ?? []).map(id => [String(id), true])) },
+    onSortingChange: setSorting, enableHiding: false,
     initialState: { pagination: { pageIndex: 0, pageSize: 20 } },
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
-  return <DataTable table={table} topHorizontalScroll columnGroups={{ fromOwnerName: 'sender', fromAccount: 'sender', toOwnerName: 'receiver', toAccount: 'receiver' }} data-testid="tx-table" tableClassName="table-fixed [&_th]:overflow-hidden [&_td]:overflow-hidden [&_th]:px-0 [&_td]:p-1" />
+  return <DataTable table={table} topHorizontalScroll onRowClick={selection ? row => selection.onToggle(row.txId) : undefined}
+    columnGroups={{ fromOwnerName: 'sender', fromAccount: 'sender', toOwnerName: 'receiver', toAccount: 'receiver' }}
+    data-testid="tx-table" tableClassName="table-fixed [&_th]:overflow-hidden [&_td]:overflow-hidden [&_th]:px-0 [&_td]:p-1" />
 }
