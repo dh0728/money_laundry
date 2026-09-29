@@ -370,3 +370,12 @@ users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·
 | demo_reset_files | (reset_id,object_key) 복합 PK, reset_id → demo_resets, is_prefix, done |
 
 두 테이블은 시연 데이터 초기화 대상에서 제외한다. DB 대상 삭제와 파일 정리 대상 기록은 한 트랜잭션으로 커밋한다. S3 작업은 이후 별도 단계이며 실패해도 DB 초기화를 다시 수행하지 않는다. 삭제 경로와 저장소 식별은 서버 내부에만 보관한다. 계정·은행/보고 기간·환율·Flyway와 ID 시퀀스를 보존한다. 업무 시각 행은 유지하고 business_at만 null로 되돌리며 revision을 증가시킨다.
+
+
+## V15 — 실제 업무 알림의 계정별 읽음 상태
+
+- notification_reads: `(user_id, notification_id)` PK, users FK(계정 삭제 시 cascade), read_at 실제 서버 시각. notification_id는 조회 뷰에서 구성한 불투명 키이며 실데이터 내용을 복제하지 않는다. 읽지 않음은 행 없음.
+- work_notifications VIEW: review_cases·alert_versions(version1)·완료 analysis_runs/batch_jobs의 담당자별 최초 분석 배정 묶음, Episode 배정, 지정 review_events의 UNION ALL. 모델 정답 라벨/개인 원문/증거 JSON을 조회하지 않는다.
+- review_events 추가 부분 인덱스: 알림 대상 COMMENT/CLOSE/TRANSFER/UNLINK/DISSOLVE만 case_id/business_at/event_id.
+- 대상 계정 조건은 서버 세션 user_id. 관리자도 타인의 읽음 상태를 변경할 수 없다. 해당 뷰는 현재 담당자 기준이며 담당자 변경 기능/수신자 이력 모델은 이번 범위에 없다.
+- 기존 사건·배정·조사 데이터 삭제/변환 없음. 시연 초기화의 명시적 truncate 대상에 notification_reads 추가. 계정과 등록 설정은 보존.

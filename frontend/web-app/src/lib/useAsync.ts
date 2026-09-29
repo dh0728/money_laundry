@@ -12,14 +12,19 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[], options: { 
   const latestLoad = useEffectEvent(() => load)
   useEffect(() => {
     if (!enabled) return
-    const ensure = () => { if (document.visibilityState !== 'hidden') void cache.fetch(key, latestLoad(), maxAge).catch(() => undefined) }
+    const dueAt = (snapshot.settledAt ?? 0) + maxAge
+    const ensure = () => {
+      if (document.visibilityState !== 'hidden' && (!snapshot.settledAt || Date.now() >= dueAt))
+        void cache.fetch(key, latestLoad(), maxAge).catch(() => undefined)
+    }
+    if (snapshot.refreshing) return
     ensure()
-    const timer = window.setInterval(ensure, maxAge)
+    const timer = window.setTimeout(ensure, Math.max(0, dueAt - Date.now()))
     window.addEventListener('focus', ensure)
     document.addEventListener('visibilitychange', ensure)
     return () => { clearInterval(timer); window.removeEventListener('focus', ensure); document.removeEventListener('visibilitychange', ensure) }
-  }, [cache, key, maxAge, enabled, snapshot.invalidation])
+  }, [cache, key, maxAge, enabled, snapshot.invalidation, snapshot.settledAt, snapshot.refreshing])
   const refresh = () => cache.fetch(key, load, maxAge, true)
   const retry = () => { void refresh().catch(() => undefined) }
-  return { state: snapshot.state, refreshing: snapshot.refreshing, refreshError: snapshot.refreshError, retry, refresh }
+  return { state: snapshot.state, refreshing: snapshot.refreshing, refreshError: snapshot.refreshError, nextRefreshAt: enabled && snapshot.settledAt ? snapshot.settledAt + maxAge : undefined, retry, refresh }
 }
