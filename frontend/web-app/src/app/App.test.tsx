@@ -72,6 +72,25 @@ describe('앱 틀', () => {
     expect(screen.queryByRole('button', { name: /연결된 Episode E-800/ })).not.toBeInTheDocument()
   })
 
+  it('Alert가 1건만 남으면 Episode를 해체하고 나머지 Alert도 단독으로 전환한다', async () => {
+    writeMemory('alerts:overrides', {})
+    window.history.replaceState({}, '', '/#episodes/800')
+    renderSignedIn()
+    window.location.hash = 'episodes/800'
+    const linked = await screen.findByTestId('linked-alerts')
+    fireEvent.click(within(linked).getByRole('button', { name: '연결 Alert 선택' }))
+    for (const id of [3003, 3018]) fireEvent.click(within(linked).getByRole('checkbox', { name: `Alert A-${id} 선택` }))
+    fireEvent.change(within(linked).getByRole('textbox', { name: '연결 해제 사유' }), { target: { value: '연관성 없음' } })
+    fireEvent.click(within(linked).getByRole('button', { name: '선택 Alert 연결 해제' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Episode를 해체할까요?')
+    fireEvent.click(screen.getByRole('button', { name: 'Episode 해체 확인' }))
+    await waitFor(() => expect(window.location.hash).toBe('#episodes'))
+    expect(screen.queryByRole('row', { name: /E-800/ })).not.toBeInTheDocument()
+    window.location.hash = 'alerts/3033'
+    await waitFor(() => expect(screen.getByTestId('detail-id')).toHaveTextContent('A-3033'))
+    expect(screen.queryByRole('button', { name: /연결된 Episode E-800/ })).not.toBeInTheDocument()
+  })
+
   it('mock Alert에서 제외한 거래는 상세와 목록의 건수에 함께 반영된다', async () => {
     window.history.replaceState({}, '', '/#alerts/3000')
     renderSignedIn()
@@ -83,6 +102,7 @@ describe('앱 틀', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '거래 T-300000 선택' }))
     fireEvent.change(screen.getByRole('textbox', { name: '거래 제외 사유' }), { target: { value: '조사 범위 밖' } })
     fireEvent.click(screen.getByRole('button', { name: '선택 거래 제외' }))
+    fireEvent.click(screen.getByRole('button', { name: '거래 제외 확인' }))
     expect(screen.queryByRole('button', { name: /300000 거래 거래 내역에서 보기/ })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /거래/ })).toHaveTextContent('3')
     fireEvent.click(screen.getByTestId('header-back'))

@@ -72,17 +72,20 @@ export default function EpisodeDetailPage({ episodeId, alerts, onOpenAlert }: Pr
   }
 
   function unlinkAlerts(alertIds: number[], reason: string) {
-    if (live || !responsible || !alertIds.length || !reason.trim() || alertIds.length >= episode.alerts.length) return
+    if (live || !responsible || !alertIds.length || !reason.trim()) return
+    const dissolve = episode.alerts.length - alertIds.length < 2
+    const unlinkedIds = dissolve ? episode.alerts.map(alert => alert.alertId) : alertIds
     setAlertOverrides(prev => {
       const next = { ...prev }
-      for (const alertId of alertIds) next[alertId] = { status: 'OPEN', resolution: null, episodeId: null }
+      for (const alertId of unlinkedIds) next[alertId] = { status: 'OPEN', resolution: null, episodeId: null }
       return next
     })
     setExtraHistory(prev => [{
       id: Date.now(), actor: { userId: currentUser.userId, name: currentUser.name, role: currentUser.role }, action: 'UNLINK',
-      targetType: 'EPISODE', targetId: episodeId, relatedIds: alertIds, from: 'LINKED', to: 'UNLINKED', resolution: null, comment: reason, at: new Date().toISOString(),
+      targetType: 'EPISODE', targetId: episodeId, relatedIds: unlinkedIds, from: 'LINKED', to: 'UNLINKED', resolution: null, comment: reason, at: new Date().toISOString(),
     }, ...prev])
-    toast.success(`Alert ${alertIds.length}건의 연결을 해제했습니다.`, { description: mockSavedNote })
+    toast.success(dissolve ? `${episodeCode(episodeId)}를 해체하고 Alert ${unlinkedIds.length}건을 단독으로 전환했습니다.` : `Alert ${unlinkedIds.length}건의 연결을 해제했습니다.`, { description: mockSavedNote })
+    if (dissolve) window.location.hash = 'episodes'
   }
 
   return (
