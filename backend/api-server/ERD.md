@@ -384,3 +384,8 @@ users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·
 ## V16 — Episode 편입 알림 중복 제거
 
 work_notifications 뷰만 교체한다. Alert 측 TRANSFER 이벤트와 편입이 기록된 Episode의 중복 배정 알림을 제외하고 Episode 측 TRANSFER를 유지한다. 테이블/원본 조사 이력/기존 읽음 기록을 삭제하지 않는다. 배포된 V15는 수정하지 않는다.
+
+
+## V17 — 시연 전용 보고 대응값
+
+`evaluation.demo_report_hints`: `report_id` PK/FK → `private.bank_reports`, `dataset_version`(pattern5-2023-v1), `is_laundering` boolean, `type_code` 0~8. 정상 라벨은 유형0만 허용한다. dev/local + demo 수집에서 내장 지문과 일치하는 보고에만 작성한다. 실행은 `analysis_input_reports`의 고정 보고 ID를 통해 조회하며 일반 `analysis.input_transactions`에는 라벨을 추가하지 않는다. PUBLIC 권한을 제거하고 일반 input_reader의 원문·라벨 차단을 유지한다. 시연 초기화에 포함된다. 실제 모델 피처나 성능평가 자료가 아니다.

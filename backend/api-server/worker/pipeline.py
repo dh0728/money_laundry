@@ -8,7 +8,8 @@ import uuid
 
 import pyarrow.parquet as pq
 
-from demo_calculator import FEATURE_VERSION, MODEL_VERSION
+from demo_calculator import LABEL_MODEL_VERSION, FIXED_LABEL_MODEL_VERSION
+from demo_label_input import DemoLabelInput, versions_for_run
 from frozen_input import FrozenInput, StaleExecution, write_demo_input
 from worker_transport import ProtocolError
 
@@ -28,7 +29,7 @@ def _lock(connection, execution):
     FrozenInput(connection, execution).check_current()
 
 
-def _existing(connection, execution, root, kind):
+def _existing(connection, execution, root, kind, versions):
     row = connection.execute("""
         SELECT input_artifact FROM analysis_model_tasks
         WHERE run_id=%s AND model_kind=%s AND phase='PUBLISH' AND status='READY'
@@ -38,8 +39,8 @@ def _existing(connection, execution, root, kind):
     document = row[0]
     if (document.get("run_id") != str(execution.run_id)
             or document.get("model_kind") != kind
-            or document.get("model_version") != MODEL_VERSION
-            or document.get("feature_version") != FEATURE_VERSION):
+            or document.get("model_version") != versions[0]
+            or document.get("feature_version") != versions[1]):
         raise ProtocolError("Stored input artifact identity mismatch")
     path = (root / document["path"]).resolve()
     if not path.is_relative_to(root) or not path.is_file():
@@ -49,9 +50,9 @@ def _existing(connection, execution, root, kind):
     return document
 
 
-def _initialize(connection, execution):
-    binding = dict(mode="demo", model_version=MODEL_VERSION,
-                   feature_version=FEATURE_VERSION, input_contract_version=1)
+def _initialize(connection, execution, versions):
+    binding = dict(mode="demo", model_version=versions[0],
+                   feature_version=versions[1], input_contract_version=1)
     with connection.transaction():
         _lock(connection, execution)
         for kind in ("BINARY", "TYPE"):
@@ -110,7 +111,7 @@ def _stage_features(connection, path):
         with cursor.copy("COPY prepared_features(tx_id,features) FROM STDIN") as copy:
             for batch in pq.ParquetFile(path).iter_batches(batch_size=4096):
                 for row in batch.to_pylist():
-                    copy.write_row((row["tx_id"], json.dumps({"demo_value": row["demo_value"]})))
+                    copy.write_row((row["tx_id"], json.dumps({k: v for k, v in row.items() if k != "tx_id"})))
 
 
 def _save_prepared(connection, execution, kind, token, document):
@@ -135,13 +136,13 @@ def _save_prepared(connection, execution, kind, token, document):
             SELECT %s,tx_id,%s,%s,features,%s FROM prepared_features
             ON CONFLICT(job_id,tx_id,model_kind) DO UPDATE SET
               feature_version=excluded.feature_version,features=excluded.features,run_id=excluded.run_id
-            """, (execution.job_id, kind, FEATURE_VERSION, execution.run_id))
+            """, (execution.job_id, kind, document["feature_version"], execution.run_id))
 
 
-def _prepare_model(connection, execution, root, kind):
-    source = FrozenInput(connection, execution)
+def _prepare_model(connection, execution, root, kind, versions):
+    source = (DemoLabelInput if versions[0] in (LABEL_MODEL_VERSION, FIXED_LABEL_MODEL_VERSION) else FrozenInput)(connection, execution)
     source.check_current()
-    artifact = _existing(connection, execution, root, kind)
+    artifact = _existing(connection, execution, root, kind, versions)
     if artifact is None:
         token = _claim(connection, execution, kind)
         relative = Path("runs") / str(execution.run_id) / kind / str(token) / "targets.parquet"
@@ -159,7 +160,7 @@ def _prepare_model(connection, execution, root, kind):
             os.replace(temporary, output)
             temporary = None
             artifact = dict(protocol_version=1, run_id=str(execution.run_id), model_kind=kind,
-                            model_version=MODEL_VERSION, feature_version=FEATURE_VERSION,
+                            model_version=versions[0], feature_version=versions[1],
                             path=relative.as_posix(), size_bytes=size, sha256=digest, row_count=count)
             _stage_features(connection, output)
             _save_prepared(connection, execution, kind, token, artifact)
@@ -180,8 +181,10 @@ def prepare_features(connection, execution, storage_root):
     Files are retained after an uncertain commit and checked on reuse.
     """
     root = Path(storage_root).resolve()
-    _initialize(connection, execution)
-    models = {kind: _prepare_model(connection, execution, root, kind)
+    FrozenInput(connection, execution).check_current()
+    versions = versions_for_run(connection, execution)
+    _initialize(connection, execution, versions)
+    models = {kind: _prepare_model(connection, execution, root, kind, versions)
               for kind in ("BINARY", "TYPE")}
     artifact = json.dumps(dict(protocol_version=2, run_id=str(execution.run_id), models=models),
                           sort_keys=True, separators=(",", ":"))

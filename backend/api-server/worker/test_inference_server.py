@@ -102,11 +102,11 @@ class InferenceServerTests(unittest.TestCase):
         self.http.server_close()
         self.thread.join(5)
 
-    def payload(self, kind="binary"):
-        request = Request(7, kind, model_version=MODEL_VERSION,
-                          feature_version=FEATURE_VERSION, run_id=str(uuid4()))
+    def payload(self, kind="binary", targets=None, versions=None):
+        versions = versions or dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
+        request = Request(7, kind, **versions, run_id=str(uuid4()))
         stream = io.BytesIO()
-        pq.write_table(build_targets([1, 99, 100]), stream)
+        pq.write_table(build_targets([1, 99, 100]) if targets is None else targets, stream)
         data = stream.getvalue()
         key = "dev/" + request.inputs + "targets.parquet"
         self.objects["/" + key] = data
@@ -151,6 +151,19 @@ class InferenceServerTests(unittest.TestCase):
             self.assertEqual(scores.column("tx_id").to_pylist(), [1, 99, 100])
             if kind == "binary":
                 self.assertEqual(scores.column("p_laundering").to_pylist(), [0.015, 0.995, 0.005])
+
+    def test_label_demo_models_use_same_http_file_callback_protocol(self):
+        from demo_calculator import build_label_targets, LABEL_MODEL_VERSION, LABEL_FEATURE_VERSION, calculate
+        targets = build_label_targets([(1, True, 3), (99, False, 0), (100, True, 0)])
+        for kind in ('binary', 'type'):
+            payload = self.payload(kind, targets, dict(model_version=LABEL_MODEL_VERSION, feature_version=LABEL_FEATURE_VERSION))
+            self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+            self.wait_for(lambda: self.state(payload)['status'] == 'COMPLETED')
+            self.wait_for(lambda: self.state(payload)['notification_delivered'])
+            result = self.state(payload)['result']
+            scores = pq.read_table(io.BytesIO(self.objects['/' + result['files'][0]['key']]))
+            self.assertEqual(scores['p_laundering' if kind == 'binary' else 'p_3'].to_pylist(),
+                             calculate(targets, kind, model_version=LABEL_MODEL_VERSION, feature_version=LABEL_FEATURE_VERSION)['p_laundering' if kind == 'binary' else 'p_3'].to_pylist())
             self.assertNotIn("manifest_url", self.state(payload))
         self.assertEqual(len(self.events), 2)
 

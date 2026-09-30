@@ -1,3 +1,4 @@
+import { agreementComposition } from '@/features/dashboard/metrics'
 import { LiveWorkQueue } from '@/features/dashboard/LiveWorkQueue'
 import { InstitutionView } from '@/features/dashboard/InstitutionView'
 import { PersonalView, PersonalSummaryView } from '@/features/dashboard/PersonalView'
@@ -20,12 +21,6 @@ import { SectionCards } from '@/components/SectionCards'
 import { useAsync } from '@/lib/useAsync'
 
 const count = (n: number | undefined) => (n ?? 0).toLocaleString('ko-KR')
-const agreementLabels: Record<string, string> = {
-  STRONG: '모델 의심 · 패턴 있음',
-  ATYPICAL: '모델 의심 · 패턴 없음',
-  PATTERN_ONLY: '모델 정상 · 패턴 있음',
-  WEAK: '모델 정상 · 패턴 없음',
-}
 
 function LiveAiDailyReport({ data }: { data: LiveDashboard }) {
   const today = data.institution.today
@@ -78,7 +73,7 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
       cards: <SectionCards items={kpis} />,
       range: { from: new Date(`${from}T00:00:00`), to: new Date(`${to}T00:00:00`) },
       onRange: range => setPeriod({ from: range?.from ? isoDate(range.from) : daysBefore(businessDate,29), to: range?.to ? isoDate(range.to) : businessDate }),
-      charts: <><div className="shrink-0"><AlertStatusChart data={data.dailyAlertStatus ?? []} unavailable={data.dailyAlertStatus == null} /></div><Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy"><CardContent className="flex min-h-0 flex-1 flex-col px-4"><SectionTitle title="의심 거래 구성과 패턴 분포" description={`전체 분석 거래 ${count(agreementTotal)}건의 모델 조합 · 의심 거래 유형별 건수`} />{agreementTotal ? <div className="min-h-0 flex-1"><TransactionPatternHierarchy linked={false} unit="거래" composition={data.agreements.map((row,i) => ({ name: agreementLabels[row.agreement] ?? row.agreement, value: row.count, fill: ['var(--foreground)','var(--muted-foreground)','var(--chart-3)','var(--chart-4)'][i%4] }))} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /></div> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</CardContent></Card></>,
+      charts: <><div className="shrink-0"><AlertStatusChart data={data.dailyAlertStatus ?? []} unavailable={data.dailyAlertStatus == null} /></div><Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy"><CardContent className="flex min-h-0 flex-1 flex-col px-4"><SectionTitle title="의심 거래 구성과 패턴 분포" description={`전체 분석 거래 ${count(agreementTotal)}건의 모델 조합 · 의심 거래 유형별 건수`} />{agreementTotal ? <div className="min-h-0 flex-1"><TransactionPatternHierarchy linked={false} unit="거래" composition={agreementComposition(data.agreements)} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /></div> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</CardContent></Card></>,
       report: <LiveAiDailyReport data={data} />,
       queue: <LiveWorkQueue personal={false} />,
     }} /> : <PersonalView remote={{

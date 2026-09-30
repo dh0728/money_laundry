@@ -28,7 +28,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Real PostgreSQL with byte-preserving storage double. No real S3 connection is claimed. */
-@SpringBootTest(properties = "spring.profiles.active=local")
+@SpringBootTest(properties = {"spring.profiles.active=local", "app.worker.mode=demo"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class BankUploadApiTests {
@@ -149,10 +149,14 @@ class BankUploadApiTests {
   }
 
   long submit(int bank, byte[] bytes) throws Exception {
+    return submit(bank, bytes, DATE);
+  }
+
+  long submit(int bank, byte[] bytes, LocalDate date) throws Exception {
     var issued =
         service.issue(
             bank,
-            new IssueUploadRequest(UUID.randomUUID() + ".csv", bytes.length, digest(bytes), DATE));
+            new IssueUploadRequest(UUID.randomUUID() + ".csv", bytes.length, digest(bytes), date));
     String key =
         jdbc.queryForObject(
             "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId());
@@ -176,6 +180,36 @@ class BankUploadApiTests {
 
   int count(String table) {
     return jdbc.queryForObject("select count(*) from " + table, Integer.class);
+  }
+
+  @Test
+  void demoCatalogLinksBothBankReportsWithoutChangingIntegratedTransaction() throws Exception {
+    var date = LocalDate.of(2023, 8, 31);
+    jdbc.update(
+        "insert into banks(bank_id,name,is_reporting) values(119,'Israel Bank #6',true),(48309,'Saudi Arabia Bank #24',true)");
+    for (int bank : new int[] {119, 48309}) {
+      jdbc.update(
+          "insert into bank_reporting_periods(bank_id,effective_from_date) values(?,?)",
+          bank,
+          date);
+    }
+    String csv =
+        HEADER
+            + "2023/08/31 00:04,0119,811C597B0,0048309,811C599A0,34254.65,Saudi Riyal,34254.65,Saudi Riyal,ACH,Israel Bank #6,Saudi Arabia Bank #24,800F224C0,Partnership #3715,800F2F200,Sole Proprietorship #979,1\n";
+    long first = submit(119, csv.getBytes(StandardCharsets.UTF_8), date);
+    long second = submit(48309, csv.getBytes(StandardCharsets.UTF_8), date);
+    assertThat(count("evaluation.demo_report_hints")).isEqualTo(2);
+    var outcome = integration.integrate(date, Instant.now().plusSeconds(1), Set.of(first, second));
+    assertThat(outcome.transactions()).isEqualTo(1);
+    assertThat(
+            jdbc.queryForList(
+                "select h.type_code from transaction_reports r join evaluation.demo_report_hints h using(report_id)",
+                Integer.class))
+        .containsExactly(3, 3);
+    assertThat(
+            jdbc.queryForObject(
+                "select is_laundering from evaluation.transaction_labels", Boolean.class))
+        .isTrue();
   }
 
   @Test
