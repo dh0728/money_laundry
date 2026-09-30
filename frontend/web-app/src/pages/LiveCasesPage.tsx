@@ -3,7 +3,8 @@ import { Panel, OverviewPanels } from '@/features/alerts/DetailPanels'
 import { AlertVerdictForm } from '@/features/alerts/AlertVerdictForm'
 import type { AlertVerdict } from '@/features/alerts/verdict'
 import { SectionTitle } from '@/components/page'
-import { CaseActivityCharts, type ActivityAmounts } from '@/features/alerts/CaseActivityCharts'
+import { CaseActivityCharts } from '@/features/alerts/CaseActivityCharts'
+import { dailyMemberAmounts } from '@/features/alerts/activityAmounts'
 import { ReviewLayout } from '@/features/alerts/ReviewLayout'
 import AlertTxTable from '@/features/alerts/AlertTxTable'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
@@ -96,13 +97,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     })
     setScopeRetry(false)
   }
-  const activityAmounts: ActivityAmounts = {}
-  for (const [key, amount] of Object.entries(item.summary.dailySuspiciousAmount ?? {})) {
-    const split = key.lastIndexOf('|')
-    const day = split < 0 ? key : key.slice(0, split)
-    const currency = split < 0 ? '통화 미제공' : key.slice(split + 1)
-    ;(activityAmounts[currency] ??= { daily: [], senders: [] }).daily.push({ day, amount })
-  }
+  const activityAmounts = dailyMemberAmounts(item.groups ?? [])
   for (const sender of item.summary.topSenders ?? []) {
     const split = sender.accountCurrency.lastIndexOf('|')
     const currency = split < 0 ? '통화 미제공' : sender.accountCurrency.slice(split + 1)
