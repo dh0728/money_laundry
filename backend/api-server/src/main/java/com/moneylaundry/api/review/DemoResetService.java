@@ -53,6 +53,7 @@ public class DemoResetService {
           "transaction_reports",
           "transactions",
           "evaluation.report_labels",
+          "evaluation.demo_report_hints",
           "private.bank_reports",
           "integration_attempt_versions",
           "integration_attempts",
