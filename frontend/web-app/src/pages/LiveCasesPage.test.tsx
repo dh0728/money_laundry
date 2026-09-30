@@ -433,3 +433,19 @@ it('USD 환산값이 없으면 0이나 NaN 대신 미제공을 표시한다', as
   await waitFor(() => expect(within(summary).getAllByText('USD 환산액 미제공')).toHaveLength(3))
   expect(summary).not.toHaveTextContent('NaN')
 })
+
+
+it.each([
+  { kind: 'ALERT', status: 'OPEN', episodeId: null, label: '처리 전', displayStatus: 'PENDING' },
+  { kind: 'ALERT', status: 'CLOSED', episodeId: 50, label: '처리 중', displayStatus: 'IN_PROGRESS' },
+  { kind: 'ALERT', status: 'CLOSED', episodeId: null, label: '처리 완료', displayStatus: 'DONE' },
+  { kind: 'EPISODE', status: 'OPEN', episodeId: null, label: '처리 중', displayStatus: 'IN_PROGRESS' },
+  { kind: 'EPISODE', status: 'CLOSED', episodeId: null, label: '처리 완료', displayStatus: 'DONE' },
+] as const)('$kind 상세는 목록 기준 $label 배지를 사용한다 ($status, $episodeId)', async ({ kind, status, episodeId, label, displayStatus }) => {
+  fetchReviewCase.mockResolvedValue(alertCase(1, 3001, { kind, status, episodeId }))
+  render(<LiveCasesPage kind={kind} caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  const tags = await screen.findByTestId('detail-tags')
+  expect(within(tags).getByText(label)).toHaveAttribute('data-status', displayStatus)
+  expect(tags).not.toHaveTextContent('진행 중')
+  expect(tags).not.toHaveTextContent('종결')
+})
