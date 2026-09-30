@@ -64,6 +64,23 @@ class DemoResetTests {
         "insert into bank_reporting_periods(bank_id,effective_from_date) select 999999,'2023-01-01' where not exists(select 1 from bank_reporting_periods where bank_id=999999)");
     var periods = jdbc.queryForList("select * from bank_reporting_periods order by period_id");
     long old = job("COMPLETED");
+    long reportSet =
+        jdbc.queryForObject(
+            "insert into report_sets(bank_id,business_date) values(999999,'2023-09-01') returning set_id",
+            Long.class);
+    long version =
+        jdbc.queryForObject(
+            "insert into report_versions(set_id,upload_id,version_no,received_at,stage_status) values(?,?,1,now(),'ACTIVE') returning version_id",
+            Long.class,
+            reportSet,
+            old);
+    long report =
+        jdbc.queryForObject(
+            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version) values(?,2,'test','cipher','test') returning report_id",
+            Long.class,
+            version);
+    jdbc.update(
+        "insert into evaluation.demo_report_hints values(?,'pattern5-2023-v1',true,3)", report);
     jdbc.update("insert into alerts(assignee_id) values(?)", admin);
     long entity =
         jdbc.queryForObject(

@@ -78,7 +78,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 time.sleep(0.25)
         cls.addClassCleanup(cls.admin.close)
         migrations = Path(__file__).resolve().parents[1] / "src/main/resources/db/migration"
-        for version in range(1, 12):
+        for version in [*range(1, 12), 17]:
             files = list(migrations.glob(f"V{version}__*.sql"))
             if len(files) != 1:
                 raise RuntimeError("Expected exactly one migration per version")
@@ -201,6 +201,58 @@ class FrozenInputPostgresTests(unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError, "EMPTY_INPUT"):
             write_demo_input(self.source, output)
         self.assertEqual(output.getvalue(), b"")
+
+    def annotate_demo(self, ids):
+        upload = self.admin.execute("INSERT INTO batch_jobs(job_type,status) VALUES('INGEST','COMPLETED') RETURNING job_id").fetchone()[0]
+        report_set = self.admin.execute("INSERT INTO report_sets(bank_id,business_date) VALUES(12,'2022-09-01') ON CONFLICT(bank_id,business_date) DO UPDATE SET bank_id=excluded.bank_id RETURNING set_id").fetchone()[0]
+        version = self.admin.execute("INSERT INTO report_versions(set_id,upload_id,version_no,received_at,stage_status) VALUES(%s,%s,%s,now(),'ACTIVE') RETURNING version_id", (report_set, upload, upload)).fetchone()[0]
+        for i, tx_id in enumerate(ids):
+            report = self.admin.execute("INSERT INTO private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version) VALUES(%s,%s,'test','test','test') RETURNING report_id", (version, i + 2)).fetchone()[0]
+            self.admin.execute("INSERT INTO analysis_input_reports(run_id,tx_id,report_id) VALUES(%s,%s,%s)", (self.run, tx_id, report))
+            self.admin.execute("INSERT INTO evaluation.demo_report_hints VALUES(%s,'pattern5-2023-v1',%s,%s)", (report, i != 1, 3 if i == 0 else 0))
+
+    def test_demo_labels_prepared_and_pinned_through_frozen_reports(self):
+        from demo_calculator import LABEL_MODEL_VERSION, LABEL_FEATURE_VERSION, calculate
+        self.annotate_demo(self.ids)
+        with tempfile.TemporaryDirectory(prefix='aml-label-input-') as root:
+            result = json.loads(prepare_features(self.admin, self.execution, root))
+            for model in result['models'].values():
+                self.assertEqual(model['model_version'], LABEL_MODEL_VERSION)
+                table = pq.read_table(Path(root) / model['path'])
+                self.assertEqual(table['demo_label'].to_pylist(), [True, False, True])
+                scores = calculate(table, 'binary', model_version=LABEL_MODEL_VERSION, feature_version=LABEL_FEATURE_VERSION)
+                self.assertTrue(all(.3 <= v <= .99 for v in [scores['p_laundering'][0].as_py(), scores['p_laundering'][2].as_py()]))
+                self.assertTrue(.01 <= scores['p_laundering'][1].as_py() <= .99)
+            repeated = json.loads(prepare_features(self.admin, self.execution, root))
+            self.assertEqual(result, repeated)
+        with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
+            self.reader.execute('SELECT * FROM evaluation.demo_report_hints')
+
+    def test_prepared_fixed_label_version_is_preserved_on_retry(self):
+        from unittest.mock import patch
+        from demo_calculator import FIXED_LABEL_MODEL_VERSION
+        self.annotate_demo(self.ids)
+        with tempfile.TemporaryDirectory(prefix='aml-label-retry-') as root:
+            with patch('demo_label_input.LABEL_MODEL_VERSION', FIXED_LABEL_MODEL_VERSION):
+                original = json.loads(prepare_features(self.admin, self.execution, root))
+            repeated = json.loads(prepare_features(self.admin, self.execution, root))
+            self.assertEqual(original, repeated)
+            for model in repeated['models'].values():
+                self.assertEqual(model['model_version'], FIXED_LABEL_MODEL_VERSION)
+
+    def test_partial_catalog_is_rejected_instead_of_id_based_scores(self):
+        self.annotate_demo(self.ids[:1])
+        with tempfile.TemporaryDirectory(prefix='aml-label-input-') as root:
+            with self.assertRaisesRegex(ProtocolError, 'Mixed annotated'):
+                prepare_features(self.admin, self.execution, root)
+            self.assertEqual(list(Path(root).iterdir()), [])
+
+    def test_conflicting_bilateral_annotation_is_rejected(self):
+        from demo_label_input import DemoLabelInput
+        self.annotate_demo(self.ids)
+        self.annotate_demo([self.ids[1]])
+        with self.assertRaisesRegex(ProtocolError, 'Conflicting demo report'):
+            list(DemoLabelInput(self.admin, self.execution).batches())
 
     def test_real_cli_persists_checkpoint_and_retry_reuses_input(self):
         import sys
@@ -418,10 +470,12 @@ class FrozenInputPostgresTests(unittest.TestCase):
             if status == 'COMPLETED':
                 logical = Request(body['job_id'], body['model_kind'].lower(), body['request_id'],
                                   body['execution_round'], body['model_version'], body['feature_version'], body['run_id'])
-                from demo_calculator import build_targets, calculate
+                from demo_calculator import build_targets, calculate, LABEL_MODEL_VERSION
                 from worker_transport import descriptor
                 stream = io.BytesIO()
-                scores = calculate(build_targets(self.ids), logical.model_kind,
+                targets = (pq.read_table(io.BytesIO(s3.objects['dev/test/' + logical.inputs + 'targets.parquet']))
+                           if logical.model_version.startswith('demo-labels-') else build_targets(self.ids))
+                scores = calculate(targets, logical.model_kind,
                     model_version=logical.model_version, feature_version=logical.feature_version)
                 if logical.model_kind == 'binary' and hasattr(self, 'score_values'):
                     import pyarrow as pa
@@ -538,6 +592,28 @@ class FrozenInputPostgresTests(unittest.TestCase):
 
     def scoring_stage(self):
         self.admin.execute("UPDATE batch_jobs SET current_stage='SCORES',threshold_value=0.5 WHERE job_id=%s", (self.job,))
+
+    def test_label_pipeline_publishes_collects_scores_and_stores_alerts(self):
+        from result_collection import save_scores
+        from alert_pipeline import save_alerts
+        self.annotate_demo(self.ids)
+        self.admin.execute("UPDATE analysis.input_transactions SET occurred_at='2022-09-01 12:00+09' WHERE run_id=%s", (self.run,))
+        self.admin.execute("INSERT INTO analysis.input_coverage VALUES(%s,'2022-09-01',1,1,true,'[]')", (self.run,))
+        self.admin.execute("INSERT INTO users(username,name,role,password_hash) VALUES(%s,'Demo','STAFF','test')", (uuid4().hex,))
+        with tempfile.TemporaryDirectory(prefix='aml-label-pipeline-') as root:
+            settings, s3 = self.collected_results(root)
+            self.scoring_stage()
+            save_scores(self.admin, self.execution, root, settings, s3)
+            from demo_calculator import calculate, build_label_targets, LABEL_MODEL_VERSION, LABEL_FEATURE_VERSION
+            targets = build_label_targets([(self.ids[0], True, 3), (self.ids[1], False, 0), (self.ids[2], True, 0)])
+            versions = dict(model_version=LABEL_MODEL_VERSION, feature_version=LABEL_FEATURE_VERSION)
+            binary = calculate(targets, 'binary', **versions)['p_laundering'].to_pylist()
+            types = calculate(targets, 'type', **versions)['p_3'].to_pylist()
+            self.assertEqual(self.admin.execute('SELECT p_laundering,p_3 FROM inference_results WHERE run_id=%s ORDER BY tx_id', (self.run,)).fetchall(), list(zip(binary, types)))
+            self.assertEqual(self.admin.execute('SELECT model_version_binary,model_version_type FROM batch_jobs WHERE job_id=%s', (self.job,)).fetchone(), ('demo-labels-v2', 'demo-labels-v2'))
+            self.admin.execute("UPDATE batch_jobs SET current_stage='ALERTS',analysis_cutoff_at='2022-09-02 09:00+09' WHERE job_id=%s", (self.job,))
+            save_alerts(self.admin, self.execution)
+            self.assertGreater(self.admin.execute('SELECT count(*) FROM alert_versions WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
 
     def test_scores_atomic_join_percentile_and_retry_without_duplicates(self):
         from result_collection import save_scores
