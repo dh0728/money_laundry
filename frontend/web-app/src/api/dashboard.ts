@@ -21,8 +21,8 @@ export type DashboardRequested = {
   /** 기간 안 의심 거래 구성: 패턴 소속 / 패턴 없음·Alert 묶음 / 패턴 없음·단일 거래 */
   suspiciousTxComposition: { patterned: number; nonPatternGrouped: number; nonPatternSingle: number }
   /**
-   * 일별 유입 Alert를 지금 처리 상태로 나눈 값(FE 제안, 기관 전체 그래프용).
-   * pending = OPEN, inProgress = ESCALATED(Episode 조사 중), done = CLOSED
+   * GET /api/v1/dashboard의 dailyAlertStatus와 같은 생성일별 현재 상태 분포.
+   * pending = 열린 Alert, inProgress = 열린 Episode 편입, done = 직접/소속 Episode 종결.
    */
   dailyAlertStatus: { date: IsoDate; pending: number; inProgress: number; done: number }[]
   /** 3일 이상 경과한 OPEN Alert 수 */
