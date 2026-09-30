@@ -53,11 +53,14 @@ RUN groupadd --gid 10001 app \
 
 COPY worker/analysis_entry.py worker/frozen_input.py worker/pipeline.py \
      worker/model_publication.py worker/inference_dispatch.py worker/result_collection.py \
-     worker/demo_calculator.py worker/model_contract.py worker/worker_transport.py \
+     worker/demo_calculator.py worker/demo_label_input.py worker/model_contract.py worker/worker_transport.py \
      worker/alert_builder.py worker/alert_pipeline.py \
      worker/inference_server.py worker/inference_service.py worker/inference_compute.py \
      worker/model_adapter.py /app/worker/
 COPY worker/recover_dev_placeholder.sql /app/worker/recover_dev_placeholder.sql
+
+# Fail the image build if an entry point's local module dependency is missing.
+RUN PYTHONPATH=/app/worker python -c "import analysis_entry, pipeline, alert_pipeline, inference_dispatch, result_collection, inference_server"
 
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 
