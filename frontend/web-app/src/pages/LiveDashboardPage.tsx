@@ -35,7 +35,7 @@ function LiveAiDailyReport({ data }: { data: LiveDashboard }) {
   return <DailyReportView generatedAt={data.businessAt} changeSummary={`신규 Alert ${count(today)}건 · 전일 ${count(yesterday)}건${change}`}
     operation={`3일 이상 미처리 Alert ${count(data.openAlertsAgedOver3Days)}건. ${data.pendingReports ? `미완료 보고 ${count(data.pendingReports)}건으로 탐지 집계 확인 필요.` : `오늘 수신 거래 ${count(data.detection.received)}건.`}`}
     focus={<p className="mt-2 text-sm leading-6 text-muted-foreground">선택 기간의 유형별 건수는 왼쪽 분포에서 확인하세요. 서로 다른 사건이 같은 시나리오라는 판정은 아닙니다.</p>}
-    priority={<QueueItems kind="ALERT" status="OPEN" personal={false} />} />
+    />
 
 }
 
@@ -81,6 +81,7 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
       onRange: range => setPeriod({ from: range?.from ? isoDate(range.from) : daysBefore(businessDate,29), to: range?.to ? isoDate(range.to) : businessDate }),
       charts: <><div className="shrink-0"><AlertStatusChart data={data.dailyAlertStatus ?? []} unavailable={data.dailyAlertStatus == null} /></div><Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy"><CardContent className="flex min-h-0 flex-1 flex-col px-4"><SectionTitle title="의심 거래 구성과 패턴 분포" description={`전체 분석 거래 ${count(agreementTotal)}건의 모델 조합 · 의심 거래 유형별 건수`} />{agreementTotal ? <div className="min-h-0 flex-1"><TransactionPatternHierarchy linked={false} unit="거래" composition={data.agreements.map((row,i) => ({ name: agreementLabels[row.agreement] ?? row.agreement, value: row.count, fill: ['var(--foreground)','var(--muted-foreground)','var(--chart-3)','var(--chart-4)'][i%4] }))} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /></div> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</CardContent></Card></>,
       report: <LiveAiDailyReport data={data} />,
+      priority: <QueueItems kind="ALERT" status="OPEN" personal={false} />,
       alerts: <QueueItems kind="ALERT" status="OPEN" personal={false} />,
       episodes: <QueueItems kind="EPISODE" status="OPEN" personal={false} />,
     }} /> : <PersonalView remote={{
