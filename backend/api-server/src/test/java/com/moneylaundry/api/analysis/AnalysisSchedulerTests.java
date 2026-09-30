@@ -2,10 +2,25 @@ package com.moneylaundry.api.analysis;
 
 import static org.mockito.Mockito.*;
 
+import com.moneylaundry.api.ApiException;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class AnalysisSchedulerTests {
+  @Test
+  void demo_registration_rejection_does_not_disable_processing_or_recovery() {
+    var service = mock(AnalysisService.class);
+    var runner = mock(AnalysisRunner.class);
+    var scheduler = new AnalysisScheduler(service, runner);
+    when(service.registerScheduled()).thenThrow(ApiException.invalidTransition("시연 시계 설정됨"));
+    scheduler.cutoff();
+    scheduler.retryDue();
+    scheduler.recover();
+    verify(service).registerScheduled();
+    verify(runner).scan();
+    verify(runner).recover();
+  }
+
   @Test
   void demo_disables_only_registration_not_processing_or_recovery() {
     var service = mock(AnalysisService.class);

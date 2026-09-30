@@ -28,6 +28,7 @@ class DemoAnalysisTests {
   @BeforeEach
   void setup() {
     jdbc.execute("truncate batch_jobs cascade");
+    jdbc.update("update demo_business_clock set business_at=null where id");
     service =
         new AnalysisService(
             jdbc,
@@ -43,6 +44,41 @@ class DemoAnalysisTests {
         "insert into batch_jobs(job_type,status,business_date,received_at) values('INGEST',?,?, '2026-09-22T00:59:00Z')",
         state,
         date);
+  }
+
+  @AfterEach
+  void clearDemoClock() {
+    jdbc.update("update demo_business_clock set business_at=null where id");
+  }
+
+  @Test
+  void demo_clock_blocks_real_date_registration_but_allows_dated_demo() {
+    jdbc.update("update demo_business_clock set business_at='2023-09-02T00:00:00+09' where id");
+    assertThatThrownBy(() -> service.registerNow())
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> {
+              assertThat(e.code()).isEqualTo("INVALID_TRANSITION");
+              assertThat(e.status().value()).isEqualTo(409);
+            });
+    assertThatThrownBy(() -> service.registerScheduled()).isInstanceOf(ApiException.class);
+    assertThat(jdbc.queryForObject("select count(*) from batch_jobs", Integer.class)).isZero();
+    upload(day, "COMPLETED");
+    long id = service.registerDemo(day, day.plusDays(1));
+    assertThat(
+            jdbc.queryForObject(
+                "select analysis_date from batch_jobs where job_id=?", LocalDate.class, id))
+        .isEqualTo(day.plusDays(1));
+    assertThat(service.job(id).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);
+  }
+
+  @Test
+  void unconfigured_clock_keeps_normal_registration_available() {
+    long manual = service.registerNow();
+    assertThat(service.job(manual).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);
+    jdbc.execute("truncate batch_jobs cascade");
+    long scheduled = service.registerScheduled();
+    assertThat(service.job(scheduled).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);
   }
 
   @Test
