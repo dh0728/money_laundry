@@ -15,6 +15,16 @@ function member(txId: number, overrides: Partial<ReviewMember> = {}, transaction
 }
 const group = (members: ReviewMember[]): ReviewGroup => ({ groupId: 1, label: '', revision: 1, members })
 
+it('실제 근거 스냅샷의 소수 금액 문자열을 숫자로 더해 일별 금액과 총액을 만든다', () => {
+  const result = dailyMemberAmounts([group([
+    member(1, {}, { amountPaid: '123.45' }),
+    member(2, {}, { amountPaid: '6.55' }),
+    member(3, {}, { amountPaid: '10.25', occurredAt: '2023-09-02T00:00:00Z' }),
+  ])])
+  expect(result.MXN.daily).toEqual([{ day: '2023-09-01', amount: 130 }, { day: '2023-09-02', amount: 10.25 }])
+  expect(result.MXN.daily.reduce((sum, row) => sum + row.amount, 0)).toBe(140.25)
+})
+
 it('씨앗·연결·정상 분류·참고 맥락 거래를 모두 집계하고 중복·제외·이관을 제거한다', () => {
   const seed = member(1)
   const result = dailyMemberAmounts([group([
