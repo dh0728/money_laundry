@@ -228,7 +228,7 @@ class Replay:
                     if day not in self.jobs:
                         self.jobs[day] = self.controls.post('demo/analysis', {'businessDate': day})['jobId']
                     job = self.jobs[day]
-                    self.report(f'{day}: 분석 대기', jobId=job)
+                    self.report(f'{day}: 분석 대기', jobId=job, bankId=None, uploadId=None)
                     stage = '분석 결과 조회'
                     self.wait_job(job, day)
                     self.completed.add(day)
@@ -251,8 +251,24 @@ class Replay:
 
     def wait_job(self, job, day):
         deadline = time.monotonic() + 3600
+        failures = 0
+        last_stage = '아직 확인하지 못함'
         while time.monotonic() < deadline:
-            detail = self.controls.get(f'batch-jobs/{job}')
+            try:
+                detail = self.controls.get(f'batch-jobs/{job}')
+            except ApiError as error:
+                if not error.retryable:
+                    raise
+                failures += 1
+                delay = min(5 * 2 ** min(failures - 1, 3), 30)
+                self.report(
+                    f'{day}: 분석 상태 확인 대기 · 마지막 확인 {last_stage} · '
+                    f'조회 재시도 {failures}회 · {delay}초 후 다시 확인 (서버 작업 취소 아님)',
+                    jobId=job, bankId=None, uploadId=None)
+                time.sleep(min(delay, max(0, deadline - time.monotonic())))
+                continue
+            failures = 0
+            last_stage = f'{detail["status"]} / {detail.get("currentStage", "")}'
             self.report(f'{day}: {detail["status"]} / {detail.get("currentStage", "")}', jobId=job)
             if detail['status'] == 'COMPLETED':
                 return

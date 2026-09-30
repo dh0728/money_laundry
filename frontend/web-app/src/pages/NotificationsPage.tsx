@@ -15,11 +15,11 @@ import { loadMockNotifications, type NotificationItem } from '@/mocks/notificati
 
 type SortOrder = 'none' | 'desc' | 'asc'
 const nextOrder = (order: SortOrder): SortOrder => order === 'none' ? 'desc' : order === 'desc' ? 'asc' : 'none'
-const sorted = (items: NotificationItem[], order: SortOrder) => order === 'none' ? items : [...items].sort((a, b) => order === 'desc' ? b.at.localeCompare(a.at) : a.at.localeCompare(b.at))
+const sorted = <T extends { at: string }>(items: T[], order: SortOrder) => order === 'none' ? items : [...items].sort((a, b) => order === 'desc' ? b.at.localeCompare(a.at) : a.at.localeCompare(b.at))
 
-function NotificationColumn({ label, items, order, onOrder, onOpen, read, onToggle }: {
-  label: string; items: NotificationItem[]; order: SortOrder; onOrder: () => void
-  onOpen: (item: NotificationItem) => void; read: boolean; onToggle: (id: string) => void
+export function NotificationColumn<T extends Pick<NotificationItem, 'id' | 'code' | 'title' | 'description' | 'at'> & Partial<Pick<NotificationItem, 'ageDays' | 'riskScore' | 'patternCode'>> & { count?: number }>({ label, items, order, onOrder, onOpen, read, onToggle }: {
+  label: string; items: T[]; order: SortOrder; onOrder: () => void
+  onOpen: (item: T) => void; read: boolean; onToggle: (id: string) => void
 }) {
   const SortIcon = order === 'desc' ? ChevronDown : order === 'asc' ? ChevronUp : ChevronsUpDown
   return <section aria-label={label} className="min-w-0">
@@ -28,13 +28,13 @@ function NotificationColumn({ label, items, order, onOrder, onOpen, read, onTogg
       <h2 className="text-sm font-semibold">{label} {items.length}</h2>
     </div>
     {items.length === 0 ? <p className="rounded-lg border py-8 text-center text-xs text-muted-foreground">표시할 알림이 없습니다.</p>
-      : <div className="space-y-2.5">{sorted(items, order).map(item => <article key={item.id} className="flex min-w-0 items-center gap-2.5 rounded-lg border bg-card px-3.5 py-3">
+      : <div className="space-y-2.5">{sorted(items, order).map(item => <article key={item.id} className="flex min-w-0 items-center gap-2.5 rounded-lg border bg-card px-3.5 py-3 transition-colors duration-150 hover:border-primary/50 hover:bg-accent/40 hover:shadow-md hover:ring-1 hover:ring-primary/30 focus-within:border-primary/50 focus-within:bg-accent/40 focus-within:shadow-md focus-within:ring-1 focus-within:ring-primary/30">
         <Button variant="ghost" size="icon" className="size-7 shrink-0 rounded-full p-0" aria-label={`${item.code} ${read ? '읽지 않음으로 표시' : '읽음으로 표시'}`} onClick={() => onToggle(item.id)}>
           <span className={`size-2.5 rounded-full ${read ? 'bg-muted-foreground/40' : 'bg-destructive'}`} aria-hidden />
         </Button>
-        <button type="button" className="min-w-0 flex-1 text-left" aria-label={`${item.code} 알림 열기`} onClick={() => onOpen(item)}>
+        <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" aria-label={`${item.code} 알림 열기`} onClick={() => onOpen(item)}>
           <span className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-semibold">{item.title}</span>
+            <span className="text-sm font-semibold">{item.title}{item.count && item.count > 1 ? ` · ${item.count.toLocaleString()}건` : ''}</span>
             <span className="flex shrink-0 items-center gap-1.5">
               {item.ageDays !== undefined && <AgeBadge days={item.ageDays} />}
               {item.riskScore !== undefined && <RiskBadge score={item.riskScore} />}

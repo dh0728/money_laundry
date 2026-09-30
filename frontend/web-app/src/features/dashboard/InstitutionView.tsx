@@ -87,13 +87,13 @@ export function InstitutionView({ today }: { today: Date }) {
   )
 }
 
-function InstitutionCharts({ data }: { data: DashboardData }) {
+export function InstitutionCharts({ data }: { data: Pick<DashboardData, 'dailyAlertStatus' | 'suspiciousTxComposition' | 'alertsByType'> }) {
   const { composition, distribution } = chartInputs(data)
   const hasComposition = composition.some(item => item.value > 0)
   return (
     <>
       <div className="shrink-0">
-        {data.dailyAlertStatus?.length ? <AlertStatusChart data={data.dailyAlertStatus} /> : <EmptyBlock>선택한 기간에 Alert가 없습니다.</EmptyBlock>}
+        {data.dailyAlertStatus === undefined ? <EmptyBlock>일별 처리 상태 데이터가 제공되지 않았습니다.</EmptyBlock> : data.dailyAlertStatus.length ? <AlertStatusChart data={data.dailyAlertStatus} /> : <EmptyBlock>선택한 기간에 Alert가 없습니다.</EmptyBlock>}
       </div>
       <Card className="h-full min-h-0 min-w-0 max-w-full flex-1 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy">
         <CardContent className="flex min-h-0 flex-1 flex-col px-4">
@@ -101,7 +101,7 @@ function InstitutionCharts({ data }: { data: DashboardData }) {
           {hasComposition ? (
             <div className="min-h-0 flex-1"><TransactionPatternHierarchy composition={composition} distribution={distribution} /></div>
           ) : (
-            <EmptyBlock>선택한 기간에 의심 거래가 없습니다.</EmptyBlock>
+            <EmptyBlock>{data.suspiciousTxComposition === undefined ? '의심 거래 구성 데이터가 제공되지 않았습니다.' : '선택한 기간에 의심 거래가 없습니다.'}</EmptyBlock>
           )}
         </CardContent>
       </Card>

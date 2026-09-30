@@ -2,16 +2,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, RotateCcw, X } from 'lucide-react'
 import { ko } from 'date-fns/locale'
-import { subDays, startOfMonth } from 'date-fns'
+import { subDays, startOfMonth, startOfYear } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 
 
-const CALENDAR_START = new Date(2026, 0, 1)
-const CALENDAR_MONTHS = 12
-const monthIndex = (date: Date) => (date.getFullYear() - CALENDAR_START.getFullYear()) * 12 + date.getMonth() - CALENDAR_START.getMonth()
 const fmt = (d?: Date) => d ? d.toLocaleDateString('sv-SE') : ''
 const presetsFor = (TODAY: Date) => [
   { id: 'today', label: '오늘', range: (): DateRange => ({ from: TODAY, to: TODAY }) },
@@ -22,6 +19,9 @@ const presetsFor = (TODAY: Date) => [
 ]
 
 export function DateRangeButton({ value, onChange, today: TODAY }: { value: DateRange | undefined; onChange: (r: DateRange | undefined) => void; today: Date }) {
+  const calendarStart = startOfYear(value?.from && value.from < TODAY ? value.from : TODAY)
+  const calendarMonths = (Math.max(TODAY.getFullYear(), value?.to?.getFullYear() ?? TODAY.getFullYear()) - calendarStart.getFullYear() + 1) * 12
+  const monthIndex = (date: Date) => (date.getFullYear() - calendarStart.getFullYear()) * 12 + date.getMonth()
   const presets = presetsFor(TODAY)
   const [open, setOpen] = useState(false), [draft, setDraft] = useState<DateRange | undefined>(value), [preset, setPreset] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -58,7 +58,7 @@ export function DateRangeButton({ value, onChange, today: TODAY }: { value: Date
           </div>
           <div ref={scroller} className="relative h-[336px] overflow-y-auto overscroll-contain" data-testid="calendar-scroll">
             <Calendar locale={ko} mode="range" selected={draft} onSelect={r => { setDraft(r); setPreset(null) }}
-              defaultMonth={CALENDAR_START} startMonth={CALENDAR_START} numberOfMonths={CALENDAR_MONTHS} today={TODAY}
+              defaultMonth={calendarStart} startMonth={calendarStart} numberOfMonths={calendarMonths} today={TODAY}
               hideNavigation showOutsideDays={false} className="continuous-calendar"
               classNames={{ months: 'relative flex flex-col gap-5 rdp-months', month_caption: 'flex h-8 items-center px-1 text-sm font-medium rdp-month_caption' }} />
           </div>

@@ -2,16 +2,18 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveDashboardPage from './LiveDashboardPage'
 import LiveLedgerPage from './LiveLedgerPage'
+import { PeriodContext } from '@/lib/workspaceState'
 
-const { fetchDemoClock, fetchLiveDashboard, fetchLedgerOwners, fetchLedgerAccounts, fetchLedgerTransactions, fetchPaymentFormats } = vi.hoisted(() => ({
-  fetchDemoClock: vi.fn(), fetchLiveDashboard: vi.fn(), fetchLedgerOwners: vi.fn(), fetchLedgerAccounts: vi.fn(), fetchLedgerTransactions: vi.fn(), fetchPaymentFormats: vi.fn(),
+const { fetchDemoClock, fetchLiveDashboard, fetchLedgerOwners, fetchLedgerAccounts, fetchLedgerTransactions, fetchPaymentFormats, fetchReviewCases } = vi.hoisted(() => ({
+  fetchDemoClock: vi.fn(), fetchLiveDashboard: vi.fn(), fetchLedgerOwners: vi.fn(), fetchLedgerAccounts: vi.fn(), fetchLedgerTransactions: vi.fn(), fetchPaymentFormats: vi.fn(), fetchReviewCases: vi.fn(),
 }))
 vi.mock('@/api/liveDashboard', async importOriginal => ({ ...await importOriginal<typeof import('@/api/liveDashboard')>(), fetchDemoClock, fetchLiveDashboard }))
 vi.mock('@/api/liveLedger', () => ({ fetchLedgerOwners, fetchLedgerAccounts, fetchLedgerTransactions, fetchPaymentFormats }))
+vi.mock('@/api/liveReview', () => ({ fetchReviewCases }))
 
 const page = <T,>(content: T[]) => ({ content, page: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0 })
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => { vi.clearAllMocks(); fetchReviewCases.mockResolvedValue(page([])) })
 
 it('실제 대시보드는 PC 날짜 대신 서버 업무 날짜로 기간을 정한다', async () => {
   fetchDemoClock.mockResolvedValue({ businessAt: '2023-09-10T00:00:00Z', configured: true, revision: 1 })
@@ -20,12 +22,13 @@ it('실제 대시보드는 PC 날짜 대신 서버 업무 날짜로 기간을 �
     detection: { received: 10, analyzed: 8, suspicious: 2 }, deliveryDate: '', pendingReports: 2, daily: [], agreements: [], types: [], activities: [], priority: [], episodeWork: { current: { open: 1, aged: 0, unreviewed: 1, created_today: 0, closed_today: 0 }, firstReview: { samples: 0, average_seconds: null }, completion: { samples: 0, average_seconds: null }, oldestOpen: [] },
   })
   render(<LiveDashboardPage onOpen={vi.fn()} />)
-  expect(await screen.findByText('열린 Alert')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '기관 전체' })).toHaveAttribute('data-variant', 'default')
+  expect(await screen.findByText('전일 대비')).toBeInTheDocument()
+  expect(screen.getByText('오늘 유입 Alert')).toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: '기관 전체' })).toHaveAttribute('aria-selected', 'true')
   expect(fetchLiveDashboard).toHaveBeenCalledWith('2023-08-12', '2023-09-10')
-  expect(screen.getByText('대상 거래일 미제공')).toBeInTheDocument()
-  expect(screen.getByText('전일 대비 —')).toBeInTheDocument()
-  expect(screen.getByText('모델 조합 데이터가 없습니다.')).toBeInTheDocument()
+  expect(screen.getByText('전일 대비')).toBeInTheDocument()
+  expect(screen.getByText('일별 처리 상태 데이터가 제공되지 않았습니다.')).toBeInTheDocument()
+  expect(screen.getByText('의심 거래 구성 데이터가 제공되지 않았습니다.')).toBeInTheDocument()
   const report = within(screen.getByTestId('ai-daily-report'))
   expect(report.getByRole('heading', { name: 'RDR 9000 Daily Report' })).toBeInTheDocument()
   expect(report.getByTestId('rdr-eye')).toBeInTheDocument()
@@ -45,17 +48,16 @@ it('서버의 전일 수치와 탐지 조합·유형·개인 활동을 그대로
     priority: [], episodeWork: { current: { open: 1, aged: 0, unreviewed: 1, created_today: 0, closed_today: 0 }, firstReview: { samples: 0, average_seconds: null }, completion: { samples: 0, average_seconds: null }, oldestOpen: [] },
   })
   render(<LiveDashboardPage onOpen={vi.fn()} />)
-  expect(await screen.findByText('전일 대비 +50.0%')).toBeInTheDocument()
-  expect(screen.getByText('대상 거래일 2023-09-09')).toBeInTheDocument()
-  expect(screen.getByText('모델 의심 · 패턴 있음')).toBeInTheDocument()
-  expect(screen.getByText('30건 · 37.5%')).toBeInTheDocument()
-  expect(screen.getByText('분산 송금')).toBeInTheDocument()
+  expect(await screen.findByText('+50%')).toBeInTheDocument()
+  expect(screen.getByText('오늘 유입 Alert')).toBeInTheDocument()
   const report = within(screen.getByTestId('ai-daily-report'))
   expect(report.getByText('오늘 신규 Alert 6건 · 전일 4건 · 50.0% 증가')).toBeInTheDocument()
   expect(report.getByText('오늘 대상 원장 100건 중 모델 의심 20건 확인됨.')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '내 담당' }))
-  expect(screen.getByText('검토 메모')).toBeInTheDocument()
-  expect(screen.getByText(/조사 사건 42/)).toBeInTheDocument()
+  fireEvent.mouseDown(screen.getByRole('tab', { name: '내 담당' }))
+  fireEvent.click(screen.getByRole('tab', { name: '내 담당' }))
+  expect(await screen.findByText('열람 상태 미확인 Alert')).toBeInTheDocument()
+  expect(screen.getByText('최초 열람 정보가 제공되지 않아 처리 전 Alert를 구분할 수 없습니다.')).toBeInTheDocument()
+  expect(fetchReviewCases).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ALERT', status: 'OPEN', page: 0, size: 20 }))
 })
 
 it('실제 거래에서 미분석을 정상으로 바꾸지 않고 원본 Alert와 Episode ID를 구별한다', async () => {
@@ -64,11 +66,26 @@ it('실제 거래에서 미분석을 정상으로 바꾸지 않고 원본 Alert�
   fetchLedgerAccounts.mockResolvedValue(page([{ id: 'account-uuid', ownerId: 'owner-uuid', bankId: 13 }]))
   fetchLedgerTransactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2023-09-10T00:00:00Z', fromAccountId: 'account-uuid', toAccountId: 'other-uuid', amountPaid: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', judgement: 'UNANALYZED', isSuspicious: null, alertIds: [3000], episodeIds: [800] }]))
   const onOpen = vi.fn()
-  render(<LiveLedgerPage onOpen={onOpen} />)
-  fireEvent.click(await screen.findByRole('button', { name: /소유주 owner-uuid/ }))
-  fireEvent.click(await screen.findByRole('button', { name: /계좌 account-uuid/ }))
-  expect(await screen.findByText('미분석')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'A-3000' })).toBeDisabled()
-  fireEvent.click(screen.getByRole('button', { name: 'E-800' }))
+  render(<PeriodContext.Provider value={{ period: { from: '2023-08-12', to: '2023-09-10' }, setPeriod: vi.fn() }}><LiveLedgerPage onOpen={onOpen} /></PeriodContext.Provider>)
+  expect(screen.getByRole('button', { name: /2023-08-12.*2023-09-10/ })).toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button', { name: /owner-uuid/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /account-uuid/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /101/ }))
+  expect(await screen.findAllByText('미분석')).not.toHaveLength(0)
+  expect(screen.getByText('Alert · A-3000')).toBeInTheDocument()
+  expect(screen.getByTestId('transaction-mini-sankey')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Episode · E-800' }))
   expect(onOpen).toHaveBeenCalledWith('EPISODE', 800)
+})
+
+it('거래 목록을 불러올 때 단계 카드의 제목을 유지하고 값만 스켈레톤으로 표시한다', () => {
+  fetchLedgerOwners.mockReturnValue(new Promise(() => undefined))
+  fetchPaymentFormats.mockReturnValue(new Promise(() => undefined))
+  render(<PeriodContext.Provider value={{ period: { from: '2023-08-12', to: '2023-09-10' }, setPeriod: vi.fn() }}><LiveLedgerPage onOpen={vi.fn()} /></PeriodContext.Provider>)
+  expect(screen.getByRole('heading', { name: '소유주' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: '계좌' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: '거래' })).toBeInTheDocument()
+  expect(screen.getByText('선택 거래 상세')).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: '소유주 불러오는 중' })).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: '소유주 수 불러오는 중' })).toBeInTheDocument()
 })
