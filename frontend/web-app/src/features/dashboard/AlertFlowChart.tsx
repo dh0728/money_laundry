@@ -46,7 +46,7 @@ export function StatusLegend() {
   )
 }
 
-export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
+export function AlertStatusChart({ data, unavailable = false }: { data: DailyStatus[]; unavailable?: boolean }) {
   return (
     <Card className="@container/card min-w-0 max-w-full shadow-none" data-testid="alert-flow-chart">
       <CardHeader>
@@ -55,6 +55,7 @@ export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
           <ProvenanceBadge kind="proposal" title="일별 처리 상태 집계는 API 계약에 없어 Backend에 요청할 항목입니다." />
         </div>
         <CardDescription>그날 들어온 Alert가 지금 어느 단계에 있는지 · 막대 전체 = 유입 건수</CardDescription>
+        {unavailable && <p className="text-xs text-muted-foreground">상태별 일별 집계 API 미연결 · 데이터 준비 중</p>}
       </CardHeader>
       <CardContent className="min-w-0 px-2 pt-2 sm:px-6">
         <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full min-w-0 max-w-full">
@@ -71,3 +72,4 @@ export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
     </Card>
   )
 }
+

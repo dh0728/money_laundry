@@ -55,12 +55,11 @@ it('successful mutation refreshes mounted queries and invalidates the inactive t
   await screen.findByText('dashboard/2023-08-12')
   fireEvent.click(screen.getByRole('button', { name: 'alerts' }))
   await screen.findByText('alerts/2023-08-12')
-  const beforeMutation = load.mock.calls.length
   act(() => { window.dispatchEvent(new Event('live-data-changed')) })
-  await waitFor(() => expect(load).toHaveBeenCalledTimes(beforeMutation + 1))
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(3))
   fireEvent.click(screen.getByRole('button', { name: 'dashboard' }))
   expect(screen.getByText('dashboard/2023-08-12')).toBeInTheDocument()
-  await waitFor(() => expect(load).toHaveBeenCalledTimes(beforeMutation + 2))
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(4))
 })
 
 it('changing account discards shared dates, filters and query results', async () => {

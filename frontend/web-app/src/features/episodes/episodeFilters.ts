@@ -4,7 +4,7 @@ import { episodeWorkStatus, workStatusLabels, type WorkStatus } from '@/lib/work
 
 export type EpisodeFilter =
   | { field: 'status'; value: WorkStatus }
-  | { field: 'type'; value: TypeCode }
+  | { field: 'type'; value: TypeCode | '패턴 미특정' | '혼합' }
   | { field: 'risk'; value: 'high' | 'medium' | 'low' }
   | { field: 'assignee'; value: number }
   | { field: 'age'; value: number }
@@ -21,23 +21,23 @@ export const riskOptions = [
 
 const ymd = (date: Date) => date.toLocaleDateString('sv-SE')
 
-export function matchesEpisode(row: EpisodeRow, filters: EpisodeFilter[], query: string, range?: { from?: Date; to?: Date }) {
+export function matchesEpisode(row: Pick<EpisodeRow, 'episodeId' | 'assignee' | 'createdAt' | 'status' | 'reviewRequestedAt' | 'riskScore' | 'ageDays'> & { primaryTypes: { code: TypeCode | null; name: string }[] }, filters: EpisodeFilter[], query: string, range?: { from?: Date; to?: Date }) {
   const groups = new Map<EpisodeFilterField, EpisodeFilter[]>()
   for (const filter of filters) groups.set(filter.field, [...(groups.get(filter.field) ?? []), filter])
   for (const group of groups.values()) if (!group.some(filter => matchesOne(row, filter))) return false
 
   const text = query.trim().toLocaleLowerCase('ko')
-  if (text && ![`E-${row.episodeId}`, String(row.episodeId), row.assignee.name, ...row.primaryTypes.flatMap(t => [typeDisplay(t.code).key, typeDisplay(t.code).label])].join(' ').toLocaleLowerCase('ko').includes(text)) return false
+  if (text && ![`E-${row.episodeId}`, String(row.episodeId), row.assignee.name, ...row.primaryTypes.flatMap(t => [t.name, t.code == null ? t.name : typeDisplay(t.code).label])].join(' ').toLocaleLowerCase('ko').includes(text)) return false
   const created = row.createdAt.slice(0, 10)
   if (range?.from && created < ymd(range.from)) return false
   if (range?.to && created > ymd(range.to)) return false
   return true
 }
 
-function matchesOne(row: EpisodeRow, filter: EpisodeFilter) {
+function matchesOne(row: Pick<EpisodeRow, 'episodeId' | 'assignee' | 'createdAt' | 'status' | 'reviewRequestedAt' | 'riskScore' | 'ageDays'> & { primaryTypes: { code: TypeCode | null; name: string }[] }, filter: EpisodeFilter) {
   switch (filter.field) {
     case 'status': return episodeWorkStatus(row.status, Boolean(row.reviewRequestedAt)) === filter.value
-    case 'type': return row.primaryTypes.some(t => t.code === filter.value)
+    case 'type': return row.primaryTypes.some(t => typeof filter.value === 'string' ? t.name === filter.value : t.code === filter.value)
     case 'risk': return filter.value === 'high' ? row.riskScore >= 0.8 : filter.value === 'medium' ? row.riskScore >= 0.5 && row.riskScore < 0.8 : row.riskScore < 0.5
     case 'assignee': return row.assignee.userId === filter.value
     case 'age': return row.ageDays >= filter.value
@@ -48,7 +48,7 @@ export function episodeFilterLabel(filter: EpisodeFilter, assigneeName: (id: num
   const name = episodeFilterNames[filter.field]
   switch (filter.field) {
     case 'status': return `${name}: ${workStatusLabels[filter.value]}`
-    case 'type': return `${name}: ${typeDisplay(filter.value).label}`
+    case 'type': return `${name}: ${typeof filter.value === 'string' ? filter.value : typeDisplay(filter.value).label}`
     case 'risk': return `${name}: ${riskOptions.find(o => o.value === filter.value)?.label}`
     case 'assignee': return `${name}: ${filter.value === meId ? '내 담당' : assigneeName(filter.value)}`
     case 'age': return `${name}: ${filter.value}일 이상`

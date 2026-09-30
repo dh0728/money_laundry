@@ -520,13 +520,30 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 | GET /api/v1/demo/clock | businessAt(오프셋 시각), configured, revision |
 | POST /api/v1/demo/clock | {businessAt,revision}; 현재 개정/진행 작업/역방향을 검사하고 저장. 최초 설정 전에 기존 분석이 있으면 초기화 필요 |
 | GET /api/v1/demo/users | 로그인 후 직원 id,name,role 조회. 이 목록으로 로그인하거나 직원 신원을 변경할 수 없음 |
-| GET /api/v1/ledger/owners 또는 accounts 또는 transactions | from,to(KST 거래일),owner/account(UUID),judgement(SUSPICIOUS,NORMAL,UNANALYZED),payments(복수),page,size. content/page/size/totalElements/totalPages |
-| GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),page,size. 위험도 내림차순 |
+| GET /api/v1/ledger/owners 또는 accounts 또는 transactions | from,to(KST 거래일),owner/account(UUID),judgement(SUSPICIOUS,NORMAL,UNANALYZED),payments(복수),query,directions(IN/OUT·account 필수),page,size. content/page/size/totalElements/totalPages |
+| GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),query,types,minAgeDays,risk,statuses,assignees,page,size. 위험도 내림차순 |
 | GET /api/v1/review/cases/{caseId} | caseId,kind,alertId,status,outcome,revision,assigneeId/Name,createdAt,assignedAt,closedAt,groups,summary,pendingCount,sourceAlertIds,primaryTypes,history,relatedDecisions |
 | GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 소유주 박스/계좌 노드 연결용; 원문 이름·계좌번호 제외 |
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
 | GET /api/v1/dashboard | from,to와 로그인 세션. businessAt,personal,institution,detection,deliveryDate,pendingReports,daily,agreements,types,activities,priority |
 | POST /api/v1/review/commands | 로그인 세션·CSRF 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
+
+**공통 화면의 전체 데이터 검색·필터**
+- 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.
+- 사건 `query`: 최대 200자. Alert 원본 `A-{alertId}` / Episode `E-{caseId}`, 담당자 표시 이름, 대표 유형의 부분 문자열 검색. `%`, `_`는 와일드카드가 아니라 문자로 취급한다. 두 ID의 의미를 바꾸지 않는다.
+- 사건 `types`: 반복 전달하는 대표 유형 이름. `Fan-out`, `Fan-in`, `Gather-scatter`, `Scatter-gather`, `Cycle`, `Random`, `Bipartite`, `Stack`, `패턴 미특정`, `혼합`. Alert는 제외된 거래를 빼고 현재 상세와 같은 씨앗 투표 결과를 사용한다. Episode는 유효 구성의 출처 Alert 유형 중 하나가 일치하면 포함한다. `패턴 미특정`을 거래 모델의 코드 0과 동일한 판정으로 해석하지 않는다.
+- `statuses=OPEN&statuses=ESCALATED`: 화면 상태의 OR 조건. 편입된 Alert는 ESCALATED, 미편입 사건은 OPEN/CLOSED다. 기존 단일 `status`와 함께 보내면 AND로 적용하므로 FE는 중복 지정하지 않는다.
+- `assignees`: 담당자 ID 반복 전달, OR. `minAgeDays`: 사건 생성 업무 시각부터 경과한 일수(0~36500). 배정 후 72시간을 세는 대시보드 카드와 기준이 다르다.
+- `risk`: `high`(0.8 이상), `medium`(0.5 이상·0.8 미만), `low`(0.5 미만). 복수는 `high,medium`처럼 쉼표로 전달하여 OR 적용한다. 필터 종류 사이는 AND다.
+- 원장 `query`: 최대 200자. 공개 가명 소유주·계좌 UUID와 거래 ID의 부분 문자열 검색. 실명·원 계좌번호는 검색하거나 반환하지 않는다. owners/accounts/transactions 모두 동일한 검색을 적용한다.
+- 원장 `directions=IN&directions=OUT`: 선택한 `account` 기준 수취/송금 OR. 계좌 선택 전에는 보내지 않는다. 자기 계좌 간 거래도 중복 행을 만들지 않는다.
+- mock/live 공통 화면은 같은 목록·기간·필터 컴포넌트를 사용한다. live는 고정 위험도 순 서버 페이지, 다운로드는 화면에 조회된 페이지 범위다. API가 제공하지 않는 숫자는 0이나 가짜 USD로 채우지 않는다.
+- live의 관리자 검수 요청 버튼은 비활성화한다. 해당 승인 절차를 새 명령으로 가정하거나 mock 성공으로 처리하지 않는다. 실제 조사 의견·범위 제외·Alert 전체 편입·연결 해제·종결은 기존 명령 계약을 사용한다.
+- 전역 검색은 사건/알림의 서버 검색을 사용한다. Alert 결과의 표시는 alertId, 조사 상세 이동은 caseId다. 소유주·계좌·거래 검색은 거래 탐색 화면으로 검색어를 넘기며 원문 식별값을 사용하지 않는다.
+- 금액 차트는 같은 통화 안에서만 비교한다. 미제공 필드는 임의 값으로 보완하지 않는다. RDR 9000·AI 요약은 별도 mock 표시를 유지한다.
+- mock 화면의 일별 유입 Alert를 현재 OPEN/ESCALATED/CLOSED로 나눈 분포는 기존 일별 incoming/completed와 의미가 다르다. 해당 상태별 분포와 대표 계좌 이력 API는 미연결이며 live 화면에서 준비 중으로 표시한다. 기존 일별 수치를 다른 뜻으로 재사용하지 않는다.
+
+
 
 명령 본문:
 

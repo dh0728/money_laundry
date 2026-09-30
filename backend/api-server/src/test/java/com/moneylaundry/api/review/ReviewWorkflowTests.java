@@ -738,6 +738,82 @@ class ReviewWorkflowTests {
       assertThat(row.get("isSuspicious")).isNull();
     }
     assertThat(encode(data)).doesNotContain("hidden", "is_laundering", "name_cipher");
+    var incoming =
+        new LedgerQueryService.Filter(
+            filter.from(),
+            filter.to(),
+            owner,
+            account,
+            null,
+            List.of("ACH"),
+            0,
+            1,
+            null,
+            List.of("IN"));
+    var outgoing =
+        new LedgerQueryService.Filter(
+            filter.from(),
+            filter.to(),
+            owner,
+            account,
+            null,
+            List.of("ACH"),
+            0,
+            1,
+            null,
+            List.of("OUT"));
+    assertThat(query.query("transactions", incoming).get("totalElements")).isEqualTo(1L);
+    assertThat(query.query("transactions", outgoing).get("totalElements")).isEqualTo(1L);
+    assertThat(
+            query
+                .query(
+                    "transactions",
+                    new LedgerQueryService.Filter(
+                        filter.from(),
+                        filter.to(),
+                        owner,
+                        account,
+                        null,
+                        null,
+                        0,
+                        1,
+                        account.toString(),
+                        List.of("IN", "OUT")))
+                .get("totalElements"))
+        .isEqualTo(2L);
+    assertThat(
+            query
+                .query(
+                    "owners",
+                    new LedgerQueryService.Filter(
+                        filter.from(),
+                        filter.to(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        0,
+                        1,
+                        owner.toString(),
+                        null))
+                .get("totalElements"))
+        .isEqualTo(1L);
+    assertThat(
+            query
+                .query(
+                    "transactions",
+                    new LedgerQueryService.Filter(
+                        filter.from(), filter.to(), owner, account, null, null, 0, 1, "%_", null))
+                .get("totalElements"))
+        .isEqualTo(0L);
+    assertThatThrownBy(
+            () ->
+                query.query(
+                    "transactions",
+                    new LedgerQueryService.Filter(
+                        null, null, null, null, null, null, 0, 20, null, List.of("IN"))))
+        .isInstanceOf(ApiException.class);
+
     assertThat(query.query("owners", filter).get("totalElements")).isEqualTo(1L);
     assertThat(query.query("accounts", filter).get("totalElements")).isEqualTo(2L);
     assertThat(
@@ -1081,5 +1157,87 @@ class ReviewWorkflowTests {
     var d = dashboard.view(l1, LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-02"));
     assertThat(d.get("openAlertsAgedOver3Days")).isEqualTo(1L);
     assertThat(object(d.get("institution")).get("aged")).isEqualTo(2L);
+  }
+
+  @Test
+  void list_filters_whole_dataset_before_paging_and_matches_effective_evidence() {
+    var actual = new ReviewService(jdbc, tx, clock, new AlertQueryService(jdbc, ReviewJson.JSON));
+    long last = 0;
+    for (int n = 0; n < 24; n++) {
+      long id = alert(l1);
+      long alertId = number(service.detail(id).get("alertId"));
+      var doc = object(encode(evidence.detail(alertId, null)));
+      doc.put("seeds", List.of(Map.of("txId", 1, "score", .9)));
+      if (n == 23)
+        for (var row : rows(doc.get("transactions")))
+          row.put("scores", Map.of("p_laundering", .9, "p_2", .9));
+      jdbc.update(
+          "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb)",
+          alertId,
+          run,
+          "a".repeat(64),
+          encode(doc));
+      last = id;
+    }
+    var filter =
+        new ReviewCaseFilter(null, List.of("Fan-in"), 0, "high", List.of("OPEN"), List.of(l1));
+    var page = actual.list("ALERT", null, null, null, null, 0, 1, filter);
+    assertThat(page.get("totalElements")).isEqualTo(1L);
+    assertThat(number(rows(page.get("content")).getFirst().get("caseId"))).isEqualTo(last);
+    assertThat(actual.list("ALERT", null, null, null, null, 1, 1, filter).get("content"))
+        .isEqualTo(List.of());
+    var d = actual.detail(last);
+    actual.command(
+        l1,
+        new ReviewService.Command(
+            UUID.randomUUID(),
+            "EXCLUDE",
+            List.of(
+                new ReviewService.Selection(last, number(d.get("revision")), 0, List.of(1L, 2L))),
+            null,
+            null,
+            null,
+            null,
+            "씨앗 제외"));
+    assertThat(actual.list("ALERT", null, null, null, null, 0, 20, filter).get("totalElements"))
+        .isEqualTo(0L);
+    assertThat(
+            actual
+                .list(
+                    "ALERT",
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    20,
+                    new ReviewCaseFilter(null, List.of("패턴 미특정"), null, null, null, null))
+                .get("totalElements"))
+        .isEqualTo(1L);
+    assertThat(
+            actual
+                .list(
+                    "ALERT",
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    20,
+                    new ReviewCaseFilter("%_", null, null, null, null, null))
+                .get("totalElements"))
+        .isEqualTo(0L);
+    assertThatThrownBy(
+            () ->
+                actual.list(
+                    "ALERT",
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    20,
+                    new ReviewCaseFilter(null, List.of("garbage"), null, null, null, null)))
+        .isInstanceOf(ApiException.class);
   }
 }

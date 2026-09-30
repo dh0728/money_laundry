@@ -6,37 +6,11 @@ const EMPTY: QuerySnapshot<never> = { state: { status: 'loading' }, refreshing: 
 type Entry = { snapshot: QuerySnapshot<unknown>; updated: number; generation: number; pending?: Promise<unknown> }
 const message = (error: unknown) => error instanceof ApiError ? error.message : '데이터를 갱신하지 못했습니다. 다시 시도해 주세요.'
 
-function retainUnchanged(previous: unknown, next: unknown): unknown {
-  if (Object.is(previous, next)) return previous
-  if (Array.isArray(previous) && Array.isArray(next)) {
-    const identity = (value: unknown) => {
-      if (!value || typeof value !== 'object') return undefined
-      const item = value as Record<string, unknown>
-      for (const field of ['caseId', 'txId', 'eventId', 'event_id', 'groupId', 'accountId', 'id']) {
-        if (typeof item[field] === 'string' || typeof item[field] === 'number') return `${field}:${item[field]}`
-      }
-      return undefined
-    }
-    const keyed = new Map<string, unknown>()
-    for (const value of previous) { const key = identity(value); if (key !== undefined) keyed.set(key, value) }
-    const values = next.map((value, index) => { const key = identity(value); return retainUnchanged((key === undefined ? undefined : keyed.get(key)) ?? previous[index], value) })
-    return values.every((value, index) => value === previous[index]) ? previous : values
-  }
-  if (previous && next && typeof previous === 'object' && typeof next === 'object') {
-    const old = previous as Record<string, unknown>, fresh = next as Record<string, unknown>
-    const keys = Object.keys(fresh)
-    const values = Object.fromEntries(keys.map(key => [key, retainUnchanged(old[key], fresh[key])]))
-    return keys.length === Object.keys(old).length && keys.every(key => values[key] === old[key]) ? previous : values
-  }
-  return next
-}
-
 /** Session memory only: never write investigation data to browser storage. */
 export class QueryCache {
   private entries = new Map<string, Entry>()
   private listeners = new Map<string, Set<() => void>>()
   snapshot<T>(key: string): QuerySnapshot<T> { return (this.entries.get(key)?.snapshot ?? EMPTY) as QuerySnapshot<T> }
-  activeRefreshing() { return [...this.listeners.keys()].some(key => this.entries.get(key)?.snapshot.refreshing) }
   subscribe(key: string, listener: () => void) {
     const listeners = this.listeners.get(key) ?? new Set()
     listeners.add(listener); this.listeners.set(key, listeners)
@@ -65,8 +39,7 @@ export class QueryCache {
     const pending = response.then(data => {
       if (current.generation === generation) {
         current.updated = Date.now()
-        const previous = current.snapshot.state
-        current.snapshot = { state: { status: 'success', data: previous.status === 'success' ? retainUnchanged(previous.data, data) : data }, refreshing: false, invalidation: current.snapshot.invalidation }
+        current.snapshot = { state: { status: 'success', data }, refreshing: false, invalidation: current.snapshot.invalidation }
       }
       return data
     }, error => {
@@ -78,7 +51,7 @@ export class QueryCache {
       if (current.generation === generation) { current.pending = undefined; current.snapshot = { ...current.snapshot, settledAt: Date.now() }; this.emit(key) }
       for (const [oldKey, old] of this.entries) {
         if (this.entries.size <= 60) break
-        if (oldKey !== key && !oldKey.startsWith('["clock"') && !old.pending && !this.listeners.has(oldKey)) this.entries.delete(oldKey)
+        if (oldKey !== key && !old.pending && !this.listeners.has(oldKey)) this.entries.delete(oldKey)
       }
     })
     current.pending = pending

@@ -1,10 +1,10 @@
 import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
+import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
+import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
 import { live } from '@/lib/apiMode'
-import { ArrowLeft, ArrowRight, Maximize2, Minimize2, PanelLeft, RotateCw } from 'lucide-react'
-import { useWorkspace } from '@/lib/workspaceState'
+import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import GlobalSearch from '@/features/search/GlobalSearch'
 import LiveGlobalSearch from '@/features/search/LiveGlobalSearch'
@@ -16,34 +16,23 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
+import ComingSoonPage from '@/pages/ComingSoonPage'
+import DashboardPage from '@/pages/DashboardPage'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import AccountPage from '@/pages/AccountPage'
+import AlertsPage from '@/pages/AlertsPage'
+import EpisodesPage from '@/pages/EpisodesPage'
+import LoginPage from '@/pages/LoginPage'
+import NotificationsPage from '@/pages/NotificationsPage'
+import SettingsPage from '@/pages/SettingsPage'
+import TransactionsPage from '@/pages/TransactionsPage'
+import LiveDashboardPage from '@/pages/LiveDashboardPage'
+import LiveLedgerPage from '@/pages/LiveLedgerPage'
+import LiveCasesPage from '@/pages/LiveCasesPage'
 import { currentScenario } from '@/mocks/scenario'
 import { CurrentUserContext, MOCK_USER, roleInfo, type CurrentUser } from './session'
 import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 import { PendingWorkCount, UnreadNotificationCount } from './SidebarCounts'
-
-const ComingSoonPage = lazy(() => import('@/pages/ComingSoonPage'))
-const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
-const AccountPage = lazy(() => import('@/pages/AccountPage'))
-const AlertsPage = lazy(() => import('@/pages/AlertsPage'))
-const EpisodesPage = lazy(() => import('@/pages/EpisodesPage'))
-const LoginPage = lazy(() => import('@/pages/LoginPage'))
-const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'))
-const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
-const TransactionsPage = lazy(() => import('@/pages/TransactionsPage'))
-const LiveDashboardPage = lazy(() => import('@/pages/LiveDashboardPage'))
-const LiveLedgerPage = lazy(() => import('@/pages/LiveLedgerPage'))
-const LiveCasesPage = lazy(() => import('@/pages/LiveCasesPage'))
-const LiveNotificationsPage = lazy(() => import('@/pages/LiveNotificationsPage'))
-
-function PageChunkSkeleton({ page }: { page: Page }) {
-  const line = (width = 'w-24') => <span className={`inline-block h-4 ${width} animate-pulse rounded bg-muted`} />
-  if (page === 'dashboard') return <div role="status" aria-label="대시보드 준비 중" className="space-y-6"><div className="flex gap-5 border-b pb-3"><span>기관 전체</span><span>내 담당</span></div><div className="grid gap-4 @xl:grid-cols-2 @5xl:grid-cols-4">{['오늘 유입 Alert', '오늘 의심 거래 탐지율', '열린 Alert', '조사 중 Episode'].map(label => <div key={label} className="space-y-4 rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">{label}</p>{line('w-20')}{line('w-32')}</div>)}</div><div className="grid gap-4 @6xl:grid-cols-3"><section className="rounded-xl border bg-card p-5 @6xl:col-span-2"><h2 className="font-semibold">기관 탐지 현황</h2><div className="mt-5 h-64 animate-pulse rounded bg-muted" /></section><section className="rounded-xl border bg-card p-5"><h2 className="font-semibold">RDR 9000 Daily Report</h2><div className="mt-5 space-y-5">{[0, 1, 2].map(index => <div key={index}>{line('w-full')}</div>)}</div></section></div></div>
-  if (page === 'transactions') return <div role="status" aria-label="거래 내역 준비 중" className="space-y-5"><div className="flex gap-2">{line('w-64')}{line('w-32')}{line('w-32')}</div><div className="grid gap-3 @5xl:grid-cols-4">{['소유주', '계좌', '거래', '선택 거래 상세'].map(label => <section key={label} className="min-h-80 rounded-xl border bg-card p-4"><h2 className="font-semibold">{label}</h2><div className="mt-5 space-y-4">{[0, 1, 2].map(index => <div key={index}>{line('w-full')}</div>)}</div></section>)}</div></div>
-  if (page === 'alerts' || page === 'episodes') return <div role="status" aria-label="조사 사건 준비 중" className="space-y-5"><div className="flex gap-2">{line('w-64')}{line('w-32')}{line('w-28')}</div><div className="overflow-hidden rounded-xl border bg-card"><div className="grid grid-cols-5 gap-4 border-b p-4 text-sm font-medium"><span>ID / 구성</span><span>위험도</span><span>탐지 유형</span><span>담당자</span><span>상태</span></div>{[0, 1, 2, 3].map(index => <div key={index} className="grid grid-cols-5 gap-4 border-b p-4">{[0, 1, 2, 3, 4].map(cell => <span key={cell}>{line('w-3/4')}</span>)}</div>)}</div></div>
-  if (page === 'notifications') return <div role="status" aria-label="알림 준비 중" className="space-y-5"><h1 className="text-xl font-semibold">알림</h1><div className="flex gap-2">{line('w-64')}{line('w-28')}</div><div className="grid gap-6 @5xl:grid-cols-2">{['안 읽음', '읽음'].map(label => <section key={label}><h2 className="font-semibold">{label}</h2><div className="mt-4 space-y-3">{[0, 1, 2].map(index => <div key={index} className="rounded-xl border bg-card p-4">{line('w-1/2')}<div className="mt-3">{line('w-3/4')}</div></div>)}</div></section>)}</div></div>
-  return <div role="status" aria-label="화면 준비 중" className="space-y-5">{line('w-32')}<div className="h-40 animate-pulse rounded-xl border bg-muted/30" /></div>
-}
 
 
 const pageTitles: Record<Page, string> = {
@@ -94,21 +83,6 @@ function SidebarBrandToggle() {
 }
 
 const navButtonClass = 'h-10 px-4 group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-12! group-data-[collapsible=icon]:px-4! group-data-[collapsible=icon]:[&>span]:hidden'
-
-function HeaderNavigation() {
-  const { queries } = useWorkspace()
-  const [, setNow] = useState(0)
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(timer)
-  }, [])
-  const refreshing = queries.activeRefreshing()
-  return <div className="flex items-center gap-0.5">
-    <Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label="뒤로가기" title="뒤로가기" onClick={() => window.history.back()}><ArrowLeft className="size-4" /></Button>
-    <Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label="앞으로가기" title="앞으로가기" onClick={() => window.history.forward()}><ArrowRight className="size-4" /></Button>
-    <Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label="데이터 새로고침" title="현재 화면 데이터 새로고침" onClick={() => window.dispatchEvent(new Event('workspace-refresh'))}><RotateCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} /></Button>
-  </div>
-}
 
 export default function App() {
   const [{ page, id }, go] = usePage()
@@ -173,12 +147,12 @@ export default function App() {
   }, [fullscreen])
 
   if (restoring) return <div role="status" className="p-6">로그인 상태 확인 중…</div>
-  if (!user) return <Suspense fallback={<PageChunkSkeleton page="account" />}><LoginPage onLogin={signIn} message={authMessage} /></Suspense>
+  if (!user) return <LoginPage onLogin={signIn} message={authMessage} />
 
   return (
     <CurrentUserContext.Provider value={currentUser}>
     <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} >
-    <SidebarProvider defaultOpen={false} className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
+    <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
           <SidebarHeader className="h-15 flex-row items-center overflow-hidden p-0">
@@ -235,7 +209,6 @@ export default function App() {
         <header className="app-header z-40 grid h-15 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-4 min-[1100px]:gap-5 min-[1100px]:px-6">
           <div className="header-navigation flex min-w-0 items-center">
           <SidebarTrigger className="size-9 rounded-full md:hidden" aria-label="메뉴 열기" />
-          <HeaderNavigation />
           {/* 상세 화면에서는 머리 왼쪽에 목록으로 돌아가는 버튼을 둔다 */}
           {id && (page === 'alerts' || page === 'episodes') && (
             <Button variant="ghost" size="sm" className="h-9 gap-1.5 rounded-full px-3 text-xs" onClick={() => go(page)} data-testid="header-back">
@@ -256,16 +229,14 @@ export default function App() {
         </header>
         <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
           <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)}>
-          <Suspense fallback={<PageChunkSkeleton page={page} />}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
             : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
-            : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
+            : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} onOpenAlert={caseId => go('alerts', caseId)} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
             : page === 'notifications' ? (live ? <LiveNotificationsPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />)
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}
-          </Suspense>
         </SharedPeriod>
         </WorkspaceMain>
       </SidebarInset>

@@ -1,17 +1,15 @@
 // 헤더의 남는 너비를 채우는 전역 검색: 소유주·계좌·거래·Alert·Episode·알림·화면을 한 번에 찾는다.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Search } from 'lucide-react'
-import { fetchAlerts, type AlertRow } from '@/api/alerts'
+import { type AlertRow } from '@/api/alerts'
 import { typeDisplay } from '@/api/codes'
-import { fetchEpisodes, type EpisodeRow } from '@/api/episodes'
-import { fetchTransactionExplorer } from '@/api/transactions'
+import { type EpisodeRow } from '@/api/episodes'
 import type { Page } from '@/app/navigation'
 import { Input } from '@/components/ui/input'
 import { Kbd } from '@/components/ui/kbd'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
 import { buildTransactionIndex, searchTransactionIndex, type TransactionIndex, type TransactionTarget } from '@/features/transactions/transactionIndex'
-import { live } from '@/lib/apiMode'
 import { memorySnapshot, writeMemory } from '@/lib/memory'
 import { allAlertsNormal } from '@/mocks/alerts'
 import { loadMockEpisodes } from '@/mocks/episodes'
@@ -21,7 +19,7 @@ import { pageLinks, settingItems } from './searchItems'
 
 type SearchData = { alerts: AlertRow[]; episodes: EpisodeRow[]; transactions: TransactionIndex; notifications: NotificationItem[] }
 type ResultItem = { key: string; primary: ReactNode; secondary?: string; onSelect: () => void }
-type ResultGroup = { id: string; label: string; items: ResultItem[] }
+export type ResultGroup = { id: string; label: string; items: ResultItem[] }
 
 // 대소문자 구분 없이 일치한 부분만 <mark>로 강조한다
 function Highlight({ text, query }: { text: string; query: string }) {
@@ -31,10 +29,6 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 async function loadSearchData(overrides: Parameters<typeof withOverride>[1]): Promise<SearchData> {
-  if (live) {
-    const [alerts, episodes, explorer] = await Promise.all([fetchAlerts({ size: 200 }), fetchEpisodes({ size: 200 }), fetchTransactionExplorer()])
-    return { alerts: alerts.content, episodes: episodes.content, transactions: buildTransactionIndex(explorer), notifications: [] }
-  }
   // mock은 Alert 화면에서 처리한 결과(연결·판정)를 반영한다
   const alerts = allAlertsNormal.content.map(row => withOverride(row, overrides))
   const [episodes, explorer, notifications] = await Promise.all([loadMockEpisodes(alerts, 'normal'), loadMockTransactionExplorer('normal'), loadMockNotifications()])
@@ -43,10 +37,11 @@ async function loadSearchData(overrides: Parameters<typeof withOverride>[1]): Pr
 
 type Props = {
   onNavigate: (page: Page, id?: number) => void
-  onOpenTransaction: (target: TransactionTarget) => void
+  onOpenTransaction?: (target: TransactionTarget) => void
+  remote?: { groups: ResultGroup[]; loading: boolean; error?: string; onQuery: (query: string) => void }
 }
 
-export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
+export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -58,11 +53,11 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
 
   // 처음 열 때와 처리 결과가 바뀔 때 검색 대상을 불러온다
   useEffect(() => {
-    if (!open) return
+    if (!open || remote) return
     let current = true
     loadSearchData(overrides).then(next => { if (current) setData(next) }, () => { if (current) setData(null) })
     return () => { current = false }
-  }, [open, overrides])
+  }, [open, overrides, remote])
 
   // "/"로 검색창에 들어간다. 입력 중인 칸에서는 가로채지 않는다.
   useEffect(() => {
@@ -75,11 +70,12 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const close = () => { setOpen(false); setQuery(''); setActive(0); input.current?.blur() }
+  const close = () => { setOpen(false); setQuery(''); remote?.onQuery(''); setActive(0); input.current?.blur() }
   const select = (fn: () => void) => () => { fn(); close() }
 
   const groups: ResultGroup[] = useMemo(() => {
     if (!q) return [{ id: 'quick', label: '바로가기', items: pageLinks.map(p => ({ key: `quick-${p.page}`, primary: p.label, onSelect: select(() => onNavigate(p.page)) })) }]
+    if (remote) return remote.groups.map(group => ({ ...group, items: group.items.map(item => ({ ...item, onSelect: select(item.onSelect) })) })).filter(group => group.items.length > 0)
     const alerts: ResultItem[] = (data?.alerts ?? [])
       .filter(a => `A-${a.alertId} ${a.alertId} ${a.summary} ${typeDisplay(a.primaryType.code).key} ${typeDisplay(a.primaryType.code).label} ${a.assignee.name} ${a.subjectAccount.account}`.toLowerCase().includes(q))
       .slice(0, 5)
@@ -99,7 +95,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
         }) }))
     const matches = data ? searchTransactionIndex(data.transactions, q) : []
     const targets = (type: TransactionTarget['type']): ResultItem[] => matches.filter(m => m.target.type === type).map(m => ({
-      key: m.key, primary: <span className={type === 'owner' ? '' : 'font-mono text-xs'}><Highlight text={m.label} query={q} /></span>, secondary: m.detail, onSelect: select(() => onOpenTransaction(m.target)),
+      key: m.key, primary: <span className={type === 'owner' ? '' : 'font-mono text-xs'}><Highlight text={m.label} query={q} /></span>, secondary: m.detail, onSelect: select(() => onOpenTransaction?.(m.target)),
     }))
     const screens: ResultItem[] = [...pageLinks, ...settingItems]
       .filter(s => s.label.toLowerCase().includes(q))
@@ -116,7 +112,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
     ].filter(g => g.items.length > 0)
     // select는 매 렌더 새로 만들지만 결과 목록은 검색어·데이터가 바뀔 때만 다시 만든다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, data])
+  }, [q, data, remote])
 
   const flat = groups.flatMap(g => g.items)
   const indexOf = new Map(flat.map((item, i) => [item, i]))
@@ -132,7 +128,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
             aria-activedescendant={flat[active] ? `gs-item-${active}` : undefined}
             placeholder="소유주 · 계좌 · 거래 · Alert · Episode · 알림 검색" className="h-9 rounded-full bg-muted/40 pl-9 pr-10" value={query}
             onFocus={() => setOpen(true)}
-            onChange={e => { setQuery(e.target.value); setActive(0); setOpen(true) }}
+            onChange={e => { setQuery(e.target.value); remote?.onQuery(e.target.value); setActive(0); setOpen(true) }}
             onKeyDown={e => {
               if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive(i => Math.min(flat.length - 1, i + 1)) }
               else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => Math.max(0, i - 1)) }
@@ -146,8 +142,9 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction }: Props) {
       <PopoverContent id="global-search-listbox" role="listbox" aria-label="검색 결과" className="w-(--radix-popper-anchor-width) max-w-[90vw] p-2"
         onOpenAutoFocus={e => e.preventDefault()}
         onInteractOutside={event => { if (anchor.current?.contains(event.target as Node)) event.preventDefault() }}>
+        {remote?.error && <p role="alert" className="p-2 text-xs text-destructive">{remote.error}</p>}
         {flat.length === 0
-          ? <p className="p-4 text-center text-xs text-muted-foreground">{q && !data ? '불러오는 중…' : '검색 결과가 없습니다.'}</p>
+          ? <p className="p-4 text-center text-xs text-muted-foreground">{(remote ? remote.loading : q && !data) ? '불러오는 중…' : '검색 결과가 없습니다.'}</p>
           : (
             <div className="max-h-[60vh] space-y-1 overflow-y-auto">
               {groups.map(g => (

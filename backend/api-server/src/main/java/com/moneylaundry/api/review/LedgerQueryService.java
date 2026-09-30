@@ -43,7 +43,21 @@ public class LedgerQueryService {
       List<String> judgement,
       List<String> payments,
       int page,
-      int size) {}
+      int size,
+      String query,
+      List<String> directions) {
+    public Filter(
+        LocalDate from,
+        LocalDate to,
+        UUID owner,
+        UUID account,
+        List<String> judgement,
+        List<String> payments,
+        int page,
+        int size) {
+      this(from, to, owner, account, judgement, payments, page, size, null, null);
+    }
+  }
 
   public Map<String, Object> query(String kind, Filter filter) {
     AnalysisService.validatePage(filter.page(), filter.size());
@@ -89,6 +103,27 @@ public class LedgerQueryService {
           .append(String.join(",", Collections.nCopies(filter.payments().size(), "?")))
           .append(")");
       args.addAll(filter.payments());
+    }
+    if (filter.query() != null && !filter.query().isBlank()) {
+      if (filter.query().length() > 200) throw AnalysisService.invalid();
+      String q =
+          "%"
+              + filter.query().strip().replace("!", "!!").replace("%", "!%").replace("_", "!_")
+              + "%";
+      sql.append(
+          " and (t.tx_id::text ilike ? escape '!' or f.service_account_id::text ilike ? escape '!' or r.service_account_id::text ilike ? escape '!' or fe.service_entity_id::text ilike ? escape '!' or re.service_entity_id::text ilike ? escape '!')");
+      args.addAll(List.of(q, q, q, q, q));
+    }
+    if (filter.directions() != null && !filter.directions().isEmpty()) {
+      if (!Set.of("IN", "OUT").containsAll(filter.directions()) || filter.account() == null)
+        throw AnalysisService.invalid();
+      var directionClauses = new ArrayList<String>();
+      for (String direction : filter.directions()) {
+        directionClauses.add(
+            direction.equals("IN") ? "r.service_account_id=?" : "f.service_account_id=?");
+        args.add(filter.account());
+      }
+      sql.append(" and (").append(String.join(" or ", directionClauses)).append(")");
     }
     String select =
         """

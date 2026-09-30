@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, RotateCcw, X } from 'lucide-react'
 import { ko } from 'date-fns/locale'
-import { subDays, startOfMonth, startOfYear } from 'date-fns'
+import { subDays, startOfMonth } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -19,10 +19,10 @@ const presetsFor = (TODAY: Date) => [
 ]
 
 export function DateRangeButton({ value, onChange, today: TODAY }: { value: DateRange | undefined; onChange: (r: DateRange | undefined) => void; today: Date }) {
-  const calendarStart = startOfYear(value?.from && value.from < TODAY ? value.from : TODAY)
-  const calendarMonths = (Math.max(TODAY.getFullYear(), value?.to?.getFullYear() ?? TODAY.getFullYear()) - calendarStart.getFullYear() + 1) * 12
-  const monthIndex = (date: Date) => (date.getFullYear() - calendarStart.getFullYear()) * 12 + date.getMonth()
   const presets = presetsFor(TODAY)
+  const [year, setYear] = useState((value?.to ?? value?.from ?? TODAY).getFullYear())
+  const calendarStart = new Date(year, 0, 1)
+  const monthIndex = (date: Date) => (date.getFullYear() - year) * 12 + date.getMonth()
   const [open, setOpen] = useState(false), [draft, setDraft] = useState<DateRange | undefined>(value), [preset, setPreset] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   // 달력은 한 줄로 이어진 세로 스크롤. preset·열기 시 기준 날짜가 있는 달로 이동한다.
@@ -37,7 +37,7 @@ export function DateRangeButton({ value, onChange, today: TODAY }: { value: Date
   useEffect(() => { if (open) scrollToMonth(value?.to ?? value?.from ?? TODAY, false) }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const label = value?.from ? `${fmt(value.from)} → ${fmt(value.to) || '종료일'}` : '기간'
   return (
-    <Popover open={open} onOpenChange={o => { setOpen(o); if (o) { setDraft(value); setPreset(null) } }}>
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (o) { setDraft(value); setPreset(null); setYear((value?.to ?? value?.from ?? TODAY).getFullYear()) } }}>
       <div role="group" aria-label="기간 설정" data-testid="date-range-combined" className="inline-flex shrink-0">
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className={`date-range-control h-9 ${value?.from ? 'rounded-r-none border-r-0' : ''}`}><CalendarDays data-icon="inline-start" /><span className="tabular-nums">{label}</span></Button>
@@ -51,17 +51,18 @@ export function DateRangeButton({ value, onChange, today: TODAY }: { value: Date
           <div className="w-32 border-r p-2 flex flex-col gap-1">
             {presets.map(p => (
               <Button key={p.id} variant={preset === p.id ? 'secondary' : 'ghost'} size="sm" className="justify-start font-normal"
-                onClick={() => { const r = p.range(); setDraft(r); setPreset(p.id); scrollToMonth(r.to ?? TODAY, true) }}>
+                onClick={() => { const r = p.range(); setDraft(r); setPreset(p.id); setYear(TODAY.getFullYear()); scrollToMonth(r.to ?? TODAY, true) }}>
                 {p.label}
               </Button>
             ))}
           </div>
+          <div><div className="flex items-center justify-between border-b p-2"><Button variant="ghost" size="sm" aria-label="이전 연도" onClick={() => setYear(year - 1)}>이전 연도</Button><span>{year}년</span><Button variant="ghost" size="sm" aria-label="다음 연도" onClick={() => setYear(year + 1)}>다음 연도</Button></div>
           <div ref={scroller} className="relative h-[336px] overflow-y-auto overscroll-contain" data-testid="calendar-scroll">
             <Calendar locale={ko} mode="range" selected={draft} onSelect={r => { setDraft(r); setPreset(null) }}
-              defaultMonth={calendarStart} startMonth={calendarStart} numberOfMonths={calendarMonths} today={TODAY}
+              key={year} defaultMonth={calendarStart} startMonth={calendarStart} numberOfMonths={12} today={TODAY}
               hideNavigation showOutsideDays={false} className="continuous-calendar"
               classNames={{ months: 'relative flex flex-col gap-5 rdp-months', month_caption: 'flex h-8 items-center px-1 text-sm font-medium rdp-month_caption' }} />
-          </div>
+          </div></div>
         </div>
         <div className="border-t p-3 flex items-center justify-between gap-6">
           <span className="text-xs text-muted-foreground tabular-nums">{draft?.from ? `${fmt(draft.from)} → ${fmt(draft.to) || '종료일 선택'}` : '전체 기간'}</span>

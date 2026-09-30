@@ -4,7 +4,7 @@ import type { WorkItem } from './workItems'
 // 대시보드 업무 카드. ID(A-·E-)가 종류를 알려 주므로 종류 태그는 두지 않는다.
 // 색이 있는 경과일·위험 점수는 ID 줄 오른쪽에, 무채색 패턴 태그는 맨 아래 줄에 따로 묶는다.
 // 누르면 해당 Alert·Episode 상세로 간다.
-export function WorkCard({ item }: { item: WorkItem }) {
+export function WorkCard({ item }: { item: Pick<WorkItem, 'kind' | 'href' | 'code' | 'riskScore' | 'ageDays' | 'summary' | 'types'> }) {
   return (
     <a
       href={item.href}
