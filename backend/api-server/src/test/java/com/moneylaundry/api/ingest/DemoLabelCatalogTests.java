@@ -40,7 +40,11 @@ class DemoLabelCatalogTests {
         }
       }
     }
-    assertThat(count).isEqualTo(7106);
+    var manifest =
+        new tools.jackson.databind.ObjectMapper()
+            .readTree(
+                java.nio.file.Files.readString(java.nio.file.Path.of(directory, "manifest.json")));
+    assertThat(count).isEqualTo(manifest.get("report_rows").asInt());
     assertThat(matched.get()).isEqualTo(count);
   }
 
