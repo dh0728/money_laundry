@@ -16,7 +16,7 @@ import { ApiError } from '@/api/common'
 import { fetchReviewCase, fetchReviewCases, fetchReviewUsers, fetchReviewMoney, setReviewMoneyScope, submitReviewCommand, type ReviewAction, type ReviewCommand, type ReviewKind } from '@/api/liveReview'
 import { CaseHeader, CaseStats } from '@/features/alerts/CasePresentation'
 import { Badge } from '@/components/ui/badge'
-import { RiskBadge } from '@/components/badges'
+import { RiskBadge, StatusBadge } from '@/components/badges'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { useCurrentUser, canEditOpen } from '@/app/session'
@@ -29,7 +29,7 @@ import Graph from '@/features/graph/v24/Graph'
 import type { DateRange } from 'react-day-picker'
 import { isoDate } from '@/lib/format'
 import AlertList from '@/features/alerts/AlertList'
-import EpisodeList from '@/features/episodes/EpisodeList'
+import EpisodeList, { EpisodeStatusBadge } from '@/features/episodes/EpisodeList'
 import type { AlertFilter } from '@/features/alerts/alertFilters'
 import type { EpisodeFilter } from '@/features/episodes/episodeFilters'
 import { alertListRow, episodeListRow } from '@/features/alerts/reviewListAdapter'
@@ -240,7 +240,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
   return <div className="space-y-5"><RefreshStatus queries={[detail, money, targets]} />
     <Button variant="outline" size="sm" onClick={onBack}>목록으로</Button>
     <CaseHeader id={item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`} title={item.kind === 'ALERT' ? item.summary.primaryType : `${item.primaryTypes.join(' · ')} · Alert ${item.sourceAlertIds.length}건`}
-      tab={tab} onTab={setTab} count={item.summary.txCount} tags={<><Badge variant="outline">{item.status === 'OPEN' ? '진행 중' : '종결'}</Badge><RiskBadge score={item.summary.riskScore} /><Badge variant="outline">담당 {item.assigneeName}</Badge><Badge variant="outline">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '—'}</Badge></>} />
+      tab={tab} onTab={setTab} count={item.summary.txCount} tags={<>{item.kind === 'ALERT' ? <StatusBadge status={alertListRow(item).status} /> : <EpisodeStatusBadge status={episodeListRow(item).status} />}<RiskBadge score={item.summary.riskScore} /><Badge variant="outline">담당 {item.assigneeName}</Badge><Badge variant="outline">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '—'}</Badge></>} />
     <div hidden={tab !== 'overview'} className="space-y-4">
     <CaseStats items={[
         ['외부 유입액', externalAmount('in'), externalUsd('in')],
