@@ -18,10 +18,11 @@ export function CaseHeader({ id, title, tags, notice, action, tab, onTab, count 
   </header><UnderTabs value={tab} onChange={onTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '그래프' }, { value: 'transactions', label: '거래', count }, { value: 'review', label: '검토 의견' }]} /></>
 }
 
-export function CaseStats({ items }: { items: { label: string; value: string }[] }) {
+export function CaseStats({ items }: { items: { label: string; value: string; secondary?: string }[] }) {
   return <section aria-label="사건 요약" className="grid items-stretch gap-3 @3xl:grid-cols-12 @6xl:grid-cols-6">
     {items.map(stat => <Card key={stat.label} className={`${card} @3xl:col-span-4 @6xl:col-span-1`} data-testid="overview-kpi-card"><CardContent className="px-4">
       <p className="text-xs text-muted-foreground">{stat.label}</p><p className="mt-2 break-words text-lg font-semibold tabular-nums">{stat.value}</p>
+      {stat.secondary && <p className="mt-1 text-xs text-muted-foreground tabular-nums">{stat.secondary}</p>}
     </CardContent></Card>)}
   </section>
 }

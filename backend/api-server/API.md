@@ -614,6 +614,8 @@ Alert/Episode 개요 공통. summary.amountsByCurrency는 기존 사건 SUBJECT 
 - selectedAccounts,candidateAccounts,customScope,revision,delayMinutes,requestedFrom/To,observedAt(실제 조회시각).
 - available=false이면 reason=EMPTY_SUBJECT_SCOPE/EMPTY_ACCOUNT_SCOPE/WAITING_RECEIPTS/NO_CLOSED_SNAPSHOT이며 비율을0으로 만들지 않는다.
 - available=true이면 start,endExclusive,complete,ledgerCount,method=FIFO_ESTIMATE,external[],accounts[].
+- externalUsd: {in,out,net}은 동일 S/T의 USD 보조 합계다. 외부 유입은 각 거래 amount_received를 거래 fx_rate_version의 receiving_currency 환율(units_per_usd)로 나누고 소수6자리 반올림 후 합산한다. 외부 유출은 원장의 amount_usd 합계, 순유입은 in−out이다. 내부이체는 제외한다. 필요한 수취 환율이 없으면 in/net은 null이며 부분합을 완전 합계로 표시하지 않는다. 실시간 환율이 아니다. 종결 스냅샷에 함께 보존되며 기존 종결 스냅샷에는 이 필드가 없을 수 있다.
+- 외부 유입액·거래 총액·순유입 카드의 원통화 값 아래에 작은 USD 값을 추가한다. 총액 USD는 원통화 총액과 동일한 현재 소속 거래(SUBJECT+CONTEXT, EXCLUDED/TRANSFERRED 제외)를 txId로 중복 제거한 amountUsd 합계다. 환산값 미제공은 `USD 환산액 미제공`으로 표시한다.
 - external 행: currency,in,out,net. accounts 행: accountId,currency,in,out,net,positiveNet,concentrationPercent,eligibleIn,excludedIn,matchedIn,rapidOutflowPercent. 비율은0~100 또는 null이다.
 
 `POST /api/v1/review/cases/{caseId}/money-scope`:

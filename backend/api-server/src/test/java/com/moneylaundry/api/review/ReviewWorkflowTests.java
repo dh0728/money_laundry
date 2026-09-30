@@ -907,6 +907,32 @@ class ReviewWorkflowTests {
     assertThat(
             new java.math.BigDecimal(rows(metrics.get("external")).getFirst().get("in").toString()))
         .isEqualByComparingTo("100");
+    assertThat(new java.math.BigDecimal(object(metrics.get("externalUsd")).get("in").toString()))
+        .isEqualByComparingTo("100");
+    jdbc.update(
+        "insert into fx_rates(fx_rate_version,currency,units_per_usd) values('usd-card-test','SAR',7.5) on conflict do nothing");
+    jdbc.update(
+        "update transactions set amount_received=375,receiving_currency='SAR',fx_rate_version='usd-card-test' where from_account_id=?",
+        internal.get(0));
+    var converted = object(service.money(id, 180).get("externalUsd"));
+    assertThat(new java.math.BigDecimal(converted.get("in").toString())).isEqualByComparingTo("50");
+    jdbc.update(
+        "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2023-09-01 01:00Z',?,?,80,'USD',80,'USD','ACH',80,'fx_rates_usd_v1','2023-09-01')",
+        internal.get(1),
+        internal.get(0));
+    converted = object(service.money(id, 180).get("externalUsd"));
+    assertThat(new java.math.BigDecimal(converted.get("out").toString()))
+        .isEqualByComparingTo("80");
+    assertThat(new java.math.BigDecimal(converted.get("net").toString()))
+        .isEqualByComparingTo("-30");
+    jdbc.update(
+        "update transactions set fx_rate_version='missing-rate' where from_account_id=?",
+        internal.get(0));
+    assertThat(object(service.money(id, 180).get("externalUsd")).get("in")).isNull();
+    assertThat(object(service.money(id, 180).get("externalUsd")).get("net")).isNull();
+    jdbc.update(
+        "update transactions set fx_rate_version='usd-card-test' where from_account_id=?",
+        internal.get(0));
     assertThat(encode(metrics)).doesNotContain("hidden", "identity_cipher");
     act(l1, "DECIDE", "NORMAL", select(id, 1, 2));
     act(l1, "CLOSE", null, select(id));
