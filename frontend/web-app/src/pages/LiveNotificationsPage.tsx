@@ -1,20 +1,35 @@
 import { useState } from 'react'
+import type { DateRange } from 'react-day-picker'
+import { Check, Search } from 'lucide-react'
 import { fetchNotifications, fetchNotificationCases, setNotificationsRead, type WorkNotification } from '@/api/notifications'
 import { PageHeading } from '@/components/page'
-import { ErrorBlock, LoadingBlock } from '@/components/states'
+import { ErrorBlock } from '@/components/states'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateRangeButton } from '@/components/DateRangeButton'
 import { RefreshStatus } from '@/components/RefreshStatus'
 import { useAsync } from '@/lib/useAsync'
 import { useViewState } from '@/lib/workspaceState'
+import { NotificationColumn } from './NotificationsPage'
 
 type Open = (kind: 'ALERT' | 'EPISODE', id: number) => void
+function NotificationColumnSkeleton({ label }: { label: string }) {
+  return <section aria-label={label} className="min-w-0">
+    <div className="mb-3 flex items-center gap-2"><Skeleton className="size-7" /><h2 className="text-sm font-semibold">{label}</h2><Skeleton className="h-4 w-5" /></div>
+    <div className="space-y-2.5">{[0, 1, 2].map(index => <article key={index} className="flex min-w-0 items-center gap-2.5 rounded-lg border bg-card px-3.5 py-3">
+      <Skeleton className="size-7 shrink-0 rounded-full" />
+      <div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-1/3" /></div>
+    </article>)}</div>
+  </section>
+}
+
 function AssignedCases({ id, onOpen, onClose }: { id: string; onOpen: Open; onClose: () => void }) {
   const [page, setPage] = useState(0)
   const cases = useAsync(() => fetchNotificationCases(id, page), [id, page], { key: 'notifications/cases' })
   return <section aria-label="배정된 Alert" className="space-y-3 rounded-lg border p-4">
     <div className="flex items-center justify-between"><h2>배정된 Alert</h2><Button variant="ghost" onClick={onClose}>목록 닫기</Button></div>
-    {cases.state.status === 'loading' ? <LoadingBlock label="배정된 Alert" /> : cases.state.status === 'error'
+    {cases.state.status === 'loading' ? <div role="status" aria-label="배정된 Alert 불러오는 중" className="space-y-2"><Skeleton className="h-3 w-24" /><div className="flex gap-2"><Skeleton className="h-9 w-24" /><Skeleton className="h-9 w-24" /></div></div> : cases.state.status === 'error'
       ? <ErrorBlock message={cases.state.message} onRetry={cases.retry} /> : <>
         <p className="text-xs text-muted-foreground">총 {cases.state.data.totalElements.toLocaleString()}건</p>
         {cases.state.data.content.map(c => <Button key={c.caseId} variant="outline" className="mr-2 mb-2" onClick={() => onOpen(c.kind, c.caseId)}>
@@ -33,7 +48,10 @@ export default function LiveNotificationsPage({ onOpen }: { onOpen: Open }) {
   const [page, setPage] = useViewState(`notifications/page/${from}/${to}/${query}`, 0)
   const [selected, setSelected] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [unreadOrder, setUnreadOrder] = useState<'none' | 'desc' | 'asc'>('none')
+  const [readOrder, setReadOrder] = useState<'none' | 'desc' | 'asc'>('none')
   const [error, setError] = useState('')
+  const range: DateRange | undefined = from || to ? { from: from ? new Date(`${from}T00:00:00`) : undefined, to: to ? new Date(`${to}T00:00:00`) : undefined } : undefined
   const invalidDates = Boolean(from && to && from > to)
   const notifications = useAsync(() => fetchNotifications(from, to, query, page), [from, to, query, page], { key: 'notifications', enabled: !invalidDates })
   const items = notifications.state.status === 'success' ? notifications.state.data.content : []
@@ -51,31 +69,20 @@ export default function LiveNotificationsPage({ onOpen }: { onOpen: Open }) {
   return <div className="space-y-4">
     <PageHeading title="알림" description="내 업무의 실제 배정·의견·편입·종결 이력입니다. 분석별 Alert 배정은 한 알림으로 묶어 표시합니다." />
     <RefreshStatus queries={[notifications]} />
-    <form className="flex flex-wrap items-end gap-2" onSubmit={e => { e.preventDefault(); setQuery(search.trim()); setPage(0); setSelected(null) }}>
-      <label className="text-xs">시작일<Input aria-label="알림 시작일" type="date" value={from} onChange={e => { setFrom(e.target.value); setSelected(null) }} /></label>
-      <label className="text-xs">종료일<Input aria-label="알림 종료일" type="date" value={to} onChange={e => { setTo(e.target.value); setSelected(null) }} /></label>
-      <Input className="w-64" aria-label="알림 검색" placeholder="내용·Alert·Episode ID 검색" value={search} onChange={e => setSearch(e.target.value)} />
-      <Button type="submit">검색</Button>
-      <Button type="button" variant="outline" disabled={busy || !items.some(item => !item.read)} onClick={() => void mark(items.filter(item => !item.read).map(item => item.id), true)}>현재 페이지 모두 읽음</Button>
+    <form className="flex flex-wrap items-center gap-2" onSubmit={e => { e.preventDefault(); setQuery(search.trim()); setPage(0); setSelected(null) }}>
+      <div className="relative w-72 max-w-full"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input className="h-9 pl-9 text-xs" aria-label="알림 검색" placeholder="내용·Alert·Episode ID 검색" value={search} onChange={e => setSearch(e.target.value)} /><button type="submit" className="sr-only">검색</button></div>
+      <DateRangeButton value={range} onChange={next => { setFrom(next?.from?.toLocaleDateString('sv-SE') ?? ''); setTo(next?.to?.toLocaleDateString('sv-SE') ?? ''); setPage(0); setSelected(null) }} today={new Date()} />
+      <Button type="button" variant="ghost" size="sm" className="ml-auto" disabled={busy || !items.some(item => !item.read)} onClick={() => void mark(items.filter(item => !item.read).map(item => item.id), true)}><Check className="size-3.5" />현재 페이지 모두 읽음</Button>
     </form>
-    {invalidDates ? <p role="alert">시작일은 종료일보다 늦을 수 없습니다.</p> : notifications.state.status === 'loading' ? <LoadingBlock label="알림" />
+    {invalidDates ? <p role="alert">시작일은 종료일보다 늦을 수 없습니다.</p> : notifications.state.status === 'loading' ? <div role="status" aria-label="알림 불러오는 중" className="space-y-4"><p className="flex items-center gap-2 text-xs text-muted-foreground">조회 결과 <Skeleton className="h-3 w-8" />건 · 안 읽음 <Skeleton className="h-3 w-8" />건</p><div className="grid gap-6 @5xl:grid-cols-2" data-testid="notification-list"><NotificationColumnSkeleton label="안 읽음" /><NotificationColumnSkeleton label="읽음" /></div><div className="flex items-center gap-3"><Button disabled>이전</Button><Skeleton className="h-4 w-10" /><Button disabled>다음</Button></div></div>
       : notifications.state.status === 'error' ? <ErrorBlock message={notifications.state.message} onRetry={notifications.retry} /> : <>
         <p className="text-xs text-muted-foreground">조회 결과 {notifications.state.data.totalElements.toLocaleString()}건 · 안 읽음 {notifications.state.data.unreadCount.toLocaleString()}건</p>
         {error && <p role="alert">{error}</p>}
         {selected && <AssignedCases key={selected} id={selected} onOpen={onOpen} onClose={() => setSelected(null)} />}
-        {items.length === 0 ? <p className="py-12 text-center">표시할 알림이 없습니다.</p> : <div className="grid gap-6 @5xl:grid-cols-2">
-          {[false, true].map(read => <section key={String(read)} aria-label={read ? '읽음' : '안 읽음'} className="space-y-3">
-            <h2>{read ? '읽음' : '안 읽음'}</h2>
-            {items.filter(item => item.read === read).map(item => <article key={item.id} className="flex gap-3 rounded-lg border p-4">
-              <Button variant="ghost" disabled={busy} aria-label={`${item.code} ${read ? '읽지 않음으로 표시' : '읽음으로 표시'}`} onClick={() => void mark([item.id], !read)}>{read ? '○' : '●'}</Button>
-              <button type="button" disabled={busy} className="min-w-0 flex-1 text-left" onClick={() => void open(item)}>
-                <h3 className="font-semibold">{item.title}{item.count > 1 ? ` · ${item.count.toLocaleString()}건` : ''}</h3>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.description}</p>
-                <p className="mt-2 text-xs text-muted-foreground">{item.code} · {item.at.replace('T', ' ').slice(0, 19)} KST</p>
-              </button>
-            </article>)}
-          </section>)}
-        </div>}
+        <div className="grid gap-6 @5xl:grid-cols-2" data-testid="notification-list">
+          <NotificationColumn label="안 읽음" items={items.filter(item => !item.read)} order={unreadOrder} onOrder={() => setUnreadOrder(current => current === 'none' ? 'desc' : current === 'desc' ? 'asc' : 'none')} onOpen={item => void open(item)} read={false} onToggle={id => { if (!busy) void mark([id], true) }} />
+          <NotificationColumn label="읽음" items={items.filter(item => item.read)} order={readOrder} onOrder={() => setReadOrder(current => current === 'none' ? 'desc' : current === 'desc' ? 'asc' : 'none')} onOpen={item => void open(item)} read onToggle={id => { if (!busy) void mark([id], false) }} />
+        </div>
         <div className="flex items-center gap-3"><Button disabled={page === 0} onClick={() => { setPage(page - 1); setSelected(null) }}>이전</Button>
           <span>{page + 1} / {Math.max(1, notifications.state.data.totalPages)}</span>
           <Button disabled={page + 1 >= notifications.state.data.totalPages} onClick={() => { setPage(page + 1); setSelected(null) }}>다음</Button></div>

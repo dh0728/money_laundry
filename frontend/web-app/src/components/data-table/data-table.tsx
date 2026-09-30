@@ -20,6 +20,7 @@ interface DataTableProps<TData> extends Omit<React.ComponentProps<"div">, "child
   topHorizontalScroll?: boolean;
   separatedColumns?: boolean;
   columnGroups?: Partial<Record<string, "sender" | "receiver">>;
+  hidePagination?: boolean;
   /** AML RADAR: 행을 누르거나 Enter로 상세를 연다 */
   onRowClick?: (row: TData) => void;
 }
@@ -37,6 +38,7 @@ export function DataTable<TData>({
   topHorizontalScroll = false,
   separatedColumns = false,
   columnGroups,
+  hidePagination = false,
   onRowClick,
   className,
   ...props
@@ -168,9 +170,9 @@ export function DataTable<TData>({
           </TableBody>
         </Table>
       </div>
-      <div className="flex flex-col gap-2.5">
+      {!hidePagination && <div className="flex flex-col gap-2.5">
         <DataTablePagination table={table} />
-      </div>
+      </div>}
     </div>
   );
 }

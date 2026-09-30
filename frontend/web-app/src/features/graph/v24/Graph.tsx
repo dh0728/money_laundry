@@ -466,11 +466,11 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
     <div className="flex-1 min-h-0 flex" data-testid={testId} data-split="horizontal">
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
         <ResizablePanel defaultSize="210px" minSize="190px" maxSize="260px">{settingsFull}</ResizablePanel>
-        <ResizableHandle />
+        <ResizableHandle withHandle aria-label="그래프 설정 너비 조절" />
         <ResizablePanel minSize="320px" id={`${testId}-main`}>{mainGraph}</ResizablePanel>
         {docked && (
           <>
-            <ResizableHandle />
+            <ResizableHandle withHandle aria-label="그래프 상세 너비 조절" />
             <ResizablePanel id={`${testId}-detail`} defaultSize="440px" minSize="340px" maxSize="760px">
               <div className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</div>
             </ResizablePanel>
@@ -487,7 +487,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         <ResizablePanel minSize="240px" defaultSize="60%" id="graph-main-v">{mainGraph}</ResizablePanel>
         {docked && (
           <>
-            <ResizableHandle />
+            <ResizableHandle withHandle aria-label="그래프 상세 높이 조절" />
             <ResizablePanel minSize="180px" defaultSize="40%" id="graph-detail-v">
               <div className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</div>
             </ResizablePanel>

@@ -66,6 +66,28 @@ it('failed refresh retains successful data and exposes a refresh error', async (
   expect(cache.snapshot('cases').refreshError).toBeTruthy()
 })
 
+it('refresh keeps unchanged rows by reference and replaces only changed rows', async () => {
+  const cache = new QueryCache()
+  const first = { content: [{ id: 1, status: 'OPEN' }, { id: 2, status: 'OPEN' }] }
+  await cache.fetch('cases', async () => first, 60_000)
+  await cache.fetch('cases', async () => ({ content: [{ id: 1, status: 'OPEN' }, { id: 2, status: 'CLOSED' }] }), 60_000, true)
+  const state = cache.snapshot<typeof first>('cases').state
+  expect(state.status).toBe('success')
+  if (state.status !== 'success') return
+  expect(state.data.content[0]).toBe(first.content[0])
+  expect(state.data.content[1]).not.toBe(first.content[1])
+})
+
+it('new rows at the front do not replace unchanged visible rows', async () => {
+  const cache = new QueryCache()
+  const oldRow = { caseId: 2, status: 'OPEN' }
+  await cache.fetch('cases', async () => ({ content: [oldRow] }), 60_000)
+  await cache.fetch('cases', async () => ({ content: [{ caseId: 3, status: 'OPEN' }, { caseId: 2, status: 'OPEN' }] }), 60_000, true)
+  const state = cache.snapshot<{ content: typeof oldRow[] }>('cases').state
+  expect(state.status).toBe('success')
+  if (state.status === 'success') expect(state.data.content[1]).toBe(oldRow)
+})
+
 it('session caches are isolated and inactive results are bounded', async () => {
   const first = new QueryCache(), second = new QueryCache()
   await first.fetch('personal', async () => 'first user', 300_000)
