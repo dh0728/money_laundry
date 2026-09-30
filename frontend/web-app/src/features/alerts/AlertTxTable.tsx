@@ -15,10 +15,10 @@ import { formatMoney, type TransactionTarget } from '@/features/transactions/tra
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
 
 // Episode 거래는 어느 Alert에서 왔는지(alertId)를 함께 가진다
-type TxRow = AlertTransaction & { alertId?: number; relabel?: TxRelabel }
+export type TxRow = Pick<AlertTransaction, 'txId' | 'txAt' | 'amountPaid' | 'paymentCurrency' | 'paymentFormat' | 'fromAccount' | 'toAccount' | 'fromOwnerName' | 'toOwnerName'> & { role: string; launderingScore: number | null; alertId?: number; relabel?: TxRelabel; reviewLabel?: string }
 type Open = (target: TransactionTarget) => void
 
-const roleLabels: Record<AlertTransaction['role'], string> = { SEED: '시작 거래', SUPPORTING: '연결 거래', PATH: '경로', PATTERN_MEMBER: '패턴 구성' }
+const roleLabels: Record<string, string> = { SEED: '시작 거래', SUPPORTING: '연결 거래', PATH: '경로', PATTERN_MEMBER: '패턴 구성' }
 
 const header = (column: Column<TxRow, unknown>, label: string) => <DataTableColumnHeader column={column} label={label} className="px-2" />
 const tag = (text: string) => <Badge variant="outline" className="semantic-metadata-badge font-normal">{text}</Badge>
@@ -34,28 +34,28 @@ function Shortcut({ label, target, onOpen, mono = false }: { label: string; targ
   )
 }
 
-const columnsFor = (onOpen: Open): ColumnDef<TxRow>[] => [
-  { accessorKey: 'txId', size: 116, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => <Shortcut label={String(row.original.txId)} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={onOpen} mono /> },
+const columnsFor = (onOpen: Open, remote: boolean): ColumnDef<TxRow>[] => [
+  { accessorKey: 'txId', size: 116, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => remote ? <span className="px-1 font-mono">T-{row.original.txId}</span> : <Shortcut label={String(row.original.txId)} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={onOpen} mono /> },
   { accessorKey: 'txAt', size: 118, header: ({ column }) => header(column, '일시'), cell: ({ row }) => <span className="px-1 text-sm tabular-nums">{row.original.txAt.slice(5, 16).replace('T', ' ')}</span> },
   { accessorKey: 'amountPaid', size: 110, header: ({ column }) => header(column, '금액'), cell: ({ row }) => <div className="truncate px-1 text-right text-sm tabular-nums">{formatMoney(row.original.amountPaid, row.original.paymentCurrency)}</div> },
   { accessorKey: 'paymentFormat', size: 92, header: ({ column }) => header(column, '결제 수단'), cell: ({ row }) => <span className="px-1">{tag(row.original.paymentFormat)}</span> },
   { accessorKey: 'fromOwnerName', size: 118, header: ({ column }) => header(column, '송금 소유주'), cell: ({ row }) => row.original.fromOwnerName ? <Shortcut label={row.original.fromOwnerName} target={{ type: 'owner', owner: row.original.fromOwnerName }} onOpen={onOpen} /> : '—' },
-  { accessorKey: 'fromAccount', size: 118, header: ({ column }) => header(column, '송금 계좌'), cell: ({ row }) => <Shortcut label={row.original.fromAccount} target={{ type: 'account', account: row.original.fromAccount }} onOpen={onOpen} mono /> },
+  { accessorKey: 'fromAccount', size: 118, header: ({ column }) => header(column, '송금 계좌'), cell: ({ row }) => remote ? <span title={row.original.fromAccount} className="block truncate px-1 font-mono">{row.original.fromAccount}</span> : <Shortcut label={row.original.fromAccount} target={{ type: 'account', account: row.original.fromAccount }} onOpen={onOpen} mono /> },
   { accessorKey: 'toOwnerName', size: 118, header: ({ column }) => header(column, '수취 소유주'), cell: ({ row }) => row.original.toOwnerName ? <Shortcut label={row.original.toOwnerName} target={{ type: 'owner', owner: row.original.toOwnerName }} onOpen={onOpen} /> : '—' },
-  { accessorKey: 'toAccount', size: 118, header: ({ column }) => header(column, '수취 계좌'), cell: ({ row }) => <Shortcut label={row.original.toAccount} target={{ type: 'account', account: row.original.toAccount }} onOpen={onOpen} mono /> },
+  { accessorKey: 'toAccount', size: 118, header: ({ column }) => header(column, '수취 계좌'), cell: ({ row }) => remote ? <span title={row.original.toAccount} className="block truncate px-1 font-mono">{row.original.toAccount}</span> : <Shortcut label={row.original.toAccount} target={{ type: 'account', account: row.original.toAccount }} onOpen={onOpen} mono /> },
   {
     accessorKey: 'launderingScore', size: 128, header: ({ column }) => header(column, '점수'),
     // 사람이 판정을 바꾼 거래에는 "사람 판정" 태그와 사유 툴팁을 단다
     cell: ({ row }) => (
       <span className="flex items-center gap-1.5 px-1">
-        <RiskBadge score={row.original.launderingScore} />
+        {row.original.launderingScore == null ? '—' : <RiskBadge score={row.original.launderingScore} />}
         {row.original.relabel && <Badge variant="outline" className="semantic-metadata-badge font-normal" title={`${row.original.relabel.actor} · ${row.original.relabel.reason}`}>사람 판정</Badge>}
       </span>
     ),
   },
   {
     accessorKey: 'role', size: 96, header: ({ column }) => header(column, '편입 역할'),
-    cell: ({ row }) => <span className="px-1">{row.original.role === 'SEED' ? <Badge className="font-normal">{roleLabels.SEED}</Badge> : tag(roleLabels[row.original.role])}</span>,
+    cell: ({ row }) => <span className="px-1">{row.original.role === 'SEED' ? <Badge className="font-normal">{roleLabels.SEED}</Badge> : tag(roleLabels[row.original.role] ?? row.original.role)}</span>,
   },
 ]
 
@@ -68,25 +68,26 @@ const sourceColumn: ColumnDef<TxRow> = {
   ),
 }
 
-type Selection = { ids: number[]; onToggle: (txId: number) => void }
+type Selection = { ids: number[]; onToggle: (txId: number) => void; disabled?: (txId: number) => boolean }
 
-export default function AlertTxTable({ rows, selection }: { rows: TxRow[]; selection?: Selection }) {
+export default function AlertTxTable({ rows, selection, remote = false }: { rows: TxRow[]; selection?: Selection; remote?: boolean }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'txAt', desc: false }])
   const [, setTarget] = useTransactionTarget()
   const data = useMemo(() => rows, [rows])
   const withSource = rows.some(row => row.alertId != null)
   const columns = useMemo(() => {
     const open: Open = target => { if (selection) return; setTarget(target); window.location.hash = 'transactions' }
-    const base = columnsFor(open)
+    const base = columnsFor(open, remote)
+    if (remote) base.push({ id: 'reviewLabel', header: '조사 상태', cell: ({ row }) => row.original.reviewLabel ?? '—' })
     const visible = withSource ? [sourceColumn, ...base] : base
     return selection ? [{
       id: 'select', size: 40,
       header: () => <span className="sr-only">거래 선택</span>,
       cell: ({ row }) => <span className="flex w-full justify-center"><input type="checkbox" aria-label={`거래 T-${row.original.txId} 선택`}
-        checked={selection.ids.includes(row.original.txId)} onClick={event => event.stopPropagation()}
+        disabled={selection.disabled?.(row.original.txId)} checked={selection.ids.includes(row.original.txId)} onClick={event => event.stopPropagation()}
         onChange={() => selection.onToggle(row.original.txId)} /></span>,
     } as ColumnDef<TxRow>, ...visible] : visible
-  }, [withSource, setTarget, selection])
+  }, [withSource, setTarget, selection, remote])
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table은 React Compiler 최적화 대상이 아니다
   const table = useReactTable({
     data, columns, getRowId: row => String(row.txId),
@@ -95,7 +96,7 @@ export default function AlertTxTable({ rows, selection }: { rows: TxRow[]; selec
     initialState: { pagination: { pageIndex: 0, pageSize: 20 } },
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
-  return <DataTable table={table} topHorizontalScroll onRowClick={selection ? row => selection.onToggle(row.txId) : undefined}
+  return <DataTable table={table} topHorizontalScroll onRowClick={selection ? row => { if (!selection.disabled?.(row.txId)) selection.onToggle(row.txId) } : undefined}
     columnGroups={{ fromOwnerName: 'sender', fromAccount: 'sender', toOwnerName: 'receiver', toAccount: 'receiver' }}
     data-testid="tx-table" tableClassName="table-fixed [&_th]:overflow-hidden [&_td]:overflow-hidden [&_th]:px-0 [&_td]:p-1" />
 }

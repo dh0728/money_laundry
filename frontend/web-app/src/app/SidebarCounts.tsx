@@ -41,20 +41,6 @@ function MockUnreadCount() {
 }
 
 export function PendingWorkCount({ routeKey }: { routeKey: string }) {
-  return live ? <LivePendingCount /> : <MockPendingCount routeKey={routeKey} />
-}
-
-function LivePendingCount() {
-  const clock = useAsync(fetchDemoClock, [], { key: 'clock' })
-  const to = clock.state.status === 'success' ? kstDate(clock.state.data.businessAt) : ''
-  const from = to ? daysBefore(to, 29) : ''
-  const dashboard = useAsync(() => fetchLiveDashboard(from, to), [from, to], { key: 'dashboard', enabled: Boolean(from && to) })
-  const pending = dashboard.state.status === 'success' ? dashboard.state.data.personal.pending : 0
-  if (!pending) return null
-  return <SidebarMenuBadge className={badgeClass} aria-label={`내 미처리 업무 ${pending}건`} title="서버 집계 · 본인 담당 OPEN Alert와 Episode">{pending}</SidebarMenuBadge>
-}
-
-function MockPendingCount({ routeKey }: { routeKey: string }) {
   const user = useCurrentUser()
   const [overrides] = useAlertOverrides()
   const [reviews] = useReviewRequests()
@@ -65,6 +51,11 @@ function MockPendingCount({ routeKey }: { routeKey: string }) {
     return () => window.removeEventListener('review-command-saved', refresh)
   }, [])
   const { state } = useAsync(async () => {
+    if (live) {
+      const clock = await fetchDemoClock()
+      const to = kstDate(clock.businessAt)
+      return (await fetchLiveDashboard(daysBefore(to, 29), to)).personal.pending
+    }
     const alerts = await loadMockMyAlerts()
     if (currentScenario() === 'empty') return 0
     const episodes = await loadMyEpisodes(user.userId, overrides, reviews)
@@ -72,7 +63,7 @@ function MockPendingCount({ routeKey }: { routeKey: string }) {
       .filter(item => item.status !== 'DONE').length
   }, [user.userId, routeKey, overrides, reviews, revision])
   if (state.status !== 'success' || !state.data) return null
-  return <SidebarMenuBadge className={badgeClass} aria-label={`내 미처리 업무 ${state.data}건 · mock 데이터`} title="시연용 mock · 내 담당 미처리 업무">
+  return <SidebarMenuBadge className={badgeClass} aria-label={`내 미처리 업무 ${state.data}건${live ? '' : ' · mock 데이터'}`} title={live ? '서버 집계 · 본인 담당 OPEN Alert와 Episode' : '시연용 mock · 내 담당 미처리 업무'}>
     {state.data}
   </SidebarMenuBadge>
 }

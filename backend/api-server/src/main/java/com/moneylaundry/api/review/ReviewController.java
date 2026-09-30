@@ -49,8 +49,22 @@ public class ReviewController {
       @RequestParam(required = false) LocalDate from,
       @RequestParam(required = false) LocalDate to,
       @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size) {
-    return reviews.list(kind, status, assigneeId, from, to, page, size);
+      @RequestParam(defaultValue = "20") int size,
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) List<String> types,
+      @RequestParam(required = false) Integer minAgeDays,
+      @RequestParam(required = false) String risk,
+      @RequestParam(required = false) List<String> statuses,
+      @RequestParam(required = false) List<Long> assignees) {
+    return reviews.list(
+        kind,
+        status,
+        assigneeId,
+        from,
+        to,
+        page,
+        size,
+        new ReviewCaseFilter(query, types, minAgeDays, risk, statuses, assignees));
   }
 
   @GetMapping("/review/cases/{id}")
@@ -85,12 +99,15 @@ public class ReviewController {
       @RequestParam(required = false) UUID account,
       @RequestParam(required = false) List<String> judgement,
       @RequestParam(required = false) List<String> payments,
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) List<String> directions,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
     time.demoOnly();
     return ledger.query(
         kind,
-        new LedgerQueryService.Filter(from, to, owner, account, judgement, payments, page, size));
+        new LedgerQueryService.Filter(
+            from, to, owner, account, judgement, payments, page, size, query, directions));
   }
 
   @GetMapping("/review/account-nodes")

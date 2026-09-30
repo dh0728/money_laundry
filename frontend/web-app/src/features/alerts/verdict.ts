@@ -21,7 +21,7 @@ export type VerdictOption = {
 
 export const verdictOptions: VerdictOption[] = [
   { value: 'normal', group: '정상', label: '정상 · 종결', action: '종결 확인', result: '정상으로 종결' },
-  { value: 'standalone', group: '이상거래', label: 'Alert 단독', action: '판정 확인', result: '이상거래(Alert 단독)로 판정', proposal: true },
+  { value: 'standalone', group: '이상거래', label: 'Alert 단독', action: '판정 확인', result: '이상거래(Alert 단독)로 판정' },
   { value: 'link-episode', group: '이상거래', label: '기존 Episode 연결', action: 'Episode 연결 확인', result: '이상거래로 기존 Episode에 연결' },
   { value: 'new-episode', group: '이상거래', label: '새 Episode 생성', action: 'Episode 생성 확인', result: '이상거래로 새 Episode 생성' },
 ]

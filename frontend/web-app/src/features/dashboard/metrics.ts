@@ -27,7 +27,7 @@ export function institutionCards(data: DashboardData): SectionCardItem[] {
   ]
 }
 
-export function chartInputs(data: Pick<DashboardData, 'suspiciousTxComposition' | 'alertsByType'>) {
+export function chartInputs(data: DashboardData) {
   const composition = data.suspiciousTxComposition
   const fill = 'var(--foreground)'
   return {

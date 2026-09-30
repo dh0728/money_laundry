@@ -1,19 +1,17 @@
 // v24 Detail.tsx(kind=Alert)를 옮김. 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/v24).
 import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
+import { CaseActivityCharts } from './CaseActivityCharts'
 import type { AlertDetail as AlertDetailData, HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay, type TypeCode } from '@/api/codes'
 import { PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
-import { UnderTabs } from '@/components/UnderTabs'
+import { CaseHeader, CaseStats } from '@/features/alerts/CasePresentation'
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { useMemoryState } from '@/lib/memory'
-import { BarList, Panel } from './DetailPanels'
-import { card, historyLabels } from './detailText'
+import { Panel, OverviewPanels } from './DetailPanels'
+import { historyLabels } from './detailText'
 import { alertCode, episodeCode } from './alertFilters'
 import AlertReview, { type VerdictSubmit } from './AlertReview'
 import AlertTxTable from './AlertTxTable'
@@ -53,8 +51,7 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
   const tx = useMemo(() => applyRelabels(alert.transactions, relabels), [alert.transactions, relabels])
   const graphModel = useMemo(() => toGraphModel(graph, alert.transactions, relabels), [graph, alert.transactions, relabels])
   const metrics = moneyMetrics(tx, alert.subjectAccount.account)
-  const daily = sumBy(tx, t => t.txAt.slice(5, 10), t => t.amountUsd).sort((a, b) => a.name.localeCompare(b.name)).map(d => ({ day: d.name, USD: Math.round(d.v) }))
-  const peak = daily.reduce((best, d, i) => (d.USD > daily[best].USD ? i : best), 0)
+  const daily = sumBy(tx, t => t.txAt.slice(5, 10), t => t.amountUsd).sort((a, b) => a.name.localeCompare(b.name)).map(d => ({ day: d.name, amount: Math.round(d.v) }))
   const senders = sumBy(tx, t => t.fromAccount, t => t.amountUsd).slice(0, 5)
   const times = tx.map(t => t.txAt).sort()
   const span = times.length ? `${times[0].slice(5, 10)} ~ ${times[times.length - 1].slice(5, 10)}` : '—'
@@ -75,56 +72,24 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
 
   return (
     <div className="flex min-h-full flex-col gap-5">
-      <header data-testid="detail-header">
-        <p data-testid="detail-id" className="font-mono text-xs text-muted-foreground">{alertCode(alert.alertId)}</p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
-          <h1 className="text-xl font-semibold tracking-tight">{typeDisplay(alert.primaryType.code).label} · 대표 계좌 {alert.subjectAccount.account}</h1>
-          {alert.episodeId != null && <Button variant="outline" size="sm" className="h-8 rounded-full px-3 font-mono text-xs font-normal" onClick={() => onOpenEpisode(alert.episodeId!)}>연결된 Episode {episodeCode(alert.episodeId)}</Button>}
-        </div>
-        <div data-testid="detail-tags" className="mt-3 flex flex-wrap items-center gap-2">
-          <StatusBadge status={alert.status} />
-          <RiskBadge score={alert.riskScore} />
-          <PatternBadge code={alert.primaryType.code} />
-          {alert.resolution && <Badge variant="outline" className="semantic-metadata-badge font-normal">{alertResolutionLabels[alert.resolution]}</Badge>}
-          <Badge variant="outline" className="semantic-metadata-badge font-normal">담당 {alert.assignee.name}</Badge>
-          <Badge variant="outline" className="semantic-metadata-badge font-normal">탐지 {alert.createdAt.slice(0, 10)}</Badge>
-        </div>
-        {assigneeNotice && <p className="mt-3 text-xs text-muted-foreground">{assigneeNotice}</p>}
-      </header>
-
-      <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '그래프' }, { value: 'transactions', label: '거래', count: tx.length }, { value: 'review', label: '검토 의견' }]} />
+      <CaseHeader id={alertCode(alert.alertId)} title={`${typeDisplay(alert.primaryType.code).label} · 대표 계좌 ${alert.subjectAccount.account}`} tab={tab} onTab={setTab} count={tx.length}
+        action={alert.episodeId != null && <Button variant="outline" size="sm" onClick={() => onOpenEpisode(alert.episodeId!)}>연결된 Episode {episodeCode(alert.episodeId)}</Button>}
+        notice={assigneeNotice} tags={<><StatusBadge status={alert.status} /><RiskBadge score={alert.riskScore} /><PatternBadge code={alert.primaryType.code} />
+          {alert.resolution && <Badge variant="outline">{alertResolutionLabels[alert.resolution]}</Badge>}
+          <Badge variant="outline">담당 {alert.assignee.name}</Badge><Badge variant="outline">탐지 {alert.createdAt.slice(0, 10)}</Badge></>} />
 
       {tab === 'overview' && (
         <div className="space-y-4" data-testid="overview">
-          <div className="grid items-stretch gap-3 @3xl:grid-cols-12 @6xl:grid-cols-6">
-            {[
+          <CaseStats items={[
               { label: '투입 원금', value: usd(metrics.principal) },
               { label: '거래 총액', value: usd(metrics.total) },
               { label: '순유입 (대표 계좌)', value: metrics.netInflow === null ? '—' : usd(metrics.netInflow) },
               { label: '근거 거래', value: `${tx.length}건` },
               { label: '참여 계좌', value: `${alert.accountCount}개 · 은행 ${alert.bankCount}곳` },
               { label: '거래 기간', value: span },
-            ].map(stat => (
-              <Card key={stat.label} className={`${card} @3xl:col-span-4 @6xl:col-span-1`} data-testid="overview-kpi-card"><CardContent className="px-4">
-                <p className="text-xs text-muted-foreground">{stat.label}</p><p className="mt-2 text-lg font-semibold tabular-nums">{stat.value}</p>
-              </CardContent></Card>
-            ))}
-          </div>
-          <div className="grid items-stretch gap-4 @4xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,1fr)]">
-            <Panel title="일별 거래 금액" description="언제 집중됐는지 · USD">
-              <ChartContainer config={{ USD: { label: 'USD', color: 'var(--muted-foreground)' } }} className="h-[170px] w-full">
-                <BarChart data={daily} margin={{ left: 0, right: 4, top: 6 }}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={10} />
-                  <YAxis width={70} tickLine={false} axisLine={false} fontSize={10} tickFormatter={v => usd(Number(v))} />
-                  <ChartTooltip cursor={{ fill: 'var(--muted)', opacity: 0.35 }} content={<ChartTooltipContent formatter={v => usd(Number(v))} hideIndicator />} />
-                  <Bar dataKey="USD" radius={3}>{daily.map((d, i) => <Cell key={d.day} fill={i === peak ? 'var(--foreground)' : 'var(--muted-foreground)'} />)}</Bar>
-                </BarChart>
-              </ChartContainer>
-            </Panel>
-            <Panel title="상위 송금 계좌" description="자금이 어디서 나갔는지"><BarList rows={senders} /></Panel>
-          </div>
-          <div className="grid items-start gap-4 @3xl:grid-cols-2 @6xl:grid-cols-4 [&>[data-slot=card]]:h-auto [&>[data-slot=card]>[data-slot=card-content]]:h-auto">
+            ]} />
+          <CaseActivityCharts amounts={{ USD: { daily, senders } }} />
+          <OverviewPanels>
             <Panel title="묶음 근거" description="이 거래들이 한 Alert가 된 이유" testId="grouping">
               <ul className="space-y-2 text-xs">
                 {alert.groupingBasis.map(b => <li key={`${b.basis}-${b.value}`} className="flex items-center gap-2"><Badge variant="outline" className="font-normal">{basisLabels[b.basis]}</Badge><span className="min-w-0 truncate">{b.value}</span></li>)}
@@ -159,7 +124,7 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
                 ))}
               </div>
             </Panel>
-          </div>
+          </OverviewPanels>
         </div>
       )}
 

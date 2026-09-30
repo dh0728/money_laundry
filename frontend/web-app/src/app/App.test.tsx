@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import App from './App'
 import { pageFromHash } from './navigation'
@@ -13,30 +13,16 @@ const renderSignedIn = () => {
 }
 
 describe('앱 틀', () => {
-  it('처음에는 대시보드를 연다', async () => {
+  it('처음에는 대시보드를 연다', () => {
     renderSignedIn()
-    expect(screen.getByRole('button', { name: '사이드바 열기/닫기' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByRole('button', { name: 'RDR 9000 열기' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByRole('button', { name: '뒤로가기' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '앞으로가기' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '데이터 새로고침' })).toBeEnabled()
-    expect(await screen.findByRole('tab', { name: '기관 전체' }, { timeout: 10_000 })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: '기관 전체' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: '내 담당' })).toHaveAttribute('aria-selected', 'false')
-  }, 15_000)
-
-  it('헤더 새로고침은 페이지를 다시 열지 않고 현재 조회에 갱신 신호를 보낸다', () => {
-    renderSignedIn()
-    const refresh = vi.fn()
-    window.addEventListener('workspace-refresh', refresh)
-    fireEvent.click(screen.getByRole('button', { name: '데이터 새로고침' }))
-    expect(refresh).toHaveBeenCalledTimes(1)
-    window.removeEventListener('workspace-refresh', refresh)
   })
 
   it('알림 메뉴는 알림 목록을 연다', async () => {
     renderSignedIn()
     fireEvent.click(screen.getByRole('button', { name: '알림' }))
-    expect(await screen.findByRole('textbox', { name: '알림 검색' }, { timeout: 3_000 })).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: '알림 검색' })).toBeInTheDocument()
   })
 
   it('Episodes 메뉴는 Episode 목록을 연다', async () => {
@@ -75,7 +61,7 @@ describe('앱 틀', () => {
     window.location.hash = 'episodes/800'
     const linked = await screen.findByTestId('linked-alerts')
     fireEvent.click(within(linked).getByRole('button', { name: '연결 Alert 선택' }))
-    fireEvent.click(within(linked).getByRole('checkbox', { name: 'Alert A-3003 선택' }))
+    fireEvent.click(within(linked).getByRole('checkbox', { name: '연결 해제 Alert A-3003' }))
     fireEvent.change(within(linked).getByRole('textbox', { name: '연결 해제 사유' }), { target: { value: '별도 조사' } })
     fireEvent.click(within(linked).getByRole('button', { name: '선택 Alert 연결 해제' }))
     const updatedLinked = await screen.findByTestId('linked-alerts')
@@ -93,7 +79,7 @@ describe('앱 틀', () => {
     window.location.hash = 'episodes/800'
     const linked = await screen.findByTestId('linked-alerts')
     fireEvent.click(within(linked).getByRole('button', { name: '연결 Alert 선택' }))
-    for (const id of [3003, 3018]) fireEvent.click(within(linked).getByRole('checkbox', { name: `Alert A-${id} 선택` }))
+    for (const id of [3003, 3018]) fireEvent.click(within(linked).getByRole('checkbox', { name: `연결 해제 Alert A-${id}` }))
     fireEvent.change(within(linked).getByRole('textbox', { name: '연결 해제 사유' }), { target: { value: '연관성 없음' } })
     fireEvent.click(within(linked).getByRole('button', { name: '선택 Alert 연결 해제' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Episode를 해체할까요?')

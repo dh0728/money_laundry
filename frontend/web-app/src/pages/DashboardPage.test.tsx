@@ -78,7 +78,7 @@ describe('대시보드 · 기관 전체', () => {
     expect(within(report).getByRole('heading', { name: 'RDR 9000 Daily Report' })).toBeInTheDocument()
     expect(within(report).getByTestId('rdr-eye')).toBeInTheDocument()
     expect(within(report).getByRole('heading', { name: '담당 조사자 우선 검토' })).toBeInTheDocument()
-    expect(within(report).getByText(/관리자의 지연·재배정 여부 확인 필요/)).toBeInTheDocument()
+    expect(within(report).getByText(/필요하면 담당 배정을 검토하세요/)).toBeInTheDocument()
     const [first] = within(report).getAllByTestId('ai-priority-item')
     expect(first.querySelector('.semantic-pattern-badge')).toBeInTheDocument()
     expect(first.querySelector('[data-testid="age-badge"]')).toBeInTheDocument()

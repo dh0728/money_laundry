@@ -16,11 +16,11 @@ import { cn } from "@/lib/utils";
 interface DataTableProps<TData> extends Omit<React.ComponentProps<"div">, "children"> {
   table: TanstackTable<TData>;
   tableClassName?: string;
+  pagination?: boolean;
   columnWidths?: Partial<Record<string, string>>;
   topHorizontalScroll?: boolean;
   separatedColumns?: boolean;
   columnGroups?: Partial<Record<string, "sender" | "receiver">>;
-  hidePagination?: boolean;
   /** AML RADAR: 행을 누르거나 Enter로 상세를 연다 */
   onRowClick?: (row: TData) => void;
 }
@@ -34,11 +34,11 @@ export const syncHorizontalScroll = (source: { scrollLeft: number }, target: { s
 export function DataTable<TData>({
   table,
   tableClassName,
+  pagination = true,
   columnWidths,
   topHorizontalScroll = false,
   separatedColumns = false,
   columnGroups,
-  hidePagination = false,
   onRowClick,
   className,
   ...props
@@ -170,9 +170,9 @@ export function DataTable<TData>({
           </TableBody>
         </Table>
       </div>
-      {!hidePagination && <div className="flex flex-col gap-2.5">
-        <DataTablePagination table={table} />
-      </div>}
+      <div className="flex flex-col gap-2.5">
+        {pagination && <DataTablePagination table={table} />}
+      </div>
     </div>
   );
 }

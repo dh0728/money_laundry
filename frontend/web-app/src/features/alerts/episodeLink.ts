@@ -19,10 +19,10 @@ export function episodeLinkReducer(state: EpisodeLinkState, action: EpisodeLinkA
   return { ...state, selected }
 }
 
-export const canLink = (row: AlertRow, user: CurrentUser = MOCK_USER) => canEditOpen(user, row.assignee.userId, row.status)
+export const canLink = (row: Pick<AlertRow, 'assignee' | 'status'>, user: CurrentUser = MOCK_USER) => canEditOpen(user, row.assignee.userId, row.status)
 
 /** 연결할 수 있는 기존 Episode: 목록에 보이는 심층 조사 Alert의 Episode */
-export const linkableEpisodes = (rows: AlertRow[]) =>
+export const linkableEpisodes = (rows: Pick<AlertRow, 'status' | 'episodeId'>[]) =>
   [...new Set(rows.flatMap(row => (row.status === 'ESCALATED' && row.episodeId != null ? [row.episodeId] : [])))].sort((a, b) => a - b)
 
 /** mock 전용: 연결할 수 있는 Alert만 심층 조사로 바꾼 결과. 실제 API는 결과를 다시 조회한다. */
