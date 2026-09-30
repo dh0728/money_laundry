@@ -23,7 +23,7 @@ export function SharedPeriod({ children, enabled = true }: { children: ReactNode
   if (clock.state.status === 'error') return <ErrorBlock message={clock.state.message} onRetry={clock.retry} />
   const to = kstDate(clock.state.data.businessAt)
   const period = override ?? { from: daysBefore(to, 29), to }
-  return <PeriodContext.Provider value={{ period, setPeriod }}>{children}</PeriodContext.Provider>
+  return <PeriodContext.Provider value={{ period, businessDate: to, setPeriod }}>{children}</PeriodContext.Provider>
 }
 export function WorkspaceMain({ route, className, style, children }: { route: string; className: string; style?: CSSProperties; children: ReactNode }) {
   const store = useWorkspace()

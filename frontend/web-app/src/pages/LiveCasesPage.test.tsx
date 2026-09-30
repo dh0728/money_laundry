@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { NuqsAdapter } from 'nuqs/adapters/react'
+import type { ReactElement } from 'react'
+import { fireEvent, render as testingRender, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveCasesPage from './LiveCasesPage'
 import { ApiError } from '@/api/common'
@@ -9,8 +11,9 @@ vi.mock('@/features/graph/v24/Graph', () => ({ default: ({ model }: { model: { e
 const { fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, setReviewMoneyScope } = vi.hoisted(() => ({
   fetchReviewCase: vi.fn(), fetchReviewCases: vi.fn(), fetchReviewMoney: vi.fn(), submitReviewCommand: vi.fn(), setReviewMoneyScope: vi.fn(),
 }))
-vi.mock('@/api/liveReview', () => ({ fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, setReviewMoneyScope }))
+vi.mock('@/api/liveReview', () => ({ fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, setReviewMoneyScope, fetchReviewUsers: async () => [{ id: 11, name: '오분석' }] }))
 
+const render = (element: ReactElement) => testingRender(<NuqsAdapter>{element}</NuqsAdapter>)
 const page = <T,>(content: T[]) => ({ content, page: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0 })
 const member = (txId: number) => ({ txId, reviewRole: 'SUBJECT', state: 'PENDING', decision: null, sources: [], transaction: { occurredAt: '2023-09-10T00:00:00Z', fromAccountId: 'a', toAccountId: 'b', fromBankId: 1, toBankId: 2, amountPaid: 10, amountUsd: 8, paymentCurrency: 'USD', paymentFormat: 'WIRE', role: 'SEED', isSuspicious: true, scores: null } })
 const alertCase = (caseId: number, alertId: number, extra = {}) => ({
@@ -118,13 +121,14 @@ it('Alert 조사 범위의 선택 거래를 EXCLUDE 명령으로 보낸다', asy
 
 it('목록에서 미편입 OPEN Alert 두 개를 골라 새 Episode를 만든다', async () => {
   render(<LiveCasesPage kind="ALERT" onOpen={vi.fn()} onBack={vi.fn()} />)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Episode로 묶기' })).toBeEnabled())
   fireEvent.click(screen.getByRole('button', { name: 'Episode로 묶기' }))
-  expect(await screen.findByLabelText('새 Episode 선택 A-3001')).toBeInTheDocument()
-  expect(screen.getByLabelText('새 Episode 선택 A-3003')).toBeDisabled()
-  fireEvent.click(screen.getByLabelText('새 Episode 선택 A-3001'))
-  fireEvent.click(screen.getByLabelText('새 Episode 선택 A-3002'))
-  fireEvent.change(screen.getByLabelText('새 Episode 생성 사유'), { target: { value: '두 Alert 연결' } })
-  fireEvent.click(screen.getByRole('button', { name: /새 Episode 생성/ }))
+  expect(await screen.findByLabelText('A-3001 선택')).toBeInTheDocument()
+  expect(screen.getByLabelText('A-3003 선택')).toBeDisabled()
+  fireEvent.click(screen.getByLabelText('A-3001 선택'))
+  fireEvent.click(screen.getByLabelText('A-3002 선택'))
+  fireEvent.change(screen.getByLabelText('연결 의견'), { target: { value: '두 Alert 연결' } })
+  fireEvent.click(screen.getByRole('button', { name: '연결 완료' }))
   await waitFor(() => expect(submitReviewCommand).toHaveBeenCalled())
   expect(submitReviewCommand.mock.calls[0][0]).toMatchObject({
     action: 'TRANSFER', targetCaseId: null, comment: '두 Alert 연결',
@@ -135,8 +139,8 @@ it('목록에서 미편입 OPEN Alert 두 개를 골라 새 Episode를 만든다
 it('필터가 바뀌면 이전 선택을 제출하지 않는다', async () => {
   render(<LiveCasesPage kind="ALERT" onOpen={vi.fn()} onBack={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: 'Episode로 묶기' }))
-  fireEvent.click(await screen.findByLabelText('새 Episode 선택 A-3001'))
-  fireEvent.click(screen.getByLabelText('내 담당'))
+  fireEvent.click(await screen.findByLabelText('A-3001 선택'))
+  fireEvent.click(screen.getByRole('button', { name: /담당자: 내 담당.*제거/ }))
   expect(screen.getByText(/0건 선택/)).toBeInTheDocument()
 })
 

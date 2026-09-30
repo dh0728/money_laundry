@@ -1,8 +1,9 @@
+import { WorkQueue } from './WorkQueue'
 import { useState } from 'react'
 import type { AlertRow } from '@/api/alerts'
 import { formatScore, type TypeCode } from '@/api/codes'
 import { useCurrentUser } from '@/app/session'
-import { PatternBadge, WorkStatusBadge } from '@/components/badges'
+import { PatternBadge } from '@/components/badges'
 import { ProvenanceBadge } from '@/components/Provenance'
 import { SectionCard, sectionCardSurface } from '@/components/SectionCards'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
@@ -81,17 +82,7 @@ export function PersonalView() {
             <SelectContent>{Object.entries(workSorts).map(([key, option]) => <SelectItem key={key} value={key}>{option.label}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <div className="grid items-start gap-4 @3xl:grid-cols-3" data-testid="work-queue">
-          {workStatuses.map(status => {
-            const column = sortWork(items.filter(item => item.status === status), sort)
-            return (
-              <div key={status} data-testid="work-status-column" className="flex min-w-0 flex-col gap-2.5">
-                <div className="flex items-center gap-2"><WorkStatusBadge status={status} /><span className="text-xs tabular-nums text-muted-foreground">{column.length}건</span></div>
-                {column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock>}
-              </div>
-            )
-          })}
-        </div>
+        <WorkQueue columns={workStatuses.map(status => { const column = sortWork(items.filter(item => item.status === status), sort); return { status, count: column.length, content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> } })} />
       </section>
     </>
   )

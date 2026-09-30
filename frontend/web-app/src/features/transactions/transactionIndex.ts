@@ -9,7 +9,7 @@ export type TransactionTarget =
 export type TransactionIndex = {
   owners: Array<{ name: string; accountIds: string[]; transactionIds: string[] }>
   accounts: Array<{ id: string; bank: string; owner: string; transactionIds: string[] }>
-  transactions: Array<{ id: string; at: string; usd: number; amount: number; currency: string; format: string; suspicious: boolean; fromAccount: string; toAccount: string; fromOwner: string; toOwner: string; alertIds: number[]; episodeIds: number[] }>
+  transactions: Array<{ id: string; at: string; usd: number; amount: number; currency: string; format: string; suspicious: boolean | null; fromAccount: string; toAccount: string; fromOwner: string; toOwner: string; alertIds: number[]; episodeIds: number[] }>
 }
 
 const sorted = (values: Iterable<string>) => [...values].sort((a, b) => a.localeCompare(b, 'ko'))

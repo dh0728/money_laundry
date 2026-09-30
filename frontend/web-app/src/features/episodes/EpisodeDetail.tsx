@@ -6,13 +6,12 @@ import type { HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay } from '@/api/codes'
 import type { EpisodeDetail as EpisodeDetailData, EpisodeTransaction } from '@/api/episodes'
 import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
-import { UnderTabs } from '@/components/UnderTabs'
+import { CaseHeader, CaseStats } from '@/features/alerts/CasePresentation'
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Panel } from '@/features/alerts/DetailPanels'
-import { card, historyLabels } from '@/features/alerts/detailText'
+import { historyLabels } from '@/features/alerts/detailText'
 import AlertTxTable from '@/features/alerts/AlertTxTable'
 import { alertCode, episodeCode } from '@/features/alerts/alertFilters'
 import { moneyMetrics, usd } from '@/features/alerts/metrics'
@@ -64,36 +63,20 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
 
   return (
     <div className="flex min-h-full flex-col gap-5">
-      <header data-testid="detail-header">
-        <p data-testid="detail-id" className="font-mono text-xs text-muted-foreground">{episodeCode(episode.episodeId)}</p>
-        <h1 className="mt-1.5 text-xl font-semibold tracking-tight">{episode.primaryTypes.map(t => typeDisplay(t.code).label).join(' · ')} · Alert {episode.alertCount}건</h1>
-        <div data-testid="detail-tags" className="mt-3 flex flex-wrap items-center gap-2">
-          <EpisodeStatusBadge status={episode.status} reviewRequested={Boolean(episode.reviewRequestedAt)} />
-          <RiskBadge score={episode.riskScore} />
-          {episode.primaryTypes.map(type => <PatternBadge key={type.code} code={type.code} />)}
-          <Badge variant="outline" className="semantic-metadata-badge font-normal">담당 {episode.assignee.name}</Badge>
-          <Badge variant="outline" className="semantic-metadata-badge font-normal">생성 {episode.createdAt.slice(0, 10)}</Badge>
-        </div>
-      </header>
-
-      <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '그래프' }, { value: 'transactions', label: '거래', count: transactions.length }, { value: 'review', label: '조사 의견' }]} />
+      <CaseHeader id={episodeCode(episode.episodeId)} title={`${episode.primaryTypes.map(t => typeDisplay(t.code).label).join(' · ')} · Alert ${episode.alertCount}건`} tab={tab} onTab={setTab} count={transactions.length}
+        tags={<><EpisodeStatusBadge status={episode.status} reviewRequested={Boolean(episode.reviewRequestedAt)} /><RiskBadge score={episode.riskScore} />
+          {episode.primaryTypes.map(type => <PatternBadge key={type.code} code={type.code} />)}<Badge variant="outline">담당 {episode.assignee.name}</Badge><Badge variant="outline">생성 {episode.createdAt.slice(0, 10)}</Badge></>} />
 
       {tab === 'overview' && (
         <div className="space-y-4" data-testid="overview">
-          <div className="grid items-stretch gap-3 @3xl:grid-cols-12 @6xl:grid-cols-6">
-            {[
+          <CaseStats items={[
               { label: '투입 원금', value: usd(metrics.principal) },
               { label: '거래 총액', value: usd(metrics.total) },
               { label: '순유입 (대표 계좌)', value: usd(episode.flow.netRetainedUsd) },
               { label: '연결 Alert', value: `${episode.alertCount}건` },
               { label: '근거 거래', value: `${transactions.length}건` },
               { label: '거래 기간', value: span },
-            ].map(stat => (
-              <Card key={stat.label} className={`${card} @3xl:col-span-4 @6xl:col-span-1`} data-testid="overview-kpi-card"><CardContent className="px-4">
-                <p className="text-xs text-muted-foreground">{stat.label}</p><p className="mt-2 text-lg font-semibold tabular-nums">{stat.value}</p>
-              </CardContent></Card>
-            ))}
-          </div>
+            ]} />
 
           <Panel title="연결 Alert" description="이 Episode를 이루는 Alert · 눌러서 Alert 상세로 이동" testId="linked-alerts"
             action={<div className="flex gap-2">

@@ -1,3 +1,4 @@
+import { NuqsAdapter } from 'nuqs/adapters/react'
 import { useState } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
@@ -11,8 +12,9 @@ const { dashboard, owners, accounts, transactions, cases, clock } = vi.hoisted((
 }))
 vi.mock('@/api/liveDashboard', async original => ({ ...await original<typeof import('@/api/liveDashboard')>(), fetchDemoClock: clock, fetchLiveDashboard: dashboard }))
 vi.mock('@/api/liveLedger', () => ({ fetchLedgerOwners: owners, fetchLedgerAccounts: accounts, fetchLedgerTransactions: transactions, fetchPaymentFormats: async () => ['WIRE'] }))
-vi.mock('@/api/liveReview', () => ({ fetchReviewCases: cases, fetchReviewCase: vi.fn(), fetchReviewMoney: vi.fn(), setReviewMoneyScope: vi.fn(), submitReviewCommand: vi.fn() }))
+vi.mock('@/api/liveReview', () => ({ fetchReviewUsers: async () => [], fetchReviewCases: cases, fetchReviewCase: vi.fn(), fetchReviewMoney: vi.fn(), setReviewMoneyScope: vi.fn(), submitReviewCommand: vi.fn() }))
 vi.mock('@/features/graph/v24/Graph', () => ({ default: () => null }))
+vi.mock('@/components/DateRangeButton', () => ({ DateRangeButton: ({ value, onChange }: { value: { from?: Date; to?: Date }; onChange: (range: { from: Date; to: Date }) => void }) => <button onClick={() => onChange({ from: new Date(2023,8,1), to: new Date(2023,8,10) })}>기간 {value?.from?.toLocaleDateString('sv-SE')}</button> }))
 const noop = () => undefined
 const page = <T,>(content: T[]) => ({ content, totalElements: content.length, page: 0, size: 20, totalPages: 1 })
 function Screens() {
@@ -33,19 +35,18 @@ it('actual live pages share the chosen range and preserve the owner/account and 
   owners.mockResolvedValue(page([{ id: 'owner-one' }]))
   accounts.mockResolvedValue(page([{ id: 'account-one', ownerId: 'owner-one', bankId: 12 }]))
   transactions.mockResolvedValue(page([])); cases.mockResolvedValue(page([]))
-  render(<WorkspaceProvider><Screens /></WorkspaceProvider>)
+  render(<NuqsAdapter><WorkspaceProvider><Screens /></WorkspaceProvider></NuqsAdapter>)
   await screen.findByText('오늘 유입 Alert')
-  fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2023-09-01' } })
+  fireEvent.click(screen.getByRole('button', { name: /기간 2023/ }))
   await waitFor(() => expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10'))
   fireEvent.click(screen.getByRole('button', { name: 'ledger' }))
   fireEvent.click(await screen.findByRole('button', { name: /owner-one/ }))
   fireEvent.click(await screen.findByRole('button', { name: /account-one/ }))
-  await screen.findByText('조회된 거래가 없습니다.')
+  await waitFor(() => expect(transactions).toHaveBeenCalled())
   expect(owners).toHaveBeenLastCalledWith(expect.objectContaining({ from: '2023-09-01', to: '2023-09-10' }))
   for (const tab of ['alerts', 'episodes']) {
     fireEvent.click(screen.getByRole('button', { name: tab }))
-    await screen.findByText('조건에 맞는 조사 사건이 없습니다.')
-    expect(cases).toHaveBeenLastCalledWith(expect.objectContaining({ kind: tab === 'alerts' ? 'ALERT' : 'EPISODE', from: '2023-09-01', to: '2023-09-10' }))
+    await waitFor(() => expect(cases).toHaveBeenCalledWith(expect.objectContaining({ kind: tab === 'alerts' ? 'ALERT' : 'EPISODE', from: '2023-09-01', to: '2023-09-10' })))
   }
   fireEvent.click(screen.getByRole('button', { name: 'ledger' }))
   expect(screen.getByRole('button', { name: /owner-one/ })).toHaveAttribute('aria-pressed', 'true')
@@ -55,7 +56,7 @@ it('actual live pages share the chosen range and preserve the owner/account and 
   expect(transactions).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getByRole('button', { name: 'dashboard' }))
   expect(screen.getByText('오늘 유입 Alert')).toBeInTheDocument()
-  expect(screen.getByLabelText('시작일')).toHaveValue('2023-09-01')
+  expect(screen.getByRole('button', { name: '기간 2023-09-01' })).toBeInTheDocument()
   expect(dashboard).toHaveBeenCalledTimes(2)
   expect(clock).toHaveBeenCalledTimes(1)
 })

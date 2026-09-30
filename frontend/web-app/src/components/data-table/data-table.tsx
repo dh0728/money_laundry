@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface DataTableProps<TData> extends Omit<React.ComponentProps<"div">, "children"> {
   table: TanstackTable<TData>;
   tableClassName?: string;
+  pagination?: boolean;
   columnWidths?: Partial<Record<string, string>>;
   topHorizontalScroll?: boolean;
   separatedColumns?: boolean;
@@ -33,6 +34,7 @@ export const syncHorizontalScroll = (source: { scrollLeft: number }, target: { s
 export function DataTable<TData>({
   table,
   tableClassName,
+  pagination = true,
   columnWidths,
   topHorizontalScroll = false,
   separatedColumns = false,
@@ -169,7 +171,7 @@ export function DataTable<TData>({
         </Table>
       </div>
       <div className="flex flex-col gap-2.5">
-        <DataTablePagination table={table} />
+        {pagination && <DataTablePagination table={table} />}
       </div>
     </div>
   );

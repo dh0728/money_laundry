@@ -1,10 +1,15 @@
+import { CaseActivityCharts, type ActivityAmounts } from '@/features/alerts/CaseActivityCharts'
+import { ReviewLayout } from '@/features/alerts/ReviewLayout'
+import AlertTxTable from '@/features/alerts/AlertTxTable'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
 import { RefreshStatus } from '@/components/RefreshStatus'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/common'
-import { fetchReviewCase, fetchReviewCases, fetchReviewMoney, setReviewMoneyScope, submitReviewCommand, type ReviewAction, type ReviewCase, type ReviewCommand, type ReviewKind, type ReviewQuery } from '@/api/liveReview'
-import { PageHeading } from '@/components/page'
+import { fetchReviewCase, fetchReviewCases, fetchReviewUsers, fetchReviewMoney, setReviewMoneyScope, submitReviewCommand, type ReviewAction, type ReviewCommand, type ReviewKind } from '@/api/liveReview'
+import { CaseHeader, CaseStats } from '@/features/alerts/CasePresentation'
+import { Badge } from '@/components/ui/badge'
+import { RiskBadge } from '@/components/badges'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { useCurrentUser, canEditOpen } from '@/app/session'
@@ -14,9 +19,13 @@ import { toReviewGraphModel } from '@/features/graph/liveAdapter'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { typeDisplay, type TypeCode } from '@/api/codes'
 import Graph from '@/features/graph/v24/Graph'
-import { AgeBadge, RiskBadge } from '@/components/badges'
-import { UnderTabs } from '@/components/UnderTabs'
-import { Combine, Download, Search } from 'lucide-react'
+import type { DateRange } from 'react-day-picker'
+import { isoDate } from '@/lib/format'
+import AlertList from '@/features/alerts/AlertList'
+import EpisodeList from '@/features/episodes/EpisodeList'
+import type { AlertFilter } from '@/features/alerts/alertFilters'
+import type { EpisodeFilter } from '@/features/episodes/episodeFilters'
+import { alertListRow, episodeListRow } from '@/features/alerts/reviewListAdapter'
 
 const moneyIntervals = [5, 15, 30, 60, 180, 360, 1440] as const
 const moneyAmount = (value: number) => Number(value).toLocaleString('ko-KR')
@@ -80,6 +89,20 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
     })
     setScopeRetry(false)
   }
+  const activityAmounts: ActivityAmounts = {}
+  for (const [key, amount] of Object.entries(item.summary.dailySuspiciousAmount ?? {})) {
+    const split = key.lastIndexOf('|')
+    const day = split < 0 ? key : key.slice(0, split)
+    const currency = split < 0 ? '통화 미제공' : key.slice(split + 1)
+    ;(activityAmounts[currency] ??= { daily: [], senders: [] }).daily.push({ day, amount })
+  }
+  for (const sender of item.summary.topSenders ?? []) {
+    const split = sender.accountCurrency.lastIndexOf('|')
+    const currency = split < 0 ? '통화 미제공' : sender.accountCurrency.slice(split + 1)
+    const account = split < 0 ? sender.accountCurrency : sender.accountCurrency.slice(0, split)
+    ;(activityAmounts[currency] ??= { daily: [], senders: [] }).senders.push({ name: account, v: sender.amount })
+  }
+  Object.values(activityAmounts).forEach(values => values.daily.sort((a, b) => a.day.localeCompare(b.day)))
   const activeSelections = (item.groups ?? []).map(group => ({
     caseId: item.caseId, revision: item.revision, groupId: group.groupId,
     txIds: (selected[group.groupId] ?? []).filter(id => group.members.some(member => member.txId === id && member.state === 'PENDING' && member.reviewRole === 'SUBJECT')),
@@ -184,23 +207,18 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
   }
   return <div className="space-y-5"><RefreshStatus queries={[detail, money, targets]} />
     <Button variant="outline" size="sm" onClick={onBack}>목록으로</Button>
-    <PageHeading title={`${item.kind === 'ALERT' ? `Alert A-${item.alertId ?? item.caseId}` : `Episode E-${item.caseId}`}`} description={`조사 사건 ID ${item.caseId} · ${item.status === 'OPEN' ? '진행 중' : '종결'} · 담당 ${item.assigneeName}`} />
-    <UnderTabs value={tab} onChange={setTab} items={[{ value: 'overview', label: '개요' }, { value: 'graph', label: '그래프' }, { value: 'transactions', label: '거래', count: item.summary.txCount }, { value: 'review', label: '검토 의견' }]} />
+    <CaseHeader id={item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`} title={item.kind === 'ALERT' ? item.summary.primaryType : `${item.primaryTypes.join(' · ')} · Alert ${item.sourceAlertIds.length}건`}
+      tab={tab} onTab={setTab} count={item.summary.txCount} tags={<><Badge variant="outline">{item.status === 'OPEN' ? '진행 중' : '종결'}</Badge><RiskBadge score={item.summary.riskScore} /><Badge variant="outline">담당 {item.assigneeName}</Badge><Badge variant="outline">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '—'}</Badge></>} />
     <div hidden={tab !== 'overview'} className="space-y-4">
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="사건 요약">
-      {[
+    <CaseStats items={[
         ['거래 총액', Object.entries(item.summary.amountsByCurrency ?? {}).map(([currency, value]) => `${moneyAmount(value)} ${currency}`).join(' · ') || '—'],
         ['거래', `${item.summary.txCount}건`],
         ['조사 대상', `${item.summary.subjectCount}건`],
         [item.kind === 'EPISODE' ? '연결 Alert' : '씨앗 거래', `${item.kind === 'EPISODE' ? item.sourceAlertIds.length : item.summary.seedCount}건`],
         ['위험도', item.summary.riskScore?.toFixed(2) ?? '—'],
         ['거래 기간', `${item.summary.firstTxAt?.slice(5, 10) ?? '—'} ~ ${item.summary.lastTxAt?.slice(5, 10) ?? '—'}`],
-      ].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 truncate text-lg font-semibold" title={value}>{value}</p></div>)}
-    </section>
-    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">일별 거래 금액</h2><p className="mt-1 text-xs text-muted-foreground">사건 거래의 날짜별 USD 금액 · 서버 집계</p>{Object.keys(item.summary.dailySuspiciousAmount ?? {}).length ? <div className="mt-5 flex h-44 items-end gap-2 border-b pb-2" role="img" aria-label="일별 거래 금액 막대 그래프">{Object.entries(item.summary.dailySuspiciousAmount ?? {}).map(([day, value]) => { const max = Math.max(1, ...Object.values(item.summary.dailySuspiciousAmount ?? {})); return <div key={day} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1 text-center" title={`${day} · ${moneyAmount(value)} USD`}><div className="w-full rounded-t bg-foreground" style={{ height: `${Math.max(2, value / max * 100)}%` }} /><span className="truncate text-[10px] text-muted-foreground">{day.slice(5)}</span></div> })}</div> : <p className="mt-5 text-xs text-muted-foreground">일별 금액 집계 없음</p>}</section>
-      <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">상위 송금 계좌</h2><p className="mt-1 text-xs text-muted-foreground">자금이 어디서 나왔는지</p>{item.summary.topSenders?.length ? <div className="mt-4 space-y-3">{item.summary.topSenders.map(row => { const max = Math.max(1, ...item.summary.topSenders!.map(sender => sender.amount)); return <div key={row.accountCurrency} className="grid grid-cols-[minmax(0,auto)_auto_minmax(50px,1fr)] items-center gap-2 text-xs"><span className="max-w-28 truncate font-mono" title={row.accountCurrency}>{row.accountCurrency}</span><span className="tabular-nums">{moneyAmount(row.amount)}</span><div className="h-2 rounded-full bg-muted"><div className="h-full rounded-full bg-foreground" style={{ width: `${row.amount / max * 100}%` }} /></div></div> })}</div> : <p className="mt-5 text-xs text-muted-foreground">송금 계좌 집계 없음</p>}</section>
-    </div>
+      ].map(([label, value]) => ({ label, value }))} />
+    <CaseActivityCharts amounts={activityAmounts} />
     <section className="rounded-xl border bg-card p-4" aria-label="사건 개요">
       <h2 className="font-semibold">사건 개요</h2>
       <p className="mt-2 text-sm">조사 대상 {item.summary.subjectCount}건 · 씨앗 거래 {item.summary.seedCount}건</p>
@@ -249,10 +267,16 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
     </div>
     {tab === 'graph' && <section aria-label="관계 그래프" className="space-y-2"><h2 className="font-semibold">관계 그래프</h2>{graphModel.edges.length ? <Graph model={graphModel} label={(item.kind === 'ALERT' ? `Alert A-${item.alertId}` : `Episode E-${item.caseId}`) + ' 관계 그래프'} nonSuspiciousLabel="의심 판정 없음 · 미분석 포함" /> : <EmptyBlock>표시할 거래가 없습니다.</EmptyBlock>}</section>}
     <div hidden={tab !== 'transactions'}>
-    <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">조사 범위</h2>{item.kind === 'ALERT' && <Button size="sm" variant="outline" disabled={!editable || busy || !removableSelections.length || !excludeComment.trim()} onClick={() => void execute('EXCLUDE')}>선택 거래 제외</Button>}</div>{item.kind === 'ALERT' && <textarea aria-label="거래 제외 사유" className="min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="선택 거래를 조사 범위에서 제외하는 이유" value={excludeComment} onChange={event => { setExcludeComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} />}{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><div className="mt-3 space-y-2">{group.members.map(member => <label key={member.txId} className="flex min-w-0 items-start gap-2 rounded-md border p-2 text-xs"><input type="checkbox" className="mt-0.5" disabled={!editable || busy || (item.kind === 'ALERT' ? !['PENDING', 'DECIDED'].includes(member.state) : member.state !== 'PENDING' || member.reviewRole !== 'SUBJECT')} checked={selected[group.groupId]?.includes(member.txId) ?? false} onChange={() => toggleTx(group.groupId, member.txId)} /><span className="min-w-0 flex-1"><strong>T-{member.txId}</strong> · {member.reviewRole} · {member.state}{member.decision && ` · ${member.decision}`}<span className="mt-1 block break-all text-muted-foreground">{member.transaction.fromAccountId} → {member.transaction.toAccountId}</span></span><span>{Number(member.transaction.amountPaid).toLocaleString('ko-KR')} {member.transaction.paymentCurrency}</span></label>)}</div></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
+    <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">조사 범위</h2>{item.kind === 'ALERT' && <Button size="sm" variant="outline" disabled={!editable || busy || !removableSelections.length || !excludeComment.trim()} onClick={() => void execute('EXCLUDE')}>선택 거래 제외</Button>}</div>{item.kind === 'ALERT' && <textarea aria-label="거래 제외 사유" className="min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="선택 거래를 조사 범위에서 제외하는 이유" value={excludeComment} onChange={event => { setExcludeComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} />}{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><AlertTxTable remote rows={group.members.map(member => ({
+      txId: member.txId, txAt: new Date(member.transaction.occurredAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T'),
+      fromAccount: member.transaction.fromAccountId, toAccount: member.transaction.toAccountId,
+      amountPaid: Number(member.transaction.amountPaid), paymentCurrency: member.transaction.paymentCurrency, paymentFormat: member.transaction.paymentFormat,
+      launderingScore: member.transaction.scores?.p_laundering ?? null, role: member.transaction.role,
+      reviewLabel: `${member.reviewRole} · ${member.state}${member.decision ? ` · ${member.decision}` : ''}`,
+    }))} selection={{ ids: selected[group.groupId] ?? [], onToggle: id => toggleTx(group.groupId, id), disabled: id => { const member = group.members.find(row => row.txId === id)!; return !editable || busy || (item.kind === 'ALERT' ? !['PENDING','DECIDED'].includes(member.state) : member.state !== 'PENDING' || member.reviewRole !== 'SUBJECT') } }} /></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
     </div>
     <div hidden={tab !== 'review'} className="space-y-4">
-    <section className="rounded-xl border bg-card p-4"><h2 className="font-semibold">조사 처리</h2><p className="mt-1 text-xs text-muted-foreground">본인 담당 진행 중 사건만 변경 가능 · 변경 뒤 최신 사건 정보 재조회</p><textarea aria-label="변경 사유" className="mt-3 min-h-20 w-full rounded-md border bg-background p-3 text-sm" placeholder="조사 의견 또는 변경 사유" maxLength={4000} value={comment} onChange={event => { setComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('COMMENT')}>의견 저장</Button><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('REVIEW_START')}>검토 시작 기록</Button><Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'NORMAL')}>선택 범위 정상 판정</Button>{item.kind === 'EPISODE' && <Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'SUSPICIOUS')}>선택 범위 이상 판정</Button>}{item.kind === 'EPISODE' && <Button size="sm" variant="outline" disabled={!editable || busy || item.pendingCount > 0} onClick={() => void execute('CLOSE')}>사건 종결</Button>}{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { const previous = previousRequest.current; if (previous) void submit(previous.command, previous.success) }}>같은 요청 재시도</Button>}</div>
+    <ReviewLayout reference={<dl className="space-y-4 text-xs"><div><dt>검토 범위</dt><dd>거래 {item.summary.txCount}건 · 조사 대상 {item.summary.subjectCount}건</dd></div><div><dt>유형</dt><dd>{item.kind === 'ALERT' ? item.summary.primaryType : item.primaryTypes.join(' · ')}</dd></div><div><dt>조사 대상 거래액</dt><dd>{Object.entries(item.summary.amountsByCurrency).map(([currency, amount]) => <p key={currency}>{currency} {moneyAmount(amount)}</p>)}</dd></div></dl>}><h2 className="font-semibold">조사 처리</h2><p className="mt-1 text-xs text-muted-foreground">본인 담당 진행 중 사건만 변경 가능 · 변경 뒤 최신 사건 정보 재조회</p><textarea aria-label="변경 사유" className="mt-3 min-h-[280px] w-full flex-1 resize-y rounded-md border bg-background p-3 text-sm leading-7" placeholder="조사 의견 또는 변경 사유" maxLength={4000} value={comment} onChange={event => { setComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('COMMENT')}>의견 저장</Button><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('REVIEW_START')}>검토 시작 기록</Button><Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'NORMAL')}>선택 범위 정상 판정</Button>{item.kind === 'EPISODE' && <Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'SUSPICIOUS')}>선택 범위 이상 판정</Button>}{item.kind === 'EPISODE' && <Button size="sm" variant="outline" disabled={!editable || busy || item.pendingCount > 0} onClick={() => void execute('CLOSE')}>사건 종결</Button>}{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { const previous = previousRequest.current; if (previous) void submit(previous.command, previous.success) }}>같은 요청 재시도</Button>}</div>
       {item.kind === 'ALERT' && <div className="mt-4 space-y-3 border-t pt-4">
         <h3 className="text-sm font-semibold">최종 처리</h3>
         {item.episodeId != null && <p className="text-xs text-muted-foreground">Episode E-{item.episodeId}에 편입된 Alert입니다. <Button size="sm" variant="link" onClick={() => onOpenEpisode(item.episodeId!)}>Episode E-{item.episodeId} 보기</Button></p>}
@@ -262,7 +286,9 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
         {targets.state.status === 'error' && <ErrorBlock message={targets.state.message} onRetry={targets.retry} />}
         {targets.state.status === 'success' && targets.state.data.totalPages > 1 && <div className="flex items-center gap-2 text-xs"><Button size="sm" variant="outline" aria-label="이전 Episode 목적지" disabled={targetPage === 0} onClick={() => { setTargetCaseId(null); setTargetPage(page => page - 1) }}>이전</Button><span>{targetPage + 1}/{targets.state.data.totalPages}쪽 · 전체 {targets.state.data.totalElements}건</span><Button size="sm" variant="outline" aria-label="다음 Episode 목적지" disabled={targetPage + 1 >= targets.state.data.totalPages} onClick={() => { setTargetCaseId(null); setTargetPage(page => page + 1) }}>다음</Button></div>}
         <p className="text-xs text-muted-foreground">새 Episode는 본인 담당 Alert를 최소 2개 선택해야 합니다.</p><Button size="sm" variant="outline" onClick={onBack}>목록에서 새 Episode 만들기</Button>
-      </div>}</section>
+      </div>}
+      {item.kind === 'EPISODE' && <div><Button size="sm" disabled title="관리자 검수 절차 준비 중">관리자 검수 넘기기</Button><p className="mt-2 text-xs text-muted-foreground">관리자 검수 절차는 준비 중입니다.</p></div>}
+    </ReviewLayout>
     {item.outcome === 'DISSOLVED' && <p role="status" className="rounded-lg border p-3 text-sm">해체된 Episode입니다. 현재 소속 Alert는 없으며 해제 당시 구성과 사유는 아래 이력에 보존됩니다.</p>}
     {item.kind === 'EPISODE' && item.status === 'OPEN' && <section aria-label="Alert 연결 해제" className="rounded-xl border bg-card p-4">
       <h2 className="font-semibold">Alert 연결 해제</h2>
@@ -291,90 +317,63 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, refreshList }: { case
 
 export default function LiveCasesPage({ kind, caseId, onOpen, onBack, onOpenEpisode }: { kind: ReviewKind; caseId?: number; onOpen: (id: number) => void; onBack: () => void; onOpenEpisode?: (id: number) => void }) {
   const user = useCurrentUser()
-  const [queryText, setQueryText] = useState('')
-  const [selecting, setSelecting] = useState(false)
-  const [status, setStatus] = useViewState<ReviewQuery['status'] | 'ALL'>(`${kind}/status`, 'ALL')
-  const [mine, setMine] = useViewState(`${kind}/mine`, false)
-  const { from, to, setFrom, setTo } = useSharedPeriod()
-  const scope = JSON.stringify([kind, from, to, status, mine])
-  const [page, setPage] = useViewState(`${scope}/page`, 0)
-  const [selectedIds, setSelectedIds] = useViewState<number[]>(`${scope}/${page}/selected`, [])
-
-  const [comment, setComment] = useState('')
+  const { from, to, businessDate, setPeriod } = useSharedPeriod()
+  const [search, setSearch] = useViewState(`cases/${kind}/search`, '')
+  const [alertFilters, setAlertFilters] = useViewState<AlertFilter[]>('cases/ALERT/filters', [{ field: 'assignee', value: user.userId }])
+  const [episodeFilters, setEpisodeFilters] = useViewState<EpisodeFilter[]>('cases/EPISODE/filters', [{ field: 'assignee', value: user.userId }])
+  const filters = kind === 'ALERT' ? alertFilters : episodeFilters
+  const values = (field: string) => filters.filter(filter => filter.field === field).map(filter => filter.value)
+  const typeNames = ['패턴 미특정','Fan-out','Fan-in','Gather-scatter','Scatter-gather','Cycle','Random','Bipartite','Stack']
+  const filterQuery = { query: search, types: values('type').map(code => typeof code === 'string' ? code : typeNames[code]),
+    statuses: values('status').map(value => value === 'IN_PROGRESS' ? 'OPEN' : value === 'DONE' ? 'CLOSED' : String(value)),
+    assignees: values('assignee').map(Number), minAgeDays: values('age').length ? Math.min(...values('age').map(Number)) : undefined,
+    risk: values('risk').length ? values('risk').join(',') : undefined }
+  const scope = JSON.stringify([kind, from, to, filterQuery])
+  const [page, setPage] = useViewState(`cases/${scope}/page`, 0)
+  const users = useAsync(fetchReviewUsers, [], { key: 'users' })
+  const [targetPage, setTargetPage] = useState(0)
   const [busy, setBusy] = useState(false)
+  const previous = useRef<{ payload: string; id: string } | null>(null)
   const busyRef = useRef(false)
-  const previousRequest = useRef<{ payload: string; id: string; command: ReviewCommand } | null>(null)
-  const [canRetry, setCanRetry] = useState(false)
-  const query: ReviewQuery = { kind, status: status === 'ALL' ? undefined : status, assigneeId: mine ? user.userId : undefined, from: from || undefined, to: to || undefined, page, size: 20 }
-  const list = useAsync(() => fetchReviewCases(query), [kind, status, mine, from, to, page], { key: 'cases', maxAge: 60_000 })
-  const { state, retry, refresh } = list
-  const selectedRows = state.status === 'success' ? state.data.content.filter(row => selectedIds.includes(row.caseId)) : []
-  const eligible = (row: ReviewCase) => user.role === 'STAFF' && row.kind === 'ALERT' && row.status === 'OPEN' && row.assigneeId === user.userId && row.episodeId == null
-  const toggleSelected = (row: ReviewCase) => {
-    if (!eligible(row) || busy) return
-    setSelectedIds(ids => ids.includes(row.caseId) ? ids.filter(id => id !== row.caseId) : [...ids, row.caseId])
-    setCanRetry(false)
-  }
-  const clearSelection = () => { setSelectedIds([]); setCanRetry(false); previousRequest.current = null; setPage(0) }
-  const visibleRows = state.status === 'success' ? state.data.content.filter(row => `${row.kind === 'ALERT' ? `A-${row.alertId ?? row.caseId}` : `E-${row.caseId}`} ${row.summary.primaryType} ${row.assigneeName}`.toLowerCase().includes(queryText.trim().toLowerCase())) : []
-  const download = () => {
-    if (state.status !== 'success') return
-    const lines = ['ID,위험도,탐지 유형,거래,담당자,상태', ...visibleRows.map(row => `${row.kind === 'ALERT' ? `A-${row.alertId ?? row.caseId}` : `E-${row.caseId}`},${row.summary.riskScore ?? ''},${row.summary.primaryType},${row.summary.txCount},${row.assigneeName},${row.status}`)]
-    const url = URL.createObjectURL(new Blob(['\ufeff', lines.join('\n')], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a'); link.href = url; link.download = `${kind.toLowerCase()}-cases.csv`; link.click(); URL.revokeObjectURL(url)
-  }
-  async function submitNew(command?: ReviewCommand) {
-    if (busyRef.current) return
-    if (!comment.trim() || comment.trim().length > 4000) { toast.error('변경 사유를 1~4,000자로 입력해 주세요.'); return }
-    let next: ReviewCommand
+  const list = useAsync(() => fetchReviewCases({ kind, from: from || undefined, to: to || undefined, ...filterQuery, page, size: 20 }), [scope, page], { key: 'cases', maxAge: 60_000 })
+  const targets = useAsync(() => fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', assigneeId: user.userId, page: targetPage, size: 20 }), [user.userId, targetPage], { key: 'cases/targets', enabled: kind === 'ALERT' })
+  const rows = list.state.status === 'success' ? list.state.data.content : []
+  async function link(ids: number[], targetId: number | 'new', comment: string) {
+    if (busyRef.current) throw new Error('처리 중입니다.')
     try {
-      if (command) next = command
-      else {
-        selectedRows.forEach(row => assertEditableAlert(row, user))
-        next = buildAlertTransfer(selectedRows, null, comment)
-      }
-    } catch (error) { toast.error((error as Error).message); return }
-    const payload = JSON.stringify(next)
-    const id = previousRequest.current?.payload === payload ? previousRequest.current.id : crypto.randomUUID()
-    previousRequest.current = { payload, id, command: next }
-    busyRef.current = true; setBusy(true)
+      ids.forEach(id => { const row = rows.find(row => row.alertId === id); if (!row) throw new Error('목록을 다시 조회하세요.'); assertEditableAlert(row, user) })
+      if (targetId !== 'new' && (targets.state.status !== 'success' || !targets.state.data.content.some(row => row.caseId === targetId))) throw new Error('편입할 Episode를 다시 조회하세요.')
+    } catch (error) { toast.error((error as Error).message); throw error }
+    const items = ids.map(id => { const row = rows.find(row => row.alertId === id); if (!row) throw new Error('목록을 다시 조회하세요.'); assertEditableAlert(row, user); return row })
+    const target = targetId === 'new' ? null : targets.state.status === 'success' ? targets.state.data.content.find(row => row.caseId === targetId) : undefined
+    if (target === undefined) throw new Error('편입할 Episode를 다시 조회하세요.')
+    const command = buildAlertTransfer(items, target, comment)
+    const payload = JSON.stringify(command)
+    const requestId = previous.current?.payload === payload ? previous.current.id : crypto.randomUUID()
+    previous.current = { payload, id: requestId }; busyRef.current = true; setBusy(true)
     try {
-      const result = await submitReviewCommand(next, id)
-      previousRequest.current = null; setCanRetry(false); setSelectedIds([]); setComment('')
+      await submitReviewCommand(command, requestId)
+      previous.current = null
       window.dispatchEvent(new Event('review-command-saved'))
-      try {
-        await refresh()
-        toast.success(`Episode E-${result.targetCaseId} 생성 완료`)
-      } catch { toast.success('Episode 생성 완료. 저장은 완료됐지만 최신 화면을 불러오지 못했습니다. 다시 조회해 주세요.') }
+      await Promise.allSettled([list.refresh(), targets.refresh()])
+      toast.success('Episode 편입 완료')
     } catch (error) {
-      if (!(error instanceof ApiError)) { setCanRetry(true); toast.error('처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.') }
-      else {
-        previousRequest.current = null; setCanRetry(false)
-        toast.error(error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 목록을 확인한 뒤 다시 제출해 주세요.' : error.problem.status === 403 ? '선택한 Alert를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
-        if (error.problem.status === 409 || error.problem.status === 404) { setSelectedIds([]); void refresh().catch(() => undefined) }
-      }
+      if (error instanceof ApiError) { previous.current = null; toast.error(error.message) }
+      else toast.error('처리 여부가 불확실합니다. 같은 선택·의견으로 다시 제출하면 동일 요청으로 확인합니다.')
+      throw error
     } finally { busyRef.current = false; setBusy(false) }
   }
-  if (caseId) return <CaseDetail key={`${kind}-${caseId}`} caseId={caseId} kind={kind} onBack={onBack} onOpenEpisode={onOpenEpisode ?? onBack} refreshList={() => { setSelectedIds([]); return refresh() }} />
-  return <div className="space-y-4"><RefreshStatus queries={[list]} />
-    <div className="flex flex-wrap items-center gap-2">
-      <label className="relative min-w-56 max-w-80 flex-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input aria-label="ID, 탐지 유형, 담당자 검색" className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm" placeholder="ID, 탐지 유형, 담당자 검색" value={queryText} onChange={event => setQueryText(event.target.value)} /></label>
-      <label className="text-xs">기간 <input type="date" aria-label="시작일" className="ml-1 rounded-md border bg-background p-2" value={from} onChange={event => { setFrom(event.target.value); clearSelection() }} /> ~ <input type="date" aria-label="종료일" className="rounded-md border bg-background p-2" value={to} onChange={event => { setTo(event.target.value); clearSelection() }} /></label>
-      <label className="text-xs">상태 <select className="ml-1 rounded-md border bg-background p-2" value={status} onChange={event => { setStatus(event.target.value as typeof status); clearSelection() }}><option value="ALL">전체</option><option value="OPEN">진행 중</option><option value="CLOSED">종결</option></select></label>
-      <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={mine} onChange={event => { setMine(event.target.checked); clearSelection() }} />내 담당</label>
-      {kind === 'ALERT' && !selecting && <Button variant="outline" size="sm" className="ml-auto" onClick={() => setSelecting(true)}><Combine className="size-4" />Episode로 묶기</Button>}
-      <Button variant="outline" size="sm" className={kind === 'EPISODE' ? 'ml-auto' : ''} onClick={download}><Download className="size-4" />다운로드</Button>
-    </div>
-    {selecting && kind === 'ALERT' && <div className="flex flex-wrap items-center gap-2 rounded-md border bg-background p-3"><strong className="mr-auto text-sm">{selectedRows.length}건 선택</strong><input aria-label="새 Episode 생성 사유" className="h-9 min-w-52 flex-1 rounded-md border bg-background px-3 text-sm" maxLength={4000} value={comment} onChange={event => { setComment(event.target.value); setCanRetry(false) }} placeholder="Alert를 묶는 근거 (필수)" disabled={busy} /><Button size="sm" disabled={selectedRows.length < 2 || !comment.trim() || busy} onClick={() => void submitNew()}>새 Episode 생성</Button><Button size="sm" variant="outline" onClick={() => { setSelecting(false); clearSelection(); setComment('') }}>선택 취소</Button>{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (previousRequest.current) void submitNew(previousRequest.current.command) }}>같은 요청 재시도</Button>}</div>}
-    {state.status === 'loading' ? <LoadingBlock label="조사 사건" /> : state.status === 'error' ? <ErrorBlock message={state.message} onRetry={retry} /> : <>
-      {visibleRows.length ? <div className="overflow-x-auto rounded-lg border"><table className="w-full min-w-[980px] table-fixed text-sm"><thead className="border-b bg-muted/20 text-left"><tr>{selecting && kind === 'ALERT' && <th className="w-12 px-3 py-3">선택</th>}<th className="w-[16%] px-3 py-3">ID / 구성</th><th className="w-[8%] px-3 py-3">위험도</th><th className="w-[16%] px-3 py-3">탐지 유형</th><th className="w-[13%] px-3 py-3 text-right">거래 총액</th><th className="w-[8%] px-3 py-3 text-right">거래</th><th className="w-[10%] px-3 py-3">담당자</th><th className="w-[10%] px-3 py-3">상태</th><th className="w-[11%] px-3 py-3">{kind === 'ALERT' ? '탐지일' : '생성일'}</th><th className="px-3 py-3">{kind === 'ALERT' ? 'Episode 연결' : 'Alert'}</th></tr></thead><tbody>{visibleRows.map((row: ReviewCase) => <tr key={row.caseId} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => selecting && kind === 'ALERT' ? toggleSelected(row) : onOpen(row.caseId)}>
-        {selecting && kind === 'ALERT' && <td className="px-3 py-3"><input type="checkbox" aria-label={`새 Episode 선택 A-${row.alertId ?? row.caseId}`} disabled={!eligible(row) || busy} checked={selectedIds.includes(row.caseId)} onClick={event => event.stopPropagation()} onChange={() => toggleSelected(row)} /></td>}
-        <td className="px-3 py-3"><span className="font-mono">{kind === 'ALERT' ? `A-${row.alertId ?? row.caseId}` : `E-${row.caseId}`}</span><span className="mt-1 block text-xs text-muted-foreground">{kind === 'ALERT' ? `조사 대상 ${row.summary.subjectCount}건` : `Alert ${row.sourceAlertIds.length}건 · 유형 ${row.primaryTypes.length}개`}</span></td>
-        <td className="px-3 py-3"><RiskBadge score={row.summary.riskScore ?? 0} /></td><td className="px-3 py-3"><span className="inline-block max-w-full truncate rounded-full bg-foreground px-2.5 py-0.5 font-mono text-xs text-background" title={row.summary.primaryType}>{row.summary.primaryType}</span></td>
-        <td className="px-3 py-3 text-right tabular-nums">{Object.entries(row.summary.amountsByCurrency ?? {}).map(([currency, amount]) => `${moneyAmount(amount)} ${currency}`).join(' · ') || '—'}</td><td className="px-3 py-3 text-right">{row.summary.txCount}건</td><td className="px-3 py-3">{row.assigneeName}</td><td className="px-3 py-3"><span className="rounded-full border px-2 py-0.5 text-xs">{row.status === 'OPEN' ? row.pendingCount ? '처리 중' : '처리 전' : '처리 완료'}</span></td><td className="px-3 py-3"><span className="mr-2 text-muted-foreground">{row.createdAt?.slice(5, 10) ?? '—'}</span><AgeBadge days={row.ageDays} /></td><td className="px-3 py-3 text-xs">{kind === 'ALERT' ? row.episodeId == null ? '미연결' : `E-${row.episodeId}` : `${row.sourceAlertIds.length}건`}</td>
-      </tr>)}</tbody></table></div> : <EmptyBlock>조건에 맞는 조사 사건이 없습니다.</EmptyBlock>}
-      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>총 {state.data.totalElements}건</span><div className="flex items-center gap-2"><span>{page + 1} / {Math.max(1, state.data.totalPages)}</span><Button size="sm" variant="outline" disabled={page === 0} onClick={() => { setSelectedIds([]); setPage(page - 1) }}>이전</Button><Button size="sm" variant="outline" disabled={page + 1 >= state.data.totalPages} onClick={() => { setSelectedIds([]); setPage(page + 1) }}>다음</Button></div></div>
-    </>}
+  if (caseId) return <CaseDetail key={`${kind}-${caseId}`} caseId={caseId} kind={kind} onBack={onBack} onOpenEpisode={onOpenEpisode ?? onBack} refreshList={list.refresh} />
+  const footer = list.state.status === 'success' ? <div className="flex items-center justify-between text-xs"><span>전체 {list.state.data.totalElements.toLocaleString()}건</span><div className="flex gap-2"><Button disabled={page === 0} onClick={() => setPage(page - 1)}>이전</Button><span>{page + 1} / {Math.max(1, list.state.data.totalPages)}</span><Button disabled={page + 1 >= list.state.data.totalPages} onClick={() => setPage(page + 1)}>다음</Button></div></div> : null
+  const remote = { query: search, onQuery: setSearch, assignees: users.state.status === 'success' ? users.state.data : [{ id: user.userId, name: user.name }], footer, busy, range: from ? { from: new Date(`${from}T00:00:00`), to: to ? new Date(`${to}T00:00:00`) : undefined } : undefined, onRange: (range?: DateRange) => setPeriod({ from: range?.from ? isoDate(range.from) : '', to: range?.to ? isoDate(range.to) : '' }), targets: targets.state.status === 'success' ? targets.state.data.content.map(row => row.caseId) : [] }
+  return <div className="space-y-4">
+    <RefreshStatus queries={[list]} />
 
+    {users.state.status === 'error' && <ErrorBlock message={users.state.message} onRetry={users.retry} />}
+    {kind === 'ALERT' && targets.state.status === 'error' && <ErrorBlock message={targets.state.message} onRetry={targets.retry} />}
+    {list.state.status === 'error' && <ErrorBlock message={list.state.message} onRetry={list.retry} />}
+    {list.state.status === 'loading' && <LoadingBlock label="사건 목록" />}
+    {kind === 'ALERT' ? <AlertList key={`${kind}/${page}`} rows={rows.map(alertListRow)} today={businessDate ? new Date(`${businessDate}T00:00:00`) : new Date()} remote={{ ...remote, filters: alertFilters, onFilters: setAlertFilters }} onOpen={row => { const item = rows.find(item => item.alertId === row.alertId); if (item) onOpen(item.caseId) }} onLink={link} /> : <EpisodeList key={`${kind}/${page}`} rows={rows.map(episodeListRow)} today={businessDate ? new Date(`${businessDate}T00:00:00`) : new Date()} remote={{ ...remote, filters: episodeFilters, onFilters: setEpisodeFilters }} onOpen={row => onOpen(row.episodeId)} />}
+    {kind === 'ALERT' && targets.state.status === 'success' && targets.state.data.totalPages > 1 && <div className="flex gap-2 text-xs"><span>편입 대상 Episode 페이지</span><Button disabled={targetPage === 0} onClick={() => setTargetPage(targetPage - 1)}>이전 대상</Button><Button disabled={targetPage + 1 >= targets.state.data.totalPages} onClick={() => setTargetPage(targetPage + 1)}>다음 대상</Button></div>}
   </div>
 }

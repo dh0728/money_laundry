@@ -3,7 +3,7 @@ import type { DateRange } from 'react-day-picker'
 import { subDays } from 'date-fns'
 import type { AlertRow } from '@/api/alerts'
 import type { DashboardData } from '@/api/dashboard'
-import { DateRangeButton } from '@/components/DateRangeButton'
+import { InstitutionLayout } from './DashboardPresentation'
 import { SectionTitle } from '@/components/page'
 import { SectionCards } from '@/components/SectionCards'
 import { Card, CardContent } from '@/components/ui/card'
@@ -35,24 +35,9 @@ export function InstitutionView({ today }: { today: Date }) {
 
   return (
     <>
-      <SectionCards items={institutionCards(summary.state.data)} />
-      <div data-testid="institution-dashboard-grid" className="grid min-w-0 max-w-full items-stretch gap-4 @6xl:grid-cols-3">
-        <section aria-labelledby="institution-chart-title" className="flex h-full min-h-0 min-w-0 max-w-full flex-col gap-4 rounded-xl border bg-card/35 p-3 @3xl:p-4 @6xl:col-span-2">
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 px-1">
-            <div>
-              <h2 id="institution-chart-title" className="text-base font-semibold tracking-tight">기관 탐지 현황</h2>
-              <p className="mt-1 text-xs text-muted-foreground">한 기간 선택이 아래 두 그래프에 함께 적용됩니다.</p>
-            </div>
-            <DateRangeButton value={range} onChange={setRange} today={today} />
-          </div>
-          {charts.state.status === 'error' && <ErrorBlock message={charts.state.message} onRetry={charts.retry} />}
-          {charts.state.status === 'loading' && <LoadingBlock label="그래프" />}
-          {charts.state.status === 'success' && <InstitutionCharts data={charts.state.data} />}
-        </section>
-        <section aria-label="RDR 9000 Daily Report" className="h-full min-w-0 @6xl:col-span-1">
-          <AiDailyReport summary={summary.state.data} openAlerts={openAlerts} />
-        </section>
-      </div>
+      <InstitutionLayout cards={<SectionCards items={institutionCards(summary.state.data)} />} range={range} onRange={setRange} today={today}
+        charts={<>{charts.state.status === 'error' && <ErrorBlock message={charts.state.message} onRetry={charts.retry} />}{charts.state.status === 'loading' && <LoadingBlock label="그래프" />}{charts.state.status === 'success' && <InstitutionCharts data={charts.state.data} />}</>}
+        report={<AiDailyReport summary={summary.state.data} openAlerts={openAlerts} />} />
       <div data-testid="institution-recent" className="grid items-start gap-4 @3xl:grid-cols-2">
         <section aria-labelledby="recent-title">
           <div className="mb-3">
