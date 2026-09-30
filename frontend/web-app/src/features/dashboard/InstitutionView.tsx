@@ -9,7 +9,7 @@ import { SectionTitle } from '@/components/page'
 import { SectionCards } from '@/components/SectionCards'
 import { Card, CardContent } from '@/components/ui/card'
 import { isoDate } from '@/lib/format'
-import { AiDailyReport } from './AiDailyReport'
+import { AiDailyReport, PriorityReview, MockPriorityItems } from './AiDailyReport'
 import { AlertStatusChart } from './AlertFlowChart'
 import { loadActiveEpisodes, loadAlerts, loadDashboard } from './dataSource'
 import { chartInputs, institutionCards } from './metrics'
@@ -22,7 +22,7 @@ import { useAlertOverrides } from '@/features/alerts/alertOverrides'
 
 export type InstitutionRemote = {
   cards: ReactNode; charts: ReactNode; report: ReactNode
-  alerts: ReactNode; episodes: ReactNode
+  alerts: ReactNode; episodes: ReactNode; priority: ReactNode
   range?: DateRange; onRange: (range?: DateRange) => void
 }
 export function InstitutionView({ today, remote }: { today: Date; remote?: InstitutionRemote }) {
@@ -44,6 +44,7 @@ export function InstitutionView({ today, remote }: { today: Date; remote?: Insti
       <InstitutionLayout cards={remote?.cards ?? (summary.state.status === 'success' && <SectionCards items={institutionCards(summary.state.data)} />)} range={remote ? remote.range : range} onRange={remote?.onRange ?? setRange} today={today}
         charts={remote?.charts ?? <>{charts.state.status === 'error' && <ErrorBlock message={charts.state.message} onRetry={charts.retry} />}{charts.state.status === 'loading' && <LoadingBlock label="그래프" />}{charts.state.status === 'success' && <InstitutionCharts data={charts.state.data} />}</>}
         report={remote?.report ?? (summary.state.status === 'success' && <AiDailyReport summary={summary.state.data} openAlerts={openAlerts} />)} />
+      <PriorityReview>{remote ? remote.priority : open.state.status === 'error' ? <ErrorBlock message={open.state.message} onRetry={open.retry} /> : open.state.status === 'loading' ? <LoadingBlock label="우선 검토" /> : <MockPriorityItems openAlerts={openAlerts} />}</PriorityReview>
       <div data-testid="institution-recent" className="grid items-start gap-4 @3xl:grid-cols-2">
         <section aria-labelledby="recent-title">
           <div className="mb-3">
