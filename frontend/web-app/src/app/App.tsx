@@ -232,7 +232,7 @@ export default function App() {
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
             : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
-            : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
+            : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} onOpenAlert={caseId => go('alerts', caseId)} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
             : page === 'notifications' ? (live ? <LiveNotificationsPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />)
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />

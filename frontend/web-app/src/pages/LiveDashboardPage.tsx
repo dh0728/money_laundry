@@ -1,6 +1,13 @@
 import { LiveWorkQueue } from '@/features/dashboard/LiveWorkQueue'
-import { InstitutionLayout } from '@/features/dashboard/DashboardPresentation'
-import { AlertDailyFlowChart } from '@/features/dashboard/AlertFlowChart'
+import { InstitutionView } from '@/features/dashboard/InstitutionView'
+import { PersonalView, PersonalSummaryView } from '@/features/dashboard/PersonalView'
+import { DailyReportView } from '@/features/dashboard/AiDailyReport'
+import { QueueItems } from '@/features/dashboard/LiveWorkQueue'
+import { fetchReviewCases } from '@/api/liveReview'
+import { useCurrentUser } from '@/app/session'
+import { Card, CardContent } from '@/components/ui/card'
+import { SectionTitle } from '@/components/page'
+import { AlertStatusChart } from '@/features/dashboard/AlertFlowChart'
 import { TransactionPatternHierarchy } from '@/features/dashboard/PatternRelation'
 import { UnderTabs } from '@/components/UnderTabs'
 import { isoDate } from '@/lib/format'
@@ -10,10 +17,7 @@ import { RefreshStatus } from '@/components/RefreshStatus'
 import { typeDisplay, type TypeCode } from '@/api/codes'
 import { fetchDemoClock, fetchLiveDashboard, daysBefore, kstDate, type LiveDashboard } from '@/api/liveDashboard'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
-import { Badge } from '@/components/ui/badge'
 import { SectionCards } from '@/components/SectionCards'
-import { RadarSweep } from '@/features/agent/RadarSweep'
-import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
 import { useAsync } from '@/lib/useAsync'
 
 const count = (n: number | undefined) => (n ?? 0).toLocaleString('ko-KR')
@@ -28,19 +32,17 @@ function LiveAiDailyReport({ data }: { data: LiveDashboard }) {
   const today = data.institution.today
   const yesterday = data.institution.yesterday
   const change = yesterday > 0 ? today === yesterday ? ' · 전일과 동일' : ` · ${Math.abs((today - yesterday) / yesterday * 100).toFixed(1)}% ${today > yesterday ? '증가' : '감소'}` : ''
-  const first = data.priority[0]
-  return <section data-testid="ai-daily-report" aria-label="RDR 9000 Daily Report" className="rounded-xl border bg-card p-5" style={rdrSummaryBackground}>
-    <div className="flex flex-wrap items-center gap-2"><RadarSweep className="size-5 shrink-0" /><h2 className="font-semibold">RDR 9000 Daily Report</h2><Badge variant="outline" className="provenance-badge font-normal" data-provenance="mock">mock · LLM 미연동</Badge></div>
-    <p className="mt-1 text-xs text-muted-foreground">수치는 서버 집계, 문장은 규칙 기반 시연. AI 분석 결과나 자금세탁 확정 판정 아님.</p>
-    <div className="mt-4 grid gap-4 text-sm">
-      <div><h3 className="text-xs font-medium">오늘의 변화</h3><p className="mt-2 text-muted-foreground">오늘 신규 Alert {count(today)}건 · 전일 {count(yesterday)}건{change}{yesterday === 0 && ' · 전일 0건으로 증감률 산출 불가'}</p></div>
-      <div><h3 className="text-xs font-medium">탐지 상태</h3><p className="mt-2 text-muted-foreground">{data.pendingReports > 0 ? `미완료 보고 ${count(data.pendingReports)}건 · 오늘 탐지율 확정 전.` : data.detection.received > 0 ? `오늘 대상 원장 ${count(data.detection.received)}건 중 모델 의심 ${count(data.detection.suspicious)}건 확인됨.` : '오늘 대상 원장 거래 없음 · 탐지율 산출 불가.'}</p></div>
-      <div><h3 className="text-xs font-medium">내 우선 검토</h3><p className="mt-2 text-muted-foreground">{first ? `${first.kind === 'ALERT' ? `Alert A-${first.alert_id ?? first.case_id}` : `Episode E-${first.case_id}`} · 위험 점수 ${first.risk.toFixed(2)}` : '우선 검토 사건 없음.'}</p></div>
-    </div>
-  </section>
+  return <DailyReportView generatedAt={data.businessAt} changeSummary={`신규 Alert ${count(today)}건 · 전일 ${count(yesterday)}건${change}`}
+    operation={`3일 이상 미처리 Alert ${count(data.openAlertsAgedOver3Days)}건. ${data.pendingReports ? `미완료 보고 ${count(data.pendingReports)}건으로 탐지 집계 확인 필요.` : `오늘 수신 거래 ${count(data.detection.received)}건.`}`}
+    focus={<p className="mt-2 text-sm leading-6 text-muted-foreground">선택 기간의 유형별 건수는 왼쪽 분포에서 확인하세요. 서로 다른 사건이 같은 시나리오라는 판정은 아닙니다.</p>}
+    priority={<QueueItems kind="ALERT" status="OPEN" personal={false} />} />
+
 }
 
-export default function LiveDashboardPage({ onOpen }: { onOpen: (kind: 'ALERT' | 'EPISODE', id: number) => void }) {
+export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EPISODE', id: number) => void }) {
+  void _props
+  const user = useCurrentUser()
+  const highRisk = useAsync(() => fetchReviewCases({ kind: 'ALERT', statuses: ['OPEN'], assigneeId: user.userId, risk: 'high', size: 1 }), [user.userId], { key: 'dashboard/high-risk' })
   const [scope, setScope] = useViewState<'personal' | 'institution'>('dashboard/scope', 'institution')
   const clock = useAsync(fetchDemoClock, [], { key: 'clock' })
   const businessDate = clock.state.status === 'success' ? kstDate(clock.state.data.businessAt) : ''
@@ -73,9 +75,22 @@ export default function LiveDashboardPage({ onOpen }: { onOpen: (kind: 'ALERT' |
   return <div className="space-y-6">
     <RefreshStatus queries={[dashboard]} />
     <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)} · <RefreshCountdown nextRefreshAt={dashboard.nextRefreshAt} refreshing={dashboard.refreshing} /></span></div>
-    {scope === 'institution' ? <InstitutionLayout cards={<SectionCards items={kpis} />} today={new Date(`${businessDate}T00:00:00`)} range={{ from: new Date(`${from}T00:00:00`), to: new Date(`${to}T00:00:00`) }} onRange={range => setPeriod({ from: range?.from ? isoDate(range.from) : daysBefore(businessDate,29), to: range?.to ? isoDate(range.to) : businessDate })}
-      charts={<><AlertDailyFlowChart data={data.daily} /><section className="min-h-80 rounded-xl border bg-card p-4"><h3 className="font-semibold">모델 판정 조합과 탐지 유형</h3><p className="mb-3 text-xs text-muted-foreground">왼쪽: 전체 분석 거래 {count(agreementTotal)}건 · 오른쪽: 모델 의심 거래의 유형별 건수</p>{agreementTotal ? <TransactionPatternHierarchy linked={false} unit="거래" composition={data.agreements.map((row,i) => ({ name: agreementLabels[row.agreement] ?? row.agreement, value: row.count, fill: ['var(--foreground)','var(--muted-foreground)','var(--chart-3)','var(--chart-4)'][i%4] }))} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</section></>} report={<LiveAiDailyReport data={data} />} /> : <SectionCards items={kpis} />}
-    {scope === 'personal' && <LiveWorkQueue />}
-    <div className="grid gap-4 lg:grid-cols-2"><section className="rounded-xl border bg-card p-5"><h2 className="font-semibold">내 우선 검토 사건</h2><p className="mb-3 text-xs text-muted-foreground">위험도와 경과를 확인할 사건</p>{data.priority.length ? <div className="space-y-2">{data.priority.slice(0, 5).map(row => <button key={row.case_id} type="button" className="flex w-full items-center justify-between rounded-lg border p-3 text-left text-sm hover:bg-accent" onClick={() => onOpen(row.kind, row.case_id)}><span className="font-mono">{row.kind === 'ALERT' ? `A-${row.alert_id ?? row.case_id}` : `E-${row.case_id}`}</span><span>위험 {row.risk.toFixed(2)}</span></button>)}</div> : <EmptyBlock>우선 검토 사건이 없습니다.</EmptyBlock>}</section><section className="rounded-xl border bg-card p-5"><h2 className="font-semibold">내 최근 활동</h2><p className="mb-3 text-xs text-muted-foreground">선택 기간의 서버 업무 이력</p>{data.activities.length ? <div className="max-h-64 overflow-auto text-sm">{data.activities.slice(0, 8).map(row => <div key={row.event_id} className="border-b py-2"><p className="font-medium">{row.action} · 조사 사건 {row.case_id}</p><p className="mt-1 text-xs text-muted-foreground">{new Date(row.business_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>{row.comment && <p className="mt-1 text-sm">{row.comment}</p>}</div>)}</div> : <EmptyBlock>선택 기간의 활동이 없습니다.</EmptyBlock>}</section></div>
+    {scope === 'institution' ? <InstitutionView today={new Date(`${businessDate}T00:00:00`)} remote={{
+      cards: <SectionCards items={kpis} />,
+      range: { from: new Date(`${from}T00:00:00`), to: new Date(`${to}T00:00:00`) },
+      onRange: range => setPeriod({ from: range?.from ? isoDate(range.from) : daysBefore(businessDate,29), to: range?.to ? isoDate(range.to) : businessDate }),
+      charts: <><div className="shrink-0"><AlertStatusChart data={[]} unavailable /></div><Card className="h-full min-h-0 min-w-0 max-w-full flex-1 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy"><CardContent className="flex min-h-0 flex-1 flex-col px-4"><SectionTitle title="의심 거래 구성과 패턴 분포" description={`전체 분석 거래 ${count(agreementTotal)}건의 모델 조합 · 의심 거래 유형별 건수`} />{agreementTotal ? <div className="min-h-0 flex-1"><TransactionPatternHierarchy linked={false} unit="거래" composition={data.agreements.map((row,i) => ({ name: agreementLabels[row.agreement] ?? row.agreement, value: row.count, fill: ['var(--foreground)','var(--muted-foreground)','var(--chart-3)','var(--chart-4)'][i%4] }))} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /></div> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</CardContent></Card></>,
+      report: <LiveAiDailyReport data={data} />,
+      alerts: <QueueItems kind="ALERT" status="OPEN" personal={false} />,
+      episodes: <QueueItems kind="EPISODE" status="OPEN" personal={false} />,
+    }} /> : <PersonalView remote={{
+      cards: [
+        { label: '위험 점수 0.80 이상', value: highRisk.state.status === 'success' ? count(highRisk.state.data.totalElements) : '—', trend: '처리 전 Alert', note: '본인 담당 고위험 건' },
+        { label: '3일 이상 경과', value: count(data.personal.aged), trend: 'Alert · Episode', note: '본인 담당 배정 후 72시간 이상' },
+      ],
+      summary: <PersonalSummaryView><p className="mt-2 text-sm leading-6 text-muted-foreground">담당 사건의 유형과 반복 계좌를 아래 업무 현황에서 확인하세요. LLM 요약은 아직 연결되지 않았습니다.</p></PersonalSummaryView>,
+      queue: <LiveWorkQueue />,
+    }} />}
+    {scope === 'personal' && highRisk.state.status === 'error' && <ErrorBlock message={highRisk.state.message} onRetry={highRisk.retry} />}
   </div>
 }

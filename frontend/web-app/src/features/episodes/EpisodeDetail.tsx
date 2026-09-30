@@ -1,16 +1,16 @@
+import { LinkedAlerts } from './LinkedAlerts'
 // v24 Detail.tsx(kind=Episode)를 옮김. 연결 Alert·탐지 유형·근거 출처가 중심이다(v23 요구).
 // 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/v24).
 import { useMemo, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
 import type { HistoryRow } from '@/api/alerts'
 import { alertResolutionLabels, typeDisplay } from '@/api/codes'
 import type { EpisodeDetail as EpisodeDetailData, EpisodeTransaction } from '@/api/episodes'
-import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { PatternBadge, RiskBadge } from '@/components/badges'
 import { CaseHeader, CaseStats } from '@/features/alerts/CasePresentation'
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Panel } from '@/features/alerts/DetailPanels'
+import { Panel, OverviewPanels } from '@/features/alerts/DetailPanels'
 import { historyLabels } from '@/features/alerts/detailText'
 import AlertTxTable from '@/features/alerts/AlertTxTable'
 import { alertCode, episodeCode } from '@/features/alerts/alertFilters'
@@ -95,36 +95,15 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
                   maxLength={4000} value={unlinkReason} onChange={event => setUnlinkReason(event.target.value)} placeholder="선택 Alert를 연결 해제하는 이유" />
               </label>
             </div>}
-            <div className="divide-y rounded-md border">
-              {episode.alerts.map(alert => {
-                const rowContent = <>
-                  <span className="font-mono">{alertCode(alert.alertId)}</span>
-                  <RiskBadge score={alert.riskScore} />
-                  <PatternBadge code={alert.primaryType.code} />
-                  <span className="col-span-3 flex min-w-0 items-center gap-2 @3xl:col-span-1"><AgeBadge days={alert.ageDays} /><span className="truncate text-muted-foreground">계좌 {alert.accountCount} · 은행 {alert.bankCount} · 거래 {alert.txCount}건</span></span>
-                  <span className="tabular-nums @3xl:text-right">{usd(alert.totalAmountUsd)}</span>
-                  <StatusBadge status={alert.status} />
-                  <ExternalLink className="size-3.5 text-muted-foreground" />
-                </>
-                const rowClass = 'grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 text-left text-xs @3xl:grid-cols-[88px_72px_160px_minmax(0,1fr)_110px_90px_16px] @3xl:gap-3'
-                return selectingAlerts ? (
-                  <label key={alert.alertId} className={`flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 interactive-surface ${selectedAlertIds.includes(alert.alertId) ? 'bg-muted/40' : ''}`}>
-                    <input type="checkbox" className="shrink-0" aria-label={`Alert ${alertCode(alert.alertId)} 선택`}
-                      checked={selectedAlertIds.includes(alert.alertId)} onChange={() => setSelectedAlertIds(ids => ids.includes(alert.alertId) ? ids.filter(id => id !== alert.alertId) : [...ids, alert.alertId])} />
-                    <span className={rowClass}>{rowContent}</span>
-                  </label>
-                ) : (
-                  <button key={alert.alertId} type="button" onClick={() => onOpenAlert(alert.alertId)} aria-label={`${alertCode(alert.alertId)} 상세 보기`}
-                    className={`${rowClass} w-full px-3 py-2.5 outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring`}>
-                    {rowContent}
-                  </button>
-                )
-              })}
-            </div>
+            <LinkedAlerts rows={episode.alerts.map(alert => ({
+              id: alert.alertId, risk: alert.riskScore, types: [typeDisplay(alert.primaryType.code).label],
+              age: alert.ageDays, detail: `계좌 ${alert.accountCount} · 은행 ${alert.bankCount} · 거래 ${alert.txCount}건`,
+              amount: usd(alert.totalAmountUsd), status: alert.status,
+            }))} onOpen={onOpenAlert} selection={selectingAlerts ? { ids: selectedAlertIds, toggle: id => setSelectedAlertIds(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id]) } : undefined} />
             {selectingAlerts && <p className="mt-2 text-xs text-muted-foreground">연결 해제 후 Alert가 1건 이하이면 Episode가 해체되고 모든 Alert가 단독으로 전환됩니다.</p>}
           </Panel>
 
-          <div className="grid items-stretch gap-4 @3xl:grid-cols-3">
+          <OverviewPanels columns={3}>
             <Panel title="패턴 증거" description="Alert별 유형 확인 항목" testId="pattern-evidence">
               <div className="space-y-4">
                 {episode.patternEvidence.map(e => (
@@ -161,7 +140,7 @@ export default function EpisodeDetail({ episode, graph, transactions: modelTrans
                 ))}
               </div>
             </Panel>
-          </div>
+          </OverviewPanels>
         </div>
       )}
 

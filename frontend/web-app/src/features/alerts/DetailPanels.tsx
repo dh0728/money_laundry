@@ -22,3 +22,8 @@ export function BarList({ rows, format = usd }: { rows: { name: string; v: numbe
 export const Panel = ({ title, description, children, testId, action }: { title: string; description?: string; children: ReactNode; testId?: string; action?: ReactNode }) => (
   <Card className={card} data-testid={testId}><CardContent className={content}><div className="flex items-start justify-between gap-3"><SectionTitle title={title} description={description} />{action}</div>{children}</CardContent></Card>
 )
+
+
+export function OverviewPanels({ children, columns = 4 }: { children: ReactNode; columns?: 3 | 4 }) {
+  return <div className={columns === 3 ? 'grid items-stretch gap-4 @3xl:grid-cols-3' : 'grid items-start gap-4 @3xl:grid-cols-2 @6xl:grid-cols-4 [&>[data-slot=card]]:h-auto [&>[data-slot=card]>[data-slot=card-content]]:h-auto'}>{children}</div>
+}

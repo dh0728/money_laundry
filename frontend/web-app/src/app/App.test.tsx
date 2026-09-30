@@ -61,7 +61,7 @@ describe('앱 틀', () => {
     window.location.hash = 'episodes/800'
     const linked = await screen.findByTestId('linked-alerts')
     fireEvent.click(within(linked).getByRole('button', { name: '연결 Alert 선택' }))
-    fireEvent.click(within(linked).getByRole('checkbox', { name: 'Alert A-3003 선택' }))
+    fireEvent.click(within(linked).getByRole('checkbox', { name: '연결 해제 Alert A-3003' }))
     fireEvent.change(within(linked).getByRole('textbox', { name: '연결 해제 사유' }), { target: { value: '별도 조사' } })
     fireEvent.click(within(linked).getByRole('button', { name: '선택 Alert 연결 해제' }))
     const updatedLinked = await screen.findByTestId('linked-alerts')
@@ -79,7 +79,7 @@ describe('앱 틀', () => {
     window.location.hash = 'episodes/800'
     const linked = await screen.findByTestId('linked-alerts')
     fireEvent.click(within(linked).getByRole('button', { name: '연결 Alert 선택' }))
-    for (const id of [3003, 3018]) fireEvent.click(within(linked).getByRole('checkbox', { name: `Alert A-${id} 선택` }))
+    for (const id of [3003, 3018]) fireEvent.click(within(linked).getByRole('checkbox', { name: `연결 해제 Alert A-${id}` }))
     fireEvent.change(within(linked).getByRole('textbox', { name: '연결 해제 사유' }), { target: { value: '연관성 없음' } })
     fireEvent.click(within(linked).getByRole('button', { name: '선택 Alert 연결 해제' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Episode를 해체할까요?')

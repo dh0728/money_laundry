@@ -30,13 +30,13 @@ it('실제 대시보드는 PC 날짜 대신 서버 업무 날짜로 기간을 �
   const report = within(screen.getByTestId('ai-daily-report'))
   expect(report.getByRole('heading', { name: 'RDR 9000 Daily Report' })).toBeInTheDocument()
   expect(report.getByTestId('rdr-eye')).toBeInTheDocument()
-  expect(report.getByText('mock · LLM 미연동')).toBeInTheDocument()
-  expect(report.getByText('수치는 서버 집계, 문장은 규칙 기반 시연. AI 분석 결과나 자금세탁 확정 판정 아님.')).toBeInTheDocument()
-  expect(report.getByText('미완료 보고 2건 · 오늘 탐지율 확정 전.')).toBeInTheDocument()
-  expect(report.getByText('우선 검토 사건 없음.')).toBeInTheDocument()
+  expect(report.getByTitle('규칙 기반 시연 문장. LLM 미연동.')).toBeInTheDocument()
+  expect(screen.getByTestId('institution-recent')).toBeInTheDocument()
+  expect(report.getByText(/미완료 보고 2건/)).toBeInTheDocument()
+  expect(screen.queryByText('내 우선 검토 사건')).not.toBeInTheDocument()
 })
 
-it('서버의 전일 수치와 탐지 조합·유형·개인 활동을 그대로 표시한다', async () => {
+it('서버 집계를 mock의 기관·개인 화면 배치에 공급한다', async () => {
   fetchDemoClock.mockResolvedValue({ businessAt: '2023-09-10T00:00:00Z', configured: true, revision: 1 })
   fetchLiveDashboard.mockResolvedValue({
     businessAt: '2023-09-10T00:00:00Z', personal: { pending: 2, aged: 1, closed: 3 }, institution: { alerts: 4, episodes: 1, aged: 2, today: 6, yesterday: 4 },
@@ -53,11 +53,12 @@ it('서버의 전일 수치와 탐지 조합·유형·개인 활동을 그대로
   expect(screen.getByText('30건')).toBeInTheDocument()
   expect(screen.getByText('FAN-OUT')).toBeInTheDocument()
   const report = within(screen.getByTestId('ai-daily-report'))
-  expect(report.getByText('오늘 신규 Alert 6건 · 전일 4건 · 50.0% 증가')).toBeInTheDocument()
-  expect(report.getByText('오늘 대상 원장 100건 중 모델 의심 20건 확인됨.')).toBeInTheDocument()
+  expect(report.getByText(/신규 Alert 6건 · 전일 4건 · 50.0% 증가/)).toBeInTheDocument()
+  expect(report.getByText(/오늘 수신 거래 100건/)).toBeInTheDocument()
   fireEvent.mouseDown(screen.getByRole('tab', { name: '내 담당' }), { button: 0, ctrlKey: false })
-  expect(screen.getByText('검토 메모')).toBeInTheDocument()
-  expect(screen.getByText(/조사 사건 42/)).toBeInTheDocument()
+  expect(screen.getByTestId('personal-top')).toBeInTheDocument()
+  expect(screen.getByTestId('personal-ai-summary')).toBeInTheDocument()
+  expect(screen.getByTestId('work-queue')).toBeInTheDocument()
 })
 
 it('실제 거래에서 미분석을 정상으로 바꾸지 않고 원본 Alert와 Episode ID를 구별한다', async () => {

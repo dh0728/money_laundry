@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { useMemoryState } from '@/lib/memory'
-import { Panel } from './DetailPanels'
+import { Panel, OverviewPanels } from './DetailPanels'
 import { historyLabels } from './detailText'
 import { alertCode, episodeCode } from './alertFilters'
 import AlertReview, { type VerdictSubmit } from './AlertReview'
@@ -89,7 +89,7 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
               { label: '거래 기간', value: span },
             ]} />
           <CaseActivityCharts amounts={{ USD: { daily, senders } }} />
-          <div className="grid items-start gap-4 @3xl:grid-cols-2 @6xl:grid-cols-4 [&>[data-slot=card]]:h-auto [&>[data-slot=card]>[data-slot=card-content]]:h-auto">
+          <OverviewPanels>
             <Panel title="묶음 근거" description="이 거래들이 한 Alert가 된 이유" testId="grouping">
               <ul className="space-y-2 text-xs">
                 {alert.groupingBasis.map(b => <li key={`${b.basis}-${b.value}`} className="flex items-center gap-2"><Badge variant="outline" className="font-normal">{basisLabels[b.basis]}</Badge><span className="min-w-0 truncate">{b.value}</span></li>)}
@@ -124,7 +124,7 @@ export default function AlertDetail({ alert, graph, relabels, onRelabel, history
                 ))}
               </div>
             </Panel>
-          </div>
+          </OverviewPanels>
         </div>
       )}
 

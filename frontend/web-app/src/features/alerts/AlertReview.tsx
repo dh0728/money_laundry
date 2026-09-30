@@ -1,20 +1,15 @@
+import { AlertVerdictForm } from './AlertVerdictForm'
 // v24 Detail.tsx "검토 의견" 탭. 판정 선택지는 verdict.ts(9/28 결정)를 따른다.
 import { useState } from 'react'
-import { Check } from 'lucide-react'
 import type { AlertDetail } from '@/api/alerts'
 import { alertResolutionLabels } from '@/api/codes'
 import { SectionTitle } from '@/components/page'
-import { ProvenanceNote } from '@/components/Provenance'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
 import { ReviewLayout } from '@/features/alerts/ReviewLayout'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { useMemoryState } from '@/lib/memory'
 import { alertCode, episodeCode } from './alertFilters'
 import { usd } from './metrics'
-import { verdictGroups, verdictOption, verdictOptions, type AlertVerdict } from './verdict'
+import { verdictOption, type AlertVerdict } from './verdict'
 
 export type VerdictSubmit = { verdict: AlertVerdict; comment: string; episodeId?: number }
 
@@ -35,7 +30,6 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
   const decided = alert.status !== 'OPEN'
   const locked = decided || !responsible
   const option = verdictOption(verdict)
-  const ready = !locked && comment.trim().length > 0 && (verdict !== 'link-episode' || target !== '')
 
   const counterparts = new Set(alert.transactions.flatMap(t => [t.fromAccount, t.toAccount])).size
   const owners = new Set(alert.transactions.flatMap(t => [t.fromOwnerName, t.toOwnerName]).filter(Boolean)).size
@@ -67,39 +61,8 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
               : alert.resolution ? alertResolutionLabels[alert.resolution] : '종결'}
           </p>
         )}
-        <div className="space-y-2">
-          <Label>판정</Label>
-          <Select value={verdict} onValueChange={v => setVerdict(v as AlertVerdict)} disabled={locked}>
-            <SelectTrigger className="w-80" aria-label="판정"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {verdictGroups.map(group => (
-                <SelectGroup key={group}>
-                  <SelectLabel>{group}</SelectLabel>
-                  {verdictOptions.filter(o => o.group === group).map(o => (
-                    <SelectItem key={o.value} value={o.value}>{o.group === '이상거래' ? `이상거래 · ${o.label}` : o.label}</SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-          {option.proposal && <ProvenanceNote kind="proposal">API 계약에 아직 없는 판정입니다. 시연 화면에서만 저장됩니다.</ProvenanceNote>}
-        </div>
-        {verdict === 'link-episode' && (
-          <div className="space-y-2">
-            <Label>연결할 Episode</Label>
-            <Select value={target} onValueChange={setTarget} disabled={locked}>
-              <SelectTrigger className="w-80" aria-label="연결할 Episode"><SelectValue placeholder="진행 중인 Episode 선택" /></SelectTrigger>
-              <SelectContent>{episodes.map(id => <SelectItem key={id} value={String(id)}>{episodeCode(id)}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="flex min-h-0 flex-1 flex-col space-y-2">
-          <Label htmlFor="reason">판단 근거 <span className="text-muted-foreground">(필수)</span></Label>
-          <Textarea id="reason" value={comment} onChange={e => setComment(e.target.value)} disabled={locked} className="min-h-[280px] flex-1 resize-y text-sm leading-7" placeholder="확인한 거래, 계좌 간 관계, 판단 근거를 작성하세요." />
-        </div>
-        <div className="flex items-center justify-end gap-2">
-          <Button size="sm" disabled={!ready} onClick={() => setConfirm(true)}><Check className="size-3.5" />{option.action}</Button>
-        </div>
+        <AlertVerdictForm verdict={verdict} setVerdict={setVerdict} comment={comment} setComment={setComment}
+          target={target} setTarget={setTarget} locked={locked} episodes={episodes} onConfirm={() => setConfirm(true)} />
     </ReviewLayout>
 
 

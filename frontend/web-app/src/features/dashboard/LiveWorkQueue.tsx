@@ -9,10 +9,10 @@ import { WorkCard } from './WorkCard'
 import { WorkQueue } from './WorkQueue'
 import { reviewType } from '@/features/alerts/reviewListAdapter'
 
-function QueueItems({ kind, status }: { kind: ReviewKind; status: ReviewStatus }) {
+export function QueueItems({ kind, status, personal = true }: { kind: ReviewKind; status: ReviewStatus; personal?: boolean }) {
   const user = useCurrentUser()
-  const [page, setPage] = useViewState(`dashboard/queue/${kind}/${status}`, 0)
-  const result = useAsync(() => fetchReviewCases({ kind, statuses: [status], assigneeId: user.userId, page, size: 20 }), [kind, status, user.userId, page], { key: 'dashboard/queue' })
+  const [page, setPage] = useViewState(`dashboard/queue/${personal}/${kind}/${status}`, 0)
+  const result = useAsync(() => fetchReviewCases({ kind, statuses: [status], assigneeId: personal ? user.userId : undefined, page, size: 20 }), [kind, status, personal, user.userId, page], { key: 'dashboard/queue' })
   if (result.state.status === 'loading') return <LoadingBlock label="담당 업무" />
   if (result.state.status === 'error') return <ErrorBlock message={result.state.message} onRetry={result.retry} />
   const data = result.state.data
@@ -27,9 +27,9 @@ function QueueItems({ kind, status }: { kind: ReviewKind; status: ReviewStatus }
 }
 
 export function LiveWorkQueue() {
-  return <section><h2 className="mb-3 text-base font-semibold">업무 현황</h2><WorkQueue columns={[
+  return <WorkQueue columns={[
     { status: 'PENDING', label: '열린 Alert', content: <QueueItems kind="ALERT" status="OPEN" /> },
     { status: 'IN_PROGRESS', label: '열린 Episode', content: <QueueItems kind="EPISODE" status="OPEN" /> },
     { status: 'DONE', content: <><QueueItems kind="ALERT" status="CLOSED" /><QueueItems kind="EPISODE" status="CLOSED" /></> },
-  ]} /></section>
+  ]} />
 }

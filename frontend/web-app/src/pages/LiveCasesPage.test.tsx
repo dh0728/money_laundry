@@ -24,6 +24,7 @@ const alertCase = (caseId: number, alertId: number, extra = {}) => ({
 })
 
 beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView = vi.fn()
   vi.clearAllMocks()
   fetchReviewCase.mockResolvedValue(alertCase(1, 3001))
   fetchReviewMoney.mockResolvedValue({ available: false, reason: 'EMPTY_SUBJECT_SCOPE' })
@@ -34,6 +35,10 @@ beforeEach(() => {
   setReviewMoneyScope.mockResolvedValue({ caseId: 1, revision: 1002 })
 })
 
+const choose = async (label: string, option: string) => {
+  fireEvent.keyDown(await screen.findByRole('combobox', { name: label }), { key: 'ArrowDown' })
+  fireEvent.click(await screen.findByRole('option', { name: option }))
+}
 const showTab = async (label: string) => fireEvent.mouseDown(await screen.findByRole('tab', { name: new RegExp(label) }), { button: 0, ctrlKey: false })
 
 const episodeCase = (count: number) => alertCase(50, 0, {
@@ -44,7 +49,8 @@ const episodeCase = (count: number) => alertCase(50, 0, {
 it('Episode 연결 해제는 사유와 2개 미만 해체 확인 뒤 전체 그룹 UNLINK를 보낸다', async () => {
   fetchReviewCase.mockResolvedValue(episodeCase(2))
   render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
-  await showTab('검토 의견')
+  await showTab('개요')
+  fireEvent.click(await screen.findByRole('button', { name: '연결 Alert 선택' }))
   fireEvent.click(await screen.findByLabelText('연결 해제 Alert A-3001'))
   expect(screen.getByRole('button', { name: '선택 Alert 연결 해제' })).toBeDisabled()
   fireEvent.change(screen.getByLabelText('연결 해제 사유'), { target: { value: '별도 조사 필요' } })
@@ -61,7 +67,8 @@ it('Episode 연결 해제는 사유와 2개 미만 해체 확인 뒤 전체 그�
 it('3개 중 하나 해제는 해체로 안내하지 않고 판정 완료 그룹도 선택할 수 있다', async () => {
   fetchReviewCase.mockResolvedValue(episodeCase(3))
   render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
-  await showTab('검토 의견')
+  await showTab('개요')
+  fireEvent.click(await screen.findByRole('button', { name: '연결 Alert 선택' }))
   fireEvent.click(await screen.findByLabelText('연결 해제 Alert A-3001'))
   fireEvent.change(screen.getByLabelText('연결 해제 사유'), { target: { value: '연결 없음' } })
   fireEvent.click(screen.getByRole('button', { name: '선택 Alert 연결 해제' }))
@@ -100,7 +107,8 @@ const open = async () => {
 
 it('Alert 단독 의심 종결은 사건 전체 CLOSE로 보낸다', async () => {
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '단독 세탁 의심 종결' }))
+  await choose('판정', '이상거래 · Alert 단독')
+  fireEvent.click(screen.getByRole('button', { name: '판정 확인' }))
   fireEvent.click(await screen.findByRole('button', { name: '최종 종결 확정' }))
   await waitFor(() => expect(submitReviewCommand).toHaveBeenCalled())
   expect(submitReviewCommand.mock.calls[0][0]).toMatchObject({ action: 'CLOSE', decision: 'SUSPICIOUS', selections: [{ caseId: 1, revision: 1001, groupId: 0, txIds: [] }] })
@@ -148,6 +156,8 @@ it('상세에서 새 Episode 안내는 목록 이동으로 연결한다', async 
   const onBack = vi.fn()
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={onBack} />)
   await showTab('검토 의견')
+  await choose('판정', '이상거래 · 새 Episode 생성')
+  fireEvent.change(screen.getByLabelText('변경 사유'), { target: { value: '함께 조사' } })
   fireEvent.click(await screen.findByRole('button', { name: /목록에서 새 Episode 만들기/ }))
   expect(onBack).toHaveBeenCalledOnce()
 })
@@ -191,12 +201,11 @@ it('실제 사건 요약의 통화별 거래액과 대표 유형 비중을 표�
     paymentFormats: { WIRE: 2, CASH: 1 }, typeDistribution: { 'Fan-out': 2 },
   } }))
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
-  const overview = await screen.findByRole('region', { name: '사건 개요' })
+  const overview = await screen.findByTestId('grouping')
   expect(overview).toHaveTextContent('대표 유형 비중 50.0%')
-  expect(overview).toHaveTextContent('KRW 120,000')
-  expect(overview).toHaveTextContent('USD 70')
-  expect(overview).toHaveTextContent('조사 대상 2건')
-  expect(overview).toHaveTextContent('씨앗 거래 1건')
+  expect(screen.getByText('120,000 KRW · 70 USD')).toBeInTheDocument()
+  expect(overview).toHaveTextContent('조사 대상2건')
+  expect(overview).toHaveTextContent('씨앗 거래1건')
 })
 
 it('자금 지표의 기간을 바꿔 다시 조회하고 계좌별 비율을 표시한다', async () => {
@@ -254,7 +263,7 @@ it('계좌 선택 저장이 409면 상세와 지표를 다시 조회하고 자�
 
 it('미판정 거래가 있어도 정상 최종 종결을 확인하고 한 요청으로 보낸다', async () => {
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '정상 종결' }))
+  fireEvent.click(screen.getByRole('button', { name: '종결 확인' }))
   expect(screen.getByText(/참고 맥락·제외 거래에는 판정하지 않습니다/)).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '최종 종결 확정' }))
   await waitFor(() => expect(submitReviewCommand).toHaveBeenCalledWith(expect.objectContaining({ action: 'CLOSE', decision: 'NORMAL' }), expect.any(String)))
@@ -266,14 +275,14 @@ it('조사 대상이 없으면 최종 종결을 막고 안내한다', async () =
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   await showTab('검토 의견')
   expect(await screen.findByText('조사 대상 거래가 없어 최종 종결할 수 없습니다.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '정상 종결' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '종결 확인' })).toBeDisabled()
 })
 
 it('처리 대상이 아닌 TRANSFERRED 거래만 있으면 최종 종결을 막는다', async () => {
   fetchReviewCase.mockResolvedValue(alertCase(1, 3001, { groups: [{ groupId: 0, label: '묶음', revision: 1, members: [{ ...member(1), state: 'TRANSFERRED' }] }] }))
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   await showTab('검토 의견')
-  expect(await screen.findByRole('button', { name: '정상 종결' })).toBeDisabled()
+  expect(await screen.findByRole('button', { name: '종결 확인' })).toBeDisabled()
 })
 
 it('V12 초기화로 이전 사건이 404이면 목록으로 이동할 수 있다', async () => {
@@ -314,14 +323,15 @@ it('편입된 원본 Alert는 그래프를 유지하고 목적지로 이동한�
   await showTab('검토 의견')
   fireEvent.click(screen.getByRole('button', { name: 'Episode E-80 보기' }))
   expect(onOpenEpisode).toHaveBeenCalledWith(80)
-  expect(screen.getByRole('button', { name: '정상 종결' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '종결 확인' })).toBeDisabled()
 })
 
 it('네트워크 실패 후 같은 UUID와 본문으로 재시도한다', async () => {
   submitReviewCommand.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce({ caseIds: [1], targetCaseId: 50 })
   await open()
-  fireEvent.change(await screen.findByLabelText('편입할 Episode'), { target: { value: '50' } })
-  fireEvent.click(screen.getByRole('button', { name: '기존 Episode에 전체 편입' }))
+  await choose('판정', '이상거래 · 기존 Episode 연결')
+  await choose('연결할 Episode', 'E-50')
+  fireEvent.click(screen.getByRole('button', { name: 'Episode 연결 확인' }))
   fireEvent.click(await screen.findByRole('button', { name: '같은 요청 재시도' }))
   await waitFor(() => expect(submitReviewCommand).toHaveBeenCalledTimes(2))
   expect(submitReviewCommand.mock.calls[1]).toEqual(submitReviewCommand.mock.calls[0])
@@ -330,8 +340,9 @@ it('네트워크 실패 후 같은 UUID와 본문으로 재시도한다', async 
 it('409가 나면 최신 내용을 재조회하고 자동 재제출하지 않는다', async () => {
   submitReviewCommand.mockRejectedValueOnce(new ApiError({ type: 'about:blank', title: 'Conflict', status: 409, code: 'INVALID_TRANSITION' }))
   await open()
-  fireEvent.change(await screen.findByLabelText('편입할 Episode'), { target: { value: '50' } })
-  fireEvent.click(screen.getByRole('button', { name: '기존 Episode에 전체 편입' }))
+  await choose('판정', '이상거래 · 기존 Episode 연결')
+  await choose('연결할 Episode', 'E-50')
+  fireEvent.click(screen.getByRole('button', { name: 'Episode 연결 확인' }))
   await waitFor(() => expect(fetchReviewCase).toHaveBeenCalledTimes(2))
   expect(submitReviewCommand).toHaveBeenCalledTimes(1)
   expect(toastError).toHaveBeenCalledWith(expect.stringContaining('최신 내용을 확인'))
@@ -339,8 +350,9 @@ it('409가 나면 최신 내용을 재조회하고 자동 재제출하지 않는
 
 it('기존 Episode 편입은 목적지 revision을 함께 보낸다', async () => {
   await open()
-  fireEvent.change(await screen.findByLabelText('편입할 Episode'), { target: { value: '50' } })
-  fireEvent.click(screen.getByRole('button', { name: '기존 Episode에 전체 편입' }))
+  await choose('판정', '이상거래 · 기존 Episode 연결')
+  await choose('연결할 Episode', 'E-50')
+  fireEvent.click(screen.getByRole('button', { name: 'Episode 연결 확인' }))
   await waitFor(() => expect(submitReviewCommand).toHaveBeenCalled())
   expect(submitReviewCommand.mock.calls[0][0]).toMatchObject({ action: 'TRANSFER', targetCaseId: 50, targetRevision: 7, selections: [{ caseId: 1, groupId: 0, txIds: [] }] })
 })
@@ -348,7 +360,7 @@ it('기존 Episode 편입은 목적지 revision을 함께 보낸다', async () =
 it('저장은 성공하고 자금 지표 재조회만 실패하면 저장 성공을 분명히 안내한다', async () => {
   fetchReviewMoney.mockResolvedValueOnce({ available: false, reason: 'EMPTY_SUBJECT_SCOPE' }).mockRejectedValueOnce(new TypeError('offline'))
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '정상 종결' }))
+  fireEvent.click(screen.getByRole('button', { name: '종결 확인' }))
   fireEvent.click(screen.getByRole('button', { name: '최종 종결 확정' }))
   await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringContaining('저장은 완료됐지만 최신 화면을 불러오지 못했습니다')))
   expect(submitReviewCommand).toHaveBeenCalledTimes(1)
@@ -360,7 +372,19 @@ it('목적지 Episode를 20건씩 넘겨 다음 페이지에서 고를 수 있�
     ? { ...page([{ ...alertCase(pageNumber ? 51 : 50, 0), kind: 'EPISODE', alertId: null, revision: 7 }]), page: pageNumber ?? 0, totalElements: 21, totalPages: 2 }
     : page([alertCase(1, 3001)])))
   await open()
+  await choose('판정', '이상거래 · 기존 Episode 연결')
   fireEvent.click(await screen.findByRole('button', { name: '다음 Episode 목적지' }))
   expect(fetchReviewCases).toHaveBeenCalledWith({ kind: 'EPISODE', status: 'OPEN', page: 1, size: 20 })
+  fireEvent.keyDown(await screen.findByRole('combobox', { name: '연결할 Episode' }), { key: 'ArrowDown' })
   expect(await screen.findByRole('option', { name: /E-51/ })).toBeInTheDocument()
+})
+
+
+it('Episode 연결 목록의 원본 Alert ID를 조사 caseId로 조회해 이동한다', async () => {
+  fetchReviewCase.mockResolvedValue(episodeCase(2))
+  const onOpenAlert = vi.fn()
+  render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} onOpenAlert={onOpenAlert} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'A-3001 상세 보기' }))
+  await waitFor(() => expect(onOpenAlert).toHaveBeenCalledWith(1))
+  expect(fetchReviewCases).toHaveBeenCalledWith({ kind: 'ALERT', query: 'A-3001', page: 0, size: 100 })
 })

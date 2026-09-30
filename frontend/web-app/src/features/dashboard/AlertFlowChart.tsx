@@ -1,10 +1,10 @@
 // 기관 전체 "일별 Alert 유입과 처리 상태". 그날 들어온 Alert를 지금 처리 상태(처리 전·중·완료)로 나눠 쌓는다.
 // 색은 상태 태그와 같은 초록·파랑·보라다. 기간은 대시보드의 DateRangeButton이 정한다.
-import { Bar, BarChart, Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { DashboardRequested } from '@/api/dashboard'
 import { ProvenanceBadge } from '@/components/Provenance'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart'
 import { fmt } from '@/lib/format'
 import { workStatusLabels } from '@/lib/workStatus'
 
@@ -46,7 +46,7 @@ export function StatusLegend() {
   )
 }
 
-export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
+export function AlertStatusChart({ data, unavailable = false }: { data: DailyStatus[]; unavailable?: boolean }) {
   return (
     <Card className="@container/card min-w-0 max-w-full shadow-none" data-testid="alert-flow-chart">
       <CardHeader>
@@ -55,6 +55,7 @@ export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
           <ProvenanceBadge kind="proposal" title="일별 처리 상태 집계는 API 계약에 없어 Backend에 요청할 항목입니다." />
         </div>
         <CardDescription>그날 들어온 Alert가 지금 어느 단계에 있는지 · 막대 전체 = 유입 건수</CardDescription>
+        {unavailable && <p className="text-xs text-muted-foreground">상태별 일별 집계 API 미연결 · 데이터 준비 중</p>}
       </CardHeader>
       <CardContent className="min-w-0 px-2 pt-2 sm:px-6">
         <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full min-w-0 max-w-full">
@@ -72,11 +73,3 @@ export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
   )
 }
 
-/** 실제 API는 날짜별 유입·종결 건수를 준다. 상태별 잔량으로 재해석하지 않는다. */
-export function AlertDailyFlowChart({ data }: { data: { day: string; incoming: number; completed: number }[] }) {
-  return <Card className="@container/card min-w-0 max-w-full shadow-none" data-testid="alert-flow-chart"><CardHeader><CardTitle>일별 Alert 유입과 종결</CardTitle><CardDescription>각 날짜의 신규 유입과 종결 건수</CardDescription></CardHeader><CardContent>
-    <ChartContainer className="h-[260px] w-full" config={{ incoming: { label: '유입', color: 'var(--status-pending)' }, completed: { label: '종결', color: 'var(--status-closed)' } }}>
-      <LineChart data={data} accessibilityLayer><CartesianGrid vertical={false} /><XAxis dataKey="day" tickFormatter={md} /><YAxis allowDecimals={false} /><ChartTooltip content={<ChartTooltipContent />} /><Line dataKey="incoming" stroke="var(--status-pending)" dot={false} /><Line dataKey="completed" stroke="var(--status-closed)" dot={false} /></LineChart>
-    </ChartContainer><p className="text-center text-xs text-muted-foreground">유입 · 종결</p>
-  </CardContent></Card>
-}
