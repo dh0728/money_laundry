@@ -7,8 +7,6 @@ import { PatternBadge } from '@/components/badges'
 import { Card, CardContent } from '@/components/ui/card'
 import { RadarSweep } from '@/features/agent/RadarSweep'
 import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
-import { WorkCard } from './WorkCard'
-import { alertWorkItem } from './workItems'
 
 const HIGH_RISK = 0.8
 
@@ -51,17 +49,4 @@ export function DailyReportView({ generatedAt, changeSummary, operation, focus }
       </CardContent>
     </Card>
   )
-}
-
-export function PriorityReview({ children }: { children: ReactNode }) {
-  return <section aria-labelledby="priority-title" className="rounded-xl border bg-card/35 p-3 @3xl:p-4">
-    <h2 id="priority-title" className="text-base font-semibold tracking-tight">담당 조사자 우선 검토</h2>
-    <p className="mt-1 text-xs leading-5 text-muted-foreground">기관 전체 미처리 Alert의 위험도와 경과를 확인합니다. 필요하면 담당 배정을 검토하세요.</p>
-    <div className="mt-3 space-y-2.5">{children}</div>
-  </section>
-}
-
-export function MockPriorityItems({ openAlerts }: { openAlerts: AlertRow[] }) {
-  const priority = openAlerts.flatMap(alert => alertWorkItem(alert) ?? []).sort((a, b) => b.ageDays - a.ageDays || b.riskScore - a.riskScore).slice(0, 3)
-  return priority.length ? <ul className="space-y-2.5">{priority.map(item => <li key={item.id} data-testid="ai-priority-item"><WorkCard item={item} /></li>)}</ul> : <p className="text-sm text-muted-foreground">미처리 Alert 없음.</p>
 }

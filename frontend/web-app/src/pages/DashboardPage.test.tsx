@@ -77,14 +77,13 @@ describe('대시보드 · 기관 전체', () => {
     const report = await screen.findByTestId('ai-daily-report')
     expect(within(report).getByRole('heading', { name: 'RDR 9000 Daily Report' })).toBeInTheDocument()
     expect(within(report).getByTestId('rdr-eye')).toBeInTheDocument()
-    const priority = screen.getByRole('region', { name: '담당 조사자 우선 검토' })
-    expect(report).not.toContainElement(priority)
-    expect(screen.getByTestId('institution-dashboard-grid')).not.toContainElement(priority)
-    expect(within(priority).getByText(/필요하면 담당 배정을 검토하세요/)).toBeInTheDocument()
-    const [first] = within(priority).getAllByTestId('ai-priority-item')
-    expect(first.querySelector('.semantic-pattern-badge')).toBeInTheDocument()
-    expect(first.querySelector('[data-testid="age-badge"]')).toBeInTheDocument()
-    expect(first.querySelector('[title^="모델 위험 점수"]')).toBeInTheDocument()
+    const queue = await screen.findByRole('region', { name: '업무 현황' })
+    expect(report).not.toContainElement(queue)
+    expect(within(queue).getAllByTestId('work-status-column')).toHaveLength(3)
+    expect(within(queue).getByText('열린 Alert')).toBeInTheDocument()
+    expect(within(queue).getByText('열린 Episode')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '담당 조사자 우선 검토' })).not.toBeInTheDocument()
+
   })
 
   it('미배정 건수 문구가 없다', async () => {
@@ -99,7 +98,7 @@ describe('대시보드 · 기관 전체', () => {
     render(<DashboardPage />)
     openInstitution()
     expect(await screen.findByText('선택한 기간에 Alert가 없습니다.')).toBeInTheDocument()
-    expect(screen.getByText('미처리 Alert가 없습니다.', { selector: 'p.rounded-lg' })).toBeInTheDocument()
+    expect(await screen.findAllByText('해당 상태 업무가 없습니다.')).toHaveLength(3)
   })
 })
 

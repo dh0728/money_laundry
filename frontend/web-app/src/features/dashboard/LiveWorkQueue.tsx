@@ -26,10 +26,10 @@ export function QueueItems({ kind, status, personal = true }: { kind: ReviewKind
   </>
 }
 
-export function LiveWorkQueue() {
+export function LiveWorkQueue({ personal = true }: { personal?: boolean } = {}) {
   return <WorkQueue columns={[
-    { status: 'PENDING', label: '열린 Alert', content: <QueueItems kind="ALERT" status="OPEN" /> },
-    { status: 'IN_PROGRESS', label: '열린 Episode', content: <QueueItems kind="EPISODE" status="OPEN" /> },
-    { status: 'DONE', content: <><QueueItems kind="ALERT" status="CLOSED" /><QueueItems kind="EPISODE" status="CLOSED" /></> },
+    { status: 'PENDING', label: '열린 Alert', content: <QueueItems kind="ALERT" status="OPEN" personal={personal} /> },
+    { status: 'IN_PROGRESS', label: '열린 Episode', content: <QueueItems kind="EPISODE" status="OPEN" personal={personal} /> },
+    { status: 'DONE', content: <><QueueItems kind="ALERT" status="CLOSED" personal={personal} /><QueueItems kind="EPISODE" status="CLOSED" personal={personal} /></> },
   ]} />
 }
