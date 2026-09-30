@@ -10,6 +10,7 @@ const { fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand
   fetchReviewCase: vi.fn(), fetchReviewCases: vi.fn(), fetchReviewMoney: vi.fn(), submitReviewCommand: vi.fn(), setReviewMoneyScope: vi.fn(),
 }))
 vi.mock('@/api/liveReview', () => ({ fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, setReviewMoneyScope }))
+vi.mock('@/lib/workspaceState', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/workspaceState')>(), useSharedPeriod: () => ({ from: '2023-08-12', to: '2023-09-10', setPeriod: vi.fn() }) }))
 
 const page = <T,>(content: T[]) => ({ content, page: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0 })
 const member = (txId: number) => ({ txId, reviewRole: 'SUBJECT', state: 'PENDING', decision: null, sources: [], transaction: { occurredAt: '2023-09-10T00:00:00Z', fromAccountId: 'a', toAccountId: 'b', fromBankId: 1, toBankId: 2, amountPaid: 10, amountUsd: 8, paymentCurrency: 'USD', paymentFormat: 'WIRE', role: 'SEED', isSuspicious: true, scores: null } })
@@ -31,11 +32,50 @@ beforeEach(() => {
   setReviewMoneyScope.mockResolvedValue({ caseId: 1, revision: 1002 })
 })
 
-const showTab = async (label: string) => fireEvent.mouseDown(await screen.findByRole('tab', { name: new RegExp(label) }), { button: 0, ctrlKey: false })
+const showTab = async (label: string) => {
+  await waitFor(() => expect(screen.getAllByTestId('overview-kpi-card')).toHaveLength(6))
+  const tab = screen.getByRole('tab', { name: new RegExp(label) })
+  fireEvent.mouseDown(tab, { button: 0, ctrlKey: false })
+  fireEvent.click(tab)
+}
 
 const episodeCase = (count: number) => alertCase(50, 0, {
   kind: 'EPISODE', alertId: null, revision: 7,
   groups: Array.from({ length: count }, (_, i) => ({ groupId: i + 10, sourceAlertId: i + 3001, label: `Alert ${i + 3001}`, members: [{ ...member(i + 1), state: 'DECIDED', decision: 'NORMAL' }] })),
+})
+
+it('상세 데이터 로딩 중에도 탭과 요약 레이블을 유지하고 값만 스켈레톤으로 표시한다', () => {
+  fetchReviewCase.mockReturnValue(new Promise(() => undefined))
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  expect(screen.getByRole('status', { name: '조사 사건 불러오는 중' })).toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: '개요' })).toBeInTheDocument()
+  expect(screen.getByText('거래 총액')).toBeInTheDocument()
+  expect(screen.getByText('일별 거래 금액')).toBeInTheDocument()
+  expect(screen.queryByText('데이터를 불러오는 중입니다')).not.toBeInTheDocument()
+  expect(screen.getByRole('status', { name: '조사 사건 불러오는 중' }).querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(6)
+})
+
+it('라이브 상세는 로컬 요약 카드 구조를 유지하고 제공되지 않은 값은 데이터 없음으로 표시한다', async () => {
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  const summary = await screen.findByRole('region', { name: '사건 요약' })
+  expect(summary.querySelectorAll('[data-testid="overview-kpi-card"]')).toHaveLength(6)
+  expect(summary).toHaveTextContent('투입 원금')
+  expect(summary).toHaveTextContent('순유입 (대표 계좌)')
+  expect(summary).toHaveTextContent('참여 계좌')
+  expect(summary).toHaveTextContent('데이터 없음')
+  expect(screen.getByRole('region', { name: '묶음 근거' })).toHaveTextContent('데이터 없음')
+  expect(screen.getByRole('region', { name: '처리 이력' })).toBeInTheDocument()
+})
+
+it('Episode 개요에서 연결 Alert를 선택해 해제 확인까지 진행한다', async () => {
+  fetchReviewCase.mockResolvedValue({ ...episodeCase(2), sourceAlertIds: [3001, 3002] })
+  render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
+  const linked = await screen.findByRole('region', { name: '연결 Alert' })
+  fireEvent.click(linked.querySelector('button')!)
+  fireEvent.click(screen.getByLabelText('Alert A-3001 선택'))
+  fireEvent.change(screen.getByLabelText('연결 해제 사유 (개요)'), { target: { value: '다른 사건' } })
+  fireEvent.click(linked.querySelectorAll('button')[1])
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('Episode를 해체할까요?')
 })
 
 it('Episode 연결 해제는 사유와 2개 미만 해체 확인 뒤 전체 그룹 UNLINK를 보낸다', async () => {
@@ -136,6 +176,7 @@ it('필터가 바뀌면 이전 선택을 제출하지 않는다', async () => {
   render(<LiveCasesPage kind="ALERT" onOpen={vi.fn()} onBack={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: 'Episode로 묶기' }))
   fireEvent.click(await screen.findByLabelText('새 Episode 선택 A-3001'))
+  fireEvent.click(screen.getByRole('button', { name: /필터/ }))
   fireEvent.click(screen.getByLabelText('내 담당'))
   expect(screen.getByText(/0건 선택/)).toBeInTheDocument()
 })
