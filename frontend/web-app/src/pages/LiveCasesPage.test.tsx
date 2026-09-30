@@ -391,8 +391,8 @@ it('Episode 연결 목록의 원본 Alert ID를 조사 caseId로 조회해 이�
 
 
 it.each(['ALERT', 'EPISODE'] as const)('%s 개요는 실제 자금 API와 전체 소속 거래로 요청한 카드를 표시한다', async kind => {
-  const seed = member(1)
-  const context = { ...member(2), reviewRole: 'CONTEXT', transaction: { ...member(2).transaction, fromAccountId: 'b', toAccountId: 'c', role: 'CONTEXT', isSuspicious: false, amountPaid: 25, paymentCurrency: 'MXN', occurredAt: '2023-09-11T03:57:00Z' } }
+  const seed = { ...member(1), transaction: { ...member(1).transaction, amountPaid: '10.00' } }
+  const context = { ...member(2), reviewRole: 'CONTEXT', transaction: { ...member(2).transaction, fromAccountId: 'b', toAccountId: 'c', role: 'CONTEXT', isSuspicious: false, amountPaid: '25.00', paymentCurrency: 'MXN', occurredAt: '2023-09-11T03:57:00Z' } }
   fetchReviewCase.mockResolvedValue(alertCase(1, 3001, {
     kind,
     groups: [

@@ -13,7 +13,8 @@ export function dailyMemberAmounts(groups: ReviewGroup[]): ActivityAmounts {
     const currency = transaction.paymentCurrency.trim()
     const day = kstDate(transaction.occurredAt)
     const amounts = days.get(currency) ?? new Map<string, number>()
-    amounts.set(day, (amounts.get(day) ?? 0) + transaction.amountPaid)
+    // Evidence snapshots serialize Decimal amounts as strings; never concatenate them.
+    amounts.set(day, (amounts.get(day) ?? 0) + Number(transaction.amountPaid))
     days.set(currency, amounts)
   }
   return Object.fromEntries([...days].map(([currency, amounts]) => [currency, {
