@@ -1,7 +1,7 @@
 import { fetchAlerts, type AlertQuery, type AlertRow } from '@/api/alerts'
 import type { Page } from '@/api/common'
 import { fetchDashboardSummary, type DashboardData, type DashboardRange } from '@/api/dashboard'
-import { allAlertsNormal, loadMockMyAlerts } from '@/mocks/alerts'
+import { allAlertsNormal, loadMockMyAlerts, loadMockAlerts } from '@/mocks/alerts'
 import { fetchEpisodes, type EpisodeRow } from '@/api/episodes'
 import { loadMockEpisodes } from '@/mocks/episodes'
 import { withOverride, type AlertOverrides } from '@/features/alerts/alertOverrides'
@@ -39,12 +39,12 @@ export function loadMyEpisodes(userId: number, overrides: AlertOverrides, review
     .map(row => (reviews[row.episodeId] ? { ...row, reviewRequestedAt: reviews[row.episodeId] } : row)))
 }
 
-/** 기관 전체의 조사 중 Episode(최신순). mock은 Alert 처리 결과를 반영해 묶는다. */
-export function loadActiveEpisodes(overrides: AlertOverrides): Promise<EpisodeRow[]> {
-  const rows = live
-    ? fetchEpisodes({ size: 200 }).then(page => page.content)
-    : loadMockEpisodes(allAlertsNormal.content.map(row => withOverride(row, overrides))).then(page => page.content)
-  return rows.then(list => list.filter(row => row.status !== 'CLOSED').sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+/** 기관 전체 업무. 담당자와 종결 여부를 제한하지 않는다. */
+export async function loadInstitutionWork(overrides: AlertOverrides) {
+  const page = await (live ? fetchAlerts({ size: 200 }) : loadMockAlerts())
+  const alerts = page.content.map(row => withOverride(row, overrides))
+  const episodes = await (live ? fetchEpisodes({ size: 200 }) : loadMockEpisodes(alerts))
+  return { alerts, episodes: episodes.content }
 }
 
 /** 대시보드 기준일. mock 데이터는 2026-09-26까지 있다. */

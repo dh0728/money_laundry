@@ -2,7 +2,6 @@ import { LiveWorkQueue } from '@/features/dashboard/LiveWorkQueue'
 import { InstitutionView } from '@/features/dashboard/InstitutionView'
 import { PersonalView, PersonalSummaryView } from '@/features/dashboard/PersonalView'
 import { DailyReportView } from '@/features/dashboard/AiDailyReport'
-import { QueueItems } from '@/features/dashboard/LiveWorkQueue'
 import { fetchReviewCases } from '@/api/liveReview'
 import { useCurrentUser } from '@/app/session'
 import { Card, CardContent } from '@/components/ui/card'
@@ -81,9 +80,7 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
       onRange: range => setPeriod({ from: range?.from ? isoDate(range.from) : daysBefore(businessDate,29), to: range?.to ? isoDate(range.to) : businessDate }),
       charts: <><div className="shrink-0"><AlertStatusChart data={data.dailyAlertStatus ?? []} unavailable={data.dailyAlertStatus == null} /></div><Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy"><CardContent className="flex min-h-0 flex-1 flex-col px-4"><SectionTitle title="의심 거래 구성과 패턴 분포" description={`전체 분석 거래 ${count(agreementTotal)}건의 모델 조합 · 의심 거래 유형별 건수`} />{agreementTotal ? <div className="min-h-0 flex-1"><TransactionPatternHierarchy linked={false} unit="거래" composition={data.agreements.map((row,i) => ({ name: agreementLabels[row.agreement] ?? row.agreement, value: row.count, fill: ['var(--foreground)','var(--muted-foreground)','var(--chart-3)','var(--chart-4)'][i%4] }))} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /></div> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</CardContent></Card></>,
       report: <LiveAiDailyReport data={data} />,
-      priority: <QueueItems kind="ALERT" status="OPEN" personal={false} />,
-      alerts: <QueueItems kind="ALERT" status="OPEN" personal={false} />,
-      episodes: <QueueItems kind="EPISODE" status="OPEN" personal={false} />,
+      queue: <LiveWorkQueue personal={false} />,
     }} /> : <PersonalView remote={{
       cards: [
         { label: '위험 점수 0.80 이상', value: highRisk.state.status === 'success' ? count(highRisk.state.data.totalElements) : '—', trend: '처리 전 Alert', note: '본인 담당 고위험 건' },
