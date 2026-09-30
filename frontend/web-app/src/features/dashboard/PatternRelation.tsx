@@ -14,6 +14,8 @@ export function TransactionPatternHierarchy(props: PatternProps) {
 
 // 이 폭보다 좁으면 좌우 배치 대신 세로 깔때기로 바꾼다.
 export const RELATION_STACK_BREAKPOINT = 720
+const RELATION_HEIGHT = 400
+const RELATION_STACK_HEIGHT = 560
 
 const sharePct = (value: number, total: number) => {
   const share = total ? value / total * 100 : 0
@@ -126,11 +128,11 @@ export function PatternRelationStack({ composition, distribution, linked = true,
 }
 
 function PatternRelationBars({ composition, distribution, linked = true, unit = 'Alert' }: PatternProps) {
-  const [ref, size] = useElementSize<HTMLDivElement>({ width: 720, height: 320 })
-  if (size.width < RELATION_STACK_BREAKPOINT) return <div ref={ref} className="h-full w-full min-w-0"><PatternRelationStack composition={composition} distribution={distribution} linked={linked} unit={unit} /></div>
-  const layout = buildPatternRelationLayout(composition, distribution, size.width, size.height)
+  const [ref, size] = useElementSize<HTMLDivElement>({ width: 720, height: RELATION_HEIGHT })
+  if (size.width < RELATION_STACK_BREAKPOINT) return <div ref={ref} style={{ height: RELATION_STACK_HEIGHT }} className="w-full min-w-0 overflow-y-auto"><PatternRelationStack composition={composition} distribution={distribution} linked={linked} unit={unit} /></div>
+  const layout = buildPatternRelationLayout(composition, distribution, size.width, RELATION_HEIGHT)
   const panel = 'absolute top-0 bottom-0 rounded-lg border bg-muted/30'
-  return <div ref={ref} data-testid="transaction-pattern-bar" role="img" aria-label={linked ? '전체 의심 거래 구성(거래 건)과 패턴 소속 거래의 유형별 Alert 분포' : '전체 분석 거래의 모델 조합과 의심 거래의 유형별 건수'} className="relative h-full min-h-[320px] w-full min-w-0 overflow-hidden">
+  return <div ref={ref} data-testid="transaction-pattern-bar" role="img" aria-label={linked ? '전체 의심 거래 구성(거래 건)과 패턴 소속 거래의 유형별 Alert 분포' : '전체 분석 거래의 모델 조합과 의심 거래의 유형별 건수'} style={{ height: RELATION_HEIGHT }} className="relative w-full min-w-0 overflow-hidden">
     <div data-testid="relation-total-panel" className={panel} style={{ left: 0, width: layout.leftW }} />
     <div data-testid="relation-pattern-panel" className={panel} style={{ left: layout.rightX, width: layout.rightW }} />
     <p className="absolute text-xs font-medium" style={{ left: layout.padX, top: 8 }}>전체 구성 <span className="font-normal text-muted-foreground">· 거래 건</span></p>
