@@ -1,6 +1,6 @@
 import { NuqsAdapter } from 'nuqs/adapters/react'
 import type { ReactElement } from 'react'
-import { fireEvent, render as testingRender, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render as testingRender, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveCasesPage from './LiveCasesPage'
 import { ApiError } from '@/api/common'
@@ -203,7 +203,7 @@ it('실제 사건 요약의 통화별 거래액과 대표 유형 비중을 표�
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   const overview = await screen.findByTestId('grouping')
   expect(overview).toHaveTextContent('대표 유형 비중 50.0%')
-  expect(screen.getByText('120,000 KRW · 70 USD')).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: '사건 요약' })).getByText('10 USD')).toBeInTheDocument()
   expect(overview).toHaveTextContent('조사 대상2건')
   expect(overview).toHaveTextContent('씨앗 거래1건')
 })
@@ -387,4 +387,37 @@ it('Episode 연결 목록의 원본 Alert ID를 조사 caseId로 조회해 이�
   fireEvent.click(await screen.findByRole('button', { name: 'A-3001 상세 보기' }))
   await waitFor(() => expect(onOpenAlert).toHaveBeenCalledWith(1))
   expect(fetchReviewCases).toHaveBeenCalledWith({ kind: 'ALERT', query: 'A-3001', page: 0, size: 100 })
+})
+
+
+it.each(['ALERT', 'EPISODE'] as const)('%s 개요는 실제 자금 API와 전체 소속 거래로 요청한 카드를 표시한다', async kind => {
+  const seed = member(1)
+  const context = { ...member(2), reviewRole: 'CONTEXT', transaction: { ...member(2).transaction, fromAccountId: 'b', toAccountId: 'c', role: 'CONTEXT', isSuspicious: false, amountPaid: 25, paymentCurrency: 'MXN', occurredAt: '2023-09-11T03:57:00Z' } }
+  fetchReviewCase.mockResolvedValue(alertCase(1, 3001, {
+    kind,
+    groups: [
+      { groupId: 1, members: [seed, context, { ...member(3), state: 'EXCLUDED' }] },
+      { groupId: 2, members: [seed, { ...member(4), state: 'TRANSFERRED' }] },
+    ],
+  }))
+  fetchReviewMoney.mockResolvedValue({ available: true, external: [{ currency: 'MXN', in: 200, out: 50, net: 150 }] })
+  render(<LiveCasesPage kind={kind} caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  const summary = await screen.findByRole('region', { name: '사건 요약' })
+  await waitFor(() => expect(summary).toHaveTextContent('외부 유입액200 MXN'))
+  expect(summary).toHaveTextContent('순유입150 MXN')
+  expect(summary).toHaveTextContent('거래 총액10 USD · 25 MXN')
+  expect(summary).toHaveTextContent('근거 거래2건')
+  expect(summary).toHaveTextContent('거래 기간09-10 09:00 ~ 09-11 12:57')
+  expect(within(summary).getAllByTestId('overview-kpi-card')).toHaveLength(kind === 'ALERT' ? 6 : 5)
+  if (kind === 'ALERT') expect(summary).toHaveTextContent('의심 거래 참여 계좌3개')
+  else expect(summary).not.toHaveTextContent('의심 거래 참여 계좌')
+  expect(summary).not.toHaveTextContent('조사 대상')
+  expect(summary).not.toHaveTextContent('씨앗 거래')
+  expect(summary).not.toHaveTextContent('위험도')
+})
+
+it('자금 지표 산출 대기를 0원으로 표시하지 않는다', async () => {
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  const summary = await screen.findByRole('region', { name: '사건 요약' })
+  await waitFor(() => expect(within(summary).getAllByText('산출 대기')).toHaveLength(2))
 })
