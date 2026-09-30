@@ -35,8 +35,8 @@ export function DailyReportView({ generatedAt, changeSummary, operation, focus, 
 }) {
   return (
     <Card data-testid="ai-daily-report" className="h-full min-w-0 overflow-hidden shadow-none" style={rdrSummaryBackground}>
-      <CardContent className="flex h-full min-h-0 flex-col">
-        <div>
+      <CardContent className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0">
           <div className="flex items-center gap-2"><RadarSweep className="size-5 shrink-0" /><h3 className="text-base font-semibold tracking-tight">RDR 9000 Daily Report</h3><ProvenanceBadge kind="mock" title="규칙 기반 시연 문장. LLM 미연동." /></div>
           <p className="mt-1 text-[11px] text-muted-foreground">
             {generatedAt ? <>집계 시각 <time dateTime={generatedAt}>{generatedAt.slice(0, 16).replace('T', ' ')}</time> 기준</> : '집계 시각 미제공'}

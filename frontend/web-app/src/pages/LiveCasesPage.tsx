@@ -3,7 +3,9 @@ import { Panel, OverviewPanels } from '@/features/alerts/DetailPanels'
 import { AlertVerdictForm } from '@/features/alerts/AlertVerdictForm'
 import type { AlertVerdict } from '@/features/alerts/verdict'
 import { SectionTitle } from '@/components/page'
-import { CaseActivityCharts, type ActivityAmounts } from '@/features/alerts/CaseActivityCharts'
+import { CaseActivityCharts } from '@/features/alerts/CaseActivityCharts'
+import { dailyMemberAmounts } from '@/features/alerts/activityAmounts'
+import { caseEvidence } from '@/features/alerts/caseEvidence'
 import { ReviewLayout } from '@/features/alerts/ReviewLayout'
 import AlertTxTable from '@/features/alerts/AlertTxTable'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
@@ -96,12 +98,15 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     })
     setScopeRetry(false)
   }
-  const activityAmounts: ActivityAmounts = {}
-  for (const [key, amount] of Object.entries(item.summary.dailySuspiciousAmount ?? {})) {
-    const split = key.lastIndexOf('|')
-    const day = split < 0 ? key : key.slice(0, split)
-    const currency = split < 0 ? '통화 미제공' : key.slice(split + 1)
-    ;(activityAmounts[currency] ??= { daily: [], senders: [] }).daily.push({ day, amount })
+  const activityAmounts = dailyMemberAmounts(item.groups ?? [])
+  const evidence = caseEvidence(item.groups ?? [])
+  const totalAmount = Object.entries(activityAmounts).map(([currency, values]) =>
+    `${moneyAmount(values.daily.reduce((sum, day) => sum + day.amount, 0))} ${currency}`).join(' · ') || '—'
+  const externalAmount = (field: 'in' | 'net') => {
+    if (money.state.status === 'loading') return '불러오는 중'
+    if (money.state.status === 'error') return '조회 실패'
+    if (!money.state.data.available) return '산출 대기'
+    return money.state.data.external?.map(row => `${moneyAmount(row[field])} ${row.currency}`).join(' · ') || '—'
   }
   for (const sender of item.summary.topSenders ?? []) {
     const split = sender.accountCurrency.lastIndexOf('|')
@@ -231,12 +236,12 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       tab={tab} onTab={setTab} count={item.summary.txCount} tags={<><Badge variant="outline">{item.status === 'OPEN' ? '진행 중' : '종결'}</Badge><RiskBadge score={item.summary.riskScore} /><Badge variant="outline">담당 {item.assigneeName}</Badge><Badge variant="outline">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '—'}</Badge></>} />
     <div hidden={tab !== 'overview'} className="space-y-4">
     <CaseStats items={[
-        ['거래 총액', Object.entries(item.summary.amountsByCurrency ?? {}).map(([currency, value]) => `${moneyAmount(value)} ${currency}`).join(' · ') || '—'],
-        ['거래', `${item.summary.txCount}건`],
-        ['조사 대상', `${item.summary.subjectCount}건`],
-        [item.kind === 'EPISODE' ? '연결 Alert' : '씨앗 거래', `${item.kind === 'EPISODE' ? item.sourceAlertIds.length : item.summary.seedCount}건`],
-        ['위험도', item.summary.riskScore?.toFixed(2) ?? '—'],
-        ['거래 기간', `${item.summary.firstTxAt?.slice(5, 10) ?? '—'} ~ ${item.summary.lastTxAt?.slice(5, 10) ?? '—'}`],
+        ['외부 유입액', externalAmount('in')],
+        ['거래 총액', totalAmount],
+        ['순유입', externalAmount('net')],
+        ['근거 거래', `${evidence.members.length}건`],
+        ...(item.kind === 'ALERT' ? [['의심 거래 참여 계좌', `${evidence.accountCount}개`]] : []),
+        ['거래 기간', evidence.period],
       ].map(([label, value]) => ({ label, value }))} />
     {item.kind === 'EPISODE' && <Panel title="연결 Alert" description="이 Episode를 이루는 Alert" testId="linked-alerts"
       action={<div className="flex gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => { setSelectingAlerts(value => !value); setUnlinkGroups([]); setUnlinkComment('') }}>{selectingAlerts ? '선택 취소' : '연결 Alert 선택'}</Button>{selectingAlerts && <Button size="sm" disabled={!editable || busy || !unlinkGroups.length || !unlinkComment.trim()} onClick={() => setConfirmUnlink(true)}>선택 Alert 연결 해제</Button>}</div>}>
