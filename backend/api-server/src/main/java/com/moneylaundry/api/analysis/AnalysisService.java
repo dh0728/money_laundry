@@ -88,6 +88,14 @@ public class AnalysisService {
     return tx.execute(
         status -> {
           receiptLock();
+          // The clock setter takes the same lock: registration must not mix a real
+          // analysis date with a configured demo business timestamp.
+          if (demoBusinessDay == null
+              && Boolean.TRUE.equals(
+                  jdbc.queryForObject(
+                      "select business_at is not null from demo_business_clock where id",
+                      Boolean.class)))
+            throw ApiException.invalidTransition("시연 업무 시각이 설정되어 있습니다. 조작패널에서 거래 기준일을 지정해 분석하세요.");
           Instant cutoff =
               scheduledDay == null
                   ? clock.instant()
