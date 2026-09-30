@@ -1160,6 +1160,125 @@ class ReviewWorkflowTests {
   }
 
   @Test
+  void daily_alert_status_uses_kst_creation_days_zero_fill_and_published_alerts_once()
+      throws Exception {
+    long before = publishedAlert(1), start = publishedAlert(2), last = publishedAlert(3);
+    long after = publishedAlert(4);
+    for (var item :
+        Map.of(
+                before,
+                "2023-08-31T14:59:59Z",
+                start,
+                "2023-08-31T15:00:00Z",
+                last,
+                "2023-09-01T14:59:59Z",
+                after,
+                "2023-09-03T15:00:00Z")
+            .entrySet())
+      jdbc.update(
+          "update review_cases set created_at=?::timestamptz where alert_id=?",
+          item.getValue(),
+          item.getKey());
+    jdbc.update(
+        "update review_cases set status='CLOSED',closed_at=now(),outcome='NORMAL' where alert_id=?",
+        last);
+    UUID secondRun = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis_runs(run_id,job_id,input_revision,status) select ?,job_id,2,'COMPLETED' from analysis_runs where run_id=?",
+        secondRun,
+        run);
+    jdbc.update(
+        "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,2,?,?,'{}')",
+        start,
+        secondRun,
+        "b".repeat(64));
+    alert(l1); // No published evidence: must not appear as an incoming Alert.
+    var dashboard = new DashboardService(jdbc, clock);
+    var result = dashboard.view(l1, LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
+    var days = rows(result.get("dailyAlertStatus"));
+    assertThat(days).hasSize(3);
+    assertThat(days.getFirst().get("date").toString()).isEqualTo("2023-09-01");
+    assertThat(days.getFirst())
+        .containsEntry("pending", 1L)
+        .containsEntry("inProgress", 0L)
+        .containsEntry("done", 1L);
+    for (int i = 0; i < days.size(); i++) {
+      var day = days.get(i);
+      assertThat(
+              number(day.get("pending")) + number(day.get("inProgress")) + number(day.get("done")))
+          .isEqualTo(number(rows(result.get("daily")).get(i).get("incoming")));
+    }
+    assertThat(days.get(1))
+        .containsEntry("pending", 0L)
+        .containsEntry("inProgress", 0L)
+        .containsEntry("done", 0L);
+    var mvc =
+        MockMvcBuilders.standaloneSetup(
+                new ReviewController(service, new LedgerQueryService(jdbc), clock, dashboard))
+            .build();
+    mvc.perform(
+            get("/api/v1/dashboard")
+                .principal(() -> "l1a")
+                .param("from", "2023-09-01")
+                .param("to", "2023-09-03"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.dailyAlertStatus[0].date").value("2023-09-01"))
+        .andExpect(jsonPath("$.dailyAlertStatus[0].inProgress").value(0));
+  }
+
+  @Test
+  void daily_alert_status_follows_episode_transfer_unlink_and_closure_on_original_day() {
+    long a = alert(l1), b = alert(l1);
+    for (long c : List.of(a, b)) {
+      long id = number(service.detail(c).get("alertId"));
+      jdbc.update(
+          "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb)",
+          id,
+          run,
+          "c".repeat(64),
+          encode(evidence.detail(id, null)));
+    }
+    var dashboard = new DashboardService(jdbc, clock);
+    var day = LocalDate.parse("2023-09-02");
+    act(l1, "REVIEW_START", null, select(a));
+    assertThat(dashboard.dailyAlertStatus(day, day).getFirst()).containsEntry("pending", 2L);
+    clock.set(clock.now().plus(Duration.ofDays(1)), 1);
+    long ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+        .containsEntry("pending", 0L)
+        .containsEntry("inProgress", 2L)
+        .containsEntry("done", 0L);
+    var detail = service.detail(ep);
+    long group = number(rows(detail.get("groups")).getFirst().get("groupId"));
+    act(
+        l2,
+        "UNLINK",
+        null,
+        new ReviewService.Selection(ep, number(detail.get("revision")), group, List.of()));
+    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+        .containsEntry("pending", 2L)
+        .containsEntry("inProgress", 0L)
+        .containsEntry("done", 0L);
+    ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    detail = service.detail(ep);
+    var selections = new ArrayList<ReviewService.Selection>();
+    for (var g : rows(detail.get("groups")))
+      selections.add(
+          new ReviewService.Selection(
+              ep, number(detail.get("revision")), number(g.get("groupId")), List.of(1L, 2L)));
+    act(l2, "DECIDE", "SUSPICIOUS", selections.toArray(ReviewService.Selection[]::new));
+    act(l2, "CLOSE", null, select(ep));
+    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+        .containsEntry("pending", 0L)
+        .containsEntry("inProgress", 0L)
+        .containsEntry("done", 2L);
+    assertThat(dashboard.dailyAlertStatus(day.plusDays(1), day.plusDays(1)).getFirst())
+        .containsEntry("pending", 0L)
+        .containsEntry("inProgress", 0L)
+        .containsEntry("done", 0L);
+  }
+
+  @Test
   void list_filters_whole_dataset_before_paging_and_matches_effective_evidence() {
     var actual = new ReviewService(jdbc, tx, clock, new AlertQueryService(jdbc, ReviewJson.JSON));
     long last = 0;

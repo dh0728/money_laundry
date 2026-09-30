@@ -343,6 +343,7 @@ Cookie: JSESSIONID=<로그인 세션>
 | deliveryDate | string, 대상 거래일. 복수이면 쉼표로 연결 | 선택 기간 무관 |
 | pendingReports | number, 대상 거래일의 처리·통합 미완료 보고 집계 | 선택 기간 무관 |
 | daily | array of {day: YYYY-MM-DD, incoming: number, completed: number} | Alert 생성/종결 업무일. 0건 날짜도 포함 |
+| dailyAlertStatus | array of {date: YYYY-MM-DD, pending: number, inProgress: number, done: number} | Alert 최초 생성 업무일별 현재 상태. 날짜 오름차순, 0건 날짜 포함 |
 | agreements | array of {agreement: string, count: number} | 최신 유효 점수의 탐지 업무일 |
 | types | array of {type: number, count: number} | 최신 유효 점수의 탐지 업무일, 이진 의심 거래만 |
 | activities | array of {event_id: number, case_id: number, action: string, comment: string, business_at: timestamp} | 본인 활동 업무 시각, 최근20건 |
@@ -361,6 +362,9 @@ Cookie: JSESSIONID=<로그인 세션>
 ### 차트·카드 의미
 
 - `daily.incoming`은 새 Alert 사건 수이고 새 근거 버전 수가 아니다. `completed`는 조사 업무 종결 건수이며 정상 판정만 세는 값이 아니다. 당일 유입 건들이 당일 종결됐다는 뜻도 아니다.
+- `dailyAlertStatus`는 완료된 분석에서 공개된 Alert만 원본 Alert당 한 번 집계한다. `pending`은 현재 Episode 소속이 없는 OPEN Alert, `inProgress`는 현재 OPEN Episode에 소속된 Alert, `done`은 직접 종결한 Alert 또는 CLOSED Episode에 소속된 Alert다. 정상·단독 의심 등 종결 결과는 합산한다.
+- 날짜는 KST 최초 생성일이며 편입·종결·해제 시 날짜가 이동하지 않는다. Episode에서 해제되어 다시 열린 Alert는 `pending`으로 돌아간다. 해당 날짜의 `pending + inProgress + done`은 `daily.incoming`과 같다. 근거 버전·거래·Episode 수를 세지 않는다.
+- 이 값은 조회 시점의 현재 상태다. 선택 날짜 당시의 상태를 복원한 이력 통계가 아니다. REVIEW_START 기록이나 단순 상세 열람은 이 분류에 영향을 주지 않는다. 기존 `daily.completed`(종결일별 이벤트)는 유지하며 이 차트에 대입하지 않는다.
 - `types`는 **의심 거래 건수**다. `alertsByType`이라는 이름으로 Alert 건수처럼 표시하지 않는다. 유형 분포는 가로 막대그래프다.
 - 도넛은 **전체 분석 거래**의 모델 조합 분포다. `STRONG`=이진 의심+패턴 있음, `ATYPICAL`=이진 의심+패턴 없음, `PATTERN_ONLY`=이진 정상+패턴 있음, `WEAK`=이진 정상+패턴 없음. 패턴 없음은 최다 확률 클래스0, 동률이면 작은 코드 우선이다. 미분석은 네 범주에 넣지 않는다.
 - agreements/types는 실제 있는 범주만 반환한다. FE는 누락 범주를0으로 채울 수 있다. 도넛 분모는 agreements의 count 합이며0이면 데이터 없음이다.
@@ -541,7 +545,7 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 - live의 관리자 검수 요청 버튼은 비활성화한다. 해당 승인 절차를 새 명령으로 가정하거나 mock 성공으로 처리하지 않는다. 실제 조사 의견·범위 제외·Alert 전체 편입·연결 해제·종결은 기존 명령 계약을 사용한다.
 - 전역 검색은 사건/알림의 서버 검색을 사용한다. Alert 결과의 표시는 alertId, 조사 상세 이동은 caseId다. 소유주·계좌·거래 검색은 거래 탐색 화면으로 검색어를 넘기며 원문 식별값을 사용하지 않는다.
 - 금액 차트는 같은 통화 안에서만 비교한다. 미제공 필드는 임의 값으로 보완하지 않는다. RDR 9000·AI 요약은 별도 mock 표시를 유지한다.
-- mock 화면의 일별 유입 Alert를 현재 OPEN/ESCALATED/CLOSED로 나눈 분포는 기존 일별 incoming/completed와 의미가 다르다. 해당 상태별 분포와 대표 계좌 이력 API는 미연결이며 live 화면에서 준비 중으로 표시한다. 기존 일별 수치를 다른 뜻으로 재사용하지 않는다.
+- mock 화면의 일별 유입 Alert를 현재 OPEN/ESCALATED/CLOSED로 나눈 분포는 기존 일별 incoming/completed와 의미가 다르다. 상태별 분포는 §6.5의 dailyAlertStatus로 연결한다. 대표 계좌 이력 API만 미연결로 남는다. 기존 일별 수치를 다른 뜻으로 재사용하지 않는다.
 
 
 
