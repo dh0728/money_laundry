@@ -400,12 +400,14 @@ it.each(['ALERT', 'EPISODE'] as const)('%s 개요는 실제 자금 API와 전체
       { groupId: 2, members: [seed, { ...member(4), state: 'TRANSFERRED' }] },
     ],
   }))
-  fetchReviewMoney.mockResolvedValue({ available: true, external: [{ currency: 'MXN', in: 200, out: 50, net: 150 }] })
+  fetchReviewMoney.mockResolvedValue({ available: true, external: [{ currency: 'MXN', in: 200, out: 50, net: 150 }], externalUsd: { in: 10, out: 2.5, net: 7.5 } })
   render(<LiveCasesPage kind={kind} caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   const summary = await screen.findByRole('region', { name: '사건 요약' })
   await waitFor(() => expect(summary).toHaveTextContent('외부 유입액200 MXN'))
   expect(summary).toHaveTextContent('순유입150 MXN')
-  expect(summary).toHaveTextContent('거래 총액10 USD · 25 MXN')
+  expect(summary).toHaveTextContent('거래 총액10 USD · 25 MXN16 USD')
+  expect(summary).toHaveTextContent('외부 유입액200 MXN10 USD')
+  expect(summary).toHaveTextContent('순유입150 MXN7.5 USD')
   expect(summary).toHaveTextContent('근거 거래2건')
   expect(summary).toHaveTextContent('거래 기간09-10 09:00 ~ 09-11 12:57')
   expect(within(summary).getAllByTestId('overview-kpi-card')).toHaveLength(kind === 'ALERT' ? 6 : 5)
@@ -420,4 +422,14 @@ it('자금 지표 산출 대기를 0원으로 표시하지 않는다', async () 
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   const summary = await screen.findByRole('region', { name: '사건 요약' })
   await waitFor(() => expect(within(summary).getAllByText('산출 대기')).toHaveLength(2))
+})
+
+
+it('USD 환산값이 없으면 0이나 NaN 대신 미제공을 표시한다', async () => {
+  fetchReviewCase.mockResolvedValue(alertCase(1, 3001, { groups: [{ groupId: 1, members: [{ ...member(1), transaction: { ...member(1).transaction, amountUsd: null } }] }] }))
+  fetchReviewMoney.mockResolvedValue({ available: true, external: [{ currency: 'SAR', in: 10, out: 20, net: -10 }] })
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  const summary = await screen.findByRole('region', { name: '사건 요약' })
+  await waitFor(() => expect(within(summary).getAllByText('USD 환산액 미제공')).toHaveLength(3))
+  expect(summary).not.toHaveTextContent('NaN')
 })

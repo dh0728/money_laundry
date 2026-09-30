@@ -72,6 +72,7 @@ export type ReviewMoney = {
   endExclusive?: string
   ledgerCount?: number
   method?: 'FIFO_ESTIMATE'
+  externalUsd?: { in: number | null; out: number | null; net: number | null }
   external?: { currency: string; in: number; out: number; net: number }[]
   accounts?: {
     accountId: string; currency: string; in: number; out: number; net: number; positiveNet: number

@@ -102,6 +102,13 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
   const evidence = caseEvidence(item.groups ?? [])
   const totalAmount = Object.entries(activityAmounts).map(([currency, values]) =>
     `${moneyAmount(values.daily.reduce((sum, day) => sum + day.amount, 0))} ${currency}`).join(' · ') || '—'
+  const usdLabel = (value: unknown) => value == null || value === '' || !Number.isFinite(Number(value))
+    ? 'USD 환산액 미제공' : `${moneyAmount(Number(value))} USD`
+  const usdAmounts = evidence.members.map(member => member.transaction.amountUsd)
+  const totalUsd = usdAmounts.some(value => value == null || !Number.isFinite(Number(value)))
+    ? null : usdAmounts.reduce((sum, value) => sum + Number(value), 0)
+  const externalUsd = (field: 'in' | 'net') => money.state.status === 'success' && money.state.data.available
+    ? usdLabel(money.state.data.externalUsd?.[field]) : undefined
   const externalAmount = (field: 'in' | 'net') => {
     if (money.state.status === 'loading') return '불러오는 중'
     if (money.state.status === 'error') return '조회 실패'
@@ -236,13 +243,13 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       tab={tab} onTab={setTab} count={item.summary.txCount} tags={<><Badge variant="outline">{item.status === 'OPEN' ? '진행 중' : '종결'}</Badge><RiskBadge score={item.summary.riskScore} /><Badge variant="outline">담당 {item.assigneeName}</Badge><Badge variant="outline">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '—'}</Badge></>} />
     <div hidden={tab !== 'overview'} className="space-y-4">
     <CaseStats items={[
-        ['외부 유입액', externalAmount('in')],
-        ['거래 총액', totalAmount],
-        ['순유입', externalAmount('net')],
+        ['외부 유입액', externalAmount('in'), externalUsd('in')],
+        ['거래 총액', totalAmount, usdLabel(totalUsd)],
+        ['순유입', externalAmount('net'), externalUsd('net')],
         ['근거 거래', `${evidence.members.length}건`],
         ...(item.kind === 'ALERT' ? [['의심 거래 참여 계좌', `${evidence.accountCount}개`]] : []),
         ['거래 기간', evidence.period],
-      ].map(([label, value]) => ({ label, value }))} />
+      ].map(([label, value, secondary]) => ({ label: label!, value: value!, secondary }))} />
     {item.kind === 'EPISODE' && <Panel title="연결 Alert" description="이 Episode를 이루는 Alert" testId="linked-alerts"
       action={<div className="flex gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => { setSelectingAlerts(value => !value); setUnlinkGroups([]); setUnlinkComment('') }}>{selectingAlerts ? '선택 취소' : '연결 Alert 선택'}</Button>{selectingAlerts && <Button size="sm" disabled={!editable || busy || !unlinkGroups.length || !unlinkComment.trim()} onClick={() => setConfirmUnlink(true)}>선택 Alert 연결 해제</Button>}</div>}>
       {selectingAlerts && <label className="text-xs">연결 해제 사유<textarea aria-label="연결 해제 사유" className="mt-1 mb-3 min-h-9 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} value={unlinkComment} disabled={!editable || busy} onChange={event => { setUnlinkComment(event.target.value); setCanRetry(false) }} placeholder="선택 Alert를 연결 해제하는 이유" /></label>}
