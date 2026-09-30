@@ -40,7 +40,7 @@ it('서버 집계를 mock의 기관·개인 화면 배치에 공급한다', asyn
   fetchDemoClock.mockResolvedValue({ businessAt: '2023-09-10T00:00:00Z', configured: true, revision: 1 })
   fetchLiveDashboard.mockResolvedValue({
     businessAt: '2023-09-10T00:00:00Z', personal: { pending: 2, aged: 1, closed: 3 }, institution: { alerts: 4, episodes: 1, aged: 2, today: 6, yesterday: 4 },
-    detection: { received: 100, analyzed: 80, suspicious: 20 }, deliveryDate: '2023-09-09', pendingReports: 0, daily: [],
+    detection: { received: 100, analyzed: 80, suspicious: 20 }, deliveryDate: '2023-09-09', pendingReports: 0, daily: [], dailyAlertStatus: [{ date: '2023-09-09', pending: 3, inProgress: 2, done: 1 }],
     agreements: [{ agreement: 'STRONG', count: 30 }, { agreement: 'ATYPICAL', count: 10 }, { agreement: 'PATTERN_ONLY', count: 20 }, { agreement: 'WEAK', count: 20 }],
     types: [{ type: 1, count: 12 }], activities: [{ event_id: 9, case_id: 42, action: 'COMMENT', comment: '검토 메모', business_at: '2023-09-10T01:00:00Z' }],
     priority: [], episodeWork: { current: { open: 1, aged: 0, unreviewed: 1, created_today: 0, closed_today: 0 }, firstReview: { samples: 0, average_seconds: null }, completion: { samples: 0, average_seconds: null }, oldestOpen: [] },
@@ -48,6 +48,11 @@ it('서버 집계를 mock의 기관·개인 화면 배치에 공급한다', asyn
   render(<LiveDashboardPage onOpen={vi.fn()} />)
   expect(await screen.findByText('오늘 유입 Alert')).toBeInTheDocument()
   expect(screen.getByText('+50%')).toBeInTheDocument()
+  const statusChart = within(screen.getByTestId('alert-flow-chart'))
+  expect(statusChart.queryByText('FE 제안')).not.toBeInTheDocument()
+  expect(statusChart.queryByText(/API 미연결/)).not.toBeInTheDocument()
+  const statusRow = within(statusChart.getByRole('row', { name: '2023-09-09 3 2 1 6' }))
+  expect(statusRow.getAllByRole('cell')).toHaveLength(4)
   expect(screen.getByText('대상 거래일 2023-09-09')).toBeInTheDocument()
   expect(screen.getByText('모델 의심 · 패턴 있음')).toBeInTheDocument()
   expect(screen.getByText('30건')).toBeInTheDocument()

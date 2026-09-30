@@ -91,6 +91,7 @@ public class DashboardService {
             "select (d AT TIME ZONE 'Asia/Seoul')::date as day,(select count(*) from visible_review_cases where kind='ALERT' and created_at>=d and created_at<d+interval '1 day') as incoming,(select count(*) from visible_review_cases where kind='ALERT' and closed_at>=d and closed_at<d+interval '1 day') as completed from generate_series(?::timestamptz,?::timestamptz,interval '1 day') d",
             at(from),
             at(to)));
+    out.put("dailyAlertStatus", dailyAlertStatus(from, to));
     out.put(
         "agreements",
         jdbc.queryForList(
@@ -120,6 +121,39 @@ public class DashboardService {
             "select case_id,kind,alert_id,created_at,risk from visible_review_cases where assignee_id=? and status='OPEN' order by risk desc,created_at,case_id limit 10",
             user));
     return out;
+  }
+
+  List<Map<String, Object>> dailyAlertStatus(LocalDate from, LocalDate to) {
+    // One row per published Alert, independent of evidence versions or transaction count.
+    // Do not use the risk projection: this chart only needs lifecycle and membership.
+    return jdbc.queryForList(
+        """
+        with counts as (
+          select (c.created_at at time zone 'Asia/Seoul')::date as day,
+            count(*) filter(where e.alert_id is null and c.status='OPEN') as pending,
+            count(*) filter(where ep.status='OPEN') as in_progress,
+            count(*) filter(where ep.status='CLOSED'
+              or (e.alert_id is null and c.status='CLOSED')) as done
+          from review_cases c
+          left join episode_alerts e on e.alert_id=c.alert_id
+          left join review_cases ep on ep.case_id=e.episode_case_id
+          where c.kind='ALERT' and c.created_at>=? and c.created_at<?
+            and exists (
+              select 1 from alert_versions v join analysis_runs r using(run_id)
+              join batch_jobs b on b.job_id=r.job_id
+              where v.alert_id=c.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
+            )
+          group by 1
+        )
+        select to_char(d,'YYYY-MM-DD') as date,coalesce(c.pending,0) as pending,
+          coalesce(c.in_progress,0) as "inProgress",coalesce(c.done,0) as done
+        from generate_series(?::date::timestamp,?::date::timestamp,interval '1 day') d
+        left join counts c on c.day=d::date order by d
+        """,
+        at(from),
+        at(to.plusDays(1)),
+        java.sql.Date.valueOf(from),
+        java.sql.Date.valueOf(to));
   }
 
   Map<String, Object> episodeWork(Instant now, LocalDate from, LocalDate to) {
