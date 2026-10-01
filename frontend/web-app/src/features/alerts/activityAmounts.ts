@@ -25,13 +25,18 @@ export function dailyMemberAmounts(groups: ReviewGroup[]): ActivityAmounts {
 }
 
 /** Use the stored USD value; missing conversions must not become partial totals. */
-export function dailyMemberUsd(groups: ReviewGroup[]): { day: string; amount: number }[] | null {
-  const days = new Map<string, number>()
+export function dailyMemberUsdByCurrency(groups: ReviewGroup[]): Record<string, { day: string; amount: number }[]> | null {
+  const currencies = new Map<string, Map<string, number>>()
   for (const { transaction } of caseEvidence(groups).members) {
     const value = transaction.amountUsd
     if (value == null || String(value).trim() === '' || !Number.isFinite(Number(value))) return null
     const day = kstDate(transaction.occurredAt)
+    const currency = transaction.paymentCurrency.trim()
+    const days = currencies.get(currency) ?? new Map<string, number>()
     days.set(day, (days.get(day) ?? 0) + Number(value))
+    currencies.set(currency, days)
   }
-  return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, amount]) => ({ day, amount }))
+  return Object.fromEntries([...currencies].sort(([a], [b]) => a.localeCompare(b)).map(([currency, days]) => [currency,
+    [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, amount]) => ({ day, amount })),
+  ]))
 }
