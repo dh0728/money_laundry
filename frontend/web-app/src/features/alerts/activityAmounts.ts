@@ -1,5 +1,6 @@
 import type { ReviewGroup } from '@/api/liveReview'
 import { kstDate } from '@/api/liveDashboard'
+import { caseEvidence } from './caseEvidence'
 import type { ActivityAmounts } from './CaseActivityCharts'
 
 /** Current case members, including context and model-normal transactions, once per txId. */
@@ -21,4 +22,16 @@ export function dailyMemberAmounts(groups: ReviewGroup[]): ActivityAmounts {
     daily: [...amounts].sort(([a], [b]) => a.localeCompare(b)).map(([day, amount]) => ({ day, amount })),
     senders: [],
   }]))
+}
+
+/** Use the stored USD value; missing conversions must not become partial totals. */
+export function dailyMemberUsd(groups: ReviewGroup[]): { day: string; amount: number }[] | null {
+  const days = new Map<string, number>()
+  for (const { transaction } of caseEvidence(groups).members) {
+    const value = transaction.amountUsd
+    if (value == null || String(value).trim() === '' || !Number.isFinite(Number(value))) return null
+    const day = kstDate(transaction.occurredAt)
+    days.set(day, (days.get(day) ?? 0) + Number(value))
+  }
+  return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, amount]) => ({ day, amount }))
 }
