@@ -39,6 +39,7 @@ export type ReviewCase = {
   ageDays: number
   summary: {
     txCount: number; subjectCount: number; seedCount: number; riskScore: number; primaryType: string; typeShare?: number | null
+    totalAmountUsd?: number | string | null
     amountsByCurrency: Record<string, number>; firstTxAt: string | null; lastTxAt: string | null
     paymentFormats?: Record<string, number>; typeDistribution?: Record<string, number>
     dailySuspiciousCount?: Record<string, number>; dailySuspiciousAmount?: Record<string, number>
