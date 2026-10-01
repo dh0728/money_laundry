@@ -715,3 +715,10 @@ CSRF 필요. `{ids: string[], read: boolean}`. 1~100개, 중복 ID는 한 번 �
 ### Episode 편입 알림 집계 보완 (V16)
 
 TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 명령으로 저장된 원본 Alert별 TRANSFER 이력은 조사 이력으로 보존하되 알림에서 제외한다. TRANSFER 이력이 있는 Episode의 최초 EPISODE_ASSIGNED 알림도 별도로 노출하지 않는다. 따라서 새 Episode에 Alert5개 편입 시 편입 알림1건이며, 이후 추가 편입은 이벤트ID가 다른 별도1건이다. 시연 업무 시각이 동일해도 시간으로 합치지 않는다. Episode 담당자 범위는 유지한다. 기존 Episode 이벤트ID와 읽음 상태는 유지되고 기존 중복은 재조회부터 숨겨진다.
+
+### 소유주 표시 이름과 그래프 연결
+
+- 소유주 표시는 공통 성20개·이름40개 후보 조합과 소유주 고유 번호의 `이름#번호` 형식이다. 번호는 최소5자리이며 초과 자릿수는 유지한다. 실제 이름 복호화·외부 인명부 조회·원본 변경은 하지 않는다. 같은 DB의 같은 소유주는 모든 화면에서 동일하다. DB 초기화로 개체를 새로 등록하면 번호/이름이 달라질 수 있다.
+- `GET /api/v1/ledger/owners` 항목에 `name`을 추가한다. `id`는 기존 소유주 UUID이며 선택·필터에 그대로 사용한다. `ledger/accounts` 및 review 계좌 조회 항목에 `ownerName`, `ledger/transactions` 항목에 `fromOwnerName`, `toOwnerName`을 추가한다. ledger의 `query`는 표시 이름과 번호도 검색한다.
+- `GET /api/v1/review/cases/{caseId}`는 현재 소속 거래 계좌의 `accounts:[{id,ownerId,ownerName,bankId}]`를 제공한다. 기존 사건에도 조회 시 연결하며 근거 스냅샷은 수정하지 않는다. 목록에는 이 매핑을 추가하지 않는다.
+- live 소유주 그래프는 `ownerId`로 묶고 `ownerName`으로 표시한다. 매핑 누락은 계좌별 미상으로 유지하며 서로 다른 소유주를 이름으로 병합하지 않는다. 별도 가상 이름 안내 문구는 표시하지 않는다. 표시 변경은 접근 통제나 API 식별자 제거를 의미하지 않는다.

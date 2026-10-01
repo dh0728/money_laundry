@@ -240,6 +240,15 @@ public class ReviewService {
           if (source.get("primaryType") != null) types.add(source.get("primaryType").toString());
     out.put("primaryTypes", types);
     if (includeHistory) {
+      var accountIds = new TreeSet<String>();
+      for (var member : members) {
+        if (Set.of("EXCLUDED", "TRANSFERRED").contains(member.get("state"))) continue;
+        var transaction = object(member.get("transaction"));
+        for (String key : List.of("fromAccountId", "toAccountId")) {
+          if (transaction.get(key) != null) accountIds.add(transaction.get(key).toString());
+        }
+      }
+      out.put("accounts", new LedgerQueryService(jdbc).accounts(accountIds));
       out.put(
           "history",
           jdbc.queryForList(

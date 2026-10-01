@@ -738,6 +738,48 @@ class ReviewWorkflowTests {
       assertThat(row.get("isSuspicious")).isNull();
     }
     assertThat(encode(data)).doesNotContain("hidden", "is_laundering", "name_cipher");
+    String displayName = OwnerDisplay.name(entity);
+    long caseId = alert(l1);
+    long alertId = number(service.detail(caseId).get("alertId"));
+    String secondAccount =
+        jdbc.queryForObject(
+            "select service_account_id::text from private.accounts where account_id=?",
+            String.class,
+            b);
+    for (var transaction : rows(evidence.detail(alertId, null).get("transactions"))) {
+      transaction.put("fromAccountId", account.toString());
+      transaction.put("toAccountId", secondAccount);
+    }
+    var ownerNodes = rows(service.detail(caseId).get("accounts"));
+    assertThat(ownerNodes)
+        .hasSize(2)
+        .allSatisfy(
+            node -> {
+              assertThat(node.get("ownerId")).isEqualTo(owner);
+              assertThat(node.get("ownerName")).isEqualTo(displayName);
+            });
+
+    for (var row : rows(data.get("content"))) {
+      assertThat(row.get("fromOwnerName")).isEqualTo(displayName);
+      assertThat(row.get("toOwnerName")).isEqualTo(displayName);
+    }
+    assertThat(rows(query.query("owners", filter).get("content")).getFirst().get("name"))
+        .isEqualTo(displayName);
+    assertThat(rows(query.query("accounts", filter).get("content")))
+        .allSatisfy(row -> assertThat(row.get("ownerName")).isEqualTo(displayName));
+    assertThat(query.accounts(List.of(account.toString())).getFirst().get("ownerName"))
+        .isEqualTo(displayName);
+    var byName =
+        new LedgerQueryService.Filter(
+            filter.from(), filter.to(), null, null, null, null, 0, 20, displayName, null);
+    assertThat(query.query("transactions", byName).get("totalElements")).isEqualTo(2L);
+    for (long number : List.of(1L, 20L, 21L, 800L, 801L, 100000L)) {
+      assertThat(
+              jdbc.queryForObject(
+                  "select " + OwnerDisplay.sql(Long.toString(number)), String.class))
+          .isEqualTo(OwnerDisplay.name(number));
+    }
+
     var incoming =
         new LedgerQueryService.Filter(
             filter.from(),
