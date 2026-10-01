@@ -4,7 +4,7 @@ import { AlertVerdictForm } from '@/features/alerts/AlertVerdictForm'
 import type { AlertVerdict } from '@/features/alerts/verdict'
 import { SectionTitle } from '@/components/page'
 import { CaseActivityCharts } from '@/features/alerts/CaseActivityCharts'
-import { dailyMemberAmounts, dailyMemberUsd } from '@/features/alerts/activityAmounts'
+import { dailyMemberAmounts, dailyMemberUsdByCurrency } from '@/features/alerts/activityAmounts'
 import { caseEvidence } from '@/features/alerts/caseEvidence'
 import { ReviewLayout } from '@/features/alerts/ReviewLayout'
 import AlertTxTable from '@/features/alerts/AlertTxTable'
@@ -265,7 +265,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
         toggle: id => { const group = linkedGroups.find(group => group.sourceAlertId === id)!; setUnlinkGroups(ids => ids.includes(group.groupId) ? ids.filter(value => value !== group.groupId) : [...ids, group.groupId]); setCanRetry(false) } } : undefined} />
       {selectingAlerts && <p className="mt-2 text-xs text-muted-foreground">남는 Alert가 2개 미만이면 모두 연결 해제하고 Episode는 해체 종결 이력으로 보존합니다.</p>}
     </Panel>}
-    {item.kind === 'ALERT' && <CaseActivityCharts amounts={activityAmounts} dailyUsd={dailyMemberUsd(item.groups ?? [])} />}
+    {item.kind === 'ALERT' && <CaseActivityCharts amounts={activityAmounts} dailyUsdByCurrency={dailyMemberUsdByCurrency(item.groups ?? [])} />}
     <OverviewPanels columns={item.kind === 'EPISODE' ? 3 : 4}>
     <Panel title={item.kind === 'ALERT' ? '묶음 근거' : '패턴 증거'} description="서버가 보존한 조사 범위" testId="grouping">
       {item.kind === 'EPISODE' && <div className="flex flex-wrap gap-1">{item.primaryTypes.map(name => <Badge key={name} variant="outline">{name}</Badge>)}</div>}
