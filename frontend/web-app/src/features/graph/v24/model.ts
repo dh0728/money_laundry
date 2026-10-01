@@ -4,7 +4,7 @@
 export type GraphViewMode = 'account' | 'owner'
 
 export type GraphNode = {
-  key: string; account: string; bank: string; entity: string; x: number; y: number
+  key: string; account: string; bank: string; entity: string; entityId?: string; x: number; y: number
   core: boolean; bridge: boolean; hub: boolean; hubDegree: number; hop: number; synthetic: boolean
 }
 /** at은 'YYYY-MM-DD HH:mm'(서울 시각) */

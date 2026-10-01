@@ -39,6 +39,7 @@ export type ReviewCase = {
   ageDays: number
   summary: {
     txCount: number; subjectCount: number; seedCount: number; riskScore: number; primaryType: string; typeShare?: number | null
+    totalAmountUsd?: number | string | null
     amountsByCurrency: Record<string, number>; firstTxAt: string | null; lastTxAt: string | null
     paymentFormats?: Record<string, number>; typeDistribution?: Record<string, number>
     dailySuspiciousCount?: Record<string, number>; dailySuspiciousAmount?: Record<string, number>
@@ -48,6 +49,7 @@ export type ReviewCase = {
   episodeId: number | null
   sourceAlertIds: number[]
   primaryTypes: string[]
+  accounts?: { id: string; ownerId: string; ownerName?: string; bankId: number }[]
   groups?: ReviewGroup[]
   detachments?: { eventId: number; action: 'UNLINK' | 'DISSOLVE'; comment: string; businessAt: string; snapshot: { selectedAlertIds?: number[]; removedAlertIds?: number[]; episodeCaseId?: number; groups: ReviewGroup[] } }[]
   history?: { eventId: number; action: string; comment: string; businessAt: string; recordedAt: string; actor: string | null }[]

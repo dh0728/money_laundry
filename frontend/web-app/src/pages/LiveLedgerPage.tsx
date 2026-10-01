@@ -35,13 +35,13 @@ export default function LiveLedgerPage({ onOpen }: { onOpen?: (kind: 'ALERT' | '
   const chooseOwner = (id: string) => { setOwner(id); setAccount(null); setAccountPage(0); setTransactionPage(0) }
   const chooseAccount = (id: string) => { setAccount(id); setTransactionPage(0) }
   const index: TransactionIndex = {
-    owners: owners.state.status === 'success' ? owners.state.data.content.map(row => ({ name: row.id, accountIds: [], transactionIds: [] })) : [],
+    owners: owners.state.status === 'success' ? owners.state.data.content.map(row => ({ id: row.id, name: row.name ?? '소유주 미상', accountIds: [], transactionIds: [] })) : [],
     accounts: accounts.state.status === 'success' ? accounts.state.data.content.map(row => ({ id: row.id, bank: String(row.bankId), owner: row.ownerId, transactionIds: transactions.state.status === 'success' ? transactions.state.data.content.map(tx => String(tx.txId)) : [] })) : [],
     transactions: transactions.state.status === 'success' ? transactions.state.data.content.map(row => ({
       id: String(row.txId), at: new Date(row.occurredAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T'),
       usd: row.amountUsd, amount: row.amountPaid, currency: row.paymentCurrency, format: row.paymentFormat,
       suspicious: row.isSuspicious, fromAccount: row.fromAccountId, toAccount: row.toAccountId,
-      fromOwner: row.fromOwnerId, toOwner: row.toOwnerId, alertIds: row.alertIds, episodeIds: row.episodeIds,
+      fromOwner: row.fromOwnerName ?? '소유주 미상', toOwner: row.toOwnerName ?? '소유주 미상', alertIds: row.alertIds, episodeIds: row.episodeIds,
     })) : [],
   }
   const filters: TransactionFilter[] = [

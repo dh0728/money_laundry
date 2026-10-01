@@ -10,13 +10,15 @@ export type LedgerFilters = {
   page?: number
   size?: number
 }
-export type LedgerOwner = { id: string }
-export type LedgerAccount = { id: string; ownerId: string; bankId: number }
+export type LedgerOwner = { id: string; name?: string }
+export type LedgerAccount = { id: string; ownerId: string; ownerName?: string; bankId: number }
 export type LedgerTransaction = {
   txId: number
   occurredAt: string
   fromAccountId: string
   toAccountId: string
+  fromOwnerName?: string
+  toOwnerName?: string
   fromOwnerId: string
   toOwnerId: string
   fromBankId: number

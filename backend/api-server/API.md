@@ -587,6 +587,7 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 - DECIDE는 NORMAL/SUSPICIOUS로 범위 판정만 저장한다. Episode는 해당 묶음의 미판정 SUBJECT 전체 선택이 필요하다. RECONSIDER는 OPEN Episode 묶음 판정을 다시 미판정으로 열며 이전 감사 기록은 보존한다.
 - `CLOSE`에 decision이 없으면 기존 범위 판정을 집계해 종결한다. Episode는 이 방식만 허용한다. 미판정 SUBJECT/상충 판정은409. 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED/DISSOLVED. DISSOLVED는 UNLINK에 따른 Episode 해체만 사용한다.
 - 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
+- review 목록·상세의 `summary.totalAmountUsd`: 현재 소속 전체 거래(SUBJECT+CONTEXT)에서 EXCLUDED/TRANSFERRED 제외·txId 중복 제거 후 저장 `amountUsd` 합계. Episode 내 여러 Alert에 겹친 거래는 한 번만 센다. 환산액 누락/잘못된 값이 하나라도 있으면 null, 거래가 없으면 0. 기존 `amountsByCurrency`의 SUBJECT 집계 의미는 유지한다. Alert·Episode 목록의 거래 총액은 이 필드를 소수 최대 2자리 USD로 표시하며 미제공 시 원통화 합계로 대체하지 않는다.
 - summary는 중복 제거한 현재 범위의 txCount,seedCount,riskScore,primaryType과 통화별 합계·순유입·집중도·상위 송금·일별 집계를 제공한다. 상세 키는 Swagger/CaseSummary 구현을 따른다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
 - 오늘 탐지율 분모는 **오늘 분석 업무가 다루는 거래일의 수신·통합 원장 거래 전체**다. 양쪽 은행 중복 보고는 한 거래로 세며 실제 반복 거래는 보존한다. 분자는 오늘 완료된 최신 유효 점수 중 임계 이상 거래다. 분석 날짜가 여러 개면 해당 거래일 합집합을 사용한다. 미분석을 분모에서 빼지 않는다. 검수/통합 미완료 보고가 있으면 최종 비율을 표시하지 않으며 분석 진행 중임을 구분한다. 분모 0은 ‘—’, 전일 Alert 0은 증감률 ‘—’다.
 - 최신 유효 점수는 COMPLETED job과 현재 COMPLETED run이 일치하는 결과다. 미완료/취소 결과로 덮지 않는다. 기관 일별 날짜는 KST, 경과는 배정 후 72시간이다. 통화별 상위 송금 10계좌, 결제 구성은 거래 건수다.
@@ -714,3 +715,10 @@ CSRF 필요. `{ids: string[], read: boolean}`. 1~100개, 중복 ID는 한 번 �
 ### Episode 편입 알림 집계 보완 (V16)
 
 TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 명령으로 저장된 원본 Alert별 TRANSFER 이력은 조사 이력으로 보존하되 알림에서 제외한다. TRANSFER 이력이 있는 Episode의 최초 EPISODE_ASSIGNED 알림도 별도로 노출하지 않는다. 따라서 새 Episode에 Alert5개 편입 시 편입 알림1건이며, 이후 추가 편입은 이벤트ID가 다른 별도1건이다. 시연 업무 시각이 동일해도 시간으로 합치지 않는다. Episode 담당자 범위는 유지한다. 기존 Episode 이벤트ID와 읽음 상태는 유지되고 기존 중복은 재조회부터 숨겨진다.
+
+### 소유주 표시 이름과 그래프 연결
+
+- 소유주 표시는 공통 성20개·이름40개 후보 조합과 소유주 고유 번호의 `이름#번호` 형식이다. 번호는 최소5자리이며 초과 자릿수는 유지한다. 실제 이름 복호화·외부 인명부 조회·원본 변경은 하지 않는다. 같은 DB의 같은 소유주는 모든 화면에서 동일하다. DB 초기화로 개체를 새로 등록하면 번호/이름이 달라질 수 있다.
+- `GET /api/v1/ledger/owners` 항목에 `name`을 추가한다. `id`는 기존 소유주 UUID이며 선택·필터에 그대로 사용한다. `ledger/accounts` 및 review 계좌 조회 항목에 `ownerName`, `ledger/transactions` 항목에 `fromOwnerName`, `toOwnerName`을 추가한다. ledger의 `query`는 표시 이름과 번호도 검색한다.
+- `GET /api/v1/review/cases/{caseId}`는 현재 소속 거래 계좌의 `accounts:[{id,ownerId,ownerName,bankId}]`를 제공한다. 기존 사건에도 조회 시 연결하며 근거 스냅샷은 수정하지 않는다. 목록에는 이 매핑을 추가하지 않는다.
+- live 소유주 그래프는 `ownerId`로 묶고 `ownerName`으로 표시한다. 매핑 누락은 계좌별 미상으로 유지하며 서로 다른 소유주를 이름으로 병합하지 않는다. 별도 가상 이름 안내 문구는 표시하지 않는다. 표시 변경은 접근 통제나 API 식별자 제거를 의미하지 않는다.

@@ -7,7 +7,7 @@ export type TransactionTarget =
   | { type: 'transaction'; transactionId: string }
 
 export type TransactionIndex = {
-  owners: Array<{ name: string; accountIds: string[]; transactionIds: string[] }>
+  owners: Array<{ id?: string; name: string; accountIds: string[]; transactionIds: string[] }>
   accounts: Array<{ id: string; bank: string; owner: string; transactionIds: string[] }>
   transactions: Array<{ id: string; at: string; usd: number; amount: number; currency: string; format: string; suspicious: boolean | null; fromAccount: string; toAccount: string; fromOwner: string; toOwner: string; alertIds: number[]; episodeIds: number[] }>
 }

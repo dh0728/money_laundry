@@ -9,7 +9,12 @@ export function reviewType(name: string) {
   // 알 수 없는 유형을 정상/0으로 바꾸지 않는다.
   return { code: code ?? null, name: code === undefined ? name : typeDisplay(code).key }
 }
-const amounts = (item: ReviewCase) => Object.entries(item.summary.amountsByCurrency).map(([currency, amount]) => `${Number(amount).toLocaleString('ko-KR')} ${currency}`).join(' · ') || '—'
+const amounts = (item: ReviewCase) => {
+  const value = item.summary.totalAmountUsd
+  return value == null || String(value).trim() === '' || !Number.isFinite(Number(value))
+    ? 'USD 환산액 미제공'
+    : `${Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 2 })} USD`
+}
 export function alertListRow(item: ReviewCase): AlertListRow {
   if (item.alertId == null) throw new Error('Alert 원본 ID가 없습니다.')
   return {
