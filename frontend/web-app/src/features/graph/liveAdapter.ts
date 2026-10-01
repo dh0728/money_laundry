@@ -11,6 +11,7 @@ export function toReviewGraphModel(item: ReviewCase): GraphModel {
     if (!previous || (!previous.decision && member.decision)) members.set(member.txId, member)
   }
   const byPair = new Map<string, GraphTransaction[]>()
+  const accounts = new Map((item.accounts ?? []).map(account => [account.id, account]))
   const banks = new Map<string, number>()
   const neighbors = new Map<string, Set<string>>()
   for (const member of members.values()) {
@@ -39,7 +40,7 @@ export function toReviewGraphModel(item: ReviewCase): GraphModel {
   })
   const suspicious = new Set(edges.filter(edge => edge.label === 1).flatMap(edge => [edge.s, edge.t]))
   const nodes: GraphNode[] = [...banks].map(([key, bank], index) => ({
-    key, account: key, bank: String(bank), entity: '',
+    key, account: key, bank: String(bank), entity: accounts.get(key)?.ownerName ?? '', entityId: accounts.get(key)?.ownerId,
     x: Math.cos(2 * Math.PI * index / banks.size) * 3, y: Math.sin(2 * Math.PI * index / banks.size) * 3,
     core: suspicious.has(key), bridge: false, hub: false, hubDegree: neighbors.get(key)?.size ?? 0, hop: 1, synthetic: false,
   }))

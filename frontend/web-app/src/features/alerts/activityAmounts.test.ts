@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { ReviewGroup, ReviewMember } from '@/api/liveReview'
-import { dailyMemberAmounts } from './activityAmounts'
+import { dailyMemberAmounts, dailyMemberUsd } from './activityAmounts'
 
 function member(txId: number, overrides: Partial<ReviewMember> = {}, transaction = {}): ReviewMember {
   return {
@@ -45,4 +45,17 @@ it('한국시간 날짜 순서와 지급 통화를 구분하고 USD 환산값으
   expect(result.MXN.daily).toEqual([{ day: '2023-08-31', amount: 200 }, { day: '2023-09-01', amount: 100 }])
   expect(result.USD.daily).toEqual([{ day: '2023-09-01', amount: 7 }])
   expect(dailyMemberAmounts([])).toEqual({})
+})
+
+it('통화와 무관하게 저장 USD를 KST 일별 합산하고 중복·제외 거래는 제거한다', () => {
+  const first = member(1, {}, { amountUsd: '1.25' })
+  expect(dailyMemberUsd([group([first,
+    member(2, { reviewRole: 'CONTEXT' }, { paymentCurrency: 'CHF', amountUsd: '2.75' }),
+    member(3, { state: 'EXCLUDED' }, { amountUsd: 500 }),
+    member(4, { state: 'TRANSFERRED' }, { amountUsd: 500 }),
+    member(5, {}, { occurredAt: '2023-08-31T14:59:59Z', amountUsd: 0 }),
+  ]), group([first])])).toEqual([{ day: '2023-08-31', amount: 0 }, { day: '2023-09-01', amount: 4 }])
+})
+it.each([null, '', 'bad'])('USD 누락·잘못된 값 %s는 부분 합계를 반환하지 않는다', value => {
+  expect(dailyMemberUsd([group([member(1), member(2, {}, { amountUsd: value })])])).toBeNull()
 })
