@@ -25,7 +25,6 @@ public class LedgerLoader {
   private final ObjectMapper mapper;
   private final PrivateDataProtector protector;
   private final ZoneId zone;
-  private final DemoLabelCatalog demoLabels;
 
   public LedgerLoader(
       BatchJobRepository jobs,
@@ -34,8 +33,7 @@ public class LedgerLoader {
       TransactionTemplate tx,
       ObjectMapper mapper,
       PrivateDataProtector protector,
-      @Value("${app.zone}") String zone,
-      DemoLabelCatalog demoLabels) {
+      @Value("${app.zone}") String zone) {
     this.jobs = jobs;
     this.store = store;
     this.jdbc = jdbc;
@@ -43,7 +41,6 @@ public class LedgerLoader {
     this.mapper = mapper;
     this.protector = protector;
     this.zone = ZoneId.of(zone);
-    this.demoLabels = demoLabels;
   }
 
   @Async
@@ -280,7 +277,6 @@ public class LedgerLoader {
                   ps.setLong(2, (Long) a[1]);
                   ps.setInt(3, (Integer) a[2]);
                 });
-            demoLabels.save(jdbc, version, rows);
             job.setStatus(errors.isEmpty() ? JobStatus.COMPLETED : JobStatus.VALIDATION_FAILED);
             job.setRowCount(preparedCount);
             job.setMissingCount(preparedMissing);
