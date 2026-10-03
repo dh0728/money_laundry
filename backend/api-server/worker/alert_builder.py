@@ -4,6 +4,7 @@ Pure computation: scheduling, persistence and run fencing belong to the pipeline
 Every exploration limit must be supplied explicitly; there are no production defaults.
 """
 from collections import defaultdict, deque
+from bisect import bisect_right
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import math
@@ -49,6 +50,27 @@ class Candidate:
     transactions: tuple[Membership, ...]
     limits: tuple[str, ...]
     policy_version: str
+
+
+def _overlapping_pairs(member_groups):
+    """Yield the old sorted pair order without retaining all pair combinations.
+
+    Membership is snapshotted before merging: later mutations must not add pairs.
+    Only one left group's distinct right neighbours are held at a time.
+    """
+    memberships = [tuple(members) for members in member_groups]
+    owners = defaultdict(list)
+    for index, members in enumerate(memberships):
+        for tx_id in members:
+            owners[tx_id].append(index)
+    for left, members in enumerate(memberships):
+        rights = set()
+        for tx_id in members:
+            indexes = owners[tx_id]
+            for offset in range(bisect_right(indexes, left), len(indexes)):
+                rights.add(indexes[offset])
+        for right in sorted(rights):
+            yield left, right
 
 
 def build_candidates(transactions, binary_scores, policy, *, coverage_start, coverage_end):
@@ -137,13 +159,6 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
         groups.append([set((seed_id,)), members, limits])
 
     # Candidate pairs must share actual transactions, never just an account ID.
-    owners = defaultdict(list)
-    pairs = set()
-    for index, (_, members, _) in enumerate(groups):
-        for tx_id in members:
-            for other in owners[tx_id]:
-                pairs.add((other, index))
-            owners[tx_id].append(index)
     parents = list(range(len(groups)))
 
     def root(index):
@@ -152,7 +167,7 @@ def build_candidates(transactions, binary_scores, policy, *, coverage_start, cov
             index = parents[index]
         return index
 
-    for left, right in sorted(pairs):
+    for left, right in _overlapping_pairs(group[1] for group in groups):
         left, right = root(left), root(right)
         if left == right:
             continue
