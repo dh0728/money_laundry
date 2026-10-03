@@ -317,7 +317,7 @@ def validate_result(store, request, document, expected_ids):
         if any(value is None or not math.isfinite(value) or not 0 <= value <= 1
                for value in scores.column(column).to_pylist()):
             raise ProtocolError("Invalid probability")
-    if request.model_version == "demo-calculator-v1":
+    if request.model_version in ("demo-calculator-v1", "demo-random-v1"):
         from demo_calculator import validate_scores
         if request.run_id is None:
             raise ProtocolError("Demo calculator requires the run-aware v2 contract")
