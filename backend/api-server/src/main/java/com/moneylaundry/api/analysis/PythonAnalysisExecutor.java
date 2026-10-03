@@ -193,6 +193,13 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
         throw new AnalysisFailure("WORKER_INPUT_INVALID", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 74)
         throw new AnalysisFailure("WORKER_STORAGE_UNAVAILABLE", AnalysisFailure.Kind.COMPUTATION);
+      // Record only process metadata; raw worker output may contain private data.
+      org.slf4j.LoggerFactory.getLogger(PythonAnalysisExecutor.class)
+          .error(
+              "Worker exited without checkpoint: jobId={}, stage={}, exitCode={} (137 may indicate SIGKILL/OOM)",
+              context.jobId(),
+              context.stage(),
+              process.exitValue());
       // Exit zero alone cannot advance a stage without a persisted checkpoint.
       throw new AnalysisFailure("WORKER_PROTOCOL_NOT_CONNECTED", AnalysisFailure.Kind.PERMANENT);
     } catch (IOException e) {
