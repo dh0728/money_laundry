@@ -48,8 +48,7 @@ class PythonAnalysisExecutorTests {
     org.junit.jupiter.api.Assumptions.assumeTrue(python != null);
     Path script = temp.resolve("killed.py");
     Files.writeString(
-        script,
-        "import sys\nprint('FAKE_PRIVATE_WORKER_OUTPUT',file=sys.stderr)\nsys.exit(137)\n");
+        script, "import sys\nprint('FAKE_PRIVATE_WORKER_OUTPUT',file=sys.stderr)\nsys.exit(137)\n");
     var executor = new PythonAnalysisExecutor(python, script.toString(), Duration.ofSeconds(10));
     assertThatThrownBy(() -> executor.prepare(context()))
         .isInstanceOfSatisfying(
