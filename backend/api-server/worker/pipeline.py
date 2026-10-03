@@ -8,10 +8,20 @@ import uuid
 
 import pyarrow.parquet as pq
 
-from demo_calculator import LABEL_MODEL_VERSION, FIXED_LABEL_MODEL_VERSION
-from demo_label_input import DemoLabelInput, versions_for_run
+from demo_calculator import MODEL_VERSION, FEATURE_VERSION, supported_versions
 from frozen_input import FrozenInput, StaleExecution, write_demo_input
 from worker_transport import ProtocolError
+
+
+def versions_for_run(connection, execution):
+    stored = connection.execute('SELECT binding FROM analysis_model_tasks WHERE run_id=%s',
+                                (execution.run_id,)).fetchall()
+    if not stored:
+        return MODEL_VERSION, FEATURE_VERSION
+    versions = {(row[0].get('model_version'), row[0].get('feature_version')) for row in stored}
+    if len(versions) != 1 or not supported_versions(*next(iter(versions))):
+        raise ProtocolError('Conflicting or unsupported stored model versions')
+    return next(iter(versions))
 
 
 def _digest(path):
@@ -140,7 +150,7 @@ def _save_prepared(connection, execution, kind, token, document):
 
 
 def _prepare_model(connection, execution, root, kind, versions):
-    source = (DemoLabelInput if versions[0] in (LABEL_MODEL_VERSION, FIXED_LABEL_MODEL_VERSION) else FrozenInput)(connection, execution)
+    source = FrozenInput(connection, execution)
     source.check_current()
     artifact = _existing(connection, execution, root, kind, versions)
     if artifact is None:
