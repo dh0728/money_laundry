@@ -148,13 +148,14 @@ public class UploadService {
             JobType.INGEST, bankId, hash)) {
       if (request.correctionRequestId() != null) continue;
       if (previous.getStatus() == JobStatus.COMPLETED) {
-        throw new DuplicateFileException(previous.getFileName(), previous.getReceivedAt());
+        throw new DuplicateFileException(
+            previous.getId(), previous.getFileName(), previous.getReceivedAt());
       }
       if (previous.getStatus() == JobStatus.RECEIVED
           || previous.getStatus() == JobStatus.RUNNING
           || (previous.getStatus() == JobStatus.URL_ISSUED
               && previous.getUrlExpiresAt().isAfter(now))) {
-        throw new ApiException(HttpStatus.CONFLICT, "UPLOAD_IN_PROGRESS", "같은 파일의 업로드가 진행 중입니다.");
+        throw new UploadInProgressException(previous.getId());
       }
     }
     Instant expiresAt = now.plus(urlTtl);

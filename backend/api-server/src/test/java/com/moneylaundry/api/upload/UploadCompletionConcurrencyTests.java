@@ -165,7 +165,11 @@ class UploadCompletionConcurrencyTests {
                     new IssueUploadRequest(
                         "too-late.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 1))))
         .isInstanceOfSatisfying(
-            ApiException.class, e -> assertThat(e.code()).isEqualTo("UPLOAD_IN_PROGRESS"));
+            UploadInProgressException.class,
+            e -> {
+              assertThat(e.code()).isEqualTo("UPLOAD_IN_PROGRESS");
+              assertThat(e.uploadId()).isEqualTo(old.getId());
+            });
     verify(loader, times(1)).load(old.getId());
   }
 

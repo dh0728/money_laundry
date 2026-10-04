@@ -110,6 +110,7 @@ class Controls:
         self.base = base.rstrip('/')
         self.client = client or ApiClient(base)
         self.cf_headers = dict(cf_headers or {})
+        self.uploads = {}
 
     def get(self, path):
         return self.client.get(path)
@@ -129,6 +130,47 @@ class Controls:
     def post(self, path, payload=None):
         return self.client.post(path, payload)
 
+    def _issue_upload(self, mock, opener, args, size, checksum, progress):
+        for attempt in range(6):
+            try:
+                return mock.request_upload(opener, args, size, checksum)
+            except HTTPError as error:
+                if error.code == 409:
+                    try:
+                        body = json.loads(error.read(8192))
+                    except (ValueError, OSError):
+                        body = {}
+                    finally:
+                        error.close()
+                    if (isinstance(body, dict)
+                            and body.get('code') in ('DUPLICATE_FILE', 'UPLOAD_IN_PROGRESS')
+                            and type(body.get('uploadId')) is int and body['uploadId'] > 0):
+                        return {'uploadId': body['uploadId'], 'existing': True}
+                    raise ApiError('기존 업로드 번호를 확인할 수 없습니다. 서버의 업로드 복구 API 배포 여부를 확인하세요.', 409) from None
+                if error.code not in (408, 429, 500, 502, 503, 504, 520, 522, 524) or attempt == 5:
+                    raise
+                error.close()
+            except (URLError, TimeoutError):
+                if attempt == 5:
+                    raise
+            delay = min(5 * 2 ** attempt, 30)
+            progress(f'업로드 접수 확인 재시도 {attempt + 1}회 · {delay}초 후')
+            time.sleep(delay)
+
+    def _upload_status(self, mock, opener, args, upload, progress):
+        for attempt in range(6):
+            try:
+                return mock.request_status(opener, args, upload)
+            except (HTTPError, URLError, TimeoutError) as error:
+                transient = not isinstance(error, HTTPError) or error.code in (408, 429, 500, 502, 503, 504, 520, 522, 524)
+                if not transient or attempt == 5:
+                    raise
+                if isinstance(error, HTTPError):
+                    error.close()
+                delay = min(5 * 2 ** attempt, 30)
+                progress(f'검수 결과 조회 재시도 {attempt + 1}회 · {delay}초 후', uploadId=upload)
+                time.sleep(delay)
+
     def upload(self, day, bank, file, report):
         stage = '목업 모듈 준비'
         def progress(value, **values):
@@ -143,17 +185,55 @@ class Controls:
             opener = build_opener(mock.NoRedirect())
             progress('파일 확인')
             size, checksum = mock.inspect_file(file)
-            progress('업로드 URL 발급')
-            target = mock.request_upload(opener, args, size, checksum)
+            key = (day, bank, file.name, size, checksum)
+            pending = self.uploads.get(key)
+            if pending is None:
+                progress('업로드 URL 발급')
+                target = self._issue_upload(mock, opener, args, size, checksum, progress)
+                pending = {'target': target, 'uploaded': False}
+                self.uploads[key] = pending
+                if target.get('existing'):
+                    progress('기존 업로드 상태 확인', uploadId=target['uploadId'])
+                    result = self._upload_status(mock, opener, args, target['uploadId'], progress)
+                else:
+                    result = {'status': 'URL_ISSUED'}
+            else:
+                progress('기존 업로드 상태 확인', uploadId=pending['target']['uploadId'])
+                result = self._upload_status(mock, opener, args, pending['target']['uploadId'], progress)
+            target = pending['target']
             upload = target['uploadId']
-            progress('S3 전송', uploadId=upload)
-            mock.upload_file(opener, file, target, size)
-            progress('업로드 완료 통지', uploadId=upload)
-            result = mock.request_status(opener, args, upload, complete=True)
+            if target.get('existing') and (result.get('businessDate') != day or result.get('sizeBytes') != size):
+                raise ApiError(f'은행 {bank} 기존 파일의 기준일·크기가 다릅니다. uploadId {upload}. 자동으로 건너뛰지 않습니다.')
+            if result['status'] == 'URL_ISSUED':
+                if target.get('existing'):
+                    # The existing object may already be stored; completion verifies its hash and size.
+                    # Forget URL-only lookup so a later retry can obtain a new URL after expiry.
+                    self.uploads.pop(key, None)
+                if not pending['uploaded'] and not target.get('existing'):
+                    progress('S3 전송', uploadId=upload)
+                    mock.upload_file(opener, file, target, size)
+                    pending['uploaded'] = True
+                progress('업로드 완료 통지', uploadId=upload)
+                try:
+                    result = mock.request_status(opener, args, upload, complete=True)
+                except (HTTPError, URLError, TimeoutError) as error:
+                    if isinstance(error, HTTPError) and error.code not in (408, 429, 500, 502, 503, 504, 520, 522, 524):
+                        raise
+                    if isinstance(error, HTTPError):
+                        error.close()
+                    # Reconcile a lost POST response by GET; never blindly repeat upload.
+                    result = self._upload_status(mock, opener, args, upload, progress)
             progress('검수 결과 조회', uploadId=upload)
-            result = mock.wait_result(opener, args, upload, result)
+            deadline = time.monotonic() + 1800
+            while result['status'] in ('RECEIVED', 'RUNNING'):
+                if time.monotonic() >= deadline:
+                    raise ApiError(f'은행 {bank} 검수 관찰 시간 초과: uploadId {upload}. 다시 실행하면 상태 조회부터 이어갑니다.')
+                time.sleep(2)
+                result = self._upload_status(mock, opener, args, upload, progress)
             if result['status'] != 'COMPLETED':
-                raise ApiError(f'은행 {bank} 검수 실패: uploadId {upload}. 업로드 상태를 확인하세요.')
+                raise ApiError(f'은행 {bank} 검수 미완료: uploadId {upload}. 업로드 상태를 확인하세요.')
+            # Do not retain signed URLs after completion. Recheck server state on replay.
+            self.uploads[key] = {'target': {'uploadId': upload}, 'uploaded': True}
             return upload
         except ApiError:
             raise
@@ -295,6 +375,7 @@ class Replay:
                 return
             if self.future is not None and not self.future.done():
                 raise ApiError('재생 중 초기화 이력이 변경됐습니다. 현재 작업 종료 후 다시 조회하세요.')
+            self.controls.uploads.clear()
             self.sent.clear()
             self.jobs.clear()
             self.completed.clear()
