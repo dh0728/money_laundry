@@ -54,7 +54,7 @@ class PythonAnalysisExecutorTests {
         .isInstanceOfSatisfying(
             AnalysisFailure.class,
             e -> assertThat(e.code()).isEqualTo("WORKER_PROTOCOL_NOT_CONNECTED"));
-    assertThat(output.getAll()).contains("jobId=1", "stage=FEATURES", "exitCode=137");
+    assertThat(output.getAll()).contains("jobId=1", "stage=FEATURES", "exitCode=137", "elapsedMs=");
     assertThat(output.getAll()).doesNotContain("FAKE_PRIVATE_WORKER_OUTPUT");
   }
 

@@ -121,6 +121,7 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
 
   @Override
   public Result prepare(Context context) {
+    long startedNanos = System.nanoTime();
     Process process = null;
     try {
       var command =
@@ -208,6 +209,13 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       Thread.currentThread().interrupt();
       throw new AnalysisFailure("WORKER_INTERRUPTED", AnalysisFailure.Kind.COMPUTATION);
     } finally {
+      org.slf4j.LoggerFactory.getLogger(PythonAnalysisExecutor.class)
+          .info(
+              "Worker stage attempt: jobId={}, runId={}, stage={}, elapsedMs={}",
+              context.jobId(),
+              context.runId(),
+              context.stage(),
+              TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos));
       if (process != null && process.isAlive()) {
         var descendants = process.descendants().toList();
         descendants.forEach(ProcessHandle::destroyForcibly);
