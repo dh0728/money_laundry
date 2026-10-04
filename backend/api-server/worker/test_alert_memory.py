@@ -1,13 +1,17 @@
 """Compatibility and bounded-memory regressions for Alert construction."""
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 import random
 import tracemalloc
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from alert_builder import Candidate, Membership, Policy, Transaction, build_candidates, _overlapping_pairs
-from alert_pipeline import _evidence, _extend, _plans
+from alert_pipeline import _evidence, _extend, _plans, _validate_baselines
+from frozen_input import StaleExecution
+from worker_transport import ProtocolError
 
 
 def eager_pairs(member_groups):
@@ -20,7 +24,74 @@ def eager_pairs(member_groups):
     return iter(sorted(pairs))
 
 
+class LinearNeighbours:
+    """Independent full-scan reference for the former neighbour selection."""
+    def __init__(self, rows, policy):
+        self.rows, self.policy = rows, policy
+
+    def choices(self, tx_id, direction):
+        row = self.rows[tx_id]
+        day = row.occurred_at.astimezone(ZoneInfo('Asia/Seoul')).replace(
+            hour=0, minute=0, second=0, microsecond=0)
+        low = day - timedelta(days=self.policy.day_radius)
+        high = day + timedelta(days=self.policy.day_radius + 1)
+        choices, limits = defaultdict(set), set()
+        rules = [(row.source, 'destination', 'UPSTREAM'),
+                 (row.destination, 'source', 'DOWNSTREAM')]
+        if direction == 'BOTH':
+            rules += [(row.source, 'source', 'SHARED_SOURCE'),
+                      (row.destination, 'destination', 'SHARED_DESTINATION')]
+        else:
+            rules = [rule for rule in rules if rule[2] == direction]
+        for account, attribute, reason in rules:
+            count = sum(low <= r.occurred_at < high and account in (r.source, r.destination)
+                        for r in self.rows.values())
+            if count > self.policy.max_account_transactions:
+                limits.add('ACCOUNT_ACTIVITY')
+                continue
+            for other in self.rows.values():
+                if other.tx_id == tx_id or getattr(other, attribute) != account:
+                    continue
+                if reason == 'UPSTREAM' and other.occurred_at >= row.occurred_at:
+                    continue
+                if reason == 'DOWNSTREAM' and other.occurred_at <= row.occurred_at:
+                    continue
+                if not low <= other.occurred_at < high:
+                    limits.add('TIME_WINDOW')
+                    continue
+                choices[other.tx_id].add(reason)
+        return choices, limits
+
+
 class AlertMemoryTests(unittest.TestCase):
+    def test_time_index_matches_linear_scan_including_limits(self):
+        rng = random.Random(618)
+        start = datetime(2023, 9, 1, tzinfo=ZoneInfo('Asia/Seoul'))
+        for trial in range(100):
+            rows = [Transaction(i, start + timedelta(hours=rng.randrange(240)),
+                                str(rng.randrange(5)), str(rng.randrange(5)))
+                    for i in range(1, 41)]
+            policy = Policy('test', .4, trial % 3, 2, 5 + trial % 20, 4 + trial % 30)
+            scores = {r.tx_id: rng.random() for r in rows}
+            args = dict(coverage_start=start, coverage_end=start + timedelta(days=10))
+            actual = build_candidates(rows, scores, policy, **args)
+            with patch('alert_builder._NeighbourIndex', LinearNeighbours):
+                expected = build_candidates(rows, scores, policy, **args)
+            self.assertEqual(actual, expected, f'trial={trial}')
+
+    def test_baseline_conflicts_preserve_origin_and_error_priority(self):
+        for unpublished, changed, expected in ((None, None, None), (1, None, StaleExecution),
+                (None, 2, ProtocolError), (1, 2, StaleExecution), (2, 1, ProtocolError),
+                (2, 2, StaleExecution)):
+            connection = Mock()
+            connection.execute.return_value.fetchone.side_effect = [(unpublished,), (changed,)]
+            if expected is None:
+                _validate_baselines(connection, 'run')
+            else:
+                with self.assertRaises(expected):
+                    _validate_baselines(connection, 'run')
+            self.assertEqual(connection.execute.call_count, 2)
+
     def test_pair_order_matches_old_algorithm_with_duplicate_overlaps(self):
         rng = random.Random(9146)
         for _ in range(100):
