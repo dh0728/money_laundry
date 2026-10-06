@@ -31,7 +31,8 @@ class WorkbenchAccessTests {
     env.setActiveProfiles("prod");
     var jdbc = mock(JdbcTemplate.class);
     var expected = Instant.parse("2023-09-02T00:00:00Z");
-    when(jdbc.queryForObject("select business_at from demo_business_clock where id", Timestamp.class))
+    when(jdbc.queryForObject(
+            "select business_at from demo_business_clock where id", Timestamp.class))
         .thenReturn(Timestamp.from(expected));
     var time = new BusinessTime(jdbc, null, env);
     time.workbenchOnly();

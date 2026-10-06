@@ -6,8 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest(
-    properties = {"spring.profiles.active=prod", "app.presentation.enabled=true"})
+@SpringBootTest(properties = {"spring.profiles.active=prod", "app.presentation.enabled=true"})
 class ProdPresentationSessionTests extends StaffSessionTests {
   @Override
   @Test
