@@ -1303,8 +1303,7 @@ class ReviewWorkflowTests {
     jdbc.update(
         "update review_cases set created_at='2023-08-31 14:59:59+00',status='CLOSED',closed_at='2023-09-01 14:59:59+00' where alert_id=?",
         b);
-    jdbc.update(
-        "update review_cases set created_at='2023-09-03 15:00+00' where alert_id=?", c);
+    jdbc.update("update review_cases set created_at='2023-09-03 15:00+00' where alert_id=?", c);
     var days =
         new DashboardService(jdbc, clock)
             .daily(LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
