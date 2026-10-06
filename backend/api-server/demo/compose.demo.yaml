@@ -1,0 +1,156 @@
+name: aml-demo
+x-api-image: &api-image
+  image: aml-demo-api
+  build:
+    context: ..
+x-runtime: &runtime
+  - ./runtime.py:/demo/runtime.py:ro
+  - secrets:/secrets:ro
+  - tls:/tls:ro
+
+services:
+  prepare:
+    <<: *api-image
+    user: "0"
+    network_mode: none
+    entrypoint: [python, -B, /demo/runtime.py, prepare]
+    volumes:
+      - ./runtime.py:/demo/runtime.py:ro
+      - secrets:/secrets
+      - tls:/tls
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: aml_demo
+      POSTGRES_USER: aml_demo
+      POSTGRES_PASSWORD_FILE: /secrets/postgres-password
+    volumes:
+      - secrets:/secrets:ro
+      - postgres:/var/lib/postgresql/data
+    depends_on:
+      prepare: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U aml_demo -d aml_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  objects:
+    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    entrypoint: [sh, -c, 'export MINIO_ROOT_PASSWORD=$$(cat /secrets/minio-password); exec minio server /data']
+    environment:
+      MINIO_ROOT_USER: local-demo-key
+      MINIO_DOMAIN: s3.amazonaws.com,s3.ap-northeast-2.amazonaws.com
+      MINIO_REGION_NAME: ap-northeast-2
+    volumes:
+      - secrets:/secrets:ro
+      - objects:/data
+    depends_on:
+      prepare: {condition: service_completed_successfully}
+  inference:
+    image: aml-demo-inference
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.inference
+    user: "0"
+    entrypoint: [python, -B, /demo/runtime.py, inference]
+    volumes:
+      - ./runtime.py:/demo/runtime.py:ro
+      - secrets:/secrets:ro
+      - tls:/tls:ro
+      - inference:/state
+    depends_on:
+      prepare: {condition: service_completed_successfully}
+  proxy:
+    image: nginx@sha256:ef8676b33d681f272ba429b27658bdd7e640963279714c96bddf1dc76307f7b6
+    command: [nginx, -c, /tls/nginx.conf, -g, "daemon off;"]
+    volumes:
+      - tls:/tls:ro
+    networks:
+      default:
+        aliases:
+          - inference.test
+          - s3.amazonaws.com
+          - s3.ap-northeast-2.amazonaws.com
+          - aml-demo-files.s3.amazonaws.com
+          - aml-demo-files.s3.ap-northeast-2.amazonaws.com
+    depends_on:
+      objects: {condition: service_started}
+      inference: {condition: service_healthy}
+  api:
+    <<: *api-image
+    user: "0"
+    entrypoint: [python, -B, /demo/runtime.py, api]
+    volumes:
+      - ./runtime.py:/demo/runtime.py:ro
+      - secrets:/secrets:ro
+      - tls:/tls:ro
+      - storage:/app/storage
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      APP_INGEST_SCHEDULED_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/aml_demo
+      SPRING_DATASOURCE_USERNAME: aml_demo
+      S3_BUCKET: aml-demo-files
+      S3_PREFIX: demo/
+      WORKER_MODE: demo
+      INFERENCE_API_URL: https://inference.test
+    ports:
+      - "127.0.0.1:${AML_DEMO_API_PORT:-8080}:8080"
+      - "127.0.0.1:${AML_DEMO_VIEW_PORT:-8501}:8501"
+      - "127.0.0.1:${AML_DEMO_CONTROL_PORT:-8502}:8502"
+    depends_on:
+      postgres: {condition: service_healthy}
+      proxy: {condition: service_started}
+    stop_grace_period: 40s
+  seed:
+    <<: *api-image
+    user: "0"
+    entrypoint: [python, -B, /demo/runtime.py, seed]
+    volumes:
+      - ./runtime.py:/demo/runtime.py:ro
+      - secrets:/secrets:ro
+      - tls:/tls:ro
+      - ${AML_DEMO_DATA_DIR:?Set AML_DEMO_DATA_DIR}:/data-input:ro
+    depends_on:
+      api: {condition: service_healthy}
+  view:
+    image: aml-demo-ui
+    build:
+      context: ../..
+      dockerfile: api-server/demo/Dockerfile.ui
+    network_mode: service:api
+    command: [app.py, "8501"]
+    volumes: *runtime
+    depends_on:
+      seed: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health',timeout=3)"]
+      interval: 3s
+      timeout: 4s
+      retries: 20
+  control:
+    image: aml-demo-ui
+    network_mode: service:api
+    command: [control_panel.py, "8502"]
+    environment:
+      AML_DEMO_DATA_DIR: /data-input
+    volumes:
+      - ./runtime.py:/demo/runtime.py:ro
+      - secrets:/secrets:ro
+      - tls:/tls:ro
+      - ${AML_DEMO_DATA_DIR:?Set AML_DEMO_DATA_DIR}:/data-input:ro
+    depends_on:
+      seed: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8502/_stcore/health',timeout=3)"]
+      interval: 3s
+      timeout: 4s
+      retries: 20
+
+volumes:
+  postgres:
+  objects:
+  inference:
+  storage:
+  secrets:
+  tls:

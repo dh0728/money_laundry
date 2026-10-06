@@ -17,11 +17,24 @@ services:
       JWT_SECRET: ${DEV_JWT_SECRET:?DEV_JWT_SECRET is required}
       S3_BUCKET: ${DEV_S3_BUCKET:?DEV_S3_BUCKET is required}
       S3_PREFIX: ${DEV_S3_PREFIX:?DEV_S3_PREFIX is required}
+      INGEST_ENCRYPTION_KEY: ${DEV_INGEST_ENCRYPTION_KEY:?DEV_INGEST_ENCRYPTION_KEY is required}
+      INGEST_SEARCH_KEY: ${DEV_INGEST_SEARCH_KEY:?DEV_INGEST_SEARCH_KEY is required}
+      INGEST_KEY_VERSION: ${DEV_INGEST_KEY_VERSION:?DEV_INGEST_KEY_VERSION is required}
       SQS_QUEUE_URL: ${DEV_SQS_URL:?DEV_SQS_URL is required}
+      WORKER_MODE: demo
+      WORKER_PYTHON: /usr/local/bin/python
+      WORKER_SCRIPT: /app/worker/analysis_entry.py
+      WORKER_TIMEOUT: PT30M
+      STORAGE_DIR: /app/storage
+      INFERENCE_API_URL: http://127.0.0.1:8090
+      INFERENCE_ALLOW_LOOPBACK: "true"
+      INFERENCE_API_TOKEN: ${DEV_INFERENCE_API_TOKEN:?DEV_INFERENCE_API_TOKEN is required}
     
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       AWS_DEFAULT_REGION: ${AWS_REGION:-ap-northeast-2}
       TZ: Asia/Seoul
+    volumes:
+      - api-storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,6 +50,41 @@ services:
         max-file: "3"
     networks:
       - dev-network
+
+  # Dev demo only: share the API network namespace; no inference port is published.
+  inference:
+    image: ${DEV_API_IMAGE:?DEV_API_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    network_mode: service:api
+    depends_on:
+      api:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/python", "-B", "/app/worker/inference_server.py"]
+    environment:
+      INFERENCE_BIND: 127.0.0.1
+      INFERENCE_PORT: "8090"
+      INFERENCE_STATE_DIR: /app/storage
+      INFERENCE_TOKEN: ${DEV_INFERENCE_API_TOKEN:?DEV_INFERENCE_API_TOKEN is required}
+      INFERENCE_OBJECT_BASE_URL: ${DEV_INFERENCE_OBJECT_BASE_URL:?DEV_INFERENCE_OBJECT_BASE_URL is required}
+      TZ: Asia/Seoul
+    volumes:
+      - inference-state:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    stop_grace_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
     image: ${DEV_WEB_IMAGE:?DEV_WEB_IMAGE is required}
@@ -86,5 +134,9 @@ networks:
     driver: bridge
 
 volumes:
+  inference-state:
+    name: aml-dev-inference-state
+  api-storage:
+    name: aml-dev-api-storage
   postgres-data:
     name: aml-dev-postgres-data

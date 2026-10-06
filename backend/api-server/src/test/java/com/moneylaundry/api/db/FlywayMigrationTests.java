@@ -31,7 +31,7 @@ class FlywayMigrationTests {
         jdbc.queryForList("select role, count(*) as n from users group by role");
     assertThat(byRole)
         .extracting(r -> r.get("role") + "=" + r.get("n"))
-        .containsExactlyInAnyOrder("L1=2", "L2=2", "ADMIN=1");
+        .containsExactlyInAnyOrder("STAFF=4", "ADMIN=1");
 
     Integer fxCount = jdbc.queryForObject("select count(*) from fx_rates", Integer.class);
     assertThat(fxCount).isEqualTo(15);
@@ -53,12 +53,268 @@ class FlywayMigrationTests {
   @Transactional
   void 같은_은행의_같은_계좌번호는_두_번_들어가지_않는다() {
     jdbc.update("insert into banks (bank_id) values (999001)");
-    jdbc.update("insert into accounts (bank_id, account_number) values (999001, 'ACC1')");
-
+    long entity =
+        jdbc.queryForObject(
+            "insert into"
+                + " private.entities(service_entity_id,entity_lookup_token,identity_cipher,name_cipher,key_version)"
+                + " values(gen_random_uuid(),'entity-test','test','test','test') returning"
+                + " entity_id",
+            Long.class);
+    jdbc.update(
+        "insert into"
+            + " private.accounts(bank_id,service_account_id,account_lookup_token,entity_id,identity_cipher,key_version)"
+            + " values(999001,gen_random_uuid(),'ACC1',?,'test','test')",
+        entity);
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "insert into accounts (bank_id, account_number) values (999001, 'ACC1')"))
+                    "insert into"
+                        + " private.accounts(bank_id,service_account_id,account_lookup_token,entity_id,identity_cipher,key_version)"
+                        + " values(999001,gen_random_uuid(),'ACC1',?,'test','test')",
+                    entity))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Autowired org.testcontainers.postgresql.PostgreSQLContainer postgres;
+  @Autowired org.springframework.transaction.PlatformTransactionManager manager;
+
+  @Test
+  void v12_resets_only_investigation_data_and_keeps_alert_evidence_and_accounts() throws Exception {
+    String name = "migration_v12_reset_test";
+    jdbc.execute("create database " + name);
+    String url =
+        "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + name;
+    try {
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .target("11")
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var st = connection.createStatement()) {
+        st.execute("update users set password_hash='preserved-test-hash' where username='l1a'");
+        st.execute("insert into batch_jobs(job_type,status) values('ANALYSIS','COMPLETED')");
+        st.execute(
+            "insert into analysis_runs(run_id,job_id,status) select gen_random_uuid(),job_id,'COMPLETED' from batch_jobs");
+        st.execute(
+            "insert into alerts(assignee_id) select user_id from users where username='l1a'");
+        st.execute(
+            "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) select alert_id,1,run_id,repeat('a',64),'{\"preserved\":true}' from alerts cross join analysis_runs");
+        st.execute("update alerts set status='CLOSED',resolution='NORMAL'");
+        st.execute(
+            "insert into review_cases(kind,assignee_id,created_at,assigned_at) select 'EPISODE',user_id,now(),now() from users where username='l1a'");
+        st.execute(
+            "insert into review_groups(case_id,label) select case_id,'old partial' from review_cases");
+        st.execute(
+            "insert into review_events(case_id,action,comment,business_at,snapshot) select case_id,'TRANSFER','old',now(),'{}' from review_cases");
+        st.execute(
+            "insert into review_requests select user_id,gen_random_uuid(),'{}','{}' from users where username='l1a'");
+      }
+      var flyway =
+          org.flywaydb.core.Flyway.configure()
+              .dataSource(url, postgres.getUsername(), postgres.getPassword())
+              .load();
+      flyway.migrate();
+      assertThat(flyway.migrate().migrationsExecuted).isZero();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var st = connection.createStatement();
+          var r =
+              st.executeQuery(
+                  "select (select count(*) from review_groups)+(select count(*) from review_events)+(select count(*) from review_requests)+(select count(*) from review_cases where kind='EPISODE'), (select count(*) from review_cases where kind='ALERT' and status='OPEN'),(select count(*) from batch_jobs),(select evidence->>'preserved' from alert_versions),(select password_hash from users where username='l1a'),(select status from alerts)")) {
+        assertThat(r.next()).isTrue();
+        assertThat(r.getLong(1)).isZero();
+        assertThat(r.getLong(2)).isEqualTo(1);
+        assertThat(r.getLong(3)).isEqualTo(1);
+        assertThat(r.getString(4)).isEqualTo("true");
+        assertThat(r.getString(5)).isEqualTo("preserved-test-hash");
+        assertThat(r.getString(6)).isEqualTo("OPEN");
+      }
+    } finally {
+      jdbc.execute("drop database " + name);
+    }
+  }
+
+  @Test
+  void v3_refuses_populated_legacy_database_without_changing_it() throws Exception {
+    String name = "migration_guard_test";
+    jdbc.execute("create database " + name);
+    String url =
+        "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + name;
+    try {
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .target("2")
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement()) {
+        statement.execute("insert into banks(bank_id) values(1)");
+        statement.execute("insert into accounts(bank_id,account_number) values(1,'LEGACY')");
+      }
+      assertThatThrownBy(
+              () ->
+                  org.flywaydb.core.Flyway.configure()
+                      .dataSource(url, postgres.getUsername(), postgres.getPassword())
+                      .load()
+                      .migrate())
+          .isInstanceOf(org.flywaydb.core.api.FlywayException.class);
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement();
+          var rows = statement.executeQuery("select account_number from accounts")) {
+        assertThat(rows.next()).isTrue();
+        assertThat(rows.getString(1)).isEqualTo("LEGACY");
+        assertThat(rows.next()).isFalse();
+      }
+    } finally {
+      jdbc.execute("drop database " + name);
+    }
+  }
+
+  @Test
+  void restricted_role_cannot_read_private_or_evaluation_tables() {
+    String role = "integration_reader_test";
+    jdbc.execute("create role " + role);
+    try {
+      jdbc.execute("grant usage on schema public to " + role);
+      jdbc.execute("grant select on transactions to " + role);
+      for (String table :
+          List.of(
+              "private.entities",
+              "private.accounts",
+              "private.bank_reports",
+              "evaluation.report_labels",
+              "evaluation.transaction_labels")) {
+        assertThatThrownBy(
+                () ->
+                    new org.springframework.transaction.support.TransactionTemplate(manager)
+                        .executeWithoutResult(
+                            status -> {
+                              jdbc.execute("set local role " + role);
+                              jdbc.queryForList("select * from " + table);
+                            }))
+            .isInstanceOf(org.springframework.dao.DataAccessException.class);
+      }
+      new org.springframework.transaction.support.TransactionTemplate(manager)
+          .executeWithoutResult(
+              status -> {
+                jdbc.execute("set local role " + role);
+                jdbc.queryForList("select tx_id from transactions");
+              });
+    } finally {
+      jdbc.execute("drop owned by " + role);
+      jdbc.execute("drop role " + role);
+    }
+  }
+
+  @Test
+  void v4_preserves_populated_v3_report_and_execution_history() throws Exception {
+    String name = "migration_v4_preserve_test";
+    jdbc.execute("create database " + name);
+    String url =
+        "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + name;
+    try {
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .target("3")
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement()) {
+        statement.execute("insert into banks(bank_id,is_reporting) values(10,true)");
+        statement.execute(
+            "insert into batch_jobs(job_type,status,bank_id,business_date,received_at) values('INGEST','COMPLETED',10,'2026-09-15',now())");
+        statement.execute("insert into report_sets(bank_id,business_date) values(10,'2026-09-15')");
+        statement.execute(
+            "insert into report_versions(set_id,upload_id,version_no,received_at,stage_status,error_code,row_count) select 1,job_id,1,received_at,'HELD','COUNTERPART_MISSING',1 from batch_jobs");
+        statement.execute(
+            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) values(1,2,'token','cipher','test','HELD')");
+        statement.execute(
+            "insert into analysis_stage_results select job_id,'FEATURES',gen_random_uuid(),'preserve-artifact',true from batch_jobs");
+      }
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement()) {
+        try (var rs =
+            statement.executeQuery(
+                "select v.self_valid,r.payload_cipher,a.artifact from report_versions v join private.bank_reports r using(version_id) cross join analysis_stage_results a")) {
+          assertThat(rs.next()).isTrue();
+          assertThat(rs.getBoolean(1)).isTrue();
+          assertThat(rs.getString(2)).isEqualTo("cipher");
+          assertThat(rs.getString(3)).isEqualTo("preserve-artifact");
+          assertThat(rs.next()).isFalse();
+        }
+      }
+    } finally {
+      jdbc.execute("drop database " + name);
+    }
+  }
+
+  @Test
+  void v5_preserves_v4_run_request_and_cancellation_history() throws Exception {
+    String name = "migration_v5_preserve_test";
+    jdbc.execute("create database " + name);
+    String url =
+        "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + name;
+    try {
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .target("4")
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement()) {
+        statement.execute(
+            "insert into batch_jobs(job_type,status,current_stage) values('ANALYSIS','FAILED','INFERENCE')");
+        statement.execute(
+            "insert into analysis_runs(run_id,job_id,status) select gen_random_uuid(),job_id,'CANCEL_REQUESTED' from batch_jobs");
+        statement.execute(
+            "update batch_jobs set current_run_id=(select run_id from analysis_runs)");
+        statement.execute(
+            "insert into analysis_model_requests select gen_random_uuid(),1,run_id,'BINARY','PUBLISHED' from analysis_runs");
+        statement.execute(
+            "insert into analysis_cancel_outbox(cancel_id,request_id,execution_round,payload,requested_at) select gen_random_uuid(),request_id,execution_round,'{\"preserve\":true}'::jsonb,now() from analysis_model_requests");
+      }
+      org.flywaydb.core.Flyway.configure()
+          .dataSource(url, postgres.getUsername(), postgres.getPassword())
+          .load()
+          .migrate();
+      try (var connection =
+              java.sql.DriverManager.getConnection(
+                  url, postgres.getUsername(), postgres.getPassword());
+          var statement = connection.createStatement()) {
+        try (var rows =
+            statement.executeQuery(
+                "select r.status,m.status,o.payload->>'preserve' from batch_jobs b join analysis_runs r on r.run_id=b.current_run_id join analysis_model_requests m using(run_id) join analysis_cancel_outbox o using(request_id,execution_round)")) {
+          assertThat(rows.next()).isTrue();
+          assertThat(rows.getString(1)).isEqualTo("CANCEL_REQUESTED");
+          assertThat(rows.getString(2)).isEqualTo("PUBLISHED");
+          assertThat(rows.getString(3)).isEqualTo("true");
+          assertThat(rows.next()).isFalse();
+        }
+        try (var rows = statement.executeQuery("select count(*) from analysis_model_tasks")) {
+          assertThat(rows.next()).isTrue();
+          assertThat(rows.getInt(1)).isZero();
+        }
+      }
+    } finally {
+      jdbc.execute("drop database " + name);
+    }
   }
 }

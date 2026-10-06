@@ -24,6 +24,15 @@ public interface BatchJobRepository extends JpaRepository<BatchJob, Long> {
       nativeQuery = true)
   int markReceived(long uploadId, int bankId, Instant receivedAt);
 
+  @Query(
+      value =
+          """
+      select * from batch_jobs where job_type=:#{#jobType.name()} and bank_id=:bankId
+      and coalesce(received_at,created_at)>:windowStartExclusive
+      and coalesce(received_at,created_at)<=:windowEndInclusive
+      order by coalesce(received_at,created_at) desc limit 1
+      """,
+      nativeQuery = true)
   Optional<BatchJob>
       findFirstByJobTypeAndBankIdAndCreatedAtGreaterThanAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
           JobType jobType, int bankId, Instant windowStartExclusive, Instant windowEndInclusive);

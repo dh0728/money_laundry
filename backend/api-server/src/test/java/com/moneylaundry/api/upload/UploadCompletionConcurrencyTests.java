@@ -25,9 +25,21 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-@SpringBootTest(properties = "app.bank.api-keys=70:concurrent-test-key")
+@SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class UploadCompletionConcurrencyTests {
+  @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  @org.junit.jupiter.api.BeforeEach
+  void reportingBank() {
+    jdbc.update(
+        "insert into banks(bank_id, is_reporting) values (70, true) on conflict do nothing");
+    jdbc.update(
+        "insert into bank_reporting_periods(bank_id,effective_from_date) select 70,date"
+            + " '2022-01-01' where not exists(select 1 from bank_reporting_periods where"
+            + " bank_id=70)");
+  }
+
   @Autowired UploadService service;
   @Autowired BatchJobRepository repository;
   @MockitoBean UploadStore store;
@@ -43,7 +55,7 @@ class UploadCompletionConcurrencyTests {
                 "concurrent.csv",
                 "c".repeat(64),
                 1,
-                null,
+                java.time.LocalDate.of(2022, 9, 1),
                 "uploads/70/concurrent.csv",
                 now,
                 now.plusSeconds(60)));
@@ -153,7 +165,11 @@ class UploadCompletionConcurrencyTests {
                     new IssueUploadRequest(
                         "too-late.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 1))))
         .isInstanceOfSatisfying(
-            ApiException.class, e -> assertThat(e.code()).isEqualTo("UPLOAD_IN_PROGRESS"));
+            UploadInProgressException.class,
+            e -> {
+              assertThat(e.code()).isEqualTo("UPLOAD_IN_PROGRESS");
+              assertThat(e.uploadId()).isEqualTo(old.getId());
+            });
     verify(loader, times(1)).load(old.getId());
   }
 

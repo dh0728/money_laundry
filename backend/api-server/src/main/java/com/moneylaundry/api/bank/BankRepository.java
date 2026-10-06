@@ -10,7 +10,5 @@ public interface BankRepository extends JpaRepository<Bank, Integer> {
   @org.springframework.data.jpa.repository.Query("select b from Bank b where b.id = :id")
   Optional<Bank> lockById(int id);
 
-  Optional<Bank> findByApiKeyHash(String apiKeyHash);
-
   List<Bank> findByReportingTrueOrderById();
 }

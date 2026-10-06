@@ -1,6 +1,5 @@
 package com.moneylaundry.api;
 
-import com.moneylaundry.api.upload.WorkerException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -19,8 +18,12 @@ public class ApiExceptionHandler {
   ProblemDetail api(ApiException e) {
     ProblemDetail result = problem(e.status(), e.code(), e.getMessage());
     if (e instanceof com.moneylaundry.api.upload.DuplicateFileException duplicate) {
+      result.setProperty("uploadId", duplicate.uploadId());
       result.setProperty("fileName", duplicate.fileName());
       result.setProperty("uploadedAt", duplicate.uploadedAt());
+    }
+    if (e instanceof com.moneylaundry.api.upload.UploadInProgressException pending) {
+      result.setProperty("uploadId", pending.uploadId());
     }
     return result;
   }
@@ -28,15 +31,16 @@ public class ApiExceptionHandler {
   @ExceptionHandler({
     MethodArgumentNotValidException.class,
     HttpMessageNotReadableException.class,
-    MethodArgumentTypeMismatchException.class
+    MethodArgumentTypeMismatchException.class,
+    org.springframework.web.bind.MissingRequestValueException.class
   })
   ProblemDetail invalidBody(Exception e) {
     return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 필드와 형식을 확인하세요.");
   }
 
-  @ExceptionHandler(WorkerException.class)
-  ProblemDetail workerFailed(WorkerException e) {
-    return problem(HttpStatus.INTERNAL_SERVER_ERROR, "WORKER_FAILED", e.getMessage());
+  @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+  ProblemDetail missingResource(Exception e) {
+    return problem(HttpStatus.NOT_FOUND, "NOT_FOUND", "요청한 경로가 없습니다.");
   }
 
   @ExceptionHandler(Exception.class)
