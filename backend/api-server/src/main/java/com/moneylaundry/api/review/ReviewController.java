@@ -27,7 +27,7 @@ public class ReviewController {
 
   @GetMapping("/demo/clock")
   public Map<String, Object> clock() {
-    time.demoOnly();
+    time.workbenchOnly();
     return time.view();
   }
 
@@ -103,7 +103,7 @@ public class ReviewController {
       @RequestParam(required = false) List<String> directions,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    time.demoOnly();
+    time.workbenchOnly();
     return ledger.query(
         kind,
         new LedgerQueryService.Filter(
@@ -112,14 +112,14 @@ public class ReviewController {
 
   @GetMapping("/review/account-nodes")
   public Object nodes(@RequestParam List<String> ids) {
-    time.demoOnly();
+    time.workbenchOnly();
     if (ids.size() > 1000) throw com.moneylaundry.api.analysis.AnalysisService.invalid();
     return ledger.accounts(ids);
   }
 
   @GetMapping("/review/payment-formats")
   public Object payments() {
-    time.demoOnly();
+    time.workbenchOnly();
     return ledger.payments();
   }
 

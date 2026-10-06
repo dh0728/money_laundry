@@ -236,6 +236,7 @@ jobs:
           tags: ${{ steps.image_names.outputs.web_image }}
           build-args: |
             VITE_API_BASE_URL=/api
+            VITE_API_MODE=live
           cache-from: type=gha,scope=aml-web
           cache-to: type=gha,mode=max,scope=aml-web,ignore-error=true
 
