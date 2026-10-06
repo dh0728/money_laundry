@@ -42,8 +42,12 @@ class DashboardDistributionTests {
     verify(jdbc)
         .queryForList(
             anyString(),
-            eq(Timestamp.from(LocalDate.parse("2023-09-01").atStartOfDay(BusinessTime.KST).toInstant())),
-            eq(Timestamp.from(LocalDate.parse("2023-09-03").atStartOfDay(BusinessTime.KST).toInstant())));
+            eq(
+                Timestamp.from(
+                    LocalDate.parse("2023-09-01").atStartOfDay(BusinessTime.KST).toInstant())),
+            eq(
+                Timestamp.from(
+                    LocalDate.parse("2023-09-03").atStartOfDay(BusinessTime.KST).toInstant())));
     verifyNoMoreInteractions(jdbc);
   }
 }

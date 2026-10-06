@@ -53,8 +53,7 @@ class DashboardScoreQueryTests {
           "insert into analysis_runs(run_id,job_id,status) values(?,?,'COMPLETED')", run, job);
       jdbc.update("update batch_jobs set current_run_id=? where job_id=?", run, job);
     }
-    jdbc.update(
-        "update batch_jobs set business_at='2023-09-02 09:00+09' where job_id=?", job);
+    jdbc.update("update batch_jobs set business_at='2023-09-02 09:00+09' where job_id=?", job);
     // Classes 1 and 2 tie: the lower ordinal must win.
     jdbc.update(
         "insert into inference_results(job_id,tx_id,run_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8) values(?,?,?,?,?,0.4,0.4,0,0,0,0,0,0)",
@@ -82,7 +81,9 @@ class DashboardScoreQueryTests {
     var oldRows = jdbc.queryForList(projection + LedgerQueryService.BASE + " order by t.tx_id");
     var newRows = jdbc.queryForList(projection + DashboardService.SCORE_BASE + " order by t.tx_id");
     assertThat(newRows).isEqualTo(oldRows).hasSize(3);
-    assertThat(newRows.getFirst()).containsEntry("job_id", published).containsEntry("type_class", 1L);
+    assertThat(newRows.getFirst())
+        .containsEntry("job_id", published)
+        .containsEntry("type_class", 1L);
     assertThat(newRows.get(2)).containsEntry("job_id", null).containsEntry("type_class", null);
   }
 
