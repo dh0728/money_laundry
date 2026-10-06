@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request as HttpRequest
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from demo_calculator import FEATURE_VERSION, MODEL_VERSION
+from demo_calculator import supported_versions
 from inference_compute import check_url, request_from
 from inference_service import Conflict, InferenceService, NotFound, Settings
 from worker_transport import ProtocolError
@@ -106,7 +106,7 @@ def create_app(settings: Settings):
         body = await payload(request)
         try:
             validate_identity(body, request_id, execution_round)
-            if (body.get("model_version") != MODEL_VERSION or body.get("feature_version") != FEATURE_VERSION
+            if (not supported_versions(body.get("model_version"), body.get("feature_version"))
                     or not re.fullmatch("[0-9a-f]{64}", body.get("manifest_sha256", ""))
                     or set(body.get("result_urls", {})) != {"scores.parquet", "result.json"}):
                 raise ValueError()

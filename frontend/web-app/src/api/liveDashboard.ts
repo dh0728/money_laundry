@@ -10,6 +10,7 @@ export type LiveDashboard = {
   deliveryDate: string
   pendingReports: number
   daily: { day: string; incoming: number; completed: number }[]
+  dailyAlertStatus: { date: string; pending: number; inProgress: number; done: number }[]
   agreements: { agreement: string; count: number }[]
   types: { type: number; count: number }[]
   activities: { event_id: number; case_id: number; action: string; comment: string; business_at: string }[]

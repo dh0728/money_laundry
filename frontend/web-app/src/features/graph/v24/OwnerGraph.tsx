@@ -16,7 +16,7 @@ export function groupOwners(model: GraphModel, visibleNodes?: ReadonlySet<string
   const groups = new Map<string, Owner>()
   for (const account of model.nodes) {
     if (visibleNodes && !visibleNodes.has(account.key)) continue
-    const key = account.entity.trim() ? `owner:${account.entity}` : `account:${account.key}`
+    const key = account.entityId ? `owner:${account.entityId}` : account.entity.trim() ? `owner:${account.entity}` : `account:${account.key}`
     if (!groups.has(key)) groups.set(key, { key, name: account.entity || '소유주 미상', accounts: [], x: 0, y: 0, width: WIDTH, height: INSET * 2 + HEADER })
     const owner = groups.get(key)!
     owner.accounts.push(account); owner.height += ROW

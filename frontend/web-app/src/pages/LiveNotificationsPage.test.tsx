@@ -4,6 +4,7 @@ import LiveNotificationsPage from './LiveNotificationsPage'
 import { fetchNotifications, fetchNotificationCases, setNotificationsRead, type WorkNotification } from '@/api/notifications'
 
 vi.mock('@/api/notifications', () => ({ fetchNotifications: vi.fn(), fetchNotificationCases: vi.fn(), setNotificationsRead: vi.fn() }))
+vi.mock('@/components/DateRangeButton', () => ({ DateRangeButton: ({ onChange }: { onChange: (value: { from: Date; to: Date }) => void }) => <button onClick={() => onChange({ from: new Date(2023, 8, 1), to: new Date(2023, 8, 3) })}>테스트 기간 적용</button> }))
 const batch: WorkNotification = { id: 'batch:run', kind: 'ALERT_ASSIGNED', title: '새 Alert 배정', description: '2건 배정', code: 'ANALYSIS-52', at: '2023-09-02T09:00:00+09:00', read: false, count: 2, caseId: null, caseKind: 'ALERT' }
 beforeEach(() => {
   vi.resetAllMocks()
@@ -32,13 +33,9 @@ it('읽음 실패는 성공으로 표시하거나 사건 이동하지 않는다'
 it('검색과 기간을 서버에 전달하고 현재 페이지의 미확인 알림만 읽음 처리한다', async () => {
   render(<LiveNotificationsPage onOpen={vi.fn()} />)
   await screen.findByText('새 Alert 배정 · 2건')
-  fireEvent.click(screen.getByRole('button', { name: '기간' }))
-  fireEvent.click(screen.getByRole('button', { name: '오늘' }))
-  fireEvent.click(screen.getByRole('button', { name: '적용' }))
+  fireEvent.click(screen.getByRole('button', { name: '테스트 기간 적용' }))
   fireEvent.change(screen.getByLabelText('알림 검색'), { target: { value: '배정' } })
-  fireEvent.click(screen.getByRole('button', { name: '검색' }))
-  const today = new Date().toLocaleDateString('sv-SE')
-  await waitFor(() => expect(fetchNotifications).toHaveBeenLastCalledWith(today, today, '배정', 0))
+  await waitFor(() => expect(fetchNotifications).toHaveBeenLastCalledWith('2023-09-01', '2023-09-03', '배정', 0))
   fireEvent.click(await screen.findByRole('button', { name: '현재 페이지 모두 읽음' }))
   await waitFor(() => expect(setNotificationsRead).toHaveBeenCalledWith(['batch:run'], true))
 })
@@ -49,17 +46,4 @@ it('기존 읽음 상태를 서버에서 복원하고 단건 Episode를 연다',
   fireEvent.click(await screen.findByText('사건 종결'))
   expect(open).toHaveBeenCalledWith('EPISODE', 81)
   expect(setNotificationsRead).not.toHaveBeenCalled()
-})
-it('초기 조회 중에도 검색과 두 알림 열을 유지하고 데이터만 스켈레톤으로 표시한다', async () => {
-  let resolve!: (value: Awaited<ReturnType<typeof fetchNotifications>>) => void
-  vi.mocked(fetchNotifications).mockReturnValue(new Promise(result => { resolve = result }))
-  render(<LiveNotificationsPage onOpen={vi.fn()} />)
-  expect(screen.getByRole('heading', { name: '알림' })).toBeInTheDocument()
-  expect(screen.getByLabelText('알림 검색')).toBeInTheDocument()
-  expect(screen.getByRole('status', { name: '알림 불러오는 중' })).toBeInTheDocument()
-  expect(screen.getByRole('region', { name: '안 읽음' })).toBeInTheDocument()
-  expect(screen.getByRole('region', { name: '읽음' })).toBeInTheDocument()
-  expect(screen.getByTestId('notification-list').querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0)
-  resolve({ content: [batch], number: 0, size: 20, totalElements: 1, totalPages: 1, unreadCount: 1 })
-  expect(await screen.findByText('새 Alert 배정 · 2건')).toBeInTheDocument()
 })

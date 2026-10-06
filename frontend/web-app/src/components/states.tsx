@@ -2,9 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
 export function LoadingBlock({ label }: { label: string }) {
-  return <div role="status" aria-label={`${label} 불러오는 중`} className="space-y-3 rounded-lg border p-4">
-    {[0, 1, 2].map(index => <div key={index} className="flex items-center gap-3"><span className="size-8 shrink-0 animate-pulse rounded-full bg-muted" /><span className="h-4 w-full animate-pulse rounded bg-muted" style={{ maxWidth: `${85 - index * 13}%` }} /></div>)}
-  </div>
+  return <p role="status" className="rounded-lg border border-dashed px-4 py-10 text-center text-xs text-muted-foreground">{label} 불러오는 중…</p>
 }
 
 export function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {

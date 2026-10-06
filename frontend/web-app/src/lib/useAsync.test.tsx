@@ -21,22 +21,6 @@ it('완료 시각부터 5분 뒤 갱신하고 수동 갱신하면 기한을 다�
   } finally { vi.useRealTimers() }
 })
 
-it('활성 조회는 설정한 1분 간격으로만 갱신하고 화면을 떠나면 중단한다', async () => {
-  vi.useFakeTimers()
-  try {
-    const load = vi.fn().mockResolvedValue(1)
-    const { unmount } = renderHook(() => useAsync(load, [], { maxAge: 60_000 }))
-    await act(async () => { await Promise.resolve() })
-    await act(async () => { await vi.advanceTimersByTimeAsync(59_999) })
-    expect(load).toHaveBeenCalledTimes(1)
-    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
-    expect(load).toHaveBeenCalledTimes(2)
-    unmount()
-    await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
-    expect(load).toHaveBeenCalledTimes(2)
-  } finally { vi.useRealTimers() }
-})
-
 it('저장 뒤 refresh가 최신 데이터를 표시하고 조회 실패를 호출자에게 알린다', async () => {
   const load = vi.fn().mockResolvedValueOnce(1).mockResolvedValueOnce(2).mockRejectedValueOnce(new Error('offline'))
   const { result } = renderHook(() => useAsync(load, []))

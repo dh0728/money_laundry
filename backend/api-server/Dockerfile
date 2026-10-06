@@ -59,6 +59,9 @@ COPY worker/analysis_entry.py worker/frozen_input.py worker/pipeline.py \
      worker/model_adapter.py /app/worker/
 COPY worker/recover_dev_placeholder.sql /app/worker/recover_dev_placeholder.sql
 
+# Fail the image build if an entry point's local module dependency is missing.
+RUN PYTHONPATH=/app/worker python -c "import analysis_entry, pipeline, alert_pipeline, inference_dispatch, result_collection, inference_server"
+
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 
 USER app:app

@@ -384,3 +384,8 @@ users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·
 ## V16 — Episode 편입 알림 중복 제거
 
 work_notifications 뷰만 교체한다. Alert 측 TRANSFER 이벤트와 편입이 기록된 Episode의 중복 배정 알림을 제외하고 Episode 측 TRANSFER를 유지한다. 테이블/원본 조사 이력/기존 읽음 기록을 삭제하지 않는다. 배포된 V15는 수정하지 않는다.
+
+
+## V17 — 시연 전용 보고 대응값
+
+`evaluation.demo_report_hints`: 과거 라벨 시연의 보고별 대응값을 보존하는 테이블. 신규 수집·추론에서는 읽거나 작성하지 않는다. 기존 스키마와 이력은 유지하며 시연 초기화 대상에 포함한다. PUBLIC/input_reader 접근 차단은 유지한다.

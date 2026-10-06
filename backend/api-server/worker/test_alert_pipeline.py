@@ -85,6 +85,22 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertEqual(self.admin.execute("SELECT checked_at FROM alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0],checked)
         self.assertEqual(self.admin.execute("SELECT count(*) FROM alert_versions WHERE alert_id=%s",(alert,)).fetchone()[0],2)
 
+    def test_bulk_members_match_evidence_and_timing_survives_retry(self):
+        self.admin.execute("UPDATE inference_results SET p_laundering=.9 WHERE run_id=%s", (self.run,))
+        save_alerts(self.admin, self.execution)
+        versions = self.admin.execute("SELECT alert_id,version,evidence FROM alert_versions WHERE run_id=%s", (self.run,)).fetchall()
+        for alert, version, evidence in versions:
+            actual = self.admin.execute("SELECT tx_id,role,reasons FROM alert_transactions WHERE alert_id=%s AND version=%s ORDER BY tx_id", (alert, version)).fetchall()
+            expected = [(m['txId'], m['role'], m['includedReasons']) for m in evidence['transactions']]
+            self.assertEqual(actual, expected)
+        query = "SELECT artifact FROM analysis_run_stage_results WHERE run_id=%s AND stage='ALERTS'"
+        before = self.admin.execute(query, (self.run,)).fetchone()[0]
+        artifact = json.loads(before) if isinstance(before, str) else before
+        for key in ('inputRead', 'candidateBuild', 'evidenceBuild', 'baselineCheck', 'publication', 'totalBeforeCommit'):
+            self.assertGreaterEqual(artifact['timingsMs'][key], 0)
+        save_alerts(self.admin, self.execution)
+        self.assertEqual(self.admin.execute(query, (self.run,)).fetchone()[0], before)
+
     def test_ten_and_twenty_three_seed_candidates_merge(self):
         self.admin.execute("UPDATE analysis.input_transactions SET occurred_at='2022-09-02 10:00+09' WHERE run_id=%s AND tx_id=%s",(self.run,self.ids[0]))
         self.admin.execute("UPDATE analysis.input_transactions SET occurred_at='2022-09-02 23:00+09',from_account_id=%s,to_account_id=%s WHERE run_id=%s AND tx_id=%s",(self.b,self.c,self.run,self.ids[1]))

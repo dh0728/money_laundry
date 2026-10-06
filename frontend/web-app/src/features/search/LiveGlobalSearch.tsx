@@ -1,23 +1,48 @@
-import { useState } from 'react'
-import { Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { fetchReviewCases } from '@/api/liveReview'
 import { fetchNotifications } from '@/api/notifications'
 import type { Page } from '@/app/navigation'
-import { Input } from '@/components/ui/input'
 import { useAsync } from '@/lib/useAsync'
+import { useViewState } from '@/lib/workspaceState'
+import GlobalSearch, { type ResultGroup } from './GlobalSearch'
 
 export default function LiveGlobalSearch({ onNavigate }: { onNavigate: (page: Page, id?: number) => void }) {
   const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const alerts = useAsync(() => fetchReviewCases({ kind: 'ALERT', size: 100 }), [], { key: 'search/alerts', enabled: open })
-  const episodes = useAsync(() => fetchReviewCases({ kind: 'EPISODE', size: 100 }), [], { key: 'search/episodes', enabled: open })
-  const notifications = useAsync(() => fetchNotifications('', '', '', 0), ['', '', '', 0], { key: 'notifications', enabled: open })
-  const q = query.trim().toLowerCase()
-  const results = [
-    ...(alerts.state.status === 'success' ? alerts.state.data.content.map(row => ({ key: `a-${row.caseId}`, label: `A-${row.alertId ?? row.caseId} · ${row.assigneeName}`, page: 'alerts' as const, id: row.caseId })) : []),
-    ...(episodes.state.status === 'success' ? episodes.state.data.content.map(row => ({ key: `e-${row.caseId}`, label: `E-${row.caseId} · ${row.assigneeName}`, page: 'episodes' as const, id: row.caseId })) : []),
-    ...(notifications.state.status === 'success' ? notifications.state.data.content.filter(row => row.caseId != null).map(row => ({ key: `n-${row.id}`, label: `${row.title} · ${row.code}`, page: row.caseKind === 'ALERT' ? 'alerts' as const : 'episodes' as const, id: row.caseId ?? undefined })) : []),
-  ].filter(row => row.label.toLowerCase().includes(q)).slice(0, 8)
-  const navigate = (page: Page, id?: number) => { onNavigate(page, id); setQuery(''); setOpen(false) }
-  return <div className="relative min-w-0 w-full"><Search className="pointer-events-none absolute left-3 top-2.5 size-3.5 text-muted-foreground" /><Input aria-label="전역 검색" placeholder="상위 100건의 조사 사건 빠른 찾기" className="h-9 rounded-full bg-muted/40 pl-9" value={query} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} onChange={event => { setQuery(event.target.value); setOpen(true) }} />{open && q && <div role="listbox" aria-label="검색 결과" className="absolute z-50 mt-2 max-h-72 w-full overflow-auto rounded-lg border bg-popover p-1 shadow-lg">{results.length ? results.map(row => <button role="option" aria-selected={false} type="button" key={row.key} className="block w-full rounded-md p-2 text-left text-xs hover:bg-accent" onMouseDown={event => event.preventDefault()} onClick={() => navigate(row.page, row.id)}>{row.label}</button>) : <p className="p-3 text-xs text-muted-foreground">{alerts.state.status === 'loading' || episodes.state.status === 'loading' ? '불러오는 중…' : '상위 100건에서 일치하는 사건이 없습니다.'}</p>}<div className="border-t p-2 text-xs text-muted-foreground">전체 조회는 각 목록, 소유주·계좌·거래는 거래 내역에서 확인</div></div>}</div>
+  const [search, setSearch] = useState('')
+  const [, setNotificationSearch] = useViewState('notifications/query', '')
+  const [, setLedgerSearch] = useViewState('ledger/search', '')
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query.trim()), 250)
+    return () => clearTimeout(timer)
+  }, [query])
+  const result = useAsync(async () => {
+    const [alerts, episodes, notifications] = await Promise.all([
+      fetchReviewCases({ kind: 'ALERT', query: search, size: 5 }),
+      fetchReviewCases({ kind: 'EPISODE', query: search, size: 5 }),
+      fetchNotifications('', '', search, 0),
+    ])
+    return { alerts, episodes, notifications }
+  }, [search], { key: 'global-search', enabled: !!search })
+  const groups: ResultGroup[] = search === query.trim() && result.state.status === 'success' ? [
+    { id: 'alerts', label: 'Alert', items: result.state.data.alerts.content.map(row => ({
+      key: `a-${row.caseId}`, primary: `A-${row.alertId}`, secondary: row.assigneeName,
+      onSelect: () => onNavigate('alerts', row.caseId),
+    })) },
+    { id: 'episodes', label: 'Episode', items: result.state.data.episodes.content.map(row => ({
+      key: `e-${row.caseId}`, primary: `E-${row.caseId}`, secondary: row.assigneeName,
+      onSelect: () => onNavigate('episodes', row.caseId),
+    })) },
+    { id: 'notifications', label: '알림', items: result.state.data.notifications.content.slice(0, 5).map(row => ({
+      key: row.id, primary: row.title, secondary: row.code,
+      onSelect: () => { setNotificationSearch(search); onNavigate('notifications') },
+    })) },
+  ] : []
+  if (query.trim()) groups.push({ id: 'ledger', label: '거래 탐색', items: [{
+    key: 'ledger-search', primary: '거래 내역에서 소유주·계좌·거래 식별자로 검색',
+    secondary: query.trim(), onSelect: () => { setLedgerSearch(query.trim()); onNavigate('transactions') },
+  }] })
+  return <GlobalSearch onNavigate={onNavigate} remote={{
+    groups, onQuery: setQuery, loading: query.trim() !== search || result.state.status === 'loading',
+    error: search === query.trim() && result.state.status === 'error' ? result.state.message : undefined,
+  }} />
 }

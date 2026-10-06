@@ -2,7 +2,6 @@
 // 색은 상태 태그와 같은 초록·파랑·보라다. 기간은 대시보드의 DateRangeButton이 정한다.
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { DashboardRequested } from '@/api/dashboard'
-import { ProvenanceBadge } from '@/components/Provenance'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart'
 import { fmt } from '@/lib/format'
@@ -46,15 +45,16 @@ export function StatusLegend() {
   )
 }
 
-export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
+export function AlertStatusChart({ data, unavailable = false }: { data: DailyStatus[]; unavailable?: boolean }) {
   return (
     <Card className="@container/card min-w-0 max-w-full shadow-none" data-testid="alert-flow-chart">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle>일별 Alert 유입과 처리 상태</CardTitle>
-          <ProvenanceBadge kind="proposal" title="일별 처리 상태 집계는 API 계약에 없어 Backend에 요청할 항목입니다." />
         </div>
         <CardDescription>그날 들어온 Alert가 지금 어느 단계에 있는지 · 막대 전체 = 유입 건수</CardDescription>
+        <p className="text-xs text-muted-foreground">처리 전: 열린 Alert · 처리 중: 열린 Episode에 편입 · 처리 완료: 직접 종결 또는 Episode 종결</p>
+        {unavailable && <p className="text-xs text-muted-foreground">상태별 일별 집계 API 미연결 · 데이터 준비 중</p>}
       </CardHeader>
       <CardContent className="min-w-0 px-2 pt-2 sm:px-6">
         <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full min-w-0 max-w-full">
@@ -67,7 +67,12 @@ export function AlertStatusChart({ data }: { data: DailyStatus[] }) {
           </BarChart>
         </ChartContainer>
         <StatusLegend />
+        <table className="sr-only" aria-label="일별 Alert 현재 처리 상태 집계">
+          <thead><tr><th>생성일</th>{series.map(s => <th key={s.key}>{s.label}</th>)}<th>유입</th></tr></thead>
+          <tbody>{data.map(day => <tr key={day.date}><th scope="row">{day.date}</th>{series.map(s => <td key={s.key}>{day[s.key]}</td>)}<td>{day.pending + day.inProgress + day.done}</td></tr>)}</tbody>
+        </table>
       </CardContent>
     </Card>
   )
 }
+

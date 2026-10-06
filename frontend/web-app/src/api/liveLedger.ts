@@ -5,16 +5,20 @@ export type LedgerFilters = {
   to?: string
   judgement?: ('SUSPICIOUS' | 'NORMAL' | 'UNANALYZED')[]
   payments?: string[]
+  query?: string
+  directions?: string[]
   page?: number
   size?: number
 }
-export type LedgerOwner = { id: string }
-export type LedgerAccount = { id: string; ownerId: string; bankId: number }
+export type LedgerOwner = { id: string; name?: string }
+export type LedgerAccount = { id: string; ownerId: string; ownerName?: string; bankId: number }
 export type LedgerTransaction = {
   txId: number
   occurredAt: string
   fromAccountId: string
   toAccountId: string
+  fromOwnerName?: string
+  toOwnerName?: string
   fromOwnerId: string
   toOwnerId: string
   fromBankId: number
@@ -38,6 +42,8 @@ export type LedgerTransaction = {
 
 function query(filters: LedgerFilters, selection?: { owner?: string; account?: string }) {
   const params = new URLSearchParams()
+  if (filters.query) params.set('query', filters.query)
+  if (selection?.account) filters.directions?.forEach(value => params.append('directions', value))
   if (filters.from) params.set('from', filters.from)
   if (filters.to) params.set('to', filters.to)
   if (selection?.owner) params.set('owner', selection.owner)

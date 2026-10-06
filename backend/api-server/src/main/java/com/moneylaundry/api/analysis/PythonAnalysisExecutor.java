@@ -121,6 +121,7 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
 
   @Override
   public Result prepare(Context context) {
+    long startedNanos = System.nanoTime();
     Process process = null;
     try {
       var command =
@@ -193,6 +194,13 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
         throw new AnalysisFailure("WORKER_INPUT_INVALID", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 74)
         throw new AnalysisFailure("WORKER_STORAGE_UNAVAILABLE", AnalysisFailure.Kind.COMPUTATION);
+      // Record only process metadata; raw worker output may contain private data.
+      org.slf4j.LoggerFactory.getLogger(PythonAnalysisExecutor.class)
+          .error(
+              "Worker exited without checkpoint: jobId={}, stage={}, exitCode={} (137 may indicate SIGKILL/OOM)",
+              context.jobId(),
+              context.stage(),
+              process.exitValue());
       // Exit zero alone cannot advance a stage without a persisted checkpoint.
       throw new AnalysisFailure("WORKER_PROTOCOL_NOT_CONNECTED", AnalysisFailure.Kind.PERMANENT);
     } catch (IOException e) {
@@ -201,6 +209,13 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       Thread.currentThread().interrupt();
       throw new AnalysisFailure("WORKER_INTERRUPTED", AnalysisFailure.Kind.COMPUTATION);
     } finally {
+      org.slf4j.LoggerFactory.getLogger(PythonAnalysisExecutor.class)
+          .info(
+              "Worker stage attempt: jobId={}, runId={}, stage={}, elapsedMs={}",
+              context.jobId(),
+              context.runId(),
+              context.stage(),
+              TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos));
       if (process != null && process.isAlive()) {
         var descendants = process.descendants().toList();
         descendants.forEach(ProcessHandle::destroyForcibly);

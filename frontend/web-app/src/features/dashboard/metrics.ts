@@ -5,6 +5,18 @@ import { fmt } from '@/lib/format'
 
 type DailyFlow = { date: string; inflow: number; closed: number }
 
+const agreementStyles = [
+  { code: 'STRONG', name: '모델 의심 · 패턴 있음', fill: 'var(--foreground)' },
+  { code: 'ATYPICAL', name: '모델 의심 · 패턴 없음', fill: 'var(--muted-foreground)' },
+  { code: 'PATTERN_ONLY', name: '모델 정상 · 패턴 있음', fill: 'var(--chart-3)' },
+  { code: 'WEAK', name: '모델 정상 · 패턴 없음', fill: 'var(--chart-4)' },
+]
+
+export function agreementComposition(rows: { agreement: string; count: number }[]) {
+  const counts = new Map(rows.map(row => [row.agreement, row.count]))
+  return agreementStyles.map(({ code, name, fill }) => ({ name, fill, value: counts.get(code) ?? 0 }))
+}
+
 const sum = (rows: DailyFlow[], key: 'inflow' | 'closed') => rows.reduce((total, row) => total + row[key], 0)
 const pct = (now: number, before: number) => (before ? Math.round(((now - before) / before) * 1000) / 10 : undefined)
 const rate = (rows: DailyFlow[]) => {
@@ -27,7 +39,7 @@ export function institutionCards(data: DashboardData): SectionCardItem[] {
   ]
 }
 
-export function chartInputs(data: Pick<DashboardData, 'suspiciousTxComposition' | 'alertsByType'>) {
+export function chartInputs(data: DashboardData) {
   const composition = data.suspiciousTxComposition
   const fill = 'var(--foreground)'
   return {

@@ -39,6 +39,7 @@ export type ReviewCase = {
   ageDays: number
   summary: {
     txCount: number; subjectCount: number; seedCount: number; riskScore: number; primaryType: string; typeShare?: number | null
+    totalAmountUsd?: number | string | null
     amountsByCurrency: Record<string, number>; firstTxAt: string | null; lastTxAt: string | null
     paymentFormats?: Record<string, number>; typeDistribution?: Record<string, number>
     dailySuspiciousCount?: Record<string, number>; dailySuspiciousAmount?: Record<string, number>
@@ -48,11 +49,12 @@ export type ReviewCase = {
   episodeId: number | null
   sourceAlertIds: number[]
   primaryTypes: string[]
+  accounts?: { id: string; ownerId: string; ownerName?: string; bankId: number }[]
   groups?: ReviewGroup[]
   detachments?: { eventId: number; action: 'UNLINK' | 'DISSOLVE'; comment: string; businessAt: string; snapshot: { selectedAlertIds?: number[]; removedAlertIds?: number[]; episodeCaseId?: number; groups: ReviewGroup[] } }[]
   history?: { eventId: number; action: string; comment: string; businessAt: string; recordedAt: string; actor: string | null }[]
 }
-export type ReviewQuery = { kind: ReviewKind; assigneeId?: number; status?: ReviewStatus; from?: string; to?: string; page?: number; size?: number }
+export type ReviewQuery = { kind: ReviewKind; assigneeId?: number; status?: ReviewStatus; from?: string; to?: string; page?: number; size?: number; query?: string; types?: string[]; minAgeDays?: number; risk?: string; statuses?: string[]; assignees?: number[] }
 export type ReviewSelection = { caseId: number; revision: number; groupId: number; txIds: number[] }
 export type ReviewAction = 'SUBJECT' | 'CONTEXT' | 'EXCLUDE' | 'DECIDE' | 'TRANSFER' | 'UNLINK' | 'RECONSIDER' | 'COMMENT' | 'REVIEW_START' | 'CLOSE'
 export type ReviewCommand = { action: ReviewAction; selections: ReviewSelection[]; decision?: 'NORMAL' | 'SUSPICIOUS' | null; targetCaseId?: number | null; targetRevision?: number | null; targetGroupId?: number | null; comment: string }
@@ -72,6 +74,7 @@ export type ReviewMoney = {
   endExclusive?: string
   ledgerCount?: number
   method?: 'FIFO_ESTIMATE'
+  externalUsd?: { in: number | null; out: number | null; net: number | null }
   external?: { currency: string; in: number; out: number; net: number }[]
   accounts?: {
     accountId: string; currency: string; in: number; out: number; net: number; positiveNet: number
@@ -79,7 +82,15 @@ export type ReviewMoney = {
   }[]
 }
 
-export const fetchReviewCases = (query: ReviewQuery) => getJson<Page<ReviewCase>>('/api/v1/review/cases', { ...query })
+export const fetchReviewCases = (query: ReviewQuery) => {
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([key, value]) => {
+    if (Array.isArray(value)) value.forEach(item => params.append(key, String(item)))
+    else if (value !== undefined && value !== '') params.set(key, String(value))
+  })
+  return getJson<Page<ReviewCase>>(`/api/v1/review/cases?${params}`)
+}
+export const fetchReviewUsers = () => getJson<{ id: number; name: string; role: string }[]>('/api/v1/demo/users')
 export const fetchReviewCase = (caseId: number) => getJson<ReviewCase>(`/api/v1/review/cases/${caseId}`)
 export const fetchReviewMoney = (caseId: number, minutes = 180) => getJson<ReviewMoney>(`/api/v1/review/cases/${caseId}/money`, { minutes })
 export const setReviewMoneyScope = (caseId: number, revision: number, accounts: string[], comment: string, requestId: string) =>

@@ -40,6 +40,25 @@ class PythonAnalysisExecutorTests {
   }
 
   @Test
+  @org.junit.jupiter.api.extension.ExtendWith(
+      org.springframework.boot.test.system.OutputCaptureExtension.class)
+  void unexpected_exit_logs_metadata_without_exposing_worker_output(
+      org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+    String python = System.getenv("AML_TEST_PYTHON");
+    org.junit.jupiter.api.Assumptions.assumeTrue(python != null);
+    Path script = temp.resolve("killed.py");
+    Files.writeString(
+        script, "import sys\nprint('FAKE_PRIVATE_WORKER_OUTPUT',file=sys.stderr)\nsys.exit(137)\n");
+    var executor = new PythonAnalysisExecutor(python, script.toString(), Duration.ofSeconds(10));
+    assertThatThrownBy(() -> executor.prepare(context()))
+        .isInstanceOfSatisfying(
+            AnalysisFailure.class,
+            e -> assertThat(e.code()).isEqualTo("WORKER_PROTOCOL_NOT_CONNECTED"));
+    assertThat(output.getAll()).contains("jobId=1", "stage=FEATURES", "exitCode=137", "elapsedMs=");
+    assertThat(output.getAll()).doesNotContain("FAKE_PRIVATE_WORKER_OUTPUT");
+  }
+
+  @Test
   void timeout_terminates_process_without_exposing_worker_output() throws Exception {
     String python = System.getenv("AML_TEST_PYTHON");
     org.junit.jupiter.api.Assumptions.assumeTrue(python != null);

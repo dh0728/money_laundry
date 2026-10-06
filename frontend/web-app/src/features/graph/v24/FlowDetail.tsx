@@ -254,7 +254,7 @@ export function FlowPanel({ model, focus, mode, onModeChange, onClose, extra }: 
         size={{ width: fitted.width, height: fitted.height }} position={{ x: fitted.x, y: fitted.y }}
         onDragStop={(_event, position) => setGeometry(normalizeFlowGeometry({ ...fitted, x: position.x, y: position.y }, readPanelBounds()))}
         onResizeStop={(_event, _direction, element, _delta, position) => setGeometry(normalizeFlowGeometry({ ...position, width: element.offsetWidth, height: element.offsetHeight }, readPanelBounds()))}
-        className="floating-resize-panel pointer-events-auto overflow-hidden rounded-xl border shadow-2xl">
+        className="pointer-events-auto overflow-hidden rounded-xl border shadow-2xl">
         {body}
       </Rnd>
     </div>

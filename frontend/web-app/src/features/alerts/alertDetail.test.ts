@@ -13,8 +13,8 @@ describe('Alert 판정 선택지 (9/28 회의)', () => {
     expect(JSON.stringify(verdictOptions)).not.toContain('오탐')
   })
 
-  it('API에 없는 Alert 단독만 FE 제안으로 표시하고, Episode로 보내는 판정은 종결하지 않는다', () => {
-    expect(verdictOptions.filter(o => o.proposal).map(o => o.value)).toEqual(['standalone'])
+  it('단독 의심 종결도 구현된 선택지이고, Episode로 보내는 판정은 종결하지 않는다', () => {
+    expect(verdictOptions.filter(o => o.proposal).map(o => o.value)).toEqual([])
     expect(verdictResolution).toEqual({ normal: 'NORMAL', standalone: 'SUSPICIOUS' })
   })
 })

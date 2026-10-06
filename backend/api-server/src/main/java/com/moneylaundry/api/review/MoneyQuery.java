@@ -2,6 +2,8 @@ package com.moneylaundry.api.review;
 
 import static com.moneylaundry.api.review.ReviewJson.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
@@ -9,6 +11,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Reads all received ledger activity, independently of case membership. */
 final class MoneyQuery {
+  private record ValuedTransfer(
+      MoneyMetrics.Transfer transfer, BigDecimal paidUsd, BigDecimal receivedUsd) {}
+
   private final JdbcTemplate jdbc;
   private final BusinessTime time;
 
@@ -94,24 +99,52 @@ final class MoneyQuery {
     String marks = String.join(",", Collections.nCopies(ids.size(), "?"));
     var transfers =
         jdbc.query(
-            "select t.tx_id,t.occurred_at,f.service_account_id as f,r.service_account_id as r,t.amount_paid,t.payment_currency,t.amount_received,t.receiving_currency from transactions t join private.accounts f on f.account_id=t.from_account_id join private.accounts r on r.account_id=t.to_account_id where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<? and (f.service_account_id in ("
+            "select t.tx_id,t.occurred_at,f.service_account_id as f,r.service_account_id as r,t.amount_paid,t.payment_currency,t.amount_received,t.receiving_currency,t.amount_usd,fx.units_per_usd from transactions t left join fx_rates fx on fx.fx_rate_version=t.fx_rate_version and fx.currency=t.receiving_currency join private.accounts f on f.account_id=t.from_account_id join private.accounts r on r.account_id=t.to_account_id where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<? and (f.service_account_id in ("
                 + marks
                 + ") or r.service_account_id in ("
                 + marks
                 + ")) order by t.occurred_at,t.tx_id",
             (rs, n) ->
-                new MoneyMetrics.Transfer(
-                    rs.getLong("tx_id"),
-                    rs.getTimestamp("occurred_at").toInstant(),
-                    rs.getString("f"),
-                    rs.getString("r"),
-                    rs.getBigDecimal("amount_paid"),
-                    rs.getString("payment_currency").trim(),
-                    rs.getBigDecimal("amount_received"),
-                    rs.getString("receiving_currency").trim()),
+                new ValuedTransfer(
+                    new MoneyMetrics.Transfer(
+                        rs.getLong("tx_id"),
+                        rs.getTimestamp("occurred_at").toInstant(),
+                        rs.getString("f"),
+                        rs.getString("r"),
+                        rs.getBigDecimal("amount_paid"),
+                        rs.getString("payment_currency").trim(),
+                        rs.getBigDecimal("amount_received"),
+                        rs.getString("receiving_currency").trim()),
+                    rs.getBigDecimal("amount_usd"),
+                    rs.getBigDecimal("units_per_usd") == null
+                            || rs.getBigDecimal("units_per_usd").signum() <= 0
+                        ? null
+                        : rs.getBigDecimal("amount_received")
+                            .divide(rs.getBigDecimal("units_per_usd"), 6, RoundingMode.HALF_UP)),
             args.toArray());
     out.putAll(
-        MoneyMetrics.calculate(transfers, accounts, start, end, Duration.ofMinutes(minutes)));
+        MoneyMetrics.calculate(
+            transfers.stream().map(ValuedTransfer::transfer).toList(),
+            accounts,
+            start,
+            end,
+            Duration.ofMinutes(minutes)));
+    BigDecimal inUsd = BigDecimal.ZERO, outUsd = BigDecimal.ZERO;
+    boolean valued = true;
+    for (var row : transfers) {
+      var t = row.transfer();
+      boolean from = accounts.contains(t.from()), to = accounts.contains(t.to());
+      if (!from && to) {
+        if (row.receivedUsd() == null) valued = false;
+        else inUsd = inUsd.add(row.receivedUsd());
+      }
+      if (from && !to) outUsd = outUsd.add(row.paidUsd());
+    }
+    var externalUsd = new LinkedHashMap<String, Object>();
+    externalUsd.put("in", valued ? inUsd : null);
+    externalUsd.put("out", outUsd);
+    externalUsd.put("net", valued ? inUsd.subtract(outUsd) : null);
+    out.put("externalUsd", externalUsd);
     out.put("available", true);
     out.put("ledgerCount", transfers.size());
     return out;

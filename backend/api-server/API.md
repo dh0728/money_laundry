@@ -35,8 +35,8 @@
 | `FORBIDDEN_ROLE` | 403 | 역할이 액션을 허용하지 않음 |
 | `NOT_FOUND` | 404 | |
 | `INVALID_TRANSITION` | 409 | 전이 표에 없는 상태 전이 |
-| `DUPLICATE_FILE` | 409 | 같은 은행의 동일 파일이 이미 적재됨. 추가 필드는 기존 `fileName`, `uploadedAt`만 |
-| `UPLOAD_IN_PROGRESS` | 409 | 같은 은행의 동일 파일이 업로드·처리 중 |
+| `DUPLICATE_FILE` | 409 | 같은 은행의 동일 파일이 이미 적재됨. 추가 필드 `uploadId`, `fileName`, `uploadedAt` |
+| `UPLOAD_IN_PROGRESS` | 409 | 같은 은행의 동일 파일이 업로드·처리 중. 기존 `uploadId` 제공 |
 | `UPLOAD_SUPERSEDED` | 409 | 같은 은행·파일의 새 업로드 번호가 발급되어 이전 URL_ISSUED 번호의 완료 통지 거절 |
 | `JOB_ALREADY_RUNNING` | 409 | 같은 analysisDate의 작업이 QUEUED·RUNNING |
 | `JOB_ALREADY_COMPLETED` | 409 | 같은 analysisDate의 작업이 이미 COMPLETED — 일별 분석은 날짜당 1회(§1.2) |
@@ -61,6 +61,7 @@
 - **POST /api/v1/bank/uploads** `{fileName,sizeBytes,checksumSha256,businessDate}` + 정정 시 `{correctionRequestId,correctionSubmissionId}` →201 `{uploadId,bankId,url,method:"PUT",expiresAt,headers,uploadRequired}`. 기본4개 필드는 필수이며 정정2개 필드는 함께 지정한다. 한 파일은 서울 거래 기준일 하루치, 최대200MiB, 기본 URL TTAlert 담당 직원5분. 체크섬은 실제 파일 바이트 SHA-256 Base64다. 파일명 경로 문자는 거절한다.
 - 은행은 응답의 서명 헤더를 유지해 S3에 PUT한다. 은행 식별 헤더를 S3로 전달하지 않는다. S3 SDK·비공개 객체·IAM 설정 계약은 기존 저장소 설정을 유지하며 실제 배포 권한은 별도 검증한다. dev/prod는 S3 설정 누락시 시작 실패, local/default만 폴더 저장소를 허용한다.
 - **POST /api/v1/bank/uploads/{uploadId}/complete** →202 처리현황. 객체 존재·크기·실제 SHA-256 확인 후 수신을 커밋하고 비동기 검수한다. ETag를 체크섬으로 대체하지 않는다. 은행 행 잠금 후 최신 URL/상태를 다시 확인한다. 같은 번호 완료 재시도는 기존 상태를 반환한다.
+- 복구: 위 두 409의 `uploadId`는 인증된 은행의 동일 SHA-256 파일에 해당한다. 은행 상태 조회로 기준일·크기·처리 결과를 확인한 뒤 완료본은 건너뛰고 진행 중인 건은 조회를 이어간다. URL 발급 상태만으로 전송 완료로 간주하지 않는다. 다른 기준일 파일이나 검수 실패는 자동 성공 처리하지 않는다.
 - 일반 동일 파일 완료본은409 `DUPLICATE_FILE`, 진행 중은409 `UPLOAD_IN_PROGRESS`, 새 URL이 발급된 옛 번호는409 `UPLOAD_SUPERSEDED`다. 명시적인 correctionRequestId·correctionSubmissionId 제출만 별도 정정 문맥으로 접수한다. 일반 업로드는 기존 보고를 임의 교체하지 않는다.
 - 검수 성공은 **은행 보고 저장 완료**다. `COMPLETED`를 통합·추론 완료로 해석하지 않는다. 반복 동일 행은 원천 발생 건수로 보존한다. 파일 자체 오류는 전체 보류하고 정상 개체·계좌·거래를 만들지 않는다. 정상 확정은 별도 통합 서비스에서 수행한다.
 - 목업은 업로드 또는 `--upload-id` 재조회, 2초/최대30분 폴링을 유지한다. 종료0은 보고 수신 처리의 종료이며 `integrationStatus`로 통합 대기/정상/보류를 별도 표시한다. 시간초과는 서버 실패로 단정하지 않는다.
@@ -79,6 +80,8 @@
 - 두 API 설정이 모두 없으면 기존 S3/local 취소 파일 전달을 유지한다. S3는 `requests/{job}/{model}/{request}/rounds/{round}/cancel.json` 조건부 불변 게시와 `results/.../cancel_ack.json` 조회를 사용한다. local은 storage-dir/analysis-transport에 원자 게시한다. API 설정 일부 누락은 기동 시 거절하며 API 전달 실패 시 파일 방식으로 우회하지 않는다. 기존 2스레드 TaskScheduler에서 Python 단계와 별도로 5초 스캔하고, outbox의 재시도 정책을 그대로 사용한다. 실제 EC2–KubeSphere HTTPS 통신은 별도 배포 검증 대상이다.
 - 전달 실패는30초/2분 간격으로 총3회까지 게시를 시도하고 미확인은 계속 대기한다. 3회 후에도 늦은 ack는 조회하며 작업 상세 cancellations의 actionRequired로 게시 재개 필요를 알린다. 취소된 작업의 기존 resume API는 outbox 시도만 재개하고 취소 run을 계산 재개하지 않는다(응답 status는 FAILED 유지). 실제 S3 권한/외부 프로세스 중단은 이 로컬·SDK 대역 검증과 구별한다.
 - 더미 모델은 TARGET만 입력받고 Alert 구성은 달력 이동 탐색용 고정 CONTEXT도 사용한다. Python FEATURES→INFERENCE→SCORES→ALERTS가 연결되어 있으며 구체적인 Alert 정책은 §3.1을 따른다.
+- 새 분석은 `demo-random-v1/demo-input-v1` 임시 변환기를 사용한다. 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
+- 기존 `demo-calculator-v1` 바인딩은 유지한다. 삭제된 `demo-labels-*` 미완료 작업은 자동 변환하지 않으며 새 실행이 필요하다. 완료된 결과는 유지한다.
 
 ### 1.2 처리현황 (W2 [원장 적재]·[일별 분석 진입점])
 - **GET /api/v1/bank/uploads/{uploadId}** — 자기 은행만 조회. 다른 은행/없는 작업404. 응답은 `{uploadId,bankId,fileName,businessDate,sizeBytes,rowCount,insertedCount,missingCount,duplicateCount,status,errorCode,errorMessage,errors:[{row,column,reason}],urlIssuedAt,receivedAt,startedAt,finishedAt,integrationStatus,reportVersionId,correctionRequired,correctionRequestId,replacementUploadId,nextAnalysisDate}`다. `insertedCount`는 해당 보고에서 정상 통합 거래에 연결된 보고 행 수이며 통합 전에는0이다. 같은 내용 반복은 중복 오류가 아니므로 `duplicateCount=0`이다. `errors`는 자기 파일의 정제된 오류 최대100건이며 원문 식별정보를 포함하지 않는다. `finishedAt`은 보고 저장/검수 종료 시각이다.
@@ -91,6 +94,8 @@
   - INFERENCE 원격 대기는 상위 `RETRY_WAIT`로 재관측을 예약하며 실패 횟수를 올리지 않는다. 모델 하나가 실패해도 다른 모델의 상태 관측을 계속한다. 원격 대기 기한 초과/종료 불명은 조치 필요로 표시하고 새 요청 회차를 자동 생성하지 않는다.
   - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→두 모델 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 두 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS는 V6 근거 저장 이후 전체 분석을 완료한다. 콜백 수신은 아직 미연결이며 GET 상태 확인을 사용한다.
 - **POST /api/v1/batch-jobs/analysis** — 본문 없이 서버 Clock 현재 시각을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
+
+- 시연 업무 시각(`demo_business_clock.business_at`)이 설정되어 있으면 일반 분석 실행과 일일 자동 예약의 신규 등록은409 `INVALID_TRANSITION`으로 차단한다. 조작패널의 날짜 지정 분석을 사용한다. 검사는 시연 시각 설정과 같은 수신 잠금 안에서 수행하며, 기존 작업의 처리·재시도·기동 복구는 유지한다. 시연 시계가 설정되지 않았으면 기존 실제 날짜 기준 등록을 유지한다. 이미 생성된 작업을 자동 삭제하거나 분석일을 변경하지 않는다.
 
 - **POST /api/v1/demo/analysis** — dev/local 날짜순 시연 전용. ADMIN 서버 세션·CSRF가 필요하다. 본문 `{businessDate:"YYYY-MM-DD"}`는 전송한 과거 거래 기준일이다. 분석 구분 날짜는 그 다음 날, 수신 cutoff는 실제 요청 시각으로 기록한다. PC 시각·수신 시각·파일 내용을 변경하지 않는다. 응답202 `{jobId,status:"QUEUED"}`. 기존 WAIT_INGEST부터 실제 파이프라인을 실행하며 검수·통합·입력 고정·실패/재개를 건너뛰지 않는다. `dev` 또는 `local` 프로파일에서 허용하며 `prod`가 함께 활성화되면403 `DEMO_CONTROL_DISABLED`다. 날짜가 없거나 시연 업무 시각 기준 오늘/미래이면400 `INVALID_DEMO_DATE`. 이전 미완료 분석409 `DEMO_PREVIOUS_JOB_PENDING`, 이전 날짜로 역행409 `DEMO_DATE_OUT_OF_ORDER`, 뒤 날짜 수신 자료409 `DEMO_FUTURE_INPUT`, 해당 날짜 수신 자료 없음409 `DEMO_INPUT_REQUIRED`, 같은 날짜 완료409 `JOB_ALREADY_COMPLETED`. 날짜순으로 파일을 전송하는 시연 DB에서 사용하며 운영 예약 API의 의미를 변경하지 않는다. PC에서 dev를 조작하는 실행 방법은 [조작패널 안내](demo/README.md#배포된-dev-서버-조작패널)를 따른다.
 - **POST /api/v1/batch-jobs/{jobId}/resume** — FAILED 작업만 실패 단계부터 새 실패 주기로 재개한다.202 `{ jobId, status: "QUEUED" }`. 이력·정상 산출물·최초 startedAt은 유지한다. 완료 작업 재분석은 허용하지 않는다.
@@ -343,6 +348,7 @@ Cookie: JSESSIONID=<로그인 세션>
 | deliveryDate | string, 대상 거래일. 복수이면 쉼표로 연결 | 선택 기간 무관 |
 | pendingReports | number, 대상 거래일의 처리·통합 미완료 보고 집계 | 선택 기간 무관 |
 | daily | array of {day: YYYY-MM-DD, incoming: number, completed: number} | Alert 생성/종결 업무일. 0건 날짜도 포함 |
+| dailyAlertStatus | array of {date: YYYY-MM-DD, pending: number, inProgress: number, done: number} | Alert 최초 생성 업무일별 현재 상태. 날짜 오름차순, 0건 날짜 포함 |
 | agreements | array of {agreement: string, count: number} | 최신 유효 점수의 탐지 업무일 |
 | types | array of {type: number, count: number} | 최신 유효 점수의 탐지 업무일, 이진 의심 거래만 |
 | activities | array of {event_id: number, case_id: number, action: string, comment: string, business_at: timestamp} | 본인 활동 업무 시각, 최근20건 |
@@ -361,6 +367,9 @@ Cookie: JSESSIONID=<로그인 세션>
 ### 차트·카드 의미
 
 - `daily.incoming`은 새 Alert 사건 수이고 새 근거 버전 수가 아니다. `completed`는 조사 업무 종결 건수이며 정상 판정만 세는 값이 아니다. 당일 유입 건들이 당일 종결됐다는 뜻도 아니다.
+- `dailyAlertStatus`는 완료된 분석에서 공개된 Alert만 원본 Alert당 한 번 집계한다. `pending`은 현재 Episode 소속이 없는 OPEN Alert, `inProgress`는 현재 OPEN Episode에 소속된 Alert, `done`은 직접 종결한 Alert 또는 CLOSED Episode에 소속된 Alert다. 정상·단독 의심 등 종결 결과는 합산한다.
+- 날짜는 KST 최초 생성일이며 편입·종결·해제 시 날짜가 이동하지 않는다. Episode에서 해제되어 다시 열린 Alert는 `pending`으로 돌아간다. 해당 날짜의 `pending + inProgress + done`은 `daily.incoming`과 같다. 근거 버전·거래·Episode 수를 세지 않는다.
+- 이 값은 조회 시점의 현재 상태다. 선택 날짜 당시의 상태를 복원한 이력 통계가 아니다. REVIEW_START 기록이나 단순 상세 열람은 이 분류에 영향을 주지 않는다. 기존 `daily.completed`(종결일별 이벤트)는 유지하며 이 차트에 대입하지 않는다.
 - `types`는 **의심 거래 건수**다. `alertsByType`이라는 이름으로 Alert 건수처럼 표시하지 않는다. 유형 분포는 가로 막대그래프다.
 - 도넛은 **전체 분석 거래**의 모델 조합 분포다. `STRONG`=이진 의심+패턴 있음, `ATYPICAL`=이진 의심+패턴 없음, `PATTERN_ONLY`=이진 정상+패턴 있음, `WEAK`=이진 정상+패턴 없음. 패턴 없음은 최다 확률 클래스0, 동률이면 작은 코드 우선이다. 미분석은 네 범주에 넣지 않는다.
 - agreements/types는 실제 있는 범주만 반환한다. FE는 누락 범주를0으로 채울 수 있다. 도넛 분모는 agreements의 count 합이며0이면 데이터 없음이다.
@@ -520,13 +529,30 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 | GET /api/v1/demo/clock | businessAt(오프셋 시각), configured, revision |
 | POST /api/v1/demo/clock | {businessAt,revision}; 현재 개정/진행 작업/역방향을 검사하고 저장. 최초 설정 전에 기존 분석이 있으면 초기화 필요 |
 | GET /api/v1/demo/users | 로그인 후 직원 id,name,role 조회. 이 목록으로 로그인하거나 직원 신원을 변경할 수 없음 |
-| GET /api/v1/ledger/owners 또는 accounts 또는 transactions | from,to(KST 거래일),owner/account(UUID),judgement(SUSPICIOUS,NORMAL,UNANALYZED),payments(복수),page,size. content/page/size/totalElements/totalPages |
-| GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),page,size. 위험도 내림차순 |
+| GET /api/v1/ledger/owners 또는 accounts 또는 transactions | from,to(KST 거래일),owner/account(UUID),judgement(SUSPICIOUS,NORMAL,UNANALYZED),payments(복수),query,directions(IN/OUT·account 필수),page,size. content/page/size/totalElements/totalPages |
+| GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),query,types,minAgeDays,risk,statuses,assignees,page,size. 위험도 내림차순 |
 | GET /api/v1/review/cases/{caseId} | caseId,kind,alertId,status,outcome,revision,assigneeId/Name,createdAt,assignedAt,closedAt,groups,summary,pendingCount,sourceAlertIds,primaryTypes,history,relatedDecisions |
 | GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 소유주 박스/계좌 노드 연결용; 원문 이름·계좌번호 제외 |
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
 | GET /api/v1/dashboard | from,to와 로그인 세션. businessAt,personal,institution,detection,deliveryDate,pendingReports,daily,agreements,types,activities,priority |
 | POST /api/v1/review/commands | 로그인 세션·CSRF 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
+
+**공통 화면의 전체 데이터 검색·필터**
+- 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.
+- 사건 `query`: 최대 200자. Alert 원본 `A-{alertId}` / Episode `E-{caseId}`, 담당자 표시 이름, 대표 유형의 부분 문자열 검색. `%`, `_`는 와일드카드가 아니라 문자로 취급한다. 두 ID의 의미를 바꾸지 않는다.
+- 사건 `types`: 반복 전달하는 대표 유형 이름. `Fan-out`, `Fan-in`, `Gather-scatter`, `Scatter-gather`, `Cycle`, `Random`, `Bipartite`, `Stack`, `패턴 미특정`, `혼합`. Alert는 제외된 거래를 빼고 현재 상세와 같은 씨앗 투표 결과를 사용한다. Episode는 유효 구성의 출처 Alert 유형 중 하나가 일치하면 포함한다. `패턴 미특정`을 거래 모델의 코드 0과 동일한 판정으로 해석하지 않는다.
+- `statuses=OPEN&statuses=ESCALATED`: 화면 상태의 OR 조건. 편입된 Alert는 ESCALATED, 미편입 사건은 OPEN/CLOSED다. 기존 단일 `status`와 함께 보내면 AND로 적용하므로 FE는 중복 지정하지 않는다.
+- `assignees`: 담당자 ID 반복 전달, OR. `minAgeDays`: 사건 생성 업무 시각부터 경과한 일수(0~36500). 배정 후 72시간을 세는 대시보드 카드와 기준이 다르다.
+- `risk`: `high`(0.8 이상), `medium`(0.5 이상·0.8 미만), `low`(0.5 미만). 복수는 `high,medium`처럼 쉼표로 전달하여 OR 적용한다. 필터 종류 사이는 AND다.
+- 원장 `query`: 최대 200자. 공개 가명 소유주·계좌 UUID와 거래 ID의 부분 문자열 검색. 실명·원 계좌번호는 검색하거나 반환하지 않는다. owners/accounts/transactions 모두 동일한 검색을 적용한다.
+- 원장 `directions=IN&directions=OUT`: 선택한 `account` 기준 수취/송금 OR. 계좌 선택 전에는 보내지 않는다. 자기 계좌 간 거래도 중복 행을 만들지 않는다.
+- mock/live 공통 화면은 같은 목록·기간·필터 컴포넌트를 사용한다. live는 고정 위험도 순 서버 페이지, 다운로드는 화면에 조회된 페이지 범위다. API가 제공하지 않는 숫자는 0이나 가짜 USD로 채우지 않는다.
+- live의 관리자 검수 요청 버튼은 비활성화한다. 해당 승인 절차를 새 명령으로 가정하거나 mock 성공으로 처리하지 않는다. 실제 조사 의견·범위 제외·Alert 전체 편입·연결 해제·종결은 기존 명령 계약을 사용한다.
+- 전역 검색은 사건/알림의 서버 검색을 사용한다. Alert 결과의 표시는 alertId, 조사 상세 이동은 caseId다. 소유주·계좌·거래 검색은 거래 탐색 화면으로 검색어를 넘기며 원문 식별값을 사용하지 않는다.
+- 금액 차트는 같은 통화 안에서만 비교한다. 미제공 필드는 임의 값으로 보완하지 않는다. RDR 9000·AI 요약은 별도 mock 표시를 유지한다.
+- mock 화면의 일별 유입 Alert를 현재 OPEN/ESCALATED/CLOSED로 나눈 분포는 기존 일별 incoming/completed와 의미가 다르다. 상태별 분포는 §6.5의 dailyAlertStatus로 연결한다. 대표 계좌 이력 API만 미연결로 남는다. 기존 일별 수치를 다른 뜻으로 재사용하지 않는다.
+
+
 
 명령 본문:
 
@@ -562,6 +588,7 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 - DECIDE는 NORMAL/SUSPICIOUS로 범위 판정만 저장한다. Episode는 해당 묶음의 미판정 SUBJECT 전체 선택이 필요하다. RECONSIDER는 OPEN Episode 묶음 판정을 다시 미판정으로 열며 이전 감사 기록은 보존한다.
 - `CLOSE`에 decision이 없으면 기존 범위 판정을 집계해 종결한다. Episode는 이 방식만 허용한다. 미판정 SUBJECT/상충 판정은409. 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED/DISSOLVED. DISSOLVED는 UNLINK에 따른 Episode 해체만 사용한다.
 - 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
+- review 목록·상세의 `summary.totalAmountUsd`: 현재 소속 전체 거래(SUBJECT+CONTEXT)에서 EXCLUDED/TRANSFERRED 제외·txId 중복 제거 후 저장 `amountUsd` 합계. Episode 내 여러 Alert에 겹친 거래는 한 번만 센다. 환산액 누락/잘못된 값이 하나라도 있으면 null, 거래가 없으면 0. 기존 `amountsByCurrency`의 SUBJECT 집계 의미는 유지한다. Alert·Episode 목록의 거래 총액은 이 필드를 소수 최대 2자리 USD로 표시하며 미제공 시 원통화 합계로 대체하지 않는다.
 - summary는 중복 제거한 현재 범위의 txCount,seedCount,riskScore,primaryType과 통화별 합계·순유입·집중도·상위 송금·일별 집계를 제공한다. 상세 키는 Swagger/CaseSummary 구현을 따른다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
 - 오늘 탐지율 분모는 **오늘 분석 업무가 다루는 거래일의 수신·통합 원장 거래 전체**다. 양쪽 은행 중복 보고는 한 거래로 세며 실제 반복 거래는 보존한다. 분자는 오늘 완료된 최신 유효 점수 중 임계 이상 거래다. 분석 날짜가 여러 개면 해당 거래일 합집합을 사용한다. 미분석을 분모에서 빼지 않는다. 검수/통합 미완료 보고가 있으면 최종 비율을 표시하지 않으며 분석 진행 중임을 구분한다. 분모 0은 ‘—’, 전일 Alert 0은 증감률 ‘—’다.
 - 최신 유효 점수는 COMPLETED job과 현재 COMPLETED run이 일치하는 결과다. 미완료/취소 결과로 덮지 않는다. 기관 일별 날짜는 KST, 경과는 배정 후 72시간이다. 통화별 상위 송금 10계좌, 결제 구성은 거래 건수다.
@@ -572,7 +599,9 @@ FE 대시보드/거래 탐색 요청의 현행 대응은 §6.5·§7.1·§7.2를 
 
 ### 9.9 조사 계좌 기준 자금 지표
 
-Alert/Episode 개요 공통. 총 거래액은 기존 사건 SUBJECT 거래 합계로 유지하고, 아래 자금 지표는 **S와 T에 해당하는 수신 원장 전체**를 조회한다. 사건 밖 거래를 조회해도 사건 소속/판정에 추가하지 않는다. 기존 summary.netFlows/topReceiverShare는 구 소속 거래 요약이며 새 지표로 해석하지 않는다. 화면은 아래 money 응답만 사용한다.
+Alert/Episode 개요 공통. summary.amountsByCurrency는 기존 사건 SUBJECT 거래 합계로 유지하고, 아래 자금 지표는 **S와 T에 해당하는 수신 원장 전체**를 조회한다. 사건 밖 거래를 조회해도 사건 소속/판정에 추가하지 않는다. 기존 summary.netFlows/topReceiverShare는 구 소속 거래 요약이며 새 지표로 해석하지 않는다. 화면은 아래 money 응답만 사용한다.
+
+**live 개요 카드 표시:** Alert는 외부 유입액·거래 총액·순유입·근거 거래·의심 거래 참여 계좌·거래 기간의 6개, Episode는 참여 계좌 카드를 제외한 5개다. 외부 유입액/순유입은 money.external의 in/net을 통화별로 표시하며, 프로토타입의 추정 ‘투입 원금’ 또는 대표 계좌 순유입과 구분한다. 산출 대기/조회 실패는 0으로 표시하지 않는다. 카드의 거래 총액은 상세 groups.members에서 EXCLUDED/TRANSFERRED를 제외하고 txId로 중복 제거한 **전체 현재 소속 거래(SUBJECT+CONTEXT)**의 amountPaid를 paymentCurrency별로 합산한다. 이는 기존 summary.amountsByCurrency의 SUBJECT 합계와 다르며 기존 응답 의미는 유지한다. 근거 거래는 같은 집합의 거래 수, 참여 계좌는 그 송·수취 계좌의 고유 수(정상 분류·맥락 거래 포함, 계좌 자체의 세탁 판정 아님), 거래 기간은 첫~마지막 occurredAt을 KST 시·분으로 표시한다. Episode의 여러 Alert에 겹친 거래는 한 번만 센다.
 
 - S 초기값: 현재 사건에서 제외/이관되지 않은 SEED 거래의 송·수취 계좌. 담당자가 가명 계좌를 추가/제외할 수 있고 직접 설정 후에는 해당 선택을 유지한다. 새 Episode의 자동 초기값도 이관받은 범위의 씨앗 기준이며 씨앗이 없으면 계좌 선택이 필요하다.
 - T: 현재 SUBJECT 거래의 첫날00시~마지막날 다음00시(KST). 사전 등록 은행의 current ACTIVE 보고가 모두 있는 연속 날짜까지만 관측한다. 첫날부터 미완료면 산출 대기, 중간 미완료면 그 전 날짜까지 계산한다. 업무 시각의 당일·미래는 완료 날짜로 보지 않는다. 마지막 거래 시각을 수신 완료 시각으로 추정하지 않는다.
@@ -587,6 +616,8 @@ Alert/Episode 개요 공통. 총 거래액은 기존 사건 SUBJECT 거래 합�
 - selectedAccounts,candidateAccounts,customScope,revision,delayMinutes,requestedFrom/To,observedAt(실제 조회시각).
 - available=false이면 reason=EMPTY_SUBJECT_SCOPE/EMPTY_ACCOUNT_SCOPE/WAITING_RECEIPTS/NO_CLOSED_SNAPSHOT이며 비율을0으로 만들지 않는다.
 - available=true이면 start,endExclusive,complete,ledgerCount,method=FIFO_ESTIMATE,external[],accounts[].
+- externalUsd: {in,out,net}은 동일 S/T의 USD 보조 합계다. 외부 유입은 각 거래 amount_received를 거래 fx_rate_version의 receiving_currency 환율(units_per_usd)로 나누고 소수6자리 반올림 후 합산한다. 외부 유출은 원장의 amount_usd 합계, 순유입은 in−out이다. 내부이체는 제외한다. 필요한 수취 환율이 없으면 in/net은 null이며 부분합을 완전 합계로 표시하지 않는다. 실시간 환율이 아니다. 종결 스냅샷에 함께 보존되며 기존 종결 스냅샷에는 이 필드가 없을 수 있다.
+- 외부 유입액·거래 총액·순유입 카드의 원통화 값 아래에 작은 USD 값을 추가한다. 총액 USD는 원통화 총액과 동일한 현재 소속 거래(SUBJECT+CONTEXT, EXCLUDED/TRANSFERRED 제외)를 txId로 중복 제거한 amountUsd 합계다. 환산값 미제공은 `USD 환산액 미제공`으로 표시한다.
 - external 행: currency,in,out,net. accounts 행: accountId,currency,in,out,net,positiveNet,concentrationPercent,eligibleIn,excludedIn,matchedIn,rapidOutflowPercent. 비율은0~100 또는 null이다.
 
 `POST /api/v1/review/cases/{caseId}/money-scope`:
@@ -685,3 +716,10 @@ CSRF 필요. `{ids: string[], read: boolean}`. 1~100개, 중복 ID는 한 번 �
 ### Episode 편입 알림 집계 보완 (V16)
 
 TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 명령으로 저장된 원본 Alert별 TRANSFER 이력은 조사 이력으로 보존하되 알림에서 제외한다. TRANSFER 이력이 있는 Episode의 최초 EPISODE_ASSIGNED 알림도 별도로 노출하지 않는다. 따라서 새 Episode에 Alert5개 편입 시 편입 알림1건이며, 이후 추가 편입은 이벤트ID가 다른 별도1건이다. 시연 업무 시각이 동일해도 시간으로 합치지 않는다. Episode 담당자 범위는 유지한다. 기존 Episode 이벤트ID와 읽음 상태는 유지되고 기존 중복은 재조회부터 숨겨진다.
+
+### 소유주 표시 이름과 그래프 연결
+
+- 소유주 표시는 공통 성20개·이름40개 후보 조합과 소유주 고유 번호의 `이름#번호` 형식이다. 번호는 최소5자리이며 초과 자릿수는 유지한다. 실제 이름 복호화·외부 인명부 조회·원본 변경은 하지 않는다. 같은 DB의 같은 소유주는 모든 화면에서 동일하다. DB 초기화로 개체를 새로 등록하면 번호/이름이 달라질 수 있다.
+- `GET /api/v1/ledger/owners` 항목에 `name`을 추가한다. `id`는 기존 소유주 UUID이며 선택·필터에 그대로 사용한다. `ledger/accounts` 및 review 계좌 조회 항목에 `ownerName`, `ledger/transactions` 항목에 `fromOwnerName`, `toOwnerName`을 추가한다. ledger의 `query`는 표시 이름과 번호도 검색한다.
+- `GET /api/v1/review/cases/{caseId}`는 현재 소속 거래 계좌의 `accounts:[{id,ownerId,ownerName,bankId}]`를 제공한다. 기존 사건에도 조회 시 연결하며 근거 스냅샷은 수정하지 않는다. 목록에는 이 매핑을 추가하지 않는다.
+- live 소유주 그래프는 `ownerId`로 묶고 `ownerName`으로 표시한다. 매핑 누락은 계좌별 미상으로 유지하며 서로 다른 소유주를 이름으로 병합하지 않는다. 별도 가상 이름 안내 문구는 표시하지 않는다. 표시 변경은 접근 통제나 API 식별자 제거를 의미하지 않는다.

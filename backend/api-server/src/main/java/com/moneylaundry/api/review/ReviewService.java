@@ -240,6 +240,15 @@ public class ReviewService {
           if (source.get("primaryType") != null) types.add(source.get("primaryType").toString());
     out.put("primaryTypes", types);
     if (includeHistory) {
+      var accountIds = new TreeSet<String>();
+      for (var member : members) {
+        if (Set.of("EXCLUDED", "TRANSFERRED").contains(member.get("state"))) continue;
+        var transaction = object(member.get("transaction"));
+        for (String key : List.of("fromAccountId", "toAccountId")) {
+          if (transaction.get(key) != null) accountIds.add(transaction.get(key).toString());
+        }
+      }
+      out.put("accounts", new LedgerQueryService(jdbc).accounts(accountIds));
       out.put(
           "history",
           jdbc.queryForList(
@@ -271,6 +280,18 @@ public class ReviewService {
 
   public Map<String, Object> list(
       String kind, String status, Long assignee, LocalDate from, LocalDate to, int page, int size) {
+    return list(kind, status, assignee, from, to, page, size, ReviewCaseFilter.EMPTY);
+  }
+
+  public Map<String, Object> list(
+      String kind,
+      String status,
+      Long assignee,
+      LocalDate from,
+      LocalDate to,
+      int page,
+      int size,
+      ReviewCaseFilter filter) {
     time.demoOnly();
     AnalysisService.validatePage(page, size);
     if (!Set.of("ALERT", "EPISODE").contains(kind)
@@ -295,6 +316,7 @@ public class ReviewService {
       args.add(Timestamp.from(to.plusDays(1).atStartOfDay(BusinessTime.KST).toInstant()));
     }
     if (from != null && to != null && from.isAfter(to)) throw AnalysisService.invalid();
+    sql += filter.append(args, time.now());
     long count = jdbc.queryForObject("select count(*)" + sql, Long.class, args.toArray());
     args.add(size);
     args.add((long) page * size);

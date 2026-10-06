@@ -12,7 +12,7 @@ export class WorkspaceState {
 }
 export const WorkspaceContext = createContext<WorkspaceState | null>(null)
 export type Period = { from: string; to: string }
-export const PeriodContext = createContext<{ period: Period; setPeriod: (period: Period) => void } | null>(null)
+export const PeriodContext = createContext<{ period: Period; businessDate?: string; setPeriod: (period: Period) => void } | null>(null)
 
 export function useWorkspace() {
   const shared = useContext(WorkspaceContext)
@@ -34,7 +34,7 @@ export function useSharedPeriod(fallback: Period = { from: '', to: '' }) {
   const [override, setOverride] = useState<Period | null>(null)
   const period = shared?.period ?? override ?? fallback
   const setPeriod = shared?.setPeriod ?? setOverride
-  return { ...period, setPeriod,
+  return { ...period, businessDate: shared?.businessDate, setPeriod,
     setFrom: (from: string) => { if (from && (!period.to || from <= period.to)) setPeriod({ ...period, from }) },
     setTo: (to: string) => { if (to && (!period.from || to >= period.from)) setPeriod({ ...period, to }) } }
 }
