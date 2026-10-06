@@ -34,8 +34,7 @@ public class BusinessTime {
 
   public void workbenchOnly() {
     if (!WorkbenchAccess.enabled(env))
-      throw new ApiException(
-          HttpStatus.FORBIDDEN, "WORKBENCH_DISABLED", "업무 화면이 활성화되지 않았습니다.");
+      throw new ApiException(HttpStatus.FORBIDDEN, "WORKBENCH_DISABLED", "업무 화면이 활성화되지 않았습니다.");
   }
 
   public Instant now() {
