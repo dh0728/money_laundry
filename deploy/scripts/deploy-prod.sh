@@ -99,6 +99,10 @@ get_parameter() {
 }
 
 cleanup() {
+  unset PROD_PRESENTATION_ENABLED
+  unset PROD_INGEST_ENCRYPTION_KEY
+  unset PROD_INGEST_SEARCH_KEY
+  unset PROD_INGEST_KEY_VERSION
   unset PROD_DB_URL
   unset PROD_POSTGRES_USER
   unset PROD_POSTGRES_PASSWORD
@@ -548,6 +552,12 @@ export PROD_WEB_IMAGE
 
 echo "prod Parameter Store 값을 조회합니다."
 
+PROD_PRESENTATION_ENABLED="$(get_parameter "presentation/enabled")"
+[[ "${PROD_PRESENTATION_ENABLED}" == "true" || "${PROD_PRESENTATION_ENABLED}" == "false" ]] \
+  || fail "presentation/enabled must be true or false."
+PROD_INGEST_ENCRYPTION_KEY="$(get_parameter "ingest/encryption-key")"
+PROD_INGEST_SEARCH_KEY="$(get_parameter "ingest/search-key")"
+PROD_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
 PROD_DB_URL="$(get_parameter "db/url")"
 PROD_POSTGRES_USER="$(get_parameter "db/username")"
 PROD_POSTGRES_PASSWORD="$(get_parameter "db/password")"
@@ -558,6 +568,10 @@ PROD_SQS_URL="$(get_parameter "sqs/url")"
 CF_ACCESS_CLIENT_ID="$(get_parameter "cloudflare/access/client-id")"
 CF_ACCESS_CLIENT_SECRET="$(get_parameter "cloudflare/access/client-secret")"
 
+export PROD_PRESENTATION_ENABLED
+export PROD_INGEST_ENCRYPTION_KEY
+export PROD_INGEST_SEARCH_KEY
+export PROD_INGEST_KEY_VERSION
 export PROD_DB_URL
 export PROD_POSTGRES_USER
 export PROD_POSTGRES_PASSWORD

@@ -41,9 +41,7 @@ public class StaffSecurity {
   @Bean
   SecurityFilterChain staffFilterChain(HttpSecurity http, Environment env, StaffAccounts accounts)
       throws Exception {
-    var profiles = Arrays.asList(env.getActiveProfiles());
-    boolean enabled =
-        !profiles.contains("prod") && (profiles.contains("dev") || profiles.contains("local"));
+    boolean enabled = WorkbenchAccess.enabled(env);
     http.csrf(c -> c.ignoringRequestMatchers("/api/v1/bank/**"))
         .requestCache(c -> c.disable())
         .exceptionHandling(
