@@ -58,7 +58,7 @@ public class AlertQueryService {
     args.add((long) page * size);
     var rows =
         jdbc.queryForList(
-            "select a.*,v.version,v.run_id,v.evidence "
+            "select a.*,v.version,v.run_id,jsonb_build_object('summary',v.evidence->'summary') as evidence "
                 + VISIBLE
                 + where
                 + " order by (v.evidence->'summary'->>'scoreMax')::double precision desc nulls last,a.alert_id limit ? offset ?",
