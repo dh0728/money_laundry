@@ -77,11 +77,13 @@ public class AlertInputSnapshot {
           and t.occurred_at<=?
           and not exists(select 1 from analysis.input_transactions i where i.run_id=? and i.tx_id=t.tx_id)
           and exists(select 1 from (
-            select occurred_at moment from analysis.input_transactions where run_id=? and input_role='TARGET'
-            union all select (seed->>'occurredAt')::timestamptz from analysis.alert_origins o,
+            select distinct (occurred_at at time zone 'Asia/Seoul')::date as anchor_date
+            from analysis.input_transactions where run_id=? and input_role='TARGET'
+            union select ((seed->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date
+            from analysis.alert_origins o,
               jsonb_array_elements(o.evidence->'seeds') seed where o.run_id=?) windows
-            where t.occurred_at>=(((moment at time zone 'Asia/Seoul')::date-6)::timestamp at time zone 'Asia/Seoul')
-              and t.occurred_at<(((moment at time zone 'Asia/Seoul')::date+7)::timestamp at time zone 'Asia/Seoul'))
+            where t.occurred_at>=((anchor_date-6)::timestamp at time zone 'Asia/Seoul')
+              and t.occurred_at<((anchor_date+7)::timestamp at time zone 'Asia/Seoul'))
           and exists(select 1 from transaction_reports tr join private.bank_reports br using(report_id)
             join report_sets rs on rs.current_version_id=br.version_id
             join report_versions rv using(version_id) where tr.tx_id=t.tx_id and rv.received_at<=?)
@@ -124,11 +126,13 @@ public class AlertInputSnapshot {
         jdbc.queryForList(
             """
         select distinct d::date from (
-          select occurred_at moment from analysis.input_transactions where run_id=? and input_role='TARGET'
-          union all select (s->>'occurredAt')::timestamptz from analysis.alert_origins o,
+          select distinct (occurred_at at time zone 'Asia/Seoul')::date as anchor_date
+          from analysis.input_transactions where run_id=? and input_role='TARGET'
+          union select ((s->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date
+          from analysis.alert_origins o,
             jsonb_array_elements(o.evidence->'seeds') s where o.run_id=?) w,
-          lateral generate_series((moment at time zone 'Asia/Seoul')::date-6,
-            least((moment at time zone 'Asia/Seoul')::date+6, (?::timestamptz at time zone 'Asia/Seoul')::date),interval '1 day') d order by 1
+          lateral generate_series(anchor_date-6,
+            least(anchor_date+6, (?::timestamptz at time zone 'Asia/Seoul')::date),interval '1 day') d order by 1
         """,
             java.sql.Date.class,
             run,

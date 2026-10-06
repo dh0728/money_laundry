@@ -45,12 +45,23 @@ public final class CaseSummary {
     Map<String, BigDecimal> received = new HashMap<>(), paid = new HashMap<>();
     Map<String, Integer> formats = new TreeMap<>(), types = new TreeMap<>(), days = new TreeMap<>();
     Map<String, BigDecimal> dayAmounts = new TreeMap<>();
+    BigDecimal totalAmountUsd = BigDecimal.ZERO;
+    boolean usdComplete = true;
     int seeds = 0;
     double risk = 0;
     int[] votes = new int[9];
     String first = null, last = null;
     for (var m : unique.values()) {
       var t = ReviewJson.object(m.get("transaction"));
+      Object usd = t.get("amountUsd");
+      if (usd == null || usd.toString().isBlank()) usdComplete = false;
+      else {
+        try {
+          totalAmountUsd = totalAmountUsd.add(amount(usd));
+        } catch (NumberFormatException e) {
+          usdComplete = false;
+        }
+      }
       var scores = t.get("scores") == null ? null : ReviewJson.object(t.get("scores"));
       if ("SEED".equals(t.get("role"))) {
         seeds++;
@@ -100,6 +111,7 @@ public final class CaseSummary {
     }
     var out = new LinkedHashMap<String, Object>();
     out.put("txCount", unique.size());
+    out.put("totalAmountUsd", usdComplete ? totalAmountUsd : null);
     out.put(
         "subjectCount",
         unique.values().stream().filter(m -> "SUBJECT".equals(m.get("reviewRole"))).count());

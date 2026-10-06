@@ -18,8 +18,12 @@ public class ApiExceptionHandler {
   ProblemDetail api(ApiException e) {
     ProblemDetail result = problem(e.status(), e.code(), e.getMessage());
     if (e instanceof com.moneylaundry.api.upload.DuplicateFileException duplicate) {
+      result.setProperty("uploadId", duplicate.uploadId());
       result.setProperty("fileName", duplicate.fileName());
       result.setProperty("uploadedAt", duplicate.uploadedAt());
+    }
+    if (e instanceof com.moneylaundry.api.upload.UploadInProgressException pending) {
+      result.setProperty("uploadId", pending.uploadId());
     }
     return result;
   }

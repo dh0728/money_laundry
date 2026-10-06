@@ -62,7 +62,7 @@ cleanup() {
   unset DEV_API_IMAGE
   unset DEV_WEB_IMAGE
   unset DEV_INGEST_ENCRYPTION_KEY DEV_INGEST_SEARCH_KEY DEV_INGEST_KEY_VERSION
-  unset DEV_INFERENCE_API_URL DEV_INFERENCE_API_TOKEN
+  unset DEV_INFERENCE_OBJECT_BASE_URL DEV_INFERENCE_API_TOKEN
 }
 
 trap cleanup EXIT
@@ -114,8 +114,8 @@ DEV_INGEST_ENCRYPTION_KEY="$(get_parameter "ingest/encryption-key")"
 DEV_INGEST_SEARCH_KEY="$(get_parameter "ingest/search-key")"
 DEV_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
 DEV_SQS_URL="$(get_parameter "sqs/url")"
-DEV_INFERENCE_API_URL="$(get_parameter "inference/url")"
 DEV_INFERENCE_API_TOKEN="$(get_parameter "inference/token")"
+DEV_INFERENCE_OBJECT_BASE_URL="https://${DEV_S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${DEV_S3_PREFIX%/}/"
 CF_ACCESS_CLIENT_ID="$(get_parameter "cloudflare/access/client-id")"
 CF_ACCESS_CLIENT_SECRET="$(get_parameter "cloudflare/access/client-secret")"
 
@@ -127,7 +127,7 @@ export DEV_S3_BUCKET
 export DEV_S3_PREFIX
 export DEV_INGEST_ENCRYPTION_KEY DEV_INGEST_SEARCH_KEY DEV_INGEST_KEY_VERSION
 export DEV_SQS_URL
-export DEV_INFERENCE_API_URL DEV_INFERENCE_API_TOKEN
+export DEV_INFERENCE_OBJECT_BASE_URL DEV_INFERENCE_API_TOKEN
 export CF_ACCESS_CLIENT_ID
 export CF_ACCESS_CLIENT_SECRET
 
@@ -162,8 +162,8 @@ if ! docker compose \
   --wait \
   --wait-timeout 180; then
   docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" \
-    logs --no-color --tail=150 api >&2 || true
-  fail "API 기동 실패. 위 로그를 확인하세요."
+    logs --no-color --tail=150 api inference >&2 || true
+  fail "dev 컨테이너 기동 실패. 위 로그를 확인하세요."
 fi
 
 # This is a dev-only fixture baseline, not automatic registration of uploading banks.

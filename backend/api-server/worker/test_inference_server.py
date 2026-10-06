@@ -18,7 +18,7 @@ import httpx
 import pyarrow.parquet as pq
 import uvicorn
 
-from demo_calculator import build_targets, FEATURE_VERSION, MODEL_VERSION
+from demo_calculator import build_targets, calculate, FEATURE_VERSION, MODEL_VERSION
 from inference_server import create_app
 from inference_service import InferenceService, Settings
 from inference_compute import atomic_json
@@ -102,11 +102,11 @@ class InferenceServerTests(unittest.TestCase):
         self.http.server_close()
         self.thread.join(5)
 
-    def payload(self, kind="binary"):
-        request = Request(7, kind, model_version=MODEL_VERSION,
-                          feature_version=FEATURE_VERSION, run_id=str(uuid4()))
+    def payload(self, kind="binary", targets=None, versions=None):
+        versions = versions or dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
+        request = Request(7, kind, **versions, run_id=str(uuid4()))
         stream = io.BytesIO()
-        pq.write_table(build_targets([1, 99, 100]), stream)
+        pq.write_table(build_targets([1, 99, 100]) if targets is None else targets, stream)
         data = stream.getvalue()
         key = "dev/" + request.inputs + "targets.parquet"
         self.objects["/" + key] = data
@@ -150,7 +150,20 @@ class InferenceServerTests(unittest.TestCase):
             scores = pq.read_table(io.BytesIO(self.objects["/" + result["files"][0]["key"]]))
             self.assertEqual(scores.column("tx_id").to_pylist(), [1, 99, 100])
             if kind == "binary":
-                self.assertEqual(scores.column("p_laundering").to_pylist(), [0.015, 0.995, 0.005])
+                self.assertEqual(scores.column("p_laundering").to_pylist(), calculate(build_targets([1, 99, 100]), "binary", model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)["p_laundering"].to_pylist())
+
+    def test_random_demo_models_use_same_http_file_callback_protocol(self):
+        from demo_calculator import build_targets, MODEL_VERSION, FEATURE_VERSION, calculate
+        targets = build_targets([1, 99, 100])
+        for kind in ('binary', 'type'):
+            payload = self.payload(kind, targets, dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION))
+            self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+            self.wait_for(lambda: self.state(payload)['status'] == 'COMPLETED')
+            self.wait_for(lambda: self.state(payload)['notification_delivered'])
+            result = self.state(payload)['result']
+            scores = pq.read_table(io.BytesIO(self.objects['/' + result['files'][0]['key']]))
+            self.assertEqual(scores['p_laundering' if kind == 'binary' else 'p_3'].to_pylist(),
+                             calculate(targets, kind, model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)['p_laundering' if kind == 'binary' else 'p_3'].to_pylist())
             self.assertNotIn("manifest_url", self.state(payload))
         self.assertEqual(len(self.events), 2)
 

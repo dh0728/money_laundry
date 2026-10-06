@@ -23,10 +23,12 @@ class Settings:
     bucket: str
     prefix: str
     region: str
+    allow_loopback: bool = False
 
     def validate(self):
         url = urlsplit(self.api_url)
-        if (url.scheme != 'https' or not url.hostname or url.username or url.password
+        local = self.allow_loopback and url.scheme == 'http' and url.hostname == '127.0.0.1'
+        if ((url.scheme != 'https' and not local) or not url.hostname or url.username or url.password
                 or url.query or url.fragment or len(self.token) < 32
                 or not self.bucket or not self.region):
             raise ProtocolError('Invalid inference publication configuration')
@@ -41,12 +43,15 @@ def configured():
     settings = Settings(os.environ.get('INFERENCE_API_URL', ''),
                         os.environ.get('INFERENCE_API_TOKEN', ''),
                         os.environ.get('S3_BUCKET', ''), os.environ.get('S3_PREFIX', ''),
-                        os.environ.get('AWS_REGION', 'ap-northeast-2'))
+                        os.environ.get('AWS_REGION', 'ap-northeast-2'),
+                        os.environ.get('INFERENCE_ALLOW_LOOPBACK') == 'true')
     settings.validate()
     import boto3
     from botocore.config import Config
     client = boto3.client('s3', region_name=settings.region,
-                          config=Config(signature_version='s3v4', connect_timeout=5,
+                          config=Config(signature_version='s3v4',
+                                        s3={'addressing_style': 'virtual'} if settings.allow_loopback else None,
+                                        connect_timeout=5,
                                         read_timeout=15, retries={'total_max_attempts': 1}))
     return settings, client
 

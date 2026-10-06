@@ -43,7 +43,21 @@ public class LedgerQueryService {
       List<String> judgement,
       List<String> payments,
       int page,
-      int size) {}
+      int size,
+      String query,
+      List<String> directions) {
+    public Filter(
+        LocalDate from,
+        LocalDate to,
+        UUID owner,
+        UUID account,
+        List<String> judgement,
+        List<String> payments,
+        int page,
+        int size) {
+      this(from, to, owner, account, judgement, payments, page, size, null, null);
+    }
+  }
 
   public Map<String, Object> query(String kind, Filter filter) {
     AnalysisService.validatePage(filter.page(), filter.size());
@@ -90,6 +104,33 @@ public class LedgerQueryService {
           .append(")");
       args.addAll(filter.payments());
     }
+    if (filter.query() != null && !filter.query().isBlank()) {
+      if (filter.query().length() > 200) throw AnalysisService.invalid();
+      String q =
+          "%"
+              + filter.query().strip().replace("!", "!!").replace("%", "!%").replace("_", "!_")
+              + "%";
+      sql.append(
+          " and (t.tx_id::text ilike ? escape '!' or f.service_account_id::text ilike ? escape '!' or r.service_account_id::text ilike ? escape '!' or fe.service_entity_id::text ilike ? escape '!' or re.service_entity_id::text ilike ? escape '!')");
+      sql.setLength(sql.length() - 1);
+      sql.append(" or ")
+          .append(OwnerDisplay.sql("fe.entity_id"))
+          .append(" ilike ? escape '!' or ")
+          .append(OwnerDisplay.sql("re.entity_id"))
+          .append(" ilike ? escape '!')");
+      args.addAll(List.of(q, q, q, q, q, q, q));
+    }
+    if (filter.directions() != null && !filter.directions().isEmpty()) {
+      if (!Set.of("IN", "OUT").containsAll(filter.directions()) || filter.account() == null)
+        throw AnalysisService.invalid();
+      var directionClauses = new ArrayList<String>();
+      for (String direction : filter.directions()) {
+        directionClauses.add(
+            direction.equals("IN") ? "r.service_account_id=?" : "f.service_account_id=?");
+        args.add(filter.account());
+      }
+      sql.append(" and (").append(String.join(" or ", directionClauses)).append(")");
+    }
     String select =
         """
       select t.tx_id as "txId",t.occurred_at as "occurredAt",
@@ -98,22 +139,24 @@ public class LedgerQueryService {
       f.bank_id as "fromBankId",r.bank_id as "toBankId",
       t.amount_paid as "amountPaid",t.payment_currency as "paymentCurrency",t.amount_usd as "amountUsd",
       t.amount_received as "amountReceived",t.receiving_currency as "receivingCurrency",t.payment_format as "paymentFormat",
+      %s as "fromOwnerName",%s as "toOwnerName",
       s.p_laundering as "launderingScore",s.threshold_value as threshold,
       s.p_laundering>=s.threshold_value as "isSuspicious", w.type_class as "typeClass",
       array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8] as probabilities,
       case when s.job_id is null then 'UNANALYZED' when s.p_laundering>=s.threshold_value then 'SUSPICIOUS' else 'NORMAL' end as judgement
-      """;
+      """
+            .formatted(OwnerDisplay.sql("fe.entity_id"), OwnerDisplay.sql("re.entity_id"));
     String dataset = select + sql;
     if ("owners".equals(kind))
       dataset =
           "with matches as ("
               + dataset
-              + ") select distinct id from (select \"fromOwnerId\" as id from matches union select \"toOwnerId\" from matches) o";
+              + ") select distinct id,name from (select \"fromOwnerId\" as id,\"fromOwnerName\" as name from matches union select \"toOwnerId\",\"toOwnerName\" from matches) o";
     else if ("accounts".equals(kind)) {
       dataset =
           "with matches as ("
               + dataset
-              + ") select distinct id,\"ownerId\",\"bankId\" from (select \"fromAccountId\" as id,\"fromOwnerId\" as \"ownerId\",\"fromBankId\" as \"bankId\" from matches union select \"toAccountId\",\"toOwnerId\",\"toBankId\" from matches) a";
+              + ") select distinct id,\"ownerId\",\"ownerName\",\"bankId\" from (select \"fromAccountId\" as id,\"fromOwnerId\" as \"ownerId\",\"fromOwnerName\" as \"ownerName\",\"fromBankId\" as \"bankId\" from matches union select \"toAccountId\",\"toOwnerId\",\"toOwnerName\",\"toBankId\" from matches) a";
       if (filter.owner() != null) {
         dataset += " where \"ownerId\"=?";
         args.add(filter.owner());
@@ -159,7 +202,9 @@ public class LedgerQueryService {
   public List<Map<String, Object>> accounts(Collection<String> ids) {
     if (ids.isEmpty()) return List.of();
     return jdbc.queryForList(
-        "select a.service_account_id as id,e.service_entity_id as \"ownerId\",a.bank_id as \"bankId\" from private.accounts a join private.entities e using(entity_id) where a.service_account_id::text in ("
+        "select "
+            + OwnerDisplay.sql("e.entity_id")
+            + " as \"ownerName\",a.service_account_id as id,e.service_entity_id as \"ownerId\",a.bank_id as \"bankId\" from private.accounts a join private.entities e using(entity_id) where a.service_account_id::text in ("
             + String.join(",", Collections.nCopies(ids.size(), "?"))
             + ")",
         ids.toArray());

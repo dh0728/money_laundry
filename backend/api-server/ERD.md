@@ -348,3 +348,44 @@ users.role CHECK는 STAFF/ADMIN. 이전 L1/L2는 STAFF로 이관하되 user_id·
 - Episode의 각 review_group은 원본 Alert의 편입 당시 전체 거래·역할·판정 스냅샷이다. 다른 Alert와 공유하는 거래도 출처별로 보존하고 조회 집계에서 중복 제거한다. 이동·분할 API는 차단한다.
 - 전체 편입은 원본 Alert 사건의 CLOSED/TRANSFERRED 및 alerts.ESCALATED와 원자 저장된다. 원본 거래 목록을 제거하지 않는다. 단독 정상/의심 종결은 CLOSE+decision으로 한 번에 처리하고 기존 범위 판정 스냅샷을 감사에 보존한다.
 - **테스트 데이터 초기화 승인에 따른 비가역 마이그레이션:** review_requests 및 기존 review_cases(그룹·이벤트 cascade)를 삭제하고 alerts를 OPEN/null로 되돌려 조사 사건을 재생성한다. 기존 조사 이력은 복원되지 않는다. 사용자·해시·거래·보고·분석·Alert 근거·업로드 파일은 삭제하지 않는다. case_id 시퀀스는 되감지 않는다.
+
+
+## V13 — Episode 연결 해제·해체 이력
+
+- 기존 데이터 초기화 없이 review_cases.outcome에 DISSOLVED를 추가한다. DISSOLVED는 CLOSED EPISODE에만 허용한다.
+- 지연 소속 제약: 일반 Episode는 종결 여부와 관계없이 Alert 2개 이상, DISSOLVED Episode는 소속 0개만 허용한다. 1개짜리 Episode는 저장할 수 없다.
+- UNLINK는 해제 후 남은 소속이 2개 미만이면 전체 해제한다. 해제 review_groups 삭제 시 episode_alerts는 FK cascade로 함께 제거한다. 제거 전 그룹·거래·판정·Alert ID·사용자 사유는 review_events의 UNLINK/DISSOLVE snapshot에 보존한다. review_cases와 과거 사건 이벤트는 삭제하지 않는다.
+- 원본 Alert 조사 사건은 원래 담당자/assigned_at 및 자체 거래 제외·판정을 보존하고 OPEN/outcome null/closed_at null/closed_by null로 복원한다. alerts 상태도 OPEN/resolution null로 복원한다. Episode의 판정은 원본 Alert로 전파하지 않는다.
+- 해체된 사건의 현재 그룹/소속은 비어 있다. 이력 snapshot은 현재 소속 조회에 사용하지 않으며, 해제된 Alert는 다른 Episode에 편입할 수 있다.
+- 사건 변경·모든 Alert 복원·사유 이력·revision·멱등 응답을 기존 advisory lock 아래 한 트랜잭션으로 처리한다. 원장·모델 결과·업로드 파일은 변경하지 않는다.
+
+
+## V14 — 시연 초기화 접수·파일 정리
+
+배포 시 테이블만 추가하며 기존 데이터를 삭제하지 않는다. 실제 삭제는 ADMIN의 dev/local 초기화 API에서만 수행한다.
+
+| 테이블 | 주요 컬럼·관계 |
+|---|---|
+| demo_resets | reset_id UUID PK(요청 멱등키), actor_id → users, status(FILES_PENDING/FILES_FAILED/COMPLETED), storage_scope, deleted_counts JSONB, created_at, completed_at |
+| demo_reset_files | (reset_id,object_key) 복합 PK, reset_id → demo_resets, is_prefix, done |
+
+두 테이블은 시연 데이터 초기화 대상에서 제외한다. DB 대상 삭제와 파일 정리 대상 기록은 한 트랜잭션으로 커밋한다. S3 작업은 이후 별도 단계이며 실패해도 DB 초기화를 다시 수행하지 않는다. 삭제 경로와 저장소 식별은 서버 내부에만 보관한다. 계정·은행/보고 기간·환율·Flyway와 ID 시퀀스를 보존한다. 업무 시각 행은 유지하고 business_at만 null로 되돌리며 revision을 증가시킨다.
+
+
+## V15 — 실제 업무 알림의 계정별 읽음 상태
+
+- notification_reads: `(user_id, notification_id)` PK, users FK(계정 삭제 시 cascade), read_at 실제 서버 시각. notification_id는 조회 뷰에서 구성한 불투명 키이며 실데이터 내용을 복제하지 않는다. 읽지 않음은 행 없음.
+- work_notifications VIEW: review_cases·alert_versions(version1)·완료 analysis_runs/batch_jobs의 담당자별 최초 분석 배정 묶음, Episode 배정, 지정 review_events의 UNION ALL. 모델 정답 라벨/개인 원문/증거 JSON을 조회하지 않는다.
+- review_events 추가 부분 인덱스: 알림 대상 COMMENT/CLOSE/TRANSFER/UNLINK/DISSOLVE만 case_id/business_at/event_id.
+- 대상 계정 조건은 서버 세션 user_id. 관리자도 타인의 읽음 상태를 변경할 수 없다. 해당 뷰는 현재 담당자 기준이며 담당자 변경 기능/수신자 이력 모델은 이번 범위에 없다.
+- 기존 사건·배정·조사 데이터 삭제/변환 없음. 시연 초기화의 명시적 truncate 대상에 notification_reads 추가. 계정과 등록 설정은 보존.
+
+
+## V16 — Episode 편입 알림 중복 제거
+
+work_notifications 뷰만 교체한다. Alert 측 TRANSFER 이벤트와 편입이 기록된 Episode의 중복 배정 알림을 제외하고 Episode 측 TRANSFER를 유지한다. 테이블/원본 조사 이력/기존 읽음 기록을 삭제하지 않는다. 배포된 V15는 수정하지 않는다.
+
+
+## V17 — 시연 전용 보고 대응값
+
+`evaluation.demo_report_hints`: 과거 라벨 시연의 보고별 대응값을 보존하는 테이블. 신규 수집·추론에서는 읽거나 작성하지 않는다. 기존 스키마와 이력은 유지하며 시연 초기화 대상에 포함한다. PUBLIC/input_reader 접근 차단은 유지한다.

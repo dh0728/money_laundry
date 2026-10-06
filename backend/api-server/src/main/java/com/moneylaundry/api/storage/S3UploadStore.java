@@ -75,4 +75,53 @@ public class S3UploadStore implements UploadStore {
   public InputStream open(String key) {
     return client.getObject(b -> b.bucket(bucket).key(prefix + key));
   }
+
+  @Override
+  public String resetScope() {
+    if (bucket.isBlank() || prefix.isBlank() || prefix.startsWith("/") || prefix.contains(".."))
+      throw new IllegalStateException("Invalid cleanup scope");
+    return "s3:" + bucket + "/" + prefix;
+  }
+
+  @Override
+  public boolean removeDemoFiles(String key, boolean directory) {
+    resetScope();
+    DemoObjectKey.check(key, directory);
+    if (!directory) {
+      client.deleteObject(
+          b ->
+              b.bucket(bucket)
+                  .key(prefix + key)
+                  .overrideConfiguration(c -> c.apiCallTimeout(Duration.ofSeconds(5))));
+      return true;
+    }
+    var page =
+        client.listObjectsV2(
+            b ->
+                b.bucket(bucket)
+                    .prefix(prefix + key)
+                    .maxKeys(100)
+                    .overrideConfiguration(c -> c.apiCallTimeout(Duration.ofSeconds(5))));
+    if (page.contents().isEmpty()) return true;
+    var keys =
+        page.contents().stream()
+            .map(
+                o -> {
+                  if (!o.key().startsWith(prefix + key))
+                    throw new IllegalStateException("Invalid cleanup key");
+                  return software.amazon.awssdk.services.s3.model.ObjectIdentifier.builder()
+                      .key(o.key())
+                      .build();
+                })
+            .toList();
+    var result =
+        client.deleteObjects(
+            b ->
+                b.bucket(bucket)
+                    .delete(d -> d.objects(keys))
+                    .overrideConfiguration(c -> c.apiCallTimeout(Duration.ofSeconds(5))));
+    if (!result.errors().isEmpty()) throw new IllegalStateException("Object cleanup failed");
+    // Confirm emptiness on the next call, also handling pagination without skipping keys.
+    return false;
+  }
 }

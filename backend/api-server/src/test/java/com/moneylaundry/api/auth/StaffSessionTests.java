@@ -52,6 +52,29 @@ class StaffSessionTests {
   }
 
   @Test
+  void demo_reset_requires_admin_and_csrf() throws Exception {
+    mvc.perform(get("/api/v1/demo/reset/preview")).andExpect(status().isUnauthorized());
+    login("l1a");
+    mvc.perform(get("/api/v1/demo/reset/preview").session(session))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            post("/api/v1/demo/reset")
+                .session(session)
+                .header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isForbidden());
+    login("admin");
+    mvc.perform(get("/api/v1/demo/reset/preview").session(session)).andExpect(status().isOk());
+    mvc.perform(
+            post("/api/v1/demo/reset")
+                .session(session)
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void caller_header_cannot_change_session_actor() throws Exception {
     login("l1a");
     long other = jdbc.queryForObject("select user_id from users where username='l1b'", Long.class);
