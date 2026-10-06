@@ -63,43 +63,54 @@ public class AlertInputSnapshot {
             run);
     if (bounds.get("lo") == null) return;
     Timestamp low = (Timestamp) bounds.get("lo"), high = (Timestamp) bounds.get("hi");
+    // Evaluate seed JSON once; reduce current reports to one eligibility row per transaction.
     jdbc.update(
         """
+        with anchors as materialized (
+          select distinct (occurred_at at time zone 'Asia/Seoul')::date as day
+          from analysis.input_transactions where run_id=? and input_role='TARGET'
+          union select ((seed->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date
+          from analysis.alert_origins o,
+            jsonb_array_elements(o.evidence->'seeds') seed where o.run_id=?
+        ), candidates as materialized (
+          select t.tx_id from transactions t
+          where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<?
+            and t.occurred_at<=?
+            and not exists (
+              select 1 from analysis.input_transactions i where i.run_id=? and i.tx_id=t.tx_id)
+            and exists (
+              select 1 from anchors w
+              where t.occurred_at>=((w.day-6)::timestamp at time zone 'Asia/Seoul')
+                and t.occurred_at<((w.day+7)::timestamp at time zone 'Asia/Seoul'))
+        ), eligible as materialized (
+          select c.tx_id from candidates c
+          join transaction_reports tr using(tx_id)
+          join private.bank_reports br using(report_id)
+          join report_sets rs on rs.current_version_id=br.version_id
+          join report_versions rv using(version_id)
+          group by c.tx_id
+          having bool_or(rv.received_at<=?) and not bool_or(rv.received_at>?)
+        )
         insert into analysis.input_transactions
         select ?,t.tx_id,'CONTEXT',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
           a.service_account_id,b.service_account_id,e.service_entity_id,f.service_entity_id,
           t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
           t.payment_format,t.amount_usd,t.fx_rate_version
-        from transactions t join private.accounts a on a.account_id=t.from_account_id
+        from eligible c join transactions t using(tx_id)
+        join private.accounts a on a.account_id=t.from_account_id
         join private.accounts b on b.account_id=t.to_account_id
-        join private.entities e on e.entity_id=a.entity_id join private.entities f on f.entity_id=b.entity_id
-        where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<?
-          and t.occurred_at<=?
-          and not exists(select 1 from analysis.input_transactions i where i.run_id=? and i.tx_id=t.tx_id)
-          and exists(select 1 from (
-            select distinct (occurred_at at time zone 'Asia/Seoul')::date as anchor_date
-            from analysis.input_transactions where run_id=? and input_role='TARGET'
-            union select ((seed->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date
-            from analysis.alert_origins o,
-              jsonb_array_elements(o.evidence->'seeds') seed where o.run_id=?) windows
-            where t.occurred_at>=((anchor_date-6)::timestamp at time zone 'Asia/Seoul')
-              and t.occurred_at<((anchor_date+7)::timestamp at time zone 'Asia/Seoul'))
-          and exists(select 1 from transaction_reports tr join private.bank_reports br using(report_id)
-            join report_sets rs on rs.current_version_id=br.version_id
-            join report_versions rv using(version_id) where tr.tx_id=t.tx_id and rv.received_at<=?)
-          and not exists(select 1 from transaction_reports tr join private.bank_reports br using(report_id)
-            join report_sets rs on rs.current_version_id=br.version_id
-            join report_versions rv using(version_id) where tr.tx_id=t.tx_id and rv.received_at>?)
+        join private.entities e on e.entity_id=a.entity_id
+        join private.entities f on f.entity_id=b.entity_id
         """,
+        run,
         run,
         low,
         high,
         Timestamp.from(cutoff),
         run,
-        run,
-        run,
         Timestamp.from(cutoff),
-        Timestamp.from(cutoff));
+        Timestamp.from(cutoff),
+        run);
     jdbc.update(
         """
         insert into analysis_input_reports select ?,tr.tx_id,tr.report_id

@@ -9,6 +9,29 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class DashboardService {
+  // Whole-period aggregates need a set of published scores, not one lookup per ledger row.
+  // Select the latest eligible result before applying the displayed detection date range.
+  static final String SCORE_BASE =
+      """
+      from transactions t
+      left join (
+        select distinct on (i.tx_id) i.*,j.threshold_value,j.business_at as detected_at
+        from inference_results i join batch_jobs j on j.job_id=i.job_id
+        left join analysis_runs ar on ar.run_id=i.run_id
+        where j.status='COMPLETED' and j.job_type='ANALYSIS'
+          and ((j.current_run_id is null and i.run_id is null)
+            or (i.run_id=j.current_run_id and ar.status='COMPLETED'))
+        order by i.tx_id,j.job_id desc
+      ) s on s.tx_id=t.tx_id
+      left join lateral (
+        select (array_position(
+          array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8],
+          greatest(s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8))-1)::bigint as type_class
+        where s.job_id is not null
+      ) w on true
+      where t.integration_status='ACTIVE'
+      """;
+
   private final JdbcTemplate jdbc;
   private final BusinessTime time;
 
@@ -70,7 +93,7 @@ public class DashboardService {
         "detection",
         jdbc.queryForMap(
             "select count(*) as received,count(*) filter(where s.detected_at>=? and s.detected_at<?) as analyzed,count(*) filter(where s.detected_at>=? and s.detected_at<? and s.p_laundering>=s.threshold_value) as suspicious "
-                + LedgerQueryService.BASE
+                + SCORE_BASE
                 + " and t.business_date in ("
                 + placeholders
                 + ")",
@@ -85,29 +108,9 @@ public class DashboardService {
                 + ") and b.status<>'EXPIRED' and v.stage_status is distinct from 'SUPERSEDED' and (b.status<>'COMPLETED' or v.stage_status is distinct from 'ACTIVE')",
             Long.class,
             deliveryDates.toArray()));
-    out.put(
-        "daily",
-        jdbc.queryForList(
-            "select (d AT TIME ZONE 'Asia/Seoul')::date as day,(select count(*) from visible_review_cases where kind='ALERT' and created_at>=d and created_at<d+interval '1 day') as incoming,(select count(*) from visible_review_cases where kind='ALERT' and closed_at>=d and closed_at<d+interval '1 day') as completed from generate_series(?::timestamptz,?::timestamptz,interval '1 day') d",
-            at(from),
-            at(to)));
+    out.put("daily", daily(from, to));
     out.put("dailyAlertStatus", dailyAlertStatus(from, to));
-    out.put(
-        "agreements",
-        jdbc.queryForList(
-            "select case when s.p_laundering>=s.threshold_value then case when w.type_class=0 then 'ATYPICAL' else 'STRONG' end else case when w.type_class=0 then 'WEAK' else 'PATTERN_ONLY' end end as agreement,count(*) as count "
-                + LedgerQueryService.BASE
-                + " and s.detected_at>=? and s.detected_at<? group by 1 order by 1",
-            at(from),
-            at(to.plusDays(1))));
-    out.put(
-        "types",
-        jdbc.queryForList(
-            "select w.type_class as type,count(*) as count "
-                + LedgerQueryService.BASE
-                + " and s.detected_at>=? and s.detected_at<? and s.p_laundering>=s.threshold_value group by 1 order by 1",
-            at(from),
-            at(to.plusDays(1))));
+    out.putAll(modelDistribution(from, to));
     out.put(
         "activities",
         jdbc.queryForList(
@@ -121,6 +124,63 @@ public class DashboardService {
             "select case_id,kind,alert_id,created_at,risk from visible_review_cases where assignee_id=? and status='OPEN' order by risk desc,created_at,case_id limit 10",
             user));
     return out;
+  }
+
+  List<Map<String, Object>> daily(LocalDate from, LocalDate to) {
+    // Aggregate each date range once, rather than counting the cases again for every day.
+    return jdbc.queryForList(
+        """
+        with incoming as (
+          select (created_at at time zone 'Asia/Seoul')::date as day,count(*) as count
+          from visible_review_cases where kind='ALERT' and created_at>=? and created_at<?
+          group by 1
+        ), completed as (
+          select (closed_at at time zone 'Asia/Seoul')::date as day,count(*) as count
+          from visible_review_cases where kind='ALERT' and closed_at>=? and closed_at<?
+          group by 1
+        )
+        select d::date as day,coalesce(i.count,0) as incoming,coalesce(c.count,0) as completed
+        from generate_series(?::date::timestamp,?::date::timestamp,interval '1 day') d
+        left join incoming i on i.day=d::date
+        left join completed c on c.day=d::date order by d
+        """,
+        at(from),
+        at(to.plusDays(1)),
+        at(from),
+        at(to.plusDays(1)),
+        java.sql.Date.valueOf(from),
+        java.sql.Date.valueOf(to));
+  }
+
+  Map<String, Object> modelDistribution(LocalDate from, LocalDate to) {
+    // The two widgets use the same published scores and detection period.
+    var counts =
+        jdbc.queryForList(
+            "select s.p_laundering>=s.threshold_value as suspicious,w.type_class,count(*) as count "
+                + SCORE_BASE
+                + " and s.detected_at>=? and s.detected_at<? group by 1,2",
+            at(from),
+            at(to.plusDays(1)));
+    var agreements = new TreeMap<String, Long>();
+    var types = new TreeMap<Long, Long>();
+    for (var row : counts) {
+      boolean suspicious = Boolean.TRUE.equals(row.get("suspicious"));
+      long type = ((Number) row.get("type_class")).longValue();
+      long count = ((Number) row.get("count")).longValue();
+      String agreement =
+          suspicious ? (type == 0 ? "ATYPICAL" : "STRONG") : (type == 0 ? "WEAK" : "PATTERN_ONLY");
+      agreements.merge(agreement, count, Long::sum);
+      if (suspicious) types.merge(type, count, Long::sum);
+    }
+    return Map.of(
+        "agreements",
+        agreements.entrySet().stream()
+            .map(e -> Map.of("agreement", e.getKey(), "count", e.getValue()))
+            .toList(),
+        "types",
+        types.entrySet().stream()
+            .map(e -> Map.of("type", e.getKey(), "count", e.getValue()))
+            .toList());
   }
 
   List<Map<String, Object>> dailyAlertStatus(LocalDate from, LocalDate to) {
