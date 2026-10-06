@@ -186,6 +186,147 @@ class FreezeInputTests {
   }
 
   @Test
+  void context_keeps_calendar_and_cutoff_boundaries_without_duplicate_targets() {
+    seed(6);
+    var ids = jdbc.queryForList("select tx_id from transactions order by tx_id", Long.class);
+    long scored =
+        jdbc.queryForObject(
+            "insert into batch_jobs(job_type,status) values('ANALYSIS','COMPLETED') returning job_id",
+            Long.class);
+    jdbc.update("update transactions set scored_job_id=? where tx_id<>?", scored, ids.getFirst());
+    var timestamps =
+        List.of(
+            "2023-08-25T15:00:00Z", // Aug 26 KST: inclusive lower bound.
+            "2023-08-25T14:59:59Z",
+            "2023-09-02T00:00:00Z", // The cutoff itself is included.
+            "2023-09-02T00:00:01Z",
+            "2023-09-01T00:00:00Z");
+    for (int i = 0; i < timestamps.size(); i++)
+      jdbc.update(
+          "update transactions set occurred_at=?::timestamptz where tx_id=?",
+          timestamps.get(i),
+          ids.get(i + 1));
+    jdbc.update("delete from transaction_reports where tx_id=?", ids.get(5));
+    UUID run = runs.freeze(job, cutoff);
+    assertThat(
+            jdbc.queryForList(
+                "select tx_id from analysis.input_transactions where run_id=? and input_role='CONTEXT' order by tx_id",
+                Long.class,
+                run))
+        .containsExactly(ids.get(1), ids.get(3));
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.input_transactions where run_id=? and tx_id=?",
+                Integer.class,
+                run,
+                ids.getFirst()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void context_does_not_fill_the_gap_between_distant_target_days() {
+    seed(6);
+    var ids = jdbc.queryForList("select tx_id from transactions order by tx_id", Long.class);
+    long scored =
+        jdbc.queryForObject(
+            "insert into batch_jobs(job_type,status) values('ANALYSIS','COMPLETED') returning job_id",
+            Long.class);
+    jdbc.update("update transactions set scored_job_id=? where tx_id>?", scored, ids.get(1));
+    var timestamps =
+        List.of(
+            "2023-08-01T00:00:00Z",
+            "2023-09-01T00:00:00Z",
+            "2023-08-07T14:59:59Z",
+            "2023-08-07T15:00:00Z",
+            "2023-08-15T00:00:00Z",
+            "2023-08-25T15:00:00Z");
+    for (int i = 0; i < timestamps.size(); i++)
+      jdbc.update(
+          "update transactions set occurred_at=?::timestamptz where tx_id=?",
+          timestamps.get(i),
+          ids.get(i));
+    UUID run = runs.freeze(job, cutoff);
+    assertThat(
+            jdbc.queryForList(
+                "select tx_id from analysis.input_transactions where run_id=? and input_role='CONTEXT' order by tx_id",
+                Long.class,
+                run))
+        .containsExactly(ids.get(2), ids.get(5));
+  }
+
+  @Test
+  void context_rejects_a_transaction_with_both_before_and_after_cutoff_current_reports() {
+    seed(2);
+    var ids = jdbc.queryForList("select tx_id from transactions order by tx_id", Long.class);
+    long scored =
+        jdbc.queryForObject(
+            "insert into batch_jobs(job_type,status) values('ANALYSIS','COMPLETED') returning job_id",
+            Long.class);
+    jdbc.update("update transactions set scored_job_id=? where tx_id=?", scored, ids.get(1));
+    long upload =
+        jdbc.queryForObject(
+            "insert into batch_jobs(job_type,status) values('INGEST','COMPLETED') returning job_id",
+            Long.class);
+    long laterSet =
+        jdbc.queryForObject(
+            "insert into report_sets(bank_id,business_date) values(12,'2023-09-02') returning set_id",
+            Long.class);
+    long laterVersion =
+        jdbc.queryForObject(
+            "insert into report_versions(set_id,upload_id,version_no,received_at,stage_status,row_count) values(?,?,1,?,'ACTIVE',1) returning version_id",
+            Long.class,
+            laterSet,
+            upload,
+            Timestamp.from(cutoff.plusSeconds(1)));
+    jdbc.update(
+        "update report_sets set current_version_id=? where set_id=?", laterVersion, laterSet);
+    long report =
+        jdbc.queryForObject(
+            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) values(?,1,'later','cipher','test','ACTIVE') returning report_id",
+            Long.class,
+            laterVersion);
+    jdbc.update("insert into transaction_reports values(?,?,'INTERNAL')", ids.get(1), report);
+    UUID run = runs.freeze(job, cutoff);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.input_transactions where run_id=? and input_role='CONTEXT'",
+                Integer.class,
+                run))
+        .isZero();
+  }
+
+  @Test
+  void freezes_one_hundred_thousand_context_rows_without_expanding_target_count() {
+    seed(100_001);
+    long scored =
+        jdbc.queryForObject(
+            "insert into batch_jobs(job_type,status) values('ANALYSIS','COMPLETED') returning job_id",
+            Long.class);
+    jdbc.update(
+        "update transactions set scored_job_id=? where tx_id<>(select min(tx_id) from transactions)",
+        scored);
+    long start = System.nanoTime();
+    UUID run = runs.freeze(job, cutoff);
+    System.out.printf(
+        "FREEZE_INPUT_BENCH contexts=100000 elapsedMs=%d%n",
+        Duration.ofNanos(System.nanoTime() - start).toMillis());
+    assertThat(
+            jdbc.queryForObject(
+                "select row_count from batch_jobs where job_id=?", Integer.class, job))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.input_transactions where run_id=? and input_role='CONTEXT'",
+                Integer.class,
+                run))
+        .isEqualTo(100_000);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis_input_reports where run_id=?", Integer.class, run))
+        .isEqualTo(100_001);
+  }
+
+  @Test
   void failure_after_target_insert_rolls_back_and_same_job_can_retry() {
     seed(2);
     jdbc.execute(

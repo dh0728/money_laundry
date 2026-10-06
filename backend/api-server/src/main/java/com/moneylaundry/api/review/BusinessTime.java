@@ -2,6 +2,7 @@ package com.moneylaundry.api.review;
 
 import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.auth.WorkbenchAccess;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
@@ -31,9 +32,13 @@ public class BusinessTime {
           HttpStatus.FORBIDDEN, "DEMO_CONTROL_DISABLED", "dev/local 시연 전용 기능입니다.");
   }
 
+  public void workbenchOnly() {
+    if (!WorkbenchAccess.enabled(env))
+      throw new ApiException(HttpStatus.FORBIDDEN, "WORKBENCH_DISABLED", "업무 화면이 활성화되지 않았습니다.");
+  }
+
   public Instant now() {
-    var p = Arrays.asList(env.getActiveProfiles());
-    if (p.contains("prod") || !(p.contains("local") || p.contains("dev"))) return Instant.now();
+    if (!WorkbenchAccess.enabled(env)) return Instant.now();
     Timestamp value =
         jdbc.queryForObject(
             "select business_at from demo_business_clock where id", Timestamp.class);

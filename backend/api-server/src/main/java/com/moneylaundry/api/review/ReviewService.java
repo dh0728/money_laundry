@@ -42,7 +42,7 @@ public class ReviewService {
   }
 
   public Map<String, Object> actor(long id) {
-    time.demoOnly();
+    time.workbenchOnly();
     var users =
         jdbc.queryForList(
             "select user_id as id,name,role from users where user_id=? and role in ('STAFF','ADMIN')",
@@ -53,7 +53,7 @@ public class ReviewService {
   }
 
   public List<Map<String, Object>> users() {
-    time.demoOnly();
+    time.workbenchOnly();
     return jdbc.queryForList(
         "select user_id as id,name,role from users where role in ('STAFF','ADMIN') order by user_id");
   }
@@ -169,7 +169,7 @@ public class ReviewService {
   }
 
   private Map<String, Object> detail(long id, boolean includeHistory) {
-    time.demoOnly();
+    time.workbenchOnly();
     var c = caseRow(id);
     var gs = groups(c);
     var members = all(gs);
@@ -292,7 +292,7 @@ public class ReviewService {
       int page,
       int size,
       ReviewCaseFilter filter) {
-    time.demoOnly();
+    time.workbenchOnly();
     AnalysisService.validatePage(page, size);
     if (!Set.of("ALERT", "EPISODE").contains(kind)
         || (status != null && !Set.of("OPEN", "CLOSED").contains(status)))
@@ -391,7 +391,7 @@ public class ReviewService {
   }
 
   public Map<String, Object> money(long id, int minutes) {
-    time.demoOnly();
+    time.workbenchOnly();
     if (!Set.of(5, 15, 30, 60, 180, 360, 1440).contains(minutes)) throw AnalysisService.invalid();
     return tx.execute(
         s -> {

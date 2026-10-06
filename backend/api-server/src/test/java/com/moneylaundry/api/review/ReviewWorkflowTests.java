@@ -1295,6 +1295,26 @@ class ReviewWorkflowTests {
   }
 
   @Test
+  void daily_counts_creation_and_closure_separately_with_kst_boundaries() {
+    long a = publishedAlert(1), b = publishedAlert(2), c = publishedAlert(3);
+    jdbc.update(
+        "update review_cases set created_at='2023-08-31 15:00+00',status='CLOSED',closed_at='2023-09-02 15:00+00' where alert_id=?",
+        a);
+    jdbc.update(
+        "update review_cases set created_at='2023-08-31 14:59:59+00',status='CLOSED',closed_at='2023-09-01 14:59:59+00' where alert_id=?",
+        b);
+    jdbc.update("update review_cases set created_at='2023-09-03 15:00+00' where alert_id=?", c);
+    var days =
+        new DashboardService(jdbc, clock)
+            .daily(LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
+    assertThat(days).hasSize(3);
+    assertThat(days.getFirst().get("day").toString()).isEqualTo("2023-09-01");
+    assertThat(days.getFirst()).containsEntry("incoming", 1L).containsEntry("completed", 1L);
+    assertThat(days.get(1)).containsEntry("incoming", 0L).containsEntry("completed", 0L);
+    assertThat(days.get(2)).containsEntry("incoming", 0L).containsEntry("completed", 1L);
+  }
+
+  @Test
   void daily_alert_status_follows_episode_transfer_unlink_and_closure_on_original_day() {
     long a = alert(l1), b = alert(l1);
     for (long c : List.of(a, b)) {
