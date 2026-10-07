@@ -332,7 +332,7 @@ public class ReviewService {
         || (status != null && !Set.of("OPEN", "CLOSED").contains(status)))
       throw AnalysisService.invalid();
     var args = new ArrayList<Object>(List.of(kind));
-    String sql = " from review.visible_cases c where kind=?";
+    String sql = " where kind=?";
     if (status != null) {
       sql += " and status=?";
       args.add(status);
@@ -351,12 +351,20 @@ public class ReviewService {
     }
     if (from != null && to != null && from.isAfter(to)) throw AnalysisService.invalid();
     sql += filter.append(args, time.now());
-    long count = jdbc.queryForObject("select count(*)" + sql, Long.class, args.toArray());
+    String countSource = filter.risk() == null ? ReviewCaseSql.PUBLISHED : ReviewCaseSql.WITH_RISK;
+    long count =
+        jdbc.queryForObject(
+            "select count(*) from " + countSource + " c" + sql, Long.class, args.toArray());
+    if (count == 0)
+      return Map.of(
+          "content", List.of(), "page", page, "size", size, "totalElements", 0L, "totalPages", 0L);
     args.add(size);
     args.add((long) page * size);
     var ids =
         jdbc.queryForList(
-            "select case_id"
+            "select case_id from "
+                + ReviewCaseSql.WITH_RISK
+                + " c"
                 + sql
                 + " order by risk desc,created_at desc,case_id desc limit ? offset ?",
             Long.class,

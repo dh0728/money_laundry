@@ -29,6 +29,12 @@ class QueryPerformanceTests {
 
   @Test
   void measure_first_day_with_dense_evidence() {
+    for (String table :
+        jdbc.queryForList(
+            "select schemaname||'.'||relname from pg_stat_user_tables where schemaname in ('analysis','review')",
+            String.class)) {
+      jdbc.execute("alter table " + table + " set (autovacuum_enabled=false)");
+    }
     jdbc.execute(
         "truncate core.owners,core.banks,analysis.jobs,review.alerts,review.episodes cascade");
     jdbc.execute("insert into core.banks(bank_id) select generate_series(1,10)");
@@ -75,13 +81,32 @@ class QueryPerformanceTests {
     jdbc.execute(
         "insert into review.alert_transactions select a.alert_id,1,t.tx_id,case when t.tx_id<a.alert_id*7+9 then 'SEED' else 'CONTEXT' end,'[]'::jsonb,case when t.tx_id<a.alert_id*7+9 then .9 end from review.alerts a join ledger.transactions t on t.tx_id between a.alert_id*7 and a.alert_id*7+30");
     jdbc.execute("update ops.business_clock set business_at='2023-09-10 09:00+09'");
-    jdbc.execute("analyze");
-    jdbc.setQueryTimeout(90);
+    for (String table :
+        new String[] {
+          "core.owners",
+          "core.accounts",
+          "core.banks",
+          "ledger.transactions",
+          "analysis.scores",
+          "analysis.current_scores",
+          "analysis.input_transactions",
+          "review.alerts",
+          "review.alert_versions",
+          "review.alert_transactions"
+        }) jdbc.execute("analyze " + table);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from pg_stats where schemaname='analysis' and tablename in ('jobs','runs')",
+                Integer.class))
+        .isZero();
+    jdbc.setQueryTimeout(15);
     String plan =
         String.join(
             "\n",
             jdbc.queryForList(
-                "explain (analyze,buffers,timing off) select case_id from review.visible_cases where kind='ALERT' order by risk desc,created_at desc,case_id desc limit 20",
+                "explain (analyze,buffers,timing off) select case_id from "
+                    + ReviewCaseSql.WITH_RISK
+                    + " c where kind='ALERT' order by risk desc,created_at desc,case_id desc limit 20",
                 String.class));
     System.out.println("ALERT_RISK_PLAN\n" + plan);
     assertThat(plan).doesNotContain("jsonb_array_elements");
@@ -92,8 +117,13 @@ class QueryPerformanceTests {
       measure("owners", i, 37994, () -> ledger.query("owners", filter));
       measure("transactions", i, 115270, () -> ledger.query("transactions", filter));
       measure("alerts", i, 12424, () -> review.list("ALERT", null, null, from, to, 0, 20));
+      measure("episodes", i, 0, () -> review.list("EPISODE", null, null, from, to, 0, 20));
       measure("dashboard", i, -1, () -> dashboard.view(user, from, to));
     }
+    jdbc.execute("analyze");
+    measure(
+        "alerts_after_analyze", 1, 12424, () -> review.list("ALERT", null, null, from, to, 0, 20));
+    measure("dashboard_after_analyze", 1, -1, () -> dashboard.view(user, from, to));
   }
 
   private void measure(String name, int round, long count, Supplier<Map<String, Object>> query) {

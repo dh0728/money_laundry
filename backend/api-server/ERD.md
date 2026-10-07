@@ -88,6 +88,8 @@ Python의 데이터 변경과 단계 완료 기록은 같은 DB 트랜잭션이�
 
 `core.assignable_staff`는 비밀번호 해시를 노출하지 않는 배정 후보 목록이다. `ops.work_items`는 작업 목록, `review.cases`는 공통 사건 목록이다. `review.event_history`, `saved_members`, `latest_versions`, `effective_members`, `visible_cases`, `notifications`는 현재 조사·완료 근거·알림을 조합한다. 업무 상태의 두 번째 저장소나 구 테이블의 쓰기 호환 계층이 아니다.
 
+현재 API의 목록·대시보드는 `ReviewCaseSql`에서 공개 사건 조회와 사건별 위험도 조회를 분리한다. `visible_cases`의 전체 집계 결합은 초기 통계 오차 시 반복 비교가 커져 API에서 사용하지 않는다. 이는 Spring 조회 변경이며 현재 V1의 수정이나 재초기화가 필요하지 않다.
+
 ## 초기화 전환
 
 초기 스키마는 빈 DB용이다. 구 Flyway 이력이 있는 DB 위에 적용하거나 validate를 끄지 않는다. 테스트 업무 데이터는 초기화하고 직원 계정·비밀번호 해시·은행·보고 기간·환율·외부 암호키를 보존하여 같은 환경 DB에 복원한다. 새 버전 DB를 추가하지 않는다. 실제 초기화·배포는 대상 확인과 코드 검증 후 수행한다.
