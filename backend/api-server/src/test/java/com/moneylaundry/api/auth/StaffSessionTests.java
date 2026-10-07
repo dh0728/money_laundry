@@ -18,7 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(properties = "spring.profiles.active=dev")
+@SpringBootTest(properties = {"spring.profiles.active=dev"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class StaffSessionTests {
@@ -77,13 +77,16 @@ class StaffSessionTests {
   @Test
   void caller_header_cannot_change_session_actor() throws Exception {
     login("l1a");
-    long other = jdbc.queryForObject("select user_id from users where username='l1b'", Long.class);
+    long other =
+        jdbc.queryForObject("select user_id from core.users where username='l1b'", Long.class);
     long alertId =
         jdbc.queryForObject(
-            "insert into alerts(assignee_id) values(?) returning alert_id", Long.class, other);
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now()) returning alert_id",
+            Long.class,
+            other);
     long id =
         jdbc.queryForObject(
-            "select case_id from review_cases where alert_id=?", Long.class, alertId);
+            "select case_id from review.cases where alert_id=?", Long.class, alertId);
     String body =
         "{\"requestId\":\""
             + java.util.UUID.randomUUID()
@@ -103,7 +106,7 @@ class StaffSessionTests {
   @BeforeEach
   void setup() {
     jdbc.update(
-        "update users set password_hash=? where username in ('l1a','admin')",
+        "update core.users set password_hash=? where username in ('l1a','admin')",
         encoder.encode("Test-password-123"));
     session = new MockHttpSession();
   }
@@ -178,8 +181,9 @@ class StaffSessionTests {
 
   @Test
   void admin_clock_requires_csrf_and_uses_business_time() throws Exception {
-    jdbc.execute("truncate batch_jobs,alerts,review_cases,review_requests cascade");
-    jdbc.update("update demo_business_clock set business_at=null,revision=0");
+    jdbc.execute(
+        "truncate analysis.jobs,ingest.uploads,review.alerts,review.episodes,review.requests cascade");
+    jdbc.update("update ops.business_clock set business_at=null,revision=0");
     login("admin");
     String body = "{\"businessAt\":\"2023-09-02T00:00:00Z\",\"revision\":0}";
     mvc.perform(

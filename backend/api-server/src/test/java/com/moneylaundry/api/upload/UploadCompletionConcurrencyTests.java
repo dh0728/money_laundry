@@ -7,9 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.TestcontainersConfiguration;
-import com.moneylaundry.api.batchjob.BatchJob;
-import com.moneylaundry.api.batchjob.BatchJobRepository;
-import com.moneylaundry.api.batchjob.JobStatus;
 import com.moneylaundry.api.ingest.LedgerLoader;
 import com.moneylaundry.api.storage.UploadStore;
 import java.time.Instant;
@@ -33,24 +30,24 @@ class UploadCompletionConcurrencyTests {
   @org.junit.jupiter.api.BeforeEach
   void reportingBank() {
     jdbc.update(
-        "insert into banks(bank_id, is_reporting) values (70, true) on conflict do nothing");
+        "insert into core.banks(bank_id, is_reporting) values (70, true) on conflict do nothing");
     jdbc.update(
-        "insert into bank_reporting_periods(bank_id,effective_from_date) select 70,date"
-            + " '2022-01-01' where not exists(select 1 from bank_reporting_periods where"
+        "insert into core.bank_reporting_periods(bank_id,effective_from_date) select 70,date"
+            + " '2022-01-01' where not exists(select 1 from core.bank_reporting_periods where"
             + " bank_id=70)");
   }
 
   @Autowired UploadService service;
-  @Autowired BatchJobRepository repository;
+  @Autowired UploadRepository repository;
   @MockitoBean UploadStore store;
   @MockitoBean LedgerLoader loader;
 
   @Test
   void 동시_완료_통지는_한_번만_접수하고_적재한다() throws Exception {
     Instant now = Instant.now();
-    BatchJob job =
+    Upload job =
         repository.save(
-            BatchJob.ingestUrlIssued(
+            Upload.urlIssued(
                 70,
                 "concurrent.csv",
                 "c".repeat(64),
@@ -78,8 +75,8 @@ class UploadCompletionConcurrencyTests {
           .containsExactlyInAnyOrder("RECEIVED", "RECEIVED");
     }
     verify(loader, times(1)).load(job.getId());
-    BatchJob received = repository.findById(job.getId()).orElseThrow();
-    assertThat(received.getStatus()).isEqualTo(JobStatus.RECEIVED);
+    Upload received = repository.findById(job.getId()).orElseThrow();
+    assertThat(received.getStatus()).isEqualTo(UploadStatus.RECEIVED);
     assertThat(received.getReceivedAt()).isNotNull();
     assertThat(received.getAttemptCount()).isZero();
   }
@@ -90,9 +87,9 @@ class UploadCompletionConcurrencyTests {
     String hash = "d".repeat(64);
     String checksum =
         java.util.Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex(hash));
-    BatchJob old =
+    Upload old =
         repository.save(
-            BatchJob.ingestUrlIssued(
+            Upload.urlIssued(
                 70,
                 "race-old.csv",
                 hash,
@@ -134,7 +131,7 @@ class UploadCompletionConcurrencyTests {
       assertThat(completing.get(20, TimeUnit.SECONDS)).isEqualTo("UPLOAD_SUPERSEDED");
       verify(loader, org.mockito.Mockito.never()).load(old.getId());
       assertThat(repository.findById(issued.uploadId()).orElseThrow().getStatus())
-          .isEqualTo(JobStatus.URL_ISSUED);
+          .isEqualTo(UploadStatus.URL_ISSUED);
     }
   }
 
@@ -144,9 +141,9 @@ class UploadCompletionConcurrencyTests {
     String hash = "e".repeat(64);
     String checksum =
         java.util.Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex(hash));
-    BatchJob old =
+    Upload old =
         repository.save(
-            BatchJob.ingestUrlIssued(
+            Upload.urlIssued(
                 70,
                 "receive-first.csv",
                 hash,

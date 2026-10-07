@@ -52,6 +52,8 @@ app:
     cutoff: ${INGEST_CUTOFF:03:00}
     fx-rate-version: fx_rates_usd_v1
   worker:
+    db-username: ${ANALYSIS_DB_USERNAME:}
+    db-password: ${ANALYSIS_DB_PASSWORD:}
     mode: ${WORKER_MODE:unconfigured}
     python: ${WORKER_PYTHON:python}
     script: ${WORKER_SCRIPT:worker/analysis_entry.py}

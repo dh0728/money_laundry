@@ -17,7 +17,7 @@ public class StaffAccounts implements UserDetailsService {
   public Map<String, Object> account(String username) {
     var rows =
         jdbc.queryForList(
-            "select user_id as id,username,name,role,password_hash from users where username=? and role in ('STAFF','ADMIN')",
+            "select user_id as id,username,name,role,password_hash from core.users where username=? and role in ('STAFF','ADMIN')",
             username);
     if (rows.isEmpty()) throw new UsernameNotFoundException("Invalid credentials");
     return rows.getFirst();

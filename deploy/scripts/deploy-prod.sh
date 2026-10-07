@@ -99,6 +99,7 @@ get_parameter() {
 }
 
 cleanup() {
+  unset PROD_ANALYSIS_DB_USERNAME PROD_ANALYSIS_DB_PASSWORD
   unset PROD_PRESENTATION_ENABLED
   unset PROD_INGEST_ENCRYPTION_KEY
   unset PROD_INGEST_SEARCH_KEY
@@ -558,6 +559,9 @@ PROD_PRESENTATION_ENABLED="$(get_parameter "presentation/enabled")"
 PROD_INGEST_ENCRYPTION_KEY="$(get_parameter "ingest/encryption-key")"
 PROD_INGEST_SEARCH_KEY="$(get_parameter "ingest/search-key")"
 PROD_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
+PROD_ANALYSIS_DB_USERNAME="$(get_parameter "analysis-db/username")"
+PROD_ANALYSIS_DB_PASSWORD="$(get_parameter "analysis-db/password")"
+export PROD_ANALYSIS_DB_USERNAME PROD_ANALYSIS_DB_PASSWORD
 PROD_DB_URL="$(get_parameter "db/url")"
 PROD_POSTGRES_USER="$(get_parameter "db/username")"
 PROD_POSTGRES_PASSWORD="$(get_parameter "db/password")"

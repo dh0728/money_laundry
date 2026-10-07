@@ -18,8 +18,8 @@ public class AlertQueryService {
   private final ObjectMapper mapper;
   private static final String VISIBLE =
       """
-      from alerts a join lateral (select v.* from alert_versions v
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
+      from review.alerts a join lateral (select v.* from review.alert_versions v
+        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
         where v.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
         order by v.version desc limit 1) v on true
       """;
@@ -36,7 +36,7 @@ public class AlertQueryService {
     if (status != null) {
       if (!List.of("OPEN", "CLOSED", "ESCALATED").contains(status))
         throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", "지원하지 않는 Alert 상태입니다.");
-      where += " and a.status=?";
+      where += " and (case when a.outcome='TRANSFERRED' then 'ESCALATED' else a.status end)=?";
       args.add(status);
     }
     if (assigneeId != null) {
@@ -49,7 +49,7 @@ public class AlertQueryService {
       if (jobId < 1)
         throw new ApiException(
             HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", "jobId must be positive");
-      where += " and exists(select 1 from analysis_runs r where r.run_id=v.run_id and r.job_id=?)";
+      where += " and exists(select 1 from analysis.runs r where r.run_id=v.run_id and r.job_id=?)";
       args.add(jobId);
     }
     long count =
@@ -72,8 +72,8 @@ public class AlertQueryService {
     var rows =
         jdbc.queryForList(
             """
-        select a.*,v.version,v.run_id,v.evidence,b.analysis_cutoff_at from alerts a join alert_versions v using(alert_id)
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
+        select a.*,v.version,v.run_id,v.evidence,b.analysis_cutoff_at from review.alerts a join review.alert_versions v using(alert_id)
+        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
         where a.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED'
         """
                 + (version == null ? " order by v.version desc limit 1" : " and v.version=?"),
@@ -83,8 +83,8 @@ public class AlertQueryService {
     var coverage =
         jdbc.queryForList(
             """
-        select c.coverage::text,c.checked_at,c.run_id,b.analysis_cutoff_at from alert_coverage_checks c
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
+        select c.coverage::text,c.checked_at,c.run_id,b.analysis_cutoff_at from review.alert_coverage_checks c
+        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
         where c.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED'
         """
                 + (version == null
@@ -125,8 +125,8 @@ public class AlertQueryService {
     detail(id, null);
     return jdbc.queryForList(
         """
-        select v.version,v.run_id as "runId",v.created_at as "createdAt" from alert_versions v
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
+        select v.version,v.run_id as "runId",v.created_at as "createdAt" from review.alert_versions v
+        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
         where v.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED' order by v.version
         """,
         id);
@@ -135,8 +135,9 @@ public class AlertQueryService {
   private Map<String, Object> view(Map<String, Object> row, boolean detail) {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("alertId", row.get("alert_id"));
-    result.put("status", row.get("status"));
-    result.put("resolution", row.get("resolution"));
+    result.put(
+        "status", "TRANSFERRED".equals(row.get("outcome")) ? "ESCALATED" : row.get("status"));
+    result.put("resolution", row.get("outcome"));
     result.put("assigneeId", row.get("assignee_id"));
     result.put("parentAlertId", row.get("parent_alert_id"));
     result.put("createdAt", row.get("created_at"));

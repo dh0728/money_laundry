@@ -15,6 +15,15 @@ Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다
 고정 맥락 기반 근거를 저장한 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
 실제 GNN의 탐지 성능을 검증한 것은 아니다.
 
+## DB 역할과 초기 구조
+
+기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 전환 절차](../../../deploy/DB_TRANSITION.md)를 따른다.
+
+- 수신 `ingest_entry.py`와 `analysis_entry.py --stage INTEGRATE`는 원문 보호·보고 통합·정정을 수행하므로 API의 데이터 작업 계정을 사용한다. `cryptography`는 이 단계의 AES-GCM 암호화/복호화와 Java 호환 검증에 필요하다. 조회 속도를 높이기 위한 라이브러리가 아니다.
+- FEATURES/INFERENCE/SCORES/ALERTS는 `ANALYSIS_DB_USERNAME`·`ANALYSIS_DB_PASSWORD`의 별도 로그인으로 같은 DB에 접속한다. 누락 시 API 관리자 계정으로 대체하지 않는다. 자식 프로세스에서 원문 암호키와 API DB 환경변수를 제거한다.
+- DB 관리자가 새 스키마 적용 후 `configure_analysis_db.py`를 명시 실행한다. 관리자 연결은 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`, 생성할 계정은 위 두 분석 환경변수로만 전달한다. 로그인 이름은 환경별로 다르게 지정하고 비밀번호는 24자 이상으로 준비한다. 이 도구는 DB를 만들지 않으며 `analysis_permissions.sql`의 권한만 부여한다.
+- 분석 역할은 보호·평가 스키마와 직원 비밀번호 해시를 읽지 못한다. 배정 후보는 `core.assignable_staff` 뷰로 읽고 배정 시각만 갱신한다. 분석 진입점도 보호 스키마 접근 권한이 있으면 실행을 거절한다.
+- dev/prod 배포 설정은 `/aml/{환경}/analysis-db/username`, `/aml/{환경}/analysis-db/password`를 읽는다. 비밀번호는 SecureString으로 보관하고 같은 값을 DB 로그인에 설정한다. 스크립트 작성·테스트는 실제 서버 권한 설정이나 배포 완료를 의미하지 않는다.
 ## 1. 이미지 빌드
 
 빌드 context는 두 이미지 모두 `backend/api-server`다. 다음은 해당 폴더의
@@ -133,12 +142,12 @@ $detail.models | Format-Table modelKind, phase, status, remoteStatus, errorCode,
 
 ```sql
 SELECT model_kind, phase, status, error_code
-FROM analysis_model_tasks
-WHERE run_id = (SELECT current_run_id FROM batch_jobs WHERE job_id = :job_id);
-SELECT stage, completed FROM analysis_run_stage_results
-WHERE run_id = (SELECT current_run_id FROM batch_jobs WHERE job_id = :job_id);
-SELECT count(*), min(score_pct), max(score_pct) FROM inference_results
-WHERE job_id = :job_id;
+FROM analysis.model_tasks
+WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id);
+SELECT stage, completed FROM analysis.stage_results
+WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id);
+SELECT count(*), min(score_pct), max(score_pct) FROM analysis.scores
+WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id);
 ```
 
 ## 5. 취소·재기동 확인의 경계
@@ -169,8 +178,7 @@ OPEN의 추가 근거는 버전으로 보존한다. 종결·이관 사건의 추
 모델을 재실행하지 않고 ALERTS에서 보완한다. 이후 보고가 바뀌면 관련 사건을 다시 확인한다. 미등록·미수신·일부 보류와 정상 수신 후 연결 없음을 구분한다.
 
 과거 버전 조회는 고정 거래·점수를 사용한다. 새 연결이 없으면 근거 버전을 복제하지 않고
-coverage 검사만 남긴다. run/job이 모두 COMPLETED인 버전만 공개한다. 실제 GNN 연결,
-사용자 판정·이력·Episode 변경 API는 별도 구현 범위다. 상세 계약은 API.md §3과 V6를 따른다.
+coverage 검사만 남긴다. run/job이 모두 COMPLETED인 버전만 공개한다. 사용자 판정·이력·Episode 변경은 Spring review API가 담당한다. 실제 GNN 연결은 별도이며 현재 모델은 시연용이다. 상세 계약은 API.md §3·§9를 따른다.
 
 동일 사건을 다른 run이 미완료 상태로 쓰고 있으면 `RUN_FENCED`로 차단한다. 동결 후 최신
 완료 근거 버전이 바뀌어도 기존 동결 입력을 그대로 적용하지 않는다. 이 충돌은 같은 입력의
@@ -179,5 +187,5 @@ coverage 검사만 남긴다. run/job이 모두 COMPLETED인 버전만 공개한
 
 Alert 상태 조회는 `dataAsOf`(공개 근거의 수신 cutoff)와 `lastCheckedAt`(성공한 검사 시각)을 구분한다.
 워커는 근거·coverage·checked_at·체크포인트를 원자 저장하고 재시도 시 검사 시각을 다시 쓰지 않는다.
-API의 `forwardComplete`는 제거했다. Spring은 V8 출처 스냅샷 차이로 재검토 대상을 선정한다.
-Python은 날짜별 이동 탐색을 수행하며 V9에서 내부 미래 수신 완료 플래그를 제거했다.
+API의 `forwardComplete`는 제거했다. Spring은 고정 출처 스냅샷 차이로 재검토 대상을 선정한다.
+Python은 날짜별 이동 탐색을 수행하며 내부 미래 수신 완료 플래그를 사용하지 않는다.

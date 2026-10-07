@@ -55,8 +55,8 @@ class FrozenInput:
             cursor.execute("""
                 SELECT b.execution_id, b.status, b.current_stage, b.current_run_id,
                        r.status, i.tx_id
-                FROM batch_jobs b
-                LEFT JOIN analysis_runs r ON r.run_id = b.current_run_id
+                FROM analysis.jobs b
+                LEFT JOIN analysis.runs r ON r.run_id = b.current_run_id
                 LEFT JOIN LATERAL (
                     SELECT tx_id FROM analysis.input_transactions
                     WHERE run_id = %s AND input_role = 'TARGET' AND tx_id > %s
@@ -83,8 +83,8 @@ class FrozenInput:
             cursor.execute("""
                 SELECT b.execution_id, b.status, b.current_stage, b.current_run_id,
                        r.status
-                FROM batch_jobs b
-                LEFT JOIN analysis_runs r ON r.run_id = b.current_run_id
+                FROM analysis.jobs b
+                LEFT JOIN analysis.runs r ON r.run_id = b.current_run_id
                 WHERE b.job_id = %s
                 """, (self.execution.job_id,))
             row = cursor.fetchone()

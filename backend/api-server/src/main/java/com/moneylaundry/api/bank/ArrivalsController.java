@@ -1,8 +1,7 @@
 package com.moneylaundry.api.bank;
 
-import com.moneylaundry.api.batchjob.BatchJob;
-import com.moneylaundry.api.batchjob.BatchJobRepository;
-import com.moneylaundry.api.batchjob.JobType;
+import com.moneylaundry.api.upload.Upload;
+import com.moneylaundry.api.upload.UploadRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -43,17 +42,17 @@ public class ArrivalsController {
       List<Row> banks) {}
 
   private final BankRepository bankRepository;
-  private final BatchJobRepository batchJobRepository;
+  private final UploadRepository uploadRepository;
   private final LocalTime cutoff;
   private final ZoneId zone;
 
   public ArrivalsController(
       BankRepository bankRepository,
-      BatchJobRepository batchJobRepository,
+      UploadRepository uploadRepository,
       @Value("${app.ingest.cutoff}") String cutoff,
       @Value("${app.zone}") String zone) {
     this.bankRepository = bankRepository;
-    this.batchJobRepository = batchJobRepository;
+    this.uploadRepository = uploadRepository;
     this.cutoff = LocalTime.parse(cutoff);
     this.zone = ZoneId.of(zone);
   }
@@ -68,11 +67,7 @@ public class ArrivalsController {
     int arrived = 0;
     List<Row> rows = new ArrayList<>();
     for (Bank bank : bankRepository.findByReportingTrueOrderById()) {
-      BatchJob job =
-          batchJobRepository
-              .findFirstByJobTypeAndBankIdAndCreatedAtGreaterThanAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
-                  JobType.INGEST, bank.getId(), windowStart, cutoffAt)
-              .orElse(null);
+      Upload job = uploadRepository.latestArrival(bank.getId(), windowStart, cutoffAt).orElse(null);
       if (job != null && job.getReceivedAt() != null) {
         arrived++;
       }

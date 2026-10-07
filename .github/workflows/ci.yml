@@ -44,11 +44,29 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/master' }}
 
+      - name: Set up Python worker runtime
+        id: python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/api-server/worker/requirements.txt
+
+      - name: Install worker dependencies
+        run: '"${{ steps.python.outputs.python-path }}" -m pip install -r worker/requirements.txt'
+
       - name: Grant execute permission to Gradle Wrapper
         run: chmod +x gradlew
 
       - name: Run backend tests and build
+        env:
+          AML_TEST_PYTHON: ${{ steps.python.outputs.python-path }}
         run: ./gradlew clean build --build-cache --no-daemon --stacktrace
+
+      - name: Run Python worker and PostgreSQL tests
+        env:
+          AML_TEST_DOCKER: docker
+        run: '"${{ steps.python.outputs.python-path }}" -B -m unittest discover -s worker -p "test_*.py"'
 
   frontend:
     name: Frontend Lint and Build

@@ -50,6 +50,7 @@ get_parameter() {
 }
 
 cleanup() {
+  unset DEV_ANALYSIS_DB_USERNAME DEV_ANALYSIS_DB_PASSWORD
   unset DEV_DB_URL
   unset DEV_POSTGRES_USER
   unset DEV_POSTGRES_PASSWORD
@@ -113,6 +114,9 @@ DEV_S3_PREFIX="$(get_parameter "s3/prefix")"
 DEV_INGEST_ENCRYPTION_KEY="$(get_parameter "ingest/encryption-key")"
 DEV_INGEST_SEARCH_KEY="$(get_parameter "ingest/search-key")"
 DEV_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
+DEV_ANALYSIS_DB_USERNAME="$(get_parameter "analysis-db/username")"
+DEV_ANALYSIS_DB_PASSWORD="$(get_parameter "analysis-db/password")"
+export DEV_ANALYSIS_DB_USERNAME DEV_ANALYSIS_DB_PASSWORD
 DEV_SQS_URL="$(get_parameter "sqs/url")"
 DEV_INFERENCE_API_TOKEN="$(get_parameter "inference/token")"
 DEV_INFERENCE_OBJECT_BASE_URL="https://${DEV_S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${DEV_S3_PREFIX%/}/"

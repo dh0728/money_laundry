@@ -48,6 +48,7 @@ class BankUploadApiTests {
 
   @DynamicPropertySource
   static void props(DynamicPropertyRegistry r) {
+    r.add("app.worker.python", () -> System.getenv("AML_TEST_PYTHON"));
     r.add("app.ingest.encryption-key", () -> ENC);
     r.add("app.ingest.search-key", () -> SEARCH);
     r.add("app.ingest.key-version", () -> "test");
@@ -55,7 +56,8 @@ class BankUploadApiTests {
 
   @Autowired JdbcTemplate jdbc;
   @Autowired UploadService service;
-  @Autowired TransactionIntegrationService integration;
+  PythonIntegrationFixture integration;
+  @Autowired org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails database;
   @Autowired PrivateDataProtector protector;
   @Autowired MockMvc mvc;
   @MockitoBean UploadStore store;
@@ -64,15 +66,16 @@ class BankUploadApiTests {
 
   @BeforeEach
   void setup() throws Exception {
+    integration = new PythonIntegrationFixture(jdbc, database, ENC, SEARCH);
     reset(store);
     files.clear();
     jdbc.execute(
-        "truncate banks,batch_jobs,private.entities,reporting_scopes,integration_attempts restart"
+        "truncate core.banks,analysis.jobs,ingest.uploads,core.owners,ingest.reporting_scopes,ingest.integration_attempts restart"
             + " identity cascade");
     for (int bank : new int[] {10, 20, 30}) {
-      jdbc.update("insert into banks(bank_id,is_reporting) values(?,true)", bank);
+      jdbc.update("insert into core.banks(bank_id,is_reporting) values(?,true)", bank);
       jdbc.update(
-          "insert into bank_reporting_periods(bank_id,effective_from_date,effective_to_date)"
+          "insert into core.bank_reporting_periods(bank_id,effective_from_date,effective_to_date)"
               + " values(?,?,?)",
           bank,
           DATE.minusDays(1),
@@ -159,7 +162,7 @@ class BankUploadApiTests {
             new IssueUploadRequest(UUID.randomUUID() + ".csv", bytes.length, digest(bytes), date));
     String key =
         jdbc.queryForObject(
-            "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId());
+            "select s3_key from ingest.uploads where upload_id=?", String.class, issued.uploadId());
     files.put(key, bytes);
     assertThat(service.complete(bank, issued.uploadId()).status().name()).isEqualTo("RECEIVED");
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
@@ -172,7 +175,7 @@ class BankUploadApiTests {
     throw new AssertionError("ingestion timeout");
   }
 
-  TransactionIntegrationService.Outcome integrate(long... ids) {
+  PythonIntegrationFixture.Outcome integrate(long... ids) {
     Set<Long> values = new HashSet<>();
     for (long id : ids) values.add(id);
     return integration.integrate(DATE, Instant.now().plusSeconds(1), values);
@@ -186,10 +189,10 @@ class BankUploadApiTests {
   void reportsIntegrateWithoutDemoCatalog() throws Exception {
     var date = LocalDate.of(2023, 8, 31);
     jdbc.update(
-        "insert into banks(bank_id,name,is_reporting) values(119,'Israel Bank #6',true),(48309,'Saudi Arabia Bank #24',true)");
+        "insert into core.banks(bank_id,name,is_reporting) values(119,'Israel Bank #6',true),(48309,'Saudi Arabia Bank #24',true)");
     for (int bank : new int[] {119, 48309}) {
       jdbc.update(
-          "insert into bank_reporting_periods(bank_id,effective_from_date) values(?,?)",
+          "insert into core.bank_reporting_periods(bank_id,effective_from_date) values(?,?)",
           bank,
           date);
     }
@@ -198,7 +201,7 @@ class BankUploadApiTests {
             + "2023/08/31 00:04,0119,811C597B0,0048309,811C599A0,34254.65,Saudi Riyal,34254.65,Saudi Riyal,ACH,Israel Bank #6,Saudi Arabia Bank #24,800F224C0,Partnership #3715,800F2F200,Sole Proprietorship #979,1\n";
     long first = submit(119, csv.getBytes(StandardCharsets.UTF_8), date);
     long second = submit(48309, csv.getBytes(StandardCharsets.UTF_8), date);
-    assertThat(count("evaluation.demo_report_hints")).isZero();
+    assertThat(count("evaluation.report_labels")).isEqualTo(2);
     var outcome = integration.integrate(date, Instant.now().plusSeconds(1), Set.of(first, second));
     assertThat(outcome.transactions()).isEqualTo(1);
     assertThat(
@@ -218,47 +221,47 @@ class BankUploadApiTests {
     long a = submit(10, HEADER + ach + wire + ach + internal),
         b = submit(20, HEADER + wire + ach + cross + ach + externalIn + externalOut),
         c = submit(30, HEADER + cross);
-    assertThat(count("transactions")).isZero();
+    assertThat(count("ledger.transactions")).isZero();
     assertThat(service.status(10, a).integrationStatus())
         .isEqualTo("VALIDATED_WAITING_INTEGRATION");
     assertThat(integrate(a, b, c).transactions()).isEqualTo(7);
     assertThat(count("private.bank_reports")).isEqualTo(11);
-    assertThat(count("transaction_reports")).isEqualTo(11);
-    assertThat(count("private.accounts")).isEqualTo(7);
-    assertThat(count("private.entities")).isEqualTo(6);
+    assertThat(count("ledger.transaction_reports")).isEqualTo(11);
+    assertThat(count("core.accounts")).isEqualTo(7);
+    assertThat(count("core.owners")).isEqualTo(6);
     assertAmounts(
         "amount_paid", "payment_currency", Map.of("USD", "305", "EUR", "13.5", "JPY", "2"));
     assertAmounts(
         "amount_received", "receiving_currency", Map.of("USD", "316", "EUR", "3.5", "JPY", "2"));
     long e1 =
         jdbc.queryForObject(
-            "select entity_id from private.entities where entity_lookup_token=?",
+            "select owner_id from private.owner_identities where lookup_token=?",
             Long.class,
             protector.token("entity", "E1"));
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from private.accounts where entity_id=?", Integer.class, e1))
+                "select count(*) from core.accounts where owner_id=?", Integer.class, e1))
         .isEqualTo(2);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from transactions t join private.accounts f on"
-                    + " f.account_id=t.from_account_id join private.accounts r on"
-                    + " r.account_id=t.to_account_id where f.account_lookup_token=? and"
-                    + " r.account_lookup_token=?",
+                "select count(*) from ledger.transactions t join core.accounts f on"
+                    + " f.account_id=t.from_account_id join core.accounts r on"
+                    + " r.account_id=t.to_account_id join private.account_identities fi on fi.account_id=f.account_id join private.account_identities ri on ri.account_id=r.account_id where fi.lookup_token=? and"
+                    + " ri.lookup_token=?",
                 Integer.class,
                 protector.token("account", "10", "A"),
                 protector.token("account", "20", "B")))
         .isEqualTo(3);
     List<String> relationships =
         jdbc.query(
-            "select f.bank_id as fb,f.identity_cipher as fc,f.key_version as fv,fe.identity_cipher"
-                + " as fec,fe.key_version as fev,r.bank_id as rb,r.identity_cipher as"
-                + " rc,r.key_version as rv,re.identity_cipher as rec,re.key_version as"
-                + " rev,t.payment_format from transactions t join private.accounts f on"
-                + " f.account_id=t.from_account_id join private.entities fe on"
-                + " fe.entity_id=f.entity_id join private.accounts r on"
-                + " r.account_id=t.to_account_id join private.entities re on"
-                + " re.entity_id=r.entity_id",
+            "select f.bank_id as fb,fi.identity_cipher as fc,fi.key_version as fv,fe.identity_cipher"
+                + " as fec,fe.key_version as fev,r.bank_id as rb,ri.identity_cipher as"
+                + " rc,ri.key_version as rv,re.identity_cipher as rec,re.key_version as"
+                + " rev,t.payment_format from ledger.transactions t join core.accounts f on"
+                + " f.account_id=t.from_account_id join private.owner_identities fe on"
+                + " fe.owner_id=f.owner_id join core.accounts r on"
+                + " r.account_id=t.to_account_id join private.owner_identities re on"
+                + " re.owner_id=r.owner_id join private.account_identities fi on fi.account_id=f.account_id join private.account_identities ri on ri.account_id=r.account_id",
             (rs, n) ->
                 rs.getInt("fb")
                     + ":"
@@ -286,12 +289,12 @@ class BankUploadApiTests {
             "20:B:E2>50:Y:E6:ACH");
     var ids =
         jdbc.queryForList(
-            "select service_account_id from private.accounts order by account_id", UUID.class);
+            "select service_account_id from core.accounts order by account_id", UUID.class);
     assertThat(integrate(a, b, c).transactions()).isEqualTo(7);
-    assertThat(count("transactions")).isEqualTo(7);
+    assertThat(count("ledger.transactions")).isEqualTo(7);
     assertThat(
             jdbc.queryForList(
-                "select service_account_id from private.accounts order by account_id", UUID.class))
+                "select service_account_id from core.accounts order by account_id", UUID.class))
         .isEqualTo(ids);
     assertThat(jdbc.queryForList("select payload_cipher from private.bank_reports", String.class))
         .allMatch(v -> !v.contains("NameE"));
@@ -316,7 +319,7 @@ class BankUploadApiTests {
                 + currency
                 + ") as currency,sum("
                 + amount
-                + ") as amount from transactions group by "
+                + ") as amount from ledger.transactions group by "
                 + currency);
     assertThat(actual).hasSize(expected.size());
     for (var item : actual)
@@ -345,9 +348,9 @@ class BankUploadApiTests {
         assertThat(service.status(10, id).rowCount()).isNull();
         assertThat(service.status(10, id).errors()).noneMatch(e -> e.reason().equals("EMPTY_FILE"));
       }
-      assertThat(count("transactions")).isZero();
-      assertThat(count("private.entities")).isZero();
-      assertThat(count("private.accounts")).isZero();
+      assertThat(count("ledger.transactions")).isZero();
+      assertThat(count("core.owners")).isZero();
+      assertThat(count("core.accounts")).isZero();
     }
   }
 
@@ -358,8 +361,8 @@ class BankUploadApiTests {
         row(20, "B", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2").replace("NameE1", "Other");
     long x = submit(10, HEADER + a), y = submit(20, HEADER + b);
     assertThat(integrate(y, x).heldFiles()).isEqualTo(2);
-    assertThat(count("transactions")).isZero();
-    assertThat(count("private.entities")).isZero();
+    assertThat(count("ledger.transactions")).isZero();
+    assertThat(count("core.owners")).isZero();
   }
 
   @Test
@@ -374,7 +377,7 @@ class BankUploadApiTests {
     assertThat(result.heldFiles()).isEqualTo(1);
     assertThat(result.dependentReports()).isEqualTo(1);
     assertThat(service.status(20, b).integrationStatus()).isEqualTo("PARTIALLY_HELD");
-    assertThat(count("private.accounts")).isEqualTo(2);
+    assertThat(count("core.accounts")).isEqualTo(2);
   }
 
   @Test
@@ -385,17 +388,17 @@ class BankUploadApiTests {
         "create function fail_integration_test() returns trigger language plpgsql as $$ begin raise"
             + " exception 'test failure'; end $$");
     jdbc.execute(
-        "create trigger fail_integration_test before insert on transactions for each row execute"
+        "create trigger fail_integration_test before insert on ledger.transactions for each row execute"
             + " function fail_integration_test()");
     try {
       assertThatThrownBy(() -> integrate(a)).isInstanceOf(RuntimeException.class);
-      assertThat(count("transactions")).isZero();
-      assertThat(count("private.entities")).isZero();
-      assertThat(count("integration_attempts")).isZero();
+      assertThat(count("ledger.transactions")).isZero();
+      assertThat(count("core.owners")).isZero();
+      assertThat(count("ingest.integration_attempts")).isZero();
       assertThat(service.status(10, a).integrationStatus())
           .isEqualTo("VALIDATED_WAITING_INTEGRATION");
     } finally {
-      jdbc.execute("drop trigger fail_integration_test on transactions");
+      jdbc.execute("drop trigger fail_integration_test on ledger.transactions");
       jdbc.execute("drop function fail_integration_test()");
     }
     assertThat(integrate(a).transactions()).isEqualTo(1);
@@ -410,8 +413,8 @@ class BankUploadApiTests {
       assertThat(f.get(20, TimeUnit.SECONDS).transactions()).isEqualTo(1);
       assertThat(g.get(20, TimeUnit.SECONDS).transactions()).isEqualTo(1);
     }
-    assertThat(count("transactions")).isEqualTo(1);
-    assertThat(count("integration_attempts")).isEqualTo(1);
+    assertThat(count("ledger.transactions")).isEqualTo(1);
+    assertThat(count("ingest.integration_attempts")).isEqualTo(1);
   }
 
   @Test
@@ -420,26 +423,27 @@ class BankUploadApiTests {
             () ->
                 service.issue(99, new IssueUploadRequest("x.csv", 1, digest(new byte[] {1}), DATE)))
         .isInstanceOf(ApiException.class);
-    assertThat(count("batch_jobs")).isZero();
+    assertThat(count("ingest.uploads")).isZero();
     long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
     assertThatThrownBy(() -> integration.integrate(DATE, Instant.EPOCH, Set.of(a)))
         .isInstanceOf(IllegalStateException.class);
-    assertThat(count("transactions")).isZero();
-    assertThat(count("reporting_scopes")).isZero();
+    assertThat(count("ledger.transactions")).isZero();
+    assertThat(count("ingest.reporting_scopes")).isZero();
   }
 
   @Test
   void empty_frozen_scope_is_not_recomputed_from_later_registration() throws Exception {
     long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
-    jdbc.update("insert into reporting_scopes(business_date,scope_revision) values(?,7)", DATE);
+    jdbc.update(
+        "insert into ingest.reporting_scopes(business_date,scope_revision) values(?,7)", DATE);
     assertThatThrownBy(() -> integrate(a))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("REPORT_OUTSIDE_SCOPE");
-    assertThat(count("reporting_scope_banks")).isZero();
-    assertThat(count("transactions")).isZero();
+    assertThat(count("ingest.reporting_scope_banks")).isZero();
+    assertThat(count("ledger.transactions")).isZero();
     assertThat(
             jdbc.queryForObject(
-                "select scope_revision from reporting_scopes where business_date=?",
+                "select scope_revision from ingest.reporting_scopes where business_date=?",
                 Long.class,
                 DATE))
         .isEqualTo(7);
@@ -462,23 +466,25 @@ class BankUploadApiTests {
     // registerNow fixes all current receipts; the staged report is a required input.
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_uploads where job_id=? and upload_id=?",
+                "select count(*) from analysis.receipts where job_id=? and upload_id=?",
                 Integer.class,
                 job,
                 a))
         .isEqualTo(1);
     var executor = mock(AnalysisStageExecutor.class);
-    try (var runner = new AnalysisRunner(analysis, executor)) {
+    try (var runner = new AnalysisRunner(analysis, executor, runs)) {
       runner.scan();
     }
     verifyNoInteractions(executor);
     assertThat(
-            jdbc.queryForObject("select status from batch_jobs where job_id=?", String.class, job))
-        .isEqualTo("FAILED");
+            jdbc.queryForObject(
+                "select status from analysis.jobs where job_id=?", String.class, job))
+        .isEqualTo("QUEUED");
+    assertThat(analysis.job(job).stage()).isEqualTo(AnalysisStage.INTEGRATE);
     assertThat(
             jdbc.queryForObject(
-                "select error_code from batch_jobs where job_id=?", String.class, job))
-        .isEqualTo("INTEGRATION_NOT_CONNECTED");
+                "select error_code from analysis.jobs where job_id=?", String.class, job))
+        .isNull();
   }
 
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -488,11 +494,11 @@ class BankUploadApiTests {
     String value = row(10, "001", 40, "001", "1", "USD", "1", "USD", "ACH", "E1", "E1");
     long a = submit(10, HEADER + value);
     integrate(a);
-    assertThat(count("private.accounts")).isEqualTo(2);
-    assertThat(count("private.entities")).isEqualTo(1);
+    assertThat(count("core.accounts")).isEqualTo(2);
+    assertThat(count("core.owners")).isEqualTo(1);
     var before =
         jdbc.queryForList(
-            "select service_account_id from private.accounts order by account_id", UUID.class);
+            "select service_account_id from core.accounts order by account_id", UUID.class);
     var bytes =
         (HEADER + value.replace("2026/09/15", "2026/09/16")).getBytes(StandardCharsets.UTF_8);
     var issued =
@@ -500,7 +506,7 @@ class BankUploadApiTests {
             10, new IssueUploadRequest("next.csv", bytes.length, digest(bytes), DATE.plusDays(1)));
     String key =
         jdbc.queryForObject(
-            "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId());
+            "select s3_key from ingest.uploads where upload_id=?", String.class, issued.uploadId());
     files.put(key, bytes);
     service.complete(10, issued.uploadId());
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
@@ -509,10 +515,10 @@ class BankUploadApiTests {
       Thread.sleep(20);
     integration.integrate(
         DATE.plusDays(1), Instant.now().plusSeconds(1), Set.of(issued.uploadId()));
-    assertThat(count("transactions")).isEqualTo(2);
+    assertThat(count("ledger.transactions")).isEqualTo(2);
     assertThat(
             jdbc.queryForList(
-                "select service_account_id from private.accounts order by account_id", UUID.class))
+                "select service_account_id from core.accounts order by account_id", UUID.class))
         .isEqualTo(before);
   }
 
@@ -523,7 +529,7 @@ class BankUploadApiTests {
     integrate(a);
     var before =
         jdbc.queryForList(
-            "select service_account_id,entity_id,identity_cipher from private.accounts order by"
+            "select service_account_id,owner_id,identity_cipher from core.accounts join private.account_identities using(account_id) order by"
                 + " account_id");
     byte[] bytes =
         (HEADER + value.replace("2026/09/15", "2026/09/16").replace("NameE1", "Other"))
@@ -534,7 +540,7 @@ class BankUploadApiTests {
             new IssueUploadRequest("conflict.csv", bytes.length, digest(bytes), DATE.plusDays(1)));
     String key =
         jdbc.queryForObject(
-            "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId());
+            "select s3_key from ingest.uploads where upload_id=?", String.class, issued.uploadId());
     files.put(key, bytes);
     service.complete(10, issued.uploadId());
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
@@ -547,10 +553,10 @@ class BankUploadApiTests {
                     DATE.plusDays(1), Instant.now().plusSeconds(1), Set.of(issued.uploadId()))
                 .heldFiles())
         .isEqualTo(1);
-    assertThat(count("transactions")).isEqualTo(1);
+    assertThat(count("ledger.transactions")).isEqualTo(1);
     assertThat(
             jdbc.queryForList(
-                "select service_account_id,entity_id,identity_cipher from private.accounts order by"
+                "select service_account_id,owner_id,identity_cipher from core.accounts join private.account_identities using(account_id) order by"
                     + " account_id"))
         .isEqualTo(before);
   }
@@ -575,20 +581,14 @@ class BankUploadApiTests {
   @Test
   void missing_key_and_tampered_report_fail_without_partial_confirmation() throws Exception {
     long a = submit(10, HEADER + row(10, "A", 40, "X", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
-    var noKeys =
-        new TransactionIntegrationService(
-            jdbc,
-            new org.springframework.transaction.support.TransactionTemplate(transactionManager),
-            new PrivateDataProtector("", "", ""),
-            new tools.jackson.databind.ObjectMapper(),
-            "fx_rates_usd_v1");
+    var noKeys = new PythonIntegrationFixture(jdbc, database, "", "");
     assertThatThrownBy(() -> noKeys.integrate(DATE, Instant.now().plusSeconds(1), Set.of(a)))
         .isInstanceOf(IllegalStateException.class);
     jdbc.update("update private.bank_reports set payload_cipher='dGFtcGVyZWQ='");
     assertThatThrownBy(() -> integrate(a)).isInstanceOf(IllegalStateException.class);
-    assertThat(count("transactions")).isZero();
-    assertThat(count("private.entities")).isZero();
-    assertThat(count("integration_attempts")).isZero();
+    assertThat(count("ledger.transactions")).isZero();
+    assertThat(count("core.owners")).isZero();
+    assertThat(count("ingest.integration_attempts")).isZero();
     assertThat(service.status(10, a).integrationStatus())
         .isEqualTo("VALIDATED_WAITING_INTEGRATION");
   }
@@ -596,19 +596,19 @@ class BankUploadApiTests {
   @Test
   void unsupported_bank_format_and_overlapping_reporting_period_are_rejected() {
     assertThatThrownBy(
-            () -> jdbc.update("update banks set report_format='UNKNOWN' where bank_id=10"))
+            () -> jdbc.update("update core.banks set report_format='UNKNOWN' where bank_id=10"))
         .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     assertThatThrownBy(
             () ->
                 jdbc.update(
                     "insert into"
-                        + " bank_reporting_periods(bank_id,effective_from_date,effective_to_date)"
+                        + " core.bank_reporting_periods(bank_id,effective_from_date,effective_to_date)"
                         + " values(10,?,?)",
                     DATE,
                     DATE))
         .isInstanceOf(org.springframework.dao.DataAccessException.class);
-    assertThat(count("bank_reporting_periods")).isEqualTo(3);
-    assertThat(count("batch_jobs")).isZero();
+    assertThat(count("core.bank_reporting_periods")).isEqualTo(3);
+    assertThat(count("ingest.uploads")).isZero();
   }
 
   @Test
@@ -620,35 +620,35 @@ class BankUploadApiTests {
     long upload = submit(10, body.toString());
     var outcome = integrate(upload);
     assertThat(outcome.transactions()).isEqualTo(2000);
-    assertThat(count("private.accounts")).isEqualTo(4000);
-    assertThat(count("private.entities")).isEqualTo(4000);
+    assertThat(count("core.accounts")).isEqualTo(4000);
+    assertThat(count("core.owners")).isEqualTo(4000);
     System.out.println(
-        "SYNTHETIC_PIPELINE transactions=2000 accounts=4000 elapsedMs="
+        "SYNTHETIC_PIPELINE ledger.transactions=2000 accounts=4000 elapsedMs="
             + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     // Query-only synthetic expansion, not a claim of 500,000 source reports integrated.
     jdbc.execute(
         "insert into"
-            + " transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date)"
+            + " ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date)"
             + " select"
             + " t.occurred_at,t.from_account_id,t.to_account_id,t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,t.payment_format,t.amount_usd,t.fx_rate_version,t.business_date"
-            + " from transactions t cross join generate_series(1,249)");
-    assertThat(count("transactions")).isEqualTo(500000);
-    jdbc.execute("analyze transactions");
-    jdbc.execute("analyze private.accounts");
-    long account = jdbc.queryForObject("select min(account_id) from private.accounts", Long.class);
+            + " from ledger.transactions t cross join generate_series(1,249)");
+    assertThat(count("ledger.transactions")).isEqualTo(500000);
+    jdbc.execute("analyze ledger.transactions");
+    jdbc.execute("analyze core.accounts");
+    long account = jdbc.queryForObject("select min(account_id) from core.accounts", Long.class);
     long entity =
         jdbc.queryForObject(
-            "select entity_id from private.accounts where account_id=?", Long.class, account);
+            "select owner_id from core.accounts where account_id=?", Long.class, account);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from transactions where from_account_id=?",
+                "select count(*) from ledger.transactions where from_account_id=?",
                 Integer.class,
                 account))
         .isEqualTo(250);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from private.accounts a join transactions t on"
-                    + " t.from_account_id=a.account_id where a.entity_id=?",
+                "select count(*) from core.accounts a join ledger.transactions t on"
+                    + " t.from_account_id=a.account_id where a.owner_id=?",
                 Integer.class,
                 entity))
         .isEqualTo(250);
@@ -656,15 +656,15 @@ class BankUploadApiTests {
     System.out.println(
         "ACCOUNT_QUERY_PLAN="
             + jdbc.queryForList(
-                "explain analyze select tx_id from transactions where from_account_id=? order by"
+                "explain analyze select tx_id from ledger.transactions where from_account_id=? order by"
                     + " occurred_at",
                 String.class,
                 account));
     System.out.println(
         "ENTITY_QUERY_PLAN="
             + jdbc.queryForList(
-                "explain analyze select a.service_account_id,t.tx_id from private.accounts a join"
-                    + " transactions t on t.from_account_id=a.account_id where a.entity_id=?",
+                "explain analyze select a.service_account_id,t.tx_id from core.accounts a join"
+                    + " ledger.transactions t on t.from_account_id=a.account_id where a.owner_id=?",
                 String.class,
                 entity));
   }
@@ -674,7 +674,7 @@ class BankUploadApiTests {
     long id = submit(10, HEADER);
     assertThat(service.status(10, id).rowCount()).isZero();
     assertThat(service.status(10, id).errors()).anyMatch(e -> e.reason().equals("EMPTY_FILE"));
-    assertThat(count("transactions")).isZero();
+    assertThat(count("ledger.transactions")).isZero();
   }
 
   @Autowired AnalysisRunService runs;
@@ -685,7 +685,9 @@ class BankUploadApiTests {
   long correction(int bank, long original) {
     long version =
         jdbc.queryForObject(
-            "select version_id from report_versions where upload_id=?", Long.class, original);
+            "select version_id from ingest.report_versions where upload_id=?",
+            Long.class,
+            original);
     return com.moneylaundry.api.correction.CorrectionService.open(
         jdbc, bank, DATE, version, "CHECK_REQUESTED", 1);
   }
@@ -704,7 +706,7 @@ class BankUploadApiTests {
                 UUID.randomUUID()));
     String key =
         jdbc.queryForObject(
-            "select s3_key from batch_jobs where job_id=?", String.class, issue.uploadId());
+            "select s3_key from ingest.uploads where upload_id=?", String.class, issue.uploadId());
     files.put(key, bytes);
     service.complete(bank, issue.uploadId());
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
@@ -719,22 +721,22 @@ class BankUploadApiTests {
 
   List<Long> activeIds() {
     return jdbc.queryForList(
-        "select tx_id from transactions where integration_status='ACTIVE' order by tx_id",
+        "select tx_id from ledger.transactions where integration_status='ACTIVE' order by tx_id",
         Long.class);
   }
 
   UUID fixtureRun(String role) {
     long job =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,current_stage,analysis_cutoff_at) values('ANALYSIS','QUEUED','FEATURES',now()) returning job_id",
+            "insert into analysis.jobs(analysis_date,business_at,threshold_value,status,current_stage,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),.7,'QUEUED','FEATURES',now()) returning job_id",
             Long.class);
     UUID run = UUID.randomUUID();
-    jdbc.update("insert into analysis_runs(run_id,job_id,status) values(?,?,'READY')", run, job);
-    jdbc.update("update batch_jobs set current_run_id=? where job_id=?", run, job);
+    jdbc.update("insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", run, job);
+    jdbc.update("update analysis.jobs set current_run_id=? where job_id=?", run, job);
     for (long id : activeIds()) {
       runs.snapshot(run, id, role);
       if (role.equals("TARGET"))
-        jdbc.update("insert into analysis_target_ownership values(?,?)", id, run);
+        jdbc.update("insert into analysis.target_ownership values(?,?)", id, run);
     }
     return run;
   }
@@ -782,19 +784,19 @@ class BankUploadApiTests {
     assertThat(service.status(10, a2).integrationStatus()).isEqualTo("WAITING_COUNTERPART");
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_runs where run_id=?", String.class, run))
+                "select status from analysis.runs where run_id=?", String.class, run))
         .isEqualTo("CANCELLED");
     long b2 = replace(20, cb, HEADER + changed);
     integrate(a, b, a2, b2);
     assertThat(activeIds()).hasSize(1).doesNotContainAnyElementsOf(old);
     assertThat(
             jdbc.queryForObject(
-                "select amount_paid from transactions where integration_status='ACTIVE'",
+                "select amount_paid from ledger.transactions where integration_status='ACTIVE'",
                 BigDecimal.class))
         .isEqualByComparingTo("200");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from correction_requests where correction_id in (?,?) and status='RESOLVED'",
+                "select count(*) from ingest.correction_requests where correction_id in (?,?) and status='RESOLVED'",
                 Integer.class,
                 ca,
                 cb))
@@ -807,17 +809,20 @@ class BankUploadApiTests {
     integrate(a, b);
     var old = activeIds();
     UUID run = fixtureRun("TARGET");
-    jdbc.update("update analysis_runs set status='COMPLETED' where run_id=?", run);
+    jdbc.update("update analysis.runs set status='COMPLETED' where run_id=?", run);
     long ca = correction(10, a), cb = correction(20, b);
     long a2 = replace(10, ca, HEADER + x() + y()), b2 = replace(20, cb, HEADER + x() + y());
     integrate(a, b, a2, b2);
     assertThat(activeIds()).isEqualTo(old);
     assertThat(
             jdbc.queryForObject(
-                "select error_code from report_versions where upload_id=?", String.class, a2))
+                "select error_code from ingest.report_versions where upload_id=?",
+                String.class,
+                a2))
         .isEqualTo("COMPLETED_TARGET_CHANGE_OUT_OF_SCOPE");
     assertThat(
-            jdbc.queryForObject("select generation from report_sets where bank_id=10", Long.class))
+            jdbc.queryForObject(
+                "select generation from ingest.report_sets where bank_id=10", Long.class))
         .isEqualTo(1);
   }
 
@@ -834,11 +839,13 @@ class BankUploadApiTests {
     assertThat(activeIds()).isEqualTo(old);
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_runs where run_id=?", String.class, run))
+                "select status from analysis.runs where run_id=?", String.class, run))
         .isEqualTo("READY");
     assertThat(
             jdbc.queryForObject(
-                "select status from correction_requests where correction_id=?", String.class, c))
+                "select status from ingest.correction_requests where correction_id=?",
+                String.class,
+                c))
         .isEqualTo("OPEN");
   }
 
@@ -854,7 +861,7 @@ class BankUploadApiTests {
     var issued = service.issue(10, request);
     files.put(
         jdbc.queryForObject(
-            "select s3_key from batch_jobs where job_id=?", String.class, issued.uploadId()),
+            "select s3_key from ingest.uploads where upload_id=?", String.class, issued.uploadId()),
         bytes);
     service.complete(10, issued.uploadId());
     assertThat(service.issue(10, request).uploadId()).isEqualTo(issued.uploadId());
@@ -886,23 +893,23 @@ class BankUploadApiTests {
     runs.publishRequest(run, type, 1);
     runs.cancel(run, "REPORT_CORRECTED");
     runs.cancel(run, "REPORT_CORRECTED");
-    assertThat(count("analysis_cancel_outbox")).isEqualTo(2);
+    assertThat(count("analysis.cancel_outbox")).isEqualTo(2);
     assertThatThrownBy(() -> runs.publishRequest(run, binary, 1)).hasMessage("RUN_FENCED");
     long replacementJob =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status) values('ANALYSIS','QUEUED') returning job_id",
+            "insert into analysis.jobs(analysis_date,business_at,threshold_value,status,current_stage,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),.7,'QUEUED','FREEZE_INPUT',now()) returning job_id",
             Long.class);
     UUID replacement = UUID.randomUUID();
     jdbc.update(
-        "insert into analysis_runs(run_id,job_id,status) values(?,?,'READY')",
+        "insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')",
         replacement,
         replacementJob);
     jdbc.update(
-        "update batch_jobs set current_run_id=? where job_id=?", replacement, replacementJob);
-    jdbc.update("insert into analysis_run_replacements values(?,?)", replacement, run);
+        "update analysis.jobs set current_run_id=? where job_id=?", replacement, replacementJob);
+    jdbc.update("insert into analysis.run_replacements values(?,?)", replacement, run);
     var cancels =
         jdbc.queryForList(
-            "select cancel_id from analysis_cancel_outbox order by cancel_id", UUID.class);
+            "select cancel_id from analysis.cancel_outbox order by cancel_id", UUID.class);
     assertThat(runs.canInfer(replacement)).isFalse();
     runs.acknowledge(cancels.get(0), "STOPPED");
     assertThat(runs.canInfer(replacement)).isFalse();
@@ -929,7 +936,7 @@ class BankUploadApiTests {
               jdbc.queryForList(
                   "select tx_id from analysis.input_transactions where run_id=?", Long.class, run))
           .containsExactlyElementsOf(activeIds());
-      assertThat(count("analysis_input_reports")).isEqualTo(2);
+      assertThat(count("analysis.input_reports")).isEqualTo(2);
     } finally {
       productionRunner.close();
     }
@@ -940,7 +947,7 @@ class BankUploadApiTests {
     long a = submit(10, HEADER + x()), b = submit(20, HEADER + x());
     integrate(a, b);
     UUID run = fixtureRun("CONTEXT");
-    jdbc.update("update analysis_runs set status='COMPLETED' where run_id=?", run);
+    jdbc.update("update analysis.runs set status='COMPLETED' where run_id=?", run);
     var old = activeIds();
     long a2 = replace(10, correction(10, a), HEADER + x().replace(",100,", ",200,")),
         b2 = replace(20, correction(20, b), HEADER + x().replace(",100,", ",200,"));
@@ -954,7 +961,7 @@ class BankUploadApiTests {
         .isEqualByComparingTo("100");
     assertThat(
             jdbc.queryForObject(
-                "select amount_paid from transactions where integration_status='ACTIVE'",
+                "select amount_paid from ledger.transactions where integration_status='ACTIVE'",
                 BigDecimal.class))
         .isEqualByComparingTo("200");
   }
@@ -970,21 +977,25 @@ class BankUploadApiTests {
     jdbc.execute(
         "create function correction_test_failure() returns trigger language plpgsql as $$ begin if NEW.bank_id=20 then raise exception 'TEST_ROLLBACK'; end if; return NEW; end $$");
     jdbc.execute(
-        "create trigger correction_test_failure before update on report_sets for each row execute function correction_test_failure()");
+        "create trigger correction_test_failure before update on ingest.report_sets for each row execute function correction_test_failure()");
     try {
       assertThatThrownBy(() -> integrate(a, b, a2, b2))
-          .isInstanceOf(org.springframework.dao.DataAccessException.class);
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("TEST_ROLLBACK");
     } finally {
-      jdbc.execute("drop trigger correction_test_failure on report_sets");
+      jdbc.execute("drop trigger correction_test_failure on ingest.report_sets");
       jdbc.execute("drop function correction_test_failure()");
     }
     assertThat(activeIds()).isEqualTo(old);
-    assertThat(count("private.accounts")).isEqualTo(2);
-    assertThat(jdbc.queryForList("select generation from report_sets order by bank_id", Long.class))
+    assertThat(count("core.accounts")).isEqualTo(2);
+    assertThat(
+            jdbc.queryForList(
+                "select generation from ingest.report_sets order by bank_id", Long.class))
         .containsExactly(1L, 1L);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from correction_requests where status='RESOLVED'", Integer.class))
+                "select count(*) from ingest.correction_requests where status='RESOLVED'",
+                Integer.class))
         .isZero();
     integrate(a, b, a2, b2);
     assertThat(activeIds()).hasSize(2);
@@ -996,18 +1007,20 @@ class BankUploadApiTests {
     integrate(a, b);
     UUID old = fixtureRun("TARGET");
     long oldJob =
-        jdbc.queryForObject("select job_id from analysis_runs where run_id=?", Long.class, old);
+        jdbc.queryForObject("select job_id from analysis.runs where run_id=?", Long.class, old);
     jdbc.update(
-        "update transactions set scored_job_id=? where tx_id=?", oldJob, activeIds().getFirst());
+        "insert into analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,type_class) values(?,?,.9,1,0,0,0,0,0,0,0,0,0)",
+        old,
+        activeIds().getFirst());
     long a2 = replace(10, correction(10, a), HEADER + x().replace(",100,", ",200,") + y()),
         b2 = replace(20, correction(20, b), HEADER + x().replace(",100,", ",200,") + y());
     integrate(a, b, a2, b2);
     long job =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status) values('ANALYSIS','QUEUED') returning job_id",
+            "insert into analysis.jobs(analysis_date,business_at,threshold_value,status,current_stage,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),.7,'QUEUED','FREEZE_INPUT',now()) returning job_id",
             Long.class);
     jdbc.update(
-        "insert into analysis_selected_versions select ?,set_id,current_version_id,generation from report_sets",
+        "insert into analysis.selected_versions select ?,set_id,current_version_id,generation from ingest.report_sets",
         job);
     UUID fresh = runs.freeze(job, Instant.now().plusSeconds(1));
     assertThat(
@@ -1018,7 +1031,7 @@ class BankUploadApiTests {
         .containsExactlyElementsOf(activeIds());
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_run_replacements where run_id=? and replaces_run_id=?",
+                "select count(*) from analysis.run_replacements where run_id=? and replaces_run_id=?",
                 Integer.class,
                 fresh,
                 old))
@@ -1054,7 +1067,7 @@ class BankUploadApiTests {
     integration.integrate(DATE, cutoff, Set.of(a, b));
     assertThat(
             jdbc.queryForObject(
-                "select amount_paid from transactions where integration_status='ACTIVE'",
+                "select amount_paid from ledger.transactions where integration_status='ACTIVE'",
                 BigDecimal.class))
         .isEqualByComparingTo("100");
     integrate(a, b, a2, b2);
@@ -1069,7 +1082,7 @@ class BankUploadApiTests {
     long a = submit(10, HEADER + x()), b = submit(20, HEADER + x());
     integrate(a, b);
     for (boolean cancelFirst : List.of(true, false)) {
-      jdbc.update("delete from analysis_target_ownership");
+      jdbc.update("delete from analysis.target_ownership");
       UUID run = fixtureRun("TARGET");
       var pool = Executors.newFixedThreadPool(2);
       var locked = new CountDownLatch(1);
@@ -1104,7 +1117,7 @@ class BankUploadApiTests {
             .isInstanceOf(ExecutionException.class);
         assertThat(
                 jdbc.queryForObject(
-                    "select status from analysis_runs where run_id=?", String.class, run))
+                    "select status from analysis.runs where run_id=?", String.class, run))
             .isEqualTo(cancelFirst ? "CANCELLED" : "COMPLETED");
       } finally {
         release.countDown();
@@ -1124,7 +1137,7 @@ class BankUploadApiTests {
   void missing_counterpart_request_targets_missing_bank_not_waiting_sender() throws Exception {
     long a = submit(10, HEADER + x());
     integrate(a);
-    assertThat(jdbc.queryForList("select bank_id from correction_requests", Integer.class))
+    assertThat(jdbc.queryForList("select bank_id from ingest.correction_requests", Integer.class))
         .containsExactly(20);
     mvc.perform(get("/api/v1/bank/corrections").header("X-Bank-Id", "20"))
         .andExpect(status().isOk())
@@ -1143,11 +1156,13 @@ class BankUploadApiTests {
     assertThat(activeIds()).isEqualTo(old);
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_runs where run_id=?", String.class, run))
+                "select status from analysis.runs where run_id=?", String.class, run))
         .isEqualTo("READY");
     assertThat(
             jdbc.queryForObject(
-                "select error_code from report_versions where upload_id=?", String.class, a2))
+                "select error_code from ingest.report_versions where upload_id=?",
+                String.class,
+                a2))
         .isEqualTo("INVALID_SELF_OR_CONFIRMED_IDENTITY");
   }
 
@@ -1162,22 +1177,22 @@ class BankUploadApiTests {
     var transport = mock(AnalysisRunService.CancelTransport.class);
     doThrow(new IllegalStateException("offline")).when(transport).publish(any(), anyString());
     for (int i = 0; i < 4; i++) {
-      jdbc.update("update analysis_cancel_outbox set retry_at=null");
+      jdbc.update("update analysis.cancel_outbox set retry_at=null");
       runs.deliverCancellations(transport);
     }
     verify(transport, times(3)).publish(any(), anyString());
-    assertThat(jdbc.queryForObject("select attempts from analysis_cancel_outbox", Integer.class))
+    assertThat(jdbc.queryForObject("select attempts from analysis.cancel_outbox", Integer.class))
         .isEqualTo(3);
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_runs where run_id=?", String.class, run))
+                "select status from analysis.runs where run_id=?", String.class, run))
         .isEqualTo("CANCEL_REQUESTED");
     when(transport.acknowledgement(any(), anyString())).thenReturn("STOPPED");
-    jdbc.update("update analysis_cancel_outbox set retry_at=null");
+    jdbc.update("update analysis.cancel_outbox set retry_at=null");
     runs.deliverCancellations(transport);
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_runs where run_id=?", String.class, run))
+                "select status from analysis.runs where run_id=?", String.class, run))
         .isEqualTo("CANCELLED");
   }
 
@@ -1193,12 +1208,12 @@ class BankUploadApiTests {
       productionRunner.scan();
       productionRunner.scan();
       assertThat(service.status(10, a2).integrationStatus()).isEqualTo("WAITING_COUNTERPART");
-      jdbc.update("update batch_jobs set analysis_date=analysis_date-1 where job_id=?", day1);
+      jdbc.update("update analysis.jobs set analysis_date=analysis_date-1 where job_id=?", day1);
       long b2 = replace(20, cb, HEADER + x().replace(",100,", ",200,"));
       long day2 = analysis.registerNow();
       assertThat(
               jdbc.queryForList(
-                  "select upload_id from analysis_receipts where job_id=?", Long.class, day2))
+                  "select upload_id from analysis.receipts where job_id=?", Long.class, day2))
           .contains(a2, b2);
       productionRunner.scan();
       productionRunner.scan();
@@ -1218,9 +1233,9 @@ class BankUploadApiTests {
   @Test
   void blocked_canceled_run_cannot_leak_replaced_component_through_new_target_path()
       throws Exception {
-    jdbc.update("insert into banks(bank_id,is_reporting) values(40,true)");
+    jdbc.update("insert into core.banks(bank_id,is_reporting) values(40,true)");
     jdbc.update(
-        "insert into bank_reporting_periods(bank_id,effective_from_date) values(40,?)", DATE);
+        "insert into core.bank_reporting_periods(bank_id,effective_from_date) values(40,?)", DATE);
     String other = row(30, "Q", 40, "R", "8", "USD", "8", "USD", "ACH", "E8", "E9");
     long a = submit(10, HEADER + x()),
         b = submit(20, HEADER + x()),
@@ -1234,14 +1249,12 @@ class BankUploadApiTests {
     integrate(a, b, c, d, a2, b2, c2);
     long job =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status) values('ANALYSIS','QUEUED') returning job_id",
+            "insert into analysis.jobs(analysis_date,business_at,threshold_value,status,current_stage,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),.7,'QUEUED','FREEZE_INPUT',now()) returning job_id",
             Long.class);
     jdbc.update(
-        "insert into analysis_selected_versions select ?,set_id,current_version_id,generation from report_sets where current_version_id is not null",
+        "insert into analysis.selected_versions select ?,set_id,current_version_id,generation from ingest.report_sets where current_version_id is not null",
         job);
-    jdbc.update(
-        "insert into analysis_receipts select ?,job_id from batch_jobs where job_type='INGEST'",
-        job);
+    jdbc.update("insert into analysis.receipts select ?,upload_id from ingest.uploads", job);
     UUID blocked = runs.freeze(job, Instant.now().plusSeconds(1));
     assertThat(
             jdbc.queryForObject(
@@ -1251,7 +1264,7 @@ class BankUploadApiTests {
         .isZero();
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_run_replacements where replaces_run_id=?",
+                "select count(*) from analysis.run_replacements where replaces_run_id=?",
                 Integer.class,
                 old))
         .isZero();
@@ -1261,14 +1274,14 @@ class BankUploadApiTests {
   void incomplete_old_receipt_is_waited_for_even_when_already_assigned_to_prior_job() {
     long old =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,received_at,business_date) values('INGEST','RUNNING',now(),?) returning job_id",
+            "insert into ingest.uploads(bank_id,file_name,file_hash,size_bytes,status,received_at,business_date) values(10,'pending.csv',repeat('a',64),1,'RUNNING',now(),?) returning upload_id",
             Long.class,
             DATE);
     long previous =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,analysis_date,current_stage) values('ANALYSIS','COMPLETED',current_date-1,'COMPLETE') returning job_id",
+            "insert into analysis.jobs(business_at,threshold_value,analysis_cutoff_at,status,analysis_date,current_stage) values(now(),.7,now(),'COMPLETED',current_date-1,'COMPLETE') returning job_id",
             Long.class);
-    jdbc.update("insert into analysis_uploads(job_id,upload_id) values(?,?)", previous, old);
+    jdbc.update("insert into analysis.receipts(job_id,upload_id) values(?,?)", previous, old);
     long job = analysis.registerNow();
     try {
       productionRunner.scan();
@@ -1299,15 +1312,13 @@ class BankUploadApiTests {
             commits.incrementAndGet();
           }
         };
-    try (var runner = new AnalysisRunner(analysis, executor, runs, integration)) {
+    try (var runner = new AnalysisRunner(analysis, executor, runs)) {
       runner.scan();
     }
     assertThat(commits).hasValue(0);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_run_stage_results where run_id=?",
-                Integer.class,
-                run))
+                "select count(*) from analysis.stage_results where run_id=?", Integer.class, run))
         .isZero();
   }
 
@@ -1324,7 +1335,7 @@ class BankUploadApiTests {
                 "older.csv", invalid.length, digest(invalid), DATE, correction, UUID.randomUUID()));
     String key =
         jdbc.queryForObject(
-            "select s3_key from batch_jobs where job_id=?", String.class, old.uploadId());
+            "select s3_key from ingest.uploads where upload_id=?", String.class, old.uploadId());
     files.put(key, invalid);
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
@@ -1344,24 +1355,25 @@ class BankUploadApiTests {
       release.countDown();
     }
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-    while (service.status(10, old.uploadId()).status().name().equals("RECEIVED")
+    while (Set.of("RECEIVED", "RUNNING")
+            .contains(service.status(10, old.uploadId()).status().name())
         && System.nanoTime() < deadline) Thread.sleep(20);
     assertThat(service.status(10, old.uploadId()).status().name()).isEqualTo("VALIDATION_FAILED");
     assertThat(
             jdbc.queryForObject(
-                "select v.upload_id from correction_requests c join report_versions v on v.version_id=c.replacement_version_id where c.correction_id=?",
+                "select v.upload_id from ingest.correction_requests c join ingest.report_versions v on v.version_id=c.replacement_version_id where c.correction_id=?",
                 Long.class,
                 correction))
         .isEqualTo(latest);
     assertThat(
             jdbc.queryForObject(
-                "select status from correction_requests where correction_id=?",
+                "select status from ingest.correction_requests where correction_id=?",
                 String.class,
                 correction))
         .isEqualTo("WAITING_COUNTERPART");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from correction_errors where correction_id=? and code='INVALID_SELF'",
+                "select count(*) from ingest.correction_errors where correction_id=? and code='INVALID_SELF'",
                 Integer.class,
                 correction))
         .isZero();
@@ -1379,17 +1391,19 @@ class BankUploadApiTests {
     integration.integrate(DATE, cutoff, Set.of(a, b, a2, b2));
     assertThat(
             jdbc.queryForObject(
-                "select status from correction_requests where correction_id=?", String.class, ca))
+                "select status from ingest.correction_requests where correction_id=?",
+                String.class,
+                ca))
         .isNotEqualTo("RESOLVED");
     assertThat(
             jdbc.queryForObject(
-                "select v.upload_id from correction_requests c join report_versions v on v.version_id=c.replacement_version_id where c.correction_id=?",
+                "select v.upload_id from ingest.correction_requests c join ingest.report_versions v on v.version_id=c.replacement_version_id where c.correction_id=?",
                 Long.class,
                 ca))
         .isEqualTo(a3);
     assertThat(
             jdbc.queryForObject(
-                "select amount_paid from transactions where integration_status='ACTIVE'",
+                "select amount_paid from ledger.transactions where integration_status='ACTIVE'",
                 BigDecimal.class))
         .isEqualByComparingTo("200");
   }

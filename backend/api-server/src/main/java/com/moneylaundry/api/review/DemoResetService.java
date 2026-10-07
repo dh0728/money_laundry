@@ -19,54 +19,57 @@ public class DemoResetService {
   static final String TABLES =
       String.join(
           ",",
-          "episode_alerts",
-          "notification_reads",
-          "review_requests",
-          "review_events",
-          "review_groups",
-          "review_cases",
+          "review.episode_members",
+          "review.episode_alerts",
+          "review.alert_members",
+          "review.alert_groups",
+          "review.notification_reads",
+          "review.requests",
+          "review.events",
+          "review.episodes",
           "analysis.alert_origins",
-          "alert_transactions",
-          "alert_coverage_checks",
-          "alert_versions",
-          "alerts",
-          "analysis.alert_source_manifest",
+          "review.alert_transactions",
+          "review.alert_coverage_checks",
+          "review.alert_versions",
+          "review.alerts",
+          "analysis.source_manifest",
           "analysis.input_scores",
           "analysis.input_coverage",
-          "analysis_input_reports",
-          "analysis_target_ownership",
+          "analysis.input_reports",
+          "analysis.target_ownership",
+          "analysis.current_scores",
+          "analysis.scores",
+          "analysis.features",
           "analysis.input_transactions",
-          "analysis_cancel_outbox",
-          "analysis_model_tasks",
-          "analysis_model_requests",
-          "analysis_run_stage_results",
-          "analysis_run_replacements",
-          "analysis_runs",
-          "analysis_receipts",
-          "analysis_selected_versions",
-          "analysis_failures",
-          "analysis_stage_results",
-          "analysis_uploads",
-          "inference_results",
-          "transaction_features",
+          "analysis.cancel_outbox",
+          "analysis.model_tasks",
+          "analysis.model_requests",
+          "analysis.stage_results",
+          "analysis.run_replacements",
+          "analysis.runs",
+          "analysis.receipts",
+          "analysis.selected_versions",
+          "analysis.failures",
+          "analysis.jobs",
           "evaluation.transaction_labels",
-          "transaction_reports",
-          "transactions",
+          "ledger.transaction_reports",
+          "ledger.transactions",
           "evaluation.report_labels",
-          "evaluation.demo_report_hints",
           "private.bank_reports",
-          "integration_attempt_versions",
-          "integration_attempts",
-          "correction_errors",
-          "correction_uploads",
-          "correction_requests",
-          "report_versions",
-          "report_sets",
-          "reporting_scope_banks",
-          "reporting_scopes",
-          "private.accounts",
-          "private.entities",
-          "batch_jobs");
+          "ingest.integration_attempt_versions",
+          "ingest.integration_attempts",
+          "ingest.correction_errors",
+          "ingest.correction_uploads",
+          "ingest.correction_requests",
+          "ingest.report_versions",
+          "ingest.report_sets",
+          "ingest.reporting_scope_banks",
+          "ingest.reporting_scopes",
+          "private.account_identities",
+          "core.accounts",
+          "private.owner_identities",
+          "core.owners",
+          "ingest.uploads");
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final BusinessTime time;
@@ -85,7 +88,7 @@ public class DemoResetService {
     time.demoOnly();
     if (!Boolean.TRUE.equals(
         jdbc.queryForObject(
-            "select exists(select 1 from users where user_id=? and role='ADMIN')",
+            "select exists(select 1 from core.users where user_id=? and role='ADMIN')",
             Boolean.class,
             actor))) throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "관리자 전용 기능입니다.");
   }
@@ -104,7 +107,8 @@ public class DemoResetService {
               + ":"
               + time.view().get("revision")
               + ":"
-              + jdbc.queryForObject("select coalesce(max(job_id),0) from batch_jobs", Long.class);
+              + jdbc.queryForObject(
+                  "select coalesce(max(job_id),0) from ops.work_items", Long.class);
       return HexFormat.of()
           .formatHex(
               MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
@@ -135,10 +139,10 @@ public class DemoResetService {
             jdbc.execute("set local lock_timeout='2s'");
             jdbc.queryForList("select pg_advisory_xact_lock(17002001)");
             jdbc.execute(
-                "lock table " + TABLES + ",demo_business_clock in access exclusive mode nowait");
+                "lock table " + TABLES + ",ops.business_clock in access exclusive mode nowait");
             var previous =
                 jdbc.queryForList(
-                    "select actor_id from demo_resets where reset_id=?", input.requestId());
+                    "select actor_id from ops.resets where reset_id=?", input.requestId());
             if (!previous.isEmpty()) {
               if (((Number) previous.getFirst().get("actor_id")).longValue() != actor)
                 throw conflict("RESET_REQUEST_CONFLICT", "다른 초기화 요청입니다.");
@@ -146,7 +150,7 @@ public class DemoResetService {
             }
             if (Boolean.TRUE.equals(
                 jdbc.queryForObject(
-                    "select exists(select 1 from demo_resets where status<>'COMPLETED')",
+                    "select exists(select 1 from ops.resets where status<>'COMPLETED')",
                     Boolean.class)))
               throw conflict("RESET_CLEANUP_PENDING", "이전 초기화의 파일 정리를 먼저 완료하세요.");
             var counts = counts();
@@ -155,32 +159,31 @@ public class DemoResetService {
             if (Boolean.TRUE.equals(
                 jdbc.queryForObject(
                     """
-            select exists(select 1 from batch_jobs
+            select exists(select 1 from ops.work_items
              where status in ('RUNNING','QUEUED','SCHEDULED','RETRY_WAIT','RECEIVED'))
-             or exists(select 1 from analysis_model_tasks where status in ('ACTIVE','WAITING','RETRY_WAIT'))
-             or exists(select 1 from analysis_model_requests m
+             or exists(select 1 from analysis.model_tasks where status in ('ACTIVE','WAITING','RETRY_WAIT'))
+             or exists(select 1 from analysis.model_requests m
                where m.status in ('REGISTERED','PUBLISHED') and not exists(
-                 select 1 from analysis_model_tasks t where t.request_id=m.request_id
+                 select 1 from analysis.model_tasks t where t.request_id=m.request_id
                    and t.execution_round=m.execution_round and t.status='SUCCEEDED'))
             """,
                     Boolean.class)))
               throw conflict("RESET_BUSY", "실행·대기 중인 작업 또는 종료가 확인되지 않은 추론 요청이 있습니다.");
             if (Boolean.TRUE.equals(
                 jdbc.queryForObject(
-                    "select exists(select 1 from batch_jobs where url_expires_at>now())",
+                    "select exists(select 1 from ingest.uploads where url_expires_at>now())",
                     Boolean.class)))
               throw conflict("RESET_UPLOAD_URL_ACTIVE", "발급된 업로드 URL 만료 후 초기화하세요.");
             String scope = store.resetScope();
             var objects = new LinkedHashMap<String, Boolean>();
             jdbc.queryForList(
-                    "select s3_key from batch_jobs where job_type='INGEST' and s3_key is not null",
-                    String.class)
+                    "select s3_key from ingest.uploads where s3_key is not null", String.class)
                 .forEach(key -> objects.put(key, false));
             for (var row :
                 jdbc.queryForList(
                     """
-            select distinct r.job_id,m.model_kind,m.request_id from analysis_model_requests m
-             join analysis_runs r using(run_id)
+            select distinct r.job_id,m.model_kind,m.request_id from analysis.model_requests m
+             join analysis.runs r using(run_id)
             """)) {
               String base =
                   row.get("job_id")
@@ -195,7 +198,7 @@ public class DemoResetService {
             // A historical destination must not silently be replaced by current configuration.
             for (String publication :
                 jdbc.queryForList(
-                    "select (binding->'publication')::text from analysis_model_tasks where binding ? 'publication'",
+                    "select (binding->'publication')::text from analysis.model_tasks where binding ? 'publication'",
                     String.class)) {
               var binding = json.readTree(publication);
               String bound =
@@ -205,7 +208,7 @@ public class DemoResetService {
             }
             objects.forEach(DemoObjectKey::check);
             jdbc.update(
-                "insert into demo_resets(reset_id,actor_id,status,storage_scope,deleted_counts) values(?,?,'FILES_PENDING',?,?::jsonb)",
+                "insert into ops.resets(reset_id,actor_id,status,storage_scope,deleted_counts) values(?,?,'FILES_PENDING',?,?::jsonb)",
                 input.requestId(),
                 actor,
                 scope,
@@ -213,16 +216,16 @@ public class DemoResetService {
             objects.forEach(
                 (key, prefix) ->
                     jdbc.update(
-                        "insert into demo_reset_files(reset_id,object_key,is_prefix) values(?,?,?)",
+                        "insert into ops.reset_files(reset_id,object_key,is_prefix) values(?,?,?)",
                         input.requestId(),
                         key,
                         prefix));
             jdbc.execute("truncate table " + TABLES + " continue identity restrict");
             jdbc.update(
-                "update demo_business_clock set business_at=null,revision=revision+1,updated_at=now() where id");
+                "update ops.business_clock set business_at=null,revision=revision+1,updated_at=now() where id");
             if (objects.isEmpty())
               jdbc.update(
-                  "update demo_resets set status='COMPLETED',completed_at=now() where reset_id=?",
+                  "update ops.resets set status='COMPLETED',completed_at=now() where reset_id=?",
                   input.requestId());
           });
     } catch (DataAccessException e) {
@@ -241,7 +244,7 @@ public class DemoResetService {
     admin(actor);
     var ids =
         jdbc.queryForList(
-            "select reset_id from demo_resets order by created_at desc limit 1", UUID.class);
+            "select reset_id from ops.resets order by created_at desc limit 1", UUID.class);
     return ids.isEmpty() ? Map.of("status", "NONE") : status(actor, ids.getFirst());
   }
 
@@ -249,7 +252,7 @@ public class DemoResetService {
     admin(actor);
     var rows =
         jdbc.queryForList(
-            "select status,created_at,completed_at from demo_resets where reset_id=?", id);
+            "select status,created_at,completed_at from ops.resets where reset_id=?", id);
     if (rows.isEmpty()) throw ApiException.notFound("초기화 요청 없음");
     var result = new LinkedHashMap<String, Object>();
     result.put("resetId", id);
@@ -258,11 +261,11 @@ public class DemoResetService {
     result.put(
         "totalTargets",
         jdbc.queryForObject(
-            "select count(*) from demo_reset_files where reset_id=?", Long.class, id));
+            "select count(*) from ops.reset_files where reset_id=?", Long.class, id));
     result.put(
         "remainingTargets",
         jdbc.queryForObject(
-            "select count(*) from demo_reset_files where reset_id=? and not done", Long.class, id));
+            "select count(*) from ops.reset_files where reset_id=? and not done", Long.class, id));
     return result;
   }
 
@@ -273,7 +276,7 @@ public class DemoResetService {
         s -> {
           var rows =
               jdbc.queryForList(
-                  "select status,storage_scope from demo_resets where reset_id=? for update skip locked",
+                  "select status,storage_scope from ops.resets where reset_id=? for update skip locked",
                   id);
           if (rows.isEmpty()) return;
           var reset = rows.getFirst();
@@ -283,30 +286,30 @@ public class DemoResetService {
               throw new IllegalStateException("Changed storage");
             var files =
                 jdbc.queryForList(
-                    "select object_key,is_prefix from demo_reset_files where reset_id=? and not done order by object_key limit 1",
+                    "select object_key,is_prefix from ops.reset_files where reset_id=? and not done order by object_key limit 1",
                     id);
             if (!files.isEmpty()) {
               var file = files.getFirst();
               if (store.removeDemoFiles(
                   (String) file.get("object_key"), (Boolean) file.get("is_prefix")))
                 jdbc.update(
-                    "update demo_reset_files set done=true where reset_id=? and object_key=?",
+                    "update ops.reset_files set done=true where reset_id=? and object_key=?",
                     id,
                     file.get("object_key"));
             }
             boolean pending =
                 Boolean.TRUE.equals(
                     jdbc.queryForObject(
-                        "select exists(select 1 from demo_reset_files where reset_id=? and not done)",
+                        "select exists(select 1 from ops.reset_files where reset_id=? and not done)",
                         Boolean.class,
                         id));
             jdbc.update(
-                "update demo_resets set status=?,completed_at=case when ? then null else now() end where reset_id=?",
+                "update ops.resets set status=?,completed_at=case when ? then null else now() end where reset_id=?",
                 pending ? "FILES_PENDING" : "COMPLETED",
                 pending,
                 id);
           } catch (RuntimeException e) {
-            jdbc.update("update demo_resets set status='FILES_FAILED' where reset_id=?", id);
+            jdbc.update("update ops.resets set status='FILES_FAILED' where reset_id=?", id);
           }
         });
     return status(actor, id);
