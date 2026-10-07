@@ -17,7 +17,7 @@ Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다
 
 ## DB 역할과 초기 구조
 
-기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 전환 절차](../../../deploy/DB_TRANSITION.md)를 따른다.
+기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. Alert 거래에 당시 SEED 위험도를 함께 저장하여 목록 정렬의 JSON 반복 전개를 제거한다. 기존 V1이 적용된 dev는 사용자 결정에 따라 설정 백업 후 재초기화한다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 전환 절차](../../../deploy/DB_TRANSITION.md)를 따른다.
 
 - 수신 `ingest_entry.py`와 `analysis_entry.py --stage INTEGRATE`는 원문 보호·보고 통합·정정을 수행하므로 API의 데이터 작업 계정을 사용한다. `cryptography`는 이 단계의 AES-GCM 암호화/복호화와 Java 호환 검증에 필요하다. 조회 속도를 높이기 위한 라이브러리가 아니다.
 - FEATURES/INFERENCE/SCORES/ALERTS는 `ANALYSIS_DB_USERNAME`·`ANALYSIS_DB_PASSWORD`의 별도 로그인으로 같은 DB에 접속한다. 누락 시 API 관리자 계정으로 대체하지 않는다. 자식 프로세스에서 원문 암호키와 API DB 환경변수를 제거한다.

@@ -605,6 +605,13 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.admin.execute("UPDATE analysis.jobs SET current_stage='ALERTS',analysis_cutoff_at='2022-09-02 09:00+09' WHERE job_id=%s", (self.job,))
             save_alerts(self.admin, self.execution)
             self.assertGreater(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
+            self.assertEqual(self.admin.execute('''SELECT count(*)
+                FROM review.alert_transactions m JOIN review.alert_versions v USING(alert_id,version)
+                CROSS JOIN LATERAL jsonb_array_elements(v.evidence->'transactions') t
+                WHERE v.run_id=%s AND (t->>'txId')::bigint=m.tx_id
+                AND m.seed_risk IS DISTINCT FROM CASE WHEN t->>'role'='SEED'
+                  THEN (t->'scores'->>'p_laundering')::double precision END''',
+                (self.run,)).fetchone()[0], 0)
 
     def test_scores_atomic_join_percentile_and_retry_without_duplicates(self):
         from result_collection import save_scores
