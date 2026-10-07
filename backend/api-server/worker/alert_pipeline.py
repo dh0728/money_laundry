@@ -191,12 +191,14 @@ def _validate_baselines(connection, run_id):
 
 def _insert_members(connection, alert, version, members):
     # One SQL statement per bounded Alert, rather than a round trip for every row.
-    payload = [{key: member[key] for key in ('txId', 'role', 'includedReasons')}
+    payload = [dict({key: member[key] for key in ('txId', 'role', 'includedReasons')},
+                    seed_risk=(member.get('scores') or {}).get('p_laundering')
+                    if member['role'] == 'SEED' else None)
                for member in members]
-    connection.execute('''INSERT INTO review.alert_transactions(alert_id,version,tx_id,role,reasons)
-        SELECT %s,%s,m."txId",m.role,m."includedReasons"
+    connection.execute('''INSERT INTO review.alert_transactions(alert_id,version,tx_id,role,reasons,seed_risk)
+        SELECT %s,%s,m."txId",m.role,m."includedReasons",m.seed_risk
         FROM jsonb_to_recordset(%s::jsonb)
-          AS m("txId" bigint,role text,"includedReasons" jsonb)''',
+          AS m("txId" bigint,role text,"includedReasons" jsonb,seed_risk double precision)''',
         (alert, version, Jsonb(payload)))
 
 

@@ -1,6 +1,6 @@
 # AML 데이터 구조
 
-PostgreSQL 17(`postgres:17-alpine`)을 사용한다. 환경별 업무 DB 하나 안에서 역할별 스키마를 나누며 dev와 prod는 분리한다. 적용 컬럼·키·제약·인덱스의 정본은 [V1 초기 스키마](src/main/resources/db/migration/V1__initial_schema.sql)다. 이 문서는 현재 구조만 설명한다.
+PostgreSQL 17(`postgres:17-alpine`)을 사용한다. 환경별 업무 DB 하나 안에서 역할별 스키마를 나누며 dev와 prod는 분리한다. 적용 컬럼·키·제약·인덱스의 정본은 [Flyway 마이그레이션](src/main/resources/db/migration)이다. 이 문서는 현재 구조만 설명한다.
 
 ## 관계
 
@@ -57,7 +57,7 @@ erDiagram
 | analysis | alert_origins | 실행 산출 Alert와 불변 근거 버전 연결 |
 | review | alerts | Alert 담당·상태·종결 결과 |
 | review | episodes | Episode 담당·상태·종결 결과. Alert와 별도 테이블 |
-| review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지 |
+| review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 유효 소속과 결합하여 위험도 정렬에 사용 |
 | review | alert_groups, alert_members | 저장한 Alert 조사 그룹·소속·역할·판정 |
 | review | episode_alerts, episode_members | Episode의 원본 Alert와 조사 거래·판정 |
 | review | events, requests, notification_reads | 감사 이력·멱등 변경 요청·알림 읽음 |

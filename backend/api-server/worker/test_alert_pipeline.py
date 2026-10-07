@@ -49,6 +49,14 @@ class AlertPostgresTests(unittest.TestCase):
         self.complete(self.execution)
         return alert
 
+    def test_restricted_worker_persists_relational_seed_risk(self):
+        args = dict(self.connect_args, user=self.worker_user, password=self.worker_password)
+        with self.psycopg.connect(**args) as writer:
+            save_alerts(writer,self.execution)
+        self.assertEqual(self.admin.execute('''SELECT m.seed_risk
+            FROM review.alert_transactions m JOIN review.alert_versions v USING(alert_id,version)
+            WHERE v.run_id=%s AND m.role='SEED' ''', (self.run,)).fetchall(), [(.9,)])
+
     def following(self,alert,extra=True,complete=True):
         run,token=uuid4(),uuid4()
         job=self.admin.execute("INSERT INTO analysis.jobs(analysis_date,business_at,status,current_stage,execution_owner,execution_id,threshold_value,analysis_cutoff_at) VALUES(date '2100-01-01'+nextval('core.work_id')::int,now(),'RUNNING','ALERTS',gen_random_uuid(),%s,.7,'2022-09-04 09:00+09') RETURNING job_id",(token,)).fetchone()[0]
@@ -73,6 +81,9 @@ class AlertPostgresTests(unittest.TestCase):
         save_alerts(self.admin,follow)
         versions=self.admin.execute("SELECT evidence FROM review.alert_versions WHERE alert_id=%s ORDER BY version",(alert,)).fetchall()
         self.assertEqual(len(versions),2)
+        self.assertEqual(self.admin.execute('''SELECT version,seed_risk FROM review.alert_transactions
+            WHERE alert_id=%s AND tx_id=%s ORDER BY version''',
+            (alert,self.ids[0])).fetchall(), [(1,.9),(2,.9)])
         self.assertEqual(versions[0][0],old)
         self.assertEqual({m['txId'] for m in versions[1][0]['transactions']},{self.ids[0],self.context})
         self.assertIsNone(next(m for m in versions[1][0]['transactions'] if m['txId']==self.context)['scores'])

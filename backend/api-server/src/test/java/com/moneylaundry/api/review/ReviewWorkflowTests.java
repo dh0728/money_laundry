@@ -116,12 +116,40 @@ class ReviewWorkflowTests {
           account,
           account);
       jdbc.update(
-          "insert into review.alert_transactions(alert_id,version,tx_id,role,reasons) values(?,?,?,?,'[]')",
+          "insert into review.alert_transactions(alert_id,version,tx_id,role,reasons,seed_risk) values(?,?,?,?,'[]',?)",
           alert,
           version,
           id,
-          item.getOrDefault("role", "SEED"));
+          item.getOrDefault("role", "SEED"),
+          "SEED".equals(item.getOrDefault("role", "SEED")) && item.get("scores") != null
+              ? object(item.get("scores")).get("p_laundering")
+              : null);
     }
+  }
+
+  @Test
+  void relational_risk_follows_exclusion_transfer_and_episode_membership() {
+    long a = alert(l1);
+    long b = alert(l1);
+    jdbc.update(
+        "update review.alert_transactions set seed_risk=.95 where alert_id=? and tx_id=1", a);
+    assertThat(risk(a)).isEqualTo(.95);
+    act(l1, "EXCLUDE", null, select(a, 1));
+    assertThat(risk(a)).isEqualTo(.9);
+    long episode = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    // Whole-Alert transfer preserves the closed source's historical scope.
+    assertThat(risk(a)).isEqualTo(.9);
+    assertThat(risk(b)).isEqualTo(.9);
+    assertThat(risk(episode)).isEqualTo(.9);
+    act(l2, "EXCLUDE", null, select(episode, 2));
+    assertThat(risk(episode)).isEqualTo(.9); // The second Alert still contains these seeds.
+    jdbc.update("update review.episode_members set state='TRANSFERRED' where alert_id=?", b);
+    assertThat(risk(episode)).isZero();
+  }
+
+  private double risk(long id) {
+    return jdbc.queryForObject(
+        "select risk from review.visible_cases where case_id=?", Double.class, id);
   }
 
   ReviewService.Selection select(long id, long... txIds) {

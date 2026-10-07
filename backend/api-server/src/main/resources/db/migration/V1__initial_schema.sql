@@ -359,6 +359,7 @@ CREATE TABLE review.alert_versions (
 CREATE TABLE review.alert_transactions (
  alert_id BIGINT NOT NULL, version INTEGER NOT NULL, tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
  role TEXT NOT NULL CHECK(role IN ('SEED','CONNECTION','CONTEXT')), reasons JSONB NOT NULL,
+ seed_risk DOUBLE PRECISION CHECK(seed_risk>=0 AND seed_risk<=1),
  PRIMARY KEY(alert_id,version,tx_id), FOREIGN KEY(alert_id,version) REFERENCES review.alert_versions
 );
 CREATE INDEX alert_transactions_tx ON review.alert_transactions(tx_id,alert_id,version);
@@ -520,15 +521,23 @@ CREATE VIEW review.effective_members AS
  WHERE (a.status='OPEN' OR NOT EXISTS(SELECT 1 FROM review.alert_groups g WHERE g.alert_id=a.alert_id))
  AND NOT EXISTS(SELECT 1 FROM review.alert_members m WHERE m.alert_id=a.alert_id AND m.tx_id=t.tx_id);
 CREATE VIEW review.visible_cases AS
+ WITH member_risks AS (
+  SELECT m.case_id,t.seed_risk
+  FROM review.saved_members m JOIN review.alert_transactions t
+    ON t.alert_id=m.alert_id AND t.version=m.evidence_version AND t.tx_id=m.tx_id
+  WHERE m.state NOT IN ('EXCLUDED','TRANSFERRED') AND t.role='SEED'
+  UNION ALL
+  SELECT a.alert_id,t.seed_risk
+  FROM review.alerts a JOIN review.latest_versions v USING(alert_id)
+  JOIN review.alert_transactions t USING(alert_id,version)
+  WHERE t.role='SEED'
+    AND (a.status='OPEN' OR NOT EXISTS(SELECT 1 FROM review.alert_groups g WHERE g.alert_id=a.alert_id))
+    AND NOT EXISTS(SELECT 1 FROM review.alert_members m WHERE m.alert_id=a.alert_id AND m.tx_id=t.tx_id)
+ ), risks AS MATERIALIZED (
+  SELECT case_id,max(seed_risk) AS risk FROM member_risks GROUP BY case_id
+ )
  SELECT c.*,coalesce(r.risk,0) AS risk FROM review.cases c
- LEFT JOIN LATERAL (
-  SELECT max((t->'scores'->>'p_laundering')::double precision) AS risk
-  FROM review.effective_members m JOIN review.alert_versions v
-    ON v.alert_id=m.alert_id AND v.version=m.evidence_version
-  CROSS JOIN LATERAL jsonb_array_elements(v.evidence->'transactions') t
-  WHERE m.case_id=c.case_id AND m.state NOT IN ('EXCLUDED','TRANSFERRED')
-    AND (t->>'txId')::bigint=m.tx_id AND t->>'role'='SEED'
- ) r ON true
+ LEFT JOIN risks r ON r.case_id=c.case_id
  WHERE c.kind='EPISODE' OR EXISTS(SELECT 1 FROM review.latest_versions v WHERE v.alert_id=c.alert_id);
 
 CREATE VIEW review.notifications AS
