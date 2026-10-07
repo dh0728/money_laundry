@@ -11,6 +11,26 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 class InferenceCancellationClientTests {
+  @Test
+  void http_requires_explicit_loopback_option() {
+    var client = new InferenceCancellationClient(new ObjectMapper());
+    assertThatThrownBy(() -> client.configure("http://127.0.0.1:8090", "a".repeat(32)))
+        .isInstanceOf(IllegalArgumentException.class);
+    client.configure("http://127.0.0.1:8090", "a".repeat(32), true);
+    assertThat(client.enabled()).isTrue();
+    for (String url :
+        List.of(
+            "http://localhost:8090",
+            "http://inference:8090",
+            "http://example.com",
+            "http://127.0.0.1.evil.test",
+            "http://user@127.0.0.1:8090",
+            "http://127.0.0.1:8090?token=x")) {
+      assertThatThrownBy(() -> client.configure(url, "a".repeat(32), true))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+  }
+
   final ObjectMapper mapper = new ObjectMapper();
   final HttpClient http = mock(HttpClient.class);
   final UUID cancel = UUID.randomUUID();

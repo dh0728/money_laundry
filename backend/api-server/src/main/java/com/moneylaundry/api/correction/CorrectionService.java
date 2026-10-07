@@ -29,7 +29,7 @@ public class CorrectionService {
     boolean allowed =
         Boolean.TRUE.equals(
             jdbc.queryForObject(
-                "select exists(select 1 from banks b join bank_reporting_periods p using(bank_id) where b.bank_id=? and b.is_reporting and p.effective_from_date<=? and (p.effective_to_date is null or p.effective_to_date>=?))",
+                "select exists(select 1 from core.banks b join core.bank_reporting_periods p using(bank_id) where b.bank_id=? and b.is_reporting and p.effective_from_date<=? and (p.effective_to_date is null or p.effective_to_date>=?))",
                 Boolean.class,
                 bank,
                 date,
@@ -44,7 +44,7 @@ public class CorrectionService {
     if (state != null && !STATES.contains(state)) throw AnalysisService.invalid();
     if (!Boolean.TRUE.equals(
         jdbc.queryForObject(
-            "select exists(select 1 from banks b join bank_reporting_periods p using(bank_id) where b.bank_id=? and b.is_reporting)",
+            "select exists(select 1 from core.banks b join core.bank_reporting_periods p using(bank_id) where b.bank_id=? and b.is_reporting)",
             Boolean.class,
             bank)))
       throw new ApiException(
@@ -54,9 +54,9 @@ public class CorrectionService {
     args.add(bank);
     if (state != null) args.add(state);
     String where =
-        " from correction_requests c where c.bank_id=? and "
+        " from ingest.correction_requests c where c.bank_id=? and "
             + filter
-            + " and exists(select 1 from bank_reporting_periods p where p.bank_id=c.bank_id and p.effective_from_date<=c.business_date and (p.effective_to_date is null or p.effective_to_date>=c.business_date))";
+            + " and exists(select 1 from core.bank_reporting_periods p where p.bank_id=c.bank_id and p.effective_from_date<=c.business_date and (p.effective_to_date is null or p.effective_to_date>=c.business_date))";
     long count = jdbc.queryForObject("select count(*)" + where, Long.class, args.toArray());
     args.add(size);
     args.add((long) page * size);
@@ -72,7 +72,7 @@ public class CorrectionService {
   public Map<String, Object> detail(int bank, long id) {
     var rows =
         jdbc.queryForList(
-            "select c.correction_id as \"correctionRequestId\",c.business_date as \"businessDate\",v.upload_id as \"uploadId\",c.version_id as \"reportVersionId\",c.status,c.revision,c.replacement_version_id as \"replacementVersionId\",rv.upload_id as \"replacementUploadId\" from correction_requests c left join report_versions v on v.version_id=c.version_id left join report_versions rv on rv.version_id=c.replacement_version_id where c.bank_id=? and c.correction_id=?",
+            "select c.correction_id as \"correctionRequestId\",c.business_date as \"businessDate\",v.upload_id as \"uploadId\",c.version_id as \"reportVersionId\",c.status,c.revision,c.replacement_version_id as \"replacementVersionId\",rv.upload_id as \"replacementUploadId\" from ingest.correction_requests c left join ingest.report_versions v on v.version_id=c.version_id left join ingest.report_versions rv on rv.version_id=c.replacement_version_id where c.bank_id=? and c.correction_id=?",
             bank,
             id);
     if (rows.isEmpty()) throw ApiException.notFound("정정 요청 없음");
@@ -82,7 +82,7 @@ public class CorrectionService {
     row.put(
         "errors",
         jdbc.queryForList(
-            "select source_row as row,column_name as \"column\",code,reason from correction_errors where correction_id=? order by ordinal",
+            "select source_row as row,column_name as \"column\",code,reason from ingest.correction_errors where correction_id=? order by ordinal",
             id));
     return row;
   }
@@ -91,7 +91,7 @@ public class CorrectionService {
       JdbcTemplate jdbc, int bank, LocalDate date, Long version, String code, long revision) {
     long id =
         jdbc.queryForObject(
-            "insert into correction_requests(bank_id,business_date,version_id,reason_code,source_revision) values(?,?,?,?,?) on conflict(bank_id,business_date,version_id,reason_code,source_revision) do update set reason_code=excluded.reason_code returning correction_id",
+            "insert into ingest.correction_requests(bank_id,business_date,version_id,reason_code,source_revision) values(?,?,?,?,?) on conflict(bank_id,business_date,version_id,reason_code,source_revision) do update set reason_code=excluded.reason_code returning correction_id",
             Long.class,
             bank,
             date,
@@ -99,7 +99,7 @@ public class CorrectionService {
             code,
             revision);
     jdbc.update(
-        "insert into correction_errors(correction_id,ordinal,source_row,column_name,code,reason) values(?,0,null,'',?,'보고 내용을 확인하고 전체 파일을 제출하세요.') on conflict do nothing",
+        "insert into ingest.correction_errors(correction_id,ordinal,source_row,column_name,code,reason) values(?,0,null,'',?,'보고 내용을 확인하고 전체 파일을 제출하세요.') on conflict do nothing",
         id,
         code);
     return id;

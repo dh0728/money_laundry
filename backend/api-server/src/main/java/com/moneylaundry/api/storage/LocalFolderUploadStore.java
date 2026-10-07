@@ -68,4 +68,34 @@ public class LocalFolderUploadStore implements UploadStore {
   private Path resolve(String key) {
     return root.resolve(key).normalize();
   }
+
+  @Override
+  public String resetScope() {
+    return "local:" + root.normalize();
+  }
+
+  @Override
+  public boolean removeDemoFiles(String key, boolean directory) {
+    DemoObjectKey.check(key, directory);
+    Path target = resolve(key);
+    try {
+      Path realRoot = root.toRealPath();
+      if (!Files.exists(target)) return true;
+      if (!target.toRealPath().startsWith(realRoot)) throw new IOException("Invalid cleanup path");
+      if (!directory) {
+        Files.deleteIfExists(target);
+        return true;
+      }
+      try (var paths = Files.walk(target)) {
+        for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+          if (!path.toRealPath().startsWith(realRoot))
+            throw new IOException("Invalid cleanup path");
+          Files.deleteIfExists(path);
+        }
+      }
+      return true;
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
 }

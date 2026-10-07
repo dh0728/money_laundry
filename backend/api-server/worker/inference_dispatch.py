@@ -51,7 +51,7 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
     with connection.transaction():
         _lock(connection, execution)
         row = connection.execute('''SELECT binding,input_artifact,request_id,execution_round
-            FROM analysis_model_tasks WHERE run_id=%s AND model_kind=%s
+            FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s
               AND phase='WAIT_REMOTE' AND status='WAITING' FOR UPDATE''', (execution.run_id, kind)).fetchone()
         if row is None:
             return
@@ -75,7 +75,7 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
                              artifact['row_count'])
     with connection.transaction():
         _lock(connection, execution)
-        stored = connection.execute('''SELECT remote_revision,remote_snapshot,phase,status FROM analysis_model_tasks
+        stored = connection.execute('''SELECT remote_revision,remote_snapshot,phase,status FROM analysis.model_tasks
             WHERE run_id=%s AND model_kind=%s FOR UPDATE''', (execution.run_id, kind)).fetchone()
         if stored[0] is not None:
             if view['revision'] < stored[0]:
@@ -87,7 +87,7 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
         remote = view['status']
         phase, status = ('COLLECT', 'READY') if remote == 'COMPLETED' else (
             ('WAIT_REMOTE', 'FAILED') if remote in ('FAILED', 'STOPPED') else ('WAIT_REMOTE', 'WAITING'))
-        connection.execute('''UPDATE analysis_model_tasks SET phase=%s,status=%s,remote_revision=%s,
+        connection.execute('''UPDATE analysis.model_tasks SET phase=%s,status=%s,remote_revision=%s,
             remote_snapshot=%s::jsonb,consecutive_failures=0,retry_at=null,
             error_code=%s,action_required=%s,updated_at=now(),
             next_poll_at=CASE WHEN %s='WAITING' THEN now()+interval '5 seconds' ELSE null END
@@ -95,7 +95,7 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
                 view.get('error_code') if remote in ('FAILED', 'STOPPED', 'RECOVERY_REQUIRED') else None,
                 remote in ('FAILED', 'STOPPED', 'RECOVERY_REQUIRED'), status, execution.run_id, kind))
         if status == 'WAITING':
-            connection.execute('''UPDATE analysis_model_tasks SET action_required=true,
+            connection.execute('''UPDATE analysis.model_tasks SET action_required=true,
                 error_code=coalesce(error_code,'REMOTE_WAIT_EXPIRED')
                 WHERE run_id=%s AND model_kind=%s AND remote_deadline_at<=now()''', (execution.run_id, kind))
 
@@ -104,7 +104,7 @@ def _failure(connection, execution, kind, error):
     with connection.transaction():
         _lock(connection, execution)
         row = connection.execute('''SELECT phase,consecutive_failures,request_id,execution_round
-            FROM analysis_model_tasks WHERE run_id=%s AND model_kind=%s FOR UPDATE''', (execution.run_id, kind)).fetchone()
+            FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s FOR UPDATE''', (execution.run_id, kind)).fetchone()
         phase, failures, request_id, round_id = row
         # publish_model has already recorded a failure. Observations have not.
         failures = max(1, failures) if phase == 'PUBLISH' else failures + 1
@@ -113,10 +113,10 @@ def _failure(connection, execution, kind, error):
                 error.response.status_code in (408, 429) or error.response.status_code >= 500))
         terminal = not transient or failures >= 3
         possibly_published = request_id is not None and connection.execute('''SELECT status='PUBLISHED'
-            FROM analysis_model_requests WHERE request_id=%s AND execution_round=%s''', (request_id, round_id)).fetchone()[0]
+            FROM analysis.model_requests WHERE request_id=%s AND execution_round=%s''', (request_id, round_id)).fetchone()[0]
         # An unconfirmed remote execution is never abandoned or retried as a new round.
         waiting = phase == 'WAIT_REMOTE' or (terminal and possibly_published)
-        connection.execute('''UPDATE analysis_model_tasks SET phase=%s,status=%s,execution_id=null,
+        connection.execute('''UPDATE analysis.model_tasks SET phase=%s,status=%s,execution_id=null,
             execution_owner=null,consecutive_failures=%s,action_required=%s,error_code=%s,
             retry_at=CASE WHEN %s THEN null ELSE now()+(%s * interval '1 second') END,
             next_poll_at=CASE WHEN %s THEN now()+(%s * interval '1 second') ELSE null END,updated_at=now()
@@ -131,12 +131,12 @@ def advance(connection, execution, storage_root, settings, s3, *, transport=None
     settings.validate()
     with connection.transaction():
         _lock(connection, execution)
-        connection.execute('''UPDATE analysis_model_tasks SET action_required=true,
+        connection.execute('''UPDATE analysis.model_tasks SET action_required=true,
             error_code=coalesce(error_code,'REMOTE_WAIT_EXPIRED')
             WHERE run_id=%s AND status='WAITING' AND remote_deadline_at<=now()''', (execution.run_id,))
         rows = connection.execute('''SELECT model_kind,phase,status,
             coalesce(CASE WHEN phase='WAIT_REMOTE' THEN next_poll_at ELSE retry_at END<=now(),true)
-            FROM analysis_model_tasks WHERE run_id=%s ORDER BY (phase='WAIT_REMOTE') DESC,model_kind''',
+            FROM analysis.model_tasks WHERE run_id=%s ORDER BY (phase='WAIT_REMOTE') DESC,model_kind''',
             (execution.run_id,)).fetchall()
         if {r[0] for r in rows} != {'BINARY', 'TYPE'}:
             raise ProtocolError('Both prepared model tasks are required')
@@ -154,12 +154,12 @@ def advance(connection, execution, storage_root, settings, s3, *, transport=None
                 raise
             _failure(connection, execution, kind, error)
     from result_collection import collect_model, finish_inference
-    collections = connection.execute('''SELECT model_kind FROM analysis_model_tasks
+    collections = connection.execute('''SELECT model_kind FROM analysis.model_tasks
         WHERE run_id=%s AND phase='COLLECT' AND status IN ('READY','RETRY_WAIT','ACTIVE')
           AND (retry_at IS NULL OR retry_at<=now()) ORDER BY model_kind''', (execution.run_id,)).fetchall()
     for (kind,) in collections:
         collect_model(connection, execution, kind, storage_root, settings, s3)
-    states = connection.execute('SELECT phase,status FROM analysis_model_tasks WHERE run_id=%s',
+    states = connection.execute('SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s',
                                 (execution.run_id,)).fetchall()
     if any(status in ('WAITING', 'RETRY_WAIT', 'ACTIVE') or (phase == 'PUBLISH' and status == 'READY')
            for phase, status in states):

@@ -8,7 +8,7 @@
 
 - `model_kind`: `binary` 또는 `type`. 외부 요청 API에서는 BINARY/TYPE이다.
 - 현재 `targets`: PyArrow Table(tx_id int64, demo_value int64). 실제 GNN 입력 피처·그래프 형식은 별도 계약이며 이 문서로 확정하지 않는다.
-- 현재 버전은 demo-calculator-v1/demo-input-v1. 실제 모델 버전 도입 시 서버의 허용 버전·입력/결과 검증도 함께 변경해야 한다. 이 문서만 적용했다고 실제 모델 연결이 완료되는 것은 아니다.
+- 신규 실행 버전은 demo-random-v1/demo-input-v1이며 기존 demo-calculator-v1 바인딩도 지원한다. 라벨 기반 demo-labels 버전은 지원하지 않는다. 실제 모델 버전 도입 시 서버의 허용 버전·입력/결과 검증도 함께 변경해야 한다. 이 문서만 적용했다고 실제 모델 연결이 완료되는 것은 아니다.
 - 성공: BINARY는 tx_id(int64), p_laundering(float64), TYPE은 tx_id(int64), p_0..p_8(float64)의 PyArrow Table 반환. 현재 시연 계약은 대상 tx_id 집합 정확히 일치, 중복/NULL 없음, 유한한 [0,1] 확률, TYPE 합 허용오차 1e-9를 요구한다.
 - 모델은 S3 전송·Spring 호출·자동 재시도를 수행하지 않는다. 파일 저장/검증/전송과 재시도는 워커 책임이다. 일부 결과만 만든 상태를 성공으로 반환하지 않는다.
 

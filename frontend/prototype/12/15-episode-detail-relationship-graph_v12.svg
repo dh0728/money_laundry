@@ -1,0 +1,262 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="Wireframe v12 / Episode detail / relationship graph" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect id="Background &#xB7; dark" x="0.0" y="0.0" width="1920.0" height="1080.0" rx="0" fill="#09090B" stroke="none"/>
+  <g id="Sidebar &#xB7; collapsible=icon &#xB7; state=collapsed">
+    <rect x="0.0" y="0.0" width="48.0" height="1080.0" rx="0" fill="#18181B" stroke="none"/>
+    <line x1="48.0" y1="0.0" x2="48.0" y2="1080.0" stroke="#27272A" stroke-width="1"/>
+    <g id="SidebarTrigger">
+      <g id="Icon &#xB7; lucide/panel-left">
+        <rect x="18.0" y="18.0" width="12.0" height="12.0" rx="2.0" fill="none" stroke="#FAFAFA" stroke-width="1.5"/>
+        <line x1="22.0" y1="18.0" x2="22.0" y2="30.0" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"/>
+      </g>
+    </g>
+    <g id="Icon &#xB7; lucide/layout-dashboard">
+      <rect x="18.0" y="66.0" width="5.0" height="5.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <rect x="25.0" y="66.0" width="5.0" height="3.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <rect x="18.0" y="73.0" width="5.0" height="5.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <rect x="25.0" y="71.0" width="5.0" height="7.0" rx="1.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+    </g>
+    <g id="Icon &#xB7; lucide/siren">
+      <polyline points="20.0,111.0 20.0,108.0 21.0,104.0 24.0,102.0 27.0,104.0 28.0,108.0 28.0,111.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="18.0" y1="113.0" x2="30.0" y2="113.0" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="18.0" y1="106.0" x2="16.5" y2="105.0" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="30.0" y1="106.0" x2="31.5" y2="105.0" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+    <rect x="8.0" y="128.0" width="32.0" height="32.0" rx="6" fill="#27272A" stroke="none"/>
+    <g id="Icon &#xB7; lucide/folder-search">
+      <polyline points="18.0,141.0 18.0,139.0 23.0,139.0 25.0,141.0 30.0,141.0 30.0,149.0 18.0,149.0 18.0,141.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="24.0" cy="145.0" r="2.3" fill="none" stroke="#FAFAFA" stroke-width="1.5"/>
+      <line x1="25.7" y1="146.7" x2="27.5" y2="148.5" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+    <g id="Icon &#xB7; lucide/bell">
+      <polyline points="19.0,983.0 21.0,981.0 21.0,978.0 22.0,975.5 24.0,974.5 26.0,975.5 27.0,978.0 27.0,981.0 29.0,983.0 19.0,983.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="22.5,985.0 24.0,986.0 25.5,985.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="Icon &#xB7; lucide/settings">
+      <path id="GearTeeth" d="M22.7,1010.4 L23.2,1009.0 H24.8 L25.3,1010.4 L26.6,1010.9 L27.9,1010.3 L29.0,1011.4 L28.4,1012.7 L28.9,1014.0 L30.3,1014.5 V1017.5 L28.9,1018.0 L28.4,1019.3 L29.0,1020.6 L27.9,1021.7 L26.6,1021.1 L25.3,1021.6 L24.8,1023.0 H23.2 L22.7,1021.6 L21.4,1021.1 L20.1,1021.7 L19.0,1020.6 L19.6,1019.3 L19.1,1018.0 L17.7,1017.5 V1014.5 L19.1,1014.0 L19.6,1012.7 L19.0,1011.4 L20.1,1010.3 L21.4,1010.9 Z" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="24.0" cy="1016.0" r="2.2" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+    </g>
+    <g id="Icon &#xB7; lucide/user">
+      <circle cx="24.0" cy="1049.0" r="3.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+      <polyline points="18.5,1058.0 19.5,1055.0 22.0,1053.5 26.0,1053.5 28.5,1055.0 29.5,1058.0" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <g id="Header &#xB7; SidebarInset">
+    <line x1="48.0" y1="48.0" x2="1920.0" y2="48.0" stroke="#27272A" stroke-width="1"/>
+    <rect x="60.0" y="8.0" width="32.0" height="32.0" rx="8" fill="#FAFAFA" stroke="none"/>
+    <g id="Icon &#xB7; lucide/radar">
+      <circle cx="76.0" cy="24.0" r="6.0" fill="none" stroke="#09090B" stroke-width="1.5"/>
+      <circle cx="76.0" cy="24.0" r="3.0" fill="none" stroke="#09090B" stroke-width="1.5"/>
+      <circle cx="76.0" cy="24.0" r="0.8" fill="none" stroke="#09090B" stroke-width="1.5"/>
+      <line x1="76.0" y1="24.0" x2="81.0" y2="19.0" stroke="#09090B" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="80.0" cy="20.0" r="1.0" fill="none" stroke="#09090B" stroke-width="1.5"/>
+    </g>
+    <text x="100" y="29" font-family="Noto Sans KR" font-size="14" font-weight="600" fill="#FAFAFA" text-anchor="start">AML RADAR</text>
+    <g id="CommandDialogTrigger &#xB7; GlobalSearch">
+      <rect x="700.0" y="8.0" width="520.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+      <g id="Icon &#xB7; lucide/search">
+        <circle cx="717.0" cy="23.0" r="5.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+        <line x1="720.8" y1="26.8" x2="724.5" y2="30.5" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+      </g>
+      <text x="734" y="29" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#A1A1AA" text-anchor="start">&#xC804;&#xC5ED; &#xAC80;&#xC0C9;</text>
+    </g>
+    <rect x="1178.0" y="14.0" width="30.0" height="20.0" rx="5" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+    <text x="1193" y="28" font-family="Noto Sans KR" font-size="11" font-weight="600" fill="#A1A1AA" text-anchor="middle">/</text>
+    <rect x="1812.0" y="8.0" width="84.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+    <g id="Icon &#xB7; lucide/maximize">
+      <polyline points="1822.0,22.0 1822.0,18.0 1826.0,18.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="1830.0,18.0 1834.0,18.0 1834.0,22.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="1834.0,26.0 1834.0,30.0 1830.0,30.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="1826.0,30.0 1822.0,30.0 1822.0,26.0" fill="none" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <rect x="1846.0" y="14.0" width="38.0" height="20.0" rx="5" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+    <text x="1865" y="28" font-family="Noto Sans KR" font-size="11" font-weight="500" fill="#A1A1AA" text-anchor="middle">F11</text>
+    <text x="1796" y="29" font-family="Noto Sans KR" font-size="14" font-weight="500" fill="#FAFAFA" text-anchor="end">&#xC548;&#xBD84;&#xC11D;</text>
+    <g id="Avatar">
+      <circle cx="1734.1" cy="24.0" r="14.0" fill="#27272A"/>
+      <text x="1734" y="28" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FAFAFA" text-anchor="middle">&#xC548;</text>
+    </g>
+    <g id="Badge &#xB7; variant=outline &#xB7; L2">
+      <rect x="1675.2" y="14.0" width="30.9" height="20.0" rx="10" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1"/>
+      <text x="1683" y="28" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#18181B" text-anchor="start">L2</text>
+    </g>
+    <text x="1667" y="29" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#A1A1AA" text-anchor="end">&#xC5ED;&#xD560;</text>
+    <g id="Badge &#xB7; variant=default &#xB7; 4">
+      <rect x="1595.8" y="14.0" width="23.4" height="20.0" rx="10" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+      <text x="1604" y="28" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FFFFFF" text-anchor="start">4</text>
+    </g>
+    <text x="1588" y="29" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#A1A1AA" text-anchor="end">&#xB0B4; &#xD560; &#xC77C;</text>
+  </g>
+  <text x="72" y="91" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#A1A1AA" text-anchor="start">EPISODES  &#x203A;  EP-000012</text>
+  <text x="72" y="130" font-family="Noto Sans KR" font-size="27" font-weight="700" fill="#FAFAFA" text-anchor="start">EP-000012</text>
+  <text x="72" y="158" font-family="Noto Sans KR" font-size="13" font-weight="400" fill="#A1A1AA" text-anchor="start">&#xC870;&#xC0AC; &#xC911; &#xB7; &#xB9C8;&#xC9C0;&#xB9C9; &#xD65C;&#xB3D9; 09-04 09:26</text>
+  <g id="Badge &#xB7; variant=default &#xB7; &#xC704;&#xD5D8;&#xB3C4; 91">
+    <rect x="324.0" y="137.0" width="65.3" height="20.0" rx="10" fill="#27272A" stroke="#27272A" stroke-width="1"/>
+    <text x="332" y="151" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FFFFFF" text-anchor="start">&#xC704;&#xD5D8;&#xB3C4; 91</text>
+  </g>
+  <g id="Badge &#xB7; variant=outline &#xB7; &#xB2F4;&#xB2F9; &#xC548;&#xBD84;&#xC11D;">
+    <rect x="408.0" y="137.0" width="76.8" height="20.0" rx="10" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1"/>
+    <text x="416" y="151" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#18181B" text-anchor="start">&#xB2F4;&#xB2F9; &#xC548;&#xBD84;&#xC11D;</text>
+  </g>
+  <g id="TabsDividerBottomWithActiveStroke &#xB7; Episode detail &#xB7; active=relationship-graph">
+    <line x1="72" y1="226" x2="1896" y2="226" stroke="#27272A" stroke-width="1"/>
+    <text x="110" y="206" font-family="Noto Sans KR" font-size="13" font-weight="400" fill="#A1A1AA" text-anchor="middle">&#xAC1C;&#xC694;</text>
+    <text x="198" y="206" font-family="Noto Sans KR" font-size="13" font-weight="650" fill="#FAFAFA" text-anchor="middle">&#xC790;&#xAE08; &#xD750;&#xB984;</text>
+    <rect x="166.0" y="224.0" width="63.6" height="3.0" rx="1" fill="#FAFAFA" stroke="none"/>
+    <text x="289" y="206" font-family="Noto Sans KR" font-size="13" font-weight="400" fill="#A1A1AA" text-anchor="middle">&#xD328;&#xD134; &#xC99D;&#xAC70;</text>
+    <text x="424" y="206" font-family="Noto Sans KR" font-size="13" font-weight="400" fill="#A1A1AA" text-anchor="middle">&#xC0C1;&#xB300;&#xBC29; &#xB7; &#xAD00;&#xB828; &#xACC4;&#xC88C; &#xB7; &#xC774;&#xB825;</text>
+    <text x="555" y="206" font-family="Noto Sans KR" font-size="13" font-weight="400" fill="#A1A1AA" text-anchor="middle">&#xACB0;&#xB860;</text>
+  </g>
+  <g id="GraphSettingsPanel &#xB7; fixed left column">
+    <rect x="72.0" y="244.0" width="280.0" height="778.0" rx="10" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+    <text x="90" y="275" font-family="Noto Sans KR" font-size="17" font-weight="650" fill="#FAFAFA" text-anchor="start">&#xADF8;&#xB798;&#xD504; &#xC124;&#xC815;</text>
+    <g id="Input">
+      <rect x="90.0" y="296.0" width="244.0" height="32.0" rx="8" fill="#09090B" stroke="#3F3F46" stroke-width="1"/>
+      <g id="Icon &#xB7; lucide/search">
+        <circle cx="107.0" cy="311.0" r="5.0" fill="none" stroke="#A1A1AA" stroke-width="1.5"/>
+        <line x1="110.8" y1="314.8" x2="114.5" y2="318.5" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round"/>
+      </g>
+      <text x="124" y="317" font-family="Noto Sans KR" font-size="14" font-weight="400" fill="#A1A1AA" text-anchor="start">&#xACC4;&#xC88C; &#xAC80;&#xC0C9;</text>
+    </g>
+    <text x="90" y="356" font-family="Noto Sans KR" font-size="12" font-weight="600" fill="#A1A1AA" text-anchor="start">&#xB77C;&#xBCA8; &#xD45C;&#xC2DC;</text>
+    <g id="ToggleGroup &#xB7; label visibility &#xB7; always/on interaction">
+      <rect x="90.0" y="370.0" width="196.0" height="32.0" rx="8" fill="#18181B" stroke="#27272A" stroke-width="1"/>
+      <text x="145" y="390" font-family="Noto Sans KR" font-size="12" font-weight="400" fill="#A1A1AA" text-anchor="middle">&#xD638;&#xBC84; &#xC2DC; &#xD45C;&#xC2DC;</text>
+      <rect x="197.0" y="373.0" width="88.0" height="26.0" rx="6" fill="#09090B" stroke="#27272A" stroke-width="1"/>
+      <text x="241" y="390" font-family="Noto Sans KR" font-size="12" font-weight="600" fill="#FAFAFA" text-anchor="middle">&#xD56D;&#xC0C1; &#xD45C;&#xC2DC;</text>
+    </g>
+    <g id="RiskCheckboxGroup &#xB7; high=true &#xB7; medium=true &#xB7; low=true">
+      <text x="90" y="434" font-family="Noto Sans KR" font-size="12" font-weight="600" fill="#A1A1AA" text-anchor="start">&#xC704;&#xD5D8;&#xB3C4; &#xBC94;&#xB840;</text>
+      <text x="334" y="434" font-family="Noto Sans KR" font-size="10" font-weight="400" fill="#71717A" text-anchor="end">&#xBAA8;&#xB450; &#xD45C;&#xC2DC;</text>
+      <g id="RiskCheckboxGlyphs · all-three-visible"><rect x="90" y="454" width="18" height="18" rx="5" fill="#FAFAFA"/><path d="M95 463l4 4 6-8" fill="none" stroke="#09090B" stroke-width="2"/><rect x="90" y="490" width="18" height="18" rx="5" fill="#FAFAFA"/><path d="M95 499l4 4 6-8" fill="none" stroke="#09090B" stroke-width="2"/><rect x="90" y="526" width="18" height="18" rx="5" fill="#FAFAFA"/><path d="M95 535l4 4 6-8" fill="none" stroke="#09090B" stroke-width="2"/></g><circle cx="122" cy="466" r="6" fill="#F87171"/>
+      <text x="138" y="471" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FAFAFA">&#xACE0;&#xC704;&#xD5D8;</text>
+      <circle cx="122" cy="502" r="6" fill="#FBBF24"/>
+      <text x="138" y="507" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FAFAFA">&#xC911;&#xC704;&#xD5D8;</text>
+      <circle cx="122" cy="538" r="6" fill="#34D399"/>
+      <text x="138" y="543" font-family="Noto Sans KR" font-size="12" font-weight="500" fill="#FAFAFA">&#xC800;&#xC704;&#xD5D8;</text>
+    </g>
+    <g id="HopSlider · disabled=true · default"><text x="90" y="590" font-family="Noto Sans KR" font-size="12" font-weight="600" fill="#71717A">표시 범위 (홉)</text><line x1="96" y1="630" x2="320" y2="630" stroke="#3F3F46" stroke-width="4" stroke-linecap="round"/><circle cx="96" cy="630" r="8" fill="#71717A"/><circle cx="171" cy="630" r="4" fill="#3F3F46"/><circle cx="246" cy="630" r="4" fill="#3F3F46"/><circle cx="320" cy="630" r="4" fill="#3F3F46"/><text x="90" y="654" font-family="Noto Sans KR" font-size="10" fill="#71717A">노드 선택 시 활성화 · 기본 1 / 최대 4</text></g>
+  </g>
+<g id="RelationshipGraphCanvas · Episode-multi-hub-cluster-network · default-state">
+<rect x="364" y="244" width="1532" height="778" rx="10" fill="#09090B" stroke="#27272A"/>
+<text x="382" y="274" font-family="Noto Sans KR" font-size="16" font-weight="650" fill="#FAFAFA">관계 그래프</text>
+<text x="382" y="296" font-family="Noto Sans KR" font-size="11" fill="#A1A1AA">Episode 전체 자금망 · 복수 허브 및 하위 클러스터</text>
+<g id="EncodingContract · width=amount · color=risk · count=text"/>
+<g id="EdgeMultiplicity · 1-straight-arrow · 2-separate-curved-arrows · 3plus-bidirectional-aggregate"/>
+<g id="ArrowEndpoint · node-center · arrowhead-visible"/>
+<g id="InteractionStateContract · mutually-exclusive"><desc>default: node-outline=none; hop-slider=disabled; pair-panel=closed. node-selected: selected-node-outline-only; hop-slider=enabled; pair-panel=closed. aggregate-edge-selected: node-outline=none; pair-panel=open.</desc></g>
+<g id="GraphResizeToFitControl"><rect x="1814" y="258" width="32" height="28" rx="8" fill="#09090B" stroke="#3F3F46"/><path d="M1823 267h4v4 M1837 267h-4v4 M1823 277h4v-4 M1837 277h-4v-4" fill="none" stroke="#FAFAFA" stroke-width="1.5"/></g>
+<g id="GraphFullscreenControl"><rect x="1854" y="258" width="32" height="28" rx="8" fill="#09090B" stroke="#3F3F46"/><path d="M1864 270v-4h4 M1872 266h4v4 M1876 274v4h-4 M1868 278h-4v-4" fill="none" stroke="#FAFAFA" stroke-width="1.5"/></g>
+<g id="StateAnnotation"><rect x="1510" y="310" width="362" height="76" rx="8" fill="#18181B" stroke="#27272A"/><text x="1524" y="330" font-family="Noto Sans KR" font-size="10" fill="#FAFAFA">기본 · 노드 무테두리 / 홉 비활성 / 거래 상세 닫힘</text><text x="1524" y="350" font-family="Noto Sans KR" font-size="10" fill="#A1A1AA">노드 선택 · 해당 노드만 outline / 홉 활성</text><text x="1524" y="370" font-family="Noto Sans KR" font-size="10" fill="#A1A1AA">집계선 선택 · 노드 선택 해제 / 우측 거래 상세 열림</text></g>
+<g id="PairTransactionPanel · default-closed"/>
+<defs><marker id="ep12-arrow-high" viewBox="0 0 24 24" refX="22" refY="12" markerWidth="32" markerHeight="24" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 3L23 12L1 21Z" fill="#F87171"/></marker></defs>
+<defs><marker id="ep12-arrow-medium" viewBox="0 0 24 24" refX="22" refY="12" markerWidth="32" markerHeight="24" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 3L23 12L1 21Z" fill="#FBBF24"/></marker></defs>
+<defs><marker id="ep12-arrow-low" viewBox="0 0 24 24" refX="22" refY="12" markerWidth="32" markerHeight="24" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 3L23 12L1 21Z" fill="#34D399"/></marker></defs>
+<g id="AggregateEdge · H1-E · width=22 · risk=high"><line x1="625" y1="555" x2="850" y2="635" stroke="#F87171" stroke-width="22" stroke-linecap="round" marker-start="url(#ep12-arrow-high)" marker-end="url(#ep12-arrow-high)"/></g>
+<g id="EdgeLabel · count-explicit"><rect x="693.5" y="584.0" width="88" height="22" rx="5" fill="#F87171"/><text x="737.5" y="599.0" font-family="Noto Sans KR" font-size="9" font-weight="700" fill="#09090B" text-anchor="middle">18건 · USD 2.4M</text></g>
+<g id="AggregateEdge · H2-E · width=12 · risk=medium"><line x1="870" y1="485" x2="850" y2="635" stroke="#FBBF24" stroke-width="12" stroke-linecap="round" marker-start="url(#ep12-arrow-medium)" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="EdgeLabel · count-explicit"><rect x="816.0" y="549.0" width="88" height="22" rx="5" fill="#FBBF24"/><text x="860.0" y="564.0" font-family="Noto Sans KR" font-size="9" font-weight="700" fill="#09090B" text-anchor="middle">9건 · USD 860K</text></g>
+<g id="AggregateEdge · E-H3 · width=22 · risk=high"><line x1="850" y1="635" x2="1135" y2="575" stroke="#F87171" stroke-width="22" stroke-linecap="round" marker-start="url(#ep12-arrow-high)" marker-end="url(#ep12-arrow-high)"/></g>
+<g id="EdgeLabel · count-explicit"><rect x="948.5" y="594.0" width="88" height="22" rx="5" fill="#F87171"/><text x="992.5" y="609.0" font-family="Noto Sans KR" font-size="9" font-weight="700" fill="#09090B" text-anchor="middle">16건 · USD 3.2M</text></g>
+<g id="AggregateEdge · E-H4 · width=12 · risk=low"><line x1="850" y1="635" x2="955" y2="815" stroke="#34D399" stroke-width="12" stroke-linecap="round" marker-start="url(#ep12-arrow-low)" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="EdgeLabel · count-explicit"><rect x="858.5" y="714.0" width="88" height="22" rx="5" fill="#34D399"/><text x="902.5" y="729.0" font-family="Noto Sans KR" font-size="9" font-weight="700" fill="#09090B" text-anchor="middle">12건 · USD 688K</text></g>
+<g id="AggregateEdge · H3-X · width=6 · risk=medium"><line x1="1135" y1="575" x2="1195" y2="720" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-start="url(#ep12-arrow-medium)" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="EdgeLabel · count-explicit"><rect x="1121.0" y="636.5" width="88" height="22" rx="5" fill="#FBBF24"/><text x="1165.0" y="651.5" font-family="Noto Sans KR" font-size="9" font-weight="700" fill="#09090B" text-anchor="middle">5건 · USD 210K</text></g>
+<g id="TwoTransactionPair · B1-H2 · separate-curved-arrows">
+<path d="M725 350Q817.9 395.5 870 485" fill="none" stroke="#F87171" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/><text x="826.8" y="386.0" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#F87171" text-anchor="middle">USD 100K</text>
+<path d="M870 485Q777.1 439.5 725 350" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/><text x="768.2" y="449.0" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FBBF24" text-anchor="middle">USD 20K</text>
+</g>
+<g id="TwoTransactionPair · H3-C2 · separate-curved-arrows">
+<path d="M1135 575Q1238.0 509.0 1360 500" fill="none" stroke="#F87171" stroke-width="12" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/><text x="1233.9" y="496.7" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#F87171" text-anchor="middle">USD 500K</text>
+<path d="M1360 500Q1257.0 566.0 1135 575" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/><text x="1261.1" y="578.3" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#34D399" text-anchor="middle">USD 15K</text>
+</g>
+<g id="TwoTransactionPair · H4-D3 · separate-curved-arrows">
+<path d="M955 815Q1013.9 860.7 1020 935" fill="none" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/><text x="1025.3" y="854.5" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FBBF24" text-anchor="middle">USD 80K</text>
+<path d="M1020 935Q961.1 889.3 955 815" fill="none" stroke="#F87171" stroke-width="12" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/><text x="949.7" y="895.5" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#F87171" text-anchor="middle">USD 420K</text>
+</g>
+<g id="SingleTransactionEdge · A1-H1 · width=2 · risk=low"><line x1="430" y1="390" x2="625" y2="555" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · A2-H1 · width=6 · risk=medium"><line x1="445" y1="510" x2="625" y2="555" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · A3-H1 · width=12 · risk=high"><line x1="455" y1="660" x2="625" y2="555" stroke="#F87171" stroke-width="12" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/></g>
+<g id="SingleTransactionEdge · A4-H1 · width=2 · risk=low"><line x1="520" y1="790" x2="625" y2="555" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · I1-A4 · width=2 · risk=low"><line x1="400" y1="835" x2="520" y2="790" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · I2-A1 · width=2 · risk=medium"><line x1="555" y1="335" x2="430" y2="390" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · I2-H1 · width=6 · risk=medium"><line x1="555" y1="335" x2="625" y2="555" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · B2-H2 · width=2 · risk=medium"><line x1="855" y1="330" x2="870" y2="485" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · B3-H2 · width=2 · risk=low"><line x1="980" y1="350" x2="870" y2="485" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · B4-H2 · width=6 · risk=medium"><line x1="1080" y1="410" x2="870" y2="485" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · I3-B4 · width=6 · risk=high"><line x1="1160" y1="335" x2="1080" y2="410" stroke="#F87171" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/></g>
+<g id="SingleTransactionEdge · I3-H3 · width=12 · risk=high"><line x1="1160" y1="335" x2="1135" y2="575" stroke="#F87171" stroke-width="12" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/></g>
+<g id="SingleTransactionEdge · H3-C1 · width=12 · risk=high"><line x1="1135" y1="575" x2="1280" y2="390" stroke="#F87171" stroke-width="12" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/></g>
+<g id="SingleTransactionEdge · H3-C3 · width=2 · risk=low"><line x1="1135" y1="575" x2="1360" y2="640" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · C3-C4 · width=2 · risk=low"><line x1="1360" y1="640" x2="1290" y2="770" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · C4-X · width=6 · risk=medium"><line x1="1290" y1="770" x2="1195" y2="720" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · X-I4 · width=2 · risk=medium"><line x1="1195" y1="720" x2="1375" y2="845" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · H4-D1 · width=2 · risk=low"><line x1="955" y1="815" x2="750" y2="875" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · D1-D2 · width=2 · risk=low"><line x1="750" y1="875" x2="835" y2="935" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · D2-H4 · width=6 · risk=medium"><line x1="835" y1="935" x2="955" y2="815" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · D4-H4 · width=2 · risk=low"><line x1="1150" y1="895" x2="955" y2="815" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · I4-D4 · width=2 · risk=low"><line x1="1375" y1="845" x2="1150" y2="895" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · H1-H2 · width=6 · risk=medium"><line x1="625" y1="555" x2="870" y2="485" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · H2-H3 · width=12 · risk=high"><line x1="870" y1="485" x2="1135" y2="575" stroke="#F87171" stroke-width="12" stroke-linecap="round" marker-end="url(#ep12-arrow-high)"/></g>
+<g id="SingleTransactionEdge · H3-H4 · width=6 · risk=medium"><line x1="1135" y1="575" x2="955" y2="815" stroke="#FBBF24" stroke-width="6" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · H4-H1 · width=2 · risk=low"><line x1="955" y1="815" x2="625" y2="555" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · A2-B1 · width=2 · risk=medium"><line x1="445" y1="510" x2="725" y2="350" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · B3-C1 · width=2 · risk=low"><line x1="980" y1="350" x2="1280" y2="390" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="SingleTransactionEdge · C4-D4 · width=2 · risk=medium"><line x1="1290" y1="770" x2="1150" y2="895" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-medium)"/></g>
+<g id="SingleTransactionEdge · D1-A4 · width=2 · risk=low"><line x1="750" y1="875" x2="520" y2="790" stroke="#34D399" stroke-width="2" stroke-linecap="round" marker-end="url(#ep12-arrow-low)"/></g>
+<g id="GraphNodes · 26 · default-outline-none">
+<circle cx="430" cy="390" r="16" fill="#34D399" stroke="none"/>
+<text x="430" y="420" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-1042</text>
+<circle cx="445" cy="510" r="16" fill="#FBBF24" stroke="none"/>
+<text x="445" y="540" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-2710</text>
+<circle cx="455" cy="660" r="16" fill="#F87171" stroke="none"/>
+<text x="455" y="690" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-4030</text>
+<circle cx="520" cy="790" r="16" fill="#34D399" stroke="none"/>
+<text x="520" y="820" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-6288</text>
+<circle cx="625" cy="555" r="24" fill="#F87171" stroke="none"/>
+<text x="625" y="593" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">HUB-A</text>
+<rect x="384" y="819" width="32" height="32" rx="6" fill="#34D399" stroke="none"/>
+<text x="400" y="865" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">BANK-A</text>
+<rect x="539" y="319" width="32" height="32" rx="6" fill="#FBBF24" stroke="none"/>
+<text x="555" y="365" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">BANK-B</text>
+<circle cx="725" cy="350" r="16" fill="#F87171" stroke="none"/>
+<text x="725" y="380" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-5B70</text>
+<circle cx="855" cy="330" r="16" fill="#FBBF24" stroke="none"/>
+<text x="855" y="360" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-0230</text>
+<circle cx="980" cy="350" r="16" fill="#34D399" stroke="none"/>
+<text x="980" y="380" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-0914</text>
+<circle cx="1080" cy="410" r="16" fill="#FBBF24" stroke="none"/>
+<text x="1080" y="440" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-5502</text>
+<circle cx="870" cy="485" r="24" fill="#FBBF24" stroke="none"/>
+<text x="870" y="523" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">HUB-B</text>
+<circle cx="850" cy="635" r="24" fill="#F87171" stroke="none"/>
+<text x="850" y="673" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">EP-000012</text>
+<circle cx="1135" cy="575" r="24" fill="#F87171" stroke="none"/>
+<text x="1135" y="613" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">HUB-C</text>
+<circle cx="1280" cy="390" r="16" fill="#F87171" stroke="none"/>
+<text x="1280" y="420" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-8800</text>
+<circle cx="1360" cy="500" r="16" fill="#FBBF24" stroke="none"/>
+<text x="1360" y="530" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-1042</text>
+<circle cx="1360" cy="640" r="16" fill="#34D399" stroke="none"/>
+<text x="1360" y="670" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-3921</text>
+<circle cx="1290" cy="770" r="16" fill="#FBBF24" stroke="none"/>
+<text x="1290" y="800" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-7740</text>
+<rect x="1144" y="319" width="32" height="32" rx="6" fill="#F87171" stroke="none"/>
+<text x="1160" y="365" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">BANK-C</text>
+<circle cx="1195" cy="720" r="16" fill="#FBBF24" stroke="none"/>
+<text x="1195" y="750" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">EXCHANGE</text>
+<circle cx="955" cy="815" r="24" fill="#34D399" stroke="none"/>
+<text x="955" y="853" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">HUB-D</text>
+<circle cx="750" cy="875" r="16" fill="#34D399" stroke="none"/>
+<text x="750" y="905" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-2F10</text>
+<circle cx="835" cy="935" r="16" fill="#FBBF24" stroke="none"/>
+<text x="835" y="965" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-7690</text>
+<circle cx="1020" cy="935" r="16" fill="#F87171" stroke="none"/>
+<text x="1020" y="965" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-8000</text>
+<circle cx="1150" cy="895" r="16" fill="#34D399" stroke="none"/>
+<text x="1150" y="925" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">AC-4301</text>
+<rect x="1359" y="829" width="32" height="32" rx="6" fill="#34D399" stroke="none"/>
+<text x="1375" y="875" font-family="Noto Sans KR" font-size="8" font-weight="650" fill="#FAFAFA" text-anchor="middle">BANK-D</text>
+</g>
+</g>
+<g id="LLMAgentEntry · bottom-right · default-sidebar"><circle cx="1852" cy="1016" r="24" fill="#FAFAFA" stroke="#3F3F46" stroke-width="1"/><path d="M1841 1012q0-8 8-8h6q8 0 8 8v5q0 8-8 8h-5l-6 5 1-7q-4-3-4-11z" fill="none" stroke="#09090B" stroke-width="2"/><circle cx="1848" cy="1015" r="1.5" fill="#09090B"/><circle cx="1853" cy="1015" r="1.5" fill="#09090B"/><circle cx="1858" cy="1015" r="1.5" fill="#09090B"/></g></svg>

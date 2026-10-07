@@ -4,7 +4,7 @@ import unittest
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from demo_calculator import (FEATURE_VERSION, MODEL_VERSION, build_targets,
+from demo_calculator import (FEATURE_VERSION, MODEL_VERSION, LEGACY_MODEL_VERSION, build_targets,
                              calculate, validate_scores)
 from worker_transport import ProtocolError
 
@@ -13,6 +13,7 @@ VERSIONS = dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
 
 class DemoCalculatorTests(unittest.TestCase):
     def test_approved_formula_boundaries_and_parquet_roundtrip(self):
+        VERSIONS = dict(model_version=LEGACY_MODEL_VERSION, feature_version=FEATURE_VERSION)
         targets = build_targets([100, 99, 1, 2**63 - 1])
         binary = calculate(targets, "binary", **VERSIONS)
         self.assertEqual(binary.column("p_laundering").to_pylist(),
@@ -34,6 +35,34 @@ class DemoCalculatorTests(unittest.TestCase):
             self.assertTrue(first.equals(calculate(reversed_targets, kind, **VERSIONS)))
             self.assertTrue(first.equals(calculate(targets, kind, **VERSIONS)))
             validate_scores(first, range(1, 101), kind, **VERSIONS)
+
+    def test_random_scores_are_batch_independent_and_not_modulo_100(self):
+        targets = build_targets([1, 101, 201])
+        for kind in ('binary', 'type'):
+            together = calculate(targets, kind, **VERSIONS)
+            separate = pa.concat_tables([calculate(build_targets([i]), kind, **VERSIONS)
+                                         for i in [1, 101, 201]])
+            self.assertTrue(together.equals(separate))
+            self.assertEqual(len(set(together.column(1).to_pylist())), 3)
+            stream = io.BytesIO()
+            pq.write_table(together, stream)
+            validate_scores(pq.read_table(io.BytesIO(stream.getvalue())),
+                            [1, 101, 201], kind, **VERSIONS)
+
+    def test_new_run_does_not_query_legacy_hints(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from pipeline import versions_for_run
+        connection = Mock()
+        connection.execute.return_value.fetchall.return_value = []
+        self.assertEqual(versions_for_run(connection, SimpleNamespace(run_id='run')),
+                         (MODEL_VERSION, FEATURE_VERSION))
+        self.assertEqual(connection.execute.call_count, 1)
+        self.assertNotIn('demo_report_hints', connection.execute.call_args.args[0])
+        connection.execute.return_value.fetchall.return_value = [
+            ({'model_version': 'demo-labels-v2', 'feature_version': 'demo-label-input-v1'},)]
+        with self.assertRaises(ProtocolError):
+            versions_for_run(connection, SimpleNamespace(run_id='run'))
 
     def test_empty_duplicate_and_invalid_targets_rejected(self):
         for ids in ([], [1, 1], [None], [True], [1.0], [0], [-1], [2**63]):
@@ -73,7 +102,7 @@ class DemoCalculatorTests(unittest.TestCase):
     def test_type_sum_tolerance(self):
         scores = calculate(build_targets([1]), "type", **VERSIONS)
         for delta, accepted in [(5e-10, True), (2e-9, False), (0.1, False)]:
-            altered = scores.set_column(1, "p_0", pa.array([0.05 + delta]))
+            altered = scores.set_column(1, "p_0", pa.array([scores["p_0"][0].as_py() + delta]))
             if accepted:
                 validate_scores(altered, [1], "type", **VERSIONS)
             else:

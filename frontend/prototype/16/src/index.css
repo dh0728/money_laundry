@@ -1,0 +1,161 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+    --sidebar: hsl(0 0% 98%);
+    --sidebar-foreground: hsl(240 5.3% 26.1%);
+    --sidebar-primary: hsl(240 5.9% 10%);
+    --sidebar-primary-foreground: hsl(0 0% 98%);
+    --sidebar-accent: hsl(240 4.8% 95.9%);
+    --sidebar-accent-foreground: hsl(240 5.9% 10%);
+    --sidebar-border: hsl(220 13% 91%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+    --sidebar: hsl(240 5.9% 10%);
+    --sidebar-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-primary: hsl(224.3 76.3% 48%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(240 3.7% 15.9%);
+    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-border: hsl(240 3.7% 15.9%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+@theme inline {
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* shadcn neutral tokens; domain colors are defined separately in domain.ts. */
+:root {
+  --radius: .625rem;
+  --background: oklch(1 0 0); --foreground: oklch(.145 0 0);
+  --card: oklch(1 0 0); --card-foreground: oklch(.145 0 0);
+  --popover: oklch(1 0 0); --popover-foreground: oklch(.145 0 0);
+  --primary: oklch(.205 0 0); --primary-foreground: oklch(.985 0 0);
+  --secondary: oklch(.97 0 0); --secondary-foreground: oklch(.205 0 0);
+  --muted: oklch(.97 0 0); --muted-foreground: oklch(.556 0 0);
+  --accent: oklch(.97 0 0); --accent-foreground: oklch(.205 0 0);
+  --destructive: #e60000; --border: oklch(.922 0 0);
+  --input: oklch(.922 0 0); --ring: oklch(.708 0 0);
+  --chart-1: oklch(.55 0 0); --chart-2: oklch(.72 0 0);
+}
+.dark {
+  --background: oklch(.145 0 0); --foreground: oklch(.985 0 0);
+  --card: oklch(.175 0 0); --card-foreground: oklch(.985 0 0);
+  --popover: oklch(.205 0 0); --popover-foreground: oklch(.985 0 0);
+  --primary: oklch(.922 0 0); --primary-foreground: oklch(.205 0 0);
+  --secondary: oklch(.269 0 0); --secondary-foreground: oklch(.985 0 0);
+  --muted: oklch(.235 0 0); --muted-foreground: oklch(.708 0 0);
+  --accent: oklch(.269 0 0); --accent-foreground: oklch(.985 0 0);
+  --destructive: #ff0000; --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%); --ring: oklch(.556 0 0);
+  --sidebar: oklch(.17 0 0); --sidebar-foreground: oklch(.92 0 0);
+  --sidebar-primary: oklch(.92 0 0); --sidebar-primary-foreground: oklch(.205 0 0);
+  --sidebar-accent: oklch(.269 0 0); --sidebar-accent-foreground: oklch(.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%); --sidebar-ring: oklch(.556 0 0);
+  --chart-1: oklch(.88 0 0); --chart-2: oklch(.50 0 0);
+}
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive); --color-border: var(--border);
+  --color-input: var(--input); --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2);
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; margin: 0; font-size: 14px; -webkit-font-smoothing: antialiased; }
+  button, [role=button] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  ::selection { background: #82828260; }
+}
+.underline-tabs { display:flex; justify-content:flex-start; width:100%; border-radius:0; padding:0; gap:25px; height:42px; background:transparent; border-bottom:1px solid var(--border); }
+.underline-tabs [data-slot=tabs-trigger] { flex:none; position:relative; height:42px; border:0; border-radius:0; padding:0 1px; background:transparent!important; box-shadow:none!important; color:var(--muted-foreground); font-weight:400; font-size:13px; }
+.underline-tabs [data-slot=tabs-trigger][data-state=active] { font-weight:650; color:var(--foreground); }
+.underline-tabs [data-slot=tabs-trigger][data-state=active]::after { content:''; opacity:1; position:absolute; height:3px; background:var(--foreground); bottom:-1px; inset-inline:0; }
+[data-slot=sidebar-menu-button][data-active=true] { background:var(--primary); color:var(--primary-foreground); font-weight:600; }
+[data-slot=table-head] { font-size:11px; font-weight:500; color:var(--muted-foreground); background:var(--muted); height:42px; padding-inline:16px; }
+[data-slot=table-cell] { padding-block:14px; padding-inline:16px; }
+.graph-canvas { background:var(--graph-bg); }
+.graph-label { fill:var(--foreground); paint-order:stroke; stroke:var(--card); stroke-width:4px; stroke-linejoin:round; pointer-events:none; }
+.graph-node:focus { outline:none; }
+.graph-node:focus-visible circle { stroke:var(--foreground); stroke-width:3px; }
+/* 전체화면 다이얼로그: flex column이어야 캔버스가 flex-1 min-h-0으로 남는 높이를 정확히 채우고 시간축이 항상 보인다 */
+.graph-dialog { display:flex; flex-direction:column; overflow:hidden; }
+.agent-sidebar-space { margin-right:390px; }
+@media (max-width:1100px) { .agent-sidebar-space { margin-right:0; } main { padding-inline:20px!important; } }
+@media (max-width:767px) { .login-layout { grid-template-columns:1fr; } .login-layout>div:first-child { display:none; } .grid-cols-3 { grid-template-columns:1fr; } .grid-cols-2 { grid-template-columns:1fr; } main { padding-inline:16px!important; } .graph-layout { overflow:auto; } .graph-layout>[data-slot=resizable-panel-group] { min-width:820px; } .underline-tabs { gap:18px; } }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+
+/* v15 · 관계 그래프: 세탁 여부 2색(1=빨강, 0=무채색) */
+:root { --graph-l1:#e60000; --graph-l0:#b4b4bc; --graph-l0-node:#3f3f46; --graph-bg:var(--card); --graph-lit:#18181b; }
+.dark { --graph-l1:#ff0000; --graph-l0:#5a5a63; --graph-l0-node:#e7e7ea; --graph-bg:#070709; --graph-lit:#f4f4f5; }
+.graph-edge, .graph-node { cursor:pointer; transition:opacity .15s; outline:none; }
+.graph-edge.is-future, .graph-node.is-future { opacity:.07; }
+.graph-node:focus-visible circle:nth-child(2), .graph-edge:focus-visible path:nth-child(2) { stroke:var(--foreground); }
+.graph-edge.is-lit path[stroke]:not([stroke=transparent]) { stroke:var(--graph-lit); }
+.graph-edge.is-lit[data-label='1'] path[stroke]:not([stroke=transparent]) { stroke:#ff8a91; }
+.graph-edge.is-lit path[fill]:not([fill=none]) { fill:var(--graph-lit); }
+.graph-edge.is-lit[data-label='1'] path[fill]:not([fill=none]) { fill:#ff8a91; }
+.graph-glow { filter:drop-shadow(0 0 6px var(--graph-lit)); }
+/* 전체화면: 거래 흐름 패널은 리사이즈 패널이 아니라 그래프 위에 겹치는 드로어(닫아도 그래프 폭 재계산 불필요) */
+.graph-drawer { position:absolute; top:0; right:0; bottom:0; width:380px; max-width:92%; z-index:20; display:flex; flex-direction:column; background:var(--card); border-left:1px solid var(--border); box-shadow:-12px 0 32px rgb(0 0 0/.28); animation:graph-drawer-in .22s cubic-bezier(.2,.8,.2,1); }
+@keyframes graph-drawer-in { from { transform:translateX(100%); } to { transform:translateX(0); } }
+@media (prefers-reduced-motion:reduce) { .graph-drawer { animation:none; } }
+.legend-dot-sm { width:6px!important; height:6px!important; }
+.graph-account { fill:var(--muted-foreground); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.graph-tooltip { position:absolute; z-index:5; max-width:250px; pointer-events:none; background:var(--popover); color:var(--popover-foreground); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:11.5px; line-height:1.55; box-shadow:0 8px 24px rgb(0 0 0/.25); }
+.graph-legend i { display:inline-block; flex:none; }
+.legend-line { width:16px; height:3px; border-radius:2px; }
+.legend-dash { width:16px; height:0; border-top:2.5px dashed var(--graph-l0); }
+.legend-dot { width:9px; height:9px; border-radius:9px; }
+.pair-lane { position:absolute; top:0; bottom:0; width:6px; border-radius:3px; opacity:.9; z-index:1; pointer-events:none; }
+.pair-row { position:relative; border-bottom:1px solid var(--border); margin-inline:6px; }
+.pair-row:last-child { border-bottom:0; }
+.pair-scroll [data-slot=scroll-area-scrollbar] { width:10px; background:var(--muted); }
+.pair-scroll [data-slot=scroll-area-thumb] { background:var(--muted-foreground); }
+.pair-label { stroke-width:3.5px; }
+/* 연속 세로 달력 */
+.continuous-calendar .rdp-month_caption { position:sticky; top:0; z-index:1; background:var(--popover); }
+/* 로그인 글래스 패널 */
+.login-glass { background:rgb(255 255 255/.06); border:1px solid rgb(255 255 255/.14); box-shadow:0 24px 80px rgb(0 0 0/.45), inset 0 1px 0 rgb(255 255 255/.08); }
+/* 설정: 넓은 화면 4열, 좁거나 세로 화면 1열 */
+.settings-grid { grid-template-columns:1fr; }
+@media (min-width:1100px) and (orientation:landscape) { .settings-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+/* 사이드바 계정: active는 배경 대신 avatar 흰 테두리 */
+.account-button[data-active=true], .account-button[data-account-active=true] { background:transparent; }
+.group[data-collapsible=icon] .account-button { justify-content:center; }
+
+/* RDR 9000: 이전 대화 목록은 대화창 뒤에서 왼쪽으로 펼쳐지고 다시 누르면 뒤로 포개진다 */
+.agent-history { transform:translateX(100%); opacity:0; pointer-events:none; transition:transform .3s cubic-bezier(.2,.8,.2,1), opacity .2s ease; }
+.agent-history.is-open { transform:translateX(0); opacity:1; pointer-events:auto; }
+section[data-mode=full] .agent-history { width:224px; }
+.rdr-glow { filter:drop-shadow(0 0 2px rgb(239 68 68/.9)); }
+@media (prefers-reduced-motion:reduce) { .agent-history { transition:none; } }
+
+/* v16 셸 정리(App/Brand/Agent 담당 agent가 추가): 계정 button active 상태 수정.
+   위쪽의 ".account-button[data-active=true]" 규칙이 배경을 투명으로 지우면서, 더 앞서 정의된
+   "[data-slot=sidebar-menu-button][data-active=true]"의 밝은 글자색(--primary-foreground)만 남아
+   어두운 sidebar 배경 위에서 이름·역할 글자가 사실상 보이지 않게 되는 문제가 있었다.
+   같은 selector를 이 파일 맨 끝에서 다시 선언해(동일 specificity, 나중 선언 우선) 배경·글자색을
+   함께 지정하고, avatar의 흰 ring은 그대로 둔다. */
+.account-button[data-active=true], .account-button[data-account-active=true] { background:var(--sidebar-accent); color:var(--sidebar-accent-foreground); }

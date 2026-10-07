@@ -32,6 +32,10 @@ final class InferenceCancellationClient {
   }
 
   void configure(String url, String token) {
+    configure(url, token, false);
+  }
+
+  void configure(String url, String token, boolean allowLoopback) {
     if (url.isBlank() && token.isBlank()) return;
     URI uri;
     try {
@@ -39,7 +43,9 @@ final class InferenceCancellationClient {
     } catch (RuntimeException e) {
       throw new IllegalArgumentException("INVALID_INFERENCE_CONFIGURATION");
     }
-    if (!"https".equals(uri.getScheme())
+    boolean local =
+        allowLoopback && "http".equals(uri.getScheme()) && "127.0.0.1".equals(uri.getHost());
+    if ((!"https".equals(uri.getScheme()) && !local)
         || uri.getHost() == null
         || uri.getUserInfo() != null
         || uri.getQuery() != null

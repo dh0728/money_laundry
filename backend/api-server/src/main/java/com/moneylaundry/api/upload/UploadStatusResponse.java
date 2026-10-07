@@ -1,6 +1,5 @@
 package com.moneylaundry.api.upload;
 
-import com.moneylaundry.api.batchjob.JobStatus;
 import com.moneylaundry.api.ingest.ValidationError;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +16,7 @@ public record UploadStatusResponse(
     Integer insertedCount,
     Integer missingCount,
     Integer duplicateCount,
-    JobStatus status,
+    UploadStatus status,
     String errorCode,
     String errorMessage,
     List<ValidationError> errors,

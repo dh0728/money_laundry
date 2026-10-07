@@ -20,4 +20,14 @@ public interface UploadStore {
   OptionalLong sizeOf(String key);
 
   InputStream open(String key) throws IOException;
+
+  /** Stable identity checked again before retrying recorded demo cleanup. */
+  default String resetScope() {
+    throw new UnsupportedOperationException("Demo cleanup unavailable");
+  }
+
+  /** Delete an exact key or one bounded page of a recorded request prefix. */
+  default boolean removeDemoFiles(String key, boolean prefix) {
+    throw new UnsupportedOperationException("Demo cleanup unavailable");
+  }
 }

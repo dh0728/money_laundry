@@ -9,14 +9,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
-/**
- * banks 한 행(V1). 원장에 등장하는 모든 은행 코드가 들어오고, 보고 은행은 is_reporting으로 구분한다. api_key_hash는 기존 스키마 호환용이다.
- */
+/** core.banks의 은행 참조 정보. 보고 은행은 is_reporting으로 구분한다. */
 @Entity
-@Table(name = "banks")
+@Table(name = "banks", schema = "core")
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -32,10 +28,6 @@ public class Bank {
 
   @Column(name = "is_reporting", nullable = false)
   private boolean reporting;
-
-  @JdbcTypeCode(SqlTypes.CHAR)
-  @Column(name = "api_key_hash")
-  private String apiKeyHash;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;

@@ -22,10 +22,11 @@ class AnalysisRunnerTests {
   @Autowired JdbcTemplate jdbc;
   @Autowired PlatformTransactionManager manager;
   @MockitoBean AnalysisScheduler scheduler;
+  @Autowired AnalysisRunService runs;
   final List<AnalysisRunner> runners = new ArrayList<>();
 
   AnalysisRunner runner(AnalysisStageExecutor executor) {
-    var result = new AnalysisRunner(service, executor);
+    var result = new AnalysisRunner(service, executor, runs);
     runners.add(result);
     return result;
   }
@@ -60,7 +61,8 @@ class AnalysisRunnerTests {
 
   @BeforeEach
   void setup() {
-    jdbc.execute("truncate batch_jobs cascade");
+    jdbc.execute("truncate analysis.jobs, ingest.uploads cascade");
+    jdbc.update("insert into core.banks(bank_id) values(12) on conflict do nothing");
     clock = new MutableClock();
     service =
         new AnalysisService(
@@ -69,7 +71,7 @@ class AnalysisRunnerTests {
 
   long upload(String status, Instant at) {
     return jdbc.queryForObject(
-        "insert into batch_jobs(job_type,status,received_at) values('INGEST',?,?) returning job_id",
+        "insert into ingest.uploads(bank_id,business_date,file_name,file_hash,size_bytes,status,received_at) values(12,'2026-09-09','fixture.csv',repeat('a',64),1,?,?) returning upload_id",
         Long.class,
         status,
         at == null ? null : Timestamp.from(at));
@@ -77,7 +79,7 @@ class AnalysisRunnerTests {
 
   long stageJob() {
     long id = service.registerNow();
-    jdbc.update("update batch_jobs set current_stage='FEATURES' where job_id=?", id);
+    jdbc.update("update analysis.jobs set current_stage='FEATURES' where job_id=?", id);
     return id;
   }
 
@@ -89,14 +91,14 @@ class AnalysisRunnerTests {
     long id = service.registerScheduled();
     assertThat(
             jdbc.queryForList(
-                "select upload_id from analysis_uploads where job_id=?", Long.class, id))
+                "select upload_id from analysis.receipts where job_id=?", Long.class, id))
         .containsExactly(included);
     clock.advance(86400);
     long next = service.registerScheduled();
     assertThat(
             jdbc.queryForList(
-                "select upload_id from analysis_uploads where job_id=?", Long.class, next))
-        .containsExactly(late);
+                "select upload_id from analysis.receipts where job_id=?", Long.class, next))
+        .containsExactlyInAnyOrder(included, late);
   }
 
   @Test
@@ -111,14 +113,19 @@ class AnalysisRunnerTests {
     runner.scan();
     assertThat(service.job(id).status()).isEqualTo("RETRY_WAIT");
     assertThat(service.job(id).attempts()).isZero();
-    jdbc.update("update batch_jobs set status='FAILED' where job_id=?", upload);
+    jdbc.update("update ingest.uploads set status='FAILED' where upload_id=?", upload);
     clock.advance(5);
     runner.scan();
     assertThat(service.job(id).status()).isEqualTo("FAILED");
     assertThat(service.job(id).error()).isEqualTo("INGEST_FAILED");
-    jdbc.update("update batch_jobs set status='VALIDATION_FAILED' where job_id=?", upload);
+    jdbc.update("update ingest.uploads set status='VALIDATION_FAILED' where upload_id=?", upload);
     service.resume(id);
     runner.scan();
+    assertThat(service.job(id).stage()).isEqualTo(AnalysisStage.INTEGRATE);
+    runner.close();
+    AnalysisRunner resumed = runner(c -> new AnalysisStageExecutor.Result("empty integration"));
+    resumed.scan();
+    resumed.scan();
     assertThat(service.job(id).status()).isEqualTo("COMPLETED");
     assertThat(service.detail(id).get("completionReason")).isEqualTo("EMPTY_INPUT");
   }
@@ -148,7 +155,7 @@ class AnalysisRunnerTests {
     assertThat(attempts).hasValue(3);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_failures where job_id=?", Integer.class, id))
+                "select count(*) from analysis.failures where job_id=?", Integer.class, id))
         .isEqualTo(3);
     service.resume(id);
     runner.scan();
@@ -182,7 +189,7 @@ class AnalysisRunnerTests {
     assertThat(service.job(id).status()).isEqualTo("COMPLETED");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_stage_results where job_id=? and completed",
+                "select count(*) from analysis.stage_results where job_id=? and completed",
                 Integer.class,
                 id))
         .isEqualTo(4);
@@ -216,7 +223,7 @@ class AnalysisRunnerTests {
         new AnalysisStageExecutor() {
           public Result prepare(Context c) {
             jdbc.update(
-                "update batch_jobs set execution_id=? where job_id=?", UUID.randomUUID(), id);
+                "update analysis.jobs set execution_id=? where job_id=?", UUID.randomUUID(), id);
             return new Result("late");
           }
 
@@ -227,7 +234,8 @@ class AnalysisRunnerTests {
     runner(executor).scan();
     assertThat(commit).hasValue(0);
     jdbc.update(
-        "update batch_jobs set consecutive_failures=2,error_code='CALCULATION' where job_id=?", id);
+        "update analysis.jobs set consecutive_failures=2,error_code='CALCULATION' where job_id=?",
+        id);
     runners.getFirst().close();
     AnalysisRunner restarted =
         runner(
@@ -252,7 +260,7 @@ class AnalysisRunnerTests {
           }
 
           public void commit(Context c, Result r) {
-            jdbc.update("update batch_jobs set suspicious_tx_count=8 where job_id=?", id);
+            jdbc.update("update analysis.jobs set suspicious_tx_count=8 where job_id=?", id);
             if (committed.incrementAndGet() < 3)
               throw new org.springframework.dao.DataAccessResourceFailureException(
                   "simulated DB outage");
@@ -262,7 +270,7 @@ class AnalysisRunnerTests {
     runner.scan();
     assertThat(
             jdbc.queryForObject(
-                "select suspicious_tx_count from batch_jobs where job_id=?", Integer.class, id))
+                "select suspicious_tx_count from analysis.jobs where job_id=?", Integer.class, id))
         .isNull();
     clock.advance(30);
     runner.scan();
@@ -273,7 +281,7 @@ class AnalysisRunnerTests {
     assertThat(service.job(id).stage()).isEqualTo(AnalysisStage.INFERENCE);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_failures where job_id=?", Integer.class, id))
+                "select count(*) from analysis.failures where job_id=?", Integer.class, id))
         .isEqualTo(2);
   }
 
@@ -380,9 +388,9 @@ class AnalysisRunnerTests {
     long id = service.registerScheduled();
     assertThat(
             jdbc.queryForList(
-                "select upload_id from analysis_uploads where job_id=?", Long.class, id))
+                "select upload_id from analysis.receipts where job_id=?", Long.class, id))
         .containsExactly(included);
-    jdbc.update("update batch_jobs set current_stage='FEATURES' where job_id=?", id);
+    jdbc.update("update analysis.jobs set current_stage='FEATURES' where job_id=?", id);
     AnalysisRunner runner =
         runner(
             c -> {

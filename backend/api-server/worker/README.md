@@ -1,14 +1,29 @@
 # 백엔드·추론 워커 배포
 
-백엔드 워커는 EC2의 API 컨테이너 안에서 Spring이 `analysis_entry.py`를 실행한다.
-추론 워커는 KubeSphere에서 `inference_server.py` 하나를 실행한다. 현재 모델은
-`demo-calculator-v1` 더미이며 실제 GNN/학습 모델은 포함하지 않는다.
+백엔드 워커는 API 컨테이너에서 Spring이 실행한다. 추론 워커는 별도 프로세스 `inference_server.py`이며 dev에서는 동일 이미지의 별도 컨테이너다.
+
+### 라벨 독립 임시 추론
+
+새 분석은 `demo-random-v1/demo-input-v1` 임시 변환기를 사용한다. 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
+
+- API와 추론 워커를 함께 배포한다. CSV를 다시 만들 필요는 없다.
+- 기존 일반 더미 바인딩은 유지한다. 삭제된 demo-labels 버전의 미완료 실행은 새 실행이 필요하며 완료 이력은 그대로 둔다.
+- 실제 모델 도입 시 계산기와 입력 피처를 모델 계약에 맞춰 교체한다. 요청·결과 전달과 검증 구조는 유지한다.
 
 연결 범위는 입력 준비 → S3 게시 → 추론 API → 결과 수집/검증 → 점수 DB 저장이다.
-Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 현재 ALERTS 저장은
-미연결이므로 점수 저장 후 `ALERTS / FAILED / PIPELINE_NOT_CONFIGURED`가 예상된다.
-이를 전체 분석 완료로 해석하지 않는다.
+Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 점수 저장 다음 ALERTS에서
+고정 맥락 기반 근거를 저장한 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
+실제 GNN의 탐지 성능을 검증한 것은 아니다.
 
+## DB 역할과 초기 구조
+
+기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. Alert 거래에 당시 SEED 위험도를 함께 저장하여 목록 정렬의 JSON 반복 전개를 제거한다. 기존 V1이 적용된 dev는 사용자 결정에 따라 설정 백업 후 재초기화한다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 전환 절차](../../../deploy/DB_TRANSITION.md)를 따른다.
+
+- 수신 `ingest_entry.py`와 `analysis_entry.py --stage INTEGRATE`는 원문 보호·보고 통합·정정을 수행하므로 API의 데이터 작업 계정을 사용한다. `cryptography`는 이 단계의 AES-GCM 암호화/복호화와 Java 호환 검증에 필요하다. 조회 속도를 높이기 위한 라이브러리가 아니다.
+- FEATURES/INFERENCE/SCORES/ALERTS는 `ANALYSIS_DB_USERNAME`·`ANALYSIS_DB_PASSWORD`의 별도 로그인으로 같은 DB에 접속한다. 누락 시 API 관리자 계정으로 대체하지 않는다. 자식 프로세스에서 원문 암호키와 API DB 환경변수를 제거한다.
+- DB 관리자가 새 스키마 적용 후 `configure_analysis_db.py`를 명시 실행한다. 관리자 연결은 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`, 생성할 계정은 위 두 분석 환경변수로만 전달한다. 로그인 이름은 환경별로 다르게 지정하고 비밀번호는 24자 이상으로 준비한다. 이 도구는 DB를 만들지 않으며 `analysis_permissions.sql`의 권한만 부여한다.
+- 분석 역할은 보호·평가 스키마와 직원 비밀번호 해시를 읽지 못한다. 배정 후보는 `core.assignable_staff` 뷰로 읽고 배정 시각만 갱신한다. 분석 진입점도 보호 스키마 접근 권한이 있으면 실행을 거절한다.
+- dev/prod 배포 설정은 `/aml/{환경}/analysis-db/username`, `/aml/{환경}/analysis-db/password`를 읽는다. 비밀번호는 SecureString으로 보관하고 같은 값을 DB 로그인에 설정한다. 스크립트 작성·테스트는 실제 서버 권한 설정이나 배포 완료를 의미하지 않는다.
 ## 1. 이미지 빌드
 
 빌드 context는 두 이미지 모두 `backend/api-server`다. 다음은 해당 폴더의
@@ -117,20 +132,22 @@ $detail.models | Format-Table modelKind, phase, status, remoteStatus, errorCode,
 `GET /api/v1/batch-jobs?type=ANALYSIS`로 실제 작업 ID·실패 단계를 확인하고 FAILED 작업만
 `POST /api/v1/batch-jobs/{jobId}/resume`한다. 완료 작업을 다시 분석하지 않는다.
 
-5. 두 모델이 `DONE/SUCCEEDED`이고 상위가 `ALERTS`까지 도달했는지 확인한다. 현재
-   `PIPELINE_NOT_CONFIGURED`가 **ALERTS에서** 나온다면 점수 단계 이후의 미연결 경계다.
-   같은 오류가 FEATURES/INFERENCE/SCORES에서 나오면 구성 실패다. 공개 점수 화면은
-   전체 완료 전 결과를 숨길 수 있으므로 빈 화면으로 점수 저장 실패를 단정하지 않는다.
+5. 두 모델이 `DONE/SUCCEEDED`이고 상위가 `COMPLETE/COMPLETED`까지 도달했는지 확인한다.
+   ALERTS는 고정 맥락에서 근거를 구성·저장한 뒤 완료한다. 의심 씨앗0건은 Alert0건으로 정상 완료한다.
+   `ALERT_ASSIGNEE_UNAVAILABLE`이면 실제 L1 사용자 등록이 필요하다. `PIPELINE_NOT_CONFIGURED`는
+   정상 완료 경계가 아니라 워커 설정 오류다. 공개 점수·Alert API는 전체 완료 전 결과를 숨긴다.
+   완료 후 `GET /api/v1/alerts?jobId={jobId}`, 상세 `/{alertId}`, `/{alertId}/versions`,
+   `/{alertId}/graph`를 확인한다. jobId는 최신 공개 근거 버전의 생성 작업 기준이다.
 6. DB 확인 권한이 있는 담당자는 실제 jobId를 넣어 아래 읽기 전용 SQL로 검증한다.
 
 ```sql
 SELECT model_kind, phase, status, error_code
-FROM analysis_model_tasks
-WHERE run_id = (SELECT current_run_id FROM batch_jobs WHERE job_id = :job_id);
-SELECT stage, completed FROM analysis_run_stage_results
-WHERE run_id = (SELECT current_run_id FROM batch_jobs WHERE job_id = :job_id);
-SELECT count(*), min(score_pct), max(score_pct) FROM inference_results
-WHERE job_id = :job_id;
+FROM analysis.model_tasks
+WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id);
+SELECT stage, completed FROM analysis.stage_results
+WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id);
+SELECT count(*), min(score_pct), max(score_pct) FROM analysis.scores
+WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id);
 ```
 
 ## 5. 취소·재기동 확인의 경계
@@ -142,5 +159,33 @@ WHERE job_id = :job_id;
 - 더미는 빠르게 끝나므로 늦은 취소의 `ALREADY_FINISHED`는 정상 응답일 수 있다.
   실행 중 중단 성공을 검증했다고 보고하지 않는다. 결정적 실행 중 취소·재시도 경합은
   기존 로컬 테스트가 다루며 실환경에서는 실제 관찰된 상태를 기록한다.
-- 이번 패키징만으로 Alert 저장, GNN 추론, 콜백, 독립 비동기 실행 슬롯 또는 원격 최종
+- 이번 패키징만으로 GNN 추론, 콜백, 독립 비동기 실행 슬롯 또는 원격 최종
   실패의 새 회차 재개가 완성된 것은 아니다.
+
+
+## 고정 맥락·Alert 단계
+
+`analysis_entry.py --stage ALERTS`는 `alert_pipeline.py`를 호출한다. Spring FREEZE_INPUT이
+TARGET와 씨앗 날짜 전후6일 범위 중 cutoff 이하의 CONTEXT·기존 점수·날짜별 수신 범위를 동결하며, Python은 패턴
+확률로 모양을 강제하지 않고 실제 거래 연결로 후보를 구성한다. 초기 한도는 깊이2/100거래/
+계좌 활동100이고 정책 버전은 `calendar-event-v4`이다. 한 후보에 다른 후보의 씨앗 거래가
+포함될 때만 병합하며 비씨앗 거래 공유만으로 합치지 않는다. 정상 예측·미채점 거래의 탐색과
+포함은 유지한다. 공유 계좌로 발견한 주변 거래는 그 이유만으로 추가 확장하지 않는다.
+직접 상류·하류 흐름으로도 도달하거나 별도 씨앗인 경우에는 해당 경로에서 탐색을 계속한다. 서울 날짜2일 간격으로 직접 경로의 탐색 창을 이동한다. 전체48시간 제한은 없으며 미래 자료 대기는 하지 않는다.
+
+OPEN의 추가 근거는 버전으로 보존한다. 종결·이관 사건의 추가 근거는 연결된 후속 Alert이며,
+기존 판정 대상은 변경하지 않는다. 신규 TARGET가0건이어도 Spring이 보고/수집 범위 변경으로 영향 Alert를 선정했다면
+모델을 재실행하지 않고 ALERTS에서 보완한다. 이후 보고가 바뀌면 관련 사건을 다시 확인한다. 미등록·미수신·일부 보류와 정상 수신 후 연결 없음을 구분한다.
+
+과거 버전 조회는 고정 거래·점수를 사용한다. 새 연결이 없으면 근거 버전을 복제하지 않고
+coverage 검사만 남긴다. run/job이 모두 COMPLETED인 버전만 공개한다. 사용자 판정·이력·Episode 변경은 Spring review API가 담당한다. 실제 GNN 연결은 별도이며 현재 모델은 시연용이다. 상세 계약은 API.md §3·§9를 따른다.
+
+동일 사건을 다른 run이 미완료 상태로 쓰고 있으면 `RUN_FENCED`로 차단한다. 동결 후 최신
+완료 근거 버전이 바뀌어도 기존 동결 입력을 그대로 적용하지 않는다. 이 충돌은 같은 입력의
+단순 resume으로 해결되지 않으며 경쟁 실행 정리와 새 스냅샷이 필요하다. 자동 재동결 정책은
+구현하지 않았으므로 여러 분석 실행의 동시 사건 갱신을 정상 지원한다고 간주하지 않는다.
+
+Alert 상태 조회는 `dataAsOf`(공개 근거의 수신 cutoff)와 `lastCheckedAt`(성공한 검사 시각)을 구분한다.
+워커는 근거·coverage·checked_at·체크포인트를 원자 저장하고 재시도 시 검사 시각을 다시 쓰지 않는다.
+API의 `forwardComplete`는 제거했다. Spring은 고정 출처 스냅샷 차이로 재검토 대상을 선정한다.
+Python은 날짜별 이동 탐색을 수행하며 내부 미래 수신 완료 플래그를 사용하지 않는다.

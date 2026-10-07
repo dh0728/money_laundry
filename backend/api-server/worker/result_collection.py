@@ -21,7 +21,7 @@ from worker_transport import ProtocolError, Request, encode
 
 def _current(connection, execution, stage):
     row = connection.execute('''SELECT b.execution_id,b.status,b.current_stage,b.current_run_id,r.status
-        FROM batch_jobs b JOIN analysis_runs r ON r.run_id=b.current_run_id WHERE b.job_id=%s''',
+        FROM analysis.jobs b JOIN analysis.runs r ON r.run_id=b.current_run_id WHERE b.job_id=%s''',
         (execution.job_id,)).fetchone()
     if (row is None or row[:4] != (execution.execution_id, 'RUNNING', stage, execution.run_id)
             or row[4] not in ('READY', 'ACTIVE')):
@@ -130,7 +130,7 @@ def _failure(connection, execution, kind, token, error):
     try:
         with connection.transaction():
             _lock(connection, execution)
-            connection.execute('''UPDATE analysis_model_tasks SET execution_id=null,execution_owner=null,
+            connection.execute('''UPDATE analysis.model_tasks SET execution_id=null,execution_owner=null,
                 consecutive_failures=consecutive_failures+1,error_code=%s,
                 status=CASE WHEN %s AND consecutive_failures<2 THEN 'RETRY_WAIT' ELSE 'FAILED' END,
                 action_required=NOT (%s AND consecutive_failures<2),
@@ -148,7 +148,7 @@ def collect_model(connection, execution, kind, storage_root, settings, s3):
     with connection.transaction():
         _lock(connection, execution)
         row = connection.execute('''SELECT binding,input_artifact,request_id,execution_round,remote_snapshot,
-            phase,status,execution_owner FROM analysis_model_tasks WHERE run_id=%s AND model_kind=%s FOR UPDATE''',
+            phase,status,execution_owner FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s FOR UPDATE''',
             (execution.run_id, kind)).fetchone()
         if row is None or row[5] != 'COLLECT' or row[6] not in ('READY', 'RETRY_WAIT', 'ACTIVE'):
             raise StaleExecution('Result collection is not ready')
@@ -157,7 +157,7 @@ def collect_model(connection, execution, kind, storage_root, settings, s3):
         result, binding = _metadata(execution, kind, row[:5])
         if binding['publication'] != settings.binding():
             raise ProtocolError('Result destination changed')
-        connection.execute('''UPDATE analysis_model_tasks SET status='ACTIVE',execution_id=%s,
+        connection.execute('''UPDATE analysis.model_tasks SET status='ACTIVE',execution_id=%s,
             execution_owner=%s,operation_attempts=operation_attempts+1,updated_at=now()
             WHERE run_id=%s AND model_kind=%s''', (token, execution.execution_id, execution.run_id, kind))
     root = Path(storage_root).resolve()
@@ -169,7 +169,7 @@ def collect_model(connection, execution, kind, storage_root, settings, s3):
         artifact = dict(result, path=relative.as_posix())
         with connection.transaction():
             _lock(connection, execution)
-            changed = connection.execute('''UPDATE analysis_model_tasks SET phase='DONE',status='SUCCEEDED',
+            changed = connection.execute('''UPDATE analysis.model_tasks SET phase='DONE',status='SUCCEEDED',
                 result_artifact=%s::jsonb,execution_id=null,execution_owner=null,consecutive_failures=0,
                 error_code=null,action_required=false,retry_at=null,next_poll_at=null,finished_at=now(),updated_at=now()
                 WHERE run_id=%s AND model_kind=%s AND phase='COLLECT' AND status='ACTIVE'
@@ -188,7 +188,7 @@ def collect_model(connection, execution, kind, storage_root, settings, s3):
 def finish_inference(connection, execution):
     with connection.transaction():
         _lock(connection, execution)
-        rows = connection.execute('''SELECT model_kind,result_artifact FROM analysis_model_tasks
+        rows = connection.execute('''SELECT model_kind,result_artifact FROM analysis.model_tasks
             WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED' AND result_artifact IS NOT NULL''',
             (execution.run_id,)).fetchall()
         if {r[0] for r in rows} != {'BINARY', 'TYPE'}:
@@ -198,23 +198,23 @@ def finish_inference(connection, execution):
 
 
 def _checkpoint(connection, execution, stage, artifact):
-    connection.execute('''INSERT INTO analysis_run_stage_results(run_id,stage,execution_id,artifact,completed)
-        VALUES(%s,%s,%s,%s,true) ON CONFLICT(run_id,stage) DO UPDATE SET
-          execution_id=excluded.execution_id,artifact=excluded.artifact,completed=true''',
-        (execution.run_id, stage, execution.execution_id, artifact))
+    connection.execute('''INSERT INTO analysis.stage_results(job_id,run_id,stage,execution_id,artifact,completed)
+        VALUES(%s,%s,%s,%s,%s,true) ON CONFLICT(job_id,stage) DO UPDATE SET
+          run_id=excluded.run_id,execution_id=excluded.execution_id,artifact=excluded.artifact,completed=true''',
+        (execution.job_id, execution.run_id, stage, execution.execution_id, artifact))
 
 
 def save_scores(connection, execution, storage_root, settings, s3):
     with connection.transaction():
         _lock(connection, execution, 'SCORES')
         rows = connection.execute('''SELECT model_kind,binding,input_artifact,request_id,execution_round,
-            remote_snapshot,result_artifact FROM analysis_model_tasks
+            remote_snapshot,result_artifact FROM analysis.model_tasks
             WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED' ORDER BY model_kind''',
             (execution.run_id,)).fetchall()
         if {r[0] for r in rows} != {'BINARY', 'TYPE'}:
             raise ProtocolError('Both model results are required')
         # A persisted checkpoint is authoritative after a lost worker response.
-        saved = connection.execute('''SELECT artifact FROM analysis_run_stage_results
+        saved = connection.execute('''SELECT artifact FROM analysis.stage_results
             WHERE run_id=%s AND stage='SCORES' AND completed''', (execution.run_id,)).fetchone()
         if saved:
             _checkpoint(connection, execution, 'SCORES', saved[0])
@@ -247,27 +247,18 @@ def save_scores(connection, execution, storage_root, settings, s3):
         FROM collected_binary b JOIN collected_type t USING(tx_id)''')
     with connection.transaction():
         _lock(connection, execution, 'SCORES')
-        if connection.execute('''SELECT EXISTS(SELECT 1 FROM inference_results
-            WHERE job_id=%s AND run_id IS DISTINCT FROM %s)''',
-            (execution.job_id, execution.run_id)).fetchone()[0]:
-            raise ProtocolError('Scores belong to another run')
-        if connection.execute('''WITH RECURSIVE predecessors(run_id) AS (
-            SELECT replaces_run_id FROM analysis_run_replacements WHERE run_id=%s
-            UNION SELECT x.replaces_run_id FROM analysis_run_replacements x JOIN predecessors p ON x.run_id=p.run_id)
-            SELECT EXISTS(SELECT 1 FROM combined_scores s JOIN transactions t USING(tx_id)
-            LEFT JOIN analysis_target_ownership o USING(tx_id)
-            WHERE t.integration_status<>'ACTIVE' OR (o.run_id IS NOT NULL AND o.run_id<>%s)
-            OR (t.scored_job_id IS NOT NULL AND t.scored_job_id<>%s AND NOT EXISTS(
-              SELECT 1 FROM batch_jobs b JOIN analysis_runs r ON r.run_id=b.current_run_id
-              JOIN predecessors p ON p.run_id=r.run_id
-              WHERE b.job_id=t.scored_job_id AND b.status<>'COMPLETED' AND r.status='CANCELLED')))''',
-            (execution.run_id, execution.run_id, execution.job_id)).fetchone()[0]:
+        if connection.execute('''SELECT EXISTS(SELECT 1 FROM combined_scores s JOIN ledger.transactions t USING(tx_id)
+            LEFT JOIN analysis.target_ownership o USING(tx_id)
+            WHERE t.integration_status<>'ACTIVE' OR o.run_id IS DISTINCT FROM %s
+            OR EXISTS(SELECT 1 FROM analysis.input_transactions i JOIN analysis.runs r USING(run_id)
+              WHERE i.tx_id=t.tx_id AND i.input_role='TARGET' AND r.status='COMPLETED'))''',
+            (execution.run_id,)).fetchone()[0]:
             raise ProtocolError('TARGET is no longer eligible for scoring')
-        connection.execute('''INSERT INTO inference_results(job_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,score_pct,run_id)
-            SELECT %s,s.*,%s FROM combined_scores s''', (execution.job_id, execution.run_id))
-        connection.execute('''UPDATE transactions t SET scored_job_id=%s
-            FROM combined_scores s WHERE t.tx_id=s.tx_id''', (execution.job_id,))
-        connection.execute('''UPDATE batch_jobs SET model_version_binary=%s,model_version_type=%s,
+        connection.execute('''INSERT INTO analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,score_pct,type_class)
+            SELECT %s,s.*,array_position(array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8],
+              greatest(s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8))-1
+            FROM combined_scores s''', (execution.run_id,))
+        connection.execute('''UPDATE analysis.jobs SET model_version_binary=%s,model_version_type=%s,
             feature_version_binary=%s,feature_version_type=%s,row_count=(SELECT count(*) FROM combined_scores),
             suspicious_tx_count=(SELECT count(*) FROM combined_scores WHERE p_laundering>=threshold_value)
             WHERE job_id=%s''', (bindings['BINARY']['model_version'], bindings['TYPE']['model_version'],
