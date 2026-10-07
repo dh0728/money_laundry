@@ -149,7 +149,7 @@ class ReviewWorkflowTests {
 
   private double risk(long id) {
     return jdbc.queryForObject(
-        "select risk from review.visible_cases where case_id=?", Double.class, id);
+        "select risk from " + ReviewCaseSql.WITH_RISK + " c where case_id=?", Double.class, id);
   }
 
   ReviewService.Selection select(long id, long... txIds) {

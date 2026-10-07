@@ -50,7 +50,9 @@ public class DashboardService {
     out.put(
         "personal",
         jdbc.queryForMap(
-            "select count(*) filter(where status='OPEN') as pending,count(*) filter(where status='OPEN' and assigned_at<=?) as aged,count(*) filter(where status='CLOSED' and closed_by=? and closed_at>=? and closed_at<?) as closed from review.visible_cases where assignee_id=?",
+            "select count(*) filter(where status='OPEN') as pending,count(*) filter(where status='OPEN' and assigned_at<=?) as aged,count(*) filter(where status='CLOSED' and closed_by=? and closed_at>=? and closed_at<?) as closed from "
+                + ReviewCaseSql.PUBLISHED
+                + " where assignee_id=?",
             Timestamp.from(now.minus(Duration.ofDays(3))),
             user,
             at(from),
@@ -59,7 +61,9 @@ public class DashboardService {
     out.put(
         "institution",
         jdbc.queryForMap(
-            "select count(*) filter(where kind='ALERT' and status='OPEN') as alerts,count(*) filter(where kind='EPISODE' and status='OPEN') as episodes,count(*) filter(where status='OPEN' and assigned_at<=?) as aged,count(*) filter(where kind='ALERT' and created_at>=? and created_at<?) as today,count(*) filter(where kind='ALERT' and created_at>=? and created_at<?) as yesterday from review.visible_cases",
+            "select count(*) filter(where kind='ALERT' and status='OPEN') as alerts,count(*) filter(where kind='EPISODE' and status='OPEN') as episodes,count(*) filter(where status='OPEN' and assigned_at<=?) as aged,count(*) filter(where kind='ALERT' and created_at>=? and created_at<?) as today,count(*) filter(where kind='ALERT' and created_at>=? and created_at<?) as yesterday from "
+                + ReviewCaseSql.PUBLISHED
+                + "",
             Timestamp.from(now.minus(Duration.ofDays(3))),
             at(today),
             at(today.plusDays(1)),
@@ -68,7 +72,9 @@ public class DashboardService {
     out.put(
         "openAlertsAgedOver3Days",
         jdbc.queryForObject(
-            "select count(*) from review.visible_cases where kind='ALERT' and status='OPEN' and assigned_at<=?",
+            "select count(*) from "
+                + ReviewCaseSql.PUBLISHED
+                + " where kind='ALERT' and status='OPEN' and assigned_at<=?",
             Long.class,
             Timestamp.from(now.minus(Duration.ofDays(3)))));
     out.put("episodeWork", episodeWork(now, from, to));
@@ -117,7 +123,9 @@ public class DashboardService {
     out.put(
         "priority",
         jdbc.queryForList(
-            "select case_id,kind,alert_id,created_at,risk from review.visible_cases where assignee_id=? and status='OPEN' order by risk desc,created_at,case_id limit 10",
+            "select case_id,kind,alert_id,created_at,risk from "
+                + ReviewCaseSql.WITH_RISK
+                + " where assignee_id=? and status='OPEN' order by risk desc,created_at,case_id limit 10",
             user));
     return out;
   }
@@ -128,18 +136,19 @@ public class DashboardService {
         """
         with incoming as (
           select (created_at at time zone 'Asia/Seoul')::date as day,count(*) as count
-          from review.visible_cases where kind='ALERT' and created_at>=? and created_at<?
+          from %s where kind='ALERT' and created_at>=? and created_at<?
           group by 1
         ), completed as (
           select (closed_at at time zone 'Asia/Seoul')::date as day,count(*) as count
-          from review.visible_cases where kind='ALERT' and closed_at>=? and closed_at<?
+          from %s where kind='ALERT' and closed_at>=? and closed_at<?
           group by 1
         )
         select d::date as day,coalesce(i.count,0) as incoming,coalesce(c.count,0) as completed
         from generate_series(?::date::timestamp,?::date::timestamp,interval '1 day') d
         left join incoming i on i.day=d::date
         left join completed c on c.day=d::date order by d
-        """,
+        """
+            .formatted(ReviewCaseSql.PUBLISHED, ReviewCaseSql.PUBLISHED),
         at(from),
         at(to.plusDays(1)),
         at(from),
