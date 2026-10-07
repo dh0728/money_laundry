@@ -88,6 +88,47 @@ class ResetTests(unittest.TestCase):
             versions.assert_not_called()
             db.assert_not_called()
 
+    def test_db_only_reset_never_accesses_s3_and_requires_backup(self):
+        for failed_backup in (False, True):
+            with self.subTest(failed_backup=failed_backup), \
+                 patch.object(reset, "run", side_effect=["", '[{"State":{"Running":false}}]']), \
+                 patch.object(reset, "configuration_backup", side_effect=RuntimeError("backup failed") if failed_backup else None) as backup, \
+                 patch.object(reset, "object_versions") as versions, \
+                 patch.object(reset, "aws") as aws, patch.object(reset, "psql") as db:
+                if failed_backup:
+                    with self.assertRaisesRegex(RuntimeError, "backup failed"):
+                        reset.reset("config.json", db_only=True)
+                    db.assert_not_called()
+                else:
+                    reset.reset("config.json", db_only=True)
+                    db.assert_called_once()
+                    self.assertIn('DROP DATABASE "aml_dev_v3"', db.call_args.args[0])
+                backup.assert_called_once_with("config.json")
+                versions.assert_not_called()
+                aws.assert_not_called()
+
+    def test_db_only_cli_inspection_apply_and_missing_backup(self):
+        for mode in ([], ["--apply"], ["--apply", "--backup-file", "config.json"]):
+            args = self.scope()
+            parameters = {k: {"Value": v} for k, v in args[2].items()}
+            with self.subTest(mode=mode), patch.object(reset.os, "name", "posix"), \
+                 patch.object(reset, "inspect", side_effect=args[:2]), \
+                 patch.object(reset, "read_parameters", return_value=parameters), \
+                 patch.object(reset, "psql"), patch.object(reset, "object_versions") as versions, \
+                 patch.object(reset, "ensure_keys") as keys, patch.object(reset, "reset") as destroy:
+                if mode == ["--apply"]:
+                    with self.assertRaisesRegex(RuntimeError, "requires --backup-file"):
+                        reset.main(["--db-only", *mode])
+                    destroy.assert_not_called()
+                else:
+                    reset.main(["--db-only", *mode])
+                    if mode:
+                        destroy.assert_called_once_with("config.json", db_only=True)
+                    else:
+                        destroy.assert_not_called()
+                versions.assert_not_called()
+                keys.assert_not_called()
+
     def test_configuration_backup_is_exclusive_and_restoration_is_atomic(self):
         tables = {name: [] for name in reset.CONFIGURATION}
         tables['users'] = [dict(zip(reset.CONFIGURATION['users'].split(','),

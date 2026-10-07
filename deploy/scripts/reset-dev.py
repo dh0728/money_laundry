@@ -184,25 +184,26 @@ def ensure_keys():
     print("Protection parameters ready; existing keys were retained and values were not printed.")
 
 
-def reset(backup_file):
+def reset(backup_file, *, db_only=False):
     run(["docker", "stop", API])
     stopped = json.loads(run(["docker", "inspect", API]))[0]["State"]
     if stopped["Running"]:
         raise RuntimeError("API must be stopped before resetting")
     configuration_backup(backup_file)
     # Re-read after stopping uploads; external upload/deployment clients must also be idle.
-    objects = object_versions()
+    objects = [] if db_only else object_versions()
     for offset in range(0, len(objects), 1000):
         response = aws("s3api", "delete-objects", body={
             "Bucket": BUCKET, "Delete": {"Objects": objects[offset:offset + 1000], "Quiet": True}
         })
         if response.get("Errors"):
             raise RuntimeError("Some S3 versions could not be deleted; API remains stopped")
-    if object_versions():
+    if not db_only and object_versions():
         raise RuntimeError("S3 prefix is not empty; API remains stopped")
     psql(f'DROP DATABASE "{DATABASE}" WITH (FORCE);\n'
          f'CREATE DATABASE "{DATABASE}" OWNER "{DB_USER}" TEMPLATE template0;\n')
-    print(f"Reset complete: only {DATABASE} is empty; configuration backup verified; named S3 prefix empty.")
+    storage = "S3 was not accessed or changed" if db_only else "named S3 prefix empty"
+    print(f"Reset complete: only {DATABASE} is empty; configuration backup verified; {storage}.")
     print("API is stopped. Apply the new initial migration, restore configuration with --restore-config, then enable uploads/analysis.")
 
 
@@ -213,6 +214,8 @@ def main(argv=None):
     mode.add_argument("--prepare-keys", action="store_true", help="prepare protection keys without deleting data")
     mode.add_argument("--restore-config", metavar="FILE", help="restore configuration after the initial migration")
     parser.add_argument("--backup-file", help="required exclusive configuration backup path for --apply")
+    parser.add_argument("--db-only", action="store_true",
+                        help="inspect/reset only the DB; no S3 access or protection key creation")
     args = parser.parse_args(argv)
     if os.name != "posix":
         raise RuntimeError("Run this script on the EC2 Linux host")
@@ -229,18 +232,22 @@ def main(argv=None):
         ensure_keys()
         return
     psql("SELECT current_user;\n")
-    objects = object_versions()
+    objects = [] if args.db_only else object_versions()
     print(f"DB target: {DATABASE}; user: {DB_USER}; configuration is preserved")
-    print(f"S3 target: s3://{BUCKET}/{PREFIX}; object versions/delete markers: {len(objects)}")
+    if args.db_only:
+        print("DB-only mode: S3 is not accessed; existing protection keys are unchanged.")
+    else:
+        print(f"S3 target: s3://{BUCKET}/{PREFIX}; object versions/delete markers: {len(objects)}")
     print("Other databases, roles, volumes, S3 prefixes and deployment artifacts are excluded.")
     if not args.apply:
-        print("Inspection only. --apply creates missing protection keys, stops API and deletes these targets.")
+        print("Inspection only. --apply with --backup-file stops API, backs up configuration and resets the selected targets.")
         return
     if not args.backup_file:
         raise RuntimeError("--apply requires --backup-file; existing configuration must be backed up")
     # Missing SSM write/KMS permissions fail here, before any data deletion or API stop.
-    ensure_keys()
-    reset(args.backup_file)
+    if not args.db_only:
+        ensure_keys()
+    reset(args.backup_file, db_only=args.db_only)
 
 
 if __name__ == "__main__":
