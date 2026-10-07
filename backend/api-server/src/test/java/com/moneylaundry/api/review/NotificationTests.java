@@ -19,7 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest(properties = "spring.profiles.active=local")
+@SpringBootTest(properties = {"spring.profiles.active=local"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Transactional
@@ -33,24 +33,27 @@ class NotificationTests {
 
   @BeforeEach
   void setup() {
-    owner = jdbc.queryForObject("select user_id from users where username='l1a'", Long.class);
-    other = jdbc.queryForObject("select user_id from users where username='l1b'", Long.class);
-    jdbc.update("update demo_business_clock set business_at='2023-09-02T00:00:00Z'");
+    owner = jdbc.queryForObject("select user_id from core.users where username='l1a'", Long.class);
+    other = jdbc.queryForObject("select user_id from core.users where username='l1b'", Long.class);
+    jdbc.update("update ops.business_clock set business_at='2023-09-02T00:00:00Z'");
     job =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,analysis_date,threshold_value) values('ANALYSIS','COMPLETED','2023-09-02',.7) returning job_id",
+            "insert into analysis.jobs(current_stage,analysis_cutoff_at,business_at,status,analysis_date,threshold_value) values('COMPLETE',now(),now(),'COMPLETED','2023-09-02',.7) returning job_id",
             Long.class);
     run = UUID.randomUUID();
     jdbc.update(
-        "insert into analysis_runs(run_id,job_id,status) values(?,?,'COMPLETED')", run, job);
+        "insert into analysis.runs(run_id,job_id,status) values(?,?,'COMPLETED')", run, job);
   }
 
   long alert(long user) {
     long id =
         jdbc.queryForObject(
-            "insert into alerts(assignee_id) values(?) returning alert_id", Long.class, user);
-    jdbc.update("insert into alert_versions values(?,1,?,repeat('a',64),'{}',now())", id, run);
-    return jdbc.queryForObject("select case_id from review_cases where alert_id=?", Long.class, id);
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,'2023-09-02T00:00:00Z','2023-09-02T00:00:00Z') returning alert_id",
+            Long.class,
+            user);
+    jdbc.update(
+        "insert into review.alert_versions values(?,1,?,repeat('a',64),'{}',now())", id, run);
+    return jdbc.queryForObject("select case_id from review.cases where alert_id=?", Long.class, id);
   }
 
   @SuppressWarnings("unchecked")
@@ -62,19 +65,19 @@ class NotificationTests {
   void five_alert_transfer_is_one_notification_and_later_transfer_stays_separate() {
     long episode =
         jdbc.queryForObject(
-            "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-02T00:00:00Z','2023-09-02T00:00:00Z') returning case_id",
+            "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,'2023-09-02T00:00:00Z','2023-09-02T00:00:00Z') returning episode_id",
             Long.class,
             owner);
     for (int i = 0; i < 5; i++) {
       long source = alert(owner);
       jdbc.update(
-          "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','다섯 건 편입','2023-09-02T00:00:00Z','{}')",
+          "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','다섯 건 편입','2023-09-02T00:00:00Z','{}')",
           source,
           owner);
     }
     long first =
         jdbc.queryForObject(
-            "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','다섯 건 편입','2023-09-02T00:00:00Z','[]') returning event_id",
+            "insert into review.events(episode_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','다섯 건 편입','2023-09-02T00:00:00Z','[]') returning event_id",
             Long.class,
             episode,
             owner);
@@ -85,7 +88,7 @@ class NotificationTests {
     assertThat(rows(service.list(owner, null, null, "Episode 조사가", 0, 20))).isEmpty();
     service.read(owner, new NotificationService.ReadInput(List.of("event:" + first), true));
     jdbc.update(
-        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','추가 편입','2023-09-02T00:00:00Z','[]')",
+        "insert into review.events(episode_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','추가 편입','2023-09-02T00:00:00Z','[]')",
         episode,
         owner);
     var later = service.list(owner, null, null, "편입", 0, 20);
@@ -93,7 +96,7 @@ class NotificationTests {
     assertThat(later.get("unreadCount")).isEqualTo(1L);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from review_events where action='TRANSFER' and actor_id=?",
+                "select count(*) from review.events where action='TRANSFER' and actor_id=?",
                 Long.class,
                 owner))
         .isEqualTo(7L);
@@ -111,7 +114,7 @@ class NotificationTests {
     assertThat(rows(service.cases(owner, "batch:" + run, 0, 20)))
         .extracting(r -> r.get("caseId"))
         .containsExactlyInAnyOrder(first, second);
-    jdbc.update("update batch_jobs set status='RUNNING' where job_id=?", job);
+    jdbc.update("update analysis.jobs set status='RUNNING' where job_id=?", job);
     assertThat(rows(service.list(owner, null, null, null, 0, 20))).isEmpty();
   }
 
@@ -133,7 +136,9 @@ class NotificationTests {
     // Failed writes validate all IDs before changing any read state.
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from notification_reads where user_id=?", Long.class, owner))
+                "select count(*) from review.notification_reads where user_id=?",
+                Long.class,
+                owner))
         .isEqualTo(1L);
   }
 
@@ -141,11 +146,11 @@ class NotificationTests {
   void business_dates_search_and_actual_events_exclude_internal_snapshots() {
     long id = alert(owner);
     jdbc.update(
-        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'COMMENT','확인 요청','2023-09-02T01:00:00Z','{}')",
+        "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,'COMMENT','확인 요청','2023-09-02T01:00:00Z','{}')",
         id,
         owner);
     jdbc.update(
-        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'MONEY_SNAPSHOT','internal','2023-09-02T01:00:00Z','{}')",
+        "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,'MONEY_SNAPSHOT','internal','2023-09-02T01:00:00Z','{}')",
         id,
         owner);
     var result =
@@ -168,7 +173,7 @@ class NotificationTests {
     long id = alert(other);
     long event =
         jdbc.queryForObject(
-            "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'CLOSE','종결',now(),'{}') returning event_id",
+            "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,'CLOSE','종결',now(),'{}') returning event_id",
             Long.class,
             id,
             other);

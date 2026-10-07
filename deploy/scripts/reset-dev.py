@@ -14,11 +14,12 @@ import re
 import secrets
 import subprocess
 import sys
+from pathlib import Path
 
 REGION = "ap-northeast-2"
 BUCKET = "aml-archive-s3"
 PREFIX = "dev/db-v3/"
-DATABASES = ("aml_dev", "aml_dev_v3")
+DATABASE = "aml_dev_v3"  # Reuse the active DB; never create another versioned DB.
 DB_USER = "aml_dev_app"
 API = "aml-dev-api-1"
 POSTGRES = "aml-dev-postgres-1"
@@ -67,7 +68,7 @@ def check_scope(api_env, postgres_env, parameters):
         raise RuntimeError("Unexpected API DB target")
     if (api_env.get("S3_BUCKET"), api_env.get("S3_PREFIX")) != (BUCKET, PREFIX):
         raise RuntimeError("Unexpected API S3 target")
-    if postgres_env.get("POSTGRES_USER") != DB_USER or postgres_env.get("POSTGRES_DB") not in DATABASES:
+    if postgres_env.get("POSTGRES_USER") != DB_USER or postgres_env.get("POSTGRES_DB") not in ("aml_dev", DATABASE):
         raise RuntimeError("Unexpected PostgreSQL configuration")
     expected = {"/aml/dev/db/url": expected_url, "/aml/dev/s3/bucket": BUCKET,
                 "/aml/dev/s3/prefix": PREFIX}
@@ -87,9 +88,66 @@ def object_versions():
     return objects
 
 
-def psql(sql):
+def psql(sql, database="postgres"):
     return run(["docker", "exec", "-i", POSTGRES, "psql", "-X", "-U", DB_USER,
-                "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-At"], sql)
+                "-d", database, "-v", "ON_ERROR_STOP=1", "-At", "-q"], sql)
+
+
+CONFIGURATION = {
+    "users": "user_id,username,name,role,password_hash,last_assigned_at,created_at",
+    "banks": "bank_id,name,country,is_reporting,report_format,created_at,updated_at",
+    "bank_reporting_periods": "period_id,bank_id,effective_from_date,effective_to_date",
+    "fx_rates": "fx_rate_version,currency,units_per_usd",
+}
+
+
+def configuration_backup(path):
+    schema = psql("SELECT CASE WHEN to_regclass('core.users') IS NOT NULL THEN 'core' ELSE 'public' END;", DATABASE).strip()
+    if schema not in ("core", "public"):
+        raise RuntimeError("Unknown configuration schema")
+    # A single SELECT gives all four configuration tables one MVCC snapshot.
+    pairs = [f"'{table}',(SELECT coalesce(json_agg(t),'[]'::json) FROM (SELECT {columns} FROM {schema}.{table}) t)"
+             for table, columns in CONFIGURATION.items()]
+    # Preserve NUMERIC exchange rates exactly; binary floating point can lose digits.
+    tables = json.loads(psql("SELECT json_build_object(" + ",".join(pairs) + ");", DATABASE), parse_float=str)
+    payload = {"format": 1, "database": DATABASE, "tables": tables}
+    validate_backup(payload)
+    # Exclusive creation prevents overwriting the only recovery copy on a retry.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as output:
+        json.dump(payload, output, ensure_ascii=False)
+        output.flush()
+        os.fsync(output.fileno())
+    if json.loads(Path(path).read_text(encoding="utf-8")) != payload:
+        raise RuntimeError("Configuration backup read-back failed; DB was not reset")
+
+
+def validate_backup(payload):
+    if payload.get("format") != 1 or payload.get("database") != DATABASE:
+        raise RuntimeError("Configuration backup belongs to another target/format")
+    tables = payload.get("tables", {})
+    if set(tables) != set(CONFIGURATION):
+        raise RuntimeError("Incomplete configuration backup")
+    for table, columns in CONFIGURATION.items():
+        if not isinstance(tables[table], list) or any(not isinstance(row, dict) or set(row) != set(columns.split(',')) for row in tables[table]):
+            raise RuntimeError("Invalid configuration backup columns")
+
+
+def restore_configuration(path):
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    validate_backup(payload)
+    sql = ["BEGIN;", "LOCK TABLE core.users,core.banks,core.bank_reporting_periods,core.fx_rates IN ACCESS EXCLUSIVE MODE;",
+           "DO $$ BEGIN IF EXISTS(SELECT FROM ingest.uploads) OR EXISTS(SELECT FROM analysis.jobs) OR EXISTS(SELECT FROM ledger.transactions) OR EXISTS(SELECT FROM review.alerts) OR EXISTS(SELECT FROM review.episodes) THEN RAISE EXCEPTION 'RESTORE_REQUIRES_EMPTY_BUSINESS_DATA'; END IF; END $$;",
+           "DELETE FROM core.bank_reporting_periods; DELETE FROM core.banks; DELETE FROM core.users; DELETE FROM core.fx_rates;"]
+    for table, columns in CONFIGURATION.items():
+        data = json.dumps(payload["tables"][table], ensure_ascii=False).replace("'", "''")
+        overriding = " OVERRIDING SYSTEM VALUE" if table in ("users", "bank_reporting_periods") else ""
+        sql.append(f"INSERT INTO core.{table}({columns}){overriding} SELECT {columns} FROM json_populate_recordset(NULL::core.{table},'{data}'::json);")
+    for table, column in (("users", "user_id"), ("bank_reporting_periods", "period_id")):
+        sql.append(f"SELECT setval(pg_get_serial_sequence('core.{table}','{column}'),coalesce(max({column}),1),max({column}) IS NOT NULL) FROM core.{table};")
+    sql.append("COMMIT;")
+    psql("\n".join(sql), DATABASE)
+    print("Configuration restored atomically; backup retained. No secret values were printed.")
 
 
 def read_parameters(names):
@@ -126,11 +184,12 @@ def ensure_keys():
     print("Protection parameters ready; existing keys were retained and values were not printed.")
 
 
-def reset():
+def reset(backup_file):
     run(["docker", "stop", API])
     stopped = json.loads(run(["docker", "inspect", API]))[0]["State"]
     if stopped["Running"]:
         raise RuntimeError("API must be stopped before resetting")
+    configuration_backup(backup_file)
     # Re-read after stopping uploads; external upload/deployment clients must also be idle.
     objects = object_versions()
     for offset in range(0, len(objects), 1000):
@@ -141,12 +200,10 @@ def reset():
             raise RuntimeError("Some S3 versions could not be deleted; API remains stopped")
     if object_versions():
         raise RuntimeError("S3 prefix is not empty; API remains stopped")
-    for database in DATABASES:
-        # All SQL identifiers are fixed constants, never arbitrary user input.
-        psql(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE);\n'
-             f'CREATE DATABASE "{database}" OWNER "{DB_USER}" TEMPLATE template0;\n')
-    print("Reset complete: aml_dev and aml_dev_v3 are empty; the named S3 prefix is empty.")
-    print("API is stopped. Deploy the updated Compose, deploy script, and backend together.")
+    psql(f'DROP DATABASE "{DATABASE}" WITH (FORCE);\n'
+         f'CREATE DATABASE "{DATABASE}" OWNER "{DB_USER}" TEMPLATE template0;\n')
+    print(f"Reset complete: only {DATABASE} is empty; configuration backup verified; named S3 prefix empty.")
+    print("API is stopped. Apply the new initial migration, restore configuration with --restore-config, then enable uploads/analysis.")
 
 
 def main(argv=None):
@@ -154,6 +211,8 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--apply", action="store_true", help="delete the displayed dev targets")
     mode.add_argument("--prepare-keys", action="store_true", help="prepare protection keys without deleting data")
+    mode.add_argument("--restore-config", metavar="FILE", help="restore configuration after the initial migration")
+    parser.add_argument("--backup-file", help="required exclusive configuration backup path for --apply")
     args = parser.parse_args(argv)
     if os.name != "posix":
         raise RuntimeError("Run this script on the EC2 Linux host")
@@ -162,21 +221,26 @@ def main(argv=None):
     names = ("/aml/dev/db/url", "/aml/dev/s3/bucket", "/aml/dev/s3/prefix")
     parameters = {name: item["Value"] for name, item in read_parameters(names).items()}
     check_scope(api_env, postgres_env, parameters)
+    if args.restore_config:
+        restore_configuration(args.restore_config)
+        return
     # Key provisioning must not depend on S3 version-list/delete or database access.
     if args.prepare_keys:
         ensure_keys()
         return
     psql("SELECT current_user;\n")
     objects = object_versions()
-    print(f"DB targets: {', '.join(DATABASES)}; user: {DB_USER}")
+    print(f"DB target: {DATABASE}; user: {DB_USER}; configuration is preserved")
     print(f"S3 target: s3://{BUCKET}/{PREFIX}; object versions/delete markers: {len(objects)}")
     print("Other databases, roles, volumes, S3 prefixes and deployment artifacts are excluded.")
     if not args.apply:
         print("Inspection only. --apply creates missing protection keys, stops API and deletes these targets.")
         return
+    if not args.backup_file:
+        raise RuntimeError("--apply requires --backup-file; existing configuration must be backed up")
     # Missing SSM write/KMS permissions fail here, before any data deletion or API stop.
     ensure_keys()
-    reset()
+    reset(args.backup_file)
 
 
 if __name__ == "__main__":

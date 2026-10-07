@@ -123,19 +123,19 @@ def _fingerprint(evidence):
 
 
 def _latest(connection, alert):
-    return connection.execute('''SELECT v.version,v.fingerprint FROM alert_versions v
-        JOIN analysis_runs r USING(run_id) JOIN batch_jobs b ON b.job_id=r.job_id
+    return connection.execute('''SELECT v.version,v.fingerprint FROM review.alert_versions v
+        JOIN analysis.runs r USING(run_id) JOIN analysis.jobs b ON b.job_id=r.job_id
         WHERE v.alert_id=%s AND r.status='COMPLETED' AND b.status='COMPLETED'
         ORDER BY v.version DESC LIMIT 1''', (alert,)).fetchone()
 
 
-def _new_alert(connection, parent=None):
-    row = connection.execute("SELECT user_id FROM users WHERE role='STAFF' AND password_hash IS NOT NULL AND password_hash<>'' ORDER BY last_assigned_at NULLS FIRST,user_id LIMIT 1 FOR UPDATE").fetchone()
+def _new_alert(connection, business_at, parent=None):
+    row = connection.execute("SELECT u.user_id FROM core.users u JOIN core.assignable_staff s USING(user_id) ORDER BY u.last_assigned_at NULLS FIRST,u.user_id LIMIT 1 FOR UPDATE OF u").fetchone()
     if row is None:
         raise AssigneeUnavailable('Register a STAFF user before constructing Alerts')
-    connection.execute('UPDATE users SET last_assigned_at=clock_timestamp() WHERE user_id=%s', (row[0],))
-    return connection.execute('INSERT INTO alerts(assignee_id,parent_alert_id) VALUES(%s,%s) RETURNING alert_id',
-                              (row[0], parent)).fetchone()[0]
+    connection.execute('UPDATE core.users SET last_assigned_at=%s WHERE user_id=%s', (business_at,row[0]))
+    return connection.execute('INSERT INTO review.alerts(assignee_id,parent_alert_id,created_at,assigned_at) VALUES(%s,%s,%s,%s) RETURNING alert_id',
+                              (row[0], parent,business_at,business_at)).fetchone()[0]
 
 
 def _plans(origins, candidates, rows, scores, seeds, timings=None):
@@ -168,16 +168,16 @@ def _validate_baselines(connection, run_id):
     # Preserve ascending origin order and unpublished-before-version error priority.
     unpublished = connection.execute('''SELECT min(o.alert_id)
         FROM analysis.alert_origins o
-        JOIN alerts a ON a.alert_id=o.alert_id OR a.parent_alert_id=o.alert_id
-        JOIN alert_versions v ON v.alert_id=a.alert_id
-        JOIN analysis_runs r ON r.run_id=v.run_id
+        JOIN review.alerts a ON a.alert_id=o.alert_id OR a.parent_alert_id=o.alert_id
+        JOIN review.alert_versions v ON v.alert_id=a.alert_id
+        JOIN analysis.runs r ON r.run_id=v.run_id
         WHERE o.run_id=%s AND v.run_id<>%s AND r.status IN ('READY','ACTIVE')''',
         (run_id, run_id)).fetchone()[0]
     changed = connection.execute('''SELECT min(o.alert_id)
         FROM analysis.alert_origins o
         LEFT JOIN LATERAL (
-            SELECT v.version FROM alert_versions v
-            JOIN analysis_runs r USING(run_id) JOIN batch_jobs b ON b.job_id=r.job_id
+            SELECT v.version FROM review.alert_versions v
+            JOIN analysis.runs r USING(run_id) JOIN analysis.jobs b ON b.job_id=r.job_id
             WHERE v.alert_id=o.alert_id AND r.status='COMPLETED' AND b.status='COMPLETED'
             ORDER BY v.version DESC LIMIT 1
         ) latest ON true
@@ -193,7 +193,7 @@ def _insert_members(connection, alert, version, members):
     # One SQL statement per bounded Alert, rather than a round trip for every row.
     payload = [{key: member[key] for key in ('txId', 'role', 'includedReasons')}
                for member in members]
-    connection.execute('''INSERT INTO alert_transactions(alert_id,version,tx_id,role,reasons)
+    connection.execute('''INSERT INTO review.alert_transactions(alert_id,version,tx_id,role,reasons)
         SELECT %s,%s,m."txId",m.role,m."includedReasons"
         FROM jsonb_to_recordset(%s::jsonb)
           AS m("txId" bigint,role text,"includedReasons" jsonb)''',
@@ -210,11 +210,11 @@ def save_alerts(connection, execution):
         cursor.execute('SELECT * FROM analysis.input_transactions WHERE run_id=%s ORDER BY tx_id,input_role DESC', (execution.run_id,))
         cursor.itersize = 256
         rows = {r['tx_id']: r for r in cursor}
-    threshold = connection.execute('SELECT threshold_value FROM batch_jobs WHERE job_id=%s', (execution.job_id,)).fetchone()[0]
+    threshold,business_at = connection.execute('SELECT threshold_value,business_at FROM analysis.jobs WHERE job_id=%s', (execution.job_id,)).fetchone()
     if threshold is None:
         raise ProtocolError('Frozen threshold is required')
     scores = dict(connection.execute('SELECT tx_id,scores FROM analysis.input_scores WHERE run_id=%s', (execution.run_id,)).fetchall())
-    current = dict(connection.execute("SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM inference_results s WHERE run_id=%s", (execution.run_id,)).fetchall())
+    current = dict(connection.execute("SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM analysis.scores s WHERE run_id=%s", (execution.run_id,)).fetchall())
     targets = {key for key, row in rows.items() if row['input_role'] == 'TARGET'}
     if targets != set(current):
         raise ProtocolError('Every frozen TARGET requires current-run scores')
@@ -224,7 +224,7 @@ def save_alerts(connection, execution):
              for key, value in current.items() if value['p_laundering'] >= threshold}
     with connection.transaction(), connection.cursor(name='alert_origin_seeds') as cursor:
         cursor.itersize = 64
-        cursor.execute("SELECT alert_id,version,evidence->'seeds' FROM analysis.alert_origins WHERE run_id=%s ORDER BY alert_id", (execution.run_id,))
+        cursor.execute("SELECT o.alert_id,o.version,v.evidence->'seeds' FROM analysis.alert_origins o JOIN review.alert_versions v USING(alert_id,version) WHERE o.run_id=%s ORDER BY o.alert_id", (execution.run_id,))
         for alert, version, old_seeds in cursor:
             for seed in old_seeds:
                 if seed['txId'] in rows:
@@ -246,7 +246,7 @@ def save_alerts(connection, execution):
     publication_started = perf_counter()
     with connection.transaction():
         _lock(connection, execution, 'ALERTS')
-        saved = connection.execute("SELECT artifact FROM analysis_run_stage_results WHERE run_id=%s AND stage='ALERTS' AND completed", (execution.run_id,)).fetchone()
+        saved = connection.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS' AND completed", (execution.run_id,)).fetchone()
         if saved:
             _checkpoint(connection, execution, 'ALERTS', saved[0])
             return
@@ -256,11 +256,11 @@ def save_alerts(connection, execution):
         changed, created, covered = set(), set(), set()
         with connection.cursor(name='alert_origin_evidence') as cursor:
             cursor.itersize = 1
-            cursor.execute('SELECT alert_id,version,evidence FROM analysis.alert_origins WHERE run_id=%s ORDER BY alert_id', (execution.run_id,))
+            cursor.execute('SELECT o.alert_id,o.version,v.evidence FROM analysis.alert_origins o JOIN review.alert_versions v USING(alert_id,version) WHERE o.run_id=%s ORDER BY o.alert_id', (execution.run_id,))
             plans = _plans(cursor, candidates, rows, scores, seeds, timings)
             for original, evidence in plans:
                 if original is None:
-                    original = _new_alert(connection)
+                    original = _new_alert(connection,business_at)
                     created.add(original)
                 covered.add(original)
                 alert = original
@@ -271,30 +271,30 @@ def save_alerts(connection, execution):
                     item['explorationLimits'] = evidence['limits']
                     if item['txId'] not in rows:
                         item['reason'] = 'SEED_NOT_ACTIVE_IN_SNAPSHOT'
-                status = connection.execute('SELECT status FROM alerts WHERE alert_id=%s FOR UPDATE', (alert,)).fetchone()[0]
+                status = connection.execute('SELECT status FROM review.alerts WHERE alert_id=%s FOR UPDATE', (alert,)).fetchone()[0]
                 if latest is not None and latest[1].strip() != fingerprint and status != 'OPEN':
-                    children = connection.execute('SELECT alert_id FROM alerts WHERE parent_alert_id=%s ORDER BY alert_id', (original,)).fetchall()
+                    children = connection.execute('SELECT alert_id FROM review.alerts WHERE parent_alert_id=%s ORDER BY alert_id', (original,)).fetchall()
                     existing = [(a, _latest(connection, a)) for (a,) in children]
                     same = next((a for a, v in existing if v and v[1].strip() == fingerprint), None)
                     if same is not None:
                         alert = same
                     else:
-                        alert = _new_alert(connection, original)
+                        alert = _new_alert(connection,business_at,original)
                         created.add(alert)
                     latest = _latest(connection, alert)
                 if latest is None or latest[1].strip() != fingerprint:
-                    version = connection.execute('SELECT coalesce(max(version),0)+1 FROM alert_versions WHERE alert_id=%s', (alert,)).fetchone()[0]
-                    connection.execute('INSERT INTO alert_versions VALUES(%s,%s,%s,%s,%s,now())',
+                    version = connection.execute('SELECT coalesce(max(version),0)+1 FROM review.alert_versions WHERE alert_id=%s', (alert,)).fetchone()[0]
+                    connection.execute('INSERT INTO review.alert_versions VALUES(%s,%s,%s,%s,%s,now())',
                                        (alert, version, execution.run_id, fingerprint, Jsonb(evidence)))
                     _insert_members(connection, alert, version, evidence['transactions'])
                     changed.add(alert)
                 for key in {original, alert}:
-                    connection.execute('''INSERT INTO alert_coverage_checks
+                    connection.execute('''INSERT INTO review.alert_coverage_checks
                         (alert_id,run_id,coverage,checked_at) VALUES(%s,%s,%s,clock_timestamp())
                         ON CONFLICT(alert_id,run_id) DO UPDATE SET coverage=excluded.coverage,
                         checked_at=excluded.checked_at''',
                         (key, execution.run_id, Jsonb(coverage)))
-        connection.execute('UPDATE batch_jobs SET alert_count=%s WHERE job_id=%s', (len(created), execution.job_id))
+        connection.execute('UPDATE analysis.jobs SET alert_count=%s WHERE job_id=%s', (len(created), execution.job_id))
         timings['publication'] = (perf_counter() - publication_started) * 1000
         timings['totalBeforeCommit'] = (perf_counter() - started) * 1000
         _checkpoint(connection, execution, 'ALERTS', json.dumps(dict(run_id=str(execution.run_id),

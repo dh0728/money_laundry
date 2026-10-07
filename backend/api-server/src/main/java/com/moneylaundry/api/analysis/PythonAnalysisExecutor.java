@@ -24,6 +24,35 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   private final String mode;
   private final String storage;
   private java.util.Map<String, String> remoteEnvironment = java.util.Map.of();
+  private java.util.Map<String, String> ingestEnvironment = java.util.Map.of();
+  private String analysisUser = "";
+  private String analysisPassword = "";
+
+  @Autowired
+  void configureDatabase(
+      @Value("${app.worker.db-username:}") String username,
+      @Value("${app.worker.db-password:}") String password) {
+    analysisUser = username;
+    analysisPassword = password;
+  }
+
+  @Autowired
+  void configureIngest(
+      @Value("${app.ingest.encryption-key:}") String encryption,
+      @Value("${app.ingest.search-key:}") String search,
+      @Value("${app.ingest.key-version:}") String version,
+      @Value("${app.ingest.fx-rate-version}") String fxVersion) {
+    ingestEnvironment =
+        java.util.Map.of(
+            "INGEST_ENCRYPTION_KEY",
+            encryption,
+            "INGEST_SEARCH_KEY",
+            search,
+            "INGEST_KEY_VERSION",
+            version,
+            "INGEST_FX_VERSION",
+            fxVersion);
+  }
 
   @Autowired
   void configureRemote(
@@ -68,7 +97,7 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
     this(python, script, timeout, null, null, "unconfigured", ".");
   }
 
-  static String workerDatabaseUrl(String jdbcUrl) {
+  public static String workerDatabaseUrl(String jdbcUrl) {
     if (!jdbcUrl.startsWith("jdbc:postgresql://"))
       throw new AnalysisFailure("WORKER_DB_CONFIGURATION", AnalysisFailure.Kind.PERMANENT);
     String[] parts = jdbcUrl.substring(5).split("\\?", 2);
@@ -82,6 +111,20 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   }
 
   private String checkpoint(Context context) {
+    if (jdbc != null && context.stage() == AnalysisStage.INTEGRATE) {
+      var rows =
+          jdbc.queryForList(
+              """
+          select s.artifact from analysis.stage_results s join analysis.jobs j using(job_id)
+          where j.job_id=? and j.status='RUNNING' and j.current_stage='INTEGRATE'
+          and j.execution_id=? and s.stage='INTEGRATE' and s.execution_id=? and s.completed
+          """,
+              String.class,
+              context.jobId(),
+              context.executionId(),
+              context.executionId());
+      return rows.isEmpty() ? null : rows.getFirst();
+    }
     if (jdbc == null
         || context.runId() == null
         || !List.of(
@@ -93,13 +136,13 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
     var rows =
         jdbc.queryForList(
             """
-        select s.artifact from analysis_run_stage_results s
-        join analysis_runs r on r.run_id=s.run_id
-        join batch_jobs b on b.job_id=r.job_id and b.current_run_id=r.run_id
+        select s.artifact from analysis.stage_results s
+        join analysis.runs r on r.run_id=s.run_id
+        join analysis.jobs b on b.job_id=r.job_id and b.current_run_id=r.run_id
         where b.job_id=? and b.status='RUNNING' and b.current_stage=?
           and b.execution_id=? and s.execution_id=? and s.run_id=?
           and s.stage=? and s.completed and r.status in ('READY','ACTIVE')
-          and (s.stage='ALERTS' or (select count(*) from analysis_model_tasks m where m.run_id=r.run_id
+          and (s.stage='ALERTS' or (select count(*) from analysis.model_tasks m where m.run_id=r.run_id
                and ((s.stage='FEATURES' and m.phase='PUBLISH' and m.status='READY' and m.input_artifact is not null)
                  or (s.stage in ('INFERENCE','SCORES') and m.phase='DONE' and m.status='SUCCEEDED' and m.result_artifact is not null)))=2)
         """,
@@ -143,10 +186,36 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       var builder = new ProcessBuilder(command);
       builder.environment().put("WORKER_MODE", mode);
       builder.environment().putAll(remoteEnvironment);
+      if (context.stage() == AnalysisStage.INTEGRATE)
+        builder.environment().putAll(ingestEnvironment);
       if (database != null) {
+        boolean integrating = context.stage() == AnalysisStage.INTEGRATE;
+        if (!integrating && (analysisUser.isBlank() || analysisPassword.isBlank()))
+          throw new AnalysisFailure("WORKER_DB_CONFIGURATION", AnalysisFailure.Kind.PERMANENT);
         builder.environment().put("WORKER_DB_URL", workerDatabaseUrl(database.getJdbcUrl()));
-        builder.environment().put("WORKER_DB_USER", database.getUsername());
-        builder.environment().put("WORKER_DB_PASSWORD", database.getPassword());
+        builder
+            .environment()
+            .put("WORKER_DB_USER", integrating ? database.getUsername() : analysisUser);
+        builder
+            .environment()
+            .put("WORKER_DB_PASSWORD", integrating ? database.getPassword() : analysisPassword);
+        if (!integrating) {
+          // Child processes inherit the API environment unless these are explicitly removed.
+          builder
+              .environment()
+              .keySet()
+              .removeIf(
+                  key ->
+                      key.startsWith("INGEST_")
+                          || key.startsWith("SPRING_DATASOURCE_")
+                          || key.equals("DB_PASSWORD")
+                          || key.equals("DB_USERNAME")
+                          || key.equals("DB_URL")
+                          || key.equals("PGPASSWORD")
+                          || key.equals("PGUSER")
+                          || key.startsWith("APP_INGEST_")
+                          || key.equals("SPRING_APPLICATION_JSON"));
+        }
         builder
             .environment()
             .put(
@@ -167,7 +236,7 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
           && jdbc != null
           && context.runId() != null
           && jdbc.queryForObject(
-              "select count(*)=2 and count(*) filter(where status in ('WAITING','RETRY_WAIT','ACTIVE'))>0 from analysis_model_tasks where run_id=?",
+              "select count(*)=2 and count(*) filter(where status in ('WAITING','RETRY_WAIT','ACTIVE'))>0 from analysis.model_tasks where run_id=?",
               Boolean.class,
               context.runId())) throw new AnalysisDeferred();
       if (process.exitValue() == 77) {
@@ -175,13 +244,17 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
             jdbc != null
                 && context.runId() != null
                 && jdbc.queryForObject(
-                    "select exists(select 1 from analysis_model_tasks where run_id=? and status='FAILED' and error_code='RESULT_INVALID')",
+                    "select exists(select 1 from analysis.model_tasks where run_id=? and status='FAILED' and error_code='RESULT_INVALID')",
                     Boolean.class,
                     context.runId());
         throw new AnalysisFailure(
             invalidScores ? "SCORES_MISMATCH" : "MODEL_TASK_FAILED",
             AnalysisFailure.Kind.PERMANENT);
       }
+      if (process.exitValue() == 81 && context.stage() == AnalysisStage.INTEGRATE)
+        throw new AnalysisDeferred();
+      if (process.exitValue() == 82 && context.stage() == AnalysisStage.INTEGRATE)
+        throw new AnalysisFailure("CUTOFF_SUPERSEDED", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 78)
         throw new AnalysisFailure("PIPELINE_NOT_CONFIGURED", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 80)

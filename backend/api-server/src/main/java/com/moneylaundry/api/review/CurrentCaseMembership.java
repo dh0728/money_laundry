@@ -19,35 +19,34 @@ final class CurrentCaseMembership {
       row.put("episodeIds", new TreeSet<Long>());
       byId.put(((Number) row.get("txId")).longValue(), row);
     }
-    String marks = String.join(",", Collections.nCopies(byId.size(), "?"));
+
     String sql =
         """
-        with latest as (
-          select distinct on (v.alert_id) v.alert_id,v.evidence
-          from alert_versions v join analysis_runs r using(run_id)
-          join batch_jobs b on b.job_id=r.job_id
+        with selected(tx_id) as (select unnest(?::bigint[])), latest as (
+          select distinct on(v.alert_id) v.alert_id,v.version
+          from review.alert_versions v join analysis.runs r using(run_id)
+          join analysis.jobs b on b.job_id=r.job_id and b.current_run_id=r.run_id
           where r.status='COMPLETED' and b.status='COMPLETED'
           order by v.alert_id,v.version desc
         ), members as (
-          select c.kind,c.alert_id,c.case_id,(m->>'txId')::bigint tx_id
-          from visible_review_cases c join review_groups g using(case_id)
-          cross join lateral jsonb_array_elements(g.members) m
-          where m->>'state' not in ('EXCLUDED','TRANSFERRED')
+          select 'ALERT' as kind,a.alert_id,a.alert_id as case_id,m.tx_id
+          from selected s join review.alert_members m using(tx_id)
+          join review.alerts a using(alert_id) join latest l using(alert_id)
+          where m.state not in ('EXCLUDED','TRANSFERRED')
           union all
-          select c.kind,c.alert_id,c.case_id,(m->>'txId')::bigint tx_id
-          from visible_review_cases c join latest v using(alert_id)
-          cross join lateral jsonb_array_elements(v.evidence->'transactions') m
-          where c.kind='ALERT' and (
-            not exists(select 1 from review_groups g where g.case_id=c.case_id)
-            or (c.status='OPEN' and not exists(
-              select 1 from review_groups g cross join lateral jsonb_array_elements(g.members) seen
-              where g.case_id=c.case_id and seen->>'txId'=m->>'txId')))
-        )
-        select distinct kind,alert_id,case_id,tx_id from members where tx_id in (
-        """
-            + marks
-            + ")";
-    for (var membership : jdbc.queryForList(sql, byId.keySet().toArray())) {
+          select 'ALERT',a.alert_id,a.alert_id,t.tx_id
+          from selected s join review.alert_transactions t using(tx_id)
+          join latest l using(alert_id,version) join review.alerts a using(alert_id)
+          where (a.status='OPEN' or not exists(select 1 from review.alert_groups g where g.alert_id=a.alert_id))
+            and not exists(select 1 from review.alert_members m where m.alert_id=a.alert_id and m.tx_id=t.tx_id)
+          union all
+          select 'EPISODE',e.alert_id,e.episode_id,m.tx_id
+          from selected s join review.episode_members m using(tx_id)
+          join review.episode_alerts e using(group_id,alert_id)
+          where m.state not in ('EXCLUDED','TRANSFERRED')
+        ) select distinct kind,alert_id,case_id,tx_id from members
+        """;
+    for (var membership : jdbc.queryForList(sql, (Object) byId.keySet().toArray(Long[]::new))) {
       var row = byId.get(((Number) membership.get("tx_id")).longValue());
       boolean alert = "ALERT".equals(membership.get("kind"));
       @SuppressWarnings("unchecked")

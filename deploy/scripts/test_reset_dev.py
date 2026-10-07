@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import unittest
+import tempfile
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("reset_dev", Path(__file__).with_name("reset-dev.py"))
@@ -57,8 +58,9 @@ class ResetTests(unittest.TestCase):
     @patch.object(reset, "run")
     def test_s3_failure_leaves_databases_untouched_and_api_stopped(self, run, versions, aws, psql):
         run.side_effect = ["", '[{"State":{"Running":false}}]']
-        with self.assertRaises(RuntimeError):
-            reset.reset()
+        with patch.object(reset, "configuration_backup") as backup, self.assertRaises(RuntimeError):
+            reset.reset("config.json")
+        backup.assert_called_once_with("config.json")
         psql.assert_not_called()
         self.assertEqual(run.call_args_list[0].args[0], ["docker", "stop", reset.API])
         self.assertEqual(run.call_count, 2)
@@ -67,12 +69,55 @@ class ResetTests(unittest.TestCase):
     @patch.object(reset, "aws", return_value={})
     @patch.object(reset, "object_versions", side_effect=[[], []])
     @patch.object(reset, "run", side_effect=["", '[{"State":{"Running":false}}]'])
-    def test_only_two_named_databases_are_recreated(self, run, versions, aws, psql):
-        reset.reset()
-        self.assertEqual(psql.call_count, 2)
-        for database, call in zip(reset.DATABASES, psql.call_args_list):
-            self.assertIn(f'DROP DATABASE IF EXISTS "{database}"', call.args[0])
-            self.assertIn(f'CREATE DATABASE "{database}"', call.args[0])
+    def test_only_active_database_is_recreated_after_backup(self, run, versions, aws, psql):
+        with patch.object(reset, "configuration_backup") as backup:
+            reset.reset("config.json")
+        backup.assert_called_once_with("config.json")
+        psql.assert_called_once()
+        sql = psql.call_args.args[0]
+        self.assertIn(f'DROP DATABASE "{reset.DATABASE}"', sql)
+        self.assertIn(f'CREATE DATABASE "{reset.DATABASE}"', sql)
+        self.assertNotIn('"aml_dev"', sql)
+
+    def test_backup_failure_prevents_s3_and_database_deletion(self):
+        with patch.object(reset, "run", side_effect=["", '[{"State":{"Running":false}}]']), \
+             patch.object(reset, "configuration_backup", side_effect=RuntimeError("backup failed")), \
+             patch.object(reset, "object_versions") as versions, patch.object(reset, "psql") as db:
+            with self.assertRaisesRegex(RuntimeError, "backup failed"):
+                reset.reset("config.json")
+            versions.assert_not_called()
+            db.assert_not_called()
+
+    def test_configuration_backup_is_exclusive_and_restoration_is_atomic(self):
+        tables = {name: [] for name in reset.CONFIGURATION}
+        tables['users'] = [dict(zip(reset.CONFIGURATION['users'].split(','),
+            [42, 'admin', "O'Brien", 'ADMIN', 'fixture-hash', None, '2026-10-07T00:00:00Z']))]
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'configuration.json'
+            with patch.object(reset, 'psql', side_effect=['public\n', json.dumps(tables)]):
+                reset.configuration_backup(path)
+            self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['tables'], tables)
+            with patch.object(reset, 'psql', side_effect=['public\n', json.dumps(tables)]):
+                with self.assertRaises(FileExistsError):
+                    reset.configuration_backup(path)
+            with patch.object(reset, 'psql') as db:
+                reset.restore_configuration(path)
+            sql, database = db.call_args.args
+            self.assertEqual(database, reset.DATABASE)
+            self.assertTrue(sql.startswith('BEGIN;'))
+            self.assertTrue(sql.endswith('COMMIT;'))
+            self.assertIn('RESTORE_REQUIRES_EMPTY_BUSINESS_DATA', sql)
+            self.assertIn('OVERRIDING SYSTEM VALUE', sql)
+            self.assertIn("O''Brien", sql)
+            self.assertIn('fixture-hash', sql)
+            self.assertNotIn('CASCADE', sql)
+            self.assertTrue(path.exists())
+
+    def test_foreign_or_incomplete_backup_is_rejected(self):
+        for payload in ({'format': 1, 'database': 'prod', 'tables': {}},
+                        {'format': 1, 'database': reset.DATABASE, 'tables': {}}):
+            with self.assertRaises(RuntimeError):
+                reset.validate_backup(payload)
 
     def existing_keys(self):
         values = [base64.b64encode(bytes([1]) * 32).decode(),
@@ -126,7 +171,7 @@ class ResetTests(unittest.TestCase):
              patch.object(reset, "ensure_keys", side_effect=RuntimeError("denied")), \
              patch.object(reset, "reset") as destroy:
             with self.assertRaisesRegex(RuntimeError, "denied"):
-                reset.main(["--apply"])
+                reset.main(["--apply", "--backup-file", "config.json"])
             destroy.assert_not_called()
 
     def test_key_preparation_does_not_delete_data(self):

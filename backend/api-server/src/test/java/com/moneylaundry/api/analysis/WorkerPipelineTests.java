@@ -3,7 +3,6 @@ package com.moneylaundry.api.analysis;
 import static org.assertj.core.api.Assertions.*;
 
 import com.moneylaundry.api.TestcontainersConfiguration;
-import com.moneylaundry.api.ingest.TransactionIntegrationService;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
@@ -23,57 +22,58 @@ class WorkerPipelineTests {
   @Autowired JdbcConnectionDetails database;
   @Autowired AnalysisService service;
   @Autowired AnalysisRunService runs;
-  @Autowired TransactionIntegrationService integration;
   @MockitoBean AnalysisScheduler scheduler;
   @TempDir Path storage;
   long job;
   UUID run;
 
   PythonAnalysisExecutor executor(String script) {
-    return new PythonAnalysisExecutor(
-        System.getenv("AML_TEST_PYTHON"),
-        script,
-        Duration.ofSeconds(20),
-        jdbc,
-        database,
-        "demo",
-        storage.toString());
+    return AnalysisWorkerTestDatabase.configure(
+        new PythonAnalysisExecutor(
+            System.getenv("AML_TEST_PYTHON"),
+            script,
+            Duration.ofSeconds(20),
+            jdbc,
+            database,
+            "demo",
+            storage.toString()),
+        jdbc);
   }
 
   @BeforeEach
   void setup() {
     Assumptions.assumeTrue(System.getenv("AML_TEST_PYTHON") != null);
-    jdbc.execute("truncate banks,batch_jobs,private.entities cascade");
-    jdbc.update("update users set password_hash=repeat('0',96) where username='l1a'");
+    jdbc.execute("truncate core.banks,analysis.jobs,core.owners cascade");
+    jdbc.update("update core.users set password_hash=repeat('0',96) where username='l1a'");
     job =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,current_stage) values('ANALYSIS','QUEUED','FEATURES') returning job_id",
+            "insert into analysis.jobs(status,current_stage,analysis_date,analysis_cutoff_at,business_at,threshold_value) values('QUEUED','FEATURES','2023-09-02',now(),now(),.7) returning job_id",
             Long.class);
     run = UUID.randomUUID();
-    jdbc.update("insert into analysis_runs(run_id,job_id,status) values(?,?,'READY')", run, job);
-    jdbc.update("update batch_jobs set current_run_id=? where job_id=?", run, job);
-    jdbc.update("insert into banks(bank_id) values(12)");
+    jdbc.update("insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", run, job);
+    jdbc.update("update analysis.jobs set current_run_id=? where job_id=?", run, job);
+    jdbc.update("insert into core.banks(bank_id) values(12)");
     long entity =
         jdbc.queryForObject(
-            "insert into private.entities(service_entity_id,entity_lookup_token,identity_cipher,name_cipher,key_version) values(?,'test','test','test','test') returning entity_id",
+            "insert into core.owners(service_owner_id,display_name) values(?,'가명#1') returning owner_id",
             Long.class,
             UUID.randomUUID());
     long account =
         jdbc.queryForObject(
-            "insert into private.accounts(bank_id,service_account_id,account_lookup_token,entity_id,identity_cipher,key_version) values(12,?,'test',?,'test','test') returning account_id",
+            "insert into core.accounts(bank_id,service_account_id,owner_id) values(12,?,?) returning account_id",
             Long.class,
             UUID.randomUUID(),
             entity);
     long tx =
         jdbc.queryForObject(
-            "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(now(),?,?,1,'USD',1,'USD','ACH',1,'test','2022-09-01') returning tx_id",
+            "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(now(),?,?,1,'USD',1,'USD','ACH',1,'test','2022-09-01') returning tx_id",
             Long.class,
             account,
             account);
     jdbc.update(
         """
         insert into analysis.input_transactions(run_id,tx_id,input_role,occurred_at,business_date,
-          from_bank_id,to_bank_id,from_account_id,to_account_id,from_entity_id,to_entity_id,
+          from_bank_id,to_bank_id,from_account_id,to_account_id,from_owner_id,to_owner_id,
           amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version)
         values(?,?,'TARGET',now(),'2022-09-01',12,12,?,?,?,?,1,'USD',1,'USD','ACH',1,'test')
         """,
@@ -83,25 +83,28 @@ class WorkerPipelineTests {
         UUID.randomUUID(),
         UUID.randomUUID(),
         UUID.randomUUID());
+    jdbc.update("insert into analysis.target_ownership(tx_id,run_id) values(?,?)", tx, run);
   }
 
   AnalysisStageExecutor.Context claim() {
     UUID token = UUID.randomUUID();
-    jdbc.update("update batch_jobs set status='RUNNING',execution_id=? where job_id=?", token, job);
+    jdbc.update(
+        "update analysis.jobs set status='RUNNING',execution_owner=gen_random_uuid(),execution_id=? where job_id=?",
+        token,
+        job);
     return new AnalysisStageExecutor.Context(
         job, AnalysisStage.FEATURES, token, List.of(), Map.of(), run);
   }
 
   @Test
   void spring_runs_real_python_and_advances_only_features() throws Exception {
-    try (var runner =
-        new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs, integration)) {
+    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
       runner.scan();
       assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.INFERENCE);
       assertThat(service.job(job).status()).isEqualTo("QUEUED");
       assertThat(
               jdbc.queryForObject(
-                  "select completed from analysis_run_stage_results where run_id=? and stage='FEATURES'",
+                  "select completed from analysis.stage_results where run_id=? and stage='FEATURES'",
                   Boolean.class,
                   run))
           .isTrue();
@@ -111,13 +114,13 @@ class WorkerPipelineTests {
       }
       assertThat(
               jdbc.queryForList(
-                  "select phase from analysis_model_tasks where run_id=? order by model_kind",
+                  "select phase from analysis.model_tasks where run_id=? order by model_kind",
                   String.class,
                   run))
           .containsExactly("PUBLISH", "PUBLISH");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from transaction_features where run_id=? and features->>'demo_value'=(tx_id%100)::text",
+                  "select count(*) from analysis.features where run_id=? and features->>'demo_value'=(tx_id%100)::text",
                   Integer.class, run))
           .isEqualTo(2);
       runner.scan();
@@ -150,7 +153,7 @@ class WorkerPipelineTests {
     assertThat(service.job(job).status()).isEqualTo("FAILED");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_model_tasks where run_id=? and status='CANCELLED' and execution_id is null",
+                "select count(*) from analysis.model_tasks where run_id=? and status='CANCELLED' and execution_id is null",
                 Integer.class,
                 run))
         .isEqualTo(2);
@@ -162,18 +165,18 @@ class WorkerPipelineTests {
     var first = executor.prepare(claim());
     var before =
         jdbc.queryForList(
-            "select input_artifact::text,operation_attempts from analysis_model_tasks where run_id=? order by model_kind",
+            "select input_artifact::text,operation_attempts from analysis.model_tasks where run_id=? order by model_kind",
             run);
     var second = executor.prepare(claim());
     assertThat(second.artifact()).isEqualTo(first.artifact());
     assertThat(
             jdbc.queryForList(
-                "select input_artifact::text,operation_attempts from analysis_model_tasks where run_id=? order by model_kind",
+                "select input_artifact::text,operation_attempts from analysis.model_tasks where run_id=? order by model_kind",
                 run))
         .isEqualTo(before);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from transaction_features where run_id=?", Integer.class, run))
+                "select count(*) from analysis.features where run_id=?", Integer.class, run))
         .isEqualTo(2);
   }
 
@@ -205,31 +208,31 @@ class WorkerPipelineTests {
         .isInstanceOf(AnalysisFailure.class);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from transaction_features where run_id=? and model_kind='BINARY'",
+                "select count(*) from analysis.features where run_id=? and model_kind='BINARY'",
                 Integer.class,
                 run))
         .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_run_stage_results where run_id=? and stage='FEATURES'",
+                "select count(*) from analysis.stage_results where run_id=? and stage='FEATURES'",
                 Integer.class,
                 run))
         .isZero();
     var binary =
         jdbc.queryForObject(
-            "select input_artifact::text from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+            "select input_artifact::text from analysis.model_tasks where run_id=? and model_kind='BINARY'",
             String.class,
             run);
     executor("worker/analysis_entry.py").prepare(claim());
     assertThat(
             jdbc.queryForObject(
-                "select input_artifact::text from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                "select input_artifact::text from analysis.model_tasks where run_id=? and model_kind='BINARY'",
                 String.class,
                 run))
         .isEqualTo(binary);
     assertThat(
             jdbc.queryForList(
-                "select operation_attempts from analysis_model_tasks where run_id=? order by model_kind",
+                "select operation_attempts from analysis.model_tasks where run_id=? order by model_kind",
                 Integer.class,
                 run))
         .containsExactly(1, 2);
@@ -241,7 +244,7 @@ class WorkerPipelineTests {
     executor.prepare(claim());
     String path =
         jdbc.queryForObject(
-            "select input_artifact->>'path' from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+            "select input_artifact->>'path' from analysis.model_tasks where run_id=? and model_kind='BINARY'",
             String.class,
             run);
     Files.delete(storage.resolve("worker").resolve(path));
@@ -258,35 +261,33 @@ class WorkerPipelineTests {
         begin raise exception 'injected feature storage failure'; end $$
         """);
     jdbc.execute(
-        "create trigger reject_test_features before insert on transaction_features for each row execute function reject_test_features()");
+        "create trigger reject_test_features before insert on analysis.features for each row execute function reject_test_features()");
     try {
       assertThatThrownBy(() -> executor("worker/analysis_entry.py").prepare(claim()))
           .isInstanceOfSatisfying(
               AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("DB_UNAVAILABLE"));
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from transaction_features where run_id=?", Integer.class, run))
+                  "select count(*) from analysis.features where run_id=?", Integer.class, run))
           .isZero();
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis_model_tasks where run_id=? and input_artifact is not null",
+                  "select count(*) from analysis.model_tasks where run_id=? and input_artifact is not null",
                   Integer.class,
                   run))
           .isZero();
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis_run_stage_results where run_id=?",
-                  Integer.class,
-                  run))
+                  "select count(*) from analysis.stage_results where run_id=?", Integer.class, run))
           .isZero();
     } finally {
-      jdbc.execute("drop trigger reject_test_features on transaction_features");
+      jdbc.execute("drop trigger reject_test_features on analysis.features");
       jdbc.execute("drop function reject_test_features()");
     }
     executor("worker/analysis_entry.py").prepare(claim());
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from transaction_features where run_id=?", Integer.class, run))
+                "select count(*) from analysis.features where run_id=?", Integer.class, run))
         .isEqualTo(2);
   }
 
@@ -312,7 +313,7 @@ class WorkerPipelineTests {
         .isInstanceOf(AnalysisFailure.class);
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                "select status from analysis.model_tasks where run_id=? and model_kind='BINARY'",
                 String.class,
                 run))
         .isEqualTo("ACTIVE");
@@ -322,12 +323,12 @@ class WorkerPipelineTests {
     executor("worker/analysis_entry.py").prepare(claim());
     assertThat(
             jdbc.queryForObject(
-                "select operation_attempts from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                "select operation_attempts from analysis.model_tasks where run_id=? and model_kind='BINARY'",
                 Integer.class,
                 run))
         .isEqualTo(2);
     jdbc.update(
-        "update analysis_model_tasks set binding=jsonb_set(binding,'{model_version}','\"changed\"') where run_id=? and model_kind='TYPE'",
+        "update analysis.model_tasks set binding=jsonb_set(binding,'{model_version}','\"changed\"') where run_id=? and model_kind='TYPE'",
         run);
     assertThatThrownBy(() -> executor("worker/analysis_entry.py").prepare(claim()))
         .isInstanceOfSatisfying(
@@ -355,7 +356,7 @@ class WorkerPipelineTests {
             else:
                 request_id = request.url.path.split('/')[-3]
                 with psycopg.connect(os.environ['WORKER_DB_URL'],user=os.environ['WORKER_DB_USER'],password=os.environ['WORKER_DB_PASSWORD']) as db:
-                    run,kind,job = db.execute('select m.run_id,m.model_kind,r.job_id from analysis_model_requests m join analysis_runs r using(run_id) where request_id=%%s',(request_id,)).fetchone()
+                    run,kind,job = db.execute('select m.run_id,m.model_kind,r.job_id from analysis.model_requests m join analysis.runs r using(run_id) where request_id=%%s',(request_id,)).fetchone()
                 body = dict(contract_version=2,job_id=job,run_id=str(run),model_kind=kind,request_id=request_id,execution_round=1)
             return httpx.Response(202 if request.method=='PUT' else 200,json={**body,'status':'RUNNING','revision':1})
         advance = inference_dispatch.advance
@@ -365,18 +366,19 @@ class WorkerPipelineTests {
         """
             .formatted(
                 "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
-    try (var runner = new AnalysisRunner(service, executor(script.toString()), runs, integration)) {
+    try (var runner = new AnalysisRunner(service, executor(script.toString()), runs)) {
       runner.scan();
       runner.scan();
       assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.INFERENCE);
       assertThat(service.job(job).status()).isEqualTo("RETRY_WAIT");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis_model_tasks where run_id=? and phase='WAIT_REMOTE' and status='WAITING'",
+                  "select count(*) from analysis.model_tasks where run_id=? and phase='WAIT_REMOTE' and status='WAITING'",
                   Integer.class,
                   run))
           .isEqualTo(2);
-      jdbc.update("update batch_jobs set retry_at=now()-interval '1 second' where job_id=?", job);
+      jdbc.update(
+          "update analysis.jobs set retry_at=now()-interval '1 second' where job_id=?", job);
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("RETRY_WAIT");
       assertThat(service.job(job).failures()).isZero();
@@ -387,17 +389,17 @@ class WorkerPipelineTests {
           .doesNotContain("https://", "input_artifact", "signature");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis_failures where job_id=?", Integer.class, job))
+                  "select count(*) from analysis.failures where job_id=?", Integer.class, job))
           .isZero();
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis_model_tasks where run_id=? and remote_snapshot->>'status'='RUNNING'",
+                  "select count(*) from analysis.model_tasks where run_id=? and remote_snapshot->>'status'='RUNNING'",
                   Integer.class,
                   run))
           .isEqualTo(2);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis_run_stage_results where run_id=? and stage='INFERENCE'",
+                  "select count(*) from analysis.stage_results where run_id=? and stage='INFERENCE'",
                   Integer.class,
                   run))
           .isZero();
@@ -411,9 +413,9 @@ class WorkerPipelineTests {
   void invalid_collected_scores_expose_the_documented_failure_code() throws Exception {
     var features = claim();
     executor("worker/analysis_entry.py").prepare(features);
-    jdbc.update("update batch_jobs set current_stage='INFERENCE' where job_id=?", job);
+    jdbc.update("update analysis.jobs set current_stage='INFERENCE' where job_id=?", job);
     jdbc.update(
-        "update analysis_model_tasks set phase='COLLECT',status='FAILED',error_code='RESULT_INVALID' where run_id=? and model_kind='BINARY'",
+        "update analysis.model_tasks set phase='COLLECT',status='FAILED',error_code='RESULT_INVALID' where run_id=? and model_kind='BINARY'",
         run);
     Path failed = storage.resolve("failed_collection.py");
     Files.writeString(failed, "raise SystemExit(77)\n");
@@ -423,11 +425,11 @@ class WorkerPipelineTests {
     assertThatThrownBy(() -> executor(failed.toString()).prepare(context))
         .isInstanceOfSatisfying(
             AnalysisFailure.class, e -> assertThat(e.code()).isEqualTo("SCORES_MISMATCH"));
-    jdbc.update("update batch_jobs set status='FAILED' where job_id=?", job);
+    jdbc.update("update analysis.jobs set status='FAILED' where job_id=?", job);
     service.resume(job);
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                "select status from analysis.model_tasks where run_id=? and model_kind='BINARY'",
                 String.class,
                 run))
         .isEqualTo("READY");
@@ -450,7 +452,7 @@ class WorkerPipelineTests {
         os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)
         def result(request_id):
             with psycopg.connect(os.environ['WORKER_DB_URL'],user=os.environ['WORKER_DB_USER'],password=os.environ['WORKER_DB_PASSWORD']) as db:
-                run,kind,job,binding = db.execute('select m.run_id,m.model_kind,r.job_id,t.binding from analysis_model_requests m join analysis_runs r using(run_id) join analysis_model_tasks t using(run_id,model_kind) where m.request_id=%%s',(request_id,)).fetchone()
+                run,kind,job,binding = db.execute('select m.run_id,m.model_kind,r.job_id,t.binding from analysis.model_requests m join analysis.runs r using(run_id) join analysis.model_tasks t using(run_id,model_kind) where m.request_id=%%s',(request_id,)).fetchone()
                 ids = [r[0] for r in db.execute("select tx_id from analysis.input_transactions where run_id=%%s and input_role='TARGET'",(run,))]
             req = Request(job,kind.lower(),request_id,1,binding['model_version'],binding['feature_version'],str(run))
             stream = io.BytesIO()
@@ -477,17 +479,18 @@ class WorkerPipelineTests {
         """
             .formatted(
                 "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
-    jdbc.update("update batch_jobs set threshold_value=1.0 where job_id=?", job);
-    try (var runner = new AnalysisRunner(service, executor(script.toString()), runs, integration)) {
+    jdbc.update("update analysis.jobs set threshold_value=1.0 where job_id=?", job);
+    try (var runner = new AnalysisRunner(service, executor(script.toString()), runs)) {
       runner.scan(); // FEATURES
       runner.scan(); // PUBLISH
-      jdbc.update("update batch_jobs set retry_at=now()-interval '1 second' where job_id=?", job);
+      jdbc.update(
+          "update analysis.jobs set retry_at=now()-interval '1 second' where job_id=?", job);
       runner.scan(); // GET + COLLECT
       assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.SCORES);
       assertThat(service.job(job).status()).isEqualTo("QUEUED");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis_model_tasks where run_id=? and status='SUCCEEDED'",
+                  "select count(*) from analysis.model_tasks where run_id=? and status='SUCCEEDED'",
                   Integer.class,
                   run))
           .isEqualTo(2);
@@ -496,17 +499,19 @@ class WorkerPipelineTests {
       assertThat(service.job(job).status()).isEqualTo("QUEUED");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from inference_results where run_id=? and score_pct=0",
+                  "select count(*) from analysis.scores where run_id=? and score_pct=0",
                   Integer.class,
                   run))
           .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from transactions where scored_job_id=?", Integer.class, job))
-          .isEqualTo(1);
+                  "select count(*) from analysis.current_scores where run_id=?",
+                  Integer.class,
+                  run))
+          .isZero();
       assertThat(
               jdbc.queryForObject(
-                  "select completed from analysis_run_stage_results where run_id=? and stage='SCORES'",
+                  "select completed from analysis.stage_results where run_id=? and stage='SCORES'",
                   Boolean.class,
                   run))
           .isTrue();
@@ -515,7 +520,13 @@ class WorkerPipelineTests {
       assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.COMPLETE);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from inference_results where run_id=?", Integer.class, run))
+                  "select count(*) from analysis.current_scores where run_id=?",
+                  Integer.class,
+                  run))
+          .isEqualTo(1);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis.scores where run_id=?", Integer.class, run))
           .isEqualTo(1);
     }
   }
@@ -524,24 +535,24 @@ class WorkerPipelineTests {
   void explicit_resume_resets_only_failed_local_publication() {
     executor("worker/analysis_entry.py").prepare(claim());
     jdbc.update(
-        "update analysis_model_tasks set status='FAILED',action_required=true,consecutive_failures=3 where run_id=? and model_kind='BINARY'",
+        "update analysis.model_tasks set status='FAILED',action_required=true,consecutive_failures=3 where run_id=? and model_kind='BINARY'",
         run);
     jdbc.update(
-        "update analysis_model_tasks set phase='COLLECT' where run_id=? and model_kind='TYPE'",
+        "update analysis.model_tasks set phase='COLLECT' where run_id=? and model_kind='TYPE'",
         run);
     jdbc.update(
-        "update batch_jobs set status='FAILED',current_stage='INFERENCE',error_code='MODEL_TASK_FAILED' where job_id=?",
+        "update analysis.jobs set status='FAILED',current_stage='INFERENCE',error_code='MODEL_TASK_FAILED' where job_id=?",
         job);
     service.resume(job);
     assertThat(
             jdbc.queryForObject(
-                "select status from analysis_model_tasks where run_id=? and model_kind='BINARY'",
+                "select status from analysis.model_tasks where run_id=? and model_kind='BINARY'",
                 String.class,
                 run))
         .isEqualTo("READY");
     assertThat(
             jdbc.queryForObject(
-                "select phase from analysis_model_tasks where run_id=? and model_kind='TYPE'",
+                "select phase from analysis.model_tasks where run_id=? and model_kind='TYPE'",
                 String.class,
                 run))
         .isEqualTo("COLLECT");

@@ -110,9 +110,9 @@ docker compose -p aml-demo -f ./backend/api-server/demo/compose.demo.yaml exec -
 2. 관리자 DB 도구에서 사용자명·표시 이름·해시를 대입하여 등록한다. 아래 `<생성한 해시>`는 실제 해시로 교체한다.
 
 ```sql
-INSERT INTO users(username,name,role,password_hash)
+INSERT INTO core.users(username,name,role,password_hash)
 VALUES ('demo-staff','시연 직원','STAFF','<생성한 해시>');
-INSERT INTO users(username,name,role,password_hash)
+INSERT INTO core.users(username,name,role,password_hash)
 VALUES ('demo-admin','시연 관리자','ADMIN','<별도로 생성한 해시>');
 -- 기존 계정에 로그인 비밀번호를 설정할 경우 사용자명 하나를 지정한다.
 -- UPDATE users SET password_hash='<생성한 해시>' WHERE username='l1a';

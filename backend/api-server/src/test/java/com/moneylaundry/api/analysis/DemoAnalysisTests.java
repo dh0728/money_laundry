@@ -27,8 +27,9 @@ class DemoAnalysisTests {
 
   @BeforeEach
   void setup() {
-    jdbc.execute("truncate batch_jobs cascade");
-    jdbc.update("update demo_business_clock set business_at=null where id");
+    jdbc.execute("truncate analysis.jobs,ingest.uploads cascade");
+    jdbc.update("update ops.business_clock set business_at=null where id");
+    jdbc.update("insert into core.banks(bank_id) values(12) on conflict do nothing");
     service =
         new AnalysisService(
             jdbc,
@@ -41,19 +42,19 @@ class DemoAnalysisTests {
 
   void upload(LocalDate date, String state) {
     jdbc.update(
-        "insert into batch_jobs(job_type,status,business_date,received_at) values('INGEST',?,?, '2026-09-22T00:59:00Z')",
+        "insert into ingest.uploads(bank_id,file_name,file_hash,size_bytes,status,business_date,received_at) values(12,'fixture.csv',repeat('a',64),1,?,?, '2026-09-22T00:59:00Z')",
         state,
         date);
   }
 
   @AfterEach
   void clearDemoClock() {
-    jdbc.update("update demo_business_clock set business_at=null where id");
+    jdbc.update("update ops.business_clock set business_at=null where id");
   }
 
   @Test
   void demo_clock_blocks_real_date_registration_but_allows_dated_demo() {
-    jdbc.update("update demo_business_clock set business_at='2023-09-02T00:00:00+09' where id");
+    jdbc.update("update ops.business_clock set business_at='2023-09-02T00:00:00+09' where id");
     assertThatThrownBy(() -> service.registerNow())
         .isInstanceOfSatisfying(
             ApiException.class,
@@ -62,12 +63,12 @@ class DemoAnalysisTests {
               assertThat(e.status().value()).isEqualTo(409);
             });
     assertThatThrownBy(() -> service.registerScheduled()).isInstanceOf(ApiException.class);
-    assertThat(jdbc.queryForObject("select count(*) from batch_jobs", Integer.class)).isZero();
+    assertThat(jdbc.queryForObject("select count(*) from analysis.jobs", Integer.class)).isZero();
     upload(day, "COMPLETED");
     long id = service.registerDemo(day, day.plusDays(1));
     assertThat(
             jdbc.queryForObject(
-                "select analysis_date from batch_jobs where job_id=?", LocalDate.class, id))
+                "select analysis_date from analysis.jobs where job_id=?", LocalDate.class, id))
         .isEqualTo(day.plusDays(1));
     assertThat(service.job(id).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);
   }
@@ -76,7 +77,7 @@ class DemoAnalysisTests {
   void unconfigured_clock_keeps_normal_registration_available() {
     long manual = service.registerNow();
     assertThat(service.job(manual).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);
-    jdbc.execute("truncate batch_jobs cascade");
+    jdbc.execute("truncate analysis.jobs,ingest.uploads cascade");
     long scheduled = service.registerScheduled();
     assertThat(service.job(scheduled).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);
   }
@@ -89,7 +90,7 @@ class DemoAnalysisTests {
     long id = service.registerDemo(future, future.plusDays(1));
     assertThat(
             jdbc.queryForObject(
-                    "select analysis_cutoff_at from batch_jobs where job_id=?",
+                    "select analysis_cutoff_at from analysis.jobs where job_id=?",
                     java.sql.Timestamp.class,
                     id)
                 .toInstant())
@@ -103,22 +104,21 @@ class DemoAnalysisTests {
     assertThat(service.job(first).stage()).isEqualTo(AnalysisStage.WAIT_INGEST);
     assertThat(
             jdbc.queryForObject(
-                "select analysis_date from batch_jobs where job_id=?", LocalDate.class, first))
+                "select analysis_date from analysis.jobs where job_id=?", LocalDate.class, first))
         .isEqualTo(day.plusDays(1));
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis_receipts where job_id=?", Integer.class, first))
+                "select count(*) from analysis.receipts where job_id=?", Integer.class, first))
         .isEqualTo(1);
     assertThatThrownBy(() -> service.registerDemo(day.plusDays(1)))
         .isInstanceOf(ApiException.class);
-    jdbc.update("update batch_jobs set status='COMPLETED' where job_id=?", first);
+    jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", first);
     upload(day.plusDays(1), "COMPLETED");
     long next = service.registerDemo(day.plusDays(1));
     assertThat(next).isGreaterThan(first);
     assertThat(
             jdbc.queryForObject(
-                "select count(distinct analysis_cutoff_at) from batch_jobs where job_type='ANALYSIS'",
-                Integer.class))
+                "select count(distinct analysis_cutoff_at) from analysis.jobs", Integer.class))
         .isEqualTo(1);
   }
 
@@ -131,7 +131,7 @@ class DemoAnalysisTests {
     upload(day.plusDays(1), "COMPLETED");
     assertThatThrownBy(() -> service.registerDemo(day)).isInstanceOf(ApiException.class);
     long later = service.registerDemo(day.plusDays(1));
-    jdbc.update("update batch_jobs set status='COMPLETED' where job_id=?", later);
+    jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", later);
     assertThatThrownBy(() -> service.registerDemo(day.plusDays(1)))
         .isInstanceOf(ApiException.class);
     assertThatThrownBy(() -> service.registerDemo(day)).isInstanceOf(ApiException.class);
@@ -141,7 +141,7 @@ class DemoAnalysisTests {
   void failed_previous_analysis_requires_resume() {
     upload(day, "COMPLETED");
     long id = service.registerDemo(day);
-    jdbc.update("update batch_jobs set status='FAILED' where job_id=?", id);
+    jdbc.update("update analysis.jobs set status='FAILED' where job_id=?", id);
     upload(day.plusDays(1), "COMPLETED");
     assertThatThrownBy(() -> service.registerDemo(day.plusDays(1)))
         .isInstanceOf(ApiException.class);

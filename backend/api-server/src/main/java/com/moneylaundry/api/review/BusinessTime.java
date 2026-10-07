@@ -40,8 +40,7 @@ public class BusinessTime {
   public Instant now() {
     if (!WorkbenchAccess.enabled(env)) return Instant.now();
     Timestamp value =
-        jdbc.queryForObject(
-            "select business_at from demo_business_clock where id", Timestamp.class);
+        jdbc.queryForObject("select business_at from ops.business_clock where id", Timestamp.class);
     return value == null ? Instant.now() : value.toInstant();
   }
 
@@ -51,10 +50,10 @@ public class BusinessTime {
     result.put(
         "configured",
         jdbc.queryForObject(
-            "select business_at is not null from demo_business_clock where id", Boolean.class));
+            "select business_at is not null from ops.business_clock where id", Boolean.class));
     result.put(
         "revision",
-        jdbc.queryForObject("select revision from demo_business_clock where id", Long.class));
+        jdbc.queryForObject("select revision from ops.business_clock where id", Long.class));
     return result;
   }
 
@@ -64,28 +63,28 @@ public class BusinessTime {
     return tx.execute(
         s -> {
           jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
-          jdbc.queryForList("select * from demo_business_clock where id for update");
+          jdbc.queryForList("select * from ops.business_clock where id for update");
           long revision =
-              jdbc.queryForObject("select revision from demo_business_clock where id", Long.class);
+              jdbc.queryForObject("select revision from ops.business_clock where id", Long.class);
           if (revision != expected)
             throw ApiException.invalidTransition("시연 시각이 변경됐습니다. 다시 조회하세요.");
           boolean busy =
               jdbc.queryForObject(
-                  "select exists(select 1 from batch_jobs where status in ('RUNNING','QUEUED','SCHEDULED','RETRY_WAIT','RECEIVED') or (job_type='ANALYSIS' and status='FAILED'))",
+                  "select exists(select 1 from ops.work_items where status in ('RUNNING','QUEUED','SCHEDULED','RETRY_WAIT','RECEIVED') or (job_type='ANALYSIS' and status='FAILED'))",
                   Boolean.class);
           if (busy) throw ApiException.invalidTransition("진행 중 또는 복구가 필요한 작업이 있습니다.");
           Timestamp previous =
               jdbc.queryForObject(
-                  "select business_at from demo_business_clock where id", Timestamp.class);
+                  "select business_at from ops.business_clock where id", Timestamp.class);
           if (previous != null && value.isBefore(previous.toInstant()))
             throw ApiException.invalidTransition("과거로 이동하려면 시연 데이터를 초기화하세요.");
           if (previous == null
               && jdbc.queryForObject(
-                  "select exists(select 1 from batch_jobs where job_type='ANALYSIS')",
+                  "select exists(select 1 from ops.work_items where job_type='ANALYSIS')",
                   Boolean.class))
             throw ApiException.invalidTransition("기존 분석 시연은 초기화 후 업무 시각을 설정하세요.");
           jdbc.update(
-              "update demo_business_clock set business_at=?,revision=revision+1,updated_at=now() where id",
+              "update ops.business_clock set business_at=?,revision=revision+1,updated_at=now() where id",
               Timestamp.from(value));
           return view();
         });

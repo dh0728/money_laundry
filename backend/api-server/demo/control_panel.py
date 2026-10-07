@@ -405,8 +405,8 @@ def render_reset(replay):
         if preview:
             counts = preview['counts']
             st.write({label: counts.get(table, 0) for label, table in (
-                ('거래', 'transactions'), ('업로드·분석 작업', 'batch_jobs'),
-                ('Alert', 'alerts'), ('조사 사건', 'review_cases'), ('은행 보고', 'report_versions'))})
+                ('거래', 'ledger.transactions'), ('업로드', 'ingest.uploads'), ('분석 작업', 'analysis.jobs'),
+                ('Alert', 'review.alerts'), ('Episode', 'review.episodes'), ('은행 보고', 'ingest.report_versions'))})
             confirmation = st.text_input('확인 문구: 시연 데이터 초기화', key='reset_confirmation')
             if st.button('DB 및 관련 파일 초기화', disabled=running or pending or confirmation != '시연 데이터 초기화'):
                 result = replay.reset_demo({'requestId': st.session_state.reset_request,

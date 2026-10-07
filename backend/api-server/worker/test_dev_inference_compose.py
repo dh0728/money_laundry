@@ -26,6 +26,7 @@ class DevInferenceComposeTests(unittest.TestCase):
         env.update(DEV_API_IMAGE=image, DEV_WEB_IMAGE=image, DEV_DB_URL='jdbc:postgresql://postgres:5432/aml_check',
                    DEV_POSTGRES_DB='aml_check', DEV_POSTGRES_USER='aml_check',
                    DEV_POSTGRES_PASSWORD=secrets.token_urlsafe(32), DEV_JWT_SECRET=secrets.token_urlsafe(48),
+                   DEV_ANALYSIS_DB_USERNAME='aml_check_analysis', DEV_ANALYSIS_DB_PASSWORD=secrets.token_urlsafe(32),
                    DEV_INGEST_ENCRYPTION_KEY=key,
                    DEV_INGEST_SEARCH_KEY=base64.b64encode(secrets.token_bytes(32)).decode(), DEV_INGEST_KEY_VERSION='test',
                    DEV_INFERENCE_API_TOKEN=secrets.token_urlsafe(32), DEV_S3_BUCKET='test-bucket',
@@ -69,6 +70,26 @@ class DevInferenceComposeTests(unittest.TestCase):
 
         self.addCleanup(compose, 'down', '--volumes', '--remove-orphans')
         compose('up', '-d', '--wait', '--wait-timeout', '120')
+        api_python("""
+import os,sys,psycopg
+sys.path.insert(0,'/app/worker')
+import cryptography,ingest_entry,report_integration,report_correction
+from zoneinfo import ZoneInfo
+assert str(ZoneInfo('Asia/Seoul'))=='Asia/Seoul'
+from configure_analysis_db import configure
+with psycopg.connect(host='postgres',dbname='aml_check',user='aml_check',password=os.environ['SPRING_DATASOURCE_PASSWORD'],autocommit=True) as db:
+    configure(db,os.environ['ANALYSIS_DB_USERNAME'],os.environ['ANALYSIS_DB_PASSWORD'])
+    assert db.execute("select version from public.flyway_schema_history where success").fetchall()==[('1',)]
+with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSIS_DB_USERNAME'],password=os.environ['ANALYSIS_DB_PASSWORD'],autocommit=True) as db:
+    db.execute('select * from analysis.input_transactions')
+    for table in ('private.bank_reports','evaluation.report_labels'):
+        try:
+            db.execute('select * from '+table)
+        except psycopg.errors.InsufficientPrivilege:
+            pass
+        else:
+            raise AssertionError('Protected table unexpectedly accessible')
+""")
         request_id = str(uuid4())
         path = f'/api/v1/inference-requests/{request_id}/rounds/1'
         body = dict(contract_version=2, job_id=1, run_id=str(uuid4()), model_kind='BINARY',

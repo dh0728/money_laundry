@@ -15,25 +15,33 @@ public class LedgerQueryService {
     this.jdbc = jdbc;
   }
 
-  public static final String BASE =
+  private static final String ACCOUNTS =
       """
-    from transactions t
-    join private.accounts f on f.account_id=t.from_account_id
-    join private.accounts r on r.account_id=t.to_account_id
-    join private.entities fe on fe.entity_id=f.entity_id
-    join private.entities re on re.entity_id=r.entity_id
-    left join lateral (
-      select i.*,j.threshold_value,j.business_at as detected_at
-      from inference_results i join batch_jobs j on j.job_id=i.job_id
-      where i.tx_id=t.tx_id and j.status='COMPLETED' and j.job_type='ANALYSIS'
-      and ((j.current_run_id is null and i.run_id is null) or
-       (i.run_id=j.current_run_id and exists(select 1 from analysis_runs ar where ar.run_id=i.run_id and ar.status='COMPLETED')))
-      order by j.job_id desc limit 1
-    ) s on true
-    left join lateral (select ordinal-1 as type_class from unnest(array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8]) with ordinality p(prob,ordinal)
-     where s.job_id is not null order by prob desc,ordinal limit 1) w on true
-    where t.integration_status='ACTIVE'
+    from ledger.transactions t
+    join core.accounts f on f.account_id=t.from_account_id
+    join core.accounts r on r.account_id=t.to_account_id
+    join core.owners fe on fe.owner_id=f.owner_id
+    join core.owners re on re.owner_id=r.owner_id
     """;
+
+  private static final String SCORE =
+      """
+    left join (
+      select i.*,j.job_id,j.threshold_value,j.business_at as detected_at
+      from analysis.current_scores c join analysis.scores i using(run_id,tx_id)
+      join analysis.runs ar on ar.run_id=i.run_id
+      join analysis.jobs j on j.job_id=ar.job_id and j.current_run_id=ar.run_id
+      where ar.status='COMPLETED' and j.status='COMPLETED'
+    ) s on s.tx_id=t.tx_id
+    """;
+
+  private static final String TYPE =
+      """
+    left join lateral (select s.type_class::bigint as type_class) w on true
+    """;
+
+  public static final String BASE =
+      ACCOUNTS + SCORE + TYPE + " where t.integration_status='ACTIVE'";
 
   public record Filter(
       LocalDate from,
@@ -64,7 +72,18 @@ public class LedgerQueryService {
     if (filter.from() != null && filter.to() != null && filter.from().isAfter(filter.to()))
       throw AnalysisService.invalid();
     var args = new ArrayList<Object>();
-    var sql = new StringBuilder(BASE);
+    // Candidate selection needs scores only when judgement is actually filtered.
+    // Type probabilities and presentation names belong to the returned page.
+    boolean needsScores = filter.judgement() != null && !filter.judgement().isEmpty();
+    boolean needsIdentity =
+        filter.owner() != null
+            || filter.account() != null
+            || (filter.query() != null && !filter.query().isBlank());
+    var sql =
+        new StringBuilder(
+            (needsIdentity ? ACCOUNTS : " from ledger.transactions t ")
+                + (needsScores ? SCORE : "")
+                + " where t.integration_status='ACTIVE'");
     if (filter.from() != null) {
       sql.append(" and t.occurred_at>=?");
       args.add(Timestamp.from(filter.from().atStartOfDay(BusinessTime.KST).toInstant()));
@@ -74,7 +93,7 @@ public class LedgerQueryService {
       args.add(Timestamp.from(filter.to().plusDays(1).atStartOfDay(BusinessTime.KST).toInstant()));
     }
     if (filter.owner() != null) {
-      sql.append(" and (fe.service_entity_id=? or re.service_entity_id=?)");
+      sql.append(" and (fe.service_owner_id=? or re.service_owner_id=?)");
       args.add(filter.owner());
       args.add(filter.owner());
     }
@@ -111,12 +130,12 @@ public class LedgerQueryService {
               + filter.query().strip().replace("!", "!!").replace("%", "!%").replace("_", "!_")
               + "%";
       sql.append(
-          " and (t.tx_id::text ilike ? escape '!' or f.service_account_id::text ilike ? escape '!' or r.service_account_id::text ilike ? escape '!' or fe.service_entity_id::text ilike ? escape '!' or re.service_entity_id::text ilike ? escape '!')");
+          " and (t.tx_id::text ilike ? escape '!' or f.service_account_id::text ilike ? escape '!' or r.service_account_id::text ilike ? escape '!' or fe.service_owner_id::text ilike ? escape '!' or re.service_owner_id::text ilike ? escape '!')");
       sql.setLength(sql.length() - 1);
       sql.append(" or ")
-          .append(OwnerDisplay.sql("fe.entity_id"))
+          .append("fe.display_name")
           .append(" ilike ? escape '!' or ")
-          .append(OwnerDisplay.sql("re.entity_id"))
+          .append("re.display_name")
           .append(" ilike ? escape '!')");
       args.addAll(List.of(q, q, q, q, q, q, q));
     }
@@ -135,7 +154,7 @@ public class LedgerQueryService {
         """
       select t.tx_id as "txId",t.occurred_at as "occurredAt",
       f.service_account_id as "fromAccountId",r.service_account_id as "toAccountId",
-      fe.service_entity_id as "fromOwnerId",re.service_entity_id as "toOwnerId",
+      fe.service_owner_id as "fromOwnerId",re.service_owner_id as "toOwnerId",
       f.bank_id as "fromBankId",r.bank_id as "toBankId",
       t.amount_paid as "amountPaid",t.payment_currency as "paymentCurrency",t.amount_usd as "amountUsd",
       t.amount_received as "amountReceived",t.receiving_currency as "receivingCurrency",t.payment_format as "paymentFormat",
@@ -145,34 +164,60 @@ public class LedgerQueryService {
       array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8] as probabilities,
       case when s.job_id is null then 'UNANALYZED' when s.p_laundering>=s.threshold_value then 'SUSPICIOUS' else 'NORMAL' end as judgement
       """
-            .formatted(OwnerDisplay.sql("fe.entity_id"), OwnerDisplay.sql("re.entity_id"));
-    String dataset = select + sql;
-    if ("owners".equals(kind))
+            .formatted("fe.display_name", "re.display_name");
+    String dataset;
+    String pageSelect;
+    if ("owners".equals(kind)) {
       dataset =
-          "with matches as ("
-              + dataset
-              + ") select distinct id,name from (select \"fromOwnerId\" as id,\"fromOwnerName\" as name from matches union select \"toOwnerId\",\"toOwnerName\" from matches) o";
-    else if ("accounts".equals(kind)) {
+          needsIdentity
+              ? "with matches as (select fe.owner_id as f,re.owner_id as r "
+                  + sql
+                  + ") select e.owner_id,e.display_name,e.service_owner_id as id from core.owners e join "
+                  + "(select f as owner_id from matches union select r from matches) m using(owner_id)"
+              : "with matches as (select t.from_account_id as f,t.to_account_id as r "
+                  + sql
+                  + "), matched_accounts as (select f as account_id from matches union select r from matches),"
+                  + " ids as (select distinct a.owner_id from core.accounts a join matched_accounts m using(account_id))"
+                  + " select e.owner_id,e.display_name,e.service_owner_id as id from core.owners e join ids using(owner_id)";
+      pageSelect = "select id," + "p.display_name" + " as name from page p order by id";
+    } else if ("accounts".equals(kind)) {
       dataset =
-          "with matches as ("
-              + dataset
-              + ") select distinct id,\"ownerId\",\"ownerName\",\"bankId\" from (select \"fromAccountId\" as id,\"fromOwnerId\" as \"ownerId\",\"fromOwnerName\" as \"ownerName\",\"fromBankId\" as \"bankId\" from matches union select \"toAccountId\",\"toOwnerId\",\"toOwnerName\",\"toBankId\" from matches) a";
+          "with matches as (select t.from_account_id as f,t.to_account_id as r "
+              + sql
+              + ") select a.service_account_id as id,e.owner_id,e.display_name,e.service_owner_id as \"ownerId\",a.bank_id as \"bankId\" "
+              + "from core.accounts a join core.owners e using(owner_id) join "
+              + "(select f as account_id from matches union select r from matches) m using(account_id)";
       if (filter.owner() != null) {
-        dataset += " where \"ownerId\"=?";
+        dataset += " where e.service_owner_id=?";
         args.add(filter.owner());
       }
-    } else if (!"transactions".equals(kind)) throw AnalysisService.invalid();
+      pageSelect =
+          "select id,\"ownerId\",\"bankId\","
+              + "p.display_name"
+              + " as \"ownerName\" from page p order by id";
+    } else if ("transactions".equals(kind)) {
+      dataset = "select t.tx_id as \"txId\",t.occurred_at as \"occurredAt\" " + sql;
+      pageSelect =
+          select
+              + ACCOUNTS
+              + " join page p on p.\"txId\"=t.tx_id "
+              + SCORE
+              + TYPE
+              + " order by t.occurred_at desc,t.tx_id";
+    } else throw AnalysisService.invalid();
     long count =
         jdbc.queryForObject("select count(*) from (" + dataset + ") q", Long.class, args.toArray());
     args.add(filter.size());
     args.add((long) filter.page() * filter.size());
     var rows =
         jdbc.queryForList(
-            dataset
+            "with page as materialized ("
+                + dataset
                 + ("transactions".equals(kind)
                     ? " order by \"occurredAt\" desc,\"txId\""
                     : " order by id")
-                + " limit ? offset ?",
+                + " limit ? offset ?) "
+                + pageSelect,
             args.toArray());
     for (var row : rows) {
       Object probs = row.remove("probabilities");
@@ -203,8 +248,8 @@ public class LedgerQueryService {
     if (ids.isEmpty()) return List.of();
     return jdbc.queryForList(
         "select "
-            + OwnerDisplay.sql("e.entity_id")
-            + " as \"ownerName\",a.service_account_id as id,e.service_entity_id as \"ownerId\",a.bank_id as \"bankId\" from private.accounts a join private.entities e using(entity_id) where a.service_account_id::text in ("
+            + "e.display_name"
+            + " as \"ownerName\",a.service_account_id as id,e.service_owner_id as \"ownerId\",a.bank_id as \"bankId\" from core.accounts a join core.owners e using(owner_id) where a.service_account_id::text in ("
             + String.join(",", Collections.nCopies(ids.size(), "?"))
             + ")",
         ids.toArray());
@@ -212,6 +257,7 @@ public class LedgerQueryService {
 
   public List<String> payments() {
     return jdbc.queryForList(
-        "select distinct payment_format from transactions order by payment_format", String.class);
+        "select distinct payment_format from ledger.transactions order by payment_format",
+        String.class);
   }
 }
