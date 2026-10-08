@@ -1564,8 +1564,10 @@ class ReviewWorkflowTests {
       selections.add(
           new ReviewService.Selection(
               ep, number(detail.get("revision")), number(g.get("groupId")), List.of(1L, 2L)));
-    act(l2, "DECIDE", "SUSPICIOUS", selections.toArray(ReviewService.Selection[]::new));
-    act(l2, "CLOSE", null, select(ep));
+    long nextAssignee = number(detail.get("assigneeId"));
+    assertThat(nextAssignee).isNotEqualTo(l2);
+    act(nextAssignee, "DECIDE", "SUSPICIOUS", selections.toArray(ReviewService.Selection[]::new));
+    act(nextAssignee, "CLOSE", null, select(ep));
     assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
         .containsEntry("pending", 0L)
         .containsEntry("inProgress", 0L)
