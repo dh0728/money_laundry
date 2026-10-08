@@ -49,12 +49,12 @@ erDiagram
 | analysis | jobs, receipts, selected_versions | 분석 상태·고정 수신 목록·통합에서 선택한 버전 |
 | analysis | runs, run_replacements | 실행 세대와 취소·대체 관계 |
 | analysis | stage_results, failures | 단계 완료 체크포인트·실패 이력 |
-| analysis | input_transactions, input_reports | 불변 TARGET/CONTEXT 거래값과 출처 |
+| analysis | input_transactions, input_reports | 불변 TARGET 및 cutoff 이전 유효 전체 CONTEXT 거래값·보고 출처 |
 | analysis | target_ownership | 미완료 TARGET 실행 소유권 |
-| analysis | input_coverage, input_scores, source_manifest | 고정 커버리지·선행 점수·Alert 근거 버전 참조 |
+| analysis | input_coverage, input_scores, source_manifest | 고정 커버리지·선행 점수와 원본 실행 참조·보고/수집 범위 상태 |
 | analysis | model_requests, model_tasks, cancel_outbox | 모델 요청·회차·관측·취소 전달 |
 | analysis | features, scores, current_scores | 실행별 피처·점수, 완료 후 공개되는 거래별 점수 참조 |
-| analysis | alert_origins | 실행 산출 Alert와 불변 근거 버전 연결 |
+| analysis | alert_origins | 입력 동결 시 공개된 후속 계보의 마지막 Alert와 불변 근거 버전 참조. 실행 산출 연결은 alert_versions.run_id |
 | review | alerts | Alert 담당·상태·종결 결과 |
 | review | episodes | Episode 담당·상태·종결 결과. Alert와 별도 테이블 |
 | review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 유효 소속과 결합하여 위험도 정렬에 사용 |

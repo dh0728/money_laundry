@@ -326,8 +326,9 @@ public class AnalysisRunner implements AutoCloseable {
                       run);
               if (count == 0) {
                 if (service.jdbc.queryForObject(
-                    "select exists(select 1 from analysis.alert_origins where run_id=?)",
+                    "select exists(select 1 from analysis.alert_origins where run_id=?) or exists(select 1 from analysis.input_scores where run_id=?)",
                     Boolean.class,
+                    run,
                     run)) {
                   service.jdbc.update(
                       "update analysis.jobs set status='QUEUED',current_stage='ALERTS',row_count=0,suspicious_tx_count=0,execution_id=null,execution_owner=null,stage_attempt_count=0 where job_id=?",

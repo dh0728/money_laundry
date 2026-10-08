@@ -40,6 +40,8 @@ class AlertPipelineTests {
   @Autowired AlertQueryService alerts;
   long target;
   long account;
+  long receiver;
+  long initialContext;
 
   @BeforeEach
   void alertSetup() {
@@ -56,8 +58,15 @@ class AlertPipelineTests {
     account =
         jdbc.queryForObject(
             "select from_account_id from ledger.transactions where tx_id=?", Long.class, target);
+    receiver =
+        jdbc.queryForObject(
+            "insert into core.accounts(bank_id,service_account_id,owner_id) select bank_id,?,owner_id from core.accounts where account_id=? returning account_id",
+            Long.class,
+            UUID.randomUUID(),
+            account);
     jdbc.update(
-        "update ledger.transactions set occurred_at='2022-09-02 23:30+09',business_date='2022-09-02' where tx_id=?",
+        "update ledger.transactions set to_account_id=?,occurred_at='2022-09-02 23:30+09',business_date='2022-09-02' where tx_id=?",
+        receiver,
         target);
     jdbc.update("delete from analysis.target_ownership where run_id=?", run);
     jdbc.update("delete from analysis.input_transactions where run_id=?", run);
@@ -66,6 +75,23 @@ class AlertPipelineTests {
         "update analysis.jobs set current_stage='ALERTS',threshold_value=.7,analysis_cutoff_at='2022-09-03 09:00+09' where job_id=?",
         job);
     report(target, "2022-09-02", "2022-09-03 00:00+09");
+    initialContext =
+        jdbc.queryForObject(
+            "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2022-09-02 23:40+09',?,?,1,'USD',1,'USD','ACH',1,'test','2022-09-02') returning tx_id",
+            Long.class,
+            receiver,
+            account);
+    long contextReport =
+        jdbc.queryForObject(
+            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) select br.version_id,2,?,'cipher','test','ACTIVE' from private.bank_reports br join ledger.transaction_reports tr using(report_id) where tr.tx_id=? returning report_id",
+            Long.class,
+            UUID.randomUUID().toString(),
+            target);
+    jdbc.update(
+        "insert into ledger.transaction_reports values(?,?,'INTERNAL')",
+        initialContext,
+        contextReport);
+
     snapshot.freeze(run, Instant.parse("2022-09-03T00:00:00Z"));
     jdbc.update(
         "insert into analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id) values(?,?,.9,1,0,0,0,0,0,0,0,0,?)",
@@ -138,7 +164,7 @@ class AlertPipelineTests {
             Long.class,
             day + " 10:00+09",
             account,
-            account,
+            receiver,
             day);
     report(id, day, "2022-09-03 01:00+09");
     return id;
@@ -164,7 +190,7 @@ class AlertPipelineTests {
   }
 
   @Test
-  void unchanged_or_unrelated_sources_do_not_recheck_an_incomplete_future_window() {
+  void full_snapshot_rechecks_visible_origins_without_copying_future_sources() {
     long alert = firstAlert();
     jdbc.update(
         "insert into ingest.reporting_scopes(business_date) values('2020-01-01'),('2030-01-01')");
@@ -174,7 +200,7 @@ class AlertPipelineTests {
                 "select count(*) from analysis.alert_origins where run_id=?",
                 Integer.class,
                 checking))
-        .isZero();
+        .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.source_manifest where run_id=? and business_date='2030-01-01'",
@@ -228,7 +254,7 @@ class AlertPipelineTests {
                 "select count(*) from analysis.alert_origins where run_id=?",
                 Integer.class,
                 unchanged))
-        .isZero();
+        .isEqualTo(1);
   }
 
   @Test
@@ -293,7 +319,7 @@ class AlertPipelineTests {
             "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2022-09-04 02:54+09',?,?,2,'USD',2,'USD','ACH',2,'test','2022-09-04') returning tx_id",
             Long.class,
             account,
-            account);
+            receiver);
     report(context, "2022-09-04", "2022-09-04 03:00+09");
     long follow =
         jdbc.queryForObject(
@@ -328,7 +354,7 @@ class AlertPipelineTests {
     }
     assertThat(alerts.versions(alert)).hasSize(2);
     assertThat(alerts.detail(alert, 1)).isEqualTo(old);
-    assertThat((List<?>) alerts.detail(alert, null).get("transactions")).hasSize(2);
+    assertThat((List<?>) alerts.detail(alert, null).get("transactions")).hasSize(3);
     assertThat(alerts.detail(alert, null)).doesNotContainKey("forwardComplete");
     assertThat(alerts.detail(alert, null).get("dataAsOf")).isEqualTo("2022-09-04T00:00:00Z");
     assertThat(alerts.detail(alert, null).get("lastCheckedAt")).isNotNull();
@@ -407,5 +433,64 @@ class AlertPipelineTests {
     assertThatThrownBy(() -> alerts.detail(alert, null)).isInstanceOf(ApiException.class);
     runs.cancel(run, "REPORT_CORRECTED");
     assertThat(alerts.list(0, 20, null, null, null).get("totalElements")).isEqualTo(0L);
+  }
+
+  @Test
+  void unassigned_historical_seed_is_revisited_without_target_or_existing_alert() {
+    jdbc.update(
+        "delete from analysis.input_reports where run_id=? and tx_id=?", run, initialContext);
+    jdbc.update(
+        "delete from analysis.input_transactions where run_id=? and tx_id=?", run, initialContext);
+    jdbc.update(
+        "update ledger.transactions set integration_status='HELD' where tx_id=?", initialContext);
+    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+      runner.scan();
+      assertThat(service.job(job).status()).isEqualTo("COMPLETED");
+    }
+    assertThat(jdbc.queryForObject("select count(*) from review.alert_versions", Integer.class))
+        .isZero();
+    long connecting = contextOn("2022-09-03");
+    long follow =
+        jdbc.queryForObject(
+            "insert into analysis.jobs(analysis_date,business_at,status,current_stage,threshold_value,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),'QUEUED','FREEZE_INPUT',.99,'2022-09-04 09:00+09') returning job_id",
+            Long.class);
+    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+      runner.scan();
+      assertThat(service.job(follow).stage()).isEqualTo(AnalysisStage.ALERTS);
+      UUID next = runs.current(follow);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis.alert_origins where run_id=?",
+                  Integer.class,
+                  next))
+          .isZero();
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",
+                  Integer.class,
+                  next))
+          .isZero();
+      runner.scan();
+      assertThat(service.job(follow).status()).isEqualTo("COMPLETED");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis.model_tasks where run_id=?", Integer.class, next))
+          .isZero();
+      long alert =
+          jdbc.queryForObject(
+              "select alert_id from review.alert_versions where run_id=?", Long.class, next);
+      assertThat(
+              jdbc.queryForList(
+                  "select tx_id from review.alert_transactions where alert_id=? order by tx_id",
+                  Long.class,
+                  alert))
+          .containsExactly(target, connecting);
+      assertThat(
+              jdbc.queryForObject(
+                  "select (evidence->'seeds'->0->>'threshold')::float8 from review.alert_versions where alert_id=?",
+                  Double.class,
+                  alert))
+          .isEqualTo(.7);
+    }
   }
 }

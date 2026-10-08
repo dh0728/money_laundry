@@ -24,7 +24,7 @@ class AlertPostgresTests(unittest.TestCase):
         self.a,self.b,self.c,self.d,self.e = [uuid4() for _ in range(5)]
         for key,source,dest,time in ((self.ids[0],self.a,self.b,'2022-09-02 23:30+09'),
                                     (self.ids[1],self.c,self.d,'2022-09-02 10:00+09'),
-                                    (self.ids[2],self.d,self.e,'2022-09-02 11:00+09'),
+                                    (self.ids[2],self.e,self.a,'2022-09-02 22:00+09'),
                                     (self.context,self.b,self.e,'2022-09-03 00:15+09')):
             self.admin.execute("UPDATE analysis.input_transactions SET from_account_id=%s,to_account_id=%s,occurred_at=%s,business_date=%s::timestamptz AT TIME ZONE 'Asia/Seoul' WHERE run_id=%s AND tx_id=%s",
                                (source,dest,time,time,self.run,key))
@@ -75,8 +75,8 @@ class AlertPostgresTests(unittest.TestCase):
     def test_daily_boundary_and_immutable_scores_and_empty_target(self):
         alert=self.first()
         old=self.admin.execute("SELECT evidence FROM review.alert_versions WHERE alert_id=%s",(alert,)).fetchone()[0]
-        self.assertEqual(old['policyVersion'], 'calendar-event-v4')
-        self.assertEqual([m['txId'] for m in old['transactions']],[self.ids[0]])
+        self.assertEqual(old['policyVersion'], 'flow-evidence-1')
+        self.assertEqual({m['txId'] for m in old['transactions']},{self.ids[0], self.ids[2]})
         follow=self.following(alert)
         save_alerts(self.admin,follow)
         versions=self.admin.execute("SELECT evidence FROM review.alert_versions WHERE alert_id=%s ORDER BY version",(alert,)).fetchall()
@@ -85,7 +85,7 @@ class AlertPostgresTests(unittest.TestCase):
             WHERE alert_id=%s AND tx_id=%s ORDER BY version''',
             (alert,self.ids[0])).fetchall(), [(1,.9),(2,.9)])
         self.assertEqual(versions[0][0],old)
-        self.assertEqual({m['txId'] for m in versions[1][0]['transactions']},{self.ids[0],self.context})
+        self.assertEqual({m['txId'] for m in versions[1][0]['transactions']},{self.ids[0],self.ids[2],self.context})
         self.assertIsNone(next(m for m in versions[1][0]['transactions'] if m['txId']==self.context)['scores'])
         self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.scores WHERE run_id=%s",(follow.run_id,)).fetchone()[0],0)
         self.assertNotIn("forwardComplete", self.admin.execute("SELECT coverage FROM review.alert_coverage_checks WHERE alert_id=%s AND run_id=%s",(alert,follow.run_id)).fetchone()[0][0])
@@ -206,20 +206,64 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertTrue(self.admin.execute("SELECT completed FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'",(self.run,)).fetchone()[0])
         self.assertEqual(self.admin.execute("SELECT alert_count FROM analysis.jobs WHERE job_id=%s",(self.job,)).fetchone()[0],0)
 
+    def test_isolated_seed_waits_in_scores_then_normal_context_creates_first_alert(self):
+        self.admin.execute("UPDATE analysis.input_transactions SET from_account_id=%s,to_account_id=%s WHERE run_id=%s AND tx_id=%s",
+                           (uuid4(), uuid4(), self.run, self.ids[2]))
+        save_alerts(self.admin, self.execution)
+        self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s',
+                         (self.run,)).fetchone()[0], 0)
+        artifact = json.loads(self.admin.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'",
+                              (self.run,)).fetchone()[0])
+        self.assertEqual(artifact['unassignedSeedCount'], 1)
+        self.complete(self.execution)
+        follow = self.following(-1)
+        # A changed job threshold cannot turn an earlier positive into a negative.
+        self.admin.execute('UPDATE analysis.jobs SET threshold_value=.99 WHERE job_id=%s', (follow.job_id,))
+        save_alerts(self.admin, follow)
+        evidence = self.admin.execute('SELECT evidence FROM review.alert_versions WHERE run_id=%s',
+                                     (follow.run_id,)).fetchone()[0]
+        self.assertEqual([s['txId'] for s in evidence['seeds']], [self.ids[0]])
+        self.assertEqual(evidence['seeds'][0]['threshold'], .7)
+        self.assertEqual({m['txId'] for m in evidence['transactions']}, {self.ids[0], self.context})
+        self.assertTrue(evidence['witnesses'])
+
+    def test_budget_failure_publishes_no_partial_graphs_or_assignment(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from worker_transport import ProtocolError
+        before = self.admin.execute('SELECT user_id,last_assigned_at FROM core.users ORDER BY user_id').fetchall()
+        with patch('alert_pipeline.POLICY', replace(POLICY, max_core_edges=1)):
+            with self.assertRaisesRegex(ProtocolError, 'budget exceeded'):
+                save_alerts(self.admin, self.execution)
+        self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s',
+                         (self.run,)).fetchone()[0], 0)
+        self.assertEqual(self.admin.execute('SELECT user_id,last_assigned_at FROM core.users ORDER BY user_id').fetchall(), before)
+
+    def test_existing_evidence_from_removed_policy_is_rejected_without_writes(self):
+        from worker_transport import ProtocolError
+        alert = self.first()
+        self.admin.execute("UPDATE review.alert_versions SET evidence=jsonb_set(evidence,'{policyVersion}','\"retired-policy\"') WHERE alert_id=%s", (alert,))
+        follow = self.following(alert)
+        with self.assertRaisesRegex(ProtocolError, 'requires regeneration'):
+            save_alerts(self.admin, follow)
+        self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s',
+                         (follow.run_id,)).fetchone()[0], 0)
+
 
 class AlertExtensionTests(unittest.TestCase):
     def evidence(self, ids, seeds, times=None):
         from alert_pipeline import _evidence
-        from alert_builder import Candidate, Membership
-        from datetime import timezone
+        from flow_graph import FlowGraph, Witness
         from decimal import Decimal
         rows={key:dict(occurred_at=datetime.fromisoformat((times or {}).get(key,'2022-09-02T10:00:00+09:00')),
             from_account_id='a',to_account_id='b',from_bank_id=12,to_bank_id=70,
             amount_received=Decimal(1),receiving_currency='USD',amount_paid=Decimal(1),
             payment_currency='USD',amount_usd=Decimal(1),payment_format='ACH') for key in ids}
         seed_info={key:dict(txId=key,occurredAt=rows[key]['occurred_at'].isoformat(),score=.9,threshold=.7) for key in seeds}
-        return _evidence(Candidate(tuple(seeds),tuple(Membership(k,'SEED' if k in seeds else 'CONTEXT',('SEED',) if k in seeds else ('SHARED_SOURCE',)) for k in ids),(),POLICY.version),rows,
-            {key:dict(p_laundering=.9) for key in seeds},seed_info)
+        witnesses = (Witness('REPEAT', tuple(ids)),)
+        return _evidence(FlowGraph(tuple(seeds), tuple(k for k in ids if k not in seeds), (), witnesses, ()), rows,
+            {key:dict(p_laundering=.9) for key in seeds}, seed_info)
+
 
     def test_split_candidates_extend_one_existing_case_and_keep_prior_members(self):
         from alert_pipeline import _extend
@@ -229,25 +273,69 @@ class AlertExtensionTests(unittest.TestCase):
         self.assertEqual([s['txId'] for s in new['seeds']],[1,2])
         self.assertEqual(len(old['transactions']),3)
 
-    def test_member_and_time_caps_preserve_prior_evidence(self):
+    def test_flow_evidence_is_not_truncated_at_old_hundred_member_cap(self):
         from alert_pipeline import _extend
         old=self.evidence(list(range(1,101)),[1])
         result=_extend(old,[self.evidence([1,101],[1,101])])
-        self.assertEqual(len(result['transactions']),100)
-        self.assertEqual([s['txId'] for s in result['seeds']],[1])
-        self.assertIn('TRANSACTION_COUNT',result['limits'])
+        self.assertEqual(len(result['transactions']),101)
+        self.assertEqual([s['txId'] for s in result['seeds']],[1,101])
+        self.assertNotIn('TRANSACTION_COUNT',result['limits'])
         old=self.evidence([1,2],[1],{1:'2022-09-01T00:00:00+09:00',2:'2022-09-02T00:00:00+09:00'})
         result=_extend(old,[self.evidence([2,3],[2],{2:'2022-09-02T00:00:00+09:00',3:'2022-09-03T00:01:00+09:00'})])
         self.assertEqual([m['txId'] for m in result['transactions']],[1,2,3])
         self.assertNotIn('MERGE_LIMIT',result['limits'])
 
-    def test_context_promoted_to_seed_gets_new_score_only_in_new_version(self):
+    def test_connection_promoted_to_seed_gets_new_score_only_in_new_version(self):
         from alert_pipeline import _extend
         old=self.evidence([1,2],[1])
         result=_extend(old,[self.evidence([1,2],[1,2])])
         self.assertIsNone(old['transactions'][1]['scores'])
         self.assertEqual(result['transactions'][1]['role'],'SEED')
         self.assertEqual(result['transactions'][1]['scores']['p_laundering'],.9)
+
+    def test_semantic_fingerprint_tracks_scores_facts_policy_and_witnesses(self):
+        from alert_pipeline import _fingerprint
+        from copy import deepcopy
+        old = self.evidence([1, 2], [1])
+        for section, key, value in [('policy', 'window_us', 1),
+                                     ('transactions', 'amountUsd', '2'),
+                                     ('seeds', 'score', .95),
+                                     ('witnesses', 'kind', 'FLOW')]:
+            changed = deepcopy(old)
+            target = changed[section]
+            (target[0] if isinstance(target, list) else target)[key] = value
+            self.assertNotEqual(_fingerprint(old), _fingerprint(changed))
+
+    def test_new_version_updates_facts_without_mutating_previous_document(self):
+        from alert_pipeline import _extend
+        old = self.evidence([1, 2], [1])
+        addition = self.evidence([1, 2], [1])
+        addition['transactions'][1]['amountUsd'] = '7'
+        result = _extend(old, [addition])
+        self.assertEqual(old['transactions'][1]['amountUsd'], '1')
+        self.assertEqual(result['transactions'][1]['amountUsd'], '7')
+        self.assertEqual(result['summary']['totalAmountUsd'], '8')
+
+    def test_historical_seed_score_and_role_stay_consistent_when_new_graph_has_it_as_connection(self):
+        from alert_pipeline import _extend
+        old = self.evidence([1, 2], [1])
+        addition = self.evidence([1, 2], [2])
+        result = _extend(old, [addition])
+        self.assertEqual(result['transactions'][0]['scores']['p_laundering'], .9)
+        self.assertEqual(result['seeds'][0]['score'], .9)
+
+    def test_database_adapter_preserves_microseconds_and_public_account_identity(self):
+        from alert_pipeline import _build_graphs
+        from decimal import Decimal
+        rows = {101: dict(occurred_at=datetime.fromisoformat('2022-09-02T10:00:00.000001+09:00'),
+                         from_bank_id=1, to_bank_id=2, from_account_id='a', to_account_id='b'),
+                209: dict(occurred_at=datetime.fromisoformat('2022-09-02T10:00:00.000002+09:00'),
+                         from_bank_id=2, to_bank_id=3, from_account_id='b', to_account_id='c')}
+        batch = _build_graphs(rows, [101])
+        self.assertEqual(batch.graphs[0].connection_ids, (209,))
+        self.assertEqual(batch.graphs[0].witnesses[0].tx_ids, (101, 209))
+        rows[209]['from_bank_id'] = 7
+        self.assertFalse(_build_graphs(rows, [101]).graphs)
 
 
 if __name__=='__main__': unittest.main()

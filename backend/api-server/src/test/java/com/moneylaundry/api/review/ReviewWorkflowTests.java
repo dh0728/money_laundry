@@ -537,7 +537,7 @@ class ReviewWorkflowTests {
     long id = alert(l1);
     long alertId = number(service.detail(id).get("alertId"));
     var doc = object(encode(evidence.detail(alertId, null)));
-    doc.put("policyVersion", "calendar-event-v4");
+    doc.put("policyVersion", "flow-evidence-1");
     doc.put("summary", Map.of("scoreMax", .9, "txCount", 3));
     doc.put(
         "seeds",
