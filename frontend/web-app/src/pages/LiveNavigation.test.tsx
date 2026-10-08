@@ -32,13 +32,13 @@ it('actual live pages share the chosen range and preserve the owner/account and 
     detection: { received: 0, analyzed: 0, suspicious: 0 }, deliveryDate: '', pendingReports: 0,
     daily: [], agreements: [], types: [], activities: [], priority: [],
     episodeWork: { current: { unreviewed: 0 }, firstReview: { average_seconds: null }, completion: { average_seconds: null } } })
-  owners.mockResolvedValue(page([{ id: 'owner-one' }]))
+  owners.mockResolvedValue(page([{ id: 'owner-one', name: 'owner-one' }]))
   accounts.mockResolvedValue(page([{ id: 'account-one', ownerId: 'owner-one', bankId: 12 }]))
   transactions.mockResolvedValue(page([])); cases.mockResolvedValue(page([]))
   render(<NuqsAdapter><WorkspaceProvider><Screens /></WorkspaceProvider></NuqsAdapter>)
   await screen.findByText('오늘 유입 Alert')
   fireEvent.click(screen.getByRole('button', { name: /기간 2023/ }))
-  await waitFor(() => expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10'))
+  await waitFor(() => expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10', expect.any(AbortSignal)))
   fireEvent.click(screen.getByRole('button', { name: 'ledger' }))
   fireEvent.click(await screen.findByRole('button', { name: /owner-one/ }))
   fireEvent.click(await screen.findByRole('button', { name: /account-one/ }))

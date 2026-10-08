@@ -28,11 +28,13 @@ export type ProblemDetail = {
 
 export class ApiError extends Error {
   readonly problem: ProblemDetail
+  readonly retryAfterMs?: number
 
-  constructor(problem: ProblemDetail) {
+  constructor(problem: ProblemDetail, retryAfterMs?: number) {
     super(problem.detail ?? problem.title)
     this.name = 'ApiError'
     this.problem = problem
+    this.retryAfterMs = retryAfterMs
   }
 }
 
@@ -47,13 +49,16 @@ export async function refreshCsrf() {
   return csrf
 }
 
-export async function responseError(response: Response, notifyUnauthorized = true) {
+export async function responseError(response: Response, notifyUnauthorized = true, signal?: AbortSignal) {
   const problem = (await response.json().catch(() => null)) as ProblemDetail | null
+  if (signal?.aborted) throw signal.reason
   if (response.status === 401 && notifyUnauthorized) {
     clearCsrf()
     window.dispatchEvent(new Event('auth-expired'))
   }
-  return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status })
+  const hint = response.headers.get('Retry-After')
+  const delay = hint == null ? NaN : /^\d+$/.test(hint.trim()) ? Number(hint) * 1000 : Date.parse(hint) - Date.now()
+  return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status }, Number.isFinite(delay) ? Math.max(0, delay) : undefined)
 }
 
 /** 시각은 서울 오프셋(+09:00)이 붙은 ISO-8601 문자열 */
@@ -61,14 +66,14 @@ export type IsoDateTime = string
 /** YYYY-MM-DD */
 export type IsoDate = string
 
-export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params ?? {})) {
     if (value !== undefined) query.set(key, String(value))
   }
   const url = query.size ? `${path}?${query}` : path
-  const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })
-  if (!response.ok) throw await responseError(response, path !== '/api/me')
+  const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' }, ...(signal ? { signal } : {}) })
+  if (!response.ok) throw await responseError(response, path !== '/api/me', signal)
   return (await response.json()) as T
 }
 

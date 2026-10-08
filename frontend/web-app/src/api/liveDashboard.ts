@@ -1,30 +1,63 @@
-import { getJson } from './common'
+import { ApiError, getJson } from './common'
 
-// API.md §6.5. 서버 업무 시각을 기준으로 표시한다.
-export type LiveDashboard = {
-  businessAt: string
+// API.md §7. Wire DTOs stay separate from the existing presentation shape.
+type Pipeline = {
+  detection: { received: number; analyzed: number; suspicious: number; deliveryDates: string[] }
+  pendingReports: number
+  agreements: { agreement: string; count: number }[]
+  types: { type: number; count: number }[]
+}
+type Investigation = {
   personal: { pending: number; aged: number; closed: number }
   institution: { alerts: number; episodes: number; aged: number; today: number; yesterday: number }
   openAlertsAgedOver3Days: number
-  detection: { received: number; analyzed: number; suspicious: number }
-  deliveryDate: string
-  pendingReports: number
-  daily: { day: string; incoming: number; completed: number }[]
+  daily: { date: string; incoming: number; completed: number }[]
   dailyAlertStatus: { date: string; pending: number; inProgress: number; done: number }[]
-  agreements: { agreement: string; count: number }[]
-  types: { type: number; count: number }[]
-  activities: { event_id: number; case_id: number; action: string; comment: string; business_at: string }[]
-  priority: { case_id: number; kind: 'ALERT' | 'EPISODE'; alert_id: number | null; created_at: string; risk: number }[]
   episodeWork: {
-    asOf: string
-    current: { open: number; aged: number; unreviewed: number; created_today: number; closed_today: number }
-    firstReview: { samples: number; average_seconds: number | null }
-    completion: { samples: number; average_seconds: number | null }
-    oldestOpen: { caseId: number; assignee: string; age_seconds: number; awaiting_review: boolean }[]
+    current: { open: number; aged: number; unreviewed: number; createdToday: number; closedToday: number }
+    firstReview: { samples: number; averageSeconds: number | null }
+    completion: { samples: number; averageSeconds: number | null }
   }
 }
+export type DashboardSummary = {
+  businessAt: string
+  range: { from: string; to: string }
+  pipeline: { computedAt: string | null; data: Pipeline | null }
+  investigation: { computedAt: string | null; data: Investigation | null }
+}
+export type LiveDashboard = {
+  businessAt: string
+  personal: Investigation['personal']
+  institution: Investigation['institution']
+  openAlertsAgedOver3Days: number
+  detection: Pipeline['detection']
+  deliveryDate: string
+  pendingReports: number
+  dailyAlertStatus: Investigation['dailyAlertStatus']
+  agreements: Pipeline['agreements']
+  types: Pipeline['types']
+  episodeWork: { current: { unreviewed: number } }
+}
 
-export const fetchLiveDashboard = (from: string, to: string) => getJson<LiveDashboard>('/api/v1/dashboard', { from, to })
+export async function fetchLiveDashboard(from: string, to: string, signal?: AbortSignal): Promise<LiveDashboard> {
+  const summary = await getJson<DashboardSummary>('/api/v1/dashboard/summary', { from, to }, signal)
+  const pipeline = summary.pipeline.data
+  const investigation = summary.investigation.data
+  if (!pipeline || !investigation) throw new ApiError({ type: 'about:blank', title: '대시보드 데이터가 아직 준비되지 않았습니다.', status: 503, code: 'DASHBOARD_NOT_READY' })
+  return {
+    businessAt: summary.businessAt,
+    personal: investigation.personal,
+    institution: investigation.institution,
+    openAlertsAgedOver3Days: investigation.openAlertsAgedOver3Days,
+    detection: pipeline.detection,
+    deliveryDate: pipeline.detection.deliveryDates.join(', '),
+    pendingReports: pipeline.pendingReports,
+    dailyAlertStatus: investigation.dailyAlertStatus,
+    agreements: pipeline.agreements,
+    types: pipeline.types,
+    episodeWork: { current: { unreviewed: investigation.episodeWork.current.unreviewed } },
+  }
+}
 
 export const fetchDemoClock = () => getJson<{ businessAt: string; configured: boolean; revision: number }>('/api/v1/demo/clock')
 

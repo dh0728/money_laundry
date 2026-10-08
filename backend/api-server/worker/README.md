@@ -213,4 +213,6 @@ Spring 분석 완료 경로는 공개 상태 반영 후 `AnalysisRunService.refr
 
 ### 대시보드 집계와 분석 역할
 
-대시보드 조회 집계는 Spring의 `DashboardRefreshWorker`가 관리한다. Python의 통합/분석 쓰기는 DB statement trigger를 통해 같은 트랜잭션에 영향 영역/거래일 갱신 요청을 기록한다. 계산은 원본 커밋 후 백그라운드에서 수행하며 Python이 집계를 직접 갱신하거나 새 프로세스를 호출하지 않는다. 분석 역할의 ops 접근 금지는 유지한다. SECURITY DEFINER 트리거가 요청을 기록하므로 `analysis_permissions.sql`에 ops 쓰기 권한을 추가하지 않는다. 모델 점수 미공개/정정/공개 전환을 집계에서도 구분한다. 조회 API는 집계 작업을 실행하지 않는다.
+대시보드 조회 집계는 Spring의 `DashboardRefreshWorker`가 관리한다. Python의 통합/분석 쓰기는 DB statement trigger를 통해 같은 트랜잭션에 영향 component/거래일·사건 키 갱신 요청을 기록한다. 계산은 원본 커밋 후 백그라운드에서 수행하며 Python이 집계를 직접 갱신하거나 새 프로세스를 호출하지 않는다. 분석 역할의 ops 접근 금지는 유지한다. SECURITY DEFINER 트리거가 요청을 기록하므로 `analysis_permissions.sql`에 ops 쓰기 권한을 추가하지 않는다. 모델 점수 미공개/정정/공개 전환을 집계에서도 구분한다. 조회 API는 집계 작업을 실행하지 않는다.
+
+대시보드 변경 확인은 기본5초이며 계산은 별도 최대2개 작업자에서 수행한다. PIPELINE(MODEL/REPORTS/DELIVERY)과 INVESTIGATION(CASES)은 독립 공개한다. 진행 중 영역은 다음 확인 차례에 중복 실행하지 않고 후속 변경을 DB에 남긴다. 해당 영역 실패는5~60초 재시도 대기를 적용한다. 실제 성공/실패/대기 상태는 ops.dashboard_refresh_state와 dashboard_dirty에서 확인한다.

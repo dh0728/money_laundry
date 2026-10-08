@@ -14,6 +14,15 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+  @ExceptionHandler(com.moneylaundry.api.review.DashboardReadDatabase.Unavailable.class)
+  org.springframework.http.ResponseEntity<ProblemDetail> dashboardUnavailable(
+      com.moneylaundry.api.review.DashboardReadDatabase.Unavailable e) {
+    return org.springframework.http.ResponseEntity.status(e.status())
+        .header("Retry-After", "2")
+        .header("Cache-Control", "private, no-store")
+        .body(problem(e.status(), e.code(), e.getMessage()));
+  }
+
   @ExceptionHandler(ApiException.class)
   ProblemDetail api(ApiException e) {
     ProblemDetail result = problem(e.status(), e.code(), e.getMessage());
@@ -38,7 +47,10 @@ public class ApiExceptionHandler {
     return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 필드와 형식을 확인하세요.");
   }
 
-  @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+  @ExceptionHandler({
+    org.springframework.web.servlet.resource.NoResourceFoundException.class,
+    org.springframework.web.servlet.NoHandlerFoundException.class
+  })
   ProblemDetail missingResource(Exception e) {
     return problem(HttpStatus.NOT_FOUND, "NOT_FOUND", "요청한 경로가 없습니다.");
   }

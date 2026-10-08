@@ -23,7 +23,7 @@ it('실제 대시보드는 PC 날짜 대신 서버 업무 날짜로 기간을 �
   render(<LiveDashboardPage onOpen={vi.fn()} />)
   expect(await screen.findByText('오늘 유입 Alert')).toBeInTheDocument()
   expect(screen.getByRole('tab', { name: '기관 전체' })).toHaveAttribute('aria-selected', 'true')
-  expect(fetchLiveDashboard).toHaveBeenCalledWith('2023-08-12', '2023-09-10')
+  expect(fetchLiveDashboard).toHaveBeenCalledWith('2023-08-12', '2023-09-10', expect.any(AbortSignal))
   expect(screen.getByText('대상 거래일 미제공')).toBeInTheDocument()
   expect(screen.getByText('전일 대비')).toBeInTheDocument()
   expect(screen.getByText('모델 조합 데이터가 없습니다.')).toBeInTheDocument()
@@ -70,7 +70,7 @@ it('서버 집계를 mock의 기관·개인 화면 배치에 공급한다', asyn
 })
 
 it('실제 거래에서 미분석을 정상으로 바꾸지 않고 원본 Alert와 Episode ID를 구별한다', async () => {
-  fetchLedgerOwners.mockResolvedValue(page([{ id: 'owner-uuid' }]))
+  fetchLedgerOwners.mockResolvedValue(page([{ id: 'owner-uuid', name: 'owner-uuid' }]))
   fetchPaymentFormats.mockResolvedValue(['WIRE'])
   fetchLedgerAccounts.mockResolvedValue(page([{ id: 'account-uuid', ownerId: 'owner-uuid', bankId: 13 }]))
   fetchLedgerTransactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2023-09-10T00:00:00Z', fromAccountId: 'account-uuid', toAccountId: 'other-uuid', amountPaid: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', judgement: 'UNANALYZED', isSuspicious: null, alertIds: [3000], episodeIds: [800] }]))

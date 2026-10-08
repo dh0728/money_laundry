@@ -70,9 +70,10 @@ erDiagram
 | review | alert_change_proposals, alert_proposal_cases | 조사 중 병합·기존 근거 제거·재평가 제안, 영향 사건 baseline과 담당자 동의 |
 | review | events, event_recipients, requests, notification_reads | 감사 이력·공개 시 고정 수신자·멱등 변경 요청·사용자별 알림 읽음 |
 | ops | business_clock | 시연 업무 시각 |
-| ops | dashboard_dirty | 원본 변경과 함께 기록되는 영역·거래일·source transaction별 집계 요청 |
+| ops | dashboard_dirty | component·영향 범위·source transaction별 요청. PIPELINE/INVESTIGATION scope는 component에서 생성 |
+| ops | dashboard_refresh_state | 영역별 성공 버전/시각·연속 실패·재시도 시각·소요시간·안전한 오류 코드 |
 | ops | dashboard_model_counts | 거래일·탐지일·이진판정·유형별 건수. 수신/분석/의심 건수와 모델 분포 |
-| ops | dashboard_case_counts | 상태·담당·생성/배정/종결/첫 열람 시각·Episode 소속별 사건 건수 |
+| ops | dashboard_case_counts | 상태·담당·생성/배정/종결/첫 열람 시각·Episode 소속별 사건 건수. 정규화 JSON group_key PK, 변경된 키의 차이만 반영 |
 | ops | dashboard_case_items | 우선순위/오래된 Episode용 작은 현재 사건 투영. 상세 JSON 없음 |
 | ops | dashboard_report_counts | 거래일별 미완료 보고 건수 |
 | ops | dashboard_delivery_days | 탐지 업무일과 보고 대상 거래일 대응 |
@@ -110,13 +111,17 @@ Python의 데이터 변경과 단계 완료 기록은 같은 DB 트랜잭션이�
 
 ## 대시보드 집계 경계
 
-업무 상태의 정본은 원본 테이블이며 `ops.dashboard_*`는 재구축 가능한 읽기 모델이다. MODEL/CASES/REPORTS/DELIVERY는 독립적으로 갱신한다. 분자·분모 및 같은 사건 집계의 카드·차트·우선순위는 해당 영역 트랜잭션 안에서 교체한다. 전역 공개 세대와 과거값 복제는 사용하지 않는다.
+정본은 업무 테이블이며 조회용 테이블은 재구축 가능하다. PIPELINE은 MODEL/REPORTS/DELIVERY component를 같은 RR 트랜잭션에서 공개하고, INVESTIGATION은 CASES component를 독립 공개한다. 변경되지 않은 component를 재계산하지 않는다. 전역 완료 대기나 과거값 복제 테이블은 없다.
 
-원본 AFTER STATEMENT 트리거는 원본 변경과 같은 트랜잭션에서 요청을 적재한다. `(scope,bucket,source_tx)` 기본키로 같은 source transaction의 중복을 합치며 서로 다른 작성자가 전역 dirty행의 잠금에 몰리지 않게 한다. 원장 날짜 정정은 이전/새 날짜 모두, 최신 점수 포인터와 관련 job/run 변경은 해당 거래일을 요청한다. TRUNCATE는 전체 재집계를 요청한다.
+statement trigger는 실제 집계 입력이 바뀐 old/new 날짜 또는 caseId를 같은 원본 트랜잭션에 기록한다. 사용자 비밀번호·분석 heartbeat·동일값 UPDATE는 제외한다. source_tx 키로 같은 트랜잭션의 중복을 합친다. worker가 보는 스냅샷 이후 커밋된 요청은 삭제되지 않는다. max(xid)를 커밋 순서로 해석하지 않는다.
 
-갱신은 영역별 advisory lock과 REPEATABLE READ 트랜잭션으로 계산·교체·해당 스냅샷의 요청 삭제를 수행한다. 도중 커밋된 요청은 다음 처리에 남고 실패 시 저장값과 요청 모두 롤백된다. 갱신 중 조회는 PostgreSQL MVCC로 기존 커밋값을 읽는다. 통상 조회는 READ ONLY REPEATABLE READ이며 원장·현재점수 조인을 수행하지 않는다. 정확한72시간 경계 때문에 사건 시간 차원은 원래 타임스탬프를 보존한다.
+모델/보고/전달일은 영향 날짜만 교체한다. 사건은 영향 caseId의 이전/새 투영에서 집계 키별 증감을 구해 같은 트랜잭션에 적용한다. group_key는 지표 차원의 JSON 배열이며 시각은 epoch 값으로 정규화해 세션 시간대 차이를 제거한다.0건 키는 커밋 전에 삭제한다. '*'/TRUNCATE는 복구용 전체 재구축이다.
 
-트리거 함수는 스키마 소유자의 SECURITY DEFINER, 고정 search_path와 정규화한 객체 참조를 사용하고 PUBLIC 실행 권한을 제거한다. 제한된 분석 계정에는 ops 접근 권한을 추가하지 않는다. 시연 초기화는 파생값과 요청도 같은 트랜잭션에서 비워 과거 집계의 재노출을 막는다.
+명시적인 영역 잠금키로 API 인스턴스 간 중복 계산을 막는다. dashboard_publication_version 시퀀스는 성공/초기화 세대를 구분하여 이전 실패가 새 성공/초기화 상태를 덮지 못하게 한다. 실패 시 출력/요청 처리는 rollback하고, 실패운영정보는 버전 검사 후 별도 짧은 트랜잭션에 기록한다.
+
+시연 초기화는 같은 영역 잠금을 고정 순서로 확보하고 집계/dirty를 비운 뒤 빈 상태의 운영 행2개를 만든다. 실행 중 집계 잠금을 얻지 못하면 RESET_BUSY다. 초기화 이전 작업이 데이터를 다시 공개하지 못한다. 운영 상태 행과 조회 투영은 시연 업무 건수/확인 fingerprint에 포함하지 않는다.
+
+제한된 Python 분석 역할에는 ops 권한을 주지 않는다. 고정 search_path·schema-qualified SECURITY DEFINER 트리거로만 변경 요청을 기록한다. 조회/집계 주기와 새 응답은 API.md §7을 따른다.
 
 ## 초기화 전환
 

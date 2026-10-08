@@ -143,14 +143,14 @@ class QueryPerformanceTests {
     long changed = System.nanoTime();
     jdbc.update(
         "update review.alerts set assigned_at=assigned_at+interval '1 second' where alert_id=1");
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isFalse();
-    assertThat(projection.refresh(DashboardProjection.Scope.CASES)).isTrue();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isFalse();
+    assertThat(projection.refresh(DashboardProjection.Scope.INVESTIGATION)).isTrue();
     System.out.printf(
         "DASHBOARD_CASE_CHANGE seconds=%.3f%n", (System.nanoTime() - changed) / 1_000_000_000.0);
     jdbc.execute(
         "update review.alerts set assigned_at='2023-09-01 00:00+09'::timestamptz+alert_id*interval '1 second'");
     long fragmented = System.nanoTime();
-    projection.refresh(DashboardProjection.Scope.CASES);
+    projection.refresh(DashboardProjection.Scope.INVESTIGATION);
     assertThat(jdbc.queryForObject("select count(*) from ops.dashboard_case_counts", Long.class))
         .isEqualTo(40389L);
     System.out.printf(
@@ -164,12 +164,19 @@ class QueryPerformanceTests {
     measure("dashboard_after_analyze", 1, -1, () -> dashboard.view(user, from, to));
   }
 
-  private void measure(String name, int round, long count, Supplier<Map<String, Object>> query) {
+  private void measure(String name, int round, long count, Supplier<?> query) {
     long start = System.nanoTime();
     var result = query.get();
     System.out.printf(
         "PERFORMANCE %s #%d %.3fs count=%s%n",
-        name, round, (System.nanoTime() - start) / 1e9, result.get("totalElements"));
-    if (count >= 0) assertThat(((Number) result.get("totalElements")).longValue()).isEqualTo(count);
+        name,
+        round,
+        (System.nanoTime() - start) / 1e9,
+        (result instanceof Map<?, ?> page ? page.get("totalElements") : null));
+    if (count >= 0)
+      assertThat(
+              ((Number) (result instanceof Map<?, ?> page ? page.get("totalElements") : null))
+                  .longValue())
+          .isEqualTo(count);
   }
 }

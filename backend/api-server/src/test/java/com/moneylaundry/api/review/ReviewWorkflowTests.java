@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ReviewWorkflowTests {
   @Autowired JdbcTemplate jdbc;
   @Autowired DashboardProjection dashboardProjection;
+  @Autowired DashboardService dashboardService;
   @Autowired TransactionTemplate tx;
   @MockitoBean AnalysisScheduler scheduler;
   ReviewService service;
@@ -34,9 +35,9 @@ class ReviewWorkflowTests {
   long l1, l2, other;
   UUID run;
 
-  DashboardService refreshedDashboard(BusinessTime time) {
+  DashboardQueries refreshedDashboard(BusinessTime time) {
     for (var scope : DashboardProjection.Scope.values()) dashboardProjection.refresh(scope);
-    return new DashboardService(jdbc, time);
+    return new DashboardQueries(jdbc, time);
   }
 
   @BeforeEach
@@ -1032,9 +1033,9 @@ class ReviewWorkflowTests {
                 .get("totalElements"))
         .isEqualTo(0L);
     var d = refreshedDashboard(clock).view(l1, filter.from(), filter.to());
-    assertThat(object(d.get("detection")).get("received")).isEqualTo(2L);
-    assertThat(object(d.get("detection")).get("analyzed")).isEqualTo(0L);
-    assertThat(rows(d.get("daily")).getFirst().get("day").toString()).isEqualTo("2023-09-01");
+    assertThat(d.pipeline().data().detection().received()).isEqualTo(2L);
+    assertThat(d.pipeline().data().detection().analyzed()).isEqualTo(0L);
+    assertThat(d.investigation().data().daily().getFirst().date()).isEqualTo("2023-09-01");
   }
 
   @Test
@@ -1207,7 +1208,9 @@ class ReviewWorkflowTests {
     assertThat(object(result.get("firstReview")).get("samples")).isEqualTo(1L);
     assertThat(number(object(result.get("completion")).get("average_seconds")))
         .isEqualTo(40 * 3600L);
-    assertThat(number(rows(result.get("oldestOpen")).getFirst().get("caseId"))).isEqualTo(old);
+    assertThat(
+            Long.parseLong(refreshedDashboard(clock).queues(l2).oldestOpen().getFirst().caseId()))
+        .isEqualTo(old);
     var otherRange =
         refreshedDashboard(clock)
             .episodeWork(now, LocalDate.parse("2023-08-01"), LocalDate.parse("2023-08-02"));
@@ -1218,8 +1221,7 @@ class ReviewWorkflowTests {
   @Test
   void http_contract_serializes_clock_cases_and_validates_missing_actor() throws Exception {
     var controller =
-        new ReviewController(
-            service, new LedgerQueryService(jdbc), clock, refreshedDashboard(clock));
+        new ReviewController(service, new LedgerQueryService(jdbc), clock, dashboardService);
     var mvc =
         MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(new ApiExceptionHandler())
@@ -1246,7 +1248,7 @@ class ReviewWorkflowTests {
     mvc.perform(get("/api/v1/ledger/transactions").param("judgement", "BOGUS"))
         .andExpect(status().isBadRequest());
     mvc.perform(
-            get("/api/v1/dashboard")
+            get("/api/v1/dashboard/summary")
                 .principal(() -> "l1a")
                 .param("from", "2023-09-01")
                 .param("to", "2023-09-02"))
@@ -1437,8 +1439,8 @@ class ReviewWorkflowTests {
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))));
     var dashboard = refreshedDashboard(clock);
     var d = dashboard.view(l1, LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-02"));
-    assertThat(d.get("openAlertsAgedOver3Days")).isEqualTo(1L);
-    assertThat(object(d.get("institution")).get("aged")).isEqualTo(2L);
+    assertThat(d.investigation().data().openAlertsAgedOver3Days()).isEqualTo(1L);
+    assertThat(d.investigation().data().institution().aged()).isEqualTo(2L);
   }
 
   @Test
@@ -1478,35 +1480,28 @@ class ReviewWorkflowTests {
         "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())", l1);
     var dashboard = refreshedDashboard(clock);
     var result = dashboard.view(l1, LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
-    var days = rows(result.get("dailyAlertStatus"));
+    var days = result.investigation().data().dailyAlertStatus();
     assertThat(days).hasSize(3);
-    assertThat(days.getFirst().get("date").toString()).isEqualTo("2023-09-01");
-    assertThat(days.getFirst())
-        .containsEntry("pending", 1L)
-        .containsEntry("inProgress", 0L)
-        .containsEntry("done", 1L);
+    assertThat(days.getFirst()).isEqualTo(new DashboardSummary.DailyStatus("2023-09-01", 1, 0, 1));
     for (int i = 0; i < days.size(); i++) {
       var day = days.get(i);
-      assertThat(
-              number(day.get("pending")) + number(day.get("inProgress")) + number(day.get("done")))
-          .isEqualTo(number(rows(result.get("daily")).get(i).get("incoming")));
+      assertThat(day.pending() + day.inProgress() + day.done())
+          .isEqualTo(result.investigation().data().daily().get(i).incoming());
     }
-    assertThat(days.get(1))
-        .containsEntry("pending", 0L)
-        .containsEntry("inProgress", 0L)
-        .containsEntry("done", 0L);
+    assertThat(days.get(1)).isEqualTo(new DashboardSummary.DailyStatus("2023-09-02", 0, 0, 0));
     var mvc =
         MockMvcBuilders.standaloneSetup(
-                new ReviewController(service, new LedgerQueryService(jdbc), clock, dashboard))
+                new ReviewController(
+                    service, new LedgerQueryService(jdbc), clock, dashboardService))
             .build();
     mvc.perform(
-            get("/api/v1/dashboard")
+            get("/api/v1/dashboard/summary")
                 .principal(() -> "l1a")
                 .param("from", "2023-09-01")
                 .param("to", "2023-09-03"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.dailyAlertStatus[0].date").value("2023-09-01"))
-        .andExpect(jsonPath("$.dailyAlertStatus[0].inProgress").value(0));
+        .andExpect(jsonPath("$.investigation.data.dailyAlertStatus[0].date").value("2023-09-01"))
+        .andExpect(jsonPath("$.investigation.data.dailyAlertStatus[0].inProgress").value(0));
   }
 
   @Test

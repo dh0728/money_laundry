@@ -653,12 +653,25 @@ INSERT INTO core.users(username,name,role) VALUES
 
 -- Rebuildable dashboard read models. Each scope publishes independently.
 create table ops.dashboard_dirty (
-  scope text not null check(scope in ('MODEL','CASES','REPORTS','DELIVERY')),
+  component text not null check(component in ('MODEL','CASES','REPORTS','DELIVERY')),
+  scope text generated always as (case when component='CASES' then 'INVESTIGATION' else 'PIPELINE' end) stored,
   bucket text not null,
   source_tx xid8 not null default pg_current_xact_id(),
   created_at timestamptz not null default clock_timestamp(),
-  primary key(scope,bucket,source_tx)
+  primary key(component,bucket,source_tx)
 );
+create index dashboard_dirty_scope_idx on ops.dashboard_dirty(scope);
+create sequence ops.dashboard_publication_version;
+create table ops.dashboard_refresh_state (
+  scope text primary key check(scope in ('PIPELINE','INVESTIGATION')),
+  version bigint not null default nextval('ops.dashboard_publication_version'),
+  computed_at timestamptz,
+  failures integer not null default 0 check(failures>=0),
+  retry_at timestamptz,
+  last_duration_ms bigint,
+  last_error_code text
+);
+insert into ops.dashboard_refresh_state(scope,computed_at) values('PIPELINE',clock_timestamp()),('INVESTIGATION',clock_timestamp());
 create table ops.dashboard_model_counts (
   business_date date not null,
   detected_day date,
@@ -680,11 +693,12 @@ create index dashboard_case_priority_idx on ops.dashboard_case_items
 create index dashboard_episode_oldest_idx on ops.dashboard_case_items
   (assigned_at,case_id) where kind='EPISODE' and status='OPEN';
 create table ops.dashboard_case_counts (
+  group_key jsonb primary key,
   kind text not null, assignee_id bigint not null, status text not null,
   created_at timestamptz not null, assigned_at timestamptz not null,
   closed_at timestamptz, closed_by bigint, first_review timestamptz,
   linked boolean not null, episode_status text,
-  n bigint not null check(n>0)
+  n bigint not null check(n>=0)
 );
 create index dashboard_case_assignee_idx on ops.dashboard_case_counts(assignee_id);
 create index dashboard_case_created_idx on ops.dashboard_case_counts(created_at);
@@ -702,7 +716,7 @@ create index review_events_episode_start_idx on review.events(episode_id,actor_i
 create function ops.dashboard_mark_scope() returns trigger
 language plpgsql security definer set search_path=pg_catalog as $$
 begin
-  insert into ops.dashboard_dirty(scope,bucket) values(TG_ARGV[0],'*') on conflict do nothing;
+  insert into ops.dashboard_dirty(component,bucket) values(TG_ARGV[0],'*') on conflict do nothing;
   return null;
 end $$;
 revoke all on function ops.dashboard_mark_scope() from public;
@@ -711,16 +725,16 @@ create function ops.dashboard_mark_ledger_transactions() returns trigger
 language plpgsql security definer set search_path=pg_catalog as $$
 begin
   if TG_OP='INSERT' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from new_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select tx_id,business_date,integration_status from new_rows)
       select 'MODEL',bucket from (select distinct business_date::text from changed) dates(bucket) on conflict do nothing;
   elsif TG_OP='DELETE' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from old_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select tx_id,business_date,integration_status from old_rows)
       select 'MODEL',bucket from (select distinct business_date::text from changed) dates(bucket) on conflict do nothing;
   elsif TG_OP='UPDATE' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from new_rows union all select * from old_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select tx_id,business_date,integration_status from new_rows except select tx_id,business_date,integration_status from old_rows) union (select tx_id,business_date,integration_status from old_rows except select tx_id,business_date,integration_status from new_rows))
       select 'MODEL',bucket from (select distinct business_date::text from changed) dates(bucket) on conflict do nothing;
   end if;
   return null;
@@ -739,16 +753,16 @@ create function ops.dashboard_mark_analysis_current_scores() returns trigger
 language plpgsql security definer set search_path=pg_catalog as $$
 begin
   if TG_OP='INSERT' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from new_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select tx_id,run_id from new_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='DELETE' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from old_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select tx_id,run_id from old_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='UPDATE' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from new_rows union all select * from old_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select tx_id,run_id from new_rows except select tx_id,run_id from old_rows) union (select tx_id,run_id from old_rows except select tx_id,run_id from new_rows))
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id) dates(bucket) on conflict do nothing;
   end if;
   return null;
@@ -767,16 +781,16 @@ create function ops.dashboard_mark_analysis_scores() returns trigger
 language plpgsql security definer set search_path=pg_catalog as $$
 begin
   if TG_OP='INSERT' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from new_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select tx_id,run_id,p_laundering,type_class from new_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id join analysis.current_scores c on c.tx_id=x.tx_id and c.run_id=x.run_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='DELETE' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from old_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select tx_id,run_id,p_laundering,type_class from old_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id join analysis.current_scores c on c.tx_id=x.tx_id and c.run_id=x.run_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='UPDATE' then
-    insert into ops.dashboard_dirty(scope,bucket)
-      with changed as (select * from new_rows union all select * from old_rows)
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select tx_id,run_id,p_laundering,type_class from new_rows except select tx_id,run_id,p_laundering,type_class from old_rows) union (select tx_id,run_id,p_laundering,type_class from old_rows except select tx_id,run_id,p_laundering,type_class from new_rows))
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id join analysis.current_scores c on c.tx_id=x.tx_id and c.run_id=x.run_id) dates(bucket) on conflict do nothing;
   end if;
   return null;
@@ -795,15 +809,15 @@ create function ops.dashboard_mark_analysis_jobs() returns trigger
 language plpgsql security definer set search_path=pg_catalog as $$
 begin
   if TG_OP='INSERT' then
-    insert into ops.dashboard_dirty(scope,bucket)
+    insert into ops.dashboard_dirty(component,bucket)
       with changed as (select job_id,status,current_run_id,threshold_value,business_at from new_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join analysis.runs r on r.job_id=x.job_id join analysis.current_scores c on c.run_id=r.run_id join ledger.transactions t on t.tx_id=c.tx_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='DELETE' then
-    insert into ops.dashboard_dirty(scope,bucket)
+    insert into ops.dashboard_dirty(component,bucket)
       with changed as (select job_id,status,current_run_id,threshold_value,business_at from old_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join analysis.runs r on r.job_id=x.job_id join analysis.current_scores c on c.run_id=r.run_id join ledger.transactions t on t.tx_id=c.tx_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='UPDATE' then
-    insert into ops.dashboard_dirty(scope,bucket)
+    insert into ops.dashboard_dirty(component,bucket)
       with changed as ((select job_id,status,current_run_id,threshold_value,business_at from new_rows except select job_id,status,current_run_id,threshold_value,business_at from old_rows) union (select job_id,status,current_run_id,threshold_value,business_at from old_rows except select job_id,status,current_run_id,threshold_value,business_at from new_rows))
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join analysis.runs r on r.job_id=x.job_id join analysis.current_scores c on c.run_id=r.run_id join ledger.transactions t on t.tx_id=c.tx_id) dates(bucket) on conflict do nothing;
   end if;
@@ -823,15 +837,15 @@ create function ops.dashboard_mark_analysis_runs() returns trigger
 language plpgsql security definer set search_path=pg_catalog as $$
 begin
   if TG_OP='INSERT' then
-    insert into ops.dashboard_dirty(scope,bucket)
+    insert into ops.dashboard_dirty(component,bucket)
       with changed as (select run_id,job_id,status from new_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join analysis.current_scores c on c.run_id=x.run_id join ledger.transactions t on t.tx_id=c.tx_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='DELETE' then
-    insert into ops.dashboard_dirty(scope,bucket)
+    insert into ops.dashboard_dirty(component,bucket)
       with changed as (select run_id,job_id,status from old_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join analysis.current_scores c on c.run_id=x.run_id join ledger.transactions t on t.tx_id=c.tx_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='UPDATE' then
-    insert into ops.dashboard_dirty(scope,bucket)
+    insert into ops.dashboard_dirty(component,bucket)
       with changed as ((select run_id,job_id,status from new_rows except select run_id,job_id,status from old_rows) union (select run_id,job_id,status from old_rows except select run_id,job_id,status from new_rows))
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join analysis.current_scores c on c.run_id=x.run_id join ledger.transactions t on t.tx_id=c.tx_id) dates(bucket) on conflict do nothing;
   end if;
@@ -846,21 +860,227 @@ create trigger dashboard_update after update on analysis.runs referencing old ta
   for each statement execute function ops.dashboard_mark_analysis_runs();
 create trigger dashboard_truncate after truncate on analysis.runs
   for each statement execute function ops.dashboard_mark_scope('MODEL');
-create trigger dashboard_cases after insert or update or delete or truncate on review.alerts
-  for each statement execute function ops.dashboard_mark_scope('CASES');
-create trigger dashboard_cases after insert or update or delete or truncate on review.episodes
-  for each statement execute function ops.dashboard_mark_scope('CASES');
-create trigger dashboard_cases after insert or update or delete or truncate on review.episode_alerts
-  for each statement execute function ops.dashboard_mark_scope('CASES');
-create trigger dashboard_cases after insert or update or delete or truncate on review.events
-  for each statement execute function ops.dashboard_mark_scope('CASES');
-create trigger dashboard_cases after insert or update or delete or truncate on core.users
-  for each statement execute function ops.dashboard_mark_scope('CASES');
-create trigger dashboard_reports after insert or update or delete or truncate on ingest.uploads
-  for each statement execute function ops.dashboard_mark_scope('REPORTS');
-create trigger dashboard_reports after insert or update or delete or truncate on ingest.report_versions
-  for each statement execute function ops.dashboard_mark_scope('REPORTS');
-create trigger dashboard_delivery after insert or update or delete or truncate on analysis.jobs
-  for each statement execute function ops.dashboard_mark_scope('DELIVERY');
 
-create index current_scores_run_idx on analysis.current_scores(run_id);
+create function ops.dashboard_mark_alerts() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select alert_id,assignee_id,published_version,merged_into_alert_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from new_rows)
+      select 'CASES',bucket from (select distinct alert_id::text from changed) affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select alert_id,assignee_id,published_version,merged_into_alert_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from old_rows)
+      select 'CASES',bucket from (select distinct alert_id::text from changed) affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select alert_id,assignee_id,published_version,merged_into_alert_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from new_rows except select alert_id,assignee_id,published_version,merged_into_alert_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from old_rows) union (select alert_id,assignee_id,published_version,merged_into_alert_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from old_rows except select alert_id,assignee_id,published_version,merged_into_alert_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from new_rows))
+      select 'CASES',bucket from (select distinct alert_id::text from changed) affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_alerts() from public;
+create trigger dashboard_alerts_insert after insert on review.alerts referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_alerts();
+create trigger dashboard_alerts_delete after delete on review.alerts referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_alerts();
+create trigger dashboard_alerts_update after update on review.alerts referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_alerts();
+create trigger dashboard_alerts_truncate after truncate on review.alerts
+  for each statement execute function ops.dashboard_mark_scope('CASES');
+
+create function ops.dashboard_mark_episodes() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select episode_id,assignee_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from new_rows)
+      select 'CASES',bucket from (select episode_id::text from changed union select a.alert_id::text from changed c join review.episode_alerts a using(episode_id)) affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select episode_id,assignee_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from old_rows)
+      select 'CASES',bucket from (select episode_id::text from changed union select a.alert_id::text from changed c join review.episode_alerts a using(episode_id)) affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select episode_id,assignee_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from new_rows except select episode_id,assignee_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from old_rows) union (select episode_id,assignee_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from old_rows except select episode_id,assignee_id,status,created_at,assigned_at,closed_at,closed_by,risk_score from new_rows))
+      select 'CASES',bucket from (select episode_id::text from changed union select a.alert_id::text from changed c join review.episode_alerts a using(episode_id)) affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_episodes() from public;
+create trigger dashboard_episodes_insert after insert on review.episodes referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_episodes();
+create trigger dashboard_episodes_delete after delete on review.episodes referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_episodes();
+create trigger dashboard_episodes_update after update on review.episodes referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_episodes();
+create trigger dashboard_episodes_truncate after truncate on review.episodes
+  for each statement execute function ops.dashboard_mark_scope('CASES');
+
+create function ops.dashboard_mark_episode_links() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select alert_id,episode_id from new_rows)
+      select 'CASES',bucket from (select distinct alert_id::text from changed) affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select alert_id,episode_id from old_rows)
+      select 'CASES',bucket from (select distinct alert_id::text from changed) affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select alert_id,episode_id from new_rows except select alert_id,episode_id from old_rows) union (select alert_id,episode_id from old_rows except select alert_id,episode_id from new_rows))
+      select 'CASES',bucket from (select distinct alert_id::text from changed) affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_episode_links() from public;
+create trigger dashboard_episode_links_insert after insert on review.episode_alerts referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_episode_links();
+create trigger dashboard_episode_links_delete after delete on review.episode_alerts referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_episode_links();
+create trigger dashboard_episode_links_update after update on review.episode_alerts referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_episode_links();
+create trigger dashboard_episode_links_truncate after truncate on review.episode_alerts
+  for each statement execute function ops.dashboard_mark_scope('CASES');
+
+create function ops.dashboard_mark_events() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select event_id,episode_id,actor_id,action,business_at from new_rows)
+      select 'CASES',bucket from (select distinct episode_id::text from changed where episode_id is not null and action='REVIEW_START') affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select event_id,episode_id,actor_id,action,business_at from old_rows)
+      select 'CASES',bucket from (select distinct episode_id::text from changed where episode_id is not null and action='REVIEW_START') affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select event_id,episode_id,actor_id,action,business_at from new_rows except select event_id,episode_id,actor_id,action,business_at from old_rows) union (select event_id,episode_id,actor_id,action,business_at from old_rows except select event_id,episode_id,actor_id,action,business_at from new_rows))
+      select 'CASES',bucket from (select distinct episode_id::text from changed where episode_id is not null and action='REVIEW_START') affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_events() from public;
+create trigger dashboard_events_insert after insert on review.events referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_events();
+create trigger dashboard_events_delete after delete on review.events referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_events();
+create trigger dashboard_events_update after update on review.events referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_events();
+create trigger dashboard_events_truncate after truncate on review.events
+  for each statement execute function ops.dashboard_mark_scope('CASES');
+
+create function ops.dashboard_mark_users() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select user_id,name from new_rows)
+      select 'CASES',bucket from (select distinct c.case_id::text from changed u join review.cases c on c.assignee_id=u.user_id) affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select user_id,name from old_rows)
+      select 'CASES',bucket from (select distinct c.case_id::text from changed u join review.cases c on c.assignee_id=u.user_id) affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select user_id,name from new_rows except select user_id,name from old_rows) union (select user_id,name from old_rows except select user_id,name from new_rows))
+      select 'CASES',bucket from (select distinct c.case_id::text from changed u join review.cases c on c.assignee_id=u.user_id) affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_users() from public;
+create trigger dashboard_users_insert after insert on core.users referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_users();
+create trigger dashboard_users_delete after delete on core.users referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_users();
+create trigger dashboard_users_update after update on core.users referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_users();
+create trigger dashboard_users_truncate after truncate on core.users
+  for each statement execute function ops.dashboard_mark_scope('CASES');
+
+create function ops.dashboard_mark_uploads() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select upload_id,business_date,status from new_rows)
+      select 'REPORTS',bucket from (select distinct business_date::text from changed) affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select upload_id,business_date,status from old_rows)
+      select 'REPORTS',bucket from (select distinct business_date::text from changed) affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select upload_id,business_date,status from new_rows except select upload_id,business_date,status from old_rows) union (select upload_id,business_date,status from old_rows except select upload_id,business_date,status from new_rows))
+      select 'REPORTS',bucket from (select distinct business_date::text from changed) affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_uploads() from public;
+create trigger dashboard_uploads_insert after insert on ingest.uploads referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_uploads();
+create trigger dashboard_uploads_delete after delete on ingest.uploads referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_uploads();
+create trigger dashboard_uploads_update after update on ingest.uploads referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_uploads();
+create trigger dashboard_uploads_truncate after truncate on ingest.uploads
+  for each statement execute function ops.dashboard_mark_scope('REPORTS');
+
+create function ops.dashboard_mark_reports() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select upload_id,stage_status from new_rows)
+      select 'REPORTS',bucket from (select distinct u.business_date::text from changed c join ingest.uploads u using(upload_id)) affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select upload_id,stage_status from old_rows)
+      select 'REPORTS',bucket from (select distinct u.business_date::text from changed c join ingest.uploads u using(upload_id)) affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select upload_id,stage_status from new_rows except select upload_id,stage_status from old_rows) union (select upload_id,stage_status from old_rows except select upload_id,stage_status from new_rows))
+      select 'REPORTS',bucket from (select distinct u.business_date::text from changed c join ingest.uploads u using(upload_id)) affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_reports() from public;
+create trigger dashboard_reports_insert after insert on ingest.report_versions referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_reports();
+create trigger dashboard_reports_delete after delete on ingest.report_versions referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_reports();
+create trigger dashboard_reports_update after update on ingest.report_versions referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_reports();
+create trigger dashboard_reports_truncate after truncate on ingest.report_versions
+  for each statement execute function ops.dashboard_mark_scope('REPORTS');
+
+create function ops.dashboard_mark_delivery() returns trigger
+language plpgsql security definer set search_path=pg_catalog as $$
+begin
+  if TG_OP='INSERT' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select job_id,business_at,analysis_date from new_rows)
+      select 'DELIVERY',bucket from (select distinct (business_at at time zone 'Asia/Seoul')::date::text from changed where business_at is not null) affected(bucket) on conflict do nothing;
+  elsif TG_OP='DELETE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as (select job_id,business_at,analysis_date from old_rows)
+      select 'DELIVERY',bucket from (select distinct (business_at at time zone 'Asia/Seoul')::date::text from changed where business_at is not null) affected(bucket) on conflict do nothing;
+  elsif TG_OP='UPDATE' then
+    insert into ops.dashboard_dirty(component,bucket)
+      with changed as ((select job_id,business_at,analysis_date from new_rows except select job_id,business_at,analysis_date from old_rows) union (select job_id,business_at,analysis_date from old_rows except select job_id,business_at,analysis_date from new_rows))
+      select 'DELIVERY',bucket from (select distinct (business_at at time zone 'Asia/Seoul')::date::text from changed where business_at is not null) affected(bucket) on conflict do nothing;
+  end if;
+  return null;
+end $$;
+revoke all on function ops.dashboard_mark_delivery() from public;
+create trigger dashboard_delivery_insert after insert on analysis.jobs referencing new table as new_rows
+  for each statement execute function ops.dashboard_mark_delivery();
+create trigger dashboard_delivery_delete after delete on analysis.jobs referencing old table as old_rows
+  for each statement execute function ops.dashboard_mark_delivery();
+create trigger dashboard_delivery_update after update on analysis.jobs referencing old table as old_rows new table as new_rows
+  for each statement execute function ops.dashboard_mark_delivery();
+create trigger dashboard_delivery_truncate after truncate on analysis.jobs
+  for each statement execute function ops.dashboard_mark_scope('DELIVERY');

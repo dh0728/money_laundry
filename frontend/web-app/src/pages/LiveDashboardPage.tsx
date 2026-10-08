@@ -15,10 +15,11 @@ import { RefreshCountdown } from '@/components/RefreshCountdown'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
 import { RefreshStatus } from '@/components/RefreshStatus'
 import { typeDisplay, type TypeCode } from '@/api/codes'
-import { fetchDemoClock, fetchLiveDashboard, daysBefore, kstDate, type LiveDashboard } from '@/api/liveDashboard'
+import { fetchDemoClock, daysBefore, kstDate, type LiveDashboard } from '@/api/liveDashboard'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { SectionCards } from '@/components/SectionCards'
 import { useAsync } from '@/lib/useAsync'
+import { useDashboardPolling } from '@/lib/useDashboardPolling'
 
 const count = (n: number | undefined) => (n ?? 0).toLocaleString('ko-KR')
 
@@ -41,7 +42,7 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
   const clock = useAsync(fetchDemoClock, [], { key: 'clock' })
   const businessDate = clock.state.status === 'success' ? kstDate(clock.state.data.businessAt) : ''
   const { from, to, setPeriod } = useSharedPeriod({ from: businessDate ? daysBefore(businessDate, 29) : '', to: businessDate })
-  const dashboard = useAsync(() => from && to ? fetchLiveDashboard(from, to) : Promise.reject(new Error('업무 시각을 확인하지 못했습니다.')), [from, to], { key: 'dashboard', enabled: Boolean(from && to) })
+  const dashboard = useDashboardPolling(user.userId, from, to)
 
   if (clock.state.status === 'loading') return <LoadingBlock label="업무 시각" />
   if (clock.state.status === 'error') return <ErrorBlock message={clock.state.message} onRetry={clock.retry} />

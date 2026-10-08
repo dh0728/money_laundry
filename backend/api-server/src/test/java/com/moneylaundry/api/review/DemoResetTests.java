@@ -115,7 +115,7 @@ class DemoResetTests {
         (DemoResetService.TABLES + "," + DemoResetService.DASHBOARD_TABLES).split(","))
       assertThat(jdbc.queryForObject("select count(*) from " + table, Long.class))
           .as(table)
-          .isZero();
+          .isEqualTo(table.equals("ops.dashboard_refresh_state") ? 2L : 0L);
     assertThat(jdbc.queryForList("select * from core.users order by user_id")).isEqualTo(users);
     assertThat(jdbc.queryForList("select * from core.banks where bank_id<>999999 order by bank_id"))
         .containsAll(
@@ -127,6 +127,26 @@ class DemoResetTests {
     clock.set(
         Instant.parse("2023-09-01T00:00:00Z"), ((Number) clock.view().get("revision")).longValue());
     assertThat(job("COMPLETED")).isGreaterThan(old);
+  }
+
+  @Test
+  void reset_cannot_race_a_running_dashboard_publication() throws Exception {
+    job("COMPLETED");
+    var request = input();
+    try (var connection = jdbc.getDataSource().getConnection()) {
+      connection.setAutoCommit(false);
+      try (var statement = connection.prepareStatement("select pg_advisory_xact_lock(?)")) {
+        statement.setLong(1, DashboardProjection.Scope.INVESTIGATION.lockKey);
+        statement.execute();
+      }
+      assertCode(() -> service.reset(admin, request), "RESET_BUSY");
+      assertThat(jdbc.queryForObject("select count(*) from ingest.uploads", Long.class))
+          .isEqualTo(1);
+      assertThat(jdbc.queryForObject("select count(*) from ops.resets", Long.class)).isZero();
+      connection.rollback();
+    }
+    assertThat(service.reset(admin, request).get("status")).isEqualTo("COMPLETED");
+    assertThat(jdbc.queryForObject("select count(*) from ingest.uploads", Long.class)).isZero();
   }
 
   @Test
