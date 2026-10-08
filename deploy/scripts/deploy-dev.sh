@@ -57,7 +57,6 @@ cleanup() {
   unset DEV_JWT_SECRET
   unset DEV_S3_BUCKET
   unset DEV_S3_PREFIX
-  unset DEV_SQS_URL
   unset CF_ACCESS_CLIENT_ID
   unset CF_ACCESS_CLIENT_SECRET
   unset DEV_API_IMAGE
@@ -117,7 +116,6 @@ DEV_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
 DEV_ANALYSIS_DB_USERNAME="$(get_parameter "analysis-db/username")"
 DEV_ANALYSIS_DB_PASSWORD="$(get_parameter "analysis-db/password")"
 export DEV_ANALYSIS_DB_USERNAME DEV_ANALYSIS_DB_PASSWORD
-DEV_SQS_URL="$(get_parameter "sqs/url")"
 DEV_INFERENCE_API_TOKEN="$(get_parameter "inference/token")"
 DEV_INFERENCE_OBJECT_BASE_URL="https://${DEV_S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${DEV_S3_PREFIX%/}/"
 CF_ACCESS_CLIENT_ID="$(get_parameter "cloudflare/access/client-id")"
@@ -130,7 +128,6 @@ export DEV_JWT_SECRET
 export DEV_S3_BUCKET
 export DEV_S3_PREFIX
 export DEV_INGEST_ENCRYPTION_KEY DEV_INGEST_SEARCH_KEY DEV_INGEST_KEY_VERSION
-export DEV_SQS_URL
 export DEV_INFERENCE_OBJECT_BASE_URL DEV_INFERENCE_API_TOKEN
 export CF_ACCESS_CLIENT_ID
 export CF_ACCESS_CLIENT_SECRET
