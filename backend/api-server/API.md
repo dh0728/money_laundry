@@ -399,7 +399,7 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
 | POST /api/v1/review/commands | 로그인 세션·CSRF 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
 
-목록과 상세의 공통 필드는 `caseId,kind,alertId,status,outcome,revision,scopeRevision,assigneeId,assigneeName,episodeId,createdAt,assignedAt,closedAt,ageDays,pendingCount,sourceAlertIds,primaryTypes,summary`다. Alert에는 `publishedVersion,reviewStartedAt,canonicalAlertId,resolution`이 추가된다. 상세는 groups/history/relatedDecisions/detachments와 Alert의 pendingProposalIds/relations/withdrawnMembers를 추가로 제공한다. relations의 키는 source_alert_id,target_alert_id,kind,event_id다.
+목록과 상세의 공통 필드는 `caseId,kind,alertId,status,outcome,revision,scopeRevision,assigneeId,assigneeName,episodeId,createdAt,assignedAt,closedAt,ageDays,pendingCount,sourceAlertIds,primaryTypes,summary`다. Alert에는 `publishedVersion,reviewStartedAt,canonicalAlertId,resolution`이 추가된다. **목록 summary는 `txCount,subjectCount,seedCount,riskScore,primaryType,totalAmountUsd,amountsByCurrency,firstTxAt,lastTxAt`만 제공한다.** SQL에서 이 필드만 추출하며 거래·계좌별 집계·근거·이력은 목록 응답에 포함하지 않는다. 상세는 선택한 caseId의 전체 summary 및 groups/history/relatedDecisions/detachments와 Alert의 pendingProposalIds/relations/withdrawnMembers를 추가로 제공한다. relations의 키는 source_alert_id,target_alert_id,kind,event_id다.
 
 **검색·필터**
 - 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.
@@ -447,7 +447,7 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 - `CLOSE`에 decision이 없으면 기존 범위 판정을 집계해 종결한다. Episode는 이 방식만 허용한다. 미판정 SUBJECT/상충 판정은409. 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED/DISSOLVED. DISSOLVED는 UNLINK에 따른 Episode 해체만 사용한다.
 - 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
 - review 목록·상세의 `summary.totalAmountUsd`: 현재 소속 전체 거래(SUBJECT+CONTEXT)에서 EXCLUDED/TRANSFERRED 제외·txId 중복 제거 후 저장 `amountUsd` 합계. Episode 내 여러 Alert에 겹친 거래는 한 번만 센다. 환산액 누락/잘못된 값이 하나라도 있으면 null, 거래가 없으면 0. 기존 `amountsByCurrency`의 SUBJECT 집계 의미는 유지한다. Alert·Episode 목록의 거래 총액은 이 필드를 소수 최대 2자리 USD로 표시하며 미제공 시 원통화 합계로 대체하지 않는다.
-- summary는 중복 제거한 현재 범위의 txCount,seedCount,riskScore,primaryType과 통화별 합계·순유입·집중도·상위 송금·일별 집계를 제공한다. 상세 키는 Swagger/CaseSummary 구현을 따른다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
+- 목록 summary는 위에서 명시한 기본 건수·위험도·대표 유형·금액·거래 기간만 제공한다. 상세 summary는 여기에 `typeShare,netFlows,topReceiverShare,topSenders,paymentFormats,dailySuspiciousCount,dailySuspiciousAmount,typeDistribution`을 더해 현재 범위의 상세 집계를 제공한다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
 
 ### 9.2 조사 계좌 기준 자금 지표
 

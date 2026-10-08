@@ -394,7 +394,9 @@ public class ReviewService {
     args.add((long) page * size);
     var pageRows =
         jdbc.queryForList(
-            "select c.*,u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id limit 1) as linked_episode_id from "
+            "select "
+                + ReviewCaseSql.LIST_COLUMNS
+                + ",u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id limit 1) as linked_episode_id from "
                 + ReviewCaseSql.WITH_RISK
                 + " c join core.users u on u.user_id=c.assignee_id"
                 + sql
