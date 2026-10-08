@@ -19,6 +19,8 @@ import { SectionCards } from '@/components/SectionCards'
 import { useAsync } from '@/lib/useAsync'
 import { useDashboardPolling } from '@/lib/useDashboardPolling'
 
+const businessTimeFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+
 const count = (n: number | undefined) => (n ?? 0).toLocaleString('ko-KR')
 
 function LiveAiDailyReport({ data }: { data: LiveDashboard }) {
@@ -67,7 +69,7 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
 
   return <div className="space-y-6">
     {dashboard.refreshError && <div role="alert" className="text-xs">최신 조회 실패 · 이전 데이터를 표시합니다. {dashboard.refreshError}</div>}
-    <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)}</span></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)} {businessTimeFormat.format(new Date(data.businessAt))} (KST)</span></div>
     {scope === 'institution' ? <InstitutionView today={new Date(`${businessDate}T00:00:00`)} remote={{
       cards: <SectionCards items={kpis} />,
       range: { from: new Date(`${from}T00:00:00`), to: new Date(`${to}T00:00:00`) },
