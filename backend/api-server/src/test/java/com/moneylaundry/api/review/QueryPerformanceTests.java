@@ -72,7 +72,7 @@ class QueryPerformanceTests {
        'fromAccountId',f.service_account_id,'toAccountId',r.service_account_id,
        'amountPaid',100,'amountReceived',100,'paymentCurrency','USD','receivingCurrency','USD',
        'paymentFormat','ACH','scores',jsonb_build_object('p_laundering',.9,'p_0',.1,'p_1',.9))),
-       'seeds',jsonb_agg(t.tx_id),'summary',jsonb_build_object('scoreMax',.9))
+       'seeds',jsonb_agg(jsonb_build_object('txId',t.tx_id,'threshold',.7)),'summary',jsonb_build_object('scoreMax',.9))
       from review.alerts a join ledger.transactions t on t.tx_id between a.alert_id*7 and a.alert_id*7+30
       join core.accounts f on f.account_id=t.from_account_id join core.accounts r on r.account_id=t.to_account_id
       group by a.alert_id
@@ -80,6 +80,9 @@ class QueryPerformanceTests {
         run);
     jdbc.execute(
         "insert into review.alert_transactions select a.alert_id,1,t.tx_id,case when t.tx_id<a.alert_id*7+9 then 'SEED' else 'CONTEXT' end,'[]'::jsonb,case when t.tx_id<a.alert_id*7+9 then .9 end from review.alerts a join ledger.transactions t on t.tx_id between a.alert_id*7 and a.alert_id*7+30");
+    jdbc.execute("update review.alert_versions set published_at=now()");
+    jdbc.execute(
+        "update review.alerts set published_version=1,summary=jsonb_build_object('riskScore',.9,'txCount',31,'seedCount',9,'primaryType','Fan-out','primaryTypes',jsonb_build_array('Fan-out'),'pendingCount',9)");
     jdbc.execute("update ops.business_clock set business_at='2023-09-10 09:00+09'");
     for (String table :
         new String[] {

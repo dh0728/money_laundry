@@ -33,6 +33,23 @@ public final class CaseSummary {
     return n == null ? BigDecimal.ZERO : new BigDecimal(n.toString());
   }
 
+  static void annotateSuspicion(Map<String, Object> evidence, double threshold) {
+    var thresholds = new HashMap<Long, Double>();
+    for (var seed : ReviewJson.rows(evidence.get("seeds")))
+      if (seed.get("threshold") instanceof Number n)
+        thresholds.put(ReviewJson.number(seed.get("txId")), n.doubleValue());
+    for (var transaction : ReviewJson.rows(evidence.get("transactions"))) {
+      var scores = transaction.get("scores");
+      transaction.put(
+          "isSuspicious",
+          scores == null
+              ? null
+              : score(ReviewJson.object(scores), "p_laundering")
+                  >= thresholds.getOrDefault(
+                      ReviewJson.number(transaction.get("txId")), threshold));
+    }
+  }
+
   public static Map<String, Object> summarize(List<Map<String, Object>> members) {
     Map<Long, Map<String, Object>> unique = new LinkedHashMap<>();
     for (var m : members)

@@ -110,7 +110,10 @@ public class NotificationService {
           " from review.cases c join review.alert_versions v on v.alert_id=c.alert_id and v.version=1 where c.assignee_id=? and v.run_id=?";
       ref = notification.get("batch_run_id");
     } else {
-      base = " from review.cases c where c.assignee_id=? and c.case_id=?";
+      // A merge notification belongs to every original recipient, even though
+      // the survivor has one assignee. Authorize through that user's notification.
+      base =
+          " from review.cases c where exists(select 1 from review.notifications n where n.user_id=? and n.case_id=c.case_id) and c.case_id=?";
       ref = notification.get("case_id");
     }
     long total = jdbc.queryForObject("select count(*)" + base, Long.class, user, ref);

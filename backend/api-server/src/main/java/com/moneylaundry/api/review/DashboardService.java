@@ -203,11 +203,7 @@ public class DashboardService {
           left join review.episode_alerts e on e.alert_id=c.alert_id
           left join review.cases ep on ep.case_id=e.episode_id
           where c.kind='ALERT' and c.created_at>=? and c.created_at<?
-            and exists (
-              select 1 from review.alert_versions v join analysis.runs r using(run_id)
-              join ops.work_items b on b.job_id=r.job_id
-              where v.alert_id=c.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
-            )
+            and c.published_version is not null and c.merged_into_alert_id is null
           group by 1
         )
         select to_char(d,'YYYY-MM-DD') as date,coalesce(c.pending,0) as pending,

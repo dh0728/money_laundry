@@ -56,7 +56,7 @@ COPY worker/analysis_entry.py worker/frozen_input.py worker/pipeline.py \
      worker/report_matching.py worker/identity_store.py worker/report_integration.py worker/report_correction.py \
      worker/model_publication.py worker/inference_dispatch.py worker/result_collection.py \
      worker/demo_calculator.py worker/model_contract.py worker/worker_transport.py \
-     worker/flow_graph.py worker/alert_pipeline.py \
+     worker/flow_graph.py worker/alert_lifecycle.py worker/alert_plan_preparation.py worker/alert_pipeline.py \
      worker/inference_server.py worker/inference_service.py worker/inference_compute.py \
      worker/model_adapter.py /app/worker/
 COPY worker/recover_dev_placeholder.sql /app/worker/recover_dev_placeholder.sql

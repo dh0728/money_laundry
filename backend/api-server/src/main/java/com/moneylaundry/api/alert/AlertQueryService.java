@@ -18,10 +18,8 @@ public class AlertQueryService {
   private final ObjectMapper mapper;
   private static final String VISIBLE =
       """
-      from review.alerts a join lateral (select v.* from review.alert_versions v
-        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
-        where v.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
-        order by v.version desc limit 1) v on true
+      from review.alerts a join review.alert_versions v
+        on v.alert_id=a.alert_id and v.version=a.published_version
       """;
 
   public AlertQueryService(JdbcTemplate jdbc, ObjectMapper mapper) {
@@ -31,7 +29,7 @@ public class AlertQueryService {
 
   public Map<String, Object> list(int page, int size, String status, Long assigneeId, Long jobId) {
     AnalysisService.validatePage(page, size);
-    String where = " where true";
+    String where = " where a.merged_into_alert_id is null";
     List<Object> args = new ArrayList<>();
     if (status != null) {
       if (!List.of("OPEN", "CLOSED", "ESCALATED").contains(status))
@@ -61,7 +59,7 @@ public class AlertQueryService {
             "select a.*,v.version,v.run_id,jsonb_build_object('summary',v.evidence->'summary') as evidence "
                 + VISIBLE
                 + where
-                + " order by (v.evidence->'summary'->>'scoreMax')::double precision desc nulls last,a.alert_id limit ? offset ?",
+                + " order by a.risk_score desc,a.alert_id limit ? offset ?",
             args.toArray());
     return AnalysisService.page(rows.stream().map(r -> view(r, false)).toList(), page, size, count);
   }
@@ -74,9 +72,9 @@ public class AlertQueryService {
             """
         select a.*,v.version,v.run_id,v.evidence,b.analysis_cutoff_at from review.alerts a join review.alert_versions v using(alert_id)
         join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
-        where a.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED'
+        where a.alert_id=? and v.published_at is not null and r.status='COMPLETED' and b.status='COMPLETED'
         """
-                + (version == null ? " order by v.version desc limit 1" : " and v.version=?"),
+                + (version == null ? " and v.version=a.published_version" : " and v.version=?"),
             version == null ? new Object[] {id} : new Object[] {id, version});
     if (rows.isEmpty()) throw ApiException.notFound("완료된 Alert 근거를 찾을 수 없습니다.");
     Map<String, Object> result = view(rows.getFirst(), true);
@@ -127,7 +125,7 @@ public class AlertQueryService {
         """
         select v.version,v.run_id as "runId",v.created_at as "createdAt" from review.alert_versions v
         join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
-        where v.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED' order by v.version
+        where v.alert_id=? and v.published_at is not null and r.status='COMPLETED' and b.status='COMPLETED' order by v.version
         """,
         id);
   }
@@ -139,7 +137,24 @@ public class AlertQueryService {
         "status", "TRANSFERRED".equals(row.get("outcome")) ? "ESCALATED" : row.get("status"));
     result.put("resolution", row.get("outcome"));
     result.put("assigneeId", row.get("assignee_id"));
-    result.put("parentAlertId", row.get("parent_alert_id"));
+    result.put(
+        "parentAlertId",
+        jdbc
+            .queryForList(
+                "select target_alert_id from review.alert_lineage where source_alert_id=? and kind='FOLLOWUP_OF' order by target_alert_id",
+                Long.class,
+                row.get("alert_id"))
+            .stream()
+            .findFirst()
+            .orElse(null));
+    result.put("publishedVersion", row.get("published_version"));
+    result.put("reviewStartedAt", instant(row.get("review_started_at")));
+    result.put(
+        "canonicalAlertId",
+        row.get("merged_into_alert_id") == null
+            ? row.get("alert_id")
+            : row.get("merged_into_alert_id"));
+    if (row.get("merged_into_alert_id") != null) result.put("resolution", "MERGED");
     result.put("createdAt", row.get("created_at"));
     result.put("version", row.get("version"));
     result.put("runId", row.get("run_id"));

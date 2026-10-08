@@ -320,7 +320,7 @@ public class AnalysisRunService {
           for (UUID old : previous)
             jdbc.update("insert into analysis.run_replacements values(?,?)", run, old);
           int targetCount = freezeTargets(run, job, cutoff, blockedSets);
-          new AlertInputSnapshot(jdbc).freeze(run, cutoff);
+          new AlertInputSnapshot(jdbc).freeze(run, cutoff, blockedSets);
           jdbc.update(
               "update analysis.jobs set current_run_id=?,row_count=? where job_id=?",
               run,

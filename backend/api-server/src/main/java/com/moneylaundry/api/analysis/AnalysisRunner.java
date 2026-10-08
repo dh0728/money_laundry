@@ -257,6 +257,9 @@ public class AnalysisRunner implements AutoCloseable {
       service.tx.executeWithoutResult(
           status -> {
             AnalysisRunService.integrationLock(service.jdbc);
+            service.jdbc.queryForList(
+                "select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
+            service.jdbc.queryForList("select id from ops.business_clock where id for update");
             service.lock(item.job.id());
             if (!service.owns(item.job)) return;
             if (item.deferred) {
@@ -351,7 +354,11 @@ public class AnalysisRunner implements AutoCloseable {
                 item.job.executionId(),
                 item.result.artifact());
             boolean complete = item.job.stage() == AnalysisStage.ALERTS;
-            if (complete && item.context.runId() != null) runs.complete(item.context.runId());
+            if (complete && item.context.runId() != null) {
+              new com.moneylaundry.api.review.AlertPublisher(service.jdbc)
+                  .publish(item.context.runId(), item.job.executionId(), item.result.artifact());
+              runs.complete(item.context.runId());
+            }
             service.jdbc.update(
                 "update analysis.jobs set"
                     + " status=?,current_stage=?,stage_attempt_count=0,consecutive_failures=0,error_code=null,error_message=null,retry_at=null,execution_id=null,execution_owner=null,finished_at=?"
@@ -370,7 +377,18 @@ public class AnalysisRunner implements AutoCloseable {
     } catch (AnalysisFailure failure) {
       addFailure(item, failure.code(), failure.kind());
     } catch (RuntimeException failure) {
-      if ("INPUT_REVISION_CHANGED".equals(failure.getMessage())) {
+      if ("ALERT_BASELINE_CHANGED".equals(failure.getMessage())) {
+        service.tx.executeWithoutResult(
+            s -> {
+              service.lock(item.job.id());
+              if (service.owns(item.job))
+                service.jdbc.update(
+                    "delete from analysis.stage_results where run_id=? and stage='ALERTS'",
+                    item.context.runId());
+            });
+        item.result = null;
+        addFailure(item, "ALERT_BASELINE_CHANGED", AnalysisFailure.Kind.COMPUTATION);
+      } else if ("INPUT_REVISION_CHANGED".equals(failure.getMessage())) {
         service.tx.executeWithoutResult(
             status -> {
               service.lock(item.job.id());

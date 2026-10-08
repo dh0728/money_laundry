@@ -3,6 +3,10 @@ package com.moneylaundry.api.analysis;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -17,23 +21,39 @@ public class AlertInputSnapshot {
   }
 
   public void freeze(UUID run, Instant cutoff) {
+    freeze(run, cutoff, Set.of());
+  }
+
+  public void freeze(UUID run, Instant cutoff, Set<Long> blockedSets) {
     freezeManifest(run, cutoff);
     // Freeze the full eligible ledger: root windows and transitive seed links
     // are evaluated by one flow policy, not a second calendar policy in SQL.
     jdbc.update(
         """
         insert into analysis.alert_origins
-        select ?,a.alert_id,v.version from review.alerts a
-        join lateral (select v.version from review.alert_versions v
-          join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
-          where v.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
-          order by v.version desc limit 1) v on true
-        where not exists(select 1 from review.alerts child
-          join review.alert_versions cv on cv.alert_id=child.alert_id
-          join analysis.runs cr on cr.run_id=cv.run_id join analysis.jobs cb on cb.job_id=cr.job_id
-          where child.parent_alert_id=a.alert_id and cr.status='COMPLETED' and cb.status='COMPLETED')
+        select ?,a.alert_id,a.published_version from review.alerts a
+        where a.published_version is not null
         """,
         run);
+    jdbc.update(
+        """
+        insert into analysis.alert_fact_checks
+        select distinct ?,t.tx_id,t.integration_status from analysis.alert_origins o
+        join review.alert_transactions m using(alert_id,version)
+        join ledger.transactions t using(tx_id) where o.run_id=?
+        """,
+        run,
+        run);
+    String blocked = "";
+    var inputArgs = new ArrayList<Object>(List.of(Timestamp.from(cutoff), run));
+    if (!blockedSets.isEmpty()) {
+      blocked =
+          "and not exists(select 1 from ledger.transaction_reports blocked_tr join private.bank_reports blocked_br using(report_id) join ingest.report_versions blocked_v using(version_id) where blocked_tr.tx_id=t.tx_id and blocked_v.set_id in ("
+              + String.join(",", Collections.nCopies(blockedSets.size(), "?"))
+              + "))";
+      inputArgs.addAll(blockedSets);
+    }
+    inputArgs.addAll(List.of(Timestamp.from(cutoff), Timestamp.from(cutoff), run));
     jdbc.update(
         """
         with eligible as materialized (
@@ -44,6 +64,7 @@ public class AlertInputSnapshot {
           join ingest.report_versions rv using(version_id)
           where t.integration_status='ACTIVE' and t.occurred_at<=?
             and not exists(select 1 from analysis.input_transactions i where i.run_id=? and i.tx_id=t.tx_id)
+            %s
           group by t.tx_id
           having bool_or(rv.received_at<=?) and not bool_or(rv.received_at>?)
         )
@@ -57,12 +78,9 @@ public class AlertInputSnapshot {
         join core.accounts b on b.account_id=t.to_account_id
         join core.owners e on e.owner_id=a.owner_id
         join core.owners f on f.owner_id=b.owner_id
-        """,
-        Timestamp.from(cutoff),
-        run,
-        Timestamp.from(cutoff),
-        Timestamp.from(cutoff),
-        run);
+        """
+            .formatted(blocked),
+        inputArgs.toArray());
     jdbc.update(
         """
         insert into analysis.input_reports select ?,tr.tx_id,tr.report_id

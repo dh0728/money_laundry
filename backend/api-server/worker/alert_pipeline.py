@@ -1,4 +1,4 @@
-"""Frozen-input Alert construction and atomic, run-fenced evidence publication.
+"""Frozen-input flow construction and run-fenced publication plan preparation.
 
 Model labels are annotations, never grouping conditions. All public account IDs
 come from the frozen pseudonymous input; this module cannot read private names.
@@ -6,14 +6,12 @@ come from the frozen pseudonymous input; this module cannot read private names.
 from dataclasses import asdict
 from datetime import datetime, timezone
 from decimal import Decimal
-from functools import lru_cache
 from time import perf_counter
 from collections import Counter, defaultdict
 import hashlib
 import json
 
 from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
 
 from flow_graph import (EdgeTable, FlowIndex, FlowPolicy, FlowGraph, Witness,
                         GraphBudgetExceeded, build_flow_graphs)
@@ -44,10 +42,6 @@ def _build_graphs(rows, seeds):
         return build_flow_graphs(FlowIndex(edges), seeds, POLICY)
     except GraphBudgetExceeded as error:
         raise ProtocolError('Alert graph budget exceeded: ' + str(error)) from error
-
-
-class AssigneeUnavailable(ProtocolError):
-    pass
 
 
 def _json(value):
@@ -158,87 +152,8 @@ def _fingerprint(evidence):
     # Coverage/check time and redundant rendered graph/summary are not semantic facts.
     body = {key: evidence[key] for key in
             ('policyVersion', 'policy', 'witnesses', 'seeds', 'transactions', 'limits')}
+    body['withdrawalReason'] = evidence.get('withdrawalReason')
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
-
-
-def _latest(connection, alert):
-    return connection.execute('''SELECT v.version,v.fingerprint FROM review.alert_versions v
-        JOIN analysis.runs r USING(run_id) JOIN analysis.jobs b ON b.job_id=r.job_id
-        WHERE v.alert_id=%s AND r.status='COMPLETED' AND b.status='COMPLETED'
-        ORDER BY v.version DESC LIMIT 1''', (alert,)).fetchone()
-
-
-def _new_alert(connection, business_at, parent=None):
-    row = connection.execute("SELECT u.user_id FROM core.users u JOIN core.assignable_staff s USING(user_id) ORDER BY u.last_assigned_at NULLS FIRST,u.user_id LIMIT 1 FOR UPDATE OF u").fetchone()
-    if row is None:
-        raise AssigneeUnavailable('Register a STAFF user before constructing Alerts')
-    connection.execute('UPDATE core.users SET last_assigned_at=%s WHERE user_id=%s', (business_at,row[0]))
-    return connection.execute('INSERT INTO review.alerts(assignee_id,parent_alert_id,created_at,assigned_at) VALUES(%s,%s,%s,%s) RETURNING alert_id',
-                              (row[0], parent,business_at,business_at)).fetchone()[0]
-
-
-def _plans(origins, graphs, rows, scores, seeds, timings=None):
-    """Generate one evidence document at a time, in the original plan order."""
-    by_seed = {}
-    for index, graph in enumerate(graphs):
-        for seed in graph.seed_ids:
-            by_seed.setdefault(seed, []).append(index)
-    evidence_for = lru_cache(maxsize=64)(lambda i: _evidence(graphs[i], rows, scores, seeds))
-    consumed = set()
-    for original, _, old in origins:
-        started = perf_counter()
-        indexes = sorted({index for seed in old['seeds']
-                          for index in by_seed.get(seed['txId'], ())})
-        evidence = _extend(old, (evidence_for(i) for i in indexes))
-        consumed.update(seed['txId'] for seed in evidence['seeds'])
-        if timings is not None:
-            timings['evidenceBuild'] += (perf_counter() - started) * 1000
-        yield original, evidence
-    for index, graph in enumerate(graphs):
-        if set(graph.seed_ids) - consumed:
-            started = perf_counter()
-            evidence = evidence_for(index)
-            if timings is not None:
-                timings['evidenceBuild'] += (perf_counter() - started) * 1000
-            yield None, evidence
-
-
-def _validate_baselines(connection, run_id):
-    # Preserve ascending origin order and unpublished-before-version error priority.
-    unpublished = connection.execute('''SELECT min(o.alert_id)
-        FROM analysis.alert_origins o
-        JOIN review.alerts a ON a.alert_id=o.alert_id OR a.parent_alert_id=o.alert_id
-        JOIN review.alert_versions v ON v.alert_id=a.alert_id
-        JOIN analysis.runs r ON r.run_id=v.run_id
-        WHERE o.run_id=%s AND v.run_id<>%s AND r.status IN ('READY','ACTIVE')''',
-        (run_id, run_id)).fetchone()[0]
-    changed = connection.execute('''SELECT min(o.alert_id)
-        FROM analysis.alert_origins o
-        LEFT JOIN LATERAL (
-            SELECT v.version FROM review.alert_versions v
-            JOIN analysis.runs r USING(run_id) JOIN analysis.jobs b ON b.job_id=r.job_id
-            WHERE v.alert_id=o.alert_id AND r.status='COMPLETED' AND b.status='COMPLETED'
-            ORDER BY v.version DESC LIMIT 1
-        ) latest ON true
-        WHERE o.run_id=%s AND latest.version IS DISTINCT FROM o.version''',
-        (run_id,)).fetchone()[0]
-    if unpublished is not None and (changed is None or unpublished <= changed):
-        raise StaleExecution('Another run has unpublished Alert evidence; resolve it and freeze new input')
-    if changed is not None:
-        raise ProtocolError('Alert baseline changed; a new input snapshot is required')
-
-
-def _insert_members(connection, alert, version, members):
-    # One SQL statement per bounded Alert, rather than a round trip for every row.
-    payload = [dict({key: member[key] for key in ('txId', 'role', 'includedReasons')},
-                    seed_risk=(member.get('scores') or {}).get('p_laundering')
-                    if member['role'] == 'SEED' else None)
-               for member in members]
-    connection.execute('''INSERT INTO review.alert_transactions(alert_id,version,tx_id,role,reasons,seed_risk)
-        SELECT %s,%s,m."txId",m.role,m."includedReasons",m.seed_risk
-        FROM jsonb_to_recordset(%s::jsonb)
-          AS m("txId" bigint,role text,"includedReasons" jsonb,seed_risk double precision)''',
-        (alert, version, Jsonb(payload)))
 
 
 def save_alerts(connection, execution):
@@ -281,64 +196,20 @@ def save_alerts(connection, execution):
         raise ProtocolError('Frozen coverage is required')
     batch = _build_graphs(rows, seeds)
     timings['candidateBuild'] = (perf_counter() - candidate_started) * 1000
-    publication_started = perf_counter()
     with connection.transaction():
         _lock(connection, execution, 'ALERTS')
         saved = connection.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS' AND completed", (execution.run_id,)).fetchone()
         if saved:
+            connection.execute('UPDATE analysis.alert_plans SET execution_id=%s WHERE run_id=%s',
+                               (execution.execution_id, execution.run_id))
             _checkpoint(connection, execution, 'ALERTS', saved[0])
             return
-        baseline_started = perf_counter()
-        _validate_baselines(connection, execution.run_id)
-        timings['baselineCheck'] = (perf_counter() - baseline_started) * 1000
-        changed, created, covered = set(), set(), set()
-        with connection.cursor(name='alert_origin_evidence') as cursor:
-            cursor.itersize = 1
-            cursor.execute('SELECT o.alert_id,o.version,v.evidence FROM analysis.alert_origins o JOIN review.alert_versions v USING(alert_id,version) WHERE o.run_id=%s ORDER BY o.alert_id', (execution.run_id,))
-            plans = _plans(cursor, batch.graphs, rows, scores, seeds, timings)
-            for original, evidence in plans:
-                if original is None:
-                    original = _new_alert(connection,business_at)
-                    created.add(original)
-                covered.add(original)
-                alert = original
-                latest = _latest(connection, alert)
-                fingerprint = _fingerprint(evidence)
-                coverage = _coverage(evidence['seeds'], days)
-                for item in coverage:
-                    item['explorationLimits'] = evidence['limits']
-                    if item['txId'] not in rows:
-                        item['reason'] = 'SEED_NOT_ACTIVE_IN_SNAPSHOT'
-                status = connection.execute('SELECT status FROM review.alerts WHERE alert_id=%s FOR UPDATE', (alert,)).fetchone()[0]
-                if latest is not None and latest[1].strip() != fingerprint and status != 'OPEN':
-                    children = connection.execute('SELECT alert_id FROM review.alerts WHERE parent_alert_id=%s ORDER BY alert_id', (original,)).fetchall()
-                    existing = [(a, _latest(connection, a)) for (a,) in children]
-                    same = next((a for a, v in existing if v and v[1].strip() == fingerprint), None)
-                    if same is not None:
-                        alert = same
-                    else:
-                        alert = _new_alert(connection,business_at,original)
-                        created.add(alert)
-                    latest = _latest(connection, alert)
-                if latest is None or latest[1].strip() != fingerprint:
-                    version = connection.execute('SELECT coalesce(max(version),0)+1 FROM review.alert_versions WHERE alert_id=%s', (alert,)).fetchone()[0]
-                    connection.execute('INSERT INTO review.alert_versions VALUES(%s,%s,%s,%s,%s,now())',
-                                       (alert, version, execution.run_id, fingerprint, Jsonb(evidence)))
-                    _insert_members(connection, alert, version, evidence['transactions'])
-                    changed.add(alert)
-                for key in {original, alert}:
-                    connection.execute('''INSERT INTO review.alert_coverage_checks
-                        (alert_id,run_id,coverage,checked_at) VALUES(%s,%s,%s,clock_timestamp())
-                        ON CONFLICT(alert_id,run_id) DO UPDATE SET coverage=excluded.coverage,
-                        checked_at=excluded.checked_at''',
-                        (key, execution.run_id, Jsonb(coverage)))
-        connection.execute('UPDATE analysis.jobs SET alert_count=%s WHERE job_id=%s', (len(created), execution.job_id))
-        timings['publication'] = (perf_counter() - publication_started) * 1000
-        timings['totalBeforeCommit'] = (perf_counter() - started) * 1000
-        _checkpoint(connection, execution, 'ALERTS', json.dumps(dict(run_id=str(execution.run_id),
-                    policyVersion=POLICY.version, policyDigest=batch.policy_digest,
-                    graphCount=len(batch.graphs), unassignedSeedCount=len(batch.unassigned),
-                    unassignedReasons=dict(Counter(item.reason for item in batch.unassigned)),
-                    rejectedRelationReasons=dict(Counter(item.reason for item in batch.rejected_relations)),
-                    timingsMs={key: round(value, 3) for key, value in timings.items()},
-                    createdAlertCount=len(created), updatedAlertCount=len(changed-created), checkedAlertCount=len(covered))))
+        from alert_plan_preparation import prepare_plans
+        connection.execute('SELECT pg_advisory_xact_lock(17002001)')
+        prepare_plans(connection, execution, batch, rows, scores, seeds, days,
+            dict(run_id=str(execution.run_id), policyVersion=POLICY.version,
+                 policyDigest=batch.policy_digest, graphCount=len(batch.graphs),
+                 unassignedSeedCount=len(batch.unassigned),
+                 unassignedReasons=dict(Counter(item.reason for item in batch.unassigned)),
+                 rejectedRelationReasons=dict(Counter(item.reason for item in batch.rejected_relations)),
+                 timingsMs={key: round(value, 3) for key, value in timings.items()}))
