@@ -544,6 +544,85 @@ class ReviewWorkflowTests {
   }
 
   @Test
+  void list_projects_only_shared_summary_and_detail_keeps_aggregates() {
+    long a = alert(l1), b = alert(l1), c = alert(l1);
+    long episode = number(act(l1, "TRANSFER", null, select(b), select(c)).get("targetCaseId"));
+    var expectedKeys =
+        Set.of(
+            "txCount",
+            "subjectCount",
+            "seedCount",
+            "riskScore",
+            "primaryType",
+            "totalAmountUsd",
+            "amountsByCurrency",
+            "firstTxAt",
+            "lastTxAt");
+    for (var entry : Map.of("ALERT", a, "EPISODE", episode).entrySet()) {
+      clearInvocations(evidence);
+      var page = service.list(entry.getKey(), "OPEN", null, null, null, 0, 20);
+      verifyNoInteractions(evidence);
+      var item = rows(page.get("content")).getFirst();
+      assertThat(number(item.get("caseId"))).isEqualTo(entry.getValue());
+      var summary = object(item.get("summary"));
+      assertThat(summary.keySet()).isEqualTo(expectedKeys);
+      assertThat(item).doesNotContainKeys("groups", "accounts", "history", "relatedFlows");
+      var detail = service.detail(entry.getValue());
+      var detailedSummary = object(encode(detail.get("summary")));
+      assertThat(detailedSummary)
+          .containsKeys(
+              "netFlows",
+              "topReceiverShare",
+              "topSenders",
+              "paymentFormats",
+              "dailySuspiciousCount",
+              "dailySuspiciousAmount",
+              "typeDistribution",
+              "typeShare");
+      assertThat(object(detailedSummary.get("netFlows"))).isNotEmpty();
+      assertThat(rows(detail.get("groups"))).isNotEmpty();
+      summary.forEach((key, value) -> assertThat(value).isEqualTo(detailedSummary.get(key)));
+      assertThat(item.get("revision")).isEqualTo(detail.get("revision"));
+      assertThat(number(item.get("pendingCount"))).isEqualTo(number(detail.get("pendingCount")));
+      assertThat(encode(item.get("sourceAlertIds")))
+          .isEqualTo(encode(detail.get("sourceAlertIds")));
+    }
+  }
+
+  @Test
+  void large_account_aggregates_do_not_expand_list_or_jdbc_result() {
+    for (int i = 0; i < 20; i++) alert(l1);
+    var before = service.list("ALERT", "OPEN", l1, null, null, 0, 20);
+    var netFlows = new LinkedHashMap<String, Object>();
+    for (int i = 0; i < 4096; i++) netFlows.put(UUID.randomUUID() + "|USD", i + .25);
+    jdbc.update(
+        "update review.alerts set summary=summary || ?::jsonb",
+        encode(Map.of("netFlows", netFlows, "futureDetail", netFlows)));
+    clearInvocations(evidence);
+    var after = service.list("ALERT", "OPEN", l1, null, null, 0, 20);
+    verifyNoInteractions(evidence);
+    assertThat(after).isEqualTo(before);
+    var projected =
+        jdbc.queryForList(
+            "select " + ReviewCaseSql.LIST_COLUMNS + " from " + ReviewCaseSql.WITH_RISK + " c");
+    for (var row : projected)
+      assertThat(object(row.get("summary")))
+          .doesNotContainKeys("netFlows", "futureDetail", "topSenders", "dailySuspiciousCount");
+    int bytes = encode(after).getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+    assertThat(bytes).isLessThan(32000);
+    System.out.printf(
+        "LIST_PAYLOAD cases=20 accountsPerSummary=4096 responseBytes=%d storedSummaryBytes=%d%n",
+        bytes,
+        jdbc.queryForObject(
+            "select sum(octet_length(summary::text)) from review.alerts", Long.class));
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from review.alerts where summary ? 'netFlows' and summary ? 'futureDetail'",
+                Long.class))
+        .isEqualTo(20L);
+  }
+
+  @Test
   void published_evidence_uses_real_query_for_list_and_review() {
     long id = alert(l1);
     long alertId = number(service.detail(id).get("alertId"));
