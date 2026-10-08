@@ -52,7 +52,7 @@ class AlertPostgresTests(unittest.TestCase):
                 with self.assertRaises(self.psycopg.errors.InsufficientPrivilege): writer.execute(statement)
         plan, = self.plans()
         self.assertEqual(plan['action'],'NEW')
-        self.assertEqual(plan['evidence']['policyVersion'],'flow-evidence-1')
+        self.assertEqual(plan['evidence']['policyVersion'],'flow-evidence-2')
         self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alerts').fetchone()[0],0)
         self.assertEqual(before,self.admin.execute('SELECT user_id,last_assigned_at FROM core.users ORDER BY user_id').fetchall())
 
@@ -72,7 +72,9 @@ class AlertPostgresTests(unittest.TestCase):
         before = self.plans()
         execution = InputExecution(self.job,self.run,uuid4())
         self.admin.execute('UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s',(execution.execution_id,self.job))
-        save_alerts(self.admin,execution)
+        from unittest.mock import patch
+        with patch('alert_pipeline._build_graphs', side_effect=AssertionError('Retry rebuilt the ledger')):
+            save_alerts(self.admin,execution)
         self.assertEqual(self.plans(),before)
         self.assertEqual(self.admin.execute('SELECT execution_id,build_generation FROM analysis.alert_plans WHERE run_id=%s',(self.run,)).fetchone(),(execution.execution_id,1))
 
@@ -121,6 +123,13 @@ class AlertPostgresTests(unittest.TestCase):
 
 
 class AlertExtensionTests(unittest.TestCase):
+    def test_coverage_calendar_is_not_repeated_for_every_seed(self):
+        from alert_pipeline import _coverage
+        result = _coverage([dict(txId=key) for key in range(4096)], {'2023-09-01': dict(complete=True)})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result[0]['txIds']), 4096)
+        self.assertEqual(result[0]['days'], [dict(businessDate='2023-09-01', complete=True)])
+
     def evidence(self, ids, seeds, times=None):
         from alert_pipeline import _evidence
         from flow_graph import FlowGraph, Witness

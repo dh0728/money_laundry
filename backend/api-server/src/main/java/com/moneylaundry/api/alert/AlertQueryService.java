@@ -78,6 +78,10 @@ public class AlertQueryService {
             version == null ? new Object[] {id} : new Object[] {id, version});
     if (rows.isEmpty()) throw ApiException.notFound("완료된 Alert 근거를 찾을 수 없습니다.");
     Map<String, Object> result = view(rows.getFirst(), true);
+    result.put(
+        "relatedFlows",
+        relatedFlows(
+            id, (List<Map<String, Object>>) result.getOrDefault("boundaryWitnesses", List.of())));
     var coverage =
         jdbc.queryForList(
             """
@@ -94,6 +98,48 @@ public class AlertQueryService {
     result.put(
         "lastCheckedAt",
         coverage.isEmpty() ? null : instant(coverage.getFirst().get("checked_at")));
+    return result;
+  }
+
+  /**
+   * Boundary facts are immutable; destination IDs resolve to currently published canonical Alerts.
+   */
+  public List<Map<String, Object>> relatedFlows(long id, List<Map<String, Object>> boundaries) {
+    if (boundaries.isEmpty()) return List.of();
+    var keys = new TreeSet<Long>();
+    for (var witness : boundaries)
+      for (Object key : (List<?>) witness.get("tx_ids")) keys.add(((Number) key).longValue());
+    var owners = new HashMap<Long, Set<Long>>();
+    for (var row :
+        jdbc.queryForList(
+            """
+        select distinct t.tx_id,a.alert_id from jsonb_array_elements_text(?::jsonb) k
+        join review.alert_transactions t on t.tx_id=k.value::bigint and t.role='SEED'
+        join review.alerts a on a.alert_id=t.alert_id and a.published_version=t.version
+        where a.merged_into_alert_id is null and a.alert_id<>?
+          and a.alert_id<>(select coalesce(merged_into_alert_id,alert_id) from review.alerts where alert_id=?)
+        """,
+            mapper.writeValueAsString(keys),
+            id,
+            id)) {
+      owners
+          .computeIfAbsent(((Number) row.get("tx_id")).longValue(), key -> new TreeSet<>())
+          .add(((Number) row.get("alert_id")).longValue());
+    }
+    var result = new ArrayList<Map<String, Object>>();
+    for (var witness : boundaries) {
+      var related = new TreeSet<Long>();
+      for (Object key : (List<?>) witness.get("tx_ids"))
+        related.addAll(owners.getOrDefault(((Number) key).longValue(), Set.of()));
+      result.add(
+          Map.of(
+              "kind",
+              witness.get("kind"),
+              "txIds",
+              witness.get("tx_ids"),
+              "relatedAlertIds",
+              new ArrayList<>(related)));
+    }
     return result;
   }
 

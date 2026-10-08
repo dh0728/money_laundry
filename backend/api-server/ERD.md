@@ -73,6 +73,8 @@ erDiagram
 | ops | resets, reset_files | 초기화 작업·파일 삭제 재시도 |
 | evaluation | report_labels, transaction_labels | 평가 라벨. 분석·화면 입력에서 제외 |
 
+분할 경계는 `alert_versions.evidence.boundaryWitnesses`에 거래 ID와 관계 종류로 고정 보존한다. 현재 관련 Alert 이동 대상은 `alert_transactions`의 거래 인덱스와 공개 포인터로 찾으며 병합·후속 계보와 혼용하지 않는다. `alert_coverage_checks.coverage`는 동일 수신 달력을 씨앗별로 복사하지 않고 `{txIds, days}` 묶음에 한 번 저장한다. 공개 API의 날짜별 coverage 형식은 유지한다.
+
 ## 식별자와 저장 원칙
 
 - `core.work_id`는 업로드와 분석 작업의 공통 숫자 ID를 발급한다. 실제 저장소는 `ingest.uploads`와 `analysis.jobs`로 분리한다.

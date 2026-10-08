@@ -141,11 +141,12 @@ def _digest(value):
 
 
 def _validate_evidence(evidence, *, allow_empty=False):
+    core_ids = evidence.core_ids
     if (len(evidence.digest) != 64
             or any(c not in '0123456789abcdef' for c in evidence.digest)):
         raise PlanningError('Evidence requires a SHA-256 semantic digest')
     if (evidence.seed_ids & evidence.connection_ids
-            or evidence.core_ids & evidence.context_ids):
+            or core_ids & evidence.context_ids):
         raise PlanningError('Evidence roles must be disjoint')
     if any(type(key) is not int or key <= 0 for key in evidence.member_ids):
         raise PlanningError('Transaction IDs must be positive integers')
@@ -159,10 +160,10 @@ def _validate_evidence(evidence, *, allow_empty=False):
     for witness in evidence.witnesses:
         keys = set(witness.tx_ids)
         if (not witness.kind or len(keys) < 2 or len(keys) != len(witness.tx_ids)
-                or not keys <= evidence.core_ids or not keys & evidence.seed_ids):
+                or not keys <= core_ids or not keys & evidence.seed_ids):
             raise PlanningError('Witness must connect a seed using only distinct core transactions')
         covered.update(keys)
-    if not evidence.core_ids <= covered:
+    if not core_ids <= covered:
         raise PlanningError('Every core transaction requires an adopted witness')
 
 
@@ -217,7 +218,8 @@ def _validate(cases, graphs, validity):
 def _matches(case, graph, by_id):
     old = case.evidence
     shared_seed = bool(old.seed_ids & graph.seed_ids)
-    direct = any(set(w.tx_ids) & old.seed_ids and set(w.tx_ids) & graph.seed_ids
+    direct = shared_seed or any(not w.kind.startswith('BOUNDARY_')
+                 and set(w.tx_ids) & old.seed_ids and set(w.tx_ids) & graph.seed_ids
                  for w in graph.witnesses)
     if not shared_seed and not direct:
         return False

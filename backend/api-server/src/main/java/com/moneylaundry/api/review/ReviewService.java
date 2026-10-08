@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ReviewService {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
+  private final TransactionTemplate readTx;
   private final BusinessTime time;
   private final AlertQueryService alerts;
 
@@ -24,6 +25,10 @@ public class ReviewService {
       JdbcTemplate jdbc, TransactionTemplate tx, BusinessTime time, AlertQueryService alerts) {
     this.jdbc = jdbc;
     this.tx = tx;
+    this.readTx = new TransactionTemplate(tx.getTransactionManager());
+    this.readTx.setReadOnly(true);
+    this.readTx.setIsolationLevel(
+        org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
     this.time = time;
     this.alerts = alerts;
   }
@@ -207,6 +212,16 @@ public class ReviewService {
     if ("ALERT".equals(c.get("kind"))) {
       out.put("publishedVersion", c.get("published_version"));
       out.put("reviewStartedAt", c.get("review_started_at"));
+      out.put(
+          "relatedFlows",
+          alerts.relatedFlows(
+              id,
+              rows(
+                  jdbc.queryForObject(
+                      "select coalesce(evidence->'boundaryWitnesses','[]'::jsonb)::text from review.alert_versions where alert_id=? and version=?",
+                      String.class,
+                      id,
+                      c.get("published_version")))));
       // Keep employee judgments in storage; a new publication changes only current scope.
       out.put(
           "withdrawnMembers",
@@ -546,9 +561,10 @@ public class ReviewService {
   public Map<String, Object> money(long id, int minutes) {
     time.workbenchOnly();
     if (!Set.of(5, 15, 30, 60, 180, 360, 1440).contains(minutes)) throw AnalysisService.invalid();
-    return tx.execute(
+    return readTx.execute(
         s -> {
-          jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
+          // All facts below share one MVCC snapshot. Reading the current money
+          // view must not queue behind an unrelated upload/publication lock.
           var c = caseRow(id);
           if ("CLOSED".equals(c.get("status"))) {
             var fixed =

@@ -110,6 +110,50 @@ class FlowGraphTests(unittest.TestCase):
         with self.assertRaisesRegex(GraphBudgetExceeded, "CORE_SIZE"):
             self.build(rows, [1], max_core_edges=1)
 
+    def test_large_flow_splits_with_boundary_evidence_and_unique_seed_ownership(self):
+        rows = [(i, i / 100, str(i), str(i + 1)) for i in range(1, 19)]
+        result = self.build(rows, range(1, 19), max_core_edges=5)
+        self.assertFalse(result.unassigned)
+        owned = [key for graph in result.graphs for key in graph.seed_ids]
+        self.assertEqual(sorted(owned), list(range(1, 19)))
+        self.assertTrue(all(len(g.seed_ids + g.connection_ids) <= 5 for g in result.graphs))
+        self.assertTrue(all(g.boundary_witnesses for g in result.graphs))
+        for graph in result.graphs:
+            for witness in graph.witnesses:
+                self.assertTrue(set(witness.tx_ids) <= set(graph.seed_ids + graph.connection_ids))
+
+    def test_next_day_reserves_previous_core_and_does_not_rejoin_partitions(self):
+        rows = [(i, i / 100, str(i), str(i + 1)) for i in range(1, 19)]
+        first = self.build(rows, range(1, 19), max_core_edges=5)
+        groups = [(g.seed_ids, g.seed_ids + g.connection_ids,
+                   g.seed_ids + g.connection_ids + g.context_ids) for g in first.graphs]
+        next_rows = rows + [(19, .19, '19', '20'), (20, .2, '20', '21')]
+        second = build_flow_graphs(FlowIndex(table(next_rows)), range(1, 21),
+                                  replace(FlowPolicy(), max_core_edges=5), seed_groups=groups)
+        self.assertFalse(second.unassigned)
+        for previous in first.graphs:
+            matches = [g for g in second.graphs if set(g.seed_ids) & set(previous.seed_ids)]
+            self.assertEqual(len(matches), 1)
+            self.assertLessEqual(len(set(previous.seed_ids + previous.connection_ids)
+                                     | set(matches[0].seed_ids + matches[0].connection_ids)), 5)
+
+    def test_held_historical_core_still_consumes_extension_capacity(self):
+        rows = [(11, 0, 'A', 'B'), (22, 1, 'B', 'C'), (33, 2, 'C', 'D')]
+        result = build_flow_graphs(FlowIndex(table(rows)), [11, 33],
+            replace(FlowPolicy(), max_core_edges=3),
+            seed_groups=[([11], [11, 22, 999], [11, 22, 999])])
+        self.assertEqual(sorted(key for g in result.graphs for key in g.seed_ids), [11, 33])
+        self.assertFalse(any(set(g.seed_ids) == {11, 33} for g in result.graphs))
+        self.assertTrue(all(g.boundary_witnesses for g in result.graphs))
+
+    def test_reserved_seed_without_current_witness_is_not_fabricated_as_new_evidence(self):
+        rows = [(11, 0, 'A', 'B'), (22, 1, 'B', 'C'), (33, 2, 'X', 'Y')]
+        result = build_flow_graphs(FlowIndex(table(rows)), [11, 33], FlowPolicy(),
+            seed_groups=[([11, 33], [11, 22, 33, 999], [11, 22, 33, 999])])
+        self.assertEqual(result.graphs[0].seed_ids, (11,))
+        self.assertEqual(result.graphs[0].connection_ids, (22,))
+        self.assertEqual(result.ungrouped_seed_ids, (33,))
+
     def test_duplicate_ids_invalid_seeds_and_immutable_append(self):
         with self.assertRaises(ValueError):
             self.build([(1, 0, "A", "B"), (1, 0, "B", "C")], [1])
@@ -235,6 +279,17 @@ class FlowGraphTests(unittest.TestCase):
 
 
 class FlowEvaluationTests(unittest.TestCase):
+    def test_demo_seeds_use_actual_calculator_without_truth_labels(self):
+        from types import SimpleNamespace
+        from demo_calculator import build_targets, calculate, MODEL_VERSION, FEATURE_VERSION
+        edges = table([(key, 0, 'A', 'B') for key in range(1, 101)]).freeze()
+        data = SimpleNamespace(edges=edges)
+        scores = calculate(build_targets(range(1, 101)), 'binary', model_version=MODEL_VERSION,
+                           feature_version=FEATURE_VERSION)
+        expected = {key for key, value in zip(scores['tx_id'].to_pylist(),
+                    scores['p_laundering'].to_pylist()) if value >= 0.7}
+        self.assertEqual(choose_seeds(data, 'demo'), expected)
+
     def test_ground_truth_is_not_needed_by_graph_builder(self):
         row = ["2022/09/01 00:00", "1", "A", "2", "B", "1", "USD",
                "1", "USD", "ACH", "1"]

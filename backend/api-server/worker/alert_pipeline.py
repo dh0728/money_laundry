@@ -24,7 +24,7 @@ POLICY = FlowPolicy()
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
-def _build_graphs(rows, seeds):
+def _build_graphs(rows, seeds, seed_groups=()):
     """Translate public UUIDs to snapshot-local codes, preserving transaction IDs."""
     edges, accounts = EdgeTable(), {}
     for tx_id, row in sorted(rows.items()):
@@ -39,7 +39,7 @@ def _build_graphs(rows, seeds):
         edges.append(tx_id, (delta.days * 86400 + delta.seconds) * 1_000_000
                      + delta.microseconds, *codes)
     try:
-        return build_flow_graphs(FlowIndex(edges), seeds, POLICY)
+        return build_flow_graphs(FlowIndex(edges), seeds, POLICY, seed_groups=seed_groups)
     except GraphBudgetExceeded as error:
         raise ProtocolError('Alert graph budget exceeded: ' + str(error)) from error
 
@@ -50,11 +50,12 @@ def _json(value):
 
 
 def _coverage(seeds, days):
-    result = []
-    for seed in seeds:
-        reports = [dict(businessDate=date, **value) for date, value in sorted(days.items())]
-        result.append(dict(txId=seed['txId'], days=reports))
-    return result
+    # Every seed uses the same frozen calendar. Store that calendar once rather
+    # than duplicating it thousands of times in large evidence versions.
+    if not seeds:
+        return []
+    reports = [dict(businessDate=date, **value) for date, value in sorted(days.items())]
+    return [dict(txIds=sorted(seed['txId'] for seed in seeds), days=reports)]
 
 
 def _evidence(graph, rows, scores, seed_info):
@@ -87,7 +88,9 @@ def _evidence(graph, rows, scores, seed_info):
     probabilities = [s['p_laundering'] for m in members if (s := m['scores']) is not None]
     seeds = [seed_info[key] for key in graph.seed_ids]
     return _json(dict(policyVersion=POLICY.version, policy=asdict(POLICY),
-        witnesses=[asdict(witness) for witness in graph.witnesses], seeds=seeds, transactions=members,
+        witnesses=[asdict(witness) for witness in graph.witnesses],
+        boundaryWitnesses=[asdict(witness) for witness in graph.boundary_witnesses],
+        seeds=seeds, transactions=members,
         limits=list(graph.limits), summary=dict(txCount=len(members), seedCount=len(seeds),
             totalAmountUsd=amounts, scoreMax=max(probabilities) if probabilities else None,
             firstTxAt=min(m['occurredAt'] for m in members), lastTxAt=max(m['occurredAt'] for m in members)),
@@ -97,7 +100,7 @@ def _evidence(graph, rows, scores, seed_info):
             includedReasons=m['includedReasons']) for m in members])))
 
 
-def _extend(old, additions):
+def _extend(old, additions, *, preserve_ids=()):
     """Compose immutable evidence versions without truncating flow witnesses.
 
     Case lifecycle is separate from graph construction. Existing historical
@@ -109,9 +112,11 @@ def _extend(old, additions):
     seeds = {s['txId']: s for s in old['seeds']}
     limits = set(old['limits'])
     witnesses = {Witness(w['kind'], tuple(w['tx_ids'])) for w in old['witnesses']}
+    boundaries = {Witness(w['kind'], tuple(w['tx_ids'])) for w in old.get('boundaryWitnesses', [])}
     for evidence in additions:
         limits.update(evidence['limits'])
         witnesses.update(Witness(w['kind'], tuple(w['tx_ids'])) for w in evidence['witnesses'])
+        boundaries.update(Witness(w['kind'], tuple(w['tx_ids'])) for w in evidence.get('boundaryWitnesses', []))
         for item in evidence['transactions']:
             key = item['txId']
             if key not in members:
@@ -128,6 +133,18 @@ def _extend(old, additions):
                 previous.update(item)
                 previous['role'] = role
         seeds.update({s['txId']: s for s in evidence['seeds'] if s['txId'] in members})
+    # Context is a selected view, not a mandatory extension. Retain every old
+    # member; add only as much new context as fits the declared context budget.
+    previous_ids = {m['txId'] for m in old['transactions']} | set(preserve_ids)
+    retained_context = sum(m['role'] == 'CONTEXT' and k in previous_ids for k, m in members.items())
+    context_slots = max(0, POLICY.max_context_edges - retained_context)
+    for key in sorted(list(members)):
+        if members[key]['role'] == 'CONTEXT' and key not in previous_ids:
+            if context_slots:
+                context_slots -= 1
+            else:
+                del members[key]
+                limits.add('CONTEXT_SELECTION')
     if (sum(m['role'] != 'CONTEXT' for m in members.values()) > POLICY.max_core_edges
             or len(members) > POLICY.max_core_edges + POLICY.max_context_edges):
         raise ProtocolError('Accumulated Alert evidence exceeds graph budget')
@@ -143,7 +160,8 @@ def _extend(old, additions):
     graph = FlowGraph(tuple(sorted(seeds)),
         tuple(k for k, m in sorted(members.items()) if m['role'] == 'CONNECTION'),
         tuple(k for k, m in sorted(members.items()) if m['role'] == 'CONTEXT'),
-        tuple(sorted(witnesses, key=lambda w: (w.kind, w.tx_ids))), tuple(sorted(limits)))
+        tuple(sorted(witnesses, key=lambda w: (w.kind, w.tx_ids))), tuple(sorted(limits)),
+        tuple(sorted(boundaries, key=lambda w: (w.kind, w.tx_ids))))
     return _evidence(graph, rows, scores, seeds)
 
 
@@ -153,14 +171,26 @@ def _fingerprint(evidence):
     body = {key: evidence[key] for key in
             ('policyVersion', 'policy', 'witnesses', 'seeds', 'transactions', 'limits')}
     body['withdrawalReason'] = evidence.get('withdrawalReason')
+    body['boundaryWitnesses'] = evidence.get('boundaryWitnesses', [])
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
 def save_alerts(connection, execution):
     if not connection.autocommit:
         raise ProtocolError('Autocommit connection required')
+    # Retry a successfully prepared stage without rebuilding the full ledger.
+    saved = connection.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS' AND completed", (execution.run_id,)).fetchone()
+    if saved:
+        with connection.transaction():
+            _lock(connection, execution, 'ALERTS')
+            saved = connection.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS' AND completed", (execution.run_id,)).fetchone()
+            if saved:
+                connection.execute('UPDATE analysis.alert_plans SET execution_id=%s WHERE run_id=%s',
+                                   (execution.execution_id, execution.run_id))
+                _checkpoint(connection, execution, 'ALERTS', saved[0])
+                return
     started = perf_counter()
-    timings = {'evidenceBuild': 0.0}
+    timings = {}
     # Only immutable input is read during computation, without holding row locks.
     with connection.transaction(), connection.cursor(name='alert_input', row_factory=dict_row) as cursor:
         cursor.execute('SELECT * FROM analysis.input_transactions WHERE run_id=%s ORDER BY tx_id,input_role DESC', (execution.run_id,))
@@ -169,12 +199,13 @@ def save_alerts(connection, execution):
     threshold,business_at = connection.execute('SELECT threshold_value,business_at FROM analysis.jobs WHERE job_id=%s', (execution.job_id,)).fetchone()
     if threshold is None:
         raise ProtocolError('Frozen threshold is required')
-    frozen_scores = connection.execute('''SELECT i.tx_id,i.scores,b.threshold_value
-        FROM analysis.input_scores i JOIN analysis.runs r ON r.run_id=i.score_run_id
-        JOIN analysis.jobs b ON b.job_id=r.job_id WHERE i.run_id=%s''',
-        (execution.run_id,)).fetchall()
-    scores = {key: score for key, score, _ in frozen_scores}
-    thresholds = {key: value for key, _, value in frozen_scores}
+    scores, thresholds = {}, {}
+    with connection.transaction(), connection.cursor(name='alert_scores') as cursor:
+        cursor.execute('''SELECT i.tx_id,i.scores,b.threshold_value
+            FROM analysis.input_scores i JOIN analysis.runs r ON r.run_id=i.score_run_id
+            JOIN analysis.jobs b ON b.job_id=r.job_id WHERE i.run_id=%s''', (execution.run_id,))
+        for key, score, value in cursor:
+            scores[key], thresholds[key] = score, value
     current = dict(connection.execute("SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM analysis.scores s WHERE run_id=%s", (execution.run_id,)).fetchall())
     targets = {key for key, row in rows.items() if row['input_role'] == 'TARGET'}
     if targets != set(current):
@@ -187,6 +218,7 @@ def save_alerts(connection, execution):
                        occurredAt=rows[key]['occurred_at'].astimezone(timezone.utc).isoformat(),
                        score=value['p_laundering'], threshold=float(thresholds[key]))
              for key, value in scores.items() if value['p_laundering'] >= thresholds[key]}
+    del current, thresholds, targets
     days = {day.isoformat(): dict(complete=complete, expectedBanks=expected, completeBanks=received, reports=reports)
             for day, expected, received, complete, reports in connection.execute(
                 'SELECT business_date,expected_banks,complete_banks,complete,reports FROM analysis.input_coverage WHERE run_id=%s', (execution.run_id,)).fetchall()}
@@ -194,7 +226,17 @@ def save_alerts(connection, execution):
     candidate_started = perf_counter()
     if seeds and not days:
         raise ProtocolError('Frozen coverage is required')
-    batch = _build_graphs(rows, seeds)
+    seed_groups = []
+    for owned, core, members in connection.execute('''SELECT v.evidence->'seeds',
+        (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t
+         WHERE t->>'role'<>'CONTEXT'),
+        (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t)
+        FROM analysis.alert_origins o JOIN review.alerts a USING(alert_id)
+        JOIN review.alert_versions v ON v.alert_id=o.alert_id AND v.version=o.version
+        WHERE o.run_id=%s AND a.status='OPEN' AND a.merged_into_alert_id IS NULL
+        ORDER BY a.alert_id''', (execution.run_id,)):
+        seed_groups.append(([s['txId'] for s in owned], core or [], members or []))
+    batch = _build_graphs(rows, seeds, seed_groups)
     timings['candidateBuild'] = (perf_counter() - candidate_started) * 1000
     with connection.transaction():
         _lock(connection, execution, 'ALERTS')

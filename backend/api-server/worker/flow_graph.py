@@ -21,7 +21,7 @@ class GraphBudgetExceeded(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class FlowPolicy:
-    version: str = "flow-evidence-1"
+    version: str = "flow-evidence-2"
     window_us: int = 72 * HOUR_US
     max_hops: int = 2
     neighbors_per_step: int = 64
@@ -179,6 +179,7 @@ class FlowGraph:
     context_ids: tuple[int, ...]
     witnesses: tuple[Witness, ...]
     limits: tuple[str, ...]
+    boundary_witnesses: tuple[Witness, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,7 +213,7 @@ class FlowBatch:
 
 
 def build_flow_graphs(index: FlowIndex, seed_ids: Iterable[int],
-                      policy: FlowPolicy) -> FlowBatch:
+                      policy: FlowPolicy, *, seed_groups=()) -> FlowBatch:
     """Build from already-classified valid seeds, including historical unassigned ones.
 
     A two-edge observed flow/branch/repeat is evidence; a single isolated edge is
@@ -220,14 +221,16 @@ def build_flow_graphs(index: FlowIndex, seed_ids: Iterable[int],
     Neighbor/context selection is declared policy, unlike fatal compute budgets.
     """
     policy.validate()
+    if policy.max_core_edges < 2:
+        raise GraphBudgetExceeded("CORE_SIZE")
     edges = index.edges
     times, sources, targets, ids = (edges.occurred_us, edges.from_accounts,
                                    edges.to_accounts, edges.tx_ids)
+    seed_ids = frozenset(seed_ids)
     seeds = {edges.position(tx_id) for tx_id in seed_ids}
     ordered_seeds = sorted(seeds, key=ids.__getitem__)
     visits = 0
     selected_windows = 0
-    relations = {}
     explored = {}
     seed_limits = defaultdict(set)
     support = {}
@@ -270,26 +273,136 @@ def build_flow_graphs(index: FlowIndex, seed_ids: Iterable[int],
             seed_limits[seed].add("NEIGHBOR_SELECTION")
         return sorted(positions, key=lambda pos: (abs(times[pos] - anchor), times[pos], ids[pos]))
 
-    def add_relation(kind, path):
-        relation_seeds = tuple(sorted(set(path) & seeds, key=ids.__getitem__))
-        if not relation_seeds:
+    # Retain a witness forest instead of materializing every seed-pair relation.
+    # Transaction edges remain complete; redundant explanations inside an already
+    # connected core do not require another all-pairs record.
+    parents = {seed: seed for seed in seeds}
+    anchors = {seed: {seed} for seed in seeds}
+    cores = {seed: {seed} for seed in seeds}
+    # Reservations use public transaction IDs, including held historical facts
+    # absent from this run's input. Missing input does not erase stored evidence.
+    reserved = {seed: {ids[seed]} for seed in seeds}
+    reserved_members = {seed: {ids[seed]} for seed in seeds}
+    core_bounds = {seed: (times[seed], times[seed]) for seed in seeds}
+    witnesses = {seed: [] for seed in seeds}
+    witnessed = {seed: set() for seed in seeds}
+    boundaries = {}
+    rejected, span_rejected_seeds = [], set()
+
+    def root(seed):
+        while parents[seed] != seed:
+            parents[seed] = parents[parents[seed]]
+            seed = parents[seed]
+        return seed
+
+    # Published seed ownership is retained on later days. New observations may
+    # join these roots only while the resulting core remains within the bound.
+    for group, historical_core, historical_members in seed_groups:
+        selected = sorted({edges.position(key) for key in group if key in seed_ids},
+                          key=ids.__getitem__)
+        if not selected:
+            continue
+        roots = sorted({root(key) for key in selected}, key=ids.__getitem__)
+        survivor = roots[0]
+        for other in roots[1:]:
+            parents[other] = survivor
+            anchors[survivor].update(anchors.pop(other))
+            cores[survivor].update(cores.pop(other))
+            reserved[survivor].update(reserved.pop(other))
+            reserved_members[survivor].update(reserved_members.pop(other))
+            witnesses.pop(other)
+            witnessed.pop(other)
+            core_bounds.pop(other)
+        reserved[survivor].update(historical_core)
+        reserved_members[survivor].update(historical_members)
+        historical_times = [core_bounds[survivor][0], core_bounds[survivor][1]]
+        for key in historical_core:
+            try:
+                historical_times.append(times[edges.position(key)])
+            except ValueError:
+                pass  # Held evidence still consumes capacity, not current flow time.
+        core_bounds[survivor] = (min(historical_times), max(historical_times))
+        if len(reserved[survivor]) > policy.max_core_edges:
+            raise GraphBudgetExceeded("INVALID_EXISTING_CORE")
+
+    def boundary(kind, path, roots):
+        witness = Witness(kind, tuple(ids[pos] for pos in path))
+        for left, right in zip(roots, roots[1:]):
+            key = (left, right, kind)
+            previous = boundaries.get(key)
+            if previous is None or witness.tx_ids < previous.tx_ids:
+                boundaries[key] = witness
+            seed_limits[left].add("CORE_PARTITION")
+            seed_limits[right].add("CORE_PARTITION")
+
+    def apply_relation(kind, relation_seeds, path):
+        roots = sorted({root(seed) for seed in relation_seeds}, key=ids.__getitem__)
+        if not roots:
             return
-        key = (kind, tuple(ids[pos] for pos in relation_seeds))
+        survivor = roots[0]
+        additions = set(path).union(*(cores[value] for value in roots[1:]))
+        if len(roots) == 1 and additions <= cores[survivor]:
+            # Pre-bound historical seeds still need observed witnesses this run.
+            if all(key in witnessed[survivor] for key in path):
+                return
+        earliest = min([times[pos] for pos in path] + [core_bounds[value][0] for value in roots])
+        latest = max([times[pos] for pos in path] + [core_bounds[value][1] for value in roots])
+        if latest - earliest > policy.component_span_us:
+            rejected.append(RejectedRelation(Witness(kind, tuple(ids[pos] for pos in path)), "COMPONENT_SPAN"))
+            span_rejected_seeds.update(relation_seeds)
+            return
+        path_ids = {ids[pos] for pos in path}
+        reserved_additions = path_ids.union(*(reserved[value] for value in roots[1:]))
+        member_additions = path_ids.union(*(reserved_members[value] for value in roots[1:]))
+        if (len(reserved[survivor]) + len(reserved_additions - reserved[survivor]) > policy.max_core_edges
+                or len(reserved_members[survivor] | member_additions)
+                > policy.max_core_edges + policy.max_context_edges):
+            if len(roots) == 1:
+                seed_limits[survivor].add("CORE_PARTITION")
+            else:
+                boundary(kind, path, roots)
+            return
+        for other in roots[1:]:
+            parents[other] = survivor
+            anchors[survivor].update(anchors.pop(other))
+            witnesses[survivor].extend(witnesses.pop(other))
+            witnessed[survivor].update(witnessed.pop(other))
+            cores.pop(other)
+            reserved.pop(other)
+            reserved_members.pop(other)
+            core_bounds.pop(other)
+        cores[survivor].update(additions)
+        reserved[survivor].update(reserved_additions)
+        reserved_members[survivor].update(member_additions)
+        core_bounds[survivor] = (earliest, latest)
+        witnesses[survivor].append(Witness(kind, tuple(ids[pos] for pos in path)))
+        witnessed[survivor].update(path)
+        if len(witnesses[survivor]) > policy.max_relations:
+            raise GraphBudgetExceeded("RELATIONS_PER_CORE")
+
+    def add_relation(kind, path):
         path = tuple(path)
-        rank = (len(set(path) - seeds), max(times[pos] for pos in path)
-                - min(times[pos] for pos in path), tuple(ids[pos] for pos in path))
-        existing = relations.get(key)
-        if existing is None or rank < existing[0]:
-            relations[key] = (rank, relation_seeds, path)
-        if len(relations) + len(weak_relations) > policy.max_relations:
-            raise GraphBudgetExceeded("RELATIONS")
+        relation_seeds = tuple(sorted(set(path) & seeds, key=ids.__getitem__))
+        if kind in ("BRANCH_OUT", "BRANCH_IN", "REPEAT") and len(path) > 2:
+            roots = {root(seed) for seed in relation_seeds}
+            combined = {ids[pos] for pos in path}.union(*(reserved[value] for value in roots))
+            combined_members = {ids[pos] for pos in path}.union(*(reserved_members[value] for value in roots))
+            if (len(combined) <= policy.max_core_edges
+                    and len(combined_members) <= policy.max_core_edges + policy.max_context_edges
+                    and max(max(times[p] for p in path), max(core_bounds[r][1] for r in roots))
+                    - min(min(times[p] for p in path), min(core_bounds[r][0] for r in roots))
+                    <= policy.component_span_us):
+                apply_relation(kind, relation_seeds, path)
+            else:
+                for left, right in zip(path, path[1:]):
+                    apply_relation(kind, (left, right), (left, right))
+        else:
+            apply_relation(kind, relation_seeds, path)
 
     def reject_ambiguous(kind, path):
         transaction_ids = tuple(ids[pos] for pos in path)
         weak_relations[(kind, transaction_ids)] = RejectedRelation(
             Witness(kind, transaction_ids), "AMBIGUOUS_HUB")
-        if len(relations) + len(weak_relations) > policy.max_relations:
-            raise GraphBudgetExceeded("RELATIONS")
 
     for seed in ordered_seeds:
         low, high = times[seed] - policy.window_us, times[seed] + policy.window_us
@@ -336,7 +449,7 @@ def build_flow_graphs(index: FlowIndex, seed_ids: Iterable[int],
             # Seed-to-seed evidence is not lost merely due to normal neighbor selection.
             if not ambiguous:
                 choices.update(scan(seed_adjacency, account, low, high, times[seed],
-                                    bounded=False, **bounds))
+                                    seed=seed, **bounds))
             for other in sorted(choices, key=lambda pos: (abs(times[pos] - times[seed]),
                                                           times[pos], ids[pos])):
                 if other in path or sources[other] == targets[other]:
@@ -389,59 +502,39 @@ def build_flow_graphs(index: FlowIndex, seed_ids: Iterable[int],
     for seed, (_, _, kind, path) in support.items():
         add_relation("SUPPORTED_" + kind, path)
 
-    parents = {seed: seed for seed in seeds}
-    anchors = {seed: {seed} for seed in seeds}
-    cores = {seed: {seed} for seed in seeds}
-    core_bounds = {seed: (times[seed], times[seed]) for seed in seeds}
-    witnesses = {seed: [] for seed in seeds}
-
-    def root(seed):
-        while parents[seed] != seed:
-            parents[seed] = parents[parents[seed]]
-            seed = parents[seed]
-        return seed
-
-    if len(relations) + len(weak_relations) > policy.max_relations:
-        raise GraphBudgetExceeded("RELATIONS")
-    rejected, span_rejected_seeds = list(weak_relations.values()), set()
-    def apply_relation(kind, relation_seeds, path):
-        roots = sorted({root(seed) for seed in relation_seeds}, key=ids.__getitem__)
-        survivor = roots[0]
-        additions = set(path).union(*(cores[value] for value in roots[1:]))
-        earliest = min([times[pos] for pos in path] + [core_bounds[value][0] for value in roots])
-        latest = max([times[pos] for pos in path] + [core_bounds[value][1] for value in roots])
-        if latest - earliest > policy.component_span_us:
-            rejected.append(RejectedRelation(
-                Witness(kind, tuple(ids[pos] for pos in path)), "COMPONENT_SPAN"))
-            span_rejected_seeds.update(relation_seeds)
-            return
-        if len(cores[survivor]) + len(additions - cores[survivor]) > policy.max_core_edges:
-            raise GraphBudgetExceeded("CORE_SIZE")
-        for other in roots[1:]:
-            parents[other] = survivor
-            anchors[survivor].update(anchors.pop(other))
-            witnesses[survivor].extend(witnesses.pop(other))
-            cores.pop(other)
-            core_bounds.pop(other)
-        cores[survivor].update(additions)
-        core_bounds[survivor] = (earliest, latest)
-        witnesses[survivor].append(Witness(kind, tuple(ids[pos] for pos in path)))
-
-    for (kind, _), (_, relation_seeds, path) in sorted(
-            relations.items(), key=lambda item: (item[1][0], item[0])):
-        if kind in ("BRANCH_OUT", "BRANCH_IN", "REPEAT") and len(path) > 2:
-            # A span conflict on one existing root must not veto unrelated valid
-            # members of a large branch. Adjacent links are O(n), never a clique.
-            for left, right in zip(path, path[1:]):
-                apply_relation(kind, (left, right), (left, right))
-        else:
-            apply_relation(kind, relation_seeds, path)
-
+    boundary_by_root = defaultdict(set)
+    canonical_boundaries = {}
+    for (left, right, kind), witness in boundaries.items():
+        left, right = sorted((root(left), root(right)), key=ids.__getitem__)
+        if left == right:
+            continue
+        key = (left, right, kind)
+        previous = canonical_boundaries.get(key)
+        if previous is None or witness.tx_ids < previous.tx_ids:
+            canonical_boundaries[key] = witness
+    for (left, right, _), witness in canonical_boundaries.items():
+        boundary_by_root[left].add(witness)
+        boundary_by_root[right].add(witness)
+    for seed, boundary_items in boundary_by_root.items():
+        if witnesses[seed]:
+            continue
+        witness = min(boundary_items, key=lambda item: (len(item.tx_ids), item.tx_ids, item.kind))
+        path = {edges.position(key) for key in witness.tx_ids}
+        if len(cores[seed] | path) <= policy.max_core_edges:
+            cores[seed].update(path)
+            witnesses[seed].append(Witness("BOUNDARY_" + witness.kind, witness.tx_ids))
+    rejected.extend(weak_relations.values())
     output, covered = [], set()
     for seed in ordered_seeds:
         if root(seed) != seed or not witnesses[seed]:
             continue
-        graph_seeds, core = anchors[seed], cores[seed]
+        # A historical ownership reservation is not newly observed evidence.
+        # Held/missing paths can leave some reserved seeds without a witness;
+        # keep those in the old case via lifecycle preservation, not this graph.
+        core = {edges.position(key) for witness in witnesses[seed] for key in witness.tx_ids}
+        graph_seeds = anchors[seed] & core
+        if not graph_seeds:
+            continue
         context, limits, context_queues = set(), set(), []
         for member_seed in sorted(graph_seeds, key=ids.__getitem__):
             limits.update(seed_limits[member_seed])
@@ -471,7 +564,8 @@ def build_flow_graphs(index: FlowIndex, seed_ids: Iterable[int],
             tuple(sorted(ids[pos] for pos in core - graph_seeds)),
             tuple(sorted(ids[pos] for pos in context)),
             tuple(sorted(set(witnesses[seed]), key=lambda witness: (witness.kind, witness.tx_ids))),
-            tuple(sorted(limits))))
+            tuple(sorted(limits)),
+            tuple(sorted(boundary_by_root[seed], key=lambda w: (w.kind, w.tx_ids)))))
         covered.update(graph_seeds)
     unassigned = []
     for seed in sorted(seeds - covered, key=ids.__getitem__):

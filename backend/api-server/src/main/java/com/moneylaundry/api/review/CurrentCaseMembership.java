@@ -22,8 +22,11 @@ final class CurrentCaseMembership {
 
     String sql =
         """
-        with selected(tx_id) as (select unnest(?::bigint[])), latest as (
+        with selected(tx_id) as (select unnest(?::bigint[])), candidates as materialized (
+          select distinct t.alert_id from selected s join review.alert_transactions t using(tx_id)
+        ), latest as (
           select a.alert_id,v.version from review.alerts a join review.latest_versions v using(alert_id)
+          join candidates c using(alert_id)
           where a.published_version is not null and a.merged_into_alert_id is null
         ), members as (
           select 'ALERT' as kind,a.alert_id,a.alert_id as case_id,m.tx_id

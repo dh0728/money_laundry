@@ -40,6 +40,18 @@ public class LedgerQueryService {
     left join lateral (select s.type_class::bigint as type_class) w on true
     """;
 
+  private static final String PAGE_SCORE =
+      """
+      left join lateral (
+        select i.*,j.job_id,j.threshold_value,j.business_at as detected_at
+        from analysis.current_scores c join analysis.scores i using(run_id,tx_id)
+        join analysis.runs ar on ar.run_id=i.run_id
+        join analysis.jobs j on j.job_id=ar.job_id and j.current_run_id=ar.run_id
+        where c.tx_id=t.tx_id and ar.status='COMPLETED' and j.status='COMPLETED'
+        limit 1
+      ) s on true
+      """;
+
   public static final String BASE =
       ACCOUNTS + SCORE + TYPE + " where t.integration_status='ACTIVE'";
 
@@ -201,25 +213,34 @@ public class LedgerQueryService {
           select
               + ACCOUNTS
               + " join page p on p.\"txId\"=t.tx_id "
-              + SCORE
+              + PAGE_SCORE
               + TYPE
               + " order by t.occurred_at desc,t.tx_id";
     } else throw AnalysisService.invalid();
-    long count =
-        jdbc.queryForObject("select count(*) from (" + dataset + ") q", Long.class, args.toArray());
+    Object[] countArgs = args.toArray();
     args.add(filter.size());
     args.add((long) filter.page() * filter.size());
+    boolean transactions = "transactions".equals(kind);
+    // Owner/account candidates require a full distinct projection. Count that
+    // projection in the same query instead of constructing it twice per page.
     var rows =
         jdbc.queryForList(
             "with page as materialized ("
-                + dataset
-                + ("transactions".equals(kind)
-                    ? " order by \"occurredAt\" desc,\"txId\""
-                    : " order by id")
+                + (transactions
+                    ? dataset
+                    : "select q.*,count(*) over() as _total from (" + dataset + ") q")
+                + (transactions ? " order by \"occurredAt\" desc,\"txId\"" : " order by id")
                 + " limit ? offset ?) "
-                + pageSelect,
+                + (transactions
+                    ? pageSelect
+                    : pageSelect.replaceFirst("select ", "select p._total,")),
             args.toArray());
+    long count =
+        transactions || rows.isEmpty()
+            ? jdbc.queryForObject("select count(*) from (" + dataset + ") q", Long.class, countArgs)
+            : ((Number) rows.getFirst().get("_total")).longValue();
     for (var row : rows) {
+      row.remove("_total");
       Object probs = row.remove("probabilities");
       if (probs instanceof java.sql.Array arr)
         try {

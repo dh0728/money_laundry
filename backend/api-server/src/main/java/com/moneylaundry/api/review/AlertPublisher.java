@@ -29,6 +29,7 @@ public final class AlertPublisher {
   }
 
   public void publish(UUID run, UUID execution, String artifact) {
+    long publicationStarted = System.nanoTime();
     if (!TransactionSynchronizationManager.isActualTransactionActive())
       throw new IllegalStateException("ALERT_PUBLICATION_REQUIRES_TRANSACTION");
     if (!jdbc.queryForObject(
@@ -47,28 +48,29 @@ public final class AlertPublisher {
     var manifest = object(artifact);
     if (!"PREPARED".equals(manifest.get("publication")))
       throw new IllegalStateException("ALERT_PLAN_MANIFEST_REQUIRED");
-    var plans =
-        jdbc.queryForList(
-            "select * from analysis.alert_plans where run_id=? order by plan_key", run);
-    if (plans.size() != number(manifest.get("planCount")))
-      throw new IllegalStateException("ALERT_PLAN_COUNT_MISMATCH");
     StringBuilder digest = new StringBuilder();
     Set<Long> affected = new HashSet<>();
-    for (var stored : plans) {
-      String payload = stored.get("payload").toString();
-      String checksum = hash(payload);
-      if (!execution.equals(stored.get("execution_id"))
-          || number(stored.get("build_generation")) != number(manifest.get("buildGeneration"))
-          || !checksum.equals(stored.get("plan_digest").toString().strip()))
-        throw new IllegalStateException("ALERT_PLAN_FENCED");
-      digest.append(stored.get("plan_key")).append(':').append(checksum).append('\n');
-      var plan = object(payload);
-      if (!stored.get("action").equals(plan.get("action")))
-        throw new IllegalStateException("ALERT_PLAN_ACTION_MISMATCH");
-      for (long id : ids(plan.get("caseIds")))
-        if (!affected.add(id)) throw new IllegalStateException("DUPLICATE_ALERT_OPERATION");
-      validate(plan);
-    }
+    int[] count = {0};
+    forEachPlan(
+        run,
+        stored -> {
+          count[0]++;
+          String payload = stored.get("payload").toString();
+          String checksum = hash(payload);
+          if (!execution.equals(stored.get("execution_id"))
+              || number(stored.get("build_generation")) != number(manifest.get("buildGeneration"))
+              || !checksum.equals(stored.get("plan_digest").toString().strip()))
+            throw new IllegalStateException("ALERT_PLAN_FENCED");
+          digest.append(stored.get("plan_key")).append(':').append(checksum).append('\n');
+          var plan = object(payload);
+          if (!stored.get("action").equals(plan.get("action")))
+            throw new IllegalStateException("ALERT_PLAN_ACTION_MISMATCH");
+          for (long id : ids(plan.get("caseIds")))
+            if (!affected.add(id)) throw new IllegalStateException("DUPLICATE_ALERT_OPERATION");
+          validate(plan);
+        });
+    if (count[0] != number(manifest.get("planCount")))
+      throw new IllegalStateException("ALERT_PLAN_COUNT_MISMATCH");
     if (!hash(digest.toString()).equals(manifest.get("planDigest")))
       throw new IllegalStateException("ALERT_PLAN_DIGEST_MISMATCH");
     Timestamp businessAt =
@@ -76,16 +78,39 @@ public final class AlertPublisher {
             "select b.business_at from analysis.runs r join analysis.jobs b using(job_id) where r.run_id=?",
             Timestamp.class,
             run);
-    int created = 0;
-    for (var stored : plans) created += apply(run, object(stored.get("payload")), businessAt);
-    jdbc.update("update analysis.jobs set alert_count=? where current_run_id=?", created, run);
+    int[] created = {0};
+    forEachPlan(run, stored -> created[0] += apply(run, object(stored.get("payload")), businessAt));
+    jdbc.update("update analysis.jobs set alert_count=? where current_run_id=?", created[0], run);
     manifest.put("publication", "PUBLISHED");
-    manifest.put("createdAlertCount", created);
+    manifest.put("createdAlertCount", created[0]);
+    var timings =
+        manifest.get("timingsMs") == null
+            ? new LinkedHashMap<String, Object>()
+            : object(manifest.get("timingsMs"));
+    timings.put("publication", (System.nanoTime() - publicationStarted) / 1_000_000.0);
+    manifest.put("timingsMs", timings);
     jdbc.update(
         "update analysis.stage_results set artifact=? where run_id=? and stage='ALERTS'",
         encode(manifest),
         run);
     jdbc.update("delete from analysis.alert_plans where run_id=?", run);
+  }
+
+  private void forEachPlan(UUID run, java.util.function.Consumer<Map<String, Object>> consumer) {
+    // Both passes run inside the same fenced transaction. Validate every operation
+    // before applying any, without retaining every evidence JSON in the JVM heap.
+    var mapper = new org.springframework.jdbc.core.ColumnMapRowMapper();
+    jdbc.query(
+        connection -> {
+          var statement =
+              connection.prepareStatement(
+                  "select * from analysis.alert_plans where run_id=? order by plan_key");
+          statement.setObject(1, run);
+          statement.setFetchSize(8);
+          return statement;
+        },
+        (org.springframework.jdbc.core.RowCallbackHandler)
+            result -> consumer.accept(mapper.mapRow(result, 0)));
   }
 
   private void validateFrozenInput(UUID run) {
@@ -634,14 +659,19 @@ public final class AlertPublisher {
           "update review.alert_groups set evidence_version=?,revision=revision+1 where group_id=?",
           version,
           group);
-      for (var member : rows(evidence.get("transactions")))
-        jdbc.update(
-            "insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state) values(?,?,?,?,?,'PENDING') on conflict(group_id,tx_id) do update set evidence_version=case when review.alert_members.state='PENDING' then excluded.evidence_version else review.alert_members.evidence_version end",
-            group,
-            target,
-            member.get("txId"),
-            version,
-            "CONTEXT".equals(member.get("role")) ? "CONTEXT" : "SUBJECT");
+      jdbc.update(
+          """
+          insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state)
+          select ?,t.alert_id,t.tx_id,t.version,
+            case when t.role='CONTEXT' then 'CONTEXT' else 'SUBJECT' end,'PENDING'
+          from review.alert_transactions t where t.alert_id=? and t.version=?
+          on conflict(group_id,tx_id) do update set evidence_version=
+            case when review.alert_members.state='PENDING' then excluded.evidence_version
+                 else review.alert_members.evidence_version end
+          """,
+          group,
+          target,
+          version);
       // Historical membership/decisions remain untouched. effective_members intersects
       // saved scope with the published version, independently of employee judgments.
     }

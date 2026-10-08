@@ -229,6 +229,18 @@ def metric(groups, data, seeds, selected_patterns=None):
 
 
 def choose_seeds(data, scenario, random_seed=20261007):
+    if scenario == "demo":
+        # Actual dev demo calculation and default threshold; evaluation IDs are
+        # not database IDs, so this reproduces density, not an exact dev run.
+        from demo_calculator import build_targets, calculate, MODEL_VERSION, FEATURE_VERSION
+        selected = set()
+        for start in range(0, len(data.edges), 10_000):
+            scores = calculate(build_targets(data.edges.tx_ids[start:start + 10_000]),
+                               'binary', model_version=MODEL_VERSION,
+                               feature_version=FEATURE_VERSION)
+            selected.update(key for key, value in zip(scores['tx_id'].to_pylist(),
+                            scores['p_laundering'].to_pylist()) if value >= 0.7)
+        return selected
     positives = data.positives
     if scenario == "oracle":
         return set(positives)
@@ -278,7 +290,7 @@ def main():
     parser.add_argument("--cutoff", help="Exclusive YYYY-MM-DD KST; fixed before reading rows")
     parser.add_argument("--split-at", help="YYYY-MM-DD KST holdout boundary; crossing blocks reported")
     parser.add_argument("--scenarios", nargs="+",
-                        choices=("oracle", "half", "one", "fp", "cluster_fn", "hub_fp"),
+                        choices=("oracle", "half", "one", "fp", "cluster_fn", "hub_fp", "demo"),
                         default=["oracle", "half", "one", "fp"])
     parser.add_argument("--hops", type=int, default=2)
     parser.add_argument("--context", type=int, default=100)
@@ -289,9 +301,14 @@ def main():
     policy.validate()
     source_hashes = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
                      for name in ("flow_graph.py", "evaluate_flow_graph.py")}
+    if 'demo' in args.scenarios:
+        source_hashes['demo_calculator.py'] = hashlib.sha256(
+            Path(__file__).with_name('demo_calculator.py').read_bytes()).hexdigest()
     print(json.dumps({"stage": "configuration", "policy": asdict(policy),
                       "source_sha256": source_hashes, "cutoff": args.cutoff,
                       "split_at": args.split_at, "scenarios": args.scenarios,
+                      "demo_seed_contract": {"model": "demo-random-v1", "threshold": 0.7,
+                          "identity": "evaluation_ids_not_dev_database_ids"} if 'demo' in args.scenarios else None,
                       "patterns_sha256": hashlib.sha256(args.patterns.read_bytes()).hexdigest()}),
           flush=True)
     cutoff = (int(datetime.fromisoformat(args.cutoff).replace(tzinfo=KST).timestamp()) * 1_000_000

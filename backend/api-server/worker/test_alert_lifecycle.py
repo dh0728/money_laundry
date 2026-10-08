@@ -29,6 +29,24 @@ def case(key, ev, *, owner=7, status='OPEN', started=False, age=0, **changes):
 
 
 class LifecycleTests(unittest.TestCase):
+    def test_boundary_connection_does_not_merge_partitioned_alerts_on_replay(self):
+        edges = EdgeTable()
+        for key in range(1, 19):
+            edges.append(key, key * 1000, key, key + 1)
+        policy = replace(FlowPolicy(), max_core_edges=5)
+        first = build_flow_graphs(FlowIndex(edges), range(1, 19), policy)
+        cases = [case(i + 1, Evidence.from_graph(g, hashlib.sha256(str(i).encode()).hexdigest()))
+                 for i, g in enumerate(first.graphs)]
+        groups = [(g.seed_ids, g.seed_ids + g.connection_ids,
+                   g.seed_ids + g.connection_ids + g.context_ids) for g in first.graphs]
+        second = build_flow_graphs(FlowIndex(edges), range(1, 19), policy, seed_groups=groups)
+        graphs = [Evidence.from_graph(g, hashlib.sha256(str(i).encode()).hexdigest())
+                  for i, g in enumerate(second.graphs)]
+        plans = self.plans(cases, graphs)
+        self.assertEqual(len(plans), len(cases))
+        self.assertTrue(all(len(p.case_ids) == 1 for p in plans))
+        self.assertFalse(any(p.action == Action.MERGE for p in plans))
+
     def plans(self, cases, graphs, **options):
         return build_case_plans(cases, graphs, **options).plans
 

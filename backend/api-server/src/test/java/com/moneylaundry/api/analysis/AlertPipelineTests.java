@@ -540,6 +540,111 @@ class AlertPipelineTests {
   }
 
   @Test
+  void money_read_does_not_wait_for_an_unrelated_receipt_transaction() throws Exception {
+    long alert = firstAlert();
+    try (var connection = jdbc.getDataSource().getConnection()) {
+      connection.setAutoCommit(false);
+      try (var statement = connection.prepareStatement("select pg_advisory_xact_lock(?)")) {
+        statement.setLong(1, AnalysisService.RECEIPT_LOCK);
+        statement.execute();
+      }
+      try (var pool = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+        var read = pool.submit(() -> reviews().money(alert, 180));
+        try {
+          assertThat(read.get(3, java.util.concurrent.TimeUnit.SECONDS)).containsKey("available");
+        } finally {
+          connection.rollback();
+        }
+      }
+    }
+  }
+
+  @Test
+  void oversized_flow_publishes_related_partitions_and_replay_preserves_ownership() {
+    jdbc.update(
+        """
+        with added as (
+          insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,
+            receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date)
+          select t.occurred_at,t.from_account_id,t.to_account_id,1,'USD',1,'USD','ACH',1,'test',t.business_date
+          from ledger.transactions t cross join generate_series(1,4097) n where t.tx_id=? returning tx_id
+        ) insert into analysis.input_transactions
+        select (jsonb_populate_record(null::analysis.input_transactions,
+          to_jsonb(i)||jsonb_build_object('tx_id',a.tx_id))).*
+        from added a cross join analysis.input_transactions i where i.run_id=? and i.tx_id=?
+        """,
+        target,
+        run,
+        target);
+    jdbc.update(
+        """
+        insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status)
+        select br.version_id,i.tx_id+1000,'partition-'||i.tx_id,'cipher','test','ACTIVE'
+        from analysis.input_transactions i cross join ledger.transaction_reports tr
+        join private.bank_reports br using(report_id)
+        where i.run_id=? and i.input_role='TARGET' and i.tx_id<>? and tr.tx_id=?
+        """,
+        run,
+        target,
+        target);
+    jdbc.update(
+        """
+        insert into ledger.transaction_reports
+        select source_row-1000,report_id,'INTERNAL' from private.bank_reports where match_key like 'partition-%'
+        """);
+    jdbc.update(
+        """
+        insert into analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id)
+        select 0,tx_id,.9,1,0,0,0,0,0,0,0,0,run_id from analysis.input_transactions
+        where run_id=? and input_role='TARGET' and tx_id<>?
+        """,
+        run,
+        target);
+    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+      runner.scan();
+      assertThat(service.job(job).status()).isEqualTo("COMPLETED");
+    }
+    var ids = jdbc.queryForList("select alert_id from review.alerts order by alert_id", Long.class);
+    assertThat(ids).hasSizeGreaterThan(1);
+    var ownership =
+        jdbc.queryForList(
+            """
+        select t.tx_id,t.alert_id from review.alert_transactions t join review.alerts a using(alert_id)
+        where t.version=a.published_version and t.role='SEED' order by t.tx_id
+        """);
+    assertThat(ownership).hasSize(4098);
+    for (long id : ids) {
+      var related = (List<Map<String, Object>>) alerts.detail(id, null).get("relatedFlows");
+      assertThat(related).isNotEmpty();
+      assertThat(
+              related.stream().flatMap(r -> ((List<?>) r.get("relatedAlertIds")).stream()).toList())
+          .isNotEmpty();
+    }
+    var repeated = nextPreparedContext();
+    publish(repeated, executor("worker/analysis_entry.py").prepare(repeated).artifact());
+    assertThat(jdbc.queryForObject("select count(*) from review.alert_versions", Integer.class))
+        .isEqualTo(ids.size());
+    assertThat(
+            jdbc.queryForList("select alert_id from review.alerts order by alert_id", Long.class))
+        .isEqualTo(ids);
+    assertThat(
+            jdbc.queryForList(
+                """
+        select t.tx_id,t.alert_id from review.alert_transactions t join review.alerts a using(alert_id)
+        where t.version=a.published_version and t.role='SEED' order by t.tx_id
+        """))
+        .isEqualTo(ownership);
+    assertThat(
+            jdbc.queryForObject(
+                """
+        select max(n) from (select count(*) n from review.alert_transactions t join review.alerts a using(alert_id)
+        where t.version=a.published_version and t.role<>'CONTEXT' group by t.alert_id) counts
+        """,
+                Integer.class))
+        .isLessThanOrEqualTo(4096);
+  }
+
+  @Test
   void final_failure_rolls_back_cases_assignments_events_and_preserves_prepared_plan() {
     UUID token = UUID.randomUUID();
     jdbc.update(

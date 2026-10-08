@@ -87,19 +87,7 @@ public class DashboardService {
             at(today.plusDays(1)));
     if (deliveryDates.isEmpty()) deliveryDates = List.of(java.sql.Date.valueOf(today.minusDays(1)));
     String placeholders = String.join(",", Collections.nCopies(deliveryDates.size(), "?"));
-    var detectionArgs =
-        new ArrayList<Object>(
-            List.of(at(today), at(today.plusDays(1)), at(today), at(today.plusDays(1))));
-    detectionArgs.addAll(deliveryDates);
-    out.put(
-        "detection",
-        jdbc.queryForMap(
-            "select count(*) as received,count(*) filter(where s.detected_at>=? and s.detected_at<?) as analyzed,count(*) filter(where s.detected_at>=? and s.detected_at<? and s.p_laundering>=s.threshold_value) as suspicious "
-                + SCORE_BASE
-                + " and t.business_date in ("
-                + placeholders
-                + ")",
-            detectionArgs.toArray()));
+    out.putAll(scoreWidgets(from, to, today, deliveryDates));
     out.put(
         "deliveryDate", String.join(", ", deliveryDates.stream().map(Object::toString).toList()));
     out.put(
@@ -112,7 +100,6 @@ public class DashboardService {
             deliveryDates.toArray()));
     out.put("daily", daily(from, to));
     out.put("dailyAlertStatus", dailyAlertStatus(from, to));
-    out.putAll(modelDistribution(from, to));
     out.put(
         "activities",
         jdbc.queryForList(
@@ -166,6 +153,51 @@ public class DashboardService {
                 + " and s.detected_at>=? and s.detected_at<? group by 1,2",
             at(from),
             at(to.plusDays(1)));
+    return distribution(counts);
+  }
+
+  Map<String, Object> scoreWidgets(
+      LocalDate from, LocalDate to, LocalDate today, List<java.sql.Date> deliveryDates) {
+    var args =
+        new ArrayList<Object>(
+            List.of(at(today), at(today.plusDays(1)), at(from), at(to.plusDays(1))));
+    args.addAll(deliveryDates);
+    args.addAll(List.of(at(from), at(to.plusDays(1))));
+    // Reception and model widgets share the current score join. Aggregate once
+    // while preserving their different business-date / detection-date filters.
+    var counts =
+        jdbc.queryForList(
+            """
+        select t.business_date,s.detected_at>=? and s.detected_at<? as analyzed_today,
+          s.detected_at>=? and s.detected_at<? as in_period,
+          s.p_laundering>=s.threshold_value as suspicious,w.type_class,count(*) as count
+        """
+                + SCORE_BASE
+                + " and (t.business_date in ("
+                + String.join(",", Collections.nCopies(deliveryDates.size(), "?"))
+                + ") or (s.detected_at>=? and s.detected_at<?)) group by 1,2,3,4,5",
+            args.toArray());
+    var selectedDays = new HashSet<>(deliveryDates);
+    long received = 0, analyzed = 0, suspicious = 0;
+    var period = new ArrayList<Map<String, Object>>();
+    for (var row : counts) {
+      long count = ((Number) row.get("count")).longValue();
+      if (selectedDays.contains(row.get("business_date"))) {
+        received += count;
+        if (Boolean.TRUE.equals(row.get("analyzed_today"))) {
+          analyzed += count;
+          if (Boolean.TRUE.equals(row.get("suspicious"))) suspicious += count;
+        }
+      }
+      if (Boolean.TRUE.equals(row.get("in_period"))) period.add(row);
+    }
+    var result = new LinkedHashMap<>(distribution(period));
+    result.put(
+        "detection", Map.of("received", received, "analyzed", analyzed, "suspicious", suspicious));
+    return result;
+  }
+
+  private Map<String, Object> distribution(List<Map<String, Object>> counts) {
     var agreements = new TreeMap<String, Long>();
     var types = new TreeMap<Long, Long>();
     for (var row : counts) {

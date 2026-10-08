@@ -431,4 +431,19 @@ public class AnalysisRunService {
               run);
         });
   }
+
+  /**
+   * Collect planner statistics after bulk publication, including small run/job tables that may
+   * never reach autovacuum's default analyze threshold in a demo.
+   */
+  public void refreshQueryStatistics() {
+    jdbc.execute(
+        """
+        analyze core.owners, core.accounts, ledger.transactions,
+          analysis.jobs, analysis.runs, analysis.scores, analysis.current_scores,
+          review.alerts, review.alert_versions, review.alert_transactions,
+          review.alert_groups, review.alert_members,
+          review.episodes, review.episode_alerts, review.episode_members
+        """);
+  }
 }

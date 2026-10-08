@@ -343,6 +343,7 @@ public class AnalysisRunner implements AutoCloseable {
                     "update analysis.jobs set status='COMPLETED',current_stage='COMPLETE',completion_reason='EMPTY_INPUT',row_count=0,suspicious_tx_count=0,alert_count=0,finished_at=?,execution_id=null,execution_owner=null where job_id=?",
                     Timestamp.from(service.clock.instant()),
                     item.job.id());
+                runs.refreshQueryStatistics();
                 return;
               }
             } else executor.commit(item.context, item.result);
@@ -367,6 +368,7 @@ public class AnalysisRunner implements AutoCloseable {
                 item.job.stage().next().name(),
                 complete ? Timestamp.from(service.clock.instant()) : null,
                 item.job.id());
+            if (complete) runs.refreshQueryStatistics();
           });
       pending.remove(item.job.id());
     } catch (DataAccessException failure) {
