@@ -331,20 +331,31 @@ CREATE TABLE analysis.current_scores (
 CREATE TABLE review.alerts (
  alert_id BIGINT PRIMARY KEY DEFAULT nextval('review.case_id'),
  assignee_id BIGINT NOT NULL REFERENCES core.users,
- parent_alert_id BIGINT REFERENCES review.alerts,
+ published_version INTEGER,
+ review_started_at TIMESTAMPTZ, review_started_by BIGINT REFERENCES core.users,
+ merged_into_alert_id BIGINT REFERENCES review.alerts,
+ CHECK(merged_into_alert_id IS DISTINCT FROM alert_id),
+ CHECK((review_started_at IS NULL)=(review_started_by IS NULL)),
  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CLOSED')),
  outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','TRANSFERRED','SCOPE_CLEARED','MIXED')),
+ summary JSONB NOT NULL DEFAULT '{}', summary_revision BIGINT NOT NULL DEFAULT 0,
+ summary_scope_digest CHAR(64),
+ risk_score DOUBLE PRECISION GENERATED ALWAYS AS (coalesce((summary->>'riskScore')::double precision,0)) STORED,
  revision BIGINT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL,
  assigned_at TIMESTAMPTZ NOT NULL, closed_at TIMESTAMPTZ, closed_by BIGINT REFERENCES core.users,
  CHECK((status='CLOSED')=(closed_at IS NOT NULL)),
  CHECK((status='CLOSED')=(outcome IS NOT NULL))
 );
-CREATE INDEX alerts_queue ON review.alerts(status,assignee_id,created_at);
+CREATE INDEX alerts_queue ON review.alerts(status,assignee_id,created_at) WHERE merged_into_alert_id IS NULL;
+CREATE INDEX alerts_risk ON review.alerts(status,risk_score DESC,alert_id DESC) WHERE merged_into_alert_id IS NULL;
 CREATE TABLE review.episodes (
  episode_id BIGINT PRIMARY KEY DEFAULT nextval('review.case_id'),
  assignee_id BIGINT NOT NULL REFERENCES core.users,
  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CLOSED')),
  outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','SCOPE_CLEARED','DISSOLVED')),
+ summary JSONB NOT NULL DEFAULT '{}', summary_revision BIGINT NOT NULL DEFAULT 0,
+ summary_scope_digest CHAR(64),
+ risk_score DOUBLE PRECISION GENERATED ALWAYS AS (coalesce((summary->>'riskScore')::double precision,0)) STORED,
  revision BIGINT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL,
  assigned_at TIMESTAMPTZ NOT NULL, closed_at TIMESTAMPTZ, closed_by BIGINT REFERENCES core.users,
  CHECK((status='CLOSED')=(closed_at IS NOT NULL)), CHECK((status='CLOSED')=(outcome IS NOT NULL))
@@ -353,8 +364,22 @@ CREATE INDEX episodes_queue ON review.episodes(status,assignee_id,created_at);
 CREATE TABLE review.alert_versions (
  alert_id BIGINT NOT NULL REFERENCES review.alerts, version INTEGER NOT NULL CHECK(version>0),
  run_id UUID NOT NULL REFERENCES analysis.runs, fingerprint CHAR(64) NOT NULL,
- evidence JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ evidence JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), published_at TIMESTAMPTZ,
  PRIMARY KEY(alert_id,version), UNIQUE(alert_id,run_id)
+);
+ALTER TABLE review.alerts ADD CONSTRAINT alerts_published_version
+ FOREIGN KEY(alert_id,published_version) REFERENCES review.alert_versions DEFERRABLE INITIALLY DEFERRED;
+CREATE TABLE analysis.alert_plans (
+ run_id UUID NOT NULL REFERENCES analysis.runs, plan_key INTEGER NOT NULL,
+ execution_id UUID NOT NULL, build_generation INTEGER NOT NULL CHECK(build_generation>0),
+ plan_digest CHAR(64) NOT NULL, action TEXT NOT NULL
+ CHECK(action IN ('NEW','UPDATE','MERGE','PROPOSE','FOLLOWUP','WITHDRAW','NOOP')),
+ payload TEXT NOT NULL, PRIMARY KEY(run_id,plan_key)
+);
+CREATE TABLE analysis.alert_fact_checks (
+ run_id UUID NOT NULL REFERENCES analysis.runs, tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
+ integration_status TEXT NOT NULL CHECK(integration_status IN ('ACTIVE','HELD','SUPERSEDED')),
+ PRIMARY KEY(run_id,tx_id)
 );
 CREATE TABLE review.alert_transactions (
  alert_id BIGINT NOT NULL, version INTEGER NOT NULL, tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
@@ -446,6 +471,42 @@ CREATE TABLE review.events (
 );
 CREATE INDEX events_alert ON review.events(alert_id,event_id DESC);
 CREATE INDEX events_episode ON review.events(episode_id,event_id DESC);
+CREATE TABLE review.alert_lineage (
+ source_alert_id BIGINT NOT NULL REFERENCES review.alerts,
+ target_alert_id BIGINT NOT NULL REFERENCES review.alerts,
+ kind TEXT NOT NULL CHECK(kind IN ('MERGED_INTO','FOLLOWUP_OF')),
+ event_id BIGINT NOT NULL REFERENCES review.events,
+ PRIMARY KEY(source_alert_id,target_alert_id,kind), CHECK(source_alert_id<>target_alert_id)
+);
+CREATE UNIQUE INDEX alert_single_merge ON review.alert_lineage(source_alert_id) WHERE kind='MERGED_INTO';
+CREATE INDEX alert_lineage_target ON review.alert_lineage(target_alert_id,kind,source_alert_id);
+CREATE TABLE review.alert_change_proposals (
+ proposal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ target_alert_id BIGINT NOT NULL REFERENCES review.alerts, proposed_version INTEGER NOT NULL,
+ evidence_digest CHAR(64) NOT NULL, status TEXT NOT NULL
+ CHECK(status IN ('OPEN','ACCEPTED','REJECTED','SUPERSEDED')),
+ source_run_id UUID NOT NULL REFERENCES analysis.runs,
+ revision BIGINT NOT NULL DEFAULT 0, generation INTEGER NOT NULL DEFAULT 1,
+ action TEXT NOT NULL CHECK(action IN ('UPDATE','MERGE','WITHDRAW')),
+ payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL, resolved_at TIMESTAMPTZ,
+ UNIQUE(target_alert_id,evidence_digest),
+ FOREIGN KEY(target_alert_id,proposed_version) REFERENCES review.alert_versions
+);
+CREATE TABLE review.alert_proposal_cases (
+ proposal_id BIGINT NOT NULL REFERENCES review.alert_change_proposals,
+ alert_id BIGINT NOT NULL REFERENCES review.alerts,
+ expected_revision BIGINT NOT NULL, expected_published_version INTEGER NOT NULL,
+ assignee_id BIGINT NOT NULL REFERENCES core.users,
+ response TEXT NOT NULL DEFAULT 'PENDING' CHECK(response IN ('PENDING','APPROVED','REJECTED')),
+ response_actor BIGINT REFERENCES core.users, response_at TIMESTAMPTZ,
+ PRIMARY KEY(proposal_id,alert_id)
+);
+CREATE INDEX alert_proposal_case ON review.alert_proposal_cases(alert_id,proposal_id);
+CREATE TABLE review.event_recipients (
+ event_id BIGINT NOT NULL REFERENCES review.events, user_id BIGINT NOT NULL REFERENCES core.users,
+ PRIMARY KEY(event_id,user_id)
+);
+CREATE INDEX event_recipients_user ON review.event_recipients(user_id,event_id DESC);
 CREATE TABLE review.requests (
  actor_id BIGINT NOT NULL REFERENCES core.users, request_id UUID NOT NULL,
  payload JSONB NOT NULL, response JSONB NOT NULL, PRIMARY KEY(actor_id,request_id)
@@ -493,10 +554,10 @@ CREATE VIEW ops.work_items AS
 -- Read projections do not own or duplicate investigation state.
 CREATE VIEW review.cases AS
  SELECT alert_id AS case_id,'ALERT'::text AS kind,alert_id,assignee_id,status,outcome,
- revision,created_at,assigned_at,closed_at,closed_by FROM review.alerts
+ revision,created_at,assigned_at,closed_at,closed_by,published_version,review_started_at,merged_into_alert_id,summary,summary_revision,summary_scope_digest,risk_score FROM review.alerts
  UNION ALL
  SELECT episode_id,'EPISODE',NULL::bigint,assignee_id,status,outcome,
- revision,created_at,assigned_at,closed_at,closed_by FROM review.episodes;
+ revision,created_at,assigned_at,closed_at,closed_by,NULL::integer,NULL::timestamptz,NULL::bigint,summary,summary_revision,summary_scope_digest,risk_score FROM review.episodes;
 CREATE VIEW review.event_history AS
  SELECT e.*,coalesce(alert_id,episode_id) AS case_id FROM review.events e;
 CREATE VIEW review.saved_members AS
@@ -506,39 +567,27 @@ CREATE VIEW review.saved_members AS
  SELECT e.episode_id,m.group_id,m.alert_id,m.tx_id,m.evidence_version,
  m.review_role,m.state,m.decision FROM review.episode_members m JOIN review.episode_alerts e USING(group_id,alert_id);
 CREATE VIEW review.latest_versions AS
- SELECT DISTINCT ON(v.alert_id) v.* FROM review.alert_versions v
- JOIN analysis.runs r USING(run_id) JOIN analysis.jobs b ON b.job_id=r.job_id
- WHERE r.status='COMPLETED' AND b.status='COMPLETED'
- ORDER BY v.alert_id,v.version DESC;
+ SELECT v.* FROM review.alerts a JOIN review.alert_versions v
+ ON v.alert_id=a.alert_id AND v.version=a.published_version
+ JOIN analysis.runs r USING(run_id) JOIN analysis.jobs j USING(job_id)
+ WHERE v.published_at IS NOT NULL AND r.status='COMPLETED' AND j.status='COMPLETED';
 CREATE VIEW review.effective_members AS
  SELECT m.case_id,m.group_id,m.alert_id,m.tx_id,m.evidence_version,m.review_role,m.state,m.decision
  FROM review.saved_members m
+ WHERE EXISTS(SELECT 1 FROM review.episodes e WHERE e.episode_id=m.case_id)
+ OR EXISTS(SELECT 1 FROM review.alerts a JOIN review.alert_transactions t
+   ON t.alert_id=a.alert_id AND t.version=a.published_version
+   WHERE a.alert_id=m.case_id AND t.tx_id=m.tx_id)
  UNION ALL
  SELECT a.alert_id,0::bigint,a.alert_id,t.tx_id,t.version,
  CASE WHEN t.role='CONTEXT' THEN 'CONTEXT' ELSE 'SUBJECT' END,'PENDING',NULL
  FROM review.alerts a JOIN review.latest_versions v USING(alert_id)
  JOIN review.alert_transactions t USING(alert_id,version)
- WHERE (a.status='OPEN' OR NOT EXISTS(SELECT 1 FROM review.alert_groups g WHERE g.alert_id=a.alert_id))
+ WHERE NOT EXISTS(SELECT 1 FROM review.alert_groups g WHERE g.alert_id=a.alert_id)
  AND NOT EXISTS(SELECT 1 FROM review.alert_members m WHERE m.alert_id=a.alert_id AND m.tx_id=t.tx_id);
 CREATE VIEW review.visible_cases AS
- WITH member_risks AS (
-  SELECT m.case_id,t.seed_risk
-  FROM review.saved_members m JOIN review.alert_transactions t
-    ON t.alert_id=m.alert_id AND t.version=m.evidence_version AND t.tx_id=m.tx_id
-  WHERE m.state NOT IN ('EXCLUDED','TRANSFERRED') AND t.role='SEED'
-  UNION ALL
-  SELECT a.alert_id,t.seed_risk
-  FROM review.alerts a JOIN review.latest_versions v USING(alert_id)
-  JOIN review.alert_transactions t USING(alert_id,version)
-  WHERE t.role='SEED'
-    AND (a.status='OPEN' OR NOT EXISTS(SELECT 1 FROM review.alert_groups g WHERE g.alert_id=a.alert_id))
-    AND NOT EXISTS(SELECT 1 FROM review.alert_members m WHERE m.alert_id=a.alert_id AND m.tx_id=t.tx_id)
- ), risks AS MATERIALIZED (
-  SELECT case_id,max(seed_risk) AS risk FROM member_risks GROUP BY case_id
- )
- SELECT c.*,coalesce(r.risk,0) AS risk FROM review.cases c
- LEFT JOIN risks r ON r.case_id=c.case_id
- WHERE c.kind='EPISODE' OR EXISTS(SELECT 1 FROM review.latest_versions v WHERE v.alert_id=c.alert_id);
+ SELECT c.*,c.risk_score AS risk FROM review.cases c
+ WHERE c.kind='EPISODE' OR (c.merged_into_alert_id IS NULL AND c.published_version IS NOT NULL);
 
 CREATE VIEW review.notifications AS
  SELECT c.assignee_id AS user_id, 'batch:'||r.run_id AS notification_id,
@@ -569,7 +618,15 @@ CREATE VIEW review.notifications AS
  AND (c.kind='EPISODE' OR EXISTS(
    SELECT 1 FROM review.alert_versions v JOIN analysis.runs r USING(run_id)
    JOIN analysis.jobs b ON b.job_id=r.job_id
-   WHERE v.alert_id=c.alert_id AND r.status='COMPLETED' AND b.status='COMPLETED'));
+   WHERE v.alert_id=c.alert_id AND r.status='COMPLETED' AND b.status='COMPLETED'))
+ UNION ALL
+ SELECT recipient.user_id,'event:'||e.event_id,e.action,e.business_at,
+ CASE e.action WHEN 'ADDED_EVIDENCE' THEN 'Alert 근거 추가' WHEN 'MERGED' THEN 'Alert 병합'
+ WHEN 'CHANGE_PROPOSED' THEN 'Alert 변경 제안' WHEN 'FOLLOWUP_CREATED' THEN '후속 Alert 생성'
+ WHEN 'EVIDENCE_WITHDRAWN' THEN 'Alert 근거 소멸' END,
+ e.comment,'A-'||e.alert_id,1,e.alert_id,'ALERT',NULL::uuid
+ FROM review.events e JOIN review.event_recipients recipient USING(event_id)
+ WHERE e.action IN ('ADDED_EVIDENCE','MERGED','CHANGE_PROPOSED','FOLLOWUP_CREATED','EVIDENCE_WITHDRAWN');
 
 -- Fixed demonstration exchange-rate snapshot.
 INSERT INTO core.fx_rates (fx_rate_version, currency, units_per_usd) VALUES

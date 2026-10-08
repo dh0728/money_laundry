@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ReviewService {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
+  private final TransactionTemplate readTx;
   private final BusinessTime time;
   private final AlertQueryService alerts;
 
@@ -24,6 +25,10 @@ public class ReviewService {
       JdbcTemplate jdbc, TransactionTemplate tx, BusinessTime time, AlertQueryService alerts) {
     this.jdbc = jdbc;
     this.tx = tx;
+    this.readTx = new TransactionTemplate(tx.getTransactionManager());
+    this.readTx.setReadOnly(true);
+    this.readTx.setIsolationLevel(
+        org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
     this.time = time;
     this.alerts = alerts;
   }
@@ -68,6 +73,9 @@ public class ReviewService {
   }
 
   private void editable(Map<String, Object> c, long user) {
+    if (c.get("merged_into_alert_id") != null)
+      throw ApiException.invalidTransition(
+          "병합된 Alert입니다. 현재 Alert " + c.get("merged_into_alert_id") + "를 조회하세요.");
     var who = actor(user);
     if (number(c.get("assignee_id")) != user || !"STAFF".equals(who.get("role")))
       throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "담당 직원만 변경할 수 있습니다.");
@@ -85,14 +93,10 @@ public class ReviewService {
             "select b.threshold_value from analysis.runs r join analysis.jobs b on b.job_id=r.job_id where r.run_id=?::uuid",
             Double.class,
             d.get("runId").toString());
+    CaseSummary.annotateSuspicion(d, threshold);
     var members = new ArrayList<Map<String, Object>>();
     for (var t : rows(d.get("transactions"))) {
       var evidence = new LinkedHashMap<>(t);
-      if (evidence.get("scores") != null)
-        evidence.put(
-            "isSuspicious",
-            CaseSummary.score(object(evidence.get("scores")), "p_laundering") >= threshold);
-      else evidence.put("isSuspicious", null);
       var m = new LinkedHashMap<String, Object>();
       m.put("txId", t.get("txId"));
       m.put("reviewRole", "CONTEXT".equals(t.get("role")) ? "CONTEXT" : "SUBJECT");
@@ -147,7 +151,7 @@ public class ReviewService {
       var stored =
           jdbc.queryForList(
               "select tx_id,evidence_version,review_role,state,decision from "
-                  + (episode ? "review.episode_members" : "review.alert_members")
+                  + (episode ? "review.episode_members" : "review.effective_members")
                   + " where group_id=? order by tx_id",
               g.get("groupId"));
       for (var row : stored) {
@@ -170,17 +174,7 @@ public class ReviewService {
       }
       g.put("members", members);
     }
-    if ("ALERT".equals(c.get("kind"))) {
-      var latest = initial(c);
-      if (found.isEmpty()) return latest;
-      if ("OPEN".equals(c.get("status"))) {
-        var seen = new HashSet<Long>();
-        for (var g : found) for (var m : rows(g.get("members"))) seen.add(number(m.get("txId")));
-        for (var m : rows(latest.getFirst().get("members")))
-          if (!seen.contains(number(m.get("txId")))) rows(found.getFirst().get("members")).add(m);
-        found.getFirst().put("evidenceVersion", latest.getFirst().get("evidenceVersion"));
-      }
-    }
+    if ("ALERT".equals(c.get("kind")) && found.isEmpty()) return initial(c);
     return found;
   }
 
@@ -214,6 +208,44 @@ public class ReviewService {
     out.put("status", c.get("status"));
     out.put("outcome", c.get("outcome"));
     out.put("revision", revision(c));
+    out.put("scopeRevision", c.get("revision"));
+    if ("ALERT".equals(c.get("kind"))) {
+      out.put("publishedVersion", c.get("published_version"));
+      out.put("reviewStartedAt", c.get("review_started_at"));
+      out.put(
+          "relatedFlows",
+          alerts.relatedFlows(
+              id,
+              rows(
+                  jdbc.queryForObject(
+                      "select coalesce(evidence->'boundaryWitnesses','[]'::jsonb)::text from review.alert_versions where alert_id=? and version=?",
+                      String.class,
+                      id,
+                      c.get("published_version")))));
+      // Keep employee judgments in storage; a new publication changes only current scope.
+      out.put(
+          "withdrawnMembers",
+          jdbc.queryForList(
+              "select m.tx_id as \"txId\",m.evidence_version as \"evidenceVersion\",m.review_role as \"reviewRole\",m.state,m.decision from review.alert_members m where m.alert_id=? and not exists(select 1 from review.alert_transactions t where t.alert_id=m.alert_id and t.version=? and t.tx_id=m.tx_id) order by m.group_id,m.tx_id",
+              id,
+              c.get("published_version")));
+      out.put(
+          "canonicalAlertId",
+          c.get("merged_into_alert_id") == null ? id : c.get("merged_into_alert_id"));
+      out.put("resolution", c.get("merged_into_alert_id") == null ? c.get("outcome") : "MERGED");
+      out.put(
+          "pendingProposalIds",
+          jdbc.queryForList(
+              "select p.proposal_id from review.alert_proposal_cases pc join review.alert_change_proposals p using(proposal_id) where pc.alert_id=? and p.status='OPEN' order by p.proposal_id",
+              Long.class,
+              id));
+      out.put(
+          "relations",
+          jdbc.queryForList(
+              "select source_alert_id,target_alert_id,kind,event_id from review.alert_lineage where source_alert_id=? or target_alert_id=? order by event_id",
+              id,
+              id));
+    }
     out.put("assigneeId", c.get("assignee_id"));
     out.put("assigneeName", c.get("assignee_name"));
     for (String key : List.of("created_at", "assigned_at", "closed_at"))
@@ -332,21 +364,21 @@ public class ReviewService {
         || (status != null && !Set.of("OPEN", "CLOSED").contains(status)))
       throw AnalysisService.invalid();
     var args = new ArrayList<Object>(List.of(kind));
-    String sql = " where kind=?";
+    String sql = " where c.kind=?";
     if (status != null) {
-      sql += " and status=?";
+      sql += " and c.status=?";
       args.add(status);
     }
     if (assignee != null) {
-      sql += " and assignee_id=?";
+      sql += " and c.assignee_id=?";
       args.add(assignee);
     }
     if (from != null) {
-      sql += " and created_at>=?";
+      sql += " and c.created_at>=?";
       args.add(Timestamp.from(from.atStartOfDay(BusinessTime.KST).toInstant()));
     }
     if (to != null) {
-      sql += " and created_at<?";
+      sql += " and c.created_at<?";
       args.add(Timestamp.from(to.plusDays(1).atStartOfDay(BusinessTime.KST).toInstant()));
     }
     if (from != null && to != null && from.isAfter(to)) throw AnalysisService.invalid();
@@ -360,22 +392,17 @@ public class ReviewService {
           "content", List.of(), "page", page, "size", size, "totalElements", 0L, "totalPages", 0L);
     args.add(size);
     args.add((long) page * size);
-    var ids =
+    var pageRows =
         jdbc.queryForList(
-            "select case_id from "
+            "select c.*,u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id limit 1) as linked_episode_id from "
                 + ReviewCaseSql.WITH_RISK
-                + " c"
+                + " c join core.users u on u.user_id=c.assignee_id"
                 + sql
-                + " order by risk desc,created_at desc,case_id desc limit ? offset ?",
-            Long.class,
+                + " order by risk desc,c.created_at desc,case_id desc limit ? offset ?",
             args.toArray());
     var content = new ArrayList<Map<String, Object>>();
-    for (long id : ids) {
-      var d = detail(id, false);
-      d.remove("groups");
-      d.remove("history");
-      content.add(d);
-    }
+    Instant now = time.now();
+    for (var row : pageRows) content.add(listItem(row, now));
     return Map.of(
         "content",
         content,
@@ -387,6 +414,52 @@ public class ReviewService {
         count,
         "totalPages",
         (count + size - 1) / size);
+  }
+
+  private Map<String, Object> listItem(Map<String, Object> c, Instant now) {
+    var out = new LinkedHashMap<String, Object>();
+    boolean alert = "ALERT".equals(c.get("kind"));
+    for (var field :
+        Map.of(
+                "caseId",
+                "case_id",
+                "alertId",
+                "alert_id",
+                "assigneeId",
+                "assignee_id",
+                "assigneeName",
+                "assignee_name",
+                "episodeId",
+                "linked_episode_id",
+                "scopeRevision",
+                "revision")
+            .entrySet()) out.put(field.getKey(), c.get(field.getValue()));
+    for (String key : List.of("kind", "status", "outcome")) out.put(key, c.get(key));
+    out.put(
+        "revision",
+        number(c.get("revision")) * (alert ? 1000000L : 1L)
+            + (alert ? number(c.get("published_version")) : 0L));
+    if (alert) {
+      out.put("publishedVersion", c.get("published_version"));
+      out.put("reviewStartedAt", c.get("review_started_at"));
+      out.put("canonicalAlertId", c.get("alert_id"));
+      out.put("resolution", c.get("outcome"));
+    }
+    for (var field :
+        Map.of("createdAt", "created_at", "assignedAt", "assigned_at", "closedAt", "closed_at")
+            .entrySet()) {
+      var value = (Timestamp) c.get(field.getValue());
+      out.put(field.getKey(), value == null ? null : value.toInstant().toString());
+    }
+    out.put(
+        "ageDays",
+        Math.max(0, Duration.between(((Timestamp) c.get("created_at")).toInstant(), now).toDays()));
+    var summary = object(c.get("summary"));
+    for (String key : List.of("pendingCount", "sourceAlertIds", "primaryTypes"))
+      out.put(key, summary.remove(key));
+    summary.remove("hasScoredSeed");
+    out.put("summary", summary);
+    return out;
   }
 
   private void updateCase(long id, String assignments, Object... values) {
@@ -402,6 +475,7 @@ public class ReviewService {
             + (episode ? "episode_id" : "alert_id")
             + "=?",
         args.toArray());
+    new CaseSummaryStore(jdbc).refresh(id);
   }
 
   private void save(long id, List<Map<String, Object>> gs) {
@@ -458,6 +532,12 @@ public class ReviewService {
 
   private void event(long id, long user, String action, String comment, Object snapshot) {
     boolean episode = "EPISODE".equals(caseRow(id).get("kind"));
+    if (!episode)
+      jdbc.update(
+          "update review.alerts set review_started_at=coalesce(review_started_at,?),review_started_by=coalesce(review_started_by,?) where alert_id=?",
+          Timestamp.from(time.now()),
+          user,
+          id);
     jdbc.update(
         "insert into review.events("
             + (episode ? "episode_id" : "alert_id")
@@ -481,9 +561,10 @@ public class ReviewService {
   public Map<String, Object> money(long id, int minutes) {
     time.workbenchOnly();
     if (!Set.of(5, 15, 30, 60, 180, 360, 1440).contains(minutes)) throw AnalysisService.invalid();
-    return tx.execute(
+    return readTx.execute(
         s -> {
-          jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
+          // All facts below share one MVCC snapshot. Reading the current money
+          // view must not queue behind an unrelated upload/publication lock.
           var c = caseRow(id);
           if ("CLOSED".equals(c.get("status"))) {
             var fixed =

@@ -98,6 +98,11 @@ class ReviewWorkflowTests {
         version,
         run,
         encode(Map.of("transactions", items, "seeds", List.of())));
+    jdbc.update(
+        "update review.alert_versions set published_at=now() where alert_id=? and version=?",
+        alert,
+        version);
+    jdbc.update("update review.alerts set published_version=? where alert_id=?", version, alert);
     jdbc.update("insert into core.banks(bank_id) values(999998) on conflict do nothing");
     long owner =
         jdbc.queryForObject(
@@ -125,6 +130,7 @@ class ReviewWorkflowTests {
               ? object(item.get("scores")).get("p_laundering")
               : null);
     }
+    new CaseSummaryStore(jdbc).refresh(alert);
   }
 
   @Test
@@ -133,6 +139,10 @@ class ReviewWorkflowTests {
     long b = alert(l1);
     jdbc.update(
         "update review.alert_transactions set seed_risk=.95 where alert_id=? and tx_id=1", a);
+    jdbc.update(
+        "update review.alert_versions set evidence=jsonb_set(evidence,'{transactions,0,scores,p_laundering}','0.95') where alert_id=?",
+        a);
+    new CaseSummaryStore(jdbc).refresh(a);
     assertThat(risk(a)).isEqualTo(.95);
     act(l1, "EXCLUDE", null, select(a, 1));
     assertThat(risk(a)).isEqualTo(.9);
@@ -144,6 +154,7 @@ class ReviewWorkflowTests {
     act(l2, "EXCLUDE", null, select(episode, 2));
     assertThat(risk(episode)).isEqualTo(.9); // The second Alert still contains these seeds.
     jdbc.update("update review.episode_members set state='TRANSFERRED' where alert_id=?", b);
+    new CaseSummaryStore(jdbc).refresh(episode);
     assertThat(risk(episode)).isZero();
   }
 
@@ -537,7 +548,7 @@ class ReviewWorkflowTests {
     long id = alert(l1);
     long alertId = number(service.detail(id).get("alertId"));
     var doc = object(encode(evidence.detail(alertId, null)));
-    doc.put("policyVersion", "calendar-event-v4");
+    doc.put("policyVersion", "flow-evidence-1");
     doc.put("summary", Map.of("scoreMax", .9, "txCount", 3));
     doc.put(
         "seeds",
@@ -1214,7 +1225,23 @@ class ReviewWorkflowTests {
             java.sql.Timestamp.from(clock.now()),
             java.sql.Timestamp.from(clock.now()));
     List<Map<String, Object>> members =
-        Arrays.stream(txIds).mapToObj(n -> Map.<String, Object>of("txId", n)).toList();
+        Arrays.stream(txIds)
+            .mapToObj(
+                n -> {
+                  var member = new LinkedHashMap<String, Object>();
+                  member.put("txId", n);
+                  member.put("role", "SEED");
+                  member.put("occurredAt", "2023-09-01T00:00:00Z");
+                  member.put("fromAccountId", "a");
+                  member.put("toAccountId", "b");
+                  member.put("amountPaid", 100);
+                  member.put("amountReceived", 100);
+                  member.put("paymentCurrency", "USD");
+                  member.put("receivingCurrency", "USD");
+                  member.put("paymentFormat", "ACH");
+                  return (Map<String, Object>) member;
+                })
+            .toList();
     publish(id, 1, members);
     return id;
   }
@@ -1282,8 +1309,8 @@ class ReviewWorkflowTests {
         .isEqualTo(new TreeSet<>(List.of(ep)));
     assertThat((Collection<?>) transactions.get(2).get("alertIds"))
         .isEqualTo(new TreeSet<>(List.of(a)));
-    assertThat((Collection<?>) transactions.get(3).get("alertIds"))
-        .isEqualTo(new TreeSet<>(List.of(a)));
+    // A stored investigation scope never picks up missing members at read time.
+    assertThat((Collection<?>) transactions.get(3).get("alertIds")).isEmpty();
     assertThat((Collection<?>) transactions.get(4).get("episodeIds")).isEmpty();
     jdbc.update(
         "update review.alerts set status='CLOSED',outcome='NORMAL',closed_at=now() where alert_id=?",
@@ -1485,6 +1512,7 @@ class ReviewWorkflowTests {
           run,
           "a".repeat(64),
           encode(doc));
+      new CaseSummaryStore(jdbc).refresh(alertId);
       last = id;
     }
     var filter =

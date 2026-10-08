@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-/** Synthetic first-day cardinalities; distributions and evidence are not the dev data. */
+/** Synthetic TOP10 cardinalities; distributions and evidence are not the dev data. */
 @SpringBootTest(properties = "spring.profiles.active=local")
 @Import(TestcontainersConfiguration.class)
 @EnabledIfEnvironmentVariable(named = "AML_PERFORMANCE_TESTS", matches = "true")
@@ -25,10 +25,11 @@ class QueryPerformanceTests {
   @Autowired LedgerQueryService ledger;
   @Autowired ReviewService review;
   @Autowired DashboardService dashboard;
+  @Autowired com.moneylaundry.api.analysis.AnalysisRunService runs;
   @MockitoBean AnalysisScheduler scheduler;
 
   @Test
-  void measure_first_day_with_dense_evidence() {
+  void measure_top10_with_dense_evidence() {
     for (String table :
         jdbc.queryForList(
             "select schemaname||'.'||relname from pg_stat_user_tables where schemaname in ('analysis','review')",
@@ -39,14 +40,14 @@ class QueryPerformanceTests {
         "truncate core.owners,core.banks,analysis.jobs,review.alerts,review.episodes cascade");
     jdbc.execute("insert into core.banks(bank_id) select generate_series(1,10)");
     jdbc.execute(
-        "insert into core.owners(owner_id,service_owner_id,display_name) overriding system value select n,gen_random_uuid(),'가명#'||n from generate_series(1,37994) n");
+        "insert into core.owners(owner_id,service_owner_id,display_name) overriding system value select n,gen_random_uuid(),'가명#'||n from generate_series(1,50381) n");
     jdbc.execute(
-        "insert into core.accounts(account_id,service_account_id,bank_id,owner_id) overriding system value select n,gen_random_uuid(),1+(n%10),1+((n-1)%37994) from generate_series(1,60000) n");
+        "insert into core.accounts(account_id,service_account_id,bank_id,owner_id) overriding system value select n,gen_random_uuid(),1+(n%10),1+((n-1)%50381) from generate_series(1,76754) n");
     jdbc.execute(
-        "insert into ledger.transactions(tx_id,occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) overriding system value select n,timestamptz '2023-08-31 00:00+09'+((n-1)%864000)*interval '1 second',date '2023-08-31'+((n-1)%10),1+((n-1)%60000),1+(n%60000),100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1' from generate_series(1,115270) n");
+        "insert into ledger.transactions(tx_id,occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) overriding system value select n,timestamptz '2023-08-31 00:00+09'+((n-1)%864000)*interval '1 second',date '2023-08-31'+((n-1)%10),1+((n-1)%76754),1+(n%76754),100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1' from generate_series(1,690519) n");
     long job =
         jdbc.queryForObject(
-            "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-10','2023-09-10 00:00+09','2023-09-10 00:00+09',.7,'COMPLETED','COMPLETE') returning job_id",
+            "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-10','2023-09-10 00:00+09','2023-09-09 09:00+09',.7,'COMPLETED','COMPLETE') returning job_id",
             Long.class);
     UUID run = UUID.randomUUID();
     jdbc.update(
@@ -62,7 +63,7 @@ class QueryPerformanceTests {
     long user =
         jdbc.queryForObject("select user_id from core.users where username='l1a'", Long.class);
     jdbc.update(
-        "insert into review.alerts(alert_id,assignee_id,created_at,assigned_at) select n,?,'2023-09-09 09:00+09'::timestamptz,'2023-09-09 09:00+09'::timestamptz from generate_series(1,12424) n",
+        "insert into review.alerts(alert_id,assignee_id,created_at,assigned_at) select n,?,'2023-09-09 09:00+09'::timestamptz,'2023-09-09 09:00+09'::timestamptz from generate_series(1,40389) n",
         user);
     jdbc.update(
         """
@@ -72,7 +73,7 @@ class QueryPerformanceTests {
        'fromAccountId',f.service_account_id,'toAccountId',r.service_account_id,
        'amountPaid',100,'amountReceived',100,'paymentCurrency','USD','receivingCurrency','USD',
        'paymentFormat','ACH','scores',jsonb_build_object('p_laundering',.9,'p_0',.1,'p_1',.9))),
-       'seeds',jsonb_agg(t.tx_id),'summary',jsonb_build_object('scoreMax',.9))
+       'seeds',jsonb_agg(jsonb_build_object('txId',t.tx_id,'threshold',.7)),'summary',jsonb_build_object('scoreMax',.9))
       from review.alerts a join ledger.transactions t on t.tx_id between a.alert_id*7 and a.alert_id*7+30
       join core.accounts f on f.account_id=t.from_account_id join core.accounts r on r.account_id=t.to_account_id
       group by a.alert_id
@@ -80,6 +81,9 @@ class QueryPerformanceTests {
         run);
     jdbc.execute(
         "insert into review.alert_transactions select a.alert_id,1,t.tx_id,case when t.tx_id<a.alert_id*7+9 then 'SEED' else 'CONTEXT' end,'[]'::jsonb,case when t.tx_id<a.alert_id*7+9 then .9 end from review.alerts a join ledger.transactions t on t.tx_id between a.alert_id*7 and a.alert_id*7+30");
+    jdbc.execute("update review.alert_versions set published_at=now()");
+    jdbc.execute(
+        "update review.alerts set published_version=1,summary=jsonb_build_object('riskScore',.9,'txCount',31,'seedCount',9,'primaryType','Fan-out','primaryTypes',jsonb_build_array('Fan-out'),'pendingCount',9)");
     jdbc.execute("update ops.business_clock set business_at='2023-09-10 09:00+09'");
     for (String table :
         new String[] {
@@ -114,15 +118,15 @@ class QueryPerformanceTests {
     var to = LocalDate.parse("2023-09-09");
     var filter = new LedgerQueryService.Filter(from, to, null, null, null, null, 0, 20);
     for (int i = 1; i <= 3; i++) {
-      measure("owners", i, 37994, () -> ledger.query("owners", filter));
-      measure("transactions", i, 115270, () -> ledger.query("transactions", filter));
-      measure("alerts", i, 12424, () -> review.list("ALERT", null, null, from, to, 0, 20));
+      measure("owners", i, 50381, () -> ledger.query("owners", filter));
+      measure("transactions", i, 690519, () -> ledger.query("transactions", filter));
+      measure("alerts", i, 40389, () -> review.list("ALERT", null, null, from, to, 0, 20));
       measure("episodes", i, 0, () -> review.list("EPISODE", null, null, from, to, 0, 20));
       measure("dashboard", i, -1, () -> dashboard.view(user, from, to));
     }
-    jdbc.execute("analyze");
+    runs.refreshQueryStatistics();
     measure(
-        "alerts_after_analyze", 1, 12424, () -> review.list("ALERT", null, null, from, to, 0, 20));
+        "alerts_after_analyze", 1, 40389, () -> review.list("ALERT", null, null, from, to, 0, 20));
     measure("dashboard_after_analyze", 1, -1, () -> dashboard.view(user, from, to));
   }
 

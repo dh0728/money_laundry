@@ -3,6 +3,10 @@ package com.moneylaundry.api.analysis;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -17,80 +21,51 @@ public class AlertInputSnapshot {
   }
 
   public void freeze(UUID run, Instant cutoff) {
+    freeze(run, cutoff, Set.of());
+  }
+
+  public void freeze(UUID run, Instant cutoff, Set<Long> blockedSets) {
     freezeManifest(run, cutoff);
+    // Freeze the full eligible ledger: root windows and transitive seed links
+    // are evaluated by one flow policy, not a second calendar policy in SQL.
     jdbc.update(
         """
         insert into analysis.alert_origins
-        select ?, a.alert_id,v.version from review.alerts a
-        join lateral (select v.* from review.alert_versions v join analysis.runs r using(run_id)
-          join analysis.jobs b on b.job_id=r.job_id
-          where v.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
-          order by v.version desc limit 1) v on true
-        left join lateral (select c.run_id from review.alert_coverage_checks c
-          join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
-          where c.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
-          order by c.checked_at desc nulls last,b.analysis_cutoff_at desc, b.job_id desc limit 1) c on true
-        where exists (
-          select 1 from (
-            select coalesce(current.business_date,previous.business_date) changed_date
-            from (select business_date,state from analysis.source_manifest where run_id=?) current
-            full join (select business_date,state from analysis.source_manifest
-              where run_id=coalesce(c.run_id,v.run_id)) previous using(business_date)
-            where current.state is distinct from previous.state
-          ) changed
-          where exists (select 1 from jsonb_array_elements(v.evidence->'transactions') member
-            where changed.changed_date between
-              ((member->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date-2
-              and ((member->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date+2))
-          and not exists(select 1 from review.alerts child join review.alert_versions cv on cv.alert_id=child.alert_id
-            join analysis.runs cr on cr.run_id=cv.run_id join analysis.jobs cb on cb.job_id=cr.job_id
-            where child.parent_alert_id=a.alert_id and cr.status='COMPLETED' and cb.status='COMPLETED')
+        select ?,a.alert_id,a.published_version from review.alerts a
+        where a.published_version is not null
+        """,
+        run);
+    jdbc.update(
+        """
+        insert into analysis.alert_fact_checks
+        select distinct ?,t.tx_id,t.integration_status from analysis.alert_origins o
+        join review.alert_transactions m using(alert_id,version)
+        join ledger.transactions t using(tx_id) where o.run_id=?
         """,
         run,
         run);
-    // Calendar radius 2, depth 2: four days reachable plus two days for terminal
-    // neighbor/hub checks. This freezes a bounded superset, not Alert membership.
-    var bounds =
-        jdbc.queryForMap(
-            """
-        select ((min(t) at time zone 'Asia/Seoul')::date-6)::timestamp at time zone 'Asia/Seoul' lo,
-          ((max(t) at time zone 'Asia/Seoul')::date+7)::timestamp at time zone 'Asia/Seoul' hi from (
-          select occurred_at t from analysis.input_transactions where run_id=?
-          union all select (s->>'occurredAt')::timestamptz from analysis.alert_origins o
-          join review.alert_versions v on v.alert_id=o.alert_id and v.version=o.version,
-          jsonb_array_elements(v.evidence->'seeds') s where o.run_id=?) x
-        """,
-            run,
-            run);
-    if (bounds.get("lo") == null) return;
-    Timestamp low = (Timestamp) bounds.get("lo"), high = (Timestamp) bounds.get("hi");
-    // Evaluate seed JSON once; reduce current reports to one eligibility row per transaction.
+    String blocked = "";
+    var inputArgs = new ArrayList<Object>(List.of(Timestamp.from(cutoff), run));
+    if (!blockedSets.isEmpty()) {
+      blocked =
+          "and not exists(select 1 from ledger.transaction_reports blocked_tr join private.bank_reports blocked_br using(report_id) join ingest.report_versions blocked_v using(version_id) where blocked_tr.tx_id=t.tx_id and blocked_v.set_id in ("
+              + String.join(",", Collections.nCopies(blockedSets.size(), "?"))
+              + "))";
+      inputArgs.addAll(blockedSets);
+    }
+    inputArgs.addAll(List.of(Timestamp.from(cutoff), Timestamp.from(cutoff), run));
     jdbc.update(
         """
-        with anchors as materialized (
-          select distinct (occurred_at at time zone 'Asia/Seoul')::date as day
-          from analysis.input_transactions where run_id=? and input_role='TARGET'
-          union select ((seed->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date
-          from analysis.alert_origins o
-          join review.alert_versions v on v.alert_id=o.alert_id and v.version=o.version,
-            jsonb_array_elements(v.evidence->'seeds') seed where o.run_id=?
-        ), candidates as materialized (
+        with eligible as materialized (
           select t.tx_id from ledger.transactions t
-          where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<?
-            and t.occurred_at<=?
-            and exists (
-              select 1 from anchors w
-              where t.occurred_at>=((w.day-6)::timestamp at time zone 'Asia/Seoul')
-                and t.occurred_at<((w.day+7)::timestamp at time zone 'Asia/Seoul'))
-          except
-          select i.tx_id from analysis.input_transactions i where i.run_id=?
-        ), eligible as materialized (
-          select c.tx_id from candidates c
           join ledger.transaction_reports tr using(tx_id)
           join private.bank_reports br using(report_id)
           join ingest.report_sets rs on rs.current_version_id=br.version_id
           join ingest.report_versions rv using(version_id)
-          group by c.tx_id
+          where t.integration_status='ACTIVE' and t.occurred_at<=?
+            and not exists(select 1 from analysis.input_transactions i where i.run_id=? and i.tx_id=t.tx_id)
+            %s
+          group by t.tx_id
           having bool_or(rv.received_at<=?) and not bool_or(rv.received_at>?)
         )
         insert into analysis.input_transactions
@@ -103,16 +78,9 @@ public class AlertInputSnapshot {
         join core.accounts b on b.account_id=t.to_account_id
         join core.owners e on e.owner_id=a.owner_id
         join core.owners f on f.owner_id=b.owner_id
-        """,
-        run,
-        run,
-        low,
-        high,
-        Timestamp.from(cutoff),
-        run,
-        Timestamp.from(cutoff),
-        Timestamp.from(cutoff),
-        run);
+        """
+            .formatted(blocked),
+        inputArgs.toArray());
     jdbc.update(
         """
         insert into analysis.input_reports select ?,tr.tx_id,tr.report_id
@@ -139,18 +107,11 @@ public class AlertInputSnapshot {
     var dates =
         jdbc.queryForList(
             """
-        select distinct d::date from (
-          select distinct (occurred_at at time zone 'Asia/Seoul')::date as anchor_date
-          from analysis.input_transactions where run_id=? and input_role='TARGET'
-          union select ((s->>'occurredAt')::timestamptz at time zone 'Asia/Seoul')::date
-          from analysis.alert_origins o
-          join review.alert_versions v on v.alert_id=o.alert_id and v.version=o.version,
-            jsonb_array_elements(v.evidence->'seeds') s where o.run_id=?) w,
-          lateral generate_series(anchor_date-6,
-            least(anchor_date+6, (?::timestamptz at time zone 'Asia/Seoul')::date),interval '1 day') d order by 1
+        select d::date from generate_series(
+          (select min(business_date)-3 from analysis.input_transactions where run_id=?),
+          (?::timestamptz at time zone 'Asia/Seoul')::date, interval '1 day') d order by 1
         """,
             java.sql.Date.class,
-            run,
             run,
             Timestamp.from(cutoff));
     for (java.sql.Date date : dates) {

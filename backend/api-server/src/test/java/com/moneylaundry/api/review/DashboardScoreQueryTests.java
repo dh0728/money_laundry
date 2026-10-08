@@ -79,6 +79,25 @@ class DashboardScoreQueryTests {
   }
 
   @Test
+  void distinct_identity_count_survives_empty_pages_without_leaking_internal_total() {
+    var ledger = new LedgerQueryService(jdbc);
+    for (String kind : List.of("owners", "accounts")) {
+      var first =
+          ledger.query(
+              kind, new LedgerQueryService.Filter(null, null, null, null, null, null, 0, 1));
+      assertThat(first.get("totalElements")).isEqualTo(1L);
+      var rows = (List<Map<String, Object>>) first.get("content");
+      assertThat(rows).hasSize(1);
+      assertThat(rows.getFirst()).doesNotContainKey("_total");
+      var empty =
+          ledger.query(
+              kind, new LedgerQueryService.Filter(null, null, null, null, null, null, 1, 1));
+      assertThat(empty.get("totalElements")).isEqualTo(1L);
+      assertThat((List<?>) empty.get("content")).isEmpty();
+    }
+  }
+
+  @Test
   void set_query_matches_point_queries_for_publication_ties_and_unscored_rows() {
     long published = score(transactions.get(0), "COMPLETED", 0.9, 0.2);
     score(transactions.get(0), "FAILED", 0.1, 0.9);
@@ -98,6 +117,27 @@ class DashboardScoreQueryTests {
         .containsEntry("job_id", published)
         .containsEntry("type_class", 1L);
     assertThat(newRows.get(2)).containsEntry("job_id", null).containsEntry("type_class", null);
+  }
+
+  @Test
+  void combined_widgets_preserve_delivery_and_detection_date_semantics() {
+    score(transactions.get(0), "COMPLETED", .9, .2);
+    long later = score(transactions.get(1), "COMPLETED", .2, .9);
+    jdbc.update("update analysis.jobs set business_at='2023-09-03 09:00+09' where job_id=?", later);
+    var dashboard = new DashboardService(jdbc, null);
+    var day = LocalDate.parse("2023-09-02");
+    var result =
+        dashboard.scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
+    assertThat(result).containsAllEntriesOf(dashboard.modelDistribution(day, day));
+    assertThat(result.get("detection"))
+        .isEqualTo(Map.of("received", 3L, "analyzed", 1L, "suspicious", 1L));
+    jdbc.update(
+        "update ledger.transactions set integration_status='HELD' where tx_id=?",
+        transactions.get(0));
+    result = dashboard.scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
+    assertThat(result.get("detection"))
+        .isEqualTo(Map.of("received", 2L, "analyzed", 0L, "suspicious", 0L));
+    assertThat(result.get("agreements")).isEqualTo(List.of());
   }
 
   @Test

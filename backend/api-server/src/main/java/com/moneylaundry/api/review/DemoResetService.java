@@ -19,6 +19,12 @@ public class DemoResetService {
   static final String TABLES =
       String.join(
           ",",
+          "analysis.alert_plans",
+          "analysis.alert_fact_checks",
+          "review.alert_proposal_cases",
+          "review.alert_change_proposals",
+          "review.alert_lineage",
+          "review.event_recipients",
           "review.episode_members",
           "review.episode_alerts",
           "review.alert_members",
