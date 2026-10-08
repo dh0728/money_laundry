@@ -6,28 +6,11 @@ import java.time.*;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DashboardService {
-  // Whole-period aggregates need a set of published scores, not one lookup per ledger row.
-  // Select the latest eligible result before applying the displayed detection date range.
-  static final String SCORE_BASE =
-      """
-      from ledger.transactions t
-      left join (
-        select i.*,j.job_id,j.threshold_value,j.business_at as detected_at
-        from analysis.current_scores c join analysis.scores i using(run_id,tx_id)
-        join analysis.runs ar on ar.run_id=i.run_id
-        join analysis.jobs j on j.job_id=ar.job_id and j.current_run_id=ar.run_id
-        where j.status='COMPLETED' and ar.status='COMPLETED'
-      ) s on s.tx_id=t.tx_id
-      left join lateral (
-        select s.type_class::bigint as type_class
-        where s.job_id is not null
-      ) w on true
-      where t.integration_status='ACTIVE'
-      """;
-
   private final JdbcTemplate jdbc;
   private final BusinessTime time;
 
@@ -40,6 +23,7 @@ public class DashboardService {
     return Timestamp.from(d.atStartOfDay(BusinessTime.KST).toInstant());
   }
 
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public Map<String, Object> view(long user, LocalDate from, LocalDate to) {
     if (from == null || to == null || from.isAfter(to) || from.plusYears(2).isBefore(to))
       throw AnalysisService.invalid();
@@ -50,8 +34,8 @@ public class DashboardService {
     out.put(
         "personal",
         jdbc.queryForMap(
-            "select count(*) filter(where status='OPEN') as pending,count(*) filter(where status='OPEN' and assigned_at<=?) as aged,count(*) filter(where status='CLOSED' and closed_by=? and closed_at>=? and closed_at<?) as closed from "
-                + ReviewCaseSql.PUBLISHED
+            "select coalesce(sum(n) filter(where status='OPEN'),0)::bigint as pending,coalesce(sum(n) filter(where status='OPEN' and assigned_at<=?),0)::bigint as aged,coalesce(sum(n) filter(where status='CLOSED' and closed_by=? and closed_at>=? and closed_at<?),0)::bigint as closed from "
+                + "ops.dashboard_case_counts"
                 + " where assignee_id=?",
             Timestamp.from(now.minus(Duration.ofDays(3))),
             user,
@@ -61,9 +45,8 @@ public class DashboardService {
     out.put(
         "institution",
         jdbc.queryForMap(
-            "select count(*) filter(where kind='ALERT' and status='OPEN') as alerts,count(*) filter(where kind='EPISODE' and status='OPEN') as episodes,count(*) filter(where status='OPEN' and assigned_at<=?) as aged,count(*) filter(where kind='ALERT' and created_at>=? and created_at<?) as today,count(*) filter(where kind='ALERT' and created_at>=? and created_at<?) as yesterday from "
-                + ReviewCaseSql.PUBLISHED
-                + "",
+            "select coalesce(sum(n) filter(where kind='ALERT' and status='OPEN'),0)::bigint as alerts,coalesce(sum(n) filter(where kind='EPISODE' and status='OPEN'),0)::bigint as episodes,coalesce(sum(n) filter(where status='OPEN' and assigned_at<=?),0)::bigint as aged,coalesce(sum(n) filter(where kind='ALERT' and created_at>=? and created_at<?),0)::bigint as today,coalesce(sum(n) filter(where kind='ALERT' and created_at>=? and created_at<?),0)::bigint as yesterday from "
+                + "ops.dashboard_case_counts",
             Timestamp.from(now.minus(Duration.ofDays(3))),
             at(today),
             at(today.plusDays(1)),
@@ -72,8 +55,8 @@ public class DashboardService {
     out.put(
         "openAlertsAgedOver3Days",
         jdbc.queryForObject(
-            "select count(*) from "
-                + ReviewCaseSql.PUBLISHED
+            "select coalesce(sum(n),0)::bigint from "
+                + "ops.dashboard_case_counts"
                 + " where kind='ALERT' and status='OPEN' and assigned_at<=?",
             Long.class,
             Timestamp.from(now.minus(Duration.ofDays(3)))));
@@ -81,7 +64,7 @@ public class DashboardService {
     // Today may include delayed batches; use their delivery dates, not only wall-clock yesterday.
     var deliveryDates =
         jdbc.queryForList(
-            "select distinct analysis_date-1 from analysis.jobs where true and business_at>=? and business_at<? and analysis_date is not null order by 1",
+            "select business_date from ops.dashboard_delivery_days where detected_day>=(?::timestamptz at time zone 'Asia/Seoul')::date and detected_day<(?::timestamptz at time zone 'Asia/Seoul')::date order by 1",
             java.sql.Date.class,
             at(today),
             at(today.plusDays(1)));
@@ -93,9 +76,9 @@ public class DashboardService {
     out.put(
         "pendingReports",
         jdbc.queryForObject(
-            "select count(*) from ingest.uploads b left join ingest.report_versions v on v.upload_id=b.upload_id where true and b.business_date in ("
+            "select coalesce(sum(n),0)::bigint from ops.dashboard_report_counts where business_date in ("
                 + placeholders
-                + ") and b.status<>'EXPIRED' and v.stage_status is distinct from 'SUPERSEDED' and (b.status<>'COMPLETED' or v.stage_status is distinct from 'ACTIVE')",
+                + ")",
             Long.class,
             deliveryDates.toArray()));
     out.put("daily", daily(from, to));
@@ -111,7 +94,7 @@ public class DashboardService {
         "priority",
         jdbc.queryForList(
             "select case_id,kind,alert_id,created_at,risk from "
-                + ReviewCaseSql.WITH_RISK
+                + "ops.dashboard_case_items"
                 + " where assignee_id=? and status='OPEN' order by risk desc,created_at,case_id limit 10",
             user));
     return out;
@@ -122,11 +105,11 @@ public class DashboardService {
     return jdbc.queryForList(
         """
         with incoming as (
-          select (created_at at time zone 'Asia/Seoul')::date as day,count(*) as count
+          select (created_at at time zone 'Asia/Seoul')::date as day,sum(n)::bigint as count
           from %s where kind='ALERT' and created_at>=? and created_at<?
           group by 1
         ), completed as (
-          select (closed_at at time zone 'Asia/Seoul')::date as day,count(*) as count
+          select (closed_at at time zone 'Asia/Seoul')::date as day,sum(n)::bigint as count
           from %s where kind='ALERT' and closed_at>=? and closed_at<?
           group by 1
         )
@@ -135,7 +118,7 @@ public class DashboardService {
         left join incoming i on i.day=d::date
         left join completed c on c.day=d::date order by d
         """
-            .formatted(ReviewCaseSql.PUBLISHED, ReviewCaseSql.PUBLISHED),
+            .formatted("ops.dashboard_case_counts", "ops.dashboard_case_counts"),
         at(from),
         at(to.plusDays(1)),
         at(from),
@@ -148,9 +131,9 @@ public class DashboardService {
     // The two widgets use the same published scores and detection period.
     var counts =
         jdbc.queryForList(
-            "select s.p_laundering>=s.threshold_value as suspicious,w.type_class,count(*) as count "
-                + SCORE_BASE
-                + " and s.detected_at>=? and s.detected_at<? group by 1,2",
+            "select suspicious,type_class,sum(n)::bigint as count from ops.dashboard_model_counts "
+                + "where detected_day>=(?::timestamptz at time zone 'Asia/Seoul')::date "
+                + "and detected_day<(?::timestamptz at time zone 'Asia/Seoul')::date group by 1,2",
             at(from),
             at(to.plusDays(1)));
     return distribution(counts);
@@ -160,22 +143,18 @@ public class DashboardService {
       LocalDate from, LocalDate to, LocalDate today, List<java.sql.Date> deliveryDates) {
     var args =
         new ArrayList<Object>(
-            List.of(at(today), at(today.plusDays(1)), at(from), at(to.plusDays(1))));
+            List.of(
+                java.sql.Date.valueOf(today),
+                java.sql.Date.valueOf(from),
+                java.sql.Date.valueOf(to)));
     args.addAll(deliveryDates);
-    args.addAll(List.of(at(from), at(to.plusDays(1))));
-    // Reception and model widgets share the current score join. Aggregate once
-    // while preserving their different business-date / detection-date filters.
+    args.addAll(List.of(java.sql.Date.valueOf(from), java.sql.Date.valueOf(to)));
     var counts =
         jdbc.queryForList(
-            """
-        select t.business_date,s.detected_at>=? and s.detected_at<? as analyzed_today,
-          s.detected_at>=? and s.detected_at<? as in_period,
-          s.p_laundering>=s.threshold_value as suspicious,w.type_class,count(*) as count
-        """
-                + SCORE_BASE
-                + " and (t.business_date in ("
+            "select business_date,detected_day=? as analyzed_today,detected_day between ? and ? as in_period,"
+                + "suspicious,type_class,sum(n)::bigint as count from ops.dashboard_model_counts where business_date in ("
                 + String.join(",", Collections.nCopies(deliveryDates.size(), "?"))
-                + ") or (s.detected_at>=? and s.detected_at<?)) group by 1,2,3,4,5",
+                + ") or detected_day between ? and ? group by 1,2,3,4,5",
             args.toArray());
     var selectedDays = new HashSet<>(deliveryDates);
     long received = 0, analyzed = 0, suspicious = 0;
@@ -227,15 +206,12 @@ public class DashboardService {
         """
         with counts as (
           select (c.created_at at time zone 'Asia/Seoul')::date as day,
-            count(*) filter(where e.alert_id is null and c.status='OPEN') as pending,
-            count(*) filter(where ep.status='OPEN') as in_progress,
-            count(*) filter(where ep.status='CLOSED'
-              or (e.alert_id is null and c.status='CLOSED')) as done
-          from review.cases c
-          left join review.episode_alerts e on e.alert_id=c.alert_id
-          left join review.cases ep on ep.case_id=e.episode_id
+            coalesce(sum(n) filter(where not c.linked and c.status='OPEN'),0)::bigint as pending,
+            coalesce(sum(n) filter(where c.episode_status='OPEN'),0)::bigint as in_progress,
+            coalesce(sum(n) filter(where c.episode_status='CLOSED'
+              or (not c.linked and c.status='CLOSED')),0)::bigint as done
+          from ops.dashboard_case_counts c
           where c.kind='ALERT' and c.created_at>=? and c.created_at<?
-            and c.published_version is not null and c.merged_into_alert_id is null
           group by 1
         )
         select to_char(d,'YYYY-MM-DD') as date,coalesce(c.pending,0) as pending,
@@ -252,19 +228,13 @@ public class DashboardService {
   Map<String, Object> episodeWork(Instant now, LocalDate from, LocalDate to) {
     var today = now.atZone(BusinessTime.KST).toLocalDate();
     String base =
-        """
-      from review.cases c left join lateral (
-        select min(e.business_at) as first_review from review.event_history e
-        where e.case_id=c.case_id and e.actor_id=c.assignee_id and e.action='REVIEW_START'
-          and e.business_at>=c.assigned_at and e.business_at<=?
-      ) r on true where c.kind='EPISODE' and c.created_at<=?
-      """;
+        "from (select c.*,case when first_review<=? then first_review end as visible_review from ops.dashboard_case_counts c) c where c.kind='EPISODE' and c.created_at<=? ";
     var result = new LinkedHashMap<String, Object>();
     result.put("asOf", now.toString());
     result.put(
         "current",
         jdbc.queryForMap(
-            "select count(*) filter(where c.status='OPEN') as open,count(*) filter(where c.status='OPEN' and c.assigned_at<=?) as aged,count(*) filter(where c.status='OPEN' and r.first_review is null) as unreviewed,count(*) filter(where c.created_at>=?) as created_today,count(*) filter(where c.status='CLOSED' and c.closed_at>=? and c.closed_at<=?) as closed_today "
+            "select coalesce(sum(n) filter(where c.status='OPEN'),0)::bigint as open,coalesce(sum(n) filter(where c.status='OPEN' and c.assigned_at<=?),0)::bigint as aged,coalesce(sum(n) filter(where c.status='OPEN' and c.visible_review is null),0)::bigint as unreviewed,coalesce(sum(n) filter(where c.created_at>=?),0)::bigint as created_today,coalesce(sum(n) filter(where c.status='CLOSED' and c.closed_at>=? and c.closed_at<=?),0)::bigint as closed_today "
                 + base,
             Timestamp.from(now.minus(Duration.ofDays(3))),
             at(today),
@@ -275,9 +245,9 @@ public class DashboardService {
     result.put(
         "firstReview",
         jdbc.queryForMap(
-            "select count(*) as samples,avg(extract(epoch from (r.first_review-c.assigned_at))) as average_seconds "
+            "select coalesce(sum(n),0)::bigint as samples,sum(n*extract(epoch from (c.visible_review-c.assigned_at)))/nullif(sum(n),0) as average_seconds "
                 + base
-                + " and r.first_review>=? and r.first_review<?",
+                + " and c.visible_review>=? and c.visible_review<?",
             Timestamp.from(now),
             Timestamp.from(now),
             at(from),
@@ -285,7 +255,7 @@ public class DashboardService {
     result.put(
         "completion",
         jdbc.queryForMap(
-            "select count(*) as samples,avg(extract(epoch from (c.closed_at-c.created_at))) as average_seconds "
+            "select coalesce(sum(n),0)::bigint as samples,sum(n*extract(epoch from (c.closed_at-c.created_at)))/nullif(sum(n),0) as average_seconds "
                 + base
                 + " and c.status='CLOSED' and c.closed_at>=? and c.closed_at<? and c.closed_at<=?",
             Timestamp.from(now),
@@ -296,7 +266,7 @@ public class DashboardService {
     result.put(
         "oldestOpen",
         jdbc.queryForList(
-            "select c.case_id as \"caseId\",u.name as assignee,extract(epoch from (?::timestamptz-c.assigned_at)) as age_seconds,(r.first_review is null) as awaiting_review from review.cases c join core.users u on u.user_id=c.assignee_id left join lateral (select min(e.business_at) as first_review from review.event_history e where e.case_id=c.case_id and e.actor_id=c.assignee_id and e.action='REVIEW_START' and e.business_at>=c.assigned_at and e.business_at<=?) r on true where c.kind='EPISODE' and c.status='OPEN' and c.created_at<=? order by c.assigned_at,c.case_id limit 20",
+            "select case_id as \"caseId\",assignee,extract(epoch from (?::timestamptz-assigned_at)) as age_seconds,(first_review is null or first_review>?) as awaiting_review from ops.dashboard_case_items where kind='EPISODE' and status='OPEN' and created_at<=? order by assigned_at,case_id limit 20",
             Timestamp.from(now),
             Timestamp.from(now),
             Timestamp.from(now)));

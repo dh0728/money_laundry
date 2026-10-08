@@ -210,3 +210,7 @@ Spring 분석 완료 경로는 공개 상태 반영 후 `AnalysisRunService.refr
 제안 수락은 통합 잠금 → review 잠금 → 업무 시각/영향 사건 잠금 순서를 사용한다. 일부 담당자의 동의만으로 공개하지 않고, 마지막 동의 시 현재 거래 상태와 점수 출처까지 다시 검사한다. 정정으로 근거가 빠져도 저장된 직원 판정을 EXCLUDED로 덮어쓰지 않는다. 현재 범위 투영에서 제외하고 API의 withdrawnMembers와 당시 근거 버전으로 보존한다.
 
 이번 생애주기 변경은 공개 포인터·계획·계보·제안 테이블 및 현재 요약을 V1에 포함한다. **이전 V1을 사용하는 dev에는 코드만 덮어 배포할 수 없다.** 설정 백업/업무 DB 재초기화 → 새 이미지 기동/Flyway V1 → 설정 복원 → configure_analysis_db.py로 분석 역할 권한 재설정 → 전송/분석 순서다. 기존 SSM 값과 원문 보호 키는 유지한다. 로컬 이미지 검증은 AML_TEST_DOCKER와 AML_TEST_API_IMAGE를 설정하고 `test_dev_inference_compose`를 실행한다. 이 검증은 실제 dev Compose를 임의 프로젝트/볼륨/네트워크로 격리해 사용하며 EC2나 S3를 변경하지 않는다.
+
+### 대시보드 집계와 분석 역할
+
+대시보드 조회 집계는 Spring의 `DashboardRefreshWorker`가 관리한다. Python의 통합/분석 쓰기는 DB statement trigger를 통해 같은 트랜잭션에 영향 영역/거래일 갱신 요청을 기록한다. 계산은 원본 커밋 후 백그라운드에서 수행하며 Python이 집계를 직접 갱신하거나 새 프로세스를 호출하지 않는다. 분석 역할의 ops 접근 금지는 유지한다. SECURITY DEFINER 트리거가 요청을 기록하므로 `analysis_permissions.sql`에 ops 쓰기 권한을 추가하지 않는다. 모델 점수 미공개/정정/공개 전환을 집계에서도 구분한다. 조회 API는 집계 작업을 실행하지 않는다.

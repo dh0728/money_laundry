@@ -17,8 +17,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import(TestcontainersConfiguration.class)
 class DashboardScoreQueryTests {
   @Autowired JdbcTemplate jdbc;
+  @Autowired DashboardProjection dashboardProjection;
   @MockitoBean AnalysisScheduler scheduler;
   List<Long> transactions;
+
+  DashboardService refreshedDashboard(BusinessTime time) {
+    for (var scope : DashboardProjection.Scope.values()) dashboardProjection.refresh(scope);
+    return new DashboardService(jdbc, time);
+  }
 
   @BeforeEach
   void setup() {
@@ -111,7 +117,8 @@ class DashboardScoreQueryTests {
     score(transactions.get(1), "COMPLETED", 0.2, 0.9);
     String projection = "select t.tx_id,s.job_id,s.p_laundering,w.type_class ";
     var oldRows = jdbc.queryForList(projection + LedgerQueryService.BASE + " order by t.tx_id");
-    var newRows = jdbc.queryForList(projection + DashboardService.SCORE_BASE + " order by t.tx_id");
+    var newRows =
+        jdbc.queryForList(projection + DashboardProjection.SCORE_BASE + " order by t.tx_id");
     assertThat(newRows).isEqualTo(oldRows).hasSize(3);
     assertThat(newRows.getFirst())
         .containsEntry("job_id", published)
@@ -124,17 +131,20 @@ class DashboardScoreQueryTests {
     score(transactions.get(0), "COMPLETED", .9, .2);
     long later = score(transactions.get(1), "COMPLETED", .2, .9);
     jdbc.update("update analysis.jobs set business_at='2023-09-03 09:00+09' where job_id=?", later);
-    var dashboard = new DashboardService(jdbc, null);
+    var dashboard = refreshedDashboard(null);
     var day = LocalDate.parse("2023-09-02");
     var result =
-        dashboard.scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
+        refreshedDashboard(null)
+            .scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
     assertThat(result).containsAllEntriesOf(dashboard.modelDistribution(day, day));
     assertThat(result.get("detection"))
         .isEqualTo(Map.of("received", 3L, "analyzed", 1L, "suspicious", 1L));
     jdbc.update(
         "update ledger.transactions set integration_status='HELD' where tx_id=?",
         transactions.get(0));
-    result = dashboard.scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
+    result =
+        refreshedDashboard(null)
+            .scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
     assertThat(result.get("detection"))
         .isEqualTo(Map.of("received", 2L, "analyzed", 0L, "suspicious", 0L));
     assertThat(result.get("agreements")).isEqualTo(List.of());
@@ -147,7 +157,7 @@ class DashboardScoreQueryTests {
     jdbc.update("update analysis.jobs set business_at='2023-09-03 09:00+09' where job_id=?", newer);
     score(transactions.get(1), "COMPLETED", 0.2, 0.9);
     var result =
-        new DashboardService(jdbc, null)
+        refreshedDashboard(null)
             .modelDistribution(LocalDate.parse("2023-09-02"), LocalDate.parse("2023-09-02"));
     assertThat(result.get("agreements"))
         .isEqualTo(List.of(Map.of("agreement", "WEAK", "count", 1L)));
@@ -156,9 +166,37 @@ class DashboardScoreQueryTests {
         "update ledger.transactions set integration_status='HELD' where tx_id=?",
         transactions.get(1));
     result =
-        new DashboardService(jdbc, null)
+        refreshedDashboard(null)
             .modelDistribution(LocalDate.parse("2023-09-02"), LocalDate.parse("2023-09-02"));
     assertThat(result.get("agreements")).isEqualTo(List.of());
+  }
+
+  @Test
+  void publication_status_threshold_and_pointer_changes_invalidate_existing_scores() {
+    long job = score(transactions.getFirst(), "COMPLETED", .8, .2);
+    var day = LocalDate.parse("2023-09-02");
+    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
+        .isNotEqualTo(List.of());
+    jdbc.update("update analysis.jobs set threshold_value=.9 where job_id=?", job);
+    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
+        .isEqualTo(List.of());
+    jdbc.update("update analysis.jobs set status='FAILED' where job_id=?", job);
+    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("agreements"))
+        .isEqualTo(List.of());
+    jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", job);
+    jdbc.update(
+        "update analysis.scores set p_laundering=.95 where tx_id=?", transactions.getFirst());
+    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
+        .isNotEqualTo(List.of());
+    jdbc.update("update analysis.runs set status='CANCELLED' where job_id=?", job);
+    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("agreements"))
+        .isEqualTo(List.of());
+    jdbc.update("update analysis.runs set status='COMPLETED' where job_id=?", job);
+    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
+        .isNotEqualTo(List.of());
+    jdbc.update("delete from analysis.current_scores where tx_id=?", transactions.getFirst());
+    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("agreements"))
+        .isEqualTo(List.of());
   }
 
   @Test

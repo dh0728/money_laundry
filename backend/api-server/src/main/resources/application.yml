@@ -35,6 +35,9 @@ management:
         enabled: true
 
 app:
+  dashboard:
+    refresh-enabled: ${DASHBOARD_REFRESH_ENABLED:true}
+    refresh-delay-ms: ${DASHBOARD_REFRESH_DELAY_MS:2000}
   presentation:
     enabled: ${PRESENTATION_ENABLED:false}
   s3:
