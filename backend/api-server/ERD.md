@@ -70,6 +70,12 @@ erDiagram
 | review | alert_change_proposals, alert_proposal_cases | 조사 중 병합·기존 근거 제거·재평가 제안, 영향 사건 baseline과 담당자 동의 |
 | review | events, event_recipients, requests, notification_reads | 감사 이력·공개 시 고정 수신자·멱등 변경 요청·사용자별 알림 읽음 |
 | ops | business_clock | 시연 업무 시각 |
+| ops | dashboard_dirty | 원본 변경과 함께 기록되는 영역·거래일·source transaction별 집계 요청 |
+| ops | dashboard_model_counts | 거래일·탐지일·이진판정·유형별 건수. 수신/분석/의심 건수와 모델 분포 |
+| ops | dashboard_case_counts | 상태·담당·생성/배정/종결/첫 열람 시각·Episode 소속별 사건 건수 |
+| ops | dashboard_case_items | 우선순위/오래된 Episode용 작은 현재 사건 투영. 상세 JSON 없음 |
+| ops | dashboard_report_counts | 거래일별 미완료 보고 건수 |
+| ops | dashboard_delivery_days | 탐지 업무일과 보고 대상 거래일 대응 |
 | ops | resets, reset_files | 초기화 작업·파일 삭제 재시도 |
 | evaluation | report_labels, transaction_labels | 평가 라벨. 분석·화면 입력에서 제외 |
 
@@ -100,7 +106,17 @@ Python의 데이터 변경과 단계 완료 기록은 같은 DB 트랜잭션이�
 
 `saved_members`는 과거 근거에 대한 직원 판정을 보존한다. `effective_members`는 Alert의 저장 범위와 현재 `published_version` 거래의 교집합이며, Episode는 편입 당시 고정 범위를 유지한다. 보고 정정에 따라 현재 범위에서 빠진 거래를 EXCLUDED나 NORMAL로 자동 재판정하지 않는다. 현재 요약은 공개/직원 명령과 같은 트랜잭션에서 이 유효 범위를 기준으로 갱신한다.
 
-현재 API의 목록·대시보드는 `ReviewCaseSql`에서 공개 사건 조회와 저장된 현재 범위 위험도 조회를 분리한다. 목록은 root summary를 읽고 페이지별 전체 근거 JSON/거래 집계를 실행하지 않는다. CaseSummaryStore가 공개/직원 명령과 같은 트랜잭션에서 요약을 갱신한다. 요약은 재구축 가능한 파생값이며 근거와 직원 판정을 대체하지 않는다. 단일 V1에 공개 포인터·계보·계획·요약 구조를 통합했으므로 기존 dev에는 검증 후 초기화 전환이 필요하다.
+현재 사건 목록 API는 `ReviewCaseSql`에서 공개 사건 조회와 저장된 현재 범위 위험도 조회를 분리한다. 목록은 root summary를 읽고 페이지별 전체 근거 JSON/거래 집계를 실행하지 않는다. CaseSummaryStore가 공개/직원 명령과 같은 트랜잭션에서 요약을 갱신한다. 요약은 재구축 가능한 파생값이며 근거와 직원 판정을 대체하지 않는다. 단일 V1에 공개 포인터·계보·계획·요약 구조를 통합했으므로 기존 dev에는 검증 후 초기화 전환이 필요하다.
+
+## 대시보드 집계 경계
+
+업무 상태의 정본은 원본 테이블이며 `ops.dashboard_*`는 재구축 가능한 읽기 모델이다. MODEL/CASES/REPORTS/DELIVERY는 독립적으로 갱신한다. 분자·분모 및 같은 사건 집계의 카드·차트·우선순위는 해당 영역 트랜잭션 안에서 교체한다. 전역 공개 세대와 과거값 복제는 사용하지 않는다.
+
+원본 AFTER STATEMENT 트리거는 원본 변경과 같은 트랜잭션에서 요청을 적재한다. `(scope,bucket,source_tx)` 기본키로 같은 source transaction의 중복을 합치며 서로 다른 작성자가 전역 dirty행의 잠금에 몰리지 않게 한다. 원장 날짜 정정은 이전/새 날짜 모두, 최신 점수 포인터와 관련 job/run 변경은 해당 거래일을 요청한다. TRUNCATE는 전체 재집계를 요청한다.
+
+갱신은 영역별 advisory lock과 REPEATABLE READ 트랜잭션으로 계산·교체·해당 스냅샷의 요청 삭제를 수행한다. 도중 커밋된 요청은 다음 처리에 남고 실패 시 저장값과 요청 모두 롤백된다. 갱신 중 조회는 PostgreSQL MVCC로 기존 커밋값을 읽는다. 통상 조회는 READ ONLY REPEATABLE READ이며 원장·현재점수 조인을 수행하지 않는다. 정확한72시간 경계 때문에 사건 시간 차원은 원래 타임스탬프를 보존한다.
+
+트리거 함수는 스키마 소유자의 SECURITY DEFINER, 고정 search_path와 정규화한 객체 참조를 사용하고 PUBLIC 실행 권한을 제거한다. 제한된 분석 계정에는 ops 접근 권한을 추가하지 않는다. 시연 초기화는 파생값과 요청도 같은 트랜잭션에서 비워 과거 집계의 재노출을 막는다.
 
 ## 초기화 전환
 

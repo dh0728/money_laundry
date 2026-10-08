@@ -25,6 +25,7 @@ class QueryPerformanceTests {
   @Autowired LedgerQueryService ledger;
   @Autowired ReviewService review;
   @Autowired DashboardService dashboard;
+  @Autowired DashboardProjection projection;
   @Autowired com.moneylaundry.api.analysis.AnalysisRunService runs;
   @MockitoBean AnalysisScheduler scheduler;
 
@@ -43,8 +44,12 @@ class QueryPerformanceTests {
         "insert into core.owners(owner_id,service_owner_id,display_name) overriding system value select n,gen_random_uuid(),'가명#'||n from generate_series(1,50381) n");
     jdbc.execute(
         "insert into core.accounts(account_id,service_account_id,bank_id,owner_id) overriding system value select n,gen_random_uuid(),1+(n%10),1+((n-1)%50381) from generate_series(1,76754) n");
+    long ledgerStarted = System.nanoTime();
     jdbc.execute(
         "insert into ledger.transactions(tx_id,occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) overriding system value select n,timestamptz '2023-08-31 00:00+09'+((n-1)%864000)*interval '1 second',date '2023-08-31'+((n-1)%10),1+((n-1)%76754),1+(n%76754),100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1' from generate_series(1,690519) n");
+    System.out.printf(
+        "DASHBOARD_SOURCE_INSERT transactions=690519 seconds=%.3f%n",
+        (System.nanoTime() - ledgerStarted) / 1_000_000_000.0);
     long job =
         jdbc.queryForObject(
             "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-10','2023-09-10 00:00+09','2023-09-09 09:00+09',.7,'COMPLETED','COMPLETE') returning job_id",
@@ -103,6 +108,17 @@ class QueryPerformanceTests {
                 "select count(*) from pg_stats where schemaname='analysis' and tablename in ('jobs','runs')",
                 Integer.class))
         .isZero();
+    for (var scope : DashboardProjection.Scope.values()) {
+      long started = System.nanoTime();
+      projection.refresh(scope);
+      System.out.printf(
+          "DASHBOARD_REFRESH scope=%s seconds=%.3f%n",
+          scope, (System.nanoTime() - started) / 1_000_000_000.0);
+    }
+    System.out.println(
+        "DASHBOARD_STORED_ROWS "
+            + jdbc.queryForMap(
+                "select (select count(*) from ops.dashboard_model_counts) as model,(select count(*) from ops.dashboard_case_counts) as cases"));
     jdbc.setQueryTimeout(15);
     String plan =
         String.join(
@@ -124,6 +140,24 @@ class QueryPerformanceTests {
       measure("episodes", i, 0, () -> review.list("EPISODE", null, null, from, to, 0, 20));
       measure("dashboard", i, -1, () -> dashboard.view(user, from, to));
     }
+    long changed = System.nanoTime();
+    jdbc.update(
+        "update review.alerts set assigned_at=assigned_at+interval '1 second' where alert_id=1");
+    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isFalse();
+    assertThat(projection.refresh(DashboardProjection.Scope.CASES)).isTrue();
+    System.out.printf(
+        "DASHBOARD_CASE_CHANGE seconds=%.3f%n", (System.nanoTime() - changed) / 1_000_000_000.0);
+    jdbc.execute(
+        "update review.alerts set assigned_at='2023-09-01 00:00+09'::timestamptz+alert_id*interval '1 second'");
+    long fragmented = System.nanoTime();
+    projection.refresh(DashboardProjection.Scope.CASES);
+    assertThat(jdbc.queryForObject("select count(*) from ops.dashboard_case_counts", Long.class))
+        .isEqualTo(40389L);
+    System.out.printf(
+        "DASHBOARD_FRAGMENTED_REFRESH rows=40389 seconds=%.3f%n",
+        (System.nanoTime() - fragmented) / 1_000_000_000.0);
+    for (int round = 1; round <= 3; round++)
+      measure("dashboard_fragmented", round, -1, () -> dashboard.view(user, from, to));
     runs.refreshQueryStatistics();
     measure(
         "alerts_after_analyze", 1, 40389, () -> review.list("ALERT", null, null, from, to, 0, 20));

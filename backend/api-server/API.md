@@ -276,6 +276,20 @@ Cookie: JSESSIONID=<로그인 세션>
 - ‘오늘’, ‘어제’, 경과시간은 `businessAt`의 시연 업무 시각 기준. FE의 PC 현재 시각으로 대체하지 않는다.
 - 이 응답 일부 키는 아래와 같이 snake_case다. 시각에는 `Z` 등 오프셋 표현이 포함될 수 있으므로 파싱 후 KST로 표시한다. 문서에서 임의로 필드명을 바꾸지 않는다.
 
+### 조회와 집계 갱신
+
+조회는 `ops.dashboard_*`에 저장된 집계값을 읽는다. 거래 원장·모델 결과·사건 근거를 요청마다 재계산하지 않는다. 기간/로그인 직원/기준시각에 맞는 작은 집계의 합산과 우선순위10건·오래된 Episode20건을 조회한다. 최근 활동20건은 사용자/시각 인덱스를 이용해 이력에서 직접 읽는다.
+
+- 원본 변경 트랜잭션이 영향받는 영역의 갱신 요청을 기록한다. 백그라운드 작업은 기본2초 간격으로 요청 유무를 확인하고 **변경이 있는 영역만** 계산한다. 같은 트랜잭션·거래일의 중복 요청은 합친다. 원장/모델은 변경된 거래일, 사건 업무 상태·보고 현황·탐지일별 거래일 대응은 각각 독립적으로 갱신한다.
+- 각 영역은 완료 즉시 교체한다. 다른 영역의 완료를 기다리지 않는다. 계산 중에는 기존 커밋값, 완료 후에는 새 커밋값이 조회되며 별도 과거값·전역 세대·`refreshing` 응답 필드는 없다. 실패하면 기존 값과 요청을 유지하고 다음 실행에서 재처리한다. API 요청이 집계를 실행하거나 완료를 기다리지 않는다.
+- `personal/institution/daily/dailyAlertStatus/episodeWork/priority`는 사건 집계 영역 안에서 함께 교체한다. `detection/agreements/types`는 같은 원장·최신 공개 모델 집계를 사용한다. 한 응답 안에서는 읽기 스냅샷을 유지하지만 독립 영역끼리의 원본 반영 시각까지 같다고 보장하지 않는다.
+- 기준시각과 정확한72시간 경계는 저장된 시각 차원에 조회 기준을 적용한다. `businessAt`은 조회 기준 업무 시각이며 집계 완료 시각이 아니다. 변경 직후에는 직전 집계값이 보일 수 있다. 기본2초는 확인 간격이며 집계 완료시간 보장이 아니다.
+- 화면 조회 초기 권장값은5초이며 비활성 탭은 중지, 복귀/직원 작업 후에는 재조회한다. 작업 직후 재조회도 집계 완료 전이면 이전 값을 받을 수 있으므로 이후 정기 조회를 유지한다. 특정5초를 실무 공통 표준으로 취급하지 않는다. 현재 구현 범위는 백엔드/API이며 프런트엔드 자동 갱신은 변경하지 않았다.
+
+운영 설정: `DASHBOARD_REFRESH_ENABLED`(기본true), `DASHBOARD_REFRESH_DELAY_MS`(기본2000, 최소100). 집계 실행기는 원장/모델과 나머지 업무 집계를 별도 스레드로 처리하며 여러 API 인스턴스의 같은 영역 중복 계산은 DB advisory lock으로 막는다. 실패·실행시간은 서버 로그로 확인한다. 재구축이 필요하면 관리자는 해당 영역의 `ops.dashboard_dirty`에 `bucket='*'`를 기록할 수 있으며 공개 API에는 관리용 갱신 명령을 추가하지 않는다.
+
+설계 근거: [Grafana 갱신 주기 지침](https://grafana.com/docs/learning-paths/visualization-metrics/time-range-refresh/), [Microsoft 사전 집계 읽기 모델](https://learn.microsoft.com/en-us/azure/architecture/patterns/materialized-view). 요구 최신성을 충족하는 범위에서 조회 빈도와 집계 비용을 따로 조정한다.
+
 ### 응답 필드
 
 아래 경로가 실제 응답 키다. 건수는 number이며 결과 없는 목록은 빈 배열이다.
@@ -316,7 +330,7 @@ Cookie: JSESSIONID=<로그인 세션>
 - `daily.incoming`은 새 Alert 사건 수이고 새 근거 버전 수가 아니다. `completed`는 조사 업무 종결 건수이며 정상 판정만 세는 값이 아니다. 당일 유입 건들이 당일 종결됐다는 뜻도 아니다.
 - `dailyAlertStatus`는 완료된 분석에서 공개된 Alert만 원본 Alert당 한 번 집계한다. `pending`은 현재 Episode 소속이 없는 OPEN Alert, `inProgress`는 현재 OPEN Episode에 소속된 Alert, `done`은 직접 종결한 Alert 또는 CLOSED Episode에 소속된 Alert다. 정상·단독 의심 등 종결 결과는 합산한다.
 - 날짜는 KST 최초 생성일이며 편입·종결·해제 시 날짜가 이동하지 않는다. Episode에서 해제되어 다시 열린 Alert는 `pending`으로 돌아간다. 해당 날짜의 `pending + inProgress + done`은 `daily.incoming`과 같다. 근거 버전·거래·Episode 수를 세지 않는다.
-- 이 값은 조회 시점의 현재 상태다. 선택 날짜 당시의 상태를 복원한 이력 통계가 아니다. REVIEW_START 기록이나 단순 상세 열람은 이 분류에 영향을 주지 않는다. 기존 `daily.completed`(종결일별 이벤트)는 유지하며 이 차트에 대입하지 않는다.
+- 이 값은 마지막으로 완료된 사건 집계의 현재 상태다. 선택 날짜 당시의 상태를 복원한 이력 통계가 아니다. REVIEW_START 기록이나 단순 상세 열람은 이 분류에 영향을 주지 않는다. 기존 `daily.completed`(종결일별 이벤트)는 유지하며 이 차트에 대입하지 않는다.
 - `types`는 **의심 거래 건수**다. `alertsByType`이라는 이름으로 Alert 건수처럼 표시하지 않는다. 유형 분포는 가로 막대그래프다.
 - 도넛은 **전체 분석 거래**의 모델 조합 분포다. `STRONG`=이진 의심+패턴 있음, `ATYPICAL`=이진 의심+패턴 없음, `PATTERN_ONLY`=이진 정상+패턴 있음, `WEAK`=이진 정상+패턴 없음. 패턴 없음은 최다 확률 클래스0, 동률이면 작은 코드 우선이다. 미분석은 네 범주에 넣지 않는다.
 - agreements/types는 실제 있는 범주만 반환한다. FE는 누락 범주를0으로 채울 수 있다. 도넛 분모는 agreements의 count 합이며0이면 데이터 없음이다.
@@ -509,7 +523,7 @@ OPEN 자금 조회는 읽기 전용 REPEATABLE READ 트랜잭션의 한 스냅�
 
 DB 원자 범위: receipt 잠금·명시 테이블 잠금 → 대상 확인 → 파일 정리 대상/접수 기록 → 허용 목록 TRUNCATE RESTRICT CONTINUE IDENTITY → 업무 시각 null·revision 증가. 예상 밖 FK가 생기면 전체 롤백하며 CASCADE로 범위를 늘리지 않는다. 동일 ADMIN의 같은 requestId 재요청은 기존 결과를 반환하고 이후 들어온 데이터를 삭제하지 않는다. 초기화 접수 기록은 삭제 대상에서 제외한다.
 
-삭제 범위: 보고·정정·통합·가명 계좌/소유주·거래·분석 입력/점수/피처/작업·Alert/조사 사건/이력·평가 라벨. 보존: users, banks, bank_reporting_periods, fx_rates, 스키마·Flyway, 초기화 기록. 원본 CSV는 서버가 접근하지 않으며 변경하지 않는다. ID 시퀀스도 유지한다.
+삭제 범위: 보고·정정·통합·가명 계좌/소유주·거래·분석 입력/점수/피처/작업·Alert/조사 사건/이력·평가 라벨·대시보드 집계/갱신 요청. 파생 집계는 preview 건수/확인값에서 제외하되 원본과 같은 초기화 트랜잭션에서 비운다. 보존: users, banks, bank_reporting_periods, fx_rates, 스키마·Flyway, 초기화 기록. 원본 CSV는 서버가 접근하지 않으며 변경하지 않는다. ID 시퀀스도 유지한다.
 
 파일은 DB 커밋 후 별도로 정리한다. 현재 설정의 환경 접두어 아래 기록된 `uploads/{bank}/{job}/{file}` 및 `requests|results/{job}/{BINARY|TYPE}/{requestId}/`만 허용한다. 추론 publication 목적지나 파일 정리 재시도 시 저장소가 달라졌으면 삭제하지 않는다. 과거 S3 버전·기록되지 않은 고아 파일·다른 환경은 대상 밖이다. 파일 대상/저장소 경로·원시 S3 오류·토큰은 상태 API에 노출하지 않는다.
 

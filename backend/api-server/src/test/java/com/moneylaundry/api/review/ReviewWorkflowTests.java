@@ -25,6 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Import(TestcontainersConfiguration.class)
 class ReviewWorkflowTests {
   @Autowired JdbcTemplate jdbc;
+  @Autowired DashboardProjection dashboardProjection;
   @Autowired TransactionTemplate tx;
   @MockitoBean AnalysisScheduler scheduler;
   ReviewService service;
@@ -32,6 +33,11 @@ class ReviewWorkflowTests {
   AlertQueryService evidence;
   long l1, l2, other;
   UUID run;
+
+  DashboardService refreshedDashboard(BusinessTime time) {
+    for (var scope : DashboardProjection.Scope.values()) dashboardProjection.refresh(scope);
+    return new DashboardService(jdbc, time);
+  }
 
   @BeforeEach
   void setup() {
@@ -1025,7 +1031,7 @@ class ReviewWorkflowTests {
                         filter.from(), filter.to(), owner, account, List.of("NORMAL"), null, 0, 20))
                 .get("totalElements"))
         .isEqualTo(0L);
-    var d = new DashboardService(jdbc, clock).view(l1, filter.from(), filter.to());
+    var d = refreshedDashboard(clock).view(l1, filter.from(), filter.to());
     assertThat(object(d.get("detection")).get("received")).isEqualTo(2L);
     assertThat(object(d.get("detection")).get("analyzed")).isEqualTo(0L);
     assertThat(rows(d.get("daily")).getFirst().get("day").toString()).isEqualTo("2023-09-01");
@@ -1157,9 +1163,9 @@ class ReviewWorkflowTests {
   @Test
   void episode_metrics_use_work_time_first_review_and_creation_not_transfer_events() {
     Instant now = Instant.parse("2023-09-05T00:00:00Z");
-    var dashboard = new DashboardService(jdbc, clock);
     var empty =
-        dashboard.episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
+        refreshedDashboard(clock)
+            .episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
     assertThat(object(empty.get("completion")).get("average_seconds")).isNull();
     long old =
         rawEpisode(
@@ -1189,7 +1195,8 @@ class ReviewWorkflowTests {
         old,
         l1);
     var result =
-        dashboard.episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
+        refreshedDashboard(clock)
+            .episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
     var current = object(result.get("current"));
     assertThat(current.get("open")).isEqualTo(2L);
     assertThat(current.get("aged")).isEqualTo(1L);
@@ -1202,7 +1209,8 @@ class ReviewWorkflowTests {
         .isEqualTo(40 * 3600L);
     assertThat(number(rows(result.get("oldestOpen")).getFirst().get("caseId"))).isEqualTo(old);
     var otherRange =
-        dashboard.episodeWork(now, LocalDate.parse("2023-08-01"), LocalDate.parse("2023-08-02"));
+        refreshedDashboard(clock)
+            .episodeWork(now, LocalDate.parse("2023-08-01"), LocalDate.parse("2023-08-02"));
     assertThat(object(otherRange.get("current"))).isEqualTo(current);
     assertThat(object(otherRange.get("firstReview")).get("samples")).isEqualTo(0L);
   }
@@ -1211,7 +1219,7 @@ class ReviewWorkflowTests {
   void http_contract_serializes_clock_cases_and_validates_missing_actor() throws Exception {
     var controller =
         new ReviewController(
-            service, new LedgerQueryService(jdbc), clock, new DashboardService(jdbc, clock));
+            service, new LedgerQueryService(jdbc), clock, refreshedDashboard(clock));
     var mvc =
         MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(new ApiExceptionHandler())
@@ -1427,7 +1435,7 @@ class ReviewWorkflowTests {
         l2,
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))),
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))));
-    var dashboard = new DashboardService(jdbc, clock);
+    var dashboard = refreshedDashboard(clock);
     var d = dashboard.view(l1, LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-02"));
     assertThat(d.get("openAlertsAgedOver3Days")).isEqualTo(1L);
     assertThat(object(d.get("institution")).get("aged")).isEqualTo(2L);
@@ -1468,7 +1476,7 @@ class ReviewWorkflowTests {
         "b".repeat(64));
     jdbc.update(
         "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())", l1);
-    var dashboard = new DashboardService(jdbc, clock);
+    var dashboard = refreshedDashboard(clock);
     var result = dashboard.view(l1, LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
     var days = rows(result.get("dailyAlertStatus"));
     assertThat(days).hasSize(3);
@@ -1512,7 +1520,7 @@ class ReviewWorkflowTests {
         b);
     jdbc.update("update review.alerts set created_at='2023-09-03 15:00+00' where alert_id=?", c);
     var days =
-        new DashboardService(jdbc, clock)
+        refreshedDashboard(clock)
             .daily(LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
     assertThat(days).hasSize(3);
     assertThat(days.getFirst().get("day").toString()).isEqualTo("2023-09-01");
@@ -1533,13 +1541,13 @@ class ReviewWorkflowTests {
           "c".repeat(64),
           encode(evidence.detail(id, null)));
     }
-    var dashboard = new DashboardService(jdbc, clock);
     var day = LocalDate.parse("2023-09-02");
     act(l1, "REVIEW_START", null, select(a));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst()).containsEntry("pending", 2L);
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
+        .containsEntry("pending", 2L);
     clock.set(clock.now().plus(Duration.ofDays(1)), 1);
     long ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
         .containsEntry("pending", 0L)
         .containsEntry("inProgress", 2L)
         .containsEntry("done", 0L);
@@ -1550,7 +1558,7 @@ class ReviewWorkflowTests {
         "UNLINK",
         null,
         new ReviewService.Selection(ep, number(detail.get("revision")), group, List.of()));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
         .containsEntry("pending", 2L)
         .containsEntry("inProgress", 0L)
         .containsEntry("done", 0L);
@@ -1563,11 +1571,12 @@ class ReviewWorkflowTests {
               ep, number(detail.get("revision")), number(g.get("groupId")), List.of(1L, 2L)));
     act(l2, "DECIDE", "SUSPICIOUS", selections.toArray(ReviewService.Selection[]::new));
     act(l2, "CLOSE", null, select(ep));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
         .containsEntry("pending", 0L)
         .containsEntry("inProgress", 0L)
         .containsEntry("done", 2L);
-    assertThat(dashboard.dailyAlertStatus(day.plusDays(1), day.plusDays(1)).getFirst())
+    assertThat(
+            refreshedDashboard(clock).dailyAlertStatus(day.plusDays(1), day.plusDays(1)).getFirst())
         .containsEntry("pending", 0L)
         .containsEntry("inProgress", 0L)
         .containsEntry("done", 0L);

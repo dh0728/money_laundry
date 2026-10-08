@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class DemoResetTests {
   @Autowired JdbcTemplate jdbc;
   @Autowired TransactionTemplate tx;
+  @Autowired DashboardProjection projection;
   @MockitoBean AnalysisScheduler scheduler;
   @MockitoBean UploadStore store;
   DemoResetService service;
@@ -107,9 +108,11 @@ class DemoResetTests {
         "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(now(),?,?,10,'USD',10,'USD','ACH',10,'test','2023-09-01')",
         account,
         account);
+    for (var scope : DashboardProjection.Scope.values()) projection.refresh(scope);
     var result = service.reset(admin, input());
     assertThat(result.get("status")).isEqualTo("COMPLETED");
-    for (String table : DemoResetService.TABLES.split(","))
+    for (String table :
+        (DemoResetService.TABLES + "," + DemoResetService.DASHBOARD_TABLES).split(","))
       assertThat(jdbc.queryForObject("select count(*) from " + table, Long.class))
           .as(table)
           .isZero();

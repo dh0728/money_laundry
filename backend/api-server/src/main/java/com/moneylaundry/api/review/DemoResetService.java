@@ -76,6 +76,8 @@ public class DemoResetService {
           "private.owner_identities",
           "core.owners",
           "ingest.uploads");
+  static final String DASHBOARD_TABLES =
+      "ops.dashboard_dirty,ops.dashboard_model_counts,ops.dashboard_case_items,ops.dashboard_case_counts,ops.dashboard_report_counts,ops.dashboard_delivery_days";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final BusinessTime time;
@@ -145,7 +147,11 @@ public class DemoResetService {
             jdbc.execute("set local lock_timeout='2s'");
             jdbc.queryForList("select pg_advisory_xact_lock(17002001)");
             jdbc.execute(
-                "lock table " + TABLES + ",ops.business_clock in access exclusive mode nowait");
+                "lock table "
+                    + TABLES
+                    + ","
+                    + DASHBOARD_TABLES
+                    + ",ops.business_clock in access exclusive mode nowait");
             var previous =
                 jdbc.queryForList(
                     "select actor_id from ops.resets where reset_id=?", input.requestId());
@@ -226,7 +232,14 @@ public class DemoResetService {
                         input.requestId(),
                         key,
                         prefix));
-            jdbc.execute("truncate table " + TABLES + " continue identity restrict");
+            jdbc.execute(
+                "truncate table "
+                    + TABLES
+                    + ","
+                    + DASHBOARD_TABLES
+                    + " continue identity restrict");
+            // The source and read models are both empty. Remove truncate invalidations atomically.
+            jdbc.update("delete from ops.dashboard_dirty");
             jdbc.update(
                 "update ops.business_clock set business_at=null,revision=revision+1,updated_at=now() where id");
             if (objects.isEmpty())

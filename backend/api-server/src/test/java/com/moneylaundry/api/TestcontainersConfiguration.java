@@ -9,6 +9,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 public class TestcontainersConfiguration {
 
   @Bean
+  org.springframework.test.context.DynamicPropertyRegistrar dashboardTestProperties() {
+    return registry -> registry.add("app.dashboard.refresh-enabled", () -> false);
+  }
+
+  @Bean
   @ServiceConnection
   PostgreSQLContainer postgres() {
     return new PostgreSQLContainer("postgres:17-alpine");
