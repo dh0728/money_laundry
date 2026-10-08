@@ -215,7 +215,7 @@ dataAsOf는 근거 생성 run cutoff, lastCheckedAt은 성공한 검사 시각�
 
 ### 3.4 배정
 
-Alert와 일반 Episode 생성은 비밀번호 해시가 등록된 STAFF에 공통 라운드로빈 배정한다. last_assigned_at NULL 우선·오래된 순·동률 userId순이다. 배정 대상이 없으면 ALERT_ASSIGNEE_UNAVAILABLE로 실패한다. 관리자 재배정 API는 제공하지 않는다.
+Alert와 일반 Episode 생성은 비밀번호 해시가 등록된 STAFF에 공통 라운드로빈 배정한다. last_assigned_at NULL 우선·오래된 순·동률 userId순이다. 배정 순서는 업무 시각과 분리하며, 공통 트랜잭션 잠금 안에서 DB 현재 시각과 기존 최대 배정 시각+1마이크로초 중 큰 값으로 갱신한다. 같은 업무 시각의 대량 생성·동시 요청에서도 순환하고 실패하면 배정 순서도 롤백한다. 사건 createdAt/assignedAt은 업무 시각을 유지한다. 시연 초기화와 설정 복원에서는 last_assigned_at을 NULL로 초기화한다. 배정 대상이 없으면 ALERT_ASSIGNEE_UNAVAILABLE로 실패한다. 관리자 재배정 API는 제공하지 않는다.
 
 ### 3.5 변경 제안 API
 

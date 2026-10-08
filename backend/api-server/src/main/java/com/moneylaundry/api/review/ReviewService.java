@@ -940,10 +940,7 @@ public class ReviewService {
     }
     long target;
     if (cmd.targetCaseId() == null) {
-      long assignee =
-          jdbc.queryForObject(
-              "select user_id from core.users where role='STAFF' and password_hash is not null and password_hash<>'' order by last_assigned_at nulls first,user_id limit 1 for update",
-              Long.class);
+      long assignee = StaffAssignment.next(jdbc);
       target =
           jdbc.queryForObject(
               "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,?,?) returning episode_id",
@@ -951,10 +948,6 @@ public class ReviewService {
               assignee,
               Timestamp.from(time.now()),
               Timestamp.from(time.now()));
-      jdbc.update(
-          "update core.users set last_assigned_at=? where user_id=?",
-          Timestamp.from(time.now()),
-          assignee);
     } else {
       target = cmd.targetCaseId();
       var dest = caseRow(target);

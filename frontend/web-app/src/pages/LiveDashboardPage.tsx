@@ -11,9 +11,7 @@ import { AlertStatusChart } from '@/features/dashboard/AlertFlowChart'
 import { TransactionPatternHierarchy } from '@/features/dashboard/PatternRelation'
 import { UnderTabs } from '@/components/UnderTabs'
 import { isoDate } from '@/lib/format'
-import { RefreshCountdown } from '@/components/RefreshCountdown'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
-import { RefreshStatus } from '@/components/RefreshStatus'
 import { typeDisplay, type TypeCode } from '@/api/codes'
 import { fetchDemoClock, daysBefore, kstDate, type LiveDashboard } from '@/api/liveDashboard'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
@@ -68,8 +66,8 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
       ]
 
   return <div className="space-y-6">
-    <RefreshStatus queries={[dashboard]} />
-    <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)} · <RefreshCountdown nextRefreshAt={dashboard.nextRefreshAt} refreshing={dashboard.refreshing} /></span></div>
+    {dashboard.refreshError && <div role="alert" className="text-xs">최신 조회 실패 · 이전 데이터를 표시합니다. {dashboard.refreshError}</div>}
+    <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)}</span></div>
     {scope === 'institution' ? <InstitutionView today={new Date(`${businessDate}T00:00:00`)} remote={{
       cards: <SectionCards items={kpis} />,
       range: { from: new Date(`${from}T00:00:00`), to: new Date(`${to}T00:00:00`) },

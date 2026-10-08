@@ -141,6 +141,9 @@ class ResetTests(unittest.TestCase):
             with patch.object(reset, 'psql', side_effect=['public\n', json.dumps(tables)]):
                 with self.assertRaises(FileExistsError):
                     reset.configuration_backup(path)
+            legacy = json.loads(path.read_text(encoding='utf-8'))
+            legacy['tables']['users'][0]['last_assigned_at'] = '2099-01-01T00:00:00Z'
+            path.write_text(json.dumps(legacy), encoding='utf-8')
             with patch.object(reset, 'psql') as db:
                 reset.restore_configuration(path)
             sql, database = db.call_args.args
@@ -151,8 +154,21 @@ class ResetTests(unittest.TestCase):
             self.assertIn('OVERRIDING SYSTEM VALUE', sql)
             self.assertIn("O''Brien", sql)
             self.assertIn('fixture-hash', sql)
+            self.assertNotIn('2099-01-01', sql)
             self.assertNotIn('CASCADE', sql)
             self.assertTrue(path.exists())
+
+    def test_new_backup_discards_assignment_history_but_preserves_account_fields(self):
+        tables = {name: [] for name in reset.CONFIGURATION}
+        user = dict(zip(reset.CONFIGURATION['users'].split(','),
+            [42, 'staff', 'Staff', 'STAFF', 'fixture-hash', '2099-01-01T00:00:00Z', '2026-10-07T00:00:00Z']))
+        tables['users'] = [user]
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'configuration.json'
+            with patch.object(reset, 'psql', side_effect=['core\n', json.dumps(tables)]):
+                reset.configuration_backup(path)
+            restored = json.loads(path.read_text(encoding='utf-8'))['tables']['users'][0]
+            self.assertEqual(restored, {**user, 'last_assigned_at': None})
 
     def test_foreign_or_incomplete_backup_is_rejected(self):
         for payload in ({'format': 1, 'database': 'prod', 'tables': {}},

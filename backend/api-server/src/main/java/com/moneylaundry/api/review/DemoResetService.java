@@ -244,6 +244,8 @@ public class DemoResetService {
                     + ","
                     + DASHBOARD_TABLES
                     + " continue identity restrict");
+            jdbc.update(
+                "update core.users set last_assigned_at=null where last_assigned_at is not null");
             // The source and read models are both empty. Remove truncate invalidations atomically.
             jdbc.update("delete from ops.dashboard_dirty");
             jdbc.update(

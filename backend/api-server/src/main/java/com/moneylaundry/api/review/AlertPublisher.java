@@ -191,15 +191,7 @@ public final class AlertPublisher {
     var recipients = new TreeSet<>(ids(plan.get("recipientIds")));
     boolean create = Set.of("NEW", "FOLLOWUP").contains(action);
     if (create) {
-      var staff =
-          jdbc.queryForList(
-              "select u.user_id from core.users u join core.assignable_staff s using(user_id) order by u.last_assigned_at nulls first,u.user_id limit 1 for update of u");
-      if (staff.isEmpty())
-        throw new com.moneylaundry.api.analysis.AnalysisFailure(
-            "ALERT_ASSIGNEE_UNAVAILABLE",
-            com.moneylaundry.api.analysis.AnalysisFailure.Kind.PERMANENT);
-      long user = number(staff.getFirst().get("user_id"));
-      jdbc.update("update core.users set last_assigned_at=? where user_id=?", at, user);
+      long user = StaffAssignment.next(jdbc);
       target =
           jdbc.queryForObject(
               "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,?,?) returning alert_id",

@@ -65,7 +65,9 @@ class DemoResetTests {
 
   @Test
   void clears_demonstration_data_and_clock_but_preserves_configuration_and_identity_sequences() {
+    jdbc.update("update core.users set last_assigned_at=null");
     var users = jdbc.queryForList("select * from core.users order by user_id");
+    jdbc.update("update core.users set last_assigned_at=now()");
     var banks = jdbc.queryForList("select * from core.banks order by bank_id");
     var fx = jdbc.queryForList("select * from core.fx_rates order by currency");
     jdbc.update(
