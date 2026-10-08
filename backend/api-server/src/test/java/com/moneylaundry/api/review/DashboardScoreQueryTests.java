@@ -21,9 +21,9 @@ class DashboardScoreQueryTests {
   @MockitoBean AnalysisScheduler scheduler;
   List<Long> transactions;
 
-  DashboardService refreshedDashboard(BusinessTime time) {
+  DashboardQueries refreshedDashboard(BusinessTime time) {
     for (var scope : DashboardProjection.Scope.values()) dashboardProjection.refresh(scope);
-    return new DashboardService(jdbc, time);
+    return new DashboardQueries(jdbc, time);
   }
 
   @BeforeEach

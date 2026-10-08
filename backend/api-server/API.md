@@ -10,7 +10,7 @@
 - uploadId/jobId/txId/alertId/episodeId/userId는 서버 발급 숫자 ID다. Alert의 caseId는 alertId, Episode의 caseId는 episodeId이며 두 사건 종류는 공통 ID 시퀀스를 사용한다. 계좌·소유주 ID는 별도 가명 UUID다.
 - 일반 페이지는 `{content,page,size,totalElements,totalPages}`. page는 0부터, size 기본20·범위1~200이다. 알림은 page 대신 number를 반환하고 size 최대100이다. 정렬은 각 API에 명시한 것만 지원한다. 빈 목록은200과 빈 content다.
 - 날짜형 필터는 KST 시작일00시 이상/종료일 다음날00시 미만이다. 작업 목록의 from/to는 날짜가 아닌 ISO-8601 Instant이며 양끝 포함이다. timestamp는 ISO-8601의 오프셋 또는 Z를 해석해 표시한다. 모든 응답이 `+09:00` 문자열이라고 가정하지 않는다. CSV의 시간대 없는 시각은 KST다.
-- JSON 이름은 엔드포인트별 응답 표를 따른다. 대시보드·제안 상세·동결 scores에는 snake_case가 있다. 요청 필드명을 임의 변환하지 않는다.
+- JSON 이름은 엔드포인트별 응답 표를 따른다. 제안 상세·동결 scores에는 snake_case가 있다. 대시보드는 camelCase DTO를 사용한다. 요청 필드명을 임의 변환하지 않는다.
 - 금액은 원통화와 명시된 USD 환산값을 구분한다. 원장 amountUsd는 고정 환율 버전으로 계산한 송금액이며 실시간 환율이 아니다. 미분석·결측·표본 없음의 null을0이나 정상 판정으로 바꾸지 않는다.
 - 업무 오류는 ProblemDetail `{type,title,status,detail,instance,code}`이며 일부 오류에 errors/uploadId 등 확장 필드가 있다. 보안 필터 오류는 `{status,code}`다. 400 형식/선택 오류, 401 미인증, 403 권한, 404 없음, 409 상태·개정 충돌, 413 파일 한도를 사용한다. INVALID_PARAMETER/VALIDATION_FAILED, UNAUTHENTICATED/INVALID_CREDENTIALS, FORBIDDEN/FORBIDDEN_ROLE, NOT_FOUND, INVALID_TRANSITION 등이 사용된다.
 - 직원 조회는 dev/local의 로그인 STAFF/ADMIN, 조사 변경은 해당 사건 담당 STAFF, 시연 제어·분석 등록/재개·초기화는 ADMIN이다. prod가 활성화된 직원 작업 환경은 허용하지 않는다. 은행 업로드·정정 API는 별도 X-Bank-Id 경계다. 인증·CSRF 상세는 §5를 따른다.
@@ -262,81 +262,56 @@ FE는 동일 출처(`/api/...`)로 쿠키를 유지하여 호출한다. `X-Demo-
 
 ## 7. 대시보드
 
-### 요청과 접근 범위
+### 조회 계약
 
-```http
-GET /api/v1/dashboard?from=2023-09-01&to=2023-09-10
-Cookie: JSESSIONID=<로그인 세션>
-```
+- `GET /api/v1/dashboard/summary?from=2023-09-01&to=2023-09-10`: 작은 카드/차트 요약. 로그인 STAFF/ADMIN, 본인 지표는 인증 사용자 기준이다. 기존 `GET /api/v1/dashboard`는 제거했다. 이번 웹 앱 API 어댑터는 아래 계약에 연결했다. 이전 웹 앱 빌드는 호환되지 않으므로 함께 갱신한다.
+- from/to 필수, KST 포함 날짜, from<=to 및 최대2년. 같은 응답의 businessAt은 하나다. 업무시각(시연 포함)과 실제 집계 실행시각을 혼동하지 않는다.
+- 정상200, `Cache-Control: private, no-store`. ETag/304, 차분 응답, SSE/WebSocket은 없다. GET은 집계/변경 명령을 실행하거나 아직 진행 중인 집계를 기다리지 않는다.
+- `businessAt`: ISO timestamp. `range`: `{from,to}` 날짜. `pipeline`/`investigation`: 각각 `{computedAt,data}`. computedAt은 실제 마지막 성공 집계 시각이고 원본의 최신 커밋까지 처리했다는 뜻은 아니다. 첫 공개가 없을 때만 두 필드가null이다. 원래 데이터가 빈 DB는 정상0으로 초기화한다. 이미 성공한 값은 재집계 중에도 제공한다. 화면에 ‘갱신중’ 표시나 상태 확인 후 별도 과거값 조회를 요구하지 않는다.
+- 모든 필드는 명시적 DTO이며 camelCase다. 각 data 객체의 필수 필드는 다음과 같다. 건수는 비음수 정수, 빈 범주/유형은 빈 배열, 표본 없는 평균은null이다.
 
-- 개인 집계 주체는 `GET /api/me`의 로그인 사용자다. 요청으로 다른 직원 ID를 지정하지 않는다.
-- **dev/local 서버 세션 인증 필수**. 접근·권한은 §5를 따른다. prod 포함 프로파일은 차단한다.
-- `from`, `to`: 필수 YYYY-MM-DD. from≤to, to≤from.plusYears(2). KST 시작일00시 이상/종료일 다음00시 미만.
-- 개인 집계의 주체는 로그인 직원. 기관 집계는 전체 직원 기준.
-- ‘오늘’, ‘어제’, 경과시간은 `businessAt`의 시연 업무 시각 기준. FE의 PC 현재 시각으로 대체하지 않는다.
-- 이 응답 일부 키는 아래와 같이 snake_case다. 시각에는 `Z` 등 오프셋 표현이 포함될 수 있으므로 파싱 후 KST로 표시한다. 문서에서 임의로 필드명을 바꾸지 않는다.
+| 경로(data 내부) | 의미·타입·기간 |
+|---|---|
+| pipeline.detection | `{received,analyzed,suspicious,deliveryDates}`. 오늘 분석 대상 거래일의 수신/통합 수, 그중 오늘 완료된 최신 유효 점수가 있는 거래, 그중 이진 의심 수. deliveryDates는 YYYY-MM-DD 배열. 선택기간 무관 |
+| pipeline.pendingReports | deliveryDates에 속한 미완료 보고 수. 선택기간 무관 |
+| pipeline.agreements | `[{agreement,count}]`. STRONG/ATYPICAL/PATTERN_ONLY/WEAK, 최신 유효 점수의 탐지 업무일이 선택기간 안인 거래. 미분석 제외 |
+| pipeline.types | `[{type,count}]`. 위 기간의 이진 의심 거래의 유형별 수. Alert 개수가 아님 |
+| investigation.personal | `{pending,aged,closed}`. 본인 현재 OPEN, 배정 후 정확히72시간 이상 OPEN, 본인 담당이며 본인이 기간 내 종결한 사건 |
+| investigation.institution | `{alerts,episodes,aged,today,yesterday}`. 현재OPEN Alert/Episode, 전체OPEN 중72시간 이상, 오늘/어제 생성 Alert |
+| investigation.openAlertsAgedOver3Days | OPEN Alert만 배정 후72시간 이상. 기간 무관 |
+| investigation.daily | `[{date,incoming,completed}]`. Alert 생성/종결 업무일별 수. 0건 날짜 포함, 날짜 오름차순 |
+| investigation.dailyAlertStatus | `[{date,pending,inProgress,done}]`. 최초 생성일별 현재 Alert 상태, 날짜 오름차순·0건 날짜 포함 |
+| investigation.episodeWork.current | `{open,aged,unreviewed,createdToday,closedToday}`. 현재/오늘, 선택기간 무관 |
+| investigation.episodeWork.firstReview | `{samples,averageSeconds}`. 선택기간의 최초 검토, 표본0이면 평균null |
+| investigation.episodeWork.completion | `{samples,averageSeconds}`. 선택기간의 종결, 표본0이면 평균null |
 
-### 조회와 집계 갱신
+지표 불변식:
+- dailyAlertStatus.pending은 Episode 소속 없는 OPEN Alert, inProgress는 OPEN Episode 소속, done은 직접 종결 또는 CLOSED Episode 소속이다. 각 날짜 상태의 합은 같은 날짜 daily.incoming과 같다. 근거 버전·거래·Episode 수를 세지 않는다.
+- daily.completed는 종결일 기준이며 같은 날 생성된 사건의 종결만 세지 않는다. 상태 차트는 과거 시점의 판정 이력을 복원한 것이 아니라 마지막 공개 집계의 현재 상태다.
+- STRONG=이진 의심+패턴 있음, ATYPICAL=이진 의심+패턴 없음, PATTERN_ONLY=이진 정상+패턴 있음, WEAK=이진 정상+패턴 없음. 유형0은 패턴 없음. agreements 합이 분모이고0이면 데이터 없음이다. 누락 범주를 표시할 때0으로 채울 수 있다.
+- PIPELINE은 거래/모델·대상 거래일·보고 집계를 같은 스냅샷에서 갱신한다. INVESTIGATION은 별도로 공개한다. 두 영역의 원본 반영 시각이 동일하다는 보장은 없다. 조회 중 원본 거래/점수/큰 근거 JSON 재계산은 하지 않지만, 준비된 집계의 선택기간 합산과 업무시각/72시간 조건 계산은 수행한다.
 
-조회는 `ops.dashboard_*`에 저장된 집계값을 읽는다. 거래 원장·모델 결과·사건 근거를 요청마다 재계산하지 않는다. 기간/로그인 직원/기준시각에 맞는 작은 집계의 합산과 우선순위10건·오래된 Episode20건을 조회한다. 최근 활동20건은 사용자/시각 인덱스를 이용해 이력에서 직접 읽는다.
+### 분리된 목록
 
-- 원본 변경 트랜잭션이 영향받는 영역의 갱신 요청을 기록한다. 백그라운드 작업은 기본2초 간격으로 요청 유무를 확인하고 **변경이 있는 영역만** 계산한다. 같은 트랜잭션·거래일의 중복 요청은 합친다. 원장/모델은 변경된 거래일, 사건 업무 상태·보고 현황·탐지일별 거래일 대응은 각각 독립적으로 갱신한다.
-- 각 영역은 완료 즉시 교체한다. 다른 영역의 완료를 기다리지 않는다. 계산 중에는 기존 커밋값, 완료 후에는 새 커밋값이 조회되며 별도 과거값·전역 세대·`refreshing` 응답 필드는 없다. 실패하면 기존 값과 요청을 유지하고 다음 실행에서 재처리한다. API 요청이 집계를 실행하거나 완료를 기다리지 않는다.
-- `personal/institution/daily/dailyAlertStatus/episodeWork/priority`는 사건 집계 영역 안에서 함께 교체한다. `detection/agreements/types`는 같은 원장·최신 공개 모델 집계를 사용한다. 한 응답 안에서는 읽기 스냅샷을 유지하지만 독립 영역끼리의 원본 반영 시각까지 같다고 보장하지 않는다.
-- 기준시각과 정확한72시간 경계는 저장된 시각 차원에 조회 기준을 적용한다. `businessAt`은 조회 기준 업무 시각이며 집계 완료 시각이 아니다. 변경 직후에는 직전 집계값이 보일 수 있다. 기본2초는 확인 간격이며 집계 완료시간 보장이 아니다.
-- 화면 조회 초기 권장값은5초이며 비활성 탭은 중지, 복귀/직원 작업 후에는 재조회한다. 작업 직후 재조회도 집계 완료 전이면 이전 값을 받을 수 있으므로 이후 정기 조회를 유지한다. 특정5초를 실무 공통 표준으로 취급하지 않는다. 현재 구현 범위는 백엔드/API이며 프런트엔드 자동 갱신은 변경하지 않았다.
+- `GET /api/v1/dashboard/activities?from=...&to=...`: 본인 최근20건, businessAt 내림차순·eventId 내림차순. `[{eventId,caseId,action,comment,businessAt}]`. ID는 문자열, 시각은ISO timestamp. 요약에 활동 본문을 포함하지 않는다.
+- `GET /api/v1/dashboard/queues`: `{businessAt,priority,oldestOpen}`. priority는 본인OPEN 최대10건 위험도 내림차순·생성시각·ID순, `[{caseId,kind,alertId,createdAt,risk}]`. oldestOpen은 현재OPEN Episode 최대20건 배정순·ID순, `[{caseId,assignee,ageSeconds,awaitingReview}]`. ID는 문자열이며 Episode의 alertId는null이다. 최초 계약과 같은 직원 조회 범위를 유지한다.
+- 두 목록도 인증과 no-store/조회 기한을 적용한다. 목록·상세 갱신 주기를 요약의1초에 자동으로 묶지 않는다. 새 프런트 소비 시 별도 주기를 결정한다.
 
-운영 설정: `DASHBOARD_REFRESH_ENABLED`(기본true), `DASHBOARD_REFRESH_DELAY_MS`(기본2000, 최소100). 집계 실행기는 원장/모델과 나머지 업무 집계를 별도 스레드로 처리하며 여러 API 인스턴스의 같은 영역 중복 계산은 DB advisory lock으로 막는다. 실패·실행시간은 서버 로그로 확인한다. 재구축이 필요하면 관리자는 해당 영역의 `ops.dashboard_dirty`에 `bucket='*'`를 기록할 수 있으며 공개 API에는 관리용 갱신 명령을 추가하지 않는다.
+### 1초 조회 소비자 규칙
 
-설계 근거: [Grafana 갱신 주기 지침](https://grafana.com/docs/learning-paths/visualization-metrics/time-range-refresh/), [Microsoft 사전 집계 읽기 모델](https://learn.microsoft.com/en-us/azure/architecture/patterns/materialized-view). 요구 최신성을 충족하는 범위에서 조회 빈도와 집계 비용을 따로 조정한다.
+- 최초 진입 즉시 조회, 이후1초 차례마다 같은 키의 진행 중 요청이 없을 때만 조회한다. 진행 중이면 차례를 버리고 큐에 쌓지 않는다. 응답 본문·해석·검증 완료까지 진행 중이다. 예:0초 시작/2.4초 완료면1·2초 생략/3초 재요청이다.
+- 수동 버튼은 진행 중 요청을 공유한다. 조회조건/로그인 사용자가 바뀌면 이전 요청 취소를 시도하고 키·세대가 다른 늦은 응답/finally를 무시한다. 숨겨진 탭·오프라인에서 신규 요청 중지, 복귀 시1회 재조회, 로그아웃 시 캐시 삭제다.
+- 클라이언트 전체 기한은5초를 초기 계약으로 한다. 네트워크/5xx 실패 후2→4→8→16→30초 상한과 작은 무작위 지연으로 재시도, 성공 시1초로 돌아온다. Retry-After보다 이른 수동/자동 재시도는 하지 않는다.401은 로그인 복구 전 중지,403은 접근 중지,400은 조건 수정 전 중지다.
+- 성공값이 있으면 다음 응답까지 유지한다. 첫 조회 실패나 지속적인 통신 장애는0으로 표시하지 않는다. 정상 집계 중 상태 배지는 요구하지 않는다. 현재 웹 앱 대시보드 요약은 이 1초 조회 규칙을 적용한다. 기존 카드·차트·문구·배치는 유지하며 수동 버튼은 진행 중 요청을 공유한다. 업무 목록·고위험 건수 등 별도 요청과 다른 페이지의 자동 주기는 이번 변경 대상이 아니다.
 
-### 응답 필드
+### 서버 기한·집계 실행·오류
 
-아래 경로가 실제 응답 키다. 건수는 number이며 결과 없는 목록은 빈 배열이다.
-
-| 필드 | 타입 / 의미 | 기간 조건 |
-|---|---|---|
-| businessAt | string, 기준 업무 시각 | 해당 없음 |
-| personal.pending | number, 본인 담당 OPEN Alert+Episode | 현재 전체 |
-| personal.aged | number, 위 건 중 배정 후72시간 이상 | 현재 전체 |
-| personal.closed | number, 본인 담당이며 본인이 종결한 사건 | 종결 업무 시각 |
-| institution.alerts / episodes | number, 현재 OPEN Alert / Episode | 현재 전체 |
-| institution.aged | number, OPEN Alert+Episode 중 배정 후72시간 이상 | 현재 전체 |
-| openAlertsAgedOver3Days | number, OPEN Alert만 배정 후72시간 이상 | 현재 전체, 선택 기간 무관 |
-| institution.today / yesterday | number, 오늘/어제 생성된 Alert | 선택 기간 무관 |
-| detection.received | number, 오늘 분석 업무 대상 거래일들의 수신·통합 원장 거래 수 | 선택 기간 무관 |
-| detection.analyzed / suspicious | number, 위 거래 중 오늘 완료된 최신 유효 점수가 있는 거래 / 그중 이진 임계 이상 거래 | 선택 기간 무관 |
-| deliveryDate | string, 대상 거래일. 복수이면 쉼표로 연결 | 선택 기간 무관 |
-| pendingReports | number, 대상 거래일의 처리·통합 미완료 보고 집계 | 선택 기간 무관 |
-| daily | array of {day: YYYY-MM-DD, incoming: number, completed: number} | Alert 생성/종결 업무일. 0건 날짜도 포함 |
-| dailyAlertStatus | array of {date: YYYY-MM-DD, pending: number, inProgress: number, done: number} | Alert 최초 생성 업무일별 현재 상태. 날짜 오름차순, 0건 날짜 포함 |
-| agreements | array of {agreement: string, count: number} | 최신 유효 점수의 탐지 업무일 |
-| types | array of {type: number, count: number} | 최신 유효 점수의 탐지 업무일, 이진 의심 거래만 |
-| activities | array of {event_id: number, case_id: number, action: string, comment: string, business_at: timestamp} | 본인 활동 업무 시각, 최근20건 |
-| priority | array of {case_id: number, kind: ALERT/EPISODE, alert_id: number 또는 null, created_at: timestamp, risk: number} | 본인 현재 OPEN, 위험도 내림차순·생성시각·ID순 최대10건 |
-| episodeWork | object, 아래 구조 | 항목별 구분 |
-
-`episodeWork` 전체 구조:
-
-- `asOf`: 업무 시각 문자열.
-- `current`: `open`, `aged`, `unreviewed`, `created_today`, `closed_today` 각 number. 현재/오늘 집계이며 기간 필터 미적용.
-- `firstReview`, `completion`: 각각 `{samples: number, average_seconds: number 또는 null}`. 선택 기간의 최초 검토/종결 집계이며 표본0이면 평균null.
-- `oldestOpen`: `[{caseId: number, assignee: string, age_seconds: number, awaiting_review: boolean}]`, 오래된 배정순 최대20건.
-
-`case_id`/`caseId`는 조사 사건 ID이며 종류가 ALERT이면 alertId, EPISODE이면 episodeId다. priority의 Episode는 alert_id가 null일 수 있다.
-
-### 차트·카드 의미
-
-- `daily.incoming`은 새 Alert 사건 수이고 새 근거 버전 수가 아니다. `completed`는 조사 업무 종결 건수이며 정상 판정만 세는 값이 아니다. 당일 유입 건들이 당일 종결됐다는 뜻도 아니다.
-- `dailyAlertStatus`는 완료된 분석에서 공개된 Alert만 원본 Alert당 한 번 집계한다. `pending`은 현재 Episode 소속이 없는 OPEN Alert, `inProgress`는 현재 OPEN Episode에 소속된 Alert, `done`은 직접 종결한 Alert 또는 CLOSED Episode에 소속된 Alert다. 정상·단독 의심 등 종결 결과는 합산한다.
-- 날짜는 KST 최초 생성일이며 편입·종결·해제 시 날짜가 이동하지 않는다. Episode에서 해제되어 다시 열린 Alert는 `pending`으로 돌아간다. 해당 날짜의 `pending + inProgress + done`은 `daily.incoming`과 같다. 근거 버전·거래·Episode 수를 세지 않는다.
-- 이 값은 마지막으로 완료된 사건 집계의 현재 상태다. 선택 날짜 당시의 상태를 복원한 이력 통계가 아니다. REVIEW_START 기록이나 단순 상세 열람은 이 분류에 영향을 주지 않는다. 기존 `daily.completed`(종결일별 이벤트)는 유지하며 이 차트에 대입하지 않는다.
-- `types`는 **의심 거래 건수**다. `alertsByType`이라는 이름으로 Alert 건수처럼 표시하지 않는다. 유형 분포는 가로 막대그래프다.
-- 도넛은 **전체 분석 거래**의 모델 조합 분포다. `STRONG`=이진 의심+패턴 있음, `ATYPICAL`=이진 의심+패턴 없음, `PATTERN_ONLY`=이진 정상+패턴 있음, `WEAK`=이진 정상+패턴 없음. 패턴 없음은 최다 확률 클래스0, 동률이면 작은 코드 우선이다. 미분석은 네 범주에 넣지 않는다.
-- agreements/types는 실제 있는 범주만 반환한다. FE는 누락 범주를0으로 채울 수 있다. 도넛 분모는 agreements의 count 합이며0이면 데이터 없음이다.
-- 오늘 탐지율은 suspicious / received다. 미분석을 분모에서 제외하지 않는다. 분모0 또는 보고 처리 미완료 시 최종 비율을 표시하지 않는다. 양쪽 은행 중복 보고는 한 거래로 세고 실제 반복 거래는 보존한다. 여러 분석 날짜는 거래일 합집합을 사용한다. 검수·통합 미완료 보고가 있으면 최종 비율을 표시하지 않는다.
-- Alert 전일 대비는 (today−yesterday)/yesterday×100. yesterday=0이면 ‘—’. 기간 밖의 오늘/어제를 daily 배열에서 추정하지 않고 institution을 사용한다.
-- `openAlertsAgedOver3Days`는 Alert만 집계하며 배정 후 정확히72시간인 건도 포함한다. institution.aged는 Alert+Episode 합계이므로 구분한다.
+- 인증/권한 확인 이후 대시보드 DB 읽기는 전용 최대4연결 풀을 사용한다. 풀 연결 대기 최대750ms, 읽기 전체 예산3초다. 같은 읽기 전용 REPEATABLE READ 스냅샷으로 조회하고 detached DTO를 반환한다. 예산 초과 시 실행 SQL에 취소를 보내고 연결을 종료한다. 취소 전파/연결 정리 시간은 추가될 수 있다. 인증·프록시·JSON 직렬화·인터넷 전송까지3초 안이라는 보장은 아니며 클라이언트5초 기한과 구분한다.
+- 읽기 시간 초과/연결 부족은503 `DASHBOARD_READ_TIMEOUT`/`DASHBOARD_READ_UNAVAILABLE`, `Retry-After: 2`. 정상 빈 결과와 구분한다. 입력 오류400·로그인401·권한403은 §0/§5를 따른다. 요청 제한 계층이429를 반환하면 같은 재시도 규칙을 따른다.
+- `DASHBOARD_REFRESH_DELAY_MS` 기본5000: 경량 확인과 실제 집계는 별도 실행기다. 확인 자체는1초 예산이며 늦어진 확인 차례를 몰아서 실행하지 않는다. 영역당 실행/예약 최대1개, 전체집계 작업자2개다. 다른 API 인스턴스는 DB advisory lock으로 동일 영역 중복 실행을 막는다.
+- 같은 영역이5초를 넘으면 다음 확인에서 건너뛴다. 집계 중 발생한 변경은 DB에 남아 완료 후 다음 확인에서 처리한다. 집계와 처리한 요청 삭제는 원자적이다. 실패하면 기존값/요청 유지, 실패 후5→10→20→40→60초 상한으로 해당 영역만 재시도한다. 새 변경으로 대기 시간을 우회하지 않는다.
+- 집계 트랜잭션 제한120초, 개별문장110초/잠금2초. 이는 실행 제한이며 완료 성능 보장이 아니다. 큐 대기 없는 데이터 반영은 대략5초 확인 대기+집계시간+다음 화면조회 대기+HTTP/렌더시간이다.
+- 조회 GET이 빠른 것, 원본 반영이 빠른 것, 일별 전송/분석6시간 달성은 별도 검증 대상이다. 운영 상태는 ops.dashboard_refresh_state 및 dashboard_dirty로 감시하며 사용자 화면에 내부 실패 원문/SQL/시크릿을 노출하지 않는다.
 
 ## 8. 거래 탐색
 

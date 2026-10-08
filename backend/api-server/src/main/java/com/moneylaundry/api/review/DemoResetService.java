@@ -77,7 +77,7 @@ public class DemoResetService {
           "core.owners",
           "ingest.uploads");
   static final String DASHBOARD_TABLES =
-      "ops.dashboard_dirty,ops.dashboard_model_counts,ops.dashboard_case_items,ops.dashboard_case_counts,ops.dashboard_report_counts,ops.dashboard_delivery_days";
+      "ops.dashboard_refresh_state,ops.dashboard_dirty,ops.dashboard_model_counts,ops.dashboard_case_items,ops.dashboard_case_counts,ops.dashboard_report_counts,ops.dashboard_delivery_days";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final BusinessTime time;
@@ -232,6 +232,12 @@ public class DemoResetService {
                         input.requestId(),
                         key,
                         prefix));
+            // Fixed lock order prevents a pre-reset refresh from republishing deleted data.
+            for (var scopeKey : DashboardProjection.Scope.values())
+              if (!Boolean.TRUE.equals(
+                  jdbc.queryForObject(
+                      "select pg_try_advisory_xact_lock(?)", Boolean.class, scopeKey.lockKey)))
+                throw conflict("RESET_BUSY", "대시보드 집계가 실행 중입니다. 잠시 후 다시 시도하세요.");
             jdbc.execute(
                 "truncate table "
                     + TABLES
@@ -240,6 +246,8 @@ public class DemoResetService {
                     + " continue identity restrict");
             // The source and read models are both empty. Remove truncate invalidations atomically.
             jdbc.update("delete from ops.dashboard_dirty");
+            jdbc.update(
+                "insert into ops.dashboard_refresh_state(scope,computed_at) values('PIPELINE',clock_timestamp()),('INVESTIGATION',clock_timestamp())");
             jdbc.update(
                 "update ops.business_clock set business_at=null,revision=revision+1,updated_at=now() where id");
             if (objects.isEmpty())

@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class DashboardProjectionTests {
   @Autowired JdbcTemplate jdbc;
   @Autowired DashboardProjection projection;
+  @Autowired DashboardService dashboard;
   @Autowired PlatformTransactionManager manager;
   @Autowired TransactionTemplate tx;
   @MockitoBean AnalysisScheduler scheduler;
@@ -63,7 +64,7 @@ class DashboardProjectionTests {
         status -> {
           long job =
               jdbc.queryForObject(
-                  "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-01',now(),now(),.7,'COMPLETED','COMPLETE') returning job_id",
+                  "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values(date '2023-09-01'+(select count(*)::int from analysis.jobs),now(),now(),.7,'COMPLETED','COMPLETE') returning job_id",
                   Long.class);
           var run = UUID.randomUUID();
           jdbc.update(
@@ -95,6 +96,21 @@ class DashboardProjectionTests {
   }
 
   @Test
+  void maximum_range_keeps_zero_days_and_rejects_one_extra_day() {
+    publishedAlert("2023-09-01 09:00+09");
+    drain();
+    var from = LocalDate.parse("2023-09-01");
+    var to = from.plusYears(2);
+    var result = dashboard.view(user, from, to);
+    var days = result.investigation().data().daily();
+    assertThat(days).hasSize((int) java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1);
+    assertThat(days.stream().mapToLong(DashboardSummary.Daily::incoming).sum()).isEqualTo(1);
+    assertThat(days.getLast().incoming()).isZero();
+    assertThatThrownBy(() -> dashboard.view(user, from, to.plusDays(1)))
+        .isInstanceOf(com.moneylaundry.api.ApiException.class);
+  }
+
+  @Test
   void changes_are_transactional_coalesced_and_only_affected_days_are_replaced() {
     tx.executeWithoutResult(
         s -> {
@@ -102,21 +118,22 @@ class DashboardProjectionTests {
           transaction("2023-08-31");
           assertThat(
                   jdbc.queryForObject(
-                      "select count(*) from ops.dashboard_dirty where scope='MODEL'", Long.class))
+                      "select count(*) from ops.dashboard_dirty where component='MODEL'",
+                      Long.class))
               .isEqualTo(1);
           s.setRollbackOnly();
         });
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isFalse();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isFalse();
     long first = transaction("2023-08-31");
     transaction("2023-09-01");
     assertThat(received()).isZero();
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isTrue();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isTrue();
     var unchanged =
         jdbc.queryForObject(
             "select xmin::text from ops.dashboard_model_counts where business_date='2023-09-01'",
             String.class);
     jdbc.update("update ledger.transactions set integration_status='HELD' where tx_id=?", first);
-    projection.refresh(DashboardProjection.Scope.MODEL);
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
     assertThat(received()).isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
@@ -126,14 +143,14 @@ class DashboardProjectionTests {
     jdbc.update(
         "update ledger.transactions set integration_status='ACTIVE',business_date='2023-09-02' where tx_id=?",
         first);
-    projection.refresh(DashboardProjection.Scope.MODEL);
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
     assertThat(
             jdbc.queryForList(
                 "select business_date::text from ops.dashboard_model_counts order by 1",
                 String.class))
         .containsExactly("2023-09-01", "2023-09-02");
     jdbc.update("delete from ledger.transactions where tx_id=?", first);
-    projection.refresh(DashboardProjection.Scope.MODEL);
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
     assertThat(received()).isEqualTo(1);
   }
 
@@ -141,7 +158,7 @@ class DashboardProjectionTests {
   void previous_committed_value_stays_readable_and_concurrent_change_survives_refresh()
       throws Exception {
     transaction("2023-08-31");
-    projection.refresh(DashboardProjection.Scope.MODEL);
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
     transaction("2023-08-31");
     var calculated = new CountDownLatch(1);
     var release = new CountDownLatch(1);
@@ -168,15 +185,15 @@ class DashboardProjectionTests {
           executor.submit(
               () ->
                   new DashboardProjection(blocked, manager)
-                      .refresh(DashboardProjection.Scope.MODEL));
+                      .refresh(DashboardProjection.Scope.PIPELINE));
       try {
         assertThat(calculated.await(10, TimeUnit.SECONDS)).isTrue();
         assertThat(received()).isEqualTo(1); // Uncommitted delete/insert is never visible.
-        assertThat(projection.refresh(DashboardProjection.Scope.MODEL))
+        assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE))
             .isFalse(); // Another instance.
         transaction("2023-08-31"); // Must survive the first worker's queue deletion.
         publishedAlert("2023-09-01 00:00Z");
-        assertThat(projection.refresh(DashboardProjection.Scope.CASES)).isTrue();
+        assertThat(projection.refresh(DashboardProjection.Scope.INVESTIGATION)).isTrue();
         assertThat(
                 jdbc.queryForObject(
                     "select sum(n)::bigint from ops.dashboard_case_counts", Long.class))
@@ -187,9 +204,9 @@ class DashboardProjectionTests {
       assertThat(work.get(10, TimeUnit.SECONDS)).isTrue();
     }
     assertThat(received()).isEqualTo(2);
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isTrue();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isTrue();
     assertThat(received()).isEqualTo(3);
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isFalse();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isFalse();
   }
 
   @Test
@@ -208,35 +225,97 @@ class DashboardProjectionTests {
           }
         };
     assertThatThrownBy(
-            () -> new DashboardProjection(broken, manager).refresh(DashboardProjection.Scope.MODEL))
+            () ->
+                new DashboardProjection(broken, manager)
+                    .refresh(DashboardProjection.Scope.PIPELINE))
         .isInstanceOf(IllegalStateException.class);
     assertThat(received()).isEqualTo(1);
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isTrue();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isFalse();
+    jdbc.update("update ops.dashboard_refresh_state set retry_at=now()-interval '1 second'");
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isTrue();
     assertThat(received()).isEqualTo(2);
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isFalse();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isFalse();
   }
 
   @Test
-  void report_and_delivery_values_update_independently_and_truncate_clears_rebuilt_values() {
+  void delayed_failure_cannot_overwrite_a_newer_success() throws Exception {
+    transaction("2023-08-31");
+    drain();
+    transaction("2023-08-31");
+    var recording = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var broken =
+        new JdbcTemplate(jdbc.getDataSource()) {
+          private int locks;
+
+          @Override
+          public <T> T queryForObject(String sql, Class<T> type, Object... args) {
+            if (sql.equals("select pg_try_advisory_xact_lock(?)") && ++locks == 2) {
+              recording.countDown();
+              try {
+                if (!release.await(10, TimeUnit.SECONDS))
+                  throw new IllegalStateException("fixture timeout");
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+              }
+            }
+            return super.queryForObject(sql, type, args);
+          }
+
+          @Override
+          public int update(String sql, Object... args) {
+            int count = super.update(sql, args);
+            if (sql.startsWith("insert into ops.dashboard_model_counts"))
+              throw new IllegalStateException("fixture failure");
+            return count;
+          }
+        };
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      var failed =
+          executor.submit(
+              () ->
+                  new DashboardProjection(broken, manager)
+                      .refresh(DashboardProjection.Scope.PIPELINE));
+      try {
+        assertThat(recording.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isTrue();
+      } finally {
+        release.countDown();
+      }
+      assertThatThrownBy(() -> failed.get(10, TimeUnit.SECONDS))
+          .isInstanceOf(ExecutionException.class);
+    }
+    var state =
+        jdbc.queryForMap(
+            "select failures,retry_at,last_error_code from ops.dashboard_refresh_state where scope='PIPELINE'");
+    assertThat(state.get("failures")).isEqualTo(0);
+    assertThat(state.get("retry_at")).isNull();
+    assertThat(state.get("last_error_code")).isNull();
+    assertThat(received()).isEqualTo(2);
+  }
+
+  @Test
+  void pipeline_components_publish_together_and_truncate_clears_rebuilt_values() {
     long upload =
         jdbc.queryForObject(
             "insert into ingest.uploads(bank_id,business_date,file_name,file_hash,size_bytes,status) values(999019,'2023-08-31','fixture.csv',repeat('a',64),1,'FAILED') returning upload_id",
             Long.class);
     jdbc.update(
         "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-01',now(),'2023-09-03 09:00+09',.7,'QUEUED','FEATURES')");
-    projection.refresh(DashboardProjection.Scope.REPORTS);
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
     assertThat(jdbc.queryForObject("select n from ops.dashboard_report_counts", Long.class))
         .isEqualTo(1);
     assertThat(jdbc.queryForObject("select count(*) from ops.dashboard_delivery_days", Long.class))
-        .isZero();
-    projection.refresh(DashboardProjection.Scope.DELIVERY);
+        .isEqualTo(1);
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
     assertThat(
             jdbc.queryForObject(
                 "select business_date::text from ops.dashboard_delivery_days where detected_day='2023-09-03'",
                 String.class))
         .isEqualTo("2023-08-31");
     jdbc.update("update ingest.uploads set status='EXPIRED' where upload_id=?", upload);
-    projection.refresh(DashboardProjection.Scope.REPORTS);
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
     assertThat(jdbc.queryForObject("select count(*) from ops.dashboard_report_counts", Long.class))
         .isZero();
     transaction("2023-08-31");
@@ -253,15 +332,17 @@ class DashboardProjectionTests {
     drain();
     var before = jdbc.queryForList("select xmin::text,n from ops.dashboard_model_counts");
     jdbc.update("update core.users set name=name where user_id=?", user);
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isFalse();
-    assertThat(projection.refresh(DashboardProjection.Scope.CASES)).isTrue();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isFalse();
+    assertThat(projection.refresh(DashboardProjection.Scope.INVESTIGATION)).isFalse();
     var clock = mock(BusinessTime.class);
-    var dashboard = new DashboardService(jdbc, clock);
+    var dashboard = new DashboardQueries(jdbc, clock);
     var day = LocalDate.parse("2023-09-04");
     var now = Instant.parse("2023-09-04T00:00:00Z");
     when(clock.now()).thenReturn(now.minusSeconds(1), now);
-    assertThat(dashboard.view(user, day, day).get("openAlertsAgedOver3Days")).isEqualTo(0L);
-    assertThat(dashboard.view(user, day, day).get("openAlertsAgedOver3Days")).isEqualTo(1L);
+    assertThat(dashboard.view(user, day, day).investigation().data().openAlertsAgedOver3Days())
+        .isEqualTo(0L);
+    assertThat(dashboard.view(user, day, day).investigation().data().openAlertsAgedOver3Days())
+        .isEqualTo(1L);
     assertThat(jdbc.queryForList("select xmin::text,n from ops.dashboard_model_counts"))
         .isEqualTo(before);
   }
@@ -281,9 +362,11 @@ class DashboardProjectionTests {
     tx.executeWithoutResult(
         s -> {
           jdbc.execute("set local role dashboard_worker_test");
-          jdbc.update("update analysis.jobs set status='RUNNING' where job_id=?", job);
+          jdbc.update(
+              "update analysis.jobs set business_at=business_at+interval '1 day' where job_id=?",
+              job);
         });
-    assertThat(projection.refresh(DashboardProjection.Scope.DELIVERY)).isTrue();
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isTrue();
     for (String sql :
         List.of("select * from ops.dashboard_delivery_days", "delete from ops.dashboard_dirty"))
       assertThatThrownBy(
@@ -301,6 +384,7 @@ class DashboardProjectionTests {
       throws Exception {
     transaction("2023-08-31");
     jdbc.update("update core.users set name=name where user_id=?", user);
+    publishedAlert("2023-09-01 00:00Z");
     var observed = spy(projection);
     var casesDone = new CountDownLatch(1);
     var attempts = new java.util.concurrent.atomic.AtomicInteger();
@@ -313,7 +397,7 @@ class DashboardProjectionTests {
               return changed;
             })
         .when(observed)
-        .refresh(DashboardProjection.Scope.CASES);
+        .refresh(DashboardProjection.Scope.INVESTIGATION);
     var modelDone = new CountDownLatch(1);
     doAnswer(
             invocation -> {
@@ -322,7 +406,7 @@ class DashboardProjectionTests {
               return changed;
             })
         .when(observed)
-        .refresh(DashboardProjection.Scope.MODEL);
+        .refresh(DashboardProjection.Scope.PIPELINE);
     // The second successful CASES pass is observable through the durable queue.
     var worker = new DashboardRefreshWorker(observed, 100, true);
     try {
@@ -335,7 +419,7 @@ class DashboardProjectionTests {
     }
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from ops.dashboard_dirty where scope in ('MODEL','CASES')",
+                "select count(*) from ops.dashboard_dirty where scope in ('PIPELINE','INVESTIGATION')",
                 Long.class))
         .isZero();
   }
@@ -350,19 +434,136 @@ class DashboardProjectionTests {
         new BusinessTime(
             jdbc, tx, new MockEnvironment().withProperty("spring.profiles.active", "local"));
     jdbc.update("update ops.business_clock set business_at='2023-09-01 09:00+09'");
-    var dashboard = new DashboardService(observed, time);
+    var dashboard = new DashboardQueries(observed, time);
     var day = LocalDate.parse("2023-09-01");
     var result = dashboard.view(user, day, day);
-    assertThat(((Map<?, ?>) result.get("detection")).get("received")).isEqualTo(1L);
-    assertThat(result).doesNotContainKeys("refreshing", "generation", "stale");
+    assertThat(result.pipeline().data().detection().received()).isEqualTo(1L);
+    assertThat(result.pipeline().computedAt()).isNotNull();
     for (var invocation : mockingDetails(observed).getInvocations()) {
       if (invocation.getArguments().length > 0
           && invocation.getArguments()[0] instanceof String sql)
         assertThat(sql).doesNotContain("ledger.", "analysis.", "review.cases", "dashboard_dirty");
     }
     assertThat(received()).isEqualTo(1);
-    assertThat(projection.refresh(DashboardProjection.Scope.MODEL)).isTrue();
-    assertThat(((Map<?, ?>) dashboard.view(user, day, day).get("detection")).get("received"))
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isTrue();
+    assertThat(dashboard.view(user, day, day).pipeline().data().detection().received())
         .isEqualTo(2L);
+  }
+
+  @Test
+  void case_updates_touch_only_affected_items_and_preserve_group_totals() {
+    long first = publishedAlert("2023-09-01 00:00Z");
+    publishedAlert("2023-09-01 00:00Z");
+    long untouched = publishedAlert("2023-09-02 00:00Z");
+    drain();
+    String before =
+        jdbc.queryForObject(
+            "select xmin::text from ops.dashboard_case_items where case_id=?",
+            String.class,
+            untouched);
+    String countBefore =
+        jdbc.queryForObject(
+            "select xmin::text from ops.dashboard_case_counts where created_at='2023-09-02 00:00Z'",
+            String.class);
+    long other =
+        jdbc.queryForObject("select user_id from core.users where username='l1b'", Long.class);
+    jdbc.update("update review.alerts set assignee_id=? where alert_id=?", other, first);
+    projection.refresh(DashboardProjection.Scope.INVESTIGATION);
+    assertThat(
+            jdbc.queryForObject(
+                "select xmin::text from ops.dashboard_case_items where case_id=?",
+                String.class,
+                untouched))
+        .isEqualTo(before);
+    assertThat(
+            jdbc.queryForObject(
+                "select xmin::text from ops.dashboard_case_counts where created_at='2023-09-02 00:00Z'",
+                String.class))
+        .isEqualTo(countBefore);
+    assertThat(
+            jdbc.queryForObject("select sum(n)::bigint from ops.dashboard_case_counts", Long.class))
+        .isEqualTo(3);
+    assertThat(
+            jdbc.queryForObject(
+                "select sum(n)::bigint from ops.dashboard_case_counts where assignee_id=?",
+                Long.class,
+                other))
+        .isEqualTo(1);
+    jdbc.update(
+        "update review.alerts set merged_into_alert_id=? where alert_id=?", untouched, first);
+    projection.refresh(DashboardProjection.Scope.INVESTIGATION);
+    assertThat(
+            jdbc.queryForObject("select sum(n)::bigint from ops.dashboard_case_counts", Long.class))
+        .isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from ops.dashboard_case_counts where n<=0", Long.class))
+        .isZero();
+  }
+
+  @Test
+  void irrelevant_user_job_and_event_changes_do_not_schedule_aggregation() {
+    long alert = publishedAlert("2023-09-01 00:00Z");
+    drain();
+    jdbc.update(
+        "update core.users set password_hash='test-only',last_assigned_at=now() where user_id=?",
+        user);
+    jdbc.update(
+        "update analysis.jobs set execution_id=gen_random_uuid(),execution_owner=gen_random_uuid(),attempt_count=attempt_count+1");
+    jdbc.update("update review.alerts set revision=revision+1 where alert_id=?", alert);
+    jdbc.update(
+        "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,'COMMENT','fixture',now(),'{}')",
+        alert,
+        user);
+    assertThat(jdbc.queryForObject("select count(*) from ops.dashboard_dirty", Long.class))
+        .isZero();
+  }
+
+  @Test
+  void pipeline_failure_does_not_publish_only_some_components() {
+    transaction("2023-08-31");
+    jdbc.update(
+        "insert into ingest.uploads(bank_id,business_date,file_name,file_hash,size_bytes,status) values(999019,'2023-08-31','fixture.csv',repeat('a',64),1,'FAILED')");
+    var broken =
+        new JdbcTemplate(jdbc.getDataSource()) {
+          @Override
+          public int update(String sql, Object... args) {
+            if (sql.contains("insert into ops.dashboard_report_counts"))
+              throw new IllegalStateException("fixture failure");
+            return super.update(sql, args);
+          }
+        };
+    assertThatThrownBy(
+            () ->
+                new DashboardProjection(broken, manager)
+                    .refresh(DashboardProjection.Scope.PIPELINE))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(received()).isZero();
+    assertThat(jdbc.queryForObject("select count(*) from ops.dashboard_report_counts", Long.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(distinct component) from ops.dashboard_dirty where scope='PIPELINE'",
+                Long.class))
+        .isEqualTo(2);
+    jdbc.update("update ops.dashboard_refresh_state set retry_at=now()-interval '1 second'");
+    assertThat(projection.refresh(DashboardProjection.Scope.PIPELINE)).isTrue();
+    assertThat(received()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("select n from ops.dashboard_report_counts", Long.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void first_unpublished_scope_is_unknown_while_other_scope_is_readable() {
+    transaction("2023-08-31");
+    projection.refresh(DashboardProjection.Scope.PIPELINE);
+    var clock = mock(BusinessTime.class);
+    when(clock.now()).thenReturn(Instant.parse("2023-09-01T00:00:00Z"));
+    var result =
+        new DashboardQueries(jdbc, clock)
+            .view(user, LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-01"));
+    assertThat(result.pipeline().data()).isNotNull();
+    assertThat(result.investigation().data()).isNull();
+    assertThat(result.investigation().computedAt()).isNull();
   }
 }
