@@ -4,6 +4,7 @@ import com.moneylaundry.api.ApiException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 
+/** 이미 처리된 파일을 다시 올릴 때의 409 DUPLICATE_FILE. 기존 업로드 정보를 함께 돌려준다. */
 public class DuplicateFileException extends ApiException {
   private final long uploadId;
   private final String fileName;

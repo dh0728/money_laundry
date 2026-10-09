@@ -10,6 +10,7 @@ import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+/** 의심 거래 목록 조회: 분석 작업·날짜·유형 필터와 페이지 처리. */
 @Service
 public class SuspiciousTransactionService {
   private static final String[] NAMES = {

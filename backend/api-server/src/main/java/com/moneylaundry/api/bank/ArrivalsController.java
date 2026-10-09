@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * GET /api/banks/arrivals?date= — 보고 은행별 도착 현황(API.md §1.2). 날짜 D의 창 = (D−1 컷오프, D 컷오프], 은행당 그 창의
- * 최신 INGEST 작업 1건. date 기본값은 "다음 컷오프의 날짜"(지금 도착하는 파일이 속하는 창). 컷오프 시각은 프로퍼티(kickoff §2.1 06:00),
+ * 최신 INGEST 작업 1건. date 기본값은 "다음 컷오프의 날짜"(지금 도착하는 파일이 속하는 창). 컷오프 시각은 app.ingest.cutoff(기본 03:00),
  * 시간대는 app.zone(서울 표준시).
  */
 @RestController

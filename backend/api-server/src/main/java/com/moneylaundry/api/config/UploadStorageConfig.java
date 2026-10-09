@@ -13,6 +13,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
+/** 업로드 저장소 선택(dev/prod는 S3, 그 밖은 로컬 폴더)과 AWS 클라이언트 빈. */
 @Configuration
 public class UploadStorageConfig {
   @Bean(destroyMethod = "close")

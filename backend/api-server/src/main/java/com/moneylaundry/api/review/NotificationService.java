@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/** review.notifications 뷰 기반 알림 목록·미읽음 수 조회와 읽음 상태 저장. */
 @Service
 public class NotificationService {
   private final JdbcTemplate jdbc;

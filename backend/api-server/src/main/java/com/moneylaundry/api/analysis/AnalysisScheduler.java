@@ -9,6 +9,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/** 매일 컷오프(app.ingest.cutoff)에 분석을 등록하고, 5초마다 실행 대기 작업을 AnalysisRunner로 진행한다. */
 @Component
 @Slf4j
 public class AnalysisScheduler {

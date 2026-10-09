@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+/** 은행별 정정 요청 목록·상세 조회와 보고 기간 내 은행인지 확인하는 공용 검사. */
 @Service
 public class CorrectionService {
   private final JdbcTemplate jdbc;

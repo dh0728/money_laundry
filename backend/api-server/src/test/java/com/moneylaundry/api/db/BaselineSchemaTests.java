@@ -21,7 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.ObjectMapper;
 
-/** The replacement baseline is tested in a fresh DB, never layered over V1-V17. */
+/**
+ * The single V1 baseline is tested in a fresh DB, never layered over the former migration history.
+ */
 class BaselineSchemaTests {
   static PostgreSQLContainer postgres;
   static JdbcTemplate jdbc;

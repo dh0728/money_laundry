@@ -1,4 +1,4 @@
-"""Read the V4 frozen TARGET snapshot for one claimed FEATURES execution.
+"""Read the frozen TARGET snapshot (analysis.input_transactions) for one claimed FEATURES execution.
 
 The caller owns the PostgreSQL connection and output stream. No stage completion
 or external publication occurs here; a cancelled read must discard its output.

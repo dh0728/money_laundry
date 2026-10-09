@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+/** 공개된 Alert 근거 버전의 목록·상세 조회. 읽기 전용 REPEATABLE READ로 한 시점을 읽는다. */
 @Service
 @Transactional(
     readOnly = true,

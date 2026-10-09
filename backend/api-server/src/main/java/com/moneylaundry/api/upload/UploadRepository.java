@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.transaction.annotation.Transactional;
 
+/** ingest.uploads 저장소: 해시 중복 조회, 수신 전이(URL_ISSUED→RECEIVED), 도착 현황용 최신 업로드 조회. */
 public interface UploadRepository extends JpaRepository<Upload, Long> {
   List<Upload> findByBankIdAndFileHashOrderByIdDesc(int bankId, String fileHash);
 

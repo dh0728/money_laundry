@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 의심 거래 목록 조회 API(/api/v1/suspicious-transactions). */
 @RestController
 @RequestMapping("/api/v1/suspicious-transactions")
 public class SuspiciousTransactionController {

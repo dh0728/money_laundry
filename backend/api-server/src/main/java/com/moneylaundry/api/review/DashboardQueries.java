@@ -7,6 +7,7 @@ import java.time.*;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+/** 대시보드 집계 조회. DashboardProjection이 갱신한 ops.dashboard_* 읽기 테이블에서 DashboardSummary를 만든다. */
 final class DashboardQueries {
   private final JdbcTemplate jdbc;
   private final BusinessTime time;

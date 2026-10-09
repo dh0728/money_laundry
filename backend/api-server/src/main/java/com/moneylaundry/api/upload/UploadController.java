@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** /api/v1/bank/** 는 은행(임시 코드 식별), /api/uploads/** 는 처리현황 조회(API.md §1.1·§1.2). */
+/** 은행 수집 API(API.md §1.1·§1.2): URL 발급·완료 통지·처리현황 조회. 은행은 임시 코드로 식별한다. */
 @RestController
 public class UploadController {
 

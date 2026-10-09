@@ -4,6 +4,7 @@ import java.time.*;
 import java.util.*;
 import org.springframework.web.bind.annotation.*;
 
+/** 조사 화면 API(/api/v1): 사건 목록·상세·자금 지표·명령, 원장 조회, 시연 업무 시계, 대시보드. */
 @RestController
 @RequestMapping("/api/v1")
 public class ReviewController {

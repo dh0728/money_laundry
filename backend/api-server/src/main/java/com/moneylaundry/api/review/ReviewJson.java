@@ -3,6 +3,7 @@ package com.moneylaundry.api.review;
 import java.util.*;
 import tools.jackson.databind.ObjectMapper;
 
+/** review 패키지 공용 JSON 변환 도우미(JSONB 값을 Map/List로). */
 final class ReviewJson {
   private ReviewJson() {}
 

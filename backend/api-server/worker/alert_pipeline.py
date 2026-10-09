@@ -15,7 +15,6 @@ from psycopg.rows import dict_row
 
 from flow_graph import (EdgeTable, FlowIndex, FlowPolicy, FlowGraph, Witness,
                         GraphBudgetExceeded, build_flow_graphs)
-from frozen_input import StaleExecution
 from model_publication import _lock
 from result_collection import _checkpoint
 from worker_transport import ProtocolError

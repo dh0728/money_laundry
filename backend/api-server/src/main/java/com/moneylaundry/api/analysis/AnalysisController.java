@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/** 분석·수집 작업 조회와 실패 작업 재개 API(/api/v1/batch-jobs). 수동 분석 등록은 dev/local 전용이다. */
 @RestController
 @RequestMapping("/api/v1/batch-jobs")
 public class AnalysisController {

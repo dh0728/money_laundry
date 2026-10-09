@@ -3,6 +3,7 @@ package com.moneylaundry.api.upload;
 import com.moneylaundry.api.ApiException;
 import org.springframework.http.HttpStatus;
 
+/** 같은 파일의 이전 업로드가 아직 처리 중일 때의 409 UPLOAD_IN_PROGRESS. */
 public class UploadInProgressException extends ApiException {
   private final long uploadId;
 

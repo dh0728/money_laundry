@@ -14,6 +14,9 @@ import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+/**
+ * 분석 단계를 Python 워커 하위 프로세스로 실행한다. 단계에 필요한 DB 계정·키만 넘기고 종료 코드를 실패 종류로 바꾸며, 완료는 워커가 저장한 체크포인트로만 인정한다.
+ */
 @Component
 public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   private final String python;

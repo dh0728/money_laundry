@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/** Alert/Episode 조사 사건의 목록·상세·자금 지표와 조사 명령(판정·제외·이관·연결 해제·종결) 처리. */
 @Service
 public class ReviewService {
   private final JdbcTemplate jdbc;
@@ -690,7 +691,6 @@ public class ReviewService {
           if ("UNLINK".equals(cmd.action())) return unlinkAlerts(user, cmd, cases, loaded);
           if (Set.of("MOVE", "SPLIT").contains(cmd.action()))
             throw ApiException.invalidTransition("Alert를 분할하거나 다른 Episode로 부분 이동할 수 없습니다.");
-          Long target = null;
           for (var sel : cmd.selections()) {
             var gs = loaded.get(sel.caseId());
             boolean episode = "EPISODE".equals(cases.get(sel.caseId()).get("kind"));
@@ -782,9 +782,6 @@ public class ReviewService {
                     "EXCLUDE",
                     "SUBJECT",
                     "CONTEXT",
-                    "TRANSFER",
-                    "MOVE",
-                    "SPLIT",
                     "RECONSIDER")
                 .contains(cmd.action())) throw AnalysisService.invalid();
             save(id, gs);
@@ -792,7 +789,8 @@ public class ReviewService {
           }
           var response = new LinkedHashMap<String, Object>();
           response.put("caseIds", loaded.keySet());
-          response.put("targetCaseId", target);
+          // TRANSFER returns earlier; other commands keep the documented null target.
+          response.put("targetCaseId", null);
           jdbc.update(
               "insert into review.requests values(?,?,?::jsonb,?::jsonb)",
               user,

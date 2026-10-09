@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
+/** 시연 DB 초기화. 허용 목록 테이블만 비우고 배정 시각을 초기화하며, 업로드 파일 정리를 기록·재시도한다. dev/local 전용. */
 @Service
 public class DemoResetService {
   // Explicit allowlist: no CASCADE, no identity restart, no user/configuration tables.
@@ -145,7 +146,9 @@ public class DemoResetService {
       tx.executeWithoutResult(
           s -> {
             jdbc.execute("set local lock_timeout='2s'");
-            jdbc.queryForList("select pg_advisory_xact_lock(17002001)");
+            jdbc.queryForList(
+                "select pg_advisory_xact_lock(?)",
+                com.moneylaundry.api.analysis.AnalysisService.RECEIPT_LOCK);
             jdbc.execute(
                 "lock table "
                     + TABLES

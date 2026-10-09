@@ -3,6 +3,7 @@ package com.moneylaundry.api.analysis;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/** 정정으로 취소된 추론 요청의 취소 통지(analysis.cancel_outbox)를 5초마다 전달·재시도한다. */
 @Component
 public class CancellationScheduler {
   private final AnalysisRunService runs;

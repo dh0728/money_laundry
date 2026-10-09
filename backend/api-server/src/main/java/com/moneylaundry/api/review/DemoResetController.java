@@ -5,6 +5,7 @@ import java.security.Principal;
 import java.util.*;
 import org.springframework.web.bind.annotation.*;
 
+/** 시연 데이터 초기화 API(/api/v1/demo/reset): 미리보기, 확인 후 초기화, 업로드 파일 정리 재시도. */
 @RestController
 @RequestMapping("/api/v1/demo/reset")
 public class DemoResetController {

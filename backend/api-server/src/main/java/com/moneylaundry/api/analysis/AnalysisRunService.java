@@ -48,17 +48,6 @@ public class AnalysisRunService {
             id));
   }
 
-  public void cancelAffected(Set<Long> changed) {
-    for (long id : changed) {
-      var runs =
-          jdbc.queryForList(
-              "select distinct r.run_id from analysis.input_transactions i join analysis.runs r using(run_id) where i.tx_id=? and r.status in ('READY','ACTIVE') order by r.run_id",
-              UUID.class,
-              id);
-      for (UUID run : runs) cancel(run, "REPORT_CORRECTED");
-    }
-  }
-
   public void cancel(UUID run, String reason) {
     if (!"REPORT_CORRECTED".equals(reason))
       throw new IllegalArgumentException("INVALID_CANCEL_REASON");
@@ -231,12 +220,6 @@ public class AnalysisRunService {
     }
   }
 
-  public void resumeCancellation(UUID cancel) {
-    jdbc.update(
-        "update analysis.cancel_outbox set attempts=0,retry_at=null,error_code=null where cancel_id=? and acknowledged_at is null",
-        cancel);
-  }
-
   public void acknowledge(UUID cancel, String response) {
     if (!List.of("STOPPED", "ALREADY_FINISHED").contains(response))
       throw new IllegalArgumentException("INVALID_CANCEL_ACK");
@@ -397,16 +380,6 @@ public class AnalysisRunService {
         "insert into analysis.input_reports select ?,tr.tx_id,tr.report_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
         run,
         id);
-  }
-
-  public boolean accepts(long job, UUID run, UUID execution) {
-    return Boolean.TRUE.equals(
-        jdbc.queryForObject(
-            "select exists(select 1 from analysis.jobs b join analysis.runs r on r.run_id=b.current_run_id where b.job_id=? and r.run_id=? and b.execution_id=? and b.status='RUNNING' and r.status in ('READY','ACTIVE'))",
-            Boolean.class,
-            job,
-            run,
-            execution));
   }
 
   public void complete(UUID run) {

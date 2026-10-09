@@ -11,8 +11,6 @@ from types import SimpleNamespace
 from urllib.request import build_opener
 from urllib.error import HTTPError, URLError
 
-import httpx
-
 from api_client import ApiClient, ApiError
 
 

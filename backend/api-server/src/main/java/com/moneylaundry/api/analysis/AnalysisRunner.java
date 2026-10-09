@@ -8,6 +8,7 @@ import java.util.*;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
+/** 일별 분석 실행기. 전역 advisory lock을 가진 인스턴스만 대기 작업을 단계별로 실행하고 실패 기록·재시도 예약·완료 공개를 처리한다. */
 @Component
 public class AnalysisRunner implements AutoCloseable {
   private final AnalysisService service;
@@ -139,7 +140,10 @@ public class AnalysisRunner implements AutoCloseable {
                     "update analysis.jobs set started_at=coalesce(started_at,?) where job_id=?",
                     Timestamp.from(service.clock.instant()),
                     id);
-                if (job.stage() == AnalysisStage.WAIT_INGEST && waitForIngest(id)) return null;
+                if (job.stage() == AnalysisStage.WAIT_INGEST) {
+                  waitForIngest(id);
+                  return null;
+                }
                 if (job.stage() == AnalysisStage.INFERENCE
                     && runs.current(id) != null
                     && !runs.canInfer(runs.current(id))) return null;
@@ -203,7 +207,8 @@ public class AnalysisRunner implements AutoCloseable {
     flush(item);
   }
 
-  private boolean waitForIngest(long id) {
+  /** Moves a WAIT_INGEST job to FAILED, RETRY_WAIT or the INTEGRATE stage; never executes it. */
+  private void waitForIngest(long id) {
     var states =
         service.jdbc.queryForList(
             "select u.status from analysis.receipts a join ingest.uploads u using(upload_id) where a.job_id=?",
@@ -215,19 +220,18 @@ public class AnalysisRunner implements AutoCloseable {
               + " 오류를 조치한 뒤 재개하세요.',finished_at=? where job_id=?",
           Timestamp.from(service.clock.instant()),
           id);
-      return true;
+      return;
     }
     if (states.stream().anyMatch(s -> !s.equals("COMPLETED") && !s.equals("VALIDATION_FAILED"))) {
       service.jdbc.update(
           "update analysis.jobs set status='RETRY_WAIT',retry_at=? where job_id=?",
           Timestamp.from(service.clock.instant().plusSeconds(5)),
           id);
-      return true;
+      return;
     }
     service.jdbc.update(
         "update analysis.jobs set status='QUEUED',current_stage='INTEGRATE',retry_at=null where job_id=?",
         id);
-    return true;
   }
 
   private void addFailure(Pending item, String code, AnalysisFailure.Kind kind) {

@@ -3,6 +3,7 @@ package com.moneylaundry.api.review;
 import java.security.Principal;
 import org.springframework.web.bind.annotation.*;
 
+/** Alert 변경 제안 조회와 담당자 동의·거절 투표 API(/api/v1/review/alert-proposals). */
 @RestController
 @RequestMapping("/api/v1/review/alert-proposals")
 public class AlertProposalController {

@@ -12,6 +12,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * 업무 시각: 업무 화면이 열린 환경에서 시연 업무 시계(ops.business_clock)가 있으면 그 시각, 없으면 실제 시각. 시계 변경은 dev/local 전용이다.
+ */
 @Service
 public class BusinessTime {
   public static final ZoneId KST = ZoneId.of("Asia/Seoul");

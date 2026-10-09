@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/** 분석 작업 등록(컷오프·수동·시연)·조회·재개와 API 공용 페이지·오류 도우미. */
 @Service
 public class AnalysisService {
   public static final long RECEIPT_LOCK = 17002001L;
@@ -116,7 +117,7 @@ public class AnalysisService {
               throw new ApiException(
                   HttpStatus.CONFLICT, "DEMO_DATE_OUT_OF_ORDER", "이미 처리한 날짜보다 이전으로 돌아갈 수 없습니다.");
             if (jdbc.queryForObject(
-                    "select count(*) from ingest.uploads where received_at is not null and (business_date>? or business_date is null)",
+                    "select count(*) from ingest.uploads where received_at is not null and business_date>?",
                     Integer.class,
                     demoBusinessDay)
                 > 0)
@@ -278,9 +279,8 @@ public class AnalysisService {
       int page, int size, String type, String status, Instant from, Instant to) {
     validatePage(page, size);
     if (type != null && !List.of("ANALYSIS", "INGEST").contains(type)) throw invalid();
-    if (status != null) {
-      try {
-        if (!Set.of(
+    if (status != null
+        && !Set.of(
                 "URL_ISSUED",
                 "RECEIVED",
                 "RUNNING",
@@ -291,11 +291,7 @@ public class AnalysisService {
                 "SCHEDULED",
                 "QUEUED",
                 "RETRY_WAIT")
-            .contains(status)) throw new IllegalArgumentException();
-      } catch (IllegalArgumentException e) {
-        throw invalid();
-      }
-    }
+            .contains(status)) throw invalid();
     StringBuilder where = new StringBuilder(" where 1=1");
     List<Object> args = new ArrayList<>();
     if (type != null) {

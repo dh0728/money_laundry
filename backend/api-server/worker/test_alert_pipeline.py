@@ -5,7 +5,6 @@ import os
 import unittest
 from uuid import uuid4
 
-from psycopg.types.json import Jsonb
 from alert_pipeline import save_alerts, POLICY
 from frozen_input import InputExecution, StaleExecution
 import test_frozen_input_postgres as fixtures

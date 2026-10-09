@@ -14,6 +14,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 
+/** S3 업로드 저장소: Presigned PUT 발급, 크기·체크섬 확인, 객체 읽기와 시연 파일 정리. */
 public class S3UploadStore implements UploadStore {
   private final S3Client client;
   private final S3Presigner presigner;

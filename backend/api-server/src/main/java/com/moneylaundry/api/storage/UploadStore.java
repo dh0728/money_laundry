@@ -6,8 +6,8 @@ import java.time.Instant;
 import java.util.OptionalLong;
 
 /**
- * 은행 업로드 파일 저장소 경계(API.md §1.1). 업무 로직이 닿는 지점은 이 셋뿐이다 — 로컬 폴더 구현으로 시작하고, S3가 준비되면 Presigned
- * PUT·HeadObject·GetObject 구현을 추가한다(kickoff §4.5 17차).
+ * 은행 업로드 파일 저장소 경계(API.md §1.1). 업로드 대상 발급·크기/체크섬 확인·읽기와 시연 파일 정리만 노출한다. 구현은 로컬
+ * 폴더(LocalFolderUploadStore)와 S3(S3UploadStore)다.
  */
 public interface UploadStore {
 
