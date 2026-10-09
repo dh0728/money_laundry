@@ -112,6 +112,9 @@ def configuration_backup(path):
     tables = json.loads(psql("SELECT json_build_object(" + ",".join(pairs) + ");", DATABASE), parse_float=str)
     payload = {"format": 1, "database": DATABASE, "tables": tables}
     validate_backup(payload)
+    # Assignment rotation is business state, never restored as account configuration.
+    for user in payload["tables"]["users"]:
+        user["last_assigned_at"] = None
     # Exclusive creation prevents overwriting the only recovery copy on a retry.
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as output:
@@ -136,6 +139,9 @@ def validate_backup(payload):
 def restore_configuration(path):
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     validate_backup(payload)
+    # Assignment rotation is business state, never restored as account configuration.
+    for user in payload["tables"]["users"]:
+        user["last_assigned_at"] = None
     sql = ["BEGIN;", "LOCK TABLE core.users,core.banks,core.bank_reporting_periods,core.fx_rates IN ACCESS EXCLUSIVE MODE;",
            "DO $$ BEGIN IF EXISTS(SELECT FROM ingest.uploads) OR EXISTS(SELECT FROM analysis.jobs) OR EXISTS(SELECT FROM ledger.transactions) OR EXISTS(SELECT FROM review.alerts) OR EXISTS(SELECT FROM review.episodes) THEN RAISE EXCEPTION 'RESTORE_REQUIRES_EMPTY_BUSINESS_DATA'; END IF; END $$;",
            "DELETE FROM core.bank_reporting_periods; DELETE FROM core.banks; DELETE FROM core.users; DELETE FROM core.fx_rates;"]

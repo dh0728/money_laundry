@@ -343,6 +343,11 @@ class BaselineSchemaTests {
       var doc =
           java.util.Map.<String, Object>of(
               "runId", run, "version", 1, "transactions", java.util.List.of(fullRow));
+      jdbc.update(
+          "update review.alert_versions set evidence=?::jsonb,published_at=now() where alert_id=? and version=1",
+          new ObjectMapper().writeValueAsString(doc),
+          alert);
+      jdbc.update("update review.alerts set published_version=1 where alert_id=?", alert);
       when(evidence.detail(eq(alert), nullable(Integer.class))).thenReturn(doc);
     }
     long first = ids.getFirst();

@@ -216,7 +216,7 @@ class FreezeInputTests {
   }
 
   @Test
-  void context_keeps_calendar_and_cutoff_boundaries_without_duplicate_targets() {
+  void context_keeps_full_history_and_cutoff_boundaries_without_duplicate_targets() {
     seed(6);
     var ids = jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
     long scored =
@@ -226,7 +226,7 @@ class FreezeInputTests {
     completed(scored, "t.tx_id<>" + ids.getFirst());
     var timestamps =
         List.of(
-            "2023-08-25T15:00:00Z", // Aug 26 KST: inclusive lower bound.
+            "2023-08-25T15:00:00Z", // History is not trimmed by the former calendar window.
             "2023-08-25T14:59:59Z",
             "2023-09-02T00:00:00Z", // The cutoff itself is included.
             "2023-09-02T00:00:01Z",
@@ -243,7 +243,7 @@ class FreezeInputTests {
                 "select tx_id from analysis.input_transactions where run_id=? and input_role='CONTEXT' order by tx_id",
                 Long.class,
                 run))
-        .containsExactly(ids.get(1), ids.get(3));
+        .containsExactly(ids.get(1), ids.get(2), ids.get(3));
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.input_transactions where run_id=? and tx_id=?",
@@ -254,7 +254,7 @@ class FreezeInputTests {
   }
 
   @Test
-  void context_does_not_fill_the_gap_between_distant_target_days() {
+  void context_includes_history_between_distant_target_days_for_flow_matching() {
     seed(6);
     var ids = jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
     long scored =
@@ -281,7 +281,7 @@ class FreezeInputTests {
                 "select tx_id from analysis.input_transactions where run_id=? and input_role='CONTEXT' order by tx_id",
                 Long.class,
                 run))
-        .containsExactly(ids.get(2), ids.get(5));
+        .containsExactly(ids.get(2), ids.get(3), ids.get(4), ids.get(5));
   }
 
   @Test

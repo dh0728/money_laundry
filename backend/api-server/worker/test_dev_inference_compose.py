@@ -74,12 +74,16 @@ class DevInferenceComposeTests(unittest.TestCase):
 import os,sys,psycopg
 sys.path.insert(0,'/app/worker')
 import cryptography,ingest_entry,report_integration,report_correction
+import alert_lifecycle,alert_plan_preparation,alert_pipeline
 from zoneinfo import ZoneInfo
 assert str(ZoneInfo('Asia/Seoul'))=='Asia/Seoul'
 from configure_analysis_db import configure
 with psycopg.connect(host='postgres',dbname='aml_check',user='aml_check',password=os.environ['SPRING_DATASOURCE_PASSWORD'],autocommit=True) as db:
     configure(db,os.environ['ANALYSIS_DB_USERNAME'],os.environ['ANALYSIS_DB_PASSWORD'])
     assert db.execute("select version from public.flyway_schema_history where success").fetchall()==[('1',)]
+    for table in ('analysis.alert_plans','analysis.alert_fact_checks','review.alert_lineage',
+                  'review.alert_change_proposals','review.alert_proposal_cases','review.event_recipients'):
+        assert db.execute('select to_regclass(%s)', (table,)).fetchone()[0] is not None
 with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSIS_DB_USERNAME'],password=os.environ['ANALYSIS_DB_PASSWORD'],autocommit=True) as db:
     db.execute('select * from analysis.input_transactions')
     for table in ('private.bank_reports','evaluation.report_labels'):
@@ -89,6 +93,11 @@ with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSI
             pass
         else:
             raise AssertionError('Protected table unexpectedly accessible')
+    for table in ('review.alerts','review.alert_versions','review.alert_members','review.events'):
+        assert db.execute("select has_table_privilege(current_user,%s,'SELECT')", (table,)).fetchone()[0]
+        for privilege in ('INSERT','UPDATE','DELETE'):
+            assert not db.execute('select has_table_privilege(current_user,%s,%s)', (table,privilege)).fetchone()[0]
+    assert db.execute("select has_table_privilege(current_user,'analysis.alert_plans','INSERT')").fetchone()[0]
 """)
         request_id = str(uuid4())
         path = f'/api/v1/inference-requests/{request_id}/rounds/1'

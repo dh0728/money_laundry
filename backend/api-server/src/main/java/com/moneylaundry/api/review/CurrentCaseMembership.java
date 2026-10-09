@@ -22,22 +22,23 @@ final class CurrentCaseMembership {
 
     String sql =
         """
-        with selected(tx_id) as (select unnest(?::bigint[])), latest as (
-          select distinct on(v.alert_id) v.alert_id,v.version
-          from review.alert_versions v join analysis.runs r using(run_id)
-          join analysis.jobs b on b.job_id=r.job_id and b.current_run_id=r.run_id
-          where r.status='COMPLETED' and b.status='COMPLETED'
-          order by v.alert_id,v.version desc
+        with selected(tx_id) as (select unnest(?::bigint[])), candidates as materialized (
+          select distinct t.alert_id from selected s join review.alert_transactions t using(tx_id)
+        ), latest as (
+          select a.alert_id,v.version from review.alerts a join review.latest_versions v using(alert_id)
+          join candidates c using(alert_id)
+          where a.published_version is not null and a.merged_into_alert_id is null
         ), members as (
           select 'ALERT' as kind,a.alert_id,a.alert_id as case_id,m.tx_id
           from selected s join review.alert_members m using(tx_id)
           join review.alerts a using(alert_id) join latest l using(alert_id)
           where m.state not in ('EXCLUDED','TRANSFERRED')
+            and exists(select 1 from review.alert_transactions t where t.alert_id=a.alert_id and t.version=l.version and t.tx_id=m.tx_id)
           union all
           select 'ALERT',a.alert_id,a.alert_id,t.tx_id
           from selected s join review.alert_transactions t using(tx_id)
           join latest l using(alert_id,version) join review.alerts a using(alert_id)
-          where (a.status='OPEN' or not exists(select 1 from review.alert_groups g where g.alert_id=a.alert_id))
+          where not exists(select 1 from review.alert_groups g where g.alert_id=a.alert_id)
             and not exists(select 1 from review.alert_members m where m.alert_id=a.alert_id and m.tx_id=t.tx_id)
           union all
           select 'EPISODE',e.alert_id,e.episode_id,m.tx_id

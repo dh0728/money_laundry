@@ -123,11 +123,36 @@ public class ReviewController {
     return ledger.payments();
   }
 
-  @GetMapping("/dashboard")
-  public Object dashboard(
+  @GetMapping("/dashboard/summary")
+  public org.springframework.http.ResponseEntity<DashboardSummary> dashboard(
       java.security.Principal principal, @RequestParam LocalDate from, @RequestParam LocalDate to) {
     long user = reviews.userId(principal);
     reviews.actor(user);
-    return dashboard.view(user, from, to);
+    return org.springframework.http.ResponseEntity.ok()
+        .header("Cache-Control", "private, no-store")
+        .body(dashboard.view(user, from, to));
+  }
+
+  @GetMapping("/dashboard/activities")
+  public org.springframework.http.ResponseEntity<java.util.List<DashboardLists.Activity>>
+      activities(
+          java.security.Principal principal,
+          @RequestParam LocalDate from,
+          @RequestParam LocalDate to) {
+    long user = reviews.userId(principal);
+    reviews.actor(user);
+    return org.springframework.http.ResponseEntity.ok()
+        .header("Cache-Control", "private, no-store")
+        .body(dashboard.activities(user, from, to));
+  }
+
+  @GetMapping("/dashboard/queues")
+  public org.springframework.http.ResponseEntity<DashboardLists.Queues> queues(
+      java.security.Principal principal) {
+    long user = reviews.userId(principal);
+    reviews.actor(user);
+    return org.springframework.http.ResponseEntity.ok()
+        .header("Cache-Control", "private, no-store")
+        .body(dashboard.queues(user));
   }
 }

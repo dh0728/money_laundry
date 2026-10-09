@@ -26,6 +26,14 @@ export class QueryCache {
       this.emit(key)
     }
   }
+  /** The caller aborted this view's request; late results must not repopulate it. */
+  discardPending(key: string) {
+    const entry = this.entries.get(key)
+    if (!entry?.pending) return
+    entry.generation++; entry.pending = undefined
+    entry.snapshot = { ...entry.snapshot, refreshing: false }
+    this.emit(key)
+  }
   async fetch<T>(key: string, load: () => Promise<T>, maxAge: number, force = false): Promise<T> {
     let entry = this.entries.get(key)
     if (entry?.pending && !force) return entry.pending as Promise<T>

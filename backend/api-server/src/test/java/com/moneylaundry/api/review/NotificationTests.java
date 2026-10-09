@@ -52,7 +52,7 @@ class NotificationTests {
             Long.class,
             user);
     jdbc.update(
-        "insert into review.alert_versions values(?,1,?,repeat('a',64),'{}',now())", id, run);
+        "insert into review.alert_versions values(?,1,?,repeat('a',64),'{}',now(),now())", id, run);
     return jdbc.queryForObject("select case_id from review.cases where alert_id=?", Long.class, id);
   }
 

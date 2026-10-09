@@ -62,6 +62,7 @@ class AnalysisRunnerTests {
   @BeforeEach
   void setup() {
     jdbc.execute("truncate analysis.jobs, ingest.uploads cascade");
+    jdbc.update("update ops.business_clock set business_at=null,revision=0");
     jdbc.update("insert into core.banks(bank_id) values(12) on conflict do nothing");
     clock = new MutableClock();
     service =

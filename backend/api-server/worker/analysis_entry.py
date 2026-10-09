@@ -48,11 +48,8 @@ def main(argv=None):
                 return 78
             execution = InputExecution(args.job_id, args.run_id, args.execution_id)
             if alerting:
-                from alert_pipeline import save_alerts, AssigneeUnavailable
-                try:
-                    save_alerts(connection, execution)
-                except AssigneeUnavailable:
-                    return 80
+                from alert_pipeline import save_alerts
+                save_alerts(connection, execution)
             elif publishing or ticking or scoring:
                 from model_publication import configured, publish_model
                 settings, s3 = configured()

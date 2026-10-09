@@ -33,7 +33,8 @@ class DatabaseTransitionTests(unittest.TestCase):
                     worker.execute('SELECT password_hash FROM core.users')
                 with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
                     worker.execute('UPDATE core.users SET role=\'ADMIN\'')
-                worker.execute('UPDATE core.users SET last_assigned_at=now() WHERE false')
+                with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
+                    worker.execute('UPDATE core.users SET last_assigned_at=now() WHERE false')
             with self.assertRaises(ValueError):
                 configure(self.admin, self.connect_args['user'], password)
         finally:

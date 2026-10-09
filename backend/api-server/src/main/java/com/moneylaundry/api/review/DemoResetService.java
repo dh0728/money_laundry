@@ -19,6 +19,12 @@ public class DemoResetService {
   static final String TABLES =
       String.join(
           ",",
+          "analysis.alert_plans",
+          "analysis.alert_fact_checks",
+          "review.alert_proposal_cases",
+          "review.alert_change_proposals",
+          "review.alert_lineage",
+          "review.event_recipients",
           "review.episode_members",
           "review.episode_alerts",
           "review.alert_members",
@@ -70,6 +76,8 @@ public class DemoResetService {
           "private.owner_identities",
           "core.owners",
           "ingest.uploads");
+  static final String DASHBOARD_TABLES =
+      "ops.dashboard_refresh_state,ops.dashboard_dirty,ops.dashboard_model_counts,ops.dashboard_case_items,ops.dashboard_case_counts,ops.dashboard_report_counts,ops.dashboard_delivery_days";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final BusinessTime time;
@@ -139,7 +147,11 @@ public class DemoResetService {
             jdbc.execute("set local lock_timeout='2s'");
             jdbc.queryForList("select pg_advisory_xact_lock(17002001)");
             jdbc.execute(
-                "lock table " + TABLES + ",ops.business_clock in access exclusive mode nowait");
+                "lock table "
+                    + TABLES
+                    + ","
+                    + DASHBOARD_TABLES
+                    + ",ops.business_clock in access exclusive mode nowait");
             var previous =
                 jdbc.queryForList(
                     "select actor_id from ops.resets where reset_id=?", input.requestId());
@@ -220,7 +232,24 @@ public class DemoResetService {
                         input.requestId(),
                         key,
                         prefix));
-            jdbc.execute("truncate table " + TABLES + " continue identity restrict");
+            // Fixed lock order prevents a pre-reset refresh from republishing deleted data.
+            for (var scopeKey : DashboardProjection.Scope.values())
+              if (!Boolean.TRUE.equals(
+                  jdbc.queryForObject(
+                      "select pg_try_advisory_xact_lock(?)", Boolean.class, scopeKey.lockKey)))
+                throw conflict("RESET_BUSY", "대시보드 집계가 실행 중입니다. 잠시 후 다시 시도하세요.");
+            jdbc.execute(
+                "truncate table "
+                    + TABLES
+                    + ","
+                    + DASHBOARD_TABLES
+                    + " continue identity restrict");
+            jdbc.update(
+                "update core.users set last_assigned_at=null where last_assigned_at is not null");
+            // The source and read models are both empty. Remove truncate invalidations atomically.
+            jdbc.update("delete from ops.dashboard_dirty");
+            jdbc.update(
+                "insert into ops.dashboard_refresh_state(scope,computed_at) values('PIPELINE',clock_timestamp()),('INVESTIGATION',clock_timestamp())");
             jdbc.update(
                 "update ops.business_clock set business_at=null,revision=revision+1,updated_at=now() where id");
             if (objects.isEmpty())

@@ -583,12 +583,20 @@ class FrozenInputPostgresTests(unittest.TestCase):
     def scoring_stage(self):
         self.admin.execute("UPDATE analysis.jobs SET current_stage='SCORES',threshold_value=0.5 WHERE job_id=%s", (self.job,))
 
-    def test_random_pipeline_publishes_collects_scores_and_stores_alerts(self):
+    def test_random_pipeline_collects_scores_and_prepares_alerts_without_publication(self):
         from result_collection import save_scores
         from alert_pipeline import save_alerts
         self.annotate_demo(self.ids)
         self.score_values = [.9, .2, .8]
         self.admin.execute("UPDATE analysis.input_transactions SET occurred_at='2022-09-01 12:00+09' WHERE run_id=%s", (self.run,))
+        # A -> B -> C -> D: a scored seed needs actual connected-flow evidence.
+        accounts = [uuid4() for _ in range(4)]
+        for index, key in enumerate(self.ids):
+            self.admin.execute('''UPDATE analysis.input_transactions
+                SET from_account_id=%s,to_account_id=%s,
+                    occurred_at='2022-09-01 12:00+09'::timestamptz + %s * interval '10 minutes'
+                WHERE run_id=%s AND tx_id=%s''',
+                (accounts[index], accounts[index+1], index, self.run, key))
         self.admin.execute("INSERT INTO analysis.input_coverage VALUES(%s,'2022-09-01',1,1,true,'[]')", (self.run,))
         self.admin.execute("INSERT INTO core.users(username,name,role,password_hash) VALUES(%s,'Demo','STAFF','test')", (uuid4().hex,))
         with tempfile.TemporaryDirectory(prefix='aml-label-pipeline-') as root:
@@ -604,14 +612,14 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute('SELECT model_version_binary,model_version_type FROM analysis.jobs WHERE job_id=%s', (self.job,)).fetchone(), (MODEL_VERSION, MODEL_VERSION))
             self.admin.execute("UPDATE analysis.jobs SET current_stage='ALERTS',analysis_cutoff_at='2022-09-02 09:00+09' WHERE job_id=%s", (self.job,))
             save_alerts(self.admin, self.execution)
-            self.assertGreater(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
-            self.assertEqual(self.admin.execute('''SELECT count(*)
-                FROM review.alert_transactions m JOIN review.alert_versions v USING(alert_id,version)
-                CROSS JOIN LATERAL jsonb_array_elements(v.evidence->'transactions') t
-                WHERE v.run_id=%s AND (t->>'txId')::bigint=m.tx_id
-                AND m.seed_risk IS DISTINCT FROM CASE WHEN t->>'role'='SEED'
-                  THEN (t->'scores'->>'p_laundering')::double precision END''',
-                (self.run,)).fetchone()[0], 0)
+            plans = self.admin.execute('SELECT payload::jsonb FROM analysis.alert_plans WHERE run_id=%s', (self.run,)).fetchall()
+            self.assertGreater(len(plans), 0)
+            self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
+            for (plan,) in plans:
+                members = plan['evidence']['transactions']
+                seeds = {seed['txId'] for seed in plan['evidence']['seeds']}
+                self.assertEqual({m['txId'] for m in members if m['role'] == 'SEED'}, seeds)
+                self.assertTrue(all(m['scores']['p_laundering'] >= .5 for m in members if m['role'] == 'SEED'))
 
     def test_scores_atomic_join_percentile_and_retry_without_duplicates(self):
         from result_collection import save_scores

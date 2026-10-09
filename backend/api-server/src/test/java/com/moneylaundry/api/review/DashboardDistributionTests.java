@@ -24,7 +24,7 @@ class DashboardDistributionTests {
     when(jdbc.queryForList(anyString(), any(Timestamp.class), any(Timestamp.class)))
         .thenReturn(counts);
     var result =
-        new DashboardService(jdbc, null)
+        new DashboardQueries(jdbc, null)
             .modelDistribution(LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-02"));
     assertThat(result.get("agreements"))
         .isEqualTo(
