@@ -1,0 +1,142 @@
+name: Deploy Two EC2 Instances
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      git_sha:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      environment:
+        required: true
+        type: choice
+        options: [dev, prod]
+      git_sha:
+        description: Full Git SHA from the environment branch
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: ${{ inputs.environment }}
+    env:
+      DEPLOY_ENV: ${{ inputs.environment }}
+      GIT_SHA: ${{ inputs.git_sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+      FRONT_EC2_INSTANCE_ID: ${{ vars.FRONT_EC2_INSTANCE_ID }}
+      BACKEND_EC2_INSTANCE_ID: ${{ vars.BACKEND_EC2_INSTANCE_ID }}
+      SPLIT_DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Validate target configuration
+        env:
+          WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$DEPLOY_ENV" == dev || "$DEPLOY_ENV" == prod ]]
+          branch=dev
+          [[ "$DEPLOY_ENV" != prod ]] || branch=master
+          [[ "$WORKFLOW_REF" == "refs/heads/$branch" ]]
+          [[ "$GIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$AWS_REGION" == ap-northeast-2 ]]
+          [[ "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]
+          [[ "$AWS_ROLE_ARN" == "arn:aws:iam::${AWS_ACCOUNT_ID}:role/aml-github-${DEPLOY_ENV}-deploy-role" ]]
+          [[ "$DEPLOY_ARTIFACT_BUCKET" == "aml-deploy-artifacts-${AWS_ACCOUNT_ID}" ]]
+          [[ "$FRONT_EC2_INSTANCE_ID" =~ ^i-[0-9a-f]{8,17}$ ]]
+          [[ "$BACKEND_EC2_INSTANCE_ID" =~ ^i-[0-9a-f]{8,17}$ ]]
+          [[ "$FRONT_EC2_INSTANCE_ID" != "$BACKEND_EC2_INSTANCE_ID" ]]
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
+
+      - name: Verify commit and deployment code
+        run: |
+          set -Eeuo pipefail
+          branch=dev
+          [[ "$DEPLOY_ENV" != prod ]] || branch=master
+          [[ "$(git rev-parse HEAD)" == "$GIT_SHA" ]]
+          git merge-base --is-ancestor "$GIT_SHA" "origin/$branch"
+          python3 -m unittest discover -s deploy/split/tests -p 'test_*.py'
+          python3 deploy/split/validate.py
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+
+      - name: Configure images and check immutable tags
+        id: images
+        run: |
+          set -Eeuo pipefail
+          [[ "$(aws sts get-caller-identity --query Account --output text)" == "$AWS_ACCOUNT_ID" ]]
+          registry="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          tag="${DEPLOY_ENV}-${GIT_SHA}"
+          echo "registry=$registry" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          aws ecr get-login-password --region "$AWS_REGION" |
+            docker login --username AWS --password-stdin "$registry"
+          for service in api web; do
+            error_file="$(mktemp)"
+            if aws ecr describe-images --repository-name "aml-$service" \
+              --image-ids "imageTag=$tag" >/dev/null 2>"$error_file"; then
+              echo "${service}_exists=true" >> "$GITHUB_OUTPUT"
+            elif grep -q ImageNotFoundException "$error_file"; then
+              echo "${service}_exists=false" >> "$GITHUB_OUTPUT"
+            else
+              cat "$error_file" >&2
+              exit 1
+            fi
+            rm -f "$error_file"
+          done
+
+      - uses: docker/setup-buildx-action@v4
+      - name: Build API
+        if: steps.images.outputs.api_exists != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: backend/api-server
+          push: true
+          tags: ${{ steps.images.outputs.registry }}/aml-api:${{ steps.images.outputs.tag }}
+          cache-from: type=gha,scope=aml-api
+          cache-to: type=gha,mode=max,scope=aml-api,ignore-error=true
+      - name: Build web
+        if: steps.images.outputs.web_exists != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend/web-app
+          push: true
+          tags: ${{ steps.images.outputs.registry }}/aml-web:${{ steps.images.outputs.tag }}
+          build-args: |
+            VITE_API_BASE_URL=/api
+            VITE_API_MODE=live
+          cache-from: type=gha,scope=aml-web
+          cache-to: type=gha,mode=max,scope=aml-web,ignore-error=true
+
+      - name: Package and deploy backend then front
+        run: |
+          set -Eeuo pipefail
+          bundle="$RUNNER_TEMP/deploy-bundle.tar.gz"
+          checksum="$(python3 deploy/split/build_bundle.py "$DEPLOY_ENV" "$bundle")"
+          aws s3 cp "$bundle" \
+            "s3://${DEPLOY_ARTIFACT_BUCKET}/releases/${DEPLOY_ENV}/${GIT_SHA}/deploy-bundle.tar.gz" \
+            --sse AES256 --only-show-errors
+          python3 deploy/split/run_ssm.py "$DEPLOY_ENV" "$GIT_SHA" "$checksum"

@@ -1,0 +1,48 @@
+"""Build an explicit, secret-free split deployment bundle."""
+import argparse
+import hashlib
+import gzip
+from pathlib import Path
+import tarfile
+
+
+def files(root, environment):
+    base = Path(root) / "deploy/split"
+    names = ["deploy.py", "check_rds.py"]
+    for role in ("front", "backend"):
+        relative = [f"compose.{environment}.yaml", f"deploy-{environment}.sh",
+                    f"nginx/conf.d/{environment}.conf"]
+        if environment == "prod":
+            relative = ["compose.prod.blue.yaml", "compose.prod.green.yaml", "deploy-prod.sh",
+                        "rollback-prod.sh", "nginx/conf.d/prod.conf",
+                        "nginx/upstreams/prod-blue.conf", "nginx/upstreams/prod-green.conf"]
+        if role == "backend":
+            relative.append("nginx/conf.d/00-default.conf")
+        names.extend(f"{role}/{name}" for name in relative)
+    result = [base / name for name in names]
+    if any(not path.is_file() or path.is_symlink() for path in result):
+        raise ValueError("A required split deployment file is missing or is a symlink.")
+    return result
+
+
+def build(root, environment, output):
+    root, output = Path(root).resolve(), Path(output)
+    # Stable archives allow a retry of the same Git SHA to reuse an existing release.
+    with output.open("wb") as stream, gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=0) as zipped:
+        with tarfile.open(fileobj=zipped, mode="w") as archive:
+            for path in files(root, environment):
+                info = archive.gettarinfo(str(path), arcname=path.relative_to(root).as_posix())
+                info.uid = info.gid = info.mtime = 0
+                info.uname = info.gname = ""
+                info.mode = 0o755 if path.suffix == ".sh" else 0o644
+                with path.open("rb") as source:
+                    archive.addfile(info, source)
+    return hashlib.sha256(output.read_bytes()).hexdigest()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("environment", choices=("dev", "prod"))
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+    print(build(Path(__file__).resolve().parents[2], args.environment, args.output))
