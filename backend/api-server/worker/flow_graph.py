@@ -49,46 +49,58 @@ class FlowPolicy:
 
 
 class EdgeTable:
-    """Compact columns. Append before indexing; never mutate a frozen table."""
+    """Compact columns. Append before indexing; never mutate a frozen table.
+
+    ``amount_usd_micros`` is an optional column (micro-USD, -1 = unknown). The
+    flow-evidence-2 policy ignores it; block-pin-1 (block_graph.py) requires it.
+    """
+
+    UNKNOWN_AMOUNT = -1
 
     def __init__(self):
         self.tx_ids = array("q")
         self.occurred_us = array("q")
         self.from_accounts = array("q")
         self.to_accounts = array("q")
+        self.amount_usd_micros = array("q")
         self._positions = None
         self._frozen = False
 
     def __len__(self):
         return len(self.tx_ids)
 
-    def append(self, tx_id: int, occurred_us: int, from_account: int, to_account: int):
+    def append(self, tx_id: int, occurred_us: int, from_account: int, to_account: int,
+               amount_usd_micros: int | None = None):
         if self._frozen:
             raise ValueError("Cannot append to frozen edge table")
+        amount = self.UNKNOWN_AMOUNT if amount_usd_micros is None else amount_usd_micros
         if (any(type(value) is not int for value in
-                (tx_id, occurred_us, from_account, to_account))
-                or tx_id <= 0 or from_account <= 0 or to_account <= 0):
-            raise ValueError("Invalid edge identity/time/account")
+                (tx_id, occurred_us, from_account, to_account, amount))
+                or tx_id <= 0 or from_account <= 0 or to_account <= 0
+                or amount < self.UNKNOWN_AMOUNT):
+            raise ValueError("Invalid edge identity/time/account/amount")
         # Check every value before mutating any column.
         if any(not -(1 << 63) <= value < (1 << 63)
-               for value in (tx_id, occurred_us, from_account, to_account)):
+               for value in (tx_id, occurred_us, from_account, to_account, amount)):
             raise ValueError("Edge value exceeds signed int64")
         self.tx_ids.append(tx_id)
         self.occurred_us.append(occurred_us)
         self.from_accounts.append(from_account)
         self.to_accounts.append(to_account)
+        self.amount_usd_micros.append(amount)
 
     def freeze(self):
         if not self._frozen:
-            if len({len(self.tx_ids), len(self.occurred_us),
-                    len(self.from_accounts), len(self.to_accounts)}) != 1:
+            if len({len(self.tx_ids), len(self.occurred_us), len(self.from_accounts),
+                    len(self.to_accounts), len(self.amount_usd_micros)}) != 1:
                 raise ValueError("Edge column lengths differ")
             if not all(tx_id == pos + 1 for pos, tx_id in enumerate(self.tx_ids)):
                 positions = {tx_id: pos for pos, tx_id in enumerate(self.tx_ids)}
                 if len(positions) != len(self):
                     raise ValueError("Duplicate transaction ID")
                 self._positions = positions
-            for name in ("tx_ids", "occurred_us", "from_accounts", "to_accounts"):
+            for name in ("tx_ids", "occurred_us", "from_accounts", "to_accounts",
+                         "amount_usd_micros"):
                 setattr(self, name, memoryview(getattr(self, name)).toreadonly())
             self._frozen = True
         return self
