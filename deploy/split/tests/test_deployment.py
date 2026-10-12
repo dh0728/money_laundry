@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 SPLIT = Path(__file__).resolve().parents[1]
 ROOT = SPLIT.parents[1]
+sys.path.insert(0, str(SPLIT))
 
 
 def module(name):
@@ -29,8 +30,19 @@ bundle = module("build_bundle")
 receive = module("receive")
 ssm = module("run_ssm")
 rds = module("check_rds")
+images = module("image_manifest")
 ACCOUNT = "123456789012"
 OLD, NEW = "a" * 40, "b" * 40
+
+
+def image_record(app_sha=OLD, environment="prod", account=ACCOUNT, digest_letter="c"):
+    registry = f"{account}.dkr.ecr.ap-northeast-2.amazonaws.com"
+    digest = "sha256:" + digest_letter * 64
+    return {"environment": environment, "account_id": account, "region": "ap-northeast-2",
+            "app_sha": app_sha, "images": [
+                {"repository": f"aml-{service}", "image": f"{registry}/aml-{service}:{environment}-{app_sha}",
+                 "digest": digest, "pinned_image": f"{registry}/aml-{service}@{digest}"}
+                for service in ("api", "web")]}
 
 
 class FakeRunner:
@@ -100,6 +112,68 @@ class DeploymentTests(unittest.TestCase):
         deploy.atomic_json(engine.state_file, {"current": old, "previous": None})
         deploy.atomic_file(engine.nginx / f"conf.d/aml-{engine.environment}.conf", b"old")
         return old
+
+    def pinned(self, engine, sha, digest_letter="c"):
+        manifest = images.from_record(image_record(digest_letter=digest_letter), environment="prod")
+        deploy.atomic_json(engine.release({"sha": sha}) / "deploy/split/images.json", manifest)
+        return manifest
+
+    def test_release_uses_app_digest_independent_of_deployment_sha(self):
+        for role, service in (("backend", "api"), ("front", "web")):
+            with self.subTest(role=role):
+                engine = self.engine(role=role)
+                manifest = self.pinned(engine, NEW)
+                with patch.dict(os.environ, {f"PROD_{service.upper()}_IMAGE": "untrusted:latest"}):
+                    self.assertEqual(engine.runtime(NEW)[f"PROD_{service.upper()}_IMAGE"],
+                                     manifest["images"][service])
+                self.assertNotEqual(manifest["app_sha"], NEW)
+
+    def test_invalid_pins_fail_before_authentication_and_do_not_fall_back(self):
+        for change in (lambda m: m.update(account_id="999999999999"),
+                       lambda m: m.update(environment="dev"),
+                       lambda m: m["images"].update(web=m["images"]["api"]),
+                       lambda m: m["images"].update(api="example.invalid/aml-api:latest")):
+            with self.subTest(change=change):
+                engine = self.engine()
+                manifest = self.pinned(engine, NEW)
+                change(manifest)
+                deploy.atomic_json(engine.release({"sha": NEW}) / "deploy/split/images.json", manifest)
+                with self.assertRaises(ValueError):
+                    engine.deploy(NEW, "invalid-pins")
+                self.assertEqual(engine.runner.calls, [])
+                self.assertFalse(engine.pending_file.exists())
+
+    def test_rollback_uses_previous_releases_pins_or_legacy_tag(self):
+        for previous_pinned in (False, True):
+            with self.subTest(previous_pinned=previous_pinned):
+                engine = self.engine()
+                self.prior(engine)
+                old_path = engine.release({"sha": OLD}) / "deploy/split/images.json"
+                old_path.unlink(missing_ok=True)
+                if previous_pinned:
+                    previous_image = self.pinned(engine, OLD, "d")["images"]["api"]
+                else:
+                    previous_image = f"{engine.registry}/aml-api:prod-{OLD}"
+                new_image = self.pinned(engine, NEW)["images"]["api"]
+                resolved = []
+                runtime = engine.runtime
+
+                def recording_runtime(sha):
+                    values = runtime(sha)
+                    resolved.append((sha, values["PROD_API_IMAGE"]))
+                    return values
+
+                engine.runtime = recording_runtime
+                engine.fail_proxy = True
+                with self.assertRaises(deploy.DeploymentError):
+                    engine.deploy(NEW, f"rollback-{previous_pinned}")
+                self.assertIn((NEW, new_image), resolved)
+                self.assertIn((OLD, previous_image), resolved)
+                self.assertEqual(engine.state()["current"]["sha"], OLD)
+
+    def test_unpinned_dev_release_keeps_commit_tag(self):
+        engine = self.engine(environment="dev")
+        self.assertEqual(engine.runtime(NEW)["DEV_API_IMAGE"], f"{engine.registry}/aml-api:dev-{NEW}")
 
     def test_success_keeps_previous_until_finalize(self):
         engine = self.engine()
@@ -377,6 +451,42 @@ class OrchestrationTests(unittest.TestCase):
 
 
 class BundleTests(unittest.TestCase):
+    def test_pinned_bundle_is_deterministic_extractable_and_excludes_receipt_extras(self):
+        with tempfile.TemporaryDirectory(prefix="aml-pinned-bundle-") as directory:
+            folder = Path(directory)
+            record = image_record()
+            record["unrelated_secret"] = "DO-NOT-PACK-THIS"
+            record["images"][0]["unrelated_secret"] = "DO-NOT-PACK-THIS"
+            receipt = folder / "receipt.json"
+            receipt.write_text(json.dumps(record), encoding="utf-8")
+            first, second = folder / "one.tar.gz", folder / "two.tar.gz"
+            self.assertEqual(bundle.build(ROOT, "prod", first, image_record=receipt),
+                             bundle.build(ROOT, "prod", second, image_record=receipt))
+            receive.extract(first, folder / "release")
+            base = folder / "release/deploy/split"
+            self.assertTrue((base / "image_manifest.py").is_file())
+            self.assertNotIn("DO-NOT-PACK-THIS", (base / "images.json").read_text())
+            manifest = images.load(base / "images.json", environment="prod", account=ACCOUNT)
+            self.assertEqual(manifest["app_sha"], OLD)
+            self.assertEqual(set(manifest["images"]), {"api", "web"})
+            with tarfile.open(first) as archive:
+                self.assertEqual(archive.getnames().count("deploy/split/images.json"), 1)
+
+    def test_mismatched_or_duplicate_receipt_is_rejected_before_output(self):
+        for change in (lambda r: r.update(environment="dev"),
+                       lambda r: r["images"].__setitem__(1, r["images"][0]),
+                       lambda r: r["images"][0].update(digest="sha256:" + "d" * 64)):
+            with self.subTest(change=change), tempfile.TemporaryDirectory(prefix="aml-bad-pins-") as directory:
+                folder = Path(directory)
+                record = image_record()
+                change(record)
+                receipt = folder / "receipt.json"
+                receipt.write_text(json.dumps(record), encoding="utf-8")
+                output = folder / "bundle.tar.gz"
+                with self.assertRaises(ValueError):
+                    bundle.build(ROOT, "prod", output, image_record=receipt)
+                self.assertFalse(output.exists())
+
     def test_deterministic_bundle_and_no_secrets(self):
         with tempfile.TemporaryDirectory(prefix="aml-bundle-test-") as directory:
             for environment in ("dev", "prod"):
@@ -388,6 +498,8 @@ class BundleTests(unittest.TestCase):
                         self.assertTrue(all(name.startswith("deploy/split/") for name in names))
                         self.assertFalse(any(".env" in name or "example.json" in name for name in names))
                         self.assertIn("deploy/split/check_rds.py", names)
+                        self.assertIn("deploy/split/image_manifest.py", names)
+                        self.assertNotIn("deploy/split/images.json", names)
                         for role in ("front", "backend"):
                             self.assertIn(f"deploy/split/{role}/deploy-{environment}.sh", names)
                         if environment == "prod":

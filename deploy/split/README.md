@@ -14,6 +14,8 @@
 | `deploy.py` | 설정 조회, 실행, 상태 검사, Nginx 전환, 배포 ID별 복구 |
 | `check_rds.py` | API 이미지 안에서 앱·분석 계정의 RDS 인증과 TLS 검증 |
 | `build_bundle.py` | 명시된 배포 파일만 묶고 SHA-256 계산 |
+| `image_manifest.py` | 선택한 API·웹 이미지의 계정·환경·저장소·Digest 검사 |
+| Bundle의 `images.json` (선택) | 앱 버전을 배포 코드 버전과 분리할 때 사용하는 이미지 고정 기록 |
 | `receive.py` | EC2에서 Bundle 다운로드·검증·압축 해제 |
 | `run_ssm.py` | GitHub에서 백엔드 → 프론트 배포와 양쪽 복구 조정 |
 | 각 서버의 `split.example.json` | 서버별 비밀값 없는 설정 예시 |
@@ -77,6 +79,21 @@ jdbc:postgresql://<RDS_ENDPOINT>:5432/aml_dev_v3?sslmode=verify-full&sslrootcert
 새 workflow는 dev 환경을 `dev` 브랜치, prod 환경을 `master` 브랜치에서 실행하며 전체 40자리 커밋 SHA를 사용한다. ECR 태그는 `dev-<SHA>` 또는 `prod-<SHA>`다. 동일 태그가 이미 있으면 이미지를 재사용한다. 실제 GitHub 변수·OIDC·DNS 전환은 별도 실습이다.
 
 ## 5. 배포와 복구
+
+### 기존 이미지를 유지하며 배포 코드만 바꾸는 경우
+
+검증한 이미지 이전 기록을 `build_bundle.py`의 `--image-record`로 전달하면 Bundle에 `deploy/split/images.json`이 추가된다. 기록의 `environment`, `account_id`, `region`, `app_sha`와 두 `images` 항목을 검사하며, 각 이미지에는 `repository`, `image`(환경·앱 SHA 태그), `digest`, `pinned_image`가 있어야 한다. Bundle에는 계정·환경·앱 SHA와 API·웹의 Digest 주소만 저장한다.
+
+```bash
+python deploy/split/build_bundle.py prod /tmp/deploy-bundle.tar.gz \
+  --image-record /path/to/prod-images-ecr.json
+```
+
+`deploy.py`는 이 파일이 있으면 각 서비스에 지정한 `repository@sha256:...` 이미지를 사용한다. 잘못된 파일은 태그 방식으로 우회하지 않고 실패한다. 파일이 없는 이전 Bundle과 일반 CI 배포는 기존 `환경-배포_SHA` 태그 방식을 유지한다. GitHub workflow는 이미지 기록 옵션을 자동으로 사용하지 않는다.
+
+배포 SHA는 새 배포 코드의 커밋으로 유지하고, `app_sha`는 기존 앱 커밋을 기록한다. 같은 배포 SHA의 Bundle·이미지 선택은 불변으로 보관해야 한다. 복구·이전 컨테이너 중지는 해당 이전 릴리스의 `images.json`을 읽으므로, 배포마다 선택한 이미지가 유지된다.
+
+### 두 서버 배포 순서
 
 1. GitHub에서 API·웹 이미지를 준비하고 환경별 Bundle을 S3에 업로드한다.
 2. 백엔드가 Bundle 체크섬·서버 역할·계정을 확인하고 RDS 접속 검사 후 API를 배포한다.

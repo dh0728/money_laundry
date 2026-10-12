@@ -14,6 +14,8 @@ import sys
 import tempfile
 import time
 
+import image_manifest
+
 
 class DeploymentError(RuntimeError):
     pass
@@ -109,8 +111,7 @@ class Deployment:
         prefix = self.environment.upper()
         values = dict(os.environ, AWS_REGION=self.region, AWS_DEFAULT_REGION=self.region)
         service = "WEB" if self.role == "front" else "API"
-        repository = "aml-web" if self.role == "front" else "aml-api"
-        values[f"{prefix}_{service}_IMAGE"] = f"{self.registry}/{repository}:{self.environment}-{sha}"
+        values[f"{prefix}_{service}_IMAGE"] = self.image_reference(sha)
         if self.role == "backend":
             if self.parameters is None:
                 mapping = {
@@ -141,6 +142,15 @@ class Deployment:
                                                PROD_INFERENCE_API_TOKEN=self.parameter("inference/token"))
             values.update(self.parameters)
         return values
+
+    def image_reference(self, sha):
+        service = "web" if self.role == "front" else "api"
+        path = self.release({"sha": sha}) / "deploy/split/images.json"
+        if path.exists() or path.is_symlink():
+            manifest = image_manifest.load(path, environment=self.environment, account=self.account)
+            return manifest["images"][service]
+        # Older bundles and normal CI releases continue to use their commit tag.
+        return f"{self.registry}/aml-{service}:{self.environment}-{sha}"
 
     def release(self, meta):
         require(re.fullmatch(r"[0-9a-f]{40}", meta["sha"]), "Invalid release SHA.")
@@ -304,6 +314,7 @@ class Deployment:
         color = "dev" if self.environment == "dev" else (
             "green" if before["current"] and before["current"]["color"] == "blue" else "blue")
         target = {"sha": sha, "color": color, "transaction": deployment_id}
+        self.image_reference(sha)
         self.authenticate()
         self.compose(target, "config", "--quiet")
         self.compose(target, "pull")
