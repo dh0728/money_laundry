@@ -78,6 +78,7 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
   const fitted = useRef(false), lastView = useRef(view)
   const camera = useRef<Viewport | undefined>(undefined)
+  const wasOnlySelected = useRef(false) // 누르기 직전에 이 계좌만 선택돼 있었는가: 다시 누르면 선택 해제(전환)
   const [showLabels, setShowLabels] = useState(true)
   const [selection, setSelection] = useState<{ nodes: string[]; edges: string[] }>({ nodes: [], edges: [] })
   const { fitView, setViewport, zoomTo } = useReactFlow()
@@ -172,7 +173,7 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
   const patTxs = patIds.length > 1 ? g.tx.filter(t => patIds.includes(t.fromAccount) && patIds.includes(t.toAccount)) : patPair ? g.tx.filter(t => (t.fromAccount === patPair[0] && t.toAccount === patPair[1])) : []
   const patActive = patIds.length > 1 || Boolean(patPair)
   const main = <div className="flex h-full min-h-0 flex-col gap-2">
-    <div ref={box} className="relative isolate min-h-0 flex-1 overflow-hidden rounded-lg border bg-card">
+    <div ref={box} onPointerDownCapture={e => { const el = (e.target as HTMLElement).closest('.react-flow__node'); const id = el?.getAttribute('data-id'); wasOnlySelected.current = Boolean(id) && selection.nodes.length === 1 && selection.nodes[0] === id }} className="relative isolate min-h-0 flex-1 overflow-hidden rounded-lg border bg-card">
       <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-wrap items-start justify-between gap-2">
       <div className="pointer-events-auto flex min-h-11 flex-wrap items-center gap-2 rounded-md border bg-background/90 px-2.5 py-1 text-xs">
         <span className="text-muted-foreground">보기</span>
@@ -189,8 +190,8 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
       {view === 'pattern' ? <PatternGraph g={g} selected={patSel} onSelect={setPatSel} onZoom={setPatZoom} controls={patCtl} /> : null}
       {view === 'pattern' ? null : <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
         // eslint-disable-next-line react-hooks/refs -- 패널 크기 조절·화면 폭 전환으로 다시 그릴 때 카메라를 이어 받으려고 마지막 위치를 ref에 둔다
-        defaultViewport={camera.current} onMoveEnd={(_, v) => { camera.current = v }}
-        onSelectionChange={onSelectionChange} nodesDraggable={false} selectionOnDrag panOnDrag={[1, 2]} panActivationKeyCode="Space" panOnScroll zoomOnScroll={false} zoomActivationKeyCode={["Meta", "Control"]} onPaneContextMenu={e => e.preventDefault()}
+        onNodeClick={() => { if (wasOnlySelected.current) { wasOnlySelected.current = false; clearSelection() } }} defaultViewport={camera.current} onMoveEnd={(_, v) => { camera.current = v }}
+        onSelectionChange={onSelectionChange} nodesDraggable={false} selectionOnDrag panOnDrag={[1, 2]} panActivationKeyCode="Space" zoomOnScroll panOnScroll={false} onPaneContextMenu={e => e.preventDefault()}
         nodesConnectable={false} minZoom={MIN_ZOOM} maxZoom={MAX_ZOOM} proOptions={{ hideAttribution: true }} aria-label="시간순 관계 그래프">
         <ViewportPortal>
           {ownerBoxes.map(({ group, top, height }) => <div key={group.key} className={`pointer-events-none absolute rounded-lg border-2 ${selectedOwners.has(group.key) ? 'border-foreground' : group.known ? 'border-foreground/45' : 'border-dashed border-border'}`} style={{ transform: `translate(-182px, ${top}px)`, width: `${laneEnd + 182}px`, height }}>
@@ -211,7 +212,7 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
         <button type="button" aria-expanded={guideOpen} onClick={() => toggleGuide(!guideOpen)} data-testid="graph-guide" className="pointer-events-auto flex min-h-10 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-2 text-left text-xs text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden">
           {guideOpen ? <ChevronLeft className="size-4 shrink-0" aria-hidden /> : <ChevronRight className="size-4 shrink-0" aria-hidden />}
           {guideOpen
-            ? view === 'pattern' ? <span><b className="font-semibold text-foreground">빈 곳 왼쪽 끌기</b> 선택 · <b className="font-semibold text-foreground">오른쪽(휠) 클릭 끌기</b> 이동 · <b className="font-semibold text-foreground">계좌 잡고 끌기</b> 옮기기 · <b className="font-semibold text-foreground">휠</b> 확대</span> : <span><b className="font-semibold text-foreground">왼쪽 클릭·끌기</b> 선택 · <b className="font-semibold text-foreground">오른쪽 또는 휠 클릭하고 끌기</b> 화면 이동 · <b className="font-semibold text-foreground">Ctrl(⌘)+휠</b> 확대·축소</span>
+            ? <span><b className="font-semibold text-foreground">왼쪽 클릭·끌기</b> 선택 · <b className="font-semibold text-foreground">오른쪽 또는 휠 클릭하고 끌기</b> 화면 이동 · <b className="font-semibold text-foreground">휠</b> 확대·축소{view === 'pattern' && <> · <b className="font-semibold text-foreground">계좌 잡고 끌기</b> 옮기기</>}</span>
             : <span className="font-medium text-foreground">조작 안내</span>}
         </button>
         {/* 확대·축소 슬라이더: 로그 눈금이라 어느 배율에서든 같은 감도로 움직인다 */}

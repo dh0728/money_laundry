@@ -1,5 +1,6 @@
 // UI 재설계 S7 Episode 상세 개요 시안. S5 Alert 개요의 카드·계산을 재사용하고 Episode에만 있는 질문(왜 묶었나·어떻게 이어지나·판정 진행)을 더한다.
 // 요약 카드는 4개(외부 유입액·순유입·근거 거래·거래 기간). 거래 총액은 두지 않는다(10/11).
+import { Callout } from '@/components/Callout'
 import { NumBadge } from '@/components/NumBadge'
 import { useState } from 'react'
 import type { AlertRow, HistoryRow } from '@/api/alerts'
@@ -78,7 +79,7 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
 
       <Step n={3} title="무엇으로 이어지나" description="2개 이상 Alert에 나온 계좌" source="관측">
         {shared.length ? <ul className="space-y-2 text-xs">{shared.slice(0, 6).map(([acc, ids]) => <li key={acc} className="flex flex-wrap items-center gap-2"><span className="font-mono">{acc}</span><span className="text-muted-foreground">Alert {ids.size}건</span><span className="flex gap-1">{[...ids].map(id => <Badge key={id} variant="outline" className="font-mono font-normal">{alertCode(id)}</Badge>)}</span></li>)}</ul> : <p className="text-xs text-muted-foreground">Alert끼리 공유하는 계좌가 없습니다.</p>}
-        {isolated.length > 0 && <p className="mt-3 rounded-md border border-destructive/40 px-3 py-2 text-xs text-destructive">연결 근거 없음: {isolated.map(s => alertCode(s.a.alertId)).join(', ')}는 다른 Alert와 공유하는 계좌가 없습니다. 묶은 이유를 <NumBadge n={1} />에서 확인하세요.</p>}
+        {isolated.length > 0 && <Callout className="mt-3">연결 근거 없음: {isolated.map(s => alertCode(s.a.alertId)).join(', ')}는 다른 Alert와 공유하는 계좌가 없습니다. 묶은 이유를 <NumBadge n={1} />에서 확인하세요.</Callout>}
       </Step>
 
       <Step n={4} title="통합 자금 흐름" description="Episode 전체에서 사건 밖으로 들어오고 나간 돈" source="계산">

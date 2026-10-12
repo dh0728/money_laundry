@@ -1,6 +1,7 @@
 // UI 재설계 S17 수집·도착 현황 + S18 분석 작업 현황 시안.
 // API는 이미 있다(origin/dev API.md §1.2·§1.3): GET /api/banks/arrivals, GET /api/v1/batch-jobs, /{jobId}, POST /{jobId}/resume(ADMIN).
 // 10/8 김명기: 전 역할 읽기, 조치는 ADMIN만. 직원 이상 보고 기능은 보류.
+import { Callout } from '@/components/Callout'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AdminButton, MockRoleSwitch, useMockRole } from '@/components/MockRole'
@@ -38,14 +39,14 @@ const JOBS: Job[] = [
 ]
 
 const Tone = ({ tone, children }: { tone: string; children: string }) => tone === 'danger'
-  ? <Badge variant="outline" className="border-destructive/50 text-xs font-normal text-destructive">{children}</Badge>
+  ? <Badge variant="outline" className="border-destructive/50 bg-destructive/15 text-xs font-normal text-destructive">{children}</Badge>
   : <Badge variant="outline" data-tone={tone} className="semantic-status-badge text-xs font-normal">{children}</Badge>
 
 function Stages({ job }: { job: Job }) {
   const ci = STAGES.findIndex(s => s[0] === job.stage)
   return <ol className="flex flex-wrap items-center gap-1 text-[0.6875rem]">{STAGES.map(([k, l], i) => {
     const failed = i === ci && job.status === 'FAILED', cur = i === ci && job.status !== 'COMPLETED'
-    return <li key={k} className="flex items-center gap-1"><span className={`rounded-full border px-2 py-0.5 ${failed ? 'border-destructive text-destructive' : cur ? 'border-foreground font-medium' : i < ci || job.status === 'COMPLETED' ? '' : 'border-dashed text-muted-foreground'}`}>{l}</span>{i < STAGES.length - 1 && <span className="text-muted-foreground">›</span>}</li>
+    return <li key={k} className="flex items-center gap-1"><span className={`rounded-full border px-2 py-0.5 ${failed ? 'border-destructive bg-destructive/15 text-destructive' : cur ? 'border-foreground font-medium' : i < ci || job.status === 'COMPLETED' ? '' : 'border-dashed text-muted-foreground'}`}>{l}</span>{i < STAGES.length - 1 && <span className="text-muted-foreground">›</span>}</li>
   })}</ol>
 }
 
@@ -93,7 +94,7 @@ function JobsTab({ role }: { role: ReturnType<typeof useMockRole>[0] }) {
     </CardContent></Card>
     <Card className="shadow-none"><CardContent className="space-y-4"><SectionTitle title={`#${sel.jobId} · ${sel.date} 분석`} description={`시작 ${sel.started} · ${JOB_STATUS[sel.status].label}`} action={sel.status === 'FAILED' ? <AdminButton role={role} size="sm" onClick={() => toast.success(`#${sel.jobId} 재개 요청`, { description: '실패 단계부터 다시 실행합니다. 시안이라 보내지 않습니다.' })}>실패 단계부터 재개</AdminButton> : undefined} />
       <Stages job={sel} />
-      {sel.action && <p className="rounded-md border border-destructive/40 px-3 py-2 text-xs text-destructive">{sel.action}</p>}
+      {sel.action && <Callout>{sel.action}</Callout>}
       <div><p className="text-xs font-medium">모델별 상태</p>
         <Table><TableHeader><TableRow><TableHead>모델</TableHead><TableHead>상태</TableHead><TableHead>버전</TableHead></TableRow></TableHeader>
           <TableBody>{[['이진 분류', sel.status === 'COMPLETED' ? '완료' : sel.stage === 'INFERENCE' ? '원격 대기' : '시작 전'], ['유형 분류', sel.status === 'COMPLETED' ? '완료' : sel.stage === 'INFERENCE' ? '수집 완료' : '시작 전']].map(([m, s]) => <TableRow key={m}><TableCell className="text-xs">{m}</TableCell><TableCell className="text-xs">{s}</TableCell><TableCell className="font-mono text-xs">demo-random-v1</TableCell></TableRow>)}</TableBody></Table>

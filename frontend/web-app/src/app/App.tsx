@@ -180,7 +180,7 @@ export default function App() {
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>)}
-            <SidebarGroup className="mt-auto border-t">
+            <SidebarGroup className="mt-auto">
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1.5">
                   {utilityNav.map(item => (

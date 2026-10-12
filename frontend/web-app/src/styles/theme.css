@@ -245,7 +245,7 @@
   --selection-muted-foreground: var(--palette-neutral-625); --selection-border: var(--palette-neutral-900-a45);
   --selection-destructive-background: var(--palette-signal-red-600); --selection-destructive-foreground: var(--palette-white);
   --input: var(--palette-neutral-200-a15); --ring: var(--primary);
-  --sidebar: var(--palette-neutral-930); --sidebar-foreground: var(--palette-neutral-200-dark);
+  --sidebar: oklch(.2 0 0); --sidebar-foreground: var(--palette-neutral-200-dark);
   --sidebar-primary: var(--primary); --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--palette-neutral-700); --sidebar-accent-foreground: var(--palette-neutral-50);
   --sidebar-border: var(--palette-neutral-200-a10); --sidebar-ring: var(--sidebar-primary);

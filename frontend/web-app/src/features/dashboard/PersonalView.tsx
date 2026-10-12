@@ -92,7 +92,7 @@ export function PersonalView({ remote }: { remote?: { cards: [SectionCardItem, S
         </div>
         <ProvenanceNote kind="proposal">미확인·처리 전을 나누려면 사건별 첫 열람 시각이 필요합니다(Backend 요청). 지금 열 배정은 시연용 예시입니다.</ProvenanceNote>
         <div className="mt-3" />
-        {remote?.queue ?? <WorkQueue columns={boardStatuses.map(status => { const column = sortWork(items.filter(item => boardStatus(item) === status), sort); return { status, hint: boardStatusHints[status], count: column.length, content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> } })} />}
+        {remote?.queue ?? <WorkQueue columns={boardStatuses.map(status => { const column = sortWork(items.filter(item => boardStatus(item) === status), sort); return { status, hint: boardStatusHints[status], count: column.length, content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} tone={({ PENDING: 'pending', IN_PROGRESS: 'working', DONE: 'closed' } as const)[status as 'PENDING' | 'IN_PROGRESS' | 'DONE']} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> } })} />}
       </section>
     </>
   )

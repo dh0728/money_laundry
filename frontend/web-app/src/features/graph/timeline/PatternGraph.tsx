@@ -29,6 +29,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
   const [size, setSize] = useState({ w: 0, h: 0 })
   const fitted = useRef(false), lastK = useRef(0)
   // 조작(김명기 10/12, 소유주 보기와 같게): 빈 곳 왼쪽 끌기 = 다중 선택, 빈 곳 오른쪽(휠) 클릭하고 끌기 = 화면 이동, 계좌를 잡고 끌 때만 옮기기
+  const press = useRef<{ x: number; y: number; id: string | null } | null>(null)
   const hover = useRef<PNode | null>(null), drag = useRef<{ mode: 'pan' | 'marquee'; sx: number; sy: number; cx: number; cy: number } | null>(null), justDragged = useRef(false)
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const local = (e: React.PointerEvent) => { const r = wrap.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
@@ -67,8 +68,8 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
     configured.current = data; fitted.current = false
     const pull = Object.assign((alpha: number) => { for (const n of data.nodes) { n.vx = (n.vx ?? 0) + (n.tx - (n.x ?? 0)) * 0.05 * alpha; n.vy = (n.vy ?? 0) + (n.ty - (n.y ?? 0)) * 0.05 * alpha } }, { initialize: () => {} })
     f.d3Force('pattern', pull as never)
-    ;(f.d3Force('charge') as unknown as { strength: (v: number) => void } | undefined)?.strength(-320)
-    ;(f.d3Force('link') as unknown as { distance: (v: number) => void } | undefined)?.distance(130)
+    ;(f.d3Force('charge') as unknown as { strength: (v: number) => { distanceMax: (d: number) => void } } | undefined)?.strength(-320).distanceMax(230) // 가까운 계좌끼리만 밀어내서 덩어리끼리 멀어지지 않게
+    ;(f.d3Force('link') as unknown as { distance: (v: number) => void } | undefined)?.distance(150)
     f.d3ReheatSimulation()
   }
 
@@ -85,10 +86,26 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
   }, [document.documentElement.className])
   const riskColor = (score: number) => colors.risk[Math.min(9, Math.max(0, Math.floor(score * 10)))]
   
+  // 휠은 소유주 보기와 같게: 그냥 휠을 굴리면 포인터 자리를 기준으로 확대·축소(Windows 크롬은 Ctrl+휠이 브라우저 배율이라 쓰지 않는다)
+  useEffect(() => {
+    const el = wrap.current; if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      const f = fg.current; if (!f) return
+      e.preventDefault()
+      const k = f.zoom(), r = el.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top
+      const nk = Math.min(2.5, Math.max(0.2, k * Math.pow(2, -e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.002)))), g0 = f.screen2GraphCoords(px, py)
+      f.zoom(nk, 0); f.centerAt(g0.x - (px - r.width / 2) / nk, g0.y - (py - r.height / 2) / nk, 0)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false }); return () => el.removeEventListener('wheel', onWheel)
+  }, [size.w])
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const f = fg.current; if (!f) return
     const p = local(e)
-    if (e.button === 0 && !hover.current) { drag.current = { mode: 'marquee', sx: p.x, sy: p.y, cx: 0, cy: 0 }; setBox({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); e.currentTarget.setPointerCapture(e.pointerId) }
+    // 클릭 판정은 직접 한다: 포인터 아래 계좌를 찾아 두고, 거의 안 움직이고 떼면 선택·해제를 전환
+    const gp = f.screen2GraphCoords(p.x, p.y), hit = data.nodes.find(n => Math.hypot((n.x ?? 0) - gp.x, (n.y ?? 0) - gp.y) <= R + 4)
+    press.current = e.button === 0 ? { x: p.x, y: p.y, id: hit?.id ?? null } : null
+    if (e.button === 0 && !hit) { drag.current = { mode: 'marquee', sx: p.x, sy: p.y, cx: 0, cy: 0 }; setBox({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); e.currentTarget.setPointerCapture(e.pointerId) }
     else if (e.button === 1 || e.button === 2) { const c = f.centerAt(); drag.current = { mode: 'pan', sx: p.x, sy: p.y, cx: c.x, cy: c.y }; e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault() }
   }
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -99,11 +116,13 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
   }
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current, f = fg.current; drag.current = null
+    const pr = press.current; press.current = null
+    if (pr && pr.id && e.button === 0) { const p = local(e); if (Math.hypot(p.x - pr.x, p.y - pr.y) < 5) onSelect(selected?.type === 'nodes' && selected.ids.length === 1 && selected.ids[0] === pr.id ? null : { type: 'nodes', ids: [pr.id] }); return }
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
     if (!d || !f || d.mode !== 'marquee' || !box) { setBox(null); return }
     const x0 = Math.min(box.x0, box.x1), x1 = Math.max(box.x0, box.x1), y0 = Math.min(box.y0, box.y1), y1 = Math.max(box.y0, box.y1)
     setBox(null)
-    if (x1 - x0 < 5 && y1 - y0 < 5) return
+    if (x1 - x0 < 5 && y1 - y0 < 5) { if (e.button === 0) onSelect(null); return } // 빈 곳을 그냥 누르면 선택 해제
     justDragged.current = true; setTimeout(() => { justDragged.current = false }, 50)
     const ids = data.nodes.filter(n => { const s = f.graph2ScreenCoords(n.x ?? 0, n.y ?? 0); return s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1 }).map(n => n.id)
     onSelect(ids.length ? { type: 'nodes', ids } : null)
@@ -112,7 +131,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
   return <div ref={wrap} className="absolute inset-0" data-testid="pattern-graph" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onContextMenu={e => e.preventDefault()}>
     {box && <div className="pointer-events-none absolute z-10 border border-[var(--palette-blue-500)] bg-[var(--palette-blue-500)]/10" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
     {size.w > 0 && <Suspense fallback={null}><ForceGraph2D<PNode, PLink> ref={fg} onRenderFramePre={() => { if (fg.current) configure(fg.current) }} width={size.w} height={size.h} graphData={data} backgroundColor="rgba(0,0,0,0)"
-      warmupTicks={150} cooldownTicks={200} enableZoomInteraction enablePanInteraction={false} enableNodeDrag onNodeHover={(n: PNode | null) => { hover.current = n }}
+      warmupTicks={150} cooldownTicks={200} enableZoomInteraction={false} enablePanInteraction={false} enableNodeDrag onNodeHover={(n: PNode | null) => { hover.current = n }}
       nodeRelSize={R} nodeVal={1} nodeLabel="" linkLabel=""
       linkCurvature="curvature" linkWidth={(l: PLink) => selected?.type === 'link' && selected.id === l.pair ? l.width + 2 : l.width}
       linkColor={(l: PLink) => riskColor(l.maxScore)} linkDirectionalArrowLength={10} linkDirectionalArrowRelPos={0.88}
@@ -134,7 +153,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
         ctx.font = '12px ui-monospace, monospace'; ctx.fillStyle = colors.muted; ctx.textBaseline = 'top'; ctx.fillText(n.id, x, y + R + 4)
       }}
       nodePointerAreaPaint={(n: PNode, color: string, ctx: CanvasRenderingContext2D) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(n.x ?? 0, n.y ?? 0, R + 4, 0, Math.PI * 2); ctx.fill() }}
-      onNodeClick={(n: PNode) => onSelect({ type: 'nodes', ids: [n.id] })} onLinkClick={(l: PLink) => onSelect({ type: 'link', id: l.pair })} onBackgroundClick={() => { if (!justDragged.current) onSelect(null) }}
+      onLinkClick={(l: PLink) => onSelect({ type: 'link', id: l.pair })} 
       onZoom={({ k }: { k: number }) => { if (Math.abs(k - lastK.current) < 0.004) return; lastK.current = k; setTimeout(() => onZoom(k), 0) }}
       onEngineStop={() => { if (!fitted.current && fg.current) { fitted.current = true; fg.current.zoomToFit(0, 100); setTimeout(() => fg.current?.zoomToFit(250, 100), 450) } }} /></Suspense>}
   </div>
