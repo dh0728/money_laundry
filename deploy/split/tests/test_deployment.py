@@ -1,4 +1,5 @@
 import importlib.util
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import io
 import json
 import os
@@ -7,6 +8,7 @@ import shutil
 import sys
 import tarfile
 import tempfile
+import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
@@ -272,6 +274,48 @@ class DeploymentTests(unittest.TestCase):
         deploy.Deployment.health(engine, {"color": "blue"}, proxy=True)
         self.assertEqual(len(calls), 2)
         self.assertTrue(all("--write-out" in command for command in calls))
+
+    @unittest.skipUnless(shutil.which("curl"), "curl is required for HTTP retry coverage")
+    def test_proxy_health_waits_for_new_nginx_worker(self):
+        # Model reload: the old virtual host returns 404, then the new one serves health.
+        requests = []
+        counts = {}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                requests.append((self.path, self.headers.get("Host")))
+                counts[self.path] = counts.get(self.path, 0) + 1
+                ready = counts[self.path] > 1
+                body = (b'{"status":"UP"}' if "actuator" in self.path else b"ok\n") if ready else b"old host"
+                self.send_response(200 if ready else 404)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            engine = self.engine(role="front", environment="dev")
+            runner = deploy.Runner()
+
+            def local_request(command, **kwargs):
+                command = list(command)
+                command[0] = shutil.which("curl")
+                command[-1] = command[-1].replace("http://127.0.0.1", f"http://127.0.0.1:{server.server_port}", 1)
+                return runner.run(command, **kwargs)
+
+            engine.runner.run = local_request
+            deploy.Deployment.health(engine, {"color": "dev"}, proxy=True)
+            self.assertEqual(counts, {"/health": 2, "/api/actuator/health": 2})
+            self.assertTrue(all(host == "dev.aiaml.co.kr" for _, host in requests))
+        finally:
+            server.shutdown()
+            worker.join(timeout=5)
+            server.server_close()
 
     def test_front_nginx_renders_private_ip_and_preserves_api_path(self):
         engine = self.engine(role="front", environment="dev")

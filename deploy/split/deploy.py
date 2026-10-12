@@ -193,7 +193,9 @@ class Deployment:
             if self.role == "front":
                 urls.insert(0, ("/health", False))
             for path, api in urls:
-                self.check_http("http://127.0.0.1" + path, api=api, headers=[f"Host: {domain}"])
+                # Reload sends a signal; old nginx workers may still answer briefly.
+                self.check_http("http://127.0.0.1" + path, api=api,
+                                headers=[f"Host: {domain}"], retry=True)
         else:
             port = {"dev": 3001, "blue": 3000, "green": 3002}[meta["color"]]
             path = "/health"
