@@ -276,6 +276,37 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual([(g.seed_ids, g.witnesses) for g in second.graphs],
                          [(g.seed_ids, g.witnesses) for g in first.graphs])
 
+    def test_full_block_steps_aside_so_the_other_spokes_form_their_star(self):
+        # Chain F->Q->...->P fills the cap (6) and holds spoke F->Q of the out face of F.
+        # Planned first, it leaves no room, and its single spoke is no fan: the star must
+        # then form from the other spokes, as a re-run forms it beside the pinned chain (I10).
+        chain_rows = chain(["F", "Q", "D", "M", "N", "O", "P"], step=30.0)
+        rows = chain_rows + [(300, 50, "F", "R1", 1000.0), (301, 56, "F", "R2", 1000.0)]
+        seeds = [row[0] for row in rows]
+        first = self.build(rows, seeds, core_max=6)
+        self.assertEqual([g.seed_ids for g in first.graphs], [(100, 101, 102, 103, 104, 105), (300, 301)])
+        self.assertEqual(first.graphs[1].witnesses, (Witness("STAR_OUT", (300, 301)),))
+        self.assertNotIn("CORE_CAP", first.graphs[1].limits)   # the discarded plan leaves no mark
+        self.assertEqual(first.graphs[1].boundary_witnesses, (Witness("BOUNDARY_SAME_FOCAL", (100, 300)),))
+        self.assertEqual(first.unassigned, ())
+        groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
+        second = self.build(rows, seeds, groups, core_max=6)
+        self.assertEqual([(g.seed_ids, g.witnesses, g.limits) for g in second.graphs],
+                         [(g.seed_ids, g.witnesses, g.limits) for g in first.graphs])
+        # A weak star then attaches the next established block that fits: the short
+        # chain F->Q2->D2 takes the slot the full chain could not use.
+        rows = chain_rows + [(200, 50, "F", "Q2", 1000.0), (201, 80, "Q2", "D2", 1000.0),
+                             (300, 56, "F", "R1", 1000.0)]
+        seeds = [row[0] for row in rows]
+        first = self.build(rows, seeds, core_max=6)
+        self.assertEqual([g.seed_ids for g in first.graphs], [(100, 101, 102, 103, 104, 105), (200, 201, 300)])
+        self.assertEqual(self.kinds(first.graphs[1]), ["PASS", "STAR_OUT"])
+        groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
+        second = self.build(rows, seeds, groups, core_max=6)
+        self.assertEqual([(g.seed_ids, g.witnesses) for g in second.graphs],
+                         [(g.seed_ids, g.witnesses) for g in first.graphs])
+        self.assertEqual(second.unassigned, first.unassigned)
+
     def test_pinned_block_contributes_only_published_spokes(self):
         # Star A{1,2,3}: seed 3 sits in a chain that is not absorbable (money leaves A
         # through it), so the star is (1,2). Seed 3's chain later joins the same block via
@@ -291,6 +322,109 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual([(g.seed_ids, g.witnesses) for g in second.graphs],
                          [(g.seed_ids, g.witnesses) for g in first.graphs])
 
+    def test_path_joins_seeds_through_non_seed_hops(self):
+        one_hop = [(1, 0, "A", "Y", 1000.0), (2, 10, "Y", "Z", 980.0), (3, 20, "Z", "C", 990.0)]
+        graph, = self.build(one_hop, [1, 3]).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((1, 3), (2,)))
+        self.assertEqual(graph.witnesses, (Witness("PATH", (1, 2, 3)),))
+        self.assertEqual(self.build(one_hop, [1, 3], path_gap_max=0).graphs, ())
+        two_hops = one_hop[:2] + [(3, 20, "Z", "W", 990.0), (4, 30, "W", "C", 1000.0)]
+        graph, = self.build(two_hops, [1, 4]).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((1, 4), (2, 3)))
+        self.assertEqual(self.build(two_hops, [1, 4], path_gap_max=1).graphs, ())
+        # A seed met on the way ends the walk: the chain is PASS evidence, never a PATH.
+        blocked = one_hop[:1] + [(2, 10, "Y", "Z", 1100.0)] + one_hop[2:]
+        self.assertEqual(self.kinds(self.build(blocked, [1, 2, 3]).graphs[0]), ["PASS"])
+
+    def test_bridge_needs_two_intermediaries_and_ignores_time_order(self):
+        rows = [(1, 0, "S", "M1", 1000.0), (2, 5, "M1", "T", 990.0),
+                (3, 2, "S", "M2", 1000.0), (4, -3, "M2", "T", 1010.0)]  # M2 forwards before it receives
+        graph, = self.build(rows, [1, 3]).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((1, 3), (2, 4)))
+        self.assertIn("BRIDGE", self.kinds(graph))
+        single = self.build(rows[:2] + [(3, 2, "S", "M3", 1000.0)], [1, 3])
+        self.assertNotIn("BRIDGE", self.kinds(single.graphs[0]))
+        # The second leg may be the seed and the first leg a normal transaction.
+        reverse = [(1, 0, "S", "M1", 1000.0), (2, 5, "M1", "T", 990.0),
+                   (3, 2, "S", "M2", 1000.0), (4, 6, "M2", "T", 1010.0)]
+        graph, = self.build(reverse, [2, 4]).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((2, 4), (1, 3)))
+
+    def test_closure_walks_back_into_the_block(self):
+        rows = [(1, 0, "A", "B", 1000.0), (2, 5, "B", "C", 1000.0), (3, 9, "C", "A", 980.0)]
+        graph, = self.build(rows, [1, 2]).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((1, 2), (3,)))
+        self.assertEqual(self.kinds(graph), ["CLOSURE", "PASS"])
+        # Backward: a head seed whose sender received the money from inside the block.
+        rows = [(1, 0, "C", "A", 980.0), (2, 5, "A", "B", 1000.0), (3, 9, "B", "C", 1000.0)]
+        graph, = self.build(rows, [2, 3]).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((2, 3), (1,)))
+        self.assertEqual(self.build(rows, [2, 3], core_max=2).graphs[0].connection_ids, ())
+
+    def test_single_seed_shapes_are_off_by_default(self):
+        cycle = [(1, 0, "A", "B", 1000.0), (2, 5, "B", "C", 990.0), (3, 9, "C", "A", 980.0)]
+        self.assertEqual(self.build(cycle, [1]).graphs, ())
+        graph, = self.build(cycle, [1], single_seed_shapes=True).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((1,), (2, 3)))
+        self.assertEqual(graph.witnesses, (Witness("SHAPE_CYCLE", (1, 2, 3)),))
+        self.assertIn("SINGLE_SEED_SHAPE", graph.limits)
+        round_trip = [(1, 0, "A", "B", 1000.0), (2, 5, "B", "A", 990.0)]
+        self.assertEqual(self.build(round_trip, [1], single_seed_shapes=True).graphs, ())
+        bridge = [(1, 0, "S", "M1", 1000.0), (2, 5, "M1", "T", 990.0),
+                  (3, 1, "S", "M2", 1000.0), (4, 6, "M2", "T", 1000.0),
+                  (5, 2, "S", "M3", 1000.0), (6, 7, "M3", "T", 1000.0)]
+        self.assertEqual(self.build(bridge, [1]).graphs, ())
+        graph, = self.build(bridge, [1], single_seed_shapes=True).graphs
+        self.assertEqual((graph.seed_ids, graph.connection_ids), ((1,), (2, 3, 4, 5, 6)))
+        self.assertEqual(graph.witnesses[0].kind, "SHAPE_BRIDGE")
+        self.assertEqual(self.build(bridge[:4], [1], single_seed_shapes=True).graphs, ())
+        # Publishing a shape and re-running reproduces it.
+        for rows in (cycle, bridge):
+            first = self.build(rows, [1], single_seed_shapes=True)
+            groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
+            second = self.build(rows, [1], groups, single_seed_shapes=True)
+            self.assertEqual([(g.seed_ids, g.connection_ids, g.witnesses, g.pinned_group) for g in second.graphs],
+                             [(g.seed_ids, g.connection_ids, g.witnesses, 0) for g in first.graphs])
+
+    def test_ablation_switches(self):
+        rows = fan("A", 5) + [(200, 8, "AR0", "Z", 1000.0)]
+        self.assertEqual(len(self.build(rows, [100, 101, 102, 103, 104, 200]).graphs), 1)
+        self.assertEqual(len(self.build(rows, [100, 101, 102, 103, 104, 200], absorb_dangling=False).graphs), 2)
+        # Seed 1 passes through F (PASS 1→6). By default F's fan-in owns it even though it
+        # cannot absorb its chain, so X1's own fan-out {1, 8} never forms.
+        rows = [(1, 0, "X1", "F", 1000.0), (2, 1, "X2", "F", 300.0), (3, 2, "X3", "F", 300.0),
+                (4, 3, "X4", "F", 300.0), (5, 4, "X5", "F", 300.0), (6, 10, "F", "Y", 1000.0),
+                (8, 2, "X1", "Q", 1000.0)]
+        seeds = [1, 2, 3, 4, 5, 6, 8]
+        default = self.build(rows, seeds)
+        self.assertEqual([g.seed_ids for g in default.graphs], [(1, 6), (2, 3, 4, 5)])
+        self.assertIn(8, {u.tx_id for u in default.unassigned})
+        excluded = self.build(rows, seeds, star_exclude_passthrough=True)
+        self.assertEqual([g.seed_ids for g in excluded.graphs], [(1, 6, 8), (2, 3, 4, 5)])
+        # Seed 1 is a contested PASS bridge at F (1 and 2 both match 3 within the margin), and
+        # its chain {5, 1} is established; F's fan-in may absorb it only without the rule.
+        contested = [(5, -5, "Z", "A", 990.0), (1, 0, "A", "F", 1000.0), (2, 1, "B", "F", 1002.0),
+                     (3, 10, "F", "C", 1000.0)]
+        self.assertEqual([g.seed_ids for g in self.build(contested, [1, 2, 3, 5], contested_check=True).graphs],
+                         [(1, 5)])
+        self.assertEqual([g.seed_ids for g in self.build(contested, [1, 2, 3, 5]).graphs], [(1, 2, 5)])
+
+    def test_fixed_point_holds_with_connections(self):
+        rows = ([(1, 0, "A", "Y", 1000.0), (2, 10, "Y", "Z", 980.0), (3, 20, "Z", "C", 990.0),
+                 (4, 30, "C", "A", 985.0)]
+                + [(11, 0, "S", "M1", 1000.0), (12, 5, "M1", "T", 990.0),
+                   (13, 2, "S", "M2", 1000.0), (14, 6, "M2", "T", 1010.0)])
+        seeds = [1, 3, 11, 13]
+        first = self.build(rows, seeds)
+        self.assertEqual([(g.seed_ids, g.connection_ids) for g in first.graphs],
+                         [((1, 3), (2, 4)), ((11, 13), (12, 14))])
+        groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
+        second = self.build(rows, seeds, groups)
+        self.assertEqual([(g.seed_ids, g.connection_ids, g.witnesses) for g in second.graphs],
+                         [(g.seed_ids, g.connection_ids, g.witnesses) for g in first.graphs])
+        planned = [Evidence.from_graph(g.flow_graph(), "b" * 64) for g in first.graphs]
+        self.assertEqual({p.action for p in build_case_plans([], planned).plans}, {Action.NEW})
+
     def test_real_output_is_accepted_by_the_lifecycle_planner(self):
         rows = fan("A", 3) + [(200, 8, "AR0", "Z", 1000.0)]
         batch = self.build(rows, [100, 101, 102, 200])
@@ -300,7 +434,8 @@ class BlockGraphTests(unittest.TestCase):
 
     def test_policy_validation_and_digest(self):
         for options in (dict(relay_mode="SOFT"), dict(ratio_num=5, ratio_den=5), dict(star_max=1),
-                        dict(star_width_us=HOUR_US), dict(core_max=1)):
+                        dict(star_width_us=HOUR_US), dict(core_max=1), dict(path_gap_max=-1),
+                        dict(bridge_min_mids=1), dict(absorb_dangling=1)):
             with self.assertRaises(ValueError):
                 replace(BlockPolicy(), **options).validate()
         one = self.build(fan("A", 2), [100, 101])

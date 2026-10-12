@@ -1,9 +1,10 @@
-"""Pure, bounded block generator (policy block-pin-1), stage 1.
+"""Pure, bounded block generator (policy block-pin-1).
 
-Implements P0-P2 (pinning, hubs, faces/stars/RELAY), the PASS part of P3, P4
-(capped Kruskal assembly) and P7 (output) of worktable/alert_motif_design.md §7.
-PATH, BRIDGE, CLOSURE and single-seed shapes are stage 2 and absent here, so every
-core transaction of this stage is a seed. No labels, persistence or review state.
+Implements P0-P7 of worktable/alert_motif_design.md §7: pinning, hubs, faces/stars/
+RELAY, PASS/PATH/BRIDGE flow relations, capped Kruskal assembly, CLOSURE walks,
+single-seed shapes (policy, default off) and the output contract. Non-seed hops of
+PATH, BRIDGE, CLOSURE and shapes become CONNECTION members; context is never a
+member. No labels, persistence or review state.
 
 Determinism: the output is a pure function of (frozen ledger, seeds, seed_groups,
 policy). Every decision iterates (time, id)-sorted structures; union-find survivors
@@ -52,6 +53,20 @@ class BlockPolicy:
     # A star needs this many distinct counterparties; repeated transfers between one
     # pair of accounts are not a fan (stage-1 refinement measured on hub_fp).
     star_min_counterparties: int = 2
+    # Stage 2: non-seed walks (PATH, CLOSURE), BRIDGE and single-seed shapes.
+    path_gap_max: int = 2
+    walk_scan: int = 128
+    ear_max: int = 12
+    bridge_min_mids: int = 2
+    shape_min_mids: int = 3
+    shape_min_hops: int = 3
+    # Ablation switches (design §13): the dangling rule, the contested-bridge rule and
+    # dropping star spokes that an adopted PASS already explains as pass-through.
+    absorb_dangling: bool = True
+    # Off by default after the stage-2 ablation (block_graph_stage2_result_20261012.md):
+    # the rule fragmented blocks without reducing mixing.
+    contested_check: bool = False
+    star_exclude_passthrough: bool = False
     relay_lead_us: int = 6 * HOUR_US
     relay_window_us: int = 120 * HOUR_US
     relay_mode: str = "WEAK"
@@ -70,12 +85,17 @@ class BlockPolicy:
                     self.pass_margin_floor_den, self.star_gap_us, self.star_width_us,
                     self.star_max, self.star_strong, self.star_min_counterparties, self.relay_window_us,
                     self.hub_min_activity, self.hub_window_us, self.link_max,
-                    self.max_edge_visits, self.max_relations)
-        non_negative = (self.relay_lead_us, self.context_pad_us, self.hub_max_seed_share_percent)
+                    self.max_edge_visits, self.max_relations, self.walk_scan, self.ear_max,
+                    self.bridge_min_mids, self.shape_min_mids, self.shape_min_hops)
+        non_negative = (self.relay_lead_us, self.context_pad_us, self.hub_max_seed_share_percent,
+                        self.path_gap_max)
+        flags = (self.single_seed_shapes, self.absorb_dangling, self.contested_check,
+                 self.star_exclude_passthrough)
         if (not self.version
                 or any(type(value) is not int or value < 1 for value in positive)
                 or any(type(value) is not int or value < 0 for value in non_negative)
-                or type(self.single_seed_shapes) is not bool
+                or any(type(value) is not bool for value in flags)
+                or self.bridge_min_mids < 2 or self.shape_min_mids < 2 or self.shape_min_hops < 2
                 or self.ratio_num >= self.ratio_den
                 or self.hub_max_seed_share_percent > 100
                 or self.relay_mode not in ("WEAK", "LINK_ONLY", "STRONG")
@@ -138,6 +158,7 @@ class _Relation:
     side: str | None = None
     parts: tuple = ()
     extend: bool = False
+    extra: tuple = ()  # non-seed transactions that become CONNECTION members
 
     def key(self):
         return (self.tier, self.rank, self.strength, self.tx_ids)
@@ -184,6 +205,9 @@ class _Build:
         self.focal_published = defaultdict(set)
         self.owned_by_star = {}
         self.contested = set()
+        self.contested_in, self.contested_out = set(), set()
+        self.pass_following = set()   # seeds that are the inbound leg of an adopted PASS
+        self.pass_preceding = set()   # seeds that are the outbound leg of an adopted PASS
         self.links = []
         self.link_seeds = set()
         self.rejected = []
@@ -299,6 +323,62 @@ class _Build:
             common = accounts if common is None else common & accounts
         return next(iter(common)) if common and len(common) == 1 else None
 
+    # ----- amount band and bounded walks -----
+    def in_band(self, a, b):
+        policy = self.policy
+        return (a >= 0 and b >= 0 and policy.ratio_num * a <= policy.ratio_den * b
+                and policy.ratio_num * b <= policy.ratio_den * a)
+
+    @staticmethod
+    def excess(a, b):
+        return Fraction(max(a, b), min(a, b)) - 1
+
+    def scan_rows(self, adjacency, account, low, high, anchor, limit):
+        """Time-nearest rows of one account face inside [low, high], at most `limit`."""
+        rows, begin, end = self.index.interval(adjacency, account, low, high)
+        count = end - begin
+        if count <= limit:
+            pool, examined = rows[begin:end], count
+        else:
+            pool, examined, _ = self.index.nearest(rows, begin, end, anchor, limit)
+            self.stats["walk_truncated"] += 1
+        self.visits += examined
+        if self.visits > self.policy.max_edge_visits:
+            raise GraphBudgetExceeded("EDGE_VISITS")
+        return pool, count > limit
+
+    def best_step(self, prev, forward):
+        """Best in-band continuation of `prev`: out of its receiver (forward) or into its sender.
+
+        Returns (position, 'SEED' | 'STEP') or (None, reason). A seed is returned as the
+        step's end point; the caller decides whether it is an arrival or a stop.
+        """
+        policy = self.policy
+        window, lag = policy.hub_window_us, policy.hop_lag_us
+        account = self.targets[prev] if forward else self.sources[prev]
+        side = "out" if forward else "in"
+        t = self.times[prev]
+        if self.is_hub(account, side, t - window, t + window):
+            return None, "HUB"
+        adjacency = self.index.outgoing if forward else self.index.incoming
+        low, high = (t, t + lag) if forward else (t - lag, t)
+        pool, truncated = self.scan_rows(adjacency, account, low, high, t, policy.walk_scan)
+        best, best_key = None, None
+        for pos in pool:
+            if pos == prev or self.sources[pos] == self.targets[pos]:
+                continue
+            tp = self.times[pos]
+            if (forward and not t < tp <= t + lag) or (not forward and not t - lag <= tp < t):
+                continue
+            if not self.in_band(self.amounts[prev], self.amounts[pos]):
+                continue
+            key = (self.excess(self.amounts[prev], self.amounts[pos]), abs(tp - t), self.ids[pos])
+            if best_key is None or key < best_key:
+                best, best_key = pos, key
+        if best is None:
+            return None, "TRUNCATED" if truncated else "NONE"
+        return best, "SEED" if best in self.seeds else "STEP"
+
     # ----- P0 -----
     def normalize_groups(self):
         pinned_seen = set()
@@ -387,8 +467,11 @@ class _Build:
             # Seeds reserved for another face (their published star lives there) are
             # skipped; pinned-group conflicts are resolved in P4, not here, so that a
             # re-run forms exactly the chunks of the batch run (I10).
+            explained = (self.pass_following if side == "in" else self.pass_preceding) \
+                if policy.star_exclude_passthrough else ()
             members = sorted((s for s in block
-                              if s not in self.owned_by_star and self.starside.get(s, face) == face),
+                              if s not in self.owned_by_star and self.starside.get(s, face) == face
+                              and s not in explained),
                              key=self.tkey)
             counterparty = self.targets if side == "out" else self.sources
             pieces = [members[i:i + policy.star_max] for i in range(0, len(members), policy.star_max)]
@@ -506,17 +589,237 @@ class _Build:
             self.relations.append(_Relation(TIER_FLOW, 0, (candidate[0], candidate[1]),
                                             self.tx_tuple((e, f)), "PASS", (e, f)))
             adopted_seeds.update((e, f))
-        contested_seeds = set()
+            self.pass_following.add(e)
+            self.pass_preceding.add(f)
+        contested_in, contested_out = set(), set()
         for candidate in candidates:
             if candidate in adopted_set:
                 continue
             e, f = candidate[4], candidate[5]
-            contested_seeds.update((e, f))
+            contested_in.add(e)
+            contested_out.add(f)
             self.rejected.append(RejectedRelation(Witness("PASS", self.tx_tuple((e, f))), "PASS_CONTESTED"))
             self.add_link(e, f, "BOUNDARY_PASS")
-        self.contested = contested_seeds - adopted_seeds
+        # A contested bridge is role-specific: the inbound leg of an unresolved pass-through
+        # stays contested even when the same transaction is the outbound leg of an adopted PASS.
+        self.contested_in = contested_in - self.pass_following
+        self.contested_out = contested_out - self.pass_preceding
+        self.contested = self.contested_in | self.contested_out
         self.stats["pass_adopted"] = len(adopted)
         self.stats["pass_contested"] = len(candidates) - len(adopted)
+
+    # ----- P3: PATH and BRIDGE (stage 2) -----
+    def paths(self):
+        """Seed → 1..path_gap_max non-seed in-band hops → seed, following the best step only."""
+        policy = self.policy
+        if policy.path_gap_max < 1:
+            return
+        best_by_arrival = {}
+        for e in self.ordered_seeds:
+            if e in self.selfie or e in self.pass_following or self.amounts[e] < 0:
+                continue
+            prev, steps, visited = e, [], {self.sources[e], self.targets[e]}
+            total = Fraction(0)
+            for hop in range(policy.path_gap_max + 1):
+                pos, kind = self.best_step(prev, True)
+                if pos is None:
+                    break
+                total += self.excess(self.amounts[prev], self.amounts[pos])
+                if kind == "SEED":
+                    if steps and pos != e and pos not in self.pass_preceding:
+                        key = (len(steps), total, self.times[pos] - self.times[e], self.ids[e])
+                        current = best_by_arrival.get(pos)
+                        if current is None or key < current[0]:
+                            best_by_arrival[pos] = (key, e, tuple(steps))
+                    break
+                if hop == policy.path_gap_max or self.targets[pos] in visited:
+                    break
+                steps.append(pos)
+                visited.add(self.targets[pos])
+                prev = pos
+        for arrival in sorted(best_by_arrival, key=self.ids.__getitem__):
+            key, e, steps = best_by_arrival[arrival]
+            self.relations.append(_Relation(
+                TIER_FLOW, 2, (key[0], key[1], key[2]), self.tx_tuple((e, arrival) + steps),
+                "PATH", (e, arrival), extra=steps))
+            self.stats["paths"] += 1
+
+    def bridges(self):
+        """S→m→T legs through distinct intermediaries, time-order independent (|Δt| ≤ hop_lag)."""
+        policy = self.policy
+        lag, window = policy.hop_lag_us, policy.hub_window_us
+        legs = defaultdict(dict)  # (S, T) -> m -> (key, first leg, second leg)
+
+        def offer(S, T, m, key, first, second):
+            current = legs[(S, T)].get(m)
+            if current is None or key < current[0]:
+                legs[(S, T)][m] = (key, first, second)
+
+        for e in self.ordered_seeds:
+            if e in self.selfie or self.amounts[e] < 0:
+                continue
+            t, amount = self.times[e], self.amounts[e]
+            # e as the first leg S→m: look for m→T within ±lag.
+            S, m = self.sources[e], self.targets[e]
+            if not self.is_hub(m, "out", t - window, t + window):
+                pool, _ = self.scan_rows(self.index.outgoing, m, t - lag, t + lag, t, 2 * policy.walk_scan)
+                for f in pool:
+                    T = self.targets[f]
+                    if f == e or T in (S, m) or self.sources[f] == self.targets[f]:
+                        continue
+                    if self.in_band(amount, self.amounts[f]):
+                        offer(S, T, m, (self.excess(amount, self.amounts[f]), abs(self.times[f] - t),
+                                        self.ids[f]), e, f)
+            # e as the second leg m→T: look for S→m within ±lag.
+            m, T = self.sources[e], self.targets[e]
+            if not self.is_hub(m, "in", t - window, t + window):
+                pool, _ = self.scan_rows(self.index.incoming, m, t - lag, t + lag, t, 2 * policy.walk_scan)
+                for g in pool:
+                    S = self.sources[g]
+                    if g == e or S in (T, m) or self.sources[g] == self.targets[g]:
+                        continue
+                    if self.in_band(self.amounts[g], amount):
+                        offer(S, T, m, (self.excess(self.amounts[g], amount), abs(self.times[g] - t),
+                                        self.ids[g]), g, e)
+        for (S, T), by_m in sorted(legs.items()):
+            if len(by_m) < min(policy.bridge_min_mids, policy.shape_min_mids):
+                continue
+            items = sorted(by_m.values(), key=lambda item: (min(self.tkey(item[1]), self.tkey(item[2])), item[0]))
+            chosen, bounds = [], None
+            for item in items:
+                if len(chosen) >= policy.star_max:
+                    break
+                times = (self.times[item[1]], self.times[item[2]])
+                candidate = self.span_union(bounds, (min(times), max(times)))
+                if candidate[1] - candidate[0] > policy.span_max_us:
+                    continue
+                chosen.append(item)
+                bounds = candidate
+            positions = {pos for item in chosen for pos in item[1:]}
+            seeds = tuple(sorted(positions & self.seeds, key=self.tkey))
+            extra = tuple(sorted(positions - self.seeds, key=self.tkey))
+            if len(seeds) >= 2 and len(chosen) >= policy.bridge_min_mids:
+                self.relations.append(_Relation(
+                    TIER_FLOW, 1, (-len(chosen), -len(seeds), bounds[1] - bounds[0]),
+                    self.tx_tuple(positions), "BRIDGE", seeds, extra=extra))
+                self.stats["bridges"] += 1
+
+    # ----- P5: closure walks (stage 2) -----
+    def walk_closure(self, root, end, forward):
+        policy = self.policy
+        core = self.core[root]
+        accounts = {self.sources[pos] for pos in core} | {self.targets[pos] for pos in core}
+        prev, steps, visited = end, [], {self.sources[end], self.targets[end]}
+        for _ in range(policy.ear_max):
+            pos, kind = self.best_step(prev, forward)
+            if pos is None or kind == "SEED":
+                break
+            steps.append(pos)
+            arrival = self.targets[pos] if forward else self.sources[pos]
+            if arrival in accounts:
+                extra = [end] + steps
+                if self.merged_size([root], extra) > policy.core_max:
+                    self.limits[end].add("CORE_CAP")
+                    return False
+                low, high = self.merged_bounds([root], extra)
+                if high - low > policy.span_max_us:
+                    self.limits[end].add("COMPONENT_SPAN")
+                    return False
+                self.adopt(root, "CLOSURE", extra)
+                self.stats["adopted_CLOSURE"] += 1
+                return True
+            if arrival in visited:
+                break
+            visited.add(arrival)
+            prev = pos
+        return False
+
+    def closures(self):
+        for root in sorted({self.find(s) for s in self.seeds}, key=self.ids.__getitem__):
+            if not self.witnesses[root] or self.frozen[root] or not self.established(root):
+                continue
+            core = self.core[root]
+            leaves = {self.sources[pos] for pos in core}
+            enters = {self.targets[pos] for pos in core}
+            core_seeds = sorted(core & self.seeds, key=self.tkey)
+            for end in core_seeds:
+                if self.targets[end] not in leaves:   # tail: nothing leaves its receiver inside the block
+                    self.walk_closure(root, end, True)
+            for end in core_seeds:
+                if self.sources[end] not in enters:   # head: nothing enters its sender inside the block
+                    self.walk_closure(root, end, False)
+
+    # ----- P6: single-seed shapes (policy, default off) -----
+    def shapes(self):
+        policy = self.policy
+        if not policy.single_seed_shapes:
+            return
+        for e in self.ordered_seeds:
+            root = self.find(e)
+            # A pinned single-seed shape is re-walked so that a re-run reproduces it (I10).
+            if (e in self.selfie or len(self.comp_seeds[root]) >= 2 or self.witnesses[root]
+                    or self.amounts[e] < 0):
+                continue
+            prev, steps, visited = e, [], {self.sources[e], self.targets[e]}
+            for _ in range(policy.ear_max):
+                pos, kind = self.best_step(prev, True)
+                if pos is None or kind == "SEED":
+                    break
+                steps.append(pos)
+                arrival = self.targets[pos]
+                if arrival == self.sources[e]:
+                    if len(steps) + 1 >= policy.shape_min_hops and len(steps) + 1 <= policy.core_max:
+                        self.adopt(root, "SHAPE_CYCLE", [e] + steps)
+                        self.limits[e].add("SINGLE_SEED_SHAPE")
+                        self.stats["adopted_SHAPE_CYCLE"] += 1
+                    break
+                if arrival in visited:
+                    break
+                visited.add(arrival)
+                prev = pos
+            if not self.witnesses[root]:
+                extra = self.shape_bridge(e)
+                if extra and len(extra) + 1 <= policy.core_max:
+                    self.adopt(root, "SHAPE_BRIDGE", (e,) + tuple(extra))
+                    self.limits[e].add("SINGLE_SEED_SHAPE")
+                    self.stats["adopted_SHAPE_BRIDGE"] += 1
+
+    def shape_bridge(self, e):
+        """Non-seed spokes of S next to e that reach one T through ≥ shape_min_mids intermediaries."""
+        policy = self.policy
+        lag, window = policy.hop_lag_us, policy.hub_window_us
+        S, t, amount = self.sources[e], self.times[e], self.amounts[e]
+        if self.is_hub(S, "out", t - window, t + window):
+            return ()
+        spokes, _ = self.scan_rows(self.index.outgoing, S, t - lag, t + lag, t, 2 * policy.walk_scan)
+        legs = defaultdict(dict)  # T -> m -> (key, spoke, second leg)
+        for spoke in sorted(spokes, key=self.tkey):
+            m = self.targets[spoke]
+            if m == S or (spoke != e and (spoke in self.seeds or not self.in_band(amount, self.amounts[spoke]))):
+                continue
+            ts = self.times[spoke]
+            if self.is_hub(m, "out", ts - window, ts + window):
+                continue
+            pool, _ = self.scan_rows(self.index.outgoing, m, ts - lag, ts + lag, ts, policy.walk_scan)
+            for f in pool:
+                T = self.targets[f]
+                if f in self.seeds or T in (S, m) or self.sources[f] == self.targets[f]:
+                    continue
+                if not self.in_band(self.amounts[spoke], self.amounts[f]):
+                    continue
+                key = (self.excess(self.amounts[spoke], self.amounts[f]), abs(self.times[f] - ts), self.ids[f])
+                current = legs[T].get(m)
+                if current is None or key < current[0]:
+                    legs[T][m] = (key, spoke, f)
+        best = ()
+        for T in sorted(legs):
+            by_m = legs[T]
+            if self.targets[e] not in by_m or len(by_m) < policy.shape_min_mids:
+                continue
+            positions = sorted({pos for item in by_m.values() for pos in item[1:]} - {e}, key=self.tkey)
+            if len(positions) > len(best):
+                best = tuple(positions)
+        return best
 
     # ----- P4 -----
     def assemble(self):
@@ -546,15 +849,16 @@ class _Build:
         policy = self.policy
         by_root = self.group_by_root(relation.seeds)
         roots = sorted(by_root, key=self.ids.__getitem__)
+        members = relation.seeds + relation.extra
         if any(self.frozen[root] for root in roots):
             self.link_roots(by_root, roots, "BOUNDARY_CAP")
             return
-        if self.merged_size(roots, relation.seeds) > policy.core_max:
+        if self.merged_size(roots, members) > policy.core_max:
             self.link_roots(by_root, roots, "BOUNDARY_CAP")
             for s in relation.seeds:
                 self.limits[s].add("CORE_CAP")
             return
-        low, high = self.merged_bounds(roots, relation.seeds)
+        low, high = self.merged_bounds(roots, members)
         if high - low > policy.span_max_us:
             self.link_roots(by_root, roots, "BOUNDARY_SPAN")
             for s in relation.seeds:
@@ -563,16 +867,20 @@ class _Build:
         if sum(1 for root in roots if self.pinned[root] is not None) >= 2:
             self.link_roots(by_root, roots, "BOUNDARY_OPEN_PAIR")
             return
-        self.adopt(self.merge(roots), relation.kind, relation.seeds)
+        self.adopt(self.merge(roots), relation.kind, members)
         self.stats["adopted_" + relation.kind] += 1
 
     def absorbable(self, root, account, side, chunk_seeds):
+        policy = self.policy
         if not self.established(root):
             return True
-        if any(s in self.contested for s in chunk_seeds):
+        contested = self.contested_in if side == "in" else self.contested_out
+        if policy.contested_check and any(s in contested for s in chunk_seeds):
             return False
-        members = self.comp_seeds[root]
-        if side == "in":
+        members = self.comp_seeds[root] | self.core[root]
+        if not policy.absorb_dangling:
+            dangling = False
+        elif side == "in":
             dangling = not any(self.sources[s] == account for s in members)
         else:
             dangling = not any(self.targets[s] == account for s in members)
@@ -590,13 +898,14 @@ class _Build:
     def plan_union(self, by_root, order, skipped, contributions=None):
         """Decide, without merging, which roots fit the caps in this order.
 
-        Returns (accepted roots, witness members). Nothing is merged until the caller
-        has checked that the resulting witness is valid, so a rejected witness never
-        leaves two blocks joined without evidence.
+        Returns (accepted roots, witness members, limit marks). Nothing is merged and no
+        limit is recorded until the caller has checked that the resulting witness is
+        valid: a rejected witness never leaves two blocks joined without evidence, and
+        never leaves a cap mark on seeds that no witness held back (I10).
         """
         policy = self.policy
         contributions = contributions or {}
-        accepted, ids_acc, bounds_acc = [], set(), None
+        accepted, ids_acc, bounds_acc, marks = [], set(), None, []
         for root in order:
             if self.frozen[root]:
                 skipped.append((root, "BOUNDARY_CAP"))
@@ -607,21 +916,23 @@ class _Build:
             root_bounds = self.span_union(self.bounds[root], (min(times), max(times)))
             if accepted:
                 if len(ids_acc | root_ids) > policy.core_max:
-                    for s in by_root[root]:
-                        self.limits[s].add("CORE_CAP")
+                    marks.extend((s, "CORE_CAP") for s in by_root[root])
                     skipped.append((root, "BOUNDARY_CAP"))
                     continue
                 low, high = self.span_union(bounds_acc, root_bounds)
                 if high - low > policy.span_max_us:
-                    for s in by_root[root]:
-                        self.limits[s].add("COMPONENT_SPAN")
+                    marks.extend((s, "COMPONENT_SPAN") for s in by_root[root])
                     skipped.append((root, "BOUNDARY_SPAN"))
                     continue
             ids_acc |= root_ids
             bounds_acc = self.span_union(bounds_acc, root_bounds)
             accepted.append(root)
         members = [s for item in accepted for s in contributions.get(item, by_root[item])]
-        return accepted, members
+        return accepted, members, marks
+
+    def apply_marks(self, marks):
+        for s, flag in marks:
+            self.limits[s].add(flag)
 
     def finish_links(self, by_root, accepted, skipped):
         anchor = by_root[accepted[0]][0] if accepted else None
@@ -635,7 +946,7 @@ class _Build:
         account, side = relation.focal, relation.side
         by_root = self.group_by_root(relation.seeds)
         roots = sorted(by_root, key=self.ids.__getitem__)
-        skipped = []
+        separate = []
         # A pinned block whose published star lives on this face is the anchor: the star's
         # own body, accepted first and contributing only its published spokes. A pinned
         # block touched through any other seed was not absorbed when it was built, so it
@@ -649,38 +960,53 @@ class _Build:
             if root == anchor:
                 continue
             if root in pinned:
-                skipped.append((root, "BOUNDARY_SAME_FOCAL"))
+                separate.append((root, "BOUNDARY_SAME_FOCAL"))
             elif self.absorbable(root, account, side, by_root[root]):
                 take.append(root)
             else:
-                skipped.append((root, "BOUNDARY_SAME_FOCAL"))
-        established = [root for root in take if self.established(root)]
-        isolated = [root for root in take if not self.established(root)]
-        if relation.tier == TIER_WEAK:
-            # A weak star may attach one established block in its lifetime; an anchor that
-            # already holds more than its published spokes has used that slot (I10).
-            slot_used = anchor is not None and bool(self.comp_seeds[anchor] - set(contributions[anchor]))
-            if slot_used:
-                skipped.extend((root, "BOUNDARY_SAME_FOCAL") for root in established)
-                established = []
-            elif len(established) > 1:
-                dominant = max(established, key=lambda root: (self.face_bridges(root, account, side), -self.ids[root]))
-                skipped.extend((root, "BOUNDARY_SAME_FOCAL") for root in established if root != dominant)
-                established = [dominant]
-        order = (([anchor] if anchor is not None else [])
-                 + sorted(established, key=lambda root: (-self.face_bridges(root, account, side), self.ids[root]))
-                 + sorted(isolated, key=lambda root: self.tkey(by_root[root][0])))
-        accepted, members = self.plan_union(by_root, order, skipped, contributions)
+                separate.append((root, "BOUNDARY_SAME_FOCAL"))
         counterparty = self.targets if side == "out" else self.sources
-        if (len(members) >= 2
-                and len({counterparty[s] for s in members}) >= self.policy.star_min_counterparties):
-            self.adopt(self.merge(accepted), relation.kind, members)
-            self.stats["adopted_" + relation.kind] += 1
-            self.finish_links(by_root, accepted, skipped)
-        else:
-            # Not a fan after all (repeated pair or nothing to join): no merge, links only.
-            self.stats["stars_rejected"] += 1
-            self.link_roots(by_root, roots, "BOUNDARY_SAME_FOCAL")
+        excluded = set()
+        while True:
+            skipped = separate + [(root, "BOUNDARY_SAME_FOCAL")
+                                  for root in sorted(excluded, key=self.ids.__getitem__)]
+            candidates = [root for root in take if root not in excluded]
+            established = [root for root in candidates if self.established(root)]
+            isolated = [root for root in candidates if not self.established(root)]
+            if relation.tier == TIER_WEAK:
+                # A weak star may attach one established block in its lifetime; an anchor
+                # that already holds more than its published spokes has used that slot (I10).
+                slot_used = anchor is not None and bool(self.comp_seeds[anchor] - set(contributions[anchor]))
+                if slot_used:
+                    skipped.extend((root, "BOUNDARY_SAME_FOCAL") for root in established)
+                    established = []
+                elif len(established) > 1:
+                    dominant = max(established,
+                                   key=lambda root: (self.face_bridges(root, account, side), -self.ids[root]))
+                    skipped.extend((root, "BOUNDARY_SAME_FOCAL") for root in established if root != dominant)
+                    established = [dominant]
+            order = (([anchor] if anchor is not None else [])
+                     + sorted(established, key=lambda root: (-self.face_bridges(root, account, side), self.ids[root]))
+                     + sorted(isolated, key=lambda root: self.tkey(by_root[root][0])))
+            accepted, members, marks = self.plan_union(by_root, order, skipped, contributions)
+            if (len(members) >= 2
+                    and len({counterparty[s] for s in members}) >= self.policy.star_min_counterparties):
+                self.apply_marks(marks)
+                self.adopt(self.merge(accepted), relation.kind, members)
+                self.stats["adopted_" + relation.kind] += 1
+                self.finish_links(by_root, accepted, skipped)
+                return
+            # Not a fan: an established block planned first that filled the cap or the
+            # span must not keep the other spokes from forming their own star. A re-run
+            # skips that block as a pinned block without spokes on this face, so the
+            # batch run steps it aside the same way (I10).
+            blockers = [root for root in accepted if root != anchor and self.established(root)]
+            if not blockers:
+                break
+            excluded.update(blockers)
+        # Not a fan after all (repeated pair or nothing to join): no merge, links only.
+        self.stats["stars_rejected"] += 1
+        self.link_roots(by_root, roots, "BOUNDARY_SAME_FOCAL")
 
     def join_relay(self, relation):
         mode = self.policy.relay_mode
@@ -709,7 +1035,14 @@ class _Build:
             # component that carries structure beyond those chunks (the anchor counts).
             pure = [root for root in free if self.comp_seeds[root] <= own]
             extended = [root for root in free if not self.comp_seeds[root] <= own]
-            clean = [root for root in extended if not any(s in self.contested for s in by_root[root])]
+            focal = relation.focal
+
+            def contested(root):
+                return self.policy.contested_check and any(
+                    s in (self.contested_in if self.targets[s] == focal else self.contested_out)
+                    for s in by_root[root])
+
+            clean = [root for root in extended if not contested(root)]
             skipped.extend((root, "BOUNDARY_SAME_FOCAL") for root in extended if root not in clean)
             if anchor is not None and self.comp_seeds[anchor] - set(contributions[anchor]):
                 skipped.extend((root, "BOUNDARY_SAME_FOCAL") for root in clean)
@@ -723,9 +1056,10 @@ class _Build:
             take = free
         order = (([anchor] if anchor is not None else [])
                  + sorted(take, key=lambda root: (-len(by_root[root]), self.ids[root])))
-        accepted, members = self.plan_union(by_root, order, skipped, contributions)
+        accepted, members, marks = self.plan_union(by_root, order, skipped, contributions)
         ins, outs = set(relation.parts[0]), set(relation.parts[1])
         if len(members) >= 2 and any(s in ins for s in members) and any(s in outs for s in members):
+            self.apply_marks(marks)
             self.adopt(self.merge(accepted), "RELAY", members)
             self.stats["adopted_RELAY"] += 1
             self.finish_links(by_root, accepted, skipped)
@@ -811,8 +1145,12 @@ class _Build:
 
     def run(self):
         self.normalize_groups()
+        self.passes()      # before faces: an adopted PASS may exclude star spokes (ablation)
         self.faces()
         self.relays()
-        self.passes()
+        self.paths()
+        self.bridges()
         self.assemble()
+        self.closures()
+        self.shapes()
         return self.output()
