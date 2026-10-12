@@ -3,8 +3,8 @@
 Model labels are annotations, never grouping conditions. All public account IDs
 come from the frozen pseudonymous input; this module cannot read private names.
 """
-from dataclasses import asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from time import perf_counter
 from collections import Counter, defaultdict
@@ -13,14 +13,30 @@ import json
 
 from psycopg.rows import dict_row
 
-from flow_graph import (EdgeTable, FlowIndex, FlowPolicy, FlowGraph, Witness,
-                        GraphBudgetExceeded, build_flow_graphs)
+from block_graph import BlockPolicy, build_block_graphs
+from flow_graph import EdgeTable, FlowIndex, FlowGraph, Witness, GraphBudgetExceeded
 from model_publication import _lock
 from result_collection import _checkpoint
 from worker_transport import ProtocolError
 
-POLICY = FlowPolicy()
+POLICY = BlockPolicy()
+USD_MICROS = 1_000_000
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+@dataclass(frozen=True)
+class GraphBatch:
+    """Generator output for one frozen input plus the snapshot's account map.
+
+    ``account_keys`` maps a snapshot-local account code back to its public
+    (bank_id, account_id) pair so that focal accounts can be rendered into the
+    evidence as a context query condition.
+    """
+    graphs: tuple
+    unassigned: tuple
+    rejected_relations: tuple
+    policy_digest: str
+    account_keys: dict
 
 
 def _build_graphs(rows, seeds, seed_groups=()):
@@ -35,12 +51,15 @@ def _build_graphs(rows, seeds, seed_groups=()):
         for side in ('from', 'to'):
             key = (row[side + '_bank_id'], str(row[side + '_account_id']))
             codes.append(accounts.setdefault(key, len(accounts) + 1))
-        edges.append(tx_id, (delta.days * 86400 + delta.seconds) * 1_000_000
-                     + delta.microseconds, *codes)
+        usd = row.get('amount_usd')
+        edges.append(tx_id, (delta.days * 86400 + delta.seconds) * 1_000_000 + delta.microseconds,
+                     *codes, None if usd is None else int((Decimal(usd) * USD_MICROS).to_integral_value()))
     try:
-        return build_flow_graphs(FlowIndex(edges), seeds, POLICY, seed_groups=seed_groups)
+        batch = build_block_graphs(FlowIndex(edges), seeds, POLICY, seed_groups=seed_groups)
     except GraphBudgetExceeded as error:
         raise ProtocolError('Alert graph budget exceeded: ' + str(error)) from error
+    return GraphBatch(batch.graphs, batch.unassigned, batch.rejected_relations, batch.policy_digest,
+                      {code: key for key, code in accounts.items()})
 
 
 def _json(value):
@@ -57,7 +76,20 @@ def _coverage(seeds, days):
     return [dict(txIds=sorted(seed['txId'] for seed in seeds), days=reports)]
 
 
-def _evidence(graph, rows, scores, seed_info):
+def _context_query(members, focal):
+    """Context is a query condition, not stored members (block-pin-1).
+
+    The window is the core's time span padded by the policy; focal accounts are
+    the block's own fan centres whose other transactions a viewer may fetch.
+    """
+    times = [datetime.fromisoformat(m['occurredAt']) for m in members]
+    pad = timedelta(microseconds=POLICY.context_pad_us)
+    unique = {(item['bankId'], item['accountId']): item for item in focal}
+    return dict(firstAt=(min(times) - pad).isoformat(), lastAt=(max(times) + pad).isoformat(),
+                focalAccounts=[unique[key] for key in sorted(unique)])
+
+
+def _evidence(graph, rows, scores, seed_info, account_keys=None, focal=()):
     roles = {key: role for role, keys in (('SEED', graph.seed_ids),
              ('CONNECTION', graph.connection_ids), ('CONTEXT', graph.context_ids)) for key in keys}
     reasons = defaultdict(set)
@@ -86,11 +118,17 @@ def _evidence(graph, rows, scores, seed_info):
     amounts = sum((Decimal(m['amountUsd']) for m in members), Decimal(0))
     probabilities = [s['p_laundering'] for m in members if (s := m['scores']) is not None]
     seeds = [seed_info[key] for key in graph.seed_ids]
+    focal_accounts = list(focal)
+    if account_keys is not None:
+        for code in getattr(graph, 'focal_accounts', ()):
+            bank, account = account_keys[code]
+            focal_accounts.append(dict(bankId=bank, accountId=account))
     return _json(dict(policyVersion=POLICY.version, policy=asdict(POLICY),
         witnesses=[asdict(witness) for witness in graph.witnesses],
         boundaryWitnesses=[asdict(witness) for witness in graph.boundary_witnesses],
-        seeds=seeds, transactions=members,
-        limits=list(graph.limits), summary=dict(txCount=len(members), seedCount=len(seeds),
+        seeds=seeds, transactions=members, limits=list(graph.limits),
+        contextQuery=_context_query(members, focal_accounts),
+        summary=dict(txCount=len(members), seedCount=len(seeds),
             totalAmountUsd=amounts, scoreMax=max(probabilities) if probabilities else None,
             firstTxAt=min(m['occurredAt'] for m in members), lastTxAt=max(m['occurredAt'] for m in members)),
         graph=dict(nodes=sorted(nodes.values(), key=lambda n: n['id']), edges=[dict(
@@ -99,23 +137,29 @@ def _evidence(graph, rows, scores, seed_info):
             includedReasons=m['includedReasons']) for m in members])))
 
 
-def _extend(old, additions, *, preserve_ids=()):
-    """Compose immutable evidence versions without truncating flow witnesses.
+def _extend(old, additions):
+    """Compose immutable evidence versions without truncating relation witnesses.
 
     Case lifecycle is separate from graph construction. Existing historical
-    members remain intact; oversized accumulated evidence fails atomically.
+    members remain intact and keep their relation witnesses; links describe the
+    current run and replace the old ones (N2 (d)); oversized accumulated
+    evidence fails atomically.
     """
     if old.get('policyVersion') != POLICY.version or 'witnesses' not in old:
-        raise ProtocolError('Existing Alert evidence requires regeneration with the flow policy')
+        raise ProtocolError('Existing Alert evidence requires regeneration with the block policy')
     members = {m['txId']: dict(m) for m in old['transactions']}
     seeds = {s['txId']: s for s in old['seeds']}
     limits = set(old['limits'])
     witnesses = {Witness(w['kind'], tuple(w['tx_ids'])) for w in old['witnesses']}
     boundaries = {Witness(w['kind'], tuple(w['tx_ids'])) for w in old.get('boundaryWitnesses', [])}
+    focal = list((old.get('contextQuery') or {}).get('focalAccounts', []))
+    if additions:
+        boundaries = set()
     for evidence in additions:
         limits.update(evidence['limits'])
         witnesses.update(Witness(w['kind'], tuple(w['tx_ids'])) for w in evidence['witnesses'])
         boundaries.update(Witness(w['kind'], tuple(w['tx_ids'])) for w in evidence.get('boundaryWitnesses', []))
+        focal.extend((evidence.get('contextQuery') or {}).get('focalAccounts', []))
         for item in evidence['transactions']:
             key = item['txId']
             if key not in members:
@@ -132,20 +176,7 @@ def _extend(old, additions, *, preserve_ids=()):
                 previous.update(item)
                 previous['role'] = role
         seeds.update({s['txId']: s for s in evidence['seeds'] if s['txId'] in members})
-    # Context is a selected view, not a mandatory extension. Retain every old
-    # member; add only as much new context as fits the declared context budget.
-    previous_ids = {m['txId'] for m in old['transactions']} | set(preserve_ids)
-    retained_context = sum(m['role'] == 'CONTEXT' and k in previous_ids for k, m in members.items())
-    context_slots = max(0, POLICY.max_context_edges - retained_context)
-    for key in sorted(list(members)):
-        if members[key]['role'] == 'CONTEXT' and key not in previous_ids:
-            if context_slots:
-                context_slots -= 1
-            else:
-                del members[key]
-                limits.add('CONTEXT_SELECTION')
-    if (sum(m['role'] != 'CONTEXT' for m in members.values()) > POLICY.max_core_edges
-            or len(members) > POLICY.max_core_edges + POLICY.max_context_edges):
+    if sum(m['role'] != 'CONTEXT' for m in members.values()) > POLICY.core_max:
         raise ProtocolError('Accumulated Alert evidence exceeds graph budget')
     rows, scores = {}, {}
     for key, m in members.items():
@@ -161,17 +192,35 @@ def _extend(old, additions, *, preserve_ids=()):
         tuple(k for k, m in sorted(members.items()) if m['role'] == 'CONTEXT'),
         tuple(sorted(witnesses, key=lambda w: (w.kind, w.tx_ids))), tuple(sorted(limits)),
         tuple(sorted(boundaries, key=lambda w: (w.kind, w.tx_ids))))
-    return _evidence(graph, rows, scores, seeds)
+    return _evidence(graph, rows, scores, seeds, focal=focal)
+
+
+def _digest_of(body):
+    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
 def _fingerprint(evidence):
-    # Facts, scores and policy changes matter even when membership stays the same.
-    # Coverage/check time and redundant rendered graph/summary are not semantic facts.
+    # Facts, scores, policy and relation witnesses matter even when membership stays
+    # the same. Links, the context query, coverage/check time and the rendered
+    # graph/summary are not semantic facts of the block (N2 (d)).
     body = {key: evidence[key] for key in
             ('policyVersion', 'policy', 'witnesses', 'seeds', 'transactions', 'limits')}
     body['withdrawalReason'] = evidence.get('withdrawalReason')
-    body['boundaryWitnesses'] = evidence.get('boundaryWitnesses', [])
-    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+    return _digest_of(body)
+
+
+def _member_digest(evidence):
+    """Identity of the block's members and their facts, ignoring relation evidence.
+
+    A later run may describe the same core with other witnesses (a PASS partner
+    changes, a star chunk is cut elsewhere); that alone is no new version (N7 (a)).
+    """
+    body = dict(policyVersion=evidence.get('policyVersion'), policy=evidence.get('policy'),
+                seeds=evidence.get('seeds', []),
+                transactions=[{k: v for k, v in m.items() if k != 'includedReasons'}
+                              for m in evidence.get('transactions', [])],
+                withdrawalReason=evidence.get('withdrawalReason'))
+    return _digest_of(body)
 
 
 def save_alerts(connection, execution):
@@ -226,15 +275,19 @@ def save_alerts(connection, execution):
     if seeds and not days:
         raise ProtocolError('Frozen coverage is required')
     seed_groups = []
-    for owned, core, members in connection.execute('''SELECT v.evidence->'seeds',
+    for owned, core, members, witnesses, version in connection.execute('''SELECT v.evidence->'seeds',
         (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t
          WHERE t->>'role'<>'CONTEXT'),
-        (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t)
+        (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t),
+        coalesce(v.evidence->'witnesses','[]'::jsonb), v.evidence->>'policyVersion'
         FROM analysis.alert_origins o JOIN review.alerts a USING(alert_id)
         JOIN review.alert_versions v ON v.alert_id=o.alert_id AND v.version=o.version
         WHERE o.run_id=%s AND a.status='OPEN' AND a.merged_into_alert_id IS NULL
         ORDER BY a.alert_id''', (execution.run_id,)):
-        seed_groups.append(([s['txId'] for s in owned], core or [], members or []))
+        # Published relations pin the block (I10); a block of another policy is frozen.
+        seed_groups.append(([s['txId'] for s in owned], core or [], members or [],
+                            [(w['kind'], tuple(w['tx_ids'])) for w in witnesses],
+                            version != POLICY.version))
     batch = _build_graphs(rows, seeds, seed_groups)
     timings['candidateBuild'] = (perf_counter() - candidate_started) * 1000
     with connection.transaction():
@@ -251,6 +304,7 @@ def save_alerts(connection, execution):
             dict(run_id=str(execution.run_id), policyVersion=POLICY.version,
                  policyDigest=batch.policy_digest, graphCount=len(batch.graphs),
                  unassignedSeedCount=len(batch.unassigned),
+                 frozenLegacyCount=sum(1 for group in seed_groups if group[4]),
                  unassignedReasons=dict(Counter(item.reason for item in batch.unassigned)),
                  rejectedRelationReasons=dict(Counter(item.reason for item in batch.rejected_relations)),
                  timingsMs={key: round(value, 3) for key, value in timings.items()}))

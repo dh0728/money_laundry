@@ -1,11 +1,11 @@
 """PostgreSQL Alert evidence tests. Expectations are manually specified flows."""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import unittest
 from uuid import uuid4
 
-from alert_pipeline import save_alerts, POLICY
+from alert_pipeline import save_alerts, _fingerprint, POLICY
 from frozen_input import InputExecution, StaleExecution
 import test_frozen_input_postgres as fixtures
 
@@ -30,7 +30,7 @@ class AlertPostgresTests(unittest.TestCase):
                                (source,dest,time,time,self.run,key))
         self.template = self.admin.execute("SELECT to_jsonb(i) FROM analysis.input_transactions i WHERE run_id=%s AND tx_id=%s",(self.run,self.context)).fetchone()[0]
         self.admin.execute("DELETE FROM analysis.input_transactions WHERE run_id=%s AND tx_id=%s",(self.run,self.context))
-        for key,score in zip(self.ids,(.9,.1,.2)):
+        for key,score in zip(self.ids,(.9,.1,.9)):
             self.admin.execute("INSERT INTO analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id) VALUES(%s,%s,%s,1,0,0,0,0,0,0,0,0,%s)", (0,key,score,self.run))
         self.coverage(self.run,False)
 
@@ -43,6 +43,22 @@ class AlertPostgresTests(unittest.TestCase):
         return [json.loads(payload) for payload, in self.admin.execute(
             'SELECT payload FROM analysis.alert_plans WHERE run_id=%s ORDER BY plan_key', (self.run,))]
 
+    def publish(self, evidence):
+        """Stand in for the Spring publisher: one OPEN Alert at version 1 of this run."""
+        user = self.admin.execute('SELECT min(user_id) FROM core.users').fetchone()[0]
+        alert = self.admin.execute('INSERT INTO review.alerts(assignee_id,created_at,assigned_at)'
+                                   ' VALUES(%s,now(),now()) RETURNING alert_id', (user,)).fetchone()[0]
+        self.admin.execute('INSERT INTO review.alert_versions(alert_id,version,run_id,fingerprint,evidence,published_at)'
+                           ' VALUES(%s,1,%s,%s,%s::jsonb,now())', (alert, self.run, _fingerprint(evidence), json.dumps(evidence)))
+        self.admin.execute('UPDATE review.alerts SET published_version=1 WHERE alert_id=%s', (alert,))
+        self.admin.execute('INSERT INTO analysis.alert_origins VALUES(%s,%s,1)', (self.run, alert))
+        self.admin.execute("DELETE FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'", (self.run,))
+        self.admin.execute('DELETE FROM analysis.alert_plans WHERE run_id=%s', (self.run,))
+        return alert
+
+    def artifact(self):
+        return json.loads(self.admin.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'", (self.run,)).fetchone()[0])
+
     def test_restricted_worker_prepares_without_modifying_business_state(self):
         before = self.admin.execute('SELECT user_id,last_assigned_at FROM core.users ORDER BY user_id').fetchall()
         with self.psycopg.connect(**dict(self.connect_args,user=self.worker_user,password=self.worker_password)) as writer:
@@ -51,7 +67,9 @@ class AlertPostgresTests(unittest.TestCase):
                 with self.assertRaises(self.psycopg.errors.InsufficientPrivilege): writer.execute(statement)
         plan, = self.plans()
         self.assertEqual(plan['action'],'NEW')
-        self.assertEqual(plan['evidence']['policyVersion'],'flow-evidence-2')
+        self.assertEqual(plan['evidence']['policyVersion'],'block-pin-1')
+        self.assertEqual([w['kind'] for w in plan['evidence']['witnesses']],['PASS'])
+        self.assertEqual(plan['evidence']['contextQuery']['focalAccounts'],[])
         self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alerts').fetchone()[0],0)
         self.assertEqual(before,self.admin.execute('SELECT user_id,last_assigned_at FROM core.users ORDER BY user_id').fetchall())
 
@@ -104,7 +122,7 @@ class AlertPostgresTests(unittest.TestCase):
         save_alerts(self.admin,self.execution)
         self.assertEqual(self.plans(),[])
         artifact = json.loads(self.admin.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'",(self.run,)).fetchone()[0])
-        self.assertEqual(artifact['unassignedSeedCount'],1)
+        self.assertEqual(artifact['unassignedSeedCount'],2)
 
     def test_rebuild_increments_generation(self):
         save_alerts(self.admin,self.execution)
@@ -116,9 +134,45 @@ class AlertPostgresTests(unittest.TestCase):
         from dataclasses import replace
         from unittest.mock import patch
         from worker_transport import ProtocolError
-        with patch('alert_pipeline.POLICY',replace(POLICY,max_core_edges=1)):
+        with patch('alert_pipeline.POLICY',replace(POLICY,max_edge_visits=1)):
             with self.assertRaisesRegex(ProtocolError,'budget exceeded'): save_alerts(self.admin,self.execution)
         self.assertEqual(self.plans(),[])
+
+    def test_witness_only_change_keeps_the_published_version(self):
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        evidence = plan['evidence']
+        evidence['witnesses'] = [dict(kind='PATH',tx_ids=w['tx_ids']) for w in evidence['witnesses']]
+        self.publish(evidence)
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        self.assertEqual((plan['action'],plan['reason']),('NOOP','UNCHANGED_CORE_MEMBERS'))
+        self.assertIsNone(plan['evidence'])
+
+    def test_changed_member_facts_still_make_a_new_version(self):
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        evidence = plan['evidence']
+        evidence['transactions'][0]['amountUsd'] = '7'
+        alert = self.publish(evidence)
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        self.assertEqual((plan['action'],plan['targetAlertId']),('UPDATE',alert))
+        self.assertEqual(plan['evidence']['transactions'][0]['amountUsd'],'1.000000')
+
+    def test_legacy_policy_alert_is_frozen(self):
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        evidence = plan['evidence']
+        evidence['policyVersion'] = 'flow-evidence-2'
+        evidence['witnesses'] = [dict(kind='FLOW',tx_ids=w['tx_ids']) for w in evidence['witnesses']]
+        self.publish(evidence)
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        self.assertEqual((plan['action'],plan['reason']),('NOOP','FROZEN_LEGACY'))
+        artifact = self.artifact()
+        self.assertEqual(artifact['frozenLegacyCount'],1)
+        self.assertEqual(artifact['unassignedReasons'],{'FROZEN_LEGACY':2})
 
 
 class AlertExtensionTests(unittest.TestCase):
@@ -151,13 +205,15 @@ class AlertExtensionTests(unittest.TestCase):
         self.assertEqual([s['txId'] for s in new['seeds']],[1,2])
         self.assertEqual(len(old['transactions']),3)
 
-    def test_flow_evidence_is_not_truncated_at_old_hundred_member_cap(self):
-        from alert_pipeline import _extend
-        old=self.evidence(list(range(1,101)),[1])
-        result=_extend(old,[self.evidence([1,101],[1,101])])
-        self.assertEqual(len(result['transactions']),101)
-        self.assertEqual([s['txId'] for s in result['seeds']],[1,101])
-        self.assertNotIn('TRANSACTION_COUNT',result['limits'])
+    def test_evidence_grows_to_core_max_and_fails_beyond(self):
+        from alert_pipeline import _extend, POLICY
+        from worker_transport import ProtocolError
+        old=self.evidence(list(range(1,POLICY.core_max)),[1])
+        result=_extend(old,[self.evidence([1,POLICY.core_max],[1,POLICY.core_max])])
+        self.assertEqual(len(result['transactions']),POLICY.core_max)
+        self.assertEqual([s['txId'] for s in result['seeds']],[1,POLICY.core_max])
+        with self.assertRaisesRegex(ProtocolError,'exceeds graph budget'):
+            _extend(result,[self.evidence([1,POLICY.core_max+1],[1])])
         old=self.evidence([1,2],[1],{1:'2022-09-01T00:00:00+09:00',2:'2022-09-02T00:00:00+09:00'})
         result=_extend(old,[self.evidence([2,3],[2],{2:'2022-09-02T00:00:00+09:00',3:'2022-09-03T00:01:00+09:00'})])
         self.assertEqual([m['txId'] for m in result['transactions']],[1,2,3])
@@ -175,7 +231,7 @@ class AlertExtensionTests(unittest.TestCase):
         from alert_pipeline import _fingerprint
         from copy import deepcopy
         old = self.evidence([1, 2], [1])
-        for section, key, value in [('policy', 'window_us', 1),
+        for section, key, value in [('policy', 'core_max', 1),
                                      ('transactions', 'amountUsd', '2'),
                                      ('seeds', 'score', .95),
                                      ('witnesses', 'kind', 'FLOW')]:
@@ -204,16 +260,64 @@ class AlertExtensionTests(unittest.TestCase):
 
     def test_database_adapter_preserves_microseconds_and_public_account_identity(self):
         from alert_pipeline import _build_graphs
+        from flow_graph import Witness
         from decimal import Decimal
         rows = {101: dict(occurred_at=datetime.fromisoformat('2022-09-02T10:00:00.000001+09:00'),
-                         from_bank_id=1, to_bank_id=2, from_account_id='a', to_account_id='b'),
+                         from_bank_id=1, to_bank_id=2, from_account_id='a', to_account_id='b', amount_usd=Decimal('1000')),
                 209: dict(occurred_at=datetime.fromisoformat('2022-09-02T10:00:00.000002+09:00'),
-                         from_bank_id=2, to_bank_id=3, from_account_id='b', to_account_id='c')}
-        batch = _build_graphs(rows, [101])
-        self.assertEqual(batch.graphs[0].connection_ids, (209,))
-        self.assertEqual(batch.graphs[0].witnesses[0].tx_ids, (101, 209))
+                         from_bank_id=2, to_bank_id=3, from_account_id='b', to_account_id='c', amount_usd=Decimal('990'))}
+        batch = _build_graphs(rows, [101, 209])
+        self.assertEqual(batch.graphs[0].witnesses, (Witness('PASS', (101, 209)),))
+        self.assertEqual(batch.account_keys[2], (2, 'b'))
         rows[209]['from_bank_id'] = 7
-        self.assertFalse(_build_graphs(rows, [101]).graphs)
+        self.assertFalse(_build_graphs(rows, [101, 209]).graphs)
+        rows[209]['from_bank_id'] = 2
+        del rows[209]['amount_usd']  # an unknown amount never passes
+        self.assertFalse(_build_graphs(rows, [101, 209]).graphs)
+
+    def test_context_query_names_focal_accounts_and_padded_window(self):
+        from alert_pipeline import _build_graphs, _evidence, POLICY
+        from flow_graph import Witness
+        from decimal import Decimal
+        base = datetime.fromisoformat('2022-09-02T10:00:00+09:00')
+        rows = {key: dict(occurred_at=base + timedelta(hours=6 * i), from_bank_id=1, to_bank_id=2,
+                          from_account_id='hub', to_account_id=f'r{i}', amount_received=Decimal(1),
+                          receiving_currency='USD', amount_paid=Decimal(1), payment_currency='USD',
+                          amount_usd=Decimal(1000), payment_format='ACH')
+                for i, key in enumerate((301, 302))}
+        batch = _build_graphs(rows, [301, 302])
+        graph, = batch.graphs
+        self.assertEqual(graph.witnesses, (Witness('STAR_OUT', (301, 302)),))
+        seed_info = {key: dict(txId=key, occurredAt=rows[key]['occurred_at'].isoformat(), score=.9, threshold=.7)
+                     for key in rows}
+        doc = _evidence(graph, rows, {key: dict(p_laundering=.9) for key in rows}, seed_info, batch.account_keys)
+        self.assertEqual(doc['contextQuery']['focalAccounts'], [dict(bankId=1, accountId='hub')])
+        pad = timedelta(microseconds=POLICY.context_pad_us)
+        self.assertEqual(doc['contextQuery']['firstAt'], (base - pad).astimezone(timezone.utc).isoformat())
+        self.assertEqual(doc['contextQuery']['lastAt'], (base + timedelta(hours=6) + pad).astimezone(timezone.utc).isoformat())
+        self.assertEqual(doc['policyVersion'], 'block-pin-1')
+        self.assertEqual(doc['summary']['txCount'], 2)
+
+    def test_links_follow_the_current_run_and_stay_out_of_the_fingerprint(self):
+        from alert_pipeline import _extend, _fingerprint, _member_digest
+        old = self.evidence([1, 2], [1])
+        old['boundaryWitnesses'] = [dict(kind='BOUNDARY_PASS', tx_ids=[1, 9])]
+        addition = self.evidence([1, 2], [1])
+        addition['boundaryWitnesses'] = [dict(kind='BOUNDARY_SAME_FOCAL', tx_ids=[2, 8])]
+        result = _extend(old, [addition])
+        self.assertEqual(result['boundaryWitnesses'], [dict(kind='BOUNDARY_SAME_FOCAL', tx_ids=[2, 8])])
+        plain = self.evidence([1, 2], [1])
+        self.assertEqual(_fingerprint(plain), _fingerprint(old))
+        self.assertEqual(_member_digest(plain), _member_digest(old))
+        # Relation witnesses change the fingerprint but not the member digest.
+        other = self.evidence([1, 2], [1])
+        other['witnesses'] = [dict(kind='PATH', tx_ids=[1, 2])]
+        other['transactions'][0]['includedReasons'] = ['PATH', 'SEED']
+        self.assertNotEqual(_fingerprint(plain), _fingerprint(other))
+        self.assertEqual(_member_digest(plain), _member_digest(other))
+        scored = self.evidence([1, 2], [1])
+        scored['transactions'][1]['amountUsd'] = '7'
+        self.assertNotEqual(_member_digest(plain), _member_digest(scored))
 
 
 if __name__=='__main__': unittest.main()

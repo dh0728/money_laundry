@@ -164,6 +164,16 @@ class BlockGraphTests(unittest.TestCase):
         graph, = batch.graphs
         self.assertEqual((graph.seed_ids, graph.pinned_group), ((100, 101, 102), 0))
 
+    def test_frozen_group_keeps_its_seeds_out_of_new_blocks(self):
+        rows = fan("A", 3)
+        group = ((100, 101), (100, 101), (100, 101), (Witness("STAR_OUT", (100, 101)),))
+        batch = self.build(rows, [100, 101, 102], [group])
+        self.assertEqual([g.seed_ids for g in batch.graphs], [(100, 101, 102)])
+        frozen = self.build(rows, [100, 101, 102], [group + (True,)])
+        self.assertEqual(frozen.graphs, ())
+        self.assertEqual({u.tx_id: u.reason for u in frozen.unassigned},
+                         {100: "FROZEN_LEGACY", 101: "FROZEN_LEGACY", 102: "LINK_ONLY"})
+
     def test_reserved_history_counts_toward_the_cap_and_freezes_legacy(self):
         rows = [(1, 0, "A", "Y", 1000.0), (2, 10, "Y", "C", 1000.0)]
         held = tuple(range(1000, 1063))  # 63 held transactions absent from this input
@@ -361,28 +371,28 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual((graph.seed_ids, graph.connection_ids), ((2, 3), (1,)))
         self.assertEqual(self.build(rows, [2, 3], core_max=2).graphs[0].connection_ids, ())
 
-    def test_single_seed_shapes_are_off_by_default(self):
+    def test_single_seed_shapes_are_on_by_default(self):
         cycle = [(1, 0, "A", "B", 1000.0), (2, 5, "B", "C", 990.0), (3, 9, "C", "A", 980.0)]
-        self.assertEqual(self.build(cycle, [1]).graphs, ())
-        graph, = self.build(cycle, [1], single_seed_shapes=True).graphs
+        self.assertEqual(self.build(cycle, [1], single_seed_shapes=False).graphs, ())
+        graph, = self.build(cycle, [1]).graphs
         self.assertEqual((graph.seed_ids, graph.connection_ids), ((1,), (2, 3)))
         self.assertEqual(graph.witnesses, (Witness("SHAPE_CYCLE", (1, 2, 3)),))
         self.assertIn("SINGLE_SEED_SHAPE", graph.limits)
         round_trip = [(1, 0, "A", "B", 1000.0), (2, 5, "B", "A", 990.0)]
-        self.assertEqual(self.build(round_trip, [1], single_seed_shapes=True).graphs, ())
+        self.assertEqual(self.build(round_trip, [1]).graphs, ())
         bridge = [(1, 0, "S", "M1", 1000.0), (2, 5, "M1", "T", 990.0),
                   (3, 1, "S", "M2", 1000.0), (4, 6, "M2", "T", 1000.0),
                   (5, 2, "S", "M3", 1000.0), (6, 7, "M3", "T", 1000.0)]
-        self.assertEqual(self.build(bridge, [1]).graphs, ())
-        graph, = self.build(bridge, [1], single_seed_shapes=True).graphs
+        self.assertEqual(self.build(bridge, [1], single_seed_shapes=False).graphs, ())
+        graph, = self.build(bridge, [1]).graphs
         self.assertEqual((graph.seed_ids, graph.connection_ids), ((1,), (2, 3, 4, 5, 6)))
         self.assertEqual(graph.witnesses[0].kind, "SHAPE_BRIDGE")
-        self.assertEqual(self.build(bridge[:4], [1], single_seed_shapes=True).graphs, ())
+        self.assertEqual(self.build(bridge[:4], [1]).graphs, ())
         # Publishing a shape and re-running reproduces it.
         for rows in (cycle, bridge):
-            first = self.build(rows, [1], single_seed_shapes=True)
+            first = self.build(rows, [1])
             groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
-            second = self.build(rows, [1], groups, single_seed_shapes=True)
+            second = self.build(rows, [1], groups)
             self.assertEqual([(g.seed_ids, g.connection_ids, g.witnesses, g.pinned_group) for g in second.graphs],
                              [(g.seed_ids, g.connection_ids, g.witnesses, 0) for g in first.graphs])
 

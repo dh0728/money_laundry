@@ -75,7 +75,7 @@ class BlockPolicy:
     hub_window_us: int = 72 * HOUR_US
     context_pad_us: int = 24 * HOUR_US
     link_max: int = 32
-    single_seed_shapes: bool = False
+    single_seed_shapes: bool = True
     max_edge_visits: int = 20_000_000
     max_relations: int = 200_000
 
@@ -168,10 +168,11 @@ def build_block_graphs(index: FlowIndex, seed_ids: Iterable[int], policy: BlockP
                        seed_groups=()) -> BlockBatch:
     """Build blocks from already-classified valid seeds.
 
-    ``seed_groups`` items are ``(seed_ids, historical_core_ids, historical_member_ids)``
-    or the same plus a fourth item with the adopted witnesses of that OPEN Alert
-    (``Witness`` objects or ``(kind, tx_ids)`` pairs). Groups are pinned before any
-    relation is considered; two pinned groups are never joined (I4).
+    ``seed_groups`` items are ``(seed_ids, historical_core_ids, historical_member_ids)``,
+    optionally followed by the adopted witnesses of that OPEN Alert (``Witness`` objects
+    or ``(kind, tx_ids)`` pairs) and a ``frozen`` flag for a block published under another
+    policy. Groups are pinned before any relation is considered; two pinned groups are
+    never joined (I4); a frozen group neither grows nor lends its seeds.
     """
     policy.validate()
     return _Build(index, seed_ids, policy, seed_groups).run()
@@ -386,6 +387,7 @@ class _Build:
             group = tuple(group)
             owned, historical_core = group[0], group[1]
             adopted = group[3] if len(group) > 3 else ()
+            legacy = bool(group[4]) if len(group) > 4 else False
             selected = sorted({self.edges.position(key) for key in owned if key in self.seed_ids},
                               key=self.ids.__getitem__)
             if not selected:
@@ -397,7 +399,9 @@ class _Build:
             self.pinned[root] = group_index
             self.reserved_ids[root].update(int(key) for key in historical_core)
             self.reserved_ids[root].update(self.ids[s] for s in selected)
-            self.frozen[root] = len(self.reserved_ids[root]) > self.policy.core_max
+            # A block published under another policy is frozen: it keeps its seeds and
+            # neither grows nor lends them to new blocks (FROZEN_LEGACY, lifecycle NOOP).
+            self.frozen[root] = legacy or len(self.reserved_ids[root]) > self.policy.core_max
             for key in historical_core:
                 try:
                     pos = self.edges.position(int(key))

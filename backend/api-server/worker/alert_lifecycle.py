@@ -73,6 +73,9 @@ class CaseSnapshot:
     # A staff-excluded transaction is still an identity match. It must not cause
     # the generator to issue an alternative Alert that bypasses the exclusion.
     excluded_tx_ids: frozenset[int] = frozenset()
+    # Generator policy of the published evidence. A case published under another
+    # policy is frozen: no automatic operation touches it (FROZEN_LEGACY).
+    policy_version: str | None = None
 
     def baseline(self):
         return dict(alertId=self.alert_id, publishedVersion=self.published_version,
@@ -242,15 +245,19 @@ def _remaining_relation(case, validity):
 
 
 def _novel(graph, references, validity):
-    old_core, old_witnesses = set(), set()
-    for case in references:
-        old_core.update(case.evidence.core_ids - validity.invalid_ids)
-        old_witnesses.update(case.evidence.witnesses)
-    return bool(graph.core_ids - old_core or set(graph.witnesses) - old_witnesses)
+    """A closed flow is followed up only by a relation that holds a seed it never had (N4).
+
+    New connections or re-described relations among the old seeds repeat the closed
+    evidence; a witness with a new seed is new activity.
+    """
+    old_seeds = set().union(*(case.evidence.seed_ids for case in references))
+    new_seeds = graph.seed_ids - old_seeds
+    return any(set(w.tx_ids) & new_seeds for w in graph.witnesses)
 
 
-def build_case_plans(cases, graphs, *, validity=Validity(),
-                     composed_digests=None, max_match_checks=1_000_000):
+def build_case_plans(cases, graphs, *, validity=Validity(), composed_digests=None,
+                     unchanged_members=frozenset(), policy_version=None,
+                     max_match_checks=1_000_000):
     """Return deterministic operations, each affecting an open case at most once.
 
     Graph IDs are positions in the input tuple. ``composed_digests`` maps a
@@ -258,7 +265,10 @@ def build_case_plans(cases, graphs, *, validity=Validity(),
     immutable evidence. The materializer supplies it after retaining history and
     removing explicitly invalid facts. Without it, equality is only established
     for an exact one-graph/one-case match or a case with no changes. This avoids
-    mistaking equal membership for equal scores/facts.
+    mistaking equal membership for equal scores/facts. ``unchanged_members`` names
+    the components whose composed evidence keeps the case's members and facts and
+    differs only in relation witnesses; they are NOOP (N7). ``policy_version``
+    freezes cases published under another generator policy (FROZEN_LEGACY).
 
     Matching uses a seed index instead of a full cases x graphs scan. The explicit
     work budget fails the whole computation; it never returns truncated plans.
@@ -267,6 +277,8 @@ def build_case_plans(cases, graphs, *, validity=Validity(),
     if type(max_match_checks) is not int or max_match_checks < 1:
         raise PlanningError('Matching budget must be positive')
     by_id, canonical = _validate(cases, graphs, validity)
+    frozen = frozenset(key for key, case in by_id.items() if policy_version is not None
+                       and case.policy_version not in (None, policy_version))
     canonical_cases = {key: case for key, case in by_id.items() if canonical[key] == key}
     # Aliases contribute identity matches to their survivor, but never receive a
     # second operation or a second owner vote.
@@ -336,7 +348,7 @@ def build_case_plans(cases, graphs, *, validity=Validity(),
         if not active:
             action = Action.FOLLOWUP if references else Action.NEW
             if references and not any(_novel(graphs[i], references, validity) for i in indexes):
-                action, reason = Action.NOOP, 'NO_NEW_CORE_OR_WITNESS'
+                action, reason = Action.NOOP, 'NO_NEW_SEED_RELATION'
         else:
             invalid = set().union(*(c.evidence.member_ids for c in active)) & validity.invalid_ids
             reassess = any(c.evidence.member_ids & validity.reassessment_ids for c in active)
@@ -352,8 +364,13 @@ def build_case_plans(cases, graphs, *, validity=Validity(),
                               or (composed is None and (not indexes
                                   or (len(indexes) == 1
                                       and graphs[indexes[0]].digest == target.evidence.digest)))))
-            if unchanged:
+            if any(c.alert_id in frozen for c in active):
+                action, reason = Action.NOOP, 'FROZEN_LEGACY'
+            elif unchanged:
                 action, reason = Action.NOOP, 'UNCHANGED_EVIDENCE'
+            elif (len(active) == 1 and not invalid and not reassess
+                  and (case_ids, indexes) in unchanged_members):
+                action, reason = Action.NOOP, 'UNCHANGED_CORE_MEMBERS'
             elif withdrawn:
                 action, reason = Action.WITHDRAW, 'EVIDENCE_WITHDRAWN'
             elif (invalid and not indexes and not reassess
@@ -392,5 +409,7 @@ def build_case_plans(cases, graphs, *, validity=Validity(),
                     caseEvidence=[(key, canonical_cases[key].evidence.digest)
                                   for key in sorted(canonical_cases)],
                     composedDigests=[(list(key[0]), list(key[1]), value)
-                                     for key, value in sorted((composed_digests or {}).items())])
+                                     for key, value in sorted((composed_digests or {}).items())],
+                    unchangedMembers=[(list(key[0]), list(key[1])) for key in sorted(unchanged_members)],
+                    frozenCases=sorted(frozen))
     return PlanBatch(tuple(plans), _digest(contract), checks)

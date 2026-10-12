@@ -22,13 +22,14 @@ def prepare_plans(connection, execution, batch, rows, scores, seeds, days, metad
     started = perf_counter()
     # Imported here because the pipeline calls this only after constructing its
     # frozen graph batch. These helpers have no persistence side effects.
-    from alert_pipeline import _evidence, _extend, _fingerprint, _coverage, POLICY
+    from alert_pipeline import _evidence, _extend, _fingerprint, _member_digest, _coverage, POLICY
     # Use a dict cursor explicitly; never depend on the caller's row factory.
     with connection.cursor(row_factory=dict_row) as cursor:
         cursor.execute('''SELECT a.*,jsonb_build_object(
               'transactions',coalesce((SELECT jsonb_agg(jsonb_build_object('txId',t->'txId','role',t->'role'))
                 FROM jsonb_array_elements(v.evidence->'transactions') t),'[]'::jsonb),
-              'witnesses',v.evidence->'witnesses') AS evidence,v.fingerprint,o.version
+              'witnesses',v.evidence->'witnesses') AS evidence,v.fingerprint,o.version,
+              v.evidence->>'policyVersion' AS policy_version
             FROM analysis.alert_origins o JOIN review.alerts a USING(alert_id)
             JOIN review.alert_versions v ON v.alert_id=o.alert_id AND v.version=o.version
             WHERE o.run_id=%s ORDER BY a.alert_id''', (execution.run_id,))
@@ -53,7 +54,8 @@ def prepare_plans(connection, execution, batch, rows, scores, seeds, days, metad
               c['created_at'], c['status'], c['review_started_at'], indexed(c['evidence'], c['fingerprint'].strip()),
               c['merged_into_alert_id'], frozenset(ancestors.get(c['alert_id'], ())),
               frozenset(excluded.get(c['alert_id'], ())) &
-              frozenset(m['txId'] for m in c['evidence']['transactions'])) for c in raw_cases]
+              frozenset(m['txId'] for m in c['evidence']['transactions']),
+              policy_version=c['policy_version']) for c in raw_cases]
     by_id = {case.alert_id: case for case in cases}
     del raw_cases
     facts = dict(connection.execute('SELECT tx_id,integration_status FROM analysis.alert_fact_checks WHERE run_id=%s',
@@ -65,20 +67,23 @@ def prepare_plans(connection, execution, batch, rows, scores, seeds, days, metad
     validity = Validity(checked, invalid, reassessed)
     graphs = []
     for graph in batch.graphs:
-        doc = _evidence(graph, rows, scores, seeds)
+        doc = _evidence(graph, rows, scores, seeds, batch.account_keys)
         graphs.append(indexed(doc, _fingerprint(doc)))
     doc = None
-    first = build_case_plans(cases, graphs, validity=validity)
+    first = build_case_plans(cases, graphs, validity=validity, policy_version=POLICY.version)
+
+    def published_doc(key):
+        return connection.execute('''SELECT evidence FROM review.alert_versions
+            WHERE alert_id=%s AND version=%s''', (key, by_id[key].published_version)).fetchone()[0]
 
     def compose(plan):
         if not plan.case_ids and len(plan.graph_ids) == 1:
-            return _evidence(batch.graphs[plan.graph_ids[0]], rows, scores, seeds)
+            return _evidence(batch.graphs[plan.graph_ids[0]], rows, scores, seeds, batch.account_keys)
         # Retain only role/relation indexes across cases; fetch full immutable
         # documents for this operation, never all historical rendered graphs.
-        sources = [connection.execute('''SELECT evidence FROM review.alert_versions
-            WHERE alert_id=%s AND version=%s''', (key, by_id[key].published_version)).fetchone()[0]
-            for key in plan.case_ids]
-        sources.extend(_evidence(batch.graphs[i], rows, scores, seeds) for i in plan.graph_ids)
+        sources = [published_doc(key) for key in plan.case_ids]
+        sources.extend(_evidence(batch.graphs[i], rows, scores, seeds, batch.account_keys)
+                       for i in plan.graph_ids)
         if not sources:
             return None
         cleaned = []
@@ -107,22 +112,28 @@ def prepare_plans(connection, execution, batch, rows, scores, seeds, days, metad
                 seeds=[], transactions=[], limits=[], withdrawalReason=plan.reason,
                 summary=dict(txCount=0, seedCount=0, totalAmountUsd='0', scoreMax=None,
                              firstTxAt=None, lastTxAt=None), graph=dict(nodes=[], edges=[]))
-        preserved = {tx_id for key in plan.case_ids for tx_id in by_id[key].evidence.member_ids
-                     if tx_id not in invalid}
-        return _extend(cleaned[0], cleaned[1:], preserve_ids=preserved)
+        return _extend(cleaned[0], cleaned[1:])
 
-    digests = {}
+    digests, unchanged = {}, set()
     for plan in first.plans:
-        if plan.reason == 'UNCHANGED_EVIDENCE':
-            digests[(plan.case_ids, plan.graph_ids)] = by_id[plan.case_ids[0]].evidence.digest
+        key = (plan.case_ids, plan.graph_ids)
+        if plan.reason in ('UNCHANGED_EVIDENCE', 'FROZEN_LEGACY'):
+            # A frozen legacy case is never composed: its evidence predates this policy.
+            digests[key] = by_id[plan.case_ids[0]].evidence.digest
             continue
         doc = compose(plan)
-        if doc is not None:
-            digests[(plan.case_ids, plan.graph_ids)] = _fingerprint(doc)
+        if doc is None:
+            continue
+        digests[key] = _fingerprint(doc)
+        # The same members and facts described by other relations: no new version (N7).
+        if (len(plan.case_ids) == 1 and plan.graph_ids
+                and _member_digest(doc) == _member_digest(published_doc(plan.case_ids[0]))):
+            unchanged.add(key)
     # Keep only digests between planning passes, not a second full copy of every
     # historical/new graph. Serialize one operation at a time below.
     doc = None
-    result = build_case_plans(cases, graphs, validity=validity, composed_digests=digests)
+    result = build_case_plans(cases, graphs, validity=validity, composed_digests=digests,
+                              unchanged_members=frozenset(unchanged), policy_version=POLICY.version)
     generation = connection.execute('''SELECT coalesce(max(build_generation),0)+1
         FROM analysis.alert_plans WHERE run_id=%s''', (execution.run_id,)).fetchone()[0]
     connection.execute('DELETE FROM analysis.alert_plans WHERE run_id=%s', (execution.run_id,))

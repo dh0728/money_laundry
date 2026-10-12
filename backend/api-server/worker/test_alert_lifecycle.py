@@ -156,22 +156,20 @@ class LifecycleTests(unittest.TestCase):
         for graph in (old, evidence([1], [2], [3]), evidence([1], [2], facts='new score')):
             plan, = self.plans([case(1, old, status='CLOSED')], [graph])
             self.assertEqual(plan.action, Action.NOOP)
-            self.assertEqual(plan.reason, 'NO_NEW_CORE_OR_WITNESS')
+            self.assertEqual(plan.reason, 'NO_NEW_SEED_RELATION')
             self.assertEqual(plan.reference_ids, (1,))
             self.assertEqual(plan.case_ids, ())
 
-    def test_closed_case_new_core_creates_followup_with_immutable_reference(self):
-        plan, = self.plans([case(1, evidence([1], [2]), status='CLOSED')],
-                           [evidence([1], [2, 3])])
+    def test_closed_case_new_seed_relation_creates_followup_with_immutable_reference(self):
+        closed = [case(1, evidence([1], [2]), status='CLOSED')]
+        plan, = self.plans(closed, [evidence([1, 3], [2])])
         self.assertEqual(plan.action, Action.FOLLOWUP)
         self.assertEqual(plan.reference_ids, (1,))
         self.assertEqual(plan.case_ids, ())
-
-    def test_new_witness_among_previous_core_also_qualifies_as_followup(self):
-        old = evidence([1, 2], witnesses=[Witness('FAN_OUT', (1, 2))])
-        new = evidence([1, 2], witnesses=[Witness('REPEAT', (1, 2))])
-        plan, = self.plans([case(1, old, status='CLOSED')], [new])
-        self.assertEqual(plan.action, Action.FOLLOWUP)
+        # A new connection or another relation among the old seeds repeats the closed flow (N4).
+        for graph in (evidence([1], [2, 3]), evidence([1], [2], witnesses=[Witness('PATH', (1, 2))])):
+            plan, = self.plans(closed, [graph])
+            self.assertEqual((plan.action, plan.reason), (Action.NOOP, 'NO_NEW_SEED_RELATION'))
 
     def test_existing_open_followup_is_updated_instead_of_reissued(self):
         parent = case(1, evidence([1], [2]), status='CLOSED', owner=99)
@@ -203,6 +201,29 @@ class LifecycleTests(unittest.TestCase):
         plan, = self.plans([parent, child], [child.evidence])
         self.assertEqual(plan.action, Action.NOOP)
         self.assertEqual(plan.reference_ids, (1, 2))
+
+    def test_unchanged_core_members_are_noop_even_with_new_witnesses(self):
+        old = evidence([1, 2], witnesses=[Witness('STAR_OUT', (1, 2))])
+        new = evidence([1, 2], witnesses=[Witness('PASS', (1, 2))])
+        key = ((1,), (0,))
+        plan, = self.plans([case(1, old)], [new], composed_digests={key: 'ab' * 32})
+        self.assertEqual(plan.action, Action.UPDATE)
+        plan, = self.plans([case(1, old)], [new], composed_digests={key: 'ab' * 32},
+                           unchanged_members=frozenset({key}))
+        self.assertEqual((plan.action, plan.reason), (Action.NOOP, 'UNCHANGED_CORE_MEMBERS'))
+        self.assertEqual(plan.recipient_ids, ())
+
+    def test_legacy_policy_case_is_frozen(self):
+        old = evidence([1], [2])
+        legacy = case(1, old, policy_version='flow-evidence-2')
+        plan, = self.plans([legacy], [evidence([1], [2, 3])], policy_version='block-pin-1')
+        self.assertEqual((plan.action, plan.reason), (Action.NOOP, 'FROZEN_LEGACY'))
+        self.assertEqual(plan.recipient_ids, ())
+        plan, = self.plans([legacy], [evidence([1], [2, 3])])
+        self.assertEqual(plan.action, Action.UPDATE)
+        current = case(1, old, policy_version='block-pin-1')
+        plan, = self.plans([current], [evidence([1], [2, 3])], policy_version='block-pin-1')
+        self.assertEqual(plan.action, Action.UPDATE)
 
     def test_missing_graph_is_not_evidence_withdrawal(self):
         plan, = self.plans([case(1, evidence([1], [2]))], [])
