@@ -5,6 +5,7 @@ import './styles/theme.css'
 import App from './app/App'
 import { Toaster } from './components/ui/sonner'
 import { ThemeProvider } from './app/ThemeProvider'
+import './app/fontSize'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

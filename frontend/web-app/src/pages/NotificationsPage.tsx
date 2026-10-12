@@ -48,7 +48,7 @@ function NotificationColumn({ label, items, order, onOrder, onOpen, read, onTogg
           </span>
           <p className="mt-1.5 text-xs text-muted-foreground">{item.description}</p>
           {item.patternCode !== undefined && <span className="mt-2.5 flex flex-wrap items-center gap-1.5"><PatternBadge code={item.patternCode} /></span>}
-          <p className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground"><span className="font-mono">{item.code}</span><span>{item.at.slice(0, 10)}</span></p>
+          <p className="mt-3 flex flex-wrap gap-2 text-[0.6875rem] text-muted-foreground"><span className="font-mono">{item.code}</span><span>{item.at.slice(0, 10)}</span></p>
         </button>
       </article>)}</div>}
   </section>

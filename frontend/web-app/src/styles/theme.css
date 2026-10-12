@@ -114,6 +114,7 @@
   --palette-heat-dark-9: oklch(.430 .140 27.0);
 }
 
+.semantic-status-badge[data-tone="unseen"] { color: var(--muted-foreground); border-style: dashed; background: transparent; }
 .semantic-status-badge[data-tone="pending"] { color: var(--badge-pending-foreground); border-color: var(--badge-pending-border); background: var(--badge-pending-background); }
 .semantic-status-badge[data-tone="working"] { color: var(--badge-working-foreground); border-color: var(--badge-working-border); background: var(--badge-working-background); }
 .semantic-status-badge[data-tone="closed"] { color: var(--badge-closed-foreground); border-color: var(--badge-closed-border); background: var(--badge-closed-background); }

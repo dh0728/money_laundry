@@ -35,7 +35,7 @@ export default function LoginPage({ onLogin, message }: { onLogin: (username: st
             <h1 className="text-4xl leading-[1.4] tracking-tight font-semibold">탐지 신호에서<br />판단의 근거까지.</h1>
             <p className="mt-6 type-body text-login-foreground/65 leading-7">Alert를 검토하고, 연결된 거래를 추적하고,<br />Episode 단위로 조사를 이어갑니다.</p>
           </div>
-          <p className="text-[11px] text-login-foreground/45">AML RADAR</p>
+          <p className="text-[0.6875rem] text-login-foreground/45">AML RADAR</p>
         </div>
         {/* 오른쪽 절반 = css.glass식 글래스모피즘(반투명+blur). 인풋만 불투명. 제목/화살표 없음 */}
         <div className="login-glass-panel relative flex items-center justify-center p-8 pointer-events-auto backdrop-blur-2xl">

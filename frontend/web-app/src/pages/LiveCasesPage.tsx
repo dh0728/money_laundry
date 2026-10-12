@@ -284,7 +284,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       {!Object.keys(item.summary.paymentFormats ?? {}).length && <p className="text-xs text-muted-foreground">집계 없음</p>}</>}
     </Panel>
     <Panel title="처리 이력" description="담당자 · 변경 사유 · 시각" testId="history">
-      <div className="divide-y">{(item.history ?? []).map(row => <div key={row.eventId} className="flex gap-2.5 py-2"><span className="w-11 shrink-0 text-[11px] text-muted-foreground">{new Date(row.businessAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5)}</span><span className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" /><div className="min-w-0 flex-1 text-xs"><p>{row.action} · {row.actor ?? '시스템'}</p>{row.comment && <p className="mt-1 text-muted-foreground">{row.comment}</p>}</div></div>)}</div>
+      <div className="divide-y">{(item.history ?? []).map(row => <div key={row.eventId} className="flex gap-2.5 py-2"><span className="w-11 shrink-0 text-[0.6875rem] text-muted-foreground">{new Date(row.businessAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5)}</span><span className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" /><div className="min-w-0 flex-1 text-xs"><p>{row.action} · {row.actor ?? '시스템'}</p>{row.comment && <p className="mt-1 text-muted-foreground">{row.comment}</p>}</div></div>)}</div>
     </Panel>
     </OverviewPanels>
     <section className="rounded-xl border bg-card p-4" aria-label="조사 계좌 자금 지표">

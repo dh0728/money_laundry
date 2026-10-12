@@ -14,11 +14,9 @@ import { loadInstitutionWork, loadDashboard } from './dataSource'
 import { chartInputs, institutionCards } from './metrics'
 import { TransactionPatternHierarchy } from './PatternRelation'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAsync } from '@/lib/useAsync'
-import { WorkCard } from './WorkCard'
-import { sortWork, workItems } from './workItems'
-import { WorkQueue } from './WorkQueue'
-import { workStatuses } from '@/lib/workStatus'
+import { EpisodeWork } from './EpisodeWork'
 import { useAlertOverrides } from '@/features/alerts/alertOverrides'
 
 export type InstitutionRemote = {
@@ -36,24 +34,14 @@ export function InstitutionView({ today, remote }: { today: Date; remote?: Insti
   const work = useAsync(() => loadInstitutionWork(overrides), [overrides], { enabled: !remote })
 
   if (!remote && summary.state.status === 'error') return <ErrorBlock message={summary.state.message} onRetry={summary.retry} />
-  if (!remote && summary.state.status === 'loading') return <LoadingBlock label="기관 지표" />
   const openAlerts = work.state.status === 'success' ? work.state.data.alerts.filter(row => row.status === 'OPEN') : []
-  const items = work.state.status === 'success' ? workItems(work.state.data.alerts, work.state.data.episodes) : []
 
   return (
     <>
-      <InstitutionLayout cards={remote?.cards ?? (summary.state.status === 'success' && <SectionCards items={institutionCards(summary.state.data)} />)} range={remote ? remote.range : range} onRange={remote?.onRange ?? setRange} today={today}
+      <InstitutionLayout cards={remote?.cards ?? (summary.state.status === 'success' ? <SectionCards items={institutionCards(summary.state.data)} /> : <KpiSkeleton />)} range={remote ? remote.range : range} onRange={remote?.onRange ?? setRange} today={today}
         charts={remote?.charts ?? <>{charts.state.status === 'error' && <ErrorBlock message={charts.state.message} onRetry={charts.retry} />}{charts.state.status === 'loading' && <LoadingBlock label="그래프" />}{charts.state.status === 'success' && <InstitutionCharts data={charts.state.data} />}</>}
         report={remote?.report ?? (summary.state.status === 'success' && <AiDailyReport summary={summary.state.data} openAlerts={openAlerts} />)} />
-      <section aria-labelledby="institution-queue-title">
-        <h2 id="institution-queue-title" className="text-base font-semibold tracking-tight">업무 현황</h2>
-        <p className="mt-1.5 mb-3 text-xs text-muted-foreground">기관 전체 · Alert·Episode 상태별 · 위험 점수 높은 순</p>
-        {remote ? remote.queue : work.state.status === 'error' ? <ErrorBlock message={work.state.message} onRetry={work.retry} /> : work.state.status === 'loading' ? <LoadingBlock label="기관 전체 업무" /> : <WorkQueue columns={workStatuses.map(status => {
-          const column = sortWork(items.filter(item => item.status === status), 'risk')
-          return { status, label: status === 'PENDING' ? '열린 Alert' : status === 'IN_PROGRESS' ? '열린 Episode' : undefined, count: column.length,
-            content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> }
-        })} />}
-      </section>
+      {remote ? remote.queue : work.state.status === 'error' ? <ErrorBlock message={work.state.message} onRetry={work.retry} /> : work.state.status === 'loading' ? <LoadingBlock label="Episode 업무" /> : <EpisodeWork episodes={work.state.data.episodes} today={today} />}
     </>
   )
 }
@@ -68,7 +56,7 @@ function InstitutionCharts({ data }: { data: DashboardData }) {
       </div>
       <Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy">
         <CardContent className="flex min-h-0 flex-1 flex-col px-4">
-          <SectionTitle title="의심 거래 구성과 패턴 분포" description="전체 구성은 거래 건, 패턴별 유형은 패턴 소속 거래의 Alert 수" />
+          <SectionTitle title="의심 거래 구성과 패턴 분포" description="전체 구성은 거래 건, 패턴별 유형은 패턴 소속 거래의 Alert 수" action={<a href="#suspicious" className="shrink-0 text-xs underline-offset-4 hover:underline">의심 거래 목록 →</a>} />
           {hasComposition ? (
             <div className="min-h-0 flex-1"><TransactionPatternHierarchy composition={composition} distribution={distribution} /></div>
           ) : (
@@ -78,4 +66,9 @@ function InstitutionCharts({ data }: { data: DashboardData }) {
       </Card>
     </>
   )
+}
+
+/** §1.5: 틀은 바로 그리고 값 자리만 낮은 대비 skeleton(페이지 전체를 로딩 문구로 바꾸지 않는다) */
+function KpiSkeleton() {
+  return <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @5xl:grid-cols-4" aria-busy="true">{['오늘 신규 Alert', '오늘 의심 거래 탐지율', '열린 Alert', '조사 중 Episode'].map(l => <Card key={l} className="shadow-none"><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">{l}</p><Skeleton className="h-8 w-20" /><Skeleton className="h-4 w-32" /></CardContent></Card>)}</div>
 }

@@ -170,7 +170,7 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
                                 <path d={d} fill="none" stroke={l.suspect ? redEdge : grey} strokeWidth={Math.max(1, linkWidth)} />
                                 {/* 의심 거래는 빨간 점, 정상 거래는 반투명 흰 점이 보낸 쪽 → 받은 쪽으로 흐른다. */}
                                 <path d={d} fill="none" className="flow-dash" stroke={l.suspect ? red : 'var(--foreground)'} strokeOpacity={l.suspect ? 1 : .5} strokeWidth={Math.min(3, Math.max(1.5, linkWidth / 4))} strokeDasharray="1 11" strokeLinecap="round" />
-                                {showInfo && <text x={label.x} y={label.y} textAnchor="middle" dominantBaseline="middle" style={{ ...fixed(zoom, 'center center'), paintOrder: 'stroke', stroke: 'var(--card)', strokeWidth: 3, strokeLinejoin: 'round', pointerEvents: 'none' }} className="fill-foreground text-[10px] tabular-nums">{flowLinkLabel(l)}</text>}
+                                {showInfo && <text x={label.x} y={label.y} textAnchor="middle" dominantBaseline="middle" style={{ ...fixed(zoom, 'center center'), paintOrder: 'stroke', stroke: 'var(--card)', strokeWidth: 3, strokeLinejoin: 'round', pointerEvents: 'none' }} className="fill-foreground text-[0.625rem] tabular-nums">{flowLinkLabel(l)}</text>}
                               </g>
                             )
                           }}
@@ -180,7 +180,7 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
                               <Layer key={`n-${index}`}>
                                 <Rectangle x={x} y={y} width={width} height={height} fill={(payload as unknown as { suspect: boolean }).suspect ? red : 'var(--muted-foreground)'} />
                                 <text x={label.x} y={label.y} textAnchor={label.textAnchor} dominantBaseline={label.dominantBaseline}
-                                  style={fixed(zoom, label.transformOrigin)} className="fill-foreground font-mono text-[11px]">{payload.name.trim()}</text>
+                                  style={fixed(zoom, label.transformOrigin)} className="fill-foreground font-mono text-[0.6875rem]">{payload.name.trim()}</text>
                               </Layer>
                             )
                           }}>
@@ -191,7 +191,7 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
                   </TransformComponent>
                   <div className="absolute bottom-3 right-3 flex items-center rounded-md border bg-card">
                     <IconButton label="축소" onClick={() => zoomOut()}><Minus className="size-3.5" /></IconButton>
-                    <span className="w-10 text-center text-[11px] tabular-nums">{Math.round(zoom * 100)}%</span>
+                    <span className="w-10 text-center text-[0.6875rem] tabular-nums">{Math.round(zoom * 100)}%</span>
                     <IconButton label="확대" onClick={() => zoomIn()}><Plus className="size-3.5" /></IconButton>
                     <IconButton label="화면 맞춤" disabled={fitted} onClick={() => resetTransform()}><Shrink className="size-3.5" /></IconButton>
                   </div>

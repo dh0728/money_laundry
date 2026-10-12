@@ -6,7 +6,7 @@ import type { AlertRow } from '@/api/alerts'
 import { formatScore, type TypeCode } from '@/api/codes'
 import { useCurrentUser } from '@/app/session'
 import { PatternBadge } from '@/components/badges'
-import { ProvenanceBadge } from '@/components/Provenance'
+import { ProvenanceBadge, ProvenanceNote } from '@/components/Provenance'
 import { SectionCard, sectionCardSurface } from '@/components/SectionCards'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,12 +17,16 @@ import { RadarSweep } from '@/features/agent/RadarSweep'
 import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
 import { fmt } from '@/lib/format'
 import { useAsync } from '@/lib/useAsync'
-import { workStatuses } from '@/lib/workStatus'
+import { boardStatuses, boardStatusHints, type WorkStatus } from '@/lib/workStatus'
 import { loadAlerts, loadMyEpisodes } from './dataSource'
 import { WorkCard } from './WorkCard'
 import { sortWork, STALE_DAYS, workItems, workSorts, type WorkSort } from './workItems'
 
 const HIGH_RISK = 0.8
+
+// 열람·작업 시작 기록이 API에 없어 mock에서는 번호로 나눠 보인다(재설계 시안용)
+const boardStatus = (item: { id: number; status: WorkStatus }): WorkStatus =>
+  item.status === 'DONE' ? 'DONE' : (['UNSEEN', 'PENDING', 'IN_PROGRESS'] as const)[item.id % 3]
 
 // 규칙으로 만든 문장이다(LLM 연결 전 mock). 위 카드·아래 보드와 겹치는 "현재 상황"은 두지 않는다.
 function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
@@ -39,7 +43,7 @@ export function PersonalSummaryView({ children }: { children: ReactNode }) {
           <RadarSweep className="size-5 shrink-0" />
           <h2 className="text-base font-semibold tracking-tight">RDR 9000 · 내 담당 요약</h2>
           <ProvenanceBadge kind="mock" title="규칙 기반 시연 문장. LLM 미연동." />
-          <p className="ml-auto text-[11px] text-muted-foreground">판단은 조사자가 수행</p>
+          <p className="ml-auto text-[0.6875rem] text-muted-foreground">판단은 조사자가 수행</p>
         </div>
         <div className="mt-4">
           <p className="text-xs font-medium">집중 패턴</p>
@@ -86,7 +90,9 @@ export function PersonalView({ remote }: { remote?: { cards: [SectionCardItem, S
             <SelectContent>{Object.entries(workSorts).map(([key, option]) => <SelectItem key={key} value={key}>{option.label}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        {remote?.queue ?? <WorkQueue columns={workStatuses.map(status => { const column = sortWork(items.filter(item => item.status === status), sort); return { status, count: column.length, content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> } })} />}
+        <ProvenanceNote kind="proposal">미확인·처리 전을 나누려면 사건별 첫 열람 시각이 필요합니다(Backend 요청). 지금 열 배정은 시연용 예시입니다.</ProvenanceNote>
+        <div className="mt-3" />
+        {remote?.queue ?? <WorkQueue columns={boardStatuses.map(status => { const column = sortWork(items.filter(item => boardStatus(item) === status), sort); return { status, hint: boardStatusHints[status], count: column.length, content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> } })} />}
       </section>
     </>
   )

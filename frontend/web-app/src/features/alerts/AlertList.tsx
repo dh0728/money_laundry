@@ -8,7 +8,7 @@ import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 import { useCurrentUser } from '@/app/session'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
-import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { AgeBadge, PatternBadge, RiskBadge, StatusBadge, alertStatusLabels } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -19,10 +19,8 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDataTable } from '@/hooks/use-data-table'
-import { usd } from '@/lib/format'
 import { useMemoryState } from '@/lib/memory'
-import { alertWorkStatus, workStatusLabels } from '@/lib/workStatus'
-import { ageOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
+import { ageOptions, riskOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
 import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget } from './episodeLink'
 
 
@@ -31,21 +29,16 @@ export type AlertListRow = Pick<AlertRow, 'alertId' | 'riskScore' | 'txCount' | 
 const baseColumns: ColumnDef<AlertListRow>[] = [
   {
     id: 'alertId', accessorKey: 'alertId',
-    header: ({ column }) => <DataTableColumnHeader column={column} label="ID / 계좌 구성" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} label="ID" />,
     cell: ({ row }) => (
       <div className="min-w-0 max-w-[340px]">
         <p className="font-mono text-sm" translate="no">{alertCode(row.original.alertId)}</p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{row.original.accountCount == null ? '조사 거래 묶음' : `계좌 ${row.original.accountCount}개 · 은행 ${row.original.bankCount}곳`}</p>
       </div>
     ),
   },
   { id: 'riskScore', accessorKey: 'riskScore', header: ({ column }) => <DataTableColumnHeader column={column} label="위험도" />, cell: ({ row }) => <RiskBadge score={row.original.riskScore} /> },
   { id: 'type', accessorFn: row => row.primaryType.code, header: ({ column }) => <DataTableColumnHeader column={column} label="탐지 유형" />, cell: ({ row }) => <>{row.original.primaryType.code == null ? <Badge variant="outline">{row.original.primaryType.name}</Badge> : <PatternBadge code={row.original.primaryType.code} />}</> },
-  {
-    id: 'totalAmountUsd', accessorKey: 'totalAmountUsd',
-    header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액" className="flex-row-reverse justify-start" />,
-    cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.amountLabel ?? (row.original.totalAmountUsd == null ? '—' : usd(row.original.totalAmountUsd))}</div>,
-  },
+  // 거래 총액 열은 두지 않는다: 경유 거래를 중복으로 세어 부풀기 때문(김명기 10/11)
   {
     id: 'txCount', accessorKey: 'txCount',
     header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />,
@@ -75,10 +68,10 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
 ]
 
 const browseColumnWidths = {
-  alertId: '13%', riskScore: '8%', type: '14%', totalAmountUsd: '14%',
-  txCount: '7%', assignee: '9%', status: '9%', createdAt: '15%', episode: '11%',
+  alertId: '12%', riskScore: '9%', type: '17%',
+  txCount: '8%', assignee: '11%', status: '14%', createdAt: '16%', episode: '13%',
 }
-const linkColumnWidths = { ...browseColumnWidths, select: '4%', alertId: '12%', type: '13%', totalAmountUsd: '13%', episode: '10%' }
+const linkColumnWidths = { ...browseColumnWidths, select: '4%', alertId: '11%', type: '15%', episode: '11%' }
 
 const statusValues: AlertStatus[] = ['OPEN', 'ESCALATED', 'CLOSED']
 const typeValues = Array.from({ length: 9 }, (_, code) => code as TypeCode)
@@ -139,17 +132,18 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
   const pageSize = Number(rowsPerPage) || 20
   const { table } = useDataTable({
     data: result, columns, pageCount: Math.max(1, Math.ceil(result.length / pageSize)), clientSide: !remote,
-    getRowId: row => String(row.alertId), defaultColumn: { enableHiding: false, enableSorting: !remote },
+    getRowId: row => String(row.alertId), defaultColumn: { enableHiding: false, enableSorting: false },
     initialState: { sorting: [{ id: 'riskScore', desc: true }], pagination: { pageIndex: 0, pageSize } },
     queryKeys: { page: 'aPage', perPage: 'aPerPage', sort: 'aSort', filters: 'aFilters', joinOperator: 'aJoin' },
   })
   const toFirst = () => table.setPageIndex(0)
 
   const valueOptions: Record<AlertFilterField, { value: string; label: string }[]> = {
-    status: statusValues.map(s => ({ value: s, label: workStatusLabels[alertWorkStatus(s)] })),
+    status: statusValues.map(s => ({ value: s, label: alertStatusLabels[s] })),
     type: remote ? [...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: typeDisplay((i + 1) as TypeCode).label })), { value: '패턴 미특정', label: '패턴 미특정' }, { value: '혼합', label: '혼합' }] : typeValues.map(code => ({ value: String(code), label: typeDisplay(code).label })),
     assignee: [{ value: String(me), label: '내 담당' }, ...[...assignees].filter(([id]) => id !== me).map(([id, name]) => ({ value: String(id), label: name }))],
     age: ageOptions.map(days => ({ value: String(days), label: `${days}일 이상` })),
+    risk: riskOptions.map(v => ({ value: String(v), label: `${v} 이상` })),
   }
   const toFilter = (f: AlertFilterField, v: string): AlertFilter =>
     f === 'status' ? { field: f, value: v as AlertStatus } : f === 'type' ? { field: f, value: v === '패턴 미특정' || v === '혼합' ? v : Number(v) as TypeCode } : { field: f, value: Number(v) }
@@ -159,8 +153,8 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
 
   function download() {
     const csv = '\uFEFF' + [
-      ['ID', '위험도', '탐지 유형', '거래 총액(통화별)', '거래', '담당자', '상태'],
-      ...result.map(r => [alertCode(r.alertId), r.riskScore, r.primaryType.name, r.amountLabel ?? (r.totalAmountUsd == null ? '' : `${r.totalAmountUsd} USD`), r.txCount, r.assignee.name, r.status]),
+      ['ID', '위험도', '탐지 유형', '거래', '담당자', '상태'],
+      ...result.map(r => [alertCode(r.alertId), r.riskScore, r.primaryType.name, r.txCount, r.assignee.name, r.status]),
     ].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a')
@@ -180,6 +174,9 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
             <Button variant="outline" size="sm" className="filter-trigger date-range-control h-9"><ListFilter data-icon="inline-start" />필터{filters.length > 0 && <Badge className="ml-1 h-5 min-w-5 px-1.5">{filters.length}</Badge>}</Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-72 space-y-3">
+            <Label>미리 정한 조건</Label>
+            <div className="grid grid-cols-2 gap-1.5">{([['내 담당 미처리', [{ field: 'assignee', value: me }, { field: 'status', value: 'OPEN' }]], ['고위험', [{ field: 'risk', value: 0.8 }]], ['3일 이상', [{ field: 'age', value: 3 }]], ['전체', []]] as [string, AlertFilter[]][]).map(([label, preset]) =>
+              <Button key={label} size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setFilters(preset); toFirst(); setFilterOpen(false) }}>{label}</Button>)}</div>
             <Label>조건 추가</Label>
             <Select value={field} onValueChange={v => { const f = v as AlertFilterField; setField(f); setValue(valueOptions[f][0].value) }}>
               <SelectTrigger className="w-full" aria-label="필터 항목"><SelectValue /></SelectTrigger>
@@ -197,12 +194,13 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
           </PopoverContent>
         </Popover>
         {currentUser.role === 'STAFF' && link.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" disabled={!rows.some(row => canLink(row, currentUser))} onClick={() => dispatchLink({ type: 'start' })}><Combine className="size-3.5" />Episode로 묶기</Button>}
+        <span className="text-xs text-muted-foreground">위험도순 · {result.length}건</span>
         <Button variant="outline" size="sm" className={link.mode === 'browse' ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />{remote ? '현재 페이지 다운로드' : '다운로드'}</Button>
       </div>
 
       {link.mode === 'link' && (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 px-3 py-2 shadow-sm backdrop-blur" data-testid="episode-link-action-bar">
-          <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">처리 전 Alert만 고를 수 있습니다</span></strong>
+          <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">본인 담당 · 진행 중 단독 Alert만 고를 수 있습니다{target === 'new' && link.selected.size < 2 ? ' · 새 Episode는 2건 이상' : ''}</span></strong>
           <Select value={target} onValueChange={setTarget}>
             <SelectTrigger size="sm" className="w-52" aria-label="Episode 연결 방식"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -210,10 +208,10 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
               {episodes.map(id => <SelectItem key={id} value={String(id)}>기존 Episode · {episodeCode(id)}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Input aria-label="연결 의견" placeholder="의견 (필수)" value={comment} onChange={e => setComment(e.target.value)} className="h-8 w-64 text-xs" />
-          <Button size="sm" disabled={Boolean(remote?.busy) || link.selected.size < (remote && target === 'new' ? 2 : 1) || !comment.trim()} onClick={() => {
+          <Input aria-label="묶는 사유" placeholder="묶는 사유 (필수)" value={comment} onChange={e => setComment(e.target.value)} className="h-8 w-64 text-xs" />
+          <Button size="sm" disabled={Boolean(remote?.busy) || link.selected.size < (target === 'new' ? 2 : 1) || !comment.trim()} onClick={() => {
             void Promise.resolve().then(() => onLink([...link.selected], target === 'new' ? 'new' : Number(target), comment.trim())).then(() => endLink('complete')).catch(() => undefined)
-          }}>연결 완료</Button>
+          }}>{target === 'new' ? '새 Episode 만들기' : 'Episode에 연결'}</Button>
           <Button size="sm" variant="outline" onClick={() => endLink('cancel')}>취소</Button>
         </div>
       )}
