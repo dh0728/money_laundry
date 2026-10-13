@@ -160,6 +160,27 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertEqual((plan['action'],plan['targetAlertId']),('UPDATE',alert))
         self.assertEqual(plan['evidence']['transactions'][0]['amountUsd'],'1.000000')
 
+    def test_artifact_records_plan_preparation_steps(self):
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        evidence = plan['evidence']
+        evidence['transactions'][0]['amountUsd'] = '7'
+        self.publish(evidence)
+        save_alerts(self.admin,self.execution)
+        artifact = self.artifact()
+        timings = artifact['timingsMs']
+        self.assertEqual(artifact['planActions'],{'UPDATE':1})
+        steps = {key:value for key,value in timings.items() if key.startswith('plan')
+                 and key not in ('planPreparation','planGcPause')}
+        for step in ('planCaseRead','planGraphRender','planFirstPass','planDigestFetch','planDigestExtend',
+                     'planMemberFetch','planSecondPass','planPayloadFetch','planPayloadSerialize','planInsert'):
+            self.assertIn(step,steps)
+        self.assertLessEqual(sum(steps.values()),timings['planPreparation'])
+        counts = artifact['planStepCounts']
+        self.assertEqual((counts['caseRead'],counts['graphRender'],counts['insert']),(1,1,1))
+        self.assertEqual((counts['digestFetch'],counts['memberFetch'],counts['payloadFetch']),(1,1,1))
+        self.assertIsInstance(artifact['planGcCollections'],dict)
+
     def test_duplicate_owned_seeds_stay_with_the_earliest_alert_and_merge(self):
         save_alerts(self.admin,self.execution)
         plan, = self.plans()
