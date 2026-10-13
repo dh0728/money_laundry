@@ -1,0 +1,21 @@
+name: aml-prod-front-blue
+services:
+  web:
+    image: ${PROD_WEB_IMAGE:?PROD_WEB_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:3000:80
+    security_opt:
+    - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
+    networks:
+    - prod-network
+networks:
+  prod-network:
+    name: aml-prod-front-blue-network
+    driver: bridge

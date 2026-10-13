@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "environment": "prod",
+  "account_id": "699258776646",
+  "region": "ap-northeast-2",
+  "app_sha": "671db265b0f5f7d026bc13b4300d288c3f70084b",
+  "images": {
+    "api": "699258776646.dkr.ecr.ap-northeast-2.amazonaws.com/aml-api@sha256:c6309ccade5932436515839fa33bfd918044942f917b45e18b392ab234d36cba",
+    "web": "699258776646.dkr.ecr.ap-northeast-2.amazonaws.com/aml-web@sha256:62be45786078e5aac974d6bcfce456d1ba33b6d0c7bf9a9e6f86098ab962d5e4"
+  }
+}

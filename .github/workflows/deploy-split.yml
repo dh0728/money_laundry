@@ -1,0 +1,229 @@
+name: Deploy Two EC2 Instances
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      git_sha:
+        required: true
+        type: string
+      operation:
+        required: false
+        type: string
+        default: preflight
+  workflow_dispatch:
+    inputs:
+      environment:
+        required: true
+        type: choice
+        options: [dev, prod]
+      git_sha:
+        description: Full Git SHA from the environment branch
+        required: true
+        type: string
+      operation:
+        description: Check OIDC and read access first; deploy changes the servers
+        required: true
+        type: choice
+        default: preflight
+        options: [preflight, deploy]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: ${{ inputs.environment }}
+    env:
+      DEPLOY_ENV: ${{ inputs.environment }}
+      GIT_SHA: ${{ inputs.git_sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      DEPLOY_ARTIFACT_BUCKET: ${{ vars.DEPLOY_ARTIFACT_BUCKET }}
+      FRONT_EC2_INSTANCE_ID: ${{ vars.FRONT_EC2_INSTANCE_ID }}
+      BACKEND_EC2_INSTANCE_ID: ${{ vars.BACKEND_EC2_INSTANCE_ID }}
+      SPLIT_DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      DEPLOY_OPERATION: ${{ inputs.operation }}
+    steps:
+      - name: Validate target configuration
+        env:
+          WORKFLOW_REF: ${{ github.ref }}
+          DEPLOY_LAYOUT: ${{ vars.AML_DEPLOY_LAYOUT }}
+          DEV_DEPLOY_ENABLED: ${{ vars.AML_DEV_DEPLOY_ENABLED }}
+          PROD_DEPLOY_ENABLED: ${{ vars.AML_PROD_DEPLOY_ENABLED }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$DEPLOY_ENV" == dev || "$DEPLOY_ENV" == prod ]]
+          [[ "$DEPLOY_OPERATION" == preflight || "$DEPLOY_OPERATION" == deploy ]]
+          if [[ "$DEPLOY_OPERATION" == deploy ]]; then
+            [[ "$DEPLOY_LAYOUT" == split ]]
+            if [[ "$DEPLOY_ENV" == dev ]]; then
+              [[ "$DEV_DEPLOY_ENABLED" == true ]]
+            else
+              [[ "$PROD_DEPLOY_ENABLED" == true ]]
+            fi
+          fi
+          branch=dev
+          [[ "$DEPLOY_ENV" != prod ]] || branch=master
+          [[ "$WORKFLOW_REF" == "refs/heads/$branch" ]]
+          [[ "$GIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$AWS_REGION" == ap-northeast-2 ]]
+          [[ "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]
+          [[ "$AWS_ROLE_ARN" == "arn:aws:iam::${AWS_ACCOUNT_ID}:role/aml-github-${DEPLOY_ENV}-deploy-role" ]]
+          [[ "$DEPLOY_ARTIFACT_BUCKET" == "aml-deploy-artifacts-${AWS_ACCOUNT_ID}" ]]
+          [[ "$FRONT_EC2_INSTANCE_ID" =~ ^i-[0-9a-f]{8,17}$ ]]
+          [[ "$BACKEND_EC2_INSTANCE_ID" =~ ^i-[0-9a-f]{8,17}$ ]]
+          [[ "$FRONT_EC2_INSTANCE_ID" != "$BACKEND_EC2_INSTANCE_ID" ]]
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
+
+      - name: Verify commit and deployment code
+        run: |
+          set -Eeuo pipefail
+          branch=dev
+          [[ "$DEPLOY_ENV" != prod ]] || branch=master
+          [[ "$(git rev-parse HEAD)" == "$GIT_SHA" ]]
+          git merge-base --is-ancestor "$GIT_SHA" "origin/$branch"
+          python3 -m unittest discover -s deploy/split/tests -p 'test_*.py'
+          python3 deploy/split/validate.py
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+
+      - name: Configure images and check immutable tags
+        id: images
+        run: |
+          set -Eeuo pipefail
+          [[ "$(aws sts get-caller-identity --query Account --output text)" == "$AWS_ACCOUNT_ID" ]]
+          [[ "$(aws s3api get-bucket-location --bucket "$DEPLOY_ARTIFACT_BUCKET" \
+            --expected-bucket-owner "$AWS_ACCOUNT_ID" --query LocationConstraint --output text)" == ap-northeast-2 ]]
+          registry="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          tag="${DEPLOY_ENV}-${GIT_SHA}"
+          echo "registry=$registry" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [[ "$DEPLOY_ENV" == prod ]]; then
+            app_sha="$(python3 deploy/split/ci_artifacts.py verify-prod deploy/split/prod-images.json "$AWS_ACCOUNT_ID")"
+            echo "app_sha=$app_sha" >> "$GITHUB_OUTPUT"
+            echo "api_exists=true" >> "$GITHUB_OUTPUT"
+            echo "web_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Production image digests verified; source builds are disabled for production."
+            exit 0
+          fi
+          echo "app_sha=$GIT_SHA" >> "$GITHUB_OUTPUT"
+          for service in api web; do
+            error_file="$(mktemp)"
+            if aws ecr describe-images --registry-id "$AWS_ACCOUNT_ID" --repository-name "aml-$service" \
+              --image-ids "imageTag=$tag" >/dev/null 2>"$error_file"; then
+              echo "${service}_exists=true" >> "$GITHUB_OUTPUT"
+            elif grep -q ImageNotFoundException "$error_file"; then
+              echo "${service}_exists=false" >> "$GITHUB_OUTPUT"
+            else
+              cat "$error_file" >&2
+              exit 1
+            fi
+            rm -f "$error_file"
+          done
+
+      - name: Preflight result
+        if: inputs.operation == 'preflight'
+        run: echo 'OIDC account, ECR and S3 location checks passed. No image build, S3 upload or SSM deployment was executed.'
+
+      - name: Authenticate image push
+        if: inputs.operation == 'deploy' && inputs.environment == 'dev'
+        env:
+          ECR_REGISTRY: ${{ steps.images.outputs.registry }}
+        run: |
+          set -Eeuo pipefail
+          aws ecr get-login-password --region "$AWS_REGION" |
+            docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+      - uses: docker/setup-buildx-action@v4
+        if: inputs.operation == 'deploy' && inputs.environment == 'dev'
+      - name: Build API
+        if: inputs.operation == 'deploy' && inputs.environment == 'dev' && steps.images.outputs.api_exists != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: backend/api-server
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.images.outputs.registry }}/aml-api:${{ steps.images.outputs.tag }}
+          cache-from: type=gha,scope=aml-api
+          cache-to: type=gha,mode=max,scope=aml-api,ignore-error=true
+      - name: Build web
+        if: inputs.operation == 'deploy' && inputs.environment == 'dev' && steps.images.outputs.web_exists != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend/web-app
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.images.outputs.registry }}/aml-web:${{ steps.images.outputs.tag }}
+          build-args: |
+            VITE_API_BASE_URL=/api
+            VITE_API_MODE=live
+          cache-from: type=gha,scope=aml-web
+          cache-to: type=gha,mode=max,scope=aml-web,ignore-error=true
+
+      - name: Package and deploy backend then front
+        if: inputs.operation == 'deploy'
+        run: |
+          set -Eeuo pipefail
+          bundle="$RUNNER_TEMP/deploy-bundle.tar.gz"
+          image_args=()
+          if [[ "$DEPLOY_ENV" == prod ]]; then
+            image_args=(--image-manifest deploy/split/prod-images.json)
+          fi
+          checksum="$(python3 deploy/split/build_bundle.py "$DEPLOY_ENV" "$bundle" "${image_args[@]}")"
+          uploaded="$(python3 deploy/split/ci_artifacts.py publish "$bundle" \
+            "$DEPLOY_ENV" "$GIT_SHA" "$AWS_ACCOUNT_ID" "$DEPLOY_ARTIFACT_BUCKET")"
+          [[ "$uploaded" == "$checksum" ]]
+          python3 deploy/split/run_ssm.py "$DEPLOY_ENV" "$GIT_SHA" "$checksum"
+
+      - name: Notify Discord of deployment result
+        if: always() && inputs.operation == 'deploy'
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          APP_SHA: ${{ steps.images.outputs.app_sha }}
+          ACTOR: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          set -Eeuo pipefail
+          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
+            echo 'Discord notification skipped: environment secret is not configured.'
+            exit 0
+          fi
+          case "$JOB_STATUS" in
+            success) result='성공' ;;
+            failure) result='실패 — 실행 로그와 SSM 상태 확인' ;;
+            cancelled) result='취소 — 실행 로그와 SSM 상태 확인' ;;
+            *) result="$JOB_STATUS" ;;
+          esac
+          message="${DEPLOY_ENV^^} 배포 $result
+          배포 코드: ${GIT_SHA:0:12}
+          앱 코드: ${APP_SHA:0:12}
+          실행자: $ACTOR
+          실행 결과: $SERVER_URL/$REPOSITORY/actions/runs/$RUN_ID"
+          payload="$(jq -cn --arg content "$message" '{content: $content, allowed_mentions: {parse: []}}')"
+          curl --disable --fail --silent --show-error --output /dev/null \
+            --proto '=https' --connect-timeout 5 --max-time 20 \
+            --retry 2 --header 'Content-Type: application/json' \
+            --request POST --data "$payload" "$DISCORD_WEBHOOK_URL"

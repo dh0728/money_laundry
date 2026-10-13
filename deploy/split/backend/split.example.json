@@ -1,0 +1,9 @@
+{
+  "layout": "split",
+  "role": "backend",
+  "account_id": "<NEW_ACCOUNT_ID>",
+  "region": "ap-northeast-2",
+  "prod_worker_mode": "unconfigured",
+  "prod_inference_url": "",
+  "drain_seconds": 30
+}
