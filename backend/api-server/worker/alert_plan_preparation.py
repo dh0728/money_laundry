@@ -12,6 +12,9 @@ from flow_graph import Witness
 from frozen_input import StaleExecution
 from result_collection import _checkpoint
 
+# Plans stored per COPY; bounds the serialized payloads held at once.
+PLAN_BATCH = 256
+
 
 def indexed(evidence, fingerprint):
     roles = {role: frozenset(m['txId'] for m in evidence['transactions'] if m['role'] == role)
@@ -112,7 +115,8 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
     steps.lap('factRead', len(facts))
     graphs = []
     for graph in batch.graphs:
-        doc = _evidence(graph, rows, scores, seeds, batch.account_keys)
+        # Digests read only the semantic keys; the full document is rendered for payloads.
+        doc = _evidence(graph, rows, scores, seeds, batch.account_keys, light=True)
         steps.lap('graphRender', 1)
         graphs.append(indexed(doc, _fingerprint(doc)))
         steps.lap('graphFingerprint', 1)
@@ -121,20 +125,26 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
     steps.lap('firstPass', len(first.plans))
 
     def published_doc(key):
-        return connection.execute('''SELECT evidence FROM review.alert_versions
+        # Composition re-renders graph and summary from the members; never ship them.
+        return connection.execute('''SELECT evidence-'graph'-'summary' FROM review.alert_versions
             WHERE alert_id=%s AND version=%s''', (key, by_id[key].published_version)).fetchone()[0]
 
-    def compose(plan, step):
+    def compose(plan, step, light=False, member_digests=None):
         # Steps are charged per caller ('digest' before, 'payload' after the second pass).
         if not plan.case_ids and len(plan.graph_ids) == 1:
-            doc = _evidence(batch.graphs[plan.graph_ids[0]], rows, scores, seeds, batch.account_keys)
+            doc = _evidence(batch.graphs[plan.graph_ids[0]], rows, scores, seeds, batch.account_keys,
+                            light=light)
             steps.lap(step + 'Render', 1)
             return doc
         # Retain only role/relation indexes across cases; fetch full immutable
         # documents for this operation, never all historical rendered graphs.
         sources = [published_doc(key) for key in plan.case_ids]
         steps.lap(step + 'Fetch', len(plan.case_ids))
-        sources.extend(_evidence(batch.graphs[i], rows, scores, seeds, batch.account_keys)
+        if member_digests is not None:
+            # Taken before the cleaning below edits the published documents in place.
+            member_digests.extend(_member_digest(source) for source in sources)
+            steps.lap('memberDigest', len(sources))
+        sources.extend(_evidence(batch.graphs[i], rows, scores, seeds, batch.account_keys, light=light)
                        for i in plan.graph_ids)
         steps.lap(step + 'Render', len(plan.graph_ids))
         if not sources:
@@ -166,7 +176,7 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
                 summary=dict(txCount=0, seedCount=0, totalAmountUsd='0', scoreMax=None,
                              firstTxAt=None, lastTxAt=None), graph=dict(nodes=[], edges=[]))
         else:
-            doc = _extend(cleaned[0], cleaned[1:])
+            doc = _extend(cleaned[0], cleaned[1:], light=light)
         steps.lap(step + 'Extend', 1)
         return doc
 
@@ -177,19 +187,17 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
             # A frozen legacy case is never composed: its evidence predates this policy.
             digests[key] = by_id[plan.case_ids[0]].evidence.digest
             continue
-        doc = compose(plan, 'digest')
+        # The same members and facts described by other relations: no new version (N7).
+        # The published side is digested from the document fetched for composition.
+        published = [] if len(plan.case_ids) == 1 and plan.graph_ids else None
+        doc = compose(plan, 'digest', light=True, member_digests=published)
         if doc is None:
             continue
         digests[key] = _fingerprint(doc)
         steps.lap('digestFingerprint', 1)
-        # The same members and facts described by other relations: no new version (N7).
-        if len(plan.case_ids) == 1 and plan.graph_ids:
-            published = published_doc(plan.case_ids[0])
-            steps.lap('memberFetch', 1)
-            if _member_digest(doc) == _member_digest(published):
-                unchanged.add(key)
-            published = None
-            steps.lap('memberDigest', 1)
+        if published is not None and _member_digest(doc) == published[0]:
+            unchanged.add(key)
+        steps.lap('memberDigest')
     # Keep only digests between planning passes, not a second full copy of every
     # historical/new graph. Serialize one operation at a time below.
     doc = None
@@ -200,7 +208,17 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
         FROM analysis.alert_plans WHERE run_id=%s''', (execution.run_id,)).fetchone()[0]
     connection.execute('DELETE FROM analysis.alert_plans WHERE run_id=%s', (execution.run_id,))
     steps.lap('delete')
-    aggregate = hashlib.sha256()
+    aggregate, pending = hashlib.sha256(), []
+
+    def store():
+        # One COPY per bounded batch; composition needs the connection between batches.
+        with connection.cursor() as cursor, cursor.copy('''COPY analysis.alert_plans
+                (run_id,plan_key,execution_id,build_generation,plan_digest,action,payload) FROM STDIN''') as copy:
+            for row in pending:
+                copy.write_row(row)
+        steps.lap('insert', len(pending))
+        pending.clear()
+
     for key, plan in enumerate(result.plans):
         payload = plan.contract()
         doc = None if plan.action == 'NOOP' else compose(plan, 'payload')
@@ -215,11 +233,12 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
         digest = hashlib.sha256(serialized.encode()).hexdigest()
         aggregate.update(f'{key}:{digest}\n'.encode())
         steps.lap('payloadSerialize', 1)
-        connection.execute('''INSERT INTO analysis.alert_plans
-            (run_id,plan_key,execution_id,build_generation,plan_digest,action,payload)
-            VALUES(%s,%s,%s,%s,%s,%s,%s)''',
-            (execution.run_id, key, execution.execution_id, generation, digest, str(plan.action), serialized))
-        steps.lap('insert', 1)
+        pending.append((execution.run_id, key, execution.execution_id, generation, digest, str(plan.action),
+                        serialized))
+        if len(pending) == PLAN_BATCH:
+            store()
+    if pending:
+        store()
     metadata.update(planCount=len(result.plans), planDigest=aggregate.hexdigest(),
                     buildGeneration=generation, publication='PREPARED')
     # Step names are prefixed so they never collide with the stage-level timings.

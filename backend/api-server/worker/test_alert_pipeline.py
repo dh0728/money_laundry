@@ -173,12 +173,14 @@ class AlertPostgresTests(unittest.TestCase):
         steps = {key:value for key,value in timings.items() if key.startswith('plan')
                  and key not in ('planPreparation','planGcPause')}
         for step in ('planCaseRead','planGraphRender','planFirstPass','planDigestFetch','planDigestExtend',
-                     'planMemberFetch','planSecondPass','planPayloadFetch','planPayloadSerialize','planInsert'):
+                     'planMemberDigest','planSecondPass','planPayloadFetch','planPayloadSerialize','planInsert'):
             self.assertIn(step,steps)
         self.assertLessEqual(sum(steps.values()),timings['planPreparation'])
         counts = artifact['planStepCounts']
         self.assertEqual((counts['caseRead'],counts['graphRender'],counts['insert']),(1,1,1))
-        self.assertEqual((counts['digestFetch'],counts['memberFetch'],counts['payloadFetch']),(1,1,1))
+        # The member digest reuses the document fetched for composition (one fetch per pass).
+        self.assertEqual((counts['digestFetch'],counts['payloadFetch'],counts['memberDigest']),(1,1,1))
+        self.assertNotIn('memberFetch',counts)
         self.assertIsInstance(artifact['planGcCollections'],dict)
 
     def test_duplicate_owned_seeds_stay_with_the_earliest_alert_and_merge(self):
@@ -271,6 +273,29 @@ class AlertExtensionTests(unittest.TestCase):
             target = changed[section]
             (target[0] if isinstance(target, list) else target)[key] = value
             self.assertNotEqual(_fingerprint(old), _fingerprint(changed))
+
+    def test_light_rendering_keeps_both_digests_of_the_full_document(self):
+        from alert_pipeline import _evidence, _extend, _fingerprint, _member_digest
+        from decimal import Decimal
+        from flow_graph import FlowGraph, Witness
+        full = self.evidence([1, 2, 3], [1, 3])
+        rows = {m['txId']: dict(occurred_at=datetime.fromisoformat(m['occurredAt']), from_account_id=m['fromAccountId'],
+                    to_account_id=m['toAccountId'], from_bank_id=m['fromBankId'], to_bank_id=m['toBankId'],
+                    amount_received=m['amountReceived'], receiving_currency=m['receivingCurrency'],
+                    amount_paid=m['amountPaid'], payment_currency=m['paymentCurrency'],
+                    amount_usd=Decimal(m['amountUsd']), payment_format=m['paymentFormat'])
+                for m in full['transactions']}
+        graph = FlowGraph((1, 3), (2,), (), (Witness('REPEAT', (1, 2, 3)),), (), (Witness('BOUNDARY_PASS', (1, 9)),))
+        seeds = {s['txId']: s for s in full['seeds']}
+        args = (graph, rows, {key: dict(p_laundering=.9) for key in (1, 3)}, seeds)
+        light, heavy = _evidence(*args, light=True), _evidence(*args)
+        self.assertNotIn('graph', light)
+        self.assertNotIn('summary', light)
+        self.assertEqual((_fingerprint(light), _member_digest(light)), (_fingerprint(heavy), _member_digest(heavy)))
+        addition = self.evidence([1, 4], [1, 4])
+        light, heavy = _extend(full, [addition], light=True), _extend(full, [addition])
+        self.assertNotIn('graph', light)
+        self.assertEqual((_fingerprint(light), _member_digest(light)), (_fingerprint(heavy), _member_digest(heavy)))
 
     def test_new_version_updates_facts_without_mutating_previous_document(self):
         from alert_pipeline import _extend

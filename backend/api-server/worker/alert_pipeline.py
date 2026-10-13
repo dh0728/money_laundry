@@ -89,7 +89,9 @@ def _context_query(members, focal):
                 focalAccounts=[unique[key] for key in sorted(unique)])
 
 
-def _evidence(graph, rows, scores, seed_info, account_keys=None, focal=()):
+def _evidence(graph, rows, scores, seed_info, account_keys=None, focal=(), light=False):
+    """Render an evidence version. ``light`` keeps only the keys that the semantic
+    and member digests read (no graph, summary or context query)."""
     roles = {key: role for role, keys in (('SEED', graph.seed_ids),
              ('CONNECTION', graph.connection_ids), ('CONTEXT', graph.context_ids)) for key in keys}
     reasons = defaultdict(set)
@@ -108,6 +110,8 @@ def _evidence(graph, rows, scores, seed_info, account_keys=None, focal=()):
                     amountUsd=str(row['amount_usd']), paymentFormat=row['payment_format'],
                     role=role, includedReasons=sorted(reasons[tx_id] | {role}), scores=score)
         members.append(item)
+        if light:
+            continue
         for side in ('from', 'to'):
             key = item[side+'AccountId']
             node = nodes.setdefault(key, dict(id=key, kind='ACCOUNT', bankId=item[side+'BankId'],
@@ -115,9 +119,14 @@ def _evidence(graph, rows, scores, seed_info, account_keys=None, focal=()):
             direction = 'out' if side == 'from' else 'in'
             node[direction+'Count'] += 1
             node[direction+'AmountUsd'] += row['amount_usd']
+    seeds = [seed_info[key] for key in graph.seed_ids]
+    if light:
+        return _json(dict(policyVersion=POLICY.version, policy=asdict(POLICY),
+            witnesses=[asdict(witness) for witness in graph.witnesses],
+            boundaryWitnesses=[asdict(witness) for witness in graph.boundary_witnesses],
+            seeds=seeds, transactions=members, limits=list(graph.limits)))
     amounts = sum((Decimal(m['amountUsd']) for m in members), Decimal(0))
     probabilities = [s['p_laundering'] for m in members if (s := m['scores']) is not None]
-    seeds = [seed_info[key] for key in graph.seed_ids]
     focal_accounts = list(focal)
     if account_keys is not None:
         for code in getattr(graph, 'focal_accounts', ()):
@@ -137,13 +146,13 @@ def _evidence(graph, rows, scores, seed_info, account_keys=None, focal=()):
             includedReasons=m['includedReasons']) for m in members])))
 
 
-def _extend(old, additions):
+def _extend(old, additions, light=False):
     """Compose immutable evidence versions without truncating relation witnesses.
 
     Case lifecycle is separate from graph construction. Existing historical
     members remain intact and keep their relation witnesses; links describe the
     current run and replace the old ones (N2 (d)); oversized accumulated
-    evidence fails atomically.
+    evidence fails atomically. ``light`` renders as in ``_evidence``.
     """
     if old.get('policyVersion') != POLICY.version or 'witnesses' not in old:
         raise ProtocolError('Existing Alert evidence requires regeneration with the block policy')
@@ -192,7 +201,7 @@ def _extend(old, additions):
         tuple(k for k, m in sorted(members.items()) if m['role'] == 'CONTEXT'),
         tuple(sorted(witnesses, key=lambda w: (w.kind, w.tx_ids))), tuple(sorted(limits)),
         tuple(sorted(boundaries, key=lambda w: (w.kind, w.tx_ids))))
-    return _evidence(graph, rows, scores, seeds, focal=focal)
+    return _evidence(graph, rows, scores, seeds, focal=focal, light=light)
 
 
 def _digest_of(body):
