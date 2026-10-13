@@ -274,7 +274,7 @@ def save_alerts(connection, execution):
     candidate_started = perf_counter()
     if seeds and not days:
         raise ProtocolError('Frozen coverage is required')
-    seed_groups = []
+    seed_groups, owned_seen, duplicates = [], set(), 0
     for owned, core, members, witnesses, version in connection.execute('''SELECT v.evidence->'seeds',
         (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t
          WHERE t->>'role'<>'CONTEXT'),
@@ -285,7 +285,15 @@ def save_alerts(connection, execution):
         WHERE o.run_id=%s AND a.status='OPEN' AND a.merged_into_alert_id IS NULL
         ORDER BY a.alert_id''', (execution.run_id,)):
         # Published relations pin the block (I10); a block of another policy is frozen.
-        seed_groups.append(([s['txId'] for s in owned], core or [], members or [],
+        # A seed owned by two OPEN Alerts (an anomaly the generator never creates) stays
+        # with the earliest Alert; the lifecycle then merges or proposes for the other.
+        keys = [s['txId'] for s in owned]
+        fresh = [key for key in keys if key not in owned_seen]
+        duplicates += len(keys) - len(fresh)
+        owned_seen.update(fresh)
+        if not fresh:
+            continue
+        seed_groups.append((fresh, core or [], members or [],
                             [(w['kind'], tuple(w['tx_ids'])) for w in witnesses],
                             version != POLICY.version))
     batch = _build_graphs(rows, seeds, seed_groups)
@@ -305,6 +313,7 @@ def save_alerts(connection, execution):
                  policyDigest=batch.policy_digest, graphCount=len(batch.graphs),
                  unassignedSeedCount=len(batch.unassigned),
                  frozenLegacyCount=sum(1 for group in seed_groups if group[4]),
+                 duplicateOwnedSeedCount=duplicates,
                  unassignedReasons=dict(Counter(item.reason for item in batch.unassigned)),
                  rejectedRelationReasons=dict(Counter(item.reason for item in batch.rejected_relations)),
                  timingsMs={key: round(value, 3) for key, value in timings.items()}))

@@ -263,7 +263,20 @@ public class ReviewService {
             0,
             Duration.between(((Timestamp) c.get("created_at")).toInstant(), time.now()).toDays()));
     out.put("groups", gs);
-    out.put("summary", CaseSummary.summarize(members));
+    var summary = new LinkedHashMap<>(CaseSummary.summarize(members));
+    // Growth deadline and context size describe the published Alert evidence, not an Episode.
+    summary.put("sealedAfter", null);
+    summary.put("contextCount", null);
+    if ("ALERT".equals(c.get("kind")) && c.get("published_version") != null)
+      summary.putAll(
+          alerts.blockFacts(
+              object(
+                  jdbc.queryForObject(
+                      "select evidence::text from review.alert_versions where alert_id=? and version=?",
+                      String.class,
+                      c.get("alert_id"),
+                      c.get("published_version")))));
+    out.put("summary", summary);
     out.put(
         "pendingCount",
         members.stream()

@@ -160,6 +160,17 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertEqual((plan['action'],plan['targetAlertId']),('UPDATE',alert))
         self.assertEqual(plan['evidence']['transactions'][0]['amountUsd'],'1.000000')
 
+    def test_duplicate_owned_seeds_stay_with_the_earliest_alert_and_merge(self):
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        first = self.publish(plan['evidence'])
+        second = self.publish(plan['evidence'])
+        save_alerts(self.admin,self.execution)
+        plan, = self.plans()
+        self.assertEqual((plan['action'],plan['targetAlertId'],plan['caseIds']),('MERGE',first,[first,second]))
+        self.assertEqual([s['txId'] for s in plan['evidence']['seeds']],sorted(self.ids[0::2]))
+        self.assertEqual(self.artifact()['duplicateOwnedSeedCount'],2)
+
     def test_legacy_policy_alert_is_frozen(self):
         save_alerts(self.admin,self.execution)
         plan, = self.plans()

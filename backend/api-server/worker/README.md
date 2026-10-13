@@ -12,7 +12,7 @@
 
 연결 범위는 입력 준비 → S3 게시 → 추론 API → 결과 수집/검증 → 점수 DB 저장이다.
 Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 점수 저장 다음 ALERTS에서
-고정 맥락 기반 근거를 저장한 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
+구조 관계 기반 블록 근거를 저장한 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
 실제 GNN의 탐지 성능을 검증한 것은 아니다.
 
 ## DB 역할과 초기 구조
@@ -133,7 +133,7 @@ $detail.models | Format-Table modelKind, phase, status, remoteStatus, errorCode,
 `POST /api/v1/batch-jobs/{jobId}/resume`한다. 완료 작업을 다시 분석하지 않는다.
 
 5. 두 모델이 `DONE/SUCCEEDED`이고 상위가 `COMPLETE/COMPLETED`까지 도달했는지 확인한다.
-   ALERTS는 고정 맥락에서 근거를 구성·저장한 뒤 완료한다. 의심 씨앗0건은 Alert0건으로 정상 완료한다.
+   ALERTS는 고정 입력에서 블록 근거를 구성·저장한 뒤 완료한다. 의심 씨앗0건은 Alert0건으로 정상 완료한다.
    `ALERT_ASSIGNEE_UNAVAILABLE`이면 실제 L1 사용자 등록이 필요하다. `PIPELINE_NOT_CONFIGURED`는
    정상 완료 경계가 아니라 워커 설정 오류다. 공개 점수·Alert API는 전체 완료 전 결과를 숨긴다.
    완료 후 `GET /api/v1/alerts?jobId={jobId}`, 상세 `/{alertId}`, `/{alertId}/versions`,
@@ -163,23 +163,25 @@ WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id)
   실패의 새 회차 재개가 완성된 것은 아니다.
 
 
-## 고정 맥락·Alert 단계
+## 맥락 조회·Alert 단계
 
 `analysis_entry.py --stage ALERTS`는 `alert_pipeline.py`를 호출한다. Spring FREEZE_INPUT이
 TARGET와 cutoff 이전에 유효하게 수신·통합된 전체 CONTEXT·기존 점수·날짜별 수신 범위를 동결한다.
-실행 경로는 `alert_pipeline.py → flow_graph.build_flow_graphs` 하나다. 계좌 UUID는 내부 정수 코드로
-변환하고 실제 거래 ID와 UTC microseconds를 보존한다. 과거 점수는 원래 실행의 임계값을 적용한다.
-정책 `flow-evidence-2`는 씨앗 기준 ±72시간·방향별2홉으로 연결 근거를 찾고 핵심을 먼저 구성한다.
-고립씨앗은 발행하지 않고 점수에 남겨 다음 실행에 재검토한다. 일반 이웃64·씨앗별C100·그래프C200,
-핵심기간240시간을 적용하며, 저의심비율 허브는512건/20% 기준·이웃16으로 제한한다.
-핵심4096 초과 연결은 관련 그래프로 분할하며 `boundaryWitnesses`와 `CORE_PARTITION`을 보존한다.
-경계 관계는 자동 병합 근거와 구분한다. 기존 OPEN 씨앗 소속과 핵심 공간을 먼저 예약하여 재분석 시
-분할이 무효화되지 않게 한다. 기존 거래·판정은 유지하며 새 맥락은 남은 공간만 채운다.
-검사위치2000만·핵심별 보존 관계20만 초과는 `WORKER_INPUT_INVALID` 오류로 종료하며 부분 공개하지 않는다.
-근거 JSON에는 정책 전체와 `witnesses`를 저장한다. 중복 관계를 전부 적재하지 않고 연결과 거래 포함을
-설명하는 근거를 보존한다. 패턴 정답·패턴 추론·금액으로 모양을 강제하지 않는다.
+실행 경로는 `alert_pipeline.py → block_graph.build_block_graphs` 하나다. 계좌 UUID는 내부 정수 코드로
+변환하고 실제 거래 ID·UTC microseconds·USD 환산 금액(마이크로 단위)을 보존한다. 과거 점수는 원래 실행의 임계값을 적용한다.
+정책 `block-pin-1`은 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
+핵심은 씨앗과 연결 거래64건·기간240시간 이하다. 맥락 거래는 멤버가 아니라 근거의 `contextQuery`(초점 계좌·핵심 기간±24시간)이며
+조회할 때 원장에서 센다. 구조 관계가 없는 씨앗은 발행하지 않고 사유(`unassignedReasons`)와 함께 아티팩트에 남겨 다음 실행에 재검토한다.
+저의심비율 허브는512건/20% 기준으로 부채꼴 면과 통과 관계를 만들지 않는다.
+상한·기간을 넘는 연결은 별도 Alert로 두고 `boundaryWitnesses`(BOUNDARY_* 링크)로 관계를 보존한다. 링크는 근거 지문에서 제외되며
+매 실행 현재 값으로 교체된다. 기존 OPEN Alert는 씨앗·과거 핵심·채택 witness를 고정 입력으로 받아 같은 Alert가 이어서 자라고,
+두 OPEN Alert를 한 그래프로 합치지 않는다. 핵심 멤버가 같고 witness만 다른 실행은 새 버전을 만들지 않는다.
+다른 정책 버전으로 공개된 Alert는 동결한다(`frozenLegacyCount`). 같은 씨앗을 두 OPEN Alert가 소유한 비정상 상태는 먼저 생성된
+Alert가 씨앗을 유지하고 생애주기가 병합·제안으로 정리한다(`duplicateOwnedSeedCount`).
+검사위치2000만·관계20만 초과는 `WORKER_INPUT_INVALID` 오류로 종료하며 부분 공개하지 않는다.
+근거 JSON에는 정책 전체와 `witnesses`·`contextQuery`를 저장한다. 패턴 정답·패턴 추론으로 모양을 강제하지 않는다.
 
-OPEN의 추가 근거는 버전으로 보존한다. 종결·이관 사건에는 기존 처리에 없던 핵심/강한 연결 근거가 새 생성 기준을 충족할 때만 후속 Alert를 만들며, 맥락만 추가되거나 같은 근거가 반복되면 만들지 않는다.
+OPEN의 추가 근거는 버전으로 보존한다. 종결·이관 사건에는 새 씨앗을 포함한 witness가 있을 때만 후속 Alert를 만들며, 연결 거래만 늘거나 관계만 바뀌거나 같은 근거가 반복되면 만들지 않는다.
 기존 판정 대상은 변경하지 않는다. 신규 TARGET가0건이어도 기존 Alert 또는 동결 과거 점수가 있으면
 모델을 재실행하지 않고 ALERTS에서 재검토한다. 새 정상 맥락만으로 과거 미소속 씨앗을 묶을 수 있다.
 미등록·미수신·일부 보류와 정상 수신 후 연결 없음을 구분한다.

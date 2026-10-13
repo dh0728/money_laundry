@@ -41,7 +41,9 @@ class AlertPipelineTests {
   long target;
   long account;
   long receiver;
-  long initialContext;
+  // block-pin-1 never publishes a lone seed: the fixture Alert is the PASS pair
+  // account -> receiver (target) followed by receiver -> account (returnSeed).
+  long returnSeed;
 
   @BeforeEach
   void alertSetup() {
@@ -75,29 +77,60 @@ class AlertPipelineTests {
         "update analysis.jobs set current_stage='ALERTS',threshold_value=.7,analysis_cutoff_at='2022-09-03 09:00+09' where job_id=?",
         job);
     report(target, "2022-09-02", "2022-09-03 00:00+09");
-    initialContext =
-        jdbc.queryForObject(
-            "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2022-09-02 23:40+09',?,?,1,'USD',1,'USD','ACH',1,'test','2022-09-02') returning tx_id",
-            Long.class,
-            receiver,
-            account);
-    long contextReport =
-        jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) select br.version_id,2,?,'cipher','test','ACTIVE' from private.bank_reports br join ledger.transaction_reports tr using(report_id) where tr.tx_id=? returning report_id",
-            Long.class,
-            UUID.randomUUID().toString(),
-            target);
-    jdbc.update(
-        "insert into ledger.transaction_reports values(?,?,'INTERNAL')",
-        initialContext,
-        contextReport);
+    returnSeed = transfer("2022-09-02 23:40+09", "2022-09-02", receiver, account, 1);
+    attach(returnSeed, target);
+    runs.snapshot(run, returnSeed, "TARGET");
 
     snapshot.freeze(run, Instant.parse("2022-09-03T00:00:00Z"));
+    score(target, run);
+    score(returnSeed, run);
+  }
+
+  long transfer(String at, String day, long from, long to, int amount) {
+    return jdbc.queryForObject(
+        "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(?::timestamptz,?,?,?,'USD',?,'USD','ACH',?,'test',?::date) returning tx_id",
+        Long.class,
+        at,
+        from,
+        to,
+        amount,
+        amount,
+        amount,
+        day);
+  }
+
+  /** Adds txId as another row of the report version that already carries sameReportAs. */
+  void attach(long txId, long sameReportAs) {
+    long report =
+        jdbc.queryForObject(
+            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) select br.version_id,(select max(source_row)+1 from private.bank_reports where version_id=br.version_id),?,'cipher','test','ACTIVE' from private.bank_reports br join ledger.transaction_reports tr using(report_id) where tr.tx_id=? returning report_id",
+            Long.class,
+            UUID.randomUUID().toString(),
+            sameReportAs);
+    jdbc.update("insert into ledger.transaction_reports values(?,?,'INTERNAL')", txId, report);
+  }
+
+  void score(long txId, UUID scoreRun) {
     jdbc.update(
-        "insert into analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id) values(?,?,.9,1,0,0,0,0,0,0,0,0,?)",
-        0,
-        target,
-        run);
+        "insert into analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id) values(0,?,.9,1,0,0,0,0,0,0,0,0,?)",
+        txId,
+        scoreRun);
+  }
+
+  /** Makes a frozen transaction of the prepared run a scored seed. */
+  void promote(AnalysisStageExecutor.Context context, long txId) {
+    jdbc.update(
+        "update analysis.input_transactions set input_role='TARGET' where run_id=? and tx_id=?",
+        context.runId(),
+        txId);
+    score(txId, context.runId());
+  }
+
+  /** A next-day seed account -> receiver that continues the fixture flow as PASS at account. */
+  long seedOn(String day) {
+    long id = transfer(day + " 10:00+09", day, account, receiver, 1);
+    report(id, day, "2022-09-03 01:00+09");
+    return id;
   }
 
   void report(long txId, String day, String received) {
@@ -311,7 +344,7 @@ class AlertPipelineTests {
   }
 
   @Test
-  void actual_freeze_empty_targets_enriches_next_day_and_keeps_old_version() {
+  void actual_freeze_empty_targets_rechecks_next_day_without_a_new_version() {
     long alert = firstAlert();
     var old = alerts.detail(alert, 1);
     long context =
@@ -352,13 +385,15 @@ class AlertPipelineTests {
                   followRun))
           .isZero();
     }
-    assertThat(alerts.versions(alert)).hasSize(2);
-    assertThat(alerts.detail(alert, 1).get("transactions")).isEqualTo(old.get("transactions"));
-    assertThat((List<?>) alerts.detail(alert, null).get("transactions")).hasSize(3);
+    // A non-seed transaction is context, never a member: no new seed, no new version.
+    assertThat(alerts.versions(alert)).hasSize(1);
+    assertThat(alerts.detail(alert, null).get("transactions")).isEqualTo(old.get("transactions"));
     assertThat(alerts.detail(alert, null)).doesNotContainKey("forwardComplete");
-    assertThat(alerts.detail(alert, null).get("dataAsOf")).isEqualTo("2022-09-04T00:00:00Z");
-    assertThat(alerts.detail(alert, null).get("lastCheckedAt")).isNotNull();
-    assertThat(alerts.list(0, 20, null, null, follow).get("totalElements")).isEqualTo(1L);
+    assertThat(alerts.detail(alert, null).get("dataAsOf")).isEqualTo("2022-09-03T00:00:00Z");
+    assertThat(alerts.detail(alert, null).get("lastCheckedAt"))
+        .isNotNull()
+        .isNotEqualTo(old.get("lastCheckedAt"));
+    assertThat(alerts.list(0, 20, null, null, follow).get("totalElements")).isEqualTo(0L);
   }
 
   @Test
@@ -454,19 +489,30 @@ class AlertPipelineTests {
 
   @Test
   void unassigned_historical_seed_is_revisited_without_target_or_existing_alert() {
+    jdbc.update("delete from analysis.scores where run_id=? and tx_id=?", run, returnSeed);
+    jdbc.update("delete from analysis.input_reports where run_id=? and tx_id=?", run, returnSeed);
     jdbc.update(
-        "delete from analysis.input_reports where run_id=? and tx_id=?", run, initialContext);
+        "delete from analysis.input_transactions where run_id=? and tx_id=?", run, returnSeed);
     jdbc.update(
-        "delete from analysis.input_transactions where run_id=? and tx_id=?", run, initialContext);
-    jdbc.update(
-        "update ledger.transactions set integration_status='HELD' where tx_id=?", initialContext);
+        "update ledger.transactions set integration_status='HELD' where tx_id=?", returnSeed);
     try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("COMPLETED");
     }
     assertThat(jdbc.queryForObject("select count(*) from review.alert_versions", Integer.class))
         .isZero();
-    long connecting = contextOn("2022-09-03");
+    // The lone target closes a cycle account -> receiver -> middle -> account the next day
+    // (single-seed shape), without any new scored target.
+    long middle =
+        jdbc.queryForObject(
+            "insert into core.accounts(bank_id,service_account_id,owner_id) select bank_id,?,owner_id from core.accounts where account_id=? returning account_id",
+            Long.class,
+            UUID.randomUUID(),
+            account);
+    long connecting = transfer("2022-09-03 00:10+09", "2022-09-03", receiver, middle, 1);
+    report(connecting, "2022-09-03", "2022-09-03 01:00+09");
+    long closing = transfer("2022-09-03 00:20+09", "2022-09-03", middle, account, 1);
+    attach(closing, connecting);
     long follow =
         jdbc.queryForObject(
             "insert into analysis.jobs(analysis_date,business_at,status,current_stage,threshold_value,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),'QUEUED','FREEZE_INPUT',.99,'2022-09-04 09:00+09') returning job_id",
@@ -501,7 +547,7 @@ class AlertPipelineTests {
                   "select tx_id from review.alert_transactions where alert_id=? order by tx_id",
                   Long.class,
                   alert))
-          .containsExactly(target, connecting);
+          .containsExactly(target, connecting, closing);
       assertThat(
               jdbc.queryForObject(
                   "select (evidence->'seeds'->0->>'threshold')::float8 from review.alert_versions where alert_id=?",
@@ -560,46 +606,27 @@ class AlertPipelineTests {
   }
 
   @Test
-  void oversized_flow_publishes_related_partitions_and_replay_preserves_ownership() {
-    jdbc.update(
-        """
-        with added as (
-          insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,
-            receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date)
-          select t.occurred_at,t.from_account_id,t.to_account_id,1,'USD',1,'USD','ACH',1,'test',t.business_date
-          from ledger.transactions t cross join generate_series(1,4097) n where t.tx_id=? returning tx_id
-        ) insert into analysis.input_transactions
-        select (jsonb_populate_record(null::analysis.input_transactions,
-          to_jsonb(i)||jsonb_build_object('tx_id',a.tx_id))).*
-        from added a cross join analysis.input_transactions i where i.run_id=? and i.tx_id=?
-        """,
-        target,
-        run,
-        target);
-    jdbc.update(
-        """
-        insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status)
-        select br.version_id,i.tx_id+1000,'partition-'||i.tx_id,'cipher','test','ACTIVE'
-        from analysis.input_transactions i cross join ledger.transaction_reports tr
-        join private.bank_reports br using(report_id)
-        where i.run_id=? and i.input_role='TARGET' and i.tx_id<>? and tr.tx_id=?
-        """,
-        run,
-        target,
-        target);
-    jdbc.update(
-        """
-        insert into ledger.transaction_reports
-        select source_row-1000,report_id,'INTERNAL' from private.bank_reports where match_key like 'partition-%'
-        """);
-    jdbc.update(
-        """
-        insert into analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id)
-        select 0,tx_id,.9,1,0,0,0,0,0,0,0,0,run_id from analysis.input_transactions
-        where run_id=? and input_role='TARGET' and tx_id<>?
-        """,
-        run,
-        target);
+  void star_beyond_core_cap_publishes_linked_alerts_and_replay_preserves_ownership() {
+    // 99 more seeds fan out of account to distinct receivers: one star face whose
+    // pieces cannot fit one core of 64, so it becomes several Alerts joined by links.
+    for (int i = 1; i <= 99; i++) {
+      long spokeReceiver =
+          jdbc.queryForObject(
+              "insert into core.accounts(bank_id,service_account_id,owner_id) select bank_id,?,owner_id from core.accounts where account_id=? returning account_id",
+              Long.class,
+              UUID.randomUUID(),
+              account);
+      long spoke =
+          transfer(
+              Instant.parse("2022-09-02T12:00:00Z").plusSeconds(60L * i).toString(),
+              "2022-09-02",
+              account,
+              spokeReceiver,
+              1);
+      attach(spoke, target);
+      runs.snapshot(run, spoke, "TARGET");
+      score(spoke, run);
+    }
     try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("COMPLETED");
@@ -612,14 +639,24 @@ class AlertPipelineTests {
         select t.tx_id,t.alert_id from review.alert_transactions t join review.alerts a using(alert_id)
         where t.version=a.published_version and t.role='SEED' order by t.tx_id
         """);
-    assertThat(ownership).hasSize(4098);
+    assertThat(ownership.stream().map(row -> row.get("tx_id")).distinct().count())
+        .isEqualTo(ownership.size());
+    var linked = new TreeSet<Long>();
     for (long id : ids) {
-      var related = (List<Map<String, Object>>) alerts.detail(id, null).get("relatedFlows");
-      assertThat(related).isNotEmpty();
-      assertThat(
-              related.stream().flatMap(r -> ((List<?>) r.get("relatedAlertIds")).stream()).toList())
-          .isNotEmpty();
+      var seeds =
+          jdbc.queryForList(
+              "select t.tx_id from review.alert_transactions t join review.alerts a using(alert_id) where a.alert_id=? and t.version=a.published_version and t.role='SEED'",
+              Long.class,
+              id);
+      for (var flow : (List<Map<String, Object>>) alerts.detail(id, null).get("relatedFlows")) {
+        // A link holds one seed of each side.
+        assertThat((List<?>) flow.get("txIds"))
+            .anySatisfy(key -> assertThat(seeds).contains(((Number) key).longValue()));
+        for (Object other : (List<?>) flow.get("relatedAlertIds"))
+          linked.add(((Number) other).longValue());
+      }
     }
+    assertThat(linked).isNotEmpty();
     var repeated = nextPreparedContext();
     publish(repeated, executor("worker/analysis_entry.py").prepare(repeated).artifact());
     assertThat(jdbc.queryForObject("select count(*) from review.alert_versions", Integer.class))
@@ -641,7 +678,7 @@ class AlertPipelineTests {
         where t.version=a.published_version and t.role<>'CONTEXT' group by t.alert_id) counts
         """,
                 Integer.class))
-        .isLessThanOrEqualTo(4096);
+        .isLessThanOrEqualTo(64);
   }
 
   @Test
@@ -837,9 +874,10 @@ class AlertPipelineTests {
         "insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state) values(?,?,?,1,'CONTEXT','EXCLUDED')",
         group,
         alert,
-        initialContext);
-    long added = contextOn("2022-09-03");
+        returnSeed);
+    long added = seedOn("2022-09-03");
     var context = nextPreparedContext();
+    promote(context, added);
     String artifact = executor("worker/analysis_entry.py").prepare(context).artifact();
     publish(context, artifact);
     assertThat(alerts.detail(alert, null).get("version")).isEqualTo(2);
@@ -860,7 +898,7 @@ class AlertPipelineTests {
                 "select state from review.alert_members where alert_id=? and tx_id=?",
                 String.class,
                 alert,
-                initialContext))
+                returnSeed))
         .isEqualTo("EXCLUDED");
     assertThat(
             jdbc.queryForMap(
@@ -935,16 +973,9 @@ class AlertPipelineTests {
     publish(unchanged, executor("worker/analysis_entry.py").prepare(unchanged).artifact());
     assertThat(jdbc.queryForObject("select count(*) from review.alerts", Integer.class))
         .isEqualTo(1);
-    long newSeed = contextOn("2022-09-03");
+    long newSeed = seedOn("2022-09-03");
     var added = nextPreparedContext();
-    jdbc.update(
-        "update analysis.input_transactions set input_role='TARGET' where run_id=? and tx_id=?",
-        added.runId(),
-        newSeed);
-    jdbc.update(
-        "insert into analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id) values(0,?,.9,1,0,0,0,0,0,0,0,0,?)",
-        newSeed,
-        added.runId());
+    promote(added, newSeed);
     publish(added, executor("worker/analysis_entry.py").prepare(added).artifact());
     long child =
         jdbc.queryForObject(
@@ -1020,8 +1051,11 @@ class AlertPipelineTests {
           alert,
           target);
     }
+    // Both PASS legs are corrected away, so no valid core remains.
     jdbc.update(
-        "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?", target);
+        "update ledger.transactions set integration_status='SUPERSEDED' where tx_id in (?,?)",
+        target,
+        returnSeed);
     var context = nextPreparedContext();
     publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
     if (started) {
@@ -1220,8 +1254,9 @@ class AlertPipelineTests {
   @Test
   void staff_change_between_preparation_and_publication_rejects_entire_plan() {
     long alert = firstAlert();
-    contextOn("2022-09-03");
+    long added = seedOn("2022-09-03");
     var context = nextPreparedContext();
+    promote(context, added);
     String artifact = executor("worker/analysis_entry.py").prepare(context).artifact();
     jdbc.update(
         "update review.alerts set review_started_at=now(),review_started_by=assignee_id,revision=revision+1 where alert_id=?",
@@ -1239,8 +1274,9 @@ class AlertPipelineTests {
   @Test
   void changed_report_manifest_rejects_automatic_addition_before_any_publication() {
     long alert = firstAlert();
-    contextOn("2022-09-03");
+    long added = seedOn("2022-09-03");
     var context = nextPreparedContext();
+    promote(context, added);
     String artifact = executor("worker/analysis_entry.py").prepare(context).artifact();
     jdbc.update(
         "update ingest.report_sets set generation=generation+1 where business_date='2022-09-03'");
@@ -1265,10 +1301,61 @@ class AlertPipelineTests {
   }
 
   @Test
+  void detail_reports_growth_deadline_and_current_context_count() {
+    long alert = firstAlert();
+    var first = (Map<?, ?>) alerts.detail(alert, null).get("summary");
+    // The core starts at 2022-09-02 23:30 KST; the block stops growing 240 hours later.
+    assertThat(first.get("sealedAfter")).isEqualTo("2022-09-12T14:30:00Z");
+    // A two-leg PASS has no fan centre, so the context query has no focal account.
+    assertThat(first.get("contextCount")).isEqualTo(0L);
+
+    long added = seedOn("2022-09-03");
+    var context = nextPreparedContext();
+    promote(context, added);
+    publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
+    var detail = alerts.detail(alert, null);
+    assertThat(detail.get("version")).isEqualTo(2);
+    // account now sends twice and receiver receives twice inside the core.
+    var query = (Map<?, ?>) detail.get("contextQuery");
+    assertThat(
+            ((List<?>) query.get("focalAccounts"))
+                .stream().map(f -> ((Map<?, ?>) f).get("accountId").toString()).toList())
+        .containsExactlyInAnyOrderElementsOf(
+            jdbc.queryForList(
+                "select service_account_id::text from core.accounts where account_id in (?,?)",
+                String.class,
+                account,
+                receiver));
+    assertThat(query.get("firstAt")).isEqualTo("2022-09-01T14:30:00+00:00");
+    assertThat(query.get("lastAt")).isEqualTo("2022-09-04T01:00:00+00:00");
+
+    // Context is read from the current ledger: only ACTIVE rows of a focal account inside
+    // the window and outside the core count, without a new evidence version.
+    transfer("2022-09-03 12:00+09", "2022-09-03", receiver, account, 5);
+    long held = transfer("2022-09-03 13:00+09", "2022-09-03", account, receiver, 5);
+    jdbc.update("update ledger.transactions set integration_status='HELD' where tx_id=?", held);
+    transfer("2022-09-05 12:00+09", "2022-09-05", account, receiver, 5);
+    var summary = (Map<?, ?>) alerts.detail(alert, null).get("summary");
+    assertThat(summary.get("contextCount")).isEqualTo(1L);
+    assertThat(summary.get("sealedAfter")).isEqualTo("2022-09-12T14:30:00Z");
+    assertThat(alerts.versions(alert)).hasSize(2);
+    var review = (Map<?, ?>) reviews().detail(alert).get("summary");
+    assertThat(review.get("contextCount")).isEqualTo(1L);
+    assertThat(review.get("sealedAfter")).isEqualTo("2022-09-12T14:30:00Z");
+    // The list keeps its documented summary fields only.
+    var listed = (List<Map<String, Object>>) alerts.list(0, 20, null, null, null).get("content");
+    assertThat(
+            ((Map<?, ?>) listed.getFirst().get("summary"))
+                .keySet().stream().map(Object::toString).toList())
+        .doesNotContain("contextCount", "sealedAfter");
+  }
+
+  @Test
   void cancelled_execution_cannot_publish_a_prepared_automatic_addition() {
     long alert = firstAlert();
-    contextOn("2022-09-03");
+    long added = seedOn("2022-09-03");
     var context = nextPreparedContext();
+    promote(context, added);
     String artifact = executor("worker/analysis_entry.py").prepare(context).artifact();
     jdbc.update(
         "update analysis.jobs set execution_id=? where job_id=?",
