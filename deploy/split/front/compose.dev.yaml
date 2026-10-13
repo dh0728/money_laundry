@@ -1,0 +1,21 @@
+name: aml-dev-front
+services:
+  web:
+    image: ${DEV_WEB_IMAGE:?DEV_WEB_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:${DEV_WEB_PORT:-3001}:80
+    security_opt:
+    - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - dev-network
+networks:
+  dev-network:
+    name: aml-dev-front-network
+    driver: bridge
