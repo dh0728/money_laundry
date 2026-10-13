@@ -18,9 +18,46 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  split-deployment-check:
+    name: Split deployment configuration and recovery tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python -m unittest discover -s deploy/split/tests -p 'test_*.py'
+      - run: python deploy/split/validate.py
+
+  deploy-dev-split:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && vars.AML_DEPLOY_LAYOUT == 'split' && vars.AML_DEV_DEPLOY_ENABLED == 'true'
+    needs: [backend, frontend, split-deployment-check]
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-split.yml
+    with:
+      environment: dev
+      git_sha: ${{ github.sha }}
+      operation: deploy
+    secrets: inherit
+
+  deploy-prod-split:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AML_DEPLOY_LAYOUT == 'split' && vars.AML_PROD_DEPLOY_ENABLED == 'true'
+    needs: [backend, frontend, split-deployment-check]
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-split.yml
+    with:
+      environment: prod
+      git_sha: ${{ github.sha }}
+      operation: deploy
+    secrets: inherit
+
   backend:
     name: Backend Test and Build
     runs-on: ubuntu-24.04
@@ -132,33 +169,3 @@ jobs:
             VITE_API_MODE=live
           cache-from: type=gha,scope=aml-web
           cache-to: type=gha,mode=max,scope=aml-web,ignore-error=true
-
-  deploy-dev:
-    name: Deploy Dev
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    needs:
-      - backend
-      - frontend
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/deploy-dev.yml
-    with:
-      git_sha: ${{ github.sha }}
-    # 재사용 워크플로에서도 dev Environment Secret을 사용할 수 있도록 전달한다.
-    secrets: inherit
-
-  deploy-prod:
-    name: Deploy Prod
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs:
-      - backend
-      - frontend
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/deploy-prod.yml
-    with:
-      git_sha: ${{ github.sha }}
-    # 재사용 워크플로에서도 prod Environment Secret을 사용할 수 있도록 전달한다.
-    secrets: inherit
