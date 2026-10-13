@@ -29,12 +29,17 @@ def files(root, environment):
     return result
 
 
-def build(root, environment, output, *, image_record=None):
+def build(root, environment, output, *, image_record=None, manifest_path=None):
     root, output = Path(root).resolve(), Path(output)
     manifest = None
+    if image_record is not None and manifest_path is not None:
+        raise ValueError("Choose one image record or manifest.")
     if image_record is not None:
         record = json.loads(Path(image_record).read_text(encoding="utf-8"))
         selected = image_manifest.from_record(record, environment=environment)
+        manifest = (json.dumps(selected, sort_keys=True, indent=2) + "\n").encode()
+    elif manifest_path is not None:
+        selected = image_manifest.load(manifest_path, environment=environment)
         manifest = (json.dumps(selected, sort_keys=True, indent=2) + "\n").encode()
     # Stable archives allow a retry of the same Git SHA to reuse an existing release.
     with output.open("wb") as stream, gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=0) as zipped:
@@ -58,8 +63,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("environment", choices=("dev", "prod"))
     parser.add_argument("output", type=Path)
-    parser.add_argument("--image-record", type=Path,
-                        help="Verified transfer receipt; pin images independently of the deployment commit.")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--image-record", type=Path,
+                           help="Verified transfer receipt; pin images independently of the deployment commit.")
+    selection.add_argument("--image-manifest", type=Path,
+                           help="Validated release manifest containing the selected image digests.")
     args = parser.parse_args()
     print(build(Path(__file__).resolve().parents[2], args.environment, args.output,
-                image_record=args.image_record))
+                image_record=args.image_record, manifest_path=args.image_manifest))

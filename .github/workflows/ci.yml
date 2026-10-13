@@ -33,7 +33,7 @@ jobs:
       - run: python deploy/split/validate.py
 
   deploy-dev-split:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && vars.AML_DEPLOY_LAYOUT == 'split'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && vars.AML_DEPLOY_LAYOUT == 'split' && vars.AML_DEV_DEPLOY_ENABLED == 'true'
     needs: [backend, frontend, split-deployment-check]
     permissions:
       contents: read
@@ -42,10 +42,11 @@ jobs:
     with:
       environment: dev
       git_sha: ${{ github.sha }}
+      operation: deploy
     secrets: inherit
 
   deploy-prod-split:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AML_DEPLOY_LAYOUT == 'split'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AML_DEPLOY_LAYOUT == 'split' && vars.AML_PROD_DEPLOY_ENABLED == 'true'
     needs: [backend, frontend, split-deployment-check]
     permissions:
       contents: read
@@ -54,6 +55,7 @@ jobs:
     with:
       environment: prod
       git_sha: ${{ github.sha }}
+      operation: deploy
     secrets: inherit
 
   backend:
@@ -167,33 +169,3 @@ jobs:
             VITE_API_MODE=live
           cache-from: type=gha,scope=aml-web
           cache-to: type=gha,mode=max,scope=aml-web,ignore-error=true
-
-  deploy-dev:
-    name: Deploy Dev
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && vars.AML_DEPLOY_LAYOUT != 'split'
-    needs:
-      - backend
-      - frontend
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/deploy-dev.yml
-    with:
-      git_sha: ${{ github.sha }}
-    # 재사용 워크플로에서도 dev Environment Secret을 사용할 수 있도록 전달한다.
-    secrets: inherit
-
-  deploy-prod:
-    name: Deploy Prod
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AML_DEPLOY_LAYOUT != 'split'
-    needs:
-      - backend
-      - frontend
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/deploy-prod.yml
-    with:
-      git_sha: ${{ github.sha }}
-    # 재사용 워크플로에서도 prod Environment Secret을 사용할 수 있도록 전달한다.
-    secrets: inherit

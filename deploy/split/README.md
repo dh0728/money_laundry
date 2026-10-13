@@ -2,7 +2,7 @@
 
 프론트 EC2는 웹과 외부 Nginx, 백엔드 EC2는 API·Python 워커와 내부 Nginx를 실행한다. DB는 RDS를 사용한다. 개발의 데모 추론 컨테이너는 백엔드에 유지한다.
 
-기존 `deploy/compose*.yaml`, `deploy/scripts/`, `deploy/nginx/`는 EC2 한 대 구성용이다. 파일 위쪽의 `LEGACY` 주석으로 구분한다. **전환 전에는 기존 CI 배포가 계속 이 파일을 사용한다.**
+기존 `deploy/compose*.yaml`, `deploy/scripts/`, `deploy/nginx/`는 EC2 한 대 구성용 보관 코드다. 파일 위쪽의 `LEGACY` 주석으로 구분한다. 이 버전의 CI는 해당 배포를 호출하지 않으며, 기존 두 배포 workflow의 실행 조건도 `false`로 막았다. 아직 이 변경을 받지 않은 원격 브랜치에서는 GitHub의 workflow 비활성화를 유지한다.
 
 ## 1. 파일 역할
 
@@ -15,6 +15,8 @@
 | `check_rds.py` | API 이미지 안에서 앱·분석 계정의 RDS 인증과 TLS 검증 |
 | `build_bundle.py` | 명시된 배포 파일만 묶고 SHA-256 계산 |
 | `image_manifest.py` | 선택한 API·웹 이미지의 계정·환경·저장소·Digest 검사 |
+| `prod-images.json` | 기존 운영 앱을 유지하기 위해 검증한 API·웹 Digest 지정. 비밀값 없음 |
+| `ci_artifacts.py` | 운영 ECR Digest 조회, S3 Bundle 조건부 업로드·재다운로드 대조 |
 | Bundle의 `images.json` (선택) | 앱 버전을 배포 코드 버전과 분리할 때 사용하는 이미지 고정 기록 |
 | `receive.py` | EC2에서 Bundle 다운로드·검증·압축 해제 |
 | `run_ssm.py` | GitHub에서 백엔드 → 프론트 배포와 양쪽 복구 조정 |
@@ -63,9 +65,15 @@ jdbc:postgresql://<RDS_ENDPOINT>:5432/aml_dev_v3?sslmode=verify-full&sslrootcert
 
 ## 4. GitHub 전환은 마지막에
 
-[ci.yml](../../.github/workflows/ci.yml)은 **Repository variable** `AML_DEPLOY_LAYOUT`이 `split`일 때만 새 workflow를 호출한다. 아직 이 값을 만들거나 바꾸지 않았다. 미설정 상태에서는 기존 한 대 배포가 유지된다.
+[ci.yml](../../.github/workflows/ci.yml)은 아래 **Repository variables**가 모두 맞을 때만 해당 환경을 자동배포한다. 미설정·`false` 상태에서는 배포하지 않고 CI 검사만 실행한다.
 
-새 서버와 데이터 준비 후 GitHub의 `dev`·`prod` Environment variables를 다음 값으로 맞춘다. 준비되지 않은 기존 자동 배포가 실행되지 않도록 전환 동안 push를 멈추고, 환경 값과 마지막 Repository variable을 함께 전환한다.
+| Repository variable | 배포 허용 값 | 준비 중 값 |
+| --- | --- | --- |
+| `AML_DEPLOY_LAYOUT` | `split` | `split` |
+| `AML_DEV_DEPLOY_ENABLED` | 개발을 배포할 때 `true` | `false` |
+| `AML_PROD_DEPLOY_ENABLED` | 운영을 배포할 때 `true` | `false` |
+
+새 서버 준비 후 GitHub의 `dev`·`prod` Environment variables를 다음 값으로 맞춘다. **이전 원격 CI는 위 스위치를 읽지 않으므로 브랜치별 코드 반영 전까지 workflow 자체를 비활성화한다.**
 
 | 변수 | 값 |
 | --- | --- |
@@ -76,7 +84,19 @@ jdbc:postgresql://<RDS_ENDPOINT>:5432/aml_dev_v3?sslmode=verify-full&sslrootcert
 | `FRONT_EC2_INSTANCE_ID` | 새 프론트 EC2 ID |
 | `BACKEND_EC2_INSTANCE_ID` | 새 백엔드 EC2 ID |
 
-새 workflow는 dev 환경을 `dev` 브랜치, prod 환경을 `master` 브랜치에서 실행하며 전체 40자리 커밋 SHA를 사용한다. ECR 태그는 `dev-<SHA>` 또는 `prod-<SHA>`다. 동일 태그가 이미 있으면 이미지를 재사용한다. 실제 GitHub 변수·OIDC·DNS 전환은 별도 실습이다.
+새 workflow는 dev 환경을 `dev` 브랜치, prod 환경을 `master` 브랜치에서 실행하며 해당 브랜치에 포함된 전체 40자리 커밋 SHA를 사용한다. `feature-infra-mig`는 수정 후 `dev`에 병합할 작업 브랜치다. 운영에는 기존 앱을 보존하며 배포 관련 파일만 반영한다.
+
+| 실행 방식 | 동작 |
+| --- | --- |
+| 수동 `operation=preflight` (기본값) | 코드 검사·OIDC 인증·AWS 계정·S3 버킷 위치·ECR 조회. 이미지 빌드·업로드·SSM 실행 없음 |
+| 수동 `operation=deploy` | 위 스위치 확인 후 실제 배포 |
+| `dev`·`master` push | CI 검사 통과 + 해당 환경 스위치가 `true`이면 실제 배포 |
+
+수동 실행 화면은 workflow가 기본 브랜치에 반영된 뒤 사용한다. 사전 확인은 S3 업로드·객체 읽기나 SSM 실행 권한까지 검증하는 과정은 아니다. 이 권한은 정책 대조 후 실제 시험 배포로 확인한다.
+
+개발은 `dev-<배포 SHA>` 태그의 API·웹 이미지를 빌드하며, 이미 있으면 재사용한다. **운영은 `prod-images.json`의 기존 앱 Digest를 사용하고 소스로 이미지를 빌드하지 않는다.** 운영 소스가 변경되어도 자동으로 새 앱 이미지가 배포되지는 않는다. 이후 운영 앱을 업데이트할 때는 새 이미지·DB 호환성을 검증하고 이 기록을 함께 변경한다.
+
+실제 배포 결과는 각 Environment의 `secrets.DISCORD_WEBHOOK_URL`로 알린다. 사전 확인에는 알림을 보내지 않으며, Secret이 없거나 알림 전송이 실패해도 배포 결과를 바꾸지 않는다. 비밀번호·Webhook URL은 로그에 출력하지 않는다.
 
 ## 5. 배포와 복구
 
@@ -89,9 +109,13 @@ python deploy/split/build_bundle.py prod /tmp/deploy-bundle.tar.gz \
   --image-record /path/to/prod-images-ecr.json
 ```
 
-`deploy.py`는 이 파일이 있으면 각 서비스에 지정한 `repository@sha256:...` 이미지를 사용한다. 잘못된 파일은 태그 방식으로 우회하지 않고 실패한다. 파일이 없는 이전 Bundle과 일반 CI 배포는 기존 `환경-배포_SHA` 태그 방식을 유지한다. GitHub workflow는 이미지 기록 옵션을 자동으로 사용하지 않는다.
+GitHub 운영 workflow는 저장소의 `prod-images.json`을 ECR과 대조한 뒤 `--image-manifest deploy/split/prod-images.json`으로 전달한다. 두 옵션을 동시에 사용할 수는 없다. 이 기록은 28~30번 실습에서 검증한 기존 운영 앱과 새 계정 Digest이며 비밀값을 포함하지 않는다.
+
+`deploy.py`는 Bundle의 `images.json`이 있으면 지정한 `repository@sha256:...` 이미지를 사용한다. 잘못된 파일은 태그 방식으로 우회하지 않고 실패한다. 이 파일이 없는 개발 Bundle과 이전 Bundle은 `환경-배포_SHA` 태그 방식을 유지한다.
 
 배포 SHA는 새 배포 코드의 커밋으로 유지하고, `app_sha`는 기존 앱 커밋을 기록한다. 같은 배포 SHA의 Bundle·이미지 선택은 불변으로 보관해야 한다. 복구·이전 컨테이너 중지는 해당 이전 릴리스의 `images.json`을 읽으므로, 배포마다 선택한 이미지가 유지된다.
+
+S3의 `releases/<환경>/<배포 SHA>/deploy-bundle.tar.gz`는 `If-None-Match: *`로 새 파일만 업로드한다. 이미 있으면 내려받아 체크섬이 같을 때만 재사용한다. 내용이 다르거나 권한·통신 오류가 나면 SSM 실행 전에 중단한다. GitHub 역할에는 자기 환경의 `releases/dev/*` 또는 `releases/prod/*`에 대한 **`s3:PutObject`와 `s3:GetObject`**가 필요하다. 버킷 위치 확인에는 `s3:GetBucketLocation`을 사용한다.
 
 ### 두 서버 배포 순서
 
@@ -128,6 +152,8 @@ python deploy/split/validate.py
 실패 복구·오래된 배포 차단·역할 분리·Bundle 검증을 모의 실행하고 Compose 6개 및 Python·Bash 문법을 검사한다. 실제 EC2에서는 추가로 `nginx -t`, 컨테이너 실행, RDS·S3 접근, HTTPS 세션 로그인, 업로드·분석, 양쪽 복구를 검증한다. 세션이 메모리에 있다면 API 전환 후 재로그인이 필요할 수 있다.
 
 2026년 10월 9일 재검토: 모의 테스트 32개와 Compose 6개 설정 검사를 통과했다. HTTP 상태·본문 판정, 백엔드 장애 중 프론트 복구, 비밀값 공백 보존, UTF-8 설정 파일 읽기를 보완했다. RDS·SSM 테스트는 외부 서비스를 대체한 모의 검사이며 실제 접속 결과가 아니다.
+
+2026년 10월 13일: 모의 테스트 50개, Compose 6개, Python·Bash 문법 검사 통과. workflow의 배포 허용 조건 14개를 외부 요청 없이 확인했다. actionlint 1.7.12 검사도 통과했으며, 보관한 두 workflow의 의도적인 `if: false` 경고만 제외했다. GitHub OIDC 인증과 실제 배포는 브랜치 반영 후 별도로 검증한다.
 
 ## 핵심 정리
 
