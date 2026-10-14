@@ -39,27 +39,97 @@ class GraphBatch:
     account_keys: dict
 
 
-def _build_graphs(rows, seeds, seed_groups=()):
-    """Translate public UUIDs to snapshot-local codes, preserving transaction IDs."""
-    edges, accounts = EdgeTable(), {}
-    for tx_id, row in sorted(rows.items()):
-        occurred = row['occurred_at']
+class _EdgeInput:
+    """Generator columns of the frozen input, appended in tx_id order into arrays.
+
+    The full input never becomes row dictionaries; only evidence members are read
+    back in full after the graphs are built (see _member_rows).
+    """
+
+    def __init__(self):
+        self.edges, self.accounts = EdgeTable(), {}
+
+    def add(self, tx_id, occurred, from_bank, from_account, to_bank, to_account, usd):
         if occurred.utcoffset() is None:
             raise ProtocolError('Frozen transaction time must include a timezone')
         delta = occurred.astimezone(timezone.utc) - EPOCH
-        codes = []
-        for side in ('from', 'to'):
-            key = (row[side + '_bank_id'], str(row[side + '_account_id']))
-            codes.append(accounts.setdefault(key, len(accounts) + 1))
-        usd = row.get('amount_usd')
-        edges.append(tx_id, (delta.days * 86400 + delta.seconds) * 1_000_000 + delta.microseconds,
-                     *codes, None if usd is None else int((Decimal(usd) * USD_MICROS).to_integral_value()))
+        codes = [self.accounts.setdefault(key, len(self.accounts) + 1)
+                 for key in ((from_bank, str(from_account)), (to_bank, str(to_account)))]
+        self.edges.append(tx_id, (delta.days * 86400 + delta.seconds) * 1_000_000 + delta.microseconds,
+                          *codes, None if usd is None else int((Decimal(usd) * USD_MICROS).to_integral_value()))
+
+
+def _build_graphs(rows, seeds, seed_groups=()):
+    """Translate public UUIDs to snapshot-local codes, preserving transaction IDs.
+
+    ``rows`` is the streamed _EdgeInput, or a mapping tx_id -> row for small inputs.
+    """
+    source = rows
+    if not isinstance(rows, _EdgeInput):
+        source = _EdgeInput()
+        for tx_id, row in sorted(rows.items()):
+            source.add(tx_id, row['occurred_at'], row['from_bank_id'], row['from_account_id'],
+                       row['to_bank_id'], row['to_account_id'], row.get('amount_usd'))
     try:
-        batch = build_block_graphs(FlowIndex(edges), seeds, POLICY, seed_groups=seed_groups)
+        batch = build_block_graphs(FlowIndex(source.edges), seeds, POLICY, seed_groups=seed_groups)
     except GraphBudgetExceeded as error:
         raise ProtocolError('Alert graph budget exceeded: ' + str(error)) from error
     return GraphBatch(batch.graphs, batch.unassigned, batch.rejected_relations, batch.policy_digest,
-                      {code: key for key, code in accounts.items()})
+                      {code: key for key, code in source.accounts.items()})
+
+
+# Transaction ids per member/score query; bounds the query parameter size.
+MEMBER_CHUNK = 10_000
+
+
+def _chunks(keys):
+    keys = sorted(keys)
+    for start in range(0, len(keys), MEMBER_CHUNK):
+        yield keys[start:start + MEMBER_CHUNK]
+
+
+def _member_rows(connection, run_id, keys):
+    """Full frozen rows, only for the transactions that evidence renders."""
+    rows = {}
+    with connection.cursor(row_factory=dict_row) as cursor:
+        for chunk in _chunks(keys):
+            cursor.execute('SELECT * FROM analysis.input_transactions WHERE run_id=%s AND tx_id=ANY(%s)',
+                           (run_id, chunk))
+            rows.update((row['tx_id'], row) for row in cursor)
+    return rows
+
+
+class _Scores:
+    """Model scores of the frozen input, without holding every score document.
+
+    Membership covers every scored input transaction; documents are loaded for the
+    evidence members up front and on demand for anything else (e.g. reassessment).
+    The current run's score wins over a copied earlier one, as in the input itself.
+    """
+
+    def __init__(self, connection, run_id, scored):
+        self.connection, self.run_id, self.scored, self.loaded = connection, run_id, scored, {}
+
+    def __contains__(self, key):
+        return key in self.scored
+
+    def __getitem__(self, key):
+        if key not in self.scored:
+            raise KeyError(key)
+        if key not in self.loaded:
+            self.load((key,))
+        return self.loaded[key]
+
+    def get(self, key, default=None):
+        return self[key] if key in self.scored else default
+
+    def load(self, keys):
+        for chunk in _chunks({key for key in keys if key in self.scored and key not in self.loaded}):
+            for sql in ('SELECT tx_id,scores FROM analysis.input_scores WHERE run_id=%s AND tx_id=ANY(%s)',
+                        "SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM analysis.scores s"
+                        " WHERE run_id=%s AND tx_id=ANY(%s)"):
+                for key, score in self.connection.execute(sql, (self.run_id, chunk)):
+                    self.loaded[key] = score
 
 
 def _json(value):
@@ -248,34 +318,47 @@ def save_alerts(connection, execution):
                 return
     started = perf_counter()
     timings = {}
-    # Only immutable input is read during computation, without holding row locks.
-    with connection.transaction(), connection.cursor(name='alert_input', row_factory=dict_row) as cursor:
-        cursor.execute('SELECT * FROM analysis.input_transactions WHERE run_id=%s ORDER BY tx_id,input_role DESC', (execution.run_id,))
-        cursor.itersize = 256
-        rows = {r['tx_id']: r for r in cursor}
     threshold,business_at = connection.execute('SELECT threshold_value,business_at FROM analysis.jobs WHERE job_id=%s', (execution.job_id,)).fetchone()
     if threshold is None:
         raise ProtocolError('Frozen threshold is required')
-    scores, thresholds = {}, {}
+    # Only the seed decision is held per scored transaction: the stored probability
+    # value (jsonb, so 1 stays 1) and its original threshold. Documents load later.
+    decisions = {}
     with connection.transaction(), connection.cursor(name='alert_scores') as cursor:
-        cursor.execute('''SELECT i.tx_id,i.scores,b.threshold_value
+        cursor.execute('''SELECT i.tx_id,i.scores->'p_laundering',b.threshold_value
             FROM analysis.input_scores i JOIN analysis.runs r ON r.run_id=i.score_run_id
             JOIN analysis.jobs b ON b.job_id=r.job_id WHERE i.run_id=%s''', (execution.run_id,))
-        for key, score, value in cursor:
-            scores[key], thresholds[key] = score, value
-    current = dict(connection.execute("SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM analysis.scores s WHERE run_id=%s", (execution.run_id,)).fetchall())
-    targets = {key for key, row in rows.items() if row['input_role'] == 'TARGET'}
-    if targets != set(current):
-        raise ProtocolError('Every frozen TARGET requires current-run scores')
-    scores.update(current)
-    thresholds.update({key: threshold for key in current})
-    if any(value is None for value in thresholds.values()):
+        for key, probability, value in cursor:
+            decisions[key] = (probability, value)
+    current = set()
+    with connection.transaction(), connection.cursor(name='alert_current') as cursor:
+        cursor.execute("SELECT tx_id,to_jsonb(s)->'p_laundering' FROM analysis.scores s WHERE run_id=%s",
+                       (execution.run_id,))
+        for key, probability in cursor:
+            current.add(key)
+            decisions[key] = (probability, threshold)
+    if any(value is None for _, value in decisions.values()):
         raise ProtocolError('Every frozen score requires its original threshold')
-    seeds = {key: dict(txId=key,
-                       occurredAt=rows[key]['occurred_at'].astimezone(timezone.utc).isoformat(),
-                       score=value['p_laundering'], threshold=float(thresholds[key]))
-             for key, value in scores.items() if value['p_laundering'] >= thresholds[key]}
-    del current, thresholds, targets
+    # Only immutable input is read during computation, without holding row locks.
+    # Generator columns are streamed into arrays; no row dictionary is kept.
+    edges, targets, seeds = _EdgeInput(), set(), {}
+    with connection.transaction(), connection.cursor(name='alert_input') as cursor:
+        cursor.itersize = 2048
+        cursor.execute('''SELECT tx_id,input_role,occurred_at,from_bank_id,from_account_id,to_bank_id,
+            to_account_id,amount_usd FROM analysis.input_transactions WHERE run_id=%s ORDER BY tx_id''',
+            (execution.run_id,))
+        for key, role, occurred, from_bank, from_account, to_bank, to_account, usd in cursor:
+            edges.add(key, occurred, from_bank, from_account, to_bank, to_account, usd)
+            if role == 'TARGET':
+                targets.add(key)
+            decision = decisions.get(key)
+            if decision is not None and decision[0] >= decision[1]:
+                seeds[key] = dict(txId=key, occurredAt=occurred.astimezone(timezone.utc).isoformat(),
+                                  score=decision[0], threshold=float(decision[1]))
+    if targets != current:
+        raise ProtocolError('Every frozen TARGET requires current-run scores')
+    scores = _Scores(connection, execution.run_id, frozenset(decisions))
+    del current, decisions, targets
     days = {day.isoformat(): dict(complete=complete, expectedBanks=expected, completeBanks=received, reports=reports)
             for day, expected, received, complete, reports in connection.execute(
                 'SELECT business_date,expected_banks,complete_banks,complete,reports FROM analysis.input_coverage WHERE run_id=%s', (execution.run_id,)).fetchall()}
@@ -305,8 +388,17 @@ def save_alerts(connection, execution):
         seed_groups.append((fresh, core or [], members or [],
                             [(w['kind'], tuple(w['tx_ids'])) for w in witnesses],
                             version != POLICY.version))
-    batch = _build_graphs(rows, seeds, seed_groups)
+    batch = _build_graphs(edges, seeds, seed_groups)
+    del edges
     timings['candidateBuild'] = (perf_counter() - candidate_started) * 1000
+    member_started = perf_counter()
+    # Evidence renders only this run's graph members: read their full rows and scores.
+    members = {key for graph in batch.graphs
+               for key in (*graph.seed_ids, *graph.connection_ids, *graph.context_ids)}
+    rows = _member_rows(connection, execution.run_id, members)
+    scores.load(members)
+    del members
+    timings['memberRead'] = (perf_counter() - member_started) * 1000
     with connection.transaction():
         _lock(connection, execution, 'ALERTS')
         saved = connection.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS' AND completed", (execution.run_id,)).fetchone()
