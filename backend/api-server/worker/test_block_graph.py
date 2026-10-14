@@ -1,4 +1,4 @@
-"""Contract regressions for the block-pin-1 generator, stage 1 (faces, PASS, assembly)."""
+"""Contract regressions for the block generator (block-pin-1 stages, block-pin-2 locality)."""
 from dataclasses import replace
 import random
 import unittest
@@ -434,6 +434,74 @@ class BlockGraphTests(unittest.TestCase):
                          [(g.seed_ids, g.connection_ids, g.witnesses) for g in first.graphs])
         planned = [Evidence.from_graph(g.flow_graph(), "b" * 64) for g in first.graphs]
         self.assertEqual({p.action for p in build_case_plans([], planned).plans}, {Action.NEW})
+
+    # ----- block-pin-2: every decision stays within the policy's time limits -----
+    def test_bridge_offers_of_one_pair_form_one_bridge_per_time_cluster(self):
+        # Two S→m→T episodes 300h apart. block-pin-1 picked one bridge for the whole history
+        # from the oldest offer, leaving the later seeds unassigned.
+        rows = [(1, 0, "S", "M1", 1000.0), (2, 5, "M1", "T", 1000.0),
+                (3, 2, "S", "M2", 1000.0), (4, 6, "M2", "T", 1000.0),
+                (11, 300, "S", "M3", 1000.0), (12, 305, "M3", "T", 1000.0),
+                (13, 302, "S", "M4", 1000.0), (14, 306, "M4", "T", 1000.0)]
+        batch = self.build(rows, [1, 4, 11, 14])
+        self.assertEqual([g.seed_ids for g in batch.graphs], [(1, 4), (11, 14)])
+        self.assertEqual([self.kinds(g) for g in batch.graphs], [["BRIDGE"], ["BRIDGE"]])
+        self.assertEqual(batch.unassigned, ())
+
+    def test_closure_walk_stops_at_the_block_span_without_marking(self):
+        # A PASS pair at hours 0-5 whose money returns to A only at hour 280.
+        rows = [(1, 0, "A", "B", 1000.0), (2, 5, "B", "C", 1000.0),
+                (3, 95, "C", "D", 1000.0), (4, 190, "D", "E", 1000.0), (5, 280, "E", "A", 1000.0)]
+        graph, = self.build(rows, [1, 2]).graphs
+        self.assertEqual(self.kinds(graph), ["PASS"])
+        self.assertNotIn("COMPONENT_SPAN", graph.limits)  # block-pin-1 marked the distant walk
+        inside = rows[:3] + [(4, 100, "D", "E", 1000.0), (5, 150, "E", "A", 1000.0)]
+        graph, = self.build(inside, [1, 2]).graphs
+        self.assertEqual(self.kinds(graph), ["CLOSURE", "PASS"])
+
+    def test_single_seed_cycle_beyond_span_is_not_a_block(self):
+        # Each hop is within hop_lag, the whole cycle is not within span_max (I6).
+        rows = [(1, 0, "A", "B", 1000.0), (2, 90, "B", "C", 1000.0),
+                (3, 180, "C", "D", 1000.0), (4, 270, "D", "A", 1000.0)]
+        self.assertEqual(self.build(rows, [1]).graphs, ())
+        short = [(1, 0, "A", "B", 1000.0), (2, 90, "B", "C", 1000.0),
+                 (3, 180, "C", "D", 1000.0), (4, 230, "D", "A", 1000.0)]
+        graph, = self.build(short, [1]).graphs
+        self.assertEqual(graph.witnesses, (Witness("SHAPE_CYCLE", (1, 2, 3, 4)),))
+
+    def test_single_seed_bridge_beyond_span_is_not_a_block(self):
+        # Spokes ±90h around the seed and second legs another 90h out: 366h wide.
+        rows = [(1, 0, "S", "M1", 1000.0), (2, 5, "M1", "T", 1000.0),
+                (3, 90, "S", "M2", 1000.0), (4, 180, "M2", "T", 1000.0),
+                (5, -90, "S", "M3", 1000.0), (6, -180, "M3", "T", 1000.0)]
+        self.assertEqual(self.build(rows, [1]).graphs, ())
+
+    def test_single_seed_bridge_ties_go_to_the_smallest_transaction_ids(self):
+        # Two destinations reached through three intermediaries each. block-pin-1 took the
+        # destination with the smaller snapshot account code (T1); ids decide now (T2).
+        rows = [(1, 0, "S", "M1", 1000.0),
+                (60, 4, "M1", "T1", 1000.0), (61, 1, "S", "M2", 1000.0), (62, 5, "M2", "T1", 1000.0),
+                (63, 2, "S", "M3", 1000.0), (64, 6, "M3", "T1", 1000.0),
+                (20, 4, "M1", "T2", 1000.0), (21, 1, "S", "M4", 1000.0), (22, 5, "M4", "T2", 1000.0),
+                (23, 2, "S", "M5", 1000.0), (24, 6, "M5", "T2", 1000.0)]
+        graph, = self.build(rows, [1]).graphs
+        self.assertEqual(graph.witnesses, (Witness("SHAPE_BRIDGE", (1, 20, 21, 22, 23, 24)),))
+
+    def test_no_block_exceeds_span_on_a_random_ledger(self):
+        rng = random.Random(20261014)
+        accounts = [f"A{i}" for i in range(12)]
+        rows, hours = [], {}
+        for tx_id in range(1, 401):
+            sender, receiver = rng.sample(accounts, 2)
+            hour = rng.uniform(0, 720)
+            rows.append((tx_id, hour, sender, receiver, rng.choice((900.0, 1000.0, 1100.0))))
+            hours[tx_id] = hour
+        seeds = [row[0] for row in rows if rng.random() < 0.3]
+        batch = self.build(rows, seeds, hub_min_activity=10_000)
+        self.assertTrue(batch.graphs)
+        for graph in batch.graphs:
+            core = graph.seed_ids + graph.connection_ids
+            self.assertLessEqual(max(hours[k] for k in core) - min(hours[k] for k in core), 240.0)
 
     def test_real_output_is_accepted_by_the_lifecycle_planner(self):
         rows = fan("A", 3) + [(200, 8, "AR0", "Z", 1000.0)]

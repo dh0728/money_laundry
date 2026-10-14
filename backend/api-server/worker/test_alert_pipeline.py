@@ -67,7 +67,7 @@ class AlertPostgresTests(unittest.TestCase):
                 with self.assertRaises(self.psycopg.errors.InsufficientPrivilege): writer.execute(statement)
         plan, = self.plans()
         self.assertEqual(plan['action'],'NEW')
-        self.assertEqual(plan['evidence']['policyVersion'],'block-pin-1')
+        self.assertEqual(plan['evidence']['policyVersion'],'block-pin-2')
         self.assertEqual([w['kind'] for w in plan['evidence']['witnesses']],['PASS'])
         self.assertEqual(plan['evidence']['contextQuery']['focalAccounts'],[])
         self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alerts').fetchone()[0],0)
@@ -352,7 +352,7 @@ class AlertExtensionTests(unittest.TestCase):
         pad = timedelta(microseconds=POLICY.context_pad_us)
         self.assertEqual(doc['contextQuery']['firstAt'], (base - pad).astimezone(timezone.utc).isoformat())
         self.assertEqual(doc['contextQuery']['lastAt'], (base + timedelta(hours=6) + pad).astimezone(timezone.utc).isoformat())
-        self.assertEqual(doc['policyVersion'], 'block-pin-1')
+        self.assertEqual(doc['policyVersion'], 'block-pin-2')
         self.assertEqual(doc['summary']['txCount'], 2)
 
     def test_links_follow_the_current_run_and_stay_out_of_the_fingerprint(self):

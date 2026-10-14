@@ -1,10 +1,12 @@
-"""Pure, bounded block generator (policy block-pin-1).
+"""Pure, bounded block generator (policy block-pin-2).
 
 Implements P0-P7 of worktable/alert_motif_design.md §7: pinning, hubs, faces/stars/
 RELAY, PASS/PATH/BRIDGE flow relations, capped Kruskal assembly, CLOSURE walks,
-single-seed shapes (policy, default off) and the output contract. Non-seed hops of
+single-seed shapes (policy, default on) and the output contract. Non-seed hops of
 PATH, BRIDGE, CLOSURE and shapes become CONNECTION members; context is never a
 member. No labels, persistence or review state.
+
+block-pin-2 keeps every decision within the policy's time limits (BRIDGE time clusters,
 
 Determinism: the output is a pure function of (frozen ledger, seeds, seed_groups,
 policy). Every decision iterates (time, id)-sorted structures; union-find survivors
@@ -36,7 +38,7 @@ class BlockInputError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class BlockPolicy:
-    version: str = "block-pin-1"
+    version: str = "block-pin-2"
     core_max: int = 64
     span_max_us: int = 240 * HOUR_US
     hop_lag_us: int = 96 * HOUR_US
@@ -348,11 +350,13 @@ class _Build:
             raise GraphBudgetExceeded("EDGE_VISITS")
         return pool, count > limit
 
-    def best_step(self, prev, forward):
+    def best_step(self, prev, forward, within=None):
         """Best in-band continuation of `prev`: out of its receiver (forward) or into its sender.
 
-        Returns (position, 'SEED' | 'STEP') or (None, reason). A seed is returned as the
-        step's end point; the caller decides whether it is an arrival or a stop.
+        ``within`` = (low, high) bounds the step's time as well as the lag (block-pin-2: a
+        walk never leaves its block span). Returns (position, 'SEED' | 'STEP') or (None,
+        reason). A seed is returned as the step's end point; the caller decides whether it
+        is an arrival or a stop.
         """
         policy = self.policy
         window, lag = policy.hub_window_us, policy.hop_lag_us
@@ -363,6 +367,10 @@ class _Build:
             return None, "HUB"
         adjacency = self.index.outgoing if forward else self.index.incoming
         low, high = (t, t + lag) if forward else (t - lag, t)
+        if within is not None:
+            low, high = max(low, within[0]), min(high, within[1])
+            if low > high:
+                return None, "SPAN"
         pool, truncated = self.scan_rows(adjacency, account, low, high, t, policy.walk_scan)
         best, best_key = None, None
         for pos in pool:
@@ -370,6 +378,8 @@ class _Build:
                 continue
             tp = self.times[pos]
             if (forward and not t < tp <= t + lag) or (not forward and not t - lag <= tp < t):
+                continue
+            if within is not None and not within[0] <= tp <= within[1]:
                 continue
             if not self.in_band(self.amounts[prev], self.amounts[pos]):
                 continue
@@ -652,12 +662,10 @@ class _Build:
         """S→m→T legs through distinct intermediaries, time-order independent (|Δt| ≤ hop_lag)."""
         policy = self.policy
         lag, window = policy.hop_lag_us, policy.hub_window_us
-        legs = defaultdict(dict)  # (S, T) -> m -> (key, first leg, second leg)
+        legs = defaultdict(list)  # (S, T) -> [(key, first leg, second leg, m)]
 
         def offer(S, T, m, key, first, second):
-            current = legs[(S, T)].get(m)
-            if current is None or key < current[0]:
-                legs[(S, T)][m] = (key, first, second)
+            legs[(S, T)].append((key, first, second, m))
 
         for e in self.ordered_seeds:
             if e in self.selfie or self.amounts[e] < 0:
@@ -685,37 +693,61 @@ class _Build:
                     if self.in_band(self.amounts[g], amount):
                         offer(S, T, m, (self.excess(self.amounts[g], amount), abs(self.times[g] - t),
                                         self.ids[g]), g, e)
-        for (S, T), by_m in sorted(legs.items()):
-            if len(by_m) < min(policy.bridge_min_mids, policy.shape_min_mids):
-                continue
-            items = sorted(by_m.values(), key=lambda item: (min(self.tkey(item[1]), self.tkey(item[2])), item[0]))
-            chosen, bounds = [], None
-            for item in items:
-                if len(chosen) >= policy.star_max:
-                    break
-                times = (self.times[item[1]], self.times[item[2]])
-                candidate = self.span_union(bounds, (min(times), max(times)))
-                if candidate[1] - candidate[0] > policy.span_max_us:
+        def start(item):
+            return min(self.tkey(item[1]), self.tkey(item[2]))
+
+        for (S, T), offers in sorted(legs.items()):
+            # block-pin-2 (A1): an (S, T) pair forms one bridge per time cluster. A cluster
+            # opens at its first offer and holds offers starting within span of it, so an old
+            # offer never decides a later bridge.
+            offers.sort(key=lambda item: (start(item), item[0]))
+            clusters, opened = [], None
+            for item in offers:
+                first_time = start(item)[0]
+                if opened is None or first_time - opened > policy.span_max_us:
+                    clusters.append([])
+                    opened = first_time
+                clusters[-1].append(item)
+            for cluster in clusters:
+                by_m = {}
+                for item in cluster:
+                    current = by_m.get(item[3])
+                    if current is None or item[0] < current[0]:
+                        by_m[item[3]] = item
+                if len(by_m) < min(policy.bridge_min_mids, policy.shape_min_mids):
                     continue
-                chosen.append(item)
-                bounds = candidate
-            positions = {pos for item in chosen for pos in item[1:]}
-            seeds = tuple(sorted(positions & self.seeds, key=self.tkey))
-            extra = tuple(sorted(positions - self.seeds, key=self.tkey))
-            if len(seeds) >= 2 and len(chosen) >= policy.bridge_min_mids:
-                self.relations.append(_Relation(
-                    TIER_FLOW, 1, (-len(chosen), -len(seeds), bounds[1] - bounds[0]),
-                    self.tx_tuple(positions), "BRIDGE", seeds, extra=extra))
-                self.stats["bridges"] += 1
+                items = sorted(by_m.values(), key=lambda item: (start(item), item[0]))
+                chosen, bounds = [], None
+                for item in items:
+                    if len(chosen) >= policy.star_max:
+                        break
+                    times = (self.times[item[1]], self.times[item[2]])
+                    candidate = self.span_union(bounds, (min(times), max(times)))
+                    if candidate[1] - candidate[0] > policy.span_max_us:
+                        continue
+                    chosen.append(item)
+                    bounds = candidate
+                positions = {pos for item in chosen for pos in item[1:3]}
+                seeds = tuple(sorted(positions & self.seeds, key=self.tkey))
+                extra = tuple(sorted(positions - self.seeds, key=self.tkey))
+                if len(seeds) >= 2 and len(chosen) >= policy.bridge_min_mids:
+                    self.relations.append(_Relation(
+                        TIER_FLOW, 1, (-len(chosen), -len(seeds), bounds[1] - bounds[0]),
+                        self.tx_tuple(positions), "BRIDGE", seeds, extra=extra))
+                    self.stats["bridges"] += 1
 
     # ----- P5: closure walks (stage 2) -----
     def walk_closure(self, root, end, forward):
         policy = self.policy
         core = self.core[root]
         accounts = {self.sources[pos] for pos in core} | {self.targets[pos] for pos in core}
+        # block-pin-2 (A2): the walk stays inside the span the block can still reach, so it
+        # reads no further than span around the block and never marks distant seeds.
+        low, high = self.bounds[root]
+        within = (high - policy.span_max_us, low + policy.span_max_us)
         prev, steps, visited = end, [], {self.sources[end], self.targets[end]}
         for _ in range(policy.ear_max):
-            pos, kind = self.best_step(prev, forward)
+            pos, kind = self.best_step(prev, forward, within)
             if pos is None or kind == "SEED":
                 break
             steps.append(pos)
@@ -764,15 +796,19 @@ class _Build:
             if (e in self.selfie or len(self.comp_seeds[root]) >= 2 or self.witnesses[root]
                     or self.amounts[e] < 0):
                 continue
+            # block-pin-2 (A2): a single-seed cycle is a block too and stays within span (I6).
+            t = self.times[e]
+            within = (t - policy.span_max_us, t + policy.span_max_us)
             prev, steps, visited = e, [], {self.sources[e], self.targets[e]}
             for _ in range(policy.ear_max):
-                pos, kind = self.best_step(prev, True)
+                pos, kind = self.best_step(prev, True, within)
                 if pos is None or kind == "SEED":
                     break
                 steps.append(pos)
                 arrival = self.targets[pos]
                 if arrival == self.sources[e]:
-                    if len(steps) + 1 >= policy.shape_min_hops and len(steps) + 1 <= policy.core_max:
+                    if (len(steps) + 1 >= policy.shape_min_hops and len(steps) + 1 <= policy.core_max
+                            and self.times[steps[-1]] - t <= policy.span_max_us):
                         self.adopt(root, "SHAPE_CYCLE", [e] + steps)
                         self.limits[e].add("SINGLE_SEED_SHAPE")
                         self.stats["adopted_SHAPE_CYCLE"] += 1
@@ -815,14 +851,20 @@ class _Build:
                 current = legs[T].get(m)
                 if current is None or key < current[0]:
                     legs[T][m] = (key, spoke, f)
-        best = ()
+        # block-pin-2 (A3): the shape is a block within span (I6), and ties go to the smallest
+        # transaction ids, never to the snapshot-local account code order.
+        best, best_key = (), None
         for T in sorted(legs):
             by_m = legs[T]
             if self.targets[e] not in by_m or len(by_m) < policy.shape_min_mids:
                 continue
             positions = sorted({pos for item in by_m.values() for pos in item[1:]} - {e}, key=self.tkey)
-            if len(positions) > len(best):
-                best = tuple(positions)
+            times = [self.times[pos] for pos in positions] + [t]
+            if max(times) - min(times) > policy.span_max_us:
+                continue
+            key = (-len(positions), self.tx_tuple(positions))
+            if best_key is None or key < best_key:
+                best, best_key = tuple(positions), key
         return best
 
     # ----- P4 -----
@@ -1135,7 +1177,7 @@ class _Build:
                           dict(sorted(self.stats.items())))
 
     def self_check(self, root, witnesses, core, seeds):
-        """The same invariants alert_lifecycle enforces at publication (I3, I5, I6)."""
+        """Invariants of every published block: I3 (seeds, witnesses), I5 (core_max), I6 (span_max)."""
         if not seeds or not witnesses or not seeds <= self.comp_seeds[root]:
             raise BlockInputError("SELF_CHECK: block without seeds or witnesses")
         for witness in witnesses:
@@ -1146,6 +1188,9 @@ class _Build:
                 raise BlockInputError("SELF_CHECK: witness without a seed")
         if len({self.ids[pos] for pos in core} | self.reserved_ids[root]) > self.policy.core_max:
             raise BlockInputError("SELF_CHECK: core exceeds core_max")
+        times = [self.times[pos] for pos in core]
+        if max(times) - min(times) > self.policy.span_max_us:
+            raise BlockInputError("SELF_CHECK: core exceeds span_max")
 
     def run(self):
         self.normalize_groups()
