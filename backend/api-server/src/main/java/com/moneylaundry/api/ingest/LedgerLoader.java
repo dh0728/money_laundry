@@ -26,7 +26,24 @@ public class LedgerLoader {
   private final Duration timeout;
   private final Map<String, String> environment;
   private final UUID owner = UUID.randomUUID();
+  private final com.moneylaundry.api.review.BusinessTime businessTime;
 
+  /** 업무 시계 없이 만든 구성(테스트)은 실제 시각을 업무 시각으로 쓴다. */
+  public LedgerLoader(
+      JdbcTemplate jdbc,
+      UploadStore store,
+      JdbcConnectionDetails database,
+      String python,
+      String script,
+      Duration timeout,
+      String encryption,
+      String search,
+      String version,
+      String zone) {
+    this(jdbc, store, database, python, script, timeout, encryption, search, version, zone, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
   public LedgerLoader(
       JdbcTemplate jdbc,
       UploadStore store,
@@ -37,8 +54,10 @@ public class LedgerLoader {
       @Value("${app.ingest.encryption-key:}") String encryption,
       @Value("${app.ingest.search-key:}") String search,
       @Value("${app.ingest.key-version:}") String version,
-      @Value("${app.zone}") String zone) {
+      @Value("${app.zone}") String zone,
+      com.moneylaundry.api.review.BusinessTime businessTime) {
     this.jdbc = jdbc;
+    this.businessTime = businessTime;
     this.store = store;
     this.database = database;
     this.python = python;
@@ -56,11 +75,16 @@ public class LedgerLoader {
             zone);
   }
 
+  private java.time.Instant businessNow() {
+    return businessTime == null ? java.time.Instant.now() : businessTime.now();
+  }
+
   @Async
   public void load(long id) {
     UUID token = UUID.randomUUID();
     if (jdbc.update(
-            "update ingest.uploads set status='RUNNING',started_at=now(),attempt_count=attempt_count+1,execution_id=?,execution_owner=? where upload_id=? and status='RECEIVED'",
+            "update ingest.uploads set status='RUNNING',started_at=?,attempt_count=attempt_count+1,execution_id=?,execution_owner=? where upload_id=? and status='RECEIVED'",
+            java.sql.Timestamp.from(businessNow()),
             token,
             owner,
             id)
@@ -85,6 +109,13 @@ public class LedgerLoader {
           .put("WORKER_DB_URL", PythonAnalysisExecutor.workerDatabaseUrl(database.getJdbcUrl()));
       builder.environment().put("WORKER_DB_USER", database.getUsername());
       builder.environment().put("WORKER_DB_PASSWORD", database.getPassword());
+      // The worker stamps its finish time as real time + this business-clock offset.
+      builder
+          .environment()
+          .put(
+              "INGEST_BUSINESS_OFFSET_SECONDS",
+              Double.toString(
+                  businessTime == null ? 0 : businessTime.offset().toMillis() / 1000.0));
       builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
       builder.redirectError(ProcessBuilder.Redirect.DISCARD);
       process = builder.start();
@@ -120,7 +151,8 @@ public class LedgerLoader {
       log.error(
           "Report load failed uploadId={} exceptionType={}", id, e.getClass().getSimpleName());
       jdbc.update(
-          "update ingest.uploads set status='FAILED',error_code='LOAD_FAILED',error_message='보고 저장 실패. 관리자 확인이 필요합니다.',finished_at=now(),execution_id=null,execution_owner=null where upload_id=? and execution_id=?",
+          "update ingest.uploads set status='FAILED',error_code='LOAD_FAILED',error_message='보고 저장 실패. 관리자 확인이 필요합니다.',finished_at=?,execution_id=null,execution_owner=null where upload_id=? and execution_id=?",
+          java.sql.Timestamp.from(businessNow()),
           id,
           token);
     } finally {

@@ -771,7 +771,9 @@ class ReviewWorkflowTests {
   @Test
   void business_clock_persists_and_blocks_backward_or_busy_changes() {
     clock.set(Instant.parse("2023-09-03T00:00:00Z"), 1);
-    assertThat(clock.now()).isEqualTo(Instant.parse("2023-09-03T00:00:00Z"));
+    // The demo clock flows from its setting.
+    assertThat(clock.now())
+        .isBetween(Instant.parse("2023-09-03T00:00:00Z"), Instant.parse("2023-09-03T00:01:00Z"));
     assertThatThrownBy(() -> clock.set(Instant.parse("2023-09-02T00:00:00Z"), 2))
         .isInstanceOf(ApiException.class);
     jdbc.update(
@@ -1229,7 +1231,8 @@ class ReviewWorkflowTests {
     long id = alert(l1);
     mvc.perform(get("/api/v1/demo/clock"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.businessAt").value("2023-09-02T09:00+09:00"));
+        .andExpect(
+            jsonPath("$.businessAt").value(org.hamcrest.Matchers.startsWith("2023-09-02T09:00")));
     mvc.perform(get("/api/v1/review/cases/" + id))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.groups[0].members.length()").value(3));

@@ -27,7 +27,8 @@ def _reporting(connection, bank, day):
         AND (p.effective_to_date IS NULL OR p.effective_to_date>=%s))''', (bank, day, day)).fetchone()[0]
 
 
-def ingest(connection, upload_id, token, stream, protector, zone='Asia/Seoul'):
+def ingest(connection, upload_id, token, stream, protector, zone='Asia/Seoul', business_offset_seconds=0.0):
+    """``business_offset_seconds`` is business time minus real time (Spring BusinessTime)."""
     if not connection.autocommit:
         raise ValueError('Autocommit connection required')
     bank, day, received = _owned(connection, upload_id, token)
@@ -132,7 +133,7 @@ def ingest(connection, upload_id, token, stream, protector, zone='Asia/Seoul'):
                 cursor.executemany('INSERT INTO ingest.correction_errors VALUES(%s,%s,%s,%s,%s,%s)',
                     [(correction_id,n,e['row'] or None,e['column'],'INVALID_SELF',e['reason']) for n,e in enumerate(errors)])
         connection.execute('''UPDATE ingest.uploads SET status=%s,row_count=%s,missing_count=%s,duplicate_count=0,
-            finished_at=clock_timestamp(),error_code=%s,error_message=%s,validation_errors=%s,
+            finished_at=clock_timestamp()+make_interval(secs=>%s),error_code=%s,error_message=%s,validation_errors=%s,
             execution_id=NULL,execution_owner=NULL WHERE upload_id=%s AND execution_id=%s''',
-            ('COMPLETED' if valid else 'VALIDATION_FAILED',None if incomplete else count,missing,
+            ('COMPLETED' if valid else 'VALIDATION_FAILED',None if incomplete else count,missing,float(business_offset_seconds),
              None if valid else 'VALIDATION_FAILED',None if valid else '파일 전체가 보류되었습니다.',Jsonb(errors),upload_id,token))

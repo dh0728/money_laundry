@@ -42,15 +42,25 @@ public class DashboardProjection {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final DashboardReadDatabase reads;
+  private final BusinessTime time;
 
   public DashboardProjection(JdbcTemplate jdbc, PlatformTransactionManager manager) {
-    this(jdbc, manager, null);
+    this(jdbc, manager, null, null);
+  }
+
+  public DashboardProjection(
+      JdbcTemplate jdbc, PlatformTransactionManager manager, DashboardReadDatabase reads) {
+    this(jdbc, manager, reads, null);
   }
 
   @org.springframework.beans.factory.annotation.Autowired
   public DashboardProjection(
-      JdbcTemplate jdbc, PlatformTransactionManager manager, DashboardReadDatabase reads) {
+      JdbcTemplate jdbc,
+      PlatformTransactionManager manager,
+      DashboardReadDatabase reads,
+      BusinessTime time) {
     this.reads = reads;
+    this.time = time;
     this.jdbc = jdbc;
     this.tx = new TransactionTemplate(manager);
     tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
@@ -130,7 +140,9 @@ public class DashboardProjection {
                 // Only requests visible in this repeatable-read snapshot are acknowledged.
                 jdbc.update("delete from ops.dashboard_dirty where scope=?", scope.name());
                 jdbc.update(
-                    "update ops.dashboard_refresh_state set version=nextval('ops.dashboard_publication_version'),computed_at=clock_timestamp(),failures=0,retry_at=null,last_error_code=null,last_duration_ms=? where scope=?",
+                    "update ops.dashboard_refresh_state set version=nextval('ops.dashboard_publication_version'),computed_at=?,failures=0,retry_at=null,last_error_code=null,last_duration_ms=? where scope=?",
+                    // Shown beside the business-time dashboard; the retry backoff stays real time.
+                    java.sql.Timestamp.from(time == null ? java.time.Instant.now() : time.now()),
                     (System.nanoTime() - started) / 1_000_000,
                     scope.name());
                 return true;

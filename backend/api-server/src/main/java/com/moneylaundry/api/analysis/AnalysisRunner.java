@@ -138,7 +138,7 @@ public class AnalysisRunner implements AutoCloseable {
                         && !job.retryAt().isAfter(service.clock.instant()))) return null;
                 service.jdbc.update(
                     "update analysis.jobs set started_at=coalesce(started_at,?) where job_id=?",
-                    Timestamp.from(service.clock.instant()),
+                    Timestamp.from(service.businessNow()),
                     id);
                 if (job.stage() == AnalysisStage.WAIT_INGEST) {
                   waitForIngest(id);
@@ -156,7 +156,7 @@ public class AnalysisRunner implements AutoCloseable {
                     """,
                     token,
                     owner,
-                    Timestamp.from(service.clock.instant()),
+                    Timestamp.from(service.businessNow()),
                     id);
                 return new Pending(service.job(id));
               });
@@ -218,7 +218,7 @@ public class AnalysisRunner implements AutoCloseable {
       service.jdbc.update(
           "update analysis.jobs set status='FAILED',error_code='INGEST_FAILED',error_message='대상 파일 적재"
               + " 오류를 조치한 뒤 재개하세요.',finished_at=? where job_id=?",
-          Timestamp.from(service.clock.instant()),
+          Timestamp.from(service.businessNow()),
           id);
       return;
     }
@@ -240,6 +240,7 @@ public class AnalysisRunner implements AutoCloseable {
     int priorCount = previous == null ? item.job.failures() : previous.count();
     int count = code.equals(priorCode) ? priorCount + 1 : 1;
     boolean terminal = kind == AnalysisFailure.Kind.PERMANENT || count >= 3;
+    // The backoff runs on the real clock; the recorded failure time is business time.
     Instant now = service.clock.instant();
     long delay =
         kind == AnalysisFailure.Kind.CONNECTION ? (count == 1 ? 30 : 120) : (count == 1 ? 60 : 300);
@@ -248,7 +249,7 @@ public class AnalysisRunner implements AutoCloseable {
             UUID.randomUUID(),
             code,
             kind,
-            now,
+            service.businessNow(),
             count,
             terminal ? null : now.plusSeconds(delay),
             terminal));
@@ -345,7 +346,7 @@ public class AnalysisRunner implements AutoCloseable {
                 runs.complete(run);
                 service.jdbc.update(
                     "update analysis.jobs set status='COMPLETED',current_stage='COMPLETE',completion_reason='EMPTY_INPUT',row_count=0,suspicious_tx_count=0,alert_count=0,finished_at=?,execution_id=null,execution_owner=null where job_id=?",
-                    Timestamp.from(service.clock.instant()),
+                    Timestamp.from(service.businessNow()),
                     item.job.id());
                 runs.refreshQueryStatistics();
                 return;
@@ -370,7 +371,7 @@ public class AnalysisRunner implements AutoCloseable {
                     + " where job_id=?",
                 complete ? "COMPLETED" : "QUEUED",
                 item.job.stage().next().name(),
-                complete ? Timestamp.from(service.clock.instant()) : null,
+                complete ? Timestamp.from(service.businessNow()) : null,
                 item.job.id());
             if (complete) runs.refreshQueryStatistics();
           });

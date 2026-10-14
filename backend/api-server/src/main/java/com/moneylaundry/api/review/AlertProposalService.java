@@ -193,13 +193,15 @@ public class AlertProposalService {
 
   private void audit(
       Map<String, Object> proposal, long actor, String action, String comment, Object snapshot) {
+    Timestamp at = Timestamp.from(time.now());
     jdbc.update(
-        "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,?,?,?,?::jsonb)",
+        "insert into review.events(alert_id,actor_id,action,comment,business_at,recorded_at,snapshot) values(?,?,?,?,?,?,?::jsonb)",
         proposal.get("target_alert_id"),
         actor,
         action,
         comment,
-        Timestamp.from(time.now()),
+        at,
+        at,
         encode(snapshot));
   }
 }

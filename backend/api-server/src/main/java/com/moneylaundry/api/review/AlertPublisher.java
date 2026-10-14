@@ -12,6 +12,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /** Applies prepared flow plans inside the runner's final, fenced transaction. */
 public final class AlertPublisher {
+  /** Business time of the run's job; takes the run id as its parameter. */
+  private static final String RUN_BUSINESS_AT =
+      "(select j.business_at from analysis.runs r join analysis.jobs j using(job_id) where r.run_id=?)";
+
   private final JdbcTemplate jdbc;
 
   public AlertPublisher(JdbcTemplate jdbc) {
@@ -302,12 +306,16 @@ public final class AlertPublisher {
     var checked = new TreeSet<Long>(ids(plan.get("caseIds")));
     checked.addAll(ids(plan.get("referenceIds")));
     if (target != null) checked.add(target);
+    // Checked at the run's business time, like every other record of this publication.
     for (long id : checked)
       jdbc.update(
-          "insert into review.alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,?::jsonb,clock_timestamp()) on conflict(alert_id,run_id) do nothing",
+          "insert into review.alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,?::jsonb,"
+              + RUN_BUSINESS_AT
+              + ") on conflict(alert_id,run_id) do nothing",
           id,
           run,
-          encode(plan.get("coverage")));
+          encode(plan.get("coverage")),
+          run);
   }
 
   private Map<String, Object> publicationChanges(
@@ -440,12 +448,15 @@ public final class AlertPublisher {
     }
     if (!memberIds.containsAll(seedIds)) throw new IllegalStateException("ALERT_SEED_MISSING");
     jdbc.update(
-        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,?,?,?,?::jsonb)",
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence,created_at) values(?,?,?,?,?::jsonb,"
+            + RUN_BUSINESS_AT
+            + ")",
         target,
         version,
         run,
         fingerprint,
-        encode(evidence));
+        encode(evidence),
+        run);
     var values = new ArrayList<Object[]>();
     for (var member : members)
       values.add(
@@ -701,11 +712,12 @@ public final class AlertPublisher {
     }
     long id =
         jdbc.queryForObject(
-            "insert into review.events(alert_id,action,comment,business_at,snapshot) values(?,?,?,?,?::jsonb) returning event_id",
+            "insert into review.events(alert_id,action,comment,business_at,recorded_at,snapshot) values(?,?,?,?,?,?::jsonb) returning event_id",
             Long.class,
             target,
             action,
             comment,
+            at,
             at,
             encode(snapshot));
     for (long user : recipients)

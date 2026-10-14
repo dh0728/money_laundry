@@ -27,7 +27,8 @@ def main(argv=None):
                 password=os.environ.get('WORKER_DB_PASSWORD'),autocommit=True,connect_timeout=10) as db:
             ingest(db,args.upload_id,args.execution_id,
                 io.TextIOWrapper(sys.stdin.buffer,encoding='utf-8',errors='strict',newline=''),
-                protector,os.environ.get('INGEST_ZONE','Asia/Seoul'))
+                protector,os.environ.get('INGEST_ZONE','Asia/Seoul'),
+                float(os.environ.get('INGEST_BUSINESS_OFFSET_SECONDS','0')))
         return 0
     except StaleExecution:
         return 79

@@ -60,6 +60,7 @@ class BankUploadApiTests {
   @Autowired org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails database;
   @Autowired PrivateDataProtector protector;
   @Autowired MockMvc mvc;
+  @Autowired com.moneylaundry.api.bank.ArrivalsController arrivals;
   @MockitoBean UploadStore store;
   @MockitoBean AnalysisScheduler scheduler;
   Map<String, byte[]> files = new ConcurrentHashMap<>();
@@ -208,6 +209,33 @@ class BankUploadApiTests {
             jdbc.queryForObject(
                 "select is_laundering from evaluation.transaction_labels", Boolean.class))
         .isTrue();
+  }
+
+  @Test
+  void demo_business_clock_stamps_issue_receipt_and_load_times() throws Exception {
+    // A business day before the real one: every stamp must come from the flowing demo clock.
+    Instant business = Instant.parse("2026-09-16T00:00:00Z");
+    jdbc.update(
+        "update ops.business_clock set business_at=?,updated_at=clock_timestamp() where id",
+        java.sql.Timestamp.from(business));
+    try {
+      long id =
+          submit(10, HEADER + row(10, "A", 20, "B", "1", "USD", "1", "USD", "ACH", "E1", "E2"));
+      var stamps =
+          jdbc.queryForMap(
+              "select created_at,url_issued_at,received_at,started_at,finished_at from ingest.uploads where upload_id=?",
+              id);
+      for (var stamp : stamps.values())
+        assertThat(((java.sql.Timestamp) stamp).toInstant())
+            .isBetween(business, business.plus(java.time.Duration.ofMinutes(2)));
+      // Received at business 09:00 KST on 09-16: the open window is the 09-17 03:00 cutoff.
+      var open = arrivals.arrivals(null);
+      assertThat(open.date()).isEqualTo(LocalDate.of(2026, 9, 17));
+      assertThat(open.arrivedCount()).isEqualTo(1);
+      assertThat(open.remainingSeconds()).isBetween(17 * 3600L - 120, 18 * 3600L);
+    } finally {
+      jdbc.update("update ops.business_clock set business_at=null where id");
+    }
   }
 
   @Test

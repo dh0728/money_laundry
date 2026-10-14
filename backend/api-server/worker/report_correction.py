@@ -123,13 +123,14 @@ def replace_component(db, day, cutoff, revision, banks, versions, rows, old_rows
                 (v['version_id'],v['set_id'],v['generation'])).rowcount!=1:
             raise ValueError('REPORT_GENERATION_CHANGED')
         db.execute("UPDATE ingest.report_versions SET stage_status='ACTIVE',error_code=NULL,revision=revision+1 WHERE version_id=%s AND revision=%s",(v['version_id'],v['revision']))
-        db.execute('''UPDATE ingest.correction_requests c SET status='RESOLVED',replacement_version_id=%s,resolved_at=now(),revision=revision+1
+        # Resolved at this job's business cutoff, never the real clock.
+        db.execute('''UPDATE ingest.correction_requests c SET status='RESOLVED',replacement_version_id=%s,resolved_at=%s,revision=revision+1
             WHERE bank_id=%s AND business_date=%s AND status<>'RESOLVED' AND NOT EXISTS(
               SELECT 1 FROM ingest.correction_uploads u JOIN ingest.uploads b USING(upload_id)
               WHERE u.correction_id=c.correction_id AND (b.received_at IS NULL OR b.received_at>%s))
             AND NOT EXISTS(SELECT 1 FROM ingest.correction_uploads u JOIN ingest.report_versions newer USING(upload_id)
               WHERE u.correction_id=c.correction_id AND newer.version_no>%s)''',
-            (v['version_id'],v['bank_id'],day,cutoff,v['version_no']))
+            (v['version_id'],cutoff,v['bank_id'],day,cutoff,v['version_no']))
     db.execute("UPDATE ingest.integration_attempts SET status='COMPLETED' WHERE attempt_id=%s",(identifier,))
 
 

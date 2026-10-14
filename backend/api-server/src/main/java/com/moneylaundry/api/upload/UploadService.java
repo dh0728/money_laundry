@@ -38,7 +38,9 @@ public class UploadService {
 
   private record Completion(UploadStatusResponse response, boolean received) {}
 
+  // URL expiry runs on the real clock; issue/receipt times are business time.
   private final java.time.Clock clock;
+  private final com.moneylaundry.api.review.BusinessTime businessTime;
   private final Duration urlTtl;
   private final long maxSizeBytes;
 
@@ -57,9 +59,11 @@ public class UploadService {
       ObjectMapper objectMapper,
       PlatformTransactionManager transactionManager,
       java.time.Clock clock,
+      com.moneylaundry.api.review.BusinessTime businessTime,
       @Value("${app.ingest.url-ttl}") Duration urlTtl,
       @Value("${app.ingest.max-size-bytes}") long maxSizeBytes) {
     this.clock = clock;
+    this.businessTime = businessTime;
     this.uploadRepository = uploadRepository;
     this.banks = banks;
     this.jdbc = jdbc;
@@ -162,7 +166,7 @@ public class UploadService {
                 request.sizeBytes(),
                 request.businessDate(),
                 null,
-                now,
+                businessTime.now(),
                 expiresAt));
     if (request.correctionRequestId() != null) {
       uploadRepository.flush();
@@ -210,7 +214,8 @@ public class UploadService {
                   "select pg_advisory_xact_lock(?)",
                   ps -> ps.setLong(1, com.moneylaundry.api.analysis.AnalysisService.RECEIPT_LOCK),
                   rs -> {});
-              Instant receivedAt = clock.instant();
+              // Compared with the business-time analysis cutoff (receipts, CUTOFF_SUPERSEDED).
+              Instant receivedAt = businessTime.now();
               if (uploadRepository.markReceived(uploadId, bankId, receivedAt) != 1) {
                 throw ApiException.invalidTransition("완료 통지 전이 실패");
               }

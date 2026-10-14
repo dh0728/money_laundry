@@ -45,12 +45,15 @@ public class ArrivalsController {
   private final UploadRepository uploadRepository;
   private final LocalTime cutoff;
   private final ZoneId zone;
+  private final com.moneylaundry.api.review.BusinessTime businessTime;
 
   public ArrivalsController(
       BankRepository bankRepository,
       UploadRepository uploadRepository,
       @Value("${app.ingest.cutoff}") String cutoff,
-      @Value("${app.zone}") String zone) {
+      @Value("${app.zone}") String zone,
+      com.moneylaundry.api.review.BusinessTime businessTime) {
+    this.businessTime = businessTime;
     this.bankRepository = bankRepository;
     this.uploadRepository = uploadRepository;
     this.cutoff = LocalTime.parse(cutoff);
@@ -83,13 +86,15 @@ public class ArrivalsController {
               job == null ? null : job.getReceivedAt(),
               job == null ? null : job.getFinishedAt()));
     }
-    long remaining = Math.max(0, cutoffAt.getEpochSecond() - Instant.now().getEpochSecond());
+    long remaining = Math.max(0, cutoffAt.getEpochSecond() - businessTime.now().getEpochSecond());
     return new Response(day, cutoffAt, remaining, arrived, rows.size(), rows);
   }
 
   private LocalDate nextCutoffDate() {
-    LocalDate today = LocalDate.now(zone);
-    boolean passed = !Instant.now().isBefore(today.atTime(cutoff).atZone(zone).toInstant());
+    // The window follows business time, like the receipts it lists.
+    Instant now = businessTime.now();
+    LocalDate today = LocalDate.ofInstant(now, zone);
+    boolean passed = !now.isBefore(today.atTime(cutoff).atZone(zone).toInstant());
     return passed ? today.plusDays(1) : today;
   }
 }

@@ -53,7 +53,8 @@ final class MoneyQuery {
     out.put("customScope", scope != null);
     out.put("revision", detail.get("revision"));
     out.put("delayMinutes", minutes);
-    out.put("observedAt", Instant.now().toString());
+    Instant now = time.now();
+    out.put("observedAt", now.toString());
     out.put("requestedFrom", first == null ? null : first.toString());
     out.put("requestedTo", last == null ? null : last.toString());
     if (first == null) {
@@ -63,8 +64,7 @@ final class MoneyQuery {
     }
     // Stop at the first unreceived/incomplete day; never infer observation from max(tx time).
     LocalDate stop = first;
-    while (!stop.isAfter(last)
-        && stop.isBefore(time.now().atZone(BusinessTime.KST).toLocalDate())) {
+    while (!stop.isAfter(last) && stop.isBefore(now.atZone(BusinessTime.KST).toLocalDate())) {
       boolean complete =
           jdbc.queryForObject(
               "select exists(select 1 from core.bank_reporting_periods where effective_from_date<=? and (effective_to_date is null or effective_to_date>=?)) and not exists(select 1 from core.bank_reporting_periods p left join ingest.report_sets s on s.bank_id=p.bank_id and s.business_date=? left join ingest.report_versions v on v.version_id=s.current_version_id where p.effective_from_date<=? and (p.effective_to_date is null or p.effective_to_date>=?) and v.stage_status is distinct from 'ACTIVE')",

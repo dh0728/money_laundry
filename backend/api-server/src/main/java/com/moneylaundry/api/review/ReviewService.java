@@ -548,21 +548,23 @@ public class ReviewService {
 
   private void event(long id, long user, String action, String comment, Object snapshot) {
     boolean episode = "EPISODE".equals(caseRow(id).get("kind"));
+    Timestamp at = Timestamp.from(time.now());
     if (!episode)
       jdbc.update(
           "update review.alerts set review_started_at=coalesce(review_started_at,?),review_started_by=coalesce(review_started_by,?) where alert_id=?",
-          Timestamp.from(time.now()),
+          at,
           user,
           id);
     jdbc.update(
         "insert into review.events("
             + (episode ? "episode_id" : "alert_id")
-            + ",actor_id,action,comment,business_at,snapshot) values(?,?,?,?,?,?::jsonb)",
+            + ",actor_id,action,comment,business_at,recorded_at,snapshot) values(?,?,?,?,?,?,?::jsonb)",
         id,
         user,
         action,
         comment,
-        Timestamp.from(time.now()),
+        at,
+        at,
         encode(snapshot));
   }
 

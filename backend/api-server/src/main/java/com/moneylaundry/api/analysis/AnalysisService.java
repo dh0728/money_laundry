@@ -29,26 +29,49 @@ public class AnalysisService {
 
   final JdbcTemplate jdbc;
   final TransactionTemplate tx;
+  // Operational timers only (retry, lease); business-meaning times use businessNow().
   final Clock clock;
   final ZoneId zone;
   private final double threshold;
   private final LocalTime cutoff;
+  private final com.moneylaundry.api.review.BusinessTime businessTime;
 
+  public AnalysisService(
+      JdbcTemplate jdbc,
+      TransactionTemplate tx,
+      Clock clock,
+      String zone,
+      double threshold,
+      LocalTime cutoff) {
+    this(jdbc, tx, clock, zone, threshold, cutoff, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
   public AnalysisService(
       JdbcTemplate jdbc,
       TransactionTemplate tx,
       Clock clock,
       @Value("${app.zone}") String zone,
       @Value("${app.suspicious-tx.threshold}") double threshold,
-      @Value("${app.ingest.cutoff}") LocalTime cutoff) {
+      @Value("${app.ingest.cutoff}") LocalTime cutoff,
+      com.moneylaundry.api.review.BusinessTime businessTime) {
     this.jdbc = jdbc;
     this.tx = tx;
     this.clock = clock;
     this.zone = ZoneId.of(zone);
     this.threshold = threshold;
     this.cutoff = cutoff;
+    this.businessTime = businessTime;
     if (!Double.isFinite(threshold) || threshold <= 0 || threshold > 1)
       throw new IllegalArgumentException("분석 임계값은 0 초과 1 이하");
+  }
+
+  /** 업무 시각(시연 시계가 있으면 그 시각). BusinessTime 없이 만든 구성은 저장된 시계값, 없으면 주입된 Clock. */
+  public Instant businessNow() {
+    if (businessTime != null) return businessTime.now();
+    Timestamp stored =
+        jdbc.queryForObject("select business_at from ops.business_clock where id", Timestamp.class);
+    return stored == null ? clock.instant() : stored.toInstant();
   }
 
   public String cron() {
@@ -66,7 +89,7 @@ public class AnalysisService {
   }
 
   public long registerScheduled() {
-    return register(LocalDate.now(clock.withZone(zone)));
+    return register(LocalDate.ofInstant(businessNow(), zone));
   }
 
   private long register(LocalDate scheduledDay) {
@@ -74,7 +97,7 @@ public class AnalysisService {
   }
 
   public long registerDemo(LocalDate businessDay) {
-    return registerDemo(businessDay, LocalDate.now(clock.withZone(zone)));
+    return registerDemo(businessDay, LocalDate.ofInstant(businessNow(), zone));
   }
 
   public long registerDemo(LocalDate businessDay, LocalDate currentBusinessDay) {
@@ -97,9 +120,11 @@ public class AnalysisService {
                       "select business_at is not null from ops.business_clock where id",
                       Boolean.class)))
             throw ApiException.invalidTransition("시연 업무 시각이 설정되어 있습니다. 조작패널에서 거래 기준일을 지정해 분석하세요.");
+          // Receipts and the cutoff are both business time, so a demo compares 2023 with 2023.
+          Instant businessAt = businessNow();
           Instant cutoff =
               scheduledDay == null
-                  ? clock.instant()
+                  ? businessAt
                   : scheduledDay.atTime(this.cutoff).atZone(zone).toInstant();
           LocalDate day =
               demoBusinessDay == null
@@ -148,13 +173,13 @@ public class AnalysisService {
               jdbc.queryForObject(
                   """
           insert into analysis.jobs(status,analysis_date,analysis_cutoff_at,current_stage,threshold_value,business_at)
-          values ('QUEUED',?,?,'WAIT_INGEST',?,coalesce((select business_at from ops.business_clock where id),?)) returning job_id
+          values ('QUEUED',?,?,'WAIT_INGEST',?,?) returning job_id
           """,
                   Long.class,
                   day,
                   Timestamp.from(cutoff),
                   threshold,
-                  Timestamp.from(clock.instant()));
+                  Timestamp.from(businessAt));
           jdbc.update(
               "insert into analysis.receipts select ?,upload_id from ingest.uploads where received_at<=?",
               id,

@@ -9,24 +9,33 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 매일 컷오프(app.ingest.cutoff)에 분석을 등록하고, 5초마다 실행 대기 작업을 AnalysisRunner로 진행한다. */
+/**
+ * 매일 컷오프(app.ingest.cutoff)에 분석을 등록하고, 5초마다 실행 대기 작업을 AnalysisRunner로 진행한다. 이 cron은 실제 시각에 울리므로 업무
+ * 시계로 시연하는 dev/local에서는 등록하지 않는다(조작패널이 날짜를 지정해 등록한다).
+ */
 @Component
 @Slf4j
 public class AnalysisScheduler {
   private final AnalysisService service;
   private final AnalysisRunner runner;
+  private final org.springframework.core.env.Environment environment;
 
   @Value("${app.ingest.scheduled-enabled:true}")
   private boolean scheduledEnabled = true;
 
-  public AnalysisScheduler(AnalysisService service, AnalysisRunner runner) {
+  public AnalysisScheduler(
+      AnalysisService service,
+      AnalysisRunner runner,
+      org.springframework.core.env.Environment environment) {
     this.service = service;
     this.runner = runner;
+    this.environment = environment;
   }
 
   @Scheduled(cron = "#{@analysisService.cron()}", zone = "${app.zone}")
   public void cutoff() {
-    if (!scheduledEnabled) return;
+    if (!scheduledEnabled || com.moneylaundry.api.review.BusinessTime.demoEnvironment(environment))
+      return;
     try {
       service.registerScheduled();
     } catch (ApiException | DataAccessException e) {
