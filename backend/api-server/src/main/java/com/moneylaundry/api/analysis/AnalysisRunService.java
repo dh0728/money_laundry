@@ -279,7 +279,7 @@ public class AnalysisRunService {
             Set<Long> origins =
                 new HashSet<>(
                     jdbc.queryForList(
-                        "select distinct v.set_id from analysis.input_reports ir join private.bank_reports br using(report_id) join ingest.report_versions v using(version_id) where ir.run_id=?",
+                        "select set_id from analysis.input_report_sets where run_id=?",
                         Long.class,
                         prior));
             boolean ready = !origins.isEmpty() && selectedSets.containsAll(origins);
@@ -385,6 +385,10 @@ public class AnalysisRunService {
         "insert into analysis.input_reports select ?,tr.tx_id,tr.report_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
         run,
         id);
+    jdbc.update(
+        "insert into analysis.input_report_sets select distinct ?,s.set_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
+        run,
+        id);
   }
 
   public void complete(UUID run) {
@@ -415,7 +419,8 @@ public class AnalysisRunService {
     jdbc.execute(
         """
         analyze analysis.input_transactions, analysis.input_reports, analysis.input_scores,
-          analysis.alert_origins, analysis.alert_fact_checks
+          analysis.alert_origins, analysis.alert_fact_checks, analysis.input_ledger,
+          analysis.input_ledger_marks, analysis.input_report_sets
         """);
   }
 

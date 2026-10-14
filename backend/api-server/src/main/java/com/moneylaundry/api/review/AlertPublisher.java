@@ -143,8 +143,12 @@ public final class AlertPublisher {
           where c.state is distinct from f.state)
           or exists(select 1 from analysis.input_transactions i join ledger.transactions t using(tx_id)
             where i.run_id=? and t.integration_status<>'ACTIVE')
+          or exists(select 1 from analysis.input_ledger_marks m join analysis.input_ledger l
+            on l.valid_from_seq<=m.run_seq and (l.valid_to_seq is null or l.valid_to_seq>m.run_seq)
+            join ledger.transactions t using(tx_id) where m.run_id=? and t.integration_status<>'ACTIVE')
         """,
             Boolean.class,
+            run,
             run,
             run,
             run);

@@ -120,8 +120,16 @@ class AlertPipelineTests {
 
   /** Makes a frozen transaction of the prepared run a scored seed. */
   void promote(AnalysisStageExecutor.Context context, long txId) {
+    // CONTEXT now lives in the shared ledger, so the promoted row becomes this run's own TARGET.
     jdbc.update(
-        "update analysis.input_transactions set input_role='TARGET' where run_id=? and tx_id=?",
+        """
+        insert into analysis.input_transactions
+        select run_id,tx_id,'TARGET',occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,
+          to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,
+          payment_currency,payment_format,amount_usd,fx_rate_version
+        from analysis.run_inputs where run_id=? and tx_id=?
+        on conflict(run_id,tx_id) do update set input_role='TARGET'
+        """,
         context.runId(),
         txId);
     score(txId, context.runId());
@@ -213,7 +221,7 @@ class AlertPipelineTests {
     UUID checking = freezeCheck();
     var ids =
         jdbc.queryForList(
-            "select tx_id from analysis.input_transactions where run_id=?", Long.class, checking);
+            "select tx_id from analysis.run_inputs where run_id=?", Long.class, checking);
     assertThat(ids).contains(distant, nearby).doesNotContain(future);
     assertThat(
             jdbc.queryForObject(
@@ -372,7 +380,7 @@ class AlertPipelineTests {
           .isZero();
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis.input_transactions where run_id=? and tx_id=?",
+                  "select count(*) from analysis.run_inputs where run_id=? and tx_id=?",
                   Integer.class,
                   followRun,
                   context))
@@ -494,6 +502,7 @@ class AlertPipelineTests {
     jdbc.update("delete from analysis.input_reports where run_id=? and tx_id=?", run, returnSeed);
     jdbc.update(
         "delete from analysis.input_transactions where run_id=? and tx_id=?", run, returnSeed);
+    jdbc.update("delete from analysis.input_ledger where tx_id=?", returnSeed);
     jdbc.update(
         "update ledger.transactions set integration_status='HELD' where tx_id=?", returnSeed);
     try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {

@@ -25,12 +25,12 @@ class FlywayMigrationTests {
   @Autowired PlatformTransactionManager manager;
 
   @Test
-  void initial_schema_has_one_migration_and_configuration_seeds() {
+  void schema_has_versioned_migrations_and_configuration_seeds() {
     assertThat(
             jdbc.queryForList(
-                "select version from flyway_schema_history where success and version is not null",
+                "select version from flyway_schema_history where success and version is not null order by installed_rank",
                 String.class))
-        .containsExactly("1");
+        .containsExactly("1", "2");
     assertThat(
             jdbc.queryForList(
                 "select role||'='||count(*) from core.users group by role", String.class))

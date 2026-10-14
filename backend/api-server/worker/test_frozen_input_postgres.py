@@ -77,9 +77,10 @@ class FrozenInputPostgresTests(unittest.TestCase):
                     raise RuntimeError("Test PostgreSQL did not become ready") from None
                 time.sleep(0.25)
         cls.addClassCleanup(cls.admin.close)
-        baseline = Path(__file__).resolve().parents[1] / 'src/main/resources/db/migration/V1__initial_schema.sql'
+        migrations = Path(__file__).resolve().parents[1] / 'src/main/resources/db/migration'
         with cls.admin.transaction():
-            cls.admin.execute(baseline.read_text(encoding='utf-8-sig'))
+            for script in sorted(migrations.glob('V*__*.sql'), key=lambda p: int(p.name[1:].split('__')[0])):
+                cls.admin.execute(script.read_text(encoding='utf-8-sig'))
         from configure_analysis_db import configure
         cls.worker_user = 'analysis_fixture'
         cls.worker_password = secrets.token_urlsafe(32)

@@ -203,7 +203,7 @@ class FreezeInputTests {
         .containsExactly(ids.getFirst());
     assertThat(
             jdbc.queryForList(
-                "select tx_id from analysis.input_transactions where run_id=? and input_role='CONTEXT' order by tx_id",
+                "select tx_id from analysis.run_inputs where run_id=? and input_role='CONTEXT' order by tx_id",
                 Long.class,
                 run))
         .containsExactly(ids.get(1), ids.get(2));
@@ -240,13 +240,13 @@ class FreezeInputTests {
     UUID run = runs.freeze(job, cutoff);
     assertThat(
             jdbc.queryForList(
-                "select tx_id from analysis.input_transactions where run_id=? and input_role='CONTEXT' order by tx_id",
+                "select tx_id from analysis.run_inputs where run_id=? and input_role='CONTEXT' order by tx_id",
                 Long.class,
                 run))
         .containsExactly(ids.get(1), ids.get(2), ids.get(3));
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.input_transactions where run_id=? and tx_id=?",
+                "select count(*) from analysis.run_inputs where run_id=? and tx_id=?",
                 Integer.class,
                 run,
                 ids.getFirst()))
@@ -278,7 +278,7 @@ class FreezeInputTests {
     UUID run = runs.freeze(job, cutoff);
     assertThat(
             jdbc.queryForList(
-                "select tx_id from analysis.input_transactions where run_id=? and input_role='CONTEXT' order by tx_id",
+                "select tx_id from analysis.run_inputs where run_id=? and input_role='CONTEXT' order by tx_id",
                 Long.class,
                 run))
         .containsExactly(ids.get(2), ids.get(3), ids.get(4), ids.get(5));
@@ -322,7 +322,7 @@ class FreezeInputTests {
     UUID run = runs.freeze(job, cutoff);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.input_transactions where run_id=? and input_role='CONTEXT'",
+                "select count(*) from analysis.run_inputs where run_id=? and input_role='CONTEXT'",
                 Integer.class,
                 run))
         .isZero();
@@ -347,14 +347,17 @@ class FreezeInputTests {
         .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.input_transactions where run_id=? and input_role='CONTEXT'",
+                "select count(*) from analysis.run_inputs where run_id=? and input_role='CONTEXT'",
                 Integer.class,
                 run))
         .isEqualTo(100_000);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.input_reports where run_id=?", Integer.class, run))
-        .isEqualTo(100_001);
+                "select count(*)||'/'||(select count(*) from analysis.input_report_sets where run_id=?) from analysis.input_reports where run_id=?",
+                String.class,
+                run,
+                run))
+        .isEqualTo("1/1");
   }
 
   @Test
@@ -374,14 +377,165 @@ class FreezeInputTests {
         Duration.ofNanos(System.nanoTime() - start).toMillis());
     assertThat(
             jdbc.queryForObject(
-                "select count(*) filter(where input_role='TARGET')||'/'||count(*) filter(where input_role='CONTEXT') from analysis.input_transactions where run_id=?",
+                "select count(*) filter(where input_role='TARGET')||'/'||count(*) filter(where input_role='CONTEXT') from analysis.run_inputs where run_id=?",
                 String.class,
                 run))
         .isEqualTo("20000/20000");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.input_reports where run_id=?", Integer.class, run))
-        .isEqualTo(40_000);
+                "select count(*)||'/'||(select count(*) from analysis.input_report_sets where run_id=?) from analysis.input_reports where run_id=?",
+                String.class,
+                run,
+                run))
+        .isEqualTo("20000/1");
+  }
+
+  static final String INPUT_COLUMNS =
+      "tx_id,occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version";
+
+  /** The former per-run CONTEXT copy, recomputed now: eligible ledger minus the run's TARGET. */
+  void assertContextMatchesFullCopy(UUID run, Instant at) {
+    String oracle =
+        """
+        select t.tx_id,t.occurred_at,t.business_date,a.bank_id,b.bank_id,a.service_account_id,b.service_account_id,
+          e.service_owner_id,f.service_owner_id,t.amount_received,t.receiving_currency::text,t.amount_paid,
+          t.payment_currency::text,t.payment_format::text,t.amount_usd,t.fx_rate_version::text
+        from ledger.transactions t join core.accounts a on a.account_id=t.from_account_id
+        join core.accounts b on b.account_id=t.to_account_id
+        join core.owners e on e.owner_id=a.owner_id join core.owners f on f.owner_id=b.owner_id
+        where t.tx_id in(select t.tx_id from ledger.transactions t
+          join ledger.transaction_reports tr using(tx_id) join private.bank_reports br using(report_id)
+          join ingest.report_sets rs on rs.current_version_id=br.version_id join ingest.report_versions rv using(version_id)
+          where t.integration_status='ACTIVE' and t.occurred_at<=:at group by t.tx_id
+          having bool_or(rv.received_at<=:at) and not bool_or(rv.received_at>:at))
+        and t.tx_id not in(select tx_id from analysis.input_transactions where run_id=:run)
+        """;
+    String frozen =
+        "select "
+            + INPUT_COLUMNS
+            + " from analysis.run_inputs where run_id=:run and input_role='CONTEXT'";
+    var params =
+        new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+            .addValue("at", Timestamp.from(at))
+            .addValue("run", run);
+    var named = new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc);
+    assertThat(
+            named.queryForObject(
+                "select count(*) from ((" + oracle + ") except all (" + frozen + ")) x",
+                params,
+                Integer.class))
+        .isZero();
+    assertThat(
+            named.queryForObject(
+                "select count(*) from ((" + frozen + ") except all (" + oracle + ")) x",
+                params,
+                Integer.class))
+        .isZero();
+  }
+
+  long nextJob(Instant at) {
+    long next =
+        jdbc.queryForObject(
+            "insert into analysis.jobs(business_at,threshold_value,status,current_stage,analysis_date,analysis_cutoff_at) values(now(),0.7,'RUNNING','FREEZE_INPUT',date '2100-01-01'+nextval('core.work_id')::int,?) returning job_id",
+            Long.class,
+            Timestamp.from(at));
+    jdbc.update("insert into analysis.selected_versions values(?,?,?,1)", next, set, version);
+    return next;
+  }
+
+  void addTransactions(int count) {
+    jdbc.update(
+        """
+        insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,
+          amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date)
+        select '2023-09-01 12:00+09'::timestamptz,?,?,n,'USD',n,'USD','ACH',n,'test','2023-09-01'
+        from generate_series(1,?) n
+        """,
+        account,
+        account,
+        count);
+    jdbc.update(
+        """
+        insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status)
+        select ?,(select max(source_row) from private.bank_reports)+row_number() over(order by tx_id),
+          tx_id::text,'cipher','test','ACTIVE'
+        from ledger.transactions where tx_id not in(select tx_id from ledger.transaction_reports)
+        """,
+        version);
+    jdbc.update(
+        """
+        insert into ledger.transaction_reports select t.tx_id,br.report_id,'INTERNAL'
+        from ledger.transactions t join private.bank_reports br on br.match_key=t.tx_id::text
+        where t.tx_id not in(select tx_id from ledger.transaction_reports)
+        """);
+  }
+
+  void finish(UUID run) {
+    jdbc.update("update analysis.runs set status='COMPLETED' where run_id=?", run);
+    jdbc.update(
+        "update analysis.jobs set status='COMPLETED',current_stage='COMPLETE' where current_run_id=?",
+        run);
+  }
+
+  @Test
+  void shared_ledger_reproduces_each_runs_full_context_copy_across_days() {
+    seed(6);
+    var ids = jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
+    UUID first = runs.freeze(job, cutoff);
+    assertContextMatchesFullCopy(first, cutoff);
+    finish(first);
+    var firstInput =
+        jdbc.queryForList(
+            "select " + INPUT_COLUMNS + ",input_role from analysis.run_inputs where run_id=?",
+            first);
+    // New rows, a superseded row, a row whose frozen value changed and one moved past the cutoff.
+    addTransactions(3);
+    jdbc.update(
+        "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?", ids.get(0));
+    jdbc.update("update ledger.transactions set amount_usd=amount_usd+1 where tx_id=?", ids.get(1));
+    Instant later = cutoff.plus(Duration.ofDays(1));
+    jdbc.update(
+        "update ledger.transactions set occurred_at=? where tx_id=?",
+        Timestamp.from(later.minusSeconds(60)),
+        ids.get(2));
+    UUID second = runs.freeze(nextJob(later), later);
+    assertContextMatchesFullCopy(second, later);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.run_inputs where run_id=? and input_role='CONTEXT'",
+                Integer.class,
+                second))
+        .isEqualTo(5);
+    finish(second);
+    var secondInput =
+        jdbc.queryForList(
+            "select " + INPUT_COLUMNS + ",input_role from analysis.run_inputs where run_id=?",
+            second);
+    // An earlier cutoff after a later one, as when a failed earlier date is resumed.
+    UUID third = runs.freeze(nextJob(cutoff), cutoff);
+    assertContextMatchesFullCopy(third, cutoff);
+    assertThat(
+            jdbc.queryForList(
+                "select tx_id from analysis.run_inputs where run_id=? order by tx_id",
+                Long.class,
+                third))
+        .doesNotContain(ids.get(0), ids.get(2));
+    // Earlier runs keep exactly what they froze.
+    assertThat(
+            jdbc.queryForList(
+                "select " + INPUT_COLUMNS + ",input_role from analysis.run_inputs where run_id=?",
+                first))
+        .containsExactlyInAnyOrderElementsOf(firstInput);
+    assertThat(
+            jdbc.queryForList(
+                "select " + INPUT_COLUMNS + ",input_role from analysis.run_inputs where run_id=?",
+                second))
+        .containsExactlyInAnyOrderElementsOf(secondInput);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.input_transactions where input_role='CONTEXT'",
+                Integer.class))
+        .isZero();
   }
 
   @Test
@@ -425,9 +579,7 @@ class FreezeInputTests {
     UUID run = runs.freeze(job, cutoff);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.input_transactions where run_id=?",
-                Integer.class,
-                run))
+                "select count(*) from analysis.run_inputs where run_id=?", Integer.class, run))
         .isEqualTo(2);
   }
 

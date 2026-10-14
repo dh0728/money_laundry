@@ -93,7 +93,7 @@ def _member_rows(connection, run_id, keys):
     rows = {}
     with connection.cursor(row_factory=dict_row) as cursor:
         for chunk in _chunks(keys):
-            cursor.execute('SELECT * FROM analysis.input_transactions WHERE run_id=%s AND tx_id=ANY(%s)',
+            cursor.execute('SELECT * FROM analysis.run_inputs WHERE run_id=%s AND tx_id=ANY(%s)',
                            (run_id, chunk))
             rows.update((row['tx_id'], row) for row in cursor)
     return rows
@@ -345,7 +345,7 @@ def save_alerts(connection, execution):
     with connection.transaction(), connection.cursor(name='alert_input') as cursor:
         cursor.itersize = 2048
         cursor.execute('''SELECT tx_id,input_role,occurred_at,from_bank_id,from_account_id,to_bank_id,
-            to_account_id,amount_usd FROM analysis.input_transactions WHERE run_id=%s ORDER BY tx_id''',
+            to_account_id,amount_usd FROM analysis.run_inputs WHERE run_id=%s ORDER BY tx_id''',
             (execution.run_id,))
         for key, role, occurred, from_bank, from_account, to_bank, to_account, usd in cursor:
             edges.add(key, occurred, from_bank, from_account, to_bank, to_account, usd)
