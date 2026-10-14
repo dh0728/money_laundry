@@ -134,7 +134,7 @@ def replace_component(db, day, cutoff, revision, banks, versions, rows, old_rows
     db.execute("UPDATE ingest.integration_attempts SET status='COMPLETED' WHERE attempt_id=%s",(identifier,))
 
 
-def correction_integration(db, day, cutoff, all_versions, eligible, reports, protector, fx_version):
+def select_versions(all_versions, eligible):
     selected = {}
     for v in all_versions:
         if v['current_version_id']==v['version_id']:
@@ -142,6 +142,16 @@ def correction_integration(db, day, cutoff, all_versions, eligible, reports, pro
     for v in all_versions:
         if v['self_valid'] and v['version_id'] in eligible:
             selected[v['set_id']] = v
+    return selected
+
+
+def correction_pending(all_versions, eligible):
+    # False exactly when every component of correction_integration would return unchanged.
+    return any(v['current_version_id']!=v['version_id'] for v in select_versions(all_versions,eligible).values())
+
+
+def correction_integration(db, day, cutoff, all_versions, eligible, reports, protector, fx_version):
+    selected = select_versions(all_versions,eligible)
     if not selected:
         return
     revision,banks = scope(db,day)

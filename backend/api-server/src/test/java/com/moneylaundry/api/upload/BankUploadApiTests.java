@@ -622,6 +622,31 @@ class BankUploadApiTests {
   }
 
   @Test
+  void unchanged_and_already_corrected_dates_are_not_decrypted_again() throws Exception {
+    String tamper = "update private.bank_reports set payload_cipher=reverse(payload_cipher)";
+    long a = submit(10, HEADER + x()), b = submit(20, HEADER + x());
+    integrate(a, b);
+    var ids = activeIds();
+    jdbc.update(tamper);
+    integrate(a, b);
+    assertThat(activeIds()).isEqualTo(ids);
+    jdbc.update(tamper);
+    long ca = correction(10, a), cb = correction(20, b);
+    String changed = x().replace(",100,", ",200,");
+    long a2 = replace(10, ca, HEADER + changed), b2 = replace(20, cb, HEADER + changed);
+    integrate(a, b, a2, b2);
+    var corrected = activeIds();
+    assertThat(corrected).hasSize(1).doesNotContainAnyElementsOf(ids);
+    jdbc.update(tamper);
+    integrate(a, b, a2, b2);
+    assertThat(activeIds()).isEqualTo(corrected);
+    // A date that still needs a replacement decrypts its reports, so the tampering is visible.
+    long a3 = replace(10, correction(10, a2), HEADER + x());
+    assertThatThrownBy(() -> integrate(a, b, a2, b2, a3)).isInstanceOf(IllegalStateException.class);
+    assertThat(activeIds()).isEqualTo(corrected);
+  }
+
+  @Test
   void unsupported_bank_format_and_overlapping_reporting_period_are_rejected() {
     assertThatThrownBy(
             () -> jdbc.update("update core.banks set report_format='UNKNOWN' where bank_id=10"))

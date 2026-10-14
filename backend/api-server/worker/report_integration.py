@@ -154,6 +154,22 @@ class ReportRevisionChanged(RuntimeError):
     pass
 
 
+def completed_versions(db, day):
+    return {r[0] for r in db.execute('''SELECT av.version_id FROM ingest.integration_attempt_versions av
+        JOIN ingest.integration_attempts a USING(attempt_id) WHERE a.business_date=%s AND a.status='COMPLETED' ''',(day,))}
+
+
+def integration_kind(versions, eligible, prior):
+    """Decided from version metadata alone, so dates that will not change are never decrypted."""
+    from report_correction import correction_pending
+    if all(v['version_no']==1 for v in versions) and bool(prior) and prior==eligible:
+        return None
+    if any(v['correction_of_version_id'] is not None or v['version_no']>1 or v['generation']>0 for v in versions):
+        # An unchanged correction date keeps its fixed scope, so skipping it equals replacing nothing.
+        return 'CORRECTION' if correction_pending(versions,eligible) else None
+    return 'FIRST'
+
+
 def integrate_job(db, job_id, token, protector, fx_version):
     from report_correction import correction_integration
     job = db.execute('SELECT analysis_cutoff_at,status,current_stage,execution_id FROM analysis.jobs WHERE job_id=%s',(job_id,)).fetchone()
@@ -166,7 +182,7 @@ def integrate_job(db, job_id, token, protector, fx_version):
     for day,upload in receipts:
         dates.setdefault(day,set()).add(upload)
     prepared = {}
-    # Decryption and source preparation run before the short ownership/generation check.
+    # Decryption of the dates that will change runs before the short ownership/generation check.
     for day,uploads in dates.items():
         if db.execute('''SELECT 1 FROM ingest.report_sets s JOIN ingest.report_versions v ON v.version_id=s.current_version_id
             WHERE s.business_date=%s AND v.received_at>%s''',(day,cutoff)).fetchone():
@@ -179,7 +195,8 @@ def integrate_job(db, job_id, token, protector, fx_version):
         eligible = {v['version_id'] for v in versions if v['upload_id'] in uploads}
         if len(eligible)!=len(uploads):
             raise ValueError('FIXED_REPORT_NOT_READY')
-        prepared[day] = (versions,eligible,read_reports(db,versions,protector))
+        work = integration_kind(versions,eligible,completed_versions(db,day))
+        prepared[day] = (versions,eligible,read_reports(db,versions,protector) if work else None)
     with db.transaction():
         db.execute('SELECT pg_advisory_xact_lock(17004000)')
         current = db.execute('SELECT analysis_cutoff_at,status,current_stage,execution_id FROM analysis.jobs WHERE job_id=%s FOR UPDATE',(job_id,)).fetchone()
@@ -195,14 +212,12 @@ def integrate_job(db, job_id, token, protector, fx_version):
             expected = {(v['version_id'],v['revision'],v['generation'],v['current_version_id']) for v in versions}
             if set(now)!=expected:
                 raise ReportRevisionChanged('Report generation changed')
-            prior = {r[0] for r in db.execute('''SELECT av.version_id FROM ingest.integration_attempt_versions av
-                JOIN ingest.integration_attempts a USING(attempt_id) WHERE a.business_date=%s AND a.status='COMPLETED' ''',(day,))}
-            unchanged_initial = all(v['version_no']==1 for v in versions) and bool(prior) and prior==eligible
-            if unchanged_initial:
-                pass
-            elif any(v['correction_of_version_id'] is not None or v['version_no']>1 or v['generation']>0 for v in versions):
+            work = integration_kind(versions,eligible,completed_versions(db,day))
+            if work and reports is None:
+                raise ReportRevisionChanged('Integration became necessary after preparation')
+            if work=='CORRECTION':
                 correction_integration(db,day,cutoff,versions,eligible,reports,protector,fx_version)
-            else:
+            elif work=='FIRST':
                 selected = [v for v in versions if v['version_id'] in eligible]
                 if len({v['set_id'] for v in selected})!=len(selected):
                     raise ValueError('ONE_VERSION_PER_BANK_REQUIRED')
