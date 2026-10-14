@@ -358,6 +358,46 @@ class FreezeInputTests {
   }
 
   @Test
+  void split_stays_exact_when_statistics_know_only_an_earlier_run() {
+    seed(40_000);
+    long scored =
+        jdbc.queryForObject(
+            "insert into analysis.jobs(business_at,threshold_value,analysis_date,analysis_cutoff_at,status,current_stage) values(now(),0.7,'2023-09-01',now(),'COMPLETED','COMPLETE') returning job_id",
+            Long.class);
+    completed(scored, "t.tx_id<(select min(tx_id)+20000 from ledger.transactions)");
+    // As after the previous day's analysis, the planner knows only the completed run.
+    jdbc.execute("analyze analysis.input_transactions");
+    long start = System.nanoTime();
+    UUID run = runs.freeze(job, cutoff);
+    System.out.printf(
+        "FREEZE_INPUT_BENCH unseenRun targets=20000 contexts=20000 elapsedMs=%d%n",
+        Duration.ofNanos(System.nanoTime() - start).toMillis());
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) filter(where input_role='TARGET')||'/'||count(*) filter(where input_role='CONTEXT') from analysis.input_transactions where run_id=?",
+                String.class,
+                run))
+        .isEqualTo("20000/20000");
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.input_reports where run_id=?", Integer.class, run))
+        .isEqualTo(40_000);
+  }
+
+  @Test
+  void snapshot_refuses_to_run_outside_a_transaction() {
+    UUID run = UUID.randomUUID();
+    jdbc.update("insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", run, job);
+    assertThatThrownBy(() -> new AlertInputSnapshot(jdbc).freeze(run, cutoff))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("FREEZE_INPUT_REQUIRES_TRANSACTION");
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from analysis.source_manifest where run_id=?", Integer.class, run))
+        .isZero();
+  }
+
+  @Test
   void failure_after_target_insert_rolls_back_and_same_job_can_retry() {
     seed(2);
     jdbc.execute(

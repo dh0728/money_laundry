@@ -327,6 +327,7 @@ public class AnalysisRunner implements AutoCloseable {
                           item.job.id())
                       .toInstant();
               UUID run = runs.freeze(item.job.id(), cutoff);
+              runs.refreshInputStatistics();
               int count =
                   service.jdbc.queryForObject(
                       "select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",

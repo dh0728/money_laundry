@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Called inside FREEZE_INPUT's integration lock and transaction. */
 @Component
@@ -24,7 +25,26 @@ public class AlertInputSnapshot {
     freeze(run, cutoff, Set.of());
   }
 
+  /**
+   * Opens the transaction-local mirror of this run's frozen rows. The planner has never seen a new
+   * run id and estimates one row for it, which once turned the CONTEXT anti-join into a rescan per
+   * ledger row; statements that join the run read this analyzed mirror instead. Rows the run
+   * already has (inserted outside FREEZE_INPUT's own statements) are copied in once.
+   */
+  static void openFrozen(JdbcTemplate jdbc, UUID run) {
+    if (!TransactionSynchronizationManager.isActualTransactionActive())
+      throw new IllegalStateException("FREEZE_INPUT_REQUIRES_TRANSACTION");
+    jdbc.execute(
+        "create temp table if not exists frozen_input(run_id uuid,tx_id bigint,business_date date not null,primary key(run_id,tx_id)) on commit drop");
+    if (jdbc.update(
+            "insert into frozen_input select run_id,tx_id,business_date from analysis.input_transactions where run_id=? and not exists(select 1 from frozen_input where run_id=?)",
+            run,
+            run)
+        > 0) jdbc.execute("analyze frozen_input");
+  }
+
   public void freeze(UUID run, Instant cutoff, Set<Long> blockedSets) {
+    openFrozen(jdbc, run);
     freezeManifest(run, cutoff);
     // Freeze the full eligible ledger: root windows and transitive seed links
     // are evaluated by one flow policy, not a second calendar policy in SQL.
@@ -63,28 +83,32 @@ public class AlertInputSnapshot {
           join ingest.report_sets rs on rs.current_version_id=br.version_id
           join ingest.report_versions rv using(version_id)
           where t.integration_status='ACTIVE' and t.occurred_at<=?
-            and not exists(select 1 from analysis.input_transactions i where i.run_id=? and i.tx_id=t.tx_id)
+            and not exists(select 1 from frozen_input i where i.run_id=? and i.tx_id=t.tx_id)
             %s
           group by t.tx_id
           having bool_or(rv.received_at<=?) and not bool_or(rv.received_at>?)
+        ), frozen as (
+          insert into analysis.input_transactions
+          select ?,t.tx_id,'CONTEXT',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
+            a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,
+            t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
+            t.payment_format,t.amount_usd,t.fx_rate_version
+          from eligible c join ledger.transactions t using(tx_id)
+          join core.accounts a on a.account_id=t.from_account_id
+          join core.accounts b on b.account_id=t.to_account_id
+          join core.owners e on e.owner_id=a.owner_id
+          join core.owners f on f.owner_id=b.owner_id
+          returning run_id,tx_id,business_date
         )
-        insert into analysis.input_transactions
-        select ?,t.tx_id,'CONTEXT',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
-          a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,
-          t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
-          t.payment_format,t.amount_usd,t.fx_rate_version
-        from eligible c join ledger.transactions t using(tx_id)
-        join core.accounts a on a.account_id=t.from_account_id
-        join core.accounts b on b.account_id=t.to_account_id
-        join core.owners e on e.owner_id=a.owner_id
-        join core.owners f on f.owner_id=b.owner_id
+        insert into frozen_input select * from frozen
         """
             .formatted(blocked),
         inputArgs.toArray());
+    jdbc.execute("analyze frozen_input");
     jdbc.update(
         """
         insert into analysis.input_reports select ?,tr.tx_id,tr.report_id
-        from analysis.input_transactions i join ledger.transaction_reports tr using(tx_id)
+        from frozen_input i join ledger.transaction_reports tr using(tx_id)
         join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id
         join ingest.report_versions v on v.version_id=br.version_id
         where i.run_id=? and v.received_at<=? on conflict do nothing
@@ -96,7 +120,7 @@ public class AlertInputSnapshot {
         """
         insert into analysis.input_scores
         select ?,i.tx_id,s.run_id,to_jsonb(s)-'run_id'-'tx_id'
-        from analysis.input_transactions i join analysis.current_scores c using(tx_id)
+        from frozen_input i join analysis.current_scores c using(tx_id)
         join analysis.scores s on s.tx_id=c.tx_id and s.run_id=c.run_id
         join analysis.runs r on r.run_id=s.run_id
         join analysis.jobs b on b.job_id=r.job_id
@@ -108,7 +132,7 @@ public class AlertInputSnapshot {
         jdbc.queryForList(
             """
         select d::date from generate_series(
-          (select min(business_date)-3 from analysis.input_transactions where run_id=?),
+          (select min(business_date)-3 from frozen_input where run_id=?),
           (?::timestamptz at time zone 'Asia/Seoul')::date, interval '1 day') d order by 1
         """,
             java.sql.Date.class,

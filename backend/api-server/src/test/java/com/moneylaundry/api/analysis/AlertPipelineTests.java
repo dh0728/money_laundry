@@ -37,6 +37,7 @@ class AlertPipelineTests {
   }
 
   @Autowired AlertInputSnapshot snapshot;
+  @Autowired org.springframework.transaction.support.TransactionTemplate tx;
   @Autowired AlertQueryService alerts;
   long target;
   long account;
@@ -81,7 +82,7 @@ class AlertPipelineTests {
     attach(returnSeed, target);
     runs.snapshot(run, returnSeed, "TARGET");
 
-    snapshot.freeze(run, Instant.parse("2022-09-03T00:00:00Z"));
+    tx.executeWithoutResult(s -> snapshot.freeze(run, Instant.parse("2022-09-03T00:00:00Z")));
     score(target, run);
     score(returnSeed, run);
   }
@@ -186,7 +187,7 @@ class AlertPipelineTests {
     UUID checking = UUID.randomUUID();
     jdbc.update(
         "insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", checking, next);
-    snapshot.freeze(checking, Instant.parse("2022-09-04T00:00:00Z"));
+    tx.executeWithoutResult(s -> snapshot.freeze(checking, Instant.parse("2022-09-04T00:00:00Z")));
     return checking;
   }
 

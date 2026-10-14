@@ -327,9 +327,11 @@ public class AnalysisRunService {
               .formatted(String.join(",", Collections.nCopies(blockedSets.size(), "?")));
       args.addAll(blockedSets);
     }
+    AlertInputSnapshot.openFrozen(jdbc, run);
     int count =
         jdbc.update(
             """
+        with frozen as (
         insert into analysis.input_transactions
         select ?,t.tx_id,'TARGET',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
           a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,
@@ -349,21 +351,24 @@ public class AnalysisRunService {
             where tr.tx_id=t.tx_id and sv.job_id=? and v.received_at<=?)
         """
                 + blocked
-                + " order by t.tx_id",
+                + " order by t.tx_id returning run_id,tx_id,business_date)"
+                + " insert into frozen_input select * from frozen",
             args.toArray());
+    // Only TARGET rows of this run exist yet, so the frozen mirror is exactly the TARGET set.
+    jdbc.execute("analyze frozen_input");
     jdbc.update(
         """
         insert into analysis.input_reports
-        select i.run_id,tr.tx_id,tr.report_id from analysis.input_transactions i
+        select i.run_id,tr.tx_id,tr.report_id from frozen_input i
         join ledger.transaction_reports tr using(tx_id) join private.bank_reports br using(report_id)
         join ingest.report_sets s on s.current_version_id=br.version_id
-        where i.run_id=? and i.input_role='TARGET' on conflict do nothing
+        where i.run_id=? on conflict do nothing
         """,
         run);
     jdbc.update(
         """
         insert into analysis.target_ownership
-        select tx_id,run_id from analysis.input_transactions where run_id=? and input_role='TARGET'
+        select tx_id,run_id from frozen_input where run_id=?
         order by tx_id on conflict(tx_id) do update set run_id=excluded.run_id
         """,
         run);
@@ -403,6 +408,15 @@ public class AnalysisRunService {
               """,
               run);
         });
+  }
+
+  /** Lets later stages plan the new run's frozen rows with statistics that include its run id. */
+  public void refreshInputStatistics() {
+    jdbc.execute(
+        """
+        analyze analysis.input_transactions, analysis.input_reports, analysis.input_scores,
+          analysis.alert_origins, analysis.alert_fact_checks
+        """);
   }
 
   /**

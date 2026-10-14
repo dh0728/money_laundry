@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import com.moneylaundry.api.TestcontainersConfiguration;
 import java.nio.file.*;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,6 +23,7 @@ class WorkerPipelineTests {
   @Autowired JdbcConnectionDetails database;
   @Autowired AnalysisService service;
   @Autowired AnalysisRunService runs;
+  @Autowired org.springframework.transaction.support.TransactionTemplate tx;
   @MockitoBean AnalysisScheduler scheduler;
   @TempDir Path storage;
   long job;
@@ -437,14 +439,13 @@ class WorkerPipelineTests {
 
   @Test
   void runner_collects_real_parquet_and_persists_scores_before_alerts() throws Exception {
-    new AlertInputSnapshot(jdbc)
-        .freeze(
-            run,
-            jdbc.queryForObject(
-                    "select analysis_cutoff_at from analysis.jobs where job_id=?",
-                    java.sql.Timestamp.class,
-                    job)
-                .toInstant());
+    Instant cutoff =
+        jdbc.queryForObject(
+                "select analysis_cutoff_at from analysis.jobs where job_id=?",
+                java.sql.Timestamp.class,
+                job)
+            .toInstant();
+    tx.executeWithoutResult(s -> new AlertInputSnapshot(jdbc).freeze(run, cutoff));
     Path script = storage.resolve("completed_remote_double.py");
     Files.writeString(
         script,
