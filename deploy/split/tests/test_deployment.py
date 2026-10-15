@@ -569,6 +569,22 @@ class RDSPreflightTests(unittest.TestCase):
         self.assertEqual([call.kwargs["password"] for call in calls], ["test-app", "test-analysis"])
         self.assertTrue(all("sslmode=verify-full" in call.args[0] for call in calls))
 
+    def test_target_switch_rejects_pending_work(self):
+        self.environment["AML_REQUIRE_INFERENCE_IDLE"] = "true"
+        cursor = self.connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+        cursor.fetchone.side_effect = [(True,), (True,)]
+        with patch.dict(os.environ, self.environment, clear=True), self.assertRaises(ValueError):
+            rds.main()
+        self.assertEqual(self.connect.call_count, 1)
+
+    def test_target_switch_accepts_idle_queues(self):
+        self.environment["AML_REQUIRE_INFERENCE_IDLE"] = "true"
+        cursor = self.connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+        cursor.fetchone.side_effect = [(True,), (False,), (True,)]
+        with patch.dict(os.environ, self.environment, clear=True), patch("builtins.print"):
+            rds.main()
+        self.assertEqual(self.connect.call_count, 2)
+
     def test_insecure_mode_fails_before_connection(self):
         self.environment["SPRING_DATASOURCE_URL"] = self.environment["SPRING_DATASOURCE_URL"].replace("verify-full", "require")
         with patch.dict(os.environ, self.environment, clear=True), self.assertRaises(ValueError):

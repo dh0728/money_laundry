@@ -3,6 +3,7 @@
   "role": "backend",
   "account_id": "<NEW_ACCOUNT_ID>",
   "region": "ap-northeast-2",
+  "dev_inference_target": "local",
   "prod_worker_mode": "unconfigured",
   "prod_inference_url": "",
   "drain_seconds": 30

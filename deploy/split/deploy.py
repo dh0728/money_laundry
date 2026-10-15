@@ -9,6 +9,9 @@ import os
 from pathlib import Path
 import re
 import signal
+import ssl
+import hashlib
+from urllib.parse import urlsplit
 import subprocess
 import sys
 import tempfile
@@ -73,6 +76,7 @@ class Deployment:
         self.region = self.config.get("region", "ap-northeast-2")
         require(self.region == "ap-northeast-2", "Expected Seoul region.")
         self.parameters = None
+        self.inference_tokens = {}
 
     @contextlib.contextmanager
     def lock(self):
@@ -107,7 +111,74 @@ class Deployment:
         require(isinstance(value, str) and bool(value), f"Missing parameter: {suffix}")
         return value
 
-    def runtime(self, sha):
+    def dev_inference(self):
+        target = self.config.get("dev_inference_target", "local")
+        require(target in ("local", "kubesphere", "naver"), "Invalid dev_inference_target.")
+        if target == "local":
+            return {"target": "local"}
+        ca = self.root / "certs/inference" / target / "ca.crt"
+        require(ca.is_file(), "Install the selected inference public CA first.")
+        selection = {"target": target, "url": self.parameter(f"inference/{target}/url"),
+                     "ca_file": str(ca), "ca_sha256": hashlib.sha256(ca.read_bytes()).hexdigest()}
+        self.validate_inference(selection)
+        return selection
+
+    def validate_inference(self, selection):
+        require(isinstance(selection, dict), "Invalid inference selection.")
+        target = selection.get("target")
+        require(target in ("local", "kubesphere", "naver"), "Invalid inference target.")
+        if target == "local":
+            require(selection == {"target": "local"}, "Invalid local inference selection.")
+            return
+        try:
+            raw_url = selection["url"]
+            url = urlsplit(raw_url)
+            valid = (url.scheme == "https" and url.hostname and not url.username
+                     and not url.password and not url.query and not url.fragment
+                     and url.path in ("", "/") and (url.port is None or 1 <= url.port <= 65535)
+                     and not any(c.isspace() or ord(c) < 32 for c in raw_url))
+            require(valid, "External inference requires an HTTPS origin URL.")
+            require(url.hostname not in ("localhost", "127.0.0.1", "::1"),
+                    "External inference cannot use loopback.")
+            ca = self.root / "certs/inference" / target / "ca.crt"
+            require(selection["ca_file"] == str(ca), "Unexpected inference CA path.")
+            require(hashlib.sha256(ca.read_bytes()).hexdigest() == selection["ca_sha256"],
+                    "Inference CA changed; review and deploy a new selection.")
+            ssl.create_default_context(cafile=str(ca))
+        except (KeyError, OSError, ValueError, ssl.SSLError):
+            raise DeploymentError("Invalid inference URL or CA configuration.") from None
+
+    def inference_environment(self, selection):
+        self.validate_inference(selection)
+        target = selection["target"]
+        local_token = self.parameters["DEV_LOCAL_INFERENCE_TOKEN"]
+        if target == "local":
+            return dict(DEV_INFERENCE_API_URL="http://127.0.0.1:8090",
+                        DEV_INFERENCE_API_TOKEN=local_token, DEV_INFERENCE_ALLOW_LOOPBACK="true",
+                        DEV_INFERENCE_CA_FILE="", DEV_INFERENCE_CA_HOST_FILE="")
+        if target not in self.inference_tokens:
+            # Check the type without ever serializing the decrypted token into deployment state.
+            token_path = "inference/token" if target == "kubesphere" else f"inference/{target}/token"
+            parameter = json.loads(self.runner.run([
+                "aws", "ssm", "get-parameter", "--region", self.region, "--with-decryption",
+                "--name", f"/aml/dev/{token_path}", "--query", "Parameter", "--output", "json"]))
+            require(parameter.get("Type") == "SecureString", "Inference token must be SecureString.")
+            token = parameter.get("Value", "")
+            require(isinstance(token, str) and len(token) >= 32
+                    and all(32 < ord(c) < 127 for c in token), "Invalid inference token.")
+            self.inference_tokens[target] = token
+        if target == "kubesphere":
+            # Reuse the existing dev credential; keep both consumers on the same fetched value.
+            local_token = self.inference_tokens[target]
+            self.parameters["DEV_LOCAL_INFERENCE_TOKEN"] = local_token
+        return dict(DEV_INFERENCE_API_URL=selection["url"].rstrip("/"),
+                    DEV_INFERENCE_API_TOKEN=self.inference_tokens[target],
+                    DEV_LOCAL_INFERENCE_TOKEN=local_token,
+                    DEV_INFERENCE_ALLOW_LOOPBACK="false",
+                    DEV_INFERENCE_CA_FILE="/app/certs/inference-ca.crt",
+                    DEV_INFERENCE_CA_HOST_FILE=selection["ca_file"])
+
+    def runtime(self, sha, *, inference=None):
         prefix = self.environment.upper()
         values = dict(os.environ, AWS_REGION=self.region, AWS_DEFAULT_REGION=self.region)
         service = "WEB" if self.role == "front" else "API"
@@ -124,7 +195,7 @@ class Deployment:
                 }
                 self.parameters = {f"{prefix}_{key}": self.parameter(path) for key, path in mapping.items()}
                 if self.environment == "dev":
-                    self.parameters["DEV_INFERENCE_API_TOKEN"] = self.parameter("inference/token")
+                    self.parameters["DEV_LOCAL_INFERENCE_TOKEN"] = self.parameter("inference/token")
                     bucket = self.parameters["DEV_S3_BUCKET"]
                     key = self.parameters["DEV_S3_PREFIX"].rstrip("/")
                     self.parameters["DEV_INFERENCE_OBJECT_BASE_URL"] = f"https://{bucket}.s3.{self.region}.amazonaws.com/{key}/"
@@ -141,6 +212,9 @@ class Deployment:
                         self.parameters.update(PROD_INFERENCE_API_URL=url,
                                                PROD_INFERENCE_API_TOKEN=self.parameter("inference/token"))
             values.update(self.parameters)
+            if self.environment == "dev":
+                values.update(self.inference_environment(
+                    self.dev_inference() if inference is None else inference))
         return values
 
     def image_reference(self, sha):
@@ -162,8 +236,18 @@ class Deployment:
         filename = "compose.dev.yaml" if self.environment == "dev" else f"compose.prod.{color}.yaml"
         path = self.release(meta) / "deploy/split" / self.role / filename
         require(path.is_file(), "Release Compose file is missing.")
+        selection = None
+        overlays = []
+        if self.role == "backend" and self.environment == "dev":
+            # Releases made before target selection always used the local server.
+            selection = meta.get("inference", {"target": "local"})
+            if selection["target"] != "local":
+                overlay = path.with_name("inference.external.yaml")
+                require(overlay.is_file(), "External inference Compose overlay is missing.")
+                overlays = ["-f", str(overlay)]
         return self.runner.run(["docker", "compose", "--env-file", "/dev/null", "-f", str(path),
-                                *arguments], env=self.runtime(meta["sha"]), data=data)
+                                *overlays, *arguments],
+                               env=self.runtime(meta["sha"], inference=selection), data=data)
 
     def state(self):
         return read_json(self.state_file, {"current": None, "previous": None})
@@ -296,7 +380,14 @@ class Deployment:
 
     def check_rds(self, meta):
         checker = self.release(meta) / "deploy/split/check_rds.py"
-        self.compose(meta, "run", "--rm", "--no-deps", "-T", "--entrypoint",
+        extra = []
+        if self.environment == "dev":
+            previous = self.state().get("current") or {}
+            old = previous.get("inference", {"target": "local"})
+            new = meta.get("inference", {"target": "local"})
+            if (old.get("target"), old.get("url")) != (new.get("target"), new.get("url")):
+                extra = ["-e", "AML_REQUIRE_INFERENCE_IDLE=true"]
+        self.compose(meta, "run", "--rm", "--no-deps", "-T", *extra, "--entrypoint",
                      "/usr/local/bin/python", "api", "-", data=checker.read_text(encoding="utf-8"))
 
     def deploy(self, sha, deployment_id):
@@ -314,6 +405,8 @@ class Deployment:
         color = "dev" if self.environment == "dev" else (
             "green" if before["current"] and before["current"]["color"] == "blue" else "blue")
         target = {"sha": sha, "color": color, "transaction": deployment_id}
+        if self.role == "backend" and self.environment == "dev":
+            target["inference"] = self.dev_inference()
         self.image_reference(sha)
         self.authenticate()
         self.compose(target, "config", "--quiet")

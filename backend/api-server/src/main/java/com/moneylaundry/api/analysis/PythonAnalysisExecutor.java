@@ -58,6 +58,7 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   void configureRemote(
       @Value("${app.inference.url:}") String url,
       @Value("${app.inference.token:}") String token,
+      @Value("${app.inference.ca-file:}") String caFile,
       @Value("${app.s3.bucket:}") String bucket,
       @Value("${app.s3.prefix:}") String prefix,
       @Value("${app.s3.region:ap-northeast-2}") String region) {
@@ -67,6 +68,8 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
             url,
             "INFERENCE_API_TOKEN",
             token,
+            "INFERENCE_CA_FILE",
+            caFile,
             "S3_BUCKET",
             bucket,
             "S3_PREFIX",

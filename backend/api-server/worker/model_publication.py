@@ -6,6 +6,7 @@ always retains the request identity and round for an idempotent retry.
 from dataclasses import dataclass
 import hashlib
 import os
+import ssl
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -24,14 +25,31 @@ class Settings:
     prefix: str
     region: str
     allow_loopback: bool = False
+    ca_file: str = ""
+
+    def client(self, *, transport=None):
+        # This CA applies only to inference, never to the S3 client.
+        self.validate()
+        try:
+            verify = ssl.create_default_context(cafile=self.ca_file) if self.ca_file else True
+        except (OSError, ssl.SSLError):
+            raise ProtocolError("Invalid inference CA file") from None
+        return httpx.Client(timeout=15, follow_redirects=False, trust_env=False,
+                            verify=verify, transport=transport)
 
     def validate(self):
         url = urlsplit(self.api_url)
         local = self.allow_loopback and url.scheme == 'http' and url.hostname == '127.0.0.1'
         if ((url.scheme != 'https' and not local) or not url.hostname or url.username or url.password
                 or url.query or url.fragment or len(self.token) < 32
+                or any(ord(c) <= 32 or ord(c) >= 127 for c in self.token)
                 or not self.bucket or not self.region):
             raise ProtocolError('Invalid inference publication configuration')
+        if self.ca_file:
+            try:
+                ssl.create_default_context(cafile=self.ca_file)
+            except (OSError, ssl.SSLError):
+                raise ProtocolError('Invalid inference CA file') from None
         S3Store(None, self.bucket, self.prefix)  # Validate relative environment prefix.
 
     def binding(self):
@@ -44,13 +62,14 @@ def configured():
                         os.environ.get('INFERENCE_API_TOKEN', ''),
                         os.environ.get('S3_BUCKET', ''), os.environ.get('S3_PREFIX', ''),
                         os.environ.get('AWS_REGION', 'ap-northeast-2'),
-                        os.environ.get('INFERENCE_ALLOW_LOOPBACK') == 'true')
+                        os.environ.get('INFERENCE_ALLOW_LOOPBACK') == 'true',
+                        os.environ.get('INFERENCE_CA_FILE', ''))
     settings.validate()
     import boto3
     from botocore.config import Config
     client = boto3.client('s3', region_name=settings.region,
                           config=Config(signature_version='s3v4',
-                                        s3={'addressing_style': 'virtual'} if settings.allow_loopback else None,
+                                        s3={'addressing_style': 'virtual'},
                                         connect_timeout=5,
                                         read_timeout=15, retries={'total_max_attempts': 1}))
     return settings, client
@@ -156,7 +175,7 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
                 raise StaleExecution('Request cancelled before publication')
         # Persist PUBLISHED before calling the remote API, including timeout cases.
         endpoint = settings.api_url.rstrip('/') + f'/api/v1/inference-requests/{request_id}/rounds/{round_id}'
-        with httpx.Client(timeout=15, follow_redirects=False, trust_env=False, transport=transport) as client:
+        with settings.client(transport=transport) as client:
             with client.stream('PUT', endpoint, headers={'Authorization': 'Bearer ' + settings.token}, json=body) as response:
                 response.raise_for_status()
                 if response.status_code not in (200, 202):

@@ -14,7 +14,7 @@ import tools.jackson.databind.ObjectMapper;
 /** Direct cancellation control; the durable outbox remains the retry owner. */
 final class InferenceCancellationClient {
   private final ObjectMapper mapper;
-  private final HttpClient client;
+  private HttpClient client;
   private String base = "", token;
 
   InferenceCancellationClient(ObjectMapper mapper) {
@@ -55,6 +55,11 @@ final class InferenceCancellationClient {
       throw new IllegalArgumentException("INVALID_INFERENCE_CONFIGURATION");
     base = url.replaceAll("/+$", "");
     this.token = token;
+  }
+
+  void configure(String url, String token, boolean allowLoopback, String caFile) {
+    configure(url, token, allowLoopback);
+    if (!caFile.isBlank()) client = InferenceTls.client(caFile);
   }
 
   boolean enabled() {
