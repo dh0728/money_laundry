@@ -20,6 +20,8 @@ def files(root, environment):
             relative = ["compose.prod.blue.yaml", "compose.prod.green.yaml", "deploy-prod.sh",
                         "rollback-prod.sh", "nginx/conf.d/prod.conf",
                         "nginx/upstreams/prod-blue.conf", "nginx/upstreams/prod-green.conf"]
+        if role == "backend" and environment == "dev":
+            relative.append("inference.external.yaml")
         if role == "backend":
             relative.append("nginx/conf.d/00-default.conf")
         names.extend(f"{role}/{name}" for name in relative)
