@@ -10,6 +10,18 @@ import tempfile
 import textwrap
 
 
+def validate_inference_mount(volumes, overlay_source):
+    # Older Compose omits false from JSON. Keep an explicit source guard as newer
+    # versions may instead omit the default true value from normalized output.
+    assert re.search(r"(?m)^\s+create_host_path:[ \t]+false[ \t]*(?:#.*)?$", overlay_source), \
+        "Inference overlay must explicitly disable host path creation"
+    assert any(v.get("type") == "bind"
+               and v.get("target") == "/app/certs/inference-ca.crt"
+               and v.get("read_only") is True
+               and v.get("bind", {}).get("create_host_path", False) is False
+               for v in volumes), "Inference CA must be a read-only bind without host path creation"
+
+
 def main():
     root = Path(__file__).resolve().parent
     bash = shutil.which("bash")
@@ -68,8 +80,8 @@ def main():
         assert api["environment"]["INFERENCE_ALLOW_LOOPBACK"] == "false"
         assert api["environment"]["INFERENCE_API_TOKEN"] == "remote-test-token"
         assert services["inference"]["environment"]["INFERENCE_TOKEN"] == "local-test-token"
-        assert any(v["target"] == "/app/certs/inference-ca.crt" and v["read_only"]
-                   and not v["bind"]["create_host_path"] for v in api["volumes"])
+        validate_inference_mount(api["volumes"],
+                                 (root / "backend/inference.external.yaml").read_text(encoding="utf-8"))
         # Check every shell block without evaluating GitHub expressions or executing it.
         source = workflow.read_text(encoding="utf-8")
         for index, match in enumerate(re.finditer(r"(?m)^(\s*)run: \|\n", source)):
