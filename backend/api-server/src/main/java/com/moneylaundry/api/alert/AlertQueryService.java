@@ -1,7 +1,7 @@
 package com.moneylaundry.api.alert;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.common.ApiException;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+/** 공개된 Alert 근거 버전의 목록·상세 조회. 읽기 전용 REPEATABLE READ로 한 시점을 읽는다. */
 @Service
 @Transactional(
     readOnly = true,
@@ -78,6 +79,11 @@ public class AlertQueryService {
             version == null ? new Object[] {id} : new Object[] {id, version});
     if (rows.isEmpty()) throw ApiException.notFound("완료된 Alert 근거를 찾을 수 없습니다.");
     Map<String, Object> result = view(rows.getFirst(), true);
+    var summary = new LinkedHashMap<String, Object>();
+    if (result.get("summary") instanceof Map<?, ?> stored)
+      stored.forEach((key, value) -> summary.put(key.toString(), value));
+    summary.putAll(blockFacts(result));
+    result.put("summary", summary);
     result.put(
         "relatedFlows",
         relatedFlows(
@@ -141,6 +147,65 @@ public class AlertQueryService {
               new ArrayList<>(related)));
     }
     return result;
+  }
+
+  /**
+   * block-pin-1 facts of one evidence version. sealedAfter is the core's first time plus the policy
+   * span; contextCount counts current ACTIVE ledger rows matching the stored context query (focal
+   * accounts within the padded window) outside the core. Both are null for evidence without these
+   * policy fields (older generators).
+   */
+  public Map<String, Object> blockFacts(Map<String, Object> evidence) {
+    var facts = new LinkedHashMap<String, Object>();
+    facts.put("sealedAfter", sealedAfter(evidence));
+    facts.put("contextCount", contextCount(evidence));
+    return facts;
+  }
+
+  private String sealedAfter(Map<String, Object> evidence) {
+    if (!(evidence.get("policy") instanceof Map<?, ?> policy)
+        || !(policy.get("span_max_us") instanceof Number span)) return null;
+    java.time.Instant first = null;
+    for (Object item : (List<?>) evidence.getOrDefault("transactions", List.of())) {
+      var t = (Map<?, ?>) item;
+      if ("CONTEXT".equals(t.get("role"))) continue;
+      var at = java.time.Instant.parse(t.get("occurredAt").toString());
+      if (first == null || at.isBefore(first)) first = at;
+    }
+    return first == null
+        ? null
+        : first.plus(span.longValue(), java.time.temporal.ChronoUnit.MICROS).toString();
+  }
+
+  private Long contextCount(Map<String, Object> evidence) {
+    if (!(evidence.get("contextQuery") instanceof Map<?, ?> query)) return null;
+    var focal = (List<?>) query.get("focalAccounts");
+    if (focal == null || focal.isEmpty()) return 0L;
+    var core = new ArrayList<Object>();
+    for (Object item : (List<?>) evidence.getOrDefault("transactions", List.of()))
+      core.add(((Map<?, ?>) item).get("txId"));
+    String window =
+        " where t.occurred_at between ?::timestamptz and ?::timestamptz and t.integration_status='ACTIVE'";
+    return jdbc.queryForObject(
+        """
+        with f as (select (e->>'bankId')::int as bank_id,(e->>'accountId')::uuid as service_account_id
+                     from jsonb_array_elements(?::jsonb) e),
+             acc as (select a.account_id from core.accounts a join f using(bank_id,service_account_id)),
+             core as (select k.value::bigint as tx_id from jsonb_array_elements_text(?::jsonb) k)
+        select count(*) from (
+          select t.tx_id from ledger.transactions t join acc on acc.account_id=t.from_account_id
+        """
+            + window
+            + " union select t.tx_id from ledger.transactions t join acc on acc.account_id=t.to_account_id"
+            + window
+            + ") x where not exists(select 1 from core where core.tx_id=x.tx_id)",
+        Long.class,
+        mapper.writeValueAsString(focal),
+        mapper.writeValueAsString(core),
+        query.get("firstAt").toString(),
+        query.get("lastAt").toString(),
+        query.get("firstAt").toString(),
+        query.get("lastAt").toString());
   }
 
   private Object instant(Object value) {

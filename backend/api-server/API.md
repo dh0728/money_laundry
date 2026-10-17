@@ -59,11 +59,12 @@
   - `models: [{ modelKind, phase, status, requestId, executionRound, remoteStatus, remoteRevision, errorCode, actionRequired, retryAt, nextPollAt, remoteDeadlineAt, modelVersion, featureVersion }]`는 현재 run의 모델별 작업 상태다. 이전 run·토큰·서명 URL·로컬 경로·원격 응답 원문은 반환하지 않는다. 모델별 조치 필요 여부는 상위 작업의 FAILED 여부와 독립적이다.
   - INFERENCE 원격 대기는 상위 `RETRY_WAIT`로 재관측을 예약하며 실패 횟수를 올리지 않는다. 모델 하나가 실패해도 다른 모델의 상태 관측을 계속한다. 원격 대기 기한 초과/종료 불명은 조치 필요로 표시하고 새 요청 회차를 자동 생성하지 않는다.
   - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→두 모델 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 두 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS는 준비 계획을 저장하고 Spring의 완료 트랜잭션에서 점수·Alert를 공개한다. 상태 확인은 GET 폴링을 사용한다.
-- **POST /api/v1/batch-jobs/analysis** — 본문 없이 서버 Clock 현재 시각을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
+- **POST /api/v1/batch-jobs/analysis** — 본문 없이 현재 업무 시각(업무 시계가 없으면 실제 시각)을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
 
-- 시연 업무 시각(`ops.business_clock.business_at`)이 설정되어 있으면 일반 분석 실행과 일일 자동 예약의 신규 등록은409 `INVALID_TRANSITION`으로 차단한다. 조작패널의 날짜 지정 분석을 사용한다. 검사는 시연 시각 설정과 같은 수신 잠금 안에서 수행하며, 기존 작업의 처리·재시도·기동 복구는 유지한다. 시연 시계가 설정되지 않았으면 기존 실제 날짜 기준 등록을 유지한다. 이미 생성된 작업을 자동 삭제하거나 분석일을 변경하지 않는다.
+- 시각의 의미: 업무 의미가 있는 시각은 모두 업무 시각이다. 대상은 수신(`receivedAt`), 업로드 발급, 분석 기준(`cutoffAt`·`dataAsOf`), 작업·적재 시작/종료, 실패, Alert·버전·이벤트·커버리지 확인, 대시보드 갱신, 화면의 오늘이다. 업무 시각은 dev/local에서 시연 업무 시계(설정값 + 그 뒤 흐른 시간), prod 발표 모드에서 복사된 시계값, 그 밖에는 실제 시각이다. 실제 시각은 URL 만료·재시도·timeout 같은 운영 타이머(`retryAt`, `nextPollAt`, `remoteDeadlineAt`, `expiresAt`)에만 쓴다.
+- 시연 업무 시각(`ops.business_clock.business_at`)이 설정되어 있으면 일반 분석 실행의 신규 등록은409 `INVALID_TRANSITION`으로 차단한다. 조작패널의 날짜 지정 분석을 사용한다. 실제 시각으로 울리는 일일 자동 예약은 dev/local에서 등록하지 않는다. 검사는 시연 시각 설정과 같은 수신 잠금 안에서 수행하며, 기존 작업의 처리·재시도·기동 복구는 유지한다. 시연 시계가 설정되지 않았으면 업무 시각이 실제 시각이므로 기존 등록과 같다. 이미 생성된 작업을 자동 삭제하거나 분석일을 변경하지 않는다.
 
-- **POST /api/v1/demo/analysis** — dev/local 날짜순 시연 전용. ADMIN 서버 세션·CSRF가 필요하다. 본문 `{businessDate:"YYYY-MM-DD"}`는 전송한 과거 거래 기준일이다. 분석 구분 날짜는 그 다음 날, 수신 cutoff는 실제 요청 시각으로 기록한다. PC 시각·수신 시각·파일 내용을 변경하지 않는다. 응답202 `{jobId,status:"QUEUED"}`. 기존 WAIT_INGEST부터 실제 파이프라인을 실행하며 검수·통합·입력 고정·실패/재개를 건너뛰지 않는다. `dev` 또는 `local` 프로파일에서 허용하며 `prod`가 함께 활성화되면403 `DEMO_CONTROL_DISABLED`다. 날짜가 없거나 시연 업무 시각 기준 오늘/미래이면400 `INVALID_DEMO_DATE`. 이전 미완료 분석409 `DEMO_PREVIOUS_JOB_PENDING`, 이전 날짜로 역행409 `DEMO_DATE_OUT_OF_ORDER`, 뒤 날짜 수신 자료409 `DEMO_FUTURE_INPUT`, 해당 날짜 수신 자료 없음409 `DEMO_INPUT_REQUIRED`, 같은 날짜 완료409 `JOB_ALREADY_COMPLETED`. 날짜순으로 파일을 전송하는 시연 DB에서 사용하며 운영 예약 API의 의미를 변경하지 않는다. PC에서 dev를 조작하는 실행 방법은 [조작패널 안내](demo/README.md#배포된-dev-서버-조작패널)를 따른다.
+- **POST /api/v1/demo/analysis** — dev/local 날짜순 시연 전용. ADMIN 서버 세션·CSRF가 필요하다. 본문 `{businessDate:"YYYY-MM-DD"}`는 전송한 과거 거래 기준일이다. 분석 구분 날짜는 그 다음 날, 수신 cutoff는 요청 시점의 업무 시각으로 기록한다. 수신 시각도 업무 시각이므로 cutoff 뒤에 수신된 보고는 이 분석에 들어가지 않는다. PC 시각·파일 내용을 변경하지 않는다. 응답202 `{jobId,status:"QUEUED"}`. 기존 WAIT_INGEST부터 실제 파이프라인을 실행하며 검수·통합·입력 고정·실패/재개를 건너뛰지 않는다. `dev` 또는 `local` 프로파일에서 허용하며 `prod`가 함께 활성화되면403 `DEMO_CONTROL_DISABLED`다. 날짜가 없거나 시연 업무 시각 기준 오늘/미래이면400 `INVALID_DEMO_DATE`. 이전 미완료 분석409 `DEMO_PREVIOUS_JOB_PENDING`, 이전 날짜로 역행409 `DEMO_DATE_OUT_OF_ORDER`, 뒤 날짜 수신 자료409 `DEMO_FUTURE_INPUT`, 해당 날짜 수신 자료 없음409 `DEMO_INPUT_REQUIRED`, 같은 날짜 완료409 `JOB_ALREADY_COMPLETED`. 날짜순으로 파일을 전송하는 시연 DB에서 사용하며 운영 예약 API의 의미를 변경하지 않는다. PC에서 dev를 조작하는 실행 방법은 [조작패널 안내](demo/README.md#배포된-dev-서버-조작패널)를 따른다.
 - **POST /api/v1/batch-jobs/{jobId}/resume** — FAILED 작업만 실패 단계부터 새 실패 주기로 재개한다.202 `{ jobId, status: "QUEUED" }`. 이력·정상 산출물·최초 startedAt은 유지한다. 완료 작업 재분석은 허용하지 않는다.
   - 현재 run의 로컬 `PUBLISH/FAILED` 또는 `COLLECT/FAILED` 모델은 같은 요청·회차로 재개한다. 수집 재시도는 모델을 재실행하지 않으며 결과 전송의 일시 오류는30초/120초 간격·총3회 후 명시 재개를 기다린다. 준비/관측 완료된 다른 모델은 초기화하지 않는다. 원격 모델의 최종 실패를 새 회차로 재실행하는 기능은 아직 미연결이며 이 API가 모델 재시작 성공을 보장하지 않는다.
 - 분석 등록/재개는 ADMIN 세션·CSRF가 필요하다. dev/local 활성·prod 비활성이어야 하며, 환경 위반은403 `ANALYSIS_CONTROL_DISABLED`다.
@@ -116,7 +117,7 @@
 - UTF-8/BOM과 CSV 인용 쉼표·이스케이프 따옴표·인용 개행을 지원한다. 오류 행 번호는 논리 레코드가 시작한 물리 행이다. 잘못된 UTF-8은 파일 전체 보류, 저장소 IO 오류는 FAILED다. 헤더 오류·UTF-8 오류·복구 불가 인용 손상으로 전수 검수를 못 끝내면 rowCount는 null이다. 정상 헤더만 있는 파일은 실제0행의 EMPTY_FILE로 구분한다. 오류 사유에는 원문 값을 넣지 않는다. 이름만 바깥 공백 제거와 Unicode NFC를 적용하고 철자·대소문자를 임의 동일시하지 않는다.
 - 통화명→ISO: Australian Dollar AUD, Bitcoin BTC, Brazil Real BRL, Canadian Dollar CAD, Euro EUR, Mexican Peso MXN, Ruble RUB, Rupee INR, Saudi Riyal SAR, Shekel ILS, Swiss Franc CHF, UK Pound GBP, US Dollar USD, Yen JPY, Yuan CNY. 알 수 없는 통화는 오류다.
 - `private.bank_reports`는 version·source_row별 실제 행을 보존한다. `core.owners/accounts`의 서비스 UUID는 정상 확정 때 만들고 동일 개체와 (은행,계좌)에 재사용한다. 가명은 최초 통합 때 core.owners.display_name에 이름+코드로 저장하여 목록에서 바로 조회한다. 원문 식별자·이름은 private.owner_identities/account_identities에 분리한다. Python 원문은 AES-256-GCM, 검색 토큰은 별도 키의 HMAC-SHA256이다. 외부 공급 `app.ingest.encryption-key`, `search-key`는 서로 다른32바이트 Base64이며 `key-version` 필수다. 값은 문서·저장소에 넣지 않는다. 누락·변조·잘못된 버전이면 원문 처리 실패다.
-- 고정 수신 upload ID 집합·cutoff·거래 기준일을 받는 Python `report_integration.integrate_job` 경계에서 정확 매칭한다. 원천 송수신 은행/계좌·시각·양쪽 금액/통화 전체를 대조한다. 해시만 같다고 통합하지 않는다. 같은 키에서는 Payment Format별로 report_id순 대응한다. 1+1→1, 2+2→2이며 은행내 거래와 수집범위 밖 상대는 단독 행 그대로 보존한다.
+- 고정 수신 upload ID 집합·cutoff·거래 기준일을 받는 Python `integrate/report_integration.integrate_job` 경계에서 정확 매칭한다. 원천 송수신 은행/계좌·시각·양쪽 금액/통화 전체를 대조한다. 해시만 같다고 통합하지 않는다. 같은 키에서는 Payment Format별로 report_id순 대응한다. 1+1→1, 2+2→2이며 은행내 거래와 수집범위 밖 상대는 단독 행 그대로 보존한다.
 - 직접 오류 파일은 전체 HELD, 그 파일에 의존하는 다른 파일의 해당 행만 DEPENDENCY_HELD다. 다른 파일의 독립 정상 행은 확정할 수 있다. 정상 관계는 오류로 덮어쓰지 않는다. 통합 확정과 출처 연결·개체/계좌·상태 전이는 한 트랜잭션이며 중단시 롤백한다.
 - 송수신 통화·원천 금액은 그대로 저장한다. USD 표시는 기존 `amount_paid / units_per_usd`, scale6 HALF_UP과 환율 버전을 사용하며 매칭 기준이 아니다. `transactions`에는 단일 보고 bank_id·row_hash UNIQUE·ingest_job_id를 두지 않고 `transaction_reports`로 출처를 연결한다.
 - Python에서 최초 통합·정정 버전 교체를 수행하고 Spring이 입력 고정·실행 조정·취소 전달을 담당한다. 초기 스키마 전환은 [DB 전환 안내](../../deploy/DB_TRANSITION.md)를 따른다.
@@ -127,7 +128,7 @@
 
 BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·상태 API는 `PUT/GET /api/v1/inference-requests/{requestId}/rounds/{round}`이며 전용 Bearer 토큰을 사용한다. 취소는 같은 경로의 `/cancellation`이다. 직원 세션 API와 구분한다.
 
-입력·결과는 `requests|results/{jobId}/{BINARY|TYPE}/{requestId}/` 아래에서 manifest·Parquet·결과 표식을 사용한다. 요청 ID·run·회차·모델/피처 버전, 행 수·정확한 tx_id 집합·파일 크기·SHA-256·유한 확률을 검증한다. 원격 COMPLETED만으로 분석을 공개하지 않는다. 구체적인 전송·프로세스 계약은 [worker 문서](worker/README.md), [게시](worker/model_publication.py), [수집](worker/result_collection.py), [추론 서비스](worker/inference_service.py)를 따른다.
+입력·결과는 `requests|results/{jobId}/{BINARY|TYPE}/{requestId}/` 아래에서 manifest·Parquet·결과 표식을 사용한다. 요청 ID·run·회차·모델/피처 버전, 행 수·정확한 tx_id 집합·파일 크기·SHA-256·유한 확률을 검증한다. 원격 COMPLETED만으로 분석을 공개하지 않는다. 구체적인 전송·프로세스 계약은 [worker 문서](worker/README.md), [게시](worker/inference/model_publication.py), [수집](worker/scores/result_collection.py), [추론 서비스](worker/inference_worker/inference_service.py)를 따른다.
 
 현재 모델은 `demo-random-v1/demo-input-v1` 시연용이다. `tx_id,demo_value` 입력에 결정적 난수 점수를 만들며 이진 결과는 p_laundering, 유형 결과는 p_0~p_8이다. 실제 그래프 패턴 모델 연결은 구현된 계약에 포함하지 않는다. 파일 운반과 모델 추론 품질을 동일시하지 않는다.
 
@@ -169,21 +170,22 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 통합 거래와 거래별 이진 점수 → 제한된 흐름 그래프 구성 → 기존 사건 대응 계획 → Spring 완료 트랜잭션에서 공개한다. worker는 review를 읽기만 하고 analysis.alert_plans에 canonical JSON 계획을 쓴다. Spring은 실행 토큰·입력 유효성·사건 개정·계획 digest를 확인한 뒤 공개 버전·현재 범위·요약·계보·이력·알림을 한 번에 반영한다. 별도 업무 ‘후보’ 상태는 없다.
 
 - 씨앗은 해당 점수 실행의 임계 이상 거래다. 과거 미소속 씨앗도 검토하며 TARGET0이어도 고정 과거 점수/사건이 있으면 재추론 없이 검토한다.
-- flow-evidence-2는 씨앗 ±72시간·시간 방향별2홉, 흐름/분기/반복 witness를 사용한다. 핵심 SEED/CONNECTION을 먼저 만들고 CONTEXT를 붙인다. 연결 근거 없는 단독 씨앗은 발행하지 않는다. 정책 버전이며 DB 마이그레이션은 단일 V1을 유지한다.
-- 일반·씨앗 이웃64·씨앗별 맥락100·신규 그래프 맥락200·핵심 기간240시간. 활동512건 이상/의심 비율20% 미만 허브는 이웃16으로 제한한다. 핵심4096거래를 초과하는 연결은 여러 관련 Alert로 분할하고 `CORE_PARTITION`과 `boundaryWitnesses`를 보존한다. 경계 연결만으로 다시 자동 병합하지 않는다. 검사위치2000만·핵심별 보존 관계20만 등 계산 예산 초과는 전체 실패하며 부분 공개하지 않는다.
-- 다음 분석에서는 기존 OPEN 사건의 씨앗 소속·핵심·저장된 거래 공간을 먼저 확보한다. 기존 거래는 보존하며 새 맥락은 남은 맥락 공간만 채운다. 병합 시 과거 맥락 합계는200을 넘을 수 있지만 핵심4096·전체4296 한도는 유지한다.
-- Alert 근거 상세와 조사 상세의 `relatedFlows`는 `{kind, txIds, relatedAlertIds}` 배열이다. `txIds`는 고정된 분할 경계 근거이고, `relatedAlertIds`는 그 거래를 씨앗으로 갖는 현재 공개 대표 사건 ID다. 따라서 과거 버전에서도 이동 대상 ID는 현재 기준이며 자기 자신은 제외한다. `boundaryWitnesses` 원본은 `{kind, tx_ids}` 형태로 근거 버전에 보존한다. 경계 거래는 다른 Alert의 CONNECTION으로 중복될 수 있지만 새 그래프의 씨앗 소속은 하나다.
-- 거래는 여러 Alert의 맥락이 될 수 있지만 맥락 공유만으로 사건을 합치지 않는다. 그래프의 패턴 모델 추론은 현재 생성 기준이 아니다.
+- 생성 정책은 block-pin-1이다. 씨앗 사이의 구조 관계(witness)로 Alert 핵심을 만든다. witness는 PASS(한 계좌를 1:1로 통과, 금액 비0.8~1.25·지연96시간 이내), STAR_OUT/STAR_IN(한 계좌의 송금·수취 부채꼴), RELAY(입금 부채꼴 뒤 출금 부채꼴), PATH(비씨앗2홉 이내로 이어진 두 씨앗), BRIDGE(두 씨앗 계좌 사이 경유 계좌2개 이상), CLOSURE(열린 사슬이 블록 계좌로 돌아옴), SHAPE_CYCLE/SHAPE_BRIDGE(씨앗 하나가 이루는 순환·경유 모양)다. 구조 근거일 뿐 유형 판정이 아니다. 핵심 SEED/CONNECTION은 채택 witness 거래의 합집합이며 새 근거에는 CONTEXT 멤버가 없다. 관계 없는 단독 씨앗은 발행하지 않는다. 정책 버전이며 DB 마이그레이션은 단일 V1을 유지한다.
+- 핵심은 과거 핵심을 포함해64건·기간240시간 이하다. 넘치는 연결은 별도 Alert로 두고 `BOUNDARY_CAP`/`BOUNDARY_SPAN` 링크를 남긴다. 링크(`boundaryWitnesses`, kind는 `BOUNDARY_PASS`/`BOUNDARY_SAME_FOCAL`/`BOUNDARY_OPEN_PAIR`/`BOUNDARY_CAP`/`BOUNDARY_SPAN`/`BOUNDARY_STAR_CHUNK`)는 다른 Alert와의 관계이며 소속이 아니다. 링크는 근거 지문에서 제외하고 매 실행의 현재 값으로 교체하므로 링크만 바뀌면 새 버전·알림을 만들지 않는다. 링크만으로 자동 병합하지 않는다. 활동이 많고 의심 비율이 낮은 허브 계좌는 관계 근거로 쓰지 않는다(`AMBIGUOUS_HUB`). 계산 예산 초과는 전체 실패하며 부분 공개하지 않는다.
+- 맥락은 소속 거래가 아니라 조회 조건이다. 근거의 `contextQuery`는 `{firstAt,lastAt,focalAccounts:[{bankId,accountId}]}`이며 핵심 기간±24시간과 블록의 초점 계좌(부채꼴 중심 등)다. accountId는 가명 계좌 UUID다. 맥락 거래 수는 조회 시 원장에서 계산한다(§3.3 contextCount).
+- 다음 분석에서는 기존 OPEN·비병합 Alert의 씨앗·핵심·채택 witness를 고정 입력으로 넘겨 같은 Alert가 이어서 자란다. 다른 Alert가 소유한 씨앗은 가져오지 않는다. 핵심 멤버가 같고 witness만 달라지면 새 버전을 만들지 않는다. 핵심 최초 시각+240시간(`sealedAfter`)이 지나면 늦은 보고 외에는 자라지 않는다. 정책 버전이 다른 기존 Alert(flow-evidence-2 등)는 동결되어 자라지도 씨앗을 내주지도 않으므로, 정책 전환 시 시연 데이터를 초기화한다(§10.2).
+- Alert 근거 상세와 조사 상세의 `relatedFlows`는 `{kind, txIds, relatedAlertIds}` 배열이다. `txIds`는 링크 근거 거래이며 **링크는 양쪽 Alert의 씨앗을 하나씩 포함한다.** `relatedAlertIds`는 그 거래를 씨앗으로 갖는 현재 공개 대표 사건 ID다. 따라서 과거 버전에서도 이동 대상 ID는 현재 기준이며 자기 자신은 제외한다. `boundaryWitnesses` 원본은 `{kind, tx_ids}` 형태로 근거 버전에 보존한다. 씨앗 소속은 한 Alert뿐이다.
+- 맥락 조회 범위가 겹쳐도 사건을 합치지 않는다. 그래프의 패턴 모델 추론은 현재 생성 기준이 아니다. flow-evidence-2 이전 버전의 근거에는 CONTEXT 멤버가 남아 있을 수 있으며 조회 계약은 그대로 읽는다.
 
 ### 3.2 사건 전이
 
 | 상황 | 처리 |
 |---|---|
 | 같은 흐름의 OPEN Alert 하나에 새 거래 연결 | 조사 중에도 자동 편입. 신규 거래만 PENDING, 기존 판정·제외·직원 역할 유지 |
-| 미착수 Alert 여러 개가 같은 흐름 | 자동 병합. 최초 생성·동률 최소ID를 대표로 유지, 대표 담당자 유지, 양쪽 담당자에게 중복 없는 알림 |
-| 조사 중 사건이 포함된 여러 Alert 병합 | 영향 담당자의 공동 변경 제안. 전원 동의 전 범위/공개 버전 유지 |
-| 종결·Episode 편입 사건에 새 핵심/새 강한 관계 | 신규 생성 기준 충족 시 후속 Alert. 같은 후속 흐름은 열린 후속에 반영 |
-| 종결 근거 반복 또는 맥락만 증가 | 후속 Alert를 새로 만들지 않음 |
+| 미착수 Alert 여러 개가 같은 흐름 | 자동 병합. 최초 생성·동률 최소ID를 대표로 유지, 대표 담당자 유지, 양쪽 담당자에게 중복 없는 알림. block-pin-1 생성기는 두 OPEN Alert를 한 그래프로 합치지 않고 `BOUNDARY_OPEN_PAIR` 링크만 남기므로 생성 경로에서는 발생하지 않는다. 예외로 두 OPEN Alert가 같은 씨앗을 소유한 비정상 상태는 먼저 생성된 Alert가 그 씨앗을 유지하고 생애주기가 자동 병합으로 정리한다(아티팩트 `duplicateOwnedSeedCount`) |
+| 조사 중 사건이 포함된 여러 Alert 병합 | 영향 담당자의 공동 변경 제안. 전원 동의 전 범위/공개 버전 유지. 위와 같은 이유로 block-pin-1 생성 경로에서는 발생하지 않는다. 같은 씨앗을 소유한 비정상 상태는 위와 같이 제안으로 정리한다 |
+| 종결·Episode 편입 사건의 씨앗이 다시 묶이고 새 씨앗을 포함한 witness가 있음 | 후속 Alert. 같은 후속 흐름은 열린 후속에 반영 |
+| 종결 근거 반복, 연결 거래만 증가 또는 관계만 변경 | 후속 Alert를 새로 만들지 않음 |
 | 정정으로 확인된 유효 핵심 소멸 | 미착수 SCOPE_CLEARED 자동 종료, 조사 중 철회 제안 |
 | 점수 재평가·기존 근거 제거 | 조사 보호 정책에 따라 제안. 보고 정정과 점수 하락을 혼용하지 않음 |
 | 같은 근거 재실행 | 새 버전·알림 없이 성공 검사만 갱신 |
@@ -205,9 +207,13 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 
 목록은 `alertId,status,resolution,assigneeId,parentAlertId,createdAt,version,runId,summary`와 생애주기 식별 필드를 제공한다. canonicalAlertId/publishedVersion/reviewStartedAt은 현재 사건 기준이다. jobId는 현재 공개 근거 생성 작업을 뜻한다. 작업 alertCount는 신규 사건 수이므로 이 목록 건수와 다를 수 있다.
 
-상세에는 policyVersion/policy/witnesses,seeds,transactions,limits,graph,coverage,dataAsOf,lastCheckedAt을 제공한다. seeds는 `{txId,occurredAt,score,threshold}`. transactions는 `{txId,occurredAt,fromAccountId,toAccountId,fromBankId,toBankId,amountReceived,receivingCurrency,amountPaid,paymentCurrency,amountUsd,paymentFormat,role,includedReasons,scores}`이며 role은 SEED/CONNECTION/CONTEXT, 미채점 scores는 null이다. 근거의 금액은 정밀도를 보존하는 decimal 문자열이며 숫자로 파싱한다. policy 필드명과 witnesses의 tx_ids, scores의 p_laundering 등은 snake_case다.
+상세에는 policyVersion/policy/witnesses,boundaryWitnesses,contextQuery,seeds,transactions,limits,graph,coverage,dataAsOf,lastCheckedAt을 제공한다. seeds는 `{txId,occurredAt,score,threshold}`. transactions는 `{txId,occurredAt,fromAccountId,toAccountId,fromBankId,toBankId,amountReceived,receivingCurrency,amountPaid,paymentCurrency,amountUsd,paymentFormat,role,includedReasons,scores}`이며 role은 SEED/CONNECTION/CONTEXT(block-pin-1 근거는 SEED/CONNECTION만), 미채점 scores는 null이다. 근거의 금액은 정밀도를 보존하는 decimal 문자열이며 숫자로 파싱한다. policy 필드명과 witnesses의 tx_ids, scores의 p_laundering 등은 snake_case다.
 
-근거 summary는 txCount,seedCount,totalAmountUsd,scoreMax,firstTxAt,lastTxAt이다. scoreMax는 포함 거래의 최대 관측 점수다. 현재 조사 summary.riskScore(현재 씨앗 최대값)와 구분한다.
+근거 summary는 txCount,seedCount,totalAmountUsd,scoreMax,firstTxAt,lastTxAt이다. txCount·totalAmountUsd·firstTxAt·lastTxAt은 근거 transactions 기준이며 block-pin-1에서는 곧 핵심(SEED+CONNECTION) 기준이다. scoreMax는 포함 거래의 최대 관측 점수다. 현재 조사 summary.riskScore(현재 씨앗 최대값)와 구분한다.
+
+상세(`GET /api/v1/alerts/{alertId}`)의 summary에는 다음 두 값을 더한다. 목록 summary에는 없다.
+- `sealedAfter`: 핵심 최초 occurredAt + policy.span_max_us(240시간)의 ISO-8601 UTC 시각. 이 시각 뒤에는 늦은 보고 외에는 Alert가 자라지 않는다. span_max_us가 없는 이전 정책 근거는 null.
+- `contextCount`: 그 버전의 contextQuery 조건(초점 계좌가 송금 또는 수취 쪽, occurredAt이 firstAt~lastAt 양끝 포함)에 맞는 현재 ACTIVE 원장 거래 중 근거 transactions 밖의 거래 수. 조회할 때마다 현재 원장으로 계산하므로 늦은 보고가 들어오면 같은 버전이라도 늘 수 있다. 초점 계좌가 없으면0, contextQuery가 없는 이전 정책 근거는 null.
 
 graph.nodes는 계좌 id,kind,bankId,inCount,outCount,inAmountUsd,outAmountUsd, graph.edges는 id,txId,from,to,amountUsd,occurredAt,role,includedReasons다. 같은 계좌쌍의 반복 거래도 별도 edge다.
 
@@ -435,7 +441,8 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 - DECIDE는 NORMAL/SUSPICIOUS로 범위 판정만 저장한다. Episode는 해당 묶음의 미판정 SUBJECT 전체 선택이 필요하다. RECONSIDER는 OPEN Episode 묶음 판정을 다시 미판정으로 열며 이전 감사 기록은 보존한다.
 - `CLOSE`에 decision이 없으면 기존 범위 판정을 집계해 종결한다. Episode는 이 방식만 허용한다. 미판정 SUBJECT/상충 판정은409. 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED/DISSOLVED. DISSOLVED는 UNLINK에 따른 Episode 해체만 사용한다.
 - 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
-- review 목록·상세의 `summary.totalAmountUsd`: 현재 소속 전체 거래(SUBJECT+CONTEXT)에서 EXCLUDED/TRANSFERRED 제외·txId 중복 제거 후 저장 `amountUsd` 합계. Episode 내 여러 Alert에 겹친 거래는 한 번만 센다. 환산액 누락/잘못된 값이 하나라도 있으면 null, 거래가 없으면 0. 기존 `amountsByCurrency`의 SUBJECT 집계 의미는 유지한다. Alert·Episode 목록의 거래 총액은 이 필드를 소수 최대 2자리 USD로 표시하며 미제공 시 원통화 합계로 대체하지 않는다.
+- review 목록·상세의 `summary.totalAmountUsd`: 현재 소속 전체 거래(SUBJECT+CONTEXT)에서 EXCLUDED/TRANSFERRED 제외·txId 중복 제거 후 저장 `amountUsd` 합계. Episode 내 여러 Alert에 겹친 거래는 한 번만 센다. 환산액 누락/잘못된 값이 하나라도 있으면 null, 거래가 없으면 0. 기존 `amountsByCurrency`의 SUBJECT 집계 의미는 유지한다. Alert·Episode 목록의 거래 총액은 이 필드를 소수 최대 2자리 USD로 표시하며 미제공 시 원통화 합계로 대체하지 않는다. block-pin-1 근거는 CONTEXT 멤버를 만들지 않으므로 직원이 역할을 바꾸지 않은 Alert에서 이 합계와 txCount는 핵심(SUBJECT) 기준이다. 직원이 CONTEXT로 지정한 거래와 이전 정책 근거의 CONTEXT는 지금처럼 포함한다.
+- 상세 summary의 `sealedAfter`·`contextCount`는 Alert의 현재 공개 근거 버전에 대해 §3.3과 같은 규칙으로 계산한다. 직원의 제외·역할 변경과 무관하며 Episode에서는 null이다. 목록 summary에는 없다.
 - 목록 summary는 위에서 명시한 기본 건수·위험도·대표 유형·금액·거래 기간만 제공한다. 상세 summary는 여기에 `typeShare,netFlows,topReceiverShare,topSenders,paymentFormats,dailySuspiciousCount,dailySuspiciousAmount,typeDistribution`을 더해 현재 범위의 상세 집계를 제공한다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
 
 ### 9.2 조사 계좌 기준 자금 지표
@@ -444,7 +451,7 @@ Alert/Episode 개요 공통. summary.amountsByCurrency는 기존 사건 SUBJECT 
 
 OPEN 자금 조회는 읽기 전용 REPEATABLE READ 트랜잭션의 한 스냅샷을 사용한다. 수신·분석 공개용 잠금을 기다리지 않으며 조회 시작 후 커밋된 변경은 다음 조회에 반영된다. 범위 수정·종결·공개 쓰기의 기존 잠금과 원자성은 유지한다.
 
-**live 개요 카드 표시:** Alert는 외부 유입액·거래 총액·순유입·근거 거래·의심 거래 참여 계좌·거래 기간의 6개, Episode는 참여 계좌 카드를 제외한 5개다. 외부 유입액/순유입은 money.external의 in/net을 통화별로 표시하며, 프로토타입의 추정 ‘투입 원금’ 또는 대표 계좌 순유입과 구분한다. 산출 대기/조회 실패는 0으로 표시하지 않는다. 카드의 거래 총액은 상세 groups.members에서 EXCLUDED/TRANSFERRED를 제외하고 txId로 중복 제거한 **전체 현재 소속 거래(SUBJECT+CONTEXT)**의 amountPaid를 paymentCurrency별로 합산한다. 이는 기존 summary.amountsByCurrency의 SUBJECT 합계와 다르며 기존 응답 의미는 유지한다. 근거 거래는 같은 집합의 거래 수, 참여 계좌는 그 송·수취 계좌의 고유 수(정상 분류·맥락 거래 포함, 계좌 자체의 세탁 판정 아님), 거래 기간은 첫~마지막 occurredAt을 KST 시·분으로 표시한다. Episode의 여러 Alert에 겹친 거래는 한 번만 센다.
+**live 개요 카드 표시:** Alert는 외부 유입액·거래 총액·순유입·근거 거래·의심 거래 참여 계좌·거래 기간의 6개, Episode는 참여 계좌 카드를 제외한 5개다. 외부 유입액/순유입은 money.external의 in/net을 통화별로 표시하며, 프로토타입의 추정 ‘투입 원금’ 또는 대표 계좌 순유입과 구분한다. 산출 대기/조회 실패는 0으로 표시하지 않는다. 카드의 거래 총액은 상세 groups.members에서 EXCLUDED/TRANSFERRED를 제외하고 txId로 중복 제거한 **전체 현재 소속 거래(SUBJECT+CONTEXT)**의 amountPaid를 paymentCurrency별로 합산한다. 이는 기존 summary.amountsByCurrency의 SUBJECT 합계와 다르며 기존 응답 의미는 유지한다. block-pin-1 근거에는 CONTEXT 멤버가 없으므로, 직원이 CONTEXT로 지정하지 않았다면 거래 총액·근거 거래·참여 계좌 카드는 핵심(SUBJECT) 거래 기준과 같다. 맥락 거래(contextQuery)는 카드에 넣지 않는다. 근거 거래는 같은 집합의 거래 수, 참여 계좌는 그 송·수취 계좌의 고유 수(정상 분류·맥락 거래 포함, 계좌 자체의 세탁 판정 아님), 거래 기간은 첫~마지막 occurredAt을 KST 시·분으로 표시한다. Episode의 여러 Alert에 겹친 거래는 한 번만 센다.
 
 - S 초기값: 현재 사건에서 제외/이관되지 않은 SEED 거래의 송·수취 계좌. 담당자가 가명 계좌를 추가/제외할 수 있고 직접 설정 후에는 해당 선택을 유지한다. 새 Episode의 자동 초기값도 이관받은 범위의 씨앗 기준이며 씨앗이 없으면 계좌 선택이 필요하다.
 - T: 현재 SUBJECT 거래의 첫날00시~마지막날 다음00시(KST). 사전 등록 은행의 current ACTIVE 보고가 모두 있는 연속 날짜까지만 관측한다. 첫날부터 미완료면 산출 대기, 중간 미완료면 그 전 날짜까지 계산한다. 업무 시각의 당일·미래는 완료 날짜로 보지 않는다. 마지막 거래 시각을 수신 완료 시각으로 추정하지 않는다.

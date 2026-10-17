@@ -3,8 +3,9 @@ package com.moneylaundry.api.analysis;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.TestcontainersConfiguration;
+import com.moneylaundry.api.common.ApiException;
+import com.moneylaundry.api.demo.DemoAnalysisController;
 import java.time.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,10 +42,16 @@ class DemoAnalysisTests {
   }
 
   void upload(LocalDate date, String state) {
+    upload(date, state, "2026-09-22T00:59:00Z");
+  }
+
+  /** received_at is business time: before the cutoff of the clock the test runs on. */
+  void upload(LocalDate date, String state, String receivedAt) {
     jdbc.update(
-        "insert into ingest.uploads(bank_id,file_name,file_hash,size_bytes,status,business_date,received_at) values(12,'fixture.csv',repeat('a',64),1,?,?, '2026-09-22T00:59:00Z')",
+        "insert into ingest.uploads(bank_id,file_name,file_hash,size_bytes,status,business_date,received_at) values(12,'fixture.csv',repeat('a',64),1,?,?,?::timestamptz)",
         state,
-        date);
+        date,
+        receivedAt);
   }
 
   @AfterEach
@@ -64,7 +71,7 @@ class DemoAnalysisTests {
             });
     assertThatThrownBy(() -> service.registerScheduled()).isInstanceOf(ApiException.class);
     assertThat(jdbc.queryForObject("select count(*) from analysis.jobs", Integer.class)).isZero();
-    upload(day, "COMPLETED");
+    upload(day, "COMPLETED", "2023-09-01T23:00:00+09");
     long id = service.registerDemo(day, day.plusDays(1));
     assertThat(
             jdbc.queryForObject(
@@ -95,6 +102,53 @@ class DemoAnalysisTests {
                     id)
                 .toInstant())
         .isEqualTo(Instant.parse("2026-09-22T01:00:00Z"));
+  }
+
+  @Test
+  void configured_business_clock_is_the_cutoff_and_receipts_compare_business_time() {
+    jdbc.update("update ops.business_clock set business_at='2023-09-02T09:00:00+09' where id");
+    jdbc.update(
+        "insert into ingest.uploads(bank_id,file_name,file_hash,size_bytes,status,business_date,received_at) values"
+            + "(12,'in.csv',repeat('a',64),1,'COMPLETED',?,'2023-09-02T08:59:00+09'),"
+            + "(12,'late.csv',repeat('b',64),1,'COMPLETED',?,'2023-09-02T09:01:00+09')",
+        day,
+        day);
+    long id = service.registerDemo(day);
+    var job =
+        jdbc.queryForMap(
+            "select analysis_date,analysis_cutoff_at,business_at from analysis.jobs where job_id=?",
+            id);
+    Instant business = Instant.parse("2023-09-02T00:00:00Z");
+    assertThat(job.get("analysis_date").toString()).isEqualTo("2023-09-02");
+    assertThat(((java.sql.Timestamp) job.get("analysis_cutoff_at")).toInstant())
+        .isEqualTo(business);
+    assertThat(((java.sql.Timestamp) job.get("business_at")).toInstant()).isEqualTo(business);
+    assertThat(
+            jdbc.queryForList(
+                "select u.file_name from analysis.receipts r join ingest.uploads u using(upload_id) where r.job_id=?",
+                String.class,
+                id))
+        .containsExactly("in.csv");
+  }
+
+  @Test
+  void demo_business_clock_flows_from_its_last_setting_but_presentation_copy_does_not() {
+    jdbc.update(
+        "update ops.business_clock set business_at='2023-09-02T09:00:00+09',updated_at=clock_timestamp()-interval '10 minutes' where id");
+    var local = new MockEnvironment();
+    local.setActiveProfiles("local");
+    Instant now =
+        new com.moneylaundry.api.common.BusinessTime(jdbc, new TransactionTemplate(manager), local)
+            .now();
+    assertThat(Duration.between(Instant.parse("2023-09-02T00:10:00Z"), now).abs())
+        .isLessThan(Duration.ofSeconds(30));
+    var presentation = new MockEnvironment().withProperty("app.presentation.enabled", "true");
+    presentation.setActiveProfiles("prod");
+    assertThat(
+            new com.moneylaundry.api.common.BusinessTime(
+                    jdbc, new TransactionTemplate(manager), presentation)
+                .now())
+        .isEqualTo(Instant.parse("2023-09-02T00:00:00Z"));
   }
 
   @Test

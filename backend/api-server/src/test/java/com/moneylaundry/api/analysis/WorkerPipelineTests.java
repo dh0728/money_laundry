@@ -3,8 +3,11 @@ package com.moneylaundry.api.analysis;
 import static org.assertj.core.api.Assertions.*;
 
 import com.moneylaundry.api.TestcontainersConfiguration;
+import com.moneylaundry.api.analysis.freeze.AlertInputSnapshot;
+import com.moneylaundry.api.analysis.worker.PythonAnalysisExecutor;
 import java.nio.file.*;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,6 +25,7 @@ class WorkerPipelineTests {
   @Autowired JdbcConnectionDetails database;
   @Autowired AnalysisService service;
   @Autowired AnalysisRunService runs;
+  @Autowired org.springframework.transaction.support.TransactionTemplate tx;
   @MockitoBean AnalysisScheduler scheduler;
   @TempDir Path storage;
   long job;
@@ -188,8 +192,8 @@ class WorkerPipelineTests {
         """
         import sys
         sys.path.insert(0, %s)
-        import pipeline
-        from worker_transport import ProtocolError
+        from features import prepare_features as pipeline
+        from common.worker_transport import ProtocolError
         original = pipeline.write_demo_input
         calls = 0
         def fail_type(source, output):
@@ -300,7 +304,7 @@ class WorkerPipelineTests {
         """
         import sys
         sys.path.insert(0, %s)
-        import pipeline
+        from features import prepare_features as pipeline
         def abandon(*args):
             raise SystemExit(74)
         pipeline.write_demo_input = abandon
@@ -345,8 +349,8 @@ class WorkerPipelineTests {
         import sys, os, json
         sys.path.insert(0, %s)
         import httpx, psycopg
-        import model_publication, inference_dispatch
-        from test_frozen_input_postgres import MemoryS3
+        from inference import model_publication, inference_dispatch
+        from tests.test_frozen_input_postgres import MemoryS3
         settings = model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
         os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)
         model_publication.configured = lambda: (settings, MemoryS3())
@@ -437,14 +441,13 @@ class WorkerPipelineTests {
 
   @Test
   void runner_collects_real_parquet_and_persists_scores_before_alerts() throws Exception {
-    new AlertInputSnapshot(jdbc)
-        .freeze(
-            run,
-            jdbc.queryForObject(
-                    "select analysis_cutoff_at from analysis.jobs where job_id=?",
-                    java.sql.Timestamp.class,
-                    job)
-                .toInstant());
+    Instant cutoff =
+        jdbc.queryForObject(
+                "select analysis_cutoff_at from analysis.jobs where job_id=?",
+                java.sql.Timestamp.class,
+                job)
+            .toInstant();
+    tx.executeWithoutResult(s -> new AlertInputSnapshot(jdbc).freeze(run, cutoff));
     Path script = storage.resolve("completed_remote_double.py");
     Files.writeString(
         script,
@@ -452,10 +455,10 @@ class WorkerPipelineTests {
         import sys, os, json, io
         sys.path.insert(0, %s)
         import httpx, psycopg, pyarrow.parquet as pq
-        import model_publication, inference_dispatch
-        from test_frozen_input_postgres import MemoryS3
-        from demo_calculator import build_targets, calculate
-        from worker_transport import Request, descriptor
+        from inference import model_publication, inference_dispatch
+        from tests.test_frozen_input_postgres import MemoryS3
+        from common.demo_calculator import build_targets, calculate
+        from common.worker_transport import Request, descriptor
         settings = model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
         os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)
         def result(request_id):

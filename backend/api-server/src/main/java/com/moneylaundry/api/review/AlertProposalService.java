@@ -2,8 +2,10 @@ package com.moneylaundry.api.review;
 
 import static com.moneylaundry.api.review.ReviewJson.*;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.analysis.publish.AlertPublisher;
+import com.moneylaundry.api.common.ApiException;
+import com.moneylaundry.api.common.BusinessTime;
 import java.sql.Timestamp;
 import java.util.*;
 import org.springframework.http.HttpStatus;
@@ -193,13 +195,15 @@ public class AlertProposalService {
 
   private void audit(
       Map<String, Object> proposal, long actor, String action, String comment, Object snapshot) {
+    Timestamp at = Timestamp.from(time.now());
     jdbc.update(
-        "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,?,?,?,?::jsonb)",
+        "insert into review.events(alert_id,actor_id,action,comment,business_at,recorded_at,snapshot) values(?,?,?,?,?,?,?::jsonb)",
         proposal.get("target_alert_id"),
         actor,
         action,
         comment,
-        Timestamp.from(time.now()),
+        at,
+        at,
         encode(snapshot));
   }
 }

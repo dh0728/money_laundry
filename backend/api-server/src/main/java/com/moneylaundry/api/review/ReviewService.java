@@ -2,9 +2,10 @@ package com.moneylaundry.api.review;
 
 import static com.moneylaundry.api.review.ReviewJson.*;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.alert.AlertQueryService;
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.common.ApiException;
+import com.moneylaundry.api.common.BusinessTime;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
@@ -13,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/** Alert/Episode 조사 사건의 목록·상세·자금 지표와 조사 명령(판정·제외·이관·연결 해제·종결) 처리. */
 @Service
 public class ReviewService {
   private final JdbcTemplate jdbc;
@@ -262,7 +264,20 @@ public class ReviewService {
             0,
             Duration.between(((Timestamp) c.get("created_at")).toInstant(), time.now()).toDays()));
     out.put("groups", gs);
-    out.put("summary", CaseSummary.summarize(members));
+    var summary = new LinkedHashMap<>(CaseSummary.summarize(members));
+    // Growth deadline and context size describe the published Alert evidence, not an Episode.
+    summary.put("sealedAfter", null);
+    summary.put("contextCount", null);
+    if ("ALERT".equals(c.get("kind")) && c.get("published_version") != null)
+      summary.putAll(
+          alerts.blockFacts(
+              object(
+                  jdbc.queryForObject(
+                      "select evidence::text from review.alert_versions where alert_id=? and version=?",
+                      String.class,
+                      c.get("alert_id"),
+                      c.get("published_version")))));
+    out.put("summary", summary);
     out.put(
         "pendingCount",
         members.stream()
@@ -534,21 +549,23 @@ public class ReviewService {
 
   private void event(long id, long user, String action, String comment, Object snapshot) {
     boolean episode = "EPISODE".equals(caseRow(id).get("kind"));
+    Timestamp at = Timestamp.from(time.now());
     if (!episode)
       jdbc.update(
           "update review.alerts set review_started_at=coalesce(review_started_at,?),review_started_by=coalesce(review_started_by,?) where alert_id=?",
-          Timestamp.from(time.now()),
+          at,
           user,
           id);
     jdbc.update(
         "insert into review.events("
             + (episode ? "episode_id" : "alert_id")
-            + ",actor_id,action,comment,business_at,snapshot) values(?,?,?,?,?,?::jsonb)",
+            + ",actor_id,action,comment,business_at,recorded_at,snapshot) values(?,?,?,?,?,?,?::jsonb)",
         id,
         user,
         action,
         comment,
-        Timestamp.from(time.now()),
+        at,
+        at,
         encode(snapshot));
   }
 
@@ -690,7 +707,6 @@ public class ReviewService {
           if ("UNLINK".equals(cmd.action())) return unlinkAlerts(user, cmd, cases, loaded);
           if (Set.of("MOVE", "SPLIT").contains(cmd.action()))
             throw ApiException.invalidTransition("Alert를 분할하거나 다른 Episode로 부분 이동할 수 없습니다.");
-          Long target = null;
           for (var sel : cmd.selections()) {
             var gs = loaded.get(sel.caseId());
             boolean episode = "EPISODE".equals(cases.get(sel.caseId()).get("kind"));
@@ -782,9 +798,6 @@ public class ReviewService {
                     "EXCLUDE",
                     "SUBJECT",
                     "CONTEXT",
-                    "TRANSFER",
-                    "MOVE",
-                    "SPLIT",
                     "RECONSIDER")
                 .contains(cmd.action())) throw AnalysisService.invalid();
             save(id, gs);
@@ -792,7 +805,8 @@ public class ReviewService {
           }
           var response = new LinkedHashMap<String, Object>();
           response.put("caseIds", loaded.keySet());
-          response.put("targetCaseId", target);
+          // TRANSFER returns earlier; other commands keep the documented null target.
+          response.put("targetCaseId", null);
           jdbc.update(
               "insert into review.requests values(?,?,?::jsonb,?::jsonb)",
               user,

@@ -1,5 +1,6 @@
 package com.moneylaundry.api.analysis;
 
+import com.moneylaundry.api.analysis.worker.PythonAnalysisExecutor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.springframework.jdbc.core.JdbcTemplate;

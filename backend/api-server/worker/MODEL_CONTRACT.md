@@ -4,7 +4,7 @@
 
 ## 연결 지점과 성공 반환
 
-`model_adapter.py`의 `run_model(targets, model_kind, *, model_version, feature_version)`이 모델 실행 진입점이다. 워커가 별도 프로세스에서 호출한다. 현재 함수 내부의 시연 계산 호출을 실제 모델의 입력 검증 → 로딩 → 추론 → 후처리로 교체한다. 테스트 프로그램을 참조하거나 실행하지 않는다.
+`inference_worker/model_adapter.py`의 `run_model(targets, model_kind, *, model_version, feature_version)`이 모델 실행 진입점이다. 워커가 별도 프로세스에서 호출한다. 현재 함수 내부의 시연 계산 호출을 실제 모델의 입력 검증 → 로딩 → 추론 → 후처리로 교체한다. 테스트 프로그램을 참조하거나 실행하지 않는다.
 
 - `model_kind`: `binary` 또는 `type`. 외부 요청 API에서는 BINARY/TYPE이다.
 - 현재 `targets`: PyArrow Table(tx_id int64, demo_value int64). 실제 GNN 입력 피처·그래프 형식은 별도 계약이며 이 문서로 확정하지 않는다.
@@ -17,7 +17,7 @@
 Python 어댑터는 공통 모듈의 예외를 사용한다.
 
 ```python
-from model_contract import ModelExecutionError
+from common.model_contract import ModelExecutionError
 
 # 모델 프레임워크의 실제 예외를 잡는 지점에서 해당 코드로 변환한다.
 raise ModelExecutionError("GPU_OUT_OF_MEMORY", "INFERENCE") from None
@@ -65,4 +65,4 @@ raise ModelExecutionError("GPU_OUT_OF_MEMORY", "INFERENCE") from None
 - 파일 전송 재시도는 별도로 30초·120초, 실패3회까지 적용한다. 결과 업로드 재시도는 저장된 계산 결과를 재사용한다. HTTP401/403은 만료/권한 원인을 단정하지 않고 TRANSFER_ACCESS_DENIED 및 REFRESH_ACCESS_OR_CHECK_PERMISSION으로 보고한다. 자동 URL 갱신/입력 수정은 이번 구현에 포함되지 않는다.
 - 같은 조건의 OOM 반복 실행, 임의 배치 축소·그래프 분할, 자동 입력 재가공은 하지 않는다. 그런 복구 방식은 모델 결과의 의미가 유지되는지 확인한 별도 계약이 필요하다.
 
-규약의 실행 정본은 `model_contract.py`의 검증과 정책이다. 모델팀 전달 시 이 문서와 해당 모듈을 함께 제공하면 Python 예외를 그대로 사용할 수 있고, 문서의 JSON을 반환하는 방식도 사용할 수 있다.
+규약의 실행 정본은 `common/model_contract.py`의 검증과 정책이다. 모델팀 전달 시 이 문서와 해당 모듈을 함께 제공하면 Python 예외를 그대로 사용할 수 있고, 문서의 JSON을 반환하는 방식도 사용할 수 있다.

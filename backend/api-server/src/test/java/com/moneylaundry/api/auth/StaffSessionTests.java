@@ -38,7 +38,7 @@ class StaffSessionTests {
   @Autowired JdbcTemplate jdbc;
   @Autowired PasswordEncoder encoder;
   @MockitoBean AnalysisScheduler scheduler;
-  @MockitoBean com.moneylaundry.api.storage.UploadStore store;
+  @MockitoBean com.moneylaundry.api.ingest.storage.UploadStore store;
   MockHttpSession session;
   String token;
 

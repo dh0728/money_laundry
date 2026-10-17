@@ -1,5 +1,6 @@
 package com.moneylaundry.api.analysis;
 
+import com.moneylaundry.api.analysis.freeze.AlertInputSnapshot;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
@@ -46,17 +47,6 @@ public class AnalysisRunService {
             "select exists(select 1 from analysis.input_transactions i join analysis.runs r using(run_id) where i.tx_id=? and i.input_role='TARGET' and r.status='COMPLETED')",
             Boolean.class,
             id));
-  }
-
-  public void cancelAffected(Set<Long> changed) {
-    for (long id : changed) {
-      var runs =
-          jdbc.queryForList(
-              "select distinct r.run_id from analysis.input_transactions i join analysis.runs r using(run_id) where i.tx_id=? and r.status in ('READY','ACTIVE') order by r.run_id",
-              UUID.class,
-              id);
-      for (UUID run : runs) cancel(run, "REPORT_CORRECTED");
-    }
   }
 
   public void cancel(UUID run, String reason) {
@@ -231,12 +221,6 @@ public class AnalysisRunService {
     }
   }
 
-  public void resumeCancellation(UUID cancel) {
-    jdbc.update(
-        "update analysis.cancel_outbox set attempts=0,retry_at=null,error_code=null where cancel_id=? and acknowledged_at is null",
-        cancel);
-  }
-
   public void acknowledge(UUID cancel, String response) {
     if (!List.of("STOPPED", "ALREADY_FINISHED").contains(response))
       throw new IllegalArgumentException("INVALID_CANCEL_ACK");
@@ -296,7 +280,7 @@ public class AnalysisRunService {
             Set<Long> origins =
                 new HashSet<>(
                     jdbc.queryForList(
-                        "select distinct v.set_id from analysis.input_reports ir join private.bank_reports br using(report_id) join ingest.report_versions v using(version_id) where ir.run_id=?",
+                        "select set_id from analysis.input_report_sets where run_id=?",
                         Long.class,
                         prior));
             boolean ready = !origins.isEmpty() && selectedSets.containsAll(origins);
@@ -344,9 +328,11 @@ public class AnalysisRunService {
               .formatted(String.join(",", Collections.nCopies(blockedSets.size(), "?")));
       args.addAll(blockedSets);
     }
+    AlertInputSnapshot.openFrozen(jdbc, run);
     int count =
         jdbc.update(
             """
+        with frozen as (
         insert into analysis.input_transactions
         select ?,t.tx_id,'TARGET',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
           a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,
@@ -366,21 +352,24 @@ public class AnalysisRunService {
             where tr.tx_id=t.tx_id and sv.job_id=? and v.received_at<=?)
         """
                 + blocked
-                + " order by t.tx_id",
+                + " order by t.tx_id returning run_id,tx_id,business_date)"
+                + " insert into frozen_input select * from frozen",
             args.toArray());
+    // Only TARGET rows of this run exist yet, so the frozen mirror is exactly the TARGET set.
+    jdbc.execute("analyze frozen_input");
     jdbc.update(
         """
         insert into analysis.input_reports
-        select i.run_id,tr.tx_id,tr.report_id from analysis.input_transactions i
+        select i.run_id,tr.tx_id,tr.report_id from frozen_input i
         join ledger.transaction_reports tr using(tx_id) join private.bank_reports br using(report_id)
         join ingest.report_sets s on s.current_version_id=br.version_id
-        where i.run_id=? and i.input_role='TARGET' on conflict do nothing
+        where i.run_id=? on conflict do nothing
         """,
         run);
     jdbc.update(
         """
         insert into analysis.target_ownership
-        select tx_id,run_id from analysis.input_transactions where run_id=? and input_role='TARGET'
+        select tx_id,run_id from frozen_input where run_id=?
         order by tx_id on conflict(tx_id) do update set run_id=excluded.run_id
         """,
         run);
@@ -397,16 +386,10 @@ public class AnalysisRunService {
         "insert into analysis.input_reports select ?,tr.tx_id,tr.report_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
         run,
         id);
-  }
-
-  public boolean accepts(long job, UUID run, UUID execution) {
-    return Boolean.TRUE.equals(
-        jdbc.queryForObject(
-            "select exists(select 1 from analysis.jobs b join analysis.runs r on r.run_id=b.current_run_id where b.job_id=? and r.run_id=? and b.execution_id=? and b.status='RUNNING' and r.status in ('READY','ACTIVE'))",
-            Boolean.class,
-            job,
-            run,
-            execution));
+    jdbc.update(
+        "insert into analysis.input_report_sets select distinct ?,s.set_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
+        run,
+        id);
   }
 
   public void complete(UUID run) {
@@ -430,6 +413,16 @@ public class AnalysisRunService {
               """,
               run);
         });
+  }
+
+  /** Lets later stages plan the new run's frozen rows with statistics that include its run id. */
+  public void refreshInputStatistics() {
+    jdbc.execute(
+        """
+        analyze analysis.input_transactions, analysis.input_reports, analysis.input_ledger,
+          analysis.input_ledger_marks, analysis.input_report_sets, analysis.score_ledger,
+          analysis.alert_origin_ledger, analysis.fact_ledger
+        """);
   }
 
   /**

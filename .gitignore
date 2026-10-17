@@ -6,10 +6,11 @@
 
 # AI 협업 파일 (개인 도구)
 /collab/
-/CLAUDE.md
-/AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+.claude/
 
-# Codex 번역·문서 작업용 스크립트 및 임시 파일
+# 문서 작업용 스크립트 및 임시 파일
 # 루트 scripts만 제외하며 deploy/scripts는 Git에 포함
 /scripts/
 /tmp/

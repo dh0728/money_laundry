@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 실제 Python DB 쓰기는 자체 트랜잭션의 토큰 검사/단계 완료 원자화로 후속 연결해야 한다. */
+/** 분석 단계 하나의 실행 경계. AnalysisRunner가 prepare를 트랜잭션 밖에서 실행하고, commit을 단계 완료 트랜잭션 안에서 호출한다. */
 public interface AnalysisStageExecutor {
   record Context(
       long jobId,
@@ -27,6 +27,6 @@ public interface AnalysisStageExecutor {
 
   Result prepare(Context context);
 
-  /** 현재는 테스트 실행기용 원자 저장 경계. 별도 Python DB 연결은 이 Java 트랜잭션에 참여하지 않는다. */
+  /** 단계 완료 직전 확인. Python 워커는 자체 연결로 저장하므로 이 트랜잭션에 참여하지 않고, 실행기는 저장된 체크포인트만 대조한다. */
   default void commit(Context context, Result result) {}
 }

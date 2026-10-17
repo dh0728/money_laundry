@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;
 
+/** core.users의 STAFF/ADMIN 계정을 Spring Security 사용자로 제공한다. 해시 형식이 맞지 않으면 비활성으로 본다. */
 @Service
 public class StaffAccounts implements UserDetailsService {
   private final JdbcTemplate jdbc;

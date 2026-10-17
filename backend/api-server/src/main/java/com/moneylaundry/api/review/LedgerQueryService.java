@@ -1,12 +1,14 @@
 package com.moneylaundry.api.review;
 
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.common.BusinessTime;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+/** Transactions 화면의 소유주·계좌·거래 조회와 필터·페이지 처리. */
 @Service
 public class LedgerQueryService {
   private final JdbcTemplate jdbc;

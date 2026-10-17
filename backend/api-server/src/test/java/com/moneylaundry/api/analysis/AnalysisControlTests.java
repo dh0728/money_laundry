@@ -32,9 +32,10 @@ class AnalysisControlTests {
     if (!profiles.isEmpty()) env.setActiveProfiles(profiles.split(","));
     var service = mock(AnalysisService.class);
     var controller = new AnalysisController(service, env);
-    assertThatThrownBy(controller::trigger).isInstanceOf(com.moneylaundry.api.ApiException.class);
+    assertThatThrownBy(controller::trigger)
+        .isInstanceOf(com.moneylaundry.api.common.ApiException.class);
     assertThatThrownBy(() -> controller.resume(1))
-        .isInstanceOf(com.moneylaundry.api.ApiException.class);
+        .isInstanceOf(com.moneylaundry.api.common.ApiException.class);
     verifyNoInteractions(service);
   }
 }

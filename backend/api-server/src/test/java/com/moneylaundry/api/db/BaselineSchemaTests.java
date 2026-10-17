@@ -5,7 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.moneylaundry.api.alert.AlertQueryService;
 import com.moneylaundry.api.analysis.AnalysisRunService;
-import com.moneylaundry.api.review.BusinessTime;
+import com.moneylaundry.api.common.BusinessTime;
 import com.moneylaundry.api.review.LedgerQueryService;
 import com.moneylaundry.api.review.ReviewService;
 import java.time.Clock;
@@ -21,7 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.ObjectMapper;
 
-/** The replacement baseline is tested in a fresh DB, never layered over V1-V17. */
+/**
+ * The single V1 baseline is tested in a fresh DB, never layered over the former migration history.
+ */
 class BaselineSchemaTests {
   static PostgreSQLContainer postgres;
   static JdbcTemplate jdbc;
@@ -73,7 +75,7 @@ class BaselineSchemaTests {
             Long.class,
             "a".repeat(64),
             source.length);
-    var store = mock(com.moneylaundry.api.storage.UploadStore.class);
+    var store = mock(com.moneylaundry.api.ingest.storage.UploadStore.class);
     when(store.open("fixture")).thenAnswer(invocation -> new java.io.ByteArrayInputStream(source));
     var database =
         new org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails() {
@@ -94,7 +96,7 @@ class BaselineSchemaTests {
     java.util.Arrays.fill(searchBytes, (byte) 1);
     String search = java.util.Base64.getEncoder().encodeToString(searchBytes);
     var loader =
-        new com.moneylaundry.api.ingest.LedgerLoader(
+        new com.moneylaundry.api.ingest.load.LedgerLoader(
             jdbc,
             store,
             database,
@@ -112,7 +114,7 @@ class BaselineSchemaTests {
         .isEqualTo("COMPLETED");
     var report = jdbc.queryForMap("select * from private.bank_reports");
     var protector =
-        new com.moneylaundry.api.ingest.PrivateDataProtector(encryption, search, "test");
+        new com.moneylaundry.api.ingest.load.PrivateDataProtector(encryption, search, "test");
     String plain =
         protector.decrypt(
             "report:" + report.get("version_id") + ":" + report.get("source_row"),
@@ -152,7 +154,7 @@ class BaselineSchemaTests {
         .putAll(
             java.util.Map.of(
                 "WORKER_DB_URL",
-                com.moneylaundry.api.analysis.PythonAnalysisExecutor.workerDatabaseUrl(
+                com.moneylaundry.api.analysis.worker.PythonAnalysisExecutor.workerDatabaseUrl(
                     postgres.getJdbcUrl()),
                 "WORKER_DB_USER",
                 postgres.getUsername(),
@@ -510,7 +512,7 @@ class BaselineSchemaTests {
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from public.flyway_schema_history where success", Integer.class))
-        .isEqualTo(1);
+        .isEqualTo(3);
     assertThat(
             jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema='public'",

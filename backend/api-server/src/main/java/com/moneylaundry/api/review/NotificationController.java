@@ -4,6 +4,7 @@ import java.security.Principal;
 import java.time.LocalDate;
 import org.springframework.web.bind.annotation.*;
 
+/** 업무 알림 목록·관련 사건·읽음 처리 API(/api/v1/notifications). */
 @RestController
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
