@@ -197,6 +197,11 @@ def finish_inference(connection, execution):
         save_checkpoint(connection, execution, 'INFERENCE', artifact)
 
 
+def run(connection, execution, context):
+    """Stage entry: ⑦ 점수 저장 (SCORES)."""
+    save_scores(connection, execution, context.storage_dir, context.settings, context.s3)
+
+
 def save_scores(connection, execution, storage_root, settings, s3):
     with connection.transaction():
         lock_stage(connection, execution, 'SCORES')

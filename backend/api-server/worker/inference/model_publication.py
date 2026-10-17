@@ -76,6 +76,11 @@ def configured():
     return settings, client
 
 
+def run(connection, execution, context):
+    """Stage entry: ⑥ 모델 추론 (INFERENCE PUBLISH), one model kind."""
+    publish_model(connection, execution, context.model_kind, context.storage_dir, context.settings, context.s3)
+
+
 def publish_model(connection, execution, kind, storage_root, settings, s3, *, transport=None):
     if kind not in ('BINARY', 'TYPE') or connection.autocommit is not True:
         raise ProtocolError('Invalid publication operation')

@@ -232,7 +232,9 @@ def choose_seeds(data, scenario, random_seed=20261007):
     if scenario == "demo":
         # Actual dev demo calculation and default threshold; evaluation IDs are
         # not database IDs, so this reproduces density, not an exact dev run.
-        from common.demo_calculator import build_targets, calculate, MODEL_VERSION, FEATURE_VERSION
+        from models.demo_random.build_input import build_targets
+        from models.demo_random.model import calculate
+        from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
         selected = set()
         for start in range(0, len(data.edges), 10_000):
             scores = calculate(build_targets(data.edges.tx_ids[start:start + 10_000]),
@@ -303,8 +305,9 @@ def main():
     source_hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                      for path in (worker / "alerts/flow_graph.py", worker / "tools/evaluate_flow_graph.py")}
     if 'demo' in args.scenarios:
-        source_hashes['demo_calculator.py'] = hashlib.sha256(
-            (worker / 'common/demo_calculator.py').read_bytes()).hexdigest()
+        for name in ('spec.py', 'build_input.py', 'model.py'):
+            source_hashes['demo_random/' + name] = hashlib.sha256(
+                (worker / 'models/demo_random' / name).read_bytes()).hexdigest()
     print(json.dumps({"stage": "configuration", "policy": asdict(policy),
                       "source_sha256": source_hashes, "cutoff": args.cutoff,
                       "split_at": args.split_at, "scenarios": args.scenarios,

@@ -18,7 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY worker/inference_server.py ./
 COPY worker/inference_worker ./inference_worker
-COPY worker/common/__init__.py worker/common/model_contract.py worker/common/demo_calculator.py \
+COPY worker/models ./models
+COPY worker/common/__init__.py worker/common/model_contract.py worker/common/score_contract.py \
      worker/common/worker_transport.py ./common/
 
 USER app:app

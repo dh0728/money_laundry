@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request as HttpRequest
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from common.demo_calculator import supported_versions
+from models.registry import supported_versions
 from inference_worker.inference_compute import check_url, request_from
 from inference_worker.inference_service import Conflict, InferenceService, NotFound, Settings
 from common.worker_transport import ProtocolError

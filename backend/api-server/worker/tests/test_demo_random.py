@@ -4,8 +4,9 @@ import unittest
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from common.demo_calculator import (FEATURE_VERSION, MODEL_VERSION, LEGACY_MODEL_VERSION, build_targets,
-                             calculate, validate_scores)
+from models.demo_random.spec import FEATURE_VERSION, MODEL_VERSION, LEGACY_MODEL_VERSION
+from models.demo_random.build_input import build_targets
+from models.demo_random.model import calculate, validate_scores
 from common.worker_transport import ProtocolError
 
 VERSIONS = dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
@@ -56,11 +57,12 @@ class DemoCalculatorTests(unittest.TestCase):
         connection = Mock()
         connection.execute.return_value.fetchall.return_value = []
         self.assertEqual(versions_for_run(connection, SimpleNamespace(run_id='run')),
-                         (MODEL_VERSION, FEATURE_VERSION))
+                         {'BINARY': (MODEL_VERSION, FEATURE_VERSION), 'TYPE': (MODEL_VERSION, FEATURE_VERSION)})
         self.assertEqual(connection.execute.call_count, 1)
         self.assertNotIn('demo_report_hints', connection.execute.call_args.args[0])
         connection.execute.return_value.fetchall.return_value = [
-            ({'model_version': 'demo-labels-v2', 'feature_version': 'demo-label-input-v1'},)]
+            ('BINARY', {'model_version': 'demo-labels-v2', 'feature_version': 'demo-label-input-v1'}),
+            ('TYPE', {'model_version': 'demo-labels-v2', 'feature_version': 'demo-label-input-v1'})]
         with self.assertRaises(ProtocolError):
             versions_for_run(connection, SimpleNamespace(run_id='run'))
 

@@ -18,7 +18,9 @@ import httpx
 import pyarrow.parquet as pq
 import uvicorn
 
-from common.demo_calculator import build_targets, calculate, FEATURE_VERSION, MODEL_VERSION
+from models.demo_random.build_input import build_targets
+from models.demo_random.model import calculate
+from models.demo_random.spec import FEATURE_VERSION, MODEL_VERSION
 from inference_server import create_app
 from inference_worker.inference_service import InferenceService, Settings
 from inference_worker.inference_compute import atomic_json
@@ -153,7 +155,9 @@ class InferenceServerTests(unittest.TestCase):
                 self.assertEqual(scores.column("p_laundering").to_pylist(), calculate(build_targets([1, 99, 100]), "binary", model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)["p_laundering"].to_pylist())
 
     def test_random_demo_models_use_same_http_file_callback_protocol(self):
-        from common.demo_calculator import build_targets, MODEL_VERSION, FEATURE_VERSION, calculate
+        from models.demo_random.build_input import build_targets
+        from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
+        from models.demo_random.model import calculate
         targets = build_targets([1, 99, 100])
         for kind in ('binary', 'type'):
             payload = self.payload(kind, targets, dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION))

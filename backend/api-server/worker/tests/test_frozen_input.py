@@ -5,7 +5,8 @@ from uuid import UUID, uuid4
 
 import pyarrow.parquet as pq
 
-from common.frozen_input import FrozenInput, InputExecution, StaleExecution, write_demo_input
+from common.frozen_input import FrozenInput, InputExecution, StaleExecution
+from models.demo_random.build_input import write_input as write_demo_input
 from common.worker_transport import ProtocolError
 
 
@@ -53,10 +54,10 @@ class FrozenInputTests(unittest.TestCase):
             with self.subTest(changes=changes):
                 self.cursor.fetchall.return_value = [self.row(1, **changes)]
                 with self.assertRaises(StaleExecution):
-                    list(FrozenInput(self.connection, self.execution).batches())
+                    list(FrozenInput(self.connection, self.execution).target_pages())
         self.cursor.fetchall.return_value = []
         with self.assertRaises(StaleExecution):
-            list(FrozenInput(self.connection, self.execution).batches())
+            list(FrozenInput(self.connection, self.execution).target_pages())
 
     def test_empty_input_never_becomes_inference_file(self):
         self.cursor.fetchall.return_value = [self.row()]
@@ -78,7 +79,7 @@ class FrozenInputTests(unittest.TestCase):
         for rows in ([self.row(1), self.row(1)], [self.row(2), self.row(1)], [self.row(0)]):
             self.cursor.fetchall.return_value = rows
             with self.assertRaises(ProtocolError):
-                list(FrozenInput(self.connection, self.execution).batches())
+                list(FrozenInput(self.connection, self.execution).target_pages())
 
     def test_invalid_execution_identity_rejected(self):
         for job in (True, 0, -1, 2**63):

@@ -60,11 +60,12 @@ COPY worker/inference /app/worker/inference
 COPY worker/scores /app/worker/scores
 COPY worker/alerts /app/worker/alerts
 COPY worker/inference_worker /app/worker/inference_worker
+COPY worker/models /app/worker/models
 COPY worker/recover_dev_placeholder.sql /app/worker/recover_dev_placeholder.sql
 COPY worker/configure_analysis_db.py worker/analysis_permissions.sql /app/worker/
 
 # Fail the image build if an entry point's local module dependency is missing.
-RUN PYTHONPATH=/app/worker python -c "import analysis_entry, ingest_entry, inference_server, ingest.report_ingest, integrate.report_integration, integrate.report_correction, features.prepare_features, alerts.alert_pipeline, inference.inference_dispatch, scores.result_collection"
+RUN PYTHONPATH=/app/worker python -c "import analysis_entry, ingest_entry, inference_server, ingest.report_ingest, integrate.report_integration, integrate.report_correction, features.prepare_features, alerts.alert_pipeline, inference.inference_dispatch, scores.result_collection, models.registry"
 
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 

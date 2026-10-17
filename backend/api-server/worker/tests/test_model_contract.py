@@ -4,7 +4,8 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from common.demo_calculator import build_targets, MODEL_VERSION, FEATURE_VERSION
+from models.demo_random.build_input import build_targets
+from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
 from inference_worker.model_adapter import run_model
 from common.model_contract import MODEL_ERRORS, ModelExecutionError, model_failure, retry_decision
 
@@ -48,7 +49,7 @@ class ModelContractTests(unittest.TestCase):
         for exception, expected in ((MemoryError("secret"), "HOST_OUT_OF_MEMORY"),
                                     (RuntimeError("secret"), "MODEL_EXECUTION_FAILED"),
                                     (ModelExecutionError("GPU_OUT_OF_MEMORY", "INFERENCE"), "GPU_OUT_OF_MEMORY")):
-            with patch("inference_worker.model_adapter.calculate", side_effect=exception):
+            with patch("models.demo_random.model.calculate", side_effect=exception):
                 with self.assertRaises(ModelExecutionError) as caught:
                     run_model(targets, "binary", **versions)
                 self.assertEqual(caught.exception.code, expected)

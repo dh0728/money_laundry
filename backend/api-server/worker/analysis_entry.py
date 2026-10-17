@@ -4,6 +4,18 @@ import os
 import uuid
 
 
+# Analysis stages after 거래 통합, in pipeline order. Each module exposes
+# run(connection, execution, context); this table is the only place that maps them.
+# (stage, operation) -> (module, needs --model-kind, talks to the inference worker, requires inference env)
+STAGES = {
+    ("FEATURES", None): ("features.prepare_features", False, False, False),
+    ("INFERENCE", "PUBLISH"): ("inference.model_publication", True, True, False),
+    ("INFERENCE", None): ("inference.inference_dispatch", False, True, True),
+    ("SCORES", None): ("scores.result_collection", False, True, True),
+    ("ALERTS", None): ("alerts.alert_pipeline", False, False, False),
+}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-id", type=int, required=True)
@@ -19,24 +31,25 @@ def main(argv=None):
         if args.run_id is not None or args.operation is not None or args.model_kind is not None:
             return 65
         return integrate(args.job_id,args.execution_id)
-    publishing = args.stage == "INFERENCE" and args.operation == "PUBLISH" and args.model_kind is not None
-    preparing = args.stage == "FEATURES" and args.operation is None and args.model_kind is None
-    ticking = args.stage == "INFERENCE" and args.operation is None and args.model_kind is None
-    scoring = args.stage == "SCORES" and args.operation is None and args.model_kind is None
-    alerting = args.stage == "ALERTS" and args.operation is None and args.model_kind is None
-    if (ticking or scoring) and not all(os.environ.get(k) for k in ('INFERENCE_API_URL', 'INFERENCE_API_TOKEN', 'S3_BUCKET')):
+    stage = STAGES.get((args.stage, args.operation))
+    if stage is not None and stage[1] != (args.model_kind is not None):
+        stage = None
+    if stage is not None and stage[3] and not all(os.environ.get(k) for k in ('INFERENCE_API_URL', 'INFERENCE_API_TOKEN', 'S3_BUCKET')):
         return 78
-    if (not (preparing or publishing or ticking or scoring or alerting) or os.environ.get("WORKER_MODE") != "demo"
+    if (stage is None or os.environ.get("WORKER_MODE") != "demo"
             or args.run_id is None or not os.environ.get("WORKER_DB_URL")
             or not os.environ.get("WORKER_STORAGE_DIR")):
         return 78  # Unconnected stages must never synthesize success.
+    module_name, _, remote, _ = stage
     try:
+        import importlib
         import psycopg
         import httpx
         from botocore.exceptions import BotoCoreError, ClientError
         from common.frozen_input import InputExecution, StaleExecution
-        from features.prepare_features import prepare_features
+        from common.stage_context import StageContext
         from common.worker_transport import ProtocolError, StoreUnavailable
+        module = importlib.import_module(module_name)
     except ImportError:
         return 78
     try:
@@ -47,24 +60,13 @@ def main(argv=None):
             if connection.execute("SELECT has_schema_privilege(current_user,'private','USAGE') OR has_schema_privilege(current_user,'evaluation','USAGE')").fetchone()[0]:
                 return 78
             execution = InputExecution(args.job_id, args.run_id, args.execution_id)
-            if alerting:
-                from alerts.alert_pipeline import save_alerts
-                save_alerts(connection, execution)
-            elif publishing or ticking or scoring:
-                from inference.model_publication import configured, publish_model
+            settings = s3 = None
+            if remote:
+                from inference.model_publication import configured
                 settings, s3 = configured()
-                if scoring:
-                    from scores.result_collection import save_scores
-                    save_scores(connection, execution, os.environ["WORKER_STORAGE_DIR"], settings, s3)
-                elif ticking:
-                    from inference.inference_dispatch import advance
-                    return advance(connection, execution, os.environ["WORKER_STORAGE_DIR"], settings, s3)
-                else:
-                    publish_model(connection, execution, args.model_kind,
-                                  os.environ["WORKER_STORAGE_DIR"], settings, s3)
-            else:
-                prepare_features(connection, execution, os.environ["WORKER_STORAGE_DIR"])
-        return 0
+            context = StageContext(os.environ["WORKER_STORAGE_DIR"], args.model_kind, settings, s3)
+            code = module.run(connection, execution, context)
+        return 0 if code is None else code
     except StaleExecution:
         return 79
     except (psycopg.Error, StoreUnavailable, httpx.TransportError, BotoCoreError, ClientError):
