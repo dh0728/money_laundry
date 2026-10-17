@@ -15,6 +15,10 @@ CLAUDE.local.md
 /scripts/
 /tmp/
 
+# 번역 작업용 스크립트 및 임시 파일
+scripts/
+tmp/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -147,3 +151,4 @@ $RECYCLE.BIN/
 ~$*
 
 /docs
+

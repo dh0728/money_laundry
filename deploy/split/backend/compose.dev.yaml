@@ -1,0 +1,103 @@
+name: aml-dev-backend
+services:
+  api:
+    image: ${DEV_API_IMAGE:?DEV_API_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: '8080'
+      SPRING_DATASOURCE_URL: ${DEV_DB_URL:?DEV_DB_URL is required}
+      SPRING_DATASOURCE_USERNAME: ${DEV_POSTGRES_USER:?DEV_POSTGRES_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${DEV_POSTGRES_PASSWORD:?DEV_POSTGRES_PASSWORD is required}
+      S3_BUCKET: ${DEV_S3_BUCKET:?DEV_S3_BUCKET is required}
+      S3_PREFIX: ${DEV_S3_PREFIX:?DEV_S3_PREFIX is required}
+      INGEST_ENCRYPTION_KEY: ${DEV_INGEST_ENCRYPTION_KEY:?DEV_INGEST_ENCRYPTION_KEY is required}
+      INGEST_SEARCH_KEY: ${DEV_INGEST_SEARCH_KEY:?DEV_INGEST_SEARCH_KEY is required}
+      INGEST_KEY_VERSION: ${DEV_INGEST_KEY_VERSION:?DEV_INGEST_KEY_VERSION is required}
+      ANALYSIS_DB_USERNAME: ${DEV_ANALYSIS_DB_USERNAME:?DEV_ANALYSIS_DB_USERNAME is required}
+      ANALYSIS_DB_PASSWORD: ${DEV_ANALYSIS_DB_PASSWORD:?DEV_ANALYSIS_DB_PASSWORD is required}
+      WORKER_MODE: demo
+      WORKER_PYTHON: /usr/local/bin/python
+      WORKER_SCRIPT: /app/worker/analysis_entry.py
+      WORKER_TIMEOUT: PT30M
+      STORAGE_DIR: /app/storage
+      INFERENCE_API_URL: ${DEV_INFERENCE_API_URL:-http://127.0.0.1:8090}
+      INFERENCE_ALLOW_LOOPBACK: ${DEV_INFERENCE_ALLOW_LOOPBACK:-true}
+      INFERENCE_CA_FILE: ${DEV_INFERENCE_CA_FILE:-}
+      INFERENCE_API_TOKEN: ${DEV_INFERENCE_API_TOKEN:?DEV_INFERENCE_API_TOKEN is required}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-northeast-2}
+      TZ: Asia/Seoul
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    volumes:
+    - api-storage:/app/storage
+    - type: bind
+      source: /opt/aml/certs/rds-ca.pem
+      target: /app/certs/rds-ca.pem
+      read_only: true
+      bind:
+        create_host_path: false
+    ports:
+    - 127.0.0.1:${DEV_API_PORT:-8081}:8080
+    stop_grace_period: 40s
+    security_opt:
+    - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - dev-network
+  inference:
+    image: ${DEV_API_IMAGE:?DEV_API_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    network_mode: service:api
+    depends_on:
+      api:
+        condition: service_healthy
+    entrypoint:
+    - /usr/local/bin/python
+    - -B
+    - /app/worker/inference_server.py
+    environment:
+      INFERENCE_BIND: 127.0.0.1
+      INFERENCE_PORT: '8090'
+      INFERENCE_STATE_DIR: /app/storage
+      INFERENCE_TOKEN: ${DEV_LOCAL_INFERENCE_TOKEN:?DEV_LOCAL_INFERENCE_TOKEN is required}
+      INFERENCE_OBJECT_BASE_URL: ${DEV_INFERENCE_OBJECT_BASE_URL:?DEV_INFERENCE_OBJECT_BASE_URL is required}
+      TZ: Asia/Seoul
+    volumes:
+    - inference-state:/app/storage
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - --fail
+      - --silent
+      - http://127.0.0.1:8090/health
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    stop_grace_period: 40s
+    security_opt:
+    - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+networks:
+  dev-network:
+    name: aml-dev-backend-network
+    driver: bridge
+volumes:
+  api-storage:
+    name: aml-dev-api-storage
+  inference-state:
+    name: aml-dev-inference-state

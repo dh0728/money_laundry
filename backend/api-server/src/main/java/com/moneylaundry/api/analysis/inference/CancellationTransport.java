@@ -32,9 +32,10 @@ public class CancellationTransport implements AnalysisRunService.CancelTransport
       @Value("${app.storage-dir}") String directory,
       @Value("${app.inference.url:}") String inferenceUrl,
       @Value("${app.inference.token:}") String inferenceToken,
-      @Value("${app.inference.allow-loopback:false}") boolean allowLoopback) {
+      @Value("${app.inference.allow-loopback:false}") boolean allowLoopback,
+      @Value("${app.inference.ca-file:}") String caFile) {
     this(client, mapper, bucket, prefix, directory);
-    this.inference.configure(inferenceUrl, inferenceToken, allowLoopback);
+    this.inference.configure(inferenceUrl, inferenceToken, allowLoopback, caFile);
   }
 
   public CancellationTransport(

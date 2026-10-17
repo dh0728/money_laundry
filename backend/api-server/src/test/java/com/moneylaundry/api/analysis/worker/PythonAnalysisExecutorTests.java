@@ -32,6 +32,31 @@ class PythonAnalysisExecutorTests {
   }
 
   @Test
+  void external_inference_configuration_reaches_child_process() throws Exception {
+    String python = System.getenv("AML_TEST_PYTHON");
+    org.junit.jupiter.api.Assumptions.assumeTrue(python != null);
+    Path script = temp.resolve("environment.py");
+    Files.writeString(
+        script,
+        "import os,pathlib\n"
+            + "assert os.environ['INFERENCE_API_URL']=='https://gpu.example:31575'\n"
+            + "assert os.environ['INFERENCE_API_TOKEN']=='x'*32\n"
+            + "assert os.environ['INFERENCE_CA_FILE']=='/app/certs/inference-ca.crt'\n"
+            + "pathlib.Path(__file__).with_name('result.txt').write_text('configuration received')\n");
+    var executor = new PythonAnalysisExecutor(python, script.toString(), Duration.ofSeconds(10));
+    executor.configureRemote(
+        "https://gpu.example:31575",
+        "x".repeat(32),
+        "/app/certs/inference-ca.crt",
+        "test-bucket",
+        "dev/test/",
+        "ap-northeast-2");
+    // This synthetic worker has no DB checkpoint; only validate the actual process boundary.
+    assertThatThrownBy(() -> executor.prepare(context())).isInstanceOf(AnalysisFailure.class);
+    assertThat(Files.readString(temp.resolve("result.txt"))).isEqualTo("configuration received");
+  }
+
+  @Test
   void unconnected_entry_reports_permanent_error() {
     String python = System.getenv("AML_TEST_PYTHON");
     org.junit.jupiter.api.Assumptions.assumeTrue(python != null);

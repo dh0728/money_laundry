@@ -3,6 +3,7 @@
 
 # 텍스트 파일의 Git 내부 줄바꿈 정규화
 * text=auto
+deploy/split/** text eol=lf
 
 # Linux, Docker, Gradle 실행 파일은 LF
 *.sh text eol=lf

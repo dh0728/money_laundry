@@ -62,7 +62,7 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
         request = Request(execution.job_id, kind.lower(), str(request_id), round_id,
                           binding['model_version'], binding['feature_version'], str(execution.run_id))
     endpoint = settings.api_url.rstrip('/') + f'/api/v1/inference-requests/{request_id}/rounds/{round_id}'
-    with httpx.Client(timeout=15, follow_redirects=False, trust_env=False, transport=transport) as client:
+    with settings.client(transport=transport) as client:
         with client.stream('GET', endpoint, headers={'Authorization': 'Bearer ' + settings.token}) as response:
             response.raise_for_status()
             if response.status_code != 200:

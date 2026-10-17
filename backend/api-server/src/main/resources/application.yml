@@ -65,5 +65,6 @@ app:
     allow-loopback: ${INFERENCE_ALLOW_LOOPBACK:false}
     url: ${INFERENCE_API_URL:}
     token: ${INFERENCE_API_TOKEN:}
+    ca-file: ${INFERENCE_CA_FILE:}
   suspicious-tx:
     threshold: ${SUSPICIOUS_TX_THRESHOLD:0.7}
