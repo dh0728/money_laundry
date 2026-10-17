@@ -1,6 +1,7 @@
 """Persistent, local-only demo bootstrap. Never imported by API or worker code."""
 import base64
 from datetime import date
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -99,7 +100,8 @@ def configure():
         INGEST_ENCRYPTION_KEY=values['encryption-key'], INGEST_SEARCH_KEY=values['search-key'],
         INGEST_KEY_VERSION='local-demo', INFERENCE_API_TOKEN=values['inference-token'],
         INFERENCE_TOKEN=values['inference-token'],
-        INFERENCE_OBJECT_BASE_URL='https://' + BUCKET + '.s3.amazonaws.com/demo/')
+        # The worker signs regional S3 URLs (AWS_REGION); the inference server accepts only this base.
+        INFERENCE_OBJECT_BASE_URL='https://' + BUCKET + '.s3.ap-northeast-2.amazonaws.com/demo/')
 
 
 def bank_days(root):
@@ -132,6 +134,11 @@ def seed():
         sys.path.insert(0, '/app/worker')
         from configure_analysis_db import configure as configure_analysis
         configure_analysis(db, os.environ['ANALYSIS_DB_USERNAME'], os.environ['ANALYSIS_DB_PASSWORD'])
+        # Local demo only: seeded accounts without a password get the fixed demo password 1234, so
+        # staff can log in and receive Alerts. Accounts that already have a password keep it.
+        salt = secrets.token_bytes(16)
+        demo_hash = (salt + hashlib.pbkdf2_hmac('sha256', b'1234', salt, 310000, 32)).hex()
+        db.execute("UPDATE core.users SET password_hash=%s WHERE coalesce(password_hash,'')=''", (demo_hash,))
         for bank, day in registrations:
             # Bank names are established from validated reports, never invented here.
             db.execute("INSERT INTO core.banks(bank_id,is_reporting,report_format) VALUES(%s,true,'AML17') ON CONFLICT(bank_id) DO NOTHING", (bank,))
