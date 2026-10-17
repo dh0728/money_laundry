@@ -43,7 +43,7 @@ public final class AlertPublisher {
         execution)) throw new IllegalStateException("ALERT_PLAN_FENCED");
     validateFrozenInput(run);
     if (jdbc.queryForObject(
-        "select exists(select 1 from analysis.alert_fact_checks f join ledger.transactions t using(tx_id) where f.run_id=? and f.integration_status<>t.integration_status) or exists(select 1 from analysis.input_scores i left join analysis.current_scores c using(tx_id) where i.run_id=? and i.score_run_id is distinct from c.run_id)",
+        "select exists(select 1 from analysis.run_fact_checks f join ledger.transactions t using(tx_id) where f.run_id=? and f.integration_status<>t.integration_status) or exists(select 1 from analysis.run_scores i left join analysis.current_scores c using(tx_id) where i.run_id=? and i.score_run_id is distinct from c.run_id)",
         Boolean.class,
         run,
         run))
@@ -492,9 +492,9 @@ public final class AlertPublisher {
           where r.run_id=? and r.status='COMPLETED' and j.status='COMPLETED')
         and not exists(select 1 from review.alert_transactions m join ledger.transactions t using(tx_id)
           where m.alert_id=? and m.version=? and t.integration_status<>'ACTIVE')
-        and not exists(select 1 from analysis.alert_fact_checks f join ledger.transactions t using(tx_id)
+        and not exists(select 1 from analysis.run_fact_checks f join ledger.transactions t using(tx_id)
           where f.run_id=? and f.integration_status is distinct from t.integration_status)
-        and not exists(select 1 from analysis.input_scores i left join analysis.current_scores c using(tx_id)
+        and not exists(select 1 from analysis.run_scores i left join analysis.current_scores c using(tx_id)
           where i.run_id=? and c.run_id is distinct from i.score_run_id and c.run_id is distinct from ?)
         and not exists(select 1 from analysis.scores s left join analysis.current_scores c using(tx_id)
           where s.run_id=? and c.run_id is distinct from s.run_id)

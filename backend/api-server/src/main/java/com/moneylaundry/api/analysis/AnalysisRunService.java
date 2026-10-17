@@ -418,9 +418,9 @@ public class AnalysisRunService {
   public void refreshInputStatistics() {
     jdbc.execute(
         """
-        analyze analysis.input_transactions, analysis.input_reports, analysis.input_scores,
-          analysis.alert_origins, analysis.alert_fact_checks, analysis.input_ledger,
-          analysis.input_ledger_marks, analysis.input_report_sets
+        analyze analysis.input_transactions, analysis.input_reports, analysis.input_ledger,
+          analysis.input_ledger_marks, analysis.input_report_sets, analysis.score_ledger,
+          analysis.alert_origin_ledger, analysis.fact_ledger
         """);
   }
 

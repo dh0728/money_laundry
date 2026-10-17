@@ -239,7 +239,7 @@ class AlertPipelineTests {
     UUID checking = freezeCheck();
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.alert_origins where run_id=?",
+                "select count(*) from analysis.run_alert_origins where run_id=?",
                 Integer.class,
                 checking))
         .isEqualTo(1);
@@ -264,7 +264,9 @@ class AlertPipelineTests {
     UUID failed = freezeCheck();
     assertThat(
             jdbc.queryForList(
-                "select alert_id from analysis.alert_origins where run_id=?", Long.class, failed))
+                "select alert_id from analysis.run_alert_origins where run_id=?",
+                Long.class,
+                failed))
         .containsExactly(alert);
     assertThat(
             jdbc.queryForObject(
@@ -280,7 +282,9 @@ class AlertPipelineTests {
     UUID retried = freezeCheck();
     assertThat(
             jdbc.queryForList(
-                "select alert_id from analysis.alert_origins where run_id=?", Long.class, retried))
+                "select alert_id from analysis.run_alert_origins where run_id=?",
+                Long.class,
+                retried))
         .containsExactly(alert);
     jdbc.update(
         "insert into review.alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,'[]',clock_timestamp())",
@@ -293,7 +297,7 @@ class AlertPipelineTests {
     UUID unchanged = freezeCheck();
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.alert_origins where run_id=?",
+                "select count(*) from analysis.run_alert_origins where run_id=?",
                 Integer.class,
                 unchanged))
         .isEqualTo(1);
@@ -306,7 +310,9 @@ class AlertPipelineTests {
     UUID checking = freezeCheck();
     assertThat(
             jdbc.queryForList(
-                "select alert_id from analysis.alert_origins where run_id=?", Long.class, checking))
+                "select alert_id from analysis.run_alert_origins where run_id=?",
+                Long.class,
+                checking))
         .containsExactly(alert);
     assertThat(
             jdbc.queryForObject(
@@ -454,7 +460,9 @@ class AlertPipelineTests {
     UUID pending = runs.freeze(next, Instant.parse("2022-09-05T00:00:00Z"));
     assertThat(
             jdbc.queryForList(
-                "select alert_id from analysis.alert_origins where run_id=?", Long.class, pending))
+                "select alert_id from analysis.run_alert_origins where run_id=?",
+                Long.class,
+                pending))
         .containsExactlyInAnyOrder(parent, child);
     jdbc.update(
         "insert into review.alert_versions select ?,2,?,fingerprint,evidence,now(),null from review.alert_versions where alert_id=? and version=1",
@@ -533,7 +541,7 @@ class AlertPipelineTests {
       UUID next = runs.current(follow);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis.alert_origins where run_id=?",
+                  "select count(*) from analysis.run_alert_origins where run_id=?",
                   Integer.class,
                   next))
           .isZero();

@@ -80,7 +80,7 @@ assert str(ZoneInfo('Asia/Seoul'))=='Asia/Seoul'
 from configure_analysis_db import configure
 with psycopg.connect(host='postgres',dbname='aml_check',user='aml_check',password=os.environ['SPRING_DATASOURCE_PASSWORD'],autocommit=True) as db:
     configure(db,os.environ['ANALYSIS_DB_USERNAME'],os.environ['ANALYSIS_DB_PASSWORD'])
-    assert db.execute("select version from public.flyway_schema_history where success").fetchall()==[('1',)]
+    assert db.execute("select version from public.flyway_schema_history where success order by installed_rank").fetchall()==[('1',),('2',),('3',)]
     for table in ('analysis.alert_plans','analysis.alert_fact_checks','review.alert_lineage',
                   'review.alert_change_proposals','review.alert_proposal_cases','review.event_recipients'):
         assert db.execute('select to_regclass(%s)', (table,)).fetchone()[0] is not None

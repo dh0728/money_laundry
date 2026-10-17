@@ -74,7 +74,7 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
                 FROM jsonb_array_elements(v.evidence->'transactions') t),'[]'::jsonb),
               'witnesses',v.evidence->'witnesses') AS evidence,v.fingerprint,o.version,
               v.evidence->>'policyVersion' AS policy_version
-            FROM analysis.alert_origins o JOIN review.alerts a USING(alert_id)
+            FROM analysis.run_alert_origins o JOIN review.alerts a USING(alert_id)
             JOIN review.alert_versions v ON v.alert_id=o.alert_id AND v.version=o.version
             WHERE o.run_id=%s ORDER BY a.alert_id''', (execution.run_id,))
         raw_cases = cursor.fetchall()
@@ -83,7 +83,7 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
         raise StaleExecution('Published input changed; freeze a new input snapshot')
     if connection.execute('''SELECT EXISTS(SELECT 1 FROM review.alerts a
         WHERE published_version IS NOT NULL AND NOT EXISTS(
-          SELECT 1 FROM analysis.alert_origins o WHERE o.run_id=%s AND o.alert_id=a.alert_id))''',
+          SELECT 1 FROM analysis.run_alert_origins o WHERE o.run_id=%s AND o.alert_id=a.alert_id))''',
         (execution.run_id,)).fetchone()[0]:
         raise StaleExecution('Newer Alert publication is outside this frozen input')
     ancestors = {}
@@ -105,7 +105,7 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
     by_id = {case.alert_id: case for case in cases}
     del raw_cases
     steps.lap('caseIndex')
-    facts = dict(connection.execute('SELECT tx_id,integration_status FROM analysis.alert_fact_checks WHERE run_id=%s',
+    facts = dict(connection.execute('SELECT tx_id,integration_status FROM analysis.run_fact_checks WHERE run_id=%s',
                                     (execution.run_id,)).fetchall())
     checked = frozenset(key for key, state in facts.items() if state in ('ACTIVE', 'SUPERSEDED'))
     invalid = frozenset(key for key, state in facts.items() if state == 'SUPERSEDED')

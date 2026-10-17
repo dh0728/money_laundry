@@ -538,6 +538,141 @@ class FreezeInputTests {
         .isZero();
   }
 
+  void assertSameRows(String expected, String frozen, UUID run) {
+    var named = new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc);
+    var params =
+        new org.springframework.jdbc.core.namedparam.MapSqlParameterSource().addValue("run", run);
+    for (String sql :
+        List.of(
+            "select count(*) from ((" + expected + ") except all (" + frozen + ")) x",
+            "select count(*) from ((" + frozen + ") except all (" + expected + ")) x"))
+      assertThat(named.queryForObject(sql, params, Integer.class)).as(sql).isZero();
+  }
+
+  /** The former per-run score, Alert origin and fact copies, recomputed now for this run. */
+  void assertSnapshotsMatchFormerCopies(UUID run) {
+    assertSameRows(
+        """
+        select c.tx_id,s.run_id,to_jsonb(s)-'run_id'-'tx_id' from analysis.current_scores c
+        join analysis.scores s on s.run_id=c.run_id and s.tx_id=c.tx_id
+        join analysis.runs r on r.run_id=c.run_id join analysis.jobs b on b.job_id=r.job_id
+        where r.status='COMPLETED' and b.status='COMPLETED'
+          and c.tx_id in(select tx_id from analysis.run_inputs where run_id=:run)
+        """,
+        "select tx_id,score_run_id,scores from analysis.run_scores where run_id=:run",
+        run);
+    assertSameRows(
+        "select tx_id,scores->'p_laundering' from analysis.run_scores where run_id=:run",
+        "select tx_id,p_laundering from analysis.run_scores where run_id=:run",
+        run);
+    assertSameRows(
+        "select alert_id,published_version from review.alerts where published_version is not null",
+        "select alert_id,version from analysis.run_alert_origins where run_id=:run",
+        run);
+    assertSameRows(
+        """
+        select distinct t.tx_id,t.integration_status from review.alerts a
+        join review.alert_transactions m on m.alert_id=a.alert_id and m.version=a.published_version
+        join ledger.transactions t using(tx_id)
+        """,
+        "select tx_id,integration_status from analysis.run_fact_checks where run_id=:run",
+        run);
+  }
+
+  List<Map<String, Object>> snapshots(UUID run) {
+    return jdbc.queryForList(
+        """
+        select 's' kind,tx_id::text k,score_run_id::text v,scores::text extra from analysis.run_scores where run_id=?
+        union all select 'o',alert_id::text,version::text,null from analysis.run_alert_origins where run_id=?
+        union all select 'f',tx_id::text,integration_status,null from analysis.run_fact_checks where run_id=?
+        """,
+        run,
+        run,
+        run);
+  }
+
+  void score(UUID run, long tx) {
+    jdbc.update(
+        "insert into analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,score_pct,type_class) values(?,?,.5,1,0,0,0,0,0,0,0,0,12.5,0)",
+        run,
+        tx);
+  }
+
+  long publish(Long alert, int version, UUID run, long... members) {
+    long user = jdbc.queryForObject("select min(user_id) from core.users", Long.class);
+    long id =
+        alert != null
+            ? alert
+            : jdbc.queryForObject(
+                "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now()) returning alert_id",
+                Long.class,
+                user);
+    jdbc.update(
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,?,?,repeat('a',64),'{}')",
+        id,
+        version,
+        run);
+    for (long member : members)
+      jdbc.update(
+          "insert into review.alert_transactions values(?,?,?,'SEED','[]',null)",
+          id,
+          version,
+          member);
+    jdbc.update("update review.alerts set published_version=? where alert_id=?", version, id);
+    return id;
+  }
+
+  @Test
+  void frozen_scores_and_alert_facts_match_former_copies_and_stay_fixed_per_run() {
+    seed(4);
+    var ids = jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
+    UUID first = runs.freeze(job, cutoff);
+    for (long id : ids) score(first, id);
+    runs.complete(first);
+    finish(first);
+    long alert = publish(null, 1, first, ids.get(0), ids.get(1));
+    Instant later = cutoff.plus(Duration.ofDays(1));
+    UUID second = runs.freeze(nextJob(later), later);
+    assertSnapshotsMatchFormerCopies(second);
+    var secondSnapshots = snapshots(second);
+    assertThat(secondSnapshots).hasSize(4 + 1 + 2);
+    // A superseded member, a new Alert version and Alert, and a replaced current score.
+    jdbc.update(
+        "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?", ids.get(1));
+    publish(alert, 2, second, ids.get(1), ids.get(2));
+    publish(null, 1, second, ids.get(3));
+    long rescoreJob = nextJob(later);
+    UUID rescore = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", rescore, rescoreJob);
+    runs.snapshot(rescore, ids.get(0), "TARGET");
+    score(rescore, ids.get(0));
+    jdbc.update("update analysis.current_scores set run_id=? where tx_id=?", rescore, ids.get(0));
+    jdbc.update("update analysis.runs set status='COMPLETED' where run_id=?", rescore);
+    jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", rescoreJob);
+    Instant last = later.plus(Duration.ofDays(1));
+    UUID third = runs.freeze(nextJob(last), last);
+    assertSnapshotsMatchFormerCopies(third);
+    assertThat(
+            jdbc.queryForObject(
+                "select (select integration_status from analysis.run_fact_checks where run_id=? and tx_id=?)||'/'||(select version from analysis.run_alert_origins where run_id=? and alert_id=?)||'/'||(select score_run_id from analysis.run_scores where run_id=? and tx_id=?)",
+                String.class,
+                third,
+                ids.get(1),
+                third,
+                alert,
+                third,
+                ids.get(0)))
+        .isEqualTo("SUPERSEDED/2/" + rescore);
+    // The earlier run, whose proposals may be checked much later, keeps what it froze.
+    assertThat(snapshots(second)).containsExactlyInAnyOrderElementsOf(secondSnapshots);
+    assertThat(
+            jdbc.queryForObject(
+                "select (select count(*) from analysis.input_scores)+(select count(*) from analysis.alert_origins)+(select count(*) from analysis.alert_fact_checks)",
+                Integer.class))
+        .isZero();
+  }
+
   @Test
   void snapshot_refuses_to_run_outside_a_transaction() {
     UUID run = UUID.randomUUID();

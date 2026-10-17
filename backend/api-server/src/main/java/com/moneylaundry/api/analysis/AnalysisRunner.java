@@ -335,7 +335,7 @@ public class AnalysisRunner implements AutoCloseable {
                       run);
               if (count == 0) {
                 if (service.jdbc.queryForObject(
-                    "select exists(select 1 from analysis.alert_origins where run_id=?) or exists(select 1 from analysis.input_scores where run_id=?)",
+                    "select exists(select 1 from analysis.run_alert_origins where run_id=?) or exists(select 1 from analysis.run_scores where run_id=?)",
                     Boolean.class,
                     run,
                     run)) {

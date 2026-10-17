@@ -125,7 +125,7 @@ class _Scores:
 
     def load(self, keys):
         for chunk in _chunks({key for key in keys if key in self.scored and key not in self.loaded}):
-            for sql in ('SELECT tx_id,scores FROM analysis.input_scores WHERE run_id=%s AND tx_id=ANY(%s)',
+            for sql in ('SELECT tx_id,scores FROM analysis.run_scores WHERE run_id=%s AND tx_id=ANY(%s)',
                         "SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM analysis.scores s"
                         " WHERE run_id=%s AND tx_id=ANY(%s)"):
                 for key, score in self.connection.execute(sql, (self.run_id, chunk)):
@@ -325,8 +325,8 @@ def save_alerts(connection, execution):
     # value (jsonb, so 1 stays 1) and its original threshold. Documents load later.
     decisions = {}
     with connection.transaction(), connection.cursor(name='alert_scores') as cursor:
-        cursor.execute('''SELECT i.tx_id,i.scores->'p_laundering',b.threshold_value
-            FROM analysis.input_scores i JOIN analysis.runs r ON r.run_id=i.score_run_id
+        cursor.execute('''SELECT i.tx_id,i.p_laundering,b.threshold_value
+            FROM analysis.run_scores i JOIN analysis.runs r ON r.run_id=i.score_run_id
             JOIN analysis.jobs b ON b.job_id=r.job_id WHERE i.run_id=%s''', (execution.run_id,))
         for key, probability, value in cursor:
             decisions[key] = (probability, value)
@@ -372,7 +372,7 @@ def save_alerts(connection, execution):
          WHERE t->>'role'<>'CONTEXT'),
         (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t),
         coalesce(v.evidence->'witnesses','[]'::jsonb), v.evidence->>'policyVersion'
-        FROM analysis.alert_origins o JOIN review.alerts a USING(alert_id)
+        FROM analysis.run_alert_origins o JOIN review.alerts a USING(alert_id)
         JOIN review.alert_versions v ON v.alert_id=o.alert_id AND v.version=o.version
         WHERE o.run_id=%s AND a.status='OPEN' AND a.merged_into_alert_id IS NULL
         ORDER BY a.alert_id''', (execution.run_id,)):
