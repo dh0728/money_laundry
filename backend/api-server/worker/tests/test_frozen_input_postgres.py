@@ -17,7 +17,8 @@ from unittest.mock import patch
 
 import pyarrow.parquet as pq
 
-from common.frozen_input import FrozenInput, InputExecution, StaleExecution, write_demo_input
+from common.frozen_input import FrozenInput, InputExecution, StaleExecution
+from models.demo_random.build_input import write_input as write_demo_input
 from common.worker_transport import ProtocolError
 from features.prepare_features import prepare_features
 
@@ -144,6 +145,15 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.reader.execute("SELECT * FROM private.account_identities")
         with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
             self.reader.execute("SELECT * FROM evaluation.transaction_labels")
+        # The analysis login reads name-free categories, never pseudonyms or bank names.
+        with self.psycopg.connect(**dict(self.connect_args, user=self.worker_user,
+                                         password=self.worker_password)) as worker:
+            worker.execute("SELECT service_owner_id,entity_type FROM core.owners").fetchall()
+            worker.execute("SELECT bank_id,country FROM core.banks").fetchall()
+            for statement in ("SELECT display_name FROM core.owners", "SELECT owner_id FROM core.owners",
+                              "SELECT name FROM core.banks", "SELECT owner_id FROM core.accounts"):
+                with self.subTest(statement=statement), self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
+                    worker.execute(statement)
         self.assertEqual(self.reader.info.transaction_status,
                          self.psycopg.pq.TransactionStatus.IDLE)
 
@@ -158,12 +168,12 @@ class FrozenInputPostgresTests(unittest.TestCase):
               receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version
             FROM analysis.input_transactions WHERE run_id=%s
             """, (other, self.run))
-        ids = [i for batch in self.source.batches() for i in batch.column("tx_id").to_pylist()]
+        ids = [i for page in self.source.target_pages() for i in page]
         self.assertEqual(ids, self.ids)
 
     def test_committed_cancellation_between_pages_is_observed(self):
-        batches = self.source.batches()
-        self.assertEqual(next(batches).num_rows, 2)
+        batches = self.source.target_pages()
+        self.assertEqual(len(next(batches)), 2)
         with self.admin.transaction():
             self.admin.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED' WHERE run_id=%s",
                                (self.run,))
@@ -171,7 +181,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             next(batches)
 
     def test_new_execution_token_between_pages_is_observed(self):
-        batches = self.source.batches()
+        batches = self.source.target_pages()
         next(batches)
         self.admin.execute("UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s",
                            (uuid4(), self.job))
@@ -179,7 +189,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             next(batches)
 
     def test_replacement_run_between_pages_is_observed(self):
-        batches = self.source.batches()
+        batches = self.source.target_pages()
         next(batches)
         replacement = uuid4()
         self.admin.execute("INSERT INTO analysis.runs(run_id,job_id,status) VALUES(%s,%s,'READY')",
@@ -190,7 +200,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             next(batches)
 
     def test_final_check_observes_cancellation_after_last_page(self):
-        list(self.source.batches())
+        list(self.source.target_pages())
         self.admin.execute("UPDATE analysis.runs SET status='CANCELLED' WHERE run_id=%s", (self.run,))
         with self.assertRaises(StaleExecution):
             self.source.check_current()
@@ -210,11 +220,10 @@ class FrozenInputPostgresTests(unittest.TestCase):
         version = self.admin.execute("INSERT INTO ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status) VALUES(%s,%s,%s,now(),'ACTIVE') RETURNING version_id", (report_set, upload, upload)).fetchone()[0]
         for i, tx_id in enumerate(ids):
             report = self.admin.execute("INSERT INTO private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version) VALUES(%s,%s,'test','test','test') RETURNING report_id", (version, i + 2)).fetchone()[0]
-            self.admin.execute("INSERT INTO analysis.input_reports(run_id,tx_id,report_id) VALUES(%s,%s,%s)", (self.run, tx_id, report))
             self.admin.execute("INSERT INTO evaluation.report_labels VALUES(%s,%s)", (report, i != 1))
 
     def test_legacy_hints_do_not_affect_random_input(self):
-        from common.demo_calculator import MODEL_VERSION
+        from models.demo_random.spec import MODEL_VERSION
         self.annotate_demo(self.ids)
         self.annotate_demo([self.ids[1]])
         with tempfile.TemporaryDirectory(prefix='aml-random-input-') as root:
@@ -228,9 +237,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.reader.execute('SELECT * FROM evaluation.report_labels')
 
     def test_prepared_legacy_version_is_preserved_on_retry(self):
-        from common.demo_calculator import LEGACY_MODEL_VERSION
+        from models.demo_random.spec import LEGACY_MODEL_VERSION
         with tempfile.TemporaryDirectory(prefix='aml-random-retry-') as root:
-            with patch('features.prepare_features.MODEL_VERSION', LEGACY_MODEL_VERSION):
+            with patch('models.demo_random.spec.MODEL_VERSION', LEGACY_MODEL_VERSION):
                 original = json.loads(prepare_features(self.admin, self.execution, root))
             repeated = json.loads(prepare_features(self.admin, self.execution, root))
             self.assertEqual(original, repeated)
@@ -462,7 +471,8 @@ class FrozenInputPostgresTests(unittest.TestCase):
             if status == 'COMPLETED':
                 logical = Request(body['job_id'], body['model_kind'].lower(), body['request_id'],
                                   body['execution_round'], body['model_version'], body['feature_version'], body['run_id'])
-                from common.demo_calculator import build_targets, calculate
+                from models.demo_random.build_input import build_targets
+                from tests.inference_peer import calculate
                 from common.worker_transport import descriptor
                 stream = io.BytesIO()
                 targets = pq.read_table(io.BytesIO(s3.objects['dev/test/' + logical.inputs + 'targets.parquet']))
@@ -604,7 +614,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
             settings, s3 = self.collected_results(root)
             self.scoring_stage()
             save_scores(self.admin, self.execution, root, settings, s3)
-            from common.demo_calculator import calculate, build_targets, MODEL_VERSION, FEATURE_VERSION
+            from tests.inference_peer import calculate
+            from models.demo_random.build_input import build_targets
+            from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
             targets = build_targets(self.ids)
             versions = dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
             binary = self.score_values
@@ -709,7 +721,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
 
     def test_result_validation_rejects_invalid_probabilities_ids_and_schema(self):
         import pyarrow as pa
-        from common.demo_calculator import build_targets, calculate, MODEL_VERSION, FEATURE_VERSION
+        from models.demo_random.build_input import build_targets
+        from tests.inference_peer import calculate
+        from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
         from scores.result_collection import _stage
         self.admin.execute("UPDATE analysis.jobs SET current_stage='INFERENCE' WHERE job_id=%s", (self.job,))
         good = calculate(build_targets(self.ids), 'binary', model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)

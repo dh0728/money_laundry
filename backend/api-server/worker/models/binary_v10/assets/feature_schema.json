@@ -1,0 +1,61 @@
+{
+  "node_features": [
+    "log_out_count",
+    "log_in_count",
+    "log_out_neighbors",
+    "log_in_neighbors",
+    "log_self_count",
+    "log_reciprocal_neighbors",
+    "mean_paid_currency_z",
+    "paid_outlier_fraction",
+    "log_currency_count",
+    "log_active_days",
+    "type_Corporation",
+    "type_Partnership",
+    "type_Sole Proprietorship",
+    "type_Individual",
+    "type_Country",
+    "type_Direct",
+    "log_entity_observed_accounts",
+    "log_entity_out_diversity",
+    "log_entity_in_diversity"
+  ],
+  "edge_features": [
+    "pair_prior_count",
+    "pair_gap_minutes",
+    "pair_count_1h",
+    "sender_gap_minutes",
+    "sender_count_1h",
+    "receiver_gap_minutes",
+    "receiver_count_1h",
+    "paid_currency_z",
+    "pair_history_count",
+    "reverse_history_count",
+    "pair_age_at_day_start",
+    "same_entity",
+    "same_known_country",
+    "both_countries_known",
+    "same_currency",
+    "is_self_transfer",
+    "amt_z_pay_ccy"
+  ],
+  "entity_types": [
+    "Corporation",
+    "Partnership",
+    "Sole Proprietorship",
+    "Individual",
+    "Country",
+    "Direct"
+  ],
+  "pattern_classes": [
+    "NORMAL",
+    "FAN-OUT",
+    "FAN-IN",
+    "G-SCATTER",
+    "S-GATHER",
+    "CYCLE",
+    "RANDOM",
+    "BIPARTITE",
+    "STACK"
+  ]
+}

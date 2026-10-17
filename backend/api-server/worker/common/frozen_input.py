@@ -6,9 +6,6 @@ or external publication occurs here; a cancelled read must discard its output.
 from dataclasses import dataclass
 from uuid import UUID
 
-import pyarrow.parquet as pq
-
-from common.demo_calculator import build_targets
 from common.worker_transport import ProtocolError
 
 
@@ -92,31 +89,12 @@ class FrozenInput:
             raise StaleExecution("Analysis job no longer exists")
         self._check(row)
 
-    def batches(self):
+    def target_pages(self):
+        """Yield the frozen TARGET IDs in ascending pages; model packages shape the input."""
         after = 0
         while True:
             ids = self._page(after)
             if not ids:
                 return
-            yield build_targets(ids)
+            yield ids
             after = ids[-1]
-
-
-def write_demo_input(source: FrozenInput, output) -> int:
-    """Write targets.parquet to a caller-owned stream; return the TARGET count.
-
-    Success is not permission to publish: the caller must recheck ownership when
-    recording artifacts. Any exception invalidates the entire output stream.
-    """
-    batches = iter(source.batches())
-    first = next(batches, None)
-    if first is None:
-        raise ProtocolError("Empty TARGET must complete as EMPTY_INPUT without inference")
-    count = first.num_rows
-    with pq.ParquetWriter(output, first.schema) as writer:
-        writer.write_table(first)
-        for batch in batches:
-            writer.write_table(batch)
-            count += batch.num_rows
-    source.check_current()
-    return count

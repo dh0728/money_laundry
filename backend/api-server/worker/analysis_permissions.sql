@@ -3,6 +3,10 @@
 GRANT USAGE ON SCHEMA core, ledger, analysis, review TO :"worker_role";
 GRANT SELECT ON core.assignable_staff, ledger.transactions TO :"worker_role";
 GRANT SELECT(user_id,last_assigned_at) ON core.users TO :"worker_role";
+-- Name-free categories for model input, keyed like the frozen input (service owner UUID, bank id);
+-- names, pseudonyms and internal owner ids stay unreadable.
+GRANT SELECT(service_owner_id,entity_type) ON core.owners TO :"worker_role";
+GRANT SELECT(bank_id,country) ON core.banks TO :"worker_role";
 REVOKE UPDATE(last_assigned_at) ON core.users FROM :"worker_role";
 GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA analysis TO :"worker_role";
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA analysis TO :"worker_role";

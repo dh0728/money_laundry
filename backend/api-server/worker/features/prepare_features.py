@@ -1,4 +1,8 @@
-"""Backend worker operations. Only persisted, fenced artifacts count as complete."""
+"""Model input preparation stage. Only persisted, fenced artifacts count as complete.
+
+Each model kind is bound to a model package (models/registry.py) when a run starts;
+the package's build_input writes that model's input file.
+"""
 import hashlib
 import json
 import os
@@ -8,20 +12,25 @@ import uuid
 
 import pyarrow.parquet as pq
 
-from common.demo_calculator import MODEL_VERSION, FEATURE_VERSION, supported_versions
-from common.frozen_input import FrozenInput, StaleExecution, write_demo_input
+from common.frozen_input import FrozenInput, StaleExecution
 from common.worker_transport import ProtocolError
+from models import registry
+
+MODEL_KINDS = ("BINARY", "TYPE")
 
 
 def versions_for_run(connection, execution):
-    stored = connection.execute('SELECT binding FROM analysis.model_tasks WHERE run_id=%s',
-                                (execution.run_id,)).fetchall()
+    """(model_version, feature_version) per model kind; a new run takes the registry defaults."""
+    stored = dict(connection.execute('SELECT model_kind,binding FROM analysis.model_tasks WHERE run_id=%s',
+                                     (execution.run_id,)).fetchall())
     if not stored:
-        return MODEL_VERSION, FEATURE_VERSION
-    versions = {(row[0].get('model_version'), row[0].get('feature_version')) for row in stored}
-    if len(versions) != 1 or not supported_versions(*next(iter(versions))):
+        return {kind: registry.default(kind).versions() for kind in MODEL_KINDS}
+    versions = {kind: (binding.get('model_version'), binding.get('feature_version'))
+                for kind, binding in stored.items()}
+    if set(versions) != set(MODEL_KINDS) or not all(
+            registry.supported_versions(*pair) for pair in versions.values()):
         raise ProtocolError('Conflicting or unsupported stored model versions')
-    return next(iter(versions))
+    return versions
 
 
 def _digest(path):
@@ -61,11 +70,11 @@ def _existing(connection, execution, root, kind, versions):
 
 
 def _initialize(connection, execution, versions):
-    binding = dict(mode="demo", model_version=versions[0],
-                   feature_version=versions[1], input_contract_version=1)
     with connection.transaction():
         _lock(connection, execution)
-        for kind in ("BINARY", "TYPE"):
+        for kind in MODEL_KINDS:
+            binding = dict(mode="demo", model_version=versions[kind][0],
+                           feature_version=versions[kind][1], input_contract_version=1)
             connection.execute("""
                 INSERT INTO analysis.model_tasks(run_id,model_kind,phase,status,binding)
                 VALUES(%s,%s,'PREPARE','READY',%s::jsonb) ON CONFLICT DO NOTHING
@@ -157,7 +166,7 @@ def _prepare_model(connection, execution, root, kind, versions):
         try:
             with tempfile.NamedTemporaryFile(dir=output.parent, suffix=".partial", delete=False) as stream:
                 temporary = Path(stream.name)
-                count = write_demo_input(source, stream)
+                count = registry.require(*versions).build_input.write_input(source, stream)
                 stream.flush()
                 os.fsync(stream.fileno())
             digest = _digest(temporary)
@@ -178,6 +187,11 @@ def _prepare_model(connection, execution, root, kind, versions):
     return artifact
 
 
+def run(connection, execution, context):
+    """Stage entry: ⑤ 모델 입력 준비 (FEATURES)."""
+    prepare_features(connection, execution, context.storage_dir)
+
+
 def prepare_features(connection, execution, storage_root):
     """Persist each model's input and feature rows before inference.
 
@@ -189,8 +203,8 @@ def prepare_features(connection, execution, storage_root):
     FrozenInput(connection, execution).check_current()
     versions = versions_for_run(connection, execution)
     _initialize(connection, execution, versions)
-    models = {kind: _prepare_model(connection, execution, root, kind, versions)
-              for kind in ("BINARY", "TYPE")}
+    models = {kind: _prepare_model(connection, execution, root, kind, versions[kind])
+              for kind in MODEL_KINDS}
     artifact = json.dumps(dict(protocol_version=2, run_id=str(execution.run_id), models=models),
                           sort_keys=True, separators=(",", ":"))
     with connection.transaction():

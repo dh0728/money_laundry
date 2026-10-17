@@ -281,7 +281,10 @@ class FlowGraphTests(unittest.TestCase):
 class FlowEvaluationTests(unittest.TestCase):
     def test_demo_seeds_use_actual_calculator_without_truth_labels(self):
         from types import SimpleNamespace
-        from common.demo_calculator import build_targets, calculate, MODEL_VERSION, FEATURE_VERSION
+        from models.demo_random.build_input import build_targets
+        from tools.evaluate_flow_graph import inference_demo_model
+        calculate = inference_demo_model().calculate
+        from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
         edges = table([(key, 0, 'A', 'B') for key in range(1, 101)]).freeze()
         data = SimpleNamespace(edges=edges)
         scores = calculate(build_targets(range(1, 101)), 'binary', model_version=MODEL_VERSION,

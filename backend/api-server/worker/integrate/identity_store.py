@@ -2,6 +2,8 @@
 
 from uuid import uuid4
 
+from integrate.entity_attributes import bank_country, entity_type
+
 FAMILY = ('김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','전','홍')
 GIVEN = ('민준','서연','서준','지우','도윤','하윤','예준','지민','시우','수빈','주원','지유','지호','서현','준서','민서',
          '건우','수아','현우','윤서','우진','채원','선우','지원','유준','소윤','정우','예은','승우','다은','현준','소율',
@@ -78,18 +80,26 @@ class IdentityStore:
                 owners[owner] = name
                 accounts[(bank,account)] = owner
         with self.db.cursor() as cursor:
-            cursor.executemany('''INSERT INTO core.banks(bank_id,name) VALUES(%s,%s)
-                ON CONFLICT(bank_id) DO UPDATE SET name=coalesce(core.banks.name,excluded.name)''',list(banks.items()))
+            cursor.executemany('''INSERT INTO core.banks(bank_id,name,country) VALUES(%s,%s,%s)
+                ON CONFLICT(bank_id) DO UPDATE SET name=coalesce(core.banks.name,excluded.name),
+                  country=coalesce(core.banks.country,excluded.country)''',
+                [(bank,name,bank_country(name)) for bank,name in banks.items()])
         owner_ids = {owner:self.owners[token][0] for owner,token in self.owner_tokens.items() if token in self.owners}
+        # Owners integrated before entity_type existed get it the next time their name is seen.
+        known = [(entity_type(owners[owner]),identifier) for owner,identifier in owner_ids.items()
+                 if owner in owners and entity_type(owners[owner]) is not None]
+        if known:
+            with self.db.cursor() as cursor:
+                cursor.executemany('UPDATE core.owners SET entity_type=%s WHERE owner_id=%s AND entity_type IS NULL',known)
         pending = [owner for owner in owners if owner not in owner_ids]
         ids = self._ids('core.owners','owner_id',len(pending))
         public,private = [],[]
         for owner,identifier in zip(pending,ids):
             owner_ids[owner] = identifier
-            public.append((identifier,uuid4(),display_name(identifier)))
+            public.append((identifier,uuid4(),display_name(identifier),entity_type(owners[owner])))
             private.append((identifier,self.owner_tokens[owner],self.protector.encrypt('entity-id',owner),
                 self.protector.encrypt('entity-name',owners[owner]),self.protector.version))
-        self._copy('core.owners','owner_id,service_owner_id,display_name',public)
+        self._copy('core.owners','owner_id,service_owner_id,display_name,entity_type',public)
         self._copy('private.owner_identities','owner_id,lookup_token,identity_cipher,name_cipher,key_version',private)
         account_ids = {key:self.accounts[(key[0],token)][0] for key,token in self.account_tokens.items() if (key[0],token) in self.accounts}
         pending = [key for key in accounts if key not in account_ids]

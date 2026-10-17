@@ -17,12 +17,12 @@ def identity(row):
 
 
 def cancel_affected(db, changed):
-    # A run's input is its own rows plus the shared ledger versions valid at its freeze mark.
+    # A run's input is its own rows plus the shared ledger versions valid at its input_seq.
     runs = db.execute('''SELECT r.run_id,r.job_id FROM analysis.runs r WHERE r.status IN('READY','ACTIVE')
         AND (EXISTS(SELECT 1 FROM analysis.input_transactions i WHERE i.run_id=r.run_id AND i.tx_id=ANY(%s))
-          OR EXISTS(SELECT 1 FROM analysis.input_ledger_marks m JOIN analysis.input_ledger l
-            ON l.valid_from_seq<=m.run_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq>m.run_seq)
-            WHERE m.run_id=r.run_id AND l.tx_id=ANY(%s)))
+          OR EXISTS(SELECT 1 FROM analysis.input_ledger l
+            WHERE l.valid_from_seq<=r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq>r.input_seq)
+            AND l.tx_id=ANY(%s)))
         ORDER BY r.run_id''',(list(changed),list(changed))).fetchall()
     for run,job in runs:
         db.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED',cancel_requested_at=now(),cancel_reason='REPORT_CORRECTED' WHERE run_id=%s",(run,))

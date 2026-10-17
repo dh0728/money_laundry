@@ -18,6 +18,7 @@ erDiagram
     uploads ||--o{ receipts : received
     jobs ||--o{ runs : executions
     runs ||--o{ input_transactions : freezes
+    transactions ||--o{ input_ledger : frozen_versions
     runs ||--o{ scores : computes
     transactions ||--o| current_scores : publishes
     alerts ||--o{ alert_versions : evidence
@@ -54,13 +55,15 @@ erDiagram
 | analysis | jobs, receipts, selected_versions | 분석 상태·고정 수신 목록·통합에서 선택한 버전 |
 | analysis | runs, run_replacements | 실행 세대와 취소·대체 관계 |
 | analysis | stage_results, failures | 단계 완료 체크포인트·실패 이력 |
-| analysis | input_transactions, input_reports | 불변 TARGET 및 cutoff 이전 유효 전체 CONTEXT 거래값·보고 출처 |
+| analysis | input_transactions | 실행별 불변 TARGET 거래값 |
+| analysis | input_ledger, input_report_sets | 모든 실행이 함께 쓰는 CONTEXT 거래값 장부(바뀔 때만 새 버전), 실행 입력의 보고 묶음 |
 | analysis | target_ownership | 미완료 TARGET 실행 소유권 |
-| analysis | input_coverage, input_scores, source_manifest | 고정 커버리지·선행 점수와 원본 실행 참조·보고/수집 범위 상태 |
+| analysis | input_coverage, source_manifest | 고정 커버리지·보고/수집 범위 상태 |
 | analysis | model_requests, model_tasks, cancel_outbox | 모델 요청·회차·관측·취소 전달 |
 | analysis | features, scores, current_scores | 실행별 피처·점수, 완료 후 공개되는 거래별 점수 참조 |
-| analysis | alert_origins | 입력 동결 시 모든 공개 Alert(종결·병합 별칭 포함)와 불변 공개 근거 버전 참조. 실행 산출 연결은 alert_versions.run_id |
-| analysis | alert_plans, alert_fact_checks | 실행 토큰·세대·SHA-256으로 검증하는 공개 준비 계획(canonical JSON TEXT), 기존 근거 거래의 명시적 유효성 스냅샷 |
+| analysis | score_ledger | 입력 고정 때의 완료 현재 점수 장부(선행 점수) |
+| analysis | alert_origin_ledger, fact_ledger | 입력 고정 때의 모든 공개 Alert(종결·병합 별칭 포함) 공개 근거 버전과 그 근거 거래의 통합 상태 장부. 실행 산출 연결은 alert_versions.run_id |
+| analysis | alert_plans | 실행 토큰·세대·SHA-256으로 검증하는 공개 준비 계획(canonical JSON TEXT) |
 | review | alerts | Alert 담당·상태·종결 결과·조사 착수·공개 버전·병합 대표 ID·현재 범위 요약/revision/digest |
 | review | episodes | Episode 담당·상태·종결 결과·현재 범위 요약/revision/digest. Alert와 별도 테이블 |
 | review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 위험도는 현재 조사 범위에서 계산해 root summary와 생성 컬럼 risk_score에 저장 |
@@ -87,7 +90,9 @@ erDiagram
 - `core.work_id`는 업로드와 분석 작업의 공통 숫자 ID를 발급한다. 실제 저장소는 `ingest.uploads`와 `analysis.jobs`로 분리한다.
 - `review.case_id`는 Alert와 Episode의 공통 숫자 ID를 발급한다. API의 `caseId`는 해당 Alert 또는 Episode ID다. 쓰기는 각 실제 테이블에서 수행한다.
 - 소유주는 최초 통합 때 서비스 UUID와 `가명이름#코드`를 확정하여 `core.owners.display_name`에 저장한다. 조회마다 원문 이름을 복호화하거나 가명을 재계산하지 않는다. 원문과 서비스 표시값은 별개다.
+- 거래 통합은 원문 이름에서 이름·번호가 없는 범주만 뽑아 `core.owners.entity_type`과 `core.banks.country`에 저장한다. 값을 알 수 없으면 NULL이다. 분석 계정은 고정 입력과 같은 키(소유주 서비스 UUID, 은행 ID)로 이 두 열만 읽고, 이름·가명·내부 소유주 번호·계좌 연결은 읽지 못한다.
 - 원천 보고의 반복 동일 행은 발생 건수대로 보존한다. 송신·수신 보고를 대조해 거래를 만들고 `ledger.transaction_reports`에 양쪽 출처를 연결한다.
+- 분석 입력 고정은 실행마다 복사하지 않는다. `input_ledger`·`score_ledger`·`alert_origin_ledger`·`fact_ledger`는 값이 바뀔 때만 새 버전을 열고 이전 버전을 닫는다(`valid_from_seq`~`valid_to_seq`). 실행은 `analysis.runs.input_seq` 하나로 자기 시점을 가리키고, 그 시점에 유효한 버전이 그 실행이 본 값이다.
 - 원장, 고정 분석 입력, Alert 생성 근거는 수명과 의미가 달라 각각 보존한다. 당시 근거 JSON은 불변 증거이며, 조사 소속·판정·Episode 연결은 관계형 테이블로 저장한다.
 - 새로운 분석은 기존 Alert 근거 JSON을 복사하지 않고 불변 버전 ID를 참조한다. 조사 변경은 근거 버전을 수정하지 않는다.
 
@@ -104,6 +109,8 @@ Python의 데이터 변경과 단계 완료 기록은 같은 DB 트랜잭션이�
 ## 읽기 전용 뷰
 
 `core.assignable_staff`는 비밀번호 해시를 노출하지 않는 배정 후보 목록이다. `ops.work_items`는 작업 목록, `review.cases`는 공통 사건 목록이다. `review.event_history`, `saved_members`, `latest_versions`, `effective_members`, `visible_cases`, `notifications`는 현재 조사·완료 근거·알림을 조합한다. 업무 상태의 두 번째 저장소나 구 테이블의 쓰기 호환 계층이 아니다.
+
+`analysis.run_inputs`·`run_scores`·`run_alert_origins`·`run_fact_checks`는 실행의 `input_seq`에 유효한 장부 버전(run_inputs는 그 실행의 TARGET 행 포함)을 보여 주는 읽기 전용 뷰다.
 
 `saved_members`는 과거 근거에 대한 직원 판정을 보존한다. `effective_members`는 Alert의 저장 범위와 현재 `published_version` 거래의 교집합이며, Episode는 편입 당시 고정 범위를 유지한다. 보고 정정에 따라 현재 범위에서 빠진 거래를 EXCLUDED나 NORMAL로 자동 재판정하지 않는다. 현재 요약은 공개/직원 명령과 같은 트랜잭션에서 이 유효 범위를 기준으로 갱신한다.
 

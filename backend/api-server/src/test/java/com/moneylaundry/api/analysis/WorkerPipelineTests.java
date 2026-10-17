@@ -192,9 +192,9 @@ class WorkerPipelineTests {
         """
         import sys
         sys.path.insert(0, %s)
-        from features import prepare_features as pipeline
+        from models.demo_random import build_input as pipeline
         from common.worker_transport import ProtocolError
-        original = pipeline.write_demo_input
+        original = pipeline.write_input
         calls = 0
         def fail_type(source, output):
             global calls
@@ -202,7 +202,7 @@ class WorkerPipelineTests {
             if calls == 2:
                 raise ProtocolError('injected second model failure')
             return original(source, output)
-        pipeline.write_demo_input = fail_type
+        pipeline.write_input = fail_type
         from analysis_entry import main
         raise SystemExit(main())
         """
@@ -304,10 +304,10 @@ class WorkerPipelineTests {
         """
         import sys
         sys.path.insert(0, %s)
-        from features import prepare_features as pipeline
+        from models.demo_random import build_input as pipeline
         def abandon(*args):
             raise SystemExit(74)
-        pipeline.write_demo_input = abandon
+        pipeline.write_input = abandon
         from analysis_entry import main
         raise SystemExit(main())
         """
@@ -457,7 +457,8 @@ class WorkerPipelineTests {
         import httpx, psycopg, pyarrow.parquet as pq
         from inference import model_publication, inference_dispatch
         from tests.test_frozen_input_postgres import MemoryS3
-        from common.demo_calculator import build_targets, calculate
+        from models.demo_random.build_input import build_targets
+        from tests.inference_peer import calculate
         from common.worker_transport import Request, descriptor
         settings = model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
         os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)

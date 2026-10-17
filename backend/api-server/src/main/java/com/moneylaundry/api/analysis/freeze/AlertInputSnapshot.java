@@ -95,17 +95,15 @@ public class AlertInputSnapshot {
   }
 
   /**
-   * Brings the shared input ledger to this cutoff and blocked sets and returns this run's mark. The
-   * ledger holds every eligible transaction (this run's TARGET included); run_inputs subtracts each
-   * run's own rows, so CONTEXT equals the former full per-run copy.
+   * Brings the shared input ledger to this cutoff and blocked sets and returns this run's
+   * input_seq. The ledger holds every eligible transaction (this run's TARGET included); run_inputs
+   * subtracts each run's own rows, so CONTEXT is every other eligible transaction.
    */
   private long freezeLedger(UUID run, Instant cutoff, Set<Long> blockedSets) {
-    long seq = jdbc.queryForObject("select nextval('analysis.input_ledger_seq')", Long.class);
-    if (jdbc.queryForObject(
-            "select coalesce(max(run_seq),0) from analysis.input_ledger_marks", Long.class)
+    long seq = jdbc.queryForObject("select nextval('analysis.input_seq')", Long.class);
+    if (jdbc.queryForObject("select coalesce(max(input_seq),0) from analysis.runs", Long.class)
         >= seq) throw new IllegalStateException("INPUT_LEDGER_ORDER");
-    jdbc.update(
-        "insert into analysis.input_ledger_marks values(?,?,?)", run, seq, Timestamp.from(cutoff));
+    jdbc.update("update analysis.runs set input_seq=? where run_id=?", seq, run);
     String blocked = "";
     var inputArgs = new ArrayList<Object>(List.of(Timestamp.from(cutoff)));
     if (!blockedSets.isEmpty()) {
@@ -156,7 +154,7 @@ public class AlertInputSnapshot {
     return seq;
   }
 
-  /** Published Alert versions and their members' states, as the former per-run copies held them. */
+  /** Published Alert versions and the integration status of their member transactions. */
   private void freezeAlerts(long seq) {
     jdbc.execute(
         """
@@ -177,9 +175,9 @@ public class AlertInputSnapshot {
   }
 
   /**
-   * Completed current scores of the frozen input, as the former input_scores copied them. They are
-   * kept for eligible transactions only, so a frozen TARGET outside the eligible set must not carry
-   * one yet; TARGET selection already excludes every transaction a completed run scored.
+   * Completed current scores of the frozen input. They are kept for eligible transactions only, so
+   * a frozen TARGET outside the eligible set must not carry one yet; TARGET selection already
+   * excludes every transaction a completed run scored.
    */
   private void freezeScores(UUID run, long seq) {
     String completed =

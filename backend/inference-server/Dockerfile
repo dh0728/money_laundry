@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-# Build context: backend/api-server (same as the API image).
+# Build context: backend/inference-server. Used by the local demo stack; the shared
+# inference server runs this folder directly (see README.md).
 FROM python:3.13-slim-trixie
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -8,21 +9,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     INFERENCE_BIND=0.0.0.0 \
     INFERENCE_PORT=8090
 
-WORKDIR /app/worker
-COPY worker/requirements.txt ./requirements.txt
+WORKDIR /app/inference-server
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
     && mkdir -p /state \
     && chown app:app /state
 
-COPY worker/inference_server.py ./
-COPY worker/inference_worker ./inference_worker
-COPY worker/common/__init__.py worker/common/model_contract.py worker/common/demo_calculator.py \
-     worker/common/worker_transport.py ./common/
+COPY inference_server.py ./
+COPY inference_worker ./inference_worker
+COPY models ./models
+COPY common ./common
+RUN python -c "import inference_server, inference_worker.inference_compute, models.registry"
 
 USER app:app
 EXPOSE 8090
 HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=3).close()"
-ENTRYPOINT ["python", "-B", "/app/worker/inference_server.py"]
+ENTRYPOINT ["python", "-B", "/app/inference-server/inference_server.py"]

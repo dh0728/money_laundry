@@ -41,13 +41,16 @@ class InferenceConfigurationTests(unittest.TestCase):
             return original(command, **kwargs)
         self.engine.runner.run = run
 
-    def test_default_is_local_and_ignores_unselected_url(self):
-        values = self.engine.runtime(NEW)
-        self.assertEqual(values["DEV_INFERENCE_API_URL"], "http://127.0.0.1:8090")
-        self.assertEqual(values["DEV_INFERENCE_API_TOKEN"], values["DEV_LOCAL_INFERENCE_TOKEN"])
-        self.assertEqual(values["DEV_INFERENCE_ALLOW_LOOPBACK"], "true")
-        self.assertEqual(values["DEV_INFERENCE_CA_FILE"], "")
-
+    def test_default_is_kubesphere_and_local_is_no_longer_selectable(self):
+        selection = self.external("kubesphere")
+        self.engine.config.pop("dev_inference_target")
+        self.assertEqual(self.engine.dev_inference(), selection)
+        self.engine.config["dev_inference_target"] = "local"
+        with self.assertRaises(deploy.DeploymentError):
+            self.engine.dev_inference()
+        # Old release records still resolve so rollback restores the Compose file they shipped with.
+        self.assertEqual(self.engine.runtime(OLD, inference={"target": "local"})["DEV_INFERENCE_API_URL"],
+                         "http://127.0.0.1:8090")
     def test_external_target_reuses_dev_token_for_kubesphere_only(self):
         for target in ("kubesphere", "naver"):
             selection = self.external(target)

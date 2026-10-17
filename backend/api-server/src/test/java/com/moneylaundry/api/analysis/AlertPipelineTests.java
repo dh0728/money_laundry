@@ -509,7 +509,6 @@ class AlertPipelineTests {
   @Test
   void unassigned_historical_seed_is_revisited_without_target_or_existing_alert() {
     jdbc.update("delete from analysis.scores where run_id=? and tx_id=?", run, returnSeed);
-    jdbc.update("delete from analysis.input_reports where run_id=? and tx_id=?", run, returnSeed);
     jdbc.update(
         "delete from analysis.input_transactions where run_id=? and tx_id=?", run, returnSeed);
     jdbc.update("delete from analysis.input_ledger where tx_id=?", returnSeed);

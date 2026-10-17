@@ -512,7 +512,7 @@ class BaselineSchemaTests {
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from public.flyway_schema_history where success", Integer.class))
-        .isEqualTo(3);
+        .isEqualTo(1);
     assertThat(
             jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema='public'",
@@ -525,7 +525,13 @@ class BaselineSchemaTests {
         .isTrue();
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from information_schema.columns where table_schema='analysis' and table_name='alert_origins' and column_name='evidence'",
+                "select count(*) from information_schema.columns where table_schema='analysis' and table_name='alert_origin_ledger' and column_name='evidence'",
+                Integer.class))
+        .isZero();
+    // One frozen copy per fact: the shared ledgers replaced the per-run copies and their marks.
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from unnest(array['analysis.input_reports','analysis.input_scores','analysis.alert_origins','analysis.alert_fact_checks','analysis.input_ledger_marks']) t where to_regclass(t) is not null",
                 Integer.class))
         .isZero();
     assertThat(

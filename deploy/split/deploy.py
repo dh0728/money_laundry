@@ -112,10 +112,10 @@ class Deployment:
         return value
 
     def dev_inference(self):
-        target = self.config.get("dev_inference_target", "local")
-        require(target in ("local", "kubesphere", "naver"), "Invalid dev_inference_target.")
-        if target == "local":
-            return {"target": "local"}
+        # Models run only on the shared inference server; "local" survives only in old release
+        # records so rollback restores the Compose file those releases shipped with.
+        target = self.config.get("dev_inference_target", "kubesphere")
+        require(target in ("kubesphere", "naver"), "Invalid dev_inference_target; local inference was removed.")
         ca = self.root / "certs/inference" / target / "ca.crt"
         require(ca.is_file(), "Install the selected inference public CA first.")
         selection = {"target": target, "url": self.parameter(f"inference/{target}/url"),

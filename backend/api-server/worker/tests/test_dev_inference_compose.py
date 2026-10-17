@@ -1,4 +1,4 @@
-"""Opt-in test of the dev Compose topology with isolated names and synthetic secrets."""
+"""Opt-in test of the dev Compose API/database topology with isolated names and synthetic secrets."""
 import base64
 import json
 import os
@@ -41,8 +41,10 @@ class DevInferenceComposeTests(unittest.TestCase):
             return result.stdout.strip()
 
         config = json.loads(run('compose', '-f', str(compose_file), 'config', '--format', 'json'))
-        self.assertEqual(config['services']['inference']['network_mode'], 'service:api')
-        self.assertFalse(config['services']['inference'].get('ports'))
+        # Models run on the shared inference server (backend/inference-server); the API image no
+        # longer carries one, so this check covers the API and database topology only.
+        config['services'].pop('inference', None)
+        config['volumes'].pop('inference-state', None)
         config['name'] = project
         del config['services']['web']
         for value in config['volumes'].values():
@@ -61,7 +63,7 @@ class DevInferenceComposeTests(unittest.TestCase):
                 return run('compose', '-p', project, '-f', '-', *args, input=encoded)
             except AssertionError:
                 if args[0] == 'up':
-                    logs = run('compose', '-p', project, '-f', '-', 'logs', '--no-color', '--tail=100', 'api', 'inference', input=encoded)
+                    logs = run('compose', '-p', project, '-f', '-', 'logs', '--no-color', '--tail=100', 'api', input=encoded)
                     print(logs[-7000:])
                 raise
 
@@ -85,8 +87,8 @@ assert str(ZoneInfo('Asia/Seoul'))=='Asia/Seoul'
 from configure_analysis_db import configure
 with psycopg.connect(host='postgres',dbname='aml_check',user='aml_check',password=os.environ['SPRING_DATASOURCE_PASSWORD'],autocommit=True) as db:
     configure(db,os.environ['ANALYSIS_DB_USERNAME'],os.environ['ANALYSIS_DB_PASSWORD'])
-    assert db.execute("select version from public.flyway_schema_history where success order by installed_rank").fetchall()==[('1',),('2',),('3',)]
-    for table in ('analysis.alert_plans','analysis.alert_fact_checks','review.alert_lineage',
+    assert db.execute("select version from public.flyway_schema_history where success order by installed_rank").fetchall()==[('1',)]
+    for table in ('analysis.alert_plans','analysis.fact_ledger','review.alert_lineage',
                   'review.alert_change_proposals','review.alert_proposal_cases','review.event_recipients'):
         assert db.execute('select to_regclass(%s)', (table,)).fetchone()[0] is not None
 with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSIS_DB_USERNAME'],password=os.environ['ANALYSIS_DB_PASSWORD'],autocommit=True) as db:
@@ -104,19 +106,7 @@ with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSI
             assert not db.execute('select has_table_privilege(current_user,%s,%s)', (table,privilege)).fetchone()[0]
     assert db.execute("select has_table_privilege(current_user,'analysis.alert_plans','INSERT')").fetchone()[0]
 """)
-        request_id = str(uuid4())
-        path = f'/api/v1/inference-requests/{request_id}/rounds/1'
-        body = dict(contract_version=2, job_id=1, run_id=str(uuid4()), model_kind='BINARY',
-                    request_id=request_id, execution_round=1, cancel_id=str(uuid4()),
-                    reason_code='REPORT_CORRECTED', requested_at='2026-09-29T00:00:00+00:00')
-        prelude = "import os,httpx\nb='http://127.0.0.1:8090'\nh={'Authorization':'Bearer '+os.environ['INFERENCE_API_TOKEN']}\n"
-        api_python(prelude + f"assert httpx.get(b+'/health').status_code==200\n"
-                   f"assert httpx.get(b+{path!r}).status_code==401\n"
-                   f"r=httpx.put(b+{path!r}+'/cancellation',headers=h,json={body!r})\n"
-                   "assert r.status_code==200, r.status_code\nassert r.json()['status']=='STOPPED'\n")
-        compose('up', '-d', '--force-recreate', '--wait', '--wait-timeout', '120', 'api', 'inference')
-        api_python(prelude + f"r=httpx.get(b+{path!r},headers=h)\n"
-                   "assert r.status_code==200, r.status_code\nassert r.json()['status']=='STOPPED'\n")
+        compose('up', '-d', '--force-recreate', '--wait', '--wait-timeout', '120', 'api')
 
 
 if __name__ == '__main__':

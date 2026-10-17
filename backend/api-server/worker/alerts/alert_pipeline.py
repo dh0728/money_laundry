@@ -301,6 +301,11 @@ def _member_digest(evidence):
     return _digest_of(body)
 
 
+def run(connection, execution, context):
+    """Stage entry: ⑧ Alert 구성 (ALERTS)."""
+    save_alerts(connection, execution)
+
+
 def save_alerts(connection, execution):
     if not connection.autocommit:
         raise ProtocolError('Autocommit connection required')

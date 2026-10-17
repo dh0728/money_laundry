@@ -1,14 +1,15 @@
-"""Model integration point. The deployed adapter is currently the approved demo."""
-from common.demo_calculator import calculate
+"""Model integration point: runs the model package bound to the request's versions."""
 from common.model_contract import ModelExecutionError
 from common.worker_transport import ProtocolError
+from models import registry
 
 
 def run_model(targets, model_kind, *, model_version, feature_version):
     """Return a score table, or raise the structured model-team exception."""
     try:
-        return calculate(targets, model_kind, model_version=model_version,
-                         feature_version=feature_version)
+        package = registry.require(model_version, feature_version)
+        return package.model.calculate(targets, model_kind, model_version=model_version,
+                                       feature_version=feature_version)
     except ModelExecutionError:
         raise
     except ProtocolError:

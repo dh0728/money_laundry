@@ -520,6 +520,24 @@ class BankUploadApiTests {
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
 
   @Test
+  void integration_stores_only_name_free_entity_type_and_bank_country() throws Exception {
+    String value =
+        row(10, "A", 40, "B", "1", "USD", "1", "USD", "ACH", "E1", "E2")
+            .replace(",Bank40,", ",Germany Bank #40,")
+            .replace(",NameE1,", ",Corporation #7,");
+    integrate(submit(10, HEADER + value));
+    assertThat(
+            jdbc.queryForList(
+                "select entity_type from core.owners order by owner_id", String.class))
+        .containsExactly("Corporation", null);
+    assertThat(
+            jdbc.queryForList(
+                "select country from core.banks where bank_id in (10,40) order by bank_id",
+                String.class))
+        .containsExactly(null, "Germany");
+  }
+
+  @Test
   void same_number_different_banks_and_next_day_uuid_reuse() throws Exception {
     String value = row(10, "001", 40, "001", "1", "USD", "1", "USD", "ACH", "E1", "E1");
     long a = submit(10, HEADER + value);
@@ -991,7 +1009,7 @@ class BankUploadApiTests {
               jdbc.queryForList(
                   "select tx_id from analysis.input_transactions where run_id=?", Long.class, run))
           .containsExactlyElementsOf(activeIds());
-      assertThat(count("analysis.input_reports")).isEqualTo(2);
+      assertThat(count("analysis.input_report_sets")).isEqualTo(2);
     } finally {
       productionRunner.close();
     }

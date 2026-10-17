@@ -1,6 +1,6 @@
-# 백엔드·추론 워커 배포
+# 백엔드 워커 배포
 
-백엔드 워커는 API 컨테이너에서 Spring이 실행한다. 추론 워커는 별도 프로세스 `inference_server.py`이며 dev에서는 동일 이미지의 별도 컨테이너다.
+백엔드 워커는 API 컨테이너에서 Spring이 실행한다. 모델은 추론 서버(`backend/inference-server`, [README](../../inference-server/README.md))에서만 돌고, 백엔드는 입력을 보내고 결과를 받아온다.
 
 ### 폴더 구조와 파이프라인 순서
 
@@ -11,17 +11,19 @@
 | ① | 파일 수집·적재 | `ingest/` | `ingest_entry.py` |
 | ③ | 거래 통합 | `integrate/` | `analysis_entry.py --stage INTEGRATE` |
 | ⑤ | 모델 입력 준비 | `features/` | `analysis_entry.py --stage FEATURES` |
-| ⑥ | 모델 추론 | `inference/` (상대편 추론 워커는 `inference_worker/`) | `analysis_entry.py --stage INFERENCE`, `inference_server.py` |
+| ⑥ | 모델 추론 | `inference/` (상대편은 `backend/inference-server`) | `analysis_entry.py --stage INFERENCE` |
 | ⑦ | 점수 저장 | `scores/` | `analysis_entry.py --stage SCORES` |
 | ⑧ | Alert 구성 | `alerts/` | `analysis_entry.py --stage ALERTS` |
 
-②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑨Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·시연 계산기·모델 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
+`models/<모델이름>/`에는 버전(`spec.py`)과 입력 만들기(`build_input.py`)만 있고, `models/registry.py`가 모델 종류(이진·유형)별로 어느 버전을 쓸지 정한다. ⑤가 `build_input`을 부른다. 같은 버전의 모델 실행(`model.py`)은 추론 서버의 `models/`에 있다. 분석 단계는 `analysis_entry.py`의 `STAGES` 표가 각 폴더의 `run(connection, execution, context)`로 연결한다.
+
+②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑨Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·점수 공통 검사·모델 오류 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
 
 ### 라벨 독립 임시 추론
 
 새 분석은 `demo-random-v1/demo-input-v1` 임시 변환기를 사용한다. 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
 
-- API와 추론 워커를 함께 배포한다. CSV를 다시 만들 필요는 없다.
+- API와 추론 서버를 함께 배포한다. CSV를 다시 만들 필요는 없다.
 - 기존 일반 더미 바인딩은 유지한다. 삭제된 demo-labels 버전의 미완료 실행은 새 실행이 필요하며 완료 이력은 그대로 둔다.
 - 실제 모델 도입 시 계산기와 입력 피처를 모델 계약에 맞춰 교체한다. 요청·결과 전달과 검증 구조는 유지한다.
 
@@ -41,60 +43,24 @@ Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다
 - dev/prod 배포 설정은 `/aml/{환경}/analysis-db/username`, `/aml/{환경}/analysis-db/password`를 읽는다. 비밀번호는 SecureString으로 보관하고 같은 값을 DB 로그인에 설정한다. 스크립트 작성·테스트는 실제 서버 권한 설정이나 배포 완료를 의미하지 않는다.
 ## 1. 이미지 빌드
 
-빌드 context는 두 이미지 모두 `backend/api-server`다. 다음은 해당 폴더의
-PowerShell 명령이다. 기존 CI도 이 context를 사용해야 한다.
+빌드 context는 `backend/api-server`다. 다음은 해당 폴더의 PowerShell 명령이다.
 
 ```powershell
 docker build -f Dockerfile -t aml-api:worker .
-docker build -f worker/Dockerfile.inference -t aml-inference:demo .
 ```
 
-API 이미지는 Java21·Python3.13을 포함한다. 두 이미지는 기존 requirements 버전을
-사용하고 운영 모듈만 복사한다. 테스트 스크립트·로컬 설정·작업 데이터는 포함하지 않는다.
-추론 이미지는 KubeSphere가 접근 가능한 팀 레지스트리에 게시한 후 그 이미지 주소로
-실행한다. 이 문서의 로컬 태그만으로 원격 KubeSphere가 이미지를 가져올 수는 없다.
+API 이미지는 Java21·Python3.13을 포함하고 운영 모듈만 복사한다. 테스트 스크립트·로컬 설정·작업 데이터와 모델·추론 서버 코드는 포함하지 않는다. 추론 서버는 `backend/inference-server/README.md`대로 KubeSphere 서버에서 직접 실행한다.
 
 ## 2. 먼저 준비할 인프라 설정
 
-인프라 담당자가 아래 두 Parameter Store 값을 **dev 재배포 전에** 준비한다.
-배포 스크립트가 직접 조회하므로 EC2 역할의 해당 경로 읽기/복호화 권한도 필요하다.
+인프라 담당자가 아래 Parameter Store 값을 **dev 재배포 전에** 준비한다. 배포 스크립트가 직접 조회하므로 EC2 역할의 해당 경로 읽기/복호화 권한도 필요하다. 정확한 경로는 `deploy/split/README.md`의 추론 대상 표를 따른다.
 
 | Parameter Store | 내용 |
 |---|---|
-| `/aml/dev/inference/url` | EC2에서 접근 가능한 추론 워커 HTTPS 기본 주소. API 경로는 붙이지 않음 |
-| `/aml/dev/inference/token` | 최소32자 무작위 공유 토큰, SecureString. 추론 워커의 INFERENCE_TOKEN과 동일 |
+| `/aml/dev/inference/kubesphere/url` | EC2에서 접근 가능한 추론 서버 HTTPS 기본 주소. API 경로는 붙이지 않음 |
+| `/aml/dev/inference/token` | 최소32자 무작위 공유 토큰, SecureString. 추론 서버의 `INFERENCE_TOKEN`과 동일 |
 
-추론 워커 설정은 KubeSphere 환경변수/Secret으로 주입한다. 토큰을 명령 인수·커밋·채팅에
-복사하지 않는다. 추론 워커에 DB 접속 정보나 AWS 장기 접근키를 넣을 필요는 없다.
-
-| 추론 환경변수/설정 | 값 |
-|---|---|
-| `INFERENCE_TOKEN` | 위 공유 토큰 |
-| `INFERENCE_OBJECT_BASE_URL` | 실제 S3 Presigned URL과 **scheme·host·prefix가 같은** 기본 URL, 끝 `/` 필수 |
-| `INFERENCE_STATE_DIR` | 이미지 기본 `/state` |
-| `INFERENCE_BIND` / `INFERENCE_PORT` | 이미지 기본 `0.0.0.0` / `8090` |
-| `/state` 저장소 | 재배포·재시작 후 유지되는 볼륨, UID/GID10001 쓰기 가능 |
-| 실행 수 | replica1, Uvicorn workers1. 같은 state를 두 서버가 동시에 열지 않음 |
-| health | 내부 HTTP `:8090/health`, 성공 시 `{"status":"UP"}` |
-| 외부 노출 | 기존 HTTPS 프록시/Ingress가 내부8090으로 전달. HTTP 우회·TLS 검증 해제는 사용하지 않음 |
-
-예를 들어 virtual-host 방식 S3 주소라면 base는
-`https://<bucket>.s3.<region>.amazonaws.com/<prefix>/`다.
-path-style 주소를 임의로 섞지 않는다. 정확한 host는 실제 SDK 서명 URL 기준으로 확인하고
-URL의 서명 query는 출력·공유하지 않는다. 입력 GET·결과 PUT이 모두 허용되어야 한다.
-EC2 API 역할에는 기존 S3 prefix의 입력/결과 GetObject·PutObject 권한이 필요하다.
-
-`/state`에는 SQLite 상태·입력/결과 캐시·서명 URL이 저장될 수 있으므로 일반 공개 파일
-경로로 노출하지 않는다. 실행 중인 모델과 서버를 중단한 뒤 같은 저장소로 재기동한다.
-비정상 종료 후 `RECOVERY_REQUIRED`는 성공/중단 확인을 대신하지 않는다.
-
-이미지를 사용할 수 없고 기존 Python 환경만 쓸 수 있다면 다음 운영 파일을 worker 폴더 구조 그대로
-배치한다: `inference_server.py`, `inference_worker/`(`__init__.py`, `inference_service.py`, `inference_compute.py`,
-`model_adapter.py`), `common/`의 `__init__.py`·`model_contract.py`·`demo_calculator.py`·`worker_transport.py`,
-`requirements.txt`. Python3.13 환경에서 requirements를 설치하고 위 환경변수를 설정한 후
-그 환경의 Python으로 `inference_server.py`를 실행한다. 수동 실행의 기본 bind는127.0.0.1이므로
-프록시의 연결 방식에 맞게 지정한다. Jupyter 셀 종료/세션 단절에도 운영 서버가 유지되는
-기동 방식은 KubeSphere 담당자와 확인한다.
+추론 서버 쪽 환경변수·상태 폴더·실행 방법은 `backend/inference-server/README.md`에 있다. EC2 API 역할에는 기존 S3 prefix의 입력/결과 GetObject·PutObject 권한이 필요하다. 추론 서버의 `INFERENCE_OBJECT_BASE_URL`은 실제 SDK 서명 URL과 scheme·host·prefix가 같아야 하며, URL의 서명 query는 출력·공유하지 않는다.
 
 ## 3. EC2 API 배포
 
@@ -107,8 +73,8 @@ EC2 API 역할에는 기존 S3 prefix의 입력/결과 GetObject·PutObject 권�
 - DB 접속 정보는 Spring이 실제 datasource 설정에서 자식 프로세스에 전달
 
 기존 `aml-dev-postgres-data`, DB URL, S3 prefix는 바꾸거나 초기화하지 않는다.
-API 저장 볼륨은 새로 만들 때 이미지의 UID10001 권한으로 초기화된다. 추론 PVC처럼
-빈 디렉터리로 덮어 마운트하는 환경에서는 UID/GID10001 쓰기 권한을 별도로 제공해야 한다.
+API 저장 볼륨은 새로 만들 때 이미지의 UID10001 권한으로 초기화된다. 빈 디렉터리로 덮어
+마운트하는 환경에서는 UID/GID10001 쓰기 권한을 별도로 제공해야 한다.
 EC2 IAM 역할 자격증명은 Python boto3에서도 접근 가능해야 한다. Java health 성공만으로
 Python의 S3 권한까지 확인된 것은 아니다.
 
@@ -167,7 +133,7 @@ WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id)
 
 ## 5. 취소·재기동 확인의 경계
 
-- 배포 후 유휴 추론 워커를 같은 `/state`로 재기동하고 health 및 기존 요청의 GET 조회를
+- 배포 후 유휴 추론 서버를 같은 상태 폴더로 재기동하고 health 및 기존 요청의 GET 조회를
   확인한다. 진행 중 모델을 강제 종료하는 테스트와 분리한다.
 - 실제 취소는 Spring의 기존 보고 정정 절차가 만든 cancellation을 사용한다. 작업 상세의
   `cancellations`에서 전달과 종료 확인을 구분한다. 운영 상태를 SQL로 임의 수정하지 않는다.

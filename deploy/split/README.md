@@ -1,6 +1,6 @@
 # EC2 두 대 + RDS 배포
 
-프론트 EC2는 웹과 외부 Nginx, 백엔드 EC2는 API·Python 워커와 내부 Nginx를 실행한다. DB는 RDS를 사용한다. 개발의 로컬 데모 추론 컨테이너는 복구용으로 유지하며, 워커의 추론 대상은 개발 설정에서 선택한다.
+프론트 EC2는 웹과 외부 Nginx, 백엔드 EC2는 API·Python 워커와 내부 Nginx를 실행한다. DB는 RDS를 사용한다. 모델은 공유 추론 서버(`backend/inference-server`)에서만 돌며, 워커의 추론 대상은 개발 설정에서 선택한다.
 
 기존 `deploy/compose*.yaml`, `deploy/scripts/`, `deploy/nginx/`는 EC2 한 대 구성용 보관 코드다. 파일 위쪽의 `LEGACY` 주석으로 구분한다. 이 버전의 CI는 해당 배포를 호출하지 않으며, 기존 두 배포 workflow의 실행 조건도 `false`로 막았다. 아직 이 변경을 받지 않은 원격 브랜치에서는 GitHub의 workflow 비활성화를 유지한다.
 
@@ -65,17 +65,17 @@ jdbc:postgresql://<RDS_ENDPOINT>:5432/aml_dev_v3?sslmode=verify-full&sslrootcert
 
 ## 개발 외부 추론 대상 선택
 
-**설정 위치: AWS 백엔드의 /opt/aml/shared/split.json.** `dev_inference_target`의 기본값은 `local`이며 `kubesphere`·`naver`를 선택할 수 있다. 운영 Compose·고정 앱 Digest·V1~V17 구조는 변경하지 않는다. 네이버 값은 클라이언트 설정 분리용이며 GPU 서버 배포 방식까지 정의하지 않는다.
+**설정 위치: AWS 백엔드의 /opt/aml/shared/split.json.** `dev_inference_target`의 기본값은 `kubesphere`이며 `naver`도 선택할 수 있다. 모델은 공유 추론 서버(`backend/inference-server`)에서만 돌기 때문에 개발 서버에 로컬 추론 컨테이너는 없다(2026-10-17). `local`은 그 이전 배포 기록의 복구에만 남아 있고 새 배포에서는 선택할 수 없다. 운영 Compose·고정 앱 Digest·V1~V17 구조는 변경하지 않는다. 네이버 값은 클라이언트 설정 분리용이며 GPU 서버 배포 방식까지 정의하지 않는다.
 
 | 대상 | API 주소 | Bearer 토큰 | 공개 CA |
 | --- | --- | --- | --- |
-| local | http://127.0.0.1:8090 | /aml/dev/inference/token | 없음 |
+| local(이전 배포 복구 전용) | http://127.0.0.1:8090 | /aml/dev/inference/token | 없음 |
 | kubesphere | /aml/dev/inference/kubesphere/url | /aml/dev/inference/token | /opt/aml/certs/inference/kubesphere/ca.crt |
 | naver | /aml/dev/inference/naver/url | /aml/dev/inference/naver/token | /opt/aml/certs/inference/naver/ca.crt |
 
 주소는 Parameter Store String, 외부 토큰은 최소 32자의 공백 없는 ASCII **SecureString**으로 준비한다. 토큰은 해당 서버의 `INFERENCE_TOKEN`과 같아야 한다. `/aml/dev/inference/url`은 사용하지 않는다. KubeSphere는 사용자 선택에 따라 기존 개발 토큰을 재사용한다. 새 KubeSphere 토큰 파라미터는 만들지 않는다. 네이버 토큰만 별도 경로를 사용한다.
 
-`deploy.py`가 선택한 URL·토큰을 조회하고, 외부일 때만 `backend/inference.external.yaml`을 병합한다. 공개 CA 파일만 API 컨테이너의 `/app/certs/inference-ca.crt`에 읽기 전용으로 연결하며 파일이 없으면 배포를 중단한다. CA 개인키·GPU 서버 개인키는 복사하지 않는다. CA 파일은 컨테이너 사용자(uid 10001)가 읽을 수 있어야 한다.
+`deploy.py`가 선택한 URL·토큰을 조회하고 `backend/inference.external.yaml`을 병합한다(이전 local 기록 복구 때만 병합하지 않는다). 공개 CA 파일만 API 컨테이너의 `/app/certs/inference-ca.crt`에 읽기 전용으로 연결하며 파일이 없으면 배포를 중단한다. CA 개인키·GPU 서버 개인키는 복사하지 않는다. CA 파일은 컨테이너 사용자(uid 10001)가 읽을 수 있어야 한다.
 
 Compose가 `INFERENCE_API_URL`·`INFERENCE_API_TOKEN`·`INFERENCE_CA_FILE`을 API에 전달한다. 외부 대상은 HTTPS와 `INFERENCE_ALLOW_LOOPBACK=false`를 사용한다. Python 워커의 제출·조회와 Spring의 취소·취소 상태 조회가 동일한 CA를 사용하며 S3/JVM 전역 신뢰 설정은 바꾸지 않는다. Python은 환경 프록시를 사용하지 않고 HTTP 리다이렉트도 따라가지 않는다. S3 서명 URL은 외부에서도 리전별 virtual-host 주소를 사용한다.
 
@@ -85,7 +85,7 @@ Compose가 `INFERENCE_API_URL`·`INFERENCE_API_TOKEN`·`INFERENCE_CA_FILE`을 AP
 
 1. 개발 분석 요청 유입·자동 예약을 멈추고 진행 중 run·취소 큐를 정리한다. 대상/주소 변경 시 배포의 RDS 사전 검사가 대기·실행·재시도 작업, READY/ACTIVE/CANCEL_REQUESTED run, 미확인 취소를 발견하면 중단한다. 이 조회가 이후 새 요청까지 잠그는 것은 아니므로 전환 중 요청 유입을 계속 막는다.
 2. 대상·URL·CA 경로/해시는 배포 상태에 저장한다. 토큰은 기록하지 않는다. 복구할 때는 이 기록의 대상으로 돌아가고, 이전 기록에 대상이 없으면 local로 처리한다.
-3. 로컬 inference와 상태 볼륨을 유지한다. KubeSphere와 local은 기존 개발 토큰을 공유하고, 네이버 토큰은 로컬 컨테이너에 주입하지 않는다. 기존 run의 목적지 고정 검증도 유지한다.
+3. 새 배포의 Compose에는 로컬 inference 서비스가 없다. 이전 local 기록으로 복구하면 그 릴리스에 들어 있던 Compose와 이미지가 로컬 inference를 다시 띄운다(기존 상태 볼륨 `aml-dev-inference-state`는 지우지 않는다). KubeSphere는 기존 개발 토큰을 쓰고, 네이버 토큰은 별도다. 기존 run의 목적지 고정 검증도 유지한다.
 4. CA 파일이 배포 당시 해시와 달라지면 복구를 중단한다. CA 교체는 별도 배포로 검토한다. 토큰은 대상별 Parameter Store의 현재 값을 읽으므로 GPU와 동시 교체해야 한다.
 5. 전환 후 실제 토큰으로 요청·조회·취소, S3 GET/PUT, 결과 검증·DB 반영을 확인한다. 기본 배포 health 검사는 Spring API 상태이며 GPU의 실제 모델 성공을 뜻하지 않는다.
 

@@ -128,6 +128,11 @@ def _failure(connection, execution, kind, error):
                 waiting, 30 if failures == 1 else 120, execution.run_id, kind))
 
 
+def run(connection, execution, context):
+    """Stage entry: ⑥ 모델 추론 (INFERENCE), one bounded tick; returns the worker exit code."""
+    return advance(connection, execution, context.storage_dir, context.settings, context.s3)
+
+
 def advance(connection, execution, storage_root, settings, s3, *, transport=None):
     settings.validate()
     with connection.transaction():

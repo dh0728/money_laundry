@@ -139,7 +139,7 @@ class FreezeInputTests {
   }
 
   @Test
-  void freezes_one_hundred_thousand_targets_with_report_links_and_is_idempotent() {
+  void freezes_one_hundred_thousand_targets_with_report_sets_and_is_idempotent() {
     seed(100_000);
     long start = System.nanoTime();
     UUID run = runs.freeze(job, cutoff);
@@ -157,8 +157,10 @@ class FreezeInputTests {
         .isEqualTo(100_000);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.input_reports where run_id=?", Integer.class, run))
-        .isEqualTo(100_000);
+                "select count(*) from analysis.input_report_sets where run_id=?",
+                Integer.class,
+                run))
+        .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.target_ownership where run_id=?",
@@ -354,11 +356,10 @@ class FreezeInputTests {
         .isEqualTo(100_000);
     assertThat(
             jdbc.queryForObject(
-                "select count(*)||'/'||(select count(*) from analysis.input_report_sets where run_id=?) from analysis.input_reports where run_id=?",
-                String.class,
-                run,
+                "select count(*) from analysis.input_report_sets where run_id=?",
+                Integer.class,
                 run))
-        .isEqualTo("1/1");
+        .isEqualTo(1);
   }
 
   @Test
@@ -384,17 +385,16 @@ class FreezeInputTests {
         .isEqualTo("20000/20000");
     assertThat(
             jdbc.queryForObject(
-                "select count(*)||'/'||(select count(*) from analysis.input_report_sets where run_id=?) from analysis.input_reports where run_id=?",
-                String.class,
-                run,
+                "select count(*) from analysis.input_report_sets where run_id=?",
+                Integer.class,
                 run))
-        .isEqualTo("20000/1");
+        .isEqualTo(1);
   }
 
   static final String INPUT_COLUMNS =
       "tx_id,occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version";
 
-  /** The former per-run CONTEXT copy, recomputed now: eligible ledger minus the run's TARGET. */
+  /** The run's expected CONTEXT, recomputed now: eligible ledger minus the run's TARGET. */
   void assertContextMatchesFullCopy(UUID run, Instant at) {
     String oracle =
         """
@@ -550,8 +550,8 @@ class FreezeInputTests {
       assertThat(named.queryForObject(sql, params, Integer.class)).as(sql).isZero();
   }
 
-  /** The former per-run score, Alert origin and fact copies, recomputed now for this run. */
-  void assertSnapshotsMatchFormerCopies(UUID run) {
+  /** Completed scores, published Alerts and member states as they stand now, at this freeze. */
+  void assertSnapshotsMatchStateAtFreeze(UUID run) {
     assertSameRows(
         """
         select c.tx_id,s.run_id,to_jsonb(s)-'run_id'-'tx_id' from analysis.current_scores c
@@ -624,7 +624,7 @@ class FreezeInputTests {
   }
 
   @Test
-  void frozen_scores_and_alert_facts_match_former_copies_and_stay_fixed_per_run() {
+  void frozen_scores_and_alert_facts_match_state_at_freeze_and_stay_fixed_per_run() {
     seed(4);
     var ids = jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
     UUID first = runs.freeze(job, cutoff);
@@ -634,7 +634,7 @@ class FreezeInputTests {
     long alert = publish(null, 1, first, ids.get(0), ids.get(1));
     Instant later = cutoff.plus(Duration.ofDays(1));
     UUID second = runs.freeze(nextJob(later), later);
-    assertSnapshotsMatchFormerCopies(second);
+    assertSnapshotsMatchStateAtFreeze(second);
     var secondSnapshots = snapshots(second);
     assertThat(secondSnapshots).hasSize(4 + 1 + 2);
     // A superseded member, a new Alert version and Alert, and a replaced current score.
@@ -653,7 +653,7 @@ class FreezeInputTests {
     jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", rescoreJob);
     Instant last = later.plus(Duration.ofDays(1));
     UUID third = runs.freeze(nextJob(last), last);
-    assertSnapshotsMatchFormerCopies(third);
+    assertSnapshotsMatchStateAtFreeze(third);
     assertThat(
             jdbc.queryForObject(
                 "select (select integration_status from analysis.run_fact_checks where run_id=? and tx_id=?)||'/'||(select version from analysis.run_alert_origins where run_id=? and alert_id=?)||'/'||(select score_run_id from analysis.run_scores where run_id=? and tx_id=?)",
@@ -667,11 +667,6 @@ class FreezeInputTests {
         .isEqualTo("SUPERSEDED/2/" + rescore);
     // The earlier run, whose proposals may be checked much later, keeps what it froze.
     assertThat(snapshots(second)).containsExactlyInAnyOrderElementsOf(secondSnapshots);
-    assertThat(
-            jdbc.queryForObject(
-                "select (select count(*) from analysis.input_scores)+(select count(*) from analysis.alert_origins)+(select count(*) from analysis.alert_fact_checks)",
-                Integer.class))
-        .isZero();
   }
 
   @Test
@@ -691,7 +686,7 @@ class FreezeInputTests {
   void failure_after_target_insert_rolls_back_and_same_job_can_retry() {
     seed(2);
     jdbc.execute(
-        "alter table analysis.input_reports add constraint freeze_test_reject check(false) not valid");
+        "alter table analysis.input_report_sets add constraint freeze_test_reject check(false) not valid");
     try {
       assertThatThrownBy(() -> runs.freeze(job, cutoff))
           .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
@@ -710,7 +705,7 @@ class FreezeInputTests {
       assertThat(jdbc.queryForObject("select count(*) from ledger.transactions", Integer.class))
           .isEqualTo(2);
     } finally {
-      jdbc.execute("alter table analysis.input_reports drop constraint freeze_test_reject");
+      jdbc.execute("alter table analysis.input_report_sets drop constraint freeze_test_reject");
     }
     UUID run = runs.freeze(job, cutoff);
     assertThat(

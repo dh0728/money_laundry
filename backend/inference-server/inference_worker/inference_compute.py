@@ -18,10 +18,10 @@ if __package__ in (None, ""):
     # inference_service starts this file as a script; resolve imports from the worker root.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common.demo_calculator import validate_scores
 from inference_worker.model_adapter import run_model
 from common.model_contract import ModelExecutionError, model_failure
 from common.worker_transport import Request, ProtocolError, decode, encode, descriptor, tx_ids
+from models import registry
 
 
 def atomic_json(path, document):
@@ -97,7 +97,8 @@ def execute(directory):
                 raise ProtocolError("TARGET count mismatch")
             scores = run_model(targets, request.model_kind, **request.versions())
             try:
-                validate_scores(scores, ids, request.model_kind, **request.versions())
+                registry.require(**request.versions()).model.validate_scores(
+                    scores, ids, request.model_kind, **request.versions())
             except Exception:
                 raise ModelExecutionError("MODEL_OUTPUT_INVALID", "POSTPROCESS") from None
             temporary = directory / "scores.partial"
