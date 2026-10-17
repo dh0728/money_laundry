@@ -1,10 +1,10 @@
 # 모델 실행부 연동 규약 v1
 
-대상: 모델팀의 실행 어댑터 ↔ Python 추론 워커. Spring API나 S3 파일 계약의 버전과 별개다. 현재 실행 모델은 시연 계산기이며 실제 GNN/GPU 예외 매핑은 모델팀의 어댑터 연결 시 검증한다.
+대상: 모델팀의 실행 어댑터 ↔ Python 추론 서버(이 폴더). Spring API나 S3 파일 계약의 버전과 별개다. 현재 실행 모델은 시연 계산기이며 실제 GNN/GPU 예외 매핑은 모델팀의 어댑터 연결 시 검증한다.
 
 ## 연결 지점과 성공 반환
 
-모델 하나는 `models/<모델이름>/` 폴더 하나다. `spec.py`(버전·지원 여부), `build_input.py`(백엔드 워커의 모델 입력 준비: 고정 입력 → 입력 파일), `model.py`(추론 워커: 입력 → 점수 표, `calculate`·`validate_scores`)를 두고 `models/registry.py`에 등록한다. 추론 워커는 `inference_worker/model_adapter.py`의 `run_model(targets, model_kind, *, model_version, feature_version)`으로 요청 버전에 맞는 패키지의 `calculate`를 부르고 예외를 아래 규약으로 바꾼다. 실제 모델은 새 폴더의 `model.py`에 입력 검증 → 로딩 → 추론 → 후처리를 넣는다. 테스트 프로그램을 참조하거나 실행하지 않는다.
+모델은 이 추론 서버 폴더(backend/inference-server)에만 있다. 모델 하나는 `models/<모델이름>/` 폴더 하나로 `spec.py`(버전·지원 여부)와 `model.py`(입력 → 점수 표, `calculate`·`validate_scores`)를 두고 `models/registry.py`에 등록한다. 같은 버전의 입력 만들기(`build_input.py`)와 등록은 백엔드 `backend/api-server/worker/models/`에 있다. 추론 워커는 `inference_worker/model_adapter.py`의 `run_model(targets, model_kind, *, model_version, feature_version)`으로 요청 버전에 맞는 패키지의 `calculate`를 부르고 예외를 아래 규약으로 바꾼다. 실제 모델은 새 폴더의 `model.py`에 입력 검증 → 로딩 → 추론 → 후처리를 넣는다. 테스트 프로그램을 참조하거나 실행하지 않는다.
 
 - `model_kind`: `binary` 또는 `type`. 외부 요청 API에서는 BINARY/TYPE이다.
 - 현재 `targets`: PyArrow Table(tx_id int64, demo_value int64). 실제 GNN 입력 피처·그래프 형식은 별도 계약이며 이 문서로 확정하지 않는다.

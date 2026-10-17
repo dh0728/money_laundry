@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from models.demo_random.build_input import build_targets
+from tests.demo_inputs import build_targets
 from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
 from inference_worker.model_adapter import run_model
 from common.model_contract import MODEL_ERRORS, ModelExecutionError, model_failure, retry_decision

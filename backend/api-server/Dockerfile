@@ -51,7 +51,7 @@ RUN groupadd --gid 10001 app \
     && mkdir -p /app/storage \
     && chown app:app /app/storage
 
-COPY worker/analysis_entry.py worker/ingest_entry.py worker/inference_server.py /app/worker/
+COPY worker/analysis_entry.py worker/ingest_entry.py /app/worker/
 COPY worker/common /app/worker/common
 COPY worker/ingest /app/worker/ingest
 COPY worker/integrate /app/worker/integrate
@@ -59,13 +59,12 @@ COPY worker/features /app/worker/features
 COPY worker/inference /app/worker/inference
 COPY worker/scores /app/worker/scores
 COPY worker/alerts /app/worker/alerts
-COPY worker/inference_worker /app/worker/inference_worker
 COPY worker/models /app/worker/models
 COPY worker/recover_dev_placeholder.sql /app/worker/recover_dev_placeholder.sql
 COPY worker/configure_analysis_db.py worker/analysis_permissions.sql /app/worker/
 
 # Fail the image build if an entry point's local module dependency is missing.
-RUN PYTHONPATH=/app/worker python -c "import analysis_entry, ingest_entry, inference_server, ingest.report_ingest, integrate.report_integration, integrate.report_correction, features.prepare_features, alerts.alert_pipeline, inference.inference_dispatch, scores.result_collection, models.registry"
+RUN PYTHONPATH=/app/worker python -c "import analysis_entry, ingest_entry, ingest.report_ingest, integrate.report_integration, integrate.report_correction, features.prepare_features, alerts.alert_pipeline, inference.inference_dispatch, scores.result_collection, models.registry"
 
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 

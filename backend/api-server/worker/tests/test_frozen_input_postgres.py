@@ -472,7 +472,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 logical = Request(body['job_id'], body['model_kind'].lower(), body['request_id'],
                                   body['execution_round'], body['model_version'], body['feature_version'], body['run_id'])
                 from models.demo_random.build_input import build_targets
-                from models.demo_random.model import calculate
+                from tests.inference_peer import calculate
                 from common.worker_transport import descriptor
                 stream = io.BytesIO()
                 targets = pq.read_table(io.BytesIO(s3.objects['dev/test/' + logical.inputs + 'targets.parquet']))
@@ -614,7 +614,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             settings, s3 = self.collected_results(root)
             self.scoring_stage()
             save_scores(self.admin, self.execution, root, settings, s3)
-            from models.demo_random.model import calculate
+            from tests.inference_peer import calculate
             from models.demo_random.build_input import build_targets
             from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
             targets = build_targets(self.ids)
@@ -722,7 +722,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
     def test_result_validation_rejects_invalid_probabilities_ids_and_schema(self):
         import pyarrow as pa
         from models.demo_random.build_input import build_targets
-        from models.demo_random.model import calculate
+        from tests.inference_peer import calculate
         from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
         from scores.result_collection import _stage
         self.admin.execute("UPDATE analysis.jobs SET current_stage='INFERENCE' WHERE job_id=%s", (self.job,))

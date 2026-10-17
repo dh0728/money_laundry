@@ -49,8 +49,8 @@ services:
   inference:
     image: aml-demo-inference
     build:
-      context: ..
-      dockerfile: worker/Dockerfile.inference
+      context: ../../inference-server
+      dockerfile: Dockerfile
     user: "0"
     entrypoint: [python, -B, /demo/runtime.py, inference]
     volumes:

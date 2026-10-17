@@ -1,24 +1,26 @@
-"""The one place that decides which model package each model kind runs.
+"""The one place that decides which model versions each model kind is bound to.
 
-To plug in a new model: add a package under models/ with spec, build_input and
-model modules, list it in MODELS, and point the model kind at it in DEFAULTS.
+The backend only prepares inputs; models run on the inference server
+(backend/inference-server, models/registry.py there). To plug in a new model: add a
+package here with spec and build_input modules, list it in MODELS, point the model kind
+at it in DEFAULTS, and add the matching model package on the inference server.
 Runs keep the versions bound when they were created, so older packages stay listed
 while their runs can still resume.
 """
 from common.worker_transport import ProtocolError
 from models import demo_random
-from models.demo_random import build_input as demo_input, model as demo_model, spec as demo_spec
+from models.demo_random import build_input as demo_input, spec as demo_spec
 
 
 class ModelPackage:
-    def __init__(self, name, spec, build_input, model):
-        self.name, self.spec, self.build_input, self.model = name, spec, build_input, model
+    def __init__(self, name, spec, build_input):
+        self.name, self.spec, self.build_input = name, spec, build_input
 
     def versions(self):
         return self.spec.MODEL_VERSION, self.spec.FEATURE_VERSION
 
 
-DEMO_RANDOM = ModelPackage(demo_random.__name__, demo_spec, demo_input, demo_model)
+DEMO_RANDOM = ModelPackage(demo_random.__name__, demo_spec, demo_input)
 MODELS = (DEMO_RANDOM,)
 DEFAULTS = {"BINARY": DEMO_RANDOM, "TYPE": DEMO_RANDOM}
 

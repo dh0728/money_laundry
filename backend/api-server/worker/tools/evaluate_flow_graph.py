@@ -228,13 +228,23 @@ def metric(groups, data, seeds, selected_patterns=None):
     }
 
 
+def inference_demo_model():
+    """The demo model runs on the inference server; this offline tool loads it from that folder."""
+    import importlib.util
+    source = Path(__file__).resolve().parents[3] / 'inference-server/models/demo_random/model.py'
+    loader = importlib.util.spec_from_file_location('inference_demo_model', source)
+    module = importlib.util.module_from_spec(loader)
+    loader.loader.exec_module(module)
+    return module
+
+
 def choose_seeds(data, scenario, random_seed=20261007):
     if scenario == "demo":
         # Actual dev demo calculation and default threshold; evaluation IDs are
         # not database IDs, so this reproduces density, not an exact dev run.
         from models.demo_random.build_input import build_targets
-        from models.demo_random.model import calculate
         from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
+        calculate = inference_demo_model().calculate
         selected = set()
         for start in range(0, len(data.edges), 10_000):
             scores = calculate(build_targets(data.edges.tx_ids[start:start + 10_000]),

@@ -164,7 +164,7 @@ def launch(mode):
         os.environ['JAVA_TOOL_OPTIONS'] = '-Djavax.net.ssl.trustStore=/tls/truststore -Djavax.net.ssl.trustStorePassword=changeit'
         args = ['java', '-jar', '/app/app.jar']
     elif mode == 'inference':
-        args = [sys.executable, '-B', '/app/worker/inference_server.py']
+        args = [sys.executable, '-B', '/app/inference-server/inference_server.py']
     else:
         file, port = sys.argv[2:]
         if (file, port) not in (('app.py', '8501'), ('control_panel.py', '8502')):

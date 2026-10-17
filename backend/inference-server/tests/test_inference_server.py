@@ -18,7 +18,7 @@ import httpx
 import pyarrow.parquet as pq
 import uvicorn
 
-from models.demo_random.build_input import build_targets
+from tests.demo_inputs import build_targets
 from models.demo_random.model import calculate
 from models.demo_random.spec import FEATURE_VERSION, MODEL_VERSION
 from inference_server import create_app
@@ -155,7 +155,7 @@ class InferenceServerTests(unittest.TestCase):
                 self.assertEqual(scores.column("p_laundering").to_pylist(), calculate(build_targets([1, 99, 100]), "binary", model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)["p_laundering"].to_pylist())
 
     def test_random_demo_models_use_same_http_file_callback_protocol(self):
-        from models.demo_random.build_input import build_targets
+        from tests.demo_inputs import build_targets
         from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
         from models.demo_random.model import calculate
         targets = build_targets([1, 99, 100])
@@ -171,16 +171,17 @@ class InferenceServerTests(unittest.TestCase):
             self.assertNotIn("manifest_url", self.state(payload))
         self.assertEqual(len(self.events), 2)
 
-    def test_real_acceptance_response_is_understood_by_backend_observer(self):
-        from inference_worker.inference_compute import request_from
-        from inference.inference_dispatch import normalize
+    def test_acceptance_response_matches_backend_contract(self):
+        # The backend observer (api-server worker/inference/inference_dispatch.normalize) is tested
+        # against this exact view in api-server worker/tests/test_inference_view_contract.py.
         payload = self.payload()
         response = self.client.put(self.path(payload), json=payload, headers=self.headers)
         self.assertEqual(response.status_code, 202)
-        self.assertEqual(response.json()['status'], 'ACCEPTED')
-        observed = normalize(request_from(payload), response.json(), 'dev/', 3)
-        self.assertEqual(observed['status'], 'ACCEPTED')
-
+        identity = {key: payload[key] for key in (
+            'contract_version', 'job_id', 'model_kind', 'request_id', 'execution_round', 'run_id')}
+        self.assertEqual(response.json(), dict(identity, status='ACCEPTED', revision=1, error_code=None,
+                                               notification_delivered=False, attempts=0,
+                                               model_failures=0, transfer_failures=0))
     def test_auth_scope_and_changed_request_are_rejected(self):
         payload = self.payload()
         self.assertEqual(self.client.put(self.path(payload), json=payload).status_code, 401)
