@@ -9,6 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.moneylaundry.api.*;
 import com.moneylaundry.api.alert.AlertQueryService;
 import com.moneylaundry.api.analysis.AnalysisScheduler;
+import com.moneylaundry.api.common.*;
+import com.moneylaundry.api.common.BusinessTime;
+import com.moneylaundry.api.dashboard.DashboardController;
+import com.moneylaundry.api.dashboard.DashboardProjection;
+import com.moneylaundry.api.dashboard.DashboardQueries;
+import com.moneylaundry.api.dashboard.DashboardService;
+import com.moneylaundry.api.dashboard.DashboardSummary;
+import com.moneylaundry.api.demo.DemoClockController;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
@@ -1222,10 +1230,12 @@ class ReviewWorkflowTests {
 
   @Test
   void http_contract_serializes_clock_cases_and_validates_missing_actor() throws Exception {
-    var controller =
-        new ReviewController(service, new LedgerQueryService(jdbc), clock, dashboardService);
     var mvc =
-        MockMvcBuilders.standaloneSetup(controller)
+        MockMvcBuilders.standaloneSetup(
+                new ReviewController(service),
+                new LedgerController(new LedgerQueryService(jdbc), clock),
+                new DashboardController(service, dashboardService),
+                new DemoClockController(service, clock))
             .setControllerAdvice(new ApiExceptionHandler())
             .build();
     long id = alert(l1);
@@ -1493,10 +1503,7 @@ class ReviewWorkflowTests {
     }
     assertThat(days.get(1)).isEqualTo(new DashboardSummary.DailyStatus("2023-09-02", 0, 0, 0));
     var mvc =
-        MockMvcBuilders.standaloneSetup(
-                new ReviewController(
-                    service, new LedgerQueryService(jdbc), clock, dashboardService))
-            .build();
+        MockMvcBuilders.standaloneSetup(new DashboardController(service, dashboardService)).build();
     mvc.perform(
             get("/api/v1/dashboard/summary")
                 .principal(() -> "l1a")

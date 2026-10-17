@@ -2,6 +2,7 @@ package com.moneylaundry.api.review;
 
 import static com.moneylaundry.api.review.ReviewJson.*;
 
+import com.moneylaundry.api.common.BusinessTime;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;

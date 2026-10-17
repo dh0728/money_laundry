@@ -34,9 +34,9 @@ def main(argv=None):
         import psycopg
         import httpx
         from botocore.exceptions import BotoCoreError, ClientError
-        from frozen_input import InputExecution, StaleExecution
-        from pipeline import prepare_features
-        from worker_transport import ProtocolError, StoreUnavailable
+        from common.frozen_input import InputExecution, StaleExecution
+        from features.prepare_features import prepare_features
+        from common.worker_transport import ProtocolError, StoreUnavailable
     except ImportError:
         return 78
     try:
@@ -48,16 +48,16 @@ def main(argv=None):
                 return 78
             execution = InputExecution(args.job_id, args.run_id, args.execution_id)
             if alerting:
-                from alert_pipeline import save_alerts
+                from alerts.alert_pipeline import save_alerts
                 save_alerts(connection, execution)
             elif publishing or ticking or scoring:
-                from model_publication import configured, publish_model
+                from inference.model_publication import configured, publish_model
                 settings, s3 = configured()
                 if scoring:
-                    from result_collection import save_scores
+                    from scores.result_collection import save_scores
                     save_scores(connection, execution, os.environ["WORKER_STORAGE_DIR"], settings, s3)
                 elif ticking:
-                    from inference_dispatch import advance
+                    from inference.inference_dispatch import advance
                     return advance(connection, execution, os.environ["WORKER_STORAGE_DIR"], settings, s3)
                 else:
                     publish_model(connection, execution, args.model_kind,
@@ -80,9 +80,9 @@ def main(argv=None):
 def integrate(job_id, execution_id):
     try:
         import psycopg
-        from private_data import PrivateDataProtector
-        from report_integration import integrate_job, ReportRevisionChanged
-        from frozen_input import StaleExecution
+        from common.private_data import PrivateDataProtector
+        from integrate.report_integration import integrate_job, ReportRevisionChanged
+        from common.frozen_input import StaleExecution
         protector = PrivateDataProtector(os.environ['INGEST_ENCRYPTION_KEY'],os.environ['INGEST_SEARCH_KEY'],os.environ['INGEST_KEY_VERSION'])
         with psycopg.connect(os.environ['WORKER_DB_URL'],user=os.environ.get('WORKER_DB_USER'),
                 password=os.environ.get('WORKER_DB_PASSWORD'),autocommit=True,connect_timeout=10) as db:

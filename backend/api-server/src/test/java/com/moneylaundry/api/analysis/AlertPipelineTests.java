@@ -2,8 +2,10 @@ package com.moneylaundry.api.analysis;
 
 import static org.assertj.core.api.Assertions.*;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.alert.AlertQueryService;
+import com.moneylaundry.api.analysis.freeze.AlertInputSnapshot;
+import com.moneylaundry.api.analysis.worker.PythonAnalysisExecutor;
+import com.moneylaundry.api.common.ApiException;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.*;
@@ -594,7 +596,7 @@ class AlertPipelineTests {
         s -> {
           AnalysisRunService.integrationLock(jdbc);
           jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
-          new com.moneylaundry.api.review.AlertPublisher(jdbc)
+          new com.moneylaundry.api.analysis.publish.AlertPublisher(jdbc)
               .publish(context.runId(), context.executionId(), artifact);
           runs.complete(context.runId());
           jdbc.update(
@@ -716,7 +718,7 @@ class AlertPipelineTests {
             () ->
                 service.tx.executeWithoutResult(
                     s -> {
-                      new com.moneylaundry.api.review.AlertPublisher(jdbc)
+                      new com.moneylaundry.api.analysis.publish.AlertPublisher(jdbc)
                           .publish(run, token, artifact);
                       throw new IllegalStateException("injected before run completion");
                     }))
@@ -814,7 +816,7 @@ class AlertPipelineTests {
             Long.class,
             alert);
     var time =
-        new com.moneylaundry.api.review.BusinessTime(
+        new com.moneylaundry.api.common.BusinessTime(
             jdbc,
             service.tx,
             new org.springframework.mock.env.MockEnvironment()
@@ -973,7 +975,7 @@ class AlertPipelineTests {
 
   com.moneylaundry.api.review.ReviewService reviews() {
     var time =
-        new com.moneylaundry.api.review.BusinessTime(
+        new com.moneylaundry.api.common.BusinessTime(
             jdbc,
             service.tx,
             new org.springframework.mock.env.MockEnvironment()
@@ -1038,7 +1040,7 @@ class AlertPipelineTests {
 
   com.moneylaundry.api.review.AlertProposalService proposals() {
     var time =
-        new com.moneylaundry.api.review.BusinessTime(
+        new com.moneylaundry.api.common.BusinessTime(
             jdbc,
             service.tx,
             new org.springframework.mock.env.MockEnvironment()

@@ -1,7 +1,7 @@
 package com.moneylaundry.api.alert;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.common.ApiException;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;

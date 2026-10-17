@@ -3,8 +3,8 @@ package com.moneylaundry.api.auth;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.moneylaundry.api.ApiException;
-import com.moneylaundry.api.review.BusinessTime;
+import com.moneylaundry.api.common.ApiException;
+import com.moneylaundry.api.common.BusinessTime;
 import java.sql.Timestamp;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;

@@ -2,7 +2,7 @@ package com.moneylaundry.api.analysis;
 
 import static org.mockito.Mockito.*;
 
-import com.moneylaundry.api.ApiException;
+import com.moneylaundry.api.common.ApiException;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.util.ReflectionTestUtils;

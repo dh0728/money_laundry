@@ -1,6 +1,6 @@
 package com.moneylaundry.api.analysis;
 
-import com.moneylaundry.api.ApiException;
+import com.moneylaundry.api.common.ApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -34,7 +34,7 @@ public class AnalysisScheduler {
 
   @Scheduled(cron = "#{@analysisService.cron()}", zone = "${app.zone}")
   public void cutoff() {
-    if (!scheduledEnabled || com.moneylaundry.api.review.BusinessTime.demoEnvironment(environment))
+    if (!scheduledEnabled || com.moneylaundry.api.common.BusinessTime.demoEnvironment(environment))
       return;
     try {
       service.registerScheduled();

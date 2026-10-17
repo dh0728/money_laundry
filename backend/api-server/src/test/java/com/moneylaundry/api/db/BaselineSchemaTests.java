@@ -5,7 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.moneylaundry.api.alert.AlertQueryService;
 import com.moneylaundry.api.analysis.AnalysisRunService;
-import com.moneylaundry.api.review.BusinessTime;
+import com.moneylaundry.api.common.BusinessTime;
 import com.moneylaundry.api.review.LedgerQueryService;
 import com.moneylaundry.api.review.ReviewService;
 import java.time.Clock;
@@ -75,7 +75,7 @@ class BaselineSchemaTests {
             Long.class,
             "a".repeat(64),
             source.length);
-    var store = mock(com.moneylaundry.api.storage.UploadStore.class);
+    var store = mock(com.moneylaundry.api.ingest.storage.UploadStore.class);
     when(store.open("fixture")).thenAnswer(invocation -> new java.io.ByteArrayInputStream(source));
     var database =
         new org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails() {
@@ -96,7 +96,7 @@ class BaselineSchemaTests {
     java.util.Arrays.fill(searchBytes, (byte) 1);
     String search = java.util.Base64.getEncoder().encodeToString(searchBytes);
     var loader =
-        new com.moneylaundry.api.ingest.LedgerLoader(
+        new com.moneylaundry.api.ingest.load.LedgerLoader(
             jdbc,
             store,
             database,
@@ -114,7 +114,7 @@ class BaselineSchemaTests {
         .isEqualTo("COMPLETED");
     var report = jdbc.queryForMap("select * from private.bank_reports");
     var protector =
-        new com.moneylaundry.api.ingest.PrivateDataProtector(encryption, search, "test");
+        new com.moneylaundry.api.ingest.load.PrivateDataProtector(encryption, search, "test");
     String plain =
         protector.decrypt(
             "report:" + report.get("version_id") + ":" + report.get("source_row"),
@@ -154,7 +154,7 @@ class BaselineSchemaTests {
         .putAll(
             java.util.Map.of(
                 "WORKER_DB_URL",
-                com.moneylaundry.api.analysis.PythonAnalysisExecutor.workerDatabaseUrl(
+                com.moneylaundry.api.analysis.worker.PythonAnalysisExecutor.workerDatabaseUrl(
                     postgres.getJdbcUrl()),
                 "WORKER_DB_USER",
                 postgres.getUsername(),

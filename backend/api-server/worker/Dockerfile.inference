@@ -16,9 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && mkdir -p /state \
     && chown app:app /state
 
-COPY worker/inference_server.py worker/inference_service.py worker/inference_compute.py \
-     worker/model_adapter.py worker/model_contract.py worker/demo_calculator.py \
-     worker/worker_transport.py ./
+COPY worker/inference_server.py ./
+COPY worker/inference_worker ./inference_worker
+COPY worker/common/__init__.py worker/common/model_contract.py worker/common/demo_calculator.py \
+     worker/common/worker_transport.py ./common/
 
 USER app:app
 EXPOSE 8090

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.moneylaundry.api.TestcontainersConfiguration;
 import com.moneylaundry.api.analysis.AnalysisScheduler;
+import com.moneylaundry.api.dashboard.DashboardProjection;
+import com.moneylaundry.api.dashboard.DashboardService;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;

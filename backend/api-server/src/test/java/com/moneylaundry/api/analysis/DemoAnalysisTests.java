@@ -3,8 +3,9 @@ package com.moneylaundry.api.analysis;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.TestcontainersConfiguration;
+import com.moneylaundry.api.common.ApiException;
+import com.moneylaundry.api.demo.DemoAnalysisController;
 import java.time.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -137,14 +138,14 @@ class DemoAnalysisTests {
     var local = new MockEnvironment();
     local.setActiveProfiles("local");
     Instant now =
-        new com.moneylaundry.api.review.BusinessTime(jdbc, new TransactionTemplate(manager), local)
+        new com.moneylaundry.api.common.BusinessTime(jdbc, new TransactionTemplate(manager), local)
             .now();
     assertThat(Duration.between(Instant.parse("2023-09-02T00:10:00Z"), now).abs())
         .isLessThan(Duration.ofSeconds(30));
     var presentation = new MockEnvironment().withProperty("app.presentation.enabled", "true");
     presentation.setActiveProfiles("prod");
     assertThat(
-            new com.moneylaundry.api.review.BusinessTime(
+            new com.moneylaundry.api.common.BusinessTime(
                     jdbc, new TransactionTemplate(manager), presentation)
                 .now())
         .isEqualTo(Instant.parse("2023-09-02T00:00:00Z"));

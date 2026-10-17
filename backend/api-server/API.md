@@ -117,7 +117,7 @@
 - UTF-8/BOM과 CSV 인용 쉼표·이스케이프 따옴표·인용 개행을 지원한다. 오류 행 번호는 논리 레코드가 시작한 물리 행이다. 잘못된 UTF-8은 파일 전체 보류, 저장소 IO 오류는 FAILED다. 헤더 오류·UTF-8 오류·복구 불가 인용 손상으로 전수 검수를 못 끝내면 rowCount는 null이다. 정상 헤더만 있는 파일은 실제0행의 EMPTY_FILE로 구분한다. 오류 사유에는 원문 값을 넣지 않는다. 이름만 바깥 공백 제거와 Unicode NFC를 적용하고 철자·대소문자를 임의 동일시하지 않는다.
 - 통화명→ISO: Australian Dollar AUD, Bitcoin BTC, Brazil Real BRL, Canadian Dollar CAD, Euro EUR, Mexican Peso MXN, Ruble RUB, Rupee INR, Saudi Riyal SAR, Shekel ILS, Swiss Franc CHF, UK Pound GBP, US Dollar USD, Yen JPY, Yuan CNY. 알 수 없는 통화는 오류다.
 - `private.bank_reports`는 version·source_row별 실제 행을 보존한다. `core.owners/accounts`의 서비스 UUID는 정상 확정 때 만들고 동일 개체와 (은행,계좌)에 재사용한다. 가명은 최초 통합 때 core.owners.display_name에 이름+코드로 저장하여 목록에서 바로 조회한다. 원문 식별자·이름은 private.owner_identities/account_identities에 분리한다. Python 원문은 AES-256-GCM, 검색 토큰은 별도 키의 HMAC-SHA256이다. 외부 공급 `app.ingest.encryption-key`, `search-key`는 서로 다른32바이트 Base64이며 `key-version` 필수다. 값은 문서·저장소에 넣지 않는다. 누락·변조·잘못된 버전이면 원문 처리 실패다.
-- 고정 수신 upload ID 집합·cutoff·거래 기준일을 받는 Python `report_integration.integrate_job` 경계에서 정확 매칭한다. 원천 송수신 은행/계좌·시각·양쪽 금액/통화 전체를 대조한다. 해시만 같다고 통합하지 않는다. 같은 키에서는 Payment Format별로 report_id순 대응한다. 1+1→1, 2+2→2이며 은행내 거래와 수집범위 밖 상대는 단독 행 그대로 보존한다.
+- 고정 수신 upload ID 집합·cutoff·거래 기준일을 받는 Python `integrate/report_integration.integrate_job` 경계에서 정확 매칭한다. 원천 송수신 은행/계좌·시각·양쪽 금액/통화 전체를 대조한다. 해시만 같다고 통합하지 않는다. 같은 키에서는 Payment Format별로 report_id순 대응한다. 1+1→1, 2+2→2이며 은행내 거래와 수집범위 밖 상대는 단독 행 그대로 보존한다.
 - 직접 오류 파일은 전체 HELD, 그 파일에 의존하는 다른 파일의 해당 행만 DEPENDENCY_HELD다. 다른 파일의 독립 정상 행은 확정할 수 있다. 정상 관계는 오류로 덮어쓰지 않는다. 통합 확정과 출처 연결·개체/계좌·상태 전이는 한 트랜잭션이며 중단시 롤백한다.
 - 송수신 통화·원천 금액은 그대로 저장한다. USD 표시는 기존 `amount_paid / units_per_usd`, scale6 HALF_UP과 환율 버전을 사용하며 매칭 기준이 아니다. `transactions`에는 단일 보고 bank_id·row_hash UNIQUE·ingest_job_id를 두지 않고 `transaction_reports`로 출처를 연결한다.
 - Python에서 최초 통합·정정 버전 교체를 수행하고 Spring이 입력 고정·실행 조정·취소 전달을 담당한다. 초기 스키마 전환은 [DB 전환 안내](../../deploy/DB_TRANSITION.md)를 따른다.
@@ -128,7 +128,7 @@
 
 BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·상태 API는 `PUT/GET /api/v1/inference-requests/{requestId}/rounds/{round}`이며 전용 Bearer 토큰을 사용한다. 취소는 같은 경로의 `/cancellation`이다. 직원 세션 API와 구분한다.
 
-입력·결과는 `requests|results/{jobId}/{BINARY|TYPE}/{requestId}/` 아래에서 manifest·Parquet·결과 표식을 사용한다. 요청 ID·run·회차·모델/피처 버전, 행 수·정확한 tx_id 집합·파일 크기·SHA-256·유한 확률을 검증한다. 원격 COMPLETED만으로 분석을 공개하지 않는다. 구체적인 전송·프로세스 계약은 [worker 문서](worker/README.md), [게시](worker/model_publication.py), [수집](worker/result_collection.py), [추론 서비스](worker/inference_service.py)를 따른다.
+입력·결과는 `requests|results/{jobId}/{BINARY|TYPE}/{requestId}/` 아래에서 manifest·Parquet·결과 표식을 사용한다. 요청 ID·run·회차·모델/피처 버전, 행 수·정확한 tx_id 집합·파일 크기·SHA-256·유한 확률을 검증한다. 원격 COMPLETED만으로 분석을 공개하지 않는다. 구체적인 전송·프로세스 계약은 [worker 문서](worker/README.md), [게시](worker/inference/model_publication.py), [수집](worker/scores/result_collection.py), [추론 서비스](worker/inference_worker/inference_service.py)를 따른다.
 
 현재 모델은 `demo-random-v1/demo-input-v1` 시연용이다. `tx_id,demo_value` 입력에 결정적 난수 점수를 만들며 이진 결과는 p_laundering, 유형 결과는 p_0~p_8이다. 실제 그래프 패턴 모델 연결은 구현된 계약에 포함하지 않는다. 파일 운반과 모델 추론 품질을 동일시하지 않는다.
 

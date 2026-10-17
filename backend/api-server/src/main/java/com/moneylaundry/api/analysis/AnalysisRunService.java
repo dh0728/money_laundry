@@ -1,5 +1,6 @@
 package com.moneylaundry.api.analysis;
 
+import com.moneylaundry.api.analysis.freeze.AlertInputSnapshot;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;

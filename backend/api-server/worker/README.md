@@ -2,6 +2,21 @@
 
 백엔드 워커는 API 컨테이너에서 Spring이 실행한다. 추론 워커는 별도 프로세스 `inference_server.py`이며 dev에서는 동일 이미지의 별도 컨테이너다.
 
+### 폴더 구조와 파이프라인 순서
+
+폴더는 Spring 분석 단계(`AnalysisStage`, `analysis_entry.py --stage`) 순서를 따른다. 진입점 파일은 배포 설정이 경로를 가리키므로 worker 루트에 둔다.
+
+| 순서 | 단계 | 폴더 | 진입점 |
+|---|---|---|---|
+| ① | 파일 수집·적재 | `ingest/` | `ingest_entry.py` |
+| ③ | 거래 통합 | `integrate/` | `analysis_entry.py --stage INTEGRATE` |
+| ⑤ | 모델 입력 준비 | `features/` | `analysis_entry.py --stage FEATURES` |
+| ⑥ | 모델 추론 | `inference/` (상대편 추론 워커는 `inference_worker/`) | `analysis_entry.py --stage INFERENCE`, `inference_server.py` |
+| ⑦ | 점수 저장 | `scores/` | `analysis_entry.py --stage SCORES` |
+| ⑧ | Alert 구성 | `alerts/` | `analysis_entry.py --stage ALERTS` |
+
+②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑨Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·시연 계산기·모델 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
+
 ### 라벨 독립 임시 추론
 
 새 분석은 `demo-random-v1/demo-input-v1` 임시 변환기를 사용한다. 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
@@ -73,9 +88,9 @@ EC2 API 역할에는 기존 S3 prefix의 입력/결과 GetObject·PutObject 권�
 경로로 노출하지 않는다. 실행 중인 모델과 서버를 중단한 뒤 같은 저장소로 재기동한다.
 비정상 종료 후 `RECOVERY_REQUIRED`는 성공/중단 확인을 대신하지 않는다.
 
-이미지를 사용할 수 없고 기존 Python 환경만 쓸 수 있다면 다음 운영 파일을 같은 폴더에
-배치한다: `inference_server.py`, `inference_service.py`, `inference_compute.py`,
-`model_adapter.py`, `model_contract.py`, `demo_calculator.py`, `worker_transport.py`,
+이미지를 사용할 수 없고 기존 Python 환경만 쓸 수 있다면 다음 운영 파일을 worker 폴더 구조 그대로
+배치한다: `inference_server.py`, `inference_worker/`(`__init__.py`, `inference_service.py`, `inference_compute.py`,
+`model_adapter.py`), `common/`의 `__init__.py`·`model_contract.py`·`demo_calculator.py`·`worker_transport.py`,
 `requirements.txt`. Python3.13 환경에서 requirements를 설치하고 위 환경변수를 설정한 후
 그 환경의 Python으로 `inference_server.py`를 실행한다. 수동 실행의 기본 bind는127.0.0.1이므로
 프록시의 연결 방식에 맞게 지정한다. Jupyter 셀 종료/세션 단절에도 운영 서버가 유지되는
@@ -165,9 +180,9 @@ WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id)
 
 ## 맥락 조회·Alert 단계
 
-`analysis_entry.py --stage ALERTS`는 `alert_pipeline.py`를 호출한다. Spring FREEZE_INPUT이
+`analysis_entry.py --stage ALERTS`는 `alerts/alert_pipeline.py`를 호출한다. Spring FREEZE_INPUT이
 TARGET와 cutoff 이전에 유효하게 수신·통합된 전체 CONTEXT·기존 점수·날짜별 수신 범위를 동결한다.
-실행 경로는 `alert_pipeline.py → block_graph.build_block_graphs` 하나다. 계좌 UUID는 내부 정수 코드로
+실행 경로는 `alerts/alert_pipeline.py → alerts/block_graph.build_block_graphs` 하나다. 계좌 UUID는 내부 정수 코드로
 변환하고 실제 거래 ID·UTC microseconds·USD 환산 금액(마이크로 단위)을 보존한다. 과거 점수는 원래 실행의 임계값을 적용한다.
 정책 `block-pin-1`은 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
 핵심은 씨앗과 연결 거래64건·기간240시간 이하다. 맥락 거래는 멤버가 아니라 근거의 `contextQuery`(초점 계좌·핵심 기간±24시간)이며
@@ -201,7 +216,7 @@ Python 탐색 창은 각 씨앗에 고정되며 미래 수신 완료 플래그�
 
 구 정책 근거가 있는 DB는 그대로 이어서 생성하지 않는다. 테스트 업무 데이터를 초기화한 뒤 재분석해야 한다.
 구 생성기나 호환 분기를 배포하지 않으며 정책이 다른 근거를 만나면 저장 전에 명시적으로 거절한다.
-사건 생애주기는 `alert_lifecycle.py`가 계획하고 `alert_plan_preparation.py`가 `analysis.alert_plans`에 저장한다. worker는 review 영역을 읽기만 하며, Spring `AlertPublisher`가 ALERTS 완료 트랜잭션에서 공개 포인터·업무 범위·요약·이력·수신자를 함께 반영한다. 계획 payload는 Python/Java 간 동일 바이트 SHA-256 검증을 위해 canonical JSON TEXT로 저장한다.
+사건 생애주기는 `alerts/alert_lifecycle.py`가 계획하고 `alerts/alert_plan_preparation.py`가 `analysis.alert_plans`에 저장한다. worker는 review 영역을 읽기만 하며, Spring `analysis.publish.AlertPublisher`가 ALERTS 완료 트랜잭션에서 공개 포인터·업무 범위·요약·이력·수신자를 함께 반영한다. 계획 payload는 Python/Java 간 동일 바이트 SHA-256 검증을 위해 canonical JSON TEXT로 저장한다.
 
 계획 단계는 사건 전체의 상세 JSON을 동시에 보관하지 않고 역할·관계 색인을 유지한 뒤 작업별 문서를 읽는다. NOOP는 근거 JSON을 복사하지 않으며, 완료된 준비 단계 재시도에서는 그래프를 다시 계산하지 않는다. Spring은 전체 계획을 검증한 뒤 작은 묶음으로 읽어 같은 트랜잭션에서 공개한다. `timingsMs`의 `inputRead`, `candidateBuild`, `planPreparation`, `publication`은 각각 입력 읽기·그래프 구성·계획 준비·Spring 공개 작업 시간(ms)이다. 마지막 값은 트랜잭션 commit이나 전체 업로드 시간을 포함하지 않는다.
 
@@ -211,7 +226,7 @@ Spring 분석 완료 경로는 공개 상태 반영 후 `AnalysisRunService.refr
 
 제안 수락은 통합 잠금 → review 잠금 → 업무 시각/영향 사건 잠금 순서를 사용한다. 일부 담당자의 동의만으로 공개하지 않고, 마지막 동의 시 현재 거래 상태와 점수 출처까지 다시 검사한다. 정정으로 근거가 빠져도 저장된 직원 판정을 EXCLUDED로 덮어쓰지 않는다. 현재 범위 투영에서 제외하고 API의 withdrawnMembers와 당시 근거 버전으로 보존한다.
 
-이번 생애주기 변경은 공개 포인터·계획·계보·제안 테이블 및 현재 요약을 V1에 포함한다. **이전 V1을 사용하는 dev에는 코드만 덮어 배포할 수 없다.** 설정 백업/업무 DB 재초기화 → 새 이미지 기동/Flyway V1 → 설정 복원 → configure_analysis_db.py로 분석 역할 권한 재설정 → 전송/분석 순서다. 기존 SSM 값과 원문 보호 키는 유지한다. 로컬 이미지 검증은 AML_TEST_DOCKER와 AML_TEST_API_IMAGE를 설정하고 `test_dev_inference_compose`를 실행한다. 이 검증은 실제 dev Compose를 임의 프로젝트/볼륨/네트워크로 격리해 사용하며 EC2나 S3를 변경하지 않는다.
+이번 생애주기 변경은 공개 포인터·계획·계보·제안 테이블 및 현재 요약을 V1에 포함한다. **이전 V1을 사용하는 dev에는 코드만 덮어 배포할 수 없다.** 설정 백업/업무 DB 재초기화 → 새 이미지 기동/Flyway V1 → 설정 복원 → configure_analysis_db.py로 분석 역할 권한 재설정 → 전송/분석 순서다. 기존 SSM 값과 원문 보호 키는 유지한다. 로컬 이미지 검증은 AML_TEST_DOCKER와 AML_TEST_API_IMAGE를 설정하고 `tests/test_dev_inference_compose.py`를 실행한다. 이 검증은 실제 dev Compose를 임의 프로젝트/볼륨/네트워크로 격리해 사용하며 EC2나 S3를 변경하지 않는다.
 
 ### 대시보드 집계와 분석 역할
 

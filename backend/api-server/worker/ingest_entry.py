@@ -8,9 +8,9 @@ from uuid import UUID
 
 import psycopg
 
-from frozen_input import StaleExecution
-from private_data import PrivateDataProtector
-from report_ingest import ingest
+from common.frozen_input import StaleExecution
+from common.private_data import PrivateDataProtector
+from ingest.report_ingest import ingest
 
 
 def main(argv=None):

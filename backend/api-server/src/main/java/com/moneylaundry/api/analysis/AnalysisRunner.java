@@ -362,7 +362,7 @@ public class AnalysisRunner implements AutoCloseable {
                 item.result.artifact());
             boolean complete = item.job.stage() == AnalysisStage.ALERTS;
             if (complete && item.context.runId() != null) {
-              new com.moneylaundry.api.review.AlertPublisher(service.jdbc)
+              new com.moneylaundry.api.analysis.publish.AlertPublisher(service.jdbc)
                   .publish(item.context.runId(), item.job.executionId(), item.result.artifact());
               runs.complete(item.context.runId());
             }

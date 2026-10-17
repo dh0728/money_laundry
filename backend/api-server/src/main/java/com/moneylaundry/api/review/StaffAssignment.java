@@ -5,10 +5,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Serializes the shared Alert/Episode rotation independently of business time. */
-final class StaffAssignment {
+public final class StaffAssignment {
   private StaffAssignment() {}
 
-  static long next(JdbcTemplate jdbc) {
+  public static long next(JdbcTemplate jdbc) {
     if (!TransactionSynchronizationManager.isActualTransactionActive())
       throw new IllegalStateException("ASSIGNMENT_REQUIRES_TRANSACTION");
     jdbc.queryForList("select pg_advisory_xact_lock(17002004)");

@@ -38,7 +38,8 @@ storage/
 **/__pycache__/
 **/*.pyc
 **/.venv/
-worker/test_*.py
+worker/tests/
+worker/tools/
 worker/*.sqlite3*
 
 # 문서 및 로컬 Compose 파일

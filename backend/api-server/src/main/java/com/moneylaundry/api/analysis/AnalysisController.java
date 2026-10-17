@@ -1,6 +1,6 @@
 package com.moneylaundry.api.analysis;
 
-import com.moneylaundry.api.ApiException;
+import com.moneylaundry.api.common.ApiException;
 import java.time.Instant;
 import java.util.*;
 import org.springframework.core.env.Environment;

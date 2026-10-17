@@ -8,14 +8,14 @@ import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Rebuildable current-scope projection, written in the scope's transaction. */
-final class CaseSummaryStore {
+public final class CaseSummaryStore {
   private final JdbcTemplate jdbc;
 
-  CaseSummaryStore(JdbcTemplate jdbc) {
+  public CaseSummaryStore(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
   }
 
-  void refresh(long id) {
+  public void refresh(long id) {
     var c = jdbc.queryForMap("select * from review.cases where case_id=?", id);
     boolean episode = "EPISODE".equals(c.get("kind"));
     var scope =

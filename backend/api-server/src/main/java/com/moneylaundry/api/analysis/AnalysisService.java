@@ -1,6 +1,6 @@
 package com.moneylaundry.api.analysis;
 
-import com.moneylaundry.api.ApiException;
+import com.moneylaundry.api.common.ApiException;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
@@ -34,7 +34,7 @@ public class AnalysisService {
   final ZoneId zone;
   private final double threshold;
   private final LocalTime cutoff;
-  private final com.moneylaundry.api.review.BusinessTime businessTime;
+  private final com.moneylaundry.api.common.BusinessTime businessTime;
 
   public AnalysisService(
       JdbcTemplate jdbc,
@@ -54,7 +54,7 @@ public class AnalysisService {
       @Value("${app.zone}") String zone,
       @Value("${app.suspicious-tx.threshold}") double threshold,
       @Value("${app.ingest.cutoff}") LocalTime cutoff,
-      com.moneylaundry.api.review.BusinessTime businessTime) {
+      com.moneylaundry.api.common.BusinessTime businessTime) {
     this.jdbc = jdbc;
     this.tx = tx;
     this.clock = clock;
