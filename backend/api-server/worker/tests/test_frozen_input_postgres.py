@@ -148,9 +148,10 @@ class FrozenInputPostgresTests(unittest.TestCase):
         # The analysis login reads name-free categories, never pseudonyms or bank names.
         with self.psycopg.connect(**dict(self.connect_args, user=self.worker_user,
                                          password=self.worker_password)) as worker:
-            worker.execute("SELECT owner_id,entity_type FROM core.owners").fetchall()
+            worker.execute("SELECT service_owner_id,entity_type FROM core.owners").fetchall()
             worker.execute("SELECT bank_id,country FROM core.banks").fetchall()
-            for statement in ("SELECT display_name FROM core.owners", "SELECT name FROM core.banks"):
+            for statement in ("SELECT display_name FROM core.owners", "SELECT owner_id FROM core.owners",
+                              "SELECT name FROM core.banks", "SELECT owner_id FROM core.accounts"):
                 with self.subTest(statement=statement), self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
                     worker.execute(statement)
         self.assertEqual(self.reader.info.transaction_status,
