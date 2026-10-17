@@ -52,7 +52,10 @@ CREATE TABLE core.fx_rates (
 );
 CREATE TABLE core.owners (
  owner_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- service_owner_id UUID NOT NULL UNIQUE, display_name TEXT NOT NULL UNIQUE
+ service_owner_id UUID NOT NULL UNIQUE, display_name TEXT NOT NULL UNIQUE,
+ -- Name-free category extracted during 거래 통합 (the only stage that sees plaintext names);
+ -- with banks.country it is all analysis may read about an owner. NULL means not derivable.
+ entity_type TEXT
 );
 CREATE TABLE private.owner_identities (
  owner_id BIGINT PRIMARY KEY REFERENCES core.owners,
@@ -216,8 +219,12 @@ CREATE TABLE analysis.runs (
  input_revision BIGINT NOT NULL DEFAULT 1,
  status TEXT NOT NULL CHECK(status IN ('READY','ACTIVE','CANCEL_REQUESTED','CANCELLED','COMPLETED')),
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), cancel_requested_at TIMESTAMPTZ,
- cancel_reason TEXT, completed_at TIMESTAMPTZ, UNIQUE(job_id,run_id)
+ cancel_reason TEXT, completed_at TIMESTAMPTZ,
+ -- Position in the shared input ledgers, issued by FREEZE_INPUT under the integration lock.
+ input_seq BIGINT UNIQUE,
+ UNIQUE(job_id,run_id)
 );
+CREATE SEQUENCE analysis.input_seq;
 ALTER TABLE analysis.jobs ADD FOREIGN KEY(job_id,current_run_id) REFERENCES analysis.runs(job_id,run_id);
 CREATE TABLE analysis.run_replacements (
  run_id UUID NOT NULL REFERENCES analysis.runs, replaces_run_id UUID NOT NULL UNIQUE REFERENCES analysis.runs,
@@ -247,9 +254,26 @@ CREATE TABLE analysis.input_transactions (
  PRIMARY KEY(run_id,tx_id)
 );
 CREATE INDEX input_transactions_tx ON analysis.input_transactions(tx_id,run_id);
-CREATE TABLE analysis.input_reports (
- run_id UUID NOT NULL, tx_id BIGINT NOT NULL, report_id BIGINT NOT NULL REFERENCES private.bank_reports,
- PRIMARY KEY(run_id,tx_id,report_id), FOREIGN KEY(run_id,tx_id) REFERENCES analysis.input_transactions
+-- Frozen values of every eligible transaction, shared by all runs. A version is what runs with
+-- valid_from_seq <= input_seq < valid_to_seq saw; FREEZE_INPUT opens and closes only what changed.
+CREATE TABLE analysis.input_ledger (
+ tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
+ valid_from_seq BIGINT NOT NULL, valid_to_seq BIGINT,
+ occurred_at TIMESTAMPTZ NOT NULL, business_date DATE NOT NULL,
+ from_bank_id INTEGER NOT NULL, to_bank_id INTEGER NOT NULL,
+ from_account_id UUID NOT NULL, to_account_id UUID NOT NULL,
+ from_owner_id UUID NOT NULL, to_owner_id UUID NOT NULL,
+ amount_received NUMERIC(24,6) NOT NULL, receiving_currency TEXT NOT NULL,
+ amount_paid NUMERIC(24,6) NOT NULL, payment_currency TEXT NOT NULL, payment_format TEXT NOT NULL,
+ amount_usd NUMERIC(24,6) NOT NULL, fx_rate_version TEXT NOT NULL,
+ PRIMARY KEY(tx_id,valid_from_seq),
+ CHECK(valid_to_seq IS NULL OR valid_to_seq > valid_from_seq)
+);
+CREATE UNIQUE INDEX input_ledger_open ON analysis.input_ledger(tx_id) WHERE valid_to_seq IS NULL;
+-- Report sets behind a run's input; a cancelled run is replaced only when these are ready again.
+CREATE TABLE analysis.input_report_sets (
+ run_id UUID NOT NULL REFERENCES analysis.runs, set_id BIGINT NOT NULL,
+ PRIMARY KEY(run_id,set_id)
 );
 CREATE TABLE analysis.target_ownership (
  tx_id BIGINT PRIMARY KEY REFERENCES ledger.transactions, run_id UUID NOT NULL,
@@ -259,11 +283,6 @@ CREATE TABLE analysis.input_coverage (
  run_id UUID NOT NULL REFERENCES analysis.runs, business_date DATE NOT NULL,
  expected_banks INTEGER NOT NULL, complete_banks INTEGER NOT NULL,
  complete BOOLEAN NOT NULL, reports JSONB NOT NULL, PRIMARY KEY(run_id,business_date)
-);
-CREATE TABLE analysis.input_scores (
- run_id UUID NOT NULL, tx_id BIGINT NOT NULL, score_run_id UUID NOT NULL REFERENCES analysis.runs,
- scores JSONB NOT NULL, PRIMARY KEY(run_id,tx_id),
- FOREIGN KEY(run_id,tx_id) REFERENCES analysis.input_transactions
 );
 CREATE TABLE analysis.source_manifest (
  run_id UUID NOT NULL REFERENCES analysis.runs, business_date DATE NOT NULL,
@@ -328,6 +347,15 @@ CREATE TABLE analysis.current_scores (
  tx_id BIGINT PRIMARY KEY REFERENCES ledger.transactions, run_id UUID NOT NULL,
  FOREIGN KEY(run_id,tx_id) REFERENCES analysis.scores
 );
+-- Completed current score of each eligible transaction, versioned like input_ledger.
+CREATE TABLE analysis.score_ledger (
+ tx_id BIGINT NOT NULL, score_run_id UUID NOT NULL,
+ valid_from_seq BIGINT NOT NULL, valid_to_seq BIGINT,
+ PRIMARY KEY(tx_id,valid_from_seq),
+ FOREIGN KEY(score_run_id,tx_id) REFERENCES analysis.scores,
+ CHECK(valid_to_seq IS NULL OR valid_to_seq > valid_from_seq)
+);
+CREATE UNIQUE INDEX score_ledger_open ON analysis.score_ledger(tx_id) WHERE valid_to_seq IS NULL;
 CREATE TABLE review.alerts (
  alert_id BIGINT PRIMARY KEY DEFAULT nextval('review.case_id'),
  assignee_id BIGINT NOT NULL REFERENCES core.users,
@@ -376,11 +404,6 @@ CREATE TABLE analysis.alert_plans (
  CHECK(action IN ('NEW','UPDATE','MERGE','PROPOSE','FOLLOWUP','WITHDRAW','NOOP')),
  payload TEXT NOT NULL, PRIMARY KEY(run_id,plan_key)
 );
-CREATE TABLE analysis.alert_fact_checks (
- run_id UUID NOT NULL REFERENCES analysis.runs, tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
- integration_status TEXT NOT NULL CHECK(integration_status IN ('ACTIVE','HELD','SUPERSEDED')),
- PRIMARY KEY(run_id,tx_id)
-);
 CREATE TABLE review.alert_transactions (
  alert_id BIGINT NOT NULL, version INTEGER NOT NULL, tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
  role TEXT NOT NULL CHECK(role IN ('SEED','CONNECTION','CONTEXT')), reasons JSONB NOT NULL,
@@ -393,10 +416,54 @@ CREATE TABLE review.alert_coverage_checks (
  coverage JSONB NOT NULL, checked_at TIMESTAMPTZ,
  PRIMARY KEY(alert_id,run_id)
 );
-CREATE TABLE analysis.alert_origins (
- run_id UUID NOT NULL REFERENCES analysis.runs, alert_id BIGINT NOT NULL, version INTEGER NOT NULL,
- PRIMARY KEY(run_id,alert_id), FOREIGN KEY(alert_id,version) REFERENCES review.alert_versions
+-- Published version of every Alert, and the integration status of those versions' member
+-- transactions, versioned like input_ledger.
+CREATE TABLE analysis.alert_origin_ledger (
+ alert_id BIGINT NOT NULL, version INTEGER NOT NULL,
+ valid_from_seq BIGINT NOT NULL, valid_to_seq BIGINT,
+ PRIMARY KEY(alert_id,valid_from_seq),
+ FOREIGN KEY(alert_id,version) REFERENCES review.alert_versions,
+ CHECK(valid_to_seq IS NULL OR valid_to_seq > valid_from_seq)
 );
+CREATE UNIQUE INDEX alert_origin_ledger_open ON analysis.alert_origin_ledger(alert_id) WHERE valid_to_seq IS NULL;
+CREATE TABLE analysis.fact_ledger (
+ tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
+ integration_status TEXT NOT NULL CHECK(integration_status IN ('ACTIVE','HELD','SUPERSEDED')),
+ valid_from_seq BIGINT NOT NULL, valid_to_seq BIGINT,
+ PRIMARY KEY(tx_id,valid_from_seq),
+ CHECK(valid_to_seq IS NULL OR valid_to_seq > valid_from_seq)
+);
+CREATE UNIQUE INDEX fact_ledger_open ON analysis.fact_ledger(tx_id) WHERE valid_to_seq IS NULL;
+
+-- What each run saw: its own TARGET rows plus the ledger versions valid at its input_seq.
+CREATE VIEW analysis.run_inputs AS
+ SELECT run_id,tx_id,input_role,occurred_at,business_date,from_bank_id,to_bank_id,
+ from_account_id,to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,
+ amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version
+ FROM analysis.input_transactions
+ UNION ALL
+ SELECT r.run_id,l.tx_id,'CONTEXT'::text,l.occurred_at,l.business_date,l.from_bank_id,l.to_bank_id,
+ l.from_account_id,l.to_account_id,l.from_owner_id,l.to_owner_id,l.amount_received,l.receiving_currency,
+ l.amount_paid,l.payment_currency,l.payment_format,l.amount_usd,l.fx_rate_version
+ FROM analysis.runs r
+ JOIN analysis.input_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq)
+ WHERE NOT EXISTS(SELECT 1 FROM analysis.input_transactions i WHERE i.run_id=r.run_id AND i.tx_id=l.tx_id);
+-- p_laundering is the same jsonb value the scores document holds, so the seed decision over every
+-- frozen score does not build each document.
+CREATE VIEW analysis.run_scores AS
+ SELECT r.run_id,l.tx_id,l.score_run_id,jsonb_build_object(
+   'p_laundering',s.p_laundering,'p_0',s.p_0,'p_1',s.p_1,'p_2',s.p_2,'p_3',s.p_3,'p_4',s.p_4,
+   'p_5',s.p_5,'p_6',s.p_6,'p_7',s.p_7,'p_8',s.p_8,'score_pct',s.score_pct,'type_class',s.type_class) AS scores,
+   to_jsonb(s.p_laundering) AS p_laundering
+ FROM analysis.runs r
+ JOIN analysis.score_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq)
+ JOIN analysis.scores s ON s.run_id=l.score_run_id AND s.tx_id=l.tx_id;
+CREATE VIEW analysis.run_alert_origins AS
+ SELECT r.run_id,l.alert_id,l.version FROM analysis.runs r
+ JOIN analysis.alert_origin_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq);
+CREATE VIEW analysis.run_fact_checks AS
+ SELECT r.run_id,l.tx_id,l.integration_status FROM analysis.runs r
+ JOIN analysis.fact_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq);
 CREATE TABLE review.alert_groups (
  group_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  alert_id BIGINT NOT NULL REFERENCES review.alerts,

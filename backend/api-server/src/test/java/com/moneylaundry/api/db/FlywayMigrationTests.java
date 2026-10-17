@@ -30,7 +30,7 @@ class FlywayMigrationTests {
             jdbc.queryForList(
                 "select version from flyway_schema_history where success and version is not null order by installed_rank",
                 String.class))
-        .containsExactly("1", "2", "3", "4");
+        .containsExactly("1");
     assertThat(
             jdbc.queryForList(
                 "select role||'='||count(*) from core.users group by role", String.class))

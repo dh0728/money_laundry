@@ -1009,7 +1009,7 @@ class BankUploadApiTests {
               jdbc.queryForList(
                   "select tx_id from analysis.input_transactions where run_id=?", Long.class, run))
           .containsExactlyElementsOf(activeIds());
-      assertThat(count("analysis.input_reports")).isEqualTo(2);
+      assertThat(count("analysis.input_report_sets")).isEqualTo(2);
     } finally {
       productionRunner.close();
     }

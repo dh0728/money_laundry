@@ -220,7 +220,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
         version = self.admin.execute("INSERT INTO ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status) VALUES(%s,%s,%s,now(),'ACTIVE') RETURNING version_id", (report_set, upload, upload)).fetchone()[0]
         for i, tx_id in enumerate(ids):
             report = self.admin.execute("INSERT INTO private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version) VALUES(%s,%s,'test','test','test') RETURNING report_id", (version, i + 2)).fetchone()[0]
-            self.admin.execute("INSERT INTO analysis.input_reports(run_id,tx_id,report_id) VALUES(%s,%s,%s)", (self.run, tx_id, report))
             self.admin.execute("INSERT INTO evaluation.report_labels VALUES(%s,%s)", (report, i != 1))
 
     def test_legacy_hints_do_not_affect_random_input(self):

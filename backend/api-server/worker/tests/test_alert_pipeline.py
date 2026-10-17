@@ -51,7 +51,9 @@ class AlertPostgresTests(unittest.TestCase):
         self.admin.execute('INSERT INTO review.alert_versions(alert_id,version,run_id,fingerprint,evidence,published_at)'
                            ' VALUES(%s,1,%s,%s,%s::jsonb,now())', (alert, self.run, _fingerprint(evidence), json.dumps(evidence)))
         self.admin.execute('UPDATE review.alerts SET published_version=1 WHERE alert_id=%s', (alert,))
-        self.admin.execute('INSERT INTO analysis.alert_origins VALUES(%s,%s,1)', (self.run, alert))
+        seq = self.admin.execute('UPDATE analysis.runs SET input_seq=coalesce(input_seq,nextval(\'analysis.input_seq\'))'
+                                 ' WHERE run_id=%s RETURNING input_seq', (self.run,)).fetchone()[0]
+        self.admin.execute('INSERT INTO analysis.alert_origin_ledger VALUES(%s,1,%s,NULL)', (alert, seq))
         self.admin.execute("DELETE FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'", (self.run,))
         self.admin.execute('DELETE FROM analysis.alert_plans WHERE run_id=%s', (self.run,))
         return alert

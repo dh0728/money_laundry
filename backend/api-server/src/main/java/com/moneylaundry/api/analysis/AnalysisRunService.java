@@ -359,15 +359,6 @@ public class AnalysisRunService {
     jdbc.execute("analyze frozen_input");
     jdbc.update(
         """
-        insert into analysis.input_reports
-        select i.run_id,tr.tx_id,tr.report_id from frozen_input i
-        join ledger.transaction_reports tr using(tx_id) join private.bank_reports br using(report_id)
-        join ingest.report_sets s on s.current_version_id=br.version_id
-        where i.run_id=? on conflict do nothing
-        """,
-        run);
-    jdbc.update(
-        """
         insert into analysis.target_ownership
         select tx_id,run_id from frozen_input where run_id=?
         order by tx_id on conflict(tx_id) do update set run_id=excluded.run_id
@@ -381,10 +372,6 @@ public class AnalysisRunService {
         "insert into analysis.input_transactions select ?,t.tx_id,?,t.occurred_at,t.business_date,a.bank_id,b.bank_id,a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,t.payment_format,t.amount_usd,t.fx_rate_version from ledger.transactions t join core.accounts a on a.account_id=t.from_account_id join core.accounts b on b.account_id=t.to_account_id join core.owners e on e.owner_id=a.owner_id join core.owners f on f.owner_id=b.owner_id where t.tx_id=?",
         run,
         role,
-        id);
-    jdbc.update(
-        "insert into analysis.input_reports select ?,tr.tx_id,tr.report_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
-        run,
         id);
     jdbc.update(
         "insert into analysis.input_report_sets select distinct ?,s.set_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
@@ -419,8 +406,8 @@ public class AnalysisRunService {
   public void refreshInputStatistics() {
     jdbc.execute(
         """
-        analyze analysis.input_transactions, analysis.input_reports, analysis.input_ledger,
-          analysis.input_ledger_marks, analysis.input_report_sets, analysis.score_ledger,
+        analyze analysis.runs, analysis.input_transactions, analysis.input_ledger,
+          analysis.input_report_sets, analysis.score_ledger,
           analysis.alert_origin_ledger, analysis.fact_ledger
         """);
   }
