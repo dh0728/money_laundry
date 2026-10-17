@@ -15,7 +15,9 @@
 | ⑦ | 점수 저장 | `scores/` | `analysis_entry.py --stage SCORES` |
 | ⑧ | Alert 구성 | `alerts/` | `analysis_entry.py --stage ALERTS` |
 
-②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑨Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·시연 계산기·모델 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
+모델은 `models/<모델이름>/` 폴더 하나(`spec.py`·`build_input.py`·`model.py`)이고 `models/registry.py`가 모델 종류(이진·유형)별로 어느 폴더를 쓸지 정한다. ⑤는 `build_input`, ⑥ 추론 워커는 `model`을 부른다. 분석 단계는 `analysis_entry.py`의 `STAGES` 표가 각 폴더의 `run(connection, execution, context)`로 연결한다.
+
+②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑨Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·점수 공통 검사·모델 오류 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
 
 ### 라벨 독립 임시 추론
 
@@ -90,7 +92,7 @@ EC2 API 역할에는 기존 S3 prefix의 입력/결과 GetObject·PutObject 권�
 
 이미지를 사용할 수 없고 기존 Python 환경만 쓸 수 있다면 다음 운영 파일을 worker 폴더 구조 그대로
 배치한다: `inference_server.py`, `inference_worker/`(`__init__.py`, `inference_service.py`, `inference_compute.py`,
-`model_adapter.py`), `common/`의 `__init__.py`·`model_contract.py`·`demo_calculator.py`·`worker_transport.py`,
+`model_adapter.py`), `models/` 전체, `common/`의 `__init__.py`·`model_contract.py`·`score_contract.py`·`worker_transport.py`,
 `requirements.txt`. Python3.13 환경에서 requirements를 설치하고 위 환경변수를 설정한 후
 그 환경의 Python으로 `inference_server.py`를 실행한다. 수동 실행의 기본 bind는127.0.0.1이므로
 프록시의 연결 방식에 맞게 지정한다. Jupyter 셀 종료/세션 단절에도 운영 서버가 유지되는
