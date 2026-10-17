@@ -49,8 +49,8 @@ def main():
                                     env=env, cwd=folder, capture_output=True, text=True, check=True)
             config = json.loads(result.stdout)
             services = config["services"]
-            expected = {"web"} if path.parent.name == "front" else (
-                {"api", "inference"} if path.name == "compose.dev.yaml" else {"api"})
+            # Models run on the shared inference server; no environment runs a local one.
+            expected = {"web"} if path.parent.name == "front" else {"api"}
             assert set(services) == expected, path
             if "api" in services:
                 api = services["api"]
@@ -61,7 +61,7 @@ def main():
             for service in services.values():
                 for port in service.get("ports", []):
                     assert port["host_ip"] == "127.0.0.1", path
-        # External override must mount only the public CA into the API; local server keeps its own token.
+        # The external override must mount only the public CA into the API.
         external_env = dict(os.environ)
         base = root / "backend/compose.dev.yaml"
         for name in re.findall(r"\$\{([A-Z][A-Z0-9_]*)", base.read_text(encoding="utf-8")):
@@ -79,7 +79,7 @@ def main():
         assert api["environment"]["INFERENCE_API_URL"] == "https://gpu.example:31575"
         assert api["environment"]["INFERENCE_ALLOW_LOOPBACK"] == "false"
         assert api["environment"]["INFERENCE_API_TOKEN"] == "remote-test-token"
-        assert services["inference"]["environment"]["INFERENCE_TOKEN"] == "local-test-token"
+        assert set(services) == {"api"}
         validate_inference_mount(api["volumes"],
                                  (root / "backend/inference.external.yaml").read_text(encoding="utf-8"))
         # Check every shell block without evaluating GitHub expressions or executing it.

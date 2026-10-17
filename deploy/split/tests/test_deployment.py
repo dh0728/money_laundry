@@ -56,7 +56,10 @@ class FakeRunner:
             return self.account
         if command[:3] == ["aws", "ssm", "get-parameter"]:
             name = command[command.index("--name") + 1]
-            value = "false" if name.endswith("presentation/enabled") else "secret-test-only"
+            if command[command.index("--query") + 1] == "Parameter":
+                return json.dumps(dict(Type="SecureString", Value="remote-" + "b" * 32))
+            value = ("false" if name.endswith("presentation/enabled") else
+                     "https://gpu.example:31575" if name.endswith("inference/kubesphere/url") else "secret-test-only")
             return json.dumps(value) if command[-1] == "json" else value
         return "test-only"
 
@@ -70,7 +73,11 @@ class Harness(deploy.Deployment):
 
     def compose(self, meta, *arguments, data=None):
         self.operations.append((meta["sha"], arguments[0]))
-        self.runtime(meta["sha"])
+        # Same release-record rule as Deployment.compose.
+        if self.environment == "dev":
+            self.runtime(meta["sha"], inference=meta.get("inference", {"target": "local"}))
+        else:
+            self.runtime(meta["sha"])
         if self.fail_start and meta["sha"] == NEW and arguments[0] == "up":
             self.fail_start = False
             raise deploy.DeploymentError("Simulated startup failure")
@@ -103,6 +110,14 @@ class DeploymentTests(unittest.TestCase):
         config = {"layout": "split", "role": role, "account_id": ACCOUNT,
                   "prod_worker_mode": "unconfigured", "drain_seconds": 0}
         deploy.atomic_json(self.root / "shared/split.json", config)
+        if environment == "dev":
+            # The only dev inference is the shared server; install its synthetic public CA.
+            ca = self.root / "certs/inference/kubesphere/ca.crt"
+            ca.parent.mkdir(parents=True, exist_ok=True)
+            ca.write_bytes(b"synthetic-public-ca")
+            patcher = patch.object(deploy.ssl, "create_default_context")
+            patcher.start()
+            self.addCleanup(patcher.stop)
         return Harness(role, environment, ACCOUNT, root=self.root,
                        nginx=self.root / "nginx", runner=FakeRunner())
 
