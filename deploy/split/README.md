@@ -186,3 +186,18 @@ python deploy/split/validate.py
 - 새 서버는 `deploy/split/`만 사용한다. 공통 배포 로직은 Python, 실행 대상은 서버별 Compose로 나눈다.
 - 보관한 기존 파일에는 EC2 한 대 구성용이라는 주석을 남겼다.
 - 로컬 코드 적용과 실제 서비스 전환은 별도다. DB·데이터·운영 추론 설정과 새 서버 검증 후 GitHub·DNS를 전환한다.
+
+## dev 업무 DB 재생성 (초기 스키마 V1이 바뀐 경우)
+
+V1 파일이 바뀌면 기존 dev DB에 새 이미지를 올릴 때 Flyway가 체크섬 불일치로 기동을 막는다. `deploy/DB_TRANSITION.md`·`deploy/scripts/reset-dev.py`는 예전 EC2 한 대(로컬 Postgres) 구성용이라 지금 구성에는 `reset_dev_rds.py`를 쓴다. dev 묶음에만 들어가며 RDS의 `aml_dev_v3`가 아니면 거절한다. 모든 SQL은 현재 릴리스 API 컨테이너 안에서 배포와 같은 환경으로 실행되어 DB 비밀번호가 명령·출력에 나오지 않는다.
+
+백엔드 EC2에서, 업로드·분석을 멈춘 상태로 순서대로 실행한다(`<sha>`는 새 커밋, 그 커밋의 배포가 한 번 실행돼 `/opt/aml/releases/dev/<sha>`가 있어야 한다).
+
+1. `sudo python3 /opt/aml/releases/dev/<sha>/deploy/split/reset_dev_rds.py` — 대상·스키마·행 수만 확인한다.
+2. `sudo python3 .../reset_dev_rds.py --apply --backup-file /root/aml-dev-config-<날짜>.json` — dev API를 멈추고 설정 4개 표(직원·은행·보고 기간·환율)를 백업한 뒤 업무 스키마와 Flyway 이력을 비운다. 백업 파일은 소유자 전용이며 비밀번호 해시가 있으므로 출력·채팅·저장소에 넣지 않는다.
+3. GitHub Actions에서 그 커밋의 배포를 다시 실행한다. 새 이미지가 빈 DB에 V1을 만든다. 빈 DB는 사전 점검에서 진행 중 작업 없음으로 본다.
+4. `sudo python3 .../reset_dev_rds.py --restore-config /root/aml-dev-config-<날짜>.json` — 설정을 한 트랜잭션으로 복원한다. 업무 데이터가 있으면 거절한다.
+5. `sudo python3 .../reset_dev_rds.py --grant-analysis` — 분석 계정에 `analysis_permissions.sql` 권한을 다시 준다. 계정 생성·비밀번호 변경은 하지 않는다.
+6. 로그인, 조작패널에서 업무 시각 설정 후 은행 파일 전송·분석을 재개한다.
+
+3에서 배포가 또 실패하면 자동 복구가 옛 API를 빈 DB로 띄워 옛 스키마를 다시 만든다. 이때는 원인을 고친 뒤 2를 **다른 백업 파일 이름**으로 다시 실행하고, 4에서는 **처음 백업 파일**을 쓴다.
