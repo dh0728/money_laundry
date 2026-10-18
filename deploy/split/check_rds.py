@@ -28,6 +28,11 @@ def main():
                 if cursor.fetchone() != (True,):
                     raise ValueError("TLS connection required")
                 if label == "app" and os.environ.get("AML_REQUIRE_INFERENCE_IDLE") == "true":
+                    # A freshly recreated business DB has no schema before the new image migrates it;
+                    # it holds no analysis or cancellation work, so it is idle.
+                    cursor.execute("SELECT to_regclass('analysis.jobs') IS NOT NULL")
+                    migrated = cursor.fetchone() == (True,)
+                if label == "app" and os.environ.get("AML_REQUIRE_INFERENCE_IDLE") == "true" and migrated:
                     cursor.execute("""SELECT
                         EXISTS(SELECT 1 FROM analysis.jobs WHERE status IN ('QUEUED','RUNNING','RETRY_WAIT'))
                         OR EXISTS(SELECT 1 FROM analysis.runs WHERE status IN ('READY','ACTIVE','CANCEL_REQUESTED'))

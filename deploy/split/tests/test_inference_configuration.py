@@ -129,3 +129,5 @@ class InferenceConfigurationTests(unittest.TestCase):
         self.assertEqual(values["PROD_INFERENCE_API_URL"], "")
         self.assertTrue(any(p.name == "inference.external.yaml" for p in bundle.files(ROOT, "dev")))
         self.assertFalse(any(p.name == "inference.external.yaml" for p in bundle.files(ROOT, "prod")))
+        self.assertTrue(any(p.name == "reset_dev_rds.py" for p in bundle.files(ROOT, "dev")))
+        self.assertFalse(any(p.name == "reset_dev_rds.py" for p in bundle.files(ROOT, "prod")))

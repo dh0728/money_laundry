@@ -13,6 +13,9 @@ import image_manifest
 def files(root, environment):
     base = Path(root) / "deploy/split"
     names = ["deploy.py", "check_rds.py", "image_manifest.py"]
+    if environment == "dev":
+        # Dev-only DB reset for new initial schemas; it refuses any database but aml_dev_v3.
+        names.append("reset_dev_rds.py")
     for role in ("front", "backend"):
         relative = [f"compose.{environment}.yaml", f"deploy-{environment}.sh",
                     f"nginx/conf.d/{environment}.conf"]
