@@ -564,6 +564,42 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
             self.assertEqual(len(puts), 6)
 
+    def test_unreceived_request_is_resent_with_same_identity_only_on_server_not_found(self):
+        import httpx
+        from inference.inference_dispatch import advance
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            puts = []
+            def unreachable(request):
+                if request.method == 'PUT':
+                    puts.append(json.loads(request.content))
+                raise httpx.ConnectError('server not listening yet')
+            for attempt in range(3):
+                self.make_observations_due()
+                advance(self.admin, self.execution, root, settings, s3, transport=httpx.MockTransport(unreachable))
+            first = {b['model_kind']: (b['request_id'], b['execution_round']) for b in puts}
+            # A proxy or wrong route answering 404 is not the server's word: keep waiting, send nothing.
+            self.make_observations_due()
+            advance(self.admin, self.execution, root, settings, s3,
+                    transport=httpx.MockTransport(lambda r: httpx.Response(404, text='not found')))
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING'", (self.run,)).fetchone()[0], 2)
+            resent = []
+            def listening(request):
+                if request.method == 'PUT':
+                    body = json.loads(request.content)
+                    resent.append(body)
+                    return httpx.Response(202, json={**body, 'status': 'ACCEPTED', 'revision': 1})
+                return httpx.Response(404, json={'error': 'REQUEST_NOT_FOUND'})
+            transport = httpx.MockTransport(listening)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
+            self.assertEqual(resent, [])
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='READY' AND NOT action_required", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
+            self.assertEqual({b['model_kind']: (b['request_id'], b['execution_round']) for b in resent}, first)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING' AND NOT action_required AND error_code IS NULL", (self.run,)).fetchone()[0], 2)
+
     def test_result_metadata_mismatch_cannot_schedule_collection(self):
         import httpx
         from inference.inference_dispatch import advance, observe_model
