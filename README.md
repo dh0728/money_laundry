@@ -15,18 +15,21 @@
 ## 폴더 구조
 
 ```
-AML/
-├── data/               # IBM AML 원천 데이터 (Git에 올리지 않음 — 아래 '데이터' 참고)
-├── docs/
-│   ├── 01_research/    # 자료조사 (AML 도메인, GNN 논문/사례)
-│   ├── 02_data/        # 데이터 명세, EDA 결과
-│   ├── 03_planning/    # 기획 (요구사항 정의서, 유즈케이스)
-│   ├── 04_design/      # 설계 (아키텍처, 모델, 화면)
-│   └── meetings/       # 회의록
+money_laundry/
+├── backend/
+│   ├── api-server/        # Spring API + Python 분석 워커(worker/). API.md·ERD.md가 계약 문서
+│   ├── inference-server/  # 모델을 실행하는 추론 서버. KubeSphere에서 이 폴더를 그대로 실행
+│   └── bank-mock/         # 은행 쪽 파일 전송 목업
+├── frontend/
+│   ├── web-app/           # React·TypeScript 웹 화면
+│   └── prototype/         # 화면 시안
+├── deploy/
+│   └── split/             # 현재 배포(EC2 두 대 + RDS). 그 밖의 deploy/ 파일은 예전 EC2 한 대 구성 보관본
+├── docs/                  # 일일 업무 일지, 회의록
 └── README.md
 ```
 
-구현 단계에 들어가면 `src/`, `notebooks/` 등을 그때 추가합니다.
+원천 데이터(`data/`)는 저장소 밖에 둡니다(아래 '데이터' 참고).
 
 ## 데이터
 
