@@ -121,22 +121,31 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
             WHERE run_id=%s AND model_kind=%s
             ''', (encode(binding).decode(), request_id, round_id, token, execution.execution_id, execution.run_id, kind))
     try:
+        from features.prepare_features import artifact_files
         root = Path(storage_root).resolve()
-        path = (root / artifact['path']).resolve()
-        if not path.is_relative_to(root) or not path.is_file():
-            raise ProtocolError('Prepared input file is missing')
-        with path.open('rb') as stream:
-            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-        if (path.stat().st_size != artifact['size_bytes'] or digest != artifact['sha256']
-                or artifact['run_id'] != str(execution.run_id) or artifact['model_kind'] != kind
+        if (artifact['run_id'] != str(execution.run_id) or artifact['model_kind'] != kind
                 or artifact['model_version'] != request.model_version
                 or artifact['feature_version'] != request.feature_version):
             raise ProtocolError('Prepared input changed')
+        prepared = {}
+        for name, relative, size, expected in artifact_files(artifact):
+            path = (root / relative).resolve()
+            if not path.is_relative_to(root) or not path.is_file():
+                raise ProtocolError('Prepared input file is missing')
+            with path.open('rb') as stream:
+                digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+            if path.stat().st_size != size or digest != expected:
+                raise ProtocolError('Prepared input changed')
+            prepared[name] = (path, size, digest)
+        folder = prepared['targets'][0].parent
+        if any(path.parent != folder for path, *_ in prepared.values()):
+            raise ProtocolError('Prepared input files are split')
         store = S3Store(s3, settings.bucket, settings.prefix)
-        manifest = publish(store, request, path.parent,
-                           [{'name': 'targets', 'relative_path': path.name}], artifact['row_count'])
-        if (manifest['files'][0]['sha256'] != artifact['sha256']
-                or manifest['files'][0]['size_bytes'] != artifact['size_bytes']):
+        manifest = publish(store, request, folder,
+                           [{'name': name, 'relative_path': path.name} for name, (path, *_) in prepared.items()],
+                           artifact['row_count'])
+        if any((entry['size_bytes'], entry['sha256']) != prepared[entry['name']][1:]
+               for entry in manifest['files']):
             raise ProtocolError('Input changed while uploading')
         def signed(method, key):
             return s3.generate_presigned_url(method, Params={'Bucket': settings.bucket,
@@ -145,6 +154,9 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
                     manifest_sha256=hashlib.sha256(encode(manifest)).hexdigest(),
                     manifest_url=signed('get_object', request.manifest),
                     input_url=signed('get_object', request.inputs + 'targets.parquet'),
+                    **({} if len(prepared) == 1 else {'input_urls': {
+                        name: signed('get_object', request.inputs + path.name)
+                        for name, (path, *_) in prepared.items()}}),
                     result_urls={name: signed('put_object', request.output + name)
                                  for name in ('scores.parquet', 'result.json')})
         with connection.transaction():

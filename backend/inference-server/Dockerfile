@@ -10,8 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     INFERENCE_PORT=8090
 
 WORKDIR /app/inference-server
-COPY requirements.txt ./requirements.txt
+COPY requirements.txt requirements-models.txt ./
+# CPU torch for the local demo stack; the shared GPU server installs its own build (README).
 RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.10.0 \
+    && pip install --no-cache-dir -r requirements-models.txt \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
     && mkdir -p /state \
@@ -21,7 +24,7 @@ COPY inference_server.py ./
 COPY inference_worker ./inference_worker
 COPY models ./models
 COPY common ./common
-RUN python -c "import inference_server, inference_worker.inference_compute, models.registry"
+RUN python -c "import inference_server, inference_worker.inference_compute, models.registry, models.binary_v10.network, models.binary_v10.preprocess"
 
 USER app:app
 EXPOSE 8090

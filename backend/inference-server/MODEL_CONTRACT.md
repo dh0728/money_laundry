@@ -7,8 +7,8 @@
 모델은 이 추론 서버 폴더(backend/inference-server)에만 있다. 모델 하나는 `models/<모델이름>/` 폴더 하나로 `spec.py`(버전·지원 여부)와 `model.py`(입력 → 점수 표, `calculate`·`validate_scores`)를 두고 `models/registry.py`에 등록한다. 같은 버전의 입력 만들기(`build_input.py`)와 등록은 백엔드 `backend/api-server/worker/models/`에 있다. 추론 워커는 `inference_worker/model_adapter.py`의 `run_model(targets, model_kind, *, model_version, feature_version)`으로 요청 버전에 맞는 패키지의 `calculate`를 부르고 예외를 아래 규약으로 바꾼다. 실제 모델은 새 폴더의 `model.py`에 입력 검증 → 로딩 → 추론 → 후처리를 넣는다. 테스트 프로그램을 참조하거나 실행하지 않는다.
 
 - `model_kind`: `binary` 또는 `type`. 외부 요청 API에서는 BINARY/TYPE이다.
-- 현재 `targets`: PyArrow Table(tx_id int64, demo_value int64). 실제 GNN 입력 피처·그래프 형식은 별도 계약이며 이 문서로 확정하지 않는다.
-- 신규 실행 버전은 demo-random-v1/demo-input-v1이며 기존 demo-calculator-v1 바인딩도 지원한다. 라벨 기반 demo-labels 버전은 지원하지 않는다. 허용 버전은 등록표에 있는 패키지의 `spec.supported_versions`로 정해지고, 대상 tx_id·확률 범위 같은 공통 결과 검사는 `common/score_contract.py`가 한다. 이 문서만 적용했다고 실제 모델 연결이 완료되는 것은 아니다.
+- 입력: 파일 이름 → PyArrow Table 묶음(`targets`, `transactions`, `accounts`, README "받는 입력"). 대상 ID만 쓰는 모델은 `calculate(targets, ...)`로 `targets`만 받고, 재료를 쓰는 모델은 `calculate_inputs(inputs, model_kind, *, model_version, feature_version)`을 정의해 묶음 전체를 받는다. 피처·그래프는 모델이 재료에서 직접 만든다.
+- 신규 실행은 이진 모델이 gnn-binary-v10/materials-v1(팀원 GNN v10), 유형 모델이 demo-random-v1/demo-input-v1이다(백엔드 `worker/models/registry.py`의 기본값). 기존 demo-random-v1·demo-calculator-v1 바인딩도 지원한다. 라벨 기반 demo-labels 버전은 지원하지 않는다. 허용 버전은 등록표에 있는 패키지의 `spec.supported_versions`로 정해지고, 대상 tx_id·확률 범위 같은 공통 결과 검사는 `common/score_contract.py`가 한다. 이 문서만 적용했다고 실제 모델 연결이 완료되는 것은 아니다.
 - 성공: BINARY는 tx_id(int64), p_laundering(float64), TYPE은 tx_id(int64), p_0..p_8(float64)의 PyArrow Table 반환. 현재 시연 계약은 대상 tx_id 집합 정확히 일치, 중복/NULL 없음, 유한한 [0,1] 확률, TYPE 합 허용오차 1e-9를 요구한다.
 - 모델은 S3 전송·Spring 호출·자동 재시도를 수행하지 않는다. 파일 저장/검증/전송과 재시도는 워커 책임이다. 일부 결과만 만든 상태를 성공으로 반환하지 않는다.
 

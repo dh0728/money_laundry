@@ -55,6 +55,20 @@ class ModelContractTests(unittest.TestCase):
                 self.assertEqual(caught.exception.code, expected)
                 self.assertNotIn("secret", str(caught.exception))
 
+    def test_adapter_hands_every_input_file_to_a_model_that_reads_materials(self):
+        from types import SimpleNamespace
+        received = {}
+        def calculate_inputs(inputs, kind, **versions):
+            received.update(inputs)
+            return "scores"
+        package = SimpleNamespace(model=SimpleNamespace(calculate_inputs=calculate_inputs))
+        inputs = {"targets": build_targets([1]), "transactions": build_targets([1, 2]), "accounts": build_targets([3])}
+        with patch("models.registry.require", return_value=package):
+            self.assertEqual(run_model(inputs, "binary", model_version="m", feature_version="f"), "scores")
+        self.assertEqual(set(received), {"targets", "transactions", "accounts"})
+        # A targets-only model keeps receiving the targets table alone, from either input form.
+        versions = dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
+        self.assertTrue(run_model(inputs, "binary", **versions).equals(run_model(inputs["targets"], "binary", **versions)))
     def test_child_serializes_model_error_not_raw_exception(self):
         from inference_worker.inference_compute import main
         error = ModelExecutionError("GPU_OUT_OF_MEMORY", "INFERENCE")

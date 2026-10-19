@@ -80,22 +80,27 @@ def execute(directory):
             manifest = decode(manifest_bytes)
             request.check(manifest)
             files = manifest.get("files")
-            if not isinstance(files, list) or len(files) != 1 or files[0].get("name") != "targets":
-                raise ProtocolError("Demo input requires one targets file")
-            entry = files[0]
+            # Earlier requests carry only targets; current ones list every input file by name.
+            urls = payload.get("input_urls") or {"targets": payload["input_url"]}
+            if (not isinstance(files, list) or not all(isinstance(entry, dict) for entry in files)
+                    or sorted(entry.get("name") for entry in files) != sorted(urls)):
+                raise ProtocolError("Manifest files differ from the request inputs")
             # Manifest keys include the environment prefix; URL scope is independently fixed.
-            expected_key = unquote(urlsplit(base).path).lstrip("/") + request.inputs + "targets.parquet"
-            if entry.get("key") != expected_key:
-                raise ProtocolError("Unexpected targets object key")
-            check_url(payload["input_url"], base, request.inputs + "targets.parquet")
-            data = download(client, payload["input_url"], payload["max_input_bytes"])
-            if len(data) != entry.get("size_bytes") or hashlib.sha256(data).hexdigest() != entry.get("sha256"):
-                raise ProtocolError("Input checksum mismatch")
-            targets = pq.read_table(io.BytesIO(data))
-            ids = tx_ids(targets)
+            prefix = unquote(urlsplit(base).path).lstrip("/") + request.inputs
+            inputs = {}
+            for entry in files:
+                name = entry["name"]
+                if entry.get("key") != prefix + name + ".parquet":
+                    raise ProtocolError("Unexpected input object key")
+                check_url(urls[name], base, request.inputs + name + ".parquet")
+                data = download(client, urls[name], payload["max_input_bytes"])
+                if len(data) != entry.get("size_bytes") or hashlib.sha256(data).hexdigest() != entry.get("sha256"):
+                    raise ProtocolError("Input checksum mismatch")
+                inputs[name] = pq.read_table(io.BytesIO(data))
+            ids = tx_ids(inputs["targets"])
             if type(manifest.get("target_row_count")) is not int or len(ids) != manifest["target_row_count"]:
                 raise ProtocolError("TARGET count mismatch")
-            scores = run_model(targets, request.model_kind, **request.versions())
+            scores = run_model(inputs, request.model_kind, **request.versions())
             try:
                 registry.require(**request.versions()).model.validate_scores(
                     scores, ids, request.model_kind, **request.versions())

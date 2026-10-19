@@ -20,7 +20,12 @@ import pyarrow.parquet as pq
 from common.frozen_input import FrozenInput, InputExecution, StaleExecution
 from models.demo_random.build_input import write_input as write_demo_input
 from common.worker_transport import ProtocolError
+from features import materials
 from features.prepare_features import prepare_features
+
+
+def input_path(model, name="targets"):
+    return next(entry["path"] for entry in model["files"] if entry["name"] == name)
 
 
 class MemoryS3:
@@ -92,6 +97,11 @@ class FrozenInputPostgresTests(unittest.TestCase):
                           "analysis.input_transactions TO input_reader")
 
     def setUp(self):
+        # These tests play the inference peer with the demo model; v10 binding has its own tests.
+        from models import registry
+        demo_only = patch.dict(registry.DEFAULTS, BINARY=registry.DEMO_RANDOM, TYPE=registry.DEMO_RANDOM)
+        demo_only.start()
+        self.addCleanup(demo_only.stop)
         self.reader = self.psycopg.connect(**self.connect_args)
         self.addCleanup(self.reader.close)
         self.reader.execute("SET ROLE input_reader")
@@ -230,7 +240,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             result = json.loads(prepare_features(self.admin, self.execution, root))
             for model in result['models'].values():
                 self.assertEqual(model['model_version'], MODEL_VERSION)
-                self.assertEqual(pq.read_table(Path(root) / model['path']).column_names,
+                self.assertEqual(pq.read_table(Path(root) / input_path(model)).column_names,
                                  ['tx_id', 'demo_value'])
             self.assertEqual(result, json.loads(prepare_features(self.admin, self.execution, root)))
         with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
@@ -251,9 +261,32 @@ class FrozenInputPostgresTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='aml-random-input-') as root:
             result = json.loads(prepare_features(self.admin, self.execution, root))
             for model in result['models'].values():
-                table = pq.read_table(Path(root) / model['path'])
+                table = pq.read_table(Path(root) / input_path(model))
                 self.assertEqual(table['tx_id'].to_pylist(), sorted(self.ids))
                 self.assertEqual(table.column_names, ['tx_id', 'demo_value'])
+
+    def test_binary_v10_binding_sends_target_ids_and_records_its_threshold(self):
+        from models import registry
+        from models.binary_v10 import spec
+        with patch.dict(registry.DEFAULTS, BINARY=registry.BINARY_V10), \
+                tempfile.TemporaryDirectory(prefix='aml-v10-input-') as root:
+            result = json.loads(prepare_features(self.admin, self.execution, root))
+            binary, kind = result['models']['BINARY'], result['models']['TYPE']
+            self.assertEqual((binary['model_version'], binary['feature_version']),
+                             (spec.MODEL_VERSION, spec.FEATURE_VERSION))
+            self.assertEqual(kind['model_version'], 'demo-random-v1')
+            table = pq.read_table(Path(root) / input_path(binary))
+            self.assertEqual(table.column_names, ['tx_id'])
+            self.assertEqual(table['tx_id'].to_pylist(), sorted(self.ids))
+            self.assertEqual([f['name'] for f in binary['files']], ['targets', *materials.MATERIALS])
+            threshold = self.admin.execute('SELECT threshold_value FROM analysis.jobs WHERE job_id=%s',
+                                           (self.job,)).fetchone()[0]
+            self.assertAlmostEqual(float(threshold), spec.RECOMMENDED_THRESHOLD, places=6)
+            # A resumed run keeps its binding and does not touch the threshold again.
+            self.admin.execute('UPDATE analysis.jobs SET threshold_value=.7 WHERE job_id=%s', (self.job,))
+            self.assertEqual(json.loads(prepare_features(self.admin, self.execution, root)), result)
+            self.assertEqual(float(self.admin.execute('SELECT threshold_value FROM analysis.jobs WHERE job_id=%s',
+                                                      (self.job,)).fetchone()[0]), .7)
 
     def test_real_cli_persists_checkpoint_and_retry_reuses_input(self):
         import sys
@@ -275,14 +308,22 @@ class FrozenInputPostgresTests(unittest.TestCase):
             for kind, model in artifact["models"].items():
                 self.assertEqual(model["model_kind"], kind)
                 self.assertEqual(model["row_count"], 3)
-                self.assertEqual(pq.read_table(Path(root) / model["path"]).column("tx_id").to_pylist(), self.ids)
+                self.assertEqual(pq.read_table(Path(root) / input_path(model)).column("tx_id").to_pylist(), self.ids)
+                # Every model gets the same materials, read with the analysis login's own grants.
+                transactions = pq.read_table(Path(root) / input_path(model, "transactions"))
+                self.assertEqual(transactions.schema, materials.TRANSACTIONS)
+                self.assertEqual(sorted(transactions.column("input_role").to_pylist()),
+                                 ["CONTEXT", "TARGET", "TARGET", "TARGET"])
+                accounts = pq.read_table(Path(root) / input_path(model, "accounts"))
+                self.assertEqual(accounts.schema, materials.ACCOUNTS)
+                self.assertEqual(accounts.num_rows, 8)
             self.assertEqual(self.admin.execute(
                 "SELECT count(*) FROM analysis.features WHERE run_id=%s", (self.run,)).fetchone()[0], 6)
             new_token = uuid4()
             self.admin.execute("UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s", (new_token, self.job))
             retry = prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
             self.assertEqual(retry, saved)
-            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 2)
+            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 6)
             self.assertEqual(list(Path(root).rglob("*.partial")), [])
 
     def test_cancel_before_checkpoint_does_not_complete_stage(self):
@@ -309,7 +350,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute(
                 "SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND input_artifact IS NOT NULL",
                 (self.run,)).fetchone()[0], 0)
-            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 1)
+            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 3)
             self.assertEqual(list(Path(root).rglob("*.partial")), [])
 
     def test_replaced_parent_token_cannot_save_an_already_prepared_file(self):
@@ -337,7 +378,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
     def test_checkpoint_with_changed_file_cannot_be_reused(self):
         with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
             artifact = json.loads(prepare_features(self.admin, self.execution, root))
-            (Path(root) / artifact["models"]["BINARY"]["path"]).write_bytes(b"changed")
+            (Path(root) / input_path(artifact["models"]["BINARY"])).write_bytes(b"changed")
             with self.assertRaisesRegex(ProtocolError, "changed"):
                 prepare_features(self.admin, self.execution, root)
 
@@ -375,7 +416,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertNotIn(settings.token, task[3])
             self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis.stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
             self.assertEqual(self.admin.execute("SELECT phase FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], 'PUBLISH')
-            self.assertEqual(len(s3.objects), 3)
+            self.assertEqual(len(s3.objects), 5)  # targets, transactions, accounts, input bundle, manifest
 
     def test_publication_rejects_wrong_receipt_and_changed_destination(self):
         import httpx

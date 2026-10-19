@@ -10,12 +10,34 @@
 | `common/` | 백엔드와 같은 전송·오류·점수 검사 계약 사본. 백엔드 `worker/common/`의 같은 이름 파일과 내용이 같아야 한다(백엔드 테스트 `test_inference_view_contract.py`가 확인) |
 | `MODEL_CONTRACT.md` | 모델 실행부와 서버 사이의 성공·실패 반환 규약 |
 
+## 받는 입력
+
+요청마다 같은 파일 묶음을 받는다(모델·피처가 바뀌어도 그대로). 파일 이름은 `<이름>.parquet`이고 manifest와 요청의 `input_urls`에 같은 이름으로 들어 있다. 예전 요청은 `targets`만 있다.
+
+| 이름 | 내용 |
+|---|---|
+| `targets` | 점수를 낼 대상 거래 ID(모델별 열 포함. 시연 모델은 `tx_id, demo_value`, v10은 `tx_id`) |
+| `transactions` | 그 실행의 고정 입력 거래 전체(대상+누적 문맥): tx_id, input_role, occurred_at(UTC), 은행·가명 계좌·가명 소유자 ID, 금액(정확한 소수), ISO 통화, 결제 형식 |
+| `accounts` | 등장한 계좌별 은행 ID, 가명 소유자 ID, 엔티티 유형, 은행 국가(없으면 null) |
+
+대상 ID만 쓰는 모델은 `calculate(targets, ...)`, 재료를 쓰는 모델은 `calculate_inputs(inputs, ...)`를 정의한다(`MODEL_CONTRACT.md`).
+
+## 등록된 모델
+
+| 폴더 | 버전(모델 / 피처) | 쓰는 곳 |
+|---|---|---|
+| `models/demo_random` | `demo-random-v1` / `demo-input-v1` | 유형 모델 자리(시연용 임의 점수) |
+| `models/binary_v10` | `gnn-binary-v10` / `materials-v1` | 이진 모델. 팀원 GNN v10(2홉 거래 그래프). 재료에서 피처를 만들고 대상 거래마다 그래프를 만들어 점수를 낸다. 가중치·통계는 `assets/`, 무결성은 `spec.py`의 SHA-256으로 확인 |
+
 ## 실행 (공유 추론 서버)
 
 KubeSphere 서버에서 이 폴더를 그대로 두고 Python 3.13 환경으로 실행한다. 이미지 빌드나 레지스트리는 쓰지 않는다.
 
 ```bash
 python -m pip install -r requirements.txt
+# torch는 장치에 맞는 빌드를 먼저 설치한다(CPU 예). GPU 서버는 CUDA 빌드 index URL을 쓴다.
+python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+python -m pip install -r requirements-models.txt
 python -B inference_server.py
 ```
 
@@ -25,6 +47,8 @@ python -B inference_server.py
 | `INFERENCE_OBJECT_BASE_URL` | 실제 S3 Presigned URL과 scheme·host·prefix가 같은 기본 URL, 끝 `/` 필수. 예 `https://<bucket>.s3.<region>.amazonaws.com/<prefix>/` |
 | `INFERENCE_STATE_DIR` | 재시작 후에도 유지되는 폴더(SQLite 상태·입출력 캐시·서명 URL 저장). 공개 경로로 노출하지 않음 |
 | `INFERENCE_BIND` / `INFERENCE_PORT` | 기본 `127.0.0.1` / `8090`. 앞단 HTTPS 프록시 연결 방식에 맞게 지정 |
+| `BINARY_V10_DEVICE` | v10 실행 장치. 기본 `cpu`, GPU면 `cuda` |
+| `BINARY_V10_THREADS` / `BINARY_V10_MEMORY_LIMIT` | v10 전처리(DuckDB)·CPU 연산 스레드 수와 DuckDB 메모리 한도. 기본 `2` / `2GB` |
 
 - 한 번에 하나만 실행한다. 같은 상태 폴더를 두 서버가 함께 열지 않는다.
 - `GET /health`가 `{"status":"UP"}`이면 정상이다. 외부에는 기존 HTTPS 프록시로만 노출한다.

@@ -8,7 +8,8 @@ Runs keep the versions bound when they were created, so older packages stay list
 while their runs can still resume.
 """
 from common.worker_transport import ProtocolError
-from models import demo_random
+from models import binary_v10, demo_random
+from models.binary_v10 import build_input as binary_v10_input, spec as binary_v10_spec
 from models.demo_random import build_input as demo_input, spec as demo_spec
 
 
@@ -21,8 +22,9 @@ class ModelPackage:
 
 
 DEMO_RANDOM = ModelPackage(demo_random.__name__, demo_spec, demo_input)
-MODELS = (DEMO_RANDOM,)
-DEFAULTS = {"BINARY": DEMO_RANDOM, "TYPE": DEMO_RANDOM}
+BINARY_V10 = ModelPackage(binary_v10.__name__, binary_v10_spec, binary_v10_input)
+MODELS = (DEMO_RANDOM, BINARY_V10)
+DEFAULTS = {"BINARY": BINARY_V10, "TYPE": DEMO_RANDOM}
 
 
 def default(model_kind):

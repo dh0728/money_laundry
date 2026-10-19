@@ -112,11 +112,20 @@ def create_app(settings: Settings):
                 raise ValueError()
             allowed = {"contract_version", "job_id", "run_id", "model_kind", "request_id", "execution_round",
                        "model_version", "feature_version", "manifest_sha256", "manifest_url", "input_url", "result_urls"}
-            if set(body) != allowed:
+            # input_urls (every input file by name) is optional so earlier single-file requests still work.
+            if set(body) - {"input_urls"} != allowed:
                 raise ValueError()
             logical = request_from(body)
             check_url(body["manifest_url"], settings.object_base_url, logical.manifest)
             check_url(body["input_url"], settings.object_base_url, logical.inputs + "targets.parquet")
+            if "input_urls" in body:
+                inputs = body["input_urls"]
+                if (not isinstance(inputs, dict) or inputs.get("targets") != body["input_url"]
+                        or not all(re.fullmatch("[a-z][a-z_]{0,31}", name) for name in inputs)
+                        or len(inputs) > 8):
+                    raise ValueError()
+                for name, url in inputs.items():
+                    check_url(url, settings.object_base_url, logical.inputs + name + ".parquet")
             for name, url in body["result_urls"].items():
                 check_url(url, settings.object_base_url, logical.output + name)
         except (ValueError, TypeError, KeyError, AttributeError, ProtocolError):
