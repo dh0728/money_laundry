@@ -35,4 +35,4 @@ desktop.ini
 /backend/
 /frontend/
 /deploy/
-/tools/
+/tools/*.zip

@@ -1,0 +1,25 @@
+TimeGAN 오전 최종본(v6pick · 2026-10-15) 합성 데이터
+
+들어 있는 것: 유형 3개 × 생성 2번(r0 · r1) = npz 파일 6개
+  c2_CYCLE      : 파일마다 5,402행(묶음 1,281개)
+  c5_BIPARTITE  : 파일마다 5,657행(묶음 940개)
+  c7_RANDOM     : 파일마다 4,330행(묶음 1,048개)
+  r0 · r1 = 같은 생성기로 두 번 만든 것(r1 = 두 번째)
+
+npz 안의 이름
+  X        : 합성 거래의 팀 피처 55열 (행 × 55 · float32)
+  features : 55열 이름
+  y        : 유형 번호(0 FAN-OUT · 1 FAN-IN · 2 CYCLE · 3 SCATTER-GATHER · 4 GATHER-SCATTER · 5 BIPARTITE · 6 STACK · 7 RANDOM)
+  seq_id   : 같은 묶음(한 세탁 시도처럼 이어진 거래) 번호
+  dt_min   : 시간 간격(분)
+  src_row · src_att : 바탕이 된 진짜 train 행 · 시도 번호
+  meta     : 생성 설정(json 글자)
+
+읽는 법(파이썬)
+  import numpy as np
+  z = np.load('c2_CYCLE/synth_v6pick_c2_s0_r0.npz')
+  X, y = z['X'], z['y']
+
+설정: TimeGAN 은닉 96 · 출력 잡음 0(입력 z 는 무작위) · 3단계 20,000번 · 계좌 열은 규칙판(고정)
+판별 AUC(진짜와 얼마나 구별되나 · 0.5 가 좋음): 0.72 ~ 0.75
+이 합성 데이터를 넣은 학습은 미리 정한 판정을 통과하지 못했고, 최종 후보 모델에는 쓰지 않았습니다.
