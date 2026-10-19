@@ -34,7 +34,7 @@ Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다
 
 ## DB 역할과 초기 구조
 
-기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. Alert 거래에 당시 SEED 위험도를 함께 저장하여 목록 정렬의 JSON 반복 전개를 제거한다. 기존 V1이 적용된 dev는 사용자 결정에 따라 설정 백업 후 재초기화한다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 전환 절차](../../../deploy/DB_TRANSITION.md)를 따른다.
+기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. Alert 거래에 당시 SEED 위험도를 함께 저장하여 목록 정렬의 JSON 반복 전개를 제거한다. 기존 V1이 적용된 dev는 사용자 결정에 따라 설정 백업 후 재초기화한다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 업무 DB 재생성 절차](../../../deploy/split/README.md#dev-업무-db-재생성-초기-스키마-v1이-바뀐-경우)를 따른다. 스키마를 바꿀 때는 V2를 덧붙이지 않고 V1을 고친 뒤 DB를 다시 만든다.
 
 - 수신 `ingest_entry.py`와 `analysis_entry.py --stage INTEGRATE`는 원문 보호·보고 통합·정정을 수행하므로 API의 데이터 작업 계정을 사용한다. `cryptography`는 이 단계의 AES-GCM 암호화/복호화와 Java 호환 검증에 필요하다. 조회 속도를 높이기 위한 라이브러리가 아니다.
 - FEATURES/INFERENCE/SCORES/ALERTS는 `ANALYSIS_DB_USERNAME`·`ANALYSIS_DB_PASSWORD`의 별도 로그인으로 같은 DB에 접속한다. 누락 시 API 관리자 계정으로 대체하지 않는다. 자식 프로세스에서 원문 암호키와 API DB 환경변수를 제거한다.
@@ -64,15 +64,15 @@ API 이미지는 Java21·Python3.13을 포함하고 운영 모듈만 복사한�
 
 ## 3. EC2 API 배포
 
-사용자의 기존 dev 반영/자동 배포 절차를 사용한다. `deploy-dev.sh`는 위 SSM 값을
-`DEV_INFERENCE_API_URL/TOKEN`으로 주입한다. Compose는 다음 값을 사용한다.
+dev는 EC2 두 대(프론트·백엔드)와 RDS 구성이며 `deploy/split/`만 쓴다. 절차는 [배포 안내](../../../deploy/split/README.md)를 따른다. 백엔드 EC2의 `deploy-dev.sh`가 `deploy.py`를 불러 위 Parameter Store 값을
+`DEV_INFERENCE_API_URL/TOKEN`으로 주입한다. `deploy/split/backend/compose.dev.yaml`은 다음 값을 사용한다.
 
 - `WORKER_MODE=demo`, `WORKER_PYTHON=/usr/local/bin/python`
 - `WORKER_SCRIPT=/app/worker/analysis_entry.py`, `WORKER_TIMEOUT=PT30M`
 - `STORAGE_DIR=/app/storage`, 새 볼륨 `aml-dev-api-storage`
-- DB 접속 정보는 Spring이 실제 datasource 설정에서 자식 프로세스에 전달
+- DB는 RDS의 `aml_dev_v3`. 접속 정보는 Parameter Store `db/*`에서 받아 Spring이 자식 프로세스에 전달
 
-기존 `aml-dev-postgres-data`, DB URL, S3 prefix는 바꾸거나 초기화하지 않는다.
+배포 중에 DB URL과 S3 prefix는 바꾸거나 초기화하지 않는다. V1이 바뀐 경우의 DB 재생성은 배포 안내의 "dev 업무 DB 재생성"을 따른다.
 API 저장 볼륨은 새로 만들 때 이미지의 UID10001 권한으로 초기화된다. 빈 디렉터리로 덮어
 마운트하는 환경에서는 UID/GID10001 쓰기 권한을 별도로 제공해야 한다.
 EC2 IAM 역할 자격증명은 Python boto3에서도 접근 가능해야 한다. Java health 성공만으로
@@ -84,12 +84,12 @@ Python의 S3 권한까지 확인된 것은 아니다.
    확인하며 `--insecure`로 우회하지 않는다. 추론 API의 무인증 GET은401이어야 한다.
 2. dev API `/actuator/health`가 UP인지 확인한다.
 3. 아직 제출하지 않은 테스트 보고라면 AML 루트 PowerShell에서 기존 은행 목업으로
-   세 파일을 올린다. 활성화한 conda aml 환경을 사용한다.
+   세 파일을 올린다. `python`은 Python 3.13 환경을 가리켜야 한다(목업은 표준 라이브러리만 쓴다).
 
 ```powershell
 $api = 'https://dev.aiaml.co.kr'
 foreach ($bank in 70, 12, 21174) {
-    & "$env:CONDA_PREFIX/python.exe" -B money_laundry/backend/bank-mock/bank_mock.py --api-url $api --bank-id $bank --file "money_laundry/backend/bank-mock/fixtures/bank_$bank.csv" --business-date 2022-09-01
+    python -B money_laundry/backend/bank-mock/bank_mock.py --api-url $api --bank-id $bank --file "money_laundry/backend/bank-mock/fixtures/bank_$bank.csv" --business-date 2022-09-01
     if ($LASTEXITCODE -ne 0) { throw "은행 $bank 업로드 결과를 먼저 확인하세요." }
 }
 ```
@@ -150,7 +150,7 @@ WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id)
 TARGET와 cutoff 이전에 유효하게 수신·통합된 전체 CONTEXT·기존 점수·날짜별 수신 범위를 동결한다.
 실행 경로는 `alerts/alert_pipeline.py → alerts/block_graph.build_block_graphs` 하나다. 계좌 UUID는 내부 정수 코드로
 변환하고 실제 거래 ID·UTC microseconds·USD 환산 금액(마이크로 단위)을 보존한다. 과거 점수는 원래 실행의 임계값을 적용한다.
-정책 `block-pin-1`은 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
+정책 `block-pin-2`는 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
 핵심은 씨앗과 연결 거래64건·기간240시간 이하다. 맥락 거래는 멤버가 아니라 근거의 `contextQuery`(초점 계좌·핵심 기간±24시간)이며
 조회할 때 원장에서 센다. 구조 관계가 없는 씨앗은 발행하지 않고 사유(`unassignedReasons`)와 함께 아티팩트에 남겨 다음 실행에 재검토한다.
 저의심비율 허브는512건/20% 기준으로 부채꼴 면과 통과 관계를 만들지 않는다.

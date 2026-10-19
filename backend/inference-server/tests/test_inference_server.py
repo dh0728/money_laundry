@@ -171,6 +171,14 @@ class InferenceServerTests(unittest.TestCase):
             self.assertNotIn("manifest_url", self.state(payload))
         self.assertEqual(len(self.events), 2)
 
+    def test_unknown_request_answer_matches_backend_resend_rule(self):
+        # The backend resends an unreceived request only on exactly this answer
+        # (api-server worker/inference/inference_dispatch._unknown_request).
+        payload = self.payload()
+        response = self.client.get(self.path(payload), headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "REQUEST_NOT_FOUND"})
+
     def test_acceptance_response_matches_backend_contract(self):
         # The backend observer (api-server worker/inference/inference_dispatch.normalize) is tested
         # against this exact view in api-server worker/tests/test_inference_view_contract.py.

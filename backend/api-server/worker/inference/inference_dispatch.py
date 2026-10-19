@@ -64,6 +64,10 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
     endpoint = settings.api_url.rstrip('/') + f'/api/v1/inference-requests/{request_id}/rounds/{round_id}'
     with settings.client(transport=transport) as client:
         with client.stream('GET', endpoint, headers={'Authorization': 'Bearer ' + settings.token}) as response:
+            if response.status_code == 404 and _unknown_request(response):
+                if _republish_unreceived(connection, execution, kind):
+                    return
+                raise ProtocolError('Inference server no longer knows an accepted request')
             response.raise_for_status()
             if response.status_code != 200:
                 raise ProtocolError('Unexpected observation response')
@@ -99,6 +103,31 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
             connection.execute('''UPDATE analysis.model_tasks SET action_required=true,
                 error_code=coalesce(error_code,'REMOTE_WAIT_EXPIRED')
                 WHERE run_id=%s AND model_kind=%s AND remote_deadline_at<=now()''', (execution.run_id, kind))
+
+
+def _unknown_request(response):
+    """The inference server's own answer that it never received this request and round."""
+    data = response.read()
+    try:
+        return len(data) <= 1024 and json.loads(data) == {'error': 'REQUEST_NOT_FOUND'}
+    except ValueError:
+        return False
+
+
+def _republish_unreceived(connection, execution, kind):
+    """Send the same request and round again when the server confirms it never received it.
+
+    A submission that failed only on the network is kept waiting rather than resent, because
+    the server might have received it. Once the server itself reports the request unknown and
+    no receipt was ever observed, resending the same identity cannot run the model twice.
+    """
+    with connection.transaction():
+        lock_stage(connection, execution)
+        return connection.execute('''UPDATE analysis.model_tasks SET phase='PUBLISH',status='READY',
+            consecutive_failures=0,error_code=NULL,action_required=false,retry_at=NULL,next_poll_at=NULL,
+            updated_at=now()
+            WHERE run_id=%s AND model_kind=%s AND phase='WAIT_REMOTE' AND status='WAITING'
+              AND remote_revision IS NULL AND remote_snapshot IS NULL''', (execution.run_id, kind)).rowcount == 1
 
 
 def _failure(connection, execution, kind, error):
