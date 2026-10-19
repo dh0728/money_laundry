@@ -52,6 +52,47 @@ class PanelTests(unittest.TestCase):
                     actual.post.assert_called_once_with('demo/analysis', {'businessDate': '2023-09-01'})
                     app.session_state.replay.close()
 
+    def test_resume_form_keeps_the_typed_id_and_result_across_refreshes(self):
+        from streamlit.testing.v1 import AppTest
+        from api_client import ApiError
+        with tempfile.TemporaryDirectory() as name:
+            (Path(name) / '2023-09-01').mkdir()
+            (Path(name) / '2023-09-01' / 'bank_12_2023-09-01.csv').write_text('header')
+            with patch.dict('os.environ', {'AML_DEMO_DATA_DIR': name, 'AML_DEMO_API_URL': 'http://127.0.0.1:8080'}), \
+                    patch('api_client.login_panel', return_value=(__import__('api_client').ApiClient('http://127.0.0.1:8080'), {'role': 'ADMIN'})), \
+                    patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}):
+                app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'control_panel.py')).run(timeout=15)
+                # The app runs the script as its own module, so stub the panel's own instance.
+                post = app.session_state.replay.controls.post = Mock(return_value={'jobId': 22, 'status': 'QUEUED'})
+                resume = lambda: next(b for b in app.button if b.label == '실패 작업 재개')
+                resume().click().run()
+                post.assert_not_called()
+                self.assertIn('작업 ID를 입력', app.error[0].value)
+                next(n for n in app.number_input if n.label == '재개할 실패 작업 ID').set_value(22)
+                resume().click().run()
+                post.assert_called_once_with('batch-jobs/22/resume')
+                app.run()  # a later refresh keeps the outcome on screen
+                self.assertIn('작업 22 재개 요청을 접수', app.success[0].value)
+                post.side_effect = ApiError('상태가 변경됐거나 처리 조건이 충족되지 않았습니다. (HTTP 409)', 409)
+                next(n for n in app.number_input if n.label == '재개할 실패 작업 ID').set_value(23)
+                resume().click().run()
+                app.run()
+                self.assertIn('작업 23 재개 실패', app.error[0].value)
+                self.assertFalse(app.exception)
+                app.session_state.replay.close()
+
+    def test_inference_wait_is_not_shown_as_a_retry(self):
+        from control_panel import describe
+        waiting = {'status': 'RETRY_WAIT', 'currentStage': 'INFERENCE', 'consecutiveFailures': 0, 'models': [
+            {'modelKind': 'BINARY', 'status': 'WAITING', 'remoteStatus': 'RUNNING'},
+            {'modelKind': 'TYPE', 'status': 'WAITING', 'remoteStatus': 'ACCEPTED'}]}
+        line = describe(waiting)
+        self.assertIn('모델 추론 · 추론 결과 대기 (이진 계산 중, 유형 접수됨)', line)
+        self.assertNotIn('재시도', line.split('(RETRY_WAIT')[0])
+        self.assertIn('실패 후 재시도 대기 · 연속 실패 2회', describe(dict(waiting, consecutiveFailures=2)))
+        self.assertIn('Alert 구성 · 실행 중', describe({'status': 'RUNNING', 'currentStage': 'ALERTS'}))
+        self.assertIn('완료', describe({'status': 'COMPLETED', 'currentStage': 'COMPLETE'}))
+
     def test_upload_failure_never_triggers_analysis_or_next_day(self):
         control = Mock()
         control.upload.side_effect = RuntimeError('secret-url')
