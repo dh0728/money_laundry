@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 import httpx
+import pyarrow as pa
 import pyarrow.parquet as pq
 import uvicorn
 
@@ -104,21 +105,30 @@ class InferenceServerTests(unittest.TestCase):
         self.http.server_close()
         self.thread.join(5)
 
-    def payload(self, kind="binary", targets=None, versions=None):
+    def payload(self, kind="binary", targets=None, versions=None, materials=False):
         versions = versions or dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
         request = Request(7, kind, **versions, run_id=str(uuid4()))
-        stream = io.BytesIO()
-        pq.write_table(build_targets([1, 99, 100]) if targets is None else targets, stream)
-        data = stream.getvalue()
-        key = "dev/" + request.inputs + "targets.parquet"
-        self.objects["/" + key] = data
+        tables = {"targets": build_targets([1, 99, 100]) if targets is None else targets}
+        if materials:
+            # Same shape the backend sends with every model input (features/materials.py there).
+            tables["transactions"] = pa.table({"tx_id": pa.array([1, 2, 99, 100], pa.int64())})
+            tables["accounts"] = pa.table({"account_id": pa.array(["a", "b"]), "entity_type": pa.array(["Corporation", None])})
+        entries, urls = [], {}
+        for name, table in tables.items():
+            stream = io.BytesIO()
+            pq.write_table(table, stream)
+            data = stream.getvalue()
+            key = "dev/" + request.inputs + name + ".parquet"
+            self.objects["/" + key] = data
+            entries.append(descriptor(name, key, data))
+            urls[name] = self.base + key
         manifest = encode(dict(request.identity(), **request.versions(), target_row_count=3,
-                               files=[descriptor("targets", key, data)]))
+                               files=sorted(entries, key=lambda entry: entry["name"])))
         self.objects["/dev/" + request.manifest] = manifest
         return dict(request.identity(), **request.versions(),
                     manifest_sha256=hashlib.sha256(manifest).hexdigest(),
                     manifest_url=self.base + "dev/" + request.manifest,
-                    input_url=self.base + key,
+                    input_url=urls["targets"], **({"input_urls": urls} if materials else {}),
                     result_urls={name: self.base + "dev/" + request.output + name
                                  for name in ("scores.parquet", "result.json")})
 
@@ -170,6 +180,28 @@ class InferenceServerTests(unittest.TestCase):
                              calculate(targets, kind, model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)['p_laundering' if kind == 'binary' else 'p_3'].to_pylist())
             self.assertNotIn("manifest_url", self.state(payload))
         self.assertEqual(len(self.events), 2)
+
+    def test_materials_bundle_is_downloaded_verified_and_scored(self):
+        payload = self.payload(materials=True)
+        self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+        self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
+        scores = pq.read_table(io.BytesIO(self.objects["/" + self.state(payload)["result"]["files"][0]["key"]]))
+        self.assertEqual(scores.column("tx_id").to_pylist(), [1, 99, 100])
+
+    def test_materials_urls_must_stay_in_request_scope_and_match_targets(self):
+        payload = self.payload(materials=True)
+        for change in ({"accounts": "http://169.254.169.254/latest/meta-data/"},
+                       {"targets": payload["input_urls"]["transactions"]},
+                       {"Bad Name": payload["input_urls"]["accounts"]}):
+            body = dict(payload, input_urls={**payload["input_urls"], **change})
+            with self.subTest(change=list(change)):
+                self.assertEqual(self.client.put(self.path(body), json=body, headers=self.headers).status_code, 422)
+
+    def test_manifest_and_request_must_list_the_same_files(self):
+        payload = self.payload(materials=True)
+        body = dict(payload, input_urls={k: v for k, v in payload["input_urls"].items() if k != "accounts"})
+        self.assertEqual(self.client.put(self.path(body), json=body, headers=self.headers).status_code, 202)
+        self.wait_for(lambda: self.state(body)["status"] == "FAILED")
 
     def test_unknown_request_answer_matches_backend_resend_rule(self):
         # The backend resends an unreceived request only on exactly this answer

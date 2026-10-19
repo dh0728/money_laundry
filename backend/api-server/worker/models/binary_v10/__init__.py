@@ -1,1 +1,1 @@
-"""Team binary GNN v10: cumulative transaction graph + entity categories -> laundering risk."""
+"""Team binary GNN v10: runs on the inference server; the backend sends targets and the materials."""

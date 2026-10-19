@@ -5,6 +5,7 @@ it in MODELS. The backend binds versions when a run starts; older packages stay 
 while their runs can still resume.
 """
 from common.worker_transport import ProtocolError
+from models.binary_v10 import model as binary_v10_model, spec as binary_v10_spec
 from models.demo_random import model as demo_model, spec as demo_spec
 
 
@@ -13,7 +14,8 @@ class ModelPackage:
         self.name, self.spec, self.model = name, spec, model
 
 
-MODELS = (ModelPackage("demo_random", demo_spec, demo_model),)
+MODELS = (ModelPackage("demo_random", demo_spec, demo_model),
+          ModelPackage("binary_v10", binary_v10_spec, binary_v10_model))
 
 
 def find(model_version, feature_version):

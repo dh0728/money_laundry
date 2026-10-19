@@ -124,8 +124,12 @@ class WorkerPipelineTests {
           .containsExactly("PUBLISH", "PUBLISH");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis.features where run_id=? and features->>'demo_value'=(tx_id%100)::text",
+                  "select count(*) from analysis.features where run_id=? and model_kind='TYPE' and features->>'demo_value'=(tx_id%100)::text",
                   Integer.class, run))
+          .isEqualTo(1);
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis.features where run_id=?", Integer.class, run))
           .isEqualTo(2);
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("FAILED");
@@ -192,14 +196,17 @@ class WorkerPipelineTests {
         """
         import sys
         sys.path.insert(0, %s)
-        from models.demo_random import build_input as pipeline
+        from models import registry
         from common.worker_transport import ProtocolError
+        pipeline = registry.default('TYPE').build_input
         original = pipeline.write_input
         calls = 0
+        # BINARY prepares first; with a shared input module TYPE is the second call.
+        fail_at = 2 if registry.default('BINARY').build_input is pipeline else 1
         def fail_type(source, output):
             global calls
             calls += 1
-            if calls == 2:
+            if calls == fail_at:
                 raise ProtocolError('injected second model failure')
             return original(source, output)
         pipeline.write_input = fail_type
@@ -248,7 +255,7 @@ class WorkerPipelineTests {
     executor.prepare(claim());
     String path =
         jdbc.queryForObject(
-            "select input_artifact->>'path' from analysis.model_tasks where run_id=? and model_kind='BINARY'",
+            "select input_artifact->'files'->0->>'path' from analysis.model_tasks where run_id=? and model_kind='BINARY'",
             String.class,
             run);
     Files.delete(storage.resolve("worker").resolve(path));
@@ -304,7 +311,8 @@ class WorkerPipelineTests {
         """
         import sys
         sys.path.insert(0, %s)
-        from models.demo_random import build_input as pipeline
+        from models import registry
+        pipeline = registry.default('BINARY').build_input
         def abandon(*args):
             raise SystemExit(74)
         pipeline.write_input = abandon
@@ -460,7 +468,9 @@ class WorkerPipelineTests {
         from models.demo_random.build_input import build_targets
         from tests.inference_peer import calculate
         from common.worker_transport import Request, descriptor
-        settings = model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
+        from models import registry
+        registry.DEFAULTS.update(BINARY=registry.DEMO_RANDOM, TYPE=registry.DEMO_RANDOM)  # peer plays the demo model
+        settings =model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
         os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)
         def result(request_id):
             with psycopg.connect(os.environ['WORKER_DB_URL'],user=os.environ['WORKER_DB_USER'],password=os.environ['WORKER_DB_PASSWORD']) as db:

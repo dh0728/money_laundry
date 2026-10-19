@@ -1,7 +1,9 @@
 """Model input preparation stage. Only persisted, fenced artifacts count as complete.
 
 Each model kind is bound to a model package (models/registry.py) when a run starts;
-the package's build_input writes that model's input file.
+the package's build_input writes the targets file. Every model input also carries the
+same model-independent materials (features/materials.py), so the files sent to the
+inference server do not change when a model or its features change.
 """
 import hashlib
 import json
@@ -14,6 +16,7 @@ import pyarrow.parquet as pq
 
 from common.frozen_input import FrozenInput, StaleExecution
 from common.worker_transport import ProtocolError
+from features.materials import MATERIALS, write_materials
 from models import registry
 
 MODEL_KINDS = ("BINARY", "TYPE")
@@ -48,6 +51,16 @@ def _lock(connection, execution):
     FrozenInput(connection, execution).check_current()
 
 
+def artifact_files(document):
+    """[(name, relative path, size, sha256)] of a prepared input; version 1 held only targets."""
+    if document.get("protocol_version") == 1:
+        return [("targets", document["path"], document["size_bytes"], document["sha256"])]
+    files = [(f["name"], f["path"], f["size_bytes"], f["sha256"]) for f in document["files"]]
+    if [name for name, *_ in files] != ["targets", *MATERIALS]:
+        raise ProtocolError("Unexpected prepared input files")
+    return files
+
+
 def _existing(connection, execution, root, kind, versions):
     row = connection.execute("""
         SELECT input_artifact FROM analysis.model_tasks
@@ -61,17 +74,25 @@ def _existing(connection, execution, root, kind, versions):
             or document.get("model_version") != versions[0]
             or document.get("feature_version") != versions[1]):
         raise ProtocolError("Stored input artifact identity mismatch")
-    path = (root / document["path"]).resolve()
-    if not path.is_relative_to(root) or not path.is_file():
-        raise ProtocolError("Stored input artifact missing")
-    if path.stat().st_size != document["size_bytes"] or _digest(path) != document["sha256"]:
-        raise ProtocolError("Stored input artifact changed")
+    for _, relative, size, digest in artifact_files(document):
+        path = (root / relative).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ProtocolError("Stored input artifact missing")
+        if path.stat().st_size != size or _digest(path) != digest:
+            raise ProtocolError("Stored input artifact changed")
     return document
 
 
 def _initialize(connection, execution, versions):
     with connection.transaction():
         _lock(connection, execution)
+        first = connection.execute("SELECT NOT EXISTS(SELECT 1 FROM analysis.model_tasks WHERE run_id=%s)",
+                                   (execution.run_id,)).fetchone()[0]
+        recommended = getattr(registry.require(*versions["BINARY"]).spec, "RECOMMENDED_THRESHOLD", None)
+        if first and recommended is not None:
+            # The suspicious threshold follows the bound binary model (user decision, 2026-10-17).
+            connection.execute("UPDATE analysis.jobs SET threshold_value=%s WHERE job_id=%s",
+                               (recommended, execution.job_id))
         for kind in MODEL_KINDS:
             binding = dict(mode="demo", model_version=versions[kind][0],
                            feature_version=versions[kind][1], input_contract_version=1)
@@ -169,13 +190,17 @@ def _prepare_model(connection, execution, root, kind, versions):
                 count = registry.require(*versions).build_input.write_input(source, stream)
                 stream.flush()
                 os.fsync(stream.fileno())
-            digest = _digest(temporary)
-            size = temporary.stat().st_size
             os.replace(temporary, output)
             temporary = None
-            artifact = dict(protocol_version=1, run_id=str(execution.run_id), model_kind=kind,
+            write_materials(source, output.parent)
+            files = []
+            for name in ("targets", *MATERIALS):
+                path = output.with_name(name + ".parquet")
+                files.append(dict(name=name, path=relative.with_name(path.name).as_posix(),
+                                  size_bytes=path.stat().st_size, sha256=_digest(path)))
+            artifact = dict(protocol_version=2, run_id=str(execution.run_id), model_kind=kind,
                             model_version=versions[0], feature_version=versions[1],
-                            path=relative.as_posix(), size_bytes=size, sha256=digest, row_count=count)
+                            files=files, row_count=count)
             _stage_features(connection, output)
             _save_prepared(connection, execution, kind, token, artifact)
         except Exception:
