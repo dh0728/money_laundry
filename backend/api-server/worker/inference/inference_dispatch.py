@@ -123,8 +123,10 @@ def _republish_unreceived(connection, execution, kind):
     """
     with connection.transaction():
         lock_stage(connection, execution)
-        return connection.execute('''UPDATE analysis.model_tasks SET phase='PUBLISH',status='READY',
-            consecutive_failures=0,error_code=NULL,action_required=false,retry_at=NULL,next_poll_at=NULL,
+        # RETRY_WAIT (due now), not READY: Spring defers an INFERENCE exit 76 only while a task is
+        # WAITING, RETRY_WAIT or ACTIVE, so READY here would fail the job instead of resending.
+        return connection.execute('''UPDATE analysis.model_tasks SET phase='PUBLISH',status='RETRY_WAIT',
+            consecutive_failures=0,error_code=NULL,action_required=false,retry_at=now(),next_poll_at=NULL,
             updated_at=now()
             WHERE run_id=%s AND model_kind=%s AND phase='WAIT_REMOTE' AND status='WAITING'
               AND remote_revision IS NULL AND remote_snapshot IS NULL''', (execution.run_id, kind)).rowcount == 1

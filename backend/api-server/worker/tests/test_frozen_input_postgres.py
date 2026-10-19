@@ -594,7 +594,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
             self.assertEqual(resent, [])
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='READY' AND NOT action_required", (self.run,)).fetchone()[0], 2)
+            # The exact condition under which Spring (PythonAnalysisExecutor) defers exit 76 instead of failing.
+            self.assertTrue(self.admin.execute("select count(*)=2 and count(*) filter(where status in ('WAITING','RETRY_WAIT','ACTIVE'))>0 from analysis.model_tasks where run_id=%s", (self.run,)).fetchone()[0])
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='RETRY_WAIT' AND retry_at<=now() AND NOT action_required", (self.run,)).fetchone()[0], 2)
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
             self.assertEqual({b['model_kind']: (b['request_id'], b['execution_round']) for b in resent}, first)
             self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 2)
