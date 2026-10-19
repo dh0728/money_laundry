@@ -602,6 +602,23 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 2)
             self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING' AND NOT action_required AND error_code IS NULL", (self.run,)).fetchone()[0], 2)
 
+    def test_rejected_submission_fails_visibly_instead_of_waiting(self):
+        import httpx
+        from inference.inference_dispatch import advance
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            def rejecting(request):
+                if json.loads(request.content)['model_kind'] == 'TYPE':
+                    # A conflict means the server already holds that request: keep waiting for it.
+                    return httpx.Response(409, json={'error': 'REQUEST_CONFLICT'})
+                return httpx.Response(422, json={'error': 'INVALID_REQUEST'})
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3,
+                                     transport=httpx.MockTransport(rejecting)), 76)
+            tasks = dict((r[0], r[1:]) for r in self.admin.execute(
+                "SELECT model_kind,phase,status,error_code,action_required FROM analysis.model_tasks WHERE run_id=%s", (self.run,)))
+            self.assertEqual(tasks['BINARY'], ('PUBLISH', 'FAILED', 'PUBLICATION_REJECTED_422', True))
+            self.assertEqual(tasks['TYPE'][:2], ('WAIT_REMOTE', 'WAITING'))
+
     def test_result_metadata_mismatch_cannot_schedule_collection(self):
         import httpx
         from inference.inference_dispatch import advance, observe_model

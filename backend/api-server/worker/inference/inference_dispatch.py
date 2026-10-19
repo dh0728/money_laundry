@@ -146,15 +146,21 @@ def _failure(connection, execution, kind, error):
         terminal = not transient or failures >= 3
         possibly_published = request_id is not None and connection.execute('''SELECT status='PUBLISHED'
             FROM analysis.model_requests WHERE request_id=%s AND execution_round=%s''', (request_id, round_id)).fetchone()[0]
+        # The server answering a submission with a definite rejection did not store it, so there is
+        # nothing remote to wait for. 409 means it holds that request; 404 on a submission comes from a
+        # route or proxy, not the inference server, so both stay an unconfirmed wait.
+        status_code = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+        rejected = (phase == 'PUBLISH' and status_code is not None and 400 <= status_code < 500
+                    and status_code not in (404, 408, 409, 429))
         # An unconfirmed remote execution is never abandoned or retried as a new round.
-        waiting = phase == 'WAIT_REMOTE' or (terminal and possibly_published)
+        waiting = phase == 'WAIT_REMOTE' or (terminal and possibly_published and not rejected)
         connection.execute('''UPDATE analysis.model_tasks SET phase=%s,status=%s,execution_id=null,
             execution_owner=null,consecutive_failures=%s,action_required=%s,error_code=%s,
             retry_at=CASE WHEN %s THEN null ELSE now()+(%s * interval '1 second') END,
             next_poll_at=CASE WHEN %s THEN now()+(%s * interval '1 second') ELSE null END,updated_at=now()
             WHERE run_id=%s AND model_kind=%s''', (
                 'WAIT_REMOTE' if waiting else phase, 'WAITING' if waiting else 'FAILED' if terminal else 'RETRY_WAIT',
-                failures, terminal, 'REMOTE_OBSERVATION_FAILED' if waiting else 'PUBLICATION_FAILED',
+                failures, terminal, 'REMOTE_OBSERVATION_FAILED' if waiting else (f'PUBLICATION_REJECTED_{status_code}' if rejected else 'PUBLICATION_FAILED'),
                 waiting or terminal, 30 if failures == 1 else 120,
                 waiting, 30 if failures == 1 else 120, execution.run_id, kind))
 
