@@ -19,13 +19,13 @@
 
 ②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑨Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·점수 공통 검사·모델 오류 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
 
-### 라벨 독립 임시 추론
+### 모델과 임시 추론
 
-새 분석은 `demo-random-v1/demo-input-v1` 임시 변환기를 사용한다. 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
+새 분석의 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10)이다. 백엔드는 대상 `tx_id`와 재료(`features/materials.py`)만 보내고, 피처·2홉 그래프·점수는 추론 서버 `models/binary_v10`이 만든다. 새 실행의 첫 바인딩 때 `analysis.jobs.threshold_value`를 권장값 0.4338742792606354로 기록한다. 유형 모델은 `demo-random-v1/demo-input-v1` 임시 변환기다. 임시 변환기의 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
 
 - API와 추론 서버를 함께 배포한다. CSV를 다시 만들 필요는 없다.
 - 기존 일반 더미 바인딩은 유지한다. 삭제된 demo-labels 버전의 미완료 실행은 새 실행이 필요하며 완료 이력은 그대로 둔다.
-- 실제 모델 도입 시 계산기와 입력 피처를 모델 계약에 맞춰 교체한다. 요청·결과 전달과 검증 구조는 유지한다.
+- 모델을 바꿀 때는 등록표와 추론 서버 모델 폴더만 바꾼다. 요청·재료·결과 전달과 검증 구조는 유지한다.
 
 연결 범위는 입력 준비 → S3 게시 → 추론 API → 결과 수집/검증 → 점수 DB 저장이다.
 Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 점수 저장 다음 ALERTS에서
