@@ -105,9 +105,13 @@ class InferenceServerTests(unittest.TestCase):
         self.http.server_close()
         self.thread.join(5)
 
-    def payload(self, kind="binary", targets=None, versions=None, materials=False):
+    def payload(self, kind="binary", targets=None, versions=None, materials=False, retry_of=None):
         versions = versions or dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
-        request = Request(7, kind, **versions, run_id=str(uuid4()))
+        if retry_of is None:
+            request = Request(7, kind, **versions, run_id=str(uuid4()))
+        else:  # The next round of the same request, as the backend sends it after a resume.
+            request = Request(7, kind, retry_of["request_id"], retry_of["execution_round"] + 1,
+                              **versions, run_id=retry_of["run_id"])
         tables = {"targets": build_targets([1, 99, 100]) if targets is None else targets}
         if materials:
             # Same shape the backend sends with every model input (features/materials.py there).
@@ -312,22 +316,80 @@ class InferenceServerTests(unittest.TestCase):
         self.assertEqual(response.json()["cancellation_status"], "ALREADY_FINISHED")
         self.assertEqual(response.json()["result"], result)
 
-    def test_uncertain_restart_never_acknowledges_model_stopped(self):
-        payload = self.payload()
+    def crash_while_running(self, payload, orphan=False):
+        """Restart the server as after a crash in the middle of the model process."""
+        from inference_worker.inference_compute import hold_compute_lock
         service = self.app.state.service
         with service.mutex:
             service.submit(payload)
             with service.db:
                 service.db.execute("UPDATE requests SET status='RUNNING'")
+        directory = Path(self.temp.name).resolve() / payload["request_id"] / str(payload["execution_round"])
+        directory.mkdir(parents=True, exist_ok=True)
+        # A model process that outlived the server keeps its lock; a finished one released it.
+        lease = hold_compute_lock(directory)
+        if not orphan:
+            lease.close()
+            lease = None
         self.client.__exit__(None, None, None)
         self.app = create_app(self.settings)
         self.client = TestClient(self.app)
         self.client.__enter__()
+        return lease
+
+    def test_uncertain_restart_never_acknowledges_model_stopped(self):
+        payload = self.payload()
+        lease = self.crash_while_running(payload, orphan=True)
+        self.addCleanup(lease.close)
         self.assertEqual(self.state(payload)["error_code"], "RECOVERY_REQUIRED")
         response = self.client.put(self.path(payload) + "/cancellation", json=self.cancel(payload), headers=self.headers)
         self.assertEqual(response.status_code, 202)
         self.assertNotIn("cancellation_status", response.json())
         self.assertIsNone(self.app.state.service.process)
+        # A new round is refused while the old model process may still write results.
+        retry = self.payload(retry_of=payload)
+        self.assertEqual(self.client.put(self.path(retry), json=retry, headers=self.headers).status_code, 409)
+
+    def test_restart_confirms_a_gone_model_process_and_accepts_a_new_round(self):
+        payload = self.payload()
+        self.crash_while_running(payload)
+        self.assertEqual((self.state(payload)["status"], self.state(payload)["error_code"]), ("FAILED", "WORKER_SHUTDOWN"))
+        retry = self.payload(retry_of=payload)
+        self.assertEqual(self.client.put(self.path(retry), json=retry, headers=self.headers).status_code, 202)
+        self.wait_for(lambda: self.state(retry)["status"] == "COMPLETED")
+        self.assertEqual(self.state(payload)["status"], "FAILED")  # The old round stays as it ended.
+
+    def test_orphan_that_finishes_later_is_confirmed_without_a_restart(self):
+        payload = self.payload()
+        lease = self.crash_while_running(payload, orphan=True)
+        self.assertEqual(self.state(payload)["error_code"], "RECOVERY_REQUIRED")
+        lease.close()
+        self.wait_for(lambda: self.state(payload)["error_code"] == "WORKER_SHUTDOWN", timeout=15)
+        retry = self.payload(retry_of=payload)
+        self.assertEqual(self.client.put(self.path(retry), json=retry, headers=self.headers).status_code, 202)
+
+    @unittest.skipUnless(Path("/proc").is_dir(), "process lookup needs /proc")
+    def test_process_started_before_the_lock_is_found_by_its_command_line(self):
+        import subprocess, sys
+        from inference_worker.inference_compute import compute_running
+        directory = Path(self.temp.name).resolve() / "legacy"
+        directory.mkdir()
+        self.assertIs(compute_running(directory), False)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "inference_compute.py", str(directory)])
+        self.addCleanup(child.wait)
+        self.addCleanup(child.kill)
+        self.wait_for(lambda: compute_running(directory))
+
+    def test_model_process_holds_its_directory_lock(self):
+        from inference_worker.inference_compute import compute_running, hold_compute_lock
+        directory = Path(self.temp.name) / "lock-check"
+        directory.mkdir()
+        lease = hold_compute_lock(directory)
+        self.assertIs(compute_running(directory), True)
+        with self.assertRaises(OSError):
+            hold_compute_lock(directory)
+        lease.close()
+        self.assertIs(compute_running(directory), False)
 
     def test_tampered_manifest_fails_without_output_upload(self):
         payload = self.payload()

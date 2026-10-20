@@ -17,6 +17,9 @@ from common.model_contract import ModelExecutionError, retry_decision
 from common.worker_transport import encode
 
 
+RECHECK_SECONDS = 5  # How often an interrupted request's model process is looked for again.
+
+
 class Conflict(ValueError):
     pass
 
@@ -59,6 +62,7 @@ class InferenceService:
         self.engine = self.notifier = None
         self.lease = None
         self.db = None
+        self.recheck_at = 0.0
 
     def start(self):
         self.lease = (self.root / "worker.lock").open("a+b")
@@ -101,7 +105,9 @@ class InferenceService:
             # Do not assume an orphaned model process has stopped after a server crash.
             for row in self.db.execute("SELECT * FROM requests WHERE status IN ('RUNNING','CANCEL_REQUESTED')").fetchall():
                 self._finish((row["request_id"], row["round"]), "FAILED", error="RECOVERY_REQUIRED")
+            self._confirm_stopped()
             self.db.commit()
+            self.recheck_at = time.monotonic() + RECHECK_SECONDS
             self.engine = threading.Thread(target=self._run, name="inference-execution")
             self.notifier = threading.Thread(target=self._notify, name="inference-outbox")
             self.engine.start()
@@ -111,6 +117,21 @@ class InferenceService:
                 self.db.close()
             self.lease.close()
             raise
+
+    def _confirm_stopped(self):
+        """Close interrupted requests whose model process is confirmed gone.
+
+        Caller owns mutex/transaction. RECOVERY_REQUIRED becomes WORKER_SHUTDOWN (the same end
+        as a graceful shutdown), which lets the backend send a new round. A process that may
+        still be running keeps RECOVERY_REQUIRED and is checked again later.
+        """
+        from inference_worker.inference_compute import compute_running
+        for row in self.db.execute("""SELECT * FROM requests
+                WHERE status='FAILED' AND error='RECOVERY_REQUIRED'""").fetchall():
+            key = (row["request_id"], row["round"])
+            if compute_running(self.root / key[0] / str(key[1])) is False:
+                self._finish(key, "STOPPED" if row["cancel"] else "FAILED",
+                             error=None if row["cancel"] else "WORKER_SHUTDOWN")
 
     def _row(self, key):
         row = self.db.execute("SELECT * FROM requests WHERE request_id=? AND round=?", key).fetchone()
@@ -294,6 +315,10 @@ class InferenceService:
                         with self.db:
                             self._record_outcome(self.active, outcome)
                         self.process = self.active = None
+                if time.monotonic() >= self.recheck_at:
+                    with self.db:
+                        self._confirm_stopped()
+                    self.recheck_at = time.monotonic() + RECHECK_SECONDS
                 if self.process is None:
                     row = self.db.execute("""SELECT * FROM requests WHERE status='ACCEPTED'
                         OR (status='RETRY_WAIT' AND retry_at<=?) ORDER BY rowid LIMIT 1""", (time.time(),)).fetchone()
