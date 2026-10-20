@@ -229,6 +229,36 @@ public class AnalysisService {
                 id);
             return;
           }
+          // A model the inference server ended as failed is sent again as a new round of the
+          // same request, reusing the prepared input. The old round is closed so it no longer
+          // counts as unconfirmed; the other model's state is left as it is.
+          jdbc.update(
+              """
+              insert into analysis.model_requests(request_id,execution_round,run_id,model_kind,status)
+              select request_id,execution_round+1,run_id,model_kind,'REGISTERED' from analysis.model_tasks
+              where run_id=(select current_run_id from analysis.jobs where job_id=?)
+                and phase='WAIT_REMOTE' and status='FAILED'
+              on conflict do nothing
+              """,
+              id);
+          jdbc.update(
+              """
+              update analysis.model_requests m set status='ALREADY_FINISHED' from analysis.model_tasks t
+              where t.run_id=(select current_run_id from analysis.jobs where job_id=?)
+                and t.phase='WAIT_REMOTE' and t.status='FAILED' and m.request_id=t.request_id
+                and m.execution_round=t.execution_round and m.status in ('REGISTERED','PUBLISHED')
+              """,
+              id);
+          jdbc.update(
+              """
+              update analysis.model_tasks set phase='PUBLISH',status='READY',execution_round=execution_round+1,
+                remote_revision=null,remote_snapshot=null,remote_deadline_at=null,next_poll_at=null,
+                last_event_id=null,consecutive_failures=0,error_code=null,action_required=false,
+                retry_at=null,finished_at=null,updated_at=now()
+              where run_id=(select current_run_id from analysis.jobs where job_id=?)
+                and phase='WAIT_REMOTE' and status='FAILED'
+              """,
+              id);
           jdbc.update(
               """
               update analysis.model_tasks set status='READY',consecutive_failures=0,error_code=null,

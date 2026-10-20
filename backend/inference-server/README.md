@@ -53,7 +53,8 @@ python -B inference_server.py
 - 한 번에 하나만 실행한다. 같은 상태 폴더를 두 서버가 함께 열지 않는다.
 - `GET /health`가 `{"status":"UP"}`이면 정상이다. 외부에는 기존 HTTPS 프록시로만 노출한다.
 - 토큰을 명령 인수·커밋·채팅에 복사하지 않는다. DB 접속 정보나 AWS 장기 접근키는 필요 없다.
-- 서버를 내렸다 올릴 때는 실행 중인 모델을 멈춘 뒤 같은 상태 폴더로 올린다. 비정상 종료 뒤 `RECOVERY_REQUIRED`는 성공·중단 확인을 대신하지 않는다.
+- 서버를 내렸다 올릴 때는 실행 중인 모델을 멈춘 뒤 같은 상태 폴더로 올린다. 계산 도중 서버가 꺼졌다 다시 켜지면 그 요청은 `RECOVERY_REQUIRED`가 된다. 계산 프로세스는 요청 폴더의 `compute.lock`을 잡고 있으므로, 서버는 그 잠금이 풀린 것(프로세스 종료)을 확인하면 `WORKER_SHUTDOWN` 실패로 바꾼다(기동 때와 5초마다). 그 뒤에만 백엔드가 같은 요청의 다음 회차를 보낼 수 있다.
+- 터미널을 닫아도 서버가 꺼지지 않게 띄운다. 예: `set -a; . ./.env; set +a; setsid nohup .venv/bin/python -B inference_server.py >> <로그 폴더>/server.log 2>&1 < /dev/null &`. 파드가 재시작되면 다시 띄워야 한다.
 - 개발 백엔드는 이 서버만 쓴다(`deploy/split/README.md`의 `dev_inference_target`). 서버가 꺼져 있으면 개발 분석은 추론 단계에서 기다린다.
 
 ## 로컬 데모

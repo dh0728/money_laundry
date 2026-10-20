@@ -502,12 +502,14 @@ class FrozenInputPostgresTests(unittest.TestCase):
         import httpx
         from common.worker_transport import Request
         bodies, states = {}, {}
+        self.submissions = []
         def remote(req):
             key = req.url.path.split('/')[-3]
             if req.method == 'PUT':
                 bodies[key] = json.loads(req.content)
+                self.submissions.append(req.url.path)
             body = bodies[key]
-            status, revision = states.get(body['model_kind'], ('RUNNING', 1))
+            status, revision, *error = states.get(body['model_kind'], ('RUNNING', 1))
             response = {**body, 'status': status, 'revision': revision}
             if status == 'COMPLETED':
                 logical = Request(body['job_id'], body['model_kind'].lower(), body['request_id'],
@@ -528,7 +530,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 response['result'] = dict(logical.identity(), **logical.versions(), status='COMPLETED',
                     row_count=len(self.ids), files=[descriptor('scores', key, stream.getvalue())])
             elif status == 'FAILED':
-                response['error_code'] = 'GPU_OUT_OF_MEMORY'
+                response['error_code'] = error[0] if error else 'GPU_OUT_OF_MEMORY'
             return httpx.Response(202 if req.method == 'PUT' else 200, json=response)
         return httpx.MockTransport(remote), states
 
@@ -562,6 +564,45 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 77)
             self.assertEqual(self.admin.execute("SELECT phase FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], 'DONE')
+
+    def test_interrupted_round_waits_for_confirmation_then_resumes_as_a_new_round(self):
+        from inference.inference_dispatch import advance
+        task = "SELECT phase,status,error_code,action_required,execution_round FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'"
+        requests = "SELECT execution_round,status FROM analysis.model_requests WHERE run_id=%s AND model_kind='BINARY' ORDER BY execution_round"
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            remote, states = self.inference_remote(s3)
+            advance(self.admin, self.execution, root, settings, s3, transport=remote)
+            # A server crash may leave the model process running: keep observing, keep the round open.
+            states['BINARY'] = ('FAILED', 2, 'RECOVERY_REQUIRED')
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual(self.admin.execute(task, (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING', 'RECOVERY_REQUIRED', True, 1))
+            self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'PUBLISHED')])
+            # Once the server confirms the process gone, the round ends and is no longer unconfirmed.
+            states.update(BINARY=('FAILED', 3, 'WORKER_SHUTDOWN'), TYPE=('COMPLETED', 2))
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 77)
+            self.assertEqual(self.admin.execute(task, (self.run,)).fetchone(), ('WAIT_REMOTE', 'FAILED', 'WORKER_SHUTDOWN', True, 1))
+            self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'ALREADY_FINISHED')])
+            # The state Spring's resume leaves (AnalysisService.resume): round 2 of the same request.
+            self.admin.execute("""INSERT INTO analysis.model_requests(request_id,execution_round,run_id,model_kind,status)
+                SELECT request_id,execution_round+1,run_id,model_kind,'REGISTERED' FROM analysis.model_tasks
+                WHERE run_id=%s AND model_kind='BINARY'""", (self.run,))
+            self.admin.execute("""UPDATE analysis.model_tasks SET phase='PUBLISH',status='READY',execution_round=2,
+                remote_revision=null,remote_snapshot=null,remote_deadline_at=null,next_poll_at=null,
+                error_code=null,action_required=false WHERE run_id=%s AND model_kind='BINARY'""", (self.run,))
+            states['BINARY'] = ('RUNNING', 1)
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            binary = [path for path in self.submissions if path.endswith('/rounds/2')]
+            self.assertEqual(len(binary), 1)
+            self.assertIn(self.admin.execute("SELECT request_id::text FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone()[0], binary[0])
+            self.assertTrue(any('/rounds/2/' in key for key in s3.objects))
+            states['BINARY'] = ('COMPLETED', 2)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+            self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'ALREADY_FINISHED'), (2, 'PUBLISHED')])
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED'", (self.run,)).fetchone()[0], 2)
 
     def test_observation_revision_fences_conflicts_and_deadline_does_not_restart_model(self):
         from inference.inference_dispatch import advance, observe_model

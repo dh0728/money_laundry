@@ -33,6 +33,59 @@ def atomic_json(path, document):
     temporary.replace(path)
 
 
+COMPUTE_LOCK = "compute.lock"
+
+
+def _try_lock(stream):
+    if os.name == "nt":
+        import msvcrt
+        stream.seek(0)
+        msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def hold_compute_lock(directory):
+    """Held by the model process for its whole life, so a restarted server can tell it is gone."""
+    stream = (directory / COMPUTE_LOCK).open("a+b")
+    _try_lock(stream)
+    return stream
+
+
+def compute_running(directory):
+    """Whether a model process still works in this request directory.
+
+    True while one holds the lock, False once none does. A process started before the lock
+    existed is looked up by its command line where /proc exists; elsewhere None (unknown).
+    """
+    path = directory / COMPUTE_LOCK
+    if path.exists():
+        with path.open("a+b") as stream:
+            try:
+                _try_lock(stream)
+            except OSError:
+                return True
+            if os.name == "nt":
+                import msvcrt
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+        return False
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return None
+    marker = str(directory)
+    for entry in proc.iterdir():
+        try:
+            command = (entry / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        arguments = [part.decode(errors="replace") for part in command]
+        if any(part.endswith("inference_compute.py") for part in arguments) and marker in arguments:
+            return True
+    return False
+
+
 def request_from(document):
     return Request(document["job_id"], document["model_kind"].lower(),
                    document["request_id"], document["execution_round"],
@@ -126,24 +179,28 @@ def execute(directory):
 
 def main(directory):
     directory = Path(directory)
+    # Held until the outcome is written, so a restarted server can tell this process is gone.
+    lease = hold_compute_lock(directory)
     try:
-        result = execute(directory)
-        outcome = dict(status="COMPLETED", result=result)
-    except ModelExecutionError as error:
-        outcome = model_failure(error)
-    except httpx.HTTPStatusError as error:
-        code = error.response.status_code
-        outcome = dict(status="FAILED", error_code=(
-            "TRANSFER_ACCESS_DENIED" if code in (401, 403) else
-            "TRANSFER_UNAVAILABLE" if code in (408, 429) or code >= 500 else
-            "INPUT_OR_MODEL_INVALID"))
-    except httpx.HTTPError:
-        outcome = dict(status="FAILED", error_code="TRANSFER_UNAVAILABLE")
-    except Exception:
-        # Never persist model exceptions or signed URLs in publicly returned state.
-        outcome = dict(status="FAILED", error_code="INPUT_OR_MODEL_INVALID", retryable=False)
-    atomic_json(directory / "outcome.json", outcome)
-
+        try:
+            result = execute(directory)
+            outcome = dict(status="COMPLETED", result=result)
+        except ModelExecutionError as error:
+            outcome = model_failure(error)
+        except httpx.HTTPStatusError as error:
+            code = error.response.status_code
+            outcome = dict(status="FAILED", error_code=(
+                "TRANSFER_ACCESS_DENIED" if code in (401, 403) else
+                "TRANSFER_UNAVAILABLE" if code in (408, 429) or code >= 500 else
+                "INPUT_OR_MODEL_INVALID"))
+        except httpx.HTTPError:
+            outcome = dict(status="FAILED", error_code="TRANSFER_UNAVAILABLE")
+        except Exception:
+            # Never persist model exceptions or signed URLs in publicly returned state.
+            outcome = dict(status="FAILED", error_code="INPUT_OR_MODEL_INVALID", retryable=False)
+        atomic_json(directory / "outcome.json", outcome)
+    finally:
+        lease.close()
 
 if __name__ == "__main__":
     main(sys.argv[1])

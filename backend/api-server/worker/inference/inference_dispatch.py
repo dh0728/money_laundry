@@ -43,7 +43,7 @@ def normalize(request, view, prefix, expected_rows):
         code = view.get('error_code')
         known = set(MODEL_ERRORS) | {'TRANSFER_UNAVAILABLE', 'TRANSFER_ACCESS_DENIED',
             'INPUT_OR_MODEL_INVALID', 'MODEL_PROCESS_FAILED', 'MODEL_PROTOCOL_INVALID',
-            'MODEL_PROCESS_UNAVAILABLE', 'RECOVERY_REQUIRED'}
+            'MODEL_PROCESS_UNAVAILABLE', 'RECOVERY_REQUIRED', 'WORKER_SHUTDOWN'}
         normalized['error_code'] = code if isinstance(code, str) and code in known else 'REMOTE_EXECUTION_FAILED'
     return normalized
 
@@ -90,8 +90,11 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
         if stored[2:] != ('WAIT_REMOTE', 'WAITING'):
             return
         remote = view['status']
+        # After a server crash the model process may still run; keep observing until the
+        # server confirms it gone (WORKER_SHUTDOWN) instead of ending the round here.
+        ended = remote in ('FAILED', 'STOPPED') and view.get('error_code') != 'RECOVERY_REQUIRED'
         phase, status = ('COLLECT', 'READY') if remote == 'COMPLETED' else (
-            ('WAIT_REMOTE', 'FAILED') if remote in ('FAILED', 'STOPPED') else ('WAIT_REMOTE', 'WAITING'))
+            ('WAIT_REMOTE', 'FAILED') if ended else ('WAIT_REMOTE', 'WAITING'))
         connection.execute('''UPDATE analysis.model_tasks SET phase=%s,status=%s,remote_revision=%s,
             remote_snapshot=%s::jsonb,consecutive_failures=0,retry_at=null,
             error_code=%s,action_required=%s,updated_at=now(),
@@ -99,6 +102,11 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
             WHERE run_id=%s AND model_kind=%s''', (phase, status, view['revision'], encode(view).decode(),
                 view.get('error_code') if remote in ('FAILED', 'STOPPED', 'RECOVERY_REQUIRED') else None,
                 remote in ('FAILED', 'STOPPED', 'RECOVERY_REQUIRED'), status, execution.run_id, kind))
+        if ended:
+            # The server ended this round; it no longer counts as unconfirmed (demo reset, cancellation).
+            connection.execute('''UPDATE analysis.model_requests SET status=%s
+                WHERE request_id=%s AND execution_round=%s AND status IN ('REGISTERED','PUBLISHED')''',
+                ('STOPPED' if remote == 'STOPPED' else 'ALREADY_FINISHED', request_id, round_id))
         if status == 'WAITING':
             connection.execute('''UPDATE analysis.model_tasks SET action_required=true,
                 error_code=coalesce(error_code,'REMOTE_WAIT_EXPIRED')

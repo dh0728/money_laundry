@@ -422,6 +422,56 @@ class WorkerPipelineTests {
   }
 
   @Test
+  void resume_sends_a_model_the_inference_server_failed_as_a_new_round() {
+    executor("worker/analysis_entry.py").prepare(claim());
+    UUID request = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis.model_requests(request_id,execution_round,run_id,model_kind,status) values(?,1,?,'BINARY','PUBLISHED')",
+        request,
+        run);
+    jdbc.update(
+        """
+        update analysis.model_tasks set phase='WAIT_REMOTE',status='FAILED',request_id=?,execution_round=1,
+          remote_revision=3,remote_snapshot='{"status":"FAILED"}'::jsonb,remote_deadline_at=now(),
+          error_code='WORKER_SHUTDOWN',action_required=true
+        where run_id=? and model_kind='BINARY'
+        """,
+        request,
+        run);
+    var type =
+        jdbc.queryForMap(
+            "select phase,status,request_id from analysis.model_tasks where run_id=? and model_kind='TYPE'",
+            run);
+    jdbc.update(
+        "update analysis.jobs set status='FAILED',current_stage='INFERENCE' where job_id=?", job);
+    service.resume(job);
+    assertThat(
+            jdbc.queryForList(
+                "select execution_round||':'||status from analysis.model_requests where request_id=? order by execution_round",
+                String.class,
+                request))
+        .containsExactly("1:ALREADY_FINISHED", "2:REGISTERED");
+    assertThat(
+            jdbc.queryForMap(
+                "select phase,status,execution_round,remote_revision,remote_snapshot,remote_deadline_at,error_code,action_required from analysis.model_tasks where run_id=? and model_kind='BINARY'",
+                run))
+        .containsEntry("phase", "PUBLISH")
+        .containsEntry("status", "READY")
+        .containsEntry("execution_round", 2)
+        .containsEntry("remote_revision", null)
+        .containsEntry("remote_snapshot", null)
+        .containsEntry("remote_deadline_at", null)
+        .containsEntry("error_code", null)
+        .containsEntry("action_required", false);
+    assertThat(
+            jdbc.queryForMap(
+                "select phase,status,request_id from analysis.model_tasks where run_id=? and model_kind='TYPE'",
+                run))
+        .isEqualTo(type);
+    assertThat(service.job(job).status()).isEqualTo("QUEUED");
+  }
+
+  @Test
   void invalid_collected_scores_expose_the_documented_failure_code() throws Exception {
     var features = claim();
     executor("worker/analysis_entry.py").prepare(features);
