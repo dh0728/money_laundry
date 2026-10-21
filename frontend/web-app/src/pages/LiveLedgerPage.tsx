@@ -9,8 +9,6 @@ import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { useAsync } from '@/lib/useAsync'
 
-const emptyPage = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
-
 function Pager({ page, total, onChange }: { page: number; total: number; onChange: (page: number) => void }) {
   return <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>전체 {total.toLocaleString('ko-KR')}건 · {page + 1}쪽</span><div className="flex gap-1"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => onChange(page - 1)}>이전</Button><Button variant="outline" size="sm" disabled={(page + 1) * 20 >= total} onClick={() => onChange(page + 1)}>다음</Button></div></div>
 }
@@ -30,9 +28,9 @@ export default function LiveLedgerPage({ onOpen }: { onOpen?: (kind: 'ALERT' | '
   const base = { from: from || undefined, to: to || undefined, judgement, payments, query: search, directions }
   const formats = useAsync(fetchPaymentFormats, [], { key: 'payment-formats' })
   const owners = useAsync(() => fetchLedgerOwners({ ...base, page: ownerPage }), [from, to, judgement, payments, search, directions, ownerPage], { key: 'ledger/owners' })
-  const accounts = useAsync(() => owner ? fetchLedgerAccounts({ ...base, page: accountPage }, owner) : Promise.resolve(emptyPage), [from, to, judgement, payments, search, directions, owner, accountPage], { key: 'ledger/accounts' })
-  const transactions = useAsync(() => account ? fetchLedgerTransactions({ ...base, page: transactionPage }, account) : Promise.resolve(emptyPage), [from, to, judgement, payments, search, directions, account, transactionPage], { key: 'ledger/transactions' })
-  const chooseOwner = (id: string) => { setOwner(id); setAccount(null); setAccountPage(0); setTransactionPage(0) }
+  const accounts = useAsync(() => fetchLedgerAccounts({ ...base, page: accountPage }, owner ?? undefined), [from, to, judgement, payments, search, directions, owner, accountPage], { key: 'ledger/accounts' })
+  const transactions = useAsync(() => fetchLedgerTransactions({ ...base, page: transactionPage }, account ?? undefined, account ? undefined : owner ?? undefined), [from, to, judgement, payments, search, directions, owner, account, transactionPage], { key: 'ledger/transactions' })
+  const chooseOwner = (id: string | undefined) => { setOwner(id ?? null); setAccount(null); setAccountPage(0); setTransactionPage(0) }
   const chooseAccount = (id: string) => { setAccount(id); setTransactionPage(0) }
   const index: TransactionIndex = {
     owners: owners.state.status === 'success' ? owners.state.data.content.map(row => ({ id: row.id, name: row.name ?? '소유주 미상', accountIds: [], transactionIds: [] })) : [],
@@ -55,7 +53,7 @@ export default function LiveLedgerPage({ onOpen }: { onOpen?: (kind: 'ALERT' | '
       onOpenEpisode: onOpen ? id => onOpen('EPISODE', id) : undefined,
       query: search, onQuery: setSearch,
       owner: owner ?? undefined, account: account ?? undefined,
-      selectOwner: chooseOwner, selectAccount: id => { if (id) chooseAccount(id); else setAccount(null) },
+      selectOwner: chooseOwner, selectAccount: id => { if (id) chooseAccount(id); else { setAccount(null); setTransactionPage(0) } },
       range: from ? { from: new Date(`${from}T00:00:00`), to: to ? new Date(`${to}T00:00:00`) : undefined } : undefined,
       filters,
       changeControls: (range, next) => {

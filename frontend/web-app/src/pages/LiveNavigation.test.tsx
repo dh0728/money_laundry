@@ -32,7 +32,7 @@ it('actual live pages share the chosen range and preserve the owner/account and 
     detection: { received: 0, analyzed: 0, suspicious: 0 }, deliveryDate: '', pendingReports: 0,
     daily: [], agreements: [], types: [], activities: [], priority: [],
     episodeWork: { current: { unreviewed: 0 }, firstReview: { average_seconds: null }, completion: { average_seconds: null } } })
-  owners.mockResolvedValue(page([{ id: 'owner-one' }]))
+  owners.mockResolvedValue(page([{ id: 'owner-one', name: 'owner-one' }]))
   accounts.mockResolvedValue(page([{ id: 'account-one', ownerId: 'owner-one', bankId: 12 }]))
   transactions.mockResolvedValue(page([])); cases.mockResolvedValue(page([]))
   render(<NuqsAdapter><WorkspaceProvider><Screens /></WorkspaceProvider></NuqsAdapter>)
@@ -42,7 +42,7 @@ it('actual live pages share the chosen range and preserve the owner/account and 
   fireEvent.click(screen.getByRole('button', { name: 'ledger' }))
   fireEvent.click(await screen.findByRole('button', { name: /owner-one/ }))
   fireEvent.click(await screen.findByRole('button', { name: /account-one/ }))
-  await waitFor(() => expect(transactions).toHaveBeenCalled())
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.anything(), 'account-one', undefined))
   expect(owners).toHaveBeenLastCalledWith(expect.objectContaining({ from: '2023-09-01', to: '2023-09-10' }))
   for (const tab of ['alerts', 'episodes']) {
     fireEvent.click(screen.getByRole('button', { name: tab }))
@@ -52,11 +52,13 @@ it('actual live pages share the chosen range and preserve the owner/account and 
   expect(screen.getByRole('button', { name: /owner-one/ })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByRole('button', { name: /account-one/ })).toHaveAttribute('aria-pressed', 'true')
   expect(owners).toHaveBeenCalledTimes(1)
-  expect(accounts).toHaveBeenCalledTimes(1)
-  expect(transactions).toHaveBeenCalledTimes(1)
+  // Initial unfiltered, then owner-scoped/account-scoped requests; return uses cache.
+  expect(accounts).toHaveBeenCalledTimes(2)
+  expect(transactions).toHaveBeenCalledTimes(3)
   fireEvent.click(screen.getByRole('button', { name: 'dashboard' }))
   expect(screen.getByText('오늘 유입 Alert')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '기간 2023-09-01' })).toBeInTheDocument()
-  expect(dashboard).toHaveBeenCalledTimes(2)
+  // Keep the fe/work dashboard contract while checking the restored range.
+  expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10')
   expect(clock).toHaveBeenCalledTimes(1)
 })

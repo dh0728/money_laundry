@@ -39,12 +39,12 @@ const moneyAmount = (value: number) => Number(value).toLocaleString('ko-KR')
 const moneyPercent = (value: number | null) => value == null ? '산출 불가' : `${value.toFixed(1)}%`
 
 function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshList }: { caseId: number; kind: ReviewKind; onBack: () => void; onOpenEpisode: (id: number) => void; onOpenAlert?: (id: number) => void; refreshList: () => Promise<unknown> }) {
-  const [tab, setTab] = useState<'overview' | 'graph' | 'transactions' | 'review'>('overview')
+  const [tab, setTab] = useViewState<'overview' | 'graph' | 'transactions' | 'review'>(`case/${kind}/${caseId}/tab`, 'overview')
   const user = useCurrentUser()
   const detail = useAsync(() => fetchReviewCase(caseId), [caseId], { key: 'case/detail', maxAge: 60_000 })
   const { state, retry, refresh } = detail
   const [verdict, setVerdict] = useState<AlertVerdict>('normal')
-  const [comment, setComment] = useState('')
+  const [comment, setComment] = useViewState(`case/${kind}/${caseId}/comment`, '')
   const [excludeComment, setExcludeComment] = useState('')
   const [unlinkComment, setUnlinkComment] = useState('')
   const [selectingAlerts, setSelectingAlerts] = useState(false)

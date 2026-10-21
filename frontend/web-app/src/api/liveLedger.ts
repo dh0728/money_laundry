@@ -56,6 +56,6 @@ function query(filters: LedgerFilters, selection?: { owner?: string; account?: s
 }
 
 export const fetchLedgerOwners = (filters: LedgerFilters) => getJson<Page<LedgerOwner>>(`/api/v1/ledger/owners?${query(filters)}`)
-export const fetchLedgerAccounts = (filters: LedgerFilters, owner: string) => getJson<Page<LedgerAccount>>(`/api/v1/ledger/accounts?${query(filters, { owner })}`)
-export const fetchLedgerTransactions = (filters: LedgerFilters, account: string) => getJson<Page<LedgerTransaction>>(`/api/v1/ledger/transactions?${query(filters, { account })}`)
+export const fetchLedgerAccounts = (filters: LedgerFilters, owner?: string) => getJson<Page<LedgerAccount>>(`/api/v1/ledger/accounts?${query(filters, { owner })}`)
+export const fetchLedgerTransactions = (filters: LedgerFilters, account?: string, owner?: string) => getJson<Page<LedgerTransaction>>(`/api/v1/ledger/transactions?${query(filters, { account, owner })}`)
 export const fetchPaymentFormats = () => getJson<string[]>('/api/v1/review/payment-formats')

@@ -1,5 +1,6 @@
 import { NuqsAdapter } from 'nuqs/adapters/react'
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
+import { WorkspaceProvider } from '@/lib/WorkspaceProvider'
 import { fireEvent, render as testingRender, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveCasesPage from './LiveCasesPage'
@@ -40,6 +41,32 @@ const choose = async (label: string, option: string) => {
   fireEvent.click(await screen.findByRole('option', { name: option }))
 }
 const showTab = async (label: string) => fireEvent.mouseDown(await screen.findByRole('tab', { name: new RegExp(label) }), { button: 0, ctrlKey: false })
+
+it('같은 로그인 workspace에서 목록을 거쳐 같은 사건으로 돌아오면 검토 탭과 미제출 의견을 보존한다', async () => {
+  function Journey() {
+    const [caseId, setCaseId] = useState<number | undefined>(1)
+    return <WorkspaceProvider><LiveCasesPage kind="ALERT" caseId={caseId} onOpen={setCaseId} onBack={() => setCaseId(undefined)} /></WorkspaceProvider>
+  }
+  render(<Journey />)
+  await showTab('검토 의견')
+  fireEvent.change(await screen.findByLabelText('변경 사유'), { target: { value: '미제출 의견 — 목록 확인 뒤 계속 검토' } })
+  fireEvent.click(screen.getByRole('button', { name: '목록으로' }))
+  fireEvent.click(await screen.findByText('A-3001', { exact: true }))
+  expect(await screen.findByRole('tab', { name: /검토 의견/ })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByLabelText('변경 사유')).toHaveValue('미제출 의견 — 목록 확인 뒤 계속 검토')
+  expect(submitReviewCommand).not.toHaveBeenCalled()
+})
+
+it('기존 의견 저장이 409이면 의견을 유지하고 자동 재제출하지 않는다', async () => {
+  submitReviewCommand.mockRejectedValueOnce(new ApiError({ type: 'about:blank', title: 'Conflict', status: 409, code: 'INVALID_TRANSITION' }))
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  await showTab('검토 의견')
+  fireEvent.change(await screen.findByLabelText('변경 사유'), { target: { value: '충돌 뒤에도 보존할 미제출 의견' } })
+  fireEvent.click(screen.getByRole('button', { name: '의견 저장' }))
+  await waitFor(() => expect(fetchReviewCase).toHaveBeenCalledTimes(2))
+  expect(screen.getByLabelText('변경 사유')).toHaveValue('충돌 뒤에도 보존할 미제출 의견')
+  expect(submitReviewCommand).toHaveBeenCalledTimes(1)
+})
 
 const episodeCase = (count: number) => alertCase(50, 0, {
   kind: 'EPISODE', alertId: null, revision: 7,

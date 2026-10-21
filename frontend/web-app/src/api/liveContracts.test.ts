@@ -4,6 +4,16 @@ import { fetchLedgerAccounts, fetchLedgerOwners, fetchLedgerTransactions } from 
 
 beforeEach(() => vi.restoreAllMocks())
 
+it('선택이 없으면 owner/account를 생략하고 소유주만 선택하면 거래 owner 필터만 전달한다', async () => {
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response('{}')))
+  await fetchLedgerAccounts({ page: 0 })
+  await fetchLedgerTransactions({ page: 0 })
+  await fetchLedgerTransactions({ page: 0 }, undefined, 'owner-uuid')
+  const urls = fetcher.mock.calls.map(([url]) => new URL(String(url), 'http://local'))
+  for (const url of urls.slice(0, 2)) { expect(url.searchParams.has('owner')).toBe(false); expect(url.searchParams.has('account')).toBe(false) }
+  expect(urls[2].searchParams.get('owner')).toBe('owner-uuid'); expect(urls[2].searchParams.has('account')).toBe(false)
+})
+
 it('대시보드는 필수 기간을 최신 경로로 보낸다', async () => {
   const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
   await fetchLiveDashboard('2026-09-01', '2026-09-28')

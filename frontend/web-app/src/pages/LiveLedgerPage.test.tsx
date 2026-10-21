@@ -1,9 +1,36 @@
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import LiveLedgerPage from './LiveLedgerPage'
 const { owners, accounts, transactions } = vi.hoisted(() => ({ owners: vi.fn(), accounts: vi.fn(), transactions: vi.fn() }))
 vi.mock('@/api/liveLedger', () => ({ fetchLedgerOwners: owners, fetchLedgerAccounts: accounts, fetchLedgerTransactions: transactions, fetchPaymentFormats: async () => [] }))
 const page = (content: unknown[]) => ({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 })
+beforeEach(() => vi.clearAllMocks())
+it('선택 전 계좌·거래 첫 페이지를 요청하고 기존 세 단계 안에 바로 표시한다', async () => {
+  owners.mockResolvedValue(page([{ id: 'owner-a', name: '검수 소유주 A' }]))
+  accounts.mockResolvedValue(page([{ id: 'account-a', ownerId: 'owner-a', bankId: 1 }]))
+  transactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2026-10-21T10:00:00+09:00', fromAccountId: 'account-a', toAccountId: 'account-b', fromOwnerName: '검수 소유주 A', toOwnerName: '검수 소유주 B', amountPaid: 100, amountUsd: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', isSuspicious: null, alertIds: [], episodeIds: [] }]))
+  render(<LiveLedgerPage />)
+  expect(await within(screen.getByTestId('account-section')).findByText('account-a')).toBeInTheDocument()
+  expect(await within(screen.getByTestId('transaction-section')).findByText('101')).toBeInTheDocument()
+  expect(accounts).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }), undefined)
+  expect(transactions).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }), undefined, undefined)
+  expect(within(screen.getByTestId('transaction-section')).queryByText('송금')).not.toBeInTheDocument()
+  expect(within(screen.getByTestId('transaction-section')).queryByText('수취')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /검수 소유주 A/ }))
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.anything(), undefined, 'owner-a'))
+  fireEvent.click(within(screen.getByTestId('account-section')).getByRole('button', { name: /account-a/ }))
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.anything(), 'account-a', undefined))
+  fireEvent.click(within(screen.getByTestId('account-section')).getByRole('button', { name: /account-a/ }))
+  expect(within(screen.getByTestId('account-section')).getByRole('button', { name: /account-a/ })).toHaveAttribute('aria-pressed', 'false')
+  expect(transactions).toHaveBeenCalledWith(expect.anything(), undefined, 'owner-a')
+  expect(within(screen.getByTestId('transaction-section')).getByText('101')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /검수 소유주 A/ }))
+  expect(transactions).toHaveBeenCalledWith(expect.anything(), undefined, undefined)
+  expect(screen.getByTestId('owner-item')).toHaveAttribute('aria-pressed', 'false')
+  fireEvent.change(screen.getByRole('textbox', { name: '거래 내역 검색' }), { target: { value: '101' } })
+  expect(await within(screen.getByTestId('transaction-section')).findByText('101')).toBeInTheDocument()
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.objectContaining({ query: '101', page: 0 }), undefined, undefined))
+})
 it('소유주 이름을 표시하되 계좌 조회에는 원래 소유주 ID를 전달한다', async () => {
   owners.mockResolvedValue(page([{ id: 'owner-uuid', name: '김민준#00001' }]))
   accounts.mockResolvedValue(page([{ id: 'account-a', ownerId: 'owner-uuid', ownerName: '김민준#00001', bankId: 1 }]))
