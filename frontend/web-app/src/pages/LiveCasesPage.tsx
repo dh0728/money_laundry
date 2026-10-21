@@ -635,7 +635,6 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       <div className="flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('COMMENT')}>의견 저장</Button><Button size="sm" variant="outline" disabled={!editable || busy} onClick={() => void execute('REVIEW_START')}>검토 시작 기록</Button><Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'NORMAL')}>선택 범위 정상 판정</Button>{item.kind === 'EPISODE' && <Button size="sm" disabled={!editable || busy || !activeSelections.length} onClick={() => void execute('DECIDE', 'SUSPICIOUS')}>선택 범위 이상 판정</Button>}{item.kind === 'EPISODE' && <Button size="sm" variant="outline" disabled={!editable || busy || item.pendingCount > 0} onClick={() => void execute('CLOSE')}>사건 종결</Button>}{canRetry && <Button size="sm" variant="outline" disabled={busy} onClick={() => { const previous = previousRequest.current; if (previous) void submit(previous.command, previous.success) }}>같은 요청 재시도</Button>}</div>
       {item.kind === 'EPISODE' && item.pendingCount > 0 && <p className="text-xs text-muted-foreground">미판정 조사 대상 {item.pendingCount}건을 먼저 판정해야 사건을 종결할 수 있습니다.</p>}
 
-      {item.kind === 'EPISODE' && <div className="flex justify-end"><Button size="sm" disabled title="관리자 검수 절차 준비 중">관리자 검수 넘기기</Button></div>}
     </ReviewLayout>
     {item.outcome === 'DISSOLVED' && <p role="status" className="rounded-lg border p-3 text-sm">해체된 Episode입니다. 현재 소속 Alert는 없으며 해제 당시 구성과 사유는 아래 이력에 보존됩니다.</p>}
     <AlertDialog open={confirmUnlink} onOpenChange={setConfirmUnlink}><AlertDialogContent><AlertDialogHeader>
@@ -691,11 +690,13 @@ export default function LiveCasesPage({ kind, caseId, onOpen, onBack, onOpenEpis
     const requestId = previous.current?.payload === payload ? previous.current.id : crypto.randomUUID()
     previous.current = { payload, id: requestId }; busyRef.current = true; setBusy(true)
     try {
-      await submitReviewCommand(command, requestId)
+      const result = await submitReviewCommand(command, requestId)
       previous.current = null
       window.dispatchEvent(new Event('review-command-saved'))
       const refreshed = await Promise.allSettled([list.refresh(), targets.refresh()])
-      toast.success(refreshed.some(result => result.status === 'rejected') ? 'Episode 편입 완료. 저장은 완료됐지만 최신 화면을 불러오지 못했습니다. 다시 조회해 주세요.' : 'Episode 편입 완료')
+      const success = result.targetCaseId == null ? 'Episode 편입 완료' : `Episode E-${result.targetCaseId} 편입 완료`
+      toast.success(refreshed.some(result => result.status === 'rejected') ? `${success}. 저장은 완료됐지만 최신 화면을 불러오지 못했습니다. 다시 조회해 주세요.` : success)
+      if (result.targetCaseId != null) onOpenEpisode?.(result.targetCaseId)
     } catch (error) {
       if (error instanceof ApiError) { previous.current = null; toast.error(error.message) }
       else toast.error('처리 여부가 불확실합니다. 같은 선택·의견으로 다시 제출하면 동일 요청으로 확인합니다.')

@@ -304,7 +304,9 @@ it('Alert 조사 범위의 선택 거래를 EXCLUDE 명령으로 보낸다', asy
 })
 
 it('목록에서 미편입 OPEN Alert 두 개를 골라 새 Episode를 만든다', async () => {
-  render(<LiveCasesPage kind="ALERT" onOpen={vi.fn()} onBack={vi.fn()} />)
+  const onOpenEpisode = vi.fn()
+  submitReviewCommand.mockResolvedValue({ caseIds: [1, 2], targetCaseId: 80 })
+  render(<LiveCasesPage kind="ALERT" onOpen={vi.fn()} onBack={vi.fn()} onOpenEpisode={onOpenEpisode} />)
   await waitFor(() => expect(screen.getByRole('button', { name: 'Episode로 묶기' })).toBeEnabled())
   fireEvent.click(screen.getByRole('button', { name: 'Episode로 묶기' }))
   expect(await screen.findByLabelText('A-3001 선택')).toBeInTheDocument()
@@ -318,6 +320,8 @@ it('목록에서 미편입 OPEN Alert 두 개를 골라 새 Episode를 만든다
     action: 'TRANSFER', targetCaseId: null, comment: '두 Alert 연결',
     selections: [{ caseId: 1, revision: 1001, groupId: 0, txIds: [] }, { caseId: 2, revision: 1002, groupId: 0, txIds: [] }],
   })
+  await waitFor(() => expect(onOpenEpisode).toHaveBeenCalledWith(80))
+  expect(toastSuccess).toHaveBeenCalledWith('Episode E-80 편입 완료')
 })
 
 it('목록 편입 저장 후 재조회가 실패해도 저장 결과와 재조회 실패를 구분한다', async () => {
@@ -968,4 +972,13 @@ it('개요의 다른 사건 보존 판정에서 정확한 Episode 조사로 이�
   fireEvent.click(within(records).getByRole('button', { name: 'Episode E-50 보기' }))
   expect(onOpenEpisode).toHaveBeenCalledWith(50)
   expect(submitReviewCommand).not.toHaveBeenCalled()
+})
+
+
+it('Episode 검토에 폐기된 관리자 검수 단계를 표시하지 않는다', async () => {
+  fetchReviewCase.mockResolvedValue(episodeCase(2))
+  render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
+  await showTab('검토 의견')
+  expect(await screen.findByLabelText('변경 사유')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '관리자 검수 넘기기' })).not.toBeInTheDocument()
 })

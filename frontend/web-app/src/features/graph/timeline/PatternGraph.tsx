@@ -2,7 +2,7 @@
 // dev의 force 그래프(react-force-graph-2d, Obsidian 그래프와 같은 방식)로 계좌를 끌어 놀 수 있고,
 // 놓으면 천천히 템플릿 모양 쪽으로 돌아온다. `원래 패턴으로` = templateLayout(보내는 쪽 → 받는 쪽 층, 이웃 평균 높이)으로 즉시 복원.
 // 패턴 이름은 구조로 추정한 값(FE 제안)이고 모델 값이 아니다. 번호는 시간순 그래프와 같은 규칙(처음 나온 순서).
-import { lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react'
+import { Component, lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import { NODE_SIZE, templateLayout, type Timeline } from './timeLayout'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof import('react-force-graph-2d').default
@@ -21,6 +21,21 @@ const MERGE_COUNT = 6, MERGE_WIDTH = 24
 function resolveColor(name: string) {
   const el = document.createElement('span'); el.style.color = `var(${name})`; document.body.appendChild(el)
   const c = getComputedStyle(el).color; el.remove(); return c
+}
+
+function PatternLoading() {
+  return <p role="status" className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground">패턴 그래프를 불러오는 중…</p>
+}
+
+class PatternLoadBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() {
+    if (this.state.failed) return <div role="alert" className="absolute inset-0 flex items-center justify-center px-6 text-center">
+      <div><p className="text-sm font-medium">패턴 그래프를 불러오지 못했습니다.</p><p className="mt-2 text-xs text-muted-foreground">상단의 소유주 보기로 전환해 조사를 계속하거나 페이지를 새로고침해 주세요.</p></div>
+    </div>
+    return this.props.children
+  }
 }
 
 export default function PatternGraph({ g, selected, onSelect, onZoom, controls }: { g: Timeline; selected: PatternSelection; onSelect: (s: PatternSelection) => void; onZoom: (k: number) => void; controls: Ref<PatternControls> }) {
@@ -147,7 +162,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
 
   return <div ref={wrap} className="absolute inset-0" data-testid="pattern-graph" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onContextMenu={e => e.preventDefault()}>
     {box && <div className="pointer-events-none absolute z-10 border border-[var(--palette-blue-500)] bg-[var(--palette-blue-500)]/10" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
-    {size.w > 0 && <Suspense fallback={null}><ForceGraph2D<PNode, PLink> ref={fg} onRenderFramePre={() => { if (fg.current) configure(fg.current) }} width={size.w} height={size.h} graphData={data} backgroundColor="rgba(0,0,0,0)"
+    {size.w > 0 && <PatternLoadBoundary><Suspense fallback={<PatternLoading />}><ForceGraph2D<PNode, PLink> ref={fg} onRenderFramePre={() => { if (fg.current) configure(fg.current) }} width={size.w} height={size.h} graphData={data} backgroundColor="rgba(0,0,0,0)"
       warmupTicks={150} cooldownTicks={200} enableZoomInteraction={false} enablePanInteraction={false} enableNodeDrag onNodeHover={(n: PNode | null) => { hover.current = n }}
       nodeRelSize={R} nodeVal={1} nodeLabel="" linkLabel=""
       linkCurvature="curvature" linkWidth={(l: PLink) => selected?.type === 'link' && selected.id === l.pair ? l.width + 2 : l.width}
@@ -172,6 +187,6 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
       nodePointerAreaPaint={(n: PNode, color: string, ctx: CanvasRenderingContext2D) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(n.x ?? 0, n.y ?? 0, R + 4, 0, Math.PI * 2); ctx.fill() }}
       onLinkClick={(l: PLink) => { if (!justDragged.current) onSelect({ type: 'link', id: l.pair }) }}
       onZoom={({ k }: { k: number }) => { if (Math.abs(k - lastK.current) < 0.004) return; lastK.current = k; setTimeout(() => onZoom(k), 0) }}
-      onEngineStop={() => { if (!fitted.current && fg.current) { fitted.current = true; fg.current.zoomToFit(0, 100); fg.current.zoom(Math.min(2.5, Math.max(0.85, fg.current.zoom())), 0) } }} /></Suspense>}
+      onEngineStop={() => { if (!fitted.current && fg.current) { fitted.current = true; fg.current.zoomToFit(0, 100); fg.current.zoom(Math.min(2.5, Math.max(0.85, fg.current.zoom())), 0) } }} /></Suspense></PatternLoadBoundary>}
   </div>
 }
