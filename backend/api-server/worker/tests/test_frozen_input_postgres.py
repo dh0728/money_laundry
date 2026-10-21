@@ -329,14 +329,14 @@ class FrozenInputPostgresTests(unittest.TestCase):
     def test_cancel_before_checkpoint_does_not_complete_stage(self):
         from features import prepare_features as pipeline
         original_save = pipeline._save_prepared
-        def cancel_then_save(connection, execution, kind, token, document):
+        def cancel_then_save(connection, execution, kind, token, document, *stage):
             # Commit on another connection after the file and staging rows exist.
             # Cancelling inside the writer's own transaction would roll back the
             # cancellation itself and would not exercise a real correction race.
             with self.psycopg.connect(**self.connect_args) as other:
                 other.execute("UPDATE analysis.runs SET status='CANCELLED' WHERE run_id=%s",
                               (self.run,))
-            original_save(connection, execution, kind, token, document)
+            original_save(connection, execution, kind, token, document, *stage)
         with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
             with patch.object(pipeline, "_save_prepared", side_effect=cancel_then_save):
                 with self.assertRaises(StaleExecution):
@@ -357,11 +357,11 @@ class FrozenInputPostgresTests(unittest.TestCase):
         from features import prepare_features as pipeline
         original_save = pipeline._save_prepared
         new_token = uuid4()
-        def replace_then_save(connection, execution, kind, token, document):
+        def replace_then_save(connection, execution, kind, token, document, *stage):
             with self.psycopg.connect(**self.connect_args) as other:
                 other.execute("UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s",
                               (new_token, self.job))
-            original_save(connection, execution, kind, token, document)
+            original_save(connection, execution, kind, token, document, *stage)
         with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
             with patch.object(pipeline, "_save_prepared", side_effect=replace_then_save):
                 with self.assertRaises(StaleExecution):
@@ -502,12 +502,13 @@ class FrozenInputPostgresTests(unittest.TestCase):
         import httpx
         from common.worker_transport import Request
         bodies, states = {}, {}
-        self.submissions = []
+        self.submissions, self.put_bodies = [], []
         def remote(req):
             key = req.url.path.split('/')[-3]
             if req.method == 'PUT':
                 bodies[key] = json.loads(req.content)
                 self.submissions.append(req.url.path)
+                self.put_bodies.append(bodies[key])
             body = bodies[key]
             status, revision, *error = states.get(body['model_kind'], ('RUNNING', 1))
             response = {**body, 'status': status, 'revision': revision}
@@ -603,6 +604,122 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
             self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'ALREADY_FINISHED'), (2, 'PUBLISHED')])
             self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED'", (self.run,)).fetchone()[0], 2)
+
+    LEDGER_COLUMNS = ("occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,"
+                      "from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,"
+                      "payment_currency,payment_format,amount_usd,fx_rate_version")
+
+    def ledger_positions(self):
+        """Ledger positions a<b<c<d (self.seq): the CONTEXT row opened at a, an earlier run at b,
+        one transaction (returned) in the ledger from a until c, and this run with its TARGETs at d."""
+        cols = self.LEDGER_COLUMNS
+        self.seq = [self.admin.execute("SELECT nextval('analysis.input_seq')").fetchone()[0] for _ in range(4)]
+        a, b, c, d = self.seq
+        self.admin.execute("UPDATE analysis.runs SET input_seq=%s WHERE run_id=%s", (d, self.run))
+        self.admin.execute(f"""INSERT INTO analysis.input_ledger(tx_id,valid_from_seq,valid_to_seq,{cols})
+            SELECT tx_id,CASE WHEN input_role='TARGET' THEN %s ELSE %s END,NULL,{cols}
+            FROM analysis.input_transactions WHERE run_id=%s""", (d, a, self.run))
+        gone = self.admin.execute("""INSERT INTO ledger.transactions(occurred_at,from_account_id,to_account_id,
+              amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,
+              fx_rate_version,business_date)
+            SELECT occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,
+              payment_currency,payment_format,amount_usd,fx_rate_version,business_date
+            FROM ledger.transactions WHERE tx_id=%s RETURNING tx_id""", (self.ids[0],)).fetchone()[0]
+        self.admin.execute(f"""INSERT INTO analysis.input_ledger(tx_id,valid_from_seq,valid_to_seq,{cols})
+            SELECT %s,%s,%s,{cols} FROM analysis.input_transactions WHERE run_id=%s AND input_role='CONTEXT'""",
+                           (gone, a, c, self.run))
+        return gone
+
+    def frozen_rows(self):
+        return self.admin.execute("SELECT count(*) FROM analysis.run_inputs WHERE run_id=%s", (self.run,)).fetchone()[0]
+
+    def no_received_runs(self):
+        # Runs share one database across tests; earlier tests' runs must not look received.
+        self.admin.execute("UPDATE analysis.model_tasks SET remote_revision=NULL WHERE run_id<>%s", (self.run,))
+
+    def received_previous_run(self):
+        """An earlier run at position b whose request the inference server received."""
+        previous = uuid4()
+        self.admin.execute("INSERT INTO analysis.runs(run_id,job_id,status,input_seq) VALUES(%s,%s,'COMPLETED',%s)",
+                           (previous, self.job, self.seq[1]))
+        self.admin.execute("""INSERT INTO analysis.model_tasks(run_id,model_kind,phase,status,binding,remote_revision)
+            VALUES(%s,'BINARY','DONE','SUCCEEDED','{}'::jsonb,2)""", (previous,))
+
+    def test_ledger_copy_gets_only_what_changed_since_the_last_received_run(self):
+        gone = self.ledger_positions()
+        self.received_previous_run()
+        with tempfile.TemporaryDirectory(prefix='aml-replica-input-') as root:
+            result = json.loads(prepare_features(self.admin, self.execution, root))
+            for model in result['models'].values():
+                self.assertEqual((model['protocol_version'], model['replica']), (3, dict(mode='delta', base_seq=self.seq[1], seq=self.seq[3], rows=self.frozen_rows())))
+                self.assertEqual([f['name'] for f in model['files']], ['targets', 'transactions', 'accounts', 'removed'])
+                changed = pq.read_table(Path(root) / input_path(model, 'transactions'))
+                self.assertEqual(changed.column('tx_id').to_pylist(), sorted(self.ids))  # not the unchanged CONTEXT
+                self.assertEqual(set(changed.column('input_role').to_pylist()), {'TARGET'})
+                self.assertEqual(changed.schema, materials.TRANSACTIONS)
+                parties = set(changed.column('from_account_id').to_pylist()) | set(changed.column('to_account_id').to_pylist())
+                self.assertEqual(set(pq.read_table(Path(root) / input_path(model, 'accounts')).column('account_id').to_pylist()), parties)
+                self.assertEqual(pq.read_table(Path(root) / input_path(model, 'removed')).column('tx_id').to_pylist(), [gone])
+
+    def test_first_run_sends_the_whole_frozen_input_for_the_copy(self):
+        self.ledger_positions()
+        self.no_received_runs()
+        with tempfile.TemporaryDirectory(prefix='aml-replica-input-') as root:
+            result = json.loads(prepare_features(self.admin, self.execution, root))
+            model = result['models']['BINARY']
+            self.assertEqual(model['replica'], dict(mode='full', base_seq=0, seq=self.seq[3], rows=self.frozen_rows()))
+            # The whole frozen input (the ledger is shared, so earlier tests' rows count too).
+            self.assertEqual(len(pq.read_table(Path(root) / input_path(model, 'transactions'))), self.frozen_rows())
+            self.assertEqual(pq.read_table(Path(root) / input_path(model, 'removed')).num_rows, 0)
+
+    def test_server_copy_mismatch_resends_that_model_in_full_as_the_next_round(self):
+        from inference.inference_dispatch import advance
+        task = "SELECT phase,status,execution_round,error_code,action_required FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'"
+        requests = "SELECT execution_round,status FROM analysis.model_requests WHERE run_id=%s AND model_kind='BINARY' ORDER BY status"
+        self.ledger_positions()
+        self.received_previous_run()
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            remote, states = self.inference_remote(s3)
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual({b['replica']['mode'] for b in self.put_bodies}, {'delta'})
+            self.assertEqual({tuple(sorted(b['input_urls'])) for b in self.put_bodies}, {('accounts', 'removed', 'targets', 'transactions')})
+            states['BINARY'] = ('FAILED', 2, 'REPLICA_MISMATCH')
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual(self.admin.execute(task, (self.run,)).fetchone(), ('PREPARE', 'RETRY_WAIT', 1, 'REPLICA_MISMATCH', False))
+            self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'ALREADY_FINISHED'), (1, 'REGISTERED')])
+            states['BINARY'] = ('RUNNING', 1)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            resent = self.put_bodies[-1]
+            first = next(b for b in self.put_bodies if b['model_kind'] == 'BINARY')
+            self.assertEqual((resent['model_kind'], resent['execution_round'], resent['replica']),
+                             ('BINARY', 1, dict(mode='full', base_seq=0, seq=self.seq[3], rows=self.frozen_rows())))
+            self.assertNotEqual(resent['request_id'], first['request_id'])  # new input files, new request
+            self.assertEqual(self.admin.execute(task, (self.run,)).fetchone()[:3], ('WAIT_REMOTE', 'WAITING', 1))
+            key = next(k for k in s3.objects if resent['request_id'] in k and k.endswith('transactions.parquet'))
+            self.assertEqual(len(pq.read_table(io.BytesIO(s3.objects[key]))), self.frozen_rows())
+            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+            self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'ALREADY_FINISHED'), (1, 'PUBLISHED')])
+
+    def test_a_refused_full_input_fails_visibly_instead_of_resending_forever(self):
+        from inference.inference_dispatch import advance
+        self.ledger_positions()
+        self.no_received_runs()
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.publication_setup(root)
+            remote, states = self.inference_remote(s3)
+            advance(self.admin, self.execution, root, settings, s3, transport=remote)
+            self.assertEqual({b['replica']['mode'] for b in self.put_bodies}, {'full'})
+            states['BINARY'] = ('FAILED', 2, 'REPLICA_MISMATCH')
+            self.make_observations_due()
+            advance(self.admin, self.execution, root, settings, s3, transport=remote)
+            self.assertEqual(self.admin.execute("SELECT phase,status,error_code,action_required FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(),
+                             ('WAIT_REMOTE', 'FAILED', 'REPLICA_MISMATCH', True))
+            self.assertEqual(len(self.put_bodies), 2)
 
     def test_observation_revision_fences_conflicts_and_deadline_does_not_restart_model(self):
         from inference.inference_dispatch import advance, observe_model

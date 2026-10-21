@@ -19,6 +19,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from inference_worker.model_adapter import run_model
+from inference_worker.replica import Replica, ReplicaMismatch
 from common.model_contract import ModelExecutionError, model_failure
 from common.worker_transport import Request, ProtocolError, decode, encode, descriptor, tx_ids
 from models import registry
@@ -153,6 +154,12 @@ def execute(directory):
             ids = tx_ids(inputs["targets"])
             if type(manifest.get("target_row_count")) is not int or len(ids) != manifest["target_row_count"]:
                 raise ProtocolError("TARGET count mismatch")
+            if "replica" in payload:
+                # The files bring the server's ledger copy to the run's position; the model reads
+                # the whole frozen input from the copy, exactly as the full files would carry it.
+                with Replica(payload["replica_dir"]).locked() as replica:
+                    replica.apply(payload["replica"], inputs)
+                    inputs = replica.inputs(inputs["targets"])
             scores = run_model(inputs, request.model_kind, **request.versions())
             try:
                 registry.require(**request.versions()).model.validate_scores(
@@ -195,12 +202,15 @@ def main(directory):
                 "INPUT_OR_MODEL_INVALID"))
         except httpx.HTTPError:
             outcome = dict(status="FAILED", error_code="TRANSFER_UNAVAILABLE")
+        except ReplicaMismatch:
+            outcome = dict(status="FAILED", error_code="REPLICA_MISMATCH")
         except Exception:
             # Never persist model exceptions or signed URLs in publicly returned state.
             outcome = dict(status="FAILED", error_code="INPUT_OR_MODEL_INVALID", retryable=False)
         atomic_json(directory / "outcome.json", outcome)
     finally:
         lease.close()
+
 
 if __name__ == "__main__":
     main(sys.argv[1])

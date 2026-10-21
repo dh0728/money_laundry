@@ -158,7 +158,9 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
                         name: signed('get_object', request.inputs + path.name)
                         for name, (path, *_) in prepared.items()}}),
                     result_urls={name: signed('put_object', request.output + name)
-                                 for name in ('scores.parquet', 'result.json')})
+                                 for name in ('scores.parquet', 'result.json')},
+                    # Ledger copy position: the inference server applies these files to its copy.
+                    **({'replica': artifact['replica']} if 'replica' in artifact else {}))
         with connection.transaction():
             lock_stage(connection, execution)
             owned = connection.execute('''SELECT execution_id FROM analysis.model_tasks

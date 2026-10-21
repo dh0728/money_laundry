@@ -22,6 +22,16 @@
 
 대상 ID만 쓰는 모델은 `calculate(targets, ...)`, 재료를 쓰는 모델은 `calculate_inputs(inputs, ...)`를 정의한다(`MODEL_CONTRACT.md`).
 
+### 원장 사본(요청의 `replica`)
+
+추론 서버는 백엔드 고정 입력 장부의 사본을 상태 폴더 `replica/`에 Parquet으로 둔다(`inference_worker/replica.py`). 백엔드는 매일 바뀐 거래만 보내고, 모델은 지금처럼 그날의 고정 입력 전체(`transactions`, `accounts`)를 사본에서 받는다. 그래서 보내는 양은 하루치로 일정하고 점수는 전체를 보낼 때와 같다.
+
+- 요청의 `replica`: `{"mode": "full"|"delta", "base_seq": 정수, "seq": 정수}`. `seq`는 그 실행의 장부 위치(`analysis.runs.input_seq`)다.
+- `full`(`base_seq` 0): 첫 실행이나 다시 맞출 때. `transactions`·`accounts`가 고정 입력 전체이고 `removed`는 비어 있다. 사본을 통째로 바꾼다.
+- `delta`: `base_seq` 이후 새로 생기거나 바뀐 거래와 그 거래의 계좌, 그 사이 장부에서 빠진 거래 ID(`removed`)만 온다. 사본이 정확히 `base_seq`에 있을 때만 반영하고, 아니면 `REPLICA_MISMATCH`로 끝낸다. 백엔드는 이 답을 받으면 그 모델만 전체 입력을 새 요청으로 다시 보낸다. 같은 실행의 다른 모델이 이미 그 위치를 반영했으면 그대로 쓴다.
+- 사본이 지워지거나 깨져도 다음 요청이 `REPLICA_MISMATCH` → 전체 재전송으로 다시 만든다. 같은 상태 폴더는 한 서버만 쓴다.
+- 전체 재전송 파일은 누적 이력만큼 크다. 파일당 입력 한도는 `INFERENCE_MAX_INPUT_BYTES`(기본 256MB)로 조정한다.
+
 ## 등록된 모델
 
 | 폴더 | 버전(모델 / 피처) | 쓰는 곳 |
@@ -49,6 +59,7 @@ python -B inference_server.py
 | `INFERENCE_BIND` / `INFERENCE_PORT` | 기본 `127.0.0.1` / `8090`. 앞단 HTTPS 프록시 연결 방식에 맞게 지정 |
 | `BINARY_V10_DEVICE` | v10 실행 장치. 기본 `cpu`, GPU면 `cuda` |
 | `BINARY_V10_THREADS` / `BINARY_V10_MEMORY_LIMIT` | v10 전처리(DuckDB)·CPU 연산 스레드 수와 DuckDB 메모리 한도. 기본 `2` / `2GB` |
+| `INFERENCE_MAX_INPUT_BYTES` | 입력 파일 하나의 최대 바이트. 기본 268435456(256MB). 원장 사본을 전체로 다시 만들 때 누적 이력이 이보다 크면 올린다 |
 
 - 한 번에 하나만 실행한다. 같은 상태 폴더를 두 서버가 함께 열지 않는다.
 - `GET /health`가 `{"status":"UP"}`이면 정상이다. 외부에는 기존 HTTPS 프록시로만 노출한다.

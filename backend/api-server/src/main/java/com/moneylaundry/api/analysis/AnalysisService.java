@@ -264,7 +264,7 @@ public class AnalysisService {
               update analysis.model_tasks set status='READY',consecutive_failures=0,error_code=null,
                 action_required=false,retry_at=null,updated_at=now()
               where run_id=(select current_run_id from analysis.jobs where job_id=?)
-                and phase in ('PUBLISH','COLLECT') and status='FAILED'
+                and phase in ('PREPARE','PUBLISH','COLLECT') and status='FAILED'
               """,
               id);
           jdbc.update(

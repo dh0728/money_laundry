@@ -112,9 +112,22 @@ def create_app(settings: Settings):
                 raise ValueError()
             allowed = {"contract_version", "job_id", "run_id", "model_kind", "request_id", "execution_round",
                        "model_version", "feature_version", "manifest_sha256", "manifest_url", "input_url", "result_urls"}
-            # input_urls (every input file by name) is optional so earlier single-file requests still work.
-            if set(body) - {"input_urls"} != allowed:
+            # input_urls (every input file by name) and replica are optional so earlier requests still work.
+            if set(body) - {"input_urls", "replica"} != allowed:
                 raise ValueError()
+            if "replica" in body:
+                # Ledger copy position: "full" replaces the copy (base_seq 0), "delta" applies the
+                # changes since base_seq and carries the tx_ids removed since then; rows is the
+                # number of transactions frozen at seq, checked before the copy is installed.
+                replica = body["replica"]
+                if (not isinstance(replica, dict) or set(replica) != {"mode", "base_seq", "seq", "rows"}
+                        or replica["mode"] not in ("full", "delta")
+                        or any(type(replica[key]) is not int for key in ("base_seq", "seq", "rows"))
+                        or replica["rows"] < 1
+                        or not 0 <= replica["base_seq"] < replica["seq"]
+                        or (replica["mode"] == "delta") != (replica["base_seq"] > 0)
+                        or set(body.get("input_urls", {})) != {"targets", "transactions", "accounts", "removed"}):
+                    raise ValueError()
             logical = request_from(body)
             check_url(body["manifest_url"], settings.object_base_url, logical.manifest)
             check_url(body["input_url"], settings.object_base_url, logical.inputs + "targets.parquet")
@@ -160,7 +173,9 @@ def main():
     import uvicorn
     settings = Settings(Path(os.environ["INFERENCE_STATE_DIR"]), os.environ["INFERENCE_TOKEN"],
                         os.environ["INFERENCE_OBJECT_BASE_URL"], os.environ.get("INFERENCE_CALLBACK_URL"),
-                        os.environ.get("INFERENCE_CALLBACK_TOKEN"))
+                        os.environ.get("INFERENCE_CALLBACK_TOKEN"),
+                        # A full input (first run or a rebuild of the ledger copy) grows with history.
+                        max_input_bytes=int(os.environ.get("INFERENCE_MAX_INPUT_BYTES", 256 * 1024 * 1024)))
     uvicorn.run(create_app(settings), host=os.environ.get("INFERENCE_BIND", "127.0.0.1"),
                 port=int(os.environ.get("INFERENCE_PORT", "8090")), workers=1, access_log=False)
 
