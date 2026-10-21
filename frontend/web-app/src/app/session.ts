@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { SessionUser } from '@/api/auth'
+import { fixture } from '@/lib/apiMode'
 
 export type Role = SessionUser['role']
 
@@ -21,11 +22,11 @@ export const MOCK_USER = {
   name: '오분석',
   role: 'STAFF' as Role,
   organization: '금융감독원',
-  email: 'reviewer@fss.or.kr',
+  email: 'demo@example.invalid',
   joinedAt: '2026. 08. 05',
 }
 
 export type CurrentUser = typeof MOCK_USER & { username?: string }
 export const CurrentUserContext = createContext<CurrentUser>(MOCK_USER)
 export const useCurrentUser = () => useContext(CurrentUserContext)
-export const canEditOpen = (user: CurrentUser, assigneeId: number, status: string) => user.role === 'STAFF' && user.userId === assigneeId && status === 'OPEN'
+export const canEditOpen = (user: CurrentUser, assigneeId: number, status: string) => !fixture && user.role === 'STAFF' && user.userId === assigneeId && status === 'OPEN'

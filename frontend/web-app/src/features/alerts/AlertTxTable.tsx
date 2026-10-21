@@ -15,13 +15,21 @@ import { formatMoney, type TransactionTarget } from '@/features/transactions/tra
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
 
 // Episode 거래는 어느 Alert에서 왔는지(alertId)를 함께 가진다
-export type TxRow = Pick<AlertTransaction, 'txId' | 'txAt' | 'amountPaid' | 'paymentCurrency' | 'paymentFormat' | 'fromAccount' | 'toAccount' | 'fromOwnerName' | 'toOwnerName'> & { role: string; launderingScore: number | null; alertId?: number; relabel?: TxRelabel; reviewLabel?: string }
+export type TxRow = Pick<AlertTransaction, 'txId' | 'txAt' | 'paymentCurrency' | 'paymentFormat' | 'fromAccount' | 'toAccount' | 'fromOwnerName' | 'toOwnerName'> & { amountPaid: number | string | null; role: string; launderingScore: number | null; alertId?: number; relabel?: TxRelabel; reviewLabel?: string }
 type Open = (target: TransactionTarget) => void
 
 const roleLabels: Record<string, string> = { SEED: '시작 거래', SUPPORTING: '연결 거래', PATH: '경로', PATTERN_MEMBER: '패턴 구성' }
 
 const header = (column: Column<TxRow, unknown>, label: string) => <DataTableColumnHeader column={column} label={label} className="px-2" />
 const tag = (text: string) => <Badge variant="outline" className="semantic-metadata-badge font-normal">{text}</Badge>
+const compareAmounts = (left: TxRow['amountPaid'], right: TxRow['amountPaid']) => {
+  const a = formatMoney(left, '', true).replaceAll(',', ''), b = formatMoney(right, '', true).replaceAll(',', '')
+  if (a === '금액 확인 불가' || b === '금액 확인 불가') return Number(a === '금액 확인 불가') - Number(b === '금액 확인 불가')
+  const [ai, af = ''] = a.split('.'), [bi, bf = ''] = b.split('.')
+  const scale = Math.max(af.length, bf.length)
+  const av = BigInt(`${ai}${af.padEnd(scale, '0')}`), bv = BigInt(`${bi}${bf.padEnd(scale, '0')}`)
+  return av < bv ? -1 : av > bv ? 1 : 0
+}
 
 function Shortcut({ label, target, onOpen, mono = false }: { label: string; target: TransactionTarget; onOpen: Open; mono?: boolean }) {
   const kind = target.type === 'transaction' ? '거래' : target.type === 'owner' ? '소유주' : '계좌'
@@ -37,11 +45,14 @@ function Shortcut({ label, target, onOpen, mono = false }: { label: string; targ
 const columnsFor = (onOpen: Open, remote: boolean): ColumnDef<TxRow>[] => [
   { accessorKey: 'txId', size: 116, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => remote ? <span className="px-1 font-mono">T-{row.original.txId}</span> : <Shortcut label={String(row.original.txId)} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={onOpen} mono /> },
   { accessorKey: 'txAt', size: 118, header: ({ column }) => header(column, '일시'), cell: ({ row }) => <span className="px-1 text-sm tabular-nums">{row.original.txAt.slice(5, 16).replace('T', ' ')}</span> },
-  { accessorKey: 'amountPaid', size: 110, header: ({ column }) => header(column, '금액'), cell: ({ row }) => <div className="truncate px-1 text-right text-sm tabular-nums">{formatMoney(row.original.amountPaid, row.original.paymentCurrency)}</div> },
+  { accessorKey: 'amountPaid', size: 110, sortingFn: remote ? (a, b) => compareAmounts(a.original.amountPaid, b.original.amountPaid) : undefined, sortDescFirst: remote ? true : undefined, header: ({ column }) => header(column, '금액'), cell: ({ row }) => {
+    const amount = formatMoney(row.original.amountPaid, row.original.paymentCurrency, remote)
+    return <div title={amount} className="truncate px-1 text-right text-sm tabular-nums">{amount}</div>
+  } },
   { accessorKey: 'paymentFormat', size: 92, header: ({ column }) => header(column, '결제 수단'), cell: ({ row }) => <span className="px-1">{tag(row.original.paymentFormat)}</span> },
-  { accessorKey: 'fromOwnerName', size: 118, header: ({ column }) => header(column, '송금 소유주'), cell: ({ row }) => row.original.fromOwnerName ? <Shortcut label={row.original.fromOwnerName} target={{ type: 'owner', owner: row.original.fromOwnerName }} onOpen={onOpen} /> : '—' },
+  { accessorKey: 'fromOwnerName', size: 118, header: ({ column }) => header(column, '송금 소유주'), cell: ({ row }) => row.original.fromOwnerName ? remote ? <span title={row.original.fromOwnerName} className="block truncate px-1">{row.original.fromOwnerName}</span> : <Shortcut label={row.original.fromOwnerName} target={{ type: 'owner', owner: row.original.fromOwnerName }} onOpen={onOpen} /> : '—' },
   { accessorKey: 'fromAccount', size: 118, header: ({ column }) => header(column, '송금 계좌'), cell: ({ row }) => remote ? <span title={row.original.fromAccount} className="block truncate px-1 font-mono">{row.original.fromAccount}</span> : <Shortcut label={row.original.fromAccount} target={{ type: 'account', account: row.original.fromAccount }} onOpen={onOpen} mono /> },
-  { accessorKey: 'toOwnerName', size: 118, header: ({ column }) => header(column, '수취 소유주'), cell: ({ row }) => row.original.toOwnerName ? <Shortcut label={row.original.toOwnerName} target={{ type: 'owner', owner: row.original.toOwnerName }} onOpen={onOpen} /> : '—' },
+  { accessorKey: 'toOwnerName', size: 118, header: ({ column }) => header(column, '수취 소유주'), cell: ({ row }) => row.original.toOwnerName ? remote ? <span title={row.original.toOwnerName} className="block truncate px-1">{row.original.toOwnerName}</span> : <Shortcut label={row.original.toOwnerName} target={{ type: 'owner', owner: row.original.toOwnerName }} onOpen={onOpen} /> : '—' },
   { accessorKey: 'toAccount', size: 118, header: ({ column }) => header(column, '수취 계좌'), cell: ({ row }) => remote ? <span title={row.original.toAccount} className="block truncate px-1 font-mono">{row.original.toAccount}</span> : <Shortcut label={row.original.toAccount} target={{ type: 'account', account: row.original.toAccount }} onOpen={onOpen} mono /> },
   {
     accessorKey: 'launderingScore', size: 128, header: ({ column }) => header(column, '점수'),

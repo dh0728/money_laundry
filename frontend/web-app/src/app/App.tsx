@@ -3,7 +3,7 @@ import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
 import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
-import { live } from '@/lib/apiMode'
+import { fixture, live } from '@/lib/apiMode'
 import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import GlobalSearch from '@/features/search/GlobalSearch'
@@ -90,10 +90,11 @@ export default function App() {
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
   const [appFullscreen, setAppFullscreen] = useState(false)
   const [logout, setLogout] = useState(false)
-  const [user, setUser] = useState<CurrentUser | null>(live ? null : MOCK_USER)
-  const [restoring, setRestoring] = useState(live)
+  const [user, setUser] = useState<CurrentUser | null>(live && !fixture ? null : MOCK_USER)
+  const [restoring, setRestoring] = useState(live && !fixture)
   const [authMessage, setAuthMessage] = useState('')
   const [logoutError, setLogoutError] = useState('')
+  const resumeUserId = useRef<number | null>(null)
   const currentUser = user ?? MOCK_USER
   const fromSession = (session: SessionUser): CurrentUser => ({ ...MOCK_USER, userId: session.id, name: session.name, role: session.role, username: session.username, organization: '—', email: '—', joinedAt: '—' })
   const [agentOpen, setAgentOpen] = useState(false)
@@ -113,26 +114,29 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!live) return
+    if (!live || fixture) return
     let active = true
     restoreSession().then(session => { if (active) setUser(fromSession(session)) }).catch(error => {
       if (active && !(error instanceof ApiError && error.problem.status === 401)) setAuthMessage('서버에 연결하지 못했습니다. 다시 로그인해 주세요.')
     }).finally(() => { if (active) setRestoring(false) })
-    const expired = () => { setUser(null); setAuthMessage('로그인 시간이 만료됐습니다. 다시 로그인해 주세요.') }
+    const expired = () => { setUser(previous => { if (previous) resumeUserId.current = previous.userId; return null }); setAuthMessage('로그인 시간이 만료됐습니다. 다시 로그인해 주세요.') }
     window.addEventListener('auth-expired', expired)
     return () => { active = false; window.removeEventListener('auth-expired', expired) }
   }, [])
 
   async function signIn(username: string, password: string) {
-    if (!live) { setUser(MOCK_USER); go('dashboard'); return }
+    if (!live || fixture) { setUser(MOCK_USER); go('dashboard'); return }
     const session = await login(username, password)
-    setUser(fromSession(session)); setAuthMessage(''); go('dashboard')
+    setUser(fromSession(session)); setAuthMessage('')
+    if (resumeUserId.current !== session.id) go('dashboard')
+    resumeUserId.current = null
   }
 
   async function signOut() {
     try {
-      if (live) await logoutSession()
-      setUser(live ? null : MOCK_USER); setLogout(false); setLogoutError(''); go('dashboard')
+      if (live && !fixture) await logoutSession()
+      resumeUserId.current = null
+      setUser(live && !fixture ? null : MOCK_USER); setLogout(false); setLogoutError(''); go('dashboard')
     } catch {
       setLogoutError('로그아웃하지 못했습니다. 다시 시도해 주세요.')
     }
@@ -206,6 +210,7 @@ export default function App() {
         </SidebarSelection>
       </Sidebar>
       <SidebarInset className="flex h-svh min-w-0 flex-col overflow-hidden">
+        {fixture && <div role="status" className="shrink-0 border-b border-amber-500/50 bg-amber-500/15 px-4 py-2 text-center text-xs font-semibold text-amber-900 dark:text-amber-200">개발 전용 합성 데이터 · 실제 서버 로그인·조회·저장 미검증 · 저장 불가</div>}
         <header className="app-header z-40 grid h-15 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-4 min-[1100px]:gap-5 min-[1100px]:px-6">
           <div className="header-navigation flex min-w-0 items-center">
           <SidebarTrigger className="size-9 rounded-full md:hidden" aria-label="메뉴 열기" />
@@ -228,7 +233,7 @@ export default function App() {
           </div>
         </header>
         <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
-          <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)}>
+          <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)} showWhileClockPending={page === 'dashboard'}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
             : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
@@ -245,7 +250,7 @@ export default function App() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>로그아웃할까요?</AlertDialogTitle>
-            <AlertDialogDescription>{live ? '현재 세션을 종료하고 로그인 화면으로 돌아갑니다.' : 'mock 시연 화면을 대시보드부터 다시 엽니다.'}</AlertDialogDescription>
+            <AlertDialogDescription>{live && !fixture ? '현재 세션을 종료하고 로그인 화면으로 돌아갑니다.' : '합성 데이터 화면을 대시보드부터 다시 엽니다.'}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>

@@ -54,7 +54,7 @@ export function PendingWorkCount({ routeKey }: { routeKey: string }) {
     if (live) {
       const clock = await fetchDemoClock()
       const to = kstDate(clock.businessAt)
-      return (await fetchLiveDashboard(daysBefore(to, 29), to)).personal.pending
+      return (await fetchLiveDashboard(daysBefore(to, 29), to)).investigation?.personal.pending
     }
     const alerts = await loadMockMyAlerts()
     if (currentScenario() === 'empty') return 0

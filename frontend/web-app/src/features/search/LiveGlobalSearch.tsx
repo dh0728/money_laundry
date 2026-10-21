@@ -16,23 +16,28 @@ export default function LiveGlobalSearch({ onNavigate }: { onNavigate: (page: Pa
     return () => clearTimeout(timer)
   }, [query])
   const result = useAsync(async () => {
-    const [alerts, episodes, notifications] = await Promise.all([
+    const [alerts, episodes, notifications] = await Promise.allSettled([
       fetchReviewCases({ kind: 'ALERT', query: search, size: 5 }),
       fetchReviewCases({ kind: 'EPISODE', query: search, size: 5 }),
       fetchNotifications('', '', search, 0),
     ])
-    return { alerts, episodes, notifications }
+    return {
+      alerts: alerts.status === 'fulfilled' ? alerts.value : null,
+      episodes: episodes.status === 'fulfilled' ? episodes.value : null,
+      notifications: notifications.status === 'fulfilled' ? notifications.value : null,
+      failed: [alerts.status === 'rejected' && 'Alert', episodes.status === 'rejected' && 'Episode', notifications.status === 'rejected' && '알림'].filter(Boolean).join('·'),
+    }
   }, [search], { key: 'global-search', enabled: !!search })
   const groups: ResultGroup[] = search === query.trim() && result.state.status === 'success' ? [
-    { id: 'alerts', label: 'Alert', items: result.state.data.alerts.content.map(row => ({
+    { id: 'alerts', label: 'Alert', items: (result.state.data.alerts?.content ?? []).map(row => ({
       key: `a-${row.caseId}`, primary: `A-${row.alertId}`, secondary: row.assigneeName,
       onSelect: () => onNavigate('alerts', row.caseId),
     })) },
-    { id: 'episodes', label: 'Episode', items: result.state.data.episodes.content.map(row => ({
+    { id: 'episodes', label: 'Episode', items: (result.state.data.episodes?.content ?? []).map(row => ({
       key: `e-${row.caseId}`, primary: `E-${row.caseId}`, secondary: row.assigneeName,
       onSelect: () => onNavigate('episodes', row.caseId),
     })) },
-    { id: 'notifications', label: '알림', items: result.state.data.notifications.content.slice(0, 5).map(row => ({
+    { id: 'notifications', label: '알림', items: (result.state.data.notifications?.content ?? []).slice(0, 5).map(row => ({
       key: row.id, primary: row.title, secondary: row.code,
       onSelect: () => { setNotificationSearch(search); onNavigate('notifications') },
     })) },
@@ -43,6 +48,8 @@ export default function LiveGlobalSearch({ onNavigate }: { onNavigate: (page: Pa
   }] })
   return <GlobalSearch onNavigate={onNavigate} remote={{
     groups, onQuery: setQuery, loading: query.trim() !== search || result.state.status === 'loading',
-    error: search === query.trim() && result.state.status === 'error' ? result.state.message : undefined,
+    error: search === query.trim() ? result.state.status === 'error' ? result.state.message
+      : result.state.status === 'success' && result.state.data.failed ? `${result.state.data.failed} 검색 실패 · 다시 시도할 수 있습니다.` : undefined : undefined,
+    onRetry: result.retry,
   }} />
 }

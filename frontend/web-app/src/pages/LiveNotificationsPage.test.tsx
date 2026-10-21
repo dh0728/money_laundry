@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveNotificationsPage from './LiveNotificationsPage'
+import { ApiError } from '@/api/common'
 import { fetchNotifications, fetchNotificationCases, setNotificationsRead, type WorkNotification } from '@/api/notifications'
 
 vi.mock('@/api/notifications', () => ({ fetchNotifications: vi.fn(), fetchNotificationCases: vi.fn(), setNotificationsRead: vi.fn() }))
@@ -29,6 +30,12 @@ it('읽음 실패는 성공으로 표시하거나 사건 이동하지 않는다'
   expect(await screen.findByRole('alert')).toHaveTextContent('읽음 상태를 변경하거나 확인하지 못했습니다')
   expect(open).not.toHaveBeenCalled()
   expect(fetchNotificationCases).not.toHaveBeenCalled()
+})
+it('알림 목록 403은 빈 결과가 아니라 권한 안내를 표시한다', async () => {
+  vi.mocked(fetchNotifications).mockRejectedValue(new ApiError({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'FORBIDDEN_ROLE' }))
+  render(<LiveNotificationsPage onOpen={vi.fn()} />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('이 알림을 조회할 권한이 없습니다.')
+  expect(screen.queryByText('표시할 알림이 없습니다.')).not.toBeInTheDocument()
 })
 it('검색과 기간을 서버에 전달하고 현재 페이지의 미확인 알림만 읽음 처리한다', async () => {
   render(<LiveNotificationsPage onOpen={vi.fn()} />)

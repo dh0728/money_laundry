@@ -70,7 +70,7 @@ export function PersonalView({ remote }: { remote?: { cards: [SectionCardItem, S
 
   return (
     <>
-      <div className={`grid grid-cols-1 items-stretch gap-4 @xl:grid-cols-2 @5xl:grid-cols-4 ${sectionCardSurface}`} data-testid="personal-top">
+      <div className={`grid grid-cols-1 items-stretch gap-4 @xl:grid-cols-2 @5xl:grid-cols-4 ${sectionCardSurface}`} data-testid="personal-top" data-wiring-id="dashboard.personal.top">
         <SectionCard item={remote?.cards[0] ?? { label: `위험 점수 ${formatScore(HIGH_RISK)} 이상`, value: fmt(pending.filter(alert => alert.riskScore >= HIGH_RISK).length), trend: '처리 전 Alert', note: '판정이 급한 고위험 건' }} />
         <SectionCard item={remote?.cards[1] ?? { label: `${STALE_DAYS}일 이상 경과`, value: fmt(stale.length), trend: `Alert ${stale.filter(item => item.kind === 'Alert').length} · Episode ${stale.filter(item => item.kind === 'Episode').length}`, note: '처리 전·처리 중 업무 중 오래 머문 건' }} />
         {remote?.summary ?? <PersonalAiSummary pending={pending} />}
@@ -79,12 +79,12 @@ export function PersonalView({ remote }: { remote?: { cards: [SectionCardItem, S
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="queue-title" className="text-base font-semibold tracking-tight">업무 현황</h2>
-            <p className="mt-1.5 text-xs text-muted-foreground">Alert·Episode 상태별 · {workSorts[sort].label}</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">Alert·Episode 상태별 · {remote ? '위험도순 서버 페이지' : workSorts[sort].label}</p>
           </div>
-          <Select disabled={Boolean(remote)} value={sort} onValueChange={value => setSort(value as WorkSort)}>
+          {remote ? <span className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground">위험도순 고정</span> : <Select value={sort} onValueChange={value => setSort(value as WorkSort)}>
             <SelectTrigger size="sm" className="w-40" aria-label="업무 정렬 기준"><SelectValue /></SelectTrigger>
             <SelectContent>{Object.entries(workSorts).map(([key, option]) => <SelectItem key={key} value={key}>{option.label}</SelectItem>)}</SelectContent>
-          </Select>
+          </Select>}
         </div>
         {remote?.queue ?? <WorkQueue columns={workStatuses.map(status => { const column = sortWork(items.filter(item => item.status === status), sort); return { status, count: column.length, content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> } })} />}
       </section>

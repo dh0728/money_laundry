@@ -1,10 +1,11 @@
-import type { ReviewCase, ReviewMember } from '@/api/liveReview'
+import type { ReviewApiMember, ReviewCase } from '@/api/liveReview'
 import type { GraphEdge, GraphModel, GraphNode, GraphTransaction } from './v24/model'
 
 const seoulMinute = (iso: string) => new Date(iso).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 16)
+const numeric = (value: unknown) => (typeof value !== 'number' && typeof value !== 'string') || !String(value).trim() || !Number.isFinite(Number(value)) ? Number.NaN : Number(value)
 
 export function toReviewGraphModel(item: ReviewCase): GraphModel {
-  const members = new Map<number, ReviewMember>()
+  const members = new Map<number, ReviewApiMember>()
   for (const group of item.groups ?? []) for (const member of group.members) {
     if (member.state === 'EXCLUDED' || member.state === 'TRANSFERRED') continue
     const previous = members.get(member.txId)
@@ -23,7 +24,7 @@ export function toReviewGraphModel(item: ReviewCase): GraphModel {
     const modelLabel: 0 | 1 = t.isSuspicious ? 1 : 0
     const label: 0 | 1 = member.decision ? (member.decision === 'SUSPICIOUS' ? 1 : 0) : modelLabel
     const row: GraphTransaction = {
-      id: String(member.txId), at: seoulMinute(t.occurredAt), usd: t.amountUsd, amount: t.amountPaid,
+      id: String(member.txId), at: seoulMinute(t.occurredAt), usd: numeric(t.amountUsd), amount: numeric(t.amountPaid),
       currency: t.paymentCurrency, format: t.paymentFormat, from, to, label, modelLabel,
     }
     const key = JSON.stringify([from, to])

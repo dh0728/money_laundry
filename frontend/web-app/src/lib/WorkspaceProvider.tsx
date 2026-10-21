@@ -15,10 +15,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [store])
   return <WorkspaceContext.Provider value={store}>{children}</WorkspaceContext.Provider>
 }
-export function SharedPeriod({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
+export function SharedPeriod({ children, enabled = true, showWhileClockPending = false }: { children: ReactNode; enabled?: boolean; showWhileClockPending?: boolean }) {
   const clock = useAsync(fetchDemoClock, [], { key: 'clock', enabled })
   const [override, setPeriod] = useViewState<Period | null>('period', null)
   if (!enabled) return <>{children}</>
+  if (showWhileClockPending && clock.state.status !== 'success') return <PeriodContext.Provider value={{ period: override ?? { from: '', to: '' }, setPeriod }}>{children}</PeriodContext.Provider>
   if (clock.state.status === 'loading') return <LoadingBlock label="업무 시각" />
   if (clock.state.status === 'error') return <ErrorBlock message={clock.state.message} onRetry={clock.retry} />
   const to = kstDate(clock.state.data.businessAt)

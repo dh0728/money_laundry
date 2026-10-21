@@ -1,30 +1,40 @@
 # AML RADAR 웹앱
 
-## 실행
+## 합성 데이터로 화면 확인
 
-Node.js 22.12 이상, pnpm 11.24 사용.
+Node.js 22.12 이상과 pnpm 11.24를 사용한다.
 
 ```sh
-pnpm install
-pnpm dev
+pnpm install --frozen-lockfile
+VITE_API_MODE=fixture pnpm dev --host 127.0.0.1
 ```
 
-기본값은 로그인 없이 동작하는 시연용 mock. `?mock=empty`와 `?mock=error`로 빈 화면과 오류 화면 확인.
+`#dashboard`, `#transactions`, `#alerts/1`, `#episodes/50`에서 조사 흐름을 확인한다. 모든 값은 가상 데이터이며 화면 위에 합성 표시가 나온다. 서버 저장과 판정은 차단된다.
 
-로컬 Backend 서버가 실행 중일 때 실제 API 모드:
+운영 API 없이 정적 검수본을 만들 때 다음 명령을 실행한다.
 
 ```sh
-VITE_API_MODE=live pnpm dev
+VITE_API_MODE=fixture VITE_STATIC_DEMO=true pnpm build
 ```
 
-기본 프록시 주소는 `http://127.0.0.1:8080`. 서버 주소가 다르면 `VITE_API_PROXY_TARGET` 지정. 브라우저에서는 같은 출처 `/api/...`로 요청하며 로그인 세션 쿠키와 CSRF 토큰 사용. 실제 모드의 대시보드·거래 내역·Alert/Episode 조사 사건은 `backend/api-server/API.md` §6.5·§7.1·§9.8 경로 기준. 알림과 RDR 9000은 실제 모드에서도 `mock` 표시.
+이 빌드에는 실제 로그인이나 서버 저장 기능이 없다. 기본 `pnpm dev`는 별도의 mock 시연 화면을 연다.
 
-실제 로그인·권한·데이터 왕복 확인에는 Backend 테스트 서버와 STAFF/ADMIN 계정 필요.
-
-## 검사
+## 테스트 Backend에 연결
 
 ```sh
-pnpm lint
+VITE_API_MODE=live VITE_API_PROXY_TARGET=http://127.0.0.1:8080 pnpm dev --host 127.0.0.1
+```
+
+브라우저는 같은 출처의 `/api/...`로 요청한다. 직원 세션 쿠키와 CSRF 토큰을 사용한다. 데이터 계약은 `backend/api-server/API.md`를 따른다.
+
+이진 점수와 유형 점수의 출처는 구분한다. 현재 Backend 계약은 이진 GNN과 시연용 유형 모델을 사용하며, 사건 응답만으로 개별 사건의 모델 버전을 확정할 수 없다. 룰 결과 API가 연결되지 않은 상태는 미적중 0건과 다르다. RDR 문장은 mock으로 표시한다.
+
+## 배포용 검사
+
+```sh
 pnpm test
-pnpm build
+pnpm lint
+VITE_API_MODE=live pnpm build
 ```
+
+`frontend` 브랜치 반영과 공용 서버 배포는 별개다. Backend와 합의하지 않은 API나 권한을 화면에서 우회하지 않는다.

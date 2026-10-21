@@ -5,7 +5,7 @@ import { fmt } from '@/lib/format'
 
 type DailyFlow = { date: string; inflow: number; closed: number }
 
-const agreementStyles = [
+export const agreementStyles = [
   { code: 'STRONG', name: '모델 의심 · 패턴 있음', fill: 'var(--foreground)' },
   { code: 'ATYPICAL', name: '모델 의심 · 패턴 없음', fill: 'var(--muted-foreground)' },
   { code: 'PATTERN_ONLY', name: '모델 정상 · 패턴 있음', fill: 'var(--chart-3)' },

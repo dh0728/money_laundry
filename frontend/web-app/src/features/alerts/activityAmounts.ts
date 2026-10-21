@@ -1,25 +1,49 @@
-import type { ReviewGroup } from '@/api/liveReview'
+import type { ReviewApiMember, ReviewGroup } from '@/api/liveReview'
 import { kstDate } from '@/api/liveDashboard'
 import { caseEvidence } from './caseEvidence'
 import type { ActivityAmounts } from './CaseActivityCharts'
 
-/** Current case members, including context and model-normal transactions, once per txId. */
-export function dailyMemberAmounts(groups: ReviewGroup[]): ActivityAmounts {
-  const days = new Map<string, Map<string, number>>()
+/** Keep Decimal snapshots exact for text totals, and invalidate incomplete currency totals. */
+export function memberAmountsByCurrency(members: ReviewApiMember[], field: 'amountPaid' | 'amountUsd' = 'amountPaid'): Record<string, string | null> {
+  const totals = new Map<string, { units: bigint; scale: number } | null>()
   const seen = new Set<number>()
-  for (const member of groups.flatMap(group => group.members)) {
+  for (const member of members) {
     if (member.state === 'EXCLUDED' || member.state === 'TRANSFERRED' || seen.has(member.txId)) continue
     seen.add(member.txId)
+    const currency = member.transaction.paymentCurrency.trim() || '통화 미제공'
+    const value = member.transaction[field]
+    const raw = typeof value === 'number' ? value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 100 }) : typeof value === 'string' ? value.trim() : undefined
+    const parts = raw?.match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
+    const previous = totals.get(currency)
+    if (!parts || previous === null || currency === '통화 미제공') { totals.set(currency, null); continue }
+    const fraction = parts[3] ?? ''
+    const units = BigInt(`${parts[1]}${parts[2]}${fraction}`)
+    const scale = Math.max(previous?.scale ?? 0, fraction.length)
+    totals.set(currency, { scale, units: (previous?.units ?? 0n) * 10n ** BigInt(scale - (previous?.scale ?? 0)) + units * 10n ** BigInt(scale - fraction.length) })
+  }
+  return Object.fromEntries([...totals].map(([currency, total]) => {
+    if (total == null) return [currency, null]
+    const digits = (total.units < 0n ? -total.units : total.units).toString().padStart(total.scale + 1, '0')
+    return [currency, `${total.units < 0n ? '-' : ''}${total.scale ? `${digits.slice(0, -total.scale)}.${digits.slice(-total.scale)}` : digits}`]
+  }))
+}
+
+/** Current case members, including context and model-normal transactions, once per txId. */
+export function dailyMemberAmounts(groups: ReviewGroup[]): ActivityAmounts {
+  const days = new Map<string, Map<string, ReviewApiMember[]>>()
+  for (const member of caseEvidence(groups).members) {
     const transaction = member.transaction
     const currency = transaction.paymentCurrency.trim()
     const day = kstDate(transaction.occurredAt)
-    const amounts = days.get(currency) ?? new Map<string, number>()
-    // Evidence snapshots serialize Decimal amounts as strings; never concatenate them.
-    amounts.set(day, (amounts.get(day) ?? 0) + Number(transaction.amountPaid))
+    const amounts = days.get(currency) ?? new Map<string, ReviewApiMember[]>()
+    amounts.set(day, [...(amounts.get(day) ?? []), member])
     days.set(currency, amounts)
   }
   return Object.fromEntries([...days].map(([currency, amounts]) => [currency, {
-    daily: [...amounts].sort(([a], [b]) => a.localeCompare(b)).map(([day, amount]) => ({ day, amount })),
+    daily: [...amounts].sort(([a], [b]) => a.localeCompare(b)).map(([day, members]) => {
+      const total = memberAmountsByCurrency(members)[currency]
+      return { day, amount: total == null || !Number.isFinite(Number(total)) ? null : Number(total) }
+    }),
     senders: [],
   }]))
 }

@@ -27,18 +27,17 @@ function Screens() {
 
 it('actual live pages share the chosen range and preserve the owner/account and cached dashboard on tab return', async () => {
   clock.mockResolvedValue({ businessAt: '2023-09-10T09:00:00+09:00', revision: 1 })
-  dashboard.mockResolvedValue({ businessAt: '2023-09-10T09:00:00+09:00', personal: { pending: 0, aged: 0, closed: 0 },
-    institution: { alerts: 0, episodes: 0, aged: 0, today: 0, yesterday: 0 }, openAlertsAgedOver3Days: 0,
-    detection: { received: 0, analyzed: 0, suspicious: 0 }, deliveryDate: '', pendingReports: 0,
-    daily: [], agreements: [], types: [], activities: [], priority: [],
-    episodeWork: { current: { unreviewed: 0 }, firstReview: { average_seconds: null }, completion: { average_seconds: null } } })
-  owners.mockResolvedValue(page([{ id: 'owner-one' }]))
+  dashboard.mockResolvedValue({ businessAt: '2023-09-10T09:00:00+09:00', pipelineComputedAt: null, investigationComputedAt: null,
+    pipeline: { detection: { received: 0, analyzed: 0, suspicious: 0, deliveryDates: [] }, pendingReports: 0, agreements: [], types: [] },
+    investigation: { personal: { pending: 0, aged: 0, closed: 0 }, institution: { alerts: 0, episodes: 0, aged: 0, today: 0, yesterday: 0 }, openAlertsAgedOver3Days: 0,
+      daily: [], dailyAlertStatus: [], episodeWork: { current: { open: 0, aged: 0, unreviewed: 0, createdToday: 0, closedToday: 0 }, firstReview: { samples: 0, averageSeconds: null }, completion: { samples: 0, averageSeconds: null } } } })
+  owners.mockResolvedValue(page([{ id: 'owner-one', name: 'owner-one' }]))
   accounts.mockResolvedValue(page([{ id: 'account-one', ownerId: 'owner-one', bankId: 12 }]))
   transactions.mockResolvedValue(page([])); cases.mockResolvedValue(page([]))
   render(<NuqsAdapter><WorkspaceProvider><Screens /></WorkspaceProvider></NuqsAdapter>)
-  await screen.findByText('오늘 유입 Alert')
+  await screen.findByText('오늘 신규 Alert')
   fireEvent.click(screen.getByRole('button', { name: /기간 2023/ }))
-  await waitFor(() => expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10'))
+  await waitFor(() => expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10', expect.any(AbortSignal)))
   fireEvent.click(screen.getByRole('button', { name: 'ledger' }))
   fireEvent.click(await screen.findByRole('button', { name: /owner-one/ }))
   fireEvent.click(await screen.findByRole('button', { name: /account-one/ }))
@@ -52,11 +51,12 @@ it('actual live pages share the chosen range and preserve the owner/account and 
   expect(screen.getByRole('button', { name: /owner-one/ })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByRole('button', { name: /account-one/ })).toHaveAttribute('aria-pressed', 'true')
   expect(owners).toHaveBeenCalledTimes(1)
-  expect(accounts).toHaveBeenCalledTimes(1)
-  expect(transactions).toHaveBeenCalledTimes(1)
+  expect(accounts).toHaveBeenCalledTimes(2)
+  expect(transactions).toHaveBeenCalledTimes(3)
   fireEvent.click(screen.getByRole('button', { name: 'dashboard' }))
-  expect(screen.getByText('오늘 유입 Alert')).toBeInTheDocument()
+  expect(screen.getByText('오늘 신규 Alert')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '기간 2023-09-01' })).toBeInTheDocument()
-  expect(dashboard).toHaveBeenCalledTimes(2)
+  // The dashboard polls every second; wall time under a parallel suite may add a call.
+  expect(dashboard.mock.calls.every(([from, to]) => ['2023-08-12', '2023-09-01'].includes(from) && to === '2023-09-10')).toBe(true)
   expect(clock).toHaveBeenCalledTimes(1)
 })

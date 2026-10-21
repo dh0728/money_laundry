@@ -1,6 +1,7 @@
 import { LaptopMinimal, Moon, RotateCcw, Sun } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTheme } from '@/app/ThemeProvider'
+import { FONT_SCALES, setFontScale, useFontScale } from '@/app/fontSize'
 import { useCurrentUser } from '@/app/session'
 import { PageHeading, SectionTitle } from '@/components/page'
 import { ProvenanceBadge } from '@/components/Provenance'
@@ -15,15 +16,16 @@ import { useMemoryState } from '@/lib/memory'
 export default function SettingsPage() {
   const currentUser = useCurrentUser()
   const { theme, setTheme } = useTheme()
+  const fontScale = useFontScale()
   const [zone, setZone] = useMemoryState('settings:zone', 'seoul'), [dateFormat, setDateFormat] = useMemoryState('settings:date', 'iso'), [rows, setRows] = useMemoryState('settings:rows', '20'), [sort, setSort] = useMemoryState('settings:sort', 'risk'), [alerts, setAlerts] = useMemoryState('settings:alerts', ['assigned', 'linked', 'comment', 'result'])
-  const reset = () => { setZone('seoul'); setDateFormat('iso'); setRows('20'); setSort('risk'); setAlerts(['assigned', 'linked', 'comment', 'result']); setTheme('system'); toast.success('설정을 초기화했습니다.') }
+  const reset = () => { setZone('seoul'); setDateFormat('iso'); setRows('20'); setSort('risk'); setAlerts(['assigned', 'linked', 'comment', 'result']); setTheme('system'); setFontScale(100); toast.success('설정을 초기화했습니다.') }
   // 조사자는 Alert 판정과 Episode 생성을 이어서 하고, 관리자는 Episode 검수를 받는다(9/28)
   const choices = currentUser.role === 'STAFF' ? [['assigned', '내 Alert 배정'], ['linked', 'Episode 연결 · 생성'], ['comment', '새 의견'], ['result', 'Episode 검수 결과']] : [['assigned', 'Episode 검수 요청'], ['linked', 'Episode에 Alert 연결'], ['comment', '새 의견'], ['result', 'Batch 결과']]
   // 설정은 선택 즉시 적용. 각 묶음은 같은 Card/SectionTitle 구조를 쓴다.
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeading title="설정" description="테마는 즉시 적용 · 나머지 항목은 시연용이며 다른 화면에 아직 적용되지 않음" />
+        <PageHeading title="설정" description="테마·글자 크기는 즉시 적용 · 페이지당 행은 mock 목록에만 적용 · 나머지는 시연용이며 서버에 저장되지 않음" />
         <div className="flex flex-wrap items-center gap-2">
           <div className="theme-segment relative grid h-8 grid-cols-3 rounded-full bg-muted p-1" role="radiogroup" aria-label="테마 선택" data-theme={theme}>
             <span className="theme-segment-thumb absolute bottom-1 top-1 rounded-full bg-background shadow-sm ring-1 ring-border/60" aria-hidden="true" />
@@ -39,6 +41,7 @@ export default function SettingsPage() {
       </div>
       <div className="settings-grid grid items-stretch gap-x-10 gap-y-10" data-testid="settings-grid">
         <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="일반" action={<ProvenanceBadge kind="mock" />} />
+          <div className="space-y-2"><Label>글자 크기</Label><Select value={String(fontScale)} onValueChange={v => setFontScale(Number(v))}><SelectTrigger className="w-full" data-testid="font-scale"><SelectValue /></SelectTrigger><SelectContent>{FONT_SCALES.map(s => <SelectItem key={s.value} value={String(s.value)}>{s.label}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">화면 전체 글자와 여백이 함께 커짐 · 이 브라우저에만 저장</p></div>
           <div className="space-y-2"><Label>시간대</Label><Select value={zone} onValueChange={setZone}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="seoul">Asia/Seoul (UTC+9)</SelectItem><SelectItem value="utc">UTC</SelectItem></SelectContent></Select></div>
           <div className="space-y-2"><Label>날짜 형식</Label><Select value={dateFormat} onValueChange={setDateFormat}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="iso">YYYY-MM-DD</SelectItem><SelectItem value="dot">YYYY. MM. DD</SelectItem></SelectContent></Select></div>
         </CardContent></Card>

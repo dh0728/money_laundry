@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { live } from '@/lib/apiMode'
+import { ApiError } from '@/api/common'
 import { fetchNotifications, setNotificationsRead } from '@/api/notifications'
 import { AssignedCases } from '@/features/notifications/AssignedCases'
 import { RefreshStatus } from '@/components/RefreshStatus'
@@ -115,7 +116,7 @@ export default function NotificationsPage({ onOpen, remote = live }: { onOpen: (
         <DateRangeButton value={range} onChange={setRange} today={remote ? (businessDate ? new Date(`${businessDate}T00:00:00`) : new Date()) : new Date(2026, 8, 26)} />
         <Button variant="ghost" size="sm" className="ml-auto" disabled={busy || !unread.length} onClick={() => void mark(unread.map(item => item.id), true)}><Check className="size-3.5" />{remote ? '현재 페이지 모두 읽음' : '모두 읽음 처리'}</Button>
       </div>
-      {state.status === 'loading' ? <LoadingBlock label="알림" /> : state.status === 'error' ? <ErrorBlock message={state.message} onRetry={retry} /> : <>
+      {state.status === 'loading' ? <LoadingBlock label="알림" /> : state.status === 'error' ? <ErrorBlock message={state.error instanceof ApiError && state.error.problem.status === 403 ? '이 알림을 조회할 권한이 없습니다.' : state.message} onRetry={retry} /> : <>
       {visible.length === 0 ? <p className="rounded-lg border py-16 text-center text-sm text-muted-foreground"><Bell className="mx-auto mb-4 size-7" />{items.length ? '조건에 맞는 알림이 없습니다.' : '표시할 알림이 없습니다.'}</p>
         : <div className="grid gap-6 @5xl:grid-cols-2" data-testid="notification-list">
           <NotificationColumn label="안 읽음" items={unread} order={unreadOrder} onOrder={() => setUnreadOrder(nextOrder)} onOpen={open} read={false} onToggle={toggle} busy={busy} />

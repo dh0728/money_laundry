@@ -6,6 +6,7 @@ import { typeDisplay } from '@/api/codes'
 import { type EpisodeRow } from '@/api/episodes'
 import type { Page } from '@/app/navigation'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
@@ -38,7 +39,7 @@ async function loadSearchData(overrides: Parameters<typeof withOverride>[1]): Pr
 type Props = {
   onNavigate: (page: Page, id?: number) => void
   onOpenTransaction?: (target: TransactionTarget) => void
-  remote?: { groups: ResultGroup[]; loading: boolean; error?: string; onQuery: (query: string) => void }
+  remote?: { groups: ResultGroup[]; loading: boolean; error?: string; onQuery: (query: string) => void; onRetry?: () => void }
 }
 
 export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: Props) {
@@ -142,7 +143,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
       <PopoverContent id="global-search-listbox" role="listbox" aria-label="검색 결과" className="w-(--radix-popper-anchor-width) max-w-[90vw] p-2"
         onOpenAutoFocus={e => e.preventDefault()}
         onInteractOutside={event => { if (anchor.current?.contains(event.target as Node)) event.preventDefault() }}>
-        {remote?.error && <p role="alert" className="p-2 text-xs text-destructive">{remote.error}</p>}
+        {remote?.error && <div role="alert" className="flex items-center justify-between gap-2 p-2 text-xs text-destructive"><span>{remote.error}</span>{remote.onRetry && <Button size="sm" variant="outline" onClick={remote.onRetry}>검색 다시 시도</Button>}</div>}
         {flat.length === 0
           ? <p className="p-4 text-center text-xs text-muted-foreground">{(remote ? remote.loading : q && !data) ? '불러오는 중…' : '검색 결과가 없습니다.'}</p>
           : (

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { fixture } from '../lib/apiMode'
 
 type Theme = 'light' | 'dark' | 'system'
 type ResolvedTheme = Exclude<Theme, 'system'>
@@ -51,6 +52,16 @@ export function ThemeProvider({ children, defaultTheme = 'system', enableSystem 
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [enableSystem])
+
+  useEffect(() => {
+    if (!fixture || window.parent === window || location.hostname !== '127.0.0.1' || new URLSearchParams(location.search).get('wiring') !== '1') return
+    const onWiringTheme = (event: Event) => {
+      const next = (event as CustomEvent<unknown>).detail
+      if (next === 'light' || next === 'dark') setTheme(next)
+    }
+    window.addEventListener('aml-wiring-theme-set', onWiringTheme)
+    return () => window.removeEventListener('aml-wiring-theme-set', onWiringTheme)
+  }, [setTheme])
 
   const value = useMemo(() => ({ theme, resolvedTheme, setTheme, themes: ['light', 'dark', 'system'] as Theme[] }), [theme, resolvedTheme, setTheme])
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

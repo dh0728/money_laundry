@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import { plugin as shadcn } from '@shadcn/lint'
 
 export default defineConfig([
   globalIgnores(['dist']),
@@ -44,5 +45,29 @@ export default defineConfig([
     // TanStack Table 타입 확장(module augmentation)은 제네릭 이름을 원본과 똑같이 둬야 한다
     files: ['src/types/data-table.ts'],
     rules: { '@typescript-eslint/no-unused-vars': 'off' },
+  },
+  {
+    // 새 UI(src/next)만 디자인 시스템 규칙을 지킨다. 기존 시연 화면은 전환 전까지 손대지 않는다.
+    files: ['src/next/**/*.{ts,tsx}'],
+    plugins: { shadcn },
+    settings: {
+      shadcn: {
+        ui: '@/next/ui',
+        note: '색·간격·글자 크기는 src/next/styles 토큰과 src/next/ui 컴포넌트만 쓴다.',
+      },
+    },
+    rules: {
+      'shadcn/no-raw-colors': 'error',
+      'shadcn/no-arbitrary-values': 'error',
+      'shadcn/no-restyle': 'error',
+      'shadcn/no-inline-styles': 'error',
+      'shadcn/no-unknown-classes': 'error',
+      'shadcn/require-static-classes': 'error',
+    },
+  },
+  {
+    // 컴포넌트 원본은 스스로의 모양을 정의하므로 restyle 검사에서 뺀다
+    files: ['src/next/ui/**/*.tsx'],
+    rules: { 'shadcn/no-restyle': 'off' },
   },
 ])

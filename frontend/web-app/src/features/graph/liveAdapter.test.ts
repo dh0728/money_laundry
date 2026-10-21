@@ -8,6 +8,22 @@ const member = (txId: number, decision: ReviewMember['decision'], isSuspicious: 
   transaction: { occurredAt: '2023-09-10T00:00:00Z', fromAccountId: 'a', toAccountId: 'b', fromBankId: 1, toBankId: 2, amountPaid: 10, amountUsd: 8, paymentCurrency: 'USD', paymentFormat: 'WIRE', role: 'SEED', isSuspicious, scores: null },
 })
 
+it('기존 그래프 숫자 모델은 wire 금액 문자열을 숫자로 변환한다', () => {
+  const row = member(1, null, true)
+  const item = { groups: [{ members: [{ ...row, transaction: { ...row.transaction, amountPaid: '12.3456', amountUsd: '8.5' } }] }] } as ReviewCase
+  const graph = toReviewGraphModel(item)
+  expect(graph.edges[0].transactions[0]).toMatchObject({ amount: 12.3456, usd: 8.5 })
+  expect(graph.edges[0].usd).toBe(8.5)
+})
+
+it.each([null, '', 'bad'])('기존 그래프 숫자 모델의 무효 금액 %s는 0으로 바꾸지 않는다', value => {
+  const row = member(1, null, true)
+  const item = { groups: [{ members: [{ ...row, transaction: { ...row.transaction, amountPaid: value, amountUsd: value } }] }] } as ReviewCase
+  const transaction = toReviewGraphModel(item).edges[0].transactions[0]
+  expect(transaction.amount).toBeNaN()
+  expect(transaction.usd).toBeNaN()
+})
+
 it('제외 거래는 그래프에서 빠지지만 다른 묶음의 활성 동일 거래는 남는다', () => {
   const item = { groups: [{ members: [{ ...member(1, null, true), state: 'EXCLUDED' }, { ...member(2, null, true), state: 'EXCLUDED' }] }, { members: [member(2, null, true)] }] } as ReviewCase
   const graph = toReviewGraphModel(item)

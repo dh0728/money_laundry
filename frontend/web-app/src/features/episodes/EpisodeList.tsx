@@ -9,7 +9,7 @@ import { useCurrentUser } from '@/app/session'
 import { FilterChip } from '@/components/FilterChip'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { ProvenanceBadge } from '@/components/Provenance'
-import { AgeBadge, PatternBadge, RiskBadge, WorkStatusBadge } from '@/components/badges'
+import { AgeBadge, PatternBadge, RiskBadge } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -19,15 +19,14 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { episodeCode } from '@/features/alerts/alertFilters'
-import { usd } from '@/features/alerts/metrics'
 import { useDataTable } from '@/hooks/use-data-table'
 import { useMemoryState } from '@/lib/memory'
-import { episodeWorkStatus, workStatusLabels, type WorkStatus } from '@/lib/workStatus'
+import { type WorkStatus } from '@/lib/workStatus'
 import { ageOptions } from '@/features/alerts/alertFilters'
 import { episodeFilterLabel, episodeFilterNames, matchesEpisode, riskOptions, type EpisodeFilter, type EpisodeFilterField } from './episodeFilters'
 
 export function EpisodeStatusBadge({ status, reviewRequested }: { status: EpisodeStatus; reviewRequested?: boolean }) {
-  return <WorkStatusBadge status={episodeWorkStatus(status, reviewRequested)} title={reviewRequested && status === 'OPEN' ? '관리자 검수 요청됨 (FE 제안)' : undefined} />
+  return <Badge variant="outline" data-tone={status === 'CLOSED' ? 'closed' : 'working'} className="semantic-status-badge text-xs font-normal" title={reviewRequested && status === 'OPEN' ? '관리자 검수 요청됨 (FE 제안)' : undefined}>{status === 'CLOSED' ? '종결' : '진행 중 · Episode'}</Badge>
 }
 
 export type EpisodeListRow = Pick<EpisodeRow, 'episodeId' | 'riskScore' | 'alertCount' | 'txCount' | 'assignee' | 'status' | 'createdAt' | 'ageDays' | 'reviewRequestedAt'> & { primaryTypes: { code: TypeCode | null; name: string }[]; totalAmountUsd?: number; amountLabel?: string }
@@ -44,11 +43,11 @@ const columns: ColumnDef<EpisodeListRow>[] = [
     ),
   },
   { id: 'riskScore', accessorKey: 'riskScore', header: ({ column }) => <DataTableColumnHeader column={column} label="위험도" />, cell: ({ row }) => <RiskBadge score={row.original.riskScore} /> },
+  { id: 'amount', header: '거래 총액 (USD)', enableSorting: false, cell: ({ row }) => <span className="block max-w-full overflow-x-auto whitespace-nowrap font-mono text-xs tabular-nums">{row.original.amountLabel ?? 'USD 환산액 미제공'}</span> },
   {
     id: 'types', header: '탐지 유형', enableSorting: false,
     cell: ({ row }) => <div className="flex flex-wrap gap-1">{row.original.primaryTypes.map(t => <span key={t.name}>{t.code == null ? <Badge variant="outline">{t.name}</Badge> : <PatternBadge code={t.code} />}</span>)}</div>,
   },
-  { id: 'totalAmountUsd', accessorKey: 'totalAmountUsd', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.amountLabel ?? (row.original.totalAmountUsd == null ? '—' : usd(row.original.totalAmountUsd))}</div> },
   { id: 'alertCount', accessorKey: 'alertCount', header: ({ column }) => <DataTableColumnHeader column={column} label="Alert" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.alertCount}건</div> },
   { id: 'txCount', accessorKey: 'txCount', header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.txCount}건</div> },
   { id: 'assignee', accessorFn: row => row.assignee.name, header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" /> },
@@ -61,11 +60,11 @@ const columns: ColumnDef<EpisodeListRow>[] = [
 ]
 
 const columnWidths = {
-  episodeId: '12%', riskScore: '8%', types: '18%', totalAmountUsd: '14%',
-  alertCount: '7%', txCount: '7%', assignee: '9%', status: '10%', createdAt: '15%',
+  episodeId: '13%', riskScore: '8%', types: '17%', amount: '17%',
+  alertCount: '7%', txCount: '7%', assignee: '10%', status: '9%', createdAt: '12%',
 }
 
-export default function EpisodeList({ rows, today, onOpen, remote }: { rows: EpisodeListRow[]; today: Date; onOpen: (row: EpisodeListRow) => void; remote?: { filters: EpisodeFilter[]; onFilters: (filters: EpisodeFilter[]) => void; query: string; onQuery: (query: string) => void; assignees: { id: number; name: string }[]; footer: ReactNode; range?: DateRange; onRange: (range?: DateRange) => void } }) {
+export default function EpisodeList({ rows, today, onOpen, remote }: { rows: EpisodeListRow[]; today: Date; onOpen: (row: EpisodeListRow) => void; remote?: { filters: EpisodeFilter[]; onFilters: (filters: EpisodeFilter[]) => void; query: string; onQuery: (query: string) => void; assignees: { id: number; name: string }[]; footer: ReactNode; range?: DateRange; onRange: (range?: DateRange) => void; loading?: boolean } }) {
   const currentUser = useCurrentUser()
   const [localQuery, setLocalQuery] = useState('')
   const query = remote ? remote.query : localQuery
@@ -96,7 +95,7 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
   })
   const toFirst = () => table.setPageIndex(0)
   const valueOptions: Record<EpisodeFilterField, { value: string; label: string }[]> = {
-    status: (['IN_PROGRESS', 'DONE'] as WorkStatus[]).map(s => ({ value: s, label: workStatusLabels[s] })),
+    status: (['IN_PROGRESS', 'DONE'] as WorkStatus[]).map(s => ({ value: s, label: s === 'DONE' ? '종결' : '진행 중 · Episode' })),
     type: remote ? [...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: typeDisplay((i + 1) as TypeCode).label })), { value: '패턴 미특정', label: '패턴 미특정' }, { value: '혼합', label: '혼합' }] : Array.from({ length: 9 }, (_, code) => ({ value: String(code), label: typeDisplay(code as TypeCode).label })),
     risk: [...riskOptions],
     assignee: [{ value: String(me), label: '내 담당' }, ...[...assignees].filter(([id]) => id !== me).map(([id, name]) => ({ value: String(id), label: name }))],
@@ -111,8 +110,8 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
 
   function download() {
     const csv = '\uFEFF' + [
-      ['ID', '위험도', 'Alert', '거래', '거래 총액(통화별)', '담당자', '상태'],
-      ...result.map(r => [episodeCode(r.episodeId), r.riskScore, r.alertCount, r.txCount, r.amountLabel ?? (r.totalAmountUsd == null ? '' : `${r.totalAmountUsd} USD`), r.assignee.name, r.status]),
+      ['ID', '위험도', 'Alert', '거래', '담당자', '상태'],
+      ...result.map(r => [episodeCode(r.episodeId), r.riskScore, r.alertCount, r.txCount, r.assignee.name, r.status]),
     ].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a')
@@ -155,7 +154,13 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
         </div>
       )}
       {result.length
-        ? <DataTable pagination={!remote} table={table} columnWidths={columnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={onOpen} data-testid="episode-table" />
+        ? <><div className="space-y-2 md:hidden">{table.getRowModel().rows.map(({ original: row }) => <article key={row.episodeId} data-testid="episode-mobile-card" className="min-w-0 rounded-lg border bg-card p-3">
+          <div className="flex items-center justify-between gap-2"><button type="button" className="font-mono text-sm font-semibold underline-offset-2 hover:underline" onClick={() => onOpen(row)}>{episodeCode(row.episodeId)} 상세 보기</button><RiskBadge score={row.riskScore} /></div>
+          <div className="mt-2 flex flex-wrap items-center gap-2"><EpisodeStatusBadge status={row.status} reviewRequested={Boolean(row.reviewRequestedAt)} />{row.primaryTypes.map(type => <span key={type.name}>{type.code == null ? <Badge variant="outline">{type.name}</Badge> : <PatternBadge code={type.code} />}</span>)}</div>
+          <p className="mt-2 text-xs text-muted-foreground">Alert {row.alertCount}건 · 거래 {row.txCount}건 · {row.assignee.name} · {row.createdAt.slice(0, 10)}</p>
+          <p className="mt-2 overflow-x-auto whitespace-nowrap font-mono text-xs tabular-nums">{row.amountLabel ?? 'USD 환산액 미제공'}</p>
+        </article>)}</div><div className="hidden md:block"><DataTable pagination={!remote} table={table} columnWidths={columnWidths} tableClassName="table-fixed min-w-[980px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={onOpen} data-testid="episode-table" /></div></>
+        : remote?.loading ? null
         : (
           <div className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />

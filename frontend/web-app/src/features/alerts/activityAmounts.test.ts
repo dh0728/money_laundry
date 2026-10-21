@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import type { ReviewGroup, ReviewMember } from '@/api/liveReview'
-import { dailyMemberAmounts, dailyMemberUsdByCurrency } from './activityAmounts'
+import type { ReviewApiMember, ReviewGroup, ReviewMember } from '@/api/liveReview'
+import { dailyMemberAmounts, dailyMemberUsdByCurrency, memberAmountsByCurrency } from './activityAmounts'
 
 function member(txId: number, overrides: Partial<ReviewMember> = {}, transaction = {}): ReviewMember {
   return {
@@ -13,7 +13,19 @@ function member(txId: number, overrides: Partial<ReviewMember> = {}, transaction
     },
   }
 }
-const group = (members: ReviewMember[]): ReviewGroup => ({ groupId: 1, label: '', revision: 1, members })
+const group = (members: ReviewApiMember[]): ReviewGroup => ({ groupId: 1, label: '', revision: 1, members })
+
+it('wire 소수 문자열·null 원본을 바꾸지 않고 통화별 정확한 총액과 누락을 보존한다', () => {
+  const first: ReviewApiMember = { ...member(1), transaction: { ...member(1).transaction, amountPaid: '9007199254740993.123456' } }
+  const rows: ReviewApiMember[] = [first,
+    { ...member(2), transaction: { ...member(2).transaction, amountPaid: '0.000001' } },
+    { ...member(3), transaction: { ...member(3).transaction, paymentCurrency: 'USD', amountPaid: null } },
+    first,
+  ]
+  const original = structuredClone(rows)
+  expect(memberAmountsByCurrency(rows)).toEqual({ MXN: '9007199254740993.123457', USD: null })
+  expect(rows).toEqual(original)
+})
 
 it('실제 근거 스냅샷의 소수 금액 문자열을 숫자로 더해 일별 금액과 총액을 만든다', () => {
   const result = dailyMemberAmounts([group([
@@ -22,7 +34,7 @@ it('실제 근거 스냅샷의 소수 금액 문자열을 숫자로 더해 일�
     member(3, {}, { amountPaid: '10.25', occurredAt: '2023-09-02T00:00:00Z' }),
   ])])
   expect(result.MXN.daily).toEqual([{ day: '2023-09-01', amount: 130 }, { day: '2023-09-02', amount: 10.25 }])
-  expect(result.MXN.daily.reduce((sum, row) => sum + row.amount, 0)).toBe(140.25)
+  expect(result.MXN.daily.reduce((sum, row) => sum + row.amount!, 0)).toBe(140.25)
 })
 
 it('씨앗·연결·정상 분류·참고 맥락 거래를 모두 집계하고 중복·제외·이관을 제거한다', () => {
@@ -45,6 +57,11 @@ it('한국시간 날짜 순서와 지급 통화를 구분하고 USD 환산값으
   expect(result.MXN.daily).toEqual([{ day: '2023-08-31', amount: 200 }, { day: '2023-09-01', amount: 100 }])
   expect(result.USD.daily).toEqual([{ day: '2023-09-01', amount: 7 }])
   expect(dailyMemberAmounts([])).toEqual({})
+})
+
+it.each([null, '', ' ', 'bad', 'Infinity', false])('원통화의 누락·무효 금액 %s는 일별 합계를 0이나 부분 합계로 만들지 않는다', amountPaid => {
+  const result = dailyMemberAmounts([group([member(1), member(2, {}, { amountPaid })])])
+  expect(result.MXN.daily).toEqual([{ day: '2023-09-01', amount: null }])
 })
 
 it('원통화별 저장 USD를 KST 일별 합산하고 중복·제외 거래는 제거한다', () => {

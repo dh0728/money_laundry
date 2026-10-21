@@ -5,14 +5,13 @@ import type { DashboardRequested } from '@/api/dashboard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart'
 import { fmt } from '@/lib/format'
-import { workStatusLabels } from '@/lib/workStatus'
 
 export type DailyStatus = DashboardRequested['dailyAlertStatus'][number]
 
 const series = [
-  { key: 'pending', label: workStatusLabels.PENDING, color: 'var(--status-pending)' },
-  { key: 'inProgress', label: workStatusLabels.IN_PROGRESS, color: 'var(--status-working)' },
-  { key: 'done', label: workStatusLabels.DONE, color: 'var(--status-closed)' },
+  { key: 'pending', label: '진행 중 · 단독 Alert', color: 'var(--status-pending)' },
+  { key: 'inProgress', label: '진행 중 · Episode', color: 'var(--status-working)' },
+  { key: 'done', label: '종결', color: 'var(--status-closed)' },
 ] as const
 
 const chartConfig = Object.fromEntries(series.map(s => [s.key, { label: s.label, color: s.color }])) satisfies ChartConfig
@@ -53,7 +52,7 @@ export function AlertStatusChart({ data, unavailable = false }: { data: DailySta
           <CardTitle>일별 Alert 유입과 처리 상태</CardTitle>
         </div>
         <CardDescription>그날 들어온 Alert가 지금 어느 단계에 있는지 · 막대 전체 = 유입 건수</CardDescription>
-        <p className="text-xs text-muted-foreground">처리 전: 열린 Alert · 처리 중: 열린 Episode에 편입 · 처리 완료: 직접 종결 또는 Episode 종결</p>
+        <p className="text-xs text-muted-foreground">생성일별 현재 상태 · 조사자의 열람 여부와는 별개입니다.</p>
         {unavailable && <p className="text-xs text-muted-foreground">상태별 일별 집계 API 미연결 · 데이터 준비 중</p>}
       </CardHeader>
       <CardContent className="min-w-0 px-2 pt-2 sm:px-6">

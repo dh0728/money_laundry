@@ -49,8 +49,13 @@ export function buildTransactionIndex(data: TransactionExplorerData): Transactio
 
 const currencyMarkers: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩', CHF: 'CHF' }
 
-export const formatMoney = (amount: number, currency: string) =>
-  `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(amount)}${currencyMarkers[currency] ?? currency}`
+export const formatMoney = (amount: number | string | null, currency: string, preservePrecision = false) => {
+  if (amount == null || !['number', 'string'].includes(typeof amount) || !String(amount).trim() || !Number.isFinite(Number(amount))) return '금액 확인 불가'
+  const formatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: preservePrecision ? 100 : 2 })
+  // Intl accepts exact decimal strings; TypeScript's format signature still omits strings.
+  const formatted = (formatter.format as (value: number | string) => string)(amount)
+  return `${formatted}${currencyMarkers[currency] ?? currency}`
+}
 
 export type TransactionSearchResult = { key: string; label: string; detail: string; target: TransactionTarget }
 

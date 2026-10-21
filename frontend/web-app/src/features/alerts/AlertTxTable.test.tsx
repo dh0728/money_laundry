@@ -8,6 +8,34 @@ import AlertTxTable from './AlertTxTable'
 afterEach(() => window.history.replaceState({}, '', '/'))
 
 describe('Alert 거래 표', () => {
+  it('live 금액 문자열은 정수·소수 정밀도를 유지한다', async () => {
+    const { detail } = await loadMockAlertDetail(3000, 'normal')
+    render(<AlertTxTable remote rows={[{ ...detail.transactions[0], amountPaid: '9007199254740993.123456', paymentCurrency: 'USD' }]} />)
+    expect(screen.getByText('9,007,199,254,740,993.123456$')).toBeInTheDocument()
+  })
+
+  it('기존 mock 금액 표시의 기본 소수 두 자리는 유지한다', async () => {
+    const { detail } = await loadMockAlertDetail(3000, 'normal')
+    render(<AlertTxTable rows={[{ ...detail.transactions[0], amountPaid: 1.234567, paymentCurrency: 'USD' }]} />)
+    expect(screen.getByText('1.23$')).toBeInTheDocument()
+  })
+
+  it('live 소수 금액 문자열을 숫자 값 순으로 정렬한다', async () => {
+    const { detail } = await loadMockAlertDetail(3000, 'normal')
+    render(<AlertTxTable remote rows={['20.11', '100.2', '1.11', '1.2'].map((amountPaid, index) => ({ ...detail.transactions[0], txId: index + 1, amountPaid }))} />)
+    const column = screen.getByRole('columnheader', { name: /금액/ })
+    fireEvent.click(within(column).getByRole('button'))
+    const ids = screen.getAllByRole('row').slice(1).map(row => within(row).getByText(/^T-/).textContent)
+    expect(ids).toEqual(column.getAttribute('aria-sort') === 'ascending' ? ['T-3', 'T-4', 'T-1', 'T-2'] : ['T-2', 'T-1', 'T-4', 'T-3'])
+  })
+
+  it.each([null, '', ' ', 'bad', 'Infinity'])('live 무효 금액 %s는 0이나 부분 금액으로 표시하지 않는다', async amountPaid => {
+    const { detail } = await loadMockAlertDetail(3000, 'normal')
+    render(<AlertTxTable remote rows={[{ ...detail.transactions[0], amountPaid }]} />)
+    expect(screen.getByText('금액 확인 불가')).toBeInTheDocument()
+    expect(screen.queryByText('0$')).not.toBeInTheDocument()
+  })
+
   it('거래 ID를 누르면 거래 내역으로 가고, 그 거래가 거래 내역 mock에도 있다', async () => {
     const { detail } = await loadMockAlertDetail(3000, 'normal')
     render(<AlertTxTable rows={detail.transactions} />)

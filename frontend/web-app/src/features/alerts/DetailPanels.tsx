@@ -19,7 +19,7 @@ export function BarList({ rows, format = usd }: { rows: { name: string; v: numbe
   )
 }
 
-export const Panel = ({ title, description, children, testId, action }: { title: string; description?: string; children: ReactNode; testId?: string; action?: ReactNode }) => (
+export const Panel = ({ title, description, children, testId, action }: { title: ReactNode; description?: string; children: ReactNode; testId?: string; action?: ReactNode }) => (
   <Card className={card} data-testid={testId}><CardContent className={content}><div className="flex items-start justify-between gap-3"><SectionTitle title={title} description={description} />{action}</div>{children}</CardContent></Card>
 )
 

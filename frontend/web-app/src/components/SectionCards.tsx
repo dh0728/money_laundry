@@ -1,7 +1,7 @@
 // v24 blocks/section-cards.tsx (shadcn dashboard-01 section-cards)
 import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
 export type SectionCardItem = { label: string; value: string; delta?: number; unit?: string; favorableDirection?: 'up' | 'down'; trend: string; note: string }
 
@@ -16,20 +16,13 @@ export function SectionCard({ item }: { item: SectionCardItem }) {
       <CardHeader>
         <CardDescription>{item.label}</CardDescription>
         <CardTitle className="type-display font-semibold tabular-nums">{item.value}</CardTitle>
-        {Icon && item.delta !== undefined && (
-          <CardAction>
-            <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent text-foreground' : undefined} style={deltaTone ? { backgroundColor: `var(--risk-${deltaTone === 'positive' ? 0 : 9})` } : undefined}>
-              <Icon />
-              {item.delta >= 0 ? '+' : ''}
-              {item.delta}
-              {item.unit ?? '%'}
-            </Badge>
-          </CardAction>
-        )}
       </CardHeader>
       <CardFooter className="flex-col items-start gap-1.5 text-sm">
-        <div className="line-clamp-1 flex gap-2 font-medium">
-          {item.trend} {Icon && <Icon className="size-4" />}
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 font-medium">
+          <span>{item.trend}</span>
+          {Icon && item.delta !== undefined && <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent text-foreground' : undefined} style={deltaTone ? { backgroundColor: `var(--risk-${deltaTone === 'positive' ? 0 : 9})` } : undefined}>
+            <Icon />{item.delta >= 0 ? '+' : ''}{item.delta}{item.unit ?? '%'}
+          </Badge>}
         </div>
         <div className="text-muted-foreground">{item.note}</div>
       </CardFooter>

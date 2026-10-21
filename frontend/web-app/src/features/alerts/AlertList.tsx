@@ -19,9 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDataTable } from '@/hooks/use-data-table'
-import { usd } from '@/lib/format'
 import { useMemoryState } from '@/lib/memory'
-import { alertWorkStatus, workStatusLabels } from '@/lib/workStatus'
 import { ageOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
 import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget } from './episodeLink'
 
@@ -41,11 +39,7 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
   },
   { id: 'riskScore', accessorKey: 'riskScore', header: ({ column }) => <DataTableColumnHeader column={column} label="위험도" />, cell: ({ row }) => <RiskBadge score={row.original.riskScore} /> },
   { id: 'type', accessorFn: row => row.primaryType.code, header: ({ column }) => <DataTableColumnHeader column={column} label="탐지 유형" />, cell: ({ row }) => <>{row.original.primaryType.code == null ? <Badge variant="outline">{row.original.primaryType.name}</Badge> : <PatternBadge code={row.original.primaryType.code} />}</> },
-  {
-    id: 'totalAmountUsd', accessorKey: 'totalAmountUsd',
-    header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액" className="flex-row-reverse justify-start" />,
-    cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.amountLabel ?? (row.original.totalAmountUsd == null ? '—' : usd(row.original.totalAmountUsd))}</div>,
-  },
+  { id: 'amount', header: '거래 총액 (USD)', enableSorting: false, cell: ({ row }) => <span className="block max-w-full overflow-x-auto whitespace-nowrap font-mono text-xs tabular-nums">{row.original.amountLabel ?? 'USD 환산액 미제공'}</span> },
   {
     id: 'txCount', accessorKey: 'txCount',
     header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />,
@@ -75,10 +69,10 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
 ]
 
 const browseColumnWidths = {
-  alertId: '13%', riskScore: '8%', type: '14%', totalAmountUsd: '14%',
-  txCount: '7%', assignee: '9%', status: '9%', createdAt: '15%', episode: '11%',
+  alertId: '14%', riskScore: '8%', type: '14%', amount: '16%',
+  txCount: '7%', assignee: '10%', status: '9%', createdAt: '13%', episode: '9%',
 }
-const linkColumnWidths = { ...browseColumnWidths, select: '4%', alertId: '12%', type: '13%', totalAmountUsd: '13%', episode: '10%' }
+const linkColumnWidths = { ...browseColumnWidths, select: '4%', alertId: '12%', amount: '14%' }
 
 const statusValues: AlertStatus[] = ['OPEN', 'ESCALATED', 'CLOSED']
 const typeValues = Array.from({ length: 9 }, (_, code) => code as TypeCode)
@@ -88,7 +82,7 @@ type Props = {
   today: Date
   onOpen: (row: AlertListRow) => void
   onLink: (alertIds: number[], target: EpisodeTarget, comment: string) => void | Promise<void>
-  remote?: { filters: AlertFilter[]; onFilters: (filters: AlertFilter[]) => void; query: string; onQuery: (query: string) => void; assignees: { id: number; name: string }[]; footer: ReactNode; range?: DateRange; onRange: (range?: DateRange) => void; busy?: boolean; targets?: number[] }
+  remote?: { filters: AlertFilter[]; onFilters: (filters: AlertFilter[]) => void; query: string; onQuery: (query: string) => void; assignees: { id: number; name: string }[]; footer: ReactNode; range?: DateRange; onRange: (range?: DateRange) => void; busy?: boolean; targets?: number[]; loading?: boolean }
 }
 
 export default function AlertList({ rows, today, onOpen, onLink, remote }: Props) {
@@ -146,21 +140,22 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
   const toFirst = () => table.setPageIndex(0)
 
   const valueOptions: Record<AlertFilterField, { value: string; label: string }[]> = {
-    status: statusValues.map(s => ({ value: s, label: workStatusLabels[alertWorkStatus(s)] })),
+    status: statusValues.map(s => ({ value: s, label: s === 'OPEN' ? '진행 중 · 단독 Alert' : s === 'ESCALATED' ? '진행 중 · Episode' : '종결' })),
     type: remote ? [...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: typeDisplay((i + 1) as TypeCode).label })), { value: '패턴 미특정', label: '패턴 미특정' }, { value: '혼합', label: '혼합' }] : typeValues.map(code => ({ value: String(code), label: typeDisplay(code).label })),
     assignee: [{ value: String(me), label: '내 담당' }, ...[...assignees].filter(([id]) => id !== me).map(([id, name]) => ({ value: String(id), label: name }))],
     age: ageOptions.map(days => ({ value: String(days), label: `${days}일 이상` })),
+    risk: [{ value: 'high', label: '높음 (0.80 이상)' }, { value: 'medium', label: '보통 (0.50 이상)' }, { value: 'low', label: '낮음 (0.50 미만)' }],
   }
   const toFilter = (f: AlertFilterField, v: string): AlertFilter =>
-    f === 'status' ? { field: f, value: v as AlertStatus } : f === 'type' ? { field: f, value: v === '패턴 미특정' || v === '혼합' ? v : Number(v) as TypeCode } : { field: f, value: Number(v) }
+    f === 'status' ? { field: f, value: v as AlertStatus } : f === 'type' ? { field: f, value: v === '패턴 미특정' || v === '혼합' ? v : Number(v) as TypeCode } : f === 'risk' ? { field: f, value: v as 'high' | 'medium' | 'low' } : { field: f, value: Number(v) }
 
   const reset = () => { setQuery(''); setFilters([]); setRange(undefined); toFirst() }
   const endLink = (type: 'complete' | 'cancel') => { dispatchLink({ type }); setTarget('new'); setComment('') }
 
   function download() {
     const csv = '\uFEFF' + [
-      ['ID', '위험도', '탐지 유형', '거래 총액(통화별)', '거래', '담당자', '상태'],
-      ...result.map(r => [alertCode(r.alertId), r.riskScore, r.primaryType.name, r.amountLabel ?? (r.totalAmountUsd == null ? '' : `${r.totalAmountUsd} USD`), r.txCount, r.assignee.name, r.status]),
+      ['ID', '위험도', '탐지 유형', '거래', '담당자', '상태'],
+      ...result.map(r => [alertCode(r.alertId), r.riskScore, r.primaryType.name, r.txCount, r.assignee.name, r.status]),
     ].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a')
@@ -202,7 +197,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
 
       {link.mode === 'link' && (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 px-3 py-2 shadow-sm backdrop-blur" data-testid="episode-link-action-bar">
-          <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">처리 전 Alert만 고를 수 있습니다</span></strong>
+          <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">현재 서버에서는 본인 담당 열린 Alert만 선택 가능 · 새 Episode는 2건 이상</span></strong>
           <Select value={target} onValueChange={setTarget}>
             <SelectTrigger size="sm" className="w-52" aria-label="Episode 연결 방식"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -230,7 +225,13 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
       )}
 
       {result.length
-        ? <DataTable pagination={!remote} table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
+        ? <><div className="space-y-2 md:hidden">{table.getRowModel().rows.map(({ original: row }) => <article key={row.alertId} data-testid="alert-mobile-card" className="min-w-0 rounded-lg border bg-card p-3">
+          <div className="flex items-center justify-between gap-2">{link.mode === 'link' ? <label className="flex items-center gap-2"><Checkbox aria-label={`${alertCode(row.alertId)} 모바일 선택`} disabled={!canLink(row, currentUser)} checked={link.selected.has(row.alertId)} onCheckedChange={() => dispatchLink({ type: 'toggle', id: row.alertId })} /><strong className="font-mono text-sm">{alertCode(row.alertId)}</strong></label> : <button type="button" className="font-mono text-sm font-semibold underline-offset-2 hover:underline" onClick={() => onOpen(row)}>{alertCode(row.alertId)} 상세 보기</button>}<RiskBadge score={row.riskScore} /></div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">{row.primaryType.code == null ? <Badge variant="outline">{row.primaryType.name}</Badge> : <PatternBadge code={row.primaryType.code} />}<StatusBadge status={row.status} />{row.episodeId != null && <Badge variant="outline">{episodeCode(row.episodeId)}</Badge>}</div>
+          <p className="mt-2 text-xs text-muted-foreground">거래 {row.txCount}건 · {row.assignee.name} · {row.createdAt.slice(0, 10)}</p>
+          <p className="mt-2 overflow-x-auto whitespace-nowrap font-mono text-xs tabular-nums">{row.amountLabel ?? 'USD 환산액 미제공'}</p>
+        </article>)}</div><div className="hidden md:block"><DataTable pagination={!remote} table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-[980px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" /></div></>
+        : remote?.loading ? null
         : (
           <div className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />

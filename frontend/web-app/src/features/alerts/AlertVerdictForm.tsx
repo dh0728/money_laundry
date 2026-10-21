@@ -29,7 +29,7 @@ export function AlertVerdictForm({ verdict, setVerdict, comment, setComment, tar
               ))}
             </SelectContent>
           </Select>
-          
+
         </div>
         {verdict === 'link-episode' && (
           <div className="space-y-2">

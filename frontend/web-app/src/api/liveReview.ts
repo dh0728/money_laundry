@@ -2,7 +2,7 @@ import { getJson, postJson, type Page } from './common'
 
 export type ReviewKind = 'ALERT' | 'EPISODE'
 export type ReviewStatus = 'OPEN' | 'CLOSED'
-export type ReviewMember = {
+export type ReviewMember<Amount extends number | string | null = number> = {
   txId: number
   reviewRole: 'SUBJECT' | 'CONTEXT'
   state: 'PENDING' | 'DECIDED' | 'EXCLUDED' | 'TRANSFERRED'
@@ -13,21 +13,31 @@ export type ReviewMember = {
     toAccountId: string
     fromBankId: number
     toBankId: number
-    amountPaid: number
-    amountUsd: number
+    amountPaid: Amount
+    amountUsd: Amount
     paymentCurrency: string
     paymentFormat: string
     role: string
+    includedReasons?: string[]
     isSuspicious: boolean | null
     scores: Record<string, number> | null
   }
   sources: { alertId: number; version: number; primaryType?: string }[]
 }
-export type ReviewGroup = { groupId: number; label: string; revision: number; evidenceVersion?: number | null; decision?: string | null; sourceAlertId?: number | null; members: ReviewMember[] }
+export type ReviewApiMember = ReviewMember<number | string | null>
+export type ReviewGroup = { groupId: number; label: string; revision: number; evidenceVersion?: number | null; decision?: string | null; sourceAlertId?: number | null; members: ReviewApiMember[] }
 export type ReviewCase = {
   caseId: number
   kind: ReviewKind
   alertId: number | null
+  publishedVersion?: number | null
+  reviewStartedAt?: string | null
+  canonicalAlertId?: number | null
+  pendingProposalIds?: number[]
+  relations?: { source_alert_id: number; target_alert_id: number; kind: string; event_id: number }[]
+  withdrawnMembers?: { txId: number; evidenceVersion: number; reviewRole: 'SUBJECT' | 'CONTEXT'; state: ReviewMember['state']; decision: ReviewMember['decision'] }[]
+  relatedDecisions?: { caseId: number; kind: ReviewKind; status: ReviewStatus; groupId: number; txId: string | number; decision: 'NORMAL' | 'SUSPICIOUS' | null }[]
+  relatedFlows?: { kind: string; txIds: number[]; relatedAlertIds: number[] }[]
   status: ReviewStatus
   outcome: string | null
   revision: number
@@ -82,6 +92,13 @@ export type ReviewMoney = {
   }[]
 }
 
+export type AlertEvidence = {
+  version?: number
+  dataAsOf?: string | null
+  lastCheckedAt?: string | null
+  coverage?: { businessDate: string; complete: boolean; expectedBanks: number; completeBanks: number; reports?: unknown[] }[]
+}
+
 export const fetchReviewCases = (query: ReviewQuery) => {
   const params = new URLSearchParams()
   Object.entries(query).forEach(([key, value]) => {
@@ -92,6 +109,7 @@ export const fetchReviewCases = (query: ReviewQuery) => {
 }
 export const fetchReviewUsers = () => getJson<{ id: number; name: string; role: string }[]>('/api/v1/demo/users')
 export const fetchReviewCase = (caseId: number) => getJson<ReviewCase>(`/api/v1/review/cases/${caseId}`)
+export const fetchAlertEvidence = (alertId: number, version?: number | null) => getJson<AlertEvidence>(`/api/v1/alerts/${alertId}`, version == null ? undefined : { version })
 export const fetchReviewMoney = (caseId: number, minutes = 180) => getJson<ReviewMoney>(`/api/v1/review/cases/${caseId}/money`, { minutes })
 export const setReviewMoneyScope = (caseId: number, revision: number, accounts: string[], comment: string, requestId: string) =>
   postJson<{ caseId: number; revision: number }>(`/api/v1/review/cases/${caseId}/money-scope`, { requestId, revision, accounts, comment })
