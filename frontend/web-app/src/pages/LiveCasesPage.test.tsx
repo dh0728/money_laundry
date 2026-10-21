@@ -5,13 +5,12 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import LiveCasesPage from './LiveCasesPage'
 import { ApiError } from '@/api/common'
 import { WorkspaceContext, WorkspaceState } from '@/lib/workspaceState'
-import { writeMemory } from '@/lib/memory'
 import { CurrentUserContext, MOCK_USER } from '@/app/session'
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({ toastSuccess: vi.fn(), toastError: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: toastError } }))
 vi.mock('@/features/graph/v24/Graph', () => ({ default: ({ model, panelExtra }: { model: { edges: { s: string; t: string }[] }; panelExtra?: (focus: { kind: 'edge'; s: string; t: string }) => ReactElement }) => <div data-testid="live-graph">{model.edges.length} edges{model.edges[0] && panelExtra?.({ kind: 'edge', s: model.edges[0].s, t: model.edges[0].t })}</div> }))
-vi.mock('@/features/graph/timeline/TimeGraph', () => ({ default: ({ rows, live }: { rows: { txId: number }[]; live?: { onInvestigate: (ids: number[]) => void } }) => <div data-testid="live-timegraph"><div data-testid="live-graph">{rows.length} edges<ButtonForTest ids={rows.map(row => row.txId)} onInvestigate={live?.onInvestigate} /></div></div> }))
+vi.mock('@/features/graph/timeline/TimeGraph', () => ({ default: ({ rows, live, active }: { rows: { txId: number }[]; live?: { onInvestigate: (ids: number[]) => void }; active?: boolean }) => <div data-testid="live-timegraph" data-active={String(active)}><div data-testid="live-graph">{rows.length} edges<ButtonForTest ids={rows.map(row => row.txId)} onInvestigate={live?.onInvestigate} /></div></div> }))
 function ButtonForTest({ ids, onInvestigate }: { ids: number[]; onInvestigate?: (ids: number[]) => void }) { return <button onClick={() => onInvestigate?.(ids)}>선택한 조사 거래 보기</button> }
 const { fetchAlertEvidence, fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, setReviewMoneyScope } = vi.hoisted(() => ({
   fetchAlertEvidence: vi.fn(), fetchReviewCase: vi.fn(), fetchReviewCases: vi.fn(), fetchReviewMoney: vi.fn(), submitReviewCommand: vi.fn(), setReviewMoneyScope: vi.fn(),
@@ -31,7 +30,6 @@ const alertCase = (caseId: number, alertId: number, extra = {}) => ({
 beforeEach(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn()
   vi.clearAllMocks()
-  for (const kind of ['ALERT', 'EPISODE']) for (const id of [1, 2, 3, 50]) writeMemory(`case-draft/11/${kind}/${id}`, '')
   fetchReviewCase.mockResolvedValue(alertCase(1, 3001))
   fetchAlertEvidence.mockResolvedValue({ coverage: [] })
   fetchReviewMoney.mockResolvedValue({ available: false, reason: 'EMPTY_SUBJECT_SCOPE' })
@@ -153,9 +151,15 @@ it.each([
 it('그래프에서 고른 연결선의 조사 거래로 이동한다', async () => {
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   await showTab('그래프')
+  const graph = await screen.findByTestId('live-timegraph')
+  expect(graph).toHaveAttribute('data-active', 'true')
   fireEvent.click(await screen.findByRole('button', { name: '선택한 조사 거래 보기' }))
   expect(screen.getByRole('tab', { name: /거래/ })).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByRole('region', { name: '선택 근거 거래' })).toHaveTextContent('T-1')
+  expect(graph).toHaveAttribute('data-active', 'false')
+  await showTab('그래프')
+  expect(screen.getByTestId('live-timegraph')).toBe(graph)
+  expect(graph).toHaveAttribute('data-active', 'true')
 })
 
 it('Episode 연결 Alert는 조사 거래 첫 시각으로 정렬하고 간격을 근거로만 보여 준다', async () => {
@@ -261,6 +265,7 @@ it('해체 이력은 현재 소속과 구분하고 닫힌 사건에서는 해제
   render(<LiveCasesPage kind="EPISODE" caseId={50} onOpen={vi.fn()} onBack={vi.fn()} />)
   await showTab('검토 의견')
   expect(await screen.findByText(/해체된 Episode입니다/)).toBeInTheDocument()
+  expect(screen.getByText('해체된 Episode · 현재 연결 Alert 0건')).toBeInTheDocument()
   expect(screen.getByRole('region', { name: '연결 해제 이력' })).toHaveTextContent('독립된 흐름')
   expect(screen.queryByRole('button', { name: '선택 Alert 연결 해제' })).not.toBeInTheDocument()
 })
@@ -470,16 +475,42 @@ it('계좌 선택 저장의 네트워크 오류 후 같은 UUID와 본문으로 
   expect(setReviewMoneyScope.mock.calls[1]).toEqual(setReviewMoneyScope.mock.calls[0])
 })
 
-it('계좌 선택 저장이 409면 상세와 지표를 다시 조회하고 자동 재제출하지 않는다', async () => {
-  fetchReviewMoney.mockResolvedValue({ available: false, reason: 'WAITING_RECEIPTS', selectedAccounts: ['account-a'], candidateAccounts: ['account-a'], revision: 1001 })
+it('계좌 선택 저장이 409면 입력을 보존하고 최신 revision 확인 뒤에만 다시 제출한다', async () => {
+  fetchReviewMoney.mockResolvedValueOnce({ available: false, reason: 'WAITING_RECEIPTS', selectedAccounts: ['account-a'], candidateAccounts: ['account-a', 'account-b'], revision: 1001 })
+    .mockResolvedValue({ available: false, reason: 'WAITING_RECEIPTS', selectedAccounts: ['account-a'], candidateAccounts: ['account-a', 'account-b'], revision: 1002 })
   setReviewMoneyScope.mockRejectedValueOnce(new ApiError({ type: 'about:blank', title: 'Conflict', status: 409, code: 'INVALID_TRANSITION' }))
   render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
-  fireEvent.change(await screen.findByLabelText('계좌 선택 사유'), { target: { value: '범위 조정' } })
+  fireEvent.click(await screen.findByRole('checkbox', { name: '조사 중심 계좌 account-b' }))
+  fireEvent.change(screen.getByLabelText('계좌 선택 사유'), { target: { value: '범위 조정' } })
   fireEvent.click(screen.getByRole('button', { name: '조사 중심 계좌 저장' }))
   await waitFor(() => expect(fetchReviewCase).toHaveBeenCalledTimes(2))
   expect(fetchReviewMoney).toHaveBeenCalledTimes(2)
   expect(setReviewMoneyScope).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('checkbox', { name: '조사 중심 계좌 account-b' })).toBeChecked()
+  expect(screen.getByLabelText('계좌 선택 사유')).toHaveValue('범위 조정')
   expect(toastError).toHaveBeenCalledWith(expect.stringContaining('최신 계좌 범위를 확인'))
+  fireEvent.click(screen.getByRole('button', { name: '조사 중심 계좌 저장' }))
+  await waitFor(() => expect(setReviewMoneyScope).toHaveBeenCalledTimes(2))
+  expect(setReviewMoneyScope.mock.calls[1].slice(0, 4)).toEqual([1, 1002, ['account-a', 'account-b'], '범위 조정'])
+  expect(setReviewMoneyScope.mock.calls[1][4]).not.toBe(setReviewMoneyScope.mock.calls[0][4])
+})
+
+it('재인증으로 상세가 다시 열려도 같은 직원의 계좌 선택과 사유를 복원한다', async () => {
+  fetchReviewMoney.mockResolvedValue({ available: false, reason: 'WAITING_RECEIPTS', selectedAccounts: ['account-a'], candidateAccounts: ['account-a', 'account-b'], revision: 1001 })
+  const mount = () => render(<WorkspaceContext.Provider value={new WorkspaceState('scope-resume/11:STAFF')}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></WorkspaceContext.Provider>)
+  const first = mount()
+  fireEvent.click(await screen.findByRole('checkbox', { name: '조사 중심 계좌 account-b' }))
+  fireEvent.change(screen.getByLabelText('계좌 선택 사유'), { target: { value: '만료 뒤 확인할 계좌 범위' } })
+  first.unmount()
+  mount()
+  expect(await screen.findByRole('checkbox', { name: '조사 중심 계좌 account-b' })).toBeChecked()
+  expect(screen.getByLabelText('계좌 선택 사유')).toHaveValue('만료 뒤 확인할 계좌 범위')
+  expect(setReviewMoneyScope).not.toHaveBeenCalled()
+})
+
+it('목록의 기존 Episode 후보를 현재 직원 담당으로 제한하지 않는다', async () => {
+  render(<LiveCasesPage kind="ALERT" onOpen={vi.fn()} onBack={vi.fn()} />)
+  await waitFor(() => expect(fetchReviewCases).toHaveBeenCalledWith({ kind: 'EPISODE', status: 'OPEN', page: 0, size: 20 }))
 })
 
 it('미판정 거래가 있어도 정상 최종 종결을 확인하고 한 요청으로 보낸다', async () => {
@@ -912,7 +943,7 @@ it('개요에서 전체 조사 계좌를 열고 계좌 거래를 고르면 거�
 
 
 it('401로 작업 공간이 사라진 뒤 같은 직원이 로그인해도 의견 초안을 복원한다', async () => {
-  const mount = () => render(<WorkspaceContext.Provider value={new WorkspaceState()}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></WorkspaceContext.Provider>)
+  const mount = () => render(<WorkspaceContext.Provider value={new WorkspaceState('comment-resume/11:STAFF')}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></WorkspaceContext.Provider>)
   const original = mount()
   await showTab('검토 의견')
   fireEvent.change(screen.getByLabelText('변경 사유'), { target: { value: '세션 만료 전 입력한 검토 근거' } })
@@ -935,9 +966,9 @@ it('Episode 판정 필드가 미제공이면 마지막 패널에서 미판정으
 
 
 it('다른 직원 로그인과 로그아웃 화면에는 이전 직원 의견을 노출하지 않는다', async () => {
-  writeMemory('case-draft/11/ALERT/1', '직원11만 보는 미저장 초안')
-  writeMemory('case-draft/12/ALERT/1', '')
-  const first = render(<CurrentUserContext.Provider value={{ ...MOCK_USER, userId: 12, name: '합성 다른 직원' }}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></CurrentUserContext.Provider>)
+  const store = new WorkspaceState()
+  store.set('case-intent/11/STAFF/ALERT/1/comment', '직원11만 보는 미저장 초안')
+  const first = render(<WorkspaceContext.Provider value={store}><CurrentUserContext.Provider value={{ ...MOCK_USER, userId: 12, name: '합성 다른 직원' }}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></CurrentUserContext.Provider></WorkspaceContext.Provider>)
   await showTab('검토 의견')
   expect(screen.getByLabelText('변경 사유')).toHaveValue('')
   expect(screen.queryByDisplayValue('직원11만 보는 미저장 초안')).not.toBeInTheDocument()
@@ -945,15 +976,16 @@ it('다른 직원 로그인과 로그아웃 화면에는 이전 직원 의견을
   const loggedOut = render(<div>직원 로그인 화면</div>)
   expect(screen.queryByLabelText('변경 사유')).not.toBeInTheDocument()
   loggedOut.unmount()
-  render(<CurrentUserContext.Provider value={MOCK_USER}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></CurrentUserContext.Provider>)
+  render(<WorkspaceContext.Provider value={store}><CurrentUserContext.Provider value={MOCK_USER}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></CurrentUserContext.Provider></WorkspaceContext.Provider>)
   await showTab('검토 의견')
   expect(screen.getByLabelText('변경 사유')).toHaveValue('직원11만 보는 미저장 초안')
 })
 
 it('사건 응답 ID가 다르면 해당 사건의 초안과 제어를 렌더하지 않는다', async () => {
-  writeMemory('case-draft/11/ALERT/2', '두 번째 사건만의 초안')
+  const store = new WorkspaceState()
+  store.set('case-intent/11/STAFF/ALERT/2/comment', '두 번째 사건만의 초안')
   fetchReviewCase.mockResolvedValue(alertCase(1, 3001))
-  render(<LiveCasesPage kind="ALERT" caseId={2} onOpen={vi.fn()} onBack={vi.fn()} />)
+  render(<WorkspaceContext.Provider value={store}><LiveCasesPage kind="ALERT" caseId={2} onOpen={vi.fn()} onBack={vi.fn()} /></WorkspaceContext.Provider>)
   expect(await screen.findByText('요청한 사건과 조회된 정보가 다릅니다. 다시 조회해 주세요.')).toBeInTheDocument()
   expect(screen.queryByLabelText('변경 사유')).not.toBeInTheDocument()
   expect(screen.queryByDisplayValue('두 번째 사건만의 초안')).not.toBeInTheDocument()
@@ -981,4 +1013,98 @@ it('Episode 검토에 폐기된 관리자 검수 단계를 표시하지 않는�
   await showTab('검토 의견')
   expect(await screen.findByLabelText('변경 사유')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '관리자 검수 넘기기' })).not.toBeInTheDocument()
+})
+
+
+it.each([{ userId: 12, caseId: 1 }, { userId: 11, caseId: 2 }])('계좌 초안은 다른 직원이나 사건에 노출되지 않는다 (%s)', async next => {
+  fetchReviewMoney.mockResolvedValue({ available: false, reason: 'WAITING_RECEIPTS', selectedAccounts: ['account-a'], candidateAccounts: ['account-a', 'account-b'], revision: 1001 })
+  const first = render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('checkbox', { name: '조사 중심 계좌 account-b' }))
+  fireEvent.change(screen.getByLabelText('계좌 선택 사유'), { target: { value: '이 사건의 비공개 계좌 근거' } })
+  first.unmount()
+  fetchReviewCase.mockResolvedValue(alertCase(next.caseId, 3000 + next.caseId, { assigneeId: next.userId }))
+  render(<CurrentUserContext.Provider value={{ ...MOCK_USER, userId: next.userId }}><LiveCasesPage kind="ALERT" caseId={next.caseId} onOpen={vi.fn()} onBack={vi.fn()} /></CurrentUserContext.Provider>)
+  expect(await screen.findByRole('checkbox', { name: '조사 중심 계좌 account-b' })).not.toBeChecked()
+  expect(screen.getByLabelText('계좌 선택 사유')).toHaveValue('')
+})
+
+it('충돌 재조회에서 후보가 달라져도 이전 선택을 보여 주고 사용자가 해제할 수 있다', async () => {
+  fetchReviewMoney.mockResolvedValueOnce({ available: false, reason: 'WAITING_RECEIPTS', selectedAccounts: ['account-a'], candidateAccounts: ['account-a', 'account-b'], revision: 1001 })
+    .mockResolvedValue({ available: false, reason: 'WAITING_RECEIPTS', selectedAccounts: ['account-a'], candidateAccounts: ['account-a'], revision: 1002 })
+  setReviewMoneyScope.mockRejectedValueOnce(new ApiError({ type: 'about:blank', title: 'Conflict', status: 409, code: 'INVALID_TRANSITION' }))
+  render(<LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('checkbox', { name: '조사 중심 계좌 account-b' }))
+  fireEvent.change(screen.getByLabelText('계좌 선택 사유'), { target: { value: '변경된 후보와 비교' } })
+  fireEvent.click(screen.getByRole('button', { name: '조사 중심 계좌 저장' }))
+  expect(await screen.findByText('· 최신 후보 목록에 없음')).toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: '조사 중심 계좌 account-b' })).toBeChecked()
+  fireEvent.click(screen.getByRole('checkbox', { name: '조사 중심 계좌 account-b' }))
+  expect(screen.queryByRole('checkbox', { name: '조사 중심 계좌 account-b' })).not.toBeInTheDocument()
+  expect(setReviewMoneyScope).toHaveBeenCalledTimes(1)
+})
+
+
+it('401 뒤 최종 판정 의도와 두 번째 페이지 목적지를 복원하고 최신 revision만 보낸다', async () => {
+  const target = (id: number, revision: number) => ({ ...alertCase(id, 0), kind: 'EPISODE', alertId: null, revision })
+  let targetRevision = 19
+  fetchReviewCases.mockImplementation(({ kind, page: targetPage = 0 }: { kind: string; page?: number }) => Promise.resolve(kind === 'EPISODE'
+    ? { ...page([target(targetPage ? 70 : 50, targetPage ? targetRevision : 7)]), page: targetPage, totalPages: 2, totalElements: 21 }
+    : page([alertCase(1, 3001)])))
+  const mount = () => render(<WorkspaceContext.Provider value={new WorkspaceState('intent-resume/11:STAFF')}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></WorkspaceContext.Provider>)
+  const first = mount()
+  await showTab('검토 의견')
+  await choose('판정', '이상거래 · 기존 Episode 연결')
+  fireEvent.click(await screen.findByRole('button', { name: '다음 Episode 목적지' }))
+  await choose('연결할 Episode', 'E-70')
+  fireEvent.change(screen.getByLabelText('변경 사유'), { target: { value: '정상 종결이 아닌 기존 묶음 편입 근거' } })
+  first.unmount()
+  targetRevision = 29
+  let finish!: (value: ReturnType<typeof alertCase>) => void
+  fetchReviewCase.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const resumed = mount()
+  expect(screen.queryByLabelText('판정')).not.toBeInTheDocument()
+  expect(screen.queryByDisplayValue('정상 종결이 아닌 기존 묶음 편입 근거')).not.toBeInTheDocument()
+  finish(alertCase(1, 3001, { revision: 1002 }))
+  await showTab('검토 의견')
+  expect(screen.getByRole('combobox', { name: '판정' })).toHaveTextContent('기존 Episode 연결')
+  expect(screen.getByRole('combobox', { name: '연결할 Episode' })).toHaveTextContent('E-70')
+  expect(screen.getByText('2/2쪽 · 전체 21건')).toBeInTheDocument()
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  expect(submitReviewCommand).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Episode 연결 확인' }))
+  await waitFor(() => expect(submitReviewCommand).toHaveBeenCalledWith(expect.objectContaining({ action: 'TRANSFER', targetCaseId: 70, targetRevision: 29, selections: [{ caseId: 1, revision: 1002, groupId: 0, txIds: [] }] }), expect.any(String)))
+  resumed.unmount()
+})
+
+it.each([{ userId: 12, role: 'STAFF' as const, caseId: 1 }, { userId: 11, role: 'ADMIN' as const, caseId: 1 }, { userId: 11, role: 'STAFF' as const, caseId: 2 }])('판정 선택은 다른 사용자·역할·사건과 격리된다 (%s)', async next => {
+  const identity = `intent-isolation/${next.userId}/${next.role}/${next.caseId}`
+  const mount = (user = MOCK_USER, caseId = 1) => render(<CurrentUserContext.Provider value={user}><WorkspaceContext.Provider value={new WorkspaceState(identity)}><LiveCasesPage kind="ALERT" caseId={caseId} onOpen={vi.fn()} onBack={vi.fn()} /></WorkspaceContext.Provider></CurrentUserContext.Provider>)
+  const first = mount()
+  await showTab('검토 의견')
+  await choose('판정', '이상거래 · 기존 Episode 연결')
+  await choose('연결할 Episode', 'E-50')
+  first.unmount()
+  fetchReviewCase.mockResolvedValue(alertCase(next.caseId, 3000 + next.caseId))
+  mount({ ...MOCK_USER, userId: next.userId, role: next.role }, next.caseId)
+  await showTab('검토 의견')
+  expect(screen.getByRole('combobox', { name: '판정' })).toHaveTextContent('정상 · 종결')
+  expect(screen.queryByRole('combobox', { name: '연결할 Episode' })).not.toBeInTheDocument()
+  expect(submitReviewCommand).not.toHaveBeenCalled()
+})
+
+it.each(['missing', 'closed'])('복원한 기존 목적지가 최신 OPEN 목록에서 유효하지 않으면 제출하지 않는다 (%s)', async mode => {
+  const mount = () => render(<WorkspaceContext.Provider value={new WorkspaceState(`intent-target/${mode}/11:STAFF`)}><LiveCasesPage kind="ALERT" caseId={1} onOpen={vi.fn()} onBack={vi.fn()} /></WorkspaceContext.Provider>)
+  const first = mount()
+  await showTab('검토 의견')
+  await choose('판정', '이상거래 · 기존 Episode 연결')
+  await choose('연결할 Episode', 'E-50')
+  fireEvent.change(screen.getByLabelText('변경 사유'), { target: { value: '대상 최신 상태 확인 후 편입' } })
+  first.unmount()
+  fetchReviewCases.mockImplementation(({ kind }: { kind: string }) => Promise.resolve(kind === 'EPISODE' ? page(mode === 'missing' ? [] : [{ ...alertCase(50, 0), kind: 'EPISODE', status: 'CLOSED' }]) : page([alertCase(1, 3001)])))
+  mount()
+  await showTab('검토 의견')
+  expect(screen.getByRole('combobox', { name: '판정' })).toHaveTextContent('기존 Episode 연결')
+  expect(screen.getByRole('button', { name: 'Episode 연결 확인' })).toBeDisabled()
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  expect(submitReviewCommand).not.toHaveBeenCalled()
 })

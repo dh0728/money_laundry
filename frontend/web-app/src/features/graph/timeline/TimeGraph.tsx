@@ -64,7 +64,7 @@ const FlowEdgeView = memo(function FlowEdgeView({ id, sourceX, sourceY, targetX,
 
 const nodeTypes = { account: AccountNode }
 const edgeTypes = { flow: FlowEdgeView }
-function GraphCanvas({ rows: allRows, context, live }: { rows: TimeTx[]; context: GraphContext; live?: LiveTimelineActions }) {
+function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[]; context: GraphContext; live?: LiveTimelineActions; active: boolean }) {
   // '선택 거래만 보기'는 사용자가 누른 위상 변경이라 다시 배치한다
   const [only, setOnly] = useState<Set<number> | null>(null)
   const rows = useMemo(() => only ? allRows.filter(t => only.has(t.txId)) : allRows, [allRows, only])
@@ -210,7 +210,7 @@ function GraphCanvas({ rows: allRows, context, live }: { rows: TimeTx[]; context
       </div>
       {view === 'pattern' && <div className="pointer-events-auto flex min-h-11 items-center rounded-md border bg-background/90 px-1.5"><Button size="sm" variant="outline" className="h-8 gap-1.5 bg-background text-xs" title="끌어 놓은 계좌를 구조로 추정한 원래 패턴 모양으로 되돌림" onClick={() => patCtl.current?.reset()}><RotateCcw className="size-3.5" />원래 패턴으로</Button></div>}
       </div>
-      {view === 'pattern' ? <PatternGraph g={g} selected={patSel} onSelect={setPatSel} onZoom={setPatZoom} controls={patCtl} /> : null}
+      {view === 'pattern' ? <PatternGraph active={active} g={g} selected={patSel} onSelect={setPatSel} onZoom={setPatZoom} controls={patCtl} /> : null}
       {view === 'pattern' ? null : <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
         // eslint-disable-next-line react-hooks/refs -- 패널 크기 조절·화면 폭 전환으로 다시 그릴 때 카메라를 이어 받으려고 마지막 위치를 ref에 둔다
         onNodeClick={() => { if (wasOnlySelected.current) { wasOnlySelected.current = false; clearSelection() } }} defaultViewport={camera.current} onMoveEnd={(_, v) => { camera.current = v }}
@@ -312,8 +312,8 @@ function AccountDetail({ app, g }: { app: Appearance; g: ReturnType<typeof build
   </div>
 }
 
-export default function TimeGraph({ rows, context, live }: { rows: TimeTx[]; context: GraphContext; live?: LiveTimelineActions }) {
+export default function TimeGraph({ rows, context, live, active = true }: { rows: TimeTx[]; context: GraphContext; live?: LiveTimelineActions; active?: boolean }) {
   if (!rows.length) return <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">조사 범위에 거래가 없습니다.</div>
   if (rows.some(row => !Number.isFinite(Date.parse(row.txAt)))) return <div role="alert" className="rounded-lg border p-6 text-sm">거래 시각을 확인할 수 없어 시간순 그래프를 표시하지 못했습니다.</div>
-  return <ReactFlowProvider><GraphCanvas rows={rows} context={context} live={live} /></ReactFlowProvider>
+  return <ReactFlowProvider><GraphCanvas rows={rows} context={context} live={live} active={active} /></ReactFlowProvider>
 }

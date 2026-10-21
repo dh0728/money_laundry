@@ -12,7 +12,6 @@ import AlertTxTable from '@/features/alerts/AlertTxTable'
 import ReviewAccounts from '@/features/alerts/ReviewAccounts'
 import CaseEvidenceHistory from '@/features/alerts/CaseEvidenceHistory'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
-import { useMemoryState } from '@/lib/memory'
 import { RefreshStatus } from '@/components/RefreshStatus'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -88,8 +87,9 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
   const alertEvidence = useAsync(() => fetchAlertEvidence(alertId!, publishedVersion), [alertId, publishedVersion], {
     key: 'case/alert-evidence', maxAge: 60_000, enabled: !fixture && kind === 'ALERT' && alertId != null,
   })
-  const [verdict, setVerdict] = useState<AlertVerdict>('normal')
-  const [comment, setComment] = useMemoryState(`case-draft/${user.userId}/${kind}/${caseId}`, '')
+  const intentKey = `case-intent/${user.userId}/${user.role}/${kind}/${caseId}`
+  const [verdict, setVerdict] = useViewState<AlertVerdict>(`${intentKey}/verdict`, 'normal')
+  const [comment, setComment] = useViewState(`${intentKey}/comment`, '')
   const [excludeComment, setExcludeComment] = useState('')
   const [unlinkComment, setUnlinkComment] = useState('')
   const [selectingAlerts, setSelectingAlerts] = useState(false)
@@ -105,17 +105,17 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
   const [confirmDecision, setConfirmDecision] = useState<'NORMAL' | 'SUSPICIOUS' | null>(null)
   const [confirmIncompleteClose, setConfirmIncompleteClose] = useState(false)
   const [sourceAssignees, setSourceAssignees] = useState<Record<number, { status: 'loading' | 'loaded' | 'missing' | 'error'; name?: string }>>({})
-  const [targetCaseId, setTargetCaseId] = useState<number | null>(null)
+  const [targetCaseId, setTargetCaseId] = useViewState<number | null>(`${intentKey}/target`, null)
   const [scoreTxId, setScoreTxId] = useState<number | null>(null)
   const [evidenceFocus, setEvidenceFocus] = useState<number[] | null>(null)
   const [moneyMinutes, setMoneyMinutes] = useState(180)
-  const [scopeDraft, setScopeDraft] = useState<string[] | null>(null)
-  const [scopeComment, setScopeComment] = useState('')
+  const [scopeDraft, setScopeDraft] = useViewState<string[] | null>(`${intentKey}/scope`, null)
+  const [scopeComment, setScopeComment] = useViewState(`${intentKey}/scope-comment`, '')
   const [scopeBusy, setScopeBusy] = useState(false)
   const scopeBusyRef = useRef(false)
   const [scopeRetry, setScopeRetry] = useState(false)
   const scopePrevious = useRef<{ revision: number; accounts: string[]; comment: string; requestId: string } | null>(null)
-  const [targetPage, setTargetPage] = useState(0)
+  const [targetPage, setTargetPage] = useViewState(`${intentKey}/target-page`, 0)
   const emptyPage = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
   const targets = useAsync(() => kind === 'ALERT' ? fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', page: targetPage, size: 20 }) : Promise.resolve(emptyPage), [kind, targetPage], { key: 'case/targets', maxAge: 60_000 })
   const money = useAsync(() => fetchReviewMoney(caseId, moneyMinutes), [caseId, moneyMinutes], { key: 'case/money', maxAge: 60_000 })
@@ -142,6 +142,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     : money.state.status === 'success' && money.state.data.reason === 'WAITING_RECEIPTS'
     ? '원장 수신 완료를 기다리는 중이라 돈의 흐름을 산출할 수 없습니다. 정상 종결은 데이터가 완결된 뒤를 권장합니다.'
     : '원장 수신이 완료되지 않아 돈의 흐름은 현재 관측 범위까지만 확인할 수 있습니다. 정상 종결은 데이터가 완결된 뒤를 권장합니다.'
+  const selectedTarget = targets.state.status === 'success' ? targets.state.data.content.find(row => row.caseId === targetCaseId && row.kind === 'EPISODE' && row.status === 'OPEN') : undefined
   const editable = canEditOpen(user, item.assigneeId, item.status) && (kind !== 'ALERT' || item.episodeId == null) && !scopeBusy
   const editRestriction = item.status !== 'OPEN' ? '종결된 사건은 변경할 수 없습니다.'
     : user.role !== 'STAFF' ? '현재 역할에서는 사건을 변경할 수 없습니다.'
@@ -159,6 +160,8 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     .filter((candidate): candidate is { code: TypeCode; score: number } => typeof candidate.score === 'number' && Number.isFinite(candidate.score) && candidate.score >= 0 && candidate.score <= 1)
     .sort((a, b) => b.score - a.score || a.code - b.code)
   const chosenAccounts = scopeDraft ?? (money.state.status === 'success' ? money.state.data.selectedAccounts ?? [] : [])
+  const scopeCandidates = money.state.status === 'success' ? money.state.data.candidateAccounts ?? [] : []
+  const scopeAccounts = [...new Set([...scopeCandidates, ...chosenAccounts])]
   const toggleAccount = (account: string) => {
     setScopeDraft(current => {
       const accounts = current ?? (money.state.status === 'success' ? money.state.data.selectedAccounts ?? [] : [])
@@ -300,7 +303,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       await submit(buildAlertClose(item, mode, closeComment), mode === 'NORMAL' ? '정상 종결 완료' : '단독 세탁 의심 종결 완료')
       return
     }
-    const target = targets.state.status === 'success' ? targets.state.data.content.find(row => row.caseId === targetCaseId) : undefined
+    const target = selectedTarget
     if (!target) { toast.error('편입할 Episode를 선택해 주세요.'); return }
     await submit(buildAlertTransfer([item], target, comment), `Episode E-${target.caseId} 편입 완료`)
   }
@@ -360,7 +363,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       else {
         scopePrevious.current = null; setScopeRetry(false)
         toast.error(error.problem.status === 403 ? '이 사건의 계좌 범위를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 계좌 범위를 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
-        if (error.problem.status === 409 || error.problem.status === 404) { setScopeDraft(null); void Promise.allSettled([refresh(), money.refresh(), refreshList()]) }
+        if (error.problem.status === 409 || error.problem.status === 404) { if (error.problem.status === 404) setScopeDraft(null); void Promise.allSettled([refresh(), money.refresh(), refreshList()]) }
       }
     } finally { scopeBusyRef.current = false; setScopeBusy(false) }
   }
@@ -452,7 +455,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     {money.state.status === 'success' && money.state.data.candidateAccounts && <div className="mt-4 border-t pt-4">
           <h3 className="text-sm font-semibold">조사 중심 계좌 선택</h3>
           <p className="mt-1 text-xs text-muted-foreground">선택한 가명 계좌를 기준으로 자금 지표를 다시 계산합니다. 사건 거래의 소속과 판정은 바뀌지 않습니다.</p>
-          <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">{money.state.data.candidateAccounts.length ? money.state.data.candidateAccounts.map(account => <label key={account} className="flex items-center gap-2 text-xs"><input type="checkbox" aria-label={`조사 중심 계좌 ${account}`} checked={chosenAccounts.includes(account)} onChange={() => toggleAccount(account)} disabled={!editable || scopeBusy || busy} /><span className="break-all">{account}</span></label>) : <p className="text-xs text-muted-foreground">선택할 계좌 후보가 없습니다.</p>}</div>
+          <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">{scopeAccounts.length ? scopeAccounts.map(account => <label key={account} className="flex items-center gap-2 text-xs"><input type="checkbox" aria-label={`조사 중심 계좌 ${account}`} checked={chosenAccounts.includes(account)} onChange={() => toggleAccount(account)} disabled={!editable || scopeBusy || busy} /><span className="break-all">{account}{!scopeCandidates.includes(account) && <span className="ml-1 text-muted-foreground">· 최신 후보 목록에 없음</span>}</span></label>) : <p className="text-xs text-muted-foreground">선택할 계좌 후보가 없습니다.</p>}</div>
           <textarea aria-label="계좌 선택 사유" className="mt-3 min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="계좌를 포함하거나 제외한 이유" value={scopeComment} onChange={event => { setScopeComment(event.target.value); setScopeRetry(false) }} disabled={!editable || scopeBusy || busy} />
           <div className="mt-2 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || scopeBusy || busy} onClick={() => void saveMoneyScope()}>조사 중심 계좌 저장</Button>{scopeRetry && <Button size="sm" variant="outline" disabled={scopeBusy || busy} onClick={() => { if (scopePrevious.current) void saveMoneyScope(scopePrevious.current) }}>같은 계좌 선택 요청 재시도</Button>}</div>
         </div>}
@@ -583,10 +586,10 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     return { ...section, focusContent: <FocusPanel number={index + 1} title={section.name} question={focus.question} visual={focus.visual} after={focus.after}>{focus.copy}</FocusPanel> }
   })
   return <div className="space-y-5"><RefreshStatus queries={[detail, money, targets]} />
-    <CaseHeader id={item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`} title={item.kind === 'ALERT' ? item.summary.primaryType : `${item.primaryTypes.join(' · ')} · Alert ${item.sourceAlertIds.length}건`}
+    <CaseHeader id={item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`} title={item.kind === 'ALERT' ? item.summary.primaryType : item.outcome === 'DISSOLVED' ? '해체된 Episode · 현재 연결 Alert 0건' : `${item.primaryTypes.join(' · ') || '유형 정보 미제공'} · Alert ${item.sourceAlertIds.length}건`}
       tab={tab} onTab={changeTab} count={item.summary.txCount} notice={incompleteReceipts && item.status === 'OPEN' ? <span role="status" className="font-medium text-destructive-text">{incompleteNotice}{alertEvidence.state.status === 'success' && <Button type="button" size="sm" variant="link" className="ml-1 h-auto p-0 text-inherit underline" onClick={showReceiptCoverage}>수신 범위 보기</Button>}</span> : undefined} tags={<><span className="inline-flex" data-wiring-id="case.header.status">{item.kind === 'ALERT' ? <StatusBadge status={alertListRow(item).status} /> : <EpisodeStatusBadge status={episodeListRow(item).status} />}</span><span className="inline-flex" data-wiring-id="case.header.risk"><RiskBadge score={item.summary.riskScore} /></span><span className="inline-flex" data-wiring-id="case.header.assignee"><Badge variant="outline">담당 {item.assigneeName}</Badge></span>{item.kind === 'ALERT' && item.publishedVersion != null && <Badge variant="outline">근거 v{item.publishedVersion}</Badge>}<Badge variant="outline">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '—'}</Badge></>} />
     <div hidden={tab !== 'overview'}><LiveOverviewViews key={item.caseId} kind={item.kind} sections={overviewSections} /></div>
-    {graphVisited && <section hidden={tab !== 'graph'} aria-label="관계 그래프" className="space-y-2"><h2 className="font-semibold">관계 그래프</h2>{graphRows.length ? <TimeGraph rows={graphRows} context={item.kind === 'ALERT' ? { kind: 'alert', code: `A-${item.alertId}` } : { kind: 'episode', code: `E-${item.caseId}` }} live={{ onInvestigate: openEvidence }} /> : <EmptyBlock>표시할 거래가 없습니다.</EmptyBlock>}</section>}
+    {graphVisited && <section hidden={tab !== 'graph'} aria-label="관계 그래프" className="space-y-2"><h2 className="font-semibold">관계 그래프</h2>{graphRows.length ? <TimeGraph active={tab === 'graph'} rows={graphRows} context={item.kind === 'ALERT' ? { kind: 'alert', code: `A-${item.alertId}` } : { kind: 'episode', code: `E-${item.caseId}` }} live={{ onInvestigate: openEvidence }} /> : <EmptyBlock>표시할 거래가 없습니다.</EmptyBlock>}</section>}
     <div hidden={tab !== 'transactions'}>
     <div role="group" aria-label="조사 범위 보기 방식" className="mb-4 flex flex-wrap gap-2"><Button type="button" size="sm" variant={transactionView === 'transactions' ? 'secondary' : 'outline'} aria-pressed={transactionView === 'transactions'} onClick={() => setTransactionView('transactions')}>거래 보기</Button><Button type="button" size="sm" variant={transactionView === 'accounts' ? 'secondary' : 'outline'} aria-pressed={transactionView === 'accounts'} onClick={() => setTransactionView('accounts')}>계좌 보기</Button></div>
     {transactionView === 'accounts' && <ReviewAccounts item={item} onInvestigate={openEvidence} />}
@@ -622,11 +625,13 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
         {!hasSubject && item.status === 'OPEN' && <p className="text-xs text-destructive-text">조사 대상 거래가 없어 최종 종결할 수 없습니다.</p>}
         <AlertVerdictForm verdict={verdict} setVerdict={setVerdict} comment={comment} setComment={value => { setComment(value); setCanRetry(false) }}
           commentLabel="변경 사유" target={targetCaseId == null ? '' : String(targetCaseId)} setTarget={value => setTargetCaseId(Number(value))}
-          locked={!editable || busy} episodes={targets.state.status === 'success' ? targets.state.data.content.map(row => row.caseId) : []}
-          disabledSubmit={(verdict === 'normal' || verdict === 'standalone') && !hasSubject}
+          locked={!editable || busy} episodes={targets.state.status === 'success' ? targets.state.data.content.filter(row => row.kind === 'EPISODE' && row.status === 'OPEN').map(row => row.caseId) : []}
+          disabledSubmit={((verdict === 'normal' || verdict === 'standalone') && !hasSubject) || (verdict === 'link-episode' && !selectedTarget)}
           newActionLabel="목록에서 새 Episode 만들기"
           onConfirm={() => { if (verdict === 'normal' || verdict === 'standalone') setConfirmDecision(verdict === 'normal' ? 'NORMAL' : 'SUSPICIOUS'); else if (verdict === 'link-episode') void finalizeAlert('EXISTING'); else onBack() }}
           targetFooter={verdict === 'link-episode' && <>
+            {targets.state.status === 'loading' && <LoadingBlock label="Episode 목적지" />}
+            {targets.state.status === 'success' && targetCaseId != null && !selectedTarget && <p role="status" className="text-xs text-muted-foreground">선택한 Episode는 최신 진행 중 목록에 없습니다. 목적지를 다시 선택해 주세요.</p>}
             {targets.state.status === 'error' && <ErrorBlock message={targets.state.message} onRetry={targets.retry} />}
             {targets.state.status === 'success' && targets.state.data.totalPages > 1 && <div className="flex items-center gap-2 text-xs"><Button size="sm" variant="outline" aria-label="이전 Episode 목적지" disabled={targetPage === 0} onClick={() => { setTargetCaseId(null); setTargetPage(page => page - 1) }}>이전</Button><span>{targetPage + 1}/{targets.state.data.totalPages}쪽 · 전체 {targets.state.data.totalElements}건</span><Button size="sm" variant="outline" aria-label="다음 Episode 목적지" disabled={targetPage + 1 >= targets.state.data.totalPages} onClick={() => { setTargetCaseId(null); setTargetPage(page => page + 1) }}>다음</Button></div>}
           </>} />
@@ -669,12 +674,12 @@ export default function LiveCasesPage({ kind, caseId, onOpen, onBack, onOpenEpis
   const scope = JSON.stringify([kind, from, to, filterQuery])
   const [page, setPage] = useViewState(`cases/${scope}/page`, 0)
   const users = useAsync(fetchReviewUsers, [], { key: 'users' })
-  const [targetPage, setTargetPage] = useState(0)
+  const [targetPage, setTargetPage] = useViewState('cases/targets/page', 0)
   const [busy, setBusy] = useState(false)
   const previous = useRef<{ payload: string; id: string } | null>(null)
   const busyRef = useRef(false)
   const list = useAsync(() => fetchReviewCases({ kind, from: from || undefined, to: to || undefined, ...filterQuery, page, size: 20 }), [scope, page], { key: 'cases', maxAge: 60_000 })
-  const targets = useAsync(() => fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', assigneeId: user.userId, page: targetPage, size: 20 }), [user.userId, targetPage], { key: 'cases/targets', enabled: kind === 'ALERT' })
+  const targets = useAsync(() => fetchReviewCases({ kind: 'EPISODE', status: 'OPEN', page: targetPage, size: 20 }), [targetPage], { key: 'cases/targets', enabled: kind === 'ALERT' })
   const rows = list.state.status === 'success' ? list.state.data.content : []
   async function link(ids: number[], targetId: number | 'new', comment: string) {
     if (busyRef.current) throw new Error('처리 중입니다.')
@@ -705,7 +710,7 @@ export default function LiveCasesPage({ kind, caseId, onOpen, onBack, onOpenEpis
   }
   if (caseId) return <CaseDetail key={`${kind}-${caseId}`} caseId={caseId} kind={kind} onBack={onBack} onOpenEpisode={onOpenEpisode ?? onBack} refreshList={list.refresh} onOpenAlert={onOpenAlert ?? (kind === 'ALERT' ? onOpen : undefined)} />
   const footer = list.state.status === 'success' ? <div className="flex items-center justify-between text-xs"><span>전체 {list.state.data.totalElements.toLocaleString()}건</span><div className="flex gap-2"><Button disabled={page === 0} onClick={() => setPage(page - 1)}>이전</Button><span>{page + 1} / {Math.max(1, list.state.data.totalPages)}</span><Button disabled={page + 1 >= list.state.data.totalPages} onClick={() => setPage(page + 1)}>다음</Button></div></div> : null
-  const remote = { query: search, onQuery: setSearch, assignees: users.state.status === 'success' ? users.state.data : [{ id: user.userId, name: user.name }], footer, busy, loading: list.state.status === 'loading', range: from ? { from: new Date(`${from}T00:00:00`), to: to ? new Date(`${to}T00:00:00`) : undefined } : undefined, onRange: (range?: DateRange) => setPeriod({ from: range?.from ? isoDate(range.from) : '', to: range?.to ? isoDate(range.to) : '' }), targets: targets.state.status === 'success' ? targets.state.data.content.map(row => row.caseId) : [] }
+  const remote = { draftScope: `${scope}/${page}`, query: search, onQuery: setSearch, assignees: users.state.status === 'success' ? users.state.data : [{ id: user.userId, name: user.name }], footer, busy, loading: list.state.status === 'loading', range: from ? { from: new Date(`${from}T00:00:00`), to: to ? new Date(`${to}T00:00:00`) : undefined } : undefined, onRange: (range?: DateRange) => setPeriod({ from: range?.from ? isoDate(range.from) : '', to: range?.to ? isoDate(range.to) : '' }), targets: targets.state.status === 'success' ? targets.state.data.content.map(row => row.caseId) : [] }
   return <div className="space-y-4">
     <RefreshStatus queries={[list]} />
 

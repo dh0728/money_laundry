@@ -5,7 +5,7 @@ import { buildTimeline, lanePlan, type TimeTx } from './timeLayout'
 import TimeGraph from './TimeGraph'
 import PairTimeline from './PairTimeline'
 
-vi.mock('./PatternGraph', () => ({ default: () => <div>시안 패턴</div> }))
+vi.mock('./PatternGraph', () => ({ default: ({ active }: { active?: boolean }) => <div data-testid="pattern-active" data-active={String(active)}>시안 패턴</div> }))
 const row: TimeTx = { txId: 101, txAt: '2023-09-10T00:00:00Z', fromAccount: 'a', toAccount: 'b', fromBank: 1, toBank: 2, amountUsd: 10, amountPaid: 12, paymentCurrency: 'EUR', launderingScore: 0.7 }
 
 it('live는 승인된 패턴과 소유주 보기를 유지하고 시안 변경 명령은 노출하지 않는다', () => {
@@ -85,4 +85,12 @@ it('같은 거래 ID의 구조가 정정되면 계좌 노드도 최신 계좌로
   rerender(<TimeGraph rows={[{ ...row, toAccount: 'c' }]} context={{ kind: 'alert', code: 'A-1' }} live={live} />)
   await waitFor(() => expect(container.querySelector('[title="2번 c"]')).not.toBeNull())
   expect(container.querySelector('[title="2번 b"]')).toBeNull()
+})
+
+it('부모 조사 탭의 활성 상태를 패턴 캔버스에 전달한다', () => {
+  const props = { rows: [row], context: { kind: 'alert' as const, code: 'A-1' }, live: { onInvestigate: vi.fn() } }
+  const { rerender } = render(<TimeGraph {...props} active={false} />)
+  expect(screen.getByTestId('pattern-active')).toHaveAttribute('data-active', 'false')
+  rerender(<TimeGraph {...props} active />)
+  expect(screen.getByTestId('pattern-active')).toHaveAttribute('data-active', 'true')
 })

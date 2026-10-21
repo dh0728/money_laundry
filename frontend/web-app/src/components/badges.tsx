@@ -34,7 +34,7 @@ export function WorkStatusBadge({ status, title }: { status: WorkStatus; title?:
   )
 }
 
-export const StatusBadge = ({ status }: { status: AlertStatus }) => <Badge variant="outline" data-tone={workStatusTone[alertWorkStatus(status)]} className="semantic-status-badge text-xs font-normal">{status === 'OPEN' ? '진행 중 · 단독 Alert' : status === 'ESCALATED' ? '진행 중 · Episode' : '종결'}</Badge>
+export const StatusBadge = ({ status }: { status: AlertStatus }) => <Badge variant="outline" data-tone={workStatusTone[alertWorkStatus(status)]} className="semantic-status-badge max-w-full whitespace-normal text-center text-xs font-normal">{status === 'OPEN' ? '진행 중 · 단독 Alert' : status === 'ESCALATED' ? '진행 중 · Episode' : '종결'}</Badge>
 
 export function PatternBadge({ code }: { code: TypeCode }) {
   const { key, label } = typeDisplay(code)

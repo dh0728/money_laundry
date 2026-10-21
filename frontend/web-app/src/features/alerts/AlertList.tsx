@@ -1,5 +1,5 @@
 // v24 Lists.tsx(kind=Alert)를 옮김. 툴바(검색·기간·필터·조건 칩) + data-table + "Episode로 묶기".
-import { useMemo, useReducer, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useReducer, useState, type ReactNode } from 'react'
 import type { DateRange } from 'react-day-picker'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Combine, Download, Inbox, ListFilter, Search } from 'lucide-react'
@@ -20,8 +20,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDataTable } from '@/hooks/use-data-table'
 import { useMemoryState } from '@/lib/memory'
+import { useViewState } from '@/lib/workspaceState'
 import { ageOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
-import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget } from './episodeLink'
+import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget, type EpisodeLinkState, type EpisodeLinkAction } from './episodeLink'
 
 
 export type AlertListRow = Pick<AlertRow, 'alertId' | 'riskScore' | 'txCount' | 'assignee' | 'status' | 'createdAt' | 'ageDays' | 'episodeId' > & Partial<Pick<AlertRow, 'summary' | 'subjectAccount' | 'lastTxAt'>> & { primaryType: { code: TypeCode | null; name: string }; accountCount?: number; bankCount?: number; totalAmountUsd?: number; amountLabel?: string }
@@ -45,7 +46,7 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />,
     cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.txCount}건</div>,
   },
-  { id: 'assignee', accessorFn: row => row.assignee.name, header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" /> },
+  { id: 'assignee', accessorFn: row => row.assignee.name, header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" />, cell: ({ row }) => <span className="block truncate" title={row.original.assignee.name}>{row.original.assignee.name}</span> },
   { id: 'status', accessorKey: 'status', header: ({ column }) => <DataTableColumnHeader column={column} label="상태" />, cell: ({ row }) => <StatusBadge status={row.original.status} /> },
   {
     id: 'createdAt', accessorKey: 'createdAt',
@@ -82,7 +83,7 @@ type Props = {
   today: Date
   onOpen: (row: AlertListRow) => void
   onLink: (alertIds: number[], target: EpisodeTarget, comment: string) => void | Promise<void>
-  remote?: { filters: AlertFilter[]; onFilters: (filters: AlertFilter[]) => void; query: string; onQuery: (query: string) => void; assignees: { id: number; name: string }[]; footer: ReactNode; range?: DateRange; onRange: (range?: DateRange) => void; busy?: boolean; targets?: number[]; loading?: boolean }
+  remote?: { filters: AlertFilter[]; onFilters: (filters: AlertFilter[]) => void; query: string; onQuery: (query: string) => void; assignees: { id: number; name: string }[]; footer: ReactNode; range?: DateRange; onRange: (range?: DateRange) => void; busy?: boolean; targets?: number[]; loading?: boolean; draftScope?: string }
 }
 
 export default function AlertList({ rows, today, onOpen, onLink, remote }: Props) {
@@ -90,7 +91,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
   const me = currentUser.userId
   const [localQuery, setLocalQuery] = useState('')
   const query = remote ? remote.query : localQuery
-  const clearSelection = () => { if (link.mode === 'link') dispatchLink({ type: 'start' }) }
+  const clearSelection = () => { if (linking) dispatchLink({ type: 'start' }) }
   const setQuery = (value: string) => { clearSelection(); if (remote) remote.onQuery(value); else setLocalQuery(value) }
   // v24처럼 "내 담당" 조건을 켠 채 시작한다(API.md §3.2 기본 뷰 assigneeId=me)
   const [localFilters, setLocalFilters] = useState<AlertFilter[]>([{ field: 'assignee', value: me }])
@@ -105,15 +106,32 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
   const [filterOpen, setFilterOpen] = useState(false)
   const [field, setField] = useState<AlertFilterField>('status')
   const [value, setValue] = useState('OPEN')
-  const [link, dispatchLink] = useReducer(episodeLinkReducer, initialLinkState)
-  const [target, setTarget] = useState<string>('new')
-  const [comment, setComment] = useState('')
+  const [localLink, dispatchLocalLink] = useReducer(episodeLinkReducer, initialLinkState)
+  const [localTarget, setLocalTarget] = useState<string>('new')
+  const [localComment, setLocalComment] = useState('')
+  const [draft, setDraft] = useViewState<{ link: EpisodeLinkState; target: string; comment: string }>(
+    `alert-link/${me}/${currentUser.role}/${remote?.draftScope ?? 'local'}`,
+    { link: initialLinkState, target: 'new', comment: '' },
+  )
+  const persistent = remote?.draftScope != null
+  const link = persistent ? draft.link : localLink
+  const linking = !remote?.loading && (link.mode === 'link' || localLink.mode === 'link')
+  const target = persistent ? draft.target : localTarget
+  const comment = persistent ? draft.comment : localComment
+  const dispatchLink = useCallback((action: EpisodeLinkAction) => {
+    dispatchLocalLink(action)
+    if (persistent) setDraft(previous => ({ ...previous, link: episodeLinkReducer(previous.link, action) }))
+  }, [persistent, setDraft])
+  const setTarget = (next: string) => { if (persistent) setDraft(previous => ({ ...previous, target: next })); else setLocalTarget(next) }
+  const setComment = (next: string) => { if (persistent) setDraft(previous => ({ ...previous, comment: next })); else setLocalComment(next) }
 
   const assignees = useMemo(() => new Map(remote ? remote.assignees.map(row => [row.id, row.name] as const) : rows.map(row => [row.assignee.userId, row.assignee.name] as const)), [rows, remote])
   const episodes = useMemo(() => remote?.targets ?? linkableEpisodes(rows), [rows, remote?.targets])
   const result = useMemo(() => remote ? rows : rows.filter(row => matchesAlert(row, filters, query, remote ? undefined : range)), [rows, filters, query, range, remote])
+  const invalidSelection = [...link.selected].some(id => !rows.some(row => row.alertId === id && canLink(row, currentUser)))
+  const invalidTarget = target !== 'new' && !episodes.includes(Number(target))
 
-  const columns = useMemo<ColumnDef<AlertListRow>[]>(() => link.mode === 'browse' ? baseColumns : [
+  const columns = useMemo<ColumnDef<AlertListRow>[]>(() => !linking ? baseColumns : [
     {
       id: 'select', header: '선택', enableSorting: false,
       cell: ({ row }) => (
@@ -127,7 +145,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
       ),
     },
     ...baseColumns,
-  ], [link, currentUser])
+  ], [linking, link.selected, currentUser, dispatchLink])
 
   const [rowsPerPage] = useMemoryState('settings:rows', '20') // 설정 > 페이지당 행
   const pageSize = Number(rowsPerPage) || 20
@@ -191,11 +209,11 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
             }}>조건 적용</Button>
           </PopoverContent>
         </Popover>
-        {currentUser.role === 'STAFF' && link.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" disabled={!rows.some(row => canLink(row, currentUser))} onClick={() => dispatchLink({ type: 'start' })}><Combine className="size-3.5" />Episode로 묶기</Button>}
-        <Button variant="outline" size="sm" className={link.mode === 'browse' ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />{remote ? '현재 페이지 다운로드' : '다운로드'}</Button>
+        {currentUser.role === 'STAFF' && !linking && <Button variant="outline" size="sm" className="ml-auto" disabled={!rows.some(row => canLink(row, currentUser))} onClick={() => dispatchLink({ type: 'start' })}><Combine className="size-3.5" />Episode로 묶기</Button>}
+        <Button variant="outline" size="sm" className={!linking ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />{remote ? '현재 페이지 다운로드' : '다운로드'}</Button>
       </div>
 
-      {link.mode === 'link' && (
+      {linking && (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 px-3 py-2 shadow-sm backdrop-blur" data-testid="episode-link-action-bar">
           <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">현재 서버에서는 본인 담당 열린 Alert만 선택 가능 · 새 Episode는 2건 이상</span></strong>
           <Select value={target} onValueChange={setTarget}>
@@ -206,7 +224,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
             </SelectContent>
           </Select>
           <Input aria-label="연결 의견" placeholder="의견 (필수)" value={comment} onChange={e => setComment(e.target.value)} className="h-8 w-64 text-xs" />
-          <Button size="sm" disabled={Boolean(remote?.busy) || link.selected.size < (remote && target === 'new' ? 2 : 1) || !comment.trim()} onClick={() => {
+          <Button size="sm" title={invalidSelection ? '선택 Alert 상태가 변경됐습니다. 최신 목록에서 다시 선택해 주세요.' : invalidTarget ? '연결할 Episode를 최신 목록에서 다시 선택해 주세요.' : undefined} disabled={Boolean(remote?.busy || remote?.loading) || invalidSelection || invalidTarget || link.selected.size < (remote && target === 'new' ? 2 : 1) || !comment.trim()} onClick={() => {
             void Promise.resolve().then(() => onLink([...link.selected], target === 'new' ? 'new' : Number(target), comment.trim())).then(() => endLink('complete')).catch(() => undefined)
           }}>연결 완료</Button>
           <Button size="sm" variant="outline" onClick={() => endLink('cancel')}>취소</Button>
@@ -226,11 +244,11 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
 
       {result.length
         ? <><div className="space-y-2 md:hidden">{table.getRowModel().rows.map(({ original: row }) => <article key={row.alertId} data-testid="alert-mobile-card" className="min-w-0 rounded-lg border bg-card p-3">
-          <div className="flex items-center justify-between gap-2">{link.mode === 'link' ? <label className="flex items-center gap-2"><Checkbox aria-label={`${alertCode(row.alertId)} 모바일 선택`} disabled={!canLink(row, currentUser)} checked={link.selected.has(row.alertId)} onCheckedChange={() => dispatchLink({ type: 'toggle', id: row.alertId })} /><strong className="font-mono text-sm">{alertCode(row.alertId)}</strong></label> : <button type="button" className="font-mono text-sm font-semibold underline-offset-2 hover:underline" onClick={() => onOpen(row)}>{alertCode(row.alertId)} 상세 보기</button>}<RiskBadge score={row.riskScore} /></div>
+          <div className="flex items-center justify-between gap-2">{linking ? <label className="flex items-center gap-2"><Checkbox aria-label={`${alertCode(row.alertId)} 모바일 선택`} disabled={!canLink(row, currentUser)} checked={link.selected.has(row.alertId)} onCheckedChange={() => dispatchLink({ type: 'toggle', id: row.alertId })} /><strong className="font-mono text-sm">{alertCode(row.alertId)}</strong></label> : <button type="button" className="font-mono text-sm font-semibold underline-offset-2 hover:underline" onClick={() => onOpen(row)}>{alertCode(row.alertId)} 상세 보기</button>}<RiskBadge score={row.riskScore} /></div>
           <div className="mt-2 flex flex-wrap items-center gap-2">{row.primaryType.code == null ? <Badge variant="outline">{row.primaryType.name}</Badge> : <PatternBadge code={row.primaryType.code} />}<StatusBadge status={row.status} />{row.episodeId != null && <Badge variant="outline">{episodeCode(row.episodeId)}</Badge>}</div>
           <p className="mt-2 text-xs text-muted-foreground">거래 {row.txCount}건 · {row.assignee.name} · {row.createdAt.slice(0, 10)}</p>
           <p className="mt-2 overflow-x-auto whitespace-nowrap font-mono text-xs tabular-nums">{row.amountLabel ?? 'USD 환산액 미제공'}</p>
-        </article>)}</div><div className="hidden md:block"><DataTable pagination={!remote} table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-[980px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" /></div></>
+        </article>)}</div><div className="hidden md:block"><DataTable pagination={!remote} table={table} columnWidths={linking ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-[980px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={linking ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" /></div></>
         : remote?.loading ? null
         : (
           <div className="glass-surface rounded-md border py-20 text-center">

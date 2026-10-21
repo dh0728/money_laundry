@@ -2,7 +2,7 @@
 // dev의 force 그래프(react-force-graph-2d, Obsidian 그래프와 같은 방식)로 계좌를 끌어 놀 수 있고,
 // 놓으면 천천히 템플릿 모양 쪽으로 돌아온다. `원래 패턴으로` = templateLayout(보내는 쪽 → 받는 쪽 층, 이웃 평균 높이)으로 즉시 복원.
 // 패턴 이름은 구조로 추정한 값(FE 제안)이고 모델 값이 아니다. 번호는 시간순 그래프와 같은 규칙(처음 나온 순서).
-import { Component, lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import { NODE_SIZE, templateLayout, type Timeline } from './timeLayout'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof import('react-force-graph-2d').default
@@ -38,9 +38,23 @@ class PatternLoadBoundary extends Component<{ children: ReactNode }, { failed: b
   }
 }
 
-export default function PatternGraph({ g, selected, onSelect, onZoom, controls }: { g: Timeline; selected: PatternSelection; onSelect: (s: PatternSelection) => void; onZoom: (k: number) => void; controls: Ref<PatternControls> }) {
+type PatternMethods = import('react-force-graph-2d').ForceGraphMethods<PNode, PLink>
+
+export default function PatternGraph({ g, selected, onSelect, onZoom, controls, active = true }: { g: Timeline; selected: PatternSelection; onSelect: (s: PatternSelection) => void; onZoom: (k: number) => void; controls: Ref<PatternControls>; active?: boolean }) {
   const wrap = useRef<HTMLDivElement>(null)
-  const fg = useRef<import('react-force-graph-2d').ForceGraphMethods<PNode, PLink>>(undefined)
+  const fg = useRef<PatternMethods>(undefined)
+  const activeRef = useRef(active)
+  useLayoutEffect(() => {
+    activeRef.current = active
+    if (active) fg.current?.resumeAnimation()
+    else fg.current?.pauseAnimation()
+  }, [active])
+  const attachGraph = useCallback((graph: PatternMethods | null) => {
+    fg.current = graph ?? undefined
+    // Lazy imports may attach after the parent investigation tab has already hidden this graph.
+    if (activeRef.current) graph?.resumeAnimation()
+    else graph?.pauseAnimation()
+  }, [])
   const [size, setSize] = useState({ w: 0, h: 0 })
   const fitted = useRef(false), lastK = useRef(0)
   // 조작(김명기 10/12, 소유주 보기와 같게): 빈 곳 왼쪽 끌기 = 다중 선택, 빈 곳 오른쪽(휠) 클릭하고 끌기 = 화면 이동, 계좌를 잡고 끌 때만 옮기기
@@ -162,7 +176,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
 
   return <div ref={wrap} className="absolute inset-0" data-testid="pattern-graph" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onContextMenu={e => e.preventDefault()}>
     {box && <div className="pointer-events-none absolute z-10 border border-[var(--palette-blue-500)] bg-[var(--palette-blue-500)]/10" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
-    {size.w > 0 && <PatternLoadBoundary><Suspense fallback={<PatternLoading />}><ForceGraph2D<PNode, PLink> ref={fg} onRenderFramePre={() => { if (fg.current) configure(fg.current) }} width={size.w} height={size.h} graphData={data} backgroundColor="rgba(0,0,0,0)"
+    {size.w > 0 && <PatternLoadBoundary><Suspense fallback={<PatternLoading />}><ForceGraph2D<PNode, PLink> ref={attachGraph as unknown as typeof fg} onRenderFramePre={() => { if (fg.current) configure(fg.current) }} width={size.w} height={size.h} graphData={data} backgroundColor="rgba(0,0,0,0)"
       warmupTicks={150} cooldownTicks={200} enableZoomInteraction={false} enablePanInteraction={false} enableNodeDrag onNodeHover={(n: PNode | null) => { hover.current = n }}
       nodeRelSize={R} nodeVal={1} nodeLabel="" linkLabel=""
       linkCurvature="curvature" linkWidth={(l: PLink) => selected?.type === 'link' && selected.id === l.pair ? l.width + 2 : l.width}

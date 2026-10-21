@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTimeline, detectPatterns, lanePlan, templateLayout, type TimeTx } from './timeLayout'
+import { buildTimeline, chooseSpacing, countConflicts, detectPatterns, lanePlan, templateLayout, type Bundle, type TimeTx } from './timeLayout'
 
 let id = 0
 const t = (from: string, to: string, hour: number, usd = 1000): TimeTx => ({ txId: ++id, txAt: `2026-09-20T${String(hour).padStart(2, '0')}:00:00+09:00`, fromAccount: from, toAccount: to, fromBank: 1, toBank: 1, amountUsd: usd, amountPaid: usd, paymentCurrency: 'USD', launderingScore: 0.5 })
@@ -85,5 +85,18 @@ describe('패턴 보기', () => {
     const g1 = buildTimeline(rows), g2 = buildTimeline([...rows].reverse())
     expect([...templateLayout(g1.tx, [...g1.numbers.keys()])]).toEqual([...templateLayout(g2.tx, [...g2.numbers.keys()])])
     expect(detectPatterns(g1)).toEqual(expect.arrayContaining(['분산 송금', '순환·되돌아옴']))
+  })
+})
+
+describe('곡선 충돌 배치 보존', () => {
+  it.each([[0, 3], [10, 3], [24, 2], [40, 0], [100, 0]])('곡선 간격 %d에서도 선·라벨·계좌 충돌 수를 보존한다', (y, expected) => {
+    const edge = (source: string, target: string): Bundle => ({ id: source + target, source, target, txs: [], sumUsd: 1, maxScore: 0.5, sameTime: false, folded: false })
+    const positions = new Map([['a', { x: 0, y: 0 }], ['b', { x: 50, y: 0 }], ['c', { x: 60, y }], ['d', { x: 110, y }]])
+    expect(countConflicts([edge('a', 'b'), edge('c', 'd')], positions)).toBe(expected)
+  })
+  it('64거래의 기존 간격과 잔여 충돌 수를 유지한다', () => {
+    const rows: TimeTx[] = Array.from({ length: 64 }, (_, i) => ({ ...t(`a${i % 33}`, `a${(i * 7 + 1) % 33}`, 0), txAt: new Date(Date.UTC(2023, 8, 1, 0, i)).toISOString(), fromOwnerId: `o${Math.floor(i % 33 / 2)}`, toOwnerId: `o${Math.floor(((i * 7 + 1) % 33) / 2)}` }))
+    const g = buildTimeline(rows), plan = lanePlan(g, 'owner')
+    expect(chooseSpacing(g, 10, plan.yOf)).toMatchObject({ timeWidth: 430, lane: 196, conflicts: 1 })
   })
 })

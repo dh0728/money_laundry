@@ -1,4 +1,5 @@
 import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
+import { clearWorkspaceViews } from '@/lib/workspaceState'
 import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
 import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
@@ -135,6 +136,7 @@ export default function App() {
   async function signOut() {
     try {
       if (live && !fixture) await logoutSession()
+      clearWorkspaceViews(`${currentUser.userId}:${currentUser.role}`)
       resumeUserId.current = null
       setUser(live && !fixture ? null : MOCK_USER); setLogout(false); setLogoutError(''); go('dashboard')
     } catch {
@@ -155,7 +157,7 @@ export default function App() {
 
   return (
     <CurrentUserContext.Provider value={currentUser}>
-    <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} >
+    <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} sessionKey={live && !fixture ? `${currentUser.userId}:${currentUser.role}` : undefined}>
     <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>

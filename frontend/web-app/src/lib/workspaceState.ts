@@ -1,10 +1,18 @@
 import { createContext, useCallback, useContext, useState, useSyncExternalStore, type SetStateAction } from 'react'
 import { QueryCache } from './queryCache'
 
+// Keep view inputs across session expiry; every provider still owns a fresh API cache.
+const sessionViews = new Map<string, Map<string, unknown>>()
+export const clearWorkspaceViews = (sessionKey: string) => { sessionViews.delete(sessionKey) }
+
 export class WorkspaceState {
   queries = new QueryCache()
   scroll = new Map<string, number>()
-  private views = new Map<string, unknown>()
+  private views: Map<string, unknown>
+  constructor(sessionKey?: string) {
+    this.views = sessionKey ? sessionViews.get(sessionKey) ?? new Map() : new Map()
+    if (sessionKey) sessionViews.set(sessionKey, this.views)
+  }
   private listeners = new Set<() => void>()
   get<T>(key: string, fallback: T): T { return this.views.has(key) ? this.views.get(key) as T : fallback }
   set<T>(key: string, value: T) { this.views.set(key, value); this.listeners.forEach(listener => listener()) }

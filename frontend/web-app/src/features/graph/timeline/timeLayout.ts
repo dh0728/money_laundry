@@ -141,7 +141,8 @@ export function countConflicts(bundles: Bundle[], positions: Map<string, Pos>) {
     const curve = edgeCurve(positions.get(b.source)!, positions.get(b.target)!, b.sameTime)
     const pts = Array.from({ length: SAMPLES + 1 }, (_, i) => at(curve, i / SAMPLES))
     const [lx, ly] = at(curve, 0.5)
-    return { b, pts, label: { l: lx - LABEL_W / 2, r: lx + LABEL_W / 2, t: ly - LABEL_H / 2, bt: ly + LABEL_H / 2 } }
+    const xs = pts.map(([x]) => x), ys = pts.map(([, y]) => y)
+    return { b, pts, bounds: { l: Math.min(...xs), r: Math.max(...xs), t: Math.min(...ys), bt: Math.max(...ys) }, label: { l: lx - LABEL_W / 2, r: lx + LABEL_W / 2, t: ly - LABEL_H / 2, bt: ly + LABEL_H / 2 } }
   })
   const nodes = [...positions].map(([id, p]) => ({ id, l: p.x, r: p.x + N, t: p.y, bt: p.y + N }))
   const hit = (a: { l: number; r: number; t: number; bt: number }, b: typeof a) => a.l < b.r && b.l < a.r && a.t < b.bt && b.t < a.bt
@@ -156,6 +157,8 @@ export function countConflicts(bundles: Bundle[], positions: Map<string, Pos>) {
     for (let j = i + 1; j < edges.length; j++) {
       const B = edges[j]
       if (hit(A.label, B.label)) conflicts++
+      // Separated sample bounds cannot contain a pair closer than CLOSE. Label collisions above still count.
+      if (A.bounds.r + CLOSE <= B.bounds.l || B.bounds.r + CLOSE <= A.bounds.l || A.bounds.bt + CLOSE <= B.bounds.t || B.bounds.bt + CLOSE <= A.bounds.t) continue
       const shared = [A.b.source, A.b.target].filter(id => id === B.b.source || id === B.b.target).map(id => positions.get(id)!)
       const nearShared = ([x, y]: Pt) => shared.some(p => Math.hypot(x - (p.x + N / 2), y - (p.y + N / 2)) < 56)
       // 한 점 교차는 괜찮다. 곡선 길이의 1/8 이상을 붙어 달리면 충돌
