@@ -265,7 +265,7 @@ class InferenceService:
             if "model_error" in outcome:
                 outcome = dict(outcome, model_error=ModelExecutionError.from_document(outcome["model_error"]).document())
             elif outcome.get("error_code") not in (
-                    "TRANSFER_UNAVAILABLE", "TRANSFER_ACCESS_DENIED", "INPUT_OR_MODEL_INVALID",
+                    "TRANSFER_UNAVAILABLE", "TRANSFER_ACCESS_DENIED", "INPUT_OR_MODEL_INVALID", "REPLICA_MISMATCH",
                     "MODEL_PROCESS_FAILED", "MODEL_PROTOCOL_INVALID", "MODEL_PROCESS_UNAVAILABLE"):
                 raise ValueError()
             domain, delay, action = retry_decision(outcome, row["model_failures"] + 1,
@@ -330,7 +330,8 @@ class InferenceService:
                             (directory / "outcome.json").unlink(missing_ok=True)
                             payload = json.loads(row["payload"])
                             payload.update(object_base_url=self.settings.object_base_url,
-                                           max_input_bytes=self.settings.max_input_bytes)
+                                           max_input_bytes=self.settings.max_input_bytes,
+                                           replica_dir=str(self.root / "replica"))
                             atomic_json(directory / "request.json", payload)
                             with self.db:
                                 self.db.execute("UPDATE requests SET status='RUNNING',revision=revision+1,attempts=attempts+1 WHERE request_id=? AND round=?", key)

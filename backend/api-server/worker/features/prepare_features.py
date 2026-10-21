@@ -16,7 +16,7 @@ import pyarrow.parquet as pq
 
 from common.frozen_input import FrozenInput, StaleExecution
 from common.worker_transport import ProtocolError
-from features.materials import MATERIALS, write_materials
+from features.materials import MATERIALS, REPLICA_MATERIALS, write_materials
 from models import registry
 
 MODEL_KINDS = ("BINARY", "TYPE")
@@ -41,24 +41,53 @@ def _digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def _lock(connection, execution):
+def _lock(connection, execution, stage="FEATURES"):
     # Same integration lock/order as Spring correction/freeze operations.
     connection.execute("SELECT pg_advisory_xact_lock(17004000)")
     connection.execute("SELECT job_id FROM analysis.jobs WHERE job_id=%s FOR UPDATE",
                        (execution.job_id,))
     connection.execute("SELECT run_id FROM analysis.runs WHERE run_id=%s FOR UPDATE",
                        (execution.run_id,))
-    FrozenInput(connection, execution).check_current()
+    FrozenInput(connection, execution, stage=stage).check_current()
 
 
 def artifact_files(document):
-    """[(name, relative path, size, sha256)] of a prepared input; version 1 held only targets."""
+    """[(name, relative path, size, sha256)] of a prepared input.
+
+    Version 1 held only targets, 2 adds the materials, 3 adds the removed file for the
+    inference server's ledger copy (with a "replica" position).
+    """
     if document.get("protocol_version") == 1:
         return [("targets", document["path"], document["size_bytes"], document["sha256"])]
     files = [(f["name"], f["path"], f["size_bytes"], f["sha256"]) for f in document["files"]]
-    if [name for name, *_ in files] != ["targets", *MATERIALS]:
+    expected = REPLICA_MATERIALS if document.get("protocol_version") == 3 else MATERIALS
+    if [name for name, *_ in files] != ["targets", *expected]:
         raise ProtocolError("Unexpected prepared input files")
     return files
+
+
+def replica_plan(connection, execution, *, full=False):
+    """Ledger copy position for this run's inputs, or None when the run has no ledger position.
+
+    The base is the latest earlier run whose request the inference server received; the copy
+    is then at that run's position. A copy at any other position answers REPLICA_MISMATCH and
+    the model is prepared again with full=True.
+    """
+    seq = connection.execute("SELECT input_seq FROM analysis.runs WHERE run_id=%s",
+                             (execution.run_id,)).fetchone()[0]
+    if seq is None:
+        return None
+    base = None if full else connection.execute("""
+        SELECT max(r.input_seq) FROM analysis.runs r
+        WHERE r.input_seq<%s AND EXISTS(SELECT 1 FROM analysis.model_tasks t
+          WHERE t.run_id=r.run_id AND t.remote_revision IS NOT NULL)
+        """, (seq,)).fetchone()[0]
+    # Transactions frozen at seq: the server installs a copy only with exactly this many.
+    rows = connection.execute("SELECT count(*) FROM analysis.run_inputs WHERE run_id=%s",
+                              (execution.run_id,)).fetchone()[0]
+    if base:
+        return dict(mode="delta", base_seq=base, seq=seq, rows=rows)
+    return dict(mode="full", base_seq=0, seq=seq, rows=rows)
 
 
 def _existing(connection, execution, root, kind, versions):
@@ -107,10 +136,10 @@ def _initialize(connection, execution, versions):
                 raise ProtocolError("Model binding changed within a run")
 
 
-def _claim(connection, execution, kind):
+def _claim(connection, execution, kind, stage="FEATURES"):
     token = uuid.uuid4()
     with connection.transaction():
-        _lock(connection, execution)
+        _lock(connection, execution, stage)
         # Only a new, fenced parent execution can recover an abandoned preparation.
         # Two processes with the same parent token may not steal each other's work.
         changed = connection.execute("""
@@ -118,7 +147,7 @@ def _claim(connection, execution, kind):
               execution_owner=%s,operation_attempts=operation_attempts+1,updated_at=now(),
               error_code=null,action_required=false
             WHERE run_id=%s AND model_kind=%s AND phase='PREPARE'
-              AND (status IN ('READY','FAILED') OR (status='ACTIVE' AND execution_owner<>%s))
+              AND (status IN ('READY','FAILED','RETRY_WAIT') OR (status='ACTIVE' AND execution_owner<>%s))
             """, (token, execution.execution_id, execution.run_id, kind,
                   execution.execution_id)).rowcount
         if changed != 1:
@@ -126,10 +155,10 @@ def _claim(connection, execution, kind):
     return token
 
 
-def _record_failure(connection, execution, kind, token):
+def _record_failure(connection, execution, kind, token, stage="FEATURES"):
     try:
         with connection.transaction():
-            _lock(connection, execution)
+            _lock(connection, execution, stage)
             connection.execute("""
                 UPDATE analysis.model_tasks SET status='FAILED',execution_id=null,
                   execution_owner=null,error_code='PREPARE_FAILED',updated_at=now(),
@@ -154,9 +183,9 @@ def _stage_features(connection, path):
                     copy.write_row((row["tx_id"], json.dumps({k: v for k, v in row.items() if k != "tx_id"})))
 
 
-def _save_prepared(connection, execution, kind, token, document):
+def _save_prepared(connection, execution, kind, token, document, stage="FEATURES"):
     with connection.transaction():
-        _lock(connection, execution)
+        _lock(connection, execution, stage)
         changed = connection.execute("""
             UPDATE analysis.model_tasks SET phase='PUBLISH',status='READY',input_artifact=%s::jsonb,
               execution_id=null,execution_owner=null,consecutive_failures=0,updated_at=now()
@@ -174,12 +203,13 @@ def _save_prepared(connection, execution, kind, token, document):
             """, (execution.run_id, kind, document["feature_version"]))
 
 
-def _prepare_model(connection, execution, root, kind, versions):
-    source = FrozenInput(connection, execution)
+def _prepare_model(connection, execution, root, kind, versions, *, stage="FEATURES", full=False):
+    source = FrozenInput(connection, execution, stage=stage)
     source.check_current()
     artifact = _existing(connection, execution, root, kind, versions)
     if artifact is None:
-        token = _claim(connection, execution, kind)
+        replica = replica_plan(connection, execution, full=full)
+        token = _claim(connection, execution, kind, stage)
         relative = Path("runs") / str(execution.run_id) / kind / str(token) / "targets.parquet"
         output = root / relative
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -192,24 +222,35 @@ def _prepare_model(connection, execution, root, kind, versions):
                 os.fsync(stream.fileno())
             os.replace(temporary, output)
             temporary = None
-            write_materials(source, output.parent)
+            write_materials(source, output.parent, replica=replica)
             files = []
-            for name in ("targets", *MATERIALS):
+            for name in ("targets", *(MATERIALS if replica is None else REPLICA_MATERIALS)):
                 path = output.with_name(name + ".parquet")
                 files.append(dict(name=name, path=relative.with_name(path.name).as_posix(),
                                   size_bytes=path.stat().st_size, sha256=_digest(path)))
-            artifact = dict(protocol_version=2, run_id=str(execution.run_id), model_kind=kind,
-                            model_version=versions[0], feature_version=versions[1],
-                            files=files, row_count=count)
+            artifact = dict(protocol_version=2 if replica is None else 3, run_id=str(execution.run_id),
+                            model_kind=kind, model_version=versions[0], feature_version=versions[1],
+                            files=files, row_count=count, **({} if replica is None else dict(replica=replica)))
             _stage_features(connection, output)
-            _save_prepared(connection, execution, kind, token, artifact)
+            _save_prepared(connection, execution, kind, token, artifact, stage)
         except Exception:
-            _record_failure(connection, execution, kind, token)
+            _record_failure(connection, execution, kind, token, stage)
             raise
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
     return artifact
+
+
+def prepare_full_again(connection, execution, storage_root, kind):
+    """⑥ 모델 추론 (INFERENCE): prepare one model again with its whole frozen input.
+
+    Used when the inference server's ledger copy was not at the delta's base position
+    (REPLICA_MISMATCH); the task was reset to PREPARE for a new round.
+    """
+    versions = versions_for_run(connection, execution)[kind]
+    return _prepare_model(connection, execution, Path(storage_root).resolve(), kind, versions,
+                          stage="INFERENCE", full=True)
 
 
 def run(connection, execution, context):

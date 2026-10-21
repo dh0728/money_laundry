@@ -1,6 +1,7 @@
 """One bounded inference tick; never wait for a model or mark scores complete."""
 import json
 import re
+from uuid import uuid4
 
 import httpx
 
@@ -43,7 +44,7 @@ def normalize(request, view, prefix, expected_rows):
         code = view.get('error_code')
         known = set(MODEL_ERRORS) | {'TRANSFER_UNAVAILABLE', 'TRANSFER_ACCESS_DENIED',
             'INPUT_OR_MODEL_INVALID', 'MODEL_PROCESS_FAILED', 'MODEL_PROTOCOL_INVALID',
-            'MODEL_PROCESS_UNAVAILABLE', 'RECOVERY_REQUIRED', 'WORKER_SHUTDOWN'}
+            'MODEL_PROCESS_UNAVAILABLE', 'RECOVERY_REQUIRED', 'WORKER_SHUTDOWN', 'REPLICA_MISMATCH'}
         normalized['error_code'] = code if isinstance(code, str) and code in known else 'REMOTE_EXECUTION_FAILED'
     return normalized
 
@@ -107,6 +108,19 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
             connection.execute('''UPDATE analysis.model_requests SET status=%s
                 WHERE request_id=%s AND execution_round=%s AND status IN ('REGISTERED','PUBLISHED')''',
                 ('STOPPED' if remote == 'STOPPED' else 'ALREADY_FINISHED', request_id, round_id))
+        # Only a delta can be repaired by sending everything; a refused full input fails visibly.
+        if ended and view.get('error_code') == 'REPLICA_MISMATCH' and artifact.get('replica', {}).get('mode') == 'delta':
+            # The server's ledger copy was not at this input's base position. Not a model failure:
+            # prepare this model again with its whole frozen input. Different input files make it a
+            # new request (a request's input files are shared by all its rounds).
+            replacement = uuid4()
+            connection.execute('''INSERT INTO analysis.model_requests(request_id,execution_round,run_id,model_kind,status)
+                VALUES(%s,1,%s,%s,'REGISTERED')''', (replacement, execution.run_id, kind))
+            connection.execute('''UPDATE analysis.model_tasks SET phase='PREPARE',status='RETRY_WAIT',retry_at=now(),
+                request_id=%s,execution_round=1,input_artifact=null,remote_revision=null,remote_snapshot=null,
+                remote_deadline_at=null,next_poll_at=null,last_event_id=null,error_code='REPLICA_MISMATCH',
+                action_required=false,consecutive_failures=0,updated_at=now()
+                WHERE run_id=%s AND model_kind=%s''', (replacement, execution.run_id, kind))
         if status == 'WAITING':
             connection.execute('''UPDATE analysis.model_tasks SET action_required=true,
                 error_code=coalesce(error_code,'REMOTE_WAIT_EXPIRED')
@@ -194,6 +208,16 @@ def advance(connection, execution, storage_root, settings, s3, *, transport=None
     for kind, phase, status, due in rows:
         if not due or status in ('SUCCEEDED', 'CANCELLED'):
             continue
+        if phase == 'PREPARE' and status in ('READY', 'RETRY_WAIT'):
+            from features.prepare_features import prepare_full_again
+            from common.frozen_input import StaleExecution
+            try:
+                prepare_full_again(connection, execution, storage_root, kind)
+            except StaleExecution:
+                raise
+            except Exception:
+                continue  # Recorded as PREPARE_FAILED; the job fails visibly and resumes from here.
+            phase, status = 'PUBLISH', 'READY'
         try:
             if phase == 'PUBLISH' and status in ('READY', 'ACTIVE', 'RETRY_WAIT'):
                 publish_model(connection, execution, kind, storage_root, settings, s3, transport=transport)
@@ -203,6 +227,7 @@ def advance(connection, execution, storage_root, settings, s3, *, transport=None
             from common.frozen_input import StaleExecution
             if isinstance(error, StaleExecution):
                 raise
+
             _failure(connection, execution, kind, error)
     from scores.result_collection import collect_model, finish_inference
     collections = connection.execute('''SELECT model_kind FROM analysis.model_tasks

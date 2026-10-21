@@ -72,5 +72,6 @@ def retry_decision(outcome, model_failures, transfer_failures):
         "MODEL_PROCESS_FAILED": "INSPECT_PROCESS_EXIT",
         "MODEL_PROTOCOL_INVALID": "CHECK_MODEL_ADAPTER",
         "MODEL_PROCESS_UNAVAILABLE": "CHECK_INFERENCE_ENVIRONMENT",
+        "REPLICA_MISMATCH": "RESEND_FULL_INPUT",
     }
     return "WORKER", None, actions.get(code, "INSPECT_WORKER_FAILURE")

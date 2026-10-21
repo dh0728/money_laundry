@@ -27,7 +27,7 @@ class InputExecution:
 
 
 class FrozenInput:
-    def __init__(self, connection, execution: InputExecution, *, batch_size=4096):
+    def __init__(self, connection, execution: InputExecution, *, batch_size=4096, stage="FEATURES"):
         # Each query sees current cancellation state; no long-running transaction
         # or snapshot is held while Arrow computes/serializes a batch.
         if connection.autocommit is not True:
@@ -37,13 +37,15 @@ class FrozenInput:
         self.connection = connection
         self.execution = execution
         self.batch_size = batch_size
+        # FEATURES prepares inputs; INFERENCE re-prepares one model when its server copy needs a full resend.
+        self.stage = stage
 
     def _check(self, row):
         token, status, stage, run, run_status = row[:5]
         if (str(token) != str(self.execution.execution_id) or status != "RUNNING"
-                or stage != "FEATURES" or str(run) != str(self.execution.run_id)
+                or stage != self.stage or str(run) != str(self.execution.run_id)
                 or run_status not in ("READY", "ACTIVE")):
-            raise StaleExecution("Execution is no longer the active FEATURES owner")
+            raise StaleExecution(f"Execution is no longer the active {self.stage} owner")
 
     def _page(self, after):
         # LEFT JOIN preserves the ownership row even for an empty/end page.

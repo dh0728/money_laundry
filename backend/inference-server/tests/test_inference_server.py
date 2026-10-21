@@ -105,7 +105,7 @@ class InferenceServerTests(unittest.TestCase):
         self.http.server_close()
         self.thread.join(5)
 
-    def payload(self, kind="binary", targets=None, versions=None, materials=False, retry_of=None):
+    def payload(self, kind="binary", targets=None, versions=None, materials=False, retry_of=None, replica=None):
         versions = versions or dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
         if retry_of is None:
             request = Request(7, kind, **versions, run_id=str(uuid4()))
@@ -117,6 +117,9 @@ class InferenceServerTests(unittest.TestCase):
             # Same shape the backend sends with every model input (features/materials.py there).
             tables["transactions"] = pa.table({"tx_id": pa.array([1, 2, 99, 100], pa.int64())})
             tables["accounts"] = pa.table({"account_id": pa.array(["a", "b"]), "entity_type": pa.array(["Corporation", None])})
+        if replica is not None:
+            replica, materials = dict(replica), True
+            tables.update(replica.pop("tables"))
         entries, urls = [], {}
         for name, table in tables.items():
             stream = io.BytesIO()
@@ -133,6 +136,7 @@ class InferenceServerTests(unittest.TestCase):
                     manifest_sha256=hashlib.sha256(manifest).hexdigest(),
                     manifest_url=self.base + "dev/" + request.manifest,
                     input_url=urls["targets"], **({"input_urls": urls} if materials else {}),
+                    **({"replica": replica} if replica is not None else {}),
                     result_urls={name: self.base + "dev/" + request.output + name
                                  for name in ("scores.parquet", "result.json")})
 
@@ -390,6 +394,34 @@ class InferenceServerTests(unittest.TestCase):
             hold_compute_lock(directory)
         lease.close()
         self.assertIs(compute_running(directory), False)
+
+    def test_replica_requests_keep_the_ledger_copy_and_refuse_a_wrong_base(self):
+        from inference_worker.replica import Replica
+        from tests.test_replica import accounts, removed, transactions
+        copy = Replica(Path(self.temp.name).resolve() / "replica")
+        full = self.payload(replica=dict(mode="full", base_seq=0, seq=5, rows=2, tables=dict(
+            transactions=transactions([(1, "a", "b", "10"), (2, "b", "a", "20")]),
+            accounts=accounts([("a", None), ("b", None)]), removed=removed([]))))
+        delta = dict(mode="delta", base_seq=5, seq=9, rows=3, tables=dict(
+            transactions=transactions([(99, "a", "c", "30"), (100, "c", "b", "40")], "TARGET"),
+            accounts=accounts([("c", None)]), removed=removed([2])))
+        binary, kind = self.payload(replica=delta), self.payload("type", replica=delta)
+        for payload in (full, binary, kind):
+            self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+            self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
+        self.assertEqual(copy.current()["seq"], 9)
+        self.assertEqual(copy.inputs(build_targets([99, 100]))["transactions"].column("tx_id").to_pylist(), [1, 99, 100])
+        stale = self.payload(replica=dict(delta, base_seq=7, seq=12))
+        self.client.put(self.path(stale), json=stale, headers=self.headers)
+        self.wait_for(lambda: self.state(stale)["status"] == "FAILED")
+        self.assertEqual(self.state(stale)["error_code"], "REPLICA_MISMATCH")
+        self.assertEqual(copy.current()["seq"], 9)
+        for broken in (dict(delta, base_seq=0), dict(delta, mode="full"), dict(delta, seq=5), dict(delta, rows=0)):
+            bad = self.payload(replica=broken)
+            self.assertEqual(self.client.put(self.path(bad), json=bad, headers=self.headers).status_code, 422)
+        missing = self.payload(replica=delta)
+        missing["input_urls"].pop("removed")
+        self.assertEqual(self.client.put(self.path(missing), json=missing, headers=self.headers).status_code, 422)
 
     def test_tampered_manifest_fails_without_output_upload(self):
         payload = self.payload()
