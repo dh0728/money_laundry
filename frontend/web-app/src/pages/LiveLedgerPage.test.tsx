@@ -2,9 +2,22 @@ import { fireEvent, render, screen, within, waitFor } from '@testing-library/rea
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveLedgerPage from './LiveLedgerPage'
 const { owners, accounts, transactions } = vi.hoisted(() => ({ owners: vi.fn(), accounts: vi.fn(), transactions: vi.fn() }))
+const { cases } = vi.hoisted(() => ({ cases: vi.fn() }))
 vi.mock('@/api/liveLedger', () => ({ fetchLedgerOwners: owners, fetchLedgerAccounts: accounts, fetchLedgerTransactions: transactions, fetchPaymentFormats: async () => [] }))
+vi.mock('@/api/liveReview', () => ({ fetchReviewCases: cases }))
 const page = (content: unknown[]) => ({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 })
 beforeEach(() => vi.clearAllMocks())
+it('원장 연결 Alert를 눌러 alertId와 다른 실제 caseId로 이동한다', async () => {
+  owners.mockResolvedValue(page([])); accounts.mockResolvedValue(page([]))
+  transactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2026-10-21T10:00:00+09:00', fromAccountId: 'account-a', toAccountId: 'account-b', fromOwnerName: '검수 A', toOwnerName: '검수 B', amountPaid: 100, amountUsd: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', isSuspicious: true, alertIds: [3001], episodeIds: [] }]))
+  cases.mockResolvedValue(page([{ kind: 'ALERT', alertId: 3001, caseId: 42 }]))
+  const onOpen = vi.fn(); render(<LiveLedgerPage onOpen={onOpen} />)
+  fireEvent.click(await within(screen.getByTestId('transaction-section')).findByText('101'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Alert · A-3001' }))
+  await waitFor(() => expect(onOpen).toHaveBeenCalledWith('ALERT', 42))
+  expect(onOpen).not.toHaveBeenCalledWith('ALERT', 3001)
+  expect(cases).toHaveBeenCalledWith({ kind: 'ALERT', query: 'A-3001', page: 0, size: 100 })
+})
 it('선택 전 계좌·거래 첫 페이지를 요청하고 기존 세 단계 안에 바로 표시한다', async () => {
   owners.mockResolvedValue(page([{ id: 'owner-a', name: '검수 소유주 A' }]))
   accounts.mockResolvedValue(page([{ id: 'account-a', ownerId: 'owner-a', bankId: 1 }]))

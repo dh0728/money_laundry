@@ -81,15 +81,15 @@ function TransactionMiniSankey({ transaction }: { transaction: IndexedTransactio
 
 function RecordLinks({ ids, kind, plain, onOpen }: { ids: number[]; kind: 'Alert' | 'Episode'; plain?: boolean; onOpen?: (id: number) => void }) {
   const prefix = kind === 'Alert' ? 'A' : 'E'
-  if (plain) return <div className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} variant="outline">Alert · A-{id}</Badge>)}</div>
+  if (plain) return <div className="flex flex-wrap gap-2">{ids.map(id => onOpen ? <Badge key={id} asChild variant="outline"><button type="button" onClick={() => onOpen(id)} title={`${prefix}-${id} 상세 보기`}>Alert · A-{id}</button></Badge> : <Badge key={id} variant="outline">Alert · A-{id}</Badge>)}</div>
   return <div className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} asChild variant="outline" className="record-link h-8 rounded-full px-3 font-mono text-xs"><a onClick={event => { if (onOpen) { event.preventDefault(); onOpen(id) } }} href={hrefFor(kind === 'Alert' ? 'alerts' : 'episodes', id)} title={`${prefix}-${id} 상세 보기`}>{kind} · {prefix}-{id}</a></Badge>)}</div>
 }
 
-function LinkedRecordActions({ transaction, remote, onOpenEpisode }: { transaction: IndexedTransaction; remote?: boolean; onOpenEpisode?: (id: number) => void }) {
+function LinkedRecordActions({ transaction, remote, onOpenEpisode, onOpenAlert }: { transaction: IndexedTransaction; remote?: boolean; onOpenEpisode?: (id: number) => void; onOpenAlert?: (id: number) => void }) {
   const { alertIds: alerts, episodeIds: episodes } = transaction
   if (!alerts.length && !episodes.length) return null
   return <div data-testid="linked-record-actions" className="flex flex-wrap gap-3 border-t pt-3">
-    {alerts.length > 0 && <div className="space-y-1.5"><p className="text-[var(--text-micro-size)] text-muted-foreground">연결 Alert</p><RecordLinks ids={alerts} kind="Alert" plain={remote} /></div>}
+    {alerts.length > 0 && <div className="space-y-1.5"><p className="text-[var(--text-micro-size)] text-muted-foreground">연결 Alert</p><RecordLinks ids={alerts} kind="Alert" plain={remote} onOpen={onOpenAlert} /></div>}
     {episodes.length > 0 && <div className="space-y-1.5"><p className="text-[var(--text-micro-size)] text-muted-foreground">연결 Episode</p><RecordLinks ids={episodes} kind="Episode" onOpen={onOpenEpisode} /></div>}
   </div>
 }
@@ -112,6 +112,7 @@ function visibleAccountsForOwner(owner: IndexedOwner, accountsByOwner: ReadonlyM
 
 export type ExplorerRemote = {
   onOpenEpisode?: (id: number) => void
+  onOpenAlert?: (id: number) => void
   query: string; onQuery: (query: string) => void
   owner?: string; account?: string
   selectOwner: (id: string | undefined) => void; selectAccount: (id: string | undefined) => void
@@ -195,7 +196,7 @@ export default function TransactionExplorer({ index, target, today, remote }: { 
         <StagePanel testId="account-section" title="계좌" count={remote ? remote.counts[1] : ownerAccounts.length} description={owner ? `${owner.name}의 계좌` : remote ? undefined : '소유주를 선택하세요'}>{ownerAccounts.map(item => <StageItem key={item.id} testId="account-item" active={item.id === account?.id} primary={item.id} secondary={remote ? `은행 ${item.bank}` : `은행 ${item.bank} · 거래 ${item.transactionIds.length}건`} mono onSelect={() => selectAccount(item)} />)}{remote?.stages[1]}</StagePanel>
         <OrthogonalConnector id="account-transaction-connector" sourceIndex={ownerAccounts.findIndex(item => item.id === account?.id)} targetCount={account ? transactionRows.length : 0} targetOffset={110} activeTargetIndex={transactionRows.findIndex(item => item.id === selectedTransactionId)} />
         <StagePanel testId="transaction-section" title="거래" count={remote ? remote.counts[2] : transactionRows.length} description={account ? `${account.id}의 거래 내역` : remote ? undefined : '계좌를 선택하세요'}><div data-testid="transaction-list">{transactionRows.map(item => <StageItem key={item.id} testId="transaction-item" active={item.id === selectedTransactionId} primary={item.id} secondary={<>{item.direction && <Badge variant="ghost" className="bg-foreground !border-transparent !text-background font-normal">{item.direction}</Badge>}<Badge variant={item.suspicious ? 'destructive' : 'ghost'} className={item.suspicious ? '!border-transparent !text-destructive-foreground font-normal' : 'bg-foreground !border-transparent !text-background font-normal'}>{item.suspicious === null ? '미분석' : item.suspicious ? '의심' : '정상'}</Badge></>} mono onSelect={() => selectTransaction(item)} />)}</div>{remote?.stages[2]}</StagePanel>
-        <Card className="transaction-detail self-start" data-testid="transaction-detail"><CardHeader><CardTitle className="text-sm">선택 거래 상세</CardTitle><CardDescription className={selected ? 'font-mono' : ''}>{selected?.id ?? '거래를 선택하세요'}</CardDescription>{selected && <LinkedRecordActions transaction={selected} remote={Boolean(remote)} onOpenEpisode={remote?.onOpenEpisode} />}</CardHeader>{selected && <CardContent data-testid="selected-transaction" className="grid gap-5 text-xs"><TransactionMiniSankey transaction={selected} /><div className="grid grid-cols-2 gap-4"><div><p className="text-muted-foreground">거래 시각</p><p className="mt-1 tabular-nums">{selected.at.slice(0, 16).replace('T', ' ')}</p></div><div><p className="text-muted-foreground">결제 수단</p><p className="mt-1">{selected.format}</p></div></div><div><p className="text-muted-foreground">상태</p><Badge className="mt-1" variant={selected.suspicious ? 'destructive' : 'outline'}>{selected.suspicious === null ? '미분석' : selected.suspicious ? '의심' : '정상'}</Badge></div></CardContent>}</Card>
+        <Card className="transaction-detail self-start" data-testid="transaction-detail"><CardHeader><CardTitle className="text-sm">선택 거래 상세</CardTitle><CardDescription className={selected ? 'font-mono' : ''}>{selected?.id ?? '거래를 선택하세요'}</CardDescription>{selected && <LinkedRecordActions transaction={selected} remote={Boolean(remote)} onOpenEpisode={remote?.onOpenEpisode} onOpenAlert={remote?.onOpenAlert} />}</CardHeader>{selected && <CardContent data-testid="selected-transaction" className="grid gap-5 text-xs"><TransactionMiniSankey transaction={selected} /><div className="grid grid-cols-2 gap-4"><div><p className="text-muted-foreground">거래 시각</p><p className="mt-1 tabular-nums">{selected.at.slice(0, 16).replace('T', ' ')}</p></div><div><p className="text-muted-foreground">결제 수단</p><p className="mt-1">{selected.format}</p></div></div><div><p className="text-muted-foreground">상태</p><Badge className="mt-1" variant={selected.suspicious ? 'destructive' : 'outline'}>{selected.suspicious === null ? '미분석' : selected.suspicious ? '의심' : '정상'}</Badge></div></CardContent>}</Card>
       </div>
     </div>
   </div>

@@ -15,9 +15,13 @@ it('선택이 없으면 owner/account를 생략하고 소유주만 선택하면 
 })
 
 it('대시보드는 필수 기간을 최신 경로로 보낸다', async () => {
-  const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    businessAt: '2026-09-28T00:00:00+09:00', range: { from: '2026-09-01', to: '2026-09-28' },
+    pipeline: { computedAt: '2026-09-28T00:00:00+09:00', data: { detection: { received: 0, analyzed: 0, suspicious: 0, deliveryDates: [] }, pendingReports: 0, agreements: [], types: [] } },
+    investigation: { computedAt: '2026-09-28T00:00:00+09:00', data: { personal: { pending: 0, aged: 0, closed: 0 }, institution: { alerts: 0, episodes: 0, aged: 0, today: 0, yesterday: 0 }, openAlertsAgedOver3Days: 0, daily: [], dailyAlertStatus: [], episodeWork: { current: { unreviewed: 0 }, firstReview: { samples: 0, averageSeconds: null }, completion: { samples: 0, averageSeconds: null } } } },
+  })))
   await fetchLiveDashboard('2026-09-01', '2026-09-28')
-  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/dashboard?from=2026-09-01&to=2026-09-28')
+  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/dashboard/summary?from=2026-09-01&to=2026-09-28')
 })
 
 it('거래 탐색은 선택된 가명 ID와 반복 필터를 세 단계에 전달한다', async () => {

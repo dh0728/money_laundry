@@ -8,6 +8,8 @@ import { fetchLedgerAccounts, fetchLedgerOwners, fetchLedgerTransactions, fetchP
 import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { useAsync } from '@/lib/useAsync'
+import { fetchReviewCases } from '@/api/liveReview'
+import { toast } from 'sonner'
 
 function Pager({ page, total, onChange }: { page: number; total: number; onChange: (page: number) => void }) {
   return <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>전체 {total.toLocaleString('ko-KR')}건 · {page + 1}쪽</span><div className="flex gap-1"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => onChange(page - 1)}>이전</Button><Button variant="outline" size="sm" disabled={(page + 1) * 20 >= total} onClick={() => onChange(page + 1)}>다음</Button></div></div>
@@ -32,6 +34,19 @@ export default function LiveLedgerPage({ onOpen }: { onOpen?: (kind: 'ALERT' | '
   const transactions = useAsync(() => fetchLedgerTransactions({ ...base, page: transactionPage }, account ?? undefined, account ? undefined : owner ?? undefined), [from, to, judgement, payments, search, directions, owner, account, transactionPage], { key: 'ledger/transactions' })
   const chooseOwner = (id: string | undefined) => { setOwner(id ?? null); setAccount(null); setAccountPage(0); setTransactionPage(0) }
   const chooseAccount = (id: string) => { setAccount(id); setTransactionPage(0) }
+  async function openSourceAlert(alertId: number) {
+    if (!onOpen) return
+    try {
+      let page = 0
+      for (;;) {
+        const result = await fetchReviewCases({ kind: 'ALERT', query: `A-${alertId}`, page, size: 100 })
+        const found = result.content.find(row => row.alertId === alertId)
+        if (found) { onOpen('ALERT', found.caseId); return }
+        if (++page >= result.totalPages) break
+      }
+      toast.error('연결된 Alert를 찾을 수 없습니다.')
+    } catch { toast.error('연결된 Alert를 조회하지 못했습니다. 다시 시도해 주세요.') }
+  }
   const index: TransactionIndex = {
     owners: owners.state.status === 'success' ? owners.state.data.content.map(row => ({ id: row.id, name: row.name ?? '소유주 미상', accountIds: [], transactionIds: [] })) : [],
     accounts: accounts.state.status === 'success' ? accounts.state.data.content.map(row => ({ id: row.id, bank: String(row.bankId), owner: row.ownerId, transactionIds: transactions.state.status === 'success' ? transactions.state.data.content.map(tx => String(tx.txId)) : [] })) : [],
@@ -51,6 +66,7 @@ export default function LiveLedgerPage({ onOpen }: { onOpen?: (kind: 'ALERT' | '
     <RefreshStatus queries={[owners, accounts, transactions, formats]} />
     <TransactionExplorer index={index} today={businessDate ? new Date(`${businessDate}T00:00:00`) : new Date()} remote={{
       onOpenEpisode: onOpen ? id => onOpen('EPISODE', id) : undefined,
+      onOpenAlert: onOpen ? id => { void openSourceAlert(id) } : undefined,
       query: search, onQuery: setSearch,
       owner: owner ?? undefined, account: account ?? undefined,
       selectOwner: chooseOwner, selectAccount: id => { if (id) chooseAccount(id); else { setAccount(null); setTransactionPage(0) } },
