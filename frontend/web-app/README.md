@@ -97,6 +97,16 @@ VITE_API_MODE=live VITE_API_PROXY_TARGET=http://127.0.0.1:8080 pnpm dev --host 1
 - 평가 전 필수 OPEN: 실제 준비 환경에서 분석 runId, 모델/피처 버전, 입력 범위·원본 라벨·임계값, 성공/실패 실행 로그를 확보하고 실제 추론 결과가 해당 사건에 연결됨을 확인한다. 정량 성능은 같은 검증 집합과 기준에서 산출한 precision/recall 등 원본 결과가 있을 때만 기재한다. 현재 이 README에는 검증되지 않은 정확도 수치가 없다.
 - 참고 가능한 소스는 현행 dev의 `backend/inference-server/README.md`, `tests/test_binary_v10.py`와 parity fixture다. 가중치 재현 검사는 정확도 평가나 이번 서비스 추론 실행의 증거를 대신하지 않는다.
 
+#### 모델 근거 확인 결과와 필요한 자료
+
+2026-10-21 확보한 dev `0ab84296`의 [패키지 명세](https://github.com/dh0728/money_laundry/blob/0ab84296f3a32a8b58a03f75a9545c1641d35473/backend/inference-server/models/binary_v10/spec.py)와 [메타데이터](https://github.com/dh0728/money_laundry/blob/0ab84296f3a32a8b58a03f75a9545c1641d35473/backend/inference-server/models/binary_v10/assets/binary.json)를 대조했다. 자산 5개의 실제 바이트 SHA-256이 명세와 모두 일치한다. 가중치 지문은 `290f42b183466b4776de7032581f6d7ef18d9c72d08620b9c80eb0bb78806926`, export 메타데이터는 `source_experiment=ego_seed42`, epoch 10, `node19_edge17_v1`, 권장 임계값 `0.4338742792606354`다. 이는 저장된 패키지를 식별하며 서버가 그 가중치를 실행했다는 증거는 아니다.
+
+- [기준 예측 원본](https://github.com/dh0728/money_laundry/blob/0ab84296f3a32a8b58a03f75a9545c1641d35473/backend/inference-server/tests/fixtures/binary_v10/expected_raw_predictions.json)은 18건, context_end `2022-10-03`, model_version은 위 가중치 지문의 앞 16자리다. 모든 `alert`가 score≥threshold와 일치한다. 정답 라벨·검증 집합 정의·precision/recall은 이 파일에 없다. [parity 검사](https://github.com/dh0728/money_laundry/blob/0ab84296f3a32a8b58a03f75a9545c1641d35473/backend/inference-server/tests/test_binary_v10.py)는 허용 오차 `2e-5`로 예측 재현을 검사하도록 구현돼 있다. 이번 확인은 파일·연결 규칙 검사이며 모델을 새로 실행하거나 해당 검사를 실행한 결과가 아니다.
+- 확보한 `model@f2e44940`의 실험 지표 요약과 `mod-eunchong@065679e9`의 별도 GNN 노트북에는 평가 결과가 있다. 그러나 이 v10 가중치 SHA와 같은 검증 집합/실험이라는 연결 근거를 확인하지 못했으므로 현재 서비스 성능으로 인용하지 않는다. 전 저장소에 지표가 없다는 뜻도 아니다.
+- 서비스 연결은 [API 계약](https://github.com/dh0728/money_laundry/blob/0ab84296f3a32a8b58a03f75a9545c1641d35473/backend/api-server/API.md)상 원본 Alert의 **공개 evidence version → `GET /api/v1/alerts/{alertId}/versions`의 runId**까지 추적할 수 있다. 현재 FE의 조사 DTO는 원본별 alertId/version과 점수를 읽으며 runId·모델 버전을 직접 제공하지 않는다. `GET /api/v1/batch-jobs/{jobId}`의 models는 **현재 run만** 반환하므로 과거 근거의 runId와 같다는 확인 없이 최신 모델 정보를 붙이면 안 된다. 현재 모델 등록표만으로 기존 사건의 점수 출처도 확정하지 않는다.
+- **현재 미확보:** 실제 시연 사건에 연결된 완료 추론의 runId/requestId·동결 모델/피처 버전·입력/결과 무결성·게시 완료 로그, 그리고 위 가중치 SHA에 대응하는 라벨 기반 평가 원본. 접근한 패키지/기준 예측/실험 요약/합성 수용 기록만으로 이 연결을 입증할 수 없다. 합성 수용 DB의 COMPLETED run과 점수는 seed로 삽입됐으므로 실제 추론 증거에서 제외한다.
+- **팀에서 받을 최소 자료:** ① 준비한 시연 사건의 caseId, 원본 alertId/evidence version, jobId/runId 및 해당 run에 동결된 BINARY/TYPE 버전·requestId·완료/게시 증거(과거 run은 Backend의 읽기 전용 확인 필요), ② 같은 가중치 SHA에 대응하는 평가 집합 식별/기간·분할·라벨 정의·표본/양성 수·임계값 선택 기준·precision/recall/PR-AUC 또는 confusion matrix 원본, ③ 같은 txId의 공개 점수·threshold와 화면 값의 대응 확인. 비밀·서명 URL·원시 고객 거래는 요구하거나 저장하지 않는다. 새 API나 추론 완료를 가정하지 않는다.
+
 ### 현재 검사와 평가 전 우선순위
 
 - 후속 확정 코드: 타입 검사 포함 live 빌드 성공, lint 오류 0/기존 TanStack 경고 1. 전체 테스트 **41파일, 179 통과/30 실패**. 통합 전 원본 실패 32개와 이름을 대조했으며 새 실패는 없다. 테스트 삭제·skip·규칙 완화는 하지 않았다.
