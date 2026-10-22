@@ -49,12 +49,43 @@ def amount(column, prefix):
     return f"CASE WHEN {prefix}.scale IS NULL THEN 0 ELSE greatest(-8,least(8,(ln(1+t.{column}::DOUBLE/{prefix}.scale)-{prefix}.med)/{prefix}.iqr)) END"
 
 
+def edge_feature_columns():
+    """SELECT list of the 17 edge features over aliases t (transaction), z (temporal counts),
+    p (pair history), sk/dk (sender/receiver KYC), ps (currency stats), a (amount stats)."""
+    gap = lambda n: f"CASE WHEN z.{n}_last IS NULL THEN 0 ELSE ln(2+date_diff('minute',z.{n}_last,t.ts)) END"
+    expressions = [
+        "ln(1+z.pair_prior)", gap("pair"), "ln(1+z.pair_hour)", gap("sender"), "ln(1+z.sender_hour)",
+        gap("receiver"), "ln(1+z.receiver_hour)", amount("paid", "ps"), "ln(1+p.pair_n)", "ln(1+p.reverse_n)",
+        "CASE WHEN p.age<0 THEN 0 ELSE ln(2+p.age) END",
+        "CASE WHEN sk.entity_id IS NOT NULL AND sk.entity_id=dk.entity_id THEN 1 ELSE 0 END",
+        "CASE WHEN sk.country!='UNKNOWN' AND dk.country!='UNKNOWN' AND sk.country=dk.country THEN 1 ELSE 0 END",
+        "CASE WHEN sk.country!='UNKNOWN' AND dk.country!='UNKNOWN' THEN 1 ELSE 0 END",
+        "CASE WHEN t.payment_currency=t.receiving_currency THEN 1 ELSE 0 END",
+        "CASE WHEN t.src=t.dst THEN 1 ELSE 0 END",
+        "CASE WHEN a.m IS NULL OR a.sd IS NULL THEN 0 ELSE greatest(-10,least(10,(ln(1+t.paid::DOUBLE)-a.m)/(a.sd+0.000001))) END",
+    ]
+    return ",".join((f'({value})::FLOAT AS "{name}"' for name, value in zip(EDGE_FEATURES, expressions)))
+
+
+def neighbour_sql(owners, context_end):
+    """Each owner's 100 sampled incoming and 100 sampled outgoing transactions in table tx."""
+    return " UNION ALL ".join(
+        f"SELECT edge_id,{owner} AS owner,{q(direction)} AS direction FROM tx WHERE {owner} IN (SELECT owner FROM {owners}) "
+        f"QUALIFY row_number() OVER(PARTITION BY {owner} ORDER BY hash(edge_id,{owner},42,DATE {q(str(context_end))}),edge_id)<=100"
+        for direction, owner in [("incoming", "dst"), ("outgoing", "src")])
+
+
 def build_nodes(c):
     agg = c.execute(
         "WITH outgoing AS (SELECT src AS node_id,count(*) AS out_n,count(DISTINCT dst) AS out_u,\n          count(*) FILTER(WHERE src=dst) AS self_n,avg(paid_currency_z) AS out_z,\n          avg(CASE WHEN abs(paid_currency_z)>=3 THEN 1.0 ELSE 0 END) AS out_tail FROM hist GROUP BY src),\n      incoming AS (SELECT dst AS node_id,count(*) AS in_n,count(DISTINCT src) AS in_u,avg(received_currency_z) AS in_z,\n          avg(CASE WHEN abs(received_currency_z)>=3 THEN 1.0 ELSE 0 END) AS in_tail FROM hist GROUP BY dst),\n      pairs AS (SELECT DISTINCT src,dst FROM hist WHERE src!=dst),\n      reciprocal AS (SELECT a.src AS node_id,count(*) AS reciprocal_n FROM pairs a JOIN pairs b ON a.src=b.dst AND a.dst=b.src GROUP BY a.src),\n      currency_set AS (SELECT src AS node_id,payment_currency AS currency FROM hist UNION SELECT dst,receiving_currency FROM hist),\n      currencies AS (SELECT node_id,count(*) AS n_currency FROM currency_set GROUP BY node_id),\n      active AS (SELECT src AS node_id,day FROM hist UNION SELECT dst,day FROM hist),\n      active_days AS (SELECT node_id,count(*) AS n_days FROM active GROUP BY node_id),\n      ent_pairs AS (SELECT DISTINCT source_entity,target_entity FROM hist WHERE source_entity IS NOT NULL AND target_entity IS NOT NULL),\n      ent_out AS (SELECT source_entity AS entity_id,count(*) AS ent_out_n FROM ent_pairs GROUP BY source_entity),\n      ent_in AS (SELECT target_entity AS entity_id,count(*) AS ent_in_n FROM ent_pairs GROUP BY target_entity)\n      SELECT k.*,CASE WHEN k.entity_id IS NULL THEN 0 ELSE count(*) OVER(PARTITION BY k.entity_id) END AS observed_entity_accounts,coalesce(o.out_n,0) AS out_n,coalesce(i.in_n,0) AS in_n,coalesce(o.out_u,0) AS out_u,\n       coalesce(i.in_u,0) AS in_u,coalesce(o.self_n,0) AS self_n,coalesce(r.reciprocal_n,0) AS reciprocal_n,\n       coalesce(o.out_z,0) AS out_z,coalesce(i.in_z,0) AS in_z,coalesce(o.out_tail,0) AS out_tail,\n       coalesce(i.in_tail,0) AS in_tail,cu.n_currency,ad.n_days,coalesce(eo.ent_out_n,0) AS ent_out_n,\n       coalesce(ei.ent_in_n,0) AS ent_in_n\n      FROM active_days ad JOIN kyc k USING(node_id) LEFT JOIN outgoing o USING(node_id)\n      LEFT JOIN incoming i USING(node_id) LEFT JOIN reciprocal r USING(node_id)\n      JOIN currencies cu USING(node_id) LEFT JOIN ent_out eo ON k.entity_id=eo.entity_id\n      LEFT JOIN ent_in ei ON k.entity_id=ei.entity_id ORDER BY node_id"
     ).fetchdf()
     if agg.empty:
         raise ValueError("No graph history")
+    return node_frame(agg)
+
+
+def node_frame(agg):
+    """The 19 node features from per-node aggregates (the columns build_nodes selects)."""
     v = lambda name: agg[name].to_numpy(np.float64)
     outn, inn = (v("out_n"), v("in_n"))
     ou, iu = (v("out_u"), v("in_u"))
@@ -162,19 +193,7 @@ def prepare_snapshot(transactions, kyc, root, *, context_end, target_start=None,
                 f"count(*) OVER(PARTITION BY {part} ORDER BY ts RANGE BETWEEN INTERVAL '60 minutes' PRECEDING AND INTERVAL '1 minute' PRECEDING) {name}_hour",
             ])
         c.execute("CREATE TABLE temporal AS SELECT edge_id," + ",".join(windows) + " FROM tx")
-        gap = lambda n: f"CASE WHEN z.{n}_last IS NULL THEN 0 ELSE ln(2+date_diff('minute',z.{n}_last,t.ts)) END"
-        expressions = [
-            "ln(1+z.pair_prior)", gap("pair"), "ln(1+z.pair_hour)", gap("sender"), "ln(1+z.sender_hour)",
-            gap("receiver"), "ln(1+z.receiver_hour)", amount("paid", "ps"), "ln(1+p.pair_n)", "ln(1+p.reverse_n)",
-            "CASE WHEN p.age<0 THEN 0 ELSE ln(2+p.age) END",
-            "CASE WHEN sk.entity_id IS NOT NULL AND sk.entity_id=dk.entity_id THEN 1 ELSE 0 END",
-            "CASE WHEN sk.country!='UNKNOWN' AND dk.country!='UNKNOWN' AND sk.country=dk.country THEN 1 ELSE 0 END",
-            "CASE WHEN sk.country!='UNKNOWN' AND dk.country!='UNKNOWN' THEN 1 ELSE 0 END",
-            "CASE WHEN t.payment_currency=t.receiving_currency THEN 1 ELSE 0 END",
-            "CASE WHEN t.src=t.dst THEN 1 ELSE 0 END",
-            "CASE WHEN a.m IS NULL OR a.sd IS NULL THEN 0 ELSE greatest(-10,least(10,(ln(1+t.paid::DOUBLE)-a.m)/(a.sd+0.000001))) END",
-        ]
-        features = ",".join((f'({value})::FLOAT AS "{name}"' for name, value in zip(EDGE_FEATURES, expressions)))
+        features = edge_feature_columns()
         c.execute(
             f"CREATE TABLE edge_features AS SELECT t.edge_id,{features} FROM tx t JOIN temporal z USING(edge_id)\n          JOIN pairs p ON t.src=p.src AND t.dst=p.dst AND t.day=p.day JOIN kyc sk ON sk.node_id=t.src JOIN kyc dk ON dk.node_id=t.dst\n          LEFT JOIN stats ps ON ps.currency=t.payment_currency LEFT JOIN amount_stats a ON a.payment_currency=t.payment_currency ORDER BY t.edge_id"
         )
@@ -314,12 +333,18 @@ class MemorySnapshot:
     round trips (hours for a business day). Equality with GraphSnapshot is tested.
     """
 
-    def __init__(self, prepared):
-        root = Path(prepared)
-        self.manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-        if self.manifest["schema_version"] != "node19_edge17_v1":
-            raise ValueError("Unsupported feature schema")
-        read = lambda name, columns=None: pd.read_parquet(root / (name + ".parquet"), columns=columns)
+    def __init__(self, prepared=None, *, frames=None, context_end=None):
+        """From a prepare_snapshot folder, or from frames {tx, targets, adjacency, node_features,
+        edge_features} holding at least every row the targets' graphs need."""
+        if frames is None:
+            root = Path(prepared)
+            self.manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            if self.manifest["schema_version"] != "node19_edge17_v1":
+                raise ValueError("Unsupported feature schema")
+            read = lambda name, columns=None: pd.read_parquet(root / (name + ".parquet"), columns=columns)
+        else:
+            self.manifest = dict(schema_version="node19_edge17_v1", context_end=str(context_end))
+            read = lambda name, columns=None: frames[name] if columns is None else frames[name][columns]
         tx = read("tx", ["edge_id", "src", "dst"]).sort_values("edge_id")
         self.tx_edge, self.tx_src, self.tx_dst = (tx[c].to_numpy() for c in ("edge_id", "src", "dst"))
         self.targets = np.sort(read("targets")["edge_id"].to_numpy(np.int64))
