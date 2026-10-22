@@ -270,6 +270,9 @@ CREATE TABLE analysis.input_ledger (
  CHECK(valid_to_seq IS NULL OR valid_to_seq > valid_from_seq)
 );
 CREATE UNIQUE INDEX input_ledger_open ON analysis.input_ledger(tx_id) WHERE valid_to_seq IS NULL;
+-- Versions opened or closed after a position: the changes a ledger copy needs since its base.
+CREATE INDEX input_ledger_from_seq ON analysis.input_ledger(valid_from_seq);
+CREATE INDEX input_ledger_to_seq ON analysis.input_ledger(valid_to_seq) WHERE valid_to_seq IS NOT NULL;
 -- Report sets behind a run's input; a cancelled run is replaced only when these are ready again.
 CREATE TABLE analysis.input_report_sets (
  run_id UUID NOT NULL REFERENCES analysis.runs, set_id BIGINT NOT NULL,
