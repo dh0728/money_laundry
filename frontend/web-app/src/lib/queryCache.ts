@@ -43,7 +43,7 @@ export class QueryCache {
       }
       return data
     }, error => {
-      if (current.generation === generation) current.snapshot = current.snapshot.state.status === 'success'
+      if (current.generation === generation) current.snapshot = current.snapshot.state.status === 'success' && !(error instanceof ApiError && [401, 403].includes(error.problem.status))
         ? { ...current.snapshot, refreshing: false, refreshError: message(error) }
         : { state: { status: 'error', message: message(error), error }, refreshing: false, invalidation: current.snapshot.invalidation }
       throw error

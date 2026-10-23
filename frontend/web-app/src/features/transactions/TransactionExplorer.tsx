@@ -115,6 +115,7 @@ export type ExplorerRemote = {
   onOpenAlert?: (id: number) => void
   query: string; onQuery: (query: string) => void
   owner?: string; account?: string
+  transaction?: string | null; selectTransaction?: (id: string | null) => void
   selectOwner: (id: string | undefined) => void; selectAccount: (id: string | undefined) => void
   range: DateRange | undefined; filters: TransactionFilter[]
   changeControls: (range: DateRange | undefined, filters: TransactionFilter[]) => void
@@ -139,7 +140,12 @@ export default function TransactionExplorer({ index, target, today, remote }: { 
   const [filterValue, setFilterValue] = useState(remote ? '의심' : '송금')
   const [localOwner, setSelectedOwner] = useState(initial.owner)
   const [localAccount, setSelectedAccount] = useState(initial.account)
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null | undefined>(initial.transaction)
+  const [localTransaction, setLocalTransaction] = useState<string | null | undefined>(initial.transaction)
+  const selectedTransactionId = remote?.selectTransaction ? remote.transaction : localTransaction
+  const setSelectedTransactionId = (id: string | null | undefined) => {
+    if (remote?.selectTransaction) remote.selectTransaction(id ?? null)
+    else setLocalTransaction(id)
+  }
 
 
   const selectedOwner = remote ? remote.owner : localOwner

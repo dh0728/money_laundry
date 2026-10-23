@@ -43,8 +43,17 @@ export default function EpisodeDetail({ episode, transactions: modelTransactions
   const [confirmDissolve, setConfirmDissolve] = useState(false)
   const transactions = useMemo(() => applyRelabels(modelTransactions, relabels), [modelTransactions, relabels])
   // Episode 금액은 거래 ID로 중복을 없애 계산한다(v23)
+  const requestUnlink = (ids: number[], reason: string) => {
+    if (!responsible || !onUnlinkAlerts || !ids.length || !reason.trim()) return false
+    if (episode.alerts.length - ids.length < 2) {
+      setSelectedAlertIds(ids); setUnlinkReason(reason.trim()); setConfirmDissolve(true)
+      return false
+    }
+    onUnlinkAlerts(ids, reason.trim())
+    return true
+  }
   const submitUnlink = () => {
-    if (!selectedAlertIds.length || !unlinkReason.trim()) return
+    if (!responsible || !onUnlinkAlerts || !selectedAlertIds.length || !unlinkReason.trim()) return
     onUnlinkAlerts?.(selectedAlertIds, unlinkReason.trim())
     setConfirmDissolve(false)
     setSelectedAlertIds([])
@@ -57,7 +66,7 @@ export default function EpisodeDetail({ episode, transactions: modelTransactions
         tags={<><EpisodeStatusBadge status={episode.status} reviewRequested={Boolean(episode.reviewRequestedAt)} /><RiskBadge score={episode.riskScore} />
           <Badge variant="outline" className="border-dashed font-normal text-muted-foreground" title="실제 모델(MONEY17-146) 연결 전까지 표시">시연용 임의 점수</Badge>{episode.primaryTypes.map(type => <PatternBadge key={type.code} code={type.code} />)}<Badge variant="outline">담당 {episode.assignee.name}</Badge><Badge variant="outline">생성 {episode.createdAt.slice(0, 10)}</Badge></>} />
 
-      {tab === 'overview' && <EpisodeOverview episode={episode} transactions={transactions} history={history} responsible={responsible} onOpenAlert={onOpenAlert} onUnlink={onUnlinkAlerts} />}
+      {tab === 'overview' && <EpisodeOverview episode={episode} transactions={transactions} history={history} responsible={responsible} onOpenAlert={onOpenAlert} onUnlink={onUnlinkAlerts ? requestUnlink : undefined} />}
 
       {/* 탭을 바꿔도 그래프 위치·카메라·선택을 유지한다(§6.1): 한 번 연 뒤에는 숨기기만 한다 */}
       {graphSeen && <div className={tab === 'graph' ? '' : 'hidden'}><TimeGraph rows={transactions} context={{ kind: 'episode', code: episodeCode(episode.episodeId) }} /></div>}
@@ -71,7 +80,7 @@ export default function EpisodeDetail({ episode, transactions: modelTransactions
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>돌아가기</AlertDialogCancel>
-            <AlertDialogAction onClick={submitUnlink}>Episode 해체 확인</AlertDialogAction>
+            <AlertDialogAction disabled={!responsible || !onUnlinkAlerts} onClick={submitUnlink}>Episode 해체 확인</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

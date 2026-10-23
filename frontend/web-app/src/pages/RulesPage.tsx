@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { AdminButton, MockRoleSwitch, useMockRole, type MockRole } from '@/components/MockRole'
+import { fixture } from '@/lib/apiMode'
+import { useAsync } from '@/lib/useAsync'
+import { fetchReviewCases } from '@/api/liveReview'
 
 type Tab = 'list' | 'write' | 'backtest' | 'approval' | 'thresholds'
 type Role = MockRole
@@ -88,6 +91,7 @@ function Outcome({ r }: { r: Pick<Rule, 'suspicious' | 'normal' | 'open'> }) {
 
 function ListTab({ role, onOpen, onNew }: { role: Role; onOpen: (rule: Rule) => void; onNew: () => void }) {
   const [selected, setSelected] = useState<Rule>(RULES[1])
+  const examples = useAsync(() => fetchReviewCases({ kind: 'ALERT', size: 4 }), [], { key: 'cases/rule-examples', enabled: fixture })
   return <div className="space-y-4">
     <Section title="룰 목록" description={`${RULES.length}개 · 적중은 최근 30일 모델 Alert ${ALERTS_IN_PERIOD}건 기준`} action={<AdminButton role={role} size="sm" onClick={onNew}>새 룰 만들기</AdminButton>}>
       <Table><TableHeader><TableRow><TableHead>번호</TableHead><TableHead>템플릿</TableHead><TableHead>버전</TableHead><TableHead>상태</TableHead><TableHead className="w-[34%]">조건</TableHead><TableHead className="text-right">적중 Alert</TableHead><TableHead className="text-right">의심 종결 비율</TableHead><TableHead>작성 · 승인</TableHead><TableHead>마지막 실행</TableHead></TableRow></TableHeader>
@@ -110,8 +114,9 @@ function ListTab({ role, onOpen, onNew }: { role: Role; onOpen: (rule: Rule) => 
         <p className="mt-4 text-xs font-medium">버전 이력</p>
         <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">{Array.from({ length: selected.v }, (_, i) => selected.v - i).map(v => <li key={v}>v{v} · {v === selected.v ? STATUS[selected.status].label : '운영 종료'} · {v === selected.v ? '10-02 승인' : '09-20 승인'}</li>)}</ul>
       </Section>
-      <Section title="최근 적중 Alert" description={<>누르면 Alert 상세의 <NumBadge n={1} /> 룰 적중으로 이동</>}>
-        {selected.hits ? <ul className="divide-y text-xs">{['A-3010', 'A-3004', 'A-3017', 'A-3021'].map((id, i) => <li key={id} className="flex items-center justify-between gap-3 py-2"><a className="font-mono underline-offset-4 hover:underline" href={`#alerts/${id.slice(2)}`}>{id}</a><span className="text-muted-foreground">{['받은 총액 52,100 USD (20,000 이상)', '송금 계좌 5개 (3개 이상)', '빠져나간 비율 91% (80% 이상)', '거래 1건 41,000 USD (30,000 이상)'][i]}</span><span>{['의심 종결', '처리 중', '정상 종결', '처리 전'][i]}</span></li>)}</ul> : <p className="text-xs text-muted-foreground">운영 전이라 적중 기록이 없습니다.</p>}
+    <Section title="최근 적중 Alert" description={fixture ? '합성 조사 연결 예시 · 실제 룰 적중 결과 아님' : <>누르면 Alert 상세의 <NumBadge n={1} /> 룰 적중으로 이동</>}>
+        {fixture ? examples.state.status === 'success' ? <ul className="divide-y text-xs">{examples.state.data.content.map(item => <li key={item.caseId} className="flex items-center justify-between gap-3 py-2"><a className="font-mono underline-offset-4 hover:underline" href={`#alerts/${item.caseId}`}>A-{item.alertId}</a><span className="text-muted-foreground">합성 근거 거래 {item.summary.txCount}건</span><span>{item.status === 'OPEN' ? '진행 중' : '종결'}</span></li>)}</ul> : <p className="text-xs text-muted-foreground">{examples.state.status === 'error' ? '합성 연결 예시를 불러오지 못했습니다.' : '합성 연결 예시를 불러오는 중입니다.'}</p>
+          : selected.hits ? <ul className="divide-y text-xs">{['A-3010', 'A-3004', 'A-3017', 'A-3021'].map((id, i) => <li key={id} className="flex items-center justify-between gap-3 py-2"><a className="font-mono underline-offset-4 hover:underline" href={`#alerts/${id.slice(2)}`}>{id}</a><span className="text-muted-foreground">{['받은 총액 52,100 USD (20,000 이상)', '송금 계좌 5개 (3개 이상)', '빠져나간 비율 91% (80% 이상)', '거래 1건 41,000 USD (30,000 이상)'][i]}</span><span>{['의심 종결', '처리 중', '정상 종결', '처리 전'][i]}</span></li>)}</ul> : <p className="text-xs text-muted-foreground">운영 전이라 적중 기록이 없습니다.</p>}
       </Section>
     </div>
   </div>
@@ -147,7 +152,7 @@ function WriteTab({ role, draft, setDraft, onBacktest }: { role: Role; draft: { 
       </Section>
       <Section title="이 룰을 문장으로 읽으면" description="입력한 값으로 만든 설명. Alert 상세에도 이 문장이 보입니다">
         <p className="text-sm leading-6">{t.sentence(draft.p)}</p>
-        <ul className="mt-4 space-y-1.5 text-xs">{checks.map(([k, s, m]) => <li key={k} className="grid grid-cols-[20px_64px_1fr] gap-2"><span className={s === 'err' ? 'text-destructive' : s === 'warn' ? 'text-[var(--palette-blue-500)]' : 'text-muted-foreground'}>{s === 'ok' ? '✓' : s === 'warn' ? '△' : '✕'}</span><span className="font-medium">{k}</span><span className="text-muted-foreground">{m}</span></li>)}</ul>
+        <ul className="mt-4 space-y-1.5 text-xs">{checks.map(([k, s, m]) => <li key={k} className="grid grid-cols-[20px_64px_1fr] gap-2"><span className={s === 'err' ? 'text-destructive-text' : s === 'warn' ? 'text-[var(--palette-blue-500)]' : 'text-muted-foreground'}>{s === 'ok' ? '✓' : s === 'warn' ? '△' : '✕'}</span><span className="font-medium">{k}</span><span className="text-muted-foreground">{m}</span></li>)}</ul>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><Stepper current={err ? 'DRAFT' : 'VALIDATED'} />
           <span className="flex gap-2"><AdminButton role={role} size="sm" variant="outline" onClick={() => toast.success('임시 저장', { description: '시안이라 저장하지 않습니다.' })}>임시 저장</AdminButton><AdminButton role={role} size="sm" disabled={err} onClick={onBacktest}>백테스트로</AdminButton></span></div>
       </Section>

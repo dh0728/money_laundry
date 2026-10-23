@@ -1,6 +1,7 @@
 import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
+import { WorkspaceState } from '@/lib/workspaceState'
 import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
-import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
 import { live } from '@/lib/apiMode'
@@ -100,6 +101,17 @@ export default function App() {
   const [restoring, setRestoring] = useState(live)
   const [authMessage, setAuthMessage] = useState('')
   const [logoutError, setLogoutError] = useState('')
+  const [workspace, setWorkspace] = useState(() => new WorkspaceState())
+  const suspended = useRef<{ identity: string; workspace: WorkspaceState; page: Page; id?: number } | null>(null)
+  const logoutInProgress = useRef(false)
+  const expiredSession = useEffectEvent(() => {
+    if (user && !logoutInProgress.current) suspended.current = {
+      identity: `${user.userId}:${user.role}`, workspace: workspace.forReauthentication(), page, id,
+    }
+    setWorkspace(new WorkspaceState())
+    setUser(null)
+    setAuthMessage('로그인 시간이 만료됐습니다. 다시 로그인해 주세요.')
+  })
   const currentUser = user ?? MOCK_USER
   const fromSession = (session: SessionUser): CurrentUser => ({ ...MOCK_USER, userId: session.id, name: session.name, role: session.role, username: session.username, organization: '—', email: '—', joinedAt: '—' })
   const [agentOpen, setAgentOpen] = useState(false)
@@ -124,7 +136,7 @@ export default function App() {
     restoreSession().then(session => { if (active) setUser(fromSession(session)) }).catch(error => {
       if (active && !(error instanceof ApiError && error.problem.status === 401)) setAuthMessage('서버에 연결하지 못했습니다. 다시 로그인해 주세요.')
     }).finally(() => { if (active) setRestoring(false) })
-    const expired = () => { setUser(null); setAuthMessage('로그인 시간이 만료됐습니다. 다시 로그인해 주세요.') }
+    const expired = () => expiredSession()
     window.addEventListener('auth-expired', expired)
     return () => { active = false; window.removeEventListener('auth-expired', expired) }
   }, [])
@@ -132,16 +144,25 @@ export default function App() {
   async function signIn(username: string, password: string) {
     if (!live) { setUser(MOCK_USER); go('dashboard'); return }
     const session = await login(username, password)
-    setUser(fromSession(session)); setAuthMessage(''); go('dashboard')
+    const recovery = suspended.current
+    const sameIdentity = recovery?.identity === `${session.id}:${session.role}`
+    suspended.current = null
+    setWorkspace(sameIdentity ? recovery.workspace : new WorkspaceState())
+    setUser(fromSession(session)); setAuthMessage('')
+    if (sameIdentity) go(recovery.page, recovery.id)
+    else go('dashboard')
   }
 
   async function signOut() {
+    suspended.current = null
+    logoutInProgress.current = true
     try {
       if (live) await logoutSession()
+      setWorkspace(new WorkspaceState())
       setUser(live ? null : MOCK_USER); setLogout(false); setLogoutError(''); go('dashboard')
     } catch {
       setLogoutError('로그아웃하지 못했습니다. 다시 시도해 주세요.')
-    }
+    } finally { logoutInProgress.current = false }
   }
 
   useEffect(() => {
@@ -157,7 +178,7 @@ export default function App() {
 
   return (
     <CurrentUserContext.Provider value={currentUser}>
-    <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} >
+    <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} state={workspace} >
     <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
@@ -237,7 +258,7 @@ export default function App() {
         <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
           <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
-            : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
+            : page === 'transactions' ? (live ? <LiveLedgerPage transactionId={id} onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
             : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} onOpenAlert={caseId => go('alerts', caseId)} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
             : page === 'notifications' ? (live ? <LiveNotificationsPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />)

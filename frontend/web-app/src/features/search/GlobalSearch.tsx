@@ -142,7 +142,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
       <PopoverContent id="global-search-listbox" role="listbox" aria-label="검색 결과" className="w-(--radix-popper-anchor-width) max-w-[90vw] p-2"
         onOpenAutoFocus={e => e.preventDefault()}
         onInteractOutside={event => { if (anchor.current?.contains(event.target as Node)) event.preventDefault() }}>
-        {remote?.error && <p role="alert" className="p-2 text-xs text-destructive">{remote.error}</p>}
+        {remote?.error && <p role="alert" className="p-2 text-xs text-destructive-text">{remote.error}</p>}
         {flat.length === 0
           ? <p className="p-4 text-center text-xs text-muted-foreground">{(remote ? remote.loading : q && !data) ? '불러오는 중…' : '검색 결과가 없습니다.'}</p>
           : (

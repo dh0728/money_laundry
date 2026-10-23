@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { live } from '@/lib/apiMode'
+import { fixture, live } from '@/lib/apiMode'
 import { fetchNotifications, setNotificationsRead } from '@/api/notifications'
 import { AssignedCases } from '@/features/notifications/AssignedCases'
 import { RefreshStatus } from '@/components/RefreshStatus'
@@ -106,14 +106,14 @@ export default function NotificationsPage({ onOpen, remote = live }: { onOpen: (
   }
 
   return <div className="space-y-4">
-    <PageHeading title="알림" description="배정과 연결, 조사 의견, 검수 결과를 확인합니다." badge={remote ? undefined : <ProvenanceBadge kind="mock" />} />
-    <RefreshStatus queries={[notifications]} />
+    <PageHeading title="알림" description={fixture ? '합성 검수용 알림입니다. 읽음 상태는 이 탭에서만 바뀌며 새로고침하면 초기화됩니다.' : '배정과 연결, 조사 의견, 검수 결과를 확인합니다.'} badge={!remote || fixture ? <ProvenanceBadge kind="mock" /> : undefined} />
     {error && <p role="alert">{error}</p>}
     {selected && <AssignedCases id={selected} onClose={() => setSelected(null)} onOpen={(kind, id) => onOpen({ id: String(id), code: String(id), title: '', description: '', at: '', target: { page: kind === 'ALERT' ? 'alerts' : 'episodes', id } })} />}
-      <div className="flex flex-wrap items-center gap-2">
+      <div role="group" aria-label="알림 조회" className="flex flex-wrap items-center gap-2">
         <div className="relative w-72 max-w-full"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="알림 검색" className="h-9 pl-9 text-xs" placeholder="내용·Alert·Episode ID 검색" value={query} onChange={event => setQuery(event.target.value)} /></div>
         <DateRangeButton value={range} onChange={setRange} today={remote ? (businessDate ? new Date(`${businessDate}T00:00:00`) : new Date()) : new Date(2026, 8, 26)} />
-        <Button variant="ghost" size="sm" className="ml-auto" disabled={busy || !unread.length} onClick={() => void mark(unread.map(item => item.id), true)}><Check className="size-3.5" />{remote ? '현재 페이지 모두 읽음' : '모두 읽음 처리'}</Button>
+        <div className="ml-auto flex flex-wrap items-center gap-2"><RefreshStatus queries={[notifications]} buttonClassName="h-9" />
+        <Button variant="ghost" size="sm" className="h-9" disabled={busy || !unread.length} onClick={() => void mark(unread.map(item => item.id), true)}><Check className="size-3.5" />{remote ? '현재 페이지 모두 읽음' : '모두 읽음 처리'}</Button></div>
       </div>
       {state.status === 'loading' ? <LoadingBlock label="알림" /> : state.status === 'error' ? <ErrorBlock message={state.message} onRetry={retry} /> : <>
       {visible.length === 0 ? <p className="rounded-lg border py-16 text-center text-sm text-muted-foreground"><Bell className="mx-auto mb-4 size-7" />{items.length ? '조건에 맞는 알림이 없습니다.' : '표시할 알림이 없습니다.'}</p>

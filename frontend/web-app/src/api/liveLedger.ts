@@ -55,7 +55,29 @@ function query(filters: LedgerFilters, selection?: { owner?: string; account?: s
   return params
 }
 
-export const fetchLedgerOwners = (filters: LedgerFilters) => getJson<Page<LedgerOwner>>(`/api/v1/ledger/owners?${query(filters)}`)
-export const fetchLedgerAccounts = (filters: LedgerFilters, owner?: string) => getJson<Page<LedgerAccount>>(`/api/v1/ledger/accounts?${query(filters, { owner })}`)
-export const fetchLedgerTransactions = (filters: LedgerFilters, account?: string, owner?: string) => getJson<Page<LedgerTransaction>>(`/api/v1/ledger/transactions?${query(filters, { account, owner })}`)
-export const fetchPaymentFormats = () => getJson<string[]>('/api/v1/review/payment-formats')
+export const fetchLedgerOwners = (filters: LedgerFilters, active?: () => boolean) => getJson<Page<LedgerOwner>>(`/api/v1/ledger/owners?${query(filters)}`, undefined, active)
+export const fetchLedgerAccounts = (filters: LedgerFilters, owner?: string, active?: () => boolean) => getJson<Page<LedgerAccount>>(`/api/v1/ledger/accounts?${query(filters, { owner })}`, undefined, active)
+export const fetchLedgerTransactions = (filters: LedgerFilters, account?: string, owner?: string, active?: () => boolean) => getJson<Page<LedgerTransaction>>(`/api/v1/ledger/transactions?${query(filters, { account, owner })}`, undefined, active)
+export const fetchPaymentFormats = (active?: () => boolean) => getJson<string[]>('/api/v1/review/payment-formats', undefined, active)
+
+
+export type LedgerTransactionContext = { from?: string; to?: string; account?: string }
+export type LocatedLedgerTransaction = LedgerTransactionContext & { txId: number; page: number }
+
+/** query is substring search: select only a server row with the exact transaction ID. */
+export async function locateLedgerTransaction(txId: number, context: LedgerTransactionContext = {}, active: () => boolean = () => true): Promise<LocatedLedgerTransaction> {
+  if (!Number.isSafeInteger(txId) || txId <= 0) throw new Error('유효하지 않은 거래 ID입니다.')
+  // Frozen case coordinates narrow the first read; current ledger facts may have changed.
+  const scopes = context.from || context.to || context.account ? [context, {}] : [{}]
+  for (const scope of scopes) {
+    for (let page = 0; ; page++) {
+      if (!active()) throw new DOMException('화면 이동으로 조회를 중단했습니다.', 'AbortError')
+      const result = await fetchLedgerTransactions({ from: scope.from, to: scope.to, query: String(txId), page, size: 20 }, scope.account, undefined, active)
+      if (!active()) throw new DOMException('화면 이동으로 조회를 중단했습니다.', 'AbortError')
+      if (!Number.isSafeInteger(result.totalPages) || result.totalPages < 0 || result.page !== page) throw new Error('거래 목록 페이지 응답을 확인할 수 없습니다.')
+      if (result.content.some(row => row.txId === txId)) return { ...scope, txId, page }
+      if (!result.content.length || page + 1 >= result.totalPages) break
+    }
+  }
+  throw new Error(`원장에서 거래 T-${txId}을 찾을 수 없습니다.`)
+}

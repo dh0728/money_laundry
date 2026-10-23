@@ -1,3 +1,4 @@
+import { fixture } from '@/lib/apiMode'
 // API.md §0 공통 규칙: 목록 응답, 오류 응답(RFC 9457 ProblemDetail)
 
 export type Page<T> = {
@@ -40,16 +41,21 @@ let csrf: { headerName: string; token: string } | null = null
 
 export function clearCsrf() { csrf = null }
 
+export function rejectFixtureWrite() {
+  if (fixture) throw new ApiError({ type: 'about:blank', title: '합성 데이터 검수에서는 저장·인증 요청을 보내지 않습니다.', status: 403, code: 'FIXTURE_READ_ONLY' })
+}
+
 export async function refreshCsrf() {
+  rejectFixtureWrite()
   const response = await fetch('/api/auth/csrf', { credentials: 'include', headers: { Accept: 'application/json' } })
   if (!response.ok) throw await responseError(response)
   csrf = await response.json() as { headerName: string; token: string }
   return csrf
 }
 
-export async function responseError(response: Response, notifyUnauthorized = true) {
+export async function responseError(response: Response, notifyUnauthorized: boolean | (() => boolean) = true) {
   const problem = (await response.json().catch(() => null)) as ProblemDetail | null
-  if (response.status === 401 && notifyUnauthorized) {
+  if (response.status === 401 && (typeof notifyUnauthorized === 'function' ? notifyUnauthorized() : notifyUnauthorized)) {
     clearCsrf()
     window.dispatchEvent(new Event('auth-expired'))
   }
@@ -61,18 +67,33 @@ export type IsoDateTime = string
 /** YYYY-MM-DD */
 export type IsoDate = string
 
-export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>, active: () => boolean = () => true): Promise<T> {
+  const assertActive = () => { if (!active()) throw new DOMException('화면 이동으로 조회를 중단했습니다.', 'AbortError') }
+  assertActive()
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params ?? {})) {
     if (value !== undefined) query.set(key, String(value))
   }
   const url = query.size ? `${path}?${query}` : path
+  if (fixture) {
+    const result = (await import('@/mocks/liveFixtureApi')).fixtureGet(url) as T
+    assertActive()
+    return result
+  }
   const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })
-  if (!response.ok) throw await responseError(response, path !== '/api/me')
-  return (await response.json()) as T
+  assertActive()
+  if (!response.ok) {
+    const error = await responseError(response, () => path !== '/api/me' && active())
+    assertActive()
+    throw error
+  }
+  const result = (await response.json()) as T
+  assertActive()
+  return result
 }
 
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  rejectFixtureWrite()
   const token = csrf ?? await refreshCsrf()
   const response = await fetch(path, {
     method: 'POST',

@@ -31,7 +31,8 @@ it('실제 대시보드는 PC 날짜 대신 서버 업무 날짜로 기간을 �
   expect(report.getByRole('heading', { name: 'RDR 9000 Daily Report' })).toBeInTheDocument()
   expect(report.getByTestId('rdr-eye')).toBeInTheDocument()
   expect(report.getByTitle('규칙 기반 시연 문장. LLM 미연동.')).toBeInTheDocument()
-  const queue = screen.getByRole('region', { name: '업무 현황' })
+  // Institution live queue uses the existing WorkQueue component without a named section.
+  const queue = screen.getByTestId('work-queue')
   expect(within(queue).getAllByTestId('work-status-column')).toHaveLength(3)
   expect(screen.getByTestId('ai-daily-report')).not.toContainElement(queue)
   expect(screen.queryByRole('heading', { name: '담당 조사자 우선 검토' })).not.toBeInTheDocument()

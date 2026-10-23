@@ -1,10 +1,11 @@
-import { clearCsrf, getJson, refreshCsrf, responseError } from './common'
+import { clearCsrf, getJson, rejectFixtureWrite, refreshCsrf, responseError } from './common'
 
 export type SessionUser = { id: number; username: string; name: string; role: 'STAFF' | 'ADMIN' }
 
 export const restoreSession = () => getJson<SessionUser>('/api/me')
 
 export async function login(username: string, password: string): Promise<SessionUser> {
+  rejectFixtureWrite()
   const csrf = await refreshCsrf()
   const response = await fetch('/api/auth/login', {
     method: 'POST', credentials: 'include',
@@ -19,6 +20,7 @@ export async function login(username: string, password: string): Promise<Session
 }
 
 export async function logout() {
+  rejectFixtureWrite()
   const csrf = await refreshCsrf()
   const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include', headers: { [csrf.headerName]: csrf.token } })
   if (!response.ok) throw await responseError(response)
