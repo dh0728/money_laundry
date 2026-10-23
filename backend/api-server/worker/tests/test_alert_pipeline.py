@@ -51,6 +51,9 @@ class AlertPostgresTests(unittest.TestCase):
         self.admin.execute('INSERT INTO review.alert_versions(alert_id,version,run_id,fingerprint,evidence,published_at)'
                            ' VALUES(%s,1,%s,%s,%s::jsonb,now())', (alert, self.run, _fingerprint(evidence), json.dumps(evidence)))
         self.admin.execute('UPDATE review.alerts SET published_version=1 WHERE alert_id=%s', (alert,))
+        for member in evidence['transactions']:  # the publisher's member index of the version
+            self.admin.execute("INSERT INTO review.alert_transactions VALUES(%s,1,%s,%s,'[]',NULL)",
+                               (alert, member['txId'], member['role']))
         seq = self.admin.execute('UPDATE analysis.runs SET input_seq=coalesce(input_seq,nextval(\'analysis.input_seq\'))'
                                  ' WHERE run_id=%s RETURNING input_seq', (self.run,)).fetchone()[0]
         self.admin.execute('INSERT INTO analysis.alert_origin_ledger VALUES(%s,1,%s,NULL)', (alert, seq))
@@ -69,7 +72,7 @@ class AlertPostgresTests(unittest.TestCase):
                 with self.assertRaises(self.psycopg.errors.InsufficientPrivilege): writer.execute(statement)
         plan, = self.plans()
         self.assertEqual(plan['action'],'NEW')
-        self.assertEqual(plan['evidence']['policyVersion'],'block-pin-2')
+        self.assertEqual(plan['evidence']['policyVersion'],'block-pin-3')
         self.assertEqual([w['kind'] for w in plan['evidence']['witnesses']],['PASS'])
         self.assertEqual(plan['evidence']['contextQuery']['focalAccounts'],[])
         self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alerts').fetchone()[0],0)
@@ -209,6 +212,102 @@ class AlertPostgresTests(unittest.TestCase):
         artifact = self.artifact()
         self.assertEqual(artifact['frozenLegacyCount'],1)
         self.assertEqual(artifact['unassignedReasons'],{'FROZEN_LEGACY':2})
+
+    # ----- new-seed scope (alert_new_seed_design_20261022.md §3) -----
+    def move(self, key, time):
+        self.admin.execute('UPDATE analysis.input_transactions SET occurred_at=%s WHERE run_id=%s AND tx_id=%s',
+                           (time, self.run, key))
+
+    def generator_seeds(self):
+        """Run the stage and return the seed ids the generator received."""
+        from unittest.mock import patch
+        import alerts.alert_pipeline as pipeline
+        with patch('alerts.alert_pipeline.build_block_graphs', wraps=pipeline.build_block_graphs) as spy:
+            save_alerts(self.admin, self.execution)
+        return sorted(spy.call_args.args[1])
+
+    def test_input_older_than_the_window_is_not_read(self):
+        # ids[2] (the PASS partner of ids[0]) is 90 days before the run's earliest TARGET.
+        self.move(self.ids[1], '2022-09-02 10:00+09')
+        self.move(self.ids[2], '2022-06-01 22:00+09')
+        self.admin.execute("UPDATE analysis.input_transactions SET input_role='CONTEXT' WHERE run_id=%s AND tx_id=%s",
+                           (self.run, self.ids[2]))
+        self.admin.execute('DELETE FROM analysis.scores WHERE run_id=%s AND tx_id=%s', (self.run, self.ids[2]))
+        self.assertEqual(self.generator_seeds(), [self.ids[0]])
+        self.assertEqual(self.plans(), [])
+        artifact = self.artifact()
+        self.assertEqual(artifact['inputWindowStart'][:10], '2022-07-04')
+        self.assertEqual(artifact['unassignedSeedCount'], 1)
+
+    def test_an_earlier_seed_before_the_seed_range_is_context_only(self):
+        # Inside the 60-day window but before window start + 240 h: read, never a seed.
+        self.move(self.ids[1], '2022-09-02 10:00+09')
+        self.move(self.ids[2], '2022-07-08 22:00+09')
+        self.admin.execute("UPDATE analysis.input_transactions SET input_role='CONTEXT' WHERE run_id=%s AND tx_id=%s",
+                           (self.run, self.ids[2]))
+        score = self.admin.execute('SELECT to_jsonb(s) FROM analysis.scores s WHERE run_id=%s AND tx_id=%s',
+                                   (self.run, self.ids[2])).fetchone()[0]
+        self.admin.execute('DELETE FROM analysis.scores WHERE run_id=%s AND tx_id=%s', (self.run, self.ids[2]))
+        # Its score is a frozen earlier score (the window reads them from the score ledger).
+        earlier = self.admin.execute("INSERT INTO analysis.runs(run_id,job_id,status) VALUES(gen_random_uuid(),%s,'COMPLETED')"
+                                     " RETURNING run_id", (self.job,)).fetchone()[0]
+        self.admin.execute("INSERT INTO analysis.input_transactions SELECT %s,tx_id,'TARGET',occurred_at,business_date,from_bank_id,"
+                           "to_bank_id,from_account_id,to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,"
+                           "amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version FROM analysis.input_transactions"
+                           " WHERE run_id=%s AND tx_id=%s", (earlier, self.run, self.ids[2]))
+        self.admin.execute("INSERT INTO analysis.scores SELECT * FROM jsonb_populate_record(NULL::analysis.scores,%s::jsonb)",
+                           (json.dumps(dict(score, run_id=str(earlier))),))
+        seq = self.admin.execute("UPDATE analysis.runs SET input_seq=nextval('analysis.input_seq') WHERE run_id=%s RETURNING input_seq",
+                                 (self.run,)).fetchone()[0]
+        self.admin.execute('INSERT INTO analysis.score_ledger VALUES(%s,%s,%s,NULL)', (self.ids[2], earlier, seq))
+        self.assertEqual(self.generator_seeds(), [self.ids[0]])
+        self.assertEqual(self.artifact()['seedRangeStart'][:10], '2022-07-18')  # window start + 336 h
+
+    def test_only_alerts_reaching_the_seed_range_are_pinned_and_planned(self):
+        save_alerts(self.admin, self.execution)
+        plan, = self.plans()
+        recent = self.publish(plan['evidence'])
+        stale = self.publish(dict(plan['evidence'], summary=dict(plan['evidence']['summary'],
+                                                                   lastTxAt='2022-05-01T00:00:00+00:00')))
+        save_alerts(self.admin, self.execution)
+        artifact = self.artifact()
+        self.assertEqual((artifact['pinnedAlertCount'], artifact['plannedAlertCount']), (1, 2))
+        plan, = self.plans()
+        # The stale Alert still owns the same seeds, so the graph touches it: it is planned
+        # (merged into the earliest), but only the recent one was pinned.
+        self.assertEqual((plan['action'], sorted(plan['caseIds'])), ('MERGE', sorted([recent, stale])))
+
+    def test_an_alert_outside_the_range_is_not_planned(self):
+        self.admin.execute('UPDATE analysis.input_transactions SET from_account_id=%s,to_account_id=%s WHERE run_id=%s AND tx_id=%s',
+                           (uuid4(), uuid4(), self.run, self.ids[2]))
+        save_alerts(self.admin, self.execution)
+        self.assertEqual(self.plans(), [])
+        evidence = AlertExtensionTests().evidence([self.ids[1], self.context], [self.ids[1]],
+                                                  {self.ids[1]: '2022-04-01T10:00:00+09:00', self.context: '2022-04-01T11:00:00+09:00'})
+        self.publish(evidence)
+        save_alerts(self.admin, self.execution)
+        artifact = self.artifact()
+        self.assertEqual((artifact['pinnedAlertCount'], artifact['plannedAlertCount']), (0, 0))
+        self.assertEqual(self.plans(), [])
+
+
+    def test_an_open_alert_with_a_changed_member_is_planned_outside_the_range(self):
+        from alerts.alert_scope import Scope
+        evidence = AlertExtensionTests().evidence([self.ids[1], self.context], [self.ids[1]],
+                                                  {self.ids[1]: '2022-04-01T10:00:00+09:00', self.context: '2022-04-01T11:00:00+09:00'})
+        alert = self.publish(evidence)
+        previous = self.admin.execute("INSERT INTO analysis.runs(run_id,job_id,status,input_seq) VALUES(gen_random_uuid(),%s,"
+                                      "'COMPLETED',nextval('analysis.input_seq')) RETURNING input_seq", (self.job,)).fetchone()[0]
+        current = self.admin.execute("UPDATE analysis.runs SET input_seq=nextval('analysis.input_seq') WHERE run_id=%s"
+                                     " RETURNING input_seq", (self.run,)).fetchone()[0]
+        scope = Scope(self.admin, self.run)
+        self.assertEqual((scope.previous_seq, scope.planned(self.admin, [], set())), (previous, set()))
+        # A corrected member: its input ledger version opened after the previous run.
+        row = dict(self.template, tx_id=self.context)
+        self.admin.execute("INSERT INTO analysis.input_ledger SELECT * FROM jsonb_populate_record(NULL::analysis.input_ledger,%s::jsonb)",
+                           (json.dumps(dict({k: v for k, v in row.items() if k not in ('run_id', 'input_role')},
+                                            valid_from_seq=current, valid_to_seq=None)),))
+        self.assertEqual(Scope(self.admin, self.run).planned(self.admin, [], set()), {alert})
 
 
 class AlertExtensionTests(unittest.TestCase):
@@ -354,7 +453,7 @@ class AlertExtensionTests(unittest.TestCase):
         pad = timedelta(microseconds=POLICY.context_pad_us)
         self.assertEqual(doc['contextQuery']['firstAt'], (base - pad).astimezone(timezone.utc).isoformat())
         self.assertEqual(doc['contextQuery']['lastAt'], (base + timedelta(hours=6) + pad).astimezone(timezone.utc).isoformat())
-        self.assertEqual(doc['policyVersion'], 'block-pin-2')
+        self.assertEqual(doc['policyVersion'], 'block-pin-3')
         self.assertEqual(doc['summary']['txCount'], 2)
 
     def test_links_follow_the_current_run_and_stay_out_of_the_fingerprint(self):

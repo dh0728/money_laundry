@@ -13,6 +13,7 @@ import json
 
 from psycopg.rows import dict_row
 
+from alerts.alert_scope import INPUT_ROWS, WINDOW_SCORES, Scope
 from alerts.block_graph import BlockPolicy, build_block_graphs
 from alerts.flow_graph import EdgeTable, FlowIndex, FlowGraph, Witness, GraphBudgetExceeded
 from common.run_fence import lock_stage, save_checkpoint
@@ -325,13 +326,12 @@ def save_alerts(connection, execution):
     threshold,business_at = connection.execute('SELECT threshold_value,business_at FROM analysis.jobs WHERE job_id=%s', (execution.job_id,)).fetchone()
     if threshold is None:
         raise ProtocolError('Frozen threshold is required')
-    # Only the seed decision is held per scored transaction: the stored probability
-    # value (jsonb, so 1 stays 1) and its original threshold. Documents load later.
+    scope = Scope(connection, execution.run_id)
+    # Only the seed decision is held per scored transaction of the window: the stored
+    # probability value (jsonb, so 1 stays 1) and its original threshold. Documents load later.
     decisions = {}
     with connection.transaction(), connection.cursor(name='alert_scores') as cursor:
-        cursor.execute('''SELECT i.tx_id,i.p_laundering,b.threshold_value
-            FROM analysis.run_scores i JOIN analysis.runs r ON r.run_id=i.score_run_id
-            JOIN analysis.jobs b ON b.job_id=r.job_id WHERE i.run_id=%s''', (execution.run_id,))
+        cursor.execute(WINDOW_SCORES, scope.arguments())
         for key, probability, value in cursor:
             decisions[key] = (probability, value)
     current = set()
@@ -345,45 +345,39 @@ def save_alerts(connection, execution):
         raise ProtocolError('Every frozen score requires its original threshold')
     # Only immutable input is read during computation, without holding row locks.
     # Generator columns are streamed into arrays; no row dictionary is kept.
-    edges, targets, seeds = _EdgeInput(), set(), {}
+    edges, targets, positive, times = _EdgeInput(), set(), {}, {}
     with connection.transaction(), connection.cursor(name='alert_input') as cursor:
         cursor.itersize = 2048
-        cursor.execute('''SELECT tx_id,input_role,occurred_at,from_bank_id,from_account_id,to_bank_id,
-            to_account_id,amount_usd FROM analysis.run_inputs WHERE run_id=%s ORDER BY tx_id''',
-            (execution.run_id,))
+        cursor.execute(INPUT_ROWS, scope.arguments())
         for key, role, occurred, from_bank, from_account, to_bank, to_account, usd in cursor:
             edges.add(key, occurred, from_bank, from_account, to_bank, to_account, usd)
             if role == 'TARGET':
                 targets.add(key)
             decision = decisions.get(key)
             if decision is not None and decision[0] >= decision[1]:
-                seeds[key] = dict(txId=key, occurredAt=occurred.astimezone(timezone.utc).isoformat(),
-                                  score=decision[0], threshold=float(decision[1]))
+                positive[key] = dict(txId=key, occurredAt=occurred.astimezone(timezone.utc).isoformat(),
+                                     score=decision[0], threshold=float(decision[1]))
+                times[key] = occurred
     if targets != current:
         raise ProtocolError('Every frozen TARGET requires current-run scores')
     scores = _Scores(connection, execution.run_id, frozenset(decisions))
     del current, decisions, targets
     days = {day.isoformat(): dict(complete=complete, expectedBanks=expected, completeBanks=received, reports=reports)
             for day, expected, received, complete, reports in connection.execute(
-                'SELECT business_date,expected_banks,complete_banks,complete,reports FROM analysis.input_coverage WHERE run_id=%s', (execution.run_id,)).fetchall()}
+                "SELECT business_date,expected_banks,complete_banks,complete,reports FROM analysis.input_coverage"
+                " WHERE run_id=%s AND business_date>=(%s::timestamptz AT TIME ZONE 'Asia/Seoul')::date",
+                (execution.run_id, scope.start)).fetchall()}
     timings['inputRead'] = (perf_counter() - started) * 1000
     candidate_started = perf_counter()
-    if seeds and not days:
+    if positive and not days:
         raise ProtocolError('Frozen coverage is required')
-    seed_groups, owned_seen, duplicates = [], set(), 0
-    for owned, core, members, witnesses, version in connection.execute('''SELECT v.evidence->'seeds',
-        (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t
-         WHERE t->>'role'<>'CONTEXT'),
-        (SELECT jsonb_agg(t->'txId') FROM jsonb_array_elements(v.evidence->'transactions') t),
-        coalesce(v.evidence->'witnesses','[]'::jsonb), v.evidence->>'policyVersion'
-        FROM analysis.run_alert_origins o JOIN review.alerts a USING(alert_id)
-        JOIN review.alert_versions v ON v.alert_id=o.alert_id AND v.version=o.version
-        WHERE o.run_id=%s AND a.status='OPEN' AND a.merged_into_alert_id IS NULL
-        ORDER BY a.alert_id''', (execution.run_id,)):
+    seed_groups, owned_seen, duplicates, pinned_ids = [], set(), 0, []
+    for alert, owned, core, members, witnesses, version in scope.pinned(connection):
         # Published relations pin the block (I10); a block of another policy is frozen.
         # A seed owned by two OPEN Alerts (an anomaly the generator never creates) stays
         # with the earliest Alert; the lifecycle then merges or proposes for the other.
-        keys = [s['txId'] for s in owned]
+        pinned_ids.append(alert)
+        keys = [s['txId'] for s in owned if s['txId'] in positive]
         fresh = [key for key in keys if key not in owned_seen]
         duplicates += len(keys) - len(fresh)
         owned_seen.update(fresh)
@@ -392,6 +386,11 @@ def save_alerts(connection, execution):
         seed_groups.append((fresh, core or [], members or [],
                             [(w['kind'], tuple(w['tx_ids'])) for w in witnesses],
                             version != POLICY.version))
+    # New seeds start Alerts: earlier ones join only within the seed range, and a seed an
+    # OPEN Alert outside that range owns stays there (alert_new_seed_design_20261022.md §3.1).
+    candidates = {key for key, at in times.items() if at >= scope.seed_start}
+    candidates -= scope.owned_elsewhere(connection, candidates, pinned_ids)
+    seeds = {key: positive[key] for key in candidates | owned_seen}
     batch = _build_graphs(edges, seeds, seed_groups)
     del edges
     timings['candidateBuild'] = (perf_counter() - candidate_started) * 1000
@@ -413,12 +412,17 @@ def save_alerts(connection, execution):
             return
         from alerts.alert_plan_preparation import prepare_plans
         connection.execute('SELECT pg_advisory_xact_lock(17002001)')
+        core_ids = {key for graph in batch.graphs for key in (*graph.seed_ids, *graph.connection_ids)}
+        planned = scope.planned(connection, pinned_ids, core_ids)
         prepare_plans(connection, execution, batch, rows, scores, seeds, days,
             dict(run_id=str(execution.run_id), policyVersion=POLICY.version,
+                 inputWindowStart=scope.start.isoformat(), seedRangeStart=scope.seed_start.isoformat(),
+                 pinnedAlertCount=len(pinned_ids), plannedAlertCount=len(planned),
                  policyDigest=batch.policy_digest, graphCount=len(batch.graphs),
                  unassignedSeedCount=len(batch.unassigned),
                  frozenLegacyCount=sum(1 for group in seed_groups if group[4]),
                  duplicateOwnedSeedCount=duplicates,
                  unassignedReasons=dict(Counter(item.reason for item in batch.unassigned)),
                  rejectedRelationReasons=dict(Counter(item.reason for item in batch.rejected_relations)),
-                 timingsMs={key: round(value, 3) for key, value in timings.items()}))
+                 timingsMs={key: round(value, 3) for key, value in timings.items()}),
+            case_ids=planned, positive=frozenset(positive))
