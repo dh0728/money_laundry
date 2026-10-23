@@ -1,4 +1,4 @@
-"""Contract regressions for the block generator (block-pin-1 stages, block-pin-2 locality)."""
+"""Contract regressions for the block generator (block-pin-1 stages, block-pin-2 locality, block-pin-3 limits)."""
 from dataclasses import replace
 import random
 import unittest
@@ -8,6 +8,10 @@ from alerts.block_graph import BlockInputError, BlockPolicy, build_block_graphs
 from alerts.flow_graph import EdgeTable, FlowIndex, GraphBudgetExceeded, HOUR_US, Witness
 
 USD = 1_000_000
+# The locality tests below were written in hours for the block-pin-2 limits; the mechanics they
+# check do not depend on the values, so they keep them explicitly (block-pin-3 defaults are
+# covered by test_block_pin_3_limits).
+PIN2_TIMES = dict(span_max_us=240 * HOUR_US, hop_lag_us=96 * HOUR_US)
 
 
 def table(rows):
@@ -80,15 +84,15 @@ class BlockGraphTests(unittest.TestCase):
 
     def test_pass_requires_order_lag_band_and_distinct_accounts(self):
         rows = [(1, 0, "A", "Y", 1000.0), (2, 10, "Y", "C", 950.0)]
-        graph, = self.build(rows, [1, 2]).graphs
+        graph, = self.build(rows, [1, 2], **PIN2_TIMES).graphs
         self.assertEqual(graph.witnesses, (Witness("PASS", (1, 2)),))
-        self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 10, "Y", "C", 700.0)], [1, 2]).graphs, ())
-        self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 97, "Y", "C", 1000.0)], [1, 2]).graphs, ())
-        self.assertEqual(self.build([(1, 10, "A", "Y", 1000.0), (2, 0, "Y", "C", 1000.0)], [1, 2]).graphs, ())
-        self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 1, "Y", "Y", 1000.0)], [1, 2]).graphs, ())
+        self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 10, "Y", "C", 700.0)], [1, 2], **PIN2_TIMES).graphs, ())
+        self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 97, "Y", "C", 1000.0)], [1, 2], **PIN2_TIMES).graphs, ())
+        self.assertEqual(self.build([(1, 10, "A", "Y", 1000.0), (2, 0, "Y", "C", 1000.0)], [1, 2], **PIN2_TIMES).graphs, ())
+        self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 1, "Y", "Y", 1000.0)], [1, 2], **PIN2_TIMES).graphs, ())
         tight = [(1, 0, "A", "Y", 1000.0), (2, 1, "Y", "C", 1200.0)]
-        self.assertEqual(len(self.build(tight, [1, 2]).graphs), 1)
-        self.assertEqual(self.build(tight, [1, 2], ratio_num=9, ratio_den=10).graphs, ())
+        self.assertEqual(len(self.build(tight, [1, 2], **PIN2_TIMES).graphs), 1)
+        self.assertEqual(self.build(tight, [1, 2], ratio_num=9, ratio_den=10, **PIN2_TIMES).graphs, ())
 
     def test_pass_matches_one_to_one_and_needs_a_margin(self):
         rows = [(1, 0, "A", "Y", 1000.0), (2, 1, "B", "Y", 1200.0), (3, 10, "Y", "C", 1000.0)]
@@ -137,7 +141,7 @@ class BlockGraphTests(unittest.TestCase):
 
     def test_component_span_splits(self):
         rows = chain([f"N{i}" for i in range(7)], step=60.0)  # six hops at 0..300h
-        batch = self.build(rows, [row[0] for row in rows])
+        batch = self.build(rows, [row[0] for row in rows], **PIN2_TIMES)
         self.assertEqual([g.seed_ids for g in batch.graphs], [(100, 101, 102, 103, 104)])
         self.assertIn("COMPONENT_SPAN", batch.graphs[0].limits)
 
@@ -443,7 +447,7 @@ class BlockGraphTests(unittest.TestCase):
                 (3, 2, "S", "M2", 1000.0), (4, 6, "M2", "T", 1000.0),
                 (11, 300, "S", "M3", 1000.0), (12, 305, "M3", "T", 1000.0),
                 (13, 302, "S", "M4", 1000.0), (14, 306, "M4", "T", 1000.0)]
-        batch = self.build(rows, [1, 4, 11, 14])
+        batch = self.build(rows, [1, 4, 11, 14], **PIN2_TIMES)
         self.assertEqual([g.seed_ids for g in batch.graphs], [(1, 4), (11, 14)])
         self.assertEqual([self.kinds(g) for g in batch.graphs], [["BRIDGE"], ["BRIDGE"]])
         self.assertEqual(batch.unassigned, ())
@@ -452,21 +456,21 @@ class BlockGraphTests(unittest.TestCase):
         # A PASS pair at hours 0-5 whose money returns to A only at hour 280.
         rows = [(1, 0, "A", "B", 1000.0), (2, 5, "B", "C", 1000.0),
                 (3, 95, "C", "D", 1000.0), (4, 190, "D", "E", 1000.0), (5, 280, "E", "A", 1000.0)]
-        graph, = self.build(rows, [1, 2]).graphs
+        graph, = self.build(rows, [1, 2], **PIN2_TIMES).graphs
         self.assertEqual(self.kinds(graph), ["PASS"])
         self.assertNotIn("COMPONENT_SPAN", graph.limits)  # block-pin-1 marked the distant walk
         inside = rows[:3] + [(4, 100, "D", "E", 1000.0), (5, 150, "E", "A", 1000.0)]
-        graph, = self.build(inside, [1, 2]).graphs
+        graph, = self.build(inside, [1, 2], **PIN2_TIMES).graphs
         self.assertEqual(self.kinds(graph), ["CLOSURE", "PASS"])
 
     def test_single_seed_cycle_beyond_span_is_not_a_block(self):
         # Each hop is within hop_lag, the whole cycle is not within span_max (I6).
         rows = [(1, 0, "A", "B", 1000.0), (2, 90, "B", "C", 1000.0),
                 (3, 180, "C", "D", 1000.0), (4, 270, "D", "A", 1000.0)]
-        self.assertEqual(self.build(rows, [1]).graphs, ())
+        self.assertEqual(self.build(rows, [1], **PIN2_TIMES).graphs, ())
         short = [(1, 0, "A", "B", 1000.0), (2, 90, "B", "C", 1000.0),
                  (3, 180, "C", "D", 1000.0), (4, 230, "D", "A", 1000.0)]
-        graph, = self.build(short, [1]).graphs
+        graph, = self.build(short, [1], **PIN2_TIMES).graphs
         self.assertEqual(graph.witnesses, (Witness("SHAPE_CYCLE", (1, 2, 3, 4)),))
 
     def test_single_seed_bridge_beyond_span_is_not_a_block(self):
@@ -501,7 +505,21 @@ class BlockGraphTests(unittest.TestCase):
         self.assertTrue(batch.graphs)
         for graph in batch.graphs:
             core = graph.seed_ids + graph.connection_ids
-            self.assertLessEqual(max(hours[k] for k in core) - min(hours[k] for k in core), 240.0)
+            self.assertLessEqual(max(hours[k] for k in core) - min(hours[k] for k in core),
+                                 BlockPolicy().span_max_us / HOUR_US)
+
+    def test_block_pin_3_limits(self):
+        policy = BlockPolicy()
+        self.assertEqual((policy.version, policy.span_max_us, policy.hop_lag_us),
+                         ("block-pin-3", 336 * HOUR_US, 168 * HOUR_US))
+        # A PASS takes up to seven days between legs, not more.
+        self.assertEqual(len(self.build([(1, 0, "A", "Y", 1000.0), (2, 168, "Y", "C", 1000.0)], [1, 2]).graphs), 1)
+        self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 169, "Y", "C", 1000.0)], [1, 2]).graphs, ())
+        # A chain of hops 100h apart splits once it would span more than 14 days.
+        rows = chain([f"N{i}" for i in range(6)], step=100.0)  # five hops at 0..400h
+        batch = self.build(rows, [row[0] for row in rows])
+        self.assertEqual([g.seed_ids for g in batch.graphs], [(100, 101, 102, 103)])
+        self.assertIn("COMPONENT_SPAN", batch.graphs[0].limits)
 
     def test_real_output_is_accepted_by_the_lifecycle_planner(self):
         rows = fan("A", 3) + [(200, 8, "AR0", "Z", 1000.0)]

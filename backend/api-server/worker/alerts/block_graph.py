@@ -1,4 +1,4 @@
-"""Pure, bounded block generator (policy block-pin-2).
+"""Pure, bounded block generator (policy block-pin-3: block-pin-2 with longer time limits).
 
 Implements P0-P7 of worktable/alert_motif_design.md §7: pinning, hubs, faces/stars/
 RELAY, PASS/PATH/BRIDGE flow relations, capped Kruskal assembly, CLOSURE walks,
@@ -38,10 +38,12 @@ class BlockInputError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class BlockPolicy:
-    version: str = "block-pin-2"
+    version: str = "block-pin-3"
     core_max: int = 64
-    span_max_us: int = 240 * HOUR_US
-    hop_lag_us: int = 96 * HOUR_US
+    # block-pin-3 (2026-10-23): fitted to HI-Medium patterns (longest hop 163 h, longest
+    # pattern 305 h); block-pin-2 used the HI-Small values 240 h / 96 h.
+    span_max_us: int = 336 * HOUR_US
+    hop_lag_us: int = 168 * HOUR_US
     # Amount band [num/den, den/num] = [0.8, 1.25]: num*a <= den*b and num*b <= den*a.
     ratio_num: int = 4
     ratio_den: int = 5
