@@ -51,3 +51,8 @@
 ## 원격 반영 차단 — 2026-10-26
 
 이 환경의 인증 사용자 `kmg200164`로 `dh0728/money_laundry`의 `fe/work`를 정상 push하는 사전 확인이 GitHub403(Permission denied)으로 거부됐다. 실제 원격 쓰기는 실행되지 않았다. 이 작업의 새 경로는 현재 클라우드 로컬 commit 대상이며, 원격 fe/work/dev/master/frontend에는 아직 적용되지 않았다. 권한/사용자 작업 없이 다른 계정·도구·branch로 우회하지 않는다.
+
+
+## 동일 구조 포트폴리오 보존 묶음
+
+[PRESERVATION.md](PRESERVATION.md)에서 버전별 원본/HTML/기록/실행/설계/검증/출처를 확인한다. [versions.json](versions.json)과 [preservation-manifest.json](preservation-manifest.json)에 팀 frontend와 Archive frontend의 정확한 상대 경로·파일 해시가 있다. 0.21.0~0.24.0과 구현 1.0.0 소스/오늘 정적 스냅샷,2.0.0 시작 기록을 포함한다. Mac 고유 HTML 5개·설계·QA·연구는 미통합이며 현재 원격에서 확보한 자료의 보존으로 범위를 한정한다. 기존 Archive 원본을 덮어쓰거나 개인 문서를 팀으로 복사하지 않았다.
