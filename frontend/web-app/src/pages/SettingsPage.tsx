@@ -11,9 +11,17 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useMemoryState } from '@/lib/memory'
+import { UnderTabs } from '@/components/UnderTabs'
+import { MockRoleSwitch, useMockRole } from '@/components/MockRole'
+import { AuditTab, MembersTab } from '@/features/settings/AdminSettings'
 
 // v24 UtilityPages.tsx의 설정 화면. 테마 외 값은 아직 다른 화면에 쓰이지 않고, 새로고침하면 초기화된다.
 export default function SettingsPage() {
+  // 재설계(10/6 김명기 제안): 구성원·권한, 감사 이력은 관리자에게만 보이는 설정 탭
+  const [role, setRole] = useMockRole()
+  const [tab, setTab] = useMemoryState<'mine' | 'members' | 'audit'>('settings:tab', 'mine')
+  const current = role === 'ADMIN' ? tab : 'mine'
+  const tabs = <div className="flex flex-wrap items-end justify-between gap-3"><UnderTabs value={current} onChange={setTab} items={[{ value: 'mine', label: '내 설정' }, ...(role === 'ADMIN' ? [{ value: 'members' as const, label: '구성원·권한' }, { value: 'audit' as const, label: '감사 이력' }] : [])]} /><MockRoleSwitch role={role} onChange={setRole} /></div>
   const currentUser = useCurrentUser()
   const { theme, setTheme } = useTheme()
   const fontScale = useFontScale()
@@ -22,6 +30,7 @@ export default function SettingsPage() {
   // 조사자는 Alert 판정과 Episode 생성을 이어서 하고, 관리자는 Episode 검수를 받는다(9/28)
   const choices = currentUser.role === 'STAFF' ? [['assigned', '내 Alert 배정'], ['linked', 'Episode 연결 · 생성'], ['comment', '새 의견'], ['result', 'Episode 검수 결과']] : [['assigned', 'Episode 검수 요청'], ['linked', 'Episode에 Alert 연결'], ['comment', '새 의견'], ['result', 'Batch 결과']]
   // 설정은 선택 즉시 적용. 각 묶음은 같은 Card/SectionTitle 구조를 쓴다.
+  if (current !== 'mine') return <div className="space-y-6"><PageHeading title="설정" description={current === 'members' ? '직원의 역할과 권한, 담당 재배정' : '사용자·사건·관리 행동의 기록'} />{tabs}{current === 'members' ? <MembersTab role={role} /> : <AuditTab />}</div>
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -39,6 +48,7 @@ export default function SettingsPage() {
           <Button size="sm" variant="outline" className="rounded-full" onClick={reset}><RotateCcw className="size-3.5" />설정 초기화</Button>
         </div>
       </div>
+      {tabs}
       <div className="settings-grid grid items-stretch gap-x-10 gap-y-10" data-testid="settings-grid">
         <Card className="h-full shadow-none"><CardContent className="space-y-5"><SectionTitle title="일반" action={<ProvenanceBadge kind="mock" />} />
           <div className="space-y-2"><Label>글자 크기</Label><Select value={String(fontScale)} onValueChange={v => setFontScale(Number(v))}><SelectTrigger className="w-full" data-testid="font-scale"><SelectValue /></SelectTrigger><SelectContent>{FONT_SCALES.map(s => <SelectItem key={s.value} value={String(s.value)}>{s.label}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">화면 전체 글자와 여백이 함께 커짐 · 이 브라우저에만 저장</p></div>

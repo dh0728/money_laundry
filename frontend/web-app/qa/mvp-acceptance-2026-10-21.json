@@ -1,0 +1,101 @@
+{
+  "scope": "existing fe/work app; isolated synthetic Backend; no shared server mutation",
+  "observedAtUtc": "2026-10-21T14:44:03.237205+00:00",
+  "frontendBaseCommit": "fd393a1a58bf5071d4e158bad79b32c58dd5d39e",
+  "frontendSourceSha256": {
+    "src/api/liveDashboard.ts": "a04e184d53e6bf3de27f163edae7f81b8f7698eec184750ec9adde98912713e5",
+    "src/api/liveLedger.ts": "7b708a90aaffff3348b7ab9aceaf54c1c8e05322540fba5dc536aa56dda8ec04",
+    "src/pages/LiveLedgerPage.tsx": "6f90624a17080c56a9544a40294d123b0f281de15174eef151fc5ec9081831d0",
+    "src/pages/LiveCasesPage.tsx": "9f77cfa67afa79e00cd704be7e0c411d131d33fe6487b12521cc07d2b5558f84",
+    "src/features/transactions/TransactionExplorer.tsx": "62f0610e1ea145d252c35efeaabec6f2b1d351015f1d1f51cbbd8a725700eb1f"
+  },
+  "backendSource": "9dc31bab",
+  "data": "synthetic seed; no real customer data",
+  "transport": "real HTTP and session/CSRF; API responses not mocked",
+  "checkpoints": [
+    {
+      "step": "dashboard",
+      "legacyEndpointRequests": 0,
+      "summaryStatus": 200
+    },
+    {
+      "step": "ledger to investigation",
+      "transactionId": 3,
+      "alertId": 3,
+      "caseId": 3,
+      "hash": "#alerts/3"
+    },
+    {
+      "step": "comment persisted",
+      "status": 200,
+      "revisionChanged": true,
+      "matchingHistoryCount": 1
+    },
+    {
+      "step": "closed result verified by fresh GET",
+      "status": 200,
+      "outcome": "NORMAL"
+    }
+  ],
+  "commandCounts": {
+    "COMMENT": 1,
+    "CLOSE": 1
+  },
+  "final": {
+    "caseId": 3,
+    "status": "CLOSED",
+    "outcome": "NORMAL",
+    "revision": 11000001,
+    "matchingCloseHistoryCount": 1
+  },
+  "browserErrors": [],
+  "sharedServerWrites": 0,
+  "original500ReproductionDbChanged": false,
+  "ai": {
+    "binaryScorePresent": true,
+    "actualInferenceExecuted": false,
+    "origin": "synthetic seed run; score display is not proof of real GNN inference",
+    "typeQualityVerified": false
+  },
+  "verification": {
+    "liveBuild": "passed (includes TypeScript)",
+    "lint": {
+      "errors": 0,
+      "existingWarnings": 1
+    },
+    "fullTests": {
+      "files": 41,
+      "passed": 179,
+      "failed": 30,
+      "baselineFailures": 32,
+      "newFailureNames": [],
+      "resolvedFailureNames": [
+        "src/pages/LiveNavigation.test.tsx > actual live pages share the chosen range and preserve the owner/account and cached dashboard on tab return",
+        "src/pages/LivePages.test.tsx > 실제 거래에서 미분석을 정상으로 바꾸지 않고 원본 Alert와 Episode ID를 구별한다"
+      ]
+    },
+    "design": {
+      "baseline": "40761b80fa1dcf4897879bf101f8e83448adf928",
+      "unchangedProtectedFiles": 40,
+      "matchingLedgerRegionsPerViewport": 7,
+      "viewports": [
+        {
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "width": 390,
+          "height": 844
+        }
+      ],
+      "scope": "same selected synthetic state, class/computed style/geometry; no claim of whole-screen pixel equality"
+    }
+  },
+  "limitations": [
+    "Not an operational deployment or user design sign-off",
+    "Not a real GNN inference or accuracy evaluation",
+    "Synthetic database and credentials are not packaged; prepare a separate test environment",
+    "All frontend tests are not green; see README for failure classification",
+    "Do not rerun writes against the already-closed synthetic case"
+  ]
+}

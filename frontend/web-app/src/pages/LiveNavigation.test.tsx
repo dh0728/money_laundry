@@ -41,7 +41,7 @@ it('actual live pages share the chosen range and preserve the owner/account and 
   fireEvent.click(screen.getByRole('button', { name: 'ledger' }))
   fireEvent.click(await screen.findByRole('button', { name: /owner-one/ }))
   fireEvent.click(await screen.findByRole('button', { name: /account-one/ }))
-  await waitFor(() => expect(transactions).toHaveBeenCalled())
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.anything(), 'account-one', undefined))
   expect(owners).toHaveBeenLastCalledWith(expect.objectContaining({ from: '2023-09-01', to: '2023-09-10' }))
   for (const tab of ['alerts', 'episodes']) {
     fireEvent.click(screen.getByRole('button', { name: tab }))

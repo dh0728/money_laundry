@@ -1,12 +1,15 @@
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import LiveLedgerPage from './LiveLedgerPage'
 import { toast } from 'sonner'
-const { owners, accounts, transactions } = vi.hoisted(() => ({ owners: vi.fn(), accounts: vi.fn(), transactions: vi.fn() }))
-const { reviewCases } = vi.hoisted(() => ({ reviewCases: vi.fn() }))
-vi.mock('@/api/liveLedger', () => ({ fetchLedgerOwners: owners, fetchLedgerAccounts: accounts, fetchLedgerTransactions: transactions, fetchPaymentFormats: async () => [] }))
-vi.mock('@/api/liveReview', () => ({ fetchReviewCases: reviewCases }))
+import { WorkspaceProvider } from '@/lib/WorkspaceProvider'
+import { WorkspaceState } from '@/lib/workspaceState'
+const { owners, accounts, transactions, locate } = vi.hoisted(() => ({ owners: vi.fn(), accounts: vi.fn(), transactions: vi.fn(), locate: vi.fn() }))
+const { cases } = vi.hoisted(() => ({ cases: vi.fn() }))
+vi.mock('@/api/liveLedger', () => ({ fetchLedgerOwners: owners, fetchLedgerAccounts: accounts, fetchLedgerTransactions: transactions, locateLedgerTransaction: locate, fetchPaymentFormats: async () => [] }))
+vi.mock('@/api/liveReview', () => ({ fetchReviewCases: cases }))
 const page = (content: unknown[]) => ({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 })
+beforeEach(() => vi.clearAllMocks())
 it('선택 전에도 전체 조건의 계좌와 거래를 조회하고 화면에 표시한다', async () => {
   owners.mockResolvedValue(page([{ id: 'owner-uuid', name: '김민준#00001' }]))
   accounts.mockResolvedValue(page([{ id: 'account-a', ownerId: 'owner-uuid', ownerName: '김민준#00001', bankId: 1 }]))
@@ -22,6 +25,62 @@ it('선택 전에도 전체 조건의 계좌와 거래를 조회하고 화면에
   expect(await within(screen.getByTestId('account-section')).findByText('account-a')).toBeInTheDocument()
   expect(await within(screen.getByTestId('transaction-section')).findByText('11')).toBeInTheDocument()
   expect(screen.getByTestId('transaction-section')).toHaveTextContent('조건에 맞는 전체 거래')
+})
+it('연결 Alert에서 같은 원장으로 돌아오면 선택했던 거래 상세를 복원한다', async () => {
+  owners.mockResolvedValue(page([{ id: 'owner-a', name: '검수 A' }]))
+  accounts.mockResolvedValue(page([{ id: 'account-a', ownerId: 'owner-a', bankId: 1 }]))
+  transactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2026-10-21T10:00:00+09:00', fromAccountId: 'account-a', toAccountId: 'account-b', fromOwnerName: '검수 A', toOwnerName: '검수 B', amountPaid: 100, amountUsd: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', isSuspicious: true, alertIds: [3001], episodeIds: [] }]))
+  cases.mockResolvedValue(page([{ kind: 'ALERT', alertId: 3001, caseId: 42 }]))
+  const onOpen = vi.fn()
+  const { rerender } = render(<WorkspaceProvider><LiveLedgerPage onOpen={onOpen} /></WorkspaceProvider>)
+  fireEvent.click(await within(screen.getByTestId('transaction-section')).findByText('101'))
+  fireEvent.click(screen.getByRole('link', { name: 'Alert · A-3001' }))
+  await waitFor(() => expect(onOpen).toHaveBeenCalledWith('ALERT', 42))
+  rerender(<WorkspaceProvider><p>사건 42 확인</p></WorkspaceProvider>)
+  rerender(<WorkspaceProvider><LiveLedgerPage onOpen={onOpen} /></WorkspaceProvider>)
+  expect(await screen.findByTestId('selected-transaction')).toHaveTextContent('거래 시각')
+  expect(within(screen.getByTestId('transaction-section')).getByRole('button', { name: /101/ })).toHaveAttribute('aria-pressed', 'true')
+  rerender(<WorkspaceProvider key="another-session"><LiveLedgerPage onOpen={onOpen} /></WorkspaceProvider>)
+  await within(screen.getByTestId('transaction-section')).findByText('101')
+  expect(screen.queryByTestId('selected-transaction')).not.toBeInTheDocument()
+  expect(within(screen.getByTestId('transaction-section')).getByRole('button', { name: /101/ })).toHaveAttribute('aria-pressed', 'false')
+})
+it('원장 연결 Alert를 눌러 alertId와 다른 실제 caseId로 이동한다', async () => {
+  owners.mockResolvedValue(page([])); accounts.mockResolvedValue(page([]))
+  transactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2026-10-21T10:00:00+09:00', fromAccountId: 'account-a', toAccountId: 'account-b', fromOwnerName: '검수 A', toOwnerName: '검수 B', amountPaid: 100, amountUsd: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', isSuspicious: true, alertIds: [3001], episodeIds: [] }]))
+  cases.mockResolvedValue(page([{ kind: 'ALERT', alertId: 3001, caseId: 42 }]))
+  const onOpen = vi.fn(); render(<LiveLedgerPage onOpen={onOpen} />)
+  fireEvent.click(await within(screen.getByTestId('transaction-section')).findByText('101'))
+  fireEvent.click(await screen.findByRole('link', { name: 'Alert · A-3001' }))
+  await waitFor(() => expect(onOpen).toHaveBeenCalledWith('ALERT', 42))
+  expect(onOpen).not.toHaveBeenCalledWith('ALERT', 3001)
+  expect(cases).toHaveBeenCalledWith({ kind: 'ALERT', query: 'A-3001', page: 0, size: 100 })
+})
+it('선택 전 계좌·거래 첫 페이지를 요청하고 기존 세 단계 안에 바로 표시한다', async () => {
+  owners.mockResolvedValue(page([{ id: 'owner-a', name: '검수 소유주 A' }]))
+  accounts.mockResolvedValue(page([{ id: 'account-a', ownerId: 'owner-a', bankId: 1 }]))
+  transactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2026-10-21T10:00:00+09:00', fromAccountId: 'account-a', toAccountId: 'account-b', fromOwnerName: '검수 소유주 A', toOwnerName: '검수 소유주 B', amountPaid: 100, amountUsd: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', isSuspicious: null, alertIds: [], episodeIds: [] }]))
+  render(<LiveLedgerPage />)
+  expect(await within(screen.getByTestId('account-section')).findByText('account-a')).toBeInTheDocument()
+  expect(await within(screen.getByTestId('transaction-section')).findByText('101')).toBeInTheDocument()
+  expect(accounts).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }), undefined)
+  expect(transactions).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }), undefined, undefined)
+  expect(within(screen.getByTestId('transaction-section')).queryByText('송금')).not.toBeInTheDocument()
+  expect(within(screen.getByTestId('transaction-section')).queryByText('수취')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /검수 소유주 A/ }))
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.anything(), undefined, 'owner-a'))
+  fireEvent.click(within(screen.getByTestId('account-section')).getByRole('button', { name: /account-a/ }))
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.anything(), 'account-a', undefined))
+  fireEvent.click(within(screen.getByTestId('account-section')).getByRole('button', { name: /account-a/ }))
+  expect(within(screen.getByTestId('account-section')).getByRole('button', { name: /account-a/ })).toHaveAttribute('aria-pressed', 'false')
+  expect(transactions).toHaveBeenCalledWith(expect.anything(), undefined, 'owner-a')
+  expect(within(screen.getByTestId('transaction-section')).getByText('101')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /검수 소유주 A/ }))
+  expect(transactions).toHaveBeenCalledWith(expect.anything(), undefined, undefined)
+  expect(screen.getByTestId('owner-item')).toHaveAttribute('aria-pressed', 'false')
+  fireEvent.change(screen.getByRole('textbox', { name: '거래 내역 검색' }), { target: { value: '101' } })
+  expect(await within(screen.getByTestId('transaction-section')).findByText('101')).toBeInTheDocument()
+  await waitFor(() => expect(transactions).toHaveBeenLastCalledWith(expect.objectContaining({ query: '101', page: 0 }), undefined, undefined))
 })
 it('소유주 이름을 표시하되 계좌 조회에는 원래 소유주 ID를 전달한다', async () => {
   owners.mockResolvedValue(page([{ id: 'owner-uuid', name: '김민준#00001' }]))
@@ -42,12 +101,12 @@ it('거래에 연결된 Alert를 정확한 caseId로 연다', async () => {
     fromAccountId: 'account-a', toAccountId: 'account-b',
     fromOwnerName: '김민준#00001', toOwnerName: '상대', alertIds: [3001], episodeIds: [],
   }]))
-  reviewCases.mockResolvedValue(page([{ alertId: 3001, caseId: 1 }]))
+  cases.mockResolvedValue(page([{ alertId: 3001, caseId: 1 }]))
   const onOpen = vi.fn()
   render(<LiveLedgerPage onOpen={onOpen} />)
   fireEvent.click(await within(screen.getByTestId('transaction-section')).findByText('11'))
   fireEvent.click(screen.getByRole('link', { name: 'Alert · A-3001' }))
-  await waitFor(() => expect(reviewCases).toHaveBeenCalledWith({ kind: 'ALERT', query: 'A-3001', page: 0, size: 100 }))
+  await waitFor(() => expect(cases).toHaveBeenCalledWith({ kind: 'ALERT', query: 'A-3001', page: 0, size: 100 }))
   await waitFor(() => expect(onOpen).toHaveBeenCalledWith('ALERT', 1))
 })
 it('연결된 Alert가 조회되지 않으면 이동하지 않고 오류를 알린다', async () => {
@@ -59,7 +118,7 @@ it('연결된 Alert가 조회되지 않으면 이동하지 않고 오류를 알�
     fromAccountId: 'account-a', toAccountId: 'account-b',
     fromOwnerName: '김민준#00001', toOwnerName: '상대', alertIds: [3001], episodeIds: [],
   }]))
-  reviewCases.mockResolvedValue(page([]))
+  cases.mockResolvedValue(page([]))
   const error = vi.spyOn(toast, 'error').mockImplementation(() => '')
   const onOpen = vi.fn()
   render(<LiveLedgerPage onOpen={onOpen} />)
@@ -89,4 +148,67 @@ it('거래 조회 실패는 거래 단계에서 재시도할 수 있다', async 
   fireEvent.click(within(section).getByRole('button', { name: '다시 시도' }))
   expect(await within(section).findByText('조건에 맞는 거래가 없습니다.')).toBeInTheDocument()
   expect(transactions).toHaveBeenCalledTimes(2)
+})
+
+it('정확한 거래 바로가기는 확인한 페이지/계좌를 열고 일반 원장 문맥을 덮지 않는다', async () => {
+  const store = new WorkspaceState()
+  store.set('ledger/search', 'retained-filter')
+  locate.mockResolvedValue({ txId: 101, from: '2026-10-13', to: '2026-10-13', account: 'account-a', page: 1 })
+  owners.mockResolvedValue(page([])); accounts.mockResolvedValue(page([]))
+  transactions.mockResolvedValue({ ...page([{ txId: 101, occurredAt: '2026-10-13T10:00:00+09:00', fromAccountId: 'account-a', toAccountId: 'account-b', fromOwnerName: '합성 A', toOwnerName: '합성 B', amountPaid: 100, amountUsd: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', isSuspicious: true, alertIds: [], episodeIds: [] }]), page: 1, totalPages: 2 })
+  const { rerender } = render(<WorkspaceProvider state={store}><LiveLedgerPage transactionId={101} /></WorkspaceProvider>)
+  expect(await screen.findByTestId('selected-transaction')).toHaveTextContent('거래 시각')
+  expect(screen.getByTestId('transaction-detail')).toHaveTextContent('101')
+  expect(screen.getByRole('textbox', { name: '거래 내역 검색' })).toHaveValue('101')
+  expect(transactions).toHaveBeenCalledWith(expect.objectContaining({ query: '101', from: '2026-10-13', to: '2026-10-13', page: 1 }), 'account-a', undefined, expect.any(Function))
+  expect(store.get('ledger/search', '')).toBe('retained-filter')
+  rerender(<WorkspaceProvider state={store}><LiveLedgerPage /></WorkspaceProvider>)
+  expect(screen.getByRole('textbox', { name: '거래 내역 검색' })).toHaveValue('retained-filter')
+})
+
+it('정확한 거래 조회가 실패하면 이전 원장 행이나 선택을 대신 보여주지 않는다', async () => {
+  locate.mockRejectedValue(new Error('원장에서 거래 T-101을 찾을 수 없습니다.'))
+  render(<WorkspaceProvider><LiveLedgerPage transactionId={101} /></WorkspaceProvider>)
+  expect(await screen.findByText('원장에서 거래 T-101을 찾을 수 없습니다.')).toBeInTheDocument()
+  expect(screen.queryByTestId('selected-transaction')).not.toBeInTheDocument()
+})
+
+
+it('조회 중 다른 화면으로 이동하면 늦은 대상 응답을 렌더하지 않는다', async () => {
+  let finish!: (target: { txId: number; page: number }) => void
+  locate.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  const { rerender } = render(<WorkspaceProvider><LiveLedgerPage transactionId={101} /></WorkspaceProvider>)
+  const active = locate.mock.calls[0][2] as () => boolean
+  expect(active()).toBe(true)
+  rerender(<WorkspaceProvider><p>사건으로 복귀</p></WorkspaceProvider>)
+  expect(active()).toBe(false)
+  finish({ txId: 101, page: 0 })
+  await waitFor(() => expect(screen.getByText('사건으로 복귀')).toBeInTheDocument())
+  expect(screen.queryByTestId('selected-transaction')).not.toBeInTheDocument()
+})
+
+it('대상 사전 조회 후 원장이 바뀌면 다른 거래 대신 기존 오류/재조회 동작을 표시한다', async () => {
+  locate.mockResolvedValue({ txId: 101, page: 0 })
+  owners.mockResolvedValue(page([])); accounts.mockResolvedValue(page([]))
+  transactions.mockResolvedValue(page([{ txId: 1101, occurredAt: '2026-10-13T00:00:00Z', fromAccountId: 'a', toAccountId: 'b', amountPaid: 1, amountUsd: 1, paymentCurrency: 'USD', paymentFormat: 'WIRE', alertIds: [], episodeIds: [] }]))
+  render(<WorkspaceProvider><LiveLedgerPage transactionId={101} /></WorkspaceProvider>)
+  expect(await screen.findByText('거래 T-101의 조회 결과가 변경되었습니다. 다시 확인해 주세요.')).toBeInTheDocument()
+  expect(screen.queryByTestId('selected-transaction')).not.toBeInTheDocument()
+  transactions.mockResolvedValue(page([]))
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+  await waitFor(() => expect(locate).toHaveBeenCalledTimes(2))
+})
+
+
+it('바로가기에서 추가한 원장 조회도 화면 이탈 시 인증 알림을 취소하도록 연결한다', async () => {
+  locate.mockResolvedValue({ txId: 101, page: 0 })
+  owners.mockResolvedValue(page([])); accounts.mockResolvedValue(page([])); transactions.mockResolvedValue(page([]))
+  const { rerender } = render(<WorkspaceProvider><LiveLedgerPage transactionId={101} /></WorkspaceProvider>)
+  await screen.findByText('거래 T-101의 조회 결과가 변경되었습니다. 다시 확인해 주세요.')
+  const transactionActive = transactions.mock.calls[0][3] as () => boolean
+  const ownerActive = owners.mock.calls[0][1] as () => boolean
+  const accountActive = accounts.mock.calls[0][2] as () => boolean
+  expect([transactionActive(), ownerActive(), accountActive()]).toEqual([true, true, true])
+  rerender(<WorkspaceProvider><p>기존 사건</p></WorkspaceProvider>)
+  expect([transactionActive(), ownerActive(), accountActive()]).toEqual([false, false, false])
 })

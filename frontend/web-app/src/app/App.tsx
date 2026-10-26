@@ -16,7 +16,7 @@ import { SidebarSelection } from '@/components/SidebarSelection'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import ComingSoonPage from '@/pages/ComingSoonPage'
 import DashboardPage from '@/pages/DashboardPage'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -26,13 +26,16 @@ import EpisodesPage from '@/pages/EpisodesPage'
 import LoginPage from '@/pages/LoginPage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import SettingsPage from '@/pages/SettingsPage'
+import RulesPage from '@/pages/RulesPage'
+import OperationsPage from '@/pages/OperationsPage'
+import SuspiciousPage from '@/pages/SuspiciousPage'
 import TransactionsPage from '@/pages/TransactionsPage'
 import LiveDashboardPage from '@/pages/LiveDashboardPage'
 import LiveLedgerPage from '@/pages/LiveLedgerPage'
 import LiveCasesPage from '@/pages/LiveCasesPage'
 import { currentScenario } from '@/mocks/scenario'
 import { CurrentUserContext, MOCK_USER, roleInfo, type CurrentUser } from './session'
-import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
+import { mainNav, manageNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 import { PendingWorkCount, UnreadNotificationCount } from './SidebarCounts'
 
 
@@ -41,6 +44,9 @@ const pageTitles: Record<Page, string> = {
   transactions: '거래 내역',
   alerts: 'Alert 목록',
   episodes: 'Episode 목록',
+  rules: '룰엔진',
+  operations: '수집·처리 현황',
+  suspicious: '의심 거래',
   notifications: '알림',
   settings: '설정',
   account: '계정',
@@ -165,10 +171,11 @@ export default function App() {
             <SidebarBrandToggle />
           </SidebarHeader>
           <SidebarContent>
-            <SidebarGroup>
+            {([['조사', mainNav], ['관리', manageNav]] as const).map(([label, items]) => <SidebarGroup key={label}>
+              <SidebarGroupLabel className="px-4 group-data-[collapsible=icon]:hidden">{label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1.5">
-                  {mainNav.map(item => (
+                  {items.map(item => (
                     <SidebarMenuItem key={item.id}>
                       <SidebarDestinationButton data-nav-id={item.id} isActive={page === item.id} tooltip={item.name} onNavigate={() => go(item.id)} className={navButtonClass}>
                         <item.icon className="size-4" />
@@ -178,8 +185,8 @@ export default function App() {
                   ))}
                 </SidebarMenu>
               </SidebarGroupContent>
-            </SidebarGroup>
-            <SidebarGroup className="mt-auto border-t">
+            </SidebarGroup>)}
+            <SidebarGroup className="mt-auto">
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1.5">
                   {utilityNav.map(item => (
@@ -202,7 +209,7 @@ export default function App() {
                   <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{currentUser.name[0]}</AvatarFallback></Avatar>
                   <span className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
                     <span className="block text-xs font-medium">{currentUser.name}</span>
-                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
+                    <span className={`mt-0.5 block text-[0.625rem] ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
                   </span>
                 </SidebarDestinationButton>
                 <PendingWorkCount routeKey={`${page}/${id ?? ''}`} />
@@ -237,10 +244,13 @@ export default function App() {
         <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
           <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)} showWhileClockPending={page === 'dashboard'}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
-            : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
+            : page === 'transactions' ? (live ? <LiveLedgerPage transactionId={id} onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
             : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} onOpenAlert={caseId => go('alerts', caseId)} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
             : page === 'notifications' ? (live ? <LiveNotificationsPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />)
+            : page === 'rules' ? <RulesPage />
+            : page === 'operations' ? <OperationsPage />
+            : page === 'suspicious' ? <SuspiciousPage />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}

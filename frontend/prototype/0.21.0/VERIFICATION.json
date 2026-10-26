@@ -1,0 +1,27 @@
+{
+  "version": "0.21.0",
+  "scope": "preservation of existing project artifacts, not acceptance or design improvement",
+  "original_html": "byte-identical to published source via old/new mapping",
+  "normalized_source": "current normalized files at local 71c29033e7eee1cc3fc1e7628d088a43874dbd46",
+  "verification_date": "2026-10-26",
+  "source_bytes_not_modified_in_this_preservation_pass": true,
+  "package_validation": {
+    "package": "money_laundry-0.21.0",
+    "install": {
+      "exit": 0,
+      "summary": []
+    },
+    "test": {
+      "exit": 0,
+      "summary": [
+        "Test Files  36 passed (36)",
+        "Tests  306 passed (306)",
+        "Duration  89.85s (transform 1.51s, setup 0ms, import 68.70s, tests 15.83s, environment 4ms)"
+      ]
+    },
+    "build": {
+      "exit": 0,
+      "summary": []
+    }
+  }
+}

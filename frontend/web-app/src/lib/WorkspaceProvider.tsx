@@ -4,8 +4,9 @@ import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { useAsync } from './useAsync'
 import { PeriodContext, WorkspaceContext, WorkspaceState, useViewState, useWorkspace, type Period } from './workspaceState'
 
-export function WorkspaceProvider({ children, sessionKey }: { children: ReactNode; sessionKey?: string }) {
-  const [store] = useState(() => new WorkspaceState(sessionKey))
+export function WorkspaceProvider({ children, sessionKey, state }: { children: ReactNode; sessionKey?: string; state?: WorkspaceState }) {
+  const [local] = useState(() => new WorkspaceState(sessionKey))
+  const store = state ?? local
   useEffect(() => {
     const changed = () => store.queries.invalidate()
     const notificationsChanged = () => store.queries.invalidate('notifications')

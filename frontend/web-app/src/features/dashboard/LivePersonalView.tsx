@@ -13,14 +13,14 @@ import { reviewCaseWorkItem } from './workItems'
 
 const size = 20
 type Source = { kind: ReviewKind; status: ReviewStatus }
-const sources: Record<WorkStatus, Source[]> = {
+const sources: Record<Exclude<WorkStatus, 'UNSEEN'>, Source[]> = {
   PENDING: [],
   IN_PROGRESS: [{ kind: 'EPISODE', status: 'OPEN' }],
   DONE: [{ kind: 'ALERT', status: 'CLOSED' }, { kind: 'EPISODE', status: 'CLOSED' }],
 }
 const unclassifiedSource: Source[] = [{ kind: 'ALERT', status: 'OPEN' }]
 
-function WorkColumn({ status }: { status: WorkStatus | 'UNKNOWN' }) {
+function WorkColumn({ status }: { status: Exclude<WorkStatus, 'UNSEEN'> | 'UNKNOWN' }) {
   const { userId } = useCurrentUser()
   const [page, setPage] = useState(0)
   const result = useAsync(() => Promise.all((status === 'UNKNOWN' ? unclassifiedSource : sources[status]).map(source =>

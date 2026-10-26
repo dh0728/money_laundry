@@ -43,17 +43,22 @@ let csrf: { headerName: string; token: string } | null = null
 
 export function clearCsrf() { csrf = null }
 
+export function rejectFixtureWrite() {
+  if (fixture) throw new ApiError({ type: 'about:blank', title: '합성 데이터 검수에서는 저장·인증 요청을 보내지 않습니다.', status: 403, code: 'FIXTURE_READ_ONLY' })
+}
+
 export async function refreshCsrf() {
+  rejectFixtureWrite()
   const response = await fetch('/api/auth/csrf', { credentials: 'include', headers: { Accept: 'application/json' } })
   if (!response.ok) throw await responseError(response)
   csrf = await response.json() as { headerName: string; token: string }
   return csrf
 }
 
-export async function responseError(response: Response, notifyUnauthorized = true, signal?: AbortSignal) {
+export async function responseError(response: Response, notifyUnauthorized: boolean | (() => boolean) = true, signal?: AbortSignal) {
   const problem = (await response.json().catch(() => null)) as ProblemDetail | null
   if (signal?.aborted) throw signal.reason
-  if (response.status === 401 && notifyUnauthorized) {
+  if (response.status === 401 && (typeof notifyUnauthorized === 'function' ? notifyUnauthorized() : notifyUnauthorized)) {
     clearCsrf()
     window.dispatchEvent(new Event('auth-expired'))
   }
@@ -67,20 +72,39 @@ export type IsoDateTime = string
 /** YYYY-MM-DD */
 export type IsoDate = string
 
-export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> {
+/** guard: AbortSignal (frontend) or an `active()` callback (fe/work) that turns false when the view is gone. */
+export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>, guard?: AbortSignal | (() => boolean)): Promise<T> {
+  const signal = typeof guard === 'function' ? undefined : guard
+  const active = typeof guard === 'function' ? guard : () => true
+  const assertActive = () => {
+    if (signal?.aborted) throw signal.reason
+    if (!active()) throw new DOMException('화면 이동으로 조회를 중단했습니다.', 'AbortError')
+  }
+  assertActive()
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params ?? {})) {
     if (value !== undefined) query.set(key, String(value))
   }
   const url = query.size ? `${path}?${query}` : path
-  if (fixture) return (await import('@/mocks/liveFixtureApi')).fixtureGet(url) as T
+  if (fixture) {
+    const result = (await import('@/mocks/liveFixtureApi')).fixtureGet(url) as T
+    assertActive()
+    return result
+  }
   const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' }, ...(signal ? { signal } : {}) })
-  if (!response.ok) throw await responseError(response, path !== '/api/me', signal)
-  return (await response.json()) as T
+  assertActive()
+  if (!response.ok) {
+    const error = await responseError(response, () => path !== '/api/me' && active(), signal)
+    assertActive()
+    throw error
+  }
+  const result = (await response.json()) as T
+  assertActive()
+  return result
 }
 
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
-  if (fixture) throw new ApiError({ type: 'about:blank', title: '합성 데이터 미리보기에서는 저장할 수 없습니다.', status: 403, code: 'FIXTURE_READ_ONLY' })
+  rejectFixtureWrite()
   const token = csrf ?? await refreshCsrf()
   const response = await fetch(path, {
     method: 'POST',

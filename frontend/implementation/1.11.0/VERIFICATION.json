@@ -1,0 +1,8 @@
+{
+  "version": "1.11.0",
+  "source_commit": "e8db7ee5bc2a4bb3ef48006a5260da5ae7af2c91",
+  "content_preservation": "original Git blobs or binary Git diff; HTML bytes checked against immutable source",
+  "user_acceptance": "not established",
+  "functional_changes_in_this_reorganization": false,
+  "new_design_2_0_in_version_list": false
+}

@@ -13,7 +13,6 @@ import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
 import { OrthogonalConnector, StageItem, StagePanel } from './transaction-stage'
 import { formatMoney, type TransactionIndex, type TransactionTarget } from './transactionIndex'
-import { useViewState } from '@/lib/workspaceState'
 import { EmptyBlock } from '@/components/states'
 
 const toggleSingleSelectedId = (current: string | null | undefined, clicked: string) => (current === clicked ? null : clicked)
@@ -73,16 +72,16 @@ function TransactionMiniSankey({ transaction }: { transaction: IndexedTransactio
       <svg viewBox="0 0 420 112" aria-hidden="true" focusable="false" className="pointer-events-none absolute inset-0 h-full w-full">
         <path d="M118 38 C176 38 244 38 302 38 L302 74 C244 74 176 74 118 74 Z" className={transaction.suspicious ? 'fill-destructive/35' : 'fill-muted-foreground/35'} />
       </svg>
-      <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2"><p className="truncate text-[10px] text-muted-foreground">송금 소유주</p><p className="mt-1 break-words text-[11px] font-medium leading-tight" title={transaction.fromOwner}>{transaction.fromOwner}</p><p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{transaction.fromAccount}</p></div>
-      <p className="relative z-10 flex min-w-0 items-center justify-center gap-1 rounded-full bg-card/90 px-1 py-1 text-center text-[10px] font-medium tabular-nums" title={amount}><span className="truncate">{amount}</span><ArrowRight data-testid="transaction-flow-direction" aria-hidden="true" className="size-3 shrink-0" /></p>
-      <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2 text-right"><p className="truncate text-[10px] text-muted-foreground">수취 소유주</p><p className="mt-1 break-words text-[11px] font-medium leading-tight" title={transaction.toOwner}>{transaction.toOwner}</p><p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{transaction.toAccount}</p></div>
+      <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2"><p className="truncate text-[0.625rem] text-muted-foreground">송금 소유주</p><p className="mt-1 break-words text-[0.6875rem] font-medium leading-tight" title={transaction.fromOwner}>{transaction.fromOwner}</p><p className="mt-1 truncate font-mono text-[0.6875rem] text-muted-foreground">{transaction.fromAccount}</p></div>
+      <p className="relative z-10 flex min-w-0 items-center justify-center gap-1 rounded-full bg-card/90 px-1 py-1 text-center text-[0.625rem] font-medium tabular-nums" title={amount}><span className="truncate">{amount}</span><ArrowRight data-testid="transaction-flow-direction" aria-hidden="true" className="size-3 shrink-0" /></p>
+      <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2 text-right"><p className="truncate text-[0.625rem] text-muted-foreground">수취 소유주</p><p className="mt-1 break-words text-[0.6875rem] font-medium leading-tight" title={transaction.toOwner}>{transaction.toOwner}</p><p className="mt-1 truncate font-mono text-[0.6875rem] text-muted-foreground">{transaction.toAccount}</p></div>
     </div>
   </figure>
 }
 
 function RecordLinks({ ids, kind, plain, onOpen }: { ids: number[]; kind: 'Alert' | 'Episode'; plain?: boolean; onOpen?: (id: number) => void }) {
   const prefix = kind === 'Alert' ? 'A' : 'E'
-  if (plain) return <div className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} variant="outline">Alert · A-{id}</Badge>)}</div>
+  if (plain) return <div className="flex flex-wrap gap-2">{ids.map(id => onOpen ? <Badge key={id} asChild variant="outline"><button type="button" onClick={() => onOpen(id)} title={`${prefix}-${id} 상세 보기`}>Alert · A-{id}</button></Badge> : <Badge key={id} variant="outline">Alert · A-{id}</Badge>)}</div>
   return <div className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} asChild variant="outline" className="record-link h-8 rounded-full px-3 font-mono text-xs"><a onClick={event => { if (onOpen) { event.preventDefault(); onOpen(id) } }} href={hrefFor(kind === 'Alert' ? 'alerts' : 'episodes', id)} title={`${prefix}-${id} 상세 보기`}>{kind} · {prefix}-{id}</a></Badge>)}</div>
 }
 
@@ -116,6 +115,7 @@ export type ExplorerRemote = {
   onOpenEpisode?: (id: number) => void
   query: string; onQuery: (query: string) => void
   owner?: string; account?: string
+  transaction?: string | null; selectTransaction?: (id: string | null) => void
   selectOwner: (id: string | undefined) => void; selectAccount: (id: string | undefined) => void
   range: DateRange | undefined; filters: TransactionFilter[]
   changeControls: (range: DateRange | undefined, filters: TransactionFilter[]) => void
@@ -140,10 +140,12 @@ export default function TransactionExplorer({ index, target, today, remote }: { 
   const [filterValue, setFilterValue] = useState(remote ? '의심' : '송금')
   const [localOwner, setSelectedOwner] = useState(initial.owner)
   const [localAccount, setSelectedAccount] = useState(initial.account)
-  const [localTransactionId, setLocalTransactionId] = useState<string | null | undefined>(initial.transaction)
-  const [remoteTransactionId, setRemoteTransactionId] = useViewState<string | null | undefined>('ledger/selectedTransaction', initial.transaction)
-  const selectedTransactionId = remote ? remoteTransactionId : localTransactionId
-  const setSelectedTransactionId = remote ? setRemoteTransactionId : setLocalTransactionId
+  const [localTransaction, setLocalTransaction] = useState<string | null | undefined>(initial.transaction)
+  const selectedTransactionId = remote?.selectTransaction ? remote.transaction : localTransaction
+  const setSelectedTransactionId = (id: string | null | undefined) => {
+    if (remote?.selectTransaction) remote.selectTransaction(id ?? null)
+    else setLocalTransaction(id)
+  }
 
 
   const selectedOwner = remote ? remote.owner : localOwner
@@ -188,7 +190,7 @@ export default function TransactionExplorer({ index, target, today, remote }: { 
       <DateRangeButton value={range} onChange={next => applyControls(query, next, filters)} today={today} />
       <Popover open={filterOpen} onOpenChange={setFilterOpen}><PopoverTrigger asChild><Button type="button" variant="outline" size="sm" className="transaction-filter-trigger date-range-control h-9"><ListFilter className="size-3.5" />필터{filters.length > 0 && <Badge className="ml-1 h-5 min-w-5 px-1.5">{filters.length}</Badge>}</Button></PopoverTrigger><PopoverContent align="start" className="w-72 space-y-3"><Label>조건 추가</Label><Select value={filterField} onValueChange={value => { const field = value as TransactionFilterField; setFilterField(field); setFilterValue(filterValues[field][0]) }}><SelectTrigger className="w-full" aria-label="거래 내역 필터 항목"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(filterLabels).filter(([key]) => !remote || remote.account || key !== 'direction').map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select><Select value={filterValue} onValueChange={setFilterValue}><SelectTrigger className="w-full" aria-label="거래 내역 필터 값"><SelectValue /></SelectTrigger><SelectContent>{filterValues[filterField].map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select><Button className="w-full" size="sm" onClick={addFilter}>조건 적용</Button></PopoverContent></Popover>
       {(query || range?.from || filters.length > 0) && <Button type="button" variant="ghost" size="sm" onClick={resetControls}><X className="size-3.5" />전체 보기</Button>}
-      {/* 거래 탐색 API는 API.md에 없어 Backend에 새로 요청할 항목이다 */}
+      {/* Live 조회는 기존 원장 API의 선택적 owner/account 필터를 사용한다. */}
     </div>
     {filters.length > 0 && <div className="flex flex-wrap items-center gap-2">{filters.map((filter, index) => <FilterChip key={`${filter.field}-${filter.value}`} onRemove={() => applyControls(query, range, filters.filter((_, current) => current !== index))}>{filterLabels[filter.field]}: {filter.value}</FilterChip>)}</div>}
     <div data-testid="transactions-explorer" className="transactions-explorer">

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "version": "1.9.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "overview",
+  "name": "개요 요약·차트 재배치",
+  "git_committer_kst": "2026-10-15T11:52:19+09:00",
+  "source_repository": "external_brain",
+  "source_commit": "b0fdf0e09ac8f342bc2c1a325d759e794ce84f0f",
+  "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "original_source_url": "https://github.com/kmg200164/external_brain/tree/b0fdf0e09ac8f342bc2c1a325d759e794ce84f0f/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [
+    56,
+    70
+  ]
+}

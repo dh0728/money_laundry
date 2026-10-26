@@ -143,14 +143,14 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
       <PopoverContent id="global-search-listbox" role="listbox" aria-label="검색 결과" className="w-(--radix-popper-anchor-width) max-w-[90vw] p-2"
         onOpenAutoFocus={e => e.preventDefault()}
         onInteractOutside={event => { if (anchor.current?.contains(event.target as Node)) event.preventDefault() }}>
-        {remote?.error && <div role="alert" className="flex items-center justify-between gap-2 p-2 text-xs text-destructive"><span>{remote.error}</span>{remote.onRetry && <Button size="sm" variant="outline" onClick={remote.onRetry}>검색 다시 시도</Button>}</div>}
+        {remote?.error && <div role="alert" className="flex items-center justify-between gap-2 p-2 text-xs text-destructive-text"><span>{remote.error}</span>{remote.onRetry && <Button size="sm" variant="outline" onClick={remote.onRetry}>검색 다시 시도</Button>}</div>}
         {flat.length === 0
           ? <p className="p-4 text-center text-xs text-muted-foreground">{(remote ? remote.loading : q && !data) ? '불러오는 중…' : '검색 결과가 없습니다.'}</p>
           : (
             <div className="max-h-[60vh] space-y-1 overflow-y-auto">
               {groups.map(g => (
                 <div key={g.id}>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium text-muted-foreground">{g.label}</p>
+                  <p className="px-2 pb-1 pt-1.5 text-[0.625rem] font-medium text-muted-foreground">{g.label}</p>
                   {g.items.map(item => {
                     const i = indexOf.get(item)!
                     return (

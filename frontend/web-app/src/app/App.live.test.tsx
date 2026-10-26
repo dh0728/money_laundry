@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
 import { login } from '@/api/auth'
+import { ApiError } from '@/api/common'
 import { clearWorkspaceViews, useViewState } from '@/lib/workspaceState'
 
 const user = { id: 42, username: 'staff42', name: '김조사', role: 'STAFF' }
@@ -10,15 +11,19 @@ vi.mock('@/lib/apiMode', () => ({ live: true, fixture: false, mockSavedNote: 'mo
 vi.mock('@/api/auth', () => ({ restoreSession: () => Promise.resolve(user), login: vi.fn(), logout: vi.fn() }))
 vi.mock('@/components/LoginNetwork', () => ({ default: () => null }))
 vi.mock('@/api/liveDashboard', async original => ({ ...await original<typeof import('@/api/liveDashboard')>(), fetchDemoClock: async () => ({ businessAt: '2023-09-10T09:00:00+09:00', revision: 1 }) }))
+const readFail = vi.hoisted(() => ({ next: null as unknown }))
 vi.mock('@/api/liveReview', () => ({
   fetchReviewUsers: async () => [],
   fetchReviewCases: async () => ({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }),
-  fetchReviewCase: async () => ({
+  fetchReviewCase: async () => {
+    if (readFail.next) { const error = readFail.next; readFail.next = null; throw error }
+    return {
     caseId: 1, kind: 'ALERT', alertId: 1, status: 'OPEN', outcome: null, assigneeId: 42, assigneeName: '김조사', revision: 1,
     createdAt: '', assignedAt: '', closedAt: null, ageDays: 0, pendingCount: 1, episodeId: null, sourceAlertIds: [], primaryTypes: [],
     summary: { txCount: 1, subjectCount: 1, seedCount: 1, riskScore: 0.8, primaryType: 'Fan-out', amountsByCurrency: {}, firstTxAt: null, lastTxAt: null },
     groups: [{ groupId: 0, label: '원본', revision: 1, members: [{ txId: 1, reviewRole: 'SUBJECT', state: 'PENDING', decision: null, sources: [], transaction: { occurredAt: '2023-09-10T00:00:00Z', fromAccountId: 'a', toAccountId: 'b', fromBankId: 1, toBankId: 2, amountPaid: '10', amountUsd: '10', paymentCurrency: 'USD', paymentFormat: 'WIRE', role: 'SEED', isSuspicious: true, scores: null } }] }], history: [],
-  }),
+    }
+  },
   fetchReviewMoney: async () => ({ available: false, reason: 'EMPTY_SUBJECT_SCOPE', selectedAccounts: ['a'], candidateAccounts: ['a', 'b'], revision: 1 }),
   fetchAlertEvidence: async () => ({ coverage: [] }),
   submitReviewCommand: vi.fn(), setReviewMoneyScope: vi.fn(),
@@ -32,7 +37,7 @@ vi.mock('@/pages/AccountPage', async original => {
   } }
 })
 
-beforeEach(() => { window.location.hash = 'account'; clearWorkspaceViews('42:STAFF'); clearWorkspaceViews('42:ADMIN'); clearWorkspaceViews('99:STAFF') })
+beforeEach(() => { readFail.next = null; window.location.hash = 'account'; clearWorkspaceViews('42:STAFF'); clearWorkspaceViews('42:ADMIN'); clearWorkspaceViews('99:STAFF') })
 
 it('서버 세션을 복원하고 만료되면 로그인 화면으로 돌린다', async () => {
   render(<App />)
@@ -112,7 +117,7 @@ it('actual case drafts survive same-session 401 but explicit logout then the sam
   expect(screen.queryByDisplayValue('private case comment')).not.toBeInTheDocument()
   expect(screen.queryByDisplayValue('private account scope')).not.toBeInTheDocument()
   await completeLogin()
-  expect(await screen.findByRole('checkbox', { name: '조사 중심 계좌 b' })).toBeChecked()
+  expect(await screen.findByRole('checkbox', { name: '조사 중심 계좌 b', hidden: true })).toBeChecked()
   expect(screen.getByLabelText('계좌 선택 사유')).toHaveValue('private account scope')
   expect(screen.getByLabelText('변경 사유')).toHaveValue('private case comment')
   act(() => { window.location.hash = 'account'; window.dispatchEvent(new HashChangeEvent('hashchange')) })
@@ -135,5 +140,17 @@ it('actual case drafts are not exposed when the same user logs in with a differe
   expect(await screen.findByRole('checkbox', { name: '조사 중심 계좌 b' })).not.toBeChecked()
   expect(screen.getByLabelText('계좌 선택 사유')).toHaveValue('')
   expect(screen.getByLabelText('변경 사유')).toHaveValue('')
+  expect(screen.queryByDisplayValue('private case comment')).not.toBeInTheDocument()
+})
+it('reauthentication case read 403 hides the restored draft and prior case', async () => {
+  vi.mocked(login).mockResolvedValue({ ...user, role: 'STAFF' })
+  render(<App />)
+  await openActualCase()
+  await fillActualCaseDrafts()
+  act(() => window.dispatchEvent(new Event('auth-expired')))
+  readFail.next = new ApiError({ type: 'about:blank', title: '조회 권한 없음', status: 403, code: 'FORBIDDEN_ROLE' })
+  await completeLogin()
+  expect(await screen.findByText('이 사건을 조회할 권한이 없습니다.')).toBeInTheDocument()
+  expect(screen.queryByLabelText('변경 사유')).not.toBeInTheDocument()
   expect(screen.queryByDisplayValue('private case comment')).not.toBeInTheDocument()
 })

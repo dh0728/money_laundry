@@ -13,7 +13,7 @@ export type AlertFilter =
 export type AlertFilterField = AlertFilter['field']
 
 export const filterFieldNames: Record<AlertFilterField, string> = {
-  status: '처리 상태',
+  status: '상태',
   type: '탐지 유형',
   assignee: '담당자',
   age: '경과일',
@@ -21,6 +21,7 @@ export const filterFieldNames: Record<AlertFilterField, string> = {
 }
 
 export const ageOptions = [1, 3, 5]
+export const riskOptions = [0.8, 0.9]
 
 const dateOf = (iso: string) => iso.slice(0, 10)
 const ymd = (date: Date) => date.toLocaleDateString('sv-SE')

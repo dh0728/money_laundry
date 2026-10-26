@@ -387,10 +387,10 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       <div className="space-y-3">
         <Label className="text-xs text-muted-foreground">선택 계좌 기준 연결 단계 (hop)</Label>
         <Slider aria-label="선택 계좌 기준 연결 단계 hop 수" min={HOP_MIN} max={HOP_MAX} step={1} value={[hop]} disabled={!selectedNode} onValueChange={([v]) => setHop(v)} />
-        <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">{HOP_TICKS.map(v => <span key={v} className={v === hop ? 'text-foreground font-semibold' : ''}>{v}</span>)}</div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">{selectedNode ? `${nodeMap.get(selectedNode)?.account} 기준 ${hop} hop 이내 노드만 표시` : '그래프에서 계좌 노드를 선택하면 hop 범위 설정이 활성화됩니다.'}</p>
+        <div className="flex justify-between text-[0.625rem] text-muted-foreground tabular-nums">{HOP_TICKS.map(v => <span key={v} className={v === hop ? 'text-foreground font-semibold' : ''}>{v}</span>)}</div>
+        <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">{selectedNode ? `${nodeMap.get(selectedNode)?.account} 기준 ${hop} hop 이내 노드만 표시` : '그래프에서 계좌 노드를 선택하면 hop 범위 설정이 활성화됩니다.'}</p>
       </div>
-      <div className="mt-auto space-y-2.5 border-t pt-4 text-[11px] text-muted-foreground graph-legend">
+      <div className="mt-auto space-y-2.5 border-t pt-4 text-[0.6875rem] text-muted-foreground graph-legend">
         <p className="flex items-center gap-2"><i className="legend-line" style={{ background: 'var(--graph-l1)' }} />의심 거래</p>
         <p className="flex items-center gap-2"><i className="legend-line" style={{ background: 'var(--graph-l0)' }} />{nonSuspiciousLabel}</p>
         <p className="flex items-center gap-2"><i className="legend-line legend-dash" />연결 경로</p>
@@ -409,9 +409,9 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         <Switch id="graph-info-c" checked={showInfo} onCheckedChange={setShowInfo} />
       </div>
       <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-        <Label className="text-[11px] text-muted-foreground shrink-0">연결 단계 (hop)</Label>
+        <Label className="text-[0.6875rem] text-muted-foreground shrink-0">연결 단계 (hop)</Label>
         <Slider aria-label="선택 계좌 기준 연결 단계 hop 수" className="flex-1" min={HOP_MIN} max={HOP_MAX} step={1} value={[hop]} disabled={!selectedNode} onValueChange={([v]) => setHop(v)} />
-        <span className="text-[11px] tabular-nums min-w-12 text-center shrink-0">{selectedNode ? `${hop} hop` : '계좌 선택'}</span>
+        <span className="text-[0.6875rem] tabular-nums min-w-12 text-center shrink-0">{selectedNode ? `${hop} hop` : '계좌 선택'}</span>
       </div>
       <IconButton label="그래프 초기화" onClick={resetGraph}><RotateCcw className="size-3.5" /></IconButton>
     </div>
@@ -439,10 +439,10 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
             {hoverEdge && <><b>{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? `연결 경로 · ${nonSuspiciousLabel}` : nonSuspiciousLabel}</b> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{formatGraphMoney(hoverEdge)} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
           </div>
         )}
-        <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[11px] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</div>
+        <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[0.6875rem] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</div>
         <div className="absolute bottom-3 right-3 flex items-center bg-card border rounded-md">
           <IconButton label="축소" onClick={() => zoomBy(1 / 1.2)}><Minus className="size-3.5" /></IconButton>
-          <span className="text-[11px] tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : (fitted ? 1 : zoomK / (fitK.current || 1))) * 100)}%</span>
+          <span className="text-[0.6875rem] tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : (fitted ? 1 : zoomK / (fitK.current || 1))) * 100)}%</span>
           <IconButton label="확대" onClick={() => zoomBy(1.2)}><Plus className="size-3.5" /></IconButton>
           <IconButton label="화면 맞춤" disabled={viewMode === 'owner' ? ownerZoom.fitted : fitted} onClick={() => fitGraph()}><Shrink className="size-3.5" /></IconButton>
         </div>

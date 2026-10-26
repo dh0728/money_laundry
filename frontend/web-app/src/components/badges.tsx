@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- 배지 컴포넌트와 상태 라벨 상수를 함께 내보냄 */
 import { Badge } from '@/components/ui/badge'
 import { formatScore, typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 import { alertWorkStatus, workStatusLabels, workStatusTone, type WorkStatus } from '@/lib/workStatus'
@@ -34,7 +35,8 @@ export function WorkStatusBadge({ status, title }: { status: WorkStatus; title?:
   )
 }
 
-export const StatusBadge = ({ status }: { status: AlertStatus }) => <Badge variant="outline" data-tone={workStatusTone[alertWorkStatus(status)]} className="semantic-status-badge max-w-full whitespace-normal text-center text-xs font-normal">{status === 'OPEN' ? '진행 중 · 단독 Alert' : status === 'ESCALATED' ? '진행 중 · Episode' : '종결'}</Badge>
+export const alertStatusLabels: Record<AlertStatus, string> = { OPEN: '진행 중 · 단독 Alert', ESCALATED: '진행 중 · Episode', CLOSED: '종결' }
+export const StatusBadge = ({ status }: { status: AlertStatus }) => <Badge variant="outline" data-tone={workStatusTone[alertWorkStatus(status)]} data-status={status} className="semantic-status-badge max-w-full whitespace-normal text-center text-xs font-normal">{alertStatusLabels[status]}</Badge>
 
 export function PatternBadge({ code }: { code: TypeCode }) {
   const { key, label } = typeDisplay(code)

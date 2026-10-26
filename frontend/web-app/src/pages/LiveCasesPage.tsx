@@ -1,3 +1,4 @@
+import { hrefFor } from '@/app/navigation'
 import { LinkedAlerts } from '@/features/episodes/LinkedAlerts'
 import { Panel } from '@/features/alerts/DetailPanels'
 import LiveOverviewViews, { FocusPanel, type OverviewSection } from '@/features/alerts/LiveOverviewViews'
@@ -8,10 +9,10 @@ import { CaseActivityCharts } from '@/features/alerts/CaseActivityCharts'
 import { dailyMemberAmounts, dailyMemberUsdByCurrency, memberAmountsByCurrency } from '@/features/alerts/activityAmounts'
 import { caseEvidence } from '@/features/alerts/caseEvidence'
 import { ReviewLayout } from '@/features/alerts/ReviewLayout'
-import AlertTxTable from '@/features/alerts/AlertTxTable'
+import AlertTxTable, { type TxRow } from '@/features/alerts/AlertTxTable'
 import ReviewAccounts from '@/features/alerts/ReviewAccounts'
 import CaseEvidenceHistory from '@/features/alerts/CaseEvidenceHistory'
-import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
+import { useSharedPeriod, useViewState, useWorkspace } from '@/lib/workspaceState'
 import { RefreshStatus } from '@/components/RefreshStatus'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -64,7 +65,8 @@ const ruleExamples = [
 ] as const
 
 function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshList }: { caseId: number; kind: ReviewKind; onBack: () => void; onOpenEpisode: (id: number) => void; onOpenAlert?: (id: number) => void; refreshList: () => Promise<unknown> }) {
-  const [tab, setTab] = useState<'overview' | 'graph' | 'transactions' | 'review'>('overview')
+  const [tab, setTab] = useViewState<'overview' | 'graph' | 'transactions' | 'review'>(`case/${kind}/${caseId}/tab`, 'overview')
+  const workspace = useWorkspace()
   useEffect(() => {
     const showSelectedPanel = (event: Event) => {
       const id = (event as CustomEvent<string>).detail
@@ -74,7 +76,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     window.addEventListener('aml-wiring-focus', showSelectedPanel)
     return () => window.removeEventListener('aml-wiring-focus', showSelectedPanel)
   }, [])
-  const [graphVisited, setGraphVisited] = useState(false)
+  const [graphVisited, setGraphVisited] = useState(tab === 'graph')
   const [transactionView, setTransactionView] = useState<'transactions' | 'accounts'>('transactions')
   const [reconsiderGroupId, setReconsiderGroupId] = useState<number | null>(null)
   const changeTab = (next: typeof tab) => { if (next === 'graph') setGraphVisited(true); setTab(next) }
@@ -219,6 +221,15 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
   const sharedOwners = [...ownerUse.values()].filter(owner => owner.alerts.size > 1 && owner.accounts.size > 1)
   const usdLabel = (value: unknown) => (typeof value !== 'number' && typeof value !== 'string') || !String(value).trim() || !Number.isFinite(Number(value))
     ? 'USD 환산액 미제공' : `${moneyAmount(value)} USD`
+  const previewMembers = [...(seedMembers.length ? seedMembers : evidence.members)]
+    .sort((a, b) => new Date(a.transaction.occurredAt).getTime() - new Date(b.transaction.occurredAt).getTime() || a.txId - b.txId).slice(0, 5)
+  const transactionRow = (member: typeof evidence.members[number]): TxRow => ({
+    txId: member.txId, txAt: new Date(member.transaction.occurredAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T'),
+    fromAccount: member.transaction.fromAccountId, toAccount: member.transaction.toAccountId,
+    amountPaid: Number(member.transaction.amountPaid), paymentCurrency: member.transaction.paymentCurrency, paymentFormat: member.transaction.paymentFormat,
+    launderingScore: member.transaction.scores?.p_laundering ?? null, role: member.transaction.role,
+    reviewLabel: `${member.reviewRole} · ${member.state}${member.decision ? ` · ${member.decision}` : ''}`,
+  })
   const externalUsd = (field: 'in' | 'net') => money.state.status === 'success' && money.state.data.available
     ? usdLabel(money.state.data.externalUsd?.[field]) : undefined
   for (const sender of item.summary.topSenders ?? []) {
@@ -246,6 +257,14 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     const ids = current[groupId] ?? []
     return { ...current, [groupId]: ids.includes(txId) ? ids.filter(id => id !== txId) : [...ids, txId] }
   })
+  function openTransaction(txId: number) {
+    const member = item.groups?.flatMap(group => group.members).find(member => member.txId === txId)
+    if (!member || !Number.isSafeInteger(txId) || txId <= 0) return
+    const occurred = new Date(member.transaction.occurredAt)
+    const day = Number.isFinite(occurred.getTime()) ? occurred.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : undefined
+    workspace.set(`ledger/transaction-target/${txId}`, { from: day, to: day, account: member.transaction.fromAccountId || undefined })
+    window.location.hash = hrefFor('transactions', txId)
+  }
   async function findSourceAlert(alertId: number) {
       let page = 0
       for (;;) {
@@ -327,7 +346,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
         toast.error('처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.')
       } else {
         previousRequest.current = null; setCanRetry(false)
-        toast.error(error.problem.status === 403 ? '이 사건을 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 내용을 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
+        toast.error(error.problem.code === 'FIXTURE_READ_ONLY' ? error.message : error.problem.status === 403 ? '이 사건을 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 내용을 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
         if (error.problem.status === 409 || error.problem.status === 404) {
           setUnlinkGroups([])
           setSelected({}); void Promise.allSettled([refresh(), money.refresh(), targets.refresh(), refreshList()])
@@ -362,12 +381,19 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       if (!(error instanceof ApiError)) { setScopeRetry(true); toast.error('계좌 선택 처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.') }
       else {
         scopePrevious.current = null; setScopeRetry(false)
-        toast.error(error.problem.status === 403 ? '이 사건의 계좌 범위를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 계좌 범위를 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
+        toast.error(error.problem.code === 'FIXTURE_READ_ONLY' ? error.message : error.problem.status === 403 ? '이 사건의 계좌 범위를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 계좌 범위를 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
         if (error.problem.status === 409 || error.problem.status === 404) { if (error.problem.status === 404) setScopeDraft(null); void Promise.allSettled([refresh(), money.refresh(), refreshList()]) }
       }
     } finally { scopeBusyRef.current = false; setScopeBusy(false) }
   }
+  const judgmentPanel = (<Panel title={item.kind === 'ALERT' ? '묶음 근거' : '패턴 증거'} description="서버가 보존한 조사 범위" testId="grouping" action={item.kind === 'ALERT' ? <Button size="sm" variant="outline" onClick={() => setTab('review')}>{editable ? '검토 의견 작성' : '검토 의견 확인'}</Button> : undefined}>
+      {item.kind === 'EPISODE' && <div className="flex flex-wrap gap-1">{item.primaryTypes.map(name => <Badge key={name} variant="outline">{name}</Badge>)}</div>}
+      <dl className="space-y-2 text-xs"><div><dt>씨앗 거래</dt><dd>{item.summary.seedCount}건</dd></div><div><dt>조사 대상</dt><dd>{item.summary.subjectCount}건</dd></div><div><dt>유효 거래</dt><dd>{item.summary.txCount}건</dd></div></dl>
+      {item.summary.typeShare != null && <p className="mt-2 text-xs text-muted-foreground">대표 유형 비중 {(item.summary.typeShare * 100).toFixed(1)}% · 사건 확률 아님</p>}
+      <p className="mt-2 text-xs text-muted-foreground">모델 유형 점수와 룰 평가는 별도 근거입니다. 룰 적중 여부는 현재 사건 응답으로 확인할 수 없습니다.</p>
+    </Panel>)
   const modelInfo = <div data-wiring-id="case.overview.model" className="min-w-0 space-y-3">
+    {judgmentPanel}
     <div className="rounded-lg border p-4 text-sm"><strong>모델 참고 정보</strong><p className="mt-2 text-xs text-muted-foreground">대표 유형 {item.summary.primaryType || '확인 불가'} · 위험 점수 {item.summary.riskScore}</p>
       {item.summary.typeShare != null && <p className="mt-1 text-xs">씨앗 거래 내 대표 유형 비중 {(item.summary.typeShare * 100).toFixed(1)}% · 사건 확률 아님</p>}
       <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">이 사건 모델 버전 미확인</summary><p className="mt-1">{fixture ? '개발 전용 합성 값입니다.' : '현재 서버 계약은 이진 GNN과 시연용 유형 모델을 구분합니다. 이 사건의 모델·피처 버전은 응답에 제공되지 않았습니다.'}</p></details>
@@ -383,11 +409,16 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       </div>)}{seedMembers.length > 3 && <Button type="button" size="sm" variant="ghost" onClick={() => openEvidence(seedMembers.map(member => member.txId))}>씨앗 거래 {seedMembers.length}건 모두 보기</Button>}</div>
         : <p className="mt-3 text-muted-foreground">현재 조사 범위에서 씨앗 거래를 확인할 수 없습니다.</p>}
     </div>}
-    {item.kind === 'ALERT' && <Panel title="거래별 패턴 후보" description="선택 거래의 모델 점수" testId="pattern-candidates">
+    {item.kind === 'ALERT' && <Panel title="근거 거래 확인" description={seedMembers.length ? `씨앗 거래 ${seedMembers.length}건 중 ${previewMembers.length}건 · 거래 ID로 현재 원장의 소유주와 계좌 확인` : '씨앗 거래 정보 없음 · 현재 조사 범위를 시각순으로 최대 5건 표시'} testId="overview-evidence"
+        action={<Button size="sm" variant="outline" onClick={() => setTab('transactions')}>전체 거래 {evidence.members.length}건 보기</Button>}>
+        {previewMembers.length ? <AlertTxTable remote rows={previewMembers.map(transactionRow)} onOpenTransaction={openTransaction} /> : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}
+      </Panel>}
+    {item.kind === 'ALERT' && <Panel title="거래별 패턴 후보" description="선택 거래의 유형 점수" testId="pattern-candidates">
       <p className="mt-1 text-xs text-muted-foreground">선택 거래의 모델 유형 점수이며 사건 전체 확률이 아닙니다.</p>
-      <p className="mt-1 text-xs text-muted-foreground">현재 서버 계약의 유형 모델은 시연용입니다. 이 거래의 실행·버전은 미확인입니다.</p>
+      <p className="mt-1 text-xs text-muted-foreground">현재 서버 계약의 유형 모델은 시연용입니다. 이 거래의 실행·버전은 미확인입니다. 실행 ID·모델 버전 미제공으로 이 결과의 실행별 출처는 확인할 수 없습니다.</p>
       {scoredMembers.length ? <><label className="mt-3 block text-xs">확률을 볼 거래 <select aria-label="확률을 볼 거래" className="ml-2 min-w-48 rounded-md border bg-background py-2 pl-3 pr-8" value={scoreMember.txId} onChange={event => setScoreTxId(Number(event.target.value))}>{scoredMembers.map(member => <option key={member.txId} value={member.txId}>T-{member.txId}{member.transaction.role === 'SEED' ? ' · 씨앗 거래' : ''}</option>)}</select></label>
         <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => openEvidence([scoreMember.txId])}>선택 거래 T-{scoreMember.txId} 보기</Button>
+        <Button type="button" size="sm" variant="outline" className="mt-2 ml-2" onClick={() => openTransaction(scoreMember.txId)}>선택 거래 원장 확인</Button>
         <ol aria-label="거래 패턴 후보" className="mt-3 space-y-2">{patternCandidates.map((candidate, index) => <li key={candidate.code} className="flex items-center gap-2 text-sm"><span className="w-5 text-muted-foreground">{index + 1}.</span><span className="rounded-full bg-foreground px-2.5 py-0.5 font-mono text-xs text-background">{typeDisplay(candidate.code).key}</span><strong className="tabular-nums">{(candidate.score * 100).toFixed(1)}%</strong></li>)}</ol>
         {!patternCandidates.length && <p className="mt-3 text-sm text-muted-foreground">이 거래의 패턴 점수가 없습니다.</p>}</> : <p className="mt-3 text-sm text-muted-foreground">점수가 제공된 거래가 없습니다.</p>}
     </Panel>}
@@ -604,7 +635,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       </div>)}</div> : <p className="mt-3 text-sm text-muted-foreground">선택한 거래가 현재 조사 범위에 없습니다. 최신 범위를 확인해 주세요.</p>}
     </section>}
     <CaseActivityCharts amounts={activityAmounts} dailyUsdByCurrency={dailyMemberUsdByCurrency(item.groups ?? [])} />
-    <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">조사 범위</h2>{item.kind === 'ALERT' && <Button size="sm" variant="outline" disabled={!editable || busy || !removableSelections.length || !excludeComment.trim()} onClick={() => void execute('EXCLUDE')}>선택 거래 제외</Button>}</div>{item.kind === 'ALERT' && <textarea aria-label="거래 제외 사유" className="min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="선택 거래를 조사 범위에서 제외하는 이유" value={excludeComment} onChange={event => { setExcludeComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} />}{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null && !group.label.includes(String(group.sourceAlertId)) ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><AlertTxTable remote rows={group.members.map(member => ({
+    <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">조사 범위</h2>{item.kind === 'ALERT' && <Button size="sm" variant="outline" disabled={!editable || busy || !removableSelections.length || !excludeComment.trim()} onClick={() => void execute('EXCLUDE')}>선택 거래 제외</Button>}</div>{item.kind === 'ALERT' && <textarea aria-label="거래 제외 사유" className="min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="선택 거래를 조사 범위에서 제외하는 이유" value={excludeComment} onChange={event => { setExcludeComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} />}{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null && !group.label.includes(String(group.sourceAlertId)) ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><AlertTxTable remote onOpenTransaction={openTransaction} rows={group.members.map(member => ({
       txId: member.txId, txAt: new Date(member.transaction.occurredAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T'),
       fromAccount: member.transaction.fromAccountId, toAccount: member.transaction.toAccountId,
       fromOwnerName: accountMeta.get(member.transaction.fromAccountId)?.ownerName, toOwnerName: accountMeta.get(member.transaction.toAccountId)?.ownerName,

@@ -8,7 +8,7 @@ import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 import { useCurrentUser } from '@/app/session'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
-import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { AgeBadge, PatternBadge, RiskBadge, StatusBadge, alertStatusLabels } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -75,6 +75,7 @@ const browseColumnWidths = {
 }
 const linkColumnWidths = { ...browseColumnWidths, select: '4%', alertId: '12%', amount: '14%' }
 
+const filterPresets = (me: number): [string, AlertFilter[]][] => [['내 담당 미처리', [{ field: 'assignee', value: me }, { field: 'status', value: 'OPEN' }]], ['고위험', [{ field: 'risk', value: 'high' }]], ['3일 이상', [{ field: 'age', value: 3 }]], ['전체', []]]
 const statusValues: AlertStatus[] = ['OPEN', 'ESCALATED', 'CLOSED']
 const typeValues = Array.from({ length: 9 }, (_, code) => code as TypeCode)
 
@@ -89,6 +90,22 @@ type Props = {
 export default function AlertList({ rows, today, onOpen, onLink, remote }: Props) {
   const currentUser = useCurrentUser()
   const me = currentUser.userId
+  const [localLink, dispatchLocalLink] = useReducer(episodeLinkReducer, initialLinkState)
+  const [localTarget, setLocalTarget] = useState<string>('new')
+  const [localComment, setLocalComment] = useState('')
+  const [draft, setDraft] = useViewState<{ link: EpisodeLinkState; target: string; comment: string }>(
+    `alert-link/${me}/${currentUser.role}/${remote?.draftScope ?? 'local'}`,
+    { link: initialLinkState, target: 'new', comment: '' },
+  )
+  const persistent = remote?.draftScope != null
+  const link = persistent ? draft.link : localLink
+  const linking = !remote?.loading && (link.mode === 'link' || localLink.mode === 'link')
+  const target = persistent ? draft.target : localTarget
+  const comment = persistent ? draft.comment : localComment
+  const dispatchLink = useCallback((action: EpisodeLinkAction) => {
+    dispatchLocalLink(action)
+    if (persistent) setDraft(previous => ({ ...previous, link: episodeLinkReducer(previous.link, action) }))
+  }, [persistent, setDraft])
   const [localQuery, setLocalQuery] = useState('')
   const query = remote ? remote.query : localQuery
   const clearSelection = () => { if (linking) dispatchLink({ type: 'start' }) }
@@ -106,22 +123,6 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
   const [filterOpen, setFilterOpen] = useState(false)
   const [field, setField] = useState<AlertFilterField>('status')
   const [value, setValue] = useState('OPEN')
-  const [localLink, dispatchLocalLink] = useReducer(episodeLinkReducer, initialLinkState)
-  const [localTarget, setLocalTarget] = useState<string>('new')
-  const [localComment, setLocalComment] = useState('')
-  const [draft, setDraft] = useViewState<{ link: EpisodeLinkState; target: string; comment: string }>(
-    `alert-link/${me}/${currentUser.role}/${remote?.draftScope ?? 'local'}`,
-    { link: initialLinkState, target: 'new', comment: '' },
-  )
-  const persistent = remote?.draftScope != null
-  const link = persistent ? draft.link : localLink
-  const linking = !remote?.loading && (link.mode === 'link' || localLink.mode === 'link')
-  const target = persistent ? draft.target : localTarget
-  const comment = persistent ? draft.comment : localComment
-  const dispatchLink = useCallback((action: EpisodeLinkAction) => {
-    dispatchLocalLink(action)
-    if (persistent) setDraft(previous => ({ ...previous, link: episodeLinkReducer(previous.link, action) }))
-  }, [persistent, setDraft])
   const setTarget = (next: string) => { if (persistent) setDraft(previous => ({ ...previous, target: next })); else setLocalTarget(next) }
   const setComment = (next: string) => { if (persistent) setDraft(previous => ({ ...previous, comment: next })); else setLocalComment(next) }
 
@@ -158,7 +159,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
   const toFirst = () => table.setPageIndex(0)
 
   const valueOptions: Record<AlertFilterField, { value: string; label: string }[]> = {
-    status: statusValues.map(s => ({ value: s, label: s === 'OPEN' ? '진행 중 · 단독 Alert' : s === 'ESCALATED' ? '진행 중 · Episode' : '종결' })),
+    status: statusValues.map(s => ({ value: s, label: alertStatusLabels[s] })),
     type: remote ? [...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: typeDisplay((i + 1) as TypeCode).label })), { value: '패턴 미특정', label: '패턴 미특정' }, { value: '혼합', label: '혼합' }] : typeValues.map(code => ({ value: String(code), label: typeDisplay(code).label })),
     assignee: [{ value: String(me), label: '내 담당' }, ...[...assignees].filter(([id]) => id !== me).map(([id, name]) => ({ value: String(id), label: name }))],
     age: ageOptions.map(days => ({ value: String(days), label: `${days}일 이상` })),
@@ -193,6 +194,9 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
             <Button variant="outline" size="sm" className="filter-trigger date-range-control h-9"><ListFilter data-icon="inline-start" />필터{filters.length > 0 && <Badge className="ml-1 h-5 min-w-5 px-1.5">{filters.length}</Badge>}</Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-72 space-y-3">
+            <Label>미리 정한 조건</Label>
+            <div className="grid grid-cols-2 gap-1.5">{filterPresets(me).map(([label, preset]) =>
+              <Button key={label} size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setFilters(preset); toFirst(); setFilterOpen(false) }}>{label}</Button>)}</div>
             <Label>조건 추가</Label>
             <Select value={field} onValueChange={v => { const f = v as AlertFilterField; setField(f); setValue(valueOptions[f][0].value) }}>
               <SelectTrigger className="w-full" aria-label="필터 항목"><SelectValue /></SelectTrigger>

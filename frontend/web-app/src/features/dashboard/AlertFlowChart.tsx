@@ -9,6 +9,7 @@ import { fmt } from '@/lib/format'
 export type DailyStatus = DashboardRequested['dailyAlertStatus'][number]
 
 const series = [
+  // Q4(10/8 김명기): Episode 편입을 처리 단계로 부르지 않는다. 단독 Alert도 이상거래일 수 있다
   { key: 'pending', label: '진행 중 · 단독 Alert', color: 'var(--status-pending)' },
   { key: 'inProgress', label: '진행 중 · Episode', color: 'var(--status-working)' },
   { key: 'done', label: '종결', color: 'var(--status-closed)' },
@@ -49,7 +50,7 @@ export function AlertStatusChart({ data, unavailable = false }: { data: DailySta
     <Card className="@container/card min-w-0 max-w-full shadow-none" data-testid="alert-flow-chart">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle>일별 Alert 유입과 처리 상태</CardTitle>
+          <CardTitle>일별 Alert 유입과 현재 상태</CardTitle>
         </div>
         <CardDescription>그날 들어온 Alert가 지금 어느 단계에 있는지 · 막대 전체 = 유입 건수</CardDescription>
         <p className="text-xs text-muted-foreground">생성일별 현재 상태 · 조사자의 열람 여부와는 별개입니다.</p>

@@ -6,6 +6,11 @@ import App from './app/App'
 import { Toaster } from './components/ui/sonner'
 import { ThemeProvider } from './app/ThemeProvider'
 import './app/fontSize'
+import { installWiringBridge } from './lib/wiringBridge'
+import { fixture } from './lib/apiMode'
+
+if (fixture) document.title = 'AML RADAR · 합성 데이터 · 저장 불가'
+installWiringBridge()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

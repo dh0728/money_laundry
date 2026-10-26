@@ -1,0 +1,16 @@
+{
+  "version": "1.14.0",
+  "source_commit": "35cec7a36942133ecee5cdaada491cc1b0718943",
+  "content_preservation": "original Git blobs or binary Git diff; HTML bytes checked against immutable source",
+  "user_acceptance": "not established",
+  "functional_changes_in_this_reorganization": false,
+  "new_design_2_0_in_version_list": false,
+  "checks_after_numeric_path_migration": {
+    "type_check": "passed: pnpm exec tsc -b",
+    "tests": "49 files /263 tests passed",
+    "build": "passed: pnpm exec vite build --outDir /tmp/aml-version-114-build",
+    "code_behavior_changes": false,
+    "source_bytes": "all moved TS/JS/HTML/CSS/assets unchanged; README/current path metadata updated",
+    "acceptance": "No new product acceptance inferred"
+  }
+}

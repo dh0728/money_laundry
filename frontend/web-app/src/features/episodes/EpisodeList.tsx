@@ -26,7 +26,7 @@ import { ageOptions } from '@/features/alerts/alertFilters'
 import { episodeFilterLabel, episodeFilterNames, matchesEpisode, riskOptions, type EpisodeFilter, type EpisodeFilterField } from './episodeFilters'
 
 export function EpisodeStatusBadge({ status, reviewRequested }: { status: EpisodeStatus; reviewRequested?: boolean }) {
-  return <Badge variant="outline" data-tone={status === 'CLOSED' ? 'closed' : 'working'} className="semantic-status-badge text-xs font-normal" title={reviewRequested && status === 'OPEN' ? '관리자 검수 요청됨 (FE 제안)' : undefined}>{status === 'CLOSED' ? '종결' : '진행 중 · Episode'}</Badge>
+  return <Badge variant="outline" data-tone={status === 'CLOSED' ? 'closed' : 'working'} data-status={status} className="semantic-status-badge text-xs font-normal" title={reviewRequested && status === 'OPEN' ? '관리자 검수 요청됨 (FE 제안)' : undefined}>{status === 'CLOSED' ? '종결' : '진행 중 · Episode'}</Badge>
 }
 
 export type EpisodeListRow = Pick<EpisodeRow, 'episodeId' | 'riskScore' | 'alertCount' | 'txCount' | 'assignee' | 'status' | 'createdAt' | 'ageDays' | 'reviewRequestedAt'> & { primaryTypes: { code: TypeCode | null; name: string }[]; totalAmountUsd?: number; amountLabel?: string }

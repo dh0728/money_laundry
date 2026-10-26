@@ -24,7 +24,7 @@ const day = (iso: string) => iso.replace('T', ' ').slice(5, 16)
 const hoursBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 36e5)
 const gapText = (h: number) => h < 0 ? '겹침' : h < 24 ? `${h}시간 뒤` : `${Math.round(h / 24)}일 뒤`
 
-type Props = { episode: EpisodeDetail; transactions: EpisodeTransaction[]; history: HistoryRow[]; responsible: boolean; onOpenAlert: (alertId: number) => void; onUnlink?: (alertIds: number[], reason: string) => void }
+type Props = { episode: EpisodeDetail; transactions: EpisodeTransaction[]; history: HistoryRow[]; responsible: boolean; onOpenAlert: (alertId: number) => void; onUnlink?: (alertIds: number[], reason: string) => void | boolean }
 
 export default function EpisodeOverview({ episode, transactions: tx, history, responsible, onOpenAlert, onUnlink }: Props) {
   const [selecting, setSelecting] = useState(false), [picked, setPicked] = useState<number[]>([]), [reason, setReason] = useState('')
@@ -60,19 +60,19 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
         <Table><TableHeader><TableRow>{selecting && <TableHead className="w-8" />}<TableHead>순서</TableHead><TableHead>Alert</TableHead><TableHead>대표 유형</TableHead><TableHead>위험</TableHead><TableHead>거래 기간</TableHead><TableHead>직전과 간격</TableHead><TableHead className="text-right">거래</TableHead><TableHead className="text-right">공유 계좌</TableHead><TableHead>원래 담당</TableHead><TableHead>판정</TableHead></TableRow></TableHeader>
           <TableBody>{spans.map(({ a, own, first, last }, i) => { const on = picked.includes(a.alertId); return <TableRow key={a.alertId} className={`cursor-pointer ${on ? 'bg-muted/50' : ''}`} onClick={() => selecting ? setPicked(p => on ? p.filter(v => v !== a.alertId) : [...p, a.alertId]) : onOpenAlert(a.alertId)}>
             {selecting && <TableCell><Checkbox checked={on} aria-label={`${alertCode(a.alertId)} 선택`} /></TableCell>}
-            <TableCell className="tabular-nums">{i + 1}</TableCell><TableCell className="font-mono text-xs">{alertCode(a.alertId)}</TableCell>
+            <TableCell className="tabular-nums">{i + 1}</TableCell><TableCell className="font-mono text-xs"><button type="button" onClick={event => { if (!selecting) { event.stopPropagation(); onOpenAlert(a.alertId) } }}>{alertCode(a.alertId)}</button></TableCell>
             <TableCell><PatternBadge code={a.primaryType.code} /></TableCell><TableCell><RiskBadge score={a.riskScore} /></TableCell>
             <TableCell className="tabular-nums text-xs">{day(first)} ~ {day(last).slice(6)}</TableCell>
             <TableCell className="text-xs">{i === 0 ? '—' : gapText(hoursBetween(spans[i - 1].last, first))}</TableCell>
             <TableCell className="text-right tabular-nums">{own.length}건</TableCell>
-            <TableCell className="text-right tabular-nums">{sharedOf(a.alertId) || <span className="text-destructive">0</span>}</TableCell>
+            <TableCell className="text-right tabular-nums">{sharedOf(a.alertId) || <span className="text-destructive-text">0</span>}</TableCell>
             <TableCell className="text-xs">{(a as AlertRow).assignee.name}</TableCell>
             <TableCell className="text-xs">{a.resolution ? '판정됨' : '미판정'}</TableCell>
           </TableRow> })}</TableBody></Table>
         {selecting && <div className="mt-3 space-y-2">
-          <Textarea className="min-h-14 text-sm" placeholder="연결 해제 사유(필수)" value={reason} onChange={e => setReason(e.target.value)} />
-          {picked.length > 0 && remain < 2 && <p className="text-xs text-destructive">Episode가 해체되고 남은 Alert {remain}건도 모두 해제됩니다.</p>}
-          <div className="flex justify-end"><Button size="sm" disabled={!picked.length || !reason.trim()} onClick={() => { onUnlink?.(picked, reason.trim()); setSelecting(false) }}>선택 {picked.length}건 연결 해제</Button></div>
+          <Textarea aria-label="연결 해제 사유" className="min-h-14 text-sm" placeholder="연결 해제 사유(필수)" value={reason} onChange={e => setReason(e.target.value)} />
+          {picked.length > 0 && remain < 2 && <p className="text-xs text-destructive-text">Episode가 해체되고 남은 Alert {remain}건도 모두 해제됩니다.</p>}
+          <div className="flex justify-end"><Button size="sm" disabled={!picked.length || !reason.trim()} onClick={() => { if (onUnlink?.(picked, reason.trim()) !== false) setSelecting(false) }}>선택 {picked.length}건 연결 해제</Button></div>
         </div>}
         <div className="mt-2"><ProvenanceNote kind="proposal">원래 담당은 Episode 상세에 없어 Alert마다 조회합니다. 서버가 함께 주는 편이 맞습니다(2단계).</ProvenanceNote></div>
       </Step>

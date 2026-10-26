@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AML RADAR · 개요와 상태 반응형 시안</title>
+<style>
+:root{color-scheme:light;--canvas:#edf1f5;--surface:#fff;--soft:#f6f8fa;--ink:#18222e;--sub:#536273;--muted:#6b7887;--line:#d7dfe7;--brand:#24374d;--brand-soft:#e9eef5;--risk:#a43832;--risk-soft:#f9ecea;--info:#2058a3;--info-soft:#edf3fb;--shell:#172331;--on-shell:#fff;--on-shell-muted:#d1d9e2;--order-bg:#0a0c0f;--order-ink:#fff;--order-stroke:#0a0c0f;--shadow:#2535490d;--risk-border:#e7bcb8;--weak-border:#e8b9b5;--weak-surface:#fff5f3;--info-border:#d2dff0;--info-ink:#184b8e;--info-soft-ink:#355c88;--tag-blue-border:#cdddf2;--tag-dark-border:#d0dbe8;--link:#174f96;--progress-track:#d4deec;--spinner-track:#b9cbe1;--r:0.75rem;--s1:0.25rem;--s2:0.5rem;--s3:0.75rem;--s4:1rem;--s5:1.5rem;--s6:2rem;font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+*{box-sizing:border-box}
+html[data-theme="dark"]{--order-bg:#f6f8fa;--order-ink:#101820;--order-stroke:#101820}
+body{margin:0;background:var(--canvas);color:var(--ink);font-size:0.875rem;line-height:1.48}
+button{font:inherit}
+.outer{max-width:90rem;margin:auto;padding:1.5rem}
+.preview-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin:0 0 1rem}
+.preview-head h1{font-size:1.25rem;line-height:1.25;margin:0;font-weight:750}
+.preview-head p{margin:0.1875rem 0 0;color:var(--sub);font-size:0.75rem}
+.preview-switch{display:flex;gap:0.375rem;flex-wrap:wrap}
+.preview-switch button{min-height:2.5rem;white-space:nowrap;border:0.0625rem solid var(--line);background:var(--surface);border-radius:0.5rem;color:var(--ink);padding:0.5rem 0.875rem;cursor:pointer}
+.preview-switch button[aria-pressed=true]{background:var(--brand);border-color:var(--brand);color:var(--on-shell)}
+.screen{container-type:inline-size;max-width:100%;min-width:0;background:var(--surface);border:0.0625rem solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:0 1rem 2.5rem var(--shadow)}
+.screen[hidden]{display:none}
+.appbar{min-height:3rem;background:var(--shell);color:var(--on-shell);display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.5rem 1.5rem;font-weight:700;letter-spacing:.025em}
+.appbar .right{font-size:0.75rem;font-weight:500;color:var(--on-shell-muted);white-space:nowrap}
+.screen-inner{padding:1.5rem;min-width:0}
+.case-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;border-bottom:0.0625rem solid var(--line);padding-bottom:1rem}
+.idline{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap}
+.idline h2{font-size:1.625rem;line-height:1.2;margin:0;font-weight:800;letter-spacing:-.02em}
+.case-meta{display:flex;align-items:center;gap:0.5rem 1rem;flex-wrap:wrap;color:var(--sub);font-size:0.75rem;margin-top:0.5rem}
+.case-right{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap}
+.risk-score{font-weight:800;font-size:1.25rem;color:var(--risk);font-variant-numeric:tabular-nums}
+.tag{display:inline-flex;align-items:center;min-height:1.625rem;border-radius:62.4375rem;padding:0.1875rem 0.5625rem;border:0.0625rem solid var(--line);font-size:0.75rem;line-height:1.2;font-weight:650;white-space:nowrap;color:var(--sub);background:var(--soft)}
+.tag.critical{border-color:var(--risk-border);background:var(--risk-soft);color:var(--risk)}
+.tag.blue{border-color:var(--tag-blue-border);background:var(--info-soft);color:var(--info)}
+.tag.dark{background:var(--brand-soft);color:var(--brand);border-color:var(--tag-dark-border)}
+.tabs{display:flex;gap:1.5rem;overflow-x:auto;border-bottom:0.0625rem solid var(--line);margin:0 0 1.25rem;scrollbar-width:thin}
+.tabs span{display:inline-flex;min-height:3rem;align-items:center;white-space:nowrap;color:var(--sub);font-weight:600}
+.tabs span.active{color:var(--ink);border-bottom:0.1875rem solid var(--brand)}
+.notice{display:flex;gap:0.75rem;align-items:flex-start;border:0.0625rem solid var(--info-border);background:var(--info-soft);padding:0.75rem 1rem;border-radius:0.5rem;margin:0 0 1rem;color:var(--info-ink);font-weight:600}
+.notice .quiet{font-weight:500;color:var(--info-soft-ink)}
+.stack{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:auto;gap:1rem;align-items:stretch}
+.panel{border:0.0625rem solid var(--line);border-radius:0.625rem;background:var(--surface);min-width:0;overflow:hidden}
+.overview-grid .panel{align-self:stretch;overflow:visible}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:1rem 1.125rem 0.75rem;flex-wrap:wrap}
+.panel-head h3{font-size:1rem;line-height:1.3;margin:0;font-weight:750}
+.overview-grid .panel-head h3{display:flex;align-items:center;gap:0.625rem;min-width:0}
+.overview-grid .panel-head h3>span:last-child{min-width:0;overflow-wrap:anywhere}
+.order-badge{display:inline-grid;place-items:center;inline-size:2rem;block-size:2rem;flex:0 0 2rem;border-radius:50%;border:0.0625rem solid var(--order-stroke);background:var(--order-bg);color:var(--order-ink);font-size:0.875rem;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.panel-body{padding:0 1.125rem 1.125rem;min-width:0}
+.eyebrow{color:var(--muted);font-size:0.75rem;font-weight:650}
+.summary-line{font-size:0.9375rem;font-weight:700;margin:0 0 0.75rem;overflow-wrap:anywhere}
+.signal-lines{display:grid;grid-template-columns:minmax(0,1fr);gap:0.5rem}
+.signal-line{display:flex;align-items:flex-start;gap:0.625rem;min-width:0;padding:0.5625rem 0.75rem;background:var(--soft);border-radius:0.4375rem}
+.signal-line b{min-width:5rem;flex:none;color:var(--sub)}
+.signal-line span:last-child{min-width:0;overflow-wrap:anywhere}
+.signal-line .tag{margin-left:auto}
+.flow{display:grid;grid-template-columns:minmax(0,1fr) 1.375rem minmax(0,1fr) 1.375rem minmax(0,1fr);gap:0.5rem;align-items:stretch}
+.flow-step{background:var(--soft);border:0.0625rem solid var(--line);border-radius:0.5rem;padding:0.875rem;min-width:0}
+.flow-step strong{display:block;font-size:1.1875rem;font-variant-numeric:tabular-nums;line-height:1.2;margin:0.3125rem 0 0.5rem;overflow-wrap:anywhere}
+.flow-step small{display:block;color:var(--sub);font-size:0.75rem;overflow-wrap:anywhere}
+.flow-arrow{display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:1.25rem;font-weight:700}
+.footline{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem 0.875rem;color:var(--sub);font-size:0.75rem;margin-top:0.75rem}
+.text-link{font:inherit;border:0;background:none;color:var(--link);padding:0;min-height:2rem;font-weight:700;white-space:nowrap;cursor:default}.text-link:disabled{opacity:1}
+.account-list,.related-list{display:grid;gap:0.5rem}
+.account-row,.related-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,.8fr);gap:0.75rem;align-items:center;background:var(--soft);border-radius:0.4375rem;padding:0.75rem;min-width:0}
+.account-row b,.related-row b{display:block;overflow-wrap:anywhere}
+.sub{color:var(--sub);font-size:0.75rem;overflow-wrap:anywhere}
+.secondary-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto;gap:1rem;align-items:stretch}
+.mini-row{display:flex;gap:0.625rem;align-items:center;flex-wrap:wrap;min-width:0}
+.mini-row>span{overflow-wrap:anywhere}.mini-row button.tag{min-height:2.5rem;cursor:default}
+.dense-line{display:flex;align-items:center;justify-content:space-between;gap:0.625rem;flex-wrap:wrap;font-weight:650;overflow-wrap:anywhere}
+.episode-list{display:grid;gap:0.5rem}
+.episode-row{display:grid;grid-template-columns:4.625rem minmax(0,1.2fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,.8fr);gap:0.75rem;align-items:center;background:var(--soft);border:0.0625rem solid var(--line);border-radius:0.4375rem;padding:0.75rem;min-width:0}
+.episode-row.weak{border-color:var(--weak-border);background:var(--weak-surface)}
+.episode-row>*{min-width:0;overflow-wrap:anywhere}
+.episode-row .tag{justify-self:start}
+.shared-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto;gap:1rem;align-items:stretch}
+.joint-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:1rem}
+.joint-section{min-width:0}
+.joint-section+.joint-section{border-left:0.0625rem solid var(--line);padding-left:1rem}
+.joint-heading{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem}
+.joint-heading h4,.joint-section>h4{font-size:0.875rem;font-weight:750;margin:0 0 0.5rem}
+.joint-heading h4{margin:0}
+.joint-grid .account-row{grid-template-columns:minmax(0,1fr);gap:0.375rem}
+.thin-rule{height:0.0625rem;background:var(--line);margin:0.75rem 0}
+.intro-line{margin-bottom:0.625rem}
+.states-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.state-card{display:flex;flex-direction:column;min-height:10.5rem}
+.state-card .panel-body{display:flex;flex-direction:column;gap:0.625rem;flex:1}
+.state-main{font-weight:700;font-size:0.9375rem;overflow-wrap:anywhere}
+.state-end{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:0.625rem;flex-wrap:wrap}
+.ghost-value{font-size:1.25rem;font-weight:750;letter-spacing:.015em;color:var(--muted)}
+.fake-button{font:inherit;display:inline-flex;align-items:center;justify-content:center;min-height:2.5rem;white-space:nowrap;border:0.0625rem solid var(--line);border-radius:0.4375rem;padding:0.5rem 0.75rem;background:var(--surface);color:var(--brand);font-weight:700}
+.progress{width:100%;height:0.625rem;overflow:hidden;border-radius:62.4375rem;background:var(--progress-track)}
+.progress>span{display:block;width:75%;height:100%;background:var(--info)}
+.spinner{display:inline-block;width:0.875rem;height:0.875rem;border:0.125rem solid var(--spinner-track);border-top-color:var(--info);border-radius:50%;vertical-align:-0.125rem;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+.rule-preview{display:grid;gap:0.375rem;padding:0.5rem 0;border-top:0.0625rem solid var(--line)}
+.rule-row{display:flex;gap:0.5rem;align-items:center;justify-content:space-between;padding:0.5rem 0.625rem;border:0.0625rem solid var(--line);border-radius:0.4375rem;min-width:0;flex-wrap:wrap}
+.rule-row>span:first-child{overflow-wrap:anywhere}
+.rule-row .ghost-value{font-size:0.875rem}
+@container (min-width: 64.0625rem){
+  .overview-grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+  .alert-overview>.secondary-grid,.episode-overview>.shared-grid,.episode-overview>.secondary-grid{display:contents}
+  .alert-overview>.overview-summary,.alert-overview>.overview-flow{grid-column:1/-1}
+  .alert-overview>.overview-summary .panel-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1.5rem}
+  .alert-overview>.overview-summary .summary-line{grid-column:1/-1}
+  .alert-overview>.overview-summary .signal-lines{grid-column:1;align-self:start}
+  .alert-overview>.overview-summary [data-rule-inspections]{grid-column:2;grid-row:2;align-self:start}
+  .alert-overview .overview-accounts,.alert-overview .overview-related{grid-column:span 6}
+  .alert-overview>.overview-progress{grid-column:span 12}
+  .episode-overview>.overview-connection{grid-column:1/-1}
+  .episode-overview .overview-shared{grid-column:span 5}
+  .episode-overview .overview-aggregate{grid-column:span 7}
+  .episode-overview .overview-context{grid-column:span 8}
+  .episode-overview>.overview-progress{grid-column:span 4}
+}
+@container (min-width: 78rem){
+  .alert-overview .overview-accounts{grid-column:span 5}
+  .alert-overview .overview-related{grid-column:span 4}
+  .alert-overview>.overview-progress{grid-column:span 3}
+}
+@container (max-width: 64rem){.secondary-grid,.shared-grid{grid-template-columns:minmax(0,1fr)}}
+@container (max-width: 42rem){
+  .appbar{padding-inline:1rem}.screen-inner{padding:1rem}
+  .flow{grid-template-columns:minmax(0,1fr);gap:0.375rem}.flow-arrow{min-height:1rem;line-height:1;font-size:0}.flow-arrow::after{content:"↓";font-size:1.25rem}
+  .account-row,.related-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .account-row>*:first-child,.related-row>*:first-child{grid-column:1/-1}
+  .episode-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0.5rem}
+  .episode-row>*:first-child,.episode-row>*:nth-child(2){grid-column:1/-1}
+  .states-grid,.joint-grid{grid-template-columns:minmax(0,1fr)}
+  .joint-section+.joint-section{border-left:0;padding-left:0;border-top:0.0625rem solid var(--line);padding-top:0.75rem}
+}
+@container (max-width: 27.5rem){
+  .idline h2{font-size:1.375rem}.case-right{width:100%}.case-meta{gap:0.3125rem 0.75rem}
+  .signal-line{flex-wrap:wrap}.signal-line .tag{margin-left:0}
+  .panel-head{padding:0.875rem 0.875rem 0.625rem}.panel-body{padding:0 0.875rem 0.875rem}
+  .account-row,.related-row{grid-template-columns:minmax(0,1fr)}
+  .account-row>*:first-child,.related-row>*:first-child{grid-column:auto}
+  .episode-row{grid-template-columns:minmax(0,1fr)}.episode-row .tag{white-space:normal;overflow-wrap:anywhere}
+  .episode-row>*:nth-child(2){grid-column:1/-1}
+}
+
+.overview-mode{display:inline-flex;align-items:stretch;gap:0;margin:0 0 1rem;padding:0.25rem;max-width:100%;border:0.0625rem solid var(--line);border-radius:0.625rem;background:var(--soft)}
+.overview-mode button{font:inherit;min-width:6.5rem;min-height:2.5rem;white-space:nowrap;border:0;background:transparent;color:var(--sub);border-radius:0.4375rem;padding:0.5rem 0.875rem;font-weight:700;cursor:pointer}
+.overview-mode button[aria-pressed="true"]{background:var(--surface);color:var(--brand);box-shadow:0 0.0625rem 0.25rem var(--shadow)}
+.overview-mode button:focus-visible{outline:0.125rem solid var(--info);outline-offset:0.125rem;position:relative}
+.overview-grid[hidden],.focus-stage[hidden]{display:none}
+.focus-stage{border:0.0625rem solid var(--line);border-radius:0.625rem;background:var(--surface);min-width:0;overflow:visible}
+.focus-main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
+.focus-visual{grid-column:span 2;min-width:0;min-height:19rem;padding:1.5rem;background:var(--soft);border-right:0.0625rem solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:1rem}
+.focus-copy{grid-column:span 1;min-width:0;padding:1.5rem;overflow-wrap:anywhere}
+.focus-copy h3{display:flex;align-items:center;gap:0.625rem;margin:0 0 1rem;font-size:1.125rem;line-height:1.3}
+.focus-copy h3>span:last-child{min-width:0;overflow-wrap:anywhere}
+.focus-copy h3:focus{outline:0.125rem solid var(--info);outline-offset:0.25rem}
+.focus-question{font-weight:750;margin:0 0 0.75rem}
+.focus-copy ul{margin:0;padding-left:1.25rem;display:grid;gap:0.75rem}
+.focus-copy li{padding-left:0.125rem}
+.focus-footer{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;border-top:0.0625rem solid var(--line);padding:0.875rem 1rem}
+.focus-footer button{font:inherit;display:inline-flex;align-items:center;justify-content:center;gap:0.375rem;min-height:2.5rem;white-space:nowrap;border:0.0625rem solid var(--line);border-radius:0.4375rem;background:var(--surface);color:var(--ink);padding:0.5rem 0.75rem;font-weight:700;cursor:pointer}
+.focus-footer kbd{display:inline-flex;align-items:center;justify-content:center;min-width:1.25rem;min-height:1.25rem;padding:0 0.125rem;border:0.0625rem solid var(--line);border-radius:0.25rem;background:var(--soft);color:var(--sub);font:inherit;font-size:0.75rem;line-height:1}
+.focus-footer button:disabled{opacity:0.45;cursor:not-allowed}
+.focus-current{flex:1;min-width:8rem;text-align:center;font-weight:750;overflow-wrap:anywhere}
+.viz-node,.viz-hub,.viz-spoke,.viz-matrix-row,.viz-event,.viz-scope-known,.viz-scope-unknown,.viz-decision{background:var(--surface);border:0.0625rem solid var(--line);border-radius:0.625rem;padding:1rem;min-width:0;overflow-wrap:anywhere}
+.viz-node b,.viz-spoke b,.viz-decision b{display:block;font-size:0.9375rem}
+.viz-node strong{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.viz-node small,.viz-spoke small,.viz-decision small{display:block;color:var(--sub);font-size:0.75rem}
+.viz-evidence{display:grid;gap:1.25rem}
+.viz-hub{position:relative;justify-self:center;text-align:center;min-width:9rem;border:0.125rem solid var(--brand);font-size:1.125rem;font-weight:800}
+.viz-hub::after{content:"";position:absolute;left:50%;bottom:-1.375rem;height:1.375rem;border-left:0.125rem solid var(--brand)}
+.viz-spokes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.75rem;border-top:0.125rem solid var(--brand)}
+.viz-spoke{position:relative;margin-top:0.75rem}
+.viz-spoke::before{content:"";position:absolute;left:50%;top:-0.875rem;height:0.875rem;border-left:0.125rem solid var(--brand)}
+.viz-flow{display:grid;grid-template-columns:minmax(0,1fr) 1.25rem minmax(0,1fr) 1.25rem minmax(0,1fr);gap:0.5rem;align-items:stretch}
+.viz-flow .viz-node{display:flex;flex-direction:column;justify-content:center;gap:0.375rem}
+.viz-arrow{display:grid;place-items:center;color:var(--sub);font-size:1.25rem;font-weight:800}
+.viz-bars{display:grid;gap:1.5rem}
+.viz-bar-label{display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;font-weight:700}
+.viz-bar-track{height:0.875rem;background:var(--progress-track);border-radius:62.4375rem;overflow:hidden;margin-top:0.5rem}
+.viz-bar-track span{display:block;height:100%;background:var(--brand);border-radius:inherit}
+.viz-bar-track .bar-full{width:100%}.viz-bar-track .bar-two-thirds{width:66.67%}
+.viz-relation,.viz-chain{display:grid;grid-template-columns:minmax(0,1fr) minmax(5rem,0.75fr) minmax(0,1fr);gap:0.5rem;align-items:center}
+.viz-chain{grid-template-columns:minmax(0,1fr) minmax(5rem,0.7fr) minmax(0,1fr) minmax(5rem,0.7fr) minmax(0,1fr)}
+.viz-link{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.375rem;text-align:center;color:var(--sub);font-size:0.75rem;overflow-wrap:anywhere}
+.viz-link::before{content:"";width:100%;border-top:0.125rem solid var(--brand)}
+.viz-link.weak::before{border-top-style:dashed;border-top-color:var(--risk)}
+.viz-counts,.viz-decisions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.75rem}
+.viz-counts .viz-node{text-align:center}
+.viz-timeline{border-left:0.125rem solid var(--brand);margin-left:0.75rem;padding-left:1.5rem}
+.viz-event{position:relative}
+.viz-event::before{content:"";position:absolute;left:-2rem;top:1.2rem;width:0.75rem;height:0.75rem;border-radius:50%;background:var(--brand)}
+.viz-matrix{display:grid;gap:0.75rem}
+.viz-matrix-row{display:grid;grid-template-columns:minmax(5rem,0.7fr) minmax(0,1fr) minmax(0,1fr);gap:0.75rem;align-items:center}
+.viz-matrix-row>span{display:block;min-width:0;overflow-wrap:anywhere}
+.viz-matrix-row small{display:block;color:var(--sub)}
+.viz-scope{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:1rem;align-items:stretch}
+.viz-scope-known{border-color:var(--brand)}
+.viz-scope-unknown{border-style:dashed;display:grid;place-content:center;color:var(--sub)}
+.viz-members{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem}
+.viz-members span{border:0.0625rem solid var(--line);border-radius:0.375rem;padding:0.375rem 0.625rem;background:var(--soft)}
+.viz-decision.weak{border-color:var(--weak-border);background:var(--weak-surface)}
+@container (max-width: 64rem){
+  .focus-main{grid-template-columns:minmax(0,1fr)}
+  .focus-visual,.focus-copy{grid-column:1}
+  .focus-visual{min-height:0;border-right:0;border-bottom:0.0625rem solid var(--line)}
+}
+@container (max-width: 42rem){
+  .focus-visual,.focus-copy{padding:1rem}
+  .viz-spokes,.viz-counts,.viz-decisions,.viz-scope{grid-template-columns:minmax(0,1fr)}
+  .viz-hub::after{display:none}
+  .viz-spokes{border-top:0;border-left:0.125rem solid var(--brand);padding-left:0.75rem}
+  .viz-spoke{margin-top:0}.viz-spoke::before{left:-0.875rem;top:50%;width:0.875rem;height:0;border-left:0;border-top:0.125rem solid var(--brand)}
+  .viz-flow,.viz-relation,.viz-chain{grid-template-columns:minmax(0,1fr)}
+  .viz-arrow{min-height:1rem;font-size:0}.viz-arrow::after{content:"↓";font-size:1.25rem}
+  .viz-link::before{width:0;height:1.25rem;border-top:0;border-left:0.125rem solid var(--brand)}
+  .viz-link.weak::before{border-left-style:dashed;border-left-color:var(--risk)}
+  .viz-matrix-row{grid-template-columns:repeat(2,minmax(0,1fr))}.viz-matrix-row>b{grid-column:1/-1}
+  .focus-footer button{flex:1 1 calc(50% - 0.5rem)}
+  .focus-current{flex:1 1 100%;order:0}
+}
+@media(max-width:31.25rem){.outer{padding:0.625rem}.preview-head h1{font-size:1.0625rem}.preview-switch{width:100%}.preview-switch button{flex:1;padding-inline:0.5rem}.appbar .right{display:none}}
+
+/* First Alert panel: compact scan in overview, separate scales in focus. */
+.overview-summary .signal-line{padding:0.4375rem 0.625rem}
+.rule-inspections{display:grid;gap:0;margin-top:0.625rem;min-width:0}
+.rule-inspection-intro{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap}
+.rule-inspection-intro h4{font-size:0.875rem;margin:0}
+.rule-example-note{font-size:0.8125rem;color:var(--sub);margin:0.1875rem 0 0.25rem}
+.rule-inspection{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0.125rem 0.5rem;border-top:0.0625rem solid var(--line);padding:0.5rem 0;min-width:0;overflow-wrap:anywhere}
+.rule-inspection-head{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:flex-start;gap:0.5rem;flex-wrap:wrap}
+.rule-inspection-head h4{font-size:0.875rem;margin:0}
+.rule-comparison{grid-column:1;grid-row:2;display:flex;gap:0.25rem 0.5rem;align-items:baseline;flex-wrap:wrap;font-size:0.875rem;font-variant-numeric:tabular-nums}
+.rule-comparison strong{font-size:0.9375rem}
+.rule-comparison span{color:var(--sub)}
+.rule-reason{grid-column:1;grid-row:3;margin:0;color:var(--sub);font-size:0.8125rem;line-height:1.3}
+.rule-inspection>.evidence-button{grid-column:2;grid-row:1/4;justify-self:end;align-self:center;padding:0.375rem 0.5rem;min-height:2.25rem}
+.rule-chart{display:none}
+.rule-chart-caption{display:flex;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;font-size:0.875rem;font-weight:700;font-variant-numeric:tabular-nums}
+.rule-meter{position:relative;height:0.875rem;margin:0.375rem 0;background:var(--line);border-radius:62.4375rem}
+.rule-meter-fill{display:block;height:100%;width:var(--observed);background:var(--risk);border-radius:62.4375rem}
+.rule-chart-miss .rule-meter-fill{background:var(--info)}
+.rule-meter-threshold{position:absolute;left:var(--threshold);top:-0.1875rem;bottom:-0.1875rem;width:0.1875rem;transform:translateX(-100%);background:var(--ink);border-radius:0.1875rem}
+.rule-chart-range{display:flex;justify-content:space-between;color:var(--sub);font-size:0.75rem}
+.rule-chart-unavailable{display:flex;gap:0.625rem;align-items:center;padding:0.625rem;border:0.0625rem dashed var(--line);border-radius:0.5rem;background:var(--info-soft);color:var(--info-ink);font-size:0.875rem}
+.rule-chart-unavailable b{white-space:nowrap}
+#alert-focus-view [data-rule-pairs]{grid-column:1/-1;min-width:0}
+.focus-rule-pairs{min-width:0}
+.focus-rule-pairs-intro{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;padding:0.875rem 1.5rem 0.375rem;border-top:0.0625rem solid var(--line)}
+.focus-rule-pairs-intro h4{margin:0;font-size:0.875rem}
+.focus-rule-pair{display:grid;grid-template-columns:2fr 1fr;min-width:0}
+.focus-rule-pair-chart{min-width:0;padding:0.75rem 1.5rem;background:var(--soft);border-right:0.0625rem solid var(--line);border-top:0.0625rem solid var(--line)}
+.focus-rule-pair-copy{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-content:center;column-gap:0.625rem;min-width:0;padding:0.75rem 1.5rem;border-top:0.0625rem solid var(--line);overflow-wrap:anywhere}
+.focus-rule-pair-copy .rule-inspection-head{grid-column:1;grid-row:1;min-width:0}
+.focus-rule-pair-copy .rule-reason{grid-column:1;grid-row:2;margin:0.375rem 0 0;font-size:0.875rem;color:var(--ink);word-break:keep-all}
+.focus-rule-pair-copy .evidence-button{grid-column:2;grid-row:1/3;justify-self:end;align-self:center}
+#alert-focus-view .focus-rule-pair .rule-chart{display:block}
+@container (max-width:64rem){
+ .focus-rule-pair{grid-template-columns:minmax(0,1fr)}
+ .focus-rule-pair-chart{border-right:0}
+ .focus-rule-pair-copy{border-top:0;padding-top:0.25rem}
+}
+@container (max-width:42rem){
+ .focus-rule-pairs-intro,.focus-rule-pair-chart,.focus-rule-pair-copy{padding-left:1rem;padding-right:1rem}
+}
+.rule-facts{margin:0;display:grid;grid-template-columns:4.5rem minmax(0,1fr);gap:0.375rem 0.5rem;font-size:0.75rem}
+.rule-facts dt{color:var(--sub)}.rule-facts dd{margin:0;min-width:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.evidence-button{border:0.0625rem solid var(--line);border-radius:0.4375rem;padding:0.5rem 0.75rem;min-height:2.5rem;background:var(--surface);color:var(--link);font-weight:700;white-space:nowrap;cursor:pointer}
+.evidence-button:hover{background:var(--brand-soft)}
+.evidence-button:focus-visible{outline:0.125rem solid var(--info);outline-offset:0.125rem}
+.evidence-dialog{width:min(56rem,calc(100vw - 2rem));max-height:calc(100dvh - 2rem);padding:0;border:0.0625rem solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);overflow:hidden}
+.evidence-dialog[open]{display:flex;flex-direction:column}
+.evidence-dialog::backdrop{background:var(--shell);opacity:0.5}
+.evidence-head{display:flex;justify-content:space-between;align-items:center;gap:0.75rem;padding:1rem;border-bottom:0.0625rem solid var(--line);flex:none}
+.evidence-head h2{font-size:1.125rem;margin:0;overflow-wrap:anywhere}
+.evidence-body{overflow:auto;min-height:0;padding:1rem}
+.evidence-body h3{font-size:1rem;margin:0 0 0.5rem}
+.evidence-body p{overflow-wrap:anywhere}
+.evidence-body .rule-facts{font-size:0.875rem;grid-template-columns:6rem minmax(0,1fr);margin:1rem 0}
+.evidence-table{border-collapse:collapse;width:100%;font-size:0.75rem;table-layout:fixed}
+.evidence-table caption{text-align:left;font-size:0.875rem;font-weight:750;margin-bottom:0.5rem}
+.evidence-table th,.evidence-table td{text-align:left;vertical-align:top;padding:0.625rem 0.5rem;border-bottom:0.0625rem solid var(--line);overflow-wrap:anywhere}
+.evidence-table th{background:var(--soft);color:var(--sub)}
+.evidence-table .amount{white-space:nowrap;font-variant-numeric:tabular-nums}
+.evidence-missing{background:var(--info-soft);color:var(--info-ink);padding:0.75rem;border-radius:0.4375rem}
+@media(max-width:42rem){
+ .evidence-dialog{width:calc(100vw - 1rem);max-height:calc(100dvh - 1rem)}
+ .evidence-head,.evidence-body{padding:0.875rem}
+ .evidence-body .rule-facts{grid-template-columns:minmax(0,1fr);gap:0.25rem}
+ .evidence-body .rule-facts dd{margin-bottom:0.5rem}
+ .evidence-table thead{display:none}
+ .evidence-table tbody,.evidence-table tr,.evidence-table td{display:block;width:100%}
+ .evidence-table tr{border:0.0625rem solid var(--line);border-radius:0.5rem;margin-bottom:0.625rem;padding:0.375rem}
+ .evidence-table td{border:0;padding:0.25rem 0.375rem}
+ .evidence-table td::before{content:attr(data-label) " · ";color:var(--sub)}
+}
+</style>
+</head>
+<body>
+<main class="outer">
+  <div class="preview-head"><div><h1>AML RADAR · 개요·상태 시안</h1><p>[제안] 시안용 예시 값 · 실제 API 응답 아님</p></div><nav class="preview-switch" aria-label="시안 보기"><button type="button" aria-pressed="true" data-target="alert">Alert 개요</button><button type="button" aria-pressed="false" data-target="episode">Episode 개요</button><button type="button" aria-pressed="false" data-target="states">상태 화면</button></nav></div>
+
+  <section class="screen" id="alert" aria-label="Alert 개요 시안">
+    <div class="appbar"><span>AML RADAR</span><span class="right">전역 검색 / &nbsp; · &nbsp; 알림</span></div>
+    <div class="screen-inner">
+      <header class="case-top"><div><div class="idline"><h2>A-2240</h2><span class="tag dark">진행 중 · 단독 Alert</span><span class="tag">집중 수취 68%</span></div><div class="case-meta"><span>담당 김조사</span><span>탐지 10/12 · 2일 경과</span><span>근거 v2 · 모델 버전 데이터 없음</span></div></div><div class="case-right"><span class="risk-score">0.82</span><span class="tag critical">시연용 임의 점수</span></div></header>
+      <div class="tabs" aria-label="상세 탭"><span class="active">개요</span><span>그래프</span><span>거래</span><span>검토 의견</span></div>
+      <div class="overview-mode" role="group" aria-label="개요 보기 방식"><button type="button" data-overview-mode="all" aria-controls="alert-all-view" aria-pressed="true">전체 보기</button><button type="button" data-overview-mode="focus" aria-controls="alert-focus-view" aria-pressed="false">패널별 보기</button></div>
+      <div id="alert-all-view" data-overview-all class="stack overview-grid alert-overview">
+        <article class="panel overview-summary"><div class="panel-head"><h3><span class="order-badge">1</span><span>판단 요약</span></h3><span class="tag blue">열린 관련 사건 1건 · E-341</span></div><div class="panel-body"><p class="summary-line">10/10~10/12 · 계좌 7개 · 거래 19건 · 외부 유입액 USD 84,200 · 빠른 유출 61%</p><div class="signal-lines"><div class="signal-line"><b>모델</b><span>의심 점수 0.82 · 집중 수취 68% · 모델 의심 거래 4건</span></div><div class="signal-line"><b>의심 패턴</b><span>집중 수취 구조 · 받아서 넘김</span></div><div class="signal-line"><b>룰</b><span>걸림 1 · 안 걸림 1 · 확인 불가 1</span><span class="tag">룰 결과 예시</span></div></div><div data-rule-inspections></div></div></article>
+        <article class="panel overview-flow"><div class="panel-head"><h3><span class="order-badge">2</span><span>돈의 흐름</span></h3></div><div class="panel-body"><div class="flow"><div class="flow-step"><span class="eyebrow">외부 유입액 · 3계좌</span><strong>USD 84,200</strong><small>상위 상대 계좌 AC-102 · 박○○<br>다른 소유주</small></div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-step"><span class="eyebrow">경유 · 2계좌</span><strong>빠른 유출 61%</strong><small>180분 기준 · 시안 값</small></div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-step"><span class="eyebrow">외부 유출 · 4계좌</span><strong>USD 79,800</strong><small>상위 상대 계좌 AC-481 · 이○○</small></div></div><div class="footline"><span>조사 중심 계좌 순유입 <b>USD 4,400</b> · 범위 S</span><button type="button" class="text-link" disabled>그래프 보기</button></div></div></article>
+        <div class="secondary-grid"><article class="panel overview-accounts"><div class="panel-head"><h3><span class="order-badge">3</span><span>핵심 계좌</span></h3><button type="button" class="text-link" disabled>전체 보기</button></div><div class="panel-body account-list"><div class="account-row"><div><b>AC-204 · 김○○</b><span class="sub">은행 B · 모음 · 모델 의심 거래 포함</span></div><div><b>순유입 USD 16,800</b><span class="sub">과거 사건 수: 데이터 없음</span></div><span class="tag">조사 대상</span></div><div class="account-row"><div><b>AC-481 · 이○○</b><span class="sub">은행 C · 도착</span></div><div><b>순유입 USD 11,200</b><span class="sub">과거 사건 수: 데이터 없음</span></div><span class="tag">연결 계좌</span></div></div></article><article class="panel overview-related"><div class="panel-head"><h3><span class="order-badge">4</span><span>다른 사건과의 연결</span></h3><button type="button" class="text-link" disabled>Episode에 연결</button></div><div class="panel-body related-list"><div class="related-row"><div><b>E-341 · 조사 중</b><span class="sub">같은 역할의 핵심 계좌 공유</span></div><div><b>연결 근거 강함</b><span class="sub">담당 이조사</span></div><span class="tag blue">열린 사건</span></div><div class="sub">판정된 같은 거래 기준 · 다른 연결은 미확인</div></div></article></div>
+        <article class="panel overview-progress"><div class="panel-head"><h3><span class="order-badge">5</span><span>진행·최근 처리</span></h3><button type="button" class="text-link" disabled>더 보기</button></div><div class="panel-body dense-line"><span>조사 범위 19 · 제외 2 · 미판정 7</span><span class="sub">마지막: 김조사 · 10/13 14:20 · 의견 기록</span></div></article>
+      </div>
+      <section id="alert-focus-view" class="focus-stage" data-overview-focus aria-label="Alert 패널별 보기" hidden>
+        <div class="focus-slot" data-focus-slot></div>
+        <footer class="focus-footer" aria-label="패널 이동">
+          <button type="button" data-focus-jump="first">처음 패널</button>
+          <button type="button" data-focus-jump="prev" aria-keyshortcuts="ArrowLeft">이전 패널<kbd aria-hidden="true">←</kbd></button>
+          <span class="focus-current" data-focus-current aria-live="polite">1 / 5</span>
+          <button type="button" data-focus-jump="next" aria-keyshortcuts="ArrowRight">다음 패널<kbd aria-hidden="true">→</kbd></button>
+          <button type="button" data-focus-jump="last">마지막 패널</button>
+        </footer>
+      </section>
+    </div>
+  </section>
+
+  <section class="screen" id="episode" aria-label="Episode 개요 시안" hidden>
+    <div class="appbar"><span>AML RADAR</span><span class="right">전역 검색 / &nbsp; · &nbsp; 알림</span></div>
+    <div class="screen-inner"><header class="case-top"><div><div class="idline"><h2>E-341</h2><span class="tag dark">진행 중 · Episode</span><span class="tag">연결 Alert 3건</span></div><div class="case-meta"><span>유형: 집중 수취 68% · 급속 자금 통과 54%</span><span>담당 이조사</span><span>근거 v2</span></div></div></header><div class="tabs"><span class="active">개요</span><span>그래프</span><span>거래</span><span>검토 의견</span></div>
+      <div class="notice"><span>판정 2/3 · 미판정 조사 대상 1 · 지금은 종결 불가</span></div>
+      <div class="overview-mode" role="group" aria-label="개요 보기 방식"><button type="button" data-overview-mode="all" aria-controls="episode-all-view" aria-pressed="true">전체 보기</button><button type="button" data-overview-mode="focus" aria-controls="episode-focus-view" aria-pressed="false">패널별 보기</button></div>
+      <div id="episode-all-view" data-overview-all class="stack overview-grid episode-overview"><article class="panel overview-connection"><div class="panel-head"><h3><span class="order-badge">1</span><span>연결 Alert와 연결 근거</span></h3><span class="eyebrow">첫 거래 시각순</span></div><div class="panel-body"><div class="sub intro-line">묶은 사유: 같은 역할의 핵심 계좌 공유</div><div class="episode-list"><div class="episode-row"><b>A-2240</b><span>집중 수취 68%<br><small class="sub">10/10~10/12</small></span><span>의심 판정</span><span>원래 담당 김조사 <small class="sub">· 시안 값</small></span><span class="tag">근거 강함</span></div><div class="episode-row"><b>A-2238</b><span>급속 자금 통과 54%<br><small class="sub">10/11~10/12</small></span><span>정상 판정</span><span>원래 담당 이조사 <small class="sub">· 시안 값</small></span><span class="tag">근거 중간</span></div><div class="episode-row weak"><b>A-2251</b><span>분산 송금 71%<br><small class="sub">10/13</small></span><span>미판정</span><span>원래 담당 박조사 <small class="sub">· 시안 값</small></span><span class="tag critical">연결 근거 약함 · 해제 후보</span></div></div><div class="footline"><span>선택 A-2251 · 해제 후 Alert 2건 유지</span><button type="button" class="text-link" disabled>이 Alert만 해제</button></div></div></article>
+        <div class="shared-grid"><article class="panel overview-shared"><div class="panel-head"><h3><span class="order-badge">2</span><span>무엇으로 이어지나</span></h3></div><div class="panel-body account-list"><div class="account-row"><div><b>AC-204 · 김○○</b><span class="sub">A-2240: 중심 · A-2238: 중심</span></div><span>공유 거래 2건</span><span class="tag">같은 역할</span></div><div class="account-row"><div><b>AC-090 · 박○○</b><span class="sub">A-2238: 중심 · A-2251: 맥락</span></div><span>공유 거래 0건</span><span class="tag critical">연결 근거 약함</span></div></div></article><article class="panel overview-aggregate"><div class="panel-head"><h3><span class="order-badge">3</span><span>통합 판단 요약·돈의 흐름</span></h3></div><div class="panel-body"><p class="summary-line">계좌 11개 · 거래 35건 · 외부 유입액 USD 121,000</p><div class="signal-lines"><div class="signal-line"><b>모델</b><span>유형 2개 · 연결 Alert마다 점수 별도</span></div><div class="signal-line"><b>룰</b><span>급속 자금 통과 걸림 ← A-2240만</span></div></div><div class="thin-rule"></div><div class="flow"><div class="flow-step"><span class="eyebrow">외부 유입</span><strong>USD 121,000</strong></div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-step"><span class="eyebrow">경유</span><strong>4계좌</strong></div><div class="flow-arrow" aria-hidden="true">→</div><div class="flow-step"><span class="eyebrow">외부 유출</span><strong>USD 115,400</strong></div></div></div></article></div>
+        <div class="secondary-grid"><article class="panel overview-context"><div class="panel-head"><h3><span class="order-badge">4</span><span>핵심 계좌·다른 사건과의 연결</span></h3></div><div class="panel-body joint-grid"><section class="joint-section"><div class="joint-heading"><h4>핵심 계좌</h4><button type="button" class="text-link" disabled>전체 보기</button></div><div class="account-list"><div class="account-row"><div><b>AC-204 · 김○○</b><span class="sub">모음 · 등장 Alert A-2240, A-2238</span></div><span>순유입 USD 16,800</span><span class="tag">조사 대상</span></div></div></section><section class="joint-section"><h4>다른 사건과의 연결</h4><div class="mini-row"><span>조회 범위 밖 · 같은 거래에 대한 판정만 확인</span></div></section></div></article></div>
+        <article class="panel overview-progress"><div class="panel-head"><h3><span class="order-badge">5</span><span>진행·최근 처리</span></h3><button type="button" class="text-link" disabled>더 보기</button></div><div class="panel-body dense-line"><span>조사 범위 35 · 제외 1 · 미판정 1</span><span class="sub">마지막: 이조사 · 10/13 16:10 · 묶음 판정</span></div></article>
+      </div>
+      <section id="episode-focus-view" class="focus-stage" data-overview-focus aria-label="Episode 패널별 보기" hidden>
+        <div class="focus-slot" data-focus-slot></div>
+        <footer class="focus-footer" aria-label="패널 이동">
+          <button type="button" data-focus-jump="first">처음 패널</button>
+          <button type="button" data-focus-jump="prev" aria-keyshortcuts="ArrowLeft">이전 패널<kbd aria-hidden="true">←</kbd></button>
+          <span class="focus-current" data-focus-current aria-live="polite">1 / 5</span>
+          <button type="button" data-focus-jump="next" aria-keyshortcuts="ArrowRight">다음 패널<kbd aria-hidden="true">→</kbd></button>
+          <button type="button" data-focus-jump="last">마지막 패널</button>
+        </footer>
+      </section>
+    </div>
+  </section>
+
+  <section class="screen" id="states" aria-label="상태 화면 시안" hidden>
+    <div class="appbar"><span>AML RADAR</span><span class="right">개요·룰 작성의 부분 상태</span></div>
+    <div class="screen-inner"><div class="case-top"><div><div class="idline"><h2>상태 화면</h2><span class="tag">부분 영역만 교체</span></div><div class="case-meta"><span>각 카드가 하나의 데이터 영역 · 시안용 상태 예시</span></div></div></div><div class="tabs"><span class="active">개요 상태</span><span>룰 작성 상태</span></div>
+      <div class="states-grid">
+        <article class="panel state-card"><div class="panel-head"><h3>데이터 없음</h3><span class="tag">돈의 흐름</span></div><div class="panel-body"><div class="state-main">외부 유입액 <span class="ghost-value" title="값이 제공되지 않음 · 시안 예시">데이터 없음</span></div><div class="sub">흐름 판단에서 제외</div></div></article>
+        <article class="panel state-card"><div class="panel-head"><h3>데이터 도착 중</h3><span class="spinner" role="status" aria-label="받는 중"></span></div><div class="panel-body"><div class="state-main">데이터 75% 도착 · 돈의 흐름은 받은 데이터 기준</div><div class="progress" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" aria-label="데이터 도착률"><span></span></div><div class="state-end"><span class="tag blue">정상 종결 시 추가 확인</span><span class="sub">75%는 시안 값</span></div></div></article>
+        <article class="panel state-card"><div class="panel-head"><h3>조회 실패</h3><span class="tag">다른 사건과의 연결</span></div><div class="panel-body"><div class="state-main">연결 사건 조회 실패 · 묶을 후보 확인 불가</div><div class="state-end"><button type="button" class="fake-button" disabled title="정적 시안 · 조회 미연결">다시 시도</button></div></div></article>
+        <article class="panel state-card"><div class="panel-head"><h3>걸린 룰 없음</h3><span class="tag">위험 신호</span></div><div class="panel-body"><div class="state-main"><span class="tag">걸린 룰 없음 · 모델만 의심</span></div><div class="sub">모델 점수 0.82 · 집중 수취 68% · 시연용 임의 점수</div></div></article>
+        <article class="panel state-card"><div class="panel-head"><h3>룰 편집기 · 빈 상태</h3><span class="tag">룰 작성</span></div><div class="panel-body"><div class="state-main">템플릿 선택</div><div class="mini-row"><button type="button" class="tag" disabled>단건 고액</button><button type="button" class="tag" disabled>분할 입출금</button><button type="button" class="tag" disabled>급속 자금 통과</button></div><div class="state-end"><span class="sub">대상: 기간 안 모델 Alert</span></div></div></article>
+        <article class="panel state-card"><div class="panel-head"><h3>룰 편집기 · 계산 중</h3><span class="spinner" role="status" aria-label="계산 중"></span></div><div class="panel-body"><div class="state-main">조건 결과 계산 중 · 이전 건수 표시</div><div class="rule-preview"><div class="rule-row"><span>금액 USD 10,000 이상</span><span class="ghost-value">이전 24건</span></div><div class="rule-row"><span>급속 자금 통과 70% 이상</span><span class="ghost-value">이전 8건</span></div></div></div></article>
+        <article class="panel state-card"><div class="panel-head"><h3>룰 편집기 · 0건</h3><span class="tag">결과</span></div><div class="panel-body"><div class="state-main">맞는 Alert 0건 · 현재 값으로는 걸리지 않음</div><div class="rule-preview"><div class="rule-row"><span>급속 자금 통과 70% 이상</span><span>실제 최대 62%</span></div></div></div></article>
+      </div>
+    </div>
+  </section>
+<template id="alert-panel-1"><div class="focus-main"><div class="focus-visual"><div class="viz-evidence"><div class="viz-hub">판단 근거</div><div class="viz-spokes"><div class="viz-spoke"><b>모델</b><span>의심 점수 0.82</span><small>모델 의심 거래 4건</small></div><div class="viz-spoke"><b>의심 패턴</b><span>집중 수취 구조</span><small>받아서 넘김</small></div><div class="viz-spoke"><b>룰</b><span>걸림 1</span><small>안 걸림 1 · 확인 불가 1</small></div></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">1</span><span>판단 요약</span></h3><p class="focus-question">무엇이 의심스럽고 룰이 실제 걸렸나?</p><ul><li>모델 점수와 룰 적중은 별도 근거.</li><li>10/10~10/12 · 계좌 7개 · 거래 19건.</li><li>관련 열린 사건 E-341 1건.</li></ul></aside><div data-rule-pairs></div></div></template>
+<template id="alert-panel-2"><div class="focus-main"><div class="focus-visual"><div class="viz-flow"><div class="viz-node"><small>외부 유입 · 3계좌</small><strong>USD 84,200</strong><span>상위 상대 AC-102</span></div><div class="viz-arrow" aria-hidden="true">→</div><div class="viz-node"><small>경유 · 2계좌</small><strong>빠른 유출 61%</strong><span>180분 기준 · 시안 값</span></div><div class="viz-arrow" aria-hidden="true">→</div><div class="viz-node"><small>외부 유출 · 4계좌</small><strong>USD 79,800</strong><span>상위 상대 AC-481</span></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">2</span><span>돈의 흐름</span></h3><p class="focus-question">돈이 어디서 들어와 어디로 나갔나?</p><ul><li>조사 중심 계좌 순유입 USD 4,400.</li><li>상위 유입 상대 AC-102는 다른 소유주.</li></ul></aside></div></template>
+<template id="alert-panel-3"><div class="focus-main"><div class="focus-visual"><div class="viz-bars"><div><div class="viz-bar-label"><span>AC-204 · 조사 대상</span><b>순유입 USD 16,800</b></div><div class="viz-bar-track"><span class="bar-full"></span></div></div><div><div class="viz-bar-label"><span>AC-481 · 연결 계좌</span><b>순유입 USD 11,200</b></div><div class="viz-bar-track"><span class="bar-two-thirds"></span></div></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">3</span><span>핵심 계좌</span></h3><p class="focus-question">어느 계좌부터 확인할까?</p><ul><li>AC-204: 은행 B · 모음 · 모델 의심 거래 포함.</li><li>AC-481: 은행 C · 도착.</li><li>과거 사건 수는 데이터 없음.</li></ul></aside></div></template>
+<template id="alert-panel-4"><div class="focus-main"><div class="focus-visual"><div class="viz-relation"><div class="viz-node"><small>현재 Alert</small><strong>A-2240</strong></div><div class="viz-link"><span>같은 역할의 핵심 계좌 공유</span></div><div class="viz-node"><small>열린 Episode</small><strong>E-341</strong><span>연결 근거 강함</span></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">4</span><span>다른 사건과의 연결</span></h3><p class="focus-question">이미 조사 중인 사건과 어떻게 이어지나?</p><ul><li>E-341은 조사 중 · 담당 이조사.</li><li>현재 확인 범위는 판정된 같은 거래.</li><li>그 밖의 연결은 아직 확인되지 않음.</li></ul></aside></div></template>
+<template id="alert-panel-5"><div class="focus-main"><div class="focus-visual"><div class="viz-counts"><div class="viz-node"><small>조사 범위</small><strong>19</strong></div><div class="viz-node"><small>제외</small><strong>2</strong></div><div class="viz-node"><small>미판정</small><strong>7</strong></div></div><div class="viz-timeline"><div class="viz-event"><b>10/13 14:20</b><span>김조사 · 의견 기록</span></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">5</span><span>진행·최근 처리</span></h3><p class="focus-question">남은 판단과 마지막 처리 내용은?</p><ul><li>미판정 7건을 확인해야 함.</li><li>표시한 처리 이력은 최근 1건.</li><li>전체 이력은 검토 의견에서 확인.</li></ul></aside></div></template>
+<template id="episode-panel-1"><div class="focus-main"><div class="focus-visual"><div class="viz-chain"><div class="viz-node"><small>의심 판정</small><strong>A-2240</strong><span>집중 수취 68%</span></div><div class="viz-link"><span>AC-204 · 같은 역할</span></div><div class="viz-node"><small>정상 판정</small><strong>A-2238</strong><span>급속 자금 통과 54%</span></div><div class="viz-link weak"><span>AC-090 · 역할 다름</span></div><div class="viz-node"><small>미판정 · 해제 후보</small><strong>A-2251</strong><span>분산 송금 71%</span></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">1</span><span>연결 Alert와 연결 근거</span></h3><p class="focus-question">이 묶음이 맞나?</p><ul><li>A-2240·A-2238은 AC-204를 같은 역할로 공유.</li><li>A-2251은 연결 근거 약함; 해제 후 Alert 2건 유지.</li><li>원래 담당자와 거래 기간은 시안 값.</li></ul></aside></div></template>
+<template id="episode-panel-2"><div class="focus-main"><div class="focus-visual"><div class="viz-matrix"><div class="viz-matrix-row"><b>AC-204<small>공유 거래 2건</small></b><span>A-2240<small>중심</small></span><span>A-2238<small>중심</small></span></div><div class="viz-matrix-row"><b>AC-090<small>공유 거래 0건</small></b><span>A-2238<small>중심</small></span><span>A-2251<small>맥락</small></span></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">2</span><span>무엇으로 이어지나</span></h3><p class="focus-question">Alert 사이에 실제로 공유된 계좌는?</p><ul><li>AC-204는 두 Alert에서 같은 역할.</li><li>AC-090은 역할이 달라 연결 근거 약함.</li><li>공유 거래 수와 역할을 분리해 확인.</li></ul></aside></div></template>
+<template id="episode-panel-3"><div class="focus-main"><div class="focus-visual"><div class="viz-flow"><div class="viz-node"><small>외부 유입</small><strong>USD 121,000</strong></div><div class="viz-arrow" aria-hidden="true">→</div><div class="viz-node"><small>경유</small><strong>4계좌</strong></div><div class="viz-arrow" aria-hidden="true">→</div><div class="viz-node"><small>외부 유출</small><strong>USD 115,400</strong></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">3</span><span>통합 판단 요약·돈의 흐름</span></h3><p class="focus-question">묶음 전체에서는 무엇이 보이나?</p><ul><li>계좌 11개 · 거래 35건.</li><li>급속 자금 통과 룰은 A-2240에서만 걸림.</li><li>모델 점수는 연결 Alert마다 따로 확인.</li></ul></aside></div></template>
+<template id="episode-panel-4"><div class="focus-main"><div class="focus-visual"><div class="viz-scope"><div class="viz-scope-known"><b>이번 Episode · E-341</b><div class="viz-node"><small>핵심 계좌</small><strong>AC-204</strong><span>순유입 USD 16,800</span></div><div class="viz-members"><span>A-2240 · 모음</span><span>A-2238 · 등장</span></div></div><div class="viz-scope-unknown"><b>다른 사건</b><span>조회 범위 밖</span></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">4</span><span>핵심 계좌·다른 사건과의 연결</span></h3><p class="focus-question">이 묶음 밖의 연결까지 확인됐나?</p><ul><li>AC-204는 A-2240·A-2238에 등장.</li><li>현재는 같은 거래에 대한 판정만 확인.</li><li>다른 사건이 없다는 뜻은 아님.</li></ul></aside></div></template>
+<template id="episode-panel-5"><div class="focus-main"><div class="focus-visual"><div class="viz-decisions"><div class="viz-decision"><b>A-2240</b><span>의심 판정</span></div><div class="viz-decision"><b>A-2238</b><span>정상 판정</span></div><div class="viz-decision weak"><b>A-2251</b><span>미판정</span></div></div><div class="viz-timeline"><div class="viz-event"><b>10/13 16:10</b><span>이조사 · 묶음 판정</span></div></div></div><aside class="focus-copy"><h3 tabindex="-1"><span class="order-badge">5</span><span>진행·최근 처리</span></h3><p class="focus-question">종결 전에 어떤 판정이 남았나?</p><ul><li>판정 2/3 · 미판정 조사 대상 1.</li><li>지금은 종결 불가.</li><li>조사 범위 35 · 제외 1 · 미판정 1.</li></ul></aside></div></template>
+<template id="rule-inspections-template">
+<section class="rule-inspections" aria-label="룰별 검사 설명">
+  <div class="rule-inspection-intro"><h4>룰별 검사 · 합성 예시</h4><span class="tag">실제 룰 결과 미연동</span></div>
+  <p class="rule-example-note">기준·거래 모두 설명용 예시 · 운영 정책 아님</p>
+  <article class="rule-inspection">
+    <div class="rule-inspection-head"><h4>급속 자금 통과</h4><span class="tag critical">걸림</span></div>
+    <div class="rule-comparison"><strong>관측 81%</strong><span>기준 ≥70% · 180분</span></div>
+    <div class="rule-chart" role="img" aria-label="급속 자금 통과: 0~100% 중 기준 70%, 관측 81%. 기준선을 넘어 걸림.">
+      <div class="rule-chart-caption"><span>기준 70%</span><span>관측 81%</span></div>
+      <div class="rule-meter" style="--observed:81%;--threshold:70%"><span class="rule-meter-fill"></span><span class="rule-meter-threshold"></span></div>
+      <div class="rule-chart-range"><span>0%</span><span>100%</span></div>
+    </div>
+    <p class="rule-reason">기준보다 11%p 높아 걸림.</p>
+    <button type="button" class="evidence-button" data-rule-evidence="rapid" aria-haspopup="dialog" aria-controls="rule-evidence-dialog" aria-label="급속 자금 통과 근거 보기">근거 보기</button>
+  </article>
+  <article class="rule-inspection">
+    <div class="rule-inspection-head"><h4>단건 고액</h4><span class="tag">안 걸림</span></div>
+    <div class="rule-comparison"><strong>최대 USD 9,900</strong><span>기준 ≥USD 10,000</span></div>
+    <div class="rule-chart rule-chart-miss" role="img" aria-label="단건 고액: 0~1만 달러 중 기준 1만 달러, 관측 최대 9900달러. 기준보다 100달러 낮아 안 걸림.">
+      <div class="rule-chart-caption"><span>관측 USD 9,900</span><span>기준 USD 10,000</span></div>
+      <div class="rule-meter" style="--observed:99%;--threshold:100%"><span class="rule-meter-fill"></span><span class="rule-meter-threshold"></span></div>
+      <div class="rule-chart-range"><span>USD 0</span><span>USD 10,000</span></div>
+    </div>
+    <p class="rule-reason">기준보다 USD 100 낮아 안 걸림.</p>
+    <button type="button" class="evidence-button" data-rule-evidence="large" aria-haspopup="dialog" aria-controls="rule-evidence-dialog" aria-label="단건 고액 근거 보기">근거 보기</button>
+  </article>
+  <article class="rule-inspection">
+    <div class="rule-inspection-head"><h4>분할 입출금</h4><span class="tag blue">확인 불가</span></div>
+    <div class="rule-comparison"><strong>현금 입금 3건</strong><span>7일·금액 기준 미확인</span></div>
+    <div class="rule-chart" role="img" aria-label="분할 입출금: 회사 기준금액과 앞선 4일 보고가 없어 기준 대비 막대를 그릴 수 없음. 현금 입금 3건만 확인.">
+      <div class="rule-chart-unavailable"><b>비교 불가</b></div>
+    </div>
+    <p class="rule-reason">회사 기준금액·앞선 4일 보고 없음.</p>
+    <button type="button" class="evidence-button" data-rule-evidence="split" aria-haspopup="dialog" aria-controls="rule-evidence-dialog" aria-label="분할 입출금 근거 보기">근거 보기</button>
+  </article>
+</section>
+</template>
+<template id="rule-evidence-rapid"><h3>급속 자금 통과 · 걸림</h3><p class="sub">합성 예시 · 예시 룰 RAPID v1 · 조건·기준값도 설명용 · 실제 평가 API 미연동</p><dl class="rule-facts"><dt>검사 기준</dt><dd>입금 후 180분 이내 유출액 / 비교 가능한 입금액 ≥ 70% (예시)</dd><dt>실제 관측</dt><dd>입금 USD 10,000 · 180분 안 유출 USD 8,100 · 81%</dd><dt>검사 범위</dt><dd>10/10 00:00~10/13 00:00 KST · AC-204 · USD · 관측 종료 전 180분 지난 입금만 분모에 포함</dd><dt>판단 이유</dt><dd>8,100 / 10,000 = 81%. 예시 기준 70% 이상이므로 걸림. 다음 날 유출 USD 1,900은 180분 밖이어서 분자에서 제외.</dd></dl><p class="sub">먼저 들어온 금액부터 출금에 대응시킨 추정입니다. 실제로 같은 돈이 이동했다는 증명은 아닙니다. 계좌별 검사 예시이며 다른 개요 숫자를 재계산하지 않습니다.</p><table class="evidence-table"><caption>근거 거래 · 합성 예시</caption><thead><tr><th scope="col">거래·시각 (KST)</th><th scope="col">송금 → 수취</th><th scope="col">금액</th><th scope="col">확인 내용</th></tr></thead><tbody><tr><td data-label="거래·시각">예시 TX-R01 · 10/10 09:00</td><td data-label="송금 → 수취">AC-102 → AC-204</td><td data-label="금액" class="amount">USD 9,000</td><td data-label="확인 내용">입금 · 분모 포함</td></tr><tr><td data-label="거래·시각">예시 TX-R02 · 10/10 09:10</td><td data-label="송금 → 수취">AC-103 → AC-204</td><td data-label="금액" class="amount">USD 1,000</td><td data-label="확인 내용">입금 · 분모 포함</td></tr><tr><td data-label="거래·시각">예시 TX-R03 · 10/10 09:40</td><td data-label="송금 → 수취">AC-204 → AC-481</td><td data-label="금액" class="amount">USD 6,500</td><td data-label="확인 내용">180분 이내 유출</td></tr><tr><td data-label="거래·시각">예시 TX-R04 · 10/10 10:00</td><td data-label="송금 → 수취">AC-204 → AC-482</td><td data-label="금액" class="amount">USD 1,600</td><td data-label="확인 내용">180분 이내 유출</td></tr><tr><td data-label="거래·시각">예시 TX-R05 · 10/11 10:00</td><td data-label="송금 → 수취">AC-204 → AC-483</td><td data-label="금액" class="amount">USD 1,900</td><td data-label="확인 내용">180분 밖 · 분자 제외</td></tr></tbody></table></template><template id="rule-evidence-large"><h3>단건 고액 · 안 걸림</h3><p class="sub">합성 예시 · 예시 룰 LARGE v1 · 조건·기준값도 설명용 · 실제 평가 API 미연동</p><dl class="rule-facts"><dt>검사 기준</dt><dd>한 건의 송금액 ≥ USD 10,000 (예시)</dd><dt>실제 관측</dt><dd>검사한 19건 중 최대 단건 송금액 USD 9,900</dd><dt>검사 범위</dt><dd>10/10 00:00~10/13 00:00 KST · A-2240 포함 거래 19건의 USD 송금액</dd><dt>판단 이유</dt><dd>최대값 USD 9,900이 예시 기준 USD 10,000 미만이라 안 걸림. 다른 의심 근거까지 없다는 뜻은 아님.</dd></dl><table class="evidence-table"><caption>근거 거래 · 합성 예시</caption><thead><tr><th scope="col">거래·시각 (KST)</th><th scope="col">송금 → 수취</th><th scope="col">금액</th><th scope="col">확인 내용</th></tr></thead><tbody><tr><td data-label="거래·시각">예시 TX-L01 · 10/11 14:20</td><td data-label="송금 → 수취">AC-510 → AC-600</td><td data-label="금액" class="amount">USD 9,900</td><td data-label="확인 내용">최댓값 거래 · 나머지 18건은 이 금액 이하라는 합성 검사 예시</td></tr></tbody></table></template><template id="rule-evidence-split"><h3>분할 입출금 · 확인 불가</h3><p class="sub">합성 예시 · 예시 룰 SPLIT v1 · 조건·기준값도 설명용 · 실제 평가 API 미연동</p><dl class="rule-facts"><dt>검사 기준</dt><dd>7일간 회사 기준금액의 90% 이상~100% 미만 현금 입금 ≥ 3회 (설계 예시)</dd><dt>실제 관측</dt><dd>받은 10/10~10/12 구간에 현금 입금 3건 · 각 USD 2,000</dd><dt>검사 범위</dt><dd>10/6 00:00~10/13 00:00 KST · AC-481 · USD 현금 입금</dd><dt>판단 이유</dt><dd>기준금액이 없어 세 입금이 해당 금액 구간인지 알 수 없고, 앞선 4일 보고도 없어 7일 검사를 완료할 수 없음. 기준 미충족 판정이 아님.</dd></dl><p class="evidence-missing">빠진 정보: 회사 기준금액 · 10/6~10/9 보고 미수신. 값을 0으로 채우거나 안 걸림으로 바꾸지 않습니다.</p><table class="evidence-table"><caption>근거 거래 · 합성 예시</caption><thead><tr><th scope="col">거래·시각 (KST)</th><th scope="col">송금 → 수취</th><th scope="col">금액</th><th scope="col">확인 내용</th></tr></thead><tbody><tr><td data-label="거래·시각">예시 TX-S01 · 10/10 11:00</td><td data-label="송금 → 수취">AC-405 → AC-481</td><td data-label="금액" class="amount">USD 2,000</td><td data-label="확인 내용">현금 입금 · 금액 구간 대조 불가</td></tr><tr><td data-label="거래·시각">예시 TX-S02 · 10/11 11:00</td><td data-label="송금 → 수취">AC-406 → AC-481</td><td data-label="금액" class="amount">USD 2,000</td><td data-label="확인 내용">현금 입금 · 금액 구간 대조 불가</td></tr><tr><td data-label="거래·시각">예시 TX-S03 · 10/12 11:00</td><td data-label="송금 → 수취">AC-407 → AC-481</td><td data-label="금액" class="amount">USD 2,000</td><td data-label="확인 내용">현금 입금 · 금액 구간 대조 불가</td></tr></tbody></table></template>
+<dialog id="rule-evidence-dialog" class="evidence-dialog" aria-labelledby="rule-evidence-title"><header class="evidence-head"><h2 id="rule-evidence-title" tabindex="-1">룰 검사 근거</h2><button type="button" class="evidence-button" data-close-evidence>돌아가기</button></header><div class="evidence-body"></div></dialog>
+</main>
+<script>
+const buttons=[...document.querySelectorAll('.preview-switch button')];
+for(const button of buttons){button.addEventListener('click',()=>{for(const item of buttons){const on=item===button;item.setAttribute('aria-pressed',String(on));document.getElementById(item.dataset.target).hidden=!on;}})}
+
+function panelArrowDirection(event, isFocused){
+  if(!isFocused||event.defaultPrevented||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return 0;
+  const direction=event.key==='ArrowLeft'?-1:event.key==='ArrowRight'?1:0;
+  if(!direction)return 0;
+  const target=event.target;
+  const arrowControl='input,textarea,select,[contenteditable],[role="slider"],[role="tab"],[role="tablist"],[role="radio"],[role="radiogroup"],[role="spinbutton"],[role="combobox"],[role="listbox"],[role="tree"],[role="grid"],[role="menu"],[role="menubar"]';
+  if(target?.isContentEditable||target?.closest?.(arrowControl))return 0;
+  return direction;
+}
+
+
+function populateRuleInspections(root){
+  for(const target of root.querySelectorAll('[data-rule-inspections]')){
+    target.replaceChildren(document.getElementById('rule-inspections-template').content.cloneNode(true));
+  }
+  for(const target of root.querySelectorAll('[data-rule-pairs]')){
+    const pairs=document.createElement('section');
+    pairs.className='focus-rule-pairs';
+    pairs.setAttribute('aria-label','룰별 검사 · 합성 예시');
+    const intro=document.createElement('div');
+    intro.className='focus-rule-pairs-intro';
+    intro.innerHTML='<h4>룰별 검사 · 합성 예시</h4><span class="tag">실제 룰 결과 미연동</span>';
+    pairs.append(intro);
+    for(const rule of document.getElementById('rule-inspections-template').content.querySelectorAll('.rule-inspection')){
+      const pair=document.createElement('article');
+      pair.className='focus-rule-pair';
+      const chart=document.createElement('div');
+      chart.className='focus-rule-pair-chart';
+      chart.append(rule.querySelector('.rule-chart').cloneNode(true));
+      const explanation=document.createElement('div');
+      explanation.className='focus-rule-pair-copy';
+      explanation.append(rule.querySelector('.rule-inspection-head').cloneNode(true),rule.querySelector('.rule-reason').cloneNode(true),rule.querySelector('[data-rule-evidence]').cloneNode(true));
+      pair.append(chart,explanation);
+      pairs.append(pair);
+    }
+    target.replaceChildren(pairs);
+  }
+}
+populateRuleInspections(document);
+const evidenceDialog=document.getElementById('rule-evidence-dialog');
+let evidenceOpener;
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-rule-evidence]');
+  if(!button)return;
+  const template=document.getElementById(`rule-evidence-${button.dataset.ruleEvidence}`);
+  if(!template)return;
+  evidenceOpener=button;
+  evidenceDialog.querySelector('.evidence-body').replaceChildren(template.content.cloneNode(true));
+  evidenceDialog.showModal();
+  document.getElementById('rule-evidence-title').focus({preventScroll:true});
+});
+evidenceDialog.querySelector('[data-close-evidence]').addEventListener('click',()=>evidenceDialog.close());
+evidenceDialog.addEventListener('close',()=>evidenceOpener?.focus({preventScroll:true}));
+
+const focusTitles={
+  alert:['판단 요약','돈의 흐름','핵심 계좌','다른 사건과의 연결','진행·최근 처리'],
+  episode:['연결 Alert와 연결 근거','무엇으로 이어지나','통합 판단 요약·돈의 흐름','핵심 계좌·다른 사건과의 연결','진행·최근 처리']
+};
+for(const [screenId,titles] of Object.entries(focusTitles)){
+  const screen=document.getElementById(screenId);
+  const all=screen.querySelector('[data-overview-all]');
+  const focus=screen.querySelector('[data-overview-focus]');
+  const slot=focus.querySelector('[data-focus-slot]');
+  const current=focus.querySelector('[data-focus-current]');
+  const modeButtons=[...screen.querySelectorAll('[data-overview-mode]')];
+  const jumpButtons=[...focus.querySelectorAll('[data-focus-jump]')];
+  let view='all';
+  let selected=0;
+  function render(){
+    const focused=view==='focus';
+    all.hidden=focused;
+    focus.hidden=!focused;
+    for(const button of modeButtons)button.setAttribute('aria-pressed',String(button.dataset.overviewMode===view));
+    if(!focused)return;
+    const template=document.getElementById(`${screenId}-panel-${selected+1}`);
+    slot.replaceChildren(template.content.cloneNode(true));
+    populateRuleInspections(slot);
+    current.textContent=`${selected+1} / ${titles.length} · ${titles[selected]}`;
+    for(const button of jumpButtons){
+      const edge=button.dataset.focusJump;
+      button.disabled=(selected===0&&(edge==='first'||edge==='prev'))||(selected===titles.length-1&&(edge==='next'||edge==='last'));
+    }
+  }
+  for(const button of modeButtons)button.addEventListener('click',()=>{
+    view=button.dataset.overviewMode;
+    render();
+    if(view==='focus')slot.querySelector('h3').focus({preventScroll:true});
+  });
+  for(const button of jumpButtons)button.addEventListener('click',()=>{
+    if(button.dataset.focusJump==='first')selected=0;
+    if(button.dataset.focusJump==='prev')selected=Math.max(0,selected-1);
+    if(button.dataset.focusJump==='next')selected=Math.min(titles.length-1,selected+1);
+    if(button.dataset.focusJump==='last')selected=titles.length-1;
+    render();
+    if(button.disabled)slot.querySelector('h3').focus({preventScroll:true});
+  });
+  screen.addEventListener('keydown',event=>{
+    const direction=panelArrowDirection(event,view==='focus'&&!screen.hidden);
+    if(!direction)return;
+    event.preventDefault();
+    const next=Math.max(0,Math.min(titles.length-1,selected+direction));
+    if(next===selected)return;
+    const target=event.target;
+    const wasInPanel=slot.contains(target);
+    selected=next;
+    render();
+    if(wasInPanel||(target?.matches?.('[data-focus-jump]')&&target.disabled)){
+      slot.querySelector('h3').focus({preventScroll:true});
+    }
+  });
+  render();
+}
+</script>
+</body>
+</html>

@@ -2,16 +2,21 @@ import type { Page } from '@/api/common'
 import type { DashboardSummary } from '@/api/liveDashboard'
 import type { LedgerAccount, LedgerOwner, LedgerTransaction } from '@/api/liveLedger'
 import type { ReviewCase, ReviewMember, ReviewMoney } from '@/api/liveReview'
+import type { WorkNotification } from '@/api/notifications'
 
 // Local FE preview only. Every identifier, person, amount and evaluation here is invented.
-const businessAt = '2026-10-15T09:00:00+09:00'
+const businessAt = '2026-10-15T18:00:00+09:00'
 const at = (day: number, hour = 10) => `2026-10-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00+09:00`
 const page = <T,>(rows: T[], url: URL): Page<T> => {
   const number = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0)
   const size = Math.max(1, Number(url.searchParams.get('size') ?? 20) || 20)
   return { content: rows.slice(number * size, (number + 1) * size), page: number, size, totalElements: rows.length, totalPages: Math.ceil(rows.length / size) }
 }
-const types = ['Fan-out', 'Fan-in', 'Gather-scatter', 'Scatter-gather', 'Cycle', 'Random', 'Bipartite', 'Stack']
+const types = ['NON_PATTERN', 'Fan-out', 'Fan-in', 'Gather-scatter', 'Scatter-gather', 'Cycle', 'Random', 'Bipartite', 'Stack']
+// User-required synthetic majority, not an observed team prevalence. Binary scores are independent.
+const generatedType = (index: number) => index % 5 < 4 ? 0 : index % 8 + 1
+const probabilitiesFor = (code: number, top = 0.72) => Array.from({ length: 9 }, (_, index) => index === code ? top : (1 - top) / 8)
+const typeScores = (code: number, top?: number) => Object.fromEntries(probabilitiesFor(code, top).map((score, index) => [`p_${index}`, score]))
 const currencies = ['KRW', 'USD', 'JPY']
 const formats = ['WIRE', 'ACH', 'CARD']
 const staff = [{ id: 11, name: '오분석', role: 'STAFF' }, { id: 12, name: '김검토', role: 'STAFF' }, { id: 13, name: '박조사', role: 'STAFF' }]
@@ -36,11 +41,11 @@ const member = (txId: number, role: string, amount: number, from: string, to: st
   transaction: { occurredAt: at(day, 10), fromAccountId: from, toAccountId: to, fromBankId: ownerOf(from)?.bankId ?? 1, toBankId: ownerOf(to)?.bankId ?? 2,
     amountPaid: amount, amountUsd: currency === 'KRW' ? Math.round(amount / 1300) : currency === 'JPY' ? Math.round(amount / 145) : amount,
     paymentCurrency: currency, paymentFormat: 'WIRE', role, isSuspicious: role === 'SEED',
-    scores: { p_laundering: role === 'SEED' ? 0.91 : 0.62, p_1: 0.72, p_2: 0.18 } },
+    scores: { p_laundering: role === 'SEED' ? 0.91 : 0.62, ...typeScores(types.indexOf(type)) } },
 })
 const members = [member(101, 'SEED', 5_200_000, 'account-a', 'account-b', 13), member(102, 'CONNECTION', 3_000_000, 'account-b', 'account-c', 14), member(103, 'CONNECTION', 1_700_000, 'account-b', 'account-d', 14)]
 const summary = { txCount: 3, subjectCount: 3, seedCount: 1, riskScore: 0.91, primaryType: 'Fan-out', typeShare: 0.72,
-  totalAmountUsd: 7615, amountsByCurrency: { KRW: 9_900_000 }, firstTxAt: at(13), lastTxAt: at(14),
+  totalAmountUsd: members.reduce((sum, row) => sum + row.transaction.amountUsd, 0), amountsByCurrency: { KRW: 9_900_000 }, firstTxAt: at(13), lastTxAt: at(14),
   paymentFormats: { WIRE: 3 }, typeDistribution: { 'Fan-out': 2, 'Fan-in': 1 },
   dailySuspiciousCount: { '2026-10-13': 1, '2026-10-14': 1 }, dailySuspiciousAmount: { '2026-10-13': 5_200_000, '2026-10-14': 3_000_000 },
   topSenders: [{ accountCurrency: 'account-b|KRW', amount: 4_700_000 }] }
@@ -49,17 +54,17 @@ const alert: ReviewCase = { caseId: 1, kind: 'ALERT', alertId: 3001, status: 'OP
   assigneeId: 11, assigneeName: '오분석', createdAt: at(14, 11), assignedAt: at(14, 11), closedAt: null, ageDays: 1,
   summary, pendingCount: 3, episodeId: null, sourceAlertIds: [], primaryTypes: ['Fan-out'], accounts: accounts.slice(0, 4),
   groups: [{ groupId: 1, label: 'A-3001 조사 범위', revision: 1, evidenceVersion: 1, members }],
-  history: [{ eventId: 1, action: 'ASSIGN', comment: '합성 배정 기록', businessAt: at(14, 11), recordedAt: at(14, 11), actor: '시연 시스템' }] }
+  history: [{ eventId: 1, action: 'ASSIGN', comment: '합성 배정 기록', businessAt: at(14, 11), recordedAt: at(14, 11), actor: '시연 시스템' },
+    { eventId: 2, action: 'COMMENT', comment: '합성 예시: account-b 수취 후 account-c·account-d로 분산되는 T-102·T-103의 거래 목적을 확인할 필요가 있습니다.', businessAt: at(14, 12), recordedAt: at(14, 12), actor: '가상 분석자' }] }
+const withSource = (rows: ReviewMember[], alertId: number) => rows.map(row => ({ ...row, sources: [{ alertId, version: 1, primaryType: 'Fan-out' }] }))
 const linkedAlerts: ReviewCase[] = [3002, 3003].map((alertId, index) => ({ ...alert,
   caseId: index + 2, alertId, status: 'CLOSED', outcome: 'TRANSFERRED', episodeId: 50, pendingCount: 0,
   summary: { ...summary, txCount: index ? 1 : 2, subjectCount: index ? 1 : 2 },
-  groups: [{ groupId: index + 2, label: `A-${alertId} 조사 범위`, revision: 1, sourceAlertId: alertId, members: index ? [members[2]] : members.slice(0, 2) }],
+  groups: [{ groupId: index + 2, label: `A-${alertId} 조사 범위`, revision: 1, sourceAlertId: alertId, members: withSource(index ? [members[2]] : members.slice(0, 2), alertId) }],
 }))
 const episode: ReviewCase = { ...alert, caseId: 50, kind: 'EPISODE', alertId: null, revision: 2, createdAt: at(13, 11), assignedAt: at(13, 11), ageDays: 2,
-  sourceAlertIds: [3002, 3003], primaryTypes: ['Fan-out', 'Fan-in'], groups: [
-    { groupId: 2, label: 'Alert A-3002', revision: 1, sourceAlertId: 3002, members: members.slice(0, 2) },
-    { groupId: 3, label: 'Alert A-3003', revision: 1, sourceAlertId: 3003, members: [members[2]] },
-  ] }
+  sourceAlertIds: [3002, 3003], primaryTypes: ['Fan-out'], groups: linkedAlerts.flatMap(row => row.groups ?? []).map(group => ({ ...group, members: group.members.map(row => ({ ...row, state: 'PENDING' as const })) })),
+  history: [{ eventId: 3, action: 'TRANSFER', comment: '합성 예시: 동일한 account-b를 거치는 A-3002·A-3003을 묶어 조사합니다.', businessAt: at(14, 12), recordedAt: at(14, 12), actor: '가상 분석자' }] }
 
 const generatedMember = (index: number, alertId: number, type: string): ReviewMember => {
   const from = accounts[(index * 7 + 4) % accounts.length]
@@ -69,12 +74,16 @@ const generatedMember = (index: number, alertId: number, type: string): ReviewMe
   const row = member(201 + index, index % 4 === 0 ? 'SEED' : 'CONNECTION', amount, from.id, to.id, 15 - index % 14, currency, type, alertId)
   row.transaction.paymentFormat = formats[index % formats.length]
   row.transaction.isSuspicious = index % 5 === 0 ? null : index % 3 === 0
-  row.transaction.scores = index % 5 === 0 ? null : { p_laundering: 0.31 + index % 7 / 10, [`p_${index % 8 + 1}`]: 0.51 + index % 4 / 10 }
+  row.transaction.scores = index % 5 === 0 ? null : { p_laundering: 0.31 + index % 7 / 10, ...typeScores(generatedType(index), 0.51 + index % 4 / 10) }
+  row.transaction.isSuspicious = row.transaction.scores === null ? null : row.transaction.scores.p_laundering >= 0.7
+  // CaseSummary does not make code 0 a named representative pattern for an Alert.
+  if (generatedType(index) === 0) row.sources = row.sources.map(source => ({ ...source, primaryType: '패턴 미특정' }))
   return row
 }
 const makeAlert = (index: number, linkedEpisode?: number): ReviewCase => {
   const alertId = 3004 + index
-  const type = types[index % types.length]
+  const type = types[generatedType(index)]
+  const primaryType = generatedType(index) === 0 ? '패턴 미특정' : type
   const member = generatedMember(index, alertId, type)
   const { transaction } = member
   const day = 15 - index % 14
@@ -85,14 +94,14 @@ const makeAlert = (index: number, linkedEpisode?: number): ReviewCase => {
     outcome: transferred ? 'TRANSFERRED' : index % 9 === 0 ? 'NORMAL' : null, revision: 1, assigneeId: assignee.id, assigneeName: assignee.name,
     createdAt: at(day, 11), assignedAt: at(day, 12), closedAt: transferred || index % 9 === 0 ? at(day, 16) : null, ageDays: 15 - day,
     summary: { txCount: noMembers ? 0 : 1, subjectCount: noMembers ? 0 : 1, seedCount: member.transaction.role === 'SEED' ? 1 : 0,
-      riskScore: Number((0.31 + index % 7 / 10).toFixed(2)), primaryType: type, typeShare: Number((0.51 + index % 4 / 10).toFixed(2)), totalAmountUsd: transaction.amountUsd,
+      riskScore: Number((0.31 + index % 7 / 10).toFixed(2)), primaryType, typeShare: generatedType(index) === 0 ? 0 : Number((0.51 + index % 4 / 10).toFixed(2)), totalAmountUsd: transaction.amountUsd,
       amountsByCurrency: noMembers ? {} : { [transaction.paymentCurrency]: transaction.amountPaid }, firstTxAt: noMembers ? null : transaction.occurredAt,
       lastTxAt: noMembers ? null : transaction.occurredAt, paymentFormats: noMembers ? {} : { [transaction.paymentFormat]: 1 },
       typeDistribution: noMembers ? {} : { [type]: 1 } },
-    pendingCount: transferred || index % 9 === 0 || noMembers ? 0 : 1, episodeId: linkedEpisode ?? null, sourceAlertIds: [], primaryTypes: [type],
+    pendingCount: transferred || index % 9 === 0 || noMembers ? 0 : 1, episodeId: linkedEpisode ?? null, sourceAlertIds: [], primaryTypes: [primaryType],
     accounts: [ownerOf(transaction.fromAccountId), ownerOf(transaction.toAccountId)].filter((item): item is LedgerAccount => item != null),
-    groups: [{ groupId: 100 + index, label: `A-${alertId} 조사 범위`, revision: 1, evidenceVersion: 1,
-      members: noMembers ? [] : [{ ...member, state: transferred ? 'TRANSFERRED' : index % 9 === 0 ? 'DECIDED' : 'PENDING', decision: index % 9 === 0 && !transferred ? 'NORMAL' : null }] }],
+    groups: [{ groupId: 100 + index, label: `A-${alertId} 조사 범위`, revision: 1, evidenceVersion: 1, sourceAlertId: alertId,
+      members: noMembers ? [] : [{ ...member, state: index % 9 === 0 && !transferred ? 'DECIDED' : 'PENDING', decision: index % 9 === 0 && !transferred ? 'NORMAL' : null }] }],
     history: [{ eventId: 100 + index, action: 'ASSIGN', comment: '합성 배정 기록', businessAt: at(day, 12), recordedAt: at(day, 12), actor: '시연 시스템' }],
   }
 }
@@ -101,15 +110,15 @@ const openAlerts = Array.from({ length: 42 }, (_, index) => makeAlert(index + 64
 const generatedEpisodes: ReviewCase[] = Array.from({ length: 32 }, (_, index) => {
   const sources = generatedLinked.slice(index * 2, index * 2 + 2)
   const first = sources[0]
-  const groups = sources.flatMap(source => source.groups ?? []).map(group => ({ ...group, label: `Alert A-${group.sourceAlertId}`,
-    members: group.members.map(member => ({ ...member, state: 'PENDING' as const, decision: null })) }))
   const closed = index % 7 === 6
+  const groups = sources.flatMap(source => source.groups ?? []).map(group => ({ ...group, label: `Alert A-${group.sourceAlertId}`,
+    members: group.members.map(member => ({ ...member, state: closed ? 'DECIDED' as const : 'PENDING' as const, decision: closed ? 'NORMAL' as const : null })) }))
   const amountsByCurrency = sources.reduce<Record<string, number>>((amounts, source) => {
     Object.entries(source.summary.amountsByCurrency).forEach(([currency, amount]) => { amounts[currency] = (amounts[currency] ?? 0) + amount })
     return amounts
   }, {})
   return { ...first, caseId: 150 + index, kind: 'EPISODE', alertId: null, status: closed ? 'CLOSED' : 'OPEN', outcome: closed ? 'NORMAL' : null,
-    episodeId: null, sourceAlertIds: sources.map(source => source.alertId ?? 0), primaryTypes: sources.map(source => source.summary.primaryType),
+    episodeId: null, sourceAlertIds: sources.map(source => source.alertId ?? 0), primaryTypes: [...new Set(sources.map(source => source.summary.primaryType))],
     summary: { ...first.summary, txCount: 2, subjectCount: 2, amountsByCurrency,
       totalAmountUsd: sources.reduce((sum, source) => sum + Number(source.summary.totalAmountUsd ?? 0), 0),
       riskScore: Math.max(...sources.map(source => source.summary.riskScore)) },
@@ -118,6 +127,23 @@ const generatedEpisodes: ReviewCase[] = Array.from({ length: 32 }, (_, index) =>
   }
 })
 const reviewCases = [alert, ...openAlerts, ...linkedAlerts, ...generatedLinked, episode, ...generatedEpisodes]
+// Summary cards, tables and source details describe the same unique evidence rows.
+for (const item of reviewCases) {
+  const evidence = [...new Map((item.groups ?? []).flatMap(group => group.members).filter(row => !['EXCLUDED', 'TRANSFERRED'].includes(row.state)).map(row => [row.txId, row])).values()]
+  const dates = evidence.map(row => row.transaction.occurredAt).sort()
+  const amounts: Record<string, number> = {}
+  const payments: Record<string, number> = {}
+  for (const row of evidence) {
+    const tx = row.transaction
+    amounts[tx.paymentCurrency] = (amounts[tx.paymentCurrency] ?? 0) + Number(tx.amountPaid ?? 0)
+    payments[tx.paymentFormat] = (payments[tx.paymentFormat] ?? 0) + 1
+  }
+  Object.assign(item.summary, { txCount: evidence.length, subjectCount: evidence.filter(row => row.reviewRole === 'SUBJECT').length,
+    seedCount: evidence.filter(row => row.transaction.role === 'SEED').length,
+    totalAmountUsd: evidence.reduce((sum, row) => sum + Number(row.transaction.amountUsd ?? 0), 0), amountsByCurrency: amounts,
+    firstTxAt: dates[0] ?? null, lastTxAt: dates.at(-1) ?? null, paymentFormats: payments })
+}
+
 // The list's statuses filter uses the displayed Alert state. A linked Alert is ESCALATED
 // even though its review case is CLOSED / TRANSFERRED (API.md §9.8).
 const reviewListStatus = (row: ReviewCase) => row.kind === 'ALERT' && row.episodeId != null ? 'ESCALATED' : row.status
@@ -150,10 +176,10 @@ const transactions: LedgerTransaction[] = [
     fromBankId: transaction.fromBankId, toBankId: transaction.toBankId, amountPaid: transaction.amountPaid, amountReceived: transaction.amountPaid,
     amountUsd: transaction.amountUsd, paymentCurrency: 'KRW', receivingCurrency: 'KRW', paymentFormat: 'WIRE',
     launderingScore: transaction.scores?.p_laundering ?? null, threshold: 0.7, isSuspicious: transaction.isSuspicious,
-    typeClass: 1, typeName: 'Fan-out', probabilities: [0.02, 0.72, 0.18], judgement: index === 0 ? 'SUSPICIOUS' as const : 'NORMAL' as const,
+    typeClass: 1, typeName: 'Fan-out', probabilities: probabilitiesFor(1), judgement: index === 0 ? 'SUSPICIOUS' as const : 'NORMAL' as const,
     alertIds: [3001], episodeIds: index ? [50] : [] })),
   ...Array.from({ length: 120 }, (_, index): LedgerTransaction => {
-    const source = generatedMember(index, 3004 + index % 106, types[index % types.length]).transaction
+    const source = generatedMember(index, 3004 + index % 106, types[generatedType(index)]).transaction
     const from = ownerOf(source.fromAccountId)
     const to = ownerOf(source.toAccountId)
     const judgement = source.isSuspicious == null ? 'UNANALYZED' : source.isSuspicious ? 'SUSPICIOUS' : 'NORMAL'
@@ -162,29 +188,83 @@ const transactions: LedgerTransaction[] = [
       fromBankId: source.fromBankId, toBankId: source.toBankId, amountPaid: source.amountPaid, amountReceived: source.amountPaid,
       amountUsd: source.amountUsd, paymentCurrency: source.paymentCurrency, receivingCurrency: source.paymentCurrency,
       paymentFormat: source.paymentFormat, launderingScore: source.scores?.p_laundering ?? null, threshold: 0.7,
-      isSuspicious: source.isSuspicious, typeClass: index % types.length + 1, typeName: types[index % types.length],
-      probabilities: source.scores ? [0.02, 0.72, 0.18] : [], judgement, alertIds: [3004 + index % 106],
+      isSuspicious: source.isSuspicious, typeClass: source.scores ? generatedType(index) : null, typeName: source.scores ? types[generatedType(index)] : undefined,
+      probabilities: source.scores ? Array.from({ length: 9 }, (_, code) => source.scores![`p_${code}`]) : [], judgement, alertIds: [3004 + index % 106],
       episodeIds: index < 64 ? [150 + Math.floor(index / 2)] : [] }
   }),
 ]
+
+// Derive navigation links from actual membership, including repeated evidence in an Episode.
+// Context-only ledger rows deliberately have no case links rather than invented targets.
+for (const row of transactions) {
+  const containing = reviewCases.filter(item => item.groups?.some(group => group.members.some(member => member.txId === row.txId)))
+  row.alertIds = containing.filter(item => item.kind === 'ALERT').map(item => item.alertId!)
+  row.episodeIds = containing.filter(item => item.kind === 'EPISODE').map(item => item.caseId)
+}
+
+const notificationTargets = [alert, episode, openAlerts[0], generatedEpisodes[0],
+  openAlerts.find(item => item.outcome === 'NORMAL')!, generatedEpisodes.find(item => item.status === 'CLOSED')!]
+const notifications: WorkNotification[] = notificationTargets.map((item, index) => ({
+  id: `fixture-notification-${index + 1}`, kind: index < 2 ? item.kind === 'ALERT' ? 'ALERT_ASSIGNED' : 'EPISODE_LINKED' : item.status === 'CLOSED' ? 'REVIEW_RESULT' : 'OPINION_ADDED',
+  title: item.status === 'CLOSED' ? '종결된 사건 검토' : index < 2 ? item.kind === 'ALERT' ? '새 Alert 배정' : 'Episode 연결·생성' : '새 조사 의견',
+  description: `합성 예시 · ${item.assigneeName} 담당 · 거래 ${item.summary.txCount}건 · ${item.status === 'CLOSED' ? '종결 결과 확인' : '근거 거래와 조사 의견 확인'}`,
+  code: item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`, at: at(15 - index % 2, 8),
+  read: index >= 3, count: 1, caseId: item.caseId, caseKind: item.kind,
+}))
+// Opinion notifications point to an explicit synthetic history event, never an implied server write.
+for (const notification of notifications.filter(row => row.kind === 'OPINION_ADDED')) {
+  const target = reviewCases.find(row => row.caseId === notification.caseId)!
+  target.history = [...(target.history ?? []), { eventId: 10000 + target.caseId, action: 'COMMENT',
+    comment: '합성 검수 의견: 원거래와 거래 목적을 추가 확인합니다. 최종 판정은 유보합니다.',
+    businessAt: notification.at, recordedAt: notification.at, actor: '가상 분석자' }]
+}
+// Only this benign preview interaction changes memory; review/auth/other HTTP writes remain blocked.
+const notificationRead = new Map(notifications.map(item => [item.id, item.read]))
+export function setFixtureNotificationsRead(ids: string[], read: boolean) {
+  if (!ids.every(id => notificationRead.has(id))) throw new Error('존재하지 않는 합성 알림입니다.')
+  ids.forEach(id => notificationRead.set(id, read))
+}
 
 const openAlertsCount = reviewCases.filter(row => row.kind === 'ALERT' && row.status === 'OPEN').length
 const openEpisodesCount = reviewCases.filter(row => row.kind === 'EPISODE' && row.status === 'OPEN').length
 const myCases = reviewCases.filter(row => row.assigneeId === 11)
 const myOpen = myCases.filter(row => row.status === 'OPEN')
-const dashboard: DashboardSummary = { businessAt, range: { from: '2026-09-16', to: '2026-10-15' },
-  pipeline: { computedAt: businessAt, data: { detection: { received: 1820, analyzed: 1792, suspicious: 138, deliveryDates: ['2026-10-14', '2026-10-15'] },
-    pendingReports: 6, agreements: [{ agreement: 'STRONG', count: 53 }, { agreement: 'ATYPICAL', count: 85 }, { agreement: 'PATTERN_ONLY', count: 250 }, { agreement: 'WEAK', count: 1404 }],
-    // The server's type distribution includes code 0 among suspicious transactions.
-    // These counts are illustrative, not inferred from the Kaggle labels or graph-block metadata.
-    types: [85, 10, 9, 8, 7, 6, 5, 4, 4].map((count, type) => ({ type, count })) } },
+const fixtureDate = businessAt.slice(0, 10)
+const alertCases = reviewCases.filter(item => item.kind === 'ALERT')
+const openEpisodeCases = reviewCases.filter(item => item.kind === 'EPISODE' && item.status === 'OPEN')
+const analyzed = transactions.filter(row => row.isSuspicious !== null)
+const suspicious = analyzed.filter(row => row.isSuspicious)
+const modelComposition = (rows: LedgerTransaction[]) => ({
+  agreements: ['STRONG', 'ATYPICAL', 'PATTERN_ONLY', 'WEAK'].map(agreement => ({ agreement, count: rows.filter(row =>
+    (row.isSuspicious ? row.typeClass ? 'STRONG' : 'ATYPICAL' : row.typeClass ? 'PATTERN_ONLY' : 'WEAK') === agreement).length })),
+  types: Array.from({ length: 9 }, (_, type) => ({ type, count: rows.filter(row => row.isSuspicious && row.typeClass === type).length })),
+})
+const displayState = (item: ReviewCase) => item.episodeId != null
+  ? reviewCases.find(row => row.caseId === item.episodeId)?.status === 'CLOSED' ? 'done' : 'inProgress'
+  : item.status === 'CLOSED' ? 'done' : 'pending'
+const dailyAlertStatus = Array.from({ length: 14 }, (_, index) => {
+  const date = `2026-10-${String(index + 2).padStart(2, '0')}`
+  const cohort = alertCases.filter(row => row.createdAt.slice(0, 10) === date)
+  return { date, pending: cohort.filter(row => displayState(row) === 'pending').length,
+    inProgress: cohort.filter(row => displayState(row) === 'inProgress').length, done: cohort.filter(row => displayState(row) === 'done').length }
+})
+const dashboard: DashboardSummary = { businessAt, range: { from: '2026-09-16', to: fixtureDate },
+  pipeline: { computedAt: businessAt, data: { detection: { received: transactions.length, analyzed: analyzed.length, suspicious: suspicious.length, deliveryDates: [fixtureDate] },
+    pendingReports: 0,
+    // Synthetic binary/type combinations only, never a model evaluation result.
+    ...modelComposition(analyzed) } },
   investigation: { computedAt: businessAt, data: { personal: { pending: myOpen.length, aged: myOpen.filter(row => row.ageDays >= 3).length, closed: myCases.filter(row => row.status === 'CLOSED').length },
-    institution: { alerts: openAlertsCount, episodes: openEpisodesCount, aged: 15, today: 8, yesterday: 11 },
-    openAlertsAgedOver3Days: reviewCases.filter(row => row.kind === 'ALERT' && row.status === 'OPEN' && row.ageDays > 3).length,
-    daily: Array.from({ length: 14 }, (_, index) => ({ date: `2026-10-${String(index + 1).padStart(2, '0')}`, incoming: 4 + index % 5, completed: 2 + index % 4 })),
-    dailyAlertStatus: Array.from({ length: 14 }, (_, index) => ({ date: `2026-10-${String(index + 1).padStart(2, '0')}`, pending: 9 + index % 6, inProgress: 5 + index % 4, done: 3 + index % 3 })),
-    episodeWork: { current: { open: openEpisodesCount, aged: 7, unreviewed: 12, createdToday: 3, closedToday: 2 },
-      firstReview: { samples: 19, averageSeconds: 2320 }, completion: { samples: 11, averageSeconds: 5290 } } } } }
+    institution: { alerts: openAlertsCount, episodes: openEpisodesCount, aged: myOpen.filter(row => row.ageDays >= 3).length,
+      today: alertCases.filter(row => row.createdAt.slice(0, 10) === fixtureDate).length,
+      yesterday: alertCases.filter(row => row.createdAt.slice(0, 10) === '2026-10-14').length },
+    openAlertsAgedOver3Days: alertCases.filter(row => row.status === 'OPEN' && row.ageDays > 3).length,
+    daily: dailyAlertStatus.map(row => ({ date: row.date, incoming: row.pending + row.inProgress + row.done, completed: alertCases.filter(item => item.closedAt?.slice(0, 10) === row.date).length })),
+    dailyAlertStatus,
+    episodeWork: { current: { open: openEpisodeCases.length, aged: openEpisodeCases.filter(row => row.ageDays >= 3).length,
+      unreviewed: openEpisodeCases.filter(row => !row.history?.some(event => event.action === 'REVIEW_START')).length,
+      createdToday: reviewCases.filter(row => row.kind === 'EPISODE' && row.createdAt.slice(0, 10) === fixtureDate).length,
+      closedToday: reviewCases.filter(row => row.kind === 'EPISODE' && row.closedAt?.slice(0, 10) === fixtureDate).length },
+      firstReview: { samples: 0, averageSeconds: null }, completion: { samples: 0, averageSeconds: null } } } } }
 
 const dateMatches = (iso: string, url: URL) => (!url.searchParams.get('from') || iso.slice(0, 10) >= url.searchParams.get('from')!)
   && (!url.searchParams.get('to') || iso.slice(0, 10) <= url.searchParams.get('to')!)
@@ -195,8 +275,18 @@ const riskMatches = (score: number, values: string[]) => !values.length || value
 export function fixtureGet(path: string): unknown {
   const url = new URL(path, 'http://fixture.invalid')
   const route = url.pathname
+  if (route === '/api/me') return { id: 11, username: 'fixture-staff', name: '가상 분석자', role: 'STAFF' }
   if (route === '/api/v1/demo/clock') return { businessAt, configured: true, revision: 1 }
-  if (route === '/api/v1/dashboard/summary') return dashboard
+  if (route === '/api/v1/dashboard/summary') {
+    // Synthetic detected-at dates equal transaction dates in this fixture only.
+    // The actual API scopes these charts by model detected_at, not ledger occurredAt.
+    const scoped = analyzed.filter(row => dateMatches(row.occurredAt, url))
+    return { ...dashboard, range: { from: url.searchParams.get('from') || dashboard.range.from, to: url.searchParams.get('to') || dashboard.range.to },
+      pipeline: { ...dashboard.pipeline, data: { ...dashboard.pipeline.data!, ...modelComposition(scoped) } },
+      investigation: { ...dashboard.investigation, data: { ...dashboard.investigation.data!,
+        daily: dashboard.investigation.data!.daily.filter(row => dateMatches(row.date, url)),
+        dailyAlertStatus: dashboard.investigation.data!.dailyAlertStatus.filter(row => dateMatches(row.date, url)) } } }
+  }
   if (route === '/api/v1/demo/users') return staff
   if (route === '/api/v1/review/payment-formats') return formats
   if (route === '/api/v1/review/cases') {
@@ -242,6 +332,13 @@ export function fixtureGet(path: string): unknown {
     const owners = [...new Map(matchingAccounts.map(row => [row.ownerId, { id: row.ownerId, name: row.ownerName } satisfies LedgerOwner])).values()]
     return page(owners, url)
   }
-  if (route === '/api/v1/notifications') return { content: [], number: 0, size: 20, totalElements: 0, totalPages: 0, unreadCount: 0 }
+  if (route === '/api/v1/notifications') {
+    const query = (url.searchParams.get('query') ?? '').trim().toLowerCase()
+    const content = notifications.map(item => ({ ...item, read: notificationRead.get(item.id)! }))
+      .filter(item => dateMatches(item.at, url) && (!query || `${item.code} ${item.title} ${item.description}`.toLowerCase().includes(query)))
+      .sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id))
+    const result = page(content, url)
+    return { ...result, number: result.page, unreadCount: [...notificationRead.values()].filter(read => !read).length }
+  }
   throw new Error(`합성 데이터가 준비되지 않은 경로: ${route}`)
 }
