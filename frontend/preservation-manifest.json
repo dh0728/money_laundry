@@ -5,21 +5,22 @@
   "source_repository": "dh0728/money_laundry",
   "source_local_commit": "71c29033e7eee1cc3fc1e7628d088a43874dbd46",
   "published_pre_rename_base": "35cec7a36942133ecee5cdaada491cc1b0718943",
-  "mirror_relation": "team frontend == Archive project/frontend; original Archive Prototype is separate and preserved",
+  "mirror_relation": "PRESERVATION.md and the selected dated recovery files are byte-identical to Archive commit f3cda3d7886b017ec78b30f1db982b913c15fc48. This team-local inventory records the selected synchronization scope and therefore differs from Archive preservation-manifest.json.",
   "version_count": 26,
-  "file_count_excluding_this_manifest": 1833,
+  "file_count_excluding_this_manifest": 1848,
   "files": [
     {
       "path": "PRESERVATION.md",
       "team_path": "frontend/PRESERVATION.md",
       "archive_path": "frontend/PRESERVATION.md",
-      "sha256": "ed89444d5f539e990645de403fe576538c8022488a284aa685b1db9ce26383e8",
-      "bytes": 8004,
+      "sha256": "a47733f554bcc87585b3fb1c3507dab08a52c51259e6521f394b95732b2bdc8e",
+      "bytes": 136072,
       "role": "new version record / verification / preservation tooling",
       "origin": {
         "created_on": "2026-10-26",
         "historical_original": false
-      }
+      },
+      "recovery_update": "2026-10-26; same-document per-revision history and explicit source/preview limits; team ac97eab5 mirror pending parent coordination"
     },
     {
       "path": "README.md",
@@ -25468,6 +25469,237 @@
       }
     },
     {
+      "path": "recovery/1.x-unassigned/2026-10-26/README.md",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/README.md",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/README.md",
+      "sha256": "20f4e390b1b20f8b5c508b82a10a957d6d03a7596956cf0802abbfe30f6818c0",
+      "bytes": 3534,
+      "role": "unassigned recovery provenance/index",
+      "origin": {
+        "created_on": "2026-10-26",
+        "historical_original": false
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-css3d-reference-20261015/aml-api-wiring-3d-2026-10-15-snapshot.html",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-css3d-reference-20261015/aml-api-wiring-3d-2026-10-15-snapshot.html",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-css3d-reference-20261015/aml-api-wiring-3d-2026-10-15-snapshot.html",
+      "sha256": "a62e893860b4374259fe8c7ff82814eb5448980df906ba3dc7b0ce6a3a56e030",
+      "bytes": 294200,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/money_laundry/Frontend/Media/css3d-wiring-tool/references/aml-api-wiring-3d-2026-10-15-snapshot.html",
+        "source_sha256": "a62e893860b4374259fe8c7ff82814eb5448980df906ba3dc7b0ce6a3a56e030"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-BrsIhYzJ.css",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-BrsIhYzJ.css",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-BrsIhYzJ.css",
+      "role": "unassigned preserved independent compiled build",
+      "origin": {
+        "source_repository": "knowledge_archive",
+        "source_commit": "f3cda3d7886b017ec78b30f1db982b913c15fc48",
+        "source_path": "Sources/Experience/2026 인공지능사관학교 7기/자금세탁소/frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-BrsIhYzJ.css",
+        "historical_original": false,
+        "preserved_from_existing_Mac_build": true,
+        "design_minor": null,
+        "acceptance": "unreviewed independent build; not latest approved UI"
+      },
+      "sha256": "d7672a91d658dee6c42f9eaeae036ab1842761165e1081016f5300d8bffe0d85",
+      "bytes": 26887
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-Da113Wnh.js",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-Da113Wnh.js",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-Da113Wnh.js",
+      "role": "unassigned preserved independent compiled build",
+      "origin": {
+        "source_repository": "knowledge_archive",
+        "source_commit": "f3cda3d7886b017ec78b30f1db982b913c15fc48",
+        "source_path": "Sources/Experience/2026 인공지능사관학교 7기/자금세탁소/frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-Da113Wnh.js",
+        "historical_original": false,
+        "preserved_from_existing_Mac_build": true,
+        "design_minor": null,
+        "acceptance": "unreviewed independent build; not latest approved UI"
+      },
+      "sha256": "3ca0466f697a3a69bb5b3ee1b8b9d0ce2a29a92a2e171612395ea020037c6d51",
+      "bytes": 418999
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/index.html",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/index.html",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/index.html",
+      "role": "unassigned preserved independent compiled build",
+      "origin": {
+        "source_repository": "knowledge_archive",
+        "source_commit": "f3cda3d7886b017ec78b30f1db982b913c15fc48",
+        "source_path": "Sources/Experience/2026 인공지능사관학교 7기/자금세탁소/frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/index.html",
+        "historical_original": false,
+        "preserved_from_existing_Mac_build": true,
+        "design_minor": null,
+        "acceptance": "unreviewed independent build; not latest approved UI"
+      },
+      "sha256": "95bcb57e3ecfa240ca3f7b277ac0f69bf7c7d7430fc9980782004ba5aa69f611",
+      "bytes": 423
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/manifest.json",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/manifest.json",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/manifest.json",
+      "role": "unassigned historical build preservation metadata",
+      "origin": {
+        "source_repository": "knowledge_archive",
+        "source_commit": "f3cda3d7886b017ec78b30f1db982b913c15fc48",
+        "source_path": "Sources/Experience/2026 인공지능사관학교 7기/자금세탁소/frontend/recovery/1.x-unassigned/2026-10-26/mac-independent-rebuild-dist-20261021/manifest.json",
+        "historical_original": false,
+        "preserved_from_existing_Mac_build": true,
+        "design_minor": null,
+        "acceptance": "unreviewed independent build; not latest approved UI"
+      },
+      "sha256": "f74c5f6420b39f12c347fd1499cd37dba0e2202b4df91bcb3935f5bc5d9228c0",
+      "bytes": 4911
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-overview-review-20261023/aml-team-review-20261023.html",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-overview-review-20261023/aml-team-review-20261023.html",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-overview-review-20261023/aml-team-review-20261023.html",
+      "sha256": "d211b797cab013ffdc939e10956d8c8e2a235ba65f0d79a829110390deb64599",
+      "bytes": 10489,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/money_laundry/Frontend/Media/aml-team-review-20261023.html",
+        "source_sha256": "d211b797cab013ffdc939e10956d8c8e2a235ba65f0d79a829110390deb64599"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-overview-states-20261014/aml-overview-responsive-states-20261014.html",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-overview-states-20261014/aml-overview-responsive-states-20261014.html",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-overview-states-20261014/aml-overview-responsive-states-20261014.html",
+      "sha256": "35d8a10d7ed23f985f3dae2d9b66fde37a73e8120de9f9c89fc1fac35bb984c6",
+      "bytes": 24232,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/money_laundry/Frontend/산출물 색인/Attachments/Historical UI/aml-overview-responsive-states-20261014.html",
+        "source_sha256": "35d8a10d7ed23f985f3dae2d9b66fde37a73e8120de9f9c89fc1fac35bb984c6"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/aml-evolution-review.html",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/aml-evolution-review.html",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/aml-evolution-review.html",
+      "sha256": "b9a5924b78da0b0306342c15be7f9aaaa7e609476f142272c8b81b88918e1fdf",
+      "bytes": 104400,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/fe-be-wiring/Examples/money_laundry/aml-evolution-review.html",
+        "source_sha256": "b9a5924b78da0b0306342c15be7f9aaaa7e609476f142272c8b81b88918e1fdf"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/data/html-review-inventory.json",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/data/html-review-inventory.json",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/data/html-review-inventory.json",
+      "sha256": "40b540c107211869db9707ee90e74c26e3e2b9f2224de00f576c6f1f9018406c",
+      "bytes": 56692,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/fe-be-wiring/Examples/money_laundry/data/html-review-inventory.json",
+        "source_sha256": "40b540c107211869db9707ee90e74c26e3e2b9f2224de00f576c6f1f9018406c"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/aml-current.css",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/aml-current.css",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/aml-current.css",
+      "sha256": "65a39918d9a9af0313711c610d1fe5d1d80a1e32af3b9c054b4bcf25a83a9670",
+      "bytes": 152486,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/fe-be-wiring/Examples/money_laundry/review-assets/aml-current.css",
+        "source_sha256": "65a39918d9a9af0313711c610d1fe5d1d80a1e32af3b9c054b4bcf25a83a9670"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/overview-after-evidence-flow-20261022.png",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/overview-after-evidence-flow-20261022.png",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/overview-after-evidence-flow-20261022.png",
+      "sha256": "cbeccd7b5e3850b96ba3f91b1daf6132a6a57865276fbbbe363318cc445128eb",
+      "bytes": 69220,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/fe-be-wiring/Examples/money_laundry/review-assets/overview-after-evidence-flow-20261022.png",
+        "source_sha256": "cbeccd7b5e3850b96ba3f91b1daf6132a6a57865276fbbbe363318cc445128eb"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/overview-before-evidence-flow-20261022.png",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/overview-before-evidence-flow-20261022.png",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-pairview-history-20261022/review-assets/overview-before-evidence-flow-20261022.png",
+      "sha256": "9dcba5e2265e26fb23d683e35b2e5682974404f58af692283bbc1acf8b50afc7",
+      "bytes": 63631,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/fe-be-wiring/Examples/money_laundry/review-assets/overview-before-evidence-flow-20261022.png",
+        "source_sha256": "9dcba5e2265e26fb23d683e35b2e5682974404f58af692283bbc1acf8b50afc7"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/mac-scroll-proof-reference/scroll-proof-old-worktree.html",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-scroll-proof-reference/scroll-proof-old-worktree.html",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/mac-scroll-proof-reference/scroll-proof-old-worktree.html",
+      "sha256": "4f927833546287c97f3dea4f60aab4430d5b6a304f489a96ed8ac48434a3f1a1",
+      "bytes": 5500,
+      "role": "reviewed byte-identical recovered original",
+      "origin": {
+        "repository": "external_brain",
+        "path": "Workspace/Projects/money_laundry/Frontend/산출물 색인/Attachments/Historical UI/scroll-proof-old-worktree.html",
+        "source_sha256": "4f927833546287c97f3dea4f60aab4430d5b6a304f489a96ed8ac48434a3f1a1"
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26/manifest.json",
+      "team_path": "frontend/recovery/1.x-unassigned/2026-10-26/manifest.json",
+      "archive_path": "frontend/recovery/1.x-unassigned/2026-10-26/manifest.json",
+      "sha256": "bb69e82c27d52a39fe4fc16c90539408993559581816ab48f8c3514019826e54",
+      "bytes": 17846,
+      "role": "unassigned recovery provenance/index",
+      "origin": {
+        "created_on": "2026-10-26",
+        "historical_original": false
+      },
+      "version_assignment": null,
+      "team_sync_status": "pending; not applied to team"
+    },
+    {
       "path": "tools/verify-preservation.py",
       "team_path": "frontend/tools/verify-preservation.py",
       "archive_path": "frontend/tools/verify-preservation.py",
@@ -25510,7 +25742,9 @@
     {
       "id": "mac-unique-html",
       "count": 5,
-      "state": "not received or integrated; source and dependent assets must be preserved together"
+      "state": "five reviewed HTML, four dependencies and independent three-file build are present in cloud team fe/work; team remote pending403",
+      "manifest": "recovery/1.x-unassigned/2026-10-26/manifest.json",
+      "dependency_files": 4
     },
     {
       "id": "mac-design-originals-and-local-evidence",
@@ -25531,7 +25765,28 @@
     "collision": "Never overwrite or delete. If path exists compare hashes; preserve distinct bytes under a distinct source-id and record lineage.",
     "privacy": "Only approved project artifacts may be added to the shared bundle. Private notes/meetings/secrets remain outside it.",
     "Figma": "no access or changes in this task",
-    "Mac_workflow": "Parent coordinates writers; this cloud pass does not receive or classify unseen local files as duplicates."
+    "Mac_workflow": "Parent coordinates writers; this cloud pass does not receive or classify unseen local files as duplicates.",
+    "unassigned_recovery": "recovery/1.x-unassigned/<recovery-date>/<source-id>/; source dates do not assign product minor"
   },
-  "remote_status": "team push denied403; no retry; current mirror preparation is cloud-local until separately published"
+  "remote_status": "Cloud team local synchronization prepared; team remote unchanged;403 push/dry-run/bypass prohibited.",
+  "unassigned_recovery_collections": [
+    {
+      "path": "recovery/1.x-unassigned/2026-10-26",
+      "manifest": "recovery/1.x-unassigned/2026-10-26/manifest.json",
+      "readme": "recovery/1.x-unassigned/2026-10-26/README.md",
+      "original_files": 9,
+      "semantic_minor": null,
+      "team_application": "prepared in cloud fe/work; not pushed"
+    }
+  ],
+  "document_sync": {
+    "archive_commit": "f3cda3d7886b017ec78b30f1db982b913c15fc48",
+    "team_previous_commit": "ac97eab5ccb15abe7ca9a63744c289f6e41423e0",
+    "relative_link_occurrences": 101,
+    "unique_relative_files": 98,
+    "upstream_manifest_sha256": "be9b4f837c5d9c308e80ebfab401e94afab6fa683070f1feb079bbd6e8be28e8",
+    "metadata_exception": "This manifest is team-local; all other97unique document targets match Archive bytes. Historical copied recovery manifests retain Archive-first team_state observations; this field records current cloud-team application.",
+    "source_manifest_boundary": "Archive listed owner-only reader files and updated owner README outside the selected document-link synchronization, while four independent-build files were not listed and its count field was stale. Archive not edited.",
+    "versions_json_status": "Existing26-version matrix retained as original baseline. Current dated recovery presence is recorded here and in recovery manifests; no new semantic version assigned."
+  }
 }
