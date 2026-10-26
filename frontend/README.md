@@ -46,7 +46,7 @@
  ## 실행
 
  저장소 루트에서 `cd frontend/implementation/1.0.0/web-app`, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`, `pnpm build`. 개별 역사 prototype은 해당 `prototype/0.N.0`에서 package-lock으로 `npm ci` 후 test/build한다. 현재 실행 여부는 각 환경에서 재확인한다.
- 
+
 
 ## 원격 반영 차단 — 2026-10-26
 

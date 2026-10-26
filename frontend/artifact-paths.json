@@ -19263,12 +19263,12 @@
   "created_files": [
     {
       "path": "frontend/README.md",
-      "sha256": "db93b7dfef417dfca297a08f9a51963ac8c3f5819095f9484d06db201489d670",
+      "sha256": "404f9dd9926c473b7cf4257aeb2afa3e7bde5bf3cf314252742feabb59087afb",
       "status": "migration index / verification evidence; not a new product design"
     },
     {
       "path": "frontend/design/2.0.0/README.md",
-      "sha256": "0dcab43635040dbb998f31ee91bc3a0b06f982ea3fe9cad2fef5bc3da793dfdd",
+      "sha256": "72a79b6b0923e6661dba80767362944860345f35b5ee5ba2010aea67c147e212",
       "status": "start baseline only; no design assets or acceptance"
     },
     {
