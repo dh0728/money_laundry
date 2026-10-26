@@ -2718,7 +2718,6 @@
         "implementation/1.0.0/web-app/.gitignore",
         "implementation/1.0.0/web-app/Dockerfile",
         "implementation/1.0.0/web-app/README.md",
-        "implementation/1.0.0/web-app/ant-review.html",
         "implementation/1.0.0/web-app/eslint.config.js",
         "implementation/1.0.0/web-app/index.html",
         "implementation/1.0.0/web-app/nginx.conf",
@@ -2726,9 +2725,6 @@
         "implementation/1.0.0/web-app/pnpm-lock.yaml",
         "implementation/1.0.0/web-app/public/favicon.svg",
         "implementation/1.0.0/web-app/public/icons.svg",
-        "implementation/1.0.0/web-app/qa/ant-investigation/PLAN.md",
-        "implementation/1.0.0/web-app/qa/ant-investigation/verification.json",
-        "implementation/1.0.0/web-app/qa/mvp-acceptance-2026-10-21.json",
         "implementation/1.0.0/web-app/src/api/alerts.ts",
         "implementation/1.0.0/web-app/src/api/auth.test.ts",
         "implementation/1.0.0/web-app/src/api/auth.ts",
@@ -2737,9 +2733,7 @@
         "implementation/1.0.0/web-app/src/api/dashboard.ts",
         "implementation/1.0.0/web-app/src/api/episodes.ts",
         "implementation/1.0.0/web-app/src/api/graph.ts",
-        "implementation/1.0.0/web-app/src/api/ledgerTarget.test.ts",
         "implementation/1.0.0/web-app/src/api/liveContracts.test.ts",
-        "implementation/1.0.0/web-app/src/api/liveDashboard.test.ts",
         "implementation/1.0.0/web-app/src/api/liveDashboard.ts",
         "implementation/1.0.0/web-app/src/api/liveLedger.ts",
         "implementation/1.0.0/web-app/src/api/liveReview.test.ts",
@@ -2748,13 +2742,11 @@
         "implementation/1.0.0/web-app/src/api/reviewCommands.test.ts",
         "implementation/1.0.0/web-app/src/api/reviewCommands.ts",
         "implementation/1.0.0/web-app/src/api/transactions.ts",
-        "implementation/1.0.0/web-app/src/api/wiringFixture.test.ts",
         "implementation/1.0.0/web-app/src/app/App.live.test.tsx",
         "implementation/1.0.0/web-app/src/app/App.test.tsx",
         "implementation/1.0.0/web-app/src/app/App.tsx",
         "implementation/1.0.0/web-app/src/app/SidebarCounts.tsx",
         "implementation/1.0.0/web-app/src/app/ThemeProvider.tsx",
-        "implementation/1.0.0/web-app/src/app/fontSize.ts",
         "implementation/1.0.0/web-app/src/app/navigation.ts",
         "implementation/1.0.0/web-app/src/app/session.test.ts",
         "implementation/1.0.0/web-app/src/app/session.ts",
@@ -2762,14 +2754,11 @@
         "implementation/1.0.0/web-app/src/assets/react.svg",
         "implementation/1.0.0/web-app/src/assets/vite.svg",
         "implementation/1.0.0/web-app/src/components/Brand.tsx",
-        "implementation/1.0.0/web-app/src/components/Callout.tsx",
         "implementation/1.0.0/web-app/src/components/CountBadge.tsx",
         "implementation/1.0.0/web-app/src/components/DateRangeButton.tsx",
         "implementation/1.0.0/web-app/src/components/FilterChip.tsx",
         "implementation/1.0.0/web-app/src/components/IconButton.tsx",
         "implementation/1.0.0/web-app/src/components/LoginNetwork.tsx",
-        "implementation/1.0.0/web-app/src/components/MockRole.tsx",
-        "implementation/1.0.0/web-app/src/components/NumBadge.tsx",
         "implementation/1.0.0/web-app/src/components/Provenance.tsx",
         "implementation/1.0.0/web-app/src/components/RefreshCountdown.test.tsx",
         "implementation/1.0.0/web-app/src/components/RefreshCountdown.tsx",
@@ -2829,8 +2818,6 @@
         "implementation/1.0.0/web-app/src/features/alerts/CaseActivityCharts.tsx",
         "implementation/1.0.0/web-app/src/features/alerts/CasePresentation.tsx",
         "implementation/1.0.0/web-app/src/features/alerts/DetailPanels.tsx",
-        "implementation/1.0.0/web-app/src/features/alerts/ExportDialog.tsx",
-        "implementation/1.0.0/web-app/src/features/alerts/RedesignOverview.tsx",
         "implementation/1.0.0/web-app/src/features/alerts/ReviewLayout.tsx",
         "implementation/1.0.0/web-app/src/features/alerts/activityAmounts.test.ts",
         "implementation/1.0.0/web-app/src/features/alerts/activityAmounts.ts",
@@ -2849,8 +2836,6 @@
         "implementation/1.0.0/web-app/src/features/dashboard/AiDailyReport.tsx",
         "implementation/1.0.0/web-app/src/features/dashboard/AlertFlowChart.tsx",
         "implementation/1.0.0/web-app/src/features/dashboard/DashboardPresentation.tsx",
-        "implementation/1.0.0/web-app/src/features/dashboard/EpisodeWork.tsx",
-        "implementation/1.0.0/web-app/src/features/dashboard/Freshness.tsx",
         "implementation/1.0.0/web-app/src/features/dashboard/InstitutionView.tsx",
         "implementation/1.0.0/web-app/src/features/dashboard/LiveWorkQueue.test.tsx",
         "implementation/1.0.0/web-app/src/features/dashboard/LiveWorkQueue.tsx",
@@ -2867,17 +2852,12 @@
         "implementation/1.0.0/web-app/src/features/episodes/EpisodeDetail.test.tsx",
         "implementation/1.0.0/web-app/src/features/episodes/EpisodeDetail.tsx",
         "implementation/1.0.0/web-app/src/features/episodes/EpisodeList.tsx",
-        "implementation/1.0.0/web-app/src/features/episodes/EpisodeOverview.tsx",
         "implementation/1.0.0/web-app/src/features/episodes/EpisodeReview.tsx",
         "implementation/1.0.0/web-app/src/features/episodes/LinkedAlerts.tsx",
         "implementation/1.0.0/web-app/src/features/episodes/episodeFilters.test.ts",
         "implementation/1.0.0/web-app/src/features/episodes/episodeFilters.ts",
         "implementation/1.0.0/web-app/src/features/episodes/episodes.test.ts",
         "implementation/1.0.0/web-app/src/features/episodes/reviewStore.ts",
-        "implementation/1.0.0/web-app/src/features/graph/0.24.0/FlowDetail.tsx",
-        "implementation/1.0.0/web-app/src/features/graph/0.24.0/Graph.tsx",
-        "implementation/1.0.0/web-app/src/features/graph/0.24.0/OwnerGraph.tsx",
-        "implementation/1.0.0/web-app/src/features/graph/0.24.0/model.ts",
         "implementation/1.0.0/web-app/src/features/graph/TxLabelPanel.tsx",
         "implementation/1.0.0/web-app/src/features/graph/adapter.ts",
         "implementation/1.0.0/web-app/src/features/graph/graph.test.ts",
@@ -2885,22 +2865,15 @@
         "implementation/1.0.0/web-app/src/features/graph/liveAdapter.test.ts",
         "implementation/1.0.0/web-app/src/features/graph/liveAdapter.ts",
         "implementation/1.0.0/web-app/src/features/graph/relabel.ts",
-        "implementation/1.0.0/web-app/src/features/graph/timeline/PairTimeline.tsx",
-        "implementation/1.0.0/web-app/src/features/graph/timeline/PatternGraph.tsx",
-        "implementation/1.0.0/web-app/src/features/graph/timeline/SelectionActions.tsx",
-        "implementation/1.0.0/web-app/src/features/graph/timeline/TimeGraph.tsx",
-        "implementation/1.0.0/web-app/src/features/graph/timeline/timeLayout.test.ts",
-        "implementation/1.0.0/web-app/src/features/graph/timeline/timeLayout.ts",
-        "implementation/1.0.0/web-app/src/features/investigation/AntInvestigation.test.tsx",
-        "implementation/1.0.0/web-app/src/features/investigation/AntInvestigation.tsx",
-        "implementation/1.0.0/web-app/src/features/investigation/AntReviewSite.tsx",
-        "implementation/1.0.0/web-app/src/features/investigation/ant-main.tsx",
+        "implementation/1.0.0/web-app/src/features/graph/v24/FlowDetail.tsx",
+        "implementation/1.0.0/web-app/src/features/graph/v24/Graph.tsx",
+        "implementation/1.0.0/web-app/src/features/graph/v24/OwnerGraph.tsx",
+        "implementation/1.0.0/web-app/src/features/graph/v24/model.ts",
         "implementation/1.0.0/web-app/src/features/notifications/AssignedCases.tsx",
         "implementation/1.0.0/web-app/src/features/search/GlobalSearch.tsx",
         "implementation/1.0.0/web-app/src/features/search/LiveGlobalSearch.test.tsx",
         "implementation/1.0.0/web-app/src/features/search/LiveGlobalSearch.tsx",
         "implementation/1.0.0/web-app/src/features/search/searchItems.ts",
-        "implementation/1.0.0/web-app/src/features/settings/AdminSettings.tsx",
         "implementation/1.0.0/web-app/src/features/transactions/TransactionExplorer.tsx",
         "implementation/1.0.0/web-app/src/features/transactions/transaction-stage.tsx",
         "implementation/1.0.0/web-app/src/features/transactions/transactionIndex.ts",
@@ -2921,10 +2894,6 @@
         "implementation/1.0.0/web-app/src/lib/useAsync.test.tsx",
         "implementation/1.0.0/web-app/src/lib/useAsync.ts",
         "implementation/1.0.0/web-app/src/lib/utils.ts",
-        "implementation/1.0.0/web-app/src/lib/wiringBridge.ant.test.ts",
-        "implementation/1.0.0/web-app/src/lib/wiringBridge.live.test.ts",
-        "implementation/1.0.0/web-app/src/lib/wiringBridge.test.ts",
-        "implementation/1.0.0/web-app/src/lib/wiringBridge.ts",
         "implementation/1.0.0/web-app/src/lib/workStatus.ts",
         "implementation/1.0.0/web-app/src/lib/workspaceState.ts",
         "implementation/1.0.0/web-app/src/main.tsx",
@@ -2933,8 +2902,6 @@
         "implementation/1.0.0/web-app/src/mocks/dashboard.ts",
         "implementation/1.0.0/web-app/src/mocks/episodes.ts",
         "implementation/1.0.0/web-app/src/mocks/graph.ts",
-        "implementation/1.0.0/web-app/src/mocks/liveFixtureApi.test.ts",
-        "implementation/1.0.0/web-app/src/mocks/liveFixtureApi.ts",
         "implementation/1.0.0/web-app/src/mocks/mocks.test.ts",
         "implementation/1.0.0/web-app/src/mocks/notifications.test.ts",
         "implementation/1.0.0/web-app/src/mocks/notifications.ts",
@@ -2962,11 +2929,7 @@
         "implementation/1.0.0/web-app/src/pages/LivePages.test.tsx",
         "implementation/1.0.0/web-app/src/pages/LoginPage.tsx",
         "implementation/1.0.0/web-app/src/pages/NotificationsPage.tsx",
-        "implementation/1.0.0/web-app/src/pages/OperationsPage.tsx",
-        "implementation/1.0.0/web-app/src/pages/RulesPage.fixture.test.tsx",
-        "implementation/1.0.0/web-app/src/pages/RulesPage.tsx",
         "implementation/1.0.0/web-app/src/pages/SettingsPage.tsx",
-        "implementation/1.0.0/web-app/src/pages/SuspiciousPage.tsx",
         "implementation/1.0.0/web-app/src/pages/TransactionsPage.test.tsx",
         "implementation/1.0.0/web-app/src/pages/TransactionsPage.tsx",
         "implementation/1.0.0/web-app/src/styles/theme.css",
@@ -2980,71 +2943,2268 @@
       ],
       "original_html": [],
       "entry_html": [
-        "implementation/1.0.0/web-app/index.html",
-        "implementation/1.0.0/web-app/ant-review.html"
+        "implementation/1.0.0/web-app/index.html"
       ],
-      "generated_html": [
-        "implementation/1.0.0/preservation/2026-10-26/index.html",
-        "implementation/1.0.0/preservation/2026-10-26/ant-review.html"
-      ],
-      "snapshot_files": [
-        "implementation/1.0.0/preservation/2026-10-26/ant-review.html",
-        "implementation/1.0.0/preservation/2026-10-26/assets/Graph-BT-VRQbS.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/liveFixtureApi-DgbFEDJm.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/main-DLioOiRN.css",
-        "implementation/1.0.0/preservation/2026-10-26/assets/main-kwCpQ_Am.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/react-DK-MTtD8.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/react-force-graph-2d-TvaAfitE.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/review-B5BXDqMa.css",
-        "implementation/1.0.0/preservation/2026-10-26/assets/review-D_rBJBeq.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/src-Cq-dprTy.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/wiringBridge-B4eGEqkh.js",
-        "implementation/1.0.0/preservation/2026-10-26/assets/wiringBridge-CZkG00my.css",
-        "implementation/1.0.0/preservation/2026-10-26/favicon.svg",
-        "implementation/1.0.0/preservation/2026-10-26/icons.svg",
-        "implementation/1.0.0/preservation/2026-10-26/index.html"
-      ],
+      "generated_html": [],
       "version_record": "implementation/1.0.0/VERSION.md",
       "verification": "implementation/1.0.0/VERIFICATION.json",
       "related_design": [
-        "implementation/1.0.0/DESIGN.md",
-        "implementation/1.0.0/web-app/README.md"
+        "implementation/1.0.0/SOURCE.json"
       ],
-      "run": "mock source: VITE_API_MODE=mock pnpm exec vite --host 127.0.0.1 --port 5210 --strictPort; #alerts/3001 then graph tab. Static bundle: serve preservation/2026-10-26 over loopback HTTP; index.html#alerts/3001 then graph tab. No Backend, DB, or credentials.",
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
       "source": {
-        "repository": "dh0728/money_laundry",
-        "local_commit": "71c29033e7eee1cc3fc1e7628d088a43874dbd46",
-        "snapshot_build": "VITE_API_MODE=mock pnpm exec vite build --base ./ --outDir <new isolated output>",
-        "node": "24.19.0",
-        "vite": "8.2.2"
+        "schema_version": 1,
+        "version": "1.0.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "baseline",
+        "name": "중간발표 이후 구현 기준",
+        "git_committer_kst": "2026-10-04T17:58:56+09:00",
+        "source_repository": "money_laundry",
+        "source_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+        "original_source_path": "frontend/web-app",
+        "original_source_url": "https://github.com/dh0728/money_laundry/tree/b28caff2086fbf83cb78ad40ba89b74a2ef3e69d/frontend/web-app",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [],
+        "original_files": [
+          {
+            "path": ".dockerignore",
+            "source_blob": "d1f8be7f3c4bc2e1d9c009f7bcacbfdfcd500d35",
+            "sha256": "973120ea1f9e424c1e263c5d8d448f4cd1842b412b6b0e0b4febad63940bf279",
+            "bytes": 157
+          },
+          {
+            "path": ".gitignore",
+            "source_blob": "a547bf36d8d11a4f89c59c144f24795749086dd1",
+            "sha256": "fe718e7babb14f3cbad2d97f08889b9ce5215ed3fe0e43b2b8cfbfb3b9b844e8",
+            "bytes": 253
+          },
+          {
+            "path": "Dockerfile",
+            "source_blob": "677504ce76b6b30c1b9495c765acceb0a764c6e1",
+            "sha256": "93661194363784099a916b7ad0227752d4445512249a077130048dc9552f77ac",
+            "bytes": 902
+          },
+          {
+            "path": "README.md",
+            "source_blob": "c9029329bd1e8abdae16fbb35ecb9c3e6521b96e",
+            "sha256": "bcff521e8fa5183fc77d5a282c23b42eb741041e6031730bdd7ef506d99c5860",
+            "bytes": 924
+          },
+          {
+            "path": "eslint.config.js",
+            "source_blob": "7efe27a137d92910b33d4346d92458c29015db7e",
+            "sha256": "41fb85545f3675c5536e54050cc50bb66fb43353581c97dd52d0d22bca12a7c9",
+            "bytes": 1928
+          },
+          {
+            "path": "index.html",
+            "source_blob": "df65798bdf2e105f52991fc7646d28209d91bad7",
+            "sha256": "4c56f40e92f860678c9d7d0b38690df350e72459a167917e419d805e7436d642",
+            "bytes": 361
+          },
+          {
+            "path": "nginx.conf",
+            "source_blob": "092efc588253a75c483ebd8b47a815cdeea2ad59",
+            "sha256": "8bc69a00c21a88b6f8e84eb80b24ab696d13b46c371ef32252f54e934d1a2298",
+            "bytes": 730
+          },
+          {
+            "path": "package.json",
+            "source_blob": "3cac420ead36a350d0f7f72dab2cdde7cf7a069f",
+            "sha256": "1c3d45df247f7a420159c883a93898f04fe3cbc8617d31a427db91b2f0cb18c7",
+            "bytes": 1564
+          },
+          {
+            "path": "pnpm-lock.yaml",
+            "source_blob": "80bea7c08f00d0f6f8327cdb63d693cfc51d1633",
+            "sha256": "13818fa9f3161c6af1cc9b95f48faf64a183656ca47fd2a4e87dc592620333c0",
+            "bytes": 205733
+          },
+          {
+            "path": "public/favicon.svg",
+            "source_blob": "6893eb13237060adc0c968a690149a49faa2d7d3",
+            "sha256": "61bc9a161de58248288e6905425d7180f0624c2865007b97d763fdac12043a66",
+            "bytes": 9522
+          },
+          {
+            "path": "public/icons.svg",
+            "source_blob": "e9522193d9f796a9748e9ad8c952a5df73c87db9",
+            "sha256": "b45fa506195cfcdef406ba9f0c77b36ddc1a7c224040926ec70abc2fdea7b93a",
+            "bytes": 5031
+          },
+          {
+            "path": "src/api/alerts.ts",
+            "source_blob": "81c912906842996af39a0b64f753517be0769e93",
+            "sha256": "688fa4d5ed41c50c99ada2b727779870cd744451b37a178feed5daa37b604478",
+            "bytes": 4888
+          },
+          {
+            "path": "src/api/auth.test.ts",
+            "source_blob": "7bd9b4022a9757757f3db5b9aa385307376ac61b",
+            "sha256": "f23f8d6386135a49c1926ef3288dfc3558c2d1e89fa12e1c4a3f858fe8fb6bf8",
+            "bytes": 2686
+          },
+          {
+            "path": "src/api/auth.ts",
+            "source_blob": "bacb499c2a65e426ff933c23e178ba8cabe39af9",
+            "sha256": "0d497bbe6a7e4e00694dd1ee1efcdc82b443af2b877fcf06ea4b75f30bce9e31",
+            "bytes": 1109
+          },
+          {
+            "path": "src/api/codes.ts",
+            "source_blob": "368b7de662ffe22c8013820dfec9c95bc87b66b5",
+            "sha256": "689c44a668a38fe3cddbcd2c158b972d1112ce5a67e1b5916dd5a9c135b907c2",
+            "bytes": 1846
+          },
+          {
+            "path": "src/api/common.ts",
+            "source_blob": "1b5056a703c8e1b731836d60dafd6a28c54323ef",
+            "sha256": "0fd35e5f0589864258cbd3592d22c7b0794a47ee2bdf0846ed83e339eceebb6c",
+            "bytes": 2968
+          },
+          {
+            "path": "src/api/dashboard.ts",
+            "source_blob": "46ed4625029182b6d7ffb3ea34f534b499da7fe8",
+            "sha256": "33c35986ef32c0ba034277524be7b1f1f02cf5a8b33ba9ac2e81ef9d81ab8bb1",
+            "bytes": 2106
+          },
+          {
+            "path": "src/api/episodes.ts",
+            "source_blob": "a02cf62b7afcb50c3f340341da882bb33364bd8e",
+            "sha256": "3c84ddea57c3ba4f171752c0e55f03751756f9de10aa1d30cbefd1dbf310352f",
+            "bytes": 3100
+          },
+          {
+            "path": "src/api/graph.ts",
+            "source_blob": "10d1968603d8f1f8c5eb4b0cf853fe81612c9619",
+            "sha256": "24b2bf1dec0c7c3dcfcb5a9753e00860df62e640ab0454c72e89f23f93e3c131",
+            "bytes": 1268
+          },
+          {
+            "path": "src/api/liveContracts.test.ts",
+            "source_blob": "e539d8a66b77d546b48e545abf0f395f03e3828a",
+            "sha256": "6a02bb297a45be33e4596e7d8361b37bfa498e88a1399667a0b06f1cfc695dd3",
+            "bytes": 1612
+          },
+          {
+            "path": "src/api/liveDashboard.ts",
+            "source_blob": "8a5b1adf020a35a455d0e36a793086c02a72a299",
+            "sha256": "8421a2f470818b555bb7682f88034a683c092292bb5dadb7da9170c82b2d3046",
+            "bytes": 1977
+          },
+          {
+            "path": "src/api/liveLedger.ts",
+            "source_blob": "69f1cfb27ec0fac4a33ff03a779bb0df5ca853e8",
+            "sha256": "100056a5de289b404bacf0674caa84e23412870dced6e143e3b9cf04339498ec",
+            "bytes": 2414
+          },
+          {
+            "path": "src/api/liveReview.test.ts",
+            "source_blob": "ede63e68f9e1e5f6650d8a4ba833ce917d9cbe8e",
+            "sha256": "98d6a5e53870023319b53641f5e8612dc287353774f196a95bf8fb62f4d4ab88",
+            "bytes": 1896
+          },
+          {
+            "path": "src/api/liveReview.ts",
+            "source_blob": "56a46aefe16bc3561df24485b43c6c59fd347cfa",
+            "sha256": "86c850943f001a094d3522f8fd9b649f4693e114490b085529305563b8a6f6b3",
+            "bytes": 5366
+          },
+          {
+            "path": "src/api/notifications.ts",
+            "source_blob": "cb26bfd6fd7407b8ca485ca85984259ff545e381",
+            "sha256": "fdb8331ac90d9a36c55409c700ee92b21cd1a3ad8a5fdbf8f0dbfb94d7854f64",
+            "bytes": 1094
+          },
+          {
+            "path": "src/api/reviewCommands.test.ts",
+            "source_blob": "4af8f6754adb8ddc17dc3961d8ab9fc4d2e273a1",
+            "sha256": "b660bc646ad55fc8b255de15bde04d2bf945c213904d20dc16884b881576f4af",
+            "bytes": 3109
+          },
+          {
+            "path": "src/api/reviewCommands.ts",
+            "source_blob": "4237bb044fe64d0c4a6f6df7e3d60f9174d9e8d8",
+            "sha256": "f9a51410e11b255231d27ab06ab0011882b81c17e62b049a5a9fc38bd47269c9",
+            "bytes": 2928
+          },
+          {
+            "path": "src/api/transactions.ts",
+            "source_blob": "635fa9fc5551e39a5367b6f0d372b9e13aa018e3",
+            "sha256": "a8ac80dd803a18e210eca5ddc118250218cd4ff67d6a7118b7165aa736125fa5",
+            "bytes": 1091
+          },
+          {
+            "path": "src/app/App.live.test.tsx",
+            "source_blob": "c2e87ee4e42f0f10ac90d0d4f6374b7598947208",
+            "sha256": "f933bd05851a83815b28b158f3abab6d7040b03e2d5a40801a0efb5ac844d21e",
+            "bytes": 1034
+          },
+          {
+            "path": "src/app/App.test.tsx",
+            "source_blob": "a88e3a7ee3141728c6c71b8705666443012aa4a8",
+            "sha256": "17e627e1c222c13ad22155a9a0f5fd9d17c244421221c7cb418d1b15d31e2875",
+            "bytes": 14092
+          },
+          {
+            "path": "src/app/App.tsx",
+            "source_blob": "2edc2a713b204ad5efa0058066f729b374ecdda3",
+            "sha256": "8595012ac2bbe56d01535fa52db986ba5a444cb8bf3cf08b84ec2a11f1b9da3b",
+            "bytes": 17005
+          },
+          {
+            "path": "src/app/SidebarCounts.tsx",
+            "source_blob": "4a26a3e80013455e04bd84676b8bdaf9dc0582fb",
+            "sha256": "9bd17f474e8d477e5a42e74699f60a4ca2057a976b7c506745c2ceca374b2fff",
+            "bytes": 4023
+          },
+          {
+            "path": "src/app/ThemeProvider.tsx",
+            "source_blob": "0ef2455f5c160b2ddcd8c90c400ece6053b942a3",
+            "sha256": "63e25a66d39905c9ec43c97877a0daf9f88df734d2a6bd2ace810ac38b82d416",
+            "bytes": 2429
+          },
+          {
+            "path": "src/app/navigation.ts",
+            "source_blob": "a9af5ada69e92c4d471e3e4c747a729fc419ee24",
+            "sha256": "c0f8260b905eb4be801734cc24431ecfde75789be58a6dac2756844640f45382",
+            "bytes": 2467
+          },
+          {
+            "path": "src/app/session.test.ts",
+            "source_blob": "f2d544ef6919b49901a4d02448a81e47a92b7bf7",
+            "sha256": "57967c3f1bee85947adb131d04edbaabae878f967ff6391591d4898cc45240dc",
+            "bytes": 533
+          },
+          {
+            "path": "src/app/session.ts",
+            "source_blob": "5565e20ab9d60f330954540a809c6b0e25bd9ae9",
+            "sha256": "5d2c7783f58bf962d6f87f85a7ece436b34f1c22a1d722660e8dd9957d0147fa",
+            "bytes": 1275
+          },
+          {
+            "path": "src/assets/hero.png",
+            "source_blob": "02251f4b956c55af2d76fd0788124d7eee2b45eb",
+            "sha256": "881ffbcaafc212e49addad08846a5b82761355fa20624253af3477ba33262c5c",
+            "bytes": 13057
+          },
+          {
+            "path": "src/assets/react.svg",
+            "source_blob": "6c87de9bb3358469122cc991d5cf578927246184",
+            "sha256": "35ef61ed53b323ae94a16a8ec659b3d0af3880698791133f23b084085ab1c2e5",
+            "bytes": 4126
+          },
+          {
+            "path": "src/assets/vite.svg",
+            "source_blob": "5101b674df391399da71c767aa5c976426c9dc7a",
+            "sha256": "5be21acd42eb7b896e517f4e0f0f11eb5c5d9e54fbbcebe9453f033008fcca6f",
+            "bytes": 8709
+          },
+          {
+            "path": "src/components/Brand.tsx",
+            "source_blob": "0ddd78db9ca9f28614a4acd10edbaa461740a309",
+            "sha256": "b97bdb849f597945b01c8deffc326eb3c3e21579e59db10e24b9b27a1b45436c",
+            "bytes": 817
+          },
+          {
+            "path": "src/components/CountBadge.tsx",
+            "source_blob": "084608ab3d94a651a070bd11158d61ed4165face",
+            "sha256": "0031f572fd161802fb5d871b2182bd47b7a9a78437bb5c7d08fdc0027654fa7e",
+            "bytes": 493
+          },
+          {
+            "path": "src/components/DateRangeButton.tsx",
+            "source_blob": "62868930945e239643d240440e1410af0fad5318",
+            "sha256": "994fe210372d599058ff9e2d2c74c3d70e73f55d71fd2fabfb1e3042263c1128",
+            "bytes": 5873
+          },
+          {
+            "path": "src/components/FilterChip.tsx",
+            "source_blob": "969f89e120f93bebe01806bd99dd7af61d0e0e19",
+            "sha256": "5250304c5a917444cc83cc713d7ba4992d158c68b86228c69dc6001ad5eb3044",
+            "bytes": 589
+          },
+          {
+            "path": "src/components/IconButton.tsx",
+            "source_blob": "54f99fdd51147c993b106c054c9bac0439012a6a",
+            "sha256": "c0cdff257849c9cf5a7b1f43fd9f24baec712be0f8967412792ca5b27758ef26",
+            "bytes": 877
+          },
+          {
+            "path": "src/components/LoginNetwork.tsx",
+            "source_blob": "f30b2c007cee5ad8c88c4470f250923cd24be543",
+            "sha256": "c9be94bacf1889aac11dca170ccbc6d512f5c920e5f577e72b98d571dfcf4412",
+            "bytes": 4458
+          },
+          {
+            "path": "src/components/Provenance.tsx",
+            "source_blob": "9c4522ae7fc9accc8a4001c72bba3ada6e8ee340",
+            "sha256": "b1897dd04fcdd3d3e62db81a1f7940600b3e78471c3d018560d56209055e2407",
+            "bytes": 1882
+          },
+          {
+            "path": "src/components/RefreshCountdown.test.tsx",
+            "source_blob": "92c8ebcec07728ce6bf1a9b6cadb607d257903e2",
+            "sha256": "5a99fceb97aa06bf1a2ef17afd22e80827268d23227afb049b963715222d1192",
+            "bytes": 953
+          },
+          {
+            "path": "src/components/RefreshCountdown.tsx",
+            "source_blob": "12c407bfcf0b8df9af5f92f82a9d5c2bb108a131",
+            "sha256": "3aa3e401ad313b99a79b0872e05eebe69d5c8800d5e24dfb9963d34aa53871f7",
+            "bytes": 779
+          },
+          {
+            "path": "src/components/RefreshStatus.tsx",
+            "source_blob": "cf7e272e7a55a506a2e91a09e2d2ee05275c3fd0",
+            "sha256": "757cf05c0ba199cf66626f28a99cf786161f76db4a9e4492dcd1c7ca825cd579",
+            "bytes": 746
+          },
+          {
+            "path": "src/components/SectionCards.tsx",
+            "source_blob": "a0c813e8e0dfdd3ea48fec9c50f0d8d7f879ab33",
+            "sha256": "b1e6914eb96c187c074453e1b1adc138da50e17084593d2aac146ffe02c0e1a8",
+            "bytes": 2515
+          },
+          {
+            "path": "src/components/SidebarSelection.tsx",
+            "source_blob": "8c109c6b36f92022479347221f5127a0d0f946eb",
+            "sha256": "7928f9c925ab387b76d2177f2fe5f26453d2b30c0ebd31bd21a36c4a1a709e40",
+            "bytes": 889
+          },
+          {
+            "path": "src/components/UnderTabs.tsx",
+            "source_blob": "78050f43e0860d82c50e58a59567f6bd1458f9ef",
+            "sha256": "5bdad154b970990734a1a50f0364d55879d67811ea2d8f9ca13f95b4e7b4b3ec",
+            "bytes": 1194
+          },
+          {
+            "path": "src/components/badges.tsx",
+            "source_blob": "d7902b3f89eacbb6cbd13c7fb8949713688b5cd3",
+            "sha256": "16a7f9c0664d306225bafa5c085dc2c0946ac95e1933c8c07997dcb3fab0aaa6",
+            "bytes": 2227
+          },
+          {
+            "path": "src/components/data-table/data-table-column-header.tsx",
+            "source_blob": "fa7f03252628db4a6e433f21b04dae61f1163cfa",
+            "sha256": "295aac22f6c9c67461a06a0aea3564e51e8279242e982bdcf75de6a71ccb9905",
+            "bytes": 1379
+          },
+          {
+            "path": "src/components/data-table/data-table-pagination.tsx",
+            "source_blob": "b59d302cf238ae32e39846c166cf0b104d327cb6",
+            "sha256": "a37ce7d233bd9f974acaf6e5fda28ffb8680e1068eb7fe8988fdd02d53a242c3",
+            "bytes": 3597
+          },
+          {
+            "path": "src/components/data-table/data-table-skeleton.tsx",
+            "source_blob": "df678e274d5c4dd8ed88d4351756bb69ad56a1bf",
+            "sha256": "d773431bdf90defb5afa7147c98cb7d1aaa65f4657e952104a08df2c08821582",
+            "bytes": 3730
+          },
+          {
+            "path": "src/components/data-table/data-table.tsx",
+            "source_blob": "2a65e426003fda42264c271634fae165a3e575cc",
+            "sha256": "a771bd634ee3c74bd5a75c2cecbf9c414f6250d8702733abc1a81f87c48e4cc5",
+            "bytes": 8161
+          },
+          {
+            "path": "src/components/page.tsx",
+            "source_blob": "c749b4b103d58c676a9a6b2338aa7384e0461a12",
+            "sha256": "1053a93acd662dc4a4e1ea9dfebbd68d5d1d97f4fdae8332358c649790021221",
+            "bytes": 949
+          },
+          {
+            "path": "src/components/states.tsx",
+            "source_blob": "1a3765c119ff7540efcb293c69eb7478d4827f5b",
+            "sha256": "b637d53390e8109a272be7a2e2286ee9daa35f084e98248b2af95f65c2b6b698",
+            "bytes": 1068
+          },
+          {
+            "path": "src/components/ui/alert-dialog.tsx",
+            "source_blob": "59bd4f2e3d418b3df2d8acfe7592adb615845108",
+            "sha256": "8714a510c124289b594a00219e7f3676456c53132aaf017c8624cd58b354fc8d",
+            "bytes": 5440
+          },
+          {
+            "path": "src/components/ui/avatar.tsx",
+            "source_blob": "cec62fa347bfb64389703fe7b1a85e8e7b4af095",
+            "sha256": "aca0c42fbd938b11b797ff29ad4238e5e3bd8b9e5b0eb7913df5b405704c9e73",
+            "bytes": 2901
+          },
+          {
+            "path": "src/components/ui/badge.tsx",
+            "source_blob": "34d2308e169b632e0667e86a912c5eb67fb11628",
+            "sha256": "9c4bc47810edd5e23538b67fb0777812c16f10aa5cae3d59b41fbc2522377339",
+            "bytes": 1792
+          },
+          {
+            "path": "src/components/ui/button.tsx",
+            "source_blob": "0ae860f9776ef760625866676c16f6ea23ebd7a7",
+            "sha256": "7cf6aa4610a506d7685a4eedd6cd0eb7fd10336687d22550774366c6413750c5",
+            "bytes": 2447
+          },
+          {
+            "path": "src/components/ui/calendar.tsx",
+            "source_blob": "8e5112e9e563ebcb39e6d98fd09873f38c9b73df",
+            "sha256": "fc19054a481a596b2528b4fa946d6a58bd3be18569c0c01ab9c51e9b07f0b4da",
+            "bytes": 7832
+          },
+          {
+            "path": "src/components/ui/card.tsx",
+            "source_blob": "6c922ec27ab7bb6a3c19253e1b3f5912ee861f91",
+            "sha256": "39480d5b63e46554f1cfcedaa91052c848bda5c45d7a5dda80fe91e7be604fb0",
+            "bytes": 1986
+          },
+          {
+            "path": "src/components/ui/chart.tsx",
+            "source_blob": "1cf8686d5c433fec5cf2da8d1bd610080c4ea8b3",
+            "sha256": "a15cb355b2f9db3b4baa0079fd0edc8faa6f1c6d9d00bce28a3d766bcf21d92a",
+            "bytes": 10529
+          },
+          {
+            "path": "src/components/ui/checkbox.tsx",
+            "source_blob": "fe3d28c5ed68a7869a1f0ae73c554f3a11504f03",
+            "sha256": "a7068fe7b1840081a0dfdb62a29a39bda24e3cff6752a8788249301a8a79e331",
+            "bytes": 1213
+          },
+          {
+            "path": "src/components/ui/dialog.tsx",
+            "source_blob": "1cbd34599911634bf63969ab060c872057eb70d7",
+            "sha256": "647ad595fef1d3475ee0eaabc3092633c838bd6061344f6ec369dfedf7e45ab1",
+            "bytes": 4318
+          },
+          {
+            "path": "src/components/ui/input.tsx",
+            "source_blob": "1e3b9328903bda2e241ad19fffd804770f30f082",
+            "sha256": "7bfd0eff6c53a38c99184394a09f55e7a86c725de12d6a300fa46b3765114091",
+            "bytes": 961
+          },
+          {
+            "path": "src/components/ui/kbd.tsx",
+            "source_blob": "2459224fbc531f6306b73aaeb22e9022d9985332",
+            "sha256": "6088c3a5432338b1719c17e9b5d0e1fa74fd1f66060f248fc88909d33a82cd13",
+            "bytes": 862
+          },
+          {
+            "path": "src/components/ui/label.tsx",
+            "source_blob": "44b8f3b17edc557f2516a4666e7cab9e5138193c",
+            "sha256": "a161d8098e6114f3b2d66c52693878e9f82f41ba075f47cc576186a2f5ef68d2",
+            "bytes": 591
+          },
+          {
+            "path": "src/components/ui/popover.tsx",
+            "source_blob": "e641fe417fa91adcd077e8a61dc40c27b72d88a4",
+            "sha256": "5c20c50041dd3a0f689ca77054b10796802de07737ca6591873d01f73325f307",
+            "bytes": 2356
+          },
+          {
+            "path": "src/components/ui/radio-group.tsx",
+            "source_blob": "1ebccab66719370095e656fb14d21df7b2a61d78",
+            "sha256": "f495c56ce09167fbdd3d463b3544cbc91874e5028cc6f8fbf165300dbb342a24",
+            "bytes": 1459
+          },
+          {
+            "path": "src/components/ui/resizable.tsx",
+            "source_blob": "3b49a2bc1c9e42a58c828bb31a329d4d24bd68fd",
+            "sha256": "67b6fc8350192688cd134ecf7e0c4cedb9775cfdbc730ee410814738470fce93",
+            "bytes": 1800
+          },
+          {
+            "path": "src/components/ui/select.tsx",
+            "source_blob": "2f889575e019f37361deb36363752d3f9036bf78",
+            "sha256": "df9e4c3eedd88de3f9c50c0b820f1fb178b9c1cd68de0af1260111433ee16373",
+            "bytes": 6327
+          },
+          {
+            "path": "src/components/ui/separator.tsx",
+            "source_blob": "056d875a1ed3622f0eaec60a8f9664f634f69537",
+            "sha256": "27e605bf54abe12bf878318ed5bd0e8b475c7fdaa15519df05d0e44b5c7b5720",
+            "bytes": 679
+          },
+          {
+            "path": "src/components/ui/sheet.tsx",
+            "source_blob": "944c8e5cedc4b2cc9d7889c8f8fc7acebac23d09",
+            "sha256": "6fccae6a848833c4b128e689a92740aa02fb5f3fda88f2af7da60cf7f9ac3d24",
+            "bytes": 4228
+          },
+          {
+            "path": "src/components/ui/sidebar.tsx",
+            "source_blob": "17c7fb610068c69de0f891ab7bf50ba5e76ec416",
+            "sha256": "833c82ed46f0c04499dbdaa26c5e8f3dc667b5237358c2b7ec32d459161dc8a9",
+            "bytes": 21708
+          },
+          {
+            "path": "src/components/ui/skeleton.tsx",
+            "source_blob": "3ec6be770b846170b8e7f8916e5f165e2d1730df",
+            "sha256": "ba48dd5be5a6a1378bd4e011028654b5bf419f1e7d20ee4b9f8330c1264e7239",
+            "bytes": 276
+          },
+          {
+            "path": "src/components/ui/slider.tsx",
+            "source_blob": "3a2f2c6aa8d8845c862740af454c9355b3bb5ee6",
+            "sha256": "a81075e81f88ef77a1f60d661212c053cb9e1c91c66e93f4733bf4a1b55b3208",
+            "bytes": 1995
+          },
+          {
+            "path": "src/components/ui/sonner.tsx",
+            "source_blob": "921ef8b75e875aece731d604be2a23b59bbcccb3",
+            "sha256": "d72a2f633861ad6886b1c27986934c922d50db3be25fd0691be0075e1ecaee52",
+            "bytes": 1042
+          },
+          {
+            "path": "src/components/ui/switch.tsx",
+            "source_blob": "29cad0f52417378019e056680d733c9193d8bde2",
+            "sha256": "020bf55cdeab5fedbe186d21b9f57101a196a4e147067ac2f0d5f0f4d4489282",
+            "bytes": 1393
+          },
+          {
+            "path": "src/components/ui/table.tsx",
+            "source_blob": "b3c0549520e02efb374ba076c95a359f5fb8215d",
+            "sha256": "8b7c50177bd721e9e5b5d8d79f366784ae8936e17bdd2686eed4b494e6685f1b",
+            "bytes": 2754
+          },
+          {
+            "path": "src/components/ui/tabs.tsx",
+            "source_blob": "27365d8b3361a1354178d8295c455763b2858b6b",
+            "sha256": "bc6b1c115fcc9d63d8f14cecd4fcb43cd0b8b201a5d295419296fe9e0ba1623f",
+            "bytes": 3781
+          },
+          {
+            "path": "src/components/ui/textarea.tsx",
+            "source_blob": "8d02e03e18a4ddca3d4626aea8ccd24aef8ebbda",
+            "sha256": "7c7122fc969c62228c691388aa1fe8b1eafe787ac25305a7a768f77d87d3c567",
+            "bytes": 758
+          },
+          {
+            "path": "src/components/ui/tooltip.tsx",
+            "source_blob": "eb64010f06e21d481ec640fbbb0448e49a574a72",
+            "sha256": "8b1a0c07f276ccc4982134938e6989d60b2e31f5e661a9e19b1d551d30b8ed93",
+            "bytes": 1815
+          },
+          {
+            "path": "src/components/useSelectionIndicator.ts",
+            "source_blob": "dfdd28d18b9ce86f9b2b405706a029b6912d15aa",
+            "sha256": "a509ee14b2bf970212d061152eac847a6a6f936dd1ebdf45b30cddfac5475113",
+            "bytes": 4128
+          },
+          {
+            "path": "src/config/data-table.ts",
+            "source_blob": "8220f3377ec729d68249fb65dff8a7c85a851f17",
+            "sha256": "febf7f10b371540eb6a46c3e196178267676cd4476319714f8d7b4ece1a8802a",
+            "bytes": 2686
+          },
+          {
+            "path": "src/features/agent/Agent.tsx",
+            "source_blob": "99afb6dcb16f3f98f8d1fb96fce7a86318c3785f",
+            "sha256": "c8560ef02676cd255fb412d2bae633607bc1b716ecf7b3163aba4c3360f4e232",
+            "bytes": 12723
+          },
+          {
+            "path": "src/features/agent/RadarSweep.tsx",
+            "source_blob": "6c4ceea4db8bc23af2a30192ae4980dc8ee63728",
+            "sha256": "0122ad503c87e674a9bf56163b39f66956642a62bcda6d5f514ed67eba591552",
+            "bytes": 2055
+          },
+          {
+            "path": "src/features/agent/agentData.test.ts",
+            "source_blob": "8aec76e67d55b083d2222234bd26b7666af68d53",
+            "sha256": "9b0adca47b257bd1b8a2d026b79bf4debcd2fd30c95bd580b80173d8a8d35774",
+            "bytes": 632
+          },
+          {
+            "path": "src/features/agent/agentData.ts",
+            "source_blob": "dbc07ae28b03066255bed8bb4abeaa533fdfe396",
+            "sha256": "0f70b78c7bd873e2f1cf554b6c20191634d45ba931659ebf06d8fde7803e549c",
+            "bytes": 1194
+          },
+          {
+            "path": "src/features/agent/rdrSummaryStyle.ts",
+            "source_blob": "30b7f90f90db571b48af87be4e984c5d5ce62dbe",
+            "sha256": "d2959431e7f592b13639706581586357d94c1cbb5c1a4a81c9f51e502cf0edd4",
+            "bytes": 152
+          },
+          {
+            "path": "src/features/alerts/AlertDetail.test.tsx",
+            "source_blob": "4a58a082429d6df22cd627421bb6925cb84f5a77",
+            "sha256": "9bc5e4eee33a478a8dd4a3de06c02ce86ab45ae603b7372fd2c90738e7d8e884",
+            "bytes": 4711
+          },
+          {
+            "path": "src/features/alerts/AlertDetail.tsx",
+            "source_blob": "d56f293a318ba90acb7e227a3691fcdd993f3d64",
+            "sha256": "a4d560ab43ce6d8117eabcd2b4f7ef50d58611e8f81e3d858d194af1ac8fbaa0",
+            "bytes": 11901
+          },
+          {
+            "path": "src/features/alerts/AlertList.tsx",
+            "source_blob": "56fc6cf58c1ec59d78b01cf7c455c97a9fda52d4",
+            "sha256": "5f6be2e561387340d6ea5d32f240eac5c241b3576df561530017a400006f7500",
+            "bytes": 16898
+          },
+          {
+            "path": "src/features/alerts/AlertReview.tsx",
+            "source_blob": "1891f4edb4ca4389239d654d4dc975c6af5987f4",
+            "sha256": "9f5d9110519d31a36a8abf31c615d9083ba234a74cba7e7b142fcead045b6108",
+            "bytes": 5174
+          },
+          {
+            "path": "src/features/alerts/AlertTxTable.test.tsx",
+            "source_blob": "61fbd05600f272e3bd2508658f60c05dbfe1c094",
+            "sha256": "017c41d2ce3a61b20a86555ea54e299a15a2d2bc78636d184d9e483a8bb0f018",
+            "bytes": 1540
+          },
+          {
+            "path": "src/features/alerts/AlertTxTable.tsx",
+            "source_blob": "e55de01ad5603ebc46f4b6d4afa0f7df0c048298",
+            "sha256": "8193b9aa1653c917487c562daceed6ca6054e02e31e216dae34f3a09e034b4f2",
+            "bytes": 8933
+          },
+          {
+            "path": "src/features/alerts/AlertVerdictForm.tsx",
+            "source_blob": "37762045387e2bd262e9e819cb4da9b9db0a6813",
+            "sha256": "8d6050a8ccbadf4557847290b3cefe06f5e96bee51de2e35629fe1b1d5398f25",
+            "bytes": 3328
+          },
+          {
+            "path": "src/features/alerts/CaseActivityCharts.test.tsx",
+            "source_blob": "7d9bb7f13d24ea30b422c9a604570e6a76b1d758",
+            "sha256": "537b5b551226a0c95b2044891961c671f3938f8151081b3b3e116376034df6d0",
+            "bytes": 3134
+          },
+          {
+            "path": "src/features/alerts/CaseActivityCharts.tsx",
+            "source_blob": "2aae94bf0f93076df85dc10bf2a1eac0bbe95190",
+            "sha256": "4472ca2b66754fc0040e12166e53847a933b0aeccea3f31c42d2f21911b89215",
+            "bytes": 4890
+          },
+          {
+            "path": "src/features/alerts/CasePresentation.tsx",
+            "source_blob": "91c8ed865f036ab38d2815cbfa85e4ad2b140adc",
+            "sha256": "4f805f8ddf97a05c5b6d693833b7f065f2e3ccace50a516c255c3d04ecd6cf06",
+            "bytes": 2006
+          },
+          {
+            "path": "src/features/alerts/DetailPanels.tsx",
+            "source_blob": "36c4bc25dd2488db6ed625179881cca1d7b4db23",
+            "sha256": "2c1d1433073497e46156018ba99b693c209f67b799b3d183bfa742531bc6bcc5",
+            "bytes": 1770
+          },
+          {
+            "path": "src/features/alerts/ReviewLayout.tsx",
+            "source_blob": "382e2300662d8c00b3992b0de03dd96070fb40b9",
+            "sha256": "f404769d67698070312e38164d580baae4e840b126be4794b706d727f26f5796",
+            "bytes": 828
+          },
+          {
+            "path": "src/features/alerts/activityAmounts.test.ts",
+            "source_blob": "b351194c0ad425fbf886d093fa8131f8514ae7b3",
+            "sha256": "139a07027d3725409eb0d6a462d50709e8575186d736d45eabc030041f3e69e4",
+            "bytes": 3331
+          },
+          {
+            "path": "src/features/alerts/activityAmounts.ts",
+            "source_blob": "1f1911c43a2b915b037ef8dcc482d886d1675b36",
+            "sha256": "8c5710e891f5743a35dad1a969cf3cc97541ad58579a658554248cede89d730e",
+            "bytes": 2257
+          },
+          {
+            "path": "src/features/alerts/alertDetail.test.ts",
+            "source_blob": "35fa6b1dc8508dd50ec8d409a71bcb09cbcda7c8",
+            "sha256": "9766d547ca7f58f76041ace573ec15c7a75ce49b6ac59aa9c57584f962ded918",
+            "bytes": 3743
+          },
+          {
+            "path": "src/features/alerts/alertFilters.ts",
+            "source_blob": "005e1f567a001fd5ee32021adc6a0447b1472fad",
+            "sha256": "c0ec420c5ad5039070e981a86dbea92df5c09d43f1172ca31de50456ec5de08e",
+            "bytes": 3540
+          },
+          {
+            "path": "src/features/alerts/alertOverrides.ts",
+            "source_blob": "0ac5c5bc6d4fa65aa8d18f206f64aa68bee28238",
+            "sha256": "7e97df30c5dc15bc67773d2fc3d9a3cff7f0e402e07a5aec99f8f623a3cb57f7",
+            "bytes": 730
+          },
+          {
+            "path": "src/features/alerts/alerts.test.ts",
+            "source_blob": "6b6c61976f7aaaae084fb2e80a84747779f7d684",
+            "sha256": "e1452e7ce32420153ba8a23378eba3ff831b816bf60d2157f9a9da7d2401c791",
+            "bytes": 2728
+          },
+          {
+            "path": "src/features/alerts/caseEvidence.test.ts",
+            "source_blob": "e52e9d09f972b242c72549564fdc3a20aa014743",
+            "sha256": "20e7a3c3a2383a87d9efedf037821d0d1347e1e5cc38d0aef2f974bf9b5b799d",
+            "bytes": 1342
+          },
+          {
+            "path": "src/features/alerts/caseEvidence.ts",
+            "source_blob": "62c9731a8ec4e9586bfc220e69364d029d320aac",
+            "sha256": "1edfd2f5647db41e207f22a7bed08d9fbc918fa0a246d0b30b9563e553a3eaf3",
+            "bytes": 1192
+          },
+          {
+            "path": "src/features/alerts/detailText.ts",
+            "source_blob": "d38618f120fa49ae1d099722c7d6a08a04aa1501",
+            "sha256": "5b9761a72ea41aa5d86fc383cdfb3ff82265c6e61ba169b11e8dfc00edc0b3b9",
+            "bytes": 662
+          },
+          {
+            "path": "src/features/alerts/episodeLink.ts",
+            "source_blob": "1cd376113f93b2563d89151c8c48f89bdaf8d7af",
+            "sha256": "01d0ea4c25258d95ca86f5602ac08d0a107dfa97fe2e1b13d374fabe4d6d24ff",
+            "bytes": 2153
+          },
+          {
+            "path": "src/features/alerts/metrics.ts",
+            "source_blob": "75826293a539aa84629258c7372b1a1a546bbbd3",
+            "sha256": "3237d209036f810ddfe319f26cc1db3b068f3186359adc8a5d60b738ae08d991",
+            "bytes": 1784
+          },
+          {
+            "path": "src/features/alerts/reviewListAdapter.test.ts",
+            "source_blob": "84b449496fadf74449ed1768fd34a54e23b0ec4b",
+            "sha256": "923bb0149d78128eb48387e344dc38bfab1718a9fee5ca7c5e23d7ebf3d45b1a",
+            "bytes": 1056
+          },
+          {
+            "path": "src/features/alerts/reviewListAdapter.ts",
+            "source_blob": "22d6d0e175acb24c6866fb1c95197d06914060be",
+            "sha256": "77231854aac441e56fc0c6335789b7131b5e3edec49bd7bcc06f679f0df31c4e",
+            "bytes": 1920
+          },
+          {
+            "path": "src/features/alerts/verdict.ts",
+            "source_blob": "c39615ca70d05af7fb4ff481438ca36677e7b423",
+            "sha256": "490f97a9953972188d1d04e37d7692ed76c42ba247c67cab7a1989c086586adb",
+            "bytes": 1898
+          },
+          {
+            "path": "src/features/dashboard/AiDailyReport.tsx",
+            "source_blob": "c30e34ac664e8f889e64b2afbe747e91d12ed267",
+            "sha256": "7ef3bce4028571436cbf8b3978198b28e9bf38cba66360a948da54aabe4080b7",
+            "bytes": 4129
+          },
+          {
+            "path": "src/features/dashboard/AlertFlowChart.tsx",
+            "source_blob": "7c83ceb2c7cac5799be0b9f369862f498f1e06bb",
+            "sha256": "263213b9699d197833b9d33f6a943f8aaaa6170a466b868c8f59b0e67b0d1978",
+            "bytes": 4650
+          },
+          {
+            "path": "src/features/dashboard/DashboardPresentation.tsx",
+            "source_blob": "e7b94f43417b35a1985574666fd013138a181528",
+            "sha256": "fb71fa37cc416c66567941834f2f973700f814e9db65b848faaeea8d28cab896",
+            "bytes": 1425
+          },
+          {
+            "path": "src/features/dashboard/InstitutionView.tsx",
+            "source_blob": "161b21a7ca53fc490df7c8c7207097683533b23f",
+            "sha256": "e3a1f4e629b19e82400511b4b34d38678388c4257ffcf63c372fb466748a4c8e",
+            "bytes": 5360
+          },
+          {
+            "path": "src/features/dashboard/LiveWorkQueue.test.tsx",
+            "source_blob": "ba57f80842e07b099510dfd7ddd0b512b2324629",
+            "sha256": "64b33564a6c2f0adddd4aa3f1e4eeadddadbd5aeee9c9e0da505697fbe5ebd2f",
+            "bytes": 1042
+          },
+          {
+            "path": "src/features/dashboard/LiveWorkQueue.tsx",
+            "source_blob": "7072dadb2aa78f7ab2eac09a6a0873179e57257f",
+            "sha256": "a6f87156aceb702ac7d1470e08e303091882aa071385910d9a5474740daae2a2",
+            "bytes": 3047
+          },
+          {
+            "path": "src/features/dashboard/PatternRelation.test.tsx",
+            "source_blob": "c258780a6ec4d24e029b041cf215c8914720aa25",
+            "sha256": "9ead3868b315916537077a77f0a33bdda30f4d045eed089c68eedb129797252e",
+            "bytes": 1776
+          },
+          {
+            "path": "src/features/dashboard/PatternRelation.tsx",
+            "source_blob": "cfc9a0eb3adc477d1ee22b08f1bc9a449e9177e9",
+            "sha256": "b15fa3e962fafadbc89d4cc7bf00342413406a90d4e5268d10abe37ae056a67e",
+            "bytes": 14410
+          },
+          {
+            "path": "src/features/dashboard/PersonalView.tsx",
+            "source_blob": "a445c7c949664fddf60e881226c9b5851e061ccb",
+            "sha256": "38c068c1238fa30b0de3ea6da62e25842d1ff311af929f31af79368e6ebb1773",
+            "bytes": 6658
+          },
+          {
+            "path": "src/features/dashboard/WorkCard.tsx",
+            "source_blob": "38d2e1f9a40a84c9ca925e18330a645780b052d9",
+            "sha256": "56d8916e70c962bee7729589a1c2296fc0375e43293e45520e27c655b7bc03a5",
+            "bytes": 1427
+          },
+          {
+            "path": "src/features/dashboard/WorkQueue.tsx",
+            "source_blob": "e2b10fb9b37b59271b12762b9d995a2bc9fd56f6",
+            "sha256": "981cb33f05307fef4999d0db174d677fc3c9b832d35b1d4c018dc9517c7ab1c6",
+            "bytes": 831
+          },
+          {
+            "path": "src/features/dashboard/alertText.ts",
+            "source_blob": "b360a47de5181f10295d0d534d5c9802c1142d16",
+            "sha256": "ea7c4bfcb0cd98d643a46b41cb54a3484475de6955a4a4c54ed1bd9fc08b0f0a",
+            "bytes": 458
+          },
+          {
+            "path": "src/features/dashboard/dataSource.ts",
+            "source_blob": "527c234d313153339bba29c744b07aa65912b778",
+            "sha256": "9e452fae1a139ba68e8d7f81563916f568b6c6c721e623cc3c3e3646856f826e",
+            "bytes": 3029
+          },
+          {
+            "path": "src/features/dashboard/metrics.test.ts",
+            "source_blob": "910920b4256241e6f77c5d4ec05efe2ea0b9eb38",
+            "sha256": "a1cbb2b7f4cdaa2169fa906f5fe1c192c1d445f823fbb431c27850acb5fce196",
+            "bytes": 1158
+          },
+          {
+            "path": "src/features/dashboard/metrics.ts",
+            "source_blob": "54c6428aa130b5c5c13d11dd8726d872fe300f38",
+            "sha256": "f7c8302f0908bb970c42f14d94400203e703b501be59da896f3382db62736329",
+            "bytes": 3395
+          },
+          {
+            "path": "src/features/dashboard/workItems.ts",
+            "source_blob": "23b9ea9ce1c74ba4521276151899ed4079320bf0",
+            "sha256": "d81b03f2ff92d7cf78ed2dfb08ed87a915ddb92ec6c67287cf22212af84fc5e1",
+            "bytes": 3162
+          },
+          {
+            "path": "src/features/episodes/EpisodeDetail.test.tsx",
+            "source_blob": "0223f4ef97af8120f72da1851bb4edd77447c906",
+            "sha256": "f666bf11c9fb9a43f6baf604453929d215bd123473405fe2388a8701f20d4995",
+            "bytes": 3525
+          },
+          {
+            "path": "src/features/episodes/EpisodeDetail.tsx",
+            "source_blob": "3d8a47aba00525ca7613f9ed9b3ea5b9bb804696",
+            "sha256": "137d838f8d05ed72119c6455a80b6dd0c056686d6872eb5a1cd076bba41842af",
+            "bytes": 11018
+          },
+          {
+            "path": "src/features/episodes/EpisodeList.tsx",
+            "source_blob": "1f6b189775039fbe64eaa7e702fb88bfb7b37813",
+            "sha256": "a3b417778b00d9b21542f3cc21b06d851250c2885892cdad177587a0baa24396",
+            "bytes": 13770
+          },
+          {
+            "path": "src/features/episodes/EpisodeReview.tsx",
+            "source_blob": "34ff077a100a1cc3d7871ee6dad35e5ea4ccb280",
+            "sha256": "aa44526defe2c8820083c9a303d352d8138dc23e2d04e86d7f283b293c64d784",
+            "bytes": 3897
+          },
+          {
+            "path": "src/features/episodes/LinkedAlerts.tsx",
+            "source_blob": "62e9d12dfc262b4219695e6f34e07eab4b7ecbf1",
+            "sha256": "1f465ad5786788e4c9b65f39083583e48094441e649e0906aa019ab817efc85d",
+            "bytes": 2593
+          },
+          {
+            "path": "src/features/episodes/episodeFilters.test.ts",
+            "source_blob": "7d326deba87ef058d50331530041c8f526c90a91",
+            "sha256": "a6f79df240475559ea55ffbf451f015b2ea5a47d67c96ac3190805a6b9f22f02",
+            "bytes": 1598
+          },
+          {
+            "path": "src/features/episodes/episodeFilters.ts",
+            "source_blob": "f3d86220ef36a414cf8ebd3c8c90f9e3248ac7c3",
+            "sha256": "a69ab1ce588d9ae2247911e5212b6232e477dda51520b3f2768ba0ce19c21f4f",
+            "bytes": 3412
+          },
+          {
+            "path": "src/features/episodes/episodes.test.ts",
+            "source_blob": "ee439e64b7f0a8ab53b7fd2cc8bba9fa47c29424",
+            "sha256": "591d5f0800170c123bfa78ad57a381ad0464a3cfefc11d32f9f0adc0867d985c",
+            "bytes": 1966
+          },
+          {
+            "path": "src/features/episodes/reviewStore.ts",
+            "source_blob": "aeef8f0a8b2db69d6cb413c79341bcfe6777c34f",
+            "sha256": "711111d55c7a87ae580a3eae1cf02be74f202aa5ea9bd6cacc6d77000b4b6bba",
+            "bytes": 475
+          },
+          {
+            "path": "src/features/graph/TxLabelPanel.tsx",
+            "source_blob": "d6c72f2a2b9c6da4f57171357bba1c72b120886b",
+            "sha256": "263ee65f257cd0ef852fd5c332e0e6bd620f34eb9fe23beeb8fc01ed6babdc62",
+            "bytes": 4705
+          },
+          {
+            "path": "src/features/graph/adapter.ts",
+            "source_blob": "4b25c77eeb2969c53805f56d4c04bb92f2c4f536",
+            "sha256": "2979bbd17efb7977211d040e241d5f862450b9f12cb7df83c86d1feb9152a761",
+            "bytes": 3822
+          },
+          {
+            "path": "src/features/graph/graph.test.ts",
+            "source_blob": "327654b560a2c5e8935fb63e0d97d164e723d505",
+            "sha256": "a5d0ac5dadc0628be367c124f2d2e18402de2f5bcb06c915656fa7b1e1583b6e",
+            "bytes": 4684
+          },
+          {
+            "path": "src/features/graph/graphStyle.ts",
+            "source_blob": "aaabfe0673f2d40cab5692acfb0805caf00e1324",
+            "sha256": "1dd430351553b541a4230b5e6b64c13078ed0fd091f64efc1b18337efb424982",
+            "bytes": 572
+          },
+          {
+            "path": "src/features/graph/liveAdapter.test.ts",
+            "source_blob": "ce9c35a8243609915771680c10fa142e6db5b23e",
+            "sha256": "a5d3a0ec5574f81ca12001f6188a0a7ed9d29beca936e031a9d67201250eed88",
+            "bytes": 2751
+          },
+          {
+            "path": "src/features/graph/liveAdapter.ts",
+            "source_blob": "83ce04968b16cbc066db3e30fa48246f33ba515b",
+            "sha256": "a2258fb0f2cfeb854f17181f328ae445054e33b0fd335d4605c6d15fd66e51ac",
+            "bytes": 2835
+          },
+          {
+            "path": "src/features/graph/relabel.ts",
+            "source_blob": "393957f2419319ed5821de497f15a09ec66e905d",
+            "sha256": "daf1f7af14ffb0e474fdb0a18aa7e06da79fdd1df13f2ebc87f550ec3cfa3916",
+            "bytes": 1851
+          },
+          {
+            "path": "src/features/graph/v24/FlowDetail.tsx",
+            "source_blob": "86cea000bc1e15d4cc6268429ed3049e9aa46e49",
+            "sha256": "cc386bc932f0bd89449cbe6dc15e542f879e52d46b554f76018de9e85fddad9d",
+            "bytes": 18129
+          },
+          {
+            "path": "src/features/graph/v24/Graph.tsx",
+            "source_blob": "a879697c8d9de47b27a1605cdab713d9e5b130e6",
+            "sha256": "6b18e8542e7d8b1b381f6b564c93d69b9ad5ded42e1d5f32f862c315ea5eff0b",
+            "bytes": 38463
+          },
+          {
+            "path": "src/features/graph/v24/OwnerGraph.tsx",
+            "source_blob": "eff671d4285fa127097ec0b7878eeed6c6a45d4c",
+            "sha256": "86bae820156a693cc275b10b1f6b7593b328849da8f6ca47cbac69eb435db2cb",
+            "bytes": 35603
+          },
+          {
+            "path": "src/features/graph/v24/model.ts",
+            "source_blob": "e51ede47ef413b3c5c82239b485a9c490c1cdbbe",
+            "sha256": "bdef445f95fa7fb22f9bbde667ccd1b4a5b63e59dda4dbd37e5b4b9b8e37f2df",
+            "bytes": 5062
+          },
+          {
+            "path": "src/features/notifications/AssignedCases.tsx",
+            "source_blob": "eec40cd815ba71cc6d5ff0d4a79a083b0a7149f7",
+            "sha256": "cc57250bb54c0ef1e412cbaa90dd786f7af9faa25c7c5fbe0fe3bfdf03a6e344",
+            "bytes": 1669
+          },
+          {
+            "path": "src/features/search/GlobalSearch.tsx",
+            "source_blob": "a482841a3b8391a242c81b9f9c27b546ae9591b6",
+            "sha256": "3ebe8f408fb8140fc54953fc87bc90b6abbf710aef4cba3729f6f6ee50aad0d0",
+            "bytes": 11216
+          },
+          {
+            "path": "src/features/search/LiveGlobalSearch.test.tsx",
+            "source_blob": "c8e882d7f98e46742d9685a1a4d68b09b237cb42",
+            "sha256": "b74f97907a3f20c3571f27f0d378edd7ba9641e69470b174a517c3a2805379a0",
+            "bytes": 2031
+          },
+          {
+            "path": "src/features/search/LiveGlobalSearch.tsx",
+            "source_blob": "d95fa575977bac4e2f066c49776f72f6a51b2e44",
+            "sha256": "020149db3fa89c429e37f981a0b08f891ccf969f87495049e914198bee6c848e",
+            "bytes": 2682
+          },
+          {
+            "path": "src/features/search/searchItems.ts",
+            "source_blob": "3b44690e69ed0236cf3785a880335c29e7e8551e",
+            "sha256": "84916f082b4b5a456df7a3f0fe1ccd4a0706c0dc1b4ecf48fc6ecff1a83536bb",
+            "bytes": 1167
+          },
+          {
+            "path": "src/features/transactions/TransactionExplorer.tsx",
+            "source_blob": "d2b480901f51f9dc5e5eaeab3cf60aeda166bb84",
+            "sha256": "65295b6fc0d73fc983f2fbbefd20398fe0d86628e729465fd4d274be2caef62c",
+            "bytes": 21854
+          },
+          {
+            "path": "src/features/transactions/transaction-stage.tsx",
+            "source_blob": "8e87585b55b7232acbc3c9acfe04d11e9600d047",
+            "sha256": "672c10b9ed2821d289a441394e643922738b40b77c087f09edbbd81c4dd491f6",
+            "bytes": 2709
+          },
+          {
+            "path": "src/features/transactions/transactionIndex.ts",
+            "source_blob": "28dc7fc8034d1de9b445cdfaee14fd5730418f9b",
+            "sha256": "93964d88b988f475d3680e9d09dc313e6605dc2755337b26c973fed42664a93c",
+            "bytes": 4491
+          },
+          {
+            "path": "src/features/transactions/transactionTarget.ts",
+            "source_blob": "8e10b2826ff8fa3096028242744ae6062e9c01ca",
+            "sha256": "62c9a1b8f9e3a2ac3805c89b86ba774bdaf590d7ac95d635cc3dd9dfc3606768",
+            "bytes": 426
+          },
+          {
+            "path": "src/hooks/use-callback-ref.ts",
+            "source_blob": "b47cbfc4d0c6b27b15861d1976cb5dbb31fb197c",
+            "sha256": "83ebaef92c057730d89d854fd0edee3e0a85db466631ede0b0eb064537de4179",
+            "bytes": 724
+          },
+          {
+            "path": "src/hooks/use-data-table.ts",
+            "source_blob": "9e9cba26834f9fc285dfee4f4fe5cc75c93b6bb9",
+            "sha256": "06f886d115a2aaaca989e36a1d7873559bb378a6a17190d3f755d6fe33c47b2b",
+            "bytes": 9000
+          },
+          {
+            "path": "src/hooks/use-debounced-callback.ts",
+            "source_blob": "784524b2f94125b6a214122cd15004ac4df5b13d",
+            "sha256": "7cec07b0d60367c509f73a6db385199983eb4887859095d15a3db3847e6b7e18",
+            "bytes": 702
+          },
+          {
+            "path": "src/hooks/use-mobile.ts",
+            "source_blob": "2b0fe1dfef3b17850bbac040665f514a8ffd0f15",
+            "sha256": "ad0936f84f1df79d3697bfbff9c18f8ad58431c1cbaf2359c6a853b0fcc9f28b",
+            "bytes": 565
+          },
+          {
+            "path": "src/lib/WorkspaceProvider.test.tsx",
+            "source_blob": "68e3a83a505e9bee183293b6e2bf0a2016939dce",
+            "sha256": "879adc9fae280843cafaf0b143011b1ff6f19b0272572b84a9fb662bd05bc42e",
+            "bytes": 4486
+          },
+          {
+            "path": "src/lib/WorkspaceProvider.tsx",
+            "source_blob": "f8df756e6bfad98786b6fe17e8ef23e54f9fde17",
+            "sha256": "020561e98cc79e2ce67c6ee423158cc493256d61c55eb9ecd5828a076160d795",
+            "bytes": 2329
+          },
+          {
+            "path": "src/lib/apiMode.ts",
+            "source_blob": "ccc9dd924d1957f66a1029a928a04e518a532bcc",
+            "sha256": "6ce8416312daceed241b9720af6a6e5c99ebf035da1118d3fecb4ac42b86f03b",
+            "bytes": 352
+          },
+          {
+            "path": "src/lib/data-table.ts",
+            "source_blob": "e9d7dff117ca498e4c4e8b8ded609f8334125ec3",
+            "sha256": "cbe78333f847c16f5ed918c8c5f8588049a920b464e9cf0db73af472e63c8a1f",
+            "bytes": 2400
+          },
+          {
+            "path": "src/lib/format.ts",
+            "source_blob": "1c05d3537a4767017b1c275a18a9be1193adc60e",
+            "sha256": "db29d8a6c824cb436351c50e61a4b2dfc6c905497242b18e2b731b1c46e64ed5",
+            "bytes": 830
+          },
+          {
+            "path": "src/lib/memory.ts",
+            "source_blob": "d5fe72a94a14997095b7891c567ae20042bbe58f",
+            "sha256": "1ec2e123fcfdfde135f654daf222a4919474c6fc69513bd9f823eb3fd979dd0c",
+            "bytes": 1581
+          },
+          {
+            "path": "src/lib/parsers.ts",
+            "source_blob": "ea4f0dd0cd4c5205c7f53c77056be57efc5ab5bb",
+            "sha256": "9edcb433e057ab95bcab5d1d1bbba8cee02844889419b66a2aa1d91e6ebd0bde",
+            "bytes": 2467
+          },
+          {
+            "path": "src/lib/queryCache.test.ts",
+            "source_blob": "dbcace902b6756ab8a7cecefacede34d3e4e3969",
+            "sha256": "c6bb54f5233239df267592e687b3bae2cfe5fab5cb3cc8ef8b911c4138011b20",
+            "bytes": 3724
+          },
+          {
+            "path": "src/lib/queryCache.ts",
+            "source_blob": "c6ea783da8bcf8e622cc6e9cc187e1412ffd9077",
+            "sha256": "daff4c3c0e4e2494d0a412b622c9347ee32b75a145bf3d19cbd4d7c877b5b27e",
+            "bytes": 3706
+          },
+          {
+            "path": "src/lib/useAsync.test.tsx",
+            "source_blob": "914d436afecf2defa99c3c7144750d41e6d0ef72",
+            "sha256": "71f561dfc365e8c69d227a75312d0a660ab4ca1a56aba4abfcc45ccb9178ae2a",
+            "bytes": 2443
+          },
+          {
+            "path": "src/lib/useAsync.ts",
+            "source_blob": "dbeb276ab188930e4e5d569767b7ada888b9b54c",
+            "sha256": "abd6661fdf0b6b35e4355b580788d4fb224b6fd628922122bc6ef6d318b8171b",
+            "bytes": 1833
+          },
+          {
+            "path": "src/lib/utils.ts",
+            "source_blob": "981516fc36b85ff73f6d0c8f8a932869ca54ea8f",
+            "sha256": "00708463d307471ed1a3ac36642e9c00a766730d7be61e2351f283a580017ea6",
+            "bytes": 163
+          },
+          {
+            "path": "src/lib/workStatus.ts",
+            "source_blob": "13ff19b21b99cffe0f0bd432f1a2b23f5b9e59c0",
+            "sha256": "2051f3947223b1c9ad743f73f6279c288d5a541c12663d1620d855fc2662eff0",
+            "bytes": 1373
+          },
+          {
+            "path": "src/lib/workspaceState.ts",
+            "source_blob": "066a47beb43675f2a2eca4878598206988040763",
+            "sha256": "a20650f82be2d7aee3d4fdad1ea891b1403f507f180e8ea57644ac8cb9fe6a2c",
+            "bytes": 2167
+          },
+          {
+            "path": "src/main.tsx",
+            "source_blob": "da4617ef3670bbd6f9fa09192760a3a808ba49fc",
+            "sha256": "5ccf959592a5582b39581199eb7214ce286a1292ff7e0195f4358288b25c2f23",
+            "bytes": 691
+          },
+          {
+            "path": "src/mocks/alertDetail.ts",
+            "source_blob": "1a6ddfcca6fef54b0e4870e534d45a53fcae5e77",
+            "sha256": "2b40d22aa876cc7e4053a196c47fae4096d2d0511d69897fff4512c89259f35b",
+            "bytes": 6588
+          },
+          {
+            "path": "src/mocks/alerts.ts",
+            "source_blob": "d3ff27ddf4290d11bdd4ef7e704a49941451fc64",
+            "sha256": "b2587073eb6b1bd98ea751e5dbdc4d15c26b862b9333f51ec77f2ba1a3f37af5",
+            "bytes": 3671
+          },
+          {
+            "path": "src/mocks/dashboard.ts",
+            "source_blob": "972971936c0bdbf04d10b8e4d4b64a516a2d661b",
+            "sha256": "eef3b0d588c5ada7478c6d0150ec7b68951701009d688358b4be66813ca455f1",
+            "bytes": 3617
+          },
+          {
+            "path": "src/mocks/episodes.ts",
+            "source_blob": "e8e03072e70a677e8fddc5ee9b8e0abcef348a07",
+            "sha256": "1d56501a83349637f5676f42f2cd12759d8c671a89e66ba6f9d910a172727308",
+            "bytes": 6733
+          },
+          {
+            "path": "src/mocks/graph.ts",
+            "source_blob": "27f3c6e1e5aa67e35e4e4c0ca4a71116203949ce",
+            "sha256": "62c40857e27023048e0236906c3f5fa3ebb44ad74af10928372050ef9490e585",
+            "bytes": 2309
+          },
+          {
+            "path": "src/mocks/mocks.test.ts",
+            "source_blob": "db57d0a5ae919543a1ad6a66caae7bbcbd80cd6b",
+            "sha256": "ff3430eee099ec5567515ac75604fcb269d8dc95fcb3a4c115ebbcf067179bda",
+            "bytes": 2074
+          },
+          {
+            "path": "src/mocks/notifications.test.ts",
+            "source_blob": "6f5594f4ed6284b19b444d4053af7319bb8b3935",
+            "sha256": "6c910dc1e97ca3d3eccf2f5b9278dea956d3e22872a14ca57605661444c89854",
+            "bytes": 798
+          },
+          {
+            "path": "src/mocks/notifications.ts",
+            "source_blob": "1b3337db8873559c2150a199025fbb94f3a93021",
+            "sha256": "f2fd6d88acfcef4b8d968d6988460e8ce541a1289a2ae2be80494fbee195334b",
+            "bytes": 2350
+          },
+          {
+            "path": "src/mocks/scenario.ts",
+            "source_blob": "2239cb3538963b94f45ad2cd56cbcaaa00f693a1",
+            "sha256": "e083177ac3da1b4d526e25bffbe2f483690e3e5eedf2cae874e3acdcd2e0266f",
+            "bytes": 775
+          },
+          {
+            "path": "src/mocks/time.ts",
+            "source_blob": "a4e74eb0fcc50b90600de9d8a1d890fc6c71d998",
+            "sha256": "3e8c335c8daa4f180b42213e4a770682b876d9c17629976deb3a1cceb6d5ed09",
+            "bytes": 264
+          },
+          {
+            "path": "src/mocks/transactionScope.test.ts",
+            "source_blob": "6c9eb8410715635ee2e130ff7c3f1584b1283b38",
+            "sha256": "7399c2d43e36964c8dcba0e43be8b42b3c2477fc19276b5aa0ba976c17b643e8",
+            "bytes": 907
+          },
+          {
+            "path": "src/mocks/transactionScope.ts",
+            "source_blob": "f275fad45aa21aba9c64580eefc3c3b3e7bdebd5",
+            "sha256": "9d9331534c9328d56b280fe05d919b8010c5e564a6d995ddb4c2a697ba387a5c",
+            "bytes": 2070
+          },
+          {
+            "path": "src/mocks/transactions.ts",
+            "source_blob": "c6011697dfe37b93bb5fe0b2bc212fdd14e575c5",
+            "sha256": "724d20e2ed640b551507850bb49afcd076296878427f01afcc202bff4c5b40f6",
+            "bytes": 3064
+          },
+          {
+            "path": "src/pages/AccountPage.tsx",
+            "source_blob": "f4f0a217b13703963edafe6dd2822bf5c1d26e7f",
+            "sha256": "913240647190262edcb9c7444cf3c71b90e5e6bff44839161eb50b83da690318",
+            "bytes": 4410
+          },
+          {
+            "path": "src/pages/AlertDetailPage.tsx",
+            "source_blob": "dc303e6329fe733843afd55203ac85177ad6bac5",
+            "sha256": "4b65be75b5c7f5a2737c415b8e6f830ec45bda507dba983e1abed056ab2dcfeb",
+            "bytes": 6913
+          },
+          {
+            "path": "src/pages/AlertsPage.tsx",
+            "source_blob": "6ed963518c12304fdd19ee6ba3f2012265bef104",
+            "sha256": "497b62fe2a2bd1bdf8fcd0b513baf1c4ce4619095bda0a265b5728a7f3bcdadf",
+            "bytes": 3311
+          },
+          {
+            "path": "src/pages/ComingSoonPage.tsx",
+            "source_blob": "a9f8cd7d130cf1d9112c10663e1a2daf2c9a7386",
+            "sha256": "fc9e2a1fb8d1e66559d3d01a2879a08e8b57a082ebb097e8d59bdac5eaf9f513",
+            "bytes": 402
+          },
+          {
+            "path": "src/pages/DashboardPage.test.tsx",
+            "source_blob": "4de867ba3241faf53f58f971cff8fb2b43b70312",
+            "sha256": "a2ee4c93a5b882a994baca50181a4f3896beb0e29e92b912564cb5410d4ce2c6",
+            "bytes": 7648
+          },
+          {
+            "path": "src/pages/DashboardPage.tsx",
+            "source_blob": "1cce114f56fa602068f6dac43b42899625bf28d6",
+            "sha256": "73efc6ea9966bcacda94316291d16787fcda3b4c9d31011b2aca7c1a46147f0d",
+            "bytes": 870
+          },
+          {
+            "path": "src/pages/EpisodeDetailPage.tsx",
+            "source_blob": "0f54f2ef35a84427e8cd35900caaa8904b5e7561",
+            "sha256": "4b71c54ec12e96517fef5fec1b8ed5626e7340406b5db89748ce562253de3746",
+            "bytes": 6068
+          },
+          {
+            "path": "src/pages/EpisodesPage.tsx",
+            "source_blob": "534ebd810d5fd9c87acfd905a95f2dae4d9a14ff",
+            "sha256": "23c79e6804540f89321797907f06c951823bda60e43a336a670b54475fd23ae3",
+            "bytes": 2250
+          },
+          {
+            "path": "src/pages/LiveCasesPage.test.tsx",
+            "source_blob": "4a30ed38ed615aea687ce2654ee540721548d6e2",
+            "sha256": "1f1b4a7eb497002096f23de9ec9127892275c0d5ffa09f037952d71b4fb9e5e0",
+            "bytes": 31368
+          },
+          {
+            "path": "src/pages/LiveCasesPage.tsx",
+            "source_blob": "81723a9757755025ce25d302ddba17a59e561c43",
+            "sha256": "2abd22531b2482d86d9a947fbe8e9c7607d6c8832537cf0b640449f3c8f8ce5d",
+            "bytes": 50330
+          },
+          {
+            "path": "src/pages/LiveDashboardPage.tsx",
+            "source_blob": "9a25f00420f51a0638258539431ef1029513c488",
+            "sha256": "cadccab798240d78bedb1a6a073748367c0315c114e809a0dab78bbd03826738",
+            "bytes": 8397
+          },
+          {
+            "path": "src/pages/LiveLedgerPage.test.tsx",
+            "source_blob": "290e2b8bbf1e75c631638b92dbf484f0a0edd90e",
+            "sha256": "b6a1f7187f9d5d563dbc37149f6f384910b689333d8ffe5399e27754e4ad5242",
+            "bytes": 1302
+          },
+          {
+            "path": "src/pages/LiveLedgerPage.tsx",
+            "source_blob": "566e4e245564b1e17eeb7e97c927541745f6048f",
+            "sha256": "2c06f7ecb366c4147025ee165f95d108f942e197cd92a5c0002a3df6a383e971",
+            "bytes": 6896
+          },
+          {
+            "path": "src/pages/LiveNavigation.test.tsx",
+            "source_blob": "079cba390ea05ad19c017e52279e4fe006b44ebc",
+            "sha256": "7774709607f250cbccbff7cc4c3ca9335fdf72ddf8dfcc41897a631a90f8c3c5",
+            "bytes": 4860
+          },
+          {
+            "path": "src/pages/LiveNotificationsPage.test.tsx",
+            "source_blob": "dfcd136a1453563594dc9066f2e27a81bcb47247",
+            "sha256": "0b96fb84f466539adcc5b9373d44f98993ccf862067a09139451e2c8e5845c42",
+            "bytes": 3748
+          },
+          {
+            "path": "src/pages/LiveNotificationsPage.tsx",
+            "source_blob": "4d1f3eeb3987d06684798af0f1c057c284ee5cd1",
+            "sha256": "94f9ce059208aa4f8a431510ae6a1faad4ea77b0e5f660fe7efa25c47f2c47a8",
+            "bytes": 370
+          },
+          {
+            "path": "src/pages/LivePages.test.tsx",
+            "source_blob": "baaae5210bc40ff8073bb5882fe02d59af7d430f",
+            "sha256": "dc26beeb0d31466ab164e2f17b85d50aed89f82bdecaf0988d6745e153201407",
+            "bytes": 7097
+          },
+          {
+            "path": "src/pages/LoginPage.tsx",
+            "source_blob": "76bed93a3089942a2c564ce07c5ee44c334268ec",
+            "sha256": "217c01d0e6cc3778bd465cc20ae9054d14e7f1210a7043cf6668e8df78acc55f",
+            "bytes": 4696
+          },
+          {
+            "path": "src/pages/NotificationsPage.tsx",
+            "source_blob": "997b3893bf2f3420965ad4c20077f328a9b885ce",
+            "sha256": "c0787c76cb92edb4aacd6c145affc01201322ddfc285779b206b2d86bc47b13c",
+            "bytes": 10070
+          },
+          {
+            "path": "src/pages/SettingsPage.tsx",
+            "source_blob": "2383b433453dce153695b95cc465817fe4c3b5e7",
+            "sha256": "a151184a007a39228a1d2c82e63bd321f4782e7c4f7df3f8df876233c8f51454",
+            "bytes": 5911
+          },
+          {
+            "path": "src/pages/TransactionsPage.test.tsx",
+            "source_blob": "b53ca5afbfa52804bf82e1f3780adbc7c4e8a9de",
+            "sha256": "fcb2cae24b0ce237d0ab50e0c0fa6af2ef77abe4a401849550136da7ce4b4375",
+            "bytes": 3153
+          },
+          {
+            "path": "src/pages/TransactionsPage.tsx",
+            "source_blob": "bdb2c2613c4d2983ec5acd3295f5d398c76a7090",
+            "sha256": "3a2f4e20890ca8912f1ff07a176bffb03711b77ec2fbae764d3690f748c6ad73",
+            "bytes": 1987
+          },
+          {
+            "path": "src/styles/theme.css",
+            "source_blob": "2e73566232f111bd1dc65cf8f962b3b68ecf61bb",
+            "sha256": "b45c085c367a45dab1e8af8e4cc22b18ccf49fd0e27653efabf7b18e52250e91",
+            "bytes": 29282
+          },
+          {
+            "path": "src/test/setup.ts",
+            "source_blob": "5d15b69be376903d9c142554ec9db18f5cf01e6b",
+            "sha256": "5bc314d452f50c18a461b8e4106de397ec274e2e3e103455d6f0e6c8df95a6cb",
+            "bytes": 947
+          },
+          {
+            "path": "src/types/data-table.ts",
+            "source_blob": "a1c36ed6f1913379d2ea128cf5873fb43f5103fc",
+            "sha256": "0338bcc6a2dd148e1131c5ce2f9d9b7627cff8a2584d0004a1b17c9086eea44a",
+            "bytes": 1377
+          },
+          {
+            "path": "tsconfig.app.json",
+            "source_blob": "ab86dd679fe55df4b899597cae89706e8f9f1a52",
+            "sha256": "1cbb64e1a8f646eb1be3819f0e0575aeef9e9aa93620bbe808ba0831a2be9879",
+            "bytes": 692
+          },
+          {
+            "path": "tsconfig.json",
+            "source_blob": "1ffef600d959ec9e396d5a260bd3f5b927b2cef8",
+            "sha256": "770b4140bbb581e2dfd9ea9946ffc9c75a1d86ba7d2db5f77c83e37cbdf9d808",
+            "bytes": 119
+          },
+          {
+            "path": "tsconfig.node.json",
+            "source_blob": "8455dcbc2c947322adef8783a42741878edaea9c",
+            "sha256": "d366cc0827139db39c61815f22491bbfda56c654354a42ad7795143d314e45e8",
+            "bytes": 558
+          },
+          {
+            "path": "vite.config.ts",
+            "source_blob": "1b90836d12b06e72968a1676b65601cbc49e8588",
+            "sha256": "0f9fbc371959daedf08e72b365b55c8063b8e18243fc31084eaa22d1d8dc423c",
+            "bytes": 463
+          },
+          {
+            "path": "vitest.config.ts",
+            "source_blob": "741fb273349da4f6ae0338172daedabe17d5c88a",
+            "sha256": "454035172cae3fd403eb00858626613025401bdcef9247c9caad4de6407d1ad1",
+            "bytes": 331
+          }
+        ],
+        "baseline_note": "b28caff2 on10/4 is after presentation; web-app subtree identical to10/1 3ba01283 and10/6 c641d7b2. Historical component names/imports are retained inside this original snapshot."
       },
-      "status": "prior implementation baseline; not accepted new design; Sites SDS external source not included"
+      "status": "retrospective identifier; user acceptance not established"
     },
     {
-      "version": "2.0.0",
-      "stage": "new-design-start",
-      "path": "design/2.0.0",
+      "version": "1.1.0",
+      "stage": "mockup",
+      "path": "implementation/1.1.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.1.0/wireframes-1.1.0-2026-10-06.html",
+        "implementation/1.1.0/wireframes-1.1.0-2026-10-08.html"
+      ],
+      "entry_html": [
+        "implementation/1.1.0/wireframes-1.1.0-2026-10-06.html",
+        "implementation/1.1.0/wireframes-1.1.0-2026-10-08.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.1.0/VERSION.md",
+      "verification": "implementation/1.1.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.1.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.1.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "wireframe",
+        "name": "계좌·소유주 와이어프레임",
+        "git_committer_kst": "2026-10-06T10:49:41+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "b521e3cfa6da1abaad7d4f0d9e9aebb7a6f9eea3",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/ui-redesign-wireframes.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/b521e3cfa6da1abaad7d4f0d9e9aebb7a6f9eea3/Workspace/Projects/money_laundry/Frontend/Media/ui-redesign-wireframes.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          27,
+          28,
+          124,
+          125
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.2.0",
+      "stage": "implementation",
+      "path": "implementation/1.2.0",
+      "source_files": [
+        "implementation/1.2.0/web-app-1.2.0.patch"
+      ],
+      "original_html": [],
+      "entry_html": [],
+      "generated_html": [],
+      "version_record": "implementation/1.2.0/VERSION.md",
+      "verification": "implementation/1.2.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.2.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.2.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "dashboard",
+        "name": "대시보드 조회·갱신 표시 구현",
+        "git_committer_kst": "2026-10-09T01:07:39+09:00",
+        "source_repository": "money_laundry",
+        "source_commit": "e781beeb31d3fad47e5d75902b3c0d13b41bc085",
+        "original_source_path": "frontend/web-app",
+        "original_source_url": "https://github.com/dh0728/money_laundry/tree/e781beeb31d3fad47e5d75902b3c0d13b41bc085/frontend/web-app",
+        "lineage_note": "dev dashboard implementation; Git ancestry is nonlinear relative to fe/work. Version number orders evidence time, not a claim that this branch was merged.",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [],
+        "reconstruction": {
+          "baseline_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+          "patch": "implementation/1.2.0/web-app-1.2.0.patch",
+          "source_tree": "frontend/web-app",
+          "run": "Use a separate working copy at the exact source commit. Do not apply historical patches to the current implementation."
+        },
+        "original_branch": "dev"
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.3.0",
+      "stage": "mockup",
+      "path": "implementation/1.3.0",
       "source_files": [],
       "original_html": [],
       "entry_html": [],
       "generated_html": [],
-      "version_record": "design/2.0.0/VERSION.md",
-      "verification": "design/2.0.0/VERIFICATION.json",
+      "version_record": "implementation/1.3.0/VERSION.md",
+      "verification": "implementation/1.3.0/VERIFICATION.json",
       "related_design": [
-        "design/2.0.0/README.md"
+        "implementation/1.3.0/SOURCE.json"
       ],
-      "run": "No new design implementation exists; nothing to launch.",
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
       "source": {
-        "basis": "user-defined start baseline 2026-10-26"
+        "schema_version": 1,
+        "version": "1.3.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "initial-patch",
+        "name": "초기 재설계 구현 시안",
+        "git_committer_kst": "2026-10-11T22:31:54+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "22533c7e82f7cfc10ddf2a451e05530ad20be14d",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/redesign-mock-2026-10-11.patch",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/22533c7e82f7cfc10ddf2a451e05530ad20be14d/Workspace/Projects/money_laundry/Frontend/Media/redesign-mock-2026-10-11.patch",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          29,
+          73
+        ],
+        "private_patch_note": "Original implementation patch remains in private Git. No private document body is copied into the team repository."
       },
-      "status": "start record only; no invented HTML or acceptance"
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.4.0",
+      "stage": "implementation",
+      "path": "implementation/1.4.0",
+      "source_files": [
+        "implementation/1.4.0/web-app-1.4.0.patch"
+      ],
+      "original_html": [],
+      "entry_html": [],
+      "generated_html": [],
+      "version_record": "implementation/1.4.0/VERSION.md",
+      "verification": "implementation/1.4.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.4.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.4.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "pattern",
+        "name": "패턴·소유주 분리와 고정 계좌행 구현",
+        "git_committer_kst": "2026-10-12T11:27:42+09:00",
+        "source_repository": "money_laundry",
+        "source_commit": "40761b80fa1dcf4897879bf101f8e83448adf928",
+        "original_source_path": "frontend/web-app",
+        "original_source_url": "https://github.com/dh0728/money_laundry/tree/40761b80fa1dcf4897879bf101f8e83448adf928/frontend/web-app",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          30,
+          31,
+          74,
+          76
+        ],
+        "reconstruction": {
+          "baseline_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+          "patch": "implementation/1.4.0/web-app-1.4.0.patch",
+          "source_tree": "frontend/web-app",
+          "run": "Use a separate working copy at the exact source commit. Do not apply historical patches to the current implementation."
+        },
+        "original_branch": "fe/work"
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.5.0",
+      "stage": "mockup",
+      "path": "implementation/1.5.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.5.0/overview-1.5.0.html"
+      ],
+      "entry_html": [
+        "implementation/1.5.0/overview-1.5.0.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.5.0/VERSION.md",
+      "verification": "implementation/1.5.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.5.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.5.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "overview",
+        "name": "개요 상태 초기 HTML",
+        "git_committer_kst": "2026-10-14T11:31:07+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "69d34adccbd38a28a911d742c02c2c0fda1d2ea9",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/69d34adccbd38a28a911d742c02c2c0fda1d2ea9/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          66,
+          77
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.6.0",
+      "stage": "mockup",
+      "path": "implementation/1.6.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.6.0/overview-1.6.0.html"
+      ],
+      "entry_html": [
+        "implementation/1.6.0/overview-1.6.0.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.6.0/VERSION.md",
+      "verification": "implementation/1.6.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.6.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.6.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "overview",
+        "name": "개요 반응형 배치·번호 배지",
+        "git_committer_kst": "2026-10-15T09:01:45+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "7f5dae5decb6edeff0afbd98e6cb41378455018c",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/7f5dae5decb6edeff0afbd98e6cb41378455018c/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          52,
+          53,
+          67
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.7.0",
+      "stage": "mockup",
+      "path": "implementation/1.7.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.7.0/overview-1.7.0.html"
+      ],
+      "entry_html": [
+        "implementation/1.7.0/overview-1.7.0.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.7.0/VERSION.md",
+      "verification": "implementation/1.7.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.7.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.7.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "overview",
+        "name": "개요 룰 점검·근거 대화상자",
+        "git_committer_kst": "2026-10-15T11:32:12+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "cf368be1dac96b0429e426f9030e172e089fa5ce",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/cf368be1dac96b0429e426f9030e172e089fa5ce/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          54,
+          68
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.8.0",
+      "stage": "mockup",
+      "path": "implementation/1.8.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.8.0/overview-1.8.0.html"
+      ],
+      "entry_html": [
+        "implementation/1.8.0/overview-1.8.0.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.8.0/VERSION.md",
+      "verification": "implementation/1.8.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.8.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.8.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "overview",
+        "name": "개요 압축 스캔·확대 구분",
+        "git_committer_kst": "2026-10-15T11:42:16+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "5c9406f977b3d967785c0012cfda1f41f438153c",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/5c9406f977b3d967785c0012cfda1f41f438153c/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          55,
+          69
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.9.0",
+      "stage": "mockup",
+      "path": "implementation/1.9.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.9.0/overview-1.9.0.html"
+      ],
+      "entry_html": [
+        "implementation/1.9.0/overview-1.9.0.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.9.0/VERSION.md",
+      "verification": "implementation/1.9.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.9.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.9.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "overview",
+        "name": "개요 요약·차트 재배치",
+        "git_committer_kst": "2026-10-15T11:52:19+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "b0fdf0e09ac8f342bc2c1a325d759e794ce84f0f",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/b0fdf0e09ac8f342bc2c1a325d759e794ce84f0f/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          56,
+          70
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.10.0",
+      "stage": "mockup",
+      "path": "implementation/1.10.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.10.0/overview-1.10.0.html"
+      ],
+      "entry_html": [
+        "implementation/1.10.0/overview-1.10.0.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.10.0/VERSION.md",
+      "verification": "implementation/1.10.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.10.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.10.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "overview",
+        "name": "개요 확대 화면 구조 개편",
+        "git_committer_kst": "2026-10-15T12:32:28+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "49769d20638633e7c350c077fc66aab658aa096e",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/49769d20638633e7c350c077fc66aab658aa096e/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          57,
+          71
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.11.0",
+      "stage": "mockup",
+      "path": "implementation/1.11.0",
+      "source_files": [],
+      "original_html": [
+        "implementation/1.11.0/overview-1.11.0.html"
+      ],
+      "entry_html": [
+        "implementation/1.11.0/overview-1.11.0.html"
+      ],
+      "generated_html": [],
+      "version_record": "implementation/1.11.0/VERSION.md",
+      "verification": "implementation/1.11.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.11.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.11.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "overview",
+        "name": "개요 설명·근거 버튼 정렬",
+        "git_committer_kst": "2026-10-15T12:42:31+09:00",
+        "source_repository": "external_brain",
+        "source_commit": "e8db7ee5bc2a4bb3ef48006a5260da5ae7af2c91",
+        "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "original_source_url": "https://github.com/kmg200164/external_brain/tree/e8db7ee5bc2a4bb3ef48006a5260da5ae7af2c91/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          72
+        ]
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.12.0",
+      "stage": "implementation",
+      "path": "implementation/1.12.0",
+      "source_files": [
+        "implementation/1.12.0/web-app-1.12.0.patch"
+      ],
+      "original_html": [],
+      "entry_html": [],
+      "generated_html": [],
+      "version_record": "implementation/1.12.0/VERSION.md",
+      "verification": "implementation/1.12.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.12.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.12.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "frontend",
+        "name": "frontend 조사·그래프 복구 구현",
+        "git_committer_kst": "2026-10-21T15:25:55+09:00",
+        "source_repository": "money_laundry",
+        "source_commit": "4525d353e2b5d29db8f424da0d3294f83048c5fd",
+        "original_source_path": "frontend/web-app",
+        "original_source_url": "https://github.com/dh0728/money_laundry/tree/4525d353e2b5d29db8f424da0d3294f83048c5fd/frontend/web-app",
+        "lineage_note": "frontend branch is nonlinear and not merged into fe/work",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          79
+        ],
+        "reconstruction": {
+          "baseline_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+          "patch": "implementation/1.12.0/web-app-1.12.0.patch",
+          "source_tree": "frontend/web-app",
+          "run": "Use a separate working copy at the exact source commit. Do not apply historical patches to the current implementation."
+        },
+        "original_branch": "frontend"
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.13.0",
+      "stage": "implementation",
+      "path": "implementation/1.13.0",
+      "source_files": [
+        "implementation/1.13.0/web-app-1.13.0.patch"
+      ],
+      "original_html": [],
+      "entry_html": [],
+      "generated_html": [],
+      "version_record": "implementation/1.13.0/VERSION.md",
+      "verification": "implementation/1.13.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.13.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.13.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "preserving",
+        "name": "fe/work 원장·의견·API 연결 구현",
+        "git_committer_kst": "2026-10-22T00:06:10+09:00",
+        "source_repository": "money_laundry",
+        "source_commit": "fb5dc96c74ace48cd673d27f56305e5bb43782a7",
+        "original_source_path": "frontend/web-app",
+        "original_source_url": "https://github.com/dh0728/money_laundry/tree/fb5dc96c74ace48cd673d27f56305e5bb43782a7/frontend/web-app",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [],
+        "reconstruction": {
+          "baseline_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+          "patch": "implementation/1.13.0/web-app-1.13.0.patch",
+          "source_tree": "frontend/web-app",
+          "run": "Use a separate working copy at the exact source commit. Do not apply historical patches to the current implementation."
+        },
+        "original_branch": "fe/work"
+      },
+      "status": "retrospective identifier; user acceptance not established"
+    },
+    {
+      "version": "1.14.0",
+      "stage": "implementation",
+      "path": "implementation/1.14.0",
+      "source_files": [
+        "implementation/1.14.0/web-app/.dockerignore",
+        "implementation/1.14.0/web-app/.gitignore",
+        "implementation/1.14.0/web-app/Dockerfile",
+        "implementation/1.14.0/web-app/README.md",
+        "implementation/1.14.0/web-app/ant-review.html",
+        "implementation/1.14.0/web-app/eslint.config.js",
+        "implementation/1.14.0/web-app/index.html",
+        "implementation/1.14.0/web-app/nginx.conf",
+        "implementation/1.14.0/web-app/package.json",
+        "implementation/1.14.0/web-app/pnpm-lock.yaml",
+        "implementation/1.14.0/web-app/public/favicon.svg",
+        "implementation/1.14.0/web-app/public/icons.svg",
+        "implementation/1.14.0/web-app/qa/ant-investigation/PLAN.md",
+        "implementation/1.14.0/web-app/qa/ant-investigation/verification.json",
+        "implementation/1.14.0/web-app/qa/mvp-acceptance-2026-10-21.json",
+        "implementation/1.14.0/web-app/src/api/alerts.ts",
+        "implementation/1.14.0/web-app/src/api/auth.test.ts",
+        "implementation/1.14.0/web-app/src/api/auth.ts",
+        "implementation/1.14.0/web-app/src/api/codes.ts",
+        "implementation/1.14.0/web-app/src/api/common.ts",
+        "implementation/1.14.0/web-app/src/api/dashboard.ts",
+        "implementation/1.14.0/web-app/src/api/episodes.ts",
+        "implementation/1.14.0/web-app/src/api/graph.ts",
+        "implementation/1.14.0/web-app/src/api/ledgerTarget.test.ts",
+        "implementation/1.14.0/web-app/src/api/liveContracts.test.ts",
+        "implementation/1.14.0/web-app/src/api/liveDashboard.test.ts",
+        "implementation/1.14.0/web-app/src/api/liveDashboard.ts",
+        "implementation/1.14.0/web-app/src/api/liveLedger.ts",
+        "implementation/1.14.0/web-app/src/api/liveReview.test.ts",
+        "implementation/1.14.0/web-app/src/api/liveReview.ts",
+        "implementation/1.14.0/web-app/src/api/notifications.ts",
+        "implementation/1.14.0/web-app/src/api/reviewCommands.test.ts",
+        "implementation/1.14.0/web-app/src/api/reviewCommands.ts",
+        "implementation/1.14.0/web-app/src/api/transactions.ts",
+        "implementation/1.14.0/web-app/src/api/wiringFixture.test.ts",
+        "implementation/1.14.0/web-app/src/app/App.live.test.tsx",
+        "implementation/1.14.0/web-app/src/app/App.test.tsx",
+        "implementation/1.14.0/web-app/src/app/App.tsx",
+        "implementation/1.14.0/web-app/src/app/SidebarCounts.tsx",
+        "implementation/1.14.0/web-app/src/app/ThemeProvider.tsx",
+        "implementation/1.14.0/web-app/src/app/fontSize.ts",
+        "implementation/1.14.0/web-app/src/app/navigation.ts",
+        "implementation/1.14.0/web-app/src/app/session.test.ts",
+        "implementation/1.14.0/web-app/src/app/session.ts",
+        "implementation/1.14.0/web-app/src/assets/hero.png",
+        "implementation/1.14.0/web-app/src/assets/react.svg",
+        "implementation/1.14.0/web-app/src/assets/vite.svg",
+        "implementation/1.14.0/web-app/src/components/Brand.tsx",
+        "implementation/1.14.0/web-app/src/components/Callout.tsx",
+        "implementation/1.14.0/web-app/src/components/CountBadge.tsx",
+        "implementation/1.14.0/web-app/src/components/DateRangeButton.tsx",
+        "implementation/1.14.0/web-app/src/components/FilterChip.tsx",
+        "implementation/1.14.0/web-app/src/components/IconButton.tsx",
+        "implementation/1.14.0/web-app/src/components/LoginNetwork.tsx",
+        "implementation/1.14.0/web-app/src/components/MockRole.tsx",
+        "implementation/1.14.0/web-app/src/components/NumBadge.tsx",
+        "implementation/1.14.0/web-app/src/components/Provenance.tsx",
+        "implementation/1.14.0/web-app/src/components/RefreshCountdown.test.tsx",
+        "implementation/1.14.0/web-app/src/components/RefreshCountdown.tsx",
+        "implementation/1.14.0/web-app/src/components/RefreshStatus.tsx",
+        "implementation/1.14.0/web-app/src/components/SectionCards.tsx",
+        "implementation/1.14.0/web-app/src/components/SidebarSelection.tsx",
+        "implementation/1.14.0/web-app/src/components/UnderTabs.tsx",
+        "implementation/1.14.0/web-app/src/components/badges.tsx",
+        "implementation/1.14.0/web-app/src/components/data-table/data-table-column-header.tsx",
+        "implementation/1.14.0/web-app/src/components/data-table/data-table-pagination.tsx",
+        "implementation/1.14.0/web-app/src/components/data-table/data-table-skeleton.tsx",
+        "implementation/1.14.0/web-app/src/components/data-table/data-table.tsx",
+        "implementation/1.14.0/web-app/src/components/page.tsx",
+        "implementation/1.14.0/web-app/src/components/states.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/alert-dialog.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/avatar.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/badge.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/button.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/calendar.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/card.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/chart.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/checkbox.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/dialog.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/input.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/kbd.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/label.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/popover.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/radio-group.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/resizable.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/select.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/separator.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/sheet.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/sidebar.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/skeleton.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/slider.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/sonner.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/switch.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/table.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/tabs.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/textarea.tsx",
+        "implementation/1.14.0/web-app/src/components/ui/tooltip.tsx",
+        "implementation/1.14.0/web-app/src/components/useSelectionIndicator.ts",
+        "implementation/1.14.0/web-app/src/config/data-table.ts",
+        "implementation/1.14.0/web-app/src/features/agent/Agent.tsx",
+        "implementation/1.14.0/web-app/src/features/agent/RadarSweep.tsx",
+        "implementation/1.14.0/web-app/src/features/agent/agentData.test.ts",
+        "implementation/1.14.0/web-app/src/features/agent/agentData.ts",
+        "implementation/1.14.0/web-app/src/features/agent/rdrSummaryStyle.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/AlertDetail.test.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/AlertDetail.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/AlertList.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/AlertReview.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/AlertTxTable.test.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/AlertTxTable.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/AlertVerdictForm.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/CaseActivityCharts.test.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/CaseActivityCharts.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/CasePresentation.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/DetailPanels.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/ExportDialog.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/RedesignOverview.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/ReviewLayout.tsx",
+        "implementation/1.14.0/web-app/src/features/alerts/activityAmounts.test.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/activityAmounts.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/alertDetail.test.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/alertFilters.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/alertOverrides.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/alerts.test.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/caseEvidence.test.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/caseEvidence.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/detailText.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/episodeLink.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/metrics.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/reviewListAdapter.test.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/reviewListAdapter.ts",
+        "implementation/1.14.0/web-app/src/features/alerts/verdict.ts",
+        "implementation/1.14.0/web-app/src/features/dashboard/AiDailyReport.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/AlertFlowChart.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/DashboardPresentation.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/EpisodeWork.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/Freshness.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/InstitutionView.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/LiveWorkQueue.test.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/LiveWorkQueue.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/PatternRelation.test.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/PatternRelation.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/PersonalView.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/WorkCard.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/WorkQueue.tsx",
+        "implementation/1.14.0/web-app/src/features/dashboard/alertText.ts",
+        "implementation/1.14.0/web-app/src/features/dashboard/dataSource.ts",
+        "implementation/1.14.0/web-app/src/features/dashboard/metrics.test.ts",
+        "implementation/1.14.0/web-app/src/features/dashboard/metrics.ts",
+        "implementation/1.14.0/web-app/src/features/dashboard/workItems.ts",
+        "implementation/1.14.0/web-app/src/features/episodes/EpisodeDetail.test.tsx",
+        "implementation/1.14.0/web-app/src/features/episodes/EpisodeDetail.tsx",
+        "implementation/1.14.0/web-app/src/features/episodes/EpisodeList.tsx",
+        "implementation/1.14.0/web-app/src/features/episodes/EpisodeOverview.tsx",
+        "implementation/1.14.0/web-app/src/features/episodes/EpisodeReview.tsx",
+        "implementation/1.14.0/web-app/src/features/episodes/LinkedAlerts.tsx",
+        "implementation/1.14.0/web-app/src/features/episodes/episodeFilters.test.ts",
+        "implementation/1.14.0/web-app/src/features/episodes/episodeFilters.ts",
+        "implementation/1.14.0/web-app/src/features/episodes/episodes.test.ts",
+        "implementation/1.14.0/web-app/src/features/episodes/reviewStore.ts",
+        "implementation/1.14.0/web-app/src/features/graph/0.24.0/FlowDetail.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/0.24.0/Graph.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/0.24.0/OwnerGraph.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/0.24.0/model.ts",
+        "implementation/1.14.0/web-app/src/features/graph/TxLabelPanel.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/adapter.ts",
+        "implementation/1.14.0/web-app/src/features/graph/graph.test.ts",
+        "implementation/1.14.0/web-app/src/features/graph/graphStyle.ts",
+        "implementation/1.14.0/web-app/src/features/graph/liveAdapter.test.ts",
+        "implementation/1.14.0/web-app/src/features/graph/liveAdapter.ts",
+        "implementation/1.14.0/web-app/src/features/graph/relabel.ts",
+        "implementation/1.14.0/web-app/src/features/graph/timeline/PairTimeline.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/timeline/PatternGraph.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/timeline/SelectionActions.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/timeline/TimeGraph.tsx",
+        "implementation/1.14.0/web-app/src/features/graph/timeline/timeLayout.test.ts",
+        "implementation/1.14.0/web-app/src/features/graph/timeline/timeLayout.ts",
+        "implementation/1.14.0/web-app/src/features/investigation/AntInvestigation.test.tsx",
+        "implementation/1.14.0/web-app/src/features/investigation/AntInvestigation.tsx",
+        "implementation/1.14.0/web-app/src/features/investigation/AntReviewSite.tsx",
+        "implementation/1.14.0/web-app/src/features/investigation/ant-main.tsx",
+        "implementation/1.14.0/web-app/src/features/notifications/AssignedCases.tsx",
+        "implementation/1.14.0/web-app/src/features/search/GlobalSearch.tsx",
+        "implementation/1.14.0/web-app/src/features/search/LiveGlobalSearch.test.tsx",
+        "implementation/1.14.0/web-app/src/features/search/LiveGlobalSearch.tsx",
+        "implementation/1.14.0/web-app/src/features/search/searchItems.ts",
+        "implementation/1.14.0/web-app/src/features/settings/AdminSettings.tsx",
+        "implementation/1.14.0/web-app/src/features/transactions/TransactionExplorer.tsx",
+        "implementation/1.14.0/web-app/src/features/transactions/transaction-stage.tsx",
+        "implementation/1.14.0/web-app/src/features/transactions/transactionIndex.ts",
+        "implementation/1.14.0/web-app/src/features/transactions/transactionTarget.ts",
+        "implementation/1.14.0/web-app/src/hooks/use-callback-ref.ts",
+        "implementation/1.14.0/web-app/src/hooks/use-data-table.ts",
+        "implementation/1.14.0/web-app/src/hooks/use-debounced-callback.ts",
+        "implementation/1.14.0/web-app/src/hooks/use-mobile.ts",
+        "implementation/1.14.0/web-app/src/lib/WorkspaceProvider.test.tsx",
+        "implementation/1.14.0/web-app/src/lib/WorkspaceProvider.tsx",
+        "implementation/1.14.0/web-app/src/lib/apiMode.ts",
+        "implementation/1.14.0/web-app/src/lib/data-table.ts",
+        "implementation/1.14.0/web-app/src/lib/format.ts",
+        "implementation/1.14.0/web-app/src/lib/memory.ts",
+        "implementation/1.14.0/web-app/src/lib/parsers.ts",
+        "implementation/1.14.0/web-app/src/lib/queryCache.test.ts",
+        "implementation/1.14.0/web-app/src/lib/queryCache.ts",
+        "implementation/1.14.0/web-app/src/lib/useAsync.test.tsx",
+        "implementation/1.14.0/web-app/src/lib/useAsync.ts",
+        "implementation/1.14.0/web-app/src/lib/utils.ts",
+        "implementation/1.14.0/web-app/src/lib/wiringBridge.ant.test.ts",
+        "implementation/1.14.0/web-app/src/lib/wiringBridge.live.test.ts",
+        "implementation/1.14.0/web-app/src/lib/wiringBridge.test.ts",
+        "implementation/1.14.0/web-app/src/lib/wiringBridge.ts",
+        "implementation/1.14.0/web-app/src/lib/workStatus.ts",
+        "implementation/1.14.0/web-app/src/lib/workspaceState.ts",
+        "implementation/1.14.0/web-app/src/main.tsx",
+        "implementation/1.14.0/web-app/src/mocks/alertDetail.ts",
+        "implementation/1.14.0/web-app/src/mocks/alerts.ts",
+        "implementation/1.14.0/web-app/src/mocks/dashboard.ts",
+        "implementation/1.14.0/web-app/src/mocks/episodes.ts",
+        "implementation/1.14.0/web-app/src/mocks/graph.ts",
+        "implementation/1.14.0/web-app/src/mocks/liveFixtureApi.test.ts",
+        "implementation/1.14.0/web-app/src/mocks/liveFixtureApi.ts",
+        "implementation/1.14.0/web-app/src/mocks/mocks.test.ts",
+        "implementation/1.14.0/web-app/src/mocks/notifications.test.ts",
+        "implementation/1.14.0/web-app/src/mocks/notifications.ts",
+        "implementation/1.14.0/web-app/src/mocks/scenario.ts",
+        "implementation/1.14.0/web-app/src/mocks/time.ts",
+        "implementation/1.14.0/web-app/src/mocks/transactionScope.test.ts",
+        "implementation/1.14.0/web-app/src/mocks/transactionScope.ts",
+        "implementation/1.14.0/web-app/src/mocks/transactions.ts",
+        "implementation/1.14.0/web-app/src/pages/AccountPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/AlertDetailPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/AlertsPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/ComingSoonPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/DashboardPage.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/DashboardPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/EpisodeDetailPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/EpisodesPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveCasesPage.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveCasesPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveDashboardPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveLedgerPage.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveLedgerPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveNavigation.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveNotificationsPage.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/LiveNotificationsPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/LivePages.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/LoginPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/NotificationsPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/OperationsPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/RulesPage.fixture.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/RulesPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/SettingsPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/SuspiciousPage.tsx",
+        "implementation/1.14.0/web-app/src/pages/TransactionsPage.test.tsx",
+        "implementation/1.14.0/web-app/src/pages/TransactionsPage.tsx",
+        "implementation/1.14.0/web-app/src/styles/theme.css",
+        "implementation/1.14.0/web-app/src/test/setup.ts",
+        "implementation/1.14.0/web-app/src/types/data-table.ts",
+        "implementation/1.14.0/web-app/tsconfig.app.json",
+        "implementation/1.14.0/web-app/tsconfig.json",
+        "implementation/1.14.0/web-app/tsconfig.node.json",
+        "implementation/1.14.0/web-app/vite.config.ts",
+        "implementation/1.14.0/web-app/vitest.config.ts"
+      ],
+      "original_html": [],
+      "entry_html": [
+        "implementation/1.14.0/web-app/index.html",
+        "implementation/1.14.0/web-app/ant-review.html"
+      ],
+      "generated_html": [
+        "implementation/1.14.0/preservation/2026-10-26/index.html",
+        "implementation/1.14.0/preservation/2026-10-26/ant-review.html"
+      ],
+      "version_record": "implementation/1.14.0/VERSION.md",
+      "verification": "implementation/1.14.0/VERIFICATION.json",
+      "related_design": [
+        "implementation/1.14.0/SOURCE.json"
+      ],
+      "run": "See VERSION.md and SOURCE.json; original, generated and Git-only artifacts are distinct.",
+      "source": {
+        "schema_version": 1,
+        "version": "1.14.0",
+        "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+        "kind": "current",
+        "name": "fe/work 합성 조사 검수·업무 문맥 구현",
+        "git_committer_kst": "2026-10-23T13:28:26+09:00",
+        "source_repository": "money_laundry",
+        "source_commit": "35cec7a36942133ecee5cdaada491cc1b0718943",
+        "original_source_path": "frontend/web-app",
+        "original_source_url": "https://github.com/dh0728/money_laundry/tree/35cec7a36942133ecee5cdaada491cc1b0718943/frontend/web-app",
+        "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+        "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+        "evidence_rows": [
+          81,
+          82
+        ],
+        "original_branch": "fe/work"
+      },
+      "status": "retrospective identifier; user acceptance not established"
     }
   ],
+  "version_count": 39,
+  "current_implementation": "1.14.0",
+  "design_work_in_progress": {
+    "version": "2.0.0",
+    "stage": "new-design-start",
+    "path": "design/2.0.0",
+    "source_files": [],
+    "original_html": [],
+    "entry_html": [],
+    "generated_html": [],
+    "version_record": "design/2.0.0/VERSION.md",
+    "verification": "design/2.0.0/VERIFICATION.json",
+    "related_design": [
+      "design/2.0.0/README.md"
+    ],
+    "run": "No new design implementation exists; nothing to launch.",
+    "source": {
+      "basis": "user-defined start baseline 2026-10-26"
+    },
+    "status": "start record only; no invented HTML or acceptance"
+  },
+  "numbering_policy": {
+    "prototype": "0.N.0 retains original vN1..24",
+    "implementation": "1.0.0 through1.14.0 follows verified substantive implementation/mockup chronology",
+    "not_releases": "acceptance is separate; documents, patches and duplicate files are evidence",
+    "excluded_current_design": "2.0.0 files retained outside completed/preserved version list",
+    "uncertain_families": "evidence appendix only; no fabricated version number"
+  },
   "pending_sources": [
     {
       "id": "mac-unique-html",
       "count": 5,
-      "state": "not received or integrated; source and dependent assets must be preserved together"
+      "state": "Reviewed recovery originals retained in recovery/unclassified; initial overview assigned1.5.0. Other uncertain experiments have no fabricated version."
     },
     {
       "id": "mac-design-originals-and-local-evidence",
@@ -3058,14 +5218,9 @@
   "folder_rules": {
     "relative_root": "frontend/",
     "prototype": "prototype/0.N.0/",
-    "implementation": "implementation/1.0.0/",
-    "new_design": "design/2.0.0/",
-    "future_dated_supplements": "implementation/1.0.0/supplements/<source-id>/<original-relative-path>",
-    "future_new_design_material": "design/2.0.0/supplements/<source-id>/<original-relative-path>",
-    "collision": "Never overwrite or delete. If path exists compare hashes; preserve distinct bytes under a distinct source-id and record lineage.",
-    "privacy": "Only approved project artifacts may be added to the shared bundle. Private notes/meetings/secrets remain outside it.",
-    "Figma": "no access or changes in this task",
-    "Mac_workflow": "Parent coordinates writers; this cloud pass does not receive or classify unseen local files as duplicates."
+    "implementation": "implementation/1.N.0/",
+    "unclassified": "recovery/unclassified/",
+    "in_progress": "design/2.0.0/"
   },
-  "complete_scope": "remotely available team source at the recorded baseline, plus explicitly dated preservation viewers/build; not all Mac/local artifacts"
+  "complete_scope": "Verified numeric preservation groups only; unresolved later experimental families remain in evidence appendix."
 }

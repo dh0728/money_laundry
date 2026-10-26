@@ -12,7 +12,7 @@ export function PageHeading({ title, description, badge }: { title: string; desc
   )
 }
 
-export function SectionTitle({ title, description, action }: { title: ReactNode; description?: ReactNode; action?: ReactNode }) {
+export function SectionTitle({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
     <div className="mb-5 flex items-start justify-between gap-4">
       <div>

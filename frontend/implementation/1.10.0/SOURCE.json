@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "version": "1.10.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "overview",
+  "name": "개요 확대 화면 구조 개편",
+  "git_committer_kst": "2026-10-15T12:32:28+09:00",
+  "source_repository": "external_brain",
+  "source_commit": "49769d20638633e7c350c077fc66aab658aa096e",
+  "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "original_source_url": "https://github.com/kmg200164/external_brain/tree/49769d20638633e7c350c077fc66aab658aa096e/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [
+    57,
+    71
+  ]
+}

@@ -8,11 +8,9 @@ import { verdictOptions, verdictResolution } from './verdict'
 describe('Alert 판정 선택지 (9/28 회의)', () => {
   it('정상 1개와 이상거래 3개이며 오탐은 없다', () => {
     expect(verdictOptions.map(o => `${o.group}/${o.label}`)).toEqual([
-      '정상/정상 종결', '이상거래/단독 의심 종결', '이상거래/기존 Episode에 연결', '이상거래/새 Episode 생성',
+      '정상/정상 · 종결', '이상거래/Alert 단독', '이상거래/기존 Episode 연결', '이상거래/새 Episode 생성',
     ])
     expect(JSON.stringify(verdictOptions)).not.toContain('오탐')
-    expect(verdictOptions.filter(option => !option.hidden).map(option => option.value)).toEqual(['normal', 'standalone', 'link-episode'])
-    expect(verdictOptions.find(option => option.value === 'new-episode')).toMatchObject({ hidden: true })
   })
 
   it('단독 의심 종결도 구현된 선택지이고, Episode로 보내는 판정은 종결하지 않는다', () => {

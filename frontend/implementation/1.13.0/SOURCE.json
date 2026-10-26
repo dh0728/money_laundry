@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "version": "1.13.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "preserving",
+  "name": "fe/work 원장·의견·API 연결 구현",
+  "git_committer_kst": "2026-10-22T00:06:10+09:00",
+  "source_repository": "money_laundry",
+  "source_commit": "fb5dc96c74ace48cd673d27f56305e5bb43782a7",
+  "original_source_path": "frontend/web-app",
+  "original_source_url": "https://github.com/dh0728/money_laundry/tree/fb5dc96c74ace48cd673d27f56305e5bb43782a7/frontend/web-app",
+  "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [],
+  "reconstruction": {
+    "baseline_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+    "patch": "implementation/1.13.0/web-app-1.13.0.patch",
+    "source_tree": "frontend/web-app",
+    "run": "Use a separate working copy at the exact source commit. Do not apply historical patches to the current implementation."
+  },
+  "original_branch": "fe/work"
+}

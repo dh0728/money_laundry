@@ -1,6 +1,5 @@
-import { hrefFor } from '@/app/navigation'
 import { LinkedAlerts } from '@/features/episodes/LinkedAlerts'
-import { Panel } from '@/features/alerts/DetailPanels'
+import { Panel, OverviewPanels } from '@/features/alerts/DetailPanels'
 import { AlertVerdictForm } from '@/features/alerts/AlertVerdictForm'
 import type { AlertVerdict } from '@/features/alerts/verdict'
 import { SectionTitle } from '@/components/page'
@@ -8,8 +7,8 @@ import { CaseActivityCharts } from '@/features/alerts/CaseActivityCharts'
 import { dailyMemberAmounts, dailyMemberUsdByCurrency } from '@/features/alerts/activityAmounts'
 import { caseEvidence } from '@/features/alerts/caseEvidence'
 import { ReviewLayout } from '@/features/alerts/ReviewLayout'
-import AlertTxTable, { type TxRow } from '@/features/alerts/AlertTxTable'
-import { useSharedPeriod, useViewState, useWorkspace } from '@/lib/workspaceState'
+import AlertTxTable from '@/features/alerts/AlertTxTable'
+import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
 import { RefreshStatus } from '@/components/RefreshStatus'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -26,7 +25,7 @@ import { assertEditableAlert, buildAlertClose, buildAlertTransfer, buildEpisodeU
 import { toReviewGraphModel } from '@/features/graph/liveAdapter'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { typeDisplay, type TypeCode } from '@/api/codes'
-import Graph from '@/features/graph/0.24.0/Graph'
+import Graph from '@/features/graph/v24/Graph'
 import type { DateRange } from 'react-day-picker'
 import { isoDate } from '@/lib/format'
 import AlertList from '@/features/alerts/AlertList'
@@ -40,13 +39,12 @@ const moneyAmount = (value: number) => Number(value).toLocaleString('ko-KR')
 const moneyPercent = (value: number | null) => value == null ? '산출 불가' : `${value.toFixed(1)}%`
 
 function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshList }: { caseId: number; kind: ReviewKind; onBack: () => void; onOpenEpisode: (id: number) => void; onOpenAlert?: (id: number) => void; refreshList: () => Promise<unknown> }) {
-  const [tab, setTab] = useViewState<'overview' | 'graph' | 'transactions' | 'review'>(`case/${kind}/${caseId}/tab`, 'overview')
-  const workspace = useWorkspace()
+  const [tab, setTab] = useState<'overview' | 'graph' | 'transactions' | 'review'>('overview')
   const user = useCurrentUser()
   const detail = useAsync(() => fetchReviewCase(caseId), [caseId], { key: 'case/detail', maxAge: 60_000 })
   const { state, retry, refresh } = detail
   const [verdict, setVerdict] = useState<AlertVerdict>('normal')
-  const [comment, setComment] = useViewState(`case/${kind}/${caseId}/comment`, '')
+  const [comment, setComment] = useState('')
   const [excludeComment, setExcludeComment] = useState('')
   const [unlinkComment, setUnlinkComment] = useState('')
   const [selectingAlerts, setSelectingAlerts] = useState(false)
@@ -102,16 +100,6 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
   }
   const activityAmounts = dailyMemberAmounts(item.groups ?? [])
   const evidence = caseEvidence(item.groups ?? [])
-  const seedMembers = evidence.members.filter(member => member.transaction.role === 'SEED')
-  const previewMembers = [...(seedMembers.length ? seedMembers : evidence.members)]
-    .sort((a, b) => new Date(a.transaction.occurredAt).getTime() - new Date(b.transaction.occurredAt).getTime() || a.txId - b.txId).slice(0, 5)
-  const transactionRow = (member: typeof evidence.members[number]): TxRow => ({
-    txId: member.txId, txAt: new Date(member.transaction.occurredAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T'),
-    fromAccount: member.transaction.fromAccountId, toAccount: member.transaction.toAccountId,
-    amountPaid: Number(member.transaction.amountPaid), paymentCurrency: member.transaction.paymentCurrency, paymentFormat: member.transaction.paymentFormat,
-    launderingScore: member.transaction.scores?.p_laundering ?? null, role: member.transaction.role,
-    reviewLabel: `${member.reviewRole} · ${member.state}${member.decision ? ` · ${member.decision}` : ''}`,
-  })
   const totalAmount = Object.entries(activityAmounts).map(([currency, values]) =>
     `${moneyAmount(values.daily.reduce((sum, day) => sum + day.amount, 0))} ${currency}`).join(' · ') || '—'
   const usdLabel = (value: unknown) => value == null || value === '' || !Number.isFinite(Number(value))
@@ -152,14 +140,6 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     const ids = current[groupId] ?? []
     return { ...current, [groupId]: ids.includes(txId) ? ids.filter(id => id !== txId) : [...ids, txId] }
   })
-  function openTransaction(txId: number) {
-    const member = item.groups?.flatMap(group => group.members).find(member => member.txId === txId)
-    if (!member || !Number.isSafeInteger(txId) || txId <= 0) return
-    const occurred = new Date(member.transaction.occurredAt)
-    const day = Number.isFinite(occurred.getTime()) ? occurred.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : undefined
-    workspace.set(`ledger/transaction-target/${txId}`, { from: day, to: day, account: member.transaction.fromAccountId || undefined })
-    window.location.hash = hrefFor('transactions', txId)
-  }
   async function openSourceAlert(alertId: number) {
     if (!onOpenAlert) return
     try {
@@ -217,7 +197,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
         toast.error('처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.')
       } else {
         previousRequest.current = null; setCanRetry(false)
-        toast.error(error.problem.code === 'FIXTURE_READ_ONLY' ? error.message : error.problem.status === 403 ? '이 사건을 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 내용을 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
+        toast.error(error.problem.status === 403 ? '이 사건을 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 내용을 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
         if (error.problem.status === 409 || error.problem.status === 404) {
           setUnlinkGroups([])
           setSelected({}); void Promise.allSettled([refresh(), money.refresh(), targets.refresh(), refreshList()])
@@ -252,36 +232,16 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       if (!(error instanceof ApiError)) { setScopeRetry(true); toast.error('계좌 선택 처리 여부가 불확실합니다. 같은 요청을 재시도해 확인해 주세요.') }
       else {
         scopePrevious.current = null; setScopeRetry(false)
-        toast.error(error.problem.code === 'FIXTURE_READ_ONLY' ? error.message : error.problem.status === 403 ? '이 사건의 계좌 범위를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 계좌 범위를 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
+        toast.error(error.problem.status === 403 ? '이 사건의 계좌 범위를 변경할 권한이 없습니다.' : error.problem.status === 404 ? '사건을 찾을 수 없습니다. 목록에서 다시 선택해 주세요.' : error.problem.status === 409 ? '사건 정보가 변경됐습니다. 최신 계좌 범위를 확인한 뒤 다시 제출해 주세요.' : error.problem.status >= 500 ? '서버 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.' : error.message)
         if (error.problem.status === 409 || error.problem.status === 404) { setScopeDraft(null); void Promise.allSettled([refresh(), money.refresh(), refreshList()]) }
       }
     } finally { scopeBusyRef.current = false; setScopeBusy(false) }
   }
-  const judgmentPanel = (<Panel title={item.kind === 'ALERT' ? '묶음 근거' : '패턴 증거'} description="서버가 보존한 조사 범위" testId="grouping" action={item.kind === 'ALERT' ? <Button size="sm" variant="outline" onClick={() => setTab('review')}>{editable ? '검토 의견 작성' : '검토 의견 확인'}</Button> : undefined}>
-      {item.kind === 'EPISODE' && <div className="flex flex-wrap gap-1">{item.primaryTypes.map(name => <Badge key={name} variant="outline">{name}</Badge>)}</div>}
-      <dl className="space-y-2 text-xs"><div><dt>씨앗 거래</dt><dd>{item.summary.seedCount}건</dd></div><div><dt>조사 대상</dt><dd>{item.summary.subjectCount}건</dd></div><div><dt>유효 거래</dt><dd>{item.summary.txCount}건</dd></div></dl>
-      {item.summary.typeShare != null && <p className="mt-2 text-xs text-muted-foreground">대표 유형 비중 {(item.summary.typeShare * 100).toFixed(1)}% · 사건 확률 아님</p>}
-      <p className="mt-2 text-xs text-muted-foreground">모델 유형 점수와 룰 평가는 별도 근거입니다. 룰 적중 여부는 현재 사건 응답으로 확인할 수 없습니다.</p>
-    </Panel>)
-  const modelPanel = item.kind === 'ALERT' ? (<Panel title="거래별 패턴 후보" description="선택 거래의 유형 점수" testId="pattern-candidates">
-      <p className="mt-1 text-xs text-muted-foreground">선택한 거래의 모델 유형 점수입니다. Alert 전체 확률이 아닙니다. 위 대표 유형은 씨앗 거래에서 가장 많이 나온 유형입니다. 실행 ID·모델 버전 미제공으로 이 결과의 실행별 출처는 확인할 수 없습니다.</p>
-      {scoredMembers.length ? <><label className="mt-3 block text-xs">확률을 볼 거래 <select aria-label="확률을 볼 거래" className="ml-2 min-w-48 rounded-md border bg-background py-2 pl-3 pr-8" value={scoreMember.txId} onChange={event => setScoreTxId(Number(event.target.value))}>{scoredMembers.map(member => <option key={member.txId} value={member.txId}>T-{member.txId}{member.transaction.role === 'SEED' ? ' · 씨앗 거래' : ''}</option>)}</select></label>
-        <ol aria-label="거래 패턴 후보" className="mt-3 space-y-2">{patternCandidates.map((candidate, index) => <li key={candidate.code} className="flex items-center gap-2 text-sm"><span className="w-5 text-muted-foreground">{index + 1}.</span><span className="rounded-full bg-foreground px-2.5 py-0.5 font-mono text-xs text-background">{typeDisplay(candidate.code).key}</span><strong className="tabular-nums">{(candidate.score * 100).toFixed(1)}%</strong></li>)}</ol>
-        <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => openTransaction(scoreMember.txId)}>선택 거래 원장 확인</Button></div>
-        {!patternCandidates.length && <p className="mt-3 text-sm text-muted-foreground">이 거래의 패턴 점수가 없습니다.</p>}</> : <p className="mt-3 text-sm text-muted-foreground">점수가 제공된 거래가 없습니다.</p>}
-    </Panel>) : null
   return <div className="space-y-5"><RefreshStatus queries={[detail, money, targets]} />
     <Button variant="outline" size="sm" onClick={onBack}>목록으로</Button>
     <CaseHeader id={item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`} title={item.kind === 'ALERT' ? item.summary.primaryType : `${item.primaryTypes.join(' · ')} · Alert ${item.sourceAlertIds.length}건`}
       tab={tab} onTab={setTab} count={item.summary.txCount} tags={<>{item.kind === 'ALERT' ? <StatusBadge status={alertListRow(item).status} /> : <EpisodeStatusBadge status={episodeListRow(item).status} />}<RiskBadge score={item.summary.riskScore} /><Badge variant="outline">담당 {item.assigneeName}</Badge><Badge variant="outline">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '—'}</Badge></>} />
     <div hidden={tab !== 'overview'} className="space-y-4">
-    {item.kind === 'ALERT' && <>
-      <div className="grid items-start gap-4 @3xl:grid-cols-2">{judgmentPanel}{modelPanel}</div>
-      <Panel title="근거 거래 확인" description={seedMembers.length ? `씨앗 거래 ${seedMembers.length}건 중 ${previewMembers.length}건 · 거래 ID로 현재 원장의 소유주와 계좌 확인` : '씨앗 거래 정보 없음 · 현재 조사 범위를 시각순으로 최대 5건 표시'} testId="overview-evidence"
-        action={<Button size="sm" variant="outline" onClick={() => setTab('transactions')}>전체 거래 {evidence.members.length}건 보기</Button>}>
-        {previewMembers.length ? <AlertTxTable remote rows={previewMembers.map(transactionRow)} onOpenTransaction={openTransaction} /> : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}
-      </Panel>
-    </>}
     <CaseStats items={[
         ['외부 유입액', externalAmount('in'), externalUsd('in')],
         ['거래 총액', totalAmount, usdLabel(totalUsd)],
@@ -305,17 +265,28 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
         toggle: id => { const group = linkedGroups.find(group => group.sourceAlertId === id)!; setUnlinkGroups(ids => ids.includes(group.groupId) ? ids.filter(value => value !== group.groupId) : [...ids, group.groupId]); setCanRetry(false) } } : undefined} />
       {selectingAlerts && <p className="mt-2 text-xs text-muted-foreground">남는 Alert가 2개 미만이면 모두 연결 해제하고 Episode는 해체 종결 이력으로 보존합니다.</p>}
     </Panel>}
-    <div className={item.kind === 'EPISODE' ? 'grid items-stretch gap-4 @3xl:grid-cols-3' : 'grid items-start gap-4 @3xl:grid-cols-2'}>
-    {item.kind === 'EPISODE' && judgmentPanel}
+    {item.kind === 'ALERT' && <CaseActivityCharts amounts={activityAmounts} dailyUsdByCurrency={dailyMemberUsdByCurrency(item.groups ?? [])} />}
+    <OverviewPanels columns={item.kind === 'EPISODE' ? 3 : 4}>
+    <Panel title={item.kind === 'ALERT' ? '묶음 근거' : '패턴 증거'} description="서버가 보존한 조사 범위" testId="grouping">
+      {item.kind === 'EPISODE' && <div className="flex flex-wrap gap-1">{item.primaryTypes.map(name => <Badge key={name} variant="outline">{name}</Badge>)}</div>}
+      <dl className="space-y-2 text-xs"><div><dt>씨앗 거래</dt><dd>{item.summary.seedCount}건</dd></div><div><dt>조사 대상</dt><dd>{item.summary.subjectCount}건</dd></div><div><dt>유효 거래</dt><dd>{item.summary.txCount}건</dd></div></dl>
+      {item.summary.typeShare != null && <p className="mt-2 text-xs text-muted-foreground">대표 유형 비중 {(item.summary.typeShare * 100).toFixed(1)}% · 사건 확률 아님</p>}
+    </Panel>
+    {item.kind === 'ALERT' && <Panel title="거래별 패턴 후보" description="선택 거래의 모델 점수" testId="pattern-candidates">
+      <p className="mt-1 text-xs text-muted-foreground">선택한 거래의 모델 유형 점수입니다. Alert 전체 확률이 아닙니다. 위 대표 유형은 씨앗 거래에서 가장 많이 나온 유형입니다.</p>
+      {scoredMembers.length ? <><label className="mt-3 block text-xs">확률을 볼 거래 <select aria-label="확률을 볼 거래" className="ml-2 min-w-48 rounded-md border bg-background py-2 pl-3 pr-8" value={scoreMember.txId} onChange={event => setScoreTxId(Number(event.target.value))}>{scoredMembers.map(member => <option key={member.txId} value={member.txId}>T-{member.txId}{member.transaction.role === 'SEED' ? ' · 씨앗 거래' : ''}</option>)}</select></label>
+        <ol aria-label="거래 패턴 후보" className="mt-3 space-y-2">{patternCandidates.map((candidate, index) => <li key={candidate.code} className="flex items-center gap-2 text-sm"><span className="w-5 text-muted-foreground">{index + 1}.</span><span className="rounded-full bg-foreground px-2.5 py-0.5 font-mono text-xs text-background">{typeDisplay(candidate.code).key}</span><strong className="tabular-nums">{(candidate.score * 100).toFixed(1)}%</strong></li>)}</ol>
+        {!patternCandidates.length && <p className="mt-3 text-sm text-muted-foreground">이 거래의 패턴 점수가 없습니다.</p>}</> : <p className="mt-3 text-sm text-muted-foreground">점수가 제공된 거래가 없습니다.</p>}
+    </Panel>}
     <Panel title={item.kind === 'ALERT' ? '결제 수단 구성' : '대표 계좌 이력'} description={item.kind === 'ALERT' ? '조사 대상 거래 건수' : '관련 계좌 조사 이력'}>
       {item.kind === 'EPISODE' ? <p className="text-xs text-muted-foreground">대표 계좌 이력 조회는 아직 연결되지 않았습니다.</p> : <>
       <dl className="space-y-2 text-xs">{Object.entries(item.summary.paymentFormats ?? {}).map(([format, count]) => <div key={format}><dt>{format}</dt><dd>{count}건</dd></div>)}</dl>
       {!Object.keys(item.summary.paymentFormats ?? {}).length && <p className="text-xs text-muted-foreground">집계 없음</p>}</>}
     </Panel>
     <Panel title="처리 이력" description="담당자 · 변경 사유 · 시각" testId="history">
-      <div className="divide-y">{(item.history ?? []).map(row => <div key={row.eventId} className="flex gap-2.5 py-2"><span className="w-11 shrink-0 text-[0.6875rem] text-muted-foreground">{new Date(row.businessAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5)}</span><span className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" /><div className="min-w-0 flex-1 text-xs"><p>{row.action} · {row.actor ?? '시스템'}</p>{row.comment && <p className="mt-1 text-muted-foreground">{row.comment}</p>}</div></div>)}</div>
+      <div className="divide-y">{(item.history ?? []).map(row => <div key={row.eventId} className="flex gap-2.5 py-2"><span className="w-11 shrink-0 text-[11px] text-muted-foreground">{new Date(row.businessAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5)}</span><span className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" /><div className="min-w-0 flex-1 text-xs"><p>{row.action} · {row.actor ?? '시스템'}</p>{row.comment && <p className="mt-1 text-muted-foreground">{row.comment}</p>}</div></div>)}</div>
     </Panel>
-    </div>
+    </OverviewPanels>
     <section className="rounded-xl border bg-card p-4" aria-label="조사 계좌 자금 지표">
       <h2 className="font-semibold">조사 계좌 자금 지표</h2>
       <p className="mt-1 text-xs text-muted-foreground">서버가 수신한 원장 기준 · 계좌 간 자금 흐름의 FIFO 추정</p>
@@ -343,11 +314,16 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
         </div>}
       </>}
     </section>
-    {item.kind === 'ALERT' && <CaseActivityCharts amounts={activityAmounts} dailyUsdByCurrency={dailyMemberUsdByCurrency(item.groups ?? [])} />}
     </div>
     {tab === 'graph' && <section aria-label="관계 그래프" className="space-y-2"><h2 className="font-semibold">관계 그래프</h2>{graphModel.edges.length ? <Graph model={graphModel} label={(item.kind === 'ALERT' ? `Alert A-${item.alertId}` : `Episode E-${item.caseId}`) + ' 관계 그래프'} nonSuspiciousLabel="의심 판정 없음 · 미분석 포함" /> : <EmptyBlock>표시할 거래가 없습니다.</EmptyBlock>}</section>}
     <div hidden={tab !== 'transactions'}>
-    <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">조사 범위</h2>{item.kind === 'ALERT' && <Button size="sm" variant="outline" disabled={!editable || busy || !removableSelections.length || !excludeComment.trim()} onClick={() => void execute('EXCLUDE')}>선택 거래 제외</Button>}</div>{item.kind === 'ALERT' && <textarea aria-label="거래 제외 사유" className="min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="선택 거래를 조사 범위에서 제외하는 이유" value={excludeComment} onChange={event => { setExcludeComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} />}{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><AlertTxTable remote onOpenTransaction={openTransaction} rows={group.members.map(transactionRow)} selection={{ ids: selected[group.groupId] ?? [], onToggle: id => toggleTx(group.groupId, id), disabled: id => { const member = group.members.find(row => row.txId === id)!; return !editable || busy || (item.kind === 'ALERT' ? !['PENDING','DECIDED'].includes(member.state) : member.state !== 'PENDING' || member.reviewRole !== 'SUBJECT') } }} /></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
+    <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">조사 범위</h2>{item.kind === 'ALERT' && <Button size="sm" variant="outline" disabled={!editable || busy || !removableSelections.length || !excludeComment.trim()} onClick={() => void execute('EXCLUDE')}>선택 거래 제외</Button>}</div>{item.kind === 'ALERT' && <textarea aria-label="거래 제외 사유" className="min-h-16 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000} placeholder="선택 거래를 조사 범위에서 제외하는 이유" value={excludeComment} onChange={event => { setExcludeComment(event.target.value); setCanRetry(false) }} disabled={!editable || busy} />}{(item.groups ?? []).length ? item.groups?.map(group => <div key={group.groupId} className="rounded-xl border bg-card p-4"><h3 className="text-sm font-medium">{item.kind === 'EPISODE' && group.sourceAlertId != null ? `Alert A-${group.sourceAlertId} · ` : ''}{group.label} · 묶음 {group.groupId}</h3><AlertTxTable remote rows={group.members.map(member => ({
+      txId: member.txId, txAt: new Date(member.transaction.occurredAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(' ', 'T'),
+      fromAccount: member.transaction.fromAccountId, toAccount: member.transaction.toAccountId,
+      amountPaid: Number(member.transaction.amountPaid), paymentCurrency: member.transaction.paymentCurrency, paymentFormat: member.transaction.paymentFormat,
+      launderingScore: member.transaction.scores?.p_laundering ?? null, role: member.transaction.role,
+      reviewLabel: `${member.reviewRole} · ${member.state}${member.decision ? ` · ${member.decision}` : ''}`,
+    }))} selection={{ ids: selected[group.groupId] ?? [], onToggle: id => toggleTx(group.groupId, id), disabled: id => { const member = group.members.find(row => row.txId === id)!; return !editable || busy || (item.kind === 'ALERT' ? !['PENDING','DECIDED'].includes(member.state) : member.state !== 'PENDING' || member.reviewRole !== 'SUBJECT') } }} /></div>) : <EmptyBlock>조사 범위가 없습니다.</EmptyBlock>}</section>
     </div>
     <div hidden={tab !== 'review'} className="space-y-4">
     <ReviewLayout reference={<dl className="space-y-4 text-xs"><div><dt>검토 범위</dt><dd>거래 {item.summary.txCount}건 · 조사 대상 {item.summary.subjectCount}건</dd></div><div><dt>유형</dt><dd>{item.kind === 'ALERT' ? item.summary.primaryType : item.primaryTypes.join(' · ')}</dd></div><div><dt>조사 대상 거래액</dt><dd>{Object.entries(item.summary.amountsByCurrency).map(([currency, amount]) => <p key={currency}>{currency} {moneyAmount(amount)}</p>)}</dd></div></dl>}>

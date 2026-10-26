@@ -17,16 +17,13 @@ export type VerdictOption = {
   result: string
   /** API.md에 요청이 없어 mock으로만 동작하는 선택지 */
   proposal?: true
-  /** 검토 의견 탭에 두지 않는 선택지(재설계 S5: 새 Episode는 목록 선택 모드에서 2건 이상으로 만든다) */
-  hidden?: true
 }
 
 export const verdictOptions: VerdictOption[] = [
-  // 재설계 S5 최종 판단 3개: 정상 종결 | 단독 의심 종결 | 기존 Episode에 연결
-  { value: 'normal', group: '정상', label: '정상 종결', action: '종결 확인', result: '정상으로 종결' },
-  { value: 'standalone', group: '이상거래', label: '단독 의심 종결', action: '종결 확인', result: '의심으로 종결(Alert 단독)' },
-  { value: 'link-episode', group: '이상거래', label: '기존 Episode에 연결', action: 'Episode 연결 확인', result: '기존 Episode에 연결' },
-  { value: 'new-episode', group: '이상거래', label: '새 Episode 생성', action: 'Episode 생성 확인', result: '새 Episode 생성', hidden: true },
+  { value: 'normal', group: '정상', label: '정상 · 종결', action: '종결 확인', result: '정상으로 종결' },
+  { value: 'standalone', group: '이상거래', label: 'Alert 단독', action: '판정 확인', result: '이상거래(Alert 단독)로 판정' },
+  { value: 'link-episode', group: '이상거래', label: '기존 Episode 연결', action: 'Episode 연결 확인', result: '이상거래로 기존 Episode에 연결' },
+  { value: 'new-episode', group: '이상거래', label: '새 Episode 생성', action: 'Episode 생성 확인', result: '이상거래로 새 Episode 생성' },
 ]
 
 export const verdictGroups = ['정상', '이상거래'] as const

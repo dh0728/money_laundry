@@ -166,7 +166,7 @@ jobs:
         if: steps.check_images.outputs.web_exists != 'true'
         uses: docker/build-push-action@v7
         with:
-          context: frontend/implementation/1.0.0/web-app
+          context: frontend/implementation/1.14.0/web-app
           push: true
           tags: ${{ steps.image_names.outputs.web_image }}
           build-args: |

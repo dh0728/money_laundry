@@ -1,7 +1,7 @@
 // v24 blocks/section-cards.tsx (shadcn dashboard-01 section-cards)
 import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
 export type SectionCardItem = { label: string; value: string; delta?: number; unit?: string; favorableDirection?: 'up' | 'down'; trend: string; note: string }
 
@@ -16,19 +16,20 @@ export function SectionCard({ item }: { item: SectionCardItem }) {
       <CardHeader>
         <CardDescription>{item.label}</CardDescription>
         <CardTitle className="type-display font-semibold tabular-nums">{item.value}</CardTitle>
-        {/* 재설계 S1: 증감 배지는 모서리가 아니라 비교 기준(전일 대비) 줄에 둔다 */}
-      </CardHeader>
-      <CardFooter className="flex-col items-start gap-1.5 text-sm">
-        <div className="flex flex-wrap items-center gap-2 font-medium">
-          {item.trend}
-          {Icon && item.delta !== undefined && (
+        {Icon && item.delta !== undefined && (
+          <CardAction>
             <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent text-foreground' : undefined} style={deltaTone ? { backgroundColor: `var(--risk-${deltaTone === 'positive' ? 0 : 9})` } : undefined}>
               <Icon />
               {item.delta >= 0 ? '+' : ''}
               {item.delta}
               {item.unit ?? '%'}
             </Badge>
-          )}
+          </CardAction>
+        )}
+      </CardHeader>
+      <CardFooter className="flex-col items-start gap-1.5 text-sm">
+        <div className="line-clamp-1 flex gap-2 font-medium">
+          {item.trend} {Icon && <Icon className="size-4" />}
         </div>
         <div className="text-muted-foreground">{item.note}</div>
       </CardFooter>

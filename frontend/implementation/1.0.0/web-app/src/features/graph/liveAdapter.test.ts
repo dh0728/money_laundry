@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import type { ReviewCase, ReviewMember } from '@/api/liveReview'
 import { toReviewGraphModel } from './liveAdapter'
-import { groupOwners } from './0.24.0/OwnerGraph'
+import { groupOwners } from './v24/OwnerGraph'
 
 const member = (txId: number, decision: ReviewMember['decision'], isSuspicious: boolean): ReviewMember => ({
   txId, reviewRole: 'SUBJECT', state: decision ? 'DECIDED' : 'PENDING', decision, sources: [],

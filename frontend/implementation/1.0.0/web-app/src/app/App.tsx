@@ -1,7 +1,6 @@
 import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
-import { WorkspaceState } from '@/lib/workspaceState'
 import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
-import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
 import { live } from '@/lib/apiMode'
@@ -16,7 +15,7 @@ import { SidebarSelection } from '@/components/SidebarSelection'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import ComingSoonPage from '@/pages/ComingSoonPage'
 import DashboardPage from '@/pages/DashboardPage'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -26,16 +25,13 @@ import EpisodesPage from '@/pages/EpisodesPage'
 import LoginPage from '@/pages/LoginPage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import SettingsPage from '@/pages/SettingsPage'
-import RulesPage from '@/pages/RulesPage'
-import OperationsPage from '@/pages/OperationsPage'
-import SuspiciousPage from '@/pages/SuspiciousPage'
 import TransactionsPage from '@/pages/TransactionsPage'
 import LiveDashboardPage from '@/pages/LiveDashboardPage'
 import LiveLedgerPage from '@/pages/LiveLedgerPage'
 import LiveCasesPage from '@/pages/LiveCasesPage'
 import { currentScenario } from '@/mocks/scenario'
 import { CurrentUserContext, MOCK_USER, roleInfo, type CurrentUser } from './session'
-import { mainNav, manageNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
+import { mainNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 import { PendingWorkCount, UnreadNotificationCount } from './SidebarCounts'
 
 
@@ -44,9 +40,6 @@ const pageTitles: Record<Page, string> = {
   transactions: '거래 내역',
   alerts: 'Alert 목록',
   episodes: 'Episode 목록',
-  rules: '룰엔진',
-  operations: '수집·처리 현황',
-  suspicious: '의심 거래',
   notifications: '알림',
   settings: '설정',
   account: '계정',
@@ -101,17 +94,6 @@ export default function App() {
   const [restoring, setRestoring] = useState(live)
   const [authMessage, setAuthMessage] = useState('')
   const [logoutError, setLogoutError] = useState('')
-  const [workspace, setWorkspace] = useState(() => new WorkspaceState())
-  const suspended = useRef<{ identity: string; workspace: WorkspaceState; page: Page; id?: number } | null>(null)
-  const logoutInProgress = useRef(false)
-  const expiredSession = useEffectEvent(() => {
-    if (user && !logoutInProgress.current) suspended.current = {
-      identity: `${user.userId}:${user.role}`, workspace: workspace.forReauthentication(), page, id,
-    }
-    setWorkspace(new WorkspaceState())
-    setUser(null)
-    setAuthMessage('로그인 시간이 만료됐습니다. 다시 로그인해 주세요.')
-  })
   const currentUser = user ?? MOCK_USER
   const fromSession = (session: SessionUser): CurrentUser => ({ ...MOCK_USER, userId: session.id, name: session.name, role: session.role, username: session.username, organization: '—', email: '—', joinedAt: '—' })
   const [agentOpen, setAgentOpen] = useState(false)
@@ -136,7 +118,7 @@ export default function App() {
     restoreSession().then(session => { if (active) setUser(fromSession(session)) }).catch(error => {
       if (active && !(error instanceof ApiError && error.problem.status === 401)) setAuthMessage('서버에 연결하지 못했습니다. 다시 로그인해 주세요.')
     }).finally(() => { if (active) setRestoring(false) })
-    const expired = () => expiredSession()
+    const expired = () => { setUser(null); setAuthMessage('로그인 시간이 만료됐습니다. 다시 로그인해 주세요.') }
     window.addEventListener('auth-expired', expired)
     return () => { active = false; window.removeEventListener('auth-expired', expired) }
   }, [])
@@ -144,25 +126,16 @@ export default function App() {
   async function signIn(username: string, password: string) {
     if (!live) { setUser(MOCK_USER); go('dashboard'); return }
     const session = await login(username, password)
-    const recovery = suspended.current
-    const sameIdentity = recovery?.identity === `${session.id}:${session.role}`
-    suspended.current = null
-    setWorkspace(sameIdentity ? recovery.workspace : new WorkspaceState())
-    setUser(fromSession(session)); setAuthMessage('')
-    if (sameIdentity) go(recovery.page, recovery.id)
-    else go('dashboard')
+    setUser(fromSession(session)); setAuthMessage(''); go('dashboard')
   }
 
   async function signOut() {
-    suspended.current = null
-    logoutInProgress.current = true
     try {
       if (live) await logoutSession()
-      setWorkspace(new WorkspaceState())
       setUser(live ? null : MOCK_USER); setLogout(false); setLogoutError(''); go('dashboard')
     } catch {
       setLogoutError('로그아웃하지 못했습니다. 다시 시도해 주세요.')
-    } finally { logoutInProgress.current = false }
+    }
   }
 
   useEffect(() => {
@@ -178,7 +151,7 @@ export default function App() {
 
   return (
     <CurrentUserContext.Provider value={currentUser}>
-    <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} state={workspace} >
+    <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} >
     <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
@@ -186,11 +159,10 @@ export default function App() {
             <SidebarBrandToggle />
           </SidebarHeader>
           <SidebarContent>
-            {([['조사', mainNav], ['관리', manageNav]] as const).map(([label, items]) => <SidebarGroup key={label}>
-              <SidebarGroupLabel className="px-4 group-data-[collapsible=icon]:hidden">{label}</SidebarGroupLabel>
+            <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1.5">
-                  {items.map(item => (
+                  {mainNav.map(item => (
                     <SidebarMenuItem key={item.id}>
                       <SidebarDestinationButton data-nav-id={item.id} isActive={page === item.id} tooltip={item.name} onNavigate={() => go(item.id)} className={navButtonClass}>
                         <item.icon className="size-4" />
@@ -200,8 +172,8 @@ export default function App() {
                   ))}
                 </SidebarMenu>
               </SidebarGroupContent>
-            </SidebarGroup>)}
-            <SidebarGroup className="mt-auto">
+            </SidebarGroup>
+            <SidebarGroup className="mt-auto border-t">
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1.5">
                   {utilityNav.map(item => (
@@ -224,7 +196,7 @@ export default function App() {
                   <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{currentUser.name[0]}</AvatarFallback></Avatar>
                   <span className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
                     <span className="block text-xs font-medium">{currentUser.name}</span>
-                    <span className={`mt-0.5 block text-[0.625rem] ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
+                    <span className={`mt-0.5 block text-[10px] ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
                   </span>
                 </SidebarDestinationButton>
                 <PendingWorkCount routeKey={`${page}/${id ?? ''}`} />
@@ -258,13 +230,10 @@ export default function App() {
         <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
           <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
-            : page === 'transactions' ? (live ? <LiveLedgerPage transactionId={id} onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
+            : page === 'transactions' ? (live ? <LiveLedgerPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
             : page === 'alerts' ? (live ? <LiveCasesPage kind="ALERT" caseId={id} onOpen={caseId => go('alerts', caseId)} onBack={() => go('alerts')} onOpenEpisode={episodeId => go('episodes', episodeId)} /> : <AlertsPage alertId={id} onOpen={alertId => go('alerts', alertId)} onOpenEpisode={episodeId => go('episodes', episodeId)} />)
             : page === 'episodes' ? (live ? <LiveCasesPage kind="EPISODE" caseId={id} onOpen={caseId => go('episodes', caseId)} onBack={() => go('episodes')} onOpenAlert={caseId => go('alerts', caseId)} /> : <EpisodesPage episodeId={id} onOpen={episodeId => go('episodes', episodeId)} onOpenAlert={alertId => go('alerts', alertId)} />)
             : page === 'notifications' ? (live ? <LiveNotificationsPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <NotificationsPage onOpen={item => go(item.target.page, item.target.id)} />)
-            : page === 'rules' ? <RulesPage />
-            : page === 'operations' ? <OperationsPage />
-            : page === 'suspicious' ? <SuspiciousPage />
             : page === 'settings' ? <SettingsPage />
               : page === 'account' ? <AccountPage onLogout={() => setLogout(true)} />
                 : <ComingSoonPage title={pageTitles[page]} />}

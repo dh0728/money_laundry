@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "version": "1.2.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "dashboard",
+  "name": "대시보드 조회·갱신 표시 구현",
+  "git_committer_kst": "2026-10-09T01:07:39+09:00",
+  "source_repository": "money_laundry",
+  "source_commit": "e781beeb31d3fad47e5d75902b3c0d13b41bc085",
+  "original_source_path": "frontend/web-app",
+  "original_source_url": "https://github.com/dh0728/money_laundry/tree/e781beeb31d3fad47e5d75902b3c0d13b41bc085/frontend/web-app",
+  "lineage_note": "dev dashboard implementation; Git ancestry is nonlinear relative to fe/work. Version number orders evidence time, not a claim that this branch was merged.",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [],
+  "reconstruction": {
+    "baseline_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+    "patch": "implementation/1.2.0/web-app-1.2.0.patch",
+    "source_tree": "frontend/web-app",
+    "run": "Use a separate working copy at the exact source commit. Do not apply historical patches to the current implementation."
+  },
+  "original_branch": "dev"
+}

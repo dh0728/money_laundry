@@ -23,7 +23,7 @@ export function ProvenanceBadge({ kind, title }: { kind: Provenance; title?: str
 
 /** 표시 + 한 줄 설명 */
 export function ProvenanceNote({ kind, children }: { kind: Provenance; children: ReactNode }) {
-  return <p className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground"><ProvenanceBadge kind={kind} />{children}</p>
+  return <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><ProvenanceBadge kind={kind} />{children}</p>
 }
 
 /** 아직 없는 화면·탭 자리 */

@@ -1,29 +1,8 @@
 {
   "version": "1.0.0",
-  "source_commit": "71c29033e7eee1cc3fc1e7628d088a43874dbd46",
-  "prior_source_validation": {
-    "tests": "49 files / 263 tests passed",
-    "build": "TypeScript + Vite passed",
-    "lint": "0 errors / 1 existing-source warning",
-    "test_run_note": "initial concurrent run hit two 5s timeouts; rerun of unchanged code passed all263"
-  },
-  "snapshot_build": {
-    "date": "2026-10-26",
-    "mode": "mock",
-    "base": "./",
-    "exit_code": 0,
-    "historical_original": false,
-    "files": 15,
-    "runtime_pixel_review": "not performed"
-  },
-  "source_code_changed": false,
-  "acceptance": "not asserted",
-  "snapshot_HTTP_verification": {
-    "files": 15,
-    "HTTP200": 15,
-    "byte_matches": 15,
-    "loopback_only": true,
-    "temporary_server_stopped": true,
-    "pixel_review_performed": false
-  }
+  "source_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+  "content_preservation": "original Git blobs or binary Git diff; HTML bytes checked against immutable source",
+  "user_acceptance": "not established",
+  "functional_changes_in_this_reorganization": false,
+  "new_design_2_0_in_version_list": false
 }

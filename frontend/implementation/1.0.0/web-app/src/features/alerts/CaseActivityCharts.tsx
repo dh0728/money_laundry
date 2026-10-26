@@ -30,10 +30,10 @@ export function CaseActivityCharts({ amounts, dailyUsdByCurrency }: { amounts: A
         {(all ? stacked.length : data.daily.length) ? <ChartContainer config={config} className="h-[170px] w-full">
           <BarChart data={all ? stacked : data.daily} margin={{ left: 0, right: 4, top: 6 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={10} tickFormatter={day => { const [m, d] = String(day).split('-'); return d ? `${Number(m)}월 ${Number(d)}일` : String(day) }} />
+            <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={10} />
             <YAxis width={70} tickLine={false} axisLine={false} fontSize={10} tickFormatter={value => Number(value).toLocaleString('ko-KR')} />
             <ChartTooltip cursor={{ fill: 'var(--muted)', opacity: 0.35 }} content={<ChartTooltipContent labelFormatter={(label, payload) => all ? `${label} · 합계 ${format(payload.reduce((sum, entry) => sum + Number(entry.value ?? 0), 0))}` : label} formatter={(value, name) => all ? `${name} · ${format(Number(value))}` : format(Number(value))} hideIndicator={!all} />} />
-            {all ? series.map(s => <Bar key={s.key} dataKey={s.key} name={s.label} stackId="usd" fill={s.color} />) : <Bar dataKey="amount" radius={3}>{data.daily.map((row, index) => <Cell key={row.day} fill={index === peak ? 'var(--palette-blue-500)' : 'color-mix(in oklab, var(--palette-blue-500) 45%, transparent)'} />)}</Bar>}
+            {all ? series.map(s => <Bar key={s.key} dataKey={s.key} name={s.label} stackId="usd" fill={s.color} />) : <Bar dataKey="amount" radius={3}>{data.daily.map((row, index) => <Cell key={row.day} fill={index === peak ? 'var(--foreground)' : 'var(--muted-foreground)'} />)}</Bar>}
             {all && <ChartLegend content={<ChartLegendContent />} />}
           </BarChart>
         </ChartContainer> : <p className="text-xs text-muted-foreground">{all && dailyUsdByCurrency == null ? 'USD 환산액 미제공' : '일별 금액 집계 없음'}</p>}

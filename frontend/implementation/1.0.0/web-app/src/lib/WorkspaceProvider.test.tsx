@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { clearCsrf, postJson } from '@/api/common'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { SharedPeriod, WorkspaceMain, WorkspaceProvider } from './WorkspaceProvider'
 import { useAsync } from './useAsync'
 import { useSharedPeriod, useViewState } from './workspaceState'
@@ -13,7 +12,6 @@ beforeEach(() => {
   clock.mockResolvedValue({ businessAt: '2023-09-10T09:00:00+09:00', revision: 1 })
   load.mockImplementation(async (page: string, from: string) => page + '/' + from)
 })
-afterEach(() => { vi.restoreAllMocks(); clearCsrf() })
 function Page({ name }: { name: string }) {
   const { from, to, setFrom } = useSharedPeriod()
   const [filter, setFilter] = useViewState(name + '/filter', '')
@@ -57,10 +55,7 @@ it('successful mutation refreshes mounted queries and invalidates the inactive t
   await screen.findByText('dashboard/2023-08-12')
   fireEvent.click(screen.getByRole('button', { name: 'alerts' }))
   await screen.findByText('alerts/2023-08-12')
-  vi.spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce(new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'synthetic-only' })))
-    .mockResolvedValueOnce(new Response(JSON.stringify({ caseIds: [1], targetCaseId: null })))
-  await act(async () => { await postJson('/api/v1/review/commands', { action: 'COMMENT', comment: '합성 갱신 검사', selections: [{ caseId: 1, revision: 1, groupId: 0, txIds: [] }] }) })
+  act(() => { window.dispatchEvent(new Event('live-data-changed')) })
   await waitFor(() => expect(load).toHaveBeenCalledTimes(3))
   fireEvent.click(screen.getByRole('button', { name: 'dashboard' }))
   expect(screen.getByText('dashboard/2023-08-12')).toBeInTheDocument()
@@ -78,24 +73,4 @@ it('changing account discards shared dates, filters and query results', async ()
   await screen.findByText('dashboard/2023-08-12')
   expect(screen.getByLabelText('필터')).toHaveValue('')
   expect(clock).toHaveBeenCalledTimes(2)
-})
-
-it('reauthentication carries only case comments and their tab, never cached data or selections', async () => {
-  const { WorkspaceState } = await import('./workspaceState')
-  const old = new WorkspaceState()
-  old.set('case/ALERT/3/comment', '미제출 의견')
-  old.set('case/ALERT/3/tab', 'review')
-  old.set('ledger/transaction/selection', '101')
-  old.set('period', { from: '2023-09-01', to: '2023-09-03' })
-  old.scroll.set('alerts', 320)
-  let finish!: (value: string) => void
-  const late = old.queries.fetch('case/3', () => new Promise<string>(resolve => { finish = resolve }), 60_000)
-  const fresh = old.forReauthentication()
-  finish('late old case'); await late
-  expect(fresh.get('case/ALERT/3/comment', '')).toBe('미제출 의견')
-  expect(fresh.get('case/ALERT/3/tab', '')).toBe('review')
-  expect(fresh.get('ledger/transaction/selection', null)).toBeNull()
-  expect(fresh.get('period', null)).toBeNull()
-  expect(fresh.scroll.size).toBe(0)
-  expect(fresh.queries.snapshot('case/3').state.status).toBe('loading')
 })

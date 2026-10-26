@@ -1,6 +1,6 @@
 import type { AlertTransaction } from '@/api/alerts'
 import { useMemoryState } from '@/lib/memory'
-import type { GraphModel, GraphTransaction } from './0.24.0/model'
+import type { GraphModel, GraphTransaction } from './v24/model'
 
 // 사람이 거래의 의심/정상 판정을 바꾼 기록(9/28 회의: 거래별 의심 표시 편집, FE 제안).
 // mock에서는 메모리에 두고 새로고침하면 사라진다. 모델 판정(isSuspicious)은 그대로 두고 위에 덮어쓴다.

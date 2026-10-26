@@ -1,4 +1,4 @@
-/* v24 시안(frontend/prototype/0.24.0/src/index.css)에서 대시보드에 필요한 토큰·기본 규칙만 옮김 */
+/* v24 시안(frontend/prototype/24/src/index.css)에서 대시보드에 필요한 토큰·기본 규칙만 옮김 */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -114,7 +114,6 @@
   --palette-heat-dark-9: oklch(.430 .140 27.0);
 }
 
-.semantic-status-badge[data-tone="unseen"] { color: var(--muted-foreground); border-style: dashed; background: transparent; }
 .semantic-status-badge[data-tone="pending"] { color: var(--badge-pending-foreground); border-color: var(--badge-pending-border); background: var(--badge-pending-background); }
 .semantic-status-badge[data-tone="working"] { color: var(--badge-working-foreground); border-color: var(--badge-working-border); background: var(--badge-working-background); }
 .semantic-status-badge[data-tone="closed"] { color: var(--badge-closed-foreground); border-color: var(--badge-closed-border); background: var(--badge-closed-background); }
@@ -143,7 +142,7 @@
   --brand-foreground: var(--palette-white);
   --primary-hover: var(--palette-neutral-900);
   --destructive-foreground: var(--palette-white);
-  --destructive-text: var(--palette-brand-700);
+  --destructive-text: var(--palette-signal-red-600);
   --overlay: var(--palette-black);
   --login-foreground: var(--palette-white);
   --login-action-background: var(--palette-white);
@@ -245,7 +244,7 @@
   --selection-muted-foreground: var(--palette-neutral-625); --selection-border: var(--palette-neutral-900-a45);
   --selection-destructive-background: var(--palette-signal-red-600); --selection-destructive-foreground: var(--palette-white);
   --input: var(--palette-neutral-200-a15); --ring: var(--primary);
-  --sidebar: oklch(.2 0 0); --sidebar-foreground: var(--palette-neutral-200-dark);
+  --sidebar: var(--palette-neutral-930); --sidebar-foreground: var(--palette-neutral-200-dark);
   --sidebar-primary: var(--primary); --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--palette-neutral-700); --sidebar-accent-foreground: var(--palette-neutral-50);
   --sidebar-border: var(--palette-neutral-200-a10); --sidebar-ring: var(--sidebar-primary);

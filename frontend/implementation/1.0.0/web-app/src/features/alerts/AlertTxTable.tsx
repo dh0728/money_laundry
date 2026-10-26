@@ -27,15 +27,15 @@ function Shortcut({ label, target, onOpen, mono = false }: { label: string; targ
   const kind = target.type === 'transaction' ? '거래' : target.type === 'owner' ? '소유주' : '계좌'
   return (
     <Button type="button" variant="ghost" size="sm" title={`거래 내역에서 ${kind} ${label} 보기`} aria-label={`${label} ${kind} 거래 내역에서 보기`}
-      className={`h-8 w-full min-w-0 justify-start gap-1 px-1 font-normal hover:[&>svg]:text-foreground ${mono ? "font-mono" : ""}`} onClick={event => { event.stopPropagation(); onOpen(target) }}>
+      className={`h-8 w-full min-w-0 justify-start gap-1 px-1 font-normal hover:[&>svg]:text-foreground ${mono ? "font-mono" : ""}`} onClick={() => onOpen(target)}>
       <span className="min-w-0 truncate">{label}</span>
       <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
     </Button>
   )
 }
 
-const columnsFor = (onOpen: Open, remote: boolean, onOpenTransaction?: (txId: number) => void): ColumnDef<TxRow>[] => [
-  { accessorKey: 'txId', size: 116, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => remote ? onOpenTransaction ? <Shortcut label={`T-${row.original.txId}`} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={() => onOpenTransaction(row.original.txId)} mono /> : <span className="px-1 font-mono">T-{row.original.txId}</span> : <Shortcut label={String(row.original.txId)} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={onOpen} mono /> },
+const columnsFor = (onOpen: Open, remote: boolean): ColumnDef<TxRow>[] => [
+  { accessorKey: 'txId', size: 116, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => remote ? <span className="px-1 font-mono">T-{row.original.txId}</span> : <Shortcut label={String(row.original.txId)} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={onOpen} mono /> },
   { accessorKey: 'txAt', size: 118, header: ({ column }) => header(column, '일시'), cell: ({ row }) => <span className="px-1 text-sm tabular-nums">{row.original.txAt.slice(5, 16).replace('T', ' ')}</span> },
   { accessorKey: 'amountPaid', size: 110, header: ({ column }) => header(column, '금액'), cell: ({ row }) => <div className="truncate px-1 text-right text-sm tabular-nums">{formatMoney(row.original.amountPaid, row.original.paymentCurrency)}</div> },
   { accessorKey: 'paymentFormat', size: 92, header: ({ column }) => header(column, '결제 수단'), cell: ({ row }) => <span className="px-1">{tag(row.original.paymentFormat)}</span> },
@@ -70,14 +70,14 @@ const sourceColumn: ColumnDef<TxRow> = {
 
 type Selection = { ids: number[]; onToggle: (txId: number) => void; disabled?: (txId: number) => boolean }
 
-export default function AlertTxTable({ rows, selection, remote = false, onOpenTransaction }: { rows: TxRow[]; selection?: Selection; remote?: boolean; onOpenTransaction?: (txId: number) => void }) {
+export default function AlertTxTable({ rows, selection, remote = false }: { rows: TxRow[]; selection?: Selection; remote?: boolean }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'txAt', desc: false }])
   const [, setTarget] = useTransactionTarget()
   const data = useMemo(() => rows, [rows])
   const withSource = rows.some(row => row.alertId != null)
   const columns = useMemo(() => {
     const open: Open = target => { if (selection) return; setTarget(target); window.location.hash = 'transactions' }
-    const base = columnsFor(open, remote, onOpenTransaction)
+    const base = columnsFor(open, remote)
     if (remote) base.push({ id: 'reviewLabel', header: '조사 상태', cell: ({ row }) => row.original.reviewLabel ?? '—' })
     const visible = withSource ? [sourceColumn, ...base] : base
     return selection ? [{
@@ -87,7 +87,7 @@ export default function AlertTxTable({ rows, selection, remote = false, onOpenTr
         disabled={selection.disabled?.(row.original.txId)} checked={selection.ids.includes(row.original.txId)} onClick={event => event.stopPropagation()}
         onChange={() => selection.onToggle(row.original.txId)} /></span>,
     } as ColumnDef<TxRow>, ...visible] : visible
-  }, [withSource, setTarget, selection, remote, onOpenTransaction])
+  }, [withSource, setTarget, selection, remote])
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table은 React Compiler 최적화 대상이 아니다
   const table = useReactTable({
     data, columns, getRowId: row => String(row.txId),

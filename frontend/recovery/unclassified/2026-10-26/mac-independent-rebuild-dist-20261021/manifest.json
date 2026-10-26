@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "source_id": "mac-independent-rebuild-dist-20261021",
+  "preservation_date": "2026-10-26",
+  "source_family": "independent rebuild experiment; separate from existing-design-preserving branch",
+  "design_version": null,
+  "acceptance": "not accepted as user-approved version; userReviewed=false in related historical evidence; no whole-product approval established",
+  "mode": "existing compiled synthetic fixture read-only build; no backend connection",
+  "source_date_limit": "folder date identifies lineage; filesystem timestamps recorded, not a release or approval date",
+  "original_files": 3,
+  "files": [
+    {
+      "path": "index.html",
+      "archive_repository_path": "Sources/Experience/2026 인공지능사관학교 7기/자금세탁소/frontend/recovery/unclassified/2026-10-26/mac-independent-rebuild-dist-20261021/index.html",
+      "future_team_path": "frontend/recovery/unclassified/2026-10-26/mac-independent-rebuild-dist-20261021/index.html",
+      "original_home_relative_path": "Documents/Codex/2026-10-21/task-2/aml-radar-rebuild-20261021/dist/index.html",
+      "source_mtime_utc": "2026-10-21T09:49:08.044397+00:00",
+      "source_birthtime_utc": "2026-10-21T09:49:08.044342+00:00",
+      "bytes": 423,
+      "sha256": "95bcb57e3ecfa240ca3f7b277ac0f69bf7c7d7430fc9980782004ba5aa69f611",
+      "preservation": "byte-identical original build copy"
+    },
+    {
+      "path": "assets/index-Da113Wnh.js",
+      "archive_repository_path": "Sources/Experience/2026 인공지능사관학교 7기/자금세탁소/frontend/recovery/unclassified/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-Da113Wnh.js",
+      "future_team_path": "frontend/recovery/unclassified/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-Da113Wnh.js",
+      "original_home_relative_path": "Documents/Codex/2026-10-21/task-2/aml-radar-rebuild-20261021/dist/assets/index-Da113Wnh.js",
+      "source_mtime_utc": "2026-10-21T09:49:08.043598+00:00",
+      "source_birthtime_utc": "2026-10-21T09:49:08.043495+00:00",
+      "bytes": 418999,
+      "sha256": "3ca0466f697a3a69bb5b3ee1b8b9d0ce2a29a92a2e171612395ea020037c6d51",
+      "preservation": "byte-identical original build copy"
+    },
+    {
+      "path": "assets/index-BrsIhYzJ.css",
+      "archive_repository_path": "Sources/Experience/2026 인공지능사관학교 7기/자금세탁소/frontend/recovery/unclassified/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-BrsIhYzJ.css",
+      "future_team_path": "frontend/recovery/unclassified/2026-10-26/mac-independent-rebuild-dist-20261021/assets/index-BrsIhYzJ.css",
+      "original_home_relative_path": "Documents/Codex/2026-10-21/task-2/aml-radar-rebuild-20261021/dist/assets/index-BrsIhYzJ.css",
+      "source_mtime_utc": "2026-10-21T09:49:08.044283+00:00",
+      "source_birthtime_utc": "2026-10-21T09:49:08.043728+00:00",
+      "bytes": 26887,
+      "sha256": "d7672a91d658dee6c42f9eaeae036ab1842761165e1081016f5300d8bffe0d85",
+      "preservation": "byte-identical original build copy",
+      "same_hash_known_local_sites_copy": "Documents/Codex/2026-10-21/task-2/aml-radar-frontend-preview/dist/client/assets/index-BrsIhYzJ.css",
+      "deduplication_note": "one Archive payload copy only; same bytes absent from existing Archive files and known team/Archive Git blobs; local Sites copy retained untouched"
+    }
+  ],
+  "entry_html": "index.html",
+  "dependencies": [
+    {
+      "from": "index.html",
+      "url": "/assets/index-Da113Wnh.js",
+      "collection_path": "assets/index-Da113Wnh.js",
+      "state": "included byte-identical"
+    },
+    {
+      "from": "index.html",
+      "url": "/assets/index-BrsIhYzJ.css",
+      "collection_path": "assets/index-BrsIhYzJ.css",
+      "state": "included once; shared hash with known local Sites copy"
+    }
+  ],
+  "serving_requirement": "Original entry uses absolute /assets paths. Serve collection at an isolated origin root or create a separately labelled derived entry. Do not silently rewrite original bytes.",
+  "minimal_review": {
+    "compiled_fixture_bootstrap": "var kr=Or(); fixture mode/readOnly true; execute throws READ_ONLY",
+    "synthetic_labels": "synthetic owner labels and fixed fixture business date present",
+    "email_matches": 0,
+    "key_pattern_matches": 0,
+    "external_host_strings": [
+      "react.dev",
+      "route.invalid",
+      "www.w3.org"
+    ],
+    "limit": "source and compiled-text review; no new pixel/browser review in this step"
+  },
+  "exclusions": [
+    "dist-live",
+    "source tree",
+    "environment files",
+    "meetings",
+    "old.md",
+    "new.md",
+    "raw metadata",
+    "browser profiles"
+  ],
+  "remote_scope": "only these3 original copies and this manifest; existing local reader changes and global manifest deliberately excluded",
+  "team_state": "not applied; team403 push restriction unchanged",
+  "originals_unchanged": true
+}

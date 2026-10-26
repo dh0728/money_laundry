@@ -56,7 +56,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: frontend/implementation/1.0.0/web-app
+        working-directory: frontend/implementation/1.14.0/web-app
 
     steps:
       - name: Checkout repository
@@ -68,8 +68,8 @@ jobs:
           version: 11.24.0
           runtime: node@24
           cache: true
-          cache-dependency-path: frontend/implementation/1.0.0/web-app/pnpm-lock.yaml
-          package-json-file: frontend/implementation/1.0.0/web-app/package.json
+          cache-dependency-path: frontend/implementation/1.14.0/web-app/pnpm-lock.yaml
+          package-json-file: frontend/implementation/1.14.0/web-app/package.json
           install: false
 
       - name: Install frontend dependencies
@@ -107,7 +107,7 @@ jobs:
       - name: Build frontend Docker image
         uses: docker/build-push-action@v7
         with:
-          context: frontend/implementation/1.0.0/web-app
+          context: frontend/implementation/1.14.0/web-app
           outputs: type=cacheonly
           build-args: |
             VITE_API_BASE_URL=/api

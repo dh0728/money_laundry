@@ -3,7 +3,7 @@ import { loadMockAlertDetail } from '@/mocks/alertDetail'
 import { loadMockEpisode } from '@/mocks/episodes'
 import { toGraphModel } from './adapter'
 import { isSuspiciousEdge } from './graphStyle'
-import { neighborhood, stepTimeline, timelineEvents } from './0.24.0/model'
+import { neighborhood, stepTimeline, timelineEvents } from './v24/model'
 
 describe('관계 그래프 mock (API.md §3.2)', () => {
   it('엣지는 두 계좌 사이 거래를 묶고, 거래 수·금액 합이 구성 거래와 같다', async () => {

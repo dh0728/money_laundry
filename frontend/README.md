@@ -5,7 +5,7 @@
  | 단계 | 실제 위치 | 상태와 근거 |
  | --- | --- | --- |
  | 중간발표 이전 프로토타입 | `prototype/0.1.0`~`prototype/0.24.0` | 기존 vN→0.N.0. 보존 시안이며 현재 구현과 분리 |
- | 이후 구현 기준 | [implementation/1.0.0/web-app](implementation/1.0.0/web-app/README.md) | 9/26 이후 v24 이식 계보. 10/26 최초 관리 기준 1.0.0, 사용자 수용·실서버 검증과 별개 |
+ | 이후 구현 기준 | [implementation/1.14.0/web-app](implementation/1.14.0/web-app/README.md) | 9/26 이후 v24 이식 계보. 10/26 최초 관리 기준 1.0.0, 사용자 수용·실서버 검증과 별개 |
  | 새 디자인 시작 | [design/2.0.0](design/2.0.0/README.md) | 2026-10-26 시작 기준. 새 디자인 산출물·승인·완료 없음 |
 
  각 기존 파일→새 파일·버전·근거·상태·전후 SHA-256은 [artifact-paths.json](artifact-paths.json)에 있다. 표준 package.json·index.html·설정 파일명은 버전 폴더 안에서 유지한다. 누적 테스트/모듈은 원래 버전 번호를 보존하며 같은 내용도 삭제하지 않는다.
@@ -45,7 +45,7 @@
 
  ## 실행
 
- 저장소 루트에서 `cd frontend/implementation/1.0.0/web-app`, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`, `pnpm build`. 개별 역사 prototype은 해당 `prototype/0.N.0`에서 package-lock으로 `npm ci` 후 test/build한다. 현재 실행 여부는 각 환경에서 재확인한다.
+ 저장소 루트에서 `cd frontend/implementation/1.14.0/web-app`, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`, `pnpm build`. 개별 역사 prototype은 해당 `prototype/0.N.0`에서 package-lock으로 `npm ci` 후 test/build한다. 현재 실행 여부는 각 환경에서 재확인한다.
 
 
 ## 원격 반영 차단 — 2026-10-26
@@ -56,3 +56,7 @@
 ## 동일 구조 포트폴리오 보존 묶음
 
 [PRESERVATION.md](PRESERVATION.md)에서 버전별 원본/HTML/기록/실행/설계/검증/출처를 확인한다. [versions.json](versions.json)과 [preservation-manifest.json](preservation-manifest.json)에 팀 frontend와 Archive frontend의 정확한 상대 경로·파일 해시가 있다. 0.21.0~0.24.0과 구현 1.0.0 소스/오늘 정적 스냅샷,2.0.0 시작 기록을 포함한다. Mac 고유 HTML 5개·설계·QA·연구는 미통합이며 현재 원격에서 확보한 자료의 보존으로 범위를 한정한다. 기존 Archive 원본을 덮어쓰거나 개인 문서를 팀으로 복사하지 않았다.
+
+## 숫자 버전 정리
+
+[PRESERVATION.md](PRESERVATION.md)의39행을 기준으로 한다. 0.x24개와1.x15개이며 제작 중2.0.0은 목록에서 제외했다. 최신 소스는implementation/1.14.0/web-app, 처음 구현은1.0.0이다. 문서/patch/중복 자료는 SOURCE.json의 관련 근거이며 제품 승인 릴리스가 아니다.

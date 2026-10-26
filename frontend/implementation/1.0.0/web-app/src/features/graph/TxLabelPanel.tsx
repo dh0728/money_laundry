@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { focusTransactions, type PanelFocus } from './relabel'
-import { formatMoney, type GraphModel, type GraphTransaction } from './0.24.0/model'
+import { formatMoney, type GraphModel, type GraphTransaction } from './v24/model'
 
 const labelText = (label: 0 | 1) => (label === 1 ? '이상 거래' : '정상 거래')
 

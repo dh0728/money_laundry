@@ -1,5 +1,5 @@
 import type { AlertRow } from '@/api/alerts'
-import { alertStatusLabels } from '@/components/badges'
+import { alertWorkStatus, workStatusLabels } from '@/lib/workStatus'
 import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 
 // v24 Lists.tsx의 목록 필터. mock은 전체 행을 가지고 있어 브라우저에서 거른다.
@@ -9,26 +9,23 @@ export type AlertFilter =
   | { field: 'type'; value: TypeCode | '패턴 미특정' | '혼합' }
   | { field: 'assignee'; value: number }
   | { field: 'age'; value: number }
-  | { field: 'risk'; value: number }
 
 export type AlertFilterField = AlertFilter['field']
 
 export const filterFieldNames: Record<AlertFilterField, string> = {
-  status: '상태',
+  status: '처리 상태',
   type: '탐지 유형',
   assignee: '담당자',
   age: '경과일',
-  risk: '위험 점수',
 }
 
 export const ageOptions = [1, 3, 5]
-export const riskOptions = [0.8, 0.9]
 
 const dateOf = (iso: string) => iso.slice(0, 10)
 const ymd = (date: Date) => date.toLocaleDateString('sv-SE')
 
 export function matchesAlert(
-  row: Pick<AlertRow, 'alertId' | 'assignee' | 'status' | 'ageDays'> & Partial<Pick<AlertRow, 'summary' | 'subjectAccount' | 'lastTxAt' | 'riskScore'>> & { primaryType: { code: TypeCode | null; name: string } },
+  row: Pick<AlertRow, 'alertId' | 'assignee' | 'status' | 'ageDays'> & Partial<Pick<AlertRow, 'summary' | 'subjectAccount' | 'lastTxAt'>> & { primaryType: { code: TypeCode | null; name: string } },
   filters: AlertFilter[],
   query: string,
   range?: { from?: Date; to?: Date },
@@ -58,24 +55,22 @@ export function matchesAlert(
   return true
 }
 
-function matchesOne(row: Pick<AlertRow, 'alertId' | 'assignee' | 'status' | 'ageDays'> & Partial<Pick<AlertRow, 'riskScore'>> & Partial<Pick<AlertRow, 'summary' | 'subjectAccount' | 'lastTxAt'>> & { primaryType: { code: TypeCode | null; name: string } }, filter: AlertFilter) {
+function matchesOne(row: Pick<AlertRow, 'alertId' | 'assignee' | 'status' | 'ageDays'> & Partial<Pick<AlertRow, 'summary' | 'subjectAccount' | 'lastTxAt'>> & { primaryType: { code: TypeCode | null; name: string } }, filter: AlertFilter) {
   switch (filter.field) {
     case 'status': return row.status === filter.value
     case 'type': return typeof filter.value === 'string' ? row.primaryType.name === filter.value : row.primaryType.code === filter.value
     case 'assignee': return row.assignee.userId === filter.value
     case 'age': return row.ageDays >= filter.value
-    case 'risk': return (row.riskScore ?? 0) >= filter.value
   }
 }
 
 export function filterLabel(filter: AlertFilter, assigneeName: (userId: number) => string, meId: number) {
   const name = filterFieldNames[filter.field]
   switch (filter.field) {
-    case 'status': return `${name}: ${alertStatusLabels[filter.value]}`
+    case 'status': return `${name}: ${workStatusLabels[alertWorkStatus(filter.value)]}`
     case 'type': return `${name}: ${typeof filter.value === 'string' ? filter.value : typeDisplay(filter.value).label}`
     case 'assignee': return `${name}: ${filter.value === meId ? '내 담당' : assigneeName(filter.value)}`
     case 'age': return `${name}: ${filter.value}일 이상`
-    case 'risk': return `${name}: ${filter.value} 이상`
   }
 }
 

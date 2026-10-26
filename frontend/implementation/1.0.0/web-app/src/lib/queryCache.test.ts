@@ -1,6 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { QueryCache } from './queryCache'
-import { ApiError } from '@/api/common'
 
 it('reading a notification invalidates only notification queries', async () => {
   const cache = new QueryCache()
@@ -65,15 +64,6 @@ it('failed refresh retains successful data and exposes a refresh error', async (
   await expect(cache.fetch('cases', async () => { throw new Error('offline') }, 60_000, true)).rejects.toThrow()
   expect(cache.snapshot('cases').state).toEqual({ status: 'success', data: 1 })
   expect(cache.snapshot('cases').refreshError).toBeTruthy()
-})
-
-it.each([401, 403])('read access denied with %i hides the previous successful snapshot', async status => {
-  const cache = new QueryCache()
-  await cache.fetch('case', async () => 'previous private snapshot', 60_000)
-  const error = new ApiError({ type: 'about:blank', title: '조회 권한이 없습니다.', status, code: status === 401 ? 'UNAUTHENTICATED' : 'FORBIDDEN_ROLE' })
-  await expect(cache.fetch('case', async () => { throw error }, 60_000, true)).rejects.toBe(error)
-  expect(cache.snapshot('case').state).toEqual({ status: 'error', message: '조회 권한이 없습니다.', error })
-  expect(cache.snapshot('case').refreshError).toBeUndefined()
 })
 
 it('session caches are isolated and inactive results are bounded', async () => {

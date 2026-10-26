@@ -8,17 +8,6 @@ export class WorkspaceState {
   private listeners = new Set<() => void>()
   get<T>(key: string, fallback: T): T { return this.views.has(key) ? this.views.get(key) as T : fallback }
   set<T>(key: string, value: T) { this.views.set(key, value); this.listeners.forEach(listener => listener()) }
-  /** Reauthentication may recover text, never cached data, command selections or revisions. */
-  forReauthentication() {
-    const fresh = new WorkspaceState()
-    for (const [key, value] of this.views) {
-      if (!/^case\/(ALERT|EPISODE)\/\d+\/comment$/.test(key) || typeof value !== 'string' || !value) continue
-      fresh.set(key, value)
-      const tabKey = key.replace(/comment$/, 'tab')
-      fresh.set(tabKey, this.get(tabKey, 'overview'))
-    }
-    return fresh
-  }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
 }
 export const WorkspaceContext = createContext<WorkspaceState | null>(null)

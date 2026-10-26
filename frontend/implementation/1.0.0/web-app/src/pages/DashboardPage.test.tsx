@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { loadMockMyAlerts } from '@/mocks/alerts'
 import { dashboardNormal } from '@/mocks/dashboard'
 import { chartInputs, institutionCards } from '@/features/dashboard/metrics'
 import { SectionCard } from '@/components/SectionCards'
@@ -13,12 +12,11 @@ const openPersonal = () => fireEvent.mouseDown(screen.getByRole('tab', { name: '
 afterEach(() => useScenario(''))
 
 describe('대시보드 · 내 담당', () => {
-  it('mock 업무 보드는 기존 미확인·처리 전·처리 중·처리 완료 4열과 시연 한계를 표시한다', async () => {
+  it('API 상태 3종을 3열로 보여 준다', async () => {
     render(<DashboardPage />)
     openPersonal()
     const columns = await screen.findAllByTestId('work-status-column')
-    expect(columns.map(column => within(column).getByText(/^(미확인|처리 전|처리 중|처리 완료)$/).textContent)).toEqual(['미확인', '처리 전', '처리 중', '처리 완료'])
-    expect(screen.getByText(/지금 열 배정은 시연용 예시입니다/)).toBeInTheDocument()
+    expect(columns.map(column => within(column).getAllByText(/처리 전|처리 중|처리 완료/)[0].textContent)).toEqual(['처리 전', '처리 중', '처리 완료'])
   })
 
   it('점수를 0~1 소수 둘째 자리로 보여 준다', async () => {
@@ -35,18 +33,14 @@ describe('대시보드 · 내 담당', () => {
     for (const card of cards) expect(card.getAttribute('href')).toMatch(card.dataset.kind === 'Episode' ? /^#episodes\/\d+$/ : /^#alerts\/\d+$/)
   })
 
-  it('mock 4열 보드는 Alert·Episode를 보여 주며 편입된 원본 Alert는 중복하지 않는다', async () => {
+  it('처리 중 열은 내 Episode이고, Episode로 보낸 Alert는 따로 나오지 않는다', async () => {
     render(<DashboardPage />)
     openPersonal()
-    await screen.findAllByTestId('work-status-column')
-    const cards = within(screen.getByTestId('work-queue')).getAllByTestId('work-card')
-    expect(new Set(cards.map(card => card.dataset.kind))).toEqual(new Set(['Alert', 'Episode']))
-    const hrefs = cards.map(card => card.getAttribute('href'))
-    expect(new Set(hrefs).size).toBe(hrefs.length)
-    const source = await loadMockMyAlerts()
-    const linked = source.content.filter(alert => alert.status === 'ESCALATED')
-    expect(linked.length).toBeGreaterThan(0)
-    for (const alert of linked) expect(hrefs).not.toContain(`#alerts/${alert.alertId}`)
+    const [pending, working] = await screen.findAllByTestId('work-status-column')
+    const kinds = (column: HTMLElement) => within(column).queryAllByTestId('work-card').map(card => card.dataset.kind)
+    expect(kinds(working).length).toBeGreaterThan(0)
+    expect(new Set(kinds(working))).toEqual(new Set(['Episode']))
+    expect(new Set(kinds(pending))).toEqual(new Set(['Alert']))
   })
 
   it('윗줄은 중복 카드 없이 고위험·경과 카드와 AI 요약만 둔다', async () => {
@@ -65,7 +59,7 @@ describe('대시보드 · 내 담당', () => {
     useScenario('empty')
     render(<DashboardPage />)
     openPersonal()
-    expect(await screen.findAllByText('해당 상태 업무가 없습니다.')).toHaveLength(4)
+    expect(await screen.findAllByText('해당 상태 업무가 없습니다.')).toHaveLength(3)
   })
 
   it('오류면 다시 시도 버튼을 보여 준다', async () => {
@@ -77,23 +71,19 @@ describe('대시보드 · 내 담당', () => {
 })
 
 describe('대시보드 · 기관 전체', () => {
-  it('기관 요약과 Episode 업무를 구분하고 오래 열린 Episode에서 상세로 이어진다', async () => {
+  it('우선 검토 대상의 실행 주체를 밝히고 패턴·위험도·경과일을 태그로 보여 준다', async () => {
     render(<DashboardPage />)
     openInstitution()
     const report = await screen.findByTestId('ai-daily-report')
     expect(within(report).getByRole('heading', { name: 'RDR 9000 Daily Report' })).toBeInTheDocument()
     expect(within(report).getByTestId('rdr-eye')).toBeInTheDocument()
-    const work = await screen.findByRole('region', { name: 'Episode 업무' })
-    expect(report).not.toContainElement(work)
-    expect(within(work).getByText('열린 Episode')).toBeInTheDocument()
-    expect(within(work).getByText('오래 열린 Episode')).toBeInTheDocument()
-    const table = within(work).getByRole('table')
-    const row = within(table).getAllByRole('row')[1]
-    const code = within(row).getAllByRole('cell')[0].textContent!
-    expect(code).toMatch(/^E-\d+$/)
-    fireEvent.click(row)
-    expect(window.location.hash).toBe(`#episodes/${code.slice(2)}`)
+    const queue = await screen.findByRole('region', { name: '업무 현황' })
+    expect(report).not.toContainElement(queue)
+    expect(within(queue).getAllByTestId('work-status-column')).toHaveLength(3)
+    expect(within(queue).getByText('열린 Alert')).toBeInTheDocument()
+    expect(within(queue).getByText('열린 Episode')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '담당 조사자 우선 검토' })).not.toBeInTheDocument()
+
   })
 
   it('미배정 건수 문구가 없다', async () => {
@@ -108,9 +98,7 @@ describe('대시보드 · 기관 전체', () => {
     render(<DashboardPage />)
     openInstitution()
     expect(await screen.findByText('선택한 기간에 Alert가 없습니다.')).toBeInTheDocument()
-    const work = await screen.findByRole('region', { name: 'Episode 업무' })
-    expect(within(work).getByText('열린 Episode가 없습니다.')).toBeInTheDocument()
-    expect(within(work).queryByRole('table')).not.toBeInTheDocument()
+    expect(await screen.findAllByText('해당 상태 업무가 없습니다.')).toHaveLength(3)
   })
 })
 
@@ -127,22 +115,21 @@ describe('대시보드 계산', () => {
     expect(todayCard.value).toBe(String(dashboardNormal.dailyAlerts!.at(-1)!.inflow))
   })
 
-  it('신규 Alert 감소는 긍정이며 비교 기준 없는 탐지율에는 증감 배지가 없다', () => {
-    const [inflow, detection] = institutionCards(dashboardNormal)
-    expect([inflow.label, detection.label]).toEqual(['오늘 신규 Alert', '오늘 의심 거래 탐지율'])
-    expect(detection.delta).toBeUndefined()
+  it('유입 감소는 긍정, 처리율 감소는 부정으로 표시하고 두 지표를 나란히 둔다', () => {
+    const [inflow, completion] = institutionCards(dashboardNormal)
+    expect([inflow.label, completion.label]).toEqual(['오늘 유입 Alert', '30일 Alert 처리율'])
     const { container, rerender } = render(<SectionCard item={{ ...inflow, delta: -4.1 }} />)
     expect(container.querySelector('[data-slot="badge"]')).toHaveStyle({ backgroundColor: 'var(--risk-0)' })
+    rerender(<SectionCard item={{ ...completion, delta: -3.8 }} />)
+    expect(container.querySelector('[data-slot="badge"]')).toHaveStyle({ backgroundColor: 'var(--risk-9)' })
     rerender(<SectionCard item={{ ...inflow, delta: 4.1 }} />)
     expect(container.querySelector('[data-slot="badge"]')).toHaveStyle({ backgroundColor: 'var(--risk-9)' })
-    rerender(<SectionCard item={detection} />)
-    expect(container.querySelector('[data-slot="badge"]')).toBeNull()
-    expect(detection.value).toBe(`${((dashboardNormal.latestJob!.suspiciousTxCount / 115270) * 100).toFixed(2)}%`)
   })
 
   it('기관 카드는 Alert와 Episode를 모두 다루고 이름에 대상을 적는다', () => {
     const labels = institutionCards(dashboardNormal).map(card => card.label)
-    expect(labels).toEqual(['오늘 신규 Alert', '오늘 의심 거래 탐지율', '열린 Alert', '조사 중 Episode'])
+    expect(labels.some(label => label.includes('Episode'))).toBe(true)
+    for (const label of labels) expect(label).toMatch(/Alert|Episode/)
   })
 
   it('일별 처리 상태의 합은 그날 유입 건수와 같다', () => {

@@ -2,7 +2,7 @@ import type { AlertTransaction } from '@/api/alerts'
 import type { RelationGraph } from '@/api/graph'
 import { isSuspiciousEdge, isSuspiciousNode } from './graphStyle'
 import type { TxRelabels } from './relabel'
-import type { GraphEdge, GraphModel, GraphNode, GraphTransaction } from './0.24.0/model'
+import type { GraphEdge, GraphModel, GraphNode, GraphTransaction } from './v24/model'
 
 // API.md §3.2 graph(nodes·edges)와 구성 거래를 v24 그래프 모양(GraphModel)으로 바꾼다.
 // v24는 엣지 안에 개별 거래를 들고 있어야 시간순 재생·상세 패널이 동작한다.

@@ -50,7 +50,7 @@ def check(root,peer=None):
             except ET.ParseError:errors.append('invalid SVG '+str(rel))
         if p.suffix=='.html':html_count+=1
     versions=json.loads((root/'versions.json').read_text(encoding='utf-8'))
-    expected={f'0.{n}.0' for n in range(1,25)}|{'1.0.0','2.0.0'}
+    expected={f'0.{n}.0' for n in range(1,25)}|{f'1.{n}.0' for n in range(15)}
     if {v['version'] for v in versions['versions']}!=expected:errors.append('version matrix incomplete')
     generated=[]
     for version in versions['versions']:
@@ -60,7 +60,7 @@ def check(root,peer=None):
             for rel in version[field]:
                 if rel not in paths:errors.append('matrix target missing '+rel)
         generated+=version['generated_html']
-        if version['version']=='2.0.0' and any(version[field] for field in ['source_files','original_html','entry_html','generated_html']):
+        if version['version']=='2.0.0':
             errors.append('invented 2.0.0 design artifact')
         if not version.get('source') or not version.get('run'):errors.append('missing provenance/run record')
     # Validate locally generated viewers/build links. Historical compiled HTML is opaque,

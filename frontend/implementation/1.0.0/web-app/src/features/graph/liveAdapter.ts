@@ -1,5 +1,5 @@
 import type { ReviewCase, ReviewMember } from '@/api/liveReview'
-import type { GraphEdge, GraphModel, GraphNode, GraphTransaction } from './0.24.0/model'
+import type { GraphEdge, GraphModel, GraphNode, GraphTransaction } from './v24/model'
 
 const seoulMinute = (iso: string) => new Date(iso).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 16)
 

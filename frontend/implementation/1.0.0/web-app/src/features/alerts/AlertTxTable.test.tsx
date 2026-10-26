@@ -26,13 +26,3 @@ describe('Alert 거래 표', () => {
     expect(within(row).getByText('시작 거래')).toHaveAttribute('data-slot', 'badge')
   })
 })
-
-it('실제 거래 ID 바로가기는 기존 버튼을 쓰며 판정 선택을 바꾸지 않는다', async () => {
-  const { detail } = await loadMockAlertDetail(3000, 'normal')
-  const row = detail.transactions[0]
-  const opened: number[] = [], selected: number[] = []
-  render(<AlertTxTable remote rows={[row]} selection={{ ids: [], onToggle: id => selected.push(id) }} onOpenTransaction={id => opened.push(id)} />)
-  fireEvent.click(screen.getByRole('button', { name: `T-${row.txId} 거래 거래 내역에서 보기` }))
-  expect(opened).toEqual([row.txId])
-  expect(selected).toEqual([])
-})

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveNotificationsPage from './LiveNotificationsPage'
 import { fetchNotifications, fetchNotificationCases, setNotificationsRead, type WorkNotification } from '@/api/notifications'
@@ -45,26 +45,5 @@ it('기존 읽음 상태를 서버에서 복원하고 단건 Episode를 연다',
   render(<LiveNotificationsPage onOpen={open} />)
   fireEvent.click(await screen.findByText('사건 종결'))
   expect(open).toHaveBeenCalledWith('EPISODE', 81)
-  expect(setNotificationsRead).not.toHaveBeenCalled()
-})
-
-it('검색·기간·새로고침·현재 페이지 모두 읽음을 한 조회 영역에서 찾을 수 있다', async () => {
-  render(<LiveNotificationsPage onOpen={vi.fn()} />)
-  await screen.findByText('새 Alert 배정 · 2건')
-  const controls = within(screen.getByRole('group', { name: '알림 조회' }))
-  expect(controls.getByRole('textbox', { name: '알림 검색' })).toBeInTheDocument()
-  expect(controls.getByRole('button', { name: '테스트 기간 적용' })).toBeInTheDocument()
-  expect(controls.getByRole('button', { name: '새로고침' })).toBeInTheDocument()
-  expect(controls.getByRole('button', { name: '현재 페이지 모두 읽음' })).toBeEnabled()
-})
-it.each([['빈 목록', []], ['읽은 알림만 있는 목록', [{ ...batch, read: true }]]])('%s에서도 모두 읽음 버튼을 유지하고 실행하지 않는다', async (_name, content) => {
-  vi.mocked(fetchNotifications).mockResolvedValue({ content, number: 0, size: 20, totalElements: content.length, totalPages: 1, unreadCount: 0 })
-  render(<LiveNotificationsPage onOpen={vi.fn()} />)
-  if (!content.length) await screen.findByText('표시할 알림이 없습니다.')
-  else await screen.findByText('새 Alert 배정 · 2건')
-  const button = screen.getByRole('button', { name: '현재 페이지 모두 읽음' })
-  expect(button).toBeVisible()
-  expect(button).toBeDisabled()
-  fireEvent.click(button)
   expect(setNotificationsRead).not.toHaveBeenCalled()
 })
