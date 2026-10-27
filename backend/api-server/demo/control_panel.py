@@ -357,7 +357,7 @@ class Replay:
             self.report('중단', error=message)
 
     def wait_job(self, job, day):
-        deadline = time.monotonic() + 3600
+        deadline = time.monotonic() + 6 * 3600
         failures = 0
         last_stage = '아직 확인하지 못함'
         while time.monotonic() < deadline:
