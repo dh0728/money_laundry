@@ -170,10 +170,10 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 통합 거래와 거래별 이진 점수 → 제한된 흐름 그래프 구성 → 기존 사건 대응 계획 → Spring 완료 트랜잭션에서 공개한다. worker는 review를 읽기만 하고 analysis.alert_plans에 canonical JSON 계획을 쓴다. Spring은 실행 토큰·입력 유효성·사건 개정·계획 digest를 확인한 뒤 공개 버전·현재 범위·요약·계보·이력·알림을 한 번에 반영한다. 별도 업무 ‘후보’ 상태는 없다.
 
 - 씨앗은 해당 점수 실행의 임계 이상 거래다. 과거 미소속 씨앗도 검토하며 TARGET0이어도 고정 과거 점수/사건이 있으면 재추론 없이 검토한다.
-- 생성 정책은 block-pin-2다. 씨앗 사이의 구조 관계(witness)로 Alert 핵심을 만든다. witness는 PASS(한 계좌를 1:1로 통과, 금액 비0.8~1.25·지연96시간 이내), STAR_OUT/STAR_IN(한 계좌의 송금·수취 부채꼴), RELAY(입금 부채꼴 뒤 출금 부채꼴), PATH(비씨앗2홉 이내로 이어진 두 씨앗), BRIDGE(두 씨앗 계좌 사이 경유 계좌2개 이상), CLOSURE(열린 사슬이 블록 계좌로 돌아옴), SHAPE_CYCLE/SHAPE_BRIDGE(씨앗 하나가 이루는 순환·경유 모양)다. 구조 근거일 뿐 유형 판정이 아니다. 핵심 SEED/CONNECTION은 채택 witness 거래의 합집합이며 새 근거에는 CONTEXT 멤버가 없다. 관계 없는 단독 씨앗은 발행하지 않는다. block-pin-2는 BRIDGE 묶음·비씨앗 걷기(PATH·CLOSURE)·단독 모양을 모두 블록 기간(최대 240시간) 안에서만 판단하므로 한 거래가 볼 수 있는 시간은 블록 기간 안이며, 동률은 작은 거래 ID로 정한다. 정책 버전이며 DB 마이그레이션은 단일 V1을 유지한다.
-- 핵심은 과거 핵심을 포함해64건·기간240시간 이하다. 넘치는 연결은 별도 Alert로 두고 `BOUNDARY_CAP`/`BOUNDARY_SPAN` 링크를 남긴다. 링크(`boundaryWitnesses`, kind는 `BOUNDARY_PASS`/`BOUNDARY_SAME_FOCAL`/`BOUNDARY_OPEN_PAIR`/`BOUNDARY_CAP`/`BOUNDARY_SPAN`/`BOUNDARY_STAR_CHUNK`)는 다른 Alert와의 관계이며 소속이 아니다. 링크는 근거 지문에서 제외하고 매 실행의 현재 값으로 교체하므로 링크만 바뀌면 새 버전·알림을 만들지 않는다. 링크만으로 자동 병합하지 않는다. 활동이 많고 의심 비율이 낮은 허브 계좌는 관계 근거로 쓰지 않는다(`AMBIGUOUS_HUB`). 계산 예산 초과는 전체 실패하며 부분 공개하지 않는다.
+- 생성 정책은 block-pin-3이다(block-pin-2의 시간 상한만 늘림. 간격 7일·기간 14일은 실데이터 연구 범위를 덮는 넉넉한 상한이며, 합성 패턴에 맞춘 값이 아니다). 씨앗 사이의 구조 관계(witness)로 Alert 핵심을 만든다. witness는 PASS(한 계좌를 1:1로 통과, 금액 비0.8~1.25·지연168시간 이내), STAR_OUT/STAR_IN(한 계좌의 송금·수취 부채꼴), RELAY(입금 부채꼴 뒤 출금 부채꼴), PATH(비씨앗2홉 이내로 이어진 두 씨앗), BRIDGE(두 씨앗 계좌 사이 경유 계좌2개 이상), CLOSURE(열린 사슬이 블록 계좌로 돌아옴), SHAPE_CYCLE/SHAPE_BRIDGE(씨앗 하나가 이루는 순환·경유 모양)다. 구조 근거일 뿐 유형 판정이 아니다. 핵심 SEED/CONNECTION은 채택 witness 거래의 합집합이며 새 근거에는 CONTEXT 멤버가 없다. 관계 없는 단독 씨앗은 발행하지 않는다. block-pin-2부터 BRIDGE 묶음·비씨앗 걷기(PATH·CLOSURE)·단독 모양을 모두 블록 기간(block-pin-3 최대 336시간) 안에서만 판단하므로 한 거래가 볼 수 있는 시간은 블록 기간 안이며, 동률은 작은 거래 ID로 정한다. 정책 버전이며 DB 마이그레이션은 단일 V1을 유지한다.
+- 핵심은 과거 핵심을 포함해64건·기간336시간(14일) 이하이고, 이어지는 두 거래 간격은 168시간(7일) 이하다(정책 block-pin-3). 넘치는 연결은 별도 Alert로 두고 `BOUNDARY_CAP`/`BOUNDARY_SPAN` 링크를 남긴다. 링크(`boundaryWitnesses`, kind는 `BOUNDARY_PASS`/`BOUNDARY_SAME_FOCAL`/`BOUNDARY_OPEN_PAIR`/`BOUNDARY_CAP`/`BOUNDARY_SPAN`/`BOUNDARY_STAR_CHUNK`)는 다른 Alert와의 관계이며 소속이 아니다. 링크는 근거 지문에서 제외하고 매 실행의 현재 값으로 교체하므로 링크만 바뀌면 새 버전·알림을 만들지 않는다. 링크만으로 자동 병합하지 않는다. 활동이 많고 의심 비율이 낮은 허브 계좌는 관계 근거로 쓰지 않는다(`AMBIGUOUS_HUB`). 계산 예산 초과는 전체 실패하며 부분 공개하지 않는다.
 - 맥락은 소속 거래가 아니라 조회 조건이다. 근거의 `contextQuery`는 `{firstAt,lastAt,focalAccounts:[{bankId,accountId}]}`이며 핵심 기간±24시간과 블록의 초점 계좌(부채꼴 중심 등)다. accountId는 가명 계좌 UUID다. 맥락 거래 수는 조회 시 원장에서 계산한다(§3.3 contextCount).
-- 다음 분석에서는 기존 OPEN·비병합 Alert의 씨앗·핵심·채택 witness를 고정 입력으로 넘겨 같은 Alert가 이어서 자란다. 다른 Alert가 소유한 씨앗은 가져오지 않는다. 핵심 멤버가 같고 witness만 달라지면 새 버전을 만들지 않는다. 핵심 최초 시각+240시간(`sealedAfter`)이 지나면 늦은 보고 외에는 자라지 않는다. 정책 버전이 다른 기존 Alert(block-pin-1·flow-evidence-2 등)는 동결되어 자라지도 씨앗을 내주지도 않으므로, 정책 전환 시 시연 데이터를 초기화한다(§10.2).
+- 다음 분석에서는 기존 OPEN·비병합 Alert의 씨앗·핵심·채택 witness를 고정 입력으로 넘겨 같은 Alert가 이어서 자란다. 다른 Alert가 소유한 씨앗은 가져오지 않는다. 핵심 멤버가 같고 witness만 달라지면 새 버전을 만들지 않는다. 핵심 최초 시각+336시간(`sealedAfter`)이 지나면 늦은 보고 외에는 자라지 않는다. 정책 버전이 다른 기존 Alert(block-pin-1·block-pin-2·flow-evidence-2 등)는 동결되어 자라지도 씨앗을 내주지도 않으므로, 정책 전환 시 시연 데이터를 초기화한다(§10.2).
 - Alert 근거 상세와 조사 상세의 `relatedFlows`는 `{kind, txIds, relatedAlertIds}` 배열이다. `txIds`는 링크 근거 거래이며 **링크는 양쪽 Alert의 씨앗을 하나씩 포함한다.** `relatedAlertIds`는 그 거래를 씨앗으로 갖는 현재 공개 대표 사건 ID다. 따라서 과거 버전에서도 이동 대상 ID는 현재 기준이며 자기 자신은 제외한다. `boundaryWitnesses` 원본은 `{kind, tx_ids}` 형태로 근거 버전에 보존한다. 씨앗 소속은 한 Alert뿐이다.
 - 맥락 조회 범위가 겹쳐도 사건을 합치지 않는다. 그래프의 패턴 모델 추론은 현재 생성 기준이 아니다. flow-evidence-2 이전 버전의 근거에는 CONTEXT 멤버가 남아 있을 수 있으며 조회 계약은 그대로 읽는다.
 
@@ -182,8 +182,8 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 | 상황 | 처리 |
 |---|---|
 | 같은 흐름의 OPEN Alert 하나에 새 거래 연결 | 조사 중에도 자동 편입. 신규 거래만 PENDING, 기존 판정·제외·직원 역할 유지 |
-| 미착수 Alert 여러 개가 같은 흐름 | 자동 병합. 최초 생성·동률 최소ID를 대표로 유지, 대표 담당자 유지, 양쪽 담당자에게 중복 없는 알림. block-pin-2 생성기는 두 OPEN Alert를 한 그래프로 합치지 않고 `BOUNDARY_OPEN_PAIR` 링크만 남기므로 생성 경로에서는 발생하지 않는다. 예외로 두 OPEN Alert가 같은 씨앗을 소유한 비정상 상태는 먼저 생성된 Alert가 그 씨앗을 유지하고 생애주기가 자동 병합으로 정리한다(아티팩트 `duplicateOwnedSeedCount`) |
-| 조사 중 사건이 포함된 여러 Alert 병합 | 영향 담당자의 공동 변경 제안. 전원 동의 전 범위/공개 버전 유지. 위와 같은 이유로 block-pin-2 생성 경로에서는 발생하지 않는다. 같은 씨앗을 소유한 비정상 상태는 위와 같이 제안으로 정리한다 |
+| 미착수 Alert 여러 개가 같은 흐름 | 자동 병합. 최초 생성·동률 최소ID를 대표로 유지, 대표 담당자 유지, 양쪽 담당자에게 중복 없는 알림. block-pin 생성기는 두 OPEN Alert를 한 그래프로 합치지 않고 `BOUNDARY_OPEN_PAIR` 링크만 남기므로 생성 경로에서는 발생하지 않는다. 예외로 두 OPEN Alert가 같은 씨앗을 소유한 비정상 상태는 먼저 생성된 Alert가 그 씨앗을 유지하고 생애주기가 자동 병합으로 정리한다(아티팩트 `duplicateOwnedSeedCount`) |
+| 조사 중 사건이 포함된 여러 Alert 병합 | 영향 담당자의 공동 변경 제안. 전원 동의 전 범위/공개 버전 유지. 위와 같은 이유로 block-pin 생성 경로에서는 발생하지 않는다. 같은 씨앗을 소유한 비정상 상태는 위와 같이 제안으로 정리한다 |
 | 종결·Episode 편입 사건의 씨앗이 다시 묶이고 새 씨앗을 포함한 witness가 있음 | 후속 Alert. 같은 후속 흐름은 열린 후속에 반영 |
 | 종결 근거 반복, 연결 거래만 증가 또는 관계만 변경 | 후속 Alert를 새로 만들지 않음 |
 | 정정으로 확인된 유효 핵심 소멸 | 미착수 SCOPE_CLEARED 자동 종료, 조사 중 철회 제안 |
@@ -212,7 +212,7 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 근거 summary는 txCount,seedCount,totalAmountUsd,scoreMax,firstTxAt,lastTxAt이다. txCount·totalAmountUsd·firstTxAt·lastTxAt은 근거 transactions 기준이며 block-pin 정책에서는 곧 핵심(SEED+CONNECTION) 기준이다. scoreMax는 포함 거래의 최대 관측 점수다. 현재 조사 summary.riskScore(현재 씨앗 최대값)와 구분한다.
 
 상세(`GET /api/v1/alerts/{alertId}`)의 summary에는 다음 두 값을 더한다. 목록 summary에는 없다.
-- `sealedAfter`: 핵심 최초 occurredAt + policy.span_max_us(240시간)의 ISO-8601 UTC 시각. 이 시각 뒤에는 늦은 보고 외에는 Alert가 자라지 않는다. span_max_us가 없는 이전 정책 근거는 null.
+- `sealedAfter`: 핵심 최초 occurredAt + policy.span_max_us(block-pin-3은 336시간)의 ISO-8601 UTC 시각. 이 시각 뒤에는 늦은 보고 외에는 Alert가 자라지 않는다. span_max_us가 없는 이전 정책 근거는 null.
 - `contextCount`: 그 버전의 contextQuery 조건(초점 계좌가 송금 또는 수취 쪽, occurredAt이 firstAt~lastAt 양끝 포함)에 맞는 현재 ACTIVE 원장 거래 중 근거 transactions 밖의 거래 수. 조회할 때마다 현재 원장으로 계산하므로 늦은 보고가 들어오면 같은 버전이라도 늘 수 있다. 초점 계좌가 없으면0, contextQuery가 없는 이전 정책 근거는 null.
 
 graph.nodes는 계좌 id,kind,bankId,inCount,outCount,inAmountUsd,outAmountUsd, graph.edges는 id,txId,from,to,amountUsd,occurredAt,role,includedReasons다. 같은 계좌쌍의 반복 거래도 별도 edge다.

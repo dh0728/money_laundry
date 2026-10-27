@@ -1323,8 +1323,8 @@ class AlertPipelineTests {
   void detail_reports_growth_deadline_and_current_context_count() {
     long alert = firstAlert();
     var first = (Map<?, ?>) alerts.detail(alert, null).get("summary");
-    // The core starts at 2022-09-02 23:30 KST; the block stops growing 240 hours later.
-    assertThat(first.get("sealedAfter")).isEqualTo("2022-09-12T14:30:00Z");
+    // The core starts at 2022-09-02 23:30 KST; the block stops growing 336 hours later.
+    assertThat(first.get("sealedAfter")).isEqualTo("2022-09-16T14:30:00Z");
     // A two-leg PASS has no fan centre, so the context query has no focal account.
     assertThat(first.get("contextCount")).isEqualTo(0L);
 
@@ -1356,11 +1356,11 @@ class AlertPipelineTests {
     transfer("2022-09-05 12:00+09", "2022-09-05", account, receiver, 5);
     var summary = (Map<?, ?>) alerts.detail(alert, null).get("summary");
     assertThat(summary.get("contextCount")).isEqualTo(1L);
-    assertThat(summary.get("sealedAfter")).isEqualTo("2022-09-12T14:30:00Z");
+    assertThat(summary.get("sealedAfter")).isEqualTo("2022-09-16T14:30:00Z");
     assertThat(alerts.versions(alert)).hasSize(2);
     var review = (Map<?, ?>) reviews().detail(alert).get("summary");
     assertThat(review.get("contextCount")).isEqualTo(1L);
-    assertThat(review.get("sealedAfter")).isEqualTo("2022-09-12T14:30:00Z");
+    assertThat(review.get("sealedAfter")).isEqualTo("2022-09-16T14:30:00Z");
     // The list keeps its documented summary fields only.
     var listed = (List<Map<String, Object>>) alerts.list(0, 20, null, null, null).get("content");
     assertThat(

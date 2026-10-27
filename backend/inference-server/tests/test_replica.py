@@ -85,21 +85,21 @@ class ReplicaTests(unittest.TestCase):
         self.full(5, [(1, "a", "b", "10")], [("a", None), ("b", None)])
         delta = dict(transactions=transactions([(4, "a", "b", "40")]), accounts=accounts([]), removed=removed([]))
         self.replica.apply(dict(mode="delta", base_seq=5, seq=9, rows=2), delta)
-        version = self.replica.current()["version"]
+        applied = self.replica.current()
         self.replica.apply(dict(mode="delta", base_seq=5, seq=9, rows=2), delta)
-        self.assertEqual(self.replica.current()["version"], version)
+        self.assertEqual(self.replica.current(), applied)
         self.assertEqual(self.replica.inputs(targets([4]))["transactions"].column("tx_id").to_pylist(), [1, 4])
 
     def test_a_result_with_the_wrong_row_count_is_never_installed(self):
         self.full(5, [(1, "a", "b", "10"), (2, "b", "a", "20")], [("a", None), ("b", None)])
-        version = self.replica.current()["version"]
+        installed = self.replica.current()
         lost = dict(transactions=transactions([(4, "a", "b", "40")]), accounts=accounts([]), removed=removed([]))
         with self.assertRaises(ReplicaMismatch):  # backend froze 4 rows; copy + delta gives 3
             self.replica.apply(dict(mode="delta", base_seq=5, seq=9, rows=4), lost)
         twice = dict(transactions=transactions([(4, "a", "b", "40"), (4, "a", "b", "40")]), accounts=accounts([]), removed=removed([]))
         with self.assertRaises(ReplicaMismatch):  # a duplicated transaction
             self.replica.apply(dict(mode="delta", base_seq=5, seq=9, rows=4), twice)
-        self.assertEqual(self.replica.current()["version"], version)
+        self.assertEqual(self.replica.current(), installed)
         self.replica.apply(dict(mode="delta", base_seq=5, seq=9, rows=3), lost)
         with self.assertRaises(ReplicaMismatch):  # the sibling model disagrees about this position
             self.replica.apply(dict(mode="delta", base_seq=5, seq=9, rows=4), lost)
@@ -115,7 +115,43 @@ class ReplicaTests(unittest.TestCase):
         self.full(5, [(1, "a", "b", "10")], [("a", None), ("b", None)])
         self.full(5, [(7, "x", "y", "70")], [("x", None), ("y", None)])  # e.g. a recreated backend DB
         self.assertEqual(self.replica.inputs(targets([7]))["transactions"].column("tx_id").to_pylist(), [7])
-        self.assertEqual(len([p for p in self.replica.root.iterdir() if p.is_dir()]), 1)
+        self.assertEqual(len(list((self.replica.root / "data").iterdir())), 2)  # one part, one accounts file
+
+    def test_new_transactions_append_a_part_and_resent_ones_are_not_duplicated(self):
+        self.full(5, [(1, "a", "b", "10")], [("a", None), ("b", None)])
+        ledger = self.replica.apply(dict(mode="delta", base_seq=5, seq=6, rows=2),
+                                    dict(transactions=transactions([(2, "b", "c", "20")], "TARGET"),
+                                         accounts=accounts([("b", None), ("c", None)]), removed=removed([])))
+        self.assertEqual((ledger.change["kind"], ledger.change["base"], len(ledger.state["parts"])), ("append", 5, 2))
+        added, changed_accounts = ledger.changed()
+        self.assertEqual(added.column("tx_id").to_pylist(), [2])
+        self.assertEqual(changed_accounts.column("account_id").to_pylist(), ["b", "c"])
+        # A retried run re-sends tx 2 unchanged with its new target tx 3.
+        ledger = self.replica.apply(dict(mode="delta", base_seq=6, seq=7, rows=3),
+                                    dict(transactions=transactions([(2, "b", "c", "20"), (3, "c", "a", "30")], "TARGET"),
+                                         accounts=accounts([]), removed=removed([])))
+        self.assertEqual(ledger.change["kind"], "append")
+        self.assertEqual(ledger.changed()[0].column("tx_id").to_pylist(), [3])
+        self.assertEqual(ledger.transactions().column("tx_id").to_pylist(), [1, 2, 3])
+        self.assertEqual(self.replica.current()["max_tx_id"], 3)
+
+    def test_a_copy_of_the_earlier_layout_is_read_and_replaced(self):
+        import json
+        import pyarrow.parquet as pq
+        folder = self.replica.root / "v5-old"
+        folder.mkdir(parents=True)
+        pq.write_table(transactions([(1, "a", "b", "10")]).drop_columns(["input_role"]), folder / "transactions.parquet")
+        pq.write_table(accounts([("a", None), ("b", None)]), folder / "accounts.parquet")
+        (self.replica.root / "current.json").write_text(json.dumps(dict(seq=5, rows=1, version="v5-old")))
+        ledger = self.replica.apply(dict(mode="delta", base_seq=5, seq=6, rows=2),
+                                    dict(transactions=transactions([(2, "b", "a", "20")]), accounts=accounts([]),
+                                         removed=removed([])))
+        self.assertEqual(ledger.transactions().column("tx_id").to_pylist(), [1, 2])
+        self.assertTrue(folder.exists())  # still named by the new copy
+        self.replica.apply(dict(mode="delta", base_seq=6, seq=7, rows=1),
+                           dict(transactions=transactions([]), accounts=accounts([]), removed=removed([1])))
+        self.assertFalse(folder.exists())  # rewritten: the old folder is no longer named
+        self.assertEqual(self.replica.inputs(targets([2]))["transactions"].column("tx_id").to_pylist(), [2])
 
 
 if __name__ == "__main__":

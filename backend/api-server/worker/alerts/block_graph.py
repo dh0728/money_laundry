@@ -1,4 +1,4 @@
-"""Pure, bounded block generator (policy block-pin-2).
+"""Pure, bounded block generator (policy block-pin-3: block-pin-2 with longer time limits).
 
 Implements P0-P7 of worktable/alert_motif_design.md §7: pinning, hubs, faces/stars/
 RELAY, PASS/PATH/BRIDGE flow relations, capped Kruskal assembly, CLOSURE walks,
@@ -38,10 +38,15 @@ class BlockInputError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class BlockPolicy:
-    version: str = "block-pin-2"
+    version: str = "block-pin-3"
     core_max: int = 64
-    span_max_us: int = 240 * HOUR_US
-    hop_lag_us: int = 96 * HOUR_US
+    # block-pin-3 (2026-10-23): loose upper bounds, not fitted values. Synthetic pattern times
+    # scale with the dataset's length (longest CYCLE/FAN pattern: HI-Small <= 96 h, HI-Medium
+    # 144 h, HI-Large 840 h), so they say nothing about laundering. Real-data studies put most
+    # mule outflow within 24 h and 85 % of repeated same-party transfers within 7 days
+    # (worktable/reports/AML 생성기 파라미터 외부 근거.md).
+    span_max_us: int = 336 * HOUR_US
+    hop_lag_us: int = 168 * HOUR_US
     # Amount band [num/den, den/num] = [0.8, 1.25]: num*a <= den*b and num*b <= den*a.
     ratio_num: int = 4
     ratio_den: int = 5

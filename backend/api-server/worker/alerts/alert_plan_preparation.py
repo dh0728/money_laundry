@@ -57,12 +57,19 @@ class _Steps:
         gc.callbacks.remove(self._on_gc)
 
 
-def prepare_plans(connection, execution, batch, rows, scores, seeds, days, metadata):
+def prepare_plans(connection, execution, batch, rows, scores, seeds, days, metadata, *, case_ids=None, positive=None):
+    """Plan the run's graphs against the published Alerts in case_ids (every Alert when None).
+
+    ``positive`` are the scored transactions at or above their threshold; a case seed scored
+    below it is reassessed. Without it the run's seeds stand in (every positive was a seed).
+    """
     with _Steps() as steps:
-        _prepare_plans(connection, execution, batch, rows, scores, seeds, days, metadata, steps)
+        _prepare_plans(connection, execution, batch, rows, scores, seeds, days, metadata, steps,
+                       sorted(case_ids) if case_ids is not None else None,
+                       frozenset(seeds) if positive is None else positive)
 
 
-def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, metadata, steps):
+def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, metadata, steps, case_ids, positive):
     started = perf_counter()
     # Imported here because the pipeline calls this only after constructing its
     # frozen graph batch. These helpers have no persistence side effects.
@@ -76,7 +83,8 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
               v.evidence->>'policyVersion' AS policy_version
             FROM analysis.run_alert_origins o JOIN review.alerts a USING(alert_id)
             JOIN review.alert_versions v ON v.alert_id=o.alert_id AND v.version=o.version
-            WHERE o.run_id=%s ORDER BY a.alert_id''', (execution.run_id,))
+            WHERE o.run_id=%s AND (%s::bigint[] IS NULL OR o.alert_id=ANY(%s)) ORDER BY a.alert_id''',
+            (execution.run_id, case_ids, case_ids))
         raw_cases = cursor.fetchall()
     steps.lap('caseRead', len(raw_cases))
     if any(c['version'] != c['published_version'] for c in raw_cases):
@@ -89,11 +97,14 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
     ancestors = {}
     for source, target in connection.execute('''WITH RECURSIVE ancestry(source,target) AS (
         SELECT source_alert_id,target_alert_id FROM review.alert_lineage WHERE kind='FOLLOWUP_OF'
+          AND (%s::bigint[] IS NULL OR source_alert_id=ANY(%s))
         UNION SELECT a.source,l.target_alert_id FROM ancestry a JOIN review.alert_lineage l
-          ON l.source_alert_id=a.target AND l.kind='FOLLOWUP_OF') SELECT source,target FROM ancestry'''):
+          ON l.source_alert_id=a.target AND l.kind='FOLLOWUP_OF') SELECT source,target FROM ancestry''',
+            (case_ids, case_ids)):
         ancestors.setdefault(source, set()).add(target)
     excluded = {}
-    for alert, key in connection.execute("SELECT alert_id,tx_id FROM review.alert_members WHERE state='EXCLUDED'"):
+    for alert, key in connection.execute('''SELECT alert_id,tx_id FROM review.alert_members WHERE state='EXCLUDED'
+            AND (%s::bigint[] IS NULL OR alert_id=ANY(%s))''', (case_ids, case_ids)):
         excluded.setdefault(alert, set()).add(key)
     steps.lap('lineageRead')
     cases = [CaseSnapshot(c['alert_id'], c['version'], c['revision'], c['assignee_id'],
@@ -105,12 +116,13 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
     by_id = {case.alert_id: case for case in cases}
     del raw_cases
     steps.lap('caseIndex')
-    facts = dict(connection.execute('SELECT tx_id,integration_status FROM analysis.run_fact_checks WHERE run_id=%s',
-                                    (execution.run_id,)).fetchall())
+    members = None if case_ids is None else sorted({key for c in cases for key in c.evidence.member_ids})
+    facts = dict(connection.execute('''SELECT tx_id,integration_status FROM analysis.run_fact_checks
+        WHERE run_id=%s AND (%s::bigint[] IS NULL OR tx_id=ANY(%s))''', (execution.run_id, members, members)).fetchall())
     checked = frozenset(key for key, state in facts.items() if state in ('ACTIVE', 'SUPERSEDED'))
     invalid = frozenset(key for key, state in facts.items() if state == 'SUPERSEDED')
     reassessed = frozenset(key for c in cases for key in c.evidence.seed_ids
-                           if key in scores and key not in seeds and key not in invalid)
+                           if key in scores and key not in positive and key not in invalid)
     validity = Validity(checked, invalid, reassessed)
     steps.lap('factRead', len(facts))
     graphs = []

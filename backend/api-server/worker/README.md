@@ -148,10 +148,13 @@ WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id)
 
 `analysis_entry.py --stage ALERTS`는 `alerts/alert_pipeline.py`를 호출한다. Spring FREEZE_INPUT이
 TARGET와 cutoff 이전에 유효하게 수신·통합된 전체 CONTEXT·기존 점수·날짜별 수신 범위를 동결한다.
-실행 경로는 `alerts/alert_pipeline.py → alerts/block_graph.build_block_graphs` 하나다. 계좌 UUID는 내부 정수 코드로
+실행 경로는 `alerts/alert_pipeline.py → alerts/block_graph.build_block_graphs` 하나다. Alert 구성은 새 씨앗에서 출발한다
+(`alerts/alert_scope.py`): 그날 가장 이른 TARGET보다 60일(`WINDOW_DAYS`) 앞부터의 고정 입력만 읽고, 창 시작+기간 상한 이후의
+씨앗만 묶으며, 그 범위에 닿는 OPEN Alert만 고정점으로 넣고, 그래프가 닿은 Alert와 직전 완료 실행 이후 멤버 사실이 바뀐 OPEN Alert만
+계획한다. 계좌 UUID는 내부 정수 코드로
 변환하고 실제 거래 ID·UTC microseconds·USD 환산 금액(마이크로 단위)을 보존한다. 과거 점수는 원래 실행의 임계값을 적용한다.
-정책 `block-pin-2`는 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
-핵심은 씨앗과 연결 거래64건·기간240시간 이하다. 맥락 거래는 멤버가 아니라 근거의 `contextQuery`(초점 계좌·핵심 기간±24시간)이며
+정책 `block-pin-3`(block-pin-2의 시간 상한을 늘린 것. 간격 7일·기간 14일은 실데이터 연구 범위를 덮는 넉넉한 상한이며, 합성 패턴에 맞춘 값이 아니다)은 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
+핵심은 씨앗과 연결 거래64건·기간336시간(14일) 이하이고, 이어지는 두 거래 간격은 168시간(7일) 이하다. 맥락 거래는 멤버가 아니라 근거의 `contextQuery`(초점 계좌·핵심 기간±24시간)이며
 조회할 때 원장에서 센다. 구조 관계가 없는 씨앗은 발행하지 않고 사유(`unassignedReasons`)와 함께 아티팩트에 남겨 다음 실행에 재검토한다.
 저의심비율 허브는512건/20% 기준으로 부채꼴 면과 통과 관계를 만들지 않는다.
 상한·기간을 넘는 연결은 별도 Alert로 두고 `boundaryWitnesses`(BOUNDARY_* 링크)로 관계를 보존한다. 링크는 근거 지문에서 제외되며

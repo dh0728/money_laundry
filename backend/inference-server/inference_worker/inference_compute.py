@@ -155,12 +155,15 @@ def execute(directory):
             if type(manifest.get("target_row_count")) is not int or len(ids) != manifest["target_row_count"]:
                 raise ProtocolError("TARGET count mismatch")
             if "replica" in payload:
-                # The files bring the server's ledger copy to the run's position; the model reads
-                # the whole frozen input from the copy, exactly as the full files would carry it.
+                # The files bring the server's ledger copy to the run's position. The model runs
+                # inside the copy's lock and reads what it needs from the copy (the whole frozen
+                # input, or its own state kept next to the copy).
                 with Replica(payload["replica_dir"]).locked() as replica:
-                    replica.apply(payload["replica"], inputs)
-                    inputs = replica.inputs(inputs["targets"])
-            scores = run_model(inputs, request.model_kind, **request.versions())
+                    ledger = replica.apply(payload["replica"], inputs)
+                    scores = run_model({"targets": inputs["targets"], "ledger": ledger},
+                                       request.model_kind, **request.versions())
+            else:
+                scores = run_model(inputs, request.model_kind, **request.versions())
             try:
                 registry.require(**request.versions()).model.validate_scores(
                     scores, ids, request.model_kind, **request.versions())
