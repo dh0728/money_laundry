@@ -147,9 +147,11 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
         if any((entry['size_bytes'], entry['sha256']) != prepared[entry['name']][1:]
                for entry in manifest['files']):
             raise ProtocolError('Input changed while uploading')
+        # The server uploads results only after the whole inference, which can exceed an hour.
+        # A link also ends when the signing credentials expire (instance role: about 6 hours).
         def signed(method, key):
             return s3.generate_presigned_url(method, Params={'Bucket': settings.bucket,
-                'Key': store.object_key(key)}, ExpiresIn=3600)
+                'Key': store.object_key(key)}, ExpiresIn=6 * 3600)
         body = dict(request.identity(), **request.versions(),
                     manifest_sha256=hashlib.sha256(encode(manifest)).hexdigest(),
                     manifest_url=signed('get_object', request.manifest),
