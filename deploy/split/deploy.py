@@ -209,8 +209,12 @@ class Deployment:
                     if mode == "demo":
                         url = self.config.get("prod_inference_url", "")
                         require(url.startswith("https://"), "Production inference requires an HTTPS URL.")
+                        # Production reaches the same KubeSphere proxy, so it trusts the same public CA.
+                        ca = self.root / "certs/inference/kubesphere/ca.crt"
+                        require(ca.is_file(), "Install the KubeSphere inference public CA first.")
                         self.parameters.update(PROD_INFERENCE_API_URL=url,
-                                               PROD_INFERENCE_API_TOKEN=self.parameter("inference/token"))
+                                               PROD_INFERENCE_API_TOKEN=self.parameter("inference/token"),
+                                               PROD_INFERENCE_CA_HOST_FILE=str(ca))
             values.update(self.parameters)
             if self.environment == "dev":
                 values.update(self.inference_environment(
@@ -244,6 +248,12 @@ class Deployment:
             if selection["target"] != "local":
                 overlay = path.with_name("inference.external.yaml")
                 require(overlay.is_file(), "External inference Compose overlay is missing.")
+                overlays = ["-f", str(overlay)]
+        if self.role == "backend" and self.environment == "prod" \
+                and self.config.get("prod_worker_mode") == "demo":
+            # Releases made before the production demo overlay keep their own Compose file.
+            overlay = path.with_name("inference.prod.yaml")
+            if overlay.is_file():
                 overlays = ["-f", str(overlay)]
         return self.runner.run(["docker", "compose", "--env-file", "/dev/null", "-f", str(path),
                                 *overlays, *arguments],

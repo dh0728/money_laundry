@@ -38,9 +38,10 @@ from psycopg import sql
 
 DATABASE, SCHEMAS, CONFIGURATION, ACTION, PAYLOAD = json.loads(base64.b64decode(ARGS))
 url = os.environ["SPRING_DATASOURCE_URL"].removeprefix("jdbc:")
-if (os.environ.get("SPRING_PROFILES_ACTIVE") != "dev" or urlsplit(url).path.strip("/") != DATABASE
+# reset_prod_rds.py reuses this body for aml_prod; the database name is still checked exactly.
+if (os.environ.get("SPRING_PROFILES_ACTIVE") not in ("dev", "prod") or urlsplit(url).path.strip("/") != DATABASE
         or not urlsplit(url).hostname.endswith(".rds.amazonaws.com")):
-    raise SystemExit("REFUSED: the API container does not target the dev business DB")
+    raise SystemExit("REFUSED: the API container does not target the expected business DB")
 with psycopg.connect(url, user=os.environ["SPRING_DATASOURCE_USERNAME"],
                      password=os.environ["SPRING_DATASOURCE_PASSWORD"], connect_timeout=10) as db:
     if db.execute("SELECT current_database()").fetchone()[0] != DATABASE:
@@ -73,6 +74,16 @@ with psycopg.connect(url, user=os.environ["SPRING_DATASOURCE_USERNAME"],
         with db.transaction():
             db.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.SQL(",").join(map(sql.Identifier, SCHEMAS))))
             db.execute("DROP TABLE IF EXISTS public.flyway_schema_history")
+        print("EMPTIED")
+    elif ACTION == "wipe":
+        # Production only, approved without backup: drop every non-system schema and public table.
+        if DATABASE != "aml_prod":
+            raise SystemExit("REFUSED: wipe is only for aml_prod")
+        with db.transaction():
+            if present:
+                db.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.SQL(",").join(map(sql.Identifier, present))))
+            for table in public + ["flyway_schema_history"]:
+                db.execute(sql.SQL("DROP TABLE IF EXISTS public.{} CASCADE").format(sql.Identifier(table)))
         print("EMPTIED")
     elif ACTION == "restore":
         tables = PAYLOAD
@@ -124,11 +135,13 @@ def load_engine():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     engine = module.Deployment("backend", "dev", config["account_id"], root=ROOT)
+    # Compose pulls the release image on run; an expired ECR login would refuse it.
+    engine.authenticate()
     return engine, current
 
 
-def inner(engine, meta, action, payload=None):
-    arguments = base64.b64encode(json.dumps([DATABASE, SCHEMAS, CONFIGURATION, action, payload]).encode()).decode()
+def inner(engine, meta, action, payload=None, database=DATABASE):
+    arguments = base64.b64encode(json.dumps([database, SCHEMAS, CONFIGURATION, action, payload]).encode()).decode()
     script = f"ARGS = {arguments!r}\n" + INNER
     # The release's Compose environment carries DB credentials into the container only.
     return engine.compose(meta, "run", "--rm", "--no-deps", "-T", "--entrypoint",

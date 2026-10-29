@@ -120,10 +120,10 @@ class InnerSqlTests(unittest.TestCase):
             self.admin.execute("CREATE TABLE public.flyway_schema_history(installed_rank int, version text, success bool)")
             self.admin.execute("INSERT INTO public.flyway_schema_history VALUES(1,'1',true)")
 
-    def run_inner(self, action, payload=None):
+    def run_inner(self, action, payload=None, database=reset.DATABASE):
         source = reset.INNER.replace('.endswith(".rds.amazonaws.com")', '== "127.0.0.1"').replace(
             "/app/worker/analysis_permissions.sql", GRANTS.as_posix())
-        arguments = base64.b64encode(json.dumps([reset.DATABASE, reset.SCHEMAS, reset.CONFIGURATION, action, payload]).encode()).decode()
+        arguments = base64.b64encode(json.dumps([database, reset.SCHEMAS, reset.CONFIGURATION, action, payload]).encode()).decode()
         output = io.StringIO()
         saved = dict(os.environ)
         os.environ.update(self.env)
@@ -162,6 +162,28 @@ class InnerSqlTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.run_inner("drop")
         self.assertIsNotNone(self.admin.execute("SELECT to_regclass('core.users')").fetchone()[0])
+
+    def test_prod_wipe_drops_every_schema_and_refuses_dev(self):
+        with self.assertRaises(SystemExit):
+            self.run_inner("wipe")
+        self.admin.execute("DROP DATABASE IF EXISTS aml_prod")
+        self.admin.execute("CREATE DATABASE aml_prod")
+        prod = self.psycopg.connect(**dict(self.args, dbname="aml_prod"))
+        self.addCleanup(prod.close)
+        prod.execute("CREATE SCHEMA old_core; CREATE TABLE old_core.t(id int); CREATE TABLE public.legacy(id int)")
+        prod.execute("CREATE TABLE public.flyway_schema_history(installed_rank int, version text, success bool)")
+        prod.execute("INSERT INTO public.flyway_schema_history VALUES(1,'17',true)")
+        saved = self.env
+        self.env = dict(saved, SPRING_PROFILES_ACTIVE="prod",
+                        SPRING_DATASOURCE_URL=saved["SPRING_DATASOURCE_URL"].replace("aml_dev_v3", "aml_prod"))
+        try:
+            self.assertEqual(self.run_inner("wipe", database="aml_prod"), "EMPTIED")
+        finally:
+            self.env = saved
+        left = prod.execute("""SELECT count(*) FROM pg_namespace WHERE nspname !~ '^pg_'
+            AND nspname NOT IN ('information_schema','public')""").fetchone()[0]
+        self.assertEqual(left, 0)
+        self.assertEqual(prod.execute("SELECT count(*) FROM pg_tables WHERE schemaname='public'").fetchone()[0], 0)
 
     def test_wrong_database_is_refused(self):
         self.env = dict(self.env, SPRING_DATASOURCE_URL=self.env["SPRING_DATASOURCE_URL"].replace("aml_dev_v3", "aml_prod"))

@@ -44,6 +44,7 @@ class MemoryS3:
         return {'Body': io.BytesIO(self.objects[args['Key']])}
 
     def generate_presigned_url(self, method, *, Params, ExpiresIn):
+        assert ExpiresIn == 6 * 3600, 'model links must outlive a long inference'
         return 'https://objects.example/' + Params['Key'] + '?signature=not-for-db'
 
 

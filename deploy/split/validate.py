@@ -82,6 +82,25 @@ def main():
         assert set(services) == {"api"}
         validate_inference_mount(api["volumes"],
                                  (root / "backend/inference.external.yaml").read_text(encoding="utf-8"))
+        # The production demo overlay switches to the dev demo profile and mounts only the public CA.
+        prod_env = dict(os.environ)
+        prod_base = root / "backend/compose.prod.blue.yaml"
+        for name in re.findall(r"\$\{([A-Z][A-Z0-9_]*)", prod_base.read_text(encoding="utf-8")):
+            prod_env[name] = "test-only"
+        prod_env.update(PROD_API_IMAGE="example.invalid/aml:validation", AWS_REGION="ap-northeast-2",
+                        PROD_WORKER_MODE="demo", PROD_INFERENCE_API_URL="https://gpu.example:31575/prod",
+                        PROD_INFERENCE_API_TOKEN="remote-test-token",
+                        PROD_INFERENCE_CA_HOST_FILE="/opt/aml/certs/inference/kubesphere/ca.crt")
+        result = subprocess.run(["docker", "compose", "--env-file", str(empty), "-f", str(prod_base),
+                                 "-f", str(root / "backend/inference.prod.yaml"), "config", "--format", "json"],
+                                env=prod_env, cwd=folder, capture_output=True, text=True, check=True)
+        api = json.loads(result.stdout)["services"]["api"]
+        assert api["environment"]["SPRING_PROFILES_ACTIVE"] == "dev"
+        assert api["environment"]["INFERENCE_API_URL"] == "https://gpu.example:31575/prod"
+        assert api["environment"]["INFERENCE_ALLOW_LOOPBACK"] == "false"
+        assert api["environment"]["INFERENCE_CA_FILE"] == "/app/certs/inference-ca.crt"
+        validate_inference_mount(api["volumes"],
+                                 (root / "backend/inference.prod.yaml").read_text(encoding="utf-8"))
         # Check every shell block without evaluating GitHub expressions or executing it.
         source = workflow.read_text(encoding="utf-8")
         for index, match in enumerate(re.finditer(r"(?m)^(\s*)run: \|\n", source)):
@@ -94,7 +113,7 @@ def main():
             script = folder / f"workflow-{index}.sh"
             script.write_text(textwrap.dedent("\n".join(lines)) + "\n", encoding="utf-8", newline="\n")
             subprocess.run([bash, "--noprofile", "--norc", "-n", script.as_posix()], check=True)
-    print("Split configuration: 6 Compose files + external dev overlay, Python and Bash syntax OK. No AWS or containers used.")
+    print("Split configuration: 6 Compose files + external dev and prod demo overlays, Python and Bash syntax OK. No AWS or containers used.")
 
 
 if __name__ == "__main__":
