@@ -19,7 +19,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import uvicorn
 
-from tests.demo_inputs import build_targets
+from tests.demo_inputs import build_alerts, build_targets
+from models.alert_type_tree import spec as alert_type_spec
 from models.demo_random.model import calculate
 from models.demo_random.spec import FEATURE_VERSION, MODEL_VERSION
 from inference_server import create_app
@@ -106,6 +107,9 @@ class InferenceServerTests(unittest.TestCase):
         self.thread.join(5)
 
     def payload(self, kind="binary", targets=None, versions=None, materials=False, retry_of=None, replica=None):
+        if kind == "type":  # An Alert type request: the Alerts and their core transactions.
+            versions = dict(model_version=alert_type_spec.MODEL_VERSION, feature_version=alert_type_spec.FEATURE_VERSION)
+            materials = True
         versions = versions or dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
         if retry_of is None:
             request = Request(7, kind, **versions, run_id=str(uuid4()))
@@ -113,7 +117,9 @@ class InferenceServerTests(unittest.TestCase):
             request = Request(7, kind, retry_of["request_id"], retry_of["execution_round"] + 1,
                               **versions, run_id=retry_of["run_id"])
         tables = {"targets": build_targets([1, 99, 100]) if targets is None else targets}
-        if materials:
+        if kind == "type":
+            tables = build_alerts([1, 99, 100])
+        if materials and kind == "binary":
             # Same shape the backend sends with every model input (features/materials.py there).
             tables["transactions"] = pa.table({"tx_id": pa.array([1, 2, 99, 100], pa.int64())})
             tables["accounts"] = pa.table({"account_id": pa.array(["a", "b"]), "entity_type": pa.array(["Corporation", None])})
@@ -168,7 +174,9 @@ class InferenceServerTests(unittest.TestCase):
             self.wait_for(lambda: self.state(payload)["notification_delivered"])
             result = self.state(payload)["result"]
             scores = pq.read_table(io.BytesIO(self.objects["/" + result["files"][0]["key"]]))
-            self.assertEqual(scores.column("tx_id").to_pylist(), [1, 99, 100])
+            self.assertEqual(scores.column("tx_id" if kind == "binary" else "alert_key").to_pylist(), [1, 99, 100])
+            if kind == "type":  # Each test Alert is a fan-out: p_1 is FAN-OUT.
+                self.assertEqual([max(range(9), key=lambda i: row[f"p_{i}"]) for row in scores.to_pylist()], [1, 1, 1])
             if kind == "binary":
                 self.assertEqual(scores.column("p_laundering").to_pylist(), calculate(build_targets([1, 99, 100]), "binary", model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)["p_laundering"].to_pylist())
 
@@ -177,17 +185,16 @@ class InferenceServerTests(unittest.TestCase):
         from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
         from models.demo_random.model import calculate
         targets = build_targets([1, 99, 100])
-        for kind in ('binary', 'type'):
-            payload = self.payload(kind, targets, dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION))
-            self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
-            self.wait_for(lambda: self.state(payload)['status'] == 'COMPLETED')
-            self.wait_for(lambda: self.state(payload)['notification_delivered'])
-            result = self.state(payload)['result']
-            scores = pq.read_table(io.BytesIO(self.objects['/' + result['files'][0]['key']]))
-            self.assertEqual(scores['p_laundering' if kind == 'binary' else 'p_3'].to_pylist(),
-                             calculate(targets, kind, model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)['p_laundering' if kind == 'binary' else 'p_3'].to_pylist())
-            self.assertNotIn("manifest_url", self.state(payload))
-        self.assertEqual(len(self.events), 2)
+        payload = self.payload('binary', targets, dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION))
+        self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+        self.wait_for(lambda: self.state(payload)['status'] == 'COMPLETED')
+        self.wait_for(lambda: self.state(payload)['notification_delivered'])
+        result = self.state(payload)['result']
+        scores = pq.read_table(io.BytesIO(self.objects['/' + result['files'][0]['key']]))
+        self.assertEqual(scores['p_laundering'].to_pylist(),
+                         calculate(targets, 'binary', model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)['p_laundering'].to_pylist())
+        self.assertNotIn("manifest_url", self.state(payload))
+        self.assertEqual(len(self.events), 1)
 
     def test_materials_bundle_is_downloaded_verified_and_scored(self):
         payload = self.payload(materials=True)
@@ -405,8 +412,8 @@ class InferenceServerTests(unittest.TestCase):
         delta = dict(mode="delta", base_seq=5, seq=9, rows=3, tables=dict(
             transactions=transactions([(99, "a", "c", "30"), (100, "c", "b", "40")], "TARGET"),
             accounts=accounts([("c", None)]), removed=removed([2])))
-        binary, kind = self.payload(replica=delta), self.payload("type", replica=delta)
-        for payload in (full, binary, kind):
+        binary, again = self.payload(replica=delta), self.payload(replica=delta)
+        for payload in (full, binary, again):
             self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
             self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
         self.assertEqual(copy.current()["seq"], 9)

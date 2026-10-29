@@ -1,0 +1,2620 @@
+{
+ "modelVersion": "alert-type-tree-v2",
+ "featureVersion": "alert-graph-features-v1",
+ "classes": [
+  "NON_PATTERN",
+  "FAN-OUT",
+  "FAN-IN",
+  "GATHER-SCATTER",
+  "SCATTER-GATHER",
+  "CYCLE",
+  "RANDOM",
+  "BIPARTITE",
+  "STACK"
+ ],
+ "features": [
+  "tx_count",
+  "account_count",
+  "density",
+  "components",
+  "source_count",
+  "sink_count",
+  "middle_count",
+  "middle_share",
+  "max_out_degree",
+  "max_in_degree",
+  "max_out_share",
+  "max_in_share",
+  "max_through_degree",
+  "hub_out_in_ratio",
+  "sources_to_sinks_ratio",
+  "two_hop_paths_top",
+  "longest_chain",
+  "cycle_size",
+  "reciprocal_pairs",
+  "repeat_pair_share",
+  "amount_cv",
+  "amount_ratio",
+  "amount_ratio_chain",
+  "format_count",
+  "top_format_share"
+ ],
+ "maxDepth": 9,
+ "minSamplesLeaf": 5,
+ "classWeight": "balanced",
+ "rule": "go left when feature <= threshold",
+ "nodes": [
+  {
+   "id": 0,
+   "samples": 9858,
+   "probabilities": [
+    0.111111,
+    0.111111,
+    0.111111,
+    0.111111,
+    0.111111,
+    0.111111,
+    0.111111,
+    0.111111,
+    0.111111
+   ],
+   "classIndex": 3,
+   "feature": "components",
+   "threshold": 1.5,
+   "left": 1,
+   "right": 136
+  },
+  {
+   "id": 1,
+   "samples": 7763,
+   "probabilities": [
+    0.142493,
+    0.142365,
+    0.142493,
+    0.142167,
+    0.142385,
+    0.142493,
+    0.142493,
+    0.0,
+    0.003112
+   ],
+   "classIndex": 2,
+   "feature": "middle_count",
+   "threshold": 0.5,
+   "left": 2,
+   "right": 77
+  },
+  {
+   "id": 2,
+   "samples": 2950,
+   "probabilities": [
+    0.323494,
+    0.3372,
+    0.337504,
+    0.001802,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "source_count",
+   "threshold": 2.5,
+   "left": 3,
+   "right": 32
+  },
+  {
+   "id": 3,
+   "samples": 1853,
+   "probabilities": [
+    0.48332,
+    0.51668,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "sink_count",
+   "threshold": 4.5,
+   "left": 4,
+   "right": 21
+  },
+  {
+   "id": 4,
+   "samples": 876,
+   "probabilities": [
+    0.81025,
+    0.18975,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0,
+   "feature": "hub_out_in_ratio",
+   "threshold": 3.5,
+   "left": 5,
+   "right": 6
+  },
+  {
+   "id": 5,
+   "samples": 478,
+   "probabilities": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 6,
+   "samples": 398,
+   "probabilities": [
+    0.54076,
+    0.45924,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0,
+   "feature": "top_format_share",
+   "threshold": 0.9000000059604645,
+   "left": 7,
+   "right": 8
+  },
+  {
+   "id": 7,
+   "samples": 130,
+   "probabilities": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 8,
+   "samples": 268,
+   "probabilities": [
+    0.251739,
+    0.748261,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_cv",
+   "threshold": 0.6567939519882202,
+   "left": 9,
+   "right": 14
+  },
+  {
+   "id": 9,
+   "samples": 160,
+   "probabilities": [
+    0.109993,
+    0.890007,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_ratio",
+   "threshold": 1.3561265468597412,
+   "left": 10,
+   "right": 11
+  },
+  {
+   "id": 10,
+   "samples": 5,
+   "probabilities": [
+    0.48231,
+    0.51769,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 11,
+   "samples": 155,
+   "probabilities": [
+    0.096455,
+    0.903545,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_cv",
+   "threshold": 0.4023311138153076,
+   "left": 12,
+   "right": 13
+  },
+  {
+   "id": 12,
+   "samples": 83,
+   "probabilities": [
+    0.033355,
+    0.966645,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 13,
+   "samples": 72,
+   "probabilities": [
+    0.166417,
+    0.833583,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 14,
+   "samples": 108,
+   "probabilities": [
+    0.441304,
+    0.558696,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_ratio",
+   "threshold": 3610.4847412109375,
+   "left": 15,
+   "right": 18
+  },
+  {
+   "id": 15,
+   "samples": 93,
+   "probabilities": [
+    0.491233,
+    0.508767,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_cv",
+   "threshold": 1.068317949771881,
+   "left": 16,
+   "right": 17
+  },
+  {
+   "id": 16,
+   "samples": 64,
+   "probabilities": [
+    0.388462,
+    0.611538,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 17,
+   "samples": 29,
+   "probabilities": [
+    0.695752,
+    0.304248,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 18,
+   "samples": 15,
+   "probabilities": [
+    0.090761,
+    0.909239,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_cv",
+   "threshold": 1.6675459146499634,
+   "left": 19,
+   "right": 20
+  },
+  {
+   "id": 19,
+   "samples": 6,
+   "probabilities": [
+    0.218443,
+    0.781557,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 20,
+   "samples": 9,
+   "probabilities": [
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 21,
+   "samples": 977,
+   "probabilities": [
+    0.114844,
+    0.885156,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "format_count",
+   "threshold": 1.5,
+   "left": 22,
+   "right": 31
+  },
+  {
+   "id": 22,
+   "samples": 897,
+   "probabilities": [
+    0.004668,
+    0.995332,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_ratio",
+   "threshold": 103.02055740356445,
+   "left": 23,
+   "right": 24
+  },
+  {
+   "id": 23,
+   "samples": 656,
+   "probabilities": [
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 24,
+   "samples": 241,
+   "probabilities": [
+    0.01731,
+    0.98269,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "amount_cv",
+   "threshold": 1.8545077443122864,
+   "left": 25,
+   "right": 30
+  },
+  {
+   "id": 25,
+   "samples": 37,
+   "probabilities": [
+    0.109772,
+    0.890228,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "max_out_degree",
+   "threshold": 8.5,
+   "left": 26,
+   "right": 29
+  },
+  {
+   "id": 26,
+   "samples": 15,
+   "probabilities": [
+    0.258914,
+    0.741086,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1,
+   "feature": "density",
+   "threshold": 0.1547619104385376,
+   "left": 27,
+   "right": 28
+  },
+  {
+   "id": 27,
+   "samples": 9,
+   "probabilities": [
+    0.411329,
+    0.588671,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 28,
+   "samples": 6,
+   "probabilities": [
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 29,
+   "samples": 22,
+   "probabilities": [
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 30,
+   "samples": 204,
+   "probabilities": [
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 1
+  },
+  {
+   "id": 31,
+   "samples": 80,
+   "probabilities": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 32,
+   "samples": 1097,
+   "probabilities": [
+    0.02322,
+    0.0,
+    0.971592,
+    0.005188,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "hub_out_in_ratio",
+   "threshold": 0.1547619104385376,
+   "left": 33,
+   "right": 52
+  },
+  {
+   "id": 33,
+   "samples": 828,
+   "probabilities": [
+    0.003254,
+    0.0,
+    0.992799,
+    0.003947,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "source_count",
+   "threshold": 6.5,
+   "left": 34,
+   "right": 39
+  },
+  {
+   "id": 34,
+   "samples": 87,
+   "probabilities": [
+    0.030724,
+    0.0,
+    0.969276,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.7508856058120728,
+   "left": 35,
+   "right": 36
+  },
+  {
+   "id": 35,
+   "samples": 53,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 36,
+   "samples": 34,
+   "probabilities": [
+    0.077659,
+    0.0,
+    0.922341,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.8030659854412079,
+   "left": 37,
+   "right": 38
+  },
+  {
+   "id": 37,
+   "samples": 5,
+   "probabilities": [
+    0.473161,
+    0.0,
+    0.526839,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 38,
+   "samples": 29,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 39,
+   "samples": 741,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.995586,
+    0.004414,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.322717621922493,
+   "left": 40,
+   "right": 43
+  },
+  {
+   "id": 40,
+   "samples": 17,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.951422,
+    0.048578,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_ratio",
+   "threshold": 3.135311245918274,
+   "left": 41,
+   "right": 42
+  },
+  {
+   "id": 41,
+   "samples": 12,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 42,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.830404,
+    0.169596,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 43,
+   "samples": 724,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.996612,
+    0.003388,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 3.5973565578460693,
+   "left": 44,
+   "right": 49
+  },
+  {
+   "id": 44,
+   "samples": 693,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.997641,
+    0.002359,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "max_out_share",
+   "threshold": 0.10555555671453476,
+   "left": 45,
+   "right": 46
+  },
+  {
+   "id": 45,
+   "samples": 461,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 46,
+   "samples": 232,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.992946,
+    0.007054,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.4431980848312378,
+   "left": 47,
+   "right": 48
+  },
+  {
+   "id": 47,
+   "samples": 35,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.976536,
+    0.023464,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 48,
+   "samples": 197,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.995849,
+    0.004151,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 49,
+   "samples": 31,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.973491,
+    0.026509,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 3.6020947694778442,
+   "left": 50,
+   "right": 51
+  },
+  {
+   "id": 50,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.830404,
+    0.169596,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 51,
+   "samples": 26,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 52,
+   "samples": 269,
+   "probabilities": [
+    0.083476,
+    0.0,
+    0.907591,
+    0.008933,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.7658608257770538,
+   "left": 53,
+   "right": 66
+  },
+  {
+   "id": 53,
+   "samples": 208,
+   "probabilities": [
+    0.05122,
+    0.0,
+    0.941014,
+    0.007765,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "sources_to_sinks_ratio",
+   "threshold": 2.75,
+   "left": 54,
+   "right": 65
+  },
+  {
+   "id": 54,
+   "samples": 163,
+   "probabilities": [
+    0.065155,
+    0.0,
+    0.924967,
+    0.009878,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_ratio",
+   "threshold": 5.276966094970703,
+   "left": 55,
+   "right": 60
+  },
+  {
+   "id": 55,
+   "samples": 104,
+   "probabilities": [
+    0.088757,
+    0.0,
+    0.903554,
+    0.007689,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.5923873484134674,
+   "left": 56,
+   "right": 59
+  },
+  {
+   "id": 56,
+   "samples": 97,
+   "probabilities": [
+    0.068348,
+    0.0,
+    0.923363,
+    0.008289,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.22820387035608292,
+   "left": 57,
+   "right": 58
+  },
+  {
+   "id": 57,
+   "samples": 23,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 58,
+   "samples": 74,
+   "probabilities": [
+    0.089154,
+    0.0,
+    0.900033,
+    0.010813,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 59,
+   "samples": 7,
+   "probabilities": [
+    0.350172,
+    0.0,
+    0.649828,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 60,
+   "samples": 59,
+   "probabilities": [
+    0.02277,
+    0.0,
+    0.963422,
+    0.013808,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_ratio",
+   "threshold": 10.264344215393066,
+   "left": 61,
+   "right": 62
+  },
+  {
+   "id": 61,
+   "samples": 37,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 62,
+   "samples": 22,
+   "probabilities": [
+    0.060782,
+    0.0,
+    0.90236,
+    0.036858,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_ratio",
+   "threshold": 10.713866233825684,
+   "left": 63,
+   "right": 64
+  },
+  {
+   "id": 63,
+   "samples": 5,
+   "probabilities": [
+    0.260872,
+    0.0,
+    0.580933,
+    0.158195,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 64,
+   "samples": 17,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 65,
+   "samples": 45,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 66,
+   "samples": 61,
+   "probabilities": [
+    0.189619,
+    0.0,
+    0.797605,
+    0.012776,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_ratio",
+   "threshold": 457.1844482421875,
+   "left": 67,
+   "right": 76
+  },
+  {
+   "id": 67,
+   "samples": 38,
+   "probabilities": [
+    0.296143,
+    0.0,
+    0.683903,
+    0.019954,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "sources_to_sinks_ratio",
+   "threshold": 2.75,
+   "left": 68,
+   "right": 73
+  },
+  {
+   "id": 68,
+   "samples": 26,
+   "probabilities": [
+    0.150474,
+    0.0,
+    0.819109,
+    0.030416,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 1.368660569190979,
+   "left": 69,
+   "right": 72
+  },
+  {
+   "id": 69,
+   "samples": 21,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.960756,
+    0.039244,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2,
+   "feature": "amount_cv",
+   "threshold": 0.8197313547134399,
+   "left": 70,
+   "right": 71
+  },
+  {
+   "id": 70,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.830404,
+    0.169596,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 71,
+   "samples": 16,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 72,
+   "samples": 5,
+   "probabilities": [
+    0.668957,
+    0.0,
+    0.331043,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 73,
+   "samples": 12,
+   "probabilities": [
+    0.573955,
+    0.0,
+    0.426045,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0,
+   "feature": "amount_cv",
+   "threshold": 0.8670235276222229,
+   "left": 74,
+   "right": 75
+  },
+  {
+   "id": 74,
+   "samples": 5,
+   "probabilities": [
+    0.473161,
+    0.0,
+    0.526839,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 75,
+   "samples": 7,
+   "probabilities": [
+    0.642375,
+    0.0,
+    0.357625,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 76,
+   "samples": 23,
+   "probabilities": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 2
+  },
+  {
+   "id": 77,
+   "samples": 4813,
+   "probabilities": [
+    0.010237,
+    0.0,
+    0.0,
+    0.24473,
+    0.246424,
+    0.246611,
+    0.246611,
+    0.0,
+    0.005386
+   ],
+   "classIndex": 6,
+   "feature": "max_out_degree",
+   "threshold": 1.5,
+   "left": 78,
+   "right": 111
+  },
+  {
+   "id": 78,
+   "samples": 2177,
+   "probabilities": [
+    0.009246,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.490027,
+    0.490027,
+    0.0,
+    0.010701
+   ],
+   "classIndex": 6,
+   "feature": "cycle_size",
+   "threshold": 2.5,
+   "left": 79,
+   "right": 98
+  },
+  {
+   "id": 79,
+   "samples": 977,
+   "probabilities": [
+    0.018274,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.968507,
+    0.0,
+    0.013219
+   ],
+   "classIndex": 6,
+   "feature": "max_in_share",
+   "threshold": 0.4166666716337204,
+   "left": 80,
+   "right": 97
+  },
+  {
+   "id": 80,
+   "samples": 962,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.986535,
+    0.0,
+    0.013465
+   ],
+   "classIndex": 6,
+   "feature": "longest_chain",
+   "threshold": 2.5,
+   "left": 81,
+   "right": 88
+  },
+  {
+   "id": 81,
+   "samples": 42,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.743673,
+    0.0,
+    0.256327
+   ],
+   "classIndex": 6,
+   "feature": "amount_cv",
+   "threshold": 0.3396531343460083,
+   "left": 82,
+   "right": 87
+  },
+  {
+   "id": 82,
+   "samples": 34,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.896948,
+    0.0,
+    0.103052
+   ],
+   "classIndex": 6,
+   "feature": "amount_cv",
+   "threshold": 0.05807245336472988,
+   "left": 83,
+   "right": 84
+  },
+  {
+   "id": 83,
+   "samples": 22,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 6
+  },
+  {
+   "id": 84,
+   "samples": 12,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.698887,
+    0.0,
+    0.301113
+   ],
+   "classIndex": 6,
+   "feature": "amount_ratio_chain",
+   "threshold": 1.0145733952522278,
+   "left": 85,
+   "right": 86
+  },
+  {
+   "id": 85,
+   "samples": 6,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 6
+  },
+  {
+   "id": 86,
+   "samples": 6,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.36719,
+    0.0,
+    0.63281
+   ],
+   "classIndex": 8
+  },
+  {
+   "id": 87,
+   "samples": 8,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "classIndex": 8
+  },
+  {
+   "id": 88,
+   "samples": 920,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.997189,
+    0.0,
+    0.002811
+   ],
+   "classIndex": 6,
+   "feature": "amount_cv",
+   "threshold": 0.7725304663181305,
+   "left": 89,
+   "right": 96
+  },
+  {
+   "id": 89,
+   "samples": 915,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.998116,
+    0.0,
+    0.001884
+   ],
+   "classIndex": 6,
+   "feature": "amount_cv",
+   "threshold": 0.31779806315898895,
+   "left": 90,
+   "right": 93
+  },
+  {
+   "id": 90,
+   "samples": 886,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.999027,
+    0.0,
+    0.000973
+   ],
+   "classIndex": 6,
+   "feature": "amount_ratio_chain",
+   "threshold": 0.9545933306217194,
+   "left": 91,
+   "right": 92
+  },
+  {
+   "id": 91,
+   "samples": 53,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.983699,
+    0.0,
+    0.016301
+   ],
+   "classIndex": 6
+  },
+  {
+   "id": 92,
+   "samples": 833,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 6
+  },
+  {
+   "id": 93,
+   "samples": 29,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.970144,
+    0.0,
+    0.029856
+   ],
+   "classIndex": 6,
+   "feature": "amount_ratio",
+   "threshold": 4.69492244720459,
+   "left": 94,
+   "right": 95
+  },
+  {
+   "id": 94,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.822759,
+    0.0,
+    0.177241
+   ],
+   "classIndex": 6
+  },
+  {
+   "id": 95,
+   "samples": 24,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 6
+  },
+  {
+   "id": 96,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.822759,
+    0.0,
+    0.177241
+   ],
+   "classIndex": 6
+  },
+  {
+   "id": 97,
+   "samples": 15,
+   "probabilities": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 98,
+   "samples": 1200,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.991877,
+    0.0,
+    0.0,
+    0.008123
+   ],
+   "classIndex": 5,
+   "feature": "amount_cv",
+   "threshold": 0.9268650114536285,
+   "left": 99,
+   "right": 110
+  },
+  {
+   "id": 99,
+   "samples": 1195,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.995467,
+    0.0,
+    0.0,
+    0.004533
+   ],
+   "classIndex": 5,
+   "feature": "amount_cv",
+   "threshold": 0.21717538684606552,
+   "left": 100,
+   "right": 103
+  },
+  {
+   "id": 100,
+   "samples": 1127,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 5,
+   "feature": "longest_chain",
+   "threshold": 2.5,
+   "left": 101,
+   "right": 102
+  },
+  {
+   "id": 101,
+   "samples": 34,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 5
+  },
+  {
+   "id": 102,
+   "samples": 1093,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 5
+  },
+  {
+   "id": 103,
+   "samples": 68,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.920803,
+    0.0,
+    0.0,
+    0.079197
+   ],
+   "classIndex": 5,
+   "feature": "amount_ratio",
+   "threshold": 1.9253178238868713,
+   "left": 104,
+   "right": 105
+  },
+  {
+   "id": 104,
+   "samples": 6,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.479913,
+    0.0,
+    0.0,
+    0.520087
+   ],
+   "classIndex": 8
+  },
+  {
+   "id": 105,
+   "samples": 62,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.965136,
+    0.0,
+    0.0,
+    0.034864
+   ],
+   "classIndex": 5,
+   "feature": "amount_ratio_chain",
+   "threshold": 0.938358724117279,
+   "left": 106,
+   "right": 107
+  },
+  {
+   "id": 106,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.786827,
+    0.0,
+    0.0,
+    0.213173
+   ],
+   "classIndex": 5
+  },
+  {
+   "id": 107,
+   "samples": 57,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.981015,
+    0.0,
+    0.0,
+    0.018985
+   ],
+   "classIndex": 5,
+   "feature": "amount_cv",
+   "threshold": 0.7224818170070648,
+   "left": 108,
+   "right": 109
+  },
+  {
+   "id": 108,
+   "samples": 52,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 5
+  },
+  {
+   "id": 109,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.786827,
+    0.0,
+    0.0,
+    0.213173
+   ],
+   "classIndex": 5
+  },
+  {
+   "id": 110,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.187447,
+    0.0,
+    0.0,
+    0.812553
+   ],
+   "classIndex": 8
+  },
+  {
+   "id": 111,
+   "samples": 2636,
+   "probabilities": [
+    0.011241,
+    0.0,
+    0.0,
+    0.492675,
+    0.496085,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4,
+   "feature": "two_hop_paths_top",
+   "threshold": 1.5,
+   "left": 112,
+   "right": 133
+  },
+  {
+   "id": 112,
+   "samples": 1482,
+   "probabilities": [
+    0.018787,
+    0.0,
+    0.0,
+    0.871889,
+    0.109324,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3,
+   "feature": "middle_share",
+   "threshold": 0.9375,
+   "left": 113,
+   "right": 120
+  },
+  {
+   "id": 113,
+   "samples": 1272,
+   "probabilities": [
+    0.02185,
+    0.0,
+    0.0,
+    0.97815,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3,
+   "feature": "top_format_share",
+   "threshold": 0.9124999940395355,
+   "left": 114,
+   "right": 117
+  },
+  {
+   "id": 114,
+   "samples": 17,
+   "probabilities": [
+    0.963484,
+    0.0,
+    0.0,
+    0.036516,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0,
+   "feature": "amount_ratio_chain",
+   "threshold": 0.9852933287620544,
+   "left": 115,
+   "right": 116
+  },
+  {
+   "id": 115,
+   "samples": 5,
+   "probabilities": [
+    0.868356,
+    0.0,
+    0.0,
+    0.131644,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 116,
+   "samples": 12,
+   "probabilities": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 0
+  },
+  {
+   "id": 117,
+   "samples": 1255,
+   "probabilities": [
+    0.001313,
+    0.0,
+    0.0,
+    0.998687,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3,
+   "feature": "max_through_degree",
+   "threshold": 1.5,
+   "left": 118,
+   "right": 119
+  },
+  {
+   "id": 118,
+   "samples": 5,
+   "probabilities": [
+    0.291917,
+    0.0,
+    0.0,
+    0.708083,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3
+  },
+  {
+   "id": 119,
+   "samples": 1250,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3
+  },
+  {
+   "id": 120,
+   "samples": 210,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.21996,
+    0.78004,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4,
+   "feature": "amount_ratio_chain",
+   "threshold": 0.8033247292041779,
+   "left": 121,
+   "right": 122
+  },
+  {
+   "id": 121,
+   "samples": 13,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3
+  },
+  {
+   "id": 122,
+   "samples": 197,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.168257,
+    0.831743,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4,
+   "feature": "amount_ratio_chain",
+   "threshold": 1.2720839381217957,
+   "left": 123,
+   "right": 128
+  },
+  {
+   "id": 123,
+   "samples": 159,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.063208,
+    0.936792,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4,
+   "feature": "longest_chain",
+   "threshold": 3.5,
+   "left": 124,
+   "right": 127
+  },
+  {
+   "id": 124,
+   "samples": 153,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.045985,
+    0.954015,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4,
+   "feature": "amount_cv",
+   "threshold": 0.48298880457878113,
+   "left": 125,
+   "right": 126
+  },
+  {
+   "id": 125,
+   "samples": 90,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.078161,
+    0.921839,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4
+  },
+  {
+   "id": 126,
+   "samples": 63,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4
+  },
+  {
+   "id": 127,
+   "samples": 6,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.501331,
+    0.498669,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3
+  },
+  {
+   "id": 128,
+   "samples": 38,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.606535,
+    0.393465,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3,
+   "feature": "longest_chain",
+   "threshold": 2.5,
+   "left": 129,
+   "right": 132
+  },
+  {
+   "id": 129,
+   "samples": 28,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.46561,
+    0.53439,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4,
+   "feature": "amount_ratio",
+   "threshold": 9.10383129119873,
+   "left": 130,
+   "right": 131
+  },
+  {
+   "id": 130,
+   "samples": 13,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.308828,
+    0.691172,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4
+  },
+  {
+   "id": 131,
+   "samples": 15,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.601277,
+    0.398723,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3
+  },
+  {
+   "id": 132,
+   "samples": 10,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 3
+  },
+  {
+   "id": 133,
+   "samples": 1154,
+   "probabilities": [
+    0.001436,
+    0.0,
+    0.0,
+    0.0,
+    0.998564,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4,
+   "feature": "amount_ratio_chain",
+   "threshold": 3.8580716848373413,
+   "left": 134,
+   "right": 135
+  },
+  {
+   "id": 134,
+   "samples": 1149,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4
+  },
+  {
+   "id": 135,
+   "samples": 5,
+   "probabilities": [
+    0.293019,
+    0.0,
+    0.0,
+    0.0,
+    0.706981,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "classIndex": 4
+  },
+  {
+   "id": 136,
+   "samples": 2095,
+   "probabilities": [
+    0.0,
+    0.000454,
+    0.0,
+    0.001154,
+    0.000383,
+    0.0,
+    0.0,
+    0.504513,
+    0.493496
+   ],
+   "classIndex": 7,
+   "feature": "middle_share",
+   "threshold": 0.1130952425301075,
+   "left": 137,
+   "right": 140
+  },
+  {
+   "id": 137,
+   "samples": 1019,
+   "probabilities": [
+    0.0,
+    0.000897,
+    0.0,
+    0.002281,
+    0.0,
+    0.0,
+    0.0,
+    0.996822,
+    0.0
+   ],
+   "classIndex": 7,
+   "feature": "top_format_share",
+   "threshold": 0.9807692170143127,
+   "left": 138,
+   "right": 139
+  },
+  {
+   "id": 138,
+   "samples": 7,
+   "probabilities": [
+    0.0,
+    0.146497,
+    0.0,
+    0.372444,
+    0.0,
+    0.0,
+    0.0,
+    0.481059,
+    0.0
+   ],
+   "classIndex": 7
+  },
+  {
+   "id": 139,
+   "samples": 1012,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0
+   ],
+   "classIndex": 7
+  },
+  {
+   "id": 140,
+   "samples": 1076,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.000775,
+    0.0,
+    0.0,
+    0.0,
+    0.999225
+   ],
+   "classIndex": 8,
+   "feature": "format_count",
+   "threshold": 1.5,
+   "left": 141,
+   "right": 142
+  },
+  {
+   "id": 141,
+   "samples": 1071,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "classIndex": 8
+  },
+  {
+   "id": 142,
+   "samples": 5,
+   "probabilities": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.1725,
+    0.0,
+    0.0,
+    0.0,
+    0.8275
+   ],
+   "classIndex": 8
+  }
+ ]
+}

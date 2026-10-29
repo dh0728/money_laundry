@@ -1,14 +1,15 @@
 """Model-independent TARGET and score checks shared by every model package.
 
 Model packages add their own input/output rules on top; transport, publication and
-score storage rely only on these checks.
+score storage rely only on these checks. A binary request scores transactions (tx_id);
+a type request classifies Alerts (alert_key, the Alert plan's number within its run).
 """
 import math
 from collections.abc import Iterable
 
 import pyarrow as pa
 
-from common.worker_transport import ProtocolError, tx_ids
+from common.worker_transport import ProtocolError, key_ids
 
 
 def target_ids(values: Iterable[int]) -> list[int]:
@@ -24,6 +25,14 @@ def target_ids(values: Iterable[int]) -> list[int]:
     return ids
 
 
+def key_column(model_kind):
+    if model_kind == "binary":
+        return "tx_id"
+    if model_kind == "type":
+        return "alert_key"
+    raise ProtocolError("Unsupported model kind")
+
+
 def score_columns(model_kind):
     if model_kind == "binary":
         return ["p_laundering"]
@@ -35,9 +44,10 @@ def score_columns(model_kind):
 def check_scores(scores: pa.Table, expected_ids: Iterable[int], model_kind: str) -> None:
     """Exact TARGET set, float64 probabilities in [0, 1], TYPE rows summing to one."""
     columns = score_columns(model_kind)
-    if scores.column_names != ["tx_id", *columns]:
-        raise ProtocolError("Unexpected demo result columns")
-    if tx_ids(scores) != set(target_ids(expected_ids)):
+    key = key_column(model_kind)
+    if scores.column_names != [key, *columns]:
+        raise ProtocolError("Unexpected result columns")
+    if key_ids(scores, key) != set(target_ids(expected_ids)):
         raise ProtocolError("Result TARGET set mismatch")
     probabilities = []
     for column in columns:

@@ -19,36 +19,30 @@ class DemoCalculatorTests(unittest.TestCase):
         binary = calculate(targets, "binary", **VERSIONS)
         self.assertEqual(binary.column("p_laundering").to_pylist(),
                          [0.015, 0.995, 0.005, 0.075])
-        typed = calculate(targets, "type", **VERSIONS)
-        self.assertEqual(typed.column("p_0").to_pylist(), [0.05, 0.6, 0.6, 0.05])
-        self.assertEqual(typed.column("p_7").to_pylist(), [0.05, 0.05, 0.05, 0.6])
-        for kind, scores in [("binary", binary), ("type", typed)]:
-            stream = io.BytesIO()
-            pq.write_table(scores, stream)
-            restored = pq.read_table(io.BytesIO(stream.getvalue()))
-            validate_scores(restored, [100, 99, 1, 2**63 - 1], kind, **VERSIONS)
+        stream = io.BytesIO()
+        pq.write_table(binary, stream)
+        restored = pq.read_table(io.BytesIO(stream.getvalue()))
+        validate_scores(restored, [100, 99, 1, 2**63 - 1], "binary", **VERSIONS)
 
     def test_order_and_repeated_calculation_do_not_change_results(self):
         targets = build_targets(range(1, 101))
         reversed_targets = targets.take(pa.array(list(reversed(range(100)))))
-        for kind in ("binary", "type"):
-            first = calculate(targets, kind, **VERSIONS)
-            self.assertTrue(first.equals(calculate(reversed_targets, kind, **VERSIONS)))
-            self.assertTrue(first.equals(calculate(targets, kind, **VERSIONS)))
-            validate_scores(first, range(1, 101), kind, **VERSIONS)
+        first = calculate(targets, "binary", **VERSIONS)
+        self.assertTrue(first.equals(calculate(reversed_targets, "binary", **VERSIONS)))
+        self.assertTrue(first.equals(calculate(targets, "binary", **VERSIONS)))
+        validate_scores(first, range(1, 101), "binary", **VERSIONS)
 
     def test_random_scores_are_batch_independent_and_not_modulo_100(self):
         targets = build_targets([1, 101, 201])
-        for kind in ('binary', 'type'):
-            together = calculate(targets, kind, **VERSIONS)
-            separate = pa.concat_tables([calculate(build_targets([i]), kind, **VERSIONS)
-                                         for i in [1, 101, 201]])
-            self.assertTrue(together.equals(separate))
-            self.assertEqual(len(set(together.column(1).to_pylist())), 3)
-            stream = io.BytesIO()
-            pq.write_table(together, stream)
-            validate_scores(pq.read_table(io.BytesIO(stream.getvalue())),
-                            [1, 101, 201], kind, **VERSIONS)
+        together = calculate(targets, 'binary', **VERSIONS)
+        separate = pa.concat_tables([calculate(build_targets([i]), 'binary', **VERSIONS)
+                                     for i in [1, 101, 201]])
+        self.assertTrue(together.equals(separate))
+        self.assertEqual(len(set(together.column(1).to_pylist())), 3)
+        stream = io.BytesIO()
+        pq.write_table(together, stream)
+        validate_scores(pq.read_table(io.BytesIO(stream.getvalue())),
+                        [1, 101, 201], 'binary', **VERSIONS)
 
     def test_raw_columns_wrong_values_and_input_types_rejected(self):
         targets = build_targets([1, 2])
@@ -80,16 +74,6 @@ class DemoCalculatorTests(unittest.TestCase):
                 validate_scores(scores.set_column(1, "p_laundering", values),
                                 [1], "binary", **VERSIONS)
 
-    def test_type_sum_tolerance(self):
-        scores = calculate(build_targets([1]), "type", **VERSIONS)
-        for delta, accepted in [(5e-10, True), (2e-9, False), (0.1, False)]:
-            altered = scores.set_column(1, "p_0", pa.array([scores["p_0"][0].as_py() + delta]))
-            if accepted:
-                validate_scores(altered, [1], "type", **VERSIONS)
-            else:
-                with self.assertRaises(ProtocolError):
-                    validate_scores(altered, [1], "type", **VERSIONS)
-
     def test_version_and_model_mixing_rejected(self):
         targets = build_targets([1])
         scores = calculate(targets, "binary", **VERSIONS)
@@ -99,8 +83,9 @@ class DemoCalculatorTests(unittest.TestCase):
                 calculate(targets, "binary", **versions)
             with self.assertRaises(ProtocolError):
                 validate_scores(scores, [1], "binary", **versions)
-        with self.assertRaises(ProtocolError):
-            calculate(targets, "unknown", **VERSIONS)
+        for kind in ("type", "unknown"):
+            with self.assertRaises(ProtocolError):
+                calculate(targets, kind, **VERSIONS)
         with self.assertRaises(ProtocolError):
             validate_scores(scores, [1], "type", **VERSIONS)
 

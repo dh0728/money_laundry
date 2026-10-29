@@ -193,10 +193,14 @@ def publish(store, request, output_dir, files, target_row_count):
     return document
 
 
-def tx_ids(data):
-    if "tx_id" not in data.column_names or data.schema.field("tx_id").type != pa.int64():
-        raise ProtocolError("tx_id must be int64")
-    ids = data.column("tx_id").to_pylist()
+def key_ids(data, column):
+    if column not in data.column_names or data.schema.field(column).type != pa.int64():
+        raise ProtocolError(f"{column} must be int64")
+    ids = data.column(column).to_pylist()
     if None in ids or len(set(ids)) != len(ids):
-        raise ProtocolError("Null or duplicate tx_id")
+        raise ProtocolError(f"Null or duplicate {column}")
     return set(ids)
+
+
+def tx_ids(data):
+    return key_ids(data, "tx_id")
