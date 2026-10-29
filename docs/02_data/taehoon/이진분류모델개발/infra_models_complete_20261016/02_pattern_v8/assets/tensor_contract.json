@@ -1,0 +1,60 @@
+{
+  "batch_arguments": [
+    {
+      "index": 0,
+      "name": "x",
+      "shape": "[N,20]",
+      "dtype": "float32"
+    },
+    {
+      "index": 1,
+      "name": "edge_index",
+      "shape": "[2,E]",
+      "dtype": "int64"
+    },
+    {
+      "index": 2,
+      "name": "edge_attr",
+      "shape": "[E,17]",
+      "dtype": "float32"
+    },
+    {
+      "index": 3,
+      "name": "target_index",
+      "shape": "[2,B]",
+      "dtype": "int64"
+    },
+    {
+      "index": 4,
+      "name": "target_attr",
+      "shape": "[B,17]",
+      "dtype": "float32"
+    },
+    {
+      "index": 5,
+      "name": "incoming",
+      "shape": "[E]",
+      "dtype": "bool"
+    },
+    {
+      "index": 6,
+      "name": "outgoing",
+      "shape": "[E]",
+      "dtype": "bool"
+    }
+  ],
+  "node_base_width": 19,
+  "ego_column": 19,
+  "class_order": [
+    "NORMAL",
+    "FAN-OUT",
+    "FAN-IN",
+    "G-SCATTER",
+    "S-GATHER",
+    "CYCLE",
+    "RANDOM",
+    "BIPARTITE",
+    "STACK"
+  ],
+  "reference_npz": "b0..b6 are ordered forward arguments; t0..t7 are topology metadata, not extra feature columns"
+}

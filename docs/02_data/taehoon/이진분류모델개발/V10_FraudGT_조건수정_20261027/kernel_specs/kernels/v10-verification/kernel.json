@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "/workspace/kimi/venv/bin/python",
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
+  ],
+  "display_name": "V10 verification",
+  "language": "python"
+}

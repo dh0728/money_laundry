@@ -1,0 +1,13 @@
+{
+  "transactions": "examples/transactions.parquet",
+  "kyc": "examples/kyc.parquet",
+  "context_end": "2022-10-03",
+  "target_start": "2022-10-03",
+  "target_end": "2022-10-03",
+  "output_dir": "outputs/demo",
+  "device": "cpu",
+  "threads": 2,
+  "memory_limit": "2GB",
+  "neighbors": 100,
+  "sampling_seed": 42
+}

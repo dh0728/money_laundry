@@ -1,0 +1,12 @@
+{
+  "raw_positive_rows": 188675,
+  "observed_positive_rows": 188675,
+  "dropped_observation_duplicates": 0,
+  "source_database": "/workspace/kimi/Claude_GNN/final_model/daily_v1/daily.duckdb",
+  "source_stat": [
+    21992845312,
+    1789115900759545156
+  ],
+  "pattern_membership_only_for_unmatched_recall": "/workspace/kimi/Claude_GNN/final_model/experiments/drop_exact_v1/pattern_labels.parquet",
+  "labels_not_used_to_select_observations_or_split": true
+}

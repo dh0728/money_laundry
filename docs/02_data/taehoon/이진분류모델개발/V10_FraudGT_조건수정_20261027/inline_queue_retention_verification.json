@@ -1,0 +1,16 @@
+{
+  "backend": "inline",
+  "single_cell_execution": true,
+  "old_renders": 12,
+  "old_queue_growth": 12,
+  "old_figures_after_gc": 12,
+  "fixed_renders": 40,
+  "fixed_queue_growth": 0,
+  "fixed_figures_after_gc": 0,
+  "png_bytes_identical": true,
+  "unrelated_plot_preserved": true,
+  "interactive_state_preserved": true,
+  "torch_imported": false,
+  "utc": "2026-10-28T22:57:34.236688+00:00",
+  "status": "pass"
+}

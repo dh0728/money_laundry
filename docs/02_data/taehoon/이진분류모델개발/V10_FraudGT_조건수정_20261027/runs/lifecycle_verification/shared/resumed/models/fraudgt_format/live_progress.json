@@ -1,0 +1,23 @@
+{
+  "variant": "fraudgt_format",
+  "epoch": 6,
+  "epochs": 6,
+  "phase": "validation",
+  "train": {
+    "completed": 16,
+    "total": 16,
+    "percent": 100.0,
+    "loss": 1.4647572590754583,
+    "elapsed_seconds": 0.19333838112652302,
+    "scored": 13
+  },
+  "validation": {
+    "completed": 16,
+    "total": 16,
+    "percent": 100.0,
+    "scheduled": true,
+    "elapsed_seconds": 0.016211820766329765,
+    "scored": 13
+  },
+  "utc": "2026-10-27T07:55:47.879437+00:00"
+}

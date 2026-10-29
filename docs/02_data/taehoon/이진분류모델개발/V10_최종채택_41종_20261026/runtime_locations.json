@@ -1,0 +1,8 @@
+{
+  "gnn_architecture": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_candidate_ablation_20261026/reduced_model.py",
+  "graph_runtime": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/graph_runtime.py",
+  "feature_preprocessing": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_daily_fixed_20261024",
+  "training_result": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_candidate_ablation_20261026/variants/combined/result.json",
+  "prepared_inputs": "tree_values follows36 tree_names columns; gnn_raw_logits comes from the reduced33-type GNN with the frozen daily-close graph. Do not pass probabilities.",
+  "raw_transaction_pipeline_dependency": "Use project daily-close cache/runtime; this example checks prepared inputs, not raw-transaction deployment."
+}

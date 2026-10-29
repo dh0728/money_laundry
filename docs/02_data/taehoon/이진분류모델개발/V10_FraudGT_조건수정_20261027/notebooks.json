@@ -1,0 +1,27 @@
+{
+  "utc": "2026-10-27T09:32:13.587366+00:00",
+  "notebooks": [
+    {
+      "mode": "disjoint",
+      "path": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/V10_FraudGT_실습형.ipynb",
+      "canonical": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_실습형.ipynb",
+      "backup": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/notebook_backups/20261027T082734Z/V10_FraudGT_실습형.ipynb",
+      "cells": 56,
+      "code_cells": 35,
+      "longest_code_cell": 23,
+      "saved_run_training": true,
+      "previous_run_name": "disjoint_corrected_001"
+    },
+    {
+      "mode": "shared",
+      "path": "/workspace/handoff/V10_FraudGT_공유그래프_20261027/V10_FraudGT_공유그래프_실습형.ipynb",
+      "canonical": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_공유그래프_실습형.ipynb",
+      "backup": "/workspace/handoff/V10_FraudGT_공유그래프_20261027/notebook_backups/20261027T082734Z/V10_FraudGT_공유그래프_실습형.ipynb",
+      "cells": 56,
+      "code_cells": 35,
+      "longest_code_cell": 23,
+      "saved_run_training": true,
+      "previous_run_name": "official_loader_001"
+    }
+  ]
+}

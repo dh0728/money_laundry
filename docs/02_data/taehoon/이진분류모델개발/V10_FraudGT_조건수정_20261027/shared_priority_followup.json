@@ -1,0 +1,46 @@
+[
+  {
+    "utc": "2026-10-27T11:00:10.159127+00:00",
+    "live_utc": "2026-10-27T11:00:09.291954+00:00",
+    "epoch": 16,
+    "phase": "train",
+    "completed": 493568,
+    "memory_bytes": 17515548672,
+    "anon_bytes": 6760280064,
+    "file_cache_bytes": 10375716864,
+    "major_faults": 114629652
+  },
+  {
+    "utc": "2026-10-27T11:00:20.160064+00:00",
+    "live_utc": "2026-10-27T11:00:19.217269+00:00",
+    "epoch": 16,
+    "phase": "train",
+    "completed": 518144,
+    "memory_bytes": 17612562432,
+    "anon_bytes": 6852947968,
+    "file_cache_bytes": 10382131200,
+    "major_faults": 114629707
+  },
+  {
+    "utc": "2026-10-27T11:00:30.160793+00:00",
+    "live_utc": "2026-10-27T11:00:22.283274+00:00",
+    "epoch": 16,
+    "phase": "train",
+    "completed": 524288,
+    "memory_bytes": 17874759680,
+    "anon_bytes": 6784978944,
+    "file_cache_bytes": 10712788992,
+    "major_faults": 114632956
+  },
+  {
+    "utc": "2026-10-27T11:00:40.161650+00:00",
+    "live_utc": "2026-10-27T11:00:31.807063+00:00",
+    "epoch": 16,
+    "phase": "validation",
+    "completed": 0,
+    "memory_bytes": 18562580480,
+    "anon_bytes": 6789337088,
+    "file_cache_bytes": 11395567616,
+    "major_faults": 114638769
+  }
+]

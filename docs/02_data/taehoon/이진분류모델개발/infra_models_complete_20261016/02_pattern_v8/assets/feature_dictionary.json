@@ -1,0 +1,218 @@
+[
+  {
+    "group": "node",
+    "index": 0,
+    "feature": "log_out_count",
+    "meaning_ko": "송신 거래 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 1,
+    "feature": "log_in_count",
+    "meaning_ko": "수신 거래 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 2,
+    "feature": "log_out_neighbors",
+    "meaning_ko": "고유 수신 계좌 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 3,
+    "feature": "log_in_neighbors",
+    "meaning_ko": "고유 송신 계좌 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 4,
+    "feature": "log_self_count",
+    "meaning_ko": "자기 자신에게 보낸 거래 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 5,
+    "feature": "log_reciprocal_neighbors",
+    "meaning_ko": "상호 거래 계좌 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 6,
+    "feature": "mean_paid_currency_z",
+    "meaning_ko": "송신 금액의 통화별 robust z 평균"
+  },
+  {
+    "group": "node",
+    "index": 7,
+    "feature": "paid_outlier_fraction",
+    "meaning_ko": "송신 금액 중 |robust z| ≥ 3 비율"
+  },
+  {
+    "group": "node",
+    "index": 8,
+    "feature": "log_currency_count",
+    "meaning_ko": "송수신 통화 종류 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 9,
+    "feature": "log_active_days",
+    "meaning_ko": "거래가 발생한 일수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 10,
+    "feature": "type_Corporation",
+    "meaning_ko": "법인 여부"
+  },
+  {
+    "group": "node",
+    "index": 11,
+    "feature": "type_Partnership",
+    "meaning_ko": "파트너십 여부"
+  },
+  {
+    "group": "node",
+    "index": 12,
+    "feature": "type_Sole Proprietorship",
+    "meaning_ko": "개인사업자 여부"
+  },
+  {
+    "group": "node",
+    "index": 13,
+    "feature": "type_Individual",
+    "meaning_ko": "개인 여부"
+  },
+  {
+    "group": "node",
+    "index": 14,
+    "feature": "type_Country",
+    "meaning_ko": "국가 유형 여부"
+  },
+  {
+    "group": "node",
+    "index": 15,
+    "feature": "type_Direct",
+    "meaning_ko": "Direct 유형 여부"
+  },
+  {
+    "group": "node",
+    "index": 16,
+    "feature": "log_entity_observed_accounts",
+    "meaning_ko": "같은 엔티티에서 관측된 활성 계좌 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 17,
+    "feature": "log_entity_out_diversity",
+    "meaning_ko": "엔티티의 고유 수신 엔티티 수 log1p"
+  },
+  {
+    "group": "node",
+    "index": 18,
+    "feature": "log_entity_in_diversity",
+    "meaning_ko": "엔티티의 고유 송신 엔티티 수 log1p"
+  },
+  {
+    "group": "edge",
+    "index": 0,
+    "feature": "pair_prior_count",
+    "meaning_ko": "같은 방향 계좌쌍의 1분 이상 이전 거래 수 log1p"
+  },
+  {
+    "group": "edge",
+    "index": 1,
+    "feature": "pair_gap_minutes",
+    "meaning_ko": "같은 계좌쌍 직전 거래와 간격: ln(2+분), 없으면 0"
+  },
+  {
+    "group": "edge",
+    "index": 2,
+    "feature": "pair_count_1h",
+    "meaning_ko": "같은 계좌쌍의 1~60분 이전 거래 수 log1p"
+  },
+  {
+    "group": "edge",
+    "index": 3,
+    "feature": "sender_gap_minutes",
+    "meaning_ko": "송신 계좌 직전 거래와 간격: ln(2+분), 없으면 0"
+  },
+  {
+    "group": "edge",
+    "index": 4,
+    "feature": "sender_count_1h",
+    "meaning_ko": "송신 계좌의 1~60분 이전 거래 수 log1p"
+  },
+  {
+    "group": "edge",
+    "index": 5,
+    "feature": "receiver_gap_minutes",
+    "meaning_ko": "수신 계좌 직전 거래와 간격: ln(2+분), 없으면 0"
+  },
+  {
+    "group": "edge",
+    "index": 6,
+    "feature": "receiver_count_1h",
+    "meaning_ko": "수신 계좌의 1~60분 이전 거래 수 log1p"
+  },
+  {
+    "group": "edge",
+    "index": 7,
+    "feature": "paid_currency_z",
+    "meaning_ko": "통화별 robust 금액 z, ±8 clipping"
+  },
+  {
+    "group": "edge",
+    "index": 8,
+    "feature": "pair_history_count",
+    "meaning_ko": "해당 일 이전 동일 방향 계좌쌍 거래 수 log1p"
+  },
+  {
+    "group": "edge",
+    "index": 9,
+    "feature": "reverse_history_count",
+    "meaning_ko": "해당 일 이전 역방향 계좌쌍 거래 수 log1p"
+  },
+  {
+    "group": "edge",
+    "index": 10,
+    "feature": "pair_age_at_day_start",
+    "meaning_ko": "당일 0시와 동일 계좌쌍의 이전 일 마지막 거래 간격 ln(2+분)"
+  },
+  {
+    "group": "edge",
+    "index": 11,
+    "feature": "same_entity",
+    "meaning_ko": "같은 엔티티 여부: 엔티티가 없으면 0"
+  },
+  {
+    "group": "edge",
+    "index": 12,
+    "feature": "same_known_country",
+    "meaning_ko": "알려진 국가가 같으면 1"
+  },
+  {
+    "group": "edge",
+    "index": 13,
+    "feature": "both_countries_known",
+    "meaning_ko": "양쪽 국가가 알려졌으면 1"
+  },
+  {
+    "group": "edge",
+    "index": 14,
+    "feature": "same_currency",
+    "meaning_ko": "지급 통화와 수취 통화가 같으면 1"
+  },
+  {
+    "group": "edge",
+    "index": 15,
+    "feature": "is_self_transfer",
+    "meaning_ko": "동일 계좌로 송수신하면 1"
+  },
+  {
+    "group": "edge",
+    "index": 16,
+    "feature": "amt_z_pay_ccy",
+    "meaning_ko": "통화별 log1p(지급금액) 표준화: (x-m)/(sd+1e-6), ±10 clipping"
+  }
+]

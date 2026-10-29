@@ -1,0 +1,16 @@
+[
+  {
+    "fixture": "reference_known",
+    "edge_id": 123464542,
+    "risk_score": 0.7999657392501831,
+    "threshold": 0.4338742792606354,
+    "alert": true
+  },
+  {
+    "fixture": "reference_unmatched",
+    "edge_id": 170170630,
+    "risk_score": 0.020001187920570374,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  }
+]

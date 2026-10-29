@@ -1,0 +1,9 @@
+{
+  "mean_epoch_seconds": 956.1352739366703,
+  "train_mean_seconds": 729.6855145790614,
+  "validation_mean_seconds": 905.7990374304354,
+  "remaining_validation_epochs": 124,
+  "remaining_hours": 131.53150287722482,
+  "estimated_finish_utc": "2026-11-01T21:50:30.747141+00:00",
+  "scope": "current variant only; accounts for scheduled validation"
+}

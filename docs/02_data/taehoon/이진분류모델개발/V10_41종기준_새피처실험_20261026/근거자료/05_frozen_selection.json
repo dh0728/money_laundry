@@ -1,0 +1,185 @@
+{
+  "frozen_utc": "2026-10-26T08:14:09.823504+00:00",
+  "selected": {
+    "baseline41__tree": {
+      "key": "baseline41__tree",
+      "variant": "baseline41",
+      "model": "tree",
+      "metrics": {
+        "threshold": -2.113322834738809,
+        "precision": 0.7034250925740472,
+        "recall": 0.6296722254169063,
+        "weighted_AP": 0.6938989288299097,
+        "TP": 7665.0,
+        "FP_estimate": 3231.682647403756,
+        "FN": 4508.0,
+        "normal_population": 8538842.0,
+        "normal_scored": 124080,
+        "positive_scored": 12173,
+        "positive_all_weights_one": true,
+        "sample_false_positives": 47,
+        "estimated_max_recall_at_precision70": 0.6296722254169063,
+        "estimated_max_precision_at_recall65": 0.5478931794457936,
+        "known_pattern_recall": 0.9904643449419569,
+        "unmatched_recall": 0.10087097427587603,
+        "feature_types": 22,
+        "scalar_columns": 36,
+        "precision_estimated": true,
+        "recall_positive_census": true
+      },
+      "new_types": [],
+      "new_columns": [],
+      "tree_sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c",
+      "fusion_sha256": "e4ed2ee65697668b27bf215a2677ecf41060ebee49dafbee268ac033158a5dcf"
+    },
+    "baseline41__fusion": {
+      "key": "baseline41__fusion",
+      "variant": "baseline41",
+      "model": "fusion",
+      "metrics": {
+        "threshold": -2.027912443050317,
+        "precision": 0.7029749747174225,
+        "recall": 0.6268791587940524,
+        "weighted_AP": 0.6883927114956373,
+        "TP": 7631.0,
+        "FP_estimate": 3224.293964152083,
+        "FN": 4542.0,
+        "normal_population": 8538842.0,
+        "normal_scored": 124080,
+        "positive_scored": 12173,
+        "positive_all_weights_one": true,
+        "sample_false_positives": 47,
+        "estimated_max_recall_at_precision70": 0.6268791587940524,
+        "estimated_max_precision_at_recall65": 0.5482838373704344,
+        "known_pattern_recall": 0.9933665008291874,
+        "unmatched_recall": 0.08973060563094996,
+        "feature_types": 41,
+        "scalar_columns": 64,
+        "precision_estimated": true,
+        "recall_positive_census": true
+      },
+      "new_types": [],
+      "new_columns": [],
+      "tree_sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c",
+      "fusion_sha256": "e4ed2ee65697668b27bf215a2677ecf41060ebee49dafbee268ac033158a5dcf"
+    },
+    "old_owner_balance__fusion": {
+      "key": "old_owner_balance__fusion",
+      "variant": "old_owner_balance",
+      "model": "fusion",
+      "metrics": {
+        "threshold": -2.0773580635267503,
+        "precision": 0.7000941221733352,
+        "recall": 0.6313973548016101,
+        "weighted_AP": 0.6886333974513336,
+        "TP": 7686.0,
+        "FP_estimate": 3292.5238249679733,
+        "FN": 4487.0,
+        "normal_population": 8538842.0,
+        "normal_scored": 124080,
+        "positive_scored": 12173,
+        "positive_all_weights_one": true,
+        "sample_false_positives": 48,
+        "estimated_max_recall_at_precision70": 0.6313973548016101,
+        "estimated_max_precision_at_recall65": 0.5672783843269613,
+        "known_pattern_recall": 0.9939192924267551,
+        "unmatched_recall": 0.10006076564715415,
+        "feature_types": 42,
+        "scalar_columns": 66,
+        "precision_estimated": true,
+        "recall_positive_census": true
+      },
+      "new_types": [
+        "owner_external_balance7d"
+      ],
+      "new_columns": [
+        "src_owner_external_balance7d",
+        "dst_owner_external_balance7d"
+      ],
+      "tree_sha256": "2107349dd390a93c155322f9b63b23817b68be04057a5de5fd4fcf73832e57ed",
+      "fusion_sha256": "a30e8c44dc6496811302751ac092e6d9d2886dd821d52c6a41d4cb39df06fd85"
+    },
+    "owner_balance_missing__tree": {
+      "key": "owner_balance_missing__tree",
+      "variant": "owner_balance_missing",
+      "model": "tree",
+      "metrics": {
+        "threshold": -2.173347083845815,
+        "precision": 0.7006509541167583,
+        "recall": 0.6345190174977409,
+        "weighted_AP": 0.6925787608041951,
+        "TP": 7724.0,
+        "FP_estimate": 3300.0340851842366,
+        "FN": 4449.0,
+        "normal_population": 8538842.0,
+        "normal_scored": 124080,
+        "positive_scored": 12173,
+        "positive_all_weights_one": true,
+        "sample_false_positives": 48,
+        "estimated_max_recall_at_precision70": 0.6345190174977409,
+        "estimated_max_precision_at_recall65": 0.5584848602127739,
+        "known_pattern_recall": 0.9906025428413489,
+        "unmatched_recall": 0.11261899939234353,
+        "feature_types": 23,
+        "scalar_columns": 38,
+        "precision_estimated": true,
+        "recall_positive_census": true
+      },
+      "new_types": [
+        "owner_balance_supported7d"
+      ],
+      "new_columns": [
+        "src_owner_balance_supported7d",
+        "dst_owner_balance_supported7d"
+      ],
+      "tree_sha256": "1c028cd21041c831fbfb83072961c9b77f0611f9c63565b6bfe587c687cd74f9",
+      "fusion_sha256": "16640fd88c87b6af2cf00bc66dae598ca6b43d77561f96b10b82230783fa374d"
+    },
+    "account_amount__fusion": {
+      "key": "account_amount__fusion",
+      "variant": "account_amount",
+      "model": "fusion",
+      "metrics": {
+        "threshold": -2.0107976995234544,
+        "precision": 0.7028389375748868,
+        "recall": 0.6272899038856485,
+        "weighted_AP": 0.6879180773614281,
+        "TP": 7636.0,
+        "FP_estimate": 3228.5090528815385,
+        "FN": 4537.0,
+        "normal_population": 8538842.0,
+        "normal_scored": 124080,
+        "positive_scored": 12173,
+        "positive_all_weights_one": true,
+        "sample_false_positives": 47,
+        "estimated_max_recall_at_precision70": 0.6272899038856485,
+        "estimated_max_precision_at_recall65": 0.5380216007535988,
+        "known_pattern_recall": 0.9932283029297955,
+        "unmatched_recall": 0.09094591857403281,
+        "feature_types": 42,
+        "scalar_columns": 66,
+        "precision_estimated": true,
+        "recall_positive_census": true
+      },
+      "new_types": [
+        "account_amount_vs_external_mean7d"
+      ],
+      "new_columns": [
+        "src_account_amount_vs_external_mean7d",
+        "dst_account_amount_vs_external_mean7d"
+      ],
+      "tree_sha256": "9e8a3321d25ade70216492af94febbfedf41488c839d887dc1ee0c0dd170980e",
+      "fusion_sha256": "3b4b690cdeae0a799473135e97c4596b1d82f91ee8d9d5fac107c292fb568608"
+    }
+  },
+  "roles": {
+    "best_fusion": "old_owner_balance__fusion",
+    "best_tree": "owner_balance_missing__tree",
+    "compact_fusion": "old_owner_balance__fusion",
+    "account_only_new_fusion": "account_amount__fusion"
+  },
+  "thresholds_frozen": true,
+  "current_batch_history_not_used_for_selection": true,
+  "reused_history_known": true,
+  "plan_sha256": "0490b10cf2d362440d3fe4902e4468d4a632d10f3e7bc32c75330c335c7f4127"
+}

@@ -1,0 +1,6 @@
+{
+  "test": "02_variant_relations_and_official_loader",
+  "traceback": "Traceback (most recent call last):\n  File \"/workspace/handoff/V10_FraudGT_조건수정_20261027/verify_corrected.py\", line 174, in <module>\n    try:check(name,fn)\n        ^^^^^^^^^^^^^^\n  File \"/workspace/handoff/V10_FraudGT_조건수정_20261027/verify_corrected.py\", line 28, in check\n    start=time.monotonic();value=fn() or {}\n                                 ^^^^\n  File \"/workspace/handoff/V10_FraudGT_조건수정_20261027/verify_corrected.py\", line 79, in upstream_relations_and_loader\n    exec(compile(ast.Module(body=[cls],type_ignores=[]),'<official_AMLDataset>','exec'),namespace)\n  File \"<official_AMLDataset>\", line 127, in <module>\n  File \"<official_AMLDataset>\", line 191, in AMLDataset\nNameError: name 'List' is not defined. Did you mean: 'list'?\n",
+  "resolved": true,
+  "resolution": "Added typing.List to the isolated upstream-class test namespace; retry passed for all six cases."
+}

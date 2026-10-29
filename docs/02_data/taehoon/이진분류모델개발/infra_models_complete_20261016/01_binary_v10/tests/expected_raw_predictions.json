@@ -1,0 +1,182 @@
+[
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 62,
+    "context_end": "2022-10-03",
+    "risk_score": 0.20197448134422302,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 63,
+    "context_end": "2022-10-03",
+    "risk_score": 0.03361808881163597,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 64,
+    "context_end": "2022-10-03",
+    "risk_score": 0.18037249147891998,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 65,
+    "context_end": "2022-10-03",
+    "risk_score": 0.19251985847949982,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 66,
+    "context_end": "2022-10-03",
+    "risk_score": 0.0641242116689682,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 67,
+    "context_end": "2022-10-03",
+    "risk_score": 0.09417662769556046,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 68,
+    "context_end": "2022-10-03",
+    "risk_score": 0.15941378474235535,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 69,
+    "context_end": "2022-10-03",
+    "risk_score": 0.1795140504837036,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 70,
+    "context_end": "2022-10-03",
+    "risk_score": 0.09947685897350311,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 71,
+    "context_end": "2022-10-03",
+    "risk_score": 0.06356560438871384,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 72,
+    "context_end": "2022-10-03",
+    "risk_score": 0.09030461311340332,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 73,
+    "context_end": "2022-10-03",
+    "risk_score": 0.23674122989177704,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 74,
+    "context_end": "2022-10-03",
+    "risk_score": 0.17192065715789795,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 75,
+    "context_end": "2022-10-03",
+    "risk_score": 0.04886598885059357,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 76,
+    "context_end": "2022-10-03",
+    "risk_score": 0.07879649102687836,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 77,
+    "context_end": "2022-10-03",
+    "risk_score": 0.19510561227798462,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 78,
+    "context_end": "2022-10-03",
+    "risk_score": 0.3087524473667145,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  },
+  {
+    "model": "binary",
+    "model_name": "이진분류모델",
+    "model_version": "290f42b183466b47",
+    "edge_id": 79,
+    "context_end": "2022-10-03",
+    "risk_score": 0.08480902761220932,
+    "threshold": 0.4338742792606354,
+    "alert": false
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "fixture": "reference_known",
+    "passed": true,
+    "risk_score": 0.7999653816223145,
+    "expected": 0.7999657392501831
+  },
+  {
+    "fixture": "reference_unmatched",
+    "passed": true,
+    "risk_score": 0.020001180469989777,
+    "expected": 0.020001187920570374
+  }
+]

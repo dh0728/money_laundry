@@ -1,0 +1,191 @@
+[
+  {
+    "order": 1,
+    "utc": "2026-10-27T07:48:01.494598+00:00",
+    "test": "01_population_split_and_supervision",
+    "status": "pass",
+    "seconds": 14.38503173366189,
+    "splits": {
+      "train": {
+        "rows": 102505233,
+        "positive": 101515
+      },
+      "val": {
+        "rows": 34491749,
+        "positive": 43057
+      },
+      "test": {
+        "rows": 33429507,
+        "positive": 44103
+      }
+    },
+    "boundaries": [
+      56,
+      74
+    ],
+    "validation_requested": 524288,
+    "label_mapping_matches_old_censuses": true,
+    "comparison_modes_same_targets": true
+  },
+  {
+    "order": 2,
+    "utc": "2026-10-27T07:48:16.575514+00:00",
+    "test": "02_variant_relations_and_official_loader",
+    "status": "pass",
+    "seconds": 15.077524937689304,
+    "cases": [
+      {
+        "variant": "fraudgt_format",
+        "disjoint": false,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "fraudgt_format",
+        "disjoint": true,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "pe_fraudgt_format",
+        "disjoint": false,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "pe_fraudgt_format",
+        "disjoint": true,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "multi_fraudgt_format",
+        "disjoint": false,
+        "relations": 2,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "multi_fraudgt_format",
+        "disjoint": true,
+        "relations": 2,
+        "exact_loader_parity": true
+      }
+    ],
+    "actual_upstream_constructor_executed": true
+  },
+  {
+    "order": 3,
+    "utc": "2026-10-27T07:48:16.609630+00:00",
+    "test": "03_upstream_head_gradient_and_coverage",
+    "status": "pass",
+    "seconds": 0.03273880109190941,
+    "official_head_exact_parity": true,
+    "missing_target_reported": true,
+    "microbatch_gradient_means_equal": true,
+    "coverage_not_misreported_as_full_recall": true
+  },
+  {
+    "order": 4,
+    "utc": "2026-10-27T07:53:17.409729+00:00",
+    "test": "04_real_gpu_batches_both_modes",
+    "status": "pass",
+    "seconds": 300.79932260513306,
+    "train_batches": [
+      {
+        "mode": "shared",
+        "variant": "fraudgt_format",
+        "scored": 843,
+        "peak_cuda_mib": 1708.1884765625,
+        "targets": 2048,
+        "nodes": 25936,
+        "forward_edges": 338698,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 1205,
+        "unique_nodes": 25936,
+        "disjoint": false,
+        "relations": 1
+      },
+      {
+        "mode": "shared",
+        "variant": "pe_fraudgt_format",
+        "scored": 843,
+        "peak_cuda_mib": 1710.77294921875,
+        "targets": 2048,
+        "nodes": 25936,
+        "forward_edges": 338698,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 1205,
+        "unique_nodes": 25936,
+        "disjoint": false,
+        "relations": 1
+      },
+      {
+        "mode": "shared",
+        "variant": "multi_fraudgt_format",
+        "scored": 843,
+        "peak_cuda_mib": 7197.1953125,
+        "targets": 2048,
+        "nodes": 120382,
+        "forward_edges": 768973,
+        "reverse_edges": 697215,
+        "target_edges_not_sampled": 1205,
+        "unique_nodes": 120382,
+        "disjoint": false,
+        "relations": 2
+      },
+      {
+        "mode": "disjoint",
+        "variant": "fraudgt_format",
+        "scored": 28,
+        "peak_cuda_mib": 99.62841796875,
+        "targets": 64,
+        "nodes": 2467,
+        "forward_edges": 15175,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 36,
+        "unique_nodes": 2020,
+        "disjoint": true,
+        "relations": 1
+      },
+      {
+        "mode": "disjoint",
+        "variant": "pe_fraudgt_format",
+        "scored": 28,
+        "peak_cuda_mib": 99.74462890625,
+        "targets": 64,
+        "nodes": 2467,
+        "forward_edges": 15175,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 36,
+        "unique_nodes": 2020,
+        "disjoint": true,
+        "relations": 1
+      },
+      {
+        "mode": "disjoint",
+        "variant": "multi_fraudgt_format",
+        "scored": 38,
+        "peak_cuda_mib": 437.27734375,
+        "targets": 64,
+        "nodes": 8633,
+        "forward_edges": 45793,
+        "reverse_edges": 38166,
+        "target_edges_not_sampled": 26,
+        "unique_nodes": 7710,
+        "disjoint": true,
+        "relations": 2
+      }
+    ],
+    "validation_graph": {
+      "targets": 2048,
+      "nodes": 27281,
+      "forward_edges": 355851,
+      "reverse_edges": 0,
+      "target_edges_not_sampled": 1353,
+      "unique_nodes": 27281,
+      "disjoint": false,
+      "relations": 1
+    },
+    "validation_prefix_day": 73
+  }
+]

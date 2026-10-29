@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "cases": [
+    {
+      "relations": 1,
+      "max_forward_absolute_error": 3.5762786865234375e-07,
+      "input_gradient_parity": true
+    },
+    {
+      "relations": 2,
+      "max_forward_absolute_error": 3.5762786865234375e-07,
+      "input_gradient_parity": true
+    }
+  ],
+  "method": "Pinned upstream class executed with identical active parameters; unavailable torch_scatter.scatter_max replaced by native scatter_reduce amax; eval mode avoids differing dropout RNG layouts."
+}

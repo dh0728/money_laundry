@@ -1,0 +1,11 @@
+{
+  "utc": "2026-10-29T01:46:17.060418+00:00",
+  "event": "corrected_training_progress",
+  "variant": "fraudgt_format",
+  "epoch": 356,
+  "loader_batches": 168,
+  "epoch_targets": 344064,
+  "train_loss": 0.013458267869997577,
+  "scored_targets": 144330,
+  "coverage": 0.4194859095982143
+}

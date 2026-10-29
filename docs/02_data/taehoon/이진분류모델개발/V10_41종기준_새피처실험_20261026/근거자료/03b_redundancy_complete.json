@@ -1,0 +1,7 @@
+{
+  "status": "pass",
+  "features": 18,
+  "candidate_plan_changed": false,
+  "exact_duplicate_of_single_baseline_column_found": false,
+  "derived_balance_and_direction_redundancy_already_verified": true
+}

@@ -1,0 +1,67 @@
+[
+  {
+    "file": "41종_피처_명세.csv",
+    "bytes": 61195,
+    "sha256": "c65c01ebe99f3c1dc759c69815822a5fdd869669a6891fd041d1a67bca2066c6"
+  },
+  {
+    "file": "adoption.json",
+    "bytes": 14791,
+    "sha256": "c13066e12bc15b7f2f2711c2b5d5c4abf1f29b0e32c00809ce804fd408003d1d"
+  },
+  {
+    "file": "bundle_verification.json",
+    "bytes": 181,
+    "sha256": "bccc2b16b5f6aa0310f2fd26f8b0792457fe0c94936db24c4855075d3265a6e8"
+  },
+  {
+    "file": "evaluation_complete.json",
+    "bytes": 2449,
+    "sha256": "3a4140d4cc8c4105ad5521e660e1ba6ca235cff11de238d06054d07f0475c4b2"
+  },
+  {
+    "file": "fusion.joblib",
+    "bytes": 3560,
+    "sha256": "e4ed2ee65697668b27bf215a2677ecf41060ebee49dafbee268ac033158a5dcf"
+  },
+  {
+    "file": "gnn.pt",
+    "bytes": 1060431,
+    "sha256": "a269c4da4a511527f83e69e874867c8641f16fa798f03676806374243fa432dd"
+  },
+  {
+    "file": "historical_test_result.json",
+    "bytes": 1021,
+    "sha256": "46924f4fb90d2c504ca6d004386f3ebf6d5ee772c8a2b69a28e1389216c60ca7"
+  },
+  {
+    "file": "predict_precomputed.py",
+    "bytes": 1327,
+    "sha256": "4016f9fe647abede2ac27c745e08af197d4f6a3d174314bb662c8499486a6045"
+  },
+  {
+    "file": "prepared_input_example.npz",
+    "bytes": 21156,
+    "sha256": "0b33f5c112aebf1addeae47fe4a40ac4f7aaaa917c9751354bc6c228f7ce6f9c"
+  },
+  {
+    "file": "runtime_locations.json",
+    "bytes": 813,
+    "sha256": "97f8447992c1bd7f060cb8d5bea21aa5d379b861e4571b0e6b2fb9b59fbe26ae"
+  },
+  {
+    "file": "saml_result.json",
+    "bytes": 935,
+    "sha256": "8de5dd33f6ad4aa4114e8ed90c1f7535cbac283e7940cd0ec4a10a9c7e70381e"
+  },
+  {
+    "file": "tree.joblib",
+    "bytes": 3309590,
+    "sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c"
+  },
+  {
+    "file": "읽어주세요.txt",
+    "bytes": 1355,
+    "sha256": "d5bfb411172452f95f317eb0bcf1f4aeb8f7c98e8d6f5caa0959ed8e9a90c5b4"
+  }
+]

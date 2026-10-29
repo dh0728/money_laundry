@@ -1,0 +1,264 @@
+{
+  "utc": "2026-10-27T10:56:34.180454+00:00",
+  "event": "disjoint_pause_for_shared_priority",
+  "requested_by_user": true,
+  "pid": 563118,
+  "run": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001",
+  "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z",
+  "files": {
+    "models/fraudgt_format/last.pt": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z/last.pt",
+      "sha256": "b90467dcb005221a1e95e2dc167bd6d4cebc701c44206d1f63597edde6518963",
+      "bytes": 3551275
+    },
+    "models/fraudgt_format/best.pt": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z/best.pt",
+      "sha256": "f5376737fdca798b31bb524fc4a1869490b47bfd020fde851f597bc0e92f8def",
+      "bytes": 689565
+    },
+    "models/fraudgt_format/progress.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z/progress.json",
+      "sha256": "4118a71c32798353a7b06032f5ca84c6af8efad21d7ad1b42e66bb4bf8ca0ca4",
+      "bytes": 163
+    },
+    "models/fraudgt_format/history.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z/history.json",
+      "sha256": "740aa907018913e84288b72d5d3c39aa9b4a5f545a410cf2ce95ab747da54f89",
+      "bytes": 7013
+    },
+    "protocol.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z/protocol.json",
+      "sha256": "41effa424ce9a1ee2f77cc951a3c2ec517d9b98c64aad1d7e6b92c12ba0baf7c",
+      "bytes": 4769
+    },
+    "code_manifest.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z/code_manifest.json",
+      "sha256": "ac14fa75b4011d3e5dd1e914fdc3cc4fdd7249cf7c9eb9cd1870db6b647cfcd9",
+      "bytes": 1343
+    },
+    "notebook_contract.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/disjoint_corrected_001/stopped_checkpoints/shared_first_20261027T105634Z/notebook_contract.json",
+      "sha256": "c9b9367f7127f917d1a14de4e40e729de9e279aadff51b9cac8b1b5a98059188",
+      "bytes": 4207
+    }
+  },
+  "saved_progress": {
+    "epoch": 6,
+    "loader_batches": 120,
+    "epoch_targets": 245760,
+    "train_loss": 0.026290890071435837,
+    "scored_targets": 104784,
+    "coverage": 0.4263671875
+  },
+  "memory_before": {
+    "current_bytes": 29359427584,
+    "limit_bytes": 29360128000
+  },
+  "status": "stopped_checkpoint_preserved_kernel_released",
+  "shutdown_reply": {
+    "status": "ok",
+    "restart": false
+  },
+  "checkpoint_verified": {
+    "epoch": 6,
+    "loader_cursor": 120,
+    "completed_epochs": 5,
+    "best_epoch": 4,
+    "optimizer_and_rng_saved": true,
+    "protocol_hash_matches": true,
+    "all_backup_hashes_match": true
+  },
+  "speed_verification": {
+    "epoch": 16,
+    "logical_batches_per_interval": 8,
+    "before_intervals": [
+      {
+        "from_batch": 160,
+        "to_batch": 168,
+        "utc": "2026-10-27T10:30:44.692627+00:00",
+        "seconds": 235.64425
+      },
+      {
+        "from_batch": 168,
+        "to_batch": 176,
+        "utc": "2026-10-27T10:39:14.133492+00:00",
+        "seconds": 509.440865
+      },
+      {
+        "from_batch": 176,
+        "to_batch": 184,
+        "utc": "2026-10-27T10:50:08.443582+00:00",
+        "seconds": 654.31009
+      }
+    ],
+    "after_intervals": [
+      {
+        "from_batch": 200,
+        "to_batch": 208,
+        "utc": "2026-10-27T10:59:42.923323+00:00",
+        "seconds": 7.607999
+      },
+      {
+        "from_batch": 208,
+        "to_batch": 216,
+        "utc": "2026-10-27T10:59:49.072889+00:00",
+        "seconds": 6.149566
+      },
+      {
+        "from_batch": 216,
+        "to_batch": 224,
+        "utc": "2026-10-27T10:59:55.765869+00:00",
+        "seconds": 6.69298
+      },
+      {
+        "from_batch": 224,
+        "to_batch": 232,
+        "utc": "2026-10-27T11:00:02.673647+00:00",
+        "seconds": 6.907778
+      },
+      {
+        "from_batch": 232,
+        "to_batch": 240,
+        "utc": "2026-10-27T11:00:08.709887+00:00",
+        "seconds": 6.03624
+      },
+      {
+        "from_batch": 240,
+        "to_batch": 248,
+        "utc": "2026-10-27T11:00:15.493970+00:00",
+        "seconds": 6.784083
+      },
+      {
+        "from_batch": 248,
+        "to_batch": 256,
+        "utc": "2026-10-27T11:00:22.239794+00:00",
+        "seconds": 6.745824
+      }
+    ],
+    "before_median_seconds": 509.440865,
+    "after_median_seconds": 6.745824,
+    "latest_shared_status": {
+      "utc": "2026-10-27T11:00:22.928738+00:00",
+      "event": "corrected_validation_started",
+      "variant": "fraudgt_format",
+      "epoch": 16
+    }
+  },
+  "memory_recovery": {
+    "utc": "2026-10-27T10:58:34.202280+00:00",
+    "before_sample": {
+      "utc": "2026-10-27T10:58:21.854178+00:00",
+      "memory_bytes": 15245737984,
+      "anon_bytes": 6611214336,
+      "file_bytes": 8255422464,
+      "major_faults": 114588122,
+      "refaults": 2305490602,
+      "progress": {
+        "variant": "fraudgt_format",
+        "epoch": 16,
+        "epochs": 500,
+        "phase": "train",
+        "train": {
+          "completed": 387072,
+          "total": 524288,
+          "percent": 73.828125,
+          "loss": 0.018507317489826983,
+          "elapsed_seconds": 2115.0814410038292,
+          "scored": 162618
+        },
+        "validation": {
+          "completed": 0,
+          "total": 524288,
+          "percent": 0.0,
+          "scheduled": true
+        },
+        "utc": "2026-10-27T10:57:17.286192+00:00"
+      }
+    },
+    "after_sample": {
+      "utc": "2026-10-27T10:58:34.202280+00:00",
+      "memory_bytes": 15897784320,
+      "anon_bytes": 6617964544,
+      "file_bytes": 8905502720,
+      "major_faults": 114597289,
+      "refaults": 2305595240,
+      "progress": {
+        "variant": "fraudgt_format",
+        "epoch": 16,
+        "epochs": 500,
+        "phase": "train",
+        "train": {
+          "completed": 387072,
+          "total": 524288,
+          "percent": 73.828125,
+          "loss": 0.018507317489826983,
+          "elapsed_seconds": 2115.0814410038292,
+          "scored": 162618
+        },
+        "validation": {
+          "completed": 0,
+          "total": 524288,
+          "percent": 0.0,
+          "scheduled": true
+        },
+        "utc": "2026-10-27T10:57:17.286192+00:00"
+      }
+    },
+    "gpu_utilization_mean": 23.583333333333332,
+    "gpu_memory_used_mib": 23932,
+    "gpu_memory_free_mib": 8563,
+    "training_active": {
+      "shared": true,
+      "disjoint": false
+    },
+    "old_disjoint_pid_exists": false
+  },
+  "memory_followup": [
+    {
+      "utc": "2026-10-27T11:00:10.159127+00:00",
+      "live_utc": "2026-10-27T11:00:09.291954+00:00",
+      "epoch": 16,
+      "phase": "train",
+      "completed": 493568,
+      "memory_bytes": 17515548672,
+      "anon_bytes": 6760280064,
+      "file_cache_bytes": 10375716864,
+      "major_faults": 114629652
+    },
+    {
+      "utc": "2026-10-27T11:00:20.160064+00:00",
+      "live_utc": "2026-10-27T11:00:19.217269+00:00",
+      "epoch": 16,
+      "phase": "train",
+      "completed": 518144,
+      "memory_bytes": 17612562432,
+      "anon_bytes": 6852947968,
+      "file_cache_bytes": 10382131200,
+      "major_faults": 114629707
+    },
+    {
+      "utc": "2026-10-27T11:00:30.160793+00:00",
+      "live_utc": "2026-10-27T11:00:22.283274+00:00",
+      "epoch": 16,
+      "phase": "train",
+      "completed": 524288,
+      "memory_bytes": 17874759680,
+      "anon_bytes": 6784978944,
+      "file_cache_bytes": 10712788992,
+      "major_faults": 114632956
+    },
+    {
+      "utc": "2026-10-27T11:00:40.161650+00:00",
+      "live_utc": "2026-10-27T11:00:31.807063+00:00",
+      "epoch": 16,
+      "phase": "validation",
+      "completed": 0,
+      "memory_bytes": 18562580480,
+      "anon_bytes": 6789337088,
+      "file_cache_bytes": 11395567616,
+      "major_faults": 114638769
+    }
+  ],
+  "completed_utc": "2026-10-27T11:01:36.468796+00:00",
+  "training_source_unchanged": true
+}

@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "cases": [
+    {
+      "mode": "disjoint",
+      "status": "pass",
+      "utc": "2026-10-27T08:01:01.000029+00:00",
+      "seconds": 15.527767298743129,
+      "cells": 41,
+      "fresh_kernel_all_cells": true,
+      "visible_backend_ast_parity": true,
+      "no_training_started": true
+    },
+    {
+      "mode": "shared",
+      "status": "pass",
+      "utc": "2026-10-27T08:01:13.835944+00:00",
+      "seconds": 12.83577373251319,
+      "cells": 41,
+      "fresh_kernel_all_cells": true,
+      "visible_backend_ast_parity": true,
+      "no_training_started": true
+    }
+  ]
+}

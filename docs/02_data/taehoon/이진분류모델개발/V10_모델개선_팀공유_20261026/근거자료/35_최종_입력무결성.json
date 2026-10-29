@@ -1,0 +1,100 @@
+{
+  "status": "pass",
+  "variants": [
+    {
+      "variant": "baseline45",
+      "types": 45,
+      "scalar_columns": 69,
+      "actual_tree_inputs": 40,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 17,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "minus_format",
+      "types": 44,
+      "scalar_columns": 68,
+      "actual_tree_inputs": 39,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 17,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "minus_amount_z",
+      "types": 44,
+      "scalar_columns": 68,
+      "actual_tree_inputs": 39,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 16,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "minus_pair_history",
+      "types": 44,
+      "scalar_columns": 68,
+      "actual_tree_inputs": 40,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 16,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "minus_pair_amount",
+      "types": 44,
+      "scalar_columns": 68,
+      "actual_tree_inputs": 39,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 17,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "minus_dst_matching",
+      "types": 45,
+      "scalar_columns": 68,
+      "actual_tree_inputs": 39,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 17,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "minus_direct",
+      "types": 44,
+      "scalar_columns": 67,
+      "actual_tree_inputs": 40,
+      "actual_gnn_node_features": 18,
+      "actual_gnn_edge_features": 17,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "minus_same_entity",
+      "types": 44,
+      "scalar_columns": 68,
+      "actual_tree_inputs": 39,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 16,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    },
+    {
+      "variant": "combined",
+      "types": 41,
+      "scalar_columns": 64,
+      "actual_tree_inputs": 36,
+      "actual_gnn_node_features": 19,
+      "actual_gnn_edge_features": 14,
+      "removed_fields_absent": true,
+      "reload_score_parity": true
+    }
+  ],
+  "original_models_unchanged": true,
+  "graph_sampler_unchanged": true,
+  "calibration_targets_excluded_from_training": true,
+  "causal_input_audit": "4924c8578f90af87f36b8c13f8af377e06c3fbfa02001f7fe46d31e145e5176e",
+  "remaining_condition": "Static KYC availability still unverified; conditional KYC limitation applies to every model retaining it."
+}

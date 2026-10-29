@@ -1,0 +1,24 @@
+{
+  "edge_id": 123464542,
+  "expected": {
+    "nine_class": {
+      "risk_score": 0.981878936290741,
+      "pattern_scores": [
+        0.02759678103029728,
+        0.0003332371124997735,
+        0.0005491888150572777,
+        0.02325885370373726,
+        0.006352176424115896,
+        0.345970094203949,
+        0.2729288637638092,
+        0.01568467915058136,
+        0.307326078414917
+      ]
+    },
+    "binary": {
+      "risk_score": 0.7999657392501831
+    }
+  },
+  "context_end": "2022-10-31",
+  "note": "Real preprocessed reference graph, NOT raw input; independent inference parity fixture"
+}

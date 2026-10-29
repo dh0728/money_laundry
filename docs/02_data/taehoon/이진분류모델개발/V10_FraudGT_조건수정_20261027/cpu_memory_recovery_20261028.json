@@ -1,0 +1,104 @@
+{
+  "utc": "2026-10-28T07:15:38.443976+00:00",
+  "event": "shared_cpu_memory_recovery",
+  "status": "validation_completed_speed_recovered",
+  "old_pid": 567017,
+  "kernel_id": "c426da3c-cad3-466d-9ee2-56ceb6b491b9",
+  "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z",
+  "files": {
+    "models/fraudgt_format/last.pt": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z/last.pt",
+      "sha256": "6f1b10bc74faf616dc1bbbfc21213850ac0887bf25610a722a08dd4cbef7af29"
+    },
+    "models/fraudgt_format/best.pt": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z/best.pt",
+      "sha256": "2c735bb8ae3cca084e6f8a0dedf8c48ed1904f8ce28cfe9c62d89800865e13ae"
+    },
+    "models/fraudgt_format/progress.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z/progress.json",
+      "sha256": "4bb85abfca9c80f1723a72deed3eb9fba6ad86baf0b5ad650482d00629a4db01"
+    },
+    "models/fraudgt_format/history.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z/history.json",
+      "sha256": "4f976ebdf896b43bac283a0dca6e349259b5325491a5aac515da658c9601ca09"
+    },
+    "protocol.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z/protocol.json",
+      "sha256": "bb5ff044498d678752dd79e72fbaf43a7dd9c201254007ecb6c55558040a9114"
+    },
+    "code_manifest.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z/code_manifest.json",
+      "sha256": "ac14fa75b4011d3e5dd1e914fdc3cc4fdd7249cf7c9eb9cd1870db6b647cfcd9"
+    },
+    "notebook_contract.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/cpu_memory_recovery_20261028T071538Z/notebook_contract.json",
+      "sha256": "59174399b6f879cfd79b30b5ff6a1e1fd5881a998a00d3b0006e0ba8a59dcbfe"
+    }
+  },
+  "resume_progress": {
+    "epoch": 172,
+    "loader_batches": 256,
+    "epoch_targets": 524288,
+    "train_loss": 0.014929608106564468,
+    "scored_targets": 220343,
+    "coverage": 0.4202709197998047
+  },
+  "memory_bytes_before": 29356863488,
+  "protocol_changed": false,
+  "core_training_source_changed": false,
+  "resume_utc": "2026-10-28T07:18:58.400785+00:00",
+  "execute_message_id": "f74c9741-67183a4c49efb965bb14cf0d_586280_2",
+  "memory_policy": "gc.collect + malloc_trim at phase boundaries and every32 logical batches",
+  "completed_utc": "2026-10-28T07:26:24.707518+00:00",
+  "validation_after_recovery": {
+    "epoch": 172,
+    "seconds": 230.88715835660696,
+    "requested_targets": 524288,
+    "scored_targets": 176385,
+    "training_rerun": false
+  },
+  "current_progress": {
+    "variant": "fraudgt_format",
+    "epoch": 174,
+    "epochs": 500,
+    "phase": "train",
+    "train": {
+      "completed": 88064,
+      "total": 524288,
+      "percent": 16.796875,
+      "loss": 0.01607950353625011,
+      "elapsed_seconds": 26.883433809503913,
+      "scored": 37046
+    },
+    "validation": {
+      "completed": 0,
+      "total": 524288,
+      "percent": 0.0,
+      "scheduled": false
+    },
+    "utc": "2026-10-28T07:26:24.091067+00:00"
+  },
+  "training_active": {
+    "shared": true,
+    "disjoint": false
+  },
+  "memory_bytes_after": 18036637696,
+  "memory_cleanup_summary": {
+    "events": 23,
+    "periodic_events": 17,
+    "median_released_mib": 102.515625,
+    "median_cleanup_seconds": 0.32298233546316624,
+    "latest_process_anon_bytes": 1414901760
+  },
+  "implemented": [
+    "Collect dead Python objects and return free glibc CPU pages at phase boundaries.",
+    "Repeat cleanup every32 logical batches in both training and validation.",
+    "Record before/after CPU memory and cleanup time.",
+    "Restart the existing shared notebook kernel and resume from epoch172/cursor256 with the same protocol."
+  ],
+  "not_applied": [
+    "Feature-loader prototype is separate; production feature values and feature-loader source remain unchanged."
+  ],
+  "verification_file": "cpu_memory_maintenance_verification_20261028.json",
+  "long_run_status": "Immediate speed recovery verified through full validation and next training epoch; overnight recurrence not yet measured."
+}

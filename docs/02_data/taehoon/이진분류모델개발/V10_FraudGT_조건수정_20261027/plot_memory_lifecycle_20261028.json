@@ -1,0 +1,42 @@
+{
+  "utc": "2026-10-28T06:55:25.136470+00:00",
+  "renders": 24,
+  "samples": [
+    {
+      "renders": 1,
+      "rss_bytes": 171761664,
+      "live_figures": 1
+    },
+    {
+      "renders": 6,
+      "rss_bytes": 194662400,
+      "live_figures": 4
+    },
+    {
+      "renders": 12,
+      "rss_bytes": 204529664,
+      "live_figures": 5
+    },
+    {
+      "renders": 18,
+      "rss_bytes": 209547264,
+      "live_figures": 1
+    },
+    {
+      "renders": 24,
+      "rss_bytes": 210448384,
+      "live_figures": 1
+    }
+  ],
+  "start_rss_bytes": 158257152,
+  "before_gc_rss_bytes": 210448384,
+  "after_gc_rss_bytes": 210448384,
+  "after_trim_rss_bytes": 176193536,
+  "figures_after_gc": 0,
+  "gc_collected_objects": 14096,
+  "malloc_trim_return": 1,
+  "scope": "Isolated CPU-only plotting lifecycle; no live-kernel inspection or cleanup",
+  "training_interrupted": false,
+  "gpu_used": false,
+  "conclusion": "All created figures are collectable. This limited test does not reproduce a persistent live-figure leak and does not diagnose the running process allocator."
+}

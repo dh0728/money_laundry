@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "rows": 2128442,
+  "columns": [
+    "src_account_net_direction7d",
+    "dst_account_net_direction7d",
+    "src_account_flow_support7d",
+    "dst_account_flow_support7d",
+    "src_account_amount_vs_external_mean7d",
+    "dst_account_amount_vs_external_mean7d",
+    "src_account_net_direction_shift7d",
+    "dst_account_net_direction_shift7d",
+    "src_owner_net_direction7d",
+    "dst_owner_net_direction7d",
+    "src_owner_flow_support7d",
+    "dst_owner_flow_support7d",
+    "src_owner_amount_vs_external_mean7d",
+    "dst_owner_amount_vs_external_mean7d",
+    "src_owner_net_direction_shift7d",
+    "dst_owner_net_direction_shift7d",
+    "src_owner_balance_supported7d",
+    "dst_owner_balance_supported7d"
+  ],
+  "seconds": 173.23173062689602
+}

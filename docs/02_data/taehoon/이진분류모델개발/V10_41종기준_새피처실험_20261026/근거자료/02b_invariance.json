@@ -1,0 +1,161 @@
+{
+  "status": "pass",
+  "actual_builder_future_day_perturbation": true,
+  "actual_builder_label_pattern_perturbation": true,
+  "same_minute_distinct_transactions_preserved": true,
+  "past_window_lower_boundary": true,
+  "source_day_reads": [
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      5,
+      5
+    ],
+    [
+      6,
+      6
+    ],
+    [
+      7,
+      7
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      5,
+      5
+    ],
+    [
+      6,
+      6
+    ],
+    [
+      7,
+      7
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      5,
+      5
+    ],
+    [
+      6,
+      6
+    ],
+    [
+      7,
+      7
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      5,
+      5
+    ],
+    [
+      6,
+      6
+    ],
+    [
+      7,
+      7
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      8,
+      8
+    ]
+  ],
+  "prior_balance_matches_where_available": true,
+  "derived_balance_redundant_with_signed_direction": true,
+  "zero_diagnosis": {
+    "old_zero_cells": 19353,
+    "old_zero_without_positive_flow": 6995,
+    "old_zero_with_one_way_positive_flow": 12358
+  },
+  "static_kyc_asof_certified": false
+}

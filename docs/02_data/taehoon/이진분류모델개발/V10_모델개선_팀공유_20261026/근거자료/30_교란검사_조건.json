@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "baseline": {
+    "precision": 0.7313544991159923,
+    "recall": 0.6300829705085024,
+    "known_recall": 0.99212271973466,
+    "unmatched_recall": 0.09945310917561272,
+    "TP": 7670.0,
+    "FP": 2817.3901907637583,
+    "average_precision": 0.6940518440333299
+  },
+  "model_sha256": "84e397589e57ec6ea9b31021e6407384bcadd5e4a8b9f07af14fb46481a25647",
+  "model_unchanged": true,
+  "feature_types": 25,
+  "joint_groups": 3,
+  "experiments": 84,
+  "donor_scheme": "Within-day or within-day-format, with replacement and probability proportional to existing inverse-probability weights; joint columns moved together. Two repeats conditional, one unconditional.",
+  "frozen_threshold": -2.164954712998408,
+  "retraining": false,
+  "limitations": [
+    "Perturbed feature combinations may be unrealistic. These are sensitivity scores, not attainable accuracy or causal feature effects.",
+    "Correlated retained features can mask single-feature dependence; joint-family probes partially address this.",
+    "Small or absent response is not proof a feature can be removed without retraining."
+  ]
+}

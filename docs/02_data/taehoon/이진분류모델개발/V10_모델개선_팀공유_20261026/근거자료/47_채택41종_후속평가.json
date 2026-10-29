@@ -1,0 +1,65 @@
+{
+  "status": "complete",
+  "results": {
+    "historical_test": {
+      "threshold": -2.027912443050317,
+      "precision": 0.6635948104097436,
+      "recall": 0.6271682198489898,
+      "weighted_AP": 0.6755293066718918,
+      "TP": 27660.0,
+      "FP_estimate": 14022.061954223307,
+      "FN": 16443.0,
+      "normal_population": 33385404.0,
+      "normal_scored": 99999,
+      "positive_scored": 44103,
+      "positive_all_weights_one": true,
+      "sample_false_positives": 42,
+      "estimated_max_recall_at_precision70": 0.6226107067546426,
+      "estimated_max_precision_at_recall65": 0.5443405353852788,
+      "known_pattern_recall": 0.9950185356811863,
+      "unmatched_recall": 0.10397100016477179,
+      "scope": "historical_test",
+      "feature_types": 41,
+      "scalar_columns": 64,
+      "precision_estimated": true,
+      "recall_positive_census": true,
+      "selection_basis": "User-selected before these follow-up scores; threshold unchanged",
+      "precision_95_interval": {
+        "method": "Approximate Wilson IPW effective sample size; excludes selection uncertainty",
+        "precision_low": 0.5934274694209283,
+        "precision_high": 0.7272265633399919
+      }
+    },
+    "saml": {
+      "threshold": -2.027912443050317,
+      "precision": 0.006654103052197273,
+      "recall": 0.6778081636787198,
+      "weighted_AP": 0.0052000392237441075,
+      "TP": 6692.0,
+      "FP_estimate": 999003.2751566138,
+      "FN": 3181.0,
+      "normal_population": 9494979.0,
+      "normal_scored": 100005,
+      "positive_scored": 9873,
+      "positive_all_weights_one": true,
+      "sample_false_positives": 10522,
+      "estimated_max_recall_at_precision70": 0.00030385900941962927,
+      "estimated_max_precision_at_recall65": 0.007290055109580633,
+      "scope": "saml",
+      "feature_types": 41,
+      "scalar_columns": 64,
+      "precision_estimated": true,
+      "recall_positive_census": true,
+      "selection_basis": "User-selected before these follow-up scores; threshold unchanged",
+      "precision_95_interval": {
+        "method": "Approximate Wilson IPW effective sample size; excludes selection uncertainty",
+        "precision_low": 0.006535821742953161,
+        "precision_high": 0.006774768811763567
+      }
+    }
+  },
+  "threshold": -2.027912443050317,
+  "goal_met": false,
+  "reason": "Validation positive-census recall is below65%; full-population precision not certified",
+  "user_adoption_unchanged": true
+}

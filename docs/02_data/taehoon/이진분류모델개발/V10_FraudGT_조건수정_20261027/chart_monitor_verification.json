@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "cases": [
+    {
+      "mode": "disjoint",
+      "utc": "2026-10-27T09:33:13.107069+00:00",
+      "png_outputs": 1,
+      "torch_not_imported": true,
+      "training_started": false
+    },
+    {
+      "mode": "shared",
+      "utc": "2026-10-27T09:33:16.402277+00:00",
+      "png_outputs": 1,
+      "torch_not_imported": true,
+      "training_started": false
+    }
+  ]
+}

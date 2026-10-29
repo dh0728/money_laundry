@@ -1,0 +1,9 @@
+﻿실험번호,모델,제거종류,제거개별열,결합종류수,결합스칼라열,트리입력열,GNN노드피처,GNN엣지피처
+299,baseline45,,,45,69,40,19,17
+300,minus_format,payment_format,,44,68,39,19,17
+301,minus_amount_z,amt_z_pay_ccy,,44,68,39,19,16
+302,minus_pair_history,pair_history_count,,44,68,40,19,16
+303,minus_pair_amount,pair_amount_seen_before_day,,44,68,39,19,17
+304,minus_dst_matching,,dst_day_ccy_log_matching_in_amount,45,68,39,19,17
+305,minus_direct,type_Direct,,44,67,40,18,17
+306,minus_same_entity,same_entity,,44,68,39,19,16

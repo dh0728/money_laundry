@@ -1,0 +1,149 @@
+{
+  "utc": "2026-10-27T11:05:14.794985+00:00",
+  "kst": "2026-10-27T20:05:14.794985+09:00",
+  "run": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001",
+  "basis": "Only batch intervals after RAM-pressure recovery; validation after epoch16. No slow full-epoch16 average.",
+  "epoch": 17,
+  "phase": "train",
+  "progress_percent": 45.703125,
+  "training_intervals_8_batches": [
+    {
+      "epoch": 16,
+      "from_batch": 200,
+      "to_batch": 208,
+      "seconds": 7.607999
+    },
+    {
+      "epoch": 16,
+      "from_batch": 208,
+      "to_batch": 216,
+      "seconds": 6.149566
+    },
+    {
+      "epoch": 16,
+      "from_batch": 216,
+      "to_batch": 224,
+      "seconds": 6.69298
+    },
+    {
+      "epoch": 16,
+      "from_batch": 224,
+      "to_batch": 232,
+      "seconds": 6.907778
+    },
+    {
+      "epoch": 16,
+      "from_batch": 232,
+      "to_batch": 240,
+      "seconds": 6.03624
+    },
+    {
+      "epoch": 16,
+      "from_batch": 240,
+      "to_batch": 248,
+      "seconds": 6.784083
+    },
+    {
+      "epoch": 16,
+      "from_batch": 248,
+      "to_batch": 256,
+      "seconds": 6.745824
+    },
+    {
+      "epoch": 17,
+      "from_batch": 8,
+      "to_batch": 16,
+      "seconds": 5.77801
+    },
+    {
+      "epoch": 17,
+      "from_batch": 16,
+      "to_batch": 24,
+      "seconds": 6.384017
+    },
+    {
+      "epoch": 17,
+      "from_batch": 24,
+      "to_batch": 32,
+      "seconds": 6.237397
+    },
+    {
+      "epoch": 17,
+      "from_batch": 32,
+      "to_batch": 40,
+      "seconds": 5.644181
+    },
+    {
+      "epoch": 17,
+      "from_batch": 40,
+      "to_batch": 48,
+      "seconds": 6.399198
+    },
+    {
+      "epoch": 17,
+      "from_batch": 48,
+      "to_batch": 56,
+      "seconds": 6.521338
+    },
+    {
+      "epoch": 17,
+      "from_batch": 56,
+      "to_batch": 64,
+      "seconds": 6.239289
+    },
+    {
+      "epoch": 17,
+      "from_batch": 64,
+      "to_batch": 72,
+      "seconds": 6.768409
+    },
+    {
+      "epoch": 17,
+      "from_batch": 72,
+      "to_batch": 80,
+      "seconds": 6.825603
+    },
+    {
+      "epoch": 17,
+      "from_batch": 80,
+      "to_batch": 88,
+      "seconds": 6.049421
+    },
+    {
+      "epoch": 17,
+      "from_batch": 88,
+      "to_batch": 96,
+      "seconds": 6.815141
+    },
+    {
+      "epoch": 17,
+      "from_batch": 96,
+      "to_batch": 104,
+      "seconds": 6.890555
+    },
+    {
+      "epoch": 17,
+      "from_batch": 104,
+      "to_batch": 112,
+      "seconds": 6.119339
+    }
+  ],
+  "training_interval_count": 20,
+  "train_minutes_per_epoch": 3.4559031466666665,
+  "validation_minutes": 3.27552967943872,
+  "validation_sample_count": 1,
+  "average_minutes_per_epoch_including_validation": 4.274785566526346,
+  "remaining_current_variant_hours": 34.456945974395865,
+  "estimated_current_variant_finish_utc": "2026-10-28T21:32:39.800493+00:00",
+  "estimated_current_variant_finish_kst": "2026-10-29T06:32:39.800493+09:00",
+  "remaining_scheduled_validations": 121,
+  "three_variants_equal_speed_scenario_days": 4.408856516909011,
+  "three_variants_equal_speed_finish_kst": "2026-11-01T05:53:59.998046+09:00",
+  "assumptions": [
+    "Shared run continues alone under the same resource conditions.",
+    "Current variant completes500epochs; current progress subtracted; eval every4epochs.",
+    "PE and Multi rates not measured: the three-variant number is an equal-speed scenario only.",
+    "Final test evaluation and startup/cache construction for future variants excluded."
+  ],
+  "old_notebook_eta_hours": 91.72417637170574
+}

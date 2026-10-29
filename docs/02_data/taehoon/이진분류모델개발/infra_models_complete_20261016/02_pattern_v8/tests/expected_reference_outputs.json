@@ -1,0 +1,40 @@
+[
+  {
+    "fixture": "reference_known",
+    "edge_id": 123464542,
+    "risk_score": 0.981878936290741,
+    "threshold": 0.4057740867137909,
+    "alert": true,
+    "pattern_class": "CYCLE",
+    "pattern_scores": {
+      "NORMAL": 0.02759678103029728,
+      "FAN-OUT": 0.0003332371124997735,
+      "FAN-IN": 0.0005491888150572777,
+      "G-SCATTER": 0.02325885370373726,
+      "S-GATHER": 0.006352176424115896,
+      "CYCLE": 0.345970094203949,
+      "RANDOM": 0.2729288637638092,
+      "BIPARTITE": 0.01568467915058136,
+      "STACK": 0.307326078414917
+    }
+  },
+  {
+    "fixture": "reference_unmatched",
+    "edge_id": 170170630,
+    "risk_score": 0.006753208115696907,
+    "threshold": 0.4057740867137909,
+    "alert": false,
+    "pattern_class": "NORMAL",
+    "pattern_scores": {
+      "NORMAL": 1.0,
+      "FAN-OUT": 5.010829529084049e-10,
+      "FAN-IN": 4.01700256391635e-10,
+      "G-SCATTER": 6.218072723385148e-10,
+      "S-GATHER": 1.1840997071743686e-09,
+      "CYCLE": 5.802617275563193e-10,
+      "RANDOM": 2.2603981186808397e-10,
+      "BIPARTITE": 2.399936427366356e-08,
+      "STACK": 1.0324951560392037e-08
+    }
+  }
+]

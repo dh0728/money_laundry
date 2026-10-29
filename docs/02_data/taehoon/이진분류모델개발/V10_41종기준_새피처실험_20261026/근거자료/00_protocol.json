@@ -1,0 +1,116 @@
+{
+  "experiment_start": 324,
+  "goal": {
+    "precision": 0.7,
+    "recall": 0.65,
+    "prefer_fewer_features": true
+  },
+  "baseline": "Explicit user selection: HGB22/36 columns + frozen GNN33, union41/64 columns",
+  "adopted_model_sha256": "c13066e12bc15b7f2f2711c2b5d5c4abf1f29b0e32c00809ce804fd408003d1d",
+  "model_hashes": {
+    "tree.joblib": {
+      "path": "/workspace/handoff/V10_최종채택_41종_20261026/tree.joblib",
+      "source": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_candidate_ablation_20261026/components/tree_a0083be4630f/model.joblib",
+      "sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c"
+    },
+    "gnn.pt": {
+      "path": "/workspace/handoff/V10_최종채택_41종_20261026/gnn.pt",
+      "source": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_candidate_ablation_20261026/components/gnn_a4acc14566e8/best.pt",
+      "sha256": "a269c4da4a511527f83e69e874867c8641f16fa798f03676806374243fa432dd"
+    },
+    "fusion.joblib": {
+      "path": "/workspace/handoff/V10_최종채택_41종_20261026/fusion.joblib",
+      "source": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_candidate_ablation_20261026/variants/combined/fusion.joblib",
+      "sha256": "e4ed2ee65697668b27bf215a2677ecf41060ebee49dafbee268ac033158a5dcf"
+    }
+  },
+  "hypothesis": "Previously unsigned owner balance collapsed absent flow and one-sided flow into zero. Separate availability, flow direction, transaction amount relative to bidirectional activity, and day-versus-history changes.",
+  "development": [
+    "2022-08-08",
+    "2022-09-25"
+  ],
+  "monitor": [
+    "2022-09-26",
+    "2022-10-04"
+  ],
+  "fusion_fit": [
+    "2022-10-05",
+    "2022-10-08"
+  ],
+  "validation": [
+    "2022-10-09",
+    "2022-10-13"
+  ],
+  "historical_test": [
+    "2022-10-14",
+    "2022-10-31"
+  ],
+  "reused_holdouts": true,
+  "previous_history_results_known": true,
+  "new_test_claim": false,
+  "new_types": [
+    "account_net_direction7d",
+    "account_flow_support7d",
+    "account_amount_vs_external_mean7d",
+    "account_net_direction_shift7d",
+    "owner_net_direction7d",
+    "owner_flow_support7d",
+    "owner_amount_vs_external_mean7d",
+    "owner_net_direction_shift7d",
+    "owner_balance_supported7d"
+  ],
+  "new_columns": [
+    "src_account_net_direction7d",
+    "dst_account_net_direction7d",
+    "src_account_flow_support7d",
+    "dst_account_flow_support7d",
+    "src_account_amount_vs_external_mean7d",
+    "dst_account_amount_vs_external_mean7d",
+    "src_account_net_direction_shift7d",
+    "dst_account_net_direction_shift7d",
+    "src_owner_net_direction7d",
+    "dst_owner_net_direction7d",
+    "src_owner_flow_support7d",
+    "dst_owner_flow_support7d",
+    "src_owner_amount_vs_external_mean7d",
+    "dst_owner_amount_vs_external_mean7d",
+    "src_owner_net_direction_shift7d",
+    "dst_owner_net_direction_shift7d",
+    "src_owner_balance_supported7d",
+    "dst_owner_balance_supported7d"
+  ],
+  "previous_control_type": "owner_external_balance7d",
+  "formulas": {
+    "net_direction": "(incoming - outgoing)/(incoming + outgoing); NaN when total amount is zero",
+    "flow_support": "log1p(incoming event count + outgoing event count); zero if no events; NaN for unknown owner",
+    "amount_vs_external_mean": "log1p(target amount / mean external amount across both directions in same currency); NaN for no positive-valued flow",
+    "net_direction_shift": "current-day net direction minus strictly prior7d net direction; NaN if either has no positive-valued flow",
+    "balance_supported": "min(incoming,outgoing)/max(incoming,outgoing); NaN if no positive-valued flow"
+  },
+  "account_external": "Exclude self-account transfers only; different accounts of one owner still count.",
+  "owner_external": "Both owners must be known and distinct. Unknown owner gets NaN; never pooled.",
+  "currency": "Source uses paid/payment currency; destination uses received/receiving currency. Aggregation never mixes currency.",
+  "history": "[day-7,day); day-shift adds current day only, under daily-close contract. All distinct same-minute observations included.",
+  "context": "All restored observed transactions, never labels or pattern IDs. Full aggregation independent of target sample.",
+  "owner_asof_certified": false,
+  "feature_ids_passed_to_model": false,
+  "payment_format_input": false,
+  "selection": "Predeclared families plus <=2 stable single types ranked on train early/late and monitor, matching week,currency,format,amount,endpoint activity. Validation selects frozen candidates once. No candidate/threshold selection on history.",
+  "tree": {
+    "max_iter": 300,
+    "max_leaf_nodes": 31,
+    "learning_rate": 0.06,
+    "min_samples_leaf": 100,
+    "l2_regularization": 20,
+    "early_stopping": false,
+    "random_state": 20261024,
+    "class_factors": [
+      1.0,
+      100.0,
+      100.0
+    ]
+  },
+  "gnn": "Frozen adopted33-type network; new features enter HGB only, followed by refitted2-score logistic fusion.",
+  "success": "Normal-sample P is an estimate. Full population evaluation required before any goal achievement claim.",
+  "scope": "Complete one recorded follow-up batch; adopted41 remains unchanged. LI-Large remains cancelled. SAML-D is not a fresh selection set."
+}

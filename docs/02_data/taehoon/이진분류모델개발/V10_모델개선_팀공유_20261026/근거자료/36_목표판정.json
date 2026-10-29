@@ -1,0 +1,7 @@
+{
+  "status": "not_required_recall_below_goal",
+  "goal_met": false,
+  "full_population_precision_certified": false,
+  "reason": "No frozen selected candidate has R>=65 in both validation and historical positive censuses. Sample precision cannot change this failure.",
+  "screen_goal_candidates": []
+}

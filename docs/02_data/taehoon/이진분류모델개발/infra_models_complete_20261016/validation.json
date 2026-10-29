@@ -1,0 +1,146 @@
+{
+  "checks": [
+    {
+      "model": "01_binary_v10",
+      "notebook": "00_weights_only.ipynb",
+      "device": "cpu",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 0.0,
+      "seconds": 11.78,
+      "relocated_execution": true
+    },
+    {
+      "model": "01_binary_v10",
+      "notebook": "01_binary_v10.ipynb",
+      "device": "cpu",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 0.0,
+      "seconds": 10.46,
+      "relocated_execution": true,
+      "raw_predictions_verified": 18
+    },
+    {
+      "model": "01_binary_v10",
+      "notebook": "00_weights_only.ipynb",
+      "device": "cuda",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 4.76837158203125e-07,
+      "seconds": 10.03,
+      "relocated_execution": true
+    },
+    {
+      "model": "01_binary_v10",
+      "notebook": "01_binary_v10.ipynb",
+      "device": "cuda",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 3.5762786865234375e-07,
+      "seconds": 10.93,
+      "relocated_execution": true,
+      "raw_predictions_verified": 18
+    },
+    {
+      "model": "02_pattern_v8",
+      "notebook": "00_weights_only.ipynb",
+      "device": "cpu",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 0.0,
+      "seconds": 8.83,
+      "relocated_execution": true
+    },
+    {
+      "model": "02_pattern_v8",
+      "notebook": "02_pattern_v8.ipynb",
+      "device": "cpu",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 0.0,
+      "seconds": 10.5,
+      "relocated_execution": true,
+      "raw_predictions_verified": 18
+    },
+    {
+      "model": "02_pattern_v8",
+      "notebook": "00_weights_only.ipynb",
+      "device": "cuda",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 1.1920928955078125e-07,
+      "seconds": 9.29,
+      "relocated_execution": true
+    },
+    {
+      "model": "02_pattern_v8",
+      "notebook": "02_pattern_v8.ipynb",
+      "device": "cuda",
+      "passed": true,
+      "reference_graphs": 2,
+      "risk_max_abs_error": 3.725290298461914e-09,
+      "seconds": 10.9,
+      "relocated_execution": true,
+      "raw_predictions_verified": 18
+    }
+  ],
+  "absolute_tolerance": 2e-05,
+  "fresh_pip_install_tested": false,
+  "hardware": {
+    "python": "3.12.3",
+    "packages": {
+      "torch": "2.10.0+cu126",
+      "torch-geometric": "2.8.0.post1",
+      "duckdb": "1.5.5",
+      "numpy": "2.4.1",
+      "pandas": "3.0.3",
+      "pyarrow": "24.0.0",
+      "nbformat": "5.10.4",
+      "nbclient": "0.10.4",
+      "ipykernel": "7.2.0",
+      "jupyterlab": "4.5.7"
+    },
+    "torch_cuda_runtime": "12.6",
+    "cudnn": 91002,
+    "gpu": "Tesla V100-SXM2-32GB",
+    "driver": "580.126.20",
+    "fresh_install_tested": false
+  },
+  "weights_unchanged": [
+    {
+      "model": "binary",
+      "original_checkpoint": "experiments/gnn36_binary_structural_v10/runs/ego_seed42/best.pt",
+      "source_sha256": "6612020ed2dff95d193d848951e9f9c5dd0af1e1848b0b9b6828fd20fad1ed59",
+      "bundle_sha256": "290f42b183466b4776de7032581f6d7ef18d9c72d08620b9c80eb0bb78806926",
+      "identical_state_tensors": 43
+    },
+    {
+      "model": "nine_class",
+      "original_checkpoint": "experiments/gnn36_structural_v8/ego_100/seed_1/selected.pt",
+      "source_sha256": "52bd347036dc0f393932d15658da2428c249e21dbd23ec7a0988ec3eea1eb5e1",
+      "bundle_sha256": "b185b95114bdcc19d0c6f8a63dcb2df3f174fd50f6200b9cb6ef2bd4944177c8",
+      "identical_state_tensors": 49
+    }
+  ],
+  "feature_notebook_checks": [
+    {
+      "model": "01_binary_v10",
+      "notebook": "입력피처_의미_순서_전처리.ipynb",
+      "passed": true,
+      "seconds": 5.29,
+      "independent_formula_checks": 4,
+      "node_edge_order_checked": true,
+      "tensor_contract_checked": true
+    },
+    {
+      "model": "02_pattern_v8",
+      "notebook": "입력피처_의미_순서_전처리.ipynb",
+      "passed": true,
+      "seconds": 4.64,
+      "independent_formula_checks": 4,
+      "node_edge_order_checked": true,
+      "tensor_contract_checked": true
+    }
+  ]
+}

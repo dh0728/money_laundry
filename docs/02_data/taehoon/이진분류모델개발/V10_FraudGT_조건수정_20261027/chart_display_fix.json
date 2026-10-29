@@ -1,0 +1,96 @@
+{
+  "utc": "2026-10-27T09:37:33.695383+00:00",
+  "event": "live_chart_display_fix",
+  "status": "pass",
+  "cause": "Existing display IDs were reused after cell outputs were cleared; update calls did not recreate the output. Final plot cells also wait for the training cell to finish.",
+  "fix": "Refresh actual PNG and HTML outputs and create a fresh callback viewer. Add a read-only live monitor for already running kernels.",
+  "reproduction_before": {
+    "phase": "before",
+    "png_outputs": 0,
+    "html_outputs": 0,
+    "uses_real_history": true
+  },
+  "reproduction_after": {
+    "phase": "after",
+    "png_outputs": 1,
+    "html_outputs": 3,
+    "uses_real_history": true
+  },
+  "monitor_verification": {
+    "status": "pass",
+    "cases": [
+      {
+        "mode": "disjoint",
+        "utc": "2026-10-27T09:33:13.107069+00:00",
+        "png_outputs": 1,
+        "torch_not_imported": true,
+        "training_started": false
+      },
+      {
+        "mode": "shared",
+        "utc": "2026-10-27T09:33:16.402277+00:00",
+        "png_outputs": 1,
+        "torch_not_imported": true,
+        "training_started": false
+      }
+    ]
+  },
+  "notebook_checks": [
+    {
+      "path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_실습형.ipynb",
+      "cells": 56,
+      "png_outputs": 2,
+      "sha256": "242be916ae4ca0eb5fd1a83ea923ff915a3a2796184943a792266ae591cc9011"
+    },
+    {
+      "path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_공유그래프_실습형.ipynb",
+      "cells": 56,
+      "png_outputs": 1,
+      "sha256": "54fa889b9a80079e071e8546d49ab44ffe520f9fd66542d79b15c71bc7985297"
+    },
+    {
+      "path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_공유그래프_진행조회.ipynb",
+      "cells": 7,
+      "png_outputs": 1,
+      "sha256": "1f5b153333f4e86cf5d3369b95cd09ff7d3e9474fac2ae18c03ef55ff9b44d3d"
+    }
+  ],
+  "training_source_unchanged": true,
+  "training_interrupted": false,
+  "training_started": false,
+  "training_status": {
+    "shared": {
+      "pid": 562918,
+      "process_exists": true,
+      "training_lock_held": true,
+      "status": {
+        "utc": "2026-10-27T09:37:21.656028+00:00",
+        "event": "corrected_training_progress",
+        "variant": "fraudgt_format",
+        "epoch": 10,
+        "loader_batches": 88,
+        "epoch_targets": 180224,
+        "train_loss": 0.02227884248242069,
+        "scored_targets": 75502,
+        "coverage": 0.41893421519886365
+      }
+    },
+    "disjoint": {
+      "pid": 563118,
+      "process_exists": true,
+      "training_lock_held": true,
+      "status": {
+        "utc": "2026-10-27T09:37:26.695363+00:00",
+        "event": "corrected_training_progress",
+        "variant": "fraudgt_format",
+        "epoch": 4,
+        "loader_batches": 224,
+        "epoch_targets": 458752,
+        "train_loss": 0.030721084691934415,
+        "scored_targets": 196184,
+        "coverage": 0.42764718191964285
+      }
+    }
+  },
+  "official_reference": "https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.DisplayHandle"
+}

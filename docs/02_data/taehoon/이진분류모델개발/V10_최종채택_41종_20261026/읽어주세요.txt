@@ -1,0 +1,14 @@
+사용자 지정 최종 채택: V10 결합41종·64열
+HGB22종·36열 + GNN33종(노드19·엣지14)
+제거: payment_format, amt_z_pay_ccy, pair_history_count, same_entity, dst_day_ccy_log_matching_in_amount
+추가 피처 현재 유지:8종·12열; 동일금액 당일 입금은 송신 측만 사용
+결합 점수 임계값: -2.027912443050317
+검증 P추정70.30%, R62.69%, 무패턴R8.97%로 P70/R65 목표 미달
+이 채택은 사용자 결정이며 목표 달성이나 서비스 배포 완료를 뜻하지 않습니다. 정적KYC 시점 한계가 남습니다.
+모델은 기존 전처리 피처 전체가 아닌 adoption.json의 실제 입력 순서와 축소 GNN 구조를 사용해야 합니다.
+
+채택 후 고정 평가: 역사 테스트 P추정66.36%, R62.72%, 무패턴R10.40%. SAML-D P추정0.6654%, R67.78%. 모두 P70/R65 동시 목표 미달.
+
+파일 안내: tree.joblib(HGB), gnn.pt(축소 GNN), fusion.joblib(결합층), adoption.json(입력 순서·임계값·채택 기록).
+predict_precomputed.py는 준비된 HGB 입력과 GNN 원시 logits의 결합을 재현하는 예시입니다. 동봉한 128개 예시의 점수·판정 일치를 확인했습니다.
+원시 거래의 전처리·그래프 생성에는 기존 프로젝트 코드와 관측 이력이 필요합니다. runtime_locations.json에 해당 경로를 기록했습니다.

@@ -1,0 +1,93 @@
+{
+  "rows": [
+    {
+      "fmt": 0,
+      "audit_class": 0,
+      "n": 30847,
+      "source_amount_novel": 0.19794469478393362,
+      "format": "ACH"
+    },
+    {
+      "fmt": 0,
+      "audit_class": 9,
+      "n": 6065,
+      "source_amount_novel": 1.0,
+      "format": "ACH"
+    },
+    {
+      "fmt": 1,
+      "audit_class": 0,
+      "n": 5957,
+      "source_amount_novel": 0.10072183985227463,
+      "format": "Bitcoin"
+    },
+    {
+      "fmt": 1,
+      "audit_class": 9,
+      "n": 147,
+      "source_amount_novel": 0.7482993197278912,
+      "format": "Bitcoin"
+    },
+    {
+      "fmt": 2,
+      "audit_class": 0,
+      "n": 26175,
+      "source_amount_novel": 0.0,
+      "format": "Cash"
+    },
+    {
+      "fmt": 2,
+      "audit_class": 9,
+      "n": 355,
+      "source_amount_novel": 0.0,
+      "format": "Cash"
+    },
+    {
+      "fmt": 3,
+      "audit_class": 0,
+      "n": 100051,
+      "source_amount_novel": 0.005867007826008736,
+      "format": "Cheque"
+    },
+    {
+      "fmt": 3,
+      "audit_class": 9,
+      "n": 1257,
+      "source_amount_novel": 0.06682577565632458,
+      "format": "Cheque"
+    },
+    {
+      "fmt": 4,
+      "audit_class": 0,
+      "n": 71375,
+      "source_amount_novel": 0.10468651488616462,
+      "format": "Credit Card"
+    },
+    {
+      "fmt": 4,
+      "audit_class": 9,
+      "n": 762,
+      "source_amount_novel": 0.0,
+      "format": "Credit Card"
+    },
+    {
+      "fmt": 5,
+      "audit_class": 0,
+      "n": 26014,
+      "source_amount_novel": 0.5427846544168524,
+      "format": "Reinvestment"
+    },
+    {
+      "fmt": 6,
+      "audit_class": 0,
+      "n": 9308,
+      "source_amount_novel": 0.001826385904598195,
+      "format": "Wire"
+    }
+  ],
+  "window": [
+    "2022-09-26",
+    "2022-10-04"
+  ],
+  "comparison": "Same payment format, normal vs unmatched; descriptive validation only."
+}

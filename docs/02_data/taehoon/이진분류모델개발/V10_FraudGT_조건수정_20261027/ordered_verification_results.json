@@ -1,0 +1,804 @@
+[
+  {
+    "order": 1,
+    "utc": "2026-10-27T07:48:01.494598+00:00",
+    "test": "01_population_split_and_supervision",
+    "status": "pass",
+    "seconds": 14.38503173366189,
+    "splits": {
+      "train": {
+        "rows": 102505233,
+        "positive": 101515
+      },
+      "val": {
+        "rows": 34491749,
+        "positive": 43057
+      },
+      "test": {
+        "rows": 33429507,
+        "positive": 44103
+      }
+    },
+    "boundaries": [
+      56,
+      74
+    ],
+    "validation_requested": 524288,
+    "label_mapping_matches_old_censuses": true,
+    "comparison_modes_same_targets": true
+  },
+  {
+    "order": 2,
+    "utc": "2026-10-27T07:48:16.575514+00:00",
+    "test": "02_variant_relations_and_official_loader",
+    "status": "pass",
+    "seconds": 15.077524937689304,
+    "cases": [
+      {
+        "variant": "fraudgt_format",
+        "disjoint": false,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "fraudgt_format",
+        "disjoint": true,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "pe_fraudgt_format",
+        "disjoint": false,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "pe_fraudgt_format",
+        "disjoint": true,
+        "relations": 1,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "multi_fraudgt_format",
+        "disjoint": false,
+        "relations": 2,
+        "exact_loader_parity": true
+      },
+      {
+        "variant": "multi_fraudgt_format",
+        "disjoint": true,
+        "relations": 2,
+        "exact_loader_parity": true
+      }
+    ],
+    "actual_upstream_constructor_executed": true
+  },
+  {
+    "order": 3,
+    "utc": "2026-10-27T07:48:16.609630+00:00",
+    "test": "03_upstream_head_gradient_and_coverage",
+    "status": "pass",
+    "seconds": 0.03273880109190941,
+    "official_head_exact_parity": true,
+    "missing_target_reported": true,
+    "microbatch_gradient_means_equal": true,
+    "coverage_not_misreported_as_full_recall": true
+  },
+  {
+    "order": 4,
+    "utc": "2026-10-27T07:53:17.409729+00:00",
+    "test": "04_real_gpu_batches_both_modes",
+    "status": "pass",
+    "seconds": 300.79932260513306,
+    "train_batches": [
+      {
+        "mode": "shared",
+        "variant": "fraudgt_format",
+        "scored": 843,
+        "peak_cuda_mib": 1708.1884765625,
+        "targets": 2048,
+        "nodes": 25936,
+        "forward_edges": 338698,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 1205,
+        "unique_nodes": 25936,
+        "disjoint": false,
+        "relations": 1
+      },
+      {
+        "mode": "shared",
+        "variant": "pe_fraudgt_format",
+        "scored": 843,
+        "peak_cuda_mib": 1710.77294921875,
+        "targets": 2048,
+        "nodes": 25936,
+        "forward_edges": 338698,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 1205,
+        "unique_nodes": 25936,
+        "disjoint": false,
+        "relations": 1
+      },
+      {
+        "mode": "shared",
+        "variant": "multi_fraudgt_format",
+        "scored": 843,
+        "peak_cuda_mib": 7197.1953125,
+        "targets": 2048,
+        "nodes": 120382,
+        "forward_edges": 768973,
+        "reverse_edges": 697215,
+        "target_edges_not_sampled": 1205,
+        "unique_nodes": 120382,
+        "disjoint": false,
+        "relations": 2
+      },
+      {
+        "mode": "disjoint",
+        "variant": "fraudgt_format",
+        "scored": 28,
+        "peak_cuda_mib": 99.62841796875,
+        "targets": 64,
+        "nodes": 2467,
+        "forward_edges": 15175,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 36,
+        "unique_nodes": 2020,
+        "disjoint": true,
+        "relations": 1
+      },
+      {
+        "mode": "disjoint",
+        "variant": "pe_fraudgt_format",
+        "scored": 28,
+        "peak_cuda_mib": 99.74462890625,
+        "targets": 64,
+        "nodes": 2467,
+        "forward_edges": 15175,
+        "reverse_edges": 0,
+        "target_edges_not_sampled": 36,
+        "unique_nodes": 2020,
+        "disjoint": true,
+        "relations": 1
+      },
+      {
+        "mode": "disjoint",
+        "variant": "multi_fraudgt_format",
+        "scored": 38,
+        "peak_cuda_mib": 437.27734375,
+        "targets": 64,
+        "nodes": 8633,
+        "forward_edges": 45793,
+        "reverse_edges": 38166,
+        "target_edges_not_sampled": 26,
+        "unique_nodes": 7710,
+        "disjoint": true,
+        "relations": 2
+      }
+    ],
+    "validation_graph": {
+      "targets": 2048,
+      "nodes": 27281,
+      "forward_edges": 355851,
+      "reverse_edges": 0,
+      "target_edges_not_sampled": 1353,
+      "unique_nodes": 27281,
+      "disjoint": false,
+      "relations": 1
+    },
+    "validation_prefix_day": 73
+  },
+  {
+    "order": 5,
+    "utc": "2026-10-27T07:55:24.645969+00:00",
+    "test": "05_pinned_GTLayer_forward_and_gradient",
+    "status": "pass",
+    "detail": {
+      "status": "pass",
+      "cases": [
+        {
+          "relations": 1,
+          "max_forward_absolute_error": 3.5762786865234375e-07,
+          "input_gradient_parity": true
+        },
+        {
+          "relations": 2,
+          "max_forward_absolute_error": 3.5762786865234375e-07,
+          "input_gradient_parity": true
+        }
+      ],
+      "method": "Pinned upstream class executed with identical active parameters; unavailable torch_scatter.scatter_max replaced by native scatter_reduce amax; eval mode avoids differing dropout RNG layouts."
+    }
+  },
+  {
+    "order": 6,
+    "utc": "2026-10-27T07:55:53.113779+00:00",
+    "test": "06_mid_epoch_resume_and_validation_schedule",
+    "status": "pass",
+    "detail": {
+      "status": "pass",
+      "synthetic_fixture_not_performance": true,
+      "cases": [
+        {
+          "mode": "shared",
+          "epochs": 6,
+          "validation_epochs": [
+            1,
+            4,
+            6
+          ],
+          "mid_epoch_resume_matches_continuous": true,
+          "gauges_complete": true,
+          "blank_skipped_validation": true
+        },
+        {
+          "mode": "disjoint",
+          "epochs": 6,
+          "validation_epochs": [
+            1,
+            4,
+            6
+          ],
+          "mid_epoch_resume_matches_continuous": true,
+          "gauges_complete": true,
+          "blank_skipped_validation": true
+        }
+      ]
+    }
+  },
+  {
+    "order": 7,
+    "utc": "2026-10-27T08:01:13.836436+00:00",
+    "test": "07_fresh_kernel_notebooks_and_visible_code",
+    "status": "pass",
+    "detail": {
+      "status": "pass",
+      "cases": [
+        {
+          "mode": "disjoint",
+          "status": "pass",
+          "utc": "2026-10-27T08:01:01.000029+00:00",
+          "seconds": 15.527767298743129,
+          "cells": 41,
+          "fresh_kernel_all_cells": true,
+          "visible_backend_ast_parity": true,
+          "no_training_started": true
+        },
+        {
+          "mode": "shared",
+          "status": "pass",
+          "utc": "2026-10-27T08:01:13.835944+00:00",
+          "seconds": 12.83577373251319,
+          "cells": 41,
+          "fresh_kernel_all_cells": true,
+          "visible_backend_ast_parity": true,
+          "no_training_started": true
+        }
+      ]
+    }
+  },
+  {
+    "order": 8,
+    "utc": "2026-10-27T08:04:26.920581+00:00",
+    "test": "08_preserve_old_sources_and_checkpoints",
+    "status": "pass",
+    "detail": [
+      {
+        "run": "official_loader_001",
+        "source_files_unchanged": 16,
+        "checkpoints_exist": {
+          "last.pt": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/models/fraudgt_format/last.pt",
+          "best.pt": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/models/fraudgt_format/best.pt"
+        },
+        "writer_active": true
+      },
+      {
+        "run": "practice_official_001",
+        "source_files_unchanged": 16,
+        "checkpoints_exist": {
+          "last.pt": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/runs/practice_official_001/models/fraudgt_format/last.pt",
+          "best.pt": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/runs/practice_official_001/models/fraudgt_format/best.pt"
+        },
+        "writer_active": true
+      },
+      {
+        "run": "shared_random_001",
+        "source_files_unchanged": 26,
+        "checkpoints_exist": {
+          "last.pt": "/workspace/handoff/V10_FraudGT_공유그래프_20261027/runs/shared_random_001/models/fraudgt_format/last.pt",
+          "best.pt": "/workspace/handoff/V10_FraudGT_공유그래프_20261027/runs/shared_random_001/models/fraudgt_format/best.pt"
+        },
+        "writer_active": false
+      }
+    ]
+  },
+  {
+    "order": 9,
+    "utc": "2026-10-27T08:30:52.399500+00:00",
+    "test": "09_cnn_assignment_notebook_layout",
+    "status": "pass",
+    "detail": {
+      "status": "pass",
+      "cases": [
+        {
+          "mode": "disjoint",
+          "utc": "2026-10-27T08:28:16.529260+00:00",
+          "status": "pass",
+          "seconds": 11.930017028003931,
+          "cells": 52,
+          "fresh_kernel_all_cells": true,
+          "real_eight_target_graph": true,
+          "training_started": false,
+          "prediction_row_alignment": true,
+          "source_sha256_unchanged": true,
+          "notebook_sha256": "1e27b24d8a0459edb80f7ba62d490ec21813527b9f80a49e150bd52f70396e1d"
+        },
+        {
+          "mode": "shared",
+          "utc": "2026-10-27T08:28:27.110325+00:00",
+          "status": "pass",
+          "seconds": 10.576422171667218,
+          "cells": 52,
+          "fresh_kernel_all_cells": true,
+          "real_eight_target_graph": true,
+          "training_started": false,
+          "prediction_row_alignment": true,
+          "source_sha256_unchanged": true,
+          "notebook_sha256": "def2af37fadab4495390ef46be71346902891baaffd30af8f53ca5bab4449983"
+        }
+      ],
+      "source_sha256": {
+        "configure.py": "cffd181ab93788a9259e40dba6fd47d70e1600a46a94136324133da203d878f4",
+        "corrected_runtime.py": "abfd43a3078c497a651ef302d518014bb7b345546d3b0c9d54da563fcfb415fa",
+        "fraudgt_lab/__init__.py": "799562903f4e2af803af75d0ba23524fb3ce9431bf3238c90b0c197e428f3d24",
+        "fraudgt_lab/config.py": "c88d7a87024be88b454d62c1ce4f5d7311f475947271290eb543518b1331f042",
+        "fraudgt_lab/csc_index.c": "b0b4cccd2a27c31a4feccb8b35bed29fa929bf3f1d92a93782287765d0642989",
+        "fraudgt_lab/data.py": "d633d5c070f0caeb695b0a522427f0cb1b064c8d81210cc79116e6f4c469c16d",
+        "fraudgt_lab/metrics.py": "784720f16f709eec4ea1d377a89aae6d4229a1da377f27a15914b75abc1c6918",
+        "fraudgt_lab/models.py": "8b8bf2055205a7695f9db558a7e3fbdd49153c4bcc87fab09ed02b0243709fc0",
+        "fraudgt_lab/official_loader.py": "3508d45add8175af7a2c8657de403ef5fd2312d8eb68eec9a306a0689e57c6f2",
+        "fraudgt_lab/optimization.py": "15b912d58e2b3ae94f2aa7a9ea34b27aaf84cde9a8c814efca860d51f3a5a278",
+        "fraudgt_lab/population.py": "cf7db4f842c6c008faea331b8f092b81354f79791d858dc6fe58af33f1435a52",
+        "fraudgt_lab/storage.py": "a668009c8eaf0cae9da52e431d41129cf42f5f38daf6de2e4ccd0a3fd076e6dc",
+        "fraudgt_lab/training.py": "54abf6a247b79faa350e707a2ee3d5d6c955c4213656b1459740ed85d404aa80",
+        "run_corrected.py": "2ab39a27c47701604e284e4618ece890c01d6ad0b3d16af49f571a6db8760011"
+      },
+      "helper_sha256": "7db3ae9aff8f6945eed20e37c1c81dc89feae8acb931c61a16fa4726b9bac067"
+    }
+  },
+  {
+    "order": 10,
+    "utc": "2026-10-27T08:44:07.854636+00:00",
+    "test": "10_default_kernel_native_sampling_dependency",
+    "status": "pass",
+    "detail": {
+      "utc": "2026-10-27T08:44:07.854636+00:00",
+      "event": "neighbor_sampler_dependency_fix",
+      "status": "pass",
+      "cause": "pyg-lib existed only in /workspace/kimi/venv; notebook metadata selected the default /usr/bin/python kernel. Prior validation used the venv.",
+      "fix": "Install the identical official pyg_lib0.8.0+pt210cu126 wheel into the bundled project runtime_deps, already added by configure().",
+      "global_packages_changed": false,
+      "training_source_changed": false,
+      "full_training_started": false,
+      "restart_required": "Restart the affected notebook kernel to discard PyG cached WITH_PYG_LIB=False, then run cells from the top.",
+      "native_dependency": {
+        "status": "pass",
+        "original_verified_pyg_lib_files_identical": 9,
+        "torch_rng_preserved": true,
+        "training_source_unchanged": true,
+        "wheel_sha256": "7cab651263b1bb158da6a0972730f641aba1c2889a4d6a1f7b3efa9a3c5cba1a",
+        "source_url": "https://data.pyg.org/whl/torch-2.10.0+cu126.html",
+        "files": {
+          "home.py": "9e4d41b616c014a937ca43570354259b0e5044cc52c5eaa94124472e7d7a6f35",
+          "_triton.py": "6c89598ecf9562771a19a2fc6f64db52de224f13d86841e71f2c83689a58ba91",
+          "__init__.py": "4fe83409d38f1d22445d0c7ba6ca55543a39f6d3ca87b36f95b49983b98ef640",
+          "testing.py": "2931668dbb53421fffe1e1b60b1a4764be9a02fca6cc5c99fd1e4d3f788b0dac",
+          "libpyg.so": "905ef0e95d37619b89842938d7cbf366cfb1fac4adf761bb355c34482f0051ad",
+          "ops/scatter_reduce.py": "d88e1a7daadf7e3a8ee9701bcb89e6510c2c885d491fb4c97ddc5c40c04c2e0d",
+          "ops/__init__.py": "4d3ee6e2525555bf99aa541a6466b74d66a12086fd292e854e10506971a22297",
+          "partition/__init__.py": "9c04ec23f8f716e6c823c4f2b94ef90127c9ef46995725d2608cb0b1f853963a",
+          "sampler/__init__.py": "2dcd419f1454bab2686ae66f368c2df061f6bfd9833e40d353fb98843fbecca4"
+        },
+        "checks": [
+          {
+            "python": "/usr/bin/python",
+            "torch": "2.10.0+cu126",
+            "torch_geometric": "2.8.0.post1",
+            "pyg_lib": "0.8.0+pt210cu126",
+            "pyg_lib_path": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_gnn_verify_20261025/runtime_deps/pyg_lib/__init__.py",
+            "graph_mode": "shared",
+            "sampling_check": "PASS"
+          },
+          {
+            "python": "/usr/bin/python",
+            "torch": "2.10.0+cu126",
+            "torch_geometric": "2.8.0.post1",
+            "pyg_lib": "0.8.0+pt210cu126",
+            "pyg_lib_path": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_gnn_verify_20261025/runtime_deps/pyg_lib/__init__.py",
+            "graph_mode": "disjoint",
+            "sampling_check": "PASS"
+          }
+        ]
+      },
+      "notebook_checks": {
+        "status": "pass",
+        "cases": [
+          {
+            "mode": "disjoint",
+            "utc": "2026-10-27T08:41:41.338539+00:00",
+            "status": "pass",
+            "seconds": 11.576132403686643,
+            "cells": 54,
+            "kernel_name": "python3",
+            "python": "/usr/bin/python",
+            "fresh_kernel_all_cells": true,
+            "real_eight_target_graph": true,
+            "training_started": false,
+            "prediction_row_alignment": true,
+            "source_sha256_unchanged": true,
+            "notebook_sha256": "94edb0622c110704fe76217fb65fd46dc0cc644fb61f81b8f0479c50b6f795ad"
+          },
+          {
+            "mode": "shared",
+            "utc": "2026-10-27T08:41:54.410326+00:00",
+            "status": "pass",
+            "seconds": 13.066807003691792,
+            "cells": 54,
+            "kernel_name": "python3",
+            "python": "/usr/bin/python",
+            "fresh_kernel_all_cells": true,
+            "real_eight_target_graph": true,
+            "training_started": false,
+            "prediction_row_alignment": true,
+            "source_sha256_unchanged": true,
+            "notebook_sha256": "6034031ddd569cbe4f5ae35c71552d0d24808f913d7e9f2166eba23c5b65c0d8"
+          }
+        ],
+        "source_sha256": {
+          "configure.py": "cffd181ab93788a9259e40dba6fd47d70e1600a46a94136324133da203d878f4",
+          "corrected_runtime.py": "abfd43a3078c497a651ef302d518014bb7b345546d3b0c9d54da563fcfb415fa",
+          "fraudgt_lab/__init__.py": "799562903f4e2af803af75d0ba23524fb3ce9431bf3238c90b0c197e428f3d24",
+          "fraudgt_lab/config.py": "c88d7a87024be88b454d62c1ce4f5d7311f475947271290eb543518b1331f042",
+          "fraudgt_lab/csc_index.c": "b0b4cccd2a27c31a4feccb8b35bed29fa929bf3f1d92a93782287765d0642989",
+          "fraudgt_lab/data.py": "d633d5c070f0caeb695b0a522427f0cb1b064c8d81210cc79116e6f4c469c16d",
+          "fraudgt_lab/metrics.py": "784720f16f709eec4ea1d377a89aae6d4229a1da377f27a15914b75abc1c6918",
+          "fraudgt_lab/models.py": "8b8bf2055205a7695f9db558a7e3fbdd49153c4bcc87fab09ed02b0243709fc0",
+          "fraudgt_lab/official_loader.py": "3508d45add8175af7a2c8657de403ef5fd2312d8eb68eec9a306a0689e57c6f2",
+          "fraudgt_lab/optimization.py": "15b912d58e2b3ae94f2aa7a9ea34b27aaf84cde9a8c814efca860d51f3a5a278",
+          "fraudgt_lab/population.py": "cf7db4f842c6c008faea331b8f092b81354f79791d858dc6fe58af33f1435a52",
+          "fraudgt_lab/storage.py": "a668009c8eaf0cae9da52e431d41129cf42f5f38daf6de2e4ccd0a3fd076e6dc",
+          "fraudgt_lab/training.py": "54abf6a247b79faa350e707a2ee3d5d6c955c4213656b1459740ed85d404aa80",
+          "run_corrected.py": "2ab39a27c47701604e284e4618ece890c01d6ad0b3d16af49f571a6db8760011"
+        },
+        "helper_sha256": "7db3ae9aff8f6945eed20e37c1c81dc89feae8acb931c61a16fa4726b9bac067"
+      },
+      "validation_command": "/usr/bin/python verify_lesson_notebooks.py",
+      "sources": [
+        "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html",
+        "https://data.pyg.org/whl/torch-2.10.0+cu126.html"
+      ]
+    }
+  },
+  {
+    "order": 11,
+    "utc": "2026-10-27T09:37:33.695383+00:00",
+    "test": "11_live_chart_output_recovery",
+    "status": "pass",
+    "detail": {
+      "utc": "2026-10-27T09:37:33.695383+00:00",
+      "event": "live_chart_display_fix",
+      "status": "pass",
+      "cause": "Existing display IDs were reused after cell outputs were cleared; update calls did not recreate the output. Final plot cells also wait for the training cell to finish.",
+      "fix": "Refresh actual PNG and HTML outputs and create a fresh callback viewer. Add a read-only live monitor for already running kernels.",
+      "reproduction_before": {
+        "phase": "before",
+        "png_outputs": 0,
+        "html_outputs": 0,
+        "uses_real_history": true
+      },
+      "reproduction_after": {
+        "phase": "after",
+        "png_outputs": 1,
+        "html_outputs": 3,
+        "uses_real_history": true
+      },
+      "monitor_verification": {
+        "status": "pass",
+        "cases": [
+          {
+            "mode": "disjoint",
+            "utc": "2026-10-27T09:33:13.107069+00:00",
+            "png_outputs": 1,
+            "torch_not_imported": true,
+            "training_started": false
+          },
+          {
+            "mode": "shared",
+            "utc": "2026-10-27T09:33:16.402277+00:00",
+            "png_outputs": 1,
+            "torch_not_imported": true,
+            "training_started": false
+          }
+        ]
+      },
+      "notebook_checks": [
+        {
+          "path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_실습형.ipynb",
+          "cells": 56,
+          "png_outputs": 2,
+          "sha256": "242be916ae4ca0eb5fd1a83ea923ff915a3a2796184943a792266ae591cc9011"
+        },
+        {
+          "path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_공유그래프_실습형.ipynb",
+          "cells": 56,
+          "png_outputs": 1,
+          "sha256": "54fa889b9a80079e071e8546d49ab44ffe520f9fd66542d79b15c71bc7985297"
+        },
+        {
+          "path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_공유그래프_진행조회.ipynb",
+          "cells": 7,
+          "png_outputs": 1,
+          "sha256": "1f5b153333f4e86cf5d3369b95cd09ff7d3e9474fac2ae18c03ef55ff9b44d3d"
+        }
+      ],
+      "training_source_unchanged": true,
+      "training_interrupted": false,
+      "training_started": false,
+      "training_status": {
+        "shared": {
+          "pid": 562918,
+          "process_exists": true,
+          "training_lock_held": true,
+          "status": {
+            "utc": "2026-10-27T09:37:21.656028+00:00",
+            "event": "corrected_training_progress",
+            "variant": "fraudgt_format",
+            "epoch": 10,
+            "loader_batches": 88,
+            "epoch_targets": 180224,
+            "train_loss": 0.02227884248242069,
+            "scored_targets": 75502,
+            "coverage": 0.41893421519886365
+          }
+        },
+        "disjoint": {
+          "pid": 563118,
+          "process_exists": true,
+          "training_lock_held": true,
+          "status": {
+            "utc": "2026-10-27T09:37:26.695363+00:00",
+            "event": "corrected_training_progress",
+            "variant": "fraudgt_format",
+            "epoch": 4,
+            "loader_batches": 224,
+            "epoch_targets": 458752,
+            "train_loss": 0.030721084691934415,
+            "scored_targets": 196184,
+            "coverage": 0.42764718191964285
+          }
+        }
+      },
+      "official_reference": "https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.DisplayHandle"
+    }
+  },
+  {
+    "order": 12,
+    "utc": "2026-10-27T10:08:31.114961+00:00",
+    "test": "12_persistent_display_without_flicker",
+    "status": "pass",
+    "detail": {
+      "utc": "2026-10-27T10:08:31.114961+00:00",
+      "event": "live_chart_flicker_fix",
+      "status": "pass",
+      "cause": "The previous missing-chart repair cleared all output and re-emitted the gauge, PNG and table every 2 seconds.",
+      "fix": [
+        "Keep independent display IDs and update only changed content.",
+        "No routine clear_output calls. Recreate display slots after explicit clear or cell rerun.",
+        "Poll progress every 2 seconds; throttle the live-loss chart to 15 seconds; publish new epoch history immediately.",
+        "Keep chart dimensions and table height stable. Reload the display module when restarting the monitor cell."
+      ],
+      "verification": {
+        "utc": "2026-10-27T10:07:00.113448+00:00",
+        "status": "pass",
+        "checks": {
+          "initial_real_history_png": true,
+          "unchanged_data_emits_nothing": true,
+          "progress_updates_existing_gauge_only": true,
+          "chart_throttled_to_15_seconds": true,
+          "new_epoch_updates_chart_and_table_immediately": true,
+          "routine_refresh_never_clears_output": true,
+          "explicit_output_clear_recovers_png": true,
+          "cell_rerun_creates_fresh_outputs": true,
+          "torch_not_imported": true
+        },
+        "training_started": false,
+        "live_run_files_written": false
+      },
+      "training_source_unchanged": true,
+      "training_interrupted": false,
+      "training_started": false,
+      "active_training": {
+        "shared": {
+          "training_lock_held": true,
+          "status": {
+            "utc": "2026-10-27T10:08:22.172716+00:00",
+            "event": "corrected_validation_started",
+            "variant": "fraudgt_format",
+            "epoch": 12
+          }
+        },
+        "disjoint": {
+          "training_lock_held": true,
+          "status": {
+            "utc": "2026-10-27T10:08:12.493598+00:00",
+            "event": "corrected_training_progress",
+            "variant": "fraudgt_format",
+            "epoch": 5,
+            "loader_batches": 64,
+            "epoch_targets": 131072,
+            "train_loss": 0.02407680512361034,
+            "scored_targets": 56214,
+            "coverage": 0.4288787841796875
+          }
+        }
+      },
+      "monitor_path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_공유그래프_진행조회.ipynb",
+      "monitor_sha256": "216c16c22584b125d53bffa8b424ff558080943518f24ad928d3d325ad3e8dc4",
+      "display_helper_sha256": "0b39e7fca6c2251d03bd2ca56483e68d942cd1434f9fd3f0ff1dd210a759df1c"
+    }
+  },
+  {
+    "order": 13,
+    "utc": "2026-10-27T11:01:36.468796+00:00",
+    "test": "13_memory_pressure_pause_disjoint_shared_recovery",
+    "status": "pass",
+    "detail_file": "disjoint_pause_20261027.json",
+    "checkpoint_verified": {
+      "epoch": 6,
+      "loader_cursor": 120,
+      "completed_epochs": 5,
+      "best_epoch": 4,
+      "optimizer_and_rng_saved": true,
+      "protocol_hash_matches": true,
+      "all_backup_hashes_match": true
+    },
+    "speed_verification": {
+      "epoch": 16,
+      "logical_batches_per_interval": 8,
+      "before_intervals": [
+        {
+          "from_batch": 160,
+          "to_batch": 168,
+          "utc": "2026-10-27T10:30:44.692627+00:00",
+          "seconds": 235.64425
+        },
+        {
+          "from_batch": 168,
+          "to_batch": 176,
+          "utc": "2026-10-27T10:39:14.133492+00:00",
+          "seconds": 509.440865
+        },
+        {
+          "from_batch": 176,
+          "to_batch": 184,
+          "utc": "2026-10-27T10:50:08.443582+00:00",
+          "seconds": 654.31009
+        }
+      ],
+      "after_intervals": [
+        {
+          "from_batch": 200,
+          "to_batch": 208,
+          "utc": "2026-10-27T10:59:42.923323+00:00",
+          "seconds": 7.607999
+        },
+        {
+          "from_batch": 208,
+          "to_batch": 216,
+          "utc": "2026-10-27T10:59:49.072889+00:00",
+          "seconds": 6.149566
+        },
+        {
+          "from_batch": 216,
+          "to_batch": 224,
+          "utc": "2026-10-27T10:59:55.765869+00:00",
+          "seconds": 6.69298
+        },
+        {
+          "from_batch": 224,
+          "to_batch": 232,
+          "utc": "2026-10-27T11:00:02.673647+00:00",
+          "seconds": 6.907778
+        },
+        {
+          "from_batch": 232,
+          "to_batch": 240,
+          "utc": "2026-10-27T11:00:08.709887+00:00",
+          "seconds": 6.03624
+        },
+        {
+          "from_batch": 240,
+          "to_batch": 248,
+          "utc": "2026-10-27T11:00:15.493970+00:00",
+          "seconds": 6.784083
+        },
+        {
+          "from_batch": 248,
+          "to_batch": 256,
+          "utc": "2026-10-27T11:00:22.239794+00:00",
+          "seconds": 6.745824
+        }
+      ],
+      "before_median_seconds": 509.440865,
+      "after_median_seconds": 6.745824,
+      "latest_shared_status": {
+        "utc": "2026-10-27T11:00:22.928738+00:00",
+        "event": "corrected_validation_started",
+        "variant": "fraudgt_format",
+        "epoch": 16
+      }
+    }
+  },
+  {
+    "order": 14,
+    "utc": "2026-10-28T06:45:52.419370+00:00",
+    "test": "14_shared_validation_memory_io_diagnosis",
+    "status": "diagnosed",
+    "detail_file": "slowdown_diagnosis_20261028.json",
+    "remaining_question": "Object-level owner of retained anonymous memory: true live-object leak versus allocator retention/fragmentation. Cross-process Python memory inspection is unavailable; no interruption or injection was performed."
+  },
+  {
+    "order": 15,
+    "utc": "2026-10-28T06:54:12.477404+00:00",
+    "test": "15_feature_loading_memory_candidate",
+    "status": "pass",
+    "detail_file": "feature_memory_candidate_verification_20261028.json"
+  },
+  {
+    "order": 16,
+    "utc": "2026-10-28T06:55:25.136470+00:00",
+    "test": "16_plot_memory_lifecycle",
+    "status": "pass",
+    "detail_file": "plot_memory_lifecycle_20261028.json"
+  },
+  {
+    "order": 17,
+    "utc": "2026-10-28T07:16:41.953913+00:00",
+    "test": "17_cpu_memory_maintenance_safety",
+    "status": "pass",
+    "detail_file": "cpu_memory_maintenance_verification_20261028.json"
+  },
+  {
+    "order": 18,
+    "utc": "2026-10-28T07:26:24.707518+00:00",
+    "test": "18_live_shared_validation_cpu_memory_recovery",
+    "status": "pass",
+    "detail_file": "cpu_memory_recovery_20261028.json",
+    "validation_seconds": 230.88715835660696,
+    "training_source_unchanged": true,
+    "long_run_recurrence_tested": false
+  },
+  {
+    "order": 19,
+    "utc": "2026-10-28T22:57:34.236688+00:00",
+    "test": "19_inline_backend_queue_root_cause",
+    "status": "pass",
+    "detail_file": "inline_queue_retention_verification.json"
+  },
+  {
+    "order": 20,
+    "utc": "2026-10-28T22:57:11.272805+00:00",
+    "test": "20_display_recovery_after_inline_fix",
+    "status": "pass",
+    "detail_file": "display_stability_verification.json"
+  },
+  {
+    "order": 21,
+    "utc": "2026-10-28T23:04:57.078757+00:00",
+    "test": "21_inline_figure_fix_live_validation_recovery",
+    "status": "pass",
+    "detail_file": "memory_retention_recurrence_20261028.json",
+    "validation_seconds": 241.46798955835402,
+    "training_conditions_unchanged": true
+  }
+]

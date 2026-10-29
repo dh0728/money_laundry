@@ -1,0 +1,37 @@
+{
+  "utc": "2026-10-28T06:54:12.477404+00:00",
+  "status": "pass",
+  "scope": "Feature-loader prototype only; not installed in live training",
+  "synthetic_allocation_check": {
+    "rows": 150000,
+    "exact_output_match": true,
+    "current_peak_bytes": 28126192,
+    "candidate_peak_bytes": 22887327,
+    "peak_reduction_percent": 18.626286132157528,
+    "current_z_read_calls": 1,
+    "candidate_extra_z_read_calls": 0
+  },
+  "real_feature_checks": [
+    {
+      "split": "train",
+      "rows": 40,
+      "duplicates_and_reverse_order": true,
+      "exact_output_match": true,
+      "candidate_z_read_calls": 0
+    },
+    {
+      "split": "val",
+      "rows": 40,
+      "duplicates_and_reverse_order": true,
+      "exact_output_match": true,
+      "candidate_z_read_calls": 0
+    }
+  ],
+  "training_source_unchanged": true,
+  "torch_imported": false,
+  "training_interrupted": false,
+  "limitations": [
+    "Does not establish the owner of the running process anonymous memory.",
+    "Full model, missing/test fallback and long-run memory behavior need validation before adoption."
+  ]
+}
