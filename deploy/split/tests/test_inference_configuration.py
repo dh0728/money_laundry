@@ -129,5 +129,43 @@ class InferenceConfigurationTests(unittest.TestCase):
         self.assertEqual(values["PROD_INFERENCE_API_URL"], "")
         self.assertTrue(any(p.name == "inference.external.yaml" for p in bundle.files(ROOT, "dev")))
         self.assertFalse(any(p.name == "inference.external.yaml" for p in bundle.files(ROOT, "prod")))
+        self.assertTrue(any(p.name == "inference.prod.yaml" for p in bundle.files(ROOT, "prod")))
+        self.assertFalse(any(p.name == "inference.prod.yaml" for p in bundle.files(ROOT, "dev")))
         self.assertTrue(any(p.name == "reset_dev_rds.py" for p in bundle.files(ROOT, "dev")))
         self.assertFalse(any(p.name == "reset_dev_rds.py" for p in bundle.files(ROOT, "prod")))
+
+
+class ProductionDemoInferenceTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="aml-prod-demo-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        deploy.atomic_json(self.root / "shared/split.json", dict(
+            layout="split", role="backend", account_id=ACCOUNT, prod_worker_mode="demo",
+            prod_inference_url="https://gpu.example:31575/prod"))
+        self.engine = deploy.Deployment("backend", "prod", ACCOUNT, root=self.root, runner=FakeRunner())
+        values = {"presentation/enabled": "false", "inference/token": "prod-" + "c" * 32}
+        self.engine.parameter = lambda name: values.get(name, "test-only")
+
+    def test_demo_requires_the_kubesphere_ca(self):
+        with self.assertRaisesRegex(deploy.DeploymentError, "public CA"):
+            self.engine.runtime(NEW)
+
+    def test_demo_passes_url_token_and_ca_and_uses_the_overlay(self):
+        ca = self.root / "certs/inference/kubesphere/ca.crt"
+        ca.parent.mkdir(parents=True)
+        ca.write_bytes(b"synthetic-public-ca")
+        values = self.engine.runtime(NEW)
+        self.assertEqual(values["PROD_WORKER_MODE"], "demo")
+        self.assertEqual(values["PROD_INFERENCE_API_URL"], "https://gpu.example:31575/prod")
+        self.assertEqual(values["PROD_INFERENCE_API_TOKEN"], "prod-" + "c" * 32)
+        self.assertEqual(values["PROD_INFERENCE_CA_HOST_FILE"], str(ca))
+        release = self.root / "releases/prod" / NEW / "deploy/split/backend"
+        release.mkdir(parents=True)
+        (release / "compose.prod.blue.yaml").write_text("services: {}\n", encoding="utf-8")
+        with patch.object(self.engine.runner, "run", return_value="") as run:
+            self.engine.compose(dict(sha=NEW, color="blue"), "config")
+            self.assertNotIn(str(release / "inference.prod.yaml"), run.call_args.args[0])
+            (release / "inference.prod.yaml").write_text("services: {}\n", encoding="utf-8")
+            self.engine.compose(dict(sha=NEW, color="blue"), "config")
+            self.assertIn(str(release / "inference.prod.yaml"), run.call_args.args[0])
