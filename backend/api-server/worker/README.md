@@ -14,14 +14,15 @@
 | ⑥ | 모델 추론 | `inference/` (상대편은 `backend/inference-server`) | `analysis_entry.py --stage INFERENCE` |
 | ⑦ | 점수 저장 | `scores/` | `analysis_entry.py --stage SCORES` |
 | ⑧ | Alert 구성 | `alerts/` | `analysis_entry.py --stage ALERTS` |
+| ⑨ | Alert 유형 분류 | `alert_types/` | `analysis_entry.py --stage ALERT_TYPES` |
 
-`models/<모델이름>/`에는 버전(`spec.py`)과 입력 만들기(`build_input.py`)만 있고, `models/registry.py`가 모델 종류(이진·유형)별로 어느 버전을 쓸지 정한다. ⑤가 `build_input`을 부른다. 같은 버전의 모델 실행(`model.py`)은 추론 서버의 `models/`에 있다. 분석 단계는 `analysis_entry.py`의 `STAGES` 표가 각 폴더의 `run(connection, execution, context)`로 연결한다.
+`models/<모델이름>/`에는 버전(`spec.py`)과 입력 만들기(`build_input.py`)만 있고, `models/registry.py`가 모델 종류(이진·유형)별로 어느 버전을 쓸지 정한다. ⑤(이진)와 ⑨(유형)가 `build_input`을 부른다. 같은 버전의 모델 실행(`model.py`)은 추론 서버의 `models/`에 있다. 분석 단계는 `analysis_entry.py`의 `STAGES` 표가 각 폴더의 `run(connection, execution, context)`로 연결한다.
 
-②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑨Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·점수 공통 검사·모델 오류 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
+②적재 완료 대기(WAIT_INGEST)·④분석 입력 고정(FREEZE_INPUT)·⑩Alert 공개(COMPLETE)는 Spring(`analysis`, `analysis.freeze`, `analysis.publish`)이 맡는다. 여러 단계가 함께 쓰는 실행 식별·전송 형식·원문 보호·점수 공통 검사·모델 오류 계약·실행 잠금은 `common/`, DB 관리 도구(`configure_analysis_db.py`, `*.sql`)는 루트, 오프라인 평가는 `tools/`, 테스트는 `tests/`다. import는 worker 루트 기준 패키지 경로(`from alerts.flow_graph import FlowIndex`)를 쓴다. 테스트는 api-server 폴더에서 `python -B -m unittest discover -s worker -p "test_*.py"`로 실행한다.
 
 ### 모델과 임시 추론
 
-새 분석의 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10)이다. 백엔드는 대상 `tx_id`와 재료(`features/materials.py`)만 보내고, 피처·2홉 그래프·점수는 추론 서버 `models/binary_v10`이 만든다. 새 실행의 첫 바인딩 때 `analysis.jobs.threshold_value`를 권장값 0.4338742792606354로 기록한다. 유형 모델은 `demo-random-v1/demo-input-v1` 임시 변환기다. 임시 변환기의 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
+새 분석의 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10)이다. 백엔드는 대상 `tx_id`와 재료(`features/materials.py`)만 보내고, 피처·2홉 그래프·점수는 추론 서버 `models/binary_v10`이 만든다. 새 실행의 첫 바인딩 때 `analysis.jobs.threshold_value`를 권장값 0.4338742792606354로 기록한다. 유형은 거래가 아니라 Alert 단위로 정한다. 유형 모델은 결정 트리 `alert-type-tree-v2/alert-graph-features-v1`이다. ⑨는 Alert 구성이 준비한 계획마다 핵심 거래(SEED·CONNECTION)를 한 요청으로 보낸다(`targets`: `alert_key`=계획 번호+1, `alert_transactions`: 거래 시각·보내는/받는 계좌·USD 금액·결제 수단). 추론 서버 `models/alert_type_tree`가 Alert마다 9개 유형 확률(`alert_key,p_0,...,p_8`)을 돌려주고, 가장 큰 확률의 번호(같으면 앞 번호)가 `analysis.alert_plans.type_class`가 된다. 공개할 때 `review.alert_versions.type_class`로 저장한다. 핵심 거래가 없는 계획(NOOP·WITHDRAW)은 요청에 넣지 않고 유형도 없다. `demo-random-v1/demo-input-v1`은 이진 전용 임시 변환기다. 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering`([0,1) 균등 난수)이다. 라벨을 읽지 않고, 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
 
 - API와 추론 서버를 함께 배포한다. CSV를 다시 만들 필요는 없다.
 - 기존 일반 더미 바인딩은 유지한다. 삭제된 demo-labels 버전의 미완료 실행은 새 실행이 필요하며 완료 이력은 그대로 둔다.
@@ -29,7 +30,7 @@
 
 연결 범위는 입력 준비 → S3 게시 → 추론 API → 결과 수집/검증 → 점수 DB 저장이다.
 Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 점수 저장 다음 ALERTS에서
-구조 관계 기반 블록 근거를 저장한 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
+구조 관계 기반 블록 근거를 저장하고, ALERT_TYPES에서 Alert 유형을 받은 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
 실제 GNN의 탐지 성능을 검증한 것은 아니다.
 
 ## DB 역할과 초기 구조
@@ -37,7 +38,7 @@ Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다
 기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. Alert 거래에 당시 SEED 위험도를 함께 저장하여 목록 정렬의 JSON 반복 전개를 제거한다. 기존 V1이 적용된 dev는 사용자 결정에 따라 설정 백업 후 재초기화한다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 업무 DB 재생성 절차](../../../deploy/split/README.md#dev-업무-db-재생성-초기-스키마-v1이-바뀐-경우)를 따른다. 스키마를 바꿀 때는 V2를 덧붙이지 않고 V1을 고친 뒤 DB를 다시 만든다.
 
 - 수신 `ingest_entry.py`와 `analysis_entry.py --stage INTEGRATE`는 원문 보호·보고 통합·정정을 수행하므로 API의 데이터 작업 계정을 사용한다. `cryptography`는 이 단계의 AES-GCM 암호화/복호화와 Java 호환 검증에 필요하다. 조회 속도를 높이기 위한 라이브러리가 아니다.
-- FEATURES/INFERENCE/SCORES/ALERTS는 `ANALYSIS_DB_USERNAME`·`ANALYSIS_DB_PASSWORD`의 별도 로그인으로 같은 DB에 접속한다. 누락 시 API 관리자 계정으로 대체하지 않는다. 자식 프로세스에서 원문 암호키와 API DB 환경변수를 제거한다.
+- FEATURES/INFERENCE/SCORES/ALERTS/ALERT_TYPES는 `ANALYSIS_DB_USERNAME`·`ANALYSIS_DB_PASSWORD`의 별도 로그인으로 같은 DB에 접속한다. 누락 시 API 관리자 계정으로 대체하지 않는다. 자식 프로세스에서 원문 암호키와 API DB 환경변수를 제거한다.
 - DB 관리자가 새 스키마 적용 후 `configure_analysis_db.py`를 명시 실행한다. 관리자 연결은 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`, 생성할 계정은 위 두 분석 환경변수로만 전달한다. 로그인 이름은 환경별로 다르게 지정하고 비밀번호는 24자 이상으로 준비한다. 이 도구는 DB를 만들지 않으며 `analysis_permissions.sql`의 권한만 부여한다.
 - 분석 역할은 보호·평가 스키마와 직원 비밀번호 해시를 읽지 못한다. 배정 후보는 `core.assignable_staff` 뷰로 읽고 배정 시각만 갱신한다. 분석 진입점도 보호 스키마 접근 권한이 있으면 실행을 거절한다.
 - dev/prod 배포 설정은 `/aml/{환경}/analysis-db/username`, `/aml/{환경}/analysis-db/password`를 읽는다. 비밀번호는 SecureString으로 보관하고 같은 값을 DB 로그인에 설정한다. 스크립트 작성·테스트는 실제 서버 권한 설정이나 배포 완료를 의미하지 않는다.
@@ -113,8 +114,9 @@ $detail.models | Format-Table modelKind, phase, status, remoteStatus, errorCode,
 `GET /api/v1/batch-jobs?type=ANALYSIS`로 실제 작업 ID·실패 단계를 확인하고 FAILED 작업만
 `POST /api/v1/batch-jobs/{jobId}/resume`한다. 완료 작업을 다시 분석하지 않는다.
 
-5. 두 모델이 `DONE/SUCCEEDED`이고 상위가 `COMPLETE/COMPLETED`까지 도달했는지 확인한다.
+5. 이진 모델이 `DONE/SUCCEEDED`이고 상위가 `COMPLETE/COMPLETED`까지 도달했는지 확인한다.
    ALERTS는 고정 입력에서 블록 근거를 구성·저장한 뒤 완료한다. 의심 씨앗0건은 Alert0건으로 정상 완료한다.
+   ALERT_TYPES는 핵심 거래가 있는 계획이 있을 때만 유형 모델 요청을 만들고, 그 요청도 `DONE/SUCCEEDED`가 된다.
    `ALERT_ASSIGNEE_UNAVAILABLE`이면 실제 L1 사용자 등록이 필요하다. `PIPELINE_NOT_CONFIGURED`는
    정상 완료 경계가 아니라 워커 설정 오류다. 공개 점수·Alert API는 전체 완료 전 결과를 숨긴다.
    완료 후 `GET /api/v1/alerts?jobId={jobId}`, 상세 `/{alertId}`, `/{alertId}/versions`,
@@ -185,7 +187,7 @@ Python 탐색 창은 각 씨앗에 고정되며 미래 수신 완료 플래그�
 
 구 정책 근거가 있는 DB는 그대로 이어서 생성하지 않는다. 테스트 업무 데이터를 초기화한 뒤 재분석해야 한다.
 구 생성기나 호환 분기를 배포하지 않으며 정책이 다른 근거를 만나면 저장 전에 명시적으로 거절한다.
-사건 생애주기는 `alerts/alert_lifecycle.py`가 계획하고 `alerts/alert_plan_preparation.py`가 `analysis.alert_plans`에 저장한다. worker는 review 영역을 읽기만 하며, Spring `analysis.publish.AlertPublisher`가 ALERTS 완료 트랜잭션에서 공개 포인터·업무 범위·요약·이력·수신자를 함께 반영한다. 계획 payload는 Python/Java 간 동일 바이트 SHA-256 검증을 위해 canonical JSON TEXT로 저장한다.
+사건 생애주기는 `alerts/alert_lifecycle.py`가 계획하고 `alerts/alert_plan_preparation.py`가 `analysis.alert_plans`에 저장한다. worker는 review 영역을 읽기만 하며, Spring `analysis.publish.AlertPublisher`가 ALERT_TYPES 완료 트랜잭션에서 공개 포인터·업무 범위·요약·이력·수신자를 함께 반영한다. 계획 payload는 Python/Java 간 동일 바이트 SHA-256 검증을 위해 canonical JSON TEXT로 저장한다.
 
 계획 단계는 사건 전체의 상세 JSON을 동시에 보관하지 않고 역할·관계 색인을 유지한 뒤 작업별 문서를 읽는다. NOOP는 근거 JSON을 복사하지 않으며, 완료된 준비 단계 재시도에서는 그래프를 다시 계산하지 않는다. Spring은 전체 계획을 검증한 뒤 작은 묶음으로 읽어 같은 트랜잭션에서 공개한다. `timingsMs`의 `inputRead`, `candidateBuild`, `planPreparation`, `publication`은 각각 입력 읽기·그래프 구성·계획 준비·Spring 공개 작업 시간(ms)이다. 마지막 값은 트랜잭션 commit이나 전체 업로드 시간을 포함하지 않는다.
 
