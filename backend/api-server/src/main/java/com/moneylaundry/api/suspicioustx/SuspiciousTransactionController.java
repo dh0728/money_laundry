@@ -25,11 +25,10 @@ public class SuspiciousTransactionController {
       @RequestParam(defaultValue = "20") int size,
       @RequestParam(required = false) Long jobId,
       @RequestParam(required = false) LocalDate analysisDate,
-      @RequestParam(required = false) Integer typeClass,
       @RequestParam(required = false) Double minScore,
       @RequestParam(required = false) Integer bankId,
       @RequestParam(defaultValue = "launderingScore,desc") String sort) {
     return suspiciousTransactionService.list(
-        page, size, jobId, analysisDate, typeClass, minScore, bankId, sort);
+        page, size, jobId, analysisDate, minScore, bankId, sort);
   }
 }

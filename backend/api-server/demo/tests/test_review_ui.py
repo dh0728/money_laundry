@@ -83,7 +83,7 @@ class ReviewScreens(unittest.TestCase):
         summary = dict(txCount=1, seedCount=1, riskScore=.9, amountsByCurrency={'USD': 10},
                        netFlows={'a|USD': -10, 'b|USD': 10}, topReceiverShare={'USD': 1}, topSenders=[],
                        paymentFormats={'ACH': 1}, dailySuspiciousCount={'2023-09-01': 1},
-                       dailySuspiciousAmount={'2023-09-01|USD': 10}, primaryType='Fan-out', typeShare=1,
+                       dailySuspiciousAmount={'2023-09-01|USD': 10}, primaryType='Fan-out',
                        firstTxAt=t['occurredAt'], lastTxAt=t['occurredAt'])
         detail = dict(caseId=1, alertId=1, kind='ALERT', status='OPEN', revision=1, assigneeId=1,
                       assigneeName='L1 A', createdAt=t['occurredAt'], assignedAt=t['occurredAt'], ageDays=1,

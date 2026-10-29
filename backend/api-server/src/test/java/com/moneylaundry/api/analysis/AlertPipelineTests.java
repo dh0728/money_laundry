@@ -115,9 +115,7 @@ class AlertPipelineTests {
 
   void score(long txId, UUID scoreRun) {
     jdbc.update(
-        "insert into analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id) values(0,?,.9,1,0,0,0,0,0,0,0,0,?)",
-        txId,
-        scoreRun);
+        "insert into analysis.scores(tx_id,p_laundering,run_id) values(?,.9,?)", txId, scoreRun);
   }
 
   /** Makes a frozen transaction of the prepared run a scored seed. */
@@ -181,8 +179,9 @@ class AlertPipelineTests {
   }
 
   long firstAlert() {
-    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+    try (var runner = new AnalysisRunner(service, pipeline(), runs)) {
       runner.scan();
+      runner.scan(); // Alert 유형 분류
       assertThat(service.job(job).status()).isEqualTo("COMPLETED");
     }
     return jdbc.queryForObject(
@@ -375,7 +374,7 @@ class AlertPipelineTests {
         jdbc.queryForObject(
             "insert into analysis.jobs(analysis_date,business_at,status,current_stage,threshold_value,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),'QUEUED','FREEZE_INPUT',.7,'2022-09-04 09:00+09') returning job_id",
             Long.class);
-    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+    try (var runner = new AnalysisRunner(service, pipeline(), runs)) {
       runner.scan();
       assertThat(service.job(follow).stage()).isEqualTo(AnalysisStage.ALERTS);
       assertThat(service.job(follow).status()).isEqualTo("QUEUED");
@@ -394,6 +393,7 @@ class AlertPipelineTests {
                   context))
           .isEqualTo(1);
       runner.scan();
+      runner.scan(); // Alert 유형 분류
       assertThat(service.job(follow).status()).isEqualTo("COMPLETED");
       assertThat(
               jdbc.queryForObject(
@@ -514,8 +514,9 @@ class AlertPipelineTests {
     jdbc.update("delete from analysis.input_ledger where tx_id=?", returnSeed);
     jdbc.update(
         "update ledger.transactions set integration_status='HELD' where tx_id=?", returnSeed);
-    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+    try (var runner = new AnalysisRunner(service, pipeline(), runs)) {
       runner.scan();
+      runner.scan(); // Alert 유형 분류
       assertThat(service.job(job).status()).isEqualTo("COMPLETED");
     }
     assertThat(jdbc.queryForObject("select count(*) from review.alert_versions", Integer.class))
@@ -536,7 +537,7 @@ class AlertPipelineTests {
         jdbc.queryForObject(
             "insert into analysis.jobs(analysis_date,business_at,status,current_stage,threshold_value,analysis_cutoff_at) values(date '2100-01-01'+nextval('core.work_id')::int,now(),'QUEUED','FREEZE_INPUT',.99,'2022-09-04 09:00+09') returning job_id",
             Long.class);
-    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+    try (var runner = new AnalysisRunner(service, pipeline(), runs)) {
       runner.scan();
       assertThat(service.job(follow).stage()).isEqualTo(AnalysisStage.ALERTS);
       UUID next = runs.current(follow);
@@ -553,6 +554,7 @@ class AlertPipelineTests {
                   next))
           .isZero();
       runner.scan();
+      runner.scan(); // Alert 유형 분류
       assertThat(service.job(follow).status()).isEqualTo("COMPLETED");
       assertThat(
               jdbc.queryForObject(
@@ -590,13 +592,60 @@ class AlertPipelineTests {
         nextJob, AnalysisStage.ALERTS, token, List.of(), Map.of(), next);
   }
 
+  /**
+   * The Python stages, with Alert 유형 분류 completing as it does for plans without a type; the worker
+   * tests and WorkerPipelineTests run that stage against an inference server double.
+   */
+  AnalysisStageExecutor pipeline() {
+    var python = executor("worker/analysis_entry.py");
+    return new AnalysisStageExecutor() {
+      @Override
+      public Result prepare(Context context) {
+        if (context.stage() != AnalysisStage.ALERT_TYPES) return python.prepare(context);
+        jdbc.update(
+            "update analysis.alert_plans set execution_id=? where run_id=?",
+            context.executionId(),
+            context.runId());
+        return new Result(
+            typesCheckpoint(
+                context.jobId(), context.runId(), context.artifacts().get("ALERTS"), 0));
+      }
+
+      @Override
+      public void commit(Context context, Result result) {
+        if (context.stage() != AnalysisStage.ALERT_TYPES) python.commit(context, result);
+      }
+    };
+  }
+
+  /** What Alert 유형 분류 leaves after typing `typed` plans: its stage and its checkpoint. */
+  String typesCheckpoint(long job, UUID run, String artifact, int typed) {
+    jdbc.update("update analysis.jobs set current_stage='ALERT_TYPES' where job_id=?", job);
+    return com.moneylaundry.api.review.ReviewJson.encode(
+        Map.of(
+            "run_id",
+            run.toString(),
+            "buildGeneration",
+            com.moneylaundry.api.review.ReviewJson.object(artifact).get("buildGeneration"),
+            "typedAlertCount",
+            typed));
+  }
+
   void publish(AnalysisStageExecutor.Context context, String artifact) {
+    publish(context, artifact, 0);
+  }
+
+  void publish(AnalysisStageExecutor.Context context, String artifact, int typed) {
     service.tx.executeWithoutResult(
         s -> {
           AnalysisRunService.integrationLock(jdbc);
           jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
           new com.moneylaundry.api.analysis.publish.AlertPublisher(jdbc)
-              .publish(context.runId(), context.executionId(), artifact);
+              .publish(
+                  context.runId(),
+                  context.executionId(),
+                  artifact,
+                  typesCheckpoint(context.jobId(), context.runId(), artifact, typed));
           runs.complete(context.runId());
           jdbc.update(
               "update analysis.jobs set status='COMPLETED',current_stage='COMPLETE' where job_id=?",
@@ -646,8 +695,9 @@ class AlertPipelineTests {
       runs.snapshot(run, spoke, "TARGET");
       score(spoke, run);
     }
-    try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
+    try (var runner = new AnalysisRunner(service, pipeline(), runs)) {
       runner.scan();
+      runner.scan(); // Alert 유형 분류
       assertThat(service.job(job).status()).isEqualTo("COMPLETED");
     }
     var ids = jdbc.queryForList("select alert_id from review.alerts order by alert_id", Long.class);
@@ -701,6 +751,27 @@ class AlertPipelineTests {
   }
 
   @Test
+  void published_version_keeps_its_plan_type_and_the_typed_count_must_match() {
+    UUID token = UUID.randomUUID();
+    jdbc.update(
+        "update analysis.jobs set status='RUNNING',execution_owner=gen_random_uuid(),execution_id=? where job_id=?",
+        token,
+        job);
+    var context =
+        new AnalysisStageExecutor.Context(
+            job, AnalysisStage.ALERTS, token, List.of(), Map.of(), run);
+    String artifact = executor("worker/analysis_entry.py").prepare(context).artifact();
+    jdbc.update("update analysis.alert_plans set type_class=1 where run_id=?", run);
+    assertThatThrownBy(() -> publish(context, artifact, 0)).hasMessage("ALERT_TYPE_COUNT_MISMATCH");
+    publish(context, artifact, 1);
+    assertThat(
+            jdbc.queryForMap(
+                "select v.type_class,a.summary->>'primaryType' as name from review.alerts a join review.alert_versions v on v.alert_id=a.alert_id and v.version=a.published_version"))
+        .containsEntry("type_class", 1)
+        .containsEntry("name", "Fan-out");
+  }
+
+  @Test
   void final_failure_rolls_back_cases_assignments_events_and_preserves_prepared_plan() {
     UUID token = UUID.randomUUID();
     jdbc.update(
@@ -718,7 +789,7 @@ class AlertPipelineTests {
                 service.tx.executeWithoutResult(
                     s -> {
                       new com.moneylaundry.api.analysis.publish.AlertPublisher(jdbc)
-                          .publish(run, token, artifact);
+                          .publish(run, token, artifact, typesCheckpoint(job, run, artifact, 0));
                       throw new IllegalStateException("injected before run completion");
                     }))
         .isInstanceOf(IllegalStateException.class);

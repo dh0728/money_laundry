@@ -36,12 +36,12 @@ public final class AlertPublisher {
     }
   }
 
-  public void publish(UUID run, UUID execution, String artifact) {
+  public void publish(UUID run, UUID execution, String artifact, String types) {
     long publicationStarted = System.nanoTime();
     if (!TransactionSynchronizationManager.isActualTransactionActive())
       throw new IllegalStateException("ALERT_PUBLICATION_REQUIRES_TRANSACTION");
     if (!jdbc.queryForObject(
-        "select exists(select 1 from analysis.jobs j join analysis.runs r on r.run_id=j.current_run_id where r.run_id=? and j.execution_id=? and j.status='RUNNING' and j.current_stage='ALERTS' and r.status in ('READY','ACTIVE'))",
+        "select exists(select 1 from analysis.jobs j join analysis.runs r on r.run_id=j.current_run_id where r.run_id=? and j.execution_id=? and j.status='RUNNING' and j.current_stage='ALERT_TYPES' and r.status in ('READY','ACTIVE'))",
         Boolean.class,
         run,
         execution)) throw new IllegalStateException("ALERT_PLAN_FENCED");
@@ -56,13 +56,17 @@ public final class AlertPublisher {
     var manifest = object(artifact);
     if (!"PREPARED".equals(manifest.get("publication")))
       throw new IllegalStateException("ALERT_PLAN_MANIFEST_REQUIRED");
+    var typing = object(types);
+    if (number(typing.get("buildGeneration")) != number(manifest.get("buildGeneration")))
+      throw new IllegalStateException("ALERT_PLAN_FENCED");
     StringBuilder digest = new StringBuilder();
     Set<Long> affected = new HashSet<>();
-    int[] count = {0};
+    int[] count = {0}, typed = {0};
     forEachPlan(
         run,
         stored -> {
           count[0]++;
+          if (stored.get("type_class") != null) typed[0]++;
           String payload = stored.get("payload").toString();
           String checksum = hash(payload);
           if (!execution.equals(stored.get("execution_id"))
@@ -81,13 +85,19 @@ public final class AlertPublisher {
       throw new IllegalStateException("ALERT_PLAN_COUNT_MISMATCH");
     if (!hash(digest.toString()).equals(manifest.get("planDigest")))
       throw new IllegalStateException("ALERT_PLAN_DIGEST_MISMATCH");
+    if (typed[0] != number(typing.get("typedAlertCount")))
+      throw new IllegalStateException("ALERT_TYPE_COUNT_MISMATCH");
     Timestamp businessAt =
         jdbc.queryForObject(
             "select b.business_at from analysis.runs r join analysis.jobs b using(job_id) where r.run_id=?",
             Timestamp.class,
             run);
     int[] created = {0};
-    forEachPlan(run, stored -> created[0] += apply(run, object(stored.get("payload")), businessAt));
+    forEachPlan(
+        run,
+        stored ->
+            created[0] +=
+                apply(run, object(stored.get("payload")), stored.get("type_class"), businessAt));
     jdbc.update("update analysis.jobs set alert_count=? where current_run_id=?", created[0], run);
     manifest.put("publication", "PUBLISHED");
     manifest.put("createdAlertCount", created[0]);
@@ -195,7 +205,7 @@ public final class AlertPublisher {
     }
   }
 
-  private int apply(UUID run, Map<String, Object> plan, Timestamp at) {
+  private int apply(UUID run, Map<String, Object> plan, Object typeClass, Timestamp at) {
     String action = plan.get("action").toString();
     Long target = plan.get("targetAlertId") == null ? null : number(plan.get("targetAlertId"));
     var affected = ids(plan.get("caseIds"));
@@ -225,12 +235,12 @@ public final class AlertPublisher {
                 fingerprint);
         if (!existing.isEmpty()) {
           refreshProposal(
-              number(existing.getFirst().get("proposal_id")), plan, run, at, recipients);
+              number(existing.getFirst().get("proposal_id")), plan, typeClass, run, at, recipients);
           recordCoverage(run, plan, target);
           return 0;
         }
       }
-      int version = saveVersion(target, run, fingerprint, evidence);
+      int version = saveVersion(target, run, fingerprint, evidence, typeClass);
       if ("PROPOSE".equals(action)) {
         String proposedAction =
             rows(evidence.get("seeds")).isEmpty()
@@ -377,7 +387,12 @@ public final class AlertPublisher {
   }
 
   private void refreshProposal(
-      long id, Map<String, Object> plan, UUID run, Timestamp at, Set<Long> recipients) {
+      long id,
+      Map<String, Object> plan,
+      Object typeClass,
+      UUID run,
+      Timestamp at,
+      Set<Long> recipients) {
     var proposal =
         jdbc.queryForMap("select * from review.alert_change_proposals where proposal_id=?", id);
     if ("REJECTED".equals(proposal.get("status"))) return;
@@ -421,7 +436,12 @@ public final class AlertPublisher {
           b.get("publishedVersion"),
           b.get("assigneeId"));
     int version =
-        saveVersion(target, run, plan.get("fingerprint").toString(), object(plan.get("evidence")));
+        saveVersion(
+            target,
+            run,
+            plan.get("fingerprint").toString(),
+            object(plan.get("evidence")),
+            typeClass);
     jdbc.update(
         "update review.alert_change_proposals set status='OPEN',revision=revision+1,generation=generation+1,source_run_id=?,proposed_version=?,payload=?::jsonb,action=?,resolved_at=null where proposal_id=?",
         run,
@@ -439,7 +459,8 @@ public final class AlertPublisher {
         Map.of("proposalId", id, "reason", plan.get("reason")));
   }
 
-  private int saveVersion(long target, UUID run, String fingerprint, Map<String, Object> evidence) {
+  private int saveVersion(
+      long target, UUID run, String fingerprint, Map<String, Object> evidence, Object typeClass) {
     int version =
         jdbc.queryForObject(
             "select coalesce(max(version),0)+1 from review.alert_versions where alert_id=?",
@@ -456,7 +477,7 @@ public final class AlertPublisher {
     }
     if (!memberIds.containsAll(seedIds)) throw new IllegalStateException("ALERT_SEED_MISSING");
     jdbc.update(
-        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence,created_at) values(?,?,?,?,?::jsonb,"
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence,type_class,created_at) values(?,?,?,?,?::jsonb,?,"
             + RUN_BUSINESS_AT
             + ")",
         target,
@@ -464,6 +485,7 @@ public final class AlertPublisher {
         run,
         fingerprint,
         encode(evidence),
+        typeClass,
         run);
     var values = new ArrayList<Object[]>();
     for (var member : members)

@@ -21,7 +21,8 @@ if __package__ in (None, ""):
 from inference_worker.model_adapter import run_model
 from inference_worker.replica import Replica, ReplicaMismatch
 from common.model_contract import ModelExecutionError, model_failure
-from common.worker_transport import Request, ProtocolError, decode, encode, descriptor, tx_ids
+from common.score_contract import key_column
+from common.worker_transport import Request, ProtocolError, decode, encode, descriptor, key_ids
 from models import registry
 
 
@@ -151,7 +152,7 @@ def execute(directory):
                 if len(data) != entry.get("size_bytes") or hashlib.sha256(data).hexdigest() != entry.get("sha256"):
                     raise ProtocolError("Input checksum mismatch")
                 inputs[name] = pq.read_table(io.BytesIO(data))
-            ids = tx_ids(inputs["targets"])
+            ids = key_ids(inputs["targets"], key_column(request.model_kind))
             if type(manifest.get("target_row_count")) is not int or len(ids) != manifest["target_row_count"]:
                 raise ProtocolError("TARGET count mismatch")
             if "replica" in payload:

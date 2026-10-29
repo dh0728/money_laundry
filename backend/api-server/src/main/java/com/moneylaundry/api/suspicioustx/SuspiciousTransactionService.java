@@ -3,36 +3,19 @@ package com.moneylaundry.api.suspicioustx;
 import com.moneylaundry.api.analysis.AnalysisService;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** 의심 거래 목록 조회: 분석 작업·날짜·유형 필터와 페이지 처리. */
+/** 의심 거래 목록 조회: 분석 작업·날짜 필터와 페이지 처리. */
 @Service
 public class SuspiciousTransactionService {
-  private static final String[] NAMES = {
-    "NON_PATTERN",
-    "FAN-OUT",
-    "FAN-IN",
-    "G-SCATTER",
-    "S-GATHER",
-    "CYCLE",
-    "RANDOM",
-    "BIPARTITE",
-    "STACK"
-  };
   private final JdbcTemplate jdbc;
-  private final double ambiguityDelta;
 
-  public SuspiciousTransactionService(
-      JdbcTemplate jdbc,
-      @org.springframework.beans.factory.annotation.Value("${app.type.ambiguity-delta:0.10}")
-          double ambiguityDelta) {
+  public SuspiciousTransactionService(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
-    this.ambiguityDelta = ambiguityDelta;
   }
 
   public Map<String, Object> list(
@@ -40,13 +23,11 @@ public class SuspiciousTransactionService {
       int size,
       Long jobId,
       LocalDate date,
-      Integer type,
       Double minScore,
       Integer bankId,
       String sort) {
     AnalysisService.validatePage(page, size);
-    if ((type != null && (type < 0 || type > 8))
-        || (minScore != null && (!Double.isFinite(minScore) || minScore < 0 || minScore > 1))
+    if ((minScore != null && (!Double.isFinite(minScore) || minScore < 0 || minScore > 1))
         || (bankId != null && bankId < 0)) throw AnalysisService.invalid();
     String order =
         switch (sort) {
@@ -74,10 +55,6 @@ public class SuspiciousTransactionService {
     if (date != null) {
       from.append(" and j.analysis_date=?");
       args.add(date);
-    }
-    if (type != null) {
-      from.append(" and i.type_class=?");
-      args.add(type);
     }
     if (minScore != null) {
       from.append(" and i.p_laundering>=?");
@@ -126,26 +103,6 @@ public class SuspiciousTransactionService {
     double score = ((Number) source.get("p_laundering")).doubleValue();
     out.put("thresholdRatio", score / ((Number) source.get("threshold_value")).doubleValue());
     out.put("isSuspicious", true);
-    List<Integer> ranking = new ArrayList<>();
-    for (int code = 0; code < 9; code++) ranking.add(code);
-    ranking.sort(
-        Comparator.<Integer>comparingDouble(
-                code -> ((Number) source.get("p_" + code)).doubleValue())
-            .reversed()
-            .thenComparingInt(code -> code));
-    int first = ranking.get(0), second = ranking.get(1);
-    double best = ((Number) source.get("p_" + first)).doubleValue();
-    out.put("typeClass", first);
-    out.put("typeName", NAMES[first]);
-    out.put("typeScore", best);
-    int count = best - ((Number) source.get("p_" + second)).doubleValue() < ambiguityDelta ? 2 : 1;
-    out.put(
-        "typeCandidates",
-        ranking.subList(0, count).stream()
-            .map(
-                code -> Map.of("code", code, "name", NAMES[code], "score", source.get("p_" + code)))
-            .toList());
-    out.put("agreement", first == 0 ? "ATYPICAL" : "STRONG");
     return out;
   }
 }

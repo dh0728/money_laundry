@@ -187,13 +187,14 @@ class AnalysisRunnerTests {
     runner.scan();
     runner.scan();
     runner.scan();
+    runner.scan();
     assertThat(service.job(id).status()).isEqualTo("COMPLETED");
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.stage_results where job_id=? and completed",
                 Integer.class,
                 id))
-        .isEqualTo(4);
+        .isEqualTo(5);
     assertThatThrownBy(() -> service.resume(id)).hasMessageContaining("상태");
   }
 

@@ -6,7 +6,7 @@ from uuid import uuid4
 import httpx
 
 from common.model_contract import MODEL_ERRORS
-from common.run_fence import lock_stage
+from common.run_fence import MODEL_STAGES, lock_stage
 from inference.model_publication import publish_model
 from common.worker_transport import ProtocolError, Request, S3Store, StoreUnavailable, encode
 
@@ -51,7 +51,7 @@ def normalize(request, view, prefix, expected_rows):
 
 def observe_model(connection, execution, kind, settings, *, transport=None):
     with connection.transaction():
-        lock_stage(connection, execution)
+        lock_stage(connection, execution, MODEL_STAGES[kind])
         row = connection.execute('''SELECT binding,input_artifact,request_id,execution_round
             FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s
               AND phase='WAIT_REMOTE' AND status='WAITING' FOR UPDATE''', (execution.run_id, kind)).fetchone()
@@ -80,7 +80,7 @@ def observe_model(connection, execution, kind, settings, *, transport=None):
             view = normalize(request, json.loads(data), S3Store(None, settings.bucket, settings.prefix).prefix,
                              artifact['row_count'])
     with connection.transaction():
-        lock_stage(connection, execution)
+        lock_stage(connection, execution, MODEL_STAGES[kind])
         stored = connection.execute('''SELECT remote_revision,remote_snapshot,phase,status FROM analysis.model_tasks
             WHERE run_id=%s AND model_kind=%s FOR UPDATE''', (execution.run_id, kind)).fetchone()
         if stored[0] is not None:
@@ -144,7 +144,7 @@ def _republish_unreceived(connection, execution, kind):
     no receipt was ever observed, resending the same identity cannot run the model twice.
     """
     with connection.transaction():
-        lock_stage(connection, execution)
+        lock_stage(connection, execution, MODEL_STAGES[kind])
         # RETRY_WAIT (due now), not READY: Spring defers an INFERENCE exit 76 only while a task is
         # WAITING, RETRY_WAIT or ACTIVE, so READY here would fail the job instead of resending.
         return connection.execute('''UPDATE analysis.model_tasks SET phase='PUBLISH',status='RETRY_WAIT',
@@ -156,7 +156,7 @@ def _republish_unreceived(connection, execution, kind):
 
 def _failure(connection, execution, kind, error):
     with connection.transaction():
-        lock_stage(connection, execution)
+        lock_stage(connection, execution, MODEL_STAGES[kind])
         row = connection.execute('''SELECT phase,consecutive_failures,request_id,execution_round
             FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s FOR UPDATE''', (execution.run_id, kind)).fetchone()
         phase, failures, request_id, round_id = row
@@ -193,35 +193,50 @@ def run(connection, execution, context):
 
 
 def advance(connection, execution, storage_root, settings, s3, *, transport=None):
+    from features.prepare_features import prepare_full_again
+    from scores.result_collection import finish_inference
+    code = tick(connection, execution, 'BINARY', storage_root, settings, s3,
+                prepare=prepare_full_again, transport=transport)
+    if code is None:
+        finish_inference(connection, execution)
+    return code or 0
+
+
+def tick(connection, execution, kind, storage_root, settings, s3, *, prepare, transport=None):
+    """One bounded pass over one model task: prepare, publish, observe, collect.
+
+    prepare(connection, execution, storage_root, kind) writes the task's input when it is in
+    PREPARE. Returns 76 while work remains, 77 when the task failed, None once collected.
+    """
     settings.validate()
     with connection.transaction():
-        lock_stage(connection, execution)
+        lock_stage(connection, execution, MODEL_STAGES[kind])
         connection.execute('''UPDATE analysis.model_tasks SET action_required=true,
             error_code=coalesce(error_code,'REMOTE_WAIT_EXPIRED')
-            WHERE run_id=%s AND status='WAITING' AND remote_deadline_at<=now()''', (execution.run_id,))
-        rows = connection.execute('''SELECT model_kind,phase,status,
+            WHERE run_id=%s AND model_kind=%s AND status='WAITING' AND remote_deadline_at<=now()''',
+            (execution.run_id, kind))
+        row = connection.execute('''SELECT phase,status,
             coalesce(CASE WHEN phase='WAIT_REMOTE' THEN next_poll_at ELSE retry_at END<=now(),true)
-            FROM analysis.model_tasks WHERE run_id=%s ORDER BY (phase='WAIT_REMOTE') DESC,model_kind''',
-            (execution.run_id,)).fetchall()
-        if {r[0] for r in rows} != {'BINARY', 'TYPE'}:
-            raise ProtocolError('Both prepared model tasks are required')
-    for kind, phase, status, due in rows:
-        if not due or status in ('SUCCEEDED', 'CANCELLED'):
-            continue
+            FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s''',
+            (execution.run_id, kind)).fetchone()
+        if row is None:
+            raise ProtocolError('The prepared model task is required')
+    phase, status, due = row
+    if due and status not in ('SUCCEEDED', 'CANCELLED'):
+        prepared = True
         if phase == 'PREPARE' and status in ('READY', 'RETRY_WAIT'):
-            from features.prepare_features import prepare_full_again
             from common.frozen_input import StaleExecution
             try:
-                prepare_full_again(connection, execution, storage_root, kind)
+                prepare(connection, execution, storage_root, kind)
+                phase, status = 'PUBLISH', 'READY'
             except StaleExecution:
                 raise
             except Exception:
-                continue  # Recorded as PREPARE_FAILED; the job fails visibly and resumes from here.
-            phase, status = 'PUBLISH', 'READY'
+                prepared = False  # Recorded as PREPARE_FAILED; the job fails visibly and resumes from here.
         try:
-            if phase == 'PUBLISH' and status in ('READY', 'ACTIVE', 'RETRY_WAIT'):
+            if prepared and phase == 'PUBLISH' and status in ('READY', 'ACTIVE', 'RETRY_WAIT'):
                 publish_model(connection, execution, kind, storage_root, settings, s3, transport=transport)
-            elif phase == 'WAIT_REMOTE' and status == 'WAITING':
+            elif prepared and phase == 'WAIT_REMOTE' and status == 'WAITING':
                 observe_model(connection, execution, kind, settings, transport=transport)
         except (httpx.HTTPError, StoreUnavailable, ProtocolError, ValueError, KeyError) as error:
             from common.frozen_input import StaleExecution
@@ -229,18 +244,15 @@ def advance(connection, execution, storage_root, settings, s3, *, transport=None
                 raise
 
             _failure(connection, execution, kind, error)
-    from scores.result_collection import collect_model, finish_inference
-    collections = connection.execute('''SELECT model_kind FROM analysis.model_tasks
-        WHERE run_id=%s AND phase='COLLECT' AND status IN ('READY','RETRY_WAIT','ACTIVE')
-          AND (retry_at IS NULL OR retry_at<=now()) ORDER BY model_kind''', (execution.run_id,)).fetchall()
-    for (kind,) in collections:
+    from scores.result_collection import collect_model
+    if connection.execute('''SELECT EXISTS(SELECT 1 FROM analysis.model_tasks
+        WHERE run_id=%s AND model_kind=%s AND phase='COLLECT' AND status IN ('READY','RETRY_WAIT','ACTIVE')
+          AND (retry_at IS NULL OR retry_at<=now()))''', (execution.run_id, kind)).fetchone()[0]:
         collect_model(connection, execution, kind, storage_root, settings, s3)
-    states = connection.execute('SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s',
-                                (execution.run_id,)).fetchall()
-    if any(status in ('WAITING', 'RETRY_WAIT', 'ACTIVE') or (phase == 'PUBLISH' and status == 'READY')
-           for phase, status in states):
+    phase, status = connection.execute('''SELECT phase,status FROM analysis.model_tasks
+        WHERE run_id=%s AND model_kind=%s''', (execution.run_id, kind)).fetchone()
+    if status in ('WAITING', 'RETRY_WAIT', 'ACTIVE') or (phase == 'PUBLISH' and status == 'READY'):
         return 76  # Durable deferred work, not a failed execution.
-    if any(status == 'FAILED' for phase, status in states):
+    if status == 'FAILED':
         return 77
-    finish_inference(connection, execution)
-    return 0
+    return None

@@ -94,37 +94,48 @@ public final class DashboardQueries {
   }
 
   Map<String, Object> modelDistribution(LocalDate from, LocalDate to) {
-    // The two widgets use the same published scores and detection period.
-    var counts =
+    // Alerts created in the period, by the type of their current published version.
+    var types =
         jdbc.queryForList(
-            "select suspicious,type_class,sum(n)::bigint as count from ops.dashboard_model_counts "
-                + "where detected_day>=(?::timestamptz at time zone 'Asia/Seoul')::date "
-                + "and detected_day<(?::timestamptz at time zone 'Asia/Seoul')::date group by 1,2",
+            "select type_class::bigint as type,count(*)::bigint as count from ops.dashboard_case_items "
+                + "where kind='ALERT' and type_class is not null and created_at>=? and created_at<? group by 1 order by 1",
             at(from),
             at(to.plusDays(1)));
-    return distribution(counts);
+    // Binary model results of transactions whose latest published score was detected in the period.
+    var agreements = new TreeMap<String, Long>();
+    for (var row :
+        jdbc.queryForList(
+            "select suspicious,sum(n)::bigint as count from ops.dashboard_model_counts "
+                + "where detected_day>=(?::timestamptz at time zone 'Asia/Seoul')::date "
+                + "and detected_day<(?::timestamptz at time zone 'Asia/Seoul')::date group by 1",
+            at(from),
+            at(to.plusDays(1))))
+      agreements.merge(
+          Boolean.TRUE.equals(row.get("suspicious")) ? "SUSPICIOUS" : "NORMAL",
+          ((Number) row.get("count")).longValue(),
+          Long::sum);
+    return Map.of(
+        "agreements",
+        agreements.entrySet().stream()
+            .map(e -> Map.of("agreement", e.getKey(), "count", e.getValue()))
+            .toList(),
+        "types",
+        types);
   }
 
   Map<String, Object> scoreWidgets(
       LocalDate from, LocalDate to, LocalDate today, List<java.sql.Date> deliveryDates) {
-    var args =
-        new ArrayList<Object>(
-            List.of(
-                java.sql.Date.valueOf(today),
-                java.sql.Date.valueOf(from),
-                java.sql.Date.valueOf(to)));
+    var args = new ArrayList<Object>(List.of(java.sql.Date.valueOf(today)));
     args.addAll(deliveryDates);
-    args.addAll(List.of(java.sql.Date.valueOf(from), java.sql.Date.valueOf(to)));
     var counts =
         jdbc.queryForList(
-            "select business_date,detected_day=? as analyzed_today,detected_day between ? and ? as in_period,"
-                + "suspicious,type_class,sum(n)::bigint as count from ops.dashboard_model_counts where business_date in ("
+            "select business_date,detected_day=? as analyzed_today,"
+                + "suspicious,sum(n)::bigint as count from ops.dashboard_model_counts where business_date in ("
                 + String.join(",", Collections.nCopies(deliveryDates.size(), "?"))
-                + ") or detected_day between ? and ? group by 1,2,3,4,5",
+                + ") group by 1,2,3",
             args.toArray());
     var selectedDays = new HashSet<>(deliveryDates);
     long received = 0, analyzed = 0, suspicious = 0;
-    var period = new ArrayList<Map<String, Object>>();
     for (var row : counts) {
       long count = ((Number) row.get("count")).longValue();
       if (selectedDays.contains(row.get("business_date"))) {
@@ -134,35 +145,11 @@ public final class DashboardQueries {
           if (Boolean.TRUE.equals(row.get("suspicious"))) suspicious += count;
         }
       }
-      if (Boolean.TRUE.equals(row.get("in_period"))) period.add(row);
     }
-    var result = new LinkedHashMap<>(distribution(period));
+    var result = new LinkedHashMap<>(modelDistribution(from, to));
     result.put(
         "detection", Map.of("received", received, "analyzed", analyzed, "suspicious", suspicious));
     return result;
-  }
-
-  private Map<String, Object> distribution(List<Map<String, Object>> counts) {
-    var agreements = new TreeMap<String, Long>();
-    var types = new TreeMap<Long, Long>();
-    for (var row : counts) {
-      boolean suspicious = Boolean.TRUE.equals(row.get("suspicious"));
-      long type = ((Number) row.get("type_class")).longValue();
-      long count = ((Number) row.get("count")).longValue();
-      String agreement =
-          suspicious ? (type == 0 ? "ATYPICAL" : "STRONG") : (type == 0 ? "WEAK" : "PATTERN_ONLY");
-      agreements.merge(agreement, count, Long::sum);
-      if (suspicious) types.merge(type, count, Long::sum);
-    }
-    return Map.of(
-        "agreements",
-        agreements.entrySet().stream()
-            .map(e -> Map.of("agreement", e.getKey(), "count", e.getValue()))
-            .toList(),
-        "types",
-        types.entrySet().stream()
-            .map(e -> Map.of("type", e.getKey(), "count", e.getValue()))
-            .toList());
   }
 
   public List<Map<String, Object>> dailyAlertStatus(LocalDate from, LocalDate to) {

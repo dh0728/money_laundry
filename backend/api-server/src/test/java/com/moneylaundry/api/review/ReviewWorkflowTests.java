@@ -591,9 +591,7 @@ class ReviewWorkflowTests {
               "topSenders",
               "paymentFormats",
               "dailySuspiciousCount",
-              "dailySuspiciousAmount",
-              "typeDistribution",
-              "typeShare");
+              "dailySuspiciousAmount");
       assertThat(object(detailedSummary.get("netFlows"))).isNotEmpty();
       assertThat(rows(detail.get("groups"))).isNotEmpty();
       summary.forEach((key, value) -> assertThat(value).isEqualTo(detailedSummary.get(key)));
@@ -1598,15 +1596,13 @@ class ReviewWorkflowTests {
       long alertId = number(service.detail(id).get("alertId"));
       var doc = object(encode(evidence.detail(alertId, null)));
       doc.put("seeds", List.of(Map.of("txId", 1, "score", .9)));
-      if (n == 23)
-        for (var row : rows(doc.get("transactions")))
-          row.put("scores", Map.of("p_laundering", .9, "p_2", .9));
       jdbc.update(
-          "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb) on conflict(alert_id,version) do update set evidence=excluded.evidence,fingerprint=excluded.fingerprint",
+          "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence,type_class) values(?,1,?,?,?::jsonb,?) on conflict(alert_id,version) do update set evidence=excluded.evidence,fingerprint=excluded.fingerprint,type_class=excluded.type_class",
           alertId,
           run,
           "a".repeat(64),
-          encode(doc));
+          encode(doc),
+          n == 23 ? 2 : 1);
       new CaseSummaryStore(jdbc).refresh(alertId);
       last = id;
     }
@@ -1632,6 +1628,7 @@ class ReviewWorkflowTests {
             "씨앗 제외"));
     assertThat(actual.list("ALERT", null, null, null, null, 0, 20, filter).get("totalElements"))
         .isEqualTo(0L);
+    // The type belongs to the published Alert version; excluding its seeds keeps it.
     assertThat(
             actual
                 .list(
@@ -1642,7 +1639,7 @@ class ReviewWorkflowTests {
                     null,
                     0,
                     20,
-                    new ReviewCaseFilter(null, List.of("패턴 미특정"), null, null, null, null))
+                    new ReviewCaseFilter(null, List.of("Fan-in"), null, null, null, null))
                 .get("totalElements"))
         .isEqualTo(1L);
     assertThat(

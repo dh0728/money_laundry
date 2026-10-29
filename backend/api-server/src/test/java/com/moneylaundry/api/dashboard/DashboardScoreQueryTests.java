@@ -31,7 +31,7 @@ class DashboardScoreQueryTests {
 
   @BeforeEach
   void setup() {
-    jdbc.execute("truncate core.banks,analysis.jobs,core.owners cascade");
+    jdbc.execute("truncate core.banks,analysis.jobs,core.owners,review.alerts cascade");
     jdbc.update("insert into core.banks(bank_id) values(999019)");
     long entity =
         jdbc.queryForObject(
@@ -50,7 +50,7 @@ class DashboardScoreQueryTests {
             account);
   }
 
-  long score(long transaction, String status, double p, double nonPattern) {
+  long score(long transaction, String status, double p) {
     long job =
         jdbc.queryForObject(
             "insert into analysis.jobs(status,threshold_value,analysis_date,analysis_cutoff_at,business_at,current_stage) values(?,.7,(select coalesce(max(analysis_date),'2000-01-01'::date)+1 from analysis.jobs),now(),'2023-09-02 09:00+09','COMPLETE') returning job_id",
@@ -73,12 +73,10 @@ class DashboardScoreQueryTests {
         run,
         transaction);
     jdbc.update(
-        "insert into analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,type_class) values(?,?,?,?,.4,.4,0,0,0,0,0,0,?)",
+        "insert into analysis.scores(run_id,tx_id,p_laundering) values(?,?,?)",
         run,
         transaction,
-        p,
-        nonPattern,
-        nonPattern >= .4 ? 0 : 1);
+        p);
     if (status.equals("COMPLETED"))
       jdbc.update(
           "insert into analysis.current_scores values(?,?) on conflict(tx_id) do update set run_id=excluded.run_id",
@@ -108,31 +106,29 @@ class DashboardScoreQueryTests {
 
   @Test
   void set_query_matches_point_queries_for_publication_ties_and_unscored_rows() {
-    long published = score(transactions.get(0), "COMPLETED", 0.9, 0.2);
-    score(transactions.get(0), "FAILED", 0.1, 0.9);
-    long stale = score(transactions.get(0), "FAILED", 0.1, 0.9);
+    long published = score(transactions.get(0), "COMPLETED", 0.9);
+    score(transactions.get(0), "FAILED", 0.1);
+    long stale = score(transactions.get(0), "FAILED", 0.1);
     UUID current = UUID.randomUUID();
     jdbc.update(
         "insert into analysis.runs(run_id,job_id,input_revision,status) values(?,?,2,'COMPLETED')",
         current,
         stale);
     jdbc.update("update analysis.jobs set current_run_id=? where job_id=?", current, stale);
-    score(transactions.get(1), "COMPLETED", 0.2, 0.9);
-    String projection = "select t.tx_id,s.job_id,s.p_laundering,w.type_class ";
+    score(transactions.get(1), "COMPLETED", 0.2);
+    String projection = "select t.tx_id,s.job_id,s.p_laundering ";
     var oldRows = jdbc.queryForList(projection + LedgerQueryService.BASE + " order by t.tx_id");
     var newRows =
         jdbc.queryForList(projection + DashboardProjection.SCORE_BASE + " order by t.tx_id");
     assertThat(newRows).isEqualTo(oldRows).hasSize(3);
-    assertThat(newRows.getFirst())
-        .containsEntry("job_id", published)
-        .containsEntry("type_class", 1L);
-    assertThat(newRows.get(2)).containsEntry("job_id", null).containsEntry("type_class", null);
+    assertThat(newRows.getFirst()).containsEntry("job_id", published);
+    assertThat(newRows.get(2)).containsEntry("job_id", null);
   }
 
   @Test
   void combined_widgets_preserve_delivery_and_detection_date_semantics() {
-    score(transactions.get(0), "COMPLETED", .9, .2);
-    long later = score(transactions.get(1), "COMPLETED", .2, .9);
+    score(transactions.get(0), "COMPLETED", .9);
+    long later = score(transactions.get(1), "COMPLETED", .2);
     jdbc.update("update analysis.jobs set business_at='2023-09-03 09:00+09' where job_id=?", later);
     var dashboard = refreshedDashboard(null);
     var day = LocalDate.parse("2023-09-02");
@@ -155,16 +151,15 @@ class DashboardScoreQueryTests {
 
   @Test
   void date_filter_does_not_fall_back_to_an_older_prediction_in_the_requested_period() {
-    score(transactions.get(0), "COMPLETED", 0.9, 0.2);
-    long newer = score(transactions.get(0), "COMPLETED", 0.9, 0.2);
+    score(transactions.get(0), "COMPLETED", 0.9);
+    long newer = score(transactions.get(0), "COMPLETED", 0.9);
     jdbc.update("update analysis.jobs set business_at='2023-09-03 09:00+09' where job_id=?", newer);
-    score(transactions.get(1), "COMPLETED", 0.2, 0.9);
+    score(transactions.get(1), "COMPLETED", 0.2);
     var result =
         refreshedDashboard(null)
             .modelDistribution(LocalDate.parse("2023-09-02"), LocalDate.parse("2023-09-02"));
     assertThat(result.get("agreements"))
-        .isEqualTo(List.of(Map.of("agreement", "WEAK", "count", 1L)));
-    assertThat(result.get("types")).isEqualTo(List.of());
+        .isEqualTo(List.of(Map.of("agreement", "NORMAL", "count", 1L)));
     jdbc.update(
         "update ledger.transactions set integration_status='HELD' where tx_id=?",
         transactions.get(1));
@@ -175,38 +170,86 @@ class DashboardScoreQueryTests {
   }
 
   @Test
-  void publication_status_threshold_and_pointer_changes_invalidate_existing_scores() {
-    long job = score(transactions.getFirst(), "COMPLETED", .8, .2);
+  void alert_types_count_current_published_versions_of_alerts_created_in_the_period() {
+    UUID first = run(score(transactions.get(0), "COMPLETED", .9));
+    UUID later = run(score(transactions.get(1), "COMPLETED", .9));
+    alert("2023-09-02 10:00+09", new UUID[] {first}, 1);
+    alert("2023-09-02 10:00+09", new UUID[] {first}, (Integer) null);
+    alert("2023-09-03 10:00+09", new UUID[] {first, later}, 5, 1);
+    var dashboard = refreshedDashboard(null);
     var day = LocalDate.parse("2023-09-02");
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
-        .isNotEqualTo(List.of());
+    assertThat(dashboard.modelDistribution(day, day).get("types"))
+        .isEqualTo(List.of(Map.of("type", 1L, "count", 1L)));
+    assertThat(dashboard.modelDistribution(day, day.plusDays(1)).get("types"))
+        .isEqualTo(List.of(Map.of("type", 1L, "count", 2L)));
+  }
+
+  UUID run(long job) {
+    return jdbc.queryForObject(
+        "select current_run_id from analysis.jobs where job_id=?", UUID.class, job);
+  }
+
+  /**
+   * An Alert with one version per run and the given version types; the last version is published.
+   */
+  void alert(String createdAt, UUID[] runs, Integer... types) {
+    long user =
+        jdbc.queryForObject(
+            "insert into core.users(username,name,role,password_hash) values(gen_random_uuid()::text,'Demo','STAFF','x') returning user_id",
+            Long.class);
+    long alert =
+        jdbc.queryForObject(
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,?::timestamptz,?::timestamptz) returning alert_id",
+            Long.class,
+            user,
+            createdAt,
+            createdAt);
+    for (int i = 0; i < runs.length; i++)
+      jdbc.update(
+          "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence,type_class) values(?,?,?,repeat('a',64),'{}',?)",
+          alert,
+          i + 1,
+          runs[i],
+          types[i]);
+    jdbc.update(
+        "update review.alerts set published_version=? where alert_id=?", runs.length, alert);
+  }
+
+  Object detection() {
+    var day = LocalDate.parse("2023-09-02");
+    return refreshedDashboard(null)
+        .scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")))
+        .get("detection");
+  }
+
+  @Test
+  void publication_status_threshold_and_pointer_changes_invalidate_existing_scores() {
+    long job = score(transactions.getFirst(), "COMPLETED", .8);
+    var suspicious = Map.of("received", 3L, "analyzed", 1L, "suspicious", 1L);
+    var normal = Map.of("received", 3L, "analyzed", 1L, "suspicious", 0L);
+    var unscored = Map.of("received", 3L, "analyzed", 0L, "suspicious", 0L);
+    assertThat(detection()).isEqualTo(suspicious);
     jdbc.update("update analysis.jobs set threshold_value=.9 where job_id=?", job);
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
-        .isEqualTo(List.of());
+    assertThat(detection()).isEqualTo(normal);
     jdbc.update("update analysis.jobs set status='FAILED' where job_id=?", job);
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("agreements"))
-        .isEqualTo(List.of());
+    assertThat(detection()).isEqualTo(unscored);
     jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", job);
     jdbc.update(
         "update analysis.scores set p_laundering=.95 where tx_id=?", transactions.getFirst());
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
-        .isNotEqualTo(List.of());
+    assertThat(detection()).isEqualTo(suspicious);
     jdbc.update("update analysis.runs set status='CANCELLED' where job_id=?", job);
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("agreements"))
-        .isEqualTo(List.of());
+    assertThat(detection()).isEqualTo(unscored);
     jdbc.update("update analysis.runs set status='COMPLETED' where job_id=?", job);
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
-        .isNotEqualTo(List.of());
+    assertThat(detection()).isEqualTo(suspicious);
     jdbc.update("delete from analysis.current_scores where tx_id=?", transactions.getFirst());
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("agreements"))
-        .isEqualTo(List.of());
+    assertThat(detection()).isEqualTo(unscored);
   }
 
   @Test
   void ledger_pages_keep_latest_published_scores_and_filter_before_paging() {
-    score(transactions.get(0), "COMPLETED", 0.9, 0.2);
-    score(transactions.get(0), "FAILED", 0.1, 0.9);
-    score(transactions.get(1), "COMPLETED", 0.2, 0.9);
+    score(transactions.get(0), "COMPLETED", 0.9);
+    score(transactions.get(0), "FAILED", 0.1);
+    score(transactions.get(1), "COMPLETED", 0.2);
     var service = new LedgerQueryService(jdbc);
     for (var judgement :
         List.of(
@@ -233,7 +276,7 @@ class DashboardScoreQueryTests {
                   + ")";
       var expected =
           jdbc.queryForList(
-              "select t.tx_id as \"txId\",s.p_laundering as \"launderingScore\",w.type_class as \"typeClass\" "
+              "select t.tx_id as \"txId\",s.p_laundering as \"launderingScore\" "
                   + LedgerQueryService.BASE
                   + predicate
                   + " order by t.occurred_at desc,t.tx_id");
@@ -272,7 +315,7 @@ class DashboardScoreQueryTests {
         "update ledger.transactions set to_account_id=? where tx_id=?",
         account,
         transactions.get(0));
-    score(transactions.get(0), "COMPLETED", 0.9, 0.2);
+    score(transactions.get(0), "COMPLETED", 0.9);
     var service = new LedgerQueryService(jdbc);
     for (String kind : List.of("owners", "accounts")) {
       var all =

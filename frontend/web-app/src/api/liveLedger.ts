@@ -34,9 +34,6 @@ export type LedgerTransaction = {
   launderingScore: number | null
   threshold: number | null
   isSuspicious: boolean | null
-  typeClass: number | null
-  typeName?: string
-  probabilities: (number | null)[]
   judgement: 'SUSPICIOUS' | 'NORMAL' | 'UNANALYZED'
 }
 

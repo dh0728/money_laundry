@@ -31,7 +31,7 @@ class AlertPostgresTests(unittest.TestCase):
         self.template = self.admin.execute("SELECT to_jsonb(i) FROM analysis.input_transactions i WHERE run_id=%s AND tx_id=%s",(self.run,self.context)).fetchone()[0]
         self.admin.execute("DELETE FROM analysis.input_transactions WHERE run_id=%s AND tx_id=%s",(self.run,self.context))
         for key,score in zip(self.ids,(.9,.1,.9)):
-            self.admin.execute("INSERT INTO analysis.scores(type_class,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,run_id) VALUES(%s,%s,%s,1,0,0,0,0,0,0,0,0,%s)", (0,key,score,self.run))
+            self.admin.execute("INSERT INTO analysis.scores(tx_id,p_laundering,run_id) VALUES(%s,%s,%s)", (key,score,self.run))
         self.coverage(self.run,False)
 
     def coverage(self,run,complete):

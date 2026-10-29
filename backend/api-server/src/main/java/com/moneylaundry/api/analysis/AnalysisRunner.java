@@ -144,7 +144,8 @@ public class AnalysisRunner implements AutoCloseable {
                   waitForIngest(id);
                   return null;
                 }
-                if (job.stage() == AnalysisStage.INFERENCE
+                if ((job.stage() == AnalysisStage.INFERENCE
+                        || job.stage() == AnalysisStage.ALERT_TYPES)
                     && runs.current(id) != null
                     && !runs.canInfer(runs.current(id))) return null;
                 UUID token = UUID.randomUUID();
@@ -360,10 +361,14 @@ public class AnalysisRunner implements AutoCloseable {
                 item.job.stage().name(),
                 item.job.executionId(),
                 item.result.artifact());
-            boolean complete = item.job.stage() == AnalysisStage.ALERTS;
+            boolean complete = item.job.stage() == AnalysisStage.ALERT_TYPES;
             if (complete && item.context.runId() != null) {
               new com.moneylaundry.api.analysis.publish.AlertPublisher(service.jdbc)
-                  .publish(item.context.runId(), item.job.executionId(), item.result.artifact());
+                  .publish(
+                      item.context.runId(),
+                      item.job.executionId(),
+                      item.context.artifacts().get("ALERTS"),
+                      item.result.artifact());
               runs.complete(item.context.runId());
             }
             service.jdbc.update(
@@ -389,10 +394,15 @@ public class AnalysisRunner implements AutoCloseable {
         service.tx.executeWithoutResult(
             s -> {
               service.lock(item.job.id());
-              if (service.owns(item.job))
+              if (service.owns(item.job)) {
+                // Alert 구성 rebuilds the plans, then Alert 유형 분류 types the new plans.
                 service.jdbc.update(
-                    "delete from analysis.stage_results where run_id=? and stage='ALERTS'",
+                    "delete from analysis.stage_results where run_id=? and stage in ('ALERTS','ALERT_TYPES')",
                     item.context.runId());
+                service.jdbc.update(
+                    "update analysis.jobs set current_stage='ALERTS' where job_id=?",
+                    item.job.id());
+              }
             });
         item.result = null;
         addFailure(item, "ALERT_BASELINE_CHANGED", AnalysisFailure.Kind.COMPUTATION);

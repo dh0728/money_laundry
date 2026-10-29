@@ -13,13 +13,14 @@ STAGES = {
     ("INFERENCE", None): ("inference.inference_dispatch", False, True, True),
     ("SCORES", None): ("scores.result_collection", False, True, True),
     ("ALERTS", None): ("alerts.alert_pipeline", False, False, False),
+    ("ALERT_TYPES", None): ("alert_types.alert_type_inference", False, True, True),
 }
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-id", type=int, required=True)
-    parser.add_argument("--stage", choices=("INTEGRATE", "FEATURES", "INFERENCE", "SCORES", "ALERTS"), required=True)
+    parser.add_argument("--stage", choices=("INTEGRATE", "FEATURES", "INFERENCE", "SCORES", "ALERTS", "ALERT_TYPES"), required=True)
     parser.add_argument("--execution-id", type=uuid.UUID, required=True)
     parser.add_argument("--run-id", type=uuid.UUID)
     parser.add_argument("--operation", choices=("PUBLISH",))

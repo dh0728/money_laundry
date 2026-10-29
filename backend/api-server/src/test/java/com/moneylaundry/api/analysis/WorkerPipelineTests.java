@@ -114,23 +114,18 @@ class WorkerPipelineTests {
           .isTrue();
       try (var paths = Files.walk(storage)) {
         assertThat(paths.filter(p -> p.toString().endsWith("targets.parquet")).count())
-            .isEqualTo(2);
+            .isEqualTo(1);
       }
       assertThat(
               jdbc.queryForList(
                   "select phase from analysis.model_tasks where run_id=? order by model_kind",
                   String.class,
                   run))
-          .containsExactly("PUBLISH", "PUBLISH");
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from analysis.features where run_id=? and model_kind='TYPE' and features->>'demo_value'=(tx_id%100)::text",
-                  Integer.class, run))
-          .isEqualTo(1);
+          .containsExactly("PUBLISH");
       assertThat(
               jdbc.queryForObject(
                   "select count(*) from analysis.features where run_id=?", Integer.class, run))
-          .isEqualTo(2);
+          .isEqualTo(1);
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("FAILED");
       assertThat(service.job(job).error()).isEqualTo("PIPELINE_NOT_CONFIGURED");
@@ -164,7 +159,7 @@ class WorkerPipelineTests {
                 "select count(*) from analysis.model_tasks where run_id=? and status='CANCELLED' and execution_id is null",
                 Integer.class,
                 run))
-        .isEqualTo(2);
+        .isEqualTo(1);
   }
 
   @Test
@@ -185,68 +180,7 @@ class WorkerPipelineTests {
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.features where run_id=?", Integer.class, run))
-        .isEqualTo(2);
-  }
-
-  @Test
-  void type_failure_preserves_binary_and_next_parent_execution_recovers() throws Exception {
-    Path failType = storage.resolve("fail_type.py");
-    Files.writeString(
-        failType,
-        """
-        import sys
-        sys.path.insert(0, %s)
-        from models import registry
-        from common.worker_transport import ProtocolError
-        pipeline = registry.default('TYPE').build_input
-        original = pipeline.write_input
-        calls = 0
-        # BINARY prepares first; with a shared input module TYPE is the second call.
-        fail_at = 2 if registry.default('BINARY').build_input is pipeline else 1
-        def fail_type(source, output):
-            global calls
-            calls += 1
-            if calls == fail_at:
-                raise ProtocolError('injected second model failure')
-            return original(source, output)
-        pipeline.write_input = fail_type
-        from analysis_entry import main
-        raise SystemExit(main())
-        """
-            .formatted(
-                "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
-    assertThatThrownBy(() -> executor(failType.toString()).prepare(claim()))
-        .isInstanceOf(AnalysisFailure.class);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from analysis.features where run_id=? and model_kind='BINARY'",
-                Integer.class,
-                run))
         .isEqualTo(1);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from analysis.stage_results where run_id=? and stage='FEATURES'",
-                Integer.class,
-                run))
-        .isZero();
-    var binary =
-        jdbc.queryForObject(
-            "select input_artifact::text from analysis.model_tasks where run_id=? and model_kind='BINARY'",
-            String.class,
-            run);
-    executor("worker/analysis_entry.py").prepare(claim());
-    assertThat(
-            jdbc.queryForObject(
-                "select input_artifact::text from analysis.model_tasks where run_id=? and model_kind='BINARY'",
-                String.class,
-                run))
-        .isEqualTo(binary);
-    assertThat(
-            jdbc.queryForList(
-                "select operation_attempts from analysis.model_tasks where run_id=? order by model_kind",
-                Integer.class,
-                run))
-        .containsExactly(1, 2);
   }
 
   @Test
@@ -299,7 +233,7 @@ class WorkerPipelineTests {
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.features where run_id=?", Integer.class, run))
-        .isEqualTo(2);
+        .isEqualTo(1);
   }
 
   @Test
@@ -340,7 +274,7 @@ class WorkerPipelineTests {
                 run))
         .isEqualTo(2);
     jdbc.update(
-        "update analysis.model_tasks set binding=jsonb_set(binding,'{model_version}','\"changed\"') where run_id=? and model_kind='TYPE'",
+        "update analysis.model_tasks set binding=jsonb_set(binding,'{model_version}','\"changed\"') where run_id=? and model_kind='BINARY'",
         run);
     assertThatThrownBy(() -> executor("worker/analysis_entry.py").prepare(claim()))
         .isInstanceOfSatisfying(
@@ -388,14 +322,14 @@ class WorkerPipelineTests {
                   "select count(*) from analysis.model_tasks where run_id=? and phase='WAIT_REMOTE' and status='WAITING'",
                   Integer.class,
                   run))
-          .isEqualTo(2);
+          .isEqualTo(1);
       jdbc.update(
           "update analysis.jobs set retry_at=now()-interval '1 second' where job_id=?", job);
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("RETRY_WAIT");
       assertThat(service.job(job).failures()).isZero();
       var models = (List<?>) service.detail(job).get("models");
-      assertThat(models).hasSize(2);
+      assertThat(models).hasSize(1);
       assertThat(models.toString())
           .contains("remoteStatus=RUNNING")
           .doesNotContain("https://", "input_artifact", "signature");
@@ -408,7 +342,7 @@ class WorkerPipelineTests {
                   "select count(*) from analysis.model_tasks where run_id=? and remote_snapshot->>'status'='RUNNING'",
                   Integer.class,
                   run))
-          .isEqualTo(2);
+          .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
                   "select count(*) from analysis.stage_results where run_id=? and stage='INFERENCE'",
@@ -438,10 +372,6 @@ class WorkerPipelineTests {
         """,
         request,
         run);
-    var type =
-        jdbc.queryForMap(
-            "select phase,status,request_id from analysis.model_tasks where run_id=? and model_kind='TYPE'",
-            run);
     jdbc.update(
         "update analysis.jobs set status='FAILED',current_stage='INFERENCE' where job_id=?", job);
     service.resume(job);
@@ -463,11 +393,6 @@ class WorkerPipelineTests {
         .containsEntry("remote_deadline_at", null)
         .containsEntry("error_code", null)
         .containsEntry("action_required", false);
-    assertThat(
-            jdbc.queryForMap(
-                "select phase,status,request_id from analysis.model_tasks where run_id=? and model_kind='TYPE'",
-                run))
-        .isEqualTo(type);
     assertThat(service.job(job).status()).isEqualTo("QUEUED");
   }
 
@@ -519,7 +444,7 @@ class WorkerPipelineTests {
         from tests.inference_peer import calculate
         from common.worker_transport import Request, descriptor
         from models import registry
-        registry.DEFAULTS.update(BINARY=registry.DEMO_RANDOM, TYPE=registry.DEMO_RANDOM)  # peer plays the demo model
+        registry.DEFAULTS.update(BINARY=registry.DEMO_RANDOM)  # peer plays the demo model
         settings =model_publication.Settings('https://inference.example','x'*32,'test','dev/test/','ap-northeast-2')
         os.environ.update(INFERENCE_API_URL=settings.api_url,INFERENCE_API_TOKEN=settings.token,S3_BUCKET=settings.bucket)
         def result(request_id):
@@ -565,7 +490,7 @@ class WorkerPipelineTests {
                   "select count(*) from analysis.model_tasks where run_id=? and status='SUCCEEDED'",
                   Integer.class,
                   run))
-          .isEqualTo(2);
+          .isEqualTo(1);
       runner.scan(); // SCORES
       assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.ALERTS);
       assertThat(service.job(job).status()).isEqualTo("QUEUED");
@@ -587,8 +512,16 @@ class WorkerPipelineTests {
                   Boolean.class,
                   run))
           .isTrue();
-      runner.scan(); // No seeds: ALERTS now completes without creating an Alert.
+      runner.scan(); // No seeds: ALERTS prepares no plan.
+      assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.ALERT_TYPES);
+      runner.scan(); // Nothing to classify: completes without a type request or an Alert.
       assertThat(service.job(job).status()).isEqualTo("COMPLETED");
+      assertThat(
+              jdbc.queryForObject(
+                  "select count(*) from analysis.model_tasks where run_id=? and model_kind='TYPE'",
+                  Integer.class,
+                  run))
+          .isZero();
       assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.COMPLETE);
       assertThat(
               jdbc.queryForObject(
@@ -610,9 +543,6 @@ class WorkerPipelineTests {
         "update analysis.model_tasks set status='FAILED',action_required=true,consecutive_failures=3 where run_id=? and model_kind='BINARY'",
         run);
     jdbc.update(
-        "update analysis.model_tasks set phase='COLLECT' where run_id=? and model_kind='TYPE'",
-        run);
-    jdbc.update(
         "update analysis.jobs set status='FAILED',current_stage='INFERENCE',error_code='MODEL_TASK_FAILED' where job_id=?",
         job);
     service.resume(job);
@@ -622,12 +552,6 @@ class WorkerPipelineTests {
                 String.class,
                 run))
         .isEqualTo("READY");
-    assertThat(
-            jdbc.queryForObject(
-                "select phase from analysis.model_tasks where run_id=? and model_kind='TYPE'",
-                String.class,
-                run))
-        .isEqualTo("COLLECT");
     assertThat(service.job(job).status()).isEqualTo("QUEUED");
   }
 }

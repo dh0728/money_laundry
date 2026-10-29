@@ -42,13 +42,13 @@
 - 수신만으로 해결하지 않는다. 자체 오류는 OPEN, 정상 후보의 상대 대기는 WAITING_COUNTERPART, 실행 해제 대기는 WAITING_ANALYSIS_RELEASE다. 공동 대조·원자 교체 이후 RESOLVED다. 후보 재제출은 RESOLVED 이외 상태에서 허용한다.
 - 업로드 조회에 reportVersionId, correctionRequired, correctionRequestId, replacementUploadId, nextAnalysisDate를 추가한다. integrationStatus는 WAITING_COUNTERPART/WAITING_ANALYSIS_RELEASE/SUPERSEDED를 포함한다. nextAnalysisDate는 수신시각 기준 예정 컷오프 날짜이며 분석 완료 약속이 아니다.
 - 정정 교체는 고정 cutoff 내 가장 높은 자체 검수 통과 version과 기존 채택본을 대조한다. 구/신 보고의 은행·계좌·개체 영향 묶음을 함께 검증한다. 동일 내용/반복 발생 건은 tx_id를 보존하며 완료 TARGET의 수정·삭제는 COMPLETED_TARGET_CHANGE_OUT_OF_SCOPE로 전체 후보 묶음을 거절한다. 완료 CONTEXT의 구 입력은 값 스냅샷으로 보존한다.
-- 분석은 WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE다. runId UUID는 입력 세대, executionId는 단계 시도다. 정정 취소는 결과/재시도/후속 진입을 차단하고 별도 run으로 대체한다. 취소된 모든 미완료 TARGET을 재검토하며 이전 날짜 TARGET도 누락시키지 않는다. 입력0은 EMPTY_INPUT이다.
+- 분석은 WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → ALERT_TYPES → COMPLETE다. runId UUID는 입력 세대, executionId는 단계 시도다. 정정 취소는 결과/재시도/후속 진입을 차단하고 별도 run으로 대체한다. 취소된 모든 미완료 TARGET을 재검토하며 이전 날짜 TARGET도 누락시키지 않는다. 입력0은 EMPTY_INPUT이다.
 - 결과 완료와 취소는 같은 실행 잠금에서 판정한다. BINARY/TYPE의 모든 게시 가능한 요청/회차를 취소 outbox로 추적하고 STOPPED 또는 ALREADY_FINISHED 확인 전 대체 추론을 대기한다. 전달 실패·미응답을 종료로 취급하지 않는다. cancel_id와 메시지는 재전달에도 불변이다. Python 실행측과 취소 전달을 연결한다. 실제 S3·외부 추론 서버의 종료 확인은 배포 환경에서 별도로 검증한다.
 - 취소 contract_version은 숫자2다. `INFERENCE_API_URL`(HTTPS 기본 주소)과 `INFERENCE_API_TOKEN`(추론 서버 INFERENCE_TOKEN과 같은 전용 토큰)을 함께 설정하면 Java 전달 담당이 `PUT /api/v1/inference-requests/{requestId}/rounds/{round}/cancellation`으로 기존 불변 취소 메시지를 보내고 같은 회차의 `GET`으로 상태를 조회한다. Bearer 인증을 사용하며 리다이렉트를 따르지 않는다. 접수 응답은 중단 완료가 아니다. job/run/model/request/round/cancel 전체 식별자와 contract_version을 대조한 뒤 `cancellation_status=STOPPED`와 `status=STOPPED`, 또는 `cancellation_status=ALREADY_FINISHED`와 `status=COMPLETED` 조합만 종료 확인으로 인정한다. RECOVERY_REQUIRED·미응답·404는 종료 확인이 아니다.
 - 두 API 설정이 모두 없으면 기존 S3/local 취소 파일 전달을 유지한다. S3는 `requests/{job}/{model}/{request}/rounds/{round}/cancel.json` 조건부 불변 게시와 `results/.../cancel_ack.json` 조회를 사용한다. local은 storage-dir/analysis-transport에 원자 게시한다. API 설정 일부 누락은 기동 시 거절하며 API 전달 실패 시 파일 방식으로 우회하지 않는다. 기존 2스레드 TaskScheduler에서 Python 단계와 별도로 5초 스캔하고, outbox의 재시도 정책을 그대로 사용한다. 실제 EC2–KubeSphere HTTPS 통신은 별도 배포 검증 대상이다.
 - 전달 실패는30초/2분 간격으로 총3회까지 게시를 시도하고 미확인은 계속 대기한다. 3회 후에도 늦은 ack는 조회하며 작업 상세 cancellations의 actionRequired로 게시 재개 필요를 알린다. 취소된 작업의 기존 resume API는 outbox 시도만 재개하고 취소 run을 계산 재개하지 않는다(응답 status는 FAILED 유지). 실제 S3 권한/외부 프로세스 중단은 이 로컬·SDK 대역 검증과 구별한다.
-- 모델 요청은 TARGET ID(targets)와 재료(transactions: 고정 입력 거래 전체, accounts: 계좌별 엔티티 유형·은행 국가)를 함께 보낸다. Alert 구성은 달력 이동 탐색용 고정 CONTEXT도 사용한다. Python FEATURES→INFERENCE→SCORES→ALERTS가 연결되어 있으며 구체적인 Alert 정책은 §3.1을 따른다.
-- 새 분석의 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10, 추론 서버가 재료에서 피처·2홉 그래프를 만든다), 유형 모델은 `demo-random-v1/demo-input-v1` 시연 변환기다. 이진 모델을 바인딩한 실행은 의심 기준을 모델 권장값 0.4338742792606354로 기록한다. 시연 변환기의 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
+- 모델 요청은 TARGET ID(targets)와 재료(transactions: 고정 입력 거래 전체, accounts: 계좌별 엔티티 유형·은행 국가)를 함께 보낸다. Alert 구성은 달력 이동 탐색용 고정 CONTEXT도 사용한다. Python FEATURES→INFERENCE→SCORES→ALERTS→ALERT_TYPES가 연결되어 있으며 구체적인 Alert 정책은 §3.1을 따른다.
+- 새 분석의 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10, 추론 서버가 재료에서 피처·2홉 그래프를 만든다), 유형 모델은 Alert 단위 결정 트리 `alert-type-tree-v2/alert-graph-features-v1`이다(ALERT_TYPES가 Alert 계획마다 핵심 거래를 보내고 9개 유형 확률을 받는다). 이진 모델을 바인딩한 실행은 의심 기준을 모델 권장값 0.4338742792606354로 기록한다. 이진 시연 변환기 `demo-random-v1/demo-input-v1`의 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering`([0,1) 균등 난수)이다. 라벨을 읽지 않고, 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
 
 ### 1.2 처리현황과 분석 제어
 - **GET /api/v1/bank/uploads/{uploadId}** — 자기 은행만 조회. 다른 은행/없는 작업404. 응답은 `{uploadId,bankId,fileName,businessDate,sizeBytes,rowCount,insertedCount,missingCount,duplicateCount,status,errorCode,errorMessage,errors:[{row,column,reason}],urlIssuedAt,receivedAt,startedAt,finishedAt,integrationStatus,reportVersionId,correctionRequired,correctionRequestId,replacementUploadId,nextAnalysisDate}`다. `insertedCount`는 해당 보고에서 정상 통합 거래에 연결된 보고 행 수이며 통합 전에는0이다. 같은 내용 반복은 중복 오류가 아니므로 `duplicateCount=0`이다. `errors`는 자기 파일의 정제된 오류 최대100건이며 원문 식별정보를 포함하지 않는다. `finishedAt`은 보고 저장/검수 종료 시각이다.
@@ -58,7 +58,7 @@
 - **GET /api/v1/batch-jobs/{jobId}** — 위 행과 `uploads: [{ uploadId, excluded, status, fileName }]`, `failures: [{ stage, errorCode, failedAt, consecutiveCount, retryAt, actionRequired }]`.
   - `models: [{ modelKind, phase, status, requestId, executionRound, remoteStatus, remoteRevision, errorCode, actionRequired, retryAt, nextPollAt, remoteDeadlineAt, modelVersion, featureVersion }]`는 현재 run의 모델별 작업 상태다. 이전 run·토큰·서명 URL·로컬 경로·원격 응답 원문은 반환하지 않는다. 모델별 조치 필요 여부는 상위 작업의 FAILED 여부와 독립적이다.
   - INFERENCE 원격 대기는 상위 `RETRY_WAIT`로 재관측을 예약하며 실패 횟수를 올리지 않는다. 모델 하나가 실패해도 다른 모델의 상태 관측을 계속한다. 원격 대기 기한 초과/종료 불명은 조치 필요로 표시하고 새 요청 회차를 자동 생성하지 않는다.
-  - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→두 모델 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 두 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS는 준비 계획을 저장하고 Spring의 완료 트랜잭션에서 점수·Alert를 공개한다. 상태 확인은 GET 폴링을 사용한다.
+  - 현재 연결은 직접 PUT 게시·GET 관측→COLLECT 파일 검증→이진 SCORES 저장이다. 원격 COMPLETED만으로 완료되지 않으며 크기/hash/버전/정확한 TARGET/확률 검증 후 모델 DONE/SUCCEEDED를 기록한다. 이진 모델 수집 후 INFERENCE 완료, 점수와 거래 연결 및 SCORES 완료는 원자 저장한다. ALERTS는 준비 계획을 저장하고, ALERT_TYPES는 같은 게시·관측·수집 절차로 계획의 Alert 유형을 받아 계획에 기록한다. Spring은 ALERT_TYPES 완료 트랜잭션에서 점수·Alert를 공개한다. 상태 확인은 GET 폴링을 사용한다.
 - **POST /api/v1/batch-jobs/analysis** — 본문 없이 현재 업무 시각(업무 시계가 없으면 실제 시각)을 cutoff로 오늘의 새 분석만 등록한다.202 `{ jobId, status: "QUEUED" }`. 같은 날짜 진행중409 `JOB_ALREADY_RUNNING`, 완료409 `JOB_ALREADY_COMPLETED`, 실패409 `JOB_REQUIRES_RESUME`.
 
 - 시각의 의미: 업무 의미가 있는 시각은 모두 업무 시각이다. 대상은 수신(`receivedAt`), 업로드 발급, 분석 기준(`cutoffAt`·`dataAsOf`), 작업·적재 시작/종료, 실패, Alert·버전·이벤트·커버리지 확인, 대시보드 갱신, 화면의 오늘이다. 업무 시각은 dev/local에서 시연 업무 시계(설정값 + 그 뒤 흐른 시간), prod 발표 모드에서 복사된 시계값, 그 밖에는 실제 시각이다. 실제 시각은 URL 만료·재시도·timeout 같은 운영 타이머(`retryAt`, `nextPollAt`, `remoteDeadlineAt`, `expiresAt`)에만 쓴다.
@@ -89,12 +89,12 @@
 | ANALYSIS | `FAILED` | 영구 실패 또는 3회 소진 | 명시 resume만 허용 |
 
 - 작업 상태와 errorCode는 별개다. 오류 코드로 실패 원인을 확인하고, 원문 저장 컬럼은 [ERD](ERD.md)를 참조한다.
-- `WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → COMPLETE`. 등록 시 `analysis.receipts`에 cutoff 이하의 전체 수신 ID를 고정하여 이전 날짜 대기 후보도 포함하며, 검수중인 고정 수신 대상의 종료를 기다린다. 기술적 INGEST 실패는 `INGEST_FAILED`이며 TARGET0이고 후속 Alert 맥락 보완도 없으면 `EMPTY_INPUT`으로 종료한다. 후속 보완이 있으면 모델 실행을 건너뛰고 ALERTS로 진행한다.
+- `WAIT_INGEST → INTEGRATE → FREEZE_INPUT → FEATURES → INFERENCE → SCORES → ALERTS → ALERT_TYPES → COMPLETE`. 등록 시 `analysis.receipts`에 cutoff 이하의 전체 수신 ID를 고정하여 이전 날짜 대기 후보도 포함하며, 검수중인 고정 수신 대상의 종료를 기다린다. 기술적 INGEST 실패는 `INGEST_FAILED`이며 TARGET0이고 후속 Alert 맥락 보완도 없으면 `EMPTY_INPUT`으로 종료한다. 후속 보완이 있으면 모델 실행을 건너뛰고 ALERTS로 진행한다.
 - INTEGRATE의 선택 version/generation은 FREEZE_INPUT에서 재확인한다. cutoff 안의 참조 변경은 같은 receipts로 INTEGRATE부터 재준비한다. 이미 cutoff 밖의 더 최신 현재본으로 교체되면 `CUTOFF_SUPERSEDED`·FAILED/조치 필요로 남긴다. 현재 포인터 역행이나 최신본의 과거 입력 몰래 편입은 없다. 이 경우 운영 확인이 필요하며 과거 cutoff를 자동 확장하지 않는다.
 
 - 같은 단계·오류 최초 포함3연속 실패에서FAILED. 연결(DB/S3)은30초/2분, 계산은1분/5분 뒤 재시도한다. 설정·계약 오류는 즉시FAILED. 교대 오류 전체 상한은 없다. 정상 단계/명시resume만 연속 실패 주기를 끝내며 이력은 보존한다. 
 - 단일 BE 기준으로 전용 연결의 DB 세션 advisory lock을 Runner 생존기간 유지하고 소유자만 실행/잔여 RUNNING 복구한다. 종료 시 잠금을 해제하고 연결 상실 시 재획득한다. 실행 UUID 확인과 DB 쓰기로 오래된 실행을 차단한다. 정상 prepare 결과는 실행중 JVM에서 유지하고 DB 복구 시 단계 결과·이력을 저장한다. DB 장애 중 미저장 실패 횟수/산출물은 프로세스까지 종료되면 소실될 수 있다. 정확한 횟수 영속성을 보장하지 않는다.
-- Python `worker/analysis_entry.py`는 INTEGRATE/FEATURES/INFERENCE/SCORES/ALERTS를 연결한다. 현재 모델은 명시적 demo이며 실제 GNN이 아니다. 설정 없는 모델 실행은 `PIPELINE_NOT_CONFIGURED`이고, Alert 저장에는 원격 추론 설정이 필요하지 않다.
+- Python `worker/analysis_entry.py`는 INTEGRATE/FEATURES/INFERENCE/SCORES/ALERTS/ALERT_TYPES를 연결한다. 현재 모델은 명시적 demo이며 실제 GNN이 아니다. 설정 없는 모델 실행은 `PIPELINE_NOT_CONFIGURED`이고, Alert 저장에는 원격 추론 설정이 필요하지 않다.
 - Python은 수집·통합 및 analysis 산출물의 DB 읽기/쓰기를 담당한다. Alert는 준비 계획까지만 저장하고 review 공개는 Spring이 분석 완료 트랜잭션에서 수행한다. 자신의 트랜잭션에서 실행 토큰 확인·데이터 저장·단계 완료를 원자 처리하고 Runner가 DB로 확인해야 한다. Java JDBC 트랜잭션에 별도 프로세스가 참여하지 않는다. 원격 추론은 고정 job/request/round 식별자로 상태·결과를 조회하며, 새 executionId만으로 모델을 다시 실행하지 않는다.
 
 ### 1.4 거래 보고 CSV와 통합
@@ -126,42 +126,42 @@
 
 ### 2.1 실행·산출물 경계
 
-BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·상태 API는 `PUT/GET /api/v1/inference-requests/{requestId}/rounds/{round}`이며 전용 Bearer 토큰을 사용한다. 취소는 같은 경로의 `/cancellation`이다. 직원 세션 API와 구분한다.
+BINARY는 고정 TARGET, TYPE은 Alert 구성이 준비한 계획의 Alert(핵심 거래가 있는 계획만)에 대한 별도 요청이다. 요청·상태 API는 `PUT/GET /api/v1/inference-requests/{requestId}/rounds/{round}`이며 전용 Bearer 토큰을 사용한다. 취소는 같은 경로의 `/cancellation`이다. 직원 세션 API와 구분한다.
 
-입력·결과는 `requests|results/{jobId}/{BINARY|TYPE}/{requestId}/` 아래에서 manifest·Parquet·결과 표식을 사용한다. 요청 ID·run·회차·모델/피처 버전, 행 수·정확한 tx_id 집합·파일 크기·SHA-256·유한 확률을 검증한다. 원격 COMPLETED만으로 분석을 공개하지 않는다. 구체적인 전송·프로세스 계약은 [worker 문서](worker/README.md), [게시](worker/inference/model_publication.py), [수집](worker/scores/result_collection.py), [추론 서버](../inference-server/README.md)를 따른다.
+입력·결과는 `requests|results/{jobId}/{BINARY|TYPE}/{requestId}/` 아래에서 manifest·Parquet·결과 표식을 사용한다. 요청 ID·run·회차·모델/피처 버전, 행 수·정확한 키 집합(BINARY tx_id, TYPE alert_key)·파일 크기·SHA-256·유한 확률을 검증한다. 원격 COMPLETED만으로 분석을 공개하지 않는다. 구체적인 전송·프로세스 계약은 [worker 문서](worker/README.md), [게시](worker/inference/model_publication.py), [수집](worker/scores/result_collection.py), [추론 서버](../inference-server/README.md)를 따른다.
 
-현재 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10, 결과 p_laundering), 유형 모델은 `demo-random-v1/demo-input-v1` 시연용(결정적 난수, 결과 p_0~p_8)이다. 버전 선택은 [등록표](worker/models/registry.py), 모델 실행은 추론 서버 `models/`에 있다. 파일 운반과 모델 추론 품질을 동일시하지 않는다.
+현재 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10, 결과 p_laundering), 유형 모델은 `alert-type-tree-v2/alert-graph-features-v1`(Alert 단위 결정 트리, 결과 alert_key별 p_0~p_8)이다. 버전 선택은 [등록표](worker/models/registry.py), 모델 실행은 추론 서버 `models/`에 있다. 파일 운반과 모델 추론 품질을 동일시하지 않는다.
 
 ### 2.2 점수의 의미
 
 - 점수는 (run_id,tx_id)로 저장하며 TARGET만 해당 run에서 채점한다. CONTEXT는 고정한 과거 점수를 사용하거나 미채점으로 남는다. 분석 전체 완료 전에는 현재 점수로 공개하지 않는다.
-- launderingScore=p_laundering, typeClass=argmax(p_0..p_8), typeScore=해당 값. 동점은 작은 코드다.
+- launderingScore=p_laundering. 유형은 거래가 아니라 Alert 버전에 붙는다(§2.3).
 - isSuspicious는 해당 실행에 동결된 threshold_value 이상인지다. 원장 최신 조회는 analysis.current_scores를 사용한다. 의심 거래 API의 jobId/analysisDate는 해당 완료 분석 결과를 선택한다.
 - scorePercentile은 같은 실행에서 `100 × percent_rank(p_laundering)`. 동점은 최저 공동 순위이며 단일/전부 동점은0이다. thresholdRatio는 점수/임계값이다.
-- typeCandidates는 상위 두 확률 차이가 app.type.ambiguity-delta(기본0.10) 미만이면2개, 아니면1개다.
-- agreement는 STRONG(이진 의심·패턴 있음), ATYPICAL(이진 의심·코드0), PATTERN_ONLY(이진 정상·패턴 있음), WEAK(이진 정상·코드0). 미분석은 여기에 넣지 않는다.
 
 ### 2.3 유형 코드
 
-| 코드 | 의심 거래 API 이름 | 원장·조사 유형 이름 |
-|---|---|---|
-| 0 | NON_PATTERN | NON_PATTERN |
-| 1 | FAN-OUT | Fan-out |
-| 2 | FAN-IN | Fan-in |
-| 3 | G-SCATTER | Gather-scatter |
-| 4 | S-GATHER | Scatter-gather |
-| 5 | CYCLE | Cycle |
-| 6 | RANDOM | Random |
-| 7 | BIPARTITE | Bipartite |
-| 8 | STACK | Stack |
+Alert 유형 분류(ALERT_TYPES)가 Alert 계획마다 9개 확률 중 가장 큰 코드(동점은 작은 코드)를 정하고, 공개 버전의 `typeClass`(Alert 목록·상세)로 저장한다. 핵심 거래가 없는 버전은 null이다.
+
+| 코드 | 조사 유형 이름 |
+|---|---|
+| 0 | 패턴 미특정 |
+| 1 | Fan-out |
+| 2 | Fan-in |
+| 3 | Gather-scatter |
+| 4 | Scatter-gather |
+| 5 | Cycle |
+| 6 | Random |
+| 7 | Bipartite |
+| 8 | Stack |
 
 코드0은 패턴 없음이며 이진 정상/직원 NORMAL 판정과 다르다. 이름 문자열을 숫자 코드나 직원 판정 대신 사용하지 않는다.
 
 ### 2.4 의심 거래 조회
 
-`GET /api/v1/suspicious-transactions`: page,size,jobId,analysisDate,typeClass,minScore,bankId,sort. bankId는 송신 또는 수신 은행이다. sort는 launderingScore 또는 txId의 asc/desc이며 기본 launderingScore,desc·동률 txId,asc다.
+`GET /api/v1/suspicious-transactions`: page,size,jobId,analysisDate,minScore,bankId,sort. bankId는 송신 또는 수신 은행이다. sort는 launderingScore 또는 txId의 asc/desc이며 기본 launderingScore,desc·동률 txId,asc다.
 
-행은 `txId,txAt,fromBank,fromAccount,toBank,toAccount,amountReceived,receivingCurrency,amountPaid,paymentCurrency,amountUsd,paymentFormat,launderingScore,scorePercentile,thresholdRatio,isSuspicious,typeClass,typeName,typeScore,typeCandidates,agreement,jobId`다. 계좌는 가명 UUID다. 이 응답을 Alert의 동결 transactions와 동일 DTO로 가정하지 않는다.
+행은 `txId,txAt,fromBank,fromAccount,toBank,toAccount,amountReceived,receivingCurrency,amountPaid,paymentCurrency,amountUsd,paymentFormat,launderingScore,scorePercentile,thresholdRatio,isSuspicious,jobId`다. 계좌는 가명 UUID다. 이 응답을 Alert의 동결 transactions와 동일 DTO로 가정하지 않는다.
 
 ## 3. Alert 생성·생애주기·근거 조회
 
@@ -205,7 +205,7 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 | GET /api/v1/alerts/{alertId}/versions | 공개 완료된 version,runId,createdAt 목록 |
 | GET /api/v1/alerts/{alertId}/graph | version 선택. 같은 버전의 graph |
 
-목록은 `alertId,status,resolution,assigneeId,parentAlertId,createdAt,version,runId,summary`와 생애주기 식별 필드를 제공한다. canonicalAlertId/publishedVersion/reviewStartedAt은 현재 사건 기준이다. jobId는 현재 공개 근거 생성 작업을 뜻한다. 작업 alertCount는 신규 사건 수이므로 이 목록 건수와 다를 수 있다.
+목록은 `alertId,status,resolution,assigneeId,parentAlertId,createdAt,version,runId,typeClass,summary`와 생애주기 식별 필드를 제공한다. canonicalAlertId/publishedVersion/reviewStartedAt은 현재 사건 기준이다. jobId는 현재 공개 근거 생성 작업을 뜻한다. 작업 alertCount는 신규 사건 수이므로 이 목록 건수와 다를 수 있다.
 
 상세에는 policyVersion/policy/witnesses,boundaryWitnesses,contextQuery,seeds,transactions,limits,graph,coverage,dataAsOf,lastCheckedAt을 제공한다. seeds는 `{txId,occurredAt,score,threshold}`. transactions는 `{txId,occurredAt,fromAccountId,toAccountId,fromBankId,toBankId,amountReceived,receivingCurrency,amountPaid,paymentCurrency,amountUsd,paymentFormat,role,includedReasons,scores}`이며 role은 SEED/CONNECTION/CONTEXT(block-pin 정책 근거는 SEED/CONNECTION만), 미채점 scores는 null이다. 근거의 금액은 정밀도를 보존하는 decimal 문자열이며 숫자로 파싱한다. policy 필드명과 witnesses의 tx_ids, scores의 p_laundering 등은 snake_case다.
 
@@ -280,8 +280,8 @@ FE는 동일 출처(`/api/...`)로 쿠키를 유지하여 호출한다. `X-Demo-
 |---|---|
 | pipeline.detection | `{received,analyzed,suspicious,deliveryDates}`. 오늘 분석 대상 거래일의 수신/통합 수, 그중 오늘 완료된 최신 유효 점수가 있는 거래, 그중 이진 의심 수. deliveryDates는 YYYY-MM-DD 배열. 선택기간 무관 |
 | pipeline.pendingReports | deliveryDates에 속한 미완료 보고 수. 선택기간 무관 |
-| pipeline.agreements | `[{agreement,count}]`. STRONG/ATYPICAL/PATTERN_ONLY/WEAK, 최신 유효 점수의 탐지 업무일이 선택기간 안인 거래. 미분석 제외 |
-| pipeline.types | `[{type,count}]`. 위 기간의 이진 의심 거래의 유형별 수. Alert 개수가 아님 |
+| pipeline.agreements | `[{agreement,count}]`. 이진 모델 판정 SUSPICIOUS/NORMAL별 거래 수. 최신 유효 점수의 탐지 업무일이 선택기간 안인 거래, 미분석 제외 |
+| pipeline.types | `[{type,count}]`. 선택기간에 생성된 공개 Alert의 현재 버전 유형(typeClass)별 수. 유형 없는 Alert 제외, 코드 오름차순 |
 | investigation.personal | `{pending,aged,closed}`. 본인 현재 OPEN, 배정 후 정확히72시간 이상 OPEN, 본인 담당이며 본인이 기간 내 종결한 사건 |
 | investigation.institution | `{alerts,episodes,aged,today,yesterday}`. 현재OPEN Alert/Episode, 전체OPEN 중72시간 이상, 오늘/어제 생성 Alert |
 | investigation.openAlertsAgedOver3Days | OPEN Alert만 배정 후72시간 이상. 기간 무관 |
@@ -294,7 +294,6 @@ FE는 동일 출처(`/api/...`)로 쿠키를 유지하여 호출한다. `X-Demo-
 지표 불변식:
 - dailyAlertStatus.pending은 Episode 소속 없는 OPEN Alert, inProgress는 OPEN Episode 소속, done은 직접 종결 또는 CLOSED Episode 소속이다. 각 날짜 상태의 합은 같은 날짜 daily.incoming과 같다. 근거 버전·거래·Episode 수를 세지 않는다.
 - daily.completed는 종결일 기준이며 같은 날 생성된 사건의 종결만 세지 않는다. 상태 차트는 과거 시점의 판정 이력을 복원한 것이 아니라 마지막 공개 집계의 현재 상태다.
-- STRONG=이진 의심+패턴 있음, ATYPICAL=이진 의심+패턴 없음, PATTERN_ONLY=이진 정상+패턴 있음, WEAK=이진 정상+패턴 없음. 유형0은 패턴 없음. agreements 합이 분모이고0이면 데이터 없음이다. 누락 범주를 표시할 때0으로 채울 수 있다.
 - PIPELINE은 거래/모델·대상 거래일·보고 집계를 같은 스냅샷에서 갱신한다. INVESTIGATION은 별도로 공개한다. 두 영역의 원본 반영 시각이 동일하다는 보장은 없다. 조회 중 원본 거래/점수/큰 근거 JSON 재계산은 하지 않지만, 준비된 집계의 선택기간 합산과 업무시각/72시간 조건 계산은 수행한다.
 
 ### 분리된 목록
@@ -367,9 +366,6 @@ GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId
 | paymentFormat | string, 결제 수단 |
 | launderingScore, threshold | number 또는 null, 이진 점수·해당 분석 임계값 |
 | isSuspicious | boolean 또는 null. 미분석은 null이며 false로 바꾸지 않음 |
-| typeClass | number0~8 또는 null, 패턴 최다 확률 코드 |
-| typeName | string, 점수 있을 때 제공. 코드0은 NON_PATTERN. 미분석에서는 키가 없을 수 있음 |
-| probabilities | 9개 원소 배열, 코드0~8 순서. 미분석은 null 원소 배열이며0점 배열이 아님 |
 | judgement | SUSPICIOUS / NORMAL / UNANALYZED |
 
 최신 유효 점수는 완료된 분석/유효 run 기준이며 미완료 결과를 노출하지 않는다. 수신·통합 ACTIVE 원장의 정상·의심·미분석을 모두 조회한다.
@@ -399,7 +395,7 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 **검색·필터**
 - 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.
 - 사건 `query`: 최대 200자. Alert 원본 `A-{alertId}` / Episode `E-{caseId}`, 담당자 표시 이름, 대표 유형의 부분 문자열 검색. `%`, `_`는 와일드카드가 아니라 문자로 취급한다. 두 ID의 의미를 바꾸지 않는다.
-- 사건 `types`: 반복 전달하는 대표 유형 이름. `Fan-out`, `Fan-in`, `Gather-scatter`, `Scatter-gather`, `Cycle`, `Random`, `Bipartite`, `Stack`, `패턴 미특정`, `혼합`. Alert는 제외된 거래를 빼고 현재 상세와 같은 씨앗 투표 결과를 사용한다. Episode는 유효 구성의 출처 Alert 유형 중 하나가 일치하면 포함한다. `패턴 미특정`을 거래 모델의 코드 0과 동일한 판정으로 해석하지 않는다.
+- 사건 `types`: 반복 전달하는 대표 유형 이름. `Fan-out`, `Fan-in`, `Gather-scatter`, `Scatter-gather`, `Cycle`, `Random`, `Bipartite`, `Stack`, `패턴 미특정`, `혼합`. Alert는 제외·이관되지 않은 거래가 남은 출처 Alert 버전의 유형을 사용한다(하나면 그 이름, 둘 이상이면 `혼합`, 없거나 코드0이면 `패턴 미특정`). Episode는 유효 구성의 출처 Alert 유형 중 하나가 일치하면 포함한다. `패턴 미특정`을 이진 정상 판정으로 해석하지 않는다.
 - `statuses=OPEN&statuses=ESCALATED`: 화면 상태의 OR 조건. 편입된 Alert는 ESCALATED, 미편입 사건은 OPEN/CLOSED다. 기존 단일 `status`와 함께 보내면 AND로 적용하므로 FE는 중복 지정하지 않는다.
 - `assignees`: 담당자 ID 반복 전달, OR. `minAgeDays`: 사건 생성 업무 시각부터 경과한 일수(0~36500). 배정 후 72시간을 세는 대시보드 카드와 기준이 다르다.
 - `risk`: `high`(0.8 이상), `medium`(0.5 이상·0.8 미만), `low`(0.5 미만). 복수는 `high,medium`처럼 쉼표로 전달하여 OR 적용한다. 필터 종류 사이는 AND다.
@@ -443,7 +439,7 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 - 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
 - review 목록·상세의 `summary.totalAmountUsd`: 현재 소속 전체 거래(SUBJECT+CONTEXT)에서 EXCLUDED/TRANSFERRED 제외·txId 중복 제거 후 저장 `amountUsd` 합계. Episode 내 여러 Alert에 겹친 거래는 한 번만 센다. 환산액 누락/잘못된 값이 하나라도 있으면 null, 거래가 없으면 0. 기존 `amountsByCurrency`의 SUBJECT 집계 의미는 유지한다. Alert·Episode 목록의 거래 총액은 이 필드를 소수 최대 2자리 USD로 표시하며 미제공 시 원통화 합계로 대체하지 않는다. block-pin 정책 근거는 CONTEXT 멤버를 만들지 않으므로 직원이 역할을 바꾸지 않은 Alert에서 이 합계와 txCount는 핵심(SUBJECT) 기준이다. 직원이 CONTEXT로 지정한 거래와 이전 정책 근거의 CONTEXT는 지금처럼 포함한다.
 - 상세 summary의 `sealedAfter`·`contextCount`는 Alert의 현재 공개 근거 버전에 대해 §3.3과 같은 규칙으로 계산한다. 직원의 제외·역할 변경과 무관하며 Episode에서는 null이다. 목록 summary에는 없다.
-- 목록 summary는 위에서 명시한 기본 건수·위험도·대표 유형·금액·거래 기간만 제공한다. 상세 summary는 여기에 `typeShare,netFlows,topReceiverShare,topSenders,paymentFormats,dailySuspiciousCount,dailySuspiciousAmount,typeDistribution`을 더해 현재 범위의 상세 집계를 제공한다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
+- 목록 summary는 위에서 명시한 기본 건수·위험도·대표 유형·금액·거래 기간만 제공한다. 상세 summary는 여기에 `netFlows,topReceiverShare,topSenders,paymentFormats,dailySuspiciousCount,dailySuspiciousAmount`을 더해 현재 범위의 상세 집계를 제공한다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
 
 ### 9.2 조사 계좌 기준 자금 지표
 

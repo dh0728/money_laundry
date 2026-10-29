@@ -63,10 +63,10 @@ erDiagram
 | analysis | features, scores, current_scores | 실행별 피처·점수, 완료 후 공개되는 거래별 점수 참조 |
 | analysis | score_ledger | 입력 고정 때의 완료 현재 점수 장부(선행 점수) |
 | analysis | alert_origin_ledger, fact_ledger | 입력 고정 때의 모든 공개 Alert(종결·병합 별칭 포함) 공개 근거 버전과 그 근거 거래의 통합 상태 장부. 실행 산출 연결은 alert_versions.run_id |
-| analysis | alert_plans | 실행 토큰·세대·SHA-256으로 검증하는 공개 준비 계획(canonical JSON TEXT) |
+| analysis | alert_plans | 실행 토큰·세대·SHA-256으로 검증하는 공개 준비 계획(canonical JSON TEXT). type_class는 Alert 유형 분류가 정한 유형 코드(핵심 거래 없는 계획은 NULL) |
 | review | alerts | Alert 담당·상태·종결 결과·조사 착수·공개 버전·병합 대표 ID·현재 범위 요약/revision/digest |
 | review | episodes | Episode 담당·상태·종결 결과·현재 범위 요약/revision/digest. Alert와 별도 테이블 |
-| review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 위험도는 현재 조사 범위에서 계산해 root summary와 생성 컬럼 risk_score에 저장 |
+| review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·유형 코드(type_class)·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 위험도는 현재 조사 범위에서 계산해 root summary와 생성 컬럼 risk_score에 저장 |
 | review | alert_groups, alert_members | 저장한 Alert 조사 그룹·소속·역할·판정 |
 | review | episode_alerts, episode_members | Episode의 원본 Alert와 조사 거래·판정 |
 | review | alert_lineage | MERGED_INTO/FOLLOWUP_OF 관계와 원인 이벤트 |
@@ -77,7 +77,7 @@ erDiagram
 | ops | dashboard_refresh_state | 영역별 성공 버전/시각·연속 실패·재시도 시각·소요시간·안전한 오류 코드 |
 | ops | dashboard_model_counts | 거래일·탐지일·이진판정·유형별 건수. 수신/분석/의심 건수와 모델 분포 |
 | ops | dashboard_case_counts | 상태·담당·생성/배정/종결/첫 열람 시각·Episode 소속별 사건 건수. 정규화 JSON group_key PK, 변경된 키의 차이만 반영 |
-| ops | dashboard_case_items | 우선순위/오래된 Episode용 작은 현재 사건 투영. 상세 JSON 없음 |
+| ops | dashboard_case_items | 우선순위/오래된 Episode·Alert 유형 분포용 작은 현재 사건 투영. 상세 JSON 없음 |
 | ops | dashboard_report_counts | 거래일별 미완료 보고 건수 |
 | ops | dashboard_delivery_days | 탐지 업무일과 보고 대상 거래일 대응 |
 | ops | resets, reset_files | 초기화 작업·파일 삭제 재시도 |
@@ -104,7 +104,7 @@ Python의 데이터 변경과 단계 완료 기록은 같은 DB 트랜잭션이�
 
 분석 등록 시 cutoff 이하 전체 수신 ID를 고정한다. 통합 버전의 세대가 변경되면 다시 준비하고, cutoff 밖 최신본으로 교체되면 과거 포인터를 되돌리지 않는다. 취소된 실행의 후속 쓰기는 실행 토큰·현재 run 확인으로 차단한다. 완료 TARGET을 바꾸는 정정은 거절하고 완료 CONTEXT는 고정 입력값으로 보존한다.
 
-점수는 `(run_id, tx_id)`로 저장하며 완료 전에는 `analysis.current_scores`로 공개하지 않는다. Alert 조회는 root published_version과 버전 published_at을 사용하며 완료한 분석의 공개 근거만 반환한다. 미승인 제안 버전은 일반 상세/버전 목록에서 숨긴다. ALERTS worker는 준비 계획만 저장하고, Spring이 run/job 완료와 공개 버전·범위·요약·계보·이벤트·수신자 변경을 한 트랜잭션에서 확정한다. 열린 Alert의 새 거래는 조사 중에도 자동 편입하되 기존 판정·제외·역할을 보존한다. 추가 ID·시각·연결 이유·전후 버전은 이벤트에 남긴다. Episode는 서로 다른 Alert 두 개 이상을 포함하며 한 Alert의 현재 Episode 소속은 최대 하나다. 연결·해제·종결은 관계와 감사 이력을 함께 변경한다.
+점수는 `(run_id, tx_id)`로 저장하며 완료 전에는 `analysis.current_scores`로 공개하지 않는다. Alert 조회는 root published_version과 버전 published_at을 사용하며 완료한 분석의 공개 근거만 반환한다. 미승인 제안 버전은 일반 상세/버전 목록에서 숨긴다. ALERTS worker는 준비 계획만 저장하고 ALERT_TYPES worker가 계획에 유형을 기록한 뒤, Spring이 run/job 완료와 공개 버전·범위·요약·계보·이벤트·수신자 변경을 한 트랜잭션에서 확정한다. 열린 Alert의 새 거래는 조사 중에도 자동 편입하되 기존 판정·제외·역할을 보존한다. 추가 ID·시각·연결 이유·전후 버전은 이벤트에 남긴다. Episode는 서로 다른 Alert 두 개 이상을 포함하며 한 Alert의 현재 Episode 소속은 최대 하나다. 연결·해제·종결은 관계와 감사 이력을 함께 변경한다.
 
 ## 읽기 전용 뷰
 

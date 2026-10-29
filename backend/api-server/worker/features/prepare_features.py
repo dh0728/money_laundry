@@ -1,7 +1,8 @@
 """Model input preparation stage. Only persisted, fenced artifacts count as complete.
 
-Each model kind is bound to a model package (models/registry.py) when a run starts;
-the package's build_input writes the targets file. Every model input also carries the
+The binary model is bound to a model package (models/registry.py) when a run starts;
+the package's build_input writes the targets file. The type model classifies Alerts and
+is prepared later, by Alert 유형 분류 (alert_types). Every model input also carries the
 same model-independent materials (features/materials.py), so the files sent to the
 inference server do not change when a model or its features change.
 """
@@ -19,13 +20,13 @@ from common.worker_transport import ProtocolError
 from features.materials import MATERIALS, REPLICA_MATERIALS, write_materials
 from models import registry
 
-MODEL_KINDS = ("BINARY", "TYPE")
+MODEL_KINDS = ("BINARY",)
 
 
 def versions_for_run(connection, execution):
     """(model_version, feature_version) per model kind; a new run takes the registry defaults."""
-    stored = dict(connection.execute('SELECT model_kind,binding FROM analysis.model_tasks WHERE run_id=%s',
-                                     (execution.run_id,)).fetchall())
+    stored = dict(connection.execute('SELECT model_kind,binding FROM analysis.model_tasks WHERE run_id=%s'
+                                     ' AND model_kind=ANY(%s)', (execution.run_id, list(MODEL_KINDS))).fetchall())
     if not stored:
         return {kind: registry.default(kind).versions() for kind in MODEL_KINDS}
     versions = {kind: (binding.get('model_version'), binding.get('feature_version'))
@@ -55,12 +56,13 @@ def artifact_files(document):
     """[(name, relative path, size, sha256)] of a prepared input.
 
     Version 1 held only targets, 2 adds the materials, 3 adds the removed file for the
-    inference server's ledger copy (with a "replica" position).
+    inference server's ledger copy (with a "replica" position). Version 4 is an Alert type
+    input: the Alerts and their core transactions (alert_types).
     """
     if document.get("protocol_version") == 1:
         return [("targets", document["path"], document["size_bytes"], document["sha256"])]
     files = [(f["name"], f["path"], f["size_bytes"], f["sha256"]) for f in document["files"]]
-    expected = REPLICA_MATERIALS if document.get("protocol_version") == 3 else MATERIALS
+    expected = {3: REPLICA_MATERIALS, 4: ("alert_transactions",)}.get(document.get("protocol_version"), MATERIALS)
     if [name for name, *_ in files] != ["targets", *expected]:
         raise ProtocolError("Unexpected prepared input files")
     return files

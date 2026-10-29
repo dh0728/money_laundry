@@ -141,7 +141,8 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
                 AnalysisStage.FEATURES,
                 AnalysisStage.INFERENCE,
                 AnalysisStage.SCORES,
-                AnalysisStage.ALERTS)
+                AnalysisStage.ALERTS,
+                AnalysisStage.ALERT_TYPES)
             .contains(context.stage())) return null;
     var rows =
         jdbc.queryForList(
@@ -152,9 +153,10 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
         where b.job_id=? and b.status='RUNNING' and b.current_stage=?
           and b.execution_id=? and s.execution_id=? and s.run_id=?
           and s.stage=? and s.completed and r.status in ('READY','ACTIVE')
-          and (s.stage='ALERTS' or (select count(*) from analysis.model_tasks m where m.run_id=r.run_id
+          and (s.stage in ('ALERTS','ALERT_TYPES') or (select count(*) from analysis.model_tasks m
+               where m.run_id=r.run_id and m.model_kind='BINARY'
                and ((s.stage='FEATURES' and m.phase='PUBLISH' and m.status='READY' and m.input_artifact is not null)
-                 or (s.stage in ('INFERENCE','SCORES') and m.phase='DONE' and m.status='SUCCEEDED' and m.result_artifact is not null)))=2)
+                 or (s.stage in ('INFERENCE','SCORES') and m.phase='DONE' and m.status='SUCCEEDED' and m.result_artifact is not null)))=1)
         """,
             String.class,
             context.jobId(),
@@ -242,13 +244,16 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       String saved = checkpoint(context);
       if (saved != null) return new Result(saved);
       if (process.exitValue() == 76
-          && context.stage() == AnalysisStage.INFERENCE
+          && (context.stage() == AnalysisStage.INFERENCE
+              || context.stage() == AnalysisStage.ALERT_TYPES)
           && jdbc != null
           && context.runId() != null
           && jdbc.queryForObject(
-              "select count(*)=2 and count(*) filter(where status in ('WAITING','RETRY_WAIT','ACTIVE'))>0 from analysis.model_tasks where run_id=?",
+              "select exists(select 1 from analysis.model_tasks where run_id=? and model_kind=? and status in ('WAITING','RETRY_WAIT','ACTIVE'))",
               Boolean.class,
-              context.runId())) throw new AnalysisDeferred();
+              context.runId(),
+              context.stage() == AnalysisStage.INFERENCE ? "BINARY" : "TYPE"))
+        throw new AnalysisDeferred();
       if (process.exitValue() == 77) {
         boolean invalidScores =
             jdbc != null

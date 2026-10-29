@@ -104,7 +104,7 @@ def main():
         cols[1].metric('Alert', counters.get('alertCount', 0))
         st.subheader('2. 의심 거래')
         page_view(client, 'suspicious-transactions', {'jobId': job_id}, f'tx_{base}_{job_id}',
-                  ['txId', 'txAt', 'fromBank', 'toBank', 'amountUsd', 'launderingScore', 'typeName'])
+                  ['txId', 'txAt', 'fromBank', 'toBank', 'amountUsd', 'launderingScore'])
         st.subheader('3. Alert')
         alerts = page_view(client, 'alerts', {'jobId': job_id}, f'alerts_{base}_{job_id}',
                            ['alertId', 'status', 'assigneeId', 'version', 'summary'])

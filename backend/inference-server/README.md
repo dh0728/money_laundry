@@ -22,6 +22,13 @@
 
 대상 ID만 쓰는 모델은 `calculate(targets, ...)`, 재료를 쓰는 모델은 `calculate_inputs(inputs, ...)`를 정의한다(`MODEL_CONTRACT.md`).
 
+유형 요청(백엔드 Alert 유형 분류 단계, 모델 종류 TYPE)은 다른 묶음을 받고 원장 사본을 쓰지 않는다.
+
+| 이름 | 내용 |
+|---|---|
+| `targets` | 유형을 낼 Alert 번호 `alert_key`(int64, 1 이상) |
+| `alert_transactions` | Alert마다 핵심 거래(SEED·CONNECTION) 한 줄씩: alert_key, tx_id, occurred_at(UTC), 보내는·받는 가명 계좌 ID, amount_usd(정확한 소수), 결제 형식 |
+
 ### 원장 사본(요청의 `replica`)
 
 추론 서버는 백엔드 고정 입력 장부의 사본을 상태 폴더 `replica/`에 Parquet 조각들로 둔다(`inference_worker/replica.py`). 백엔드는 매일 바뀐 거래만 보내고, 새 거래만 있는 날은 사본에 조각 하나를 더한다. 이미 있는 거래가 바뀌거나 빠진 날은 사본을 조각 하나로 다시 쓴다. 모델은 사본의 잠금 안에서 실행되며, 사본을 읽는 방식은 모델이 정한다(`MODEL_CONTRACT.md`).
@@ -40,7 +47,8 @@
 
 | 폴더 | 버전(모델 / 피처) | 쓰는 곳 |
 |---|---|---|
-| `models/demo_random` | `demo-random-v1` / `demo-input-v1` | 유형 모델 자리(시연용 임의 점수) |
+| `models/demo_random` | `demo-random-v1` / `demo-input-v1` | 이진 전용 시연 계산기(임의 점수) |
+| `models/alert_type_tree` | `alert-type-tree-v2` / `alert-graph-features-v1` | 유형 모델. Alert 하나의 핵심 거래 그래프에서 구조 피처를 만들고 결정 트리로 9개 유형(패턴 아님 + 8개 패턴) 확률을 낸다. 트리는 `assets/`, 무결성은 `spec.py`의 SHA-256으로 확인 |
 | `models/binary_v10` | `gnn-binary-v10` / `materials-v1` | 이진 모델. 팀원 GNN v10(2홉 거래 그래프). 재료에서 피처를 만들고 대상 거래마다 그래프를 만들어 점수를 낸다. 가중치·통계는 `assets/`, 무결성은 `spec.py`의 SHA-256으로 확인 |
 
 ## 실행 (공유 추론 서버)

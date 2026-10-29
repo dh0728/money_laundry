@@ -4,7 +4,7 @@ import { fetchLiveDashboard, type DashboardSummary } from './liveDashboard'
 function summary(): DashboardSummary {
   return {
     businessAt: '2023-09-10T00:00:00Z', range: { from: '2023-08-31', to: '2023-09-10' },
-    pipeline: { computedAt: '2026-10-08T00:00:00Z', data: { detection: { received: 115270, analyzed: 100000, suspicious: 20, deliveryDates: ['2023-08-31', '2023-09-01'] }, pendingReports: 2, agreements: [{ agreement: 'STRONG', count: 20 }], types: [{ type: 3, count: 20 }] } },
+    pipeline: { computedAt: '2026-10-08T00:00:00Z', data: { detection: { received: 115270, analyzed: 100000, suspicious: 20, deliveryDates: ['2023-08-31', '2023-09-01'] }, pendingReports: 2, agreements: [{ agreement: 'SUSPICIOUS', count: 20 }], types: [{ type: 3, count: 20 }] } },
     investigation: { computedAt: '2026-10-08T00:00:01Z', data: { personal: { pending: 4, aged: 2, closed: 1 }, institution: { alerts: 7811, episodes: 1, aged: 8, today: 20, yesterday: 5 }, openAlertsAgedOver3Days: 7, daily: [], dailyAlertStatus: [{ date: '2023-09-01', pending: 2, inProgress: 1, done: 3 }], episodeWork: { current: { open: 1, aged: 0, unreviewed: 1, createdToday: 1, closedToday: 0 }, firstReview: { samples: 0, averageSeconds: null }, completion: { samples: 0, averageSeconds: null } } } },
   }
 }

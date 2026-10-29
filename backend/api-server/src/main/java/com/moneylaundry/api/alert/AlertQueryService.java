@@ -57,7 +57,7 @@ public class AlertQueryService {
     args.add((long) page * size);
     var rows =
         jdbc.queryForList(
-            "select a.*,v.version,v.run_id,jsonb_build_object('summary',v.evidence->'summary') as evidence "
+            "select a.*,v.version,v.run_id,v.type_class,jsonb_build_object('summary',v.evidence->'summary') as evidence "
                 + VISIBLE
                 + where
                 + " order by a.risk_score desc,a.alert_id limit ? offset ?",
@@ -71,7 +71,7 @@ public class AlertQueryService {
     var rows =
         jdbc.queryForList(
             """
-        select a.*,v.version,v.run_id,v.evidence,b.analysis_cutoff_at from review.alerts a join review.alert_versions v using(alert_id)
+        select a.*,v.version,v.run_id,v.type_class,v.evidence,b.analysis_cutoff_at from review.alerts a join review.alert_versions v using(alert_id)
         join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
         where a.alert_id=? and v.published_at is not null and r.status='COMPLETED' and b.status='COMPLETED'
         """
@@ -269,6 +269,7 @@ public class AlertQueryService {
     result.put("createdAt", row.get("created_at"));
     result.put("version", row.get("version"));
     result.put("runId", row.get("run_id"));
+    result.put("typeClass", row.get("type_class"));
     Map<String, Object> evidence = mapper.readValue(row.get("evidence").toString(), Map.class);
     if (detail) result.putAll(evidence);
     else result.put("summary", evidence.get("summary"));
