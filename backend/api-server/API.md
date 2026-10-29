@@ -280,6 +280,7 @@ FE는 동일 출처(`/api/...`)로 쿠키를 유지하여 호출한다. `X-Demo-
 |---|---|
 | pipeline.detection | `{received,analyzed,suspicious,deliveryDates}`. 오늘 분석 대상 거래일의 수신/통합 수, 그중 오늘 완료된 최신 유효 점수가 있는 거래, 그중 이진 의심 수. deliveryDates는 YYYY-MM-DD 배열. 선택기간 무관 |
 | pipeline.pendingReports | deliveryDates에 속한 미완료 보고 수. 선택기간 무관 |
+| pipeline.agreements | `[{agreement,count}]`. 이진 모델 판정 SUSPICIOUS/NORMAL별 거래 수. 최신 유효 점수의 탐지 업무일이 선택기간 안인 거래, 미분석 제외 |
 | pipeline.types | `[{type,count}]`. 선택기간에 생성된 공개 Alert의 현재 버전 유형(typeClass)별 수. 유형 없는 Alert 제외, 코드 오름차순 |
 | investigation.personal | `{pending,aged,closed}`. 본인 현재 OPEN, 배정 후 정확히72시간 이상 OPEN, 본인 담당이며 본인이 기간 내 종결한 사건 |
 | investigation.institution | `{alerts,episodes,aged,today,yesterday}`. 현재OPEN Alert/Episode, 전체OPEN 중72시간 이상, 오늘/어제 생성 Alert |
