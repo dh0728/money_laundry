@@ -151,4 +151,5 @@ $RECYCLE.BIN/
 ~$*
 
 /docs
-
+/outputs
+AGENTS.md
