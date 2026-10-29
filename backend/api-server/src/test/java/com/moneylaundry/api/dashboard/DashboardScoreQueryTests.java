@@ -146,6 +146,27 @@ class DashboardScoreQueryTests {
             .scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
     assertThat(result.get("detection"))
         .isEqualTo(Map.of("received", 2L, "analyzed", 0L, "suspicious", 0L));
+    assertThat(result.get("agreements")).isEqualTo(List.of());
+  }
+
+  @Test
+  void date_filter_does_not_fall_back_to_an_older_prediction_in_the_requested_period() {
+    score(transactions.get(0), "COMPLETED", 0.9);
+    long newer = score(transactions.get(0), "COMPLETED", 0.9);
+    jdbc.update("update analysis.jobs set business_at='2023-09-03 09:00+09' where job_id=?", newer);
+    score(transactions.get(1), "COMPLETED", 0.2);
+    var result =
+        refreshedDashboard(null)
+            .modelDistribution(LocalDate.parse("2023-09-02"), LocalDate.parse("2023-09-02"));
+    assertThat(result.get("agreements"))
+        .isEqualTo(List.of(Map.of("agreement", "NORMAL", "count", 1L)));
+    jdbc.update(
+        "update ledger.transactions set integration_status='HELD' where tx_id=?",
+        transactions.get(1));
+    result =
+        refreshedDashboard(null)
+            .modelDistribution(LocalDate.parse("2023-09-02"), LocalDate.parse("2023-09-02"));
+    assertThat(result.get("agreements")).isEqualTo(List.of());
   }
 
   @Test

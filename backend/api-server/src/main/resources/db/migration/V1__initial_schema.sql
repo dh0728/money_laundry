@@ -740,6 +740,7 @@ create table ops.dashboard_model_counts (
   n bigint not null check(n>0)
 );
 create index dashboard_model_business_idx on ops.dashboard_model_counts(business_date);
+create index dashboard_model_detected_idx on ops.dashboard_model_counts(detected_day);
 create table ops.dashboard_case_items (
   case_id bigint primary key, kind text not null, alert_id bigint,
   assignee_id bigint not null, assignee text not null, status text not null,

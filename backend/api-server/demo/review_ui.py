@@ -434,8 +434,18 @@ def dashboard_page(client, user, today):
         st.subheader('기관 탐지 현황')
         if data['daily']:
             st.line_chart(pd.DataFrame(data['daily']), x='day', y=['incoming', 'completed'])
-        st.subheader('Alert 유형별 분포')
-        chart_map({TYPE_NAMES[r['type']]: r['count'] for r in data['types']}, 'Alert 수', horizontal=True)
+        cols = st.columns(2)
+        with cols[0]:
+            st.subheader('모델 판정 분포')
+            counts = {r['agreement']: r['count'] for r in data['agreements']}
+            frame = pd.DataFrame([{'유형': k, '건수': counts.get(k, 0)} for k in ['SUSPICIOUS', 'NORMAL']])
+            total = frame['건수'].sum()
+            frame['비율'] = frame['건수'] / total if total else 0
+            st.altair_chart(alt.Chart(frame).mark_arc(innerRadius=65).encode(theta='건수:Q', color='유형:N', tooltip=['유형', '건수', alt.Tooltip('비율:Q', format='.1%')]), width='stretch')
+            table(frame.to_dict('records'))
+        with cols[1]:
+            st.subheader('의심 거래 탐지 유형별 분포')
+            chart_map({TYPE_NAMES[r['type']]: r['count'] for r in data['types']}, 'Alert 수', horizontal=True)
 
 
 def main():

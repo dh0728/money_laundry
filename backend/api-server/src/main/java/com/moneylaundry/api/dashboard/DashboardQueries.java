@@ -95,13 +95,32 @@ public final class DashboardQueries {
 
   Map<String, Object> modelDistribution(LocalDate from, LocalDate to) {
     // Alerts created in the period, by the type of their current published version.
-    return Map.of(
-        "types",
+    var types =
         jdbc.queryForList(
             "select type_class::bigint as type,count(*)::bigint as count from ops.dashboard_case_items "
                 + "where kind='ALERT' and type_class is not null and created_at>=? and created_at<? group by 1 order by 1",
             at(from),
-            at(to.plusDays(1))));
+            at(to.plusDays(1)));
+    // Binary model results of transactions whose latest published score was detected in the period.
+    var agreements = new TreeMap<String, Long>();
+    for (var row :
+        jdbc.queryForList(
+            "select suspicious,sum(n)::bigint as count from ops.dashboard_model_counts "
+                + "where detected_day>=(?::timestamptz at time zone 'Asia/Seoul')::date "
+                + "and detected_day<(?::timestamptz at time zone 'Asia/Seoul')::date group by 1",
+            at(from),
+            at(to.plusDays(1))))
+      agreements.merge(
+          Boolean.TRUE.equals(row.get("suspicious")) ? "SUSPICIOUS" : "NORMAL",
+          ((Number) row.get("count")).longValue(),
+          Long::sum);
+    return Map.of(
+        "agreements",
+        agreements.entrySet().stream()
+            .map(e -> Map.of("agreement", e.getKey(), "count", e.getValue()))
+            .toList(),
+        "types",
+        types);
   }
 
   Map<String, Object> scoreWidgets(

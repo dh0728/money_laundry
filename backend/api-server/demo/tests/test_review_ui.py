@@ -22,7 +22,7 @@ def response(path, params=None, **kwargs):
                 'institution': dict(alerts=0, episodes=0, aged=0, today=0, yesterday=0),
                 'detection': dict(received=10, analyzed=5, suspicious=2), 'deliveryDate': '2023-09-01',
                 'episodeWork': dict(asOf=CLOCK['businessAt'], current=dict(open=2, created_today=1, closed_today=0, aged=1, unreviewed=1), firstReview=dict(samples=0, average_seconds=None), completion=dict(samples=1, average_seconds=7200), oldestOpen=[]),
-                'daily': [], 'types': [], 'activities': [], 'priority': []}
+                'daily': [], 'agreements': [], 'types': [], 'activities': [], 'priority': []}
     if path == 'review/payment-formats': return ['ACH', 'Cash']
     return dict(content=[], page=0, size=20, totalElements=0, totalPages=0)
 

@@ -13,10 +13,16 @@ public record DashboardSummary(
 
   public record Section<T>(Instant computedAt, T data) {}
 
-  public record Pipeline(Detection detection, List<TypeCount> types, long pendingReports) {}
+  public record Pipeline(
+      Detection detection,
+      List<Agreement> agreements,
+      List<TypeCount> types,
+      long pendingReports) {}
 
   public record Detection(
       long received, long analyzed, long suspicious, List<LocalDate> deliveryDates) {}
+
+  public record Agreement(String agreement, long count) {}
 
   public record TypeCount(long type, long count) {}
 
@@ -71,6 +77,10 @@ public record DashboardSummary(
                   count(d, "analyzed"),
                   count(d, "suspicious"),
                   days.stream().map(java.sql.Date::toLocalDate).toList()),
+              ((List<Map<String, Object>>) values.get("agreements"))
+                  .stream()
+                      .map(r -> new Agreement((String) r.get("agreement"), count(r, "count")))
+                      .toList(),
               ((List<Map<String, Object>>) values.get("types"))
                   .stream().map(r -> new TypeCount(count(r, "type"), count(r, "count"))).toList(),
               count(values, "pendingReports"));
