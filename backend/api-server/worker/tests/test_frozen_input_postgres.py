@@ -100,7 +100,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
     def setUp(self):
         # These tests play the inference peer with the demo model; v10 binding has its own tests.
         from models import registry
-        demo_only = patch.dict(registry.DEFAULTS, BINARY=registry.DEMO_RANDOM, TYPE=registry.DEMO_RANDOM)
+        demo_only = patch.dict(registry.DEFAULTS, BINARY=registry.DEMO_RANDOM)
         demo_only.start()
         self.addCleanup(demo_only.stop)
         self.reader = self.psycopg.connect(**self.connect_args)
@@ -272,10 +272,10 @@ class FrozenInputPostgresTests(unittest.TestCase):
         with patch.dict(registry.DEFAULTS, BINARY=registry.BINARY_V10), \
                 tempfile.TemporaryDirectory(prefix='aml-v10-input-') as root:
             result = json.loads(prepare_features(self.admin, self.execution, root))
-            binary, kind = result['models']['BINARY'], result['models']['TYPE']
+            self.assertEqual(set(result['models']), {'BINARY'})
+            binary = result['models']['BINARY']
             self.assertEqual((binary['model_version'], binary['feature_version']),
                              (spec.MODEL_VERSION, spec.FEATURE_VERSION))
-            self.assertEqual(kind['model_version'], 'demo-random-v1')
             table = pq.read_table(Path(root) / input_path(binary))
             self.assertEqual(table.column_names, ['tx_id'])
             self.assertEqual(table['tx_id'].to_pylist(), sorted(self.ids))
@@ -305,7 +305,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                                        (self.run,)).fetchone()[0]
             artifact = json.loads(saved)
             self.assertEqual(artifact["protocol_version"], 2)
-            self.assertEqual(set(artifact["models"]), {"BINARY", "TYPE"})
+            self.assertEqual(set(artifact["models"]), {"BINARY"})
             for kind, model in artifact["models"].items():
                 self.assertEqual(model["model_kind"], kind)
                 self.assertEqual(model["row_count"], 3)
@@ -319,12 +319,12 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 self.assertEqual(accounts.schema, materials.ACCOUNTS)
                 self.assertEqual(accounts.num_rows, 8)
             self.assertEqual(self.admin.execute(
-                "SELECT count(*) FROM analysis.features WHERE run_id=%s", (self.run,)).fetchone()[0], 6)
+                "SELECT count(*) FROM analysis.features WHERE run_id=%s", (self.run,)).fetchone()[0], 3)
             new_token = uuid4()
             self.admin.execute("UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s", (new_token, self.job))
             retry = prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
             self.assertEqual(retry, saved)
-            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 6)
+            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 3)
             self.assertEqual(list(Path(root).rglob("*.partial")), [])
 
     def test_cancel_before_checkpoint_does_not_complete_stage(self):
@@ -374,7 +374,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
             self.assertEqual(self.admin.execute(
                 "SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='READY'",
-                (self.run,)).fetchone()[0], 2)
+                (self.run,)).fetchone()[0], 1)
 
     def test_checkpoint_with_changed_file_cannot_be_reused(self):
         with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
@@ -416,7 +416,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertNotIn('signature=', task[3])
             self.assertNotIn(settings.token, task[3])
             self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis.stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
-            self.assertEqual(self.admin.execute("SELECT phase FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], 'PUBLISH')
             self.assertEqual(len(s3.objects), 5)  # targets, transactions, accounts, input bundle, manifest
 
     def test_publication_rejects_wrong_receipt_and_changed_destination(self):
@@ -481,9 +480,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
                     'inference.model_publication.publish_model', side_effect=dispatch):
                 code = main(['--job-id', str(self.job), '--run-id', str(self.run),
                              '--execution-id', str(self.token), '--stage', 'INFERENCE',
-                             '--operation', 'PUBLISH', '--model-kind', 'TYPE'])
+                             '--operation', 'PUBLISH', '--model-kind', 'BINARY'])
             self.assertEqual(code, 0)
-            self.assertEqual(self.admin.execute("SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING'))
+            self.assertEqual(self.admin.execute("SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING'))
             self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis.stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
 
     def test_unstopped_predecessor_blocks_publication_without_side_effects(self):
@@ -516,13 +515,12 @@ class FrozenInputPostgresTests(unittest.TestCase):
             if status == 'COMPLETED':
                 logical = Request(body['job_id'], body['model_kind'].lower(), body['request_id'],
                                   body['execution_round'], body['model_version'], body['feature_version'], body['run_id'])
-                from models.demo_random.build_input import build_targets
-                from tests.inference_peer import calculate
+                from tests.inference_peer import calculate, classify_alerts
                 from common.worker_transport import descriptor
                 stream = io.BytesIO()
                 targets = pq.read_table(io.BytesIO(s3.objects['dev/test/' + logical.inputs + 'targets.parquet']))
-                scores = calculate(targets, logical.model_kind,
-                    model_version=logical.model_version, feature_version=logical.feature_version)
+                scores = (classify_alerts(targets) if logical.model_kind == 'type' else calculate(targets, logical.model_kind,
+                    model_version=logical.model_version, feature_version=logical.feature_version))
                 if logical.model_kind == 'binary' and hasattr(self, 'score_values'):
                     import pyarrow as pa
                     scores = scores.set_column(1, 'p_laundering', pa.array(self.score_values, type=pa.float64()))
@@ -530,7 +528,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 key = 'dev/test/' + logical.output + 'scores.parquet'
                 s3.objects[key] = stream.getvalue()
                 response['result'] = dict(logical.identity(), **logical.versions(), status='COMPLETED',
-                    row_count=len(self.ids), files=[descriptor('scores', key, stream.getvalue())])
+                    row_count=len(targets), files=[descriptor('scores', key, stream.getvalue())])
             elif status == 'FAILED':
                 response['error_code'] = error[0] if error else 'GPU_OUT_OF_MEMORY'
             return httpx.Response(202 if req.method == 'PUT' else 200, json=response)
@@ -539,7 +537,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
     def make_observations_due(self):
         self.admin.execute("UPDATE analysis.model_tasks SET next_poll_at=now()-interval '1 second',retry_at=now()-interval '1 second' WHERE run_id=%s", (self.run,))
 
-    def test_dispatch_completes_inference_only_after_both_results_are_validated(self):
+    def test_dispatch_completes_inference_only_after_the_result_is_validated(self):
         from inference.inference_dispatch import advance
         with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
             settings, s3 = self.publication_setup(root)
@@ -547,25 +545,22 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
             self.assertEqual(self.admin.execute('SELECT sum(consecutive_failures) FROM analysis.model_tasks WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
-            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            states.update(BINARY=('COMPLETED', 2))
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED'", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute("SELECT model_kind FROM analysis.model_tasks WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED'", (self.run,)).fetchall(), [('BINARY',)])
             self.assertIsNotNone(self.admin.execute("SELECT 1 FROM analysis.stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
 
-    def test_failed_model_does_not_stop_other_model_observation(self):
+    def test_failed_model_fails_the_stage_visibly(self):
         from inference.inference_dispatch import advance
         with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
             settings, s3 = self.publication_setup(root)
             remote, states = self.inference_remote(s3)
-            advance(self.admin, self.execution, root, settings, s3, transport=remote)
-            states['BINARY'] = ('FAILED', 2)
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
-            self.assertEqual(self.admin.execute("SELECT error_code FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone()[0], 'GPU_OUT_OF_MEMORY')
-            states['TYPE'] = ('COMPLETED', 2)
+            states['BINARY'] = ('FAILED', 2)
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 77)
-            self.assertEqual(self.admin.execute("SELECT phase FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], 'DONE')
+            self.assertEqual(self.admin.execute("SELECT phase,status,error_code FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(), ('WAIT_REMOTE', 'FAILED', 'GPU_OUT_OF_MEMORY'))
 
     def test_interrupted_round_waits_for_confirmation_then_resumes_as_a_new_round(self):
         from inference.inference_dispatch import advance
@@ -582,7 +577,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute(task, (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING', 'RECOVERY_REQUIRED', True, 1))
             self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'PUBLISHED')])
             # Once the server confirms the process gone, the round ends and is no longer unconfirmed.
-            states.update(BINARY=('FAILED', 3, 'WORKER_SHUTDOWN'), TYPE=('COMPLETED', 2))
+            states.update(BINARY=('FAILED', 3, 'WORKER_SHUTDOWN'))
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 77)
             self.assertEqual(self.admin.execute(task, (self.run,)).fetchone(), ('WAIT_REMOTE', 'FAILED', 'WORKER_SHUTDOWN', True, 1))
@@ -604,7 +599,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
             self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'ALREADY_FINISHED'), (2, 'PUBLISHED')])
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED'", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED'", (self.run,)).fetchone()[0], 1)
 
     LEDGER_COLUMNS = ("occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,"
                       "from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,"
@@ -701,7 +696,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute(task, (self.run,)).fetchone()[:3], ('WAIT_REMOTE', 'WAITING', 1))
             key = next(k for k in s3.objects if resent['request_id'] in k and k.endswith('transactions.parquet'))
             self.assertEqual(len(pq.read_table(io.BytesIO(s3.objects[key]))), self.frozen_rows())
-            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            states.update(BINARY=('COMPLETED', 2))
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
             self.assertEqual(self.admin.execute(requests, (self.run,)).fetchall(), [(1, 'ALREADY_FINISHED'), (1, 'PUBLISHED')])
@@ -720,7 +715,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             advance(self.admin, self.execution, root, settings, s3, transport=remote)
             self.assertEqual(self.admin.execute("SELECT phase,status,error_code,action_required FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(),
                              ('WAIT_REMOTE', 'FAILED', 'REPLICA_MISMATCH', True))
-            self.assertEqual(len(self.put_bodies), 2)
+            self.assertEqual(len(self.put_bodies), 1)
 
     def test_observation_revision_fences_conflicts_and_deadline_does_not_restart_model(self):
         from inference.inference_dispatch import advance, observe_model
@@ -740,7 +735,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.admin.execute("UPDATE analysis.model_tasks SET remote_deadline_at=now()-interval '1 second' WHERE run_id=%s", (self.run,))
             observe_model(self.admin, self.execution, 'BINARY', settings, transport=remote)
             self.assertEqual(self.admin.execute("SELECT status,error_code,action_required FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(), ('WAITING', 'REMOTE_WAIT_EXPIRED', True))
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 1)
 
     def test_ambiguous_publication_budget_switches_to_observation_without_new_round(self):
         import httpx
@@ -756,13 +751,13 @@ class FrozenInputPostgresTests(unittest.TestCase):
             for attempt in range(3):
                 self.make_observations_due()
                 self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
-            self.assertEqual(len(puts), 6)
-            self.assertEqual(len({b['request_id'] for b in puts}), 2)
+            self.assertEqual(len(puts), 3)
+            self.assertEqual(len({b['request_id'] for b in puts}), 1)
             self.assertEqual({b['execution_round'] for b in puts}, {1})
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING' AND action_required", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING' AND action_required", (self.run,)).fetchone()[0], 1)
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
-            self.assertEqual(len(puts), 6)
+            self.assertEqual(len(puts), 3)
 
     def test_unreceived_request_is_resent_with_same_identity_only_on_server_not_found(self):
         import httpx
@@ -782,7 +777,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.make_observations_due()
             advance(self.admin, self.execution, root, settings, s3,
                     transport=httpx.MockTransport(lambda r: httpx.Response(404, text='not found')))
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING'", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING'", (self.run,)).fetchone()[0], 1)
             resent = []
             def listening(request):
                 if request.method == 'PUT':
@@ -795,29 +790,27 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
             self.assertEqual(resent, [])
             # The exact condition under which Spring (PythonAnalysisExecutor) defers exit 76 instead of failing.
-            self.assertTrue(self.admin.execute("select count(*)=2 and count(*) filter(where status in ('WAITING','RETRY_WAIT','ACTIVE'))>0 from analysis.model_tasks where run_id=%s", (self.run,)).fetchone()[0])
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='RETRY_WAIT' AND retry_at<=now() AND NOT action_required", (self.run,)).fetchone()[0], 2)
+            self.assertTrue(self.admin.execute("select exists(select 1 from analysis.model_tasks where run_id=%s and model_kind='BINARY' and status in ('WAITING','RETRY_WAIT','ACTIVE'))", (self.run,)).fetchone()[0])
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='RETRY_WAIT' AND retry_at<=now() AND NOT action_required", (self.run,)).fetchone()[0], 1)
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=transport), 76)
             self.assertEqual({b['model_kind']: (b['request_id'], b['execution_round']) for b in resent}, first)
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 2)
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING' AND NOT action_required AND error_code IS NULL", (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 1)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='WAIT_REMOTE' AND status='WAITING' AND NOT action_required AND error_code IS NULL", (self.run,)).fetchone()[0], 1)
 
     def test_rejected_submission_fails_visibly_instead_of_waiting(self):
         import httpx
         from inference.inference_dispatch import advance
         with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
             settings, s3 = self.publication_setup(root)
-            def rejecting(request):
-                if json.loads(request.content)['model_kind'] == 'TYPE':
-                    # A conflict means the server already holds that request: keep waiting for it.
-                    return httpx.Response(409, json={'error': 'REQUEST_CONFLICT'})
-                return httpx.Response(422, json={'error': 'INVALID_REQUEST'})
-            self.assertEqual(advance(self.admin, self.execution, root, settings, s3,
-                                     transport=httpx.MockTransport(rejecting)), 76)
-            tasks = dict((r[0], r[1:]) for r in self.admin.execute(
-                "SELECT model_kind,phase,status,error_code,action_required FROM analysis.model_tasks WHERE run_id=%s", (self.run,)))
-            self.assertEqual(tasks['BINARY'], ('PUBLISH', 'FAILED', 'PUBLICATION_REJECTED_422', True))
-            self.assertEqual(tasks['TYPE'][:2], ('WAIT_REMOTE', 'WAITING'))
+            task = "SELECT phase,status,error_code,action_required FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'"
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=httpx.MockTransport(
+                lambda request: httpx.Response(422, json={'error': 'INVALID_REQUEST'}))), 77)
+            self.assertEqual(self.admin.execute(task, (self.run,)).fetchone(), ('PUBLISH', 'FAILED', 'PUBLICATION_REJECTED_422', True))
+            # A conflict means the server already holds that request: keep waiting for it.
+            self.admin.execute("UPDATE analysis.model_tasks SET status='READY' WHERE run_id=%s", (self.run,))
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=httpx.MockTransport(
+                lambda request: httpx.Response(409, json={'error': 'REQUEST_CONFLICT'}))), 76)
+            self.assertEqual(self.admin.execute(task, (self.run,)).fetchone()[:2], ('WAIT_REMOTE', 'WAITING'))
 
     def test_result_metadata_mismatch_cannot_schedule_collection(self):
         import httpx
@@ -842,14 +835,15 @@ class FrozenInputPostgresTests(unittest.TestCase):
         settings, s3 = self.publication_setup(root)
         remote, states = self.inference_remote(s3)
         advance(self.admin, self.execution, root, settings, s3, transport=remote)
-        states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+        states.update(BINARY=('COMPLETED', 2))
         self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
         return settings, s3
 
     def scoring_stage(self):
         self.admin.execute("UPDATE analysis.jobs SET current_stage='SCORES',threshold_value=0.5 WHERE job_id=%s", (self.job,))
 
-    def test_random_pipeline_collects_scores_and_prepares_alerts_without_publication(self):
+    def prepared_alert_plans(self, root):
+        """Run the pipeline through Alert 구성 on a connected flow; returns the remote settings."""
         from scores.result_collection import save_scores
         from alerts.alert_pipeline import save_alerts
         self.annotate_demo(self.ids)
@@ -865,21 +859,19 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 (accounts[index], accounts[index+1], index, self.run, key))
         self.admin.execute("INSERT INTO analysis.input_coverage VALUES(%s,'2022-09-01',1,1,true,'[]')", (self.run,))
         self.admin.execute("INSERT INTO core.users(username,name,role,password_hash) VALUES(%s,'Demo','STAFF','test')", (uuid4().hex,))
+        settings, s3 = self.collected_results(root)
+        self.scoring_stage()
+        save_scores(self.admin, self.execution, root, settings, s3)
+        self.admin.execute("UPDATE analysis.jobs SET current_stage='ALERTS',analysis_cutoff_at='2022-09-02 09:00+09' WHERE job_id=%s", (self.job,))
+        save_alerts(self.admin, self.execution)
+        return settings, s3
+
+    def test_random_pipeline_collects_scores_and_prepares_alerts_without_publication(self):
+        from models.demo_random.spec import MODEL_VERSION
         with tempfile.TemporaryDirectory(prefix='aml-label-pipeline-') as root:
-            settings, s3 = self.collected_results(root)
-            self.scoring_stage()
-            save_scores(self.admin, self.execution, root, settings, s3)
-            from tests.inference_peer import calculate
-            from models.demo_random.build_input import build_targets
-            from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
-            targets = build_targets(self.ids)
-            versions = dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
-            binary = self.score_values
-            types = calculate(targets, 'type', **versions)['p_3'].to_pylist()
-            self.assertEqual(self.admin.execute('SELECT p_laundering,p_3 FROM analysis.scores WHERE run_id=%s ORDER BY tx_id', (self.run,)).fetchall(), list(zip(binary, types)))
-            self.assertEqual(self.admin.execute('SELECT model_version_binary,model_version_type FROM analysis.jobs WHERE job_id=%s', (self.job,)).fetchone(), (MODEL_VERSION, MODEL_VERSION))
-            self.admin.execute("UPDATE analysis.jobs SET current_stage='ALERTS',analysis_cutoff_at='2022-09-02 09:00+09' WHERE job_id=%s", (self.job,))
-            save_alerts(self.admin, self.execution)
+            self.prepared_alert_plans(root)
+            self.assertEqual(self.admin.execute('SELECT p_laundering FROM analysis.scores WHERE run_id=%s ORDER BY tx_id', (self.run,)).fetchall(), [(value,) for value in self.score_values])
+            self.assertEqual(self.admin.execute('SELECT model_version_binary,model_version_type FROM analysis.jobs WHERE job_id=%s', (self.job,)).fetchone(), (MODEL_VERSION, None))
             plans = self.admin.execute('SELECT payload::jsonb FROM analysis.alert_plans WHERE run_id=%s', (self.run,)).fetchall()
             self.assertGreater(len(plans), 0)
             self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
@@ -888,6 +880,122 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 seeds = {seed['txId'] for seed in plan['evidence']['seeds']}
                 self.assertEqual({m['txId'] for m in members if m['role'] == 'SEED'}, seeds)
                 self.assertTrue(all(m['scores']['p_laundering'] >= .5 for m in members if m['role'] == 'SEED'))
+
+    def alert_types_stage(self):
+        self.admin.execute("UPDATE analysis.jobs SET current_stage='ALERT_TYPES' WHERE job_id=%s", (self.job,))
+
+    def core_plan_keys(self):
+        return [key for key, payload in self.admin.execute(
+            'SELECT plan_key,payload::jsonb FROM analysis.alert_plans WHERE run_id=%s ORDER BY plan_key', (self.run,))
+            if payload['evidence'] and any(m['role'] in ('SEED', 'CONNECTION') for m in payload['evidence']['transactions'])]
+
+    def typed_alerts(self, root):
+        """Pipeline through Alert 유형 분류; returns settings, s3 and the remote peer."""
+        from alert_types.alert_type_inference import classify
+        settings, s3 = self.prepared_alert_plans(root)
+        self.alert_types_stage()
+        remote, states = self.inference_remote(s3)
+        self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+        states['TYPE'] = ('COMPLETED', 2)
+        self.make_observations_due()
+        self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+        return settings, s3, remote
+
+    def test_alert_types_classify_each_core_plan_and_hand_plans_to_publication(self):
+        from models.alert_type_tree import spec
+        with tempfile.TemporaryDirectory(prefix='aml-alert-types-') as root:
+            settings, s3, remote = self.typed_alerts(root)
+            keys = self.core_plan_keys()
+            self.assertGreater(len(keys), 0)
+            # One request: the core plans' Alerts and their transactions; no ledger copy position.
+            body = self.put_bodies[-1]
+            self.assertEqual((body['model_kind'], body['model_version'], sorted(body['input_urls'])),
+                             ('TYPE', spec.MODEL_VERSION, ['alert_transactions', 'targets']))
+            self.assertNotIn('replica', body)
+            inputs = 'dev/test/requests/{job_id}/TYPE/{request_id}/files/'.format(**body)
+            sent = pq.read_table(io.BytesIO(s3.objects[inputs + 'targets.parquet']))
+            self.assertEqual(sent.column('alert_key').to_pylist(), [key + 1 for key in keys])
+            rows = pq.read_table(io.BytesIO(s3.objects[inputs + 'alert_transactions.parquet']))
+            self.assertEqual(set(rows.column('tx_id').to_pylist()), set(self.ids))
+            self.assertEqual(self.admin.execute(
+                'SELECT plan_key,type_class FROM analysis.alert_plans WHERE run_id=%s AND type_class IS NOT NULL ORDER BY plan_key',
+                (self.run,)).fetchall(), [(key, (key + 1) % 9) for key in keys])
+            self.assertEqual(self.admin.execute('SELECT DISTINCT execution_id FROM analysis.alert_plans WHERE run_id=%s',
+                                                (self.run,)).fetchall(), [(self.token,)])
+            artifact = json.loads(self.admin.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERT_TYPES'",
+                                                     (self.run,)).fetchone()[0])
+            self.assertEqual(artifact['typedAlertCount'], len(keys))
+            self.assertEqual(self.admin.execute('SELECT model_version_type,feature_version_type FROM analysis.jobs WHERE job_id=%s',
+                                                (self.job,)).fetchone(), (spec.MODEL_VERSION, spec.FEATURE_VERSION))
+            self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alert_versions WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
+
+    def test_alert_types_retry_after_checkpoint_only_restamps_plans(self):
+        from alert_types.alert_type_inference import classify
+        with tempfile.TemporaryDirectory(prefix='aml-alert-types-') as root:
+            settings, s3, remote = self.typed_alerts(root)
+            types = self.admin.execute('SELECT plan_key,type_class FROM analysis.alert_plans WHERE run_id=%s ORDER BY plan_key', (self.run,)).fetchall()
+            submissions = len(self.submissions)
+            self.token = uuid4()
+            self.admin.execute('UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s', (self.token, self.job))
+            self.execution = InputExecution(self.job, self.run, self.token)
+            self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+            self.assertEqual(len(self.submissions), submissions)
+            self.assertEqual(self.admin.execute('SELECT plan_key,type_class FROM analysis.alert_plans WHERE run_id=%s ORDER BY plan_key', (self.run,)).fetchall(), types)
+            self.assertEqual(self.admin.execute('SELECT DISTINCT execution_id FROM analysis.alert_plans WHERE run_id=%s',
+                                                (self.run,)).fetchall(), [(self.token,)])
+
+    def test_alert_types_of_rebuilt_plans_are_a_new_request(self):
+        from alert_types.alert_type_inference import classify
+        with tempfile.TemporaryDirectory(prefix='aml-alert-types-') as root:
+            settings, s3, remote = self.typed_alerts(root)
+            task = "SELECT request_id FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'"
+            first = self.admin.execute(task, (self.run,)).fetchone()[0]
+            # What Alert 구성 leaves after it ran again (Spring deletes both checkpoints when the baseline changed).
+            self.admin.execute("DELETE FROM analysis.stage_results WHERE run_id=%s AND stage='ALERT_TYPES'", (self.run,))
+            self.admin.execute("UPDATE analysis.alert_plans SET build_generation=build_generation+1,type_class=NULL WHERE run_id=%s", (self.run,))
+            self.admin.execute("""UPDATE analysis.stage_results SET artifact=jsonb_set(artifact::jsonb,'{buildGeneration}',
+                to_jsonb((artifact::jsonb->>'buildGeneration')::int+1))::text WHERE run_id=%s AND stage='ALERTS'""", (self.run,))
+            self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.make_observations_due()
+            self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+            self.assertNotEqual(self.admin.execute(task, (self.run,)).fetchone()[0], first)
+            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.alert_plans WHERE run_id=%s AND type_class IS NOT NULL",
+                                                (self.run,)).fetchone()[0], len(self.core_plan_keys()))
+
+    def test_plans_without_core_transactions_complete_without_a_request(self):
+        from alert_types.alert_type_inference import classify
+        with tempfile.TemporaryDirectory(prefix='aml-alert-types-') as root:
+            settings, s3 = self.prepared_alert_plans(root)
+            self.admin.execute("UPDATE analysis.alert_plans SET payload=jsonb_set(payload::jsonb,'{evidence}','null')::text WHERE run_id=%s", (self.run,))
+            self.alert_types_stage()
+            remote, states = self.inference_remote(s3)
+            self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+            self.assertEqual(self.submissions, [])
+            self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone())
+            artifact = json.loads(self.admin.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERT_TYPES'",
+                                                     (self.run,)).fetchone()[0])
+            self.assertEqual(artifact['typedAlertCount'], 0)
+
+    def test_type_result_for_other_alerts_fails_visibly(self):
+        import pyarrow as pa
+        from alert_types.alert_type_inference import classify
+        from tests import inference_peer
+        with tempfile.TemporaryDirectory(prefix='aml-alert-types-') as root:
+            settings, s3 = self.prepared_alert_plans(root)
+            self.alert_types_stage()
+            remote, states = self.inference_remote(s3)
+            self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            states['TYPE'] = ('COMPLETED', 2)
+            self.make_observations_due()
+            right = inference_peer.classify_alerts
+            wrong = lambda targets: right(targets).set_column(
+                0, 'alert_key', pa.array([key + 100 for key in targets.column('alert_key').to_pylist()], pa.int64()))
+            with patch('tests.inference_peer.classify_alerts', side_effect=wrong):
+                self.assertEqual(classify(self.admin, self.execution, root, settings, s3, transport=remote), 77)
+            self.assertEqual(self.admin.execute("SELECT phase,status,error_code FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'",
+                                                (self.run,)).fetchone(), ('COLLECT', 'FAILED', 'RESULT_INVALID'))
+            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.alert_plans WHERE run_id=%s AND type_class IS NOT NULL',
+                                                (self.run,)).fetchone()[0], 0)
 
     def test_scores_atomic_join_percentile_and_retry_without_duplicates(self):
         from scores.result_collection import save_scores
@@ -901,7 +1009,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual([r[2] for r in rows], [0, 50, 100])
             self.assertEqual({r[3] for r in rows}, {self.run})
             self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.current_scores WHERE run_id=%s', (self.run,)).fetchone()[0], 0)
-            self.assertEqual(self.admin.execute('SELECT row_count,model_version_binary,feature_version_type FROM analysis.jobs WHERE job_id=%s', (self.job,)).fetchone(), (3, 'demo-random-v1', 'demo-input-v1'))
+            self.assertEqual(self.admin.execute('SELECT row_count,model_version_binary,feature_version_binary FROM analysis.jobs WHERE job_id=%s', (self.job,)).fetchone(), (3, 'demo-random-v1', 'demo-input-v1'))
             self.token = uuid4()
             self.admin.execute('UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s', (self.token, self.job))
             self.execution = InputExecution(self.job, self.run, self.token)
@@ -939,7 +1047,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.scoring_stage()
             save_scores(self.admin, self.execution, root, settings, s3)
             self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (self.job,)).fetchone()[0], 3)
-            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_requests WHERE run_id=%s', (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_requests WHERE run_id=%s', (self.run,)).fetchone()[0], 1)
 
     def test_cancel_after_score_staging_blocks_every_persistent_write(self):
         from scores import result_collection
@@ -949,30 +1057,28 @@ class FrozenInputPostgresTests(unittest.TestCase):
             stage = result_collection._stage
             def cancel(*args):
                 stage(*args)
-                if args[2] == 'TYPE':
+                if args[2] == 'BINARY':
                     self.admin.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED' WHERE run_id=%s", (self.run,))
             with patch('scores.result_collection._stage', side_effect=cancel), self.assertRaises(StaleExecution):
                 result_collection.save_scores(self.admin, self.execution, root, settings, s3)
             self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (self.job,)).fetchone()[0], 0)
 
-    def test_collection_rejects_corrupt_file_but_preserves_peer_and_request(self):
+    def test_collection_rejects_corrupt_file_but_preserves_request(self):
         from inference.inference_dispatch import advance
         from scores.result_collection import _download
         with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
             settings, s3 = self.publication_setup(root)
             remote, states = self.inference_remote(s3)
             advance(self.admin, self.execution, root, settings, s3, transport=remote)
-            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            states.update(BINARY=('COMPLETED', 2))
             def corrupt(client, bucket, descriptor, path):
-                if '/BINARY/' in descriptor['key']:
-                    client.objects[descriptor['key']] = b'corrupt'
+                client.objects[descriptor['key']] = b'corrupt'
                 _download(client, bucket, descriptor, path)
             with patch('scores.result_collection._download', side_effect=corrupt):
                 self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 77)
             self.assertEqual(self.admin.execute("SELECT phase,status,error_code FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(), ('COLLECT', 'FAILED', 'RESULT_INVALID'))
-            self.assertEqual(self.admin.execute("SELECT status FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], 'SUCCEEDED')
             self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis.stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
-            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_requests WHERE run_id=%s', (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_requests WHERE run_id=%s', (self.run,)).fetchone()[0], 1)
 
     def test_result_validation_rejects_invalid_probabilities_ids_and_schema(self):
         import pyarrow as pa
@@ -993,32 +1099,30 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 with self.subTest(table=table.to_pydict()):
                     pq.write_table(table, path)
                     with self.assertRaises(ProtocolError):
-                        _stage(self.admin, self.execution, 'BINARY', path, 3, 'INFERENCE')
-            types = calculate(build_targets(self.ids), 'type', model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
-            types = types.set_column(1, 'p_0', pa.array([1.0]*3))
+                        _stage(self.admin, self.execution, 'BINARY', path, 3, {}, 'INFERENCE')
+            # Type rows must sum to one (here 1 + 1/9 * 8).
+            types = pa.table({'alert_key': pa.array([1, 2, 3], pa.int64()),
+                              **{f'p_{i}': pa.array([1.0 if i == 0 else 1 / 9] * 3) for i in range(9)}})
             pq.write_table(types, path)
             with self.assertRaises(ProtocolError):
-                _stage(self.admin, self.execution, 'TYPE', path, 3, 'INFERENCE')
+                _stage(self.admin, self.execution, 'TYPE', path, 3, {'build_generation': 1}, 'INFERENCE')
 
-    def test_collection_transient_retry_does_not_rerun_successful_model(self):
+    def test_collection_transient_retry_does_not_rerun_the_model(self):
         from inference.inference_dispatch import advance
         from botocore.exceptions import EndpointConnectionError
-        from scores.result_collection import _download
         with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
             settings, s3 = self.publication_setup(root)
             remote, states = self.inference_remote(s3)
             advance(self.admin, self.execution, root, settings, s3, transport=remote)
-            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            states.update(BINARY=('COMPLETED', 2))
             def unavailable(client, bucket, descriptor, path):
-                if '/BINARY/' in descriptor['key']:
-                    raise EndpointConnectionError(endpoint_url='https://objects.example')
-                _download(client, bucket, descriptor, path)
+                raise EndpointConnectionError(endpoint_url='https://objects.example')
             with patch('scores.result_collection._download', side_effect=unavailable):
                 self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
-            peer = self.admin.execute("SELECT result_artifact FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0]
+            self.assertEqual(self.admin.execute("SELECT phase,status,error_code FROM analysis.model_tasks WHERE run_id=%s", (self.run,)).fetchone(), ('COLLECT', 'RETRY_WAIT', 'RESULT_TRANSFER_FAILED'))
             self.make_observations_due()
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
-            self.assertEqual(self.admin.execute("SELECT result_artifact FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone()[0], peer)
+            self.assertEqual(len(self.submissions), 1)
 
     def test_percentile_ties_have_equal_rank_and_threshold_count_uses_raw_score(self):
         from scores.result_collection import save_scores
@@ -1037,7 +1141,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             settings, s3 = self.publication_setup(root)
             remote, states = self.inference_remote(s3)
             advance(self.admin, self.execution, root, settings, s3, transport=remote)
-            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            states.update(BINARY=('COMPLETED', 2))
             def cancel(*args):
                 _download(*args)
                 self.admin.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED' WHERE run_id=%s", (self.run,))
@@ -1051,7 +1155,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             settings, s3 = self.publication_setup(root)
             remote, states = self.inference_remote(s3)
             advance(self.admin, self.execution, root, settings, s3, transport=remote)
-            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
+            states.update(BINARY=('COMPLETED', 2))
             with patch('scores.result_collection._stage', side_effect=SystemExit(74)), self.assertRaises(SystemExit):
                 advance(self.admin, self.execution, root, settings, s3, transport=remote)
             with self.assertRaises(StaleExecution):
@@ -1060,7 +1164,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.admin.execute('UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s', (token, self.job))
             self.execution = InputExecution(self.job, self.run, token)
             self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
-            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_requests WHERE run_id=%s', (self.run,)).fetchone()[0], 2)
+            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_requests WHERE run_id=%s', (self.run,)).fetchone()[0], 1)
 
     def test_unrelated_scored_transaction_cannot_be_overwritten(self):
         from scores.result_collection import save_scores
@@ -1086,8 +1190,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.admin.execute('UPDATE analysis.jobs SET current_run_id=%s WHERE job_id=%s', (previous, other))
             self.admin.execute('INSERT INTO analysis.run_replacements(run_id,replaces_run_id) VALUES(%s,%s)', (self.run, previous))
             self.admin.execute("INSERT INTO analysis.input_transactions SELECT %s,tx_id,input_role,occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version FROM analysis.input_transactions WHERE run_id=%s AND tx_id=%s",(previous,self.run,self.ids[0]))
-            self.admin.execute('''INSERT INTO analysis.scores(type_class,tx_id,run_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8)
-                VALUES(%s,%s,%s,0.8,1,0,0,0,0,0,0,0,0)''', (0, self.ids[0], previous))
+            self.admin.execute('INSERT INTO analysis.scores(tx_id,run_id,p_laundering) VALUES(%s,%s,0.8)', (self.ids[0], previous))
             save_scores(self.admin, self.execution, root, settings, s3)
             self.assertEqual(self.admin.execute('SELECT p_laundering FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (other,)).fetchone()[0], 0.8)
             self.assertIsNone(self.admin.execute('SELECT run_id FROM analysis.current_scores WHERE tx_id=%s', (self.ids[0],)).fetchone())
@@ -1126,11 +1229,11 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 return httpx.Response(202, json={**calls[-1], 'status': 'ACCEPTED', 'revision': 1})
             settings = replace(settings, api_url='http://127.0.0.1:8090', allow_loopback=True)
             advance_inference(self.admin, self.execution, root, settings, s3, transport=httpx.MockTransport(remote))
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 1)
             self.assertEqual({x['request_id'] for x in calls}, {str(x[1]) for x in before})
             self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s "
                              "AND phase='WAIT_REMOTE' AND status='WAITING' AND remote_deadline_at IS NOT NULL "
-                             "AND binding ? 'placeholder_recovery'", (self.run,)).fetchone()[0], 2)
+                             "AND binding ? 'placeholder_recovery'", (self.run,)).fetchone()[0], 1)
             with self.assertRaises(self.psycopg.errors.RaiseException):
                 self.recover_placeholder()
             self.admin.execute('ROLLBACK')
@@ -1148,7 +1251,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 self.admin.execute('ROLLBACK')
                 self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s "
                                  "AND phase='WAIT_REMOTE' AND NOT binding ? 'placeholder_recovery'",
-                                 (self.run,)).fetchone()[0], 2)
+                                 (self.run,)).fetchone()[0], 1)
 
 
 if __name__ == "__main__":

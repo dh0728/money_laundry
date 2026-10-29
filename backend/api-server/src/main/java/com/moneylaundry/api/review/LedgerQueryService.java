@@ -37,11 +37,6 @@ public class LedgerQueryService {
     ) s on s.tx_id=t.tx_id
     """;
 
-  private static final String TYPE =
-      """
-    left join lateral (select s.type_class::bigint as type_class) w on true
-    """;
-
   private static final String PAGE_SCORE =
       """
       left join lateral (
@@ -54,8 +49,7 @@ public class LedgerQueryService {
       ) s on true
       """;
 
-  public static final String BASE =
-      ACCOUNTS + SCORE + TYPE + " where t.integration_status='ACTIVE'";
+  public static final String BASE = ACCOUNTS + SCORE + " where t.integration_status='ACTIVE'";
 
   public record Filter(
       LocalDate from,
@@ -174,8 +168,7 @@ public class LedgerQueryService {
       t.amount_received as "amountReceived",t.receiving_currency as "receivingCurrency",t.payment_format as "paymentFormat",
       %s as "fromOwnerName",%s as "toOwnerName",
       s.p_laundering as "launderingScore",s.threshold_value as threshold,
-      s.p_laundering>=s.threshold_value as "isSuspicious", w.type_class as "typeClass",
-      array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8] as probabilities,
+      s.p_laundering>=s.threshold_value as "isSuspicious",
       case when s.job_id is null then 'UNANALYZED' when s.p_laundering>=s.threshold_value then 'SUSPICIOUS' else 'NORMAL' end as judgement
       """
             .formatted("fe.display_name", "re.display_name");
@@ -216,7 +209,6 @@ public class LedgerQueryService {
               + ACCOUNTS
               + " join page p on p.\"txId\"=t.tx_id "
               + PAGE_SCORE
-              + TYPE
               + " order by t.occurred_at desc,t.tx_id";
     } else throw AnalysisService.invalid();
     Object[] countArgs = args.toArray();
@@ -241,18 +233,7 @@ public class LedgerQueryService {
         transactions || rows.isEmpty()
             ? jdbc.queryForObject("select count(*) from (" + dataset + ") q", Long.class, countArgs)
             : ((Number) rows.getFirst().get("_total")).longValue();
-    for (var row : rows) {
-      row.remove("_total");
-      Object probs = row.remove("probabilities");
-      if (probs instanceof java.sql.Array arr)
-        try {
-          row.put("probabilities", arr.getArray());
-        } catch (java.sql.SQLException e) {
-          throw new IllegalStateException(e);
-        }
-      if (row.get("typeClass") != null)
-        row.put("typeName", CaseSummary.TYPES[((Number) row.get("typeClass")).intValue()]);
-    }
+    for (var row : rows) row.remove("_total");
     if ("transactions".equals(kind)) new CurrentCaseMembership(jdbc).attach(rows);
     return Map.of(
         "content",

@@ -20,10 +20,18 @@ public final class CaseSummary {
     "Stack"
   };
 
-  public static int type(Map<String, Object> scores) {
-    int best = 0;
-    for (int i = 1; i < 9; i++) if (score(scores, "p_" + i) > score(scores, "p_" + best)) best = i;
-    return best;
+  /** Name of an Alert version's type (alert_versions.type_class); 0 and null name no pattern. */
+  public static String typeName(Object typeClass) {
+    return typeClass == null || ((Number) typeClass).intValue() == 0
+        ? "패턴 미특정"
+        : TYPES[((Number) typeClass).intValue()];
+  }
+
+  /** A case's type from the types of its source Alert versions. */
+  public static String primaryType(Collection<String> types) {
+    var patterns = new TreeSet<>(types);
+    patterns.remove("패턴 미특정");
+    return patterns.isEmpty() ? "패턴 미특정" : patterns.size() > 1 ? "혼합" : patterns.first();
   }
 
   static double score(Map<String, Object> s, String name) {
@@ -61,13 +69,12 @@ public final class CaseSummary {
             (a, b) -> "SUBJECT".equals(b.get("reviewRole")) ? b : a);
     Map<String, BigDecimal> totals = new TreeMap<>();
     Map<String, BigDecimal> received = new HashMap<>(), paid = new HashMap<>();
-    Map<String, Integer> formats = new TreeMap<>(), types = new TreeMap<>(), days = new TreeMap<>();
+    Map<String, Integer> formats = new TreeMap<>(), days = new TreeMap<>();
     Map<String, BigDecimal> dayAmounts = new TreeMap<>();
     BigDecimal totalAmountUsd = BigDecimal.ZERO;
     boolean usdComplete = true;
     int seeds = 0;
     double risk = 0;
-    int[] votes = new int[9];
     String first = null, last = null;
     for (var m : unique.values()) {
       var t = ReviewJson.object(m.get("transaction"));
@@ -83,10 +90,7 @@ public final class CaseSummary {
       var scores = t.get("scores") == null ? null : ReviewJson.object(t.get("scores"));
       if ("SEED".equals(t.get("role"))) {
         seeds++;
-        if (scores != null) {
-          risk = Math.max(risk, score(scores, "p_laundering"));
-          votes[type(scores)]++;
-        }
+        if (scores != null) risk = Math.max(risk, score(scores, "p_laundering"));
       }
       if (!"SUBJECT".equals(m.get("reviewRole"))) continue;
       String at = t.get("occurredAt").toString();
@@ -103,13 +107,8 @@ public final class CaseSummary {
         String day = java.time.Instant.parse(at).atZone(BusinessTime.KST).toLocalDate().toString();
         days.merge(day, 1, Integer::sum);
         dayAmounts.merge(day + "|" + pc, p, BigDecimal::add);
-        if (scores != null) types.merge(TYPES[type(scores)], 1, Integer::sum);
       }
     }
-    int top = 0;
-    for (int i = 1; i < 9; i++) top = Math.max(top, votes[i]);
-    List<String> winners = new ArrayList<>();
-    for (int i = 1; i < 9; i++) if (votes[i] > 0 && votes[i] == top) winners.add(TYPES[i]);
     var net = new TreeMap<String, BigDecimal>(received);
     paid.forEach((k, v) -> net.merge(k, v.negate(), BigDecimal::add));
     var concentrations = new TreeMap<String, Double>();
@@ -135,10 +134,6 @@ public final class CaseSummary {
         unique.values().stream().filter(m -> "SUBJECT".equals(m.get("reviewRole"))).count());
     out.put("seedCount", seeds);
     out.put("riskScore", risk);
-    out.put(
-        "primaryType",
-        winners.isEmpty() ? "패턴 미특정" : winners.size() > 1 ? "혼합" : winners.getFirst());
-    out.put("typeShare", seeds == 0 ? null : (double) top / seeds);
     out.put("amountsByCurrency", totals);
     out.put("firstTxAt", first);
     out.put("lastTxAt", last);
@@ -164,7 +159,6 @@ public final class CaseSummary {
     out.put("paymentFormats", formats);
     out.put("dailySuspiciousCount", days);
     out.put("dailySuspiciousAmount", dayAmounts);
-    out.put("typeDistribution", types);
     return out;
   }
 }

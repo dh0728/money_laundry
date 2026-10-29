@@ -44,28 +44,15 @@ public final class CaseSummaryStore {
       if (alert != previousAlert || version != previousVersion) {
         var stored =
             jdbc.queryForMap(
-                "select v.evidence,b.threshold_value from review.alert_versions v join analysis.runs r using(run_id) join analysis.jobs b using(job_id) where v.alert_id=? and v.version=?",
+                "select v.evidence,v.type_class,b.threshold_value from review.alert_versions v join analysis.runs r using(run_id) join analysis.jobs b using(job_id) where v.alert_id=? and v.version=?",
                 alert,
                 version);
         var evidence = object(stored.get("evidence"));
         CaseSummary.annotateSuspicion(
             evidence, ((Number) stored.get("threshold_value")).doubleValue());
         transactions = new HashMap<>();
-        var originalMembers = new ArrayList<Map<String, Object>>();
-        for (var t : rows(evidence.get("transactions"))) {
-          transactions.put(number(t.get("txId")), t);
-          originalMembers.add(
-              Map.of(
-                  "txId",
-                  t.get("txId"),
-                  "transaction",
-                  t,
-                  "reviewRole",
-                  "CONTEXT".equals(t.get("role")) ? "CONTEXT" : "SUBJECT",
-                  "state",
-                  "PENDING"));
-        }
-        sourceType = CaseSummary.summarize(originalMembers).get("primaryType").toString();
+        for (var t : rows(evidence.get("transactions"))) transactions.put(number(t.get("txId")), t);
+        sourceType = CaseSummary.typeName(stored.get("type_class"));
         previousAlert = alert;
         previousVersion = version;
       }
@@ -92,6 +79,7 @@ public final class CaseSummaryStore {
               id));
     }
     var summary = new LinkedHashMap<>(CaseSummary.summarize(members));
+    summary.put("primaryType", CaseSummary.primaryType(sourceTypes));
     summary.put(
         "pendingCount",
         members.stream()

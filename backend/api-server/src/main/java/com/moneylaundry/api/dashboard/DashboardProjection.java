@@ -34,10 +34,6 @@ public class DashboardProjection {
         join analysis.jobs j on j.job_id=ar.job_id and j.current_run_id=ar.run_id
         where j.status='COMPLETED' and ar.status='COMPLETED'
       ) s on s.tx_id=t.tx_id
-      left join lateral (
-        select s.type_class::bigint as type_class
-        where s.job_id is not null
-      ) w on true
       where t.integration_status='ACTIVE'
       """;
 
@@ -196,10 +192,10 @@ public class DashboardProjection {
             + (all ? "" : " where business_date in (" + dates + ")"),
         args);
     jdbc.update(
-        "insert into ops.dashboard_model_counts select t.business_date,(s.detected_at at time zone 'Asia/Seoul')::date,s.p_laundering>=s.threshold_value,w.type_class,count(*) "
+        "insert into ops.dashboard_model_counts select t.business_date,(s.detected_at at time zone 'Asia/Seoul')::date,s.p_laundering>=s.threshold_value,count(*) "
             + SCORE_BASE
             + (all ? "" : " and t.business_date in (" + dates + ")")
-            + " group by 1,2,3,4",
+            + " group by 1,2,3",
         args);
   }
 
@@ -222,8 +218,10 @@ public class DashboardProjection {
         """
       create temporary table dashboard_next_cases on commit drop as
       select c.case_id,c.kind,c.alert_id,c.assignee_id,u.name as assignee,c.status,c.created_at,c.assigned_at,
-        c.closed_at,c.closed_by,r.first_review,(ea.alert_id is not null) as linked,ep.status as episode_status,c.risk_score as risk
+        c.closed_at,c.closed_by,r.first_review,(ea.alert_id is not null) as linked,ep.status as episode_status,c.risk_score as risk,
+        v.type_class
       from %s c join core.users u on u.user_id=c.assignee_id
+      left join review.alert_versions v on v.alert_id=c.alert_id and v.version=c.published_version
       left join review.episode_alerts ea on ea.alert_id=c.alert_id and c.kind='ALERT'
       left join review.episodes ep on ep.episode_id=ea.episode_id
       left join lateral (

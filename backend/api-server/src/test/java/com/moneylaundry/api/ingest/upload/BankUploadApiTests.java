@@ -1082,7 +1082,7 @@ class BankUploadApiTests {
     long oldJob =
         jdbc.queryForObject("select job_id from analysis.runs where run_id=?", Long.class, old);
     jdbc.update(
-        "insert into analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,type_class) values(?,?,.9,1,0,0,0,0,0,0,0,0,0)",
+        "insert into analysis.scores(run_id,tx_id,p_laundering) values(?,?,.9)",
         old,
         activeIds().getFirst());
     long a2 = replace(10, correction(10, a), HEADER + x().replace(",100,", ",200,") + y()),

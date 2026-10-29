@@ -72,7 +72,7 @@ class SuspiciousTransactionApiTests {
           run,
           tx);
       jdbc.update(
-          "insert into analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,score_pct,type_class) values(?,?,?,0.4,0.4,0.2,0,0,0,0,0,0,50,0)",
+          "insert into analysis.scores(run_id,tx_id,p_laundering,score_pct) values(?,?,?,50)",
           run,
           tx,
           n == 0 ? 0.6 : n == 1 ? 0.7 : 0.95);
@@ -81,19 +81,12 @@ class SuspiciousTransactionApiTests {
   }
 
   @Test
-  void db_threshold_ties_candidates_paging_and_participant_bank_filter() throws Exception {
+  void db_threshold_ties_paging_and_participant_bank_filter() throws Exception {
     mvc.perform(get("/api/v1/suspicious-transactions").param("size", "1").param("bankId", "992"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.totalElements").value(2))
-        .andExpect(jsonPath("$.content[0].launderingScore").value(0.95))
-        .andExpect(jsonPath("$.content[0].typeClass").value(0))
-        .andExpect(jsonPath("$.content[0].typeName").value("NON_PATTERN"))
-        .andExpect(jsonPath("$.content[0].typeCandidates[0].name").value("NON_PATTERN"))
-        .andExpect(jsonPath("$.content[0].typeCandidates.length()").value(2))
-        .andExpect(jsonPath("$.content[0].agreement").value("ATYPICAL"));
+        .andExpect(jsonPath("$.content[0].launderingScore").value(0.95));
     mvc.perform(get("/api/v1/suspicious-transactions").param("bankId", "993"))
-        .andExpect(jsonPath("$.totalElements").value(0));
-    mvc.perform(get("/api/v1/suspicious-transactions").param("typeClass", "1"))
         .andExpect(jsonPath("$.totalElements").value(0));
     mvc.perform(get("/api/v1/suspicious-transactions").param("minScore", "0.9"))
         .andExpect(jsonPath("$.totalElements").value(1));
@@ -110,7 +103,7 @@ class SuspiciousTransactionApiTests {
   }
 
   @Test
-  void ledger_non_pattern_does_not_imply_suspicious() {
+  void ledger_marks_rows_suspicious_by_their_job_threshold() {
     var ledger = new com.moneylaundry.api.review.LedgerQueryService(jdbc);
     var page =
         ledger.query(
@@ -120,7 +113,6 @@ class SuspiciousTransactionApiTests {
     var rows = (java.util.List<java.util.Map<String, Object>>) page.get("content");
     org.assertj.core.api.Assertions.assertThat(rows).hasSize(3);
     for (var row : rows) {
-      org.assertj.core.api.Assertions.assertThat(row.get("typeName")).isEqualTo("NON_PATTERN");
       org.assertj.core.api.Assertions.assertThat(row.get("amountUsd").toString()).startsWith("1");
     }
     org.assertj.core.api.Assertions.assertThat(

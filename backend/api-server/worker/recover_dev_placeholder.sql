@@ -25,13 +25,13 @@ BEGIN
         AND t.input_artifact IS NOT NULL AND t.result_artifact IS NULL
         AND t.remote_revision IS NULL AND t.remote_snapshot IS NULL
         AND t.remote_deadline_at IS NULL AND t.last_event_id IS NULL
-        AND t.execution_id IS NULL AND t.finished_at IS NULL) <> 2
+        AND t.execution_id IS NULL AND t.finished_at IS NULL) <> 1
      OR EXISTS(SELECT 1 FROM analysis.stage_results WHERE run_id=target_run
                AND stage IN ('INFERENCE','SCORES','ALERTS'))
      OR EXISTS(SELECT 1 FROM analysis.scores WHERE run_id=target_run)
      OR EXISTS(SELECT 1 FROM analysis.cancel_outbox c JOIN analysis.model_requests r
                USING(request_id,execution_round) WHERE r.run_id=target_run) THEN
-    RAISE EXCEPTION 'RECOVERY_REFUSED: expected two unaccepted example.com requests';
+    RAISE EXCEPTION 'RECOVERY_REFUSED: expected one unaccepted example.com request';
   END IF;
   UPDATE analysis.model_tasks
     SET binding=(binding-'publication') || jsonb_build_object('placeholder_recovery',

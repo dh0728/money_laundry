@@ -193,7 +193,7 @@ CREATE TABLE analysis.jobs (
  analysis_date DATE NOT NULL UNIQUE, analysis_cutoff_at TIMESTAMPTZ NOT NULL,
  business_at TIMESTAMPTZ NOT NULL, threshold_value DOUBLE PRECISION NOT NULL CHECK(threshold_value>0 AND threshold_value<=1),
  status TEXT NOT NULL CHECK(status IN ('SCHEDULED','QUEUED','RUNNING','RETRY_WAIT','FAILED','COMPLETED')),
- current_stage TEXT NOT NULL CHECK(current_stage IN ('WAIT_INGEST','INTEGRATE','FREEZE_INPUT','FEATURES','INFERENCE','SCORES','ALERTS','COMPLETE')),
+ current_stage TEXT NOT NULL CHECK(current_stage IN ('WAIT_INGEST','INTEGRATE','FREEZE_INPUT','FEATURES','INFERENCE','SCORES','ALERTS','ALERT_TYPES','COMPLETE')),
  current_run_id UUID, execution_id UUID, execution_owner UUID,
  attempt_count INTEGER NOT NULL DEFAULT 0, stage_attempt_count INTEGER NOT NULL DEFAULT 0,
  consecutive_failures INTEGER NOT NULL DEFAULT 0, retry_at TIMESTAMPTZ,
@@ -326,24 +326,14 @@ CREATE TABLE analysis.cancel_outbox (
 );
 CREATE TABLE analysis.features (
  run_id UUID NOT NULL, tx_id BIGINT NOT NULL,
- model_kind TEXT NOT NULL CHECK(model_kind IN ('BINARY','TYPE')),
+ model_kind TEXT NOT NULL CHECK(model_kind='BINARY'),
  feature_version TEXT NOT NULL, features JSONB NOT NULL,
  PRIMARY KEY(run_id,tx_id,model_kind), FOREIGN KEY(run_id,tx_id) REFERENCES analysis.input_transactions
 );
 CREATE TABLE analysis.scores (
  run_id UUID NOT NULL, tx_id BIGINT NOT NULL,
  p_laundering DOUBLE PRECISION NOT NULL CHECK(p_laundering>=0 AND p_laundering<=1),
- p_0 DOUBLE PRECISION NOT NULL CHECK(p_0>=0 AND p_0<=1),
- p_1 DOUBLE PRECISION NOT NULL CHECK(p_1>=0 AND p_1<=1),
- p_2 DOUBLE PRECISION NOT NULL CHECK(p_2>=0 AND p_2<=1),
- p_3 DOUBLE PRECISION NOT NULL CHECK(p_3>=0 AND p_3<=1),
- p_4 DOUBLE PRECISION NOT NULL CHECK(p_4>=0 AND p_4<=1),
- p_5 DOUBLE PRECISION NOT NULL CHECK(p_5>=0 AND p_5<=1),
- p_6 DOUBLE PRECISION NOT NULL CHECK(p_6>=0 AND p_6<=1),
- p_7 DOUBLE PRECISION NOT NULL CHECK(p_7>=0 AND p_7<=1),
- p_8 DOUBLE PRECISION NOT NULL CHECK(p_8>=0 AND p_8<=1),
  score_pct DOUBLE PRECISION CHECK(score_pct>=0 AND score_pct<=100),
- type_class SMALLINT NOT NULL CHECK(type_class BETWEEN 0 AND 8),
  PRIMARY KEY(run_id,tx_id), FOREIGN KEY(run_id,tx_id) REFERENCES analysis.input_transactions
 );
 CREATE TABLE analysis.current_scores (
@@ -396,6 +386,8 @@ CREATE TABLE review.alert_versions (
  alert_id BIGINT NOT NULL REFERENCES review.alerts, version INTEGER NOT NULL CHECK(version>0),
  run_id UUID NOT NULL REFERENCES analysis.runs, fingerprint CHAR(64) NOT NULL,
  evidence JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), published_at TIMESTAMPTZ,
+ -- Alert type from the ALERT_TYPES stage (0 NON_PATTERN .. 8 Stack); null when the version has no core transactions.
+ type_class SMALLINT CHECK(type_class BETWEEN 0 AND 8),
  PRIMARY KEY(alert_id,version), UNIQUE(alert_id,run_id)
 );
 ALTER TABLE review.alerts ADD CONSTRAINT alerts_published_version
@@ -405,7 +397,7 @@ CREATE TABLE analysis.alert_plans (
  execution_id UUID NOT NULL, build_generation INTEGER NOT NULL CHECK(build_generation>0),
  plan_digest CHAR(64) NOT NULL, action TEXT NOT NULL
  CHECK(action IN ('NEW','UPDATE','MERGE','PROPOSE','FOLLOWUP','WITHDRAW','NOOP')),
- payload TEXT NOT NULL, PRIMARY KEY(run_id,plan_key)
+ payload TEXT NOT NULL, type_class SMALLINT CHECK(type_class BETWEEN 0 AND 8), PRIMARY KEY(run_id,plan_key)
 );
 CREATE TABLE review.alert_transactions (
  alert_id BIGINT NOT NULL, version INTEGER NOT NULL, tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
@@ -455,8 +447,7 @@ CREATE VIEW analysis.run_inputs AS
 -- frozen score does not build each document.
 CREATE VIEW analysis.run_scores AS
  SELECT r.run_id,l.tx_id,l.score_run_id,jsonb_build_object(
-   'p_laundering',s.p_laundering,'p_0',s.p_0,'p_1',s.p_1,'p_2',s.p_2,'p_3',s.p_3,'p_4',s.p_4,
-   'p_5',s.p_5,'p_6',s.p_6,'p_7',s.p_7,'p_8',s.p_8,'score_pct',s.score_pct,'type_class',s.type_class) AS scores,
+   'p_laundering',s.p_laundering,'score_pct',s.score_pct) AS scores,
    to_jsonb(s.p_laundering) AS p_laundering
  FROM analysis.runs r
  JOIN analysis.score_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq)
@@ -746,17 +737,16 @@ create table ops.dashboard_model_counts (
   business_date date not null,
   detected_day date,
   suspicious boolean,
-  type_class bigint,
   n bigint not null check(n>0)
 );
 create index dashboard_model_business_idx on ops.dashboard_model_counts(business_date);
-create index dashboard_model_detected_idx on ops.dashboard_model_counts(detected_day);
 create table ops.dashboard_case_items (
   case_id bigint primary key, kind text not null, alert_id bigint,
   assignee_id bigint not null, assignee text not null, status text not null,
   created_at timestamptz not null, assigned_at timestamptz not null,
   closed_at timestamptz, closed_by bigint, first_review timestamptz,
-  linked boolean not null, episode_status text, risk double precision
+  linked boolean not null, episode_status text, risk double precision,
+  type_class smallint
 );
 create index dashboard_case_priority_idx on ops.dashboard_case_items
   (assignee_id,risk desc,created_at,case_id) where status='OPEN';
@@ -852,15 +842,15 @@ language plpgsql security definer set search_path=pg_catalog as $$
 begin
   if TG_OP='INSERT' then
     insert into ops.dashboard_dirty(component,bucket)
-      with changed as (select tx_id,run_id,p_laundering,type_class from new_rows)
+      with changed as (select tx_id,run_id,p_laundering from new_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id join analysis.current_scores c on c.tx_id=x.tx_id and c.run_id=x.run_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='DELETE' then
     insert into ops.dashboard_dirty(component,bucket)
-      with changed as (select tx_id,run_id,p_laundering,type_class from old_rows)
+      with changed as (select tx_id,run_id,p_laundering from old_rows)
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id join analysis.current_scores c on c.tx_id=x.tx_id and c.run_id=x.run_id) dates(bucket) on conflict do nothing;
   elsif TG_OP='UPDATE' then
     insert into ops.dashboard_dirty(component,bucket)
-      with changed as ((select tx_id,run_id,p_laundering,type_class from new_rows except select tx_id,run_id,p_laundering,type_class from old_rows) union (select tx_id,run_id,p_laundering,type_class from old_rows except select tx_id,run_id,p_laundering,type_class from new_rows))
+      with changed as ((select tx_id,run_id,p_laundering from new_rows except select tx_id,run_id,p_laundering from old_rows) union (select tx_id,run_id,p_laundering from old_rows except select tx_id,run_id,p_laundering from new_rows))
       select 'MODEL',bucket from (select distinct t.business_date::text from changed x join ledger.transactions t on t.tx_id=x.tx_id join analysis.current_scores c on c.tx_id=x.tx_id and c.run_id=x.run_id) dates(bucket) on conflict do nothing;
   end if;
   return null;

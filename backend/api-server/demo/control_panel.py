@@ -16,7 +16,7 @@ from api_client import ApiClient, ApiError
 STAGE_NAMES = {
     'WAIT_INGEST': '적재 완료 대기', 'INTEGRATE': '거래 통합', 'FREEZE_INPUT': '분석 입력 고정',
     'FEATURES': '모델 입력 준비', 'INFERENCE': '모델 추론', 'SCORES': '점수 저장',
-    'ALERTS': 'Alert 구성', 'COMPLETE': 'Alert 공개',
+    'ALERTS': 'Alert 구성', 'ALERT_TYPES': 'Alert 유형 분류', 'COMPLETE': 'Alert 공개',
 }
 MODEL_NAMES = {'BINARY': '이진', 'TYPE': '유형'}
 REMOTE_NAMES = {

@@ -315,8 +315,6 @@ def case_detail(client, user, case_id):
         st.subheader('연결 유형' if d['kind'] == 'EPISODE' else '대표 탐지 유형')
         st.write(' · '.join(d['primaryTypes']) if d['kind'] == 'EPISODE' else summary['primaryType'])
         st.caption('모델 분류의 요약이며 실제 세탁 패턴의 정답이 아닙니다.')
-        if d['kind'] == 'ALERT':
-            st.write('씨앗 중 대표 유형 비중', summary['typeShare'])
         patterns = {'Fan-out': 'A -> B; A -> C; A -> D;', 'Fan-in': 'B -> A; C -> A; D -> A;',
                     'Gather-scatter': 'A -> M; B -> M; M -> C; M -> D;',
                     'Scatter-gather': 'A -> B; A -> C; B -> D; C -> D;',
@@ -356,7 +354,7 @@ def cases_page(client, user, today, kind):
     if not rows:
         st.info('조건에 맞는 사건이 없습니다.')
         return
-    shown = [dict(선택=False, 사건=r['caseId'], Alert=r.get('alertId'), 위험도=r['summary']['riskScore'], 유형=' · '.join(r['primaryTypes']), 씨앗유형비중=r['summary']['typeShare'], 거래금액=str(r['summary']['amountsByCurrency']), 거래수=r['summary']['txCount'], 담당자=r['assigneeName'], 상태=r['status'], 탐지일=display(r['createdAt']), 경과일=r['ageDays']) for r in rows]
+    shown = [dict(선택=False, 사건=r['caseId'], Alert=r.get('alertId'), 위험도=r['summary']['riskScore'], 유형=' · '.join(r['primaryTypes']), 거래금액=str(r['summary']['amountsByCurrency']), 거래수=r['summary']['txCount'], 담당자=r['assigneeName'], 상태=r['status'], 탐지일=display(r['createdAt']), 경과일=r['ageDays']) for r in rows]
     edited = st.data_editor(pd.DataFrame(shown), hide_index=True, disabled=[k for k in shown[0] if k != '선택'], key=kind + '_selection')
     picked = edited.loc[edited['선택'], '사건'].tolist()
     if kind == 'ALERT' and user['role'] == 'STAFF' and picked:
@@ -436,18 +434,8 @@ def dashboard_page(client, user, today):
         st.subheader('기관 탐지 현황')
         if data['daily']:
             st.line_chart(pd.DataFrame(data['daily']), x='day', y=['incoming', 'completed'])
-        cols = st.columns(2)
-        with cols[0]:
-            st.subheader('모델 판정 조합 분포')
-            counts = {r['agreement']: r['count'] for r in data['agreements']}
-            frame = pd.DataFrame([{'유형': k, '건수': counts.get(k, 0)} for k in ['STRONG', 'ATYPICAL', 'PATTERN_ONLY', 'WEAK']])
-            total = frame['건수'].sum()
-            frame['비율'] = frame['건수'] / total if total else 0
-            st.altair_chart(alt.Chart(frame).mark_arc(innerRadius=65).encode(theta='건수:Q', color='유형:N', tooltip=['유형', '건수', alt.Tooltip('비율:Q', format='.1%')]), width='stretch')
-            table(frame.to_dict('records'))
-        with cols[1]:
-            st.subheader('의심 거래 탐지 유형별 분포')
-            chart_map({TYPE_NAMES[r['type']]: r['count'] for r in data['types']}, '거래 수', horizontal=True)
+        st.subheader('Alert 유형별 분포')
+        chart_map({TYPE_NAMES[r['type']]: r['count'] for r in data['types']}, 'Alert 수', horizontal=True)
 
 
 def main():

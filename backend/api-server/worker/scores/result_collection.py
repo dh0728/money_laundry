@@ -1,7 +1,9 @@
-"""Stream model results, validate frozen TARGETs, and atomically persist scores.
+"""Stream model results, validate them against what was sent, and atomically persist scores.
 
-S3 objects and local files are not completion signals. Only fenced DB records are.
-Large files are copied/validated in bounded batches, without application row locks.
+A binary result holds one probability per frozen TARGET (tx_id); a type result holds the
+9 type probabilities per classified Alert (alert_key, see alert_types). S3 objects and local
+files are not completion signals. Only fenced DB records are. Large files are
+copied/validated in bounded batches, without application row locks.
 """
 import hashlib
 import math
@@ -15,7 +17,7 @@ import pyarrow.parquet as pq
 from botocore.exceptions import BotoCoreError, ClientError
 
 from common.frozen_input import StaleExecution
-from common.run_fence import lock_stage, save_checkpoint
+from common.run_fence import MODEL_STAGES, lock_stage, save_checkpoint
 from common.worker_transport import ProtocolError, Request, encode
 
 
@@ -34,6 +36,19 @@ def _columns(kind):
     if kind == 'TYPE':
         return [f'p_{i}' for i in range(9)]
     raise ProtocolError('Invalid result model kind')
+
+
+def _key(kind):
+    return 'alert_key' if kind == 'TYPE' else 'tx_id'
+
+
+def _expected(execution, kind, inputs):
+    """Query and arguments of the keys a result must hold exactly: what the request was built from."""
+    if kind == 'TYPE':
+        from alert_types.alert_type_inference import ALERT_KEYS
+        return ALERT_KEYS, (execution.run_id, inputs['build_generation'])
+    return ("SELECT tx_id AS key FROM analysis.input_transactions WHERE run_id=%s AND input_role='TARGET'",
+            (execution.run_id,))
 
 
 def _table_name(kind):
@@ -86,15 +101,15 @@ def _download(s3, bucket, descriptor, path):
         temporary.unlink(missing_ok=True)
 
 
-def _stage(connection, execution, kind, path, rows, stage):
-    """Validate schema, probabilities and the exact TARGET set in a session table."""
-    columns, name = _columns(kind), _table_name(kind)
-    schema = pa.schema([('tx_id', pa.int64()), *[(c, pa.float64()) for c in columns]])
+def _stage(connection, execution, kind, path, rows, inputs, stage):
+    """Validate schema, probabilities and the exact key set in a session table."""
+    columns, name, key = _columns(kind), _table_name(kind), _key(kind)
+    schema = pa.schema([(key, pa.int64()), *[(c, pa.float64()) for c in columns]])
     try:
         parquet = pq.ParquetFile(path)
         if not parquet.schema_arrow.equals(schema, check_metadata=False) or parquet.metadata.num_rows != rows:
             raise ProtocolError('Result schema or row count mismatch')
-        connection.execute(f'''CREATE TEMP TABLE IF NOT EXISTS {name}(tx_id bigint PRIMARY KEY,
+        connection.execute(f'''CREATE TEMP TABLE IF NOT EXISTS {name}({key} bigint PRIMARY KEY,
             {','.join(c + ' double precision NOT NULL' for c in columns)})''')
         connection.execute(f'TRUNCATE {name}')
         for batch in parquet.iter_batches(batch_size=4096):
@@ -102,7 +117,7 @@ def _stage(connection, execution, kind, path, rows, stage):
             with connection.cursor() as cursor:
                 with cursor.copy(f'COPY {name} FROM STDIN') as copy:
                     for row in batch.to_pylist():
-                        identifier = row['tx_id']
+                        identifier = row[key]
                         values = [row[c] for c in columns]
                         if (type(identifier) is not int or identifier <= 0
                                 or any(v is None or not math.isfinite(v) or not 0 <= v <= 1 for v in values)
@@ -114,12 +129,12 @@ def _stage(connection, execution, kind, path, rows, stage):
     finally:
         if 'parquet' in locals():
             parquet.close()
+    expected, arguments = _expected(execution, kind, inputs)
     mismatch = connection.execute(f'''SELECT EXISTS(
-        SELECT 1 FROM {name} s FULL JOIN
-          (SELECT tx_id FROM analysis.input_transactions WHERE run_id=%s AND input_role='TARGET') i USING(tx_id)
-        WHERE s.tx_id IS NULL OR i.tx_id IS NULL)''', (execution.run_id,)).fetchone()[0]
+        SELECT 1 FROM {name} s FULL JOIN ({expected}) i ON i.key=s.{key}
+        WHERE s.{key} IS NULL OR i.key IS NULL)''', arguments).fetchone()[0]
     if mismatch or rows <= 0:
-        raise ProtocolError('Result TARGET set mismatch')
+        raise ProtocolError('Result key set mismatch')
 
 
 def _failure(connection, execution, kind, token, error):
@@ -129,7 +144,7 @@ def _failure(connection, execution, kind, token, error):
                      or error.response.get('Error', {}).get('Code') in ('SlowDown', 'RequestTimeout', 'NoSuchKey'))
     try:
         with connection.transaction():
-            lock_stage(connection, execution)
+            lock_stage(connection, execution, MODEL_STAGES[kind])
             connection.execute('''UPDATE analysis.model_tasks SET execution_id=null,execution_owner=null,
                 consecutive_failures=consecutive_failures+1,error_code=%s,
                 status=CASE WHEN %s AND consecutive_failures<2 THEN 'RETRY_WAIT' ELSE 'FAILED' END,
@@ -146,7 +161,7 @@ def _failure(connection, execution, kind, token, error):
 def collect_model(connection, execution, kind, storage_root, settings, s3):
     token = uuid4()
     with connection.transaction():
-        lock_stage(connection, execution)
+        lock_stage(connection, execution, MODEL_STAGES[kind])
         row = connection.execute('''SELECT binding,input_artifact,request_id,execution_round,remote_snapshot,
             phase,status,execution_owner FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s FOR UPDATE''',
             (execution.run_id, kind)).fetchone()
@@ -165,10 +180,10 @@ def collect_model(connection, execution, kind, storage_root, settings, s3):
     path = root / relative
     try:
         _download(s3, settings.bucket, result['files'][0], path)
-        _stage(connection, execution, kind, path, result['row_count'], 'INFERENCE')
+        _stage(connection, execution, kind, path, result['row_count'], row[1], MODEL_STAGES[kind])
         artifact = dict(result, path=relative.as_posix())
         with connection.transaction():
-            lock_stage(connection, execution)
+            lock_stage(connection, execution, MODEL_STAGES[kind])
             changed = connection.execute('''UPDATE analysis.model_tasks SET phase='DONE',status='SUCCEEDED',
                 result_artifact=%s::jsonb,execution_id=null,execution_owner=null,consecutive_failures=0,
                 error_code=null,action_required=false,retry_at=null,next_poll_at=null,finished_at=now(),updated_at=now()
@@ -189,10 +204,10 @@ def finish_inference(connection, execution):
     with connection.transaction():
         lock_stage(connection, execution)
         rows = connection.execute('''SELECT model_kind,result_artifact FROM analysis.model_tasks
-            WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED' AND result_artifact IS NOT NULL''',
-            (execution.run_id,)).fetchall()
-        if {r[0] for r in rows} != {'BINARY', 'TYPE'}:
-            raise ProtocolError('Both validated results are required')
+            WHERE run_id=%s AND model_kind='BINARY' AND phase='DONE' AND status='SUCCEEDED'
+              AND result_artifact IS NOT NULL''', (execution.run_id,)).fetchall()
+        if len(rows) != 1:
+            raise ProtocolError('The validated binary result is required')
         artifact = encode(dict(run_id=str(execution.run_id), models=dict(rows))).decode()
         save_checkpoint(connection, execution, 'INFERENCE', artifact)
 
@@ -202,47 +217,55 @@ def run(connection, execution, context):
     save_scores(connection, execution, context.storage_dir, context.settings, context.s3)
 
 
+def done_task(connection, execution, kind):
+    """The model task's stored result columns, once collection has finished."""
+    row = connection.execute('''SELECT binding,input_artifact,request_id,execution_round,
+        remote_snapshot,result_artifact FROM analysis.model_tasks
+        WHERE run_id=%s AND model_kind=%s AND phase='DONE' AND status='SUCCEEDED' ''',
+        (execution.run_id, kind)).fetchone()
+    if row is None:
+        raise ProtocolError('The model result is required')
+    return row
+
+
+def stage_stored(connection, execution, kind, data, storage_root, settings, s3, stage):
+    """Validate a collected result again into its session table (collected_<kind>); return the binding."""
+    root = Path(storage_root).resolve()
+    result, binding = _metadata(execution, kind, data[:5])
+    stored = data[5]
+    if stored is None or {k: v for k, v in stored.items() if k != 'path'} != result:
+        raise ProtocolError('Stored result binding mismatch')
+    if binding['publication'] != settings.binding():
+        raise ProtocolError('Result destination changed')
+    path = (root / stored['path']).resolve()
+    if not path.is_relative_to(root):
+        raise ProtocolError('Result path escapes storage')
+    if not _verified(path, result['files'][0]):
+        # Local files are a cache; restore the same immutable remote result.
+        # Separate token path avoids colliding with an abandoned process.
+        path = root / 'runs' / str(execution.run_id) / kind / str(execution.execution_id) / 'scores.parquet'
+        _download(s3, settings.bucket, result['files'][0], path)
+    _stage(connection, execution, kind, path, result['row_count'], data[1], stage)
+    return binding
+
+
 def save_scores(connection, execution, storage_root, settings, s3):
     with connection.transaction():
         lock_stage(connection, execution, 'SCORES')
-        rows = connection.execute('''SELECT model_kind,binding,input_artifact,request_id,execution_round,
-            remote_snapshot,result_artifact FROM analysis.model_tasks
-            WHERE run_id=%s AND phase='DONE' AND status='SUCCEEDED' ORDER BY model_kind''',
-            (execution.run_id,)).fetchall()
-        if {r[0] for r in rows} != {'BINARY', 'TYPE'}:
-            raise ProtocolError('Both model results are required')
+        task = done_task(connection, execution, 'BINARY')
         # A persisted checkpoint is authoritative after a lost worker response.
         saved = connection.execute('''SELECT artifact FROM analysis.stage_results
             WHERE run_id=%s AND stage='SCORES' AND completed''', (execution.run_id,)).fetchone()
         if saved:
             save_checkpoint(connection, execution, 'SCORES', saved[0])
             return
-    root = Path(storage_root).resolve()
-    bindings = {}
-    for kind, *data in rows:
-        result, binding = _metadata(execution, kind, data[:5])
-        stored = data[5]
-        if stored is None or {k: v for k, v in stored.items() if k != 'path'} != result:
-            raise ProtocolError('Stored result binding mismatch')
-        if binding['publication'] != settings.binding():
-            raise ProtocolError('Result destination changed')
-        path = (root / stored['path']).resolve()
-        if not path.is_relative_to(root):
-            raise ProtocolError('Result path escapes storage')
-        if not _verified(path, result['files'][0]):
-            # Local files are a cache; restore the same immutable remote result.
-            # Separate token path avoids colliding with an abandoned process.
-            path = root / 'runs' / str(execution.run_id) / kind / str(execution.execution_id) / 'scores.parquet'
-            _download(s3, settings.bucket, result['files'][0], path)
-        _stage(connection, execution, kind, path, result['row_count'], 'SCORES')
-        bindings[kind] = binding
+    binding = stage_stored(connection, execution, 'BINARY', task, storage_root, settings, s3, 'SCORES')
     # Rank work precedes the short fenced transaction. Equal scores share the
     # lowest rank; a singleton is 0. This is 100 * (rank - 1) / (count - 1).
     connection.execute('DROP TABLE IF EXISTS pg_temp.combined_scores')
-    connection.execute('''CREATE TEMP TABLE combined_scores AS SELECT b.tx_id,b.p_laundering,
-        t.p_0,t.p_1,t.p_2,t.p_3,t.p_4,t.p_5,t.p_6,t.p_7,t.p_8,
-        100.0*percent_rank() OVER(ORDER BY b.p_laundering) AS score_pct
-        FROM collected_binary b JOIN collected_type t USING(tx_id)''')
+    connection.execute('''CREATE TEMP TABLE combined_scores AS SELECT tx_id,p_laundering,
+        100.0*percent_rank() OVER(ORDER BY p_laundering) AS score_pct
+        FROM collected_binary''')
     with connection.transaction():
         lock_stage(connection, execution, 'SCORES')
         if connection.execute('''SELECT EXISTS(SELECT 1 FROM combined_scores s JOIN ledger.transactions t USING(tx_id)
@@ -252,14 +275,11 @@ def save_scores(connection, execution, storage_root, settings, s3):
               WHERE i.tx_id=t.tx_id AND i.input_role='TARGET' AND r.status='COMPLETED'))''',
             (execution.run_id,)).fetchone()[0]:
             raise ProtocolError('TARGET is no longer eligible for scoring')
-        connection.execute('''INSERT INTO analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,score_pct,type_class)
-            SELECT %s,s.*,array_position(array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8],
-              greatest(s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8))-1
-            FROM combined_scores s''', (execution.run_id,))
-        connection.execute('''UPDATE analysis.jobs SET model_version_binary=%s,model_version_type=%s,
-            feature_version_binary=%s,feature_version_type=%s,row_count=(SELECT count(*) FROM combined_scores),
+        connection.execute('''INSERT INTO analysis.scores(run_id,tx_id,p_laundering,score_pct)
+            SELECT %s,s.* FROM combined_scores s''', (execution.run_id,))
+        connection.execute('''UPDATE analysis.jobs SET model_version_binary=%s,
+            feature_version_binary=%s,row_count=(SELECT count(*) FROM combined_scores),
             suspicious_tx_count=(SELECT count(*) FROM combined_scores WHERE p_laundering>=threshold_value)
-            WHERE job_id=%s''', (bindings['BINARY']['model_version'], bindings['TYPE']['model_version'],
-                bindings['BINARY']['feature_version'], bindings['TYPE']['feature_version'], execution.job_id))
+            WHERE job_id=%s''', (binding['model_version'], binding['feature_version'], execution.job_id))
         save_checkpoint(connection, execution, 'SCORES', encode(dict(run_id=str(execution.run_id),
-            row_count=rows[0][2]['row_count'], percentile='percent_rank-v1')).decode())
+            row_count=task[1]['row_count'], percentile='percent_rank-v1')).decode())

@@ -14,7 +14,7 @@ from uuid import uuid4
 import httpx
 
 from common.frozen_input import StaleExecution
-from common.run_fence import lock_stage
+from common.run_fence import MODEL_STAGES, lock_stage
 from common.worker_transport import ProtocolError, Request, S3Store, encode, publish
 
 
@@ -82,12 +82,12 @@ def run(connection, execution, context):
 
 
 def publish_model(connection, execution, kind, storage_root, settings, s3, *, transport=None):
-    if kind not in ('BINARY', 'TYPE') or connection.autocommit is not True:
+    if kind not in MODEL_STAGES or connection.autocommit is not True:
         raise ProtocolError('Invalid publication operation')
     settings.validate()
     token = uuid4()
     with connection.transaction():
-        lock_stage(connection, execution)
+        lock_stage(connection, execution, MODEL_STAGES[kind])
         row = connection.execute('''
             SELECT phase,status,binding,input_artifact,request_id,execution_round,execution_owner
             FROM analysis.model_tasks WHERE run_id=%s AND model_kind=%s FOR UPDATE
@@ -164,7 +164,7 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
                     # Ledger copy position: the inference server applies these files to its copy.
                     **({'replica': artifact['replica']} if 'replica' in artifact else {}))
         with connection.transaction():
-            lock_stage(connection, execution)
+            lock_stage(connection, execution, MODEL_STAGES[kind])
             owned = connection.execute('''SELECT execution_id FROM analysis.model_tasks
                 WHERE run_id=%s AND model_kind=%s FOR UPDATE''', (execution.run_id, kind)).fetchone()[0]
             if owned != token:
@@ -194,7 +194,7 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
                                                   'FAILED', 'RECOVERY_REQUIRED', 'CANCEL_REQUESTED', 'STOPPED'):
                     raise ProtocolError('Invalid inference receipt')
         with connection.transaction():
-            lock_stage(connection, execution)
+            lock_stage(connection, execution, MODEL_STAGES[kind])
             if connection.execute('''
                 UPDATE analysis.model_tasks SET phase='WAIT_REMOTE',status='WAITING',execution_id=null,
                   execution_owner=null,consecutive_failures=0,error_code=null,action_required=false,
@@ -205,7 +205,7 @@ def publish_model(connection, execution, kind, storage_root, settings, s3, *, tr
     except Exception:
         try:
             with connection.transaction():
-                lock_stage(connection, execution)
+                lock_stage(connection, execution, MODEL_STAGES[kind])
                 connection.execute('''UPDATE analysis.model_tasks SET status='FAILED',execution_id=null,
                     execution_owner=null,error_code='PUBLICATION_FAILED',consecutive_failures=consecutive_failures+1,
                     updated_at=now() WHERE run_id=%s AND model_kind=%s AND execution_id=%s
