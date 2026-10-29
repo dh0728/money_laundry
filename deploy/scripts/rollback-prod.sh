@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 # LEGACY: EC2 1대 구성용 보관 코드. 새 EC2 2대 + RDS 구성에서는 사용하지 않음.
-# 신규 배포 구성: deploy/split/
+# 전환 전 기존 서버의 배포에서는 계속 사용할 수 있음. 신규 구성: deploy/split/
 

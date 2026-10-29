@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # LEGACY: EC2 1대 구성용 보관 코드. 새 EC2 2대 + RDS 구성에서는 사용하지 않음.
-# 신규 배포 구성: deploy/split/
+# 전환 전 기존 서버의 배포에서는 계속 사용할 수 있음. 신규 구성: deploy/split/
 
 set -Eeuo pipefail
 
@@ -101,6 +101,7 @@ get_parameter() {
 }
 
 cleanup() {
+  unset PROD_ANALYSIS_DB_USERNAME PROD_ANALYSIS_DB_PASSWORD
   unset PROD_PRESENTATION_ENABLED
   unset PROD_INGEST_ENCRYPTION_KEY
   unset PROD_INGEST_SEARCH_KEY
@@ -560,6 +561,9 @@ PROD_PRESENTATION_ENABLED="$(get_parameter "presentation/enabled")"
 PROD_INGEST_ENCRYPTION_KEY="$(get_parameter "ingest/encryption-key")"
 PROD_INGEST_SEARCH_KEY="$(get_parameter "ingest/search-key")"
 PROD_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
+PROD_ANALYSIS_DB_USERNAME="$(get_parameter "analysis-db/username")"
+PROD_ANALYSIS_DB_PASSWORD="$(get_parameter "analysis-db/password")"
+export PROD_ANALYSIS_DB_USERNAME PROD_ANALYSIS_DB_PASSWORD
 PROD_DB_URL="$(get_parameter "db/url")"
 PROD_POSTGRES_USER="$(get_parameter "db/username")"
 PROD_POSTGRES_PASSWORD="$(get_parameter "db/password")"

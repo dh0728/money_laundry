@@ -11,9 +11,36 @@ from types import SimpleNamespace
 from urllib.request import build_opener
 from urllib.error import HTTPError, URLError
 
-import httpx
-
 from api_client import ApiClient, ApiError
+
+STAGE_NAMES = {
+    'WAIT_INGEST': '적재 완료 대기', 'INTEGRATE': '거래 통합', 'FREEZE_INPUT': '분석 입력 고정',
+    'FEATURES': '모델 입력 준비', 'INFERENCE': '모델 추론', 'SCORES': '점수 저장',
+    'ALERTS': 'Alert 구성', 'COMPLETE': 'Alert 공개',
+}
+MODEL_NAMES = {'BINARY': '이진', 'TYPE': '유형'}
+REMOTE_NAMES = {
+    'ACCEPTED': '접수됨', 'QUEUED': '차례 대기', 'RUNNING': '계산 중', 'RETRY_WAIT': '서버 재시도 대기',
+    'COMPLETED': '계산 완료', 'FAILED': '서버 실패', 'STOPPED': '중단됨', 'RECOVERY_REQUIRED': '서버 복구 필요',
+}
+
+
+def describe(detail):
+    """One status line for an analysis job; waiting on the inference server is not a retry."""
+    status, stage = detail.get('status'), detail.get('currentStage')
+    failures = detail.get('consecutiveFailures') or 0
+    if status in ('QUEUED', 'RUNNING', 'RETRY_WAIT') and failures:
+        state = f'실패 후 재시도 대기 · 연속 실패 {failures}회'
+    elif status in ('QUEUED', 'RUNNING', 'RETRY_WAIT') and stage == 'INFERENCE' and detail.get('models'):
+        models = ', '.join(
+            f'{MODEL_NAMES.get(m.get("modelKind"), m.get("modelKind"))} '
+            f'{"결과 확인 완료" if m.get("status") == "SUCCEEDED" else REMOTE_NAMES.get(m.get("remoteStatus"), "전송 중")}'
+            for m in detail['models'])
+        state = f'추론 결과 대기 ({models})'
+    else:
+        state = {'QUEUED': '대기열', 'RUNNING': '실행 중', 'RETRY_WAIT': '다음 단계 대기',
+                 'COMPLETED': '완료', 'FAILED': '실패'}.get(status, status)
+    return f'{STAGE_NAMES.get(stage, stage or "")} · {state} ({status} / {stage or ""})'
 
 
 def catalog(root):
@@ -330,7 +357,7 @@ class Replay:
             self.report('중단', error=message)
 
     def wait_job(self, job, day):
-        deadline = time.monotonic() + 3600
+        deadline = time.monotonic() + 6 * 3600
         failures = 0
         last_stage = '아직 확인하지 못함'
         while time.monotonic() < deadline:
@@ -348,8 +375,8 @@ class Replay:
                 time.sleep(min(delay, max(0, deadline - time.monotonic())))
                 continue
             failures = 0
-            last_stage = f'{detail["status"]} / {detail.get("currentStage", "")}'
-            self.report(f'{day}: {detail["status"]} / {detail.get("currentStage", "")}', jobId=job)
+            last_stage = describe(detail)
+            self.report(f'{day}: {last_stage}', jobId=job)
             if detail['status'] == 'COMPLETED':
                 return
             if detail['status'] == 'FAILED':
@@ -405,8 +432,8 @@ def render_reset(replay):
         if preview:
             counts = preview['counts']
             st.write({label: counts.get(table, 0) for label, table in (
-                ('거래', 'transactions'), ('업로드·분석 작업', 'batch_jobs'),
-                ('Alert', 'alerts'), ('조사 사건', 'review_cases'), ('은행 보고', 'report_versions'))})
+                ('거래', 'ledger.transactions'), ('업로드', 'ingest.uploads'), ('분석 작업', 'analysis.jobs'),
+                ('Alert', 'review.alerts'), ('Episode', 'review.episodes'), ('은행 보고', 'ingest.report_versions'))})
             confirmation = st.text_input('확인 문구: 시연 데이터 초기화', key='reset_confirmation')
             if st.button('DB 및 관련 파일 초기화', disabled=running or pending or confirmation != '시연 데이터 초기화'):
                 result = replay.reset_demo({'requestId': st.session_state.reset_request,
@@ -539,14 +566,28 @@ def render():
                 st.error(state['error'])
             if state['history']:
                 st.dataframe(state['history'], hide_index=True)
-            job = st.number_input('재개할 실패 작업 ID', min_value=1, step=1)
-            if st.button('실패 작업 재개', disabled=running):
-                try:
-                    replay.controls.post(f'batch-jobs/{job}/resume')
-                    st.success('재개 요청을 접수했습니다. 결과 화면에서 진행 상태를 확인하세요.')
-                except ApiError as error:
-                    st.error(str(error))
         actions()
+
+        # Outside the 1-second fragment: a refresh must not drop the typed ID or the result.
+        with st.form('resume_failed_job'):
+            job = st.number_input('재개할 실패 작업 ID', min_value=1, step=1, value=None,
+                                  placeholder='작업 ID 입력')
+            if st.form_submit_button('실패 작업 재개'):
+                if job is None:
+                    st.session_state.resume_result = ('error', '재개할 작업 ID를 입력하세요.')
+                elif reset_pending:
+                    st.session_state.resume_result = ('error', '초기화 정리가 끝난 뒤 재개하세요.')
+                else:
+                    try:
+                        replay.controls.post(f'batch-jobs/{int(job)}/resume')
+                        st.session_state.resume_result = (
+                            'success', f'작업 {int(job)} 재개 요청을 접수했습니다. 패널에서 진행을 보려면 같은 날짜로 '
+                            '자동 재생을 다시 누르세요(이미 받은 작업을 이어서 봅니다).')
+                    except ApiError as error:
+                        st.session_state.resume_result = ('error', f'작업 {int(job)} 재개 실패: {error}')
+        if 'resume_result' in st.session_state:
+            kind, text = st.session_state.resume_result
+            (st.success if kind == 'success' else st.error)(text)
     except (OSError, ValueError, ApiError) as error:
         st.error(str(error))
 

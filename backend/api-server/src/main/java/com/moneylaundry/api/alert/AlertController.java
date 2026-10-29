@@ -3,6 +3,7 @@ package com.moneylaundry.api.alert;
 import java.util.*;
 import org.springframework.web.bind.annotation.*;
 
+/** Alert 조회 API(/api/v1/alerts): 목록·상세·근거 버전. 조사 명령은 ReviewController가 받는다. */
 @RestController
 @RequestMapping("/api/v1/alerts")
 public class AlertController {

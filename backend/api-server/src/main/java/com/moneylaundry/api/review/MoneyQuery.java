@@ -2,6 +2,7 @@ package com.moneylaundry.api.review;
 
 import static com.moneylaundry.api.review.ReviewJson.*;
 
+import com.moneylaundry.api.common.BusinessTime;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
@@ -53,7 +54,8 @@ final class MoneyQuery {
     out.put("customScope", scope != null);
     out.put("revision", detail.get("revision"));
     out.put("delayMinutes", minutes);
-    out.put("observedAt", Instant.now().toString());
+    Instant now = time.now();
+    out.put("observedAt", now.toString());
     out.put("requestedFrom", first == null ? null : first.toString());
     out.put("requestedTo", last == null ? null : last.toString());
     if (first == null) {
@@ -63,11 +65,10 @@ final class MoneyQuery {
     }
     // Stop at the first unreceived/incomplete day; never infer observation from max(tx time).
     LocalDate stop = first;
-    while (!stop.isAfter(last)
-        && stop.isBefore(time.now().atZone(BusinessTime.KST).toLocalDate())) {
+    while (!stop.isAfter(last) && stop.isBefore(now.atZone(BusinessTime.KST).toLocalDate())) {
       boolean complete =
           jdbc.queryForObject(
-              "select exists(select 1 from bank_reporting_periods where effective_from_date<=? and (effective_to_date is null or effective_to_date>=?)) and not exists(select 1 from bank_reporting_periods p left join report_sets s on s.bank_id=p.bank_id and s.business_date=? left join report_versions v on v.version_id=s.current_version_id where p.effective_from_date<=? and (p.effective_to_date is null or p.effective_to_date>=?) and v.stage_status is distinct from 'ACTIVE')",
+              "select exists(select 1 from core.bank_reporting_periods where effective_from_date<=? and (effective_to_date is null or effective_to_date>=?)) and not exists(select 1 from core.bank_reporting_periods p left join ingest.report_sets s on s.bank_id=p.bank_id and s.business_date=? left join ingest.report_versions v on v.version_id=s.current_version_id where p.effective_from_date<=? and (p.effective_to_date is null or p.effective_to_date>=?) and v.stage_status is distinct from 'ACTIVE')",
               Boolean.class,
               stop,
               stop,
@@ -99,7 +100,7 @@ final class MoneyQuery {
     String marks = String.join(",", Collections.nCopies(ids.size(), "?"));
     var transfers =
         jdbc.query(
-            "select t.tx_id,t.occurred_at,f.service_account_id as f,r.service_account_id as r,t.amount_paid,t.payment_currency,t.amount_received,t.receiving_currency,t.amount_usd,fx.units_per_usd from transactions t left join fx_rates fx on fx.fx_rate_version=t.fx_rate_version and fx.currency=t.receiving_currency join private.accounts f on f.account_id=t.from_account_id join private.accounts r on r.account_id=t.to_account_id where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<? and (f.service_account_id in ("
+            "select t.tx_id,t.occurred_at,f.service_account_id as f,r.service_account_id as r,t.amount_paid,t.payment_currency,t.amount_received,t.receiving_currency,t.amount_usd,fx.units_per_usd from ledger.transactions t left join core.fx_rates fx on fx.fx_rate_version=t.fx_rate_version and fx.currency=t.receiving_currency join core.accounts f on f.account_id=t.from_account_id join core.accounts r on r.account_id=t.to_account_id where t.integration_status='ACTIVE' and t.occurred_at>=? and t.occurred_at<? and (f.service_account_id in ("
                 + marks
                 + ") or r.service_account_id in ("
                 + marks

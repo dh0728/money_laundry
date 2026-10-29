@@ -11,7 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(properties = "spring.profiles.active=local")
+@SpringBootTest(properties = {"spring.profiles.active=local"})
 @org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
@@ -49,7 +49,7 @@ class AnalysisEntryTests {
   void 날짜와시각_응답은_서울_ISO_계약이다() throws Exception {
     long id =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,analysis_date,analysis_cutoff_at,started_at,current_stage) values('ANALYSIS','QUEUED','2099-01-01','2098-12-31T18:00:00Z','2098-12-31T18:00:00Z','WAIT_INGEST') returning job_id",
+            "insert into analysis.jobs(business_at,threshold_value,status,analysis_date,analysis_cutoff_at,started_at,current_stage) values(now(),0.7,'QUEUED','2099-01-01','2098-12-31T18:00:00Z','2098-12-31T18:00:00Z','WAIT_INGEST') returning job_id",
             Long.class);
     mvc.perform(get("/api/v1/batch-jobs/" + id))
         .andExpect(status().isOk())

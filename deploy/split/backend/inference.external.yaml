@@ -1,0 +1,10 @@
+# Added by deploy.py only for an explicitly selected external dev target.
+services:
+  api:
+    volumes:
+    - type: bind
+      source: ${DEV_INFERENCE_CA_HOST_FILE:?DEV_INFERENCE_CA_HOST_FILE is required}
+      target: /app/certs/inference-ca.crt
+      read_only: true
+      bind:
+        create_host_path: false

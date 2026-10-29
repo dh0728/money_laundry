@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # LEGACY: EC2 1대 구성용 보관 코드. 새 EC2 2대 + RDS 구성에서는 사용하지 않음.
-# 신규 배포 구성: deploy/split/
+# 전환 전 기존 서버의 배포에서는 계속 사용할 수 있음. 신규 구성: deploy/split/
 
 set -Eeuo pipefail
 
@@ -52,13 +52,13 @@ get_parameter() {
 }
 
 cleanup() {
+  unset DEV_ANALYSIS_DB_USERNAME DEV_ANALYSIS_DB_PASSWORD
   unset DEV_DB_URL
   unset DEV_POSTGRES_USER
   unset DEV_POSTGRES_PASSWORD
   unset DEV_JWT_SECRET
   unset DEV_S3_BUCKET
   unset DEV_S3_PREFIX
-  unset DEV_SQS_URL
   unset CF_ACCESS_CLIENT_ID
   unset CF_ACCESS_CLIENT_SECRET
   unset DEV_API_IMAGE
@@ -115,7 +115,9 @@ DEV_S3_PREFIX="$(get_parameter "s3/prefix")"
 DEV_INGEST_ENCRYPTION_KEY="$(get_parameter "ingest/encryption-key")"
 DEV_INGEST_SEARCH_KEY="$(get_parameter "ingest/search-key")"
 DEV_INGEST_KEY_VERSION="$(get_parameter "ingest/key-version")"
-DEV_SQS_URL="$(get_parameter "sqs/url")"
+DEV_ANALYSIS_DB_USERNAME="$(get_parameter "analysis-db/username")"
+DEV_ANALYSIS_DB_PASSWORD="$(get_parameter "analysis-db/password")"
+export DEV_ANALYSIS_DB_USERNAME DEV_ANALYSIS_DB_PASSWORD
 DEV_INFERENCE_API_TOKEN="$(get_parameter "inference/token")"
 DEV_INFERENCE_OBJECT_BASE_URL="https://${DEV_S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${DEV_S3_PREFIX%/}/"
 CF_ACCESS_CLIENT_ID="$(get_parameter "cloudflare/access/client-id")"
@@ -128,7 +130,6 @@ export DEV_JWT_SECRET
 export DEV_S3_BUCKET
 export DEV_S3_PREFIX
 export DEV_INGEST_ENCRYPTION_KEY DEV_INGEST_SEARCH_KEY DEV_INGEST_KEY_VERSION
-export DEV_SQS_URL
 export DEV_INFERENCE_OBJECT_BASE_URL DEV_INFERENCE_API_TOKEN
 export CF_ACCESS_CLIENT_ID
 export CF_ACCESS_CLIENT_SECRET
@@ -167,38 +168,6 @@ if ! docker compose \
     logs --no-color --tail=150 api inference >&2 || true
   fail "dev 컨테이너 기동 실패. 위 로그를 확인하세요."
 fi
-
-# This is a dev-only fixture baseline, not automatic registration of uploading banks.
-[[ "${DEV_DB_URL}" =~ ^jdbc:postgresql://postgres:5432/([a-zA-Z_][a-zA-Z0-9_]*)$ ]] \
-  || fail "테스트 은행 초기화에 지원되지 않는 DB URL 형식입니다."
-DEV_DATABASE="${BASH_REMATCH[1]}"
-echo "dev 테스트 은행과 fixture 기준일을 준비합니다."
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" \
-  exec -T postgres psql -U "${DEV_POSTGRES_USER}" -d "${DEV_DATABASE}" \
-  -v ON_ERROR_STOP=1 <<'SQL'
-BEGIN;
-INSERT INTO banks(bank_id,name,is_reporting,report_format)
-VALUES (12,'MOCK Bank 12',true,'AML17'),
-       (70,'MOCK Bank 70',true,'AML17'),
-       (21174,'MOCK Bank 21174',true,'AML17')
-ON CONFLICT(bank_id) DO NOTHING;
-SELECT bank_id FROM banks WHERE bank_id IN (12,70,21174) ORDER BY bank_id FOR UPDATE;
-DO $$ BEGIN
-  IF EXISTS(SELECT 1 FROM banks WHERE bank_id IN (12,70,21174)
-            AND (NOT is_reporting OR report_format <> 'AML17')) THEN
-    RAISE EXCEPTION 'DEV_FIXTURE_BANK_CONFIGURATION_CONFLICT';
-  END IF;
-END $$;
-INSERT INTO bank_reporting_periods(bank_id,effective_from_date,effective_to_date)
-SELECT b.bank_id,DATE '2022-09-01',DATE '2022-09-01'
-FROM banks b WHERE b.bank_id IN (12,70,21174)
-AND NOT EXISTS (
-  SELECT 1 FROM bank_reporting_periods p WHERE p.bank_id=b.bank_id
-  AND p.effective_from_date <= DATE '2022-09-01'
-  AND (p.effective_to_date IS NULL OR p.effective_to_date >= DATE '2022-09-01')
-);
-COMMIT;
-SQL
 
 echo "dev 컨테이너 상태를 확인합니다."
 

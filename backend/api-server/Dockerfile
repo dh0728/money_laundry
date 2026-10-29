@@ -43,7 +43,7 @@ RUN apt-get update \
 COPY worker/requirements.txt /app/worker/requirements.txt
 RUN pip install --no-cache-dir -r /app/worker/requirements.txt \
     && java -version \
-    && python -c "import psycopg, pyarrow, httpx, boto3"
+    && python -c "import psycopg, pyarrow, httpx, boto3, cryptography"
 
 # 애플리케이션을 root가 아닌 전용 사용자로 실행한다.
 RUN groupadd --gid 10001 app \
@@ -51,16 +51,20 @@ RUN groupadd --gid 10001 app \
     && mkdir -p /app/storage \
     && chown app:app /app/storage
 
-COPY worker/analysis_entry.py worker/frozen_input.py worker/pipeline.py \
-     worker/model_publication.py worker/inference_dispatch.py worker/result_collection.py \
-     worker/demo_calculator.py worker/model_contract.py worker/worker_transport.py \
-     worker/alert_builder.py worker/alert_pipeline.py \
-     worker/inference_server.py worker/inference_service.py worker/inference_compute.py \
-     worker/model_adapter.py /app/worker/
+COPY worker/analysis_entry.py worker/ingest_entry.py /app/worker/
+COPY worker/common /app/worker/common
+COPY worker/ingest /app/worker/ingest
+COPY worker/integrate /app/worker/integrate
+COPY worker/features /app/worker/features
+COPY worker/inference /app/worker/inference
+COPY worker/scores /app/worker/scores
+COPY worker/alerts /app/worker/alerts
+COPY worker/models /app/worker/models
 COPY worker/recover_dev_placeholder.sql /app/worker/recover_dev_placeholder.sql
+COPY worker/configure_analysis_db.py worker/analysis_permissions.sql /app/worker/
 
 # Fail the image build if an entry point's local module dependency is missing.
-RUN PYTHONPATH=/app/worker python -c "import analysis_entry, pipeline, alert_pipeline, inference_dispatch, result_collection, inference_server"
+RUN PYTHONPATH=/app/worker python -c "import analysis_entry, ingest_entry, ingest.report_ingest, integrate.report_integration, integrate.report_correction, features.prepare_features, alerts.alert_pipeline, inference.inference_dispatch, scores.result_collection, models.registry"
 
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 

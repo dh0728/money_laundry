@@ -1,5 +1,6 @@
 package com.moneylaundry.api.review;
 
+import com.moneylaundry.api.common.BusinessTime;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -31,6 +32,23 @@ public final class CaseSummary {
 
   static BigDecimal amount(Object n) {
     return n == null ? BigDecimal.ZERO : new BigDecimal(n.toString());
+  }
+
+  static void annotateSuspicion(Map<String, Object> evidence, double threshold) {
+    var thresholds = new HashMap<Long, Double>();
+    for (var seed : ReviewJson.rows(evidence.get("seeds")))
+      if (seed.get("threshold") instanceof Number n)
+        thresholds.put(ReviewJson.number(seed.get("txId")), n.doubleValue());
+    for (var transaction : ReviewJson.rows(evidence.get("transactions"))) {
+      var scores = transaction.get("scores");
+      transaction.put(
+          "isSuspicious",
+          scores == null
+              ? null
+              : score(ReviewJson.object(scores), "p_laundering")
+                  >= thresholds.getOrDefault(
+                      ReviewJson.number(transaction.get("txId")), threshold));
+    }
   }
 
   public static Map<String, Object> summarize(List<Map<String, Object>> members) {

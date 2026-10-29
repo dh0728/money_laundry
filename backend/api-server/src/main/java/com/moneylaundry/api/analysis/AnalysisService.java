@@ -1,6 +1,6 @@
 package com.moneylaundry.api.analysis;
 
-import com.moneylaundry.api.ApiException;
+import com.moneylaundry.api.common.ApiException;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/** 분석 작업 등록(컷오프·수동·시연)·조회·재개와 API 공용 페이지·오류 도우미. */
 @Service
 public class AnalysisService {
   public static final long RECEIPT_LOCK = 17002001L;
@@ -28,26 +29,49 @@ public class AnalysisService {
 
   final JdbcTemplate jdbc;
   final TransactionTemplate tx;
+  // Operational timers only (retry, lease); business-meaning times use businessNow().
   final Clock clock;
   final ZoneId zone;
   private final double threshold;
   private final LocalTime cutoff;
+  private final com.moneylaundry.api.common.BusinessTime businessTime;
 
+  public AnalysisService(
+      JdbcTemplate jdbc,
+      TransactionTemplate tx,
+      Clock clock,
+      String zone,
+      double threshold,
+      LocalTime cutoff) {
+    this(jdbc, tx, clock, zone, threshold, cutoff, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
   public AnalysisService(
       JdbcTemplate jdbc,
       TransactionTemplate tx,
       Clock clock,
       @Value("${app.zone}") String zone,
       @Value("${app.suspicious-tx.threshold}") double threshold,
-      @Value("${app.ingest.cutoff}") LocalTime cutoff) {
+      @Value("${app.ingest.cutoff}") LocalTime cutoff,
+      com.moneylaundry.api.common.BusinessTime businessTime) {
     this.jdbc = jdbc;
     this.tx = tx;
     this.clock = clock;
     this.zone = ZoneId.of(zone);
     this.threshold = threshold;
     this.cutoff = cutoff;
+    this.businessTime = businessTime;
     if (!Double.isFinite(threshold) || threshold <= 0 || threshold > 1)
       throw new IllegalArgumentException("분석 임계값은 0 초과 1 이하");
+  }
+
+  /** 업무 시각(시연 시계가 있으면 그 시각). BusinessTime 없이 만든 구성은 저장된 시계값, 없으면 주입된 Clock. */
+  public Instant businessNow() {
+    if (businessTime != null) return businessTime.now();
+    Timestamp stored =
+        jdbc.queryForObject("select business_at from ops.business_clock where id", Timestamp.class);
+    return stored == null ? clock.instant() : stored.toInstant();
   }
 
   public String cron() {
@@ -65,7 +89,7 @@ public class AnalysisService {
   }
 
   public long registerScheduled() {
-    return register(LocalDate.now(clock.withZone(zone)));
+    return register(LocalDate.ofInstant(businessNow(), zone));
   }
 
   private long register(LocalDate scheduledDay) {
@@ -73,7 +97,7 @@ public class AnalysisService {
   }
 
   public long registerDemo(LocalDate businessDay) {
-    return registerDemo(businessDay, LocalDate.now(clock.withZone(zone)));
+    return registerDemo(businessDay, LocalDate.ofInstant(businessNow(), zone));
   }
 
   public long registerDemo(LocalDate businessDay, LocalDate currentBusinessDay) {
@@ -93,12 +117,14 @@ public class AnalysisService {
           if (demoBusinessDay == null
               && Boolean.TRUE.equals(
                   jdbc.queryForObject(
-                      "select business_at is not null from demo_business_clock where id",
+                      "select business_at is not null from ops.business_clock where id",
                       Boolean.class)))
             throw ApiException.invalidTransition("시연 업무 시각이 설정되어 있습니다. 조작패널에서 거래 기준일을 지정해 분석하세요.");
+          // Receipts and the cutoff are both business time, so a demo compares 2023 with 2023.
+          Instant businessAt = businessNow();
           Instant cutoff =
               scheduledDay == null
-                  ? clock.instant()
+                  ? businessAt
                   : scheduledDay.atTime(this.cutoff).atZone(zone).toInstant();
           LocalDate day =
               demoBusinessDay == null
@@ -106,20 +132,17 @@ public class AnalysisService {
                   : demoBusinessDay.plusDays(1);
           if (demoBusinessDay != null) {
             if (jdbc.queryForObject(
-                    "select count(*) from batch_jobs where job_type='ANALYSIS' and status<>'COMPLETED'",
-                    Integer.class)
+                    "select count(*) from analysis.jobs where status<>'COMPLETED'", Integer.class)
                 > 0)
               throw new ApiException(
                   HttpStatus.CONFLICT, "DEMO_PREVIOUS_JOB_PENDING", "이전 분석을 완료하거나 실패 작업을 재개하세요.");
             if (jdbc.queryForObject(
-                    "select count(*) from batch_jobs where job_type='ANALYSIS' and analysis_date>?",
-                    Integer.class,
-                    day)
+                    "select count(*) from analysis.jobs where analysis_date>?", Integer.class, day)
                 > 0)
               throw new ApiException(
                   HttpStatus.CONFLICT, "DEMO_DATE_OUT_OF_ORDER", "이미 처리한 날짜보다 이전으로 돌아갈 수 없습니다.");
             if (jdbc.queryForObject(
-                    "select count(*) from batch_jobs where job_type='INGEST' and received_at is not null and (business_date>? or business_date is null)",
+                    "select count(*) from ingest.uploads where received_at is not null and business_date>?",
                     Integer.class,
                     demoBusinessDay)
                 > 0)
@@ -128,7 +151,7 @@ public class AnalysisService {
                   "DEMO_FUTURE_INPUT",
                   "선택한 날짜보다 뒤의 수신 자료가 있습니다. 날짜순 시연 DB를 사용하세요.");
             if (jdbc.queryForObject(
-                    "select count(*) from batch_jobs where job_type='INGEST' and business_date=? and received_at<=?",
+                    "select count(*) from ingest.uploads where business_date=? and received_at<=?",
                     Integer.class,
                     demoBusinessDay,
                     Timestamp.from(cutoff))
@@ -138,9 +161,7 @@ public class AnalysisService {
           }
           var existing =
               jdbc.queryForList(
-                  "select status from batch_jobs where job_type='ANALYSIS' and analysis_date=?",
-                  String.class,
-                  day);
+                  "select status from analysis.jobs where analysis_date=?", String.class, day);
           if (!existing.isEmpty())
             throw conflict(
                 existing.getFirst().equals("COMPLETED")
@@ -151,23 +172,16 @@ public class AnalysisService {
           long id =
               jdbc.queryForObject(
                   """
-          insert into batch_jobs(job_type,status,analysis_date,analysis_cutoff_at,current_stage,threshold_value)
-          values ('ANALYSIS','QUEUED',?,?,'WAIT_INGEST',?) returning job_id
+          insert into analysis.jobs(status,analysis_date,analysis_cutoff_at,current_stage,threshold_value,business_at)
+          values ('QUEUED',?,?,'WAIT_INGEST',?,?) returning job_id
           """,
                   Long.class,
                   day,
                   Timestamp.from(cutoff),
-                  threshold);
+                  threshold,
+                  Timestamp.from(businessAt));
           jdbc.update(
-              """
-          insert into analysis_uploads(job_id,upload_id)
-          select ?,b.job_id from batch_jobs b where b.job_type='INGEST' and b.received_at<=?
-          and not exists(select 1 from analysis_uploads a where a.upload_id=b.job_id)
-          """,
-              id,
-              Timestamp.from(cutoff));
-          jdbc.update(
-              "insert into analysis_receipts select ?,job_id from batch_jobs where job_type='INGEST' and received_at<=?",
+              "insert into analysis.receipts select ?,upload_id from ingest.uploads where received_at<=?",
               id,
               Timestamp.from(cutoff));
           return id;
@@ -181,7 +195,7 @@ public class AnalysisService {
   public Job job(long id) {
     var rows =
         jdbc.query(
-            "select * from batch_jobs where job_id=? and job_type='ANALYSIS'",
+            "select * from analysis.jobs where job_id=?",
             (rs, n) ->
                 new Job(
                     rs.getLong("job_id"),
@@ -211,27 +225,58 @@ public class AnalysisService {
                 job.status().equals("COMPLETED") ? "JOB_ALREADY_COMPLETED" : "INVALID_TRANSITION");
           if ("RUN_CANCELLED".equals(job.error())) {
             jdbc.update(
-                "update analysis_cancel_outbox o set attempts=0,retry_at=null,error_code=null from analysis_model_requests m join analysis_runs r using(run_id) where o.request_id=m.request_id and o.execution_round=m.execution_round and r.job_id=? and o.acknowledged_at is null",
+                "update analysis.cancel_outbox o set attempts=0,retry_at=null,error_code=null from analysis.model_requests m join analysis.runs r using(run_id) where o.request_id=m.request_id and o.execution_round=m.execution_round and r.job_id=? and o.acknowledged_at is null",
                 id);
             return;
           }
+          // A model the inference server ended as failed is sent again as a new round of the
+          // same request, reusing the prepared input. The old round is closed so it no longer
+          // counts as unconfirmed; the other model's state is left as it is.
           jdbc.update(
               """
-              update analysis_model_tasks set status='READY',consecutive_failures=0,error_code=null,
-                action_required=false,retry_at=null,updated_at=now()
-              where run_id=(select current_run_id from batch_jobs where job_id=?)
-                and phase in ('PUBLISH','COLLECT') and status='FAILED'
+              insert into analysis.model_requests(request_id,execution_round,run_id,model_kind,status)
+              select request_id,execution_round+1,run_id,model_kind,'REGISTERED' from analysis.model_tasks
+              where run_id=(select current_run_id from analysis.jobs where job_id=?)
+                and phase='WAIT_REMOTE' and status='FAILED'
+              on conflict do nothing
               """,
               id);
           jdbc.update(
-              "update batch_jobs set status='QUEUED',consecutive_failures=0,error_code=null,error_message=null,retry_at=null,execution_id=null,execution_owner=null,finished_at=null where job_id=?",
+              """
+              update analysis.model_requests m set status='ALREADY_FINISHED' from analysis.model_tasks t
+              where t.run_id=(select current_run_id from analysis.jobs where job_id=?)
+                and t.phase='WAIT_REMOTE' and t.status='FAILED' and m.request_id=t.request_id
+                and m.execution_round=t.execution_round and m.status in ('REGISTERED','PUBLISHED')
+              """,
+              id);
+          jdbc.update(
+              """
+              update analysis.model_tasks set phase='PUBLISH',status='READY',execution_round=execution_round+1,
+                remote_revision=null,remote_snapshot=null,remote_deadline_at=null,next_poll_at=null,
+                last_event_id=null,consecutive_failures=0,error_code=null,action_required=false,
+                retry_at=null,finished_at=null,updated_at=now()
+              where run_id=(select current_run_id from analysis.jobs where job_id=?)
+                and phase='WAIT_REMOTE' and status='FAILED'
+              """,
+              id);
+          jdbc.update(
+              """
+              update analysis.model_tasks set status='READY',consecutive_failures=0,error_code=null,
+                action_required=false,retry_at=null,updated_at=now()
+              where run_id=(select current_run_id from analysis.jobs where job_id=?)
+                and phase in ('PREPARE','PUBLISH','COLLECT') and status='FAILED'
+              """,
+              id);
+          jdbc.update(
+              "update analysis.jobs set status='QUEUED',consecutive_failures=0,error_code=null,error_message=null,retry_at=null,execution_id=null,execution_owner=null,finished_at=null where job_id=?",
               id);
         });
   }
 
   void lock(long id) {
     AnalysisRunService.integrationLock(jdbc);
-    if (jdbc.queryForList("select job_id from batch_jobs where job_id=? for update", Long.class, id)
+    if (jdbc.queryForList(
+            "select job_id from analysis.jobs where job_id=? for update", Long.class, id)
         .isEmpty()) throw ApiException.notFound("작업 없음");
   }
 
@@ -241,24 +286,24 @@ public class AnalysisService {
         && Objects.equals(expected.executionId(), actual.executionId())
         && !Boolean.TRUE.equals(
             jdbc.queryForObject(
-                "select exists(select 1 from analysis_runs r join batch_jobs b on b.current_run_id=r.run_id where b.job_id=? and r.status in ('CANCEL_REQUESTED','CANCELLED'))",
+                "select exists(select 1 from analysis.runs r join analysis.jobs b on b.current_run_id=r.run_id where b.job_id=? and r.status in ('CANCEL_REQUESTED','CANCELLED'))",
                 Boolean.class,
                 expected.id()));
   }
 
   public Map<String, Object> detail(long id) {
-    var rows = jdbc.queryForList("select * from batch_jobs where job_id=?", id);
+    var rows = jdbc.queryForList("select * from ops.work_items where job_id=?", id);
     if (rows.isEmpty()) throw ApiException.notFound("작업 없음");
     Map<String, Object> result = view(rows.getFirst());
     result.put(
         "uploads",
         jdbc.queryForList(
-            "select a.upload_id as \"uploadId\",a.excluded,b.status,b.file_name as \"fileName\" from analysis_uploads a join batch_jobs b on b.job_id=a.upload_id where a.job_id=? order by a.upload_id",
+            "select a.upload_id as \"uploadId\",(b.status='VALIDATION_FAILED') as excluded,b.status,b.file_name as \"fileName\" from analysis.receipts a join ingest.uploads b on b.upload_id=a.upload_id where a.job_id=? order by a.upload_id",
             id));
     result.put(
         "failures",
         jdbc.queryForList(
-            "select stage,error_code as \"errorCode\",failed_at as \"failedAt\",consecutive_count as \"consecutiveCount\",retry_at as \"retryAt\",action_required as \"actionRequired\" from analysis_failures where job_id=? order by failed_at,failure_id",
+            "select stage,error_code as \"errorCode\",failed_at as \"failedAt\",consecutive_count as \"consecutiveCount\",retry_at as \"retryAt\",action_required as \"actionRequired\" from analysis.failures where job_id=? order by failed_at,failure_id",
             id));
     result.put(
         "models",
@@ -270,7 +315,7 @@ public class AnalysisService {
           m.action_required as "actionRequired",m.retry_at as "retryAt",m.next_poll_at as "nextPollAt",
           m.remote_deadline_at as "remoteDeadlineAt",m.binding->>'model_version' as "modelVersion",
           m.binding->>'feature_version' as "featureVersion"
-        from analysis_model_tasks m join batch_jobs b on b.current_run_id=m.run_id
+        from analysis.model_tasks m join analysis.jobs b on b.current_run_id=m.run_id
         where b.job_id=? order by m.model_kind
         """,
             id));
@@ -280,7 +325,7 @@ public class AnalysisService {
     result.put(
         "cancellations",
         jdbc.queryForList(
-            "select o.cancel_id as \"cancelId\",o.attempts,o.error_code as \"errorCode\",o.acknowledged_at as \"acknowledgedAt\",(o.attempts>=3 and o.acknowledged_at is null) as \"actionRequired\" from analysis_cancel_outbox o join analysis_model_requests m using(request_id,execution_round) join analysis_runs r using(run_id) where r.job_id=?",
+            "select o.cancel_id as \"cancelId\",o.attempts,o.error_code as \"errorCode\",o.acknowledged_at as \"acknowledgedAt\",(o.attempts>=3 and o.acknowledged_at is null) as \"actionRequired\" from analysis.cancel_outbox o join analysis.model_requests m using(request_id,execution_round) join analysis.runs r using(run_id) where r.job_id=?",
             id));
     return result;
   }
@@ -289,13 +334,19 @@ public class AnalysisService {
       int page, int size, String type, String status, Instant from, Instant to) {
     validatePage(page, size);
     if (type != null && !List.of("ANALYSIS", "INGEST").contains(type)) throw invalid();
-    if (status != null) {
-      try {
-        com.moneylaundry.api.batchjob.JobStatus.valueOf(status);
-      } catch (IllegalArgumentException e) {
-        throw invalid();
-      }
-    }
+    if (status != null
+        && !Set.of(
+                "URL_ISSUED",
+                "RECEIVED",
+                "RUNNING",
+                "COMPLETED",
+                "VALIDATION_FAILED",
+                "FAILED",
+                "EXPIRED",
+                "SCHEDULED",
+                "QUEUED",
+                "RETRY_WAIT")
+            .contains(status)) throw invalid();
     StringBuilder where = new StringBuilder(" where 1=1");
     List<Object> args = new ArrayList<>();
     if (type != null) {
@@ -315,12 +366,13 @@ public class AnalysisService {
       args.add(Timestamp.from(to));
     }
     long count =
-        jdbc.queryForObject("select count(*) from batch_jobs" + where, Long.class, args.toArray());
+        jdbc.queryForObject(
+            "select count(*) from ops.work_items" + where, Long.class, args.toArray());
     args.add(size);
     args.add((long) page * size);
     var rows =
         jdbc.queryForList(
-            "select * from batch_jobs" + where + " order by job_id desc limit ? offset ?",
+            "select * from ops.work_items" + where + " order by job_id desc limit ? offset ?",
             args.toArray());
     return page(rows.stream().map(this::view).toList(), page, size, count);
   }

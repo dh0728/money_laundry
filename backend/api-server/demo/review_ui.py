@@ -9,7 +9,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from api_client import ApiClient, ApiError
+from api_client import ApiError
 
 KST = timezone(timedelta(hours=9))
 TYPE_NAMES = ['패턴아님', 'Fan-out', 'Fan-in', 'Gather-scatter', 'Scatter-gather',

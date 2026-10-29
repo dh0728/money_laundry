@@ -71,7 +71,7 @@ class PollRecoveryTests(unittest.TestCase):
         controls.get.side_effect = ApiError('timeout', retryable=True)
         replay = Replay(controls)
         try:
-            with patch('control_panel.time.monotonic', side_effect=[0, 1, 3599, 3601]), patch('control_panel.time.sleep'):
+            with patch('control_panel.time.monotonic', side_effect=[0, 1, 6 * 3600 - 1, 6 * 3600 + 1]), patch('control_panel.time.sleep'):
                 with self.assertRaisesRegex(ApiError, '관찰 시간 초과'):
                     replay.wait_job(63, 'd1')
             controls.post.assert_not_called()

@@ -1,0 +1,15 @@
+# Added by deploy.py only when prod_worker_mode is demo: run the dev-style demo
+# (control panel, business clock) on production against the external inference server.
+services:
+  api:
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      INFERENCE_ALLOW_LOOPBACK: 'false'
+      INFERENCE_CA_FILE: /app/certs/inference-ca.crt
+    volumes:
+    - type: bind
+      source: ${PROD_INFERENCE_CA_HOST_FILE:?PROD_INFERENCE_CA_HOST_FILE is required}
+      target: /app/certs/inference-ca.crt
+      read_only: true
+      bind:
+        create_host_path: false

@@ -1,4 +1,4 @@
-"""Verify production pins and publish a bundle without replacing a release key."""
+"""Resolve release images and publish a bundle without replacing a release key."""
 import argparse
 import base64
 import hashlib
@@ -40,6 +40,31 @@ def verify_production(manifest_path, account):
     return manifest
 
 
+def resolve_production(sha, account):
+    """Pin both images built for this production commit, including reused retry tags."""
+    if not re.fullmatch(r"[0-9a-f]{40}", sha) or not re.fullmatch(r"[0-9]{12}", account):
+        raise ValueError("Invalid production commit or account.")
+    tag = f"prod-{sha}"
+    registry = f"{account}.dkr.ecr.ap-northeast-2.amazonaws.com"
+    manifest = {
+        "version": 1, "environment": "prod", "account_id": account,
+        "region": "ap-northeast-2", "app_sha": sha, "images": {},
+    }
+    for service in ("api", "web"):
+        repository = f"aml-{service}"
+        result = aws("ecr", "describe-images", "--registry-id", account,
+                     "--repository-name", repository, "--image-ids", f"imageTag={tag}")
+        details = result.get("imageDetails", [])
+        if len(details) != 1:
+            raise ValueError(f"Production {service} image was not found for this commit.")
+        image = details[0]
+        if (image.get("registryId") != account or image.get("repositoryName") != repository
+                or tag not in image.get("imageTags", [])):
+            raise ValueError(f"Production {service} image does not match this release.")
+        manifest["images"][service] = f"{registry}/{repository}@{image.get('imageDigest', '')}"
+    return image_manifest.validate(manifest, environment="prod", account=account)
+
+
 def publish(bundle, *, environment, sha, account, bucket):
     if (environment not in ("dev", "prod") or not re.fullmatch(r"[0-9a-f]{40}", sha)
             or not re.fullmatch(r"[0-9]{12}", account)
@@ -75,6 +100,10 @@ def main():
     verify = commands.add_parser("verify-prod")
     verify.add_argument("manifest", type=Path)
     verify.add_argument("account")
+    resolve = commands.add_parser("resolve-prod")
+    resolve.add_argument("sha")
+    resolve.add_argument("account")
+    resolve.add_argument("output", type=Path)
     upload = commands.add_parser("publish")
     upload.add_argument("bundle", type=Path)
     upload.add_argument("environment", choices=("dev", "prod"))
@@ -84,6 +113,9 @@ def main():
     args = parser.parse_args()
     if args.command == "verify-prod":
         print(verify_production(args.manifest, args.account)["app_sha"])
+    elif args.command == "resolve-prod":
+        manifest = resolve_production(args.sha, args.account)
+        args.output.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     else:
         print(publish(args.bundle, environment=args.environment, sha=args.sha,
                       account=args.account, bucket=args.bucket))

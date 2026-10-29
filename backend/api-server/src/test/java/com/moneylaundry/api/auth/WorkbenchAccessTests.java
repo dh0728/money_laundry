@@ -3,8 +3,8 @@ package com.moneylaundry.api.auth;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.moneylaundry.api.ApiException;
-import com.moneylaundry.api.review.BusinessTime;
+import com.moneylaundry.api.common.ApiException;
+import com.moneylaundry.api.common.BusinessTime;
 import java.sql.Timestamp;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class WorkbenchAccessTests {
     var jdbc = mock(JdbcTemplate.class);
     var expected = Instant.parse("2023-09-02T00:00:00Z");
     when(jdbc.queryForObject(
-            "select business_at from demo_business_clock where id", Timestamp.class))
+            "select business_at from ops.business_clock where id", Timestamp.class))
         .thenReturn(Timestamp.from(expected));
     var time = new BusinessTime(jdbc, null, env);
     time.workbenchOnly();

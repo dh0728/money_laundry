@@ -97,7 +97,7 @@ Cloudflare 인증이 있으면 CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET 환�
 
 ## 서버 세션 로그인·테스트 계정 등록
 
-직원 선택 버튼을 단일 로그인으로 교체했다. 결과 화면은 STAFF 또는 ADMIN으로 로그인하고, 조작패널은 ADMIN으로 로그인한다. 회원가입은 없다. 최초 실행 후 DB에 테스트 계정을 등록해야 하며 비밀번호가 없는 초기 계정은 로그인·신규 자동 배정 대상이 아니다. 기존 담당 사건을 열려면 해당 기존 계정에 비밀번호 해시를 설정한다. 기존 사용자명 l1a/l2a도 역할은 모두 STAFF다.
+직원 선택 버튼을 단일 로그인으로 교체했다. 결과 화면은 STAFF 또는 ADMIN으로 로그인하고, 조작패널은 ADMIN으로 로그인한다. 회원가입은 없다. 로컬 데모는 seed 단계에서 비밀번호가 없는 초기 계정(admin, l1a, l1b, l2a, l2b)에 시연용 비밀번호 `1234`를 넣는다. 이미 비밀번호가 있는 계정은 바꾸지 않는다. 비밀번호가 없는 계정은 로그인·신규 자동 배정 대상이 아니므로, 로컬 데모 밖(dev 등)에서는 아래처럼 직접 등록한다. 기존 사용자명 l1a/l2a도 역할은 모두 STAFF다.
 
 1. 호스트의 Python 환경에서 `password_hash.py`를 실행한다. 비밀번호를 두 번 숨김 입력하면 Spring 호환 해시만 출력한다. Python이 없으면 실행 중인 로컬 demo UI 컨테이너에서 다음 명령으로 생성할 수 있다(저장소 루트 PowerShell):
 
@@ -110,9 +110,9 @@ docker compose -p aml-demo -f ./backend/api-server/demo/compose.demo.yaml exec -
 2. 관리자 DB 도구에서 사용자명·표시 이름·해시를 대입하여 등록한다. 아래 `<생성한 해시>`는 실제 해시로 교체한다.
 
 ```sql
-INSERT INTO users(username,name,role,password_hash)
+INSERT INTO core.users(username,name,role,password_hash)
 VALUES ('demo-staff','시연 직원','STAFF','<생성한 해시>');
-INSERT INTO users(username,name,role,password_hash)
+INSERT INTO core.users(username,name,role,password_hash)
 VALUES ('demo-admin','시연 관리자','ADMIN','<별도로 생성한 해시>');
 -- 기존 계정에 로그인 비밀번호를 설정할 경우 사용자명 하나를 지정한다.
 -- UPDATE users SET password_hash='<생성한 해시>' WHERE username='l1a';

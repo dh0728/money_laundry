@@ -29,7 +29,7 @@ class ProdPresentationSessionTests extends StaffSessionTests {
   @Override
   @Test
   void admin_clock_requires_csrf_and_uses_business_time() throws Exception {
-    jdbc.update("update demo_business_clock set business_at='2023-09-02 09:00+09',revision=1");
+    jdbc.update("update ops.business_clock set business_at='2023-09-02 09:00+09',revision=1");
     login("admin");
     mvc.perform(get("/api/v1/demo/clock").session(session))
         .andExpect(status().isOk())

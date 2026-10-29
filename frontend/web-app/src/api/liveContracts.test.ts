@@ -1,14 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { fetchLiveDashboard } from './liveDashboard'
 import { fetchLedgerAccounts, fetchLedgerOwners, fetchLedgerTransactions } from './liveLedger'
 
 beforeEach(() => vi.restoreAllMocks())
-
-it('대시보드는 필수 기간을 최신 경로로 보낸다', async () => {
-  const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
-  await fetchLiveDashboard('2026-09-01', '2026-09-28')
-  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/dashboard?from=2026-09-01&to=2026-09-28')
-})
 
 it('거래 탐색은 선택된 가명 ID와 반복 필터를 세 단계에 전달한다', async () => {
   const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response('{}')))

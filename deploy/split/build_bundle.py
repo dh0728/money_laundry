@@ -13,6 +13,11 @@ import image_manifest
 def files(root, environment):
     base = Path(root) / "deploy/split"
     names = ["deploy.py", "check_rds.py", "image_manifest.py"]
+    if environment == "dev":
+        # Dev-only DB reset for new initial schemas; it refuses any database but aml_dev_v3.
+        names.append("reset_dev_rds.py")
+        # Production DB reset runs from a dev release folder because it reuses reset_dev_rds.py.
+        names.append("reset_prod_rds.py")
     for role in ("front", "backend"):
         relative = [f"compose.{environment}.yaml", f"deploy-{environment}.sh",
                     f"nginx/conf.d/{environment}.conf"]
@@ -20,6 +25,8 @@ def files(root, environment):
             relative = ["compose.prod.blue.yaml", "compose.prod.green.yaml", "deploy-prod.sh",
                         "rollback-prod.sh", "nginx/conf.d/prod.conf",
                         "nginx/upstreams/prod-blue.conf", "nginx/upstreams/prod-green.conf"]
+        if role == "backend":
+            relative.append("inference.external.yaml" if environment == "dev" else "inference.prod.yaml")
         if role == "backend":
             relative.append("nginx/conf.d/00-default.conf")
         names.extend(f"{role}/{name}" for name in relative)

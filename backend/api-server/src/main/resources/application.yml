@@ -35,6 +35,9 @@ management:
         enabled: true
 
 app:
+  dashboard:
+    refresh-enabled: ${DASHBOARD_REFRESH_ENABLED:true}
+    refresh-delay-ms: ${DASHBOARD_REFRESH_DELAY_MS:5000}
   presentation:
     enabled: ${PRESENTATION_ENABLED:false}
   s3:
@@ -52,6 +55,8 @@ app:
     cutoff: ${INGEST_CUTOFF:03:00}
     fx-rate-version: fx_rates_usd_v1
   worker:
+    db-username: ${ANALYSIS_DB_USERNAME:}
+    db-password: ${ANALYSIS_DB_PASSWORD:}
     mode: ${WORKER_MODE:unconfigured}
     python: ${WORKER_PYTHON:python}
     script: ${WORKER_SCRIPT:worker/analysis_entry.py}
@@ -60,5 +65,6 @@ app:
     allow-loopback: ${INFERENCE_ALLOW_LOOPBACK:false}
     url: ${INFERENCE_API_URL:}
     token: ${INFERENCE_API_TOKEN:}
+    ca-file: ${INFERENCE_CA_FILE:}
   suspicious-tx:
     threshold: ${SUSPICIOUS_TX_THRESHOLD:0.7}

@@ -1,5 +1,5 @@
 # LEGACY: EC2 1대 구성용 보관 코드. 새 EC2 2대 + RDS 구성에서는 사용하지 않음.
-# 신규 배포 구성: deploy/split/
+# split 전환 후 실행 차단. 참고용 본문 보관. 신규 구성: deploy/split/
 name: Deploy Prod
 
 run-name: Deploy prod ${{ inputs.git_sha }}

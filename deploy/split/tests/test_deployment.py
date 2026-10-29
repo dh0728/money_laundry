@@ -56,7 +56,10 @@ class FakeRunner:
             return self.account
         if command[:3] == ["aws", "ssm", "get-parameter"]:
             name = command[command.index("--name") + 1]
-            value = "false" if name.endswith("presentation/enabled") else "secret-test-only"
+            if command[command.index("--query") + 1] == "Parameter":
+                return json.dumps(dict(Type="SecureString", Value="remote-" + "b" * 32))
+            value = ("false" if name.endswith("presentation/enabled") else
+                     "https://gpu.example:31575" if name.endswith("inference/kubesphere/url") else "secret-test-only")
             return json.dumps(value) if command[-1] == "json" else value
         return "test-only"
 
@@ -70,7 +73,11 @@ class Harness(deploy.Deployment):
 
     def compose(self, meta, *arguments, data=None):
         self.operations.append((meta["sha"], arguments[0]))
-        self.runtime(meta["sha"])
+        # Same release-record rule as Deployment.compose.
+        if self.environment == "dev":
+            self.runtime(meta["sha"], inference=meta.get("inference", {"target": "local"}))
+        else:
+            self.runtime(meta["sha"])
         if self.fail_start and meta["sha"] == NEW and arguments[0] == "up":
             self.fail_start = False
             raise deploy.DeploymentError("Simulated startup failure")
@@ -103,6 +110,14 @@ class DeploymentTests(unittest.TestCase):
         config = {"layout": "split", "role": role, "account_id": ACCOUNT,
                   "prod_worker_mode": "unconfigured", "drain_seconds": 0}
         deploy.atomic_json(self.root / "shared/split.json", config)
+        if environment == "dev":
+            # The only dev inference is the shared server; install its synthetic public CA.
+            ca = self.root / "certs/inference/kubesphere/ca.crt"
+            ca.parent.mkdir(parents=True, exist_ok=True)
+            ca.write_bytes(b"synthetic-public-ca")
+            patcher = patch.object(deploy.ssl, "create_default_context")
+            patcher.start()
+            self.addCleanup(patcher.stop)
         return Harness(role, environment, ACCOUNT, root=self.root,
                        nginx=self.root / "nginx", runner=FakeRunner())
 
@@ -568,6 +583,31 @@ class RDSPreflightTests(unittest.TestCase):
         self.assertEqual([call.kwargs["user"] for call in calls], ["app", "analysis"])
         self.assertEqual([call.kwargs["password"] for call in calls], ["test-app", "test-analysis"])
         self.assertTrue(all("sslmode=verify-full" in call.args[0] for call in calls))
+
+    def test_target_switch_rejects_pending_work(self):
+        self.environment["AML_REQUIRE_INFERENCE_IDLE"] = "true"
+        cursor = self.connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+        cursor.fetchone.side_effect = [(True,), (True,), (True,)]
+        with patch.dict(os.environ, self.environment, clear=True), self.assertRaises(ValueError):
+            rds.main()
+        self.assertEqual(self.connect.call_count, 1)
+
+    def test_target_switch_accepts_idle_queues(self):
+        self.environment["AML_REQUIRE_INFERENCE_IDLE"] = "true"
+        cursor = self.connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+        cursor.fetchone.side_effect = [(True,), (True,), (False,), (True,)]
+        with patch.dict(os.environ, self.environment, clear=True), patch("builtins.print"):
+            rds.main()
+        self.assertEqual(self.connect.call_count, 2)
+
+    def test_target_switch_accepts_unmigrated_empty_database(self):
+        self.environment["AML_REQUIRE_INFERENCE_IDLE"] = "true"
+        cursor = self.connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+        cursor.fetchone.side_effect = [(True,), (False,), (True,)]
+        with patch.dict(os.environ, self.environment, clear=True), patch("builtins.print"):
+            rds.main()
+        self.assertEqual(cursor.execute.call_count, 3)
+        self.assertNotIn("analysis.jobs WHERE", " ".join(str(c.args[0]) for c in cursor.execute.call_args_list))
 
     def test_insecure_mode_fails_before_connection(self):
         self.environment["SPRING_DATASOURCE_URL"] = self.environment["SPRING_DATASOURCE_URL"].replace("verify-full", "require")

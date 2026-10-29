@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -94,6 +95,89 @@ class PublicationTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 self.publish(**change)
         self.assertEqual(self.calls, [])
+
+
+class ProductionBuildSelectionTests(unittest.TestCase):
+    def image_details(self, service):
+        return {
+            "registryId": ACCOUNT, "repositoryName": f"aml-{service}",
+            "imageTags": [f"prod-{SHA}"],
+            "imageDigest": "sha256:" + ("b" if service == "api" else "c") * 64,
+        }
+
+    def fake_ecr(self, *args):
+        self.assertEqual(args[:2], ("ecr", "describe-images"))
+        self.assertEqual(args[args.index("--registry-id") + 1], ACCOUNT)
+        self.assertEqual(args[args.index("--image-ids") + 1], f"imageTag=prod-{SHA}")
+        repository = args[args.index("--repository-name") + 1]
+        self.assertIn(repository, ("aml-api", "aml-web"))
+        return {"imageDetails": [self.image_details(repository.removeprefix("aml-"))]}
+
+    def test_current_commit_tags_resolve_to_distinct_api_and_web_digests(self):
+        with patch.object(ci_artifacts, "aws", side_effect=self.fake_ecr) as aws:
+            selected = ci_artifacts.resolve_production(SHA, ACCOUNT)
+        self.assertEqual(aws.call_count, 2)
+        self.assertEqual(selected["app_sha"], SHA)
+        self.assertEqual(selected["environment"], "prod")
+        for service in ("api", "web"):
+            self.assertEqual(selected["images"][service],
+                             f"{ACCOUNT}.dkr.ecr.ap-northeast-2.amazonaws.com/aml-{service}@"
+                             + self.image_details(service)["imageDigest"])
+
+    def test_wrong_release_inputs_fail_before_ecr(self):
+        for sha, account in (("latest", ACCOUNT), ("../master", ACCOUNT), (SHA, "invalid")):
+            with self.subTest(sha=sha, account=account), patch.object(ci_artifacts, "aws") as aws:
+                with self.assertRaises(ValueError):
+                    ci_artifacts.resolve_production(sha, account)
+                aws.assert_not_called()
+
+    def test_missing_duplicate_or_wrong_release_images_are_rejected(self):
+        valid = self.image_details("api")
+        invalid = [[], [valid, valid]]
+        for change in ({"registryId": "999999999999"}, {"repositoryName": "aml-web"},
+                       {"imageTags": ["prod-" + "d" * 40]}, {"imageTags": [f"dev-{SHA}"]},
+                       {"imageDigest": "sha256:invalid"}, {"imageDigest": ""}):
+            invalid.append([dict(valid, **change)])
+        for details in invalid:
+            with self.subTest(details=details), patch.object(ci_artifacts, "aws") as aws:
+                aws.side_effect = [{"imageDetails": details},
+                                   {"imageDetails": [self.image_details("web")]}]
+                with self.assertRaises(ValueError):
+                    ci_artifacts.resolve_production(SHA, ACCOUNT)
+
+    def test_cli_does_not_write_a_partial_manifest_when_web_is_missing(self):
+        with tempfile.TemporaryDirectory(prefix="aml-prod-build-") as temporary:
+            output = Path(temporary) / "images.json"
+            with patch.object(sys, "argv", ["ci_artifacts.py", "resolve-prod", SHA, ACCOUNT, str(output)]), \
+                    patch.object(ci_artifacts, "aws") as aws:
+                aws.side_effect = [{"imageDetails": [self.image_details("api")]}, {"imageDetails": []}]
+                with self.assertRaises(ValueError):
+                    ci_artifacts.main()
+            self.assertFalse(output.exists())
+
+    def test_ecr_access_error_does_not_fall_back_to_old_production_images(self):
+        with patch.object(ci_artifacts, "aws", side_effect=ci_artifacts.AWSError("ecr describe-images", "AccessDenied")):
+            with self.assertRaises(ci_artifacts.AWSError):
+                ci_artifacts.resolve_production(SHA, ACCOUNT)
+
+    def test_cli_manifest_is_bundled_and_retry_is_identical(self):
+        with tempfile.TemporaryDirectory(prefix="aml-prod-build-") as temporary:
+            folder = Path(temporary)
+            output = folder / "images.json"
+            checksums = []
+            for attempt in range(2):
+                with patch.object(sys, "argv", ["ci_artifacts.py", "resolve-prod", SHA, ACCOUNT, str(output)]), \
+                        patch.object(ci_artifacts, "aws", side_effect=self.fake_ecr):
+                    ci_artifacts.main()
+                bundle = folder / f"attempt-{attempt}.tar.gz"
+                checksums.append(build_bundle.build(SPLIT.parents[1], "prod", bundle, manifest_path=output))
+                with tarfile.open(bundle) as archive:
+                    selected = json.load(archive.extractfile("deploy/split/images.json"))
+                    self.assertEqual(selected["app_sha"], SHA)
+                    self.assertTrue(selected["images"]["api"].endswith("b" * 64))
+                    self.assertTrue(selected["images"]["web"].endswith("c" * 64))
+                    self.assertNotIn("deploy/split/prod-images.json", archive.getnames())
+            self.assertEqual(checksums[0], checksums[1])
 
 
 class ProductionSelectionTests(unittest.TestCase):

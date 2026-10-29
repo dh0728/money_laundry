@@ -9,6 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.moneylaundry.api.*;
 import com.moneylaundry.api.alert.AlertQueryService;
 import com.moneylaundry.api.analysis.AnalysisScheduler;
+import com.moneylaundry.api.common.*;
+import com.moneylaundry.api.common.BusinessTime;
+import com.moneylaundry.api.dashboard.DashboardController;
+import com.moneylaundry.api.dashboard.DashboardProjection;
+import com.moneylaundry.api.dashboard.DashboardQueries;
+import com.moneylaundry.api.dashboard.DashboardService;
+import com.moneylaundry.api.dashboard.DashboardSummary;
+import com.moneylaundry.api.demo.DemoClockController;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
@@ -25,6 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Import(TestcontainersConfiguration.class)
 class ReviewWorkflowTests {
   @Autowired JdbcTemplate jdbc;
+  @Autowired DashboardProjection dashboardProjection;
+  @Autowired DashboardService dashboardService;
   @Autowired TransactionTemplate tx;
   @MockitoBean AnalysisScheduler scheduler;
   ReviewService service;
@@ -33,28 +43,35 @@ class ReviewWorkflowTests {
   long l1, l2, other;
   UUID run;
 
+  DashboardQueries refreshedDashboard(BusinessTime time) {
+    for (var scope : DashboardProjection.Scope.values()) dashboardProjection.refresh(scope);
+    return new DashboardQueries(jdbc, time);
+  }
+
   @BeforeEach
   void setup() {
-    jdbc.execute("truncate alerts,batch_jobs,review_cases,review_requests cascade");
-    jdbc.update("update demo_business_clock set business_at=null,revision=0");
-    jdbc.update("update users set last_assigned_at=now(),password_hash='test-hash'");
-    jdbc.update("update users set last_assigned_at=null where username='l2a'");
-    l1 = jdbc.queryForObject("select user_id from users where username='l1a'", Long.class);
-    other = jdbc.queryForObject("select user_id from users where username='l1b'", Long.class);
-    l2 = jdbc.queryForObject("select user_id from users where username='l2a'", Long.class);
+    jdbc.execute(
+        "truncate review.alerts,analysis.jobs,review.episodes,review.requests,core.owners,ingest.uploads cascade");
+    jdbc.update("update ops.business_clock set business_at=null,revision=0");
+    jdbc.update("update core.users set last_assigned_at=now(),password_hash='test-hash'");
+    jdbc.update("update core.users set last_assigned_at=null where username='l2a'");
+    l1 = jdbc.queryForObject("select user_id from core.users where username='l1a'", Long.class);
+    other = jdbc.queryForObject("select user_id from core.users where username='l1b'", Long.class);
+    l2 = jdbc.queryForObject("select user_id from core.users where username='l2a'", Long.class);
     clock =
         new BusinessTime(
             jdbc, tx, new MockEnvironment().withProperty("spring.profiles.active", "local"));
     clock.set(Instant.parse("2023-09-02T00:00:00Z"), 0);
     long job =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,analysis_date,threshold_value) values('ANALYSIS','COMPLETED','2023-09-02',.7) returning job_id",
+            "insert into analysis.jobs(status,analysis_date,threshold_value,current_stage,analysis_cutoff_at,business_at) values('COMPLETED','2023-09-02',.7,'COMPLETE',now(),now()) returning job_id",
             Long.class);
     run = UUID.randomUUID();
     jdbc.update(
-        "insert into analysis_runs(run_id,job_id,input_revision,status) values(?,?,1,'COMPLETED')",
+        "insert into analysis.runs(run_id,job_id,input_revision,status) values(?,?,1,'COMPLETED')",
         run,
         job);
+    jdbc.update("update analysis.jobs set current_run_id=? where job_id=?", run, job);
     evidence = mock(AlertQueryService.class);
     service = new ReviewService(jdbc, tx, clock, evidence);
   }
@@ -62,7 +79,11 @@ class ReviewWorkflowTests {
   long alert(long owner) {
     long id =
         jdbc.queryForObject(
-            "insert into alerts(assignee_id) values(?) returning alert_id", Long.class, owner);
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,?,?) returning alert_id",
+            Long.class,
+            owner,
+            java.sql.Timestamp.from(clock.now()),
+            java.sql.Timestamp.from(clock.now()));
     var items = new ArrayList<Map<String, Object>>();
     for (int i = 1; i <= 3; i++) {
       var t = new LinkedHashMap<String, Object>();
@@ -79,9 +100,82 @@ class ReviewWorkflowTests {
       t.put("scores", Map.of("p_laundering", .9, "p_0", .1, "p_1", .9));
       items.add(t);
     }
-    when(evidence.detail(id, null))
+    when(evidence.detail(eq(id), nullable(Integer.class)))
         .thenReturn(Map.of("runId", run.toString(), "version", 1, "transactions", items));
-    return jdbc.queryForObject("select case_id from review_cases where alert_id=?", Long.class, id);
+    publish(id, 1, items);
+    return jdbc.queryForObject("select case_id from review.cases where alert_id=?", Long.class, id);
+  }
+
+  void publish(long alert, int version, List<Map<String, Object>> items) {
+    jdbc.update(
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,?,?,repeat('f',64),?::jsonb)",
+        alert,
+        version,
+        run,
+        encode(Map.of("transactions", items, "seeds", List.of())));
+    jdbc.update(
+        "update review.alert_versions set published_at=now() where alert_id=? and version=?",
+        alert,
+        version);
+    jdbc.update("update review.alerts set published_version=? where alert_id=?", version, alert);
+    jdbc.update("insert into core.banks(bank_id) values(999998) on conflict do nothing");
+    long owner =
+        jdbc.queryForObject(
+            "insert into core.owners(service_owner_id,display_name) values(gen_random_uuid(),gen_random_uuid()::text) returning owner_id",
+            Long.class);
+    long account =
+        jdbc.queryForObject(
+            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999998,gen_random_uuid(),?) returning account_id",
+            Long.class,
+            owner);
+    for (var item : items) {
+      long id = number(item.get("txId"));
+      jdbc.update(
+          "insert into ledger.transactions(tx_id,occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date,integration_status) overriding system value values(?,'2023-09-01',?,?,100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1','2023-09-01','HELD') on conflict do nothing",
+          id,
+          account,
+          account);
+      jdbc.update(
+          "insert into review.alert_transactions(alert_id,version,tx_id,role,reasons,seed_risk) values(?,?,?,?,'[]',?)",
+          alert,
+          version,
+          id,
+          item.getOrDefault("role", "SEED"),
+          "SEED".equals(item.getOrDefault("role", "SEED")) && item.get("scores") != null
+              ? object(item.get("scores")).get("p_laundering")
+              : null);
+    }
+    new CaseSummaryStore(jdbc).refresh(alert);
+  }
+
+  @Test
+  void relational_risk_follows_exclusion_transfer_and_episode_membership() {
+    long a = alert(l1);
+    long b = alert(l1);
+    jdbc.update(
+        "update review.alert_transactions set seed_risk=.95 where alert_id=? and tx_id=1", a);
+    jdbc.update(
+        "update review.alert_versions set evidence=jsonb_set(evidence,'{transactions,0,scores,p_laundering}','0.95') where alert_id=?",
+        a);
+    new CaseSummaryStore(jdbc).refresh(a);
+    assertThat(risk(a)).isEqualTo(.95);
+    act(l1, "EXCLUDE", null, select(a, 1));
+    assertThat(risk(a)).isEqualTo(.9);
+    long episode = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
+    // Whole-Alert transfer preserves the closed source's historical scope.
+    assertThat(risk(a)).isEqualTo(.9);
+    assertThat(risk(b)).isEqualTo(.9);
+    assertThat(risk(episode)).isEqualTo(.9);
+    act(l2, "EXCLUDE", null, select(episode, 2));
+    assertThat(risk(episode)).isEqualTo(.9); // The second Alert still contains these seeds.
+    jdbc.update("update review.episode_members set state='TRANSFERRED' where alert_id=?", b);
+    new CaseSummaryStore(jdbc).refresh(episode);
+    assertThat(risk(episode)).isZero();
+  }
+
+  private double risk(long id) {
+    return jdbc.queryForObject(
+        "select risk from " + ReviewCaseSql.WITH_RISK + " c where case_id=?", Double.class, id);
   }
 
   ReviewService.Selection select(long id, long... txIds) {
@@ -109,12 +203,18 @@ class ReviewWorkflowTests {
           for (int i = 0; i < 2; i++) {
             long sourceCase = alert(l1);
             long source = number(service.detail(sourceCase).get("alertId"));
-            long group =
-                jdbc.queryForObject(
-                    "insert into review_groups(case_id,label) values(?,'fixture') returning group_id",
-                    Long.class,
-                    ep);
-            jdbc.update("insert into episode_alerts values(?,?,?,1)", source, ep, group);
+            jdbc.update(
+                "insert into review.episode_alerts(alert_id,episode_id,alert_version,label) values(?,?,1,'fixture')",
+                source,
+                ep);
+            savedMembers(
+                source,
+                Map.of("txId", 1, "state", "TRANSFERRED"),
+                Map.of("txId", 2, "state", "TRANSFERRED"),
+                Map.of("txId", 3, "state", "TRANSFERRED"));
+            jdbc.update(
+                "update review.alerts set status='CLOSED',outcome='TRANSFERRED',closed_at=now() where alert_id=?",
+                source);
           }
           return ep;
         });
@@ -125,25 +225,26 @@ class ReviewWorkflowTests {
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,now(),now())",
+                    "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,now(),now())",
                     l2))
         .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     long ep =
         number(act(l1, "TRANSFER", null, select(alert(l1)), select(alert(l1))).get("targetCaseId"));
     long source =
         jdbc.queryForObject(
-            "select min(alert_id) from episode_alerts where episode_case_id=?", Long.class, ep);
-    assertThatThrownBy(() -> jdbc.update("delete from episode_alerts where alert_id=?", source))
+            "select min(alert_id) from review.episode_alerts where episode_id=?", Long.class, ep);
+    assertThatThrownBy(
+            () -> jdbc.update("delete from review.episode_alerts where alert_id=?", source))
         .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "insert into episode_alerts select * from episode_alerts where alert_id=?",
+                    "insert into review.episode_alerts overriding system value select * from review.episode_alerts where alert_id=?",
                     source))
         .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from episode_alerts where episode_case_id=?", Integer.class, ep))
+                "select count(*) from review.episode_alerts where episode_id=?", Integer.class, ep))
         .isEqualTo(2);
   }
 
@@ -231,7 +332,7 @@ class ReviewWorkflowTests {
     assertThat(service.detail(b).get("episodeId")).isEqualTo(ep);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from episode_alerts where episode_case_id=?", Integer.class, ep))
+                "select count(*) from review.episode_alerts where episode_id=?", Integer.class, ep))
         .isEqualTo(2);
   }
 
@@ -279,7 +380,7 @@ class ReviewWorkflowTests {
   void unlink_rolls_back_all_restorations_when_a_source_is_inconsistent() {
     long a = alert(l1), b = alert(l1);
     long ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
-    jdbc.update("update review_cases set outcome='NORMAL' where case_id=?", b);
+    jdbc.update("update review.alerts set outcome='NORMAL' where alert_id=?", b);
     assertThatThrownBy(() -> act(l2, "UNLINK", null, select(ep))).isInstanceOf(ApiException.class);
     assertThat(service.detail(a).get("status")).isEqualTo("CLOSED");
     assertThat(rows(service.detail(ep).get("groups"))).hasSize(2);
@@ -298,7 +399,7 @@ class ReviewWorkflowTests {
     assertThat(members.get(2).get("state")).isEqualTo("EXCLUDED");
     assertThat(
             jdbc.queryForObject(
-                "select snapshot->0->'members'->0->>'decision' from review_events where case_id=? and action='BEFORE_EXCLUDE'",
+                "select snapshot->0->'members'->0->>'decision' from review.event_history where case_id=? and action='BEFORE_EXCLUDE'",
                 String.class,
                 a))
         .isEqualTo("NORMAL");
@@ -310,13 +411,13 @@ class ReviewWorkflowTests {
   void dissolved_episode_must_be_closed_and_empty() {
     long a = alert(l1);
     assertThatThrownBy(
-            () -> jdbc.update("update review_cases set outcome='DISSOLVED' where case_id=?", a))
+            () -> jdbc.update("update review.alerts set outcome='DISSOLVED' where alert_id=?", a))
         .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     long ep = number(act(l1, "TRANSFER", null, select(a), select(alert(l1))).get("targetCaseId"));
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "update review_cases set status='CLOSED',outcome='DISSOLVED',closed_at=now() where case_id=?",
+                    "update review.episodes set status='CLOSED',outcome='DISSOLVED',closed_at=now() where episode_id=?",
                     ep))
         .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     assertThat(service.detail(ep).get("status")).isEqualTo("OPEN");
@@ -369,11 +470,11 @@ class ReviewWorkflowTests {
     assertThat(service.detail(id).get("outcome")).isEqualTo("SUSPICIOUS");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from review_cases where kind='EPISODE'", Integer.class))
+                "select count(*) from review.cases where kind='EPISODE'", Integer.class))
         .isZero();
     assertThat(
             jdbc.queryForObject(
-                "select resolution from alerts where alert_id=?",
+                "select outcome from review.alerts where alert_id=?",
                 String.class,
                 service.detail(id).get("alertId")))
         .isEqualTo("SUSPICIOUS");
@@ -404,7 +505,7 @@ class ReviewWorkflowTests {
       service.command(l1, command);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from review_events where case_id=? and action='CLOSE'",
+                  "select count(*) from review.event_history where case_id=? and action='CLOSE'",
                   Integer.class,
                   id))
           .isEqualTo(1);
@@ -453,8 +554,87 @@ class ReviewWorkflowTests {
       assertThat(List.of(futures.get(0).get(), futures.get(1).get()))
           .containsExactlyInAnyOrder(true, false);
     }
-    assertThat(jdbc.queryForObject("select count(*) from episode_alerts", Integer.class))
+    assertThat(jdbc.queryForObject("select count(*) from review.episode_alerts", Integer.class))
         .isEqualTo(2);
+  }
+
+  @Test
+  void list_projects_only_shared_summary_and_detail_keeps_aggregates() {
+    long a = alert(l1), b = alert(l1), c = alert(l1);
+    long episode = number(act(l1, "TRANSFER", null, select(b), select(c)).get("targetCaseId"));
+    var expectedKeys =
+        Set.of(
+            "txCount",
+            "subjectCount",
+            "seedCount",
+            "riskScore",
+            "primaryType",
+            "totalAmountUsd",
+            "amountsByCurrency",
+            "firstTxAt",
+            "lastTxAt");
+    for (var entry : Map.of("ALERT", a, "EPISODE", episode).entrySet()) {
+      clearInvocations(evidence);
+      var page = service.list(entry.getKey(), "OPEN", null, null, null, 0, 20);
+      verifyNoInteractions(evidence);
+      var item = rows(page.get("content")).getFirst();
+      assertThat(number(item.get("caseId"))).isEqualTo(entry.getValue());
+      var summary = object(item.get("summary"));
+      assertThat(summary.keySet()).isEqualTo(expectedKeys);
+      assertThat(item).doesNotContainKeys("groups", "accounts", "history", "relatedFlows");
+      var detail = service.detail(entry.getValue());
+      var detailedSummary = object(encode(detail.get("summary")));
+      assertThat(detailedSummary)
+          .containsKeys(
+              "netFlows",
+              "topReceiverShare",
+              "topSenders",
+              "paymentFormats",
+              "dailySuspiciousCount",
+              "dailySuspiciousAmount",
+              "typeDistribution",
+              "typeShare");
+      assertThat(object(detailedSummary.get("netFlows"))).isNotEmpty();
+      assertThat(rows(detail.get("groups"))).isNotEmpty();
+      summary.forEach((key, value) -> assertThat(value).isEqualTo(detailedSummary.get(key)));
+      assertThat(item.get("revision")).isEqualTo(detail.get("revision"));
+      assertThat(number(item.get("pendingCount"))).isEqualTo(number(detail.get("pendingCount")));
+      assertThat(encode(item.get("sourceAlertIds")))
+          .isEqualTo(encode(detail.get("sourceAlertIds")));
+    }
+  }
+
+  @Test
+  void large_account_aggregates_do_not_expand_list_or_jdbc_result() {
+    for (int i = 0; i < 20; i++) alert(l1);
+    var before = service.list("ALERT", "OPEN", l1, null, null, 0, 20);
+    var netFlows = new LinkedHashMap<String, Object>();
+    for (int i = 0; i < 4096; i++) netFlows.put(UUID.randomUUID() + "|USD", i + .25);
+    jdbc.update(
+        "update review.alerts set summary=summary || ?::jsonb",
+        encode(Map.of("netFlows", netFlows, "futureDetail", netFlows)));
+    clearInvocations(evidence);
+    var after = service.list("ALERT", "OPEN", l1, null, null, 0, 20);
+    verifyNoInteractions(evidence);
+    assertThat(after).isEqualTo(before);
+    var projected =
+        jdbc.queryForList(
+            "select " + ReviewCaseSql.LIST_COLUMNS + " from " + ReviewCaseSql.WITH_RISK + " c");
+    for (var row : projected)
+      assertThat(object(row.get("summary")))
+          .doesNotContainKeys("netFlows", "futureDetail", "topSenders", "dailySuspiciousCount");
+    int bytes = encode(after).getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+    assertThat(bytes).isLessThan(32000);
+    System.out.printf(
+        "LIST_PAYLOAD cases=20 accountsPerSummary=4096 responseBytes=%d storedSummaryBytes=%d%n",
+        bytes,
+        jdbc.queryForObject(
+            "select sum(octet_length(summary::text)) from review.alerts", Long.class));
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from review.alerts where summary ? 'netFlows' and summary ? 'futureDetail'",
+                Long.class))
+        .isEqualTo(20L);
   }
 
   @Test
@@ -462,7 +642,7 @@ class ReviewWorkflowTests {
     long id = alert(l1);
     long alertId = number(service.detail(id).get("alertId"));
     var doc = object(encode(evidence.detail(alertId, null)));
-    doc.put("policyVersion", "calendar-event-v4");
+    doc.put("policyVersion", "flow-evidence-1");
     doc.put("summary", Map.of("scoreMax", .9, "txCount", 3));
     doc.put(
         "seeds",
@@ -470,7 +650,7 @@ class ReviewWorkflowTests {
             Map.of("txId", 1, "score", .9, "threshold", .7),
             Map.of("txId", 2, "score", .9, "threshold", .7)));
     jdbc.update(
-        "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb)",
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb) on conflict(alert_id,version) do update set evidence=excluded.evidence,fingerprint=excluded.fingerprint",
         alertId,
         run,
         "a".repeat(64),
@@ -496,7 +676,7 @@ class ReviewWorkflowTests {
     assertThat(actual.detail(id).get("pendingCount")).isEqualTo(0L);
     assertThat(
             jdbc.queryForObject(
-                "select evidence->'transactions'->0->>'role' from alert_versions where alert_id=?",
+                "select evidence->'transactions'->0->>'role' from review.alert_versions where alert_id=?",
                 String.class,
                 alertId))
         .isEqualTo("SEED");
@@ -548,7 +728,7 @@ class ReviewWorkflowTests {
     assertThatThrownBy(() -> service.command(l1, request)).isInstanceOf(ApiException.class);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from review_cases where kind='EPISODE'", Integer.class))
+                "select count(*) from review.cases where kind='EPISODE'", Integer.class))
         .isZero();
     assertThat(service.detail(a).get("revision")).isEqualTo(1L);
     var ok =
@@ -566,7 +746,7 @@ class ReviewWorkflowTests {
     assertThat(number(first.get("targetCaseId"))).isEqualTo(number(second.get("targetCaseId")));
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from review_cases where kind='EPISODE'", Integer.class))
+                "select count(*) from review.cases where kind='EPISODE'", Integer.class))
         .isEqualTo(1);
     assertThatThrownBy(
             () ->
@@ -599,10 +779,13 @@ class ReviewWorkflowTests {
   @Test
   void business_clock_persists_and_blocks_backward_or_busy_changes() {
     clock.set(Instant.parse("2023-09-03T00:00:00Z"), 1);
-    assertThat(clock.now()).isEqualTo(Instant.parse("2023-09-03T00:00:00Z"));
+    // The demo clock flows from its setting.
+    assertThat(clock.now())
+        .isBetween(Instant.parse("2023-09-03T00:00:00Z"), Instant.parse("2023-09-03T00:01:00Z"));
     assertThatThrownBy(() -> clock.set(Instant.parse("2023-09-02T00:00:00Z"), 2))
         .isInstanceOf(ApiException.class);
-    jdbc.update("insert into batch_jobs(job_type,status) values('INGEST','RUNNING')");
+    jdbc.update(
+        "insert into analysis.jobs(status,analysis_date,threshold_value,current_stage,analysis_cutoff_at,business_at) values('RUNNING','2023-09-03',.7,'FEATURES',now(),now())");
     assertThatThrownBy(() -> clock.set(Instant.parse("2023-09-04T00:00:00Z"), 2))
         .isInstanceOf(ApiException.class);
     assertThat(
@@ -628,7 +811,8 @@ class ReviewWorkflowTests {
     assertThatThrownBy(() -> act(l1, "TRANSFER", null, select(a))).isInstanceOf(ApiException.class);
     assertThatThrownBy(() -> act(l1, "TRANSFER", null, select(a, 1), select(b)))
         .isInstanceOf(ApiException.class);
-    assertThat(jdbc.queryForObject("select count(*) from episode_alerts", Integer.class)).isZero();
+    assertThat(jdbc.queryForObject("select count(*) from review.episode_alerts", Integer.class))
+        .isZero();
     assertThat(service.detail(a).get("status")).isEqualTo("OPEN");
   }
 
@@ -681,44 +865,42 @@ class ReviewWorkflowTests {
     assertThat(service.detail(ep).get("pendingCount")).isEqualTo(2L);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from review_events where case_id=? and action='DECIDE' and snapshot::text like '%NORMAL%'",
+                "select count(*) from review.event_history where case_id=? and action='DECIDE' and snapshot::text like '%NORMAL%'",
                 Integer.class, ep))
         .isEqualTo(1);
   }
 
   @Test
   void ledger_filters_show_unique_incoming_and_outgoing_without_private_or_label_fields() {
-    jdbc.update("insert into banks(bank_id) values(999010) on conflict do nothing");
+    jdbc.update("insert into core.banks(bank_id) values(999010) on conflict do nothing");
     String token = UUID.randomUUID().toString();
     long entity =
         jdbc.queryForObject(
-            "insert into private.entities(service_entity_id,entity_lookup_token,identity_cipher,name_cipher,key_version) values(gen_random_uuid(),?,'hidden','hidden','test') returning entity_id",
+            "insert into core.owners(service_owner_id,display_name) values(gen_random_uuid(),?) returning owner_id",
             Long.class,
             token);
     long a =
         jdbc.queryForObject(
-            "insert into private.accounts(bank_id,service_account_id,account_lookup_token,entity_id,identity_cipher,key_version) values(999010,gen_random_uuid(),?,?, 'hidden','test') returning account_id",
+            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999010,gen_random_uuid(),?) returning account_id",
             Long.class,
-            token + "a",
             entity);
     long b =
         jdbc.queryForObject(
-            "insert into private.accounts(bank_id,service_account_id,account_lookup_token,entity_id,identity_cipher,key_version) values(999010,gen_random_uuid(),?,?, 'hidden','test') returning account_id",
+            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999010,gen_random_uuid(),?) returning account_id",
             Long.class,
-            token + "b",
             entity);
     for (int i = 0; i < 2; i++)
       jdbc.update(
-          "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2023-08-31 15:00Z',?,?,10,'USD',10,'USD','ACH',10,'fx_rates_usd_v1','2023-09-01')",
+          "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2023-08-31 15:00Z',?,?,10,'USD',10,'USD','ACH',10,'fx_rates_usd_v1','2023-09-01')",
           i == 0 ? a : b,
           i == 0 ? b : a);
     var query = new LedgerQueryService(jdbc);
     UUID owner =
         jdbc.queryForObject(
-            "select service_entity_id from private.entities where entity_id=?", UUID.class, entity);
+            "select service_owner_id from core.owners where owner_id=?", UUID.class, entity);
     UUID account =
         jdbc.queryForObject(
-            "select service_account_id from private.accounts where account_id=?", UUID.class, a);
+            "select service_account_id from core.accounts where account_id=?", UUID.class, a);
     var filter =
         new LedgerQueryService.Filter(
             LocalDate.parse("2023-09-01"),
@@ -738,12 +920,12 @@ class ReviewWorkflowTests {
       assertThat(row.get("isSuspicious")).isNull();
     }
     assertThat(encode(data)).doesNotContain("hidden", "is_laundering", "name_cipher");
-    String displayName = OwnerDisplay.name(entity);
+    String displayName = token;
     long caseId = alert(l1);
     long alertId = number(service.detail(caseId).get("alertId"));
     String secondAccount =
         jdbc.queryForObject(
-            "select service_account_id::text from private.accounts where account_id=?",
+            "select service_account_id::text from core.accounts where account_id=?",
             String.class,
             b);
     for (var transaction : rows(evidence.detail(alertId, null).get("transactions"))) {
@@ -773,12 +955,6 @@ class ReviewWorkflowTests {
         new LedgerQueryService.Filter(
             filter.from(), filter.to(), null, null, null, null, 0, 20, displayName, null);
     assertThat(query.query("transactions", byName).get("totalElements")).isEqualTo(2L);
-    for (long number : List.of(1L, 20L, 21L, 800L, 801L, 100000L)) {
-      assertThat(
-              jdbc.queryForObject(
-                  "select " + OwnerDisplay.sql(Long.toString(number)), String.class))
-          .isEqualTo(OwnerDisplay.name(number));
-    }
 
     var incoming =
         new LedgerQueryService.Filter(
@@ -866,21 +1042,21 @@ class ReviewWorkflowTests {
                         filter.from(), filter.to(), owner, account, List.of("NORMAL"), null, 0, 20))
                 .get("totalElements"))
         .isEqualTo(0L);
-    var d = new DashboardService(jdbc, clock).view(l1, filter.from(), filter.to());
-    assertThat(object(d.get("detection")).get("received")).isEqualTo(2L);
-    assertThat(object(d.get("detection")).get("analyzed")).isEqualTo(0L);
-    assertThat(rows(d.get("daily")).getFirst().get("day").toString()).isEqualTo("2023-09-01");
+    var d = refreshedDashboard(clock).view(l1, filter.from(), filter.to());
+    assertThat(d.pipeline().data().detection().received()).isEqualTo(2L);
+    assertThat(d.pipeline().data().detection().analyzed()).isEqualTo(0L);
+    assertThat(d.investigation().data().daily().getFirst().date()).isEqualTo("2023-09-01");
   }
 
   @Test
   void money_scope_reads_nonmember_ledger_and_preserves_closed_snapshot() {
     // This test owns its isolated Testcontainers database.
-    jdbc.execute("truncate bank_reporting_periods cascade");
-    jdbc.update("insert into banks(bank_id) values(999011) on conflict do nothing");
+    jdbc.execute("truncate core.bank_reporting_periods cascade");
+    jdbc.update("insert into core.banks(bank_id) values(999011) on conflict do nothing");
     String token = UUID.randomUUID().toString();
     long entity =
         jdbc.queryForObject(
-            "insert into private.entities(service_entity_id,entity_lookup_token,identity_cipher,name_cipher,key_version) values(gen_random_uuid(),?,'hidden','hidden','test') returning entity_id",
+            "insert into core.owners(service_owner_id,display_name) values(gen_random_uuid(),?) returning owner_id",
             Long.class,
             token);
     List<Long> internal = new ArrayList<>();
@@ -890,14 +1066,13 @@ class ReviewWorkflowTests {
       ids.add(uuid);
       internal.add(
           jdbc.queryForObject(
-              "insert into private.accounts(bank_id,service_account_id,account_lookup_token,entity_id,identity_cipher,key_version) values(999011,?,?,?,'hidden','test') returning account_id",
+              "insert into core.accounts(bank_id,service_account_id,owner_id) values(999011,?,?) returning account_id",
               Long.class,
               uuid,
-              token + i,
               entity));
     }
     jdbc.update(
-        "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2023-09-01 00:00Z',?,?,100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1','2023-09-01')",
+        "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2023-09-01 00:00Z',?,?,100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1','2023-09-01')",
         internal.get(0),
         internal.get(1));
     long id = alert(l1);
@@ -926,22 +1101,22 @@ class ReviewWorkflowTests {
                         UUID.randomUUID(), request.revision(), List.of(), "오래된 화면")))
         .isInstanceOf(ApiException.class);
     jdbc.update(
-        "insert into bank_reporting_periods(bank_id,effective_from_date,effective_to_date) values(999011,'2023-09-01','2023-09-01')");
+        "insert into core.bank_reporting_periods(bank_id,effective_from_date,effective_to_date) values(999011,'2023-09-01','2023-09-01')");
     long upload =
         jdbc.queryForObject(
-            "insert into batch_jobs(job_type,status,bank_id,business_date) values('INGEST','COMPLETED',999011,'2023-09-01') returning job_id",
+            "insert into ingest.uploads(file_name,file_hash,size_bytes,status,bank_id,business_date) values('fixture.csv',repeat('a',64),1,'COMPLETED',999011,'2023-09-01') returning upload_id",
             Long.class);
     long set =
         jdbc.queryForObject(
-            "insert into report_sets(bank_id,business_date) values(999011,'2023-09-01') returning set_id",
+            "insert into ingest.report_sets(bank_id,business_date) values(999011,'2023-09-01') returning set_id",
             Long.class);
     long version =
         jdbc.queryForObject(
-            "insert into report_versions(set_id,upload_id,version_no,received_at,stage_status) values(?,?,1,now(),'ACTIVE') returning version_id",
+            "insert into ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status) values(?,?,1,now(),'ACTIVE') returning version_id",
             Long.class,
             set,
             upload);
-    jdbc.update("update report_sets set current_version_id=? where set_id=?", version, set);
+    jdbc.update("update ingest.report_sets set current_version_id=? where set_id=?", version, set);
     var metrics = service.money(id, 180);
     assertThat(metrics.get("available")).isEqualTo(true);
     assertThat(metrics.get("complete")).isEqualTo(true);
@@ -952,14 +1127,14 @@ class ReviewWorkflowTests {
     assertThat(new java.math.BigDecimal(object(metrics.get("externalUsd")).get("in").toString()))
         .isEqualByComparingTo("100");
     jdbc.update(
-        "insert into fx_rates(fx_rate_version,currency,units_per_usd) values('usd-card-test','SAR',7.5) on conflict do nothing");
+        "insert into core.fx_rates(fx_rate_version,currency,units_per_usd) values('usd-card-test','SAR',7.5) on conflict do nothing");
     jdbc.update(
-        "update transactions set amount_received=375,receiving_currency='SAR',fx_rate_version='usd-card-test' where from_account_id=?",
+        "update ledger.transactions set amount_received=375,receiving_currency='SAR',fx_rate_version='usd-card-test' where from_account_id=?",
         internal.get(0));
     var converted = object(service.money(id, 180).get("externalUsd"));
     assertThat(new java.math.BigDecimal(converted.get("in").toString())).isEqualByComparingTo("50");
     jdbc.update(
-        "insert into transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2023-09-01 01:00Z',?,?,80,'USD',80,'USD','ACH',80,'fx_rates_usd_v1','2023-09-01')",
+        "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values('2023-09-01 01:00Z',?,?,80,'USD',80,'USD','ACH',80,'fx_rates_usd_v1','2023-09-01')",
         internal.get(1),
         internal.get(0));
     converted = object(service.money(id, 180).get("externalUsd"));
@@ -968,19 +1143,20 @@ class ReviewWorkflowTests {
     assertThat(new java.math.BigDecimal(converted.get("net").toString()))
         .isEqualByComparingTo("-30");
     jdbc.update(
-        "update transactions set fx_rate_version='missing-rate' where from_account_id=?",
+        "update ledger.transactions set fx_rate_version='missing-rate' where from_account_id=?",
         internal.get(0));
     assertThat(object(service.money(id, 180).get("externalUsd")).get("in")).isNull();
     assertThat(object(service.money(id, 180).get("externalUsd")).get("net")).isNull();
     jdbc.update(
-        "update transactions set fx_rate_version='usd-card-test' where from_account_id=?",
+        "update ledger.transactions set fx_rate_version='usd-card-test' where from_account_id=?",
         internal.get(0));
     assertThat(encode(metrics)).doesNotContain("hidden", "identity_cipher");
     act(l1, "DECIDE", "NORMAL", select(id, 1, 2));
     act(l1, "CLOSE", null, select(id));
     String frozen = encode(service.money(id, 180));
     jdbc.update(
-        "update transactions set amount_received=999 where from_account_id=?", internal.get(0));
+        "update ledger.transactions set amount_received=999 where from_account_id=?",
+        internal.get(0));
     assertThat(encode(service.money(id, 60))).isEqualTo(frozen);
     assertThatThrownBy(
             () ->
@@ -998,39 +1174,40 @@ class ReviewWorkflowTests {
   @Test
   void episode_metrics_use_work_time_first_review_and_creation_not_transfer_events() {
     Instant now = Instant.parse("2023-09-05T00:00:00Z");
-    var dashboard = new DashboardService(jdbc, clock);
     var empty =
-        dashboard.episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
+        refreshedDashboard(clock)
+            .episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
     assertThat(object(empty.get("completion")).get("average_seconds")).isNull();
     long old =
         rawEpisode(
-            "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-01 00:00Z','2023-09-02 00:00Z') returning case_id",
+            "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,'2023-09-01 00:00Z','2023-09-02 00:00Z') returning episode_id",
             l2);
     long today =
         rawEpisode(
-            "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,'2023-09-04 15:00Z','2023-09-04 15:00Z') returning case_id",
+            "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,'2023-09-04 15:00Z','2023-09-04 15:00Z') returning episode_id",
             l2);
     rawEpisode(
-        "insert into review_cases(kind,assignee_id,status,created_at,assigned_at,closed_at,closed_by,outcome) values('EPISODE',?,'CLOSED','2023-09-03 00:00Z','2023-09-03 00:00Z','2023-09-04 16:00Z',?,'NORMAL') returning case_id",
+        "insert into review.episodes(assignee_id,status,created_at,assigned_at,closed_at,closed_by,outcome) values(?,'CLOSED','2023-09-03 00:00Z','2023-09-03 00:00Z','2023-09-04 16:00Z',?,'NORMAL') returning episode_id",
         l2,
         l2);
     for (String at : List.of("2023-09-04T16:00:00Z", "2023-09-04T17:00:00Z"))
       jdbc.update(
-          "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'REVIEW_START','test',?::timestamptz,'{}')",
+          "insert into review.events(episode_id,actor_id,action,comment,business_at,snapshot) values(?,?,'REVIEW_START','test',?::timestamptz,'{}')",
           today,
           l2,
           at);
     jdbc.update(
-        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','existing destination','2023-09-04 18:00Z','{}')",
+        "insert into review.events(episode_id,actor_id,action,comment,business_at,snapshot) values(?,?,'TRANSFER','existing destination','2023-09-04 18:00Z','{}')",
         today,
         l1);
     // Another staff member's opening is not the assignee's first review.
     jdbc.update(
-        "insert into review_events(case_id,actor_id,action,comment,business_at,snapshot) values(?,?,'REVIEW_START','other staff','2023-09-04 18:00Z','{}')",
+        "insert into review.events(episode_id,actor_id,action,comment,business_at,snapshot) values(?,?,'REVIEW_START','other staff','2023-09-04 18:00Z','{}')",
         old,
         l1);
     var result =
-        dashboard.episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
+        refreshedDashboard(clock)
+            .episodeWork(now, LocalDate.parse("2023-09-05"), LocalDate.parse("2023-09-05"));
     var current = object(result.get("current"));
     assertThat(current.get("open")).isEqualTo(2L);
     assertThat(current.get("aged")).isEqualTo(1L);
@@ -1041,26 +1218,31 @@ class ReviewWorkflowTests {
     assertThat(object(result.get("firstReview")).get("samples")).isEqualTo(1L);
     assertThat(number(object(result.get("completion")).get("average_seconds")))
         .isEqualTo(40 * 3600L);
-    assertThat(number(rows(result.get("oldestOpen")).getFirst().get("caseId"))).isEqualTo(old);
+    assertThat(
+            Long.parseLong(refreshedDashboard(clock).queues(l2).oldestOpen().getFirst().caseId()))
+        .isEqualTo(old);
     var otherRange =
-        dashboard.episodeWork(now, LocalDate.parse("2023-08-01"), LocalDate.parse("2023-08-02"));
+        refreshedDashboard(clock)
+            .episodeWork(now, LocalDate.parse("2023-08-01"), LocalDate.parse("2023-08-02"));
     assertThat(object(otherRange.get("current"))).isEqualTo(current);
     assertThat(object(otherRange.get("firstReview")).get("samples")).isEqualTo(0L);
   }
 
   @Test
   void http_contract_serializes_clock_cases_and_validates_missing_actor() throws Exception {
-    var controller =
-        new ReviewController(
-            service, new LedgerQueryService(jdbc), clock, new DashboardService(jdbc, clock));
     var mvc =
-        MockMvcBuilders.standaloneSetup(controller)
+        MockMvcBuilders.standaloneSetup(
+                new ReviewController(service),
+                new LedgerController(new LedgerQueryService(jdbc), clock),
+                new DashboardController(service, dashboardService),
+                new DemoClockController(service, clock))
             .setControllerAdvice(new ApiExceptionHandler())
             .build();
     long id = alert(l1);
     mvc.perform(get("/api/v1/demo/clock"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.businessAt").value("2023-09-02T09:00+09:00"));
+        .andExpect(
+            jsonPath("$.businessAt").value(org.hamcrest.Matchers.startsWith("2023-09-02T09:00")));
     mvc.perform(get("/api/v1/review/cases/" + id))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.groups[0].members.length()").value(3));
@@ -1079,7 +1261,7 @@ class ReviewWorkflowTests {
     mvc.perform(get("/api/v1/ledger/transactions").param("judgement", "BOGUS"))
         .andExpect(status().isBadRequest());
     mvc.perform(
-            get("/api/v1/dashboard")
+            get("/api/v1/dashboard/summary")
                 .principal(() -> "l1a")
                 .param("from", "2023-09-01")
                 .param("to", "2023-09-02"))
@@ -1108,13 +1290,13 @@ class ReviewWorkflowTests {
       assertThat(List.of(a.get(), b.get())).containsExactlyInAnyOrder(true, false);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from review_events where case_id=? and action='EXCLUDE'",
+                  "select count(*) from review.event_history where case_id=? and action='EXCLUDE'",
                   Integer.class,
                   id))
           .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from review_events where case_id=? and action='BEFORE_EXCLUDE'",
+                  "select count(*) from review.event_history where case_id=? and action='BEFORE_EXCLUDE'",
                   Integer.class,
                   id))
           .isEqualTo(1);
@@ -1131,7 +1313,7 @@ class ReviewWorkflowTests {
     var added = object(encode(rows(old.get("transactions")).getFirst()));
     added.put("txId", 4);
     rows(old.get("transactions")).add(added);
-    when(evidence.detail(alertId, null)).thenReturn(old);
+    when(evidence.detail(eq(alertId), nullable(Integer.class))).thenReturn(old);
     assertThatThrownBy(() -> act(l1, "DECIDE", "NORMAL", stale)).isInstanceOf(ApiException.class);
     assertThat(service.detail(id).get("pendingCount")).isEqualTo(3L);
   }
@@ -1139,29 +1321,74 @@ class ReviewWorkflowTests {
   long publishedAlert(long... txIds) {
     long id =
         jdbc.queryForObject(
-            "insert into alerts(assignee_id) values(?) returning alert_id", Long.class, l1);
-    var members = Arrays.stream(txIds).mapToObj(n -> Map.of("txId", n)).toList();
-    jdbc.update(
-        "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb)",
-        id,
-        run,
-        "f".repeat(64),
-        encode(Map.of("seeds", List.of(), "transactions", members)));
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,?,?) returning alert_id",
+            Long.class,
+            l1,
+            java.sql.Timestamp.from(clock.now()),
+            java.sql.Timestamp.from(clock.now()));
+    List<Map<String, Object>> members =
+        Arrays.stream(txIds)
+            .mapToObj(
+                n -> {
+                  var member = new LinkedHashMap<String, Object>();
+                  member.put("txId", n);
+                  member.put("role", "SEED");
+                  member.put("occurredAt", "2023-09-01T00:00:00Z");
+                  member.put("fromAccountId", "a");
+                  member.put("toAccountId", "b");
+                  member.put("amountPaid", 100);
+                  member.put("amountReceived", 100);
+                  member.put("paymentCurrency", "USD");
+                  member.put("receivingCurrency", "USD");
+                  member.put("paymentFormat", "ACH");
+                  return (Map<String, Object>) member;
+                })
+            .toList();
+    publish(id, 1, members);
     return id;
   }
 
   void savedMembers(long caseId, Map<String, Object>... members) {
-    jdbc.update(
-        "insert into review_groups(case_id,label,members) values(?,'test',?::jsonb)",
-        caseId,
-        encode(List.of(members)));
+    boolean episode =
+        jdbc.queryForObject(
+            "select exists(select 1 from review.episodes where episode_id=?)",
+            Boolean.class,
+            caseId);
+    long alert = caseId;
+    long group;
+    if (episode) {
+      var row =
+          jdbc.queryForMap(
+              "select alert_id,group_id from review.episode_alerts g where episode_id=? and not exists(select 1 from review.episode_members m where m.group_id=g.group_id) order by group_id limit 1",
+              caseId);
+      alert = number(row.get("alert_id"));
+      group = number(row.get("group_id"));
+    } else {
+      group =
+          jdbc.queryForObject(
+              "insert into review.alert_groups(alert_id,label,evidence_version) values(?,'test',1) returning group_id",
+              Long.class,
+              alert);
+    }
+    for (var member : members) {
+      String state = (String) member.getOrDefault("state", "PENDING");
+      jdbc.update(
+          "insert into review."
+              + (episode ? "episode_members" : "alert_members")
+              + "(group_id,alert_id,tx_id,evidence_version,review_role,state,decision) values(?,?,?,1,'SUBJECT',?,?)",
+          group,
+          alert,
+          number(member.get("txId")),
+          state,
+          state.equals("DECIDED") ? "NORMAL" : null);
+    }
   }
 
   @Test
   void membership_matches_current_scope_and_preserves_closed_cases() {
     long a = publishedAlert(1, 2, 3, 4);
     long c =
-        jdbc.queryForObject("select case_id from review_cases where alert_id=?", Long.class, a);
+        jdbc.queryForObject("select case_id from review.cases where alert_id=?", Long.class, a);
     savedMembers(
         c,
         Map.of("txId", 1, "state", "EXCLUDED"),
@@ -1170,7 +1397,7 @@ class ReviewWorkflowTests {
     long otherAlert = publishedAlert(1);
     long ep =
         rawEpisode(
-            "insert into review_cases(kind,assignee_id,created_at,assigned_at,status,closed_at) values('EPISODE',?,now(),now(),'CLOSED',now()) returning case_id",
+            "insert into review.episodes(assignee_id,created_at,assigned_at,status,closed_at,outcome) values(?,now(),now(),'CLOSED',now(),'NORMAL') returning episode_id",
             l2);
     savedMembers(ep, Map.of("txId", 2, "state", "DECIDED"), Map.of("txId", 1, "state", "EXCLUDED"));
     savedMembers(ep, Map.of("txId", 2, "state", "DECIDED"));
@@ -1184,16 +1411,18 @@ class ReviewWorkflowTests {
         .isEqualTo(new TreeSet<>(List.of(ep)));
     assertThat((Collection<?>) transactions.get(2).get("alertIds"))
         .isEqualTo(new TreeSet<>(List.of(a)));
-    assertThat((Collection<?>) transactions.get(3).get("alertIds"))
-        .isEqualTo(new TreeSet<>(List.of(a)));
+    // A stored investigation scope never picks up missing members at read time.
+    assertThat((Collection<?>) transactions.get(3).get("alertIds")).isEmpty();
     assertThat((Collection<?>) transactions.get(4).get("episodeIds")).isEmpty();
-    jdbc.update("update review_cases set status='CLOSED',closed_at=now() where case_id=?", c);
+    jdbc.update(
+        "update review.alerts set status='CLOSED',outcome='NORMAL',closed_at=now() where alert_id=?",
+        c);
     new CurrentCaseMembership(jdbc).attach(transactions);
     assertThat((Collection<?>) transactions.get(2).get("alertIds"))
         .isEqualTo(new TreeSet<>(List.of(a)));
     assertThat((Collection<?>) transactions.get(3).get("alertIds")).isEmpty();
     // An unpublished later version must not replace the visible completed evidence.
-    jdbc.update("update analysis_runs set status='ACTIVE' where run_id=?", run);
+    jdbc.update("update analysis.runs set status='ACTIVE' where run_id=?", run);
     new CurrentCaseMembership(jdbc).attach(transactions);
     assertThat((Collection<?>) transactions.get(0).get("alertIds")).isEmpty();
     assertThat((Collection<?>) transactions.get(1).get("episodeIds"))
@@ -1204,27 +1433,27 @@ class ReviewWorkflowTests {
   void aged_alert_count_excludes_episodes_closed_and_just_under_72_hours() {
     long a = publishedAlert(1), b = publishedAlert(2), c = publishedAlert(3);
     jdbc.update(
-        "update review_cases set assigned_at=? where alert_id=?",
+        "update review.alerts set assigned_at=? where alert_id=?",
         java.sql.Timestamp.from(clock.now().minus(Duration.ofHours(72))),
         a);
     jdbc.update(
-        "update review_cases set assigned_at=? where alert_id=?",
+        "update review.alerts set assigned_at=? where alert_id=?",
         java.sql.Timestamp.from(clock.now().minus(Duration.ofHours(72)).plusSeconds(1)),
         b);
     jdbc.update(
-        "update review_cases set assigned_at=?,status='CLOSED',closed_at=? where alert_id=?",
+        "update review.alerts set assigned_at=?,status='CLOSED',outcome='NORMAL',closed_at=? where alert_id=?",
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))),
         java.sql.Timestamp.from(clock.now()),
         c);
     rawEpisode(
-        "insert into review_cases(kind,assignee_id,created_at,assigned_at) values('EPISODE',?,?,?) returning case_id",
+        "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,?,?) returning episode_id",
         l2,
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))),
         java.sql.Timestamp.from(clock.now().minus(Duration.ofDays(4))));
-    var dashboard = new DashboardService(jdbc, clock);
+    var dashboard = refreshedDashboard(clock);
     var d = dashboard.view(l1, LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-02"));
-    assertThat(d.get("openAlertsAgedOver3Days")).isEqualTo(1L);
-    assertThat(object(d.get("institution")).get("aged")).isEqualTo(2L);
+    assertThat(d.investigation().data().openAlertsAgedOver3Days()).isEqualTo(1L);
+    assertThat(d.investigation().data().institution().aged()).isEqualTo(2L);
   }
 
   @Test
@@ -1244,54 +1473,65 @@ class ReviewWorkflowTests {
                 "2023-09-03T15:00:00Z")
             .entrySet())
       jdbc.update(
-          "update review_cases set created_at=?::timestamptz where alert_id=?",
+          "update review.alerts set created_at=?::timestamptz where alert_id=?",
           item.getValue(),
           item.getKey());
     jdbc.update(
-        "update review_cases set status='CLOSED',closed_at=now(),outcome='NORMAL' where alert_id=?",
+        "update review.alerts set status='CLOSED',closed_at=now(),outcome='NORMAL' where alert_id=?",
         last);
     UUID secondRun = UUID.randomUUID();
     jdbc.update(
-        "insert into analysis_runs(run_id,job_id,input_revision,status) select ?,job_id,2,'COMPLETED' from analysis_runs where run_id=?",
+        "insert into analysis.runs(run_id,job_id,input_revision,status) select ?,job_id,2,'COMPLETED' from analysis.runs where run_id=?",
         secondRun,
         run);
     jdbc.update(
-        "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,2,?,?,'{}')",
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,2,?,?,'{}')",
         start,
         secondRun,
         "b".repeat(64));
-    alert(l1); // No published evidence: must not appear as an incoming Alert.
-    var dashboard = new DashboardService(jdbc, clock);
+    jdbc.update(
+        "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())", l1);
+    var dashboard = refreshedDashboard(clock);
     var result = dashboard.view(l1, LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
-    var days = rows(result.get("dailyAlertStatus"));
+    var days = result.investigation().data().dailyAlertStatus();
     assertThat(days).hasSize(3);
-    assertThat(days.getFirst().get("date").toString()).isEqualTo("2023-09-01");
-    assertThat(days.getFirst())
-        .containsEntry("pending", 1L)
-        .containsEntry("inProgress", 0L)
-        .containsEntry("done", 1L);
+    assertThat(days.getFirst()).isEqualTo(new DashboardSummary.DailyStatus("2023-09-01", 1, 0, 1));
     for (int i = 0; i < days.size(); i++) {
       var day = days.get(i);
-      assertThat(
-              number(day.get("pending")) + number(day.get("inProgress")) + number(day.get("done")))
-          .isEqualTo(number(rows(result.get("daily")).get(i).get("incoming")));
+      assertThat(day.pending() + day.inProgress() + day.done())
+          .isEqualTo(result.investigation().data().daily().get(i).incoming());
     }
-    assertThat(days.get(1))
-        .containsEntry("pending", 0L)
-        .containsEntry("inProgress", 0L)
-        .containsEntry("done", 0L);
+    assertThat(days.get(1)).isEqualTo(new DashboardSummary.DailyStatus("2023-09-02", 0, 0, 0));
     var mvc =
-        MockMvcBuilders.standaloneSetup(
-                new ReviewController(service, new LedgerQueryService(jdbc), clock, dashboard))
-            .build();
+        MockMvcBuilders.standaloneSetup(new DashboardController(service, dashboardService)).build();
     mvc.perform(
-            get("/api/v1/dashboard")
+            get("/api/v1/dashboard/summary")
                 .principal(() -> "l1a")
                 .param("from", "2023-09-01")
                 .param("to", "2023-09-03"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.dailyAlertStatus[0].date").value("2023-09-01"))
-        .andExpect(jsonPath("$.dailyAlertStatus[0].inProgress").value(0));
+        .andExpect(jsonPath("$.investigation.data.dailyAlertStatus[0].date").value("2023-09-01"))
+        .andExpect(jsonPath("$.investigation.data.dailyAlertStatus[0].inProgress").value(0));
+  }
+
+  @Test
+  void daily_counts_creation_and_closure_separately_with_kst_boundaries() {
+    long a = publishedAlert(1), b = publishedAlert(2), c = publishedAlert(3);
+    jdbc.update(
+        "update review.alerts set created_at='2023-08-31 15:00+00',status='CLOSED',outcome='NORMAL',closed_at='2023-09-02 15:00+00' where alert_id=?",
+        a);
+    jdbc.update(
+        "update review.alerts set created_at='2023-08-31 14:59:59+00',status='CLOSED',outcome='NORMAL',closed_at='2023-09-01 14:59:59+00' where alert_id=?",
+        b);
+    jdbc.update("update review.alerts set created_at='2023-09-03 15:00+00' where alert_id=?", c);
+    var days =
+        refreshedDashboard(clock)
+            .daily(LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-03"));
+    assertThat(days).hasSize(3);
+    assertThat(days.getFirst().get("day").toString()).isEqualTo("2023-09-01");
+    assertThat(days.getFirst()).containsEntry("incoming", 1L).containsEntry("completed", 1L);
+    assertThat(days.get(1)).containsEntry("incoming", 0L).containsEntry("completed", 0L);
+    assertThat(days.get(2)).containsEntry("incoming", 0L).containsEntry("completed", 1L);
   }
 
   @Test
@@ -1300,19 +1540,19 @@ class ReviewWorkflowTests {
     for (long c : List.of(a, b)) {
       long id = number(service.detail(c).get("alertId"));
       jdbc.update(
-          "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb)",
+          "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb) on conflict(alert_id,version) do update set evidence=excluded.evidence,fingerprint=excluded.fingerprint",
           id,
           run,
           "c".repeat(64),
           encode(evidence.detail(id, null)));
     }
-    var dashboard = new DashboardService(jdbc, clock);
     var day = LocalDate.parse("2023-09-02");
     act(l1, "REVIEW_START", null, select(a));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst()).containsEntry("pending", 2L);
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
+        .containsEntry("pending", 2L);
     clock.set(clock.now().plus(Duration.ofDays(1)), 1);
     long ep = number(act(l1, "TRANSFER", null, select(a), select(b)).get("targetCaseId"));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
         .containsEntry("pending", 0L)
         .containsEntry("inProgress", 2L)
         .containsEntry("done", 0L);
@@ -1323,7 +1563,7 @@ class ReviewWorkflowTests {
         "UNLINK",
         null,
         new ReviewService.Selection(ep, number(detail.get("revision")), group, List.of()));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
         .containsEntry("pending", 2L)
         .containsEntry("inProgress", 0L)
         .containsEntry("done", 0L);
@@ -1334,13 +1574,16 @@ class ReviewWorkflowTests {
       selections.add(
           new ReviewService.Selection(
               ep, number(detail.get("revision")), number(g.get("groupId")), List.of(1L, 2L)));
-    act(l2, "DECIDE", "SUSPICIOUS", selections.toArray(ReviewService.Selection[]::new));
-    act(l2, "CLOSE", null, select(ep));
-    assertThat(dashboard.dailyAlertStatus(day, day).getFirst())
+    long nextAssignee = number(detail.get("assigneeId"));
+    assertThat(nextAssignee).isNotEqualTo(l2);
+    act(nextAssignee, "DECIDE", "SUSPICIOUS", selections.toArray(ReviewService.Selection[]::new));
+    act(nextAssignee, "CLOSE", null, select(ep));
+    assertThat(refreshedDashboard(clock).dailyAlertStatus(day, day).getFirst())
         .containsEntry("pending", 0L)
         .containsEntry("inProgress", 0L)
         .containsEntry("done", 2L);
-    assertThat(dashboard.dailyAlertStatus(day.plusDays(1), day.plusDays(1)).getFirst())
+    assertThat(
+            refreshedDashboard(clock).dailyAlertStatus(day.plusDays(1), day.plusDays(1)).getFirst())
         .containsEntry("pending", 0L)
         .containsEntry("inProgress", 0L)
         .containsEntry("done", 0L);
@@ -1359,11 +1602,12 @@ class ReviewWorkflowTests {
         for (var row : rows(doc.get("transactions")))
           row.put("scores", Map.of("p_laundering", .9, "p_2", .9));
       jdbc.update(
-          "insert into alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb)",
+          "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,?,?::jsonb) on conflict(alert_id,version) do update set evidence=excluded.evidence,fingerprint=excluded.fingerprint",
           alertId,
           run,
           "a".repeat(64),
           encode(doc));
+      new CaseSummaryStore(jdbc).refresh(alertId);
       last = id;
     }
     var filter =

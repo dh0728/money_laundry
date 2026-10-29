@@ -28,7 +28,7 @@ public record ReviewCaseFilter(
       if (statuses.size() > 3 || !Set.of("OPEN", "CLOSED", "ESCALATED").containsAll(statuses))
         throw AnalysisService.invalid();
       var clauses = new ArrayList<String>();
-      String linked = "exists(select 1 from episode_alerts ea where ea.alert_id=c.alert_id)";
+      String linked = "exists(select 1 from review.episode_alerts ea where ea.alert_id=c.alert_id)";
       for (String state : statuses)
         clauses.add(
             state.equals("ESCALATED")
@@ -78,7 +78,7 @@ public record ReviewCaseFilter(
       String q = query.strip();
       String like = "%" + q.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
       sql.append(
-          " and ((c.kind='ALERT' and ('A-'||c.alert_id::text) ilike ? escape '!') or (c.kind='EPISODE' and ('E-'||c.case_id::text) ilike ? escape '!') or exists(select 1 from users u where u.user_id=c.assignee_id and u.name ilike ? escape '!')");
+          " and ((c.kind='ALERT' and ('A-'||c.alert_id::text) ilike ? escape '!') or (c.kind='EPISODE' and ('E-'||c.case_id::text) ilike ? escape '!') or exists(select 1 from core.users u where u.user_id=c.assignee_id and u.name ilike ? escape '!')");
       args.addAll(List.of(like, like, like));
       var names = new ArrayList<>(List.of(CaseSummary.TYPES));
       names.addAll(List.of("패턴 미특정", "혼합"));
@@ -94,38 +94,12 @@ public record ReviewCaseFilter(
     return sql.toString();
   }
 
-  // Match the same effective evidence as ReviewService.groups: persisted decisions take
-  // precedence, new Alert evidence is appended only while that case remains OPEN.
+  // Current summaries are rebuilt in the same transaction as scope publication.
+  // Episodes match the fixed source Alert types; Alerts match their current scope.
   static final String TYPES =
       """
-    with saved as (
-      select m from review_groups g cross join lateral jsonb_array_elements(g.members) m
-      where g.case_id=c.case_id
-    ), latest as (
-      select v.evidence from alert_versions v join analysis_runs r using(run_id)
-      join batch_jobs b on b.job_id=r.job_id where v.alert_id=c.alert_id
-      and r.status='COMPLETED' and b.status='COMPLETED' order by v.version desc limit 1
-    ), effective as (
-      select m->'transaction' as t, m->'sources' as sources from saved
-      where m->>'state' not in ('EXCLUDED','TRANSFERRED')
+      select c.summary->>'primaryType' as name where c.kind='ALERT'
       union all
-      select t, '[]'::jsonb from latest cross join lateral jsonb_array_elements(evidence->'transactions') t
-      where c.kind='ALERT' and (c.status='OPEN' or not exists(select 1 from saved))
-      and not exists(select 1 from saved where m->>'txId'=t->>'txId')
-    ), votes as (
-      select code,count(*) as n from (
-        select distinct on(t->>'txId') t->>'txId' as id,
-          (select i from generate_series(0,8) i
-           order by coalesce((t->'scores'->>('p_'||i))::double precision,0) desc,i limit 1) code
-        from effective where t->>'role'='SEED' and t->'scores' is not null
-      ) x where code>0 group by code
-    ), winners as (select code from votes where n=(select max(n) from votes))
-    select case when count(*)=0 then '패턴 미특정' when count(*)>1 then '혼합'
-      else (array['NON_PATTERN','Fan-out','Fan-in','Gather-scatter','Scatter-gather','Cycle','Random','Bipartite','Stack'])[max(code)+1] end as name
-      from winners where c.kind='ALERT'
-    having c.kind='ALERT'
-    union
-    select distinct source->>'primaryType' from effective cross join lateral jsonb_array_elements(coalesce(sources,'[]'::jsonb)) source
-      where c.kind='EPISODE' and source->>'primaryType' is not null
-    """;
+      select jsonb_array_elements_text(c.summary->'primaryTypes') where c.kind='EPISODE'
+      """;
 }
