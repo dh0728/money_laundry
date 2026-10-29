@@ -1,0 +1,58 @@
+[
+  {
+    "utc": "2026-10-28T07:22:36.853702+00:00",
+    "epoch": 172,
+    "phase": "validation",
+    "value": {
+      "completed": 462848,
+      "total": 524288,
+      "percent": 88.28125,
+      "scheduled": true,
+      "elapsed_seconds": 210.55093849264085,
+      "scored": 155807
+    },
+    "memory_bytes": 16257986560
+  },
+  {
+    "utc": "2026-10-28T07:22:41.854439+00:00",
+    "epoch": 172,
+    "phase": "validation",
+    "value": {
+      "completed": 485376,
+      "total": 524288,
+      "percent": 92.578125,
+      "scheduled": true,
+      "elapsed_seconds": 216.05101324245334,
+      "scored": 163364
+    },
+    "memory_bytes": 16352710656
+  },
+  {
+    "utc": "2026-10-28T07:22:46.855043+00:00",
+    "epoch": 172,
+    "phase": "validation",
+    "value": {
+      "completed": 507904,
+      "total": 524288,
+      "percent": 96.875,
+      "scheduled": true,
+      "elapsed_seconds": 221.38793568126857,
+      "scored": 170873
+    },
+    "memory_bytes": 16226512896
+  },
+  {
+    "utc": "2026-10-28T07:22:51.855807+00:00",
+    "epoch": 173,
+    "phase": "train",
+    "value": {
+      "completed": 0,
+      "total": 524288,
+      "percent": 0.0,
+      "loss": null,
+      "elapsed_seconds": 0.0,
+      "scored": 0
+    },
+    "memory_bytes": 16164962304
+  }
+]

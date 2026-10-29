@@ -1,0 +1,190 @@
+{
+  "utc": "2026-10-28T06:45:52.419370+00:00",
+  "event": "shared_validation_slowdown_diagnosis",
+  "status": "bottleneck_confirmed_allocation_owner_unresolved",
+  "training_active": {
+    "shared": true,
+    "disjoint": false
+  },
+  "current_progress": {
+    "variant": "fraudgt_format",
+    "epoch": 172,
+    "epochs": 500,
+    "phase": "validation",
+    "train": {
+      "completed": 524288,
+      "total": 524288,
+      "percent": 100.0,
+      "loss": 0.014929608106564468,
+      "elapsed_seconds": 159.4945539366454,
+      "scored": 220343
+    },
+    "validation": {
+      "completed": 303104,
+      "total": 524288,
+      "percent": 57.8125,
+      "scheduled": true,
+      "elapsed_seconds": 9980.152618084103,
+      "scored": 101911
+    },
+    "utc": "2026-10-28T06:45:16.094057+00:00"
+  },
+  "normal_validation_median_seconds": 125.43676192685962,
+  "recent_timings": [
+    {
+      "epoch": 156,
+      "train_seconds": 145.1478227376938,
+      "validation_seconds": 3420.301489526406,
+      "validation_performed": true,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 157,
+      "train_seconds": 343.03261987678707,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 158,
+      "train_seconds": 157.28776251897216,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 159,
+      "train_seconds": 154.99075052700937,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 160,
+      "train_seconds": 152.83190849237144,
+      "validation_seconds": 5819.825244754553,
+      "validation_performed": true,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 161,
+      "train_seconds": 337.14390538074076,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 162,
+      "train_seconds": 160.87397061660886,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 163,
+      "train_seconds": 160.67612945847213,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 164,
+      "train_seconds": 159.16882828250527,
+      "validation_seconds": 7339.119726115838,
+      "validation_performed": true,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 165,
+      "train_seconds": 353.77208002470434,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 166,
+      "train_seconds": 147.3833647016436,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 167,
+      "train_seconds": 155.33572461269796,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 168,
+      "train_seconds": 158.2783516254276,
+      "validation_seconds": 13258.785498518497,
+      "validation_performed": true,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 169,
+      "train_seconds": 352.02334098890424,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 170,
+      "train_seconds": 157.94356913678348,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    },
+    {
+      "epoch": 171,
+      "train_seconds": 159.52768261358142,
+      "validation_seconds": 0.0,
+      "validation_performed": false,
+      "resumed_partial_epoch": false
+    }
+  ],
+  "memory_limit_bytes": 29360128000,
+  "memory_current_bytes": 29357563904,
+  "anonymous_bytes": 17323921408,
+  "file_cache_bytes": 11681243136,
+  "probe_file": "slowdown_probe_20261028.json",
+  "measurement_seconds": 12.512516843155026,
+  "measurement_delta": {
+    "major_faults": 7999,
+    "cpu_ticks": 137,
+    "read_bytes": 429293568
+  },
+  "measurement_refaults": 68491,
+  "confirmed": [
+    "One shared training kernel is active; disjoint remains stopped.",
+    "Training epochs remain about150-160 seconds while validation expanded from about125 seconds to13258.8 seconds at epoch168.",
+    "The cgroup RAM budget is effectively full and the main thread waits in folio_wait_bit_common.",
+    "High major page faults and file-cache refaults confirm repeated disk loading.",
+    "Validation graph covers136996982 edges versus102505233 training edges and therefore needs more graph data.",
+    "Core training and notebook helper source hashes are unchanged."
+  ],
+  "inference": "Anonymous memory retention reduces space available for memory-mapped graph/feature pages. The broader validation access pattern encounters page-cache thrashing while training can remain fast.",
+  "unresolved": "Object-level owner of retained anonymous memory: true live-object leak versus allocator retention/fragmentation. Cross-process Python memory inspection is unavailable; no interruption or injection was performed.",
+  "gpu_snapshot": {
+    "global_memory_free_mib": 581,
+    "global_compute_allocations_mib": [
+      28736,
+      3174
+    ],
+    "attribution": "Host GPU process IDs are not directly visible in this container; do not attribute the large allocation to this notebook without mapping."
+  },
+  "safe_resume_progress": {
+    "epoch": 172,
+    "loader_batches": 256,
+    "epoch_targets": 524288,
+    "train_loss": 0.014929608106564468,
+    "scored_targets": 220343,
+    "coverage": 0.4202709197998047
+  },
+  "core_source_changes": [],
+  "helper_source_changes": [],
+  "training_interrupted": false,
+  "training_settings_changed": false,
+  "followup": "Preserve the existing epoch172/cursor256 checkpoint, then profile CPU allocations and test memory reclamation before validation without changing features, sampling or evaluation targets."
+}

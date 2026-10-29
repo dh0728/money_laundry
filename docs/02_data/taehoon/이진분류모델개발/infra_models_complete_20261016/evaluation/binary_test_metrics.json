@@ -1,0 +1,88 @@
+{
+  "rows": 33429507,
+  "risk_AP": 0.6221134696628695,
+  "threshold": 0.4338742792606354,
+  "fpr_threshold": 0.09794379770755768,
+  "precision": 0.8174185380155927,
+  "recall": 0.5562886878443644,
+  "F1": 0.6620343510935413,
+  "FPR": 0.00016414358801828487,
+  "risk_confusion": [
+    [
+      33379924,
+      5480
+    ],
+    [
+      19569,
+      24534
+    ]
+  ],
+  "recall_at_val_fpr_0_001": 0.6305466748293767,
+  "actual_fpr_at_fixed_threshold": 0.0011839305583961183,
+  "known_pattern_recall": 0.943466172381835,
+  "unmatched_recall": 0.0056022408963585435,
+  "pattern_detection": [
+    {
+      "group": "NORMAL",
+      "support": 33385404,
+      "alarm_rate": 0.00016414358801828487,
+      "alarm_rate_at_fixed_fpr": 0.0011839305583961183
+    },
+    {
+      "group": "BIPARTITE",
+      "support": 2312,
+      "alarm_rate": 0.8931660899653979,
+      "alarm_rate_at_fixed_fpr": 0.9645328719723183
+    },
+    {
+      "group": "CYCLE",
+      "support": 2375,
+      "alarm_rate": 0.9275789473684211,
+      "alarm_rate_at_fixed_fpr": 0.983578947368421
+    },
+    {
+      "group": "FAN-IN",
+      "support": 2456,
+      "alarm_rate": 0.9429967426710097,
+      "alarm_rate_at_fixed_fpr": 0.9898208469055375
+    },
+    {
+      "group": "FAN-OUT",
+      "support": 2699,
+      "alarm_rate": 0.9803630974434976,
+      "alarm_rate_at_fixed_fpr": 0.9962949240459429
+    },
+    {
+      "group": "G-SCATTER",
+      "support": 4907,
+      "alarm_rate": 0.9671897289586305,
+      "alarm_rate_at_fixed_fpr": 0.9957203994293866
+    },
+    {
+      "group": "RANDOM",
+      "support": 1733,
+      "alarm_rate": 0.9290248124639354,
+      "alarm_rate_at_fixed_fpr": 0.9884593190998269
+    },
+    {
+      "group": "S-GATHER",
+      "support": 5013,
+      "alarm_rate": 0.9698783163774187,
+      "alarm_rate_at_fixed_fpr": 0.9966088170756034
+    },
+    {
+      "group": "STACK",
+      "support": 4401,
+      "alarm_rate": 0.9052488070892979,
+      "alarm_rate_at_fixed_fpr": 0.9815950920245399
+    },
+    {
+      "group": "UNMATCHED",
+      "support": 18207,
+      "alarm_rate": 0.0056022408963585435,
+      "alarm_rate_at_fixed_fpr": 0.12127203822705553
+    }
+  ],
+  "scope": "full_test",
+  "epoch": 10
+}

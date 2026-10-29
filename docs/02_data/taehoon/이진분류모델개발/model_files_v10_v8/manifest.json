@@ -1,0 +1,11 @@
+{
+  "binary_test_metrics.json": "7e2ed92e0c38d1dd63dc55eaff736a458bb87b847284a6e44dc1c20974b03bb1",
+  "binary.json": "d22660e82875490cab1419db7b486e1454cad84d7bd6d0f44302b1b4ac552f69",
+  "pattern_selection.json": "73677c28823f97df1cf07e50d32cf1cc106378e64960871c39069ae537b0af22",
+  "pattern_test_metrics.json": "92428b288c4b560cd74ebe0c82536b622522251ae27382171fd37b4e8ca138d9",
+  "nine_class.json": "5696012b1dffa0cbce8dd4c4a82aa6676a4eac88fd9efcff646f460040343f28",
+  "README.txt": "16063462dd739bd3fbad649475fb941aeda71fe96660b0155b1b3a78daa2da14",
+  "nine_class.pt": "b185b95114bdcc19d0c6f8a63dcb2df3f174fd50f6200b9cb6ef2bd4944177c8",
+  "binary.pt": "290f42b183466b4776de7032581f6d7ef18d9c72d08620b9c80eb0bb78806926",
+  "binary_selection.json": "8381aed0a995621b8db5f9a768dc2d443a994919499af04a6ca68ae04e2beed8"
+}

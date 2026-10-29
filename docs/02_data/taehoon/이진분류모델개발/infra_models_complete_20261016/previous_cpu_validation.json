@@ -1,0 +1,40 @@
+{
+  "checks": [
+    {
+      "notebook": "01_binary_v10/01_binary_v10.ipynb",
+      "status": "passed",
+      "seconds": 13.51,
+      "relocated": true,
+      "reference_graphs": 2,
+      "predictions": 18,
+      "code_cells": 27
+    },
+    {
+      "notebook": "02_pattern_v8/02_pattern_v8.ipynb",
+      "status": "passed",
+      "seconds": 9.91,
+      "relocated": true,
+      "reference_graphs": 2,
+      "predictions": 18,
+      "code_cells": 27
+    }
+  ],
+  "environment": "Existing Python 3.12 packages; CPU execution; no fresh pip-install test",
+  "scope": "Both notebooks executed in independent relocated folders; fresh raw preprocessing, graph creation, strict checkpoint loading, two golden prediction fixtures, complete example JSONL inference",
+  "weights": [
+    {
+      "model": "binary",
+      "original_checkpoint": "experiments/gnn36_binary_structural_v10/runs/ego_seed42/best.pt",
+      "source_sha256": "6612020ed2dff95d193d848951e9f9c5dd0af1e1848b0b9b6828fd20fad1ed59",
+      "bundle_sha256": "290f42b183466b4776de7032581f6d7ef18d9c72d08620b9c80eb0bb78806926",
+      "identical_state_tensors": 43
+    },
+    {
+      "model": "nine_class",
+      "original_checkpoint": "experiments/gnn36_structural_v8/ego_100/seed_1/selected.pt",
+      "source_sha256": "52bd347036dc0f393932d15658da2428c249e21dbd23ec7a0988ec3eea1eb5e1",
+      "bundle_sha256": "b185b95114bdcc19d0c6f8a63dcb2df3f174fd50f6200b9cb6ef2bd4944177c8",
+      "identical_state_tensors": 49
+    }
+  ]
+}

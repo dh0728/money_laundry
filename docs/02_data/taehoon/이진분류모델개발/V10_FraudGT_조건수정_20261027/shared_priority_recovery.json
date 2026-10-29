@@ -1,0 +1,69 @@
+{
+  "utc": "2026-10-27T10:58:34.202280+00:00",
+  "before_sample": {
+    "utc": "2026-10-27T10:58:21.854178+00:00",
+    "memory_bytes": 15245737984,
+    "anon_bytes": 6611214336,
+    "file_bytes": 8255422464,
+    "major_faults": 114588122,
+    "refaults": 2305490602,
+    "progress": {
+      "variant": "fraudgt_format",
+      "epoch": 16,
+      "epochs": 500,
+      "phase": "train",
+      "train": {
+        "completed": 387072,
+        "total": 524288,
+        "percent": 73.828125,
+        "loss": 0.018507317489826983,
+        "elapsed_seconds": 2115.0814410038292,
+        "scored": 162618
+      },
+      "validation": {
+        "completed": 0,
+        "total": 524288,
+        "percent": 0.0,
+        "scheduled": true
+      },
+      "utc": "2026-10-27T10:57:17.286192+00:00"
+    }
+  },
+  "after_sample": {
+    "utc": "2026-10-27T10:58:34.202280+00:00",
+    "memory_bytes": 15897784320,
+    "anon_bytes": 6617964544,
+    "file_bytes": 8905502720,
+    "major_faults": 114597289,
+    "refaults": 2305595240,
+    "progress": {
+      "variant": "fraudgt_format",
+      "epoch": 16,
+      "epochs": 500,
+      "phase": "train",
+      "train": {
+        "completed": 387072,
+        "total": 524288,
+        "percent": 73.828125,
+        "loss": 0.018507317489826983,
+        "elapsed_seconds": 2115.0814410038292,
+        "scored": 162618
+      },
+      "validation": {
+        "completed": 0,
+        "total": 524288,
+        "percent": 0.0,
+        "scheduled": true
+      },
+      "utc": "2026-10-27T10:57:17.286192+00:00"
+    }
+  },
+  "gpu_utilization_mean": 23.583333333333332,
+  "gpu_memory_used_mib": 23932,
+  "gpu_memory_free_mib": 8563,
+  "training_active": {
+    "shared": true,
+    "disjoint": false
+  },
+  "old_disjoint_pid_exists": false
+}

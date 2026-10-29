@@ -1,0 +1,147 @@
+{
+  "frozen_before_validation": true,
+  "variants": [
+    {
+      "name": "old_owner_balance",
+      "new_types": [
+        "owner_external_balance7d"
+      ],
+      "new_columns": [
+        "src_owner_external_balance7d",
+        "dst_owner_external_balance7d"
+      ]
+    },
+    {
+      "name": "owner_balance_missing",
+      "new_types": [
+        "owner_balance_supported7d"
+      ],
+      "new_columns": [
+        "src_owner_balance_supported7d",
+        "dst_owner_balance_supported7d"
+      ]
+    },
+    {
+      "name": "account_direction_context",
+      "new_types": [
+        "account_net_direction7d",
+        "account_flow_support7d"
+      ],
+      "new_columns": [
+        "src_account_net_direction7d",
+        "dst_account_net_direction7d",
+        "src_account_flow_support7d",
+        "dst_account_flow_support7d"
+      ]
+    },
+    {
+      "name": "owner_direction_context",
+      "new_types": [
+        "owner_net_direction7d",
+        "owner_flow_support7d"
+      ],
+      "new_columns": [
+        "src_owner_net_direction7d",
+        "dst_owner_net_direction7d",
+        "src_owner_flow_support7d",
+        "dst_owner_flow_support7d"
+      ]
+    },
+    {
+      "name": "account_amount",
+      "new_types": [
+        "account_amount_vs_external_mean7d"
+      ],
+      "new_columns": [
+        "src_account_amount_vs_external_mean7d",
+        "dst_account_amount_vs_external_mean7d"
+      ]
+    },
+    {
+      "name": "owner_amount",
+      "new_types": [
+        "owner_amount_vs_external_mean7d"
+      ],
+      "new_columns": [
+        "src_owner_amount_vs_external_mean7d",
+        "dst_owner_amount_vs_external_mean7d"
+      ]
+    },
+    {
+      "name": "account_shift",
+      "new_types": [
+        "account_net_direction_shift7d"
+      ],
+      "new_columns": [
+        "src_account_net_direction_shift7d",
+        "dst_account_net_direction_shift7d"
+      ]
+    },
+    {
+      "name": "owner_shift",
+      "new_types": [
+        "owner_net_direction_shift7d"
+      ],
+      "new_columns": [
+        "src_owner_net_direction_shift7d",
+        "dst_owner_net_direction_shift7d"
+      ]
+    },
+    {
+      "name": "account_all",
+      "new_types": [
+        "account_net_direction7d",
+        "account_flow_support7d",
+        "account_amount_vs_external_mean7d",
+        "account_net_direction_shift7d"
+      ],
+      "new_columns": [
+        "src_account_net_direction7d",
+        "dst_account_net_direction7d",
+        "src_account_flow_support7d",
+        "dst_account_flow_support7d",
+        "src_account_amount_vs_external_mean7d",
+        "dst_account_amount_vs_external_mean7d",
+        "src_account_net_direction_shift7d",
+        "dst_account_net_direction_shift7d"
+      ]
+    },
+    {
+      "name": "owner_all",
+      "new_types": [
+        "owner_net_direction7d",
+        "owner_flow_support7d",
+        "owner_amount_vs_external_mean7d",
+        "owner_net_direction_shift7d"
+      ],
+      "new_columns": [
+        "src_owner_net_direction7d",
+        "dst_owner_net_direction7d",
+        "src_owner_flow_support7d",
+        "dst_owner_flow_support7d",
+        "src_owner_amount_vs_external_mean7d",
+        "dst_owner_amount_vs_external_mean7d",
+        "src_owner_net_direction_shift7d",
+        "dst_owner_net_direction_shift7d"
+      ]
+    },
+    {
+      "name": "compact2",
+      "new_types": [
+        "account_net_direction_shift7d",
+        "owner_balance_supported7d"
+      ],
+      "new_columns": [
+        "src_account_net_direction_shift7d",
+        "dst_account_net_direction_shift7d",
+        "src_owner_balance_supported7d",
+        "dst_owner_balance_supported7d"
+      ]
+    }
+  ],
+  "compact_selection": [
+    "account_net_direction_shift7d",
+    "owner_balance_supported7d"
+  ],
+  "selection": "Predeclared families and one compact pair chosen only from development and monitor conditional association. NaN analyzed separately, not assigned a numeric rank."
+}

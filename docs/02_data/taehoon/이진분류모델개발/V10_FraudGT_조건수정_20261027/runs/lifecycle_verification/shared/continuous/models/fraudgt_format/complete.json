@@ -1,0 +1,9 @@
+{
+  "status": "complete",
+  "variant": "fraudgt_format",
+  "epochs": 6,
+  "best": {
+    "F1": 0.5882352941176471,
+    "epoch": 6
+  }
+}

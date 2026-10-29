@@ -1,0 +1,39 @@
+{
+  "status": "pass",
+  "original_verified_pyg_lib_files_identical": 9,
+  "torch_rng_preserved": true,
+  "training_source_unchanged": true,
+  "wheel_sha256": "7cab651263b1bb158da6a0972730f641aba1c2889a4d6a1f7b3efa9a3c5cba1a",
+  "source_url": "https://data.pyg.org/whl/torch-2.10.0+cu126.html",
+  "files": {
+    "home.py": "9e4d41b616c014a937ca43570354259b0e5044cc52c5eaa94124472e7d7a6f35",
+    "_triton.py": "6c89598ecf9562771a19a2fc6f64db52de224f13d86841e71f2c83689a58ba91",
+    "__init__.py": "4fe83409d38f1d22445d0c7ba6ca55543a39f6d3ca87b36f95b49983b98ef640",
+    "testing.py": "2931668dbb53421fffe1e1b60b1a4764be9a02fca6cc5c99fd1e4d3f788b0dac",
+    "libpyg.so": "905ef0e95d37619b89842938d7cbf366cfb1fac4adf761bb355c34482f0051ad",
+    "ops/scatter_reduce.py": "d88e1a7daadf7e3a8ee9701bcb89e6510c2c885d491fb4c97ddc5c40c04c2e0d",
+    "ops/__init__.py": "4d3ee6e2525555bf99aa541a6466b74d66a12086fd292e854e10506971a22297",
+    "partition/__init__.py": "9c04ec23f8f716e6c823c4f2b94ef90127c9ef46995725d2608cb0b1f853963a",
+    "sampler/__init__.py": "2dcd419f1454bab2686ae66f368c2df061f6bfd9833e40d353fb98843fbecca4"
+  },
+  "checks": [
+    {
+      "python": "/usr/bin/python",
+      "torch": "2.10.0+cu126",
+      "torch_geometric": "2.8.0.post1",
+      "pyg_lib": "0.8.0+pt210cu126",
+      "pyg_lib_path": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_gnn_verify_20261025/runtime_deps/pyg_lib/__init__.py",
+      "graph_mode": "shared",
+      "sampling_check": "PASS"
+    },
+    {
+      "python": "/usr/bin/python",
+      "torch": "2.10.0+cu126",
+      "torch_geometric": "2.8.0.post1",
+      "pyg_lib": "0.8.0+pt210cu126",
+      "pyg_lib_path": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_gnn_verify_20261025/runtime_deps/pyg_lib/__init__.py",
+      "graph_mode": "disjoint",
+      "sampling_check": "PASS"
+    }
+  ]
+}

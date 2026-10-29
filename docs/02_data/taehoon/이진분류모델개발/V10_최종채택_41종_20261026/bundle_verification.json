@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "types": 41,
+  "scalars": 64,
+  "tree_input": 36,
+  "gnn_node": 19,
+  "gnn_edge": 14,
+  "sample_score_parity": 128,
+  "artifacts_match_frozen_hashes": true
+}

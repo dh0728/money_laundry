@@ -1,0 +1,89 @@
+{
+  "binary": {
+    "negative_class": 0,
+    "negative_meaning": "정상 거래",
+    "positive_class": 1,
+    "positive_meaning": "자금세탁 거래: 알려진 패턴 및 무패턴 포함",
+    "score_field": "risk_score",
+    "decision_field": "alert",
+    "threshold": 0.4338742792606354,
+    "decision_rule": "risk_score >= threshold"
+  },
+  "pattern": {
+    "classes": [
+      {
+        "id": 0,
+        "name": "NORMAL",
+        "meaning_ko": "정상 거래 또는 알려진 8패턴에 속하지 않는 무패턴 자금세탁"
+      },
+      {
+        "id": 1,
+        "name": "FAN-OUT",
+        "meaning_ko": "한 계좌에서 여러 계좌로 분산"
+      },
+      {
+        "id": 2,
+        "name": "FAN-IN",
+        "meaning_ko": "여러 계좌에서 한 계좌로 집결"
+      },
+      {
+        "id": 3,
+        "name": "G-SCATTER",
+        "meaning_ko": "여러 계좌에서 중심 계좌로 모은 뒤 여러 계좌로 분산"
+      },
+      {
+        "id": 4,
+        "name": "S-GATHER",
+        "meaning_ko": "출발 계좌에서 여러 중간 계좌로 분산한 뒤 도착 계좌로 집결"
+      },
+      {
+        "id": 5,
+        "name": "CYCLE",
+        "meaning_ko": "여러 거래를 거쳐 출발 계좌로 돌아오는 순환"
+      },
+      {
+        "id": 6,
+        "name": "RANDOM",
+        "meaning_ko": "데이터 생성기의 무작위 이동 패턴 라벨"
+      },
+      {
+        "id": 7,
+        "name": "BIPARTITE",
+        "meaning_ko": "송신 계좌 집단에서 별도 수신 계좌 집단으로 이동"
+      },
+      {
+        "id": 8,
+        "name": "STACK",
+        "meaning_ko": "여러 계좌 층을 순차적으로 이동"
+      }
+    ],
+    "decision_rule": "argmax of pattern_scores in the listed class order",
+    "normal_includes_unmatched_laundering": true,
+    "auxiliary_risk_threshold": 0.4057740867137909
+  },
+  "id_scope": "Deployed API output IDs, not raw training class IDs",
+  "raw_training_class_order": [
+    "NORMAL",
+    "BIPARTITE",
+    "CYCLE",
+    "FAN-IN",
+    "FAN-OUT",
+    "GATHER-SCATTER",
+    "RANDOM",
+    "SCATTER-GATHER",
+    "STACK",
+    "UNMATCHED_POSITIVE"
+  ],
+  "raw_to_api": [
+    0,
+    7,
+    5,
+    2,
+    1,
+    3,
+    6,
+    4,
+    8,
+    0
+  ]
+}

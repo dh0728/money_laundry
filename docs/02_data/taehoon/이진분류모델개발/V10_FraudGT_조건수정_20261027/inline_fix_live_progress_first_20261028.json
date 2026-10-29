@@ -1,0 +1,167 @@
+[
+  {
+    "utc": "2026-10-28T22:59:56.828507+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 0,
+      "total": 524288,
+      "percent": 0.0,
+      "scheduled": true,
+      "elapsed_seconds": 0.0,
+      "scored": 0
+    },
+    "memory_bytes": 14784630784,
+    "anon_bytes": 1514844160
+  },
+  {
+    "utc": "2026-10-28T23:00:01.829428+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 0,
+      "total": 524288,
+      "percent": 0.0,
+      "scheduled": true,
+      "elapsed_seconds": 0.0,
+      "scored": 0
+    },
+    "memory_bytes": 14902456320,
+    "anon_bytes": 1517719552
+  },
+  {
+    "utc": "2026-10-28T23:00:06.830427+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 0,
+      "total": 524288,
+      "percent": 0.0,
+      "scheduled": true,
+      "elapsed_seconds": 0.0,
+      "scored": 0
+    },
+    "memory_bytes": 15220174848,
+    "anon_bytes": 1753018368
+  },
+  {
+    "utc": "2026-10-28T23:00:11.831507+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 2048,
+      "total": 524288,
+      "percent": 0.390625,
+      "scheduled": true,
+      "elapsed_seconds": 52.9151151701808,
+      "scored": 654
+    },
+    "memory_bytes": 15469924352,
+    "anon_bytes": 1872867328
+  },
+  {
+    "utc": "2026-10-28T23:00:16.832561+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 2048,
+      "total": 524288,
+      "percent": 0.390625,
+      "scheduled": true,
+      "elapsed_seconds": 52.9151151701808,
+      "scored": 654
+    },
+    "memory_bytes": 15606276096,
+    "anon_bytes": 1903853568
+  },
+  {
+    "utc": "2026-10-28T23:00:21.833579+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 2048,
+      "total": 524288,
+      "percent": 0.390625,
+      "scheduled": true,
+      "elapsed_seconds": 52.9151151701808,
+      "scored": 654
+    },
+    "memory_bytes": 15715303424,
+    "anon_bytes": 1909616640
+  },
+  {
+    "utc": "2026-10-28T23:00:26.834704+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 2048,
+      "total": 524288,
+      "percent": 0.390625,
+      "scheduled": true,
+      "elapsed_seconds": 52.9151151701808,
+      "scored": 654
+    },
+    "memory_bytes": 15823347712,
+    "anon_bytes": 1919377408
+  },
+  {
+    "utc": "2026-10-28T23:00:31.835864+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 4096,
+      "total": 524288,
+      "percent": 0.78125,
+      "scheduled": true,
+      "elapsed_seconds": 74.2204008102417,
+      "scored": 1337
+    },
+    "memory_bytes": 15893614592,
+    "anon_bytes": 1897984000
+  },
+  {
+    "utc": "2026-10-28T23:00:36.836939+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 4096,
+      "total": 524288,
+      "percent": 0.78125,
+      "scheduled": true,
+      "elapsed_seconds": 74.2204008102417,
+      "scored": 1337
+    },
+    "memory_bytes": 15998128128,
+    "anon_bytes": 1912557568
+  },
+  {
+    "utc": "2026-10-28T23:00:41.838156+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 6144,
+      "total": 524288,
+      "percent": 1.171875,
+      "scheduled": true,
+      "elapsed_seconds": 85.43855444900692,
+      "scored": 2029
+    },
+    "memory_bytes": 16073101312,
+    "anon_bytes": 1907781632
+  },
+  {
+    "utc": "2026-10-28T23:00:46.839289+00:00",
+    "epoch": 304,
+    "phase": "validation",
+    "phase_state": {
+      "completed": 8192,
+      "total": 524288,
+      "percent": 1.5625,
+      "scheduled": true,
+      "elapsed_seconds": 92.41872468218207,
+      "scored": 2737
+    },
+    "memory_bytes": 16123531264,
+    "anon_bytes": 1887846400
+  }
+]

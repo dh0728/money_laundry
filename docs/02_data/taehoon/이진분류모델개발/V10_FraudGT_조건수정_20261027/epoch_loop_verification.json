@@ -1,0 +1,30 @@
+{
+  "status": "pass",
+  "synthetic_fixture_not_performance": true,
+  "cases": [
+    {
+      "mode": "shared",
+      "epochs": 6,
+      "validation_epochs": [
+        1,
+        4,
+        6
+      ],
+      "mid_epoch_resume_matches_continuous": true,
+      "gauges_complete": true,
+      "blank_skipped_validation": true
+    },
+    {
+      "mode": "disjoint",
+      "epochs": 6,
+      "validation_epochs": [
+        1,
+        4,
+        6
+      ],
+      "mid_epoch_resume_matches_continuous": true,
+      "gauges_complete": true,
+      "blank_skipped_validation": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "utc": "2026-10-28T07:16:41.953913+00:00",
+  "status": "pass",
+  "live_tensors_and_gradients_unchanged": true,
+  "torch_rng_unchanged": true,
+  "numpy_rng_unchanged": true,
+  "cleanup_boundary_and_rate_limit_pass": true,
+  "gpu_initialized": false,
+  "core_training_source_unchanged": true,
+  "checkpoint_resume": {
+    "epoch": 172,
+    "loader_cursor": 256,
+    "completed_epochs": 171,
+    "protocol_hash_matches": true
+  },
+  "cleanup_seconds": [
+    0.03784841671586037,
+    0.026081399992108345,
+    0.028220178559422493
+  ]
+}

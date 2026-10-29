@@ -1,0 +1,19 @@
+﻿new_feature,closest_baseline_column,spearman,rows,missing_fraction,meaning
+src_account_net_direction7d,src_log_out_neighbors,-0.45804200902516234,32567,0.21042040440285117,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_account_net_direction7d,dst_log_out_count,-0.6692052118229698,37865,0.08197158512340591,Descriptive unweighted monitor sample; correlation is not a removal test
+src_account_flow_support7d,src_log_out_count,0.7988366834105783,41246,0.0,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_account_flow_support7d,dst_log_active_days,0.7217358327050213,41246,0.0,Descriptive unweighted monitor sample; correlation is not a removal test
+src_account_amount_vs_external_mean7d,src_prior_ccy_amount_vs_mean,0.7105321521586553,32567,0.21042040440285117,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_account_amount_vs_external_mean7d,dst_prior_ccy_amount_vs_mean,0.69751299147476,37865,0.08197158512340591,Descriptive unweighted monitor sample; correlation is not a removal test
+src_account_net_direction_shift7d,src_prior_ccy_amount_seen,0.2517682955170462,32351,0.2156572758570528,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_account_net_direction_shift7d,src_prior_ccy_amount_seen,-0.31750664792630634,37668,0.0867478058478398,Descriptive unweighted monitor sample; correlation is not a removal test
+src_owner_net_direction7d,src_log_out_neighbors,-0.45238742019499034,34533,0.16275517625951608,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_owner_net_direction7d,dst_log_out_neighbors,-0.4780050173557045,40964,0.006837026620763226,Descriptive unweighted monitor sample; correlation is not a removal test
+src_owner_flow_support7d,src_log_out_count,0.5830259500106213,41246,0.0,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_owner_flow_support7d,dst_log_entity_out_diversity,0.7475239353577793,41246,0.0,Descriptive unweighted monitor sample; correlation is not a removal test
+src_owner_amount_vs_external_mean7d,paid_currency_z,0.664803736069777,34533,0.16275517625951608,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_owner_amount_vs_external_mean7d,paid_currency_z,0.5802186962416221,40964,0.006837026620763226,Descriptive unweighted monitor sample; correlation is not a removal test
+src_owner_net_direction_shift7d,dst_prior_ccy_amount_seen,0.19219664268005654,34505,0.16343402996654222,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_owner_net_direction_shift7d,pair_prior_count,-0.21336919798748474,40943,0.007346166901032828,Descriptive unweighted monitor sample; correlation is not a removal test
+src_owner_balance_supported7d,src_paid_outlier_fraction,-0.3049803107503395,34533,0.16275517625951608,Descriptive unweighted monitor sample; correlation is not a removal test
+dst_owner_balance_supported7d,dst_log_entity_out_diversity,0.4266399934696364,40964,0.006837026620763226,Descriptive unweighted monitor sample; correlation is not a removal test

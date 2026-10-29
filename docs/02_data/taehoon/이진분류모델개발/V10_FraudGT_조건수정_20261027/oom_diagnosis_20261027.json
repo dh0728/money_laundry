@@ -1,0 +1,78 @@
+{
+  "utc": "2026-10-27T09:14:30.867297+00:00",
+  "event": "gpu_memory_pressure_diagnosed_and_old_run_stopped",
+  "observations": {
+    "before_gpu_used_mib": 32422,
+    "before_gpu_free_mib": 73,
+    "after_gpu_used_mib": 27158,
+    "after_gpu_free_mib": 5337,
+    "new_cgroup_oom_kills": 0
+  },
+  "cause_assessment": "GPU exhaustion is strongly indicated by near-zero available VRAM with three simultaneous training processes. The exact CUDA exception text was not persisted; the user resumed the affected kernel before it could be inspected.",
+  "stopped_run": "official_loader_001",
+  "checkpoint_preserved": {
+    "utc": "2026-10-27T09:12:36.934200+00:00",
+    "run": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001",
+    "pid": 557563,
+    "reason": "Superseded experiment running alongside both corrected comparisons; GPU memory exhausted. Preserve checkpoint before stopping only the old process.",
+    "files": {
+      "models/fraudgt_format/last.pt": {
+        "backup": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/stopped_checkpoints/oom_old_run_cleanup_20261027T091236Z/last.pt",
+        "sha256": "5592ada823e3722a25ca2ddda99404f9d8095fa421b05dc130282305de03b445",
+        "bytes": 2084651
+      },
+      "models/fraudgt_format/best.pt": {
+        "backup": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/stopped_checkpoints/oom_old_run_cleanup_20261027T091236Z/best.pt",
+        "sha256": "46274d8ed643cd1f0fde83d29579e95fbd9f883c15519f79febdb4ce60e078c9",
+        "bytes": 688861
+      },
+      "models/fraudgt_format/progress.json": {
+        "backup": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/stopped_checkpoints/oom_old_run_cleanup_20261027T091236Z/progress.json",
+        "sha256": "f4a129a5498ddcceba8d31aba0e7298bf64d26fac8a6ec2f2e09a157bcd24ed2",
+        "bytes": 124
+      },
+      "models/fraudgt_format/history.json": {
+        "backup": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/stopped_checkpoints/oom_old_run_cleanup_20261027T091236Z/history.json",
+        "sha256": "3b5c0b8419bf3d9e40f2bb0f8ff16b8a0408272aa6d5c1fca234b067bf1a2280",
+        "bytes": 8543
+      },
+      "protocol.json": {
+        "backup": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/stopped_checkpoints/oom_old_run_cleanup_20261027T091236Z/protocol.json",
+        "sha256": "63b9b9777d172a38e0f492fb26fd2fe226409feef4ae476fe2fd853f18616268",
+        "bytes": 7116
+      },
+      "code_manifest.json": {
+        "backup": "/workspace/handoff/V10_FraudGT_공식로더_20261027/runs/official_loader_001/stopped_checkpoints/oom_old_run_cleanup_20261027T091236Z/code_manifest.json",
+        "sha256": "04b85a2e906309397de09a3fa3a384ad3532a8c00c1f1a76bf6c23e2c7fb0b7d",
+        "bytes": 1547
+      }
+    }
+  },
+  "preserved_old_resume_position": {
+    "epoch": 10,
+    "loader_cursor": 0,
+    "completed_epochs": 9
+  },
+  "model_settings_changed": false,
+  "user_notebooks_interrupted": false,
+  "user_notebooks_restarted_by_agent": false,
+  "old_process_state": "Zs       0 python",
+  "current_runs": [
+    {
+      "run": "disjoint_corrected_001",
+      "epoch": 2,
+      "phase": "train",
+      "percent": 90.13671875,
+      "utc": "2026-10-27T09:14:30.189394+00:00",
+      "last_saved_batch": 224
+    },
+    {
+      "run": "shared_corrected_001",
+      "epoch": 4,
+      "phase": "validation",
+      "percent": 89.453125,
+      "utc": "2026-10-27T09:14:30.260185+00:00",
+      "last_saved_batch": 256
+    }
+  ]
+}

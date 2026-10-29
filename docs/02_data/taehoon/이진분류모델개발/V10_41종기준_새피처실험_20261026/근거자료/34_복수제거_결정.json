@@ -1,0 +1,20 @@
+{
+  "eligible": [
+    "minus_format",
+    "minus_amount_z",
+    "minus_pair_history",
+    "minus_dst_matching",
+    "minus_same_entity"
+  ],
+  "selection_data": "validation only",
+  "criteria": "At P>=70, R>=baseline-0.1pp and unmatched R>=baseline-0.5pp; not a statistical noninferiority certificate",
+  "removed_types": [
+    "amt_z_pay_ccy",
+    "pair_history_count",
+    "payment_format",
+    "same_entity"
+  ],
+  "removed_columns": [
+    "dst_day_ccy_log_matching_in_amount"
+  ]
+}

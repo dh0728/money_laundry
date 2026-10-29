@@ -1,0 +1,27 @@
+{
+  "names": [
+    "src_prior_ccy_log_count",
+    "src_prior_ccy_amount_seen",
+    "src_prior_ccy_log_amount_z",
+    "src_prior_ccy_amount_vs_mean",
+    "src_day_ccy_rate_vs_prior",
+    "dst_prior_ccy_log_count",
+    "dst_prior_ccy_amount_seen",
+    "dst_prior_ccy_log_amount_z",
+    "dst_prior_ccy_amount_vs_mean",
+    "dst_day_ccy_rate_vs_prior",
+    "pair_amount_seen_before_day"
+  ],
+  "unique_new_types": 6,
+  "scalar_columns": 11,
+  "history_cutoff": "Strictly before target day; current-day events are added after all features for that day are emitted.",
+  "amount_seen": "Exact float64 monetary value in same account/currency/direction, first_day < target_day. Pair lookup also requires same paid amount/currency.",
+  "currency_roles": "Source outgoing paid/payment currency; destination incoming received/receiving currency.",
+  "z": "log1p amount vs previous-day-inclusive population mean/std; std floor .001; clipped [-10,10]; no history -> 0.",
+  "mean_ratio": "log1p(target amount / past mean amount); absent or zero mean -> 0, with past count retained.",
+  "activity": "log1p(current-day directional currency count)-log1p(past count / calendar days since first past activity).",
+  "first_occurrence": "Built from observation-only full input, but only Boolean past existence is used, never future first date or future count.",
+  "labels_in_context": false,
+  "prediction_day_future_context": false,
+  "rows": 170426489
+}

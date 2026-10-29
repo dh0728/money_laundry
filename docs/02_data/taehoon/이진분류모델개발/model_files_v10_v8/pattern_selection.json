@@ -1,0 +1,14 @@
+{
+  "epoch": 20,
+  "validation_threshold": 0.4057740867137909,
+  "seed": 1,
+  "best": 0.45804248698522443,
+  "selection_metric": "pattern_macro_F1_9",
+  "scope": "full_validation",
+  "test_used": false,
+  "stage": "ego",
+  "run": "ego_100/seed_1",
+  "risk_AP": 0.6024195990146571,
+  "criterion": "highest full-validation pattern_macro_F1_9 across 12 completed V8 runs; test never used for selection",
+  "checkpoint_sha256": "52bd347036dc0f393932d15658da2428c249e21dbd23ec7a0988ec3eea1eb5e1"
+}

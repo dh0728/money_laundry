@@ -1,0 +1,8 @@
+{
+  "epoch": 6,
+  "loader_batches": 2,
+  "epoch_targets": 16,
+  "train_loss": 1.4647572590754583,
+  "scored_targets": 13,
+  "coverage": 0.8125
+}

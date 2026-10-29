@@ -1,0 +1,144 @@
+{
+  "utc": "2026-10-28T22:52:57.861232+00:00",
+  "event": "recurrent_memory_retention_investigation",
+  "kernel_id": "b8a63910-636e-4db1-bc49-6892afc4b297",
+  "pid": 587135,
+  "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z",
+  "files": {
+    "models/fraudgt_format/last.pt": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z/last.pt",
+      "sha256": "19e2feb6e479bfab08f1083557746bc2f5fe27b74d042b1e11685614d06792a6"
+    },
+    "models/fraudgt_format/best.pt": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z/best.pt",
+      "sha256": "a7359a19a109abc2aa0f0223b495a57291ca435dc3854f775d6d409e864f2e95"
+    },
+    "models/fraudgt_format/progress.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z/progress.json",
+      "sha256": "f3b4153f6e71842d9d5c526ad3c7da6b6b4bdb7bf597c5500614afa2be4fdc4d"
+    },
+    "models/fraudgt_format/history.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z/history.json",
+      "sha256": "0e992e278be929a033070fdf34beac2ebd9706c626d687ea9c9608112bc52631"
+    },
+    "protocol.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z/protocol.json",
+      "sha256": "bb5ff044498d678752dd79e72fbaf43a7dd9c201254007ecb6c55558040a9114"
+    },
+    "code_manifest.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z/code_manifest.json",
+      "sha256": "ac14fa75b4011d3e5dd1e914fdc3cc4fdd7249cf7c9eb9cd1870db6b647cfcd9"
+    },
+    "notebook_contract.json": {
+      "backup": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/stopped_checkpoints/retained_objects_20261028T225257Z/notebook_contract.json",
+      "sha256": "59174399b6f879cfd79b30b5ff6a1e1fd5881a998a00d3b0006e0ba8a59dcbfe"
+    }
+  },
+  "resume_progress": {
+    "epoch": 304,
+    "loader_batches": 256,
+    "epoch_targets": 524288,
+    "train_loss": 0.013538120336820144,
+    "scored_targets": 219853,
+    "coverage": 0.41933631896972656
+  },
+  "status": "inline_retention_fixed_full_validation_completed",
+  "root_cause": "The live-chart function used pyplot in an interactive Jupyter inline backend. Each newly created figure entered show._to_draw and remained referenced until the long training cell ended. plt.close did not remove this queue entry, so gc.collect and malloc_trim could not release the figure tree.",
+  "verified_fix": {
+    "backend": "inline",
+    "single_cell_execution": true,
+    "old_renders": 12,
+    "old_queue_growth": 12,
+    "old_figures_after_gc": 12,
+    "fixed_renders": 40,
+    "fixed_queue_growth": 0,
+    "fixed_figures_after_gc": 0,
+    "png_bytes_identical": true,
+    "unrelated_plot_preserved": true,
+    "interactive_state_preserved": true,
+    "torch_imported": false,
+    "utc": "2026-10-28T22:57:34.236688+00:00",
+    "status": "pass"
+  },
+  "resume_utc": "2026-10-28T22:59:08.136410+00:00",
+  "execute_message_id": "7753f182-17a04d3f498734f26e0d5279_605657_2",
+  "memory_policy": "gc.collect + malloc_trim at phase boundaries and every32 logical batches",
+  "prior_mitigation_limitation": "CPU garbage collection and allocator trimming freed temporary arrays but not figures still referenced by the inline display queue. The earlier plotting test used Agg outside a notebook and missed the inline-specific retention.",
+  "live_object_audit_file": "live_retained_objects_20261028.json",
+  "implementation": "Use Figure + FigureCanvasAgg directly for the live-chart PNG. Do not register a pyplot manager or touch other user plots/the global interactive mode.",
+  "regression_verification": {
+    "backend": "inline",
+    "single_cell_execution": true,
+    "old_renders": 12,
+    "old_queue_growth": 12,
+    "old_figures_after_gc": 12,
+    "fixed_renders": 40,
+    "fixed_queue_growth": 0,
+    "fixed_figures_after_gc": 0,
+    "png_bytes_identical": true,
+    "unrelated_plot_preserved": true,
+    "interactive_state_preserved": true,
+    "torch_imported": false,
+    "utc": "2026-10-28T22:57:34.236688+00:00",
+    "status": "pass"
+  },
+  "display_verification": {
+    "utc": "2026-10-28T22:57:11.272805+00:00",
+    "status": "pass",
+    "checks": {
+      "initial_real_history_png": true,
+      "unchanged_data_emits_nothing": true,
+      "progress_updates_existing_gauge_only": true,
+      "chart_throttled_to_15_seconds": true,
+      "new_epoch_updates_chart_and_table_immediately": true,
+      "routine_refresh_never_clears_output": true,
+      "explicit_output_clear_recovers_png": true,
+      "cell_rerun_creates_fresh_outputs": true,
+      "torch_not_imported": true
+    },
+    "training_started": false,
+    "live_run_files_written": false
+  },
+  "scientific_settings_changed": false,
+  "feature_loader_candidate_applied": false,
+  "completed_utc": "2026-10-28T23:04:57.078757+00:00",
+  "live_validation": {
+    "epoch": 304,
+    "seconds": 241.46798955835402,
+    "requested_targets": 524288,
+    "scored_targets": 176061,
+    "training_rerun": false
+  },
+  "current_progress": {
+    "variant": "fraudgt_format",
+    "epoch": 305,
+    "epochs": 500,
+    "phase": "train",
+    "train": {
+      "completed": 278528,
+      "total": 524288,
+      "percent": 53.125,
+      "loss": 0.01571858855561409,
+      "elapsed_seconds": 104.7704385239631,
+      "scored": 117262
+    },
+    "validation": {
+      "completed": 0,
+      "total": 524288,
+      "percent": 0.0,
+      "scheduled": false
+    },
+    "utc": "2026-10-28T23:04:56.717206+00:00"
+  },
+  "training_active": {
+    "shared": true,
+    "disjoint": false
+  },
+  "memory_current_bytes": 18054459392,
+  "latest_process_anon_bytes": 1290932224,
+  "median_cleanup_seconds": 0.26967974100261927,
+  "core_training_sources_unchanged": true,
+  "protocol_unchanged": true,
+  "checkpoint_backup_hashes_verified": true,
+  "bounds": "Inline-queue regression tested40consecutive renders within one cell; full resumed validation and next training epoch verified. Remaining500epoch run is still in progress."
+}

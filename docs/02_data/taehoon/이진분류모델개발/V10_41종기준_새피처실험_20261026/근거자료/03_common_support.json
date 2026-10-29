@@ -1,0 +1,14 @@
+[
+  {
+    "period": "train_early",
+    "unmatched_support": 0.9908890668802564
+  },
+  {
+    "period": "train_late",
+    "unmatched_support": 0.9914743287800283
+  },
+  {
+    "period": "monitor",
+    "unmatched_support": 0.8343815513626834
+  }
+]

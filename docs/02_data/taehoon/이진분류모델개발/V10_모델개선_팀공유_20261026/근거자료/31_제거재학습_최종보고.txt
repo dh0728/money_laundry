@@ -1,0 +1,103 @@
+V10 후보 제거 후 실제 재학습 — 2026-10-26 UTC
+
+검증된45종에서 후보를 하나씩 제거하고 실제 입력 차원과 모델을 다시 학습했다.
+원래 모델 파일은 유지했다. 아래는 이번 새로운 기준 모델과의 비교다.
+precision은 정상 표본 가중치 기반 추정치, recall은 해당 평가 기간 양성 전수 기준이다.
+전체 모집단 인증 결과가 별도로 없으면 P70/R65 목표 달성으로 주장하지 않는다.
+
+공통 조건
+- HGB 학습 1,835,113건, GNN 학습 179,733건. 양성 94,309건은 공통 전수.
+- 8/1~8/7은 보정과 관측 이력에만 사용. 학습은8/8~9/25, GNN 회차 선택9/26~10/4, 결합 학습10/5~10/8, 검증10/9~10/13.
+- HGB300회/31잎, GNN 최대6회·monitor AP로 체크포인트 선택·미개선2회 조기 종료. 모든 후보는 같은 초기 가중치에서 해당 입력만 잘라 새 학습.
+- 결합은 고정 설정의 로지스틱 회귀. 검증에서 P>=70% 조건의 최대 recall 임계값을 선택하고 테스트에는 고정 적용.
+- 기존 45종 동결 모델과는 학습 시작일과 GNN 학습 일정이 다르므로 삭제 효과는 이번 baseline45와 비교.
+- 동일 분 거래·주변 그래프·가중치·표본 목록은 유지. 피처 제거로 거래나 그래프 간선을 삭제하지 않음.
+- 같은 입력을 가진 구성요소는 재사용. 예: ACH를 제거해도 GNN36은 원래 ACH 입력이 없으므로 이번 새 기준 GNN을 재사용.
+- 정적 KYC 가용 시점은 여전히 미확인. 이 조건을 해결했다거나 모든 피처가 무조건 시점 인증됐다고 주장하지 않음.
+
+단일 후보 제거 및 결합 후보 검증 결과
+번호 / 모델 / 종류 / 스칼라열 / P% / R% / 패턴R% / 무패턴R%
+299 / baseline45 / 45 / 69 / 70.189 / 62.507 / 99.433 / 8.386
+300 / minus_format / 44 / 68 / 70.182 / 62.433 / 99.337 / 8.345
+301 / minus_amount_z / 44 / 68 / 70.328 / 62.828 / 99.475 / 9.115
+302 / minus_pair_history / 44 / 68 / 70.335 / 62.869 / 99.502 / 9.176
+303 / minus_pair_amount / 44 / 68 / 70.092 / 62.228 / 99.392 / 7.758
+304 / minus_dst_matching / 45 / 68 / 70.189 / 62.507 / 99.433 / 8.386
+305 / minus_direct / 44 / 67 / 70.185 / 62.302 / 99.323 / 8.041
+306 / minus_same_entity / 44 / 68 / 70.182 / 62.474 / 99.309 / 8.487
+307 / combined / 41 / 64 / 70.297 / 62.688 / 99.337 / 8.973
+
+제거된 항목
+- baseline45: 종류=없음, 개별열=없음
+- minus_format: 종류=payment_format, 개별열=없음
+- minus_amount_z: 종류=amt_z_pay_ccy, 개별열=없음
+- minus_pair_history: 종류=pair_history_count, 개별열=없음
+- minus_pair_amount: 종류=pair_amount_seen_before_day, 개별열=없음
+- minus_dst_matching: 종류=없음, 개별열=dst_day_ccy_log_matching_in_amount
+- minus_direct: 종류=type_Direct, 개별열=없음
+- minus_same_entity: 종류=same_entity, 개별열=없음
+- combined: 종류=amt_z_pay_ccy|pair_history_count|payment_format|same_entity, 개별열=dst_day_ccy_log_matching_in_amount
+
+검증으로 미리 선택한 역할
+- baseline: baseline45 / fusion
+- without_format: minus_format / fusion
+- best_reduced_fusion: minus_pair_history / fusion
+- best_tree: minus_format / tree
+- best_overall: minus_format / tree
+
+고정 임계값으로 평가한 과거 테스트 / SAML-D
+데이터 / 모델 / 구성 / 종류 / P% / R% / 무패턴R% / P의 근사95%구간
+historical_test / baseline45 / fusion / 45 / 73.351 / 62.510 / 9.776459603449222 / [65.851,79.713]
+historical_test / minus_format / fusion / 44 / 70.266 / 62.613 / 10.270774976657329 / [62.955,76.670]
+historical_test / minus_pair_history / fusion / 44 / 68.059 / 62.907 / 10.649750096116877 / [60.921,74.441]
+historical_test / minus_format / tree / 24 / 57.853 / 63.386 / 12.561102872521557 / [51.663,63.807]
+saml / baseline45 / fusion / 45 / 0.421 / 11.567 / 정의없음 / [0.407,0.437]
+saml / minus_format / fusion / 44 / 0.721 / 65.147 / 정의없음 / [0.708,0.735]
+saml / minus_pair_history / fusion / 44 / 0.502 / 13.289 / 정의없음 / [0.484,0.521]
+saml / minus_format / tree / 24 / 0.433 / 68.267 / 정의없음 / [0.427,0.439]
+
+복수 제거 후보
+{
+  "eligible": [
+    "minus_format",
+    "minus_amount_z",
+    "minus_pair_history",
+    "minus_dst_matching",
+    "minus_same_entity"
+  ],
+  "selection_data": "validation only",
+  "criteria": "At P>=70, R>=baseline-0.1pp and unmatched R>=baseline-0.5pp; not a statistical noninferiority certificate",
+  "removed_types": [
+    "amt_z_pay_ccy",
+    "pair_history_count",
+    "payment_format",
+    "same_entity"
+  ],
+  "removed_columns": [
+    "dst_day_ccy_log_matching_in_amount"
+  ]
+}
+개별 삭제에서 P>=70%, R 감소0.1pp 이내·무패턴R 감소0.5pp 이내 후보를 합쳤다. 합쳐도 보존된다는 보장이 없어 별도 재학습했다.
+이 기준은 탐색 규칙이며 통계적인 비열등성 증명은 아니다. 단일 seed42 비교라 초기화 변동을 모두 측정하지는 않았다.
+
+검증·무결성
+- 삭제된 피처가 HGB feature_names와 실제 GNN 입력/엣지/readout 차원에서 사라진 것을 검사.
+- 새 신경망의 입력 차원 축소가 기존 초기 신경망의 해당 입력0 처리와 출력·기울기 수준에서 일치하는지 사전검사.
+- 저장 모델 재로딩 후 점수 재현 및 원래 모델3개·그래프 샘플러 해시 보존 검사.
+- 08_조건별_검증.csv에서 ACH/비ACH, 반복금액/새금액, ACH새금액 정상 대 무패턴을 구분. 그룹별 임계값 재조정 없음.
+- 과거 테스트와 SAML-D는 이전에도 사용한 자료다. 새 독립 holdout으로 부르지 않음.
+- SAML-D는 자체 유형을 사용하므로 HI의 무패턴 recall을 만들어 보고하지 않음.
+- SAML-D에는 수취금액·HI KYC가 없어 기존 어댑터의 결측0 처리 제한이 남음.
+
+원본 실행 경로: /workspace/kimi/Claude_GNN/final_model/experiments/v10_candidate_ablation_20261026
+run_series.py는 완료 파일과 일별 체크포인트를 읽어 재개한다. 인계 스크립트는 원래 실험 디렉터리 배치를 기준으로 작성됐다.
+
+목표 판정: 미달. 검증 또는 역사 테스트 양성 전수 R이65% 미달이므로 정상 전수 평가는 생략했다. 정밀도는 표본 추정치다.
+{
+  "status": "not_required_recall_below_goal",
+  "goal_met": false,
+  "full_population_precision_certified": false,
+  "reason": "No frozen selected candidate has R>=65 in both validation and historical positive censuses. Sample precision cannot change this failure.",
+  "screen_goal_candidates": []
+}
+

@@ -1,0 +1,60 @@
+{
+  "utc": "2026-10-27T10:08:31.114961+00:00",
+  "event": "live_chart_flicker_fix",
+  "status": "pass",
+  "cause": "The previous missing-chart repair cleared all output and re-emitted the gauge, PNG and table every 2 seconds.",
+  "fix": [
+    "Keep independent display IDs and update only changed content.",
+    "No routine clear_output calls. Recreate display slots after explicit clear or cell rerun.",
+    "Poll progress every 2 seconds; throttle the live-loss chart to 15 seconds; publish new epoch history immediately.",
+    "Keep chart dimensions and table height stable. Reload the display module when restarting the monitor cell."
+  ],
+  "verification": {
+    "utc": "2026-10-27T10:07:00.113448+00:00",
+    "status": "pass",
+    "checks": {
+      "initial_real_history_png": true,
+      "unchanged_data_emits_nothing": true,
+      "progress_updates_existing_gauge_only": true,
+      "chart_throttled_to_15_seconds": true,
+      "new_epoch_updates_chart_and_table_immediately": true,
+      "routine_refresh_never_clears_output": true,
+      "explicit_output_clear_recovers_png": true,
+      "cell_rerun_creates_fresh_outputs": true,
+      "torch_not_imported": true
+    },
+    "training_started": false,
+    "live_run_files_written": false
+  },
+  "training_source_unchanged": true,
+  "training_interrupted": false,
+  "training_started": false,
+  "active_training": {
+    "shared": {
+      "training_lock_held": true,
+      "status": {
+        "utc": "2026-10-27T10:08:22.172716+00:00",
+        "event": "corrected_validation_started",
+        "variant": "fraudgt_format",
+        "epoch": 12
+      }
+    },
+    "disjoint": {
+      "training_lock_held": true,
+      "status": {
+        "utc": "2026-10-27T10:08:12.493598+00:00",
+        "event": "corrected_training_progress",
+        "variant": "fraudgt_format",
+        "epoch": 5,
+        "loader_batches": 64,
+        "epoch_targets": 131072,
+        "train_loss": 0.02407680512361034,
+        "scored_targets": 56214,
+        "coverage": 0.4288787841796875
+      }
+    }
+  },
+  "monitor_path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/V10_FraudGT_공유그래프_진행조회.ipynb",
+  "monitor_sha256": "216c16c22584b125d53bffa8b424ff558080943518f24ad928d3d325ad3e8dc4",
+  "display_helper_sha256": "0b39e7fca6c2251d03bd2ca56483e68d942cd1434f9fd3f0ff1dd210a759df1c"
+}

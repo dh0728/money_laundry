@@ -1,0 +1,6 @@
+{
+  "passed": true,
+  "device": "cuda",
+  "rows": 18,
+  "absolute_tolerance": 2e-05
+}

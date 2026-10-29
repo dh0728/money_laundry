@@ -1,0 +1,10 @@
+{
+  "source_sha256": "52bd347036dc0f393932d15658da2428c249e21dbd23ec7a0988ec3eea1eb5e1",
+  "bundle_sha256": "b185b95114bdcc19d0c6f8a63dcb2df3f174fd50f6200b9cb6ef2bd4944177c8",
+  "epoch": 20,
+  "threshold": 0.4057740867137909,
+  "source_experiment": "seed_1",
+  "architecture": "TransformerConv dual-direction 2-hop with ego marker",
+  "feature_schema": "node19_edge17_v1",
+  "display_name": "9클래스 모델"
+}

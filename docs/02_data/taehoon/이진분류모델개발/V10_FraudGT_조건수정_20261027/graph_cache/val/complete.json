@@ -1,0 +1,12 @@
+{
+  "scope": "val",
+  "end_day": 73,
+  "cutoff_minute_exclusive": 106560,
+  "nodes": 2116168,
+  "edges_per_relation": {
+    "incoming": 136996982,
+    "outgoing": 136996982
+  },
+  "labels_used": false,
+  "sampling_implementation": "PyG LinkNeighborLoader, not this index conversion"
+}

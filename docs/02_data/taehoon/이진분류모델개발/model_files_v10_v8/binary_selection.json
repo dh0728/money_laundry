@@ -1,0 +1,13 @@
+{
+  "stage": "ego",
+  "seed": 42,
+  "epoch": 10,
+  "best": 0.6302289387733604,
+  "validation_threshold": 0.4338742792606354,
+  "fpr_threshold": 0.09794379770755768,
+  "selection_metric": "full_validation_binary_AP",
+  "test_used": false,
+  "run": "ego_seed42",
+  "criterion": "best existing full-validation metric; user-authorized truncated experiment; no test selection",
+  "budget_truncated": true
+}

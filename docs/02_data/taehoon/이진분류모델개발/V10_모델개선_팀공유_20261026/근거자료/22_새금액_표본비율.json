@@ -1,0 +1,23 @@
+{
+  "rows": [
+    {
+      "audit_class": 0,
+      "n": 269727,
+      "source_amount_novel": 0.10715278781879456,
+      "destination_amount_novel": 0.10727884119869349,
+      "pair_amount_novel": 0.10730850081749324
+    },
+    {
+      "audit_class": 9,
+      "n": 8586,
+      "source_amount_novel": 0.728977405078034,
+      "destination_amount_novel": 0.7287444677381785,
+      "pair_amount_novel": 0.728977405078034
+    }
+  ],
+  "window": [
+    "2022-09-26",
+    "2022-10-04"
+  ],
+  "scope": "Descriptive validation sample only; no historical test labels or model scores."
+}
