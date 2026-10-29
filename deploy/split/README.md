@@ -15,9 +15,9 @@
 | `check_rds.py` | API 이미지 안에서 앱·분석 계정의 RDS 인증과 TLS 검증 |
 | `build_bundle.py` | 명시된 배포 파일만 묶고 SHA-256 계산 |
 | `image_manifest.py` | 선택한 API·웹 이미지의 계정·환경·저장소·Digest 검사 |
-| `prod-images.json` | 기존 운영 앱을 유지하기 위해 검증한 API·웹 Digest 지정. 비밀값 없음 |
-| `ci_artifacts.py` | 운영 ECR Digest 조회, S3 Bundle 조건부 업로드·재다운로드 대조 |
-| Bundle의 `images.json` (선택) | 앱 버전을 배포 코드 버전과 분리할 때 사용하는 이미지 고정 기록 |
+| `prod-images.json` | 마이그레이션 당시 운영 앱의 Digest 보관 기록. 현재 자동배포에서는 읽지 않음 |
+| `ci_artifacts.py` | 운영 커밋 태그의 ECR Digest 조회, S3 Bundle 조건부 업로드·재다운로드 대조 |
+| Bundle의 `images.json` (선택) | 해당 릴리스에서 실행할 API·웹 Digest 기록. 운영 자동배포 때마다 생성 |
 | `receive.py` | EC2에서 Bundle 다운로드·검증·압축 해제 |
 | `run_ssm.py` | GitHub에서 백엔드 → 프론트 배포와 양쪽 복구 조정 |
 | 각 서버의 `split.example.json` | 서버별 비밀값 없는 설정 예시 |
@@ -65,7 +65,7 @@ jdbc:postgresql://<RDS_ENDPOINT>:5432/aml_dev_v3?sslmode=verify-full&sslrootcert
 
 ## 개발 외부 추론 대상 선택
 
-**설정 위치: AWS 백엔드의 /opt/aml/shared/split.json.** `dev_inference_target`의 기본값은 `kubesphere`이며 `naver`도 선택할 수 있다. 모델은 공유 추론 서버(`backend/inference-server`)에서만 돌기 때문에 개발 서버에 로컬 추론 컨테이너는 없다(2026-10-17). `local`은 그 이전 배포 기록의 복구에만 남아 있고 새 배포에서는 선택할 수 없다. 운영 Compose·고정 앱 Digest·V1~V17 구조는 변경하지 않는다. 네이버 값은 클라이언트 설정 분리용이며 GPU 서버 배포 방식까지 정의하지 않는다.
+**설정 위치: AWS 백엔드의 /opt/aml/shared/split.json.** `dev_inference_target`의 기본값은 `kubesphere`이며 `naver`도 선택할 수 있다. 모델은 공유 추론 서버(`backend/inference-server`)에서만 돌기 때문에 개발 서버에 로컬 추론 컨테이너는 없다(2026-10-17). `local`은 그 이전 배포 기록의 복구에만 남아 있고 새 배포에서는 선택할 수 없다. 이 대상 선택은 개발 전용이다. 운영 추론 URL·토큰·CA 설정과 DB 전환은 별도로 준비한다. 네이버 값은 클라이언트 설정 분리용이며 GPU 서버 배포 방식까지 정의하지 않는다.
 
 | 대상 | API 주소 | Bearer 토큰 | 공개 CA |
 | --- | --- | --- | --- |
@@ -110,7 +110,7 @@ Compose가 `INFERENCE_API_URL`·`INFERENCE_API_TOKEN`·`INFERENCE_CA_FILE`을 AP
 | `FRONT_EC2_INSTANCE_ID` | 새 프론트 EC2 ID |
 | `BACKEND_EC2_INSTANCE_ID` | 새 백엔드 EC2 ID |
 
-새 workflow는 dev 환경을 `dev` 브랜치, prod 환경을 `master` 브랜치에서 실행하며 해당 브랜치에 포함된 전체 40자리 커밋 SHA를 사용한다. `feature-infra-mig`는 수정 후 `dev`에 병합할 작업 브랜치다. 운영에는 기존 앱을 보존하며 배포 관련 파일만 반영한다.
+workflow는 dev 환경을 `dev` 브랜치, prod 환경을 `master` 브랜치에서 실행하며 해당 브랜치에 포함된 전체 40자리 커밋 SHA를 사용한다. `dev → master` PR이 병합되면 `master` push의 CI가 실행되고, 검사 통과와 운영 스위치 확인 후 해당 master 커밋의 API·웹 이미지를 빌드하여 운영에 배포한다. GitHub `prod` Environment에 필수 승인자가 설정되어 있으면 기존과 같이 승인을 기다린다.
 
 | 실행 방식 | 동작 |
 | --- | --- |
@@ -120,7 +120,13 @@ Compose가 `INFERENCE_API_URL`·`INFERENCE_API_TOKEN`·`INFERENCE_CA_FILE`을 AP
 
 수동 실행 화면은 workflow가 기본 브랜치에 반영된 뒤 사용한다. 사전 확인은 S3 업로드·객체 읽기나 SSM 실행 권한까지 검증하는 과정은 아니다. 이 권한은 정책 대조 후 실제 시험 배포로 확인한다.
 
-개발은 `dev-<배포 SHA>` 태그의 API·웹 이미지를 빌드하며, 이미 있으면 재사용한다. **운영은 `prod-images.json`의 기존 앱 Digest를 사용하고 소스로 이미지를 빌드하지 않는다.** 운영 소스가 변경되어도 자동으로 새 앱 이미지가 배포되지는 않는다. 이후 운영 앱을 업데이트할 때는 새 이미지·DB 호환성을 검증하고 이 기록을 함께 변경한다.
+개발은 `dev-<배포 SHA>`, 운영은 `prod-<배포 SHA>` 태그로 API·웹 이미지를 빌드하고 ECR에 업로드한다. 재시도 때 같은 태그가 있으면 해당 이미지를 재사용하고, 없는 이미지만 빌드한다. ECR 저장소는 태그 변경 불가(Immutable)를 유지한다. 웹은 두 환경 모두 `VITE_API_BASE_URL=/api`, `VITE_API_MODE=live`로 빌드한다.
+
+운영은 빌드가 끝난 뒤 `resolve-prod`가 이번 커밋 태그의 API·웹 Digest를 ECR에서 조회한다. 계정·저장소·태그·Digest를 확인해 실행 중인 GitHub runner의 임시 `prod-images.json`을 만들고 Bundle의 `images.json`에 넣는다. 배포 SHA와 앱 SHA는 해당 master 커밋으로 같아진다. **저장소에 보관한 예전 `prod-images.json`은 자동배포에 사용하지 않는다.** 한 이미지라도 조회·검증에 실패하면 SSM 배포 전에 중단한다.
+
+운영 역할 `aml-github-prod-deploy-role`에도 이미지 업로드 권한이 필요하다. `ecr:GetAuthorizationToken`은 `Resource: "*"`, `ecr:DescribeImages`, `ecr:BatchCheckLayerAvailability`, `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, `ecr:InitiateLayerUpload`, `ecr:UploadLayerPart`, `ecr:CompleteLayerUpload`, `ecr:PutImage`는 새 계정의 `aml-api`·`aml-web` 저장소에 허용한다. 로컬 코드 변경은 실제 IAM 정책을 변경하지 않으며, `preflight`만으로 이미지 업로드 권한까지 확인되지는 않는다.
+
+첫 운영 배포 전에는 운영 DB의 구조·Flyway 이력이 배포할 앱과 호환되는지 확인한다. 개발에서 SQL을 V1 하나로 합쳤다고 기존 운영 DB가 자동으로 같은 구조가 되는 것은 아니다. 이 자동배포는 DB 초기화나 Flyway 이력 수정·repair를 실행하지 않는다. 개발과 같은 GPU 서버를 쓰더라도 운영 URL·토큰·CA 마운트, 운영 S3 경로 허용과 작업 상태 분리는 별도로 맞춰야 한다. 준비 중에는 `AML_PROD_DEPLOY_ENABLED=false`를 유지한다.
 
 실제 배포 결과는 각 Environment의 `secrets.DISCORD_WEBHOOK_URL`로 알린다. 사전 확인에는 알림을 보내지 않으며, Secret이 없거나 알림 전송이 실패해도 배포 결과를 바꾸지 않는다. 비밀번호·Webhook URL은 로그에 출력하지 않는다.
 
@@ -135,11 +141,11 @@ python deploy/split/build_bundle.py prod /tmp/deploy-bundle.tar.gz \
   --image-record /path/to/prod-images-ecr.json
 ```
 
-GitHub 운영 workflow는 저장소의 `prod-images.json`을 ECR과 대조한 뒤 `--image-manifest deploy/split/prod-images.json`으로 전달한다. 두 옵션을 동시에 사용할 수는 없다. 이 기록은 28~30번 실습에서 검증한 기존 운영 앱과 새 계정 Digest이며 비밀값을 포함하지 않는다.
+수동으로 특정 이미지를 선택할 때는 `--image-manifest <검증한 파일>`도 사용할 수 있다. `--image-record`와 동시에 사용할 수는 없다. 저장소의 `prod-images.json`은 28~30번 실습에서 검증한 기존 운영 앱과 새 계정 Digest를 보관한 파일이며 비밀값을 포함하지 않는다. GitHub 자동배포는 매번 현재 커밋 태그로 새 manifest를 만들므로 이 과거 기록을 수정할 필요가 없다.
 
 `deploy.py`는 Bundle의 `images.json`이 있으면 지정한 `repository@sha256:...` 이미지를 사용한다. 잘못된 파일은 태그 방식으로 우회하지 않고 실패한다. 이 파일이 없는 개발 Bundle과 이전 Bundle은 `환경-배포_SHA` 태그 방식을 유지한다.
 
-배포 SHA는 새 배포 코드의 커밋으로 유지하고, `app_sha`는 기존 앱 커밋을 기록한다. 같은 배포 SHA의 Bundle·이미지 선택은 불변으로 보관해야 한다. 복구·이전 컨테이너 중지는 해당 이전 릴리스의 `images.json`을 읽으므로, 배포마다 선택한 이미지가 유지된다.
+기존 이미지를 수동으로 선택한 경우 배포 SHA는 배포 코드의 커밋, `app_sha`는 선택한 앱 커밋을 기록한다. 자동배포에서는 두 SHA가 같다. 같은 배포 SHA의 Bundle·이미지 선택은 불변으로 보관해야 한다. 복구·이전 컨테이너 중지는 해당 이전 릴리스의 `images.json`을 읽으므로, 배포마다 선택한 이미지가 유지된다.
 
 S3의 `releases/<환경>/<배포 SHA>/deploy-bundle.tar.gz`는 `If-None-Match: *`로 새 파일만 업로드한다. 이미 있으면 내려받아 체크섬이 같을 때만 재사용한다. 내용이 다르거나 권한·통신 오류가 나면 SSM 실행 전에 중단한다. GitHub 역할에는 자기 환경의 `releases/dev/*` 또는 `releases/prod/*`에 대한 **`s3:PutObject`와 `s3:GetObject`**가 필요하다. 버킷 위치 확인에는 `s3:GetBucketLocation`을 사용한다.
 
@@ -180,6 +186,8 @@ python deploy/split/validate.py
 2026년 10월 9일 재검토: 모의 테스트 32개와 Compose 6개 설정 검사를 통과했다. HTTP 상태·본문 판정, 백엔드 장애 중 프론트 복구, 비밀값 공백 보존, UTF-8 설정 파일 읽기를 보완했다. RDS·SSM 테스트는 외부 서비스를 대체한 모의 검사이며 실제 접속 결과가 아니다.
 
 2026년 10월 13일: 모의 테스트 50개, Compose 6개, Python·Bash 문법 검사 통과. workflow의 배포 허용 조건 14개를 외부 요청 없이 확인했다. actionlint 1.7.12 검사도 통과했으며, 보관한 두 workflow의 의도적인 `if: false` 경고만 제외했다. GitHub OIDC 인증과 실제 배포는 브랜치 반영 후 별도로 검증한다.
+
+2026년 10월 29일: 운영도 master 커밋으로 이미지를 빌드하고 그 Digest를 Bundle에 기록하도록 변경했다. split 테스트 78개 중 76개 통과, `AML_TEST_DOCKER` 미설정으로 DB 통합 테스트 2개 제외. Compose 6개·개발 외부 CA overlay·Python/Bash 문법과 workflow YAML·빌드 조건 16개 조합을 확인했다. AWS IAM·GitHub 환경 설정 변경이나 실제 배포는 실행하지 않았다.
 
 ## 핵심 정리
 
