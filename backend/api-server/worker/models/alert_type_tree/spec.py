@@ -1,8 +1,8 @@
 """Versions the backend binds for the Alert type tree (backend/inference-server models/alert_type_tree)."""
 from common.worker_transport import ProtocolError
 
-MODEL_VERSION = "alert-type-tree-v2"
-FEATURE_VERSION = "alert-graph-features-v1"
+MODEL_VERSION = "alert-type-tree-v3"
+FEATURE_VERSION = "alert-graph-features-v2"
 
 
 def supported_versions(model_version, feature_version):
