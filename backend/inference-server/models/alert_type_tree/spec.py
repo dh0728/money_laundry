@@ -1,7 +1,7 @@
-"""Versions and fixed file of the Alert type decision tree v2.
+"""Versions and fixed file of the Alert type decision tree v3.
 
-The tree was trained on HI-Large pattern graphs (worktable/worker_experiments/alert_type_tree_v2,
-validation accuracy 98.50%). Its checksum is part of the model version, so a different file is a
+The tree was trained on HI-Large pattern graphs without payment-format features
+(worktable/worker_experiments/alert_type_tree_v2/train_v3.py, validation accuracy 97.24%). Its checksum is part of the model version, so a different file is a
 different model.
 """
 import hashlib
@@ -9,12 +9,12 @@ from pathlib import Path
 
 from common.worker_transport import ProtocolError
 
-MODEL_VERSION = "alert-type-tree-v2"
-FEATURE_VERSION = "alert-graph-features-v1"
+MODEL_VERSION = "alert-type-tree-v3"
+FEATURE_VERSION = "alert-graph-features-v2"
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 ASSET_SHA256 = {
-    "alert_type_tree_v2.json": "1c7b4aaf4a23392ab154a1c12a776f5969c97d0ebd1a8e554c0049002d88258e",
+    "alert_type_tree_v3.json": "1b9fa545fa3d7158296740518f6f5dcef8a347e0ca89844041151ebdd4502a3e",
 }
 
 

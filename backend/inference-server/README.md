@@ -48,7 +48,7 @@
 | 폴더 | 버전(모델 / 피처) | 쓰는 곳 |
 |---|---|---|
 | `models/demo_random` | `demo-random-v1` / `demo-input-v1` | 이진 전용 시연 계산기(임의 점수) |
-| `models/alert_type_tree` | `alert-type-tree-v2` / `alert-graph-features-v1` | 유형 모델. Alert 하나의 핵심 거래 그래프에서 구조 피처를 만들고 결정 트리로 9개 유형(패턴 아님 + 8개 패턴) 확률을 낸다. 트리는 `assets/`, 무결성은 `spec.py`의 SHA-256으로 확인 |
+| `models/alert_type_tree` | `alert-type-tree-v3` / `alert-graph-features-v2` | 유형 모델. Alert 하나의 핵심 거래 그래프에서 구조 피처(결제 수단은 쓰지 않음)를 만들고 결정 트리로 9개 유형(패턴 아님 + 8개 패턴) 확률을 낸다. 트리는 `assets/`, 무결성은 `spec.py`의 SHA-256으로 확인 |
 | `models/binary_v10` | `gnn-binary-v10` / `materials-v1` | 이진 모델. 팀원 GNN v10(2홉 거래 그래프). 재료에서 피처를 만들고 대상 거래마다 그래프를 만들어 점수를 낸다. 가중치·통계는 `assets/`, 무결성은 `spec.py`의 SHA-256으로 확인 |
 
 ## 실행 (공유 추론 서버)

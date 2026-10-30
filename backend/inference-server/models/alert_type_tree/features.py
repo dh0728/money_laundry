@@ -7,6 +7,8 @@ Input per transaction: occurred time (us), from account, to account, amount (USD
 Every feature is a number computed from the Alert's own transactions only. Time span is left out on purpose:
 in the synthetic datasets it follows dataset length, not laundering (Alert parameter audit, 2026-10-27).
 Time is used only to order transactions for longest_chain and amount_ratio_chain.
+Payment format is also left out: Patterns.txt patterns are almost all one format, so a tree with format features
+learned "one format = pattern" (2026-10-29); the team's v10 does not use payment format either.
 """
 from collections import Counter, defaultdict
 import math
@@ -19,7 +21,6 @@ FEATURES = (
     "sources_to_sinks_ratio", "two_hop_paths_top", "longest_chain",
     "cycle_size", "reciprocal_pairs", "repeat_pair_share",
     "amount_cv", "amount_ratio", "amount_ratio_chain",
-    "format_count", "top_format_share",
 )
 
 
@@ -61,7 +62,8 @@ def _scc_max(nodes, out_edges):
 
 
 def features(rows):
-    """rows: list of (occurred_us, src, dst, amount_usd, payment_format). Returns a tuple in FEATURES order."""
+    """rows: list of (occurred_us, src, dst, amount_usd, payment_format). Returns a tuple in FEATURES order.
+    payment_format is not used."""
     n = len(rows)
     out_nb, in_nb = defaultdict(set), defaultdict(set)
     pairs = Counter()
@@ -118,7 +120,6 @@ def features(rows):
     amounts = [r[3] for r in rows]
     mean = sum(amounts) / n
     sd = math.sqrt(sum((x - mean) ** 2 for x in amounts) / n)
-    formats = Counter(r[4] for r in rows)
     positive = [x for x in amounts if x > 0]
     return (
         n, a, len(pairs) / (a * (a - 1)) if a > 1 else 0.0, components,
@@ -131,5 +132,4 @@ def features(rows):
         sd / mean if mean else 0.0,
         max(positive) / min(positive) if positive else 1.0,
         sorted(ratios)[len(ratios) // 2] if ratios else 1.0,
-        len(formats), formats.most_common(1)[0][1] / n,
     )

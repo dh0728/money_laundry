@@ -15,10 +15,11 @@ from tests.demo_inputs import build_alerts
 VERSIONS = dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
 
 
-def alert(key, edges):
-    """Inputs of one Alert from (hour, from, to, amount) edges."""
+def alert(key, edges, formats=("ACH",)):
+    """Inputs of one Alert from (hour, from, to, amount) edges; payment formats cycle through formats."""
     rows = [dict(alert_key=key, tx_id=index + 1, occurred_at=datetime(2023, 8, 1, hour, tzinfo=timezone.utc),
-                 from_account_id=source, to_account_id=target, amount_usd=Decimal(amount), payment_format="ACH")
+                 from_account_id=source, to_account_id=target, amount_usd=Decimal(amount),
+                 payment_format=formats[index % len(formats)])
             for index, (hour, source, target, amount) in enumerate(edges)]
     return dict(targets=pa.table({"alert_key": pa.array([key], pa.int64())}),
                 alert_transactions=pa.Table.from_pylist(rows, schema=TRANSACTIONS))
@@ -41,6 +42,14 @@ class AlertTypeTreeTests(unittest.TestCase):
             inputs = alert(7, edges)
             self.assertEqual(predicted(inputs), [expected])
             validate_scores(calculate_inputs(inputs, "type", **VERSIONS), [7], "type", **VERSIONS)
+
+    def test_payment_format_does_not_change_the_result(self):
+        # v2 called a fan-out with mixed formats NON_PATTERN; v3 has no format feature.
+        edges = [(i, "hub", f"leaf{i}", str(500 + 1000 * i)) for i in range(8)]
+        one = calculate_inputs(alert(7, edges), "type", **VERSIONS)
+        mixed = alert(7, edges, ("Cheque", "Credit Card", "Cash"))
+        self.assertEqual(predicted(mixed), ["FAN-OUT"])
+        self.assertTrue(one.equals(calculate_inputs(mixed, "type", **VERSIONS)))
 
     def test_result_follows_alert_keys_not_file_order(self):
         inputs = build_alerts([3, 1, 2])

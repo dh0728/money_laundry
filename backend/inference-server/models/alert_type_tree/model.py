@@ -1,4 +1,4 @@
-"""Alert type decision tree v2: each Alert's core transactions -> probabilities of the 9 types.
+"""Alert type decision tree v3: each Alert's core transactions -> probabilities of the 9 types.
 
 Runs in the inference server's model child process; no DB access and no ledger copy. The request
 carries the Alerts to classify (targets: alert_key) and the core transactions of each Alert
@@ -29,7 +29,7 @@ EPOCH, MICROSECOND = datetime(1970, 1, 1, tzinfo=timezone.utc), timedelta(micros
 
 
 def load_tree():
-    tree = json.loads(asset("alert_type_tree_v2.json").read_text(encoding="utf-8"))
+    tree = json.loads(asset("alert_type_tree_v3.json").read_text(encoding="utf-8"))
     if tuple(tree["features"]) != FEATURES or tuple(tree["classes"]) != CLASSES:
         raise ProtocolError("alert_type_tree features or classes differ from the package")
     return tree["nodes"]
