@@ -7,6 +7,7 @@ while their runs can still resume.
 from common.worker_transport import ProtocolError
 from models.binary_v10 import model as binary_v10_model, spec as binary_v10_spec
 from models.demo_random import model as demo_model, spec as demo_spec
+from models.salt_r import model as salt_r_model, spec as salt_r_spec
 
 
 class ModelPackage:
@@ -15,7 +16,8 @@ class ModelPackage:
 
 
 MODELS = (ModelPackage("demo_random", demo_spec, demo_model),
-          ModelPackage("binary_v10", binary_v10_spec, binary_v10_model))
+          ModelPackage("binary_v10", binary_v10_spec, binary_v10_model),
+          ModelPackage("salt_r", salt_r_spec, salt_r_model))
 
 
 def find(model_version, feature_version):

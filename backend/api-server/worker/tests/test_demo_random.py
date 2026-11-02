@@ -16,10 +16,11 @@ class DemoInputTests(unittest.TestCase):
         from types import SimpleNamespace
         from unittest.mock import Mock
         from features.prepare_features import versions_for_run
+        from models.salt_r import spec as salt_r_spec
         connection = Mock()
         connection.execute.return_value.fetchall.return_value = []
         self.assertEqual(versions_for_run(connection, SimpleNamespace(run_id='run')),
-                         {'BINARY': ('gnn-binary-v10', 'materials-v1'), 'TYPE': (MODEL_VERSION, FEATURE_VERSION)})
+                         {'BINARY': ('gnn-binary-v10', 'materials-v1'), 'TYPE': (salt_r_spec.MODEL_VERSION, salt_r_spec.FEATURE_VERSION)})
         self.assertEqual(connection.execute.call_count, 1)
         self.assertNotIn('demo_report_hints', connection.execute.call_args.args[0])
         connection.execute.return_value.fetchall.return_value = [
