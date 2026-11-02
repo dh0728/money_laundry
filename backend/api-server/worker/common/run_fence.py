@@ -1,8 +1,5 @@
-"""Run-ownership fence and stage checkpoint shared by the INFERENCE, SCORES, ALERTS and ALERT_TYPES stages."""
+"""Run-ownership fence and stage checkpoint shared by the INFERENCE, SCORES and ALERTS stages."""
 from common.frozen_input import StaleExecution
-
-# The stage that sends each model kind to the inference server and collects its result.
-MODEL_STAGES = {'BINARY': 'INFERENCE', 'TYPE': 'ALERT_TYPES'}
 
 
 def lock_stage(connection, execution, stage='INFERENCE'):

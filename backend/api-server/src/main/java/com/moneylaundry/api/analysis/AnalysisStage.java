@@ -9,7 +9,6 @@ public enum AnalysisStage {
   INFERENCE,
   SCORES,
   ALERTS,
-  ALERT_TYPES,
   COMPLETE;
 
   public AnalysisStage next() {

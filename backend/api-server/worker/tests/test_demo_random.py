@@ -1,5 +1,6 @@
 import unittest
 
+from models.demo_random.spec import FEATURE_VERSION, MODEL_VERSION
 from models.demo_random.build_input import build_targets
 from common.worker_transport import ProtocolError
 
@@ -18,11 +19,12 @@ class DemoInputTests(unittest.TestCase):
         connection = Mock()
         connection.execute.return_value.fetchall.return_value = []
         self.assertEqual(versions_for_run(connection, SimpleNamespace(run_id='run')),
-                         {'BINARY': ('gnn-binary-v10', 'materials-v1')})
+                         {'BINARY': ('gnn-binary-v10', 'materials-v1'), 'TYPE': (MODEL_VERSION, FEATURE_VERSION)})
         self.assertEqual(connection.execute.call_count, 1)
         self.assertNotIn('demo_report_hints', connection.execute.call_args.args[0])
         connection.execute.return_value.fetchall.return_value = [
-            ('BINARY', {'model_version': 'demo-labels-v2', 'feature_version': 'demo-label-input-v1'})]
+            ('BINARY', {'model_version': 'demo-labels-v2', 'feature_version': 'demo-label-input-v1'}),
+            ('TYPE', {'model_version': 'demo-labels-v2', 'feature_version': 'demo-label-input-v1'})]
         with self.assertRaises(ProtocolError):
             versions_for_run(connection, SimpleNamespace(run_id='run'))
 
