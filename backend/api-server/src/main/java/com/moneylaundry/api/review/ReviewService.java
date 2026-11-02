@@ -110,7 +110,7 @@ public class ReviewService {
           new ArrayList<>(List.of(Map.of("alertId", alertId, "version", d.get("version")))));
       members.add(m);
     }
-    String sourceType = CaseSummary.typeName(d.get("typeClass"));
+    String sourceType = CaseSummary.summarize(members).get("primaryType").toString();
     for (var m : members)
       m.put(
           "sources",
@@ -320,7 +320,6 @@ public class ReviewService {
         for (var source : rows(m.get("sources")))
           if (source.get("primaryType") != null) types.add(source.get("primaryType").toString());
     out.put("primaryTypes", types);
-    summary.put("primaryType", CaseSummary.primaryType(types));
     if (includeHistory) {
       var accountIds = new TreeSet<String>();
       for (var member : members) {
