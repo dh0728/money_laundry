@@ -124,8 +124,9 @@ class WorkerPipelineTests {
           .containsExactly("PUBLISH", "PUBLISH");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis.features where run_id=? and model_kind='TYPE' and features->>'demo_value'=(tx_id%100)::text",
-                  Integer.class, run))
+                  "select count(*) from analysis.features where run_id=? and model_kind='TYPE' and feature_version='ledger-history-v1'",
+                  Integer.class,
+                  run))
           .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
