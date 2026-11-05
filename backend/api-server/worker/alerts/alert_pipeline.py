@@ -16,6 +16,7 @@ from psycopg.rows import dict_row
 from alerts.alert_scope import INPUT_ROWS, WINDOW_SCORES, Scope
 from alerts.block_graph import BlockPolicy, build_block_graphs
 from alerts.flow_graph import EdgeTable, FlowIndex, FlowGraph, Witness, GraphBudgetExceeded
+from alerts.seed_promotion import promote
 from common.run_fence import lock_stage, save_checkpoint
 from common.worker_transport import ProtocolError
 
@@ -302,6 +303,25 @@ def _member_digest(evidence):
     return _digest_of(body)
 
 
+def _promote_seeds(connection, execution, edges, decisions, positive, times):
+    """Add the seeds alerts/seed_promotion.py promotes (when the bound binary model defines its values)."""
+    from features.prepare_features import versions_for_run
+    from models import registry
+    spec = registry.require(*versions_for_run(connection, execution)['BINARY']).spec
+    low, floor = getattr(spec, 'ALERT_SEED_LOW', None), getattr(spec, 'ALERT_CHAIN_FLOOR', None)
+    if low is None or floor is None or not positive:
+        return 0
+    probability = {key: decision[0] for key, decision in decisions.items()}
+    positions = promote(edges, probability, positive, low, floor)
+    for i in positions:
+        key = edges.tx_ids[i]
+        occurred = EPOCH + timedelta(microseconds=edges.occurred_us[i])
+        positive[key] = dict(txId=key, occurredAt=occurred.isoformat(),
+                             score=decisions[key][0], threshold=float(decisions[key][1]))
+        times[key] = occurred
+    return len(positions)
+
+
 def run(connection, execution, context):
     """Stage entry: ⑧ Alert 구성 (ALERTS)."""
     save_alerts(connection, execution)
@@ -361,13 +381,17 @@ def save_alerts(connection, execution):
     if targets != current:
         raise ProtocolError('Every frozen TARGET requires current-run scores')
     scores = _Scores(connection, execution.run_id, frozenset(decisions))
-    del current, decisions, targets
+    del current, targets
     days = {day.isoformat(): dict(complete=complete, expectedBanks=expected, completeBanks=received, reports=reports)
             for day, expected, received, complete, reports in connection.execute(
                 "SELECT business_date,expected_banks,complete_banks,complete,reports FROM analysis.input_coverage"
                 " WHERE run_id=%s AND business_date>=(%s::timestamptz AT TIME ZONE 'Asia/Seoul')::date",
                 (execution.run_id, scope.start)).fetchall()}
     timings['inputRead'] = (perf_counter() - started) * 1000
+    promotion_started = perf_counter()
+    promoted = _promote_seeds(connection, execution, edges.edges, decisions, positive, times)
+    del decisions
+    timings['seedPromotion'] = (perf_counter() - promotion_started) * 1000
     candidate_started = perf_counter()
     if positive and not days:
         raise ProtocolError('Frozen coverage is required')
@@ -419,7 +443,7 @@ def save_alerts(connection, execution):
                  inputWindowStart=scope.start.isoformat(), seedRangeStart=scope.seed_start.isoformat(),
                  pinnedAlertCount=len(pinned_ids), plannedAlertCount=len(planned),
                  policyDigest=batch.policy_digest, graphCount=len(batch.graphs),
-                 unassignedSeedCount=len(batch.unassigned),
+                 unassignedSeedCount=len(batch.unassigned), promotedSeedCount=promoted,
                  frozenLegacyCount=sum(1 for group in seed_groups if group[4]),
                  duplicateOwnedSeedCount=duplicates,
                  unassignedReasons=dict(Counter(item.reason for item in batch.unassigned)),

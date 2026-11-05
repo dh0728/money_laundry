@@ -169,7 +169,7 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 
 통합 거래와 거래별 이진 점수 → 제한된 흐름 그래프 구성 → 기존 사건 대응 계획 → Spring 완료 트랜잭션에서 공개한다. worker는 review를 읽기만 하고 analysis.alert_plans에 canonical JSON 계획을 쓴다. Spring은 실행 토큰·입력 유효성·사건 개정·계획 digest를 확인한 뒤 공개 버전·현재 범위·요약·계보·이력·알림을 한 번에 반영한다. 별도 업무 ‘후보’ 상태는 없다.
 
-- 씨앗은 해당 점수 실행의 임계 이상 거래다. 과거 미소속 씨앗도 검토하며 TARGET0이어도 고정 과거 점수/사건이 있으면 재추론 없이 검토한다.
+- 씨앗은 해당 점수 실행의 임계 이상 거래와, 묶기 전에 그 씨앗에서 보강한 거래(이중 임계값·금액 비율 연결, worker README의 Alert 구성 참조)다. 보강한 씨앗은 임계 미만이라 `isSuspicious`가 false다. 과거 미소속 씨앗도 검토하며 TARGET0이어도 고정 과거 점수/사건이 있으면 재추론 없이 검토한다.
 - 생성 정책은 block-pin-3이다(block-pin-2의 시간 상한만 늘림. 간격 7일·기간 14일은 실데이터 연구 범위를 덮는 넉넉한 상한이며, 합성 패턴에 맞춘 값이 아니다). 씨앗 사이의 구조 관계(witness)로 Alert 핵심을 만든다. witness는 PASS(한 계좌를 1:1로 통과, 금액 비0.8~1.25·지연168시간 이내), STAR_OUT/STAR_IN(한 계좌의 송금·수취 부채꼴), RELAY(입금 부채꼴 뒤 출금 부채꼴), PATH(비씨앗2홉 이내로 이어진 두 씨앗), BRIDGE(두 씨앗 계좌 사이 경유 계좌2개 이상), CLOSURE(열린 사슬이 블록 계좌로 돌아옴), SHAPE_CYCLE/SHAPE_BRIDGE(씨앗 하나가 이루는 순환·경유 모양)다. 구조 근거일 뿐 유형 판정이 아니다. 핵심 SEED/CONNECTION은 채택 witness 거래의 합집합이며 새 근거에는 CONTEXT 멤버가 없다. 관계 없는 단독 씨앗은 발행하지 않는다. block-pin-2부터 BRIDGE 묶음·비씨앗 걷기(PATH·CLOSURE)·단독 모양을 모두 블록 기간(block-pin-3 최대 336시간) 안에서만 판단하므로 한 거래가 볼 수 있는 시간은 블록 기간 안이며, 동률은 작은 거래 ID로 정한다. 정책 버전이며 DB 마이그레이션은 단일 V1을 유지한다.
 - 핵심은 과거 핵심을 포함해64건·기간336시간(14일) 이하이고, 이어지는 두 거래 간격은 168시간(7일) 이하다(정책 block-pin-3). 넘치는 연결은 별도 Alert로 두고 `BOUNDARY_CAP`/`BOUNDARY_SPAN` 링크를 남긴다. 링크(`boundaryWitnesses`, kind는 `BOUNDARY_PASS`/`BOUNDARY_SAME_FOCAL`/`BOUNDARY_OPEN_PAIR`/`BOUNDARY_CAP`/`BOUNDARY_SPAN`/`BOUNDARY_STAR_CHUNK`)는 다른 Alert와의 관계이며 소속이 아니다. 링크는 근거 지문에서 제외하고 매 실행의 현재 값으로 교체하므로 링크만 바뀌면 새 버전·알림을 만들지 않는다. 링크만으로 자동 병합하지 않는다. 활동이 많고 의심 비율이 낮은 허브 계좌는 관계 근거로 쓰지 않는다(`AMBIGUOUS_HUB`). 계산 예산 초과는 전체 실패하며 부분 공개하지 않는다.
 - 맥락은 소속 거래가 아니라 조회 조건이다. 근거의 `contextQuery`는 `{firstAt,lastAt,focalAccounts:[{bankId,accountId}]}`이며 핵심 기간±24시간과 블록의 초점 계좌(부채꼴 중심 등)다. accountId는 가명 계좌 UUID다. 맥락 거래 수는 조회 시 원장에서 계산한다(§3.3 contextCount).
@@ -399,7 +399,7 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 **검색·필터**
 - 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.
 - 사건 `query`: 최대 200자. Alert 원본 `A-{alertId}` / Episode `E-{caseId}`, 담당자 표시 이름, 대표 유형의 부분 문자열 검색. `%`, `_`는 와일드카드가 아니라 문자로 취급한다. 두 ID의 의미를 바꾸지 않는다.
-- 사건 `types`: 반복 전달하는 대표 유형 이름. `Fan-out`, `Fan-in`, `Gather-scatter`, `Scatter-gather`, `Cycle`, `Random`, `Bipartite`, `Stack`, `패턴 미특정`, `혼합`. Alert는 제외된 거래를 빼고 현재 상세와 같은 씨앗 투표 결과를 사용한다. Episode는 유효 구성의 출처 Alert 유형 중 하나가 일치하면 포함한다. `패턴 미특정`을 거래 모델의 코드 0과 동일한 판정으로 해석하지 않는다.
+- 사건 `types`: 반복 전달하는 대표 유형 이름. `Fan-out`, `Fan-in`, `Gather-scatter`, `Scatter-gather`, `Cycle`, `Random`, `Bipartite`, `Stack`, `패턴 미특정`, `혼합`. Alert는 제외된 거래를 빼고 현재 상세와 같은 씨앗 확률 곱하기 결과를 사용한다(1등이 NON_PATTERN인 씨앗 제외, 6가지 유형의 log(p+1e-6) 합이 가장 큰 유형, 값이 같으면 `혼합`). Episode는 유효 구성의 출처 Alert 유형 중 하나가 일치하면 포함한다. `패턴 미특정`을 거래 모델의 코드 0과 동일한 판정으로 해석하지 않는다.
 - `statuses=OPEN&statuses=ESCALATED`: 화면 상태의 OR 조건. 편입된 Alert는 ESCALATED, 미편입 사건은 OPEN/CLOSED다. 기존 단일 `status`와 함께 보내면 AND로 적용하므로 FE는 중복 지정하지 않는다.
 - `assignees`: 담당자 ID 반복 전달, OR. `minAgeDays`: 사건 생성 업무 시각부터 경과한 일수(0~36500). 배정 후 72시간을 세는 대시보드 카드와 기준이 다르다.
 - `risk`: `high`(0.8 이상), `medium`(0.5 이상·0.8 미만), `low`(0.5 미만). 복수는 `high,medium`처럼 쉼표로 전달하여 OR 적용한다. 필터 종류 사이는 AND다.
