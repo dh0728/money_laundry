@@ -149,6 +149,24 @@ public class UploadService {
         throw new DuplicateFileException(
             previous.getId(), previous.getFileName(), previous.getReceivedAt());
       }
+      // A retry after a lost issue response gets the same upload back, so its PUT still happens.
+      if (previous.getStatus() == UploadStatus.URL_ISSUED
+          && previous.getUrlExpiresAt().isAfter(now)
+          && previous.getFileName().equals(fileName)
+          && previous.getBusinessDate().equals(request.businessDate())
+          && previous.getSizeBytes().equals(request.sizeBytes())) {
+        UploadTarget priorTarget =
+            uploadStore.issue(
+                previous.getS3Key(), previous.getUrlExpiresAt(), request.checksumSha256());
+        log.info("업로드 URL 재발급 uploadId={} bankId={} file={}", previous.getId(), bankId, fileName);
+        return new IssueUploadResponse(
+            previous.getId(),
+            bankId,
+            priorTarget.url(),
+            priorTarget.method(),
+            previous.getUrlExpiresAt(),
+            priorTarget.headers());
+      }
       if (previous.getStatus() == UploadStatus.RECEIVED
           || previous.getStatus() == UploadStatus.RUNNING
           || (previous.getStatus() == UploadStatus.URL_ISSUED
