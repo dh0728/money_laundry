@@ -170,6 +170,48 @@ class UploadCompletionConcurrencyTests {
     verify(loader, times(1)).load(old.getId());
   }
 
+  @Test
+  void 응답을_놓친_같은_파일_재요청은_유효한_기존_업로드를_다시_내준다() {
+    Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    String hash = "f".repeat(64);
+    String checksum =
+        java.util.Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex(hash));
+    Upload issued =
+        repository.save(
+            Upload.urlIssued(
+                70,
+                "lost-response.csv",
+                hash,
+                1,
+                java.time.LocalDate.of(2022, 9, 2),
+                "uploads/lost-response",
+                now,
+                now.plusSeconds(60)));
+    when(store.issue(issued.getS3Key(), issued.getUrlExpiresAt(), checksum))
+        .thenReturn(
+            new com.moneylaundry.api.ingest.storage.UploadTarget(
+                "https://example.com/lost-response", "PUT", java.util.Map.of()));
+    var again =
+        service.issue(
+            70,
+            new IssueUploadRequest(
+                "lost-response.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 2)));
+    assertThat(again.uploadId()).isEqualTo(issued.getId());
+    assertThat(again.url()).isEqualTo("https://example.com/lost-response");
+    assertThat(again.expiresAt()).isEqualTo(issued.getUrlExpiresAt());
+    assertThat(repository.findByBankIdAndFileHashOrderByIdDesc(70, hash)).hasSize(1);
+    // Same bytes for another business date is a different submission: still in progress.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                service.issue(
+                    70,
+                    new IssueUploadRequest(
+                        "lost-response.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 3))))
+        .isInstanceOfSatisfying(
+            UploadInProgressException.class,
+            e -> assertThat(e.uploadId()).isEqualTo(issued.getId()));
+  }
+
   private String complete(long uploadId) {
     try {
       return service.complete(70, uploadId).status().name();
