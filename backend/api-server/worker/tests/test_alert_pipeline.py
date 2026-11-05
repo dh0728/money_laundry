@@ -129,6 +129,19 @@ class AlertPostgresTests(unittest.TestCase):
         artifact = json.loads(self.admin.execute("SELECT artifact FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'",(self.run,)).fetchone()[0])
         self.assertEqual(artifact['unassignedSeedCount'],2)
 
+    def test_low_score_transaction_on_a_seed_account_is_promoted(self):
+        # ids[1] scored .1 (below .7) now leaves the seed receiver b: v10's dual threshold promotes it.
+        from unittest.mock import patch
+        from models import registry
+        self.admin.execute("UPDATE analysis.input_transactions SET from_account_id=%s,occurred_at='2022-09-02 23:50+09' WHERE run_id=%s AND tx_id=%s",
+                           (self.b,self.run,self.ids[1]))
+        with patch.dict(registry.DEFAULTS, BINARY=registry.BINARY_V10):
+            save_alerts(self.admin,self.execution)
+        self.assertEqual(self.artifact()['promotedSeedCount'],1)
+        plan, = self.plans()
+        seed, = [s for s in plan['evidence']['seeds'] if s['txId']==self.ids[1]]
+        self.assertEqual((seed['score'],seed['threshold']),(.1,.7))
+
     def test_rebuild_increments_generation(self):
         save_alerts(self.admin,self.execution)
         self.admin.execute("DELETE FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'",(self.run,))
