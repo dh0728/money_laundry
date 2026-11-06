@@ -1,0 +1,168 @@
+{
+  "files": {
+    ".gitignore": {
+      "bytes": 153,
+      "sha256": "0b3170a9c84772568729b4057ad7c7081af3ce241eb7e4a93818c479c6a934fc"
+    },
+    "00_환경확인_입력캐시연결.ipynb": {
+      "bytes": 2863,
+      "sha256": "01cd9bfde87b52c62ddf5c772226ddde53f82dc3ad4ed1e2bfddaf3b8c5c43f7"
+    },
+    "01_기간그래프_실험설정.ipynb": {
+      "bytes": 3511,
+      "sha256": "01d22527f8078768c46a9a77e43a080b5f926ed49608ce4032e6f27d65dcccbf"
+    },
+    "02_FraudGT_모델별학습.ipynb": {
+      "bytes": 3034,
+      "sha256": "1bed1137af3cdfdd6f0f5840ae5dd2bd4816d0daabde594611bf5b623cd5b0e3"
+    },
+    "03_모델별_전체Val_Test_결과.ipynb": {
+      "bytes": 3544,
+      "sha256": "136d0f2313a93154a2b34ce9b15dbe1f4249d4cbcd60a21316203fa1eb6a18bd"
+    },
+    "04_합성데이터_스모크검증.ipynb": {
+      "bytes": 2082,
+      "sha256": "ee9daeb78c34a4611aeb02a5d2d79cb9875fea58998c73c7fd2122a3c2e2206c"
+    },
+    "FraudGT_구현_결과_논문비교.md": {
+      "bytes": 12901,
+      "sha256": "348cd8221cbfc255013ff87112b47bcfb984479201d07544e87666e9a3122663"
+    },
+    "README.md": {
+      "bytes": 5901,
+      "sha256": "7e2e1338f5b3ff5f7c2497226a11e975521092b8311392ae22ae2df94479eaa4"
+    },
+    "configs/shared_500.json": {
+      "bytes": 470,
+      "sha256": "0d034444de269668e1d0b59a47b391d3901d81c1e74a97e1f56176efffc0b5a3"
+    },
+    "configs/smoke.json": {
+      "bytes": 461,
+      "sha256": "36ad00f8c20bad849aea5633509621cd1a32c6df1a4075d14a0f01d68cb3df56"
+    },
+    "docs/feature_manifest.json": {
+      "bytes": 1467,
+      "sha256": "4782de6935df2117f2335bb53f5bc91ed9a174a7cd5f63990429c30c184dc6de"
+    },
+    "docs/provenance.json": {
+      "bytes": 2089,
+      "sha256": "7320a48a6995715664b056dabba1d5e82eff93b57debb1065c8d8934a771d1a3"
+    },
+    "docs/validation.json": {
+      "bytes": 3475,
+      "sha256": "9ba03aefedd9843b9265d43dbebd9e0c83430bc333b3291311d3e31e65de388d"
+    },
+    "docs/입력캐시_계약.md": {
+      "bytes": 3942,
+      "sha256": "3ab078d0d51cbb032af2d9eeb1cebf04c3a072de8c7b4db2df049137cb202e1c"
+    },
+    "fraudgt_lab/__init__.py": {
+      "bytes": 940,
+      "sha256": "cf1fbe5f9796af4c23a34ca0e64f816d62ed079abdb3f17ba92a7e18580bb009"
+    },
+    "fraudgt_lab/config.py": {
+      "bytes": 4922,
+      "sha256": "1630a91e977cc207ca030b5a9774fe019eb85ecc945a518c87f1d2e8b4abe129"
+    },
+    "fraudgt_lab/csc_index.c": {
+      "bytes": 1090,
+      "sha256": "b0b4cccd2a27c31a4feccb8b35bed29fa929bf3f1d92a93782287765d0642989"
+    },
+    "fraudgt_lab/data.py": {
+      "bytes": 5162,
+      "sha256": "e6775095a4979cd36f7416c6111b20cc87028d144e845cfc0d2f8cfca2607e68"
+    },
+    "fraudgt_lab/environment.py": {
+      "bytes": 1386,
+      "sha256": "26f794a405ce2e2821c6cfe0b89dc960e9797ceb9df5eff36ae30d02313e03be"
+    },
+    "fraudgt_lab/evaluation.py": {
+      "bytes": 8233,
+      "sha256": "fc6b024734af3d35219b7a28d46424cf027fc5fc977dcdb1f496711a5876bb8f"
+    },
+    "fraudgt_lab/inputs.py": {
+      "bytes": 1294,
+      "sha256": "8b86d4dbab3547078cbba63fbaade5216d53400d3a56a8df64467473924b4322"
+    },
+    "fraudgt_lab/metrics.py": {
+      "bytes": 3744,
+      "sha256": "9ee80ad2eb1765e4f59e4449a6fb2ae9d5f9d378b74229aff2fb30f9986cfa78"
+    },
+    "fraudgt_lab/models.py": {
+      "bytes": 9505,
+      "sha256": "8b8bf2055205a7695f9db558a7e3fbdd49153c4bcc87fab09ed02b0243709fc0"
+    },
+    "fraudgt_lab/official_loader.py": {
+      "bytes": 8647,
+      "sha256": "5595f1a5d8b77699b6faf3c7f3113accb4cb046b09334dbb47aa0f3efe72fc35"
+    },
+    "fraudgt_lab/optimization.py": {
+      "bytes": 931,
+      "sha256": "15b912d58e2b3ae94f2aa7a9ea34b27aaf84cde9a8c814efca860d51f3a5a278"
+    },
+    "fraudgt_lab/population.py": {
+      "bytes": 5473,
+      "sha256": "4fea8cf701be0a26627487a9159c68ba17dca39b3cb4671b5bb557125c533f00"
+    },
+    "fraudgt_lab/runtime.py": {
+      "bytes": 2549,
+      "sha256": "fdf0da732e6325bed8a1a6701f8f65ec7fd92c9eb0cca5818b3b5dd6a5342516"
+    },
+    "fraudgt_lab/setup_data.py": {
+      "bytes": 4223,
+      "sha256": "00bab09748b4c17c21effabe9598877c2cdff4045152ac77c44b817879bd39a0"
+    },
+    "fraudgt_lab/storage.py": {
+      "bytes": 1294,
+      "sha256": "a668009c8eaf0cae9da52e431d41129cf42f5f38daf6de2e4ccd0a3fd076e6dc"
+    },
+    "fraudgt_lab/training.py": {
+      "bytes": 15384,
+      "sha256": "8eb44b3e034720ffa440dba49e52df37de97a57e0ac4ea90d7d47fbbf2d8322f"
+    },
+    "requirements.txt": {
+      "bytes": 184,
+      "sha256": "49a42e5a80e2f79a005376b2a0a0d5543b5e11f494a58060e3e9d1a2b7bfd4b9"
+    },
+    "results/degree_all_targets.csv": {
+      "bytes": 4244,
+      "sha256": "84a2df8357f2257b4ddc4e6b5b1d4a52fe3e79c82e94c7d46af6b94f17e95564"
+    },
+    "results/full_test_summary.csv": {
+      "bytes": 731,
+      "sha256": "b15d005433d5cb298c04de10c076a70e3adb66d1558f8db73477d8476df698e5"
+    },
+    "results/full_test_summary.json": {
+      "bytes": 7455,
+      "sha256": "7adca09dacc9ad643f1a777b965cd3bd0df03e701b73c47eca8bca8c62a99a2f"
+    },
+    "results/selected_validation.csv": {
+      "bytes": 393,
+      "sha256": "49038c4200326a9c2ead62ecf8bfe1eebdf0aa9528c4b38e5e6e4d70afc1cb59"
+    },
+    "results/splits.json": {
+      "bytes": 1921,
+      "sha256": "6e904dba270a3af005fd9b5e80fe5cb5a65207475a9282368951a131f9d1cc3d"
+    },
+    "results/threshold_topk.csv": {
+      "bytes": 15066,
+      "sha256": "e89918da37e9afe0044756f19a77a2878833d2eba6f82975c77b03acf9180193"
+    },
+    "results/training_history.csv": {
+      "bytes": 491890,
+      "sha256": "69d5a659cb27702ab1bb015a1afd7420aebf064ac1a14e2fe6b251507f818f15"
+    },
+    "run.py": {
+      "bytes": 3272,
+      "sha256": "fab9e308edbbde683d57c24fab43cc7754d2f8173c3b7cf5cbd61b4f722ca3d1"
+    },
+    "tests/__init__.py": {
+      "bytes": 61,
+      "sha256": "db2bcefe862ba35d81b560a1bfa72148eb8d55bf09928dc252baa2737c6749e4"
+    },
+    "tests/smoke.py": {
+      "bytes": 6263,
+      "sha256": "b7674b2304d9b9176d95ac3b1dbb4598e1d6e746f27718e2c81daf6dbbe3019d"
+    }
+  }
+}
