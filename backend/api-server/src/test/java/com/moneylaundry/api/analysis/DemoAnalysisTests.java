@@ -192,6 +192,33 @@ class DemoAnalysisTests {
   }
 
   @Test
+  void backfill_marks_its_job_and_is_refused_once_analysis_has_begun() {
+    upload(day, "COMPLETED");
+    long backfill = service.registerDemo(day, true);
+    assertThat(
+            jdbc.queryForObject(
+                "select completion_reason from analysis.jobs where job_id=?",
+                String.class,
+                backfill))
+        .isEqualTo("BACKFILL");
+    jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", backfill);
+    upload(day.plusDays(1), "COMPLETED");
+    long analyzed = service.registerDemo(day.plusDays(1));
+    assertThat(
+            jdbc.queryForObject(
+                "select completion_reason from analysis.jobs where job_id=?",
+                String.class,
+                analyzed))
+        .isNull();
+    jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", analyzed);
+    upload(day.plusDays(2), "COMPLETED");
+    assertThatThrownBy(() -> service.registerDemo(day.plusDays(2), true))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            e -> assertThat(e.code()).isEqualTo("DEMO_BACKFILL_AFTER_ANALYSIS"));
+  }
+
+  @Test
   void failed_previous_analysis_requires_resume() {
     upload(day, "COMPLETED");
     long id = service.registerDemo(day);
@@ -221,6 +248,6 @@ class DemoAnalysisTests {
                 .getStatusCode()
                 .value())
         .isEqualTo(202);
-    verify(mocked).registerDemo(day);
+    verify(mocked).registerDemo(day, false);
   }
 }

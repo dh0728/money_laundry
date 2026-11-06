@@ -32,7 +32,12 @@ public class DemoAnalysisController {
     this.businessTime = businessTime;
   }
 
-  public record Trigger(LocalDate businessDate) {}
+  /** backfill: integrate and freeze the day as history only, without scores or Alerts. */
+  public record Trigger(LocalDate businessDate, boolean backfill) {
+    public Trigger(LocalDate businessDate) {
+      this(businessDate, false);
+    }
+  }
 
   @PostMapping("/analysis")
   public ResponseEntity<Map<String, Object>> trigger(@RequestBody Trigger input) {
@@ -45,13 +50,14 @@ public class DemoAnalysisController {
             Map.of(
                 "jobId",
                 businessTime == null
-                    ? service.registerDemo(input.businessDate())
+                    ? service.registerDemo(input.businessDate(), input.backfill())
                     : service.registerDemo(
                         input.businessDate(),
                         businessTime
                             .now()
                             .atZone(com.moneylaundry.api.common.BusinessTime.KST)
-                            .toLocalDate()),
+                            .toLocalDate(),
+                        input.backfill()),
                 "status",
                 "QUEUED"));
   }

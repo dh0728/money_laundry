@@ -478,6 +478,60 @@ class FreezeInputTests {
         run);
   }
 
+  @Autowired AnalysisService analysis;
+
+  @Test
+  void backfill_job_completes_after_freeze_and_its_transactions_stay_unscored_history() {
+    seed(3);
+    var backfilled =
+        jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
+    jdbc.update(
+        "update analysis.jobs set status='QUEUED',completion_reason='BACKFILL' where job_id=?",
+        job);
+    var runner =
+        new AnalysisRunner(
+            analysis,
+            c -> {
+              throw new AssertionError("a backfill job runs no model or Alert stage");
+            },
+            runs);
+    try {
+      runner.scan();
+    } finally {
+      runner.close();
+    }
+    var done =
+        jdbc.queryForMap(
+            "select status,current_stage,completion_reason,row_count,suspicious_tx_count,alert_count from analysis.jobs where job_id=?",
+            job);
+    assertThat(done)
+        .containsEntry("status", "COMPLETED")
+        .containsEntry("current_stage", "COMPLETE")
+        .containsEntry("completion_reason", "BACKFILL")
+        .containsEntry("row_count", 3)
+        .containsEntry("alert_count", 0);
+    assertThat(jdbc.queryForObject("select count(*) from analysis.scores", Integer.class)).isZero();
+    assertThat(jdbc.queryForObject("select count(*) from analysis.current_scores", Integer.class))
+        .isZero();
+    // The next analysis scores only new transactions and reads the backfilled ones as history.
+    addTransactions(2);
+    Instant later = cutoff.plus(Duration.ofDays(1));
+    UUID next = runs.freeze(nextJob(later), later);
+    assertThat(
+            jdbc.queryForList(
+                "select tx_id from analysis.run_inputs where run_id=? and input_role='TARGET'",
+                Long.class,
+                next))
+        .hasSize(2)
+        .doesNotContainAnyElementsOf(backfilled);
+    assertThat(
+            jdbc.queryForList(
+                "select tx_id from analysis.run_inputs where run_id=? and input_role='CONTEXT'",
+                Long.class,
+                next))
+        .containsExactlyInAnyOrderElementsOf(backfilled);
+  }
+
   @Test
   void shared_ledger_reproduces_each_runs_full_context_copy_across_days() {
     seed(6);

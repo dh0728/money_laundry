@@ -93,22 +93,34 @@ public class AnalysisService {
   }
 
   private long register(LocalDate scheduledDay) {
-    return register(scheduledDay, null);
+    return register(scheduledDay, null, false);
   }
 
   public long registerDemo(LocalDate businessDay) {
-    return registerDemo(businessDay, LocalDate.ofInstant(businessNow(), zone));
+    return registerDemo(businessDay, false);
+  }
+
+  public long registerDemo(LocalDate businessDay, boolean backfill) {
+    return registerDemo(businessDay, LocalDate.ofInstant(businessNow(), zone), backfill);
   }
 
   public long registerDemo(LocalDate businessDay, LocalDate currentBusinessDay) {
+    return registerDemo(businessDay, currentBusinessDay, false);
+  }
+
+  /**
+   * A backfill day only integrates and freezes its transactions: they become history for later
+   * analyses but are never scored or grouped into Alerts.
+   */
+  public long registerDemo(LocalDate businessDay, LocalDate currentBusinessDay, boolean backfill) {
     if (businessDay == null
         || currentBusinessDay == null
         || !businessDay.isBefore(currentBusinessDay))
       throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DEMO_DATE", "과거 거래 기준일을 선택하세요.");
-    return register(null, businessDay);
+    return register(null, businessDay, backfill);
   }
 
-  private long register(LocalDate scheduledDay, LocalDate demoBusinessDay) {
+  private long register(LocalDate scheduledDay, LocalDate demoBusinessDay, boolean backfill) {
     return tx.execute(
         status -> {
           receiptLock();
@@ -158,6 +170,17 @@ public class AnalysisService {
                 == 0)
               throw new ApiException(
                   HttpStatus.CONFLICT, "DEMO_INPUT_REQUIRED", "선택한 날짜의 파일을 먼저 전송하세요.");
+            // Backfilled transactions are never scored, so a backfill after analysis has begun
+            // would silently drop that day from analysis.
+            if (backfill
+                && jdbc.queryForObject(
+                        "select count(*) from analysis.jobs where completion_reason is distinct from 'BACKFILL'",
+                        Integer.class)
+                    > 0)
+              throw new ApiException(
+                  HttpStatus.CONFLICT,
+                  "DEMO_BACKFILL_AFTER_ANALYSIS",
+                  "분석을 시작한 뒤에는 백필할 수 없습니다. 시연 데이터를 초기화하세요.");
           }
           var existing =
               jdbc.queryForList(
@@ -172,14 +195,15 @@ public class AnalysisService {
           long id =
               jdbc.queryForObject(
                   """
-          insert into analysis.jobs(status,analysis_date,analysis_cutoff_at,current_stage,threshold_value,business_at)
-          values ('QUEUED',?,?,'WAIT_INGEST',?,?) returning job_id
+          insert into analysis.jobs(status,analysis_date,analysis_cutoff_at,current_stage,threshold_value,business_at,completion_reason)
+          values ('QUEUED',?,?,'WAIT_INGEST',?,?,?) returning job_id
           """,
                   Long.class,
                   day,
                   Timestamp.from(cutoff),
                   threshold,
-                  Timestamp.from(businessAt));
+                  Timestamp.from(businessAt),
+                  backfill ? "BACKFILL" : null);
           jdbc.update(
               "insert into analysis.receipts select ?,upload_id from ingest.uploads where received_at<=?",
               id,
