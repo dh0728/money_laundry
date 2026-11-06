@@ -1,0 +1,10 @@
+{
+  "all_passed": true,
+  "utc": "2026-11-06T07:21:59.656982+00:00",
+  "all_target_score_hashes_match": true,
+  "all_confusion_counts_match": true,
+  "all_paired_deltas_reconcile": true,
+  "frozen_model_plan_artifacts_unchanged": true,
+  "salt_still_paused": true,
+  "bootstrap_post_selection": true
+}

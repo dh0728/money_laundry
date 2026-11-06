@@ -1,0 +1,469 @@
+{
+  "version": 1,
+  "created_utc": "2026-11-06T08:19:34.322088+00:00",
+  "purpose": "Report and evidence only",
+  "files": [
+    {
+      "path": "보고서.html",
+      "source": "SAML_D_Test_최종보고서_팀공유_20261106.html",
+      "size": 145077,
+      "sha256": "ec0c863efb88e916414f9f2ee290c76cf025ee98771e7ad47e4dc8c99a0bda21",
+      "source_sha256": "c0f03b87db71720f4ba7840e1cc32b2e7c28f242001f5642d501807a9f24e686",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "보고서.md",
+      "source": "SAML_D_Test_최종보고서_팀공유_20261106.md",
+      "size": 34636,
+      "sha256": "938cfe5036b4d0a7744c2684d1ec64c47381c5bb3a07d1267647a95fcc977d22",
+      "source_sha256": "a15216e20aa73696d63194a8e812f00dce7d3ccd8ee87e416cce758b65692b76",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "metadata/01_baseline/protocol.json",
+      "source": "protocol.json",
+      "size": 4361,
+      "sha256": "c5f0e4befa414810c8df7049760f4170f779accc6ecf024b80ac0bd844c04d34",
+      "source_sha256": "c5f0e4befa414810c8df7049760f4170f779accc6ecf024b80ac0bd844c04d34",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/01_baseline/result.json",
+      "source": "result.json",
+      "size": 917,
+      "sha256": "c7c78e645b7bbe2e0c2e731fe732fea1aa72d66a8cc78ee95747da3402502353",
+      "source_sha256": "c7c78e645b7bbe2e0c2e731fe732fea1aa72d66a8cc78ee95747da3402502353",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "reports/01_최초전체평가.md",
+      "source": "결과.md",
+      "size": 6473,
+      "sha256": "d03255ee917f8e4b6a25ce794a1c1b156a261216746a4b1478606f5c3b87a929",
+      "source_sha256": "48a364fcf8ab8104abfb6c0b6509429e268526a3af0c76d6fd6da161a4eb19c0",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "results/02_missingness_controls/HI_full_test_payment_metrics.csv",
+      "source": "결측_분포진단_20261106/HI_full_test_payment_metrics.csv",
+      "size": 507,
+      "sha256": "be34c1008971d163775ba9cb1ee23830ee837fd98a56061ad47e60b5e379e105",
+      "source_sha256": "be34c1008971d163775ba9cb1ee23830ee837fd98a56061ad47e60b5e379e105",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/02_missingness_controls/HI_payment_population.csv",
+      "source": "결측_분포진단_20261106/HI_payment_population.csv",
+      "size": 804,
+      "sha256": "358f5a0422c933aee4f0d1750072b1fb80b08d4f838b521440015846925487e1",
+      "source_sha256": "358f5a0422c933aee4f0d1750072b1fb80b08d4f838b521440015846925487e1",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/02_missingness_controls/control_metrics.csv",
+      "source": "결측_분포진단_20261106/control_metrics.csv",
+      "size": 4269,
+      "sha256": "871b21e1aec06e735fa53964a41bf64bbf8d65c0044ada1c813f2a744634e94f",
+      "source_sha256": "871b21e1aec06e735fa53964a41bf64bbf8d65c0044ada1c813f2a744634e94f",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/02_missingness_controls/control_plan.json",
+      "source": "결측_분포진단_20261106/control_plan.json",
+      "size": 3357,
+      "sha256": "1db5b70bedbba7263ff30c633a331e39c568ccb42a0a3d8e85a75f6901da4c90",
+      "source_sha256": "1db5b70bedbba7263ff30c633a331e39c568ccb42a0a3d8e85a75f6901da4c90",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/02_missingness_controls/control_result.json",
+      "source": "결측_분포진단_20261106/control_result.json",
+      "size": 25844,
+      "sha256": "192e1a97e77579801d1266d19f7858757c38b4ad2e9d94cc2cade2dd0d36b227",
+      "source_sha256": "192e1a97e77579801d1266d19f7858757c38b4ad2e9d94cc2cade2dd0d36b227",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/02_missingness_controls/distribution_sampling.json",
+      "source": "결측_분포진단_20261106/distribution_sampling.json",
+      "size": 586,
+      "sha256": "51ff843f467f771cdfae3b680ff1bfae79cb157828838b8726bc5aa52496f88b",
+      "source_sha256": "51ff843f467f771cdfae3b680ff1bfae79cb157828838b8726bc5aa52496f88b",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/02_missingness_controls/feature_distribution_normal_sample.csv",
+      "source": "결측_분포진단_20261106/feature_distribution_normal_sample.csv",
+      "size": 25006,
+      "sha256": "d42e92c0881f4c77bfe7301225603aa22c16b9cd32ce3f955d662fa7fe4efe00",
+      "source_sha256": "d42e92c0881f4c77bfe7301225603aa22c16b9cd32ce3f955d662fa7fe4efe00",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/02_missingness_controls/final_verification.json",
+      "source": "결측_분포진단_20261106/final_verification.json",
+      "size": 1044,
+      "sha256": "16892e9da68b7b2054e8321237b8d3e047e439c2da512eb3978aa1b929c46bc8",
+      "source_sha256": "16892e9da68b7b2054e8321237b8d3e047e439c2da512eb3978aa1b929c46bc8",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/02_missingness_controls/missingness_inventory.json",
+      "source": "결측_분포진단_20261106/missingness_inventory.json",
+      "size": 529,
+      "sha256": "1a95f912afb48b89235f76cd039dc795cdd4b03989eff2deb1218acf92f60695",
+      "source_sha256": "1a95f912afb48b89235f76cd039dc795cdd4b03989eff2deb1218acf92f60695",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/02_missingness_controls/normal_pattern_fp_contribution.csv",
+      "source": "결측_분포진단_20261106/normal_pattern_fp_contribution.csv",
+      "size": 838,
+      "sha256": "06fe708d6cf9a0b0f1cc8631cb86defdcb27bfbd0211598d094c0cb876bab886",
+      "source_sha256": "06fe708d6cf9a0b0f1cc8631cb86defdcb27bfbd0211598d094c0cb876bab886",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "figures/02_missingness_controls/paired_missing_controls.png",
+      "source": "결측_분포진단_20261106/paired_missing_controls.png",
+      "size": 140014,
+      "sha256": "3bcb65615804a061b234b5ac9a7243c7bb286342f438f32fdb2fc2a582599d3f",
+      "source_sha256": "3bcb65615804a061b234b5ac9a7243c7bb286342f438f32fdb2fc2a582599d3f",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "figures/02_missingness_controls/saml_error_groups.png",
+      "source": "결측_분포진단_20261106/saml_error_groups.png",
+      "size": 112480,
+      "sha256": "d6384e60df86c9f7323d6aa459418a8a792597da0e027cfbe42cf20960ba9225",
+      "source_sha256": "d6384e60df86c9f7323d6aa459418a8a792597da0e027cfbe42cf20960ba9225",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/02_missingness_controls/saml_group_metrics.csv",
+      "source": "결측_분포진단_20261106/saml_group_metrics.csv",
+      "size": 6973,
+      "sha256": "3df2f1e32d0b2f77d0d43461516c88d774bbc29c38f17bf5deb8a94d770b01b7",
+      "source_sha256": "3df2f1e32d0b2f77d0d43461516c88d774bbc29c38f17bf5deb8a94d770b01b7",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "reports/03_결측분포진단.md",
+      "source": "결측_분포진단_20261106/분석결과.md",
+      "size": 13076,
+      "sha256": "0d17808eba1133d2cdff6a9416f5342bc2eccb45c591a14119a0a3b19a243366",
+      "source_sha256": "9c51ff48e17a9e0575da0f3935e7eaa4db3415f4a432db43bc99c1988763b563",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "figures/03_global_median/comparison.png",
+      "source": "대체값_비교_20261106/comparison.png",
+      "size": 115611,
+      "sha256": "68eba1ed20a47f45806ce6e517e453d028caadf6ae04526e52ebb2408810ff48",
+      "source_sha256": "68eba1ed20a47f45806ce6e517e453d028caadf6ae04526e52ebb2408810ff48",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/03_global_median/final_verification.json",
+      "source": "대체값_비교_20261106/final_verification.json",
+      "size": 417,
+      "sha256": "2360b7e98c35acc55db0711cb0f2d84cb84f89cec1bf5024265be9a7aaaac090",
+      "source_sha256": "2360b7e98c35acc55db0711cb0f2d84cb84f89cec1bf5024265be9a7aaaac090",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/03_global_median/pattern_comparison.csv",
+      "source": "대체값_비교_20261106/pattern_comparison.csv",
+      "size": 1958,
+      "sha256": "1478650bee4d5ea0dd120fe9fe1a4087b706d14608ad81f08b0e3296477cb259",
+      "source_sha256": "1478650bee4d5ea0dd120fe9fe1a4087b706d14608ad81f08b0e3296477cb259",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/03_global_median/plan.json",
+      "source": "대체값_비교_20261106/plan.json",
+      "size": 2274,
+      "sha256": "c3aac7d1721c478c5922259c5fcd1f7103e9a6ca986fef8741448daa3de13245",
+      "source_sha256": "c3aac7d1721c478c5922259c5fcd1f7103e9a6ca986fef8741448daa3de13245",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/03_global_median/result.json",
+      "source": "대체값_비교_20261106/result.json",
+      "size": 1463,
+      "sha256": "cac0d6c36f193875ba581c5424b5d24663260ee925d6553925927f2062f1e76e",
+      "source_sha256": "cac0d6c36f193875ba581c5424b5d24663260ee925d6553925927f2062f1e76e",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/03_global_median/selection.json",
+      "source": "대체값_비교_20261106/selection.json",
+      "size": 1939,
+      "sha256": "88cff90889e8bdc8e77b2bf4af982b4a2a505cc15f095ee78619f2bc97f08714",
+      "source_sha256": "88cff90889e8bdc8e77b2bf4af982b4a2a505cc15f095ee78619f2bc97f08714",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/03_global_median/validation_metrics.csv",
+      "source": "대체값_비교_20261106/validation_metrics.csv",
+      "size": 597,
+      "sha256": "92d5aa7ed76ea497339389645be5dada2efdbf94d0a31cc4e344a612665ea60c",
+      "source_sha256": "92d5aa7ed76ea497339389645be5dada2efdbf94d0a31cc4e344a612665ea60c",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "reports/04_전체중앙값대체.md",
+      "source": "대체값_비교_20261106/결과.md",
+      "size": 6415,
+      "sha256": "b23b6c6f2491d25ba45eba02d4ba43a163fb3a2d1db6ef9e7694989efffd8e49",
+      "source_sha256": "0db78c92e77ec309a7c523bbd4035237711d30451c0a4162f58166113b1b057c",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "figures/04_additional_imputation/comparison.png",
+      "source": "대체값_추가실험_20261106/comparison.png",
+      "size": 72546,
+      "sha256": "1490425967d6fe7c7bfb40bb78af9ca42404a9bc9b5f993c608ba66178fb00e3",
+      "source_sha256": "1490425967d6fe7c7bfb40bb78af9ca42404a9bc9b5f993c608ba66178fb00e3",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/04_additional_imputation/final_verification.json",
+      "source": "대체값_추가실험_20261106/final_verification.json",
+      "size": 465,
+      "sha256": "fad5d9f251f63cce45b6fc166d8b4b88bcd17b141eda3dd8d037c41f3ea04883",
+      "source_sha256": "fad5d9f251f63cce45b6fc166d8b4b88bcd17b141eda3dd8d037c41f3ea04883",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/04_additional_imputation/fit.json",
+      "source": "대체값_추가실험_20261106/fit.json",
+      "size": 6882,
+      "sha256": "fa0c75e54bc908484f8a25b8339c57264274c1a9d7fa67d14ecc48763520aa9d",
+      "source_sha256": "fa0c75e54bc908484f8a25b8339c57264274c1a9d7fa67d14ecc48763520aa9d",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/04_additional_imputation/independent_verification.json",
+      "source": "대체값_추가실험_20261106/independent_verification.json",
+      "size": 302,
+      "sha256": "dcdc5ffce1c7c937c5e8e4bc7bcb91a7df7f7c6ff24d557473a8a47111450a99",
+      "source_sha256": "dcdc5ffce1c7c937c5e8e4bc7bcb91a7df7f7c6ff24d557473a8a47111450a99",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/04_additional_imputation/pattern_comparison.csv",
+      "source": "대체값_추가실험_20261106/pattern_comparison.csv",
+      "size": 3425,
+      "sha256": "5d64e87da2297a88d10040cc3ed0b50a10bd249a9c9e77ec98606a3d08b8919a",
+      "source_sha256": "5d64e87da2297a88d10040cc3ed0b50a10bd249a9c9e77ec98606a3d08b8919a",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/04_additional_imputation/plan.json",
+      "source": "대체값_추가실험_20261106/plan.json",
+      "size": 3182,
+      "sha256": "75607f156c894e349fcb14092786ebad45876fcf8121243cd374c9b142cfbc24",
+      "source_sha256": "75607f156c894e349fcb14092786ebad45876fcf8121243cd374c9b142cfbc24",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/04_additional_imputation/result.json",
+      "source": "대체값_추가실험_20261106/result.json",
+      "size": 2567,
+      "sha256": "5b299fcb20fbc6cf1d7ffb952b85f8ab9ea02f16ef9cf7c69203c34a806e8ece",
+      "source_sha256": "5b299fcb20fbc6cf1d7ffb952b85f8ab9ea02f16ef9cf7c69203c34a806e8ece",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/04_additional_imputation/saml_metrics.csv",
+      "source": "대체값_추가실험_20261106/saml_metrics.csv",
+      "size": 783,
+      "sha256": "e8869e2448ecaf61eb168bc04aa57e95611c0c40a7f153a6fcc8744de42ade7a",
+      "source_sha256": "e8869e2448ecaf61eb168bc04aa57e95611c0c40a7f153a6fcc8744de42ade7a",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/04_additional_imputation/selection.json",
+      "source": "대체값_추가실험_20261106/selection.json",
+      "size": 2331,
+      "sha256": "fa567f760e9266d2cab61660efe62eaf17c95eb223ae671a6ff2f2366d94978b",
+      "source_sha256": "fa567f760e9266d2cab61660efe62eaf17c95eb223ae671a6ff2f2366d94978b",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/04_additional_imputation/target_protocol.json",
+      "source": "대체값_추가실험_20261106/target_protocol.json",
+      "size": 1366,
+      "sha256": "8a031c8b855cb68470c39cb46586076c2293af5c831ba73d7800a95426f6cfc9",
+      "source_sha256": "8a031c8b855cb68470c39cb46586076c2293af5c831ba73d7800a95426f6cfc9",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/04_additional_imputation/validation_metrics.csv",
+      "source": "대체값_추가실험_20261106/validation_metrics.csv",
+      "size": 723,
+      "sha256": "a5ad2adf37e437bed45f0968868f2adcaca05f0aeda4f7c2e6f5391117043e17",
+      "source_sha256": "a5ad2adf37e437bed45f0968868f2adcaca05f0aeda4f7c2e6f5391117043e17",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/04_additional_imputation/validation_uncertainty.json",
+      "source": "대체값_추가실험_20261106/validation_uncertainty.json",
+      "size": 1006,
+      "sha256": "fb938239ab7d6565567cdc34a9891a35d30e971d2df75d9a27168dda815b5675",
+      "source_sha256": "fb938239ab7d6565567cdc34a9891a35d30e971d2df75d9a27168dda815b5675",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "reports/06_추가결측대체실험.md",
+      "source": "대체값_추가실험_20261106/결과.md",
+      "size": 10607,
+      "sha256": "97a3e20010110d05d9b5f70cf407e3776760f2a28ebc126953cc6c001da76fe1",
+      "source_sha256": "a14487447d2e1a3d1c00a416900ffb455b55d02cb14148c2638ceab9376905e4",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "reports/05_성능하락원인상세.md",
+      "source": "성능하락_원인보고서_20261106.md",
+      "size": 44684,
+      "sha256": "8e00d2ea82d7d5ca0c8c3800546f3425e806309570ce4ea6a9b818d4ab729f7b",
+      "source_sha256": "29d952bd5713955624576b2fb09165cd2d7c1f8a23ba124b24b06762bcb6cb8c",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "metadata/05_full_input_statistics/coverage.json",
+      "source": "전체입력비교_20261106/coverage.json",
+      "size": 1018,
+      "sha256": "715344c557a2d97f4aaaadeed880fdafa45d8647241cb8a94cc4ec7c8ddd1c08",
+      "source_sha256": "715344c557a2d97f4aaaadeed880fdafa45d8647241cb8a94cc4ec7c8ddd1c08",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/05_full_input_statistics/edge_full_statistics.csv",
+      "source": "전체입력비교_20261106/edge_full_statistics.csv",
+      "size": 9809,
+      "sha256": "6feeaf99168cf2d5f2c82b47e9cf6b3df3468893e02f70c12d1f1096c0af949b",
+      "source_sha256": "6feeaf99168cf2d5f2c82b47e9cf6b3df3468893e02f70c12d1f1096c0af949b",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/05_full_input_statistics/input_manifest.json",
+      "source": "전체입력비교_20261106/input_manifest.json",
+      "size": 6093,
+      "sha256": "d26854f605e8133baebdce60e042cbd7d43cf70cbab7ed9df118c4d5e6288fd5",
+      "source_sha256": "d26854f605e8133baebdce60e042cbd7d43cf70cbab7ed9df118c4d5e6288fd5",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/05_full_input_statistics/node_account_full_statistics.csv",
+      "source": "전체입력비교_20261106/node_account_full_statistics.csv",
+      "size": 12819,
+      "sha256": "22810de6d922155c75f8edec127831380d26b553ffb8b4e45c6506f503622bf3",
+      "source_sha256": "22810de6d922155c75f8edec127831380d26b553ffb8b4e45c6506f503622bf3",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/05_full_input_statistics/node_query_full_statistics.csv",
+      "source": "전체입력비교_20261106/node_query_full_statistics.csv",
+      "size": 22403,
+      "sha256": "b57a3762967bbc190c8c63ad5edaf5cc82603605abca39a3a39753a6494d6de3",
+      "source_sha256": "b57a3762967bbc190c8c63ad5edaf5cc82603605abca39a3a39753a6494d6de3",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/05_full_input_statistics/payment_full_distribution.csv",
+      "source": "전체입력비교_20261106/payment_full_distribution.csv",
+      "size": 1668,
+      "sha256": "49f7762b142b719e0c615a3542f2a9749554cf2a47492b4c606ba900c3ab90c2",
+      "source_sha256": "49f7762b142b719e0c615a3542f2a9749554cf2a47492b4c606ba900c3ab90c2",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/05_full_input_statistics/plan.json",
+      "source": "전체입력비교_20261106/plan.json",
+      "size": 1995,
+      "sha256": "00d0ef0377f07afbe0c941cbe9832f871a70b90c46f5fe9e47b102e66a911caf",
+      "source_sha256": "00d0ef0377f07afbe0c941cbe9832f871a70b90c46f5fe9e47b102e66a911caf",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/05_full_input_statistics/verification.json",
+      "source": "전체입력비교_20261106/verification.json",
+      "size": 499,
+      "sha256": "5b4da002c95a0cff7abe17daf83720995cc53e9aaa6177f0e69fa6a56855be9c",
+      "source_sha256": "5b4da002c95a0cff7abe17daf83720995cc53e9aaa6177f0e69fa6a56855be9c",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/07_report_provenance/검증.json",
+      "source": "최종보고서_자료/검증.json",
+      "size": 2050,
+      "sha256": "b9bdafe616bad768e1ed736d83cfd5051986c7b64dbcd0394cf2efa77a4506fa",
+      "source_sha256": "b9bdafe616bad768e1ed736d83cfd5051986c7b64dbcd0394cf2efa77a4506fa",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "figures/06_pattern_detection/fraud_recall.png",
+      "source": "패턴별탐지_20261106/fraud_recall.png",
+      "size": 173062,
+      "sha256": "0d6d2a4319e9331d050a7aef8a4284a8d6fa6783b2130c6a380eca8b7bf8bbe1",
+      "source_sha256": "0d6d2a4319e9331d050a7aef8a4284a8d6fa6783b2130c6a380eca8b7bf8bbe1",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "figures/06_pattern_detection/normal_false_positive_rate.png",
+      "source": "패턴별탐지_20261106/normal_false_positive_rate.png",
+      "size": 146614,
+      "sha256": "f782829f3c0ee1e14e8d4926bc13cb2db71d264617003891ee4a9ec2b4add6b0",
+      "source_sha256": "f782829f3c0ee1e14e8d4926bc13cb2db71d264617003891ee4a9ec2b4add6b0",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/06_pattern_detection/pattern_detection.csv",
+      "source": "패턴별탐지_20261106/pattern_detection.csv",
+      "size": 3523,
+      "sha256": "83ea4a986e76b869dde2d4659d79ec34340903c1cbc18647df9abf994913500a",
+      "source_sha256": "83ea4a986e76b869dde2d4659d79ec34340903c1cbc18647df9abf994913500a",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "results/06_pattern_detection/pattern_scores.csv",
+      "source": "패턴별탐지_20261106/pattern_scores.csv",
+      "size": 8707,
+      "sha256": "17999afa7c903c37111aa83c506183acfcd38e53b08c9a796d3613b7740f23c7",
+      "source_sha256": "17999afa7c903c37111aa83c506183acfcd38e53b08c9a796d3613b7740f23c7",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "metadata/06_pattern_detection/verification.json",
+      "source": "패턴별탐지_20261106/verification.json",
+      "size": 548,
+      "sha256": "a4a950c536e9906bdc835718822eb3959a7c7d8c2059f66a83493ffd06256abb",
+      "source_sha256": "a4a950c536e9906bdc835718822eb3959a7c7d8c2059f66a83493ffd06256abb",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "reports/02_입력피처대응.md",
+      "source": "피처대응.md",
+      "size": 3713,
+      "sha256": "8fdf323170f1e409fcf90a1bf1211ae68662bcb90cefbd6a865193b9cd19d01c",
+      "source_sha256": "8fdf323170f1e409fcf90a1bf1211ae68662bcb90cefbd6a865193b9cd19d01c",
+      "treatment": "Document links rewritten; experiment results unchanged"
+    },
+    {
+      "path": "results/hi_reference/full_test_result.json",
+      "source": "../V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/result.json",
+      "size": 7552,
+      "sha256": "d26c6ca9d05a104a901a77ed62d54dcd7a9cf9391d5bb99e12ccb37cc451f002",
+      "source_sha256": "d26c6ca9d05a104a901a77ed62d54dcd7a9cf9391d5bb99e12ccb37cc451f002",
+      "treatment": "Byte-for-byte copy"
+    },
+    {
+      "path": "README.md",
+      "size": 3055,
+      "sha256": "a6f3897fc0dd879a578a1bafced9ebfc2151b8a69a30348d8169098a49c2ecf4",
+      "treatment": "Package guide"
+    }
+  ]
+}
