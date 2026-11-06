@@ -194,6 +194,25 @@ class PanelTests(unittest.TestCase):
             release.set()
             replay.close()
 
+    def test_backfill_requests_history_only_jobs_and_auto_play_skips_those_days(self):
+        control = Mock()
+        control.post.side_effect = [{'jobId': 1}, {'jobId': 2}, {'jobId': 3}]
+        control.get.return_value = {'status': 'COMPLETED'}
+        replay = Replay(control)
+        files = {'d1': [(1, Path('a'))], 'd2': [(1, Path('b'))], 'd3': [(1, Path('c'))]}
+        try:
+            replay.start(['d1', 'd2'], files, backfill=True)
+            replay.future.result(timeout=5)
+            self.assertEqual([item['result'] for item in replay.snapshot()['history']], ['백필 완료'] * 2)
+            replay.start(['d1', 'd2', 'd3'], files)
+            replay.future.result(timeout=5)
+            self.assertEqual([c.args for c in control.post.call_args_list], [
+                ('demo/analysis', {'businessDate': 'd1', 'backfill': True}),
+                ('demo/analysis', {'businessDate': 'd2', 'backfill': True}),
+                ('demo/analysis', {'businessDate': 'd3'})])
+        finally:
+            replay.close()
+
 
 if __name__ == '__main__':
     unittest.main()

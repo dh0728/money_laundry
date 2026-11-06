@@ -289,7 +289,7 @@ class Replay:
         with self.lock:
             return dict(self.state, history=list(self.state['history']))
 
-    def start(self, days, files, *, analyze=True, upload=True, interval=0):
+    def start(self, days, files, *, analyze=True, upload=True, interval=0, backfill=False):
         with self.lock:
             if self.future is not None and not self.future.done():
                 raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
@@ -299,9 +299,9 @@ class Replay:
                         doneDays=sum(day in self.completed for day in days) if analyze else 0,
                         currentDay=None, fileDone=0, fileTotal=0,
                         bankId=None, uploadId=None, jobId=None)
-            self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
+            self.future = self.pool.submit(self._run, days, files, analyze, upload, interval, backfill)
 
-    def _run(self, days, files, analyze, upload, interval):
+    def _run(self, days, files, analyze, upload, interval, backfill=False):
         stage = '날짜 준비'
         day = None
         try:
@@ -333,7 +333,9 @@ class Replay:
                     stage = '분석 시작 요청'
                     self.report(f'{day}: 분석 시작 요청')
                     if day not in self.jobs:
-                        self.jobs[day] = self.controls.post('demo/analysis', {'businessDate': day})['jobId']
+                        # A backfill day is integrated as history only: no scores, no Alerts.
+                        payload = {'businessDate': day, 'backfill': True} if backfill else {'businessDate': day}
+                        self.jobs[day] = self.controls.post('demo/analysis', payload)['jobId']
                     job = self.jobs[day]
                     self.report(f'{day}: 분석 대기', jobId=job, bankId=None, uploadId=None)
                     stage = '분석 결과 조회'
@@ -341,7 +343,8 @@ class Replay:
                     self.completed.add(day)
                 with self.lock:
                     self.state['doneDays'] += 1
-                    self.state['history'].append({'date': day, 'result': '분석 완료' if analyze else '전송·검수 완료'})
+                    result = '백필 완료' if backfill else '분석 완료' if analyze else '전송·검수 완료'
+                    self.state['history'].append({'date': day, 'result': result})
                 if self.pause.wait(interval):
                     break
             self.report('일시정지' if self.pause.is_set() else '선택한 작업 완료')
@@ -538,7 +541,7 @@ def render():
         @st.fragment(run_every='1s')
         def actions():
             running = reset_pending or (replay.future is not None and not replay.future.done())
-            cols = st.columns(3)
+            cols = st.columns(4)
             if cols[0].button('선택 날짜 전송', disabled=running or len(days) != 1):
                 replay.start(sorted(days), files, analyze=False)
                 st.rerun()
@@ -547,6 +550,10 @@ def render():
                 st.rerun()
             if cols[2].button('전송 → 분석 자동 재생', disabled=running or not days):
                 replay.start(sorted(days), files, interval=interval)
+                st.rerun()
+            if cols[3].button('전송 → 백필', disabled=running or not days,
+                              help='분석을 시작하기 전 앞 날짜에만 씁니다. 거래를 이력으로만 쌓고 점수·Alert는 만들지 않습니다.'):
+                replay.start(sorted(days), files, interval=interval, backfill=True)
                 st.rerun()
             if st.button('현재 날짜 완료 후 일시정지', disabled=not running):
                 replay.pause.set()
