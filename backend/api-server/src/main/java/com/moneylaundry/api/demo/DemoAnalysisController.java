@@ -32,10 +32,17 @@ public class DemoAnalysisController {
     this.businessTime = businessTime;
   }
 
-  /** backfill: integrate and freeze the day as history only, without scores or Alerts. */
-  public record Trigger(LocalDate businessDate, boolean backfill) {
+  /**
+   * backfill: integrate and freeze the day as history only, without scores or Alerts. Boxed so a
+   * body without it (the normal analysis request) reads as false, not as a null primitive.
+   */
+  public record Trigger(LocalDate businessDate, Boolean backfill) {
     public Trigger(LocalDate businessDate) {
       this(businessDate, false);
+    }
+
+    boolean isBackfill() {
+      return Boolean.TRUE.equals(backfill);
     }
   }
 
@@ -50,14 +57,14 @@ public class DemoAnalysisController {
             Map.of(
                 "jobId",
                 businessTime == null
-                    ? service.registerDemo(input.businessDate(), input.backfill())
+                    ? service.registerDemo(input.businessDate(), input.isBackfill())
                     : service.registerDemo(
                         input.businessDate(),
                         businessTime
                             .now()
                             .atZone(com.moneylaundry.api.common.BusinessTime.KST)
                             .toLocalDate(),
-                        input.backfill()),
+                        input.isBackfill()),
                 "status",
                 "QUEUED"));
   }
