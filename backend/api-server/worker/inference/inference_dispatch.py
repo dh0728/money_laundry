@@ -192,6 +192,44 @@ def run(connection, execution, context):
     return advance(connection, execution, context.storage_dir, context.settings, context.s3)
 
 
+def _step(connection, execution, kind, phase, status, error_code, storage_root, settings, s3, transport):
+    """Move one model task one step: prepare, publish or observe."""
+    if phase == 'PREPARE' and status in ('READY', 'RETRY_WAIT'):
+        from features.prepare_features import prepare_full_again, prepare_type
+        from common.frozen_input import StaleExecution
+        try:
+            if kind == 'TYPE':
+                # Judges only the TARGETs the collected binary result marks suspicious.
+                if prepare_type(connection, execution, storage_root, s3, settings.bucket,
+                                full=error_code == 'REPLICA_MISMATCH') is None:
+                    return  # No suspicious TARGET: done without a request.
+            else:
+                prepare_full_again(connection, execution, storage_root, kind)
+        except StaleExecution:
+            raise
+        except Exception:
+            return  # Recorded as PREPARE_FAILED; the job fails visibly and resumes from here.
+        phase, status = 'PUBLISH', 'READY'
+    try:
+        if phase == 'PUBLISH' and status in ('READY', 'ACTIVE', 'RETRY_WAIT'):
+            publish_model(connection, execution, kind, storage_root, settings, s3, transport=transport)
+        elif phase == 'WAIT_REMOTE' and status == 'WAITING':
+            observe_model(connection, execution, kind, settings, transport=transport)
+    except (httpx.HTTPError, StoreUnavailable, ProtocolError, ValueError, KeyError) as error:
+        from common.frozen_input import StaleExecution
+        if isinstance(error, StaleExecution):
+            raise
+
+        _failure(connection, execution, kind, error)
+
+
+def _tasks(connection, execution):
+    return connection.execute('''SELECT model_kind,phase,status,
+        coalesce(CASE WHEN phase='WAIT_REMOTE' THEN next_poll_at ELSE retry_at END<=now(),true),error_code
+        FROM analysis.model_tasks WHERE run_id=%s ORDER BY (phase='WAIT_REMOTE') DESC,model_kind''',
+        (execution.run_id,)).fetchall()
+
+
 def advance(connection, execution, storage_root, settings, s3, *, transport=None):
     settings.validate()
     with connection.transaction():
@@ -199,42 +237,28 @@ def advance(connection, execution, storage_root, settings, s3, *, transport=None
         connection.execute('''UPDATE analysis.model_tasks SET action_required=true,
             error_code=coalesce(error_code,'REMOTE_WAIT_EXPIRED')
             WHERE run_id=%s AND status='WAITING' AND remote_deadline_at<=now()''', (execution.run_id,))
-        rows = connection.execute('''SELECT model_kind,phase,status,
-            coalesce(CASE WHEN phase='WAIT_REMOTE' THEN next_poll_at ELSE retry_at END<=now(),true)
-            FROM analysis.model_tasks WHERE run_id=%s ORDER BY (phase='WAIT_REMOTE') DESC,model_kind''',
-            (execution.run_id,)).fetchall()
+        rows = _tasks(connection, execution)
         if {r[0] for r in rows} != {'BINARY', 'TYPE'}:
             raise ProtocolError('Both prepared model tasks are required')
-    for kind, phase, status, due in rows:
+    binary_done = any(r[0] == 'BINARY' and r[1] == 'DONE' for r in rows)
+    for kind, phase, status, due, error_code in rows:
         if not due or status in ('SUCCEEDED', 'CANCELLED'):
             continue
-        if phase == 'PREPARE' and status in ('READY', 'RETRY_WAIT'):
-            from features.prepare_features import prepare_full_again
-            from common.frozen_input import StaleExecution
-            try:
-                prepare_full_again(connection, execution, storage_root, kind)
-            except StaleExecution:
-                raise
-            except Exception:
-                continue  # Recorded as PREPARE_FAILED; the job fails visibly and resumes from here.
-            phase, status = 'PUBLISH', 'READY'
-        try:
-            if phase == 'PUBLISH' and status in ('READY', 'ACTIVE', 'RETRY_WAIT'):
-                publish_model(connection, execution, kind, storage_root, settings, s3, transport=transport)
-            elif phase == 'WAIT_REMOTE' and status == 'WAITING':
-                observe_model(connection, execution, kind, settings, transport=transport)
-        except (httpx.HTTPError, StoreUnavailable, ProtocolError, ValueError, KeyError) as error:
-            from common.frozen_input import StaleExecution
-            if isinstance(error, StaleExecution):
-                raise
-
-            _failure(connection, execution, kind, error)
+        if kind == 'TYPE' and phase == 'PREPARE' and not binary_done:
+            continue  # The type model waits for the binary result.
+        _step(connection, execution, kind, phase, status, error_code, storage_root, settings, s3, transport)
     from scores.result_collection import collect_model, finish_inference
     collections = connection.execute('''SELECT model_kind FROM analysis.model_tasks
         WHERE run_id=%s AND phase='COLLECT' AND status IN ('READY','RETRY_WAIT','ACTIVE')
           AND (retry_at IS NULL OR retry_at<=now()) ORDER BY model_kind''', (execution.run_id,)).fetchall()
     for (kind,) in collections:
         collect_model(connection, execution, kind, storage_root, settings, s3)
+    if not binary_done:
+        # The binary result collected in this tick lets the type model start now.
+        tasks = {r[0]: r for r in _tasks(connection, execution)}
+        kind, phase, status, due, error_code = tasks['TYPE']
+        if tasks['BINARY'][1] == 'DONE' and phase == 'PREPARE' and due and status in ('READY', 'RETRY_WAIT'):
+            _step(connection, execution, kind, phase, status, error_code, storage_root, settings, s3, transport)
     states = connection.execute('SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s',
                                 (execution.run_id,)).fetchall()
     if any(status in ('WAITING', 'RETRY_WAIT', 'ACTIVE') or (phase == 'PUBLISH' and status == 'READY')

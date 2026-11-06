@@ -126,7 +126,7 @@
 
 ### 2.1 실행·산출물 경계
 
-BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·상태 API는 `PUT/GET /api/v1/inference-requests/{requestId}/rounds/{round}`이며 전용 Bearer 토큰을 사용한다. 취소는 같은 경로의 `/cancellation`이다. 직원 세션 API와 구분한다.
+BINARY는 고정 TARGET 전체, TYPE은 BINARY 결과가 의심(`p_laundering>=analysis.jobs.threshold_value`, 의심 판정과 같은 값)인 TARGET만 대상으로 하는 별도 요청이다. TYPE 요청은 BINARY 결과를 수집한 뒤 만든다. 의심 TARGET이 없으면 TYPE 요청 없이 끝난다. 요청·상태 API는 `PUT/GET /api/v1/inference-requests/{requestId}/rounds/{round}`이며 전용 Bearer 토큰을 사용한다. 취소는 같은 경로의 `/cancellation`이다. 직원 세션 API와 구분한다.
 
 입력·결과는 `requests|results/{jobId}/{BINARY|TYPE}/{requestId}/` 아래에서 manifest·Parquet·결과 표식을 사용한다. 요청 ID·run·회차·모델/피처 버전, 행 수·정확한 tx_id 집합·파일 크기·SHA-256·유한 확률을 검증한다. 원격 COMPLETED만으로 분석을 공개하지 않는다. 구체적인 전송·프로세스 계약은 [worker 문서](worker/README.md), [게시](worker/inference/model_publication.py), [수집](worker/scores/result_collection.py), [추론 서버](../inference-server/README.md)를 따른다.
 
@@ -139,7 +139,7 @@ BINARY와 TYPE은 각각 고정 TARGET에 대한 별도 요청이다. 요청·�
 - isSuspicious는 해당 실행에 동결된 threshold_value 이상인지다. 원장 최신 조회는 analysis.current_scores를 사용한다. 의심 거래 API의 jobId/analysisDate는 해당 완료 분석 결과를 선택한다.
 - scorePercentile은 같은 실행에서 `100 × percent_rank(p_laundering)`. 동점은 최저 공동 순위이며 단일/전부 동점은0이다. thresholdRatio는 점수/임계값이다.
 - typeCandidates는 상위 두 확률 차이가 app.type.ambiguity-delta(기본0.10) 미만이면2개, 아니면1개다.
-- agreement는 STRONG(이진 의심·패턴 있음), ATYPICAL(이진 의심·코드0), PATTERN_ONLY(이진 정상·패턴 있음), WEAK(이진 정상·코드0). 미분석은 여기에 넣지 않는다.
+- agreement는 STRONG(이진 의심·패턴 있음), ATYPICAL(이진 의심·코드0), PATTERN_ONLY(이진 정상·패턴 있음), WEAK(이진 정상·코드0). 미분석은 여기에 넣지 않는다. 유형 모델은 의심 거래만 판정하므로 이진 정상 거래는 유형이 없어 모두 WEAK이고 PATTERN_ONLY는 0이다.
 
 ### 2.3 유형 코드
 
@@ -367,9 +367,9 @@ GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId
 | paymentFormat | string, 결제 수단 |
 | launderingScore, threshold | number 또는 null, 이진 점수·해당 분석 임계값 |
 | isSuspicious | boolean 또는 null. 미분석은 null이며 false로 바꾸지 않음 |
-| typeClass | number0~8 또는 null, 패턴 최다 확률 코드 |
+| typeClass | number0~8 또는 null, 패턴 최다 확률 코드. 유형 모델은 의심 거래만 판정하므로 미분석·이진 정상 거래는 null |
 | typeName | string, 점수 있을 때 제공. 코드0은 NON_PATTERN. 미분석에서는 키가 없을 수 있음 |
-| probabilities | 9개 원소 배열, 코드0~8 순서. 미분석은 null 원소 배열이며0점 배열이 아님 |
+| probabilities | 9개 원소 배열, 코드0~8 순서. 미분석·이진 정상 거래는 null 원소 배열이며0점 배열이 아님 |
 | judgement | SUSPICIOUS / NORMAL / UNANALYZED |
 
 최신 유효 점수는 완료된 분석/유효 run 기준이며 미완료 결과를 노출하지 않는다. 수신·통합 ACTIVE 원장의 정상·의심·미분석을 모두 조회한다.

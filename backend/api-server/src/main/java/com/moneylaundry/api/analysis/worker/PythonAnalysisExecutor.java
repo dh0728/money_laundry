@@ -153,7 +153,8 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
           and b.execution_id=? and s.execution_id=? and s.run_id=?
           and s.stage=? and s.completed and r.status in ('READY','ACTIVE')
           and (s.stage='ALERTS' or (select count(*) from analysis.model_tasks m where m.run_id=r.run_id
-               and ((s.stage='FEATURES' and m.phase='PUBLISH' and m.status='READY' and m.input_artifact is not null)
+               and ((s.stage='FEATURES' and ((m.model_kind='BINARY' and m.phase='PUBLISH' and m.status='READY' and m.input_artifact is not null)
+                 or (m.model_kind='TYPE' and m.phase='PREPARE' and m.status='READY')))
                  or (s.stage in ('INFERENCE','SCORES') and m.phase='DONE' and m.status='SUCCEEDED' and m.result_artifact is not null)))=2)
         """,
             String.class,

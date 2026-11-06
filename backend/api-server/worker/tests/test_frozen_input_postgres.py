@@ -272,10 +272,14 @@ class FrozenInputPostgresTests(unittest.TestCase):
         with patch.dict(registry.DEFAULTS, BINARY=registry.BINARY_V10), \
                 tempfile.TemporaryDirectory(prefix='aml-v10-input-') as root:
             result = json.loads(prepare_features(self.admin, self.execution, root))
-            binary, kind = result['models']['BINARY'], result['models']['TYPE']
+            binary = result['models']['BINARY']
             self.assertEqual((binary['model_version'], binary['feature_version']),
                              (spec.MODEL_VERSION, spec.FEATURE_VERSION))
-            self.assertEqual(kind['model_version'], 'demo-random-v1')
+            # The type model is bound now but prepared only after the binary result (INFERENCE).
+            self.assertEqual(set(result['models']), {'BINARY'})
+            self.assertEqual(self.admin.execute("""SELECT phase,status,binding->>'model_version',input_artifact
+                FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'""", (self.run,)).fetchone(),
+                ('PREPARE', 'READY', 'demo-random-v1', None))
             table = pq.read_table(Path(root) / input_path(binary))
             self.assertEqual(table.column_names, ['tx_id'])
             self.assertEqual(table['tx_id'].to_pylist(), sorted(self.ids))
@@ -305,7 +309,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                                        (self.run,)).fetchone()[0]
             artifact = json.loads(saved)
             self.assertEqual(artifact["protocol_version"], 2)
-            self.assertEqual(set(artifact["models"]), {"BINARY", "TYPE"})
+            self.assertEqual(set(artifact["models"]), {"BINARY"})  # TYPE waits for the binary result
             for kind, model in artifact["models"].items():
                 self.assertEqual(model["model_kind"], kind)
                 self.assertEqual(model["row_count"], 3)
@@ -319,12 +323,12 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 self.assertEqual(accounts.schema, materials.ACCOUNTS)
                 self.assertEqual(accounts.num_rows, 8)
             self.assertEqual(self.admin.execute(
-                "SELECT count(*) FROM analysis.features WHERE run_id=%s", (self.run,)).fetchone()[0], 6)
+                "SELECT count(*) FROM analysis.features WHERE run_id=%s", (self.run,)).fetchone()[0], 3)
             new_token = uuid4()
             self.admin.execute("UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s", (new_token, self.job))
             retry = prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
             self.assertEqual(retry, saved)
-            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 6)
+            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 3)
             self.assertEqual(list(Path(root).rglob("*.partial")), [])
 
     def test_cancel_before_checkpoint_does_not_complete_stage(self):
@@ -374,7 +378,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
             prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
             self.assertEqual(self.admin.execute(
                 "SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND phase='PUBLISH' AND status='READY'",
-                (self.run,)).fetchone()[0], 2)
+                (self.run,)).fetchone()[0], 1)
 
     def test_checkpoint_with_changed_file_cannot_be_reused(self):
         with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
@@ -383,9 +387,20 @@ class FrozenInputPostgresTests(unittest.TestCase):
             with self.assertRaisesRegex(ProtocolError, "changed"):
                 prepare_features(self.admin, self.execution, root)
 
+    def prepare_type_for_every_target(self, root):
+        """The type input as if every TARGET were suspicious, prepared before INFERENCE.
+
+        Lets the publication and collection tests drive both models at once; the
+        type model's wait for the binary result has its own tests.
+        """
+        from features import prepare_features as pipeline
+        versions = pipeline.versions_for_run(self.admin, self.execution)['TYPE']
+        return pipeline._prepare_model(self.admin, self.execution, Path(root).resolve(), 'TYPE', versions)
+
     def publication_setup(self, root):
         from inference.model_publication import Settings
         prepare_features(self.admin, self.execution, root)
+        self.prepare_type_for_every_target(root)
         self.admin.execute("UPDATE analysis.jobs SET current_stage='INFERENCE' WHERE job_id=%s", (self.job,))
         return Settings('https://inference.example', 'x' * 32, 'test-bucket', 'dev/test/', 'ap-northeast-2'), MemoryS3()
 
@@ -530,7 +545,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 key = 'dev/test/' + logical.output + 'scores.parquet'
                 s3.objects[key] = stream.getvalue()
                 response['result'] = dict(logical.identity(), **logical.versions(), status='COMPLETED',
-                    row_count=len(self.ids), files=[descriptor('scores', key, stream.getvalue())])
+                    row_count=targets.num_rows, files=[descriptor('scores', key, stream.getvalue())])
             elif status == 'FAILED':
                 response['error_code'] = error[0] if error else 'GPU_OUT_OF_MEMORY'
             return httpx.Response(202 if req.method == 'PUT' else 200, json=response)
@@ -848,6 +863,91 @@ class FrozenInputPostgresTests(unittest.TestCase):
 
     def scoring_stage(self):
         self.admin.execute("UPDATE analysis.jobs SET current_stage='SCORES',threshold_value=0.5 WHERE job_id=%s", (self.job,))
+
+    def binary_only_setup(self, root):
+        from inference.model_publication import Settings
+        prepare_features(self.admin, self.execution, root)
+        self.admin.execute("UPDATE analysis.jobs SET current_stage='INFERENCE' WHERE job_id=%s", (self.job,))
+        return Settings('https://inference.example', 'x' * 32, 'test-bucket', 'dev/test/', 'ap-northeast-2'), MemoryS3()
+
+    def test_type_model_waits_for_binary_and_judges_only_suspicious_targets(self):
+        from inference.inference_dispatch import advance
+        from scores.result_collection import save_scores
+        type_task = "SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'"
+        # threshold_value .7 is the job's suspicious threshold; a score equal to it is suspicious.
+        self.score_values = [.2, .7, .9]
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.binary_only_setup(root)
+            remote, states = self.inference_remote(s3)
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual([b['model_kind'] for b in self.put_bodies], ['BINARY'])
+            self.assertEqual(self.admin.execute(type_task, (self.run,)).fetchone(), ('PREPARE', 'READY'))
+            # Collecting the binary result starts the type model in the same tick.
+            states['BINARY'] = ('COMPLETED', 2)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual(self.admin.execute(type_task, (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING'))
+            body = self.put_bodies[-1]
+            self.assertEqual(body['model_kind'], 'TYPE')
+            key = next(k for k in s3.objects if body['request_id'] in k and k.endswith('targets.parquet'))
+            suspicious = sorted(self.ids)[1:]
+            self.assertEqual(pq.read_table(io.BytesIO(s3.objects[key])).column('tx_id').to_pylist(), suspicious)
+            self.assertEqual([r[0] for r in self.admin.execute("""SELECT tx_id FROM analysis.features
+                WHERE run_id=%s AND model_kind='TYPE' ORDER BY tx_id""", (self.run,))], suspicious)
+            states['TYPE'] = ('COMPLETED', 2)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+            self.admin.execute("UPDATE analysis.jobs SET current_stage='SCORES' WHERE job_id=%s", (self.job,))
+            save_scores(self.admin, self.execution, root, settings, s3)
+            rows = self.admin.execute("""SELECT tx_id,type_class IS NOT NULL,p_0 IS NOT NULL FROM analysis.scores
+                WHERE run_id=%s ORDER BY tx_id""", (self.run,)).fetchall()
+            self.assertEqual(rows, [(tx, tx in suspicious, tx in suspicious) for tx in sorted(self.ids)])
+            self.assertEqual(self.admin.execute('SELECT suspicious_tx_count FROM analysis.jobs WHERE job_id=%s',
+                                                (self.job,)).fetchone()[0], 2)
+
+    def test_type_preparation_failure_fails_visibly_and_resume_retries_it(self):
+        from inference.inference_dispatch import advance
+        type_task = "SELECT phase,status,error_code FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'"
+        self.score_values = [.9, .9, .9]
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.binary_only_setup(root)
+            remote, states = self.inference_remote(s3)
+            advance(self.admin, self.execution, root, settings, s3, transport=remote)
+            states['BINARY'] = ('COMPLETED', 2)
+            self.make_observations_due()
+            with patch('features.prepare_features._suspicious_ids', side_effect=OSError('binary result unreadable')):
+                self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 77)
+            self.assertEqual(self.admin.execute(type_task, (self.run,)).fetchone(), ('PREPARE', 'FAILED', 'PREPARE_FAILED'))
+            self.assertEqual(self.admin.execute("SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'",
+                                                (self.run,)).fetchone(), ('DONE', 'SUCCEEDED'))
+            # The state Spring's resume leaves (AnalysisService.resume): the failed preparation is READY again.
+            self.admin.execute("""UPDATE analysis.model_tasks SET status='READY',error_code=null,action_required=false
+                WHERE run_id=%s AND phase='PREPARE' AND status='FAILED'""", (self.run,))
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 76)
+            self.assertEqual(self.admin.execute(type_task, (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING', None))
+            self.assertEqual([b['model_kind'] for b in self.put_bodies], ['BINARY', 'TYPE'])
+
+    def test_no_suspicious_target_completes_type_model_without_a_request(self):
+        from features.prepare_features import EMPTY_RESULT
+        from inference.inference_dispatch import advance
+        from scores.result_collection import save_scores
+        self.score_values = [.1, .2, .3]
+        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
+            settings, s3 = self.binary_only_setup(root)
+            remote, states = self.inference_remote(s3)
+            advance(self.admin, self.execution, root, settings, s3, transport=remote)
+            states['BINARY'] = ('COMPLETED', 2)
+            self.make_observations_due()
+            self.assertEqual(advance(self.admin, self.execution, root, settings, s3, transport=remote), 0)
+            self.assertEqual([b['model_kind'] for b in self.put_bodies], ['BINARY'])
+            self.assertEqual(self.admin.execute("""SELECT phase,status,request_id,result_artifact FROM analysis.model_tasks
+                WHERE run_id=%s AND model_kind='TYPE'""", (self.run,)).fetchone(), ('DONE', 'SUCCEEDED', None, EMPTY_RESULT))
+            self.admin.execute("UPDATE analysis.jobs SET current_stage='SCORES' WHERE job_id=%s", (self.job,))
+            save_scores(self.admin, self.execution, root, settings, s3)
+            self.assertEqual(self.admin.execute("""SELECT count(*),count(type_class) FROM analysis.scores
+                WHERE run_id=%s""", (self.run,)).fetchone(), (3, 0))
+            self.assertEqual(self.admin.execute('SELECT model_version_type FROM analysis.jobs WHERE job_id=%s',
+                                                (self.job,)).fetchone()[0], 'demo-random-v1')
 
     def test_random_pipeline_collects_scores_and_prepares_alerts_without_publication(self):
         from scores.result_collection import save_scores
