@@ -28,6 +28,7 @@
 - 모델을 바꿀 때는 등록표와 추론 서버 모델 폴더만 바꾼다. 요청·재료·결과 전달과 검증 구조는 유지한다.
 
 연결 범위는 입력 준비 → S3 게시 → 추론 API → 결과 수집/검증 → 점수 DB 저장이다.
+유형 모델은 이진 결과가 의심(`p_laundering>=analysis.jobs.threshold_value`, 의심 판정과 같은 값)인 TARGET만 판정한다. 그래서 FEATURES는 이진 입력만 만들고, 유형 입력은 INFERENCE에서 이진 결과를 수집한 뒤 만든다(`features/prepare_features.py` `prepare_type`). 의심 TARGET이 없으면 유형 요청 없이 끝나고, 이진 정상 거래의 `analysis.scores` 유형 열은 비어 있다.
 Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다. 점수 저장 다음 ALERTS에서
 구조 관계 기반 블록 근거를 저장한 뒤 `COMPLETE / COMPLETED`로 종료한다. 현재 모델은 demo이며
 실제 GNN의 탐지 성능을 검증한 것은 아니다.

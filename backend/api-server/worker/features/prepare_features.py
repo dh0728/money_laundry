@@ -4,6 +4,11 @@ Each model kind is bound to a model package (models/registry.py) when a run star
 the package's build_input writes the targets file. Every model input also carries the
 same model-independent materials (features/materials.py), so the files sent to the
 inference server do not change when a model or its features change.
+
+The binary model judges every frozen TARGET and is prepared here (FEATURES). The type
+model judges only the TARGETs the binary model marked suspicious (p_laundering at or
+above the job's threshold_value, the same value every suspicious count uses), so it is
+prepared during INFERENCE once the binary result is collected (prepare_type).
 """
 import hashlib
 import json
@@ -171,6 +176,20 @@ def _record_failure(connection, execution, kind, token, stage="FEATURES"):
         pass
 
 
+def _record_unclaimed_failure(connection, execution, kind, stage="INFERENCE"):
+    """A failure before the task was claimed (reading the binary result): fail it visibly."""
+    try:
+        with connection.transaction():
+            _lock(connection, execution, stage)
+            connection.execute("""
+                UPDATE analysis.model_tasks SET status='FAILED',error_code='PREPARE_FAILED',updated_at=now(),
+                  consecutive_failures=consecutive_failures+1
+                WHERE run_id=%s AND model_kind=%s AND phase='PREPARE' AND status IN ('READY','RETRY_WAIT')
+                """, (execution.run_id, kind))
+    except Exception:
+        pass  # Preserve the original failure, as _record_failure does.
+
+
 def _stage_features(connection, path):
     # Stage bounded batches on this connection without holding application row locks.
     connection.execute("""CREATE TEMP TABLE IF NOT EXISTS prepared_features(
@@ -203,8 +222,8 @@ def _save_prepared(connection, execution, kind, token, document, stage="FEATURES
             """, (execution.run_id, kind, document["feature_version"]))
 
 
-def _prepare_model(connection, execution, root, kind, versions, *, stage="FEATURES", full=False):
-    source = FrozenInput(connection, execution, stage=stage)
+def _prepare_model(connection, execution, root, kind, versions, *, stage="FEATURES", full=False, source=None):
+    source = source or FrozenInput(connection, execution, stage=stage)
     source.check_current()
     artifact = _existing(connection, execution, root, kind, versions)
     if artifact is None:
@@ -242,6 +261,72 @@ def _prepare_model(connection, execution, root, kind, versions, *, stage="FEATUR
     return artifact
 
 
+class _SuspiciousTargets:
+    """The frozen input seen through the binary result: only suspicious TARGET IDs."""
+
+    def __init__(self, source, ids, batch_size=4096):
+        self._source, self._ids, self._batch_size = source, ids, batch_size
+        self.connection, self.execution = source.connection, source.execution
+
+    def target_pages(self):
+        for start in range(0, len(self._ids), self._batch_size):
+            yield self._ids[start:start + self._batch_size]
+
+    def check_current(self):
+        self._source.check_current()
+
+
+def _suspicious_ids(connection, execution, storage_root, s3, bucket):
+    """TARGET IDs whose collected binary score reaches the job's threshold_value, ascending."""
+    from scores.result_collection import load_collected
+    load_collected(connection, execution, 'BINARY', storage_root, s3, bucket, 'INFERENCE')
+    # Same comparison as the suspicious count in SCORES (p_laundering>=threshold_value).
+    return [row[0] for row in connection.execute("""
+        SELECT b.tx_id FROM collected_binary b JOIN analysis.jobs j ON j.job_id=%s
+        WHERE b.p_laundering>=j.threshold_value ORDER BY b.tx_id""", (execution.job_id,)).fetchall()]
+
+
+# Result of a type task that had no suspicious TARGET to judge.
+EMPTY_RESULT = {"status": "NO_SUSPICIOUS_TARGET", "row_count": 0}
+
+
+def _complete_without_suspicious(connection, execution, kind):
+    """No suspicious TARGET: the type model has nothing to judge, so no request is sent."""
+    with connection.transaction():
+        _lock(connection, execution, "INFERENCE")
+        changed = connection.execute("""
+            UPDATE analysis.model_tasks SET phase='DONE',status='SUCCEEDED',input_artifact=null,
+              result_artifact=%s::jsonb,execution_id=null,execution_owner=null,consecutive_failures=0,
+              error_code=null,action_required=false,retry_at=null,next_poll_at=null,
+              finished_at=now(),updated_at=now()
+            WHERE run_id=%s AND model_kind=%s AND phase='PREPARE' AND status IN ('READY','RETRY_WAIT')
+            """, (json.dumps(EMPTY_RESULT), execution.run_id, kind)).rowcount
+        if changed != 1:
+            raise StaleExecution("Model preparation is already owned or fenced")
+
+
+def prepare_type(connection, execution, storage_root, s3, bucket, *, full=False):
+    """⑥ 모델 추론 (INFERENCE): prepare the type model from the collected binary result.
+
+    Returns the input artifact, or None when no TARGET is suspicious (the task is then done
+    without a request). full=True resends the whole frozen input after REPLICA_MISMATCH.
+    """
+    versions = versions_for_run(connection, execution)["TYPE"]
+    source = FrozenInput(connection, execution, stage="INFERENCE")
+    try:
+        ids = _suspicious_ids(connection, execution, storage_root, s3, bucket)
+    except StaleExecution:
+        raise
+    except Exception:
+        _record_unclaimed_failure(connection, execution, "TYPE")
+        raise
+    if not ids:
+        _complete_without_suspicious(connection, execution, "TYPE")
+        return None
+    return _prepare_model(connection, execution, Path(storage_root).resolve(), "TYPE", versions,
+                          stage="INFERENCE", full=full, source=_SuspiciousTargets(source, ids))
+
+
 def prepare_full_again(connection, execution, storage_root, kind):
     """⑥ 모델 추론 (INFERENCE): prepare one model again with its whole frozen input.
 
@@ -259,18 +344,17 @@ def run(connection, execution, context):
 
 
 def prepare_features(connection, execution, storage_root):
-    """Persist each model's input and feature rows before inference.
+    """Persist the binary model's input and feature rows before inference.
 
-    Prepared models survive a later model failure. The existing stage runner still
-    invokes this sequentially; independent publication is a separate dispatcher step.
-    Files are retained after an uncertain commit and checked on reuse.
+    Both model tasks are created here; the type task stays in PREPARE until the binary
+    result is collected (prepare_type). Files are retained after an uncertain commit and
+    checked on reuse.
     """
     root = Path(storage_root).resolve()
     FrozenInput(connection, execution).check_current()
     versions = versions_for_run(connection, execution)
     _initialize(connection, execution, versions)
-    models = {kind: _prepare_model(connection, execution, root, kind, versions[kind])
-              for kind in MODEL_KINDS}
+    models = {"BINARY": _prepare_model(connection, execution, root, "BINARY", versions["BINARY"])}
     artifact = json.dumps(dict(protocol_version=2, run_id=str(execution.run_id), models=models),
                           sort_keys=True, separators=(",", ":"))
     with connection.transaction():

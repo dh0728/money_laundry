@@ -24,7 +24,8 @@ class ModelPackage:
 
 DEMO_RANDOM = ModelPackage(demo_random.__name__, demo_spec, demo_input)
 BINARY_V10 = ModelPackage(binary_v10.__name__, binary_v10_spec, binary_v10_input)
-# Like v10 the type model reads the materials, so its targets file is the same tx_id list.
+# Like v10 the type model reads the materials, so its targets file is a tx_id list too
+# (only the suspicious TARGETs, chosen by features/prepare_features.py prepare_type).
 SALT_R = ModelPackage(salt_r.__name__, salt_r_spec, binary_v10_input)
 MODELS = (DEMO_RANDOM, BINARY_V10, SALT_R)
 DEFAULTS = {"BINARY": BINARY_V10, "TYPE": SALT_R}

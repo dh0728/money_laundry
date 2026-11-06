@@ -51,4 +51,25 @@ class DashboardDistributionTests {
                     LocalDate.parse("2023-09-03").atStartOfDay(BusinessTime.KST).toInstant())));
     verifyNoMoreInteractions(jdbc);
   }
+
+  @Test
+  void normal_transactions_without_a_type_count_as_weak() {
+    var jdbc = mock(JdbcTemplate.class);
+    // The type model judges only suspicious transactions, so normal ones have no type.
+    var normal = new HashMap<String, Object>(Map.of("suspicious", false, "count", 6L));
+    normal.put("type_class", null);
+    List<Map<String, Object>> counts =
+        List.of(normal, Map.of("suspicious", true, "type_class", 2L, "count", 5L));
+    when(jdbc.queryForList(anyString(), any(Timestamp.class), any(Timestamp.class)))
+        .thenReturn(counts);
+    var result =
+        new DashboardQueries(jdbc, null)
+            .modelDistribution(LocalDate.parse("2023-09-01"), LocalDate.parse("2023-09-02"));
+    assertThat(result.get("agreements"))
+        .isEqualTo(
+            List.of(
+                Map.of("agreement", "STRONG", "count", 5L),
+                Map.of("agreement", "WEAK", "count", 6L)));
+    assertThat(result.get("types")).isEqualTo(List.of(Map.of("type", 2L, "count", 5L)));
+  }
 }

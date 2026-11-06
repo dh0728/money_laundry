@@ -17,6 +17,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from common.frozen_input import StaleExecution
 from common.run_fence import lock_stage, save_checkpoint
 from common.worker_transport import ProtocolError, Request, encode
+from features.prepare_features import EMPTY_RESULT
 
 
 def _current(connection, execution, stage):
@@ -114,12 +115,34 @@ def _stage(connection, execution, kind, path, rows, stage):
     finally:
         if 'parquet' in locals():
             parquet.close()
+    # The binary model judges every TARGET; the type model exactly the IDs it was sent
+    # (its feature rows, written with its prepared input).
+    expected = ("SELECT tx_id FROM analysis.input_transactions WHERE run_id=%s AND input_role='TARGET'"
+                if kind == 'BINARY' else
+                "SELECT tx_id FROM analysis.features WHERE run_id=%s AND model_kind='TYPE'")
     mismatch = connection.execute(f'''SELECT EXISTS(
-        SELECT 1 FROM {name} s FULL JOIN
-          (SELECT tx_id FROM analysis.input_transactions WHERE run_id=%s AND input_role='TARGET') i USING(tx_id)
+        SELECT 1 FROM {name} s FULL JOIN ({expected}) i USING(tx_id)
         WHERE s.tx_id IS NULL OR i.tx_id IS NULL)''', (execution.run_id,)).fetchone()[0]
     if mismatch or rows <= 0:
         raise ProtocolError('Result TARGET set mismatch')
+
+
+def load_collected(connection, execution, kind, storage_root, s3, bucket, stage):
+    """Stage an already collected model result into its session table (collected_<kind>)."""
+    row = connection.execute('''SELECT result_artifact FROM analysis.model_tasks
+        WHERE run_id=%s AND model_kind=%s AND phase='DONE' AND status='SUCCEEDED' AND result_artifact IS NOT NULL''',
+        (execution.run_id, kind)).fetchone()
+    if row is None:
+        raise ProtocolError('Model result is not collected')
+    root = Path(storage_root).resolve()
+    path = (root / row[0]['path']).resolve()
+    if not path.is_relative_to(root):
+        raise ProtocolError('Result path escapes storage')
+    if not _verified(path, row[0]['files'][0]):
+        # Local files are a cache; restore the same immutable remote result.
+        path = root / 'runs' / str(execution.run_id) / kind / str(execution.execution_id) / 'scores.parquet'
+        _download(s3, bucket, row[0]['files'][0], path)
+    _stage(connection, execution, kind, path, row[0]['row_count'], stage)
 
 
 def _failure(connection, execution, kind, token, error):
@@ -220,6 +243,13 @@ def save_scores(connection, execution, storage_root, settings, s3):
     root = Path(storage_root).resolve()
     bindings = {}
     for kind, *data in rows:
+        if kind == 'TYPE' and data[5] == EMPTY_RESULT:
+            # No suspicious TARGET: nothing was judged, every score keeps an empty type.
+            connection.execute('''CREATE TEMP TABLE IF NOT EXISTS collected_type(tx_id bigint PRIMARY KEY,
+                ''' + ','.join(c + ' double precision NOT NULL' for c in _columns(kind)) + ')')
+            connection.execute('TRUNCATE collected_type')
+            bindings[kind] = data[0]
+            continue
         result, binding = _metadata(execution, kind, data[:5])
         stored = data[5]
         if stored is None or {k: v for k, v in stored.items() if k != 'path'} != result:
@@ -238,11 +268,12 @@ def save_scores(connection, execution, storage_root, settings, s3):
         bindings[kind] = binding
     # Rank work precedes the short fenced transaction. Equal scores share the
     # lowest rank; a singleton is 0. This is 100 * (rank - 1) / (count - 1).
+    # Only suspicious TARGETs were sent to the type model; the others keep empty type columns.
     connection.execute('DROP TABLE IF EXISTS pg_temp.combined_scores')
     connection.execute('''CREATE TEMP TABLE combined_scores AS SELECT b.tx_id,b.p_laundering,
         t.p_0,t.p_1,t.p_2,t.p_3,t.p_4,t.p_5,t.p_6,t.p_7,t.p_8,
         100.0*percent_rank() OVER(ORDER BY b.p_laundering) AS score_pct
-        FROM collected_binary b JOIN collected_type t USING(tx_id)''')
+        FROM collected_binary b LEFT JOIN collected_type t USING(tx_id)''')
     with connection.transaction():
         lock_stage(connection, execution, 'SCORES')
         if connection.execute('''SELECT EXISTS(SELECT 1 FROM combined_scores s JOIN ledger.transactions t USING(tx_id)
@@ -253,8 +284,8 @@ def save_scores(connection, execution, storage_root, settings, s3):
             (execution.run_id,)).fetchone()[0]:
             raise ProtocolError('TARGET is no longer eligible for scoring')
         connection.execute('''INSERT INTO analysis.scores(run_id,tx_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8,score_pct,type_class)
-            SELECT %s,s.*,array_position(array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8],
-              greatest(s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8))-1
+            SELECT %s,s.*,CASE WHEN s.p_0 IS NOT NULL THEN array_position(array[s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8],
+              greatest(s.p_0,s.p_1,s.p_2,s.p_3,s.p_4,s.p_5,s.p_6,s.p_7,s.p_8))-1 END
             FROM combined_scores s''', (execution.run_id,))
         connection.execute('''UPDATE analysis.jobs SET model_version_binary=%s,model_version_type=%s,
             feature_version_binary=%s,feature_version_type=%s,row_count=(SELECT count(*) FROM combined_scores),

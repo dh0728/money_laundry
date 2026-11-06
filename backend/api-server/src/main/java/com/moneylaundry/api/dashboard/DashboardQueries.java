@@ -147,7 +147,8 @@ public final class DashboardQueries {
     var types = new TreeMap<Long, Long>();
     for (var row : counts) {
       boolean suspicious = Boolean.TRUE.equals(row.get("suspicious"));
-      long type = ((Number) row.get("type_class")).longValue();
+      // Only suspicious transactions are sent to the type model; the others have no type.
+      long type = row.get("type_class") instanceof Number n ? n.longValue() : 0;
       long count = ((Number) row.get("count")).longValue();
       String agreement =
           suspicious ? (type == 0 ? "ATYPICAL" : "STRONG") : (type == 0 ? "WEAK" : "PATTERN_ONLY");

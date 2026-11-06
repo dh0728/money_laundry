@@ -333,17 +333,19 @@ CREATE TABLE analysis.features (
 CREATE TABLE analysis.scores (
  run_id UUID NOT NULL, tx_id BIGINT NOT NULL,
  p_laundering DOUBLE PRECISION NOT NULL CHECK(p_laundering>=0 AND p_laundering<=1),
- p_0 DOUBLE PRECISION NOT NULL CHECK(p_0>=0 AND p_0<=1),
- p_1 DOUBLE PRECISION NOT NULL CHECK(p_1>=0 AND p_1<=1),
- p_2 DOUBLE PRECISION NOT NULL CHECK(p_2>=0 AND p_2<=1),
- p_3 DOUBLE PRECISION NOT NULL CHECK(p_3>=0 AND p_3<=1),
- p_4 DOUBLE PRECISION NOT NULL CHECK(p_4>=0 AND p_4<=1),
- p_5 DOUBLE PRECISION NOT NULL CHECK(p_5>=0 AND p_5<=1),
- p_6 DOUBLE PRECISION NOT NULL CHECK(p_6>=0 AND p_6<=1),
- p_7 DOUBLE PRECISION NOT NULL CHECK(p_7>=0 AND p_7<=1),
- p_8 DOUBLE PRECISION NOT NULL CHECK(p_8>=0 AND p_8<=1),
+ p_0 DOUBLE PRECISION CHECK(p_0>=0 AND p_0<=1),
+ p_1 DOUBLE PRECISION CHECK(p_1>=0 AND p_1<=1),
+ p_2 DOUBLE PRECISION CHECK(p_2>=0 AND p_2<=1),
+ p_3 DOUBLE PRECISION CHECK(p_3>=0 AND p_3<=1),
+ p_4 DOUBLE PRECISION CHECK(p_4>=0 AND p_4<=1),
+ p_5 DOUBLE PRECISION CHECK(p_5>=0 AND p_5<=1),
+ p_6 DOUBLE PRECISION CHECK(p_6>=0 AND p_6<=1),
+ p_7 DOUBLE PRECISION CHECK(p_7>=0 AND p_7<=1),
+ p_8 DOUBLE PRECISION CHECK(p_8>=0 AND p_8<=1),
  score_pct DOUBLE PRECISION CHECK(score_pct>=0 AND score_pct<=100),
- type_class SMALLINT NOT NULL CHECK(type_class BETWEEN 0 AND 8),
+ -- Type columns only for suspicious TARGETs (the type model judges only those); empty otherwise.
+ type_class SMALLINT CHECK(type_class BETWEEN 0 AND 8),
+ CHECK((type_class IS NULL) = (p_0 IS NULL)),
  PRIMARY KEY(run_id,tx_id), FOREIGN KEY(run_id,tx_id) REFERENCES analysis.input_transactions
 );
 CREATE TABLE analysis.current_scores (

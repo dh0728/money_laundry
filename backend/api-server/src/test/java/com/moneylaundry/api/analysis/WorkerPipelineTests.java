@@ -114,24 +114,25 @@ class WorkerPipelineTests {
           .isTrue();
       try (var paths = Files.walk(storage)) {
         assertThat(paths.filter(p -> p.toString().endsWith("targets.parquet")).count())
-            .isEqualTo(2);
+            .isEqualTo(1);
       }
+      // The type model is bound but judges only suspicious TARGETs: it waits for the binary result.
       assertThat(
               jdbc.queryForList(
                   "select phase from analysis.model_tasks where run_id=? order by model_kind",
                   String.class,
                   run))
-          .containsExactly("PUBLISH", "PUBLISH");
+          .containsExactly("PUBLISH", "PREPARE");
       assertThat(
               jdbc.queryForObject(
-                  "select count(*) from analysis.features where run_id=? and model_kind='TYPE' and feature_version='ledger-history-v1'",
-                  Integer.class,
+                  "select binding->>'feature_version' from analysis.model_tasks where run_id=? and model_kind='TYPE'",
+                  String.class,
                   run))
-          .isEqualTo(1);
+          .isEqualTo("ledger-history-v1");
       assertThat(
               jdbc.queryForObject(
                   "select count(*) from analysis.features where run_id=?", Integer.class, run))
-          .isEqualTo(2);
+          .isEqualTo(1);
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("FAILED");
       assertThat(service.job(job).error()).isEqualTo("PIPELINE_NOT_CONFIGURED");
@@ -186,11 +187,11 @@ class WorkerPipelineTests {
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.features where run_id=?", Integer.class, run))
-        .isEqualTo(2);
+        .isEqualTo(1);
   }
 
   @Test
-  void type_failure_preserves_binary_and_next_parent_execution_recovers() throws Exception {
+  void features_never_builds_the_type_input() throws Exception {
     Path failType = storage.resolve("fail_type.py");
     Files.writeString(
         failType,
@@ -202,13 +203,13 @@ class WorkerPipelineTests {
         pipeline = registry.default('TYPE').build_input
         original = pipeline.write_input
         calls = 0
-        # BINARY prepares first; with a shared input module TYPE is the second call.
-        fail_at = 2 if registry.default('BINARY').build_input is pipeline else 1
+        # With a shared input module the first call is BINARY's; any other would be TYPE's.
+        allowed = 1 if registry.default('BINARY').build_input is pipeline else 0
         def fail_type(source, output):
             global calls
             calls += 1
-            if calls == fail_at:
-                raise ProtocolError('injected second model failure')
+            if calls > allowed:
+                raise ProtocolError('type input built during FEATURES')
             return original(source, output)
         pipeline.write_input = fail_type
         from analysis_entry import main
@@ -216,38 +217,19 @@ class WorkerPipelineTests {
         """
             .formatted(
                 "'" + Path.of("worker").toAbsolutePath().toString().replace("\\", "/") + "'"));
-    assertThatThrownBy(() -> executor(failType.toString()).prepare(claim()))
-        .isInstanceOf(AnalysisFailure.class);
+    executor(failType.toString()).prepare(claim());
     assertThat(
-            jdbc.queryForObject(
-                "select count(*) from analysis.features where run_id=? and model_kind='BINARY'",
-                Integer.class,
+            jdbc.queryForList(
+                "select model_kind||':'||phase||':'||operation_attempts from analysis.model_tasks where run_id=? order by model_kind",
+                String.class,
                 run))
-        .isEqualTo(1);
+        .containsExactly("BINARY:PUBLISH:1", "TYPE:PREPARE:0");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.stage_results where run_id=? and stage='FEATURES'",
+                "select count(*) from analysis.features where run_id=? and model_kind='TYPE'",
                 Integer.class,
                 run))
         .isZero();
-    var binary =
-        jdbc.queryForObject(
-            "select input_artifact::text from analysis.model_tasks where run_id=? and model_kind='BINARY'",
-            String.class,
-            run);
-    executor("worker/analysis_entry.py").prepare(claim());
-    assertThat(
-            jdbc.queryForObject(
-                "select input_artifact::text from analysis.model_tasks where run_id=? and model_kind='BINARY'",
-                String.class,
-                run))
-        .isEqualTo(binary);
-    assertThat(
-            jdbc.queryForList(
-                "select operation_attempts from analysis.model_tasks where run_id=? order by model_kind",
-                Integer.class,
-                run))
-        .containsExactly(1, 2);
   }
 
   @Test
@@ -300,7 +282,7 @@ class WorkerPipelineTests {
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from analysis.features where run_id=?", Integer.class, run))
-        .isEqualTo(2);
+        .isEqualTo(1);
   }
 
   @Test
@@ -384,12 +366,13 @@ class WorkerPipelineTests {
       runner.scan();
       assertThat(service.job(job).stage()).isEqualTo(AnalysisStage.INFERENCE);
       assertThat(service.job(job).status()).isEqualTo("RETRY_WAIT");
+      // Only the binary model is sent; the type model waits for its result.
       assertThat(
               jdbc.queryForObject(
                   "select count(*) from analysis.model_tasks where run_id=? and phase='WAIT_REMOTE' and status='WAITING'",
                   Integer.class,
                   run))
-          .isEqualTo(2);
+          .isEqualTo(1);
       jdbc.update(
           "update analysis.jobs set retry_at=now()-interval '1 second' where job_id=?", job);
       runner.scan();
@@ -409,7 +392,7 @@ class WorkerPipelineTests {
                   "select count(*) from analysis.model_tasks where run_id=? and remote_snapshot->>'status'='RUNNING'",
                   Integer.class,
                   run))
-          .isEqualTo(2);
+          .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
                   "select count(*) from analysis.stage_results where run_id=? and stage='INFERENCE'",
