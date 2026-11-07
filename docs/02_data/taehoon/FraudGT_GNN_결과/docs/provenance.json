@@ -1,0 +1,51 @@
+{
+  "created_date": "2026-11-05",
+  "upstream_commit": "f88db9dc003a6f521a90631c4741541686043119",
+  "unchanged_core_files": [
+    {
+      "file": "fraudgt_lab/models.py",
+      "sha256": "8b8bf2055205a7695f9db558a7e3fbdd49153c4bcc87fab09ed02b0243709fc0",
+      "unchanged_from_historical_source": true
+    },
+    {
+      "file": "fraudgt_lab/optimization.py",
+      "sha256": "15b912d58e2b3ae94f2aa7a9ea34b27aaf84cde9a8c814efca860d51f3a5a278",
+      "unchanged_from_historical_source": true
+    },
+    {
+      "file": "fraudgt_lab/metrics.py",
+      "sha256": "9ee80ad2eb1765e4f59e4449a6fb2ae9d5f9d378b74229aff2fb30f9986cfa78",
+      "unchanged_from_historical_source": true
+    },
+    {
+      "file": "fraudgt_lab/csc_index.c",
+      "sha256": "b0b4cccd2a27c31a4feccb8b35bed29fa929bf3f1d92a93782287765d0642989",
+      "unchanged_from_historical_source": true
+    }
+  ],
+  "historical_results": [
+    {
+      "source": "V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/basic_alltargets_fulltest_20261103/result.json",
+      "sha256": "f0c3e24701c44c1bf92cdcad666881ee4477a98ca4c9b0d74eb01b106180e6c2"
+    },
+    {
+      "source": "V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/pe_alltargets_fulltest_20261103/result.json",
+      "sha256": "15aca13dd0c9b4460594f7afbf991dfe511d935d4deb3f813926df0a8978d6e7"
+    },
+    {
+      "source": "V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/result.json",
+      "sha256": "d26c6ca9d05a104a901a77ed62d54dcd7a9cf9391d5bb99e12ccb37cc451f002"
+    },
+    {
+      "source": "FraudGT_3종_전체채점_성능비교_20261103/metrics.csv",
+      "sha256": "e89918da37e9afe0044756f19a77a2878833d2eba6f82975c77b03acf9180193"
+    },
+    {
+      "source": "FraudGT_degree_논문기준_20261103/metrics.json",
+      "sha256": "1665fb8db07d91940cf032ab8da05f3e119348c9a6dcc781bb48ef6b6c850f57"
+    }
+  ],
+  "portable_runner_is_new": true,
+  "real_dataset_retrained": false,
+  "absolute_local_paths_and_individual_transaction_previews_included": false
+}

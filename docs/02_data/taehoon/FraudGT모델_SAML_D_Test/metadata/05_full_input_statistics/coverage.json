@@ -1,0 +1,43 @@
+[
+  {
+    "domain": "HI_train",
+    "rows": 102505233,
+    "first_id": 0,
+    "last_id": 102546453,
+    "active_query_accounts": 2100893,
+    "snapshot_date": "2022-09-25",
+    "active_context_accounts": 2100893
+  },
+  {
+    "domain": "HI_val",
+    "rows": 34491749,
+    "first_id": 1008146,
+    "last_id": 137039006,
+    "active_query_accounts": 1914243,
+    "snapshot_date": "2022-10-13",
+    "active_context_accounts": 2109684
+  },
+  {
+    "domain": "HI_test",
+    "rows": 33429507,
+    "first_id": 13484506,
+    "last_id": 170467585,
+    "active_query_accounts": 1978561,
+    "snapshot_date": "2022-10-31",
+    "active_context_accounts": 2116072
+  },
+  {
+    "domain": "HI_all",
+    "rows": 170426489,
+    "id_slots": 170467586,
+    "excluded_id_slots": 41097,
+    "active_query_accounts": 2116072,
+    "snapshot_date": "query: each split end; account: 2022-10-31"
+  },
+  {
+    "domain": "SAML_all",
+    "rows": 9504852,
+    "active_query_accounts": 855460,
+    "snapshot_date": "2023-08-23 full period end"
+  }
+]

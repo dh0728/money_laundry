@@ -1,0 +1,27 @@
+{
+  "plan_sha256": "75607f156c894e349fcb14092786ebad45876fcf8121243cd374c9b142cfbc24",
+  "selection_sha256": "fa567f760e9266d2cab61660efe62eaf17c95eb223ae671a6ff2f2366d94978b",
+  "source_selected_method": "degree_median",
+  "target_methods": [
+    "degree_median",
+    "behavior_donor"
+  ],
+  "owner_sha256": {
+    "degree_median": "5396cfba76b251031384db25865141d407768bb96cc9e7a29c416c7f072254fa",
+    "behavior_donor": "e0f5c5a2a8bf313e2672cfc213ee78b895a6935d553657a070f8170b393e9174"
+  },
+  "original_saml_protocol_sha256": "c5f0e4befa414810c8df7049760f4170f779accc6ecf024b80ac0bd844c04d34",
+  "rows": 9504852,
+  "threshold": 0.5,
+  "checkpoint_sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+  "graph_order_sampling": "Same original SAML order and samplers; both methods share each sampled batch",
+  "labels_used_to_choose_methods": false,
+  "weights_retrained": false,
+  "source_sha256": {
+    "experiment.py": "266d4de9601b311c73469b64c215758eac2ccf032be4b4900c63c92b92714dfd",
+    "prepare.py": "423ecc92e83a1460e4aefbe178f1ae194ef267b578d979f0f8c6b871f8b332a0",
+    "validate.py": "bae71d6e9cd649fc03bf10ee225dae3f93bdc5198b4280eadafac1cc80ce22b8",
+    "full_saml.py": "9036ed1d8ac317d569856e9d05d665dce816f4f8cbde499a38b5b400f19b23a8",
+    "report.py": "9fb2356661bf0851d21624f080b1a89aba324537f59fb6d8e638365c67cacbe8"
+  }
+}

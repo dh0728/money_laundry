@@ -1,0 +1,24 @@
+{
+  "method": "Label-independent uniform100000 transactions per domain; numeric distribution comparison uses normals within sample",
+  "domains": {
+    "HI_train": {
+      "rows": 100000,
+      "normal": 99914,
+      "positive": 86,
+      "seed": 20261106
+    },
+    "HI_test": {
+      "rows": 100000,
+      "normal": 99851,
+      "positive": 149,
+      "seed": 20261106
+    },
+    "SAML": {
+      "rows": 100000,
+      "normal": 99900,
+      "positive": 100,
+      "seed": 20261106
+    }
+  },
+  "node_snapshot": "HI train/test split-end; SAML full-period-end, same as model context"
+}

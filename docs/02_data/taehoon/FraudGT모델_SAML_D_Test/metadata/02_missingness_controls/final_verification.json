@@ -1,0 +1,47 @@
+{
+  "utc": "2026-11-06T05:34:27.783256+00:00",
+  "all_passed": true,
+  "unique_transactions": 262144,
+  "positive": 332,
+  "conditions": [
+    {
+      "condition": "baseline",
+      "AP": 0.6915337105466187,
+      "verified": true
+    },
+    {
+      "condition": "node_type_zero",
+      "AP": 0.6934365341590376,
+      "verified": true
+    },
+    {
+      "condition": "node_owner_zero",
+      "AP": 0.6258065249665332,
+      "verified": true
+    },
+    {
+      "condition": "country_zero",
+      "AP": 0.6893241599682608,
+      "verified": true
+    },
+    {
+      "condition": "missing11",
+      "AP": 0.6134458883359878,
+      "verified": true
+    },
+    {
+      "condition": "unknown31",
+      "AP": 0.6831458119552963,
+      "verified": true
+    },
+    {
+      "condition": "missing11_unknown31",
+      "AP": 0.5679656637662451,
+      "verified": true
+    }
+  ],
+  "source_implementation_matches_archived_run": true,
+  "source_code_and_control_plan_unchanged": true,
+  "salt_still_paused": true,
+  "salt_resume_checkpoint_unchanged": true
+}
