@@ -1,0 +1,50 @@
+{
+  "status": "PASS",
+  "purpose": "feasibility_only_not_final_model",
+  "completed_utc": "2026-11-05T05:18:50.693653+00:00",
+  "device": "cpu",
+  "cuda_initialized": false,
+  "salt_checkpoint_epoch": 1,
+  "salt_snapshot_sha256": "e8ebbc8245cb9d0bf9965b3780a8886066405396f8c2a9d16e53e137cc54f60e",
+  "hgb_sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c",
+  "hgb_training_dates": [
+    "2022-08-08",
+    "2022-09-25"
+  ],
+  "hgb_feature_columns": 36,
+  "fusion_fit_dates": [
+    "2022-10-05",
+    "2022-10-08"
+  ],
+  "existing_fusion_fit_rows": 115830,
+  "existing_fusion_fit_positives": 9637,
+  "fusion_fit_population_rows": 7315599,
+  "sampled_cohort_ids_dates_binary_and_unmatched_labels_verified": true,
+  "label_mapping": "Legacy known patterns 1..8 -> SALT 1; 0 and 9 unchanged",
+  "hgb_cached_score_parity": true,
+  "smoke_rows": 256,
+  "smoke_microbatch": 16,
+  "production_microbatch": 4096,
+  "batch_membership_affects_salt_prediction": true,
+  "smoke_is_production_parity_test": false,
+  "finite_scores": true,
+  "fusion_fit_converged": true,
+  "serialization_parity": true,
+  "held_out_performance_evaluated": false,
+  "evaluation_inputs": {
+    "validation": {
+      "rows": 8551015,
+      "all_ids_aligned": true,
+      "feature_shapes_verified": true,
+      "scores_not_evaluated": true
+    },
+    "test": {
+      "rows": 33429507,
+      "all_ids_aligned": true,
+      "feature_shapes_verified": true,
+      "scores_not_evaluated": true
+    }
+  },
+  "applies_to": "Existing server model/cache; fresh notebook preprocessing requires separate feature/score parity checks.",
+  "handoff_status": "HGB weights, 36-column feature generator and final fusion trainer are planned, not bundled."
+}

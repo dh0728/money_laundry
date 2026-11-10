@@ -1,0 +1,49 @@
+{
+  "status": "historical_source_measurement_not_this_handoff_benchmark",
+  "source_experiment": "SALT_GNN_직접공유샘플링_20261104",
+  "source_record": "tuning/gpu_features_20261104_233609/comparison_summary.json",
+  "source_sha256": "e9f103bd6b5b9c22ff07521467effdb587ed79d84c8ace13b9fc1a65f773b83f",
+  "source_protocol_sha256": "03a10f20f1dc5b5a4d0c03350f087f3119c7e0c26463829bab5d436b5160d0ff",
+  "hardware": "Tesla V100-SXM2-32GB",
+  "targets_per_measurement": 32768,
+  "warmup_excluded": true,
+  "baseline": {
+    "graph": "cuda",
+    "features": "cpu",
+    "microbatch": 4096,
+    "logical_batch": 4096,
+    "max_edges": 8000000
+  },
+  "current": {
+    "graph": "cuda",
+    "features": "cuda",
+    "microbatch": 4096,
+    "logical_batch": 8192,
+    "max_edges": 6000000
+  },
+  "measurements": [
+    {
+      "day": 15,
+      "baseline_tps": 1596.8721043658936,
+      "new_tps": 6208.881278825687,
+      "speedup": 3.888151882577465,
+      "baseline_prepare_fraction": 0.696636716087013,
+      "new_prepare_fraction": 0.052164669912752315,
+      "new_model_fraction": 0.8053596158023013,
+      "new_peak_gib": 20.59577178955078
+    },
+    {
+      "day": 55,
+      "baseline_tps": 792.6885508002324,
+      "new_tps": 3973.541944010285,
+      "speedup": 5.012740426235409,
+      "baseline_prepare_fraction": 0.7435880872300876,
+      "new_prepare_fraction": 0.05520447679274626,
+      "new_model_fraction": 0.8600644362687164,
+      "new_peak_gib": 26.289698123931885
+    }
+  ],
+  "changed_multiple_factors": true,
+  "original_cpu_graph_baseline_speedup_not_measured_here": true,
+  "production_checkpoint_not_updated_by_benchmark": true
+}
