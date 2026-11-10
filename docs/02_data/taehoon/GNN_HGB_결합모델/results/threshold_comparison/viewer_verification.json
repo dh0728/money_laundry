@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "common_threshold_states": 212,
+  "model_card_checks": 424,
+  "chart_metric_zoom_states": 28,
+  "own_validation_threshold_modes": 2,
+  "keyboard_and_slider": true,
+  "csv_rows": 212,
+  "actual_browser_layout_test": false,
+  "method": "Actual embedded JavaScript executed in V8 with DOM stubs; static PNG inspected separately",
+  "html_sha256": "88080b63e873c1048a0c05ca277851f5ab705e89c096c143ef1c4178ff1778aa"
+}

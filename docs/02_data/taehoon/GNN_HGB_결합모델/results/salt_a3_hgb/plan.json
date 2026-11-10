@@ -1,0 +1,168 @@
+{
+  "created_utc": "2026-11-07T23:51:57.805768+00:00",
+  "name": "Frozen A3 epoch6 + adopted HGB, full-population logistic stacking",
+  "salt_checkpoint_epoch": 6,
+  "salt_checkpoint_sha256": "86326a538768634ec06799abac69da603951dfb004038c7cfb1937cd67cc25ab",
+  "salt_protocol_sha256": "03a10f20f1dc5b5a4d0c03350f087f3119c7e0c26463829bab5d436b5160d0ff",
+  "hgb_sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c",
+  "source_code_sha256": {
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/notebook_control.py": "fbde60183e010f2e3b5f989c5afe2304ddb29751e97d362c3334d237cdbbf231",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/run.py": "fcda1aece72e9715980e4b235e94655e4b31c033ec01f72bbe514718dfdb8879",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/__init__.py": "31d2c7d482cb6d6c0685e94c94994a4ddc8344df805846f55703823c9f6f93d8",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/config.py": "c3f616cb67ffb59058a1155c565f5c121fce0027c7389fe4fe34729ec69a77ca",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_features.py": "c595bc52df0256442ecccab5be0a70a16e20e16704f993492e8e4a0644bd4483",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_sampler.cu": "f487376d0d297f3ef802e1d4b9a7de63500dc6582b43fd385cdfdbb8c2e41d8b",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_topology.py": "4f4ba31f1bce712567d8226f252aa2aade43c50749340f598253335f3eb63deb",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/data.py": "78930bfdc460e54180d563796b0bbb9ac87b08c8dce3c0e00c231b99f99a4f4d",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/degree.c": "4b1026922b1691e1a1c25c0967d0da9e89c63892201578bf7fa753bd76c00181",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/evaluation.py": "239e5c105e53612a317c133d8b549dcc7b91301c038196d53d21eb5a04125405",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/extra_features.py": "de1b1310615234320a09e2170d68ef0c991cbbf4e8768d91f87a126168933ea6",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/metrics.py": "2fe333b8fe50753e278b26b6b7bf9a08a4235f05f98bbc585f809aa18289e900",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/model.py": "bbbc5eb346e8a314d807b39b9202a570c44f891c87e9c5e7ae72d90c5e2eeaf0",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/population.py": "ef0b6c1782c24784cd081bafb385bd409f5227d1bf0afa1ab06e3d73f5e1edcf",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/prepare.py": "74d0d4aa7d0c435bc11803beb896695fb998061387648e4dcf1c85454c1c8f23",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_sampler.c": "b2c7171130f28ec77950759752848c52ba6e287dc05133d885938ccfa6957c0c",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_topology.py": "e062f929f429c7db84254f41bd7cf4888fcde523027326c1cfd37d99117fa822",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_validation.py": "db060ca99262425d57c5c2074b5dec707010cbe893da35fec03125a9bdb17f3c",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/storage.py": "e5ad8410b8dd35af0d4ab77189b4fb618d482b03ff7c3450e186b6b30100977f",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/training.py": "0b07ff0a066edcdf178c7c8f4ff5391bdbb130653fa067b736986ae981e31b34",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/validate.py": "8fc1dc7bc87461d711c78027e9739c83bcf7adb33e60a4320eba23aa8acdee4b",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/tests/test_cuda_features.py": "898b0695c36dca0937a5e1bcf64246e254c8d6dfe7e211d29ed5b466159235ce",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/tests/test_cuda_topology.py": "1b032e4d756ac12dfdf7cec66ddb648f4f962409ca76d011070eb8a4d09ea816",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/tests/test_extra_features.py": "460ad5a657df05489eece23b5197b3534522c94379abbb36e9b3fab30e8c43f5",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/tests/test_full_population.py": "1a302ff0150aeb1a4e5c9df2f207a8b50ab66bc1a3c72935efbdedb33e315e67",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/tests/test_independent_evaluation.py": "2818c0d00ac2953d917241c6f6fb67f2d7ac1e0d4c9e8fd8056335b198f9179b",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/tests/test_shared_topology.py": "4d76f9d325388d06f4b9163f97457b1cad2971a935d63e7d26fa085c1abaf873",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/11_prepare_full_validation.py": "3037166618f39d78ae8a580310b7121df4bd11a6245362f4c5cc8d82e5abae6c",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/08_prepare_dayflow.py": "975bb6f7663a18000000f7c9cdb3fa6e83f326056501b4908369c1b3a235e41f",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/06_daily_scalar_contract.json": "e5c624b2e8c94c3ab64d0238fc53635f4ae90fb28d4f1b92f29fb4410d7154c5",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/08_dayflow_contract.json": "c70bb09c46e3473384013495c2f266c5158ef8080c6a5499cccab9f09e7d15d8",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/16_amount_history_contract.json": "5a9405725370feef9ba83b74e5d1cbaa8a64405f21827c272c14a0a62b477ca8",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/lab.py": "169a08abb641447edca5da3c1c5ba84cdf3f7fb52ff486292b864fe0f76d4c14"
+  },
+  "base_models_retrained": false,
+  "base_models_frozen": true,
+  "fit_dates": [
+    "2022-10-05",
+    "2022-10-08"
+  ],
+  "fit_rows": 7315599,
+  "fit_population": "all observed deduplicated transactions, no downsampling/IPW",
+  "validation_dates": [
+    "2022-10-09",
+    "2022-10-13"
+  ],
+  "validation_rows": 8551015,
+  "test_dates": [
+    "2022-10-14",
+    "2022-10-31"
+  ],
+  "test_rows": 33429507,
+  "inputs": [
+    "hgb_corrected_logit",
+    "salt_raw_logit_difference"
+  ],
+  "hgb": {
+    "columns": [
+      "pair_prior_count",
+      "receiver_gap_minutes",
+      "paid_currency_z",
+      "reverse_history_count",
+      "minute_receiver_vs_prior_hour",
+      "minute_sender_vs_prior_hour",
+      "src_log_out_count",
+      "src_log_out_neighbors",
+      "src_log_in_neighbors",
+      "src_log_reciprocal_neighbors",
+      "src_paid_outlier_fraction",
+      "src_log_currency_count",
+      "src_log_active_days",
+      "src_log_entity_observed_accounts",
+      "src_log_entity_out_diversity",
+      "src_log_entity_in_diversity",
+      "dst_log_out_count",
+      "dst_log_out_neighbors",
+      "dst_log_in_neighbors",
+      "dst_log_reciprocal_neighbors",
+      "dst_paid_outlier_fraction",
+      "dst_log_currency_count",
+      "dst_log_active_days",
+      "dst_log_entity_observed_accounts",
+      "dst_log_entity_out_diversity",
+      "dst_log_entity_in_diversity",
+      "src_day_ccy_flow_balance",
+      "src_day_ccy_log_matching_in_amount",
+      "dst_day_ccy_flow_balance",
+      "src_prior_ccy_amount_seen",
+      "src_prior_ccy_amount_vs_mean",
+      "src_day_ccy_rate_vs_prior",
+      "dst_prior_ccy_amount_seen",
+      "dst_prior_ccy_amount_vs_mean",
+      "dst_day_ccy_rate_vs_prior",
+      "pair_amount_seen_before_day"
+    ],
+    "class_probability_divisors": [
+      1,
+      100,
+      100
+    ],
+    "clipping": [
+      1e-12,
+      0.999999999999
+    ],
+    "extra_logit_shift": null
+  },
+  "salt": {
+    "checkpoint": "Monitor-selected epoch6",
+    "microbatch": 4096,
+    "score_commit_targets": 8192,
+    "max_edges": 6000000,
+    "order": "chronological day, ascending transaction ID within day",
+    "sampler": "unchanged CUDA shared",
+    "reuse_completed_validation_test_scores": true
+  },
+  "logistic": {
+    "C": 0.1,
+    "solver": "lbfgs",
+    "max_iter": 1000,
+    "tol": 1e-07,
+    "class_weight": null,
+    "sample_weight": null,
+    "seed": 20261107,
+    "scale": "StandardScaler fitted on full fusion_fit only",
+    "posthoc_logit_shift": null,
+    "hyperparameter_search": false
+  },
+  "reporting": {
+    "models": [
+      "A3",
+      "HGB",
+      "A3_HGB"
+    ],
+    "primary": "probability >= 0.5 for every model",
+    "secondary": "For each model separately, maximize full Validation F1; tie: higher threshold; freeze before new Test scoring",
+    "metrics": [
+      "precision",
+      "recall",
+      "F1",
+      "AP",
+      "TP",
+      "FP",
+      "FN",
+      "TN",
+      "known_pattern_recall",
+      "unmatched_recall",
+      "coverage"
+    ]
+  },
+  "no_test_tuning": true,
+  "test_previously_used": true,
+  "comparison_not_fresh_holdout": true,
+  "limitations": [
+    "Daily-close context may include later same-day transactions",
+    "Single fixed checkpoint pair and one logistic recipe",
+    "HGB candidate and historical Test were examined in previous work"
+  ],
+  "training_remains_paused": true,
+  "automatic_resume": false
+}

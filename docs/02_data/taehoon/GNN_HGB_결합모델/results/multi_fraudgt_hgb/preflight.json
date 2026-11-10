@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "utc": "2026-11-08T11:29:03.415010+00:00",
+  "plan_sha256": "57d34ba0f6faf621c33d64e500803f9153dba226513e1127f2fc9a8384df83d3",
+  "checks": [
+    {
+      "scope": "test",
+      "rows": 2048,
+      "all_input_tensors_bitwise_equal": true,
+      "cpu_gpu_logit_max_abs_error": 7.62939453125e-06,
+      "seconds": 67.10889508202672,
+      "archived_test_max_abs_error": 7.62939453125e-06
+    },
+    {
+      "scope": "val",
+      "rows": 2048,
+      "all_input_tensors_bitwise_equal": true,
+      "cpu_gpu_logit_max_abs_error": 3.814697265625e-06,
+      "seconds": 38.78017023950815
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "utc": "2026-11-08T00:10:56.427293+00:00",
+  "plan_sha256": "799e37adc6867abf4b0e4694732e5c8979dbcf6df1cfa34670e32650bfce41eb",
+  "fusion_sha256": "7ec974d72a5d46774acf47c2f8c68aeb5dcdb55451c9ceca13efde58f45519b5",
+  "validation_sha256": "fdec12a393ff7b0a4dc4d2a7db63efe7b9bbc2a30fb49e0d05c6e42fb0757b4a",
+  "thresholds": {
+    "A3": 1.4183788299560547,
+    "HGB": -0.9449479020486691,
+    "A3_HGB": -1.0286091977504466
+  },
+  "primary_threshold_logit": 0.0,
+  "all_three_models_will_be_reported": true,
+  "test_tuning": false,
+  "validation_score_sha256": {
+    "A3": "f16090cbdeb14346a2ce4767a34bf57d1afd2e54cd9f78d7c111826ad0228fb9",
+    "HGB": "2cdae81a24badd346b05ad46ba11cbb311d193bc2b3085afa60464fe232b9574",
+    "A3_HGB": "6c92f79ffa8a75d8c390834a011f4a3d3f046227442eb0b1b0b87081595dae78"
+  }
+}

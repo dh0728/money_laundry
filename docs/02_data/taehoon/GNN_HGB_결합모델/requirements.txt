@@ -1,0 +1,12 @@
+# CPU result notebooks and portable score-level evaluation; Python 3.12 recommended.
+numpy==2.4.1
+pandas>=2.2,<4
+scikit-learn==1.8.0
+scipy>=1.14,<2
+joblib>=1.4,<2
+threadpoolctl>=3.5,<4
+matplotlib>=3.9,<4
+nbformat>=5.10,<6
+nbclient>=0.10,<1
+ipykernel>=6,<8
+ipywidgets>=8,<9

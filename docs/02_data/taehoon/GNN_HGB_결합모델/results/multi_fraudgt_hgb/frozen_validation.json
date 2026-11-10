@@ -1,0 +1,18 @@
+{
+  "utc": "2026-11-08T11:59:12.815022+00:00",
+  "plan_sha256": "57d34ba0f6faf621c33d64e500803f9153dba226513e1127f2fc9a8384df83d3",
+  "fusion_sha256": "735f1ba23ff0308945ab63f7b194dc74d6c95559e687878075fef2f726304681",
+  "validation_sha256": "509a64682c86419c346f1d18b87f5789b93bc7f215c14635f40db716dc3f752b",
+  "thresholds": {
+    "Multi_FraudGT": 0.7844613790512085,
+    "HGB": -0.9449479020486691,
+    "Multi_FraudGT_HGB": -1.4178564536600042
+  },
+  "primary_threshold_logit": 0.0,
+  "test_tuning": false,
+  "validation_scores_sha256": {
+    "Multi_FraudGT": "976dedf2fc76ef78138c62fb8109f304a92b7875cd2dc559c4997717796d3845",
+    "HGB": "2cdae81a24badd346b05ad46ba11cbb311d193bc2b3085afa60464fe232b9574",
+    "Multi_FraudGT_HGB": "56518bc18ef5c7e1da15bfd38170621d74d00a1c0e10412409f0ca2764de4587"
+  }
+}

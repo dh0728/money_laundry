@@ -1,0 +1,14 @@
+[
+  {
+    "path": "results/salt_a3_hgb/결과.md",
+    "target": "fusion.joblib"
+  },
+  {
+    "path": "results/salt_a3_hgb/결과.md",
+    "target": "salt_paused.json"
+  },
+  {
+    "path": "results/salt_a3_hgb/결과.md",
+    "target": "run_pipeline.py"
+  }
+]

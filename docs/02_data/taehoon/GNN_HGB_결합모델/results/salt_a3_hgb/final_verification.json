@@ -1,0 +1,25 @@
+{
+  "all_passed": true,
+  "utc": "2026-11-08T00:22:52.370994+00:00",
+  "complete_sha256": "eae4d65cc042af0c3f98237976b8b089097ad2396b7b9fb55269d3f7d109c9ea",
+  "all_ids_aligned": true,
+  "all_population_coverage": true,
+  "AP_independent_and_sklearn": true,
+  "original_A3_metrics_reproduced": true,
+  "base_models_unchanged": true,
+  "A1_still_paused": true,
+  "hgb_feature_parity_rows": 115830,
+  "salt_production_parity": {
+    "rows": 8192,
+    "max_abs_error": 4.57763671875e-05,
+    "rtol": 2e-05,
+    "atol": 0.0002,
+    "identical_production_batch_context": true,
+    "model_sha256": "81f51b549217d0daba1aff6c1b7605992d089384216554658ca145fd2c4bb13a"
+  },
+  "independent_verification_sha256": "3926cb7ac329f4574f80e0db240d5be81cb6aa64a282e0bea2ab0df1f66a9e46",
+  "fusion_serialization_parity": true,
+  "code_manifest_sha256": "d65733f1116644c4ce22d8df28c35fa5dbc1db6cb7916898a8cdd833f42d9b44",
+  "report_sha256": "bd9acb5a3c82b938f904ad1c997c4d3386274d9f4c266e60b60fc7d044a78384",
+  "metrics_sha256": "a59f86169995c307c58c10bf368d9ccc23f951a4525156cf4d975360bc27ca46"
+}

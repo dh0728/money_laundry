@@ -1,0 +1,41 @@
+{
+  "passed": true,
+  "utc": "2026-11-08T12:01:32.975631+00:00",
+  "checks": [
+    {
+      "scope": "validation",
+      "rows": 8551015,
+      "all_fusion_scores_independently_recomputed": true,
+      "max_abs_error": 7.105427357601002e-15,
+      "primary_and_frozen_confusions_verified": true,
+      "fusion_scores_sha256": "56518bc18ef5c7e1da15bfd38170621d74d00a1c0e10412409f0ca2764de4587"
+    },
+    {
+      "scope": "test",
+      "rows": 33429507,
+      "all_fusion_scores_independently_recomputed": true,
+      "max_abs_error": 1.4210854715202004e-14,
+      "primary_and_frozen_confusions_verified": true,
+      "fusion_scores_sha256": "6d182344c90ecd1a0045fa68de147772d4a0a790edaa3fe72cb94583cd61a274"
+    }
+  ],
+  "orders": [
+    {
+      "scope": "fusion_fit",
+      "rows": 7315599,
+      "complete_unique_permutation": true
+    },
+    {
+      "scope": "validation",
+      "rows": 8551015,
+      "complete_unique_permutation": true
+    }
+  ],
+  "plan_sha256": "57d34ba0f6faf621c33d64e500803f9153dba226513e1127f2fc9a8384df83d3",
+  "code_manifest_sha256": "e62ede90aeee3b01fe98132cce4da398238482653ffd447be00baea5a0a72c0c",
+  "audit_script_sha256": "117064260fdc66b254784a5ee2d55067453a6619b4c85a340afc9657da92c90f",
+  "base_artifacts_preserved": true,
+  "salt_training_still_paused": true,
+  "validation_frozen_before_fused_test": true,
+  "original_multi_test_reproduced": true
+}

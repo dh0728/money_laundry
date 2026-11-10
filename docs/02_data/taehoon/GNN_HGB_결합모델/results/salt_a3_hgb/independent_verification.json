@@ -1,0 +1,22 @@
+{
+  "all_passed": true,
+  "utc": "2026-11-08T00:22:20.147537+00:00",
+  "records": [
+    {
+      "scope": "validation",
+      "rows": 8551015,
+      "max_algebra_abs_error": 7.105427357601002e-15,
+      "six_confusion_counts_verified": true,
+      "validation_threshold_sklearn_checked": true
+    },
+    {
+      "scope": "test",
+      "rows": 33429507,
+      "max_algebra_abs_error": 7.105427357601002e-15,
+      "six_confusion_counts_verified": true,
+      "validation_threshold_sklearn_checked": false
+    }
+  ],
+  "freeze_precedes_new_test_scoring": true,
+  "original_models_and_paused_A1_unchanged": true
+}
