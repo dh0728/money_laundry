@@ -1,0 +1,78 @@
+{
+  "passed": true,
+  "protocol_sha256": "8a031c8b855cb68470c39cb46586076c2293af5c831ba73d7800a95426f6cfc9",
+  "checks": [
+    {
+      "batch": 0,
+      "method": "degree_median",
+      "rows": 2048,
+      "baseline_max_error": 3.814697265625e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    },
+    {
+      "batch": 0,
+      "method": "behavior_donor",
+      "rows": 2048,
+      "baseline_max_error": 3.814697265625e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    },
+    {
+      "batch": 1,
+      "method": "degree_median",
+      "rows": 2048,
+      "baseline_max_error": 2.384185791015625e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    },
+    {
+      "batch": 1,
+      "method": "behavior_donor",
+      "rows": 2048,
+      "baseline_max_error": 2.384185791015625e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    },
+    {
+      "batch": 2320,
+      "method": "degree_median",
+      "rows": 2048,
+      "baseline_max_error": 2.86102294921875e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    },
+    {
+      "batch": 2320,
+      "method": "behavior_donor",
+      "rows": 2048,
+      "baseline_max_error": 2.86102294921875e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    },
+    {
+      "batch": 4641,
+      "method": "degree_median",
+      "rows": 84,
+      "baseline_max_error": 1.9073486328125e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    },
+    {
+      "batch": 4641,
+      "method": "behavior_donor",
+      "rows": 84,
+      "baseline_max_error": 1.9073486328125e-06,
+      "modified_inputs_bitwise_CPU_parity": true,
+      "modified_scores_CPU_GPU_parity": true,
+      "only_owner_fields_changed": true
+    }
+  ]
+}

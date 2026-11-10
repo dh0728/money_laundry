@@ -1,0 +1,38 @@
+{
+  "passed": true,
+  "protocol_sha256": "ffc074bd1a4f7be892ff6b2a6f51e2b5dc37ed38468bfecff890ec31e1d3cbce",
+  "checks": [
+    {
+      "global_batch": 0,
+      "rows": 2048,
+      "baseline_max_error": 2.86102294921875e-06,
+      "changed_inputs_bitwise_match_CPU": true,
+      "only_owner_fields_changed": true,
+      "all_targets_coverage": 1.0
+    },
+    {
+      "global_batch": 1,
+      "rows": 2048,
+      "baseline_max_error": 1.9073486328125e-06,
+      "changed_inputs_bitwise_match_CPU": true,
+      "only_owner_fields_changed": true,
+      "all_targets_coverage": 1.0
+    },
+    {
+      "global_batch": 2320,
+      "rows": 2048,
+      "baseline_max_error": 2.86102294921875e-06,
+      "changed_inputs_bitwise_match_CPU": true,
+      "only_owner_fields_changed": true,
+      "all_targets_coverage": 1.0
+    },
+    {
+      "global_batch": 4641,
+      "rows": 84,
+      "baseline_max_error": 1.430511474609375e-06,
+      "changed_inputs_bitwise_match_CPU": true,
+      "only_owner_fields_changed": true,
+      "all_targets_coverage": 1.0
+    }
+  ]
+}

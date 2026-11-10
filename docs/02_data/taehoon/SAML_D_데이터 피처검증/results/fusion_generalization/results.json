@@ -1,0 +1,286 @@
+{
+  "utc": "2026-11-08T13:49:54.000931+00:00",
+  "population": "complete SAML-D",
+  "results": {
+    "Multi_FraudGT": {
+      "model": "Multi_FraudGT",
+      "rows": 9504852,
+      "positive": 9873,
+      "coverage": 1.0,
+      "AP": 0.020362635473623953,
+      "AP_sklearn": 0.020362635473623953,
+      "AP_crosscheck": true,
+      "ROC_AUC": 0.6770827626560363,
+      "primary": {
+        "TP": 4511,
+        "FP": 1018255,
+        "FN": 5362,
+        "TN": 8476724,
+        "precision": 0.00441058854126946,
+        "recall": 0.45690266383064926,
+        "F1": 0.008736838333628693,
+        "FPR": 0.10724141675300176,
+        "predicted_positive": 1022766,
+        "alert_rate": 0.10760462130288825,
+        "threshold_logit": 0.0,
+        "threshold_probability": 0.5
+      },
+      "top_k": [
+        {
+          "fraction": 0.001,
+          "alerts": 9505,
+          "TP": 783,
+          "FP": 8722,
+          "precision": 0.08237769594950026,
+          "recall": 0.07930720145852324
+        },
+        {
+          "fraction": 0.005,
+          "alerts": 47525,
+          "TP": 1178,
+          "FP": 46347,
+          "precision": 0.02478695423461336,
+          "recall": 0.1193153043654411
+        },
+        {
+          "fraction": 0.01,
+          "alerts": 95049,
+          "TP": 1365,
+          "FP": 93684,
+          "precision": 0.014361013792885775,
+          "recall": 0.13825584928593132
+        }
+      ],
+      "original_saml_baseline_reproduced": true
+    },
+    "HGB": {
+      "model": "HGB",
+      "rows": 9504852,
+      "positive": 9873,
+      "coverage": 1.0,
+      "AP": 0.022757996029556724,
+      "AP_sklearn": 0.022757996029556724,
+      "AP_crosscheck": true,
+      "ROC_AUC": 0.7744399871358976,
+      "primary": {
+        "TP": 5018,
+        "FP": 623998,
+        "FN": 4855,
+        "TN": 8870981,
+        "precision": 0.007977539522047133,
+        "recall": 0.5082548364225666,
+        "F1": 0.015708519007214084,
+        "FPR": 0.06571873408040187,
+        "predicted_positive": 629016,
+        "alert_rate": 0.06617841077378164,
+        "threshold_logit": 0.0,
+        "threshold_probability": 0.5
+      },
+      "top_k": [
+        {
+          "fraction": 0.001,
+          "alerts": 9505,
+          "TP": 807,
+          "FP": 8698,
+          "precision": 0.08490268279852708,
+          "recall": 0.08173807353388028
+        },
+        {
+          "fraction": 0.005,
+          "alerts": 47525,
+          "TP": 1296,
+          "FP": 46229,
+          "precision": 0.027269857969489743,
+          "recall": 0.13126709206927986
+        },
+        {
+          "fraction": 0.01,
+          "alerts": 95049,
+          "TP": 1602,
+          "FP": 93447,
+          "precision": 0.016854464539342865,
+          "recall": 0.16226071103008205
+        }
+      ]
+    },
+    "A3": {
+      "model": "A3",
+      "rows": 9504852,
+      "positive": 9873,
+      "coverage": 1.0,
+      "AP": 0.0032973473634441935,
+      "AP_sklearn": 0.0032973473634441935,
+      "AP_crosscheck": true,
+      "ROC_AUC": 0.7100120816884697,
+      "primary": {
+        "TP": 4337,
+        "FP": 725325,
+        "FN": 5536,
+        "TN": 8769654,
+        "precision": 0.005943847973445239,
+        "recall": 0.4392788412843108,
+        "F1": 0.011728991866510713,
+        "FPR": 0.07639037432310276,
+        "predicted_positive": 729662,
+        "alert_rate": 0.07676731841800377,
+        "threshold_logit": 0.0,
+        "threshold_probability": 0.5
+      },
+      "top_k": [
+        {
+          "fraction": 0.001,
+          "alerts": 9505,
+          "TP": 14,
+          "FP": 9491,
+          "precision": 0.0014729089952656496,
+          "recall": 0.0014180087106249366
+        },
+        {
+          "fraction": 0.005,
+          "alerts": 47525,
+          "TP": 76,
+          "FP": 47449,
+          "precision": 0.0015991583377169911,
+          "recall": 0.007697761571963942
+        },
+        {
+          "fraction": 0.01,
+          "alerts": 95049,
+          "TP": 227,
+          "FP": 94822,
+          "precision": 0.002388241854201517,
+          "recall": 0.022991998379418618
+        }
+      ]
+    },
+    "Multi_FraudGT_HGB": {
+      "model": "Multi_FraudGT_HGB",
+      "rows": 9504852,
+      "positive": 9873,
+      "coverage": 1.0,
+      "AP": 0.02235109250558708,
+      "AP_sklearn": 0.022351092505587082,
+      "AP_crosscheck": true,
+      "ROC_AUC": 0.7539926869831991,
+      "primary": {
+        "TP": 4663,
+        "FP": 591077,
+        "FN": 5210,
+        "TN": 8903902,
+        "precision": 0.007827240071171988,
+        "recall": 0.47229818697457715,
+        "F1": 0.015399273133172504,
+        "FPR": 0.06225153315241666,
+        "predicted_positive": 595740,
+        "alert_rate": 0.06267746199519993,
+        "threshold_logit": 0.0,
+        "threshold_probability": 0.5
+      },
+      "top_k": [
+        {
+          "fraction": 0.001,
+          "alerts": 9505,
+          "TP": 609,
+          "FP": 8896,
+          "precision": 0.06407154129405576,
+          "recall": 0.06168337891218475
+        },
+        {
+          "fraction": 0.005,
+          "alerts": 47525,
+          "TP": 973,
+          "FP": 46552,
+          "precision": 0.02047343503419253,
+          "recall": 0.0985516053884331
+        },
+        {
+          "fraction": 0.01,
+          "alerts": 95049,
+          "TP": 1228,
+          "FP": 93821,
+          "precision": 0.012919651968984418,
+          "recall": 0.12437962118910159
+        }
+      ],
+      "hi_validation_threshold": {
+        "TP": 5993,
+        "FP": 835693,
+        "FN": 3880,
+        "TN": 8659286,
+        "precision": 0.007120232485748842,
+        "recall": 0.6070090144839461,
+        "F1": 0.014075360603316975,
+        "FPR": 0.08801420203246368,
+        "predicted_positive": 841686,
+        "alert_rate": 0.08855329888355969,
+        "threshold_logit": -1.4178564536600042,
+        "threshold_probability": 0.19499784398798747
+      }
+    },
+    "A3_HGB": {
+      "model": "A3_HGB",
+      "rows": 9504852,
+      "positive": 9873,
+      "coverage": 1.0,
+      "AP": 0.010357741262007164,
+      "AP_sklearn": 0.010357741262007164,
+      "AP_crosscheck": true,
+      "ROC_AUC": 0.7691322002756383,
+      "primary": {
+        "TP": 4569,
+        "FP": 588165,
+        "FN": 5304,
+        "TN": 8906814,
+        "precision": 0.0077083480954357264,
+        "recall": 0.4627772713460954,
+        "F1": 0.015164111933648299,
+        "FPR": 0.06194484474373245,
+        "predicted_positive": 592734,
+        "alert_rate": 0.06236120246796058,
+        "threshold_logit": 0.0,
+        "threshold_probability": 0.5
+      },
+      "top_k": [
+        {
+          "fraction": 0.001,
+          "alerts": 9505,
+          "TP": 218,
+          "FP": 9287,
+          "precision": 0.022935297211993687,
+          "recall": 0.02208042135115973
+        },
+        {
+          "fraction": 0.005,
+          "alerts": 47525,
+          "TP": 508,
+          "FP": 47017,
+          "precision": 0.010689110994213573,
+          "recall": 0.05145345892839056
+        },
+        {
+          "fraction": 0.01,
+          "alerts": 95049,
+          "TP": 737,
+          "FP": 94312,
+          "precision": 0.007753895359235763,
+          "recall": 0.07464802998075559
+        }
+      ],
+      "hi_validation_threshold": {
+        "TP": 5609,
+        "FP": 747361,
+        "FN": 4264,
+        "TN": 8747618,
+        "precision": 0.007449167961538972,
+        "recall": 0.5681150612782335,
+        "F1": 0.014705516076047103,
+        "FPR": 0.07871117987728041,
+        "predicted_positive": 752970,
+        "alert_rate": 0.07921953966247976,
+        "threshold_logit": -1.0286091977504466,
+        "threshold_probability": 0.26335382902414334
+      }
+    }
+  },
+  "plan_sha256": "771378da3f65db251b0fc8d50938dd08a5cc127f5f93ab493bba72d7d19aaa65"
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "purpose": "Change owner missing-value imputation; frozen GNN weights and threshold",
+  "fields": [
+    "log_entity_observed_accounts",
+    "log_entity_out_diversity",
+    "log_entity_in_diversity"
+  ],
+  "unchanged": "Node type6,country2 remain zero; payment format mapping,Port,Ego,graph and all observed numeric fields unchanged",
+  "methods": {
+    "train_median": "Coordinate-wise median over active HI Train accounts (not transaction-weighted)",
+    "degree_median": "Same HI Train owner medians in fixed source/destination unique-counterparty count bins; groups<128 use global Train median"
+  },
+  "fitting": "Only HI Train node snapshot 2022-09-25; all active accounts; no fraud labels",
+  "validation": "128 shared2048-target batches (262144 rows), uniform permutation of entire HI Validation, seed20261107; original val graph and sampler scope val/epoch0/index",
+  "selection": "Highest HI masked-validation AP among the two alternative imputers; tie within1e-12 -> higherF1 -> train_median. Zero baseline is reference, not candidate. Selected alternative is evaluated even if worse than zero.",
+  "validation_conditions": [
+    "original",
+    "zero",
+    "train_median",
+    "degree_median"
+  ],
+  "target": "Every one of9504852 SAML-D observations, original fixed random order and samplers; selected method only",
+  "threshold": 0.5,
+  "selected_checkpoint_epoch": 280,
+  "checkpoint_sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+  "readout": "all_targets",
+  "batch_size": 2048,
+  "fanout": [
+    50,
+    50
+  ],
+  "main_model_retrained": false,
+  "status": "Post-hoc follow-up after SAML full Test was already inspected; not a fresh unseen benchmark",
+  "imputation_limit": "Owner values are source-based numerical guesses, not recovered SAML ground truth; source validation choice may not transfer",
+  "salt_remains_paused": true,
+  "source_sha256": {
+    "imputation.py": "9cd82e580ee697a146828d973ab6c250c5779f4310edd42010169c327e717577",
+    "prepare.py": "7515b8fa003764a130a87eefae6bb593553b6a1d962115f2ba2e0b490b6d722b",
+    "validate.py": "f738c7d9c22afcfb1183f2e212aef6c0bbe66e72790e76315d474cdc6058bf26",
+    "full_saml.py": "3099eb8b0f58e77473ee27795e9817b2cbf5bd67129d761f1352c4e696a8d874"
+  }
+}

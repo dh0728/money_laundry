@@ -1,0 +1,71 @@
+{
+  "passed": true,
+  "utc": "2026-11-06T04:56:28.565416+00:00",
+  "protocol_sha256": "c5f0e4befa414810c8df7049760f4170f779accc6ecf024b80ac0bd844c04d34",
+  "checks": [
+    {
+      "batch": 0,
+      "targets": 2048,
+      "nodes": 75698,
+      "forward_edges": 681532,
+      "reverse_edges": 405080,
+      "target_edges_not_sampled": 424,
+      "unique_nodes": 75698,
+      "disjoint": false,
+      "relations": 2,
+      "official_common_max_abs_error": 2.86102294921875e-06,
+      "seconds": 1.9696239288896322,
+      "gpu_peak_allocated_bytes": 3458721792,
+      "gpu_input_bitwise_matches_cpu": true,
+      "gpu_adapter_logit_max_abs_error": 1.9073486328125e-06
+    },
+    {
+      "batch": 1,
+      "targets": 2048,
+      "nodes": 78239,
+      "forward_edges": 687125,
+      "reverse_edges": 407016,
+      "target_edges_not_sampled": 429,
+      "unique_nodes": 78239,
+      "disjoint": false,
+      "relations": 2,
+      "official_common_max_abs_error": 2.86102294921875e-06,
+      "seconds": 1.5699228849262,
+      "gpu_peak_allocated_bytes": 3478430208,
+      "gpu_input_bitwise_matches_cpu": true,
+      "gpu_adapter_logit_max_abs_error": 2.86102294921875e-06
+    },
+    {
+      "batch": 2320,
+      "targets": 2048,
+      "nodes": 75754,
+      "forward_edges": 679823,
+      "reverse_edges": 398785,
+      "target_edges_not_sampled": 434,
+      "unique_nodes": 75754,
+      "disjoint": false,
+      "relations": 2,
+      "official_common_max_abs_error": 3.337860107421875e-06,
+      "seconds": 1.5477502215653658,
+      "gpu_peak_allocated_bytes": 3478430208,
+      "gpu_input_bitwise_matches_cpu": true,
+      "gpu_adapter_logit_max_abs_error": 2.175569534301758e-06
+    },
+    {
+      "batch": 4641,
+      "targets": 84,
+      "nodes": 3635,
+      "forward_edges": 30030,
+      "reverse_edges": 17152,
+      "target_edges_not_sampled": 19,
+      "unique_nodes": 3635,
+      "disjoint": false,
+      "relations": 2,
+      "official_common_max_abs_error": 1.9073486328125e-06,
+      "seconds": 0.07799702510237694,
+      "gpu_peak_allocated_bytes": 3478430208,
+      "gpu_input_bitwise_matches_cpu": true,
+      "gpu_adapter_logit_max_abs_error": 1.9073486328125e-06
+    }
+  ]
+}

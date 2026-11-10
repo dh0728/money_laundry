@@ -1,0 +1,35 @@
+﻿feature,role,retained,scalar_columns,saml_availability
+log_out_count,node,True,1,observed
+log_in_count,node,True,1,observed
+log_out_neighbors,node,True,1,observed
+log_in_neighbors,node,True,1,observed
+log_self_count,node,True,1,observed
+log_reciprocal_neighbors,node,True,1,observed
+mean_paid_currency_z,node,True,1,observed
+paid_outlier_fraction,node,True,1,observed
+log_currency_count,node,True,1,observed
+log_active_days,node,True,1,observed
+type_Corporation,node,False,1,unavailable; removed from both HI and SAML model inputs
+type_Partnership,node,False,1,unavailable; removed from both HI and SAML model inputs
+type_Sole Proprietorship,node,False,1,unavailable; removed from both HI and SAML model inputs
+type_Individual,node,False,1,unavailable; removed from both HI and SAML model inputs
+type_Country,node,False,1,unavailable; removed from both HI and SAML model inputs
+type_Direct,node,False,1,unavailable; removed from both HI and SAML model inputs
+log_entity_observed_accounts,node,False,1,unavailable; removed from both HI and SAML model inputs
+log_entity_out_diversity,node,False,1,unavailable; removed from both HI and SAML model inputs
+log_entity_in_diversity,node,False,1,unavailable; removed from both HI and SAML model inputs
+pair_prior_count,edge,True,1,observed
+pair_gap_minutes,edge,True,1,observed
+pair_count_1h,edge,True,1,observed
+sender_gap_minutes,edge,True,1,observed
+sender_count_1h,edge,True,1,observed
+receiver_gap_minutes,edge,True,1,observed
+receiver_count_1h,edge,True,1,observed
+paid_currency_z,edge,True,1,observed
+reverse_history_count,edge,True,1,observed
+pair_age_at_day_start,edge,True,1,observed
+same_known_country,edge,False,1,unavailable; removed from both HI and SAML model inputs
+both_countries_known,edge,False,1,unavailable; removed from both HI and SAML model inputs
+same_currency,edge,True,1,observed
+is_self_transfer,edge,True,1,observed
+payment_format,edge,True,8,observed; unsupported categories remain Unknown

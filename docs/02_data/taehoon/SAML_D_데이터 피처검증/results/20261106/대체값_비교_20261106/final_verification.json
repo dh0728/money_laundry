@@ -1,0 +1,13 @@
+{
+  "utc": "2026-11-06T06:02:51.472446+00:00",
+  "all_passed": true,
+  "all_rows": 9504852,
+  "class_counts_verified": true,
+  "paired_counts_verified": true,
+  "full_logit_hash_verified": true,
+  "source_only_selection_verified": true,
+  "original_checkpoint_and_input_code_unchanged": true,
+  "source_validation_and_target_preflight_passed": true,
+  "salt_still_paused": true,
+  "salt_checkpoint_unchanged": true
+}

@@ -1,0 +1,15 @@
+{
+  "all_passed": true,
+  "hi_rows": 170426489,
+  "saml_rows": 9504852,
+  "exact_full_census": true,
+  "finite_all_input_values": true,
+  "source_file_stats_unchanged": true,
+  "hi_split_ids_unique_present_disjoint_and_cover_all": true,
+  "hi_existing_payment_audit_matches": true,
+  "saml_unknown_count_matches": true,
+  "zero_filled_columns_verified": true,
+  "no_training_or_inference": true,
+  "node_query_stats_weighted_by_exact_endpoint_counts": true,
+  "elapsed_seconds": 73.08461471274495
+}

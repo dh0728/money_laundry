@@ -1,0 +1,37 @@
+{
+  "all_passed": true,
+  "created_utc": "2026-11-06T07:39:13.170155+00:00",
+  "model_runs_started": 0,
+  "source_experiment_verifications_passed": true,
+  "saml_rows_per_method": 9504852,
+  "methods": [
+    "zero",
+    "train_median",
+    "degree_median",
+    "behavior_donor"
+  ],
+  "fraud_patterns": 17,
+  "normal_patterns": 11,
+  "all_pattern_counts_match_global_metrics": true,
+  "hi_test_and_validation_samples_distinguished": true,
+  "md_tables_have_consistent_columns": true,
+  "local_links": 21,
+  "embedded_images": 1,
+  "html_remote_dependencies": 0,
+  "source_sha256": {
+    "result.json": "c7c78e645b7bbe2e0c2e731fe732fea1aa72d66a8cc78ee95747da3402502353",
+    "결측_분포진단_20261106/control_result.json": "192e1a97e77579801d1266d19f7858757c38b4ad2e9d94cc2cade2dd0d36b227",
+    "대체값_비교_20261106/result.json": "cac0d6c36f193875ba581c5424b5d24663260ee925d6553925927f2062f1e76e",
+    "대체값_추가실험_20261106/result.json": "5b299fcb20fbc6cf1d7ffb952b85f8ab9ea02f16ef9cf7c69203c34a806e8ece",
+    "대체값_추가실험_20261106/selection.json": "fa567f760e9266d2cab61660efe62eaf17c95eb223ae671a6ff2f2366d94978b",
+    "대체값_추가실험_20261106/pattern_comparison.csv": "5d64e87da2297a88d10040cc3ed0b50a10bd249a9c9e77ec98606a3d08b8919a",
+    "전체입력비교_20261106/edge_full_statistics.csv": "6feeaf99168cf2d5f2c82b47e9cf6b3df3468893e02f70c12d1f1096c0af949b",
+    "전체입력비교_20261106/node_query_full_statistics.csv": "b57a3762967bbc190c8c63ad5edaf5cc82603605abca39a3a39753a6494d6de3",
+    "전체입력비교_20261106/payment_full_distribution.csv": "49f7762b142b719e0c615a3542f2a9749554cf2a47492b4c606ba900c3ab90c2"
+  },
+  "hi_reference_sha256": "d26c6ca9d05a104a901a77ed62d54dcd7a9cf9391d5bb99e12ccb37cc451f002",
+  "artifact_sha256": {
+    "SAML_D_Test_최종보고서_팀공유_20261106.md": "a15216e20aa73696d63194a8e812f00dce7d3ccd8ee87e416cce758b65692b76",
+    "SAML_D_Test_최종보고서_팀공유_20261106.html": "c0f03b87db71720f4ba7840e1cc32b2e7c28f242001f5642d501807a9f24e686"
+  }
+}

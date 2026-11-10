@@ -1,0 +1,67 @@
+{
+  "plan_sha256": "c3aac7d1721c478c5922259c5fcd1f7103e9a6ca986fef8741448daa3de13245",
+  "selected_method": "train_median",
+  "criterion": "Highest HI masked-validation AP among the two alternative imputers; tie within1e-12 -> higherF1 -> train_median. Zero baseline is reference, not candidate. Selected alternative is evaluated even if worse than zero.",
+  "results": [
+    {
+      "method": "original",
+      "rows": 262144,
+      "positive": 340,
+      "TP": 202,
+      "FP": 16,
+      "FN": 138,
+      "TN": 261788,
+      "precision": 0.926605504587156,
+      "recall": 0.5941176470588235,
+      "F1": 0.7240143369175627,
+      "FPR": 6.111442147560771e-05,
+      "AP": 0.6855461912948451
+    },
+    {
+      "method": "zero",
+      "rows": 262144,
+      "positive": 340,
+      "TP": 270,
+      "FP": 3335,
+      "FN": 70,
+      "TN": 258469,
+      "precision": 0.07489597780859916,
+      "recall": 0.7941176470588235,
+      "F1": 0.13688212927756654,
+      "FPR": 0.012738537226321981,
+      "AP": 0.5855247175889572
+    },
+    {
+      "method": "train_median",
+      "rows": 262144,
+      "positive": 340,
+      "TP": 203,
+      "FP": 28,
+      "FN": 137,
+      "TN": 261776,
+      "precision": 0.8787878787878788,
+      "recall": 0.5970588235294118,
+      "F1": 0.7110332749562172,
+      "FPR": 0.00010695023758231348,
+      "AP": 0.6821485084686014
+    },
+    {
+      "method": "degree_median",
+      "rows": 262144,
+      "positive": 340,
+      "TP": 204,
+      "FP": 40,
+      "FN": 136,
+      "TN": 261764,
+      "precision": 0.8360655737704918,
+      "recall": 0.6,
+      "F1": 0.6986301369863014,
+      "FPR": 0.00015278605368901926,
+      "AP": 0.6805442977223484
+    }
+  ],
+  "validation_ids_sha256": "77c4619635d530c00fff9aae48169816772715eed26e90fa86c7b5588e8b5c30",
+  "saml_labels_used": false,
+  "saml_predictions_used": false,
+  "checkpoint_sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f"
+}

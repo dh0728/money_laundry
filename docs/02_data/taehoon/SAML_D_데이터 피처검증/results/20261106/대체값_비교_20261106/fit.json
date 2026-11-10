@@ -1,0 +1,45 @@
+{
+  "active_train_accounts": 2100893,
+  "total_accounts": 2116168,
+  "owner_fields": [
+    "log_entity_observed_accounts",
+    "log_entity_out_diversity",
+    "log_entity_in_diversity"
+  ],
+  "global_median": [
+    2.3025851249694824,
+    3.044522523880005,
+    2.7725887298583984
+  ],
+  "degree_bins_log": [
+    0.40546509623527527,
+    0.9162907600402832,
+    1.504077434539795,
+    2.140066146850586,
+    2.8033604621887207,
+    3.4812400341033936,
+    4.166665077209473,
+    4.855928897857666,
+    5.547128677368164,
+    6.239300727844238,
+    6.931960105895996
+  ],
+  "supported_cells": 41,
+  "total_cells": 144,
+  "minimum_cell_count": 128,
+  "labels_read": false,
+  "saml_inputs_used": false,
+  "inputs": {
+    "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/nodes/2022-09-25.npy": {
+      "size": 160828896,
+      "mtime_ns": 1792855962038213328,
+      "sha256": "421601a2a40366f509f2accc6cc8ef29131cb491e61d5b36f834e706fa6beb1b"
+    }
+  },
+  "artifacts": {
+    "owner_train_median.npy": "b5beb998afc3660e07a84d2cac144ae1128b419b4ed0c49bd9546c49631318e7",
+    "degree_bin_edges.npy": "1c4b07f969e16f372ffc2f7b514bdad1f2bc46c47d030ab50afa14aaea300473",
+    "owner_bin_medians.npy": "b42700ed66c46838cd87a3bfb090c0a51e7800045a88603988095aa910c37f1b",
+    "owner_bin_counts.npy": "ef0b17563f162558631a608e2bab09e12fa77c08a6659e6099144f029a99341e"
+  }
+}

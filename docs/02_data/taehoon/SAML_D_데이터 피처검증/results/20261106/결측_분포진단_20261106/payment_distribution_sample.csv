@@ -1,0 +1,25 @@
+domain,format,rows,fraction
+HI_train,ACH,12502,0.12502
+HI_train,Bitcoin,2166,0.02166
+HI_train,Cash,10467,0.10467
+HI_train,Cheque,39416,0.39416
+HI_train,Credit Card,28327,0.28327
+HI_train,Reinvestment,3592,0.03592
+HI_train,Wire,3530,0.0353
+HI_train,Unknown,0,0.0
+HI_test,ACH,12408,0.12408
+HI_test,Bitcoin,2151,0.02151
+HI_test,Cash,10021,0.10021
+HI_test,Cheque,38585,0.38585
+HI_test,Credit Card,27742,0.27742
+HI_test,Reinvestment,5554,0.05554
+HI_test,Wire,3539,0.03539
+HI_test,Unknown,0,0.0
+SAML,ACH,21230,0.2123
+SAML,Bitcoin,0,0.0
+SAML,Cash,5375,0.05375
+SAML,Cheque,21176,0.21176
+SAML,Credit Card,21257,0.21257
+SAML,Reinvestment,0,0.0
+SAML,Wire,0,0.0
+SAML,Unknown,30962,0.30962

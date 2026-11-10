@@ -1,0 +1,54 @@
+{
+  "utc": "2026-11-06T06:01:52.461005+00:00",
+  "method": "train_median",
+  "protocol_sha256": "ffc074bd1a4f7be892ff6b2a6f51e2b5dc37ed38468bfecff890ec31e1d3cbce",
+  "baseline": {
+    "rows": 9504852,
+    "positive": 9873,
+    "TP": 4511,
+    "FP": 1018255,
+    "FN": 5362,
+    "TN": 8476724,
+    "precision": 0.00441058854126946,
+    "recall": 0.45690266383064926,
+    "F1": 0.008736838333628693,
+    "AP": 0.020362635473623953,
+    "FPR": 0.10724141675300176,
+    "ROC_AUC": 0.6770827626560363,
+    "coverage": 1.0
+  },
+  "imputed": {
+    "rows": 9504852,
+    "positive": 9873,
+    "TP": 2209,
+    "FP": 712843,
+    "FN": 7664,
+    "TN": 8782136,
+    "precision": 0.0030892858141785494,
+    "recall": 0.22374151726932037,
+    "F1": 0.00609442356105804,
+    "AP": 0.001609817331166864,
+    "FPR": 0.07507578479109854,
+    "ROC_AUC": 0.5226080000565846,
+    "coverage": 1.0
+  },
+  "paired": {
+    "normal_rescued": 440012,
+    "new_false_positives": 134600,
+    "positive_gained": 73,
+    "positive_lost": 2375
+  },
+  "delta": {
+    "precision": -0.0013213027270909104,
+    "recall": -0.23316114656132889,
+    "F1": -0.0026424147725706525,
+    "AP": -0.01875281814245709,
+    "FPR": -0.032165631961903224
+  },
+  "logits_sha256": "bfc1a0f05cd145d383c5670c8070e86b3be62db30f1b6b1644c8990fe6a928af",
+  "methods_selected_on": "HI Validation AP only",
+  "main_model_retrained": false,
+  "threshold": 0.5,
+  "all_rows_verified": true,
+  "AP_sklearn_crosscheck": true
+}

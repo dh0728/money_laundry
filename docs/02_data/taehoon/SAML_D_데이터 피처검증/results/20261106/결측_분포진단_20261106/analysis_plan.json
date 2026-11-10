@@ -1,0 +1,10 @@
+{
+  "created_utc": "2026-11-06T05:17:51.838250+00:00",
+  "scope": "Existing frozen predictions, missingness audit, source/target feature distributions",
+  "threshold": 0.5,
+  "refit": false,
+  "select_threshold": false,
+  "causal_claim": false,
+  "salt_remains_paused": true,
+  "note": "Missing KYC/country is constant across SAML; group associations cannot identify its causal effect. No new SAML model evaluation or training in this script."
+}

@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "batch": 0,
+      "bitwise_CPU_input_parity": true
+    },
+    {
+      "batch": 64,
+      "bitwise_CPU_input_parity": true
+    },
+    {
+      "batch": 127,
+      "bitwise_CPU_input_parity": true
+    }
+  ],
+  "all_four_prior_conditions_reproduced_for_all128_batches": true
+}

@@ -1,0 +1,11 @@
+{
+  "python": "3.12.3 (main, Jan  8 2026, 11:30:50) [GCC 13.3.0]",
+  "torch": "2.10.0+cu126",
+  "cuda": "12.6",
+  "torch_geometric": "2.8.0.post1",
+  "pyg_lib": "0.8.0+pt210cu126",
+  "numpy": "2.4.1",
+  "sklearn": "1.8.0",
+  "pyarrow": "24.0.0",
+  "gpu": "Tesla V100-SXM2-32GB, 580.126.20, 32768 MiB"
+}

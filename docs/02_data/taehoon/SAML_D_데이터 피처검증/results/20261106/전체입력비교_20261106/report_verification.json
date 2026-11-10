@@ -1,0 +1,13 @@
+{
+  "all_passed": true,
+  "weighted_nodes_match_independent_direct_queries": true,
+  "validation_sample_rows_per_role": 100003,
+  "max_mean_difference": {
+    "src": 0.0,
+    "dst": 0.0
+  },
+  "csv_row_counts_and_ranges_checked": true,
+  "report_links_exist": 35,
+  "report_table_structure_checked": true,
+  "report_full_statistics_are_not_sample_estimates": true
+}

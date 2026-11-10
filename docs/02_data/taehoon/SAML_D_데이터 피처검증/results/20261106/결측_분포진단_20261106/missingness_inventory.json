@@ -1,0 +1,23 @@
+{
+  "rows": 9504852,
+  "node_missing_columns": [
+    "type_Corporation",
+    "type_Partnership",
+    "type_Sole Proprietorship",
+    "type_Individual",
+    "type_Country",
+    "type_Direct",
+    "log_entity_observed_accounts",
+    "log_entity_out_diversity",
+    "log_entity_in_diversity"
+  ],
+  "country_columns": [
+    "same_known_country",
+    "both_countries_known"
+  ],
+  "unknown_payment_rows": 2946034,
+  "unsupported_currency_rows": 159771,
+  "all_country_zero": true,
+  "all_node_kyc_zero": true,
+  "nan_inf_count": 0
+}

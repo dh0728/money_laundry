@@ -1,0 +1,88 @@
+{
+  "passed": true,
+  "utc": "2026-11-09T02:29:11.344756+00:00",
+  "code_manifest_sha256": "2351df69e7d67d6cf2db1ee69e0535e9b772c5c3b898c6da765d165bc7bc63ca",
+  "plan_sha256": "bc2bc9533760c677677db499bb735a4ad6078da63f1d5003dcc8b2cf5ebe41a8",
+  "model_checks": {
+    "removed_columns_cannot_affect_inputs": true,
+    "initialization_rng_preserved": true,
+    "physically_reduced_dimensions": [
+      11,
+      21,
+      21
+    ],
+    "fresh_full_masked_vs_compact_grad_max_abs_error": 2.384185791015625e-07,
+    "common_initial_weights_and_optimizer_step_match": true,
+    "identically_unused_parameters": [
+      "layers.1.edge_output.1.weight",
+      "layers.1.edge_output.1.bias",
+      "layers.1.edge_ffn.1.0.weight",
+      "layers.1.edge_ffn.1.0.bias",
+      "layers.1.edge_ffn.1.2.weight",
+      "layers.1.edge_ffn.1.2.bias"
+    ],
+    "parameters": 226561
+  },
+  "input_checks": [
+    {
+      "scope": "train",
+      "rows": 2048,
+      "input_bitwise_equal": true,
+      "targets": 2048,
+      "nodes": 122690,
+      "forward_edges": 764269,
+      "reverse_edges": 709805,
+      "target_edges_not_sampled": 1195,
+      "unique_nodes": 122690,
+      "disjoint": false,
+      "relations": 2,
+      "compact_cpu_gpu_logit_max_abs_error": 3.5762786865234375e-07,
+      "seconds": 25.831181271001697
+    },
+    {
+      "scope": "val",
+      "rows": 2048,
+      "input_bitwise_equal": true,
+      "targets": 2048,
+      "nodes": 123704,
+      "forward_edges": 764522,
+      "reverse_edges": 722249,
+      "target_edges_not_sampled": 1353,
+      "unique_nodes": 123704,
+      "disjoint": false,
+      "relations": 2,
+      "compact_cpu_gpu_logit_max_abs_error": 2.384185791015625e-07,
+      "seconds": 32.30387067049742
+    },
+    {
+      "scope": "test",
+      "rows": 2048,
+      "input_bitwise_equal": true,
+      "targets": 2048,
+      "nodes": 127275,
+      "forward_edges": 803176,
+      "reverse_edges": 754699,
+      "target_edges_not_sampled": 1440,
+      "unique_nodes": 127275,
+      "disjoint": false,
+      "relations": 2,
+      "compact_cpu_gpu_logit_max_abs_error": 2.384185791015625e-07,
+      "baseline_test_reproduced_max_abs_error": 9.5367431640625e-06,
+      "seconds": 56.0999950543046
+    },
+    {
+      "scope": "saml",
+      "batch": 0,
+      "rows": 2048,
+      "input_bitwise_equal": true,
+      "baseline_logits_reproduced_max_abs_error": 2.86102294921875e-06
+    },
+    {
+      "scope": "saml",
+      "batch": 4641,
+      "rows": 84,
+      "input_bitwise_equal": true,
+      "baseline_logits_reproduced_max_abs_error": 9.5367431640625e-07
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "conditions": [
+    "baseline",
+    "node_type_zero",
+    "node_owner_zero",
+    "country_zero",
+    "missing11",
+    "unknown31",
+    "missing11_unknown31"
+  ],
+  "checks": [
+    "Only declared feature columns change",
+    "Context and query edge policies match",
+    "Ego, graph indices, Port and target IDs unchanged",
+    "Original batch never mutated"
+  ]
+}

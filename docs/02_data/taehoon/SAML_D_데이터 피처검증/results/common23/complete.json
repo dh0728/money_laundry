@@ -1,0 +1,111 @@
+{
+  "status": "complete",
+  "utc": "2026-11-09T22:42:25.224871+00:00",
+  "selection": {
+    "checkpoint_sha256": "d48f114e13d0f7c214021efadb12ae6c3af08537873e3ebcafda2898a78cdb4e",
+    "selected_epoch": 280,
+    "selection": "HI validation F1 only",
+    "plan_sha256": "bc2bc9533760c677677db499bb735a4ad6078da63f1d5003dcc8b2cf5ebe41a8",
+    "code_manifest_sha256": "2351df69e7d67d6cf2db1ee69e0535e9b772c5c3b898c6da765d165bc7bc63ca"
+  },
+  "comparisons": {
+    "hi_test": {
+      "scope": "hi_test",
+      "original_34": {
+        "rows": 33429507,
+        "positive": 44103,
+        "normal": 33385404,
+        "coverage": 1.0,
+        "TP": 25483,
+        "FP": 3078,
+        "FN": 18620,
+        "TN": 33382326,
+        "precision": 0.8922306641924302,
+        "recall": 0.5778064984241434,
+        "F1": 0.7013927116591434,
+        "AP": 0.6687875213029661,
+        "ROC_AUC": 0.992310467314612,
+        "FPR": 9.21959788175695e-05,
+        "threshold_probability": 0.5,
+        "threshold_rule": "logit > 0"
+      },
+      "common_23": {
+        "rows": 33429507,
+        "positive": 44103,
+        "normal": 33385404,
+        "coverage": 1.0,
+        "TP": 25343,
+        "FP": 3174,
+        "FN": 18760,
+        "TN": 33382230,
+        "precision": 0.8886979696321492,
+        "recall": 0.5746321111942498,
+        "F1": 0.6979619939410631,
+        "AP": 0.6616553213824542,
+        "ROC_AUC": 0.9917294206835491,
+        "FPR": 9.507148692883872e-05,
+        "threshold_probability": 0.5,
+        "threshold_rule": "logit > 0"
+      },
+      "delta": {
+        "AP": -0.00713219992051195,
+        "ROC_AUC": -0.0005810466310629536,
+        "precision": -0.0035326945602810467,
+        "recall": -0.003174387229893605,
+        "F1": -0.003430717718080345,
+        "FP": 96,
+        "FPR": 2.875508111269221e-06
+      }
+    },
+    "saml": {
+      "scope": "saml",
+      "original_34": {
+        "rows": 9504852,
+        "positive": 9873,
+        "normal": 9494979,
+        "coverage": 1.0,
+        "TP": 4511,
+        "FP": 1018255,
+        "FN": 5362,
+        "TN": 8476724,
+        "precision": 0.00441058854126946,
+        "recall": 0.45690266383064926,
+        "F1": 0.008736838333628693,
+        "AP": 0.020362635473623953,
+        "ROC_AUC": 0.6770827626560363,
+        "FPR": 0.10724141675300176,
+        "threshold_probability": 0.5,
+        "threshold_rule": "logit > 0"
+      },
+      "common_23": {
+        "rows": 9504852,
+        "positive": 9873,
+        "normal": 9494979,
+        "coverage": 1.0,
+        "TP": 3122,
+        "FP": 580586,
+        "FN": 6751,
+        "TN": 8914393,
+        "precision": 0.005348564693305557,
+        "recall": 0.31621594246936086,
+        "F1": 0.010519204624137229,
+        "AP": 0.012136744585701307,
+        "ROC_AUC": 0.6201827682644242,
+        "FPR": 0.06114663339434453,
+        "threshold_probability": 0.5,
+        "threshold_rule": "logit > 0"
+      },
+      "delta": {
+        "AP": -0.008225890887922646,
+        "ROC_AUC": -0.056899994391612085,
+        "precision": 0.0009379761520360973,
+        "recall": -0.1406867213612884,
+        "F1": 0.0017823662905085361,
+        "FP": -437669,
+        "FPR": -0.046094783358657236
+      }
+    }
+  },
+  "report_sha256": "4e670cd36156fa8a455855691d595114d11229b0e20f0f6ff35afc935e8c5057",
+  "plan_sha256": "bc2bc9533760c677677db499bb735a4ad6078da63f1d5003dcc8b2cf5ebe41a8"
+}

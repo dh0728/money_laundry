@@ -1,0 +1,51 @@
+{
+  "passed": true,
+  "utc": "2026-11-08T13:51:31.698952+00:00",
+  "salt_prediction_chunks": 1302,
+  "salt_coverage": 9504852,
+  "all_committed_score_hashes_verified": true,
+  "all_operating_point_counts_verified": [
+    {
+      "model": "Multi_FraudGT",
+      "point": "primary",
+      "all_counts_verified": true
+    },
+    {
+      "model": "HGB",
+      "point": "primary",
+      "all_counts_verified": true
+    },
+    {
+      "model": "A3",
+      "point": "primary",
+      "all_counts_verified": true
+    },
+    {
+      "model": "Multi_FraudGT_HGB",
+      "point": "primary",
+      "all_counts_verified": true
+    },
+    {
+      "model": "Multi_FraudGT_HGB",
+      "point": "hi_validation_threshold",
+      "all_counts_verified": true
+    },
+    {
+      "model": "A3_HGB",
+      "point": "primary",
+      "all_counts_verified": true
+    },
+    {
+      "model": "A3_HGB",
+      "point": "hi_validation_threshold",
+      "all_counts_verified": true
+    }
+  ],
+  "all_pattern_totals_verified": true,
+  "html_tables": 5,
+  "all_report_links_exist": true,
+  "source_models_unchanged": true,
+  "salt_training_still_paused": true,
+  "report_sha256": "9498c4da5293f5846643961544ab23363671daa4324f5d28ae2b9a5d78e968b7",
+  "script_sha256": "28e33f680f4087c16f81dd1f9fd19e32253fb70c15924d86cbf16e218d6a065c"
+}

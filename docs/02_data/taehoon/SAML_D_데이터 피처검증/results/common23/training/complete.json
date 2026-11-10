@@ -1,0 +1,10 @@
+{
+  "status": "complete",
+  "epochs": 284,
+  "best": {
+    "F1": 0.7492625368731564,
+    "epoch": 280
+  },
+  "checkpoint_sha256": "d48f114e13d0f7c214021efadb12ae6c3af08537873e3ebcafda2898a78cdb4e",
+  "plan_sha256": "bc2bc9533760c677677db499bb735a4ad6078da63f1d5003dcc8b2cf5ebe41a8"
+}

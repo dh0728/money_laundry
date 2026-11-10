@@ -1,0 +1,11 @@
+{
+  "status": "complete",
+  "utc": "2026-11-08T13:50:07.910004+00:00",
+  "rows": 9504852,
+  "positive": 9873,
+  "coverage": 1.0,
+  "plan_sha256": "771378da3f65db251b0fc8d50938dd08a5cc127f5f93ab493bba72d7d19aaa65",
+  "results_sha256": "eaf8a881bf32a18e759140998295118fa6bfe0c4bd91949031eb448976ba6750",
+  "report_sha256": "9498c4da5293f5846643961544ab23363671daa4324f5d28ae2b9a5d78e968b7",
+  "salt_training_still_paused": true
+}

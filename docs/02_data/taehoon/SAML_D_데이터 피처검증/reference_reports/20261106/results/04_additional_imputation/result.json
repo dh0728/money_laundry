@@ -1,0 +1,97 @@
+{
+  "completed_utc": "2026-11-06T07:21:37.620779+00:00",
+  "protocol_sha256": "8a031c8b855cb68470c39cb46586076c2293af5c831ba73d7800a95426f6cfc9",
+  "source_selected_method": "degree_median",
+  "target_methods": [
+    "degree_median",
+    "behavior_donor"
+  ],
+  "results": [
+    {
+      "method": "zero",
+      "rows": 9504852,
+      "positive": 9873,
+      "TP": 4511,
+      "FP": 1018255,
+      "FN": 5362,
+      "TN": 8476724,
+      "precision": 0.00441058854126946,
+      "recall": 0.45690266383064926,
+      "F1": 0.008736838333628693,
+      "AP": 0.020362635473623953,
+      "FPR": 0.10724141675300176,
+      "ROC_AUC": 0.6770827626560363,
+      "coverage": 1.0
+    },
+    {
+      "method": "train_median",
+      "rows": 9504852,
+      "positive": 9873,
+      "TP": 2209,
+      "FP": 712843,
+      "FN": 7664,
+      "TN": 8782136,
+      "precision": 0.0030892858141785494,
+      "recall": 0.22374151726932037,
+      "F1": 0.00609442356105804,
+      "AP": 0.001609817331166864,
+      "FPR": 0.07507578479109854,
+      "ROC_AUC": 0.5226080000565846,
+      "coverage": 1.0
+    },
+    {
+      "method": "degree_median",
+      "rows": 9504852,
+      "positive": 9873,
+      "TP": 2167,
+      "FP": 676670,
+      "FN": 7706,
+      "TN": 8818309,
+      "precision": 0.0031922243484076443,
+      "recall": 0.21948749113744556,
+      "F1": 0.006292924452962785,
+      "AP": 0.0017145482313525493,
+      "FPR": 0.07126608705506353,
+      "ROC_AUC": 0.5399570115816534,
+      "coverage": 1.0
+    },
+    {
+      "method": "behavior_donor",
+      "rows": 9504852,
+      "positive": 9873,
+      "TP": 2437,
+      "FP": 668211,
+      "FN": 7436,
+      "TN": 8826768,
+      "precision": 0.003633798952654746,
+      "recall": 0.24683480198521218,
+      "F1": 0.007162159580674218,
+      "AP": 0.0023205985350060864,
+      "FPR": 0.07037519514261169,
+      "ROC_AUC": 0.5874391925322059,
+      "coverage": 1.0
+    }
+  ],
+  "paired": {
+    "degree_median": {
+      "normal_rescued": 473149,
+      "new_false_positives": 131564,
+      "positive_gained": 57,
+      "positive_lost": 2401
+    },
+    "behavior_donor": {
+      "normal_rescued": 479285,
+      "new_false_positives": 129241,
+      "positive_gained": 34,
+      "positive_lost": 2108
+    }
+  },
+  "target_logits_sha256": {
+    "degree_median": "586b238096852df66ea67fd8b63d7b237050067c6167bc49520b471b95f832c7",
+    "behavior_donor": "8281d7be665a810e3d4c4e6d6e2b9303b90aa47a706c0229ebd0f10208d16b50"
+  },
+  "main_model_retrained": false,
+  "threshold": 0.5,
+  "all_rows_verified": true,
+  "AP_sklearn_crosscheck": true
+}

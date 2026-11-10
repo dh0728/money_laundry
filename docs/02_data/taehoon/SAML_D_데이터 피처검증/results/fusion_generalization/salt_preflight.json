@@ -1,0 +1,41 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "day": "2022-10-07",
+      "targets": 4096,
+      "sampled_edges": 13366,
+      "graph_arrays_exact": true,
+      "input_arrays_exact": true,
+      "all_node_degrees_match_independent_prefix_counts": true,
+      "no_later_day_context": true,
+      "max_logit_error": 3.814697265625e-06
+    },
+    {
+      "day": "2023-03-16",
+      "targets": 4096,
+      "sampled_edges": 600156,
+      "graph_arrays_exact": true,
+      "input_arrays_exact": true,
+      "all_node_degrees_match_independent_prefix_counts": true,
+      "no_later_day_context": true,
+      "max_logit_error": 1.52587890625e-05
+    },
+    {
+      "day": "2023-08-23",
+      "targets": 4096,
+      "sampled_edges": 1161237,
+      "graph_arrays_exact": true,
+      "input_arrays_exact": true,
+      "all_node_degrees_match_independent_prefix_counts": true,
+      "no_later_day_context": true,
+      "max_logit_error": 1.52587890625e-05
+    }
+  ],
+  "final_node_state_matches_previous_saml": true,
+  "checkpoint_delta_unchanged": [
+    2.4758098125457764,
+    2.38604998588562
+  ],
+  "utc": "2026-11-08T13:45:20.630358+00:00"
+}

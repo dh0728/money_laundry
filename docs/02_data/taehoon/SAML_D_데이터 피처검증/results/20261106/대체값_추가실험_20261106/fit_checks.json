@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "scope": "val",
+      "brute_force_rows": 32,
+      "approximation_bound_checked": true,
+      "joint_donor_tuple_exact": true
+    },
+    {
+      "scope": "saml",
+      "brute_force_rows": 32,
+      "approximation_bound_checked": true,
+      "joint_donor_tuple_exact": true
+    }
+  ]
+}

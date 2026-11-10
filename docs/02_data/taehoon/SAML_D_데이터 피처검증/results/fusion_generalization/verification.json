@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "utc": "2026-11-08T13:50:07.906580+00:00",
+  "all_rows_scored": true,
+  "labels_ids_aligned": true,
+  "AP_independently_verified": true,
+  "original_multi_saml_result_reproduced": true,
+  "all_fusion_scores_independently_recomputed": true,
+  "threshold_scans_crosschecked": true,
+  "original_models_and_thresholds_preserved": true,
+  "salt_training_still_paused": true,
+  "plan_sha256": "771378da3f65db251b0fc8d50938dd08a5cc127f5f93ab493bba72d7d19aaa65",
+  "code_manifest_sha256": "6ac484cd6f91500799c6d3af537efe29efef6c5f16efaf3e45a022510d101b8f",
+  "salt_preflight_sha256": "b71eb7d7903e90a40cb12bcbff0a20bbb7df50881def38972989cbbbde38c76b"
+}
