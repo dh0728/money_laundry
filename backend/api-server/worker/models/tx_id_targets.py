@@ -1,7 +1,7 @@
 """Model input preparation (backend worker): frozen TARGET IDs -> targets.parquet (tx_id only).
 
-v10 builds its features from the materials sent with every request, so the targets file
-names only the transactions to score.
+For models that build their features from the materials sent with every request (the binary
+and type models today): the targets file names only the transactions to score.
 """
 import pyarrow as pa
 import pyarrow.parquet as pq

@@ -14,6 +14,7 @@ COPY requirements.txt requirements-models.txt ./
 # CPU torch for the local demo stack; the shared GPU server installs its own build (README).
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.10.0 \
+    && pip install --no-cache-dir pyg_lib==0.8.0 -f https://data.pyg.org/whl/torch-2.10.0+cpu.html \
     && pip install --no-cache-dir -r requirements-models.txt \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
@@ -24,7 +25,7 @@ COPY inference_server.py ./
 COPY inference_worker ./inference_worker
 COPY models ./models
 COPY common ./common
-RUN python -c "import inference_server, inference_worker.inference_compute, models.registry, models.binary_v10.network, models.binary_v10.preprocess"
+RUN python -c "import inference_server, inference_worker.inference_compute, models.registry, models.multi_fraudgt_hgb.backend_model.inference, models.multi_fraudgt_hgb.backend_model.preprocessing"
 
 USER app:app
 EXPOSE 8090

@@ -98,7 +98,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                           "analysis.input_transactions TO input_reader")
 
     def setUp(self):
-        # These tests play the inference peer with the demo model; v10 binding has its own tests.
+        # These tests play the inference peer with the demo model; the binary model binding has its own test.
         from models import registry
         demo_only = patch.dict(registry.DEFAULTS, BINARY=registry.DEMO_RANDOM, TYPE=registry.DEMO_RANDOM)
         demo_only.start()
@@ -266,11 +266,11 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 self.assertEqual(table['tx_id'].to_pylist(), sorted(self.ids))
                 self.assertEqual(table.column_names, ['tx_id', 'demo_value'])
 
-    def test_binary_v10_binding_sends_target_ids_and_records_its_threshold(self):
+    def test_binary_model_binding_sends_target_ids_and_records_its_threshold(self):
         from models import registry
-        from models.binary_v10 import spec
-        with patch.dict(registry.DEFAULTS, BINARY=registry.BINARY_V10), \
-                tempfile.TemporaryDirectory(prefix='aml-v10-input-') as root:
+        from models.multi_fraudgt_hgb import spec
+        with patch.dict(registry.DEFAULTS, BINARY=registry.MULTI_FRAUDGT_HGB), \
+                tempfile.TemporaryDirectory(prefix='aml-binary-input-') as root:
             result = json.loads(prepare_features(self.admin, self.execution, root))
             binary = result['models']['BINARY']
             self.assertEqual((binary['model_version'], binary['feature_version']),

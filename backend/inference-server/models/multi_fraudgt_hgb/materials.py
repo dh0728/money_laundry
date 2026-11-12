@@ -1,13 +1,15 @@
-"""Materials sent by the backend -> the normalized transactions/KYC files v10 was trained on.
+"""Materials sent by the backend -> the normalized transactions/KYC files the team's package reads.
 
-Rules match the team's package (checked against its reference graphs, 2026-10-17):
+Rules match the team's package (transactions/KYC table contract in its README):
 - ts is the source report wall clock. The backend stores report time read as Asia/Seoul,
   so converting the UTC instant back to Asia/Seoul restores it.
 - currencies use the source names the calibration files are keyed by.
 - entity_type outside the six trained categories and a missing country become null,
   which the preprocessing reads as UNKNOWN; entity_id is the pseudonymous owner.
-- accounts are numbered densely in sorted account-ID order; only the neighbour sampling
-  hash depends on these numbers, and it stays deterministic for the same frozen input.
+- accounts are numbered densely in sorted account-ID order; neighbour sampling follows these
+  numbers, and they stay the same for the same frozen input.
+- times must fall on a whole minute, as the package's temporal features require.
+- duplicate_group_id is not known to the backend and stays null.
 """
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -33,7 +35,7 @@ REQUIRED = {
 def _currency(column):
     names = [CURRENCY_NAMES.get((code or "").strip()) for code in column.to_pylist()]
     if None in names:
-        raise ProtocolError("Currency outside the binary_v10 calibration")
+        raise ProtocolError("Currency outside the model calibration")
     return pa.array(names, pa.string())
 
 
@@ -42,7 +44,7 @@ def normalize(inputs, directory):
     for name, columns in REQUIRED.items():
         table = inputs.get(name)
         if table is None or any(column not in table.column_names for column in columns):
-            raise ProtocolError("binary_v10 requires the transactions and accounts materials")
+            raise ProtocolError("The model requires the transactions and accounts materials")
     transactions, accounts = inputs["transactions"], inputs["accounts"]
     if transactions.num_rows == 0:
         raise ProtocolError("No transactions in the materials")
@@ -60,6 +62,8 @@ def normalize(inputs, directory):
         raise ProtocolError("occurred_at must be a timezone-aware instant")
     # Same instant shown in Asia/Seoul, then its wall clock without a zone.
     local = pc.local_timestamp(pc.cast(occurred, pa.timestamp("us", tz="Asia/Seoul")))
+    if not pc.all(pc.equal(local, pc.floor_temporal(local, unit="minute"))).as_py():
+        raise ProtocolError("occurred_at must fall on a whole minute")
     normalized = pa.table({
         "edge_id": pc.cast(transactions.column("tx_id"), pa.int64()),
         "ts": pc.cast(local, pa.timestamp("us")),

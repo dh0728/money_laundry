@@ -16,7 +16,7 @@
 
 | 이름 | 내용 |
 |---|---|
-| `targets` | 점수를 낼 대상 거래 ID(모델별 열 포함. 시연 모델은 `tx_id, demo_value`, v10은 `tx_id`) |
+| `targets` | 점수를 낼 대상 거래 ID(모델별 열 포함. 시연 모델은 `tx_id, demo_value`, 이진·유형 모델은 `tx_id`) |
 | `transactions` | 그 실행의 고정 입력 거래 전체(대상+누적 문맥): tx_id, input_role, occurred_at(UTC), 은행·가명 계좌·가명 소유자 ID, 금액(정확한 소수), ISO 통화, 결제 형식 |
 | `accounts` | 등장한 계좌별 은행 ID, 가명 소유자 ID, 엔티티 유형, 은행 국가(없으면 null) |
 
@@ -26,14 +26,14 @@
 
 추론 서버는 백엔드 고정 입력 장부의 사본을 상태 폴더 `replica/`에 Parquet 조각들로 둔다(`inference_worker/replica.py`). 백엔드는 매일 바뀐 거래만 보내고, 새 거래만 있는 날은 사본에 조각 하나를 더한다. 이미 있는 거래가 바뀌거나 빠진 날은 사본을 조각 하나로 다시 쓴다. 모델은 사본의 잠금 안에서 실행되며, 사본을 읽는 방식은 모델이 정한다(`MODEL_CONTRACT.md`).
 
-- v10은 사본 옆 `replica/models/binary_v10/state.duckdb`에 피처의 누적값(계좌별 건수·합계, 거래 쌍·통화·엔티티 쌍 집합, 거래 피처)을 두고 그날 더해진 거래만 반영한다(`models/binary_v10/state.py`). 이웃 표본은 그날 대상의 2홉 안 계좌만 다시 뽑는다. 결과는 사본 전체를 원래 전처리로 다시 계산한 것과 같다(계좌 번호는 처음 등장 순서로 고정). 과거 날짜 거래가 바뀌거나 빠지거나 늦게 들어온 날, 아는 계좌의 KYC가 바뀐 날, 위치를 건너뛴 날은 사본 전체로 상태를 다시 만든다. 요청마다 단계별 시간이 같은 폴더의 `timings.jsonl`에 한 줄씩 남는다.
+- 이진 모델 `multi_fraudgt_hgb`는 사본에서 그날의 고정 입력 전체를 읽어 매 요청 피처를 처음부터 다시 계산한다(누적 상태를 두지 않는다). 요청마다 단계별 시간(재료 변환·모델 로딩·전처리·추론·전체)이 `replica/models/multi_fraudgt_hgb/timings.jsonl`에 한 줄씩 남는다.
 - 그 밖의 모델(`USES_LEDGER`를 선언하지 않은 모델)은 지금처럼 그날의 고정 입력 전체(`transactions`, `accounts`)를 사본에서 받는다. 점수는 전체를 보낼 때와 같다.
 
 - 요청의 `replica`: `{"mode": "full"|"delta", "base_seq": 정수, "seq": 정수}`. `seq`는 그 실행의 장부 위치(`analysis.runs.input_seq`)다.
 - `full`(`base_seq` 0): 첫 실행이나 다시 맞출 때. `transactions`·`accounts`가 고정 입력 전체이고 `removed`는 비어 있다. 사본을 통째로 바꾼다.
 - `delta`: `base_seq` 이후 새로 생기거나 바뀐 거래와 그 거래의 계좌, 그 사이 장부에서 빠진 거래 ID(`removed`)만 온다. 사본이 정확히 `base_seq`에 있을 때만 반영하고, 아니면 `REPLICA_MISMATCH`로 끝낸다. 백엔드는 이 답을 받으면 그 모델만 전체 입력을 새 요청으로 다시 보낸다. 같은 실행의 다른 모델이 이미 그 위치를 반영했으면 그대로 쓴다.
-- 사본이 지워지거나 깨져도 다음 요청이 `REPLICA_MISMATCH` → 전체 재전송으로 다시 만든다. v10 상태만 지워지면 다음 요청이 사본으로 다시 만든다. 같은 상태 폴더는 한 서버만 쓴다.
-- 디스크: 사본 외에 v10 상태가 거래 수에 비례해 더 든다(2,600만 건 기준 수 GB 추정).
+- 사본이 지워지거나 깨져도 다음 요청이 `REPLICA_MISMATCH` → 전체 재전송으로 다시 만든다. 같은 상태 폴더는 한 서버만 쓴다.
+- 디스크: 이진 모델 전처리는 요청마다 임시 폴더(`TMPDIR`, 기본 `/tmp`)에 거래 수에 비례하는 DuckDB 작업 파일을 만들고 끝나면 지운다.
 - 전체 재전송 파일은 누적 이력만큼 크다. 파일당 입력 한도는 `INFERENCE_MAX_INPUT_BYTES`(기본 256MB)로 조정한다.
 
 ## 등록된 모델
@@ -41,7 +41,7 @@
 | 폴더 | 버전(모델 / 피처) | 쓰는 곳 |
 |---|---|---|
 | `models/demo_random` | `demo-random-v1` / `demo-input-v1` | 유형 모델 자리(시연용 임의 점수) |
-| `models/binary_v10` | `gnn-binary-v10` / `materials-v1` | 이진 모델. 팀원 GNN v10(2홉 거래 그래프). 재료에서 피처를 만들고 대상 거래마다 그래프를 만들어 점수를 낸다. 가중치·통계는 `assets/`, 무결성은 `spec.py`의 SHA-256으로 확인 |
+| `models/multi_fraudgt_hgb` | `multi280_hgb36_v1` / `materials-v1` | 이진 모델. 팀원 Multi-FraudGT(epoch 280) + HGB + 로지스틱 회귀 결합. `backend_model/`·`assets/`·`models/`는 팀원 전달본 그대로(대상을 날짜 대신 ID로 받는 부분만 추가), `model.py`가 재료 → 팀원 입력 표 변환과 대상별 점수를 맡는다. 내용이 완전히 같은 거래는 팀원 전처리가 하나(가장 작은 ID)만 남기고, 나머지는 그 거래의 점수를 받는다. 점수는 같은 묶음(2,048건)의 다른 대상에 따라 달라질 수 있어 묶음 크기·seed는 `spec.py`에 고정. 가중치 무결성은 전달본의 `assets/provenance.json` SHA-256으로 확인 |
 
 ## 실행 (공유 추론 서버)
 
@@ -51,6 +51,8 @@ KubeSphere 서버에서 이 폴더를 그대로 두고 Python 3.13 환경으로 
 python -m pip install -r requirements.txt
 # torch는 장치에 맞는 빌드를 먼저 설치한다(CPU 예). GPU 서버는 CUDA 빌드 index URL을 쓴다.
 python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+# pyg_lib은 PyPI에 없다. torch 빌드에 맞는 PyG 색인에서 받는다(CPU 예. CUDA 12.6이면 +cu126).
+python -m pip install pyg_lib==0.8.0 -f https://data.pyg.org/whl/torch-2.10.0+cpu.html
 python -m pip install -r requirements-models.txt
 python -B inference_server.py
 ```
@@ -61,8 +63,8 @@ python -B inference_server.py
 | `INFERENCE_OBJECT_BASE_URL` | 실제 S3 Presigned URL과 scheme·host·prefix가 같은 기본 URL, 끝 `/` 필수. 예 `https://<bucket>.s3.<region>.amazonaws.com/<prefix>/` |
 | `INFERENCE_STATE_DIR` | 재시작 후에도 유지되는 폴더(SQLite 상태·입출력 캐시·서명 URL 저장). 공개 경로로 노출하지 않음 |
 | `INFERENCE_BIND` / `INFERENCE_PORT` | 기본 `127.0.0.1` / `8090`. 앞단 HTTPS 프록시 연결 방식에 맞게 지정 |
-| `BINARY_V10_DEVICE` | v10 실행 장치. 기본 `cpu`, GPU면 `cuda` |
-| `BINARY_V10_THREADS` / `BINARY_V10_MEMORY_LIMIT` | v10 전처리(DuckDB)·CPU 연산 스레드 수와 DuckDB 메모리 한도. 기본 `2` / `2GB` |
+| `MULTI_FRAUDGT_HGB_DEVICE` | 이진 모델 실행 장치. 기본 `cpu`, GPU면 `cuda`. 팀원 검증은 CPU에서 했다 |
+| `MULTI_FRAUDGT_HGB_THREADS` / `MULTI_FRAUDGT_HGB_MEMORY_LIMIT` | 이진 모델 전처리(DuckDB)·CPU 연산 스레드 수와 DuckDB 메모리 한도. 기본 `2` / `2GB` |
 | `INFERENCE_MAX_INPUT_BYTES` | 입력 파일 하나의 최대 바이트. 기본 268435456(256MB). 원장 사본을 전체로 다시 만들 때 누적 이력이 이보다 크면 올린다 |
 
 - 한 번에 하나만 실행한다. 같은 상태 폴더를 두 서버가 함께 열지 않는다.
