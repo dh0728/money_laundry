@@ -98,12 +98,12 @@ class ApiClient:
             self.cookies.clear()
             self.csrf = None
 
-    def post(self, path, payload, user=None):
+    def post(self, path, payload, user=None, *, timeout=30):
         headers = dict(self.headers)
         if self.csrf:
             headers[self.csrf['headerName']] = self.csrf['token']
         try:
-            with httpx.Client(timeout=30, follow_redirects=False, headers=headers,
+            with httpx.Client(timeout=timeout, follow_redirects=False, headers=headers,
                               transport=self.transport, cookies=self.cookies) as client:
                 response = client.post(self.base_url + '/api/v1/' + path, json=payload)
                 self.cookies.update(client.cookies)
@@ -121,9 +121,9 @@ class ApiClient:
         except ValueError:
             raise ApiError('JSON 응답을 확인하지 못했습니다.') from None
 
-    def get(self, path, params=None, *, page=False):
+    def get(self, path, params=None, *, page=False, timeout=15):
         try:
-            with httpx.Client(timeout=15, follow_redirects=False, headers=self.headers,
+            with httpx.Client(timeout=timeout, follow_redirects=False, headers=self.headers,
                               transport=self.transport, cookies=self.cookies) as client:
                 response = client.get(self.base_url + '/api/v1/' + path, params=params)
                 self.cookies.update(client.cookies)

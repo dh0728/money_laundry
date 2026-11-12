@@ -44,3 +44,15 @@ class SessionClientTests(unittest.TestCase):
             client.login('staff','test')
         self.assertEqual(len(calls), 1)
         self.assertNotIn('secret', str(error.exception))
+
+    def test_timeout_defaults_and_per_call_override(self):
+        waits = []
+        def handle(request):
+            waits.append(request.extensions['timeout']['read'])
+            return httpx.Response(200, json={})
+        client = ApiClient('http://localhost:8080', transport=httpx.MockTransport(handle))
+        client.get('demo/clock')
+        client.post('demo/clock', {})
+        client.get('demo/reset/preview', timeout=120)
+        client.post('demo/reset', {}, timeout=120)
+        self.assertEqual(waits, [15, 30, 120, 120])

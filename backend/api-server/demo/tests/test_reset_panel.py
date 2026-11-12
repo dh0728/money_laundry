@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from api_client import ApiError
-from control_panel import Replay
+from control_panel import RESET_TIMEOUT, Replay
 import operator_session
 
 
@@ -27,6 +27,7 @@ class ResetPanelTests(unittest.TestCase):
             controls.post.side_effect = None
             controls.post.return_value = {'resetId': 'reset-1', 'status': 'FILES_PENDING'}
             replay.reset_demo({})
+            controls.post.assert_called_with('demo/reset', {}, timeout=RESET_TIMEOUT)
             self.assertFalse(replay.sent)
             self.assertFalse(replay.jobs)
             self.assertFalse(replay.completed)
@@ -57,14 +58,17 @@ class ResetPanelTests(unittest.TestCase):
         controls = Mock(base='https://dev.example')
         current = {'status': 'NONE'}
         clock = {'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 2}
-        def get(path):
+        waits = {}
+        def get(path, **options):
             if path == 'demo/reset/latest':
                 return dict(current)
             if path == 'demo/reset/preview':
+                waits[path] = options.get('timeout')
                 return {'counts': {'transactions': 12}, 'snapshot': 'snapshot'}
             return clock
-        def post(path, payload=None):
+        def post(path, payload=None, **options):
             if path == 'demo/reset':
+                waits[path] = options.get('timeout')
                 self.assertEqual(payload['confirmation'], '시연 데이터 초기화')
                 self.assertEqual(payload['snapshot'], 'snapshot')
                 current.update(resetId='reset-1', status='FILES_PENDING', totalTargets=1, remainingTargets=1)
@@ -92,6 +96,7 @@ class ResetPanelTests(unittest.TestCase):
                     self.assertFalse(app.error)
                     self.assertEqual(current['status'], 'COMPLETED')
                     self.assertEqual(controls.post.call_count, 2)
+                    self.assertEqual(waits, {'demo/reset/preview': RESET_TIMEOUT, 'demo/reset': RESET_TIMEOUT})
                     self.assertTrue(any('초기화 완료' in x.value for x in app.success))
             finally:
                 replay.close()
