@@ -65,11 +65,11 @@ class AdminClient:
                 # Retry once only after an explicit authentication rejection.
                 return getattr(self._client, method)(*args, **kwargs)
 
-    def get(self, path, params=None, *, page=False):
-        return self._request('get', path, params, page=page)
+    def get(self, path, params=None, *, page=False, **options):
+        return self._request('get', path, params, page=page, **options)
 
-    def post(self, path, payload=None):
-        return self._request('post', path, payload)
+    def post(self, path, payload=None, **options):
+        return self._request('post', path, payload, **options)
 
     def close(self):
         with self._lock:

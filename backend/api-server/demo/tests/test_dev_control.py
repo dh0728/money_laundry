@@ -12,7 +12,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from api_client import ApiClient, ApiError
-from control_panel import Controls, Replay
+from control_panel import RESET_TIMEOUT, Controls, Replay
 from operator_session import AdminClient, cloudflare_headers
 import dev_control
 import operator_session
@@ -283,6 +283,29 @@ class DevControlTests(unittest.TestCase):
             self.assertEqual(dev_control.main(), 0)
             self.assertEqual(captured, [cloudflare_headers('test-id', 'test-secret')])
             self.assertNotIn('test-secret', str(run.call_args))
+
+
+    def test_reset_calls_wait_longer_through_the_admin_session(self):
+        waits = {}
+        def handle(request):
+            path = request.url.path
+            if path == '/api/auth/csrf':
+                return httpx.Response(200, json={'headerName': 'X-CSRF-TOKEN', 'token': 't'})
+            if path == '/api/auth/login':
+                return httpx.Response(200, json={'id': 1, 'role': 'ADMIN'})
+            waits[(request.method, path)] = request.extensions['timeout']['read']
+            return httpx.Response(200, json={'counts': {}, 'snapshot': 's', 'resetId': 'r', 'status': 'NONE'})
+        client = AdminClient('https://dev.example', 'admin', 'password', transport=httpx.MockTransport(handle))
+        client.connect()
+        controls = Controls('https://dev.example', client, allow_remote=True)
+        controls.get('demo/reset/latest')
+        controls.get('demo/reset/preview', timeout=RESET_TIMEOUT)
+        controls.post('demo/reset', {}, timeout=RESET_TIMEOUT)
+        controls.post('demo/clock', {})
+        self.assertEqual(waits, {('GET', '/api/v1/demo/reset/latest'): 15,
+                                 ('GET', '/api/v1/demo/reset/preview'): RESET_TIMEOUT,
+                                 ('POST', '/api/v1/demo/reset'): RESET_TIMEOUT,
+                                 ('POST', '/api/v1/demo/clock'): 30})
 
 
 if __name__ == '__main__':
