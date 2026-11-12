@@ -130,12 +130,12 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertEqual(artifact['unassignedSeedCount'],2)
 
     def test_low_score_transaction_on_a_seed_account_is_promoted(self):
-        # ids[1] scored .1 (below .7) now leaves the seed receiver b: v10's dual threshold promotes it.
+        # ids[1] scored .1 (below .7) now leaves the seed receiver b: the binary model's dual threshold promotes it.
         from unittest.mock import patch
         from models import registry
         self.admin.execute("UPDATE analysis.input_transactions SET from_account_id=%s,occurred_at='2022-09-02 23:50+09' WHERE run_id=%s AND tx_id=%s",
                            (self.b,self.run,self.ids[1]))
-        with patch.dict(registry.DEFAULTS, BINARY=registry.BINARY_V10):
+        with patch.dict(registry.DEFAULTS, BINARY=registry.MULTI_FRAUDGT_HGB):
             save_alerts(self.admin,self.execution)
         self.assertEqual(self.artifact()['promotedSeedCount'],1)
         plan, = self.plans()

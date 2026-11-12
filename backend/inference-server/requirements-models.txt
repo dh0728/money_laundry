@@ -1,7 +1,14 @@
-# Model runtime for models/binary_v10. Install torch first for the target device:
+# Model runtime for models/multi_fraudgt_hgb and models/salt_r. Install torch first for the target device:
 #   CPU:  python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
 #   CUDA: python -m pip install --index-url https://download.pytorch.org/whl/cu126 torch==2.10.0
+# then pyg_lib (neighbour sampling of multi_fraudgt_hgb) from the PyG wheel index of that torch build;
+# it is not on PyPI:
+#   CPU:  python -m pip install pyg_lib==0.8.0 -f https://data.pyg.org/whl/torch-2.10.0+cpu.html
+#   CUDA: python -m pip install pyg_lib==0.8.0 -f https://data.pyg.org/whl/torch-2.10.0+cu126.html
 torch-geometric==2.8.0.post1
 duckdb==1.5.5
 numpy==2.4.1
 pandas==3.0.3
+scikit-learn==1.8.0
+joblib==1.5.3
+tqdm==4.67.3

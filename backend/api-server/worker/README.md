@@ -21,7 +21,7 @@
 
 ### 모델과 임시 추론
 
-새 분석의 이진 모델은 `gnn-binary-v10/materials-v1`(팀원 GNN v10)이다. 백엔드는 대상 `tx_id`와 재료(`features/materials.py`)만 보내고, 피처·2홉 그래프·점수는 추론 서버 `models/binary_v10`이 만든다. 새 실행의 첫 바인딩 때 `analysis.jobs.threshold_value`를 권장값 0.4338742792606354로 기록한다. 유형 모델은 `demo-random-v1/demo-input-v1` 임시 변환기다. 임시 변환기의 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
+새 분석의 이진 모델은 `multi280_hgb36_v1/materials-v1`(팀원 Multi-FraudGT + HGB)이다. 백엔드는 대상 `tx_id`와 재료(`features/materials.py`)만 보내고, 피처·그래프·점수는 추론 서버 `models/multi_fraudgt_hgb`가 만든다. 새 실행의 첫 바인딩 때 `analysis.jobs.threshold_value`를 권장값 0.194997844(`models/multi_fraudgt_hgb/spec.py`의 `RECOMMENDED_THRESHOLD`, 임계값을 바꾸는 유일한 곳)로 기록한다. 유형 모델은 `demo-random-v1/demo-input-v1` 임시 변환기다. 임시 변환기의 입력은 TARGET의 `tx_id,demo_value`, 출력은 `tx_id,p_laundering` 또는 `tx_id,p_0,...,p_8`이다. 라벨·패턴 대응표를 읽지 않는다. 이진 값은 [0,1) 균등 난수, 유형 값은 9개 균등 난수를 합계1로 정규화한다. 거래 ID·모델 종류·버전별 seed로 재시도·순서·분할에 무관한 값을 만든다. 탐지 성능을 의미하지 않는다.
 
 - API와 추론 서버를 함께 배포한다. CSV를 다시 만들 필요는 없다.
 - 기존 일반 더미 바인딩은 유지한다. 삭제된 demo-labels 버전의 미완료 실행은 새 실행이 필요하며 완료 이력은 그대로 둔다.
@@ -156,7 +156,7 @@ TARGET와 cutoff 이전에 유효하게 수신·통합된 전체 CONTEXT·기존
 변환하고 실제 거래 ID·UTC microseconds·USD 환산 금액(마이크로 단위)을 보존한다. 과거 점수는 원래 실행의 임계값을 적용한다.
 그다음 묶기 전에 씨앗을 보강한다(`alerts/seed_promotion.py`). 이진 모델 spec에 `ALERT_SEED_LOW`·`ALERT_CHAIN_FLOOR`가 있을 때만 하며, 매 실행 창의 저장된 점수로 새로 판단한다.
 ① 이중 임계값: 점수가 `ALERT_SEED_LOW` 이상이고 씨앗과 계좌를 공유하는 거래를 씨앗으로 올린다. ② 금액 비율 연결: 씨앗(①로 올린 거래 포함)에서 받은 계좌가 7일 안에 받은 금액의 0.5~1.05배를 보낸 거래와, 보낸 계좌가 7일 안에 같은 비율로 받은 앞 거래를 6단계까지 따라가 씨앗으로 올린다. 점수가 `ALERT_CHAIN_FLOOR` 이상이고 금액을 아는 거래만 따라간다.
-올린 씨앗은 점수가 임계값 미만이므로 근거 화면에서 의심 표시가 붙지 않는다. 올린 수는 아티팩트 `promotedSeedCount`, 계산 시간은 `timingsMs.seedPromotion`이다. v10 값(0.1·0.01)은 Alert 생성기 연구(2026-11-04, HI-Small 조정·HI-Medium 시험)에서 정했으며 모델을 바꾸면 다시 정한다.
+올린 씨앗은 점수가 임계값 미만이므로 근거 화면에서 의심 표시가 붙지 않는다. 올린 수는 아티팩트 `promotedSeedCount`, 계산 시간은 `timingsMs.seedPromotion`이다. 현재 값(0.1·0.01)은 이전 이진 모델로 Alert 생성기 연구(2026-11-04, HI-Small 조정·HI-Medium 시험)에서 정한 값을 임시로 쓴 것이며, 새 모델 결과를 본 뒤 다시 정한다.
 정책 `block-pin-3`(block-pin-2의 시간 상한을 늘린 것. 간격 7일·기간 14일은 실데이터 연구 범위를 덮는 넉넉한 상한이며, 합성 패턴에 맞춘 값이 아니다)은 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
 핵심은 씨앗과 연결 거래64건·기간336시간(14일) 이하이고, 이어지는 두 거래 간격은 168시간(7일) 이하다. 맥락 거래는 멤버가 아니라 근거의 `contextQuery`(초점 계좌·핵심 기간±24시간)이며
 조회할 때 원장에서 센다. 구조 관계가 없는 씨앗은 발행하지 않고 사유(`unassignedReasons`)와 함께 아티팩트에 남겨 다음 실행에 재검토한다.
