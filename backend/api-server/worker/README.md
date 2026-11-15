@@ -69,7 +69,7 @@ dev는 EC2 두 대(프론트·백엔드)와 RDS 구성이며 `deploy/split/`만 
 `DEV_INFERENCE_API_URL/TOKEN`으로 주입한다. `deploy/split/backend/compose.dev.yaml`은 다음 값을 사용한다.
 
 - `WORKER_MODE=demo`, `WORKER_PYTHON=/usr/local/bin/python`
-- `WORKER_SCRIPT=/app/worker/analysis_entry.py`, `WORKER_TIMEOUT=PT30M`
+- `WORKER_SCRIPT=/app/worker/analysis_entry.py`, `WORKER_TIMEOUT=PT120M`
 - `STORAGE_DIR=/app/storage`, 새 볼륨 `aml-dev-api-storage`
 - DB는 RDS의 `aml_dev_v3`. 접속 정보는 Parameter Store `db/*`에서 받아 Spring이 자식 프로세스에 전달
 
