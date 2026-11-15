@@ -1,6 +1,6 @@
 # API requirements and gaps
 
-The contract lives in [API.md](../../../backend/api-server/API.md). Code labels in this branch are in [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts); recheck the active app path when implementing. Related: [data rules](data-rules.md), [screens](screens.md).
+For the new screens, [API.md](../../../backend/api-server/API.md) is reference material. Build with mocks first and hand the screen's required data to backend for API design. The first bundle's required fields and metric definitions are in [app shell, login and dashboard handoff](first-bundle.md#data-required-from-backend). Code labels in this branch are in [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts). Related: [data rules](data-rules.md), [screens](screens.md).
 
 An unconfirmed item is `unconfirmed`. Never present a guess as fact.
 
@@ -28,3 +28,7 @@ An unconfirmed item is `unconfirmed`. Never present a guess as fact.
 | Notifications | Field mapping between the screen samples and the notification routes in API.md. | unconfirmed |
 | Table sort | Whether table view has sort parameters; the default list order is risk, descending. | unconfirmed |
 | Filters "human verdict abnormal only" and "my assignments" | Whether the query names match the filter chips one to one. | unconfirmed |
+
+## v3 전체 샘플 앱의 연동 경계 (2026-11-15)
+
+새 `src/next` 앱은 전체 화면을 공유 메모리 샘플로 구현했다. 실제 endpoint 요청이나 운영 저장은 하지 않는다. 필드별 데이터 요구와 미확정 계약은 [전체 구현 인계](complete-bundle.md)를 따른다. 수억 건 운영 연동은 전체 원장 다운로드 대신 서버 KPI/집계·최대100행 cursor page·case-scoped evidence/neighborhood·비동기 backtest/export job이 필요하다. 클라이언트10,000건 제한은 샘플 adapter 보호 장치이며 서버 처리 성능이나 실제 대용량 지원의 증거가 아니다.

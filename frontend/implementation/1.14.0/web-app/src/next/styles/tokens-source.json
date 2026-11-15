@@ -1,0 +1,8 @@
+{
+  "source": "https://github.com/kmg200164/second-brain/tree/main/projects/aml-radar/assets/design-system-zero-base",
+  "mode": "Copied snapshot; run tokens:sync explicitly to update.",
+  "sha256": {
+    "tokens.css": "3f83c37f7436d563765c965361fde090bd47c1920de5cd4aab5563aa568a7db4",
+    "tokens.json": "da7fece43133a8a5870028c24d8d2ae6d9fbb9a5746bf0195df6a27d1e6dc997"
+  }
+}

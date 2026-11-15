@@ -19,8 +19,8 @@ The source is [API.md](../../../backend/api-server/API.md) section 2.3 and [code
 | 0 | NON_PATTERN | NON_PATTERN | 패턴 없는 이상거래 |
 | 1 | FAN-OUT | Fan-out | 분산 송금 |
 | 2 | FAN-IN | Fan-in | 집중 수취 |
-| 3 | G-SCATTER | Gather-scatter | 모아서 뿌리기 |
-| 4 | S-GATHER | Scatter-gather | 뿌려서 모으기 |
+| 3 | GATHER-SCATTER | Gather-scatter | 모아서 뿌리기 |
+| 4 | SCATTER-GATHER | Scatter-gather | 뿌려서 모으기 |
 | 5 | CYCLE | Cycle | 순환 거래 |
 | 6 | RANDOM | Random | 무작위 경로 |
 | 7 | BIPARTITE | Bipartite | 그룹 간 교차 송금 |

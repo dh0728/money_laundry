@@ -4,6 +4,7 @@ Run-book for building the new screens: layout, API gaps, screen routes, data rul
 
 | Created | Updated | Note | About |
 | --- | --- | --- | --- |
+| 2026-11-15 | 2026-11-15 | [first-bundle](first-bundle.md) | App shell, login, personal/team dashboards: mock data, per-screen requirements, Figma references and verification. |
 | 2026-11-11 | 2026-11-11 | [frontend-handoff](frontend-handoff.md) | Layout and component rules. Read before coding a screen. |
 | 2026-11-11 | 2026-11-11 | [api](api.md) | Data the screens need, pointers to the team API, and the gaps still open. Hand to backend. |
 | 2026-11-11 | 2026-11-11 | [screens](screens.md) | Screen list with proposed routes and required variants. |

@@ -145,4 +145,11 @@ $RECYCLE.BIN/
 # Microsoft Office 임시파일
 ~$*
 
-/docs
+/docs/*
+!/docs/frontend/
+/docs/frontend/*
+!/docs/frontend/implementation/
+/docs/frontend/implementation/*
+!/docs/frontend/implementation/first-bundle.md
+
+!/docs/frontend/implementation/complete-bundle.md
