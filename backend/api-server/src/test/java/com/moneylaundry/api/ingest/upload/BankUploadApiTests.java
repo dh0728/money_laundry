@@ -326,7 +326,9 @@ class BankUploadApiTests {
             jdbc.queryForList(
                 "select service_account_id from core.accounts order by account_id", UUID.class))
         .isEqualTo(ids);
-    assertThat(jdbc.queryForList("select payload_cipher from private.bank_report_payloads", String.class))
+    assertThat(
+            jdbc.queryForList(
+                "select payload_cipher from private.bank_report_payloads", String.class))
         .allMatch(v -> !v.contains("NameE"));
     mvc.perform(
             get("/api/uploads/{id}", a)
@@ -643,7 +645,8 @@ class BankUploadApiTests {
 
   @Test
   void unchanged_and_already_corrected_dates_are_not_decrypted_again() throws Exception {
-    String tamper = "update private.bank_report_payloads set payload_cipher=reverse(payload_cipher)";
+    String tamper =
+        "update private.bank_report_payloads set payload_cipher=reverse(payload_cipher)";
     long a = submit(10, HEADER + x()), b = submit(20, HEADER + x());
     integrate(a, b);
     var ids = activeIds();

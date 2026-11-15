@@ -112,7 +112,8 @@ class BaselineSchemaTests {
             jdbc.queryForObject(
                 "select status from ingest.uploads where upload_id=?", String.class, upload))
         .isEqualTo("COMPLETED");
-    var report = jdbc.queryForMap(
+    var report =
+        jdbc.queryForMap(
             "select * from private.bank_reports join private.bank_report_payloads using(report_id)");
     var protector =
         new com.moneylaundry.api.ingest.load.PrivateDataProtector(encryption, search, "test");
