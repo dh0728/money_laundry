@@ -19,6 +19,9 @@ STAGE_NAMES = {
     'ALERTS': 'Alert 구성', 'COMPLETE': 'Alert 공개',
 }
 MODEL_NAMES = {'BINARY': '이진', 'TYPE': '유형'}
+# Reset preview and reset both count every reset table on the server (dev, 16 days: about 19 s on
+# 2026-11-12), longer than the default 15 s / 30 s. Above Cloudflare's 100 s cut, which then answers 524.
+RESET_TIMEOUT = 120
 REMOTE_NAMES = {
     'ACCEPTED': '접수됨', 'QUEUED': '차례 대기', 'RUNNING': '계산 중', 'RETRY_WAIT': '서버 재시도 대기',
     'COMPLETED': '계산 완료', 'FAILED': '서버 실패', 'STOPPED': '중단됨', 'RECOVERY_REQUIRED': '서버 복구 필요',
@@ -139,8 +142,8 @@ class Controls:
         self.cf_headers = dict(cf_headers or {})
         self.uploads = {}
 
-    def get(self, path):
-        return self.client.get(path)
+    def get(self, path, **options):
+        return self.client.get(path, **options)
 
     def set_clock(self, value):
         clock = self.get('demo/clock')
@@ -154,8 +157,8 @@ class Controls:
             return
         self.set_clock(target.isoformat())
 
-    def post(self, path, payload=None):
-        return self.client.post(path, payload)
+    def post(self, path, payload=None, **options):
+        return self.client.post(path, payload, **options)
 
     def _issue_upload(self, mock, opener, args, size, checksum, progress):
         for attempt in range(6):
@@ -395,7 +398,7 @@ class Replay:
         with self.lock:
             if self.future is not None and not self.future.done():
                 raise ApiError('현재 날짜 처리가 끝난 뒤 초기화하세요.')
-            result = self.controls.post('demo/reset', payload)
+            result = self.controls.post('demo/reset', payload, timeout=RESET_TIMEOUT)
             self.clear_after_reset(result['resetId'])
             return result
 
@@ -429,7 +432,7 @@ def render_reset(replay):
     with st.expander('시연 데이터 초기화'):
         st.warning('거래·업로드·분석·Alert/Episode·조사 이력과 관련 S3 파일을 삭제합니다. PC의 CSV, 직원 계정, 은행 등록, 환율은 보존합니다.')
         if st.button('초기화 대상 확인', disabled=running or pending):
-            st.session_state.reset_preview = replay.controls.get('demo/reset/preview')
+            st.session_state.reset_preview = replay.controls.get('demo/reset/preview', timeout=RESET_TIMEOUT)
             st.session_state.reset_request = str(uuid4())
         preview = st.session_state.get('reset_preview')
         if preview:

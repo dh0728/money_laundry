@@ -21,7 +21,7 @@ services:
       WORKER_MODE: demo
       WORKER_PYTHON: /usr/local/bin/python
       WORKER_SCRIPT: /app/worker/analysis_entry.py
-      WORKER_TIMEOUT: PT30M
+      WORKER_TIMEOUT: PT120M
       STORAGE_DIR: /app/storage
       # Models run only on the shared inference server (backend/inference-server); no local fallback.
       INFERENCE_API_URL: ${DEV_INFERENCE_API_URL:?DEV_INFERENCE_API_URL is required}
