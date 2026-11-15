@@ -26,7 +26,7 @@ class DatabaseTransitionTests(unittest.TestCase):
                 worker.execute('SELECT * FROM analysis.input_transactions')
                 worker.execute('SELECT * FROM core.assignable_staff')
                 worker.execute('SELECT tx_id FROM ledger.transactions')
-                for table in ('private.bank_reports', 'private.owner_identities', 'private.account_identities', 'evaluation.report_labels', 'evaluation.transaction_labels'):
+                for table in ('private.bank_reports', 'private.bank_report_payloads', 'private.owner_identities', 'private.account_identities', 'evaluation.report_labels', 'evaluation.transaction_labels'):
                     with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
                         worker.execute('SELECT * FROM ' + table)
                 with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):

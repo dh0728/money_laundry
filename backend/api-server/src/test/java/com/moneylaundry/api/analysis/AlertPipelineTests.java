@@ -106,9 +106,8 @@ class AlertPipelineTests {
   void attach(long txId, long sameReportAs) {
     long report =
         jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) select br.version_id,(select max(source_row)+1 from private.bank_reports where version_id=br.version_id),?,'cipher','test','ACTIVE' from private.bank_reports br join ledger.transaction_reports tr using(report_id) where tr.tx_id=? returning report_id",
+            "insert into private.bank_reports(version_id,source_row,report_status) select br.version_id,(select max(source_row)+1 from private.bank_reports where version_id=br.version_id),'ACTIVE' from private.bank_reports br join ledger.transaction_reports tr using(report_id) where tr.tx_id=? returning report_id",
             Long.class,
-            UUID.randomUUID().toString(),
             sameReportAs);
     jdbc.update("insert into ledger.transaction_reports values(?,?,'INTERNAL')", txId, report);
   }
@@ -169,10 +168,9 @@ class AlertPipelineTests {
         set);
     long report =
         jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) values(?,1,?,'cipher','test','ACTIVE') returning report_id",
+            "insert into private.bank_reports(version_id,source_row,report_status) values(?,1,'ACTIVE') returning report_id",
             Long.class,
-            version,
-            UUID.randomUUID().toString());
+            version);
     jdbc.update("insert into ledger.transaction_reports values(?,?,'INTERNAL')", txId, report);
     jdbc.update(
         "insert into ingest.reporting_scopes(business_date) values(?::date) on conflict do nothing",

@@ -131,6 +131,7 @@ class FlywayMigrationTests {
               "private.owner_identities",
               "private.account_identities",
               "private.bank_reports",
+              "private.bank_report_payloads",
               "evaluation.report_labels",
               "evaluation.transaction_labels")) {
         assertThatThrownBy(

@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 from psycopg.types.json import Jsonb
 
 from ingest.report_csv import ReportReader, RowError
-from ingest.report_matching import key
 from common.frozen_input import StaleExecution
 
 
@@ -34,7 +33,7 @@ def ingest(connection, upload_id, token, stream, protector, zone='Asia/Seoul', b
     bank, day, received = _owned(connection, upload_id, token)
     version = connection.execute("SELECT nextval(pg_get_serial_sequence('ingest.report_versions','version_id'))").fetchone()[0]
     connection.execute('''CREATE TEMP TABLE prepared_reports(source_row integer PRIMARY KEY,
-        match_key text NOT NULL,payload_cipher text NOT NULL,key_version text NOT NULL,label boolean)''')
+        payload_cipher text NOT NULL,key_version text NOT NULL,label boolean)''')
     errors, claims = [], defaultdict(dict)
     count = missing = 0
     incomplete = False
@@ -81,7 +80,7 @@ def ingest(connection, upload_id, token, stream, protector, zone='Asia/Seoul', b
                             error(dict(row=0,column='',reason='IDENTITY_CONFLICT'))
                 label = row.pop('isLaundering')
                 row['isLaundering'] = None
-                copy.write_row((source_row,protector.token('match',*(str(v) for v in key(row))),
+                copy.write_row((source_row,
                     protector.encrypt(f'report:{version}:{source_row}',json.dumps(row,ensure_ascii=False,separators=(',',':'))),
                     protector.version,label))
     except RowError as failure:
@@ -111,9 +110,12 @@ def ingest(connection, upload_id, token, stream, protector, zone='Asia/Seoul', b
             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
             (version,set_id,upload_id,version_no,received,'VALIDATED_WAITING_INTEGRATION' if valid else 'HELD',
              None if valid else 'INVALID_SELF',None if incomplete else count,correction[1] if correction else None,valid))
-        connection.execute('''INSERT INTO private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status,error_code)
-            SELECT %s,source_row,match_key,payload_cipher,key_version,%s,%s FROM prepared_reports ORDER BY source_row''',
+        connection.execute('''INSERT INTO private.bank_reports(version_id,source_row,report_status,error_code)
+            SELECT %s,source_row,%s,%s FROM prepared_reports ORDER BY source_row''',
             (version,'WAITING' if valid else 'HELD',None if valid else 'INVALID_SELF'))
+        connection.execute('''INSERT INTO private.bank_report_payloads(report_id,payload_cipher,key_version)
+            SELECT b.report_id,p.payload_cipher,p.key_version FROM prepared_reports p JOIN private.bank_reports b USING(source_row)
+            WHERE b.version_id=%s ORDER BY b.report_id''',(version,))
         connection.execute('''INSERT INTO evaluation.report_labels(report_id,is_laundering)
             SELECT b.report_id,p.label FROM prepared_reports p JOIN private.bank_reports b USING(source_row)
             WHERE b.version_id=%s AND p.label IS NOT NULL''',(version,))

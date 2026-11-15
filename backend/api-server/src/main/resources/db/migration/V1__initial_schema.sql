@@ -123,12 +123,16 @@ ALTER TABLE ingest.report_sets ADD FOREIGN KEY(set_id,current_version_id)
 CREATE TABLE private.bank_reports (
  report_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  version_id BIGINT NOT NULL REFERENCES ingest.report_versions,
- source_row INTEGER NOT NULL CHECK(source_row>0), match_key TEXT NOT NULL,
- payload_cipher TEXT NOT NULL, key_version TEXT NOT NULL,
+ source_row INTEGER NOT NULL CHECK(source_row>0),
  report_status TEXT NOT NULL DEFAULT 'WAITING' CHECK(report_status IN ('WAITING','ACTIVE','HELD','DEPENDENCY_HELD')),
  error_code TEXT, UNIQUE(version_id,source_row)
 );
-CREATE INDEX bank_reports_match ON private.bank_reports(match_key);
+-- Encrypted report rows, written once at ingest and read only when their date is integrated, so
+-- status changes and the daily joins over private.bank_reports never touch them.
+CREATE TABLE private.bank_report_payloads (
+ report_id BIGINT PRIMARY KEY REFERENCES private.bank_reports,
+ payload_cipher TEXT NOT NULL, key_version TEXT NOT NULL
+);
 CREATE TABLE ingest.integration_attempts (
  attempt_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  business_date DATE NOT NULL, cutoff_at TIMESTAMPTZ NOT NULL, scope_revision BIGINT NOT NULL,

@@ -91,7 +91,7 @@ class DemoResetTests {
             old);
     long report =
         jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version) values(?,2,'test','cipher','test') returning report_id",
+            "insert into private.bank_reports(version_id,source_row) values(?,2) returning report_id",
             Long.class,
             version);
     jdbc.update("insert into evaluation.report_labels values(?,true)", report);
