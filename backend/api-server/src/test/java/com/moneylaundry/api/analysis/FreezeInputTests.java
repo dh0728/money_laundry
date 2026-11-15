@@ -124,15 +124,13 @@ class FreezeInputTests {
         count);
     jdbc.update(
         """
-        insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status)
-        select ?,row_number() over(order by tx_id),tx_id::text,'cipher','test','ACTIVE' from ledger.transactions
+        with numbered as (select tx_id,row_number() over(order by tx_id) n from ledger.transactions),
+        added as (insert into private.bank_reports(version_id,source_row,report_status)
+          select ?,n,'ACTIVE' from numbered returning report_id,source_row)
+        insert into ledger.transaction_reports select t.tx_id,a.report_id,'INTERNAL'
+        from numbered t join added a on a.source_row=t.n
         """,
         version);
-    jdbc.update(
-        """
-        insert into ledger.transaction_reports select t.tx_id,br.report_id,'INTERNAL'
-        from ledger.transactions t join private.bank_reports br on br.match_key=t.tx_id::text
-        """);
     jdbc.execute("analyze ledger.transactions");
     jdbc.execute("analyze private.bank_reports");
     jdbc.execute("analyze ledger.transaction_reports");
@@ -317,7 +315,7 @@ class FreezeInputTests {
         laterSet);
     long report =
         jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status) values(?,1,'later','cipher','test','ACTIVE') returning report_id",
+            "insert into private.bank_reports(version_id,source_row,report_status) values(?,1,'ACTIVE') returning report_id",
             Long.class,
             laterVersion);
     jdbc.update(
@@ -457,18 +455,15 @@ class FreezeInputTests {
         count);
     jdbc.update(
         """
-        insert into private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version,report_status)
-        select ?,(select max(source_row) from private.bank_reports)+row_number() over(order by tx_id),
-          tx_id::text,'cipher','test','ACTIVE'
-        from ledger.transactions where tx_id not in(select tx_id from ledger.transaction_reports)
+        with numbered as (
+          select tx_id,(select max(source_row) from private.bank_reports)+row_number() over(order by tx_id) n
+          from ledger.transactions where tx_id not in(select tx_id from ledger.transaction_reports)),
+        added as (insert into private.bank_reports(version_id,source_row,report_status)
+          select ?,n,'ACTIVE' from numbered returning report_id,source_row)
+        insert into ledger.transaction_reports select t.tx_id,a.report_id,'INTERNAL'
+        from numbered t join added a on a.source_row=t.n
         """,
         version);
-    jdbc.update(
-        """
-        insert into ledger.transaction_reports select t.tx_id,br.report_id,'INTERNAL'
-        from ledger.transactions t join private.bank_reports br on br.match_key=t.tx_id::text
-        where t.tx_id not in(select tx_id from ledger.transaction_reports)
-        """);
   }
 
   void finish(UUID run) {

@@ -65,6 +65,7 @@ public class DemoResetService {
           "ledger.transaction_reports",
           "ledger.transactions",
           "evaluation.report_labels",
+          "private.bank_report_payloads",
           "private.bank_reports",
           "ingest.integration_attempt_versions",
           "ingest.integration_attempts",

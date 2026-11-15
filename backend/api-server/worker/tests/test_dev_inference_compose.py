@@ -93,7 +93,7 @@ with psycopg.connect(host='postgres',dbname='aml_check',user='aml_check',passwor
         assert db.execute('select to_regclass(%s)', (table,)).fetchone()[0] is not None
 with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSIS_DB_USERNAME'],password=os.environ['ANALYSIS_DB_PASSWORD'],autocommit=True) as db:
     db.execute('select * from analysis.input_transactions')
-    for table in ('private.bank_reports','evaluation.report_labels'):
+    for table in ('private.bank_reports','private.bank_report_payloads','evaluation.report_labels'):
         try:
             db.execute('select * from '+table)
         except psycopg.errors.InsufficientPrivilege:

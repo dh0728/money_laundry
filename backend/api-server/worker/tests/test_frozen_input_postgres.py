@@ -230,7 +230,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
         report_set = self.admin.execute("INSERT INTO ingest.report_sets(bank_id,business_date) VALUES(12,'2022-09-01') ON CONFLICT(bank_id,business_date) DO UPDATE SET bank_id=excluded.bank_id RETURNING set_id").fetchone()[0]
         version = self.admin.execute("INSERT INTO ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status) VALUES(%s,%s,%s,now(),'ACTIVE') RETURNING version_id", (report_set, upload, upload)).fetchone()[0]
         for i, tx_id in enumerate(ids):
-            report = self.admin.execute("INSERT INTO private.bank_reports(version_id,source_row,match_key,payload_cipher,key_version) VALUES(%s,%s,'test','test','test') RETURNING report_id", (version, i + 2)).fetchone()[0]
+            report = self.admin.execute("INSERT INTO private.bank_reports(version_id,source_row) VALUES(%s,%s) RETURNING report_id", (version, i + 2)).fetchone()[0]
             self.admin.execute("INSERT INTO evaluation.report_labels VALUES(%s,%s)", (report, i != 1))
 
     def test_legacy_hints_do_not_affect_random_input(self):
