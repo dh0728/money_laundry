@@ -1,5 +1,7 @@
 # Figma implementation review
 
+> **사용 중단 · 2026-11-16:** 팀 논의로 이 Figma 구현 검수본은 폐기됐고 Figma 휴지통으로 이동했다(복구 가능). 아래 내용은 당시 제작·검수 절차의 이력이며 현재 작업 지침이 아니다. 새 구현은 [사용자 원본 Figma](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh)와 [최신 구현 지침](frontend-handoff.md)을 따른다. 기존 앱 코드를 전부 폐기할지, 일부 기능을 재사용할지는 별도로 확인 중이다.
+
 Updated: 2026-11-16. Editable design review artifact, not a new application release or design acceptance.
 
 ## Open the work

@@ -1,64 +1,90 @@
-# Screen QA checklist
+# 화면 검수 체크리스트
 
-Before calling a screen done, check every item on the current screen or current Figma. An old screenshot does not pass. When one item is fixed, recheck every screen of the same kind. Rules: [frontend-handoff](frontend-handoff.md), [data-rules](data-rules.md).
+갱신: 2026-11-16.
 
-## Per-screen handoff
+화면을 완료했다고 보고하기 전에 실제 구현 화면과 사용이 허용된 최신 원본을 대조한다. 옛 캡처만으로 검수를 통과시키지 않는다. 한 항목을 고치면 같은 유형의 다른 화면도 다시 확인한다. 기준: [화면 구현 지침](frontend-handoff.md), [데이터 표시 규칙](data-rules.md). 현재 Figma는 다른 작업자가 수정 중이므로 이번 문서 작업에서는 접근하지 않는다. 미검증 항목은 미검증으로 남긴다.
 
-These are evidence requirements, not completed checks. Design acceptance belongs to KMG.
+<a id="per-screen-handoff"></a>
+## 화면별 전달 자료
 
-- [ ] Exact Figma frame link, or an explicit no-reference label for Login.
-- [ ] The data source and meaning of every visible number and label, including mock status.
-- [ ] Domain labels mapped to the exact `codes.ts` values.
-- [ ] Loading, empty, and error appearances and behavior documented and exercised.
-- [ ] Light and dark captures linked; all 16 theme/brand combinations checked for contrast, clipping, and token usage.
-- [ ] Real implementation version/commit and preview/source links recorded in [screens](screens.md); local-only and unverified links identified.
-- [ ] Test results, visual review status, and remaining issues distinguished. No implementation-complete claim based on a screenshot alone.
+아래는 제출해야 할 근거 목록이며 완료 표시가 아니다. 디자인 승인 여부는 KMG가 결정한다.
 
-## Layout
+- [ ] 정확한 원본 Figma 프레임 링크를 연결한다. 로그인은 원본이 없다고 명시한다.
+- [ ] 표시한 모든 숫자·문구의 출처와 의미를 설명하고 mock 여부를 표시한다.
+- [ ] 도메인 용어를 정확한 `codes.ts` 값에 대응시킨다.
+- [ ] 로딩·빈 결과·오류 화면과 동작을 기록하고 실행해 본다.
+- [ ] 라이트·다크 캡처를 연결한다. 테마·브랜드 16개 조합에서 대비·잘림·토큰 사용을 확인한다.
+- [ ] [화면 목록](screens.md)에 실제 구현 버전·커밋과 실행/소스 링크를 기록한다. 로컬 전용·미검증 링크는 구분한다.
+- [ ] 테스트 결과, 디자인 검수 상태, 남은 문제를 따로 표시한다. 캡처만 보고 구현 완료라고 하지 않는다.
 
-- [ ] No panel inside a panel. No scroll area except `main`.
-- [ ] A table-only screen has no card-list shell and no outer border.
-- [ ] Header and all rows share column start and end. Zero drift.
-- [ ] Fill columns were counted before widths were set. IDs do not wrap; pattern tags are not cut.
-- [ ] AI summary: width fill, height hug. KPI: width hug, height fill.
-- [ ] Card lists keep their minimum card width and the column count follows the width.
-- [ ] PageHeader is full width. A screen with a verdict has one Primary verdict button.
-- [ ] The AI summary sits at the top of the body.
-- [ ] Frames do not overlap and stay inside their section. No page footer.
+<a id="layout"></a>
+## 레이아웃
 
-## Text and components
+- [ ] 패널 안에 패널을 넣지 않는다. 스크롤 영역은 `main` 하나다.
+- [ ] 표 전용 화면에는 카드 목록 틀과 바깥 테두리가 없다.
+- [ ] 헤더와 모든 행의 열 시작·끝 위치가 일치한다.
+- [ ] fill 열 개수를 확인한 뒤 너비를 정한다. ID는 줄바꿈되지 않고 패턴 태그는 잘리지 않는다.
+- [ ] AI 요약은 너비 fill·높이 hug, KPI는 너비 hug·높이 fill이다.
+- [ ] 카드 목록은 최소 너비를 유지하며 화면 너비에 맞춰 열 수가 바뀐다.
+- [ ] PageHeader는 너비 전체를 쓴다. 판정 화면에는 Primary 판정 버튼 하나가 있다.
+- [ ] AI 요약은 본문 상단에 있다.
+- [ ] 프레임은 서로 겹치거나 섹션 밖으로 나가지 않는다. 페이지 푸터는 없다.
 
-- [ ] Screen text is Korean. Exceptions: fixed English pattern names, IDs, code. No placeholder text (`Button 1`, `Value`).
-- [ ] No Korean beside a pattern tag. Format `Fan-out 82%`.
-- [ ] Status, risk, age, and verdict use StatusTag presets. Age bands are 3 days, 7 days, over 7 days.
-- [ ] Applied filters are FilterTag. Two or more chips add a clear-all button. Clicking a chip clears only that filter.
-- [ ] Sample names are masked, and no real names appear in sample data.
+<a id="text-and-components"></a>
+## 문구와 컴포넌트
 
-## Data and filters
+- [ ] 화면 문구는 한국어다. 고정 영문 패턴명·ID·코드는 예외다. 임시 문구(`Button 1`, `Value`)는 남기지 않는다.
+- [ ] 패턴 태그 옆에 한국어를 덧붙이지 않는다. 형식은 `Fan-out 82%`다.
+- [ ] 상태·위험도·경과일·판정에 StatusTag 프리셋을 쓴다. 경과일 구간은 3일, 7일, 7일 초과다.
+- [ ] 적용 필터는 FilterTag로 표시한다. 두 개 이상이면 전체 해제가 있고, 개별 태그를 누르면 해당 필터만 해제된다.
+- [ ] 샘플 이름은 가리고 실제 이름을 넣지 않는다.
 
-- [ ] Display IDs use `{A|E}-YYMMDD-NNNNNN` and match across screens. No old `A-0001`.
-- [ ] Title count equals row or card count.
-- [ ] Rows match the active filter, period, and permission.
-- [ ] Filtered and unfiltered versions are not mixed on one screen.
-- [ ] Amounts show their currency. No native-currency total stands in for a missing USD total.
+<a id="data-and-filters"></a>
+## 데이터와 필터
 
-## Removed features stay removed
+- [ ] 표시 ID는 `{A|E}-YYMMDD-NNNNNN` 형식이며 화면 간 동일하다. 옛 `A-0001` 형식은 쓰지 않는다.
+- [ ] 제목의 개수와 행·카드 수가 같다.
+- [ ] 행 데이터가 적용 필터·기간·권한과 맞는다.
+- [ ] 한 화면에서 필터 적용/미적용 값을 섞어 보여주지 않는다.
+- [ ] 금액에 통화를 표시한다. USD 합계가 없다고 원통화 합계로 대신하지 않는다.
 
-- [ ] No tab-limit text, no "max tabs" toast, no max-tabs screen. The Toast component may exist.
-- [ ] No AppHeader on new screens.
-- [ ] No separate "select" or "bundle" row in the Related tab header.
-- [ ] No "false positive" verdict choice.
+<a id="removed-features-stay-removed"></a>
+## 제외한 기능
 
-## State screens
+- [ ] 탭 제한 문구·토스트·화면은 없다. Toast 컴포넌트 자체는 남길 수 있다.
+- [ ] 새 화면에는 AppHeader가 없다.
+- [ ] 관련 탭 헤더에 별도 선택·묶기 버튼 줄이 없다.
+- [ ] 판정 선택지에 오탐(false positive)이 없다.
 
-- [ ] Loading and zero results look different.
-- [ ] A failed refetch keeps the last good list and shows a one-line banner.
-- [ ] Verdict save shows success, failure, and needs-confirmation differently.
-- [ ] Another assignee's Alert is read only; the verdict button is disabled.
+<a id="state-screens"></a>
+## 상태별 화면
 
-## Access and tables
+- [ ] 로딩과 결과 없음이 구분된다.
+- [ ] 재조회에 실패하면 마지막 정상 목록을 유지하고 한 줄 안내를 보여준다.
+- [ ] 판정 저장의 성공·실패·추가 확인 상태를 구분한다.
+- [ ] 다른 담당자의 Alert는 읽기 전용이며 판정 버튼이 비활성화돼 있다.
 
-- [ ] Number columns right-aligned, text columns left-aligned. No centered text.
-- [ ] A long account or ID does not cover the next cell.
-- [ ] Browser zoom is not blocked.
-- [ ] Whether filter, tab, and page state stay in the URL is noted. If not built, mark it not built.
+<a id="access-and-tables"></a>
+## 접근성과 표
+
+- [ ] 숫자 열은 오른쪽, 문자 열은 왼쪽 정렬한다. 문자를 가운데 정렬하지 않는다.
+- [ ] 긴 계좌번호·ID가 다음 셀을 덮지 않는다.
+- [ ] 브라우저 확대를 막지 않는다.
+- [ ] 필터·탭·페이지 상태의 URL 보존 여부를 기록한다. 구현하지 않았다면 미구현으로 표시한다.
+
+## 최근 실행 결과
+
+2026-11-16, 코드 기준 `680e5fd6336f52ddeb4b8015655423b34bd63498`. 이번 작업은 문서만 수정했으며, 아래 결과는 코드 수정 전 재검증 기록이다. 디자인 승인이나 API 연동 완료를 뜻하지 않는다.
+
+| 검사 | 결과 | 남은 사항 |
+| --- | --- | --- |
+| `pnpm lint` | 오류 0, 경고 1 | 기존 `use-data-table.ts`의 React Compiler 호환성 경고 |
+| `pnpm build` | 통과 | 큰 번들 경고 유지 |
+| `pnpm test` | 69개 파일 중 67개 통과, 402개 테스트 중 399개 통과 | 아래 기존 `src/app` 테스트 3개가 각 5초 제한시간을 넘겨 실패. 원인 미확정, 전체 테스트 통과 아님 |
+
+실패한 테스트:
+- `src/app/App.live.test.tsx`: 명시적 로그아웃 후 같은 신원으로 로그인해도 이전 의견을 복원하지 않는다.
+- `src/app/App.test.tsx`: mock Alert에서 제외한 거래는 상세와 목록의 건수에 함께 반영된다.
+- `src/app/App.test.tsx`: RDR 9000을 닫고 다시 열 수 있으며, 화면 이동에도 패널 상태가 유지된다.
+
+현재 Figma 원본과의 새 화면 대조, 실제 API 연동, 사용자 디자인 승인은 이 검사에 포함하지 않았다.

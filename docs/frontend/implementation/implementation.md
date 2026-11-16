@@ -1,14 +1,16 @@
-# Frontend implementation
+# 프론트엔드 구현 문서
 
-Run-book for building the new screens: layout, API gaps, screen routes, data rules, and QA. The [Figma design](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) is the reference for composition, sizes, and variables; conflicts need review. The five rule documents below are the team-facing implementation source on `fe/work`. Keep them current with each screen change rather than copying their contents into a personal work log. Dates show document updates, not screen completion.
+화면 구현에 필요한 레이아웃, 경로, 데이터 규칙, API 요구사항, 검수 기준을 모은 허브다. 아래 다섯 기준 문서를 `fe/work`에서 관리하고 화면이 바뀔 때 함께 갱신한다. 개인 작업 기록에 본문을 복제하지 않는다. 갱신일은 문서를 수정한 날짜이며 화면 구현 완료일이 아니다.
 
-| Created | Updated | Note | About |
+**현재 기준(2026-11-16):** [사용자 원본 Figma](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh)의 초안을 바탕으로 실행 가능한 코드를 준비하고, 이후 검수하며 다듬는다. 11월 17일 코드 시연이 목표다. 이전에 만든 Figma 구현 검수본은 팀 논의로 폐기됐으며 새 구현의 기준으로 사용하지 않는다. 기존 코드의 재사용 범위는 확인 중이다. 원본에 없거나 모호한 동작은 임의로 채우지 않고 확인한다. 현재 원본 Figma를 다른 작업자가 수정 중이므로 이 문서 정리 작업에서는 읽기·쓰기를 모두 하지 않는다.
+
+| 생성일 | 갱신일 | 문서 | 확인할 내용 |
 | --- | --- | --- | --- |
-| 2026-11-16 | 2026-11-16 | [figma-review](figma-review.md) | Editable review entry, code-to-Figma scope, structural checks, and remaining visual/runtime verification. |
-| 2026-11-15 | 2026-11-15 | [complete-bundle](complete-bundle.md) | Full mock app handoff, data requirements, verification reports and unverified integration limits. |
-| 2026-11-15 | 2026-11-15 | [first-bundle](first-bundle.md) | App shell, login, personal/team dashboards: mock data, per-screen requirements, Figma references and verification. |
-| 2026-11-11 | 2026-11-15 | [frontend-handoff](frontend-handoff.md) | Layout and component rules. Read before coding a screen. |
-| 2026-11-11 | 2026-11-15 | [api](api.md) | Data the screens need, pointers to the team API, and the gaps still open. Hand to backend. |
-| 2026-11-11 | 2026-11-15 | [screens](screens.md) | Screen list with proposed routes and required variants. |
-| 2026-11-11 | 2026-11-15 | [data-rules](data-rules.md) | Display IDs, pattern codes, status rules, sample-data rules. |
-| 2026-11-11 | 2026-11-15 | [qa-checklist](qa-checklist.md) | Checks to run on the finished screens. |
+| 2026-11-11 | 2026-11-16 | [화면 구현 지침](frontend-handoff.md) | 레이아웃·컴포넌트 규칙, 현재 작업 범위와 일정. 구현 전에 읽는다. |
+| 2026-11-11 | 2026-11-16 | [API 요구사항](api.md) | 화면에 필요한 데이터와 동작, 기존 API 참고자료, 백엔드와 확인할 항목. |
+| 2026-11-11 | 2026-11-16 | [화면 목록](screens.md) | 화면 경로, 필요한 변형·상태, 구현 기록과 검수 자료. |
+| 2026-11-11 | 2026-11-16 | [데이터 표시 규칙](data-rules.md) | 표시 ID, 패턴 코드, 상태·점수, 샘플 데이터의 일관성. |
+| 2026-11-11 | 2026-11-16 | [검수 체크리스트](qa-checklist.md) | 구현한 화면에서 확인할 항목과 완료 보고에 필요한 근거. |
+| 2026-11-16 | 2026-11-16 | [이전 Figma 검수 기록](figma-review.md) | 폐기된 검수본의 제작 이력. 이 파일에 남은 검수 순서는 현재 지침이 아니다. |
+| 2026-11-15 | 2026-11-15 | [전체 샘플 앱 인계](complete-bundle.md) | 기존 mock 앱의 기능·데이터·테스트 기록. 디자인 승인이나 API 연동 완료를 뜻하지 않는다. |
+| 2026-11-15 | 2026-11-15 | [첫 화면 묶음 인계](first-bundle.md) | 앱 틀·로그인·내 담당/전체 대시보드의 데이터, 요구사항, Figma 대응과 당시 검증 기록. |

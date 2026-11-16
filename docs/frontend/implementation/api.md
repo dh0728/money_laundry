@@ -1,50 +1,58 @@
-# API requirements and gaps
+<a id="api-requirements-and-gaps"></a>
+# 화면에 필요한 API와 미확정 사항
 
-The existing [API.md](../../../backend/api-server/API.md) is a reference for current backend behavior, not the specification that new screens must copy. The implementation direction confirmed on 2026-11-15 is: build a screen with mock data, document the data and actions it needs, then agree the API with backend. Domain values come from [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts). Related: [data rules](data-rules.md), [screens](screens.md).
+문서 수정: 2026-11-16. 이 날짜는 API 연동 완료일이 아니다.
 
-## Per-screen data handoff
+기존 [API.md](../../../backend/api-server/API.md)는 현재 백엔드 동작을 확인하는 참고 자료다. 새 화면을 기존 API에 맞춰 바꾸는 기준은 아니다. 2026-11-15에 정한 순서는 **가짜 데이터로 화면 구현 → 필요한 데이터와 동작 기록 → 백엔드와 API 합의**다. 유형 등 도메인 값은 [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts)를 따른다. 함께 볼 문서: [데이터 표시 규칙](data-rules.md), [화면 목록](screens.md).
 
-For every implemented screen, keep its data requirements with that screen in [screens](screens.md):
+<a id="per-screen-data-handoff"></a>
+## 화면별 데이터 전달
 
-- Visible field or metric, meaning, unit, mock source, and any aggregation or filter.
-- Required identifiers and domain values from `codes.ts`; distinguish display labels from stored values.
-- User action, required input, expected result, permission, and failure state.
-- Loading, empty, missing-value, stale, and error behavior.
-- Existing API reference if relevant; mark each item as mock-only, existing behavior verified, proposed, or agreed with backend.
+화면을 구현할 때마다 [화면 목록](screens.md)의 해당 항목에 다음 내용을 기록한다.
 
-Do not invent routes, response fields, permissions, or an agreement. A working mock screen does not prove API integration.
+- 화면에 나오는 필드·지표의 의미, 단위, 가짜 데이터 출처, 집계식과 필터 조건.
+- 필요한 식별자와 `codes.ts` 값. 화면에 표시하는 이름과 저장하는 값을 구분한다.
+- 사용자 동작, 필수 입력, 기대 결과, 권한, 실패 상태.
+- 로딩, 빈 결과, 값 없음, 데이터가 오래된 상태(stale), 오류 발생 시 동작.
+- 참고할 기존 API가 있다면 그 근거. 각 항목은 `가짜 데이터만 구현`, `기존 동작 확인`, `제안`, `백엔드 합의 완료` 중 어디에 해당하는지 표시한다.
 
-Existing screen requirements: [first bundle](first-bundle.md#data-required-from-backend), [complete mock app](complete-bundle.md).
+경로, 응답 필드, 권한이나 합의 내용을 임의로 만들지 않는다. 가짜 데이터로 화면이 동작해도 API 연동을 마쳤다는 뜻은 아니다.
 
-An unconfirmed item is `unconfirmed`. Never present a guess as fact.
+기존 화면별 요구사항: [첫 묶음](first-bundle.md#data-required-from-backend), [전체 샘플 앱](complete-bundle.md).
 
-## Existing integration safeguards
+확인되지 않은 항목은 미확정(`unconfirmed`)으로 남긴다. 추측을 사실처럼 적지 않는다.
 
-Retain these safeguards when using existing endpoints. Recheck the actual endpoint before wiring a new screen; these notes do not settle the open gaps below.
+<a id="existing-integration-safeguards"></a>
+## 기존 API 연동 시 지킬 규칙
 
-- Never send the number in a display ID (`A-1042`) as `caseId`. Search an exact `alertId`, then open that row's `caseId`.
-- Send `revision` back exactly as the GET returned it. Never merge it in the frontend.
-- Times come as ISO-8601 with offset; show KST. A date filter includes the start day 00:00 and excludes the day after the end date 00:00.
-- Without a USD total, never fill in a native-currency total. Scores are 0 to 1.
-- Do not write "laundering scale" or "laundered transactions". Write "suspicious transactions"; show a pattern with its probability.
-- Model result and human verdict are separate.
+기존 엔드포인트를 사용할 때도 아래 규칙을 유지한다. 새 화면에 연결하기 전 실제 엔드포인트를 다시 확인한다. 이 규칙만으로 아래 미확정 사항이 해결된 것은 아니다.
 
-## Open gaps
+- 표시 ID(`A-1042`)의 숫자를 `caseId`로 보내지 않는다. 정확한 `alertId`로 조회한 뒤 해당 행의 `caseId`를 사용한다.
+- `revision`은 GET 응답 값을 그대로 돌려보낸다. 프론트엔드에서 합치거나 새 값을 만들지 않는다.
+- 시각은 오프셋이 포함된 ISO-8601로 받고 KST로 표시한다. 날짜 필터는 시작일 00:00을 포함하고, 종료일 다음 날 00:00은 제외한다.
+- USD 합계가 없으면 원래 통화의 합계로 대신 채우지 않는다. 점수 범위는 0~1이다.
+- '자금세탁 규모'나 '세탁된 거래'로 단정하지 않는다. '의심 거래'로 표기하고 패턴에는 확률을 함께 표시한다.
+- 모델 결과와 사람의 판정은 별개다.
 
-| Screen or feature | What is missing | Status |
+<a id="open-gaps"></a>
+## 백엔드·팀과 확인할 사항
+
+| 화면·기능 | 확인할 내용 | 상태 |
 | --- | --- | --- |
-| Related tab candidates | Whether API.md provides a route for the full related-case candidate list. Do not show old relatedFlows or relatedDecisions as the full candidate list. | unconfirmed |
-| AI summary card | Route, model, and caching for the summary text. | unconfirmed |
-| Dashboard intake metrics | New accounts and owners, score bands, daily totals, and share of Alerts; metric definitions remain unconfirmed. | unconfirmed |
-| Rule engine | List, create, and backtest routes. | unconfirmed |
-| Pattern tag name | Who maps the API type name to the screen name (`Fan-out 82%`); `codes.ts` labels are Korean. | unconfirmed |
-| Display ID | Conversion between server numeric ids and `A-YYMMDD-NNNNNN`; whether the date is creation or closing. Figma samples are not a contract. | unconfirmed |
-| Alert closing values | Product rule is normal or abnormal with a reason; `codes.ts` still holds a false-positive value. | unconfirmed |
-| Pattern class count | The screens show nine types; the model team may drop some. | unconfirmed, team and model |
-| Notifications | Field mapping between the screen samples and the notification routes in API.md. | unconfirmed |
-| Table sort | Whether table view has sort parameters; the default list order is risk, descending. | unconfirmed |
-| Filters "human verdict abnormal only" and "my assignments" | Whether the query names match the filter chips one to one. | unconfirmed |
+| 연관 탭 후보 | API.md에 연관 업무 후보 전체를 조회하는 경로가 있는가. 기존 relatedFlows나 relatedDecisions를 전체 후보 목록처럼 표시하지 않는다. | 미확정 |
+| AI 요약 카드 | 요약문 조회 경로, 생성 모델, 캐시 방식. | 미확정 |
+| 대시보드 유입 지표 | 신규 계좌·소유주, 점수 구간, 일별 총계, Alert 비중의 정의. | 미확정 |
+| 룰 엔진 | 목록, 생성, 백테스트 경로. | 미확정 |
+| 패턴 태그 이름 | API 유형명을 화면 이름(`Fan-out 82%`)으로 누가 변환하는가. `codes.ts`의 표시명은 한국어다. | 미확정 |
+| 표시 ID | 서버 숫자 ID와 `A-YYMMDD-NNNNNN`의 대응 방식. 날짜가 생성일인지 종결일인지도 확인한다. Figma 예시는 API 계약이 아니다. | 미확정 |
+| Alert 종결 값 | 화면 규칙은 사유를 입력한 정상·이상 판정이다. `codes.ts`에는 오탐 값도 남아 있다. | 미확정 |
+| 패턴 유형 수 | 화면은 9개 유형을 사용한다. 모델 팀에서 일부를 제외할 가능성이 있다. | 미확정 · 팀·모델 확인 |
+| 알림 | 화면 샘플의 필드와 API.md 알림 경로의 필드 대응. | 미확정 |
+| 표 정렬 | 표 보기에서 정렬 파라미터를 지원하는가. 목록 기본 정렬은 위험도 내림차순이다. | 미확정 |
+| '사람 판정 이상만'·'내 담당' 필터 | 조회 파라미터가 각 필터 칩과 일대일로 대응하는가. | 미확정 |
 
 ## v3 전체 샘플 앱의 연동 경계 (2026-11-15)
 
-새 `src/next` 앱은 전체 화면을 공유 메모리 샘플로 구현했다. 실제 endpoint 요청이나 운영 저장은 하지 않는다. 필드별 데이터 요구와 미확정 계약은 [전체 구현 인계](complete-bundle.md)를 따른다. 수억 건 운영 연동은 전체 원장 다운로드 대신 서버 KPI/집계·최대100행 cursor page·case-scoped evidence/neighborhood·비동기 backtest/export job이 필요하다. 클라이언트10,000건 제한은 샘플 adapter 보호 장치이며 서버 처리 성능이나 실제 대용량 지원의 증거가 아니다.
+새 `src/next` 앱은 전체 화면을 메모리에 있는 공유 샘플 데이터로 구현했다. 실제 엔드포인트 요청이나 운영 데이터 저장은 하지 않는다. 필드별 요구사항과 미확정 계약은 [전체 구현 인계](complete-bundle.md)를 따른다.
+
+다음은 백엔드와 합의가 필요한 요구사항 제안이며, 확정된 API 계약이 아니다. 수억 건 규모의 운영 데이터를 연결하려면 전체 원장을 내려받는 방식 대신 서버 KPI·집계, 최대 100행의 커서 기반 페이지 조회, 업무별 근거 거래·주변 그래프 조회(case-scoped evidence/neighborhood), 비동기 백테스트·내보내기 작업(backtest/export job)이 필요하다. 클라이언트의 10,000건 제한은 샘플 어댑터의 보호 장치다. 서버 처리 성능이나 실제 대용량 지원을 검증한 결과가 아니다.
