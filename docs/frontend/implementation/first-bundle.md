@@ -1,10 +1,16 @@
-# App shell, login and dashboard handoff
+<a id="app-shell-login-and-dashboard-handoff"></a>
+# 앱 틀·로그인·대시보드 구현 인계
 
-Implemented in `frontend/implementation/1.14.0/web-app/src/next`. Scope ends at the personal and whole-team dashboards. No backend request, real authentication, verdict, or persistence of business records is connected.
+대상: 팀원 · 언어: 한국어 · 구분: 이전 구현 인계 기록(현재 정본 아님)
 
-## Run and routes
+문서 정리: 2026-11-16. 아래 구현·검증 결과는 첫 묶음을 작성한 당시의 기록이다. 현재 코드 상태나 디자인 승인을 뜻하지 않는다. 현재 구현 기준은 [구현 문서 허브](implementation.md)에서 확인한다.
 
-From `frontend/implementation/1.14.0/web-app`:
+구현 위치는 `frontend/implementation/1.14.0/web-app/src/next`이며, 이 묶음의 범위는 개인·전체 대시보드까지다. 백엔드 요청, 실제 인증, 판정, 업무 기록의 영구 저장은 연결하지 않았다.
+
+<a id="run-and-routes"></a>
+## 실행과 화면 경로
+
+`frontend/implementation/1.14.0/web-app`에서 실행한다.
 
 ```sh
 pnpm dev --host 127.0.0.1 --port 5211 --strictPort
@@ -14,64 +20,68 @@ pnpm build
 pnpm build-storybook
 ```
 
-Root `/` now loads the new app. Routes use hashes: `#/login`, `#/dashboard/mine`, `#/dashboard/all`. The period and applied search live in the hash query (`?start=2026-11-09&end=2026-11-15&q=...`) and survive scope navigation, reload and browser history. Unknown authenticated routes fall back to the personal dashboard. The mock identity lives in tab-scoped session storage; appearance lives in local storage. Passwords are never stored. Blocked or malformed storage falls back safely.
+작성 당시 루트 `/`는 새 앱을 연다. 화면 경로는 `#/login`, `#/dashboard/mine`, `#/dashboard/all`처럼 해시를 사용한다. 기간과 적용된 검색어는 해시 쿼리(`?start=2026-11-09&end=2026-11-15&q=...`)에 저장되며, 개인·전체 전환, 새로고침, 브라우저 뒤로·앞으로 이동 시 유지된다. 인증 후 알 수 없는 경로로 이동하면 개인 대시보드로 돌아간다. 가짜 로그인 정보는 탭별 session storage에, 화면 설정은 local storage에 저장한다. 비밀번호는 저장하지 않는다. 저장소가 차단됐거나 값이 잘못됐을 때도 기본값으로 동작한다.
 
-Use the sample-account button or `demo` / `radar-demo`. `VITE_API_MODE` does not connect this new entry to the old app's live API. Existing source screens and `ant-review.html` remain in the repository; the new app imports none of those screens.
+샘플 계정 버튼 또는 `demo` / `radar-demo`를 사용한다. `VITE_API_MODE`를 설정해도 새 앱이 기존 앱의 실제 API에 연결되지는 않는다. 기존 화면 소스와 `ant-review.html`은 저장소에 남겨 뒀으며 새 앱에서는 해당 화면을 가져오지 않는다.
 
-The original `ShellChrome.stories.tsx`, Storybook configuration, token snapshot, sync script and dependencies are preserved. `ShellChrome` gained optional header/sidebar/content slots; the new app uses those slots. Its default empty-content story and `/next-review.html` retain the original controls and sidebar collapse behavior. New `App/First bundle` stories expose login, mine/all, loading, empty, first-load error and refetch error. Storybook is a static component specimen; use the running app to verify navigation and sign-in.
+기존 `ShellChrome.stories.tsx`, Storybook 설정, 토큰 스냅샷, 동기화 스크립트, 의존성을 보존했다. `ShellChrome`에 선택형 header/sidebar/content 슬롯을 추가해 새 앱에서 사용했다. 본문이 비어 있는 기본 스토리와 `/next-review.html`은 기존 컨트롤과 사이드바 접기 동작을 유지한다. 새 `App/First bundle` 스토리에서는 로그인, 개인·전체 대시보드, 로딩, 빈 결과, 첫 조회 오류, 재조회 오류를 확인할 수 있다. Storybook은 컴포넌트 상태를 보여주는 예시이므로 화면 이동과 로그인은 실행 중인 앱에서 검증한다.
 
-## Screen correspondence and data provenance
+<a id="screen-correspondence-and-data-provenance"></a>
+## 대응 Figma 화면과 데이터 출처
 
-| Screen | Figma reference | Displayed text and numbers | Code values | States and actual captures |
+| 화면 | Figma 참고 | 표시 문구·숫자 출처 | 코드 값 | 상태·실제 캡처 |
 | --- | --- | --- | --- | --- |
-| App shell | [Header `3510:13270`](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh?node-id=3510-13270); the dashboard frame composition below | Menu labels are product copy in `ui/AppShell.tsx`. Sample identity is `snapshot.userName` / `userId` in `dashboard-data.ts`. No fabricated unread count or fabricated open work tabs. | No new domain enum. `Scope` is local navigation state. | Sidebar expanded/hidden and restored; default legacy preview checked. `preserved-shell-preview.jpg`, `sidebar-hidden-dark.jpg`. |
-| Login | Not drawn in Figma; explicitly included in this implementation bundle | Korean form labels/errors are product copy in `App.tsx`. The displayed account is a local mock fixture, not a backend account. No operational totals. | Mock STAFF identity only. No claim that a submitted password is server-authenticated. | Idle, validation failure, submitting, expired session; successful sample sign-in. `login-light-sky.jpg`, `login-dark-sky.jpg`, `login-validation-dark.jpg`, `login-expired-dark.jpg`. |
-| Personal dashboard | [Dashboard / mine `3031:7466`](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh?node-id=3031-7466); AI summary `4148:13745`, KPI `3511:17333`, card `3511:17376` | All cards, column counts, KPIs, days elapsed and daily Alert counts derive from `cases` and `selectDashboard` in `dashboard-data.ts`. Only assignee 7 is included. AI prose is explicitly a synthetic summary example derived from current counts. | `TypeCode` and `typeDisplay` from `src/api/codes.ts`; case `status` uses `OPEN` / `CLOSED`. Human verdict is a separate display-only field. | Ready, loading, zero results, initial failure, failed refetch/retry; 16 visible records in the default period, four per workflow column. `mine-light-sky.jpg`, `mine-dark-sky.jpg`. |
-| Whole-team dashboard | [Dashboard / all `3031:7805`](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh?node-id=3031-7805); chart row `3526:34982` | One fixture contains 126 transactions and 24 cases. Default-period totals: 94 model-suspicious transactions, 16 Alerts, 8 Episodes, 6 closed cases, 25.0% workflow completion. New accounts/owners use first appearance within the available fixture history. All eight KPIs, risk bands, daily charts and pattern counts derive from the same selection. Search restricts both cases and linked transactions; the UI names that scope. | All nine `TypeCode` values retained. Pattern charts count only suspicious transactions with code 1–8. Code 0 remains independently possible on suspicious transactions; it never means a human NORMAL verdict. | Same loading/empty/error treatment. Default board has 24 records, six per column. `all-light-sky.jpg`, `all-dark-sky.jpg`; middle/lower captures cover pattern charts and work cards. |
+| 앱 틀 | [Header `3510:13270`](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh?node-id=3510-13270), 아래 대시보드 프레임 구성 | 메뉴 문구는 `ui/AppShell.tsx`, 샘플 사용자 정보는 `dashboard-data.ts`의 `snapshot.userName` / `userId`. 읽지 않은 알림 수나 열린 업무 탭을 임의로 만들지 않음. | 새 도메인 enum 없음. `Scope`는 로컬 화면 이동 상태. | 사이드바 펼치기·숨기기·복원과 기존 기본 미리보기 확인. `preserved-shell-preview.jpg`, `sidebar-hidden-dark.jpg`. |
+| 로그인 | Figma에 없지만 이 구현 묶음에 명시적으로 포함 | 한국어 입력 안내·오류 문구는 `App.tsx`. 표시 계정은 로컬 가짜 데이터이며 백엔드 계정이 아님. 운영 집계 없음. | 가짜 STAFF 사용자만 사용. 입력한 비밀번호를 서버가 인증했다고 주장하지 않음. | 대기, 입력 검증 실패, 제출 중, 세션 만료, 샘플 로그인 성공. `login-light-sky.jpg`, `login-dark-sky.jpg`, `login-validation-dark.jpg`, `login-expired-dark.jpg`. |
+| 개인 대시보드 | [Dashboard / mine `3031:7466`](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh?node-id=3031-7466), AI 요약 `4148:13745`, KPI `3511:17333`, 카드 `3511:17376` | 카드, 열별 건수, KPI, 경과일, 일별 Alert 건수는 모두 `dashboard-data.ts`의 `cases`와 `selectDashboard`에서 계산. 담당자 7만 포함. AI 문구는 현재 건수를 이용한 합성 요약 예시임을 명시. | `src/api/codes.ts`의 `TypeCode`, `typeDisplay` 사용. 업무 `status`는 `OPEN` / `CLOSED`. 사람 판정은 별도 표시용 필드. | 기본, 로딩, 0건, 첫 조회 실패, 재조회 실패·재시도. 기본 기간에는 16건이 보이며 업무 상태별 열에 4건씩 표시. `mine-light-sky.jpg`, `mine-dark-sky.jpg`. |
+| 전체 대시보드 | [Dashboard / all `3031:7805`](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh?node-id=3031-7805), 차트 행 `3526:34982` | 하나의 샘플에 거래 126건과 업무 24건. 기본 기간에는 모델 의심 거래 94건, Alert 16건, Episode 8건, 종결 업무 6건, 처리율 25.0%. 신규 계좌·소유주는 샘플 이력에서 처음 등장한 시점 기준. KPI 8개, 위험도 구간, 일별 차트, 패턴 건수는 같은 조회 결과에서 계산. 검색 시 업무와 연결 거래를 함께 제한하고 화면에 범위를 표시. | `TypeCode` 9개 값 모두 유지. 패턴 차트는 코드 1–8의 의심 거래만 집계. 의심 거래에도 코드 0이 있을 수 있으며 사람의 NORMAL 판정을 뜻하지 않음. | 동일한 로딩·빈 결과·오류 처리. 기본 보드는 24건이며 열마다 6건. `all-light-sky.jpg`, `all-dark-sky.jpg`; 중간·하단 캡처에 패턴 차트와 업무 카드 포함. |
 
-`patternName()` derives English display names from `typeDisplay()`; code 3 remains `GATHER-SCATTER` → `Gather-scatter`, code 4 remains `SCATTER-GATHER` → `Scatter-gather`. Display IDs and numeric case/source IDs are stored independently. Display IDs follow `{A|E}-YYMMDD-NNNNNN`. Names are masked. USD totals are not substituted with native-currency totals; missing totals render `값 없음`. Ratios with zero denominator render `값 없음`, not zero percent.
+`patternName()`은 `typeDisplay()`에서 영어 표시명을 만든다. 코드 3은 `GATHER-SCATTER` → `Gather-scatter`, 코드 4는 `SCATTER-GATHER` → `Scatter-gather`를 유지한다. 표시 ID와 숫자형 업무·원본 ID는 각각 저장한다. 표시 ID는 `{A|E}-YYMMDD-NNNNNN` 형식이며 이름은 가린다. USD 합계가 없으면 원래 통화의 합계로 대신 채우지 않고 `값 없음`으로 표시한다. 비율의 분모가 0일 때도 0%가 아니라 `값 없음`으로 표시한다.
 
-Four workflow labels (`열람 전`, `처리 전`, `처리 중`, `처리 완료`) are **frontend display state**, separate from backend status codes. `정상` / `이상` are display-only verdicts; neither `FALSE_POSITIVE` nor the unconfirmed API value `SUSPICIOUS` is offered or submitted. Model score remains visible after the human verdict. The risk thresholds are passed from the fixture's rule settings (`medium=0.7`, `high=0.9`), not embedded in a tag component.
+업무 상태 4개(`열람 전`, `처리 전`, `처리 중`, `처리 완료`)는 백엔드 상태 코드와 별개인 **프론트엔드 표시 상태**다. `정상` / `이상`도 표시용 판정이며, `FALSE_POSITIVE`와 미확정 API 값 `SUSPICIOUS`는 선택지로 제공하거나 제출하지 않는다. 사람 판정 후에도 모델 점수는 보인다. 위험도 경계는 샘플 룰 설정(`medium=0.7`, `high=0.9`)에서 전달하며 태그 컴포넌트에 직접 넣지 않았다.
 
-## Data required from backend
+<a id="data-required-from-backend"></a>
+## 백엔드에 필요한 데이터
 
-These are screen needs for backend design, not assertions about existing API.md endpoints.
+백엔드 설계를 위해 화면이 요구하는 데이터다. 기존 API.md의 엔드포인트가 이미 제공한다는 뜻은 아니다.
 
-| Surface | Required data | Semantics to settle |
+| 화면·영역 | 필요한 데이터 | 합의할 정의 |
 | --- | --- | --- |
-| Login / shell | Current user ID, masked/display name, role, session status/expiry, allowed scopes; login errors; later logout/session endpoint | Real session and CSRF handling; permission to view all staff. Preferences can remain local. |
-| Personal dashboard | Snapshot timestamp with offset; business date/timezone; current assignee; applied period; stable case/source/display IDs; kind; assignee ID/name; created timestamp; work-state evidence; backend status; human verdict; model score; type code/probability; transaction IDs/count; nullable USD total | Which events define unread, pending and in-progress; whether closed cases are in the selected cohort; creation-date vs detection-date period; age origin; independent ID mapping. |
-| Personal summary | Daily created Alert counts for the same assignee/period; priority candidate counts; generated text, provenance, generation timestamp and stale/error status | AI generation/caching route is unconfirmed. Current prose is explicitly a local example. |
-| Team intake KPIs | Received/analyzed transaction counts, suspicious count and denominator; new account/owner counts; daily bucket counts | Analysis coverage vs receipt coverage, timestamp defining period, first-seen history boundary. Current fixture has all 126 received transactions analyzed. |
-| Team work KPIs | Created Alerts; pending Alert count; open Episode count; completed count and denominator; distinct suspicious transaction IDs linked to Alerts | Current local completion rate uses selected created cases, not the old Figma sample's unconfirmed rolling-30-day definition. Real comparison windows and prior-period changes are not invented. |
-| Team charts | Suspicious score-band counts with rule settings/version; daily total/suspicious transaction counts; daily workflow cohorts; code 1–8 counts and NON_PATTERN exclusion count; scoped case list | Shared filters, consistent denominators and inclusive/exclusive dates; counted unit (transactions vs cases); distinct IDs for deduplication. |
-| Loading / recovery | Nullable response, successful empty response, typed failure, last successful snapshot with its applied query and timestamp | Failed refetch retains the exact prior successful result, including a successful empty result. A new URL starts a fresh local projection from the cached fixture. Actual network/cache behavior awaits the API. |
+| 로그인·앱 틀 | 현재 사용자 ID, 가린 이름·표시명, 역할, 세션 상태·만료, 조회 허용 범위, 로그인 오류, 추후 로그아웃·세션 엔드포인트 | 실제 세션과 CSRF 처리, 모든 직원 업무를 조회할 권한. 화면 설정은 로컬에 둘 수 있음. |
+| 개인 대시보드 | 오프셋 포함 스냅샷 시각, 업무 기준일·시간대, 현재 담당자, 적용 기간, 안정적인 업무·원본·표시 ID, 종류, 담당자 ID·이름, 생성 시각, 업무 상태의 근거, 백엔드 상태, 사람 판정, 모델 점수, 유형 코드·확률, 거래 ID·건수, 값이 없을 수 있는 USD 합계 | 어떤 이벤트로 열람 전·처리 전·처리 중을 구분하는지, 선택한 업무 집합에 종결 업무를 포함하는지, 생성일·탐지일 중 기간 기준, 경과일 기산점, 독립적인 ID 대응. |
+| 개인 요약 | 같은 담당자·기간의 일별 생성 Alert 건수, 우선 처리 후보 건수, 생성 문구·출처·생성 시각, 오래된 데이터·오류 상태 | AI 생성·캐시 경로는 미확정. 현재 문구는 로컬 예시임을 명시. |
+| 전체 유입 KPI | 수신·분석 거래 건수, 의심 거래 건수와 분모, 신규 계좌·소유주 수, 일별 구간 건수 | 수신 범위와 분석 범위의 차이, 기간에 적용할 시각, 최초 등장 여부를 판단할 이력 범위. 현재 샘플은 수신 거래 126건 모두 분석된 상태. |
+| 전체 업무 KPI | 생성 Alert 수, 처리 대기 Alert 수, 열린 Episode 수, 처리 완료 건수와 분모, Alert에 연결된 중복 없는 의심 거래 ID | 현재 로컬 처리율은 선택된 생성 업무 기준. 예전 Figma 샘플의 미확정 최근 30일 정의를 사용하지 않음. 실제 비교 기간과 이전 기간 대비 증감은 만들지 않음. |
+| 전체 차트 | 룰 설정·버전을 포함한 의심 점수 구간별 건수, 일별 전체·의심 거래 건수, 일별 업무 집합, 코드 1–8 건수와 NON_PATTERN 제외 건수, 범위가 적용된 업무 목록 | 공통 필터, 일치하는 분모, 시작·종료일 포함 범위, 집계 단위(거래·업무), 중복 제거용 식별자. |
+| 로딩·복구 | 값이 없을 수 있는 응답, 성공한 빈 응답, 구분 가능한 실패 유형, 적용 쿼리·시각을 포함한 마지막 성공 스냅샷 | 재조회 실패 시 앞서 성공한 결과를 그대로 유지하며, 성공한 빈 결과도 유지. 새 URL에서는 캐시된 샘플로 로컬 결과를 다시 계산. 실제 네트워크·캐시 동작은 API 연결 후 확인. |
 
-The sample date is fixed at `2026-11-15`, with available transaction history `11-09` through `11-15`. Dates earlier than the available history do not fabricate older data. The UI says the sample snapshot time. Dates and searches affect counts consistently; preset period buttons edit a draft and Apply commits it. Removing the search FilterTag clears only search. Empty-screen reset clears all conditions.
+샘플 기준일은 `2026-11-15`로 고정하며 거래 이력은 `11-09`부터 `11-15`까지다. 이력보다 이전 날짜의 데이터를 만들지 않는다. 화면에 샘플 스냅샷 시각을 표시한다. 날짜·검색 조건은 건수에 일관되게 반영된다. 기간 프리셋 버튼은 선택 초안만 바꾸며 Apply를 눌러야 적용된다. 검색 FilterTag를 지우면 검색만 해제되고, 빈 화면의 초기화는 모든 조건을 해제한다.
 
-## Visual system and states
+<a id="visual-system-and-states"></a>
+## 색상 체계와 화면 상태
 
-All new colors reference v3 variables. Source `tokens.css` and `tokens.json` still match their recorded SHA-256 values in `tokens-source.json`. Four themes (Default Light/Dark, Solarized Light/Dark) and four accents (Sky/Violet/Pink/Lime) work on login and both dashboard scopes. Selected navigation uses opposite-brightness ink/fill tokens. Read-only cards do not expose fake click targets. Out-of-bundle menus are disabled and visibly labeled `준비 중`.
+새 색상은 모두 v3 변수를 참조했다. 당시 원본 `tokens.css`와 `tokens.json`은 `tokens-source.json`에 기록된 SHA-256 값과 일치했다. 로그인과 개인·전체 대시보드에서 테마 4개(Default Light/Dark, Solarized Light/Dark)와 브랜드 4개(Sky/Violet/Pink/Lime)가 동작했다. 선택한 메뉴는 반대 명도의 글자·배경 토큰을 사용한다. 읽기 전용 카드에는 가짜 클릭 영역을 만들지 않았다. 이 묶음에 포함되지 않은 메뉴는 비활성화하고 `준비 중`으로 표시했다.
 
-Source v3 tokens do not define a distinct unread/orange semantic role. Unread and 4–7-day age tags use the existing amber solid/text-on-accent pair; 0–3-day ages use amber subtle and over-7-day ages use negative. No old orange token or raw color was added. Labels show the actual age.
+원본 v3 토큰에는 별도의 읽지 않음·주황 의미 색상이 없었다. 읽지 않음과 경과일 4–7일 태그는 기존 amber 단색 배경·text-on-accent 조합, 0–3일은 amber 옅은 배경, 7일 초과는 negative를 사용했다. 예전 orange 토큰이나 직접 지정한 색상은 추가하지 않았다. 표시명은 실제 경과일을 사용했다.
 
-Loading has a distinct status message. Initial error hides unavailable totals and offers retry. Refetch error keeps the previous successful dataset with a single banner. The developer-only state selector and `?state=loading|empty|error` permit repeatable checks; the selector is omitted from production. A busy login disables duplicate submission. Session expiration and logout remove the mock identity and return to login, retaining appearance only.
+로딩은 별도 상태 문구로 표시한다. 첫 조회 오류는 확인할 수 없는 합계를 숨기고 재시도를 제공한다. 재조회 오류는 마지막 성공 데이터를 유지하며 배너 하나를 표시한다. 개발용 상태 선택기와 `?state=loading|empty|error`로 반복 확인할 수 있고, 운영 빌드에는 선택기가 없다. 로그인 처리 중에는 중복 제출을 막는다. 세션 만료·로그아웃 시 가짜 로그인 정보를 지우고 로그인 화면으로 돌아가며 화면 설정만 유지한다.
 
-## Verification and local evidence
+<a id="verification-and-local-evidence"></a>
+## 당시 검증 결과와 로컬 근거
 
-Measured on the local Vite app with the in-app browser, not a production deployment:
+운영 배포가 아니라 로컬 Vite 앱을 인앱 브라우저로 측정한 기록이다. 아래 결과를 현재 버전의 검증 결과로 사용하지 않는다.
 
-- `pnpm lint`: zero errors; one existing TanStack React Compiler warning outside `src/next`. Generated `storybook-static` is excluded like `dist`; source rules, including all six shadcn rules, remain enabled.
-- `pnpm test`: **51 files, 273 tests passed**, including ten new contract/journey regressions. Vitest workers disable Node's experimental WebStorage so Node 26 cannot shadow jsdom storage. Existing jsdom pseudo-element notices remain.
-- `pnpm build` and `pnpm build-storybook`: passed. The retained legacy graph build still emits the existing large-chunk warning.
-- Browser: 16 theme/accent combinations for each of login, personal dashboard and team dashboard; 48 main captures. Final 32 dashboard combinations all measured header 48px, sidebar 240px, zero document horizontal overflow and zero clipped card descendants at 1920×1080.
-- Browser journeys: sample sign-in, invalid login, session expiry, logout, sidebar hide/restore, scoped search/clear, period draft/Apply, scope switch retaining period, missing-search aggregates, loading, empty, first-load failure, retry, and failed-refetch retention of both populated and empty results.
-- Widths: 960×900 split view, 1280×720 and 2400×1350 effective CSS viewports passed the recorded overflow checks. The latter two approximate 150%/80% layout space at Full HD; they are not a claim that actual browser zoom controls were tested.
-- Existing ShellChrome preview retains its empty-content main and functional sidebar collapse. Its existing story source is unchanged.
-- Independent read-only review found three important issues (search-only clear, search aggregate scope, retained empty result); each was reproduced by a failing regression and fixed. No outstanding important finding from that review.
+- `pnpm lint`: 오류 0개. `src/next` 바깥의 기존 TanStack React Compiler 경고 1개. 생성된 `storybook-static`은 `dist`처럼 검사에서 제외했으며 shadcn 규칙 6개를 포함한 소스 검사 규칙은 유지했다.
+- `pnpm test`: 새 계약·사용 흐름 회귀 테스트 10개를 포함해 **51개 파일, 273개 테스트 통과**. Node 26이 jsdom 저장소를 가리지 않도록 Vitest worker에서 Node의 실험적 WebStorage를 껐다. 기존 jsdom 의사 요소 알림은 남아 있다.
+- `pnpm build`, `pnpm build-storybook`: 통과. 보존한 기존 그래프 빌드의 큰 청크 경고는 남아 있다.
+- 브라우저: 로그인·개인 대시보드·전체 대시보드 각각 테마·브랜드 16조합, 주요 캡처 48장. 최종 대시보드 32조합에서 1920×1080 기준 헤더 48px, 사이드바 240px, 문서 가로 넘침 0건, 카드 내부 잘림 0건을 측정했다.
+- 사용자 흐름: 샘플 로그인, 잘못된 로그인, 세션 만료, 로그아웃, 사이드바 숨기기·복원, 범위 검색·해제, 기간 초안·Apply, 기간을 유지한 개인·전체 전환, 검색 결과 없음의 집계, 로딩, 빈 결과, 첫 조회 실패, 재시도, 재조회 실패 후 데이터가 있는 결과·빈 결과 유지.
+- 화면 크기: 960×900 분할 화면, 1280×720·2400×1350 CSS 뷰포트에서 기록된 넘침 검사를 통과했다. 뒤의 두 크기는 Full HD에서 150%·80% 확대·축소 시 레이아웃 영역을 근사한 값이다. 실제 브라우저 확대·축소 컨트롤을 시험했다는 뜻은 아니다.
+- 기존 ShellChrome 미리보기의 빈 main과 사이드바 접기 동작을 유지했다. 기존 스토리 소스는 변경하지 않았다.
+- 독립적인 읽기 전용 검토에서 검색만 해제하는 동작, 검색 집계 범위, 빈 결과 유지 문제 3건을 발견했다. 각각 실패하는 회귀 테스트로 재현한 뒤 수정했으며, 당시 해당 검토에서 남은 주요 지적은 없었다.
 
-Local captures and JSON measurements are in `/tmp/aml-first-bundle-captures/`; raw screenshots/logs are not staged or added to the repository. Per-screen `*-light-sky.jpg` / `*-dark-sky.jpg` are full-size actual captures. `*-matrix.jpg` shows all 16 combinations; `*-light-dark.jpg` pairs light/dark. `states-matrix.jpg` covers state renders. Test/build logs use `/tmp/aml-first-*.log`. These are local review artifacts and need copying if long-term retention is required.
+로컬 캡처와 JSON 측정값은 `/tmp/aml-first-bundle-captures/`에 있다. 원본 캡처·로그는 스테이징하거나 저장소에 추가하지 않았다. 화면별 `*-light-sky.jpg` / `*-dark-sky.jpg`는 실제 전체 크기 캡처다. `*-matrix.jpg`는 16조합, `*-light-dark.jpg`는 라이트·다크 비교, `states-matrix.jpg`는 상태별 화면이다. 테스트·빌드 로그는 `/tmp/aml-first-*.log`에 있다. 로컬 검수 자료이므로 장기 보관하려면 별도 복사가 필요하다.
 
-Limits: no real authentication/API/AI execution, actual browser-zoom control verification, screen-reader study, production deployment or human design approval. Bundled Playwright sweep was omitted because this checkout has no Playwright dependency; the available in-app browser supplied direct DOM geometry, interaction and screenshot evidence. An attempted isolated native Chrome launch crashed during startup; it was abandoned and all successful browser verification used the in-app browser.
+검증하지 않은 범위는 실제 인증·API·AI 실행, 실제 브라우저 확대·축소 컨트롤, 스크린 리더, 운영 배포, 사용자의 디자인 승인이다. 이 체크아웃에는 Playwright 의존성이 없어 일괄 검사는 생략했다. 사용 가능한 인앱 브라우저로 DOM 치수, 상호작용, 캡처 근거를 확보했다. 별도 네이티브 Chrome 실행은 시작 중 충돌해 중단했으며, 성공한 브라우저 검증은 모두 인앱 브라우저에서 했다.
 
-Figma use for this task was read-only: create_session 1, get_metadata 3, get_design_context 5, get_screenshot 2 (**11 calls**). The usage table had no rows inside the last 24 hours when checked, so the visible-table rolling count plus this task is 11; other concurrent/unlogged work cannot be inferred. No Figma write, stage, commit, push or PR was performed.
+당시 Figma 사용은 읽기 전용이었다. create_session 1회, get_metadata 3회, get_design_context 5회, get_screenshot 2회로 **총 11회**다. 확인 당시 사용 기록 표에 최근 24시간 행이 없어, 보이는 표의 누계에 해당 작업을 더한 값은 11회였다. 동시에 수행됐거나 기록되지 않은 다른 작업은 추정할 수 없다. 당시 Figma 쓰기, 스테이징, 커밋, 푸시, PR은 하지 않았다. 이번 문서 번역에서도 Figma에 접근하지 않았다.

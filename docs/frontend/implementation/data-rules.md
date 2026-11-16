@@ -1,6 +1,8 @@
 <a id="data-and-display-rules"></a>
 # 데이터와 화면 표시 규칙
 
+대상: 프론트엔드·백엔드 팀원 · 언어: 한국어 · 구분: 팀 공유 구현 기준
+
 문서 수정: 2026-11-16. 화면 구성은 [구현 인계](frontend-handoff.md), 데이터 전달과 API 미확정 사항은 [API 요구사항](api.md)을 따른다.
 
 <a id="display-id"></a>

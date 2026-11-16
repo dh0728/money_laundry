@@ -1,6 +1,8 @@
 <a id="api-requirements-and-gaps"></a>
 # 화면에 필요한 API와 미확정 사항
 
+대상: 프론트엔드·백엔드 팀원 · 언어: 한국어 · 구분: 팀 공유 구현 기준
+
 문서 수정: 2026-11-16. 이 날짜는 API 연동 완료일이 아니다.
 
 기존 [API.md](../../../backend/api-server/API.md)는 현재 백엔드 동작을 확인하는 참고 자료다. 새 화면을 기존 API에 맞춰 바꾸는 기준은 아니다. 2026-11-15에 정한 순서는 **가짜 데이터로 화면 구현 → 필요한 데이터와 동작 기록 → 백엔드와 API 합의**다. 유형 등 도메인 값은 [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts)를 따른다. 함께 볼 문서: [데이터 표시 규칙](data-rules.md), [화면 목록](screens.md).

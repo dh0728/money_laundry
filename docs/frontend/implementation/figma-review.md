@@ -1,43 +1,51 @@
-# Figma implementation review
+<a id="figma-implementation-review"></a>
+# 폐기된 Figma 구현 검수 기록
+
+대상: 팀원 · 언어: 한국어 · 구분: 이전 검수 기록(현재 정본 아님)
 
 > **사용 중단 · 2026-11-16:** 팀 논의로 이 Figma 구현 검수본은 폐기됐고 Figma 휴지통으로 이동했다(복구 가능). 아래 내용은 당시 제작·검수 절차의 이력이며 현재 작업 지침이 아니다. 새 구현은 [사용자 원본 Figma](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh)와 [최신 구현 지침](frontend-handoff.md)을 따른다. 기존 앱 코드를 전부 폐기할지, 일부 기능을 재사용할지는 별도로 확인 중이다.
 
-Updated: 2026-11-16. Editable design review artifact, not a new application release or design acceptance.
+갱신: 2026-11-16. 당시 편집 가능한 디자인 검수 자료를 만든 기록이며, 앱의 새 버전 출시나 디자인 승인을 뜻하지 않는다.
 
-## Open the work
+<a id="open-the-work"></a>
+## 당시 작업 링크
 
-- [Latest review entry](https://www.figma.com/design/14dbGFblPyKdMQAg4lsKr9/AML-RADAR?node-id=63-3): `AML RADAR · 구현 검수 · 2026-11-16`, in the team AML RADAR project.
-- [Application handoff and local run instructions](complete-bundle.md#실행과-상태-보존): `frontend/implementation/1.14.0/web-app` on `fe/work`. A localhost address works only while that machine's server is running; it is not a hosted preview.
-- [Original design reference](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) is preserved. The new review file does not silently replace the approved design source; no full design approval has been recorded.
+- [폐기된 검수 진입 프레임](https://www.figma.com/design/14dbGFblPyKdMQAg4lsKr9/AML-RADAR?node-id=63-3): 팀 AML RADAR 프로젝트에 만들었던 `AML RADAR · 구현 검수 · 2026-11-16`. 현재 휴지통에 있으며 사용하지 않는다.
+- [앱 인계와 로컬 실행 방법](complete-bundle.md#실행과-상태-보존): `fe/work`의 `frontend/implementation/1.14.0/web-app`. localhost 주소는 해당 컴퓨터의 서버가 켜져 있을 때만 열리며, 배포된 미리보기가 아니다.
+- [사용자 원본](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh)은 보존돼 있다. 당시 검수본이 디자인 정본을 대체한 것은 아니며, 전체 디자인 승인 기록도 없다.
 
-## Work history
+<a id="work-history"></a>
+## 제작 이력
 
-Newest first. This entry records the Figma worker's structural validation, not a fresh browser comparison by the documentation author.
+최신 항목부터 기록한다. 아래 수치는 당시 Figma 작업자의 구조 검사 결과다. 문서 작성자가 브라우저와 새로 대조한 결과가 아니다.
 
-| Date | Work | Artifact / verification | Remaining boundary |
+| 날짜 | 작업 | 결과물·검사 | 당시 남은 범위 |
 | --- | --- | --- | --- |
-| 2026-11-16 | Core functionality takes priority; login background decoration is optional only if time remains after core completion. | Current team lead direction. | No decoration requirement or implementation change added. |
-| 2026-11-16 | Code-based editable screens, reusable components, variables, and prepared interaction states arranged for design review. | [Entry frame 63:3](https://www.figma.com/design/14dbGFblPyKdMQAg4lsKr9/AML-RADAR?node-id=63-3); 23 main flow screens and grouped supporting states. Structural report: 1,619 navigation actions, 218 distinct targets, 0 invalid targets; 0 reported top-level/section overlaps. | Actual prototype playback and browser visual fidelity remain unverified. This is not app code, deployment, API integration, or user acceptance. |
+| 2026-11-16 | 핵심 기능을 우선하고 로그인 배경 장식은 완성 후 시간이 남을 때만 만들기로 했다. | 팀장 방향을 반영한 기록. | 장식 요구나 구현 변경을 추가하지 않았다. |
+| 2026-11-16 | 코드에서 편집 가능한 화면·공통 컴포넌트·변수·상호작용 상태를 만들어 검수용으로 배치했다. | [진입 프레임 63:3](https://www.figma.com/design/14dbGFblPyKdMQAg4lsKr9/AML-RADAR?node-id=63-3). 주요 흐름 23개 화면과 보조 상태 묶음. 구조 보고: 이동 동작 1,619개, 고유 대상 218개, 잘못된 대상 0개, 최상위·섹션 겹침 보고 0개. | 실제 프로토타입 재생과 브라우저 시각 일치는 검증하지 않았다. 앱 구현·배포·API 연동·사용자 수용 결과가 아니다. |
 
-## Scope and source
+<a id="scope-and-source"></a>
+## 제작 범위와 출처
 
-React JSX and fixture outputs were used to construct native editable Figma frames, text, components/instances, variables, and Auto Layout. This was not screenshot reconstruction. Covered routes include login, shell, personal/team dashboards, rules/editor/backtest, Alert/Episode lists and detail tabs, ledger, verdict dialogs, reports, notifications, account, and settings. Prepared states include loading, empty, error, selection, validation, and sample success/failure outcomes.
+React JSX와 샘플 출력에서 편집 가능한 Figma 프레임·텍스트·컴포넌트/인스턴스·변수·Auto Layout을 구성했다. 캡처를 재구성한 방식은 아니다. 로그인, 앱 틀, 내 담당/전체 대시보드, 룰 목록·편집·백테스트, Alert·Episode 목록과 상세 탭, 원장, 판정 창, 보고서, 알림, 계정, 설정을 다뤘다. 로딩·빈 결과·오류·선택·입력 검증·샘플 성공/실패 상태를 준비했다.
 
-The review file uses Inter intentionally. The code's declared font and its actual runtime font still need comparison; do not claim exact browser typography parity. Shared variables were resolved across 4 themes × 4 brands, but resolution is not a contrast or visual acceptance test. Some chart text retains scaled numeric typography values, so not every numeric property is token-bound.
+검수 파일의 Inter 사용은 의도한 선택이었다. 코드에 선언한 폰트와 실제 실행 시 폰트는 별도 대조가 필요하며 브라우저와 서체가 정확히 같다고 하지 않는다. 공통 변수를 4테마 × 4브랜드에서 해석했지만, 변수 해석 성공은 대비나 디자인 승인 검사와 다르다. 일부 차트 문구에는 배율이 적용된 숫자 서체값이 남아 있어 모든 숫자 속성이 토큰에 연결된 것은 아니다.
 
-Fixture data is synthetic. Domain values remain governed by `src/api/codes.ts`; the Figma copy is not a replacement data contract. Existing [per-screen data requirements](complete-bundle.md#화면figma출처필요-데이터) and [API needs](api.md) remain the backend handoff.
+샘플 데이터는 합성 데이터다. 도메인 값의 기준은 `src/api/codes.ts`이며 Figma 복사본은 데이터 계약을 대체하지 않는다. 백엔드 전달 자료는 기존 [화면별 데이터 요구사항](complete-bundle.md#화면figma출처필요-데이터)과 [API 요구사항](api.md)이다.
 
-## Review loop
+<a id="review-loop"></a>
+## 폐기 전 검수 절차 · 현재 사용 안 함
 
-1. KMG opens the entry frame and directly edits layout, typography, components, and variables in the team review file.
-2. When KMG says the changes are ready, inspect changed nodes, properties, variable bindings, and components, then apply the accepted changes to code. There is no automatic two-way synchronization.
-3. Check the actual web app for text input/validation, persistence/API behavior, generated PDF files, and dynamic draggable/force-directed graphs. Prepared Figma transitions cannot prove these work.
-4. Update the affected implementation rules/data requirements and version record with the exact artifact link, code revision, tests, and acceptance status. Design changes require KMG review; structural validation alone is not approval.
+1. KMG가 검수 진입 프레임을 열고 팀 검수 파일의 레이아웃·서체·컴포넌트·변수를 직접 수정하는 방식이었다.
+2. 수정 완료를 알리면 바뀐 노드·속성·변수 연결·컴포넌트를 확인해 승인된 변경을 코드에 반영하는 방식이었다. 자동 양방향 동기화는 아니었다.
+3. 텍스트 입력·검증, 상태 저장·API 동작, 생성 PDF, 드래그 가능한 힘 기반 그래프는 실제 웹 앱에서 확인해야 했다. Figma 화면 전환만으로 동작을 입증할 수 없다.
+4. 영향받은 구현 규칙·데이터 요구·버전 기록에 결과물 링크, 코드 버전, 테스트, 승인 여부를 기록하도록 했다. 구조 검사만으로 디자인 승인을 대신하지 않는다.
 
-## Unverified checks
+<a id="unverified-checks"></a>
+## 당시 검증하지 못한 항목
 
-- Interactive Figma prototype replay was blocked by the cloud login wall; navigation structure was inspected instead.
-- Browser fidelity and graph viewport fit were not verified; the attempted browser run hit an environment socket permission failure.
-- Whole-file one-to-one correspondence of every code component has not been independently certified.
-- Theme resolution and overlap checks do not certify all 16 visual combinations or accessibility.
-- Real input, saved state, API operations, PDF generation, and graph physics must be tested in the actual app.
+- 클라우드 로그인 화면에 막혀 상호작용 프로토타입을 재생하지 못했다. 대신 이동 연결 구조를 검사했다.
+- 브라우저 시각 일치와 그래프의 화면 맞춤을 검증하지 못했다. 시도한 브라우저 실행은 환경의 socket 권한 오류로 실패했다.
+- 파일 전체의 모든 코드 컴포넌트가 일대일로 대응하는지는 독립 검증하지 않았다.
+- 테마 변수 해석·겹침 검사는 16개 조합의 시각 검수나 접근성 검사를 대체하지 않는다.
+- 실제 입력, 저장 상태, API 처리, PDF 생성, 그래프 물리는 실제 앱에서 검사해야 한다.
