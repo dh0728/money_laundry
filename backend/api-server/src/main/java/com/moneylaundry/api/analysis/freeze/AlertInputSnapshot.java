@@ -52,12 +52,15 @@ public class AlertInputSnapshot {
     freezeManifest(run, cutoff);
     long seq = freezeLedger(run, cutoff, blockedSets);
     freezeAlerts(seq);
+    // The run's input is its own frozen rows plus the eligible set, which desired_input still
+    // holds; both are read in place instead of copying the eligible set into frozen_input.
     jdbc.update(
         """
         insert into analysis.input_report_sets select distinct ?,s.set_id
-        from frozen_input i join ledger.transaction_reports tr using(tx_id)
+        from (select tx_id from frozen_input where run_id=? union all select tx_id from desired_input) i
+        join ledger.transaction_reports tr using(tx_id)
         join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id
-        where i.run_id=? on conflict do nothing
+        on conflict do nothing
         """,
         run,
         run);
@@ -66,7 +69,8 @@ public class AlertInputSnapshot {
         jdbc.queryForList(
             """
         select d::date from generate_series(
-          (select min(business_date)-3 from frozen_input where run_id=?),
+          (select least((select min(business_date) from frozen_input where run_id=?),
+            (select min(business_date) from desired_input))-3),
           (?::timestamptz at time zone 'Asia/Seoul')::date, interval '1 day') d order by 1
         """,
             java.sql.Date.class,
@@ -146,11 +150,6 @@ public class AlertInputSnapshot {
         inputArgs.toArray());
     analyzeDesired("input", "tx_id");
     syncLedger("analysis.input_ledger", "input", "tx_id", LEDGER_VALUES, seq);
-    // After the sync the open versions are exactly the eligible set, valid at this newest mark.
-    jdbc.update(
-        "insert into frozen_input select ?,tx_id,business_date from desired_input on conflict do nothing",
-        run);
-    jdbc.execute("analyze frozen_input");
     return seq;
   }
 
