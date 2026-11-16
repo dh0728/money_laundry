@@ -57,8 +57,15 @@ function PeriodPicker({ start, end, onRange }: { start: string; end: string; onR
   const [draftStart, setStart] = useState(start)
   const [draftEnd, setEnd] = useState(end)
   function preset(days: number) { const date = new Date(`${snapshot.date}T00:00:00Z`); date.setUTCDate(date.getUTCDate() - days + 1); setStart(date.toISOString().slice(0, 10)); setEnd(snapshot.date) }
-  return <details data-part="period-popover"><summary><CalendarDays />{start.slice(5)} ~ {end.slice(5)}</summary>
-    <form aria-label="조회 기간" onSubmit={e => { e.preventDefault(); if (draftStart > draftEnd) return; onRange(draftStart, draftEnd); e.currentTarget.closest('details')?.removeAttribute('open') }}>
+  function resetDraft() { setStart(start); setEnd(end) }
+  return <details data-part="period-popover" onToggle={e => { if (!e.currentTarget.open) resetDraft() }} onKeyDown={e => {
+    if (e.key !== 'Escape') return
+    e.preventDefault()
+    e.currentTarget.open = false
+    resetDraft()
+    e.currentTarget.querySelector('summary')?.focus()
+  }}><summary><CalendarDays />{start.slice(5)} ~ {end.slice(5)}</summary>
+    <form aria-label="조회 기간" onSubmit={e => { e.preventDefault(); if (!e.currentTarget.checkValidity() || !draftStart || !draftEnd || draftStart > draftEnd || draftEnd > snapshot.date) return; onRange(draftStart, draftEnd); e.currentTarget.closest('details')?.removeAttribute('open') }}>
       <strong>조회 기간</strong><p data-part="muted">샘플 이력: 11-09 ~ 11-15</p>
       <div data-part="period-presets">{[{ label: '오늘', days: 1 }, { label: '최근 3일', days: 3 }, { label: '최근 7일', days: 7 }, { label: '최근 30일', days: 30 }].map(p => <Button key={p.days} type="button" variant="ghost" onClick={() => preset(p.days)}>{p.label}</Button>)}<Button type="button" variant="ghost" onClick={() => { setStart('2026-11-01'); setEnd(snapshot.date) }}>이번 달</Button></div>
       <label>시작일<input type="date" name="start" aria-label="시작일" value={draftStart} onChange={e => setStart(e.target.value)} max={draftEnd} required /></label><label>종료일<input type="date" name="end" aria-label="종료일" value={draftEnd} onChange={e => setEnd(e.target.value)} min={draftStart} max={snapshot.date} required /></label><Button type="submit">적용</Button>

@@ -85,7 +85,7 @@ function WorkspaceApp() {
   function updateAppearance(value: Partial<typeof appearance>) {
     const next = { ...appearance, ...value }; setAppearance(next); saveStorage('aml-next-appearance', JSON.stringify(next))
   }
-  function signOut(expired = false) { saveStorage('aml-next-session', null, true); setUtility(null); workspace.resetWorkspace?.(); setSignedIn(false); navigate(expired ? '/login?expired=1' : '/login', true) }
+  function signOut(expired = false) { saveStorage('aml-next-session', null, true); setUtility(null); setRetained(null); setState('ready'); setHasData(true); workspace.resetWorkspace?.(); setSignedIn(false); navigate(expired ? '/login?expired=1' : '/login', true) }
   function signIn() { saveStorage('aml-next-session', 'sample-staff-7', true); setSignedIn(true); navigate('/dashboard/mine', true) }
   function updateFilter(next: { start?: string; end?: string; q?: string; state?: string }) {
     const target = new URL(route)

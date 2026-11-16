@@ -7,6 +7,23 @@ afterEach(cleanup)
 async function login() { render(<App />); fireEvent.click(screen.getByRole('button', { name: '샘플 계정으로 입장' })); await screen.findByRole('heading', { name: '내 담당 업무' }) }
 async function go(path: string) { await act(async () => { window.history.pushState(null, '', `/#${path}`); window.dispatchEvent(new PopStateEvent('popstate')) }) }
 describe('complete workspace integration', () => {
+  it('discards session-only rule drafts after logout and a fresh login', async () => {
+    await login()
+    await go('/rules/new')
+    fireEvent.change(await screen.findByLabelText('룰 이름'), { target: { value: '이전 세션 전용 초안' } })
+    fireEvent.change(screen.getByLabelText('목적과 근거'), { target: { value: '로그아웃 이후 다른 세션에 남아서는 안 되는 샘플 작업' } })
+    fireEvent.click(screen.getByRole('button', { name: '초안 저장' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('초안이 저장되었습니다')
+    await go('/rules')
+    expect(await screen.findByText('이전 세션 전용 초안')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+    await screen.findByRole('heading', { name: '로그인' })
+    fireEvent.click(screen.getByRole('button', { name: '샘플 계정으로 입장' }))
+    await screen.findByRole('heading', { name: '내 담당 업무' })
+    await go('/rules')
+    await screen.findByRole('link', { name: '룰 만들기' })
+    expect(screen.queryByText('이전 세션 전용 초안')).toBeNull()
+  })
   it('connects detail judgment to shared report records and enforces read-only access', async () => {
     await login()
     await go('/alerts/8101?tab=overview')
