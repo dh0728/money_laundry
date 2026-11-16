@@ -2,6 +2,18 @@
 
 Before calling a screen done, check every item on the current screen or current Figma. An old screenshot does not pass. When one item is fixed, recheck every screen of the same kind. Rules: [frontend-handoff](frontend-handoff.md), [data-rules](data-rules.md).
 
+## Per-screen handoff
+
+These are evidence requirements, not completed checks. Design acceptance belongs to KMG.
+
+- [ ] Exact Figma frame link, or an explicit no-reference label for Login.
+- [ ] The data source and meaning of every visible number and label, including mock status.
+- [ ] Domain labels mapped to the exact `codes.ts` values.
+- [ ] Loading, empty, and error appearances and behavior documented and exercised.
+- [ ] Light and dark captures linked; all 16 theme/brand combinations checked for contrast, clipping, and token usage.
+- [ ] Real implementation version/commit and preview/source links recorded in [screens](screens.md); local-only and unverified links identified.
+- [ ] Test results, visual review status, and remaining issues distinguished. No implementation-complete claim based on a screenshot alone.
+
 ## Layout
 
 - [ ] No panel inside a panel. No scroll area except `main`.

@@ -1,12 +1,22 @@
 # AML RADAR 전체 샘플 프론트엔드 인계
 
-2026-11-15 · `fe/work` 작업 트리 · 커밋·스테이징·push 없음.
+2026-11-15 작성 · `fe/work` 작업 트리의 전체 샘플 구현 인계.
+
+> **작성 당시와 원격 반영 상태 구분:** 아래 각 작업 절의 “커밋·push·stage 없음”은 해당 절을 작성한 작업자가 그 시점에 수행하지 않았다는 이력이다. 이후 이 문서와 샘플 구현은 [`62c6624f`](https://github.com/dh0728/money_laundry/commit/62c6624f609c23c342ac03d8105a36818df88626)에 포함되어 `fe/work`에 반영됐다. 이후 문서 정정과 QA 변경의 반영 여부는 `fe/work`의 커밋 이력으로 확인한다. 구현의 원격 저장은 API 연동·운영 배포·전체 QA 통과·사용자 디자인 승인을 뜻하지 않는다.
 
 사용자가 전체 화면 구현을 먼저 끝내고 디자인을 나중에 한 번에 검수하도록 범위를 확장했다. 이 기록은 기존 `first-bundle.md` 이후의 기능 구현과 데이터·성능 경계를 설명한다. Figma 최종 디자인 승인이나 운영 배포 기록이 아니다.
 
+## 2026-11-16 Mac 재검증
+
+- 기간 선택: 적용 전 닫기·Escape는 변경 취소, Escape 후 키보드 초점 복귀. 빈 날짜·역순·미래 기간 적용 방지.
+- 로그아웃·세션 만료: 이전 조회 결과·오류·업무 초안 초기화. 다시 로그인하면 초기 샘플 상태.
+- `pnpm test --maxWorkers=2`: 69개 파일, 402개 테스트 통과. 4테마×4브랜드 및 토큰 참조 회귀 검사 포함.
+- `pnpm lint`: 오류 0, 기존 TanStack Table 호환성 경고 1. `pnpm build`: 성공, 기존 큰 청크 경고 유지.
+- 자동 검사 통과는 실제 화면 검수·디자인 수용·API 통합 완료를 뜻하지 않음. 라이트·다크 캡처와 사용자 검수는 별도.
+
 ## 실행과 상태 보존
 
-앱: `frontend/implementation/1.14.0/web-app`. `pnpm dev --host 127.0.0.1 --port 5211 --strictPort`, 접속 `http://127.0.0.1:5211/`. `demo / radar-demo` 또는 샘플 계정 버튼. React + TypeScript + Vite, PageHeader 48px·Sidebar 240px, main 하나의 스크롤. 기존 ShellChrome 기본 스토리와 빈 콘텐츠 `/next-review.html`, 미커밋 Storybook 구성을 보존한다.
+앱: `frontend/implementation/1.14.0/web-app`. `pnpm dev --host 127.0.0.1 --port 5211 --strictPort`, 접속 `http://127.0.0.1:5211/`. `demo / radar-demo` 또는 샘플 계정 버튼. React + TypeScript + Vite, PageHeader 48px·Sidebar 240px, main 하나의 스크롤. 기존 ShellChrome 기본 스토리와 빈 콘텐츠 `/next-review.html`, 인계 당시 미커밋이었던 Storybook 구성을 보존한다(이후 위 구현 커밋에 포함).
 
 `WorkspaceProvider`가 업무·거래·룰·판정·의견·알림·열린 업무를 공유한다. 페이지 이동은 상태를 유지하며 새로고침·로그아웃은 초기 샘플로 돌아간다. 표/카드·필터·선택·페이지는 해시 URL로 표현한다. 테마·브랜드·글자 크기만 브라우저 설정에 저장한다. 실제 인증·API·모델·서버 저장·운영 룰 배포는 연결하지 않았다. 기존 `src/app` live 시연 코드와 새 `src/next` 앱을 혼동하지 않는다.
 

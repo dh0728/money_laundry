@@ -1,6 +1,6 @@
 # Data and display rules
 
-Screen rules: [frontend-handoff](frontend-handoff.md). Contract: [api](api.md).
+Screen rules: [frontend-handoff](frontend-handoff.md). Data handoff and open API questions: [api](api.md).
 
 ## Display ID
 
@@ -12,9 +12,9 @@ Format `{A|E}-YYMMDD-NNNNNN`. `A` is Alert, `E` is Episode; six-digit date, six-
 
 ## Pattern codes
 
-The source is [API.md](../../../backend/api-server/API.md) section 2.3 and [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts).
+The implementation source of truth is [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts) in the current app path. [API.md](../../../backend/api-server/API.md) section 2.3 is an existing-backend reference. The table uses the current `codes.ts` keys, including `GATHER-SCATTER` and `SCATTER-GATHER` for codes 3 and 4. Do not replace these with the old abbreviated names. Recheck this file when the active app path changes.
 
-| Code | API name | Screen name (tag) | Korean label in codes.ts |
+| Code | codes.ts key | Screen name (tag) | Korean label in codes.ts |
 | --- | --- | --- | --- |
 | 0 | NON_PATTERN | NON_PATTERN | 패턴 없는 이상거래 |
 | 1 | FAN-OUT | Fan-out | 분산 송금 |
@@ -36,9 +36,9 @@ Use the StatusTag presets below and the current Figma semantic variables.
 
 - Work status: not opened, not handled, in progress, handled. Never just "done".
 - Human verdict: normal or abnormal. "False positive" is not a choice.
-- Risk: below 0.7 low, 0.7 up to 0.9 caution, 0.9 and above danger.
+- Risk sample only: the current [dashboard fixture](../../../frontend/implementation/1.14.0/web-app/src/next/dashboard-data.ts) uses `riskSettings = { medium: 0.7, high: 0.9 }`, as recorded in [first-bundle](first-bundle.md). With those sample settings, below 0.7 is low, 0.7 to below 0.9 is caution, and 0.9 or above is danger. These numbers are fixture examples, not fixed production thresholds or an agreed API contract.
 - Age: up to 3 days yellow, over 3 up to 7 orange, over 7 red.
-- Scores are 0 to 1. Band thresholds come from rule-engine settings; never hard-code them in a component.
+- Scores are 0 to 1. Band thresholds come from rule-engine settings (currently the fixture settings); never hard-code them in a component. The backend source, rule version and effective period of production thresholds remain API handoff questions.
 
 ## StatusTag presets
 
@@ -75,3 +75,7 @@ Numbers on a screen must match its filter, period, and permission. If they do no
 - "Human verdict abnormal only" keeps only rows judged abnormal.
 - A period label matches the transaction dates and age tags shown.
 - One case has the same display ID, assignee, status, pattern, and score in list and detail, card and table, and notification text.
+
+## Domain reconciliation
+
+`codes.ts` also defines `AlertStatus`, `EpisodeStatus`, `AlertResolution`, and `EpisodeResolution`. UI work-stage labels above are not automatically those stored enum values. Document their mapping for each screen. The existing `FALSE_POSITIVE` enum and the product rule excluding that option are a known mismatch: do not delete the enum or invent a replacement API value; keep the screen choice and backend mapping separate until resolved.

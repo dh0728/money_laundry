@@ -2,7 +2,27 @@
 
 Layout and component rules for the new screens. Related: [screens](screens.md), [data rules](data-rules.md), [API requirements](api.md).
 
-The [Figma design](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) decides sizes, frames, and node ids. Read the current design when implementing.
+The [Figma design](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) decides sizes, frames, and node ids. Read the current design when implementing. Inspect layout, component instances, variable bindings, and interactions, not only screenshots. If a reference conflicts with a sensible implementation or the current requirements, record the conflict for KMG rather than silently copying or redesigning it.
+
+## Current implementation boundary
+
+Confirmed 2026-11-15: React + TypeScript + Vite, keeping the team sidebar and work area. The current app is `frontend/implementation/1.14.0/web-app`. Preserve existing uncommitted work, Storybook, v3 tokens under `src/next/styles`, and `src/next/ShellChrome.stories.tsx` when present in the working tree; their presence on a device does not imply they are on the remote branch.
+
+Use v3 color tokens, not hard-coded screen colors. Support Default Light, Default Dark, Solarized Light, and Solarized Dark, each with Sky, Violet, Pink, and Lime (16 combinations). Login is required even though it has no Figma reference.
+
+Build with mock data first and document per-screen needs for backend in [screens](screens.md) and [api](api.md). Do not reshape the design to fit the old backend reference. Visual acceptance stays with KMG; implementation, tests, and visual acceptance are separate states.
+
+## Delivery schedule
+
+Target dates, not claims of completion. Latest date first. Deliver each screen with the evidence required by [QA](qa-checklist.md#per-screen-handoff). KMG review begins 2026-11-21.
+
+| Date | Screen bundle |
+| --- | --- |
+| 2026-11-20 | Episode detail and verdict; Report; notifications, account, settings; loading, empty, and error states |
+| 2026-11-19 | Alert detail: overview, analysis, related; verdict dialog |
+| 2026-11-18 | Investigation: Alert and Episode lists; owner, account, and transaction exploration |
+| 2026-11-17 | Rule engine: list, create, backtest |
+| 2026-11-16 | App shell, Login, Dashboard |
 
 ## Frame
 
@@ -35,7 +55,7 @@ The [Figma design](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) decides 
 - A disabled Verdict done button is not clickable: no click handler, no prototype interaction, until it is enabled.
 - Reports are AI-written. Report write page: verdict logs in table or card view, pick with checkboxes, download the picked ones as one PDF. No human input form, no draft or final step. Verdict IDs use `J-YYMMDD-NNNNNN` (example `J-261111-000001`); the report-write table and the verdict-dialog header may show this ID. Every table panel has a CSV download button; a vector PDF of the overview is under review.
 - A judged item shows the human verdict first and the model score second.
-- Build order, one confirmed screen at a time: Dashboard, Alert list, Episode list, Transactions, Rule engine.
+- Build and hand off one screen bundle at a time according to the Delivery schedule above. The earlier Dashboard → Alert list → Episode list → Transactions → Rule engine sequence is superseded by the 2026-11-15 schedule.
 
 ## Left out
 
@@ -44,7 +64,7 @@ The [Figma design](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) decides 
 
 ## Carried-over UI rules
 
-Carried-over rules for implementation. Where the current Figma differs, Figma wins; update this section.
+Carried-over rules for implementation. Compare them with the current Figma and the implementation boundary above. A contradiction needs an explicit decision; do not silently treat an old rule or an inconsistent Figma frame as approval.
 
 ### Build
 - Start from proven components (shadcn/ui). Make a shared component only when two or more screens use it.

@@ -1,10 +1,26 @@
 # API requirements and gaps
 
-For the new screens, [API.md](../../../backend/api-server/API.md) is reference material. Build with mocks first and hand the screen's required data to backend for API design. The first bundle's required fields and metric definitions are in [app shell, login and dashboard handoff](first-bundle.md#data-required-from-backend). Code labels in this branch are in [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts). Related: [data rules](data-rules.md), [screens](screens.md).
+The existing [API.md](../../../backend/api-server/API.md) is a reference for current backend behavior, not the specification that new screens must copy. The implementation direction confirmed on 2026-11-15 is: build a screen with mock data, document the data and actions it needs, then agree the API with backend. Domain values come from [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts). Related: [data rules](data-rules.md), [screens](screens.md).
+
+## Per-screen data handoff
+
+For every implemented screen, keep its data requirements with that screen in [screens](screens.md):
+
+- Visible field or metric, meaning, unit, mock source, and any aggregation or filter.
+- Required identifiers and domain values from `codes.ts`; distinguish display labels from stored values.
+- User action, required input, expected result, permission, and failure state.
+- Loading, empty, missing-value, stale, and error behavior.
+- Existing API reference if relevant; mark each item as mock-only, existing behavior verified, proposed, or agreed with backend.
+
+Do not invent routes, response fields, permissions, or an agreement. A working mock screen does not prove API integration.
+
+Existing screen requirements: [first bundle](first-bundle.md#data-required-from-backend), [complete mock app](complete-bundle.md).
 
 An unconfirmed item is `unconfirmed`. Never present a guess as fact.
 
-## Frontend rules from the contract
+## Existing integration safeguards
+
+Retain these safeguards when using existing endpoints. Recheck the actual endpoint before wiring a new screen; these notes do not settle the open gaps below.
 
 - Never send the number in a display ID (`A-1042`) as `caseId`. Search an exact `alertId`, then open that row's `caseId`.
 - Send `revision` back exactly as the GET returned it. Never merge it in the frontend.
