@@ -718,6 +718,31 @@ class FreezeInputTests {
     assertThat(snapshots(second)).containsExactlyInAnyOrderElementsOf(secondSnapshots);
   }
 
+  @Autowired org.springframework.transaction.support.TransactionTemplate transactions;
+
+  @Test
+  void rejects_a_frozen_target_outside_the_eligible_set_that_already_has_a_completed_score() {
+    seed(2);
+    var ids = jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
+    UUID first = runs.freeze(job, cutoff);
+    for (long id : ids) score(first, id);
+    runs.complete(first);
+    finish(first);
+    jdbc.update(
+        "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?", ids.get(0));
+    Instant later = cutoff.plus(Duration.ofDays(1));
+    UUID run = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", run, nextJob(later));
+    runs.snapshot(run, ids.get(0), "TARGET");
+    assertThatThrownBy(
+            () ->
+                transactions.executeWithoutResult(
+                    s -> new AlertInputSnapshot(jdbc).freeze(run, later)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("FROZEN_TARGET_ALREADY_SCORED");
+  }
+
   @Test
   void snapshot_refuses_to_run_outside_a_transaction() {
     UUID run = UUID.randomUUID();

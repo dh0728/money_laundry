@@ -185,11 +185,15 @@ public class AlertInputSnapshot {
         join analysis.current_scores c using(tx_id)
         join analysis.runs r on r.run_id=c.run_id join analysis.jobs b on b.job_id=r.job_id
         """;
+    // Frozen rows outside the eligible set come first: normally none, and found by comparing the
+    // two analyzed temp tables. Joined with the scores in one pass, this check took 50 minutes on
+    // some days of a 5.5M-row history.
     if (jdbc.queryForObject(
-        "select exists(select 1 from frozen_input f "
+        "select exists(with outside as materialized (select f.tx_id from frozen_input f"
+            + " where f.run_id=? and not exists(select 1 from desired_input e where e.tx_id=f.tx_id))"
+            + " select 1 from outside f "
             + completed
-            + " where f.run_id=? and r.status='COMPLETED' and b.status='COMPLETED'"
-            + " and not exists(select 1 from desired_input e where e.tx_id=f.tx_id))",
+            + " where r.status='COMPLETED' and b.status='COMPLETED')",
         Boolean.class,
         run)) throw new IllegalStateException("FROZEN_TARGET_ALREADY_SCORED");
     jdbc.execute(
