@@ -4,6 +4,7 @@ Run-book for building the new screens: layout, API gaps, screen routes, data rul
 
 | Created | Updated | Note | About |
 | --- | --- | --- | --- |
+| 2026-11-16 | 2026-11-16 | [figma-review](figma-review.md) | Editable review entry, code-to-Figma scope, structural checks, and remaining visual/runtime verification. |
 | 2026-11-15 | 2026-11-15 | [complete-bundle](complete-bundle.md) | Full mock app handoff, data requirements, verification reports and unverified integration limits. |
 | 2026-11-15 | 2026-11-15 | [first-bundle](first-bundle.md) | App shell, login, personal/team dashboards: mock data, per-screen requirements, Figma references and verification. |
 | 2026-11-11 | 2026-11-15 | [frontend-handoff](frontend-handoff.md) | Layout and component rules. Read before coding a screen. |

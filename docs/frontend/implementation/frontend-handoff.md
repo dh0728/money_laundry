@@ -12,6 +12,10 @@ Use v3 color tokens, not hard-coded screen colors. Support Default Light, Defaul
 
 Build with mock data first and document per-screen needs for backend in [screens](screens.md) and [api](api.md). Do not reshape the design to fit the old backend reference. Visual acceptance stays with KMG; implementation, tests, and visual acceptance are separate states.
 
+## Review and scope update — 2026-11-16
+
+[Editable Figma review file and review loop](figma-review.md) are available for KMG design edits. This does not mean design acceptance or automatic code synchronization. Core functionality comes first; login background decoration is optional only if time remains after core completion.
+
 ## Delivery schedule
 
 Target dates, not claims of completion. Latest date first. Deliver each screen with the evidence required by [QA](qa-checklist.md#per-screen-handoff). KMG review begins 2026-11-21.
