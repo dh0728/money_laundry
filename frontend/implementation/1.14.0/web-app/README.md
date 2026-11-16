@@ -14,7 +14,7 @@ pnpm build-storybook
 
 테마·브랜드는 로그인과 사이드바에서 바꾸며 브라우저에 저장한다. 샘플 로그인은 탭 세션에만 유지하고 비밀번호를 저장하지 않는다. 개발 화면의 `검수 상태` 또는 `?state=loading|empty|error`로 상태를 확인한다. 루트 URL의 쿼리 뒤에 해시를 둔다. 예: `/?state=error#/dashboard/mine`.
 
-전체 화면·필요 데이터·수억 건 처리 경계·검증 결과는 [전체 구현 인계](../../../../docs/frontend/implementation/complete-bundle.md)에 있다. 초기 로그인·대시보드의 상세 기록은 [첫 묶음 인계](../../../../docs/frontend/implementation/first-bundle.md)에 있다. 기존 `ShellChrome.stories.tsx`와 v3 원본 토큰을 보존했으며, 새 앱도 ShellChrome의 선택 슬롯을 사용한다. 기존 기본 스토리와 `/next-review.html`은 계속 빈 콘텐츠 검수본이다.
+전체 화면·필요 데이터·수억 건 처리 경계·검증 결과는 [전체 구현 인계](../../../../docs/frontend/implementation/history/complete-bundle.md)에 있다. 초기 로그인·대시보드의 상세 기록은 [첫 묶음 인계](../../../../docs/frontend/implementation/history/first-bundle.md)에 있다. 기존 `ShellChrome.stories.tsx`와 v3 원본 토큰을 보존했으며, 새 앱도 ShellChrome의 선택 슬롯을 사용한다. 기존 기본 스토리와 `/next-review.html`은 계속 빈 콘텐츠 검수본이다.
 
 이하 실제 API·Ant 조사 흐름 관련 내용은 보존한 이전 시연 코드의 기록이다. 새 v3 앱의 API 연결 상태나 구현 범위를 뜻하지 않는다.
 

@@ -1,9 +1,11 @@
+> 보존 기록 · 현재 지침 아님. 2026-11-16 두 정본 통합 전 내용을 보존한다. 현재 기준은 [영어 FE 구현 지침](../frontend-handoff.md)과 [한국어 API 요구사항](../api.md)이다. 아래 문구·상태는 당시 기록이다.
+
 <a id="data-and-display-rules"></a>
 # 데이터와 화면 표시 규칙
 
 대상: 프론트엔드·백엔드 팀원 · 언어: 한국어 · 구분: 팀 공유 구현 기준
 
-문서 수정: 2026-11-16. 화면 구성은 [구현 인계](frontend-handoff.md), 데이터 전달과 API 미확정 사항은 [API 요구사항](api.md)을 따른다.
+문서 수정: 2026-11-16. 화면 구성은 [구현 인계](frontend-handoff-2026-11-16.md), 데이터 전달과 API 미확정 사항은 [API 요구사항](../api.md)을 따른다.
 
 <a id="display-id"></a>
 ## 표시 ID
@@ -11,13 +13,13 @@
 형식은 `{A|E}-YYMMDD-NNNNNN`이다. `A`는 Alert, `E`는 Episode이며, 날짜 6자리와 일련번호 6자리로 구성한다. 예: `A-261111-000007`, `E-261111-000001`.
 
 - 같은 Alert나 Episode는 모든 화면에서 같은 표시 ID를 사용한다.
-- 표시 ID에서 서버 숫자 ID(`alertId`, `caseId`, `episodeId`)를 추출하거나, 반대로 숫자 ID만으로 표시 ID를 만들지 않는다. 변환 규칙은 [미확정](api.md)이며 가짜 데이터에는 두 ID를 각각 둔다.
+- 표시 ID에서 서버 숫자 ID(`alertId`, `caseId`, `episodeId`)를 추출하거나, 반대로 숫자 ID만으로 표시 ID를 만들지 않는다. 변환 규칙은 [미확정](../api.md)이며 가짜 데이터에는 두 ID를 각각 둔다.
 - 거래 ID `T-…`, `RULE-001` 같은 룰 이름은 이 형식의 적용 대상이 아니다.
 
 <a id="pattern-codes"></a>
 ## 패턴 코드
 
-구현 기준은 현재 앱의 [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts)다. [API.md](../../../backend/api-server/API.md) 2.3절은 기존 백엔드 참고 자료다. 아래 표는 현재 `codes.ts`의 키를 사용한다. 특히 코드 3과 4는 `GATHER-SCATTER`, `SCATTER-GATHER`이며 예전 축약명으로 바꾸지 않는다. 작업 대상 앱 경로가 바뀌면 해당 파일을 다시 확인한다.
+구현 기준은 현재 앱의 [codes.ts](../../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts)다. [API.md](../../../../backend/api-server/API.md) 2.3절은 기존 백엔드 참고 자료다. 아래 표는 현재 `codes.ts`의 키를 사용한다. 특히 코드 3과 4는 `GATHER-SCATTER`, `SCATTER-GATHER`이며 예전 축약명으로 바꾸지 않는다. 작업 대상 앱 경로가 바뀌면 해당 파일을 다시 확인한다.
 
 | 코드 | codes.ts 키 | 화면 이름(태그) | codes.ts 한국어 표시명 |
 | --- | --- | --- | --- |
@@ -42,7 +44,7 @@
 
 - 업무 상태는 열람 전, 처리 전, 처리 중, 처리 완료로 구분한다. '완료'로 줄이지 않는다.
 - 사람의 판정은 정상 또는 이상이다. '오탐'은 선택지에 넣지 않는다.
-- 현재 [대시보드 샘플 데이터](../../../frontend/implementation/1.14.0/web-app/src/next/dashboard-data.ts)는 `riskSettings = { medium: 0.7, high: 0.9 }`를 사용한다([첫 묶음 기록](first-bundle.md)). 이 샘플 설정에서 0.7 미만은 낮음, 0.7 이상 0.9 미만은 주의, 0.9 이상은 위험이다. 운영용 고정 기준이나 합의된 API 계약이 아니다.
+- 현재 [대시보드 샘플 데이터](../../../../frontend/implementation/1.14.0/web-app/src/next/dashboard-data.ts)는 `riskSettings = { medium: 0.7, high: 0.9 }`를 사용한다([첫 묶음 기록](first-bundle.md)). 이 샘플 설정에서 0.7 미만은 낮음, 0.7 이상 0.9 미만은 주의, 0.9 이상은 위험이다. 운영용 고정 기준이나 합의된 API 계약이 아니다.
 - 경과일은 3일 이하 노랑, 3일 초과 7일 이하 주황, 7일 초과 빨강으로 구분한다.
 - 점수 범위는 0~1이다. 구간 경계는 룰 엔진 설정에서 받는다(현재는 샘플 설정). 컴포넌트에 숫자를 직접 넣지 않는다. 운영 기준의 백엔드 출처, 룰 버전, 적용 기간은 API 인계 때 확인해야 한다.
 

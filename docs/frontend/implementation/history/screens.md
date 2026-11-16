@@ -1,17 +1,19 @@
+> 보존 기록 · 현재 지침 아님. 2026-11-16 두 정본 통합 전 내용을 보존한다. 현재 기준은 [영어 FE 구현 지침](../frontend-handoff.md)과 [한국어 API 요구사항](../api.md)이다. 아래 문구·상태는 당시 기록이다.
+
 # 화면과 경로
 
 대상: 프론트엔드·백엔드 팀원 · 언어: 한국어 · 구분: 팀 공유 구현 기준
 
 갱신: 2026-11-16.
 
-구현할 화면과 필요한 상태를 정리한 목록이다. 아래 경로는 화면 설계상의 제안이며, 실제 샘플 앱 경로와 검증 범위는 [기존 구현 기록](complete-bundle.md)을 함께 확인한다. 레이아웃은 [화면 구현 지침](frontend-handoff.md)을 따른다.
+구현할 화면과 필요한 상태를 정리한 목록이다. 아래 경로는 화면 설계상의 제안이며, 실제 샘플 앱 경로와 검증 범위는 [기존 구현 기록](complete-bundle.md)을 함께 확인한다. 레이아웃은 [화면 구현 지침](frontend-handoff-2026-11-16.md)을 따른다.
 
 원본 Figma 섹션: Dashboard, RuleEngine, AddTab, Alert, Episode, Report, ETC.
 
 <a id="required-variants-and-evidence"></a>
 ## 필요한 변형과 검수 자료
 
-로그인을 포함한 모든 화면은 Default Light/Dark, Solarized Light/Dark × Sky/Violet/Pink/Lime, 총 16개 조합을 지원해야 한다. v3 토큰과 컴포넌트 연결을 유지한다. 일정은 [구현 일정](frontend-handoff.md#delivery-schedule)에서 관리한다.
+로그인을 포함한 모든 화면은 Default Light/Dark, Solarized Light/Dark × Sky/Violet/Pink/Lime, 총 16개 조합을 지원해야 한다. v3 토큰과 컴포넌트 연결을 유지한다. 일정은 [구현 일정](frontend-handoff-2026-11-16.md#delivery-schedule)에서 관리한다.
 
 화면 하나를 끝낼 때마다 원본 Figma 프레임 링크(로그인은 `Figma 원본 없음`), 구현 버전·커밋·실행 링크, 필요한 데이터, `codes.ts` 대응값, 로딩·빈 결과·오류 동작, 라이트·다크 캡처를 기록한다. 열리지 않는 링크와 검증하지 못한 상태는 따로 표시한다. 아래 경로만으로 실행 가능한 미리보기가 제공되는 것은 아니다.
 
