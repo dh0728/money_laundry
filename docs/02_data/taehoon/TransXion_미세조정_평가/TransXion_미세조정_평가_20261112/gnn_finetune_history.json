@@ -1,0 +1,111 @@
+{
+  "settings": {
+    "seed": 20261112,
+    "batch": 2048,
+    "steps": 900,
+    "lr": 0.0003,
+    "warmup": 20,
+    "positive_weight": 6.0,
+    "weight_decay": 1e-05,
+    "clip": 1.0,
+    "selection": "validation AP",
+    "payment": "Card\u2192Credit Card, Transfer\u2192Wire, Mobile\u2192Unknown"
+  },
+  "history": [
+    {
+      "step": 0,
+      "tag": "step0_frozen",
+      "split": "val",
+      "rows": 504627,
+      "positive": 671,
+      "AP": 0.002199589915090873,
+      "AUC": 0.6333229875685572,
+      "seconds": 101.24794067256153
+    },
+    {
+      "step": 150,
+      "train_loss": 0.0381595549841101,
+      "tag": "step150",
+      "split": "val",
+      "rows": 504627,
+      "positive": 671,
+      "AP": 0.10907387720070628,
+      "AUC": 0.8367150609592997,
+      "seconds": 98.48267053626478
+    },
+    {
+      "step": 300,
+      "train_loss": 0.02048444886691868,
+      "tag": "step300",
+      "split": "val",
+      "rows": 504627,
+      "positive": 671,
+      "AP": 0.15600847061956064,
+      "AUC": 0.873235578582139,
+      "seconds": 98.64146736077964
+    },
+    {
+      "step": 450,
+      "train_loss": 0.018145009817865987,
+      "tag": "step450",
+      "split": "val",
+      "rows": 504627,
+      "positive": 671,
+      "AP": 0.17851425191569764,
+      "AUC": 0.8543988354600398,
+      "seconds": 105.40821409597993
+    },
+    {
+      "step": 600,
+      "train_loss": 0.01759645593352616,
+      "tag": "step600",
+      "split": "val",
+      "rows": 504627,
+      "positive": 671,
+      "AP": 0.19279736622958032,
+      "AUC": 0.8746884426867678,
+      "seconds": 102.77769112214446
+    },
+    {
+      "step": 750,
+      "train_loss": 0.01695277957400928,
+      "tag": "step750",
+      "split": "val",
+      "rows": 504627,
+      "positive": 671,
+      "AP": 0.19934689529543992,
+      "AUC": 0.8530235852918298,
+      "seconds": 101.31318101659417
+    },
+    {
+      "step": 900,
+      "train_loss": 0.016895626103505493,
+      "tag": "step900",
+      "split": "val",
+      "rows": 504627,
+      "positive": 671,
+      "AP": 0.20107212026365906,
+      "AUC": 0.8865645741149379,
+      "seconds": 100.17122562788427
+    }
+  ],
+  "selected_step": 900,
+  "test_frozen": {
+    "tag": "step0_frozen",
+    "split": "test",
+    "rows": 514482,
+    "positive": 733,
+    "AP": 0.001923402967806919,
+    "AUC": 0.5692758056028533,
+    "seconds": 104.23264151252806
+  },
+  "test_finetuned": {
+    "tag": "step900_selected",
+    "split": "test",
+    "rows": 514482,
+    "positive": 733,
+    "AP": 0.16260127708614205,
+    "AUC": 0.8590040666128421,
+    "seconds": 105.53326363116503
+  }
+}
