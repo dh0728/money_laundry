@@ -464,6 +464,17 @@ class FreezeInputTests {
         from numbered t join added a on a.source_row=t.n
         """,
         version);
+    revise(version);
+  }
+
+  /**
+   * Integration bumps a version's revision whenever it changes the version's transactions, links or
+   * their status; FREEZE_INPUT re-evaluates what such a bump marks. Fixtures that edit those rows
+   * directly bump it the same way.
+   */
+  void revise(long changedVersion) {
+    jdbc.update(
+        "update ingest.report_versions set revision=revision+1 where version_id=?", changedVersion);
   }
 
   void finish(UUID run) {
@@ -548,6 +559,7 @@ class FreezeInputTests {
         "update ledger.transactions set occurred_at=? where tx_id=?",
         Timestamp.from(later.minusSeconds(60)),
         ids.get(2));
+    revise(version);
     UUID second = runs.freeze(nextJob(later), later);
     assertContextMatchesFullCopy(second, later);
     assertThat(
@@ -689,6 +701,7 @@ class FreezeInputTests {
     // A superseded member, a new Alert version and Alert, and a replaced current score.
     jdbc.update(
         "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?", ids.get(1));
+    revise(version);
     publish(alert, 2, second, ids.get(1), ids.get(2));
     publish(null, 1, second, ids.get(3));
     long rescoreJob = nextJob(later);
@@ -730,6 +743,7 @@ class FreezeInputTests {
     finish(first);
     jdbc.update(
         "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?", ids.get(0));
+    revise(version);
     Instant later = cutoff.plus(Duration.ofDays(1));
     UUID run = UUID.randomUUID();
     jdbc.update(
@@ -741,6 +755,261 @@ class FreezeInputTests {
                     s -> new AlertInputSnapshot(jdbc).freeze(run, later)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("FROZEN_TARGET_ALREADY_SCORED");
+  }
+
+  long upload(int bank, String day, Instant received) {
+    jdbc.update("insert into core.banks(bank_id) values(?) on conflict do nothing", bank);
+    return jdbc.queryForObject(
+        """
+        insert into ingest.uploads(file_name,file_hash,size_bytes,status,bank_id,business_date,received_at)
+        values('fixture.csv',md5(random()::text)||md5(random()::text),1,'COMPLETED',?,?::date,?) returning upload_id
+        """,
+        Long.class,
+        bank,
+        day,
+        Timestamp.from(received));
+  }
+
+  /** A report set with one current version received at the given time. */
+  long[] reportSet(int bank, String day, Instant received) {
+    long upload = upload(bank, day, received);
+    long newSet =
+        jdbc.queryForObject(
+            "insert into ingest.report_sets(bank_id,business_date) values(?,?::date) returning set_id",
+            Long.class,
+            bank,
+            day);
+    long newVersion = reportVersion(newSet, upload, 1, received);
+    jdbc.update(
+        "update ingest.report_sets set current_version_id=?,generation=1 where set_id=?",
+        newVersion,
+        newSet);
+    return new long[] {newSet, newVersion};
+  }
+
+  long reportVersion(long ofSet, long upload, int number, Instant received) {
+    return jdbc.queryForObject(
+        """
+        insert into ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status,row_count)
+        values(?,?,?,?,'ACTIVE',0) returning version_id
+        """,
+        Long.class,
+        ofSet,
+        upload,
+        number,
+        Timestamp.from(received));
+  }
+
+  /** New transactions reported through a version, the way integration leaves them. */
+  List<Long> reported(long throughVersion, String day, Instant occurred, int count) {
+    var ids =
+        jdbc.queryForList(
+            """
+        insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,
+          amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date)
+        select ?,?,?,n,'USD',n,'USD','ACH',n,'test',?::date from generate_series(1,?) n returning tx_id
+        """,
+            Long.class,
+            Timestamp.from(occurred),
+            account,
+            account,
+            day,
+            count);
+    for (long id : ids) link(id, throughVersion);
+    return ids;
+  }
+
+  void link(long tx, long throughVersion) {
+    jdbc.update(
+        """
+        with added as (insert into private.bank_reports(version_id,source_row,report_status)
+          select ?,coalesce(max(source_row),0)+1,'ACTIVE' from private.bank_reports returning report_id)
+        insert into ledger.transaction_reports select ?,report_id,'INTERNAL' from added
+        """,
+        throughVersion,
+        tx);
+    revise(throughVersion);
+  }
+
+  /** Freezes a run without TARGET rows, so the ledgers alone are under test. */
+  UUID freezeLedgers(Instant at, Set<Long> blocked) {
+    UUID run = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", run, nextJob(at));
+    transactions.executeWithoutResult(s -> new AlertInputSnapshot(jdbc).freeze(run, at, blocked));
+    return run;
+  }
+
+  /** A completed run of a completed job holding the current score of these transactions. */
+  UUID scored(List<Long> ids) {
+    long scoringJob = nextJob(cutoff);
+    UUID run = UUID.randomUUID();
+    jdbc.update(
+        "insert into analysis.runs(run_id,job_id,status) values(?,?,'COMPLETED')", run, scoringJob);
+    for (long id : ids) {
+      runs.snapshot(run, id, "TARGET");
+      score(run, id);
+      jdbc.update(
+          "insert into analysis.current_scores values(?,?) on conflict(tx_id) do update set run_id=excluded.run_id",
+          id,
+          run);
+    }
+    jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", scoringJob);
+    return run;
+  }
+
+  /**
+   * Everything the freeze derives from the eligible set, compared with evaluating every transaction
+   * from scratch: the open input ledger, the run's report sets, its first coverage date and the
+   * open score ledger.
+   */
+  void assertLedgersMatchFullEvaluation(UUID run, Instant at, Set<Long> blocked) {
+    String eligible =
+        """
+        select t.tx_id from ledger.transactions t
+        join ledger.transaction_reports tr using(tx_id) join private.bank_reports br using(report_id)
+        join ingest.report_sets rs on rs.current_version_id=br.version_id join ingest.report_versions rv using(version_id)
+        where t.integration_status='ACTIVE' and t.occurred_at<=:at
+          and not exists(select 1 from ledger.transaction_reports btr join private.bank_reports bbr using(report_id)
+            join ingest.report_versions bv using(version_id) where btr.tx_id=t.tx_id and bv.set_id=any(:blocked::bigint[]))
+        group by t.tx_id having bool_or(rv.received_at<=:at) and not bool_or(rv.received_at>:at)
+        """;
+    var named = new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc);
+    var params =
+        new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+            .addValue("at", Timestamp.from(at))
+            .addValue("run", run)
+            .addValue(
+                "blocked",
+                blocked.stream()
+                    .map(String::valueOf)
+                    .collect(java.util.stream.Collectors.joining(",", "{", "}")));
+    var pairs =
+        List.of(
+            List.of(
+                """
+                select t.tx_id,t.occurred_at,t.business_date,a.bank_id,b.bank_id,a.service_account_id,b.service_account_id,
+                  e.service_owner_id,f.service_owner_id,t.amount_received,t.receiving_currency::text,t.amount_paid,
+                  t.payment_currency::text,t.payment_format::text,t.amount_usd,t.fx_rate_version::text
+                from ledger.transactions t join core.accounts a on a.account_id=t.from_account_id
+                join core.accounts b on b.account_id=t.to_account_id
+                join core.owners e on e.owner_id=a.owner_id join core.owners f on f.owner_id=b.owner_id
+                where t.tx_id in(%s)
+                """
+                    .formatted(eligible),
+                "select "
+                    + INPUT_COLUMNS
+                    + " from analysis.input_ledger where valid_to_seq is null"),
+            List.of(
+                """
+                select distinct s.set_id from (%s) i join ledger.transaction_reports tr using(tx_id)
+                join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id
+                """
+                    .formatted(eligible),
+                "select set_id from analysis.input_report_sets where run_id=:run"),
+            List.of(
+                "select min(t.business_date)-3 from ledger.transactions t where t.tx_id in(%s) having count(*)>0"
+                    .formatted(eligible),
+                "select min(business_date) from analysis.input_coverage where run_id=:run having count(*)>0"),
+            List.of(
+                """
+                select c.tx_id,c.run_id from analysis.current_scores c
+                join analysis.runs r on r.run_id=c.run_id join analysis.jobs b on b.job_id=r.job_id
+                where r.status='COMPLETED' and b.status='COMPLETED' and c.tx_id in(%s)
+                """
+                    .formatted(eligible),
+                "select tx_id,score_run_id from analysis.score_ledger where valid_to_seq is null"));
+    for (var pair : pairs)
+      for (String sql :
+          List.of(
+              "select count(*) from ((" + pair.get(0) + ") except all (" + pair.get(1) + ")) x",
+              "select count(*) from ((" + pair.get(1) + ") except all (" + pair.get(0) + ")) x"))
+        assertThat(named.queryForObject(sql, params, Integer.class)).as(sql).isZero();
+  }
+
+  int openInputs() {
+    return jdbc.queryForObject(
+        "select count(*) from analysis.input_ledger where valid_to_seq is null", Integer.class);
+  }
+
+  @Test
+  void re_evaluating_only_changed_report_sets_matches_evaluating_every_transaction() {
+    seed(4);
+    var first =
+        jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);
+    Instant day2 = cutoff.plus(Duration.ofDays(1)), day3 = cutoff.plus(Duration.ofDays(2));
+    // Timed after the first cutoff: eligible later although its report set stays as it is.
+    long future = reported(version, "2023-09-01", cutoff.plusSeconds(1800), 1).getFirst();
+    assertLedgersMatchFullEvaluation(freezeLedgers(cutoff, Set.of()), cutoff, Set.of());
+    assertThat(openInputs()).isEqualTo(4);
+
+    // A new day's set, a set received only after the cutoff, and a transaction two banks report.
+    long[] own = reportSet(12, "2023-09-02", cutoff.plusSeconds(3600));
+    long[] other = reportSet(13, "2023-09-02", cutoff.plusSeconds(3600));
+    long[] late = reportSet(13, "2023-09-03", day2.plusSeconds(3600));
+    var second = reported(own[1], "2023-09-02", cutoff.plusSeconds(60), 3);
+    link(second.get(0), other[1]);
+    var waiting = reported(late[1], "2023-09-03", cutoff.plusSeconds(120), 2);
+    link(second.get(1), late[1]);
+    // Dated after the cutoff's day, so the source manifest of neither run lists it.
+    long[] ahead = reportSet(12, "2023-09-10", cutoff.plusSeconds(3600));
+    reported(ahead[1], "2023-09-10", cutoff.plusSeconds(60), 1);
+    UUID scoring = scored(List.of(first.get(0), second.get(2), waiting.get(0)));
+    assertLedgersMatchFullEvaluation(freezeLedgers(day2, Set.of()), day2, Set.of());
+    assertThat(openInputs()).isEqualTo(4 + 1 + 2 + 1);
+
+    // Nothing changed: no version is opened or closed.
+    long versions = jdbc.queryForObject("select count(*) from analysis.input_ledger", Long.class);
+    assertLedgersMatchFullEvaluation(freezeLedgers(day2, Set.of()), day2, Set.of());
+    assertThat(jdbc.queryForObject("select count(*) from analysis.input_ledger", Long.class))
+        .isEqualTo(versions);
+
+    // A still-late set changes its current version and no longer reports the two-bank transaction,
+    // and the set dated ahead reports one more.
+    reported(ahead[1], "2023-09-10", cutoff.plusSeconds(60), 1);
+    long relate = reportVersion(late[0], upload(13, "2023-09-03", day2), 2, day2.plusSeconds(7200));
+    for (long id : waiting) link(id, relate);
+    jdbc.update(
+        "update ingest.report_sets set current_version_id=?,generation=generation+1 where set_id=?",
+        relate,
+        late[0]);
+    assertLedgersMatchFullEvaluation(freezeLedgers(day2, Set.of()), day2, Set.of());
+    assertThat(openInputs()).isEqualTo(4 + 1 + 3 + 2);
+
+    // The late set is in, a blocked set takes its transactions out, and the scoring job reopens.
+    jdbc.update(
+        "update analysis.jobs set status='RUNNING' where job_id=(select job_id from analysis.runs where run_id=?)",
+        scoring);
+    assertLedgersMatchFullEvaluation(freezeLedgers(day3, Set.of(other[0])), day3, Set.of(other[0]));
+    assertThat(openInputs()).isEqualTo(4 + 1 + 3 + 2 + 2 - 1);
+    jdbc.update(
+        "update analysis.jobs set status='COMPLETED' where job_id=(select job_id from analysis.runs where run_id=?)",
+        scoring);
+
+    // The block is lifted, and a replacement version supersedes one transaction and adds another.
+    long replacement =
+        reportVersion(set, upload(12, "2023-09-01", day2.plusSeconds(60)), 2, day2.plusSeconds(60));
+    jdbc.update(
+        "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?",
+        first.get(1));
+    for (long kept : List.of(first.get(0), first.get(2), first.get(3), future))
+      link(kept, replacement);
+    reported(replacement, "2023-09-01", cutoff.minusSeconds(3600), 1);
+    jdbc.update(
+        "update ingest.report_versions set stage_status='SUPERSEDED',revision=revision+1 where version_id=?",
+        version);
+    jdbc.update(
+        "update ingest.report_sets set current_version_id=?,generation=generation+1 where set_id=?",
+        replacement,
+        set);
+    assertLedgersMatchFullEvaluation(freezeLedgers(day3, Set.of()), day3, Set.of());
+    assertThat(openInputs()).isEqualTo(4 + 1 + 3 + 2 + 2);
+
+    // An earlier cutoff after a later one: the replacement and the late set are not received yet.
+    assertLedgersMatchFullEvaluation(freezeLedgers(cutoff, Set.of()), cutoff, Set.of());
+    assertThat(openInputs()).isZero();
+    assertLedgersMatchFullEvaluation(freezeLedgers(day3, Set.of()), day3, Set.of());
+    assertThat(openInputs()).isEqualTo(4 + 1 + 3 + 2 + 2);
   }
 
   @Test

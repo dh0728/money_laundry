@@ -226,6 +226,9 @@ CREATE TABLE analysis.runs (
  cancel_reason TEXT, completed_at TIMESTAMPTZ,
  -- Position in the shared input ledgers, issued by FREEZE_INPUT under the integration lock.
  input_seq BIGINT UNIQUE,
+ -- The cutoff and blocked report sets FREEZE_INPUT applied. The next freeze re-evaluates only the
+ -- transactions whose eligibility can differ from this one.
+ input_cutoff_at TIMESTAMPTZ, input_blocked_sets BIGINT[],
  UNIQUE(job_id,run_id)
 );
 CREATE SEQUENCE analysis.input_seq;

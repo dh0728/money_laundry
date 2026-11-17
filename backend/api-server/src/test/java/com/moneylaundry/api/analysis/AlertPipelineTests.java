@@ -187,6 +187,21 @@ class AlertPipelineTests {
         "select alert_id from review.alert_versions where run_id=?", Long.class, run);
   }
 
+  /**
+   * Integration changes a transaction's status only together with its report version's revision,
+   * which marks the transaction for FREEZE_INPUT to re-evaluate; direct edits here do the same.
+   */
+  void reviseReportsOf(long... transactions) {
+    for (long id : transactions)
+      jdbc.update(
+          """
+          update ingest.report_versions set revision=revision+1 where version_id in(
+            select br.version_id from ledger.transaction_reports tr
+            join private.bank_reports br using(report_id) where tr.tx_id=?)
+          """,
+          id);
+  }
+
   UUID freezeCheck() {
     long next =
         jdbc.queryForObject(
@@ -1022,6 +1037,7 @@ class AlertPipelineTests {
   void held_fact_is_not_a_confirmed_withdrawal() {
     long alert = firstAlert();
     jdbc.update("update ledger.transactions set integration_status='HELD' where tx_id=?", target);
+    reviseReportsOf(target);
     var context = nextPreparedContext();
     publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
     assertThat(
@@ -1073,6 +1089,7 @@ class AlertPipelineTests {
         "update ledger.transactions set integration_status='SUPERSEDED' where tx_id in (?,?)",
         target,
         returnSeed);
+    reviseReportsOf(target, returnSeed);
     var context = nextPreparedContext();
     publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
     if (started) {
