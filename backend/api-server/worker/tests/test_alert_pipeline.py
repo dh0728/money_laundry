@@ -322,6 +322,13 @@ class AlertPostgresTests(unittest.TestCase):
                                             valid_from_seq=current, valid_to_seq=None)),))
         self.assertEqual(Scope(self.admin, self.run).planned(self.admin, [], set()), {alert})
 
+    def test_scope_leaves_the_planner_setting_as_it_found_it(self):
+        from alerts.alert_scope import Scope
+        with self.admin.transaction():
+            self.admin.execute("SET LOCAL enable_seqscan=on")
+            Scope(self.admin, self.run)
+            self.assertEqual(self.admin.execute("SHOW enable_seqscan").fetchone()[0], 'on')
+
 
 class AlertExtensionTests(unittest.TestCase):
     def test_coverage_calendar_is_not_repeated_for_every_seed(self):
