@@ -1,0 +1,16 @@
+# This handoff publishes notebook-embedded source and compact documentation only.
+/*
+!/.gitignore
+!/README.md
+!/00_환경설정과_실행준비.ipynb
+!/01_원본전처리.ipynb
+!/02_그래프와_학습입력.ipynb
+!/03_SALT_GNN_모델학습.ipynb
+!/04_검증_Test_결과.ipynb
+!/05_전체흐름_스모크테스트.ipynb
+!/속도개선_학습방식_논문비교_HGB계획.md
+!/docs/
+/docs/*
+!/docs/verification_20261105.json
+!/docs/source_speed_comparison_20261105.json
+!/docs/hgb_feasibility_summary_20261105.json

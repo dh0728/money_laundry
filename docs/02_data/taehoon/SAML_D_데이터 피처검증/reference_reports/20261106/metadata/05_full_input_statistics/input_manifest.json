@@ -1,0 +1,201 @@
+{
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/gnn36_structural_v8/cache/edges/x.npy": {
+    "shape": [
+      137039007,
+      17
+    ],
+    "dtype": "float32",
+    "size": 9318652604,
+    "mtime_ns": 1790673298148860670
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/gnn36_structural_v8/cache/edges/present.npy": {
+    "shape": [
+      137039007
+    ],
+    "dtype": "uint8",
+    "size": 137039135,
+    "mtime_ns": 1790672119842304962
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/z.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "float32",
+    "size": 681870472,
+    "mtime_ns": 1792856060865982205
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_gnn_verify_20261025/cache/hi/paid_z.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "float32",
+    "size": 681870472,
+    "mtime_ns": 1792909402007252569
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/minute.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "int32",
+    "size": 681870472,
+    "mtime_ns": 1792856060826978350
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/src.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "int32",
+    "size": 681870472,
+    "mtime_ns": 1792856060794975186
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/dst.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "int32",
+    "size": 681870472,
+    "mtime_ns": 1792856060809976669
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/fmt.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "int8",
+    "size": 170467714,
+    "mtime_ns": 1792856060893984973
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/present.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "uint8",
+    "size": 170467714,
+    "mtime_ns": 1792856060903985962
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_fraudgt_compare_20261026/cache/incoming_ports.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "int32",
+    "size": 681870472,
+    "mtime_ns": 1793011979212831406
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_fraudgt_compare_20261026/cache/outgoing_ports.npy": {
+    "shape": [
+      170467586
+    ],
+    "dtype": "int32",
+    "size": 681870472,
+    "mtime_ns": 1793011998899776937
+  },
+  "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/train_ids.npy": {
+    "shape": [
+      102505233
+    ],
+    "dtype": "uint32",
+    "size": 410021060,
+    "mtime_ns": 1793086234662924590
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/nodes/2022-09-25.npy": {
+    "shape": [
+      2116168,
+      19
+    ],
+    "dtype": "float32",
+    "size": 160828896,
+    "mtime_ns": 1792855962038213328
+  },
+  "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/val_ids.npy": {
+    "shape": [
+      34491749
+    ],
+    "dtype": "uint32",
+    "size": 137967124,
+    "mtime_ns": 1793086235261983680
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/nodes/2022-10-13.npy": {
+    "shape": [
+      2116168,
+      19
+    ],
+    "dtype": "float32",
+    "size": 160828896,
+    "mtime_ns": 1792856014929441494
+  },
+  "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/test_ids.npy": {
+    "shape": [
+      33429507
+    ],
+    "dtype": "uint32",
+    "size": 133718156,
+    "mtime_ns": 1793086235827039417
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/nodes/2022-10-31.npy": {
+    "shape": [
+      2116168,
+      19
+    ],
+    "dtype": "float32",
+    "size": 160828896,
+    "mtime_ns": 1792856062565150163
+  },
+  "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_gnn_verify_20261025/cache/hi/test_edge17.npy": {
+    "shape": [
+      156983080,
+      17
+    ],
+    "dtype": "float32",
+    "size": 10674849568,
+    "mtime_ns": 1792909423645389718
+  },
+  "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/edge22.npy": {
+    "shape": [
+      9504852,
+      22
+    ],
+    "dtype": "float32",
+    "size": 836427104,
+    "mtime_ns": 1793940801960384896
+  },
+  "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/nodes19.npy": {
+    "shape": [
+      855460,
+      19
+    ],
+    "dtype": "float32",
+    "size": 65015088,
+    "mtime_ns": 1793940807968878683
+  },
+  "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/src.npy": {
+    "shape": [
+      9504852
+    ],
+    "dtype": "int32",
+    "size": 38019536,
+    "mtime_ns": 1792909318011956551
+  },
+  "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/dst.npy": {
+    "shape": [
+      9504852
+    ],
+    "dtype": "int32",
+    "size": 38019536,
+    "mtime_ns": 1792909318031958527
+  },
+  "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/incoming_ports.npy": {
+    "shape": [
+      9504852
+    ],
+    "dtype": "int32",
+    "size": 38019536,
+    "mtime_ns": 1793940804504593983
+  },
+  "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/outgoing_ports.npy": {
+    "shape": [
+      9504852
+    ],
+    "dtype": "int32",
+    "size": 38019536,
+    "mtime_ns": 1793940807095806933
+  }
+}

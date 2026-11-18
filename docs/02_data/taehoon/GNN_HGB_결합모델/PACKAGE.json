@@ -1,0 +1,9 @@
+{
+  "package": "gnn_hgb_fusion",
+  "version": "2026-11-10",
+  "created_utc": "2026-11-10T01:34:41.299777+00:00",
+  "notebook_default": "offline result review; full experiments require external artifacts and explicit opt-in",
+  "raw_transactions_included": false,
+  "model_checkpoints_included": false,
+  "production_training_modified": false
+}

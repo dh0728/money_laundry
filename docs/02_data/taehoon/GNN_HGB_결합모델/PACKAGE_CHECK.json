@@ -1,0 +1,41 @@
+{
+  "status": "passed",
+  "checked_utc": "2026-11-10T01:40:21.231630+00:00",
+  "scope": "Offline notebook execution, CPU score logic, stored result reconciliation; no full GPU inference or training rerun",
+  "stored_result_checks": {
+    "fusion_summary_rows": 20,
+    "threshold_rows": 424,
+    "saml_summary_rows": 9,
+    "common23_pattern_rows": 56,
+    "portable_coefficient_max_error_128_probes": {
+      "salt_a3_hgb": 0.0,
+      "multi_fraudgt_hgb": 0.0
+    }
+  },
+  "python_ast_files": 48,
+  "local_document_links_checked": 19,
+  "adjusted_historical_links": 3,
+  "unit_tests": "test_frozen_workflow_and_tampering (test_fusion_workflow.FusionTests.test_frozen_workflow_and_tampering) ... ok\ntest_hgb_correction_once (test_fusion_workflow.FusionTests.test_hgb_correction_once) ... ok\ntest_id_alignment_and_duplicates (test_fusion_workflow.FusionTests.test_id_alignment_and_duplicates) ... ok\ntest_overlap_rejected (test_fusion_workflow.FusionTests.test_overlap_rejected) ... ok\ntest_threshold_ties_are_atomic (test_fusion_workflow.FusionTests.test_threshold_ties_are_atomic) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 1.419s\n\nOK",
+  "notebooks": [
+    {
+      "path": "notebooks/01_실험조건_입력점수.ipynb",
+      "status": "passed",
+      "seconds": 2.012
+    },
+    {
+      "path": "notebooks/02_SALT_A3_HGB_결합학습.ipynb",
+      "status": "passed",
+      "seconds": 1.539
+    },
+    {
+      "path": "notebooks/03_Multi_FraudGT_HGB_결합학습.ipynb",
+      "status": "passed",
+      "seconds": 1.547
+    },
+    {
+      "path": "notebooks/04_임계값별_결과비교.ipynb",
+      "status": "passed",
+      "seconds": 2.156
+    }
+  ]
+}

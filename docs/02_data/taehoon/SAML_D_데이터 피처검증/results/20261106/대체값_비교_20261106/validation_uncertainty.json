@@ -1,0 +1,28 @@
+{
+  "method": "Paired128-batch cluster bootstrap500 resamples",
+  "seed": 20261108,
+  "sklearn_weighted_AP_crosscheck": true,
+  "selection_already_frozen": true,
+  "comparisons": {
+    "train_median minus zero": {
+      "AP_delta": 0.09662379087964423,
+      "CI95_low": 0.07474152816994159,
+      "CI95_high": 0.11760055357778874
+    },
+    "degree_median minus zero": {
+      "AP_delta": 0.09501958013339118,
+      "CI95_low": 0.07150261067803627,
+      "CI95_high": 0.117414930209408
+    },
+    "train_median minus degree_median": {
+      "AP_delta": 0.0016042107462530542,
+      "CI95_low": -0.007309569918492531,
+      "CI95_high": 0.010189247539714022
+    },
+    "train_median minus original": {
+      "AP_delta": -0.003397682826243642,
+      "CI95_low": -0.017896284382445674,
+      "CI95_high": 0.009716978081844298
+    }
+  }
+}

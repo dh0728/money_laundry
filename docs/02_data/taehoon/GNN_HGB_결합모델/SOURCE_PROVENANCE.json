@@ -1,0 +1,447 @@
+[
+  {
+    "path": "results/salt_a3_hgb/fit.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/fit.json",
+    "sha256": "eb0c4fa00e6b48c9077915d3f3fe0b79375c24fda244f1d844bdbfba90670c2a"
+  },
+  {
+    "path": "results/salt_a3_hgb/plan.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/plan.json",
+    "sha256": "799e37adc6867abf4b0e4694732e5c8979dbcf6df1cfa34670e32650bfce41eb"
+  },
+  {
+    "path": "results/salt_a3_hgb/code_manifest.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/code_manifest.json",
+    "sha256": "d65733f1116644c4ce22d8df28c35fa5dbc1db6cb7916898a8cdd833f42d9b44"
+  },
+  {
+    "path": "results/salt_a3_hgb/validation.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/validation.json",
+    "sha256": "fdec12a393ff7b0a4dc4d2a7db63efe7b9bbc2a30fb49e0d05c6e42fb0757b4a"
+  },
+  {
+    "path": "results/salt_a3_hgb/test.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/test.json",
+    "sha256": "a13262f162f9ff76caf20e2a7e814224e7662f6b365fd5c94019975634332ae2"
+  },
+  {
+    "path": "results/salt_a3_hgb/frozen_validation.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/frozen_validation.json",
+    "sha256": "7ee6acbab087be36f7399037d02fed2b4f3233a1641501b3cb5e9405a8f65536"
+  },
+  {
+    "path": "results/salt_a3_hgb/complete.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/complete.json",
+    "sha256": "eae4d65cc042af0c3f98237976b8b089097ad2396b7b9fb55269d3f7d109c9ea"
+  },
+  {
+    "path": "results/salt_a3_hgb/independent_verification.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/independent_verification.json",
+    "sha256": "3926cb7ac329f4574f80e0db240d5be81cb6aa64a282e0bea2ab0df1f66a9e46"
+  },
+  {
+    "path": "results/salt_a3_hgb/final_verification.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/final_verification.json",
+    "sha256": "35df38ae23b0dc39a11c55a33a70485385b0150745dcd07594cb80801e3ca340"
+  },
+  {
+    "path": "results/salt_a3_hgb/metric_preflight.json",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/metric_preflight.json",
+    "sha256": "25f063e60f843479ec1c6420c3f1b898b71d06d15134fa60ef27051554afa10c"
+  },
+  {
+    "path": "results/salt_a3_hgb/metrics.csv",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/metrics.csv",
+    "sha256": "a59f86169995c307c58c10bf368d9ccc23f951a4525156cf4d975360bc27ca46"
+  },
+  {
+    "path": "results/salt_a3_hgb/결과.md",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/결과.md",
+    "sha256": "bd9acb5a3c82b938f904ad1c997c4d3386274d9f4c266e60b60fc7d044a78384"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/combine.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/combine.py",
+    "sha256": "a17e10dad4d6cd16d1471e5251a5f5cb3c9b6e2996bd3e6d7c46d943120da986"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/experiment.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/experiment.py",
+    "sha256": "7298101df287a4f4e47702047cee7a22750bab878132024cd29300ffc961a492"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/prepare.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/prepare.py",
+    "sha256": "97b93085ec81616b589c7e12cf977356a7fcdd042207cade3e903a72a37b86bb"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/report.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/report.py",
+    "sha256": "5b4c968f5e72aeceaa0b4f135ed5c47c27aff03487a427dfeae26ece06c50685"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/run_pipeline.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/run_pipeline.py",
+    "sha256": "5969e20e32b3acea0f23111b3f04861a1634e54cfeb3efb57656868f725170af"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/score_hgb.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/score_hgb.py",
+    "sha256": "8548e3e38b067c6141c44813847c046a21ea8c16cc6f927f1af571a6a7fcf83a"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/score_salt.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/score_salt.py",
+    "sha256": "725df7b73beaeaffca49a1d7cff3ac3d3cbf6e55b7e26906d1d60fb25262cd5e"
+  },
+  {
+    "path": "reference_source/SALT_GNN_A3_HGB_결합실험_20261107/verify_results.py",
+    "source": "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/verify_results.py",
+    "sha256": "1710aa59a606e914681998dabf059d01937488e776ff41a81626075cb97e16e6"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/fit.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/fit.json",
+    "sha256": "b4a39ce2ffa5e1b543f07ca5d131fd2ce8a1e6d82809ea5e6171ad05ed9f335e"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/plan.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/plan.json",
+    "sha256": "57d34ba0f6faf621c33d64e500803f9153dba226513e1127f2fc9a8384df83d3"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/code_manifest.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/code_manifest.json",
+    "sha256": "e62ede90aeee3b01fe98132cce4da398238482653ffd447be00baea5a0a72c0c"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/validation.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/validation.json",
+    "sha256": "509a64682c86419c346f1d18b87f5789b93bc7f215c14635f40db716dc3f752b"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/test.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/test.json",
+    "sha256": "63b0e3866adf44a667d25724709283395a2f55d69ae985ea6be0b6f20e67ca2a"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/frozen_validation.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/frozen_validation.json",
+    "sha256": "946a599cea813858d3612bf2ac75091492d5b56639f436c3a3d9ce484c1b424d"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/complete.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/complete.json",
+    "sha256": "9c55198c3cb8c9a8260b664971eb3feea552ce2f849c9afdf6f158c0617564e6"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/independent_verification.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/independent_verification.json",
+    "sha256": "69d7af7b1d4bec7cbe52cfe4c53e438e21102faae57a9b3e2fb8bc98e56d9379"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/preflight.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/preflight.json",
+    "sha256": "338361184ee11a7fb22a9a44a02534b91c123853578eaa28090c6e13f51342cc"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/population_audit.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/population_audit.json",
+    "sha256": "587064662134235b747d6f337fd49b8cc2286d09f8c53119f3632adbf6d11cc9"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/input_provenance.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/input_provenance.json",
+    "sha256": "05a0eeedb7b749b8d66c200ff97b616946c1974821ec23809e00595b4f1c5845"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/metrics.csv",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/metrics.csv",
+    "sha256": "a78e17f6a6171caae11367f9c2e6ae1ef8b108adb32d61dfddb2ea4fe924fb1b"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/thresholds.csv",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/thresholds.csv",
+    "sha256": "72e24b1276796164c18da2c0b48b962dcd0975e2b74d8cf0a904a495e235d891"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/thresholds.json",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/thresholds.json",
+    "sha256": "ba8d7babbdef58fd217791e5de6831dedee3674eb0fee30dda4c43b149d7d9cd"
+  },
+  {
+    "path": "results/multi_fraudgt_hgb/결과.md",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/결과.md",
+    "sha256": "583ea9fc220550bce0e0bb97efe8581c028704a2a56aa25234fd46bf5d85cfc1"
+  },
+  {
+    "path": "reference_source/Multi_FraudGT_HGB_결합실험_20261108/combine.py",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/combine.py",
+    "sha256": "588888965eced5241d31c2cde50661ebbd21bdeb24869fdc13638735274bc59c"
+  },
+  {
+    "path": "reference_source/Multi_FraudGT_HGB_결합실험_20261108/experiment.py",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/experiment.py",
+    "sha256": "5a22ada2482ee17842c217c2411b7b573ce5e780c81d8340f7596d9c80dab9e6"
+  },
+  {
+    "path": "reference_source/Multi_FraudGT_HGB_결합실험_20261108/report.py",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/report.py",
+    "sha256": "3c1359413226d662d1d2eb986429377e13d701909ebd25058c54f7bbefa21db4"
+  },
+  {
+    "path": "reference_source/Multi_FraudGT_HGB_결합실험_20261108/run_pipeline.py",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/run_pipeline.py",
+    "sha256": "d56875c1dc593852f829626d2bb3f0a456e379d0fc59addf45b4fd17d00668c5"
+  },
+  {
+    "path": "reference_source/Multi_FraudGT_HGB_결합실험_20261108/score_multi.py",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/score_multi.py",
+    "sha256": "d7f20e00a120c73697d09794edae9a97adf2842fda0300fe85cbd0159e7fd44b"
+  },
+  {
+    "path": "reference_source/Multi_FraudGT_HGB_결합실험_20261108/audit/verify_results.py",
+    "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/audit/verify_results.py",
+    "sha256": "117064260fdc66b254784a5ee2d55067453a6619b4c85a340afc9657da92c90f"
+  },
+  {
+    "path": "results/threshold_comparison/두모델_임계값비교.html",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/두모델_임계값비교.html",
+    "sha256": "88080b63e873c1048a0c05ca277851f5ab705e89c096c143ef1c4178ff1778aa"
+  },
+  {
+    "path": "results/threshold_comparison/임계값별_나란히비교.csv",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/임계값별_나란히비교.csv",
+    "sha256": "726ce922f2d8991470e196a617a35274c70841597f06efde5ff7042b1ec340f2"
+  },
+  {
+    "path": "results/threshold_comparison/임계값별_전체지표.csv",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/임계값별_전체지표.csv",
+    "sha256": "7183301510fe89e17df4efc0ef1c188d161f02f7ee9c6d5ebad19e7bb861fe3f"
+  },
+  {
+    "path": "results/threshold_comparison/기본값_검증선택값_비교.csv",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/기본값_검증선택값_비교.csv",
+    "sha256": "8a1e6bfc38bf6fc8ae11c3e8ccaa7705951b969bab282f51836b65802676e8fd"
+  },
+  {
+    "path": "results/threshold_comparison/comparison.json",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/comparison.json",
+    "sha256": "21037a30982cdf52f55a6f0f749d13fb8210dee7cc78876c504d402b6f825fd7"
+  },
+  {
+    "path": "results/threshold_comparison/verification.json",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/verification.json",
+    "sha256": "700ceae9d252430eb505d28f7b9234eede150215c28dbcdcca36e291e2a7fdf1"
+  },
+  {
+    "path": "results/threshold_comparison/viewer_verification.json",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/viewer_verification.json",
+    "sha256": "fe81eeb0674a240faf62cd76558e0659d778b6f1b30c17e3e23fd35c6b557d4a"
+  },
+  {
+    "path": "reference_source/threshold_comparison/compare.py",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/compare.py",
+    "sha256": "410300eb08033a99356bf8a0f6f5de98123071ef85f69649933bfd785276a5f0"
+  },
+  {
+    "path": "reference_source/threshold_comparison/viewer_template.html",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/viewer_template.html",
+    "sha256": "5740930dd4b93de34d14b75e75b4a4fb4eebbe263d03dd2354a4c71915422003"
+  },
+  {
+    "path": "figures/Test_임계값비교.png",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/Test_임계값비교.png",
+    "sha256": "596d0baca5304ab0e4fdefec3a0269779934bd368e25c44f2f819e5bacb73406"
+  },
+  {
+    "path": "figures/Test_임계값비교.svg",
+    "source": "/workspace/handoff/HGB_결합모델_임계값비교_20261108/Test_임계값비교.svg",
+    "sha256": "3d852e2634397da4327d5557b16211a830e3fc2e2816a920a3d90118bc04d037"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/__init__.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/__init__.py",
+    "sha256": "31d2c7d482cb6d6c0685e94c94994a4ddc8344df805846f55703823c9f6f93d8"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/config.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/config.py",
+    "sha256": "c3f616cb67ffb59058a1155c565f5c121fce0027c7389fe4fe34729ec69a77ca"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_features.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_features.py",
+    "sha256": "c595bc52df0256442ecccab5be0a70a16e20e16704f993492e8e4a0644bd4483"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_sampler.cu",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_sampler.cu",
+    "sha256": "f487376d0d297f3ef802e1d4b9a7de63500dc6582b43fd385cdfdbb8c2e41d8b"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_topology.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_topology.py",
+    "sha256": "4f4ba31f1bce712567d8226f252aa2aade43c50749340f598253335f3eb63deb"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/data.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/data.py",
+    "sha256": "78930bfdc460e54180d563796b0bbb9ac87b08c8dce3c0e00c231b99f99a4f4d"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/degree.c",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/degree.c",
+    "sha256": "4b1026922b1691e1a1c25c0967d0da9e89c63892201578bf7fa753bd76c00181"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/evaluation.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/evaluation.py",
+    "sha256": "239e5c105e53612a317c133d8b549dcc7b91301c038196d53d21eb5a04125405"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/extra_features.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/extra_features.py",
+    "sha256": "de1b1310615234320a09e2170d68ef0c991cbbf4e8768d91f87a126168933ea6"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/metrics.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/metrics.py",
+    "sha256": "2fe333b8fe50753e278b26b6b7bf9a08a4235f05f98bbc585f809aa18289e900"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/model.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/model.py",
+    "sha256": "bbbc5eb346e8a314d807b39b9202a570c44f891c87e9c5e7ae72d90c5e2eeaf0"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/population.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/population.py",
+    "sha256": "ef0b6c1782c24784cd081bafb385bd409f5227d1bf0afa1ab06e3d73f5e1edcf"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/prepare.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/prepare.py",
+    "sha256": "74d0d4aa7d0c435bc11803beb896695fb998061387648e4dcf1c85454c1c8f23"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_sampler.c",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_sampler.c",
+    "sha256": "b2c7171130f28ec77950759752848c52ba6e287dc05133d885938ccfa6957c0c"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_topology.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_topology.py",
+    "sha256": "e062f929f429c7db84254f41bd7cf4888fcde523027326c1cfd37d99117fa822"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_validation.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/shared_validation.py",
+    "sha256": "db060ca99262425d57c5c2074b5dec707010cbe893da35fec03125a9bdb17f3c"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/storage.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/storage.py",
+    "sha256": "e5ad8410b8dd35af0d4ab77189b4fb618d482b03ff7c3450e186b6b30100977f"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/training.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/training.py",
+    "sha256": "0b07ff0a066edcdf178c7c8f4ff5391bdbb130653fa067b736986ae981e31b34"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/salt_daily/validate.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/validate.py",
+    "sha256": "8fc1dc7bc87461d711c78027e9739c83bcf7adb33e60a4320eba23aa8acdee4b"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/run.py",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/run.py",
+    "sha256": "fcda1aece72e9715980e4b235e94655e4b31c033ec01f72bbe514718dfdb8879"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/protocol.json",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/protocol.json",
+    "sha256": "03a10f20f1dc5b5a4d0c03350f087f3119c7e0c26463829bab5d436b5160d0ff"
+  },
+  {
+    "path": "reference_source/SALT_GNN_직접공유샘플링_20261104/calibration.json",
+    "source": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/calibration.json",
+    "sha256": "c7c4b9e33f218c9e40245e7048bfb84f4740c5f9cd0e041b6daf8eea2fbc62e8"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/__init__.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/__init__.py",
+    "sha256": "799562903f4e2af803af75d0ba23524fb3ce9431bf3238c90b0c197e428f3d24"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/config.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/config.py",
+    "sha256": "c88d7a87024be88b454d62c1ce4f5d7311f475947271290eb543518b1331f042"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/csc_index.c",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/csc_index.c",
+    "sha256": "b0b4cccd2a27c31a4feccb8b35bed29fa929bf3f1d92a93782287765d0642989"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/data.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/data.py",
+    "sha256": "d633d5c070f0caeb695b0a522427f0cb1b064c8d81210cc79116e6f4c469c16d"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/metrics.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/metrics.py",
+    "sha256": "9ee80ad2eb1765e4f59e4449a6fb2ae9d5f9d378b74229aff2fb30f9986cfa78"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/models.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/models.py",
+    "sha256": "8b8bf2055205a7695f9db558a7e3fbdd49153c4bcc87fab09ed02b0243709fc0"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/official_loader.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/official_loader.py",
+    "sha256": "3508d45add8175af7a2c8657de403ef5fd2312d8eb68eec9a306a0689e57c6f2"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/optimization.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/optimization.py",
+    "sha256": "15b912d58e2b3ae94f2aa7a9ea34b27aaf84cde9a8c814efca860d51f3a5a278"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/population.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/population.py",
+    "sha256": "cf7db4f842c6c008faea331b8f092b81354f79791d858dc6fe58af33f1435a52"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/storage.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/storage.py",
+    "sha256": "a668009c8eaf0cae9da52e431d41129cf42f5f38daf6de2e4ccd0a3fd076e6dc"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/fraudgt_lab/training.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/training.py",
+    "sha256": "54abf6a247b79faa350e707a2ee3d5d6c955c4213656b1459740ed85d404aa80"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/protocol_shared.json",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/protocol_shared.json",
+    "sha256": "bb5ff044498d678752dd79e72fbaf43a7dd9c201254007ecb6c55558040a9114"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/configure.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/configure.py",
+    "sha256": "cffd181ab93788a9259e40dba6fd47d70e1600a46a94136324133da203d878f4"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/corrected_runtime.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/corrected_runtime.py",
+    "sha256": "abfd43a3078c497a651ef302d518014bb7b345546d3b0c9d54da563fcfb415fa"
+  },
+  {
+    "path": "reference_source/V10_FraudGT_조건수정_20261027/run_corrected.py",
+    "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/run_corrected.py",
+    "sha256": "2ab39a27c47701604e284e4618ece890c01d6ad0b3d16af49f571a6db8760011"
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "completed_utc": "2026-11-06T06:44:49.719380+00:00",
+  "all_passed": true,
+  "rows": 9504852,
+  "fraud_patterns": 17,
+  "normal_patterns": 11,
+  "positives": 9873,
+  "threshold": "logit > 0; sigmoid(logit) > 0.5",
+  "score_sha256_matches": true,
+  "labels_and_eid_order_verified": true,
+  "all_patterns_single_class": true,
+  "pattern_totals_match_global_confusion": true,
+  "archived_pattern_counts_match": true,
+  "source_truth_sha256": "178c41b91f01be80ac43e1994366cd646733db12b0e60059cc7d0407daa0a701",
+  "no_training_or_inference": true
+}

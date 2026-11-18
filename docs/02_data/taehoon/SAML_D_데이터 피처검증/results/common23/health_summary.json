@@ -1,0 +1,19 @@
+{
+  "reviews": 19,
+  "issues": [],
+  "final_oom_counters": {
+    "low": 0,
+    "high": 0,
+    "max": 8682,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0
+  },
+  "actual_learning_rates_match": true,
+  "daemon": {
+    "pid": 103001,
+    "status": "stopped",
+    "reason": "experiment_complete",
+    "heartbeat_utc": "2026-11-09T22:43:22.834523+00:00"
+  }
+}

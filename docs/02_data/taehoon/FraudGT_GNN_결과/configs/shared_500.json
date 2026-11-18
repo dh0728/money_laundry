@@ -1,0 +1,21 @@
+{
+  "graph_mode": "shared",
+  "seed": 42,
+  "epochs": 500,
+  "seed_batch": 2048,
+  "iterations_per_epoch": 256,
+  "validation_batches": 256,
+  "batch_accumulation": 8,
+  "positive_weight": 6.0,
+  "base_lr": 0.001,
+  "weight_decay": 1e-05,
+  "warmup_epochs": 5,
+  "gradient_clip": 1.0,
+  "eval_period": 4,
+  "reference_microbatch": 64,
+  "readout": "official",
+  "loader_workers": 0,
+  "torch_threads": 2,
+  "checkpoint_layers": true,
+  "extra_epoch_validation": false
+}

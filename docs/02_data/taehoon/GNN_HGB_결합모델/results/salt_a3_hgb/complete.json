@@ -1,0 +1,12 @@
+{
+  "status": "complete",
+  "utc": "2026-11-08T00:21:19.058298+00:00",
+  "fit_rows": 7315599,
+  "validation_rows": 8551015,
+  "test_rows": 33429507,
+  "base_models_unchanged": true,
+  "salt_training_still_paused": true,
+  "plan_sha256": "799e37adc6867abf4b0e4694732e5c8979dbcf6df1cfa34670e32650bfce41eb",
+  "test_sha256": "a13262f162f9ff76caf20e2a7e814224e7662f6b365fd5c94019975634332ae2",
+  "all_population_metrics_verified": true
+}

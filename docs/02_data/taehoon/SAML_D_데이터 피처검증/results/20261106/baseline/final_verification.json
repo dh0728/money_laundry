@@ -1,0 +1,11 @@
+{
+  "full_population_verified": true,
+  "confusion_total": 9504852,
+  "positives": 9873,
+  "normal": 9494979,
+  "frozen_checkpoint_epoch": 280,
+  "ap_crosscheck": "Custom exact-tie AP equals sklearn within 1e-12",
+  "cpu_gpu_parity_rows": 196608,
+  "all_output_files_exist": true,
+  "salt_resume_verified": true
+}

@@ -1,0 +1,20 @@
+{
+  "plan_sha256": "c3aac7d1721c478c5922259c5fcd1f7103e9a6ca986fef8741448daa3de13245",
+  "selection_sha256": "88cff90889e8bdc8e77b2bf4af982b4a2a505cc15f095ee78619f2bc97f08714",
+  "selected_method": "train_median",
+  "imputed_owner_sha256": "adb2b69277d8cec9680d960eeca5f84043e989afc31b39927bd6fe83de8b5d96",
+  "original_saml_protocol_sha256": "c5f0e4befa414810c8df7049760f4170f779accc6ecf024b80ac0bd844c04d34",
+  "rows": 9504852,
+  "threshold": 0.5,
+  "checkpoint_sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+  "graph_and_order": "Same as original complete SAML evaluation",
+  "original_target_metrics_preserved": true,
+  "target_labels_used_for_selection": false,
+  "target_status": "Post-hoc diagnostic re-evaluation of already inspected external Test",
+  "source_sha256": {
+    "imputation.py": "9cd82e580ee697a146828d973ab6c250c5779f4310edd42010169c327e717577",
+    "prepare.py": "7515b8fa003764a130a87eefae6bb593553b6a1d962115f2ba2e0b490b6d722b",
+    "validate.py": "f738c7d9c22afcfb1183f2e212aef6c0bbe66e72790e76315d474cdc6058bf26",
+    "full_saml.py": "3099eb8b0f58e77473ee27795e9817b2cbf5bd67129d761f1352c4e696a8d874"
+  }
+}

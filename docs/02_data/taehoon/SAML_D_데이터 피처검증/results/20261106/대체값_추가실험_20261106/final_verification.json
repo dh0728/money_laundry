@@ -1,0 +1,17 @@
+{
+  "all_passed": true,
+  "completed_utc": "2026-11-06T07:21:39.090469+00:00",
+  "rows": 9504852,
+  "methods": [
+    "degree_median",
+    "behavior_donor"
+  ],
+  "full_id_coverage": true,
+  "AP_sklearn_crosscheck": true,
+  "baseline_and_prior_median_reproduced": true,
+  "pattern_totals_match_global_metrics": true,
+  "source_selection_precedes_target": true,
+  "input_preflight_passed": true,
+  "salt_still_paused": true,
+  "original_checkpoint_unchanged": true
+}

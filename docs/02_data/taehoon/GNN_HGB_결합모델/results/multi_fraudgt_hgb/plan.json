@@ -1,0 +1,128 @@
+{
+  "created_utc": "2026-11-08T11:22:58.373907+00:00",
+  "name": "Frozen Multi-FraudGT epoch280 + adopted HGB exploratory stacking",
+  "gnn_checkpoint_sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+  "hgb_sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c",
+  "preserved": {
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/protocol.json": "03a10f20f1dc5b5a4d0c03350f087f3119c7e0c26463829bab5d436b5160d0ff",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/code_manifest.json": "852d3933946654281e58defd0479887cd6e3c97089151115dbbf0e56f18ed9c5",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/runs/daily_close_001/models/A3/best.pt": "86326a538768634ec06799abac69da603951dfb004038c7cfb1937cd67cc25ab",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/runs/daily_close_001/models/A3/validation.json": "1520afedf75948af0d0024a0c4d277c74e82f6e57146506371ff7b4fc3d7a838",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/runs/daily_close_001/models/A3/test.json": "d7714fb2a33281cfa448c2269239a3cf64d66832a9edf66aa41c557a5f8641a4",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/runs/daily_close_001/models/A1/last.pt": "fc693255a39359950c537e23c2211350c454c41c500362486f47eea2fad5ec85",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/population/fusion_fit_ids.npy": "586dfdc4cb918fa9c8cc7ca6c8217ed8e21a7d8cbaaeec80ea58d47dc9141fa3",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/population/fusion_fit_labels.npy": "0a945c3299950be9ac27d3fce97a1d31742acc4c4e80cfcfff81bce2ef3bdf89",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/cache/population/validation_ids.npy": "90aeb71e2d304454d139b1f92ab6cc1d5ba7cdcb1fac032786a4ed68d97491ed",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/cache/population/validation_labels.npy": "93f6a8275bbe7ae2cb0e457cb333e01ef432365bdfa72414e930075f1dd8e130",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/cache/population/test_ids.npy": "fbf8c17d958d3e69ee3d00d6b194b80f121d132d75705b4b73752a26ee7937a7",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/cache/population/test_labels.npy": "7c8560c0e4928ba103bbc679875d25511b460270f224fb1d0b64668a1fd55ece",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/models/multi_fraudgt_format/best.pt": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+    "/workspace/handoff/V10_최종채택_41종_20261026/tree.joblib": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/protocol.json": "bb5ff044498d678752dd79e72fbaf43a7dd9c201254007ecb6c55558040a9114",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/request.json": "5b1e07911d00e3dae7c2ddc402377e3d12e286bce2ebbfed8a80bea023db5c14",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/result.json": "d26c6ca9d05a104a901a77ed62d54dcd7a9cf9391d5bb99e12ccb37cc451f002",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/protocol.json": "bb5ff044498d678752dd79e72fbaf43a7dd9c201254007ecb6c55558040a9114",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/plan.json": "799e37adc6867abf4b0e4694732e5c8979dbcf6df1cfa34670e32650bfce41eb",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/fusion.joblib": "7ec974d72a5d46774acf47c2f8c68aeb5dcdb55451c9ceca13efde58f45519b5",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/validation.json": "fdec12a393ff7b0a4dc4d2a7db63efe7b9bbc2a30fb49e0d05c6e42fb0757b4a",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/test.json": "a13262f162f9ff76caf20e2a7e814224e7662f6b365fd5c94019975634332ae2",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/frozen_validation.json": "7ee6acbab087be36f7399037d02fed2b4f3233a1641501b3cb5e9405a8f65536",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/splits.json": "6e904dba270a3af005fd9b5e80fe5cb5a65207475a9282368951a131f9d1cc3d",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/positive_ids.npy": "83bfea88df004d8f06b5505468f58ac539f4ce7a471d18f8eba740e41a7c0dc5",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/positive_classes.npy": "ed0fc8a34818892f26521ce6dd3b00ffc052884f4e9dba12b2beae5a36198e3b",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/population.py": "cf7db4f842c6c008faea331b8f092b81354f79791d858dc6fe58af33f1435a52",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/training.py": "54abf6a247b79faa350e707a2ee3d5d6c955c4213656b1459740ed85d404aa80",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/__init__.py": "799562903f4e2af803af75d0ba23524fb3ce9431bf3238c90b0c197e428f3d24",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/storage.py": "a668009c8eaf0cae9da52e431d41129cf42f5f38daf6de2e4ccd0a3fd076e6dc",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/config.py": "c88d7a87024be88b454d62c1ce4f5d7311f475947271290eb543518b1331f042",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/optimization.py": "15b912d58e2b3ae94f2aa7a9ea34b27aaf84cde9a8c814efca860d51f3a5a278",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/data.py": "d633d5c070f0caeb695b0a522427f0cb1b064c8d81210cc79116e6f4c469c16d",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/metrics.py": "9ee80ad2eb1765e4f59e4449a6fb2ae9d5f9d378b74229aff2fb30f9986cfa78",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/official_loader.py": "3508d45add8175af7a2c8657de403ef5fd2312d8eb68eec9a306a0689e57c6f2",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/models.py": "8b8bf2055205a7695f9db558a7e3fbdd49153c4bcc87fab09ed02b0243709fc0",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/config.py": "c3f616cb67ffb59058a1155c565f5c121fce0027c7389fe4fe34729ec69a77ca",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/population.py": "ef0b6c1782c24784cd081bafb385bd409f5227d1bf0afa1ab06e3d73f5e1edcf",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/metrics.py": "2fe333b8fe50753e278b26b6b7bf9a08a4235f05f98bbc585f809aa18289e900",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/salt_daily/cuda_features.py": "c595bc52df0256442ecccab5be0a70a16e20e16704f993492e8e4a0644bd4483",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/fusion_fit/scores.npy": "6de88899cac630a28a9139c7489b9e7729b069b24dd2de069e6764388b42decb",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/fusion_fit/complete.json": "40dd54b5c18982ca975050e507b5243d709b5abb8630e395f1ed8e1d8a86d4ff",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/fusion_fit/request.json": "ffb3df3dd9984c71289e03b96ad8a649026179606afd51635b228698b8fcf67c",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/validation/scores.npy": "2cdae81a24badd346b05ad46ba11cbb311d193bc2b3085afa60464fe232b9574",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/validation/complete.json": "6cfb2139af2435a9aad53969a746d604eac9fb706357290935e483a3ebcf3a5d",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/validation/request.json": "025b53be6899c89508c2bb06e42582f1db533f77a73440ebbff01cfcfca0bdb0",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/test/scores.npy": "5c94530be56eedc1093c9659d7cfa16ea340d8ef68cfbe3621cc40ac97a10e78",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/test/complete.json": "9f3cfd65caa48a7d432414ca98ebe29fb3d21b85d637e54c91e79a7bbab417ff",
+    "/workspace/handoff/SALT_GNN_A3_HGB_결합실험_20261107/hgb_scores/test/request.json": "f195f6f900053ea08d927aaa894b37f297804e65a86b12f4b1157ff5b608c699"
+  },
+  "hgb_scores": {
+    "fusion_fit": "6de88899cac630a28a9139c7489b9e7729b069b24dd2de069e6764388b42decb",
+    "validation": "2cdae81a24badd346b05ad46ba11cbb311d193bc2b3085afa60464fe232b9574",
+    "test": "5c94530be56eedc1093c9659d7cfa16ea340d8ef68cfbe3621cc40ac97a10e78"
+  },
+  "fit_rows": 7315599,
+  "validation_rows": 8551015,
+  "test_rows": 33429507,
+  "windows": {
+    "fusion_fit": [
+      "2022-10-05",
+      "2022-10-08"
+    ],
+    "validation": [
+      "2022-10-09",
+      "2022-10-13"
+    ],
+    "test": [
+      "2022-10-14",
+      "2022-10-31"
+    ]
+  },
+  "inputs": [
+    "HGB corrected fraud logit (class factors 1/100/100 divided once)",
+    "Multi-FraudGT raw logit"
+  ],
+  "logistic": {
+    "scaler": "StandardScaler",
+    "C": 0.1,
+    "solver": "lbfgs",
+    "max_iter": 1000,
+    "tol": 1e-07,
+    "random_state": 20261108,
+    "class_weight": null,
+    "sample_weight": null
+  },
+  "primary_threshold": {
+    "probability": 0.5,
+    "logit": 0.0,
+    "comparison": ">=; exact-zero Multi logits audited against original strict > rule"
+  },
+  "secondary_threshold": "Each model: maximum full Validation F1; ties choose higher threshold; freeze before new fused Test evaluation",
+  "test_tuning": false,
+  "base_retraining": false,
+  "scope": "HI-Large, same canonical populations/HGB scores as A3+HGB; not SAML-D",
+  "inference": {
+    "readout": "all_targets",
+    "seed_batch": 2048,
+    "fanout": [
+      50,
+      50
+    ],
+    "graph": "original split-end cumulative graph",
+    "validation_graph_end": "2022-10-13",
+    "test_graph_end": "2022-10-31",
+    "query_order": "separate whole-population uniform permutation in each scope",
+    "order_seed": 1000045,
+    "sampler_scope": "val",
+    "sampler_epoch": 0,
+    "sampler_index": "global index per scope; maintained across chunks and resumes",
+    "feature_cache": "lossless compact CUDA; CPU PyG sampler with one-batch prefetch",
+    "dtype": "float32",
+    "test_predictions": "reuse original full all_targets Test shards by original transaction ID; no Test resampling"
+  },
+  "limitations": [
+    "Multi epoch280 was selected using subsets of original Validation 2022-09-26 through 2022-10-13; fusion_fit and comparison Validation overlap that earlier selection period. This is exploratory reuse, not independent held-out stacking.",
+    "The original split-end cumulative graph includes later observed edges/nodes within its period. This is not causal transaction-time inference.",
+    "Both historical Test and Validation have already been examined in prior experiments; this is not a fresh unseen holdout claim.",
+    "A3 and Multi differ in graph, training, and selection protocols. Comparison measures existing systems and cannot isolate architecture effects."
+  ],
+  "salt_training_must_remain_paused": true
+}

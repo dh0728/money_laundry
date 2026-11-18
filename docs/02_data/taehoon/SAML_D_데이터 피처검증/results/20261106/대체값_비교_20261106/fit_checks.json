@@ -1,0 +1,5 @@
+{
+  "passed": true,
+  "checked_rows": 128,
+  "all_sparse_cells_use_train_median": true
+}

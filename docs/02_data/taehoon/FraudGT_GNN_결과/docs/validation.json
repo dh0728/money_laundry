@@ -1,0 +1,131 @@
+{
+  "status": "pass",
+  "utc": "2026-11-05T06:36:22.369764+00:00",
+  "scope": "portable package CPU smoke and historical artifact consistency; no full real-data retraining or GPU throughput benchmark",
+  "smoke": {
+    "status": "pass",
+    "backend": {
+      "status": "pass",
+      "python": "3.12.3",
+      "torch": "2.10.0+cu126",
+      "cuda": "12.6",
+      "torch_geometric": "2.8.0.post1",
+      "pyg_lib": "0.8.0+pt210cu126",
+      "native_sampler": "passed"
+    },
+    "readout_parity": [
+      "fraudgt_format",
+      "pe_fraudgt_format",
+      "multi_fraudgt_format"
+    ],
+    "AP_tie_check": "pass",
+    "accumulation_mean_check": "pass",
+    "variants": [
+      {
+        "variant": "fraudgt_format",
+        "epochs": 2,
+        "resume": "pass",
+        "val_rows": 108,
+        "test_rows": 108,
+        "replay": "pass"
+      },
+      {
+        "variant": "pe_fraudgt_format",
+        "epochs": 2,
+        "resume": "pass",
+        "val_rows": 108,
+        "test_rows": 108,
+        "replay": "pass"
+      },
+      {
+        "variant": "multi_fraudgt_format",
+        "epochs": 2,
+        "resume": "pass",
+        "val_rows": 108,
+        "test_rows": 108,
+        "replay": "pass"
+      }
+    ]
+  },
+  "notebooks": [
+    {
+      "file": "00_환경확인_입력캐시연결.ipynb",
+      "status": "pass",
+      "fresh_kernel": true,
+      "cells": 5,
+      "seconds": 8.54
+    },
+    {
+      "file": "01_기간그래프_실험설정.ipynb",
+      "status": "pass",
+      "fresh_kernel": true,
+      "cells": 6,
+      "seconds": 8.66
+    },
+    {
+      "file": "02_FraudGT_모델별학습.ipynb",
+      "status": "pass",
+      "fresh_kernel": true,
+      "cells": 4,
+      "seconds": 1.58
+    },
+    {
+      "file": "03_모델별_전체Val_Test_결과.ipynb",
+      "status": "pass",
+      "fresh_kernel": true,
+      "cells": 5,
+      "seconds": 1.56
+    },
+    {
+      "file": "04_합성데이터_스모크검증.ipynb",
+      "status": "pass",
+      "fresh_kernel": true,
+      "cells": 3,
+      "seconds": 12.18
+    }
+  ],
+  "notebook_execution_scope": "default flags: external data preparation, real training and full real evaluation disabled; notebook04 runs actual synthetic pipeline",
+  "historical_checkpoints": [
+    {
+      "variant": "fraudgt_format",
+      "selected_epoch": 280,
+      "historical_checkpoint_strict_load": "pass"
+    },
+    {
+      "variant": "pe_fraudgt_format",
+      "selected_epoch": 496,
+      "historical_checkpoint_strict_load": "pass"
+    },
+    {
+      "variant": "multi_fraudgt_format",
+      "selected_epoch": 280,
+      "historical_checkpoint_strict_load": "pass"
+    }
+  ],
+  "original_input_contract": {
+    "status": "pass",
+    "original_input_files_checked": 22,
+    "rows": 170426489,
+    "real_graph_built": false,
+    "large_input_content_fully_hashed": false
+  },
+  "aggregate_audit": {
+    "models": 3,
+    "test_rows_each": 33429507,
+    "confusion_counts_and_precision_recall_F1_recomputed": true,
+    "AP_source": "completed historical full-test result, not recomputed from original 33M logits in this task",
+    "best_epoch_matches_selection_history": true,
+    "history_rows": 1284
+  },
+  "public_files": {
+    "absolute_server_paths": false,
+    "individual_transaction_previews": false,
+    "data_or_weights": false
+  },
+  "commands": [
+    "python run.py environment",
+    "python run.py smoke",
+    "fresh-kernel execution of all five notebooks"
+  ],
+  "cuda_execution_in_this_handoff": false
+}

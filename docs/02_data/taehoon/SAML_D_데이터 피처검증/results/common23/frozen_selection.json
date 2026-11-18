@@ -1,0 +1,7 @@
+{
+  "checkpoint_sha256": "d48f114e13d0f7c214021efadb12ae6c3af08537873e3ebcafda2898a78cdb4e",
+  "selected_epoch": 280,
+  "selection": "HI validation F1 only",
+  "plan_sha256": "bc2bc9533760c677677db499bb735a4ad6078da63f1d5003dcc8b2cf5ebe41a8",
+  "code_manifest_sha256": "2351df69e7d67d6cf2db1ee69e0535e9b772c5c3b898c6da765d165bc7bc63ca"
+}

@@ -1,0 +1,3 @@
+{"split": "train", "rows": 2010061, "positive": 3237, "frozen_AP": 0.0024601327718055946, "frozen_AUC": 0.6078095487840223, "retrained_AP": 0.5974457372354349, "retrained_AUC": 0.9970286728454215}
+{"split": "val", "rows": 504627, "positive": 671, "frozen_AP": 0.002565313555840136, "frozen_AUC": 0.6600947003286155, "retrained_AP": 0.35799609483120026, "retrained_AUC": 0.969887417666475}
+{"split": "test", "rows": 514482, "positive": 733, "frozen_AP": 0.003475400390778258, "frozen_AUC": 0.7108492859794309, "retrained_AP": 0.3472068490332555, "retrained_AUC": 0.977368177070198}

@@ -1,0 +1,308 @@
+{
+  "created_utc": "2026-11-09T02:23:16.696566+00:00",
+  "name": "Multi-FraudGT common 23 features, trained from scratch on HI-Large",
+  "hypothesis": "Removing attributes systematically unavailable on SAML during both training and inference improves external ranking and/or reduces false alarms.",
+  "features": {
+    "original_types": 34,
+    "retained_types": 23,
+    "removed_types": 11,
+    "removed_fraction": 0.3235294117647059,
+    "node_features": [
+      "log_out_count",
+      "log_in_count",
+      "log_out_neighbors",
+      "log_in_neighbors",
+      "log_self_count",
+      "log_reciprocal_neighbors",
+      "mean_paid_currency_z",
+      "paid_outlier_fraction",
+      "log_currency_count",
+      "log_active_days"
+    ],
+    "numeric_edge_features": [
+      "pair_prior_count",
+      "pair_gap_minutes",
+      "pair_count_1h",
+      "sender_gap_minutes",
+      "sender_count_1h",
+      "receiver_gap_minutes",
+      "receiver_count_1h",
+      "paid_currency_z",
+      "reverse_history_count",
+      "pair_age_at_day_start",
+      "same_currency",
+      "is_self_transfer"
+    ],
+    "payment_encoding": "Unchanged HI 7 categories plus Unknown, 8 one-hot columns; Debit card/Cross-border remain Unknown",
+    "node_tensor_columns": 11,
+    "edge_tensor_columns_without_port": 20,
+    "port_columns_per_relation": 1,
+    "node_keep": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      19
+    ],
+    "edge_keep": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21
+    ],
+    "removed": [
+      "type_Corporation",
+      "type_Partnership",
+      "type_Sole Proprietorship",
+      "type_Individual",
+      "type_Country",
+      "type_Direct",
+      "log_entity_observed_accounts",
+      "log_entity_out_diversity",
+      "log_entity_in_diversity",
+      "same_known_country",
+      "both_countries_known"
+    ]
+  },
+  "training": {
+    "graph_mode": "shared",
+    "seed": 42,
+    "epochs": 500,
+    "seed_batch": 2048,
+    "iterations_per_epoch": 256,
+    "validation_batches": 256,
+    "batch_accumulation": 8,
+    "positive_weight": 6.0,
+    "base_lr": 0.001,
+    "weight_decay": 1e-05,
+    "warmup_epochs": 5,
+    "gradient_clip": 1.0,
+    "eval_period": 4,
+    "reference_microbatch": 64,
+    "readout": "official",
+    "loader_workers": 0,
+    "torch_threads": 2,
+    "checkpoint_layers": true,
+    "extra_epoch_validation": false
+  },
+  "completed_epoch_budget": 284,
+  "lr_schedule_horizon": 500,
+  "initialization": "Fresh seed42 original initializer, then physically slice input encoder columns; retain same initial common/downstream weights and CPU RNG state. No trained checkpoint initialization.",
+  "selection": "Highest HI Validation official-readout F1 at p>0.5 among epochs 1,4,8,...,284; strict improvement, same as baseline",
+  "splits": {
+    "train": {
+      "first_day": 0,
+      "last_day": 55,
+      "rows": 102505233,
+      "start": "2022-08-01",
+      "end": "2022-09-25"
+    },
+    "val": {
+      "first_day": 56,
+      "last_day": 73,
+      "rows": 34491749,
+      "start": "2022-09-26",
+      "end": "2022-10-13"
+    },
+    "test": {
+      "first_day": 74,
+      "last_day": 91,
+      "rows": 33429507,
+      "start": "2022-10-14",
+      "end": "2022-10-31"
+    }
+  },
+  "final_evaluation": {
+    "primary_threshold_probability": 0.5,
+    "positive_rule": "logit > 0",
+    "readout": "all_targets",
+    "hi_test_rows": 33429507,
+    "saml_rows": 9504852,
+    "saml_positive": 9873,
+    "graph": "Same native split-end cumulative HI graph and full-period SAML graph as the archived baseline",
+    "sampling": "Same PyG shared2048, fanout[50,50], uniform without replacement, forward and reverse; same original order and global sampler index",
+    "hi_test_order": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_fulltest_stop284_20261102/ordered_test_ids.npy",
+    "saml_order": "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/order.npy",
+    "baseline_hi_scores": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/chunks",
+    "baseline_saml_scores": "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/logits.npy",
+    "metrics": [
+      "AP",
+      "ROC_AUC",
+      "precision",
+      "recall",
+      "F1",
+      "FP",
+      "FPR",
+      "TP",
+      "FN",
+      "TN",
+      "SAML pattern recall/FPR"
+    ]
+  },
+  "execution": {
+    "gpu_memory_fraction": 0.9,
+    "lossless_cuda_feature_lookup": true,
+    "training_sampler_prefetch": false,
+    "optimizer_boundary_checkpoint_every_batches": 8,
+    "salt_stays_paused": true
+  },
+  "preserved": {
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/models/multi_fraudgt_format/best.pt": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/protocol.json": "bb5ff044498d678752dd79e72fbaf43a7dd9c201254007ecb6c55558040a9114",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/models/multi_fraudgt_format/history.json": "ff059b3a3d6306de3c8d4f55aea3a0f51e2b6d689c60dff6e524de3c1105f2c0",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/request.json": "5b1e07911d00e3dae7c2ddc402377e3d12e286bce2ebbfed8a80bea023db5c14",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/result.json": "d26c6ca9d05a104a901a77ed62d54dcd7a9cf9391d5bb99e12ccb37cc451f002",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/result.json": "c7c78e645b7bbe2e0c2e731fe732fea1aa72d66a8cc78ee95747da3402502353",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/protocol.json": "c5f0e4befa414810c8df7049760f4170f779accc6ecf024b80ac0bd844c04d34",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/complete.json": "c1e5e19c1cf74508e00b26ee379d25f0d6a27af66767834044f199ec42cb9749",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/protocol.json": "03a10f20f1dc5b5a4d0c03350f087f3119c7e0c26463829bab5d436b5160d0ff",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/code_manifest.json": "852d3933946654281e58defd0479887cd6e3c97089151115dbbf0e56f18ed9c5",
+    "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/runs/daily_close_001/models/A1/last.pt": "1b6282779abc79db1b7a1cc64ae8d0a8ed869ad3fa380de4fb0a242e2930c51d",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/project/experiments/v10_daily_fixed_20261024/input_contract.json": "39b5b3ae5d64884e2db051d7503c76c42bdd9f17b8950994dd947574c3c0da4f"
+  },
+  "input_file_stats": {
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/val_ids.npy": {
+      "bytes": 137967124,
+      "mtime_ns": 1793086235261983680
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/test_ids.npy": {
+      "bytes": 133718156,
+      "mtime_ns": 1793086235827039417
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/positive_classes.npy": {
+      "bytes": 188803,
+      "mtime_ns": 1793086312208575502
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/train_ids.npy": {
+      "bytes": 410021060,
+      "mtime_ns": 1793086234662924590
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/positive_ids.npy": {
+      "bytes": 1509528,
+      "mtime_ns": 1793086312207575403
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/orders/train_seed42_cycle0.npy": {
+      "bytes": 410021060,
+      "mtime_ns": 1793088658202168721
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/orders/train_seed42_cycle1.npy": {
+      "bytes": 410021060,
+      "mtime_ns": 1793176747102650609
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/orders/train_seed42_cycle2.npy": {
+      "bytes": 410021060,
+      "mtime_ns": 1793245261529922436
+    },
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_fulltest_stop284_20261102/ordered_test_ids.npy": {
+      "bytes": 133718156,
+      "mtime_ns": 1793612208362112369
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/order.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1793940810982126317
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/logits.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1793941670482790413
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/labels.npy": {
+      "bytes": 9504980,
+      "mtime_ns": 1793940810505087113
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/edge22.npy": {
+      "bytes": 836427104,
+      "mtime_ns": 1793940801960384896
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/incoming_ports.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1793940804504593983
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/incoming_row.npy": {
+      "bytes": 76038944,
+      "mtime_ns": 1793940804324579189
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/nodes19.npy": {
+      "bytes": 65015088,
+      "mtime_ns": 1793940807968878683
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/outgoing_ports.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1793940807095806933
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/outgoing_row.npy": {
+      "bytes": 76038944,
+      "mtime_ns": 1793940806894790413
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_saml_generalization_20261025/cache/X.npy": {
+      "bytes": 2699378096,
+      "mtime_ns": 1792892371535319038
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_saml_generalization_20261025/cache/truth.parquet": {
+      "bytes": 13711618,
+      "mtime_ns": 1792892167413141234
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_saml_generalization_20261025/cache/observations.parquet": {
+      "bytes": 132311527,
+      "mtime_ns": 1792892166743074998
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/src.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1792909318011956551
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/dst.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1792909318031958527
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/minute.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1792909318050960403
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/incoming_time_offsets.npy": {
+      "bytes": 6843816,
+      "mtime_ns": 1792909320298182356
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/incoming_time_ids.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1792909320221174750
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/outgoing_time_offsets.npy": {
+      "bytes": 6843816,
+      "mtime_ns": 1792909322457395617
+    },
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/cache/saml/outgoing_time_ids.npy": {
+      "bytes": 38019536,
+      "mtime_ns": 1792909322372387220
+    }
+  },
+  "limitations": [
+    "One seed and a reduced input parameter count; this is evidence about dependence on unavailable features, not a full causal decomposition.",
+    "HI and SAML have already been inspected. Results are exploratory and are not a pristine unseen-holdout claim.",
+    "Payment schema, pattern distribution, observation horizon and graph differences remain. Improvement cannot establish missingness as the only cause.",
+    "Original 284 completed epochs used a 500-epoch cosine horizon; matching 284 epochs must not compress that horizon.",
+    "Native split-end graphs contain later observed transactions within each period; this is not real-time causal scoring."
+  ],
+  "saml_labels_used_for_training_or_selection": false,
+  "test_used_for_selection": false
+}

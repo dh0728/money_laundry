@@ -1,0 +1,7 @@
+# Original full-graph experiments additionally used these versions.
+# Install the appropriate CUDA wheel and PyG native extensions for your hardware.
+# torch==2.10.0+cu126
+# torch-geometric==2.8.0.post1
+# pyg-lib / torch-scatter / torch-sparse matched to the torch/CUDA ABI
+pyarrow>=18,<25
+# gcc / CUDA toolkit are required for .c/.cu graph kernels.

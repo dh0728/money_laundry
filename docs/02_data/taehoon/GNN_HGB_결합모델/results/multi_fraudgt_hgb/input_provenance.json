@@ -1,0 +1,11 @@
+{
+  "utc": "2026-11-08T11:24:19.826293+00:00",
+  "plan_sha256": "57d34ba0f6faf621c33d64e500803f9153dba226513e1127f2fc9a8384df83d3",
+  "code_manifest_sha256": "e62ede90aeee3b01fe98132cce4da398238482653ffd447be00baea5a0a72c0c",
+  "source_code": {
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/graph_runtime.py": "652a9785958302da54704c83022e617236d2bdb51edbb61c50de497f24fd85f1",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/common.py": "162113e501ce21af5f3dbe685c4191c8639689aa9026118cab2012ce00038984"
+  },
+  "graph_root": "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_gnn_verify_20261025",
+  "feature_root": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/cache/gnn"
+}

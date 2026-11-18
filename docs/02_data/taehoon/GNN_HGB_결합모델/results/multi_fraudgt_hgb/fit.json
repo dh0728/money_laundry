@@ -1,0 +1,34 @@
+{
+  "rows": 7315599,
+  "positives": 9637,
+  "seconds": 7.3626519944518805,
+  "iterations": [
+    22
+  ],
+  "coefficients": [
+    [
+      1.8922219439813746,
+      1.4830810031519177
+    ]
+  ],
+  "intercept": [
+    -13.709453887374266
+  ],
+  "scaler_mean": [
+    -13.472869605413308,
+    -11.93543551526449
+  ],
+  "scaler_scale": [
+    2.807821016193249,
+    4.22596018093033
+  ],
+  "unscaled_coefficients": [
+    0.673911169219321,
+    0.3509453330498308
+  ],
+  "unscaled_intercept": -0.44125118685145637,
+  "serialization_parity": true,
+  "converged": true,
+  "class_weight": null,
+  "sample_weight": null
+}

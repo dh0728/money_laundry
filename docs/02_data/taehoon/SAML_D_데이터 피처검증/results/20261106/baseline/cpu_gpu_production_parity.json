@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "chunk": "00000000.npz",
+      "rows": 65536,
+      "max_abs_logit_error": 2.9802322387695312e-06
+    },
+    {
+      "chunk": "00065536.npz",
+      "rows": 65536,
+      "max_abs_logit_error": 2.86102294921875e-06
+    },
+    {
+      "chunk": "00131072.npz",
+      "rows": 65536,
+      "max_abs_logit_error": 3.337860107421875e-06
+    }
+  ],
+  "rows": 196608,
+  "meaning": "Same seed2048 batches and target order; CPU reference vs CUDA lookup + sampler prefetch"
+}

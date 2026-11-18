@@ -1,0 +1,29 @@
+{
+  "fusion_fit": {
+    "rows": 7315599,
+    "positive": 9637,
+    "known": 5724,
+    "unmatched": 3913,
+    "day_min": 65,
+    "day_max": 68,
+    "date_membership_and_unique_ids_verified": true
+  },
+  "validation": {
+    "rows": 8551015,
+    "positive": 12173,
+    "known": 7236,
+    "unmatched": 4937,
+    "day_min": 69,
+    "day_max": 73,
+    "date_membership_and_unique_ids_verified": true
+  },
+  "test": {
+    "rows": 33429507,
+    "positive": 44103,
+    "known": 25896,
+    "unmatched": 18207,
+    "day_min": 74,
+    "day_max": 91,
+    "date_membership_and_unique_ids_verified": true
+  }
+}

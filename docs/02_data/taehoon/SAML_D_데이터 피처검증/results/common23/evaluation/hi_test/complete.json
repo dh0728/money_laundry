@@ -1,0 +1,51 @@
+{
+  "status": "complete",
+  "utc": "2026-11-09T22:22:44.299379+00:00",
+  "selection": {
+    "checkpoint_sha256": "d48f114e13d0f7c214021efadb12ae6c3af08537873e3ebcafda2898a78cdb4e",
+    "selected_epoch": 280,
+    "selection": "HI validation F1 only",
+    "plan_sha256": "bc2bc9533760c677677db499bb735a4ad6078da63f1d5003dcc8b2cf5ebe41a8",
+    "code_manifest_sha256": "2351df69e7d67d6cf2db1ee69e0535e9b772c5c3b898c6da765d165bc7bc63ca"
+  },
+  "coverage": 1.0,
+  "scored": 33429507,
+  "scores_sha256": "da5962a2862b929ef5792fcd0265411835661e93410e313619735b141b63cc99",
+  "request_sha256": "9c6a1900fe41ac9104e36c94d76540c81bcc1ee71a0d07ca7a60eed8cd8de727",
+  "metrics": {
+    "rows": 33429507,
+    "positive": 44103,
+    "normal": 33385404,
+    "coverage": 1.0,
+    "TP": 25343,
+    "FP": 3174,
+    "FN": 18760,
+    "TN": 33382230,
+    "precision": 0.8886979696321492,
+    "recall": 0.5746321111942498,
+    "F1": 0.6979619939410631,
+    "AP": 0.6616553213824542,
+    "ROC_AUC": 0.9917294206835491,
+    "FPR": 9.507148692883872e-05,
+    "threshold_probability": 0.5,
+    "threshold_rule": "logit > 0"
+  },
+  "baseline": {
+    "rows": 33429507,
+    "positive": 44103,
+    "normal": 33385404,
+    "coverage": 1.0,
+    "TP": 25483,
+    "FP": 3078,
+    "FN": 18620,
+    "TN": 33382326,
+    "precision": 0.8922306641924302,
+    "recall": 0.5778064984241434,
+    "F1": 0.7013927116591434,
+    "AP": 0.6687875213029661,
+    "ROC_AUC": 0.992310467314612,
+    "FPR": 9.21959788175695e-05,
+    "threshold_probability": 0.5,
+    "threshold_rule": "logit > 0"
+  }
+}

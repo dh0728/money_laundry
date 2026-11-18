@@ -1,0 +1,27 @@
+{
+  "input_order": [
+    "hgb_corrected_logit",
+    "gnn_raw_logit"
+  ],
+  "scaler_mean": [
+    -13.472869605413308,
+    -11.93543551526449
+  ],
+  "scaler_scale": [
+    2.807821016193249,
+    4.22596018093033
+  ],
+  "coefficients": [
+    1.8922219439813746,
+    1.4830810031519177
+  ],
+  "intercept": -13.709453887374266,
+  "raw_coefficients": [
+    0.673911169219321,
+    0.3509453330498308
+  ],
+  "raw_intercept": -0.44125118685145637,
+  "random_state": 20261108,
+  "source_fit_sha256": "b4a39ce2ffa5e1b543f07ca5d131fd2ce8a1e6d82809ea5e6171ad05ed9f335e",
+  "source_fusion_joblib_sha256": "735f1ba23ff0308945ab63f7b194dc74d6c95559e687878075fef2f726304681"
+}

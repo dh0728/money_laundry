@@ -1,0 +1,107 @@
+{
+  "all_passed": true,
+  "utc": "2026-11-08T13:25:21.180377+00:00",
+  "checks": [
+    {
+      "scope": "test",
+      "model": "multi",
+      "rows": 33429507,
+      "thresholds": 106,
+      "independent_scans": [
+        0.0,
+        0.05,
+        0.1,
+        0.2,
+        0.3,
+        0.5,
+        0.9,
+        1.0,
+        0.19499784398798747,
+        0.26335382902414334
+      ],
+      "original_default_and_val_threshold_reproduced": true,
+      "counts_monotonic": true,
+      "full_coverage": true
+    },
+    {
+      "scope": "test",
+      "model": "salt",
+      "rows": 33429507,
+      "thresholds": 106,
+      "independent_scans": [
+        0.0,
+        0.05,
+        0.1,
+        0.2,
+        0.3,
+        0.5,
+        0.9,
+        1.0,
+        0.19499784398798747,
+        0.26335382902414334
+      ],
+      "original_default_and_val_threshold_reproduced": true,
+      "counts_monotonic": true,
+      "full_coverage": true
+    },
+    {
+      "scope": "validation",
+      "model": "multi",
+      "rows": 8551015,
+      "thresholds": 106,
+      "independent_scans": [
+        0.0,
+        0.05,
+        0.1,
+        0.2,
+        0.3,
+        0.5,
+        0.9,
+        1.0,
+        0.19499784398798747,
+        0.26335382902414334
+      ],
+      "original_default_and_val_threshold_reproduced": true,
+      "counts_monotonic": true,
+      "full_coverage": true
+    },
+    {
+      "scope": "validation",
+      "model": "salt",
+      "rows": 8551015,
+      "thresholds": 106,
+      "independent_scans": [
+        0.0,
+        0.05,
+        0.1,
+        0.2,
+        0.3,
+        0.5,
+        0.9,
+        1.0,
+        0.19499784398798747,
+        0.26335382902414334
+      ],
+      "original_default_and_val_threshold_reproduced": true,
+      "counts_monotonic": true,
+      "full_coverage": true
+    }
+  ],
+  "identical_population_ids_and_labels": true,
+  "original_files_unchanged": true,
+  "salt_still_paused": true,
+  "models_not_refit": true,
+  "thresholds_not_reselected": true,
+  "code_sha256": {
+    "compare.py": "410300eb08033a99356bf8a0f6f5de98123071ef85f69649933bfd785276a5f0",
+    "viewer_template.html": "5740930dd4b93de34d14b75e75b4a4fb4eebbe263d03dd2354a4c71915422003"
+  },
+  "outputs": {
+    "두모델_임계값비교.html": "88080b63e873c1048a0c05ca277851f5ab705e89c096c143ef1c4178ff1778aa",
+    "Test_임계값비교.png": "596d0baca5304ab0e4fdefec3a0269779934bd368e25c44f2f819e5bacb73406",
+    "기본값_검증선택값_비교.csv": "8a1e6bfc38bf6fc8ae11c3e8ccaa7705951b969bab282f51836b65802676e8fd",
+    "임계값별_나란히비교.csv": "726ce922f2d8991470e196a617a35274c70841597f06efde5ff7042b1ec340f2",
+    "Test_임계값비교.svg": "3d852e2634397da4327d5557b16211a830e3fc2e2816a920a3d90118bc04d037",
+    "임계값별_전체지표.csv": "7183301510fe89e17df4efc0ef1c188d161f02f7ee9c6d5ebad19e7bb861fe3f"
+  }
+}

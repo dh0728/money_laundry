@@ -1,0 +1,8 @@
+# Install PyTorch and pyg-lib first; see README for matching CUDA wheels.
+numpy==2.4.1
+torch-geometric==2.8.0.post1
+pandas==3.0.3
+tqdm>=4.66
+nbformat>=5.10
+nbclient>=0.10
+ipykernel>=6

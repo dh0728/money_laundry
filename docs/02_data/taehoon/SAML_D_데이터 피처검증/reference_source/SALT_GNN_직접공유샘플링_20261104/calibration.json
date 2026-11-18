@@ -1,0 +1,13 @@
+{
+  "delta": [
+    2.4758097050853167,
+    2.386050081142177
+  ],
+  "calibration_date": "2022-09-25",
+  "active_accounts": 2100893,
+  "original_transaction_count": 102505233,
+  "zero_degree_in_each_direction_included": true,
+  "normalization": "mean log1p original degree over active account union at training graph close",
+  "fit_scope": "training graph only; no Monitor/Val/Test",
+  "daily_graph_cutoff_unchanged": true
+}

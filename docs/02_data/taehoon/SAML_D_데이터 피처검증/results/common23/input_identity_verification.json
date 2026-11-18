@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "utc": "2026-11-09T02:30:12.369421+00:00",
+  "verified_against": "Original frozen HI evaluation request and SAML cache/result manifests",
+  "files": {
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_fulltest_stop284_20261102/ordered_test_ids.npy": "66903a6e48c13f76bdf60c85457a3efbfcd78dc3d709b458fdab72f38f4db72f",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/order.npy": "bc59e9fcf06a3c992d3a57afd870e14131af801be15874f3afb579d3335c0ae5",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/labels.npy": "80b00cb27cc2283bb3daf9027aef3debef9cc36127a4bf6fb94314ba50e68794",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/edge22.npy": "974bb102472e8d32bebb0f6f9550a480aa6bb0c09945e513259802048e5157b5",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/nodes19.npy": "38cc4363834b3f08399981079dcb5a65844feec47699d604461994ee6eed2748",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/incoming_ports.npy": "33774fc301e25f8f11cf2608ada370b4cc60511dfacf9f6b479750143f96b8f8",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/outgoing_ports.npy": "aa54e43827662502afb4f4e57e616e5f7baaf391eba18dfb2aaebc36a8aed8e6",
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/logits.npy": "1ecc57601e567a76f509daee89399e4dbe37f1c4e07cdddc187b1df5780fe042"
+  }
+}

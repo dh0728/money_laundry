@@ -1,0 +1,923 @@
+{
+  "version": "salt-daily-direct-shared-equivalent-v1",
+  "created_utc": "2026-11-04T01:22:11.699136+00:00",
+  "authorized_date": "2026-11-04",
+  "source_plan": "/workspace/handoff/SALT_GNN_논문분석_실험계획_20261029/daily_close_protocol_plan.json",
+  "splits": {
+    "calibration": [
+      "2022-08-01",
+      "2022-08-07"
+    ],
+    "train": [
+      "2022-08-08",
+      "2022-09-25"
+    ],
+    "monitor": [
+      "2022-09-26",
+      "2022-10-04"
+    ],
+    "fusion_fit": [
+      "2022-10-05",
+      "2022-10-08"
+    ],
+    "validation": [
+      "2022-10-09",
+      "2022-10-13"
+    ],
+    "test": [
+      "2022-10-14",
+      "2022-10-31"
+    ]
+  },
+  "inputs": {
+    "node_features": [
+      "log_out_count",
+      "log_in_count",
+      "log_out_neighbors",
+      "log_in_neighbors",
+      "log_self_count",
+      "log_reciprocal_neighbors",
+      "mean_paid_currency_z",
+      "paid_outlier_fraction",
+      "log_currency_count",
+      "log_active_days",
+      "type_Corporation",
+      "type_Partnership",
+      "type_Sole Proprietorship",
+      "type_Individual",
+      "type_Country",
+      "type_Direct",
+      "log_entity_observed_accounts",
+      "log_entity_out_diversity",
+      "log_entity_in_diversity"
+    ],
+    "edge_features": [
+      "pair_prior_count",
+      "pair_gap_minutes",
+      "pair_count_1h",
+      "sender_gap_minutes",
+      "sender_count_1h",
+      "receiver_gap_minutes",
+      "receiver_count_1h",
+      "paid_currency_z",
+      "reverse_history_count",
+      "pair_age_at_day_start",
+      "same_known_country",
+      "both_countries_known",
+      "same_currency",
+      "is_self_transfer"
+    ],
+    "business_features": 34,
+    "ego_indicator": true,
+    "payment_format_input": true,
+    "payment_format_names": [
+      "ACH",
+      "Bitcoin",
+      "Cash",
+      "Cheque",
+      "Credit Card",
+      "Reinvestment",
+      "Wire",
+      "Unknown"
+    ],
+    "payment_format_encoding": "one-hot, 8 columns; invalid codes use Unknown",
+    "port_numbering": true,
+    "structural_features": [
+      "in_port",
+      "out_port"
+    ],
+    "port_encoding": "raw float32, zero-based first distinct counterpart order by (minute, edge_id); immutable historical ranks",
+    "edge_tensor_columns": 24
+  },
+  "cohorts": {
+    "train_gnn": {
+      "rows": 87572226,
+      "min_day": 7,
+      "max_day": 55,
+      "positive": 94309,
+      "unmatched": 41206,
+      "spans": [
+        {
+          "day": 7,
+          "start": 0,
+          "stop": 1928372
+        },
+        {
+          "day": 8,
+          "start": 1928372,
+          "stop": 3857193
+        },
+        {
+          "day": 9,
+          "start": 3857193,
+          "stop": 5784819
+        },
+        {
+          "day": 10,
+          "start": 5784819,
+          "stop": 7713960
+        },
+        {
+          "day": 11,
+          "start": 7713960,
+          "stop": 10335658
+        },
+        {
+          "day": 12,
+          "start": 10335658,
+          "stop": 11165578
+        },
+        {
+          "day": 13,
+          "start": 11165578,
+          "stop": 11996128
+        },
+        {
+          "day": 14,
+          "start": 11996128,
+          "stop": 13925035
+        },
+        {
+          "day": 15,
+          "start": 13925035,
+          "stop": 15855192
+        },
+        {
+          "day": 16,
+          "start": 15855192,
+          "stop": 17784433
+        },
+        {
+          "day": 17,
+          "start": 17784433,
+          "stop": 19714157
+        },
+        {
+          "day": 18,
+          "start": 19714157,
+          "stop": 22733156
+        },
+        {
+          "day": 19,
+          "start": 22733156,
+          "stop": 23561631
+        },
+        {
+          "day": 20,
+          "start": 23561631,
+          "stop": 24392430
+        },
+        {
+          "day": 21,
+          "start": 24392430,
+          "stop": 26320858
+        },
+        {
+          "day": 22,
+          "start": 26320858,
+          "stop": 28249566
+        },
+        {
+          "day": 23,
+          "start": 28249566,
+          "stop": 30179308
+        },
+        {
+          "day": 24,
+          "start": 30179308,
+          "stop": 32108340
+        },
+        {
+          "day": 25,
+          "start": 32108340,
+          "stop": 34729572
+        },
+        {
+          "day": 26,
+          "start": 34729572,
+          "stop": 35558469
+        },
+        {
+          "day": 27,
+          "start": 35558469,
+          "stop": 36386788
+        },
+        {
+          "day": 28,
+          "start": 36386788,
+          "stop": 38314540
+        },
+        {
+          "day": 29,
+          "start": 38314540,
+          "stop": 40244117
+        },
+        {
+          "day": 30,
+          "start": 40244117,
+          "stop": 44535079
+        },
+        {
+          "day": 31,
+          "start": 44535079,
+          "stop": 46466099
+        },
+        {
+          "day": 32,
+          "start": 46466099,
+          "stop": 49487989
+        },
+        {
+          "day": 33,
+          "start": 49487989,
+          "stop": 50320017
+        },
+        {
+          "day": 34,
+          "start": 50320017,
+          "stop": 51151465
+        },
+        {
+          "day": 35,
+          "start": 51151465,
+          "stop": 53081978
+        },
+        {
+          "day": 36,
+          "start": 53081978,
+          "stop": 55014924
+        },
+        {
+          "day": 37,
+          "start": 55014924,
+          "stop": 56946026
+        },
+        {
+          "day": 38,
+          "start": 56946026,
+          "stop": 58877709
+        },
+        {
+          "day": 39,
+          "start": 58877709,
+          "stop": 61500672
+        },
+        {
+          "day": 40,
+          "start": 61500672,
+          "stop": 62333378
+        },
+        {
+          "day": 41,
+          "start": 62333378,
+          "stop": 63165290
+        },
+        {
+          "day": 42,
+          "start": 63165290,
+          "stop": 65096514
+        },
+        {
+          "day": 43,
+          "start": 65096514,
+          "stop": 67026785
+        },
+        {
+          "day": 44,
+          "start": 67026785,
+          "stop": 68956650
+        },
+        {
+          "day": 45,
+          "start": 68956650,
+          "stop": 70887155
+        },
+        {
+          "day": 46,
+          "start": 70887155,
+          "stop": 73909004
+        },
+        {
+          "day": 47,
+          "start": 73909004,
+          "stop": 74738980
+        },
+        {
+          "day": 48,
+          "start": 74738980,
+          "stop": 75568330
+        },
+        {
+          "day": 49,
+          "start": 75568330,
+          "stop": 77498342
+        },
+        {
+          "day": 50,
+          "start": 77498342,
+          "stop": 79428008
+        },
+        {
+          "day": 51,
+          "start": 79428008,
+          "stop": 81358017
+        },
+        {
+          "day": 52,
+          "start": 81358017,
+          "stop": 83286264
+        },
+        {
+          "day": 53,
+          "start": 83286264,
+          "stop": 85909553
+        },
+        {
+          "day": 54,
+          "start": 85909553,
+          "stop": 86740478
+        },
+        {
+          "day": 55,
+          "start": 86740478,
+          "stop": 87572226
+        }
+      ],
+      "normal": 87477917,
+      "files": {
+        "train_gnn_ids.npy": "11da4dd4ac52f856eb44c190b4a178be8976c60dade649acc540404d75727a96",
+        "train_gnn_labels.npy": "0c6d1ab793001c6c2763897e97bae2e1ad3934fe6753ca86fc860a712f33e2bc"
+      }
+    },
+    "monitor": {
+      "rows": 18625135,
+      "min_day": 56,
+      "max_day": 64,
+      "positive": 21247,
+      "unmatched": 8586,
+      "spans": [
+        {
+          "day": 56,
+          "start": 0,
+          "stop": 1930438
+        },
+        {
+          "day": 57,
+          "start": 1930438,
+          "stop": 3859903
+        },
+        {
+          "day": 58,
+          "start": 3859903,
+          "stop": 5789625
+        },
+        {
+          "day": 59,
+          "start": 5789625,
+          "stop": 7720296
+        },
+        {
+          "day": 60,
+          "start": 7720296,
+          "stop": 13099919
+        },
+        {
+          "day": 61,
+          "start": 13099919,
+          "stop": 13932034
+        },
+        {
+          "day": 62,
+          "start": 13932034,
+          "stop": 14764403
+        },
+        {
+          "day": 63,
+          "start": 14764403,
+          "stop": 16694542
+        },
+        {
+          "day": 64,
+          "start": 16694542,
+          "stop": 18625135
+        }
+      ],
+      "normal": 18603888,
+      "files": {
+        "monitor_ids.npy": "c49ae02b0d0b614d238c49f77edef904f6a37e931ce076f2eeca5679dfb71b1b",
+        "monitor_labels.npy": "067bac074651feae52c971b263744a8cab5aa33510b7c0441a5d3369fefeea00"
+      }
+    },
+    "validation": {
+      "rows": 8551015,
+      "min_day": 69,
+      "max_day": 73,
+      "positive": 12173,
+      "unmatched": 4937,
+      "spans": [
+        {
+          "day": 69,
+          "start": 0,
+          "stop": 832170
+        },
+        {
+          "day": 70,
+          "start": 832170,
+          "stop": 2762512
+        },
+        {
+          "day": 71,
+          "start": 2762512,
+          "stop": 4692126
+        },
+        {
+          "day": 72,
+          "start": 4692126,
+          "stop": 6621375
+        },
+        {
+          "day": 73,
+          "start": 6621375,
+          "stop": 8551015
+        }
+      ],
+      "normal": 8538842,
+      "files": {
+        "validation_ids.npy": "90aeb71e2d304454d139b1f92ab6cc1d5ba7cdcb1fac032786a4ed68d97491ed",
+        "validation_labels.npy": "93f6a8275bbe7ae2cb0e457cb333e01ef432365bdfa72414e930075f1dd8e130"
+      }
+    },
+    "test": {
+      "rows": 33429507,
+      "min_day": 74,
+      "max_day": 91,
+      "positive": 44103,
+      "unmatched": 18207,
+      "spans": [
+        {
+          "day": 74,
+          "start": 0,
+          "stop": 3019871
+        },
+        {
+          "day": 75,
+          "start": 3019871,
+          "stop": 3852403
+        },
+        {
+          "day": 76,
+          "start": 3852403,
+          "stop": 4685700
+        },
+        {
+          "day": 77,
+          "start": 4685700,
+          "stop": 6615089
+        },
+        {
+          "day": 78,
+          "start": 6615089,
+          "stop": 8544693
+        },
+        {
+          "day": 79,
+          "start": 8544693,
+          "stop": 10475624
+        },
+        {
+          "day": 80,
+          "start": 10475624,
+          "stop": 12404528
+        },
+        {
+          "day": 81,
+          "start": 12404528,
+          "stop": 15023961
+        },
+        {
+          "day": 82,
+          "start": 15023961,
+          "stop": 15854699
+        },
+        {
+          "day": 83,
+          "start": 15854699,
+          "stop": 16683939
+        },
+        {
+          "day": 84,
+          "start": 16683939,
+          "stop": 18612738
+        },
+        {
+          "day": 85,
+          "start": 18612738,
+          "stop": 20542355
+        },
+        {
+          "day": 86,
+          "start": 20542355,
+          "stop": 22473083
+        },
+        {
+          "day": 87,
+          "start": 22473083,
+          "stop": 24403058
+        },
+        {
+          "day": 88,
+          "start": 24403058,
+          "stop": 27419457
+        },
+        {
+          "day": 89,
+          "start": 27419457,
+          "stop": 28250008
+        },
+        {
+          "day": 90,
+          "start": 28250008,
+          "stop": 31493930
+        },
+        {
+          "day": 91,
+          "start": 31493930,
+          "stop": 33429507
+        }
+      ],
+      "normal": 33385404,
+      "files": {
+        "test_ids.npy": "fbf8c17d958d3e69ee3d00d6b194b80f121d132d75705b4b73752a26ee7937a7",
+        "test_labels.npy": "7c8560c0e4928ba103bbc679875d25511b460270f224fb1d0b64668a1fd55ece"
+      }
+    }
+  },
+  "graph": {
+    "batch_mode": "shared union of per-query sampled graphs within each GPU microbatch",
+    "context": "all observed transactions through target day close",
+    "directions": [
+      "incoming",
+      "outgoing"
+    ],
+    "hops": 2,
+    "other_minute_cap_per_node_direction": 100,
+    "all_target_minute_edges_at_each_hop": true,
+    "sampler": "CUDA two-hop expansion of unique (account, query-minute) states, same priority CSR and exact CPU graph union for identical target batches",
+    "parallel_transactions": "retain distinct edge IDs",
+    "labels_in_context": false,
+    "graph_independent_of_other_supervised_queries_required": false,
+    "ego_scope": "all supervised transaction endpoints in the shared microbatch",
+    "direction_flags": "bitwise OR across occurrences of the same transaction ID",
+    "post_union_fanout": "may exceed 100 per node/direction; cap100 applies to original per-query selection before union",
+    "target_batch_size": 4096,
+    "batch_membership_affects_prediction": true,
+    "sampler_backend": "cuda"
+  },
+  "degree": {
+    "primary_scaling_degree": "exact observed original transaction count per direction through target day close",
+    "statistics_over": "actually sampled messages",
+    "track": [
+      "context_degree",
+      "sampled_degree",
+      "unique_counterparties"
+    ],
+    "delta_window": [
+      "2022-08-01",
+      "2022-09-25"
+    ],
+    "delta_snapshot": "2022-09-25 training graph close",
+    "delta_population": "active account union in training graph; include zero degree per direction",
+    "delta_definition": "separate mean(log1p(in_degree)) and mean(log1p(out_degree)); freeze",
+    "delta_future_nodes_excluded": "Monitor/Val/Test-only nodes excluded; full Train statistics fitted once",
+    "synthetic_reverse_edges_in_original_degree": false,
+    "zero_degree_guard_required": true,
+    "project_choice_not_paper_reproduction": true
+  },
+  "architecture": {
+    "common_hidden": 20,
+    "heads": 2,
+    "layers": 2,
+    "activation": "ReLU",
+    "dropout": 0.083,
+    "common_input_projection": true,
+    "common_target_head": true,
+    "all_query_targets_scored": true,
+    "statistics": [
+      "mean",
+      "population_std",
+      "min",
+      "max"
+    ],
+    "scalers": [
+      "identity",
+      "amplification",
+      "attenuation"
+    ],
+    "fusion": "concat(previous,statistical,attention), MLP, average residual; feed fused state into next layer",
+    "models": {
+      "A0": "attention_only",
+      "A1": "statistics_only",
+      "A2": "prediction_time_fusion",
+      "A3": "layerwise_salt_trans"
+    },
+    "common_A0_is_not_claimed_identical_to_frozen_V10": true,
+    "parameter_equality_not_assumed": true,
+    "implementation_contract_to_freeze_before_training": [
+      "direction merge and root path",
+      "projection dimensions and MLP layers",
+      "normalization and exact residual placements in every control",
+      "edge conditioning and parallel-edge handling",
+      "self-loop policy and zero-degree branch",
+      "common head input width and target index mapping"
+    ],
+    "followup_controls": [
+      "attention with explicit same context-degree at each layer",
+      "attention parameter count within 5% of SALT",
+      "SALT without degree scalers",
+      "SALT using mean+std only"
+    ],
+    "implementation_contract": {
+      "hidden": 20,
+      "heads": 2,
+      "layers": 2,
+      "node_projection": "Linear20to20 + ReLU",
+      "attention": "per-direction TransformerConv20 with 2 heads, edge_dim24, root_weight=False, bias=False, coefficient dropout0",
+      "unused_pyg_skip_projection": "frozen; excluded from trainable parameter counts",
+      "statistics": "h_source + Linear(edge24to20); population mean/std/min/max; 3 degree scalers; concat h_destination; MLP260to20to20",
+      "direction_merge": "separate Linear40to20 for attention and statistics",
+      "fusion": "MLP concat(previous, available branches) to20to20; (previous+fusion)/2, then Dropout0.083",
+      "A2": "independent A0 and A1 towers, final MLP concat(initial,statistics,attention), residual average with initial",
+      "head": "Linear64to20, ReLU, Dropout0.288, Linear20to2; score=logit1-logit0",
+      "normalization": "none beyond structural degree scaling",
+      "self_loops": "no synthetic self loops; observed self transfers retained",
+      "std": "population centered second moment; guarded sqrt and zero std for zero variance",
+      "original_degree": "unscaled exact observed count, through query day close; sampled degrees separate"
+    },
+    "final_dropout": 0.288,
+    "output_classes": 2,
+    "dropout_placement": "hidden states after residual fusion; final hidden layer before two-class head",
+    "attention_coefficient_dropout": 0.0,
+    "edge_dim": 24
+  },
+  "training": {
+    "seed": 42,
+    "optimizer": "Adam",
+    "loss": "two-class weighted cross entropy; PyTorch weighted mean over logical batch",
+    "positive_weight": 7,
+    "sampling_weight_normalization": "none",
+    "full_train_population": 87572226,
+    "logical_batch": 8192,
+    "microbatch_max": 4096,
+    "max_edges_per_microbatch": 6000000,
+    "gradient_clip": 5,
+    "epochs_primary": 6,
+    "primary_early_stopping": false,
+    "learning_rates_primary": [
+      0.0012,
+      0.0012,
+      0.0012,
+      0.0012,
+      0.0012,
+      0.0012
+    ],
+    "targets_per_epoch": 87572226,
+    "targets_per_six_epochs": 525433356,
+    "checkpoint": "maximum unweighted full Monitor F1 at fixed probability >=0.5; earliest tie",
+    "seeds_final": [
+      42,
+      0,
+      1
+    ],
+    "representative_seed": 42,
+    "recipe_source": "SALT-Trans final hyperparameters; full targets, no IPW, daily-close HI-Large adapter",
+    "day_order": "ascending every epoch",
+    "day_boundary_batch_policy": "flush final shorter logical batch; never mix days",
+    "epochs_note": "6 is the retained initial pilot budget, not a paper epoch count; no claimed convergence",
+    "target_sampling": "none; all observed transactions in the Train date range",
+    "seeds_final_status": "planned only; initial run uses seed42",
+    "population_ipw": false,
+    "checkpoint_resume": "preserve model/Adam/RNG/target cursor; keep committed old-batch optimizer updates and count remaining new-batch updates separately",
+    "updates_per_full_epoch": 10714,
+    "gpu_batch_tuning": "Train-only 8192-target sweep followed by 32768-target repeats: micro4096 / logical8192 chosen for measured throughput across early and late Train days; edge cap6000000",
+    "cuda_memory_fraction": 0.9
+  },
+  "variants": [
+    "A3",
+    "A0",
+    "A1",
+    "A2"
+  ],
+  "evaluation": {
+    "monitor": "all observed Monitor transactions; no population/sample weights",
+    "candidate_selection": "full held-out Val F1; checkpoint selected on full Monitor only",
+    "full_validation_before_goal_claim": true,
+    "full_test_after_freeze": true,
+    "full_validation_rows": 8551015,
+    "full_historical_test_rows": 33429507,
+    "coverage": 1,
+    "no_test_tuning": true,
+    "no_best_seed_cherry_pick": true,
+    "degree_bins": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        10,
+        19
+      ],
+      [
+        20,
+        49
+      ],
+      [
+        50,
+        99
+      ],
+      [
+        100,
+        199
+      ],
+      [
+        200,
+        499
+      ],
+      [
+        500,
+        999
+      ],
+      [
+        1000,
+        null
+      ]
+    ],
+    "metrics": [
+      "precision",
+      "recall",
+      "F1",
+      "AP",
+      "known_pattern_recall",
+      "unmatched_recall",
+      "TP",
+      "FP",
+      "FN",
+      "TN",
+      "coverage",
+      "top_k"
+    ],
+    "one_global_threshold_for_all_subgroups": true,
+    "threshold_probability": 0.5,
+    "threshold_logit_difference": 0.0,
+    "threshold_search": false,
+    "checkpoint_selection_split": "monitor",
+    "validation_role": "full held-out comparison after Monitor checkpoint selection",
+    "degree_bins_status": "planned diagnostic; not emitted in this settings change",
+    "attention_diagnostics_status": "ENN/Hit@k not implemented",
+    "population_ipw": false,
+    "score_commit_targets": 8192,
+    "test_policy": "A3: completed Train/Monitor -> full Val -> per-variant checkpoint/Val freeze -> full Test, before A0 training. Others: full Val comparison and global freeze before Test. Reuse completed A3 Test; never select or tune using Test.",
+    "top_k_fractions": [
+      0.001,
+      0.005,
+      0.01
+    ],
+    "thresholds": [
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      1.0
+    ],
+    "independent_variants": [
+      "A3"
+    ],
+    "independent_validation_role": "A3 full Val is reported and locked with its Monitor-selected checkpoint; global model comparison still uses full Val only after other models finish"
+  },
+  "source_manifest": {
+    "/workspace/handoff/SALT_GNN_논문분석_실험계획_20261029/daily_close_protocol_plan.json": "d76c94ba37ce58702b3bdcbf0958ad30f12a8857f57561ad35ed7b98fa7fc4b9",
+    "/workspace/handoff/SALT_GNN.pdf": "084837dedf3d675441294e3edf1dfc44d16ef55e49b700ac6bade71feca12633",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/sampler.c": "bdb2d825b1eb330cb354f78e033025bedc06a5a5490c509a09de5dbc34ed34d5",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/graph_runtime.py": "652a9785958302da54704c83022e617236d2bdb51edbb61c50de497f24fd85f1",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_gnn_verify_20261025/common.py": "162113e501ce21af5f3dbe685c4191c8639689aa9026118cab2012ce00038984",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_daily_fixed_20261024/input_contract.json": "39b5b3ae5d64884e2db051d7503c76c42bdd9f17b8950994dd947574c3c0da4f",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/positive_ids.npy": "83bfea88df004d8f06b5505468f58ac539f4ce7a471d18f8eba740e41a7c0dc5",
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/assets/positive_classes.npy": "ed0fc8a34818892f26521ce6dd3b00ffc052884f4e9dba12b2beae5a36198e3b",
+    "/workspace/handoff/SALT_GNN_전체거래_일별배치_20261103/calibration.json": "c7c4b9e33f218c9e40245e7048bfb84f4740c5f9cd0e041b6daf8eea2fbc62e8",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_goal65_20261024/cache/gnn/fmt.npy": "4665c01d329382ead196230932f86a990e4242beef7e51394a828096382a0f39",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_fraudgt_compare_20261026/cache/incoming_ports.npy": "b2ab6ebe35460842da3e75d55cbb37f2e2cceceb39a6fc289e08e9d8017f03fc",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_fraudgt_compare_20261026/cache/outgoing_ports.npy": "1581417c39ba7475ec13748880f0374064c5d1cf64500beaddeefc561db2caf7",
+    "/workspace/handoff/SALT_GNN_payment_port_GPU확대_20261104/calibration.json": "c7c4b9e33f218c9e40245e7048bfb84f4740c5f9cd0e041b6daf8eea2fbc62e8",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_fraudgt_compare_20261026/fraudgt_lab/ports.py": "6c8bbc99ef5517904883a4f7a4eaae479cfe515ded9f02a305ac727c3a00bbc4",
+    "/workspace/kimi/Claude_GNN/final_model/experiments/v10_fraudgt_compare_20261026/fraudgt_lab/ports.c": "a418d16488491c70e5757253018f220ceee4f067890a0e44f8bfdc61b3943f4e"
+  },
+  "limitations": [
+    "Custom HI-Large inputs and daily-close adapter; not an exact HI-Small/Medium paper reproduction",
+    "Same-day later transactions may appear in the graph; D+1 and later excluded",
+    "Sampled message statistics do not equal full-neighborhood statistics",
+    "Single seed and six full-population epochs retained as initial budget, not a paper convergence claim",
+    "Bidirectional towers, heads=2 and dropout placement remain project choices",
+    "Degree normalization fitted on the full Train graph and frozen",
+    "Attention ENN/Hit@k diagnostic remains pending"
+  ],
+  "execution": {
+    "state": "paused_ready_after_validation",
+    "automatic_start": false,
+    "reuse_ipw_checkpoint": false,
+    "pipeline": [
+      "train_A3_full_monitor",
+      "A3_full_validation",
+      "freeze_A3_checkpoint_and_validation",
+      "A3_full_test",
+      "train_A0_A1_A2_full_monitor",
+      "remaining_full_validation",
+      "freeze_global_val_selection",
+      "remaining_full_test_reuse_A3"
+    ]
+  },
+  "parent_experiment": {
+    "root": "/workspace/handoff/SALT_GNN_논문설정_일별배치_20261103",
+    "protocol_sha256": "54271588cef49dbda8b765d945516c9adeaa92518f28ac14d8231c78f375bb40",
+    "fresh_training_required": "Full targets and no IPW changes the training recipe; old optimizer/checkpoints cannot resume here"
+  },
+  "paper_reference": {
+    "local_pdf": "/workspace/handoff/SALT_GNN.pdf",
+    "url": "https://arxiv.org/abs/2607.10131v1",
+    "recipe": "SALT-Trans HI final hyperparameter table",
+    "learning_rate_note": "Final table 0.0012; main descriptive paragraph says 0.001. Use final table.",
+    "official_exact_reproduction": false
+  },
+  "parent_protocol_sha256": "54271588cef49dbda8b765d945516c9adeaa92518f28ac14d8231c78f375bb40",
+  "population_manifest_sha256": "ca094e096fecab1a4ef2ae14fe090309f3c2c56676e21d77022bb68ad5dddfca",
+  "source_experiment": "/workspace/handoff/SALT_GNN_공유그래프_payment_port_20261104",
+  "change_scope": [
+    "execution only: batch-wide account/minute state deduplication; output graph arrays must match prior shared union exactly"
+  ],
+  "stochastic_note": "Sharing changes node neighborhoods, batch-wide Ego and dropout assignment; model outputs are not expected to equal disjoint outputs. Batch composition is part of the evaluation protocol.",
+  "execution_equivalence": {
+    "reference_root": "/workspace/handoff/SALT_GNN_공유그래프_payment_port_20261104",
+    "required": "all graph/input arrays byte-identical on same targets; CPU logits/model/Adam update byte-identical; CUDA repeat noise measured against unchanged sampler, no GPU bitwise guarantee",
+    "scientific_conditions_unchanged": true,
+    "same_minute_rule_preserved": true
+  },
+  "gpu_tuning_20261104": {
+    "directory": "tuning/gpu_batch_20261104_231058",
+    "previous_training": {
+      "microbatch_max": 128,
+      "logical_batch": 512,
+      "max_edges_per_microbatch": 640000,
+      "cuda_memory_fraction": 0.09
+    },
+    "resume_checkpoint_sha256": "33131c20cb09fb57a4c6dc91417591d220481ed9ebb55708039ea1b14d981601",
+    "resume_epoch_targets": 14566059,
+    "resume_optimizer_updates": 28453,
+    "batch_change_changes_trajectory": true,
+    "neighbor_selection_and_daily_cutoff_unchanged": true,
+    "benchmark_scope": "A3 Train days 15 and 55; 8192 timed targets per case after warmup; benchmark steps not committed to production",
+    "cpu_feature_gather_remains": true
+  },
+  "input_pipeline": {
+    "backend": "cuda",
+    "numeric_dtype": "float32; unchanged values",
+    "categorical_storage": "four binary fields plus payment code and validity bit in uint8",
+    "bytes_per_transaction": 49,
+    "feature_cache_gib": 7.7792552430182695,
+    "labels_cached": false,
+    "daily_node_and_degree_refresh": true,
+    "graph_and_features_stay_on_gpu": true,
+    "split_before_feature_gather": true,
+    "future_features_never_selected_before_daily_cutoff": true
+  },
+  "gpu_features_tuning_20261104": {
+    "directory": "tuning/gpu_features_20261104_233609",
+    "previous_training": {
+      "logical_batch": 4096,
+      "microbatch_max": 4096,
+      "max_edges_per_microbatch": 8000000,
+      "cuda_memory_fraction": 0.85
+    },
+    "resume_checkpoint_sha256": "e16601219becd972759bf89260002b449120eba4898b2faef0315b41da576518",
+    "feature_values_exact": true,
+    "neighbor_selection_and_daily_cutoff_unchanged": true,
+    "logical_batch_and_graph_split_change_training_trajectory": true,
+    "benchmark_scope": "Train days15/55 only; no benchmark updates committed"
+  },
+  "a3_independent_evaluation_20261105": {
+    "previous_test_policy": "freeze all variant checkpoints and Val choice before full Test; no Test tuning",
+    "training_conditions_unchanged": true,
+    "source_and_verification_directory": "/workspace/handoff/SALT_GNN_직접공유샘플링_20261104/repairs/a3_independent_eval_20261105_002700",
+    "change": "A3 final evaluation precedes other models; immutable per-variant checkpoint and validation guard; global comparison remains validation-only"
+  }
+}

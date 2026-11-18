@@ -1,0 +1,240 @@
+{
+  "status": "complete",
+  "utc": "2026-11-03T18:10:59.991212+00:00",
+  "variant": "multi_fraudgt_format",
+  "selected_epoch": 280,
+  "training_completed_epochs": 284,
+  "evaluation_scope": "all_test_targets",
+  "checkpoint_sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+  "protocol_sha256": "bb5ff044498d678752dd79e72fbaf43a7dd9c201254007ecb6c55558040a9114",
+  "request_sha256": "5b1e07911d00e3dae7c2ddc402377e3d12e286bce2ebbfed8a80bea023db5c14",
+  "test_population": {
+    "first_day": 74,
+    "last_day": 91,
+    "rows": 33429507,
+    "start": "2022-10-14",
+    "end": "2022-10-31"
+  },
+  "all_test_targets_requested": true,
+  "all_test_targets_scored": true,
+  "sampler_epoch": 0,
+  "threshold_probability": 0.5,
+  "positive_rule": "logit>0",
+  "conditional_metrics": {
+    "loss": 0.011261388631433842,
+    "accuracy_at_05": 0.9993509326954777,
+    "precision_at_05": 0.8922306641924302,
+    "recall_at_05": 0.5778064984241434,
+    "F1": 0.7013927116591434,
+    "AP": 0.6687875213029661,
+    "unmatched_recall_at_05": 0.0026363486571099027,
+    "known_recall_at_05": 0.9821980228606735,
+    "requested": 33429507,
+    "scored": 33429507,
+    "coverage": 1.0,
+    "requested_positive": 44103,
+    "scored_positive": 44103,
+    "requested_recall_lower_bound": 0.5778064984241434,
+    "requested_unmatched_recall_lower_bound": 0.0026363486571099027,
+    "missing_positive": 0,
+    "missing_targets": 0
+  },
+  "confusion_scored": {
+    "TP": 25483,
+    "FP": 3078,
+    "FN": 18620,
+    "TN": 33382326
+  },
+  "full_test_missed_positive": 18620,
+  "full_test_recall_unscored_as_missed": 0.5778064984241434,
+  "full_test_unmatched_recall_unscored_as_missed": 0.0026363486571099027,
+  "evaluation_seconds": 38265.361078139395,
+  "prediction_replay_verified": true,
+  "predictions_layout": "npz_shards",
+  "prediction_chunks": 256,
+  "predictions_path": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_alltargets_fulltest_20261103/chunks",
+  "top_scored_preview": [
+    {
+      "transaction_id": 141001842,
+      "actual_class": 1,
+      "logit": 11.674569129943848,
+      "risk_score": 0.9999914926293708
+    },
+    {
+      "transaction_id": 140458408,
+      "actual_class": 1,
+      "logit": 11.461772918701172,
+      "risk_score": 0.9999894752764364
+    },
+    {
+      "transaction_id": 141355147,
+      "actual_class": 1,
+      "logit": 11.395415306091309,
+      "risk_score": 0.9999887531959369
+    },
+    {
+      "transaction_id": 140823315,
+      "actual_class": 1,
+      "logit": 11.368627548217773,
+      "risk_score": 0.9999884478512626
+    },
+    {
+      "transaction_id": 88185328,
+      "actual_class": 1,
+      "logit": 11.361410140991211,
+      "risk_score": 0.999988364174068
+    },
+    {
+      "transaction_id": 143216471,
+      "actual_class": 1,
+      "logit": 11.360806465148926,
+      "risk_score": 0.9999883571477621
+    },
+    {
+      "transaction_id": 83572034,
+      "actual_class": 1,
+      "logit": 11.33925724029541,
+      "risk_score": 0.9999881035335251
+    },
+    {
+      "transaction_id": 141387605,
+      "actual_class": 1,
+      "logit": 11.333427429199219,
+      "risk_score": 0.9999880339776509
+    },
+    {
+      "transaction_id": 99536907,
+      "actual_class": 1,
+      "logit": 11.290743827819824,
+      "risk_score": 0.9999875121740935
+    },
+    {
+      "transaction_id": 138072153,
+      "actual_class": 1,
+      "logit": 11.277417182922363,
+      "risk_score": 0.9999873446415344
+    },
+    {
+      "transaction_id": 115708547,
+      "actual_class": 1,
+      "logit": 11.175422668457031,
+      "risk_score": 0.9999859857611263
+    },
+    {
+      "transaction_id": 105595596,
+      "actual_class": 1,
+      "logit": 11.160079002380371,
+      "risk_score": 0.9999857690762658
+    },
+    {
+      "transaction_id": 145512308,
+      "actual_class": 1,
+      "logit": 11.158608436584473,
+      "risk_score": 0.9999857481336594
+    },
+    {
+      "transaction_id": 114459524,
+      "actual_class": 1,
+      "logit": 11.147260665893555,
+      "risk_score": 0.9999855854879918
+    },
+    {
+      "transaction_id": 117905856,
+      "actual_class": 1,
+      "logit": 11.143072128295898,
+      "risk_score": 0.9999855249865224
+    },
+    {
+      "transaction_id": 120359055,
+      "actual_class": 1,
+      "logit": 11.138556480407715,
+      "risk_score": 0.999985459475608
+    },
+    {
+      "transaction_id": 121474162,
+      "actual_class": 1,
+      "logit": 11.126751899719238,
+      "risk_score": 0.9999852868162594
+    },
+    {
+      "transaction_id": 114484974,
+      "actual_class": 1,
+      "logit": 11.111550331115723,
+      "risk_score": 0.9999850614474892
+    },
+    {
+      "transaction_id": 155485767,
+      "actual_class": 1,
+      "logit": 11.110363960266113,
+      "risk_score": 0.9999850437145742
+    },
+    {
+      "transaction_id": 129162894,
+      "actual_class": 1,
+      "logit": 11.101117134094238,
+      "risk_score": 0.9999849047771151
+    }
+  ],
+  "top1pct_scored": {
+    "fraction": 0.01,
+    "requested_budget": 334296,
+    "selected": 334296,
+    "TP": 38666,
+    "FP": 295630,
+    "precision": 0.11566396247636825,
+    "recall_scored": 0.8767204045076299,
+    "recall_requested_unscored_as_missed": 0.8767204045076299,
+    "unmatched_recall_scored": 0.7032460042840666,
+    "unmatched_recall_requested_unscored_as_missed": 0.7032460042840666,
+    "cutoff_logit": -3.486874580383301,
+    "cutoff_probability": 0.02968800475661505,
+    "ties": "score descending, transaction ID ascending",
+    "scope": "scored_subset_top1pct",
+    "full_population_top1pct": true
+  },
+  "top1pct_requested_budget": {
+    "fraction": 0.01,
+    "requested_budget": 334296,
+    "selected": 334296,
+    "TP": 38666,
+    "FP": 295630,
+    "precision": 0.11566396247636825,
+    "recall_scored": 0.8767204045076299,
+    "recall_requested_unscored_as_missed": 0.8767204045076299,
+    "unmatched_recall_scored": 0.7032460042840666,
+    "unmatched_recall_requested_unscored_as_missed": 0.7032460042840666,
+    "cutoff_logit": -3.486874580383301,
+    "cutoff_probability": 0.02968800475661505,
+    "ties": "score descending, transaction ID ascending",
+    "scope": "full_test_1pct_alert_budget_selected_from_scored",
+    "full_population_top1pct": true
+  },
+  "interpretation": "All Test transactions scored using frozen multi_fraudgt_format epoch280 weights and unchanged sampled graphs. Query edge updates do not add edges to message passing. New evaluation condition; original official results preserved. Split-end cumulative graph, not daily-causal.",
+  "readout": "all_targets",
+  "training_readout": "official",
+  "inference_only": true,
+  "evaluation_config": {
+    "graph_mode": "shared",
+    "seed": 42,
+    "epochs": 500,
+    "seed_batch": 2048,
+    "iterations_per_epoch": 256,
+    "validation_batches": 256,
+    "batch_accumulation": 8,
+    "positive_weight": 6.0,
+    "base_lr": 0.001,
+    "weight_decay": 1e-05,
+    "warmup_epochs": 5,
+    "gradient_clip": 1.0,
+    "eval_period": 4,
+    "reference_microbatch": 64,
+    "readout": "all_targets",
+    "loader_workers": 0,
+    "torch_threads": 2,
+    "checkpoint_layers": true,
+    "extra_epoch_validation": false
+  },
+  "evaluation_code_sha256": "5deb40b6f2b952f744201dfc15bb5f4352eac6c43875746e6817840449244ba0",
+  "previous_official_result": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/evaluations/multi_fulltest_stop284_20261102/result.json",
+  "previous_result_sha256": "13edd54a37210178dff185f137ff47be2159677c31f7a3cfd16cb3c6ca262df5"
+}

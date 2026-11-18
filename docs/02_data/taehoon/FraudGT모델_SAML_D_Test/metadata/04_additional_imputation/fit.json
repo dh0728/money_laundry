@@ -1,0 +1,197 @@
+{
+  "train_active_accounts": 2100893,
+  "donors": 65536,
+  "labels_used": false,
+  "train_only_fit": true,
+  "saml_inputs_used_for_fit": false,
+  "saml_inputs_used_only_for_transform_and_query": true,
+  "scaler": {
+    "low": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.37312212586402893,
+      0.0,
+      0.6931471824645996,
+      0.6931471824645996
+    ],
+    "high": [
+      6.196444034576416,
+      5.587248802185059,
+      3.332204580307007,
+      3.0910425186157227,
+      2.5649492740631104,
+      1.3862943649291992,
+      2.992083549499513,
+      0.6666666865348816,
+      1.0986123085021973,
+      4.043051242828369
+    ],
+    "center": [
+      1.945910096168518,
+      2.1972246170043945,
+      1.0986123085021973,
+      1.0986123085021973,
+      1.0986123085021973,
+      0.0,
+      0.21465592086315155,
+      0.0,
+      0.6931471824645996,
+      2.4849066734313965
+    ],
+    "scale": [
+      1.1786549091339111,
+      3.8394522666931152,
+      0.9162907600402832,
+      0.9162907600402832,
+      1.6094379425048828,
+      0.1,
+      0.8234110325574875,
+      0.1,
+      0.1,
+      2.079441547393799
+    ]
+  },
+  "diagnostics": {
+    "val": {
+      "nodes": 2116168,
+      "donors_used": 39471,
+      "distance_quantiles": [
+        0.0,
+        0.2201171081009754,
+        0.3894072275999847,
+        0.7777146892372959,
+        3.332359291173702
+      ],
+      "clip_fraction_by_feature": {
+        "log_out_count": 0.021639586271033302,
+        "log_in_count": 0.04166398887044885,
+        "log_out_neighbors": 0.02082018062838111,
+        "log_in_neighbors": 0.012103481387111042,
+        "log_self_count": 0.010896110327724452,
+        "log_reciprocal_neighbors": 0.017203738077506133,
+        "mean_paid_currency_z": 0.018103477606692852,
+        "paid_outlier_fraction": 0.00940095493363476,
+        "log_currency_count": 0.008474752477119018,
+        "log_active_days": 0.28052167880810974
+      },
+      "owner_mean": [
+        2.6057270382847193,
+        3.225652382553914,
+        3.1253276619637695
+      ],
+      "owner_min": [
+        0.6931471824645996,
+        0.0,
+        0.0
+      ],
+      "owner_max": [
+        9.059982299804688,
+        10.903843879699707,
+        8.443116188049316
+      ],
+      "owner_MAE_against_actual_val": [
+        1.5366146825485067,
+        1.547116714429495,
+        1.3792642263312036
+      ]
+    },
+    "saml": {
+      "nodes": 855460,
+      "donors_used": 1939,
+      "distance_quantiles": [
+        0.0,
+        0.44608681609839046,
+        1.3346798724840554,
+        2.1187507137560067,
+        2.794214906591193
+      ],
+      "clip_fraction_by_feature": {
+        "log_out_count": 0.004107731512870269,
+        "log_in_count": 0.00117714446029037,
+        "log_out_neighbors": 0.01412105767657167,
+        "log_in_neighbors": 0.003192434479695135,
+        "log_self_count": 0.0,
+        "log_reciprocal_neighbors": 0.004039931732635073,
+        "mean_paid_currency_z": 7.013770369158114e-06,
+        "paid_outlier_fraction": 3.506885184579057e-06,
+        "log_currency_count": 0.025233207864774506,
+        "log_active_days": 0.022639281789914197
+      },
+      "owner_mean": [
+        4.272396116540098,
+        3.240532173456131,
+        3.0281839379052373
+      ],
+      "owner_min": [
+        0.6931471824645996,
+        0.0,
+        0.0
+      ],
+      "owner_max": [
+        9.059982299804688,
+        9.241353988647461,
+        8.443116188049316
+      ]
+    }
+  },
+  "inputs": {
+    "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/nodes/2022-09-25.npy": {
+      "size": 160828896,
+      "mtime_ns": 1792855962038213328,
+      "sha256": "421601a2a40366f509f2accc6cc8ef29131cb491e61d5b36f834e706fa6beb1b"
+    },
+    "/workspace/handoff/V10_FraudGT_전체실행_20261027/V10_FraudGT_전체실행/project/experiments/v10_goal65_20261024/cache/gnn/nodes/2022-10-13.npy": {
+      "size": 160828896,
+      "mtime_ns": 1792856014929441494,
+      "sha256": "9ba39d9a189f15263375be2b024f8f159514f7a10b62e32f289189a0efc34073"
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/cache/nodes19.npy": {
+      "size": 65015088,
+      "mtime_ns": 1793940807968878683,
+      "sha256": "38cc4363834b3f08399981079dcb5a65844feec47699d604461994ee6eed2748"
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/대체값_비교_20261106/validation_ids.npy": {
+      "size": 1048704,
+      "mtime_ns": 1793943888999764136,
+      "sha256": "77c4619635d530c00fff9aae48169816772715eed26e90fa86c7b5588e8b5c30"
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/대체값_비교_20261106/degree_bin_edges.npy": {
+      "size": 172,
+      "mtime_ns": 1793943876550757521,
+      "sha256": "1c4b07f969e16f372ffc2f7b514bdad1f2bc46c47d030ab50afa14aaea300473"
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/대체값_비교_20261106/owner_bin_medians.npy": {
+      "size": 1856,
+      "mtime_ns": 1793943876550757521,
+      "sha256": "b42700ed66c46838cd87a3bfb090c0a51e7800045a88603988095aa910c37f1b"
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/대체값_비교_20261106/owner_bin_counts.npy": {
+      "size": 1280,
+      "mtime_ns": 1793943876551757602,
+      "sha256": "ef0b17563f162558631a608e2bab09e12fa77c08a6659e6099144f029a99341e"
+    },
+    "/workspace/handoff/Multi_FraudGT_SAML_D_전체평가_20261106/대체값_비교_20261106/owner_train_median.npy": {
+      "size": 140,
+      "mtime_ns": 1793943876550757521,
+      "sha256": "b5beb998afc3660e07a84d2cac144ae1128b419b4ed0c49bd9546c49631318e7"
+    }
+  },
+  "artifacts": {
+    "donor_ids.npy": "c9f8506cf38022fbab2426bf379306cd2587a3d68e5c836dde27a0124b018cce",
+    "donor_x.npy": "a58bb8e094a9776a7549b3d83a76b4d9791e5e17f3550e995713ea2079710d83",
+    "donor_y.npy": "0fd0fb3d93853b58be9f66856e9b134d0ae8ee9e3db7588e0e3aecd36b57c78d",
+    "saml_behavior_donor_owners.npy": "e0f5c5a2a8bf313e2672cfc213ee78b895a6935d553657a070f8170b393e9174",
+    "saml_degree_median_owners.npy": "5396cfba76b251031384db25865141d407768bb96cc9e7a29c416c7f072254fa",
+    "saml_donor_distances.npy": "44196366240bd25bdcf4471e3014ed8ad291a82528187e05bfeed12aec006610",
+    "saml_donor_indices.npy": "344f6401d1fd909faeecb4f6419bcd556d8c4b777bbec23425589c982a13dc8e",
+    "scaler.npz": "858556f6beced6abd054d13aa04c2109635963a8283341512effc173b1b538b2",
+    "val_behavior_donor_owners.npy": "95b81077ce6cfc6b76db7defd9a725d56f5613343dc9665d251b1ed5872015e1",
+    "val_degree_median_owners.npy": "17de4075aa6151d582275cf77a8222538c80ece40ab90adbb27e41f1caaa3841",
+    "val_donor_distances.npy": "567248db3e2a6be794f3b26f561e929bf649637af52dc9c8d135223ae519df6d",
+    "val_donor_indices.npy": "12e76324390905dc3249102c5b1a1cca769a180cfba8abe8cd3c0756063bece9"
+  }
+}

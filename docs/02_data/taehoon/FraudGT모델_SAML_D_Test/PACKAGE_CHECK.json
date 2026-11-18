@@ -1,0 +1,12 @@
+{
+  "all_passed": true,
+  "local_links_verified": 93,
+  "no_links_escape_package": true,
+  "csv_json_png_unchanged": true,
+  "no_model_or_data_arrays": true,
+  "no_training_code": true,
+  "final_report_md_and_html_included": true,
+  "files": 60,
+  "excluded_linked_code_files": 3,
+  "manifest_scope": "All content files; MANIFEST.json and PACKAGE_CHECK.json are package metadata"
+}

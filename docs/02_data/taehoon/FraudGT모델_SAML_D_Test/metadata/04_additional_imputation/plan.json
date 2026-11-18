@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "created_utc": "2026-11-06T06:54:53.642912+00:00",
+  "purpose": "Additional missing owner-field imputations, frozen classifier; all methods evaluated by predeclared protocol",
+  "methods": [
+    "degree_median",
+    "behavior_donor"
+  ],
+  "fields": [
+    "log_entity_observed_accounts",
+    "log_entity_out_diversity",
+    "log_entity_in_diversity"
+  ],
+  "unchanged": "Node types6,country2 remain zero; observed fields,format mapping,Port,Ego,graph,order,sampler and weights unchanged",
+  "degree_median": "Reuse exact previously fitted HI Train out/in unique-counterparty bin medians, min128 accounts, otherwise global Train median",
+  "behavior_donor": {
+    "training": "HI Train active nodes at2022-09-25 only, no fraud labels",
+    "donor_sample": 65536,
+    "donor_seed": 20261109,
+    "match_features": [
+      "log_out_count",
+      "log_in_count",
+      "log_out_neighbors",
+      "log_in_neighbors",
+      "log_self_count",
+      "log_reciprocal_neighbors",
+      "mean_paid_currency_z",
+      "paid_outlier_fraction",
+      "log_currency_count",
+      "log_active_days"
+    ],
+    "scaling": "Train account-weighted feature quantiles: clip to p01/p99, center median, divide max(IQR,0.1)",
+    "search": "Euclidean cKDTree k=1, eps=0.1, leafsize32, workers2; approximate nearest within factor1.1",
+    "output": "Copy all3 owner fields from ONE actual HI Train donor; retain their joint tuple",
+    "rationale": "Condition on observed behavior instead of a global constant; does not recover true SAML owner identity"
+  },
+  "validation": "Same previous262144 HI Validation IDs,128 shared2048 batches, seed20261107; val sampler epoch0/index",
+  "validation_conditions": [
+    "original",
+    "zero",
+    "train_median",
+    "degree_median",
+    "behavior_donor"
+  ],
+  "source_selection": "Highest masked HI Validation AP among degree_median and behavior_donor; tie1e-12 -> F1 -> degree_median. Record before target inference. Both candidates evaluated on full SAML regardless of this ranking.",
+  "target": "Both predeclared alternatives on ALL9504852 SAML rows. Same sampled graph per batch reused for paired methods; no new method or threshold selected from target outcomes.",
+  "benchmark": "Preserved original zero and prior global median full SAML results",
+  "threshold": 0.5,
+  "selected_epoch": 280,
+  "checkpoint_sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f",
+  "readout": "all_targets",
+  "batch_size": 2048,
+  "fanout": [
+    50,
+    50
+  ],
+  "main_model_retrained": false,
+  "salt_remains_paused": true,
+  "interpretation": "Exploratory follow-up on already-inspected SAML Test; no fresh holdout claim or causal allocation of entire domain gap",
+  "source_sha256": {
+    "experiment.py": "266d4de9601b311c73469b64c215758eac2ccf032be4b4900c63c92b92714dfd",
+    "prepare.py": "423ecc92e83a1460e4aefbe178f1ae194ef267b578d979f0f8c6b871f8b332a0",
+    "validate.py": "bae71d6e9cd649fc03bf10ee225dae3f93bdc5198b4280eadafac1cc80ce22b8",
+    "full_saml.py": "9036ed1d8ac317d569856e9d05d665dce816f4f8cbde499a38b5b400f19b23a8",
+    "report.py": "9fb2356661bf0851d21624f080b1a89aba324537f59fb6d8e638365c67cacbe8"
+  }
+}
