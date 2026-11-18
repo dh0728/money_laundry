@@ -14,9 +14,14 @@ def read_reports(db, versions, protector):
     by_id = {v['version_id']:v for v in versions}
     result = {identifier:[] for identifier in by_id}
     with db.cursor(row_factory=dict_row) as cursor:
+        # Each payload is fetched by its key: joined as a set, the planner read the whole payload
+        # table to return one date's rows.
         cursor.execute('''SELECT r.report_id,r.version_id,r.source_row,p.payload_cipher,p.key_version
-            FROM private.bank_reports r JOIN private.bank_report_payloads p USING(report_id)
-            WHERE r.version_id=ANY(%s) ORDER BY r.report_id''',(list(by_id),))
+            FROM (SELECT report_id,version_id,source_row FROM private.bank_reports
+                WHERE version_id=ANY(%s) ORDER BY report_id OFFSET 0) r
+            CROSS JOIN LATERAL (SELECT payload_cipher,key_version FROM private.bank_report_payloads p
+                WHERE p.report_id=r.report_id OFFSET 0) p
+            ORDER BY r.report_id''',(list(by_id),))
         for stored in cursor:
             version = stored['version_id']
             payload = protector.decrypt(f"report:{version}:{stored['source_row']}",stored['payload_cipher'],stored['key_version'])
