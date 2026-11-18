@@ -50,14 +50,27 @@ _ACCOUNTS = """
     ORDER BY p.account_id
 """
 # Rows of this run's frozen input that are new or changed since the copy's base position: ledger
-# versions opened after it, and the run's own TARGET rows. Values come from run_inputs, like the
-# full file.
-_CHANGED_IDS = """
-    WITH changed AS (
-      SELECT tx_id FROM analysis.input_ledger
-      WHERE valid_from_seq>%(base)s AND valid_from_seq<=%(seq)s AND (valid_to_seq IS NULL OR valid_to_seq>%(seq)s)
-      UNION SELECT tx_id FROM analysis.input_transactions WHERE run_id=%(run)s AND input_role='TARGET'),
-    rows AS (SELECT * FROM analysis.run_inputs WHERE run_id=%(run)s AND tx_id IN (SELECT tx_id FROM changed))
+# versions opened after it, and the run's own TARGET rows. The values are those of run_inputs (an
+# own row wins over the ledger version). The view scans the whole ledger for this, so the run's
+# own rows and the versions opened since the base are read directly, and each looks the other
+# table up by primary key in a lateral subquery: the run and its position are newer than the
+# tables' statistics, and a plain join of the two was planned as a rescan per row.
+_VALUES = """occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,
+      from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,payment_currency,
+      payment_format,amount_usd"""
+_CHANGED_IDS = f"""
+    WITH rows AS (
+      SELECT tx_id,input_role,{_VALUES} FROM analysis.input_transactions i
+      LEFT JOIN LATERAL (SELECT l.valid_from_seq FROM analysis.input_ledger l
+        WHERE l.tx_id=i.tx_id AND l.valid_from_seq<=%(seq)s
+          AND (l.valid_to_seq IS NULL OR l.valid_to_seq>%(seq)s) LIMIT 1) l ON true
+      WHERE i.run_id=%(run)s AND (i.input_role='TARGET' OR l.valid_from_seq>%(base)s)
+      UNION ALL
+      SELECT tx_id,'CONTEXT',{_VALUES} FROM analysis.input_ledger l
+      LEFT JOIN LATERAL (SELECT true AS own FROM analysis.input_transactions i
+        WHERE i.run_id=%(run)s AND i.tx_id=l.tx_id LIMIT 1) i ON true
+      WHERE l.valid_from_seq>%(base)s AND l.valid_from_seq<=%(seq)s
+        AND (l.valid_to_seq IS NULL OR l.valid_to_seq>%(seq)s) AND i.own IS NULL)
 """
 _CHANGED = _CHANGED_IDS + """
     SELECT tx_id,input_role,occurred_at,business_date,from_bank_id,to_bank_id,

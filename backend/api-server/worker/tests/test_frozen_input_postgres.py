@@ -21,7 +21,7 @@ from common.frozen_input import FrozenInput, InputExecution, StaleExecution
 from models.demo_random.build_input import write_input as write_demo_input
 from common.worker_transport import ProtocolError
 from features import materials
-from features.prepare_features import prepare_features
+from features.prepare_features import prepare_features, replica_plan
 
 
 def input_path(model, name="targets"):
@@ -653,13 +653,15 @@ class FrozenInputPostgresTests(unittest.TestCase):
         # Runs share one database across tests; earlier tests' runs must not look received.
         self.admin.execute("UPDATE analysis.model_tasks SET remote_revision=NULL WHERE run_id<>%s", (self.run,))
 
-    def received_previous_run(self):
+    def received_previous_run(self, recorded=True):
         """An earlier run at position b whose request the inference server received."""
         previous = uuid4()
         self.admin.execute("INSERT INTO analysis.runs(run_id,job_id,status,input_seq) VALUES(%s,%s,'COMPLETED',%s)",
                            (previous, self.job, self.seq[1]))
-        self.admin.execute("""INSERT INTO analysis.model_tasks(run_id,model_kind,phase,status,binding,remote_revision)
-            VALUES(%s,'BINARY','DONE','SUCCEEDED','{}'::jsonb,2)""", (previous,))
+        rows = self.admin.execute("SELECT count(*) FROM analysis.run_inputs WHERE run_id=%s", (previous,)).fetchone()[0]
+        artifact = json.dumps(dict(replica=dict(mode='full', base_seq=0, seq=self.seq[1], rows=rows))) if recorded else None
+        self.admin.execute("""INSERT INTO analysis.model_tasks(run_id,model_kind,phase,status,binding,remote_revision,input_artifact)
+            VALUES(%s,'BINARY','DONE','SUCCEEDED','{}'::jsonb,2,%s::jsonb)""", (previous, artifact))
 
     def test_ledger_copy_gets_only_what_changed_since_the_last_received_run(self):
         gone = self.ledger_positions()
@@ -676,6 +678,11 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 parties = set(changed.column('from_account_id').to_pylist()) | set(changed.column('to_account_id').to_pylist())
                 self.assertEqual(set(pq.read_table(Path(root) / input_path(model, 'accounts')).column('account_id').to_pylist()), parties)
                 self.assertEqual(pq.read_table(Path(root) / input_path(model, 'removed')).column('tx_id').to_pylist(), [gone])
+
+    def test_row_count_without_the_base_runs_recorded_count_is_counted_in_full(self):
+        self.ledger_positions()
+        self.received_previous_run(recorded=False)
+        self.assertEqual(replica_plan(self.admin, self.execution)['rows'], self.frozen_rows())
 
     def test_first_run_sends_the_whole_frozen_input_for_the_copy(self):
         self.ledger_positions()
