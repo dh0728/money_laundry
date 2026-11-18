@@ -179,6 +179,23 @@ class FreezeInputTests {
   }
 
   @Test
+  void a_freeze_leaves_no_integrated_table_without_statistics() {
+    seed(5);
+    runs.freeze(job, cutoff);
+    assertThat(
+            jdbc.queryForList(
+                """
+                select oid::regclass::text from pg_class where reltuples<0 and oid in (
+                  'ledger.transactions'::regclass,'ledger.transaction_reports'::regclass,
+                  'private.bank_reports'::regclass,'core.accounts'::regclass,'core.owners'::regclass,
+                  'ingest.report_sets'::regclass,'ingest.report_versions'::regclass,
+                  'analysis.selected_versions'::regclass)
+                """,
+                String.class))
+        .isEmpty();
+  }
+
+  @Test
   void preserves_eligibility_and_freezes_scored_or_owned_transactions_only_as_context() {
     seed(5);
     var ids = jdbc.queryForList("select tx_id from ledger.transactions order by tx_id", Long.class);

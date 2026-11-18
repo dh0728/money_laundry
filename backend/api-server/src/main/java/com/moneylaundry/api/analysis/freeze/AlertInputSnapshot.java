@@ -38,6 +38,22 @@ public class AlertInputSnapshot {
       join core.owners e on e.owner_id=a.owner_id join core.owners f on f.owner_id=b.owner_id
       where t.integration_status='ACTIVE' and t.tx_id=""";
 
+  /**
+   * Tables 거래 통합 fills. Right after their first load they have no statistics until autovacuum
+   * reaches them, and without statistics the planner once walked every report of a version for each
+   * transaction instead of looking the transaction up. A freeze analyzes those never analyzed.
+   */
+  private static final List<String> INTEGRATED =
+      List.of(
+          "ledger.transactions",
+          "ledger.transaction_reports",
+          "private.bank_reports",
+          "core.accounts",
+          "core.owners",
+          "ingest.report_sets",
+          "ingest.report_versions",
+          "analysis.selected_versions");
+
   private final JdbcTemplate jdbc;
 
   public AlertInputSnapshot(JdbcTemplate jdbc) {
@@ -77,6 +93,10 @@ public class AlertInputSnapshot {
    */
   public long prepare(UUID run, Instant cutoff, Set<Long> blockedSets) {
     openFrozen(jdbc, run);
+    for (String table : INTEGRATED)
+      if (jdbc.queryForObject(
+          "select reltuples<0 from pg_class where oid=?::regclass", Boolean.class, table))
+        jdbc.execute("analyze " + table);
     freezeManifest(run, cutoff);
     return changedInput(run, cutoff, blockedSets);
   }
