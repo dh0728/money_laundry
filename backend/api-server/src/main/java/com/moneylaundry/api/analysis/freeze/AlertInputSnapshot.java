@@ -19,6 +19,25 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class AlertInputSnapshot {
   static final String LEDGER_VALUES =
       "tx_id,occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version";
+
+  /**
+   * One transaction's frozen values, read by primary keys; append the tx_id. Statements reach the
+   * growing tables only through lateral subqueries like this one, run once per candidate row. A
+   * plain join lets the planner scan those tables whole once the candidates pass a few percent of
+   * them, and the day's work then follows the history instead of the day.
+   */
+  public static final String LEDGER_ROW =
+      """
+      select t.tx_id,t.occurred_at,t.business_date,a.bank_id as from_bank_id,b.bank_id as to_bank_id,
+        a.service_account_id as from_account_id,b.service_account_id as to_account_id,
+        e.service_owner_id as from_owner_id,f.service_owner_id as to_owner_id,
+        t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
+        t.payment_format,t.amount_usd,t.fx_rate_version
+      from ledger.transactions t join core.accounts a on a.account_id=t.from_account_id
+      join core.accounts b on b.account_id=t.to_account_id
+      join core.owners e on e.owner_id=a.owner_id join core.owners f on f.owner_id=b.owner_id
+      where t.integration_status='ACTIVE' and t.tx_id=""";
+
   private final JdbcTemplate jdbc;
 
   public AlertInputSnapshot(JdbcTemplate jdbc) {
@@ -48,9 +67,22 @@ public class AlertInputSnapshot {
   }
 
   public void freeze(UUID run, Instant cutoff, Set<Long> blockedSets) {
+    complete(run, cutoff, blockedSets, prepare(run, cutoff, blockedSets));
+  }
+
+  /**
+   * Records the manifest and this run's input_seq and lists the transactions whose eligibility can
+   * differ from the previous freeze (changed_input). TARGET selection reads the same list, so it
+   * runs between this and {@link #complete}.
+   */
+  public long prepare(UUID run, Instant cutoff, Set<Long> blockedSets) {
     openFrozen(jdbc, run);
     freezeManifest(run, cutoff);
-    long seq = freezeLedger(run, cutoff, blockedSets);
+    return changedInput(run, cutoff, blockedSets);
+  }
+
+  public void complete(UUID run, Instant cutoff, Set<Long> blockedSets, long seq) {
+    freezeLedger(cutoff, blockedSets, seq);
     freezeAlerts(seq);
     // The run's input is its own frozen rows plus the eligible set, which is the open ledger now.
     // The second branch stops at the first eligible transaction of each report set.
@@ -58,8 +90,10 @@ public class AlertInputSnapshot {
         """
         insert into analysis.input_report_sets
         select distinct ?::uuid,s.set_id from frozen_input i
-        join ledger.transaction_reports tr using(tx_id)
-        join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id
+        cross join lateral (select rs.set_id from ledger.transaction_reports tr
+          join private.bank_reports br using(report_id) join ingest.report_versions rv using(version_id)
+          join ingest.report_sets rs on rs.set_id=rv.set_id and rs.current_version_id=rv.version_id
+          where tr.tx_id=i.tx_id offset 0) s
         where i.run_id=?
         union
         select ?::uuid,s.set_id from ingest.report_sets s cross join lateral (
@@ -140,8 +174,11 @@ public class AlertInputSnapshot {
    * two runs, of a set the manifest does not list (dated after the cutoff, or current version
    * received after it), of a set blocked in either run, and those timed between the two cutoffs.
    * The first freeze has no previous run and re-evaluates everything.
+   *
+   * <p>TARGET selection also depends on the versions the job selected, so a set this job selected
+   * and the previous run's job did not is a candidate as well.
    */
-  private long freezeLedger(UUID run, Instant cutoff, Set<Long> blockedSets) {
+  private long changedInput(UUID run, Instant cutoff, Set<Long> blockedSets) {
     long seq = jdbc.queryForObject("select nextval('analysis.input_seq')", Long.class);
     if (jdbc.queryForObject("select coalesce(max(input_seq),0) from analysis.runs", Long.class)
         >= seq) throw new IllegalStateException("INPUT_LEDGER_ORDER");
@@ -177,12 +214,18 @@ public class AlertInputSnapshot {
           join ingest.report_versions rv on rv.version_id=rs.current_version_id where rv.received_at>?
         union select unnest(?::bigint[])
         union select unnest(input_blocked_sets) from analysis.runs where run_id=?
+        union select sv.set_id from analysis.runs r join analysis.selected_versions sv using(job_id)
+          where r.run_id=? and not exists(select 1 from analysis.runs p
+            join analysis.selected_versions was using(job_id)
+            where p.run_id=? and was.set_id=sv.set_id and was.version_id=sv.version_id)
         """,
         previous,
         run,
         at,
         at,
         blockedIds,
+        previous,
+        run,
         previous);
     jdbc.execute("analyze changed_sets");
     jdbc.execute("create temp table changed_input(tx_id bigint primary key) on commit drop");
@@ -190,7 +233,10 @@ public class AlertInputSnapshot {
         """
         insert into changed_input
         select tr.tx_id from changed_sets s join ingest.report_versions v using(set_id)
-          join private.bank_reports br using(version_id) join ledger.transaction_reports tr using(report_id)
+          cross join lateral (select br.report_id from private.bank_reports br
+            where br.version_id=v.version_id offset 0) br
+          cross join lateral (select tr.tx_id from ledger.transaction_reports tr
+            where tr.report_id=br.report_id offset 0) tr
         union
         select t.tx_id from ledger.transactions t cross join (select coalesce(
             (select input_cutoff_at from analysis.runs where run_id=?),'-infinity') as at) was
@@ -201,13 +247,18 @@ public class AlertInputSnapshot {
         at,
         at);
     jdbc.execute("analyze changed_input");
+    return seq;
+  }
+
+  private void freezeLedger(Instant cutoff, Set<Long> blockedSets, long seq) {
+    Timestamp at = Timestamp.from(cutoff);
     String blocked = "";
     var inputArgs = new ArrayList<Object>(List.of(at));
     if (!blockedSets.isEmpty()) {
       blocked =
-          "and not exists(select 1 from ledger.transaction_reports blocked_tr join private.bank_reports blocked_br using(report_id) join ingest.report_versions blocked_v using(version_id) where blocked_tr.tx_id=t.tx_id and blocked_v.set_id in ("
+          "and (select count(*) from (select 1 from ledger.transaction_reports blocked_tr join private.bank_reports blocked_br using(report_id) join ingest.report_versions blocked_v using(version_id) where blocked_tr.tx_id=k.tx_id and blocked_v.set_id in ("
               + String.join(",", Collections.nCopies(blockedSets.size(), "?"))
-              + "))";
+              + ") limit 1) hit)=0";
       inputArgs.addAll(blockedSets);
     }
     inputArgs.addAll(List.of(at, at));
@@ -218,32 +269,24 @@ public class AlertInputSnapshot {
     jdbc.update(
         """
         with eligible as materialized (
-          select t.tx_id from changed_input k join ledger.transactions t using(tx_id)
-          join ledger.transaction_reports tr using(tx_id)
-          join private.bank_reports br using(report_id)
-          join ingest.report_sets rs on rs.current_version_id=br.version_id
-          join ingest.report_versions rv using(version_id)
-          where t.integration_status='ACTIVE' and t.occurred_at<=?
-            %s
-          group by t.tx_id
+          select k.tx_id from changed_input k
+          cross join lateral (select rv.received_at from ledger.transactions t
+            join ledger.transaction_reports tr using(tx_id)
+            join private.bank_reports br using(report_id)
+            join ingest.report_versions rv using(version_id)
+            join ingest.report_sets rs on rs.set_id=rv.set_id and rs.current_version_id=rv.version_id
+            where t.tx_id=k.tx_id and t.integration_status='ACTIVE' and t.occurred_at<=? offset 0) rv
+          where true %s
+          group by k.tx_id
           having bool_or(rv.received_at<=?) and not bool_or(rv.received_at>?)
         )
         insert into desired_input
-        select t.tx_id,t.occurred_at,t.business_date,a.bank_id,b.bank_id,
-          a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,
-          t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
-          t.payment_format,t.amount_usd,t.fx_rate_version
-        from eligible c join ledger.transactions t using(tx_id)
-        join core.accounts a on a.account_id=t.from_account_id
-        join core.accounts b on b.account_id=t.to_account_id
-        join core.owners e on e.owner_id=a.owner_id
-        join core.owners f on f.owner_id=b.owner_id
+        select v.* from eligible c cross join lateral (%s c.tx_id offset 0) v
         """
-            .formatted(blocked),
+            .formatted(blocked, LEDGER_ROW),
         inputArgs.toArray());
     analyzeDesired("input", "tx_id");
     syncLedger("analysis.input_ledger", "input", "tx_id", LEDGER_VALUES, seq, "changed_input");
-    return seq;
   }
 
   /** Published Alert versions and the integration status of their member transactions. */
@@ -302,9 +345,11 @@ public class AlertInputSnapshot {
             .queryForList(
                 """
             select r.run_id::text from analysis.runs r join analysis.jobs b using(job_id)
-            left join lateral (select true as open from analysis.scores s
-              join analysis.score_ledger l on l.tx_id=s.tx_id and l.score_run_id=s.run_id and l.valid_to_seq is null
-              where s.run_id=r.run_id limit 1) entry on true
+            left join lateral (select true as open from (select s.tx_id from analysis.scores s
+                where s.run_id=r.run_id order by s.tx_id offset 0) s
+              cross join lateral (select 1 from analysis.score_ledger l
+                where l.tx_id=s.tx_id and l.score_run_id=r.run_id and l.valid_to_seq is null offset 0) l
+              limit 1) entry on true
             where r.status='COMPLETED' and (entry.open is null or b.status<>'COMPLETED')
             """,
                 String.class)
@@ -320,10 +365,10 @@ public class AlertInputSnapshot {
         turned);
     jdbc.execute("analyze changed_scores");
     jdbc.execute(
-        "create temp table desired_scores on commit drop as select tx_id,c.run_id as score_run_id"
-            + " from (select k.tx_id from changed_scores k join analysis.input_ledger l"
-            + " on l.tx_id=k.tx_id and l.valid_to_seq is null) eligible "
-            + completed);
+        "create temp table desired_scores on commit drop as select k.tx_id,c.run_id as score_run_id"
+            + " from changed_scores k cross join lateral (select c.run_id from analysis.input_ledger l "
+            + completed.replace("where", "where l.tx_id=k.tx_id and l.valid_to_seq is null and")
+            + " offset 0) c");
     analyzeDesired("scores", "tx_id");
     syncLedger(
         "analysis.score_ledger", "scores", "tx_id", "tx_id,score_run_id", seq, "changed_scores");
@@ -361,15 +406,11 @@ public class AlertInputSnapshot {
             + desired
             + " with no data");
     jdbc.update(
-        "insert into "
-            + open
-            + " select "
-            + prefixed("l", columns)
-            + " from "
-            + ledger
-            + " l"
-            + (scope == null ? "" : " join " + scope + " k on k." + key + "=l." + key)
-            + " where l.valid_to_seq is null");
+        scope == null
+            ? "insert into %s select %s from %s where valid_to_seq is null"
+                .formatted(open, columns, ledger)
+            : "insert into %s select l.* from %s k cross join lateral (select %s from %s where %s=k.%s and valid_to_seq is null offset 0) l"
+                .formatted(open, scope, columns, ledger, key, key));
     jdbc.execute("alter table " + open + " add primary key(" + key + ")");
     jdbc.execute("analyze " + open);
     jdbc.execute(

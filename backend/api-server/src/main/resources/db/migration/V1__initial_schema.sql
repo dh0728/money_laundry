@@ -181,6 +181,8 @@ CREATE INDEX transactions_active_time ON ledger.transactions(occurred_at DESC,tx
 CREATE INDEX transactions_from_time ON ledger.transactions(from_account_id,occurred_at);
 CREATE INDEX transactions_to_time ON ledger.transactions(to_account_id,occurred_at);
 CREATE INDEX transactions_day ON ledger.transactions(business_date);
+-- Alert publication checks that no frozen transaction has left ACTIVE; without this it scans every transaction.
+CREATE INDEX transactions_inactive ON ledger.transactions(tx_id) WHERE integration_status<>'ACTIVE';
 CREATE TABLE ledger.transaction_reports (
  tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
  report_id BIGINT NOT NULL UNIQUE REFERENCES private.bank_reports,

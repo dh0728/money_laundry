@@ -303,8 +303,10 @@ public class AnalysisRunService {
               "insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", run, job);
           for (UUID old : previous)
             jdbc.update("insert into analysis.run_replacements values(?,?)", run, old);
+          var snapshot = new AlertInputSnapshot(jdbc);
+          long seq = snapshot.prepare(run, cutoff, blockedSets);
           int targetCount = freezeTargets(run, job, cutoff, blockedSets);
-          new AlertInputSnapshot(jdbc).freeze(run, cutoff, blockedSets);
+          snapshot.complete(run, cutoff, blockedSets, seq);
           jdbc.update(
               "update analysis.jobs set current_run_id=?,row_count=? where job_id=?",
               run,
@@ -314,46 +316,56 @@ public class AnalysisRunService {
         });
   }
 
+  /**
+   * A transaction can newly qualify as TARGET only if its eligibility could differ from the
+   * previous freeze (changed_input, prepared by the snapshot) or a run this one replaces held it.
+   */
   private int freezeTargets(UUID run, long job, Instant cutoff, Set<Long> blockedSets) {
-    // Keep the same eligibility and transaction boundary without four DB round trips per row.
     var args = new ArrayList<Object>(List.of(run, run, job, Timestamp.from(cutoff)));
     String blocked = "";
     if (!blockedSets.isEmpty()) {
       blocked =
           """
-          and not exists(select 1 from ledger.transaction_reports tr
+          and (select count(*) from (select 1 from ledger.transaction_reports tr
             join private.bank_reports br using(report_id) join ingest.report_versions v using(version_id)
-            where tr.tx_id=t.tx_id and v.set_id in (%s))
+            where tr.tx_id=k.tx_id and v.set_id in (%s) limit 1) hit)=0
           """
               .formatted(String.join(",", Collections.nCopies(blockedSets.size(), "?")));
       args.addAll(blockedSets);
     }
+    args.add(run);
     AlertInputSnapshot.openFrozen(jdbc, run);
     int count =
         jdbc.update(
             """
         with frozen as (
         insert into analysis.input_transactions
-        select ?,t.tx_id,'TARGET',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
-          a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,
+        select ?,t.tx_id,'TARGET',t.occurred_at,t.business_date,t.from_bank_id,t.to_bank_id,
+          t.from_account_id,t.to_account_id,t.from_owner_id,t.to_owner_id,
           t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
           t.payment_format,t.amount_usd,t.fx_rate_version
-        from ledger.transactions t join core.accounts a on a.account_id=t.from_account_id
-        join core.accounts b on b.account_id=t.to_account_id
-        join core.owners e on e.owner_id=a.owner_id join core.owners f on f.owner_id=b.owner_id
-        left join analysis.target_ownership o on o.tx_id=t.tx_id
-        where t.integration_status='ACTIVE'
-          and not exists(select 1 from analysis.input_transactions scored
-            join analysis.runs completed using(run_id)
-            where scored.tx_id=t.tx_id and scored.input_role='TARGET' and completed.status='COMPLETED')
+        from (select tx_id from changed_input
+          union select i.tx_id from analysis.run_replacements x
+            join analysis.input_transactions i on i.run_id=x.replaces_run_id
+            where x.run_id=? and i.input_role='TARGET') k
+        cross join lateral (%s k.tx_id offset 0) t
+        cross join lateral (select 1 from ledger.transaction_reports tr
+          join private.bank_reports br using(report_id) join ingest.report_versions v using(version_id)
+          join analysis.selected_versions sv on sv.set_id=v.set_id and sv.version_id=v.version_id
+          where tr.tx_id=k.tx_id and sv.job_id=? and v.received_at<=? limit 1) selected
+        left join lateral (select true as hit from analysis.input_transactions scored
+          join analysis.runs completed using(run_id)
+          where scored.tx_id=k.tx_id and scored.input_role='TARGET' and completed.status='COMPLETED'
+          limit 1) scored on true
+        left join lateral (select o.run_id from analysis.target_ownership o
+          where o.tx_id=k.tx_id offset 0) o on true
+        where scored.hit is null
+          %s
           and (o.run_id is null or exists(select 1 from analysis.run_replacements x where x.run_id=? and x.replaces_run_id=o.run_id))
-          and exists(select 1 from ledger.transaction_reports tr join private.bank_reports br using(report_id)
-            join ingest.report_versions v using(version_id) join analysis.selected_versions sv on sv.version_id=v.version_id
-            where tr.tx_id=t.tx_id and sv.job_id=? and v.received_at<=?)
+        order by t.tx_id returning run_id,tx_id,business_date)
+        insert into frozen_input select * from frozen
         """
-                + blocked
-                + " order by t.tx_id returning run_id,tx_id,business_date)"
-                + " insert into frozen_input select * from frozen",
+                .formatted(AlertInputSnapshot.LEDGER_ROW, blocked),
             args.toArray());
     // Only TARGET rows of this run exist yet, so the frozen mirror is exactly the TARGET set.
     jdbc.execute("analyze frozen_input");

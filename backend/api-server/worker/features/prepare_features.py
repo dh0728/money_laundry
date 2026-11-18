@@ -88,11 +88,46 @@ def replica_plan(connection, execution, *, full=False):
           WHERE t.run_id=r.run_id AND t.remote_revision IS NOT NULL)
         """, (seq,)).fetchone()[0]
     # Transactions frozen at seq: the server installs a copy only with exactly this many.
-    rows = connection.execute("SELECT count(*) FROM analysis.run_inputs WHERE run_id=%s",
-                              (execution.run_id,)).fetchone()[0]
+    rows = _rows_since(connection, execution.run_id, base, seq) if base else None
+    if rows is None:
+        rows = connection.execute("SELECT count(*) FROM analysis.run_inputs WHERE run_id=%s",
+                                  (execution.run_id,)).fetchone()[0]
     if base:
         return dict(mode="delta", base_seq=base, seq=seq, rows=rows)
     return dict(mode="full", base_seq=0, seq=seq, rows=rows)
+
+
+# A run's frozen input is the ledger versions valid at its position plus its own rows that have
+# none (_UNLEDGERED). Counting it from the base run's recorded count reads only the versions
+# opened or closed since the base; counting the view reads the whole ledger every day.
+_UNLEDGERED = """
+    SELECT count(*) FROM analysis.runs r JOIN analysis.input_transactions i USING(run_id)
+    LEFT JOIN LATERAL (SELECT true AS valid FROM analysis.input_ledger l
+      WHERE l.tx_id=i.tx_id AND l.valid_from_seq<=r.input_seq
+        AND (l.valid_to_seq IS NULL OR l.valid_to_seq>r.input_seq) LIMIT 1) l ON true
+    WHERE r.input_seq=%s AND l.valid IS NULL
+"""
+_LEDGER_GROWTH = """
+    SELECT (SELECT count(*) FROM analysis.input_ledger
+            WHERE valid_from_seq>%(base)s AND valid_from_seq<=%(seq)s
+              AND (valid_to_seq IS NULL OR valid_to_seq>%(seq)s))
+         - (SELECT count(*) FROM analysis.input_ledger
+            WHERE valid_to_seq>%(base)s AND valid_to_seq<=%(seq)s AND valid_from_seq<=%(base)s)
+"""
+
+
+def _rows_since(connection, run, base, seq):
+    """Row count of the run's frozen input from the base run's, or None when that is not recorded."""
+    recorded = connection.execute("""
+        SELECT (t.input_artifact->'replica'->>'rows')::bigint
+        FROM analysis.runs r JOIN analysis.model_tasks t USING(run_id)
+        WHERE r.input_seq=%s AND (t.input_artifact->'replica'->>'seq')::bigint=%s LIMIT 1
+        """, (base, base)).fetchone()
+    if recorded is None or recorded[0] is None:
+        return None
+    unledgered = [connection.execute(_UNLEDGERED, (at,)).fetchone()[0] for at in (base, seq)]
+    growth = connection.execute(_LEDGER_GROWTH, dict(base=base, seq=seq)).fetchone()[0]
+    return recorded[0] - unledgered[0] + growth + unledgered[1]
 
 
 def _existing(connection, execution, root, kind, versions):

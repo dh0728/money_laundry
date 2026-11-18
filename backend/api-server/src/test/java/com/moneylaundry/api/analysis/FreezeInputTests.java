@@ -1012,6 +1012,100 @@ class FreezeInputTests {
     assertThat(openInputs()).isEqualTo(4 + 1 + 3 + 2 + 2);
   }
 
+  /**
+   * TARGET selection reads only the transactions the freeze re-evaluates. Selecting over every
+   * transaction, as it did before, must find nothing more once the run is frozen: whatever
+   * qualified is owned by the run now.
+   */
+  void assertNoTargetMissed(UUID run, long ofJob, Instant at) {
+    assertThat(
+            jdbc.queryForObject(
+                """
+                select count(*) from ledger.transactions t
+                left join analysis.target_ownership o on o.tx_id=t.tx_id
+                where t.integration_status='ACTIVE'
+                  and not exists(select 1 from analysis.input_transactions scored
+                    join analysis.runs completed using(run_id)
+                    where scored.tx_id=t.tx_id and scored.input_role='TARGET' and completed.status='COMPLETED')
+                  and (o.run_id is null or exists(select 1 from analysis.run_replacements x
+                    where x.run_id=? and x.replaces_run_id=o.run_id))
+                  and exists(select 1 from ledger.transaction_reports tr join private.bank_reports br using(report_id)
+                    join ingest.report_versions v using(version_id)
+                    join analysis.selected_versions sv on sv.version_id=v.version_id
+                    where tr.tx_id=t.tx_id and sv.job_id=? and v.received_at<=?)
+                """,
+                Integer.class,
+                run,
+                ofJob,
+                Timestamp.from(at)))
+        .isZero();
+  }
+
+  int targets(UUID run) {
+    return jdbc.queryForObject(
+        "select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",
+        Integer.class,
+        run);
+  }
+
+  void select(long forJob, long[] setAndVersion) {
+    jdbc.update(
+        "insert into analysis.selected_versions values(?,?,?,1)",
+        forJob,
+        setAndVersion[0],
+        setAndVersion[1]);
+  }
+
+  @Test
+  void selecting_targets_among_re_evaluated_transactions_misses_none_of_all_transactions() {
+    seed(4);
+    Instant day2 = cutoff.plus(Duration.ofDays(1)), day3 = cutoff.plus(Duration.ofDays(2));
+    Instant day4 = cutoff.plus(Duration.ofDays(3));
+    UUID first = runs.freeze(job, cutoff);
+    assertThat(targets(first)).isEqualTo(4);
+    assertNoTargetMissed(first, job, cutoff);
+    finish(first);
+
+    // A new day's set the next job selects, and a received one it leaves out.
+    long[] own = reportSet(12, "2023-09-02", cutoff.plusSeconds(3600));
+    long[] left = reportSet(13, "2023-09-02", cutoff.plusSeconds(3600));
+    reported(own[1], "2023-09-02", cutoff.plusSeconds(60), 3);
+    reported(left[1], "2023-09-02", cutoff.plusSeconds(60), 2);
+    long secondJob = nextJob(day2);
+    select(secondJob, own);
+    UUID second = runs.freeze(secondJob, day2);
+    assertThat(targets(second)).isEqualTo(3);
+    assertNoTargetMissed(second, secondJob, day2);
+    finish(second);
+
+    // The set left out is selected now, with the manifest entry it had at the previous freeze.
+    // Another set is received only after this cutoff.
+    long[] late = reportSet(13, "2023-09-03", day3.plusSeconds(3600));
+    reported(late[1], "2023-09-03", day3.minusSeconds(60), 1);
+    long thirdJob = nextJob(day3);
+    select(thirdJob, own);
+    select(thirdJob, left);
+    UUID third = runs.freeze(thirdJob, day3);
+    assertThat(targets(third)).isEqualTo(2);
+    assertNoTargetMissed(third, thirdJob, day3);
+
+    // That run is cancelled: its replacement takes its targets over, and the late set's.
+    jdbc.update("update analysis.runs set status='CANCELLED' where run_id=?", third);
+    long fourthJob = nextJob(day4);
+    select(fourthJob, own);
+    select(fourthJob, left);
+    select(fourthJob, late);
+    UUID fourth = runs.freeze(fourthJob, day4);
+    assertThat(
+            jdbc.queryForObject(
+                "select replaces_run_id from analysis.run_replacements where run_id=?",
+                UUID.class,
+                fourth))
+        .isEqualTo(third);
+    assertThat(targets(fourth)).isEqualTo(2 + 1);
+    assertNoTargetMissed(fourth, fourthJob, day4);
+  }
+
   @Test
   void snapshot_refuses_to_run_outside_a_transaction() {
     UUID run = UUID.randomUUID();
