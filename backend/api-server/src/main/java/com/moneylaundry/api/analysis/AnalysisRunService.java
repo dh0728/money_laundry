@@ -404,9 +404,11 @@ public class AnalysisRunService {
               """
               insert into analysis.current_scores(tx_id,run_id)
               select s.tx_id,s.run_id from analysis.scores s
-              join analysis.input_transactions i using(run_id,tx_id)
-              join ledger.transactions t using(tx_id)
-              where s.run_id=? and i.input_role='TARGET' and t.integration_status='ACTIVE'
+              cross join lateral (select 1 from analysis.input_transactions i
+                where i.run_id=s.run_id and i.tx_id=s.tx_id and i.input_role='TARGET' offset 0) i
+              cross join lateral (select 1 from ledger.transactions t
+                where t.tx_id=s.tx_id and t.integration_status='ACTIVE' offset 0) t
+              where s.run_id=?
               order by s.tx_id
               on conflict(tx_id) do update set run_id=excluded.run_id
               """,

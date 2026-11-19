@@ -47,9 +47,15 @@ class Scope:
         self.seq, cutoff = connection.execute(
             '''SELECT r.input_seq,b.analysis_cutoff_at FROM analysis.runs r JOIN analysis.jobs b USING(job_id)
                WHERE r.run_id=%s''', (run_id,)).fetchone()
-        earliest = connection.execute(
-            "SELECT min(occurred_at) FROM analysis.input_transactions WHERE run_id=%s AND input_role='TARGET'",
-            (run_id,)).fetchone()[0]
+        # The run's rows are read through the primary key (run_id first): by its estimates the
+        # planner scans every run's rows of the growing table to find this one's.
+        with connection.transaction():
+            previous = connection.execute("SELECT current_setting('enable_seqscan')").fetchone()[0]
+            connection.execute("SELECT set_config('enable_seqscan','off',true)")
+            earliest = connection.execute(
+                "SELECT min(occurred_at) FROM analysis.input_transactions WHERE run_id=%s AND input_role='TARGET'",
+                (run_id,)).fetchone()[0]
+            connection.execute("SELECT set_config('enable_seqscan',%s,true)", (previous,))
         self.start = (earliest or cutoff) - timedelta(days=WINDOW_DAYS)
         self.seed_start = self.start + SPAN
         self.previous_seq = connection.execute(

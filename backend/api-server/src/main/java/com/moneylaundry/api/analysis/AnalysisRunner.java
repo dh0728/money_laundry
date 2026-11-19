@@ -328,11 +328,12 @@ public class AnalysisRunner implements AutoCloseable {
                       .toInstant();
               UUID run = runs.freeze(item.job.id(), cutoff);
               runs.refreshInputStatistics();
+              // FREEZE_INPUT stored the run's TARGET count with the run, in the same transaction.
               int count =
                   service.jdbc.queryForObject(
-                      "select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",
+                      "select row_count from analysis.jobs where job_id=?",
                       Integer.class,
-                      run);
+                      item.job.id());
               boolean backfill =
                   "BACKFILL"
                       .equals(
