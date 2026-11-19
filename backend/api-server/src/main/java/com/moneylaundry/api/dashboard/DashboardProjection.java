@@ -22,18 +22,20 @@ public class DashboardProjection {
     }
   }
 
-  // Whole-period aggregates need a set of published scores, not one lookup per ledger row.
-  // Select the latest eligible result before applying the displayed detection date range.
+  // Recounts cover the changed business dates: each of their ledger rows looks up its published
+  // score by primary key, so the cost follows those dates and not every score ever stored.
   static final String SCORE_BASE =
       """
       from ledger.transactions t
-      left join (
+      left join lateral (
         select i.*,j.job_id,j.threshold_value,j.business_at as detected_at
-        from analysis.current_scores c join analysis.scores i using(run_id,tx_id)
+        from analysis.current_scores c
+        join analysis.scores i on i.run_id=c.run_id and i.tx_id=c.tx_id
         join analysis.runs ar on ar.run_id=i.run_id
         join analysis.jobs j on j.job_id=ar.job_id and j.current_run_id=ar.run_id
-        where j.status='COMPLETED' and ar.status='COMPLETED'
-      ) s on s.tx_id=t.tx_id
+        where c.tx_id=t.tx_id and j.status='COMPLETED' and ar.status='COMPLETED'
+        offset 0
+      ) s on true
       left join lateral (
         select s.type_class::bigint as type_class
         where s.job_id is not null
