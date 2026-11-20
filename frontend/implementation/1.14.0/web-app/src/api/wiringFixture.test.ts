@@ -16,10 +16,12 @@ it('supplies explicit synthetic reads and blocks all HTTP writes/auth in fixture
 })
 
 it('allows only notification read state in fixture memory without any HTTP or review write', async () => {
-  const { fetchNotifications, setNotificationsRead } = await import('./notifications')
+  const { fetchNotificationCases, fetchNotifications, setNotificationsRead } = await import('./notifications')
   const network = vi.fn(() => { throw new Error('fixture must not reach network') })
   vi.stubGlobal('fetch', network)
   const before = await fetchNotifications('', '', '', 0)
+  expect((await fetchNotificationCases('fixture-notification-1', 0)).content)
+    .toEqual([{ caseId: 1, kind: 'ALERT', alertId: 3001, status: 'OPEN' }])
   const unread = before.content.find(row => !row.read)
   expect(unread).toBeDefined()
   if (!unread) return

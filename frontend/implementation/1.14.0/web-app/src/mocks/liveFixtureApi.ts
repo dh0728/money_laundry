@@ -1,5 +1,5 @@
 import type { Page } from '@/api/common'
-import type { DashboardSummary } from '@/api/liveDashboard'
+import type { DashboardResponse } from '@/api/liveDashboard'
 import type { LedgerAccount, LedgerOwner, LedgerTransaction } from '@/api/liveLedger'
 import type { ReviewCase, ReviewMember, ReviewMoney } from '@/api/liveReview'
 import type { WorkNotification } from '@/api/notifications'
@@ -248,23 +248,27 @@ const dailyAlertStatus = Array.from({ length: 14 }, (_, index) => {
   return { date, pending: cohort.filter(row => displayState(row) === 'pending').length,
     inProgress: cohort.filter(row => displayState(row) === 'inProgress').length, done: cohort.filter(row => displayState(row) === 'done').length }
 })
-const dashboard: DashboardSummary = { businessAt, range: { from: '2026-09-16', to: fixtureDate },
-  pipeline: { computedAt: businessAt, data: { detection: { received: transactions.length, analyzed: analyzed.length, suspicious: suspicious.length, deliveryDates: [fixtureDate] },
-    pendingReports: 0,
-    // Synthetic binary/type combinations only, never a model evaluation result.
-    ...modelComposition(analyzed) } },
-  investigation: { computedAt: businessAt, data: { personal: { pending: myOpen.length, aged: myOpen.filter(row => row.ageDays >= 3).length, closed: myCases.filter(row => row.status === 'CLOSED').length },
-    institution: { alerts: openAlertsCount, episodes: openEpisodesCount, aged: myOpen.filter(row => row.ageDays >= 3).length,
-      today: alertCases.filter(row => row.createdAt.slice(0, 10) === fixtureDate).length,
-      yesterday: alertCases.filter(row => row.createdAt.slice(0, 10) === '2026-10-14').length },
-    openAlertsAgedOver3Days: alertCases.filter(row => row.status === 'OPEN' && row.ageDays > 3).length,
-    daily: dailyAlertStatus.map(row => ({ date: row.date, incoming: row.pending + row.inProgress + row.done, completed: alertCases.filter(item => item.closedAt?.slice(0, 10) === row.date).length })),
-    dailyAlertStatus,
-    episodeWork: { current: { open: openEpisodeCases.length, aged: openEpisodeCases.filter(row => row.ageDays >= 3).length,
+const dashboard: DashboardResponse = { businessAt,
+  detection: { received: transactions.length, analyzed: analyzed.length, suspicious: suspicious.length },
+  deliveryDate: fixtureDate,
+  pendingReports: 0,
+  // Synthetic binary/type combinations only, never a model evaluation result.
+  ...modelComposition(analyzed),
+  personal: { pending: myOpen.length, aged: myOpen.filter(row => row.ageDays >= 3).length, closed: myCases.filter(row => row.status === 'CLOSED').length },
+  institution: { alerts: openAlertsCount, episodes: openEpisodesCount, aged: myOpen.filter(row => row.ageDays >= 3).length,
+    today: alertCases.filter(row => row.createdAt.slice(0, 10) === fixtureDate).length,
+    yesterday: alertCases.filter(row => row.createdAt.slice(0, 10) === '2026-10-14').length },
+  openAlertsAgedOver3Days: alertCases.filter(row => row.status === 'OPEN' && row.ageDays > 3).length,
+  daily: dailyAlertStatus.map(row => ({ day: row.date, incoming: row.pending + row.inProgress + row.done, completed: alertCases.filter(item => item.closedAt?.slice(0, 10) === row.date).length })),
+  dailyAlertStatus,
+  episodeWork: { asOf: businessAt,
+    current: { open: openEpisodeCases.length, aged: openEpisodeCases.filter(row => row.ageDays >= 3).length,
       unreviewed: openEpisodeCases.filter(row => !row.history?.some(event => event.action === 'REVIEW_START')).length,
-      createdToday: reviewCases.filter(row => row.kind === 'EPISODE' && row.createdAt.slice(0, 10) === fixtureDate).length,
-      closedToday: reviewCases.filter(row => row.kind === 'EPISODE' && row.closedAt?.slice(0, 10) === fixtureDate).length },
-      firstReview: { samples: 0, averageSeconds: null }, completion: { samples: 0, averageSeconds: null } } } } }
+      created_today: reviewCases.filter(row => row.kind === 'EPISODE' && row.createdAt.slice(0, 10) === fixtureDate).length,
+      closed_today: reviewCases.filter(row => row.kind === 'EPISODE' && row.closedAt?.slice(0, 10) === fixtureDate).length },
+    firstReview: { samples: 0, average_seconds: null }, completion: { samples: 0, average_seconds: null }, oldestOpen: [] },
+  activities: [], priority: [],
+}
 
 const dateMatches = (iso: string, url: URL) => (!url.searchParams.get('from') || iso.slice(0, 10) >= url.searchParams.get('from')!)
   && (!url.searchParams.get('to') || iso.slice(0, 10) <= url.searchParams.get('to')!)
@@ -277,15 +281,13 @@ export function fixtureGet(path: string): unknown {
   const route = url.pathname
   if (route === '/api/me') return { id: 11, username: 'fixture-staff', name: '가상 분석자', role: 'STAFF' }
   if (route === '/api/v1/demo/clock') return { businessAt, configured: true, revision: 1 }
-  if (route === '/api/v1/dashboard/summary') {
+  if (route === '/api/v1/dashboard') {
     // Synthetic detected-at dates equal transaction dates in this fixture only.
     // The actual API scopes these charts by model detected_at, not ledger occurredAt.
     const scoped = analyzed.filter(row => dateMatches(row.occurredAt, url))
-    return { ...dashboard, range: { from: url.searchParams.get('from') || dashboard.range.from, to: url.searchParams.get('to') || dashboard.range.to },
-      pipeline: { ...dashboard.pipeline, data: { ...dashboard.pipeline.data!, ...modelComposition(scoped) } },
-      investigation: { ...dashboard.investigation, data: { ...dashboard.investigation.data!,
-        daily: dashboard.investigation.data!.daily.filter(row => dateMatches(row.date, url)),
-        dailyAlertStatus: dashboard.investigation.data!.dailyAlertStatus.filter(row => dateMatches(row.date, url)) } } }
+    return { ...dashboard, ...modelComposition(scoped),
+      daily: dashboard.daily.filter(row => dateMatches(row.day, url)),
+      dailyAlertStatus: dashboard.dailyAlertStatus.filter(row => dateMatches(row.date, url)) }
   }
   if (route === '/api/v1/demo/users') return staff
   if (route === '/api/v1/review/payment-formats') return formats
@@ -339,6 +341,15 @@ export function fixtureGet(path: string): unknown {
       .sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id))
     const result = page(content, url)
     return { ...result, number: result.page, unreadCount: [...notificationRead.values()].filter(read => !read).length }
+  }
+  const notificationCases = /^\/api\/v1\/notifications\/([^/]+)\/cases$/.exec(route)
+  if (notificationCases) {
+    const notification = notifications.find(item => item.id === decodeURIComponent(notificationCases[1]))
+    if (!notification) throw new Error('존재하지 않는 합성 알림입니다.')
+    const records = reviewCases.filter(row => row.caseId === notification.caseId)
+      .map(({ caseId, kind, alertId, status }) => ({ caseId, kind, alertId, status }))
+    const result = page(records, url)
+    return { ...result, number: result.page }
   }
   throw new Error(`합성 데이터가 준비되지 않은 경로: ${route}`)
 }
