@@ -17,7 +17,7 @@ describe('first bundle app journeys', () => {
     expect(window.location.hash).toBe('#/dashboard/mine')
     fireEvent.click(screen.getByRole('link', { name: '전체' }))
     await screen.findByRole('heading', { name: '기관 탐지 현황' })
-    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+    fireEvent.click(screen.getByRole('button', { name: /님\s*조사 담당자 · 샘플 계정/ })); fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
     await screen.findByRole('heading', { name: '로그인' })
     expect(window.sessionStorage.getItem('aml-next-session')).toBeNull()
   })
@@ -86,7 +86,7 @@ describe('first bundle app journeys', () => {
     fireEvent.change(screen.getByLabelText('검수 상태'), { target: { value: 'empty' } })
     fireEvent.change(screen.getByLabelText('검수 상태'), { target: { value: 'error' } })
     expect(screen.queryByTestId('case-card')).toBeNull()
-    if (mode === 'logout') fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+    if (mode === 'logout') { fireEvent.click(screen.getByRole('button', { name: /님\s*조사 담당자 · 샘플 계정/ })); fireEvent.click(screen.getByRole('button', { name: '로그아웃' })) }
     else fireEvent.change(screen.getByLabelText('검수 상태'), { target: { value: 'expired' } })
     await screen.findByRole('heading', { name: '로그인' })
     await login()

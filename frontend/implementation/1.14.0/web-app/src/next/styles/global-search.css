@@ -1,0 +1,18 @@
+[data-ui="aml-app"] [data-slot="button"][data-variant="ghost"][data-search="trigger"] { width: 100%; justify-content: flex-start; background: var(--aml-surface-muted); }
+[data-ui="aml-app"] [data-search="dialog"] { width: min(calc(var(--aml-size-sidebar) * 3), calc(100dvw - var(--aml-space-32))); }
+[data-ui="aml-app"] [data-search="input"] { display: flex; flex-direction: row; align-items: center; gap: var(--aml-space-8); }
+[data-ui="aml-app"] [data-search="categories"] { display: flex; flex-wrap: wrap; gap: var(--aml-space-4); }
+[data-ui="aml-app"] [data-search="categories"] [data-slot="button"][data-variant="ghost"][role="tab"][aria-selected="true"] { background: var(--aml-semantic-surface-brand-strong-default); color: var(--aml-semantic-contents-absolute-theme); }
+[data-ui="aml-app"] [data-search="categories"] [data-slot="button"][data-variant="ghost"][role="tab"][aria-selected="true"]:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--aml-semantic-surface-brand-strong-hover); }
+[data-ui="aml-app"] [data-search="categories"] [data-slot="button"][data-variant="ghost"][role="tab"][aria-selected="true"]:active:not(:disabled):not([aria-disabled="true"]) { background: var(--aml-semantic-surface-brand-strong-pressed); }
+[data-ui="aml-app"] [data-search="results"] { display: grid; gap: var(--aml-space-4); }
+[data-ui="aml-app"] [data-search="result"] { display: flex; align-items: center; gap: var(--aml-space-12); padding: var(--aml-space-12); color: var(--aml-text-primary); border-radius: var(--aml-radius-control); text-decoration: none; }
+[data-ui="aml-app"] [data-search="result"] > span { display: grid; gap: var(--aml-space-4); min-width: 0; }
+[data-ui="aml-app"] [data-search="result"] :is(strong,small) { overflow-wrap: anywhere; }
+[data-ui="aml-app"] [data-search="result"]:hover { background: var(--aml-semantic-surface-neutral-subtle-hover); }
+[data-ui="aml-app"] [data-search="result"]:active { background: var(--aml-semantic-surface-neutral-subtle-pressed); }
+[data-ui="aml-app"] [data-search="result"][aria-selected="true"] { background: var(--aml-semantic-surface-brand-subtle-default); }
+[data-ui="aml-app"] [data-search="result"][aria-selected="true"]:hover { background: var(--aml-semantic-surface-brand-subtle-hover); }
+[data-ui="aml-app"] [data-search="result"][aria-selected="true"]:active { background: var(--aml-semantic-surface-brand-subtle-pressed); }
+[data-ui="aml-app"] [data-search="result"] small { color: var(--aml-text-primary); }
+[data-ui="aml-app"] [data-search="empty"] { padding: var(--aml-space-48) var(--aml-space-16); text-align: center; display: grid; gap: var(--aml-space-8); }

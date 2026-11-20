@@ -26,6 +26,21 @@ function mount(path: string, override: Partial<WorkspaceValue> = {}) {
 }
 afterEach(() => { cleanup(); document.body.innerHTML = ''; vi.restoreAllMocks() })
 describe('investigation workflows', () => {
+ it('shows only the selected transaction membership in the related-case panel', async () => {
+  const alert = { ...records.find(r=>r.kind==='ALERT')!, transactionIds:[7000] }
+  const episode = { ...records.find(r=>r.kind==='EPISODE')!, transactionIds:[7000] }
+  const unrelated = { ...records.filter(r=>r.kind==='ALERT')[1], transactionIds:[7001] }
+  mount('/investigate/ledger', { records:[alert,episode,unrelated] })
+  const panel = screen.getByRole('region', { name:'선택 거래와 연결된 Alert·Episode' })
+  expect(within(panel).getByText('거래를 선택하세요.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name:'T-7000 선택' }))
+  await within(panel).findByRole('link', { name:alert.displayId })
+  expect(within(panel).getByRole('link', { name:episode.displayId })).toBeInTheDocument()
+  expect(within(panel).queryByRole('link', { name:unrelated.displayId })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name:'T-7000 선택 해제' }))
+  await within(panel).findByText('거래를 선택하세요.')
+  expect(within(panel).queryAllByRole('link')).toHaveLength(0)
+ })
  it('keeps search draft until Apply, and card/table links use numeric case IDs', async () => {
   mount('/investigate/alerts')
   const count = screen.getAllByTestId('investigation-card').length
@@ -51,6 +66,25 @@ describe('investigation workflows', () => {
   expect(within(dialog).getByRole('alert')).toHaveTextContent('변경된 Alert')
   expect(within(dialog).getByLabelText('묶기 사유')).toHaveValue('같은 거래 흐름을 함께 조사합니다.')
   expect(value.records).toHaveLength(records.length)
+ })
+ it('closes the bundle dialog when history leaves bundle mode without reopening on return', async () => {
+  const bundleAlerts = vi.fn(() => ({ ok: false as const, error: 'Unexpected mutation' }))
+  mount('/investigate/alerts?mode=bundle', { bundleAlerts })
+  const owned = records.filter(r => investigationSelectors.canBundle(r, 7))
+  fireEvent.click(screen.getByRole('checkbox', { name: `${owned[0].displayId} 선택` }))
+  fireEvent.click(screen.getByRole('checkbox', { name: `${owned[1].displayId} 선택` }))
+  fireEvent.click(screen.getByRole('button', { name: 'Episode로 묶기 (2)' }))
+  fireEvent.change(screen.getByLabelText('묶기 사유'), { target: { value: '같은 흐름 조사' } })
+  window.location.hash = '/investigate/alerts'
+  await screen.findByRole('button', { name: '묶기 모드' })
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(screen.queryByRole('button', { name: 'Episode 만들기' })).toBeNull()
+  window.location.hash = '/investigate/alerts?mode=bundle'
+  await screen.findByRole('button', { name: 'Episode로 묶기 (2)' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Episode로 묶기 (2)' }))
+  expect(screen.getByLabelText('묶기 사유')).toHaveValue('같은 흐름 조사')
+  expect(bundleAlerts).not.toHaveBeenCalled()
  })
  it('selects owner and account, filters incoming transfers, and deselects hierarchy', async () => {
   mount('/investigate/ledger')
@@ -105,6 +139,48 @@ describe('investigation workflows', () => {
   expect(download.mock.calls[1][1].slice(1).map(row=>row[0])).toEqual(visibleAccounts)
   fireEvent.click(screen.getByRole('button',{name:'소유주 현재 페이지 CSV'}))
   expect(download.mock.calls[2][1].length).toBeLessThanOrEqual(26)
+ })
+ it.each(['alerts', 'episodes'])('exports only the visible %s page', kind => {
+  const download = vi.spyOn(investigationSelectors, 'downloadInvestigationCsv').mockImplementation(() => undefined)
+  const source = records.find(row => row.kind === (kind === 'alerts' ? 'ALERT' : 'EPISODE'))!
+  const pagedRecords = Array.from({ length: 30 }, (_, index) => ({ ...source, caseId: 9000 + index, displayId: `${kind === 'alerts' ? 'A' : 'E'}-261115-${String(index).padStart(6, '0')}` }))
+  mount(`/investigate/${kind}?view=table&page=2`, { records: pagedRecords })
+  fireEvent.click(screen.getByRole('button', { name: '현재 페이지 CSV' }))
+  const exported = download.mock.calls[0][1].slice(1).map(row => row[1])
+  const visible = within(screen.getByRole('table')).getAllByRole('link').map(link => link.textContent)
+  expect(exported).toEqual(visible)
+  expect(exported).toHaveLength(5)
+ })
+ it('renders UTC ledger timestamps on the next KST calendar day', () => {
+  mount('/investigate/ledger', { transactions: [{ ...txs[0], occurredAt: '2026-11-15T16:30:00Z' }] })
+  const expected = new Date('2026-11-15T16:30:00Z').toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+  expect(within(screen.getByRole('table', { name: '거래 목록' })).getByText(expected)).toBeInTheDocument()
+ })
+ it('opens a selected transaction on its actual page and respects explicit pages and local filters', async () => {
+  const transactions = fixtureTransactions.map(t=>({...t,displayId:`T-${t.id}`,occurredAt:`${t.date}T12:00:00Z`,fromAccountId:t.accountId,toAccountId:900+(t.id%47),currency:'USD' as const,probability:.8,humanVerdict:null}))
+  mount(`/investigate/ledger?transaction=${transactions[0].id}`, { transactions })
+  const table = screen.getByRole('table', { name: '거래 목록' })
+  expect(within(table).getByRole('button', { name: `T-${transactions[0].id} 선택 해제` })).toBeInTheDocument()
+  expect(screen.getByRole('navigation', { name: '거래 페이지' })).toHaveTextContent('126–126건')
+  window.location.hash=`/investigate/ledger?transaction=${transactions[0].id}&transactionPage=1`
+  await waitFor(() => expect(within(table).queryByRole('button', { name: `T-${transactions[0].id} 선택 해제` })).toBeNull())
+  window.location.hash=`/investigate/ledger?transaction=${transactions[0].id}&q=does-not-match`
+  await screen.findByText('조건에 맞는 거래가 없습니다.')
+  expect(screen.queryByRole('complementary', { name: '선택한 거래' })).toBeNull()
+ })
+ it.each(['owner', 'account'] as const)('opens a selected %s on its actual page without overriding explicit pages or filters', async kind => {
+  const transactions = Array.from({ length: 40 }, (_, index) => ({ ...txs[0], id: 8000+index, displayId: `T-paging-${index}`, ownerId: 1000+index, accountId: 2000+index, fromAccountId: 2000+index, toAccountId: 3000+index }))
+  const target = kind==='owner' ? 1039 : 2039
+  const label = kind==='owner' ? '소유주' : '계좌'
+  mount(`/investigate/ledger?${kind}=${target}`, { transactions })
+  const table = screen.getByRole('table', { name: `${label} 목록` })
+  expect(table.querySelectorAll('tr[data-selected="true"]')).toHaveLength(1)
+  expect(screen.getByRole('navigation', { name: `${label} 페이지` })).toHaveTextContent('2/2페이지')
+  window.location.hash=`/investigate/ledger?${kind}=${target}&${kind}Page=1`
+  await waitFor(() => expect(table.querySelectorAll('tr[data-selected="true"]')).toHaveLength(0))
+  window.location.hash=`/investigate/ledger?${kind}=${target}&q=does-not-match`
+  await screen.findByText('조건에 맞는 거래가 없습니다.')
+  expect(table.querySelectorAll('tr[data-selected="true"]')).toHaveLength(0)
  })
  it('shows server-query-required instead of a misleading empty ledger for oversized sources', () => {
   const oversized = new Proxy({length:10001} as WorkspaceValue['transactions'],{get(target,key){if (/^\d+$/.test(String(key))) throw new Error('Oversized source row read');return Reflect.get(target,key)}})

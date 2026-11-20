@@ -5,12 +5,16 @@ export const verdictLabel = (verdict: Verdict) => verdict === 'normal' ? '정상
 export function validReportDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value
 }
+const kstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })
 export function filterJudgments(rows: JudgmentRecord[], filters: ReportFilters) {
   const query = filters.query?.trim().toLocaleLowerCase() ?? ''
-  return rows.filter(row => (!filters.start || row.at.slice(0, 10) >= filters.start)
-    && (!filters.end || row.at.slice(0, 10) <= filters.end)
+  return rows.filter(row => {
+    const date = kstDate.format(new Date(row.at))
+    return (!filters.start || date >= filters.start)
+    && (!filters.end || date <= filters.end)
     && (!filters.verdict || row.verdict === filters.verdict)
-    && `${row.id} ${row.displayIds.join(' ')} ${row.reviewer} ${row.reason} ${row.reportText}`.toLocaleLowerCase().includes(query))
+    && `${row.id} ${row.displayIds.join(' ')} ${row.reviewer} ${row.reason} ${row.reportText}`.toLocaleLowerCase().includes(query)
+  })
 }
 export function selectedJudgments(visible: JudgmentRecord[], selected: string) {
   const ids = new Set(selected.split(','))

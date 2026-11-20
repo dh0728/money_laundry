@@ -20,13 +20,61 @@ export function canJudgeCase(item: WorkspaceCase, viewerId: number) {
 }
 export function indexCaseLedger(transactions: LedgerTransaction[]) {
   if (transactions.length > caseDataBudget.transactions) throw new RangeError('서버 범위 조회가 필요합니다: 거래 스냅샷 한도 초과')
-  return { byId: new Map(transactions.map(tx => [tx.id, tx])), owners: new Map(transactions.map(tx => [tx.accountId, tx.ownerId])) }
+  const owners = new Map<number, number>()
+  const conflicts = new Set<number>()
+  for (const { accountId, ownerId } of transactions) {
+    if (conflicts.has(accountId)) continue
+    if (owners.has(accountId) && owners.get(accountId) !== ownerId) {
+      owners.delete(accountId)
+      conflicts.add(accountId)
+    } else owners.set(accountId, ownerId)
+  }
+  return { byId: new Map(transactions.map(tx => [tx.id, tx])), owners }
 }
 type LedgerIndex = ReturnType<typeof indexCaseLedger>
 export function caseEvidence(item: WorkspaceCase, source: LedgerTransaction[] | LedgerIndex) {
   if (item.transactionIds.length > caseDataBudget.references) throw new RangeError('서버 범위 조회가 필요합니다: 근거 참조 한도 초과')
   const index = Array.isArray(source) ? indexCaseLedger(source) : source
-  return item.transactionIds.flatMap(id => { const tx = index.byId.get(id); return tx ? [tx] : [] }).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id - b.id)
+  return [...new Set(item.transactionIds)].flatMap(id => { const tx = index.byId.get(id); return tx ? [tx] : [] }).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id - b.id)
+}
+function evidenceInstant(value: string) {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/i.exec(value)
+  if (!parts) return NaN
+  const [, year, month, day] = parts.map(Number)
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+  return daysInMonth && day >= 1 && day <= daysInMonth ? Date.parse(value) : NaN
+}
+export type CaseOverviewFacts = {
+  referenceCount: number; availableCount: number; missingCount: number; duplicateReferenceCount: number
+  complete: boolean; accountCount: number; knownOwnerCount: number; unknownOwnerAccountCount: number
+  period: { start: string; end: string } | null; invalidTimestampCount: number
+}
+export function caseOverviewFacts(item: WorkspaceCase, source: LedgerTransaction[] | LedgerIndex): CaseOverviewFacts {
+  if (item.transactionIds.length > caseDataBudget.references) throw new RangeError('서버 범위 조회가 필요합니다: 근거 참조 한도 초과')
+  const index = Array.isArray(source) ? indexCaseLedger(source) : source
+  const evidence = caseEvidence(item, index)
+  const referenceCount = new Set(item.transactionIds).size
+  const missingCount = referenceCount - evidence.length
+  const complete = missingCount === 0
+  const accounts = new Set(evidence.flatMap(tx => [tx.fromAccountId, tx.toAccountId]))
+  const owners = new Set<number>()
+  let unknownOwnerAccountCount = 0
+  for (const accountId of accounts) {
+    const ownerId = index.owners.get(accountId)
+    if (ownerId === undefined) unknownOwnerAccountCount++
+    else owners.add(ownerId)
+  }
+  const timestamps = evidence.map(tx => evidenceInstant(tx.occurredAt))
+  const invalidTimestampCount = timestamps.filter(at => !Number.isFinite(at)).length
+  const period = complete && timestamps.length > 0 && invalidTimestampCount === 0
+    ? { start: new Date(Math.min(...timestamps)).toISOString(), end: new Date(Math.max(...timestamps)).toISOString() }
+    : null
+  return {
+    referenceCount, availableCount: evidence.length, missingCount,
+    duplicateReferenceCount: item.transactionIds.length - referenceCount, complete,
+    accountCount: accounts.size, knownOwnerCount: owners.size, unknownOwnerAccountCount, period, invalidTimestampCount,
+  }
 }
 export function relatedCases(item: WorkspaceCase, records: WorkspaceCase[], source: LedgerTransaction[] | LedgerIndex) {
   if (!caseReferencesWithinBudget(records)) throw new RangeError('서버 범위 조회가 필요합니다: 업무 스냅샷 한도 초과')
