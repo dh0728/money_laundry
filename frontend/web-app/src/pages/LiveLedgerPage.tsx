@@ -47,10 +47,10 @@ function FocusedLedger({ target, active, businessDate, onOpen, onRelocate }: Led
   const [workspace] = useState(() => {
     const store = new WorkspaceState()
     const query = String(target.txId)
-    const scope = JSON.stringify([target.from ?? '', target.to ?? '', [], [], query, []])
+    const scope = JSON.stringify([target.from ?? '', target.to ?? '', [], [], query])
     store.set('ledger/search', query)
     store.set(`ledger/account/${scope}`, target.account ?? null)
-    store.set(`ledger/transactionPage/${scope}/all/${target.account ?? 'all'}`, target.page)
+    store.set(`ledger/transactionPage/${scope}`, target.page)
     store.set(`ledger/transaction/${JSON.stringify([scope, [], null, target.account ?? null, target.page])}`, query)
     return store
   })
@@ -63,20 +63,33 @@ function LedgerContent({ onOpen, active, expectedTarget, onRelocate }: LedgerPro
   const [directions, setDirections] = useViewState<string[]>('ledger/directions', [])
   const [judgement, setJudgement] = useViewState<LedgerFilters['judgement']>('ledger/judgement', [])
   const [payments, setPayments] = useViewState<string[]>('ledger/payments', [])
-  const scope = JSON.stringify([from, to, judgement, payments, search, directions])
+  const scope = JSON.stringify([from, to, judgement, payments, search])
   const [owner, setOwner] = useViewState<string | null>(`ledger/owner/${scope}`, null)
   const [account, setAccount] = useViewState<string | null>(`ledger/account/${scope}`, null)
   const [ownerPage, setOwnerPage] = useViewState(`ledger/ownerPage/${scope}`, 0)
-  const [accountPage, setAccountPage] = useViewState(`ledger/accountPage/${scope}/${owner ?? 'all'}`, 0)
-  const [transactionPage, setTransactionPage] = useViewState(`ledger/transactionPage/${scope}/${owner ?? 'all'}/${account ?? 'all'}`, 0)
+  const [accountPage, setAccountPage] = useViewState(`ledger/accountPage/${scope}`, 0)
+  const [transactionPage, setTransactionPage] = useViewState(`ledger/transactionPage/${scope}`, 0)
   const [transaction, setTransaction] = useViewState<string | null>(`ledger/transaction/${JSON.stringify([scope, directions, owner, account, transactionPage])}`, null)
   const base = { from: from || undefined, to: to || undefined, judgement, payments, query: search, directions }
   const formats = useAsync(active ? () => fetchPaymentFormats(active) : fetchPaymentFormats, [], { key: 'payment-formats' })
   const owners = useAsync(() => active ? fetchLedgerOwners({ ...base, page: ownerPage }, active) : fetchLedgerOwners({ ...base, page: ownerPage }), [from, to, judgement, payments, search, directions, ownerPage], { key: 'ledger/owners' })
   const accounts = useAsync(() => active ? fetchLedgerAccounts({ ...base, page: accountPage }, owner ?? undefined, active) : fetchLedgerAccounts({ ...base, page: accountPage }, owner ?? undefined), [from, to, judgement, payments, search, directions, owner, accountPage], { key: 'ledger/accounts' })
   const transactions = useAsync(() => active ? fetchLedgerTransactions({ ...base, page: transactionPage }, account ?? undefined, account ? undefined : owner ?? undefined, active) : fetchLedgerTransactions({ ...base, page: transactionPage }, account ?? undefined, account ? undefined : owner ?? undefined), [from, to, judgement, payments, search, directions, owner, account, transactionPage], { key: 'ledger/transactions' })
-  const chooseOwner = (id?: string) => { setOwner(id ?? null); setAccount(null) }
-  const chooseAccount = (id: string) => { setAccount(id) }
+  const chooseOwner = (id: string | undefined) => { setOwner(id ?? null); setAccount(null); setAccountPage(0); setTransactionPage(0) }
+  const chooseAccount = (id: string) => { setAccount(id); setTransactionPage(0) }
+  async function openSourceAlert(alertId: number) {
+    if (!onOpen) return
+    try {
+      let page = 0
+      for (;;) {
+        const result = await fetchReviewCases({ kind: 'ALERT', query: `A-${alertId}`, page, size: 100 })
+        const found = result.content.find(row => row.alertId === alertId)
+        if (found) { onOpen('ALERT', found.caseId); return }
+        if (++page >= result.totalPages) break
+      }
+      toast.error('연결된 Alert를 찾을 수 없습니다.')
+    } catch { toast.error('연결된 Alert를 조회하지 못했습니다. 다시 시도해 주세요.') }
+  }
   const index: TransactionIndex = {
     owners: owners.state.status === 'success' ? owners.state.data.content.map(row => ({ id: row.id, name: row.name ?? '소유주 미상', accountIds: [], transactionIds: [] })) : [],
     accounts: accounts.state.status === 'success' ? accounts.state.data.content.map(row => ({ id: row.id, bank: String(row.bankId), owner: row.ownerId, transactionIds: transactions.state.status === 'success' ? transactions.state.data.content.map(tx => String(tx.txId)) : [] })) : [],
@@ -93,28 +106,15 @@ function LedgerContent({ onOpen, active, expectedTarget, onRelocate }: LedgerPro
     ...payments.map(value => ({ field: 'format' as const, value })),
     ...directions.map(value => ({ field: 'direction' as const, value: value === 'IN' ? '수취' : '송금' })),
   ]
-  async function openLinkedAlert(alertId: number) {
-    if (!onOpen) return
-    try {
-      let page = 0
-      for (;;) {
-        const result = await fetchReviewCases({ kind: 'ALERT', query: `A-${alertId}`, page, size: 100 })
-        const found = result.content.find(row => row.alertId === alertId)
-        if (found) { onOpen('ALERT', found.caseId); return }
-        if (++page >= result.totalPages) break
-      }
-      toast.error('연결된 Alert를 찾을 수 없습니다.')
-    } catch { toast.error('연결된 Alert를 조회하지 못했습니다. 다시 시도해 주세요.') }
-  }
   return <div className="space-y-5">
     <RefreshStatus queries={[owners, accounts, transactions, formats]} />
     <TransactionExplorer index={index} today={businessDate ? new Date(`${businessDate}T00:00:00`) : new Date()} remote={{
-      onOpenAlert: onOpen ? id => { void openLinkedAlert(id) } : undefined,
       onOpenEpisode: onOpen ? id => onOpen('EPISODE', id) : undefined,
+      onOpenAlert: onOpen ? id => { void openSourceAlert(id) } : undefined,
       query: search, onQuery: setSearch,
       owner: owner ?? undefined, account: account ?? undefined,
       transaction, selectTransaction: setTransaction,
-      selectOwner: chooseOwner, selectAccount: id => { if (id) chooseAccount(id); else setAccount(null) },
+      selectOwner: chooseOwner, selectAccount: id => { if (id) chooseAccount(id); else { setAccount(null); setTransactionPage(0) } },
       range: from ? { from: new Date(`${from}T00:00:00`), to: to ? new Date(`${to}T00:00:00`) : undefined } : undefined,
       filters,
       changeControls: (range, next) => {
@@ -122,6 +122,7 @@ function LedgerContent({ onOpen, active, expectedTarget, onRelocate }: LedgerPro
         setJudgement(next.filter(f => f.field === 'status').map(f => f.value === '의심' ? 'SUSPICIOUS' : f.value === '정상' ? 'NORMAL' : 'UNANALYZED'))
         setPayments(next.filter(f => f.field === 'format').map(f => f.value))
         setDirections(next.filter(f => f.field === 'direction').map(f => f.value === '수취' ? 'IN' : 'OUT'))
+        setOwnerPage(0); setAccountPage(0); setTransactionPage(0)
       },
       formats: formats.state.status === 'success' ? formats.state.data : [],
       counts: [owners, accounts, transactions].map(query => query.state.status === 'success' ? query.state.data.totalElements : undefined) as [number | undefined, number | undefined, number | undefined],

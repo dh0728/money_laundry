@@ -42,7 +42,7 @@ it('화면 이탈 뒤 늦게 온 401은 현재 로그인 만료 이벤트를 보
 it('401 본문 읽기 중 취소되어도 인증 알림을 보내지 않는다', async () => {
   const dispatched = vi.spyOn(window, 'dispatchEvent')
   let active = true
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 401, headers: new Headers(), json: async () => { active = false; return { title: 'expired' } } } as Response)
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 401, json: async () => { active = false; return { title: 'expired' } } } as Response)
   await expect(locateLedgerTransaction(101, {}, () => active)).rejects.toMatchObject({ name: 'AbortError' })
   expect(dispatched.mock.calls.filter(([event]) => event.type === 'auth-expired')).toHaveLength(0)
 })

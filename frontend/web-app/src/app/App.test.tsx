@@ -79,7 +79,7 @@ describe('앱 틀', () => {
     expect(screen.getByRole('button', { name: 'A-3018' })).toBeInTheDocument()
     window.location.hash = 'alerts/3003'
     await waitFor(() => expect(screen.getByTestId('detail-id')).toHaveTextContent('A-3003'))
-    expect(within(screen.getByTestId('detail-tags')).getByText('진행 중 · 단독 Alert')).toHaveAttribute('data-status', 'OPEN')
+    expect(within(screen.getByTestId('detail-tags')).getByText('진행 중 · 단독')).toHaveAttribute('data-status', 'OPEN')
     expect(screen.queryByRole('button', { name: /연결된 Episode E-800/ })).not.toBeInTheDocument()
   })
 
@@ -99,7 +99,7 @@ describe('앱 틀', () => {
     expect(screen.queryByRole('row', { name: /E-800/ })).not.toBeInTheDocument()
     window.location.hash = 'alerts/3033'
     await waitFor(() => expect(screen.getByTestId('detail-id')).toHaveTextContent('A-3033'))
-    expect(within(screen.getByTestId('detail-tags')).getByText('진행 중 · 단독 Alert')).toHaveAttribute('data-status', 'OPEN')
+    expect(within(screen.getByTestId('detail-tags')).getByText('진행 중 · 단독')).toHaveAttribute('data-status', 'OPEN')
     expect(screen.queryByRole('button', { name: /연결된 Episode E-800/ })).not.toBeInTheDocument()
   })
 

@@ -4,7 +4,7 @@ import type { AlertStatus, EpisodeStatus } from '@/api/codes'
 // API 상태(OPEN·ESCALATED·CLOSED)와 이름을 일부러 다르게 둔다. 서버 값이 바뀌면 아래 대응만 고친다.
 export type WorkStatus = 'UNSEEN' | 'PENDING' | 'IN_PROGRESS' | 'DONE'
 
-export const workStatuses: Exclude<WorkStatus, 'UNSEEN'>[] =['PENDING', 'IN_PROGRESS', 'DONE']
+export const workStatuses: WorkStatus[] = ['PENDING', 'IN_PROGRESS', 'DONE']
 
 // 재설계(10/11) 내 담당 업무 보드 4열. 미확인 = 안 열어 봄 / 처리 전 = 열어 봤지만 작업 없음 / 처리 중 = 작업 시작, 판정 전 / 처리 완료 = 종결
 export const boardStatuses: WorkStatus[] = ['UNSEEN', 'PENDING', 'IN_PROGRESS', 'DONE']

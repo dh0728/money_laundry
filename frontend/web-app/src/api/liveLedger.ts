@@ -55,10 +55,10 @@ function query(filters: LedgerFilters, selection?: { owner?: string; account?: s
   return params
 }
 
-export const fetchLedgerOwners = (filters: LedgerFilters, active?: AbortSignal | (() => boolean)) => getJson<Page<LedgerOwner>>(`/api/v1/ledger/owners?${query(filters)}`, undefined, active)
-export const fetchLedgerAccounts = (filters: LedgerFilters, owner?: string, active?: AbortSignal | (() => boolean)) => getJson<Page<LedgerAccount>>(`/api/v1/ledger/accounts?${query(filters, { owner })}`, undefined, active)
-export const fetchLedgerTransactions = (filters: LedgerFilters, account?: string, owner?: string, active?: AbortSignal | (() => boolean)) => getJson<Page<LedgerTransaction>>(`/api/v1/ledger/transactions?${query(filters, { account, owner })}`, undefined, active)
-export const fetchPaymentFormats = (active?: AbortSignal | (() => boolean)) => getJson<string[]>('/api/v1/review/payment-formats', undefined, active)
+export const fetchLedgerOwners = (filters: LedgerFilters, active?: () => boolean) => getJson<Page<LedgerOwner>>(`/api/v1/ledger/owners?${query(filters)}`, undefined, active)
+export const fetchLedgerAccounts = (filters: LedgerFilters, owner?: string, active?: () => boolean) => getJson<Page<LedgerAccount>>(`/api/v1/ledger/accounts?${query(filters, { owner })}`, undefined, active)
+export const fetchLedgerTransactions = (filters: LedgerFilters, account?: string, owner?: string, active?: () => boolean) => getJson<Page<LedgerTransaction>>(`/api/v1/ledger/transactions?${query(filters, { account, owner })}`, undefined, active)
+export const fetchPaymentFormats = (active?: () => boolean) => getJson<string[]>('/api/v1/review/payment-formats', undefined, active)
 
 
 export type LedgerTransactionContext = { from?: string; to?: string; account?: string }

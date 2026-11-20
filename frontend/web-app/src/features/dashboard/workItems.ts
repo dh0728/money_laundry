@@ -1,7 +1,6 @@
 import type { AlertRow } from '@/api/alerts'
 import type { TypeCode } from '@/api/codes'
 import type { EpisodeRow } from '@/api/episodes'
-import type { ReviewCase } from '@/api/liveReview'
 import { hrefFor } from '@/app/navigation'
 import { usd } from '@/lib/format'
 import type { WorkStatus } from '@/lib/workStatus'
@@ -15,11 +14,11 @@ export type WorkItem = {
   id: number
   code: string
   href: string
-  status: WorkStatus | 'UNKNOWN'
+  status: WorkStatus
   riskScore: number
   ageDays: number
   createdAt: string
-  totalAmountUsd: number | null
+  totalAmountUsd: number
   types: TypeCode[]
   /** 태그로 나타내지 않는 짧은 요약(개수·금액) */
   summary: string
@@ -46,27 +45,6 @@ export function episodeWorkItem(episode: EpisodeRow): WorkItem {
   }
 }
 
-export function reviewCaseWorkItem(item: ReviewCase): WorkItem | null {
-  if (item.kind === 'ALERT' && item.episodeId != null) return null
-  const status: WorkStatus | 'UNKNOWN' = item.status === 'CLOSED' ? 'DONE' : item.kind === 'EPISODE' ? 'IN_PROGRESS' : 'UNKNOWN'
-  const totalAmountUsd = item.summary.amountsByCurrency?.USD ?? null
-  const amounts = Object.entries(item.summary.amountsByCurrency ?? {})
-    .map(([currency, value]) => `${value.toLocaleString('ko-KR')} ${currency}`).join(' · ')
-  return {
-    kind: item.kind === 'ALERT' ? 'Alert' : 'Episode',
-    id: item.caseId,
-    code: item.kind === 'ALERT' ? `A-${item.alertId ?? item.caseId}` : `E-${item.caseId}`,
-    href: hrefFor(item.kind === 'ALERT' ? 'alerts' : 'episodes', item.caseId),
-    status,
-    riskScore: item.summary.riskScore,
-    ageDays: item.ageDays,
-    createdAt: item.createdAt,
-    totalAmountUsd,
-    types: [],
-    summary: `${item.kind === 'EPISODE' ? `Alert ${item.sourceAlertIds.length}건 · ` : ''}거래 ${item.summary.txCount}건${amounts ? ` · ${amounts}` : ''}`,
-  }
-}
-
 export const workItems = (alerts: AlertRow[], episodes: EpisodeRow[]) => [
   ...alerts.flatMap(alert => alertWorkItem(alert) ?? []),
   ...episodes.map(episodeWorkItem),
@@ -76,7 +54,7 @@ export const workSorts = {
   risk: { label: '위험 점수 높은 순', compare: (a: WorkItem, b: WorkItem) => b.riskScore - a.riskScore || b.ageDays - a.ageDays },
   age: { label: '경과일 긴 순', compare: (a: WorkItem, b: WorkItem) => b.ageDays - a.ageDays || b.riskScore - a.riskScore },
   recent: { label: '최근 탐지 순', compare: (a: WorkItem, b: WorkItem) => b.createdAt.localeCompare(a.createdAt) || b.riskScore - a.riskScore },
-  amount: { label: '금액 큰 순', compare: (a: WorkItem, b: WorkItem) => (b.totalAmountUsd ?? -1) - (a.totalAmountUsd ?? -1) || b.riskScore - a.riskScore },
+  amount: { label: '금액 큰 순', compare: (a: WorkItem, b: WorkItem) => b.totalAmountUsd - a.totalAmountUsd || b.riskScore - a.riskScore },
 } as const
 export type WorkSort = keyof typeof workSorts
 

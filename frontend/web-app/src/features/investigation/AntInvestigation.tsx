@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Drawer, Empty, Form, Input, Modal, Radio, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
-import { fetchReviewCase, fetchReviewCases, submitReviewCommand, type ReviewCommand, type ReviewCase, type ReviewApiMember as ReviewMember } from '@/api/liveReview'
+import { fetchReviewCase, fetchReviewCases, submitReviewCommand, type ReviewCommand, type ReviewCase, type ReviewMember } from '@/api/liveReview'
 import { fetchLedgerTransactions, type LedgerTransaction } from '@/api/liveLedger'
 import { buildAlertClose, wholeAlertSelection } from '@/api/reviewCommands'
 import { canEditOpen, useCurrentUser } from '@/app/session'
@@ -10,7 +10,7 @@ import { toReviewGraphModel } from '@/features/graph/liveAdapter'
 import { useAsync } from '@/lib/useAsync'
 import { useViewState, useWorkspace } from '@/lib/workspaceState'
 import { isWiringEmbed } from '@/lib/wiringBridge'
-const Graph = lazy(() => import('@/features/graph/v24/Graph'))
+const Graph = lazy(() => import('@/features/graph/0.24.0/Graph'))
 const { Text, Title } = Typography
 const stamp = (at: string) => new Date(at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
 const stateName: Record<string, string> = { PENDING: '미판정', DECIDED: '판정됨', EXCLUDED: '조사 제외', TRANSFERRED: '이관됨' }
@@ -108,7 +108,7 @@ function InvestigationBody({ item, onOpen, onBack, refresh, onOpenLedger }: { it
   const table = <Table<ReviewMember> data-wiring-id="case.overview.evidence" rowKey="txId" dataSource={evidence.members} scroll={{ x: 950 }} pagination={{ pageSize: 10, showSizeChanger: false }} rowSelection={item.kind === 'EPISODE' ? { selectedRowKeys: selected, onChange: keys => setSelected(keys as number[]), getCheckboxProps: member => ({ disabled: !editable || busy || member.reviewRole !== 'SUBJECT' || member.state !== 'PENDING' }) } : undefined} columns={[
     { title: '거래', key: 'tx', render: (_, member) => <Button type="link" onClick={() => setTxId(member.txId)}>T-{member.txId} 원거래 확인</Button> },
     { title: '거래 시각', render: (_, member) => stamp(member.transaction.occurredAt) },
-    { title: '금액·통화', render: (_, member) => `${Number(member.transaction.amountPaid ?? 0).toLocaleString('ko-KR')} ${member.transaction.paymentCurrency}` },
+    { title: '금액·통화', render: (_, member) => `${member.transaction.amountPaid.toLocaleString('ko-KR')} ${member.transaction.paymentCurrency}` },
     { title: '송금 소유주 / 계좌', render: (_, member) => <>{ownerName(member.transaction.fromAccountId, member.txId, 'from')}<br /><Text code>{member.transaction.fromAccountId}</Text></> },
     { title: '수취 소유주 / 계좌', render: (_, member) => <>{ownerName(member.transaction.toAccountId, member.txId, 'to')}<br /><Text code>{member.transaction.toAccountId}</Text></> },
     { title: '조사 역할·상태', render: (_, member) => `${member.reviewRole === 'SUBJECT' ? '판정 대상' : '참고 거래'} · ${stateName[member.state]}` },

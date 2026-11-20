@@ -38,15 +38,13 @@ const JOBS: Job[] = [
   { jobId: 401, type: 'ANALYSIS', date: '10-08', status: 'COMPLETED', stage: 'COMPLETE', failures: 0, suspicious: 52, alerts: 15, started: '10-08 03:00' },
 ]
 
-const Tone = ({ tone, children }: { tone: string; children: string }) => tone === 'danger'
-  ? <Badge variant="outline" className="border-destructive/50 bg-destructive/15 text-xs font-normal text-destructive">{children}</Badge>
-  : <Badge variant="outline" data-tone={tone} className="semantic-status-badge text-xs font-normal">{children}</Badge>
+const Tone = ({ tone, children }: { tone: string; children: string }) => <Badge variant={tone === 'danger' ? 'destructive' : 'outline'} data-tone={tone} className={`${tone === 'danger' ? '' : 'semantic-status-badge '}text-xs font-normal`}>{children}</Badge>
 
 function Stages({ job }: { job: Job }) {
   const ci = STAGES.findIndex(s => s[0] === job.stage)
   return <ol className="flex flex-wrap items-center gap-1 text-[0.6875rem]">{STAGES.map(([k, l], i) => {
     const failed = i === ci && job.status === 'FAILED', cur = i === ci && job.status !== 'COMPLETED'
-    return <li key={k} className="flex items-center gap-1"><span className={`rounded-full border px-2 py-0.5 ${failed ? 'border-destructive bg-destructive/15 text-destructive' : cur ? 'border-foreground font-medium' : i < ci || job.status === 'COMPLETED' ? '' : 'border-dashed text-muted-foreground'}`}>{l}</span>{i < STAGES.length - 1 && <span className="text-muted-foreground">›</span>}</li>
+    return <li key={k} className="flex items-center gap-1"><Badge variant={failed ? 'destructive' : 'outline'} className={!failed && cur ? 'border-foreground font-medium' : !failed && i > ci ? 'border-dashed text-muted-foreground' : undefined}>{l}</Badge>{i < STAGES.length - 1 && <span className="text-muted-foreground">›</span>}</li>
   })}</ol>
 }
 

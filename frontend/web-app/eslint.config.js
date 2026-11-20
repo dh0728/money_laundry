@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import { plugin as shadcn } from '@shadcn/lint'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'storybook-static']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -33,7 +33,7 @@ export default defineConfig([
   {
     // v24 시안의 자금 흐름 그래프를 동작 그대로 옮긴 파일이다. 시안의 lint 기준으로 만들어져 아래 규칙만 예외로 둔다.
     // 고칠 때는 v24 동작(시간순 재생·hop·소유주별 보기·상세 패널)을 화면에서 다시 확인한다.
-    files: ['src/features/graph/v24/**/*.tsx'],
+    files: ['src/features/graph/0.24.0/**/*.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
       'react-hooks/refs': 'off',

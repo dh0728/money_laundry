@@ -1,4 +1,4 @@
-// v24 Detail.tsx(kind=Alert)를 옮김. 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/v24).
+// v24 Detail.tsx(kind=Alert)를 옮김. 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/0.24.0).
 import { useMemo, useState } from 'react'
 import { Download, TriangleAlert } from 'lucide-react'
 import TimeGraph from '@/features/graph/timeline/TimeGraph'

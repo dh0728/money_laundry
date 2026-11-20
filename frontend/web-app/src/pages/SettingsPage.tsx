@@ -34,7 +34,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeading title="설정" description="테마·글자 크기는 즉시 적용 · 페이지당 행은 mock 목록에만 적용 · 나머지는 시연용이며 서버에 저장되지 않음" />
+        <PageHeading title="설정" description="테마·글자 크기는 즉시 적용 · 나머지 항목은 시연용이며 다른 화면에 아직 적용되지 않음" />
         <div className="flex flex-wrap items-center gap-2">
           <div className="theme-segment relative grid h-8 grid-cols-3 rounded-full bg-muted p-1" role="radiogroup" aria-label="테마 선택" data-theme={theme}>
             <span className="theme-segment-thumb absolute bottom-1 top-1 rounded-full bg-background shadow-sm ring-1 ring-border/60" aria-hidden="true" />

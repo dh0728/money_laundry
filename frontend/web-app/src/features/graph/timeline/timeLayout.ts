@@ -4,12 +4,12 @@
 // 받은 등장은 마지막 수취 시각의 받는 자리, 보내기만 한 등장은 첫 송금 시각의 보내는 자리 → 모든 선이 왼쪽→오른쪽(같은 칸이면 동시각 세로선).
 export type TimeTx = {
   txId: number; txAt: string; fromAccount: string; toAccount: string; fromBank: number; toBank: number
-  amountUsd: number; amountPaid: number; paymentCurrency: string; launderingScore: number | null; alertId?: number
+  amountUsd: number; amountPaid: number; paymentCurrency: string; launderingScore: number; alertId?: number
   /** FE 제안 필드(API 확정 전). 없으면 소유주 보기에서 계좌마다 따로 묶인다 */
-  fromOwnerName?: string; toOwnerName?: string; fromOwnerId?: string; toOwnerId?: string
+  fromOwnerName?: string; toOwnerName?: string
 }
 export type Appearance = { id: string; account: string; n: number; nth: number; col: number; recv: TimeTx[]; send: TimeTx[]; folded: number }
-export type Bundle = { id: string; source: string; target: string; txs: TimeTx[]; sumUsd: number; maxScore: number | null; sameTime: boolean; folded: boolean }
+export type Bundle = { id: string; source: string; target: string; txs: TimeTx[]; sumUsd: number; maxScore: number; sameTime: boolean; folded: boolean }
 export type Timeline = { tx: TimeTx[]; numbers: Map<string, number>; apps: Appearance[]; bundles: Bundle[]; times: number[]; gaps: { afterIndex: number; days: number }[]; violations: number }
 
 export const REAPPEAR_CAP = 5 // 출발점(측정 뒤 확정)
@@ -43,9 +43,9 @@ export function buildTimeline(rows: TimeTx[], cap = REAPPEAR_CAP): Timeline {
   const map = new Map<string, Bundle>()
   for (const t of tx) {
     const s = src.get(t.txId)!, d = dst.get(t.txId)!, key = `${s.id}>${d.id}`
-    const b = map.get(key) ?? { id: key, source: s.id, target: d.id, txs: [], sumUsd: 0, maxScore: null as number | null, sameTime: s.col === d.col, folded: false }
+    const b = map.get(key) ?? { id: key, source: s.id, target: d.id, txs: [], sumUsd: 0, maxScore: 0, sameTime: s.col === d.col, folded: false }
     if (foldedTx.has(t.txId)) b.folded = true
-    b.txs.push(t); b.sumUsd += t.amountUsd; if (t.launderingScore != null) b.maxScore = Math.max(b.maxScore ?? -Infinity, t.launderingScore); map.set(key, b)
+    b.txs.push(t); b.sumUsd += Number.isFinite(t.amountUsd) ? t.amountUsd : 0; b.maxScore = Math.max(b.maxScore, t.launderingScore ?? 0); map.set(key, b)
   }
   const bundles = [...map.values()]
   const byId = new Map(apps.map(a => [a.id, a]))
@@ -80,16 +80,13 @@ export type LanePlan = { groups: OwnerGroup[]; yOf: (account: string, lane: numb
 /** 계좌 보기: 번호대로 한 줄씩. 소유주 보기: 소유주가 처음 나온 순서대로 상자, 상자 안은 계좌 번호순 */
 export function lanePlan(g: Pick<Timeline, 'tx' | 'numbers'>, view: LaneView): LanePlan {
   if (view === 'account') return { groups: [], yOf: (acc, lane) => laneY(g.numbers.get(acc)!, lane), boxes: () => [] }
-  const ownerOf = new Map<string, { id?: string; name?: string }>()
-  for (const t of g.tx) {
-    if (t.fromOwnerId || t.fromOwnerName) ownerOf.set(t.fromAccount, { id: t.fromOwnerId, name: t.fromOwnerName })
-    if (t.toOwnerId || t.toOwnerName) ownerOf.set(t.toAccount, { id: t.toOwnerId, name: t.toOwnerName })
-  }
+  const ownerOf = new Map<string, string>()
+  for (const t of g.tx) { if (t.fromOwnerName) ownerOf.set(t.fromAccount, t.fromOwnerName); if (t.toOwnerName) ownerOf.set(t.toAccount, t.toOwnerName) }
   const groups: OwnerGroup[] = [], byKey = new Map<string, OwnerGroup>(), where = new Map<string, { gi: number; k: number }>()
   for (const [acc] of [...g.numbers].sort((a, b) => a[1] - b[1])) {
-    const owner = ownerOf.get(acc), name = owner?.name, key = owner?.id ? `owner:${owner.id}` : name ? `owner:${name}` : `account:${acc}`
+    const name = ownerOf.get(acc), key = name ? `owner:${name}` : `account:${acc}`
     let grp = byKey.get(key)
-    if (!grp) { grp = { key, name: name ?? '소유주 미상', known: Boolean(owner?.id || name), accounts: [] }; byKey.set(key, grp); groups.push(grp) }
+    if (!grp) { grp = { key, name: name ?? '소유주 미상', known: Boolean(name), accounts: [] }; byKey.set(key, grp); groups.push(grp) }
     where.set(acc, { gi: groups.indexOf(grp), k: grp.accounts.length }); grp.accounts.push(acc)
   }
   const cache = new Map<number, OwnerBox[]>()
@@ -141,8 +138,7 @@ export function countConflicts(bundles: Bundle[], positions: Map<string, Pos>) {
     const curve = edgeCurve(positions.get(b.source)!, positions.get(b.target)!, b.sameTime)
     const pts = Array.from({ length: SAMPLES + 1 }, (_, i) => at(curve, i / SAMPLES))
     const [lx, ly] = at(curve, 0.5)
-    const xs = pts.map(([x]) => x), ys = pts.map(([, y]) => y)
-    return { b, pts, bounds: { l: Math.min(...xs), r: Math.max(...xs), t: Math.min(...ys), bt: Math.max(...ys) }, label: { l: lx - LABEL_W / 2, r: lx + LABEL_W / 2, t: ly - LABEL_H / 2, bt: ly + LABEL_H / 2 } }
+    return { b, pts, label: { l: lx - LABEL_W / 2, r: lx + LABEL_W / 2, t: ly - LABEL_H / 2, bt: ly + LABEL_H / 2 } }
   })
   const nodes = [...positions].map(([id, p]) => ({ id, l: p.x, r: p.x + N, t: p.y, bt: p.y + N }))
   const hit = (a: { l: number; r: number; t: number; bt: number }, b: typeof a) => a.l < b.r && b.l < a.r && a.t < b.bt && b.t < a.bt
@@ -157,8 +153,6 @@ export function countConflicts(bundles: Bundle[], positions: Map<string, Pos>) {
     for (let j = i + 1; j < edges.length; j++) {
       const B = edges[j]
       if (hit(A.label, B.label)) conflicts++
-      // Separated sample bounds cannot contain a pair closer than CLOSE. Label collisions above still count.
-      if (A.bounds.r + CLOSE <= B.bounds.l || B.bounds.r + CLOSE <= A.bounds.l || A.bounds.bt + CLOSE <= B.bounds.t || B.bounds.bt + CLOSE <= A.bounds.t) continue
       const shared = [A.b.source, A.b.target].filter(id => id === B.b.source || id === B.b.target).map(id => positions.get(id)!)
       const nearShared = ([x, y]: Pt) => shared.some(p => Math.hypot(x - (p.x + N / 2), y - (p.y + N / 2)) < 56)
       // 한 점 교차는 괜찮다. 곡선 길이의 1/8 이상을 붙어 달리면 충돌

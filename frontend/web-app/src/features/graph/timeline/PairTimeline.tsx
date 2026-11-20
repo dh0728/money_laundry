@@ -12,13 +12,13 @@ export default function PairTimeline({ a, b, numbers, all }: { a: string; b: str
   const [hover, setHover] = useState<number | null>(null)
   const W = 300, H = 150, top = 26, bottom = H - 26, step = Math.max(26, (W - 30) / Math.max(1, tx.length))
   const width = Math.max(W, 30 + step * tx.length)
-  const vals = tx.filter(t => Number.isFinite(t.amountUsd)).map(t => Math.log10(Math.max(1, t.amountUsd))), lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 0
-  const bw = (t: TimeTx) => !Number.isFinite(t.amountUsd) ? 4 : 4 + 12 * (hi === lo ? 0.5 : (Math.log10(Math.max(1, t.amountUsd)) - lo) / (hi - lo))
+  const vals = tx.map(t => Math.log10(Math.max(1, t.amountUsd))), lo = Math.min(...vals), hi = Math.max(...vals)
+  const bw = (t: TimeTx) => 4 + 12 * (hi === lo ? 0.5 : (Math.log10(Math.max(1, t.amountUsd)) - lo) / (hi - lo))
   const sum = (from: string) => tx.filter(t => t.fromAccount === from).reduce((s, t) => s + t.amountUsd, 0)
   const count = (from: string) => tx.filter(t => t.fromAccount === from).length
   return <div className="space-y-3">
     <div><p className="text-base font-semibold"><span className="inline-flex items-center gap-1.5"><NumBadge n={numbers.get(a)!} />↔<NumBadge n={numbers.get(b)!} /></span><span className="ml-2 text-xs font-normal text-muted-foreground">두 계좌 사이 거래 {tx.length}건</span></p>
-      <p className="mt-1 text-xs tabular-nums"><span style={{ color: AB }}>■</span> <Dir from={a} to={b} numbers={numbers} /> {count(a)}건 · {Number.isFinite(sum(a)) ? Math.round(sum(a)).toLocaleString() : '확인 불가'} USD{count(b) > 0 && <><span className="ml-2" style={{ color: BA }}>■</span> <Dir from={b} to={a} numbers={numbers} /> {count(b)}건 · {Number.isFinite(sum(b)) ? Math.round(sum(b)).toLocaleString() : '확인 불가'} USD</>}</p></div>
+      <p className="mt-1 text-xs tabular-nums"><span style={{ color: AB }}>■</span> <Dir from={a} to={b} numbers={numbers} /> {count(a)}건 · {Math.round(sum(a)).toLocaleString()} USD{count(b) > 0 && <><span className="ml-2" style={{ color: BA }}>■</span> <Dir from={b} to={a} numbers={numbers} /> {count(b)}건 · {Math.round(sum(b)).toLocaleString()} USD</>}</p></div>
     <div className="overflow-x-auto rounded-md border">
       <svg width={width} height={H} role="img" aria-label="두 계좌 레인 타임라인" className="block">
         <line x1={0} x2={width} y1={top} y2={top} stroke="var(--border)" strokeWidth={6} /><line x1={0} x2={width} y1={bottom} y2={bottom} stroke="var(--border)" strokeWidth={6} />
@@ -33,8 +33,8 @@ export default function PairTimeline({ a, b, numbers, all }: { a: string; b: str
       </svg>
     </div>
     <ul className="divide-y text-sm">{tx.map((t, i) => <li key={t.txId} onMouseEnter={() => setHover(t.txId)} onMouseLeave={() => setHover(null)} className={`grid grid-cols-[20px_88px_1fr_auto] items-center gap-2 py-1.5 ${hover === t.txId ? 'bg-muted/60' : ''}`}>
-      <span className="tabular-nums text-muted-foreground">{i + 1}</span><span className="tabular-nums text-muted-foreground">{new Date(t.txAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5, 16)}</span>
-      <span style={{ color: t.fromAccount === a ? AB : BA }}><Dir from={t.fromAccount} to={t.toAccount} numbers={numbers} /></span><span className="tabular-nums">{Number.isFinite(t.amountPaid) ? t.amountPaid.toLocaleString() : '금액 확인 불가'} {t.paymentCurrency}</span>
+      <span className="tabular-nums text-muted-foreground">{i + 1}</span><span className="tabular-nums text-muted-foreground">{t.txAt.replace('T', ' ').slice(5, 16)}</span>
+      <span style={{ color: t.fromAccount === a ? AB : BA }}><Dir from={t.fromAccount} to={t.toAccount} numbers={numbers} /></span><span className="tabular-nums">{t.amountPaid.toLocaleString()} {t.paymentCurrency}</span>
     </li>)}</ul>
   </div>
 }

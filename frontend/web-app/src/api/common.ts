@@ -1,5 +1,5 @@
-// API.md §0 공통 규칙: 목록 응답, 오류 응답(RFC 9457 ProblemDetail)
 import { fixture } from '@/lib/apiMode'
+// API.md §0 공통 규칙: 목록 응답, 오류 응답(RFC 9457 ProblemDetail)
 
 export type Page<T> = {
   content: T[]
@@ -29,13 +29,11 @@ export type ProblemDetail = {
 
 export class ApiError extends Error {
   readonly problem: ProblemDetail
-  readonly retryAfterMs?: number
 
-  constructor(problem: ProblemDetail, retryAfterMs?: number) {
+  constructor(problem: ProblemDetail) {
     super(problem.detail ?? problem.title)
     this.name = 'ApiError'
     this.problem = problem
-    this.retryAfterMs = retryAfterMs
   }
 }
 
@@ -55,16 +53,13 @@ export async function refreshCsrf() {
   return csrf
 }
 
-export async function responseError(response: Response, notifyUnauthorized: boolean | (() => boolean) = true, signal?: AbortSignal) {
+export async function responseError(response: Response, notifyUnauthorized: boolean | (() => boolean) = true) {
   const problem = (await response.json().catch(() => null)) as ProblemDetail | null
-  if (signal?.aborted) throw signal.reason
   if (response.status === 401 && (typeof notifyUnauthorized === 'function' ? notifyUnauthorized() : notifyUnauthorized)) {
     clearCsrf()
     window.dispatchEvent(new Event('auth-expired'))
   }
-  const hint = response.headers.get('Retry-After')
-  const delay = hint == null ? NaN : /^\d+$/.test(hint.trim()) ? Number(hint) * 1000 : Date.parse(hint) - Date.now()
-  return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status }, Number.isFinite(delay) ? Math.max(0, delay) : undefined)
+  return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status })
 }
 
 /** 시각은 서울 오프셋(+09:00)이 붙은 ISO-8601 문자열 */
@@ -72,14 +67,8 @@ export type IsoDateTime = string
 /** YYYY-MM-DD */
 export type IsoDate = string
 
-/** guard: AbortSignal (frontend) or an `active()` callback (fe/work) that turns false when the view is gone. */
-export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>, guard?: AbortSignal | (() => boolean)): Promise<T> {
-  const signal = typeof guard === 'function' ? undefined : guard
-  const active = typeof guard === 'function' ? guard : () => true
-  const assertActive = () => {
-    if (signal?.aborted) throw signal.reason
-    if (!active()) throw new DOMException('화면 이동으로 조회를 중단했습니다.', 'AbortError')
-  }
+export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>, active: () => boolean = () => true): Promise<T> {
+  const assertActive = () => { if (!active()) throw new DOMException('화면 이동으로 조회를 중단했습니다.', 'AbortError') }
   assertActive()
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params ?? {})) {
@@ -91,10 +80,10 @@ export async function getJson<T>(path: string, params?: Record<string, string | 
     assertActive()
     return result
   }
-  const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' }, ...(signal ? { signal } : {}) })
+  const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })
   assertActive()
   if (!response.ok) {
-    const error = await responseError(response, () => path !== '/api/me' && active(), signal)
+    const error = await responseError(response, () => path !== '/api/me' && active())
     assertActive()
     throw error
   }

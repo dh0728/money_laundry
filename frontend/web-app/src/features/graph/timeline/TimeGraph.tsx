@@ -18,17 +18,14 @@ import PairTimeline from './PairTimeline'
 import PatternGraph, { type PatternControls, type PatternSelection } from './PatternGraph'
 import { NumBadge } from '@/components/NumBadge'
 import { SelectionActions, type GraphContext } from './SelectionActions'
-import { selectedTimelineTxIds } from './liveTimelineAdapter'
-
-export type LiveTimelineActions = { onInvestigate: (txIds: number[]) => void }
 
 const NODE = NODE_SIZE
 const MIN_ZOOM = 0.2, MAX_ZOOM = 2.5
 // 조작 안내 열림 여부는 이 브라우저에 기억한다(기본은 열림). 저장소를 못 쓰면 매번 열림
 const GUIDE_KEY = 'aml:graphGuideOpen'
 const readGuide = () => { try { return window.localStorage.getItem(GUIDE_KEY) !== '0' } catch { return true } }
-const usdShort = (v: number): string => !Number.isFinite(v) ? '확인 불가' : v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : `${Math.round(v)}`
-const risk = (score: number | null) => score == null ? 'var(--muted-foreground)' : `var(--risk-${Math.min(9, Math.max(0, Math.floor(score * 10)))})`
+const usdShort = (v: number) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : `${Math.round(v)}`
+const risk = (score: number) => `var(--risk-${Math.min(9, Math.max(0, Math.floor(score * 10)))})`
 
 type AccNode = Node<{ app: Appearance; highlighted: boolean }, 'account'>
 type FlowEdge = Edge<{ bundle: Bundle; width: number; showLabel: boolean }, 'flow'>
@@ -64,7 +61,7 @@ const FlowEdgeView = memo(function FlowEdgeView({ id, sourceX, sourceY, targetX,
 
 const nodeTypes = { account: AccountNode }
 const edgeTypes = { flow: FlowEdgeView }
-function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[]; context: GraphContext; live?: LiveTimelineActions; active: boolean }) {
+function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: GraphContext }) {
   // '선택 거래만 보기'는 사용자가 누른 위상 변경이라 다시 배치한다
   const [only, setOnly] = useState<Set<number> | null>(null)
   const rows = useMemo(() => only ? allRows.filter(t => only.has(t.txId)) : allRows, [allRows, only])
@@ -74,10 +71,9 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
   const plan = useMemo(() => lanePlan(g, view === 'owner' ? 'owner' : 'account'), [g, view])
   // 결정적 배치: x = 시간 칸, y = 계좌 행. 선이 붙으면 간격을 벌린 값
   const sp = useMemo(() => chooseSpacing(g, 10, plan.yOf), [g, plan])
-  const dataKey = useMemo(() => JSON.stringify(g.tx.map(t => [t.txId, t.fromAccount, t.toAccount, t.txAt, t.fromBank, t.toBank, t.fromOwnerId, t.toOwnerId, t.fromOwnerName, t.toOwnerName])), [g])
-  const sums = g.bundles.map(b => Number.isFinite(b.sumUsd) && b.sumUsd > 0 ? b.sumUsd : 1)
-  const minSum = Math.min(...sums, 1), maxSum = Math.max(...sums, 1)
-  const widthOf = useCallback((sum: number) => !Number.isFinite(sum) ? 1.5 : 1.5 + 7 * (maxSum === minSum ? 0.5 : (Math.log(sum || 1) - Math.log(minSum)) / (Math.log(maxSum) - Math.log(minSum))), [minSum, maxSum])
+  const dataKey = useMemo(() => g.tx.map(t => t.txId).join(','), [g])
+  const minSum = Math.min(...g.bundles.map(b => b.sumUsd || 1)), maxSum = Math.max(...g.bundles.map(b => b.sumUsd || 1))
+  const widthOf = useCallback((sum: number) => 1.5 + 7 * (maxSum === minSum ? 0.5 : (Math.log(sum || 1) - Math.log(minSum)) / (Math.log(maxSum) - Math.log(minSum))), [minSum, maxSum])
   const [nodes, setNodes, onNodesChange] = useNodesState<AccNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
   const fitted = useRef(false), lastView = useRef(view)
@@ -99,7 +95,7 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
   const toggleGuide = (open: boolean) => { setGuideOpen(open); try { window.localStorage.setItem(GUIDE_KEY, open ? '1' : '0') } catch { /* 저장 불가 */ } }
   const box = useRef<HTMLDivElement>(null)
 
-  // 거래 집합·계좌·소유주·시각이 정정될 때 배치를 갱신한다. 금액·점수 갱신으로는 카메라를 움직이지 않는다
+  // 위상(거래 집합)이 바뀔 때만 배치한다. 금액·상태 갱신으로는 다시 배치하지 않는다
   useEffect(() => {
     {
       // 보기 단위를 바꾸면 행 배치가 달라지므로 카메라도 다시 정한다
@@ -116,22 +112,13 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
         const xs = [...pos.values()].map(p => p.x), ys = [...pos.values()].map(p => p.y)
         const w = box.current.clientWidth, h = box.current.clientHeight, minX = Math.min(...xs) - 180, maxX = Math.max(...xs) + NODE, minY = Math.min(...ys), maxY = Math.max(...ys) + NODE
         const zoom = Math.min(1.1, Math.max(0.85, Math.min((w - 80) / (maxX - minX), (h - 140) / (maxY - minY))))
-        const toolbarHeight = box.current.querySelector('[data-testid="timeline-toolbar"]')?.getBoundingClientRect().height ?? 44
-        requestAnimationFrame(() => void setViewport({ x: 40 - minX * zoom, y: toolbarHeight + 36 + 56 * zoom, zoom }))
+        requestAnimationFrame(() => void setViewport({ x: 40 - minX * zoom, y: 120 - minY * zoom, zoom }))
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, view])
 
   useEffect(() => { setEdges(es => es.map(e => ({ ...e, data: { ...e.data!, showLabel: showLabels } }))) }, [showLabels, setEdges])
-  // Refresh amounts and scores without re-laying out nodes or moving the camera.
-  useEffect(() => {
-    const bundles = new Map(g.bundles.map(bundle => [bundle.id, bundle]))
-    setEdges(es => es.map(edge => {
-      const bundle = bundles.get(edge.id)
-      return bundle ? { ...edge, data: { ...edge.data!, bundle, width: widthOf(bundle.sumUsd) } } : edge
-    }))
-  }, [g, widthOf, setEdges])
   // 같은 번호의 다른 등장도 강조
   const selectedAccounts = useMemo(() => new Set(nodes.filter(n => selection.nodes.includes(n.id)).map(n => n.data.app.account)), [nodes, selection.nodes])
   // 바뀐 노드가 없으면 같은 배열을 돌려줘야 한다(새 배열을 돌려주면 selectedAccounts가 다시 계산되어 무한 갱신)
@@ -158,7 +145,7 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
     for (const t of g.tx) {
       const f = of.get(t.fromAccount), to = of.get(t.toAccount)
       if (!f || !to) continue
-      const usd = t.amountUsd
+      const usd = Number.isFinite(t.amountUsd) ? t.amountUsd : 0
       if (f === to) { stat.get(f)!.internal++; continue }
       stat.get(f)!.outUsd += usd; stat.get(f)!.outN++; stat.get(to)!.inUsd += usd; stat.get(to)!.inN++
       const k = `${f}>${to}`, cur = flow.get(k) ?? { from: f, to, n: 0, usd: 0 }
@@ -175,7 +162,7 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
   useLayoutEffect(() => {
     const el = wrap.current
     if (!el) return
-    const ro = new ResizeObserver(([e]) => { if (e.contentRect.width > 0) setWide(e.contentRect.width >= 1024) })
+    const ro = new ResizeObserver(([e]) => setWide(e.contentRect.width >= 1024))
     ro.observe(el); setWide(el.clientWidth >= 1024)
     return () => ro.disconnect()
   }, [])
@@ -185,32 +172,22 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
   const patApp = patIds.length === 1 ? g.apps.find(a => a.account === patIds[0]) : undefined
   const patTxs = patIds.length > 1 ? g.tx.filter(t => patIds.includes(t.fromAccount) && patIds.includes(t.toAccount)) : patPair ? g.tx.filter(t => (t.fromAccount === patPair[0] && t.toAccount === patPair[1])) : []
   const patActive = patIds.length > 1 || Boolean(patPair)
-  const selectedLiveTxIds = view === 'pattern'
-    ? (patIds.length === 1 ? g.tx.filter(tx => tx.fromAccount === patIds[0] || tx.toAccount === patIds[0]) : patTxs).map(tx => tx.txId)
-    : selectedTimelineTxIds(g, selection)
-  const liveAccountCount = new Set(g.tx.filter(tx => selectedLiveTxIds.includes(tx.txId)).flatMap(tx => [tx.fromAccount, tx.toAccount])).size
-  const selectAccount = (account: string) => {
-    if (view === 'pattern') { setPatSel({ type: 'nodes', ids: [account] }); return }
-    const ids = g.apps.filter(app => app.account === account).map(app => app.id)
-    setNodes(ns => ns.map(node => ({ ...node, selected: ids.includes(node.id) })))
-    setSelection({ nodes: ids, edges: [] })
-  }
   const main = <div className="flex h-full min-h-0 flex-col gap-2">
     <div ref={box} onPointerDownCapture={e => { const el = (e.target as HTMLElement).closest('.react-flow__node'); const id = el?.getAttribute('data-id'); wasOnlySelected.current = Boolean(id) && selection.nodes.length === 1 && selection.nodes[0] === id }} className="relative isolate min-h-0 flex-1 overflow-hidden rounded-lg border bg-card">
       <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-wrap items-start justify-between gap-2">
-      <div data-testid="timeline-toolbar" className="pointer-events-auto flex min-h-11 flex-wrap items-center gap-2 rounded-md border bg-background/90 px-2.5 py-1 text-xs">
+      <div className="pointer-events-auto flex min-h-11 flex-wrap items-center gap-2 rounded-md border bg-background/90 px-2.5 py-1 text-xs">
         <span className="text-muted-foreground">보기</span>
         <div role="group" aria-label="보기 단위" className="flex gap-0.5 rounded-md border p-0.5">
           {([['pattern', '패턴'], ['owner', '소유주']] as const).map(([v, label]) => <Button key={v} type="button" size="sm" variant={view === v ? 'default' : 'ghost'} aria-pressed={view === v} className="h-6 px-2 text-xs" onClick={() => setView(v)}>{label}</Button>)}
         </div>
-        {!live && view === 'pattern' && <ProvenanceBadge kind="proposal" title="패턴 보기와 패턴 이름은 FE 제안(김명기 10/12), 이름은 거래 구조로 추정한 값이며 모델 값이 아님" />}
-        {!live && view === 'owner' && <ProvenanceBadge kind="proposal" title="소유주 이름은 FE 제안 필드(fromOwnerName·toOwnerName). API 확정 전" />}
+        {view === 'pattern' && <ProvenanceBadge kind="proposal" title="패턴 보기와 패턴 이름은 FE 제안(김명기 10/12), 이름은 거래 구조로 추정한 값이며 모델 값이 아님" />}
+        {view === 'owner' && <ProvenanceBadge kind="proposal" title="소유주 이름은 FE 제안 필드(fromOwnerName·toOwnerName). API 확정 전" />}
         <span className="mx-1 h-3 w-px bg-border" /><label className="flex items-center gap-1.5">금액(USD)·건수<Switch checked={showLabels} onCheckedChange={setShowLabels} /></label>
-        {view === 'owner' && <><span className="mx-1 h-3 w-px bg-border" /><span className="text-muted-foreground">시간 →</span></>}
+        <span className="mx-1 h-3 w-px bg-border" /><span className="text-muted-foreground">시간 →</span>
       </div>
       {view === 'pattern' && <div className="pointer-events-auto flex min-h-11 items-center rounded-md border bg-background/90 px-1.5"><Button size="sm" variant="outline" className="h-8 gap-1.5 bg-background text-xs" title="끌어 놓은 계좌를 구조로 추정한 원래 패턴 모양으로 되돌림" onClick={() => patCtl.current?.reset()}><RotateCcw className="size-3.5" />원래 패턴으로</Button></div>}
       </div>
-      {view === 'pattern' ? <PatternGraph active={active} g={g} selected={patSel} onSelect={setPatSel} onZoom={setPatZoom} controls={patCtl} /> : null}
+      {view === 'pattern' ? <PatternGraph g={g} selected={patSel} onSelect={setPatSel} onZoom={setPatZoom} controls={patCtl} /> : null}
       {view === 'pattern' ? null : <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
         // eslint-disable-next-line react-hooks/refs -- 패널 크기 조절·화면 폭 전환으로 다시 그릴 때 카메라를 이어 받으려고 마지막 위치를 ref에 둔다
         onNodeClick={() => { if (wasOnlySelected.current) { wasOnlySelected.current = false; clearSelection() } }} defaultViewport={camera.current} onMoveEnd={(_, v) => { camera.current = v }}
@@ -224,8 +201,8 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
             <StickyX boxLeft={-170} maxShift={laneEnd - 160} className="w-[150px] shrink-0"><span className={`block truncate rounded bg-card/90 pr-1 text-base ${selectedAccounts.has(acc) ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}><NumBadge n={n} /> <span className="font-mono">{acc}</span></span></StickyX>
             <span className="h-px flex-1 bg-border/60" />
           </div>)}
-          {g.times.map((t, i) => { const x = columnX(i * 2, g.gaps, sp.timeWidth) + NODE / 2 + 30, d = new Date(t); const label = d.toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5, 16)
-            return <div data-testid="timeline-tick" key={t} className="absolute whitespace-nowrap text-xs tabular-nums text-muted-foreground" style={{ transform: `translate(${x}px, ${yMin}px) translate(-50%, 0)` }}>{(i === 0 || i % Math.ceil(g.times.length / 12) === 0) && label}<div className="mx-auto mt-1 h-2 w-px bg-border" /></div> })}
+          {g.times.map((t, i) => { const x = columnX(i * 2, g.gaps, sp.timeWidth) + NODE / 2 + 30, d = new Date(t); const label = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+            return <div key={t} className="absolute whitespace-nowrap text-xs tabular-nums text-muted-foreground" style={{ transform: `translate(${x}px, ${yMin}px) translate(-50%, 0)` }}>{(i === 0 || i % Math.ceil(g.times.length / 12) === 0) && label}<div className="mx-auto mt-1 h-2 w-px bg-border" /></div> })}
           {g.gaps.map(gap => <div key={gap.afterIndex} className="absolute text-xs font-medium text-muted-foreground" style={{ transform: `translate(${columnX(gap.afterIndex * 2 + 2, g.gaps, sp.timeWidth) - 40}px, ${yMin - 2}px)` }}>⋯ {gap.days}일</div>)}
         </ViewportPortal>
       </ReactFlow>}
@@ -250,7 +227,7 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
     </div>
     {/* 고르기 동작 줄: 항상 같은 높이라 선택해도 그래프가 움직이지 않는다 */}
     <div className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto rounded-md border bg-background px-3 text-xs" data-testid="selection-strip">
-      {live ? <><span className="shrink-0 whitespace-nowrap">계좌 {liveAccountCount}개 · 거래 {selectedLiveTxIds.length}건</span><Button size="sm" variant="outline" disabled={!selectedLiveTxIds.length} onClick={() => live.onInvestigate(selectedLiveTxIds)}>선택한 조사 거래 보기</Button>{(patSel != null || selection.nodes.length + selection.edges.length > 0) && <Button size="sm" variant="ghost" onClick={() => { setPatSel(null); clearSelection() }}>선택 해제</Button>}</> : view === 'pattern' && patActive ? <SelectionActions context={context} accounts={patIds.length || 2} txs={patTxs} onOnly={() => { setOnly(new Set(patTxs.map(t => t.txId))); setPatSel(null) }} onClear={() => setPatSel(null)} />
+      {view === 'pattern' && patActive ? <SelectionActions context={context} accounts={patIds.length || 2} txs={patTxs} onOnly={() => { setOnly(new Set(patTxs.map(t => t.txId))); setPatSel(null) }} onClear={() => setPatSel(null)} />
       : view === 'pattern' && only ? <><span className="shrink-0 whitespace-nowrap">선택 거래 {only.size}건만 보는 중</span><Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" onClick={() => setOnly(null)}>전체 보기</Button></>
       : view === 'pattern' ? <><span className="shrink-0 whitespace-nowrap text-muted-foreground">추정 패턴</span>{patterns.length ? patterns.map(p => <Badge key={p} variant="outline" className="shrink-0 font-normal">{p}</Badge>) : <span className="shrink-0 whitespace-nowrap">추정 불가(거래가 적거나 단순 경로)</span>}<ProvenanceBadge kind="proposal" title="거래 구조로 추정한 이름이며 모델 값이 아님" /><span className="shrink-0 whitespace-nowrap text-muted-foreground"></span></>
       : showBar ? <SelectionActions context={context} accounts={selectedAccounts.size || new Set(selectedTxs.flatMap(t => [t.fromAccount, t.toAccount])).size} txs={selectedTxs} onOnly={() => { setOnly(new Set(selectedTxs.map(t => t.txId))); clearSelection() }} onClear={clearSelection} />
@@ -267,9 +244,9 @@ function GraphCanvas({ rows: allRows, context, live, active }: { rows: TimeTx[];
       {view === 'owner' && !shownPair && !shownApp && <OwnerFlows info={ownerInfo} />}
       <div>
         <p className="text-xs font-medium">번호 대응표</p>
-        <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">{[...g.numbers].map(([acc, n]) => <li key={acc} className={`flex items-center gap-1.5 ${hiAcc.has(acc) ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{live ? <button type="button" aria-label={`계좌 ${acc} 선택`} className="flex min-w-0 items-center gap-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => selectAccount(acc)}><NumBadge n={n} /><span className="truncate font-mono">{acc}</span></button> : <><NumBadge n={n} /><span className="truncate font-mono">{acc}</span></>}</li>)}</ul>
+        <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">{[...g.numbers].map(([acc, n]) => <li key={acc} className={`flex items-center gap-1.5 ${hiAcc.has(acc) ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}><NumBadge n={n} /><span className="truncate font-mono">{acc}</span></li>)}</ul>
       </div>
-      {!live && <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">오른쪽→왼쪽 선 {g.violations}개 · 선 겹침 {sp.conflicts}개 · 등장 {g.apps.length}개 · 계좌 {g.numbers.size}개 <ProvenanceBadge kind="mock" /></p>}
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">오른쪽→왼쪽 선 {g.violations}개 · 선 겹침 {sp.conflicts}개 · 등장 {g.apps.length}개 · 계좌 {g.numbers.size}개 <ProvenanceBadge kind="mock" /></p>
     </CardContent></Card>
 
   // 패널 그룹은 높이를 자동(내용 따라)으로 정해 두므로, 고정 높이 상자 안에서 남는 높이를 채우게 한다.
@@ -308,12 +285,10 @@ function AccountDetail({ app, g }: { app: Appearance; g: ReturnType<typeof build
   return <div className="space-y-3">
     <div><p className="text-base font-semibold"><NumBadge n={app.n} className="mr-1.5" /><span className="font-mono text-sm">{app.account}</span></p><p className="mt-1 text-xs text-muted-foreground">등장 {appearances}번 · 이 등장은 {app.nth}번째{app.folded ? ` · 상한을 넘어 ${app.folded}건을 여기에 모음` : ''}</p></div>
     <dl className="grid grid-cols-[72px_1fr] gap-y-2 text-xs"><dt className="text-muted-foreground">받음</dt><dd className="tabular-nums">{all.filter(t => t.toAccount === app.account).length}건 · {usdShort(inUsd)} USD</dd><dt className="text-muted-foreground">보냄</dt><dd className="tabular-nums">{all.filter(t => t.fromAccount === app.account).length}건 · {usdShort(outUsd)} USD</dd></dl>
-    <ul className="divide-y text-sm">{all.map(t => { const inbound = t.toAccount === app.account; return <li key={t.txId} className="flex items-center justify-between gap-2 py-1.5"><span className="tabular-nums text-muted-foreground">{new Date(t.txAt).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(5, 16)}</span><span className="inline-flex items-center gap-1">{inbound ? '←' : '→'}<NumBadge n={g.numbers.get(inbound ? t.fromAccount : t.toAccount)!} /></span><span className="tabular-nums">{Number.isFinite(t.amountPaid) ? t.amountPaid.toLocaleString() : '금액 확인 불가'} {t.paymentCurrency}</span></li> })}</ul>
+    <ul className="divide-y text-sm">{all.map(t => { const inbound = t.toAccount === app.account; return <li key={t.txId} className="flex items-center justify-between gap-2 py-1.5"><span className="tabular-nums text-muted-foreground">{t.txAt.replace('T', ' ').slice(5, 16)}</span><span className="inline-flex items-center gap-1">{inbound ? '←' : '→'}<NumBadge n={g.numbers.get(inbound ? t.fromAccount : t.toAccount)!} /></span><span className="tabular-nums">{t.amountPaid.toLocaleString()} {t.paymentCurrency}</span></li> })}</ul>
   </div>
 }
 
-export default function TimeGraph({ rows, context, live, active = true }: { rows: TimeTx[]; context: GraphContext; live?: LiveTimelineActions; active?: boolean }) {
-  if (!rows.length) return <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">조사 범위에 거래가 없습니다.</div>
-  if (rows.some(row => !Number.isFinite(Date.parse(row.txAt)))) return <div role="alert" className="rounded-lg border p-6 text-sm">거래 시각을 확인할 수 없어 시간순 그래프를 표시하지 못했습니다.</div>
-  return <ReactFlowProvider><GraphCanvas rows={rows} context={context} live={live} active={active} /></ReactFlowProvider>
+export default function TimeGraph({ rows, context }: { rows: TimeTx[]; context: GraphContext }) {
+  return <ReactFlowProvider><GraphCanvas rows={rows} context={context} /></ReactFlowProvider>
 }

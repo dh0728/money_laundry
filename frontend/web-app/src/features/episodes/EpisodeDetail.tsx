@@ -1,7 +1,7 @@
 import EpisodeOverview from './EpisodeOverview'
 import TimeGraph from '@/features/graph/timeline/TimeGraph'
 // v24 Detail.tsx(kind=Episode)를 옮김. 연결 Alert·탐지 유형·근거 출처가 중심이다(v23 요구).
-// 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/v24).
+// 그래프 탭은 v24 자금 흐름 그래프를 그대로 옮겼다(features/graph/0.24.0).
 import { useMemo, useState } from 'react'
 import type { HistoryRow } from '@/api/alerts'
 import { typeDisplay } from '@/api/codes'

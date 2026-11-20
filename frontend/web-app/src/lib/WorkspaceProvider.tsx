@@ -4,8 +4,8 @@ import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { useAsync } from './useAsync'
 import { PeriodContext, WorkspaceContext, WorkspaceState, useViewState, useWorkspace, type Period } from './workspaceState'
 
-export function WorkspaceProvider({ children, sessionKey, state }: { children: ReactNode; sessionKey?: string; state?: WorkspaceState }) {
-  const [local] = useState(() => new WorkspaceState(sessionKey))
+export function WorkspaceProvider({ children, state }: { children: ReactNode; state?: WorkspaceState }) {
+  const [local] = useState(() => new WorkspaceState())
   const store = state ?? local
   useEffect(() => {
     const changed = () => store.queries.invalidate()
@@ -16,11 +16,10 @@ export function WorkspaceProvider({ children, sessionKey, state }: { children: R
   }, [store])
   return <WorkspaceContext.Provider value={store}>{children}</WorkspaceContext.Provider>
 }
-export function SharedPeriod({ children, enabled = true, showWhileClockPending = false }: { children: ReactNode; enabled?: boolean; showWhileClockPending?: boolean }) {
+export function SharedPeriod({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
   const clock = useAsync(fetchDemoClock, [], { key: 'clock', enabled })
   const [override, setPeriod] = useViewState<Period | null>('period', null)
   if (!enabled) return <>{children}</>
-  if (showWhileClockPending && clock.state.status !== 'success') return <PeriodContext.Provider value={{ period: override ?? { from: '', to: '' }, setPeriod }}>{children}</PeriodContext.Provider>
   if (clock.state.status === 'loading') return <LoadingBlock label="업무 시각" />
   if (clock.state.status === 'error') return <ErrorBlock message={clock.state.message} onRetry={clock.retry} />
   const to = kstDate(clock.state.data.businessAt)

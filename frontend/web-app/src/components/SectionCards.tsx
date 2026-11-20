@@ -16,13 +16,19 @@ export function SectionCard({ item }: { item: SectionCardItem }) {
       <CardHeader>
         <CardDescription>{item.label}</CardDescription>
         <CardTitle className="type-display font-semibold tabular-nums">{item.value}</CardTitle>
+        {/* 재설계 S1: 증감 배지는 모서리가 아니라 비교 기준(전일 대비) 줄에 둔다 */}
       </CardHeader>
       <CardFooter className="flex-col items-start gap-1.5 text-sm">
-        <div className="flex w-full flex-wrap items-center justify-between gap-2 font-medium">
-          <span>{item.trend}</span>
-          {Icon && item.delta !== undefined && <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent text-foreground' : undefined} style={deltaTone ? { backgroundColor: `var(--risk-${deltaTone === 'positive' ? 0 : 9})` } : undefined}>
-            <Icon />{item.delta >= 0 ? '+' : ''}{item.delta}{item.unit ?? '%'}
-          </Badge>}
+        <div className="flex flex-wrap items-center gap-2 font-medium">
+          {item.trend}
+          {Icon && item.delta !== undefined && (
+            <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent text-foreground' : undefined} style={deltaTone ? { backgroundColor: `var(--risk-${deltaTone === 'positive' ? 0 : 9})` } : undefined}>
+              <Icon />
+              {item.delta >= 0 ? '+' : ''}
+              {item.delta}
+              {item.unit ?? '%'}
+            </Badge>
+          )}
         </div>
         <div className="text-muted-foreground">{item.note}</div>
       </CardFooter>
