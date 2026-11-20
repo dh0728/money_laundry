@@ -1,0 +1,22 @@
+.section-download-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--workspace-gap);
+  min-inline-size: 0;
+}
+.section-download-tools {
+  flex: none;
+  margin-inline-start: auto;
+}
+:where(.screen-panel, .dashboard-metric) > .section-download-heading:has(> .section-download-tools) {
+  --query-control-size: var(--aml-panel-control-size);
+  --panel-heading-offset: calc(var(--aml-panel-inset) - var(--panel-content-padding));
+  align-self: stretch;
+  inline-size: auto;
+  margin-block-start: var(--panel-heading-offset);
+  margin-inline-end: var(--panel-heading-offset);
+}
+:where(.screen-panel, .dashboard-metric) > .section-download-heading > .section-download-tools {
+  align-self: flex-start;
+}

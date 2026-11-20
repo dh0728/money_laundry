@@ -1,0 +1,9 @@
+.catalogue-card-samples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  align-items: start;
+  gap: var(--workspace-gap);
+}
+
+.catalogue-card-samples > div { min-width: 0 }
+.catalogue-card-samples h3 { margin-block: 0 var(--workspace-gap); font-size: var(--aml-type-caption-size) }

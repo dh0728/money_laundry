@@ -1,5 +1,5 @@
 import { cases, transactions, snapshot, patternName } from './dashboard-data'
-import type { ActionResult, JudgmentRecord, LedgerTransaction, RuleInput, RuleRecord, RuleStatus, Verdict, WorkspaceCase, WorkspaceState } from './workspace-store'
+import type { ActionResult, JudgmentRecord, LedgerTransaction, RuleInput, RuleRecord, RuleStatus, RuleVersionSnapshot, Verdict, WorkspaceCase, WorkspaceState } from './workspace-store'
 
 type Mutation<T> = ActionResult<{ state: WorkspaceState; value: T }>
 // This adapter is for bounded fixtures only. Production supplies server pages,
@@ -41,21 +41,21 @@ export function createWorkspaceState(): WorkspaceState {
   })
   const judgments: JudgmentRecord[] = records.filter(c => c.verdict).map((c, i) => ({
     id: `J-261115-${String(i + 1).padStart(6, '0')}`, caseIds: [c.caseId], displayIds: [c.displayId], transactionIds: [...c.transactionIds],
-    verdict: c.verdict!, reason: '거래 근거와 관련 계좌를 확인한 샘플 판정', reviewer: c.assignee,
-    at: '2026-11-15T16:00:00+09:00', cases: [structuredClone(c)], reportText: reportText([c], c.verdict!, '거래 근거와 관련 계좌를 확인한 샘플 판정'),
+    verdict: c.verdict!, reason: '거래 근거와 관련 계좌를 확인함', reviewer: c.assignee,
+    at: '2026-11-15T16:00:00+09:00', cases: [structuredClone(c)], reportText: reportText([c], c.verdict!, '거래 근거와 관련 계좌를 확인함'),
   }))
   const inputs: RuleInput[] = [
-    { name: '분산 송금 후보 검토', description: '모델 점수와 분산 송금 유형을 함께 검토하는 샘플 룰', typeCode: 1, scoreMin: .7, minTransactions: 1, windowHours: 24 },
+    { name: '분산 송금 후보 검토', description: '모델 점수와 분산 송금 유형을 함께 검토', typeCode: 1, scoreMin: .7, minTransactions: 1, windowHours: 24 },
     { name: '고위험 거래 모니터링', description: '유형과 별개로 높은 모델 점수의 거래를 검토', typeCode: null, scoreMin: .9, minTransactions: 2, windowHours: 72 },
     { name: '순환 거래 후보', description: '순환 거래 추정 결과를 검토', typeCode: 5, scoreMin: .8, minTransactions: 1, windowHours: 48 },
   ]
   const rules: RuleRecord[] = inputs.map((input, i) => ({ ...input, id: `RULE-${String(i + 1).padStart(3, '0')}`, version: 1,
     status: (['DRAFT', 'ACTIVE', 'REJECTED'] as const)[i], author: snapshot.userName, updatedAt: snapshot.at,
-    history: [event('샘플 룰 등록', i === 2 ? '오래된 조건을 다시 검토해 주세요.' : '검수용 초기 조건')],
+    history: [event('룰 등록', i === 2 ? '오래된 조건을 다시 검토해 주세요.' : '초기 조건 등록')],
   }))
   return { records, transactions: ledger, rules, judgments, notifications: [
     { id: 1, title: `${records[0].displayId} 새 배정`, body: '김OO 님 담당 업무입니다.', at: snapshot.at, href: `#/alerts/${records[0].caseId}?tab=overview`, read: false },
-    { id: 2, title: 'RULE-001 초안 검토', body: '샘플 룰 조건을 확인해 주세요.', at: snapshot.at, href: '#/rules?selected=RULE-001', read: false },
+    { id: 2, title: 'RULE-001 초안 검토', body: '룰 조건을 확인해 주세요.', at: snapshot.at, href: '#/rules?selected=RULE-001', read: false },
     { id: 3, title: `${records[2].displayId} 조사 중`, body: '연결 Alert와 거래 근거를 함께 확인하세요.', at: snapshot.at, href: `#/episodes/${records[2].caseId}?tab=overview`, read: true },
   ] }
 }
@@ -83,6 +83,7 @@ export function applyCaseVerdict(state: WorkspaceState, ids: number[], verdict: 
 export function bundleCaseAlerts(state: WorkspaceState, ids: number[], reason: string): Mutation<WorkspaceCase> {
   if (ids.length > 100) return failure('한 번에 최대 100건의 Alert를 묶을 수 있습니다.')
   const unique = [...new Set(ids)]
+  if (reason.trim().length > 2000) return failure('묶는 사유는 2,000자 이내로 입력해 주세요.')
   if (unique.length < 2 || !reasonValid(reason)) return failure('Alert 2건 이상을 선택하고 묶는 사유를 입력해 주세요.')
   const lookup = new Map(state.records.map(c => [c.caseId, c]))
   const rows = unique.flatMap(id => lookup.has(id) ? [lookup.get(id)!] : [])
@@ -113,12 +114,16 @@ export function updateTransactionVerdict(state: WorkspaceState, id: number, verd
   const next = { ...row, humanVerdict: verdict }
   return { ok: true, value: { value: next, state: { ...state, transactions: state.transactions.map(t => t.id === id ? next : t), records: state.records.map(c => c.transactionIds.includes(id) ? { ...c, revision: c.revision + 1, history: [...c.history, event(`거래 ${row.displayId} ${verdict === 'normal' ? '정상' : '이상'} 판정`, reason.trim())] } : c) } } }
 }
+function ruleVersionSnapshot(rule: RuleRecord): RuleVersionSnapshot {
+  const { name, description, typeCode, scoreMin, minTransactions, windowHours, version, status, author, updatedAt } = rule
+  return { name, description, typeCode, scoreMin, minTransactions, windowHours, version, status, author, updatedAt }
+}
 export function saveWorkspaceRule(state: WorkspaceState, input: RuleInput, existingId?: string): Mutation<RuleRecord> {
   if (!input.name.trim() || input.name.length > 100 || input.description.length > 2000 || !Number.isFinite(input.scoreMin) || input.scoreMin < 0 || input.scoreMin > 1 || !Number.isInteger(input.minTransactions) || input.minTransactions < 1 || !Number.isFinite(input.windowHours) || input.windowHours <= 0 || input.windowHours > 24 * 365 || (input.typeCode !== null && (!Number.isInteger(input.typeCode) || input.typeCode < 0 || input.typeCode > 8))) return failure('룰 이름, 유형, 점수(0~1), 최소 거래 수와 시간 범위를 확인해 주세요.')
   const existing = existingId ? state.rules.find(r => r.id === existingId) : undefined
   if (existingId && (!existing || !['DRAFT', 'REJECTED', 'STOPPED'].includes(existing.status))) return failure('현재 상태의 룰은 수정할 수 없습니다.')
   const id = existingId ?? `RULE-${String(Math.max(0, ...state.rules.map(r => Number(r.id.slice(5)))) + 1).padStart(3, '0')}`
-  const next: RuleRecord = { ...input, name: input.name.trim(), id, version: existing ? existing.version + 1 : 1, status: 'DRAFT', author: snapshot.userName, updatedAt: stamp(), history: [...(existing?.history ?? []), event(existing ? '초안 수정' : '초안 생성', input.description.trim() || '샘플 룰 조건 저장')] }
+  const next: RuleRecord = { ...input, name: input.name.trim(), id, version: existing ? existing.version + 1 : 1, versions: existing ? [...(existing.versions ?? []), ruleVersionSnapshot(existing)] : [], status: 'DRAFT', author: snapshot.userName, updatedAt: stamp(), history: [...(existing?.history ?? []), event(existing ? '초안 수정' : '초안 생성', input.description.trim() || '룰 조건 저장')] }
   return { ok: true, value: { value: next, state: { ...state, rules: existing ? state.rules.map(r => r.id === id ? next : r) : [...state.rules, next] } } }
 }
 export function transitionWorkspaceRule(state: WorkspaceState, id: string, status: RuleStatus, reason: string): Mutation<RuleRecord> {
@@ -126,6 +131,6 @@ export function transitionWorkspaceRule(state: WorkspaceState, id: string, statu
   const allowed: Record<RuleStatus, RuleStatus[]> = { DRAFT: ['PENDING_APPROVAL'], PENDING_APPROVAL: ['TESTING', 'REJECTED'], TESTING: ['ACTIVE', 'REJECTED', 'STOPPED'], ACTIVE: ['STOPPED'], STOPPED: ['TESTING'], REJECTED: ['DRAFT'] }
   if (!rule || !allowed[rule.status].includes(status)) return failure('허용되지 않은 룰 상태 변경입니다.')
   if (!reasonValid(reason)) return failure('상태 변경 사유를 입력해 주세요.')
-  const next = { ...rule, status, version: rule.version + 1, updatedAt: stamp(), history: [...rule.history, event(`모의 상태 변경: ${status}`, reason.trim())] }
+  const next = { ...rule, status, version: rule.version + 1, versions: [...(rule.versions ?? []), ruleVersionSnapshot(rule)], updatedAt: stamp(), history: [...rule.history, event(`모의 상태 변경: ${status}`, reason.trim())] }
   return { ok: true, value: { value: next, state: { ...state, rules: state.rules.map(r => r.id === id ? next : r) } } }
 }

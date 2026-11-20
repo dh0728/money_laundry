@@ -17,9 +17,13 @@ export type LedgerTransaction = {
 }
 export type RuleStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'TESTING' | 'ACTIVE' | 'STOPPED' | 'REJECTED'
 export type RuleInput = { name: string; description: string; typeCode: TypeCode | null; scoreMin: number; minTransactions: number; windowHours: number }
-export type RuleRecord = RuleInput & {
-  id: string; version: number; status: RuleStatus; author: string; updatedAt: string
+export type RuleVersionSnapshot = RuleInput & {
+  version: number; status: RuleStatus; author: string; updatedAt: string
+}
+export type RuleRecord = RuleVersionSnapshot & {
+  id: string
   history: { at: string; actor: string; action: string; reason: string }[]
+  versions?: RuleVersionSnapshot[]
 }
 export type JudgmentRecord = {
   id: string; caseIds: number[]; transactionIds: number[]; displayIds: string[]

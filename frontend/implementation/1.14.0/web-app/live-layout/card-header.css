@@ -1,0 +1,64 @@
+.card-header {
+  --card-action-size: max(var(--aml-space-24), calc(var(--aml-size-control-compact) - var(--aml-space-4)));
+  --card-action-icon: calc(var(--ui-icon-size) - var(--aml-space-4));
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-4);
+  min-inline-size: 0;
+  padding: var(--aml-card-header-padding);
+}
+.card-header:not(:has(> .spring-check)) { padding-inline-start: var(--aml-card-title-inset) }
+
+.card-header > .card-header-main {
+  --button-hover-bg: transparent;
+  --button-active-bg: transparent;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-inline-size: 0;
+  min-block-size: var(--card-action-size);
+  margin: 0;
+  padding: 0;
+  border-radius: var(--aml-radius-none);
+  text-align: start;
+  font-size: var(--aml-type-section-title-size);
+  font-weight: var(--aml-type-body-strong-weight);
+  line-height: var(--aml-type-section-title-lineHeight);
+  white-space: nowrap;
+}
+.card-header .card-header-main > code {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--aml-font-mono, monospace);
+}
+
+.card-header > .work-tab-add.button[data-add-work-tab] {
+  display: grid;
+  place-items: center;
+  flex: 0 0 var(--card-action-size);
+  min-inline-size: var(--card-action-size);
+  min-block-size: var(--card-action-size);
+  block-size: var(--card-action-size);
+  border-radius: var(--aml-radius-full);
+  color: var(--text);
+}
+
+.card-header > .spring-check.aml-density-check {
+  display: grid;
+  place-items: center start;
+  flex: 0 0 var(--aml-space-24);
+  min-block-size: var(--card-action-size);
+  background: transparent;
+}
+.card-header > .spring-check .spring-check__label { display: none }
+.card-header > .spring-check .spring-check__ring { opacity: .5 }
+.card-header > .work-tab-add .icon {
+  inline-size: var(--card-action-icon);
+  block-size: var(--card-action-icon);
+}
+
+.card-header > .work-tab-add:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring);
+  outline-offset: calc(-1 * var(--aml-stroke-focus));
+}

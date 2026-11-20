@@ -1,0 +1,24 @@
+.screen-layout > [data-case-list-table] {
+  display: flex;
+  flex-direction: column;
+  max-block-size: var(--workspace-available-block);
+}
+.case-table-scroll.entry-list { margin-block-start: 0 }
+.preview-case-table .case-table-open {
+  padding-block: var(--aml-space-6);
+  padding-inline: 0;
+  font-weight: var(--aml-type-body-strong-weight);
+}
+.preview-case-table code { font-family: var(--aml-font-mono, monospace) }
+.case-table-flows :is(code, small), .case-table-numeric > span { display: block }
+.preview-case-table tbody .case-table-numeric { text-align: end; font-variant-numeric: tabular-nums }
+.case-evidence-table { min-block-size: 0 }
+
+.case-table-episode {
+  --table-cell-inset: var(--aml-space-4);
+}
+.data-table-frame .case-table-episode .table-sort-button {
+  column-gap: var(--aml-space-4);
+  padding-inline: var(--table-cell-inset);
+}
+.case-table-episode .table-field-label { column-gap: var(--aml-space-4) }

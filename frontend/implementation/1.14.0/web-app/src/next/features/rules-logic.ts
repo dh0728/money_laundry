@@ -1,9 +1,40 @@
+import { typeDisplay } from '@/api/codes'
 import type { LedgerTransaction, RuleInput, RuleRecord, RuleStatus } from '../workspace-store'
 import { downloadCsv } from './report-io'
 
 export const ruleStatusLabels: Record<RuleStatus, string> = { DRAFT: '초안', PENDING_APPROVAL: '승인 대기', TESTING: '테스트 중', ACTIVE: '운영 중', STOPPED: '중지', REJECTED: '반려' }
 export const ruleTransitions: Record<RuleStatus, RuleStatus[]> = { DRAFT: ['PENDING_APPROVAL'], PENDING_APPROVAL: ['TESTING', 'REJECTED'], TESTING: ['ACTIVE', 'STOPPED', 'REJECTED'], ACTIVE: ['STOPPED'], STOPPED: ['TESTING'], REJECTED: ['DRAFT'] }
 export type RulePeriod = { start: string; end: string }
+export type RuleBlockKind = 'typeCode' | 'scoreMin' | 'accountWindow'
+
+export function ruleBlocksFor(input: RuleInput): RuleBlockKind[] {
+  const blocks: RuleBlockKind[] = []
+  if (input.typeCode !== null) blocks.push('typeCode')
+  if (input.scoreMin !== 0) blocks.push('scoreMin')
+  if (input.minTransactions !== 1 || input.windowHours !== 24) blocks.push('accountWindow')
+  return blocks.length ? blocks : ['scoreMin']
+}
+
+export function compileRuleBlocks(input: RuleInput, blocks: RuleBlockKind[]): RuleInput {
+  return {
+    name: input.name,
+    description: input.description,
+    typeCode: blocks.includes('typeCode') ? input.typeCode : null,
+    scoreMin: blocks.includes('scoreMin') ? input.scoreMin : 0,
+    minTransactions: blocks.includes('accountWindow') ? input.minTransactions : 1,
+    windowHours: blocks.includes('accountWindow') ? input.windowHours : 24,
+  }
+}
+
+export function ruleConditionSummary(input: RuleInput) {
+  const conditions = [
+    input.typeCode === null ? '' : `거래 유형이 ‘${typeDisplay(input.typeCode).label}’`,
+    input.scoreMin > 0 ? `모델 점수가 ${Number((input.scoreMin * 100).toFixed(2))}점 이상` : '',
+    input.minTransactions > 1 ? `같은 송금 계좌에서 ${input.windowHours}시간 안에 조건에 해당하는 거래가 ${input.minTransactions}건 이상` : '',
+  ].filter(Boolean)
+  return conditions.length ? `${conditions.join(', ')}이면 검토 대상으로 표시합니다.` : '조회 기간의 모든 거래를 검토 대상으로 표시합니다.'
+}
+
 export function validateRule(input: RuleInput) {
   const errors: Partial<Record<keyof RuleInput, string>> = {}
   if (!input.name.trim() || input.name.trim().length > 80) errors.name = '룰 이름은 1~80자로 입력해 주세요.'
@@ -64,7 +95,20 @@ export function runBacktest(transactions: LedgerTransaction[], input: RuleInput,
     if (matchedCount >= offset && rows.length < limit) rows.push(tx)
     matchedCount++; amountUsd += tx.amountUsd; matchedAccounts.add(tx.accountId)
   })
-  return { transactions: rows, matchedCount, scannedCount: scanned.length, accountCount: matchedAccounts.size, amountUsd }
+  return { transactions: rows, matchedCount, scannedCount: scanned.length, accountCount: matchedAccounts.size, amountUsd, matchedAccountIds: [...matchedAccounts] }
+}
+/** Compare the complete sender-account result sets, independently of visible paging. */
+export function compareBacktests(current: { matchedAccountIds: readonly number[] }, baseline: { matchedAccountIds: readonly number[] }) {
+  const currentIds = new Set(current.matchedAccountIds)
+  const baselineIds = new Set(baseline.matchedAccountIds)
+  const retainedAccountCount = [...currentIds].filter(id => baselineIds.has(id)).length
+  return {
+    matchedAccountCount: currentIds.size,
+    addedAccountCount: currentIds.size - retainedAccountCount,
+    removedAccountCount: baselineIds.size - retainedAccountCount,
+    retainedAccountCount,
+    deltaAccountCount: currentIds.size - baselineIds.size,
+  }
 }
 export function downloadRulesCsv(filename: string, rows: (string | number)[][]) {
   downloadCsv(filename, (rows[0] ?? []).map(String), rows.slice(1))
