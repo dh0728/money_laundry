@@ -1,6 +1,6 @@
 # AML RADAR 웹앱
 
-[팀 검수 프리뷰](live-layout/README.md)는 5215에서 실행합니다. 저장소 루트의 Mac [현재 화면.command](../../../../AML%20RADAR%20현재%20화면.command) 또는 Windows [현재 화면.bat](../../../../AML%20RADAR%20현재%20화면.bat)을 사용합니다.
+[팀 검수 프리뷰](live-layout/README.md)는 5215에서 실행합니다.
 
 5211은 아래 명령으로 여는 별도 샘플 앱입니다. 터미널을 열어 둔 채 브라우저에서 http://127.0.0.1:5211/ 에 접속합니다. 작업 이력은 [구현 문서](../../../../docs/frontend/implementation/implementation.md)에서 확인할 수 있습니다.
 
