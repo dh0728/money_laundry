@@ -6,6 +6,7 @@
 
 # Linux, Docker, Gradle 실행 파일은 LF
 *.sh text eol=lf
+*.command text eol=lf
 Dockerfile text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
