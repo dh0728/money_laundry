@@ -6,7 +6,6 @@
 
 | 필요한 것 | 열 파일이나 화면 |
 | --- | --- |
-| 팀 검수 화면 | 저장소를 받은 뒤 Mac은 [현재 화면.command](AML%20RADAR%20현재%20화면.command), Windows는 [현재 화면.bat](AML%20RADAR%20현재%20화면.bat)을 실행합니다. Git, Node.js 22.12 이상, pnpm 11.24.0이 필요합니다. |
 | 팀원이 프리뷰를 여는 방법 | [프리뷰 실행 안내](frontend/implementation/1.14.0/web-app/live-layout/README.md)에 터미널 명령과 화면별 주소가 있습니다. |
 | 프리뷰 소스 | [현재 프리뷰 폴더](frontend/implementation/1.14.0/web-app/live-layout/)에서 화면과 컴포넌트 코드를 찾습니다. |
 | 예전 화면 | [버전별 보존표](frontend/PRESERVATION.md)를 확인합니다. |
@@ -34,8 +33,7 @@ money_laundry/
 │   └── recovery/              # 회수한 과거 산출물
 ├── backend/                    # 백엔드 API 서버
 ├── docs/                       # API 명세, 인계, 검증과 연구 문서
-├── deploy/                     # 서버 환경과 배포 스크립트
-└── AML RADAR 현재 화면.command / .bat   # Mac·Windows 5215 실행
+└── deploy/                     # 서버 환경과 배포 스크립트
 ```
 
 ## 데이터
