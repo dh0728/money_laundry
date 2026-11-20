@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { CaseCard, StatusTag } from './ui/Tags'
 import { DailyChart } from './ui/DailyChart'
+import { PageHeaderActions } from './ui/PageHeaderActions'
 import { number, patternName, percent, riskBand, riskSettings, snapshot, workStates, type DashboardData, type Scope } from './dashboard-data'
 
 export function Dashboard({ data, scope, start, end, query, state, onRetry, onRange, onClear, onClearSearch }: {
@@ -13,15 +14,14 @@ export function Dashboard({ data, scope, start, end, query, state, onRetry, onRa
   const topPattern = [...data.patterns].sort((a, b) => b.count - a.count)[0]
   const totalAlerts = data.cases.filter(c => c.kind === 'ALERT').length
   return <>
-    <div data-part="context-row"><div><h1>{scope === 'mine' ? '내 담당 업무' : '기관 탐지 현황'}</h1><p data-part="muted">샘플 데이터 · {snapshot.date} 18:00 KST 기준{scope === 'mine' ? ` · ${snapshot.userName} 님 담당` : ' · 전체 담당자'}</p></div>
-      <PeriodPicker key={`${start}-${end}`} start={start} end={end} onRange={onRange} />
-    </div>
-    {query && <div data-part="filters"><Button data-tag="filter" variant="ghost" aria-label={`검색: ${query} 필터 해제`} onClick={onClearSearch}>검색: {query} ×</Button>{scope === 'all' && <p data-part="muted">검색에 해당하는 업무와 연결된 거래만 집계합니다.</p>}</div>}
+    <h1 data-part="dashboard-a11y-heading">{scope === 'mine' ? '내 담당 업무' : '기관 탐지 현황'}</h1>
+    <PageHeaderActions><div data-part="dashboard-period"><PeriodPicker key={`${start}-${end}`} start={start} end={end} onRange={onRange} /></div></PageHeaderActions>
+    {query && <div data-part="filters"><Button data-tag="filter" variant="ghost" aria-label={`검색: ${query} 필터 해제`} onClick={onClearSearch}>검색: {query} ×</Button></div>}
     {state === 'error' && <div role="alert" data-part="error-banner"><TriangleAlert />새로 불러오지 못했습니다. 마지막으로 불러온 데이터를 표시합니다.<Button variant="ghost" onClick={onRetry}>다시 시도</Button></div>}
     {state === 'loading' ? <section data-part="state-panel" role="status"><RefreshCw data-part="spinner" /><h2>대시보드를 불러오는 중</h2><p>집계와 담당 업무를 확인하고 있습니다.</p></section> : state === 'initial-error' ? <section data-part="state-panel" role="alert"><TriangleAlert /><h2>데이터를 불러오지 못했습니다</h2><p>연결을 확인한 뒤 다시 시도해 주세요.</p><Button onClick={onRetry}>다시 시도</Button></section> : <>
       <section data-part="summary-band" aria-label="요약 및 주요 지표">
         <article data-part="ai-summary"><h2><Sparkles />AI 요약</h2><strong>{scope === 'mine' ? `조회 기간 내 담당 Alert ${totalAlerts}건` : `조회 기간 의심 거래 ${data.suspicious.length}건`}</strong>
-          <p data-part="muted">합성 데이터로 작성한 요약 예시</p>
+          <p data-part="summary-context">샘플 · {snapshot.date} 18:00 KST{scope === 'mine' ? ` · ${snapshot.userName} 님 담당` : ' · 전체 담당자'}</p>
           <figure data-part="mini-chart"><figcaption>일별 {scope === 'mine' ? '내 담당' : '전체'} Alert 생성</figcaption><div>{data.daily.map(day => <div key={day.date}><meter aria-label={`${day.date} Alert ${day.alerts}건`} min={0} max={Math.max(1, ...data.daily.map(d => d.alerts))} value={day.alerts} /><span>{day.date.slice(5)}</span><strong>{day.alerts}건</strong></div>)}</div></figure>
           <p><TriangleAlert />{data.highRiskAlerts ? `위험 점수가 높은 처리 전 Alert ${data.highRiskAlerts}건을 먼저 확인해 주세요.` : '위험 점수가 높은 미처리 Alert가 없습니다.'}</p>
           <p data-part="muted">{scope === 'all' && topPattern?.count ? `의심 거래 중 ${patternName(topPattern.code)} 추정이 ${topPattern.count}건입니다. 모델 추정은 사람의 판정과 다릅니다.` : '모델 점수와 근거를 함께 확인한 뒤 판정해 주세요.'}</p>
@@ -44,7 +44,7 @@ export function Dashboard({ data, scope, start, end, query, state, onRetry, onRa
         <article data-part="chart-panel"><h2>전체 거래 구성</h2><div data-part="bar-rows">{[{ label: '모델 의심', count: data.suspicious.length }, { label: '그 외 분석 거래', count: data.transactions.length - data.suspicious.length }].map(row => <div key={row.label}><span>{row.label}</span><strong>{row.count}건</strong><meter min={0} max={data.transactions.length} value={row.count} aria-label={`${row.label} ${row.count}건`} /></div>)}</div><p data-part="muted">모델 분류이며 사람의 정상·이상 판정이 아닙니다.</p></article>
         <article data-part="chart-panel"><h2>의심 거래 유형별 건수</h2><p data-part="muted">패턴이 추정된 의심 거래 · NON_PATTERN 제외</p><div data-part="bar-rows">{data.patterns.map(row => <div key={row.code}><span>{patternName(row.code)}</span><strong>{row.count}건</strong><meter min={0} max={Math.max(1, ...data.patterns.map(p => p.count))} value={row.count} aria-label={`${patternName(row.code)} ${row.count}건`} /></div>)}</div></article>
       </section>}
-      {data.cases.length === 0 ? <section data-part="state-panel"><SearchEmpty /><h2>조건에 맞는 업무가 없습니다</h2><p>검색어나 조회 기간을 바꿔 다시 확인해 주세요.</p><Button variant="secondary" onClick={onClear}>조건 초기화</Button></section> : <section aria-label="업무 현황"><div data-part="board-heading"><h2>업무 현황 <span>{data.cases.length}건</span></h2><p data-part="muted">생성일 기준 · 업무 ID를 선택해 상세 조사</p></div><div data-part="case-board">{workStates.map(({ key, label }) => { const rows = data.cases.filter(c => c.workState === key); return <section key={key} aria-label={`${label} ${rows.length}건`}><h3><StatusTag preset={key}>{label}</StatusTag><span data-part="count">{rows.length}건</span></h3>{rows.slice(0, 25).map(item => <CaseCard key={item.caseId} item={item} />)}{rows.length > 25 && <p data-part="empty-column">상위 25건 표시 · 전체 업무는 Alert·Episode 목록에서 조회하세요.</p>}{!rows.length && <p data-part="empty-column">업무 없음</p>}</section> })}</div></section>}
+      {data.cases.length === 0 ? <section data-part="state-panel"><SearchEmpty /><h2>조건에 맞는 업무가 없습니다</h2><p>검색어나 조회 기간을 바꿔 다시 확인해 주세요.</p><Button variant="secondary" onClick={onClear}>조건 초기화</Button></section> : <section aria-label="업무 현황"><h2 data-part="dashboard-a11y-heading">업무 현황 {data.cases.length}건</h2><div data-part="case-board">{workStates.map(({ key, label }) => { const rows = data.cases.filter(c => c.workState === key); return <section key={key} aria-label={`${label} ${rows.length}건`}><h3><StatusTag preset={key}>{label}</StatusTag><span data-part="count">{rows.length}건</span></h3>{rows.slice(0, 25).map(item => <CaseCard key={item.caseId} item={item} />)}{rows.length > 25 && <p data-part="empty-column">상위 25건 표시 · 전체 업무는 Alert·Episode 목록에서 조회하세요.</p>}{!rows.length && <p data-part="empty-column">업무 없음</p>}</section> })}</div></section>}
     </>}
   </>
 }

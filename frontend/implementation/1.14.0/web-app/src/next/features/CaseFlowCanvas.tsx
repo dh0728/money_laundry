@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useId, useImperativeHandle, useMemo, useState, type Ref } from 'react'
-import { BaseEdge, Handle, MiniMap, Position, ReactFlow, getNodesBounds, type Edge, type EdgeChange, type EdgeProps, type Node, type NodeChange, type NodeProps, type ReactFlowInstance } from '@xyflow/react'
+import { BaseEdge, Handle, MiniMap, Position, ReactFlow, ViewportPortal, getNodesBounds, type Edge, type EdgeChange, type EdgeProps, type Node, type NodeChange, type NodeProps, type ReactFlowInstance } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk-api'
 import elkWorkerUrl from 'elkjs/lib/elk-worker.min.js?url'
 import '@xyflow/react/dist/base.css'
@@ -7,21 +7,23 @@ import { Button } from '@/components/ui/button'
 import type { GraphEdge, GraphNode } from './case-selectors'
 import { caseLayoutPositions, caseLayoutRequest, caseNodeSize, seedCasePositions, type CaseDirection, type CasePositions } from './case-graph-layout'
 import { caseEdgePath } from './case-edge-path'
+import { wrappingHull, type AlertGraphGroup } from './case-alert-groups'
 
-type FlowNode = Node<{ record: GraphNode; direction: CaseDirection }, 'case'>
-type FlowEdge = Edge<{ record: GraphEdge; moving: boolean }, 'case'>
+type FlowNode = Node<{ record: GraphNode; groups: string[]; direction: CaseDirection; highlighted: boolean }, 'case'>
+type FlowEdge = Edge<{ record: GraphEdge; groups: string[]; moving: boolean; highlighted: boolean }, 'case'>
 type Graph = { nodes: GraphNode[]; edges: GraphEdge[] }
 export type CaseFlowControls = { zoomBy: (factor: number) => void; fit: () => void; focus: (id: string) => void; arrange: () => void }
 type Props = {
   topology: Graph; visible: Graph; direction: CaseDirection; selectedNode: string | null; selectedEdge: string | null; moving: boolean
+  highlightedTransactionId?: number; alertGroups?: AlertGraphGroup[]
   controls: Ref<CaseFlowControls>; onNode: (id: string) => void; onEdge: (id: string) => void; onClear: () => void; onZoom: (zoom: number) => void
 }
 const riskLabels = { high: '위험', medium: '주의', low: '낮음' }
 const FlowAccount = memo(function FlowAccount({ data, selected }: NodeProps<FlowNode>) {
   const vertical = data.direction === 'DOWN'
-  return <div data-case="graph-node" data-selected={selected || undefined} data-abnormal={data.record.abnormal || undefined}>
+  return <div data-case="graph-node" data-selected={selected || undefined} data-highlighted={data.highlighted || undefined} data-abnormal={data.record.abnormal || undefined}>
     <Handle type="target" position={vertical ? Position.Top : Position.Left} isConnectable={false} />
-    <strong>{data.record.label}</strong><span>계좌 {data.record.accountIds.length}개{data.record.abnormal ? ' · 사람 판정 이상' : ''}</span>
+    <strong>{data.record.label}</strong>{data.groups.length > 0 && <small data-case="node-membership" title={data.groups.join(', ')}>{data.groups.length > 1 ? '공유 ' : ''}Alert {data.groups.length}개</small>}<span>계좌 {data.record.accountIds.length}개{data.record.abnormal ? ' · 사람 판정 이상' : ''}</span>
     <Handle type="source" position={vertical ? Position.Bottom : Position.Right} isConnectable={false} />
   </div>
 })
@@ -30,13 +32,14 @@ const FlowConnection = memo(function FlowConnection({ id, source, target, source
   const loop = source === target
   const [path, labelX, labelY] = caseEdgePath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, loop })
   if (!data) return null
-  return <g data-case="edge" data-case-risk={data.record.risk} data-selected={selected || undefined} data-moving={data.moving || undefined} strokeWidth={selected ? data.record.width + 2 : data.record.width}>
+  return <g data-case="edge" data-case-risk={data.record.risk} data-selected={selected || undefined} data-highlighted={data.highlighted || undefined} data-moving={data.moving || undefined} strokeWidth={selected || data.highlighted ? data.record.width + 2 : data.record.width}>
     <defs><marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" /></marker></defs>
     <BaseEdge id={id} path={path} interactionWidth={24} markerEnd={`url(#${markerId})`} />
-    <text data-case="edge-label" x={labelX} y={labelY} textAnchor="middle">{riskLabels[data.record.risk]} · {data.record.count}건</text>
-    <title>{data.record.count}건 · {data.record.amountUsd.toLocaleString('ko-KR')} USD · {riskLabels[data.record.risk]}</title>
+    <text data-case="edge-label" x={labelX} y={labelY} textAnchor="middle">{riskLabels[data.record.risk]} · {data.record.count}건{data.groups.length > 1 ? ` · 공유 Alert ${data.groups.length}개` : ''}</text>
+    <title>{data.record.count}건 · {data.record.amountUsd.toLocaleString('ko-KR')} USD · {riskLabels[data.record.risk]}{data.groups.length ? ` · ${data.groups.join(', ')}` : ''}</title>
   </g>
 })
+const noGroups: AlertGraphGroup[] = []
 const nodeTypes = { case: FlowAccount }
 const edgeTypes = { case: FlowConnection }
 const ariaLabelConfig = {
@@ -45,7 +48,7 @@ const ariaLabelConfig = {
   'edge.a11yDescription.default': 'Enter로 연결을 선택합니다.',
   'minimap.ariaLabel': '관계 전체 지도',
 }
-export function CaseFlowCanvas({ topology, visible, direction, selectedNode, selectedEdge, moving, controls, onNode, onEdge, onClear, onZoom }: Props) {
+export function CaseFlowCanvas({ topology, visible, direction, selectedNode, selectedEdge, highlightedTransactionId, alertGroups = noGroups, moving, controls, onNode, onEdge, onClear, onZoom }: Props) {
   const [flow, setFlow] = useState<ReactFlowInstance<FlowNode, FlowEdge> | null>(null)
   const [revision, setRevision] = useState(0)
   const request = useMemo(() => caseLayoutRequest(topology.nodes, topology.edges, direction), [topology.nodes, topology.edges, direction])
@@ -77,9 +80,11 @@ export function CaseFlowCanvas({ topology, visible, direction, selectedNode, sel
   }, [request, key, seeds])
   const positions = layout.key === key ? layout.positions : seeds
   const visibleNodes = useMemo(() => new Set(visible.nodes.map(node => node.id)), [visible.nodes])
-  const nodes = useMemo<FlowNode[]>(() => topology.nodes.map(record => ({ id: record.id, type: 'case', data: { record, direction }, position: (moves.key === key && moves.positions[record.id]) || positions[record.id] || { x: 0, y: 0 }, ...caseNodeSize, selected: record.id === selectedNode, hidden: !visibleNodes.has(record.id), ariaLabel: `${record.label} 선택`, ariaRole: 'button', deletable: false })), [topology.nodes, direction, moves, key, positions, selectedNode, visibleNodes])
+  const highlightedEdges = useMemo(() => new Set(visible.edges.filter(edge => highlightedTransactionId !== undefined && edge.transactionIds.includes(highlightedTransactionId)).map(edge => edge.id)), [visible.edges, highlightedTransactionId])
+  const highlightedNodes = useMemo(() => new Set(visible.edges.filter(edge => highlightedEdges.has(edge.id)).flatMap(edge => [edge.source, edge.target])), [visible.edges, highlightedEdges])
+  const nodes = useMemo<FlowNode[]>(() => topology.nodes.map(record => ({ id: record.id, type: 'case', data: { record, groups: alertGroups.filter(group => group.nodeIds.includes(record.id)).map(group => group.label), direction, highlighted: highlightedNodes.has(record.id) }, position: (moves.key === key && moves.positions[record.id]) || positions[record.id] || { x: 0, y: 0 }, ...caseNodeSize, selected: record.id === selectedNode, hidden: !visibleNodes.has(record.id), ariaLabel: `${record.label} 선택`, ariaRole: 'button', deletable: false })), [topology.nodes, direction, moves, key, positions, selectedNode, visibleNodes, highlightedNodes, alertGroups])
   const labels = useMemo(() => new Map(topology.nodes.map(node => [node.id, node.label])), [topology.nodes])
-  const edges = useMemo<FlowEdge[]>(() => visible.edges.map(record => ({ id: record.id, type: 'case', source: record.source, target: record.target, data: { record, moving }, selected: record.id === selectedEdge, focusable: true, deletable: false, ariaRole: 'button', ariaLabel: `${labels.get(record.source)} → ${labels.get(record.target)} · ${record.count}건 연결 선택` })), [visible.edges, moving, selectedEdge, labels])
+  const edges = useMemo<FlowEdge[]>(() => visible.edges.map(record => ({ id: record.id, type: 'case', source: record.source, target: record.target, data: { record, groups: alertGroups.filter(group => group.edgeIds.includes(record.id)).map(group => group.label), moving, highlighted: highlightedEdges.has(record.id) }, selected: record.id === selectedEdge, focusable: true, deletable: false, ariaRole: 'button', ariaLabel: `${labels.get(record.source)} → ${labels.get(record.target)} · ${record.count}건 연결 선택` })), [visible.edges, moving, selectedEdge, labels, highlightedEdges, alertGroups])
   const changeNodes = useCallback((changes: NodeChange<FlowNode>[]) => {
     const selected = changes.find(change => change.type === 'select' && change.selected)
     if (selected?.type === 'select') onNode(selected.id)
@@ -127,6 +132,13 @@ export function CaseFlowCanvas({ topology, visible, direction, selectedNode, sel
         onNodeClick={(_, node) => onNode(node.id)} onEdgeClick={(_, edge) => onEdge(edge.id)} onPaneClick={onClear} onMoveEnd={(_, viewport) => onZoom(viewport.zoom)}
         nodesDraggable nodesConnectable={false} edgesReconnectable={false} deleteKeyCode={null} multiSelectionKeyCode={null} selectionKeyCode={null} minZoom={.25} maxZoom={3}
         fitView fitViewOptions={{ padding: .2, maxZoom: 1.25 }} ariaLabelConfig={ariaLabelConfig}>
+        <ViewportPortal><svg data-case="alert-wrapping" aria-hidden="true" width="1" height="1">
+          {alertGroups.map((group,index) => {
+            const members = nodes.filter(node => !node.hidden && group.nodeIds.includes(node.id))
+            const hull = wrappingHull(members.map(node => node.position), caseNodeSize, 12)
+            return hull ? <g key={group.id} data-group-tone={index % 3}><polygon points={hull} /><text x={Math.min(...members.map(node=>node.position.x))} y={Math.min(...members.map(node=>node.position.y))-5}>{group.label}</text></g> : null
+          })}
+        </svg></ViewportPortal>
         <MiniMap pannable zoomable nodeColor="var(--aml-surface-muted)" nodeStrokeColor="var(--aml-border-strong)" maskColor="var(--aml-black-020)" />
       </ReactFlow>
     </div>

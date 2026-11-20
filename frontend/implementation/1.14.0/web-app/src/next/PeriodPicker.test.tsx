@@ -1,12 +1,18 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { Dashboard } from './Dashboard'
 import { selectDashboard } from './dashboard-data'
+import { PageHeaderContext } from './page-header-context'
 
 afterEach(cleanup)
 function setup() {
   const onRange = vi.fn()
-  render(<Dashboard data={selectDashboard('mine', '2026-11-09', '2026-11-15', '')} scope="mine" start="2026-11-09" end="2026-11-15" query="" state="ready" onRetry={vi.fn()} onRange={onRange} onClear={vi.fn()} onClearSearch={vi.fn()} />)
+  function DashboardWithHeader() {
+    const [host, setHost] = useState<HTMLElement | null>(null)
+    return <><header ref={setHost} /><PageHeaderContext.Provider value={host}><Dashboard data={selectDashboard('mine', '2026-11-09', '2026-11-15', '')} scope="mine" start="2026-11-09" end="2026-11-15" query="" state="ready" onRetry={vi.fn()} onRange={onRange} onClear={vi.fn()} onClearSearch={vi.fn()} /></PageHeaderContext.Provider></>
+  }
+  render(<DashboardWithHeader />)
   return { onRange, picker: screen.getByRole('form', { name: '조회 기간' }).closest('details')! }
 }
 describe('dashboard period edit lifecycle', () => {

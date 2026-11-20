@@ -14,6 +14,12 @@ describe('report filtering and selection', () => {
     expect(filterJudgments(rows, { query: '출처' })).toEqual([rows[1]])
     expect(filterJudgments(rows, { start: '2026-11-15', verdict: 'abnormal' })).toEqual([])
   })
+  it('filters on KST calendar dates including midnight and excluding the next midnight', () => {
+    const records = ['2026-11-15T14:59:59.999Z', '2026-11-15T15:00:00Z', '2026-11-15T16:30:00Z', '2026-11-16T14:59:59.999Z', '2026-11-16T15:00:00Z'].map((at, index) => ({ ...rows[0], id: `J-boundary-${index}`, at }))
+    expect(filterJudgments(records, { start: '2026-11-16', end: '2026-11-16' })).toEqual(records.slice(1, 4))
+    expect(filterJudgments(records, { end: '2026-11-15' })).toEqual([records[0]])
+    expect(filterJudgments(records, { start: '2026-11-17' })).toEqual([records[4]])
+  })
   it('excludes hidden, unknown and duplicate selections and preserves visible row order', () => {
     expect(selectedJudgments(rows, `${rows[1].id},${rows[0].id},${rows[0].id},unknown`)).toEqual(rows)
     expect(selectedJudgments([rows[0]], `${rows[1].id},${rows[0].id}`)).toEqual([rows[0]])

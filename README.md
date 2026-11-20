@@ -2,6 +2,16 @@
 
 인공지능사관학교 기업연계 프로젝트 — GNN(Graph Neural Network)을 활용해 금융 거래 그래프에서 자금세탁 의심거래를 탐지하는 팀 프로젝트입니다.
 
+## 어디서 시작하나요
+
+| 필요한 것 | 열 파일이나 화면 |
+| --- | --- |
+| 팀원이 프리뷰를 여는 방법 | [프리뷰 실행 안내](frontend/implementation/1.14.0/web-app/live-layout/README.md)에 터미널 명령과 화면별 주소가 있습니다. |
+| 프리뷰 소스 | [현재 프리뷰 폴더](frontend/implementation/1.14.0/web-app/live-layout/)에서 화면과 컴포넌트 코드를 찾습니다. |
+| 예전 화면 | [버전별 보존표](frontend/PRESERVATION.md)를 확인합니다. |
+| 백엔드 연결에 필요한 정보 | [프론트엔드 인계](docs/frontend/implementation/frontend-handoff.md)와 [API 연결 요구사항](docs/frontend/implementation/api.md)을 엽니다. |
+| 개발·운영 서버 설정 | [deploy](deploy/)에 환경별 설정과 배포 스크립트가 있습니다. |
+
 ## 팀 구성
 
 | 이름 | 역할 |
@@ -15,18 +25,16 @@
 ## 폴더 구조
 
 ```
-AML/
-├── data/               # IBM AML 원천 데이터 (Git에 올리지 않음 — 아래 '데이터' 참고)
-├── docs/
-│   ├── 01_research/    # 자료조사 (AML 도메인, GNN 논문/사례)
-│   ├── 02_data/        # 데이터 명세, EDA 결과
-│   ├── 03_planning/    # 기획 (요구사항 정의서, 유즈케이스)
-│   ├── 04_design/      # 설계 (아키텍처, 모델, 화면)
-│   └── meetings/       # 회의록
-└── README.md
+money_laundry/
+├── frontend/                   # 프론트엔드와 보존 이력. README.md에서 버전별 위치 안내
+│   ├── implementation/        # 구현 이력. 현재 코드는 1.14.0/web-app/
+│   ├── prototype/             # 중간발표 전 프로토타입
+│   ├── design/2.0.0/          # 10월 26일 새 디자인 시작 기록
+│   └── recovery/              # 회수한 과거 산출물
+├── backend/                    # 백엔드 API 서버
+├── docs/                       # API 명세, 인계, 검증과 연구 문서
+└── deploy/                     # 서버 환경과 배포 스크립트
 ```
-
-구현 단계에 들어가면 `src/`, `notebooks/` 등을 그때 추가합니다.
 
 ## 데이터
 

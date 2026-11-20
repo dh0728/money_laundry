@@ -7,7 +7,7 @@ import { selectDashboard, snapshot, type Scope, type DashboardData } from './das
 import { WorkspaceProvider } from './WorkspaceProvider'
 import { withinSampleBudget } from './workspace-data'
 import { useWorkspace } from './workspace-store'
-import { WorkspaceUtilities, type Preferences } from './WorkspaceUtilities'
+import { AccountDetails, WorkspaceUtilities, type Preferences } from './WorkspaceUtilities'
 import './styles/app.css'
 import './styles/workspace.css'
 
@@ -51,7 +51,7 @@ function WorkspaceBudget() {
 
 function WorkspaceApp() {
   const workspace = useWorkspace()
-  const [utility, setUtility] = useState<'notifications' | 'settings' | 'account' | null>(null)
+  const [utility, setUtility] = useState<'notifications' | 'settings' | 'account' | 'account-settings' | null>(null)
   const hash = useSyncExternalStore(subscribe, () => window.location.hash)
   const route = parseRoute(hash)
   const isDashboard = route.pathname.startsWith('/dashboard')
@@ -116,11 +116,11 @@ function WorkspaceApp() {
 
   const appearanceControls = <Appearance {...appearance} onTheme={theme => updateAppearance({ theme })} onAccent={accent => updateAppearance({ accent })} />
   return <div data-ui="aml-app" data-theme={appearance.theme} data-accent={appearance.accent} data-font-size={appearance.fontSize}>
-    {!signedIn || loginRoute ? <Login expired={route.searchParams.get('expired') === '1'} onLogin={signIn} appearance={appearanceControls} /> : <AppShell {...appearance} scope={scope} pathname={route.pathname} openRecords={openRecords} unreadCount={unread} onNotifications={() => setUtility('notifications')} onSettings={() => setUtility('settings')} onAccount={() => setUtility('account')} onCloseCase={id => { workspace.closeCase?.(id); if (id === currentCaseId) navigate('/dashboard/mine') }} filters={route.search} sidebarOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} onLogout={() => signOut()} appearance={appearanceControls} query={query} onSearch={q => updateFilter({ q })} actions={<>
+    {!signedIn || loginRoute ? <Login expired={route.searchParams.get('expired') === '1'} onLogin={signIn} appearance={appearanceControls} /> : <AppShell {...appearance} scope={scope} pathname={route.pathname} openRecords={openRecords} unreadCount={unread} onNotifications={() => setUtility('notifications')} onSettings={() => setUtility(current => current === 'account' ? 'account-settings' : 'settings')} accountOpen={utility === 'account'} onAccountOpenChange={open => setUtility(current => open ? 'account' : current === 'account' ? null : current)} accountContent={<AccountDetails onLogout={() => signOut()} />} onCloseCase={id => { workspace.closeCase?.(id); if (id === currentCaseId) navigate('/dashboard/mine') }} filters={route.search} sidebarOpen={sidebarOpen} onToggle={() => { setSidebarOpen(!sidebarOpen); setUtility(current => current === 'account' ? null : current) }} onLogout={() => signOut()} appearance={appearanceControls} query={query} onSearch={q => updateFilter({ q })} actions={<>
       {import.meta.env.DEV && <label data-part="preview-control"><span>검수 상태</span><select aria-label="검수 상태" value={isDashboard ? visibleState : featureState} onChange={e => preview(e.target.value)}><option value="ready">기본</option><option value="loading">로딩</option><option value="empty">빈 결과</option><option value="error">재조회 오류</option><option value="expired">세션 만료</option></select></label>}
       <Button variant="ghost" size="icon-sm" aria-label="새로고침" disabled={state === 'loading'} onClick={() => { if (!isDashboard) { const next = new URL(route); next.searchParams.delete('state'); navigate(`${next.pathname}${next.search}`) } setState('loading') }}><RefreshCw /></Button>
     </>}>{isDashboard ? <Dashboard data={data!} scope={scope} start={start} end={end} query={query} state={visibleState === 'error' && !hasData ? 'initial-error' : visibleState} onRetry={() => { setState('ready'); setHasData(true) }} onRange={(start, end) => updateFilter({ start, end })} onClearSearch={() => updateFilter({ q: '' })} onClear={() => { setState('ready'); updateFilter({ q: '', start: '2026-11-09', end: snapshot.date }) }} /> : <Suspense fallback={<p role="status" data-ws="empty">화면을 불러오는 중입니다.</p>}>{feature}</Suspense>}</AppShell>}
-    {signedIn && !loginRoute && <WorkspaceUtilities active={utility} onClose={() => setUtility(null)} preferences={appearance} onPreferences={value => updateAppearance(value)} onLogout={() => signOut()} />}
+    {signedIn && !loginRoute && <WorkspaceUtilities active={utility === 'account-settings' ? 'settings' : utility === 'account' ? null : utility} onClose={() => setUtility(current => current === 'account-settings' ? 'account' : null)} preferences={appearance} onPreferences={value => { updateAppearance(value); setUtility(null) }} />}
   </div>
 }
 

@@ -3,7 +3,7 @@ import type { Page } from '@/api/common'
 import type { WorkNotification, NotificationPage } from '@/api/notifications'
 import type { ReviewCase } from '@/api/liveReview'
 import type { LedgerTransaction } from '@/api/liveLedger'
-import type { DashboardSummary } from '@/api/liveDashboard'
+import type { DashboardResponse } from '@/api/liveDashboard'
 import { fixtureGet } from './liveFixtureApi'
 const rows = <T,>(path: string) => (fixtureGet(`${path}${path.includes('?') ? '&' : '?'}size=1000`) as Page<T>).content
 
@@ -39,14 +39,14 @@ it('uses the same transaction facts and exact source IDs in every case and ledge
   }
 })
 it('derives dashboard aggregate counts from the same synthetic ledger and cases', () => {
-  const dashboard = fixtureGet('/api/v1/dashboard/summary') as DashboardSummary
+  const dashboard = fixtureGet('/api/v1/dashboard') as DashboardResponse
   const ledger = rows<LedgerTransaction>('/api/v1/ledger/transactions')
   const cases = rows<ReviewCase>('/api/v1/review/cases')
-  expect(dashboard.pipeline.data?.detection.received).toBe(ledger.length)
-  expect(dashboard.pipeline.data?.detection.analyzed).toBe(ledger.filter(row => row.isSuspicious !== null).length)
-  expect(dashboard.pipeline.data?.detection.suspicious).toBe(ledger.filter(row => row.isSuspicious === true).length)
-  expect(dashboard.investigation.data?.institution.alerts).toBe(cases.filter(c => c.kind === 'ALERT' && c.status === 'OPEN').length)
-  expect(dashboard.investigation.data?.institution.episodes).toBe(cases.filter(c => c.kind === 'EPISODE' && c.status === 'OPEN').length)
+  expect(dashboard.detection.received).toBe(ledger.length)
+  expect(dashboard.detection.analyzed).toBe(ledger.filter(row => row.isSuspicious !== null).length)
+  expect(dashboard.detection.suspicious).toBe(ledger.filter(row => row.isSuspicious === true).length)
+  expect(dashboard.institution.alerts).toBe(cases.filter(c => c.kind === 'ALERT' && c.status === 'OPEN').length)
+  expect(dashboard.institution.episodes).toBe(cases.filter(c => c.kind === 'EPISODE' && c.status === 'OPEN').length)
 })
 
 it('uses NON_PATTERN as the largest synthetic class independently of binary suspicion', () => {
@@ -74,7 +74,7 @@ it('uses NON_PATTERN as the largest synthetic class independently of binary susp
 it('keeps dashboard denominators, scoped distributions and source scores consistent', () => {
   const ledger = rows<LedgerTransaction>('/api/v1/ledger/transactions')
   for (const query of ['', '?from=2026-10-13&to=2026-10-14', '?from=2026-11-01&to=2026-11-02']) {
-    const data = (fixtureGet('/api/v1/dashboard/summary' + query) as DashboardSummary).pipeline.data!
+    const data = fixtureGet('/api/v1/dashboard' + query) as DashboardResponse
     const params = new URLSearchParams(query)
     const scoped = ledger.filter(row => row.isSuspicious !== null && (!params.get('from') || row.occurredAt.slice(0, 10) >= params.get('from')!) && (!params.get('to') || row.occurredAt.slice(0, 10) <= params.get('to')!))
     expect(data.agreements.reduce((sum, row) => sum + row.count, 0)).toBe(scoped.length)
@@ -110,9 +110,9 @@ it('preserves IDs, per-currency amounts, personal filters and unique-transaction
   const range = rows<LedgerTransaction>('/api/v1/ledger/transactions?from=2026-10-13&to=2026-10-14')
   expect(range.length).toBeLessThan(ledger.length)
   expect(range.every(row => row.occurredAt.slice(0, 10) >= '2026-10-13' && row.occurredAt.slice(0, 10) <= '2026-10-14')).toBe(true)
-  const dashboard = fixtureGet('/api/v1/dashboard/summary') as DashboardSummary
-  expect(dashboard.pipeline.data?.agreements.reduce((sum, row) => sum + row.count, 0)).toBe(99)
-  expect(dashboard.pipeline.data?.types.reduce((sum, row) => sum + row.count, 0)).toBe(42)
+  const dashboard = fixtureGet('/api/v1/dashboard') as DashboardResponse
+  expect(dashboard.agreements.reduce((sum, row) => sum + row.count, 0)).toBe(99)
+  expect(dashboard.types.reduce((sum, row) => sum + row.count, 0)).toBe(42)
 })
 
 it('preserves transferred Alert evidence and uses the same active membership as summary', () => {

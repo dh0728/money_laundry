@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./tokens.css";
+@import "./semantic-tokens.css";
 @source "../../components/ui/button.tsx";
 
 /* Only this development unit consumes v3. The existing app keeps its stylesheet. */
@@ -22,23 +23,36 @@
   padding: 8px;
   border: 0;
   border-radius: 6px;
-  background: transparent;
-  color: var(--aml-text-primary);
+  background: var(--aml-semantic-surface-brand-base-default);
+  color: var(--aml-text-on-primary);
   font: inherit;
   white-space: nowrap;
   box-shadow: none;
+  transition: none;
 }
-[data-ui="shell-chrome"] [data-slot="button"]:hover { background: var(--aml-action-ghost-hover); }
-[data-ui="shell-chrome"] [data-slot="button"]:active { background: var(--aml-action-ghost-pressed); }
-[data-ui="shell-chrome"] [data-slot="button"]:focus-visible { outline: 2px solid var(--aml-border-focus); outline-offset: 2px; }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="default"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-brand-base-hover); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="default"]:active:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-brand-base-pressed); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="destructive"] { background: var(--aml-semantic-surface-status-danger-base-default); color: var(--aml-semantic-contents-absolute-inverse); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="destructive"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-status-danger-base-hover); color: var(--aml-semantic-contents-absolute-theme); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="destructive"]:active:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-status-danger-base-pressed); color: var(--aml-semantic-contents-absolute-theme); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="ghost"] { background: transparent; color: var(--aml-text-primary); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="ghost"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-action-ghost-hover); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="ghost"]:active:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-action-ghost-pressed); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="secondary"] { background: var(--aml-semantic-surface-neutral-base-default); color: var(--aml-semantic-contents-absolute-inverse); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="secondary"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-neutral-base-hover); color: var(--aml-semantic-contents-absolute-theme); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant="secondary"]:active:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-neutral-base-pressed); color: var(--aml-semantic-contents-absolute-theme); }
+[data-ui="shell-chrome"] [data-slot="button"][data-variant]:is(:disabled,[aria-disabled="true"]) { cursor: default; pointer-events: none; background: var(--aml-action-disabled); color: var(--aml-text-disabled); opacity: 1; }
+[data-ui="shell-chrome"] [data-slot="button"]:focus-visible { outline: var(--aml-stroke-focus) solid var(--aml-focus-ring); outline-offset: var(--aml-space-2); }
 [data-ui="shell-chrome"] [data-slot="button"][data-size="icon-sm"] { width: 32px; }
 [data-ui="shell-chrome"] [data-slot="button"][data-size="icon-xs"] { width: 20px; height: 20px; padding: 4px; }
 [data-ui="shell-chrome"] svg { width: 16px; height: 16px; flex-shrink: 0; }
-[data-ui="shell-chrome"] [data-slot="button"][data-tone="brand"] { background: var(--aml-action-primary); color: var(--aml-text-on-primary); }
-[data-ui="shell-chrome"] [data-slot="button"][data-tone="brand"]:hover { background: var(--aml-action-primary-hover); }
-[data-ui="shell-chrome"] [data-slot="button"][data-tone="brand"]:active { background: var(--aml-action-primary-pressed); }
-[data-ui="shell-chrome"] [data-slot="button"][data-tone="inverse"] { background: var(--aml-gray-020); color: var(--aml-white-100); }
-[data-ui="shell-chrome"] [data-slot="button"][data-tone="muted"] { background: var(--aml-surface-muted); }
+[data-ui="shell-chrome"] [data-slot="button"][data-tone="brand"]:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-brand-base-default); color: var(--aml-text-on-primary); }
+[data-ui="shell-chrome"] [data-slot="button"][data-tone="brand"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-brand-base-hover); }
+[data-ui="shell-chrome"] [data-slot="button"][data-tone="brand"]:active:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-brand-base-pressed); }
+[data-ui="shell-chrome"] [data-slot="button"][data-tone="inverse"]:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-neutral-base-default); color: var(--aml-semantic-contents-absolute-inverse); }
+[data-ui="shell-chrome"] [data-slot="button"][data-tone="inverse"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-neutral-base-hover); color: var(--aml-semantic-contents-absolute-theme); }
+[data-ui="shell-chrome"] [data-slot="button"][data-tone="inverse"]:active:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-semantic-surface-neutral-base-pressed); color: var(--aml-semantic-contents-absolute-theme); }
+[data-ui="shell-chrome"] [data-slot="button"][data-tone="muted"]:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-current]) { background: var(--aml-surface-muted); }
 [data-ui="shell-chrome"] [data-chrome-slot="common-header"] { display: flex; align-items: center; gap: 8px; height: 48px; padding: 8px; box-shadow: inset 0 -1px 0 var(--aml-border-default); }
 [data-ui="shell-chrome"] [data-chrome-slot="header-sidebar"] { display: flex; align-items: center; gap: 8px; flex: 0 0 232px; height: 32px; padding-right: 8px; }
 [data-ui="shell-chrome"] [data-chrome-slot="unread"] { margin-left: auto; width: 120px; }
@@ -50,7 +64,9 @@
 [data-ui="shell-chrome"] [data-chrome-slot="work-tabs"] [data-slot="button"]:last-child { width: 79px; }
 [data-ui="shell-chrome"] [data-chrome-slot="view-tabs"] [data-slot="button"]:first-child { width: 79px; }
 [data-ui="shell-chrome"] [data-chrome-slot="view-tabs"] [data-slot="button"]:last-child { width: 67px; }
-[data-ui="shell-chrome"] [data-slot="button"][aria-pressed="true"] { background: var(--aml-surface-panel); color: var(--aml-text-link); }
+[data-ui="shell-chrome"] [data-slot="button"]:is([aria-pressed="true"],[aria-current]):not(:disabled):not([aria-disabled="true"]) { background: var(--aml-selection-bg); color: var(--aml-selection-fg); }
+[data-ui="shell-chrome"] [data-slot="button"]:is([aria-pressed="true"],[aria-current]):not(:disabled):not([aria-disabled="true"]):hover { background: var(--aml-semantic-surface-neutral-strong-hover); color: var(--aml-selection-fg); }
+[data-ui="shell-chrome"] [data-slot="button"]:is([aria-pressed="true"],[aria-current]):not(:disabled):not([aria-disabled="true"]):active { background: var(--aml-semantic-surface-neutral-strong-pressed); color: var(--aml-selection-fg); }
 [data-ui="shell-chrome"] [data-chrome-slot="header-actions"] { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 [data-ui="shell-chrome"] [data-chrome-slot="header-actions"] [data-slot="button"]:nth-child(1) { width: 94px; }
 [data-ui="shell-chrome"] [data-chrome-slot="header-actions"] [data-slot="button"]:nth-child(2) { width: 80px; }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PageHeaderContext } from '../page-header-context'
 import type { JudgmentRecord } from '../workspace-store'
@@ -16,7 +16,7 @@ function setup(search = '') {
   const header = document.createElement('div'); header.dataset.testHeader = ''; document.body.append(header)
   const page = (query: string) => <PageHeaderContext value={header}><ReportPage route={new URL(`https://aml.local/report${query}`)} /></PageHeaderContext>
   const view = render(page(search))
-  return { reroute: (query: string) => view.rerender(page(query)) }
+  return { ...view, reroute: (query: string) => view.rerender(page(query)) }
 }
 
 describe('report selection journey', () => {
@@ -38,6 +38,72 @@ describe('report selection journey', () => {
     expect(downloadCsv).toHaveBeenCalledOnce()
     expect(vi.mocked(downloadCsv).mock.calls[0][2]).toHaveLength(1)
     expect(vi.mocked(downloadCsv).mock.calls[0][2][0][0]).toBe(judgments[0].id)
+  })
+  it.each(['success', 'failure'])('keeps the PDF invoker focusable during a pending download and after %s', async outcome => {
+    let finish!: () => void
+    let fail!: (error: Error) => void
+    vi.mocked(downloadJudgmentPdf).mockImplementationOnce(() => new Promise<void>((resolve, reject) => { finish = resolve; fail = reject }))
+    setup('?selected=J-261115-000001')
+    const download = screen.getByRole('button', { name: '선택 1건 PDF 다운로드' })
+    download.focus()
+    fireEvent.click(download)
+    expect(download).toHaveAttribute('aria-disabled', 'true')
+    expect(download).toBeEnabled()
+    expect(download).toHaveFocus()
+    fireEvent.click(download)
+    expect(downloadJudgmentPdf).toHaveBeenCalledTimes(1)
+    await act(async () => { if (outcome === 'success') finish(); else fail(new Error('PDF 만들기 실패')) })
+    expect(download).toHaveFocus()
+    expect(download).not.toHaveAttribute('aria-disabled', 'true')
+    expect(download).toBeEnabled()
+    expect(screen.getByRole(outcome === 'success' ? 'status' : 'alert')).toHaveTextContent(outcome === 'success' ? '1건의 판정 보고서' : 'PDF 만들기 실패')
+  })
+  it.each(['success', 'failure'])('does not reclaim focus after the user moves during a PDF %s', async outcome => {
+    let finish!: () => void
+    let fail!: (error: Error) => void
+    vi.mocked(downloadJudgmentPdf).mockImplementationOnce(() => new Promise<void>((resolve, reject) => { finish = resolve; fail = reject }))
+    setup('?selected=J-261115-000001')
+    const download = screen.getByRole('button', { name: '선택 1건 PDF 다운로드' })
+    download.focus()
+    fireEvent.click(download)
+    const search = screen.getByRole('searchbox')
+    search.focus()
+    await act(async () => { if (outcome === 'success') finish(); else fail(new Error('PDF 만들기 실패')) })
+    expect(search).toHaveFocus()
+  })
+  it('keeps an invalid selection disabled after a pending PDF finishes without reclaiming focus', async () => {
+    let finish!: () => void
+    vi.mocked(downloadJudgmentPdf).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+    const { reroute } = setup('?selected=J-261115-000001')
+    fireEvent.click(screen.getByRole('button', { name: '선택 1건 PDF 다운로드' }))
+    const search = screen.getByRole('searchbox')
+    search.focus()
+    reroute('?selected=missing')
+    await act(async () => finish())
+    expect(search).toHaveFocus()
+    expect(screen.getByRole('button', { name: '선택 0건 PDF 다운로드' })).toBeDisabled()
+    expect(downloadJudgmentPdf).toHaveBeenCalledExactlyOnceWith([judgments[0]])
+  })
+  it('does not restore report focus after leaving the report while a PDF finishes', async () => {
+    let finish!: () => void
+    vi.mocked(downloadJudgmentPdf).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+    const { rerender } = setup('?selected=J-261115-000001')
+    const download = screen.getByRole('button', { name: '선택 1건 PDF 다운로드' })
+    download.focus()
+    fireEvent.click(download)
+    rerender(<button>이전 화면</button>)
+    const destination = screen.getByRole('button', { name: '이전 화면' })
+    destination.focus()
+    await act(async () => finish())
+    expect(destination).toHaveFocus()
+    expect(download).not.toBeInTheDocument()
+  })
+  it.each(['table', 'cards'])('renders UTC judgment timestamps on the next KST day in %s view', view => {
+    const at = '2026-11-15T16:30:00Z'
+    judgments.push({ ...judgments[0], id: 'J-261116-000003', at })
+    setup(`?view=${view}`)
+    const time = document.querySelector(`time[datetime="${at}"]`)
+    expect(time).toHaveTextContent(new Date(at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))
   })
   it('keeps the last empty snapshot on refetch error and retries without data fabrication', () => {
     const { reroute } = setup('?state=empty')

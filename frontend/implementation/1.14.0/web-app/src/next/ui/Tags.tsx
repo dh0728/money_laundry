@@ -13,7 +13,7 @@ export function ScoreTag({ score }: { score: number }) {
   return <span data-tag="score" data-band={riskBand(score)} aria-label={`모델 점수 ${score.toFixed(2)}`}><TriangleAlert aria-hidden="true" />{score.toFixed(2)}</span>
 }
 export function CaseCard({ item }: { item: CaseRecord }) {
-  return <article data-part="case-card" data-testid="case-card" aria-label={item.displayId}>
+  return <article data-part="case-card" data-testid="case-card" data-verdict={item.verdict ?? 'unjudged'} aria-label={item.displayId}>
     <header><strong><a href={caseHref(item)}>{item.displayId}</a></strong></header>
     <dl>
       <div><dt>추정 패턴</dt><dd><PatternTag code={item.typeCode} probability={item.probability} /></dd></div>

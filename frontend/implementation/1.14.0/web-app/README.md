@@ -1,5 +1,9 @@
 # AML RADAR 웹앱
 
+[팀 검수 프리뷰](live-layout/README.md)는 5215에서 실행합니다. 저장소 루트의 Mac [현재 화면.command](../../../../AML%20RADAR%20현재%20화면.command) 또는 Windows [현재 화면.bat](../../../../AML%20RADAR%20현재%20화면.bat)을 사용합니다.
+
+5211은 아래 명령으로 여는 별도 샘플 앱입니다. 터미널을 열어 둔 채 브라우저에서 http://127.0.0.1:5211/ 에 접속합니다. 작업 이력은 [구현 문서](../../../../docs/frontend/implementation/implementation.md)에서 확인할 수 있습니다.
+
 ## 전체 샘플 프론트엔드
 
 루트 `/`는 `src/next/main.tsx`의 새 v3 앱이다. `#/login`, `#/dashboard/mine`, `#/dashboard/all`, `#/rules`, `#/rules/new`, `#/rules/RULE-001/backtest`, `#/investigate/ledger`, `#/investigate/alerts`, `#/investigate/episodes`, `#/alerts/8100`, `#/episodes/8102`, `#/report`를 지원한다. 샘플 계정 버튼 또는 `demo` / `radar-demo`로 입장한다. 판정·묶기·룰·검토 의견·알림은 화면 간 공유하는 메모리 샘플이며 새로고침·로그아웃하면 초기화된다. 실제 인증·API 요청·서버 저장은 연결하지 않는다. `VITE_API_MODE`는 새 앱에 적용되지 않는다.

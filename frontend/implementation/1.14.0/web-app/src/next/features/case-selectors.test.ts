@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { cases } from '../dashboard-data'
 import type { LedgerTransaction, WorkspaceCase } from '../workspace-store'
-import { buildCaseGraph, canJudgeCase, caseEvidence, caseGraphBudget, downloadCaseCsv, indexCaseLedger, relatedCases } from './case-selectors'
+import { buildCaseGraph, canJudgeCase, caseEvidence, caseOverviewFacts, caseGraphBudget, downloadCaseCsv, indexCaseLedger, relatedCases } from './case-selectors'
 
 const item: WorkspaceCase = { ...cases[0], revision: 1, alertCaseIds: [], comments: [], history: [] }
-const tx = (id: number, from: number, to: number, amountUsd = 100): LedgerTransaction => ({ id, displayId: `T-${id}`, date: '2026-11-15', occurredAt: `2026-11-15T12:00:${id % 60}Z`, typeCode: 3, probability: .8, suspicious: true, score: .95, amountUsd, currency: 'USD', accountId: from, ownerId: from + 100, fromAccountId: from, toAccountId: to, humanVerdict: null })
+const tx = (id: number, from: number, to: number, amountUsd = 100): LedgerTransaction => ({ id, displayId: `T-${id}`, date: '2026-11-15', occurredAt: `2026-11-15T12:00:${String(id % 60).padStart(2, '0')}Z`, typeCode: 3, probability: .8, suspicious: true, score: .95, amountUsd, currency: 'USD', accountId: from, ownerId: from + 100, fromAccountId: from, toAccountId: to, humanVerdict: null })
 
 describe('case detail evidence and permissions', () => {
   it('denies another assignee and closed cases', () => {
@@ -89,5 +89,96 @@ describe('case detail evidence and permissions', () => {
       expect(output).toContain('"증빙 확인"')
       await new Promise(resolve => setTimeout(resolve, 1))
     } finally { click.mockRestore(); vi.unstubAllGlobals() }
+  })
+})
+
+
+describe('case overview facts', () => {
+  it('deduplicates evidence references before table, graph and related-case aggregates', () => {
+    const record = { ...item, transactionIds: [1, 1, 2, 2] }
+    const rows = [tx(1, 1, 2, 100), tx(2, 1, 2, 200)]
+    const evidence = caseEvidence(record, rows)
+    expect(evidence.map(row => row.id)).toEqual([1, 2])
+    expect(buildCaseGraph(evidence, 'pattern').edges[0]).toMatchObject({ count: 2, amountUsd: 300 })
+    const related = { ...record, caseId: item.caseId + 1 }
+    expect(relatedCases(record, [record, related], rows)[0].sharedTransactions).toBe(2)
+  })
+  it('counts unique missing references without treating duplicates as loaded evidence', () => {
+    const record = { ...item, transactionIds: [1, 1, 2, 99, 99] }
+    expect(caseOverviewFacts(record, [tx(1, 1, 2), tx(2, 2, 3), tx(3, 3, 4)])).toEqual({
+      referenceCount: 3, availableCount: 2, missingCount: 1, duplicateReferenceCount: 2,
+      complete: false, accountCount: 3, knownOwnerCount: 3, unknownOwnerAccountCount: 0,
+      period: null, invalidTimestampCount: 0,
+    })
+  })
+  it('resolves both endpoint owners from the full snapshot and counts shared owners once', () => {
+    const record = { ...item, transactionIds: [1, 1, 2] }
+    const rows = [tx(1, 1, 2), { ...tx(2, 2, 3), ownerId: 101 }, { ...tx(3, 3, 4), occurredAt: '2000-01-01T00:00:00Z' }]
+    expect(caseOverviewFacts(record, indexCaseLedger(rows))).toEqual({
+      referenceCount: 2, availableCount: 2, missingCount: 0, duplicateReferenceCount: 1,
+      complete: true, accountCount: 3, knownOwnerCount: 2, unknownOwnerAccountCount: 0,
+      period: { start: '2026-11-15T12:00:01.000Z', end: '2026-11-15T12:00:02.000Z' }, invalidTimestampCount: 0,
+    })
+  })
+  it('keeps an unobserved destination owner unknown', () => {
+    expect(caseOverviewFacts({ ...item, transactionIds: [1] }, [tx(1, 1, 2)])).toMatchObject({
+      accountCount: 2, knownOwnerCount: 1, unknownOwnerAccountCount: 1,
+      period: { start: '2026-11-15T12:00:01.000Z', end: '2026-11-15T12:00:01.000Z' },
+    })
+  })
+  it('counts a self-transfer account once', () => {
+    expect(caseOverviewFacts({ ...item, transactionIds: [1] }, [tx(1, 1, 1)])).toMatchObject({
+      accountCount: 1, knownOwnerCount: 1, unknownOwnerAccountCount: 0,
+    })
+  })
+  it.each([false, true])('keeps conflicting ownership unknown regardless of row order (reversed=%s)', reversed => {
+    const rows = [tx(1, 1, 2), tx(2, 2, 3), { ...tx(3, 1, 4), ownerId: 999 }, tx(4, 1, 5)]
+    const index = indexCaseLedger(reversed ? [...rows].reverse() : rows)
+    expect(index.owners.has(1)).toBe(false)
+    expect(caseOverviewFacts({ ...item, transactionIds: [1] }, index)).toMatchObject({
+      accountCount: 2, knownOwnerCount: 1, unknownOwnerAccountCount: 1,
+    })
+    expect(buildCaseGraph([rows[0]], 'owner', index.owners).nodes.map(node => node.id)).toEqual(['account:1', 'owner:102'])
+  })
+  it('orders period endpoints by parsed instants, not strings containing different offsets', () => {
+    const rows = [
+      { ...tx(1, 1, 2), occurredAt: '2026-11-15T09:00:00+09:00' },
+      { ...tx(2, 2, 3), occurredAt: '2026-11-14T20:00:00-05:00' },
+    ]
+    expect(caseOverviewFacts({ ...item, transactionIds: [2, 1] }, rows).period).toEqual({
+      start: '2026-11-15T00:00:00.000Z', end: '2026-11-15T01:00:00.000Z',
+    })
+  })
+  it.each(['not-a-date', '', '2026-11-15T09:00:00', '2026-02-30T00:00:00Z', '2026-11-31T12:00:00+09:00', '2026-02-29T00:00:00Z', '2026-11-15T24:00:00Z'])('withholds the whole period for invalid or offset-free time %j', occurredAt => {
+    const rows = [tx(1, 1, 2), { ...tx(2, 2, 3), occurredAt }]
+    expect(caseOverviewFacts({ ...item, transactionIds: [1, 2, 2] }, rows)).toMatchObject({
+      referenceCount: 2, availableCount: 2, complete: true, duplicateReferenceCount: 1,
+      invalidTimestampCount: 1, period: null,
+    })
+  })
+  it('accepts a real leap day with an explicit offset', () => {
+    const rows = [{ ...tx(1, 1, 2), occurredAt: '2024-02-29T12:00:00.250+09:00' }]
+    expect(caseOverviewFacts({ ...item, transactionIds: [1] }, rows)).toMatchObject({
+      invalidTimestampCount: 0, period: { start: '2024-02-29T03:00:00.250Z', end: '2024-02-29T03:00:00.250Z' },
+    })
+  })
+  it('returns no period for an empty case even when the ledger has other transactions', () => {
+    expect(caseOverviewFacts({ ...item, transactionIds: [] }, [tx(1, 1, 2)])).toEqual({
+      referenceCount: 0, availableCount: 0, missingCount: 0, duplicateReferenceCount: 0,
+      complete: true, accountCount: 0, knownOwnerCount: 0, unknownOwnerAccountCount: 0,
+      period: null, invalidTimestampCount: 0,
+    })
+  })
+  it('distinguishes an entirely missing evidence set from an empty case', () => {
+    expect(caseOverviewFacts({ ...item, transactionIds: [1, 2] }, [])).toMatchObject({
+      referenceCount: 2, availableCount: 0, missingCount: 2, complete: false, period: null, invalidTimestampCount: 0,
+    })
+  })
+  it('retains reference and ledger bounds before inspecting oversized rows', () => {
+    const inaccessible = <T,>(length: number) => new Proxy(new Array<T>(length), {
+      get(target, property) { if (property === 'length') return target.length; throw new Error('Oversized input was inspected') },
+    })
+    expect(() => caseOverviewFacts({ ...item, transactionIds: inaccessible<number>(10_001) }, [])).toThrow(RangeError)
+    expect(() => caseOverviewFacts(item, inaccessible<LedgerTransaction>(10_001))).toThrow(RangeError)
   })
 })

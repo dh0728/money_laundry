@@ -1,0 +1,24 @@
+/* Related reuses the existing account/owner graph and its controls. */
+[data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] { container-type: inline-size; }
+[data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] > [data-case="analysis-layout"] { grid-template-columns: minmax(240px,372px) minmax(0,1fr); align-items: start; }
+[data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] > [data-case="analysis-layout"] > [data-case="analysis-side"],
+[data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] > [data-case="analysis-layout"] > [data-case="graph-area"] { order: 0; grid-column: auto; }
+[data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] > [data-case="analysis-layout"] > [data-case="analysis-detail"] { grid-column: 1 / -1; order: 1; min-height: 0; }
+[data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] [data-case="graph-scope"] { min-width: 0; }
+@container (max-width: 800px) {
+  [data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] > [data-case="analysis-layout"]:not(:fullscreen) { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 800px) {
+  [data-ui="aml-app"] [data-case="analysis"][data-graph-layout="related"] > [data-case="analysis-layout"]:fullscreen { grid-template-columns: minmax(0,1fr); }
+}
+
+[data-ui="aml-app"] [data-case="alert-group-legend"] { padding: 8px 12px; border-bottom: 1px solid var(--aml-border-default); font-size: 12px; }
+[data-ui="aml-app"] [data-case="alert-group-legend"] p { margin: 4px 0; color: var(--aml-text-secondary); }
+[data-ui="aml-app"] [data-case="alert-group-legend"] span { display: inline-block; margin: 4px 12px 4px 0; padding-left: 8px; border-left: 3px solid currentColor; }
+[data-ui="aml-app"] [data-group-tone="0"] { color: var(--aml-text-link); }
+[data-ui="aml-app"] [data-group-tone="1"] { color: var(--aml-status-positive-text); }
+[data-ui="aml-app"] [data-group-tone="2"] { color: var(--aml-status-caution-text); }
+[data-ui="aml-app"] [data-case="alert-wrapping"] polygon { fill: currentColor; fill-opacity: .07; stroke: currentColor; stroke-opacity: .65; stroke-width: 2; stroke-linejoin: round; }
+[data-ui="aml-app"] [data-case="alert-wrapping"] text { fill: currentColor; font-size: 12px; font-weight: 600; }
+[data-ui="aml-app"] [data-case="node-membership"] { font-size: 11px; color: var(--aml-text-link); }
+[data-ui="aml-app"] [data-case="alert-wrapping"] { overflow: visible; position: absolute; pointer-events: none; z-index: -1; }
