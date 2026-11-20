@@ -1,0 +1,66 @@
+.ai-summary-blob {
+  --ai-blob-blue: var(--aml-figma-surface-brand-accent-default);
+  --ai-blob-violet: var(--aml-figma-surface-status-pending-accent-default);
+  --panel-material-solid: color-mix(in srgb, var(--ai-summary-start), var(--ai-summary-end));
+  --panel-material-light: color-mix(in srgb, var(--ai-blob-blue), var(--ai-blob-violet));
+  isolation: isolate;
+}
+
+.ai-summary-blob__light {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  overflow: clip;
+  pointer-events: none;
+}
+
+.ai-summary-blob__light::before,
+.ai-summary-blob__light::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 4%;
+  inset-inline-start: 24%;
+  inline-size: 72%;
+  block-size: 88%;
+  background: radial-gradient(ellipse at 44% 52%,
+    color-mix(in srgb, var(--ai-blob-blue) 37%, transparent), transparent 75%);
+  border-radius: 61% 39% 45% 55% / 43% 39% 61% 57%;
+  filter: blur(var(--aml-space-8));
+  transform-origin: center;
+}
+
+.ai-summary-blob__light::after {
+  inset-inline-start: 13%;
+  inset-block-start: 17%;
+  inline-size: 65%;
+  block-size: 74%;
+  background: radial-gradient(ellipse at 60% 43%,
+    color-mix(in srgb, var(--ai-blob-violet) 39%, transparent), transparent 73%);
+  border-radius: 42% 58% 35% 65% / 63% 36% 64% 37%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) .ai-summary-blob:not([data-blob-static]) .ai-summary-blob__light::before {
+    animation: ai-summary-drift 10s ease-in-out infinite alternate;
+  }
+
+  :root:not([data-reduced-motion="true"]) .ai-summary-blob:not([data-blob-static]) .ai-summary-blob__light::after {
+    animation: ai-summary-drift 13s ease-in-out -3s infinite alternate-reverse;
+  }
+}
+
+@keyframes ai-summary-drift {
+  0% {
+    transform: translate(-12%, 4%) rotate(-8deg) scale(.9, 1.09);
+    border-radius: 61% 39% 45% 55% / 43% 61% 39% 57%;
+  }
+  50% {
+    transform: translate(6%, -11%) rotate(11deg) scale(1.12, .93);
+    border-radius: 41% 59% 64% 36% / 60% 44% 56% 40%;
+  }
+  100% {
+    transform: translate(15%, 7%) rotate(3deg) scale(.94, 1.06);
+    border-radius: 54% 46% 42% 58% / 38% 52% 48% 62%;
+  }
+}

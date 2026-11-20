@@ -1,0 +1,128 @@
+[data-rule-builder] {
+  --rule-block-hover: color-mix(in srgb, var(--aml-text-primary) 8%, transparent);
+  display: grid;
+  gap: var(--aml-space-12);
+  min-width: 0;
+}
+
+[data-rule-palette] > div,
+[data-rule-block-fields],
+[data-rule-block-actions],
+[data-rule-block-input] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aml-space-6);
+}
+
+[data-rule-palette] > p,
+[data-rule-workbench] > p {
+  margin-block: var(--aml-space-4);
+  color: var(--aml-text-secondary);
+}
+
+[data-rule-palette] button,
+[data-rule-block-actions] button,
+[data-rule-drag-handle] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--aml-space-4);
+  min-height: var(--aml-size-control-compact);
+  padding: var(--aml-space-4) var(--aml-space-8);
+  border: var(--aml-stroke-divider) solid var(--aml-border-default);
+  border-radius: var(--aml-radius-control);
+  color: inherit;
+  background: var(--aml-surface-panel);
+  cursor: pointer;
+}
+
+[data-rule-palette] button[draggable="true"],
+[data-rule-drag-handle] { cursor: grab; }
+[data-rule-drag-handle]:active { cursor: grabbing; }
+[data-rule-palette] button:is(:disabled, [aria-disabled="true"]),
+[data-rule-block-actions] button[aria-disabled="true"] { opacity: .45; cursor: default; }
+[data-rule-builder] svg { width: 1em; height: 1em; flex: none; }
+[data-rule-builder] :is(button, fieldset):focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--aml-focus-ring);
+  outline-offset: 2px;
+}
+[data-rule-builder] button:not(:disabled, [aria-disabled="true"]):hover { background: var(--rule-block-hover); }
+[data-rule-sr-only] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-rule-workbench] {
+  min-width: 0;
+  padding: var(--aml-space-12);
+  border: var(--aml-stroke-divider) solid var(--aml-border-default);
+  border-radius: var(--aml-radius-card);
+  background: var(--aml-surface-inset);
+}
+[data-rule-workbench][data-empty] { border-style: dashed; }
+[data-rule-drop-slot] {
+  position: relative;
+  block-size: var(--aml-space-8);
+}
+[data-rule-drop-slot][data-active]::after {
+  position: absolute;
+  inset-inline: var(--aml-space-4);
+  inset-block-start: 50%;
+  block-size: 2px;
+  border-radius: var(--aml-radius-full);
+  background: var(--aml-focus-ring);
+  translate: 0 -50%;
+  content: '';
+}
+
+[data-rule-workbench] fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: var(--aml-space-4) var(--aml-space-8) var(--aml-space-8);
+  border: var(--aml-stroke-divider) solid var(--aml-border-default);
+  border-radius: var(--aml-radius-card);
+  background: var(--aml-surface-panel);
+}
+[data-rule-workbench] fieldset[data-dragging] { opacity: .58; }
+
+[data-rule-block-header] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--aml-space-4);
+}
+[data-rule-block-header] strong { overflow-wrap: anywhere; }
+
+[data-rule-block-body] {
+  padding-top: var(--aml-space-4);
+  padding-inline-start: calc(var(--aml-size-control-compact) + var(--aml-space-4));
+}
+
+[data-rule-block-fields] { align-items: start; gap: var(--aml-space-8) var(--aml-space-12); }
+[data-rule-block-fields] label { display: grid; gap: var(--aml-space-4); min-width: 0; }
+[data-rule-block-fields] input { inline-size: 8ch; }
+[data-rule-block-fields] :is(input, select) {
+  min-width: 0;
+  min-height: var(--aml-size-control-compact);
+  max-width: 100%;
+  padding-inline: var(--aml-space-4);
+  border: var(--aml-stroke-divider) solid var(--aml-border-strong);
+  border-radius: var(--aml-radius-control);
+  color: var(--aml-text-primary);
+  background: var(--aml-surface-panel);
+}
+[data-rule-block-actions] { flex-wrap: nowrap; gap: var(--aml-space-2); }
+[data-rule-block-actions] button,
+[data-rule-drag-handle] {
+  inline-size: var(--aml-size-control-compact);
+  border-color: transparent;
+  padding: 0;
+  color: var(--aml-text-secondary);
+  background: transparent;
+}
+[data-rule-block-error] { color: var(--aml-status-negative-text); }

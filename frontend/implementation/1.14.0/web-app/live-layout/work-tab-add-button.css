@@ -1,0 +1,36 @@
+.button.work-tab-add[data-add-work-tab] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: auto;
+  min-inline-size: var(--aml-size-control-compact);
+  min-block-size: var(--aml-size-control-compact);
+  padding: 0;
+  color: inherit;
+}
+.button.work-tab-add[data-add-work-tab]:disabled { opacity: var(--aml-opacity-disabled) }
+
+[data-verdict] .button.work-tab-add[data-add-work-tab] {
+  --glass-surface-face: var(--panel-material-solid, var(--record-verdict-surface));
+  --button-hover-bg: color-mix(in srgb, var(--record-verdict-accent) 72%, var(--record-verdict-surface));
+  --button-active-bg: var(--record-verdict-accent);
+}
+[data-verdict] .button.work-tab-add[data-add-work-tab]:enabled:is(:hover, :active) {
+  color: var(--status-accent-dark-ink);
+}
+.button.work-tab-add--inline[data-add-work-tab] {
+  min-inline-size: var(--aml-size-control);
+  min-block-size: var(--aml-size-control);
+  vertical-align: middle;
+  background: transparent;
+  box-shadow: none;
+}
+.button.work-tab-add--inline[data-add-work-tab]:enabled:is(:hover, :active) {
+  background: transparent;
+  color: var(--record-verdict-accent, var(--text));
+}
+.work-tab-flight[data-verdict] {
+  background: var(--record-verdict-accent);
+  color: var(--status-accent-dark-ink);
+}
