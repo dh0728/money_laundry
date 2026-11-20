@@ -2,7 +2,7 @@
 
 [팀 검수 프리뷰](live-layout/README.md)는 5215에서 실행합니다.
 
-5211은 아래 명령으로 여는 별도 샘플 앱입니다. 터미널을 열어 둔 채 브라우저에서 http://127.0.0.1:5211/ 에 접속합니다. 작업 이력은 [구현 문서](../../../../docs/frontend/implementation/implementation.md)에서 확인할 수 있습니다.
+5211은 아래 명령으로 여는 별도 샘플 앱입니다. 터미널을 열어 둔 채 브라우저에서 http://127.0.0.1:5211/ 에 접속합니다. 작업 이력은 [구현 문서](../../docs/frontend/implementation/implementation.md)에서 확인할 수 있습니다.
 
 ## 전체 샘플 프론트엔드
 
@@ -18,7 +18,7 @@ pnpm build-storybook
 
 테마·브랜드는 로그인과 사이드바에서 바꾸며 브라우저에 저장한다. 샘플 로그인은 탭 세션에만 유지하고 비밀번호를 저장하지 않는다. 개발 화면의 `검수 상태` 또는 `?state=loading|empty|error`로 상태를 확인한다. 루트 URL의 쿼리 뒤에 해시를 둔다. 예: `/?state=error#/dashboard/mine`.
 
-전체 화면·필요 데이터·수억 건 처리 경계·검증 결과는 [전체 구현 인계](../../../../docs/frontend/implementation/history/complete-bundle.md)에 있다. 초기 로그인·대시보드의 상세 기록은 [첫 묶음 인계](../../../../docs/frontend/implementation/history/first-bundle.md)에 있다. 기존 `ShellChrome.stories.tsx`와 v3 원본 토큰을 보존했으며, 새 앱도 ShellChrome의 선택 슬롯을 사용한다. 기존 기본 스토리와 `/next-review.html`은 계속 빈 콘텐츠 검수본이다.
+전체 화면·필요 데이터·수억 건 처리 경계·검증 결과는 [전체 구현 인계](../../docs/frontend/implementation/history/complete-bundle.md)에 있다. 초기 로그인·대시보드의 상세 기록은 [첫 묶음 인계](../../docs/frontend/implementation/history/first-bundle.md)에 있다. 기존 `ShellChrome.stories.tsx`와 v3 원본 토큰을 보존했으며, 새 앱도 ShellChrome의 선택 슬롯을 사용한다. 기존 기본 스토리와 `/next-review.html`은 계속 빈 콘텐츠 검수본이다.
 
 이하 실제 API·Ant 조사 흐름 관련 내용은 보존한 이전 시연 코드의 기록이다. 새 v3 앱의 API 연결 상태나 구현 범위를 뜻하지 않는다.
 
@@ -82,7 +82,7 @@ pnpm build
 새 clone의 저장소 루트에서 실행한다. 사용자 기기의 절대경로·다른 checkout의 node_modules·Windows 서비스는 요구하지 않는다. package.json의 Node.js/pnpm 버전과 커밋된 lockfile을 사용한다.
 
 ```sh
-cd frontend/implementation/1.14.0/web-app
+cd frontend/web-app
 pnpm install --frozen-lockfile
 pnpm exec vitest run src/pages/LiveLedgerPage.test.tsx src/api/liveContracts.test.ts src/pages/LiveCasesPage.test.tsx src/pages/LiveNavigation.test.tsx
 pnpm lint
@@ -199,7 +199,7 @@ VITE_API_MODE=live VITE_API_PROXY_TARGET=http://127.0.0.1:8080 pnpm dev --host 1
 - **이전 13건의 원인과 보완:** App 3건은 기존 목록의 실제 행 이름·키보드 진입, 현재 씨앗 점수/출처와 3개 판정, 중첩 거래 탭의 외부 범위로 정합화했다. 상세→거래 제외 확인→상세·목록 건수 반영 검증은 유지했다. Live 대시보드 1건은 기존 WorkQueue의 test ID로 범위를 한정하고 업무 날짜·집계·보드 3열 검증을 유지했다.
 - Dashboard 7건은 현재 mock 보드 4열 및 시연 한계, 편입된 원본 Alert의 중복 방지, 기관 Episode 업무·상세 이동/빈 결과, 현행 KPI 이름과 증감 배지 규칙으로 정합화했다. 기존 화면을 옛 3열 구조로 돌리지 않았다. Alert 2건은 없어진 후보 선택 UI 대신 현재 씨앗별 점수 갱신·mock 출처·룰 미연동 구분을 검사하고, 현재 판정 문구/숨긴 신규 Episode 선택 조건을 고정했다. 삭제·skip·단순 존재 검사로 업무 결과를 대체하지 않았다.
 - **좁은 안전 리뷰:** 재인증 복구는 서버 로그인 응답의 ID·역할을 확인하며 같은 경우에만 사건 의견 텍스트·탭/위치를 넘긴다. 최신 조회 전에는 사건 입력을 표시하지 않는다. 다른 신원/역할·명시적 로그아웃은 복구를 폐기한다. 캐시·거래/판정 선택·revision·명령 재시도는 새 workspace로 옮기지 않는다. 새 HTTP/외부 전송 경로, 브라우저 영구 저장, 인증 우회, 자동 업무 명령은 추가하지 않았다. 이 코드는 미제출 의견 복원 범위의 검사이며 전체 보안 감사를 의미하지 않는다.
-- **로컬 실행 복구:** 위 두 Vite 명령은 현재 repo의 `frontend/implementation/1.14.0/web-app`에서 기존 설치 의존성으로 실행한다. Backend는 이미 준비된 별도의 격리 합성 DB/API가 필요하다. 기존 local setup 스크립트는 DB 생성·seed 단계까지 포함하므로 프로세스 재시작만을 위해 통째로 다시 실행하면 안 된다. 현재 DB/API는 정상 조회되지만, 별도 안전한 Backend 재시작 전용 명령이 있는지는 확인되지 않았다. API가 중단되면 기존 담당 환경의 같은 jar/config로 재시작해야 하며 공유 서버나 다른 DB로 임의 전환하지 않는다. Backend 없이도 보조 mock은 기존 명령으로 실행 가능하다. Mac을 재부팅해도 로컬 Backend가 자동 복구된다고 약속하지 않는다.
+- **로컬 실행 복구:** 위 두 Vite 명령은 현재 repo의 `frontend/web-app`에서 기존 설치 의존성으로 실행한다. Backend는 이미 준비된 별도의 격리 합성 DB/API가 필요하다. 기존 local setup 스크립트는 DB 생성·seed 단계까지 포함하므로 프로세스 재시작만을 위해 통째로 다시 실행하면 안 된다. 현재 DB/API는 정상 조회되지만, 별도 안전한 Backend 재시작 전용 명령이 있는지는 확인되지 않았다. API가 중단되면 기존 담당 환경의 같은 jar/config로 재시작해야 하며 공유 서버나 다른 DB로 임의 전환하지 않는다. Backend 없이도 보조 mock은 기존 명령으로 실행 가능하다. Mac을 재부팅해도 로컬 Backend가 자동 복구된다고 약속하지 않는다.
 - **인계 경계:** 현재 로컬 변경 21파일은 미반영이며 마지막 성공한 fe/work 반영은 `fb5dc96c`다. 앞선 11파일 commit 명령의 자동 심사 거절은 실행 전 발생했고 재시도하지 않았다. 개발 중인 로컬 화면과 원격 버전·실제 팀 시연 환경·공개 Sites를 구분한다. 실제 AI 추론/팀 환경 검증은 여전히 OPEN이다.
 
 ### 아침 검수의 실제 Backend 차단 (16:42 UTC 관찰)
@@ -226,7 +226,7 @@ VITE_API_MODE=live VITE_API_PROXY_TARGET=http://127.0.0.1:8080 pnpm dev --host 1
 동일 앱을 PairView용 **로컬 읽기 전용 합성 응답**으로 실행:
 
 ```sh
-# 이 README가 있는 frontend/implementation/1.14.0/web-app에서
+# 이 README가 있는 frontend/web-app에서
 VITE_API_MODE=fixture VITE_WIRING_PARENT_ORIGIN=http://127.0.0.1:5182 pnpm dev --host 127.0.0.1 --port 5208 --strictPort
 ```
 
@@ -303,7 +303,7 @@ HTML 원본과 전체 목록은 Vault의 `Workspace/Projects/money_laundry/Front
 기존 앱 코드를 보존한 같은 web-app의 추가 진입점이다. 새 저장소·작업 공간이나 실제 서버 배포가 아니다. 공식 Ant 기본 라이트/다크·한국어, 고정 아이콘 메뉴와 focus/hover 메뉴명, 개요/기존 그래프/거래표/의견 역할을 제공한다. 의견 Drawer 배치와 검색·복귀 정책은 사용자 검수용 제안이다.
 
 ```sh
-# 이 README가 있는 frontend/implementation/1.14.0/web-app에서 실행
+# 이 README가 있는 frontend/web-app에서 실행
 pnpm install --frozen-lockfile
 VITE_API_MODE=fixture pnpm exec vite --host 127.0.0.1 --port 5209 --strictPort
 ```
@@ -336,7 +336,7 @@ PairView 연결은 **부분 검증**이다. 현재 FE에 명시적 앵커·테�
 저장소 루트에서:
 
 ```sh
-cd frontend/implementation/1.14.0/web-app
+cd frontend/web-app
 pnpm install --frozen-lockfile
 VITE_API_MODE=mock pnpm exec vite --host 127.0.0.1 --port 5210 --strictPort
 ```

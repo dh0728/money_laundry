@@ -16,7 +16,7 @@ import { mountTransactionEvidenceTable } from './preview-case-table.jsx';
 import { mountWorkflows, mountWorkflowNotifications } from './workflow-components.jsx';
 import { renderScreenNav, refreshScreenNav } from './screen-navigation.jsx';
 import { ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
-import { Button, Divider, GlassDialog, Icon, IconButton, ScrollArea, Sidebar, Tooltip, bindTooltip, hideTooltip } from './components.js';
+import { BrandSymbol, Button, Divider, GlassDialog, Icon, IconButton, ScrollArea, Sidebar, Tooltip, bindTooltip, hideTooltip } from './components.js';
 import { setupGlassMaterial } from './glass-material.js';
 import { mountLoginScene } from './preview-login-scene.js';
 import { uiSizeOptions } from './appearance-options.js';
@@ -97,7 +97,7 @@ function Header() {
   return `<header class="app-header" aria-label="헤더">
     <div class="header-frame header-frame--left">
       ${DrawerChromeRow('brand-header sidebar-chrome',
-        IconButton(Icon('radar', 'idle-icon') + Icon('left', 'alternate-icon') + '<span class="brand">AML RADAR</span>', '사이드바 열기',
+        IconButton(BrandSymbol('idle-icon') + Icon('left', 'alternate-icon') + '<span class="brand">AML RADAR</span>', '사이드바 열기',
           'id="sidebar-toggle" aria-expanded="false" aria-controls="sidebar" data-drawer-button', 'brand-pill', 'floating', 'pill'),
         IconButton(Icon('search'), '검색',
           'id="search-toggle" aria-haspopup="dialog" aria-controls="search-dialog" data-drawer-button', '', 'floating'),
@@ -313,7 +313,7 @@ document.body.innerHTML = Header() + NavigationSidebar() +
   `<main id="preview-login" aria-labelledby="login-title" hidden>
     <canvas class="login-scene" aria-hidden="true"></canvas>
     <section class="glass login-card">
-      <div class="login-brand"><span class="login-brand-mark">${Icon('radar')}</span><span>AML RADAR</span></div>
+      <div class="login-brand"><span class="login-brand-mark">${BrandSymbol()}</span><span>AML RADAR</span></div>
       <h1 id="login-title">로그인</h1>
       <form id="preview-login-form" class="login-form" aria-labelledby="login-title" novalidate>
         <label for="preview-login-id">아이디</label>

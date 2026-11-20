@@ -3,7 +3,7 @@
 현재 작업 폴더의 코드를 직접 실행하려면 저장소 루트에서 아래 명령을 사용합니다.
 
 ```sh
-cd frontend/implementation/1.14.0/web-app
+cd frontend/web-app
 pnpm install --frozen-lockfile
 pnpm exec vite live-layout --config live-layout/vite.config.mjs
 ```
@@ -34,7 +34,7 @@ pnpm exec vite live-layout --config live-layout/vite.config.mjs
 
 - 룰 목록·상세와 샘플 상태는 [preview-rule-workspace.jsx](preview-rule-workspace.jsx)에 있습니다.
 - 룰 작성·백테스트 화면은 [workflow-components.jsx](workflow-components.jsx), 조건 트리는 [rule-condition-tree.jsx](rule-condition-tree.jsx)에 있습니다.
-- 조회·저장·실행 API의 현행 계약과 합의할 항목은 [백엔드 인계](../../../../../docs/frontend/implementation/api.md#live-layout-api-handoff)에서 확인할 수 있습니다.
+- 조회·저장·실행 API의 현행 계약과 합의할 항목은 [백엔드 인계](../../../docs/frontend/implementation/api.md#live-layout-api-handoff)에서 확인할 수 있습니다.
 
 ## 디자인 시스템
 

@@ -119,6 +119,23 @@ body {
   flex-shrink: 0;
 }
 .icon-compact { --icon-size: var(--compact-icon-size) }
+/* AML RADAR symbol (lucide radar, ISC): the SVG file is the mask, currentColor is the theme color. */
+.aml-radar-symbol {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask: url(/aml_radar_symbol_animated.svg) center / contain no-repeat;
+  mask: url(/aml_radar_symbol_animated.svg) center / contain no-repeat;
+}
+[data-reduced-motion="true"] .aml-radar-symbol {
+  -webkit-mask-image: url(/aml_radar_symbol_static.svg);
+  mask-image: url(/aml_radar_symbol_static.svg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .aml-radar-symbol {
+    -webkit-mask-image: url(/aml_radar_symbol_static.svg);
+    mask-image: url(/aml_radar_symbol_static.svg);
+  }
+}
 .icon-button {
   display: inline-grid;
   place-items: center;
@@ -240,8 +257,6 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
 .button[data-button-surface="floating"]:is(:disabled, [aria-disabled="true"]) { color: var(--disabled-text) }
 .inbox-header { --drawer-chrome-width: var(--inbox-width) }
 .inbox-header:has(#inbox-toggle[aria-expanded="false"]) { padding-inline-start: 0 }
-.brand-pill[aria-expanded="true"] .idle-icon { display: none }
-.brand-pill[aria-expanded="true"] .alternate-icon { display: block }
 .inbox-pill { position: relative }
 .unread-dot {
   flex: none;
