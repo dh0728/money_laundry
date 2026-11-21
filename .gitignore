@@ -152,6 +152,7 @@ $RECYCLE.BIN/
 /docs/frontend/implementation/*
 !/docs/frontend/implementation/history/
 /docs/frontend/implementation/history/*
+!/docs/frontend/implementation/history/screenshots/
 !/docs/frontend/implementation/history/first-bundle.md
 !/docs/frontend/implementation/history/complete-bundle.md
 !/docs/frontend/implementation/history/figma-review.md
