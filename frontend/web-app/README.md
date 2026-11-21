@@ -14,8 +14,8 @@ pnpm dev --host 127.0.0.1 --port 5215 --strictPort
 
 ## API 연결
 
-[요청 코드](src/api/) · [화면별 API 인계](../../docs/frontend/implementation/api.md#episode-api-handoff)
-
-실제 API 사용 시 실행 명령 앞에 `VITE_API_MODE=live` 추가. `/api` 기본 연결은 Local 8080.
-
-[화면 버전 기록](../../docs/frontend/implementation/version-history.md) · [이전 시안과 버전별 사본](https://github.com/dh0728/money_laundry/tree/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend)
+- 화면의 저장 호출부: [`saveEpisode`](src/app/layout.js)
+- 요청 생성: [`buildAlertTransfer`·`buildEpisodeUnlink`](src/api/reviewCommands.ts)
+- 요청 전송: [`submitReviewCommand`](src/api/liveReview.ts) · `POST /api/v1/review/commands`
+- 편입은 사건 `caseId`·`revision`과 기존 대상의 `targetCaseId`·`targetRevision` 사용. 해제는 대상 Episode의 `caseId`·`revision`과 소속 Alert의 `groupId` 사용.
+- `saveEpisode`는 현재 Sample 저장 호출부. 실제 Episode 저장 연결은 진행 전. `/api` 기본 연결은 Local 8080.
