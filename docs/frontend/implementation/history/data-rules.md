@@ -19,7 +19,7 @@
 <a id="pattern-codes"></a>
 ## 패턴 코드
 
-구현 기준은 현재 앱의 [codes.ts](../../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts)다. [API.md](../../../../backend/api-server/API.md) 2.3절은 기존 백엔드 참고 자료다. 아래 표는 현재 `codes.ts`의 키를 사용한다. 특히 코드 3과 4는 `GATHER-SCATTER`, `SCATTER-GATHER`이며 예전 축약명으로 바꾸지 않는다. 작업 대상 앱 경로가 바뀌면 해당 파일을 다시 확인한다.
+구현 기준은 현재 앱의 [codes.ts](https://github.com/dh0728/money_laundry/blob/c58849003f7a85a455f9f328d31c17c5f1985d97/frontend/implementation/1.14.0/web-app/src/api/codes.ts)다. [API.md](../../../../backend/api-server/API.md) 2.3절은 기존 백엔드 참고 자료다. 아래 표는 현재 `codes.ts`의 키를 사용한다. 특히 코드 3과 4는 `GATHER-SCATTER`, `SCATTER-GATHER`이며 예전 축약명으로 바꾸지 않는다. 작업 대상 앱 경로가 바뀌면 해당 파일을 다시 확인한다.
 
 | 코드 | codes.ts 키 | 화면 이름(태그) | codes.ts 한국어 표시명 |
 | --- | --- | --- | --- |
@@ -44,7 +44,7 @@
 
 - 업무 상태는 열람 전, 처리 전, 처리 중, 처리 완료로 구분한다. '완료'로 줄이지 않는다.
 - 사람의 판정은 정상 또는 이상이다. '오탐'은 선택지에 넣지 않는다.
-- 현재 [대시보드 샘플 데이터](../../../../frontend/implementation/1.14.0/web-app/src/next/dashboard-data.ts)는 `riskSettings = { medium: 0.7, high: 0.9 }`를 사용한다([첫 묶음 기록](first-bundle.md)). 이 샘플 설정에서 0.7 미만은 낮음, 0.7 이상 0.9 미만은 주의, 0.9 이상은 위험이다. 운영용 고정 기준이나 합의된 API 계약이 아니다.
+- 현재 [대시보드 샘플 데이터](https://github.com/dh0728/money_laundry/blob/c58849003f7a85a455f9f328d31c17c5f1985d97/frontend/implementation/1.14.0/web-app/src/next/dashboard-data.ts)는 `riskSettings = { medium: 0.7, high: 0.9 }`를 사용한다([첫 묶음 기록](first-bundle.md)). 이 샘플 설정에서 0.7 미만은 낮음, 0.7 이상 0.9 미만은 주의, 0.9 이상은 위험이다. 운영용 고정 기준이나 합의된 API 계약이 아니다.
 - 경과일은 3일 이하 노랑, 3일 초과 7일 이하 주황, 7일 초과 빨강으로 구분한다.
 - 점수 범위는 0~1이다. 구간 경계는 룰 엔진 설정에서 받는다(현재는 샘플 설정). 컴포넌트에 숫자를 직접 넣지 않는다. 운영 기준의 백엔드 출처, 룰 버전, 적용 기간은 API 인계 때 확인해야 한다.
 
