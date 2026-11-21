@@ -3,15 +3,15 @@ import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/tab
 import { Textarea } from '@/components/ui/textarea';
 import { createWorkspaceState, saveWorkspaceRule, transitionWorkspaceRule } from '@/next/workspace-data';
 import { ruleStatusLabels } from '@/next/features/rules-logic';
-import { ActionButton, PrimaryButton } from '../../components/radar/primary-button';
-import { Panel } from '../../components/radar/panel';
+import { ActionButton, PrimaryButton } from '../../components/primary-button';
+import { Panel } from '../../components/panel';
 import { RuleConditionFacts } from './rule-condition-tree';
-import { activateRecordCard } from '../../components/radar/record-card';
-import { ScreenActions } from '../../components/radar/screen-actions';
-import { StatusTag } from '../../components/radar/semantic-tags';
+import { activateRecordCard } from '../../components/record-card';
+import { ScreenActions } from '../../components/screen-actions';
+import { StatusTag } from '../../components/semantic-tags';
 import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user.js';
-import { downloadCsv } from '../../components/radar/query-controls';
-import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/radar/workflow-table';
+import { downloadCsv } from '../../components/query-controls';
+import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
 import './preview-rule-workspace.css';
 
 const presets = { DRAFT: 'pending', PENDING_APPROVAL: 'caution', TESTING: 'inProgress', ACTIVE: 'done', STOPPED: 'cancelled', REJECTED: 'failed' };

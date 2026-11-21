@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
-import { ModelScoreTag, ReviewStatusTag, reviewStatusLabel, VerdictTag, verdictLabels } from '../../components/radar/semantic-tags';
+import { ModelScoreTag, ReviewStatusTag, reviewStatusLabel, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { currencyColumn, SortableTableHead, tableCount,
-  useTableSelection, useTableSort } from '../../components/radar/workflow-table';
-import { dateFromCode, downloadCsv, inDateRange, TableQueryTools } from '../../components/radar/query-controls';
+  useTableSelection, useTableSort } from '../../components/workflow-table';
+import { dateFromCode, downloadCsv, inDateRange, TableQueryTools } from '../../components/query-controls';
 
 const columns = [
   { name: '거래', value: row => row.code },

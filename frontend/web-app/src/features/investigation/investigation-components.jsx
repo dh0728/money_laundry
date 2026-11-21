@@ -2,19 +2,19 @@ import React, { useId, useLayoutEffect, useRef, useSyncExternalStore, useState }
 import { createRoot } from 'react-dom/client';
 import { ChevronRight } from 'lucide-react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CardHeader } from '../../components/radar/card-header';
-import { activateRecordCard, RecordCard, recordCardSurface } from '../../components/radar/record-card';
-import { ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/radar/semantic-tags';
-import { ACCOUNTS_PER_OWNER, OWNER_COUNT, accountCode, findLedgerSelection, ownerName, sampleTransactions } from '../../mocks/radar/transaction-fixtures';
+import { CardHeader } from '../../components/card-header';
+import { activateRecordCard, RecordCard, recordCardSurface } from '../../components/record-card';
+import { ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { ACCOUNTS_PER_OWNER, OWNER_COUNT, accountCode, findLedgerSelection, ownerName, sampleTransactions } from '../../mocks/transaction-fixtures';
 import { CaseProgressBoard, PreviewCaseCard } from './preview-case-card';
-import { dashboardFixtures } from '../../mocks/radar/dashboard-fixtures';
-import { ActionButton, WorkTabAddButton } from '../../components/radar/primary-button';
+import { dashboardFixtures } from '../../mocks/dashboard-fixtures';
+import { ActionButton, WorkTabAddButton } from '../../components/primary-button';
 import AnimatedList from '../../components/react-bits/AnimatedList';
-import { TableFieldLabel, WorkflowTable } from '../../components/radar/workflow-table';
-import { downloadCsv, TableQueryTools } from '../../components/radar/query-controls';
+import { TableFieldLabel, WorkflowTable } from '../../components/workflow-table';
+import { downloadCsv, TableQueryTools } from '../../components/query-controls';
 import './investigation-components.css';
 
-export { sampleTransactions } from '../../mocks/radar/transaction-fixtures';
+export { sampleTransactions } from '../../mocks/transaction-fixtures';
 const amountFormat = new Intl.NumberFormat('ko-KR');
 
 const readReducedMotion = () => document.documentElement.dataset.reducedMotion === 'true';

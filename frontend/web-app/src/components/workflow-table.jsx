@@ -4,7 +4,7 @@ import { ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight, ArrowLeft
   ListChecks, ListTree, Network, ScanSearch, Settings2, Tag, Timer, UserRound, WalletCards } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader } from '@/components/ui/table';
 import { ActionButton } from './primary-button';
-import SpringCheck from '../react-bits/SpringCheck';
+import SpringCheck from './react-bits/SpringCheck';
 import './table-frame.css';
 
 const textOrder = new Intl.Collator(['ko', 'en'], { numeric: true, sensitivity: 'base' });

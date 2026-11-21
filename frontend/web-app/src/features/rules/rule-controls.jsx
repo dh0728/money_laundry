@@ -4,15 +4,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import BranchedMenu from '../../components/react-bits/BranchedMenu';
-import { bindTooltip } from '../../components/radar/components';
+import { bindTooltip } from '../../components/components';
 import { RuleConditionBlocks } from '@/next/features/RuleConditionBlocks';
 import { compileRuleBlocks, ruleBlocksFor, validateRule } from '@/next/features/rules-logic';
 import { previewRuleTemplates, savePreviewRule } from './preview-rule-workspace';
 import { RuleConditionFacts, RuleTreeBranches } from './rule-condition-tree';
-import { ActionButton, PrimaryButton } from '../../components/radar/primary-button';
-import { Panel } from '../../components/radar/panel';
-import { ScreenActions } from '../../components/radar/screen-actions';
-import '../../components/radar/form-dropdown.css';
+import { ActionButton, PrimaryButton } from '../../components/primary-button';
+import { Panel } from '../../components/panel';
+import { ScreenActions } from '../../components/screen-actions';
+import '../../components/form-dropdown.css';
 
 const rules = [
   { label: '거래 패턴', children: [

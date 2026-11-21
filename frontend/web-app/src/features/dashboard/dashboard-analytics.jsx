@@ -1,6 +1,6 @@
 import React from 'react';
-import { Panel } from '../../components/radar/panel';
-import { PatternTag, ReviewStatusTag, reviewStates } from '../../components/radar/semantic-tags';
+import { Panel } from '../../components/panel';
+import { PatternTag, ReviewStatusTag, reviewStates } from '../../components/semantic-tags';
 import { DashboardRiskChart } from './dashboard-risk-chart';
 import { DashboardStatusArea } from './dashboard-status-area';
 import { BarChart } from '../../components/charts/charts/bar-chart';
@@ -9,8 +9,8 @@ import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
 import { Grid } from '../../components/charts/charts/grid';
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
 import { ibmLaundering, ibmPatterns, ibmRemaining } from '../investigation/ibm-hi-small-aggregate';
-import { ChartSectionDownload } from '../../components/radar/section-download';
-import { dashboardPattern } from '../../mocks/radar/dashboard-patterns';
+import { ChartSectionDownload } from '../../components/section-download';
+import { dashboardPattern } from '../../mocks/dashboard-patterns';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;

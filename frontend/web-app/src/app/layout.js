@@ -2,27 +2,27 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { login, logout, restoreSession } from '@/api/auth';
-import { currentPreviewUser, previewAdmin, previewStaff, setPreviewUser, subscribePreviewUser } from '../../features/auth/preview-session-user.js';
+import { currentPreviewUser, previewAdmin, previewStaff, setPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user.js';
 import { fetchNotificationCases, fetchNotifications, setNotificationsRead } from '@/api/notifications';
-import { bindCardGlow } from '../../components/radar/card-glow.js';
-import { ConfirmHoldButton, mountLoginPrimary } from '../../components/radar/primary-button.jsx';
-import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../../components/radar/query-controls.jsx';
-import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../../mocks/radar/dashboard-fixtures.js';
-import { savePreviewJudgment, startPreviewReview } from '../../features/investigation/case-judgment-data.js';
-import { createCaseEvidenceSelection } from '../../features/investigation/case-evidence-selection.js';
-import { editPreviewAlertTransactions } from '../../features/investigation/case-membership-data.js';
-import { markPreviewCaseRead, resetPreviewCaseRead } from '../../features/investigation/case-read-state.js';
-import { mountTransactionEvidenceTable } from '../../features/investigation/preview-case-table.jsx';
-import { mountWorkflows, mountWorkflowNotifications } from '../../pages/radar/workflow-components.jsx';
+import { bindCardGlow } from '../components/card-glow.js';
+import { ConfirmHoldButton, mountLoginPrimary } from '../components/primary-button.jsx';
+import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
+import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
+import { savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
+import { createCaseEvidenceSelection } from '../features/investigation/case-evidence-selection.js';
+import { editPreviewAlertTransactions } from '../features/investigation/case-membership-data.js';
+import { markPreviewCaseRead, resetPreviewCaseRead } from '../features/investigation/case-read-state.js';
+import { mountTransactionEvidenceTable } from '../features/investigation/preview-case-table.jsx';
+import { mountWorkflows, mountWorkflowNotifications } from '../pages/workflow-components.jsx';
 import { renderScreenNav, refreshScreenNav } from './screen-navigation.jsx';
 import { ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
-import { BrandSymbol, Button, Divider, GlassDialog, Icon, IconButton, ScrollArea, Sidebar, Tooltip, bindTooltip, hideTooltip } from '../../components/radar/components.js';
-import { setupGlassMaterial } from '../../components/radar/glass-material.js';
-import { mountLoginScene } from '../../features/auth/preview-login-scene.js';
-import { uiSizeOptions } from '../../config/appearance-options.js';
-import { enableBackdropDismissal, setupOverlayDismissal } from '../../lib/radar/overlay-dismissal.js';
-import { SquishSwitch, bindSquishSwitch } from '../../components/radar/squish-switch.js';
-import { mountNotificationPreference, receivesSampleNotifications } from '../../features/settings/notification-preference.jsx';
+import { BrandSymbol, Button, Divider, GlassDialog, Icon, IconButton, ScrollArea, Sidebar, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
+import { setupGlassMaterial } from '../components/glass-material.js';
+import { mountLoginScene } from '../features/auth/preview-login-scene.js';
+import { uiSizeOptions } from '../config/appearance-options.js';
+import { enableBackdropDismissal, setupOverlayDismissal } from '../lib/overlay-dismissal.js';
+import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch.js';
+import { mountNotificationPreference, receivesSampleNotifications } from '../features/settings/notification-preference.jsx';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
 
@@ -46,7 +46,7 @@ function readDataMode() {
 const dataMode = readDataMode();
 const sampleData = dataMode === 'sample';
 const workTabsStorageKey = benchmarkLedgerRoute ? 'aml-live-layout-ibm-work-tabs' : 'aml-live-layout-work-tabs';
-const avatarUrl = new URL('../../assets/sample-avatar.png', import.meta.url).href;
+const avatarUrl = new URL('../assets/sample-avatar.png', import.meta.url).href;
 let storedWorkTabs;
 try {
   storedWorkTabs = JSON.parse(sessionStorage.getItem(workTabsStorageKey));
@@ -418,7 +418,7 @@ const preferenceDialogs = ['account', 'settings'].map(id => {
 });
 let adminSettingsLoading;
 byId('settings-toggle').addEventListener('click', () => {
-  adminSettingsLoading ??= import('../../features/settings/admin-settings.jsx')
+  adminSettingsLoading ??= import('../features/settings/admin-settings.jsx')
     .then(({ mountAdminSettings }) => mountAdminSettings(byId('admin-settings-content')))
     .catch(() => { adminSettingsLoading = undefined; });
   void refreshPreviewSessionUser();
@@ -588,7 +588,7 @@ function updateWorkspaceAddress(path, code, navigationMode, urlParams, { scroll 
 }
 
 function loadBenchmarkDataset() {
-  benchmarkLoading ??= fetch(new URL('../../mocks/radar/ibm-hi-small-data.json', import.meta.url)).then(response => {
+  benchmarkLoading ??= fetch(new URL('../mocks/ibm-hi-small-data.json', import.meta.url)).then(response => {
     if (!response.ok) throw new Error(`Benchmark data request failed (${response.status})`);
     return response.json();
   }).then(dataset => {
@@ -602,7 +602,7 @@ function loadBenchmarkDataset() {
 }
 
 function loadBenchmarkSummary() {
-  benchmarkSummaryLoading ??= fetch(new URL('../../mocks/radar/ibm-hi-small-summary.json', import.meta.url)).then(response => {
+  benchmarkSummaryLoading ??= fetch(new URL('../mocks/ibm-hi-small-summary.json', import.meta.url)).then(response => {
     if (!response.ok) throw new Error(`Benchmark summary request failed (${response.status})`);
     return response.json();
   }).catch(error => {
@@ -647,7 +647,7 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
     if (!host.isConnected) return;
     if (ledger) {
       host.replaceChildren();
-      const { mountBenchmarkLedger } = await import('../../features/investigation/ibm-ledger.jsx');
+      const { mountBenchmarkLedger } = await import('../features/investigation/ibm-ledger.jsx');
       if (!host.isConnected) return;
       if (code) {
         const entry = addWorkTab(code);
@@ -830,7 +830,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const evidenceHost = workspace.querySelector('[data-case-evidence]');
   const evidenceTable = evidenceHost && !caseGraphHost && mountTransactionEvidenceTable(evidenceHost, relatedTransactions);
   unmountCaseEvidence = evidenceTable?.unmount;
-  if (caseGraphHost) void import('../../features/investigation/preview-case-graph.jsx').then(({ mountCaseGraph }) => {
+  if (caseGraphHost) void import('../features/investigation/preview-case-graph.jsx').then(({ mountCaseGraph }) => {
     if (caseGraphHost.isConnected) {
       unmountCaseGraph = mountCaseGraph(caseGraphHost, {
         active: dashboardSource.cases.find(row => row.code === code),
@@ -840,19 +840,19 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     }
   });
   const ruleTarget = byId('workspace').querySelector('[data-rule-editor], [data-rule-template], [data-risk-dial]');
-  if (ruleTarget) void import('../../features/rules/rule-controls.jsx').then(({ mountRuleControls }) => {
+  if (ruleTarget) void import('../features/rules/rule-controls.jsx').then(({ mountRuleControls }) => {
     if (ruleTarget.isConnected) unmountRuleControls = mountRuleControls(byId('workspace'), byId('footer-actions'));
   });
   const component = byId('workspace').querySelector('[data-investigation-component]');
   const caseTable = byId('workspace').querySelector('[data-case-list-table]');
-  if (caseTable) void import('../../features/investigation/preview-case-list-table.jsx').then(({ mountPreviewCaseTable }) => {
+  if (caseTable) void import('../features/investigation/preview-case-list-table.jsx').then(({ mountPreviewCaseTable }) => {
     if (!caseTable.isConnected) return;
     dashboardSource ??= dashboardFixtures(groups);
     const caseRows = new Map(dashboardSource.cases.map(row => [row.code, row]));
     unmountInvestigation = mountPreviewCaseTable(caseTable, caseTable.dataset.caseListTable,
       codes.map(recordCode => caseRows.get(recordCode)).filter(Boolean), groupPrefix === 'E', queryData.rows.length);
   });
-  if (component) void import('../../features/investigation/investigation-components.jsx').then(({ mountInvestigation }) => {
+  if (component) void import('../features/investigation/investigation-components.jsx').then(({ mountInvestigation }) => {
     if (component.isConnected) {
       ({ unmount: unmountInvestigation, setLedgerView } = mountInvestigation(component, {
         codes,

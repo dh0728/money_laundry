@@ -9,12 +9,12 @@ pnpm dev --host 127.0.0.1 --port 5215 --strictPort
 
 | 위치 | 용도 |
 | --- | --- |
-| [src/app/radar](src/app/radar) | 앱 진입점, 메뉴, URL과 화면 전환 |
-| [src/pages/radar](src/pages/radar) | 화면 조립 |
+| [src/app](src/app) | 앱 진입점, 메뉴, URL과 화면 전환 |
+| [src/pages](src/pages) | 화면 조립 |
 | [src/features](src/features) | 대시보드, 원장·조사, 룰 엔진, 설정 |
 | [src/api](src/api) | 백엔드 요청과 응답 형식 |
-| [src/mocks/radar](src/mocks/radar) | 화면 검수용 샘플 데이터 |
-| [src/components/radar](src/components/radar) | 공통 버튼, 카드, 표 |
+| [src/mocks](src/mocks) | 화면 검수용 샘플 데이터 |
+| [src/components](src/components) | 공통 버튼, 카드, 표 |
 
 API를 연결할 때는 `VITE_API_MODE=live`로 실행합니다. 개발 서버의 `/api`는 기본적으로 로컬 8080으로 전달하며 `VITE_API_PROXY_TARGET`으로 바꿀 수 있습니다. 로그인·세션·알림은 기존 API를 사용합니다. 대시보드·조사·룰·보고서는 샘플 데이터에서 시작합니다. [화면별 API 인계](../../docs/frontend/implementation/api.md#live-layout-api-handoff)
 

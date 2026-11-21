@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { WarmTooltipGroup } from '../react-bits/WarmTooltip';
+import { WarmTooltipGroup } from './react-bits/WarmTooltip';
 
 const groups = new WeakMap();
 const delay = 400;

@@ -192,7 +192,7 @@
   inline-size: var(--ui-icon-size);
   block-size: var(--ui-icon-size);
   margin: 0;
-  background: url('../../assets/icons/query/radio.svg') center / 100% no-repeat;
+  background: url('../assets/icons/query/radio.svg') center / 100% no-repeat;
   border-radius: var(--aml-radius-full);
 }
 :root[data-theme="dark"] .query-choice input:not(:checked) { filter: invert(1) }
@@ -315,9 +315,9 @@
   mask: var(--calendar-chevron) center / 100% no-repeat;
   background: currentColor;
 }
-.aml-calendar-chevron[data-direction="left"] { --calendar-chevron: url('../../assets/icons/query/previous.svg') }
-.aml-calendar-chevron[data-direction="right"] { --calendar-chevron: url('../../assets/icons/query/next.svg') }
-.aml-calendar-chevron:is([data-direction="down"], [data-direction="up"]) { --calendar-chevron: url('../../assets/icons/query/dropdown.svg') }
+.aml-calendar-chevron[data-direction="left"] { --calendar-chevron: url('../assets/icons/query/previous.svg') }
+.aml-calendar-chevron[data-direction="right"] { --calendar-chevron: url('../assets/icons/query/next.svg') }
+.aml-calendar-chevron:is([data-direction="down"], [data-direction="up"]) { --calendar-chevron: url('../assets/icons/query/dropdown.svg') }
 .aml-calendar-chevron[data-direction="up"] { transform: rotate(180deg) }
 .query-tool-popover .rdp-selected { font-size: inherit }
 .query-tool-popover :is(.rdp-day_button, .rdp-button_previous, .rdp-button_next):focus-visible {

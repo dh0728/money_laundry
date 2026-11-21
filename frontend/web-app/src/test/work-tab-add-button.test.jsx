@@ -1,8 +1,8 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
-import { WorkTabAddButton } from '../../components/radar/primary-button.jsx';
-import { setWorkTabCodes } from '../../app/radar/work-tab-state.js';
+import { WorkTabAddButton } from '../components/primary-button.jsx';
+import { setWorkTabCodes } from '../app/work-tab-state.js';
 
 afterEach(() => act(() => setWorkTabCodes([])));
 

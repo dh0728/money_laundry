@@ -1,6 +1,6 @@
 import React from 'react';
-import { ActionButton } from '../../components/radar/primary-button';
-import { WorkflowTable } from '../../components/radar/workflow-table';
+import { ActionButton } from '../../components/primary-button';
+import { WorkflowTable } from '../../components/workflow-table';
 import './preview-case-list-table.css';
 
 export function CaseDataTable({ title, summary, className = '', tools, selection, children }) {

@@ -1,5 +1,5 @@
 @layer theme, base, utilities;
-@import "../../styles/preview-design-system.css";
+@import "../styles/preview-design-system.css";
 
 :root {
   scrollbar-gutter: stable;

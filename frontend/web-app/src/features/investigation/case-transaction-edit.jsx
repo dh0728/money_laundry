@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { ActionButton, ConfirmHoldButton } from '../../components/radar/primary-button';
-import { enableBackdropDismissal } from '../../lib/radar/overlay-dismissal';
+import { ActionButton, ConfirmHoldButton } from '../../components/primary-button';
+import { enableBackdropDismissal } from '../../lib/overlay-dismissal';
 import { membershipReasonLimit } from './case-membership-data';
 import './case-judgment.css';
 import './case-transaction-edit.css';

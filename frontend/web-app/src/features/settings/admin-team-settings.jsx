@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { fetchReviewUsers } from '@/api/liveReview';
-import { ActionButton } from '../../components/radar/primary-button';
-import { StatusTag } from '../../components/radar/semantic-tags';
+import { ActionButton } from '../../components/primary-button';
+import { StatusTag } from '../../components/semantic-tags';
 import './admin-team-settings.css';
 
 const roles = { ADMIN: '관리자', STAFF: '분석가' };

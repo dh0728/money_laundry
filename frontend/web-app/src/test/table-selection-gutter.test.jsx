@@ -1,8 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it } from 'vitest';
-import { PreviewCaseTable } from '../../features/investigation/preview-case-list-table';
-import { mountWorkflows } from '../../pages/radar/workflow-components';
+import { PreviewCaseTable } from '../features/investigation/preview-case-list-table';
+import { mountWorkflows } from '../pages/workflow-components';
 
 function getSelectableTable(scope, label, columns) {
   const table = scope.getByRole('table', { name: label });

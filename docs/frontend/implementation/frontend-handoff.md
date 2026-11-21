@@ -6,7 +6,7 @@ This is the single current FE implementation reference. The other current refere
 
 ## Authority and scope
 
-- Work in `frontend/web-app` on `fe/work`. The current 3.4.1 Liquid Glass app starts at `src/app/radar/layout.js` and uses the existing `src` structure. See the [app runbook](../../../frontend/web-app/README.md) for the page, feature, and API paths. Preserve existing user changes and the comparison entries and Storybook.
+- Work in `frontend/web-app` on `fe/work`. The current 3.4.1 Liquid Glass app starts at `src/app/layout.js` and uses the existing `src` structure. See the [app runbook](../../../frontend/web-app/README.md) for the page, feature, and API paths. Preserve existing user changes and the comparison entries and Storybook.
 - Use the user's [original Figma](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) for layout, dimensions, component instances, variable bindings, and interactions. Do not replace it with the rejected generated review file.
 - Latest authorized layout work may read original Figma structure and reuse cached exports. KMG owns border/contents and a separate session owns surface; do not edit those variable groups, collections or bindings to compensate for concurrent changes. Keep Figma calls scoped and read-only during this work.
 - The rejected artifact is the Figma review copy, not all existing code. Preserve and reuse functionality; rework the layout against the user's original. Ask KMG about ambiguous behavior or application choices instead of inventing them. Continue independent confirmed work.

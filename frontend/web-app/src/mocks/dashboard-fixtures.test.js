@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { dashboardFixtures, dashboardFixtureResponse, dashboardFixtureBoardPage, dashboardRecordCodes } from './dashboard-fixtures';
-import { readPreviewRoute } from '../../app/radar/preview-route';
+import { readPreviewRoute } from '../app/preview-route';
 
 const source = dashboardFixtures({
   T: dashboardRecordCodes({ prefix: 'T', digits: 8 }),

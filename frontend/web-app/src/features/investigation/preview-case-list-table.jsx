@@ -2,9 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
-import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStatusLabel, VerdictTag } from '../../components/radar/semantic-tags';
+import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStatusLabel, VerdictTag } from '../../components/semantic-tags';
 import { currencyColumn, SortableTableHead, tableCount,
-  useTableSelection, useTableSort } from '../../components/radar/workflow-table';
+  useTableSelection, useTableSort } from '../../components/workflow-table';
 
 const flowsFor = records => [...new Set(records.map(({ from, to }) => `${from.code} → ${to.code}`))];
 const timesFor = records => records.map(record => record.timestamp).sort();

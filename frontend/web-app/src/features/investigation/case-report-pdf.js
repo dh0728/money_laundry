@@ -1,4 +1,4 @@
-import { buildImagePdf } from '../../lib/radar/preview-pdf.js';
+import { buildImagePdf } from '../../lib/preview-pdf.js';
 import { judgmentReasonLabels } from './case-judgment-data.js';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
 

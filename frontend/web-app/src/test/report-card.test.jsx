@@ -1,6 +1,6 @@
 import { act, fireEvent, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { mountWorkflows } from '../../pages/radar/workflow-components';
+import { mountWorkflows } from '../pages/workflow-components';
 
 it('shares the investigation card structure while retaining judgment selection and target access', async () => {
   vi.stubGlobal('IntersectionObserver', class {

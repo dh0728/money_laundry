@@ -19,7 +19,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 test('first opening a case updates only its unread flag across fixture rebuild and reload', async () => {
   const { markPreviewCaseRead } = await import('./case-read-state.js');
-  const { dashboardFixtures } = await import('../../mocks/radar/dashboard-fixtures.js');
+  const { dashboardFixtures } = await import('../../mocks/dashboard-fixtures.js');
   const [unreadAlert, unreadEpisode] = dashboardFixtures(fixture).cases;
   expect(unreadAlert).toMatchObject({ code: alert, unread: true, status: '처리 전' });
   expect(unreadEpisode).toMatchObject({ code: episode, unread: true });
@@ -31,7 +31,7 @@ test('first opening a case updates only its unread flag across fixture rebuild a
   ]);
 
   vi.resetModules();
-  const restored = await import('../../mocks/radar/dashboard-fixtures.js');
+  const restored = await import('../../mocks/dashboard-fixtures.js');
   expect(restored.dashboardFixtures(fixture).cases[0]).toMatchObject({ unread: false, status: '처리 전' });
   const { markPreviewCaseRead: markRestoredCaseRead, resetPreviewCaseRead } = await import('./case-read-state.js');
   expect(markRestoredCaseRead(restored.dashboardFixtures(fixture).cases[1])).toBe(true);
@@ -52,7 +52,7 @@ test('opening a transaction, an already-read case or an unknown code stores noth
 
 test('a pending case requires an explicit start and a saved judgment completes it on reload', async () => {
   const { markPreviewCaseRead } = await import('./case-read-state.js');
-  const { dashboardFixtures } = await import('../../mocks/radar/dashboard-fixtures.js');
+  const { dashboardFixtures } = await import('../../mocks/dashboard-fixtures.js');
   const { canStartPreviewReview, canJudgePreviewCase, startPreviewReview, savePreviewJudgment } =
     await import('./case-judgment-data.js');
   const unread = dashboardFixtures(fixture).cases[0];
@@ -67,7 +67,7 @@ test('a pending case requires an explicit start and a saved judgment completes i
   expect(startPreviewReview(pending)).toBe(false);
 
   vi.resetModules();
-  const { dashboardFixtures: restoredFixtures } = await import('../../mocks/radar/dashboard-fixtures.js');
+  const { dashboardFixtures: restoredFixtures } = await import('../../mocks/dashboard-fixtures.js');
   const { savePreviewJudgment: saveAfterReload, previewJudgmentReason } = await import('./case-judgment-data.js');
   const [review, untouched] = restoredFixtures(fixture).cases;
   expect(review).toMatchObject({ status: '처리 중', unread: false });
@@ -84,7 +84,7 @@ test('a pending case requires an explicit start and a saved judgment completes i
       reasonCategory: 'normal-business', reviewer: '분석가' } });
   expect(previewJudgmentReason(completed.judgment)).toBe('정상 영업 거래 · 정상 영업 확인');
   vi.resetModules();
-  const { dashboardFixtures: persistedFixtures } = await import('../../mocks/radar/dashboard-fixtures.js');
+  const { dashboardFixtures: persistedFixtures } = await import('../../mocks/dashboard-fixtures.js');
   expect(persistedFixtures(fixture).cases[0].judgment).toEqual(completed.judgment);
 });
 
@@ -92,6 +92,6 @@ test('existing saved judgments still restore even if the original fixture was pe
   storage.set('aml-live-layout-case-judgments', JSON.stringify([{
     code: alert, id: 'J-261119-100001', verdict: 'abnormal', reason: '기존 판정', at: '2026-11-19T09:00:00Z',
   }]));
-  const { dashboardFixtures } = await import('../../mocks/radar/dashboard-fixtures.js');
+  const { dashboardFixtures } = await import('../../mocks/dashboard-fixtures.js');
   expect(dashboardFixtures(fixture).cases[0]).toMatchObject({ status: '처리 완료', verdict: 'abnormal', open: false });
 });

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { ActionButton, ConfirmHoldButton, PrimaryButton } from '../../components/radar/primary-button';
+import { ActionButton, ConfirmHoldButton, PrimaryButton } from '../../components/primary-button';
 import { canJudgePreviewCase, canStartPreviewReview, judgmentReasonLabels, judgmentTextLimit, validJudgmentDetails } from './case-judgment-data';
-import { enableBackdropDismissal } from '../../lib/radar/overlay-dismissal.js';
-import { VerdictTag, verdictLabels } from '../../components/radar/semantic-tags';
+import { enableBackdropDismissal } from '../../lib/overlay-dismissal.js';
+import { VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import './case-judgment.css';
 
 function JudgmentTargets({ row }) {

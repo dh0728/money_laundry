@@ -4,7 +4,7 @@ import { AdminTeamSettings } from './admin-team-settings';
 import { ModelRiskDial } from './model-risk-dial';
 import { getModelRiskThresholds, saveModelRiskThresholds } from './model-risk-settings';
 import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user';
-import { PrimaryButton } from '../../components/radar/primary-button';
+import { PrimaryButton } from '../../components/primary-button';
 import './admin-settings.css';
 
 function ModelRiskSettings({ user }) {
