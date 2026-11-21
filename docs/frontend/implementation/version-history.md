@@ -4,11 +4,13 @@
 
 ## 포트폴리오 화면 자료
 
-0.x 초기 시안, 1.x 조사 화면, 3.5.0 Episode 편입 화면 비교. 0.x 전체는 하단의 버전별 HTML 다운로드.
+0.x 초기 시안, 1.x 조사 화면, 2.x Dashboard, 3.5.0 Episode 편입 화면 비교. 0.x 전체는 하단의 버전별 HTML 다운로드.
 
 ![초기 Dashboard 시안](https://raw.githubusercontent.com/dh0728/money_laundry/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.1.0/1-dashboard_0.1.0.svg)
 
 ![1.x 조사 개요 캡처](https://raw.githubusercontent.com/dh0728/money_laundry/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/recovery/unclassified/2026-10-26/mac-pairview-history-20261022/review-assets/overview-after-evidence-flow-20261022.png)
+
+![2.x Sky Blue 개인 Dashboard](history/screenshots/2.x-dashboard.png)
 
 ![3.5.0 기존 Episode 편입 화면](history/screenshots/3.5.0-episode-transfer.png)
 
