@@ -65,6 +65,7 @@ function caseRow(item, transactions, userId) {
     amountByCurrency: Object.fromEntries(Object.entries(item.summary.amountsByCurrency ?? {})
       .map(([currency, amount]) => [currency, Number(amount)])),
     caseId: item.caseId, revision: item.revision, assigneeName: item.assigneeName, episodeId: item.episodeId,
+    ...(item.judgment && { judgment: { ...item.judgment, code, verdict: verdicts[item.judgment.verdict] } }),
   };
 }
 
@@ -75,7 +76,6 @@ function build() {
   for (const row of cases) for (const record of row.related) {
     const shared = transactions.get(record.txId);
     if (record.verdict !== 'unjudged') shared.verdict = record.verdict;
-    if (record.status !== '처리 전' && shared.status !== '처리 완료') shared.status = record.status;
   }
   const alerts = cases.filter(row => row.kind === 'Alert');
   for (const row of cases) {

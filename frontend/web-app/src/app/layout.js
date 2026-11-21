@@ -9,7 +9,8 @@ import { ConfirmHoldButton, mountLoginPrimary } from '../components/primary-butt
 import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
-import { savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
+import { excludeLiveTransactions, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
+import { canStartPreviewReview, savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { createCaseEvidenceSelection } from '../features/investigation/case-evidence-selection.js';
 import { editPreviewAlertTransactions } from '../features/investigation/case-membership-data.js';
 import { markPreviewCaseRead, resetPreviewCaseRead } from '../features/investigation/case-read-state.js';
@@ -790,31 +791,59 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (!evidenceSelection || activeWorkCode !== code || activeEvidence?.selection !== evidenceSelection) {
         return { ok: false, error: '현재 Alert에서 편집할 거래를 다시 선택해 주세요.' };
       }
-      const result = editPreviewAlertTransactions({
+      const applied = result => {
+        if (!result.ok) return result;
+        dashboardSource = caseSource(groups);
+        const row = dashboardSource.cases.find(item => item.code === code);
+        mountedWorkflows.updateCase(row, dashboardSource);
+        unmountCaseGraph?.update({ active: row, cases: dashboardSource.cases });
+        evidenceSelection.clear();
+        document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
+          status: 'done',
+          title: targetCode ? `거래 ${result.value.transactionCodes.length}건 이동` : `거래 ${result.value.transactionCodes.length}건 제외`,
+          description: targetCode ? `${code} → ${targetCode}` : code,
+        } }));
+        return result;
+      };
+      if (serviceMode) {
+        const mounted = mountedWorkflows;
+        if (targetCode) return { ok: false, error: 'Alert 사이 거래 이동은 아직 지원하지 않습니다.' };
+        return excludeLiveTransactions(dashboardSource.cases.find(item => item.code === code), transactionCodes, reason)
+          .then(result => result.ok ? loadLiveSource().then(() => mountedWorkflows === mounted ? applied(result) : result) : result);
+      }
+      return applied(editPreviewAlertTransactions({
         cases: dashboardSource.cases, sourceCode: code, targetCode, transactionCodes, reason, user: currentPreviewUser(),
-      });
-      if (!result.ok) return result;
-      dashboardSource = caseSource(groups);
-      const row = dashboardSource.cases.find(item => item.code === code);
-      mountedWorkflows.updateCase(row, dashboardSource);
-      unmountCaseGraph?.update({ active: row, cases: dashboardSource.cases });
-      evidenceSelection.clear();
-      document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
-        status: 'done',
-        title: targetCode ? `거래 ${result.value.transactionCodes.length}건 이동` : `거래 ${result.value.transactionCodes.length}건 제외`,
-        description: targetCode ? `${code} → ${targetCode}` : code,
-      } }));
-      return result;
+      }));
     },
     startReview: target => {
       if (readOnly || activeWorkCode !== target) return;
       const current = dashboardSource.cases.find(item => item.code === target);
+      if (serviceMode) {
+        const mounted = mountedWorkflows;
+        if (!canStartPreviewReview(current)) return;
+        void startLiveReview(current).then(result => {
+          if (!result.ok) {
+            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '상태를 바꾸지 못했습니다.', description: result.error } }));
+            return;
+          }
+          return loadLiveSource().then(() => {
+            if (mountedWorkflows !== mounted) return;
+            dashboardSource = caseSource(groups);
+            mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
+          });
+        });
+        return;
+      }
       if (!startPreviewReview(current)) return;
       dashboardSource = caseSource(groups);
       mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
     },
     saveJudgment: (target, verdict, details, reasonCategory) => {
       const row = !readOnly && activeWorkCode === target ? dashboardSource.cases.find(item => item.code === target) : undefined;
+      if (serviceMode) {
+        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => result.ok
+          ? loadLiveSource().then(() => { dashboardSource = caseSource(groups); return result; }) : result);
+      }
       const result = savePreviewJudgment(row, verdict, details, reasonCategory, currentPreviewUser()?.username ?? '');
       if (result.ok) dashboardSource = caseSource(groups);
       return result;
