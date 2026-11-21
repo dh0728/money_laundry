@@ -1,0 +1,19 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "./charts";
+
+@theme inline {
+  --color-chart-label: var(--muted-text);
+  --color-chart-tooltip-foreground: var(--text);
+  --color-chart-tooltip-muted: var(--muted-text);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --color-border: var(--divider);
+}
+
+.bklit-tooltip-panel.glass {
+  --glass-surface-face: color-mix(in srgb, var(--information-panel-surface) 64%, var(--glass-material-frost));
+  border: var(--aml-stroke-control) solid var(--glass-surface-edge);
+  border-radius: var(--aml-radius-card);
+}
+.bklit-tooltip-panel .border-b { border-color: var(--glass-edge) }
+.bklit-tooltip-clip { border-radius: calc(var(--aml-radius-card) - var(--aml-stroke-control)) }

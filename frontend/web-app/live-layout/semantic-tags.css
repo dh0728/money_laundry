@@ -1,0 +1,193 @@
+/* Standalone tags consume the Figma semantic palette exposed by preview-design-system.css. */
+:root {
+  --tag-danger-ink: var(--aml-figma-contents-status-danger-default);
+  --tag-positive-ink: var(--aml-figma-contents-status-positive-default);
+  --tag-caution-ink: var(--aml-figma-contents-status-caution-default);
+  --tag-pattern-fill: var(--selection-surface);
+  --tag-pattern-ink: var(--selection-ink);
+}
+
+.semantic-tag-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--aml-space-4);
+  min-inline-size: 0;
+}
+
+[data-glow-surface][data-selected] {
+  --tag-pattern-fill: color-mix(in srgb, var(--selection-surface), var(--selection-ink) 18%);
+}
+
+.semantic-tag {
+  --tag-fill: var(--tag-pattern-fill);
+  --tag-ink: var(--tag-pattern-ink);
+  --tag-font: var(--aml-type-label-weight) var(--aml-type-label-size)/var(--aml-type-label-lineHeight) Inter, var(--aml-font-family);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--aml-space-4);
+  width: fit-content;
+  block-size: calc(var(--aml-type-label-lineHeight) + 2 * var(--aml-space-2));
+  padding: var(--aml-space-2) var(--aml-space-6);
+  border-radius: var(--aml-radius-small);
+  background: var(--tag-fill);
+  color: var(--tag-ink);
+  font: var(--tag-font);
+  white-space: nowrap;
+}
+.semantic-tag[data-tone="danger"] {
+  --tag-solid-fill: var(--status-danger-accent);
+}
+.semantic-tag[data-tone="positive"] {
+  --tag-solid-fill: var(--status-positive-accent);
+  --tag-solid-ink: var(--status-accent-dark-ink);
+}
+.semantic-tag[data-tone="caution"] {
+  --tag-solid-fill: var(--status-caution-accent);
+  --tag-solid-ink: var(--status-accent-dark-ink);
+}
+.semantic-tag[data-tone="pending"] {
+  --tag-solid-fill: var(--status-pending-accent);
+}
+.semantic-tag[data-tone="info"] {
+  --tag-solid-fill: var(--status-info-accent);
+}
+.semantic-tag[data-emphasis="solid"] {
+  --tag-fill: var(--tag-solid-fill, var(--tag-pattern-fill));
+}
+.semantic-tag[data-emphasis="solid"][data-tone]:not([data-tone="neutral"]) {
+  --tag-ink: var(--tag-solid-ink, var(--status-accent-light-ink));
+}
+.semantic-tag[data-tag="model-score"] {
+  padding-inline: var(--aml-space-4);
+}
+.semantic-tag[data-tag="pattern"][data-emphasis="subtle"] {
+  --tag-fill: var(--information-panel-surface);
+  --tag-ink: var(--text);
+}
+.semantic-tag:is(.semantic-tag--human-verdict, [data-tag="model-score"], [data-tag="case-actor"], [data-preset^="elapsed"], [data-preset^="risk"])::before,
+.filter-tag-remove::before {
+  content: '';
+  flex: 0 0 var(--compact-icon-size);
+  height: var(--compact-icon-size);
+  background: currentColor;
+  mask: var(--tag-icon) center no-repeat;
+}
+.semantic-tag:is([data-tag="model-score"], [data-preset^="risk"]) { --tag-icon: url('./verdict-icons/model-score.svg') }
+.semantic-tag[data-preset^="elapsed"] { --tag-icon: url('./verdict-icons/elapsed.svg') }
+.semantic-tag[data-tag="case-actor"] { --tag-icon: url('./verdict-icons/assignee.svg') }
+.semantic-tag--human-verdict { --tag-icon: url('./verdict-icons/person-check.svg') }
+.semantic-tag[data-tag="status"]:not([data-preset="neutral"]) {
+  border-radius: var(--aml-radius-full);
+  block-size: auto;
+  font: bold var(--aml-type-caption-size)/var(--aml-type-label-lineHeight) var(--aml-font-family);
+}
+.semantic-tag[data-tag="status"][data-preset]:not(.semantic-tag--human-verdict, [data-tone="neutral"], [data-preset^="elapsed"], [data-preset^="risk"])::before {
+  content: '';
+  inline-size: var(--aml-space-6);
+  block-size: var(--aml-space-6);
+  flex: none;
+  border-radius: var(--aml-radius-full);
+  background: var(--tag-dot, currentColor);
+}
+.semantic-tag[data-tag="status"][data-emphasis="subtle"] {
+  --tag-fill: color-mix(in srgb, var(--tag-solid-fill, var(--text)) var(--review-tag-strength), var(--review-tag-base));
+  --tag-ink: var(--status-accent-dark-ink);
+  --tag-dot: var(--tag-solid-fill, var(--text));
+}
+.semantic-tag[data-tag="status"][data-emphasis="solid"] {
+  --tag-dot: color-mix(in srgb, var(--tag-ink) 70%, var(--tag-solid-fill));
+}
+[data-review="unread"] {
+  --review-status-accent: var(--review-status-unread-accent);
+}
+[data-review="pending"] {
+  --review-status-accent: var(--review-status-pending-accent);
+}
+[data-review="inProgress"] {
+  --review-status-accent: var(--review-status-inProgress-accent);
+}
+[data-review="done"] {
+  --review-status-accent: var(--review-status-done-accent);
+}
+.button.semantic-tag[data-tag="link"] {
+  --button-hover-bg: var(--tag-ink);
+  --button-active-bg: var(--tag-ink);
+  flex: 0 0 auto;
+  block-size: auto;
+  min-block-size: calc(var(--aml-type-label-lineHeight) + 2 * var(--aml-space-2));
+  max-inline-size: 100%;
+  padding: var(--aml-space-2) var(--aml-space-4);
+  border-radius: var(--aml-radius-small);
+  background-color: var(--tag-fill);
+  color: var(--tag-ink);
+  border: 0;
+  outline-offset: var(--aml-stroke-control);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  vertical-align: middle;
+}
+.button.semantic-tag[data-tag="link"]:is(:hover, :focus-visible, :active) {
+  background-color: var(--tag-ink);
+  color: var(--tag-fill);
+}
+.button.semantic-tag[data-tag="link"] code { font-size: inherit; font-weight: inherit }
+
+.semantic-tag[data-tag="filter"] {
+  --tag-fill: var(--selection-surface);
+  --tag-ink: var(--selection-ink);
+  --focus-ring: var(--tag-ink);
+  --tag-icon: url('./verdict-icons/filter-dismiss.svg');
+  min-block-size: var(--aml-size-control-compact);
+  block-size: auto;
+  max-inline-size: 100%;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border: var(--aml-stroke-control) solid color-mix(in srgb, var(--tag-ink) 26%, var(--tag-fill));
+  background: var(--tag-fill);
+  color: var(--tag-ink);
+  font: var(--tag-font);
+  overflow: clip;
+}
+.semantic-tag[data-tag="filter"] > * {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  font: inherit;
+  border-radius: 0;
+  --button-hover-bg: color-mix(in srgb, var(--tag-ink) 7%, var(--tag-fill));
+  --button-active-bg: color-mix(in srgb, var(--tag-ink) 12%, var(--tag-fill));
+}
+.filter-tag-label {
+  padding: var(--aml-space-4) var(--aml-space-8);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.filter-tag-remove {
+  justify-content: center;
+  inline-size: var(--aml-space-24);
+  flex: none;
+  padding: 0;
+  border-inline-start: var(--aml-stroke-divider) solid var(--selection-divider);
+}
+.filter-tag-remove::before {
+  inline-size: var(--compact-icon-size);
+}
+
+.active-query-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-8) }
+.active-query-tags .clear-query-tags { font-size: var(--aml-type-label-size); padding: var(--aml-space-2) var(--aml-space-6); border-radius: var(--aml-radius-small) }
+[data-query-tags]:empty { display: none }
+.entry-list .row, .case-glow .row { flex-wrap: wrap }
+.entry-list .row { gap: var(--aml-space-4) var(--aml-space-8) }
+
+[data-verdict] {
+  --record-verdict-surface: color-mix(in srgb, var(--information-panel-surface),
+    var(--record-verdict-accent, var(--information-panel-surface)) var(--record-verdict-tint));
+}
+[data-verdict="unjudged"] { --record-verdict-accent: var(--status-caution-accent) }
+[data-verdict="abnormal"] { --record-verdict-accent: var(--status-danger-accent) }
+[data-verdict="normal"] { --record-verdict-accent: var(--status-positive-accent) }

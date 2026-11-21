@@ -1,0 +1,90 @@
+.catalogue {
+  --workspace-list-limit: 340px;
+  max-width: 1440px;
+  padding: clamp(var(--aml-space-16), 4vw, var(--aml-space-48));
+  margin-inline: auto;
+}
+.catalogue-header, .catalogue-index, .catalogue-actions, .catalogue-preferences, .catalogue-setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--workspace-gap);
+}
+.catalogue-header { justify-content: space-between }
+.catalogue-header h1 { margin: var(--aml-space-4) 0 0; font-size: clamp(var(--aml-type-metric-size), 5vw, var(--aml-space-40)) }
+.catalogue a { color: inherit }
+.catalogue-preferences { gap: var(--aml-space-16) }
+.catalogue-setting { justify-content: space-between }
+.catalogue-status-select { display: flex; flex-wrap: wrap; align-items: center; gap: var(--workspace-gap) }
+.catalogue-index {
+  position: sticky;
+  z-index: var(--aml-layer-popover);
+  top: 0;
+  margin-block: var(--aml-space-16);
+  padding-block: var(--aml-space-8);
+  background: var(--canvas-surface);
+  border-block-end: var(--aml-stroke-divider) solid var(--divider);
+}
+.catalogue-index a { border-radius: var(--aml-radius-control); padding: var(--aml-space-8) var(--aml-space-12); text-decoration: none }
+.catalogue-index a:hover { background: var(--hover) }
+.catalogue-index-preferences { display: flex; align-items: center; flex-wrap: wrap; margin-inline-start: auto }
+.catalogue-feedback:not(:empty) {
+  position: fixed;
+  z-index: var(--aml-layer-toast);
+  inset: auto var(--aml-space-16) var(--aml-space-16) auto;
+  max-width: calc(100% - var(--aml-space-32));
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-radius-card);
+  padding: var(--aml-space-8) var(--aml-space-12);
+  background: var(--canvas-surface);
+  pointer-events: none;
+}
+.catalogue-group { margin-block: var(--aml-space-24); scroll-margin-block-start: calc(var(--catalogue-index-height, var(--aml-size-row-comfortable)) + var(--aml-space-12)) }
+.catalogue-group h2 { margin: 0 0 var(--aml-space-12) }
+.catalogue-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--aml-space-12) }
+.catalogue-demo {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--aml-space-12);
+  min-width: 0;
+  padding: var(--aml-space-16);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-radius-card);
+}
+.catalogue-demo > h3 { font-size: 1em; margin: 0 }
+.catalogue-demo > p { margin-block: 0 }
+.catalogue-span { grid-column: 1 / -1 }
+.catalogue-actions .icon-button { padding: var(--header-button-padding) }
+.catalogue-actions > .button { min-height: var(--header-control-size) }
+.catalogue-actions > .button:disabled { opacity: var(--aml-opacity-disabled) }
+.catalogue-scroll { display: flex; min-height: 0; max-height: 98px }
+.catalogue-control-stack { display: grid; justify-items: start; gap: var(--workspace-gap) }
+.catalogue-control-stack .catalogue-setting { justify-self: stretch }
+.catalogue-control-stack .jelly-radio { padding-inline: 0 }
+.catalogue-navigation { display: flex; position: relative; align-self: start; justify-content: flex-start; max-width: 100% }
+.catalogue-query-codes { display: flex; flex-wrap: wrap; gap: var(--workspace-gap) }
+.catalogue-glass-sample {
+  display: flex;
+  align-items: center;
+  min-height: 96px;
+  padding: var(--aml-space-8);
+  border-radius: var(--aml-radius-card);
+  background: repeating-linear-gradient(120deg, var(--canvas-surface) 0 var(--aml-space-24), var(--inner-surface) var(--aml-space-24) var(--aml-space-48));
+}
+.catalogue-tags { display: flex; gap: var(--workspace-gap); flex-wrap: wrap; padding: var(--aml-space-12); border-radius: var(--aml-radius-card) }
+.catalogue-stack { max-height: 170px; height: 170px }
+.catalogue-stack .scroll-stack__inner, .catalogue-stack .scroll-stack-card { padding: var(--aml-space-4) }
+.catalogue-stack .scroll-stack-card { min-height: 54px; height: auto }
+.catalogue-ledger .ledger-components { block-size: min(600px, 72dvh) }
+.catalogue-workflow .screen-actions { position: static; margin-block-start: var(--aml-space-8); justify-content: end }
+.catalogue-workflow .screen-primary { pointer-events: auto }
+.catalogue-count { font-size: 2em }
+.catalogue-shell { width: 100%; height: min(720px, 80dvh); margin-block-start: var(--aml-space-8); border: var(--aml-stroke-divider) solid var(--divider); border-radius: var(--aml-radius-card) }
+.catalogue summary { cursor: pointer }
+@media (max-width: 760px) {
+  .catalogue-grid { grid-template-columns: minmax(0, 1fr) }
+}
+@media (max-width: 1120px), (max-height: 480px) {
+  .catalogue-ledger .ledger-components { block-size: auto }
+}

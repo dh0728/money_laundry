@@ -1,0 +1,7 @@
+:root {
+  --case-wrap-violet: light-dark(#6943d8, #b28bff);
+  --case-wrap-teal: light-dark(#0c897d, #48daca);
+  --case-wrap-rose: light-dark(#bc3b89, #f47abd);
+  --case-wrap-indigo: light-dark(#384bbc, #8199ff);
+  --case-wrap-ochre: light-dark(#a26108, #f5b847);
+}

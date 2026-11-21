@@ -1,0 +1,31 @@
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { expect, it, vi } from 'vitest';
+import { fetchReviewUsers } from '@/api/liveReview';
+import { AdminTeamSettings } from './admin-team-settings';
+
+vi.mock('@/api/liveReview', () => ({ fetchReviewUsers: vi.fn() }));
+
+it('keeps team management restricted to administrators and scopes fixture edits to fixture rows', () => {
+  fetchReviewUsers.mockClear();
+  const staff = { id: 1, name: '실제 분석가', role: 'STAFF', source: 'api' };
+  const { rerender } = render(<AdminTeamSettings sessionUser={staff} />);
+  expect(screen.queryByRole('region', { name: '팀원 권한' })).not.toBeInTheDocument();
+  rerender(<AdminTeamSettings sessionUser={{ id: -2, name: '프리뷰 관리자', role: 'ADMIN', source: 'fixture' }} />);
+  expect(screen.getByText('현재 계정')).toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: '프리뷰 관리자 권한' })).not.toBeInTheDocument();
+  const target = screen.getByRole('combobox', { name: '김서윤 권한' });
+  fireEvent.change(target, { target: { value: 'ADMIN' } });
+  expect(target).toHaveValue('ADMIN');
+  expect(screen.getByRole('status')).toHaveTextContent('김서윤의 권한을 관리자로 변경했습니다.');
+  expect(fetchReviewUsers).not.toHaveBeenCalled();
+});
+
+it('reads verified administrator directory entries without exposing mutation controls', async () => {
+  fetchReviewUsers.mockReset().mockResolvedValue([{ id: 2, name: '실제 관리자', role: 'ADMIN' }]);
+  render(<AdminTeamSettings sessionUser={{ id: 2, name: '실제 관리자', role: 'ADMIN', source: 'api' }} />);
+  expect(await screen.findByText('실제 관리자')).toBeInTheDocument();
+  expect(screen.getByText('현재 계정')).toBeInTheDocument();
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  expect(fetchReviewUsers).toHaveBeenCalledOnce();
+});

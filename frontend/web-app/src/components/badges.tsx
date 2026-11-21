@@ -1,6 +1,7 @@
+/* eslint-disable react-refresh/only-export-components -- 배지 컴포넌트와 상태 라벨 상수를 함께 내보냄 */
 import { Badge } from '@/components/ui/badge'
 import { formatScore, typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
-import { alertWorkStatus, workStatusLabels, workStatusTone, type WorkStatus } from '@/lib/workStatus'
+import { workStatusLabels, workStatusTone, type WorkStatus } from '@/lib/workStatus'
 
 // 위험 색 단계(--risk-0~9)는 theme.css가 가진다. 점수 0~1을 10단계로 나눈다.
 const riskTone = (score: number) => `var(--risk-${Math.min(9, Math.max(0, Math.floor(score * 10)))})`
@@ -34,7 +35,9 @@ export function WorkStatusBadge({ status, title }: { status: WorkStatus; title?:
   )
 }
 
-export const StatusBadge = ({ status }: { status: AlertStatus }) => <WorkStatusBadge status={alertWorkStatus(status)} />
+// Q4(10/8): Alert 상태는 처리 단계가 아니라 지금 어디 있나로 부른다. 대시보드 상태 차트 범례와 같은 말
+export const alertStatusLabels: Record<AlertStatus, string> = { OPEN: '진행 중 · 단독', ESCALATED: '진행 중 · Episode', CLOSED: '종결' }
+export const StatusBadge = ({ status }: { status: AlertStatus }) => <Badge variant="outline" data-tone={{ OPEN: 'pending', ESCALATED: 'working', CLOSED: 'closed' }[status]} data-status={status} className="semantic-status-badge text-xs font-normal">{alertStatusLabels[status]}</Badge>
 
 export function PatternBadge({ code }: { code: TypeCode }) {
   const { key, label } = typeDisplay(code)

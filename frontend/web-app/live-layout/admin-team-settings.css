@@ -1,0 +1,9 @@
+.admin-team-list {
+  list-style: none;
+  margin: var(--aml-space-8) 0 0;
+  padding: 0;
+}
+.admin-team-list > li + li { border-top: var(--aml-stroke-divider) solid var(--glass-edge) }
+.admin-team-member { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--aml-space-4) var(--aml-space-8) }
+.admin-team-member small { color: var(--muted-text) }
+.admin-team-retry { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--aml-space-8) }

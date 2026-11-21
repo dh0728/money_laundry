@@ -27,7 +27,9 @@ import { ageOptions } from '@/features/alerts/alertFilters'
 import { episodeFilterLabel, episodeFilterNames, matchesEpisode, riskOptions, type EpisodeFilter, type EpisodeFilterField } from './episodeFilters'
 
 export function EpisodeStatusBadge({ status, reviewRequested }: { status: EpisodeStatus; reviewRequested?: boolean }) {
-  return <WorkStatusBadge status={episodeWorkStatus(status, reviewRequested)} title={reviewRequested && status === 'OPEN' ? '관리자 검수 요청됨 (FE 제안)' : undefined} />
+  // Q4(10/8): Alert 상태와 같은 말을 쓴다. 관리자 검수 넘기기는 API가 없어 표시하지 않는다(재설계 S5)
+  void reviewRequested; void episodeWorkStatus; void WorkStatusBadge
+  return <Badge variant="outline" data-tone={status === 'OPEN' ? 'working' : 'closed'} data-status={status} className="semantic-status-badge text-xs font-normal">{status === 'OPEN' ? '진행 중' : '종결'}</Badge>
 }
 
 export type EpisodeListRow = Pick<EpisodeRow, 'episodeId' | 'riskScore' | 'alertCount' | 'txCount' | 'assignee' | 'status' | 'createdAt' | 'ageDays' | 'reviewRequestedAt'> & { primaryTypes: { code: TypeCode | null; name: string }[]; totalAmountUsd?: number; amountLabel?: string }

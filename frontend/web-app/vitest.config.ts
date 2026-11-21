@@ -8,6 +8,8 @@ export default defineConfig({
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
   test: {
+    // Node 26 native localStorage shadows jsdom storage unless disabled in workers.
+    execArgv: ['--no-experimental-webstorage'],
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
   },

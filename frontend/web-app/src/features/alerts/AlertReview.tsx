@@ -8,7 +8,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ReviewLayout } from '@/features/alerts/ReviewLayout'
 import { useMemoryState } from '@/lib/memory'
 import { alertCode, episodeCode } from './alertFilters'
-import { usd } from './metrics'
+import { toast } from 'sonner'
+import { PatternBadge } from '@/components/badges'
 import { verdictOption, type AlertVerdict } from './verdict'
 
 export type VerdictSubmit = { verdict: AlertVerdict; comment: string; episodeId?: number }
@@ -31,24 +32,23 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
   const locked = decided || !responsible
   const option = verdictOption(verdict)
 
-  const counterparts = new Set(alert.transactions.flatMap(t => [t.fromAccount, t.toAccount])).size
-  const owners = new Set(alert.transactions.flatMap(t => [t.fromOwnerName, t.toOwnerName]).filter(Boolean)).size
-  const biggest = [...alert.transactions].sort((a, b) => b.amountUsd - a.amountUsd)[0]
+  // 재설계 S5 참고 정보: 조사 범위·미판정 수, 대표 유형·씨앗, 같은 거래의 다른 사건 판정, 저장본(COMMENT 기록)
+  const [drafts, setDrafts] = useMemoryState<{ at: string; text: string }[]>(`${key}:drafts`, [])
+  const seeds = alert.transactions.filter(t => t.role === 'SEED')
+  const saveDraft = () => { setDrafts([{ at: new Date().toTimeString().slice(0, 5), text: comment.trim() }, ...drafts]); toast.success('임시 저장', { description: '처리 이력에 의견(COMMENT)으로 남습니다. 시안이라 서버에는 보내지 않습니다.' }) }
 
   return (
     <>
     <ReviewLayout reference={<>
         <dl className="space-y-4 text-xs">
-          <div><dt className="text-muted-foreground">검토 범위</dt><dd className="mt-1 font-medium">거래 {alert.transactions.length}건 · 소유주 {owners}명 · 계좌 {counterparts}개</dd></div>
-          <div><dt className="text-muted-foreground">대표 계좌</dt><dd className="mt-1 font-mono">{alert.subjectAccount.account} · 은행 {alert.subjectAccount.bank}</dd></div>
-          <div><dt className="text-muted-foreground">최대 거래</dt><dd className="mt-1 font-medium">{biggest ? `${biggest.txId} · ${usd(biggest.amountUsd)}` : '거래 없음'}</dd></div>
-          <div><dt className="text-muted-foreground">임계 초과 비율</dt><dd className="mt-1 font-medium">{Math.round(alert.scoreStats.aboveRatio * 100)}%</dd></div>
+          <div><dt className="text-muted-foreground">조사 범위</dt><dd className="mt-1 font-medium tabular-nums">거래 {alert.transactions.length}건 · 미판정 {alert.status === 'OPEN' ? alert.transactions.length : 0}건</dd></div>
+          <div><dt className="text-muted-foreground">대표 유형</dt><dd className="mt-1 flex items-center gap-2"><PatternBadge code={alert.primaryType.code} /><span className="text-muted-foreground">씨앗 거래 {seeds.length}건{seeds[0] ? ` · T-${seeds[0].txId} 점수 ${seeds[0].launderingScore.toFixed(2)}` : ''}</span></dd></div>
+          <div><dt className="text-muted-foreground">같은 거래의 다른 사건 판정</dt><dd className="mt-1">없음</dd></div>
         </dl>
         <div className="mt-5 border-t pt-4">
-          <p className="text-xs font-medium">판단 전 확인</p>
-          <ul className="mt-2 list-disc space-y-2 pl-4 text-xs leading-5 text-muted-foreground"><li>거래 목적과 고객 프로필이 일치하는가</li><li>송금·수취 관계를 입증할 자료가 있는가</li><li>같은 소유주의 다른 Alert가 있는가</li></ul>
+          <p className="text-xs font-medium">저장본 {drafts.length}개</p>
+          {drafts.length ? <ul className="mt-2 space-y-2 text-xs">{drafts.map((d, i) => <li key={i} className="rounded-md border px-2.5 py-2"><span className="tabular-nums text-muted-foreground">{d.at}</span><p className="mt-1 line-clamp-2">{d.text}</p><button type="button" className="mt-1 text-[0.6875rem] underline underline-offset-4" onClick={() => setComment(d.text)}>불러오기</button></li>)}</ul> : <p className="mt-2 text-xs text-muted-foreground">임시 저장한 의견이 여기에 쌓입니다.</p>}
         </div>
-
     </>}> 
         <SectionTitle
           title={decided ? '판정 완료' : '검토 의견'}
@@ -62,7 +62,8 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
           </p>
         )}
         <AlertVerdictForm verdict={verdict} setVerdict={setVerdict} comment={comment} setComment={setComment}
-          target={target} setTarget={setTarget} locked={locked} episodes={episodes} onConfirm={() => setConfirm(true)} />
+          target={target} setTarget={setTarget} locked={locked} episodes={episodes} onConfirm={() => setConfirm(true)}
+          onDraft={saveDraft} draftCount={drafts.length} onOpenDrafts={() => document.querySelector('[data-testid=review-reference]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })} />
     </ReviewLayout>
 
 
@@ -70,7 +71,7 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{alertCode(alert.alertId)} · {option.group === '이상거래' ? `이상거래 · ${option.label}` : option.label}</AlertDialogTitle>
+            <AlertDialogTitle>{alertCode(alert.alertId)} · {option.label}</AlertDialogTitle>
             <AlertDialogDescription>{option.result}{verdict === 'link-episode' && target ? ` · ${episodeCode(Number(target))}` : ''}. 판단 근거와 담당자를 처리 이력에 남깁니다.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="max-h-44 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{comment}</div>

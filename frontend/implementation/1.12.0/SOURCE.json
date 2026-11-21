@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "version": "1.12.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "frontend",
+  "name": "frontend 조사·그래프 복구 구현",
+  "git_committer_kst": "2026-10-21T15:25:55+09:00",
+  "source_repository": "money_laundry",
+  "source_commit": "4525d353e2b5d29db8f424da0d3294f83048c5fd",
+  "original_source_path": "frontend/web-app",
+  "original_source_url": "https://github.com/dh0728/money_laundry/tree/4525d353e2b5d29db8f424da0d3294f83048c5fd/frontend/web-app",
+  "lineage_note": "frontend branch is nonlinear and not merged into fe/work",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [
+    79
+  ],
+  "reconstruction": {
+    "baseline_commit": "b28caff2086fbf83cb78ad40ba89b74a2ef3e69d",
+    "patch": "implementation/1.12.0/web-app-1.12.0.patch",
+    "source_tree": "frontend/web-app",
+    "run": "Use a separate working copy at the exact source commit. Do not apply historical patches to the current implementation."
+  },
+  "original_branch": "frontend"
+}

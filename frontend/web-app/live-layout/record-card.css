@@ -1,0 +1,82 @@
+[data-glow-surface] {
+  --panel-material-edge: var(--record-card-edge, var(--aml-data-grid));
+  --panel-material-depth: var(--information-panel-shadow), var(--shadow-floating);
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  border-radius: var(--aml-radius-card);
+  color: var(--text);
+}
+[data-glow-surface][data-card-interactive] {
+  cursor: pointer;
+  user-select: text;
+  outline: var(--aml-stroke-focus) solid transparent;
+  outline-offset: calc(-1 * var(--aml-stroke-focus));
+  transition: background-color calc(var(--aml-motion-drawer-duration) / 2) ease,
+    outline-color calc(var(--aml-motion-drawer-duration) / 2) ease;
+}
+[data-glow-surface][data-verdict]:not([data-selected]) {
+  --record-card-edge: color-mix(in srgb, var(--record-verdict-surface), var(--record-card-glow) var(--record-verdict-edge-strength));
+  --panel-material-light: var(--record-verdict-accent);
+  --record-card-divider: color-mix(in srgb, var(--record-verdict-surface), var(--record-card-glow) var(--record-verdict-divider-strength));
+  --panel-material-solid: color-mix(in srgb, var(--record-verdict-surface),
+    var(--record-card-edge) var(--record-card-interaction, 0%));
+  --muted-text: color-mix(in srgb, var(--status-surface-secondary-ink), var(--text) var(--record-card-interaction, 0%));
+  --divider: var(--record-card-divider);
+}
+[data-card-interactive]:has(.card-header-main:focus-visible) { outline-color: var(--focus-ring) }
+@media (hover: hover) {
+  [data-card-interactive]:hover:not(:has(.card-header > .work-tab-add:hover)) {
+    --record-card-interaction: 22%;
+  }
+  [data-card-interactive][data-selected]:hover:not(:has(.card-header-main:focus-visible,
+    .card-header > .work-tab-add:hover)) {
+    outline-color: color-mix(in srgb, var(--selection-ink) 48%, transparent);
+  }
+}
+[data-card-interactive]:active:not(:has(.card-header > :is(.spring-check, .work-tab-add):active)) {
+  --record-card-interaction: 34%;
+}
+[data-card-interactive][data-selected]:active:not(:has(.card-header > :is(.spring-check, .work-tab-add):active)) {
+  outline-color: color-mix(in srgb, var(--selection-ink) 66%, transparent);
+}
+[data-reduced-motion="true"] [data-card-interactive] { transition: none }
+@media (prefers-reduced-motion: reduce) {
+  [data-glow-surface][data-card-interactive] { transition: none }
+}
+@media (any-hover: hover) and (prefers-reduced-motion: no-preference) {
+  :root:not([data-glassmorphism="false"], [data-reduced-motion="true"]) .preview-tilt-cards [data-card-spotlight]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 var(--aml-stroke-focus)
+      var(--card-spotlight-rim, light-dark(var(--aml-black-030), var(--aml-white-040)));
+    pointer-events: none;
+    mask-image: radial-gradient(circle calc(var(--aml-space-64) * 3) at var(--card-spotlight-x) var(--card-spotlight-y),
+      var(--aml-black-100), transparent);
+  }
+}
+
+[data-verdict="unjudged"] {
+  --record-card-glow: light-dark(
+    color-mix(in srgb, var(--risk-medium), var(--aml-black-100) 34%),
+    color-mix(in srgb, var(--risk-medium), var(--aml-white-100) 52%));
+}
+[data-verdict="abnormal"] { --record-card-glow: var(--risk-high) }
+[data-verdict="normal"] { --record-card-glow: var(--risk-low) }
+[data-card-spotlight][data-verdict] {
+  --card-spotlight-rim: color-mix(in srgb, var(--record-verdict-accent, var(--text)) var(--record-verdict-glow-strength), transparent);
+}
+[data-card-spotlight][data-review] {
+  --card-spotlight-rim: color-mix(in srgb, var(--review-status-accent, var(--text)) var(--record-verdict-glow-strength), transparent);
+}
+[data-glow-surface][data-selected] {
+  --panel-material-solid: var(--selection-surface);
+  --panel-material-light: var(--selection-surface);
+  --panel-material-backdrop: none;
+  --panel-glass-opacity: 100%;
+  --record-card-edge: var(--selection-divider);
+  --record-card-glow: var(--focus-ring);
+}

@@ -1,0 +1,33 @@
+.footer-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--aml-space-8);
+  max-inline-size: calc(100vw - 2 * var(--workspace-inset));
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.footer-pagination .button,
+.footer-pagination select {
+  min-inline-size: 0;
+  padding-inline: var(--aml-space-12);
+  min-block-size: var(--account-control-size, var(--aml-density-control-comfortable));
+}
+.footer-pagination select {
+  max-inline-size: min(44vw, 15rem);
+  border: var(--aml-stroke-control) solid var(--divider);
+  border-radius: var(--aml-radius-full);
+  color: var(--text);
+  background: var(--information-panel-surface);
+  font: inherit;
+}
+.footer-pagination select:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring);
+}
+.footer-pagination__status {
+  padding: var(--aml-space-4) var(--aml-space-8);
+  border-radius: var(--aml-radius-full);
+  background: var(--information-panel-surface);
+  color: var(--muted-text);
+  font-variant-numeric: tabular-nums;
+}

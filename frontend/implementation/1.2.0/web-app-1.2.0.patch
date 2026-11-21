@@ -1,0 +1,497 @@
+diff --git a/frontend/web-app/src/api/common.ts b/frontend/web-app/src/api/common.ts
+index 1b5056a..3773ac7 100644
+--- a/frontend/web-app/src/api/common.ts
++++ b/frontend/web-app/src/api/common.ts
+@@ -28,11 +28,13 @@ export type ProblemDetail = {
+ 
+ export class ApiError extends Error {
+   readonly problem: ProblemDetail
++  readonly retryAfterMs?: number
+ 
+-  constructor(problem: ProblemDetail) {
++  constructor(problem: ProblemDetail, retryAfterMs?: number) {
+     super(problem.detail ?? problem.title)
+     this.name = 'ApiError'
+     this.problem = problem
++    this.retryAfterMs = retryAfterMs
+   }
+ }
+ 
+@@ -47,13 +49,16 @@ export async function refreshCsrf() {
+   return csrf
+ }
+ 
+-export async function responseError(response: Response, notifyUnauthorized = true) {
++export async function responseError(response: Response, notifyUnauthorized = true, signal?: AbortSignal) {
+   const problem = (await response.json().catch(() => null)) as ProblemDetail | null
++  if (signal?.aborted) throw signal.reason
+   if (response.status === 401 && notifyUnauthorized) {
+     clearCsrf()
+     window.dispatchEvent(new Event('auth-expired'))
+   }
+-  return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status })
++  const hint = response.headers.get('Retry-After')
++  const delay = hint == null ? NaN : /^\d+$/.test(hint.trim()) ? Number(hint) * 1000 : Date.parse(hint) - Date.now()
++  return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status }, Number.isFinite(delay) ? Math.max(0, delay) : undefined)
+ }
+ 
+ /** 시각은 서울 오프셋(+09:00)이 붙은 ISO-8601 문자열 */
+@@ -61,14 +66,14 @@ export type IsoDateTime = string
+ /** YYYY-MM-DD */
+ export type IsoDate = string
+ 
+-export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
++export async function getJson<T>(path: string, params?: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> {
+   const query = new URLSearchParams()
+   for (const [key, value] of Object.entries(params ?? {})) {
+     if (value !== undefined) query.set(key, String(value))
+   }
+   const url = query.size ? `${path}?${query}` : path
+-  const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })
+-  if (!response.ok) throw await responseError(response, path !== '/api/me')
++  const response = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' }, ...(signal ? { signal } : {}) })
++  if (!response.ok) throw await responseError(response, path !== '/api/me', signal)
+   return (await response.json()) as T
+ }
+ 
+diff --git a/frontend/web-app/src/api/liveContracts.test.ts b/frontend/web-app/src/api/liveContracts.test.ts
+index e539d8a..1a015d2 100644
+--- a/frontend/web-app/src/api/liveContracts.test.ts
++++ b/frontend/web-app/src/api/liveContracts.test.ts
+@@ -1,15 +1,8 @@
+ import { beforeEach, expect, it, vi } from 'vitest'
+-import { fetchLiveDashboard } from './liveDashboard'
+ import { fetchLedgerAccounts, fetchLedgerOwners, fetchLedgerTransactions } from './liveLedger'
+ 
+ beforeEach(() => vi.restoreAllMocks())
+ 
+-it('대시보드는 필수 기간을 최신 경로로 보낸다', async () => {
+-  const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
+-  await fetchLiveDashboard('2026-09-01', '2026-09-28')
+-  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/dashboard?from=2026-09-01&to=2026-09-28')
+-})
+-
+ it('거래 탐색은 선택된 가명 ID와 반복 필터를 세 단계에 전달한다', async () => {
+   const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response('{}')))
+   const filters = { from: '2026-09-01', to: '2026-09-28', judgement: ['SUSPICIOUS', 'NORMAL'] as const, payments: ['WIRE', 'CASH'], size: 20 }
+diff --git a/frontend/web-app/src/api/liveDashboard.test.ts b/frontend/web-app/src/api/liveDashboard.test.ts
+new file mode 100644
+index 0000000..5052616
+--- /dev/null
++++ b/frontend/web-app/src/api/liveDashboard.test.ts
+@@ -0,0 +1,48 @@
++import { afterEach, expect, it, vi } from 'vitest'
++import { fetchLiveDashboard, type DashboardSummary } from './liveDashboard'
++
++function summary(): DashboardSummary {
++  return {
++    businessAt: '2023-09-10T00:00:00Z', range: { from: '2023-08-31', to: '2023-09-10' },
++    pipeline: { computedAt: '2026-10-08T00:00:00Z', data: { detection: { received: 115270, analyzed: 100000, suspicious: 20, deliveryDates: ['2023-08-31', '2023-09-01'] }, pendingReports: 2, agreements: [{ agreement: 'STRONG', count: 20 }], types: [{ type: 3, count: 20 }] } },
++    investigation: { computedAt: '2026-10-08T00:00:01Z', data: { personal: { pending: 4, aged: 2, closed: 1 }, institution: { alerts: 7811, episodes: 1, aged: 8, today: 20, yesterday: 5 }, openAlertsAgedOver3Days: 7, daily: [], dailyAlertStatus: [{ date: '2023-09-01', pending: 2, inProgress: 1, done: 3 }], episodeWork: { current: { open: 1, aged: 0, unreviewed: 1, createdToday: 1, closedToday: 0 }, firstReview: { samples: 0, averageSeconds: null }, completion: { samples: 0, averageSeconds: null } } } },
++  }
++}
++afterEach(() => vi.restoreAllMocks())
++it('new summary fields supply existing cards without requesting unused lists', async () => {
++  const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(summary())))
++  const controller = new AbortController()
++  const data = await fetchLiveDashboard('2023-08-31', '2023-09-10', controller.signal)
++  expect(fetcher).toHaveBeenCalledTimes(1)
++  expect(fetcher).toHaveBeenCalledWith('/api/v1/dashboard/summary?from=2023-08-31&to=2023-09-10', expect.objectContaining({ signal: controller.signal, credentials: 'include' }))
++  expect(data.institution.alerts).toBe(7811)
++  expect(data.personal.pending).toBe(4)
++  expect(data.deliveryDate).toBe('2023-08-31, 2023-09-01')
++  expect(data.detection.received).toBe(115270)
++  expect(data.dailyAlertStatus[0]).toEqual({ date: '2023-09-01', pending: 2, inProgress: 1, done: 3 })
++  expect(data.episodeWork.current.unreviewed).toBe(1)
++})
++it('an unpublished section is not manufactured as zero', async () => {
++  const data = summary(); data.pipeline = { computedAt: null, data: null }
++  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(data)))
++  await expect(fetchLiveDashboard('2023-08-31', '2023-09-10')).rejects.toMatchObject({ problem: { code: 'DASHBOARD_NOT_READY' } })
++})
++it('retry-after and server error reach the polling policy', async () => {
++  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ code: 'DASHBOARD_READ_UNAVAILABLE', title: '잠시 후 재시도' }), { status: 503, headers: { 'Retry-After': '7' } }))
++  await expect(fetchLiveDashboard('2023-08-31', '2023-09-10')).rejects.toMatchObject({ problem: { status: 503 }, retryAfterMs: 7000 })
++})
++
++it('an aborted old 401 response cannot expire the current session', async () => {
++  let finish!: (body: unknown) => void
++  const response = new Response('', { status: 401 })
++  vi.spyOn(response, 'json').mockImplementation(() => new Promise(resolve => { finish = resolve }))
++  vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
++  const notify = vi.spyOn(window, 'dispatchEvent')
++  const controller = new AbortController()
++  const request = fetchLiveDashboard('2023-08-31', '2023-09-10', controller.signal)
++  await Promise.resolve()
++  controller.abort(new Error('view changed'))
++  finish({ code: 'UNAUTHENTICATED' })
++  await expect(request).rejects.toThrow('view changed')
++  expect(notify).not.toHaveBeenCalled()
++})
+diff --git a/frontend/web-app/src/api/liveDashboard.ts b/frontend/web-app/src/api/liveDashboard.ts
+index 8a5b1ad..c8a769c 100644
+--- a/frontend/web-app/src/api/liveDashboard.ts
++++ b/frontend/web-app/src/api/liveDashboard.ts
+@@ -1,30 +1,63 @@
+-import { getJson } from './common'
++import { ApiError, getJson } from './common'
+ 
+-// API.md §6.5. 서버 업무 시각을 기준으로 표시한다.
+-export type LiveDashboard = {
+-  businessAt: string
++// API.md §7. Wire DTOs stay separate from the existing presentation shape.
++type Pipeline = {
++  detection: { received: number; analyzed: number; suspicious: number; deliveryDates: string[] }
++  pendingReports: number
++  agreements: { agreement: string; count: number }[]
++  types: { type: number; count: number }[]
++}
++type Investigation = {
+   personal: { pending: number; aged: number; closed: number }
+   institution: { alerts: number; episodes: number; aged: number; today: number; yesterday: number }
+   openAlertsAgedOver3Days: number
+-  detection: { received: number; analyzed: number; suspicious: number }
+-  deliveryDate: string
+-  pendingReports: number
+-  daily: { day: string; incoming: number; completed: number }[]
++  daily: { date: string; incoming: number; completed: number }[]
+   dailyAlertStatus: { date: string; pending: number; inProgress: number; done: number }[]
+-  agreements: { agreement: string; count: number }[]
+-  types: { type: number; count: number }[]
+-  activities: { event_id: number; case_id: number; action: string; comment: string; business_at: string }[]
+-  priority: { case_id: number; kind: 'ALERT' | 'EPISODE'; alert_id: number | null; created_at: string; risk: number }[]
+   episodeWork: {
+-    asOf: string
+-    current: { open: number; aged: number; unreviewed: number; created_today: number; closed_today: number }
+-    firstReview: { samples: number; average_seconds: number | null }
+-    completion: { samples: number; average_seconds: number | null }
+-    oldestOpen: { caseId: number; assignee: string; age_seconds: number; awaiting_review: boolean }[]
++    current: { open: number; aged: number; unreviewed: number; createdToday: number; closedToday: number }
++    firstReview: { samples: number; averageSeconds: number | null }
++    completion: { samples: number; averageSeconds: number | null }
+   }
+ }
++export type DashboardSummary = {
++  businessAt: string
++  range: { from: string; to: string }
++  pipeline: { computedAt: string | null; data: Pipeline | null }
++  investigation: { computedAt: string | null; data: Investigation | null }
++}
++export type LiveDashboard = {
++  businessAt: string
++  personal: Investigation['personal']
++  institution: Investigation['institution']
++  openAlertsAgedOver3Days: number
++  detection: Pipeline['detection']
++  deliveryDate: string
++  pendingReports: number
++  dailyAlertStatus: Investigation['dailyAlertStatus']
++  agreements: Pipeline['agreements']
++  types: Pipeline['types']
++  episodeWork: { current: { unreviewed: number } }
++}
+ 
+-export const fetchLiveDashboard = (from: string, to: string) => getJson<LiveDashboard>('/api/v1/dashboard', { from, to })
++export async function fetchLiveDashboard(from: string, to: string, signal?: AbortSignal): Promise<LiveDashboard> {
++  const summary = await getJson<DashboardSummary>('/api/v1/dashboard/summary', { from, to }, signal)
++  const pipeline = summary.pipeline.data
++  const investigation = summary.investigation.data
++  if (!pipeline || !investigation) throw new ApiError({ type: 'about:blank', title: '대시보드 데이터가 아직 준비되지 않았습니다.', status: 503, code: 'DASHBOARD_NOT_READY' })
++  return {
++    businessAt: summary.businessAt,
++    personal: investigation.personal,
++    institution: investigation.institution,
++    openAlertsAgedOver3Days: investigation.openAlertsAgedOver3Days,
++    detection: pipeline.detection,
++    deliveryDate: pipeline.detection.deliveryDates.join(', '),
++    pendingReports: pipeline.pendingReports,
++    dailyAlertStatus: investigation.dailyAlertStatus,
++    agreements: pipeline.agreements,
++    types: pipeline.types,
++    episodeWork: { current: { unreviewed: investigation.episodeWork.current.unreviewed } },
++  }
++}
+ 
+ export const fetchDemoClock = () => getJson<{ businessAt: string; configured: boolean; revision: number }>('/api/v1/demo/clock')
+ 
+diff --git a/frontend/web-app/src/lib/queryCache.ts b/frontend/web-app/src/lib/queryCache.ts
+index c6ea783..a483c71 100644
+--- a/frontend/web-app/src/lib/queryCache.ts
++++ b/frontend/web-app/src/lib/queryCache.ts
+@@ -26,6 +26,14 @@ export class QueryCache {
+       this.emit(key)
+     }
+   }
++  /** The caller aborted this view's request; late results must not repopulate it. */
++  discardPending(key: string) {
++    const entry = this.entries.get(key)
++    if (!entry?.pending) return
++    entry.generation++; entry.pending = undefined
++    entry.snapshot = { ...entry.snapshot, refreshing: false }
++    this.emit(key)
++  }
+   async fetch<T>(key: string, load: () => Promise<T>, maxAge: number, force = false): Promise<T> {
+     let entry = this.entries.get(key)
+     if (entry?.pending && !force) return entry.pending as Promise<T>
+diff --git a/frontend/web-app/src/lib/useDashboardPolling.test.tsx b/frontend/web-app/src/lib/useDashboardPolling.test.tsx
+new file mode 100644
+index 0000000..4095cce
+--- /dev/null
++++ b/frontend/web-app/src/lib/useDashboardPolling.test.tsx
+@@ -0,0 +1,80 @@
++import { StrictMode } from 'react'
++import { act, renderHook } from '@testing-library/react'
++import { afterEach, beforeEach, expect, it, vi } from 'vitest'
++import { ApiError } from '@/api/common'
++import { fetchLiveDashboard, type LiveDashboard } from '@/api/liveDashboard'
++import { useDashboardPolling } from './useDashboardPolling'
++
++vi.mock('@/api/liveDashboard', () => ({ fetchLiveDashboard: vi.fn() }))
++const load = vi.mocked(fetchLiveDashboard)
++const value = (pending: number) => ({ personal: { pending } }) as LiveDashboard
++const flush = () => act(async () => { await Promise.resolve() })
++beforeEach(() => { vi.useFakeTimers(); load.mockReset(); vi.spyOn(Math, 'random').mockReturnValue(0); vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible'); vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true) })
++afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
++it('polls each second and a 2.4-second request skips two ticks; manual refresh shares it', async () => {
++  let finish!: (v: LiveDashboard) => void
++  load.mockImplementationOnce(() => new Promise(resolve => { finish = resolve })).mockResolvedValue(value(2))
++  const { result, unmount } = renderHook(() => useDashboardPolling(1, '2023-09-01', '2023-09-10'))
++  await act(async () => { await vi.advanceTimersByTimeAsync(2400); void result.current.refresh() })
++  expect(load).toHaveBeenCalledTimes(1)
++  await act(async () => { finish(value(1)) })
++  expect(result.current.state).toEqual({ status: 'success', data: value(1) })
++  await act(async () => { await vi.advanceTimersByTimeAsync(600) })
++  expect(load).toHaveBeenCalledTimes(2)
++  unmount()
++})
++it('late previous-period response cannot replace the new period', async () => {
++  let finish!: (v: LiveDashboard) => void
++  load.mockImplementationOnce(() => new Promise(resolve => { finish = resolve })).mockResolvedValue(value(2))
++  const { result, rerender, unmount } = renderHook(({ from }) => useDashboardPolling(1, from, '2023-09-10'), { initialProps: { from: '2023-09-01' } })
++  const signal = load.mock.calls[0][2]!
++  rerender({ from: '2023-09-02' }); await flush()
++  expect(signal.aborted).toBe(true)
++  await act(async () => { finish(value(1)) })
++  expect(result.current.state).toEqual({ status: 'success', data: value(2) })
++  unmount()
++})
++it('stops in hidden or offline views and refreshes once on return', async () => {
++  load.mockResolvedValue(value(1))
++  const { unmount } = renderHook(() => useDashboardPolling(1, '2023-09-01', '2023-09-10')); await flush()
++  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
++  await act(async () => { await vi.advanceTimersByTimeAsync(3000) }); expect(load).toHaveBeenCalledTimes(1)
++  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
++  await act(async () => { document.dispatchEvent(new Event('visibilitychange')) }); expect(load).toHaveBeenCalledTimes(2)
++  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
++  await act(async () => { await vi.advanceTimersByTimeAsync(2000) }); expect(load).toHaveBeenCalledTimes(2)
++  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
++  await act(async () => { window.dispatchEvent(new Event('online')) }); expect(load).toHaveBeenCalledTimes(3)
++  unmount()
++})
++it('keeps the last success and honors retry-after even for manual refresh', async () => {
++  load.mockResolvedValueOnce(value(1)).mockRejectedValueOnce(new ApiError({ type: 'about:blank', title: 'busy', status: 503, code: 'BUSY' }, 7000)).mockResolvedValue(value(3))
++  const { result, unmount } = renderHook(() => useDashboardPolling(1, '2023-09-01', '2023-09-10')); await flush()
++  await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
++  expect(result.current.state).toEqual({ status: 'success', data: value(1) })
++  expect(result.current.refreshError).toBeTruthy()
++  await act(async () => { await result.current.refresh(); await vi.advanceTimersByTimeAsync(6000) })
++  expect(load).toHaveBeenCalledTimes(2)
++  await act(async () => { await vi.advanceTimersByTimeAsync(1000) }); expect(load).toHaveBeenCalledTimes(3)
++  unmount()
++})
++it('5-second timeout aborts a stalled body and fences its later result', async () => {
++  let finish!: (v: LiveDashboard) => void
++  load.mockImplementationOnce(() => new Promise(resolve => { finish = resolve })).mockResolvedValue(value(2))
++  const { result, unmount } = renderHook(() => useDashboardPolling(1, '2023-09-01', '2023-09-10'))
++  const signal = load.mock.calls[0][2]!
++  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
++  expect(signal.aborted).toBe(true); expect(result.current.state.status).toBe('error')
++  await act(async () => { finish(value(1)); await vi.advanceTimersByTimeAsync(2000) })
++  expect(result.current.state).toEqual({ status: 'success', data: value(2) })
++  unmount()
++})
++it('authentication rejection stops retries and strict remount can recover an aborted request', async () => {
++  load.mockRejectedValue(new ApiError({ type: 'about:blank', title: 'login', status: 401, code: 'UNAUTHENTICATED' }))
++  const { result, unmount } = renderHook(() => useDashboardPolling(1, '2023-09-01', '2023-09-10')); await flush()
++  await act(async () => { await vi.advanceTimersByTimeAsync(10000); await result.current.refresh() })
++  expect(load).toHaveBeenCalledTimes(1); unmount()
++  load.mockReset().mockResolvedValue(value(3))
++  const mounted = renderHook(() => useDashboardPolling(2, '2023-09-01', '2023-09-10'), { wrapper: StrictMode }); await flush()
++  expect(mounted.result.current.state).toEqual({ status: 'success', data: value(3) }); mounted.unmount()
++})
+diff --git a/frontend/web-app/src/lib/useDashboardPolling.ts b/frontend/web-app/src/lib/useDashboardPolling.ts
+new file mode 100644
+index 0000000..14196d3
+--- /dev/null
++++ b/frontend/web-app/src/lib/useDashboardPolling.ts
+@@ -0,0 +1,85 @@
++import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
++import { ApiError } from '@/api/common'
++import { fetchLiveDashboard, type LiveDashboard } from '@/api/liveDashboard'
++import { useWorkspace } from './workspaceState'
++
++/** One summary request per active view; elapsed ticks are discarded, never queued. */
++export function useDashboardPolling(userId: number, from: string, to: string) {
++  const cache = useWorkspace().queries
++  const key = JSON.stringify(['dashboard', userId, from, to])
++  const enabled = Boolean(from && to)
++  const snapshot = useSyncExternalStore(useCallback(listener => cache.subscribe(key, listener), [cache, key]), () => cache.snapshot<LiveDashboard>(key))
++  const control = useRef<{ refresh: () => Promise<unknown> } | null>(null)
++  const [schedule, setSchedule] = useState<{ key: string; at?: number }>({ key })
++  useEffect(() => {
++    if (!enabled) return
++    const origin = performance.now()
++    let nextTick = origin + 1000
++    let retryAt = 0, failures = 0, stopped = false, disposed = false
++    let active: Promise<unknown> | undefined
++    let controller: AbortController | undefined
++    let timer: ReturnType<typeof setTimeout>
++    const visible = () => document.visibilityState !== 'hidden' && navigator.onLine
++    const updateSchedule = () => {
++      if (!disposed) setSchedule({ key, at: stopped || !visible() ? undefined : Date.now() + Math.max(0, Math.max(nextTick, retryAt) - performance.now()) })
++    }
++    const refresh = (initial = false): Promise<unknown> => {
++      if (active) return active
++      if (disposed || stopped || !visible() || performance.now() < retryAt) return Promise.resolve()
++      controller = new AbortController()
++      const current = controller
++      let cancel!: () => void
++      const cancellation = new Promise<never>((_, reject) => {
++        cancel = () => reject(current.signal.reason)
++        current.signal.addEventListener('abort', cancel, { once: true })
++      })
++      const deadline = window.setTimeout(() => current.abort(new DOMException('Dashboard request timed out', 'TimeoutError')), 5000)
++      active = cache.fetch(key, () => Promise.race([fetchLiveDashboard(from, to, current.signal), cancellation]), initial ? 1000 : 0)
++        .then(() => { failures = 0; retryAt = 0 })
++        .catch((error: unknown) => {
++          if (disposed) return
++          failures++
++          stopped = error instanceof ApiError && [400, 401, 403].includes(error.problem.status)
++          const backoff = Math.min(30_000, 2000 * 2 ** Math.min(failures - 1, 4))
++          retryAt = performance.now() + Math.max(backoff + Math.random() * 250, error instanceof ApiError ? error.retryAfterMs ?? 0 : 0)
++          throw error
++        }).finally(() => {
++          window.clearTimeout(deadline)
++          current.signal.removeEventListener('abort', cancel)
++          active = undefined
++          updateSchedule()
++        })
++      return active
++    }
++    const tick = () => {
++      if (disposed) return
++      void refresh().catch(() => undefined)
++      nextTick = origin + (Math.floor((performance.now() - origin) / 1000) + 1) * 1000
++      timer = window.setTimeout(tick, Math.max(0, nextTick - performance.now()))
++      updateSchedule()
++    }
++    const resume = () => { if (visible()) void refresh().catch(() => undefined) }
++    control.current = { refresh }
++    void refresh(true).catch(() => undefined)
++    timer = window.setTimeout(tick, 1000)
++    window.addEventListener('online', resume)
++    window.addEventListener('focus', resume)
++    window.addEventListener('live-data-changed', resume)
++    document.addEventListener('visibilitychange', resume)
++    return () => {
++      disposed = true
++      window.clearTimeout(timer)
++      controller?.abort(new DOMException('Dashboard view changed', 'AbortError'))
++      if (active) cache.discardPending(key)
++      control.current = null
++      window.removeEventListener('online', resume)
++      window.removeEventListener('focus', resume)
++      window.removeEventListener('live-data-changed', resume)
++      document.removeEventListener('visibilitychange', resume)
++    }
++  }, [cache, key, enabled, from, to])
++  const refresh = () => control.current?.refresh() ?? Promise.resolve()
++  const retry = () => { void refresh().catch(() => undefined) }
++  return { state: snapshot.state, refreshing: snapshot.refreshing, refreshError: snapshot.refreshError,
++    nextRefreshAt: enabled && schedule.key === key ? schedule.at : undefined, refresh, retry }
++}
+diff --git a/frontend/web-app/src/pages/LiveDashboardPage.tsx b/frontend/web-app/src/pages/LiveDashboardPage.tsx
+index 9a25f00..8e60e96 100644
+--- a/frontend/web-app/src/pages/LiveDashboardPage.tsx
++++ b/frontend/web-app/src/pages/LiveDashboardPage.tsx
+@@ -11,14 +11,15 @@ import { AlertStatusChart } from '@/features/dashboard/AlertFlowChart'
+ import { TransactionPatternHierarchy } from '@/features/dashboard/PatternRelation'
+ import { UnderTabs } from '@/components/UnderTabs'
+ import { isoDate } from '@/lib/format'
+-import { RefreshCountdown } from '@/components/RefreshCountdown'
+ import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
+-import { RefreshStatus } from '@/components/RefreshStatus'
+ import { typeDisplay, type TypeCode } from '@/api/codes'
+-import { fetchDemoClock, fetchLiveDashboard, daysBefore, kstDate, type LiveDashboard } from '@/api/liveDashboard'
++import { fetchDemoClock, daysBefore, kstDate, type LiveDashboard } from '@/api/liveDashboard'
+ import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
+ import { SectionCards } from '@/components/SectionCards'
+ import { useAsync } from '@/lib/useAsync'
++import { useDashboardPolling } from '@/lib/useDashboardPolling'
++
++const businessTimeFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+ 
+ const count = (n: number | undefined) => (n ?? 0).toLocaleString('ko-KR')
+ 
+@@ -41,7 +42,7 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
+   const clock = useAsync(fetchDemoClock, [], { key: 'clock' })
+   const businessDate = clock.state.status === 'success' ? kstDate(clock.state.data.businessAt) : ''
+   const { from, to, setPeriod } = useSharedPeriod({ from: businessDate ? daysBefore(businessDate, 29) : '', to: businessDate })
+-  const dashboard = useAsync(() => from && to ? fetchLiveDashboard(from, to) : Promise.reject(new Error('업무 시각을 확인하지 못했습니다.')), [from, to], { key: 'dashboard', enabled: Boolean(from && to) })
++  const dashboard = useDashboardPolling(user.userId, from, to)
+ 
+   if (clock.state.status === 'loading') return <LoadingBlock label="업무 시각" />
+   if (clock.state.status === 'error') return <ErrorBlock message={clock.state.message} onRetry={clock.retry} />
+@@ -67,8 +68,8 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
+       ]
+ 
+   return <div className="space-y-6">
+-    <RefreshStatus queries={[dashboard]} />
+-    <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)} · <RefreshCountdown nextRefreshAt={dashboard.nextRefreshAt} refreshing={dashboard.refreshing} /></span></div>
++    {dashboard.refreshError && <div role="alert" className="text-xs">최신 조회 실패 · 이전 데이터를 표시합니다. {dashboard.refreshError}</div>}
++    <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)} {businessTimeFormat.format(new Date(data.businessAt))} (KST)</span></div>
+     {scope === 'institution' ? <InstitutionView today={new Date(`${businessDate}T00:00:00`)} remote={{
+       cards: <SectionCards items={kpis} />,
+       range: { from: new Date(`${from}T00:00:00`), to: new Date(`${to}T00:00:00`) },
+diff --git a/frontend/web-app/src/pages/LiveNavigation.test.tsx b/frontend/web-app/src/pages/LiveNavigation.test.tsx
+index 079cba3..fa379fe 100644
+--- a/frontend/web-app/src/pages/LiveNavigation.test.tsx
++++ b/frontend/web-app/src/pages/LiveNavigation.test.tsx
+@@ -32,13 +32,13 @@ it('actual live pages share the chosen range and preserve the owner/account and
+     detection: { received: 0, analyzed: 0, suspicious: 0 }, deliveryDate: '', pendingReports: 0,
+     daily: [], agreements: [], types: [], activities: [], priority: [],
+     episodeWork: { current: { unreviewed: 0 }, firstReview: { average_seconds: null }, completion: { average_seconds: null } } })
+-  owners.mockResolvedValue(page([{ id: 'owner-one' }]))
++  owners.mockResolvedValue(page([{ id: 'owner-one', name: 'owner-one' }]))
+   accounts.mockResolvedValue(page([{ id: 'account-one', ownerId: 'owner-one', bankId: 12 }]))
+   transactions.mockResolvedValue(page([])); cases.mockResolvedValue(page([]))
+   render(<NuqsAdapter><WorkspaceProvider><Screens /></WorkspaceProvider></NuqsAdapter>)
+   await screen.findByText('오늘 유입 Alert')
+   fireEvent.click(screen.getByRole('button', { name: /기간 2023/ }))
+-  await waitFor(() => expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10'))
++  await waitFor(() => expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10', expect.any(AbortSignal)))
+   fireEvent.click(screen.getByRole('button', { name: 'ledger' }))
+   fireEvent.click(await screen.findByRole('button', { name: /owner-one/ }))
+   fireEvent.click(await screen.findByRole('button', { name: /account-one/ }))
+diff --git a/frontend/web-app/src/pages/LivePages.test.tsx b/frontend/web-app/src/pages/LivePages.test.tsx
+index baaae52..39e69c3 100644
+--- a/frontend/web-app/src/pages/LivePages.test.tsx
++++ b/frontend/web-app/src/pages/LivePages.test.tsx
+@@ -23,7 +23,7 @@ it('실제 대시보드는 PC 날짜 대신 서버 업무 날짜로 기간을 
+   render(<LiveDashboardPage onOpen={vi.fn()} />)
+   expect(await screen.findByText('오늘 유입 Alert')).toBeInTheDocument()
+   expect(screen.getByRole('tab', { name: '기관 전체' })).toHaveAttribute('aria-selected', 'true')
+-  expect(fetchLiveDashboard).toHaveBeenCalledWith('2023-08-12', '2023-09-10')
++  expect(fetchLiveDashboard).toHaveBeenCalledWith('2023-08-12', '2023-09-10', expect.any(AbortSignal))
+   expect(screen.getByText('대상 거래일 미제공')).toBeInTheDocument()
+   expect(screen.getByText('전일 대비')).toBeInTheDocument()
+   expect(screen.getByText('모델 조합 데이터가 없습니다.')).toBeInTheDocument()
+@@ -70,7 +70,7 @@ it('서버 집계를 mock의 기관·개인 화면 배치에 공급한다', asyn
+ })
+ 
+ it('실제 거래에서 미분석을 정상으로 바꾸지 않고 원본 Alert와 Episode ID를 구별한다', async () => {
+-  fetchLedgerOwners.mockResolvedValue(page([{ id: 'owner-uuid' }]))
++  fetchLedgerOwners.mockResolvedValue(page([{ id: 'owner-uuid', name: 'owner-uuid' }]))
+   fetchPaymentFormats.mockResolvedValue(['WIRE'])
+   fetchLedgerAccounts.mockResolvedValue(page([{ id: 'account-uuid', ownerId: 'owner-uuid', bankId: 13 }]))
+   fetchLedgerTransactions.mockResolvedValue(page([{ txId: 101, occurredAt: '2023-09-10T00:00:00Z', fromAccountId: 'account-uuid', toAccountId: 'other-uuid', amountPaid: 100, paymentCurrency: 'USD', paymentFormat: 'WIRE', judgement: 'UNANALYZED', isSuspicious: null, alertIds: [3000], episodeIds: [800] }]))

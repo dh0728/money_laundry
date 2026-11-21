@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><title>AML RADAR scroll contract proof</title>
+<style>
+*{box-sizing:border-box}html{overflow-y:scroll;overflow-x:clip;background:#15171c;color:#eef2f8;font:14px system-ui}body{margin:0}
+header{position:fixed;inset:0 0 auto;height:64px;z-index:30;background:#222832;display:flex;align-items:center;gap:8px;padding:0 8px}
+button{background:#3a4555;color:white;border:1px solid #718096;border-radius:3px;padding:7px;cursor:pointer}button:focus-visible{outline:2px solid #ffce58}
+aside{position:fixed;top:64px;bottom:0;left:0;width:64px;min-height:512px;background:#222832;z-index:25;text-align:center;display:flex;flex-direction:column}.navtop{height:320px;flex-shrink:0}.navbottom{height:192px;flex-shrink:0;margin-top:auto}
+.divider{position:fixed;left:64px;top:64px;bottom:0;width:4px;background:#63778b;z-index:25}
+footer{position:fixed;bottom:0;left:68px;right:0;height:64px;z-index:30;background:#222832;display:flex;align-items:center;padding:0 16px;gap:16px}
+main{margin-left:68px;padding-top:64px;padding-bottom:64px;min-width:0}.intro{height:120px;padding:16px}.panel{min-width:0;overflow:visible}.panel-title{height:40px;padding:10px 16px;background:#313b48}
+.table{min-width:0;--columns:175px 192px 167px 74px 175px 125px;--table-width:908px}.table.large{--columns:462px 508px 442px 196px 462px 330px;--table-width:2400px}
+.row{display:grid;grid-template-columns:var(--columns);width:max(100%,var(--table-width));min-height:54px}.cell{padding:8px 16px;border-bottom:1px solid #36404c;white-space:nowrap;overflow:hidden}.row:nth-child(even){background:#1d242e}
+.head .cell{height:47px;padding:14px 16px;background:#41516b;font-weight:600}.head .row{min-height:47px}
+.xscroll{overflow-x:auto;overflow-y:visible;width:100%;height:auto;max-height:none}
+.sticky{position:sticky;top:64px;z-index:15}.head-clip{overflow:hidden}.tail{height:900px;padding:16px}
+#state{font-family:monospace;font-size:12px}#mode-label{margin-left:auto;color:#b9cee8}.baseline .head{position:sticky;top:64px;z-index:15}
+</style>
+<header id="header"><strong>Scroll proof</strong><button id="mode">Baseline</button><button id="width">Table 2400</button><button id="top">Y=0</button><button id="middle">Y=400</button><button id="bottom">End</button><button id="xend">X=end</button><span id="mode-label">Split header / 908px</span></header>
+<aside id="sidebar"><div class="navtop">Top<br>320px</div><div class="navbottom">Bottom<br>192px</div></aside><div class="divider" id="divider"></div><main id="main"><div class="intro">Figma 디자인 정본이 아닌 스크롤 동작만 검증하는 화면. Content = clientWidth − 68px.<br>기존 셀 좌우 여백 16px를 유지함.</div><section class="panel" id="panel"><div class="panel-title">Alert table — provisional columns</div><div class="table" id="table" role="table" aria-label="Sample alerts"></div></section><div class="tail">표 아래 문서 영역. 헤더는 표 영역 끝에서 해제되어야 함.</div></main><footer id="status"><strong>StatusBar 64px</strong><output id="state"></output></footer>
+<script>
+const table=document.querySelector('#table');let baseline=false,large=false;
+const names=['ALERT ID','DETECTED AT','AMOUNT','RISK','PATTERN','STATUS'];
+function row(values,head=false){return '<div class="row" role="row">'+values.map((x,i)=>'<div class="cell" role="'+(head?'columnheader':'cell')+'" data-column="'+i+'">'+x+'</div>').join('')+'</div>'}
+function render(){table.className='table'+(large?' large':'')+(baseline?' baseline':'');const head='<div class="head" id="head" role="rowgroup">'+row(names,true)+'</div>';const rows=Array.from({length:40},(_,i)=>row(['ALT-20260903-'+String(i+1).padStart(4,'0'),'2026-09-03 23:59:59','KRW 999,999,999','99.9%','Stacked Bipartite','In Progress'])).join('');table.innerHTML=baseline?'<div class="xscroll" id="xscroll">'+head+'<div role="rowgroup">'+rows+'</div></div>':'<div class="sticky" id="sticky"><div class="head-clip" id="head-clip">'+head+'</div></div><div class="xscroll" id="xscroll" role="rowgroup" tabindex="0" aria-label="Alert rows horizontally scrollable">'+rows+'</div>';const sc=document.querySelector('#xscroll');sc.addEventListener('scroll',()=>{if(!baseline)document.querySelector('#head-clip').scrollLeft=sc.scrollLeft;measure()},{passive:true});document.querySelector('#mode-label').textContent=(baseline?'Baseline':'Split header')+' / '+(large?2400:908)+'px';measure()}
+function measure(){const sc=document.querySelector('#xscroll');if(sc)document.querySelector('#state').textContent='client='+document.documentElement.clientWidth+' / table client='+sc.clientWidth+' / X='+sc.scrollLeft+'/'+(sc.scrollWidth-sc.clientWidth)+' / Y='+Math.round(scrollY);}
+document.querySelector('#mode').onclick=()=>{baseline=!baseline;document.querySelector('#mode').textContent=baseline?'Split header':'Baseline';render()};
+document.querySelector('#width').onclick=()=>{large=!large;document.querySelector('#width').textContent=large?'Table 908':'Table 2400';render()};
+document.querySelector('#top').onclick=()=>window.scrollTo(0,0);document.querySelector('#middle').onclick=()=>window.scrollTo(0,400);document.querySelector('#bottom').onclick=()=>window.scrollTo(0,document.documentElement.scrollHeight);document.querySelector('#xend').onclick=()=>{const sc=document.querySelector('#xscroll');sc.scrollLeft=sc.scrollWidth};addEventListener('scroll',measure,{passive:true});addEventListener('resize',measure);render();
+</script></html>
