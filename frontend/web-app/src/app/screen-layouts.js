@@ -179,10 +179,12 @@ function InvestigationList(path) {
   if (isLedgerScreen(path)) {
     return '<div data-investigation-component="ledger"></div>';
   }
-  const title = path.includes('alerts') ? 'Alert 목록' : 'Episode 목록';
-  return path.includes('table')
+  const alerts = path.includes('alerts');
+  const title = alerts ? 'Alert 목록' : 'Episode 목록';
+  const actions = alerts ? '<div data-workflow="alert-episode-actions"></div>' : '';
+  return actions + (path.includes('table')
     ? `<section class="screen-section screen-entries" data-case-list-table="${title}"></section>`
-    : `<div data-investigation-component="cards" data-label="${title}"></div>`;
+    : `<div data-investigation-component="cards" data-label="${title}"></div>`);
 }
 
 function CaseDetail(path) {
@@ -235,7 +237,7 @@ export function ScreenLayout(path, { code = '', hasQuery = false, showCaseJudgme
     <div class="screen-query-area">
       <div class="screen-query-row">
         ${hasQuery ? '<div class="screen-query-tags" data-query-tags></div>' : ''}
-        <div class="screen-query-tools" data-screen-query-tools></div>
+        ${route && ['analysis', 'related'].includes(route.detail) ? '' : '<div class="screen-query-tools" data-screen-query-tools></div>'}
       </div>
       ${hasQuery ? '<div class="screen-query-editor" data-query-editor></div>' : ''}
     </div>

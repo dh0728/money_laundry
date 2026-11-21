@@ -13,7 +13,7 @@ import { useCaseEvidenceSelection } from './case-evidence-selection';
 import { SquishSwitch, bindSquishSwitch } from '../../components/squish-switch';
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { dateFromCode, downloadCsv, inDateRange, TableQueryTools } from '../../components/query-controls';
+import { dateFromCode, downloadCsv, inDateRange, LocalQueryTools, TableQueryTools, visibleCaseRows } from '../../components/query-controls';
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip } from '../../components/charts/charts/sankey';
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
 import { caseSankeyGraph, caseSankeyLayers, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
@@ -76,15 +76,16 @@ function GraphSettings({ id, groups, onDetailsChange, ownerView, sankeyView, anc
     return () => host.replaceChildren();
   }, [onDetailsChange, sankeyView]);
   const caseEntry = ({ id, color }) => {
-    const hidden = hiddenCases.has(id);
+    const isBase = id === groups[0].id;
+    const hidden = !isBase && hiddenCases.has(id);
     const interactive = shownCases.has(id);
     const membership = <>
       <i className="preview-flow-swatch" style={{ borderColor: color }} aria-hidden="true" />
-      <code>{id}</code>{id === groups[0].id && <span>기준</span>}
+      <code>{id}</code>{isBase && <span>기준</span>}
       {hidden ? <span>숨김</span> : !interactive && <span>범위 밖</span>}
     </>;
     return <li key={id}>
-      <QueryCheck label={null} ariaLabel={`${id} 그래프 표시`} checked={!hidden}
+      <QueryCheck label={null} ariaLabel={`${id} 그래프 표시`} checked={!hidden} disabled={isBase}
         onChange={checked => onVisibilityChange(id, checked)} />
       {interactive
         ? <ActionButton aria-pressed={highlightedCase === id} onClick={() => onHighlight(id)}>{membership}</ActionButton>
@@ -403,7 +404,8 @@ function ComparisonEvidence({ active, candidates }) {
 const candidateDropType = 'application/x-aml-case-id';
 const workspaceGraphSelections = new WeakMap();
 
-function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHost, caseGraphSelections, evidenceSelection }) {
+function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHost, caseGraphSelections, evidenceSelection, onComparedCases }) {
+  const bundleNoticeHost = useRef(null);
   const selectedEvidence = useCaseEvidenceSelection(evidenceSelection);
   const alertTransactions = useMemo(() => new Set(active?.related.map(row => row.code)), [active]);
   const ownerView = lens === 'owner';
@@ -432,16 +434,25 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   const [flowPulse, setFlowPulse] = useState();
   const [controlsHost, setControlsHost] = useState(null);
   const [draggingCase, setDraggingCase] = useState(false);
+  const [candidateQuery, setCandidateQuery] = useState();
+  const candidatesByCode = useMemo(() => new Map(candidates.map(candidate => [candidate.record.code, candidate])), [candidates]);
+  const candidateRows = useMemo(() => candidates.map(({ record }) => record), [candidates]);
+  const visibleCandidates = candidateQuery
+    ? visibleCaseRows(candidateRows, candidateQuery).map(row => candidatesByCode.get(row.code)) : candidates;
   const compared = useMemo(() => candidates.filter(({ record }) => candidateIds.has(record.code)).map(({ record }) => record),
     [candidates, candidateIds]);
+  useLayoutEffect(() => {
+    if (related) onComparedCases?.(compared, bundleNoticeHost.current);
+  }, [related, compared, onComparedCases]);
   const comparedCases = useMemo(() => [active, ...compared].filter(Boolean), [active, compared]);
   const groups = useMemo(() => related ? comparedCases.map(record => ({
     id: record.code, transactionIds: new Set(record.related.map(row => row.code)),
     color: caseGroupColor(record === active ? 0 : candidates.findIndex(item => item.record.code === record.code) + 1),
   })) : [], [active, candidates, comparedCases, related]);
-  const shownGroups = useMemo(() => groups.filter(group => !hiddenCases.has(group.id)), [groups, hiddenCases]);
-  const transactions = useMemo(() => mergeCaseTransactions(comparedCases.filter(record => !hiddenCases.has(record.code))),
-    [comparedCases, hiddenCases]);
+  const shownGroups = useMemo(() => groups.filter(group => group.id === active?.code || !hiddenCases.has(group.id)),
+    [active, groups, hiddenCases]);
+  const transactions = useMemo(() => mergeCaseTransactions(comparedCases.filter(record => record === active || !hiddenCases.has(record.code))),
+    [active, comparedCases, hiddenCases]);
   const cursor = casePlaybackCursor(transactions, through);
   const current = useMemo(() => transactions.slice(0, cursor), [transactions, cursor]);
   const network = useMemo(() => buildCaseNetwork(transactions), [transactions]);
@@ -580,6 +591,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
     if (!include && highlightedCase === record.code) setHighlightedCase(undefined);
   };
   function setCaseVisible(id, visible) {
+    if (id === active?.code) return;
     setHiddenCases(previous => {
       const next = new Set(previous);
       if (visible) next.delete(id);
@@ -622,15 +634,19 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   };
   return <>
     {related && <Panel className="preview-related-cases">
-      <h2>{active?.kind === 'Episode' ? '추가 후보 Alert' : '연관 후보'}</h2>
+      <div className="preview-related-heading">
+        <h2>{active?.kind === 'Episode' ? '추가 후보 Alert' : '연관 후보'}</h2>
+        <LocalQueryTools relatedRows={candidateRows} onRelatedQuery={setCandidateQuery} />
+      </div>
+      <div className="related-bundle-notice" ref={bundleNoticeHost} />
       {compared.length > 0 && <p className="preview-graph-scope-label" role="status">그래프에서 {compared.length}건 비교 중</p>}
-      {candidates.length ? <ul>{candidates.map(({ record, sharedTransactions, sharedAccounts }) =>
+      {visibleCandidates.length ? <ul>{visibleCandidates.map(({ record, sharedTransactions, sharedAccounts }) =>
         <li className="list-item-enter" key={record.code}>
           <PreviewCaseCard row={record} sharedEvidence={{ transactions: sharedTransactions, accounts: sharedAccounts }}
             drag={{ onDragStart: event => dragCandidate(event, record.code), onDragEnd: () => setDraggingCase(false) }}
             selection={{ label: `${record.code} 그래프에서 비교`,
             checked: candidateIds.has(record.code), onChange: checked => updateCandidate(record, checked) }} />
-        </li>)}</ul> : <p>공통 거래나 계좌가 확인된 업무가 없습니다.</p>}
+        </li>)}</ul> : <p>{candidates.length ? '조회 조건에 맞는 후보가 없습니다.' : '공통 거래나 계좌가 확인된 업무가 없습니다.'}</p>}
     </Panel>}
     <Panel className="preview-case-network" aria-label={related ? '합친 그래프' : '그래프'}>
       {network.nodes.length || groups.length ?
@@ -657,6 +673,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
                 </div>}
                 {(selected || tablePicks.size > 0) &&
                   <GraphIconButton label="그래프 선택 해제" icon={X} onClick={clearSelection} />}
+                <div data-screen-query-tools />
               </div>
             </header>
             {!network.nodes.length ? <div className="preview-evidence-canvas preview-graph-empty" role="status">
@@ -693,7 +710,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   </>;
 }
 
-export function mountCaseGraph(host, { active, cases, evidenceSelection }) {
+export function mountCaseGraph(host, { active, cases, evidenceSelection, onComparedCases }) {
   const root = createRoot(host);
   const workspace = host.closest('#workspace') ?? host.parentElement ?? host;
   if (!workspaceGraphSelections.has(workspace)) workspaceGraphSelections.set(workspace, new Map());
@@ -708,7 +725,7 @@ export function mountCaseGraph(host, { active, cases, evidenceSelection }) {
   const update = ({ active, cases }) => root.render(<CaseGraph active={active}
     candidates={related && active ? casesSharingEvidence(active, cases) : []}
     related={related} lens={host.dataset.lens ?? 'pattern'} evidenceHost={evidenceHost} accountsHost={accountsHost}
-    caseGraphSelections={caseGraphSelections} evidenceSelection={evidenceSelection} />);
+    caseGraphSelections={caseGraphSelections} evidenceSelection={evidenceSelection} onComparedCases={onComparedCases} />);
   update({ active, cases });
   return Object.assign(() => {
     root.unmount();

@@ -8,6 +8,7 @@ import { bindCardGlow } from '../components/card-glow.js';
 import { ConfirmHoldButton, mountLoginPrimary } from '../components/primary-button.jsx';
 import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
+import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
 import { savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { createCaseEvidenceSelection } from '../features/investigation/case-evidence-selection.js';
 import { editPreviewAlertTransactions } from '../features/investigation/case-membership-data.js';
@@ -778,7 +779,13 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   mountedWorkflows = mountWorkflows(workspace, undefined, {
     actionsHost: byId('footer-actions'),
     paginationHost: byId('footer-pagination'),
-    row: selectedCase, perPanel, initialPanel, reportData: isReport || isCaseDetail ? dashboardSource : undefined,
+    row: selectedCase, perPanel, initialPanel, reportData: isReport || isCaseDetail || isCaseList ? dashboardSource : undefined,
+    saveEpisode: options => {
+      const result = changePreviewEpisode({ ...options, cases: dashboardSource.cases, user: currentPreviewUser() });
+      if (result.ok) dashboardSource = dashboardFixtures(groups);
+      return result;
+    },
+    refreshEpisode: () => showWorkspace('', code, path, 'none', new URLSearchParams(location.search)),
     reportDocument, evidenceSelection,
     editTransactions: ({ codes: transactionCodes, targetCode, reason }) => {
       if (!evidenceSelection || activeWorkCode !== code || activeEvidence?.selection !== evidenceSelection) {
@@ -836,6 +843,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         active: dashboardSource.cases.find(row => row.code === code),
         cases: dashboardSource.cases,
         evidenceSelection,
+        onComparedCases: (compared, noticeHost) => mountedWorkflows.updateBundle(compared, noticeHost),
       });
     }
   });

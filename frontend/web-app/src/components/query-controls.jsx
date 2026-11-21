@@ -39,16 +39,23 @@ export function QueryToolbar() {
 
 const embeddedToolbar = { __html: QueryToolbar() };
 
-export function LocalQueryTools({ actions }) {
+export function LocalQueryTools({ actions, relatedRows, onRelatedQuery }) {
   const host = useRef(null);
   const controller = useRef(null);
   useEffect(() => {
     const instance = setupQueryControls({
       workspace: host.current, controls: host.current.firstElementChild, embedded: true,
+      onChange: (_tool, query) => {
+        onRelatedQuery?.(query);
+        instance.refresh();
+      },
     });
     controller.current = instance;
     return () => instance.dispose();
-  }, []);
+  }, [onRelatedQuery]);
+  useEffect(() => {
+    if (relatedRows) controller.current.setScreen('related-candidates', [], { rows: relatedRows });
+  }, [onRelatedQuery, relatedRows]);
   useEffect(() => controller.current.registerTableTools(actions), [actions]);
   return <div ref={host} dangerouslySetInnerHTML={embeddedToolbar} />;
 }
@@ -147,8 +154,11 @@ function formatDate(date) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-const queryScope = path => path?.startsWith('dashboard/')
-  ? path.replace('/', '-') : /^add-tab\/(alerts|episodes)(?:-|\/|$)/.exec(path ?? '')?.[1];
+const queryScope = path => {
+  if (path === 'related-candidates') return path;
+  return path?.startsWith('dashboard/')
+    ? path.replace('/', '-') : /^add-tab\/(alerts|episodes)(?:-|\/|$)/.exec(path ?? '')?.[1];
+};
 const hasLocalTableTools = path => /^(add-tab\/(alerts|episodes)-table|report\/write\/(?:table|card)|rule-engine\/draft-(list(?:\/reason)?|backtest))$/
   .test(path?.replace(/\/(no-filter|sidebar-collapsed)$/, '') ?? '');
 const allowsAssignment = scope => scope !== 'dashboard-mine';
@@ -493,7 +503,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
         if (tool === 'sort' && boardSortHost) {
           sortControl?.querySelector('[data-query-tool="sort"]')?.focus({ preventScroll: true });
         } else focusTags = true;
-        onChange(tool);
+        onChange(tool, current());
       }} />);
   }
   function syncAppliedButtons() {
@@ -606,7 +616,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const tool = trigger.dataset.queryTool;
     if (triggerOrigin !== trigger) focusTags = tool;
     close();
-    onChange(tool);
+    onChange(tool, current());
   }
   function focusOpenPopover() {
     const tool = trigger.dataset.queryTool;
@@ -654,7 +664,8 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     if (scope && rows.length) {
       const filtered = visibleCaseRows(rows, current());
       const visible = localTable ? sortSavedTableRows(filtered, scope) : filtered;
-      const dataset = scope.startsWith('dashboard-') ? 'Alert·Episode' : scope === 'alerts' ? 'Alert' : 'Episode';
+      const dataset = scope === 'related-candidates' ? '연관 후보'
+        : scope.startsWith('dashboard-') ? 'Alert·Episode' : scope === 'alerts' ? 'Alert' : 'Episode';
       entries.push({ label: `조회된 ${dataset}`, format: 'CSV', count: visible.length, disabled: !visible.length,
         download: () => exportCases(visible, scope) });
       if (visible.length !== rows.length) entries.push({ label: `전체 ${dataset}`, format: 'CSV', count: rows.length,

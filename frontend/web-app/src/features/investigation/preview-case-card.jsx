@@ -69,13 +69,22 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
             items={cards.slice(0, limit).map(row => ({ id: row.code, content: <PreviewCaseCard
               row={row} showReviewStatus={false} showAssignee={showAssignee} /> }))}
             columns={1} rowHeight={0} gap={readWorkspaceGap()} theme={theme}
-            enableTilt disableAnimations={reduced} intro={false} textAutoHide={false}
+            disableAnimations={reduced} intro={false} textAutoHide={false}
             enableBorderGlow={false} enableSpotlight={false} enableStars={false} clickEffect={false} />
             : !isEmpty && <EmptyState>이 상태의 업무가 없습니다.</EmptyState>}
           {limit < cards.length && <ActionButton shape="pill" aria-label={`${label} 업무 더 보기`}
             onClick={() => setLimits(previous => ({ ...previous, [preset]: limit + pageSize }))}>더 보기</ActionButton>}
         </Panel>;
     }} />;
+}
+
+export function EpisodeAlertSummary({ codes, complete = Boolean(codes) }) {
+  if (!complete && !codes?.length) return <span>샘플에 소속 Alert 정보 없음</span>;
+  if (!codes.length) return <span>소속 Alert 0건</span>;
+  return <span className="semantic-tag-group">
+    <span>{complete ? `${codes.length}건` : `추가 연결 ${codes.length}건 · 기존 소속 정보 없음`}</span>
+    {codes.map(code => <code key={code}>{code}</code>)}
+  </span>;
 }
 
 export function PreviewCaseCard({ row, selectedTransaction, className = '', selection, showAdd = true, sharedEvidence, drag,
@@ -110,7 +119,9 @@ export function PreviewCaseCard({ row, selectedTransaction, className = '', sele
         <Field label="거래 기간"><TransactionPeriod related={related} /></Field>
         <Field label="거래 건수">{related.length}건</Field>
         <Field label="거래 금액">{totals.join(' · ') || '—'}</Field>
-        {isEpisode && <Field label="Alert 건수">{row.linkedAlerts}건</Field>}
+        {isEpisode && (sharedEvidence
+          ? <Field label="소속 Alert"><EpisodeAlertSummary codes={row.linkedAlertCodes} complete={row.linkedAlertCodesComplete} /></Field>
+          : <Field label="Alert 건수">{row.linkedAlerts}건</Field>)}
         {isEpisode && <Field label="관련 계좌">{row.relatedAccounts}개</Field>}
       </dl>
     </div>

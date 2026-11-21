@@ -11,13 +11,57 @@ export function updateBorderGlowPointer(card, clientX, clientY) {
 }
 
 export function bindCardGlow(workspace) {
-  const surfaceSelector = '.preview-tilt-cards [data-glow-surface]';
+  const surfaceSelector = '[data-card-interactive], .preview-tilt-cards [data-glow-surface]';
   const page = workspace.ownerDocument;
   let active;
+  let tiltBounds;
+  let clipping;
+
+  function clipArea(surface) {
+    const area = { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity };
+    for (let parent = surface.parentElement; parent && parent !== workspace; parent = parent.parentElement) {
+      const { overflowX, overflowY } = page.defaultView.getComputedStyle(parent);
+      if (overflowX === 'visible' && overflowY === 'visible') continue;
+      const { left, top, right, bottom } = parent.getBoundingClientRect();
+      if (overflowX !== 'visible') {
+        area.left = Math.max(area.left, left);
+        area.right = Math.min(area.right, overflowX === 'clip' ? right : left + parent.clientLeft + parent.clientWidth);
+      }
+      if (overflowY !== 'visible') {
+        area.top = Math.max(area.top, top);
+        area.bottom = Math.min(area.bottom, overflowY === 'clip' ? bottom : top + parent.clientTop + parent.clientHeight);
+      }
+    }
+    return area;
+  }
+
+  function tiltScale(bounds, area, rx, ry) {
+    const halfWidth = bounds.width / 2;
+    const halfHeight = bounds.height / 2;
+    const centerX = bounds.left + halfWidth;
+    const centerY = bounds.top + halfHeight;
+    const matrix = new DOMMatrix(`perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`);
+    let scale = 1;
+    for (const x of [-halfWidth, halfWidth]) for (const y of [-halfHeight, halfHeight]) {
+      const point = matrix.transformPoint({ x, y });
+      const dx = point.x >= 0 ? area.right - centerX : centerX - area.left;
+      const dy = point.y >= 0 ? area.bottom - centerY : centerY - area.top;
+      // Solve the perspective projection against each scroll edge before applying the transform.
+      for (const [extent, distance] of [[Math.abs(point.x), dx], [Math.abs(point.y), dy]]) {
+        if (extent / point.w > distance) scale = Math.min(scale, distance / (extent - distance * (point.w - 1)));
+      }
+    }
+    return scale;
+  }
   function clear() {
     active?.removeAttribute('data-card-spotlight');
+    active?.removeAttribute('data-card-tilted');
     active?.style.removeProperty('--card-spotlight-x');
     active?.style.removeProperty('--card-spotlight-y');
+    active?.style.removeProperty('--card-tilt-x');
+    active?.style.removeProperty('--card-tilt-y');
+    active?.style.removeProperty('--card-tilt-scale');
+    tiltBounds = undefined;
     active = undefined;
   }
   function move(event) {
@@ -30,7 +74,8 @@ export function bindCardGlow(workspace) {
       clear();
       return;
     }
-    const { left, top, width, height } = surface.getBoundingClientRect();
+    const bounds = surface.getBoundingClientRect();
+    const { left, top, width, height } = bounds;
     const x = event.clientX - left;
     const y = event.clientY - top;
     if (!width || !height || x < 0 || y < 0 || x > width || y > height) {
@@ -40,10 +85,23 @@ export function bindCardGlow(workspace) {
     if (surface !== active) {
       clear();
       active = surface;
+      if (surface.hasAttribute('data-card-interactive')) {
+        clipping = clipArea(surface);
+        if (bounds.left >= clipping.left - 1 && bounds.right <= clipping.right + 1
+            && bounds.top >= clipping.top - 1 && bounds.bottom <= clipping.bottom + 1) tiltBounds = bounds;
+      }
     }
     active.style.setProperty('--card-spotlight-x', `${x * 100 / width}%`);
     active.style.setProperty('--card-spotlight-y', `${y * 100 / height}%`);
     active.setAttribute('data-card-spotlight', '');
+    if (tiltBounds) {
+      const rx = (0.5 - y / height) * 12;
+      const ry = (x / width - 0.5) * 12;
+      active.setAttribute('data-card-tilted', '');
+      active.style.setProperty('--card-tilt-x', `${rx}deg`);
+      active.style.setProperty('--card-tilt-y', `${ry}deg`);
+      active.style.setProperty('--card-tilt-scale', String(tiltScale(tiltBounds, clipping, rx, ry)));
+    }
   }
   workspace.addEventListener('pointermove', move, { passive: true });
   workspace.addEventListener('pointerleave', clear);
