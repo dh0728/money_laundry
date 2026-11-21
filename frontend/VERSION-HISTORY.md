@@ -1,6 +1,6 @@
 # AML RADAR 화면 버전
 
-팀 검수본은 **3.4.1**. 작업 위치는 `frontend/web-app/live-layout`입니다.
+팀 작업 기준은 **3.4.1 리퀴드 글래스**. 11/21부터 앱의 기본 주소가 `frontend/web-app/src`의 코드를 사용합니다.
 
 ## 3.x.y 리퀴드 글래스
 
@@ -15,7 +15,7 @@
 | 3.0.1 | 11/18 | 검색 닫기 버튼, 프로필 정렬, 읽지 않은 알림 표시, 버튼 크기 조정 |
 | 3.0.0 | 11/18 | 독립 화면 첫 기록. 헤더, 오버레이 사이드바, 검색, 보관함, 업무 탭 |
 
-[리퀴드 글래스 실행 안내](web-app/live-layout/README.md) · 로그인 `/login?data=sample`
+[리퀴드 글래스 실행 안내](web-app/README.md) · 로그인 `/login?data=sample`
 
 ## 2.x.y 하늘색 브랜드
 

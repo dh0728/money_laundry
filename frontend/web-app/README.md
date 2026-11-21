@@ -1,26 +1,26 @@
 # AML RADAR 웹앱
 
-[팀 검수 프리뷰](live-layout/README.md)는 5215에서 실행합니다.
-
-5211은 아래 명령으로 여는 별도 샘플 앱입니다. 터미널을 열어 둔 채 브라우저에서 http://127.0.0.1:5211/ 에 접속합니다. 작업 이력은 [구현 문서](../../docs/frontend/implementation/implementation.md)에서 확인할 수 있습니다.
-
-## 전체 샘플 프론트엔드
-
-루트 `/`는 `src/next/main.tsx`의 새 v3 앱이다. `#/login`, `#/dashboard/mine`, `#/dashboard/all`, `#/rules`, `#/rules/new`, `#/rules/RULE-001/backtest`, `#/investigate/ledger`, `#/investigate/alerts`, `#/investigate/episodes`, `#/alerts/8100`, `#/episodes/8102`, `#/report`를 지원한다. 샘플 계정 버튼 또는 `demo` / `radar-demo`로 입장한다. 판정·묶기·룰·검토 의견·알림은 화면 간 공유하는 메모리 샘플이며 새로고침·로그아웃하면 초기화된다. 실제 인증·API 요청·서버 저장은 연결하지 않는다. `VITE_API_MODE`는 새 앱에 적용되지 않는다.
+앱의 기본 주소 `/`는 3.4.1 리퀴드 글래스 화면을 엽니다. `frontend/web-app`에서 아래 명령을 실행하고 [샘플 로그인](http://127.0.0.1:5215/login?data=sample)을 열어 주세요.
 
 ```sh
-pnpm dev --host 127.0.0.1 --port 5211 --strictPort
-pnpm lint
-pnpm test
-pnpm build
-pnpm build-storybook
+pnpm install --frozen-lockfile
+pnpm dev --host 127.0.0.1 --port 5215 --strictPort
 ```
 
-테마·브랜드는 로그인과 사이드바에서 바꾸며 브라우저에 저장한다. 샘플 로그인은 탭 세션에만 유지하고 비밀번호를 저장하지 않는다. 개발 화면의 `검수 상태` 또는 `?state=loading|empty|error`로 상태를 확인한다. 루트 URL의 쿼리 뒤에 해시를 둔다. 예: `/?state=error#/dashboard/mine`.
+| 위치 | 용도 |
+| --- | --- |
+| [src/app/radar](src/app/radar) | 앱 진입점, 메뉴, URL과 화면 전환 |
+| [src/pages/radar](src/pages/radar) | 화면 조립 |
+| [src/features](src/features) | 대시보드, 원장·조사, 룰 엔진, 설정 |
+| [src/api](src/api) | 백엔드 요청과 응답 형식 |
+| [src/mocks/radar](src/mocks/radar) | 화면 검수용 샘플 데이터 |
+| [src/components/radar](src/components/radar) | 공통 버튼, 카드, 표 |
 
-전체 화면·필요 데이터·수억 건 처리 경계·검증 결과는 [전체 구현 인계](../../docs/frontend/implementation/history/complete-bundle.md)에 있다. 초기 로그인·대시보드의 상세 기록은 [첫 묶음 인계](../../docs/frontend/implementation/history/first-bundle.md)에 있다. 기존 `ShellChrome.stories.tsx`와 v3 원본 토큰을 보존했으며, 새 앱도 ShellChrome의 선택 슬롯을 사용한다. 기존 기본 스토리와 `/next-review.html`은 계속 빈 콘텐츠 검수본이다.
+API를 연결할 때는 `VITE_API_MODE=live`로 실행합니다. 개발 서버의 `/api`는 기본적으로 로컬 8080으로 전달하며 `VITE_API_PROXY_TARGET`으로 바꿀 수 있습니다. 로그인·세션·알림은 기존 API를 사용합니다. 대시보드·조사·룰·보고서는 샘플 데이터에서 시작합니다. [화면별 API 인계](../../docs/frontend/implementation/api.md#live-layout-api-handoff)
 
-이하 실제 API·Ant 조사 흐름 관련 내용은 보존한 이전 시연 코드의 기록이다. 새 v3 앱의 API 연결 상태나 구현 범위를 뜻하지 않는다.
+주요 주소는 `/dashboard/mine`, `/rules`, `/rules/new`, `/rules/backtest`, `/investigate/ledger`, `/investigate/alerts`, `/investigate/episodes`, `/report`입니다. [화면 검수 안내](live-layout/README.md)
+
+이전 React 샘플은 `/react-review.html#/login`에서 열 수 있습니다. 아래는 기존 컴포넌트·API 구현을 비교할 때 참고하는 기록입니다.
 
 ## 컴포넌트 작업 도구
 
@@ -34,7 +34,7 @@ pnpm dev --host 127.0.0.1 --port 5173 --strictPort
 ```
 
 - Storybook: `http://127.0.0.1:6006`, Header + Sidebar story.
-- Vite 개발 견본: `http://127.0.0.1:5173/next-review.html`. 루트 `/`는 새 v3 앱이며 이 검수본은 별도 진입점으로 보존한다.
+- Vite 개발 견본: `http://127.0.0.1:5173/next-review.html`. 이 주소에서 Header와 Sidebar를 따로 확인할 수 있다.
 - Storybook Controls에서 네 가지 테마와 Sky/Violet/Pink/Lime을 고른다. 중앙은 빈 콘텐츠 슬롯이다.
 - `src/next/styles/tokens.css`와 `tokens.json`은 [v3 원본](https://github.com/kmg200164/second-brain/tree/main/projects/aml-radar/assets/design-system-zero-base)의 변환 없는 복사본이다. `tokens-source.json`에 SHA-256을 기록한다. 자동 양방향 동기화가 아니다.
 - 토큰 갱신: `pnpm tokens:sync <v3-assets-directory>`. 다른 저장소의 절대경로를 코드·설정에 저장하지 않는다.

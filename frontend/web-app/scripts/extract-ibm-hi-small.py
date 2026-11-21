@@ -1,6 +1,6 @@
 """Build the local benchmark from IBM AMLworld HI-Small_Trans.csv (CDLA-Sharing-1.0).
 
-Usage: python3 scripts/extract-ibm-hi-small.py INPUT_CSV live-layout/ibm-hi-small-data.json
+Usage: python3 scripts/extract-ibm-hi-small.py INPUT_CSV src/mocks/radar/ibm-hi-small-data.json
 """
 
 import argparse

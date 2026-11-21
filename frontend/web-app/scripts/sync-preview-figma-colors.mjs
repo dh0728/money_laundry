@@ -8,9 +8,9 @@ const fileKey = 'eHgUPAyr9bZ2UC7oTZNmwh'
 const collectionName = 'Color Semantic'
 const modes = ['Light', 'Dark']
 const tokenPrefix = '--aml-figma-'
-const directory = resolve(import.meta.dirname, '../live-layout')
-const snapshotPath = resolve(directory, 'figma-colors.json')
-const cssPath = resolve(directory, 'figma-colors.css')
+const directory = resolve(import.meta.dirname, '../src')
+const snapshotPath = resolve(directory, 'config/figma-colors.json')
+const cssPath = resolve(directory, 'styles/figma-colors.css')
 const sourceMode = name => name.toLowerCase()
 const slug = name => name.replaceAll('/', '-')
 
@@ -148,7 +148,7 @@ async function run() {
     },
   })
   if (values.help) {
-    console.log('Usage: node scripts/sync-preview-figma-colors.mjs [--check] [--input <path> | --fetch]\nDefaults to the cached live-layout/figma-colors.json. --fetch reads FIGMA_TOKEN from the environment.')
+    console.log('Usage: node scripts/sync-preview-figma-colors.mjs [--check] [--input <path> | --fetch]\nDefaults to the cached src/config/figma-colors.json. --fetch reads FIGMA_TOKEN from the environment.')
     return
   }
   if (values.fetch && values.input !== undefined) throw new Error('Choose one source: --input or --fetch.')
