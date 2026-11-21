@@ -1,6 +1,6 @@
 import React from 'react';
-import { RingChart } from '../charts/charts/ring/ring-chart';
-import { Ring } from '../charts/charts/ring/ring';
+import { RingChart } from './charts/charts/ring/ring-chart';
+import { Ring } from './charts/charts/ring/ring';
 
 // RingChart and Ring are from the MIT-licensed Bklit UI ring-chart registry.
 const percent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 1 });

@@ -4,24 +4,24 @@ import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PanelLeft, Settings2, X } from 'lucide-react';
-import { ActionButton } from '../../components/radar/primary-button';
-import { QueryCheck } from '../../components/radar/selection-check';
-import { Panel } from '../../components/radar/panel';
+import { ActionButton } from '../../components/primary-button';
+import { QueryCheck } from '../../components/selection-check';
+import { Panel } from '../../components/panel';
 import { PreviewCaseCard } from './preview-case-card';
 import { TransactionEvidenceTable } from './preview-case-table';
 import { useCaseEvidenceSelection } from './case-evidence-selection';
-import { SquishSwitch, bindSquishSwitch } from '../../components/radar/squish-switch';
+import { SquishSwitch, bindSquishSwitch } from '../../components/squish-switch';
 import { currencyColumn, SortableTableHead, tableCount,
-  useTableSelection, useTableSort, WorkflowTable } from '../../components/radar/workflow-table';
-import { dateFromCode, downloadCsv, inDateRange, TableQueryTools } from '../../components/radar/query-controls';
+  useTableSelection, useTableSort, WorkflowTable } from '../../components/workflow-table';
+import { dateFromCode, downloadCsv, inDateRange, TableQueryTools } from '../../components/query-controls';
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip } from '../../components/charts/charts/sankey';
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
 import { caseSankeyGraph, caseSankeyLayers, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
-import { complexSankeySampleCode } from '../../mocks/radar/dashboard-fixtures';
+import { complexSankeySampleCode } from '../../mocks/dashboard-fixtures';
 import { buildCaseNetwork, casePlaybackCursor, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
   mergeCaseTransactions, transactionsWithinHops } from './case-graph-scope';
 import { caseAccountLayout } from './case-pattern-layout';
-import { LinkTag, ModelScoreTag } from '../../components/radar/semantic-tags';
+import { LinkTag, ModelScoreTag } from '../../components/semantic-tags';
 import { caseGroupColor, caseMembership } from '../graph/graph-case-groups';
 import { ForceCaseCanvas } from '../graph/force-case-canvas';
 import { GraphIconButton, GraphPlayback, GraphZoomControls } from '../graph/preview-graph-controls';
@@ -30,7 +30,7 @@ import { OwnerGraphTimeline } from '../graph/owner-graph-timeline';
 import { useSpringNodeDrag } from '../graph/graph-node-drag';
 import { modelRiskLabels } from '../settings/model-risk-settings';
 import { graphFlowDuration } from '../graph/graph-flow-pulse';
-import '../../components/radar/form-dropdown.css';
+import '../../components/form-dropdown.css';
 import './preview-case-graph.css';
 
 function casesSharingEvidence(active, cases) {

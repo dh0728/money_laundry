@@ -1,11 +1,11 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
-import { CardHeader } from '../../components/radar/card-header';
-import { Panel } from '../../components/radar/panel';
-import { ActionButton } from '../../components/radar/primary-button';
-import { RecordCard } from '../../components/radar/record-card';
+import { CardHeader } from '../../components/card-header';
+import { Panel } from '../../components/panel';
+import { ActionButton } from '../../components/primary-button';
+import { RecordCard } from '../../components/record-card';
 import MagicBento from '../../components/react-bits/MagicBento';
-import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/radar/semantic-tags';
+import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/semantic-tags';
 import { readWorkspaceGap } from '../dashboard/workspace-metrics';
 import './preview-case-card.css';
 

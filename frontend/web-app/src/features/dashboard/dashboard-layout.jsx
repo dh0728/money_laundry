@@ -1,7 +1,7 @@
 import React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import MagicBento from '../../components/react-bits/MagicBento';
-import { Panel } from '../../components/radar/panel';
+import { Panel } from '../../components/panel';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';

@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
-import { Panel } from '../../components/radar/panel';
-import { FooterPagination } from '../../components/radar/footer-pagination';
-import { CardHeader } from '../../components/radar/card-header';
-import { StatusTag } from '../../components/radar/semantic-tags';
-import { TableFieldLabel } from '../../components/radar/workflow-table';
+import { Panel } from '../../components/panel';
+import { FooterPagination } from '../../components/footer-pagination';
+import { CardHeader } from '../../components/card-header';
+import { StatusTag } from '../../components/semantic-tags';
+import { TableFieldLabel } from '../../components/workflow-table';
 import './ibm-ledger.css';
 
 const pageSize = 30;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { PreviewCaseCard } from '../../features/investigation/preview-case-card';
-import { TransactionCard } from '../../features/investigation/investigation-components';
-import { dashboardFixtures } from '../../mocks/radar/dashboard-fixtures';
+import { PreviewCaseCard } from '../features/investigation/preview-case-card';
+import { TransactionCard } from '../features/investigation/investigation-components';
+import { dashboardFixtures } from '../mocks/dashboard-fixtures';
 import './component-card-samples.css';
 
 const { cases, transactions } = dashboardFixtures({

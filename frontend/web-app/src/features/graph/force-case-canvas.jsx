@@ -6,7 +6,7 @@ import { graphRiskBand, graphVerdict, graphVerdictLabels } from '../investigatio
 import { caseMembership } from './graph-case-groups';
 import { GraphZoomControls } from './preview-graph-controls';
 import { graphFlowDuration, graphRevealDuration } from './graph-flow-pulse';
-import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/radar/preview-visual-export';
+import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
 

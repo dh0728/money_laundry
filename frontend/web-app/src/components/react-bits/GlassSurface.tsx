@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useLayoutEffect, useState, useRef, useId, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import './GlassSurface.css';
-import { glassDisplacementMap } from '../radar/glass-map.js';
+import { glassDisplacementMap } from '../glass-map.js';
 
 export type GlassSurfaceChannel = 'R' | 'G' | 'B';
 

@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Plus } from 'lucide-react';
 import { bindTooltip, buttonPresentation } from './components.js';
-import HoldButton from '../react-bits/HoldButton';
-import StarBorder from '../react-bits/StarBorder';
-import { hasWorkTab, subscribeToWorkTabs } from '../../app/radar/work-tab-state';
+import HoldButton from './react-bits/HoldButton';
+import StarBorder from './react-bits/StarBorder';
+import { hasWorkTab, subscribeToWorkTabs } from '../app/work-tab-state';
 import './primary-button.css';
 import './work-tab-add-button.css';
 

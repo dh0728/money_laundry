@@ -1,5 +1,5 @@
 import { applyPreviewJudgment } from './case-judgment-data.js';
-import { validWorkCode } from '../../app/radar/preview-route.js';
+import { validWorkCode } from '../../app/preview-route.js';
 
 export const membershipReasonLimit = 2000;
 const storageKey = 'aml-live-layout-alert-membership';

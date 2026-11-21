@@ -1,5 +1,5 @@
 import React from 'react';
-import SpringCheck from '../react-bits/SpringCheck';
+import SpringCheck from './react-bits/SpringCheck';
 
 export function QueryCheck({ label, ariaLabel, checked, mixed, onChange, disabled = false }) {
   return <SpringCheck className="aml-density-check" label={label} ariaLabel={ariaLabel} checked={checked}

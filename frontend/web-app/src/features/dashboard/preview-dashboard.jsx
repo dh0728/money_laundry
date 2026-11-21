@@ -1,6 +1,6 @@
 import React from 'react';
-import { Panel } from '../../components/radar/panel';
-import { AISummaryPanel } from '../../components/radar/ai-summary-panel';
+import { Panel } from '../../components/panel';
+import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
@@ -8,9 +8,9 @@ import { DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardMetricGrid
 import { AreaSparkline, BarSparkline, LineSparkline } from '../../components/charts/sparkline';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
-import { ActionButton } from '../../components/radar/primary-button';
-import { exportCases } from '../../components/radar/query-controls';
-import { BoardSectionDownload, ChartSectionDownload } from '../../components/radar/section-download';
+import { ActionButton } from '../../components/primary-button';
+import { exportCases } from '../../components/query-controls';
+import { BoardSectionDownload, ChartSectionDownload } from '../../components/section-download';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
 
 const formatter = new Intl.NumberFormat('ko-KR');

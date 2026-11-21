@@ -1,6 +1,6 @@
 import React from 'react';
 import { Minus, Pause, Play, Plus, Shrink, SkipBack, SkipForward } from 'lucide-react';
-import { ActionButton } from '../../components/radar/primary-button';
+import { ActionButton } from '../../components/primary-button';
 
 export function GraphIconButton({ label, icon: Icon, alternateIcon: AlternateIcon, grouped = false, ...props }) {
   return <ActionButton className="icon-button preview-graph-icon-button" surface={grouped ? 'ghost' : 'floating'}

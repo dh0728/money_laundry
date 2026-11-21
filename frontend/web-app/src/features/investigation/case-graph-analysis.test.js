@@ -6,9 +6,9 @@ import { caseAccountLayout } from './case-pattern-layout';
 import { caseSankeyGraph, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
 import { ownerGraphLayout, ownerTransferPath } from '../graph/owner-graph-layout';
 import { mountCaseGraph } from './preview-case-graph';
-import { previewUrl, readPreviewRoute } from '../../app/radar/preview-route';
-import { ScreenLayout, ScreenNavigation } from '../../app/radar/screen-layouts';
-import { useTableSelection } from '../../components/radar/workflow-table';
+import { previewUrl, readPreviewRoute } from '../../app/preview-route';
+import { ScreenLayout, ScreenNavigation } from '../../app/screen-layouts';
+import { useTableSelection } from '../../components/workflow-table';
 
 vi.mock('react-force-graph-2d', () => ({
   default: function MockForceGraph({ graphData, nodeVisibility, onNodeClick }) {

@@ -1,10 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { expect, it } from 'vitest';
-import { Button, IconButton } from '../../components/radar/components.js';
-import { ActionButton } from '../../components/radar/primary-button.jsx';
-import layoutCss from '../../app/radar/layout.css?raw';
-import workTabButtonCss from '../../components/radar/work-tab-add-button.css?raw';
+import { Button, IconButton } from '../components/components.js';
+import { ActionButton } from '../components/primary-button.jsx';
+import layoutCss from '../app/layout.css?raw';
+import workTabButtonCss from '../components/work-tab-add-button.css?raw';
 
 it('keeps the React button shape when its surface changes', () => {
   const { rerender } = render(<ActionButton className="icon-button" surface="floating">도구</ActionButton>);

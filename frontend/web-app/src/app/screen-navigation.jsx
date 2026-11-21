@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { bindTooltip, Icon } from '../../components/radar/components.js';
+import { bindTooltip, Icon } from '../components/components.js';
 import { previewUrl } from './preview-route.js';
-import RubberSegment from '../../components/react-bits/RubberSegment';
+import RubberSegment from '../components/react-bits/RubberSegment';
 import './screen-navigation.css';
 
 let root;

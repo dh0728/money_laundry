@@ -5,35 +5,35 @@ import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/tab
 import { Input } from '@/components/ui/input';
 import { ruleConditionSummary, runBacktest } from '@/next/features/rules-logic';
 import { Check, Circle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
-import StatusMark from '../../components/react-bits/StatusMark';
-import Stepper, { Step } from '../../components/react-bits/Stepper';
-import MagicBento from '../../components/react-bits/MagicBento';
-import { ActionButton, PrimaryButton } from '../../components/radar/primary-button';
-import { CardHeader } from '../../components/radar/card-header';
-import { RecordCard } from '../../components/radar/record-card';
-import { Panel } from '../../components/radar/panel';
-import { ScreenActions } from '../../components/radar/screen-actions';
-import { CompletionRing } from '../../components/radar/completion-ring';
-import { ChartSectionDownload } from '../../components/radar/section-download';
-import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../../components/radar/semantic-tags';
-import { downloadCsv, inDateRange, LocalQueryTools } from '../../components/radar/query-controls';
-import { RuleList, ruleWorkspace } from '../../features/rules/preview-rule-workspace';
-import { RuleConditionFacts } from '../../features/rules/rule-condition-tree';
-import { readWorkspaceGap } from '../../features/dashboard/workspace-metrics';
-import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../../components/radar/workflow-table';
-import { DashboardSkeleton } from '../../features/dashboard/dashboard-layout';
-import { CaseJudgment } from '../../features/investigation/case-judgment';
-import { CaseTransactionEdit } from '../../features/investigation/case-transaction-edit';
-import { useCaseEvidenceSelection } from '../../features/investigation/case-evidence-selection';
-import { previewAlertEditUnavailable, previewAlertMembershipTargets } from '../../features/investigation/case-membership-data';
-import { currentPreviewUser, subscribePreviewUser } from '../../features/auth/preview-session-user';
-import { judgmentReasonLabels } from '../../features/investigation/case-judgment-data';
-import '../../features/investigation/preview-case-card.css';
+import StatusMark from '../components/react-bits/StatusMark';
+import Stepper, { Step } from '../components/react-bits/Stepper';
+import MagicBento from '../components/react-bits/MagicBento';
+import { ActionButton, PrimaryButton } from '../components/primary-button';
+import { CardHeader } from '../components/card-header';
+import { RecordCard } from '../components/record-card';
+import { Panel } from '../components/panel';
+import { ScreenActions } from '../components/screen-actions';
+import { CompletionRing } from '../components/completion-ring';
+import { ChartSectionDownload } from '../components/section-download';
+import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
+import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
+import { RuleList, ruleWorkspace } from '../features/rules/preview-rule-workspace';
+import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
+import { readWorkspaceGap } from '../features/dashboard/workspace-metrics';
+import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
+import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
+import { CaseJudgment } from '../features/investigation/case-judgment';
+import { CaseTransactionEdit } from '../features/investigation/case-transaction-edit';
+import { useCaseEvidenceSelection } from '../features/investigation/case-evidence-selection';
+import { previewAlertEditUnavailable, previewAlertMembershipTargets } from '../features/investigation/case-membership-data';
+import { currentPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user';
+import { judgmentReasonLabels } from '../features/investigation/case-judgment-data';
+import '../features/investigation/preview-case-card.css';
 import './workflow-components.css';
 
-const PreviewDashboard = lazy(() => import('../../features/dashboard/preview-dashboard').then(module => ({ default: module.PreviewDashboard })));
-const BenchmarkDashboard = lazy(() => import('../../features/dashboard/preview-dashboard').then(module => ({ default: module.BenchmarkDashboard })));
-const PreviewCaseOverview = lazy(() => import('../../features/investigation/preview-case-overview').then(module => ({ default: module.PreviewCaseOverview })));
+const PreviewDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.PreviewDashboard })));
+const BenchmarkDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.BenchmarkDashboard })));
+const PreviewCaseOverview = lazy(() => import('../features/investigation/preview-case-overview').then(module => ({ default: module.PreviewCaseOverview })));
 const sampleDates = ruleWorkspace.transactions.map(record => record.date).sort();
 const backtestPeriod = { start: sampleDates[0], end: sampleDates.at(-1) };
 const reportSelection = { ids: [], verdict: 'all' };
@@ -332,7 +332,7 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
 }
 
 async function downloadReport(rows) {
-  const { downloadCaseReport } = await import('../../features/investigation/case-report-pdf.js');
+  const { downloadCaseReport } = await import('../features/investigation/case-report-pdf.js');
   await downloadCaseReport(rows);
 }
 

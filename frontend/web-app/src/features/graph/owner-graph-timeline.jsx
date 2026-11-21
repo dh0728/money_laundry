@@ -5,7 +5,7 @@ import { graphVerdict, graphVerdictLabels } from '../investigation/case-graph-sc
 import {
   ownerAccountY, ownerGraphLayout, ownerHeaderHeight, ownerRowHeight, ownerTransferPath, ownerTransferRisk, ownerWidth,
 } from './owner-graph-layout';
-import { copySVG, registerGraphSnapshot } from '../../lib/radar/preview-visual-export';
+import { copySVG, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { GraphFlowReveal, GraphFlowStroke } from './graph-flow-pulse';
 import { useSpringNodeDrag } from './graph-node-drag';
 

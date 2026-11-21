@@ -1,5 +1,5 @@
 import React from 'react';
-import { modelRiskBand } from '../../features/settings/model-risk-settings';
+import { modelRiskBand } from '../features/settings/model-risk-settings';
 import { ActionButton } from './primary-button';
 import './semantic-tags.css';
 

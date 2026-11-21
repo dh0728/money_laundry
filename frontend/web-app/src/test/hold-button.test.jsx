@@ -1,8 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import HoldButton from '../../components/react-bits/HoldButton';
-import { PrimaryButton } from '../../components/radar/primary-button';
+import HoldButton from '../components/react-bits/HoldButton';
+import { PrimaryButton } from '../components/primary-button';
 
 afterEach(() => vi.useRealTimers());
 

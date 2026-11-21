@@ -1,4 +1,4 @@
-import { validWorkCode } from '../../app/radar/preview-route.js';
+import { validWorkCode } from '../../app/preview-route.js';
 
 const startedStorageKey = 'aml-live-layout-started-reviews';
 const isCaseCode = code => validWorkCode(code) && !code.startsWith('T-');

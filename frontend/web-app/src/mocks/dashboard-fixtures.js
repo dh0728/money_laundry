@@ -1,11 +1,11 @@
-import { caseFixtureRows, dateFromCode } from '../../components/radar/query-controls.jsx';
-import { applyPreviewJudgment } from '../../features/investigation/case-judgment-data.js';
-import { applyPreviewAlertMembership } from '../../features/investigation/case-membership-data.js';
-import { wasPreviewCaseRead } from '../../features/investigation/case-read-state.js';
+import { caseFixtureRows, dateFromCode } from '../components/query-controls.jsx';
+import { applyPreviewJudgment } from '../features/investigation/case-judgment-data.js';
+import { applyPreviewAlertMembership } from '../features/investigation/case-membership-data.js';
+import { wasPreviewCaseRead } from '../features/investigation/case-read-state.js';
 import { sampleTransactions, transactionFixture } from './transaction-fixtures.js';
 import { fixtureCompletionTime } from './verdict-fixtures.js';
 import { dashboardDays, samplePeriod } from './dashboard-record-codes.js';
-import { modelRiskBand, modelRiskLabels } from '../../features/settings/model-risk-settings.js';
+import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings.js';
 
 export { dashboardRecordCodes, samplePeriod } from './dashboard-record-codes.js';
 export const dashboardPeriodEnd = new Date(`${samplePeriod[1]}T00:00:00`);

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
-import { Panel } from '../../components/radar/panel';
-import { LinkTag, VerdictTag } from '../../components/radar/semantic-tags';
-import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/radar/workflow-table';
-import figmaColors from '../../config/figma-colors.json';
+import { Panel } from '../components/panel';
+import { LinkTag, VerdictTag } from '../components/semantic-tags';
+import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../components/workflow-table';
+import figmaColors from '../config/figma-colors.json';
 import './component-variables.css';
 
 const figmaFoundation = 'https://www.figma.com/design/iWjQL5GdXwenHGeZNHF4Uw?node-id=8-101';

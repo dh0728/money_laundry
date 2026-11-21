@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it } from 'vitest';
-import { BenchmarkLedger } from '../../features/investigation/ibm-ledger';
+import { BenchmarkLedger } from '../features/investigation/ibm-ledger';
 
 const records = Array.from({ length: 65 }, (_, index) => ({
   code: `TEST-TRANSACTION-${index + 1}`,

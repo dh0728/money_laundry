@@ -2,7 +2,7 @@
 
 import React, { useRef, useCallback, useEffect, type ReactNode } from 'react';
 import './BorderGlow.css';
-import { updateBorderGlowPointer } from '../radar/card-glow.js';
+import { updateBorderGlowPointer } from '../card-glow.js';
 
 interface BorderGlowProps {
   children?: ReactNode;

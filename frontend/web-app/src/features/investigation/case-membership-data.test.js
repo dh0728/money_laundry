@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { dashboardFixtures, dashboardRecordCodes } from '../../mocks/radar/dashboard-fixtures.js';
+import { dashboardFixtures, dashboardRecordCodes } from '../../mocks/dashboard-fixtures.js';
 import {
   editPreviewAlertTransactions, membershipReasonLimit, previewAlertEditUnavailable, previewAlertMembershipTargets,
 } from './case-membership-data.js';

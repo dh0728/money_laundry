@@ -1,5 +1,5 @@
 import { frames } from './screen-frames.js';
-import { isSampleTransactionCode } from '../../mocks/radar/dashboard-record-codes.js';
+import { isSampleTransactionCode } from '../mocks/dashboard-record-codes.js';
 
 const screens = new Set(frames.map(([, path]) => path));
 const workCode = /^(?:[AE]-\d{6}-\d{6}|T-\d{6}-\d{8})$/;
