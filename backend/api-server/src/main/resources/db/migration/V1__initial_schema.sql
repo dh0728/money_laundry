@@ -375,11 +375,12 @@ CREATE TABLE review.alerts (
  assignee_id BIGINT NOT NULL REFERENCES core.users,
  published_version INTEGER,
  review_started_at TIMESTAMPTZ, review_started_by BIGINT REFERENCES core.users,
+ read_at TIMESTAMPTZ,
  merged_into_alert_id BIGINT REFERENCES review.alerts,
  CHECK(merged_into_alert_id IS DISTINCT FROM alert_id),
  CHECK((review_started_at IS NULL)=(review_started_by IS NULL)),
  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CLOSED')),
- outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','TRANSFERRED','SCOPE_CLEARED','MIXED')),
+ outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','TRANSFERRED','SCOPE_CLEARED')),
  summary JSONB NOT NULL DEFAULT '{}', summary_revision BIGINT NOT NULL DEFAULT 0,
  summary_scope_digest CHAR(64),
  risk_score DOUBLE PRECISION GENERATED ALWAYS AS (coalesce((summary->>'riskScore')::double precision,0)) STORED,
@@ -394,7 +395,7 @@ CREATE TABLE review.episodes (
  episode_id BIGINT PRIMARY KEY DEFAULT nextval('review.case_id'),
  assignee_id BIGINT NOT NULL REFERENCES core.users,
  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CLOSED')),
- outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','SCOPE_CLEARED','DISSOLVED')),
+ outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','DISSOLVED')),
  summary JSONB NOT NULL DEFAULT '{}', summary_revision BIGINT NOT NULL DEFAULT 0,
  summary_scope_digest CHAR(64),
  risk_score DOUBLE PRECISION GENERATED ALWAYS AS (coalesce((summary->>'riskScore')::double precision,0)) STORED,
@@ -478,48 +479,13 @@ CREATE VIEW analysis.run_alert_origins AS
 CREATE VIEW analysis.run_fact_checks AS
  SELECT r.run_id,l.tx_id,l.integration_status FROM analysis.runs r
  JOIN analysis.fact_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq);
-CREATE TABLE review.alert_groups (
- group_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- alert_id BIGINT NOT NULL REFERENCES review.alerts,
- label TEXT NOT NULL, revision BIGINT NOT NULL DEFAULT 0,
- decision TEXT CHECK(decision IN ('NORMAL','SUSPICIOUS')),
- evidence_version INTEGER NOT NULL,
- FOREIGN KEY(alert_id,evidence_version) REFERENCES review.alert_versions,
- UNIQUE(group_id,alert_id)
-);
-CREATE TABLE review.alert_members (
- group_id BIGINT NOT NULL, alert_id BIGINT NOT NULL, tx_id BIGINT NOT NULL,
- evidence_version INTEGER NOT NULL,
- review_role TEXT NOT NULL CHECK(review_role IN ('SUBJECT','CONTEXT')),
- state TEXT NOT NULL CHECK(state IN ('PENDING','DECIDED','EXCLUDED','TRANSFERRED')),
- decision TEXT CHECK(decision IN ('NORMAL','SUSPICIOUS')),
- PRIMARY KEY(group_id,tx_id), FOREIGN KEY(group_id,alert_id) REFERENCES review.alert_groups(group_id,alert_id),
- FOREIGN KEY(alert_id,evidence_version,tx_id) REFERENCES review.alert_transactions,
- CHECK(state<>'DECIDED' OR decision IS NOT NULL)
-);
-CREATE INDEX alert_members_tx ON review.alert_members(tx_id);
+-- Episode는 Alert를 통째로 묶는다. 거래는 묶인 Alert의 현재 근거 거래를 그대로 따른다.
 CREATE TABLE review.episode_alerts (
  alert_id BIGINT PRIMARY KEY REFERENCES review.alerts,
  episode_id BIGINT NOT NULL REFERENCES review.episodes, alert_version INTEGER NOT NULL,
- group_id BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
- label TEXT NOT NULL, revision BIGINT NOT NULL DEFAULT 0,
- decision TEXT CHECK(decision IN ('NORMAL','SUSPICIOUS')),
- FOREIGN KEY(alert_id,alert_version) REFERENCES review.alert_versions,
- UNIQUE(group_id,alert_id)
+ FOREIGN KEY(alert_id,alert_version) REFERENCES review.alert_versions
 );
 CREATE INDEX episode_alerts_episode ON review.episode_alerts(episode_id);
-CREATE TABLE review.episode_members (
- group_id BIGINT NOT NULL, alert_id BIGINT NOT NULL, tx_id BIGINT NOT NULL,
- evidence_version INTEGER NOT NULL,
- review_role TEXT NOT NULL CHECK(review_role IN ('SUBJECT','CONTEXT')),
- state TEXT NOT NULL CHECK(state IN ('PENDING','DECIDED','EXCLUDED','TRANSFERRED')),
- decision TEXT CHECK(decision IN ('NORMAL','SUSPICIOUS')),
- PRIMARY KEY(group_id,tx_id),
- FOREIGN KEY(group_id,alert_id) REFERENCES review.episode_alerts(group_id,alert_id) ON DELETE CASCADE,
- FOREIGN KEY(alert_id,evidence_version,tx_id) REFERENCES review.alert_transactions,
- CHECK(state<>'DECIDED' OR decision IS NOT NULL)
-);
-CREATE INDEX episode_members_tx ON review.episode_members(tx_id);
 CREATE FUNCTION review.check_episode_count(p_id BIGINT) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE n BIGINT; disposition TEXT;
 BEGIN
@@ -552,6 +518,25 @@ CREATE TABLE review.events (
 );
 CREATE INDEX events_alert ON review.events(alert_id,event_id DESC);
 CREATE INDEX events_episode ON review.events(episode_id,event_id DESC);
+-- 판정은 Alert 또는 Episode 하나에 한 번만 남는다.
+CREATE TABLE review.judgments (
+ judgment_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ alert_id BIGINT UNIQUE REFERENCES review.alerts, episode_id BIGINT UNIQUE REFERENCES review.episodes,
+ CHECK(num_nonnulls(alert_id,episode_id)=1),
+ verdict TEXT NOT NULL CHECK(verdict IN ('NORMAL','SUSPICIOUS')),
+ reason_category TEXT NOT NULL CHECK(reason_category IN ('pattern','rule','normal-business','etc')),
+ evidence TEXT NOT NULL DEFAULT '', observations TEXT NOT NULL DEFAULT '', rationale TEXT NOT NULL,
+ reviewer_id BIGINT NOT NULL REFERENCES core.users, judged_at TIMESTAMPTZ NOT NULL
+);
+-- 직원이 Alert에서 뺀 거래. target_alert_id가 없으면 제외, 있으면 그 Alert로 이동이다.
+CREATE TABLE review.alert_tx_edits (
+ edit_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ alert_id BIGINT NOT NULL REFERENCES review.alerts, tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
+ target_alert_id BIGINT REFERENCES review.alerts, reason TEXT NOT NULL,
+ editor_id BIGINT NOT NULL REFERENCES core.users, edited_at TIMESTAMPTZ NOT NULL,
+ UNIQUE(alert_id,tx_id), CHECK(target_alert_id IS DISTINCT FROM alert_id)
+);
+CREATE INDEX alert_tx_edits_target ON review.alert_tx_edits(target_alert_id) WHERE target_alert_id IS NOT NULL;
 CREATE TABLE review.alert_lineage (
  source_alert_id BIGINT NOT NULL REFERENCES review.alerts,
  target_alert_id BIGINT NOT NULL REFERENCES review.alerts,
@@ -561,37 +546,29 @@ CREATE TABLE review.alert_lineage (
 );
 CREATE UNIQUE INDEX alert_single_merge ON review.alert_lineage(source_alert_id) WHERE kind='MERGED_INTO';
 CREATE INDEX alert_lineage_target ON review.alert_lineage(target_alert_id,kind,source_alert_id);
-CREATE TABLE review.alert_change_proposals (
- proposal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- target_alert_id BIGINT NOT NULL REFERENCES review.alerts, proposed_version INTEGER NOT NULL,
- evidence_digest CHAR(64) NOT NULL, status TEXT NOT NULL
- CHECK(status IN ('OPEN','ACCEPTED','REJECTED','SUPERSEDED')),
- source_run_id UUID NOT NULL REFERENCES analysis.runs,
- revision BIGINT NOT NULL DEFAULT 0, generation INTEGER NOT NULL DEFAULT 1,
- action TEXT NOT NULL CHECK(action IN ('UPDATE','MERGE','WITHDRAW')),
- payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL, resolved_at TIMESTAMPTZ,
- UNIQUE(target_alert_id,evidence_digest),
- FOREIGN KEY(target_alert_id,proposed_version) REFERENCES review.alert_versions
-);
-CREATE TABLE review.alert_proposal_cases (
- proposal_id BIGINT NOT NULL REFERENCES review.alert_change_proposals,
- alert_id BIGINT NOT NULL REFERENCES review.alerts,
- expected_revision BIGINT NOT NULL, expected_published_version INTEGER NOT NULL,
- assignee_id BIGINT NOT NULL REFERENCES core.users,
- response TEXT NOT NULL DEFAULT 'PENDING' CHECK(response IN ('PENDING','APPROVED','REJECTED')),
- response_actor BIGINT REFERENCES core.users, response_at TIMESTAMPTZ,
- PRIMARY KEY(proposal_id,alert_id)
-);
-CREATE INDEX alert_proposal_case ON review.alert_proposal_cases(alert_id,proposal_id);
 CREATE TABLE review.event_recipients (
  event_id BIGINT NOT NULL REFERENCES review.events, user_id BIGINT NOT NULL REFERENCES core.users,
  PRIMARY KEY(event_id,user_id)
 );
 CREATE INDEX event_recipients_user ON review.event_recipients(user_id,event_id DESC);
-CREATE TABLE review.requests (
- actor_id BIGINT NOT NULL REFERENCES core.users, request_id UUID NOT NULL,
- payload JSONB NOT NULL, response JSONB NOT NULL, PRIMARY KEY(actor_id,request_id)
+-- 룰엔진 화면의 룰과 변경 이력. 저장하거나 상태를 바꿀 때마다 버전이 하나 오른다.
+CREATE TABLE review.rules (
+ rule_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ name TEXT NOT NULL, description TEXT NOT NULL,
+ type_code SMALLINT CHECK(type_code BETWEEN 0 AND 8),
+ score_min DOUBLE PRECISION NOT NULL CHECK(score_min BETWEEN 0 AND 1),
+ min_transactions INTEGER NOT NULL CHECK(min_transactions>=1),
+ window_hours INTEGER NOT NULL CHECK(window_hours BETWEEN 1 AND 720),
+ status TEXT NOT NULL CHECK(status IN ('DRAFT','PENDING_APPROVAL','TESTING','ACTIVE','STOPPED','REJECTED')),
+ version INTEGER NOT NULL DEFAULT 1, author_id BIGINT NOT NULL REFERENCES core.users,
+ updated_at TIMESTAMPTZ NOT NULL
 );
+CREATE TABLE review.rule_history (
+ history_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ rule_id BIGINT NOT NULL REFERENCES review.rules, actor_id BIGINT NOT NULL REFERENCES core.users,
+ action TEXT NOT NULL, reason TEXT NOT NULL, at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX rule_history_rule ON review.rule_history(rule_id,history_id);
 CREATE TABLE review.notification_reads (
  user_id BIGINT NOT NULL REFERENCES core.users, notification_id TEXT NOT NULL,
  read_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY(user_id,notification_id)
@@ -635,37 +612,54 @@ CREATE VIEW ops.work_items AS
 -- Read projections do not own or duplicate investigation state.
 CREATE VIEW review.cases AS
  SELECT alert_id AS case_id,'ALERT'::text AS kind,alert_id,assignee_id,status,outcome,
- revision,created_at,assigned_at,closed_at,closed_by,published_version,review_started_at,merged_into_alert_id,summary,summary_revision,summary_scope_digest,risk_score FROM review.alerts
+ revision,created_at,assigned_at,closed_at,closed_by,published_version,review_started_at,merged_into_alert_id,summary,summary_revision,summary_scope_digest,risk_score,read_at FROM review.alerts
  UNION ALL
  SELECT episode_id,'EPISODE',NULL::bigint,assignee_id,status,outcome,
- revision,created_at,assigned_at,closed_at,closed_by,NULL::integer,NULL::timestamptz,NULL::bigint,summary,summary_revision,summary_scope_digest,risk_score FROM review.episodes;
+ revision,created_at,assigned_at,closed_at,closed_by,NULL::integer,NULL::timestamptz,NULL::bigint,summary,summary_revision,summary_scope_digest,risk_score,NULL::timestamptz FROM review.episodes;
 CREATE VIEW review.event_history AS
  SELECT e.*,coalesce(alert_id,episode_id) AS case_id FROM review.events e;
-CREATE VIEW review.saved_members AS
- SELECT a.alert_id AS case_id,m.group_id,m.alert_id,m.tx_id,m.evidence_version,
- m.review_role,m.state,m.decision FROM review.alert_members m JOIN review.alert_groups a USING(group_id,alert_id)
- UNION ALL
- SELECT e.episode_id,m.group_id,m.alert_id,m.tx_id,m.evidence_version,
- m.review_role,m.state,m.decision FROM review.episode_members m JOIN review.episode_alerts e USING(group_id,alert_id);
 CREATE VIEW review.latest_versions AS
  SELECT v.* FROM review.alerts a JOIN review.alert_versions v
  ON v.alert_id=a.alert_id AND v.version=a.published_version
  JOIN analysis.runs r USING(run_id) JOIN analysis.jobs j USING(job_id)
  WHERE v.published_at IS NOT NULL AND r.status='COMPLETED' AND j.status='COMPLETED';
-CREATE VIEW review.effective_members AS
- SELECT m.case_id,m.group_id,m.alert_id,m.tx_id,m.evidence_version,m.review_role,m.state,m.decision
- FROM review.saved_members m
- WHERE EXISTS(SELECT 1 FROM review.episodes e WHERE e.episode_id=m.case_id)
- OR EXISTS(SELECT 1 FROM review.alerts a JOIN review.alert_transactions t
-   ON t.alert_id=a.alert_id AND t.version=a.published_version
-   WHERE a.alert_id=m.case_id AND t.tx_id=m.tx_id)
+-- 사건의 현재 거래. Alert는 최신 근거에서 직원이 뺀 거래를 상태로 남기고 옮겨 온 거래를 더한다.
+-- Episode는 묶인 Alert의 남은 거래를 모은다. 조사 대상 거래의 판정은 사건 판정을 따른다.
+CREATE VIEW review.current_members AS
+ WITH held AS (
+  SELECT a.alert_id AS holder_id,a.alert_id,t.tx_id,t.version AS evidence_version,
+  CASE WHEN t.role='CONTEXT' THEN 'CONTEXT' ELSE 'SUBJECT' END AS review_role,
+  CASE WHEN e.target_alert_id IS NOT NULL THEN 'TRANSFERRED' WHEN e.edit_id IS NOT NULL THEN 'EXCLUDED'
+   ELSE 'KEPT' END AS edit_state
+  FROM review.alerts a JOIN review.latest_versions v USING(alert_id)
+  JOIN review.alert_transactions t USING(alert_id,version)
+  LEFT JOIN review.alert_tx_edits e ON e.alert_id=a.alert_id AND e.tx_id=t.tx_id
+  UNION ALL
+  SELECT x.target_alert_id,x.alert_id,x.tx_id,t.version,
+  CASE WHEN t.role='CONTEXT' THEN 'CONTEXT' ELSE 'SUBJECT' END,'KEPT'
+  FROM review.alert_tx_edits x JOIN review.latest_versions v ON v.alert_id=x.alert_id
+  JOIN review.alert_transactions t ON t.alert_id=v.alert_id AND t.version=v.version AND t.tx_id=x.tx_id
+  WHERE x.target_alert_id IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM review.alert_tx_edits o WHERE o.alert_id=x.target_alert_id AND o.tx_id=x.tx_id)
+  AND NOT EXISTS(SELECT 1 FROM review.alerts b JOIN review.alert_transactions bt
+    ON bt.alert_id=b.alert_id AND bt.version=b.published_version
+    WHERE b.alert_id=x.target_alert_id AND bt.tx_id=x.tx_id)
+ ), judged AS (
+  SELECT h.*,ea.episode_id,coalesce(j.verdict,ej.verdict) AS verdict
+  FROM held h LEFT JOIN review.judgments j ON j.alert_id=h.holder_id
+  LEFT JOIN review.episode_alerts ea ON ea.alert_id=h.holder_id
+  LEFT JOIN review.judgments ej ON ej.episode_id=ea.episode_id
+ )
+ SELECT holder_id AS case_id,alert_id,tx_id,evidence_version,review_role,
+ CASE WHEN edit_state<>'KEPT' THEN edit_state
+  WHEN verdict IS NOT NULL AND review_role='SUBJECT' THEN 'DECIDED' ELSE 'PENDING' END AS state,
+ CASE WHEN edit_state='KEPT' AND review_role='SUBJECT' THEN verdict END AS decision
+ FROM judged
  UNION ALL
- SELECT a.alert_id,0::bigint,a.alert_id,t.tx_id,t.version,
- CASE WHEN t.role='CONTEXT' THEN 'CONTEXT' ELSE 'SUBJECT' END,'PENDING',NULL
- FROM review.alerts a JOIN review.latest_versions v USING(alert_id)
- JOIN review.alert_transactions t USING(alert_id,version)
- WHERE NOT EXISTS(SELECT 1 FROM review.alert_groups g WHERE g.alert_id=a.alert_id)
- AND NOT EXISTS(SELECT 1 FROM review.alert_members m WHERE m.alert_id=a.alert_id AND m.tx_id=t.tx_id);
+ SELECT episode_id,alert_id,tx_id,evidence_version,review_role,
+ CASE WHEN verdict IS NOT NULL AND review_role='SUBJECT' THEN 'DECIDED' ELSE 'PENDING' END,
+ CASE WHEN review_role='SUBJECT' THEN verdict END
+ FROM judged WHERE episode_id IS NOT NULL AND edit_state='KEPT';
 CREATE VIEW review.visible_cases AS
  SELECT c.*,c.risk_score AS risk FROM review.cases c
  WHERE c.kind='EPISODE' OR (c.merged_into_alert_id IS NULL AND c.published_version IS NOT NULL);
@@ -703,11 +697,11 @@ CREATE VIEW review.notifications AS
  UNION ALL
  SELECT recipient.user_id,'event:'||e.event_id,e.action,e.business_at,
  CASE e.action WHEN 'ADDED_EVIDENCE' THEN 'Alert 근거 추가' WHEN 'MERGED' THEN 'Alert 병합'
- WHEN 'CHANGE_PROPOSED' THEN 'Alert 변경 제안' WHEN 'FOLLOWUP_CREATED' THEN '후속 Alert 생성'
+ WHEN 'FOLLOWUP_CREATED' THEN '후속 Alert 생성'
  WHEN 'EVIDENCE_WITHDRAWN' THEN 'Alert 근거 소멸' END,
  e.comment,'A-'||e.alert_id,1,e.alert_id,'ALERT',NULL::uuid
  FROM review.events e JOIN review.event_recipients recipient USING(event_id)
- WHERE e.action IN ('ADDED_EVIDENCE','MERGED','CHANGE_PROPOSED','FOLLOWUP_CREATED','EVIDENCE_WITHDRAWN');
+ WHERE e.action IN ('ADDED_EVIDENCE','MERGED','FOLLOWUP_CREATED','EVIDENCE_WITHDRAWN');
 
 -- Fixed demonstration exchange-rate snapshot.
 INSERT INTO core.fx_rates (fx_rate_version, currency, units_per_usd) VALUES
@@ -787,6 +781,19 @@ create table ops.dashboard_report_counts (business_date date primary key, n bigi
 create table ops.dashboard_delivery_days (
   detected_day date not null, business_date date not null,
   primary key(detected_day,business_date)
+);
+-- 새 화면 대시보드: 시간대별 거래 수, 의심 거래의 점수별 수, 그날 처음 등장한 계좌·소유자 수.
+create table ops.dashboard_tx_hours (
+  business_date date not null, hour smallint not null check(hour between 0 and 23),
+  suspicious boolean not null, n bigint not null check(n>0),
+  primary key(business_date,hour,suspicious)
+);
+create table ops.dashboard_score_points (
+  business_date date not null, score_pct smallint not null check(score_pct between 0 and 100),
+  n bigint not null check(n>0), primary key(business_date,score_pct)
+);
+create table ops.dashboard_first_seen (
+  business_date date primary key, new_accounts bigint not null, new_owners bigint not null
 );
 create index review_events_actor_time_idx on review.events(actor_id,business_at desc,event_id desc);
 create index review_events_episode_start_idx on review.events(episode_id,actor_id,business_at)

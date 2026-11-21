@@ -39,6 +39,15 @@ public class DashboardController {
         .body(dashboard.activities(user, from, to));
   }
 
+  @GetMapping("/dashboard/transaction-days")
+  public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> transactionDays(
+      java.security.Principal principal, @RequestParam LocalDate from, @RequestParam LocalDate to) {
+    reviews.actor(reviews.userId(principal));
+    return org.springframework.http.ResponseEntity.ok()
+        .header("Cache-Control", "private, no-store")
+        .body(dashboard.transactionDays(from, to));
+  }
+
   @GetMapping("/dashboard/queues")
   public org.springframework.http.ResponseEntity<DashboardLists.Queues> queues(
       java.security.Principal principal) {

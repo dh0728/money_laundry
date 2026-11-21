@@ -89,7 +89,7 @@ with psycopg.connect(host='postgres',dbname='aml_check',user='aml_check',passwor
     configure(db,os.environ['ANALYSIS_DB_USERNAME'],os.environ['ANALYSIS_DB_PASSWORD'])
     assert db.execute("select version from public.flyway_schema_history where success order by installed_rank").fetchall()==[('1',)]
     for table in ('analysis.alert_plans','analysis.fact_ledger','review.alert_lineage',
-                  'review.alert_change_proposals','review.alert_proposal_cases','review.event_recipients'):
+                  'review.alert_tx_edits','review.judgments','review.event_recipients'):
         assert db.execute('select to_regclass(%s)', (table,)).fetchone()[0] is not None
 with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSIS_DB_USERNAME'],password=os.environ['ANALYSIS_DB_PASSWORD'],autocommit=True) as db:
     db.execute('select * from analysis.input_transactions')
@@ -100,7 +100,7 @@ with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSI
             pass
         else:
             raise AssertionError('Protected table unexpectedly accessible')
-    for table in ('review.alerts','review.alert_versions','review.alert_members','review.events'):
+    for table in ('review.alerts','review.alert_versions','review.alert_tx_edits','review.events'):
         assert db.execute("select has_table_privilege(current_user,%s,'SELECT')", (table,)).fetchone()[0]
         for privilege in ('INSERT','UPDATE','DELETE'):
             assert not db.execute('select has_table_privilege(current_user,%s,%s)', (table,privilege)).fetchone()[0]

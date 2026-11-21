@@ -24,7 +24,7 @@ public class DashboardProjection {
 
   // Recounts cover the changed business dates: each of their ledger rows looks up its published
   // score by primary key, so the cost follows those dates and not every score ever stored.
-  static final String SCORE_BASE =
+  public static final String SCORE_BASE =
       """
       from ledger.transactions t
       left join lateral (
@@ -203,6 +203,56 @@ public class DashboardProjection {
             + (all ? "" : " and t.business_date in (" + dates + ")")
             + " group by 1,2,3,4",
         args);
+    // 새 화면 지표도 같은 날짜 단위로 다시 만든다.
+    for (String table :
+        List.of("dashboard_tx_hours", "dashboard_score_points", "dashboard_first_seen"))
+      jdbc.update(
+          "delete from ops." + table + (all ? "" : " where business_date in (" + dates + ")"),
+          args);
+    jdbc.update(
+        "insert into ops.dashboard_tx_hours select t.business_date,extract(hour from t.occurred_at at time zone 'Asia/Seoul')::smallint,coalesce(s.p_laundering>=s.threshold_value,false),count(*) "
+            + SCORE_BASE
+            + (all ? "" : " and t.business_date in (" + dates + ")")
+            + " group by 1,2,3",
+        args);
+    jdbc.update(
+        "insert into ops.dashboard_score_points select t.business_date,floor(s.p_laundering*100)::smallint,count(*) "
+            + SCORE_BASE
+            + " and s.p_laundering>=s.threshold_value"
+            + (all ? "" : " and t.business_date in (" + dates + ")")
+            + " group by 1,2",
+        args);
+    var days =
+        all
+            ? jdbc.queryForList(
+                "select distinct business_date from ledger.transactions where integration_status='ACTIVE'",
+                java.sql.Date.class)
+            : buckets.stream().map(java.sql.Date::valueOf).toList();
+    for (var day : days)
+      jdbc.update(
+          """
+          insert into ops.dashboard_first_seen
+          with seen as (
+            select from_account_id as account_id from ledger.transactions where business_date=? and integration_status='ACTIVE'
+            union select to_account_id from ledger.transactions where business_date=? and integration_status='ACTIVE'
+          ), fresh as (
+            select a.account_id,a.owner_id from seen join core.accounts a using(account_id)
+            where not exists(select 1 from ledger.transactions p where p.from_account_id=a.account_id and p.business_date<? and p.integration_status='ACTIVE')
+              and not exists(select 1 from ledger.transactions p where p.to_account_id=a.account_id and p.business_date<? and p.integration_status='ACTIVE')
+          )
+          select ?,(select count(*) from fresh),
+            (select count(*) from (select distinct owner_id from fresh) o
+             where not exists(select 1 from core.accounts k join ledger.transactions p
+               on p.from_account_id=k.account_id or p.to_account_id=k.account_id
+               where k.owner_id=o.owner_id and p.business_date<? and p.integration_status='ACTIVE'))
+          where exists(select 1 from seen)
+          """,
+          day,
+          day,
+          day,
+          day,
+          day,
+          day);
   }
 
   private static final String CASE_FIELDS =

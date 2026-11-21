@@ -28,24 +28,21 @@ final class CurrentCaseMembership {
           select a.alert_id,v.version from review.alerts a join review.latest_versions v using(alert_id)
           join candidates c using(alert_id)
           where a.published_version is not null and a.merged_into_alert_id is null
-        ), members as (
-          select 'ALERT' as kind,a.alert_id,a.alert_id as case_id,m.tx_id
-          from selected s join review.alert_members m using(tx_id)
-          join review.alerts a using(alert_id) join latest l using(alert_id)
-          where m.state not in ('EXCLUDED','TRANSFERRED')
-            and exists(select 1 from review.alert_transactions t where t.alert_id=a.alert_id and t.version=l.version and t.tx_id=m.tx_id)
-          union all
-          select 'ALERT',a.alert_id,a.alert_id,t.tx_id
+        ), held as (
+          select t.alert_id as holder,t.tx_id
           from selected s join review.alert_transactions t using(tx_id)
-          join latest l using(alert_id,version) join review.alerts a using(alert_id)
-          where not exists(select 1 from review.alert_groups g where g.alert_id=a.alert_id)
-            and not exists(select 1 from review.alert_members m where m.alert_id=a.alert_id and m.tx_id=t.tx_id)
-          union all
-          select 'EPISODE',e.alert_id,e.episode_id,m.tx_id
-          from selected s join review.episode_members m using(tx_id)
-          join review.episode_alerts e using(group_id,alert_id)
-          where m.state not in ('EXCLUDED','TRANSFERRED')
-        ) select distinct kind,alert_id,case_id,tx_id from members
+          join latest l using(alert_id,version)
+          where not exists(select 1 from review.alert_tx_edits e where e.alert_id=t.alert_id and e.tx_id=t.tx_id)
+          union
+          select x.target_alert_id,x.tx_id
+          from selected s join review.alert_tx_edits x using(tx_id)
+          join latest l on l.alert_id=x.alert_id
+          join review.alert_transactions t on t.alert_id=l.alert_id and t.version=l.version and t.tx_id=x.tx_id
+          where x.target_alert_id is not null
+            and not exists(select 1 from review.alert_tx_edits o where o.alert_id=x.target_alert_id and o.tx_id=x.tx_id)
+        ) select case when ea.episode_id is null then 'ALERT' else 'EPISODE' end as kind,
+            h.holder as alert_id,coalesce(ea.episode_id,h.holder) as case_id,h.tx_id
+          from held h left join review.episode_alerts ea on ea.alert_id=h.holder
         """;
     for (var membership : jdbc.queryForList(sql, (Object) byId.keySet().toArray(Long[]::new))) {
       var row = byId.get(((Number) membership.get("tx_id")).longValue());

@@ -618,26 +618,6 @@ class AlertPipelineTests {
   }
 
   @Test
-  void money_read_does_not_wait_for_an_unrelated_receipt_transaction() throws Exception {
-    long alert = firstAlert();
-    try (var connection = jdbc.getDataSource().getConnection()) {
-      connection.setAutoCommit(false);
-      try (var statement = connection.prepareStatement("select pg_advisory_xact_lock(?)")) {
-        statement.setLong(1, AnalysisService.RECEIPT_LOCK);
-        statement.execute();
-      }
-      try (var pool = java.util.concurrent.Executors.newSingleThreadExecutor()) {
-        var read = pool.submit(() -> reviews().money(alert, 180));
-        try {
-          assertThat(read.get(3, java.util.concurrent.TimeUnit.SECONDS)).containsKey("available");
-        } finally {
-          connection.rollback();
-        }
-      }
-    }
-  }
-
-  @Test
   void star_beyond_core_cap_publishes_linked_alerts_and_replay_preserves_ownership() {
     // 99 more seeds fan out of account to distinct receivers: one star face whose
     // pieces cannot fit one core of 64, so it becomes several Alerts joined by links.
@@ -796,91 +776,69 @@ class AlertPipelineTests {
   }
 
   @Test
-  void investigated_merge_is_hidden_until_owner_accepts_and_replay_is_idempotent()
-      throws Exception {
+  void investigated_merge_is_published_at_once_keeps_staff_edits_and_notifies_both_owners() {
     long alert = firstAlert();
     long owner =
         jdbc.queryForObject(
             "select assignee_id from review.alerts where alert_id=?", Long.class, alert);
+    long other =
+        jdbc.queryForObject(
+            "select min(user_id) from core.users where role='STAFF' and user_id<>?",
+            Long.class,
+            owner);
     jdbc.update(
         "update review.alerts set review_started_at=now(),review_started_by=assignee_id where alert_id=?",
         alert);
     long source =
         jdbc.queryForObject(
-            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now()+interval '1 hour',now()) returning alert_id",
+            "insert into review.alerts(assignee_id,created_at,assigned_at,review_started_at,review_started_by) values(?,now()+interval '1 hour',now(),now(),?) returning alert_id",
             Long.class,
-            owner);
+            other,
+            other);
     jdbc.update(
         "insert into review.alert_versions select ?,1,run_id,fingerprint,evidence,now(),now() from review.alert_versions where alert_id=? and version=1",
         source,
         alert);
     jdbc.update("update review.alerts set published_version=1 where alert_id=?", source);
+    // 사라지는 Alert에서 직원이 뺀 거래는 남는 Alert에서도 빠진 채로 유지된다.
+    jdbc.update(
+        "insert into review.alert_tx_edits(alert_id,tx_id,reason,editor_id,edited_at) values(?,?,'무관',?,now())",
+        source,
+        returnSeed,
+        other);
     contextOn("2022-09-03");
     var context = nextPreparedContext();
-    String artifact = executor("worker/analysis_entry.py").prepare(context).artifact();
-    publish(context, artifact);
-    assertThat(alerts.detail(alert, null).get("version")).isEqualTo(1);
-    assertThat(alerts.versions(alert)).hasSize(1);
-    assertThatThrownBy(() -> alerts.detail(alert, 2)).isInstanceOf(ApiException.class);
-    long proposal =
-        jdbc.queryForObject(
-            "select proposal_id from review.alert_change_proposals where target_alert_id=?",
-            Long.class,
-            alert);
-    var time =
-        new com.moneylaundry.api.common.BusinessTime(
-            jdbc,
-            service.tx,
-            new org.springframework.mock.env.MockEnvironment()
-                .withProperty("spring.profiles.active", "local"));
-    var reviews = new com.moneylaundry.api.review.ReviewService(jdbc, service.tx, time, alerts);
-    var proposals =
-        new com.moneylaundry.api.review.AlertProposalService(jdbc, service.tx, time, reviews);
-    long outsider =
-        jdbc.queryForObject(
-            "select min(user_id) from core.users where role='STAFF' and user_id<>?",
-            Long.class,
-            owner);
-    assertThatThrownBy(() -> proposals.detail(proposal, outsider)).isInstanceOf(ApiException.class);
-    var mvc =
-        org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
-                new com.moneylaundry.api.review.AlertProposalController(proposals, reviews))
-            .build();
-    String username =
-        jdbc.queryForObject("select username from core.users where user_id=?", String.class, owner);
-    mvc.perform(
-            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
-                    "/api/v1/review/alert-proposals/" + proposal)
-                .principal(() -> username))
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status")
-                .value("OPEN"))
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
-                    "$.evidence.transactions")
-                .isArray());
-    long revision =
-        jdbc.queryForObject(
-            "select revision from review.alerts where alert_id=?", Long.class, alert);
-    var vote =
-        new com.moneylaundry.api.review.AlertProposalService.Vote(
-            UUID.randomUUID(), 0, "ACCEPT", Map.of(alert, revision, source, 0L), "accept merge");
-    mvc.perform(
-            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                    "/api/v1/review/alert-proposals/" + proposal + "/votes")
-                .principal(() -> username)
-                .contentType("application/json")
-                .content(new tools.jackson.databind.ObjectMapper().writeValueAsString(vote)))
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status")
-                .value("ACCEPTED"));
-    assertThat(proposals.vote(proposal, owner, vote)).containsEntry("status", "ACCEPTED");
+    publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
     assertThat(alerts.detail(alert, null).get("version")).isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "select merged_into_alert_id from review.alerts where alert_id=?",
+                Long.class,
+                source))
+        .isEqualTo(alert);
+    assertThat(
+            jdbc.queryForObject(
+                "select alert_id from review.alert_tx_edits where tx_id=?", Long.class, returnSeed))
+        .isEqualTo(alert);
+    assertThat(
+            jdbc.queryForObject(
+                "select state from review.current_members where case_id=? and tx_id=?",
+                String.class,
+                alert,
+                returnSeed))
+        .isEqualTo("EXCLUDED");
+    assertThat(
+            jdbc.queryForList(
+                "select user_id from review.notifications where kind='MERGED' order by user_id",
+                Long.class))
+        .containsExactlyInAnyOrder(owner, other);
+    var repeat = nextPreparedContext();
+    publish(repeat, executor("worker/analysis_entry.py").prepare(repeat).artifact());
     assertThat(alerts.versions(alert)).hasSize(2);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from review.events where action='MERGED'", Integer.class))
+        .isEqualTo(1);
   }
 
   @Test
@@ -892,21 +850,11 @@ class AlertPipelineTests {
     jdbc.update(
         "update review.alerts set review_started_at=now(),review_started_by=assignee_id where alert_id=?",
         alert);
-    long group =
-        jdbc.queryForObject(
-            "insert into review.alert_groups(alert_id,label,evidence_version) values(?,'investigating',1) returning group_id",
-            Long.class,
-            alert);
     jdbc.update(
-        "insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state,decision) values(?,?,?,1,'SUBJECT','DECIDED','NORMAL')",
-        group,
+        "insert into review.alert_tx_edits(alert_id,tx_id,reason,editor_id,edited_at) values(?,?,'무관',?,now())",
         alert,
-        target);
-    jdbc.update(
-        "insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state) values(?,?,?,1,'CONTEXT','EXCLUDED')",
-        group,
-        alert,
-        returnSeed);
+        returnSeed,
+        owner);
     long added = seedOn("2022-09-03");
     var context = nextPreparedContext();
     promote(context, added);
@@ -915,26 +863,14 @@ class AlertPipelineTests {
     assertThat(alerts.detail(alert, null).get("version")).isEqualTo(2);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from review.alert_change_proposals", Integer.class))
-        .isZero();
-    assertThat(
-            jdbc.queryForMap(
-                "select state,decision,evidence_version from review.alert_members where alert_id=? and tx_id=?",
-                alert,
-                target))
-        .containsEntry("state", "DECIDED")
-        .containsEntry("decision", "NORMAL")
-        .containsEntry("evidence_version", 1);
-    assertThat(
-            jdbc.queryForObject(
-                "select state from review.alert_members where alert_id=? and tx_id=?",
+                "select state from review.current_members where case_id=? and tx_id=?",
                 String.class,
                 alert,
                 returnSeed))
         .isEqualTo("EXCLUDED");
     assertThat(
             jdbc.queryForMap(
-                "select state,decision,evidence_version from review.alert_members where alert_id=? and tx_id=?",
+                "select state,decision,evidence_version from review.current_members where case_id=? and tx_id=?",
                 alert,
                 added))
         .containsEntry("state", "PENDING")
@@ -983,16 +919,6 @@ class AlertPipelineTests {
                 Boolean.class,
                 alert))
         .isTrue();
-  }
-
-  com.moneylaundry.api.review.ReviewService reviews() {
-    var time =
-        new com.moneylaundry.api.common.BusinessTime(
-            jdbc,
-            service.tx,
-            new org.springframework.mock.env.MockEnvironment()
-                .withProperty("spring.profiles.active", "local"));
-    return new com.moneylaundry.api.review.ReviewService(jdbc, service.tx, time, alerts);
   }
 
   @Test
@@ -1045,45 +971,19 @@ class AlertPipelineTests {
                 "select status from review.alerts where alert_id=?", String.class, alert))
         .isEqualTo("OPEN");
     assertThat(alerts.versions(alert)).hasSize(1);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from review.alert_change_proposals", Integer.class))
-        .isZero();
-  }
-
-  com.moneylaundry.api.review.AlertProposalService proposals() {
-    var time =
-        new com.moneylaundry.api.common.BusinessTime(
-            jdbc,
-            service.tx,
-            new org.springframework.mock.env.MockEnvironment()
-                .withProperty("spring.profiles.active", "local"));
-    return new com.moneylaundry.api.review.AlertProposalService(jdbc, service.tx, time, reviews());
   }
 
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-  void corrected_core_withdrawal_preserves_judgments_and_removes_only_current_scope(
-      boolean started) {
+  void corrected_core_withdrawal_closes_the_alert_whether_or_not_review_started(boolean started) {
     long alert = firstAlert();
     long owner =
         jdbc.queryForObject(
             "select assignee_id from review.alerts where alert_id=?", Long.class, alert);
-    if (started) {
+    if (started)
       jdbc.update(
           "update review.alerts set review_started_at=now(),review_started_by=assignee_id where alert_id=?",
           alert);
-      long group =
-          jdbc.queryForObject(
-              "insert into review.alert_groups(alert_id,label,evidence_version) values(?,'reviewed',1) returning group_id",
-              Long.class,
-              alert);
-      jdbc.update(
-          "insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state,decision) values(?,?,?,1,'SUBJECT','DECIDED','NORMAL')",
-          group,
-          alert,
-          target);
-    }
     // Both PASS legs are corrected away, so no valid core remains.
     jdbc.update(
         "update ledger.transactions set integration_status='SUPERSEDED' where tx_id in (?,?)",
@@ -1092,38 +992,6 @@ class AlertPipelineTests {
     reviseReportsOf(target, returnSeed);
     var context = nextPreparedContext();
     publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
-    if (started) {
-      assertThat(alerts.detail(alert, null).get("version")).isEqualTo(1);
-      long proposal =
-          jdbc.queryForObject(
-              "select proposal_id from review.alert_change_proposals where target_alert_id=?",
-              Long.class,
-              alert);
-      long revision =
-          jdbc.queryForObject(
-              "select revision from review.alerts where alert_id=?", Long.class, alert);
-      assertThat(
-              proposals()
-                  .vote(
-                      proposal,
-                      owner,
-                      new com.moneylaundry.api.review.AlertProposalService.Vote(
-                          UUID.randomUUID(),
-                          0,
-                          "ACCEPT",
-                          Map.of(alert, revision),
-                          "정정으로 사라진 근거 확인")))
-          .containsEntry("status", "ACCEPTED");
-      assertThat(
-              jdbc.queryForMap(
-                  "select state,decision,evidence_version from review.alert_members where alert_id=? and tx_id=?",
-                  alert,
-                  target))
-          .containsEntry("state", "DECIDED")
-          .containsEntry("decision", "NORMAL")
-          .containsEntry("evidence_version", 1);
-      assertThat((List<?>) reviews().detail(alert).get("withdrawnMembers")).hasSize(1);
-    }
     assertThat(jdbc.queryForMap("select status,outcome from review.alerts where alert_id=?", alert))
         .containsEntry("status", "CLOSED")
         .containsEntry("outcome", "SCOPE_CLEARED");
@@ -1135,154 +1003,14 @@ class AlertPipelineTests {
         .isZero();
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from review.effective_members where case_id=?",
+                "select count(*) from review.current_members where case_id=?",
                 Integer.class,
                 alert))
         .isZero();
-    assertThat(((Map<?, ?>) reviews().detail(alert).get("summary")).get("txCount")).isEqualTo(0);
     assertThat(alerts.versions(alert)).hasSize(2);
     var repeat = nextPreparedContext();
     publish(repeat, executor("worker/analysis_entry.py").prepare(repeat).artifact());
     assertThat(alerts.versions(alert)).hasSize(2);
-  }
-
-  @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(
-      strings = {"ACCEPT", "REJECT", "STALE_FACT", "STALE_CASE"})
-  void multi_owner_merge_requires_current_unanimous_approval(String outcome) {
-    long alert = firstAlert();
-    long owner =
-        jdbc.queryForObject(
-            "select assignee_id from review.alerts where alert_id=?", Long.class, alert);
-    long other =
-        jdbc.queryForObject(
-            "select min(user_id) from core.users where role='STAFF' and user_id<>?",
-            Long.class,
-            owner);
-    jdbc.update(
-        "update review.alerts set review_started_at=now(),review_started_by=assignee_id where alert_id=?",
-        alert);
-    long source =
-        jdbc.queryForObject(
-            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now()+interval '1 hour',now()) returning alert_id",
-            Long.class,
-            other);
-    jdbc.update(
-        "insert into review.alert_versions select ?,1,run_id,fingerprint,evidence,now(),now() from review.alert_versions where alert_id=? and version=1",
-        source,
-        alert);
-    jdbc.update("update review.alerts set published_version=1 where alert_id=?", source);
-    var context = nextPreparedContext();
-    publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
-    long proposal =
-        jdbc.queryForObject(
-            "select proposal_id from review.alert_change_proposals where target_alert_id=?",
-            Long.class,
-            alert);
-    long revision =
-        jdbc.queryForObject(
-            "select revision from review.alerts where alert_id=?", Long.class, alert);
-    var firstVote =
-        new com.moneylaundry.api.review.AlertProposalService.Vote(
-            UUID.randomUUID(), 0, "ACCEPT", Map.of(alert, revision), "첫 담당자 확인");
-    assertThat(proposals().vote(proposal, owner, firstVote)).containsEntry("status", "OPEN");
-    assertThat(proposals().vote(proposal, owner, firstVote)).containsEntry("status", "OPEN");
-    assertThat(alerts.detail(alert, null).get("version")).isEqualTo(1);
-    assertThat(
-            jdbc.queryForObject(
-                "select merged_into_alert_id from review.alerts where alert_id=?",
-                Long.class,
-                source))
-        .isNull();
-    if ("STALE_FACT".equals(outcome))
-      jdbc.update(
-          "update ledger.transactions set integration_status='SUPERSEDED' where tx_id=?", target);
-    if ("STALE_CASE".equals(outcome))
-      jdbc.update("update review.alerts set revision=revision+1 where alert_id=?", source);
-    var lastVote =
-        new com.moneylaundry.api.review.AlertProposalService.Vote(
-            UUID.randomUUID(),
-            1,
-            "REJECT".equals(outcome) ? "REJECT" : "ACCEPT",
-            Map.of(source, 0L),
-            "두 번째 담당자 확인");
-    if (outcome.startsWith("STALE")) {
-      assertThatThrownBy(() -> proposals().vote(proposal, other, lastVote))
-          .isInstanceOf(ApiException.class);
-      assertThat(
-              jdbc.queryForObject(
-                  "select status from review.alert_change_proposals where proposal_id=?",
-                  String.class,
-                  proposal))
-          .isEqualTo("SUPERSEDED");
-    } else {
-      assertThat(proposals().vote(proposal, other, lastVote))
-          .containsEntry("status", "ACCEPT".equals(outcome) ? "ACCEPTED" : "REJECTED");
-    }
-    assertThat(alerts.detail(alert, null).get("version"))
-        .isEqualTo("ACCEPT".equals(outcome) ? 2 : 1);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from review.events where action='MERGED'", Integer.class))
-        .isEqualTo("ACCEPT".equals(outcome) ? 1 : 0);
-    if (Set.of("REJECT", "STALE_CASE").contains(outcome)) {
-      var repeated = nextPreparedContext();
-      publish(repeated, executor("worker/analysis_entry.py").prepare(repeated).artifact());
-      assertThat(
-              jdbc.queryForObject(
-                  "select count(*) from review.alert_change_proposals", Integer.class))
-          .isEqualTo(1);
-      if ("REJECT".equals(outcome)) {
-        assertThat(
-                jdbc.queryForObject(
-                    "select status from review.alert_change_proposals where proposal_id=?",
-                    String.class,
-                    proposal))
-            .isEqualTo("REJECTED");
-      } else {
-        assertThat(
-                jdbc.queryForMap(
-                    "select status,generation from review.alert_change_proposals where proposal_id=?",
-                    proposal))
-            .containsEntry("status", "OPEN")
-            .containsEntry("generation", 2);
-        assertThat(
-                jdbc.queryForObject(
-                    "select count(*) from review.alert_proposal_cases where proposal_id=? and response='PENDING'",
-                    Integer.class,
-                    proposal))
-            .isEqualTo(2);
-        assertThat(
-                jdbc.queryForObject(
-                    "select count(*) from review.events where action='PROPOSAL_SUPERSEDED' and snapshot ? 'votes'",
-                    Integer.class))
-            .isPositive();
-        assertThat(
-                jdbc.queryForObject(
-                    "select v.run_id from review.alert_change_proposals p join review.alert_versions v on v.alert_id=p.target_alert_id and v.version=p.proposed_version where proposal_id=?",
-                    UUID.class,
-                    proposal))
-            .isEqualTo(repeated.runId());
-        assertThat(
-                proposals()
-                    .vote(
-                        proposal,
-                        owner,
-                        new com.moneylaundry.api.review.AlertProposalService.Vote(
-                            UUID.randomUUID(), 3, "ACCEPT", Map.of(alert, revision), "새 제안 확인")))
-            .containsEntry("status", "OPEN");
-        assertThat(
-                proposals()
-                    .vote(
-                        proposal,
-                        other,
-                        new com.moneylaundry.api.review.AlertProposalService.Vote(
-                            UUID.randomUUID(), 4, "ACCEPT", Map.of(source, 1L), "새 제안 동의")))
-            .containsEntry("status", "ACCEPTED");
-        assertThat(alerts.detail(alert, null).get("version")).isEqualTo(3);
-        assertThat(alerts.versions(alert)).hasSize(2);
-      }
-    }
   }
 
   @Test
@@ -1299,10 +1027,6 @@ class AlertPipelineTests {
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("ALERT_BASELINE_CHANGED");
     assertThat(alerts.detail(alert, null).get("version")).isEqualTo(1);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from review.alert_change_proposals", Integer.class))
-        .isZero();
   }
 
   @Test
@@ -1373,9 +1097,6 @@ class AlertPipelineTests {
     assertThat(summary.get("contextCount")).isEqualTo(1L);
     assertThat(summary.get("sealedAfter")).isEqualTo("2022-09-16T14:30:00Z");
     assertThat(alerts.versions(alert)).hasSize(2);
-    var review = (Map<?, ?>) reviews().detail(alert).get("summary");
-    assertThat(review.get("contextCount")).isEqualTo(1L);
-    assertThat(review.get("sealedAfter")).isEqualTo("2022-09-16T14:30:00Z");
     // The list keeps its documented summary fields only.
     var listed = (List<Map<String, Object>>) alerts.list(0, 20, null, null, null).get("content");
     assertThat(

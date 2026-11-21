@@ -2,7 +2,6 @@ package com.moneylaundry.api.review;
 
 import static com.moneylaundry.api.review.ReviewJson.*;
 
-import com.moneylaundry.api.alert.AlertQueryService;
 import com.moneylaundry.api.analysis.AnalysisService;
 import com.moneylaundry.api.common.ApiException;
 import com.moneylaundry.api.common.BusinessTime;
@@ -14,25 +13,23 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Alert/Episode 조사 사건의 목록·상세·자금 지표와 조사 명령(판정·제외·이관·연결 해제·종결) 처리. */
+/** 새 화면의 Alert·Episode 조회와 조사 동작(열람, 처리 시작, 판정, 거래 제외·이동, Episode 묶기·편입·연결 해제). */
 @Service
 public class ReviewService {
+  private static final Set<String> REASON_CATEGORIES =
+      Set.of("pattern", "rule", "normal-business", "etc");
+  private static final int JUDGMENT_TEXT_LIMIT = 2000;
+  private static final int EDIT_REASON_LIMIT = 2000;
+  private static final int EPISODE_REASON_LIMIT = 4000;
+
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
-  private final TransactionTemplate readTx;
   private final BusinessTime time;
-  private final AlertQueryService alerts;
 
-  public ReviewService(
-      JdbcTemplate jdbc, TransactionTemplate tx, BusinessTime time, AlertQueryService alerts) {
+  public ReviewService(JdbcTemplate jdbc, TransactionTemplate tx, BusinessTime time) {
     this.jdbc = jdbc;
     this.tx = tx;
-    this.readTx = new TransactionTemplate(tx.getTransactionManager());
-    this.readTx.setReadOnly(true);
-    this.readTx.setIsolationLevel(
-        org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
     this.time = time;
-    this.alerts = alerts;
   }
 
   public long userId(java.security.Principal principal) {
@@ -65,442 +62,91 @@ public class ReviewService {
         "select user_id as id,name,role from core.users where role in ('STAFF','ADMIN') order by user_id");
   }
 
-  private Map<String, Object> caseRow(long id) {
-    var found =
-        jdbc.queryForList(
-            "select c.*,u.name as assignee_name from review.cases c join core.users u on u.user_id=c.assignee_id where c.case_id=?",
-            id);
-    if (found.isEmpty()) throw ApiException.notFound("사건이 없습니다.");
-    return found.getFirst();
-  }
+  // ---- 조회 ----
 
-  private void editable(Map<String, Object> c, long user) {
-    if (c.get("merged_into_alert_id") != null)
-      throw ApiException.invalidTransition(
-          "병합된 Alert입니다. 현재 Alert " + c.get("merged_into_alert_id") + "를 조회하세요.");
-    var who = actor(user);
-    if (number(c.get("assignee_id")) != user || !"STAFF".equals(who.get("role")))
-      throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "담당 직원만 변경할 수 있습니다.");
-    if (!"OPEN".equals(c.get("status"))) throw ApiException.invalidTransition("종결 사건은 변경할 수 없습니다.");
-  }
-
-  private List<Map<String, Object>> initial(Map<String, Object> c) {
-    return initial(number(c.get("alert_id")), null);
-  }
-
-  private List<Map<String, Object>> initial(long alertId, Integer version) {
-    var d = alerts.detail(alertId, version);
-    double threshold =
-        jdbc.queryForObject(
-            "select b.threshold_value from analysis.runs r join analysis.jobs b on b.job_id=r.job_id where r.run_id=?::uuid",
-            Double.class,
-            d.get("runId").toString());
-    CaseSummary.annotateSuspicion(d, threshold);
-    var members = new ArrayList<Map<String, Object>>();
-    for (var t : rows(d.get("transactions"))) {
-      var evidence = new LinkedHashMap<>(t);
-      var m = new LinkedHashMap<String, Object>();
-      m.put("txId", t.get("txId"));
-      m.put("reviewRole", "CONTEXT".equals(t.get("role")) ? "CONTEXT" : "SUBJECT");
-      m.put("state", "PENDING");
-      m.put("decision", null);
-      m.put("transaction", evidence);
-      m.put(
-          "sources",
-          new ArrayList<>(List.of(Map.of("alertId", alertId, "version", d.get("version")))));
-      members.add(m);
-    }
-    String sourceType = CaseSummary.summarize(members).get("primaryType").toString();
-    for (var m : members)
-      m.put(
-          "sources",
-          new ArrayList<>(
-              List.of(
-                  Map.of(
-                      "alertId",
-                      alertId,
-                      "version",
-                      d.get("version"),
-                      "primaryType",
-                      sourceType))));
-    return new ArrayList<>(
-        List.of(
-            new LinkedHashMap<>(
-                Map.of(
-                    "groupId",
-                    0L,
-                    "label",
-                    "Alert " + alertId,
-                    "revision",
-                    0L,
-                    "evidenceVersion",
-                    d.get("version"),
-                    "members",
-                    members))));
-  }
-
-  private List<Map<String, Object>> groups(Map<String, Object> c) {
-    boolean episode = "EPISODE".equals(c.get("kind"));
-    var found =
-        jdbc.queryForList(
-            episode
-                ? "select group_id as \"groupId\",label,revision,alert_version as \"evidenceVersion\",decision,alert_id as \"sourceAlertId\" from review.episode_alerts where episode_id=? order by group_id"
-                : "select group_id as \"groupId\",label,revision,evidence_version as \"evidenceVersion\",decision,alert_id as \"sourceAlertId\" from review.alert_groups where alert_id=? order by group_id",
-            c.get("case_id"));
-    for (var g : found) {
-      var evidence = new HashMap<Integer, Map<Long, Map<String, Object>>>();
-      var members = new ArrayList<Map<String, Object>>();
-      var stored =
-          jdbc.queryForList(
-              "select tx_id,evidence_version,review_role,state,decision from "
-                  + (episode ? "review.episode_members" : "review.effective_members")
-                  + " where group_id=? order by tx_id",
-              g.get("groupId"));
-      for (var row : stored) {
-        int version = ((Number) row.get("evidence_version")).intValue();
-        var byId =
-            evidence.computeIfAbsent(
-                version,
-                key -> {
-                  var map = new HashMap<Long, Map<String, Object>>();
-                  for (var m :
-                      rows(initial(number(g.get("sourceAlertId")), key).getFirst().get("members")))
-                    map.put(number(m.get("txId")), m);
-                  return map;
-                });
-        var m = new LinkedHashMap<>(byId.get(number(row.get("tx_id"))));
-        m.put("reviewRole", row.get("review_role"));
-        m.put("state", row.get("state"));
-        m.put("decision", row.get("decision"));
-        members.add(m);
-      }
-      g.put("members", members);
-    }
-    if ("ALERT".equals(c.get("kind")) && found.isEmpty()) return initial(c);
-    return found;
-  }
-
-  private long revision(Map<String, Object> c) {
-    long base = number(c.get("revision"));
-    if ("ALERT".equals(c.get("kind")))
-      return base * 1000000L
-          + number(alerts.detail(number(c.get("alert_id")), null).get("version"));
-    return base;
-  }
-
-  private List<Map<String, Object>> all(List<Map<String, Object>> groups) {
-    var result = new ArrayList<Map<String, Object>>();
-    for (var g : groups) result.addAll(rows(g.get("members")));
-    return result;
-  }
-
-  public Map<String, Object> detail(long id) {
-    return detail(id, true);
-  }
-
-  private Map<String, Object> detail(long id, boolean includeHistory) {
-    time.workbenchOnly();
-    var c = caseRow(id);
-    var gs = groups(c);
-    var members = all(gs);
-    var out = new LinkedHashMap<String, Object>();
-    out.put("caseId", id);
-    out.put("kind", c.get("kind"));
-    out.put("alertId", c.get("alert_id"));
-    out.put("status", c.get("status"));
-    out.put("outcome", c.get("outcome"));
-    out.put("revision", revision(c));
-    out.put("scopeRevision", c.get("revision"));
-    if ("ALERT".equals(c.get("kind"))) {
-      out.put("publishedVersion", c.get("published_version"));
-      out.put("reviewStartedAt", c.get("review_started_at"));
-      out.put(
-          "relatedFlows",
-          alerts.relatedFlows(
-              id,
-              rows(
-                  jdbc.queryForObject(
-                      "select coalesce(evidence->'boundaryWitnesses','[]'::jsonb)::text from review.alert_versions where alert_id=? and version=?",
-                      String.class,
-                      id,
-                      c.get("published_version")))));
-      // Keep employee judgments in storage; a new publication changes only current scope.
-      out.put(
-          "withdrawnMembers",
-          jdbc.queryForList(
-              "select m.tx_id as \"txId\",m.evidence_version as \"evidenceVersion\",m.review_role as \"reviewRole\",m.state,m.decision from review.alert_members m where m.alert_id=? and not exists(select 1 from review.alert_transactions t where t.alert_id=m.alert_id and t.version=? and t.tx_id=m.tx_id) order by m.group_id,m.tx_id",
-              id,
-              c.get("published_version")));
-      out.put(
-          "canonicalAlertId",
-          c.get("merged_into_alert_id") == null ? id : c.get("merged_into_alert_id"));
-      out.put("resolution", c.get("merged_into_alert_id") == null ? c.get("outcome") : "MERGED");
-      out.put(
-          "pendingProposalIds",
-          jdbc.queryForList(
-              "select p.proposal_id from review.alert_proposal_cases pc join review.alert_change_proposals p using(proposal_id) where pc.alert_id=? and p.status='OPEN' order by p.proposal_id",
-              Long.class,
-              id));
-      out.put(
-          "relations",
-          jdbc.queryForList(
-              "select source_alert_id,target_alert_id,kind,event_id from review.alert_lineage where source_alert_id=? or target_alert_id=? order by event_id",
-              id,
-              id));
-    }
-    out.put("assigneeId", c.get("assignee_id"));
-    out.put("assigneeName", c.get("assignee_name"));
-    for (String key : List.of("created_at", "assigned_at", "closed_at"))
-      out.put(
-          switch (key) {
-            case "created_at" -> "createdAt";
-            case "assigned_at" -> "assignedAt";
-            default -> "closedAt";
-          },
-          c.get(key) == null ? null : ((Timestamp) c.get(key)).toInstant().toString());
-    out.put(
-        "ageDays",
-        Math.max(
-            0,
-            Duration.between(((Timestamp) c.get("created_at")).toInstant(), time.now()).toDays()));
-    out.put("groups", gs);
-    var summary = new LinkedHashMap<>(CaseSummary.summarize(members));
-    // Growth deadline and context size describe the published Alert evidence, not an Episode.
-    summary.put("sealedAfter", null);
-    summary.put("contextCount", null);
-    if ("ALERT".equals(c.get("kind")) && c.get("published_version") != null)
-      summary.putAll(
-          alerts.blockFacts(
-              object(
-                  jdbc.queryForObject(
-                      "select evidence::text from review.alert_versions where alert_id=? and version=?",
-                      String.class,
-                      c.get("alert_id"),
-                      c.get("published_version")))));
-    out.put("summary", summary);
-    out.put(
-        "pendingCount",
-        members.stream()
-            .filter(
-                m ->
-                    "OPEN".equals(c.get("status"))
-                        && "SUBJECT".equals(m.get("reviewRole"))
-                        && "PENDING".equals(m.get("state")))
-            .map(m -> number(m.get("txId")))
-            .distinct()
-            .count());
-    var sourceIds = new TreeSet<Long>();
-    for (var m : members)
-      if (!Set.of("EXCLUDED", "TRANSFERRED").contains(m.get("state")))
-        for (var source : rows(m.get("sources"))) sourceIds.add(number(source.get("alertId")));
-    if ("EPISODE".equals(c.get("kind"))) {
-      sourceIds.clear();
-      sourceIds.addAll(
-          jdbc.queryForList(
-              "select alert_id from review.episode_alerts where episode_id=? order by alert_id",
-              Long.class,
-              id));
-    }
-    out.put(
-        "episodeId",
-        "ALERT".equals(c.get("kind"))
-            ? jdbc
-                .queryForList(
-                    "select episode_id from review.episode_alerts where alert_id=?",
-                    Long.class,
-                    c.get("alert_id"))
-                .stream()
-                .findFirst()
-                .orElse(null)
-            : null);
-    out.put("sourceAlertIds", sourceIds);
-    var types = new TreeSet<String>();
-    for (var m : members)
-      if (!Set.of("EXCLUDED", "TRANSFERRED").contains(m.get("state")))
-        for (var source : rows(m.get("sources")))
-          if (source.get("primaryType") != null) types.add(source.get("primaryType").toString());
-    out.put("primaryTypes", types);
-    if (includeHistory) {
-      var accountIds = new TreeSet<String>();
-      for (var member : members) {
-        if (Set.of("EXCLUDED", "TRANSFERRED").contains(member.get("state"))) continue;
-        var transaction = object(member.get("transaction"));
-        for (String key : List.of("fromAccountId", "toAccountId")) {
-          if (transaction.get(key) != null) accountIds.add(transaction.get(key).toString());
-        }
-      }
-      out.put("accounts", new LedgerQueryService(jdbc).accounts(accountIds));
-      out.put(
-          "history",
-          jdbc.queryForList(
-              "select e.event_id as \"eventId\",e.action,e.comment,e.business_at as \"businessAt\",e.recorded_at as \"recordedAt\",u.name as actor from review.event_history e left join core.users u on u.user_id=e.actor_id where case_id=? order by event_id desc",
-              id));
-      var detachments =
-          jdbc.queryForList(
-              "select event_id as \"eventId\",action,comment,business_at as \"businessAt\",snapshot::text as snapshot from review.event_history where case_id=? and action in ('UNLINK','DISSOLVE') order by event_id desc",
-              id);
-      for (var entry : detachments) entry.put("snapshot", object(entry.get("snapshot")));
-      out.put("detachments", detachments);
-    }
-    if (includeHistory && !members.isEmpty()) {
-      var ids = members.stream().map(m -> number(m.get("txId"))).distinct().toList();
-      var args = new ArrayList<Object>(ids);
-      args.add(id);
-      out.put(
-          "relatedDecisions",
-          jdbc.queryForList(
-              "select c.case_id as \"caseId\",c.kind,c.status,m.group_id as \"groupId\",m.tx_id::text as \"txId\",m.decision "
-                  + "from review.saved_members m join review.cases c using(case_id) "
-                  + "where m.state='DECIDED' and m.tx_id in ("
-                  + String.join(",", Collections.nCopies(ids.size(), "?"))
-                  + ") and c.case_id<>? order by c.case_id,m.group_id",
-              args.toArray()));
-    }
-    return out;
-  }
-
-  public Map<String, Object> list(
-      String kind, String status, Long assignee, LocalDate from, LocalDate to, int page, int size) {
-    return list(kind, status, assignee, from, to, page, size, ReviewCaseFilter.EMPTY);
-  }
-
-  public Map<String, Object> list(
-      String kind,
-      String status,
-      Long assignee,
-      LocalDate from,
-      LocalDate to,
-      int page,
-      int size,
-      ReviewCaseFilter filter) {
-    time.workbenchOnly();
-    AnalysisService.validatePage(page, size);
-    if (!Set.of("ALERT", "EPISODE").contains(kind)
-        || (status != null && !Set.of("OPEN", "CLOSED").contains(status)))
-      throw AnalysisService.invalid();
-    var args = new ArrayList<Object>(List.of(kind));
-    String sql = " where c.kind=?";
-    if (status != null) {
-      sql += " and c.status=?";
-      args.add(status);
-    }
-    if (assignee != null) {
-      sql += " and c.assignee_id=?";
-      args.add(assignee);
-    }
-    if (from != null) {
-      sql += " and c.created_at>=?";
-      args.add(Timestamp.from(from.atStartOfDay(BusinessTime.KST).toInstant()));
-    }
-    if (to != null) {
-      sql += " and c.created_at<?";
-      args.add(Timestamp.from(to.plusDays(1).atStartOfDay(BusinessTime.KST).toInstant()));
-    }
-    if (from != null && to != null && from.isAfter(to)) throw AnalysisService.invalid();
-    sql += filter.append(args, time.now());
-    String countSource = filter.risk() == null ? ReviewCaseSql.PUBLISHED : ReviewCaseSql.WITH_RISK;
-    long count =
-        jdbc.queryForObject(
-            "select count(*) from " + countSource + " c" + sql, Long.class, args.toArray());
-    if (count == 0)
-      return Map.of(
-          "content", List.of(), "page", page, "size", size, "totalElements", 0L, "totalPages", 0L);
-    args.add(size);
-    args.add((long) page * size);
-    var pageRows =
-        jdbc.queryForList(
-            "select "
-                + ReviewCaseSql.LIST_COLUMNS
-                + ",u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id limit 1) as linked_episode_id from "
-                + ReviewCaseSql.WITH_RISK
-                + " c join core.users u on u.user_id=c.assignee_id"
-                + sql
-                + " order by risk desc,c.created_at desc,case_id desc limit ? offset ?",
-            args.toArray());
-    var content = new ArrayList<Map<String, Object>>();
-    Instant now = time.now();
-    for (var row : pageRows) content.add(listItem(row, now));
-    return Map.of(
-        "content",
-        content,
-        "page",
-        page,
-        "size",
-        size,
-        "totalElements",
-        count,
-        "totalPages",
-        (count + size - 1) / size);
-  }
-
-  /**
-   * 화면 전체 조회: 공개된 모든 사건과 현재 구성 거래를 한 번에 제공한다. 목록 API(list)는 가볍게 유지하고 거래는 이 조회에만 포함한다. 제외(EXCLUDED)된
-   * 거래는 현재 구성이 아니므로 빠진다.
-   */
+  /** 화면이 한 번에 읽는 사건 전체: 사건, 현재 거래, 판정, 거래 편집 이력, Episode 연결. */
   public Map<String, Object> board() {
     time.workbenchOnly();
     Instant now = time.now();
     var members = new HashMap<Long, List<Map<String, Object>>>();
     var txIds = new TreeSet<Long>();
-    for (var m : jdbc.queryForList(BOARD_MEMBERS)) {
-      long caseId = number(m.remove("caseId"));
-      members.computeIfAbsent(caseId, key -> new ArrayList<>()).add(m);
+    for (var m :
+        jdbc.queryForList(
+            """
+            select case_id as "caseId",tx_id as "txId",review_role as "reviewRole",state,decision
+            from review.current_members where state in ('PENDING','DECIDED') order by case_id,tx_id
+            """)) {
+      members.computeIfAbsent(number(m.remove("caseId")), key -> new ArrayList<>()).add(m);
       txIds.add(number(m.get("txId")));
     }
+    var linked = new HashMap<Long, List<Long>>();
+    for (var row :
+        jdbc.queryForList(
+            "select episode_id,alert_id from review.episode_alerts order by alert_id"))
+      linked
+          .computeIfAbsent(number(row.get("episode_id")), key -> new ArrayList<>())
+          .add(number(row.get("alert_id")));
+    var judged = judgments();
+    var edits = edits();
+    // 빠진 거래도 편집 이력에 코드로 보여야 하므로 거래 정보에 포함한다.
+    for (var list : edits.values())
+      for (var edit : list) for (Object tx : (List<?>) edit.get("txIds")) txIds.add(number(tx));
     var cases = new ArrayList<Map<String, Object>>();
     for (var row :
         jdbc.queryForList(
             "select "
                 + ReviewCaseSql.LIST_COLUMNS
-                + ",(c.summary->>'typeShare')::double precision as type_share,u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id limit 1) as linked_episode_id from "
-                + ReviewCaseSql.WITH_RISK
+                + ",c.read_at,(c.summary->>'typeShare')::double precision as type_share,u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id) as linked_episode_id from "
+                + ReviewCaseSql.PUBLISHED
                 + " c join core.users u on u.user_id=c.assignee_id order by c.created_at desc,case_id desc")) {
-      var item = listItem(row, now);
-      object(item.get("summary")).put("typeShare", row.get("type_share"));
-      item.put("members", members.getOrDefault(number(row.get("case_id")), List.of()));
+      long id = number(row.get("case_id"));
+      boolean alert = "ALERT".equals(row.get("kind"));
+      var item = new LinkedHashMap<String, Object>();
+      item.put("caseId", id);
+      item.put("kind", row.get("kind"));
+      item.put("status", row.get("status"));
+      item.put("outcome", row.get("outcome"));
+      item.put("assigneeId", row.get("assignee_id"));
+      item.put("assigneeName", row.get("assignee_name"));
+      item.put("createdAt", instant(row.get("created_at")));
+      item.put("assignedAt", instant(row.get("assigned_at")));
+      item.put("closedAt", instant(row.get("closed_at")));
+      item.put(
+          "ageDays",
+          Math.max(
+              0, Duration.between(((Timestamp) row.get("created_at")).toInstant(), now).toDays()));
+      if (alert) {
+        item.put("readAt", instant(row.get("read_at")));
+        item.put("reviewStartedAt", instant(row.get("review_started_at")));
+        item.put("episodeId", row.get("linked_episode_id"));
+      } else item.put("linkedAlertIds", linked.getOrDefault(id, List.of()));
+      var summary = object(row.get("summary"));
+      for (String key : List.of("pendingCount", "sourceAlertIds", "primaryTypes"))
+        item.put(key, summary.remove(key));
+      summary.put("typeShare", row.get("type_share"));
+      item.put("summary", summary);
+      item.put("members", members.getOrDefault(id, List.of()));
+      item.put("judgment", judged.get(id));
+      item.put("edits", edits.getOrDefault(id, List.of()));
       cases.add(item);
-    }
-    var judged = judgments(cases.stream().map(item -> number(item.get("caseId"))).toList());
-    for (var item : cases) {
-      // 판정 입력 없이 닫힌 사건은 종결 이력을 판정 기록으로 보여 준다. 판정 결과가 없으면 기록도 없다.
-      var judgment = judged.get(number(item.get("caseId")));
-      if (judgment != null && judgment.get("verdict") == null) {
-        if (item.get("outcome") == null) judgment = null;
-        else judgment.put("verdict", item.get("outcome"));
-      }
-      item.put("judgment", judgment);
     }
     var transactions =
         txIds.isEmpty()
             ? List.<Map<String, Object>>of()
             : jdbc.queryForList(BOARD_TRANSACTIONS, (Object) txIds.toArray(Long[]::new));
-    for (var t : transactions)
-      t.put("occurredAt", ((Timestamp) t.get("occurredAt")).toInstant().toString());
-    return Map.of("businessAt", now.toString(), "cases", cases, "transactions", transactions);
+    for (var t : transactions) t.put("occurredAt", instant(t.get("occurredAt")));
+    // 화면이 새 Episode의 ID를 만들기 전에 보여 주므로 번호를 미리 하나 잡아 준다.
+    long nextEpisodeId = jdbc.queryForObject("select nextval('review.case_id')", Long.class);
+    return Map.of(
+        "businessAt",
+        now.toString(),
+        "cases",
+        cases,
+        "transactions",
+        transactions,
+        "nextEpisodeId",
+        nextEpisodeId);
   }
-
-  private static final String BOARD_MEMBERS =
-      """
-      with members as (
-        select m.alert_id as case_id,m.tx_id,m.review_role,m.state,m.decision
-        from review.alert_members m join review.alerts a using(alert_id)
-        join review.alert_transactions t
-          on t.alert_id=a.alert_id and t.version=a.published_version and t.tx_id=m.tx_id
-        where a.merged_into_alert_id is null
-        union all
-        select a.alert_id,t.tx_id,case when t.role='CONTEXT' then 'CONTEXT' else 'SUBJECT' end,'PENDING',null
-        from review.alerts a join review.latest_versions v using(alert_id)
-        join review.alert_transactions t using(alert_id,version)
-        where a.merged_into_alert_id is null
-          and not exists(select 1 from review.alert_groups g where g.alert_id=a.alert_id)
-          and not exists(select 1 from review.alert_members m where m.alert_id=a.alert_id and m.tx_id=t.tx_id)
-        union all
-        select e.episode_id,m.tx_id,m.review_role,m.state,m.decision
-        from review.episode_members m join review.episode_alerts e using(group_id,alert_id)
-      ) select distinct on (case_id,tx_id) case_id as "caseId",tx_id as "txId",
-        review_role as "reviewRole",state,decision
-      from members where state<>'EXCLUDED' order by case_id,tx_id,decision nulls last
-      """;
 
   private static final String BOARD_TRANSACTIONS =
       """
@@ -508,7 +154,8 @@ public class ReviewService {
         f.service_account_id::text as "fromAccountId",r.service_account_id::text as "toAccountId",
         fe.display_name as "fromOwnerName",re.display_name as "toOwnerName",
         t.amount_paid as "amountPaid",t.payment_currency as "paymentCurrency",
-        t.payment_format as "paymentFormat",s.p_laundering as "launderingScore"
+        t.payment_format as "paymentFormat",s.p_laundering as "launderingScore",
+        coalesce(s.p_laundering>=j.threshold_value,false) as "suspicious"
       from ledger.transactions t
       join core.accounts f on f.account_id=t.from_account_id
       join core.accounts r on r.account_id=t.to_account_id
@@ -516,132 +163,114 @@ public class ReviewService {
       join core.owners re on re.owner_id=r.owner_id
       left join analysis.current_scores cs on cs.tx_id=t.tx_id
       left join analysis.scores s on s.run_id=cs.run_id and s.tx_id=cs.tx_id
+      left join analysis.runs ar on ar.run_id=s.run_id
+      left join analysis.jobs j on j.job_id=ar.job_id
       where t.tx_id=any(?::bigint[]) order by t.tx_id
       """;
 
-  private Map<String, Object> listItem(Map<String, Object> c, Instant now) {
-    var out = new LinkedHashMap<String, Object>();
-    boolean alert = "ALERT".equals(c.get("kind"));
-    for (var field :
-        Map.of(
-                "caseId",
-                "case_id",
-                "alertId",
-                "alert_id",
-                "assigneeId",
-                "assignee_id",
-                "assigneeName",
-                "assignee_name",
-                "episodeId",
-                "linked_episode_id",
-                "scopeRevision",
-                "revision")
-            .entrySet()) out.put(field.getKey(), c.get(field.getValue()));
-    for (String key : List.of("kind", "status", "outcome")) out.put(key, c.get(key));
-    out.put(
-        "revision",
-        number(c.get("revision")) * (alert ? 1000000L : 1L)
-            + (alert ? number(c.get("published_version")) : 0L));
-    if (alert) {
-      out.put("publishedVersion", c.get("published_version"));
-      out.put("reviewStartedAt", c.get("review_started_at"));
-      out.put("canonicalAlertId", c.get("alert_id"));
-      out.put("resolution", c.get("outcome"));
-    }
-    for (var field :
-        Map.of("createdAt", "created_at", "assignedAt", "assigned_at", "closedAt", "closed_at")
-            .entrySet()) {
-      var value = (Timestamp) c.get(field.getValue());
-      out.put(field.getKey(), value == null ? null : value.toInstant().toString());
-    }
-    out.put(
-        "ageDays",
-        Math.max(0, Duration.between(((Timestamp) c.get("created_at")).toInstant(), now).toDays()));
-    var summary = object(c.get("summary"));
-    for (String key : List.of("pendingCount", "sourceAlertIds", "primaryTypes"))
-      out.put(key, summary.remove(key));
-    summary.remove("hasScoredSeed");
-    out.put("summary", summary);
+  private static String instant(Object value) {
+    return value == null ? null : ((Timestamp) value).toInstant().toString();
+  }
+
+  /** 사건별 판정 기록. 판정 ID는 J-{업무일 yyMMdd}-{판정 번호 6자리}. */
+  private Map<Long, Map<String, Object>> judgments() {
+    var out = new HashMap<Long, Map<String, Object>>();
+    for (var row :
+        jdbc.queryForList(
+            "select j.*,u.name as reviewer from review.judgments j join core.users u on u.user_id=j.reviewer_id"))
+      out.put(
+          number(row.get("alert_id") == null ? row.get("episode_id") : row.get("alert_id")),
+          judgment(row));
     return out;
   }
 
-  private void updateCase(long id, String assignments, Object... values) {
-    boolean episode = "EPISODE".equals(caseRow(id).get("kind"));
-    var args = new ArrayList<Object>(Arrays.asList(values));
-    args.add(id);
-    jdbc.update(
-        "update "
-            + (episode ? "review.episodes" : "review.alerts")
-            + " set "
-            + assignments
-            + " where "
-            + (episode ? "episode_id" : "alert_id")
-            + "=?",
-        args.toArray());
-    new CaseSummaryStore(jdbc).refresh(id);
+  private static Map<String, Object> judgment(Map<String, Object> row) {
+    Instant at = ((Timestamp) row.get("judged_at")).toInstant();
+    var out = new LinkedHashMap<String, Object>();
+    out.put(
+        "id",
+        "J-"
+            + java.time.format.DateTimeFormatter.ofPattern("yyMMdd")
+                .format(at.atZone(BusinessTime.KST))
+            + "-"
+            + String.format("%06d", number(row.get("judgment_id"))));
+    out.put("verdict", row.get("verdict"));
+    out.put("reasonCategory", row.get("reason_category"));
+    out.put("evidence", row.get("evidence"));
+    out.put("observations", row.get("observations"));
+    out.put("reason", row.get("rationale"));
+    out.put("at", at.toString());
+    out.put("reviewer", row.get("reviewer"));
+    return out;
   }
 
-  private void save(long id, List<Map<String, Object>> gs) {
-    boolean episode = "EPISODE".equals(caseRow(id).get("kind"));
-    for (var g : gs) {
-      long alertId = episode ? number(g.get("sourceAlertId")) : id;
-      if (number(g.get("groupId")) == 0) {
-        long gid =
-            jdbc.queryForObject(
-                episode
-                    ? "insert into review.episode_alerts(episode_id,alert_id,label,alert_version) values(?,?,?,?) returning group_id"
-                    : "insert into review.alert_groups(alert_id,label,evidence_version) values(?,?,?) returning group_id",
-                Long.class,
-                episode
-                    ? new Object[] {id, alertId, g.get("label"), g.get("evidenceVersion")}
-                    : new Object[] {id, g.get("label"), g.get("evidenceVersion")});
-        g.put("groupId", gid);
-      } else {
-        jdbc.update(
-            episode
-                ? "update review.episode_alerts set decision=?,alert_version=?,revision=revision+1 where group_id=? and episode_id=?"
-                : "update review.alert_groups set decision=?,evidence_version=?,revision=revision+1 where group_id=? and alert_id=?",
-            g.get("decision"),
-            g.get("evidenceVersion"),
-            g.get("groupId"),
-            id);
-      }
-      String table = episode ? "review.episode_members" : "review.alert_members";
-      var values = new ArrayList<Object[]>();
-      for (var m : rows(g.get("members"))) {
-        var source = rows(m.get("sources")).getFirst();
-        if (number(source.get("alertId")) != alertId)
-          throw new IllegalStateException("MEMBER_SOURCE_MISMATCH");
-        values.add(
-            new Object[] {
-              g.get("groupId"),
-              alertId,
-              m.get("txId"),
-              source.get("version"),
-              m.get("reviewRole"),
-              m.get("state"),
-              m.get("decision")
-            });
-      }
-      jdbc.batchUpdate(
-          "insert into "
-              + table
-              + "(group_id,alert_id,tx_id,evidence_version,review_role,state,decision) values(?,?,?,?,?,?,?) "
-              + "on conflict(group_id,tx_id) do update set evidence_version=excluded.evidence_version,review_role=excluded.review_role,state=excluded.state,decision=excluded.decision",
-          values);
+  /** Alert별 거래 편집 이력. 거래를 내보낸 Alert와 받은 Alert 양쪽에 같은 기록이 보인다. */
+  private Map<Long, List<Map<String, Object>>> edits() {
+    var out = new HashMap<Long, List<Map<String, Object>>>();
+    for (var row :
+        jdbc.queryForList(
+            "select e.alert_id,e.action,e.comment,e.business_at,e.snapshot::text as snapshot,u.name as editor from review.events e join core.users u on u.user_id=e.actor_id where e.action in ('EXCLUDE','MOVE') order by e.event_id")) {
+      var detail = object(row.get("snapshot"));
+      var edit = new LinkedHashMap<String, Object>();
+      edit.put("action", row.get("action"));
+      edit.put("sourceAlertId", row.get("alert_id"));
+      edit.put("targetAlertId", detail.get("targetAlertId"));
+      edit.put("txIds", detail.get("txIds"));
+      edit.put("reason", row.get("comment"));
+      edit.put("editor", row.get("editor"));
+      edit.put("at", instant(row.get("business_at")));
+      out.computeIfAbsent(number(row.get("alert_id")), key -> new ArrayList<>()).add(edit);
+      if (detail.get("targetAlertId") != null)
+        out.computeIfAbsent(number(detail.get("targetAlertId")), key -> new ArrayList<>())
+            .add(edit);
     }
-    updateCase(id, "revision=revision+1");
+    return out;
   }
 
-  private void event(long id, long user, String action, String comment, Object snapshot) {
-    boolean episode = "EPISODE".equals(caseRow(id).get("kind"));
+  // ---- 공통 확인 ----
+
+  private Map<String, Object> lockAlert(long id) {
+    var found = jdbc.queryForList("select * from review.alerts where alert_id=? for update", id);
+    if (found.isEmpty() || found.getFirst().get("published_version") == null)
+      throw ApiException.notFound("Alert가 없습니다.");
+    var alert = found.getFirst();
+    if (alert.get("merged_into_alert_id") != null)
+      throw ApiException.invalidTransition(
+          "병합된 Alert입니다. 현재 Alert " + alert.get("merged_into_alert_id") + "를 조회하세요.");
+    return alert;
+  }
+
+  private Map<String, Object> lockEpisode(long id) {
+    var found =
+        jdbc.queryForList("select * from review.episodes where episode_id=? for update", id);
+    if (found.isEmpty()) throw ApiException.notFound("Episode가 없습니다.");
+    return found.getFirst();
+  }
+
+  private boolean episode(long id) {
+    return jdbc.queryForObject(
+        "select exists(select 1 from review.episodes where episode_id=?)", Boolean.class, id);
+  }
+
+  private static void open(Map<String, Object> c) {
+    if (!"OPEN".equals(c.get("status")))
+      throw ApiException.invalidTransition("처리 완료된 사건은 변경할 수 없습니다.");
+  }
+
+  private static void assigned(Map<String, Object> c, long user) {
+    if (number(c.get("assignee_id")) != user)
+      throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "담당 직원만 변경할 수 있습니다.");
+  }
+
+  private static String text(String value, int limit, boolean required) {
+    String out = value == null ? "" : value.strip();
+    if ((required && out.isEmpty()) || out.length() > limit) throw AnalysisService.invalid();
+    return out;
+  }
+
+  private void event(
+      boolean episode, long id, long user, String action, String comment, Object snapshot) {
     Timestamp at = Timestamp.from(time.now());
-    if (!episode)
-      jdbc.update(
-          "update review.alerts set review_started_at=coalesce(review_started_at,?),review_started_by=coalesce(review_started_by,?) where alert_id=?",
-          at,
-          user,
-          id);
     jdbc.update(
         "insert into review.events("
             + (episode ? "episode_id" : "alert_id")
@@ -655,612 +284,308 @@ public class ReviewService {
         encode(snapshot));
   }
 
-  private Map<String, Object> moneyScope(long id) {
-    var found =
-        jdbc.queryForList(
-            "select snapshot::text from review.event_history where case_id=? and action='MONEY_SCOPE' order by event_id desc limit 1",
-            id);
-    return found.isEmpty() ? null : object(found.getFirst().get("snapshot"));
+  private void touch(boolean episode, long id) {
+    jdbc.update(
+        "update review."
+            + (episode
+                ? "episodes set revision=revision+1 where episode_id=?"
+                : "alerts set revision=revision+1 where alert_id=?"),
+        id);
+    new CaseSummaryStore(jdbc).refresh(id);
   }
 
-  public Map<String, Object> money(long id, int minutes) {
-    time.workbenchOnly();
-    if (!Set.of(5, 15, 30, 60, 180, 360, 1440).contains(minutes)) throw AnalysisService.invalid();
-    return readTx.execute(
-        s -> {
-          // All facts below share one MVCC snapshot. Reading the current money
-          // view must not queue behind an unrelated upload/publication lock.
-          var c = caseRow(id);
-          if ("CLOSED".equals(c.get("status"))) {
-            var fixed =
-                jdbc.queryForList(
-                    "select snapshot::text from review.event_history where case_id=? and action='MONEY_SNAPSHOT' order by event_id desc limit 1",
-                    id);
-            if (!fixed.isEmpty()) return object(fixed.getFirst().get("snapshot"));
-            return Map.<String, Object>of(
-                "available",
-                false,
-                "reason",
-                "NO_CLOSED_SNAPSHOT",
-                "selectedAccounts",
-                List.of(),
-                "candidateAccounts",
-                List.of(),
-                "delayMinutes",
-                180);
-          }
-          return new MoneyQuery(jdbc, time).read(detail(id), moneyScope(id), minutes);
-        });
-  }
+  // ---- 조사 동작 ----
 
-  public record MoneyScope(UUID requestId, long revision, List<UUID> accounts, String comment) {}
-
-  public Map<String, Object> setMoneyScope(long id, long user, MoneyScope scope) {
+  /** 담당자가 Alert 상세를 처음 연 시각을 남긴다. 담당자가 아니면 아무것도 바꾸지 않는다. */
+  public Map<String, Object> read(long id, long user) {
     actor(user);
-    if (scope.requestId() == null
-        || scope.accounts() == null
-        || scope.accounts().size() > 1000
-        || scope.accounts().stream().anyMatch(Objects::isNull)
-        || scope.comment() == null
-        || scope.comment().isBlank()
-        || scope.comment().length() > 4000) throw AnalysisService.invalid();
     return tx.execute(
         s -> {
-          jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
-          var payload = Map.of("action", "MONEY_SCOPE", "caseId", id, "body", scope);
-          var cached =
-              jdbc.queryForList(
-                  "select payload::text,response::text from review.requests where actor_id=? and request_id=?",
-                  user,
-                  scope.requestId());
-          if (!cached.isEmpty()) {
-            if (!object(cached.getFirst().get("payload")).equals(object(encode(payload))))
-              throw ApiException.invalidTransition("같은 요청 번호의 내용이 다릅니다.");
-            return object(cached.getFirst().get("response"));
-          }
-          var c = caseRow(id);
-          editable(c, user);
-          if (revision(c) != scope.revision())
-            throw ApiException.invalidTransition("사건이 변경됐습니다. 다시 조회하세요.");
-          for (var account : new HashSet<>(scope.accounts()))
-            if (!jdbc.queryForObject(
-                "select exists(select 1 from core.accounts where service_account_id=?)",
-                Boolean.class,
-                account)) throw AnalysisService.invalid();
-          event(id, user, "MONEY_SCOPE", scope.comment(), Map.of("accounts", scope.accounts()));
-          updateCase(id, "revision=revision+1");
-          var response = Map.<String, Object>of("caseId", id, "revision", revision(caseRow(id)));
-          jdbc.update(
-              "insert into review.requests values(?,?,?::jsonb,?::jsonb)",
-              user,
-              scope.requestId(),
-              encode(payload),
-              encode(response));
-          return response;
+          var alert = lockAlert(id);
+          if (alert.get("read_at") == null && number(alert.get("assignee_id")) == user)
+            jdbc.update(
+                "update review.alerts set read_at=? where alert_id=?",
+                Timestamp.from(time.now()),
+                id);
+          return Map.of("caseId", id);
         });
   }
 
-  public record Selection(long caseId, long revision, long groupId, List<Long> txIds) {}
-
-  public record Command(
-      UUID requestId,
-      String action,
-      List<Selection> selections,
-      Long targetCaseId,
-      Long targetRevision,
-      Long targetGroupId,
-      String decision,
-      String comment) {}
-
-  public Map<String, Object> command(long user, Command cmd) {
+  /** 처리 전 Alert를 처리 중으로 바꾼다. */
+  public Map<String, Object> start(long id, long user) {
     actor(user);
-    if (cmd.requestId() == null
-        || cmd.action() == null
-        || cmd.comment() == null
-        || cmd.comment().isBlank()
-        || cmd.comment().length() > 4000
-        || cmd.selections() == null
-        || cmd.selections().isEmpty()
-        || cmd.selections().size() > 100
-        || cmd.selections().stream().anyMatch(Objects::isNull)) throw AnalysisService.invalid();
     return tx.execute(
         s -> {
-          // Shared ordering serializes local clock updates and multi-case writes without deadlocks.
-          jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
-          jdbc.queryForList("select id from ops.business_clock where id for update");
-          var cached =
-              jdbc.queryForList(
-                  "select payload::text,response::text from review.requests where actor_id=? and request_id=?",
-                  user,
-                  cmd.requestId());
-          if (!cached.isEmpty()) {
-            if (!object(cached.getFirst().get("payload")).equals(object(encode(cmd))))
-              throw ApiException.invalidTransition("같은 요청 번호의 내용이 다릅니다.");
-            return object(cached.getFirst().get("response"));
+          var alert = lockAlert(id);
+          open(alert);
+          assigned(alert, user);
+          if (alert.get("review_started_at") == null) {
+            Timestamp at = Timestamp.from(time.now());
+            jdbc.update(
+                "update review.alerts set review_started_at=?,review_started_by=?,read_at=coalesce(read_at,?) where alert_id=?",
+                at,
+                user,
+                at,
+                id);
+            event(false, id, user, "REVIEW_START", "조사 착수", Map.of());
+            touch(false, id);
           }
-          var loaded = new LinkedHashMap<Long, List<Map<String, Object>>>();
-          var cases = new LinkedHashMap<Long, Map<String, Object>>();
-          for (var sel : cmd.selections()) {
-            var c = caseRow(sel.caseId());
-            editable(c, user);
-            if (revision(c) != sel.revision())
-              throw ApiException.invalidTransition("사건이 변경됐습니다. 다시 조회하세요.");
-            cases.put(sel.caseId(), c);
-            loaded.computeIfAbsent(sel.caseId(), id -> groups(c));
-          }
-
-          if ("TRANSFER".equals(cmd.action())) return transferWholeAlerts(user, cmd, cases, loaded);
-          if ("UNLINK".equals(cmd.action())) return unlinkAlerts(user, cmd, cases, loaded);
-          if (Set.of("MOVE", "SPLIT").contains(cmd.action()))
-            throw ApiException.invalidTransition("Alert를 분할하거나 다른 Episode로 부분 이동할 수 없습니다.");
-          for (var sel : cmd.selections()) {
-            var gs = loaded.get(sel.caseId());
-            boolean episode = "EPISODE".equals(cases.get(sel.caseId()).get("kind"));
-            if ("CLOSE".equals(cmd.action()) && cmd.decision() != null) {
-              if (episode
-                  || !Set.of("NORMAL", "SUSPICIOUS").contains(cmd.decision())
-                  || sel.txIds() == null
-                  || !sel.txIds().isEmpty()
-                  || cases.size() != cmd.selections().size()) throw AnalysisService.invalid();
-              var subjects =
-                  all(gs).stream()
-                      .filter(
-                          m ->
-                              "SUBJECT".equals(m.get("reviewRole"))
-                                  && !Set.of("EXCLUDED", "TRANSFERRED").contains(m.get("state")))
-                      .toList();
-              if (subjects.isEmpty()) throw ApiException.invalidTransition("판정할 조사 대상이 없습니다.");
-              event(sel.caseId(), user, "BEFORE_RESOLUTION", cmd.comment(), gs);
-              for (var m : subjects) {
-                m.put("state", "DECIDED");
-                m.put("decision", cmd.decision());
-              }
-            }
-            if (Set.of("CLOSE", "COMMENT", "REVIEW_START").contains(cmd.action())) continue;
-            var g =
-                gs.stream()
-                    .filter(x -> number(x.get("groupId")) == sel.groupId())
-                    .findFirst()
-                    .orElseThrow(AnalysisService::invalid);
-            var members = rows(g.get("members"));
-            if (sel.txIds() == null
-                || sel.txIds().isEmpty()
-                || new HashSet<>(sel.txIds()).size() != sel.txIds().size())
-              throw AnalysisService.invalid();
-            var selected =
-                members.stream().filter(m -> sel.txIds().contains(number(m.get("txId")))).toList();
-            if (selected.size() != sel.txIds().size()
-                || selected.stream()
-                    .anyMatch(
-                        m ->
-                            !"PENDING".equals(m.get("state"))
-                                && !(("RECONSIDER".equals(cmd.action())
-                                        || (!episode && "EXCLUDE".equals(cmd.action())))
-                                    && "DECIDED".equals(m.get("state")))))
-              throw ApiException.invalidTransition("선택 범위에 이미 처리된 거래가 있습니다.");
-            if ("DECIDE".equals(cmd.action())) {
-              if (!Set.of("NORMAL", "SUSPICIOUS").contains(Objects.toString(cmd.decision(), "")))
-                throw AnalysisService.invalid();
-              if (selected.stream().anyMatch(m -> !"SUBJECT".equals(m.get("reviewRole"))))
-                throw AnalysisService.invalid();
-              if (episode
-                  && members.stream()
-                          .filter(
-                              m ->
-                                  "SUBJECT".equals(m.get("reviewRole"))
-                                      && "PENDING".equals(m.get("state")))
-                          .count()
-                      != selected.size())
-                throw ApiException.invalidTransition(
-                    "Episode는 묶음 단위로 판정합니다. 다른 결론이 필요하면 먼저 분리하세요.");
-              for (var m : selected) {
-                m.put("state", "DECIDED");
-                m.put("decision", cmd.decision());
-              }
-              if (episode) g.put("decision", cmd.decision());
-            } else if ("RECONSIDER".equals(cmd.action())) {
-              if (!episode) throw AnalysisService.invalid();
-              for (var m : members)
-                if ("DECIDED".equals(m.get("state"))) {
-                  m.put("state", "PENDING");
-                  m.put("decision", null);
-                }
-              g.put("decision", null);
-            } else if ("EXCLUDE".equals(cmd.action())) {
-              event(sel.caseId(), user, "BEFORE_EXCLUDE", cmd.comment(), gs);
-              selected.forEach(m -> m.put("state", "EXCLUDED"));
-            } else if ("SUBJECT".equals(cmd.action()) || "CONTEXT".equals(cmd.action()))
-              selected.forEach(m -> m.put("reviewRole", cmd.action()));
-            else throw AnalysisService.invalid();
-          }
-          for (var entry : loaded.entrySet()) {
-            long id = entry.getKey();
-            var gs = entry.getValue();
-            if ("CLOSE".equals(cmd.action())) close(id, user, gs);
-            else if (!Set.of(
-                    "COMMENT",
-                    "REVIEW_START",
-                    "DECIDE",
-                    "EXCLUDE",
-                    "SUBJECT",
-                    "CONTEXT",
-                    "RECONSIDER")
-                .contains(cmd.action())) throw AnalysisService.invalid();
-            save(id, gs);
-            event(id, user, cmd.action(), cmd.comment(), gs);
-          }
-          var response = new LinkedHashMap<String, Object>();
-          response.put("caseIds", loaded.keySet());
-          // TRANSFER returns earlier; other commands keep the documented null target.
-          response.put("targetCaseId", null);
-          jdbc.update(
-              "insert into review.requests values(?,?,?::jsonb,?::jsonb)",
-              user,
-              cmd.requestId(),
-              encode(cmd),
-              encode(response));
-          return response;
+          return Map.of("caseId", id);
         });
   }
 
-  /** 새 화면의 판정 입력. reasonCategory와 근거·관찰·사유를 판정 기록(JUDGMENT 이력)으로 남긴다. */
   public record Judgment(
-      UUID requestId,
-      Long revision,
       String verdict,
       String reasonCategory,
       String evidence,
       String observations,
       String rationale) {}
 
-  private static final Set<String> REASON_CATEGORIES =
-      Set.of("pattern", "rule", "normal-business", "etc");
-
-  private static boolean judgmentText(String value) {
-    return value != null && !value.isBlank() && value.length() <= 2000;
-  }
-
-  /**
-   * 사건 하나를 정상/의심으로 판정하고 종결한다. Alert는 CLOSE(decision), Episode는 미판정 묶음을 같은 결론으로 DECIDE한 뒤 CLOSE하며 기존
-   * 명령 규칙(담당자·revision·상충 판정 409)을 그대로 따른다. 전체가 한 트랜잭션이다.
-   */
+  /** 사건 하나에 판정을 한 번 남기고 처리 완료로 닫는다. */
   public Map<String, Object> judge(long id, long user, Judgment in) {
+    actor(user);
     if (in == null
-        || in.requestId() == null
-        || in.revision() == null
         || !Set.of("NORMAL", "SUSPICIOUS").contains(Objects.toString(in.verdict(), ""))
-        || !REASON_CATEGORIES.contains(Objects.toString(in.reasonCategory(), ""))
-        || !judgmentText(in.evidence())
-        || !judgmentText(in.observations())
-        || !judgmentText(in.rationale())) throw AnalysisService.invalid();
+        || !REASON_CATEGORIES.contains(Objects.toString(in.reasonCategory(), "")))
+      throw AnalysisService.invalid();
+    String evidence = text(in.evidence(), JUDGMENT_TEXT_LIMIT, false);
+    String observations = text(in.observations(), JUDGMENT_TEXT_LIMIT, false);
+    String rationale = text(in.rationale(), JUDGMENT_TEXT_LIMIT, true);
     return tx.execute(
         s -> {
-          var replay =
-              jdbc.queryForList(
-                  "select event_id from review.event_history where case_id=? and action='JUDGMENT' and actor_id=? and snapshot->>'requestId'=?",
+          boolean episode = episode(id);
+          var c = episode ? lockEpisode(id) : lockAlert(id);
+          open(c);
+          assigned(c, user);
+          if (!episode && c.get("review_started_at") == null)
+            throw ApiException.invalidTransition("처리 중 상태로 바꾼 뒤 판정할 수 있습니다.");
+          Timestamp at = Timestamp.from(time.now());
+          long judgment =
+              jdbc.queryForObject(
+                  "insert into review.judgments("
+                      + (episode ? "episode_id" : "alert_id")
+                      + ",verdict,reason_category,evidence,observations,rationale,reviewer_id,judged_at) values(?,?,?,?,?,?,?,?) returning judgment_id",
+                  Long.class,
                   id,
+                  in.verdict(),
+                  in.reasonCategory(),
+                  evidence,
+                  observations,
+                  rationale,
                   user,
-                  in.requestId().toString());
-          if (!replay.isEmpty()) return judgments(List.of(id)).get(id);
-          var c = caseRow(id);
-          int step = 0;
-          if ("EPISODE".equals(c.get("kind"))) {
-            editable(c, user);
-            if (revision(c) != in.revision())
-              throw ApiException.invalidTransition("사건이 변경됐습니다. 다시 조회하세요.");
-            for (var g : groups(c)) {
-              var pending =
-                  rows(g.get("members")).stream()
-                      .filter(
-                          m ->
-                              "SUBJECT".equals(m.get("reviewRole"))
-                                  && "PENDING".equals(m.get("state")))
-                      .map(m -> number(m.get("txId")))
-                      .toList();
-              if (pending.isEmpty()) continue;
-              command(
-                  user,
-                  new Command(
-                      subRequest(in.requestId(), step++),
-                      "DECIDE",
-                      List.of(
-                          new Selection(
-                              id, revision(caseRow(id)), number(g.get("groupId")), pending)),
-                      null,
-                      null,
-                      null,
-                      in.verdict(),
-                      in.rationale()));
-            }
-          }
-          boolean episode = "EPISODE".equals(c.get("kind"));
-          command(
+                  at);
+          jdbc.update(
+              "update review."
+                  + (episode ? "episodes" : "alerts")
+                  + " set status='CLOSED',outcome=?,closed_at=?,closed_by=? where "
+                  + (episode ? "episode_id" : "alert_id")
+                  + "=?",
+              in.verdict(),
+              at,
               user,
-              new Command(
-                  subRequest(in.requestId(), step),
-                  "CLOSE",
-                  List.of(
-                      new Selection(
-                          id, episode ? revision(caseRow(id)) : in.revision(), 0, List.of())),
-                  null,
-                  null,
-                  null,
-                  episode ? null : in.verdict(),
-                  in.rationale()));
-          var record = new LinkedHashMap<String, Object>();
-          record.put("requestId", in.requestId().toString());
-          record.put("verdict", in.verdict());
-          record.put("reasonCategory", in.reasonCategory());
-          record.put("evidence", in.evidence().strip());
-          record.put("observations", in.observations().strip());
-          event(id, user, "JUDGMENT", in.rationale().strip(), record);
-          return judgments(List.of(id)).get(id);
+              id);
+          event(
+              episode,
+              id,
+              user,
+              "CLOSE",
+              rationale,
+              Map.of("judgmentId", judgment, "verdict", in.verdict()));
+          touch(episode, id);
+          return judgment(
+              jdbc.queryForMap(
+                  "select j.*,u.name as reviewer from review.judgments j join core.users u on u.user_id=j.reviewer_id where j.judgment_id=?",
+                  judgment));
         });
   }
 
-  private static UUID subRequest(UUID requestId, int step) {
-    return UUID.nameUUIDFromBytes(
-        (requestId + ":" + step).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  public record TransactionEdit(List<Long> txIds, Long targetAlertId, String reason) {}
+
+  /** 열린 Alert에서 거래를 제외하거나 다른 열린 Alert로 옮긴다. 직원은 자기 Alert만, 관리자는 모든 열린 Alert를 고친다. */
+  public Map<String, Object> editTransactions(long id, long user, TransactionEdit in) {
+    boolean admin = "ADMIN".equals(actor(user).get("role"));
+    if (in == null
+        || in.txIds() == null
+        || in.txIds().isEmpty()
+        || in.txIds().stream().anyMatch(java.util.Objects::isNull)
+        || new HashSet<>(in.txIds()).size() != in.txIds().size()
+        || Objects.equals(in.targetAlertId(), id)) throw AnalysisService.invalid();
+    String reason = text(in.reason(), EDIT_REASON_LIMIT, true);
+    return tx.execute(
+        s -> {
+          // 두 Alert를 번호 순서로 잠가 서로 기다리는 일이 없게 한다.
+          var locked = new TreeMap<Long, Map<String, Object>>();
+          for (long alert :
+              new TreeSet<>(
+                  Arrays.asList(id, in.targetAlertId() == null ? id : in.targetAlertId()))) {
+            var row = lockAlert(alert);
+            open(row);
+            if (!admin) assigned(row, user);
+            if (jdbc.queryForObject(
+                "select exists(select 1 from review.episode_alerts where alert_id=?)",
+                Boolean.class,
+                alert)) throw ApiException.invalidTransition("Episode에 묶인 Alert는 변경할 수 없습니다.");
+            locked.put(alert, row);
+          }
+          // 현재 이 Alert에 남아 있는 거래와 그 거래의 원래 Alert.
+          var origins = new HashMap<Long, Long>();
+          for (var row :
+              jdbc.queryForList(
+                  "select tx_id,alert_id from review.current_members where case_id=? and state='PENDING'",
+                  id)) origins.put(number(row.get("tx_id")), number(row.get("alert_id")));
+          if (!origins.keySet().containsAll(in.txIds()))
+            throw ApiException.invalidTransition("선택한 거래가 이 Alert의 현재 구성에 없습니다. 다시 조회해 주세요.");
+          Timestamp at = Timestamp.from(time.now());
+          for (long txId : in.txIds()) {
+            long origin = origins.get(txId);
+            if (Objects.equals(in.targetAlertId(), origin))
+              // 원래 Alert로 되돌리면 편집 기록이 필요 없다.
+              jdbc.update(
+                  "delete from review.alert_tx_edits where alert_id=? and tx_id=?", origin, txId);
+            else
+              jdbc.update(
+                  """
+                  insert into review.alert_tx_edits(alert_id,tx_id,target_alert_id,reason,editor_id,edited_at)
+                  values(?,?,?,?,?,?) on conflict(alert_id,tx_id) do update set
+                    target_alert_id=excluded.target_alert_id,reason=excluded.reason,
+                    editor_id=excluded.editor_id,edited_at=excluded.edited_at
+                  """,
+                  origin,
+                  txId,
+                  in.targetAlertId(),
+                  reason,
+                  user,
+                  at);
+          }
+          var snapshot = new LinkedHashMap<String, Object>();
+          snapshot.put("txIds", in.txIds());
+          snapshot.put("targetAlertId", in.targetAlertId());
+          event(false, id, user, in.targetAlertId() == null ? "EXCLUDE" : "MOVE", reason, snapshot);
+          for (long alert : locked.keySet()) touch(false, alert);
+          return Map.of("caseId", id, "txIds", in.txIds());
+        });
   }
 
-  /** 사건별 최신 판정 기록. 판정 입력이 없으면 종결 이력을 쓴다. 판정 ID는 J-{업무일 yyMMdd}-{이력 번호 6자리}. */
-  private Map<Long, Map<String, Object>> judgments(Collection<Long> caseIds) {
-    var out = new HashMap<Long, Map<String, Object>>();
-    if (caseIds.isEmpty()) return out;
-    for (var row :
-        jdbc.queryForList(
-            "select distinct on (e.case_id) e.case_id,e.event_id,e.action,e.comment,e.business_at,e.snapshot::text as snapshot,u.name as reviewer from review.event_history e left join core.users u on u.user_id=e.actor_id where e.action in ('JUDGMENT','CLOSE') and e.case_id=any(?::bigint[]) order by e.case_id,(e.action='JUDGMENT') desc,e.event_id desc",
-            (Object) caseIds.toArray(Long[]::new))) {
-      var detail =
-          "JUDGMENT".equals(row.get("action"))
-              ? object(row.get("snapshot"))
-              : Map.<String, Object>of();
-      Instant at = ((Timestamp) row.get("business_at")).toInstant();
-      var judgment = new LinkedHashMap<String, Object>();
-      judgment.put(
-          "id",
-          "J-"
-              + java.time.format.DateTimeFormatter.ofPattern("yyMMdd")
-                  .format(at.atZone(BusinessTime.KST))
-              + "-"
-              + String.format("%06d", number(row.get("event_id"))));
-      judgment.put("verdict", detail.get("verdict"));
-      judgment.put("reasonCategory", detail.get("reasonCategory"));
-      judgment.put("evidence", detail.get("evidence"));
-      judgment.put("observations", detail.get("observations"));
-      judgment.put("reason", row.get("comment"));
-      judgment.put("at", at.toString());
-      judgment.put("reviewer", row.get("reviewer"));
-      out.put(number(row.get("case_id")), judgment);
-    }
-    return out;
+  /** episodeId는 새 Episode를 만들 때만 쓴다. 목록 조회가 미리 잡아 준 번호다. */
+  public record EpisodeChange(List<Long> alertIds, String reason, Long episodeId) {}
+
+  private List<Long> alertIds(EpisodeChange in) {
+    if (in == null
+        || in.alertIds() == null
+        || in.alertIds().isEmpty()
+        || in.alertIds().stream().anyMatch(java.util.Objects::isNull)
+        || new HashSet<>(in.alertIds()).size() != in.alertIds().size())
+      throw AnalysisService.invalid();
+    return new ArrayList<>(new TreeSet<>(in.alertIds()));
   }
 
-  private Map<String, Object> unlinkAlerts(
-      long user,
-      Command cmd,
-      Map<Long, Map<String, Object>> cases,
-      Map<Long, List<Map<String, Object>>> loaded) {
-    if (cases.size() != 1
-        || cmd.targetCaseId() != null
-        || cmd.targetRevision() != null
-        || cmd.targetGroupId() != null
-        || cmd.decision() != null) throw AnalysisService.invalid();
-    var c = cases.values().iterator().next();
-    if (!"EPISODE".equals(c.get("kind"))) throw AnalysisService.invalid();
-    long id = number(c.get("case_id"));
-    var current = loaded.get(id);
-    var selectedGroups = new HashSet<Long>();
-    for (var selection : cmd.selections()) {
-      if (selection.txIds() == null
-          || !selection.txIds().isEmpty()
-          || !selectedGroups.add(selection.groupId())
-          || current.stream()
-              .noneMatch(
-                  g ->
-                      number(g.get("groupId")) == selection.groupId()
-                          && g.get("sourceAlertId") != null)) throw AnalysisService.invalid();
-    }
-    boolean dissolve = current.size() - selectedGroups.size() < 2;
-    var removed =
-        current.stream()
-            .filter(g -> dissolve || selectedGroups.contains(number(g.get("groupId"))))
-            .toList();
-    var selectedAlerts =
-        current.stream()
-            .filter(g -> selectedGroups.contains(number(g.get("groupId"))))
-            .map(g -> number(g.get("sourceAlertId")))
-            .toList();
-    var removedAlerts = removed.stream().map(g -> number(g.get("sourceAlertId"))).toList();
-    var reopened = new ArrayList<Long>();
-    // Snapshot before deleting active groups. Past decisions remain in review_events,
-    // and are never copied over the source Alert's own investigation decisions.
-    var snapshot =
-        Map.of(
-            "selectedAlertIds",
-            selectedAlerts,
-            "removedAlertIds",
-            removedAlerts,
-            "groups",
-            removed);
-    if (dissolve) {
-      event(
-          id,
-          user,
-          "MONEY_SNAPSHOT",
-          "Episode 해체 시점 자금 관측 지표",
-          new MoneyQuery(jdbc, time).read(detail(id), moneyScope(id), 180));
-    }
-    event(id, user, dissolve ? "DISSOLVE" : "UNLINK", cmd.comment(), snapshot);
-    for (var group : removed) {
-      long alertId = number(group.get("sourceAlertId"));
-      long source =
-          jdbc.queryForObject(
-              "select case_id from review.cases where alert_id=?", Long.class, alertId);
-      var sourceCase = caseRow(source);
-      if (!"CLOSED".equals(sourceCase.get("status"))
-          || !"TRANSFERRED".equals(sourceCase.get("outcome")))
-        throw ApiException.invalidTransition("원본 Alert 상태가 변경됐습니다. 다시 조회하세요.");
-      jdbc.update(
-          "delete from review.episode_alerts where group_id=? and episode_id=?",
-          group.get("groupId"),
-          id);
-      updateCase(
-          source, "status='OPEN',outcome=null,closed_at=null,closed_by=null,revision=revision+1");
-      event(
-          source,
-          user,
-          "UNLINK",
-          cmd.comment(),
-          Map.of("episodeCaseId", id, "dissolved", dissolve, "groups", List.of(group)));
-      reopened.add(source);
-    }
-    if (dissolve) {
-      updateCase(
-          id,
-          "status='CLOSED',outcome='DISSOLVED',closed_at=?,closed_by=?,revision=revision+1",
-          Timestamp.from(time.now()),
-          user);
-    } else {
-      updateCase(id, "revision=revision+1");
-    }
-    var affected = new ArrayList<Long>();
-    affected.add(id);
-    affected.addAll(reopened);
-    var response = new LinkedHashMap<String, Object>();
-    response.put("caseIds", affected);
-    response.put("targetCaseId", null);
-    response.put("dissolved", dissolve);
-    response.put("reopenedCaseIds", reopened);
-    jdbc.update(
-        "insert into review.requests values(?,?,?::jsonb,?::jsonb)",
-        user,
-        cmd.requestId(),
-        encode(cmd),
-        encode(response));
-    return response;
+  /** 내 담당의 열린 미판정 Alert를 Episode에 넣는다. episodeId가 없으면 새 Episode를 만든다(2건 이상). */
+  public Map<String, Object> linkAlerts(Long episodeId, long user, EpisodeChange in) {
+    actor(user);
+    var alertIds = alertIds(in);
+    String reason = text(in.reason(), EPISODE_REASON_LIMIT, true);
+    if (episodeId == null && alertIds.size() < 2)
+      throw ApiException.invalidTransition("새 Episode는 Alert가 2건 이상 필요합니다.");
+    return tx.execute(
+        s -> {
+          Timestamp at = Timestamp.from(time.now());
+          long episode;
+          if (episodeId == null) {
+            if (in.episodeId() == null)
+              episode =
+                  jdbc.queryForObject(
+                      "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,?,?) returning episode_id",
+                      Long.class,
+                      user,
+                      at,
+                      at);
+            else {
+              // 미리 잡아 둔 번호만 받는다. 이미 쓰였거나 발급된 적 없는 번호는 거절한다.
+              if (!jdbc.queryForObject(
+                  "select ?<=(select last_value from review.case_id) and not exists(select 1 from review.cases where case_id=?)",
+                  Boolean.class,
+                  in.episodeId(),
+                  in.episodeId()))
+                throw ApiException.invalidTransition("생성 예정 ID가 바뀌었습니다. 내용을 다시 확인해 주세요.");
+              jdbc.update(
+                  "insert into review.episodes(episode_id,assignee_id,created_at,assigned_at) values(?,?,?,?)",
+                  in.episodeId(),
+                  user,
+                  at,
+                  at);
+              episode = in.episodeId();
+            }
+          } else {
+            open(lockEpisode(episodeId));
+            episode = episodeId;
+          }
+          for (long alertId : alertIds) {
+            var alert = lockAlert(alertId);
+            if (!"OPEN".equals(alert.get("status")) || number(alert.get("assignee_id")) != user)
+              throw ApiException.invalidTransition("내 담당 진행 중 Alert를 다시 선택해 주세요.");
+            jdbc.update(
+                "insert into review.episode_alerts(alert_id,episode_id,alert_version) values(?,?,?)",
+                alertId,
+                episode,
+                alert.get("published_version"));
+            jdbc.update(
+                "update review.alerts set status='CLOSED',outcome='TRANSFERRED',closed_at=?,closed_by=? where alert_id=?",
+                at,
+                user,
+                alertId);
+            event(false, alertId, user, "TRANSFER", reason, Map.of("episodeId", episode));
+            touch(false, alertId);
+          }
+          event(true, episode, user, "TRANSFER", reason, Map.of("alertIds", alertIds));
+          touch(true, episode);
+          return Map.of("episodeId", episode, "alertIds", alertIds);
+        });
   }
 
-  private Map<String, Object> transferWholeAlerts(
-      long user,
-      Command cmd,
-      Map<Long, Map<String, Object>> cases,
-      Map<Long, List<Map<String, Object>>> loaded) {
-    if (cmd.targetGroupId() != null
-        || cmd.decision() != null
-        || cases.size() != cmd.selections().size()) throw AnalysisService.invalid();
-    if (cmd.targetCaseId() == null && cases.size() < 2)
-      throw ApiException.invalidTransition("새 Episode에는 서로 다른 Alert가 2개 이상 필요합니다.");
-    for (var sel : cmd.selections()) {
-      var c = cases.get(sel.caseId());
-      if (!"ALERT".equals(c.get("kind"))) throw AnalysisService.invalid();
-      var members = all(loaded.get(sel.caseId()));
-      var ids = new HashSet<Long>();
-      for (var m : members) ids.add(number(m.get("txId")));
-      // Empty selection explicitly means the entire Alert; a supplied list must
-      // contain every member, including context and previously reviewed rows.
-      if (sel.txIds() == null
-          || (!sel.txIds().isEmpty()
-              && (sel.txIds().size() != ids.size() || !ids.equals(new HashSet<>(sel.txIds())))))
-        throw ApiException.invalidTransition("거래 일부가 아닌 Alert 전체를 선택하세요.");
-      if (members.isEmpty()
-          || members.stream().anyMatch(m -> "TRANSFERRED".equals(m.get("state")))
-          || jdbc.queryForObject(
-              "select exists(select 1 from review.episode_alerts where alert_id=?)",
-              Boolean.class,
-              c.get("alert_id")))
-        throw ApiException.invalidTransition("이미 편입됐거나 이관할 수 없는 Alert입니다.");
-    }
-    long target;
-    if (cmd.targetCaseId() == null) {
-      long assignee = StaffAssignment.next(jdbc);
-      target =
-          jdbc.queryForObject(
-              "insert into review.episodes(assignee_id,created_at,assigned_at) values(?,?,?) returning episode_id",
-              Long.class,
-              assignee,
-              Timestamp.from(time.now()),
-              Timestamp.from(time.now()));
-    } else {
-      target = cmd.targetCaseId();
-      var dest = caseRow(target);
-      if (!"EPISODE".equals(dest.get("kind"))
-          || !"OPEN".equals(dest.get("status"))
-          || cmd.targetRevision() == null
-          || revision(dest) != cmd.targetRevision())
-        throw ApiException.invalidTransition("목적지 상태/버전이 변경됐습니다.");
-    }
-    var destination = groups(caseRow(target));
-    for (var c : cases.values()) {
-      long id = number(c.get("case_id")), alertId = number(c.get("alert_id"));
-      var source = loaded.get(id);
-      var members = copy(all(source));
-      int version = ((Number) source.getFirst().get("evidenceVersion")).intValue();
-      var group = new LinkedHashMap<String, Object>();
-      group.put("groupId", 0L);
-      group.put("sourceAlertId", alertId);
-      group.put("label", "Alert " + alertId);
-      group.put("evidenceVersion", version);
-      group.put("members", members);
-      // Keep the original review snapshot, including context/exclusions/decisions.
-      // Each source Alert remains one group; shared transactions are not merged.
-      save(target, new ArrayList<>(List.of(group)));
-      destination.add(group);
-      var snapshot = new MoneyQuery(jdbc, time).read(detail(id), moneyScope(id), 180);
-      event(id, user, "MONEY_SNAPSHOT", "Episode 편입 시점 자금 관측 지표", snapshot);
-      // The Alert remains a whole visible block; only its case disposition changes.
-      save(id, source);
-      updateCase(
-          id,
-          "status='CLOSED',outcome='TRANSFERRED',closed_at=?,closed_by=?",
-          Timestamp.from(time.now()),
-          user);
-      event(id, user, "TRANSFER", cmd.comment(), Map.of("targetCaseId", target, "groups", source));
-    }
-    event(target, user, "TRANSFER", cmd.comment(), destination);
-    var response = new LinkedHashMap<String, Object>();
-    response.put("caseIds", cases.keySet());
-    response.put("targetCaseId", target);
-    jdbc.update(
-        "insert into review.requests values(?,?,?::jsonb,?::jsonb)",
-        user,
-        cmd.requestId(),
-        encode(cmd),
-        encode(response));
-    return response;
-  }
-
-  private void close(long id, long user, List<Map<String, Object>> gs) {
-    var members = all(gs);
-    if (members.stream()
-        .anyMatch(m -> "SUBJECT".equals(m.get("reviewRole")) && "PENDING".equals(m.get("state"))))
-      throw ApiException.invalidTransition("미판정 조사 대상이 남아 있습니다.");
-    var decided = members.stream().filter(m -> "DECIDED".equals(m.get("state"))).toList();
-    var verdicts = new HashMap<Long, String>();
-    for (var m : decided) {
-      String previous = verdicts.putIfAbsent(number(m.get("txId")), m.get("decision").toString());
-      if (previous != null && !previous.equals(m.get("decision")))
-        throw ApiException.invalidTransition("같은 거래의 묶음 판정이 상충합니다. 범위를 재검토하세요.");
-    }
-    boolean transferred =
-        members.stream()
-            .anyMatch(
-                m ->
-                    "TRANSFERRED".equals(m.get("state"))
-                        && !Boolean.TRUE.equals(m.get("internalMove")));
-    String result =
-        decided.stream().anyMatch(m -> "SUSPICIOUS".equals(m.get("decision")))
-            ? "SUSPICIOUS"
-            : decided.isEmpty()
-                ? (transferred ? "TRANSFERRED" : "SCOPE_CLEARED")
-                : transferred && "ALERT".equals(caseRow(id).get("kind")) ? "MIXED" : "NORMAL";
-    var snapshot = new MoneyQuery(jdbc, time).read(detail(id), moneyScope(id), 180);
-    event(id, user, "MONEY_SNAPSHOT", "종결 시점 자금 관측 지표", snapshot);
-    updateCase(
-        id,
-        "status='CLOSED',outcome=?,closed_at=?,closed_by=?",
-        result,
-        Timestamp.from(time.now()),
-        user);
+  /** Episode 담당자가 Alert 연결을 푼다. 남는 Alert가 2건보다 적으면 Episode를 해체하고 모두 되돌린다. */
+  public Map<String, Object> unlinkAlerts(long episodeId, long user, EpisodeChange in) {
+    actor(user);
+    var alertIds = alertIds(in);
+    String reason = text(in.reason(), EPISODE_REASON_LIMIT, true);
+    return tx.execute(
+        s -> {
+          var episode = lockEpisode(episodeId);
+          open(episode);
+          assigned(episode, user);
+          var linked =
+              jdbc.queryForList(
+                  "select alert_id from review.episode_alerts where episode_id=? order by alert_id",
+                  Long.class,
+                  episodeId);
+          if (!linked.containsAll(alertIds))
+            throw ApiException.invalidTransition("연결된 Alert를 다시 선택해 주세요.");
+          boolean dissolve = linked.size() - alertIds.size() < 2;
+          var released = dissolve ? linked : alertIds;
+          Timestamp at = Timestamp.from(time.now());
+          for (long alertId : released) {
+            jdbc.queryForList("select 1 from review.alerts where alert_id=? for update", alertId);
+            jdbc.update("delete from review.episode_alerts where alert_id=?", alertId);
+            jdbc.update(
+                "update review.alerts set status='OPEN',outcome=null,closed_at=null,closed_by=null where alert_id=?",
+                alertId);
+            event(false, alertId, user, "UNLINK", reason, Map.of("episodeId", episodeId));
+            touch(false, alertId);
+          }
+          if (dissolve)
+            jdbc.update(
+                "update review.episodes set status='CLOSED',outcome='DISSOLVED',closed_at=?,closed_by=? where episode_id=?",
+                at,
+                user,
+                episodeId);
+          event(
+              true,
+              episodeId,
+              user,
+              dissolve ? "DISSOLVE" : "UNLINK",
+              reason,
+              Map.of("alertIds", released));
+          touch(true, episodeId);
+          return Map.of("episodeId", episodeId, "alertIds", released, "dissolved", dissolve);
+        });
   }
 }

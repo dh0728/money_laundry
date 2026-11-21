@@ -67,9 +67,9 @@ class LifecycleTests(unittest.TestCase):
     def test_scores_and_facts_change_without_membership_change(self):
         old = evidence([1], [2])
         new = evidence([1], [2], facts='amount or selected score changed')
-        for started, action in ((False, Action.UPDATE), (True, Action.PROPOSE)):
+        for started in (False, True):
             plan, = self.plans([case(8, old, started=started)], [new])
-            self.assertEqual(plan.action, action)
+            self.assertEqual(plan.action, Action.UPDATE)
 
     def test_new_evidence_updates_one_unstarted_case(self):
         plan, = self.plans([case(8, evidence([1], [2]))], [evidence([1], [2, 3])])
@@ -82,11 +82,11 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(plan.action, Action.UPDATE)
         self.assertEqual(plan.recipient_ids, (7,))
 
-    def test_corrected_fact_removal_still_requires_investigator_approval(self):
+    def test_corrected_fact_removal_updates_investigated_case_at_once(self):
         plan, = self.plans([case(8, evidence([1], [2], [3]), started=True)],
                           [evidence([1], [2])],
                           validity=Validity(frozenset({3}), frozenset({3})))
-        self.assertEqual(plan.action, Action.PROPOSE)
+        self.assertEqual(plan.action, Action.UPDATE)
         self.assertEqual(plan.reason, 'REPORT_CORRECTED')
 
     def test_merge_keeps_earliest_creation_not_smallest_id_and_both_owners(self):
@@ -105,10 +105,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(plan.target_alert_id, 10)
         self.assertEqual(plan.recipient_ids, (7,))
 
-    def test_one_investigation_protects_entire_component_from_copying(self):
+    def test_investigated_case_merges_at_once(self):
         plan, = self.plans([case(1, evidence([1], [2]), started=True),
                             case(2, evidence([3], [4]))], [evidence([1, 3], [2, 4])])
-        self.assertEqual(plan.action, Action.PROPOSE)
+        self.assertEqual(plan.action, Action.MERGE)
         self.assertEqual(plan.case_ids, (1, 2))
 
     def test_split_graphs_touching_one_case_produce_one_operation(self):
@@ -230,11 +230,11 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(plan.action, Action.NOOP)
         self.assertEqual(plan.invalid_tx_ids, frozenset())
 
-    def test_complete_correction_withdraws_unstarted_and_proposes_started(self):
+    def test_complete_correction_withdraws_whether_or_not_started(self):
         validity = Validity(frozenset({1, 2}), frozenset({2}))
-        for started, expected in ((False, Action.WITHDRAW), (True, Action.PROPOSE)):
+        for started in (False, True):
             plan, = self.plans([case(1, evidence([1], [2]), started=started)], [], validity=validity)
-            self.assertEqual(plan.action, expected)
+            self.assertEqual(plan.action, Action.WITHDRAW)
             self.assertEqual(plan.reason, 'EVIDENCE_WITHDRAWN')
 
     def test_incomplete_core_checks_cannot_auto_withdraw(self):
@@ -243,10 +243,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(plan.action, Action.NOOP)
         self.assertEqual(plan.reason, 'INCOMPLETE_VALIDITY')
 
-    def test_score_decline_is_proposal_not_report_withdrawal_even_unstarted(self):
+    def test_score_decline_updates_and_is_not_report_withdrawal(self):
         plan, = self.plans([case(1, evidence([1], [2]))], [],
                            validity=Validity(reassessment_ids=frozenset({1})))
-        self.assertEqual(plan.action, Action.PROPOSE)
+        self.assertEqual(plan.action, Action.UPDATE)
         self.assertEqual(plan.reason, 'SCORE_OR_POLICY_REASSESSMENT')
 
     def test_partial_correction_with_remaining_relation_updates_without_split(self):
@@ -329,7 +329,7 @@ class LifecycleTests(unittest.TestCase):
         invalid_cases = [
             ([old, old], [graph], {}),
             ([replace(old, created_at=NOW.replace(tzinfo=None))], [graph], {}),
-            ([replace(old, excluded_tx_ids=frozenset({1}))], [graph], {}),
+            ([replace(old, excluded_tx_ids=frozenset({9}))], [graph], {}),
             ([replace(old, merged_into_alert_id=1)], [graph], {}),
             ([replace(old, merged_into_alert_id=2)], [graph], {}),
             ([replace(old, ancestor_ids=frozenset({1}))], [graph], {}),

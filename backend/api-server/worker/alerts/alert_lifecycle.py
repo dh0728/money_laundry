@@ -23,7 +23,6 @@ class Action(StrEnum):
     NEW = 'NEW'
     UPDATE = 'UPDATE'
     MERGE = 'MERGE'
-    PROPOSE = 'PROPOSE'
     FOLLOWUP = 'FOLLOWUP'
     WITHDRAW = 'WITHDRAW'
     NOOP = 'NOOP'
@@ -91,7 +90,7 @@ class Validity:
 
     ``checked_ids`` must cover a case's complete former core before automatic
     withdrawal. Only report-correction invalidation belongs in ``invalid_ids``.
-    Score/policy changes use ``reassessment_ids`` and always require a proposal.
+    Score/policy changes use ``reassessment_ids`` and are published like any other change.
     """
     checked_ids: frozenset[int] = frozenset()
     invalid_ids: frozenset[int] = frozenset()
@@ -108,8 +107,7 @@ class Plan:
     recipient_ids: tuple[int, ...]
     reason: str
     baselines: tuple[CaseSnapshot, ...]
-    # Existing explicit staff exclusions survive both automatic publication and
-    # proposal acceptance. The publisher preserves other staff states as well.
+    # Existing explicit staff exclusions survive publication.
     excluded_tx_ids: frozenset[int]
     invalid_tx_ids: frozenset[int]
 
@@ -186,8 +184,6 @@ def _validate(cases, graphs, validity):
         _instant(case.review_started_at)
         if not case.excluded_tx_ids <= case.evidence.member_ids:
             raise PlanningError('Excluded transactions must belong to the case evidence')
-        if case.excluded_tx_ids and case.review_started_at is None:
-            raise PlanningError('Staff exclusions require a recorded investigation start')
         if case.alert_id in case.ancestor_ids or not case.ancestor_ids <= by_id.keys():
             raise PlanningError('Incomplete or cyclic follow-up ancestry')
         for ancestor in case.ancestor_ids:
@@ -377,20 +373,14 @@ def build_case_plans(cases, graphs, *, validity=Validity(), composed_digests=Non
                   and not any(_remaining_relation(c, validity) for c in active)):
                 action, reason = Action.NOOP, 'INCOMPLETE_VALIDITY'
             elif reassess:
-                action, reason = Action.PROPOSE, 'SCORE_OR_POLICY_REASSESSMENT'
+                action = Action.MERGE if len(active) > 1 else Action.UPDATE
+                reason = 'SCORE_OR_POLICY_REASSESSMENT'
             elif len(active) > 1:
                 action = Action.MERGE
             else:
                 action = Action.UPDATE
-            # New evidence joins an existing investigation automatically. Staff
-            # judgments/exclusions are preserved by the publisher. Merging cases
-            # or removing corrected facts still changes the existing scope and
-            # requires the affected investigators' approval.
-            added_members = any(graphs[i].member_ids - target.evidence.member_ids for i in indexes)
-            additive_update = action == Action.UPDATE and not invalid and added_members
-            if action not in (Action.NOOP, Action.PROPOSE) and not additive_update and any(
-                    c.review_started_at is not None for c in active):
-                action = Action.PROPOSE
+            # Every change to an open Alert is published at once; the assignees are
+            # notified. Staff exclusions and moves are kept by the publisher.
             if invalid and reason == 'FLOW_EVIDENCE':
                 reason = 'REPORT_CORRECTED'
         baselines = tuple(sorted(active + references, key=lambda c: c.alert_id))

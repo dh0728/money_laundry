@@ -182,19 +182,18 @@ BINARY는 고정 TARGET 전체, TYPE은 BINARY 결과가 의심(`p_laundering>=a
 | 상황 | 처리 |
 |---|---|
 | 같은 흐름의 OPEN Alert 하나에 새 거래 연결 | 조사 중에도 자동 편입. 신규 거래만 PENDING, 기존 판정·제외·직원 역할 유지 |
-| 미착수 Alert 여러 개가 같은 흐름 | 자동 병합. 최초 생성·동률 최소ID를 대표로 유지, 대표 담당자 유지, 양쪽 담당자에게 중복 없는 알림. block-pin 생성기는 두 OPEN Alert를 한 그래프로 합치지 않고 `BOUNDARY_OPEN_PAIR` 링크만 남기므로 생성 경로에서는 발생하지 않는다. 예외로 두 OPEN Alert가 같은 씨앗을 소유한 비정상 상태는 먼저 생성된 Alert가 그 씨앗을 유지하고 생애주기가 자동 병합으로 정리한다(아티팩트 `duplicateOwnedSeedCount`) |
-| 조사 중 사건이 포함된 여러 Alert 병합 | 영향 담당자의 공동 변경 제안. 전원 동의 전 범위/공개 버전 유지. 위와 같은 이유로 block-pin 생성 경로에서는 발생하지 않는다. 같은 씨앗을 소유한 비정상 상태는 위와 같이 제안으로 정리한다 |
+| OPEN Alert 여러 개가 같은 흐름 | 조사 중이어도 바로 병합. 최초 생성·동률 최소ID를 대표로 유지, 대표 담당자 유지. 사라지는 Alert는 `merged_into_alert_id`로 대표를 가리키고 목록에서 빠지며, 그 Alert에서 직원이 뺀·옮긴 거래 기록(`alert_tx_edits`)은 대표로 옮긴다. 양쪽 담당자에게 MERGED 알림 |
 | 종결·Episode 편입 사건의 씨앗이 다시 묶이고 새 씨앗을 포함한 witness가 있음 | 후속 Alert. 같은 후속 흐름은 열린 후속에 반영 |
 | 종결 근거 반복, 연결 거래만 증가 또는 관계만 변경 | 후속 Alert를 새로 만들지 않음 |
-| 정정으로 확인된 유효 핵심 소멸 | 미착수 SCOPE_CLEARED 자동 종료, 조사 중 철회 제안 |
-| 점수 재평가·기존 근거 제거 | 조사 보호 정책에 따라 제안. 보고 정정과 점수 하락을 혼용하지 않음 |
+| 정정으로 확인된 유효 핵심 소멸 | 조사 중이어도 SCOPE_CLEARED 자동 종료 |
+| 점수 재평가·기존 근거 제거 | 조사 중이어도 새 버전으로 바로 반영(사유 SCORE_OR_POLICY_REASSESSMENT). 변경 제안·동의 절차는 없다 |
 | 같은 근거 재실행 | 새 버전·알림 없이 성공 검사만 갱신 |
 
 병합 원본은 삭제하지 않고 canonicalAlertId로 대표를 안내한다. 별칭은 목록에서 제외하고 수정은409다. 종결/편입 판정은 자동 재개하거나 덮어쓰지 않는다. 후속 계보는 단일 parent 열이 아닌 관계로 보존한다.
 
 직원 판단이 있던 거래가 정정으로 빠져도 저장 판정·역할·당시 버전은 보존한다. 현재 범위·요약은 공개 버전과의 교집합이며 상세 withdrawnMembers로 과거 판정을 별도 조회한다. 미수신·HELD·탐색 한도는 무효 근거로 단정하지 않는다.
 
-공개 포인터가 가리키는 버전만 현재 근거다. 제안 버전은 일반 버전 목록/상세에 노출하지 않는다. 원자 공개 전 취소·실행 교체·입력 변경은 전체 공개를 막는다. 사건 개정 충돌은 재계획하고, 고정 거래/점수 입력 변경은 STALE_INPUT으로 중단한다. 옛 입력의 단순 resume이 새 snapshot을 자동 생성하지 않는다.
+공개 포인터가 가리키는 버전만 현재 근거다. 
 
 ### 3.3 Alert 근거 API
 
@@ -223,26 +222,13 @@ dataAsOf는 근거 생성 run cutoff, lastCheckedAt은 성공한 검사 시각�
 
 Alert와 일반 Episode 생성은 비밀번호 해시가 등록된 STAFF에 공통 라운드로빈 배정한다. last_assigned_at NULL 우선·오래된 순·동률 userId순이다. 배정 순서는 업무 시각과 분리하며, 공통 트랜잭션 잠금 안에서 DB 현재 시각과 기존 최대 배정 시각+1마이크로초 중 큰 값으로 갱신한다. 같은 업무 시각의 대량 생성·동시 요청에서도 순환하고 실패하면 배정 순서도 롤백한다. 사건 createdAt/assignedAt은 업무 시각을 유지한다. 시연 초기화와 설정 복원에서는 last_assigned_at을 NULL로 초기화한다. 배정 대상이 없으면 ALERT_ASSIGNEE_UNAVAILABLE로 실패한다. 관리자 재배정 API는 제공하지 않는다.
 
-### 3.5 변경 제안 API
+### 3.5 변경 제안 없음
 
-자동 거래 추가에는 투표가 필요 없다. 조사 중 사건의 병합·근거 철회·재평가 제안에만 아래 API를 사용한다. 화면 연결은 현재 백엔드 검증 범위에 포함하지 않는다.
-
-- `GET /api/v1/review/alert-proposals/{id}`: 영향 사건의 **현재 STAFF 담당자**만 접근한다. 타인·ADMIN 또는 접근 가능한 사건이 없는 제안은403 FORBIDDEN_ROLE이다.
-- 상세는 저장 필드명을 유지한 snake_case다. 주요 필드는 `proposal_id,revision,status,action,target_alert_id,proposed_version,generation,source_run_id,evidence,cases`. evidence는 제안된 비공개 근거이며 payload는 반환하지 않는다. cases에는 사건별 `alert_id,expected_revision,expected_published_version,assignee_id,response,response_actor,response_at`가 있다. response는 PENDING/APPROVED/REJECTED다.
-- `POST /api/v1/review/alert-proposals/{id}/votes`: 같은 담당자 권한과 CSRF가 필요하다. 아래 본문의 caseRevisions에는 **자기 담당 영향 사건 전체**의 scopeRevision을 보낸다. 조사 명령용 합성 revision과 혼용하지 않는다. comment는 공백 제외 필수·최대4000자다.
-
-```json
-{"requestId":"UUID","expectedProposalRevision":1,"decision":"ACCEPT","caseRevisions":{"101":1,"102":2},"comment":"연결 근거 확인"}
-```
-
-- decision은 ACCEPT/REJECT. 성공200 `{proposalId,status,revision}`. 일부 동의는 OPEN을 유지하고 마지막 영향 담당자의 동의로 ACCEPTED 및 원자 공개된다. 한 명의 거절은 REJECTED다. 투표 후 proposal revision이 바뀌므로 다른 담당자는 최신 상세를 재조회한다.
-- 같은 사용자·requestId·본문 재전송은 최초 응답을 반환한다. 같은 requestId의 다른 본문이나 낡은 expectedProposalRevision은409 INVALID_TRANSITION이다.
-- 사건 개정·담당자·공개 버전·거래 유효성·선택 점수 출처가 바뀌면 제안을 SUPERSEDED로 만료한 뒤409 INVALID_TRANSITION을 반환한다. REJECTED를 제외하고 낡아진 제안을 새로 분석하면 generation·revision과 비공개 근거 버전을 새로 만들고 이전 동의는 감사 이력에만 보존한다. 같은 근거에 대한 거절을 반복 제안하지 않는다.
-- 숨겨진 제안 버전은 일반 Alert 상세·버전 목록에서404/제외다. 사건 상세의 pendingProposalIds로 열린 제안을 찾는다. 종결·병합 이력은 §6, 현재 조사 범위는 §9를 따른다.
+새 분석 결과(거래 추가·병합·정정 삭제·재평가)는 OPEN Alert에 바로 반영한다. 제안 테이블과 투표 API는 없다.
 
 ## 4. Episode
 
-서로 다른 Alert 전체2개 이상을 묶는 조사 사건이다. Alert 하나는 최대 한 Episode에 소속되며 부분 이관·SPLIT·MOVE는 제공하지 않는다. 편입 시점 거래·조사 역할·판정을 고정 보존하고 원본 Alert를 CLOSED/TRANSFERRED로 처리한다. Episode 판정·종결·연결 해제는 §9의 명령 API를 사용한다.
+서로 다른 Alert 전체 2개 이상을 묶는 조사 사건이다. Alert 하나는 최대 한 Episode에 소속된다. Episode의 거래는 소속 Alert의 현재 거래 합집합이고, 편입된 Alert는 CLOSED/TRANSFERRED다. 만들기·편입·연결 해제·판정은 §9의 API를 사용한다.
 
 ## 5. 인증·사용자 — 서버 세션 (dev/local)
 
@@ -262,7 +248,7 @@ FE는 동일 출처(`/api/...`)로 쿠키를 유지하여 호출한다. `X-Demo-
 
 ## 6. 감사 이력
 
-`GET /api/v1/review/cases/{caseId}`의 history를 사용한다. 행은 `{eventId,action,comment,businessAt,recordedAt,actor}`다. businessAt은 업무 시각, recordedAt은 실제 저장 시각이다. REVIEW_START는 명시 명령이며 GET은 이력을 생성하지 않는다.
+이력은 `review.events`에 남는다. 화면용 판정 기록은 `GET /api/v1/review/board`의 `judgment`, 거래 변경 기록은 `edits`로 내려간다. 행의 businessAt은 업무 시각, recordedAt은 실제 저장 시각이다.
 
 범위 변경·판정·편입·해제·종결은 변경 전후 근거를 이벤트 snapshot에 보존한다. 자동 편입은 추가 거래 ID·업무 시각·전후 버전을 comment에 표시하고 연결 이유는 저장 snapshot에 남긴다. 사용자 판정과 모델 결과는 서로 덮어쓰지 않는다. 공개/범위/요약/이력/수신자 저장은 같은 트랜잭션이다.
 
@@ -296,6 +282,8 @@ FE는 동일 출처(`/api/...`)로 쿠키를 유지하여 호출한다. `X-Demo-
 - daily.completed는 종결일 기준이며 같은 날 생성된 사건의 종결만 세지 않는다. 상태 차트는 과거 시점의 판정 이력을 복원한 것이 아니라 마지막 공개 집계의 현재 상태다.
 - STRONG=이진 의심+패턴 있음, ATYPICAL=이진 의심+패턴 없음, PATTERN_ONLY=이진 정상+패턴 있음, WEAK=이진 정상+패턴 없음. 유형0은 패턴 없음. agreements 합이 분모이고0이면 데이터 없음이다. 누락 범주를 표시할 때0으로 채울 수 있다.
 - PIPELINE은 거래/모델·대상 거래일·보고 집계를 같은 스냅샷에서 갱신한다. INVESTIGATION은 별도로 공개한다. 두 영역의 원본 반영 시각이 동일하다는 보장은 없다. 조회 중 원본 거래/점수/큰 근거 JSON 재계산은 하지 않지만, 준비된 집계의 선택기간 합산과 업무시각/72시간 조건 계산은 수행한다.
+
+`GET /api/v1/dashboard/transaction-days?from&to`(로그인 필수): 거래일 기준 화면용 집계. `days[{date,total,suspicious,newAccounts,newOwners}]`, `types[{type,count}]`(type은 유형 이름), `hours[{hour,total,suspicious}]`, `scores[{scorePct,count}]`. `ops.dashboard_model_counts`와 `dashboard_tx_hours`·`dashboard_score_points`·`dashboard_first_seen`을 읽는다.
 
 ### 분리된 목록
 
@@ -380,111 +368,26 @@ GET /api/v1/ledger/transactions?from=2023-09-01&to=2023-09-10&account={accountId
 
 alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseId는 alertId와 같고 Episode caseId는 episodeId다. 원문 계좌번호는 반환하지 않는다.
 
-## 9. 조사 범위와 명령
+## 9. 조사 화면 API
 
-### 9.1 조회·명령 계약
-
-다음 API는 **dev/local 서버 세션 인증**을 사용한다. 접근·권한·CSRF는 §5를 따른다. 직원 식별 헤더는 사용하지 않는다. 사건 ID는 kind와 함께 해석한다. Alert caseId=alertId, Episode caseId=episodeId다.
+**dev/local 서버 세션 인증**을 사용한다. 접근·권한·CSRF는 §5를 따른다. 사건 ID는 kind와 함께 해석한다. Alert caseId=alertId, Episode caseId=episodeId다.
 
 | 요청 | 입력 / 응답 |
 |---|---|
-| GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),query,types,minAgeDays,risk,statuses,assignees,page,size. 위험도·생성 시각·caseId 내림차순 |
-| GET /api/v1/review/cases/{caseId} | caseId,kind,alertId,status,outcome,revision,assigneeId/Name,createdAt,assignedAt,closedAt,groups,summary,pendingCount,sourceAlertIds,primaryTypes,history,relatedDecisions |
-| GET /api/v1/review/board | 입력 없음. `{businessAt,cases,transactions}`. 새 화면(src/layout.js)이 로그인 후 한 번 읽는 전체 조회 |
-| GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 소유주 박스/계좌 노드 연결용; 원문 이름·계좌번호 제외 |
+| GET /api/v1/review/board | `{businessAt,cases,transactions,nextEpisodeId}`. 화면이 Alert·Episode 목록·카드·상세·대시보드 업무 지표를 이 응답 하나로 그린다 |
+| POST /api/v1/review/cases/{caseId}/read | 담당자가 처음 열면 `read_at` 기록(열람 전 → 처리 전). 담당자가 아니면 변화 없음 |
+| POST /api/v1/review/cases/{caseId}/start | 담당자만. Alert를 처리 중으로 바꾼다 |
+| POST /api/v1/review/cases/{caseId}/judgment | `{verdict:NORMAL/SUSPICIOUS,reasonCategory:pattern/rule/normal-business/etc,evidence,observations,rationale}`. rationale 필수, evidence·observations 선택. 담당자만, Alert는 처리 중이어야 한다. 사건당 1회이며 저장과 함께 CLOSED. 응답 `{id:"J-yyMMdd-NNNNNN",...}` |
+| POST /api/v1/review/cases/{caseId}/transaction-edits | Alert만. `{txIds,targetAlertId,reason}`. targetAlertId가 null이면 제외, 있으면 그 OPEN Alert로 이동. STAFF는 본인 담당(대상 포함), ADMIN은 모든 OPEN Alert. 원래 Alert로 되돌리면 기록을 지운다 |
+| POST /api/v1/review/episodes | `{alertIds,reason,episodeId}`. 본인 담당 OPEN·미판정·미편입 Alert 2건 이상. episodeId는 board의 `nextEpisodeId`(선택) |
+| POST /api/v1/review/episodes/{episodeId}/alerts | `{alertIds,reason}`. OPEN Episode에 Alert 편입 |
+| POST /api/v1/review/episodes/{episodeId}/unlink | `{alertIds,reason}`. Episode 담당자만. 남는 Alert가 2건 미만이면 Episode를 해체(DISSOLVED)하고 Alert를 다시 연다 |
+| GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 원문 이름·계좌번호 제외 |
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
-| POST /api/v1/review/commands | 로그인 세션·CSRF 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
-| POST /api/v1/review/cases/{caseId}/judgment | `{requestId,revision,verdict,reasonCategory,evidence,observations,rationale}`. 새 화면의 판정 입력. 성공 200에 판정 기록 `{id,verdict,reasonCategory,evidence,observations,reason,at,reviewer}`; 같은 requestId 재전송은 저장된 기록을 돌려준다 |
 
-목록과 상세의 공통 필드는 `caseId,kind,alertId,status,outcome,revision,scopeRevision,assigneeId,assigneeName,episodeId,createdAt,assignedAt,closedAt,ageDays,pendingCount,sourceAlertIds,primaryTypes,summary`다. Alert에는 `publishedVersion,reviewStartedAt,canonicalAlertId,resolution`이 추가된다. **목록 summary는 `txCount,subjectCount,seedCount,riskScore,primaryType,totalAmountUsd,amountsByCurrency,firstTxAt,lastTxAt`만 제공한다.** SQL에서 이 필드만 추출하며 거래·계좌별 집계·근거·이력은 목록 응답에 포함하지 않는다. 상세는 선택한 caseId의 전체 summary 및 groups/history/relatedDecisions/detachments와 Alert의 pendingProposalIds/relations/withdrawnMembers를 추가로 제공한다. relations의 키는 source_alert_id,target_alert_id,kind,event_id다.
+board의 사건 행은 `caseId,kind,status,outcome,assigneeId,assigneeName,createdAt,assignedAt,closedAt,ageDays,readAt,reviewStartedAt,episodeId(Alert)/linkedAlertIds(Episode),pendingCount,sourceAlertIds,primaryTypes,summary,members,judgment,edits`다. 현재 거래는 뷰 `review.current_members`(공개 버전 거래 − `alert_tx_edits` + 옮겨 온 거래)로 계산한다. 거래 판정은 사건 판정(Alert 자신 또는 소속 Episode)을 따른다. reason은 4000자 이하다.
 
-**화면 전체 조회(board):** `cases`는 공개된 모든 Alert·Episode이며 각 항목은 목록 공통 필드와 목록 summary에 `typeShare`를 더하고, 현재 구성 거래를 `members:[{txId,reviewRole,state,decision}]`로 포함한다. EXCLUDED 거래는 현재 구성이 아니므로 제외하고, 편입된 원본 Alert의 TRANSFERRED 거래는 유지한다. `transactions`는 위 members에 등장하는 거래를 중복 없이 `{txId,occurredAt,fromAccountId,toAccountId,fromOwnerName,toOwnerName,amountPaid,paymentCurrency,paymentFormat,launderingScore}`로 제공한다(계좌는 가명 UUID 문자열, 미분석 거래의 launderingScore는 null). 정렬은 생성 시각·caseId 내림차순이며 페이지가 없다. 목록 API(`/review/cases`)의 가벼운 응답은 바꾸지 않는다.
-
-**판정 입력(judgment):** 담당 직원이 OPEN 사건에 한 번 낸다. `verdict`는 NORMAL/SUSPICIOUS, `reasonCategory`는 pattern/rule/normal-business/etc, `evidence`·`observations`·`rationale`은 각각 필수다. Alert는 그 판정으로 종결하고, Episode는 남은 판정 대상 거래를 같은 판정으로 정한 뒤 종결한다. 입력 내용은 테이블 추가 없이 `review.events`의 `JUDGMENT` 이력 한 건(comment=rationale, snapshot=나머지 입력)으로 남는다. 판정 ID는 `J-{업무일 yyMMdd(KST)}-{이력 번호 6자리}`다. board의 각 사건은 최신 판정 기록을 `judgment`로 포함하며, 판정 입력 없이 종결되어 판정 결과가 있는 사건은 종결(CLOSE) 이력을 같은 모양으로 제공한다(이때 reasonCategory·evidence·observations는 null). 판정 결과가 없는 사건의 `judgment`는 null이다.
-
-**검색·필터**
-- 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.
-- 사건 `query`: 최대 200자. Alert 원본 `A-{alertId}` / Episode `E-{caseId}`, 담당자 표시 이름, 대표 유형의 부분 문자열 검색. `%`, `_`는 와일드카드가 아니라 문자로 취급한다. 두 ID의 의미를 바꾸지 않는다.
-- 사건 `types`: 반복 전달하는 대표 유형 이름. `Fan-out`, `Fan-in`, `Gather-scatter`, `Scatter-gather`, `Cycle`, `Random`, `Bipartite`, `Stack`, `패턴 미특정`, `혼합`. Alert는 제외된 거래를 빼고 현재 상세와 같은 씨앗 확률 곱하기 결과를 사용한다(1등이 NON_PATTERN인 씨앗 제외, 6가지 유형의 log(p+1e-6) 합이 가장 큰 유형, 값이 같으면 `혼합`). Episode는 유효 구성의 출처 Alert 유형 중 하나가 일치하면 포함한다. `패턴 미특정`을 거래 모델의 코드 0과 동일한 판정으로 해석하지 않는다.
-- `statuses=OPEN&statuses=ESCALATED`: 화면 상태의 OR 조건. 편입된 Alert는 ESCALATED, 미편입 사건은 OPEN/CLOSED다. 기존 단일 `status`와 함께 보내면 AND로 적용하므로 FE는 중복 지정하지 않는다.
-- `assignees`: 담당자 ID 반복 전달, OR. `minAgeDays`: 사건 생성 업무 시각부터 경과한 일수(0~36500). 배정 후 72시간을 세는 대시보드 카드와 기준이 다르다.
-- `risk`: `high`(0.8 이상), `medium`(0.5 이상·0.8 미만), `low`(0.5 미만). 복수는 `high,medium`처럼 쉼표로 전달하여 OR 적용한다. 필터 종류 사이는 AND다.
-
-명령 본문:
-
-```json
-{
-  "requestId": "UUID",
-  "action": "TRANSFER",
-  "selections": [
-    {"caseId": 1, "revision": 1000001, "groupId": 0, "txIds": []},
-    {"caseId": 2, "revision": 1, "groupId": 0, "txIds": []}
-  ],
-  "targetCaseId": null,
-  "targetRevision": null,
-  "targetGroupId": null,
-  "decision": null,
-  "comment": "두 Alert가 연관된 시나리오로 판단되어 전체 편입"
-}
-```
-
-- groupId와 revision은 GET 값을 그대로 전달한다. 최초 미저장 Alert 묶음의 0도 유효하다. Alert revision은 업무 개정과 완료 근거 버전을 결합한 불투명 값이다. 재계산하지 않는다.
-- action: SUBJECT,CONTEXT,EXCLUDE,DECIDE,TRANSFER,UNLINK,RECONSIDER,COMMENT,REVIEW_START,CLOSE. SPLIT/MOVE는 409로 거절한다.
-- **Alert 정상/단독 의심 종결:** `action=CLOSE`, `decision=NORMAL` 또는 `SUSPICIOUS`, `selections=[{caseId,revision,groupId:0,txIds:[]}]`. 사건의 제외되지 않은 SUBJECT 전체에 최종 판정을 적용하고 같은 요청에서 종결한다. 이전 범위 판정은 BEFORE_RESOLUTION 감사 스냅샷으로 보존한다. CONTEXT/EXCLUDED에는 판정을 전파하지 않는다. 대상이 없으면409.
-- **새 Episode:** 예시처럼 `action=TRANSFER`, 서로 다른 본인 담당 OPEN Alert의 caseId 2개 이상. **기존 Episode:** Alert 1개 이상과 `targetCaseId`, GET에서 받은 `targetRevision`을 보낸다. targetGroupId/decision은 null이다.
-- TRANSFER의 `txIds:[]`는 전체 Alert를 뜻한다. 명시적 거래 목록은 맥락·제외·기존 판정 포함 구성 거래 전체와 정확히 같을 때만 허용한다. 부분 목록은409, 중복 caseId는400. groupId는 전체 편입에서는 사용하지 않으며0으로 보낸다. 편입은 원본 Alert를 CLOSED/TRANSFERRED(Alert 근거 API의 status는 ESCALATED)로 종결하므로 별도 CLOSE를 보내지 않는다.
-- TRANSFER 성공200: `{caseIds:[원본 조사 사건 ID...], targetCaseId:Episode 사건 ID}`. 일반 명령은 targetCaseId=null. 실패는 전체 롤백, 같은 requestId/본문 재전송은 최초 응답을 반환한다.
-- 상세·목록의 `episodeId`는 Alert가 속한 Episode caseId 또는 null이다. Episode의 `sourceAlertIds`는 거래 제외/판정과 무관한 전체 소속 Alert ID 목록이다. Episode의 각 groups 항목은 하나의 Alert 편입 시점 범위이며 sourceAlertId로 원본 Alert를 식별한다(Alert 자체의 group에는 null일 수 있음). 편입된 원본 Alert도 구성 거래와 요약을 계속 조회할 수 있다.
-- 초기 SEED/CONNECTION은 SUBJECT, CONTEXT는 참고 맥락이다. members에는 txId,reviewRole,state,decision,transaction,sources가 있다. 편입은 사건의 outcome으로 표현하고 원본 member 상태·판정은 보존한다. CLOSED 사건 pendingCount는0이다.
-- **연결 거래 자동 추가:** 열린 Alert는 조사 착수 여부와 무관하게 같은 흐름의 새 거래를 분석 완료 시 자동 편입한다. 기존 거래의 판정·제외·직원 지정 역할은 유지하고 신규 거래만 PENDING으로 추가한다. GET은 범위를 바꾸지 않는다. 공개 버전과 사건 revision이 함께 바뀌므로 오래된 화면의 변경 요청은 기존 revision 검사로 충돌을 반환한다. 종결·Episode 편입 사건의 고정 범위는 이 동작으로 변경하지 않는다.
-- **정정과 판정 보존:** 현재 `groups`·`summary`·거래 소속은 공개 버전에 남아 있는 거래만 포함한다. 정정으로 빠진 거래의 저장 판정·역할·당시 근거 버전은 변경하지 않으며, 상세의 `withdrawnMembers`에 `{txId,evidenceVersion,reviewRole,state,decision}`로 별도 제공한다. 미착수 근거 소멸은 자동 SCOPE_CLEARED, 조사 중에는 철회 제안 수락 후 SCOPE_CLEARED다. 정상 판정을 자동 생성하지 않는다.
-- 자동 추가는 `ADDED_EVIDENCE` 이력과 담당자 알림을 한 번 기록한다. 이력의 `businessAt`은 업무 시각, `recordedAt`은 실제 저장 시각이며 `comment`에 추가 거래 ID·업무 시각·전후 근거 버전을 표시한다. 동일 근거 재실행은 버전·이력·알림을 추가하지 않는다. 조사 중인 여러 Alert의 병합, 기존 근거 제거 및 점수 재평가에 대한 제안은 거래 추가와 구분한다.
-- **Alert 거래 제외:** `action=EXCLUDE`, `selections=[{caseId,revision,groupId,txIds:[거래 ID...]}]`, 필수 comment. 본인 담당 OPEN Alert의 PENDING 또는 DECIDED 거래를 선택한다(SUBJECT/CONTEXT 모두 가능). 원장·모델 근거를 삭제하지 않고 조사 member를 EXCLUDED로 바꾸며 이전 상태/판정은 BEFORE_EXCLUDE 이력에 보존한다. 제외 거래는 현재 요약·그래프·소속에서 빠진다. 이후 근거 갱신으로 자동 복구하지 않는다.
-- **Episode Alert 연결 해제:** `action=UNLINK`, `selections=[{caseId:Episode caseId,revision,groupId:해제할 Alert 묶음 ID,txIds:[]}, ...]`. 한 요청은 한 Episode만 대상으로 하며 동일 groupId 중복·부분 거래 선택은400. targetCaseId/targetRevision/targetGroupId/decision은 모두 null. comment는 해제 사유(공백 제외 필수, 최대4000자). Episode 담당 STAFF만 요청할 수 있고 소속 Alert 담당자가 달라도 원래 담당자에게 복원한다.
-- 해제 후 Alert 2개 이상이 남으면 선택 Alert만 해제한다. 2개 미만이면 **선택하지 않은 잔여 Alert도 모두 해제**하고 Episode를 `CLOSED / DISSOLVED`로 보존한다. 모든 해제 Alert의 조사 사건은 OPEN/outcome=null/closedAt=null, alerts는 OPEN/resolution=null, episodeId=null로 바뀐다. 원래 담당자·배정 시각·Alert 자신의 거래 제외/판정은 유지하며 Episode 판정을 Alert에 덮어쓰지 않는다.
-- 해제·해체·Alert 복원·revision 증가·사유/구성/판정 스냅샷·멱등 응답은 하나의 트랜잭션이다. 정상·의심 종결된 Episode에서 UNLINK는409. 해체 사건은 다시 편입 목적지가 될 수 없다. 해제된 Alert는 새 Episode에 다시 편입할 수 있다.
-- UNLINK 성공200: `{caseIds:[Episode caseId,복원 Alert caseId...],targetCaseId:null,dissolved:boolean,reopenedCaseIds:[복원 Alert caseId...]}`. 상세의 `detachments`는 `{eventId,action:UNLINK|DISSOLVE,comment,businessAt,snapshot}` 목록이다. Episode snapshot은 selectedAlertIds/removedAlertIds/groups(해제 당시 거래·판정·sourceAlertId)를 포함한다. 복원 Alert snapshot은 episodeCaseId/dissolved/groups다. 이력은 현재 소속이 아니다. 해체 후 groups/sourceAlertIds는 빈 배열이며 summary는 빈 현재 범위다. 자금 지표는 해체 시점 MONEY_SNAPSHOT을 반환한다.
-- DECIDE는 NORMAL/SUSPICIOUS로 범위 판정만 저장한다. Episode는 해당 묶음의 미판정 SUBJECT 전체 선택이 필요하다. RECONSIDER는 OPEN Episode 묶음 판정을 다시 미판정으로 열며 이전 감사 기록은 보존한다.
-- `CLOSE`에 decision이 없으면 기존 범위 판정을 집계해 종결한다. Episode는 이 방식만 허용한다. 미판정 SUBJECT/상충 판정은409. 업무 상태 OPEN/CLOSED, outcome NORMAL/SUSPICIOUS/TRANSFERRED/SCOPE_CLEARED/MIXED/DISSOLVED. DISSOLVED는 UNLINK에 따른 Episode 해체만 사용한다.
-- 요청 UUID는 동일한 재시도에 유지한다. 같은 UUID의 다른 본문, 오래된 개정/근거, 처리 완료 범위, 닫힌 목적지 등은 409 INVALID_TRANSITION, 타 담당자/역할은 403 FORBIDDEN_ROLE, 형식/잘못된 선택은 400 계열 ProblemDetail이다. 화면은 재조회 후 범위를 다시 선택한다.
-- review 목록·상세의 `summary.totalAmountUsd`: 현재 소속 전체 거래(SUBJECT+CONTEXT)에서 EXCLUDED/TRANSFERRED 제외·txId 중복 제거 후 저장 `amountUsd` 합계. Episode 내 여러 Alert에 겹친 거래는 한 번만 센다. 환산액 누락/잘못된 값이 하나라도 있으면 null, 거래가 없으면 0. 기존 `amountsByCurrency`의 SUBJECT 집계 의미는 유지한다. Alert·Episode 목록의 거래 총액은 이 필드를 소수 최대 2자리 USD로 표시하며 미제공 시 원통화 합계로 대체하지 않는다. block-pin 정책 근거는 CONTEXT 멤버를 만들지 않으므로 직원이 역할을 바꾸지 않은 Alert에서 이 합계와 txCount는 핵심(SUBJECT) 기준이다. 직원이 CONTEXT로 지정한 거래와 이전 정책 근거의 CONTEXT는 지금처럼 포함한다.
-- 상세 summary의 `sealedAfter`·`contextCount`는 Alert의 현재 공개 근거 버전에 대해 §3.3과 같은 규칙으로 계산한다. 직원의 제외·역할 변경과 무관하며 Episode에서는 null이다. 목록 summary에는 없다.
-- 목록 summary는 위에서 명시한 기본 건수·위험도·대표 유형·금액·거래 기간만 제공한다. 상세 summary는 여기에 `typeShare,netFlows,topReceiverShare,topSenders,paymentFormats,dailySuspiciousCount,dailySuspiciousAmount,typeDistribution`을 더해 현재 범위의 상세 집계를 제공한다. 관련 사건 판정 relatedDecisions는 참조 정보이며 현재 결론을 덮지 않는다.
-
-### 9.2 조사 계좌 기준 자금 지표
-
-Alert/Episode 개요 공통. summary.amountsByCurrency는 기존 사건 SUBJECT 거래 합계로 유지하고, 아래 자금 지표는 **S와 T에 해당하는 수신 원장 전체**를 조회한다. 사건 밖 거래를 조회해도 사건 소속/판정에 추가하지 않는다. 기존 summary.netFlows/topReceiverShare는 구 소속 거래 요약이며 새 지표로 해석하지 않는다. 화면은 아래 money 응답만 사용한다.
-
-OPEN 자금 조회는 읽기 전용 REPEATABLE READ 트랜잭션의 한 스냅샷을 사용한다. 수신·분석 공개용 잠금을 기다리지 않으며 조회 시작 후 커밋된 변경은 다음 조회에 반영된다. 범위 수정·종결·공개 쓰기의 기존 잠금과 원자성은 유지한다.
-
-**live 개요 카드 표시:** Alert는 외부 유입액·거래 총액·순유입·근거 거래·의심 거래 참여 계좌·거래 기간의 6개, Episode는 참여 계좌 카드를 제외한 5개다. 외부 유입액/순유입은 money.external의 in/net을 통화별로 표시하며, 프로토타입의 추정 ‘투입 원금’ 또는 대표 계좌 순유입과 구분한다. 산출 대기/조회 실패는 0으로 표시하지 않는다. 카드의 거래 총액은 상세 groups.members에서 EXCLUDED/TRANSFERRED를 제외하고 txId로 중복 제거한 **전체 현재 소속 거래(SUBJECT+CONTEXT)**의 amountPaid를 paymentCurrency별로 합산한다. 이는 기존 summary.amountsByCurrency의 SUBJECT 합계와 다르며 기존 응답 의미는 유지한다. block-pin 정책 근거에는 CONTEXT 멤버가 없으므로, 직원이 CONTEXT로 지정하지 않았다면 거래 총액·근거 거래·참여 계좌 카드는 핵심(SUBJECT) 거래 기준과 같다. 맥락 거래(contextQuery)는 카드에 넣지 않는다. 근거 거래는 같은 집합의 거래 수, 참여 계좌는 그 송·수취 계좌의 고유 수(정상 분류·맥락 거래 포함, 계좌 자체의 세탁 판정 아님), 거래 기간은 첫~마지막 occurredAt을 KST 시·분으로 표시한다. Episode의 여러 Alert에 겹친 거래는 한 번만 센다.
-
-- S 초기값: 현재 사건에서 제외/이관되지 않은 SEED 거래의 송·수취 계좌. 담당자가 가명 계좌를 추가/제외할 수 있고 직접 설정 후에는 해당 선택을 유지한다. 새 Episode의 자동 초기값도 이관받은 범위의 씨앗 기준이며 씨앗이 없으면 계좌 선택이 필요하다.
-- T: 현재 SUBJECT 거래의 첫날00시~마지막날 다음00시(KST). 사전 등록 은행의 current ACTIVE 보고가 모두 있는 연속 날짜까지만 관측한다. 첫날부터 미완료면 산출 대기, 중간 미완료면 그 전 날짜까지 계산한다. 업무 시각의 당일·미래는 완료 날짜로 보지 않는다. 마지막 거래 시각을 수신 완료 시각으로 추정하지 않는다.
-- 외부 유입=송금 계좌∉S, 수취 계좌∈S의 수취액. 외부 유출=송금 계좌∈S, 수취 계좌∉S의 송금액. 각각 해당 통화 사용. 순유입=외부 유입−외부 유출. S 내부 이체 제외.
-- 계좌 순유입=in−out, 내부 이체 포함. 집중도=max(in−out,0)/같은 통화에서 S 내 양의 순유입 합계×100. 분모0은 null(화면 ‘산출 불가’). 실제 잔액 비중이 아니다.
-- 단시간 유출은 계좌·통화별 FIFO 추정. 출금은 앞선 입금의 잔여액부터 한 번만 소진하며 Δt를 지난 입금도 먼저 소진한다. 대응 입금 중 입금+Δt≤T 종료인 것만 분모/분자에 포함한다. 분자=Δt 이내 대응액, 분모=평가 가능 입금액. 관측 끝의 미성숙 입금은 excludedIn으로 별도 제공한다. 잔액을 모르는 기간 시작점부터의 추정이지 동일 자금 추적 사실이 아니다.
-- 같은 시각의 거래에는 순서 근거가 없어 출금 먼저 처리한다. 자기 계좌 이체는 순유입 집계에는 반영하지만 FIFO 평가에서는 제외한다. 반복 거래는 서로 다른 tx_id면 보존하며 이중 보고/복수 소속은 한 거래로 센다. 환산 없이 통화를 합치지 않는다.
-- 초기 Δt=180분. 비교 선택 5/15/30/60/180/360/1440분. 탐색용 시간 범위이며 정상/세탁 판정 임계가 아니다.
-
-`GET /api/v1/review/cases/{caseId}/money?minutes=180` (dev/local 로그인 필수):
-
-- selectedAccounts,candidateAccounts,customScope,revision,delayMinutes,requestedFrom/To,observedAt(실제 조회시각).
-- available=false이면 reason=EMPTY_SUBJECT_SCOPE/EMPTY_ACCOUNT_SCOPE/WAITING_RECEIPTS/NO_CLOSED_SNAPSHOT이며 비율을0으로 만들지 않는다.
-- available=true이면 start,endExclusive,complete,ledgerCount,method=FIFO_ESTIMATE,external[],accounts[].
-- externalUsd: {in,out,net}은 동일 S/T의 USD 보조 합계다. 외부 유입은 각 거래 amount_received를 거래 fx_rate_version의 receiving_currency 환율(units_per_usd)로 나누고 소수6자리 반올림 후 합산한다. 외부 유출은 원장의 amount_usd 합계, 순유입은 in−out이다. 내부이체는 제외한다. 필요한 수취 환율이 없으면 in/net은 null이며 부분합을 완전 합계로 표시하지 않는다. 실시간 환율이 아니다. 종결 스냅샷에 함께 보존되며 스냅샷에 값이 없으면 null 의미를 유지한다.
-- 외부 유입액·거래 총액·순유입 카드의 원통화 값 아래에 작은 USD 값을 추가한다. 총액 USD는 원통화 총액과 동일한 현재 소속 거래(SUBJECT+CONTEXT, EXCLUDED/TRANSFERRED 제외)를 txId로 중복 제거한 amountUsd 합계다. 환산값 미제공은 `USD 환산액 미제공`으로 표시한다.
-- external 행: currency,in,out,net. accounts 행: accountId,currency,in,out,net,positiveNet,concentrationPercent,eligibleIn,excludedIn,matchedIn,rapidOutflowPercent. 비율은0~100 또는 null이다.
-
-`POST /api/v1/review/cases/{caseId}/money-scope`:
-
-```json
-{"requestId":"UUID","revision":1000001,"accounts":["가명 계좌 UUID"],"comment":"조사 중심 계좌 조정"}
-```
-
-로그인 세션·CSRF 헤더 필수. 본인 담당 OPEN 사건·기대 revision·실재 가명 계좌를 검증한다. accounts는 최대1000개, 빈 배열은 빈 S를 명시한다. 멱등 요청은 review.requests를 사용하고 MONEY_SCOPE 이력·사건 개정과 원자 저장한다. 상태/HTTP 오류 원칙은 §9.1과 같다.
-
-종결할 때 180분 지표를 MONEY_SNAPSHOT 이벤트에 저장하며 이후 수신/원장 정정에도 바꾸지 않는다. CLOSED 조회는 minutes와 무관하게 그 스냅샷을 반환한다. 과거 종결 사건에 기록이 없으면 현재 원장으로 과거를 재구성하지 않는다. 원문 정보/정답 라벨은 조회·계산에 사용하지 않는다.
+댓글·재배정·재개·오탐 표시·변경 제안 API는 없다(화면에 없는 기능).
 
 ## 10. 시연 제어와 초기화
 
@@ -559,3 +462,15 @@ CSRF 필요. `{ids: string[], read: boolean}`. 1~100개, 중복 ID는 한 번 �
 ### Episode 편입 알림 집계
 
 TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 명령으로 저장된 원본 Alert별 TRANSFER 이력은 조사 이력으로 보존하되 알림에서 제외한다. TRANSFER 이력이 있는 Episode의 최초 EPISODE_ASSIGNED 알림도 별도로 노출하지 않는다. 따라서 새 Episode에 Alert5개 편입 시 편입 알림1건이며, 이후 추가 편입은 이벤트ID가 다른 별도1건이다. 시연 업무 시각이 동일해도 시간으로 합치지 않는다. Episode 담당자 범위는 유지한다. 기존 Episode 이벤트ID와 읽음 상태는 유지되고 기존 중복은 재조회부터 숨겨진다.
+
+## 12. 룰엔진
+
+| 요청 | 입력 / 응답 |
+|---|---|
+| GET /api/v1/rules | 룰 목록. `{id:"RULE-NNN",name,description,typeCode,scoreMin,minTransactions,windowHours,status,version,author,updatedAt,history[{at,actor,action,reason}]}` |
+| POST /api/v1/rules | 초안 생성. `{name,description,typeCode,scoreMin(0~1),minTransactions,windowHours}` |
+| POST /api/v1/rules/{id} | 초안 수정. DRAFT·REJECTED·STOPPED만, 그 밖은 409 |
+| POST /api/v1/rules/{id}/review | `{status,reason}`. DRAFT→PENDING_APPROVAL(작성 가능한 직원), PENDING_APPROVAL→TESTING/REJECTED(ADMIN만) |
+| POST /api/v1/rules/backtest | `{rule,start,end,offset,limit}`. 기간(최대 2년)의 ACTIVE 원장 전체에 조건 적용. `{matchedCount,accountCount,amountUsd,matchedAccountIds,scannedCount,transactions}`. 서버 제한 90초 |
+
+룰은 분석 파이프라인에 연결하지 않는다. 화면에 ACTIVE로 바꾸는 버튼이 없어 서버에도 그 전이는 없다.

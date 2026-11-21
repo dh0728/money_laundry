@@ -399,7 +399,7 @@ def save_alerts(connection, execution):
     for alert, owned, core, members, witnesses, version in scope.pinned(connection):
         # Published relations pin the block (I10); a block of another policy is frozen.
         # A seed owned by two OPEN Alerts (an anomaly the generator never creates) stays
-        # with the earliest Alert; the lifecycle then merges or proposes for the other.
+        # with the earliest Alert; the lifecycle then merges the other.
         pinned_ids.append(alert)
         keys = [s['txId'] for s in owned if s['txId'] in positive]
         fresh = [key for key in keys if key not in owned_seen]

@@ -23,16 +23,12 @@ public class DemoResetService {
       String.join(
           ",",
           "analysis.alert_plans",
-          "review.alert_proposal_cases",
-          "review.alert_change_proposals",
+          "review.judgments",
+          "review.alert_tx_edits",
           "review.alert_lineage",
           "review.event_recipients",
-          "review.episode_members",
           "review.episode_alerts",
-          "review.alert_members",
-          "review.alert_groups",
           "review.notification_reads",
-          "review.requests",
           "review.events",
           "review.episodes",
           "analysis.alert_origin_ledger",
@@ -82,7 +78,7 @@ public class DemoResetService {
           "core.owners",
           "ingest.uploads");
   public static final String DASHBOARD_TABLES =
-      "ops.dashboard_refresh_state,ops.dashboard_dirty,ops.dashboard_model_counts,ops.dashboard_case_items,ops.dashboard_case_counts,ops.dashboard_report_counts,ops.dashboard_delivery_days";
+      "ops.dashboard_refresh_state,ops.dashboard_dirty,ops.dashboard_model_counts,ops.dashboard_tx_hours,ops.dashboard_score_points,ops.dashboard_first_seen,ops.dashboard_case_items,ops.dashboard_case_counts,ops.dashboard_report_counts,ops.dashboard_delivery_days";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final BusinessTime time;
