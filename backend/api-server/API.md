@@ -390,11 +390,14 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 |---|---|
 | GET /api/v1/review/cases | kind=ALERT/EPISODE 필수; status=OPEN/CLOSED,assigneeId,from,to(생성 업무일),query,types,minAgeDays,risk,statuses,assignees,page,size. 위험도·생성 시각·caseId 내림차순 |
 | GET /api/v1/review/cases/{caseId} | caseId,kind,alertId,status,outcome,revision,assigneeId/Name,createdAt,assignedAt,closedAt,groups,summary,pendingCount,sourceAlertIds,primaryTypes,history,relatedDecisions |
+| GET /api/v1/review/board | 입력 없음. `{businessAt,cases,transactions}`. 새 화면(src/layout.js)이 로그인 후 한 번 읽는 전체 조회 |
 | GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 소유주 박스/계좌 노드 연결용; 원문 이름·계좌번호 제외 |
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
 | POST /api/v1/review/commands | 로그인 세션·CSRF 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
 
 목록과 상세의 공통 필드는 `caseId,kind,alertId,status,outcome,revision,scopeRevision,assigneeId,assigneeName,episodeId,createdAt,assignedAt,closedAt,ageDays,pendingCount,sourceAlertIds,primaryTypes,summary`다. Alert에는 `publishedVersion,reviewStartedAt,canonicalAlertId,resolution`이 추가된다. **목록 summary는 `txCount,subjectCount,seedCount,riskScore,primaryType,totalAmountUsd,amountsByCurrency,firstTxAt,lastTxAt`만 제공한다.** SQL에서 이 필드만 추출하며 거래·계좌별 집계·근거·이력은 목록 응답에 포함하지 않는다. 상세는 선택한 caseId의 전체 summary 및 groups/history/relatedDecisions/detachments와 Alert의 pendingProposalIds/relations/withdrawnMembers를 추가로 제공한다. relations의 키는 source_alert_id,target_alert_id,kind,event_id다.
+
+**화면 전체 조회(board):** `cases`는 공개된 모든 Alert·Episode이며 각 항목은 목록 공통 필드와 목록 summary에 `typeShare`를 더하고, 현재 구성 거래를 `members:[{txId,reviewRole,state,decision}]`로 포함한다. EXCLUDED 거래는 현재 구성이 아니므로 제외하고, 편입된 원본 Alert의 TRANSFERRED 거래는 유지한다. `transactions`는 위 members에 등장하는 거래를 중복 없이 `{txId,occurredAt,fromAccountId,toAccountId,fromOwnerName,toOwnerName,amountPaid,paymentCurrency,paymentFormat,launderingScore}`로 제공한다(계좌는 가명 UUID 문자열, 미분석 거래의 launderingScore는 null). 정렬은 생성 시각·caseId 내림차순이며 페이지가 없다. 목록 API(`/review/cases`)의 가벼운 응답은 바꾸지 않는다.
 
 **검색·필터**
 - 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.

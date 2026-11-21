@@ -433,6 +433,82 @@ public class ReviewService {
         (count + size - 1) / size);
   }
 
+  /**
+   * 화면 전체 조회: 공개된 모든 사건과 현재 구성 거래를 한 번에 제공한다. 목록 API(list)는 가볍게 유지하고 거래는 이 조회에만 포함한다. 제외(EXCLUDED)된
+   * 거래는 현재 구성이 아니므로 빠진다.
+   */
+  public Map<String, Object> board() {
+    time.workbenchOnly();
+    Instant now = time.now();
+    var members = new HashMap<Long, List<Map<String, Object>>>();
+    var txIds = new TreeSet<Long>();
+    for (var m : jdbc.queryForList(BOARD_MEMBERS)) {
+      long caseId = number(m.remove("caseId"));
+      members.computeIfAbsent(caseId, key -> new ArrayList<>()).add(m);
+      txIds.add(number(m.get("txId")));
+    }
+    var cases = new ArrayList<Map<String, Object>>();
+    for (var row :
+        jdbc.queryForList(
+            "select "
+                + ReviewCaseSql.LIST_COLUMNS
+                + ",(c.summary->>'typeShare')::double precision as type_share,u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id limit 1) as linked_episode_id from "
+                + ReviewCaseSql.WITH_RISK
+                + " c join core.users u on u.user_id=c.assignee_id order by c.created_at desc,case_id desc")) {
+      var item = listItem(row, now);
+      object(item.get("summary")).put("typeShare", row.get("type_share"));
+      item.put("members", members.getOrDefault(number(row.get("case_id")), List.of()));
+      cases.add(item);
+    }
+    var transactions =
+        txIds.isEmpty()
+            ? List.<Map<String, Object>>of()
+            : jdbc.queryForList(BOARD_TRANSACTIONS, (Object) txIds.toArray(Long[]::new));
+    for (var t : transactions)
+      t.put("occurredAt", ((Timestamp) t.get("occurredAt")).toInstant().toString());
+    return Map.of("businessAt", now.toString(), "cases", cases, "transactions", transactions);
+  }
+
+  private static final String BOARD_MEMBERS =
+      """
+      with members as (
+        select m.alert_id as case_id,m.tx_id,m.review_role,m.state,m.decision
+        from review.alert_members m join review.alerts a using(alert_id)
+        join review.alert_transactions t
+          on t.alert_id=a.alert_id and t.version=a.published_version and t.tx_id=m.tx_id
+        where a.merged_into_alert_id is null
+        union all
+        select a.alert_id,t.tx_id,case when t.role='CONTEXT' then 'CONTEXT' else 'SUBJECT' end,'PENDING',null
+        from review.alerts a join review.latest_versions v using(alert_id)
+        join review.alert_transactions t using(alert_id,version)
+        where a.merged_into_alert_id is null
+          and not exists(select 1 from review.alert_groups g where g.alert_id=a.alert_id)
+          and not exists(select 1 from review.alert_members m where m.alert_id=a.alert_id and m.tx_id=t.tx_id)
+        union all
+        select e.episode_id,m.tx_id,m.review_role,m.state,m.decision
+        from review.episode_members m join review.episode_alerts e using(group_id,alert_id)
+      ) select distinct on (case_id,tx_id) case_id as "caseId",tx_id as "txId",
+        review_role as "reviewRole",state,decision
+      from members where state<>'EXCLUDED' order by case_id,tx_id,decision nulls last
+      """;
+
+  private static final String BOARD_TRANSACTIONS =
+      """
+      select t.tx_id as "txId",t.occurred_at as "occurredAt",
+        f.service_account_id::text as "fromAccountId",r.service_account_id::text as "toAccountId",
+        fe.display_name as "fromOwnerName",re.display_name as "toOwnerName",
+        t.amount_paid as "amountPaid",t.payment_currency as "paymentCurrency",
+        t.payment_format as "paymentFormat",s.p_laundering as "launderingScore"
+      from ledger.transactions t
+      join core.accounts f on f.account_id=t.from_account_id
+      join core.accounts r on r.account_id=t.to_account_id
+      join core.owners fe on fe.owner_id=f.owner_id
+      join core.owners re on re.owner_id=r.owner_id
+      left join analysis.current_scores cs on cs.tx_id=t.tx_id
+      left join analysis.scores s on s.run_id=cs.run_id and s.tx_id=cs.tx_id
+      where t.tx_id=any(?::bigint[]) order by t.tx_id
+      """;
+
   private Map<String, Object> listItem(Map<String, Object> c, Instant now) {
     var out = new LinkedHashMap<String, Object>();
     boolean alert = "ALERT".equals(c.get("kind"));

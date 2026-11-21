@@ -408,6 +408,34 @@ class ReviewWorkflowTests {
   }
 
   @Test
+  void board_returns_every_case_with_current_members_and_ledger_rows() {
+    long a = alert(l1);
+    long b = alert(other);
+    act(l1, "DECIDE", "NORMAL", select(a, 1));
+    act(l1, "EXCLUDE", null, select(a, 3));
+    var board = service.board();
+    var cases = new HashMap<Long, Map<String, Object>>();
+    for (var c : rows(board.get("cases"))) cases.put(number(c.get("caseId")), c);
+    assertThat(cases.keySet()).containsExactlyInAnyOrder(a, b);
+    var mine = rows(cases.get(a).get("members"));
+    assertThat(mine).extracting(m -> number(m.get("txId"))).containsExactly(1L, 2L);
+    assertThat(mine.getFirst())
+        .containsEntry("state", "DECIDED")
+        .containsEntry("decision", "NORMAL");
+    assertThat(rows(cases.get(b).get("members")))
+        .extracting(m -> number(m.get("txId")))
+        .containsExactly(1L, 2L, 3L);
+    assertThat(object(cases.get(a).get("summary"))).containsKeys("typeShare", "txCount");
+    assertThat(cases.get(a)).containsKeys("assigneeName", "ageDays", "createdAt");
+    var transactions = rows(board.get("transactions"));
+    assertThat(transactions).extracting(t -> number(t.get("txId"))).containsExactly(1L, 2L, 3L);
+    assertThat(transactions.getFirst())
+        .containsKeys("fromAccountId", "toAccountId", "fromOwnerName", "toOwnerName")
+        .containsEntry("paymentCurrency", "USD")
+        .containsEntry("occurredAt", "2023-09-01T00:00:00Z");
+  }
+
+  @Test
   void dissolved_episode_must_be_closed_and_empty() {
     long a = alert(l1);
     assertThatThrownBy(

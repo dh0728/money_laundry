@@ -40,6 +40,11 @@ public class ReviewController {
         new ReviewCaseFilter(query, types, minAgeDays, risk, statuses, assignees));
   }
 
+  @GetMapping("/review/board")
+  public Object board() {
+    return reviews.board();
+  }
+
   @GetMapping("/review/cases/{id}")
   public Object detail(@PathVariable long id) {
     return reviews.detail(id);
