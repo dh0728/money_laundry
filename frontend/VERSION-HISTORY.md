@@ -1,11 +1,12 @@
 # AML RADAR 화면 버전
 
-팀 작업 기준은 **3.4.1 Liquid Glass**. 11/21부터 앱의 기본 주소의 코드 위치 `frontend/web-app/src`.
+팀 작업 기준은 **3.5.0 Liquid Glass**. 11/21부터 앱의 기본 주소의 코드 위치 `frontend/web-app/src`.
 
 ## 3.x.y Liquid Glass
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| 3.5.0 | 11/21 | 관련 Alert 선택 → 판정 → Episode 편입. Alert 목록 묶기와 Episode 연결 해제. 파란 Primary Button 한 번 클릭. Sample 데이터 검수. |
 | 3.4.1 | 11/20 | Login·Dashboard 회전 Logo, Motion 감소 시 정적 Logo, Sidebar Button Hover 수정 |
 | 3.4.0 | 11/20 | Alert 개요 배치, 거래 방향 Animation, 소유주별 계좌, 통합 Sankey, 2초 실행 Button. [팀 Git 반영](https://github.com/dh0728/money_laundry/commit/81630aa7) |
 | 3.3.0 | 11/20 | 움직이는 Login 배경, Header·Footer 정리, Rule 편집과 Backtest 검수 |

@@ -122,15 +122,33 @@
   border: 0;
 }
 .case-judgment-evidence legend { padding: 0 }
-.case-judgment-references { display: flex; flex-wrap: wrap; gap: var(--aml-space-8) var(--aml-space-16) }
-.case-judgment-references label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--aml-space-4);
-  min-block-size: var(--aml-size-control-compact);
-  cursor: pointer;
-}
-.case-judgment-references input { margin: 0; accent-color: var(--primary-action-blue) }
 .case-judgment-details { display: grid; gap: var(--aml-space-8); margin: 0 }
 .case-judgment-details dd { margin: 0; white-space: pre-wrap }
 .case-judgment-details dt { color: var(--muted-text) }
+
+.case-judgment-dropdowns {
+  display: grid;
+  gap: var(--aml-space-8);
+}
+.case-judgment-dropdowns .glide-select__trigger {
+  inline-size: 100%;
+}
+.case-judgment-dropdowns .glide-select__chevron {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+.case-judgment-dropdowns .glide-select__menu[data-side] {
+  position: relative;
+  inset: auto;
+  margin-block-start: var(--aml-space-4);
+}
+
+.related-bundle-notice > [role="alert"] {
+  margin: 0;
+  padding: var(--aml-space-8) var(--aml-space-12);
+  border-color: var(--status-danger-accent);
+  border-radius: var(--aml-radius-control);
+  background: color-mix(in srgb, var(--status-danger-accent) 14%, var(--inner-surface));
+  color: var(--text);
+  overflow-wrap: anywhere;
+}

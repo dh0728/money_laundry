@@ -223,7 +223,7 @@ function Catalogue() {
         <div className="catalogue-actions">
           <PrimaryButton tone="brand" onClick={() => setFeedback('강조 버튼 실행')}>실행</PrimaryButton>
           <PrimaryButton tone="brand" disabled>실행 불가</PrimaryButton>
-          <ConfirmHoldButton doneLabel="확인 완료" onHold={() => setFeedback('길게 눌러 실행했습니다.')}>길게 눌러 확인</ConfirmHoldButton>
+          <ConfirmHoldButton tone="negative" doneLabel="확인 완료" onHold={() => setFeedback('길게 눌러 실행했습니다.')}>길게 눌러 확인</ConfirmHoldButton>
           <ActionButton className="row" onClick={() => setFeedback('보조 버튼 실행')}>보조 동작</ActionButton>
         </div>
       </Demo>

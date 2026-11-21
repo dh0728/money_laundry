@@ -36,23 +36,13 @@ it('commits once after a full keyboard hold and cancels early release or blur', 
 });
 
 
-it('requires the full hold on the blue primary variant', () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+it('executes a blue primary action with one click', () => {
   const execute = vi.fn();
   render(<PrimaryButton tone="brand" onHold={execute}>AI 보고서 다운로드</PrimaryButton>);
   const button = screen.getByRole('button', { name: 'AI 보고서 다운로드' });
+  expect(button).toHaveAttribute('data-activation', 'press');
   expect(button.closest('.star-border').querySelector('canvas')).toHaveAttribute('aria-hidden', 'true');
   fireEvent.click(button);
-  expect(execute).not.toHaveBeenCalled();
-
-  fireEvent.keyDown(button, { key: 'Enter' });
-  act(() => vi.advanceTimersByTime(1000));
-  fireEvent.keyUp(button, { key: 'Enter' });
-  expect(execute).not.toHaveBeenCalled();
-
-  fireEvent.keyDown(button, { key: ' ' });
-  act(() => vi.advanceTimersByTime(2100));
-  fireEvent.keyUp(button, { key: ' ' });
   expect(execute).toHaveBeenCalledOnce();
 });
 

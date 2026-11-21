@@ -44,17 +44,19 @@ export function PrimaryButton({ children, className = '', disabled, radius, styl
 }
 
 function AccentButton({ tone = 'brand', activation = 'hold', radius = 'var(--aml-radius-full)',
-  className = '', children, doneLabel = children, disabled = false, ...props }) {
+  className = '', children, doneLabel = children, disabled = false, onClick, onHold, ...props }) {
+  const needsHold = activation === 'hold' && tone !== 'brand';
   const ink = `var(--action-${tone}-ink)`;
   return <StarBorder as="span" className="accent-action" aria-disabled={disabled || undefined}
     color="var(--aml-white-100)" trailLength={0.26} thickness={1.5} glow={0.38}
     backgroundColor="transparent" borderColor="transparent" radius={typeof radius === 'number' ? radius : 999}>
     <HoldButton className={`screen-primary screen-primary--${tone} ${className}`.trim()}
-      size="sm" radius={radius} activation={activation} disabled={disabled}
+      size="sm" radius={radius} activation={needsHold ? 'hold' : 'press'} disabled={disabled}
+      onHold={needsHold ? onHold : undefined} onClick={needsHold ? undefined : onClick ?? onHold}
       backgroundColor={`var(--action-${tone}-face)`} textColor={ink}
       fillColor={`var(--action-${tone}-edge)`} fillTextColor={ink}
       holdTime={2000} resetAfter={250} pressScale={1} glow={false} doneLabel={doneLabel}
-      title={!disabled && activation === 'hold' ? '2초 동안 길게 누르기' : undefined} {...props}>{children}</HoldButton>
+      title={!disabled && needsHold ? '2초 동안 길게 누르기' : undefined} {...props}>{children}</HoldButton>
   </StarBorder>;
 }
 

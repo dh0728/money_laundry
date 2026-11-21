@@ -1,5 +1,6 @@
 import { caseFixtureRows, dateFromCode } from '../components/query-controls.jsx';
 import { applyPreviewJudgment } from '../features/investigation/case-judgment-data.js';
+import { applyPreviewEpisodeTransfers } from '../features/investigation/preview-episode-transfer.js';
 import { applyPreviewAlertMembership } from '../features/investigation/case-membership-data.js';
 import { wasPreviewCaseRead } from '../features/investigation/case-read-state.js';
 import { sampleTransactions, transactionFixture } from './transaction-fixtures.js';
@@ -109,13 +110,13 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
   for (const row of baseCases) for (const transaction of row.related) {
     if (!allTransactions.has(transaction.code)) allTransactions.set(transaction.code, transaction);
   }
-  const cases = applyPreviewAlertMembership(baseCases, allTransactions, evidenceSummary);
+  const cases = applyPreviewEpisodeTransfers(applyPreviewAlertMembership(baseCases, allTransactions, evidenceSummary), evidenceSummary);
   const alertCases = cases.filter(row => row.kind === 'Alert');
   for (const row of cases) {
     if (row.kind !== 'Episode') continue;
     const relatedCodes = new Set(row.related.map(transaction => transaction.code));
     row.overlappingAlerts = alertCases.filter(alert => alert.related.some(transaction => relatedCodes.has(transaction.code)));
-    row.linkedAlerts = row.overlappingAlerts.length;
+    row.linkedAlerts = row.linkedAlertCodes?.length ?? row.overlappingAlerts.length;
   }
   return { transactions: [...allTransactions.values()], cases, mine: cases.filter(row => row.assigned) };
 }

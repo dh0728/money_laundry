@@ -75,7 +75,13 @@
 <a id="live-layout-api-handoff"></a>
 ### 2026-11-20 5215 화면 검수 및 백엔드 인계 초안
 
-코드는 `frontend/web-app/src`에 있고, 앱 기본 주소에서 3.4.1 화면을 연다. `VITE_API_MODE=live`는 기존 로그인·세션 및 알림 API를 사용한다. 룰·조사·대시보드·보고서는 아래 샘플 기준으로 API를 붙일 수 있다. 기존 경로와 응답의 근거는 [백엔드 API §7·§9·§10](../../../backend/api-server/API.md)과 [프론트 API 어댑터](../../../frontend/web-app/src/api/)다.
+코드는 `frontend/web-app/src`에 있고, 앱 기본 주소에서 3.5.0 화면을 연다. `VITE_API_MODE=live`는 기존 로그인·세션 및 알림 API를 사용한다. 룰·조사·대시보드·보고서는 아래 샘플 기준으로 API를 붙일 수 있다. 기존 경로와 응답의 근거는 [백엔드 API §7·§9·§10](../../../backend/api-server/API.md)과 [프론트 API 어댑터](../../../frontend/web-app/src/api/)다.
+
+3.5.0 Sample 동선은 Alert 상세 **관련 → 후보 선택 → 판정 → 대상·사유 확인 → 편입**. 기존 Episode 편입은 Alert 1건부터, 새 Episode는 2건부터. Sample은 브라우저 탭에 저장. 원래 소속 정보가 없는 기존 Sample Episode는 추가 연결만 해제하고, 새 Episode는 남은 Alert가 2건 미만이면 해체 및 Alert 복원.
+
+API 연결 위치는 [화면의 저장 호출부](../../../frontend/web-app/src/app/layout.js)의 `saveEpisode`. [기존 명령 생성 함수](../../../frontend/web-app/src/api/reviewCommands.ts)와 [전송 함수](../../../frontend/web-app/src/api/liveReview.ts)를 사용해 `POST /api/v1/review/commands` 호출. 편입은 원본 사건 `caseId`·`revision`과 기존 대상의 `targetCaseId`·`targetRevision` 사용. 해제는 대상 Episode의 `caseId`·`revision`과 소속 Alert의 `groupId` 사용. 생성 ID와 해체 결과는 서버 응답 사용.
+
+Sample은 ADMIN·STAFF 계정으로 검수 가능. 현재 서버 명령의 조사 변경 권한은 담당 STAFF 기준. 연결 시 서버 권한과 revision 충돌 응답 확인.
 
 | 화면 | 현재 화면에서 확인할 동작과 데이터 | 기존 API와 합의할 항목 |
 | --- | --- | --- |

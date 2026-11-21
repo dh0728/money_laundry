@@ -13,7 +13,8 @@
   outline: var(--aml-stroke-focus) solid transparent;
   outline-offset: calc(-1 * var(--aml-stroke-focus));
   transition: background-color calc(var(--aml-motion-drawer-duration) / 2) ease,
-    outline-color calc(var(--aml-motion-drawer-duration) / 2) ease;
+    outline-color calc(var(--aml-motion-drawer-duration) / 2) ease,
+    transform var(--aml-motion-drawer-duration) var(--aml-motion-drawer-ease);
 }
 [data-glow-surface][data-verdict]:not([data-selected]) {
   --record-card-edge: color-mix(in srgb, var(--record-verdict-surface), var(--record-card-glow) var(--record-verdict-edge-strength));
@@ -45,7 +46,19 @@
   [data-glow-surface][data-card-interactive] { transition: none }
 }
 @media (any-hover: hover) and (prefers-reduced-motion: no-preference) {
-  :root:not([data-glassmorphism="false"], [data-reduced-motion="true"]) .preview-tilt-cards [data-card-spotlight]::after {
+  :root:not([data-reduced-motion="true"]) :is(.magic-bento__cell, .case-list > *, .preview-related-cases > ul > li):has([data-card-tilted]) {
+    position: relative;
+    z-index: 1;
+  }
+  :root:not([data-reduced-motion="true"]) .magic-bento__card:has([data-card-interactive]) {
+    overflow: visible;
+  }
+  :root:not([data-reduced-motion="true"]) [data-card-tilted] {
+    z-index: 1;
+    transform: perspective(900px) rotateX(var(--card-tilt-x, 0deg)) rotateY(var(--card-tilt-y, 0deg)) scale(var(--card-tilt-scale, 1));
+  }
+  :root:not([data-glassmorphism="false"], [data-reduced-motion="true"])
+    :is([data-card-interactive], .preview-tilt-cards [data-glow-surface])[data-card-spotlight]::after {
     content: "";
     position: absolute;
     inset: 0;
