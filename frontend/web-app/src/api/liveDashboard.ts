@@ -18,8 +18,6 @@ type Investigation = {
     firstReview: { samples: number; averageSeconds: number | null }
     completion: { samples: number; averageSeconds: number | null }
   }
-  activities: { event_id: number; case_id: number; action: string; comment: string | null; business_at: string }[]
-  priority: { case_id: number; kind: 'ALERT' | 'EPISODE'; alert_id: number | null; created_at: string; risk: number }[]
 }
 export type DashboardSummary = {
   businessAt: string

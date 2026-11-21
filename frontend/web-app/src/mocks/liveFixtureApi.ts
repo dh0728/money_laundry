@@ -1,8 +1,31 @@
 import type { Page } from '@/api/common'
-import type { DashboardResponse } from '@/api/liveDashboard'
 import type { LedgerAccount, LedgerOwner, LedgerTransaction } from '@/api/liveLedger'
 import type { ReviewCase, ReviewMember, ReviewMoney } from '@/api/liveReview'
 import type { WorkNotification } from '@/api/notifications'
+
+// 예전 대시보드(/api/v1/dashboard) 응답 모양. 최신 백엔드에는 없고 이 합성 데이터만 쓴다.
+export type DashboardResponse = {
+  businessAt: string
+  personal: { pending: number; aged: number; closed: number }
+  institution: { alerts: number; episodes: number; aged: number; today: number; yesterday: number }
+  openAlertsAgedOver3Days: number
+  detection: { received: number; analyzed: number; suspicious: number }
+  deliveryDate: string
+  pendingReports: number
+  dailyAlertStatus: { date: string; pending: number; inProgress: number; done: number }[]
+  agreements: { agreement: string; count: number }[]
+  types: { type: number; count: number }[]
+  daily: { day: string; incoming: number; completed: number }[]
+  episodeWork: {
+    asOf: string
+    current: { open: number; aged: number; unreviewed: number; created_today: number; closed_today: number }
+    firstReview: { samples: number; average_seconds: number | null }
+    completion: { samples: number; average_seconds: number | null }
+    oldestOpen: { caseId: number; assignee: string; age_seconds: number; awaiting_review: boolean }[]
+  }
+  activities: { event_id: number; case_id: number; action: string; comment: string | null; business_at: string }[]
+  priority: { case_id: number; kind: 'ALERT' | 'EPISODE'; alert_id: number | null; created_at: string; risk: number }[]
+}
 
 // Local FE preview only. Every identifier, person, amount and evaluation here is invented.
 const businessAt = '2026-10-15T18:00:00+09:00'

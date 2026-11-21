@@ -8,6 +8,7 @@ import { bindCardGlow } from '../components/card-glow.js';
 import { ConfirmHoldButton, mountLoginPrimary } from '../components/primary-button.jsx';
 import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
+import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { createCaseEvidenceSelection } from '../features/investigation/case-evidence-selection.js';
 import { editPreviewAlertTransactions } from '../features/investigation/case-membership-data.js';
@@ -133,8 +134,13 @@ function WorkTab(code) {
   </div>`;
 }
 
+// 서비스 모드는 서버에서 받은 사건을, 프리뷰는 샘플을 화면 데이터로 쓴다.
+function caseSource(groups) {
+  return serviceMode ? rebuildLiveSource() : dashboardFixtures(groups);
+}
+
 function tabCodes(group) {
-  return dashboardRecordCodes(group);
+  return serviceMode ? liveCodes(group.prefix) : dashboardRecordCodes(group);
 }
 
 function TabGroup(group) {
@@ -744,9 +750,9 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const isCaseList = /^add-tab\/(alerts|episodes)(?:-|\/|$)/.test(path ?? '');
   const groups = isDashboard || isReport || isCaseDetail || path?.startsWith('add-tab/')
     ? Object.fromEntries(tabGroups.map(group => [group.prefix, tabCodes(group)])) : undefined;
-  if (isDashboard || isReport || isCaseDetail || isCaseList) dashboardSource ??= dashboardFixtures(groups);
+  if (isDashboard || isReport || isCaseDetail || isCaseList) dashboardSource ??= caseSource(groups);
   if (isCaseDetail && markPreviewCaseRead(dashboardSource.cases.find(row => row.code === code))) {
-    dashboardSource = dashboardFixtures(groups);
+    dashboardSource = caseSource(groups);
   }
   const queryData = isDashboard ? {
     rows: path === sections.dashboard ? dashboardSource.mine : dashboardSource.cases,
@@ -788,7 +794,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         cases: dashboardSource.cases, sourceCode: code, targetCode, transactionCodes, reason, user: currentPreviewUser(),
       });
       if (!result.ok) return result;
-      dashboardSource = dashboardFixtures(groups);
+      dashboardSource = caseSource(groups);
       const row = dashboardSource.cases.find(item => item.code === code);
       mountedWorkflows.updateCase(row, dashboardSource);
       unmountCaseGraph?.update({ active: row, cases: dashboardSource.cases });
@@ -804,13 +810,13 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (readOnly || activeWorkCode !== target) return;
       const current = dashboardSource.cases.find(item => item.code === target);
       if (!startPreviewReview(current)) return;
-      dashboardSource = dashboardFixtures(groups);
+      dashboardSource = caseSource(groups);
       mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
     },
     saveJudgment: (target, verdict, details, reasonCategory) => {
       const row = !readOnly && activeWorkCode === target ? dashboardSource.cases.find(item => item.code === target) : undefined;
       const result = savePreviewJudgment(row, verdict, details, reasonCategory, currentPreviewUser()?.username ?? '');
-      if (result.ok) dashboardSource = dashboardFixtures(groups);
+      if (result.ok) dashboardSource = caseSource(groups);
       return result;
     },
     onJudgmentClose: () => {
@@ -847,7 +853,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const caseTable = byId('workspace').querySelector('[data-case-list-table]');
   if (caseTable) void import('../features/investigation/preview-case-list-table.jsx').then(({ mountPreviewCaseTable }) => {
     if (!caseTable.isConnected) return;
-    dashboardSource ??= dashboardFixtures(groups);
+    dashboardSource ??= caseSource(groups);
     const caseRows = new Map(dashboardSource.cases.map(row => [row.code, row]));
     unmountInvestigation = mountPreviewCaseTable(caseTable, caseTable.dataset.caseListTable,
       codes.map(recordCode => caseRows.get(recordCode)).filter(Boolean), groupPrefix === 'E', queryData.rows.length);
@@ -858,6 +864,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         codes,
         code,
         groups,
+        cases: serviceMode ? liveSource().cases : undefined,
         label: component.dataset.label,
         tableView: path === ledgerTableScreen,
       }));
@@ -1392,6 +1399,37 @@ function showRoute(route, params, navigationMode) {
   loginScene.cancel();
   document.body.removeAttribute('data-login-required');
   byId('preview-login').hidden = true;
+  if (serviceMode && !liveSourceLoaded()) {
+    const actor = previewActor;
+    const open = () => {
+      if (!signedIn || previewActor !== actor) return;
+      dashboardSource = undefined;
+      showLoadedRoute(route, params, navigationMode);
+    };
+    void loadLiveSource().then(open, () => {
+      document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
+        status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
+      } }));
+      open();
+    });
+    return;
+  }
+  showLoadedRoute(route, params, navigationMode);
+}
+
+function showLoadedRoute(route, params, navigationMode) {
+  if (serviceMode) {
+    // 서버에 없는 사건 탭(이전 세션, 다른 데이터)은 열지 않는다.
+    const cases = new Set(liveSource().cases.map(row => row.code));
+    let removed = false;
+    for (const tab of document.querySelectorAll('.work-tabs [data-work-code]')) {
+      if (tab.dataset.workCode.startsWith('T-') || cases.has(tab.dataset.workCode)) continue;
+      tab.closest('.work-tab').remove();
+      removed = true;
+    }
+    if (removed) persistWorkTabs();
+    if (route.code && !route.code.startsWith('T-') && !cases.has(route.code)) route = dashboardRoute;
+  }
   if (route.code) addWorkTab(route.code);
   showWorkspace('', route.code, route.screen, navigationMode, params);
 }
@@ -1557,6 +1595,7 @@ function clearWorkspaceSession() {
   setPreviewSession(null);
   activeEvidence = undefined;
   resetPreviewCaseRead();
+  resetLiveSource();
   dashboardSource = undefined;
 }
 createRoot(byId('preview-sign-out')).render(createElement(ConfirmHoldButton, {

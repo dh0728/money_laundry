@@ -439,7 +439,7 @@ export function CaseCards({ codes, label, caseRows }) {
 
 export function mountInvestigation(host, props) {
   const root = createRoot(host);
-  const caseRows = new Map(dashboardFixtures(props.groups).cases.map(row => [row.code, row]));
+  const caseRows = new Map((props.cases ?? dashboardFixtures(props.groups).cases).map(row => [row.code, row]));
   const ledger = host.dataset.investigationComponent === 'ledger';
   const renderLedger = tableView => root.render(<Ledger {...props} caseRows={caseRows} tableView={tableView} />);
   if (ledger) renderLedger(props.tableView);

@@ -3,7 +3,7 @@ import type { Page } from '@/api/common'
 import type { WorkNotification, NotificationPage } from '@/api/notifications'
 import type { ReviewCase } from '@/api/liveReview'
 import type { LedgerTransaction } from '@/api/liveLedger'
-import type { DashboardResponse } from '@/api/liveDashboard'
+import type { DashboardResponse } from './liveFixtureApi'
 import { fixtureGet } from './liveFixtureApi'
 const rows = <T,>(path: string) => (fixtureGet(`${path}${path.includes('?') ? '&' : '?'}size=1000`) as Page<T>).content
 
