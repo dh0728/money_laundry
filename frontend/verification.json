@@ -1,0 +1,282 @@
+{
+  "date": "2026-10-26",
+  "scope": "path/version migration, not design or feature acceptance",
+  "new_missing_imports": 0,
+  "frontend_syntax_checked_files": 1273,
+  "frontend_syntax_errors": 0,
+  "current_web_app": {
+    "tests": "49 files / 263 tests passed",
+    "build": "TypeScript + Vite passed",
+    "lint": "0 errors / 1 existing-source warning",
+    "test_run_note": "initial concurrent run hit two 5s timeouts; rerun of unchanged code passed all263"
+  },
+  "historical_packages": [
+    {
+      "package": "money_laundry-0.13.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  2 passed (2)",
+          "Tests  9 passed (9)",
+          "Duration  9.70s (transform 264ms, setup 0ms, import 8.55s, tests 331ms, environment 0ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.14.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  3 passed (3)",
+          "Tests  16 passed (16)",
+          "Duration  9.81s (transform 356ms, setup 0ms, import 7.82s, tests 252ms, environment 4ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.15.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  11 passed (11)",
+          "Tests  111 passed (111)",
+          "Duration  24.25s (transform 733ms, setup 0ms, import 17.87s, tests 5.02s, environment 1ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.16.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  11 passed (11)",
+          "Tests  111 passed (111)",
+          "Duration  24.06s (transform 722ms, setup 0ms, import 17.79s, tests 4.87s, environment 1ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.17.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  15 passed (15)",
+          "Tests  180 passed (180)",
+          "Duration  35.72s (transform 1.06s, setup 0ms, import 24.76s, tests 8.73s, environment 2ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.18.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 1,
+        "summary": [
+          "Test Files  5 failed | 18 passed (23)",
+          "Tests  6 failed | 217 passed (223)",
+          "Duration  48.55s (transform 888ms, setup 0ms, import 31.57s, tests 13.84s, environment 3ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.19.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 1,
+        "summary": [
+          "Test Files  5 failed | 18 passed (23)",
+          "Tests  6 failed | 194 passed (200)",
+          "Duration  48.70s (transform 1.03s, setup 0ms, import 32.83s, tests 12.62s, environment 2ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.20.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 1,
+        "summary": [
+          "Test Files  5 failed | 18 passed (23)",
+          "Tests  6 failed | 210 passed (216)",
+          "Duration  48.38s (transform 1.00s, setup 0ms, import 31.91s, tests 13.41s, environment 2ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.21.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  36 passed (36)",
+          "Tests  306 passed (306)",
+          "Duration  89.85s (transform 1.51s, setup 0ms, import 68.70s, tests 15.83s, environment 4ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.22.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  40 passed (40)",
+          "Tests  340 passed (340)",
+          "Duration  85.45s (transform 1.06s, setup 0ms, import 65.86s, tests 14.33s, environment 4ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.23.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  50 passed (50)",
+          "Tests  453 passed (453)",
+          "Duration  110.12s (transform 1.30s, setup 0ms, import 86.68s, tests 16.72s, environment 6ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    },
+    {
+      "package": "money_laundry-0.24.0",
+      "install": {
+        "exit": 0,
+        "summary": []
+      },
+      "test": {
+        "exit": 0,
+        "summary": [
+          "Test Files  53 passed (53)",
+          "Tests  459 passed (459)",
+          "Duration  123.47s (transform 1.54s, setup 0ms, import 98.86s, tests 17.45s, environment 6ms)"
+        ]
+      },
+      "build": {
+        "exit": 0,
+        "summary": []
+      }
+    }
+  ],
+  "historical_known_failures": {
+    "0.18.0": {
+      "failed_tests": 6,
+      "same_failing_cases_as_original_Git_base": true
+    },
+    "0.19.0": {
+      "failed_tests": 6,
+      "same_failing_cases_as_original_Git_base": true
+    },
+    "0.20.0": {
+      "failed_tests": 6,
+      "same_failing_cases_as_original_Git_base": true
+    }
+  },
+  "remote_boundary": {
+    "team": "git push --dry-run origin HEAD:refs/heads/fe/work denied GitHub403 to kmg200164; no remote write; local commit only",
+    "personal_vaults": "main push and fetch verification follow this report",
+    "unchanged_team_branches": [
+      "master",
+      "dev",
+      "frontend"
+    ],
+    "devices": "Mac and Windows local worktrees/ignored artifacts unverified; no access granted"
+  },
+  "graph_review": {
+    "project": "money_laundry fe/work frontend/implementation/1.0.0/web-app",
+    "command": "VITE_API_MODE=mock pnpm exec vite --host 127.0.0.1 --port 5210 --strictPort",
+    "url": "http://127.0.0.1:5210/#alerts/3001",
+    "next": "select graph tab",
+    "transport": "mock; fixture takes live branch and is not this timeline graph",
+    "source_last_change": [
+      "22fa227",
+      "0cdb468"
+    ],
+    "TimeGraph_sha256": "7015e9d0f8abcaa35eeb7c2becf3c9c5ae5d6f5c8c3f57690be420d971565cdc",
+    "PatternGraph_sha256": "0803cf0f3932186e5cc35176460e2e06365a7be0914dabb3881b3988258e4849",
+    "runtime_and_pixels": "not launched in this task; Mac checked separately",
+    "Sites_a12acd6_comparison": "not directly available in these three repos; no pixel/source difference asserted"
+  }
+}

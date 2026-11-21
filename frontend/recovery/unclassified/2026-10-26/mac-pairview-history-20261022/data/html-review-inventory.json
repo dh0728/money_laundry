@@ -1,0 +1,1982 @@
+{
+  "counts": {
+    "paths": 223,
+    "unique_sha256": 83,
+    "prior_exact_sha_join": 27,
+    "new_boundary_review_groups": 56
+  },
+  "groups": [
+    {
+      "id": "H001",
+      "sha256": "0113dbbd2713078eae0c53b20fd7c01f67fc792145a8eac82085610342c96b6a",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P001",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H002",
+      "sha256": "0390f97af0416f537d65730bf68d30a90282e0881c4285ddc92c5f76bf475517",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P002",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H003",
+      "sha256": "069e775eff7791cca4a3f829f1fb57939858c7fb3edc054e84f3903d80115a54",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "qa-dom-snapshots",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-scripts-dom-boundary",
+      "disposition": "captured-state-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P003",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H004",
+      "sha256": "0991e1c1a572012ebd562850f776f6670429e1d6bd8b198c9f04a3c4190caff5",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P004",
+          "fileLabel": "aml-overview-responsive-states.html"
+        },
+        {
+          "id": "P005",
+          "fileLabel": "mock.html"
+        },
+        {
+          "id": "P006",
+          "fileLabel": "aml-overview-responsive-states.html"
+        },
+        {
+          "id": "P007",
+          "fileLabel": "aml-overview-responsive-states.html"
+        },
+        {
+          "id": "P008",
+          "fileLabel": "mock.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H005",
+      "sha256": "0bfa18d67667ca982b5162403b305248508cce95bece1183d8016899b340bd28",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-21,22,23,24",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P009",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P010",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P011",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P012",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P013",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P014",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P015",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P016",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P017",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P018",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P019",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P020",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P021",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P022",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P023",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P024",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H006",
+      "sha256": "0c86992d77b2318685983e12b081596c6889d06d8c1d03a26e157a65aed9bc9b",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "qa-dom-snapshots",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-scripts-dom-boundary",
+      "disposition": "captured-state-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P025",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H007",
+      "sha256": "0ced941f58d04413a94a6e50c9a45c0f049ade9d916af692abb92f4d8996a2a3",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-16",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P026",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P027",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P028",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P029",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P030",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H008",
+      "sha256": "0fc0a693c488effacff917a2682f0aeee5555c5038d4d4b9f0af23474295dfbd",
+      "category": "vendor-generated-report",
+      "versionGroup": "generated-build-report",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-product-ux",
+      "pathOccurrences": [
+        {
+          "id": "P031",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H009",
+      "sha256": "105a5a8fc93cf98b71fd5108be43317341f5a4dd235de59abf2f234eb297e89e",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P032",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H010",
+      "sha256": "1866e5eb463e3619eac92b13ed484517721175734da1f2ceb760189a2f599e92",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P033",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H011",
+      "sha256": "196602ef07f255a4243c48413ff3008b75a8b48089ab64ff6fea40a14c1ca37f",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P034",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P035",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H012",
+      "sha256": "19a218c773d04e4e15699883221f9fb9924ba3338806a0717c383f3ecfac9640",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-13,14",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P036",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P037",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P038",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P039",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P040",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P041",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P042",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P043",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P044",
+          "fileLabel": "AML-RADAR-v13.html"
+        },
+        {
+          "id": "P045",
+          "fileLabel": "AML-RADAR-v13.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H013",
+      "sha256": "1bd0b9e47a82aa35989ea78a80226e8accf560d9ec9484b2345cd0b8443c7390",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P046",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H014",
+      "sha256": "1c5db9f11d07e6df756b139870dc73c774fba79df0128df8f5cbab5bb30ca7fa",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-14",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P047",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P048",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P049",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P050",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P051",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H015",
+      "sha256": "248fa7339216986a981459d7cf57304b51bb0c9cc7d2648cc049341b78b1d8bb",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-19",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P052",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P053",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P054",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P055",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P056",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H016",
+      "sha256": "25b529b71c7a2b471e7802392b1bbc84b7a5618f6562d17aed42e133b38405b5",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P057",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P058",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H017",
+      "sha256": "296592b72336d1da790d08ab5b5e0cb141170008b3b0bf77bc328bed111663d3",
+      "category": "overview-standalone",
+      "versionGroup": "overview-design-reference",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "prior-bounded-review-plus-current-comparison",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P059",
+          "fileLabel": "ui-redesign-wireframes.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H018",
+      "sha256": "344e79214cf6fa33b7a48510d1543b209a1e0e5e291ff8292ad5a79826bb7160",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P060",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P061",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H019",
+      "sha256": "35d8a10d7ed23f985f3dae2d9b66fde37a73e8120de9f9c89fc1fac35bb984c6",
+      "category": "overview-standalone",
+      "versionGroup": "overview-design-reference",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "prior-bounded-review-plus-current-comparison",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P062",
+          "fileLabel": "aml-overview-responsive-states.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H020",
+      "sha256": "39453e7c507500ca95549cc431a2c7d827dea076fa3a8799f9c47e2b34fe7a80",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P063",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H021",
+      "sha256": "46ab1249cbd94e73c6e800d738f529f4ca8abf956f80929976fe6806bf9fd424",
+      "category": "research-docs-and-standalone",
+      "versionGroup": "prior-reviewed-reference",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "prior-evidence-plus-structure",
+      "disposition": "prior-review-evidence-linked",
+      "pathOccurrences": [
+        {
+          "id": "P064",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H022",
+      "sha256": "47d97545a4aef5273ba4137ce4071f5b613ff3c942f7bff0e2d964365c73ad03",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-16",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P065",
+          "fileLabel": "AML-RADAR-v16.html"
+        },
+        {
+          "id": "P066",
+          "fileLabel": "AML-RADAR-v16.html"
+        },
+        {
+          "id": "P067",
+          "fileLabel": "AML-RADAR-v16.html"
+        },
+        {
+          "id": "P068",
+          "fileLabel": "AML-RADAR-v16.html"
+        },
+        {
+          "id": "P069",
+          "fileLabel": "AML-RADAR-v16.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H023",
+      "sha256": "484d59e8aeb0ebb6fd55e4feb753a72fcf68b975f84426d75e4f21d4b512fa59",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P070",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P071",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H024",
+      "sha256": "4a116abf6045e79d3a75ad616c2263bbccb5999193d939202927172ce2f8977e",
+      "category": "research-docs-and-standalone",
+      "versionGroup": "prior-reviewed-reference",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "prior-evidence-plus-structure",
+      "disposition": "prior-review-evidence-linked",
+      "pathOccurrences": [
+        {
+          "id": "P072",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P073",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P074",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P075",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H025",
+      "sha256": "4c56f40e92f860678c9d7d0b38690df350e72459a167917e419d805e7436d642",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P076",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P077",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P078",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P079",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P080",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P081",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P082",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P083",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P084",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P085",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H026",
+      "sha256": "4ea373ae95b26584370f172b8ff88ed9dc742541d53020b8455e8105d5859dee",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P086",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H027",
+      "sha256": "4f927833546287c97f3dea4f60aab4430d5b6a304f489a96ed8ac48434a3f1a1",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "scroll-contract-proof",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "full-small-proof-source",
+      "disposition": "no-independent-product-ux",
+      "pathOccurrences": [
+        {
+          "id": "P087",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P088",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H028",
+      "sha256": "53075f1c950895983a1db71c54e2a08a275ed956366c751e4ea8b104455d4a26",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-17",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P089",
+          "fileLabel": "AML-RADAR-v17.html"
+        },
+        {
+          "id": "P090",
+          "fileLabel": "AML-RADAR-v17.html"
+        },
+        {
+          "id": "P091",
+          "fileLabel": "AML-RADAR-v17.html"
+        },
+        {
+          "id": "P092",
+          "fileLabel": "AML-RADAR-v17.html"
+        },
+        {
+          "id": "P093",
+          "fileLabel": "AML-RADAR-v17.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H029",
+      "sha256": "5d1772be1ba31ac0c730ed83070f4f6cc22e8671c0b9586f3613853a8ba70bc1",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P094",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H030",
+      "sha256": "5e44ec8d08d9cf119d47bad8e9f7ac8480e735b99ba4df10a461679564d68c12",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "qa-dom-snapshots",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-scripts-dom-boundary",
+      "disposition": "captured-state-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P095",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H031",
+      "sha256": "607966085ddce1200f19ace18c82b3769766be564389a30fdcbce728080fc5a2",
+      "category": "pairview-and-fixture",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P096",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H032",
+      "sha256": "617ba174f602633bbc511e1fe7d85146c9fda2f0c262204117830f93181d4fa9",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P097",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H033",
+      "sha256": "61db586f44d0e120f3dab661b802b3e50816f07216a54076acbadee92845f098",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-20",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P098",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P099",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P100",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P101",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P102",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H034",
+      "sha256": "682b8a9b8a87d91bce179f888e35d7845b3ae77ca08d4022d6201b94c291cae4",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P103",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H035",
+      "sha256": "6d8254c651bc1964e69e6a49df85e059be400f359b88b5e427a5e79e57767f1d",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P104",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H036",
+      "sha256": "6f4903010c07bee80046ebff9c19549b7e81f129fe48230e789fd10c82fdf751",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "qa-dom-snapshots",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-scripts-dom-boundary",
+      "disposition": "captured-state-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P105",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H037",
+      "sha256": "72390bbe6b8e174781921c209a8450ab0850f73c5f942016bf6db0c65a136024",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P106",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H038",
+      "sha256": "75226b47215e940c1c57b2edbdefc0577c827015c7e3466901346f81373d9036",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P107",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H039",
+      "sha256": "7577ed755d2eafcbf202a44347dfcdaedf709860f6a2e506325b0d75645eac21",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P108",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H040",
+      "sha256": "75809205d4ac735d3efd9afc9db31308e5fd7e46998fc91a412c4f17c446655e",
+      "category": "research-docs-and-standalone",
+      "versionGroup": "dataset-research",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-and-script-purpose",
+      "disposition": "research-boundary-reviewed",
+      "pathOccurrences": [
+        {
+          "id": "P109",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P110",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P111",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P112",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H041",
+      "sha256": "77452fed0c931393236e0bdf7be2d6078b3b56f4683baa67e40ab87ff4314c98",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P113",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P114",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H042",
+      "sha256": "774a72ccbd9712ad88d02d3402b323e0dc7019dbe44a2e1e4831a16587941a0e",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P115",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H043",
+      "sha256": "783bee2f242dff6b16d5e8ba195b910822b10b35fba0d92aa57813f0dfe9d65b",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P116",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P117",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H044",
+      "sha256": "830792a4295a3231326d7ceb6cefd5ae53061366a98a76055ddb5f1e77950eae",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P118",
+          "fileLabel": "wiring.html"
+        },
+        {
+          "id": "P119",
+          "fileLabel": "aml-api-wiring-css3d.html"
+        },
+        {
+          "id": "P120",
+          "fileLabel": "aml-api-wiring-css3d.html"
+        },
+        {
+          "id": "P121",
+          "fileLabel": "wiring.html"
+        },
+        {
+          "id": "P122",
+          "fileLabel": "aml-api-wiring-css3d.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H045",
+      "sha256": "85f2e14e41fadde5d6a440c206c50a9fe2132465c9079e07fa4307736e7214e7",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P123",
+          "fileLabel": "aml-api-wiring-css3d.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H046",
+      "sha256": "8a073b2a2a5d51f3b0c81aa262e9ec3165342d31dfdbee0ea12a9023f7859316",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-14",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P124",
+          "fileLabel": "AML-RADAR-v14.html"
+        },
+        {
+          "id": "P125",
+          "fileLabel": "AML-RADAR-v14.html"
+        },
+        {
+          "id": "P126",
+          "fileLabel": "AML-RADAR-v14.html"
+        },
+        {
+          "id": "P127",
+          "fileLabel": "AML-RADAR-v14.html"
+        },
+        {
+          "id": "P128",
+          "fileLabel": "AML-RADAR-v14.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H047",
+      "sha256": "8b6c993abd2eeb6154c0009e701e527657b5e69475bdadf87cba2ca90bc13a44",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P129",
+          "fileLabel": "aml-api-wiring-css3d.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H048",
+      "sha256": "8b9968ec19566ba0fd8574f205973c9a64dd3d658469573e9be02307e67956e9",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-22",
+      "date": "2026-09-22",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P130",
+          "fileLabel": "AML-RADAR-v22.html"
+        },
+        {
+          "id": "P131",
+          "fileLabel": "AML-RADAR-v22.html"
+        },
+        {
+          "id": "P132",
+          "fileLabel": "AML-RADAR-v22.html"
+        },
+        {
+          "id": "P133",
+          "fileLabel": "AML-RADAR-v22.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H049",
+      "sha256": "93100e5fa9addb58d8220b0ed31a02578356fc3f940a7e3d0460a0c417b6e970",
+      "category": "cross-project",
+      "versionGroup": "out-of-scope",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "metadata-only",
+      "disposition": "cross-project-excluded",
+      "pathOccurrences": [
+        {
+          "id": "P134",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H050",
+      "sha256": "95135990737177249af5977513b7a5caea17f714cd053fd3e1e6336ac41cf595",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P135",
+          "fileLabel": "aml-api-wiring-3d.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H051",
+      "sha256": "95bcb57e3ecfa240ca3f7b277ac0f69bf7c7d7430fc9980782004ba5aa69f611",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P136",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H052",
+      "sha256": "98989ae3e60fe1612545bf0fa808e8a765826680cabf83738c13d291fc03ae0e",
+      "category": "research-docs-and-standalone",
+      "versionGroup": "prior-reviewed-reference",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "prior-evidence-plus-structure",
+      "disposition": "prior-review-evidence-linked",
+      "pathOccurrences": [
+        {
+          "id": "P137",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P138",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P139",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P140",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H053",
+      "sha256": "9aab6475e4cdff518f0d26164d15bc3d0e49fdc089e46f8c9b02b77516d6c210",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-23",
+      "date": "2026-09-22",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P141",
+          "fileLabel": "AML-RADAR-v23.html"
+        },
+        {
+          "id": "P142",
+          "fileLabel": "AML-RADAR-v23.html"
+        },
+        {
+          "id": "P143",
+          "fileLabel": "AML-RADAR-v23.html"
+        },
+        {
+          "id": "P144",
+          "fileLabel": "AML-RADAR-v23.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H054",
+      "sha256": "9ea03ad9cc7eb4ecc96b6d4e53df78003653127579e16a04dbdeea65af0d30f3",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "observed-deployment-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-product-ux",
+      "pathOccurrences": [
+        {
+          "id": "P145",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H055",
+      "sha256": "a00721faaa8c9820db93de8493a609cd63f354bd11ce3bb333673f74bf87fb81",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P146",
+          "fileLabel": "aml-api-wiring-css3d.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H056",
+      "sha256": "a40002f36d0c26ccb949fb8a926a252a5634cf7ce38b650c9eaa9b0979a57786",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-24",
+      "date": "2026-09-25",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P147",
+          "fileLabel": "AML-RADAR-v24.html"
+        },
+        {
+          "id": "P148",
+          "fileLabel": "AML-RADAR-v24.html"
+        },
+        {
+          "id": "P149",
+          "fileLabel": "AML-RADAR-v24.html"
+        },
+        {
+          "id": "P150",
+          "fileLabel": "AML-RADAR-v24.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H057",
+      "sha256": "a62e893860b4374259fe8c7ff82814eb5448980df906ba3dc7b0ce6a3a56e030",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P151",
+          "fileLabel": "aml-api-wiring-3d-2026-10-15-snapshot.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H058",
+      "sha256": "a888f0e550ac008e094a106f61e49f8db422e35aea0953627730e26cfafdd7ce",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-15",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P152",
+          "fileLabel": "AML-RADAR-v15.html"
+        },
+        {
+          "id": "P153",
+          "fileLabel": "AML-RADAR-v15.html"
+        },
+        {
+          "id": "P154",
+          "fileLabel": "AML-RADAR-v15.html"
+        },
+        {
+          "id": "P155",
+          "fileLabel": "AML-RADAR-v15.html"
+        },
+        {
+          "id": "P156",
+          "fileLabel": "AML-RADAR-v15.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H059",
+      "sha256": "b0a22562992a84feec54664b5fe88fabd054020219c6632cd42739901e231905",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P157",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H060",
+      "sha256": "b1360f8e02a98dec14b8af02226fbb45ed494d35556a178163dfc8f7309866d3",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P158",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P159",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H061",
+      "sha256": "b3d4e118775a6da3bf899fd6b01560e7024e0c89f9acd993307ddfaf16daeea0",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-15",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P160",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P161",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P162",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P163",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P164",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H062",
+      "sha256": "b83c30ff4b7007bf7c619a3adc11072089002c85b034c162c08464c6ae385c45",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-13",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P165",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P166",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P167",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P168",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P169",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H063",
+      "sha256": "b926853a5be13297668f0067ce5fb273e33aa706703b19769eafda617c8d768d",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-20",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P170",
+          "fileLabel": "AML-RADAR-v20.html"
+        },
+        {
+          "id": "P171",
+          "fileLabel": "AML-RADAR-v20.html"
+        },
+        {
+          "id": "P172",
+          "fileLabel": "AML-RADAR-v20.html"
+        },
+        {
+          "id": "P173",
+          "fileLabel": "AML-RADAR-v20.html"
+        },
+        {
+          "id": "P174",
+          "fileLabel": "AML-RADAR-v20.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H064",
+      "sha256": "ba5944c228b64b745bf8700f3d639d9f50057b578c7fc4d2f885c27a441f31bf",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P175",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H065",
+      "sha256": "bbc825befee7c6f41cc9b3919a5403e427c532e90b31e605c27903b1def6e68e",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P176",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H066",
+      "sha256": "bc70181931d72ef8a6f81b8d2af9fd6cfe8d60848b7875cb33d797f4e9b61140",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P177",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P178",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H067",
+      "sha256": "c03bf7d31a91bffbaf9b2439e7c04b77b9c22b04056212f67a69ac5f21c2b560",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-19",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P179",
+          "fileLabel": "AML-RADAR-v19.html"
+        },
+        {
+          "id": "P180",
+          "fileLabel": "AML-RADAR-v19.html"
+        },
+        {
+          "id": "P181",
+          "fileLabel": "AML-RADAR-v19.html"
+        },
+        {
+          "id": "P182",
+          "fileLabel": "AML-RADAR-v19.html"
+        },
+        {
+          "id": "P183",
+          "fileLabel": "AML-RADAR-v19.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H068",
+      "sha256": "c1eae8e0b12b886a74ed5436adc620679110884ddbfea809a23c7b1531fdabc2",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P184",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H069",
+      "sha256": "c98fa30e0c3beafc641704c26243ae780e27a7a78ebb2ffd486d0c77d949b223",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P185",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H070",
+      "sha256": "cea478a8836d1a0d7ef38b6181f2761bdbf549dd6bee4bf35262afc2e50f99db",
+      "category": "research-docs-and-standalone",
+      "versionGroup": "dataset-research",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-and-script-purpose",
+      "disposition": "research-boundary-reviewed",
+      "pathOccurrences": [
+        {
+          "id": "P186",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P187",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P188",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P189",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H071",
+      "sha256": "cf2b4a0e4ebf7da3f638e4c5613b1e0d16dd68c7d8ca19f678aa1295cd84a2d8",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P190",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P191",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H072",
+      "sha256": "cf2fe5fc9223acb400dcd60efeb903fd5ee997d0efa3da88096d5bd93320bfc1",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-17",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P192",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P193",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P194",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P195",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P196",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H073",
+      "sha256": "d673315cd19a3d68fb3bf354198fc9c817ec1e4082c76730617b2214b7e86a30",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P197",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P198",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H074",
+      "sha256": "e612cee60425d8ab11105798e78267b8ec341ba058b14af150d9d5d608793fb4",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P199",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P200",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H075",
+      "sha256": "e62a6c6e99e24c470483571125b0898efee8f42afe041e91251eaf48dd066973",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-18",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P201",
+          "fileLabel": "AML-RADAR-v18.html"
+        },
+        {
+          "id": "P202",
+          "fileLabel": "AML-RADAR-v18.html"
+        },
+        {
+          "id": "P203",
+          "fileLabel": "AML-RADAR-v18.html"
+        },
+        {
+          "id": "P204",
+          "fileLabel": "AML-RADAR-v18.html"
+        },
+        {
+          "id": "P205",
+          "fileLabel": "AML-RADAR-v18.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H076",
+      "sha256": "e8b5f4c95789a2040700b237a28d43af2b72e026c915f14fbc8cf2e1878f56e1",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "qa-dom-snapshots",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-scripts-dom-boundary",
+      "disposition": "captured-state-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P206",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H077",
+      "sha256": "eff57375bc60d31fd5a4093bf733c657d1d7f29e704f9e9aa14ce4896890e5f3",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "qa-dom-snapshots",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-scripts-dom-boundary",
+      "disposition": "captured-state-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P207",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H078",
+      "sha256": "f4432bfc2fc9991a139d22364f17ba2922fff55bee1814b999d77aab662491e1",
+      "category": "app-entry-or-build-shell",
+      "versionGroup": "application-entry-shell",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "structure-boundary",
+      "disposition": "no-independent-html-ux",
+      "pathOccurrences": [
+        {
+          "id": "P208",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H079",
+      "sha256": "f4fc66f14e3c006241efb18c0e8b871b47341a9ff40bb987a0799cd6e0df5558",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-18",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P209",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P210",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P211",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P212",
+          "fileLabel": "index.html"
+        },
+        {
+          "id": "P213",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H080",
+      "sha256": "f58cc16fa9660a973a151cf12bf92eda7b3eb77560ca64462554c00aae786fa5",
+      "category": "research-docs-and-standalone",
+      "versionGroup": "prior-reviewed-reference",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "prior-evidence-plus-structure",
+      "disposition": "prior-review-evidence-linked",
+      "pathOccurrences": [
+        {
+          "id": "P214",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P215",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P216",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        },
+        {
+          "id": "P217",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H081",
+      "sha256": "f7936f7cb32efce48b00077c8830a126fcb9bb1f13e3bf3816ad0366415d74e9",
+      "category": "pairview-and-fixture",
+      "versionGroup": "pairview",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "outer-dom-and-module-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P218",
+          "fileLabel": "index.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H082",
+      "sha256": "f84f685cb7589cac2ed2a2bd8744e8cc343ee092317c57ba9d31b28cd5b99937",
+      "category": "qa-dom-or-proof",
+      "versionGroup": "qa-dom-snapshots",
+      "date": null,
+      "dateConfidence": "unestablished",
+      "reviewDepth": "headings-scripts-dom-boundary",
+      "disposition": "captured-state-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P219",
+          "fileLabel": "HTML 파일(내부 색인 참조)"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    },
+    {
+      "id": "H083",
+      "sha256": "faa42c1a390e39c10686056463a98c5cc78c761cad0ffe683c3d296abeefcdca",
+      "category": "prototype-compiled-or-wrapper",
+      "versionGroup": "prototype-21",
+      "date": "2026-09-21",
+      "dateConfidence": "git-first-presence",
+      "reviewDepth": "structure-boundary",
+      "disposition": "reviewed-version-family-linked",
+      "pathOccurrences": [
+        {
+          "id": "P220",
+          "fileLabel": "AML-RADAR-v21.html"
+        },
+        {
+          "id": "P221",
+          "fileLabel": "AML-RADAR-v21.html"
+        },
+        {
+          "id": "P222",
+          "fileLabel": "AML-RADAR-v21.html"
+        },
+        {
+          "id": "P223",
+          "fileLabel": "AML-RADAR-v21.html"
+        }
+      ],
+      "historicalRuntimeVerified": false
+    }
+  ],
+  "note": "Private absolute paths, document titles, scripts and meeting text removed. Originals remain in internal Vault index."
+}

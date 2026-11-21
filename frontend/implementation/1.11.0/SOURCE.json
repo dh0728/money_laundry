@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "version": "1.11.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "overview",
+  "name": "개요 설명·근거 버튼 정렬",
+  "git_committer_kst": "2026-10-15T12:42:31+09:00",
+  "source_repository": "external_brain",
+  "source_commit": "e8db7ee5bc2a4bb3ef48006a5260da5ae7af2c91",
+  "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "original_source_url": "https://github.com/kmg200164/external_brain/tree/e8db7ee5bc2a4bb3ef48006a5260da5ae7af2c91/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    72
+  ]
+}

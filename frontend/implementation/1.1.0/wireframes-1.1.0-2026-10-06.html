@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AML RADAR 재설계 화면안</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 문서형 안내 + 폭을 바꿔 보는 와이어프레임 무대. 무대 안 배치는 콘텐츠 폭 container query로 실제 제안 기준(42/64/90rem)을 그대로 적용한다. */
+:root{
+  --bg:#f4f5f7; --paper:#ffffff; --ink:#15181d; --ink-2:#4a515c; --ink-3:#7a828e; --line:#d9dde3; --line-2:#c3c9d1;
+  --accent:#1f2937; --accent-ink:#ffffff; --sel:#111827;
+  --wf-bg:#eef0f3; --wf-region:#ffffff; --wf-region-2:#f7f8fa; --wf-dash:#aab2bd; --wf-shell:#e3e6ea;
+  --st-unknown:#8a929c; --st-pending:#2f9e6a; --st-progress:#2f6fd6; --st-done:#8a4fd1;
+  --risk-lo:#9bd27a; --risk-mid:#e8b33c; --risk-hi:#df4b3a; --mock:#b45309; --err:#c2410c;
+  --font-ui:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1216; --paper:#161a20; --ink:#e8ebef; --ink-2:#b3bac4; --ink-3:#88909b; --line:#2a3038; --line-2:#3a424c;
+  --accent:#e5e7eb; --accent-ink:#0f1216; --sel:#f3f4f6;
+  --wf-bg:#12161b; --wf-region:#1b2027; --wf-region-2:#20262e; --wf-dash:#4b5562; --wf-shell:#1a1f25;
+  --st-unknown:#9aa2ac; --st-pending:#4cc38a; --st-progress:#5b93ec; --st-done:#a77ae6;
+  --risk-lo:#8cc66b; --risk-mid:#e2ad3a; --risk-hi:#f0705f; --mock:#f59e0b; --err:#fb923c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1216; --paper:#161a20; --ink:#e8ebef; --ink-2:#b3bac4; --ink-3:#88909b; --line:#2a3038; --line-2:#3a424c;
+  --accent:#e5e7eb; --accent-ink:#0f1216; --sel:#f3f4f6;
+  --wf-bg:#12161b; --wf-region:#1b2027; --wf-region-2:#20262e; --wf-dash:#4b5562; --wf-shell:#1a1f25;
+  --st-unknown:#9aa2ac; --st-pending:#4cc38a; --st-progress:#5b93ec; --st-done:#a77ae6;
+  --risk-lo:#8cc66b; --risk-mid:#e2ad3a; --risk-hi:#f0705f; --mock:#f59e0b; --err:#fb923c; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.6;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:28px 64px}
+h1{font-size:1.75rem;line-height:1.25;margin:0 0 .25rem;text-wrap:balance;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.2rem;margin:0 0 .75rem;text-wrap:balance}
+h3{font-size:1rem;margin:0 0 .5rem}
+p{margin:0 0 .6rem;max-width:68ch}
+.muted{color:var(--ink-2)} .small{font-size:.82rem}
+.banner{display:flex;gap:.75rem;align-items:flex-start;background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--mock);padding:.75rem 1rem;border-radius:6px;margin:1rem 0 1.25rem}
+.banner b{white-space:nowrap}
+nav.toc{display:flex;flex-wrap:wrap;gap:.4rem;margin:0 0 1.5rem}
+nav.toc a{color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--paper);padding:.3rem .65rem;border-radius:999px;font-size:.85rem}
+nav.toc a:hover,nav.toc a:focus-visible{border-color:var(--ink-2)}
+section{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:1.25rem;margin-bottom:1.25rem}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:1rem}
+.scroll{overflow-x:auto}
+table.t{border-collapse:collapse;width:100%;font-size:.85rem;min-width:560px}
+table.t th,table.t td{border-bottom:1px solid var(--line);padding:.45rem .5rem;text-align:left;vertical-align:top}
+table.t th{font-weight:600;color:var(--ink-2);background:var(--wf-region-2)}
+code,.mono{font-family:var(--font-mono);font-size:.82em}
+.pill{display:inline-block;font-size:.72rem;padding:.05rem .45rem;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap}
+.pill.rec{border-color:var(--ink);color:var(--ink);font-weight:600}
+.pill.mock{border-color:var(--mock);color:var(--mock)}
+.pill.gap{border-color:var(--err);color:var(--err)}
+/* controls */
+.ctrl{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;margin:.25rem 0 .75rem}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line-2);border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:.8rem;border:0;background:var(--paper);color:var(--ink);padding:.35rem .6rem;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:focus-visible,.chk input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.chk{display:inline-flex;gap:.35rem;align-items:center;font-size:.82rem}
+.lbl-c{font-size:.75rem;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+.screen-tabs{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.6rem}
+.screen-tabs button{font:inherit;font-size:.82rem;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:.3rem .6rem;border-radius:6px;cursor:pointer}
+.screen-tabs button[aria-pressed="true"]{border-color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--ink)}
+.meta{font-size:.78rem;color:var(--ink-3);font-family:var(--font-mono)}
+/* stage */
+.stage-outer{border:1px solid var(--line-2);border-radius:6px;overflow:hidden;background:var(--wf-bg);position:relative}
+.stage{transform-origin:0 0;width:1920px;box-shadow:1px 0 0 var(--ink-3)}
+.app{container:app/inline-size;display:grid;grid-template-columns:56px minmax(0,1fr);min-height:760px;background:var(--wf-bg);font-size:13px;line-height:1.4;color:var(--ink)}
+.app.sb-open{grid-template-columns:240px minmax(0,1fr)}
+.app.rdr-on{grid-template-columns:56px minmax(0,1fr) 384px}
+.app.sb-open.rdr-on{grid-template-columns:240px minmax(0,1fr) 384px}
+.sb{background:var(--wf-shell);border-right:1px solid var(--line-2);padding:10px 8px;display:flex;flex-direction:column;gap:8px}
+.sb i{display:block;height:28px;border-radius:6px;background:var(--wf-region-2);border:1px solid var(--line)}
+.sb i.on{background:var(--sel)}
+.sb .sp{flex:1}
+.col{display:flex;flex-direction:column;min-width:0}
+.hdr{height:56px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:0 14px;background:var(--wf-shell);border-bottom:1px solid var(--line-2)}
+.hdr .nav,.hdr .rt{display:flex;gap:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 8px;border-radius:6px;border:1px solid var(--line-2);background:var(--wf-region);font-size:12px;white-space:nowrap;color:var(--ink)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.dis{opacity:.45}
+.btn.menu{display:none}
+.search{justify-self:center;width:min(460px,100%);height:32px;border-radius:8px;border:1px solid var(--line-2);background:var(--wf-region);display:flex;align-items:center;justify-content:space-between;padding:0 10px;color:var(--ink-3);font-size:12px}
+.search kbd{font-family:var(--font-mono);border:1px solid var(--line-2);border-radius:4px;padding:0 5px}
+.main{container:content/inline-size;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.rdr{background:var(--wf-region);border-left:4px solid var(--wf-shell);position:relative;padding:12px;display:flex;flex-direction:column;gap:10px}
+.rdr::before{content:"";position:absolute;inset:0;border:2px solid var(--risk-hi);border-radius:4px;opacity:.55;pointer-events:none}
+.rdr .comp{margin-top:auto;height:72px;border-radius:14px;border:1px solid var(--line-2);display:flex;align-items:flex-end;justify-content:flex-end;padding:8px}
+/* narrow viewport rules: sidebar overlay < 768, rdr overlay < 1280 */
+@container app (max-width: 767px){
+  .app .sb{display:none}
+  .btn.menu{display:inline-flex}
+}
+.app.narrow-shell{grid-template-columns:minmax(0,1fr)!important}
+.app.narrow-shell .sb{display:none}
+.app.narrow-shell .btn.menu{display:inline-flex}
+.app.rdr-overlay .rdr{position:absolute;right:0;top:56px;bottom:0;width:min(384px,92%);box-shadow:-8px 0 24px rgba(0,0,0,.18);z-index:3}
+/* regions */
+.r{background:var(--wf-region);border:1.5px dashed var(--wf-dash);border-radius:8px;padding:10px;min-width:0;display:flex;flex-direction:column;gap:6px;position:relative}
+.r.solid{border-style:solid;border-color:var(--line-2)}
+.r h4{margin:0;font-size:12px;font-weight:600;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.n{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:9px;background:var(--ink);color:var(--paper);font-size:10px;font-weight:700;padding:0 4px}
+.api{font-family:var(--font-mono);font-size:10px;color:var(--ink-3);overflow-wrap:anywhere}
+.v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.v.nd{font-size:14px;font-weight:600;color:var(--ink-2)}
+.sub{font-size:11px;color:var(--ink-2)}
+.ph{flex:1;min-height:60px;border-radius:6px;background:repeating-linear-gradient(135deg,var(--wf-region-2) 0 8px,transparent 8px 16px);border:1px solid var(--line)}
+.row{display:grid;gap:12px;min-width:0}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tg{font-size:10.5px;padding:1px 6px;border-radius:999px;border:1px solid var(--line-2);white-space:nowrap}
+.tg.u{border-color:var(--st-unknown);color:var(--st-unknown)} .tg.p{border-color:var(--st-pending);color:var(--st-pending)}
+.tg.i{border-color:var(--st-progress);color:var(--st-progress)} .tg.d{border-color:var(--st-done);color:var(--st-done)}
+.tg.hi{background:var(--risk-hi);color:#fff;border-color:transparent} .tg.mid{background:var(--risk-mid);color:#111;border-color:transparent}
+.tg.mk{border-color:var(--mock);color:var(--mock)}
+.ptitle{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.ptitle .l{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-weight:600;font-size:14px}
+.ptitle .r2{display:flex;gap:6px;flex-wrap:wrap}
+.tabs{display:flex;gap:16px;border-bottom:1px solid var(--line-2);font-size:12px;overflow-x:auto}
+.tabs span{padding:6px 0;white-space:nowrap;color:var(--ink-2)} .tabs span.on{font-weight:700;color:var(--ink);box-shadow:inset 0 -2px 0 var(--ink)}
+.fbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-size:11px;border:1px solid var(--line-2);border-radius:999px;padding:1px 8px;background:var(--wf-region)}
+/* table */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+.tbl{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
+.tbl th{background:var(--wf-region-2);font-weight:600;color:var(--ink-2)}
+.tbl td.num{text-align:right}
+.tbl .gsep{border-left:2px solid var(--line-2)}
+.tbl tr:hover td{background:var(--wf-region-2)}
+.cards{display:none;flex-direction:column;gap:8px}
+.card{border:1px solid var(--line-2);border-radius:8px;padding:8px;display:grid;gap:4px;background:var(--wf-region)}
+.card .top{display:flex;justify-content:space-between;gap:6px;font-weight:600}
+.selbar{display:none;position:sticky;bottom:0;margin-top:4px;background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}
+.selbar .btn{background:transparent;color:var(--paper);border-color:rgba(255,255,255,.4)}
+.selbar .btn.pri{background:var(--paper);color:var(--ink)}
+.app.sel .selbar{display:flex}
+.cb{display:none;width:13px;height:13px;border:1.5px solid var(--ink-2);border-radius:3px;background:#fff;vertical-align:middle}
+.cb.on{background:#fff;box-shadow:inset 0 0 0 3px #fff, inset 0 0 0 10px var(--ink)}
+.app.sel .cb{display:inline-block}
+.app:not(.sel) .tbl th:has(> .cb),.app:not(.sel) .tbl td:has(> .cb){display:none}
+/* graph */
+.gwrap{display:grid;grid-template-columns:220px 4px minmax(0,1fr) 4px 340px;min-height:460px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--wf-region)}
+.div{background:var(--line);position:relative} .div::after{content:"⋮";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;color:var(--ink-3)}
+.gset,.gdet{padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.gcan{position:relative;min-width:0;background:var(--wf-region-2)}
+.gcan svg{position:absolute;inset:0;width:100%;height:100%}
+.gctl{position:absolute;right:10px;bottom:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.gtool{display:none;position:absolute;left:10px;top:10px;gap:6px}
+.sheet{display:none}
+/* states */
+.stage[data-state="loading"] .d{color:transparent!important;background:linear-gradient(90deg,var(--wf-region-2),var(--line),var(--wf-region-2));border-radius:4px}
+.stage[data-state="loading"] .d *{visibility:hidden}
+.stage[data-state="loading"] .ph{background:var(--line);opacity:.5}
+.err{display:none;font-size:11px;color:var(--err);border:1px solid var(--err);border-radius:6px;padding:4px 6px}
+.stage[data-state="error"] .r.e .err{display:block}
+.stage[data-state="error"] .r.e .d,.stage[data-state="error"] .r.e .ph{opacity:.35}
+.emp{display:none;font-size:11.5px;color:var(--ink-2);padding:10px;border:1px dashed var(--line-2);border-radius:6px;text-align:center}
+.stage[data-state="empty"] .lst .emp{display:block}
+.stage[data-state="empty"] .lst .tw,.stage[data-state="empty"] .lst .cards{display:none!important}
+.refresh{display:none;height:2px;background:linear-gradient(90deg,var(--ink) 30%,transparent 30%);border-radius:2px}
+.stage[data-state="refresh"] .refresh{display:block}
+/* ===== content container queries (content width) ===== */
+.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.k6{grid-template-columns:repeat(6,minmax(0,1fr))}
+.c21{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.c11{grid-template-columns:repeat(2,minmax(0,1fr))}
+.c111{grid-template-columns:repeat(3,minmax(0,1fr))}
+.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ldg{grid-template-columns:minmax(200px,1fr) minmax(220px,1.1fr) minmax(0,2.4fr) minmax(280px,1.3fr)}
+.kmine{grid-template-columns:repeat(4,minmax(0,1fr))} .kmine .rdrc{grid-column:span 2}
+.rev{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.drawer-note{display:none}
+@container content (max-width: 1439px){
+  .ldg{grid-template-columns:minmax(190px,1fr) minmax(200px,1fr) minmax(0,2.2fr)}
+  .ldg .ldet{display:none} .ldg ~ .drawer-note{display:block}
+  .gwrap{grid-template-columns:180px 4px minmax(0,1fr) 4px 300px}
+  .wide-only{display:none}
+}
+@container content (max-width: 1023px){
+  .k4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .k6{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .c21,.c11,.rev{grid-template-columns:minmax(0,1fr)}
+  .c111{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .c4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kmine{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ldg{grid-template-columns:minmax(210px,1fr) minmax(0,2fr)}
+  .ldg .lacc{display:none}
+  .gwrap{grid-template-columns:minmax(0,1fr)}
+  .gwrap .gset,.gwrap .div{display:none}
+  .gwrap .gtool{display:flex}
+  .gwrap .gdet{display:none}
+  .gwrap ~ .sheet.drawer{display:block}
+  .split-hide{display:none}
+}
+@container content (max-width: 671px){
+  .k4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .k6{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .c111,.c4{grid-template-columns:minmax(0,1fr)}
+  .kmine{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ldg{grid-template-columns:minmax(0,1fr)} .ldg .lown{display:none} .ldg .crumb{display:flex!important}
+  .lst .tw{display:none} .lst .cards{display:flex}
+  .gwrap ~ .sheet.drawer{display:none} .gwrap ~ .sheet.bottom{display:block}
+  .narrow-hide{display:none}
+  .tabs{gap:12px}
+}
+.crumb{display:none;gap:4px;font-size:11px;color:var(--ink-2);flex-wrap:wrap}
+.sheet{border:1.5px solid var(--line-2);border-radius:10px;background:var(--wf-region);padding:10px;font-size:12px}
+.sheet.bottom{border-bottom-left-radius:0;border-bottom-right-radius:0}
+/* notes */
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:.75rem;margin-top:.9rem}
+.notes>div{border:1px solid var(--line);border-radius:6px;padding:.65rem .8rem;background:var(--wf-region-2);font-size:.84rem}
+.notes ul{margin:.2rem 0 0;padding-left:1.1rem}
+.notes li{margin:.15rem 0}
+/* flow svg */
+.flow{width:100%;height:auto;display:block}
+.flow text{font-family:var(--font-ui);fill:var(--ink)}
+.flow .bx{fill:var(--paper);stroke:var(--ink-2);stroke-width:1.2}
+.flow .bx.k{fill:var(--wf-region-2)}
+.flow .ar{stroke:var(--ink-2);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+.flow .lb{font-size:11px;fill:var(--ink-2)}
+.viz text{font-family:var(--font-ui);fill:var(--ink);font-size:11px}
+.viz .ax{stroke:var(--ink-3);stroke-width:1}
+.viz .ab{fill:var(--risk-hi);opacity:.85} .viz .ba{fill:var(--st-progress);opacity:.85}
+.viz .gr{stroke:var(--line);stroke-width:1}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>AML RADAR 재설계 화면안</h1>
+  <p class="muted">MONEY17-174 · 2026-10-06 작성 · 근거 <span class="mono">origin/dev bc4729fb</span>의 API·controller와 UI 재설계 기준</p>
+  <div class="banner" role="note"><b>설계 후보</b><span>사용자 승인 전 검토안입니다. 새 UI가 구현된 화면이 아니고 팀 결정도 아닙니다. 회색 빗금 영역은 차트·그래프 자리, 점선 상자는 API 데이터가 들어오는 영역입니다.</span></div>
+  <nav class="toc" aria-label="목차">
+    <a href="#flow">조사 흐름</a><a href="#screens">화면 배치</a><a href="#states">상태 표현</a><a href="#graph">그래프 비교</a><a href="#gaps">필요한 계약</a><a href="#plan">구현 순서</a><a href="#ask">결정할 것</a>
+  </nav>
+
+  <section id="flow">
+    <h2>Alert → Episode 조사 흐름</h2>
+    <svg class="flow" viewBox="0 0 1000 300" role="img" aria-label="대시보드에서 Alert 목록과 상세를 거쳐 종결하거나 Episode로 묶는 흐름">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--ink-2)"/></marker></defs>
+      <rect class="bx k" x="10" y="40" width="130" height="50" rx="8"/><text x="75" y="62" text-anchor="middle" font-size="13" font-weight="600">대시보드</text><text x="75" y="80" text-anchor="middle" class="lb">기관 · 내 담당</text>
+      <rect class="bx k" x="10" y="200" width="130" height="50" rx="8"/><text x="75" y="230" text-anchor="middle" font-size="13" font-weight="600">알림</text>
+      <rect class="bx" x="200" y="40" width="140" height="50" rx="8"/><text x="270" y="62" text-anchor="middle" font-size="13" font-weight="600">Alert 목록</text><text x="270" y="80" text-anchor="middle" class="lb">위험도순 · 필터</text>
+      <rect class="bx" x="400" y="20" width="230" height="110" rx="8"/><text x="515" y="42" text-anchor="middle" font-size="13" font-weight="600">Alert 상세</text>
+      <text x="420" y="66" class="lb">개요 — 근거·금액·이력</text><text x="420" y="84" class="lb">그래프 — 관계·계좌쌍 흐름</text><text x="420" y="102" class="lb">거래 — 조사 범위 제거</text><text x="420" y="120" class="lb">검토 의견 — 판정</text>
+      <rect class="bx" x="700" y="20" width="130" height="50" rx="8"/><text x="765" y="50" text-anchor="middle" font-size="13" font-weight="600">종결</text>
+      <rect class="bx" x="560" y="200" width="200" height="60" rx="8"/><text x="660" y="224" text-anchor="middle" font-size="13" font-weight="600">Episode 상세</text><text x="660" y="244" text-anchor="middle" class="lb">연결 Alert · 묶음별 판정</text>
+      <path class="ar" d="M140,65 H198"/>
+      <path class="ar" d="M340,65 H398"/><text x="345" y="57" class="lb">행 클릭</text>
+      <path class="ar" d="M140,225 C300,225 330,140 420,132"/>
+      <path class="ar" d="M630,45 H698"/><text x="636" y="38" class="lb">정상 · 단독 의심</text>
+      <path class="ar" d="M600,130 C600,160 620,180 640,198"/><text x="612" y="168" class="lb">기존 Episode 연결</text>
+      <path class="ar" d="M270,90 C270,230 400,232 558,230"/><text x="282" y="190" class="lb">Episode로 묶기 · 본인 OPEN 2건 이상</text>
+      <path class="ar" d="M760,215 C820,200 790,100 770,72"/><text x="800" y="150" class="lb">판정 후 종결</text>
+      <path class="ar" d="M600,262 C480,292 300,290 272,92"/><text x="380" y="286" class="lb">연결 해제 · 2건 미만이면 해체</text>
+    </svg>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>시작</th><th>명령</th><th>결과</th><th>표시</th></tr></thead>
+      <tbody>
+        <tr><td>Alert OPEN</td><td><code>CLOSE</code>+decision+사유</td><td>CLOSED · NORMAL/SUSPICIOUS</td><td><span class="tg d">처리 완료</span></td></tr>
+        <tr><td>본인 OPEN Alert 2건+</td><td><code>TRANSFER</code></td><td>새 Episode OPEN, 원본 ESCALATED</td><td><span class="tg i">처리 중</span> · 새 담당자는 라운드로빈</td></tr>
+        <tr><td>Episode OPEN</td><td><code>UNLINK</code></td><td>남은 Alert 2건 미만이면 DISSOLVED</td><td>실행 전 해체 경고</td></tr>
+        <tr><td>Episode OPEN</td><td><code>DECIDE</code> → <code>CLOSE</code></td><td>미판정·상충이면 409</td><td>종결 비활성 + 이유</td></tr>
+        <tr><td>모든 CLOSED</td><td>모든 명령</td><td>409</td><td>읽기 전용 배너</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section id="screens">
+    <h2>화면 배치</h2>
+    <p class="muted small">폭을 바꾸면 무대 안 배치가 콘텐츠 폭 기준(42 · 64 · 90rem)으로 다시 짜입니다. 사이드바·RDR을 열면 콘텐츠 폭이 줄어 같은 규칙이 다시 적용됩니다.</p>
+    <div class="screen-tabs" id="screenTabs" role="group" aria-label="화면 선택"></div>
+    <div class="ctrl">
+      <span class="lbl-c">폭</span><div class="seg" id="widthSeg" role="group" aria-label="화면 폭"></div>
+    </div>
+    <div class="ctrl">
+      <span class="lbl-c">상태</span><div class="seg" id="stateSeg" role="group" aria-label="데이터 상태"></div>
+      <label class="chk"><input type="checkbox" id="sbT"> 사이드바 펼침</label>
+      <label class="chk"><input type="checkbox" id="rdrT"> RDR 열림</label>
+      <label class="chk" id="selWrap"><input type="checkbox" id="selT"> 선택 모드</label>
+      <span class="meta" id="metaW"></span>
+    </div>
+    <div class="stage-outer" id="outer"><div class="stage" id="stage"><div class="app" id="app"></div></div></div>
+    <div class="notes" id="notes"></div>
+  </section>
+
+  <section id="states">
+    <h2>데이터 상태 표현</h2>
+    <p class="muted small">모든 데이터 영역이 같은 문법을 씁니다. 셸·제목·고정 설명은 API를 기다리지 않고 먼저 그립니다. 위 무대의 <b>상태</b> 버튼으로 일부를 미리 볼 수 있습니다.</p>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>상태</th><th>언제</th><th>표현</th></tr></thead>
+      <tbody>
+        <tr><td>초기 로딩</td><td>그 영역의 첫 응답 전</td><td>데이터 자리만 낮은 대비 skeleton, 영역 크기 고정</td></tr>
+        <tr><td>갱신 중</td><td>이전 데이터 있음</td><td>이전 데이터 유지 + 얇은 진행 표시, 마지막 갱신 시각</td></tr>
+        <tr><td>빈 결과</td><td>200 + 빈 목록</td><td>조건을 말하는 문장 + 조건 지우기. 로딩과 동시에 띄우지 않음</td></tr>
+        <tr><td>데이터 없음</td><td>API가 값을 주지 않음</td><td><b>데이터 없음</b> + 이유(산식 미정·API 없음). 0으로 바꾸지 않음</td></tr>
+        <tr><td>금액 확인 불가</td><td>숫자 변환 실패</td><td>건수만 집계, NaN 표시 금지</td></tr>
+        <tr><td>오류</td><td>4xx·5xx</td><td>영역 안 한 줄 오류 + 다시 시도. 이전 데이터는 유지</td></tr>
+        <tr><td>권한 없음</td><td>403</td><td>조작 비활성 + “담당 직원만 변경할 수 있습니다”</td></tr>
+        <tr><td>충돌</td><td>409</td><td>최신 내용으로 다시 불러왔다는 안내 + 선택 초기화</td></tr>
+        <tr><td>세션 만료</td><td>401(유휴 30분)</td><td>로그인 후 원래 경로로 복귀</td></tr>
+        <tr><td>mock</td><td>LLM 미연동</td><td><span class="pill mock">mock · LLM 미연동</span> 배지, 분석 중처럼 움직이지 않음</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section id="graph">
+    <h2>그래프와 거래 상세 비교</h2>
+    <div class="grid2">
+      <div>
+        <h3>메인 그래프 렌더러</h3>
+        <div class="scroll"><table class="t" style="min-width:420px">
+          <thead><tr><th></th><th>A Canvas force(현재)</th><th>B React Flow + ELK <span class="pill rec">추천</span></th></tr></thead>
+          <tbody>
+            <tr><td>초기 배치</td><td>매번 조금씩 다름</td><td>같은 입력이면 같은 배치</td></tr>
+            <tr><td>위치 안정</td><td>재가열 경로 차단 필요</td><td>위치를 상태로 보관</td></tr>
+            <tr><td>겹침 검증</td><td>Canvas라 측정 불가</td><td>DOM 라벨 수치 검증</td></tr>
+            <tr><td>소유주 보기</td><td>별도 구현</td><td>계좌 행 port 노드</td></tr>
+            <tr><td>비용</td><td>추가 없음</td><td><code>@xyflow/react</code> 추가</td></tr>
+          </tbody></table></div>
+        <p class="small muted" style="margin-top:.5rem">C(Cytoscape·Sigma)는 기관 전체 그래프를 2단계로 채택할 때 별도 화면 후보.</p>
+      </div>
+      <div>
+        <h3>묶음 엣지</h3>
+        <svg class="viz" viewBox="0 0 440 150" role="img" aria-label="양방향 묶음 엣지: 위 반쪽은 A에서 B, 아래 반쪽은 B에서 A">
+          <circle cx="40" cy="70" r="22" fill="var(--wf-region-2)" stroke="var(--ink-2)"/><text x="40" y="74" text-anchor="middle" font-weight="600">A</text>
+          <circle cx="400" cy="70" r="22" fill="var(--wf-region-2)" stroke="var(--ink-2)"/><text x="400" y="74" text-anchor="middle" font-weight="600">B</text>
+          <rect x="62" y="56" width="316" height="12" fill="var(--risk-hi)" opacity=".75"/>
+          <rect x="62" y="70" width="316" height="5" fill="var(--risk-mid)" opacity=".85"/>
+          <g fill="var(--paper)"><circle cx="120" cy="62" r="3"/><circle cx="200" cy="62" r="3"/><circle cx="280" cy="62" r="3"/><circle cx="330" cy="72.5" r="2"/><circle cx="220" cy="72.5" r="2"/></g>
+          <text x="220" y="44" text-anchor="middle">A→B 12건 · 34.2K USD  │  B→A 3건 · 1.1K USD</text>
+          <text x="220" y="100" text-anchor="middle" fill="var(--ink-2)">위 반쪽 굵기=A→B 금액, 아래=B→A · 입자 진행 방향=흐름</text>
+          <text x="220" y="120" text-anchor="middle" fill="var(--ink-2)">reduced-motion: 반쪽마다 정지 쉐브론 ›› ‹‹</text>
+        </svg>
+      </div>
+    </div>
+    <h3 style="margin-top:1rem">계좌쌍 상세 — 거래 하나하나의 방향·금액·통화·시각</h3>
+    <div class="grid2">
+      <div>
+        <p class="small"><b>(a) 두 계좌 레인 타임라인</b> <span class="pill rec">추천</span></p>
+        <svg class="viz" viewBox="0 0 460 190" role="img" aria-label="A와 B 두 레인 사이에 시간순으로 거래 리본을 그린 타임라인">
+          <line class="ax" x1="40" y1="40" x2="450" y2="40"/><line class="ax" x1="40" y1="130" x2="450" y2="130"/>
+          <text x="10" y="44" font-weight="600">A</text><text x="10" y="134" font-weight="600">B</text>
+          <rect class="ab" x="80" y="42" width="12" height="86"/><text x="96" y="70">1,200 SAR</text><text x="66" y="150" fill="var(--ink-2)">19:01</text>
+          <rect class="ab" x="160" y="42" width="3" height="86"/><text x="167" y="92">80 SAR</text><text x="146" y="150" fill="var(--ink-2)">19:05</text>
+          <rect class="ba" x="240" y="42" width="22" height="86"/><text x="266" y="112">5,000 USD</text><text x="236" y="150" fill="var(--ink-2)">19:13</text>
+          <rect class="ab" x="380" y="42" width="5" height="86"/><text x="390" y="70">300 SAR</text><text x="358" y="150" fill="var(--ink-2)">09-02 08:40</text>
+          <text x="86" y="124" fill="var(--paper)">▼</text><text x="246" y="56" fill="var(--paper)">▲</text>
+          <rect x="40" y="168" width="410" height="14" fill="var(--wf-region-2)" stroke="var(--line)"/>
+          <g fill="var(--ink-3)"><rect x="80" y="172" width="4" height="8"/><rect x="160" y="175" width="3" height="5"/><rect x="240" y="170" width="6" height="10"/><rect x="380" y="174" width="3" height="6"/></g>
+          <rect x="60" y="166" width="230" height="18" fill="none" stroke="var(--ink)" stroke-width="1.2"/>
+        </svg>
+        <p class="small muted">섞인 방향의 실제 순서가 보이고 메인 그래프의 굵기=금액 문법을 잇습니다. 20건이 넘으면 아래 개요 스트립에서 구간을 고릅니다.</p>
+      </div>
+      <div>
+        <p class="small"><b>(c) 시간축 양방향 막대</b> <span class="pill">대안</span></p>
+        <svg class="viz" viewBox="0 0 460 190" role="img" aria-label="0선 위는 A에서 B, 아래는 B에서 A인 막대 차트">
+          <line class="gr" x1="40" y1="95" x2="450" y2="95"/>
+          <text x="6" y="40">A→B</text><text x="6" y="160">B→A</text>
+          <rect class="ab" x="80" y="45" width="14" height="50"/><rect class="ab" x="160" y="85" width="14" height="10"/><rect class="ab" x="380" y="75" width="14" height="20"/>
+          <rect class="ba" x="240" y="95" width="14" height="70"/>
+          <polyline points="87,70 167,64 247,120 387,110" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="300" y="30" fill="var(--ink-2)">--- 누적 순유입(USD)</text>
+          <text x="70" y="185" fill="var(--ink-2)">19:01</text><text x="150" y="185" fill="var(--ink-2)">19:05</text><text x="230" y="185" fill="var(--ink-2)">19:13</text><text x="360" y="185" fill="var(--ink-2)">09-02</text>
+        </svg>
+        <p class="small muted">금액 비교·순유입은 정확하지만 높이=금액이라 메인 그래프 문법과 다르고, 흐름을 위/아래 부호로 해석해야 합니다.</p>
+      </div>
+    </div>
+    <div class="scroll" style="margin-top:.5rem"><table class="t">
+      <thead><tr><th>조작</th><th>바꾸는 것</th><th>바꾸지 않는 것</th></tr></thead>
+      <tbody><tr><td>화면 맞춤</td><td>카메라</td><td>노드 위치</td></tr>
+      <tr><td>초기 배치 복원</td><td>위치 → 최초 배치(시간순 좌→우 제안)</td><td>선택·hop·시간축·필터</td></tr>
+      <tr><td>패턴 정리 전으로</td><td>위치 → 정리 직전</td><td>카메라·선택</td></tr></tbody></table></div>
+  </section>
+
+  <section id="gaps">
+    <h2>새 UI에 필요한 계약</h2>
+    <p class="muted small">API에 없는 값·행동은 화면에서 실행 가능한 것처럼 두지 않습니다. 아래는 필요성 정리이며 요청·합의 전입니다.</p>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>우선</th><th>필요한 것</th><th>현재</th><th>담당 영역</th></tr></thead>
+      <tbody>
+        <tr><td>높음</td><td>사건별 첫 열람·검토 시작 여부</td><td><code>REVIEW_START</code> 이벤트만, 사유 필수</td><td>Backend API</td></tr>
+        <tr><td>높음</td><td>금액 타입 통일</td><td>근거 거래 금액은 문자열</td><td>Backend API</td></tr>
+        <tr><td>높음</td><td>시각 형식 통일</td><td><code>+09:00</code>·<code>Z</code> 혼재</td><td>Backend API</td></tr>
+        <tr><td>높음</td><td>거래 기간·총액 범위 정의</td><td>summary는 SUBJECT만</td><td>Backend API</td></tr>
+        <tr><td>중간</td><td>투입 원금 산식, 대표 계좌 규칙</td><td>없음</td><td>모델 → Backend</td></tr>
+        <tr><td>중간</td><td>정렬 선택, 잘림·출처 정보, 제외 취소</td><td>위험도순 고정 등</td><td>Backend API</td></tr>
+        <tr><td>범위 결정</td><td>보고서 내보내기, 세션 목록, 비밀번호, RDR 요약</td><td>없음</td><td>Backend · 인프라 · 모델</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section id="plan">
+    <h2>구현 순서</h2>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>단계</th><th>범위</th><th>통과 기준</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>dev 기준선 측정</td><td>요청 수·응답 크기·첫 의미 있는 내용·long task 기록</td></tr>
+        <tr><td>1</td><td>토큰·셸·데이터 계층·공통 컴포넌트</td><td>폭·확대 행렬에서 겹침 0, 셸이 API를 기다리지 않음</td></tr>
+        <tr><td>2</td><td>Alert 목록 + Episode로 묶기</td><td>긴 금액 열 겹침 0, 재조회 중 목록 유지</td></tr>
+        <tr><td>3</td><td>Alert 상세(개요·거래·검토 의견)</td><td>데이터 없음·금액 확인 불가 표시, 403·409·401 경로</td></tr>
+        <tr><td>4</td><td>그래프·계좌쌍 상세</td><td>30초 대기 좌표 변화 0, NaN DOM 0건, 배치 시간·FPS</td></tr>
+        <tr><td>5</td><td>Episode 목록·상세</td><td>해체 경고, 행 하나=거래 하나</td></tr>
+        <tr><td>6–8</td><td>대시보드·거래 내역·알림·검색·계정</td><td>영역별 독립 로딩, 그룹별 실패</td></tr>
+        <tr><td>9</td><td>통합 재측정·전체 시각 검수</td><td>0단계 대비 표, 확대하지 않은 영역은 미확인</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section id="ask">
+    <h2>결정할 것</h2>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>#</th><th>질문</th><th>추천</th></tr></thead>
+      <tbody>
+        <tr><td>Q1</td><td>새 UI 위치와 시연 화면 공존</td><td><code>frontend/web-app</code> 안에 새 화면 트리를 따로 두고 시연 경로 유지, 완성 후 전환</td></tr>
+        <tr><td>Q2</td><td>그래프 렌더러·초기 배치·쌍 상세</td><td>React Flow+ELK · 시간순 기본 · 레인 타임라인</td></tr>
+        <tr><td>Q3</td><td>임시 저장의 실체</td><td>COMMENT 서버 기록 + 입력 중 브라우저 보존</td></tr>
+        <tr><td>Q4</td><td>미편입 OPEN Alert 표시 이름</td><td>회색 “열람 상태 미확인”</td></tr>
+        <tr><td>Q5</td><td>10/18까지 범위</td><td>조사 흐름(1~5단계) 우선</td></tr>
+        <tr><td>Q6</td><td>기관 추이 차트가 v24 영역 차트인지</td><td>확인 필요</td></tr>
+        <tr><td>Q7</td><td>기관 대시보드 하단 최근 Alert 목록</td><td>API.md §9.2와 승인 기록 중 최신 확인</td></tr>
+      </tbody></table></div>
+  </section>
+</div>
+
+<script>
+(function(){
+const SCREENS={
+inst:{name:"기관 대시보드",sel:false,html:`
+<div class="ptitle"><div class="l">대시보드 <span class="tabs" style="border:0"><span class="on">기관</span><span>내 담당</span></span></div><div class="r2"><span class="sub">기준 업무 시각 10-06 09:00</span><span class="btn">최근 7일 ▾</span></div></div>
+<div class="refresh"></div>
+<div class="row k4">
+ <div class="r e"><h4><span class="n">1</span>오늘 신규 Alert</h4><div class="v d">42</div><div class="sub d">전일 대비 +12%</div><div class="api">institution.today / yesterday</div><div class="err">불러오지 못했습니다 · 다시 시도</div></div>
+ <div class="r"><h4><span class="n">2</span>오늘 의심 거래 탐지율</h4><div class="v d">1.8%</div><div class="sub d">312 / 17,240건 · 보고 미완료면 “분석 진행 중”</div><div class="api">detection.suspicious / received · pendingReports</div></div>
+ <div class="r"><h4><span class="n">3</span>열린 Alert</h4><div class="v d">128</div><div class="sub d">72시간 경과 9</div><div class="api">institution.alerts · openAlertsAgedOver3Days</div></div>
+ <div class="r"><h4><span class="n">4</span>조사 중 Episode</h4><div class="v d">17</div><div class="api">institution.episodes</div></div>
+</div>
+<div class="row c21">
+ <div class="r"><h4><span class="n">5</span>기관 탐지 현황 <span class="sub">기간 하나가 아래 차트에 함께 적용</span></h4>
+  <div class="sub">일별 Alert 유입·처리 추이 <span class="tg">형태 확인 필요 Q6</span></div><div class="ph"></div><div class="api">daily[day, incoming, completed]</div>
+  <div class="sub">일별 처리 상태 분포 — 미편입 · Episode 편입 · 처리 완료</div><div class="ph" style="min-height:44px"></div><div class="api">dailyAlertStatus[date, pending, inProgress, done]</div>
+  <div class="row c11"><div><div class="sub">의심 거래 구성 (전체 분석 거래)</div><div class="ph" style="min-height:70px"></div><div class="api">agreements[]</div></div><div><div class="sub">유형별 의심 거래 건수</div><div class="ph" style="min-height:70px"></div><div class="api">types[]</div></div></div></div>
+ <div class="r solid" style="border-color:var(--risk-hi)"><h4><span class="n">6</span>RDR 9000 Daily Report <span class="tg mk">mock · LLM 미연동</span></h4><div class="sub d">오늘 신규 Alert 42건 가운데 Fan-out이 가장 많습니다. 72시간 넘게 열린 업무 9건을 먼저 확인하세요.</div><div class="ph"></div><div class="api">위 집계 기반 규칙 문장 · 출처·기준 시각 표시</div></div>
+</div>
+<div class="row c11">
+ <div class="r"><h4><span class="n">7</span>Episode 업무 지표</h4><div class="sub d">미검토 4 · 첫 검토 평균 3.2시간 · 종결 평균 1.4일</div><div class="api">episodeWork.current / firstReview / completion</div></div>
+ <div class="r lst"><h4><span class="n">8</span>오래 열린 업무</h4><div class="sub d">E-512 · 이OO · 5일 · 검토 대기</div><div class="sub d">E-498 · 김OO · 4일</div><div class="emp">조건에 맞는 업무가 없습니다</div><div class="api">episodeWork.oldestOpen[]</div></div>
+</div>`,
+notes:{"우선순위":["KPI 4개 → 추이 → 구성 → 업무 목록","②가 기준 미완료면 비율 대신 진행 중 문구"],"행동":["기간 선택 하나로 ⑤ 전체 갱신","⑧ 행 클릭 → 사건 상세"],"좁은 화면":["split: KPI 2×2, ⑥은 KPI 아래, 나머지 1열","narrow: 차트 세로 배치, 가로 스크롤 없음"],"확인할 것":["Q6 추이 차트 형태","Q7 하단 최근 Alert 목록 — API.md §9.2와 승인 기록 충돌"]}},
+mine:{name:"내 담당 대시보드",sel:false,html:`
+<div class="ptitle"><div class="l">대시보드 <span class="tabs" style="border:0"><span>기관</span><span class="on">내 담당</span></span></div><div class="r2"><span class="btn">최근 7일 ▾</span></div></div>
+<div class="row kmine">
+ <div class="r"><h4><span class="n">1</span>내 미처리</h4><div class="v d">14</div><div class="api">personal.pending</div></div>
+ <div class="r"><h4><span class="n">2</span>72시간 경과</h4><div class="v d">3</div><div class="api">personal.aged</div></div>
+ <div class="r solid rdrc" style="border-color:var(--risk-hi)"><h4><span class="n">3</span>RDR 9000 · 내 담당 요약 <span class="tg mk">mock</span></h4><div class="sub d">위험 0.9 이상 2건이 72시간을 넘었습니다.</div><div class="ph" style="min-height:36px"></div></div>
+</div>
+<div class="r lst"><h4><span class="n">4</span>업무 보드 <span class="sub">정렬 위험도순(서버) · 경과일순은 받은 페이지 안에서만</span></h4>
+ <div class="row c4">
+  <div class="r solid"><h4><span class="tg u">열람 상태 미확인</span> 9</h4><div class="card"><div class="top">A-27406 <span class="tg hi">0.93</span></div><div class="sub">Fan-out 62% · 1일</div></div><div class="api">review/cases ALERT · statuses=OPEN · assigneeId=나</div></div>
+  <div class="r solid"><h4><span class="tg p">처리 전</span> —</h4><div class="emp" style="display:block">열람 기록 API가 연결되면 표시합니다</div><div class="api">firstReviewAt 필요</div></div>
+  <div class="r solid"><h4><span class="tg i">처리 중</span> 5</h4><div class="card"><div class="top">E-512 <span class="tg mid">0.71</span></div><div class="sub">연결 Alert 3</div></div><div class="api">ESCALATED Alert + 내 OPEN Episode</div></div>
+  <div class="r solid"><h4><span class="tg d">처리 완료</span> 11</h4><div class="card"><div class="top">A-27011</div><div class="sub">정상 종결</div></div><div class="api">status=CLOSED (기간=생성일 기준)</div></div>
+ </div></div>
+<div class="row c11">
+ <div class="r"><h4><span class="n">5</span>위험도순 우선 검토 10</h4><div class="api">priority[]</div></div>
+ <div class="r"><h4><span class="n">6</span>최근 내 활동 20</h4><div class="api">activities[] · 내부 이벤트 제외</div></div>
+</div>`,
+notes:{"우선순위":["내 미처리·경과 → 보드 → 우선 검토"],"행동":["카드 전체 클릭 → 상세","정렬 위험도·경과일"],"좁은 화면":["보드 4열 → 2열 → 1열","카드의 긴 제목·금액은 줄바꿈으로 모두 보임"],"API 제약":["첫 열람 필드 없음 → 처리 전 열은 비움(Direct 요구)","서버 정렬은 위험도순 고정"]}},
+ledger:{name:"거래 내역",sel:false,html:`
+<div class="fbar"><span class="btn">검색 소유주·계좌·거래 ID</span><span class="btn">거래 발생일 ▾</span><span class="chip">판정: 의심 ×</span><span class="chip">결제 수단: Wire ×</span><span class="btn">방향(계좌 선택 후)</span></div>
+<div class="crumb">소유주 › <b>ACME-17</b> › 계좌 › 거래</div>
+<div class="row ldg">
+ <div class="r lown"><h4><span class="n">1</span>소유주</h4><div class="card" style="background:var(--sel);color:var(--paper)">ACME-17</div><div class="card">BETA-02</div><div class="api">ledger/owners {id, name}</div></div>
+ <div class="r lacc"><h4><span class="n">2</span>계좌</h4><div class="card" style="background:var(--sel);color:var(--paper)">은행 12 · 8f3a…</div><div class="card">은행 7 · 1c9d…</div><div class="api">ledger/accounts {id, ownerId, bankId}</div></div>
+ <div class="r lst"><h4><span class="n">3</span>거래 <span class="sub">발생 시각 내림차순</span></h4><div class="tw"><table class="tbl"><thead><tr><th>시각</th><th>방향</th><th>상대 계좌</th><th class="num">금액</th><th>통화</th><th>판정</th><th>연결</th></tr></thead><tbody><tr><td>09-04 19:13</td><td>수취</td><td>BETA-02 · 1c9d…</td><td class="num">5,000.00</td><td>USD</td><td>의심</td><td>A-27406</td></tr><tr><td>09-04 19:01</td><td>송금</td><td>GAMMA-9 · 77ab…</td><td class="num">1,200.00</td><td>SAR</td><td>정상</td><td>—</td></tr></tbody></table></div><div class="cards"><div class="card"><div class="top">09-04 19:13 · 수취 <span>5,000.00 USD</span></div><div class="sub">BETA-02 · 의심 · A-27406</div></div></div><div class="emp">이 기간에 거래가 없습니다 · 기간 넓히기</div><div class="api">ledger/transactions account, directions</div></div>
+ <div class="r ldet"><h4><span class="n">4</span>선택 거래 상세</h4><div class="sub d">BETA-02 · 1c9d… → ACME-17 · 8f3a…</div><div class="v d" style="font-size:16px">5,000.00 USD</div><div class="sub">지급·수취 통화가 다르면 둘 다 · USD 환산 별도</div><div class="sub">점수 0.91 · 유형 후보 Fan-out 0.62</div><div class="sub">연결 사건 A-27406 (alertId → caseId 정확 일치 검색)</div><div class="api">transactions 행 전체</div></div>
+</div>
+<div class="drawer-note sheet">④ 선택 거래 상세는 오른쪽 드로어로 열립니다</div>`,
+notes:{"유지":["소유주→계좌→거래→상세 계층과 밀도(Direct)","단계별 독립 로딩·오류"],"고칠 점":["연결선은 고정 좌표 대신 행 실측 위치","금액 truncate 금지"],"좁은 화면":["regular: 상세를 드로어로","split: 소유주+거래 2열","narrow: 단계 이동 + 경로 표시"],"API 제약":["소유주의 계좌 수·은행 이름 없음","상대 계좌 필터 없음"]}},
+alerts:{name:"Alert 목록",sel:true,html:`
+<div class="ptitle"><div class="l">Alert <span class="sub d">128건 · 위험도순</span></div><div class="r2"><span class="btn">Episode로 묶기</span><span class="btn">다운로드(현재 페이지)</span></div></div>
+<div class="fbar"><span class="btn">탐지일 최근 7일 ▾</span><span class="btn">필터 ▾</span><span class="btn">검색 A-·담당자·유형</span><span class="chip">상태: 열린 Alert ×</span><span class="chip">위험도: 높음 ×</span><span class="chip">담당: 나 ×</span></div>
+<div class="refresh"></div>
+<div class="r solid lst e"><div class="err">목록을 새로 받지 못했습니다. 마지막 결과(09:12)를 보여 줍니다 · 다시 시도</div><div class="tw"><table class="tbl"><thead><tr><th><span class="cb"></span></th><th>ID</th><th>위험도</th><th>대표 유형·비중</th><th class="num">거래 총액(USD)</th><th class="num">거래 수</th><th>담당</th><th>상태</th><th>탐지일·경과</th><th>Episode</th></tr></thead><tbody>
+<tr><td><span class="cb on"></span></td><td class="d">A-27406</td><td><span class="tg hi">0.93</span></td><td>Fan-out 62%</td><td class="num d">1,234,567.89</td><td class="num">100</td><td>김OO</td><td><span class="tg u">열람 미확인</span></td><td>10-05 · 1일</td><td>—</td></tr>
+<tr><td><span class="cb on"></span></td><td class="d">A-27399</td><td><span class="tg hi">0.88</span></td><td>Cycle 50%</td><td class="num">데이터 없음</td><td class="num">37</td><td>김OO</td><td><span class="tg u">열람 미확인</span></td><td>10-04 · 2일</td><td>—</td></tr>
+<tr><td><span class="cb" style="opacity:.3"></span></td><td>A-27310</td><td><span class="tg mid">0.71</span></td><td>혼합</td><td class="num">88,020.10</td><td class="num">12</td><td>이OO</td><td><span class="tg i">처리 중</span></td><td>10-03 · 3일</td><td>E-512</td></tr>
+</tbody></table></div>
+<div class="cards"><div class="card"><div class="top"><span><span class="cb on"></span> A-27406</span><span class="tg hi">0.93</span></div><div class="sub">Fan-out 62% · 100건</div><div class="top" style="font-weight:500"><span>1,234,567.89 USD</span><span class="tg u">열람 미확인</span></div></div><div class="card"><div class="top">A-27399 <span class="tg hi">0.88</span></div><div class="sub">Cycle 50% · 37건 · 금액 데이터 없음</div></div></div>
+<div class="emp">조건에 맞는 Alert가 없습니다 · 조건 지우기</div>
+<div class="selbar"><b>2건 선택</b><span>본인 담당 OPEN만 선택 가능</span><span class="btn">기존 Episode에 연결</span><span class="btn pri">새 Episode 만들기</span><span class="btn">취소</span></div>
+<div class="api">review/cases?kind=ALERT · statuses · risk · types · assignees · minAgeDays · query · page,size=20</div></div>
+<div class="sub">1 2 3 … 7 · 20건씩</div>`,
+notes:{"일반 모드":["행 전체 클릭 → 상세, 체크박스 없음","재조회 중 목록 유지, 실패는 한 줄 배너"],"선택 모드":["Episode로 묶기로만 진입, 흰 체크박스","새 Episode는 서로 다른 2건 이상, 사유 필수","새 담당자는 라운드로빈 — 생성 후 안내"],"좁은 화면":["split: 표 가로 스크롤(열 최소 폭 유지)","narrow: 카드 목록, 선택 바 하단 고정"],"API 제약":["정렬은 위험도순 고정","은행·계좌 수 열 없음","totalAmountUsd null → 데이터 없음"]}},
+ov:{name:"Alert 상세 · 개요",sel:false,html:`
+<div class="ptitle"><div class="l">A-27406 <span>Fan-out 62%</span><span class="tg hi">0.93</span><span class="tg u">열람 미확인</span><span class="sub">담당 김OO · 탐지 10-05 (1일) · Episode — · 근거 v3</span></div></div>
+<div class="tabs"><span class="on">개요</span><span>그래프</span><span>거래 100</span><span>검토 의견</span></div>
+<div class="row k6">
+ <div class="r"><h4><span class="n">1</span>투입 원금</h4><div class="v nd">데이터 없음</div><div class="sub">산식 미정</div></div>
+ <div class="r"><h4><span class="n">2</span>거래 총액</h4><div class="v d" style="font-size:18px">USD 1.23M</div><div class="sub d">SAR 3.1M 외 2개 통화</div><div class="api">members SUBJECT+CONTEXT · FE 합산</div></div>
+ <div class="r"><h4><span class="n">3</span>순유입(대표 계좌)</h4><div class="v nd">데이터 없음</div><div class="sub">대표 계좌 규칙 없음</div></div>
+ <div class="r"><h4><span class="n">4</span>근거 거래</h4><div class="v d">100</div><div class="api">summary.txCount</div></div>
+ <div class="r"><h4><span class="n">5</span>참여 계좌</h4><div class="v d">17</div><div class="api">accounts.length</div></div>
+ <div class="r"><h4><span class="n">6</span>거래 기간</h4><div class="v d" style="font-size:15px">09-01 ~ 09-04</div><div class="sub">4일</div></div>
+</div>
+<div class="row c21">
+ <div class="r e"><h4><span class="n">7</span>일별 거래 금액 <span class="sub">시간축 · 통화별</span></h4><div class="ph"></div><div class="err">일별 금액을 계산하지 못했습니다 · 다시 시도</div></div>
+ <div class="r"><h4><span class="n">8</span>상위 송금 계좌</h4><div class="sub d">8f3a… · 420,000 SAR</div><div class="sub d">1c9d… · 88,000 USD</div><div class="api">summary.topSenders (계좌|통화)</div></div>
+</div>
+<div class="row c111">
+ <div class="r"><h4><span class="n">9</span>묶음 근거·씨앗</h4><div class="sub d">씨앗 8 · 유형 투표 Fan-out 5/8</div><div class="api">seedCount · typeShare · sources[]</div></div>
+ <div class="r"><h4><span class="n">10</span>조사 계좌 자금 지표 <span class="sub">FIFO 추정</span></h4><div class="sub d">외부 유입 · 유출 · 순 / 단시간 유출</div><div class="api">GET …/money · method · observedAt</div></div>
+ <div class="r"><h4><span class="n">11</span>거래별 패턴 후보 <span class="sub">선택 거래 · 사건 확률 아님</span></h4><div class="sub d">Fan-out 0.62 · Scatter-gather 0.21</div><div class="api">scores.p_0..p_8</div></div>
+</div>
+<div class="r"><h4><span class="n">12</span>처리 이력 <span class="sub">내부 이벤트 제외</span></h4><div class="sub d">10-05 14:20 생성 · 김OO 배정</div><div class="api">history[] · detachments[]</div></div>`,
+notes:{"머리":["ID·대표 유형·위험·상태·담당·탐지일·Episode·근거 버전","목록으로 버튼 없음 — 헤더 뒤로 사용","담당 아님/ADMIN/종결/편입 시 읽기 전용 배너"],"규칙":["계산 불가는 데이터 없음, 0 금지","혼합 통화를 하나로 합치지 않음","형제 카드 높이 맞춤"],"좁은 화면":["split: KPI 3×2, ⑦⑧ 세로","narrow: KPI 2×3, 나머지 1열"],"API 차이":["summary 기간·통화별 합계는 SUBJECT만 → FE 계산","일별 금액 집계는 의심 거래만 → FE 계산"]}},
+graph:{name:"Alert 상세 · 그래프",sel:false,html:`
+<div class="ptitle"><div class="l">A-27406 <span>Fan-out 62%</span><span class="tg hi">0.93</span></div></div>
+<div class="tabs"><span>개요</span><span class="on">그래프</span><span>거래 100</span><span>검토 의견</span></div>
+<div class="gwrap">
+ <div class="gset"><b style="font-size:12px">설정</b><span class="btn">보기 계좌 | 소유주</span><span class="btn">계좌 검색</span><span class="btn">hop 1 · 2 (사건 안 데이터)</span><span class="btn">정보 표시</span><span class="btn">시간축 ▶</span><div class="sub">범례: 색=위험 · 굵기=금액 · 입자=방향 · 숫자=건수</div></div>
+ <div class="div"></div>
+ <div class="gcan"><svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+   <g fill="var(--wf-region)" stroke="var(--ink-2)"><rect x="40" y="170" width="70" height="34" rx="6"/><rect x="200" y="90" width="70" height="34" rx="6"/><rect x="200" y="250" width="70" height="34" rx="6"/><rect x="370" y="170" width="70" height="34" rx="6"/><rect x="500" y="170" width="70" height="34" rx="6"/></g>
+   <g fill="none"><path d="M110,180 C150,150 170,110 200,107" stroke="var(--risk-hi)" stroke-width="9"/><path d="M110,195 C150,230 170,265 200,267" stroke="var(--risk-mid)" stroke-width="4"/><path d="M270,107 C320,110 340,170 370,182" stroke="var(--risk-hi)" stroke-width="7"/><path d="M270,267 C320,262 340,200 370,193" stroke="var(--risk-lo)" stroke-width="3"/><path d="M440,187 H500" stroke="var(--risk-hi)" stroke-width="11"/><path d="M535,204 C535,330 75,330 75,204" stroke="var(--risk-mid)" stroke-width="2" stroke-dasharray="5 4"/></g>
+   <g font-size="11" fill="var(--ink-2)" font-family="IBM Plex Sans KR"><text x="70" y="160">t1</text><text x="225" y="80">t2</text><text x="395" y="160">t3</text><text x="525" y="160">t4</text><text x="250" y="345">되돌아오는 거래 · 09-04 08:40</text></g>
+   <text x="300" y="30" text-anchor="middle" font-size="11" fill="var(--ink-3)" font-family="IBM Plex Sans KR">열 = 처음 등장 순서(시간 간격 아님)</text>
+ </svg>
+ <div class="gtool"><span class="btn">설정</span><span class="btn">범례</span></div>
+ <div class="gctl"><span class="btn">패턴 정리 ▾</span><span class="btn">초기 배치 복원</span><span class="btn">화면 맞춤</span><span class="btn">⛶</span></div></div>
+ <div class="div"></div>
+ <div class="gdet"><b style="font-size:12px">계좌쌍 8f3a… ↔ 1c9d…</b><div class="sub">현재 범위 12건 / 전체 15건</div><div class="ph" style="min-height:170px"></div><div class="sub">두 계좌 레인 타임라인 · 거래별 금액·통화·시각</div><div class="ph" style="min-height:22px;flex:0"></div><div class="sub">개요 스트립 · 구간 선택</div><div class="api">사건 상세 members 조립 (조사 범위 제외 반영)</div></div>
+</div>
+<div class="sheet drawer">선택 상세는 오른쪽 드로어로 열리고 분할선으로 폭을 조절합니다. 설정은 왼쪽 위 툴바 팝오버입니다.</div>
+<div class="sheet bottom">선택 상세: 절반 높이 하단 시트 · 설정: 하단 시트</div>`,
+notes:{"배치":["설정 / 그래프 / 선택 상세 3열, 4px 분할선·손잡이","시간순 좌→우 초기 배치(제안, Q2)"],"안정성":["자동 화면 맞춤은 최초 1회","데이터 갱신·hover·패널 크기 변경에 위치·카메라 유지","탭을 바꿔도 위치 유지(언마운트 금지)"],"좁은 화면":["regular: 설정 열 좁게","split: 설정 팝오버, 상세 드로어","narrow: 하단 시트 두 개"],"API 제약":["hop 확장 API 없음 → 사건 안 데이터만","Alert당 근거 거래 최대 100건","잘림 limits는 Alert 원본 응답에만"]}},
+tx:{name:"Alert 상세 · 거래",sel:true,html:`
+<div class="ptitle"><div class="l">A-27406</div></div>
+<div class="tabs"><span>개요</span><span>그래프</span><span class="on">거래 100</span><span>검토 의견</span></div>
+<div class="ptitle"><div class="l" style="font-size:12px">조사 범위 100건 · SUBJECT 92 · CONTEXT 8 · 제외 0</div><div class="r2"><span class="btn">제거</span></div></div>
+<div class="r solid lst"><div class="tw"><table class="tbl"><thead><tr><th><span class="cb"></span></th><th>송금 소유주</th><th>송금 계좌</th><th class="gsep">수취 소유주</th><th>수취 계좌</th><th class="num gsep">금액</th><th>통화</th><th class="num">USD</th><th>시각</th><th>결제 수단</th><th class="num">점수</th><th>역할</th><th>상태</th></tr></thead><tbody>
+<tr><td><span class="cb on"></span></td><td>ACME-17</td><td>8f3a…</td><td class="gsep">BETA-02</td><td>1c9d…</td><td class="num gsep">1,200.00</td><td>SAR</td><td class="num">319.99</td><td>09-01 19:01</td><td>Wire</td><td class="num">0.91</td><td>SUBJECT</td><td>PENDING</td></tr>
+<tr><td><span class="cb"></span></td><td>BETA-02</td><td>1c9d…</td><td class="gsep">ACME-17</td><td>8f3a…</td><td class="num gsep">5,000.00</td><td>USD</td><td class="num">5,000.00</td><td>09-01 19:13</td><td>ACH</td><td class="num">0.44</td><td>CONTEXT</td><td>PENDING</td></tr>
+</tbody></table></div>
+<div class="cards"><div class="card"><div class="top"><span><span class="cb on"></span> 09-01 19:01</span><span>1,200.00 SAR</span></div><div class="sub">ACME-17 · 8f3a… → BETA-02 · 1c9d…</div><div class="sub">Wire · 0.91 · SUBJECT</div></div></div>
+<div class="emp">조사 범위에 거래가 없습니다</div>
+<div class="selbar"><b>1건</b><span class="btn" style="flex:1;justify-content:flex-start">사유(필수) 입력</span><span class="btn">취소</span><span class="btn pri">조사 범위에서 제거</span></div>
+<div class="api">EXCLUDE · PENDING·DECIDED만 · 되돌리는 API 없음 → 확인 창에 명시</div></div>`,
+notes:{"규칙":["기본 상태엔 체크박스 없음, 제거로 진입","행 클릭 = 그 거래 하나만 토글","송금 묶음 ‖ 수취 묶음 구분선"],"금액":["원통화 금액·통화·USD 열 분리","truncate 금지, 넘치면 표만 가로 스크롤"],"좁은 화면":["narrow: 거래 카드(방향 한 줄, 금액 한 줄)"],"API 제약":["제외 취소 불가","사유는 이벤트 comment로만 저장"]}},
+review:{name:"Alert 상세 · 검토 의견",sel:false,html:`
+<div class="ptitle"><div class="l">A-27406</div></div>
+<div class="tabs"><span>개요</span><span>그래프</span><span>거래 100</span><span class="on">검토 의견</span></div>
+<div class="row rev">
+ <div class="r solid"><h4>검토 의견</h4><div class="fbar"><span class="btn pri">정상 종결</span><span class="btn">단독 의심 종결</span><span class="btn">기존 Episode에 연결</span></div>
+  <div class="ph" style="min-height:220px;background:var(--wf-region);"></div><div class="sub">판단 근거 (필수 · 넓고 높은 입력 · 입력 중 내용은 이 브라우저에 보존)</div>
+  <div class="fbar" style="justify-content:flex-end"><span class="btn" style="border:0">저장본 목록</span><span class="btn">임시 저장</span><span class="btn pri">종결 확인</span></div>
+  <div class="api">임시 저장 = COMMENT(영구 기록) 제안 Q3 · 종결 = CLOSE+decision · 새 Episode는 목록 선택 모드로 안내</div></div>
+ <div class="r"><h4>참고 정보</h4><div class="sub d">조사 범위 100 · 미판정 92</div><div class="sub d">대표 유형 Fan-out · 씨앗 8</div><div class="sub d">같은 거래의 다른 사건 판정 2</div><div class="sub d">저장본 3 (COMMENT 이력)</div><div class="api">pendingCount · relatedDecisions · history(COMMENT)</div></div>
+</div>`,
+notes:{"위계":["저장본 목록(3순위) → 임시 저장(2순위) → 종결 확인(1순위)","종결 전 판단·근거 미리보기 확인 창"],"제외":["관리자 검수 넘기기 — API 없음, 표시 안 함","오탐 옵션 없음"],"좁은 화면":["split 이하: 참고 정보는 입력 아래 접힘 패널"],"권한":["담당 STAFF·OPEN만 실행, 아니면 비활성+이유"]}},
+ep:{name:"Episode 상세",sel:true,html:`
+<div class="ptitle"><div class="l">E-512 <span class="sub">연결 Alert 3</span><span class="tg">Fan-out</span><span class="tg">Cycle</span><span class="tg i">처리 중</span><span class="sub">담당 이OO</span></div></div>
+<div class="tabs"><span class="on">개요</span><span>그래프</span><span>거래</span><span>검토 의견</span></div>
+<div class="row k6 narrow-hide"><div class="r"><h4>투입 원금</h4><div class="v nd">데이터 없음</div></div><div class="r"><h4>거래 총액</h4><div class="v d" style="font-size:16px">USD 2.4M</div></div><div class="r"><h4>순유입</h4><div class="v nd">데이터 없음</div></div><div class="r"><h4>근거 거래</h4><div class="v d">240</div></div><div class="r"><h4>참여 계좌</h4><div class="v d">31</div></div><div class="r"><h4>거래 기간</h4><div class="v d" style="font-size:14px">08-28 ~ 09-04</div></div></div>
+<div class="r solid lst"><h4><span class="n">1</span>연결 Alert <span class="sub">중심 영역</span><span style="margin-left:auto" class="btn">연결 해제</span></h4>
+ <div class="tw"><table class="tbl"><thead><tr><th><span class="cb"></span></th><th>Alert</th><th>유형·점수</th><th>묶음 판정</th><th class="num">거래</th><th>연결 시각</th></tr></thead><tbody>
+ <tr><td><span class="cb on"></span></td><td>A-27406</td><td>Fan-out 62% · 0.93</td><td>미정</td><td class="num">100</td><td>10-05 14:20</td></tr>
+ <tr><td><span class="cb on"></span></td><td>A-27399</td><td>Cycle 50% · 0.88</td><td>의심</td><td class="num">37</td><td>10-05 14:20</td></tr>
+ <tr><td><span class="cb"></span></td><td>A-27310</td><td>혼합 · 0.71</td><td>미정</td><td class="num">12</td><td>10-05 15:02</td></tr></tbody></table></div>
+ <div class="cards"><div class="card"><div class="top"><span><span class="cb on"></span> A-27406</span><span>0.93</span></div><div class="sub">Fan-out 62% · 거래 100 · 미정</div></div></div>
+ <div class="selbar"><b>2건 해제</b><span>남는 Alert 1건 → Episode가 해체되고 남은 Alert도 모두 해제됩니다</span><span class="btn">사유(필수)</span><span class="btn">취소</span><span class="btn pri">연결 해제</span></div>
+ <div class="api">groups[].sourceAlertId · 이동은 A-{id} 정확 일치 검색으로 caseId 확인 · UNLINK는 Episode 담당자만</div></div>
+<div class="row c21"><div class="r"><h4>일별 거래 금액 (시간축)</h4><div class="ph"></div></div><div class="r"><h4>상위 송금 계좌</h4><div class="ph"></div></div></div>
+<div class="row c111"><div class="r"><h4>패턴 근거 · 유형별 카드</h4><div class="ph" style="min-height:40px"></div></div><div class="r"><h4>대표 계좌 이력</h4><div class="v nd">데이터 없음</div><div class="sub">API 미연결</div></div><div class="r"><h4>처리 이력</h4><div class="sub">편입·해제·판정</div></div></div>`,
+notes:{"개요":["연결 Alert가 중심, 행 전체 선택","유형을 하나로 줄이지 않음"],"검토 의견":["Alert 묶음별 DECIDE(정상/의심)·RECONSIDER","모두 판정되면 CLOSE(판정 없이)"],"해제":["사유 필수, 2건 미만이면 해체 경고","Episode 담당 STAFF만"],"좁은 화면":["narrow: KPI 접고 연결 Alert 카드 우선"]}},
+noti:{name:"알림 · 검색 · 계정",sel:false,html:`
+<div class="row c11">
+ <div class="r lst"><h4>알림 <span class="sub">안 읽음 4</span><span style="margin-left:auto" class="btn">이 페이지 모두 읽음</span></h4>
+  <div class="card"><div class="top"><span>● 새 Alert 배정 · A-27406</span><span class="sub">10-05 14:20</span></div><div class="sub">행 전체 클릭 → 읽음 처리 후 사건 이동</div></div>
+  <div class="card"><div class="top"><span>Episode 편입 3건</span><span class="sub">10-05 15:02</span></div><div class="sub">caseId 없음 → 사건 목록 펼침(GET …/{id}/cases)</div></div>
+  <div class="emp">이 기간에 알림이 없습니다</div><div class="api">notifications · unreadCount · 페이지 키 number</div></div>
+ <div class="r"><h4>전역 검색 <span class="sub">/ 로 열기</span></h4>
+  <div class="search" style="justify-self:stretch;width:100%">27406<kbd>Esc</kbd></div>
+  <div class="sub"><b>Alert</b> · A-27406 Fan-out 0.93</div><div class="sub"><b>Episode</b> · 결과 없음</div><div class="sub"><b>거래</b> · 2건 — 거래 내역에서 해당 항목 선택 상태로 열기</div><div class="err" style="display:block">알림 검색만 실패 · 다시 시도 (다른 그룹은 그대로)</div>
+  <div class="api">사건 2종 · 원장 3종 · 알림 병렬, 그룹별 실패</div></div>
+</div>
+<div class="r"><h4>계정</h4><div class="row c11"><div><div class="sub">이름 김명기 · 아이디 l1a · 역할 STAFF (바꿀 수 없는 값은 텍스트)</div></div><div class="card"><div class="top">현재 세션 <span class="tg">현재</span></div><div class="sub">Chrome · macOS · 최근 활동 방금</div><span class="btn" style="justify-self:start">로그아웃</span></div></div><div class="sub">다른 세션 목록·모두 로그아웃은 서버가 제공하지 않아 표시하지 않습니다.</div></div>`,
+notes:{"알림":["안 읽음/읽음은 굵기·점·문구로 구분","갱신 주기는 공통 변수"],"검색":["종류별 그룹, 정확한 대상으로 이동","하나가 실패해도 나머지 표시"],"계정":["v9 가로 세션 카드 형태(현재 세션만)","로그아웃 전 확인 창"],"제외":["비밀번호 변경·재설정, 세션 목록 — API 없음"]}}
+};
+const WIDTHS=[["1920 · 100%",1920],["1920 · 150%",1280],["1366 노트북",1366],["960 분할",960],["960 · 125%",768],["640",640]];
+const STATES=[["정상","ok"],["초기 로딩","loading"],["갱신 중","refresh"],["빈 결과","empty"],["오류","error"]];
+const st={screen:"alerts",w:1920,state:"ok",sb:false,rdr:false,sel:false};
+try{const s=JSON.parse(localStorage.getItem("wf-state")||"{}");Object.assign(st,s)}catch(e){}
+const $=id=>document.getElementById(id);
+const app=$("app"),stage=$("stage"),outer=$("outer");
+function seg(el,items,key,cast){el.innerHTML="";items.forEach(([l,v])=>{const b=document.createElement("button");b.type="button";b.textContent=l;b.setAttribute("aria-pressed",String(st[key]===v));b.onclick=()=>{st[key]=cast?cast(v):v;render()};el.appendChild(b)})}
+function render(){
+  try{localStorage.setItem("wf-state",JSON.stringify(st))}catch(e){}
+  const tabs=$("screenTabs");tabs.innerHTML="";
+  Object.entries(SCREENS).forEach(([k,s])=>{const b=document.createElement("button");b.type="button";b.textContent=s.name;b.setAttribute("aria-pressed",String(st.screen===k));b.onclick=()=>{st.screen=k;st.sel=false;render()};tabs.appendChild(b)});
+  seg($("widthSeg"),WIDTHS,"w");seg($("stateSeg"),STATES,"state");
+  const S=SCREENS[st.screen];
+  $("selWrap").hidden=!S.sel; if(!S.sel) st.sel=false;
+  $("sbT").checked=st.sb;$("rdrT").checked=st.rdr;$("selT").checked=st.sel;
+  const narrowShell=st.w<768, rdrPush=st.w>=1280;
+  app.className="app"+(st.sb&&!narrowShell?" sb-open":"")+(st.rdr&&rdrPush?" rdr-on":"")+(st.rdr&&!rdrPush?" rdr-overlay":"")+(st.sel?" sel":"")+(narrowShell?" narrow-shell":"");
+  const items=["대시보드","거래 내역","Alert","Episode"];const on={inst:0,mine:0,ledger:1,alerts:2,ov:2,graph:2,tx:2,review:2,ep:3,noti:-1}[st.screen];
+  app.innerHTML=`<aside class="sb" aria-label="사이드바">${items.map((x,i)=>`<i class="${i===on?"on":""}" title="${x}"></i>`).join("")}<div class="sp"></div><i title="알림"></i><i title="설정"></i></aside>
+  <div class="col"><header class="hdr"><div class="nav"><span class="btn menu">☰</span><span class="btn">←</span><span class="btn dis">→</span><span class="btn">⟳</span></div><div class="search"><span>전역 검색</span><kbd>/</kbd></div><div class="rt"><span class="btn">⛶</span><span class="btn">RDR</span><span class="btn">🔔</span></div></header><main class="main">${S.html}</main></div>
+  ${st.rdr?`<aside class="rdr" aria-label="RDR 9000"><b>RDR 9000 <span class="tg mk">mock · LLM 미연동</span></b><div class="sub">A-27406 요약: 실제 집계 기반 규칙 문장 · 출처와 기준 시각</div><div class="ph" style="min-height:120px;flex:0"></div><div class="comp"><span class="btn pri">보내기</span></div></aside>`:""}`;
+  stage.dataset.state=st.state; stage.style.width=st.w+"px";
+  const n=$("notes");n.innerHTML=Object.entries(S.notes).map(([h,l])=>`<div><b>${h}</b><ul>${l.map(x=>`<li>${x}</li>`).join("")}</ul></div>`).join("");
+  fit();
+}
+function fit(){
+  const ow=outer.clientWidth; const s=Math.min(1,ow/st.w);
+  stage.style.transform=`scale(${s})`; outer.style.height=Math.ceil(app.offsetHeight*s)+"px";
+  const sideW=(st.w<768)?0:(st.sb?240:56), rdrW=(st.rdr&&st.w>=1280)?384:0, cw=st.w-sideW-rdrW-32;
+  const g=cw>=1440?"wide":cw>=1024?"regular":cw>=672?"split":"narrow";
+  $("metaW").textContent=`CSS 폭 ${st.w}px · 콘텐츠 약 ${cw}px → ${g} · 축소 ${Math.round(s*100)}%`;
+}
+$("sbT").onchange=e=>{st.sb=e.target.checked;render()};
+$("rdrT").onchange=e=>{st.rdr=e.target.checked;render()};
+$("selT").onchange=e=>{st.sel=e.target.checked;render()};
+if(window.ResizeObserver){new ResizeObserver(fit).observe(outer);new ResizeObserver(fit).observe(app)}else{addEventListener("resize",fit)}
+render();
+})();
+</script>
+</body>
+</html>

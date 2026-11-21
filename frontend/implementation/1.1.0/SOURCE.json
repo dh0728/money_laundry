@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "version": "1.1.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "wireframe",
+  "name": "계좌·소유주 와이어프레임",
+  "git_committer_kst": "2026-10-06T10:49:41+09:00",
+  "source_repository": "external_brain",
+  "source_commit": "b521e3cfa6da1abaad7d4f0d9e9aebb7a6f9eea3",
+  "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/ui-redesign-wireframes.html",
+  "original_source_url": "https://github.com/kmg200164/external_brain/tree/b521e3cfa6da1abaad7d4f0d9e9aebb7a6f9eea3/Workspace/Projects/money_laundry/Frontend/Media/ui-redesign-wireframes.html",
+  "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [
+    27,
+    28,
+    124,
+    125
+  ]
+}

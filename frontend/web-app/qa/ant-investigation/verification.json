@@ -1,0 +1,65 @@
+{
+  "at": "2026-10-23T04:24:34.240819+00:00",
+  "scope": "local synthetic frontend review; no production or actual BE/AI validation",
+  "tests": {
+    "files": 49,
+    "passed": 263,
+    "failed": 0,
+    "command": "pnpm test"
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 1,
+    "warning": "existing TanStack Table react-hooks/incompatible-library"
+  },
+  "build": {
+    "command": "pnpm build",
+    "passed": true,
+    "warning": "large graph and application chunks"
+  },
+  "browser": {
+    "standaloneJourneyChecks": 13,
+    "actualApiRequests": 0,
+    "uncaughtErrors": 0,
+    "dashboardWidths": [
+      1440,
+      960,
+      390
+    ],
+    "dashboardDocumentHorizontalOverflow": 0,
+    "separateChecks": [
+      "E-50 owner graph",
+      "T-102 exact detail",
+      "Escape close"
+    ]
+  },
+  "pairview": {
+    "status": "partial",
+    "verified": [
+      "Ant iframe",
+      "separate 26 mappings",
+      "host to iframe dark theme",
+      "graph tab and focus-ready rect",
+      "review tab and focus-ready rect",
+      "exact transaction drawer rect"
+    ],
+    "unverified": [
+      "drawer close then header interaction",
+      "reverse theme sync",
+      "later menu round trips",
+      "standalone shared package"
+    ]
+  },
+  "notVerified": [
+    "actual backend save/requery",
+    "actual authorization enforcement",
+    "actual AI run or evaluation",
+    "independent UI retest",
+    "human acceptance"
+  ],
+  "delivery": {
+    "branch": "fe/work",
+    "deployed": false,
+    "humanAccepted": false
+  }
+}

@@ -8,6 +8,31 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 beforeEach(() => vi.restoreAllMocks())
 
 describe('서버 세션', () => {
+  it.each([
+    null,
+    { ...user, id: '11' },
+    { ...user, id: 1.5 },
+    { ...user, role: 'L1' },
+    { ...user, name: null },
+    { username: 'reviewer', role: 'STAFF' },
+  ])('잘못된 200 응답을 정상 사용자로 복원하지 않는다: %j', async payload => {
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json(payload))
+    await expect(restoreSession()).rejects.toMatchObject({ problem: { status: 502, code: 'INVALID_SESSION_RESPONSE' } })
+    expect(fetcher).toHaveBeenCalledOnce()
+  })
+
+  it('허용된 관리자 응답만 복원하고 불필요한 서버 필드는 전달하지 않는다', async () => {
+    const admin = { ...user, role: 'ADMIN' }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ ...admin, internalNote: 'not-profile-data' }))
+    expect(await restoreSession()).toEqual(admin)
+  })
+
+  it('로그인 HTTP 200이어도 사용자 계약이 틀리면 인증 성공으로 반환하지 않는다', async () => {
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ headerName: 'X-CSRF-TOKEN', token: 'before-invalid' })).mockResolvedValueOnce(json({ ...user, role: 'UNKNOWN' }))
+    await expect(login('reviewer', 'secret')).rejects.toMatchObject({ problem: { status: 502, code: 'INVALID_SESSION_RESPONSE' } })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
   it('로그인 전후 CSRF를 받고 양식 본문과 쿠키를 보낸다', async () => {
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ headerName: 'X-CSRF-TOKEN', token: 'before' })).mockResolvedValueOnce(json(user)).mockResolvedValueOnce(json({ headerName: 'X-CSRF-TOKEN', token: 'after' })).mockResolvedValueOnce(json({ ok: true }))
     expect(await login('reviewer', 'secret')).toEqual(user)

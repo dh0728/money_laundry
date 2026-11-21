@@ -122,7 +122,7 @@ export default function Agent({ open, setOpen, closeRef, mode, setMode, record, 
   }
   if (!open) return null
   const header = <div data-testid="agent-header" className={`agent-drag-handle flex items-center justify-between gap-2 border-b px-3 py-2.5 ${mode === 'floating' ? 'cursor-move' : ''}`}>
-    <span className="flex items-center gap-2 font-mono text-sm font-semibold tracking-wide"><button ref={avatarRef} type="button" aria-label={`${name} 심볼로 닫기`} onClick={requestClose} disabled={Boolean(morph) || closing} className={`agent-logo rdr-avatar size-6 shrink-0 rounded-full p-0 ${morph ? 'invisible opacity-0' : ''}`}><RadarSweep className="size-6" /></button>{name}{live && <span className="rounded-full border px-2 py-0.5 font-sans text-[10px] font-normal">mock</span>}</span>
+    <span className="flex items-center gap-2 font-mono text-sm font-semibold tracking-wide"><button ref={avatarRef} type="button" aria-label={`${name} 심볼로 닫기`} onClick={requestClose} disabled={Boolean(morph) || closing} className={`agent-logo rdr-avatar size-6 shrink-0 rounded-full p-0 ${morph ? 'invisible opacity-0' : ''}`}><RadarSweep className="size-6" /></button>{name}{live && <span className="rounded-full border px-2 py-0.5 font-sans text-[0.625rem] font-normal">mock</span>}</span>
     <div className="agent-action flex gap-0.5">
       <IconButton label="새 대화" className="size-8" onClick={() => setMessages([])}><Plus className="size-4" /></IconButton>
       <IconButton label={mode === 'sidebar' ? '플로팅 패널로 보기' : '우측 사이드바로 보기'} className="size-8" onClick={() => setMode(mode === 'sidebar' ? 'floating' : 'sidebar')}>
@@ -133,7 +133,7 @@ export default function Agent({ open, setOpen, closeRef, mode, setMode, record, 
   </div>
   const content = <section aria-label={name} data-mode={mode} data-closing={closing || undefined} className={`agent-panel flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-background shadow-xl ${closing ? 'pointer-events-none opacity-0' : ''}`}>
     {header}
-    <div className="flex items-center gap-2 px-4 py-3 text-[11px] text-muted-foreground"><span>{record?.id ?? '전체 업무 · 오늘 요약'}</span></div>
+    <div className="flex items-center gap-2 px-4 py-3 text-[0.6875rem] text-muted-foreground"><span>{record?.id ?? '전체 업무 · 오늘 요약'}</span></div>
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
       <div className="space-y-3"><p className="whitespace-pre-wrap text-sm leading-7">{summary}</p>
         <div className="flex flex-wrap gap-2">{['주요 근거 확인', '검토 우선순위 요약'].map(question => <Button key={question} variant="outline" size="sm" className="text-xs" onClick={() => send(question)}>{question}</Button>)}</div>
@@ -143,7 +143,7 @@ export default function Agent({ open, setOpen, closeRef, mode, setMode, record, 
     <form className="border-t p-4" onSubmit={event => { event.preventDefault(); send() }}>
       <div className="relative"><Textarea aria-label={`${name}에게 질문`} placeholder="현재 조사에 대해 질문하세요" className="min-h-24 resize-y pr-12 text-xs" value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} />
         <Button size="icon" className="absolute bottom-2 right-2 size-7" disabled={!input.trim()} aria-label="질문 보내기"><Send className="size-3.5" /></Button></div>
-      <p className="mt-2 text-center text-[10px] text-muted-foreground">판단과 최종 처리는 조사자가 수행합니다.</p>
+      <p className="mt-2 text-center text-[0.625rem] text-muted-foreground">판단과 최종 처리는 조사자가 수행합니다.</p>
     </form>
   </section>
   const morphLayer = morph && createPortal(<div aria-hidden data-testid="rdr-morph" className="rdr-morph pointer-events-none fixed z-[80] overflow-hidden rounded-full" style={{ left: morph.rect.left, top: morph.rect.top, width: morph.rect.width, height: morph.rect.height }}><RadarSweep className="size-full" /></div>, document.body)

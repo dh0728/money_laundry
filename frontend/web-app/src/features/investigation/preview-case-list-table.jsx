@@ -1,0 +1,91 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { CaseDataTable, RecordIdCell } from './case-table-components';
+import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStatusLabel, VerdictTag } from '../../components/semantic-tags';
+import { currencyColumn, SortableTableHead, tableCount,
+  useTableSelection, useTableSort } from '../../components/workflow-table';
+
+const flowsFor = records => [...new Set(records.map(({ from, to }) => `${from.code} → ${to.code}`))];
+const timesFor = records => records.map(record => record.timestamp).sort();
+const columns = [
+  { name: 'ID', value: row => row.code },
+  { name: '패턴', value: row => row.pattern },
+  { name: '모델 점수·사람 판정', compactName: '점수·판정', label: '모델 점수', value: row => row.score },
+  { name: '담당자', value: row => row.assigned ? '내 담당' : '다른 담당자' },
+  { name: '업무 상태', value: row => reviewStatusLabel(row.status) },
+  { name: '경과일', value: row => row.open ? row.elapsed : null },
+  { name: '계좌 흐름', value: row => flowsFor(row.related).join(' ') || null },
+  { name: '기간 · KST', value: row => timesFor(row.related)[0] },
+];
+const measures = [
+  { name: '거래 건수', value: row => row.related.length },
+  { name: '거래 금액', ...currencyColumn(row => row.amountByCurrency) },
+];
+const episodeMeasures = [
+  { name: '거래가 겹치는 Alert 수', compactName: '겹친 Alert', value: row => row.linkedAlerts },
+  { name: '관련 계좌 수', compactName: '관련 계좌', value: row => row.relatedAccounts },
+];
+const number = new Intl.NumberFormat('ko-KR');
+
+function EvidencePeriod({ records }) {
+  if (!records.length) return '미제공';
+  const times = timesFor(records);
+  const start = times[0];
+  const end = times.at(-1);
+  const time = value => <time dateTime={value.replace(' ', 'T') + '+09:00'}>{value}</time>;
+  return <>{time(start)}{start !== end && <><br />{time(end)}</>}</>;
+}
+
+function AccountFlows({ records }) {
+  const flows = flowsFor(records);
+  if (!flows.length) return '미제공';
+  return <>{flows.slice(0, 2).map(flow => <code key={flow}>{flow}</code>)}
+    {flows.length > 2 && <small>외 {flows.length - 2}개 흐름</small>}</>;
+}
+
+export function PreviewCaseTable({ title, rows, episode = false, totalCount = rows.length }) {
+  const scope = episode ? 'episodes' : 'alerts';
+  const sorting = useTableSort(rows, scope);
+  const selection = useTableSelection(sorting.rows, scope);
+  const numericHeadings = episode ? [...episodeMeasures, ...measures] : measures;
+  const headings = [...columns, ...numericHeadings];
+  return <CaseDataTable title={title} summary={tableCount(rows.length, totalCount, '건', selection.selectedCount)} className={`entry-list${episode ? ' case-table-episode' : ''}`} selection={selection}>
+      <TableHeader><TableRow>
+        {headings.map(({ name, compactName, ...options }, index) =>
+          <SortableTableHead key={name} sorting={sorting} column={name} label={options.label ?? name} {...options}
+            className={index >= columns.length ? 'case-table-numeric' : undefined}>{episode ? compactName ?? name : name}</SortableTableHead>)}
+      </TableRow></TableHeader>
+      <TableBody>
+        {sorting.rows.map(row => {
+          const { code, verdict, pattern, score, assigned, status, elapsed, open, related, relatedAccounts, linkedAlerts, amountByCurrency } = row;
+          const totals = Object.entries(amountByCurrency);
+          return <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}>
+            <RecordIdCell code={code} />
+            <TableCell><PatternTag emphasis="solid">{pattern}</PatternTag></TableCell>
+            <TableCell><div className="semantic-tag-group"><VerdictTag verdict={verdict} /><ModelScoreTag score={score} /></div></TableCell>
+            <TableCell><CaseActorTag>{assigned ? '내 담당' : '다른 담당자'}</CaseActorTag></TableCell>
+            <TableCell><ReviewStatusTag status={status} /></TableCell>
+            <TableCell>{open ? `${elapsed}일` : '—'}</TableCell>
+            <TableCell className="case-table-flows"><AccountFlows records={related} /></TableCell>
+            <TableCell><EvidencePeriod records={related} /></TableCell>
+            {episode && <>
+              <TableCell className="case-table-numeric">{linkedAlerts}건</TableCell>
+              <TableCell className="case-table-numeric">{relatedAccounts}개</TableCell>
+            </>}
+            <TableCell className="case-table-numeric">{related.length}건</TableCell>
+            <TableCell className="case-table-numeric">
+              {totals.length ? totals.map(([currency, amount]) => <span key={currency}>{number.format(amount)} {currency}</span>) : '미제공'}
+            </TableCell>
+          </TableRow>;
+        })}
+        {!rows.length && <TableRow><TableCell colSpan={headings.length}>조회 조건과 일치하는 항목이 없습니다.</TableCell></TableRow>}
+      </TableBody>
+    </CaseDataTable>;
+}
+
+export function mountPreviewCaseTable(host, title, rows, episode, totalCount) {
+  const root = createRoot(host);
+  root.render(<PreviewCaseTable title={title} rows={rows} episode={episode} totalCount={totalCount} />);
+  return () => root.unmount();
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "version": "1.6.0",
+  "assignment": "retrospective chronological preservation identifier; not a tested or approved release",
+  "kind": "overview",
+  "name": "개요 반응형 배치·번호 배지",
+  "git_committer_kst": "2026-10-15T09:01:45+09:00",
+  "source_repository": "external_brain",
+  "source_commit": "7f5dae5decb6edeff0afbd98e6cb41378455018c",
+  "original_source_path": "Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "original_source_url": "https://github.com/kmg200164/external_brain/tree/7f5dae5decb6edeff0afbd98e6cb41378455018c/Workspace/Projects/money_laundry/Frontend/Media/aml-overview-responsive-states.html",
+  "lineage_note": "Same-day related fixes and documents are grouped; branch names and patch files do not create extra releases",
+  "user_acceptance": "not established; Ant/SDS remain explicitly unaccepted",
+  "evidence_rows": [
+    52,
+    53,
+    67
+  ]
+}

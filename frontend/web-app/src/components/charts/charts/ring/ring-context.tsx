@@ -1,0 +1,139 @@
+"use client";
+
+import type { Transition } from "motion/react";
+import { createContext, type RefObject, useContext } from "react";
+
+// CSS variable references for ring chart theming
+export const ringCssVars = {
+  background: "var(--chart-background)",
+  foreground: "var(--chart-foreground)",
+  foregroundMuted: "var(--chart-foreground-muted)",
+  label: "var(--chart-label)",
+  ringBackground: "var(--border)",
+  // Default ring colors from chart palette
+  ring1: "var(--chart-1)",
+  ring2: "var(--chart-2)",
+  ring3: "var(--chart-3)",
+  ring4: "var(--chart-4)",
+  ring5: "var(--chart-5)",
+};
+
+// Default ring color palette
+export const defaultRingColors = [
+  ringCssVars.ring1,
+  ringCssVars.ring2,
+  ringCssVars.ring3,
+  ringCssVars.ring4,
+  ringCssVars.ring5,
+];
+
+export interface RingData {
+  /** Display label for the ring */
+  label: string;
+  /** Current value */
+  value: number;
+  /** Maximum value (determines progress percentage) */
+  maxValue: number;
+  /** Optional color override - falls back to palette */
+  color?: string;
+}
+
+/**
+ * Stable pointer hit area for ring `index`.
+ *
+ * The visible ring scales on hover, so using it as the hit target creates a
+ * feedback loop at its edges (hover → grow → pointer leaves → shrink → hover).
+ * The hit band is static and extends half the ring gap on each side, so
+ * neighbouring bands share an edge: no overlap and no dead gap between rings.
+ */
+export function getRingHitRadii(
+  index: number,
+  baseInnerRadius: number,
+  strokeWidth: number,
+  ringGap: number
+): { innerRadius: number; outerRadius: number } {
+  const halfGap = Math.max(0, ringGap) / 2;
+  const bandInner = baseInnerRadius + index * (strokeWidth + ringGap);
+  return {
+    innerRadius: Math.max(0, bandInner - halfGap),
+    outerRadius: bandInner + strokeWidth + halfGap,
+  };
+}
+
+export interface RingHoverContextValue {
+  hoveredIndex: number | null;
+  setHoveredIndex: (index: number | null) => void;
+}
+
+export interface RingStableContextValue {
+  // Data
+  data: RingData[];
+
+  // Dimensions
+  size: number;
+  center: number;
+  strokeWidth: number;
+  ringGap: number;
+  baseInnerRadius: number;
+
+  // Animation state
+  animationKey: number;
+  isLoaded: boolean;
+  enterTransition?: Transition;
+  enterStaggerScale: number;
+
+  // Container ref for portals
+  containerRef: RefObject<HTMLDivElement | null>;
+
+  // Computed values
+  totalValue: number;
+
+  // Get color for a ring index
+  getColor: (index: number) => string;
+
+  // Get ring radii for an index
+  getRingRadii: (index: number) => { innerRadius: number; outerRadius: number };
+
+  // Arc angle range
+  startAngle: number;
+  endAngle: number;
+
+  /**
+   * Studio geometry scrub — skip Motion path morphing and use plain SVG paths.
+   * @default false
+   */
+  geometryScrubbing: boolean;
+}
+
+export type RingContextValue = RingStableContextValue & RingHoverContextValue;
+
+export const RingStableContext = createContext<RingStableContextValue | null>(null);
+export const RingHoverContext = createContext<RingHoverContextValue | null>(null);
+
+export function useRingStable(): RingStableContextValue {
+  const context = useContext(RingStableContext);
+  if (!context) {
+    throw new Error(
+      "useRingStable must be used within a RingProvider. " +
+        "Make sure your component is wrapped in <RingChart>."
+    );
+  }
+  return context;
+}
+
+export function useRingHover(): RingHoverContextValue {
+  const context = useContext(RingHoverContext);
+  if (!context) {
+    throw new Error(
+      "useRingHover must be used within a RingProvider. " +
+        "Make sure your component is wrapped in <RingChart>."
+    );
+  }
+  return context;
+}
+
+export function useRing(): RingContextValue {
+  return { ...useRingStable(), ...useRingHover() };
+}
+
+export { RingStableContext as default };
