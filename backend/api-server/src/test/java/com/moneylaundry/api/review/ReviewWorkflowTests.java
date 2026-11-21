@@ -433,6 +433,70 @@ class ReviewWorkflowTests {
         .containsKeys("fromAccountId", "toAccountId", "fromOwnerName", "toOwnerName")
         .containsEntry("paymentCurrency", "USD")
         .containsEntry("occurredAt", "2023-09-01T00:00:00Z");
+    assertThat(cases.get(b).get("judgment")).isNull();
+    act(other, "CLOSE", "SUSPICIOUS", select(b));
+    var closed =
+        rows(service.board().get("cases")).stream()
+            .filter(c -> number(c.get("caseId")) == b)
+            .findFirst()
+            .orElseThrow();
+    assertThat(object(closed.get("judgment")))
+        .containsEntry("verdict", "SUSPICIOUS")
+        .containsEntry("reason", "검토 근거")
+        .containsKeys("id", "at", "reviewer");
+  }
+
+  ReviewService.Judgment judgment(UUID request, long id, String verdict) {
+    return new ReviewService.Judgment(
+        request,
+        number(service.detail(id).get("revision")),
+        verdict,
+        "pattern",
+        "T-1 거래 내역",
+        "단기간 분산 송금",
+        "패턴과 일치");
+  }
+
+  @Test
+  void judgment_closes_alert_and_episode_and_records_structured_reason() {
+    long a = alert(l1);
+    UUID request = UUID.randomUUID();
+    var input = judgment(request, a, "SUSPICIOUS");
+    var saved = service.judge(a, l1, input);
+    assertThat(saved.get("id").toString()).matches("J-230902-\\d{6}");
+    assertThat(saved)
+        .containsEntry("verdict", "SUSPICIOUS")
+        .containsEntry("reasonCategory", "pattern")
+        .containsEntry("evidence", "T-1 거래 내역")
+        .containsEntry("observations", "단기간 분산 송금")
+        .containsEntry("reason", "패턴과 일치");
+    assertThat(service.detail(a))
+        .containsEntry("status", "CLOSED")
+        .containsEntry("outcome", "SUSPICIOUS");
+    assertThat(service.judge(a, l1, input)).isEqualTo(saved);
+    assertThatThrownBy(() -> service.judge(a, l1, judgment(UUID.randomUUID(), a, "NORMAL")))
+        .isInstanceOf(ApiException.class);
+    long foreign = alert(other);
+    assertThatThrownBy(
+            () -> service.judge(foreign, l1, judgment(UUID.randomUUID(), foreign, "NORMAL")))
+        .isInstanceOf(ApiException.class);
+
+    long first = alert(l1);
+    long second = alert(l1);
+    long episode =
+        number(act(l1, "TRANSFER", null, select(first), select(second)).get("targetCaseId"));
+    long owner = number(service.detail(episode).get("assigneeId"));
+    var closed = service.judge(episode, owner, judgment(UUID.randomUUID(), episode, "NORMAL"));
+    assertThat(closed).containsEntry("verdict", "NORMAL");
+    assertThat(service.detail(episode))
+        .containsEntry("status", "CLOSED")
+        .containsEntry("outcome", "NORMAL");
+    var board = new HashMap<Long, Map<String, Object>>();
+    for (var c : rows(service.board().get("cases"))) board.put(number(c.get("caseId")), c);
+    assertThat(object(board.get(a).get("judgment"))).containsEntry("id", saved.get("id"));
+    assertThat(object(board.get(episode).get("judgment")))
+        .containsEntry("reviewer", service.detail(episode).get("assigneeName"));
+    assertThat(board.get(first).get("judgment")).isNull();
   }
 
   @Test

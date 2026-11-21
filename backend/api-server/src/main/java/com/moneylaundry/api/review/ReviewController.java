@@ -63,6 +63,14 @@ public class ReviewController {
     return reviews.setMoneyScope(id, reviews.userId(principal), input);
   }
 
+  @PostMapping("/review/cases/{id}/judgment")
+  public Object judge(
+      @PathVariable long id,
+      java.security.Principal principal,
+      @RequestBody ReviewService.Judgment input) {
+    return reviews.judge(id, reviews.userId(principal), input);
+  }
+
   @PostMapping("/review/commands")
   public Object command(java.security.Principal principal, @RequestBody ReviewService.Command cmd) {
     return reviews.command(reviews.userId(principal), cmd);

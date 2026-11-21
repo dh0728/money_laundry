@@ -460,6 +460,16 @@ public class ReviewService {
       item.put("members", members.getOrDefault(number(row.get("case_id")), List.of()));
       cases.add(item);
     }
+    var judged = judgments(cases.stream().map(item -> number(item.get("caseId"))).toList());
+    for (var item : cases) {
+      // 판정 입력 없이 닫힌 사건은 종결 이력을 판정 기록으로 보여 준다. 판정 결과가 없으면 기록도 없다.
+      var judgment = judged.get(number(item.get("caseId")));
+      if (judgment != null && judgment.get("verdict") == null) {
+        if (item.get("outcome") == null) judgment = null;
+        else judgment.put("verdict", item.get("outcome"));
+      }
+      item.put("judgment", judgment);
+    }
     var transactions =
         txIds.isEmpty()
             ? List.<Map<String, Object>>of()
@@ -891,6 +901,139 @@ public class ReviewService {
               encode(response));
           return response;
         });
+  }
+
+  /** 새 화면의 판정 입력. reasonCategory와 근거·관찰·사유를 판정 기록(JUDGMENT 이력)으로 남긴다. */
+  public record Judgment(
+      UUID requestId,
+      Long revision,
+      String verdict,
+      String reasonCategory,
+      String evidence,
+      String observations,
+      String rationale) {}
+
+  private static final Set<String> REASON_CATEGORIES =
+      Set.of("pattern", "rule", "normal-business", "etc");
+
+  private static boolean judgmentText(String value) {
+    return value != null && !value.isBlank() && value.length() <= 2000;
+  }
+
+  /**
+   * 사건 하나를 정상/의심으로 판정하고 종결한다. Alert는 CLOSE(decision), Episode는 미판정 묶음을 같은 결론으로 DECIDE한 뒤 CLOSE하며 기존
+   * 명령 규칙(담당자·revision·상충 판정 409)을 그대로 따른다. 전체가 한 트랜잭션이다.
+   */
+  public Map<String, Object> judge(long id, long user, Judgment in) {
+    if (in == null
+        || in.requestId() == null
+        || in.revision() == null
+        || !Set.of("NORMAL", "SUSPICIOUS").contains(Objects.toString(in.verdict(), ""))
+        || !REASON_CATEGORIES.contains(Objects.toString(in.reasonCategory(), ""))
+        || !judgmentText(in.evidence())
+        || !judgmentText(in.observations())
+        || !judgmentText(in.rationale())) throw AnalysisService.invalid();
+    return tx.execute(
+        s -> {
+          var replay =
+              jdbc.queryForList(
+                  "select event_id from review.event_history where case_id=? and action='JUDGMENT' and actor_id=? and snapshot->>'requestId'=?",
+                  id,
+                  user,
+                  in.requestId().toString());
+          if (!replay.isEmpty()) return judgments(List.of(id)).get(id);
+          var c = caseRow(id);
+          int step = 0;
+          if ("EPISODE".equals(c.get("kind"))) {
+            editable(c, user);
+            if (revision(c) != in.revision())
+              throw ApiException.invalidTransition("사건이 변경됐습니다. 다시 조회하세요.");
+            for (var g : groups(c)) {
+              var pending =
+                  rows(g.get("members")).stream()
+                      .filter(
+                          m ->
+                              "SUBJECT".equals(m.get("reviewRole"))
+                                  && "PENDING".equals(m.get("state")))
+                      .map(m -> number(m.get("txId")))
+                      .toList();
+              if (pending.isEmpty()) continue;
+              command(
+                  user,
+                  new Command(
+                      subRequest(in.requestId(), step++),
+                      "DECIDE",
+                      List.of(
+                          new Selection(
+                              id, revision(caseRow(id)), number(g.get("groupId")), pending)),
+                      null,
+                      null,
+                      null,
+                      in.verdict(),
+                      in.rationale()));
+            }
+          }
+          boolean episode = "EPISODE".equals(c.get("kind"));
+          command(
+              user,
+              new Command(
+                  subRequest(in.requestId(), step),
+                  "CLOSE",
+                  List.of(
+                      new Selection(
+                          id, episode ? revision(caseRow(id)) : in.revision(), 0, List.of())),
+                  null,
+                  null,
+                  null,
+                  episode ? null : in.verdict(),
+                  in.rationale()));
+          var record = new LinkedHashMap<String, Object>();
+          record.put("requestId", in.requestId().toString());
+          record.put("verdict", in.verdict());
+          record.put("reasonCategory", in.reasonCategory());
+          record.put("evidence", in.evidence().strip());
+          record.put("observations", in.observations().strip());
+          event(id, user, "JUDGMENT", in.rationale().strip(), record);
+          return judgments(List.of(id)).get(id);
+        });
+  }
+
+  private static UUID subRequest(UUID requestId, int step) {
+    return UUID.nameUUIDFromBytes(
+        (requestId + ":" + step).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+
+  /** 사건별 최신 판정 기록. 판정 입력이 없으면 종결 이력을 쓴다. 판정 ID는 J-{업무일 yyMMdd}-{이력 번호 6자리}. */
+  private Map<Long, Map<String, Object>> judgments(Collection<Long> caseIds) {
+    var out = new HashMap<Long, Map<String, Object>>();
+    if (caseIds.isEmpty()) return out;
+    for (var row :
+        jdbc.queryForList(
+            "select distinct on (e.case_id) e.case_id,e.event_id,e.action,e.comment,e.business_at,e.snapshot::text as snapshot,u.name as reviewer from review.event_history e left join core.users u on u.user_id=e.actor_id where e.action in ('JUDGMENT','CLOSE') and e.case_id=any(?::bigint[]) order by e.case_id,(e.action='JUDGMENT') desc,e.event_id desc",
+            (Object) caseIds.toArray(Long[]::new))) {
+      var detail =
+          "JUDGMENT".equals(row.get("action"))
+              ? object(row.get("snapshot"))
+              : Map.<String, Object>of();
+      Instant at = ((Timestamp) row.get("business_at")).toInstant();
+      var judgment = new LinkedHashMap<String, Object>();
+      judgment.put(
+          "id",
+          "J-"
+              + java.time.format.DateTimeFormatter.ofPattern("yyMMdd")
+                  .format(at.atZone(BusinessTime.KST))
+              + "-"
+              + String.format("%06d", number(row.get("event_id"))));
+      judgment.put("verdict", detail.get("verdict"));
+      judgment.put("reasonCategory", detail.get("reasonCategory"));
+      judgment.put("evidence", detail.get("evidence"));
+      judgment.put("observations", detail.get("observations"));
+      judgment.put("reason", row.get("comment"));
+      judgment.put("at", at.toString());
+      judgment.put("reviewer", row.get("reviewer"));
+      out.put(number(row.get("case_id")), judgment);
+    }
+    return out;
   }
 
   private Map<String, Object> unlinkAlerts(

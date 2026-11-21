@@ -394,10 +394,13 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 | GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 소유주 박스/계좌 노드 연결용; 원문 이름·계좌번호 제외 |
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
 | POST /api/v1/review/commands | 로그인 세션·CSRF 헤더와 아래 명령. 성공 200; 동일 요청 재전송은 저장 응답 재사용 |
+| POST /api/v1/review/cases/{caseId}/judgment | `{requestId,revision,verdict,reasonCategory,evidence,observations,rationale}`. 새 화면의 판정 입력. 성공 200에 판정 기록 `{id,verdict,reasonCategory,evidence,observations,reason,at,reviewer}`; 같은 requestId 재전송은 저장된 기록을 돌려준다 |
 
 목록과 상세의 공통 필드는 `caseId,kind,alertId,status,outcome,revision,scopeRevision,assigneeId,assigneeName,episodeId,createdAt,assignedAt,closedAt,ageDays,pendingCount,sourceAlertIds,primaryTypes,summary`다. Alert에는 `publishedVersion,reviewStartedAt,canonicalAlertId,resolution`이 추가된다. **목록 summary는 `txCount,subjectCount,seedCount,riskScore,primaryType,totalAmountUsd,amountsByCurrency,firstTxAt,lastTxAt`만 제공한다.** SQL에서 이 필드만 추출하며 거래·계좌별 집계·근거·이력은 목록 응답에 포함하지 않는다. 상세는 선택한 caseId의 전체 summary 및 groups/history/relatedDecisions/detachments와 Alert의 pendingProposalIds/relations/withdrawnMembers를 추가로 제공한다. relations의 키는 source_alert_id,target_alert_id,kind,event_id다.
 
 **화면 전체 조회(board):** `cases`는 공개된 모든 Alert·Episode이며 각 항목은 목록 공통 필드와 목록 summary에 `typeShare`를 더하고, 현재 구성 거래를 `members:[{txId,reviewRole,state,decision}]`로 포함한다. EXCLUDED 거래는 현재 구성이 아니므로 제외하고, 편입된 원본 Alert의 TRANSFERRED 거래는 유지한다. `transactions`는 위 members에 등장하는 거래를 중복 없이 `{txId,occurredAt,fromAccountId,toAccountId,fromOwnerName,toOwnerName,amountPaid,paymentCurrency,paymentFormat,launderingScore}`로 제공한다(계좌는 가명 UUID 문자열, 미분석 거래의 launderingScore는 null). 정렬은 생성 시각·caseId 내림차순이며 페이지가 없다. 목록 API(`/review/cases`)의 가벼운 응답은 바꾸지 않는다.
+
+**판정 입력(judgment):** 담당 직원이 OPEN 사건에 한 번 낸다. `verdict`는 NORMAL/SUSPICIOUS, `reasonCategory`는 pattern/rule/normal-business/etc, `evidence`·`observations`·`rationale`은 각각 필수다. Alert는 그 판정으로 종결하고, Episode는 남은 판정 대상 거래를 같은 판정으로 정한 뒤 종결한다. 입력 내용은 테이블 추가 없이 `review.events`의 `JUDGMENT` 이력 한 건(comment=rationale, snapshot=나머지 입력)으로 남는다. 판정 ID는 `J-{업무일 yyMMdd(KST)}-{이력 번호 6자리}`다. board의 각 사건은 최신 판정 기록을 `judgment`로 포함하며, 판정 입력 없이 종결되어 판정 결과가 있는 사건은 종결(CLOSE) 이력을 같은 모양으로 제공한다(이때 reasonCategory·evidence·observations는 null). 판정 결과가 없는 사건의 `judgment`는 null이다.
 
 **검색·필터**
 - 검색·필터는 서버에서 적용한 뒤 `totalElements`와 페이지를 계산한다. 현재 페이지 20건만 검색하지 않는다.
