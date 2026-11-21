@@ -2,6 +2,14 @@
 
 팀 작업 기준은 **3.5.0 Liquid Glass**. 11/21부터 앱의 기본 주소의 코드 위치 `frontend/web-app/src`.
 
+## 포트폴리오 화면 자료
+
+아래 시안과 캡처를 비교. 0.x 전체는 하단의 버전별 HTML 링크에서 파일을 받아 열기.
+
+![초기 Dashboard 시안](https://raw.githubusercontent.com/dh0728/money_laundry/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.1.0/1-dashboard_0.1.0.svg)
+
+![1.x 조사 개요 캡처](https://raw.githubusercontent.com/dh0728/money_laundry/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/recovery/unclassified/2026-10-26/mac-pairview-history-20261022/review-assets/overview-after-evidence-flow-20261022.png)
+
 ## 3.x.y Liquid Glass
 
 | 버전 | 날짜 | 변경 내용 |
@@ -16,7 +24,7 @@
 | 3.0.1 | 11/18 | 검색 닫기 Button, Profile 정렬, 읽지 않은 알림 표시, Button 크기 조정 |
 | 3.0.0 | 11/18 | 독립 화면 첫 기록. Header, Overlay Sidebar, 검색, 보관함, 업무 Tab |
 
-[Liquid Glass 실행 안내](web-app/README.md) · Login `/login?data=sample`
+[Liquid Glass 실행 안내](../../../frontend/web-app/README.md) · Login `/login?data=sample`
 
 ## 2.x.y Sky Blue Brand
 
@@ -30,7 +38,7 @@
 | 2.0.4 | 10/27 | Figma Header·Tab 비교 |
 | 2.0.3 | 10/27 | Design HTML·자산 보존 |
 | 2.0.1, 2.0.2 | 미확인 | 원본 미확인 |
-| 2.0.0 | 10/26 | [Design 시작 기록](design/2.0.0/VERSION.md) |
+| 2.0.0 | 10/26 | [Design 시작 기록](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/design/2.0.0/VERSION.md) |
 
 React 화면은 `src/next`의 `/#/login`. 일부 옛 커밋 제목에서 이 화면을 ‘v3’로 표기했습니다. 위 날짜는 모두 2026년 KST 기준입니다.
 
@@ -58,29 +66,29 @@ React 화면은 `src/next`의 `/#/login`. 일부 옛 커밋 제목에서 이 화
 
 | 버전 | 당시 이름 | 남아 있는 자료 |
 | --- | --- | --- |
-| 0.24.0 | v24 | [원본 HTML](prototype/0.24.0/AML-RADAR-0.24.0.html) |
-| 0.23.0 | v23 | [원본 HTML](prototype/0.23.0/AML-RADAR-0.23.0.html) |
-| 0.22.0 | v22 | [원본 HTML](prototype/0.22.0/AML-RADAR-0.22.0.html) |
-| 0.21.0 | v21 | [원본 HTML](prototype/0.21.0/AML-RADAR-0.21.0.html) |
-| 0.20.0 | v20 | [원본 HTML](prototype/0.20.0/AML-RADAR-0.20.0.html) |
-| 0.19.0 | v19 | [원본 HTML](prototype/0.19.0/AML-RADAR-0.19.0.html) |
-| 0.18.0 | v18 | [원본 HTML](prototype/0.18.0/AML-RADAR-0.18.0.html) |
-| 0.17.0 | v17 | [원본 HTML](prototype/0.17.0/AML-RADAR-0.17.0.html) |
-| 0.16.0 | v16 | [원본 HTML](prototype/0.16.0/AML-RADAR-0.16.0.html) |
-| 0.15.0 | v15 | [원본 HTML](prototype/0.15.0/AML-RADAR-0.15.0.html) |
-| 0.14.0 | v14 | [원본 HTML](prototype/0.14.0/AML-RADAR-0.14.0.html) |
-| 0.13.0 | v13 | [원본 HTML](prototype/0.13.0/AML-RADAR-0.13.0.html) |
-| 0.12.0 | v12 | [SVG 열람용 HTML](prototype/0.12.0/preservation/2026-10-26/index.html) |
-| 0.11.0 | v11 | [SVG 열람용 HTML](prototype/0.11.0/preservation/2026-10-26/index.html) |
-| 0.10.0 | v10 | [SVG 열람용 HTML](prototype/0.10.0/preservation/2026-10-26/index.html) |
-| 0.9.0 | v9 | [SVG 열람용 HTML](prototype/0.9.0/preservation/2026-10-26/index.html) |
-| 0.8.0 | v8 | [SVG 열람용 HTML](prototype/0.8.0/preservation/2026-10-26/index.html) |
-| 0.7.0 | v7 | [SVG 열람용 HTML](prototype/0.7.0/preservation/2026-10-26/index.html) |
-| 0.6.0 | v6 | [SVG 열람용 HTML](prototype/0.6.0/preservation/2026-10-26/index.html) |
-| 0.5.0 | v5 | [SVG 열람용 HTML](prototype/0.5.0/preservation/2026-10-26/index.html) |
-| 0.4.0 | v4 | [SVG 열람용 HTML](prototype/0.4.0/preservation/2026-10-26/index.html) |
-| 0.3.0 | v3 | [SVG 열람용 HTML](prototype/0.3.0/preservation/2026-10-26/index.html) |
-| 0.2.0 | v2 | [SVG 열람용 HTML](prototype/0.2.0/preservation/2026-10-26/index.html) |
-| 0.1.0 | v1 | [SVG 열람용 HTML](prototype/0.1.0/preservation/2026-10-26/index.html) |
+| 0.24.0 | v24 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.24.0/AML-RADAR-0.24.0.html) |
+| 0.23.0 | v23 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.23.0/AML-RADAR-0.23.0.html) |
+| 0.22.0 | v22 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.22.0/AML-RADAR-0.22.0.html) |
+| 0.21.0 | v21 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.21.0/AML-RADAR-0.21.0.html) |
+| 0.20.0 | v20 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.20.0/AML-RADAR-0.20.0.html) |
+| 0.19.0 | v19 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.19.0/AML-RADAR-0.19.0.html) |
+| 0.18.0 | v18 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.18.0/AML-RADAR-0.18.0.html) |
+| 0.17.0 | v17 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.17.0/AML-RADAR-0.17.0.html) |
+| 0.16.0 | v16 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.16.0/AML-RADAR-0.16.0.html) |
+| 0.15.0 | v15 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.15.0/AML-RADAR-0.15.0.html) |
+| 0.14.0 | v14 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.14.0/AML-RADAR-0.14.0.html) |
+| 0.13.0 | v13 | [원본 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.13.0/AML-RADAR-0.13.0.html) |
+| 0.12.0 | v12 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.12.0/preservation/2026-10-26/index.html) |
+| 0.11.0 | v11 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.11.0/preservation/2026-10-26/index.html) |
+| 0.10.0 | v10 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.10.0/preservation/2026-10-26/index.html) |
+| 0.9.0 | v9 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.9.0/preservation/2026-10-26/index.html) |
+| 0.8.0 | v8 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.8.0/preservation/2026-10-26/index.html) |
+| 0.7.0 | v7 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.7.0/preservation/2026-10-26/index.html) |
+| 0.6.0 | v6 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.6.0/preservation/2026-10-26/index.html) |
+| 0.5.0 | v5 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.5.0/preservation/2026-10-26/index.html) |
+| 0.4.0 | v4 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.4.0/preservation/2026-10-26/index.html) |
+| 0.3.0 | v3 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.3.0/preservation/2026-10-26/index.html) |
+| 0.2.0 | v2 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.2.0/preservation/2026-10-26/index.html) |
+| 0.1.0 | v1 | [SVG 열람용 HTML](https://github.com/dh0728/money_laundry/blob/09b67d800783d46df5cf2a90f2eac9d8e5a24af2/frontend/prototype/0.1.0/preservation/2026-10-26/index.html) |
 
 버전 번호는 화면 계열 변경, 기능 추가, 기존 기능 수정 순으로 첫째·둘째·셋째 자리를 올립니다. 초기 작업 번호는 대화와 검수 기록을 보고 나중에 붙였습니다. `implementation/1.14.0`은 과거 보존 경로입니다. 현재 앱은 `frontend/web-app` 한 곳에서 관리합니다.
