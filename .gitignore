@@ -146,19 +146,3 @@ $RECYCLE.BIN/
 ~$*
 
 /docs/*
-!/docs/frontend/
-/docs/frontend/*
-!/docs/frontend/implementation/
-/docs/frontend/implementation/*
-!/docs/frontend/implementation/history/
-/docs/frontend/implementation/history/*
-!/docs/frontend/implementation/history/screenshots/
-!/docs/frontend/implementation/history/first-bundle.md
-!/docs/frontend/implementation/history/complete-bundle.md
-!/docs/frontend/implementation/history/figma-review.md
-
-# Preserved documentation snapshots (not active implementation references)
-!/docs/frontend/implementation/history/screens.md
-!/docs/frontend/implementation/history/data-rules.md
-!/docs/frontend/implementation/history/qa-checklist.md
-!/docs/frontend/implementation/history/frontend-handoff-2026-11-16.md
