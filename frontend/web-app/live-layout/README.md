@@ -1,6 +1,6 @@
 # AML RADAR 인터랙티브 프리뷰
 
-현재 작업 폴더의 코드를 직접 실행하려면 저장소 루트에서 아래 명령을 사용합니다.
+화면 코드는 [서비스 앱의 src](../src)에 있습니다. 아래 명령은 기존 프리뷰 주소에서 같은 화면을 엽니다.
 
 ```sh
 cd frontend/web-app
@@ -22,7 +22,7 @@ pnpm exec vite live-layout --config live-layout/vite.config.mjs
 
 기본 [조사 화면](http://localhost:5215/investigate/ledger)은 소유주 → 계좌 → 거래와 연결 업무를 샘플로 보여줍니다. 카드와 표는 같은 거래와 선택을 사용합니다. [IBM 벤치마크 대시보드](http://localhost:5215/dashboard/all?data=ibm)는 2022년 9월 1~18일의 전체 거래, 원본 세탁 라벨, 처음 등장한 계좌와 은행 코드를 집계합니다. 선택한 기간을 집계와 CSV에 함께 적용합니다.
 
-원장에는 원본 세탁 라벨이 1인 거래 5,177건과 0인 예시 88건을 담았습니다. IBM이 제공한 CSV에서 행을 선별하고 JSON으로 변환했으며 지급·수취 통화와 금액을 보존했습니다. 거래 ID는 CSV의 행 순서와 거래일에서 생성합니다. 다시 생성하려면 `python3 scripts/extract-ibm-hi-small.py <HI-Small_Trans.csv 경로> live-layout/ibm-hi-small-data.json`을 실행합니다. [IBM AML-Data](https://github.com/IBM/AML-Data) · [CDLA-Sharing-1.0](https://cdla.dev/sharing-1-0/)
+원장에는 원본 세탁 라벨이 1인 거래 5,177건과 0인 예시 88건을 담았습니다. IBM이 제공한 CSV에서 행을 선별하고 JSON으로 변환했으며 지급·수취 통화와 금액을 보존했습니다. 거래 ID는 CSV의 행 순서와 거래일에서 생성합니다. 다시 생성하려면 `python3 scripts/extract-ibm-hi-small.py <HI-Small_Trans.csv 경로> src/mocks/radar/ibm-hi-small-data.json`을 실행합니다. [IBM AML-Data](https://github.com/IBM/AML-Data) · [CDLA-Sharing-1.0](https://cdla.dev/sharing-1-0/)
 
 담당자별 Alert·Episode와 판정 이력에는 팀 업무 API 연결이 필요합니다. 기존 그래프, 판정·보고서 등 업무 흐름은 [샘플 검수 모드](http://localhost:5215/dashboard/mine?data=sample)에서 확인할 수 있습니다. 개별 원본 거래는 [IBM 벤치마크 원장](http://localhost:5215/benchmark/ledger?view=table)에서 조회합니다.
 
@@ -32,8 +32,8 @@ pnpm exec vite live-layout --config live-layout/vite.config.mjs
 
 ## 룰 엔진과 백엔드 인계
 
-- 룰 목록·상세와 샘플 상태는 [preview-rule-workspace.jsx](preview-rule-workspace.jsx)에 있습니다.
-- 룰 작성·백테스트 화면은 [workflow-components.jsx](workflow-components.jsx), 조건 트리는 [rule-condition-tree.jsx](rule-condition-tree.jsx)에 있습니다.
+- 룰 목록·상세와 샘플 상태는 [preview-rule-workspace.jsx](../src/features/rules/preview-rule-workspace.jsx)에 있습니다.
+- 룰 작성·백테스트 화면은 [workflow-components.jsx](../src/pages/radar/workflow-components.jsx), 조건 트리는 [rule-condition-tree.jsx](../src/features/rules/rule-condition-tree.jsx)에 있습니다.
 - 조회·저장·실행 API의 현행 계약과 합의할 항목은 [백엔드 인계](../../../docs/frontend/implementation/api.md#live-layout-api-handoff)에서 확인할 수 있습니다.
 
 ## 디자인 시스템
@@ -42,9 +42,9 @@ pnpm exec vite live-layout --config live-layout/vite.config.mjs
 
 | 단위 | 맡는 일 | 수정하는 곳 |
 | --- | --- | --- |
-| 변수 | 색, 글자 크기, 여백, 모서리와 같이 반복하는 값 | [Figma 프리뷰 디자인 시스템](https://www.figma.com/design/iWjQL5GdXwenHGeZNHF4Uw?node-id=8-101)과 [웹의 디자인 시스템 CSS](preview-design-system.css) |
-| 공통 컴포넌트 | 태그의 아이콘, 카드의 버튼, 패널의 글래스처럼 반복하는 모양과 동작 | [태그](semantic-tags.jsx) · [카드 헤더](card-header.jsx) · [패널](panel.jsx) · [표](workflow-table.jsx) |
-| 화면 | 구성 요소의 배치와 표시할 거래·Alert·Episode 선택 | [대시보드](preview-dashboard.jsx) · [Alert 개요](preview-case-overview.jsx) · [분석](preview-case-graph.jsx) |
+| 변수 | 색, 글자 크기, 여백, 모서리와 같이 반복하는 값 | [Figma 프리뷰 디자인 시스템](https://www.figma.com/design/iWjQL5GdXwenHGeZNHF4Uw?node-id=8-101)과 [웹의 디자인 시스템 CSS](../src/styles/preview-design-system.css) |
+| 공통 컴포넌트 | 태그의 아이콘, 카드의 버튼, 패널의 글래스처럼 반복하는 모양과 동작 | [태그](../src/components/radar/semantic-tags.jsx) · [카드 헤더](../src/components/radar/card-header.jsx) · [패널](../src/components/radar/panel.jsx) · [표](../src/components/radar/workflow-table.jsx) |
+| 화면 | 구성 요소의 배치와 표시할 거래·Alert·Episode 선택 | [대시보드](../src/features/dashboard/preview-dashboard.jsx) · [Alert 개요](../src/features/investigation/preview-case-overview.jsx) · [분석](../src/features/investigation/preview-case-graph.jsx) |
 
 예를 들어 이상 판정의 색을 바꾸면 공통 색을 읽는 태그와 카드, 표, 글로우에 반영됩니다. 체크박스의 모양이나 플러스 버튼의 크기를 바꿀 때는 공통 카드 헤더를 수정합니다. 각 화면에 배치된 카드 인스턴스는 이 헤더에 자기 제목과 상태, 클릭 시 동작을 전달합니다.
 

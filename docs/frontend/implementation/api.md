@@ -5,7 +5,7 @@
 
 문서 수정: 2026-11-20. 화면 검수용 초안이며, 운영 연동 상태와 백엔드 합의 상태는 아래에 따로 기록한다.
 
-기존 [API.md](../../../backend/api-server/API.md)는 현재 백엔드 동작을 확인하는 참고 자료다. 새 화면을 기존 API에 맞춰 바꾸는 기준은 아니다. 2026-11-15에 정한 순서는 **가짜 데이터로 화면 구현 → 필요한 데이터와 동작 기록 → 백엔드와 API 합의**다. 유형 등 도메인 값은 [codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts)를 따른다. 함께 볼 문서: [데이터 표시 규칙](frontend-handoff.md#display-id), [화면 목록](frontend-handoff.md#screen-inventory).
+기존 [API.md](../../../backend/api-server/API.md)는 현재 백엔드 동작을 확인하는 참고 자료다. 새 화면을 기존 API에 맞춰 바꾸는 기준은 아니다. 2026-11-15에 정한 순서는 **가짜 데이터로 화면 구현 → 필요한 데이터와 동작 기록 → 백엔드와 API 합의**다. 유형 등 도메인 값은 [codes.ts](../../../frontend/web-app/src/api/codes.ts)를 따른다. 함께 볼 문서: [데이터 표시 규칙](frontend-handoff.md#display-id), [화면 목록](frontend-handoff.md#screen-inventory).
 
 <a id="per-screen-data-handoff"></a>
 ## 화면별 데이터 전달
@@ -70,12 +70,12 @@
 <a id="mock-boundary"></a>
 ### 2026-11-18 별도 셸 시험 화면
 
-`frontend/implementation/1.14.0/web-app/live-layout/`의 검색과 보관함은 브라우저에서 생성한 테스트 데이터로 동작한다. 검색은 거래·Alert·Episode의 전체 시험 코드를 검색어로 필터링한다. 알림 필터와 모두 읽음은 메모리에서 처리하며 새로고침하면 초기화된다. 계정 메뉴는 설정·권한·로그아웃 항목의 배치만 검토 중이다. 운영 연결에는 검색 범위와 페이지네이션, 알림 읽음 상태 저장, 계정·권한 계약 확인이 필요하다.
+`frontend/web-app/src/app/radar`의 검색과 보관함은 브라우저에서 생성한 테스트 데이터로 동작한다. 검색은 거래·Alert·Episode의 전체 시험 코드를 검색어로 필터링한다. 알림 필터와 모두 읽음은 메모리에서 처리하며 새로고침하면 초기화된다. 계정 메뉴는 설정·권한·로그아웃 항목의 배치만 검토 중이다. 운영 연결에는 검색 범위와 페이지네이션, 알림 읽음 상태 저장, 계정·권한 계약 확인이 필요하다.
 
 <a id="live-layout-api-handoff"></a>
 ### 2026-11-20 5215 화면 검수 및 백엔드 인계 초안
 
-현재 검수 대상은 `live-layout`의 5215 화면이다. 기존 경로와 응답의 근거는 [백엔드 API §7·§9·§10](../../../backend/api-server/API.md)과 [프론트 API 어댑터](../../../frontend/implementation/1.14.0/web-app/src/api/)다.
+코드는 `frontend/web-app/src`에 있고, 앱 기본 주소에서 3.4.1 화면을 연다. `VITE_API_MODE=live`는 기존 로그인·세션 및 알림 API를 사용한다. 룰·조사·대시보드·보고서는 아래 샘플 기준으로 API를 붙일 수 있다. 기존 경로와 응답의 근거는 [백엔드 API §7·§9·§10](../../../backend/api-server/API.md)과 [프론트 API 어댑터](../../../frontend/web-app/src/api/)다.
 
 | 화면 | 현재 화면에서 확인할 동작과 데이터 | 기존 API와 합의할 항목 |
 | --- | --- | --- |
@@ -92,7 +92,7 @@ IBM AMLworld HI-Small은 팀이 사용하는 연구 벤치마크다. 원본 세�
 <a id="dashboard-api-preview"></a>
 ### 5215 대시보드의 모의 응답과 연결 기준
 
-`live-layout/dashboard-fixtures.js`는 2026-11-11~18 KST의 모의 거래 175건, Alert 67건, Episode 37건과 근거 관계를 같은 원본에서 만들어 배포 없이 검수할 수 있게 한다. 요약, KPI, 차트, 보드와 CSV는 같은 범위를 사용한다. 기간 기본값은 이 모의 데이터의 8일이며 `businessAt`은 2026-11-18 18:00 KST다. IBM 집계는 `/dashboard/all?data=ibm`에 제공한다. 원본의 세탁 라벨을 모의 모델 점수나 조사 상태에 합치지 않는다.
+`frontend/web-app/src/mocks/radar/dashboard-fixtures.js`는 2026-11-11~18 KST의 모의 거래 175건, Alert 67건, Episode 37건과 근거 관계를 같은 원본에서 만들어 배포 없이 검수할 수 있게 한다. 요약, KPI, 차트, 보드와 CSV는 같은 범위를 사용한다. 기간 기본값은 이 모의 데이터의 8일이며 `businessAt`은 2026-11-18 18:00 KST다. IBM 집계는 `/dashboard/all?data=ibm`에 제공한다. 원본의 세탁 라벨을 모의 모델 점수나 조사 상태에 합치지 않는다.
 
 | 구분 | 확인한 경로 또는 모의 응답 | 연결할 때 확인할 내용 |
 | --- | --- | --- |

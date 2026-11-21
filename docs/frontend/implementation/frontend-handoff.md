@@ -1,12 +1,12 @@
 # Frontend implementation guide
 
-Audience: FE implementation agents · Language: English · Updated: 2026-11-17.
+Audience: FE implementation agents · Language: English · Updated: 2026-11-21.
 
 This is the single current FE implementation reference. The other current reference is the [Korean API handoff for the backend](api.md). Read that document directly; do not maintain a second English copy of its contracts. Preserve Korean UI labels, code identifiers, enum values, and URLs exactly. [History](history/) contains dated evidence, not additional current requirements or design approval.
 
 ## Authority and scope
 
-- Build React + TypeScript + Vite in `frontend/implementation/1.14.0/web-app` on `fe/work`. Preserve existing user changes, Storybook, v3 tokens in `src/next/styles`, and `ShellChrome.stories.tsx`.
+- Work in `frontend/web-app` on `fe/work`. The current 3.4.1 Liquid Glass app starts at `src/app/radar/layout.js` and uses the existing `src` structure. See the [app runbook](../../../frontend/web-app/README.md) for the page, feature, and API paths. Preserve existing user changes and the comparison entries and Storybook.
 - Use the user's [original Figma](https://www.figma.com/design/eHgUPAyr9bZ2UC7oTZNmwh) for layout, dimensions, component instances, variable bindings, and interactions. Do not replace it with the rejected generated review file.
 - Latest authorized layout work may read original Figma structure and reuse cached exports. KMG owns border/contents and a separate session owns surface; do not edit those variable groups, collections or bindings to compensate for concurrent changes. Keep Figma calls scoped and read-only during this work.
 - The rejected artifact is the Figma review copy, not all existing code. Preserve and reuse functionality; rework the layout against the user's original. Ask KMG about ambiguous behavior or application choices instead of inventing them. Continue independent confirmed work.
@@ -38,7 +38,7 @@ Use the left sidebar plus work area. All screens, including login (which has no 
 <a id="verdict-and-lists"></a>
 ## 2026-11-18 standalone shell trial (historical)
 
-Use the [current preview runbook](../../../frontend/implementation/1.14.0/web-app/live-layout/README.md) for the current source and controls. The following describes the November trial. The standalone trial signs in with a sample tab session and opens My Dashboard. It uses JavaScript for the shell and React Bits components for selected interactive surfaces. Its sample records and workflows are local fixtures.
+Use the [current preview runbook](../../../frontend/web-app/live-layout/README.md) for the controls. The following describes the Liquid Glass interface. In the sample run, a tab session signs in to My Dashboard. The service entry uses JavaScript for the shell and React Bits for selected interactive surfaces. Workflows and work records still use local fixtures.
 
 - The [standalone component catalogue](http://localhost:5215/components.html) mounts the same controls, workspace navigation, record cards, investigation ledger, case list, dashboard, rules, backtest and report. Toggle appearance, edit the fixture query, generate files and open a separate embedded shell to try search, inbox and Settings. The ScrollStack sample records an earlier comparison. The catalogue uses the app tooltip trigger and starts with the system motion preference. Its notification example changes only the sample state. The catalogue runs on its own Vite entry.
 - The standalone address records the current dashboard, investigation list and view, case and detail tab, transaction, report view, or rule screen. Chrome Back and Forward recover earlier addresses. Reload and direct links recover the active record and committed sort, filters and date range. Changing a query updates the current history entry. Background tab addition does not navigate, and open work tabs survive reload in the same browser tab. An unsigned deep link resumes after sample login. Temporary overlays and unapplied inputs are cleared on history navigation.
@@ -136,7 +136,7 @@ These conflicts are preserved for clarification, not resolved by preference:
 <a id="pattern-codes"></a>
 ## Pattern codes
 
-[App codes.ts](../../../frontend/implementation/1.14.0/web-app/src/api/codes.ts) is authoritative. Recheck it when the app path changes. Existing backend API section 2.3 is reference only. Do not drop types before team agreement.
+[App codes.ts](../../../frontend/web-app/src/api/codes.ts) is authoritative. Recheck it when the app path changes. Existing backend API section 2.3 is reference only. Do not drop types before team agreement.
 
 | Code | codes.ts key | Tag label | Existing Korean code label |
 | --- | --- | --- | --- |

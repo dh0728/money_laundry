@@ -6,7 +6,12 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  build: { rolldownOptions: { input: { main: path.resolve(import.meta.dirname, 'index.html'), review: path.resolve(import.meta.dirname, 'ant-review.html'), chrome: path.resolve(import.meta.dirname, 'next-review.html') } } },
+  build: {
+    rolldownOptions: {
+      input: ['index.html', 'components.html', 'ant-review.html', 'next-review.html', 'react-review.html']
+        .map(page => path.resolve(import.meta.dirname, page)),
+    },
+  },
   server: {
     proxy: { '/api': { target: process.env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:8080', changeOrigin: true } },
   },
