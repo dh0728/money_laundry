@@ -188,3 +188,23 @@ it('keeps approve and reject in the shared footer, and requires administrator an
     footer.remove();
   }
 });
+
+it('opens with a sample rule awaiting approval so an administrator can reject or approve it', () => {
+  const beforeUser = currentPreviewUser();
+  const footer = document.createElement('footer');
+  document.body.append(footer);
+  const pending = ruleWorkspace.rules.find(rule => rule.status === 'PENDING_APPROVAL');
+  let unmount;
+  try {
+    expect(pending).toBeDefined();
+    setPreviewUser(previewAdmin);
+    ({ unmount } = render(<RuleList initialRule={pending.id} actionsHost={footer} />));
+    expect(within(screen.getByLabelText('룰 상태별 수')).getByText('승인 대기')).toBeInTheDocument();
+    expect(within(footer).getByRole('button', { name: '반려' })).toBeEnabled();
+    expect(within(footer).getByRole('button', { name: '승인' })).toBeEnabled();
+  } finally {
+    unmount?.();
+    setPreviewUser(beforeUser);
+    footer.remove();
+  }
+});
