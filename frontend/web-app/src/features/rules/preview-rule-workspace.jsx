@@ -42,6 +42,11 @@ function BlockedReason({ reason, children }) {
   </span>;
 }
 
+/** 대화상자 버튼은 공용 DialogFooter의 직속 자식이어야 꽉 채운 너비가 된다. 감싸지 않고, 못 쓰는 이유는 본문의 숨은 설명으로 잇는다. */
+function DialogReasons({ reasons }) {
+  return reasons.filter(([, text]) => text).map(([id, text]) => <span key={id} id={id} className="visually-hidden">{text}</span>);
+}
+
 const reasonFor = (rule, action) => !rule ? noRule
   : rule.allowedActions.includes(action) ? '' : rule.blockedReasons[action] ?? '지금은 할 수 없어요.';
 
@@ -83,6 +88,7 @@ function RuleDecision({ rule, action, repository, onClose, onDone }) {
   const dialog = useRef(null);
   const reasonField = useRef(null);
   const titleId = useId();
+  const submitReasonId = useId();
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -92,6 +98,8 @@ function RuleDecision({ rule, action, repository, onClose, onDone }) {
     dialog.current.showModal();
     reasonField.current.focus();
   }, []);
+
+  const submitBlocked = busy ? '처리 중입니다.' : reason.trim() ? '' : '변경 사유를 입력해 주세요.';
 
   function submit(event) {
     event.preventDefault();
@@ -113,10 +121,9 @@ function RuleDecision({ rule, action, repository, onClose, onDone }) {
 
   return <DialogFrame ref={dialog} className="rule-review-dialog" title={`룰 ${definition.label}`} titleId={titleId}
     onClose={onClose} onSubmit={submit}
-    actions={<BlockedReason reason={busy ? '처리 중입니다.' : reason.trim() ? '' : '변경 사유를 입력해 주세요.'}>
-      <PrimaryButton type="submit" tone={actionTones[action]} disabled={!reason.trim() || busy} aria-busy={busy || undefined}>
-        {busy ? '처리 중…' : `${definition.label} 확인`}</PrimaryButton>
-    </BlockedReason>}>
+    actions={<PrimaryButton type="submit" tone={actionTones[action]} disabled={!reason.trim() || busy} aria-busy={busy || undefined}
+      aria-describedby={submitBlocked ? submitReasonId : undefined}>
+      {busy ? '처리 중…' : `${definition.label} 확인`}</PrimaryButton>}>
     <div className="case-judgment-body">
       <p><code>{rule.id}</code> · {rule.name}</p>
       <p>변경 후 상태 · {ruleStatusLabels[definition.to]}</p>
@@ -125,6 +132,7 @@ function RuleDecision({ rule, action, repository, onClose, onDone }) {
           onChange={event => { setReason(event.target.value); setError(''); }} />
       </label>
       {error && <p role="alert" data-rule-block-error>{error}</p>}
+      <DialogReasons reasons={[[submitReasonId, submitBlocked]]} />
     </div>
   </DialogFrame>;
 }
@@ -133,6 +141,8 @@ function RuleDecision({ rule, action, repository, onClose, onDone }) {
 function RuleRemove({ rule, repository, onClose, onDone }) {
   const dialog = useRef(null);
   const titleId = useId();
+  const archiveReasonId = useId();
+  const deleteReasonId = useId();
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -164,16 +174,13 @@ function RuleRemove({ rule, repository, onClose, onDone }) {
     });
   }
 
-  const archiveButton = <BlockedReason key="archive" reason={archiveReason}>
-    <PrimaryButton type={keepsHistory ? 'submit' : 'button'} tone={keepsHistory ? 'brand' : 'inverse'} disabled={Boolean(archiveReason)}
-      onClick={keepsHistory ? undefined : archive}>{keepsHistory ? '보관 (권장)' : '보관'}</PrimaryButton>
-  </BlockedReason>;
-  const deleteButton = <BlockedReason key="delete" reason={deleteReason}>
-    {keepsHistory
-      ? <ActionButton shape="pill" surface="floating" className="rule-remove-danger" disabled={Boolean(deleteReason)}
-        onClick={remove}>삭제</ActionButton>
-      : <PrimaryButton type="submit" tone="negative" disabled={Boolean(deleteReason)}>삭제</PrimaryButton>}
-  </BlockedReason>;
+  // 공용 버튼 규격만 쓴다. 운영 이력이 있으면 보관(파란 기본)을 맨 오른쪽 제출 버튼으로, 삭제(빨강)는 그 앞 보조 자리로 둔다.
+  const archiveButton = <PrimaryButton key="archive" type={keepsHistory ? 'submit' : 'button'} tone={keepsHistory ? 'brand' : 'inverse'}
+    disabled={Boolean(archiveReason)} aria-describedby={archiveReason ? archiveReasonId : undefined}
+    onClick={keepsHistory ? undefined : archive}>{keepsHistory ? '보관 (권장)' : '보관'}</PrimaryButton>;
+  const deleteButton = <PrimaryButton key="delete" type={keepsHistory ? 'button' : 'submit'} tone="negative"
+    disabled={Boolean(deleteReason)} aria-describedby={deleteReason ? deleteReasonId : undefined}
+    onClick={keepsHistory ? remove : undefined}>삭제</PrimaryButton>;
 
   return <DialogFrame ref={dialog} className="rule-review-dialog" title="룰 삭제" titleId={titleId}
     onClose={onClose} onSubmit={event => {
@@ -187,13 +194,14 @@ function RuleRemove({ rule, repository, onClose, onDone }) {
     <div className="case-judgment-body">
       <p><code>{rule.id}</code> · {rule.name}</p>
       {keepsHistory
-        ? <p className="rule-remove-warning">운영 이력이 있는 룰입니다. 삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다.</p>
+        ? <p>운영 이력이 있는 룰입니다. 삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다.</p>
         : <p>삭제하면 룰과 이력이 목록에서 사라집니다. 이력을 남기려면 보관하세요.</p>}
       <label className="case-judgment-field">보관 사유
         <Textarea value={reason} rows={2} maxLength={RULE_LIMITS.reason}
           onChange={event => { setReason(event.target.value); setError(''); }} />
       </label>
       {error && <p role="alert" data-rule-block-error>{error}</p>}
+      <DialogReasons reasons={[[archiveReasonId, archiveReason], [deleteReasonId, deleteReason]]} />
     </div>
   </DialogFrame>;
 }

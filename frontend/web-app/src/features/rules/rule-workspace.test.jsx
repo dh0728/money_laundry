@@ -110,6 +110,7 @@ it('moves a rule through approve, start operation, stop, and retest with one rea
     const confirm = dialog.getByRole('button', { name: `${name} 확인` });
     expect(confirm).toBeDisabled();
     expect(confirm).toHaveAccessibleDescription('변경 사유를 입력해 주세요.');
+    expect(screen.getByRole('dialog', { name: `룰 ${name}` }).querySelector('footer.dialog-actions-fill > .accent-action')).toBeInTheDocument();
     fireEvent.change(dialog.getByRole('textbox', { name: '변경 사유' }), { target: { value: `${name} 사유` } });
     fireEvent.click(dialog.getByRole('button', { name: `${name} 확인` }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -132,7 +133,11 @@ it('recommends archiving rules with operating history but still lets them be del
   let dialog = within(screen.getByRole('dialog', { name: '룰 삭제' }));
   expect(dialog.getByText(/삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다/)).toBeInTheDocument();
   expect(dialog.getByRole('button', { name: '삭제' })).toBeEnabled();
-  expect(dialog.getByRole('button', { name: '삭제' })).toHaveClass('rule-remove-danger');
+  expect(dialog.getByRole('button', { name: '삭제' })).toHaveClass('screen-primary--negative');
+  // 공용 DialogFooter가 버튼을 꽉 채우려면 버튼이 감싸이지 않은 직속 자식이어야 한다.
+  const dialogFooter = screen.getByRole('dialog', { name: '룰 삭제' }).querySelector('footer.dialog-actions-fill');
+  expect([...dialogFooter.children].every(child => child.matches('.button, .accent-action, .hold-button'))).toBe(true);
+  expect(dialogFooter.children).toHaveLength(3);
   expect(dialog.getByRole('button', { name: '보관 (권장)' })).toHaveClass('screen-primary--brand');
   expect(dialog.getByRole('button', { name: '보관 (권장)' })).toHaveAccessibleDescription('보관 사유를 입력해 주세요.');
   const [cancel, remove, keep] = ['취소', '삭제', '보관 (권장)'].map(name => dialog.getByRole('button', { name }));
