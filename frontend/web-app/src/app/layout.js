@@ -14,6 +14,8 @@ import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls 
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
+import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
+  sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
 import { liveDashboardAsOf, liveDashboardResponse } from '../features/dashboard/live-dashboard.js';
 import { loadLiveRules } from '../features/rules/preview-rule-workspace.jsx';
@@ -1176,10 +1178,19 @@ function openNotification(item) {
 
 function workRequestActor() {
   const actor = currentPreviewUser();
-  return !serviceMode && dataMode !== 'ibm' && actor?.source === 'fixture' ? actor : null;
+  if (serviceMode) return actor?.source === 'api' && liveWorkRequestsReady() ? actor : null;
+  return dataMode !== 'ibm' && actor?.source === 'fixture' ? actor : null;
 }
 
+// 서비스 모드는 서버의 요청을, 프리뷰는 이 탭에 저장한 요청을 쓴다.
+const workRequests = actor => serviceMode ? (actor ? liveWorkRequests() : []) : previewWorkRequests(actor);
+const readWorkRequests = (actor, ids) => (serviceMode ? readLiveWorkRequests : readPreviewWorkRequests)(actor, ids);
+// 서버가 요청을 받았으면 바뀐 업무와 요청 목록을 다시 받아 온다.
+const afterLiveWorkRequest = (result, apply) => result.then(settled => settled.ok
+  ? Promise.all([loadLiveSource(), loadLiveWorkRequests()]).then(() => { apply(); return settled; }, () => settled) : settled);
+
 function requestCaseData() {
+  if (serviceMode) return liveSource().cases;
   dashboardSource ??= dashboardFixtures(Object.fromEntries(tabGroups.map(group => [group.prefix, tabCodes(group)])));
   return dashboardSource.cases;
 }
@@ -1203,31 +1214,35 @@ function openWorkRequest(item, relation) {
         key: entry.at, item: entry, actor, currentAssignee: row && previewCaseAssignee(row),
         onOpenCase: code => { onClose(); toggleDisclosure(inboxButton, '보관함', false); openWorkCode(code); },
         onRespond: options => {
-          const result = resolvePreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
-          if (result.ok) {
+          const applied = () => {
             applyWorkRequestChange();
-            showDetail(previewWorkRequests(actor).find(request => request.id === item.id));
-          }
+            showDetail(workRequests(actor).find(request => request.id === item.id));
+          };
+          if (serviceMode) return afterLiveWorkRequest(resolveLiveWorkRequest(options), applied);
+          const result = resolvePreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
+          if (result.ok) applied();
           return result;
         },
       }));
     };
-    if (item.unreadFor.includes(actor.username)) readPreviewWorkRequests(actor, [item.id]);
+    if (item.unreadFor.includes(actor.username)) readWorkRequests(actor, [item.id]);
     renderNotifications();
     showDetail(item);
   } else {
     workRequestRoot.render(createElement(WorkRequestForm, {
       actor, cases, initialCode: activeWorkCode, relation,
       onSend: options => {
-        const result = sendPreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
-        if (result.ok) {
+        const sent = () => {
           onClose();
           if (relation) {
             renderNotifications();
             relation.onSent();
           } else applyWorkRequestChange();
-          document.dispatchEvent(new CustomEvent('aml:notice', { detail: { title: 'Sample 요청 전송', status: 'done' } }));
-        }
+          document.dispatchEvent(new CustomEvent('aml:notice', { detail: { title: serviceMode ? '요청 전송' : 'Sample 요청 전송', status: 'done' } }));
+        };
+        if (serviceMode) return afterLiveWorkRequest(sendLiveWorkRequest({ ...options, cases: requestCaseData() }), sent);
+        const result = sendPreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
+        if (result.ok) sent();
         return result;
       },
     }));
@@ -1259,12 +1274,14 @@ function renderNotifications(arrivalIds) {
     'aria-description': actor ? undefined : '현재 연결에서는 업무 요청을 보낼 수 없습니다.',
     onClick: () => openWorkRequest(),
   }, '요청 보내기'));
-  const requests = previewWorkRequests(actor).map(item => ({
+  const requests = workRequests(actor).map(item => ({
     id: item.id, title: `${item.sender === actor.username ? '보낸 요청' : [item.recipient, item.assignee].includes(actor.username) ? '받은 요청' : '담당 변경 알림'} · ${workRequestTypes[item.type].label} · ${requestStateLabels[item.state]}`,
     time: new Date(item.at), read: !item.unreadFor.includes(actor.username), request: item,
   })).sort((left, right) => right.time - left.time);
-  const items = liveInbox?.content ?? [...requests, ...notifications];
-  const unreadCount = liveInbox?.unreadCount ?? items.filter(item => !item.read).length;
+  // 서버 알림은 페이지로 나뉘므로 업무 요청은 첫 페이지 위에 둔다.
+  const items = liveInbox ? [...(liveInbox.number === 0 ? requests : []), ...liveInbox.content] : [...requests, ...notifications];
+  const unreadCount = liveInbox ? liveInbox.unreadCount + requests.filter(item => !item.read).length
+    : items.filter(item => !item.read).length;
   const countBadge = byId('inbox-count');
   countBadge.hidden = unreadCount === 0;
   countBadge.setAttribute('aria-label', `읽지 않은 알림 ${unreadCount}개`);
@@ -1322,7 +1339,7 @@ async function refreshLiveInbox(page = 0) {
   if (!signedIn || currentPreviewUser()?.source !== 'api') return;
   const request = ++inboxRequest;
   try {
-    const result = await fetchNotifications('', '', '', page);
+    const [result] = await Promise.all([fetchNotifications('', '', '', page), loadLiveWorkRequests()]);
     const content = result.content.map(item => ({ ...item, time: new Date(item.at) }));
     if (content.some(item => !Number.isFinite(+item.time))) throw new Error('Invalid notification timestamp');
     if (request !== inboxRequest || !signedIn) return;
@@ -1341,6 +1358,10 @@ async function refreshLiveInbox(page = 0) {
 async function markInboxRead(items) {
   if (!items.length) return;
   if (liveInbox) {
+    const requestIds = items.filter(item => item.request).map(item => item.id);
+    if (requestIds.length) readWorkRequests(workRequestActor(), requestIds);
+    items = items.filter(item => !item.request);
+    if (!items.length) return renderNotifications();
     try {
       await setNotificationsRead(items.map(item => item.id), true);
       await refreshLiveInbox(liveInbox?.number ?? 0);
@@ -1350,7 +1371,7 @@ async function markInboxRead(items) {
     return;
   }
   const requestIds = items.filter(item => item.request).map(item => item.id);
-  if (requestIds.length) readPreviewWorkRequests(workRequestActor(), requestIds);
+  if (requestIds.length) readWorkRequests(workRequestActor(), requestIds);
   items.filter(item => !item.request).forEach(item => { item.read = true; });
   renderNotifications();
 }
@@ -1381,10 +1402,10 @@ window.addEventListener('live-data-changed', () => {
 });
 bindSquishSwitch(unreadOnly, renderNotifications);
 byId('mark-all-read').addEventListener('click', () => {
-  if (!liveInbox) {
-    const actor = workRequestActor();
-    const ids = previewWorkRequests(actor).filter(item => item.unreadFor.includes(actor.username)).map(item => item.id);
-    if (ids.length) readPreviewWorkRequests(actor, ids);
+  const actor = workRequestActor();
+  if (actor) {
+    const ids = workRequests(actor).filter(item => item.unreadFor.includes(actor.username)).map(item => item.id);
+    if (ids.length) readWorkRequests(actor, ids);
   }
   void markInboxRead((liveInbox?.content ?? notifications).filter(item => !item.read));
   renderNotifications();
@@ -1568,7 +1589,7 @@ function showRoute(route, params, navigationMode) {
       dashboardSource = undefined;
       showLoadedRoute(route, params, navigationMode);
     };
-    void Promise.all([loadLiveSource(), loadLiveRules()]).then(open, () => {
+    void Promise.all([loadLiveSource(), loadLiveRules(), loadLiveWorkRequests().catch(() => undefined)]).then(open, () => {
       document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
         status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
       } }));
@@ -1821,6 +1842,7 @@ function clearWorkspaceSession() {
   activeEvidence = undefined;
   resetPreviewCaseRead();
   resetLiveSource();
+  resetLiveWorkRequests();
   dashboardSource = undefined;
 }
 for (const host of document.querySelectorAll('[data-dialog-heading]')) {

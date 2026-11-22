@@ -3,6 +3,12 @@ import { sharedCaseEvidence } from './case-graph-scope';
 
 export const requestStaff = [previewStaff, alternatePreviewStaff];
 const users = [previewAdmin, ...requestStaff];
+export const requestAdmin = () => users[0];
+// 서버 연결에서는 서버의 관리자·분석가 목록으로 바꾼다.
+export function setRequestPeople(admin, staff) {
+  requestStaff.splice(0, requestStaff.length, ...staff);
+  users.splice(0, users.length, admin, ...staff);
+}
 const storageKey = 'aml-preview-work-requests';
 export const activeReviewStatuses = ['처리 전', '처리 중'];
 
@@ -30,7 +36,7 @@ export function previewCaseAssignee(row) {
 }
 
 export function requestCases(cases, type, actor) {
-  if (!type || actor?.source !== 'fixture' || type.role !== actor.role) return [];
+  if (!type || !['fixture', 'api'].includes(actor?.source) || type.role !== actor.role) return [];
   return cases.filter(row => {
     if (type === workRequestTypes.relationReview) return true;
     if (actor.role === 'STAFF' && previewCaseAssignee(row) !== actor.username) return false;

@@ -66,7 +66,7 @@ function caseRow(item, transactions, userId, codes) {
     relatedAccounts: new Set(related.flatMap(record => [record.account, record.counterparty])).size,
     amountByCurrency: Object.fromEntries(Object.entries(item.summary.amountsByCurrency ?? {})
       .map(([currency, amount]) => [currency, Number(amount)])),
-    caseId: item.caseId, assigneeName: item.assigneeName,
+    caseId: item.caseId, assigneeName: item.assigneeName, assignee: item.assigneeUsername, reviewDueOn: item.dueOn ?? undefined,
     ...(item.episodeId && { episodeCode: codes.get(item.episodeId) }),
     ...(item.kind === 'EPISODE' && { linkedAlertCodes: item.linkedAlertIds.map(id => codes.get(id)), linkedAlertCodesComplete: true }),
     ...(item.edits?.length && { membershipHistory: item.edits.map(edit => ({
