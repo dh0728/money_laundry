@@ -339,4 +339,261 @@ class ReviewWorkflowTests {
       assertThat(boardCase(id).get("episodeId")).isNull();
     }
   }
+
+  ResultActions request(Object body) throws Exception {
+    return send("/work-requests", body);
+  }
+
+  /** 지금 로그인한 사람에게 보이는 요청 가운데 가장 최근 것. */
+  Map<String, Object> latestRequest() throws Exception {
+    var body =
+        object(
+            mvc.perform(get("/api/v1/review/work-requests").session(session))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+    assertThat(object(body.get("admin")).get("username")).isEqualTo("admin");
+    assertThat(rows(body.get("staff"))).extracting(u -> u.get("username")).contains("l1a", "l1b");
+    return rows(body.get("requests")).getFirst();
+  }
+
+  void judge(long a, String verdict) throws Exception {
+    send("/cases/" + a + "/start", Map.of()).andExpect(status().isOk());
+    send("/cases/" + a + "/judgment", judgment(verdict)).andExpect(status().isOk());
+  }
+
+  @Test
+  void approved_reopen_request_opens_the_case_and_keeps_the_old_judgment() throws Exception {
+    long a = alert(l1, 1);
+    login("l1a");
+    var reopen = Map.of("type", "reopen", "caseId", a, "reason", "판정 근거 재확인");
+    request(reopen).andExpect(status().isConflict()); // 판정으로 닫힌 업무만 재검토를 요청한다.
+    judge(a, "NORMAL");
+    request(Map.of("type", "assign", "caseId", a, "reason", "x")).andExpect(status().isForbidden());
+    request(reopen).andExpect(status().isOk());
+    request(reopen).andExpect(status().isConflict()); // 같은 요청이 처리 대기 중이다.
+    long id = number(latestRequest().get("id"));
+    send("/work-requests/" + id + "/resolve", Map.of("action", "approved", "note", "승인"))
+        .andExpect(status().isConflict()); // 받은 사람만 처리한다.
+
+    login("l1b");
+    assertThat(
+            rows(
+                object(
+                        mvc.perform(get("/api/v1/review/work-requests").session(session))
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString())
+                    .get("requests")))
+        .isEmpty(); // 관련 없는 직원에게는 보이지 않는다.
+
+    login("admin");
+    var received = latestRequest();
+    assertThat(received.get("unreadFor")).isEqualTo(List.of("admin"));
+    send("/work-requests/read", Map.of("ids", List.of(id))).andExpect(status().isOk());
+    assertThat(latestRequest().get("unreadFor")).isEqualTo(List.of());
+    send("/work-requests/" + id + "/resolve", Map.of("action", "approved"))
+        .andExpect(status().isConflict()); // 처리 내용은 필수다.
+    send(
+            "/work-requests/" + id + "/resolve",
+            Map.of("action", "approved", "note", "다시 확인하세요", "reviewStatus", "PENDING"))
+        .andExpect(status().isOk());
+    var approved = latestRequest();
+    assertThat(approved.get("state")).isEqualTo("approved");
+    assertThat(approved.get("unreadFor")).isEqualTo(List.of("l1a"));
+    assertThat(approved.get("reviewStatus")).isEqualTo("PENDING");
+    var before = object(approved.get("before"));
+    assertThat(before.get("outcome")).isEqualTo("NORMAL");
+    assertThat(object(before.get("judgment")).get("reason")).isEqualTo("판정 사유");
+
+    login("l1a");
+    var reopened = boardCase(a);
+    assertThat(reopened.get("status")).isEqualTo("OPEN");
+    assertThat(reopened.get("outcome")).isNull();
+    assertThat(reopened.get("judgment")).isNull();
+    assertThat(reopened.get("reviewStartedAt")).isNull();
+    assertThat(rows(reopened.get("members")))
+        .extracting(m -> m.get("state"))
+        .containsOnly("PENDING");
+    judge(a, "SUSPICIOUS");
+    assertThat(boardCase(a).get("outcome")).isEqualTo("SUSPICIOUS");
+    // 이전 판정은 기록으로 남는다.
+    assertThat(
+            jdbc.queryForList(
+                "select verdict from review.judgments where alert_id=? order by judgment_id",
+                String.class,
+                a))
+        .containsExactly("NORMAL", "SUSPICIOUS");
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from review.judgments where alert_id=? and superseded_at is null",
+                Long.class,
+                a))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void case_with_a_followup_alert_is_not_reopened() throws Exception {
+    long a = alert(l1, 1);
+    long followup = alert(l1, 10);
+    login("l1a");
+    judge(a, "NORMAL");
+    long event =
+        jdbc.queryForObject(
+            "select max(event_id) from review.events where alert_id=?", Long.class, a);
+    jdbc.update("insert into review.alert_lineage values(?,?,'FOLLOWUP_OF',?)", followup, a, event);
+    request(Map.of("type", "reopen", "caseId", a, "reason", "재확인")).andExpect(status().isOk());
+    long id = number(latestRequest().get("id"));
+    login("admin");
+    send("/work-requests/" + id + "/resolve", Map.of("action", "approved", "note", "승인"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("후속 Alert")));
+    assertThat(boardCase(a).get("status")).isEqualTo("CLOSED");
+    assertThat(latestRequest().get("state")).isEqualTo("pending");
+    request(
+            Map.of(
+                "type",
+                "reviewAgain",
+                "caseId",
+                a,
+                "recipient",
+                "l1a",
+                "reason",
+                "재검토",
+                "reviewStatus",
+                "IN_PROGRESS"))
+        .andExpect(status().isConflict());
+    send("/work-requests/" + id + "/resolve", Map.of("action", "declined", "note", "후속 Alert에서"))
+        .andExpect(status().isOk());
+    assertThat(latestRequest().get("state")).isEqualTo("declined");
+  }
+
+  @Test
+  void admin_orders_apply_at_once_and_staff_answers() throws Exception {
+    long a = alert(l1, 1);
+    login("admin");
+    // 담당 변경: 새 담당자와 이전 담당자 모두에게 보인다.
+    request(Map.of("type", "assign", "caseId", a, "recipient", "l1a", "reason", "재배정"))
+        .andExpect(status().isConflict()); // 이미 담당자다.
+    request(Map.of("type", "assign", "caseId", a, "recipient", "l1b", "reason", "재배정"))
+        .andExpect(status().isOk());
+    var assigned = latestRequest();
+    assertThat(assigned.get("assignee")).isEqualTo("l1b");
+    assertThat(object(assigned.get("before")).get("assignee")).isEqualTo("l1a");
+    assertThat(assigned.get("unreadFor")).isEqualTo(List.of("l1b", "l1a"));
+    assertThat(boardCase(a).get("assigneeUsername")).isEqualTo("l1b");
+    // 처리 기한.
+    request(Map.of("type", "deadline", "caseId", a, "recipient", "l1b", "reason", "기한"))
+        .andExpect(status().isConflict()); // 기한 날짜가 필요하다.
+    request(
+            Map.of(
+                "type",
+                "deadline",
+                "caseId",
+                a,
+                "recipient",
+                "l1b",
+                "reason",
+                "기한",
+                "deadline",
+                "2023-09-10"))
+        .andExpect(status().isOk());
+    assertThat(boardCase(a).get("dueOn")).isEqualTo("2023-09-10");
+    // 처리 상태.
+    request(
+            Map.of(
+                "type",
+                "changeStatus",
+                "caseId",
+                a,
+                "recipient",
+                "l1b",
+                "reason",
+                "착수",
+                "reviewStatus",
+                "PENDING"))
+        .andExpect(status().isConflict()); // 이미 처리 전이다.
+    request(
+            Map.of(
+                "type",
+                "changeStatus",
+                "caseId",
+                a,
+                "recipient",
+                "l1b",
+                "reason",
+                "착수",
+                "reviewStatus",
+                "IN_PROGRESS"))
+        .andExpect(status().isOk());
+    assertThat(boardCase(a).get("reviewStartedAt")).isNotNull();
+    long status = number(latestRequest().get("id"));
+    send("/work-requests/" + status + "/resolve", Map.of("action", "cancelled"))
+        .andExpect(status().isConflict()); // 이미 적용된 지시는 취소할 수 없다.
+    // 효과 없는 지시는 보낸 사람이 취소할 수 있다.
+    request(Map.of("type", "investigate", "caseId", a, "recipient", "l1b", "reason", "추가 조사"))
+        .andExpect(status().isOk());
+    long order = number(latestRequest().get("id"));
+    send("/work-requests/" + order + "/resolve", Map.of("action", "cancelled"))
+        .andExpect(status().isOk());
+    request(Map.of("type", "evidence", "caseId", a, "recipient", "l1b", "reason", "근거 보완"))
+        .andExpect(status().isOk());
+    long evidence = number(latestRequest().get("id"));
+
+    login("l1a"); // 이전 담당자는 담당 변경 알림만 본다.
+    assertThat(latestRequest().get("type")).isEqualTo("assign");
+    login("l1b");
+    send("/work-requests/" + evidence + "/resolve", Map.of("action", "approved", "note", "x"))
+        .andExpect(status().isConflict()); // 분석가는 처리 완료·협의 필요로 답한다.
+    send("/work-requests/" + evidence + "/resolve", Map.of("action", "completed", "note", "보완함"))
+        .andExpect(status().isOk());
+    var done = latestRequest();
+    assertThat(done.get("state")).isEqualTo("completed");
+    assertThat(done.get("note")).isEqualTo("보완함");
+    assertThat(done.get("unreadFor")).isEqualTo(List.of("admin"));
+  }
+
+  @Test
+  void staff_requests_for_assignee_deadline_and_relation_review() throws Exception {
+    long a = alert(l1, 1);
+    long b = alert(other, 10);
+    login("l1a");
+    request(Map.of("type", "extension", "caseId", b, "reason", "x", "deadline", "2023-09-20"))
+        .andExpect(status().isForbidden()); // 내 담당 업무만 요청한다.
+    request(Map.of("type", "extension", "caseId", a, "reason", "연장", "deadline", "2023-09-20"))
+        .andExpect(status().isOk());
+    long extension = number(latestRequest().get("id"));
+    request(Map.of("type", "changeAssignee", "caseId", a, "reason", "휴가"))
+        .andExpect(status().isOk());
+    long change = number(latestRequest().get("id"));
+    var related =
+        List.of(
+            Map.of(
+                "code", "A-230902-000002", "transactions", List.of("T-1"), "accounts", List.of()));
+    // 연관 업무 검토는 다른 사람 담당 업무에도 요청할 수 있다.
+    request(Map.of("type", "relationReview", "caseId", b, "reason", "x"))
+        .andExpect(status().isConflict());
+    request(Map.of("type", "relationReview", "caseId", b, "reason", "공통 거래", "related", related))
+        .andExpect(status().isOk());
+    request(Map.of("type", "relationReview", "caseId", b, "reason", "공통 거래", "related", related))
+        .andExpect(status().isConflict());
+    assertThat(rows(latestRequest().get("related")).getFirst().get("code"))
+        .isEqualTo("A-230902-000002");
+
+    login("admin");
+    send("/work-requests/" + extension + "/resolve", Map.of("action", "approved", "note", "연장 승인"))
+        .andExpect(status().isOk());
+    assertThat(boardCase(a).get("dueOn")).isEqualTo("2023-09-20");
+    send("/work-requests/" + change + "/resolve", Map.of("action", "approved", "note", "변경"))
+        .andExpect(status().isConflict()); // 새 담당자가 필요하다.
+    send(
+            "/work-requests/" + change + "/resolve",
+            Map.of("action", "approved", "note", "변경", "assignee", "l1b"))
+        .andExpect(status().isOk());
+    assertThat(boardCase(a).get("assigneeUsername")).isEqualTo("l1b");
+    login("l1b"); // 새 담당자에게도 요청이 보인다.
+    assertThat(latestRequest().get("assignee")).isEqualTo("l1b");
+    send("/cases/" + a + "/start", Map.of()).andExpect(status().isOk());
+  }
 }

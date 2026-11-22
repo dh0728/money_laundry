@@ -189,7 +189,7 @@ BINARY는 고정 TARGET 전체, TYPE은 BINARY 결과가 의심(`p_laundering>=a
 | 점수 재평가·기존 근거 제거 | 조사 중이어도 새 버전으로 바로 반영(사유 SCORE_OR_POLICY_REASSESSMENT). 변경 제안·동의 절차는 없다 |
 | 같은 근거 재실행 | 새 버전·알림 없이 성공 검사만 갱신 |
 
-병합 원본은 삭제하지 않고 canonicalAlertId로 대표를 안내한다. 별칭은 목록에서 제외하고 수정은409다. 종결/편입 판정은 자동 재개하거나 덮어쓰지 않는다. 후속 계보는 단일 parent 열이 아닌 관계로 보존한다.
+병합 원본은 삭제하지 않고 canonicalAlertId로 대표를 안내한다. 별칭은 목록에서 제외하고 수정은409다. 종결/편입 판정은 자동 재개하거나 덮어쓰지 않는다. 다시 여는 길은 관리자의 재검토 승인·지시(§9 업무 요청)뿐이며, 후속 Alert가 이미 있는 Alert는 다시 열지 않는다. 후속 계보는 단일 parent 열이 아닌 관계로 보존한다.
 
 직원 판단이 있던 거래가 정정으로 빠져도 저장 판정·역할·당시 버전은 보존한다. 현재 범위·요약은 공개 버전과의 교집합이며 상세 withdrawnMembers로 과거 판정을 별도 조회한다. 미수신·HELD·탐색 한도는 무효 근거로 단정하지 않는다.
 
@@ -377,17 +377,41 @@ alertIds는 원본 alertId, episodeIds는 kind=EPISODE인 caseId다. Alert caseI
 | GET /api/v1/review/board | `{businessAt,cases,transactions,nextEpisodeId}`. 화면이 Alert·Episode 목록·카드·상세·대시보드 업무 지표를 이 응답 하나로 그린다 |
 | POST /api/v1/review/cases/{caseId}/read | 담당자가 처음 열면 `read_at` 기록(열람 전 → 처리 전). 담당자가 아니면 변화 없음 |
 | POST /api/v1/review/cases/{caseId}/start | 담당자만. Alert를 처리 중으로 바꾼다 |
-| POST /api/v1/review/cases/{caseId}/judgment | `{verdict:NORMAL/SUSPICIOUS,reasonCategory:pattern/rule/normal-business/etc,evidence,observations,rationale}`. rationale 필수, evidence·observations 선택. 담당자만, Alert는 처리 중이어야 한다. 사건당 1회이며 저장과 함께 CLOSED. 응답 `{id:"J-yyMMdd-NNNNNN",...}` |
+| POST /api/v1/review/cases/{caseId}/judgment | `{verdict:NORMAL/SUSPICIOUS,reasonCategory:pattern/rule/normal-business/etc,evidence,observations,rationale}`. rationale 필수, evidence·observations 선택. 담당자만, Alert는 처리 중이어야 한다. 유효한 판정은 사건당 하나이며 저장과 함께 CLOSED(재검토로 다시 열린 사건은 새로 판정한다). 응답 `{id:"J-yyMMdd-NNNNNN",...}` |
 | POST /api/v1/review/cases/{caseId}/transaction-edits | Alert만. `{txIds,targetAlertId,reason}`. targetAlertId가 null이면 제외, 있으면 그 OPEN Alert로 이동. STAFF는 본인 담당(대상 포함), ADMIN은 모든 OPEN Alert. 원래 Alert로 되돌리면 기록을 지운다 |
 | POST /api/v1/review/episodes | `{alertIds,reason,episodeId}`. 본인 담당 OPEN·미판정·미편입 Alert 2건 이상. episodeId는 board의 `nextEpisodeId`(선택) |
 | POST /api/v1/review/episodes/{episodeId}/alerts | `{alertIds,reason}`. OPEN Episode에 Alert 편입 |
 | POST /api/v1/review/episodes/{episodeId}/unlink | `{alertIds,reason}`. Episode 담당자만. 남는 Alert가 2건 미만이면 Episode를 해체(DISSOLVED)하고 Alert를 다시 연다 |
+| GET /api/v1/review/work-requests | `{admin,staff,requests}`. 내가 보냈거나 받은 요청, 담당 변경으로 내 담당이 바뀐 요청. admin·staff는 요청 화면이 고르는 직원(`username,name,role`) |
+| POST /api/v1/review/work-requests | `{type,caseId,recipient,reason,deadline,reviewStatus,related}`. 응답 `{id}` |
+| POST /api/v1/review/work-requests/{id}/resolve | `{action,note,assignee,reviewStatus}`. 보낸 사람: `cancelled`(적용 전 요청만). 받은 사람: ADMIN `approved/declined`, STAFF `completed/needs-discussion`, note 필수 |
+| POST /api/v1/review/work-requests/read | `{ids}`. 내 읽지 않음 표시를 지운다 |
 | GET /api/v1/review/account-nodes | ids=가명 계좌 UUID 목록. 원문 이름·계좌번호 제외 |
 | GET /api/v1/review/payment-formats | 원장에 존재하는 결제 수단 목록 |
 
-board의 사건 행은 `caseId,kind,status,outcome,assigneeId,assigneeName,createdAt,assignedAt,closedAt,ageDays,readAt,reviewStartedAt,episodeId(Alert)/linkedAlertIds(Episode),pendingCount,sourceAlertIds,primaryTypes,summary,members,judgment,edits`다. 현재 거래는 뷰 `review.current_members`(공개 버전 거래 − `alert_tx_edits` + 옮겨 온 거래)로 계산한다. 거래 판정은 사건 판정(Alert 자신 또는 소속 Episode)을 따른다. reason은 4000자 이하다.
+board의 사건 행은 `caseId,kind,status,outcome,assigneeId,assigneeName,assigneeUsername,dueOn,createdAt,assignedAt,closedAt,ageDays,readAt,reviewStartedAt,episodeId(Alert)/linkedAlertIds(Episode),pendingCount,sourceAlertIds,primaryTypes,summary,members,judgment,edits`다. 현재 거래는 뷰 `review.current_members`(공개 버전 거래 − `alert_tx_edits` + 옮겨 온 거래)로 계산한다. 거래 판정은 사건 판정(Alert 자신 또는 소속 Episode)을 따른다. reason은 4000자 이하다.
 
-댓글·재배정·재개·오탐 표시·변경 제안 API는 없다(화면에 없는 기능).
+### 업무 요청
+
+요청 유형과 보내는 역할, 사건에 적용되는 효과는 다음과 같다. STAFF가 보낸 요청은 ADMIN(받는 사람)이 승인할 때, ADMIN이 보낸 지시는 보내는 즉시 적용된다. 효과가 없는 유형은 의견 교환만 한다.
+
+| type | 보내는 역할 | 효과 |
+|---|---|---|
+| reopen / reviewAgain | STAFF / ADMIN | 다시 열기 |
+| changeAssignee / assign | STAFF / ADMIN | 담당 변경 |
+| extension / deadline | STAFF / ADMIN | 처리 기한(`deadline` yyyy-MM-dd 필수) |
+| changeStatus | ADMIN | 처리 상태(처리 전 ↔ 처리 중, Alert만) |
+| opinion, relationReview, evidenceRequest | STAFF | 없음 |
+| investigate, evidence | ADMIN | 없음 |
+
+- STAFF는 본인 담당 사건에만 요청한다(relationReview는 예외이며 `related`에 비교 후보와 공통 거래·계좌를 담는다). 받는 사람은 ADMIN이다. ADMIN의 지시는 현재 담당자에게, 담당 변경은 새 담당자(`recipient`)에게 보낸다.
+- 다시 열기는 판정(NORMAL/SUSPICIOUS)으로 닫힌 사건만 대상이다. Episode로 옮겨진 Alert, 해체된 Episode, 후속 Alert가 이미 만들어진 Alert는 409다. 다시 열면 OPEN·미판정이 되고 이전 판정은 `judgments.superseded_at`을 채워 기록으로 남는다. `reviewStatus`(PENDING/IN_PROGRESS)로 처리 전·처리 중을 정하며 Episode는 IN_PROGRESS만 된다.
+- 담당 변경은 OPEN 사건만. 승인할 때 `assignee`(새 담당자 username)가 필요하다. 처리 기한은 OPEN 사건의 `due_on`에 저장한다.
+- 같은 사람이 같은 사건에 같은 유형으로 보낸 요청이 처리 대기 중이면 409다.
+- 요청 행은 `id,type,caseId,caseKind,caseCreatedAt,sender,recipient,related,reason,deadline,sentAt,at,state,unreadFor,appliedAt,reviewStatus,assignee,before,note`다. 사람은 username으로 적는다. `before`는 적용 직전의 `outcome,reviewStatus,assignee,judgment,completedAt`이다. state는 pending/approved/declined/completed/needs-discussion/cancelled.
+- 적용된 변경은 `review.events`에 REOPEN/ASSIGN/STATUS/DEADLINE으로 남는다.
+
+댓글·오탐 표시·변경 제안 API는 없다(화면에 없는 기능).
 
 ## 10. 시연 제어와 초기화
 

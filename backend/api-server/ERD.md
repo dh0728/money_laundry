@@ -27,10 +27,12 @@ erDiagram
     events ||--o{ event_recipients : notifies
     alerts ||--o{ alert_lineage : relates
     alerts ||--o{ alert_tx_edits : staff_edits
-    alerts ||--o| judgments : judged
+    alerts ||--o{ judgments : judged
     episodes ||--o{ episode_alerts : contains
     alerts ||--o| episode_alerts : belongs
-    episodes ||--o| judgments : judged
+    episodes ||--o{ judgments : judged
+    alerts ||--o{ work_requests : requested
+    episodes ||--o{ work_requests : requested
     rules ||--o{ rule_history : changes
 ```
 
@@ -63,10 +65,11 @@ erDiagram
 | analysis | score_ledger | 입력 고정 때의 완료 현재 점수 장부(선행 점수) |
 | analysis | alert_origin_ledger, fact_ledger | 입력 고정 때의 모든 공개 Alert(종결·병합 별칭 포함) 공개 근거 버전과 그 근거 거래의 통합 상태 장부. 실행 산출 연결은 alert_versions.run_id |
 | analysis | alert_plans | 실행 토큰·세대·SHA-256으로 검증하는 공개 준비 계획(canonical JSON TEXT) |
-| review | alerts | Alert 담당·상태·종결 결과·조사 착수·공개 버전·병합 대표 ID·현재 범위 요약/revision/digest |
-| review | episodes | Episode 담당·상태·종결 결과·현재 범위 요약/revision/digest. Alert와 별도 테이블 |
+| review | alerts | Alert 담당·상태·종결 결과·조사 착수·처리 기한(due_on)·공개 버전·병합 대표 ID·현재 범위 요약/revision/digest |
+| review | episodes | Episode 담당·상태·종결 결과·처리 기한(due_on)·현재 범위 요약/revision/digest. Alert와 별도 테이블 |
 | review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 위험도는 현재 조사 범위에서 계산해 root summary와 생성 컬럼 risk_score에 저장 |
-| review | judgments | Alert 또는 Episode당 1회의 판정(정상/이상, 사유 유형, 근거·관찰·판정 사유, 판정자·시각) |
+| review | judgments | Alert 또는 Episode의 판정(정상/이상, 사유 유형, 근거·관찰·판정 사유, 판정자·시각). 유효한 판정은 사건당 하나이며, 재검토로 다시 열면 이전 판정은 superseded_at을 채워 기록으로 남긴다 |
+| review | work_requests | 보관함의 업무 요청·지시(유형, 대상 사건, 보낸 사람·받는 사람, 사유, 기한, 상태, 처리 내용, 적용 시각과 적용 전 상태, 읽지 않은 사람) |
 | review | alert_tx_edits | 직원이 Alert에서 뺀 거래(target 없음)와 다른 OPEN Alert로 옮긴 거래(target 있음), 사유·수정자 |
 | review | episode_alerts | Episode에 편입된 Alert. Episode 거래는 소속 Alert의 현재 거래 합집합 |
 | review | alert_lineage | MERGED_INTO/FOLLOWUP_OF 관계와 원인 이벤트 |

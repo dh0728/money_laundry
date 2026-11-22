@@ -96,7 +96,7 @@ public class ReviewService {
         jdbc.queryForList(
             "select "
                 + ReviewCaseSql.LIST_COLUMNS
-                + ",c.read_at,(c.summary->>'typeShare')::double precision as type_share,u.name as assignee_name,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id) as linked_episode_id from "
+                + ",c.read_at,(c.summary->>'typeShare')::double precision as type_share,u.name as assignee_name,u.username as assignee_username,c.due_on,(select ea.episode_id from review.episode_alerts ea where ea.alert_id=c.alert_id) as linked_episode_id from "
                 + ReviewCaseSql.PUBLISHED
                 + " c join core.users u on u.user_id=c.assignee_id order by c.created_at desc,case_id desc")) {
       long id = number(row.get("case_id"));
@@ -108,6 +108,8 @@ public class ReviewService {
       item.put("outcome", row.get("outcome"));
       item.put("assigneeId", row.get("assignee_id"));
       item.put("assigneeName", row.get("assignee_name"));
+      item.put("assigneeUsername", row.get("assignee_username"));
+      item.put("dueOn", row.get("due_on") == null ? null : row.get("due_on").toString());
       item.put("createdAt", instant(row.get("created_at")));
       item.put("assignedAt", instant(row.get("assigned_at")));
       item.put("closedAt", instant(row.get("closed_at")));
@@ -177,14 +179,14 @@ public class ReviewService {
     var out = new HashMap<Long, Map<String, Object>>();
     for (var row :
         jdbc.queryForList(
-            "select j.*,u.name as reviewer from review.judgments j join core.users u on u.user_id=j.reviewer_id"))
+            "select j.*,u.name as reviewer from review.judgments j join core.users u on u.user_id=j.reviewer_id where j.superseded_at is null"))
       out.put(
           number(row.get("alert_id") == null ? row.get("episode_id") : row.get("alert_id")),
           judgment(row));
     return out;
   }
 
-  private static Map<String, Object> judgment(Map<String, Object> row) {
+  static Map<String, Object> judgment(Map<String, Object> row) {
     Instant at = ((Timestamp) row.get("judged_at")).toInstant();
     var out = new LinkedHashMap<String, Object>();
     out.put(
@@ -229,7 +231,7 @@ public class ReviewService {
 
   // ---- 공통 확인 ----
 
-  private Map<String, Object> lockAlert(long id) {
+  Map<String, Object> lockAlert(long id) {
     var found = jdbc.queryForList("select * from review.alerts where alert_id=? for update", id);
     if (found.isEmpty() || found.getFirst().get("published_version") == null)
       throw ApiException.notFound("Alert가 없습니다.");
@@ -240,14 +242,14 @@ public class ReviewService {
     return alert;
   }
 
-  private Map<String, Object> lockEpisode(long id) {
+  Map<String, Object> lockEpisode(long id) {
     var found =
         jdbc.queryForList("select * from review.episodes where episode_id=? for update", id);
     if (found.isEmpty()) throw ApiException.notFound("Episode가 없습니다.");
     return found.getFirst();
   }
 
-  private boolean episode(long id) {
+  boolean episode(long id) {
     return jdbc.queryForObject(
         "select exists(select 1 from review.episodes where episode_id=?)", Boolean.class, id);
   }
@@ -262,14 +264,13 @@ public class ReviewService {
       throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "담당 직원만 변경할 수 있습니다.");
   }
 
-  private static String text(String value, int limit, boolean required) {
+  static String text(String value, int limit, boolean required) {
     String out = value == null ? "" : value.strip();
     if ((required && out.isEmpty()) || out.length() > limit) throw AnalysisService.invalid();
     return out;
   }
 
-  private void event(
-      boolean episode, long id, long user, String action, String comment, Object snapshot) {
+  void event(boolean episode, long id, long user, String action, String comment, Object snapshot) {
     Timestamp at = Timestamp.from(time.now());
     jdbc.update(
         "insert into review.events("
@@ -284,7 +285,7 @@ public class ReviewService {
         encode(snapshot));
   }
 
-  private void touch(boolean episode, long id) {
+  void touch(boolean episode, long id) {
     jdbc.update(
         "update review."
             + (episode

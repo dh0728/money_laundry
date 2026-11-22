@@ -375,7 +375,7 @@ CREATE TABLE review.alerts (
  assignee_id BIGINT NOT NULL REFERENCES core.users,
  published_version INTEGER,
  review_started_at TIMESTAMPTZ, review_started_by BIGINT REFERENCES core.users,
- read_at TIMESTAMPTZ,
+ read_at TIMESTAMPTZ, due_on DATE,
  merged_into_alert_id BIGINT REFERENCES review.alerts,
  CHECK(merged_into_alert_id IS DISTINCT FROM alert_id),
  CHECK((review_started_at IS NULL)=(review_started_by IS NULL)),
@@ -395,7 +395,7 @@ CREATE TABLE review.episodes (
  episode_id BIGINT PRIMARY KEY DEFAULT nextval('review.case_id'),
  assignee_id BIGINT NOT NULL REFERENCES core.users,
  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CLOSED')),
- outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','DISSOLVED')),
+ outcome TEXT CHECK(outcome IN ('NORMAL','SUSPICIOUS','DISSOLVED')), due_on DATE,
  summary JSONB NOT NULL DEFAULT '{}', summary_revision BIGINT NOT NULL DEFAULT 0,
  summary_scope_digest CHAR(64),
  risk_score DOUBLE PRECISION GENERATED ALWAYS AS (coalesce((summary->>'riskScore')::double precision,0)) STORED,
@@ -518,16 +518,40 @@ CREATE TABLE review.events (
 );
 CREATE INDEX events_alert ON review.events(alert_id,event_id DESC);
 CREATE INDEX events_episode ON review.events(episode_id,event_id DESC);
--- 판정은 Alert 또는 Episode 하나에 한 번만 남는다.
+-- 유효한 판정은 Alert 또는 Episode 하나에 하나다. 재검토로 다시 열면 이전 판정은 superseded_at을 채워 기록으로 남긴다.
 CREATE TABLE review.judgments (
  judgment_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- alert_id BIGINT UNIQUE REFERENCES review.alerts, episode_id BIGINT UNIQUE REFERENCES review.episodes,
+ alert_id BIGINT REFERENCES review.alerts, episode_id BIGINT REFERENCES review.episodes,
  CHECK(num_nonnulls(alert_id,episode_id)=1),
  verdict TEXT NOT NULL CHECK(verdict IN ('NORMAL','SUSPICIOUS')),
  reason_category TEXT NOT NULL CHECK(reason_category IN ('pattern','rule','normal-business','etc')),
  evidence TEXT NOT NULL DEFAULT '', observations TEXT NOT NULL DEFAULT '', rationale TEXT NOT NULL,
- reviewer_id BIGINT NOT NULL REFERENCES core.users, judged_at TIMESTAMPTZ NOT NULL
+ reviewer_id BIGINT NOT NULL REFERENCES core.users, judged_at TIMESTAMPTZ NOT NULL,
+ superseded_at TIMESTAMPTZ
 );
+CREATE UNIQUE INDEX judgments_alert ON review.judgments(alert_id) WHERE superseded_at IS NULL;
+CREATE UNIQUE INDEX judgments_episode ON review.judgments(episode_id) WHERE superseded_at IS NULL;
+-- 보관함의 업무 요청. 분석가가 관리자에게 요청하거나 관리자가 분석가에게 지시한다.
+-- 재검토(다시 열기)·담당 변경·처리 상태·처리 기한은 적용될 때 applied_at과 적용 전 상태(before)를 남긴다.
+CREATE TABLE review.work_requests (
+ request_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ type TEXT NOT NULL CHECK(type IN ('reopen','changeAssignee','opinion','relationReview','evidenceRequest','extension',
+  'assign','reviewAgain','changeStatus','investigate','evidence','deadline')),
+ alert_id BIGINT REFERENCES review.alerts, episode_id BIGINT REFERENCES review.episodes,
+ CHECK(num_nonnulls(alert_id,episode_id)=1),
+ sender_id BIGINT NOT NULL REFERENCES core.users, recipient_id BIGINT NOT NULL REFERENCES core.users,
+ reason TEXT NOT NULL, due_on DATE, related JSONB,
+ state TEXT NOT NULL DEFAULT 'pending'
+  CHECK(state IN ('pending','approved','declined','completed','needs-discussion','cancelled')),
+ note TEXT NOT NULL DEFAULT '',
+ review_status TEXT CHECK(review_status IN ('PENDING','IN_PROGRESS')),
+ new_assignee_id BIGINT REFERENCES core.users,
+ before JSONB, applied_at TIMESTAMPTZ,
+ unread_user_ids BIGINT[] NOT NULL DEFAULT '{}',
+ sent_at TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX work_requests_alert ON review.work_requests(alert_id);
+CREATE INDEX work_requests_episode ON review.work_requests(episode_id);
 -- 직원이 Alert에서 뺀 거래. target_alert_id가 없으면 제외, 있으면 그 Alert로 이동이다.
 CREATE TABLE review.alert_tx_edits (
  edit_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -612,10 +636,10 @@ CREATE VIEW ops.work_items AS
 -- Read projections do not own or duplicate investigation state.
 CREATE VIEW review.cases AS
  SELECT alert_id AS case_id,'ALERT'::text AS kind,alert_id,assignee_id,status,outcome,
- revision,created_at,assigned_at,closed_at,closed_by,published_version,review_started_at,merged_into_alert_id,summary,summary_revision,summary_scope_digest,risk_score,read_at FROM review.alerts
+ revision,created_at,assigned_at,closed_at,closed_by,published_version,review_started_at,merged_into_alert_id,summary,summary_revision,summary_scope_digest,risk_score,read_at,due_on FROM review.alerts
  UNION ALL
  SELECT episode_id,'EPISODE',NULL::bigint,assignee_id,status,outcome,
- revision,created_at,assigned_at,closed_at,closed_by,NULL::integer,NULL::timestamptz,NULL::bigint,summary,summary_revision,summary_scope_digest,risk_score,NULL::timestamptz FROM review.episodes;
+ revision,created_at,assigned_at,closed_at,closed_by,NULL::integer,NULL::timestamptz,NULL::bigint,summary,summary_revision,summary_scope_digest,risk_score,NULL::timestamptz,due_on FROM review.episodes;
 CREATE VIEW review.event_history AS
  SELECT e.*,coalesce(alert_id,episode_id) AS case_id FROM review.events e;
 CREATE VIEW review.latest_versions AS
@@ -646,9 +670,9 @@ CREATE VIEW review.current_members AS
     WHERE b.alert_id=x.target_alert_id AND bt.tx_id=x.tx_id)
  ), judged AS (
   SELECT h.*,ea.episode_id,coalesce(j.verdict,ej.verdict) AS verdict
-  FROM held h LEFT JOIN review.judgments j ON j.alert_id=h.holder_id
+  FROM held h LEFT JOIN review.judgments j ON j.alert_id=h.holder_id AND j.superseded_at IS NULL
   LEFT JOIN review.episode_alerts ea ON ea.alert_id=h.holder_id
-  LEFT JOIN review.judgments ej ON ej.episode_id=ea.episode_id
+  LEFT JOIN review.judgments ej ON ej.episode_id=ea.episode_id AND ej.superseded_at IS NULL
  )
  SELECT holder_id AS case_id,alert_id,tx_id,evidence_version,review_role,
  CASE WHEN edit_state<>'KEPT' THEN edit_state

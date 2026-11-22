@@ -33,8 +33,8 @@ public final class CaseSummaryStore {
                   case when e.edit_id is null and t.role<>'CONTEXT' then j.verdict end as decision
                 from review.alert_transactions t
                 left join review.alert_tx_edits e on e.alert_id=t.alert_id and e.tx_id=t.tx_id
-                left join lateral (select verdict from review.judgments j where j.alert_id=t.alert_id
-                  or j.episode_id=(select episode_id from review.episode_alerts where alert_id=t.alert_id) limit 1) j on true
+                left join lateral (select verdict from review.judgments j where j.superseded_at is null and (j.alert_id=t.alert_id
+                  or j.episode_id=(select episode_id from review.episode_alerts where alert_id=t.alert_id)) limit 1) j on true
                 where t.alert_id=? and t.version=?
                 union all
                 select x.tx_id,x.alert_id,t.version,
@@ -43,8 +43,8 @@ public final class CaseSummaryStore {
                   case when t.role<>'CONTEXT' then j.verdict end
                 from review.alert_tx_edits x join review.alerts o on o.alert_id=x.alert_id
                 join review.alert_transactions t on t.alert_id=o.alert_id and t.version=o.published_version and t.tx_id=x.tx_id
-                left join lateral (select verdict from review.judgments j where j.alert_id=x.target_alert_id
-                  or j.episode_id=(select episode_id from review.episode_alerts where alert_id=x.target_alert_id) limit 1) j on true
+                left join lateral (select verdict from review.judgments j where j.superseded_at is null and (j.alert_id=x.target_alert_id
+                  or j.episode_id=(select episode_id from review.episode_alerts where alert_id=x.target_alert_id)) limit 1) j on true
                 where x.target_alert_id=?
                   and not exists(select 1 from review.alert_tx_edits k where k.alert_id=x.target_alert_id and k.tx_id=x.tx_id)
                   and not exists(select 1 from review.alert_transactions own where own.alert_id=? and own.version=? and own.tx_id=x.tx_id)

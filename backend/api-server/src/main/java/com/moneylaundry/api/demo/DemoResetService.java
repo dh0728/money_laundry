@@ -24,6 +24,7 @@ public class DemoResetService {
           ",",
           "analysis.alert_plans",
           "review.judgments",
+          "review.work_requests",
           "review.alert_tx_edits",
           "review.alert_lineage",
           "review.event_recipients",
