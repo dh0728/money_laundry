@@ -80,7 +80,6 @@
   font-size: var(--aml-type-caption-size);
   line-height: var(--aml-type-caption-lineHeight);
 }
-.case-progress-count { color: var(--muted-text); font-variant-numeric: tabular-nums }
 @container case-progress-board (min-width: 540px) {
   .case-progress-lanes { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 }

@@ -13,7 +13,7 @@ import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { ChartSectionDownload } from '../../components/section-download';
 import { OverviewScoreChart, overviewScorePoints } from './overview-score-chart';
-import { CaseActorTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag } from '../../components/semantic-tags';
+import { CaseActorTag, CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag } from '../../components/semantic-tags';
 import { TransactionEvidenceTable } from './preview-case-table';
 import { useCaseEvidenceSelection } from './case-evidence-selection';
 import { caseOverviewEvidence, relatedJudgments } from './case-overview-evidence';
@@ -249,15 +249,15 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       <ul className="overview-fact-list">{accounts.map(({ code, owner, sent, received }) => <li key={code}>
         <code>{code}</code><span>{owner}</span><span className="overview-note">송금 {sent} · 수취 {received}</span>
       </li>)}</ul>
-      {episode && overlap.length > 0 && <><h3>거래가 겹치는 Alert · {overlap.length}건</h3>
+      {episode && overlap.length > 0 && <><h3>거래가 겹치는 Alert <CountTag count={overlap.length} /></h3>
         <ul className="overview-fact-list">{overlap.map(alert => <li key={alert.code}>
           <LinkTag code={alert.code} /><VerdictTag verdict={alert.verdict} /><PatternTag>{alert.pattern}</PatternTag>
           <span>{records.filter(record => alert.related.some(item => item.code === record.code)).length}건 공유</span>
         </li>)}</ul>
       </>}
     </> },
-    past: { title: '과거 판단', content: prior.length ? <>
-      <p>공유 계좌가 있는 다른 판정 {prior.length}건</p>
+    past: { title: '과거 판단', count: prior.length || undefined, content: prior.length ? <>
+      <p className="overview-note">공유 계좌가 있는 다른 판정</p>
       <ul className="overview-fact-list overview-past-verdicts" tabIndex={0} aria-label="공유 계좌가 있는 판정">
         {prior.map(item => <li key={item.id}>
         <LinkTag href={`/report?selected=${item.id}`} code={item.id} />
@@ -279,14 +279,14 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
         <LinkTag href={`/report?selected=${row.judgment.id}`} code={row.judgment.id} />
       </> : !row.open && <p className="overview-note">세부 변경 시각 없음</p>}
     </> },
-    detection: { title: '탐지 근거',
+    detection: { title: '탐지 근거', count: records.length,
       compact: scorePoints.length > 1 ? <OverviewScoreChart points={scorePoints} reduced={reduced} /> : undefined,
       content: <>
       <p className="semantic-tag-group">
         {lead && <ModelScoreTag score={lead.score} />}
         <PatternTag>{row.pattern}</PatternTag>
       </p>
-      <p>연결된 근거 거래 {records.length}건{focus && <> · <code>{focus.code}</code>에 {focus.transactions.size}건 집중</>}</p>
+      {focus && <p><code>{focus.code}</code>에 {focus.transactions.size}건 집중</p>}
       <ul className="overview-fact-list">{records.filter(record => Number.isFinite(record.score))
         .toSorted((a, b) => b.score - a.score).map(record => <li key={record.code}>
           <LinkTag code={record.code} /><ModelScoreTag score={record.score} />
@@ -295,7 +295,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
     </> },
     transactions: {
       title: '씨앗 거래',
-      details: <p className="overview-note">씨앗 역할 미기록 · 연결 근거 거래 전체 {records.length}건</p>,
+      details: <p className="overview-note">씨앗 역할 미기록 · 근거 거래 전체를 표시</p>,
       visualContent: <TransactionEvidenceTable title="근거 거래" transactions={records.toSorted((a, b) => (b.score ?? -1) - (a.score ?? -1))}
         showScore selectionControl={evidenceSelection} />,
     },
@@ -316,7 +316,8 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
         </li>)}</ul></>}
     </> },
     composition: {
-      title: `구성 · 근거 거래 ${records.length}건`,
+      title: '구성 · 근거 거래',
+      count: records.length,
       compact: <>{compositionChart}{overlapNote}</>,
       details: <>
         {overlapNote}
@@ -403,7 +404,8 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
     <div className="overview-panel-layout">
       <Panel className="overview-current" aria-labelledby="overview-current-title" data-export-visualization={panel.graphic || undefined}>
         <div className="section-download-heading">
-          <h2 id="overview-current-title">{panel.number}. {panel.title}</h2>
+          <h2 id="overview-current-title">{panel.number}. {panel.title}
+            {panel.count !== undefined && <CountTag count={panel.count} />}</h2>
           {panel.graphic && <ChartSectionDownload label={panel.title} />}
         </div>
         <div className="overview-panel-visual">
@@ -477,11 +479,11 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
         </dl>
       </div>
       <div className="overview-tiles" data-episode={episode || undefined}>
-        {panels.map(({ id, title, number, content, details, visualContent, span, overviewGraphic, compact }) => <Panel key={id}
+        {panels.map(({ id, title, count, number, content, details, visualContent, span, overviewGraphic, compact }) => <Panel key={id}
           data-overview-panel={id} data-overview-span={span}
           data-export-visualization={overviewGraphic || undefined}>
           <div className="section-download-heading">
-            <h2>{number}. {title}</h2>
+            <h2>{number}. {title}{count !== undefined && <CountTag count={count} />}</h2>
             {overviewGraphic && <ChartSectionDownload label={title} />}
           </div>
           {compact ?? content ?? <>{visualContent}{details}</>}

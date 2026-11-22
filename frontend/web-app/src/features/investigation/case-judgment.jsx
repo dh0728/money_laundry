@@ -5,14 +5,15 @@ import { Textarea } from '../../components/ui/textarea';
 import { ActionButton, ConfirmHoldButton, PrimaryButton } from '../../components/primary-button';
 import { canJudgePreviewCase, canStartPreviewReview, judgmentReasonLabels, judgmentTextLimit, validJudgmentDetails } from './case-judgment-data';
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal.js';
-import { VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { CountTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import './case-judgment.css';
 
 function JudgmentTargets({ row }) {
   const related = row.kind === 'Episode' ? row.overlappingAlerts ?? [] : [];
   const targets = related.length ? related : [row];
   return <div className="case-judgment-target-group">
-    {related.length > 0 && <p className="case-judgment-target-label"><code>{row.code}</code> · 거래가 겹치는 Alert</p>}
+    {related.length > 0 && <p className="case-judgment-target-label semantic-tag-group"><code>{row.code}</code> · 거래가 겹치는 Alert
+      <CountTag count={related.length} /></p>}
     <ul className="case-judgment-targets" aria-label={related.length ? '거래가 겹치는 Alert' : '판정 대상'}>
       {targets.map(target => <li key={target.code}>
         <code>{target.code}</code>{target.pattern && <span> · {target.pattern}</span>}

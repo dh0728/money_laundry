@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { ActionButton, ConfirmHoldButton } from '../../components/primary-button';
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal';
+import { CountTag } from '../../components/semantic-tags';
 import { membershipReasonLimit } from './case-membership-data';
 import './case-judgment.css';
 import './case-transaction-edit.css';
@@ -82,7 +83,8 @@ export function CaseTransactionEdit({ row, selected = [], destinations = [], can
         </header>
         <div className="case-judgment-body">
           <div className="case-judgment-target-group">
-            <p><code>{row.code}</code> · 선택 거래 {countLabel}</p>
+            <p className="case-judgment-target-label semantic-tag-group"><code>{row.code}</code> · 선택 거래
+              <CountTag count={codes.length} /></p>
             <ul className="case-judgment-targets case-transaction-edit-targets" aria-label="선택 거래 ID">
               {codes.map(code => <li key={code}><code>{code}</code></li>)}
             </ul>

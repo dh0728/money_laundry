@@ -513,6 +513,7 @@ let unmountCaseEvidence;
 let activeEvidence;
 let benchmarkLedgerView;
 let dashboardSource;
+let caseListPage = { key: '', page: 0 };
 let navigationFrame;
 let headerPath;
 let headerCode;
@@ -756,6 +757,13 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   } : isCaseList ? { rows: dashboardSource.cases.filter(row => row.code.startsWith(groupPrefix)) } : undefined;
   activePath = path;
   const codes = queryControls.setScreen(path, tabCodes(group), queryData, params);
+  // 같은 목록·같은 조건으로 돌아오면 보던 페이지를 유지하고, 조건이 바뀌면 첫 페이지부터 보여 준다.
+  const caseListKey = isCaseList ? `${path}?${queryControls.params(path)}` : '';
+  const caseListPaging = isCaseList ? {
+    initialPage: caseListPage.key === caseListKey ? caseListPage.page : 0,
+    onPageChange: page => { caseListPage = { key: caseListKey, page }; },
+    paginationHost: byId('footer-pagination'),
+  } : {};
   unmountWorkspace();
   const selectedCase = isCaseDetail ? dashboardSource.cases.find(row => row.code === code) : undefined;
   const relatedTransactions = selectedCase?.related;
@@ -858,7 +866,8 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     dashboardSource ??= dashboardFixtures(groups);
     const caseRows = new Map(dashboardSource.cases.map(row => [row.code, row]));
     unmountInvestigation = mountPreviewCaseTable(caseTable, caseTable.dataset.caseListTable,
-      codes.map(recordCode => caseRows.get(recordCode)).filter(Boolean), groupPrefix === 'E', queryData.rows.length);
+      codes.map(recordCode => caseRows.get(recordCode)).filter(Boolean), groupPrefix === 'E', queryData.rows.length,
+      { ...caseListPaging, pageSize: 20 });
   });
   if (component) void import('../features/investigation/investigation-components.jsx').then(({ mountInvestigation }) => {
     if (component.isConnected) {
@@ -868,6 +877,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         groups,
         label: component.dataset.label,
         tableView: path === ledgerTableScreen,
+        ...caseListPaging,
       }));
     }
   });

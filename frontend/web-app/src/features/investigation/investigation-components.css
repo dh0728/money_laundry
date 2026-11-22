@@ -262,3 +262,59 @@
   }
   [data-ledger-view="cards"] #ledger-related-title { padding-inline-end: var(--header-control-size) }
 }
+
+/* 원장 목록 검색·더 보기: 세 목록이 각자 20건씩 조회한다. 검색은 상단 작업 코드 검색과 같은 pill(.search-field). */
+.ledger-search.search-field {
+  --search-field-inset: var(--aml-space-4);
+  --search-field-size: var(--aml-density-control-compact);
+  --search-field-radius: var(--aml-radius-full);
+  margin-block-start: var(--aml-space-8);
+  padding-inline: var(--aml-space-12);
+  font-size: var(--ui-font-size);
+  color: var(--text);
+}
+.ledger-search .icon { inline-size: 1rem; block-size: 1rem; flex: none; color: var(--muted-text) }
+.ledger-search input::placeholder { color: var(--muted-text) }
+.ledger-search[data-disabled] { opacity: .55 }
+.ledger-more {
+  display: grid;
+  gap: var(--aml-space-8);
+  margin-block-start: var(--aml-space-12);
+}
+/* 대시보드 업무 레인의 더 보기와 같은 크기: 패널 폭을 채우는 pill. */
+.ledger-more > .button { inline-size: 100%; min-block-size: var(--aml-panel-control-size) }
+@media (pointer: coarse) {
+  .ledger-more > .button { min-block-size: max(44px, var(--aml-panel-control-size)) }
+}
+.ledger-status {
+  margin-block: var(--aml-space-8) 0;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+}
+.ledger-pane[aria-busy="true"] .animated-list { opacity: .5 }
+.ledger-linked-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aml-space-6);
+  margin: var(--workspace-gap) 0;
+  padding: 0;
+  list-style: none;
+}
+.ledger-linked-ids code {
+  padding: var(--aml-space-2) var(--aml-space-8);
+  border-radius: var(--aml-radius-full);
+  background: var(--information-panel-surface);
+}
+.ledger-table-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--aml-space-8) var(--workspace-gap);
+  margin-block-end: var(--workspace-gap);
+}
+.ledger-table-controls .ledger-search { margin-block-start: 0 }
+.ledger-hierarchy-scroll tr[data-ledger-more] > td { padding-block: var(--aml-space-4) }
+.ledger-hierarchy-scroll tr[data-ledger-more] .ledger-more { margin: 0 }
+/* 하단 공통 도구(계정·페이지)와 목록 끝 더 보기가 겹치지 않게 비워 둔다. */
+@media (min-width: 1121px) and (min-height: 481px) {
+  .ledger-components { padding-block-end: var(--aml-space-48) }
+}

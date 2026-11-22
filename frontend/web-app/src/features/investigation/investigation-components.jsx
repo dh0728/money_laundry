@@ -1,17 +1,19 @@
-import React, { useId, useLayoutEffect, useRef, useSyncExternalStore, useState } from 'react';
+import React, { useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CardHeader } from '../../components/card-header';
 import { activateRecordCard, RecordCard, recordCardSurface } from '../../components/record-card';
-import { ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
-import { ACCOUNTS_PER_OWNER, OWNER_COUNT, accountCode, findLedgerSelection, ownerName, sampleTransactions } from '../../mocks/transaction-fixtures';
+import { CountTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user.js';
+import { createSampleLedgerSource, createServerLedgerSource, useDebouncedValue, useLedgerList } from './ledger-source';
 import { CaseProgressBoard, PreviewCaseCard } from './preview-case-card';
 import { dashboardFixtures } from '../../mocks/dashboard-fixtures';
 import { ActionButton, WorkTabAddButton } from '../../components/primary-button';
 import AnimatedList from '../../components/react-bits/AnimatedList';
 import { TableFieldLabel, WorkflowTable } from '../../components/workflow-table';
 import { downloadCsv, TableQueryTools } from '../../components/query-controls';
+import { FooterPagination } from '../../components/footer-pagination';
 import './investigation-components.css';
 
 export { sampleTransactions } from '../../mocks/transaction-fixtures';
@@ -34,7 +36,7 @@ function visibleRowCenter(row, viewport) {
   return center >= viewport.top && center <= viewport.bottom ? center : null;
 }
 
-function LedgerConnections({ owner, account, transaction }) {
+function LedgerConnections({ owner, account, transaction, version }) {
   const overlayRef = useRef(null);
   const [paths, setPaths] = useState([]);
   useLayoutEffect(() => {
@@ -109,7 +111,7 @@ function LedgerConnections({ owner, account, transaction }) {
       ledger.removeEventListener('scroll', schedule, true);
       transitionEvents.forEach(event => ledger.removeEventListener(event, trackMovement));
     };
-  }, [owner, account, transaction]);
+  }, [owner, account, transaction, version]);
   return <svg ref={overlayRef} className="ledger-connections" aria-hidden="true" focusable="false">
     {paths.map(({ name, targetIndex, active, d }) => <path key={`${name}-${targetIndex}`} data-source={name}
       data-target-index={targetIndex} data-active={active || undefined} d={d} />)}
@@ -139,9 +141,9 @@ function List({ label, items, selected, onSelect, reduced, renderItem, renderIte
   </div>;
 }
 
-function LedgerHeading({ as: Heading = 'h2', id, title, count, suffix }) {
+function LedgerHeading({ as: Heading = 'h2', id, title, count, total, suffix }) {
   return <div className="ledger-panel-heading">
-    <Heading id={id}>{title}</Heading><StatusTag preset="neutral">{count}{suffix}</StatusTag>
+    <Heading id={id}>{title}</Heading><CountTag count={count} total={total} unit={suffix} />
   </div>;
 }
 
@@ -154,7 +156,8 @@ function TransactionParty({ party, label, direction, verdict }) {
 }
 
 export function TransactionHeader({ record }) {
-  return <CardHeader code={record.code} />;
+  return record.openable === false ? <CardHeader code={record.code} openRecord={false} showAdd={false} />
+    : <CardHeader code={record.code} />;
 }
 
 export function TransactionFlow({ record }) {
@@ -192,7 +195,7 @@ export function TransactionRow({ record }) {
   return <div className="ledger-transaction">
     <div className="semantic-tag-group">
       <VerdictTag verdict={record.verdict} />
-      <ReviewStatusTag status={record.status} />
+      {record.status && <ReviewStatusTag status={record.status} />}
       <StatusTag preset="neutral">{record.incoming ? '수취' : '송금'}</StatusTag>
     </div>
     <TransactionFlow record={record} />
@@ -215,9 +218,21 @@ function CaseList({ entries, transaction }) {
   </div>;
 }
 
+const serverCaseCode = (kind, id) => `${kind === 'Alert' ? 'A' : 'E'}-${id}`;
+const serverCaseIds = (transaction, kind) => (kind === 'Alert' ? transaction.alertIds : transaction.episodeIds) ?? [];
+
 function LinkedCaseGroups({ transaction, caseRows }) {
   return <div className="ledger-case-groups">
     {['Alert', 'Episode'].map(label => {
+      if (!caseRows) {
+        const ids = serverCaseIds(transaction, label);
+        return <section key={label} aria-label={`연결 ${label} ${ids.length}건`}>
+          <LedgerHeading as="h3" title={label} count={ids.length} suffix="건" />
+          {ids.length ? <ul className="ledger-linked-ids">
+            {ids.map(id => <li key={id}><code>{serverCaseCode(label, id)}</code></li>)}
+          </ul> : <p className="ledger-empty">연결된 {label} 없음</p>}
+        </section>;
+      }
       const entries = linkedCaseEntries(caseRows, transaction, label);
       return <section key={label} aria-label={`연결 ${label} ${entries.length}건`}>
         <LedgerHeading as="h3" title={label} count={entries.length} suffix="건" />
@@ -238,6 +253,7 @@ const linkedCaseColumns = [
 ];
 const transactionDirection = record => record.incoming ? '수취' : '송금';
 const counterpartyCode = record => (record.incoming ? record.from : record.to).code;
+const integerFormat = new Intl.NumberFormat('ko-KR');
 
 function LedgerColumns({ columns }) {
   return <TableHeader><TableRow>
@@ -247,9 +263,9 @@ function LedgerColumns({ columns }) {
   </TableRow></TableHeader>;
 }
 
-function LedgerRecordId({ code, ...buttonProps }) {
+function LedgerRecordId({ code, addable = true, ...buttonProps }) {
   return <th scope="row"><div className="ledger-table-record-id">
-    <WorkTabAddButton inline code={code} />
+    {addable && <WorkTabAddButton inline code={code} />}
     <ActionButton className="ledger-table-select" {...buttonProps}><code>{code}</code></ActionButton>
   </div></th>;
 }
@@ -260,37 +276,58 @@ function LedgerBranchToggle({ label, expanded, onClick, children }) {
   </ActionButton>;
 }
 
-function toggleBranch(set, key) {
-  set(previous => {
-    const next = new Set(previous);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    return next;
-  });
+/** 상단 작업 코드 검색과 같은 pill 검색 필드(.search-field)를 쓴다. */
+function LedgerSearch({ label, value, onChange, placeholder, disabled }) {
+  return <label className="search-field ledger-search" data-disabled={disabled || undefined}>
+    <Search className="icon" aria-hidden="true" />
+    <input type="search" aria-label={label} placeholder={placeholder} value={value} disabled={disabled}
+      spellCheck={false} autoComplete="off" onChange={event => onChange(event.target.value)} />
+  </label>;
 }
 
-function LedgerHierarchy({ codes, owners, owner, account, records, selected, onSelect }) {
+function LedgerListStatus({ list, empty }) {
+  if (list.status === 'loading') return <p className="ledger-status" role="status">불러오는 중…</p>;
+  if (list.status === 'error' && !list.items.length) return <p className="ledger-status" role="alert">{list.message}{' '}
+    <ActionButton className="ledger-retry" onClick={list.retry}>다시 시도</ActionButton></p>;
+  if (list.status === 'success' && !list.items.length) return <p className="ledger-status" role="status">{empty}</p>;
+  return null;
+}
+
+/** 목록 끝의 더 보기: 다음 20건(page+1)을 이어 붙인다. 대시보드 업무 레인처럼 패널 폭을 채우는 pill 버튼. */
+function LedgerMore({ label, list }) {
+  if (list.status === 'error' && list.items.length) return <div className="ledger-more" role="alert">
+    <span>{list.message}</span>
+    <ActionButton shape="pill" onClick={list.retry}>다시 시도</ActionButton>
+  </div>;
+  if (!list.items.length || !list.hasMore) return null;
+  return <div className="ledger-more">
+    <ActionButton shape="pill" aria-label={`${label} 20건 더 보기`}
+      disabled={list.status === 'loading-more'} onClick={list.loadMore}>
+      {list.status === 'loading-more' ? '불러오는 중…' : '더 보기'}</ActionButton>
+  </div>;
+}
+
+function LedgerMoreRow({ label, list, depth }) {
+  if (!list.hasMore && list.status !== 'error') return null;
+  return <TableRow data-ledger-depth={depth} data-ledger-more="">
+    <TableCell colSpan={ledgerColumns.length}><LedgerMore label={label} list={list} /></TableCell>
+  </TableRow>;
+}
+
+function LedgerHierarchy({ owners, accounts, transactions, selection, select, queries }) {
   const frame = useRef(null);
-  const [openOwners, setOpenOwners] = useState(() => new Set(owner >= 0 ? [owner] : []));
-  const [openAccounts, setOpenAccounts] = useState(() => new Set(
-    owner >= 0 && account >= 0 ? [accountCode(owner, account)] : []));
-  const selectedRecord = records[selected];
-  const selectedCode = selectedRecord?.code;
-  const branches = owners.map((name, ownerIndex) => ({
-    name,
-    ownerIndex,
-    accounts: openOwners.has(ownerIndex) ? Array.from({ length: ACCOUNTS_PER_OWNER }, (_, accountIndex) => {
-      const code = accountCode(ownerIndex, accountIndex);
-      return { accountIndex, code, transactions: openAccounts.has(code) ? sampleTransactions(codes, ownerIndex, accountIndex) : [] };
-    }) : [],
-  }));
-  const visibleAccounts = branches.flatMap(branch => branch.accounts);
-  const visibleTransactions = visibleAccounts.reduce((count, entry) => count + entry.transactions.length, 0);
-  const summary = `소유주 ${amountFormat.format(owners.length)}명 · 표시 계좌 ${amountFormat.format(visibleAccounts.length)}개 · 거래 ${amountFormat.format(visibleTransactions)}건`;
+  const { owner, account, transaction } = selection;
+  const records = transactions.items;
+  const ownerOpen = row => owner?.id === row.id;
+  const summary = <>
+    <CountTag label="소유주" count={owners.items.length} total={owners.total} unit="명" />
+    {owner && <CountTag label="계좌" count={accounts.items.length} total={accounts.total} unit="개" />}
+    {account && <CountTag label="거래" count={records.length} total={transactions.total} />}
+  </>;
   const actions = { entries: [{
-    label: '선택 계좌 거래', format: 'CSV', count: records.length,
+    label: '선택 계좌 거래(불러온 목록)', format: 'CSV', count: account ? records.length : 0,
     download: () => downloadCsv('account-transactions', ledgerColumns.map(([, label]) => label), records.map(record => [
-      owners[owner], accountCode(owner, account), record.code, record.timestamp, transactionDirection(record), counterpartyCode(record),
+      owner?.name ?? '', account?.label ?? '', record.code, record.timestamp, transactionDirection(record), counterpartyCode(record),
       `${record.amount} ${record.currency}`, record.method, verdictLabels[record.verdict],
     ])),
   }] };
@@ -304,61 +341,86 @@ function LedgerHierarchy({ codes, owners, owner, account, records, selected, onS
     const visibleTop = bounds.top + viewport.querySelector('thead').getBoundingClientRect().height;
     if (rowBounds.bottom > bounds.bottom) viewport.scrollTop += rowBounds.bottom - bounds.bottom;
     else if (rowBounds.top < visibleTop) viewport.scrollTop += rowBounds.top - visibleTop;
-  }, [selectedCode]);
+  }, [transaction?.id]);
 
   return <div ref={frame} className="ledger-hierarchy">
+    <div className="ledger-table-controls" role="group" aria-label="원장 목록 검색">
+      {[['소유주', queries.owner, true], ['계좌', queries.account, Boolean(owner)], ['거래', queries.transaction, Boolean(account)]]
+        .map(([label, query, enabled]) => <LedgerSearch key={label} label={`${label} 검색`}
+          placeholder={enabled ? `${label} 검색` : `${label} 검색 · 상위 항목을 먼저 선택`} value={query.value} onChange={query.set}
+          disabled={!enabled} />)}
+    </div>
     <WorkflowTable className="ledger-hierarchy-scroll" tableClassName="ledger-hierarchy-table" label="통합 테이블" summary={summary}
-      tools={records.length > 0 && <TableQueryTools actions={actions} />}>
+      tools={account && records.length > 0 && <TableQueryTools actions={actions} />}>
       <colgroup>{ledgerColumns.map(([key, , width]) => <col key={key} style={{ width: `${width}%` }} />)}</colgroup>
       <LedgerColumns columns={ledgerColumns} />
-      {branches.map(({ name, ownerIndex, accounts }) => <TableBody key={name}>
+      {owners.items.map(row => <TableBody key={row.id}>
         <TableRow data-ledger-depth="owner">
-          <th scope="rowgroup"><LedgerBranchToggle label={`${name}의 계좌`} expanded={openOwners.has(ownerIndex)}
-            onClick={() => toggleBranch(setOpenOwners, ownerIndex)}>{name}</LedgerBranchToggle></th>
+          <th scope="rowgroup"><LedgerBranchToggle label={`${row.name}의 계좌`} expanded={ownerOpen(row)}
+            onClick={() => select.owner(ownerOpen(row) ? null : row)}>{row.name}</LedgerBranchToggle></th>
           <TableCell colSpan={ledgerColumns.length - 1} />
         </TableRow>
-        {accounts.map(({ code: accountId, accountIndex, transactions }) => <React.Fragment key={accountId}>
-          <TableRow data-ledger-depth="account">
-            <TableCell aria-hidden="true" />
-            <th scope="row"><LedgerBranchToggle label={`${accountId}의 거래`} expanded={openAccounts.has(accountId)}
-              onClick={() => toggleBranch(setOpenAccounts, accountId)}><code>{accountId}</code></LedgerBranchToggle></th>
-            <TableCell colSpan={ledgerColumns.length - 2} />
-          </TableRow>
-          {transactions.map((record, index) => {
-            const active = selectedCode === record.code;
-            return <TableRow key={record.code} data-ledger-depth="transaction" data-selected={active || undefined}>
-              <TableCell aria-hidden="true" /><TableCell aria-hidden="true" />
-              <LedgerRecordId code={record.code} aria-pressed={active} aria-description={`${name} · ${accountId}`}
-                onClick={() => onSelect(ownerIndex, accountIndex, index)} />
-              <TableCell><time dateTime={`${record.timestamp.replace(' ', 'T')}+09:00`}>{record.timestamp}</time></TableCell>
-              <TableCell>{transactionDirection(record)}</TableCell>
-              <TableCell><code>{counterpartyCode(record)}</code></TableCell>
-              <TableCell className="ledger-table-amount">{amountFormat.format(record.amount)} {record.currency}</TableCell>
-              <TableCell>{record.method}</TableCell>
-              <TableCell><VerdictTag verdict={record.verdict} /></TableCell>
-            </TableRow>;
+        {ownerOpen(row) && <>
+          {accounts.items.map(item => {
+            const open = account?.id === item.id;
+            return <React.Fragment key={item.id}>
+              <TableRow data-ledger-depth="account">
+                <TableCell aria-hidden="true" />
+                <th scope="row"><LedgerBranchToggle label={`${item.label}의 거래`} expanded={open}
+                  onClick={() => select.account(open ? null : item)}><code title={item.id}>{item.label}</code></LedgerBranchToggle></th>
+                <TableCell colSpan={ledgerColumns.length - 2} />
+              </TableRow>
+              {open && records.map(record => {
+                const active = transaction?.id === record.id;
+                return <TableRow key={record.id} data-ledger-depth="transaction" data-selected={active || undefined}>
+                  <TableCell aria-hidden="true" /><TableCell aria-hidden="true" />
+                  <LedgerRecordId code={record.code} addable={record.openable} aria-pressed={active}
+                    aria-description={`${row.name} · ${item.label}`} onClick={() => select.transaction(record)} />
+                  <TableCell><time dateTime={`${record.timestamp.replace(' ', 'T')}+09:00`}>{record.timestamp}</time></TableCell>
+                  <TableCell>{transactionDirection(record)}</TableCell>
+                  <TableCell><code>{counterpartyCode(record)}</code></TableCell>
+                  <TableCell className="ledger-table-amount">{amountFormat.format(record.amount)} {record.currency}</TableCell>
+                  <TableCell>{record.method}</TableCell>
+                  <TableCell><VerdictTag verdict={record.verdict} /></TableCell>
+                </TableRow>;
+              })}
+              {open && <LedgerMoreRow label={`${item.label} 거래`} list={transactions} depth="transaction" />}
+            </React.Fragment>;
           })}
-        </React.Fragment>)}
+          <LedgerMoreRow label={`${row.name} 계좌`} list={accounts} depth="account" />
+        </>}
       </TableBody>)}
+      <TableBody>
+        {owners.status === 'success' && !owners.items.length && <TableRow>
+          <TableCell colSpan={ledgerColumns.length}>조건과 일치하는 소유주가 없습니다.</TableCell>
+        </TableRow>}
+        <LedgerMoreRow label="소유주" list={owners} depth="owner" />
+      </TableBody>
     </WorkflowTable>
+    <LedgerListStatus list={owners} empty="" />
   </div>;
 }
 
 function LinkedCaseTable({ transaction, caseRows }) {
-  const entries = transaction ? linkedCaseEntries(caseRows, transaction) : [];
+  const entries = !transaction ? [] : caseRows ? linkedCaseEntries(caseRows, transaction)
+    : ['Alert', 'Episode'].flatMap(kind => serverCaseIds(transaction, kind).map(id => ({ code: serverCaseCode(kind, id), kind, server: true })));
   const alertCount = entries.filter(row => row.kind === 'Alert').length;
   const actions = { entries: [{
     label: '연결 업무', format: 'CSV', count: entries.length,
-    download: () => downloadCsv('linked-cases', linkedCaseColumns.map(([, label]) => label), entries.map(row => [
-      row.code, row.kind, row.pattern, row.score, row.status, verdictLabels[row.verdict], row.related.length,
-    ])),
+    download: () => downloadCsv('linked-cases', linkedCaseColumns.map(([, label]) => label), entries.map(row => row.server
+      ? [row.code, row.kind, '', '', '', '', '']
+      : [row.code, row.kind, row.pattern, row.score, row.status, verdictLabels[row.verdict], row.related.length])),
   }] };
   return <WorkflowTable label="선택 거래와 연결된 Alert·Episode"
-    summary={transaction && `${transaction.code} · Alert ${amountFormat.format(alertCount)}건 · Episode ${amountFormat.format(entries.length - alertCount)}건`}
+    summary={transaction && <><CountTag label="Alert" count={alertCount} /><CountTag label="Episode" count={entries.length - alertCount} /></>}
     tools={entries.length > 0 && <TableQueryTools actions={actions} />}>
     <LedgerColumns columns={linkedCaseColumns} />
     <TableBody>
-      {entries.map(row => <TableRow key={row.code}>
+      {entries.map(row => row.server ? <TableRow key={row.code}>
+        <th scope="row"><code>{row.code}</code></th>
+        <TableCell>{row.kind}</TableCell>
+        <TableCell colSpan={linkedCaseColumns.length - 2}>서버 원장 연결 ID</TableCell>
+      </TableRow> : <TableRow key={row.code}>
         <LedgerRecordId code={row.code} aria-label={`${row.code} 상세 열기`} data-work-code={row.code} />
         <TableCell>{row.kind}</TableCell>
         <TableCell><PatternTag emphasis="solid">{row.pattern}</PatternTag></TableCell>
@@ -374,66 +436,133 @@ function LinkedCaseTable({ transaction, caseRows }) {
   </WorkflowTable>;
 }
 
-export function Ledger({ codes, code, caseRows, tableView = false }) {
-  const [initial] = useState(() => code ? findLedgerSelection(codes, code) : { owner: 0, account: 0, index: 0 });
-  const [owner, setOwner] = useState(initial?.owner ?? -1);
-  const [account, setAccount] = useState(initial?.account ?? -1);
-  const [selected, setSelected] = useState(initial?.index ?? -1);
-  const reduced = useSyncExternalStore(subscribeAppearance, readReducedMotion);
-  const owners = Array.from({ length: OWNER_COUNT }, (_, index) => ownerName(index));
-  const accounts = owner < 0 ? [] : Array.from({ length: ACCOUNTS_PER_OWNER }, (_, index) => accountCode(owner, index));
-  const activeAccount = accounts[account];
-  const records = activeAccount ? sampleTransactions(codes, owner, account) : [];
-  const transaction = records[selected];
+const readServerMode = () => currentPreviewUser()?.source === 'api';
 
-  if (tableView) return <div className="ledger-tables" data-ledger-view="table">
-    <LedgerHierarchy codes={codes} owners={owners} owner={owner} account={account} records={records} selected={selected}
-      onSelect={(ownerIndex, accountIndex, index) => { setOwner(ownerIndex); setAccount(accountIndex); setSelected(index); }} />
+/** 로그인 세션이 API 사용자면 서버 원장을, 아니면 Sample 원장을 같은 화면 계약으로 보여 준다. */
+export function Ledger({ codes, code, caseRows, tableView = false, serverSource }) {
+  const server = useSyncExternalStore(subscribePreviewUser, readServerMode);
+  const source = useMemo(() => server ? serverSource ?? createServerLedgerSource() : createSampleLedgerSource(codes),
+    [server, serverSource, codes]);
+  return <LedgerWorkspace key={source.kind} source={source} code={server ? '' : code}
+    caseRows={server ? undefined : caseRows} tableView={tableView} />;
+}
+
+export function LedgerWorkspace({ source, code, caseRows, tableView = false }) {
+  const [initial] = useState(() => code ? source.locate(code) ?? { missing: true } : undefined);
+  const [owner, setOwner] = useState(initial?.owner ?? null);
+  const [account, setAccount] = useState(initial?.account ?? null);
+  const [transaction, setTransaction] = useState(initial?.transaction ?? null);
+  const [ownerQuery, setOwnerQuery] = useState('');
+  const [accountQuery, setAccountQuery] = useState('');
+  const [transactionQuery, setTransactionQuery] = useState('');
+  const ownerSearch = useDebouncedValue(ownerQuery);
+  const accountSearch = useDebouncedValue(accountQuery);
+  const transactionSearch = useDebouncedValue(transactionQuery);
+  const ownerKey = JSON.stringify([ownerSearch]);
+  const accountKey = JSON.stringify([owner?.id ?? null, accountSearch]);
+  const transactionKey = JSON.stringify([owner?.id ?? null, account?.id ?? null, transactionSearch]);
+  const reduced = useSyncExternalStore(subscribeAppearance, readReducedMotion);
+
+  // 검색·상위 선택이 바뀌면 key가 바뀌어 각 목록이 page=0부터 다시 조회한다.
+  const owners = useLedgerList((page, active) => source.owners({ query: ownerSearch, page }, active), ownerKey);
+  const accounts = useLedgerList((page, active) => source.accounts({ query: accountSearch, page, owner: owner?.id }, active), accountKey);
+  const transactions = useLedgerList((page, active) => source.transactions({
+    query: transactionSearch, page, owner: owner?.id, account: account?.id,
+  }, active), transactionKey);
+
+  const select = {
+    owner: row => {
+      if ((row?.id ?? null) === (owner?.id ?? null)) return;
+      setOwner(row); setAccount(null); setTransaction(null);
+    },
+    account: row => {
+      if ((row?.id ?? null) === (account?.id ?? null)) return;
+      setAccount(row); setTransaction(null);
+    },
+    transaction: row => setTransaction(row),
+  };
+  const queries = {
+    owner: { value: ownerQuery, set: setOwnerQuery },
+    account: { value: accountQuery, set: setAccountQuery },
+    transaction: { value: transactionQuery, set: setTransactionQuery },
+  };
+  const selection = { owner, account, transaction };
+
+  if (tableView) return <div className="ledger-tables" data-ledger-view="table" data-ledger-source={source.kind}>
+    <LedgerHierarchy owners={owners} accounts={accounts} transactions={transactions} selection={selection}
+      select={select} queries={queries} />
     <LinkedCaseTable transaction={transaction} caseRows={caseRows} />
   </div>;
 
-  return <div className="ledger-components" data-ledger-view="cards">
-    <section className="ledger-pane ledger-owners" aria-labelledby="ledger-owner-title">
-      <LedgerHeading id="ledger-owner-title" title="소유주" count={owners.length} suffix="명" />
-      <List label="소유주 목록" items={owners} selected={owner} reduced={reduced} onSelect={(_, index) => {
-        if (index === owner) return;
-        setOwner(index); setAccount(0); setSelected(0);
-      }} />
-    </section>
-    <section className="ledger-pane ledger-accounts" aria-labelledby="ledger-account-title">
-      <LedgerHeading id="ledger-account-title" title="계좌" count={accounts.length} suffix="개" />
-      <List key={owner} label={owners[owner] ? `${owners[owner]} 계좌 목록` : '계좌 목록'} items={accounts}
-        selected={account} reduced={reduced} onSelect={(_, index) => {
-          if (index === account) return;
-          setAccount(index); setSelected(0);
-        }} />
-    </section>
-    <section className="ledger-pane ledger-transactions" aria-labelledby="ledger-transaction-title">
-      <LedgerHeading id="ledger-transaction-title" title="거래" count={records.length} suffix="건" />
-      <List key={activeAccount} label={activeAccount ? `${activeAccount} 거래 목록` : '거래 목록'}
-        items={records.map(record => ({ id: record.code, title: record.code }))}
-        className="ledger-transaction-list" selected={selected} reduced={reduced} onSelect={(_, index) => setSelected(index)}
+  const ownerRows = owners.items;
+  const accountRows = accounts.items;
+  const records = transactions.items;
+  const ownerIndex = ownerRows.findIndex(row => row.id === owner?.id);
+  const accountIndex = accountRows.findIndex(row => row.id === account?.id);
+  const transactionIndex = records.findIndex(row => row.id === transaction?.id);
+  // 더 보기로 이어 붙일 때는 목록을 다시 만들지 않고, 새 조건의 첫 응답에서만 다시 만든다.
+  const listKey = (list, key) => `${key}:${list.status === 'loading' ? 'loading' : 'ready'}`;
+  const pane = (name, title, suffix, list, query, emptyText, content) =>
+    <section className={`ledger-pane ledger-${name}`} aria-labelledby={`ledger-${name}-title`} aria-busy={list.status === 'loading' || undefined}>
+      <LedgerHeading id={`ledger-${name}-title`} title={title} count={list.items.length} total={list.total} suffix={suffix} />
+      <LedgerSearch label={`${title} 검색`} placeholder={`${title} 검색`} value={query.value} onChange={query.set} />
+      <LedgerListStatus list={list} empty={emptyText} />
+      {content}
+      <LedgerMore label={title} list={list} />
+    </section>;
+
+  return <div className="ledger-components" data-ledger-view="cards" data-ledger-source={source.kind}>
+    {pane('owners', '소유주', '명', owners, queries.owner, '조건과 일치하는 소유주가 없습니다.',
+      <List key={listKey(owners, ownerKey)} label="소유주 목록" items={ownerRows.map(row => ({ id: row.id, title: row.name }))}
+        selected={ownerIndex} reduced={reduced} onSelect={(_, index) => select.owner(ownerRows[index])} />)}
+    {pane('accounts', '계좌', '개', accounts, queries.account, '조건과 일치하는 계좌가 없습니다.',
+      <List key={listKey(accounts, accountKey)} label={owner ? `${owner.name} 계좌 목록` : '계좌 목록'}
+        items={accountRows.map(row => ({ id: row.id, title: row.label }))}
+        selected={accountIndex} reduced={reduced} onSelect={(_, index) => select.account(accountRows[index])} />)}
+    {pane('transactions', '거래', '건', transactions, queries.transaction, '조건과 일치하는 거래가 없습니다.',
+      <List key={listKey(transactions, transactionKey)} label={account ? `${account.label} 거래 목록` : '거래 목록'}
+        items={records.map(record => ({ id: record.id, title: record.code }))}
+        className="ledger-transaction-list" selected={transactionIndex} reduced={reduced}
+        onSelect={(_, index) => select.transaction(records[index])}
         itemData={(_, index) => recordCardSurface(records[index].verdict, true)}
         onItemSurfaceClick={activateRecordCard}
         renderItem={(_, index) => <TransactionRow record={records[index]} />}
-        renderItemHeader={(_, index) => <TransactionHeader record={records[index]} />} />
-    </section>
+        renderItemHeader={(_, index) => <TransactionHeader record={records[index]} />} />)}
     <section className="ledger-pane ledger-related" aria-labelledby="ledger-related-title">
       <h2 id="ledger-related-title">선택 거래와 연결된 Alert·Episode</h2>
       {transaction ? <>
         <p className="ledger-source" aria-live="polite"><code>{transaction.code}</code></p>
         <LinkedCaseGroups transaction={transaction} caseRows={caseRows} />
-      </> : <p className="ledger-empty" role="status">요청한 거래를 찾을 수 없습니다. 소유주를 선택해 계속 조사할 수 있습니다.</p>}
+      </> : <p className="ledger-empty" role="status">{initial?.missing
+        ? '요청한 거래를 찾을 수 없습니다. 소유주를 선택해 계속 조사할 수 있습니다.'
+        : '거래를 선택해 연결된 Alert·Episode를 확인하세요.'}</p>}
     </section>
-    <LedgerConnections owner={owner} account={account} transaction={selected} />
+    <LedgerConnections owner={ownerIndex} account={accountIndex} transaction={transactionIndex}
+      version={`${ownerKey}|${ownerRows.length}|${owners.status}|${accountKey}|${accountRows.length}|${accounts.status}|${transactionKey}|${records.length}|${transactions.status}`} />
   </div>;
 }
 
-export function CaseCards({ codes, label, caseRows }) {
+export const CASE_LIST_PAGE_SIZE = 20;
+
+/** 필터·정렬이 끝난 전체 목록(codes)을 20건씩 나눠 보여 준다. */
+export function CaseCards({ codes, label, caseRows, initialPage = 0, onPageChange, paginationHost }) {
   const reduced = useSyncExternalStore(subscribeAppearance, readReducedMotion);
   const rows = codes.map(code => caseRows.get(code)).filter(Boolean);
+  const pageCount = Math.max(1, Math.ceil(rows.length / CASE_LIST_PAGE_SIZE));
+  const [requested, setRequested] = useState(initialPage);
+  const page = Math.min(Math.max(0, requested), pageCount - 1);
+  const visible = rows.slice(page * CASE_LIST_PAGE_SIZE, (page + 1) * CASE_LIST_PAGE_SIZE);
+  const changePage = next => {
+    setRequested(next);
+    onPageChange?.(next);
+    window.scrollTo?.(0, 0);
+  };
   return <section className="screen-section case-list-panel" aria-label={label}>
-    <CaseProgressBoard rows={rows} reduced={reduced} />
+    <CaseProgressBoard key={page} rows={visible} reduced={reduced} />
+    <FooterPagination host={paginationHost} label={`${label} 페이지`} page={page} pageCount={pageCount}
+      onPageChange={changePage} alwaysShow>
+      <span className="footer-pagination__status">전체 {integerFormat.format(rows.length)}건</span>
+    </FooterPagination>
   </section>;
 }
 
