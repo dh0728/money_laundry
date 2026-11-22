@@ -11,9 +11,39 @@ from types import SimpleNamespace
 from urllib.request import build_opener
 from urllib.error import HTTPError, URLError
 
-import httpx
-
 from api_client import ApiClient, ApiError
+
+STAGE_NAMES = {
+    'WAIT_INGEST': '적재 완료 대기', 'INTEGRATE': '거래 통합', 'FREEZE_INPUT': '분석 입력 고정',
+    'FEATURES': '모델 입력 준비', 'INFERENCE': '모델 추론', 'SCORES': '점수 저장',
+    'ALERTS': 'Alert 구성', 'COMPLETE': 'Alert 공개',
+}
+MODEL_NAMES = {'BINARY': '이진', 'TYPE': '유형'}
+# Reset preview and reset both count every reset table on the server (dev, 16 days: about 19 s on
+# 2026-11-12), longer than the default 15 s / 30 s. Above Cloudflare's 100 s cut, which then answers 524.
+RESET_TIMEOUT = 120
+REMOTE_NAMES = {
+    'ACCEPTED': '접수됨', 'QUEUED': '차례 대기', 'RUNNING': '계산 중', 'RETRY_WAIT': '서버 재시도 대기',
+    'COMPLETED': '계산 완료', 'FAILED': '서버 실패', 'STOPPED': '중단됨', 'RECOVERY_REQUIRED': '서버 복구 필요',
+}
+
+
+def describe(detail):
+    """One status line for an analysis job; waiting on the inference server is not a retry."""
+    status, stage = detail.get('status'), detail.get('currentStage')
+    failures = detail.get('consecutiveFailures') or 0
+    if status in ('QUEUED', 'RUNNING', 'RETRY_WAIT') and failures:
+        state = f'실패 후 재시도 대기 · 연속 실패 {failures}회'
+    elif status in ('QUEUED', 'RUNNING', 'RETRY_WAIT') and stage == 'INFERENCE' and detail.get('models'):
+        models = ', '.join(
+            f'{MODEL_NAMES.get(m.get("modelKind"), m.get("modelKind"))} '
+            f'{"결과 확인 완료" if m.get("status") == "SUCCEEDED" else REMOTE_NAMES.get(m.get("remoteStatus"), "전송 중")}'
+            for m in detail['models'])
+        state = f'추론 결과 대기 ({models})'
+    else:
+        state = {'QUEUED': '대기열', 'RUNNING': '실행 중', 'RETRY_WAIT': '다음 단계 대기',
+                 'COMPLETED': '완료', 'FAILED': '실패'}.get(status, status)
+    return f'{STAGE_NAMES.get(stage, stage or "")} · {state} ({status} / {stage or ""})'
 
 
 def catalog(root):
@@ -112,8 +142,8 @@ class Controls:
         self.cf_headers = dict(cf_headers or {})
         self.uploads = {}
 
-    def get(self, path):
-        return self.client.get(path)
+    def get(self, path, **options):
+        return self.client.get(path, **options)
 
     def set_clock(self, value):
         clock = self.get('demo/clock')
@@ -127,8 +157,8 @@ class Controls:
             return
         self.set_clock(target.isoformat())
 
-    def post(self, path, payload=None):
-        return self.client.post(path, payload)
+    def post(self, path, payload=None, **options):
+        return self.client.post(path, payload, **options)
 
     def _issue_upload(self, mock, opener, args, size, checksum, progress):
         for attempt in range(6):
@@ -262,7 +292,7 @@ class Replay:
         with self.lock:
             return dict(self.state, history=list(self.state['history']))
 
-    def start(self, days, files, *, analyze=True, upload=True, interval=0):
+    def start(self, days, files, *, analyze=True, upload=True, interval=0, backfill=False):
         with self.lock:
             if self.future is not None and not self.future.done():
                 raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
@@ -272,9 +302,9 @@ class Replay:
                         doneDays=sum(day in self.completed for day in days) if analyze else 0,
                         currentDay=None, fileDone=0, fileTotal=0,
                         bankId=None, uploadId=None, jobId=None)
-            self.future = self.pool.submit(self._run, days, files, analyze, upload, interval)
+            self.future = self.pool.submit(self._run, days, files, analyze, upload, interval, backfill)
 
-    def _run(self, days, files, analyze, upload, interval):
+    def _run(self, days, files, analyze, upload, interval, backfill=False):
         stage = '날짜 준비'
         day = None
         try:
@@ -306,7 +336,9 @@ class Replay:
                     stage = '분석 시작 요청'
                     self.report(f'{day}: 분석 시작 요청')
                     if day not in self.jobs:
-                        self.jobs[day] = self.controls.post('demo/analysis', {'businessDate': day})['jobId']
+                        # A backfill day is integrated as history only: no scores, no Alerts.
+                        payload = {'businessDate': day, 'backfill': True} if backfill else {'businessDate': day}
+                        self.jobs[day] = self.controls.post('demo/analysis', payload)['jobId']
                     job = self.jobs[day]
                     self.report(f'{day}: 분석 대기', jobId=job, bankId=None, uploadId=None)
                     stage = '분석 결과 조회'
@@ -314,7 +346,8 @@ class Replay:
                     self.completed.add(day)
                 with self.lock:
                     self.state['doneDays'] += 1
-                    self.state['history'].append({'date': day, 'result': '분석 완료' if analyze else '전송·검수 완료'})
+                    result = '백필 완료' if backfill else '분석 완료' if analyze else '전송·검수 완료'
+                    self.state['history'].append({'date': day, 'result': result})
                 if self.pause.wait(interval):
                     break
             self.report('일시정지' if self.pause.is_set() else '선택한 작업 완료')
@@ -330,7 +363,7 @@ class Replay:
             self.report('중단', error=message)
 
     def wait_job(self, job, day):
-        deadline = time.monotonic() + 3600
+        deadline = time.monotonic() + 6 * 3600
         failures = 0
         last_stage = '아직 확인하지 못함'
         while time.monotonic() < deadline:
@@ -348,8 +381,8 @@ class Replay:
                 time.sleep(min(delay, max(0, deadline - time.monotonic())))
                 continue
             failures = 0
-            last_stage = f'{detail["status"]} / {detail.get("currentStage", "")}'
-            self.report(f'{day}: {detail["status"]} / {detail.get("currentStage", "")}', jobId=job)
+            last_stage = describe(detail)
+            self.report(f'{day}: {last_stage}', jobId=job)
             if detail['status'] == 'COMPLETED':
                 return
             if detail['status'] == 'FAILED':
@@ -365,7 +398,7 @@ class Replay:
         with self.lock:
             if self.future is not None and not self.future.done():
                 raise ApiError('현재 날짜 처리가 끝난 뒤 초기화하세요.')
-            result = self.controls.post('demo/reset', payload)
+            result = self.controls.post('demo/reset', payload, timeout=RESET_TIMEOUT)
             self.clear_after_reset(result['resetId'])
             return result
 
@@ -399,14 +432,14 @@ def render_reset(replay):
     with st.expander('시연 데이터 초기화'):
         st.warning('거래·업로드·분석·Alert/Episode·조사 이력과 관련 S3 파일을 삭제합니다. PC의 CSV, 직원 계정, 은행 등록, 환율은 보존합니다.')
         if st.button('초기화 대상 확인', disabled=running or pending):
-            st.session_state.reset_preview = replay.controls.get('demo/reset/preview')
+            st.session_state.reset_preview = replay.controls.get('demo/reset/preview', timeout=RESET_TIMEOUT)
             st.session_state.reset_request = str(uuid4())
         preview = st.session_state.get('reset_preview')
         if preview:
             counts = preview['counts']
             st.write({label: counts.get(table, 0) for label, table in (
-                ('거래', 'transactions'), ('업로드·분석 작업', 'batch_jobs'),
-                ('Alert', 'alerts'), ('조사 사건', 'review_cases'), ('은행 보고', 'report_versions'))})
+                ('거래', 'ledger.transactions'), ('업로드', 'ingest.uploads'), ('분석 작업', 'analysis.jobs'),
+                ('Alert', 'review.alerts'), ('Episode', 'review.episodes'), ('은행 보고', 'ingest.report_versions'))})
             confirmation = st.text_input('확인 문구: 시연 데이터 초기화', key='reset_confirmation')
             if st.button('DB 및 관련 파일 초기화', disabled=running or pending or confirmation != '시연 데이터 초기화'):
                 result = replay.reset_demo({'requestId': st.session_state.reset_request,
@@ -511,7 +544,7 @@ def render():
         @st.fragment(run_every='1s')
         def actions():
             running = reset_pending or (replay.future is not None and not replay.future.done())
-            cols = st.columns(3)
+            cols = st.columns(4)
             if cols[0].button('선택 날짜 전송', disabled=running or len(days) != 1):
                 replay.start(sorted(days), files, analyze=False)
                 st.rerun()
@@ -520,6 +553,10 @@ def render():
                 st.rerun()
             if cols[2].button('전송 → 분석 자동 재생', disabled=running or not days):
                 replay.start(sorted(days), files, interval=interval)
+                st.rerun()
+            if cols[3].button('전송 → 백필', disabled=running or not days,
+                              help='분석을 시작하기 전 앞 날짜에만 씁니다. 거래를 이력으로만 쌓고 점수·Alert는 만들지 않습니다.'):
+                replay.start(sorted(days), files, interval=interval, backfill=True)
                 st.rerun()
             if st.button('현재 날짜 완료 후 일시정지', disabled=not running):
                 replay.pause.set()
@@ -539,14 +576,28 @@ def render():
                 st.error(state['error'])
             if state['history']:
                 st.dataframe(state['history'], hide_index=True)
-            job = st.number_input('재개할 실패 작업 ID', min_value=1, step=1)
-            if st.button('실패 작업 재개', disabled=running):
-                try:
-                    replay.controls.post(f'batch-jobs/{job}/resume')
-                    st.success('재개 요청을 접수했습니다. 결과 화면에서 진행 상태를 확인하세요.')
-                except ApiError as error:
-                    st.error(str(error))
         actions()
+
+        # Outside the 1-second fragment: a refresh must not drop the typed ID or the result.
+        with st.form('resume_failed_job'):
+            job = st.number_input('재개할 실패 작업 ID', min_value=1, step=1, value=None,
+                                  placeholder='작업 ID 입력')
+            if st.form_submit_button('실패 작업 재개'):
+                if job is None:
+                    st.session_state.resume_result = ('error', '재개할 작업 ID를 입력하세요.')
+                elif reset_pending:
+                    st.session_state.resume_result = ('error', '초기화 정리가 끝난 뒤 재개하세요.')
+                else:
+                    try:
+                        replay.controls.post(f'batch-jobs/{int(job)}/resume')
+                        st.session_state.resume_result = (
+                            'success', f'작업 {int(job)} 재개 요청을 접수했습니다. 패널에서 진행을 보려면 같은 날짜로 '
+                            '자동 재생을 다시 누르세요(이미 받은 작업을 이어서 봅니다).')
+                    except ApiError as error:
+                        st.session_state.resume_result = ('error', f'작업 {int(job)} 재개 실패: {error}')
+        if 'resume_result' in st.session_state:
+            kind, text = st.session_state.resume_result
+            (st.success if kind == 'success' else st.error)(text)
     except (OSError, ValueError, ApiError) as error:
         st.error(str(error))
 

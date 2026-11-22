@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
+/** 직원 세션용 CSRF 토큰 발급과 현재 로그인 사용자 조회. */
 @RestController
 public class AuthController {
   private final StaffAccounts accounts;

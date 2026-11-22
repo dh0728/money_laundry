@@ -98,9 +98,9 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
     requestAnimationFrame(focusTitle);
   }
 
-  function commit() {
+  async function commit() {
     if (!valid || !confirm || result) return;
-    const response = save(row.code, verdict, details, reasonCategory);
+    const response = await save(row.code, verdict, details, reasonCategory);
     if (response.ok) {
       setResult(response.value);
       requestAnimationFrame(focusTitle);

@@ -13,11 +13,17 @@ import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-pa
 import { SearchField } from '../components/search-field.jsx';
 import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
+import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
+import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
+import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
+  sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
+import { liveDashboardAsOf, liveDashboardResponse } from '../features/dashboard/live-dashboard.js';
+import { ruleRepository } from '../features/rules/rule-repository.js';
+import { canStartPreviewReview, savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { requestStateLabels, WorkRequestDetail, WorkRequestForm } from '../features/investigation/preview-work-request-dialog.jsx';
 import { previewCaseAssignee, previewWorkRequests, readPreviewWorkRequests, resolvePreviewWorkRequest, sendPreviewWorkRequest,
   workRequestTypes } from '../features/investigation/preview-work-requests.js';
-import { savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { createCaseEvidenceSelection } from '../features/investigation/case-evidence-selection.js';
 import { editPreviewAlertTransactions } from '../features/investigation/case-membership-data.js';
 import { markPreviewCaseRead, resetPreviewCaseRead } from '../features/investigation/case-read-state.js';
@@ -142,8 +148,13 @@ function WorkTab(code) {
   </div>`;
 }
 
+// 서비스 모드는 서버에서 받은 사건을, 프리뷰는 샘플을 화면 데이터로 쓴다.
+function caseSource(groups) {
+  return serviceMode ? rebuildLiveSource() : dashboardFixtures(groups);
+}
+
 function tabCodes(group) {
-  return dashboardRecordCodes(group);
+  return serviceMode ? liveCodes(group.prefix) : dashboardRecordCodes(group);
 }
 
 function TabGroup(group) {
@@ -699,8 +710,8 @@ function loadPreviewDashboard(mounted, source, query) {
     mounted.updateDashboard(undefined);
     afterWorkspacePaint(() => {
       if (mountedWorkflows !== mounted) return;
-      try {
-        const summary = dashboardFixtureResponse(source, query);
+      const show = summary => {
+        if (mountedWorkflows !== mounted) return;
         mounted.updateDashboard(summary);
         afterWorkspacePaint(() => {
           if (mountedWorkflows !== mounted) return;
@@ -708,8 +719,16 @@ function loadPreviewDashboard(mounted, source, query) {
           const board = dashboardFixtureBoardPage(rows, { size: Math.max(1, rows.length) });
           mounted.updateDashboard({ ...summary, board });
         });
+      };
+      const fail = () => mounted.updateDashboard({ error: true, retry: load });
+      if (serviceMode) {
+        liveDashboardResponse(source, query).then(show, fail);
+        return;
+      }
+      try {
+        show(dashboardFixtureResponse(source, query));
       } catch {
-        mounted.updateDashboard({ error: true, retry: load });
+        fail();
       }
     });
   };
@@ -749,13 +768,15 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const isCaseList = /^add-tab\/(alerts|episodes)(?:-|\/|$)/.test(path ?? '');
   const groups = isDashboard || isReport || isCaseDetail || path?.startsWith('add-tab/')
     ? Object.fromEntries(tabGroups.map(group => [group.prefix, tabCodes(group)])) : undefined;
-  if (isDashboard || isReport || isCaseDetail || isCaseList) dashboardSource ??= dashboardFixtures(groups);
-  if (isCaseDetail && markPreviewCaseRead(dashboardSource.cases.find(row => row.code === code))) {
-    dashboardSource = dashboardFixtures(groups);
+  if (isDashboard || isReport || isCaseDetail || isCaseList) dashboardSource ??= caseSource(groups);
+  const opened = isCaseDetail ? dashboardSource.cases.find(row => row.code === code) : undefined;
+  if (markPreviewCaseRead(opened)) {
+    if (serviceMode) void markLiveRead(opened);
+    dashboardSource = caseSource(groups);
   }
   const queryData = isDashboard ? {
     rows: path === sections.dashboard ? dashboardSource.mine : dashboardSource.cases,
-    asOf: dashboardPeriodEnd,
+    asOf: serviceMode ? liveDashboardAsOf(dashboardSource) : dashboardPeriodEnd,
     dashboard: true,
   } : isCaseList ? { rows: dashboardSource.cases.filter(row => row.code.startsWith(groupPrefix)) } : undefined;
   activePath = path;
@@ -793,6 +814,10 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     row: selectedCase, perPanel, initialPanel, reportData: isReport || isCaseDetail || isCaseList ? dashboardSource : undefined,
     openRelationRequest: workRequestActor()?.role === 'STAFF' ? relation => openWorkRequest(undefined, relation) : undefined,
     saveEpisode: options => {
+      if (serviceMode) {
+        return changeLiveEpisode(options).then(result => result.ok
+          ? loadLiveSource().then(() => { dashboardSource = caseSource(groups); return result; }) : result);
+      }
       const result = changePreviewEpisode({ ...options, cases: dashboardSource.cases, user: currentPreviewUser() });
       if (result.ok) dashboardSource = dashboardFixtures(groups);
       return result;
@@ -803,34 +828,62 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (!evidenceSelection || activeWorkCode !== code || activeEvidence?.selection !== evidenceSelection) {
         return { ok: false, error: '현재 Alert에서 편집할 거래를 다시 선택해 주세요.' };
       }
-      const result = editPreviewAlertTransactions({
+      const applied = result => {
+        if (!result.ok) return result;
+        dashboardSource = caseSource(groups);
+        const row = dashboardSource.cases.find(item => item.code === code);
+        mountedWorkflows.updateCase(row, dashboardSource);
+        unmountCaseGraph?.update({ active: row, cases: dashboardSource.cases });
+        evidenceSelection.clear();
+        document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
+          status: 'done',
+          title: targetCode ? `거래 ${result.value.transactionCodes.length}건 이동` : `거래 ${result.value.transactionCodes.length}건 제외`,
+          description: targetCode ? `${code} → ${targetCode}` : code,
+        } }));
+        return result;
+      };
+      if (serviceMode) {
+        const mounted = mountedWorkflows;
+        const find = wanted => dashboardSource.cases.find(item => item.code === wanted);
+        return editLiveTransactions(find(code), transactionCodes, targetCode ? find(targetCode) : undefined, reason)
+          .then(result => result.ok ? loadLiveSource().then(() => mountedWorkflows === mounted ? applied(result) : result) : result);
+      }
+      return applied(editPreviewAlertTransactions({
         cases: dashboardSource.cases, sourceCode: code, targetCode, transactionCodes, reason, user: currentPreviewUser(),
-      });
-      if (!result.ok) return result;
-      dashboardSource = dashboardFixtures(groups);
-      const row = dashboardSource.cases.find(item => item.code === code);
-      mountedWorkflows.updateCase(row, dashboardSource);
-      unmountCaseGraph?.update({ active: row, cases: dashboardSource.cases });
-      evidenceSelection.clear();
-      document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
-        status: 'done',
-        title: targetCode ? `거래 ${result.value.transactionCodes.length}건 이동` : `거래 ${result.value.transactionCodes.length}건 제외`,
-        description: targetCode ? `${code} → ${targetCode}` : code,
-      } }));
-      return result;
+      }));
     },
     startReview: target => {
       if (readOnly || activeWorkCode !== target) return;
       const current = dashboardSource.cases.find(item => item.code === target);
+      if (serviceMode) {
+        const mounted = mountedWorkflows;
+        if (!canStartPreviewReview(current, currentPreviewUser())) return;
+        void startLiveReview(current).then(result => {
+          if (!result.ok) {
+            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '상태를 바꾸지 못했습니다.', description: result.error } }));
+            return;
+          }
+          return loadLiveSource().then(() => {
+            if (mountedWorkflows !== mounted) return;
+            dashboardSource = caseSource(groups);
+            mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
+          });
+        });
+        return;
+      }
       if (!startPreviewReview(current, currentPreviewUser())) return;
-      dashboardSource = dashboardFixtures(groups);
+      dashboardSource = caseSource(groups);
       mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
     },
     saveJudgment: (target, verdict, details, reasonCategory) => {
       const row = !readOnly && activeWorkCode === target ? dashboardSource.cases.find(item => item.code === target) : undefined;
+      if (serviceMode) {
+        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => result.ok
+          ? loadLiveSource().then(() => { dashboardSource = caseSource(groups); return result; }) : result);
+      }
       const actor = currentPreviewUser();
       const result = savePreviewJudgment(row, verdict, details, reasonCategory, actor?.username ?? '', actor);
-      if (result.ok) dashboardSource = dashboardFixtures(groups);
+      if (result.ok) dashboardSource = caseSource(groups);
       return result;
     },
     onJudgmentClose: () => {
@@ -869,7 +922,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const caseTable = byId('workspace').querySelector('[data-case-list-table]');
   if (caseTable) void import('../features/investigation/preview-case-list-table.jsx').then(({ mountPreviewCaseTable }) => {
     if (!caseTable.isConnected) return;
-    dashboardSource ??= dashboardFixtures(groups);
+    dashboardSource ??= caseSource(groups);
     const caseRows = new Map(dashboardSource.cases.map(row => [row.code, row]));
     unmountInvestigation = mountPreviewCaseTable(caseTable, caseTable.dataset.caseListTable,
       codes.map(recordCode => caseRows.get(recordCode)).filter(Boolean), groupPrefix === 'E', queryData.rows.length,
@@ -881,6 +934,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         codes,
         code,
         groups,
+        cases: serviceMode ? liveSource().cases : undefined,
         label: component.dataset.label,
         tableView: path === ledgerTableScreen,
         ...caseListPaging,
@@ -1130,10 +1184,19 @@ function openNotification(item) {
 
 function workRequestActor() {
   const actor = currentPreviewUser();
-  return !serviceMode && dataMode !== 'ibm' && actor?.source === 'fixture' ? actor : null;
+  if (serviceMode) return actor?.source === 'api' && liveWorkRequestsReady() ? actor : null;
+  return dataMode !== 'ibm' && actor?.source === 'fixture' ? actor : null;
 }
 
+// 서비스 모드는 서버의 요청을, 프리뷰는 이 탭에 저장한 요청을 쓴다.
+const workRequests = actor => serviceMode ? (actor ? liveWorkRequests() : []) : previewWorkRequests(actor);
+const readWorkRequests = (actor, ids) => (serviceMode ? readLiveWorkRequests : readPreviewWorkRequests)(actor, ids);
+// 서버가 요청을 받았으면 바뀐 업무와 요청 목록을 다시 받아 온다.
+const afterLiveWorkRequest = (result, apply) => result.then(settled => settled.ok
+  ? Promise.all([loadLiveSource(), loadLiveWorkRequests()]).then(() => { apply(); return settled; }, () => settled) : settled);
+
 function requestCaseData() {
+  if (serviceMode) return liveSource().cases;
   dashboardSource ??= dashboardFixtures(Object.fromEntries(tabGroups.map(group => [group.prefix, tabCodes(group)])));
   return dashboardSource.cases;
 }
@@ -1157,31 +1220,35 @@ function openWorkRequest(item, relation) {
         key: entry.at, item: entry, actor, currentAssignee: row && previewCaseAssignee(row),
         onOpenCase: code => { onClose(); toggleDisclosure(inboxButton, '보관함', false); openWorkCode(code); },
         onRespond: options => {
-          const result = resolvePreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
-          if (result.ok) {
+          const applied = () => {
             applyWorkRequestChange();
-            showDetail(previewWorkRequests(actor).find(request => request.id === item.id));
-          }
+            showDetail(workRequests(actor).find(request => request.id === item.id));
+          };
+          if (serviceMode) return afterLiveWorkRequest(resolveLiveWorkRequest(options), applied);
+          const result = resolvePreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
+          if (result.ok) applied();
           return result;
         },
       }));
     };
-    if (item.unreadFor.includes(actor.username)) readPreviewWorkRequests(actor, [item.id]);
+    if (item.unreadFor.includes(actor.username)) readWorkRequests(actor, [item.id]);
     renderNotifications();
     showDetail(item);
   } else {
     workRequestRoot.render(createElement(WorkRequestForm, {
       actor, cases, initialCode: activeWorkCode, relation,
       onSend: options => {
-        const result = sendPreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
-        if (result.ok) {
+        const sent = () => {
           onClose();
           if (relation) {
             renderNotifications();
             relation.onSent();
           } else applyWorkRequestChange();
-          document.dispatchEvent(new CustomEvent('aml:notice', { detail: { title: 'Sample 요청 전송', status: 'done' } }));
-        }
+          document.dispatchEvent(new CustomEvent('aml:notice', { detail: { title: serviceMode ? '요청 전송' : 'Sample 요청 전송', status: 'done' } }));
+        };
+        if (serviceMode) return afterLiveWorkRequest(sendLiveWorkRequest({ ...options, cases: requestCaseData() }), sent);
+        const result = sendPreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
+        if (result.ok) sent();
         return result;
       },
     }));
@@ -1213,12 +1280,14 @@ function renderNotifications(arrivalIds) {
     'aria-description': actor ? undefined : '현재 연결에서는 업무 요청을 보낼 수 없습니다.',
     onClick: () => openWorkRequest(),
   }, '요청 보내기'));
-  const requests = previewWorkRequests(actor).map(item => ({
+  const requests = workRequests(actor).map(item => ({
     id: item.id, title: `${item.sender === actor.username ? '보낸 요청' : [item.recipient, item.assignee].includes(actor.username) ? '받은 요청' : '담당 변경 알림'} · ${workRequestTypes[item.type].label} · ${requestStateLabels[item.state]}`,
     time: new Date(item.at), read: !item.unreadFor.includes(actor.username), request: item,
   })).sort((left, right) => right.time - left.time);
-  const items = liveInbox?.content ?? [...requests, ...notifications];
-  const unreadCount = liveInbox?.unreadCount ?? items.filter(item => !item.read).length;
+  // 서버 알림은 페이지로 나뉘므로 업무 요청은 첫 페이지 위에 둔다.
+  const items = liveInbox ? [...(liveInbox.number === 0 ? requests : []), ...liveInbox.content] : [...requests, ...notifications];
+  const unreadCount = liveInbox ? liveInbox.unreadCount + requests.filter(item => !item.read).length
+    : items.filter(item => !item.read).length;
   const countBadge = byId('inbox-count');
   countBadge.hidden = unreadCount === 0;
   countBadge.setAttribute('aria-label', `읽지 않은 알림 ${unreadCount}개`);
@@ -1276,7 +1345,7 @@ async function refreshLiveInbox(page = 0) {
   if (!signedIn || currentPreviewUser()?.source !== 'api') return;
   const request = ++inboxRequest;
   try {
-    const result = await fetchNotifications('', '', '', page);
+    const [result] = await Promise.all([fetchNotifications('', '', '', page), loadLiveWorkRequests()]);
     const content = result.content.map(item => ({ ...item, time: new Date(item.at) }));
     if (content.some(item => !Number.isFinite(+item.time))) throw new Error('Invalid notification timestamp');
     if (request !== inboxRequest || !signedIn) return;
@@ -1295,6 +1364,10 @@ async function refreshLiveInbox(page = 0) {
 async function markInboxRead(items) {
   if (!items.length) return;
   if (liveInbox) {
+    const requestIds = items.filter(item => item.request).map(item => item.id);
+    if (requestIds.length) readWorkRequests(workRequestActor(), requestIds);
+    items = items.filter(item => !item.request);
+    if (!items.length) return renderNotifications();
     try {
       await setNotificationsRead(items.map(item => item.id), true);
       await refreshLiveInbox(liveInbox?.number ?? 0);
@@ -1304,7 +1377,7 @@ async function markInboxRead(items) {
     return;
   }
   const requestIds = items.filter(item => item.request).map(item => item.id);
-  if (requestIds.length) readPreviewWorkRequests(workRequestActor(), requestIds);
+  if (requestIds.length) readWorkRequests(workRequestActor(), requestIds);
   items.filter(item => !item.request).forEach(item => { item.read = true; });
   renderNotifications();
 }
@@ -1335,10 +1408,10 @@ window.addEventListener('live-data-changed', () => {
 });
 bindSquishSwitch(unreadOnly, renderNotifications);
 byId('mark-all-read').addEventListener('click', () => {
-  if (!liveInbox) {
-    const actor = workRequestActor();
-    const ids = previewWorkRequests(actor).filter(item => item.unreadFor.includes(actor.username)).map(item => item.id);
-    if (ids.length) readPreviewWorkRequests(actor, ids);
+  const actor = workRequestActor();
+  if (actor) {
+    const ids = workRequests(actor).filter(item => item.unreadFor.includes(actor.username)).map(item => item.id);
+    if (ids.length) readWorkRequests(actor, ids);
   }
   void markInboxRead((liveInbox?.content ?? notifications).filter(item => !item.read));
   renderNotifications();
@@ -1515,6 +1588,37 @@ function showRoute(route, params, navigationMode) {
   loginScene.cancel();
   document.body.removeAttribute('data-login-required');
   byId('preview-login').hidden = true;
+  if (serviceMode && !liveSourceLoaded()) {
+    const actor = previewActor;
+    const open = () => {
+      if (!signedIn || previewActor !== actor) return;
+      dashboardSource = undefined;
+      showLoadedRoute(route, params, navigationMode);
+    };
+    void Promise.all([loadLiveSource(), ruleRepository.list({ fresh: true }), loadLiveWorkRequests().catch(() => undefined)]).then(open, () => {
+      document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
+        status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
+      } }));
+      open();
+    });
+    return;
+  }
+  showLoadedRoute(route, params, navigationMode);
+}
+
+function showLoadedRoute(route, params, navigationMode) {
+  if (serviceMode) {
+    // 서버에 없는 사건 탭(이전 세션, 다른 데이터)은 열지 않는다.
+    const cases = new Set(liveSource().cases.map(row => row.code));
+    let removed = false;
+    for (const tab of document.querySelectorAll('.work-tabs [data-work-code]')) {
+      if (tab.dataset.workCode.startsWith('T-') || cases.has(tab.dataset.workCode)) continue;
+      tab.closest('.work-tab').remove();
+      removed = true;
+    }
+    if (removed) persistWorkTabs();
+    if (route.code && !route.code.startsWith('T-') && !cases.has(route.code)) route = dashboardRoute;
+  }
   if (route.code) addWorkTab(route.code);
   showWorkspace('', route.code, route.screen, navigationMode, params);
 }
@@ -1743,6 +1847,8 @@ function clearWorkspaceSession() {
   setPreviewSession(null);
   activeEvidence = undefined;
   resetPreviewCaseRead();
+  resetLiveSource();
+  resetLiveWorkRequests();
   dashboardSource = undefined;
 }
 for (const host of document.querySelectorAll('[data-dialog-heading]')) {

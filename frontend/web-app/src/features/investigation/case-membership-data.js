@@ -29,7 +29,8 @@ export function previewAlertEditUnavailable(row, user) {
   if (!row.open || row.status === '처리 완료' || row.verdict !== 'unjudged' || row.judgment) {
     return '처리 완료된 Alert의 근거 거래는 수정할 수 없습니다.';
   }
-  if (user?.source !== 'fixture' || !['ADMIN', 'STAFF'].includes(user.role)) {
+  const server = user?.source === 'api';
+  if ((user?.source !== 'fixture' && !server) || !['ADMIN', 'STAFF'].includes(user.role)) {
     return '거래 편집은 프리뷰 계정에서 사용할 수 있습니다.';
   }
   if (user.role === 'STAFF' && !row.assigned) return '내가 담당하는 Alert의 근거 거래만 수정할 수 있습니다.';
@@ -43,6 +44,8 @@ export function previewAlertMembershipTargets(cases, sourceCode, user) {
 }
 
 export function editPreviewAlertTransactions({ cases, sourceCode, targetCode = null, transactionCodes, reason, user }) {
+  // 이 함수는 브라우저에만 저장한다. 서버 계정의 편집은 live-actions.js가 서버로 보낸다.
+  if (user?.source !== 'fixture') return deny('거래 편집은 프리뷰 계정에서 사용할 수 있습니다.');
   const source = cases.find(row => row.code === sourceCode);
   const unavailable = previewAlertEditUnavailable(source && applyPreviewJudgment(source), user);
   if (unavailable) return deny(unavailable);

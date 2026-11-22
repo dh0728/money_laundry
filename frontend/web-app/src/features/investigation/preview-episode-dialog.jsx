@@ -30,7 +30,8 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
   const dissolves = unlink && previewEpisodeWillDissolve(row, selected.length);
   const label = unlink ? 'Alert 연결 해제' : 'Episode로 묶기';
 
-  function submit(event) {
+  // 서버 저장은 응답을 기다린다. 프리뷰 저장은 바로 끝난다.
+  async function submit(event) {
     event.preventDefault();
     if (!valid || result) return;
     if (!confirmed) {
@@ -38,7 +39,7 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
       setConfirmed(true);
       return;
     }
-    const response = save({ alertCodes: selected, episodeCode: unlink ? row.code : useNewEpisode ? '' : target,
+    const response = await save({ alertCodes: selected, episodeCode: unlink ? row.code : useNewEpisode ? '' : target,
       expectedNewCode: confirmedNewCode, reason, unlink });
     if (response.ok) setResult(response.code);
     else setError(response.error);

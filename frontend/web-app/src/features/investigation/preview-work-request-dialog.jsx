@@ -5,8 +5,13 @@ import { DialogFooter } from '../../components/dialog-parts';
 import { Textarea } from '../../components/ui/textarea';
 import { Input } from '../../components/ui/input';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
-import { activeReviewStatuses, previewCaseAssignee, requestCases, requestStaff, workRequestTypes, workRequestUserName } from './preview-work-requests';
+import { activeReviewStatuses, previewCaseAssignee, requestAdmin, requestCases, requestStaff, workRequestTypes, workRequestUserName } from './preview-work-requests';
 import './case-judgment.css';
+
+// 서버 연결에서는 결과가 나중에 온다.
+const showFailure = (result, setError) => result instanceof Promise
+  ? void result.then(settled => { if (!settled.ok) setError(settled.error); })
+  : !result.ok && setError(result.error);
 
 export const requestStateLabels = {
   pending: '처리 대기', approved: '승인', declined: '반려', completed: '처리 완료', 'needs-discussion': '협의 필요', cancelled: '취소',
@@ -44,8 +49,7 @@ export function WorkRequestForm({ actor, cases, initialCode, relation, onSend })
   const setsReviewStatus = admin && ['reopen', 'status'].includes(type?.effect);
   return <form className="work-request-frame" onSubmit={event => {
     event.preventDefault();
-    const result = onSend({ typeKey, code: row?.code, recipient: target, reason, deadline, reviewStatus, relatedCodes: relation?.codes });
-    if (!result.ok) setError(result.error);
+    showFailure(onSend({ typeKey, code: row?.code, recipient: target, reason, deadline, reviewStatus, relatedCodes: relation?.codes }), setError);
   }}>
     <div className="work-request-form settings-content scroll-area">
       {relation ? <div className="case-judgment-target-group">
@@ -71,7 +75,7 @@ export function WorkRequestForm({ actor, cases, initialCode, relation, onSend })
         {pickRecipient && row ? <div className="case-judgment-field">
           <span>새 담당자</span>
           <StaffSelect label="새 담당자" value={recipient} onChange={setRecipient} except={previewCaseAssignee(row)} />
-        </div> : <p>받는 사람 · {admin ? target && workRequestUserName(target) : '프리뷰 관리자'}</p>}
+        </div> : <p>받는 사람 · {admin ? target && workRequestUserName(target) : requestAdmin().name}</p>}
         {setsReviewStatus && row && <ReviewStatusSelect value={reviewStatus} onChange={setReviewStatus} except={row.status} />}
         {type.deadline && <label className="case-judgment-field">처리 기한
           <Input type="date" required value={deadline} onChange={event => setDeadline(event.target.value)} />
@@ -127,8 +131,7 @@ export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onO
       {item.note && <p className="work-request-message">처리 내용 · {item.note}</p>}
       {canRespond && <form id="work-request-response" className="work-request-form" onSubmit={event => {
         event.preventDefault();
-        const result = onRespond({ id: item.id, action, note, assignee, reviewStatus });
-        if (!result.ok) setError(result.error);
+        showFailure(onRespond({ id: item.id, action, note, assignee, reviewStatus }), setError);
       }}>
         <GlideSelect ariaLabel="처리 방법" value={action} placeholder="처리 방법 선택" onChange={setAction}
           options={(admin ? ['approved', 'declined'] : ['completed', 'needs-discussion'])
@@ -144,8 +147,7 @@ export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onO
     </div>
     {(canCancel || canRespond) && <DialogFooter>
       {canCancel && <ActionButton shape="pill" surface="floating" onClick={() => {
-        const result = onRespond({ id: item.id, action: 'cancelled' });
-        if (!result.ok) setError(result.error);
+        showFailure(onRespond({ id: item.id, action: 'cancelled' }), setError);
       }}>요청 취소</ActionButton>}
       {canRespond && <PrimaryButton type="submit" form="work-request-response" tone="brand"
         disabled={!action || !note.trim() || (needsAssignee && !assignee)}>처리 결과 보내기</PrimaryButton>}

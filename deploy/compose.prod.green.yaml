@@ -1,3 +1,5 @@
+# LEGACY: EC2 1대 구성용 보관 코드. 새 EC2 2대 + RDS 구성에서는 사용하지 않음.
+# 전환 전 기존 서버의 배포에서는 계속 사용할 수 있음. 신규 구성: deploy/split/
 name: aml-prod-green
 
 services:
@@ -8,6 +10,10 @@ services:
     init: true
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      PRESENTATION_ENABLED: ${PROD_PRESENTATION_ENABLED:?PROD_PRESENTATION_ENABLED is required}
+      INGEST_ENCRYPTION_KEY: ${PROD_INGEST_ENCRYPTION_KEY:?PROD_INGEST_ENCRYPTION_KEY is required}
+      INGEST_SEARCH_KEY: ${PROD_INGEST_SEARCH_KEY:?PROD_INGEST_SEARCH_KEY is required}
+      INGEST_KEY_VERSION: ${PROD_INGEST_KEY_VERSION:?PROD_INGEST_KEY_VERSION is required}
       SERVER_PORT: "8080"
     
       SPRING_DATASOURCE_URL: ${PROD_DB_URL:?PROD_DB_URL is required}

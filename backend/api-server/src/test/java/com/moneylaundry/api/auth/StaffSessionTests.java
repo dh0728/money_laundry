@@ -18,7 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(properties = "spring.profiles.active=dev")
+@SpringBootTest(properties = {"spring.profiles.active=dev"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class StaffSessionTests {
@@ -38,7 +38,7 @@ class StaffSessionTests {
   @Autowired JdbcTemplate jdbc;
   @Autowired PasswordEncoder encoder;
   @MockitoBean AnalysisScheduler scheduler;
-  @MockitoBean com.moneylaundry.api.storage.UploadStore store;
+  @MockitoBean com.moneylaundry.api.ingest.storage.UploadStore store;
   MockHttpSession session;
   String token;
 
@@ -77,33 +77,40 @@ class StaffSessionTests {
   @Test
   void caller_header_cannot_change_session_actor() throws Exception {
     login("l1a");
-    long other = jdbc.queryForObject("select user_id from users where username='l1b'", Long.class);
+    long other =
+        jdbc.queryForObject("select user_id from core.users where username='l1b'", Long.class);
     long alertId =
         jdbc.queryForObject(
-            "insert into alerts(assignee_id) values(?) returning alert_id", Long.class, other);
-    long id =
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now()) returning alert_id",
+            Long.class,
+            other);
+    // 공개된 Alert만 화면에 보인다.
+    java.util.UUID run = java.util.UUID.randomUUID();
+    long job =
         jdbc.queryForObject(
-            "select case_id from review_cases where alert_id=?", Long.class, alertId);
-    String body =
-        "{\"requestId\":\""
-            + java.util.UUID.randomUUID()
-            + "\",\"action\":\"COMMENT\",\"comment\":\"test\",\"selections\":[{\"caseId\":"
-            + id
-            + ",\"revision\":1,\"groupId\":0,\"txIds\":[]}]}";
+            "insert into analysis.jobs(status,analysis_date,threshold_value,current_stage,analysis_cutoff_at,business_at) values('COMPLETED','2099-01-01',.7,'COMPLETE',now(),now()) returning job_id",
+            Long.class);
+    jdbc.update(
+        "insert into analysis.runs(run_id,job_id,input_revision,status) values(?,?,1,'COMPLETED')",
+        run,
+        job);
+    jdbc.update(
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence,published_at) values(?,1,?,repeat('f',64),'{}',now())",
+        alertId,
+        run);
+    jdbc.update("update review.alerts set published_version=1 where alert_id=?", alertId);
     mvc.perform(
-            post("/api/v1/review/commands")
+            post("/api/v1/review/cases/" + alertId + "/start")
                 .session(session)
                 .header("X-CSRF-TOKEN", token)
-                .header("X-Demo-User-Id", other)
-                .contentType("application/json")
-                .content(body))
+                .header("X-Demo-User-Id", other))
         .andExpect(status().isForbidden());
   }
 
   @BeforeEach
   void setup() {
     jdbc.update(
-        "update users set password_hash=? where username in ('l1a','admin')",
+        "update core.users set password_hash=? where username in ('l1a','admin')",
         encoder.encode("Test-password-123"));
     session = new MockHttpSession();
   }
@@ -178,8 +185,8 @@ class StaffSessionTests {
 
   @Test
   void admin_clock_requires_csrf_and_uses_business_time() throws Exception {
-    jdbc.execute("truncate batch_jobs,alerts,review_cases,review_requests cascade");
-    jdbc.update("update demo_business_clock set business_at=null,revision=0");
+    jdbc.execute("truncate analysis.jobs,ingest.uploads,review.alerts,review.episodes cascade");
+    jdbc.update("update ops.business_clock set business_at=null,revision=0");
     login("admin");
     String body = "{\"businessAt\":\"2023-09-02T00:00:00Z\",\"revision\":0}";
     mvc.perform(
