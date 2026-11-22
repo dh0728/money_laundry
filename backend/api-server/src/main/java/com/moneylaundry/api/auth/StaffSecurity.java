@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.*;
 import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.ObjectMapper;
 
+/** 직원 세션 인증 설정: 세션 쿠키, PBKDF2 비밀번호, 경로별 권한과 JSON 오류 응답. */
 @Configuration
 public class StaffSecurity {
   @Bean
@@ -41,9 +42,7 @@ public class StaffSecurity {
   @Bean
   SecurityFilterChain staffFilterChain(HttpSecurity http, Environment env, StaffAccounts accounts)
       throws Exception {
-    var profiles = Arrays.asList(env.getActiveProfiles());
-    boolean enabled =
-        !profiles.contains("prod") && (profiles.contains("dev") || profiles.contains("local"));
+    boolean enabled = WorkbenchAccess.enabled(env);
     http.csrf(c -> c.ignoringRequestMatchers("/api/v1/bank/**"))
         .requestCache(c -> c.disable())
         .exceptionHandling(

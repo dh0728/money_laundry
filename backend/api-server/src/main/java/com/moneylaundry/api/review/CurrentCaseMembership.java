@@ -19,35 +19,32 @@ final class CurrentCaseMembership {
       row.put("episodeIds", new TreeSet<Long>());
       byId.put(((Number) row.get("txId")).longValue(), row);
     }
-    String marks = String.join(",", Collections.nCopies(byId.size(), "?"));
+
     String sql =
         """
-        with latest as (
-          select distinct on (v.alert_id) v.alert_id,v.evidence
-          from alert_versions v join analysis_runs r using(run_id)
-          join batch_jobs b on b.job_id=r.job_id
-          where r.status='COMPLETED' and b.status='COMPLETED'
-          order by v.alert_id,v.version desc
-        ), members as (
-          select c.kind,c.alert_id,c.case_id,(m->>'txId')::bigint tx_id
-          from visible_review_cases c join review_groups g using(case_id)
-          cross join lateral jsonb_array_elements(g.members) m
-          where m->>'state' not in ('EXCLUDED','TRANSFERRED')
-          union all
-          select c.kind,c.alert_id,c.case_id,(m->>'txId')::bigint tx_id
-          from visible_review_cases c join latest v using(alert_id)
-          cross join lateral jsonb_array_elements(v.evidence->'transactions') m
-          where c.kind='ALERT' and (
-            not exists(select 1 from review_groups g where g.case_id=c.case_id)
-            or (c.status='OPEN' and not exists(
-              select 1 from review_groups g cross join lateral jsonb_array_elements(g.members) seen
-              where g.case_id=c.case_id and seen->>'txId'=m->>'txId')))
-        )
-        select distinct kind,alert_id,case_id,tx_id from members where tx_id in (
-        """
-            + marks
-            + ")";
-    for (var membership : jdbc.queryForList(sql, byId.keySet().toArray())) {
+        with selected(tx_id) as (select unnest(?::bigint[])), candidates as materialized (
+          select distinct t.alert_id from selected s join review.alert_transactions t using(tx_id)
+        ), latest as (
+          select a.alert_id,v.version from review.alerts a join review.latest_versions v using(alert_id)
+          join candidates c using(alert_id)
+          where a.published_version is not null and a.merged_into_alert_id is null
+        ), held as (
+          select t.alert_id as holder,t.tx_id
+          from selected s join review.alert_transactions t using(tx_id)
+          join latest l using(alert_id,version)
+          where not exists(select 1 from review.alert_tx_edits e where e.alert_id=t.alert_id and e.tx_id=t.tx_id)
+          union
+          select x.target_alert_id,x.tx_id
+          from selected s join review.alert_tx_edits x using(tx_id)
+          join latest l on l.alert_id=x.alert_id
+          join review.alert_transactions t on t.alert_id=l.alert_id and t.version=l.version and t.tx_id=x.tx_id
+          where x.target_alert_id is not null
+            and not exists(select 1 from review.alert_tx_edits o where o.alert_id=x.target_alert_id and o.tx_id=x.tx_id)
+        ) select case when ea.episode_id is null then 'ALERT' else 'EPISODE' end as kind,
+            h.holder as alert_id,coalesce(ea.episode_id,h.holder) as case_id,h.tx_id
+          from held h left join review.episode_alerts ea on ea.alert_id=h.holder
+        """;
+    for (var membership : jdbc.queryForList(sql, (Object) byId.keySet().toArray(Long[]::new))) {
       var row = byId.get(((Number) membership.get("tx_id")).longValue());
       boolean alert = "ALERT".equals(membership.get("kind"));
       @SuppressWarnings("unchecked")

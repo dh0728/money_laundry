@@ -1,0 +1,596 @@
+import dataclasses
+import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import io
+import json
+from pathlib import Path
+import socket
+import tempfile
+import threading
+import time
+import unittest
+from unittest.mock import patch
+from urllib.parse import urlsplit
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+import httpx
+import pyarrow as pa
+import pyarrow.parquet as pq
+import uvicorn
+
+from tests.demo_inputs import build_targets
+from models.demo_random.model import calculate
+from models.demo_random.spec import FEATURE_VERSION, MODEL_VERSION
+from inference_server import create_app
+from inference_worker.inference_service import InferenceService, Settings
+from inference_worker.inference_compute import atomic_json
+from common.model_contract import ModelExecutionError, model_failure
+from common.worker_transport import Request, descriptor, encode
+
+
+class InferenceEntryTests(unittest.TestCase):
+    def test_polling_only_startup_does_not_require_callback_environment(self):
+        from inference_server import main
+        environment = dict(INFERENCE_STATE_DIR="state", INFERENCE_TOKEN="t" * 32,
+                           INFERENCE_OBJECT_BASE_URL="https://objects.example/dev/")
+        with patch.dict("os.environ", environment, clear=True), \
+                patch("inference_server.create_app") as create, patch("uvicorn.run") as run:
+            main()
+        settings = create.call_args.args[0]
+        self.assertIsNone(settings.callback_url)
+        self.assertIsNone(settings.callback_token)
+        self.assertEqual(run.call_args.kwargs['workers'], 1)
+        self.assertEqual(run.call_args.kwargs['host'], '127.0.0.1')
+
+
+class InferenceServerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="aml-inference-test-")
+        self.addCleanup(self.temp.cleanup)
+        self.objects, self.events = {}, []
+        self.entered, self.release = threading.Event(), threading.Event()
+        self.block_download = False
+        self.reject_upload = False
+        self.reject_callback = False
+        owner = self
+
+        class Objects(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                if owner.block_download:
+                    owner.entered.set()
+                    owner.release.wait(10)
+                data = owner.objects.get(urlsplit(self.path).path)
+                try:
+                    self.send_response(200 if data is not None else 404)
+                    self.end_headers()
+                    self.wfile.write(data or b"")
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    pass
+
+            def do_PUT(self):
+                data = self.rfile.read(int(self.headers["Content-Length"]))
+                if not owner.reject_upload:
+                    owner.objects[urlsplit(self.path).path] = data
+                self.send_response(503 if owner.reject_upload else 200)
+                self.end_headers()
+
+            def do_POST(self):
+                owner.events.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                owner.assertEqual(self.headers.get("Authorization"), "Bearer " + owner.callback_token)
+                self.send_response(503 if owner.reject_callback else 202)
+                self.end_headers()
+
+        self.http = ThreadingHTTPServer(("127.0.0.1", 0), Objects)
+        self.http.daemon_threads = True
+        self.thread = threading.Thread(target=self.http.serve_forever)
+        self.thread.start()
+        self.addCleanup(self.stop_objects)
+        self.base = f"http://127.0.0.1:{self.http.server_port}/"
+        self.token, self.callback_token = "test-access-" + uuid4().hex, "test-callback-" + uuid4().hex
+        self.settings = Settings(Path(self.temp.name), self.token, self.base + "dev/",
+                                 self.base + "events", self.callback_token, allow_loopback=True)
+        self.app = create_app(self.settings)
+        self.client = TestClient(self.app)
+        self.client.__enter__()
+        self.addCleanup(lambda: self.client.__exit__(None, None, None))
+        self.headers = {"Authorization": "Bearer " + self.token}
+
+    def stop_objects(self):
+        self.release.set()
+        self.http.shutdown()
+        self.http.server_close()
+        self.thread.join(5)
+
+    def payload(self, kind="binary", targets=None, versions=None, materials=False, retry_of=None, replica=None):
+        versions = versions or dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)
+        if retry_of is None:
+            request = Request(7, kind, **versions, run_id=str(uuid4()))
+        else:  # The next round of the same request, as the backend sends it after a resume.
+            request = Request(7, kind, retry_of["request_id"], retry_of["execution_round"] + 1,
+                              **versions, run_id=retry_of["run_id"])
+        tables = {"targets": build_targets([1, 99, 100]) if targets is None else targets}
+        if materials:
+            # Same shape the backend sends with every model input (features/materials.py there).
+            tables["transactions"] = pa.table({"tx_id": pa.array([1, 2, 99, 100], pa.int64())})
+            tables["accounts"] = pa.table({"account_id": pa.array(["a", "b"]), "entity_type": pa.array(["Corporation", None])})
+        if replica is not None:
+            replica, materials = dict(replica), True
+            tables.update(replica.pop("tables"))
+        entries, urls = [], {}
+        for name, table in tables.items():
+            stream = io.BytesIO()
+            pq.write_table(table, stream)
+            data = stream.getvalue()
+            key = "dev/" + request.inputs + name + ".parquet"
+            self.objects["/" + key] = data
+            entries.append(descriptor(name, key, data))
+            urls[name] = self.base + key
+        manifest = encode(dict(request.identity(), **request.versions(), target_row_count=3,
+                               files=sorted(entries, key=lambda entry: entry["name"])))
+        self.objects["/dev/" + request.manifest] = manifest
+        return dict(request.identity(), **request.versions(),
+                    manifest_sha256=hashlib.sha256(manifest).hexdigest(),
+                    manifest_url=self.base + "dev/" + request.manifest,
+                    input_url=urls["targets"], **({"input_urls": urls} if materials else {}),
+                    **({"replica": replica} if replica is not None else {}),
+                    result_urls={name: self.base + "dev/" + request.output + name
+                                 for name in ("scores.parquet", "result.json")})
+
+    def path(self, payload):
+        return f"/api/v1/inference-requests/{payload['request_id']}/rounds/{payload['execution_round']}"
+
+    def cancel(self, payload):
+        return {**{k: payload[k] for k in ("contract_version", "job_id", "run_id", "model_kind", "request_id", "execution_round")},
+                "cancel_id": str(uuid4()), "reason_code": "REPORT_CORRECTED",
+                "requested_at": "2026-09-21T00:00:00+00:00"}
+
+    def wait_for(self, check, timeout=15):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            value = check()
+            if value:
+                return value
+            time.sleep(0.05)
+        self.fail("Timed out waiting for inference state")
+
+    def state(self, payload):
+        return self.client.get(self.path(payload), headers=self.headers).json()
+
+    def test_end_to_end_models_and_callback(self):
+        for kind in ("binary", "type"):
+            payload = self.payload(kind)
+            self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+            self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
+            self.wait_for(lambda: self.state(payload)["notification_delivered"])
+            result = self.state(payload)["result"]
+            scores = pq.read_table(io.BytesIO(self.objects["/" + result["files"][0]["key"]]))
+            self.assertEqual(scores.column("tx_id").to_pylist(), [1, 99, 100])
+            if kind == "binary":
+                self.assertEqual(scores.column("p_laundering").to_pylist(), calculate(build_targets([1, 99, 100]), "binary", model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)["p_laundering"].to_pylist())
+
+    def test_random_demo_models_use_same_http_file_callback_protocol(self):
+        from tests.demo_inputs import build_targets
+        from models.demo_random.spec import MODEL_VERSION, FEATURE_VERSION
+        from models.demo_random.model import calculate
+        targets = build_targets([1, 99, 100])
+        for kind in ('binary', 'type'):
+            payload = self.payload(kind, targets, dict(model_version=MODEL_VERSION, feature_version=FEATURE_VERSION))
+            self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+            self.wait_for(lambda: self.state(payload)['status'] == 'COMPLETED')
+            self.wait_for(lambda: self.state(payload)['notification_delivered'])
+            result = self.state(payload)['result']
+            scores = pq.read_table(io.BytesIO(self.objects['/' + result['files'][0]['key']]))
+            self.assertEqual(scores['p_laundering' if kind == 'binary' else 'p_3'].to_pylist(),
+                             calculate(targets, kind, model_version=MODEL_VERSION, feature_version=FEATURE_VERSION)['p_laundering' if kind == 'binary' else 'p_3'].to_pylist())
+            self.assertNotIn("manifest_url", self.state(payload))
+        self.assertEqual(len(self.events), 2)
+
+    def test_materials_bundle_is_downloaded_verified_and_scored(self):
+        payload = self.payload(materials=True)
+        self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+        self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
+        scores = pq.read_table(io.BytesIO(self.objects["/" + self.state(payload)["result"]["files"][0]["key"]]))
+        self.assertEqual(scores.column("tx_id").to_pylist(), [1, 99, 100])
+
+    def test_materials_urls_must_stay_in_request_scope_and_match_targets(self):
+        payload = self.payload(materials=True)
+        for change in ({"accounts": "http://169.254.169.254/latest/meta-data/"},
+                       {"targets": payload["input_urls"]["transactions"]},
+                       {"Bad Name": payload["input_urls"]["accounts"]}):
+            body = dict(payload, input_urls={**payload["input_urls"], **change})
+            with self.subTest(change=list(change)):
+                self.assertEqual(self.client.put(self.path(body), json=body, headers=self.headers).status_code, 422)
+
+    def test_manifest_and_request_must_list_the_same_files(self):
+        payload = self.payload(materials=True)
+        body = dict(payload, input_urls={k: v for k, v in payload["input_urls"].items() if k != "accounts"})
+        self.assertEqual(self.client.put(self.path(body), json=body, headers=self.headers).status_code, 202)
+        self.wait_for(lambda: self.state(body)["status"] == "FAILED")
+
+    def test_unknown_request_answer_matches_backend_resend_rule(self):
+        # The backend resends an unreceived request only on exactly this answer
+        # (api-server worker/inference/inference_dispatch._unknown_request).
+        payload = self.payload()
+        response = self.client.get(self.path(payload), headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "REQUEST_NOT_FOUND"})
+
+    def test_acceptance_response_matches_backend_contract(self):
+        # The backend observer (api-server worker/inference/inference_dispatch.normalize) is tested
+        # against this exact view in api-server worker/tests/test_inference_view_contract.py.
+        payload = self.payload()
+        response = self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 202)
+        identity = {key: payload[key] for key in (
+            'contract_version', 'job_id', 'model_kind', 'request_id', 'execution_round', 'run_id')}
+        self.assertEqual(response.json(), dict(identity, status='ACCEPTED', revision=1, error_code=None,
+                                               notification_delivered=False, attempts=0,
+                                               model_failures=0, transfer_failures=0))
+    def test_auth_scope_and_changed_request_are_rejected(self):
+        payload = self.payload()
+        self.assertEqual(self.client.put(self.path(payload), json=payload).status_code, 401)
+        malicious = dict(payload, input_url="http://169.254.169.254/latest/meta-data/")
+        response = self.client.put(self.path(payload), json=malicious, headers=self.headers)
+        self.assertEqual(response.status_code, 422)
+        self.assertNotIn("169.254", response.text)
+        self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+        self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 200)
+        changed = dict(payload, run_id=str(uuid4()))
+        self.assertEqual(self.client.put(self.path(payload), json=changed, headers=self.headers).status_code, 409)
+
+    def test_prearrival_cancel_survives_restart_and_prevents_execution(self):
+        payload = self.payload()
+        cancellation = self.cancel(payload)
+        self.assertEqual(self.client.put(self.path(payload) + "/cancellation", json=cancellation, headers=self.headers).status_code, 200)
+        self.client.__exit__(None, None, None)
+        self.app = create_app(self.settings)
+        self.client = TestClient(self.app)
+        self.client.__enter__()
+        result = self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.assertEqual(result.json()["status"], "STOPPED")
+        self.assertEqual(result.json()["cancellation_status"], "STOPPED")
+        self.assertIsNone(self.app.state.service.process)
+        altered = dict(cancellation, cancel_id=str(uuid4()))
+        self.assertEqual(self.client.put(self.path(payload) + "/cancellation", json=altered, headers=self.headers).status_code, 409)
+
+    def test_running_cancel_remains_responsive_during_download(self):
+        self.block_download = True
+        payload = self.payload()
+        self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.assertTrue(self.entered.wait(10))
+        started = time.monotonic()
+        response = self.client.put(self.path(payload) + "/cancellation", json=self.cancel(payload), headers=self.headers)
+        self.assertEqual(response.status_code, 202)
+        self.assertLess(time.monotonic() - started, 2)
+        self.wait_for(lambda: self.state(payload)["status"] == "STOPPED")
+        self.assertNotIn("result", self.state(payload))
+        self.release.set()
+
+    def test_upload_retry_reuses_computed_artifact_and_same_identity(self):
+        self.reject_upload = True
+        payload = self.payload()
+        self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.wait_for(lambda: self.state(payload)["status"] == "RETRY_WAIT")
+        output = Path(self.temp.name) / payload["request_id"] / "1" / "scores.parquet"
+        before = (output.stat().st_mtime_ns, output.read_bytes())
+        refreshed = dict(payload, input_url=payload["input_url"] + "?fresh-signature")
+        self.assertEqual(self.client.put(self.path(payload), json=refreshed, headers=self.headers).status_code, 200)
+        self.reject_upload = False
+        service = self.app.state.service
+        with service.mutex, service.db:
+            service.db.execute("UPDATE requests SET retry_at=0")
+        self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
+        self.assertEqual(before, (output.stat().st_mtime_ns, output.read_bytes()))
+
+    def test_callback_retry_uses_same_event_id(self):
+        self.reject_callback = True
+        payload = self.payload()
+        self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.wait_for(lambda: len(self.events) == 1)
+        service = self.app.state.service
+        def attempt_recorded():
+            with service.mutex:
+                return service.db.execute("SELECT notify_attempts FROM requests").fetchone()[0] == 1
+        self.wait_for(attempt_recorded)
+        self.reject_callback = False
+        with service.mutex, service.db:
+            service.db.execute("UPDATE requests SET notify_at=0")
+        self.wait_for(lambda: self.state(payload)["notification_delivered"])
+        self.assertEqual(len(self.events), 2)
+        self.assertEqual(self.events[0]["event_id"], self.events[1]["event_id"])
+
+    def test_second_server_cannot_own_same_state_directory(self):
+        other = InferenceService(self.settings)
+        with self.assertRaises(OSError):
+            other.start()
+        self.assertTrue(self.app.state.service.engine.is_alive())
+
+    def test_completed_cancel_acknowledges_finished_without_reexecuting(self):
+        payload = self.payload()
+        self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
+        result = self.state(payload)["result"]
+        cancellation = self.cancel(payload)
+        response = self.client.put(self.path(payload) + "/cancellation", json=cancellation, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["cancellation_status"], "ALREADY_FINISHED")
+        self.assertEqual(response.json()["result"], result)
+
+    def crash_while_running(self, payload, orphan=False):
+        """Restart the server as after a crash in the middle of the model process."""
+        from inference_worker.inference_compute import hold_compute_lock
+        service = self.app.state.service
+        with service.mutex:
+            service.submit(payload)
+            with service.db:
+                service.db.execute("UPDATE requests SET status='RUNNING'")
+        directory = Path(self.temp.name).resolve() / payload["request_id"] / str(payload["execution_round"])
+        directory.mkdir(parents=True, exist_ok=True)
+        # A model process that outlived the server keeps its lock; a finished one released it.
+        lease = hold_compute_lock(directory)
+        if not orphan:
+            lease.close()
+            lease = None
+        self.client.__exit__(None, None, None)
+        self.app = create_app(self.settings)
+        self.client = TestClient(self.app)
+        self.client.__enter__()
+        return lease
+
+    def test_uncertain_restart_never_acknowledges_model_stopped(self):
+        payload = self.payload()
+        lease = self.crash_while_running(payload, orphan=True)
+        self.addCleanup(lease.close)
+        self.assertEqual(self.state(payload)["error_code"], "RECOVERY_REQUIRED")
+        response = self.client.put(self.path(payload) + "/cancellation", json=self.cancel(payload), headers=self.headers)
+        self.assertEqual(response.status_code, 202)
+        self.assertNotIn("cancellation_status", response.json())
+        self.assertIsNone(self.app.state.service.process)
+        # A new round is refused while the old model process may still write results.
+        retry = self.payload(retry_of=payload)
+        self.assertEqual(self.client.put(self.path(retry), json=retry, headers=self.headers).status_code, 409)
+
+    def test_restart_confirms_a_gone_model_process_and_accepts_a_new_round(self):
+        payload = self.payload()
+        self.crash_while_running(payload)
+        self.assertEqual((self.state(payload)["status"], self.state(payload)["error_code"]), ("FAILED", "WORKER_SHUTDOWN"))
+        retry = self.payload(retry_of=payload)
+        self.assertEqual(self.client.put(self.path(retry), json=retry, headers=self.headers).status_code, 202)
+        self.wait_for(lambda: self.state(retry)["status"] == "COMPLETED")
+        self.assertEqual(self.state(payload)["status"], "FAILED")  # The old round stays as it ended.
+
+    def test_orphan_that_finishes_later_is_confirmed_without_a_restart(self):
+        payload = self.payload()
+        lease = self.crash_while_running(payload, orphan=True)
+        self.assertEqual(self.state(payload)["error_code"], "RECOVERY_REQUIRED")
+        lease.close()
+        self.wait_for(lambda: self.state(payload)["error_code"] == "WORKER_SHUTDOWN", timeout=15)
+        retry = self.payload(retry_of=payload)
+        self.assertEqual(self.client.put(self.path(retry), json=retry, headers=self.headers).status_code, 202)
+
+    @unittest.skipUnless(Path("/proc").is_dir(), "process lookup needs /proc")
+    def test_process_started_before_the_lock_is_found_by_its_command_line(self):
+        import subprocess, sys
+        from inference_worker.inference_compute import compute_running
+        directory = Path(self.temp.name).resolve() / "legacy"
+        directory.mkdir()
+        self.assertIs(compute_running(directory), False)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "inference_compute.py", str(directory)])
+        self.addCleanup(child.wait)
+        self.addCleanup(child.kill)
+        self.wait_for(lambda: compute_running(directory))
+
+    def test_model_process_holds_its_directory_lock(self):
+        from inference_worker.inference_compute import compute_running, hold_compute_lock
+        directory = Path(self.temp.name) / "lock-check"
+        directory.mkdir()
+        lease = hold_compute_lock(directory)
+        self.assertIs(compute_running(directory), True)
+        with self.assertRaises(OSError):
+            hold_compute_lock(directory)
+        lease.close()
+        self.assertIs(compute_running(directory), False)
+
+    def test_replica_requests_keep_the_ledger_copy_and_refuse_a_wrong_base(self):
+        from inference_worker.replica import Replica
+        from tests.test_replica import accounts, removed, transactions
+        copy = Replica(Path(self.temp.name).resolve() / "replica")
+        full = self.payload(replica=dict(mode="full", base_seq=0, seq=5, rows=2, tables=dict(
+            transactions=transactions([(1, "a", "b", "10"), (2, "b", "a", "20")]),
+            accounts=accounts([("a", None), ("b", None)]), removed=removed([]))))
+        delta = dict(mode="delta", base_seq=5, seq=9, rows=3, tables=dict(
+            transactions=transactions([(99, "a", "c", "30"), (100, "c", "b", "40")], "TARGET"),
+            accounts=accounts([("c", None)]), removed=removed([2])))
+        binary, kind = self.payload(replica=delta), self.payload("type", replica=delta)
+        for payload in (full, binary, kind):
+            self.assertEqual(self.client.put(self.path(payload), json=payload, headers=self.headers).status_code, 202)
+            self.wait_for(lambda: self.state(payload)["status"] == "COMPLETED")
+        self.assertEqual(copy.current()["seq"], 9)
+        self.assertEqual(copy.inputs(build_targets([99, 100]))["transactions"].column("tx_id").to_pylist(), [1, 99, 100])
+        stale = self.payload(replica=dict(delta, base_seq=7, seq=12))
+        self.client.put(self.path(stale), json=stale, headers=self.headers)
+        self.wait_for(lambda: self.state(stale)["status"] == "FAILED")
+        self.assertEqual(self.state(stale)["error_code"], "REPLICA_MISMATCH")
+        self.assertEqual(copy.current()["seq"], 9)
+        for broken in (dict(delta, base_seq=0), dict(delta, mode="full"), dict(delta, seq=5), dict(delta, rows=0)):
+            bad = self.payload(replica=broken)
+            self.assertEqual(self.client.put(self.path(bad), json=bad, headers=self.headers).status_code, 422)
+        missing = self.payload(replica=delta)
+        missing["input_urls"].pop("removed")
+        self.assertEqual(self.client.put(self.path(missing), json=missing, headers=self.headers).status_code, 422)
+
+    def test_tampered_manifest_fails_without_output_upload(self):
+        payload = self.payload()
+        self.objects[urlsplit(payload["manifest_url"]).path] = b"tampered"
+        self.client.put(self.path(payload), json=payload, headers=self.headers)
+        self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+        self.assertEqual(self.state(payload)["error_code"], "INPUT_OR_MODEL_INVALID")
+        self.assertNotIn(urlsplit(payload["result_urls"]["scores.parquet"]).path, self.objects)
+
+    def test_request_id_cannot_be_reused_for_another_run_across_rounds(self):
+        payload = self.payload()
+        self.client.put(self.path(payload) + "/cancellation", json=self.cancel(payload), headers=self.headers)
+        later = dict(payload, execution_round=2, run_id=str(uuid4()))
+        later["manifest_url"] = payload["manifest_url"].replace("rounds/1/", "rounds/2/")
+        later["result_urls"] = {key: value.replace("rounds/1/", "rounds/2/") for key, value in payload["result_urls"].items()}
+        self.assertEqual(self.client.put(self.path(later), json=later, headers=self.headers).status_code, 409)
+
+    def test_actual_http_server_roundtrip(self):
+        settings = dataclasses.replace(self.settings, directory=Path(self.temp.name) / "http-server")
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", 0))
+        url = f"http://127.0.0.1:{sock.getsockname()[1]}"
+        server = uvicorn.Server(uvicorn.Config(create_app(settings), log_level="error", access_log=False))
+        thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]})
+        thread.start()
+        try:
+            self.wait_for(lambda: server.started)
+            payload = self.payload()
+            with httpx.Client(base_url=url, headers=self.headers, trust_env=False) as client:
+                self.assertEqual(client.put(self.path(payload), json=payload).status_code, 202)
+                self.wait_for(lambda: client.get(self.path(payload)).json()["status"] == "COMPLETED")
+        finally:
+            server.should_exit = True
+            thread.join(10)
+            sock.close()
+        self.assertFalse(thread.is_alive())
+
+    def failing_processes(self, kind, failure, limit):
+        """Process boundary double; successful attempts still execute the real child."""
+        import subprocess
+        original = subprocess.Popen
+        calls = []
+
+        class Exited:
+            returncode = 0
+            def poll(self):
+                return 0
+
+        def spawn(command, **kwargs):
+            directory = Path(command[-1])
+            body = json.loads((directory / "request.json").read_text())
+            calls.append(body["model_kind"])
+            if body["model_kind"] == kind and calls.count(kind) <= limit:
+                atomic_json(directory / "outcome.json", failure)
+                return Exited()
+            return original(command, **kwargs)
+
+        return patch("inference_worker.inference_service.subprocess.Popen", side_effect=spawn), calls
+
+    def retry_now(self, payload):
+        service = self.app.state.service
+        with service.mutex, service.db:
+            service.db.execute("UPDATE requests SET retry_at=0 WHERE request_id=?", (payload["request_id"],))
+
+    def test_model_retry_keeps_other_model_result_and_only_final_event(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("TYPE", failure, 2)
+        with process_patch:
+            binary, pattern = self.payload("binary"), self.payload("type")
+            self.client.put(self.path(binary), json=binary, headers=self.headers)
+            self.wait_for(lambda: self.state(binary)["status"] == "COMPLETED")
+            completed = self.state(binary)["result"]
+            self.client.put(self.path(pattern), json=pattern, headers=self.headers)
+            for attempt, delay in ((1, 60), (2, 300)):
+                self.wait_for(lambda: self.state(pattern)["status"] == "RETRY_WAIT"
+                              and self.state(pattern)["model_failures"] == attempt)
+                state = self.state(pattern)
+                self.assertAlmostEqual(state["retry_at"] - time.time(), delay, delta=3)
+                self.assertEqual(state["transfer_failures"], 0)
+                self.assertFalse(any(event["request_id"] == pattern["request_id"] for event in self.events))
+                self.retry_now(pattern)
+            self.wait_for(lambda: self.state(pattern)["status"] == "COMPLETED")
+            self.wait_for(lambda: self.state(pattern)["notification_delivered"])
+            self.assertEqual(calls.count("TYPE"), 3)
+            self.assertEqual(calls.count("BINARY"), 1)
+            self.assertEqual(self.state(binary)["result"], completed)
+
+    def test_three_model_failures_stop_and_survive_restart(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("TYPE", failure, 10)
+        with process_patch:
+            payload = self.payload("type")
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            for count in (1, 2):
+                self.wait_for(lambda: self.state(payload)["status"] == "RETRY_WAIT"
+                              and self.state(payload)["model_failures"] == count)
+                self.retry_now(payload)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.wait_for(lambda: self.state(payload)["notification_delivered"])
+            self.assertEqual(self.state(payload)["model_failures"], 3)
+            self.assertEqual(self.state(payload)["failure"]["action"], "CHECK_INFERENCE_ENVIRONMENT")
+            service = self.app.state.service
+            with service.mutex:
+                self.assertEqual(service.db.execute("SELECT count(*) FROM attempt_failures").fetchone()[0], 3)
+            self.client.__exit__(None, None, None)
+            self.app = create_app(self.settings)
+            self.client = TestClient(self.app)
+            self.client.__enter__()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.assertEqual(self.state(payload)["status"], "FAILED")
+            self.assertEqual(calls.count("TYPE"), 3)
+
+    def test_oom_is_environment_failure_not_input_resend(self):
+        failure = model_failure(ModelExecutionError("GPU_OUT_OF_MEMORY", "INFERENCE"))
+        failure["retryable"] = True
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.assertEqual(self.state(payload)["failure"]["action"], "CHECK_INFERENCE_ENVIRONMENT")
+            self.assertEqual(calls, ["BINARY"])
+
+    def test_cancel_during_model_retry_prevents_next_attempt(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "RETRY_WAIT")
+            self.client.put(self.path(payload) + "/cancellation", json=self.cancel(payload), headers=self.headers)
+            self.assertEqual(self.state(payload)["status"], "STOPPED")
+            self.retry_now(payload)
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.assertEqual(self.state(payload)["status"], "STOPPED")
+            self.assertEqual(calls, ["BINARY"])
+
+    def test_invalid_model_error_is_terminal_and_does_not_kill_engine(self):
+        failure = {"status": "FAILED", "error_code": "UNKNOWN", "model_error": {"secret": "private"}}
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.assertEqual(self.state(payload)["error_code"], "MODEL_PROTOCOL_INVALID")
+            self.assertNotIn("private", json.dumps(self.state(payload)))
+            self.assertTrue(self.app.state.service.engine.is_alive())
+
+    def test_retry_wait_restart_preserves_budget_and_schedule(self):
+        failure = model_failure(ModelExecutionError("MODEL_TEMPORARILY_UNAVAILABLE", "INFERENCE"))
+        process_patch, calls = self.failing_processes("BINARY", failure, 10)
+        with process_patch:
+            payload = self.payload()
+            self.client.put(self.path(payload), json=payload, headers=self.headers)
+            self.wait_for(lambda: self.state(payload)["status"] == "RETRY_WAIT")
+            retry_at = self.state(payload)["retry_at"]
+            self.client.__exit__(None, None, None)
+            self.app = create_app(self.settings)
+            self.client = TestClient(self.app)
+            self.client.__enter__()
+            self.assertEqual(self.state(payload)["model_failures"], 1)
+            self.assertEqual(self.state(payload)["retry_at"], retry_at)
+            self.retry_now(payload)
+            self.wait_for(lambda: self.state(payload)["model_failures"] == 2)
+            self.assertEqual(self.state(payload)["status"], "RETRY_WAIT")
+            self.retry_now(payload)
+            self.wait_for(lambda: self.state(payload)["status"] == "FAILED")
+            self.assertEqual(calls.count("BINARY"), 3)
+
+
+if __name__ == "__main__":
+    unittest.main()

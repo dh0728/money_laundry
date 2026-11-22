@@ -1,6 +1,7 @@
 import { validWorkCode } from '../../app/preview-route.js';
 
 import { applyPreviewJudgment } from './case-judgment-data.js';
+import { liveNextEpisodeCode } from './live-data.js';
 
 const storageKey = 'aml-radar-preview-episode-transfers';
 const isAlert = code => validWorkCode(code) && code.startsWith('A-');
@@ -27,7 +28,8 @@ function storeTransfers(rows, code) {
 }
 
 export function canManagePreviewEpisodes(user) {
-  return user?.source === 'fixture' && (user.role === 'ADMIN' || user.role === 'STAFF');
+  // 서버 계정(api)의 변경은 layout.js의 saveEpisode가 서버로 보낸다.
+  return (user?.source === 'fixture' || user?.source === 'api') && (user.role === 'ADMIN' || user.role === 'STAFF');
 }
 
 export function canTransferAlert(row) {
@@ -40,6 +42,9 @@ export function previewEpisodeWillDissolve(episode, unlinkCount) {
 
 export function nextPreviewEpisodeCode(cases, alertCode, rows = readTransfers()) {
   if (!isAlert(alertCode)) return '';
+  // 서버 데이터를 볼 때는 서버가 미리 잡아 준 번호를 쓴다.
+  const reserved = liveNextEpisodeCode();
+  if (reserved) return reserved;
   const date = alertCode.split('-')[1];
   const used = new Set([...cases, ...rows].map(row => row.code));
   let sequence = 900000 + rows.length;

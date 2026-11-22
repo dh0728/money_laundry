@@ -1,0 +1,42 @@
+{
+  "frozen_files": [
+    {
+      "file": "assets/currency_stats.parquet",
+      "source": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_daily_fixed_20261024/currency_stats.parquet",
+      "sha256": "3d8dc9c8a87b77d91b2c4cded385d8774b00f20244de817b6009534b1c50bbb7"
+    },
+    {
+      "file": "assets/amount_stats.parquet",
+      "source": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_daily_fixed_20261024/amount_stats.parquet",
+      "sha256": "c8396f8337965f98ef1bb5e5a00c74818d77837bfd1e35196f6d2335f20b8f1c"
+    },
+    {
+      "file": "assets/categories.json",
+      "source": "/workspace/kimi/Claude_GNN/final_model/experiments/v10_daily_fixed_20261024/categories.json",
+      "sha256": "53e2e93610d688c5fc64ba54944e1cefa9bb4264c5f11a6189c4a20fad4e77ed"
+    },
+    {
+      "file": "models/multi_epoch280.pt",
+      "source": "/workspace/handoff/V10_FraudGT_조건수정_20261027/runs/shared_corrected_001/models/multi_fraudgt_format/best.pt",
+      "sha256": "42d0d8002a87962291eb3f409cfbba1d1dec381c35162f11f2e11cb3a034c58f"
+    },
+    {
+      "file": "models/hgb.joblib",
+      "source": "/workspace/handoff/V10_최종채택_41종_20261026/tree.joblib",
+      "sha256": "fa78dfe12c2e8ceb790850890f6d8966bad29e0e5de697219dcf0f0e85a5cf4c"
+    },
+    {
+      "file": "models/fusion.joblib",
+      "source": "/workspace/handoff/Multi_FraudGT_HGB_결합실험_20261108/fusion.joblib",
+      "sha256": "735f1ba23ff0308945ab63f7b194dc74d6c95559e687878075fef2f726304681"
+    }
+  ],
+  "source_code": {
+    "/workspace/handoff/V10_FraudGT_조건수정_20261027/fraudgt_lab/models.py": "8b8bf2055205a7695f9db558a7e3fbdd49153c4bcc87fab09ed02b0243709fc0",
+    "/workspace/handoff/inference_xai_handoff_20261011/aml_pipeline/preprocessing.py": "a651037fd8012ee6ac79db7117d5835f9d808b90b28d7aaa1e08f2969bf196d0",
+    "/workspace/handoff/inference_xai_handoff_20261011/aml_pipeline/node_features.py": "b27e9ef3f4268fb80ecce169068de72caac3e559caa233c9c7a3693932a8829a"
+  },
+  "checkpoint_epoch": 280,
+  "inference_readout": "all_targets",
+  "raw_pipeline_status": "integration reference, pending actual server and full historical population parity"
+}

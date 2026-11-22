@@ -1,4 +1,4 @@
 package com.moneylaundry.api.analysis;
 
 /** Persisted model work is pending; this is not an execution failure. */
-final class AnalysisDeferred extends RuntimeException {}
+public final class AnalysisDeferred extends RuntimeException {}

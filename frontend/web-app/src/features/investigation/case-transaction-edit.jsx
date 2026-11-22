@@ -60,12 +60,18 @@ export function CaseTransactionEdit({ row, selected = [], destinations = [], can
   function apply() {
     if (!valid) return;
     setError('');
-    try {
-      const result = onApply({ codes, targetCode: target?.code ?? null, reason: note });
+    const failed = '변경을 적용하지 못했습니다. 선택한 항목을 확인해 주세요.';
+    const finish = result => {
       if (result.ok) close();
-      else setError(result.error ?? '변경을 적용하지 못했습니다. 선택한 항목을 확인해 주세요.');
+      else setError(result.error ?? failed);
+    };
+    try {
+      // 프리뷰는 결과를 바로 돌려주고, 서비스 모드는 서버 응답을 기다린다.
+      const result = onApply({ codes, targetCode: target?.code ?? null, reason: note });
+      if (result instanceof Promise) result.then(finish, () => setError(failed));
+      else finish(result);
     } catch {
-      setError('변경을 적용하지 못했습니다. 선택한 항목을 확인해 주세요.');
+      setError(failed);
     }
   }
 

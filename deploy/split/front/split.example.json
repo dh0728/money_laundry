@@ -1,0 +1,8 @@
+{
+  "layout": "split",
+  "role": "front",
+  "account_id": "<NEW_ACCOUNT_ID>",
+  "region": "ap-northeast-2",
+  "backend_private_ip": "<BACKEND_PRIVATE_IP>",
+  "drain_seconds": 30
+}

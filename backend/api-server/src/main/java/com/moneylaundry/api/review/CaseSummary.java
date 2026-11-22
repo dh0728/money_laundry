@@ -1,5 +1,6 @@
 package com.moneylaundry.api.review;
 
+import com.moneylaundry.api.common.BusinessTime;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -25,12 +26,39 @@ public final class CaseSummary {
     return best;
   }
 
+  /** Small floor so one zero probability does not zero out the whole product. */
+  static final double TYPE_EPSILON = 1e-6;
+
+  /** Top class among NON_PATTERN and the six pattern types; Bipartite and Stack are left out. */
+  static int seedType(Map<String, Object> scores) {
+    int best = 0;
+    for (int i = 1; i <= 6; i++) if (score(scores, "p_" + i) > score(scores, "p_" + best)) best = i;
+    return best;
+  }
+
   static double score(Map<String, Object> s, String name) {
     return s.get(name) instanceof Number n ? n.doubleValue() : 0;
   }
 
   static BigDecimal amount(Object n) {
     return n == null ? BigDecimal.ZERO : new BigDecimal(n.toString());
+  }
+
+  static void annotateSuspicion(Map<String, Object> evidence, double threshold) {
+    var thresholds = new HashMap<Long, Double>();
+    for (var seed : ReviewJson.rows(evidence.get("seeds")))
+      if (seed.get("threshold") instanceof Number n)
+        thresholds.put(ReviewJson.number(seed.get("txId")), n.doubleValue());
+    for (var transaction : ReviewJson.rows(evidence.get("transactions"))) {
+      var scores = transaction.get("scores");
+      transaction.put(
+          "isSuspicious",
+          scores == null
+              ? null
+              : score(ReviewJson.object(scores), "p_laundering")
+                  >= thresholds.getOrDefault(
+                      ReviewJson.number(transaction.get("txId")), threshold));
+    }
   }
 
   public static Map<String, Object> summarize(List<Map<String, Object>> members) {
@@ -49,7 +77,9 @@ public final class CaseSummary {
     boolean usdComplete = true;
     int seeds = 0;
     double risk = 0;
-    int[] votes = new int[9];
+    int typedSeeds = 0;
+    int[] seedTops = new int[7];
+    double[] logProducts = new double[7];
     String first = null, last = null;
     for (var m : unique.values()) {
       var t = ReviewJson.object(m.get("transaction"));
@@ -67,7 +97,13 @@ public final class CaseSummary {
         seeds++;
         if (scores != null) {
           risk = Math.max(risk, score(scores, "p_laundering"));
-          votes[type(scores)]++;
+          int top = seedType(scores);
+          if (top > 0) {
+            typedSeeds++;
+            seedTops[top]++;
+            for (int i = 1; i <= 6; i++)
+              logProducts[i] += Math.log(score(scores, "p_" + i) + TYPE_EPSILON);
+          }
         }
       }
       if (!"SUBJECT".equals(m.get("reviewRole"))) continue;
@@ -88,10 +124,12 @@ public final class CaseSummary {
         if (scores != null) types.merge(TYPES[type(scores)], 1, Integer::sum);
       }
     }
-    int top = 0;
-    for (int i = 1; i < 9; i++) top = Math.max(top, votes[i]);
-    List<String> winners = new ArrayList<>();
-    for (int i = 1; i < 9; i++) if (votes[i] > 0 && votes[i] == top) winners.add(TYPES[i]);
+    List<Integer> winners = new ArrayList<>();
+    if (typedSeeds > 0) {
+      double best = Double.NEGATIVE_INFINITY;
+      for (int i = 1; i <= 6; i++) best = Math.max(best, logProducts[i]);
+      for (int i = 1; i <= 6; i++) if (logProducts[i] == best) winners.add(i);
+    }
     var net = new TreeMap<String, BigDecimal>(received);
     paid.forEach((k, v) -> net.merge(k, v.negate(), BigDecimal::add));
     var concentrations = new TreeMap<String, Double>();
@@ -119,8 +157,12 @@ public final class CaseSummary {
     out.put("riskScore", risk);
     out.put(
         "primaryType",
-        winners.isEmpty() ? "패턴 미특정" : winners.size() > 1 ? "혼합" : winners.getFirst());
-    out.put("typeShare", seeds == 0 ? null : (double) top / seeds);
+        winners.isEmpty() ? "패턴 미특정" : winners.size() > 1 ? "혼합" : TYPES[winners.getFirst()]);
+    out.put(
+        "typeShare",
+        seeds == 0
+            ? null
+            : (double) (winners.size() == 1 ? seedTops[winners.getFirst()] : 0) / seeds);
     out.put("amountsByCurrency", totals);
     out.put("firstTxAt", first);
     out.put("lastTxAt", last);

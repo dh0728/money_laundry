@@ -6,10 +6,9 @@
 
 서버에 실제 S3 설정과 활성 `dev` 프로파일이 준비되어 있어야 한다. 운영자가 보고 은행의 `banks.is_reporting=true`, 거래 기준일을 포함하는 `bank_reporting_periods`의 적용 기간, `banks.report_format=AML17`을 사전 등록해야 한다. 적용 시작일·종료일은 포함하며 종료일이 없으면 이후 기간에 적용한다. 거래에 등장하는 참조 은행의 존재만으로 보고 자격이 생기지 않는다. 미등록 은행·기준일은 403 `REPORTING_NOT_REGISTERED`다.
 
-API 키 없이 필수 `--bank-id`로 은행 코드(0~2147483647)를 전달한다. 누구든 은행 코드를 지정할 수 있는 테스트용 식별이며 실제 로그인을 대신하지 않는다. `local`도 허용하지만 `prod`가 함께 활성화되면 차단한다. 기본/미지정/그외 프로파일도 차단한다. PowerShell에서 저장소 루트 기준으로 실행한다.
+API 키 없이 필수 `--bank-id`로 은행 코드(0~2147483647)를 전달한다. 누구든 은행 코드를 지정할 수 있는 테스트용 식별이며 실제 로그인을 대신하지 않는다. `local`도 허용하지만 `prod`가 함께 활성화되면 차단한다. 기본/미지정/그외 프로파일도 차단한다. PowerShell에서 저장소 루트 기준으로 실행하며, `python`은 Python 3.13 환경을 가리켜야 한다.
 
 ```powershell
-conda activate aml
 python -B backend/bank-mock/bank_mock.py --api-url https://api.example.com --bank-id 12 --file ./transactions_2026-09-08.csv --business-date 2026-09-08
 $LASTEXITCODE
 ```
@@ -103,7 +102,6 @@ URL 만료만으로 완료 통지가 차단되지는 않는다. 새 URL을 재�
 ## 개발자 테스트
 
 ```powershell
-conda activate aml
 python -B -m unittest discover -s backend/bank-mock -p 'test_*.py' -v
 ```
 
@@ -115,12 +113,12 @@ python -B -m unittest discover -s backend/bank-mock -p 'test_*.py' -v
 
 은행 웹/로그인 대신 목업으로 자기 은행의 요청만 확인한다. `--corrections`는 OPEN뿐 아니라 모든 미해결 상태를 조회하고, `--status`로 특정 상태를 선택한다. `--page`는0부터, `--size`는1~200이다. 상세에는 기준일·원본/수정본 uploadId와 정제된 오류가 표시된다. 미도착 원본의 uploadId는 없을 수 있다.
 
-conda 환경 `aml`을 활성화한 PowerShell에서 실행한다.
+`backend/bank-mock` 폴더에서 Python 3.13으로 실행한다.
 
 ```powershell
-& "$env:CONDA_PREFIX/python.exe" -B bank_mock.py --api-url https://example.test --bank-id 70 --corrections
-& "$env:CONDA_PREFIX/python.exe" -B bank_mock.py --api-url https://example.test --bank-id 70 --correction-id 7
-& "$env:CONDA_PREFIX/python.exe" -B bank_mock.py --api-url https://example.test --bank-id 70 --file ./corrected.csv --business-date 2022-09-01 --correction-request-id 7
+python -B bank_mock.py --api-url https://example.test --bank-id 70 --corrections
+python -B bank_mock.py --api-url https://example.test --bank-id 70 --correction-id 7
+python -B bank_mock.py --api-url https://example.test --bank-id 70 --file ./corrected.csv --business-date 2022-09-01 --correction-request-id 7
 ```
 
 출력한 제출 UUID를 `--submission-id UUID`로 다시 전달하면 같은 제출의 재시도다. 서버가 이미 수신한 제출이면 PUT/완료 통지를 반복하지 않고 기존 uploadId를 조회한다. 새 후보를 의도적으로 제출할 때는 새 제출 ID를 사용한다. 만료된 미수신 URL의 재시도는 새 ID가 필요하다. 동일 제출 ID로 다른 파일을 보내면 거절한다. 이전 파일과 바이트가 같은 명시 정정도 허용하며 일반 중복 업로드와 구별한다.

@@ -1,6 +1,7 @@
 """Persistent, local-only demo bootstrap. Never imported by API or worker code."""
 import base64
 from datetime import date
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -11,12 +12,12 @@ import sys
 BUCKET = 'aml-demo-files'
 SECRET_DIR = Path('/secrets')
 TLS = Path('/tls')
-KEYS = ('postgres-password', 'minio-password', 'inference-token', 'encryption-key', 'search-key')
+KEYS = ('postgres-password', 'minio-password', 'inference-token', 'encryption-key', 'search-key', 'analysis-password')
 
 
 def prepare_keys(folder):
     folder.mkdir(parents=True, exist_ok=True)
-    if (folder / 'ready').exists() and any(not (folder / key).is_file() for key in KEYS):
+    if (folder / 'ready').exists() and any(not (folder / key).is_file() for key in KEYS if key != 'analysis-password'):
         raise RuntimeError('Persistent keys are missing; restore the existing keys instead of regenerating them')
     for key in KEYS:
         target = folder / key
@@ -95,10 +96,12 @@ def configure():
         AWS_REGION='ap-northeast-2', AWS_DEFAULT_REGION='ap-northeast-2', AWS_EC2_METADATA_DISABLED='true',
         AWS_CA_BUNDLE='/tls/bundle.pem', SSL_CERT_FILE='/tls/bundle.pem',
         SPRING_DATASOURCE_PASSWORD=values['postgres-password'],
+        ANALYSIS_DB_USERNAME='aml_demo_analysis', ANALYSIS_DB_PASSWORD=values['analysis-password'],
         INGEST_ENCRYPTION_KEY=values['encryption-key'], INGEST_SEARCH_KEY=values['search-key'],
         INGEST_KEY_VERSION='local-demo', INFERENCE_API_TOKEN=values['inference-token'],
         INFERENCE_TOKEN=values['inference-token'],
-        INFERENCE_OBJECT_BASE_URL='https://' + BUCKET + '.s3.amazonaws.com/demo/')
+        # The worker signs regional S3 URLs (AWS_REGION); the inference server accepts only this base.
+        INFERENCE_OBJECT_BASE_URL='https://' + BUCKET + '.s3.ap-northeast-2.amazonaws.com/demo/')
 
 
 def bank_days(root):
@@ -128,11 +131,19 @@ def seed():
     registrations = bank_days(Path('/data-input'))
     with psycopg.connect(host='postgres', dbname='aml_demo', user='aml_demo',
                          password=(SECRET_DIR / 'postgres-password').read_text().strip()) as db:
+        sys.path.insert(0, '/app/worker')
+        from configure_analysis_db import configure as configure_analysis
+        configure_analysis(db, os.environ['ANALYSIS_DB_USERNAME'], os.environ['ANALYSIS_DB_PASSWORD'])
+        # Local demo only: seeded accounts without a password get the fixed demo password 1234, so
+        # staff can log in and receive Alerts. Accounts that already have a password keep it.
+        salt = secrets.token_bytes(16)
+        demo_hash = (salt + hashlib.pbkdf2_hmac('sha256', b'1234', salt, 310000, 32)).hex()
+        db.execute("UPDATE core.users SET password_hash=%s WHERE coalesce(password_hash,'')=''", (demo_hash,))
         for bank, day in registrations:
             # Bank names are established from validated reports, never invented here.
-            db.execute("INSERT INTO banks(bank_id,is_reporting,report_format) VALUES(%s,true,'AML17') ON CONFLICT(bank_id) DO NOTHING", (bank,))
-            db.execute('''INSERT INTO bank_reporting_periods(bank_id,effective_from_date,effective_to_date)
-                SELECT %s,%s,%s WHERE NOT EXISTS(SELECT 1 FROM bank_reporting_periods
+            db.execute("INSERT INTO core.banks(bank_id,is_reporting,report_format) VALUES(%s,true,'AML17') ON CONFLICT(bank_id) DO NOTHING", (bank,))
+            db.execute('''INSERT INTO core.bank_reporting_periods(bank_id,effective_from_date,effective_to_date)
+                SELECT %s,%s,%s WHERE NOT EXISTS(SELECT 1 FROM core.bank_reporting_periods
                 WHERE bank_id=%s AND effective_from_date<=%s AND (effective_to_date IS NULL OR effective_to_date>=%s))''',
                 (bank, day, day, bank, day, day))
     s3 = boto3.client('s3', config=Config(signature_version='s3v4'))
@@ -153,7 +164,7 @@ def launch(mode):
         os.environ['JAVA_TOOL_OPTIONS'] = '-Djavax.net.ssl.trustStore=/tls/truststore -Djavax.net.ssl.trustStorePassword=changeit'
         args = ['java', '-jar', '/app/app.jar']
     elif mode == 'inference':
-        args = [sys.executable, '-B', '/app/worker/inference_server.py']
+        args = [sys.executable, '-B', '/app/inference-server/inference_server.py']
     else:
         file, port = sys.argv[2:]
         if (file, port) not in (('app.py', '8501'), ('control_panel.py', '8502')):
