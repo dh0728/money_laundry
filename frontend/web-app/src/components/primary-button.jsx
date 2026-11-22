@@ -38,6 +38,10 @@ export function PrimaryButton({ children, className = '', disabled, radius, size
     return <AccentButton tone={tone} className={className} disabled={disabled} radius={radius} style={style} data-button-size={size}
       activation={onHold ? 'hold' : 'press'} onHold={onHold} onClick={onClick} {...buttonProps}>{children}</AccentButton>;
   }
+  if (tone === 'inverse') {
+    return <ActionButton className={`screen-primary screen-primary--inverse ${className}`.trim()} shape="pill" surface="primary"
+      disabled={disabled} style={buttonStyle} onClick={onClick} data-button-size={size} {...buttonProps}>{children}</ActionButton>;
+  }
   return <ActionButton className={`screen-primary glass ${className}`} shape="pill" surface="floating"
     disabled={disabled} style={buttonStyle} onClick={onClick} data-button-size={size} {...buttonProps}>{children}</ActionButton>;
 }

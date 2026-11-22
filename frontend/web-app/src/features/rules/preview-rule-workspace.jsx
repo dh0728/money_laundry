@@ -21,12 +21,23 @@ export const ruleWorkspace = createWorkspaceState();
 export const previewRuleTemplates = ruleWorkspace.rules;
 const templatesById = new Map(previewRuleTemplates.map(rule => [rule.id, rule]));
 const draftStorageKey = 'aml-preview-rule-drafts';
+const deletedStorageKey = 'aml-preview-rule-deleted';
+
+function readDeletedTemplates() {
+  try {
+    const ids = JSON.parse(sessionStorage.getItem(deletedStorageKey) ?? '[]');
+    return Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 if (liveRules) ruleWorkspace.rules = [];
 else try {
   const changes = JSON.parse(sessionStorage.getItem(draftStorageKey) ?? '[]');
   if (Array.isArray(changes)) {
     const rulesById = new Map(templatesById);
+    for (const id of readDeletedTemplates()) rulesById.delete(id);
     for (const rule of changes) if (rule && typeof rule.id === 'string') rulesById.set(rule.id, rule);
     ruleWorkspace.rules = [...rulesById.values()];
   }
@@ -68,16 +79,30 @@ export function savePreviewRule(input, existingId) {
   return persistRuleChange(saveWorkspaceRule(ruleWorkspace, input, existingId), currentPreviewUser()?.name);
 }
 
+export function deletePreviewRule(id) {
+  if (!ruleWorkspace.rules.some(rule => rule.id === id)) return { ok: false, error: '삭제할 룰을 찾을 수 없습니다.' };
+  const rules = ruleWorkspace.rules.filter(rule => rule.id !== id);
+  try {
+    sessionStorage.setItem(draftStorageKey, JSON.stringify(rules.filter(rule => rule !== templatesById.get(rule.id))));
+    if (templatesById.has(id)) sessionStorage.setItem(deletedStorageKey, JSON.stringify([...new Set([...readDeletedTemplates(), id])]));
+  } catch {
+    return { ok: false, error: '이 브라우저 탭에 룰 삭제를 저장할 수 없습니다.' };
+  }
+  ruleWorkspace.rules = rules;
+  return { ok: true, value: id };
+}
+
 const requestReview = { status: 'PENDING_APPROVAL', label: '승인 요청', tone: 'brand' };
-const reviewDecisions = [
-  { status: 'REJECTED', label: '반려', tone: 'negative' },
-  { status: 'TESTING', label: '승인', tone: 'positive' },
-];
+const approveRule = { status: 'TESTING', label: '승인', tone: 'brand' };
+const rejectRule = { status: 'REJECTED', label: '반려', tone: 'negative' };
+const stopRule = { status: 'STOPPED', label: '중지', tone: 'negative' };
 
 function reviewActions(rule, user) {
   if (!user || !rule) return [];
   if (rule.status === 'DRAFT') return [requestReview];
-  return user.role === 'ADMIN' && rule.status === 'PENDING_APPROVAL' ? reviewDecisions : [];
+  if (user.role !== 'ADMIN') return [];
+  if (rule.status === 'PENDING_APPROVAL') return [rejectRule, approveRule];
+  return ['TESTING', 'ACTIVE'].includes(rule.status) ? [stopRule] : [];
 }
 
 export function reviewPreviewRule(id, status, reason) {
@@ -97,7 +122,7 @@ function RuleTime({ value }) {
   return value && Number.isFinite(date.getTime()) ? <time dateTime={value}>{timeFormat.format(date)} KST</time> : '기록 없음';
 }
 
-function RuleReview({ rule, actionsHost, onReview }) {
+function RuleReview({ rule, actionsHost, destructive, children, onReview }) {
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   const [decision, setDecision] = useState(null);
   const [reason, setReason] = useState('');
@@ -129,15 +154,21 @@ function RuleReview({ rule, actionsHost, onReview }) {
     else applied(result);
   }
 
+  const actionButton = action => <PrimaryButton key={action.status} tone={action.tone}
+    disabled={!allowed.includes(action)} aria-haspopup="dialog" onHold={() => {
+      setReason('');
+      setError('');
+      setDecision(action);
+    }}>{action.label}</PrimaryButton>;
+
   return <>
-    {allowed.length > 0 && <ScreenActions host={actionsHost} stackOnNarrow>
-      {allowed.map(action => <PrimaryButton key={action.status} tone={action.tone}
-        aria-haspopup="dialog" onHold={() => {
-          setReason('');
-          setError('');
-          setDecision(action);
-        }}>{action.label}</PrimaryButton>)}
-    </ScreenActions>}
+    <ScreenActions host={actionsHost} stackOnNarrow>
+      {destructive}
+      {actionButton(stopRule)}
+      {actionButton(rejectRule)}
+      {children}
+      {actionButton(rule?.status === 'DRAFT' ? requestReview : approveRule)}
+    </ScreenActions>
     {decision && <DialogFrame ref={dialog} className="rule-review-dialog" title={`룰 ${decision.label}`} titleId={titleId}
       onClose={() => setDecision(null)} onSubmit={submit}
       actions={<PrimaryButton type="submit" tone={decision.tone} disabled={!reason.trim()}>{decision.label} 확인</PrimaryButton>}>
@@ -154,6 +185,43 @@ function RuleReview({ rule, actionsHost, onReview }) {
   </>;
 }
 
+function RuleLink({ rule, path, children }) {
+  return rule ? <PrimaryButton tone="inverse" as="a" href={`${path}?rule=${rule.id}`}>{children}</PrimaryButton>
+    : <PrimaryButton tone="inverse" disabled>{children}</PrimaryButton>;
+}
+
+function RuleDelete({ rule, onClose, onDelete }) {
+  const dialog = useRef(null);
+  const titleId = useId();
+  const [error, setError] = useState('');
+
+  useEffect(() => { dialog.current.showModal(); }, []);
+
+  function submit(event) {
+    event.preventDefault();
+    const result = deletePreviewRule(rule.id);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    dialog.current.close();
+    onDelete();
+  }
+
+  return <DialogFrame ref={dialog} className="rule-review-dialog" title="룰 삭제" titleId={titleId}
+    onClose={onClose} onSubmit={submit}
+    actions={<>
+      <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
+      <PrimaryButton type="submit" tone="negative">삭제</PrimaryButton>
+    </>}>
+    <div className="case-judgment-body">
+      <p><code>{rule.id}</code> · {rule.name}</p>
+      <p>이 룰을 목록에서 삭제합니다.</p>
+      {error && <p role="alert" data-rule-block-error>{error}</p>}
+    </div>
+  </DialogFrame>;
+}
+
 export function RuleList({ reason = false, initialRule, registerTableTools, actionsHost }) {
   const [rules, setRules] = useState(() => ruleWorkspace.rules);
   useEffect(() => {
@@ -162,9 +230,10 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
   const [notice, setNotice] = useState('');
   const [id, choose] = useState(() => rules.some(row => row.id === initialRule) ? initialRule : rules[0]?.id);
   const [status, setStatus] = useState('all');
+  const [deleting, setDeleting] = useState(null);
   const rows = rules.filter(rule => status === 'all' || rule.status === status);
   const sorting = useTableSort(rows);
-  const selected = rows.find(rule => rule.id === id) ?? rows[0];
+  const selected = id === null ? undefined : rows.find(rule => rule.id === id) ?? rows[0];
   const breakdown = Object.entries(ruleStatusLabels).map(([value, label]) => ({
     value, label, count: rules.filter(rule => rule.status === value).length,
   })).filter(({ count }) => count);
@@ -221,11 +290,6 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
         </dl>
         <h3>적용 조건</h3>
         <RuleConditionFacts input={selected} />
-        <div className="workflow-rule-links">
-          <ActionButton as="a" shape="pill" href={`/rules/backtest?rule=${selected.id}`}>백테스트로 열기</ActionButton>
-          {reason ? <ActionButton as="a" shape="pill" href={`/rules?rule=${selected.id}`}>룰 목록</ActionButton> :
-            <ActionButton as="a" shape="pill" href={`/rules/reason?rule=${selected.id}`}>변경 사유</ActionButton>}
-        </div>
       </Panel>}
     </div>
     {selected && <Panel className="workflow-rule-reason" aria-label={reason ? '룰 변경 사유' : '룰 최근 변경'}>
@@ -237,9 +301,24 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
         </li>)}
       </ol> : <p>기록된 변경 이력이 없습니다.</p>}
     </Panel>}
-    {selected && <RuleReview key={selected.id} rule={selected} actionsHost={actionsHost} onReview={rule => {
+    <RuleReview key={selected?.id ?? ''} rule={selected} actionsHost={actionsHost} onReview={rule => {
       setRules(ruleWorkspace.rules);
       setNotice(`${rule.id} · ${ruleStatusLabels[rule.status]}`);
+    }} destructive={<PrimaryButton tone="negative" disabled={!selected} aria-haspopup="dialog"
+      onClick={() => setDeleting(selected)}>룰 삭제</PrimaryButton>}>
+      <PrimaryButton tone="inverse" disabled={!selected} onClick={() => {
+        const result = savePreviewRule({ ...selected, name: `${selected.name} (복제)` });
+        setRules(ruleWorkspace.rules);
+        if (result.ok) choose(result.value.id);
+        setNotice(result.ok ? `${result.value.id} 복제됨` : result.error);
+      }}>복제</PrimaryButton>
+      <RuleLink rule={selected} path="/rules/backtest">백테스트로 열기</RuleLink>
+      {reason && <RuleLink rule={selected} path="/rules">룰 목록</RuleLink>}
+    </RuleReview>
+    {deleting && <RuleDelete rule={deleting} onClose={() => setDeleting(null)} onDelete={() => {
+      setRules(ruleWorkspace.rules);
+      choose(null);
+      setNotice(`${deleting.id} 삭제됨`);
     }} />}
   </>;
 }

@@ -144,9 +144,9 @@
   align-content: start;
   gap: var(--workspace-gap);
 }
-.workflow-risk-legend, .workflow-rule-links { display: flex; flex-wrap: wrap; gap: var(--workspace-gap); margin-block: var(--workspace-gap) }
+.workflow-risk-legend { display: flex; flex-wrap: wrap; gap: var(--workspace-gap); margin-block: var(--workspace-gap) }
 .workflow-rule-count { color: var(--muted-text); font-size: var(--aml-type-caption-size); font-variant-numeric: tabular-nums }
-.workflow-rule-select, .workflow-rule-links .button { padding: var(--aml-space-6); text-decoration: none; color: inherit }
+.workflow-rule-select { padding: var(--aml-space-6); text-decoration: none; color: inherit }
 .workflow-rule-detail dt { color: var(--muted-text); margin-block-start: var(--workspace-gap) }
 .workflow-rule-detail dd { margin-inline-start: 0 }
 .workflow-rule-validation { min-inline-size: 0; align-content: start }
