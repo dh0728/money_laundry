@@ -293,11 +293,10 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
             <BacktestMetric label="적중 거래" value={results.matchedCount} unit="건" />
             <BacktestMetric label="검사 거래" value={results.scannedCount} unit="건" />
           </dl>
-          <WorkflowTable label="백테스트 근거 거래" summary={[
-            tableCount(sorting.rows.length, results.matchedCount),
-            `검사 ${results.scannedCount.toLocaleString('ko-KR')}건`,
-            `합계 ${results.amountUsd.toLocaleString('ko-KR')} USD`,
-          ].join(' · ')}>
+          <WorkflowTable label="백테스트 근거 거래" summary={<>
+            {tableCount(sorting.rows.length, results.matchedCount)}
+            <span>합계 {results.amountUsd.toLocaleString('ko-KR')} USD</span>
+          </>}>
               <TableHeader><TableRow>
                 <SortableTableHead sorting={sorting} column="transaction" value={record => record.displayId}>거래</SortableTableHead>
                 <SortableTableHead sorting={sorting} column="date" value={record => Date.parse(record.occurredAt)}>거래일 · KST</SortableTableHead>

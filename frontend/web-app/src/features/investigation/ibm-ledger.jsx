@@ -6,7 +6,7 @@ import { Panel } from '../../components/panel';
 import { FooterPagination } from '../../components/footer-pagination';
 import { CardHeader } from '../../components/card-header';
 import { StatusTag } from '../../components/semantic-tags';
-import { TableFieldLabel } from '../../components/workflow-table';
+import { tableCount, TableFieldLabel } from '../../components/workflow-table';
 import './ibm-ledger.css';
 
 const pageSize = 30;
@@ -114,7 +114,7 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
     {selected && tableView && <Detail record={selected} />}
     {code && !selected && <p className="benchmark-empty" role="status">이 원장에 포함된 거래에서 <code>{code}</code>을 찾을 수 없습니다.</p>}
     <div className="benchmark-ledger-results" ref={results}>
-      {tableView ? <CaseDataTable title="벤치마크 거래" summary={`${integer.format(rows.length)}건`} className="benchmark-table" tools={false}>
+      {tableView ? <CaseDataTable title="벤치마크 거래" summary={tableCount(rows.length)} className="benchmark-table" tools={false}>
         <TableHeader><TableRow>
           {columns.map(title => <TableHead key={title} scope="col">
             <TableFieldLabel column={title}>{title}</TableFieldLabel>

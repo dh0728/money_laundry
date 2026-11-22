@@ -5,7 +5,7 @@ import { Panel } from '../../components/panel';
 import { ActionButton } from '../../components/primary-button';
 import { RecordCard } from '../../components/record-card';
 import MagicBento from '../../components/react-bits/MagicBento';
-import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/semantic-tags';
+import { CaseActorTag, CountTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/semantic-tags';
 import { readWorkspaceGap } from '../dashboard/workspace-metrics';
 import './preview-case-card.css';
 
@@ -63,7 +63,7 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
         return <Panel className="case-progress-lane" data-review={preset} key={preset} aria-label={label}>
           <h2 className="case-progress-heading">
             <StatusTag preset={preset}>{label}</StatusTag>
-            <span className="case-progress-count">{amount.format(cards.length)}건</span>
+            <CountTag count={Math.min(limit, cards.length)} total={cards.length} />
           </h2>
           {cards.length > 0 ? <MagicBento key={reduced} className="case-progress-cards preview-tilt-cards"
             items={cards.slice(0, limit).map(row => ({ id: row.code, content: <PreviewCaseCard

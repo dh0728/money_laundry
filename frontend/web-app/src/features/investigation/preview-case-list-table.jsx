@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { FooterPagination } from '../../components/footer-pagination';
 import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
@@ -44,20 +45,39 @@ function AccountFlows({ records }) {
     {flows.length > 2 && <small>외 {flows.length - 2}개 흐름</small>}</>;
 }
 
-export function PreviewCaseTable({ title, rows, episode = false, totalCount = rows.length }) {
+/** pageSize를 주면 표 정렬까지 적용한 전체 결과를 먼저 구한 뒤 페이지로 나눈다. 정렬을 바꾸면 첫 페이지로 돌아간다. */
+export function PreviewCaseTable({ title, rows, episode = false, totalCount = rows.length, pageSize, initialPage = 0, onPageChange,
+  paginationHost }) {
   const scope = episode ? 'episodes' : 'alerts';
   const sorting = useTableSort(rows, scope);
   const selection = useTableSelection(sorting.rows, scope);
+  const sortKey = `${sorting.active?.column ?? ''}:${sorting.active?.direction ?? 0}`;
+  const [paging, setPaging] = useState(() => ({ key: sortKey, page: initialPage }));
+  const frame = useRef(null);
+  const paged = pageSize > 0;
+  const pageCount = paged ? Math.max(1, Math.ceil(sorting.rows.length / pageSize)) : 1;
+  const page = Math.min(paging.key === sortKey ? paging.page : 0, pageCount - 1);
+  const visibleRows = paged ? sorting.rows.slice(page * pageSize, (page + 1) * pageSize) : sorting.rows;
+  const changePage = next => {
+    setPaging({ key: sortKey, page: next });
+    onPageChange?.(next);
+    const scrollRegion = frame.current?.querySelector('.data-table-scroll');
+    if (scrollRegion) scrollRegion.scrollTop = 0;
+    window.scrollTo?.(0, 0);
+  };
+  useEffect(() => {
+    if (paging.key !== sortKey && paging.page !== 0) onPageChange?.(0);
+  }, [paging.key, paging.page, sortKey, onPageChange]);
   const numericHeadings = episode ? [...episodeMeasures, ...measures] : measures;
   const headings = [...columns, ...numericHeadings];
-  return <CaseDataTable title={title} summary={tableCount(rows.length, totalCount, '건', selection.selectedCount)} className={`entry-list${episode ? ' case-table-episode' : ''}`} selection={selection}>
+  return <div ref={frame} className="case-table-pages"><CaseDataTable title={title} summary={tableCount(rows.length, totalCount, '건', selection.selectedCount)} className={`entry-list${episode ? ' case-table-episode' : ''}`} selection={selection}>
       <TableHeader><TableRow>
         {headings.map(({ name, compactName, ...options }, index) =>
           <SortableTableHead key={name} sorting={sorting} column={name} label={options.label ?? name} {...options}
             className={index >= columns.length ? 'case-table-numeric' : undefined}>{episode ? compactName ?? name : name}</SortableTableHead>)}
       </TableRow></TableHeader>
       <TableBody>
-        {sorting.rows.map(row => {
+        {visibleRows.map(row => {
           const { code, verdict, pattern, score, assigned, status, elapsed, open, related, relatedAccounts, linkedAlerts, amountByCurrency } = row;
           const totals = Object.entries(amountByCurrency);
           return <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}>
@@ -81,11 +101,14 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
         })}
         {!rows.length && <TableRow><TableCell colSpan={headings.length}>조회 조건과 일치하는 항목이 없습니다.</TableCell></TableRow>}
       </TableBody>
-    </CaseDataTable>;
+    </CaseDataTable>
+    {paged && <FooterPagination host={paginationHost} label={`${title} 페이지`} page={page} pageCount={pageCount}
+      onPageChange={changePage} alwaysShow />}
+  </div>;
 }
 
-export function mountPreviewCaseTable(host, title, rows, episode, totalCount) {
+export function mountPreviewCaseTable(host, title, rows, episode, totalCount, paging = {}) {
   const root = createRoot(host);
-  root.render(<PreviewCaseTable title={title} rows={rows} episode={episode} totalCount={totalCount} />);
+  root.render(<PreviewCaseTable title={title} rows={rows} episode={episode} totalCount={totalCount} {...paging} />);
   return () => root.unmount();
 }

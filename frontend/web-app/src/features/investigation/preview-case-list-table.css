@@ -22,3 +22,4 @@
   padding-inline: var(--table-cell-inset);
 }
 .case-table-episode .table-field-label { column-gap: var(--aml-space-4) }
+.case-table-pages { display: contents }
