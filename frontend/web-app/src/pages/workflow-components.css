@@ -1,0 +1,273 @@
+.workflow-panel > [role="status"], .workflow-static-status {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-6);
+  margin-block: var(--workspace-gap);
+}
+.workflow-backtest .stepper {
+  --stepper-bleed: 0px;
+  --stepper-inset: 0px;
+  --stepper-well-radius: var(--aml-radius-full);
+  --stepper-tile-radius: var(--aml-radius-full);
+  margin-block-start: var(--workspace-gap);
+}
+.workflow-backtest .stepper__body { padding-block-start: var(--workspace-gap) }
+.backtest-footer-action, .backtest-edit-conditions {
+  block-size: var(--account-control-size);
+  padding-block: 0;
+  white-space: nowrap;
+}
+.workflow-backtest, .workflow-report {
+  align-self: start;
+  padding-block-end: var(--account-footer-reserve);
+}
+.backtest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--workspace-gap);
+  align-items: stretch;
+  margin: 0;
+}
+.backtest-card, .backtest-metric {
+  display: grid;
+  gap: var(--aml-space-8);
+  align-content: start;
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.backtest-card :is(p, dl, dd), .backtest-metric dd { margin: 0 }
+.backtest-card .backtest-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aml-space-8);
+}
+.backtest-card-heading .workflow-static-status { margin-block: 0 }
+.backtest-rule-name { font-size: var(--aml-type-heading-size, var(--ui-font-size)) }
+.backtest-meta, .backtest-rule-conditions dt { color: var(--muted-text) }
+.backtest-rule-conditions { display: grid; gap: var(--aml-space-4) }
+.workflow-threshold { display: flex; align-items: center; gap: var(--aml-space-8) }
+.workflow-threshold [data-slot="input"] {
+  inline-size: 10ch;
+  min-inline-size: 0;
+  block-size: var(--aml-panel-control-size);
+  padding-inline: var(--aml-space-8);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-panel-control-radius);
+  color: var(--text);
+  background: var(--information-panel-surface);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.workflow-threshold [aria-invalid="true"] { border-color: var(--risk-high) }
+.workflow-threshold [data-slot="input"]:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring);
+  outline-offset: var(--aml-stroke-focus);
+}
+@media (pointer: coarse) {
+  .workflow-threshold [data-slot="input"] {
+    min-block-size: max(44px, var(--aml-panel-control-size));
+    font-size: max(16px, var(--ui-font-size));
+  }
+}
+.backtest-result-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-16);
+}
+.backtest-result-summary .completion-ring {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+}
+.backtest-result-summary .completion-ring > * { grid-area: 1 / 1 }
+.backtest-result-summary .completion-ring > strong {
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.backtest-result-summary > div:last-child { min-inline-size: 0 }
+.backtest-result-summary p + p { margin-block-start: var(--aml-space-4) }
+.backtest-comparison { margin-block: var(--workspace-gap) }
+.backtest-metric-number strong, .backtest-metric dd strong {
+  font-size: var(--workspace-kpi-value-size, var(--aml-type-metric-size));
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.backtest-metric-number span, .backtest-metric dd span { color: var(--muted-text) }
+.workflow-report-targets, .workflow-report-patterns {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--aml-space-4);
+}
+.workflow-report .data-table-frame tbody :is(th, td) { vertical-align: top }
+.workflow-report .data-table-frame :is(.workflow-report-targets, .workflow-report-patterns) {
+  flex-flow: column nowrap;
+  align-items: flex-start;
+}
+.report-audit-cell { min-inline-size: 14rem }
+.report-audit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--aml-space-4);
+  max-inline-size: 22rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: var(--aml-type-caption-size);
+}
+.workflow-report :is(.report-audit-fields, .preview-case-card-body .report-audit-fields) {
+  display: grid;
+  gap: var(--aml-space-2);
+  margin: 0;
+}
+.workflow-report :is(.report-audit-fields, .preview-case-card-body .report-audit-fields) > div {
+  display: grid;
+  grid-template-columns: 5.5em minmax(0, 1fr);
+  align-items: start;
+  gap: var(--aml-space-4);
+}
+.report-audit-fields dt { color: var(--muted-text) }
+.report-audit-fields dd { margin: 0; white-space: pre-wrap }
+.report-audit-details summary {
+  display: list-item;
+  cursor: pointer;
+  font-weight: var(--aml-type-body-strong-weight);
+}
+.report-audit-preview { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.report-audit-details[open] .report-audit-preview { display: none }
+.workflow-report .report-audit-details > dl { margin-block-start: var(--aml-space-4) }
+.workflow-report-cards .preview-case-card-body dl > div { align-items: center }
+.workflow-rule-overview, .workflow-rule-overview [data-workflow="rules-list"] {
+  display: grid;
+  align-content: start;
+  gap: var(--workspace-gap);
+}
+.workflow-risk-legend, .workflow-rule-links { display: flex; flex-wrap: wrap; gap: var(--workspace-gap); margin-block: var(--workspace-gap) }
+.workflow-rule-count { color: var(--muted-text); font-size: var(--aml-type-caption-size); font-variant-numeric: tabular-nums }
+.workflow-rule-select, .workflow-rule-links .button { padding: var(--aml-space-6); text-decoration: none; color: inherit }
+.workflow-rule-detail dt { color: var(--muted-text); margin-block-start: var(--workspace-gap) }
+.workflow-rule-detail dd { margin-inline-start: 0 }
+.workflow-rule-validation { min-inline-size: 0; align-content: start }
+.workflow-rule-validation ul { padding-inline-start: var(--aml-space-20) }
+.workflow-rule-conditions fieldset { border: var(--aml-stroke-control) solid var(--divider); border-radius: var(--aml-radius-control); min-inline-size: 0 }
+.workflow-rule-conditions fieldset label { display: flex; align-items: center; flex-wrap: wrap; gap: var(--aml-space-6); margin-block: var(--aml-space-8) }
+.workflow-rule-conditions input {
+  max-inline-size: 5rem;
+  min-inline-size: 0;
+  padding: var(--aml-space-4);
+  border: var(--aml-stroke-control) solid var(--divider);
+  border-radius: var(--aml-radius-control);
+  background: var(--canvas-surface);
+  color: var(--text);
+  font: inherit;
+}
+.workflow-rule-conditions input[aria-invalid="true"] { border-color: var(--risk-high) }
+.workflow-report-cards {
+  container-type: inline-size;
+  margin-block-start: var(--workspace-gap);
+  padding: var(--record-card-shadow-gutter);
+}
+.workflow-report .data-table-scroll,
+.workflow-backtest .data-table-scroll {
+  scrollbar-gutter: auto;
+}
+.workflow-report-cards .report-bento {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-auto-rows: minmax(var(--aml-size-control-compact), auto) !important;
+  align-items: stretch;
+}
+@container (max-width: 950px) {
+  .workflow-report-cards .report-bento {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+@container (max-width: 720px) {
+  .workflow-report-cards .report-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@container (max-width: 500px) {
+  .workflow-report-cards .report-bento {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+#workflow-notifications {
+  --notice-inline-start: var(--workspace-inset);
+  --notice-inline-end: var(--workspace-inset);
+  --notice-footer-reserve: var(--app-footer-height, var(--account-footer-reserve));
+  position: fixed;
+  inset-inline: var(--notice-inline-start) var(--notice-inline-end);
+  inset-block-end: calc(var(--notice-footer-reserve) + var(--workspace-gap));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: end;
+  pointer-events: none;
+}
+@media (min-width: 841px) {
+  body:has(#sidebar:not([hidden])) #workflow-notifications {
+    --notice-inline-start: calc(var(--sidebar-width) + var(--workspace-gap));
+  }
+  body:has(#inbox:not([hidden])) #workflow-notifications {
+    --notice-inline-end: calc(var(--inbox-width) + var(--workspace-gap));
+  }
+}
+.footer-notice {
+  --notice-accent: var(--status-info-accent);
+  --notice-ink: var(--status-accent-light-ink);
+  --glass-surface-face: color-mix(in srgb, var(--notice-accent) 96%, transparent);
+  --notice-fuse-delay: var(--notice-motion);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-8);
+  min-inline-size: 0;
+  max-inline-size: min(100%, 28rem);
+  height: var(--account-control-size);
+  padding-inline: var(--aml-space-16);
+  border-radius: var(--aml-radius-full);
+  color: var(--notice-ink);
+  animation: footer-notice-in var(--notice-motion) both;
+}
+.footer-notice[data-tone="success"] { --notice-accent: var(--status-positive-accent); --notice-ink: var(--status-accent-dark-ink) }
+.footer-notice[data-tone="warning"] { --notice-accent: var(--status-caution-accent); --notice-ink: var(--status-accent-dark-ink) }
+.footer-notice[data-tone="error"] {
+  --notice-accent: color-mix(in srgb, var(--status-danger-accent) 88%, var(--aml-black-100));
+}
+:root[data-glassmorphism="false"] .footer-notice { --glass-surface-face: var(--notice-accent) }
+.footer-notice[data-closing] { animation-name: footer-notice-out }
+.footer-notice > .icon { flex: none }
+.footer-notice-text { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+@media (width < 560px) {
+  .footer-notice {
+    block-size: auto;
+    min-block-size: var(--account-control-size);
+    padding-block: var(--aml-space-4) var(--aml-space-8);
+  }
+  .footer-notice-text { white-space: normal; overflow-wrap: anywhere }
+}
+.footer-notice-fuse {
+  position: absolute;
+  inset-inline: var(--aml-space-16);
+  inset-block-end: var(--aml-space-4);
+  block-size: var(--aml-stroke-control);
+  border-radius: var(--aml-radius-full);
+  background: currentColor;
+  opacity: .62;
+  transform-origin: left;
+  animation: footer-fuse var(--notice-duration) linear var(--notice-fuse-delay) both;
+}
+@keyframes footer-fuse { to { transform: scaleX(0) } }
+@keyframes footer-notice-in {
+  0% { translate: 0 135%; opacity: 0; animation-timing-function: cubic-bezier(.14,.82,.26,1) }
+  56% { translate: 0 -18%; opacity: 1; animation-timing-function: cubic-bezier(.32,0,.52,1) }
+  100% { translate: 0 0; opacity: 1 }
+}
+@keyframes footer-notice-out {
+  0% { translate: 0 0; opacity: 1 }
+  23% { translate: 0 -14%; opacity: 1; animation-timing-function: cubic-bezier(.6,0,.88,.42) }
+  100% { translate: 0 135%; opacity: 0 }
+}
+[data-reduced-motion="true"] .footer-notice { animation: none; --notice-fuse-delay: 0ms }
+[data-reduced-motion="true"] .footer-notice-fuse { animation-timing-function: steps(5, end) }

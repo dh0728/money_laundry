@@ -436,8 +436,8 @@ public class AnalysisRunService {
         analyze core.owners, core.accounts, ledger.transactions,
           analysis.jobs, analysis.runs, analysis.scores, analysis.current_scores,
           review.alerts, review.alert_versions, review.alert_transactions,
-          review.alert_groups, review.alert_members,
-          review.episodes, review.episode_alerts, review.episode_members
+          review.alert_tx_edits, review.judgments,
+          review.episodes, review.episode_alerts
         """);
   }
 }

@@ -24,15 +24,16 @@ erDiagram
     alerts ||--o{ alert_versions : evidence
     alert_versions ||--o{ alert_transactions : evidence_members
     runs ||--o{ alert_plans : prepares
-    alerts ||--o{ alert_change_proposals : scope_changes
-    alert_change_proposals ||--o{ alert_proposal_cases : approvals
     events ||--o{ event_recipients : notifies
     alerts ||--o{ alert_lineage : relates
-    alerts ||--o{ alert_groups : investigation
-    alert_groups ||--o{ alert_members : decisions
+    alerts ||--o{ alert_tx_edits : staff_edits
+    alerts ||--o{ judgments : judged
     episodes ||--o{ episode_alerts : contains
     alerts ||--o| episode_alerts : belongs
-    episodes ||--o{ episode_members : decisions
+    episodes ||--o{ judgments : judged
+    alerts ||--o{ work_requests : requested
+    episodes ||--o{ work_requests : requested
+    rules ||--o{ rule_history : changes
 ```
 
 ## 테이블 역할
@@ -64,18 +65,21 @@ erDiagram
 | analysis | score_ledger | 입력 고정 때의 완료 현재 점수 장부(선행 점수) |
 | analysis | alert_origin_ledger, fact_ledger | 입력 고정 때의 모든 공개 Alert(종결·병합 별칭 포함) 공개 근거 버전과 그 근거 거래의 통합 상태 장부. 실행 산출 연결은 alert_versions.run_id |
 | analysis | alert_plans | 실행 토큰·세대·SHA-256으로 검증하는 공개 준비 계획(canonical JSON TEXT) |
-| review | alerts | Alert 담당·상태·종결 결과·조사 착수·공개 버전·병합 대표 ID·현재 범위 요약/revision/digest |
-| review | episodes | Episode 담당·상태·종결 결과·현재 범위 요약/revision/digest. Alert와 별도 테이블 |
+| review | alerts | Alert 담당·상태·종결 결과·조사 착수·처리 기한(due_on)·공개 버전·병합 대표 ID·현재 범위 요약/revision/digest |
+| review | episodes | Episode 담당·상태·종결 결과·처리 기한(due_on)·현재 범위 요약/revision/digest. Alert와 별도 테이블 |
 | review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 위험도는 현재 조사 범위에서 계산해 root summary와 생성 컬럼 risk_score에 저장 |
-| review | alert_groups, alert_members | 저장한 Alert 조사 그룹·소속·역할·판정 |
-| review | episode_alerts, episode_members | Episode의 원본 Alert와 조사 거래·판정 |
+| review | judgments | Alert 또는 Episode의 판정(정상/이상, 사유 유형, 근거·관찰·판정 사유, 판정자·시각). 유효한 판정은 사건당 하나이며, 재검토로 다시 열면 이전 판정은 superseded_at을 채워 기록으로 남긴다 |
+| review | work_requests | 보관함의 업무 요청·지시(유형, 대상 사건, 보낸 사람·받는 사람, 사유, 기한, 상태, 처리 내용, 적용 시각과 적용 전 상태, 읽지 않은 사람) |
+| review | alert_tx_edits | 직원이 Alert에서 뺀 거래(target 없음)와 다른 OPEN Alert로 옮긴 거래(target 있음), 사유·수정자 |
+| review | episode_alerts | Episode에 편입된 Alert. Episode 거래는 소속 Alert의 현재 거래 합집합 |
 | review | alert_lineage | MERGED_INTO/FOLLOWUP_OF 관계와 원인 이벤트 |
-| review | alert_change_proposals, alert_proposal_cases | 조사 중 병합·기존 근거 제거·재평가 제안, 영향 사건 baseline과 담당자 동의 |
-| review | events, event_recipients, requests, notification_reads | 감사 이력·공개 시 고정 수신자·멱등 변경 요청·사용자별 알림 읽음 |
+| review | events, event_recipients, notification_reads | 감사 이력·공개 시 고정 수신자·사용자별 알림 읽음 |
+| review | rules, rule_history | 룰엔진 초안·승인 상태·버전과 변경 이력. 파이프라인과 연결하지 않음 |
 | ops | business_clock | 시연 업무 시각 |
 | ops | dashboard_dirty | component·영향 범위·source transaction별 요청. PIPELINE/INVESTIGATION scope는 component에서 생성 |
 | ops | dashboard_refresh_state | 영역별 성공 버전/시각·연속 실패·재시도 시각·소요시간·안전한 오류 코드 |
 | ops | dashboard_model_counts | 거래일·탐지일·이진판정·유형별 건수. 수신/분석/의심 건수와 모델 분포 |
+| ops | dashboard_tx_hours, dashboard_score_points, dashboard_first_seen | 거래일별 시간대 건수, 점수(1점 단위) 분포, 처음 등장한 계좌·소유주 수. 대시보드 갱신 작업이 채운다 |
 | ops | dashboard_case_counts | 상태·담당·생성/배정/종결/첫 열람 시각·Episode 소속별 사건 건수. 정규화 JSON group_key PK, 변경된 키의 차이만 반영 |
 | ops | dashboard_case_items | 우선순위/오래된 Episode용 작은 현재 사건 투영. 상세 JSON 없음 |
 | ops | dashboard_report_counts | 거래일별 미완료 보고 건수 |
@@ -108,11 +112,11 @@ Python의 데이터 변경과 단계 완료 기록은 같은 DB 트랜잭션이�
 
 ## 읽기 전용 뷰
 
-`core.assignable_staff`는 비밀번호 해시를 노출하지 않는 배정 후보 목록이다. `ops.work_items`는 작업 목록, `review.cases`는 공통 사건 목록이다. `review.event_history`, `saved_members`, `latest_versions`, `effective_members`, `visible_cases`, `notifications`는 현재 조사·완료 근거·알림을 조합한다. 업무 상태의 두 번째 저장소나 구 테이블의 쓰기 호환 계층이 아니다.
+`core.assignable_staff`는 비밀번호 해시를 노출하지 않는 배정 후보 목록이다. `ops.work_items`는 작업 목록, `review.cases`는 공통 사건 목록이다. `review.event_history`, `latest_versions`, `current_members`, `visible_cases`, `notifications`는 현재 조사·완료 근거·알림을 조합한다. 업무 상태의 두 번째 저장소나 구 테이블의 쓰기 호환 계층이 아니다.
 
 `analysis.run_inputs`·`run_scores`·`run_alert_origins`·`run_fact_checks`는 실행의 `input_seq`에 유효한 장부 버전(run_inputs는 그 실행의 TARGET 행 포함)을 보여 주는 읽기 전용 뷰다.
 
-`saved_members`는 과거 근거에 대한 직원 판정을 보존한다. `effective_members`는 Alert의 저장 범위와 현재 `published_version` 거래의 교집합이며, Episode는 편입 당시 고정 범위를 유지한다. 보고 정정에 따라 현재 범위에서 빠진 거래를 EXCLUDED나 NORMAL로 자동 재판정하지 않는다. 현재 요약은 공개/직원 명령과 같은 트랜잭션에서 이 유효 범위를 기준으로 갱신한다.
+`current_members`는 사건의 현재 거래다. Alert는 현재 `published_version` 거래에서 `alert_tx_edits`로 빼거나 옮긴 거래를 반영하고, Episode는 소속 Alert의 현재 거래를 합친다. 거래 상태(PENDING/DECIDED/EXCLUDED/TRANSFERRED)와 판정은 `judgments`에서 계산하며 따로 저장하지 않는다.
 
 현재 사건 목록 API는 `ReviewCaseSql`에서 공개 사건 조회와 저장된 현재 범위 위험도 조회를 분리한다. 목록은 root summary를 읽고 페이지별 전체 근거 JSON/거래 집계를 실행하지 않는다. CaseSummaryStore가 공개/직원 명령과 같은 트랜잭션에서 요약을 갱신한다. 요약은 재구축 가능한 파생값이며 근거와 직원 판정을 대체하지 않는다. 단일 V1에 공개 포인터·계보·계획·요약 구조를 통합했으므로 기존 dev에는 검증 후 초기화 전환이 필요하다.
 

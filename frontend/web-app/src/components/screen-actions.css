@@ -1,0 +1,15 @@
+@media (width < 560px) {
+  .app-footer:has(#footer-actions .screen-actions[data-stack-on-narrow]) #footer-actions {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .app-footer:has(#footer-actions .screen-actions[data-stack-on-narrow]) .account-footer {
+    grid-row: 2;
+    max-inline-size: none;
+  }
+  .app-footer:has(#footer-actions .screen-actions[data-stack-on-narrow]) #footer-pagination { grid-row: 3 }
+  body:has(#footer-actions .screen-actions[data-stack-on-narrow]) .screen-layout {
+    padding-block-end: var(--app-footer-height, calc(2 * var(--account-footer-reserve)));
+  }
+}

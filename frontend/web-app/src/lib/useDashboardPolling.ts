@@ -18,7 +18,7 @@ export function useDashboardPolling(userId: number, from: string, to: string) {
     let retryAt = 0, failures = 0, stopped = false, disposed = false
     let active: Promise<unknown> | undefined
     let controller: AbortController | undefined
-    let timer: ReturnType<typeof setTimeout>
+    let timer: number
     const visible = () => document.visibilityState !== 'hidden' && navigator.onLine
     const updateSchedule = () => {
       if (!disposed) setSchedule({ key, at: stopped || !visible() ? undefined : Date.now() + Math.max(0, Math.max(nextTick, retryAt) - performance.now()) })

@@ -130,6 +130,44 @@ class DashboardScoreQueryTests {
   }
 
   @Test
+  void transaction_days_count_all_and_suspicious_rows_by_transaction_date() {
+    score(transactions.get(0), "COMPLETED", .9, .2);
+    score(transactions.get(1), "COMPLETED", .2, .9);
+    var result =
+        refreshedDashboard(null)
+            .transactionDays(LocalDate.parse("2023-08-31"), LocalDate.parse("2023-09-01"));
+    assertThat(result.get("days"))
+        .isEqualTo(
+            List.of(
+                Map.of(
+                    "date",
+                    "2023-08-31",
+                    "total",
+                    0L,
+                    "suspicious",
+                    0L,
+                    "newAccounts",
+                    0L,
+                    "newOwners",
+                    0L),
+                Map.of(
+                    "date",
+                    "2023-09-01",
+                    "total",
+                    3L,
+                    "suspicious",
+                    1L,
+                    "newAccounts",
+                    1L,
+                    "newOwners",
+                    1L)));
+    assertThat(result.get("types")).isEqualTo(List.of(Map.of("type", "Fan-out", "count", 1L)));
+    assertThat(result.get("hours"))
+        .isEqualTo(List.of(Map.of("hour", 12, "total", 3L, "suspicious", 1L)));
+    assertThat(result.get("scores")).isEqualTo(List.of(Map.of("scorePct", 90, "count", 1L)));
+  }
+
+  @Test
   void combined_widgets_preserve_delivery_and_detection_date_semantics() {
     score(transactions.get(0), "COMPLETED", .9, .2);
     long later = score(transactions.get(1), "COMPLETED", .2, .9);

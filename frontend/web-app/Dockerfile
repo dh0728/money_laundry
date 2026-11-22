@@ -8,7 +8,7 @@ WORKDIR /app
 RUN npm install --global pnpm@11.24.0
 
 # 의존성 파일을 먼저 복사해 Docker 레이어 캐시를 활용한다.
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -16,7 +16,7 @@ COPY . .
 # VITE_ 변수는 빌드 시점에 브라우저 코드에 포함된다.
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ARG VITE_API_MODE=mock
+ARG VITE_API_MODE=live
 ENV VITE_API_MODE=$VITE_API_MODE
 
 RUN pnpm run build

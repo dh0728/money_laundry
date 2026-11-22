@@ -62,6 +62,48 @@ public final class DashboardQueries {
     return DashboardSummary.assemble(now, from, to, computed, out, deliveryDates);
   }
 
+  /**
+   * 새 화면 대시보드의 거래 지표. 거래일 기준 일별 전체·의심 거래 수와 신규 계좌·소유자 수, 기간 내 의심 거래의 유형별·시간대별·점수별 수를 이미 집계된
+   * ops.dashboard_* 표에서만 읽는다.
+   */
+  public Map<String, Object> transactionDays(LocalDate from, LocalDate to) {
+    if (from == null || to == null || from.isAfter(to) || from.plusYears(2).isBefore(to))
+      throw AnalysisService.invalid();
+    var days =
+        jdbc.queryForList(
+            """
+      select to_char(d,'YYYY-MM-DD') as date,coalesce(sum(c.n),0)::bigint as total,
+        coalesce(sum(c.n) filter(where c.suspicious),0)::bigint as suspicious,
+        coalesce(max(f.new_accounts),0)::bigint as "newAccounts",
+        coalesce(max(f.new_owners),0)::bigint as "newOwners"
+      from generate_series(?::date::timestamp,?::date::timestamp,interval '1 day') d
+      left join ops.dashboard_model_counts c on c.business_date=d::date
+      left join ops.dashboard_first_seen f on f.business_date=d::date group by d order by d
+      """,
+            java.sql.Date.valueOf(from),
+            java.sql.Date.valueOf(to));
+    var types =
+        jdbc.queryForList(
+            "select coalesce(type_class,0) as type,sum(n)::bigint as count from ops.dashboard_model_counts where suspicious and business_date between ? and ? group by 1 order by 1",
+            java.sql.Date.valueOf(from),
+            java.sql.Date.valueOf(to));
+    for (var row : types)
+      row.put(
+          "type",
+          com.moneylaundry.api.review.CaseSummary.TYPES[((Number) row.get("type")).intValue()]);
+    var hours =
+        jdbc.queryForList(
+            "select hour,sum(n)::bigint as total,coalesce(sum(n) filter(where suspicious),0)::bigint as suspicious from ops.dashboard_tx_hours where business_date between ? and ? group by hour order by hour",
+            java.sql.Date.valueOf(from),
+            java.sql.Date.valueOf(to));
+    var scores =
+        jdbc.queryForList(
+            "select score_pct as \"scorePct\",sum(n)::bigint as count from ops.dashboard_score_points where business_date between ? and ? group by score_pct order by score_pct",
+            java.sql.Date.valueOf(from),
+            java.sql.Date.valueOf(to));
+    return Map.of("days", days, "types", types, "hours", hours, "scores", scores);
+  }
+
   public List<Map<String, Object>> daily(LocalDate from, LocalDate to) {
     return dailyCharts(from, to);
   }

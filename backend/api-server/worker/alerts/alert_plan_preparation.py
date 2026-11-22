@@ -103,8 +103,8 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
             (case_ids, case_ids)):
         ancestors.setdefault(source, set()).add(target)
     excluded = {}
-    for alert, key in connection.execute('''SELECT alert_id,tx_id FROM review.alert_members WHERE state='EXCLUDED'
-            AND (%s::bigint[] IS NULL OR alert_id=ANY(%s))''', (case_ids, case_ids)):
+    for alert, key in connection.execute('''SELECT alert_id,tx_id FROM review.alert_tx_edits
+            WHERE (%s::bigint[] IS NULL OR alert_id=ANY(%s))''', (case_ids, case_ids)):
         excluded.setdefault(alert, set()).add(key)
     steps.lap('lineageRead')
     cases = [CaseSnapshot(c['alert_id'], c['version'], c['revision'], c['assignee_id'],

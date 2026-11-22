@@ -84,22 +84,26 @@ class StaffSessionTests {
             "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now()) returning alert_id",
             Long.class,
             other);
-    long id =
+    // 공개된 Alert만 화면에 보인다.
+    java.util.UUID run = java.util.UUID.randomUUID();
+    long job =
         jdbc.queryForObject(
-            "select case_id from review.cases where alert_id=?", Long.class, alertId);
-    String body =
-        "{\"requestId\":\""
-            + java.util.UUID.randomUUID()
-            + "\",\"action\":\"COMMENT\",\"comment\":\"test\",\"selections\":[{\"caseId\":"
-            + id
-            + ",\"revision\":1,\"groupId\":0,\"txIds\":[]}]}";
+            "insert into analysis.jobs(status,analysis_date,threshold_value,current_stage,analysis_cutoff_at,business_at) values('COMPLETED','2099-01-01',.7,'COMPLETE',now(),now()) returning job_id",
+            Long.class);
+    jdbc.update(
+        "insert into analysis.runs(run_id,job_id,input_revision,status) values(?,?,1,'COMPLETED')",
+        run,
+        job);
+    jdbc.update(
+        "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence,published_at) values(?,1,?,repeat('f',64),'{}',now())",
+        alertId,
+        run);
+    jdbc.update("update review.alerts set published_version=1 where alert_id=?", alertId);
     mvc.perform(
-            post("/api/v1/review/commands")
+            post("/api/v1/review/cases/" + alertId + "/start")
                 .session(session)
                 .header("X-CSRF-TOKEN", token)
-                .header("X-Demo-User-Id", other)
-                .contentType("application/json")
-                .content(body))
+                .header("X-Demo-User-Id", other))
         .andExpect(status().isForbidden());
   }
 
@@ -181,8 +185,7 @@ class StaffSessionTests {
 
   @Test
   void admin_clock_requires_csrf_and_uses_business_time() throws Exception {
-    jdbc.execute(
-        "truncate analysis.jobs,ingest.uploads,review.alerts,review.episodes,review.requests cascade");
+    jdbc.execute("truncate analysis.jobs,ingest.uploads,review.alerts,review.episodes cascade");
     jdbc.update("update ops.business_clock set business_at=null,revision=0");
     login("admin");
     String body = "{\"businessAt\":\"2023-09-02T00:00:00Z\",\"revision\":0}";

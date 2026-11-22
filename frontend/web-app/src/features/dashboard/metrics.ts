@@ -3,9 +3,8 @@ import type { DashboardData } from '@/api/dashboard'
 import type { SectionCardItem } from '@/components/SectionCards'
 import { fmt } from '@/lib/format'
 
-type DailyFlow = { date: string; inflow: number; closed: number }
 
-const agreementStyles = [
+export const agreementStyles = [
   { code: 'STRONG', name: '모델 의심 · 패턴 있음', fill: 'var(--foreground)' },
   { code: 'ATYPICAL', name: '모델 의심 · 패턴 없음', fill: 'var(--muted-foreground)' },
   { code: 'PATTERN_ONLY', name: '모델 정상 · 패턴 있음', fill: 'var(--chart-3)' },
@@ -17,24 +16,20 @@ export function agreementComposition(rows: { agreement: string; count: number }[
   return agreementStyles.map(({ code, name, fill }) => ({ name, fill, value: counts.get(code) ?? 0 }))
 }
 
-const sum = (rows: DailyFlow[], key: 'inflow' | 'closed') => rows.reduce((total, row) => total + row[key], 0)
 const pct = (now: number, before: number) => (before ? Math.round(((now - before) / before) * 1000) / 10 : undefined)
-const rate = (rows: DailyFlow[]) => {
-  const inflow = sum(rows, 'inflow')
-  return inflow ? Math.round((sum(rows, 'closed') / inflow) * 1000) / 10 : 0
-}
 
 export function institutionCards(data: DashboardData): SectionCardItem[] {
   const days = data.dailyAlerts ?? []
   const today = days.at(-1)
   const yesterday = days.at(-2)
-  const last30 = days.slice(-30)
-  const prev30 = days.slice(-60, -30)
+  // mock: 수신·의심 거래 수(API.md §7 pipeline.detection)
+  const received = 115270, suspicious = data.latestJob?.suspiciousTxCount ?? 0
   return [
     // 기관 전체는 Alert와 Episode 현황을 함께 보인다. 모든 카드 이름에 대상(Alert·Episode)을 적는다.
-    { label: '오늘 유입 Alert', value: fmt(today?.inflow ?? 0), delta: today && yesterday ? pct(today.inflow, yesterday.inflow) : undefined, favorableDirection: 'down', trend: '전일 대비', note: '모델이 의심으로 판별한 신규 Alert' },
-    { label: '30일 Alert 처리율', value: `${rate(last30)}%`, delta: prev30.length ? Math.round((rate(last30) - rate(prev30)) * 10) / 10 : undefined, unit: '%p', favorableDirection: 'up', trend: '직전 30일 대비', note: '처리 완료 ÷ 유입 Alert' },
-    { label: '처리 전 Alert', value: fmt(data.alertsByStatus.OPEN), trend: `3일 이상 경과 ${fmt(data.openAlertsAgedOver3Days ?? 0)}건`, note: '아직 판정하지 않은 Alert' },
+    // 재설계 S1 KPI 4개(10/11): 오늘 신규 Alert / 오늘 의심 거래 탐지율 / 열린 Alert / 조사 중 Episode
+    { label: '오늘 신규 Alert', value: fmt(today?.inflow ?? 0), delta: today && yesterday ? pct(today.inflow, yesterday.inflow) : undefined, favorableDirection: 'down', trend: '전일 대비', note: '모델이 의심으로 판별한 신규 Alert' },
+    { label: '오늘 의심 거래 탐지율', value: received ? `${((suspicious / received) * 100).toFixed(2)}%` : '분석 진행 중', trend: `의심 ${fmt(suspicious)}건 / 수신 ${fmt(received)}건`, note: '대상 거래일 보고가 모두 들어온 뒤 확정' },
+    { label: '열린 Alert', value: fmt(data.alertsByStatus.OPEN), trend: `3일 이상 경과 ${fmt(data.openAlertsAgedOver3Days ?? 0)}건`, note: 'Episode에 묶이지 않고 종결 전인 Alert' },
     { label: '조사 중 Episode', value: fmt(data.episodesByStatus.OPEN), trend: `소속 Alert ${fmt(data.alertsByStatus.ESCALATED)}건`, note: `종결 Episode ${fmt(data.episodesByStatus.CLOSED)}건` },
   ]
 }

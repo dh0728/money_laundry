@@ -2,6 +2,7 @@ package com.moneylaundry.api.dashboard;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 /** Executes detached dashboard queries inside one bounded, read-only snapshot. */
@@ -19,6 +20,10 @@ public class DashboardService {
 
   public List<DashboardLists.Activity> activities(long user, LocalDate from, LocalDate to) {
     return database.read(c -> new DashboardQueries(c.jdbc(), c.time()).activities(user, from, to));
+  }
+
+  public Map<String, Object> transactionDays(LocalDate from, LocalDate to) {
+    return database.read(c -> new DashboardQueries(c.jdbc(), c.time()).transactionDays(from, to));
   }
 
   public DashboardLists.Queues queues(long user) {

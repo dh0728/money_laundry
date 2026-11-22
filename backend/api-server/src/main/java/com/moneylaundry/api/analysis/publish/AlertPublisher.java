@@ -217,94 +217,52 @@ public final class AlertPublisher {
       if (target == null) throw new IllegalStateException("ALERT_TARGET_REQUIRED");
       var evidence = object(plan.get("evidence"));
       String fingerprint = plan.get("fingerprint").toString();
-      if ("PROPOSE".equals(action)) {
-        var existing =
-            jdbc.queryForList(
-                "select proposal_id,status from review.alert_change_proposals where target_alert_id=? and evidence_digest=?",
-                target,
-                fingerprint);
-        if (!existing.isEmpty()) {
-          refreshProposal(
-              number(existing.getFirst().get("proposal_id")), plan, run, at, recipients);
-          recordCoverage(run, plan, target);
-          return 0;
-        }
-      }
       int version = saveVersion(target, run, fingerprint, evidence);
-      if ("PROPOSE".equals(action)) {
-        String proposedAction =
-            rows(evidence.get("seeds")).isEmpty()
-                ? "WITHDRAW"
-                : affected.size() > 1 ? "MERGE" : "UPDATE";
-        long proposal =
-            jdbc.queryForObject(
-                "insert into review.alert_change_proposals(target_alert_id,proposed_version,evidence_digest,status,source_run_id,action,payload,created_at) values(?,?,?,'OPEN',?,?,?::jsonb,?) returning proposal_id",
-                Long.class,
-                target,
-                version,
-                fingerprint,
-                run,
-                proposedAction,
-                encode(proposalPayload(plan)),
-                at);
-        for (var base : rows(plan.get("baselines")))
-          if (affected.contains(number(base.get("alertId"))))
+      var changes = publicationChanges(target, version, evidence);
+      publishVersion(target, version, evidence, plan, at);
+      // 점수 재평가로 근거가 모두 사라진 경우도 근거 소멸로 닫는다.
+      boolean withdrawn = "WITHDRAW".equals(action) || rows(evidence.get("seeds")).isEmpty();
+      String eventAction =
+          withdrawn
+              ? "EVIDENCE_WITHDRAWN"
+              : switch (action) {
+                case "MERGE" -> "MERGED";
+                case "FOLLOWUP" -> "FOLLOWUP_CREATED";
+                case "NEW" -> "ALERT_CREATED";
+                default -> "ADDED_EVIDENCE";
+              };
+      long event =
+          event(
+              target,
+              eventAction,
+              at,
+              recipients,
+              publicationSnapshot(changes, affected, references, plan, fingerprint));
+      if ("MERGE".equals(action))
+        for (long source : affected)
+          if (source != target) {
             jdbc.update(
-                "insert into review.alert_proposal_cases(proposal_id,alert_id,expected_revision,expected_published_version,assignee_id) values(?,?,?,?,?)",
-                proposal,
-                base.get("alertId"),
-                base.get("revision"),
-                base.get("publishedVersion"),
-                base.get("assigneeId"));
-        event(
-            target,
-            "CHANGE_PROPOSED",
-            at,
-            recipients,
-            Map.of("proposalId", proposal, "reason", plan.get("reason")));
-      } else {
-        var changes = publicationChanges(target, version, evidence);
-        publishVersion(target, version, evidence, plan, at);
-        String eventAction =
-            switch (action) {
-              case "MERGE" -> "MERGED";
-              case "WITHDRAW" -> "EVIDENCE_WITHDRAWN";
-              case "FOLLOWUP" -> "FOLLOWUP_CREATED";
-              case "NEW" -> "ALERT_CREATED";
-              default -> "ADDED_EVIDENCE";
-            };
-        long event =
-            event(
+                "update review.alerts set merged_into_alert_id=?,revision=revision+1,summary_revision=revision+1 where alert_id=?",
                 target,
-                eventAction,
-                at,
-                recipients,
-                publicationSnapshot(changes, affected, references, plan, fingerprint));
-        if ("MERGE".equals(action))
-          for (long source : affected)
-            if (source != target) {
-              jdbc.update(
-                  "update review.alerts set merged_into_alert_id=?,revision=revision+1,summary_revision=revision+1 where alert_id=?",
-                  target,
-                  source);
-              jdbc.update(
-                  "update review.alerts set merged_into_alert_id=? where merged_into_alert_id=?",
-                  target,
-                  source);
-              jdbc.update(
-                  "insert into review.alert_lineage values(?,?,'MERGED_INTO',?)",
-                  source,
-                  target,
-                  event);
-            }
-        if ("FOLLOWUP".equals(action))
-          for (long source : references)
+                source);
             jdbc.update(
-                "insert into review.alert_lineage values(?,?,'FOLLOWUP_OF',?)",
+                "update review.alerts set merged_into_alert_id=? where merged_into_alert_id=?",
                 target,
+                source);
+            jdbc.update(
+                "insert into review.alert_lineage values(?,?,'MERGED_INTO',?)",
                 source,
+                target,
                 event);
-      }
+            mergeEdits(source, target);
+          }
+      if ("FOLLOWUP".equals(action))
+        for (long source : references)
+          jdbc.update(
+              "insert into review.alert_lineage values(?,?,'FOLLOWUP_OF',?)",
+              target,
+              source,
+              event);
     }
     recordCoverage(run, plan, target);
     return create ? 1 : 0;
@@ -376,69 +334,6 @@ public final class AlertPublisher {
     return changes;
   }
 
-  private void refreshProposal(
-      long id, Map<String, Object> plan, UUID run, Timestamp at, Set<Long> recipients) {
-    var proposal =
-        jdbc.queryForMap("select * from review.alert_change_proposals where proposal_id=?", id);
-    if ("REJECTED".equals(proposal.get("status"))) return;
-    var votes =
-        jdbc.queryForList(
-            "select * from review.alert_proposal_cases where proposal_id=? order by alert_id", id);
-    var bases =
-        rows(plan.get("baselines")).stream()
-            .filter(b -> ids(plan.get("caseIds")).contains(number(b.get("alertId"))))
-            .toList();
-    boolean same =
-        bases.size() == votes.size()
-            && bases.stream()
-                .allMatch(
-                    b ->
-                        votes.stream()
-                            .anyMatch(
-                                v ->
-                                    number(b.get("alertId")) == number(v.get("alert_id"))
-                                        && number(b.get("revision"))
-                                            == number(v.get("expected_revision"))
-                                        && number(b.get("publishedVersion"))
-                                            == number(v.get("expected_published_version"))
-                                        && number(b.get("assigneeId"))
-                                            == number(v.get("assignee_id"))));
-    if (same && "OPEN".equals(proposal.get("status")) && proposalInputCurrent(proposal)) return;
-    long target = number(proposal.get("target_alert_id"));
-    event(
-        target,
-        "PROPOSAL_SUPERSEDED",
-        at,
-        Set.of(),
-        Map.of("proposalId", id, "previousStatus", proposal.get("status"), "votes", votes));
-    jdbc.update("delete from review.alert_proposal_cases where proposal_id=?", id);
-    for (var b : bases)
-      jdbc.update(
-          "insert into review.alert_proposal_cases(proposal_id,alert_id,expected_revision,expected_published_version,assignee_id) values(?,?,?,?,?)",
-          id,
-          b.get("alertId"),
-          b.get("revision"),
-          b.get("publishedVersion"),
-          b.get("assigneeId"));
-    int version =
-        saveVersion(target, run, plan.get("fingerprint").toString(), object(plan.get("evidence")));
-    jdbc.update(
-        "update review.alert_change_proposals set status='OPEN',revision=revision+1,generation=generation+1,source_run_id=?,proposed_version=?,payload=?::jsonb,action=?,resolved_at=null where proposal_id=?",
-        run,
-        version,
-        encode(proposalPayload(plan)),
-        rows(object(plan.get("evidence")).get("seeds")).isEmpty()
-            ? "WITHDRAW"
-            : ids(plan.get("caseIds")).size() > 1 ? "MERGE" : "UPDATE",
-        id);
-    event(
-        target,
-        "CHANGE_PROPOSED",
-        at,
-        recipients,
-        Map.of("proposalId", id, "reason", plan.get("reason")));
-  }
-
   private int saveVersion(long target, UUID run, String fingerprint, Map<String, Object> evidence) {
     int version =
         jdbc.queryForObject(
@@ -482,165 +377,23 @@ public final class AlertPublisher {
     return version;
   }
 
-  private Map<String, Object> proposalPayload(Map<String, Object> plan) {
-    var payload = new LinkedHashMap<>(plan);
-    payload.remove("evidence");
-    payload.remove("coverage");
-    return payload;
-  }
-
-  public boolean proposalInputCurrent(Map<String, Object> proposal) {
-    return jdbc.queryForObject(
-        """
-        select exists(select 1 from analysis.runs r join analysis.jobs j using(job_id)
-          where r.run_id=? and r.status='COMPLETED' and j.status='COMPLETED')
-        and not exists(select 1 from review.alert_transactions m join ledger.transactions t using(tx_id)
-          where m.alert_id=? and m.version=? and t.integration_status<>'ACTIVE')
-        and not exists(select 1 from analysis.run_fact_checks f join ledger.transactions t using(tx_id)
-          where f.run_id=? and f.integration_status is distinct from t.integration_status)
-        and not exists(select 1 from analysis.run_scores i left join analysis.current_scores c using(tx_id)
-          where i.run_id=? and c.run_id is distinct from i.score_run_id and c.run_id is distinct from ?)
-        and not exists(select 1 from analysis.scores s left join analysis.current_scores c using(tx_id)
-          where s.run_id=? and c.run_id is distinct from s.run_id)
-        """,
-        Boolean.class,
-        proposal.get("source_run_id"),
-        proposal.get("target_alert_id"),
-        proposal.get("proposed_version"),
-        proposal.get("source_run_id"),
-        proposal.get("source_run_id"),
-        proposal.get("source_run_id"),
-        proposal.get("source_run_id"));
-  }
-
-  public void accept(Map<String, Object> proposal, Timestamp at) {
-    if (!TransactionSynchronizationManager.isActualTransactionActive())
-      throw new IllegalStateException("ALERT_PUBLICATION_REQUIRES_TRANSACTION");
-    if (!jdbc.queryForObject(
-            """
-        select count(*)>0 and bool_and(coalesce(response='APPROVED' and response_actor=assignee_id and response_at is not null,false))
-        from review.alert_proposal_cases where proposal_id=?
-        """,
-            Boolean.class,
-            proposal.get("proposal_id"))
-        || !proposalInputCurrent(proposal))
-      throw com.moneylaundry.api.common.ApiException.invalidTransition("제안의 동의 또는 근거가 변경됐습니다.");
-    long target = number(proposal.get("target_alert_id"));
-    int version = ((Number) proposal.get("proposed_version")).intValue();
-    var plan = object(proposal.get("payload"));
-    plan.put("action", proposal.get("action"));
-    var evidence =
-        object(
-            jdbc.queryForObject(
-                "select evidence::text from review.alert_versions where alert_id=? and version=?",
-                String.class,
-                target,
-                version));
-    var affected = ids(plan.get("caseIds"));
-    var changes = publicationChanges(target, version, evidence);
-    if ("MERGE".equals(proposal.get("action"))) mergeScopes(target, version, affected);
-    publishVersion(target, version, evidence, plan, at);
-    var recipients =
-        new TreeSet<>(
-            jdbc.queryForList(
-                "select distinct assignee_id from review.alert_proposal_cases where proposal_id=?",
-                Long.class,
-                proposal.get("proposal_id")));
-    String action =
-        "MERGE".equals(proposal.get("action"))
-            ? "MERGED"
-            : "WITHDRAW".equals(proposal.get("action")) ? "EVIDENCE_WITHDRAWN" : "ADDED_EVIDENCE";
-    long event =
-        event(target, action, at, recipients, acceptedSnapshot(changes, proposal, affected, plan));
-    if ("MERGE".equals(proposal.get("action")))
-      for (long source : affected)
-        if (source != target) {
-          jdbc.update(
-              "update review.alerts set merged_into_alert_id=?,revision=revision+1,summary_revision=revision+1 where alert_id=?",
-              target,
-              source);
-          jdbc.update(
-              "update review.alerts set merged_into_alert_id=? where merged_into_alert_id=?",
-              target,
-              source);
-          jdbc.update(
-              "insert into review.alert_lineage values(?,?,'MERGED_INTO',?)",
-              source,
-              target,
-              event);
-        }
-  }
-
-  private Map<String, Object> acceptedSnapshot(
-      Map<String, Object> changes,
-      Map<String, Object> proposal,
-      List<Long> affected,
-      Map<String, Object> plan) {
-    changes.put("proposalId", proposal.get("proposal_id"));
-    changes.put("caseIds", affected);
-    changes.put("reason", plan.get("reason"));
-    return changes;
-  }
-
-  private void mergeScopes(long target, int version, List<Long> affected) {
-    var selected = new TreeMap<Long, Map<String, Object>>();
-    // Preserve employee decisions/exclusions. Conflicting judgments or explicit
-    // role choices need staff resolution; approval must not silently choose one.
-    for (long source : affected)
-      for (var member :
-          jdbc.queryForList(
-              "select * from review.alert_members where alert_id=? order by group_id,tx_id",
-              source)) {
-        long key = number(member.get("tx_id"));
-        var previous = selected.get(key);
-        if (previous != null) {
-          if ("EXCLUDED".equals(previous.get("state"))) continue;
-          if (!"EXCLUDED".equals(member.get("state"))
-              && (!Objects.equals(previous.get("review_role"), member.get("review_role"))
-                  || ("DECIDED".equals(previous.get("state"))
-                      && "DECIDED".equals(member.get("state"))
-                      && !Objects.equals(previous.get("decision"), member.get("decision")))))
-            throw com.moneylaundry.api.common.ApiException.invalidTransition(
-                "병합 대상의 판정 또는 조사 역할이 충돌합니다. 범위를 확인하세요.");
-          if ("DECIDED".equals(previous.get("state")) && "PENDING".equals(member.get("state")))
-            continue;
-        }
-        selected.put(key, member);
-      }
-    if (selected.isEmpty()) return;
-    var groups =
-        jdbc.queryForList(
-            "select group_id from review.alert_groups where alert_id=? order by group_id",
-            Long.class,
-            target);
-    long group =
-        groups.isEmpty()
-            ? jdbc.queryForObject(
-                "insert into review.alert_groups(alert_id,label,evidence_version) values(?,?,?) returning group_id",
-                Long.class,
-                target,
-                "Alert " + target,
-                version)
-            : groups.getFirst();
-    for (var member : selected.values()) {
-      // Invalidated facts remain in the original immutable evidence and events;
-      // they are never reintroduced into the survivor's active scope.
-      if (!jdbc.queryForObject(
-          "select exists(select 1 from review.alert_transactions where alert_id=? and version=? and tx_id=?)",
-          Boolean.class,
-          target,
-          version,
-          member.get("tx_id"))) continue;
-      jdbc.update(
-          "insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state,decision) values(?,?,?,?,?,?,?) on conflict(group_id,tx_id) do update set review_role=excluded.review_role,state=excluded.state,decision=excluded.decision",
-          group,
-          target,
-          member.get("tx_id"),
-          version,
-          member.get("review_role"),
-          member.get("state"),
-          member.get("decision"));
-    }
+  /** 병합으로 사라지는 Alert에서 직원이 뺀 거래 기록을 남는 Alert로 옮긴다. */
+  private void mergeEdits(long source, long target) {
+    jdbc.update(
+        "delete from review.alert_tx_edits where (alert_id=? and target_alert_id=?) or (alert_id=? and target_alert_id=?)",
+        source,
+        target,
+        target,
+        source);
+    jdbc.update(
+        "delete from review.alert_tx_edits e where e.alert_id=? and exists(select 1 from review.alert_tx_edits k where k.alert_id=? and k.tx_id=e.tx_id)",
+        source,
+        target);
+    jdbc.update("update review.alert_tx_edits set alert_id=? where alert_id=?", target, source);
+    jdbc.update(
+        "update review.alert_tx_edits set target_alert_id=? where target_alert_id=?",
+        target,
+        source);
   }
 
   void publishVersion(
@@ -658,35 +411,7 @@ public final class AlertPublisher {
         "update review.alerts set published_version=?,revision=revision+1 where alert_id=?",
         version,
         target);
-    // Once staff has materialized a scope, only explicit publication changes it.
-    var groups =
-        jdbc.queryForList(
-            "select group_id from review.alert_groups where alert_id=? order by group_id",
-            Long.class,
-            target);
-    if (!groups.isEmpty()) {
-      long group = groups.getFirst();
-      jdbc.update(
-          "update review.alert_groups set evidence_version=?,revision=revision+1 where group_id=?",
-          version,
-          group);
-      jdbc.update(
-          """
-          insert into review.alert_members(group_id,alert_id,tx_id,evidence_version,review_role,state)
-          select ?,t.alert_id,t.tx_id,t.version,
-            case when t.role='CONTEXT' then 'CONTEXT' else 'SUBJECT' end,'PENDING'
-          from review.alert_transactions t where t.alert_id=? and t.version=?
-          on conflict(group_id,tx_id) do update set evidence_version=
-            case when review.alert_members.state='PENDING' then excluded.evidence_version
-                 else review.alert_members.evidence_version end
-          """,
-          group,
-          target,
-          version);
-      // Historical membership/decisions remain untouched. effective_members intersects
-      // saved scope with the published version, independently of employee judgments.
-    }
-    if ("WITHDRAW".equals(plan.get("action")))
+    if ("WITHDRAW".equals(plan.get("action")) || rows(evidence.get("seeds")).isEmpty())
       jdbc.update(
           "update review.alerts set status='CLOSED',outcome='SCOPE_CLEARED',closed_at=? where alert_id=?",
           at,

@@ -138,8 +138,7 @@ class QueryPerformanceTests {
     for (int i = 1; i <= 3; i++) {
       measure("owners", i, 50381, () -> ledger.query("owners", filter));
       measure("transactions", i, 690519, () -> ledger.query("transactions", filter));
-      measure("alerts", i, 40389, () -> review.list("ALERT", null, null, from, to, 0, 20));
-      measure("episodes", i, 0, () -> review.list("EPISODE", null, null, from, to, 0, 20));
+      measure("board", i, -1, () -> review.board());
       measure("dashboard", i, -1, () -> dashboard.view(user, from, to));
     }
     long changed = System.nanoTime();
@@ -161,8 +160,7 @@ class QueryPerformanceTests {
     for (int round = 1; round <= 3; round++)
       measure("dashboard_fragmented", round, -1, () -> dashboard.view(user, from, to));
     runs.refreshQueryStatistics();
-    measure(
-        "alerts_after_analyze", 1, 40389, () -> review.list("ALERT", null, null, from, to, 0, 20));
+    measure("board_after_analyze", 1, -1, () -> review.board());
     measure("dashboard_after_analyze", 1, -1, () -> dashboard.view(user, from, to));
   }
 

@@ -1,0 +1,348 @@
+.ledger-components {
+  --ledger-relationship-gutter: clamp(var(--aml-space-24), 3vw, var(--aml-space-48));
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(110px, 9.5%) var(--ledger-relationship-gutter)
+    minmax(116px, 10%) var(--ledger-relationship-gutter)
+    minmax(290px, 1fr) var(--workspace-gap) minmax(365px, 1.25fr);
+  grid-template-areas: "owners . accounts . transactions . related";
+  align-items: start;
+  row-gap: var(--workspace-gap);
+}
+.ledger-pane { min-width: 0 }
+.ledger-pane h2 {
+  margin: 0;
+  font-size: var(--aml-type-section-title-size);
+  font-weight: var(--aml-type-section-title-weight);
+  line-height: var(--aml-type-section-title-lineHeight);
+}
+.ledger-owners { grid-area: owners }
+.ledger-accounts { grid-area: accounts }
+.ledger-transactions { grid-area: transactions }
+.ledger-related { grid-area: related }
+.ledger-tables {
+  display: grid;
+  min-inline-size: 0;
+  align-content: start;
+  gap: var(--workspace-gap);
+}
+.ledger-hierarchy { min-inline-size: 0 }
+.ledger-hierarchy-scroll > [data-slot="table-container"] { min-inline-size: 72rem }
+.ledger-hierarchy-table { table-layout: fixed }
+.ledger-hierarchy-table tr[data-ledger-depth="transaction"] {
+  scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
+}
+.ledger-hierarchy-scroll tbody tr[data-ledger-depth="owner"] {
+  background: var(--information-panel-surface);
+}
+.ledger-hierarchy-scroll tbody tr[data-ledger-depth] > :is(th, td) {
+  padding-block: var(--aml-space-4);
+}
+.ledger-hierarchy-scroll th[scope="rowgroup"] { text-align: start }
+.ledger-hierarchy-scroll tbody tr[data-ledger-depth="account"] > th,
+.ledger-hierarchy-scroll tbody tr[data-ledger-depth="transaction"] > th {
+  border-inline-start: var(--aml-stroke-divider) solid var(--aml-data-grid);
+}
+.ledger-branch-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aml-space-4);
+  padding: 0;
+  min-block-size: var(--aml-size-control-compact);
+  font-weight: inherit;
+  white-space: nowrap;
+}
+.ledger-branch-toggle .icon {
+  inline-size: var(--aml-size-icon-mini);
+  block-size: var(--aml-size-icon-mini);
+}
+.ledger-branch-toggle[aria-expanded="true"] .icon { rotate: 90deg }
+.ledger-table-record-id {
+  display: grid;
+  grid-template-columns: var(--aml-size-control) minmax(0, max-content);
+  align-items: center;
+  min-block-size: var(--aml-size-control);
+  gap: var(--aml-space-4);
+}
+.ledger-table-select { grid-column: 2; justify-self: start; padding: 0 }
+.ledger-table-select code { font-weight: var(--aml-type-body-strong-weight) }
+.ledger-table-amount { text-align: end; font-variant-numeric: tabular-nums }
+.ledger-connections {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--muted-text);
+  stroke-width: var(--aml-stroke-divider);
+}
+.ledger-connections path { opacity: .55 }
+.ledger-connections path[data-active] { stroke: var(--text); stroke-width: var(--aml-stroke-focus); opacity: 1 }
+.ledger-components .animated-list { margin-block-start: var(--workspace-gap) }
+.ledger-panel-heading, .ledger-source {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-6);
+}
+.ledger-source {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-block: var(--workspace-gap);
+  color: var(--muted-text);
+  overflow-wrap: anywhere;
+}
+.ledger-empty { margin-block: var(--workspace-gap); color: var(--muted-text); font-size: var(--aml-type-caption-size) }
+.ledger-components .animated-list__viewport {
+  padding-inline: var(--aml-space-4);
+  scrollbar-gutter: stable;
+}
+.ledger-transaction-list .animated-list__viewport {
+  padding: var(--record-card-shadow-gutter);
+  border-radius: 0;
+}
+.ledger-components .animated-list__item {
+  min-height: var(--ui-row-height);
+  padding-inline: var(--aml-space-6);
+}
+.ledger-components .animated-list__title { font-size: var(--ui-font-size); white-space: nowrap }
+:is(.ledger-owners, .ledger-accounts) .animated-list__item {
+  --al-hover: none;
+  --al-press: none;
+}
+@media (hover: hover) {
+  :is(.ledger-owners, .ledger-accounts) .animated-list__item:hover:not([data-selected]) {
+    background-color: color-mix(in srgb, var(--al-tile), var(--text) 9%);
+  }
+}
+:is(.ledger-owners, .ledger-accounts) .animated-list__item:active:not([data-selected]) {
+  background-color: color-mix(in srgb, var(--al-tile), var(--text) 15%);
+}
+:is(.ledger-transaction-list .animated-list__item, .ledger-transaction-card) {
+  display: block;
+  padding: 0;
+  filter: none;
+}
+.ledger-components .animated-list__item[data-selected] { filter: none }
+.ledger-transaction-list .animated-list__item { color: var(--text) }
+:is(.ledger-transaction-list, .ledger-transaction-card) .animated-list__item-content { padding: 0 }
+.ledger-transaction {
+  --ledger-body-inset: var(--workspace-gap);
+  container-type: inline-size;
+  font-size: var(--ui-font-size);
+  padding: var(--ledger-body-inset);
+}
+.ledger-transaction > .ledger-transaction-flow {
+  padding: var(--aml-space-8) 0 0;
+}
+.ledger-transaction-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1fr);
+  align-items: stretch;
+  padding: var(--aml-space-12);
+  color: inherit;
+  font-family: var(--aml-font-mono, monospace);
+  font-size: var(--ui-font-size);
+  line-height: 1.3;
+}
+.ledger-transaction-flow [data-account-verdict] {
+  --transaction-endpoint-fill: var(--status-caution-accent);
+  --transaction-endpoint-ink: var(--status-accent-dark-ink);
+}
+.ledger-transaction-flow [data-account-verdict="abnormal"] {
+  --transaction-endpoint-fill: var(--status-danger-accent);
+  --transaction-endpoint-ink: var(--status-accent-light-ink);
+}
+.ledger-transaction-flow [data-account-verdict="normal"] { --transaction-endpoint-fill: var(--status-positive-accent) }
+.ledger-party {
+  display: grid;
+  align-content: center;
+  gap: var(--aml-space-2);
+  min-width: 0;
+  border-radius: var(--aml-radius-card);
+  padding: var(--aml-space-8);
+  background: var(--transaction-endpoint-fill);
+  color: var(--transaction-endpoint-ink);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.ledger-transaction .ledger-party {
+  border-radius: max(0px, calc(var(--aml-radius-card) - var(--ledger-body-inset)));
+}
+.ledger-transaction-details {
+  display: grid;
+  grid-template-rows: 1fr 23px 1fr;
+  min-width: 0;
+  justify-items: center;
+  align-items: center;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.ledger-transaction-arrow {
+  inline-size: 100%;
+  block-size: 100%;
+}
+.ledger-arrow-shaft { width: calc(100% - 18px) }
+.ledger-transaction-details :is(time, span) { padding-inline: var(--aml-space-4) }
+.ledger-transaction-details strong { font-weight: inherit }
+@container (max-width: 360px) {
+  .ledger-transaction-flow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+    font-size: var(--aml-type-caption-size);
+  }
+}
+@container (max-width: 320px) {
+  .ledger-transaction-flow { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+}
+.ledger-case-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--workspace-gap);
+}
+.ledger-case-groups > section { min-width: 0 }
+.ledger-case-groups h3 { margin: 0; font-size: var(--aml-type-body-strong-size); line-height: var(--aml-type-body-strong-lineHeight) }
+.ledger-case-groups .case-list {
+  padding: var(--record-card-shadow-gutter);
+  scrollbar-gutter: stable;
+}
+.ledger-case-groups .card-header > .card-header-main,
+.ledger-case-groups .card-header .card-header-main > code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ledger-case-groups .card-header .card-header-main > code { overflow: visible }
+.ledger-case-groups .semantic-tag {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  block-size: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 1121px) and (min-height: 481px) {
+  .ledger-components {
+    block-size: var(--workspace-available-block);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .ledger-pane, .ledger-scroll-shell, .ledger-components .animated-list,
+  .ledger-case-groups > section {
+    display: flex;
+    flex-direction: column;
+    min-block-size: 0;
+  }
+  .ledger-scroll-shell, .ledger-components .animated-list, .ledger-components .animated-list__viewport,
+  .ledger-case-groups, .ledger-case-groups .case-list {
+    flex: 1;
+    min-block-size: 0;
+  }
+  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables) {
+    display: flex;
+    flex-direction: column;
+    block-size: calc(100dvh - var(--header-height));
+    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
+  }
+  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables)
+    > [data-investigation-component="ledger"] {
+    display: grid;
+    flex: 1;
+    grid-template-rows: minmax(0, 1fr);
+    min-block-size: 0;
+  }
+  .ledger-tables { grid-template-rows: minmax(0, 1fr) auto }
+  .ledger-hierarchy {
+    display: flex;
+    flex-direction: column;
+    min-block-size: 0;
+  }
+  .ledger-hierarchy :is(.data-table-frame, .data-table-content, .ledger-hierarchy-scroll) { flex: 1 }
+}
+@media (max-width: 1120px) {
+  .ledger-components {
+    grid-template-columns: minmax(110px, 16%) var(--ledger-relationship-gutter)
+      minmax(116px, 16%) var(--ledger-relationship-gutter) minmax(0, 1fr);
+    grid-template-areas: "owners . accounts . transactions" "related related related related related";
+  }
+}
+@media (max-width: 650px) {
+  .ledger-components {
+    --ledger-relationship-gutter: var(--aml-space-16);
+    grid-template-columns: minmax(0, 1fr) var(--ledger-relationship-gutter) minmax(0, 1fr);
+    grid-template-areas: "owners . accounts" "transactions transactions transactions" "related related related";
+  }
+}
+@media (max-width: 1120px), (max-height: 480px) {
+  .screen-layout:has(> [data-investigation-component="ledger"]) {
+    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
+  }
+  .ledger-components { --ledger-list-limit: none }
+  .ledger-components .animated-list__viewport,
+  .ledger-case-groups .case-list {
+    max-block-size: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+  .ledger-components .animated-list__item {
+    scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
+  }
+}
+
+@media (min-width: 1121px) {
+  .screen-layout:has(> [data-investigation-component="ledger"] > [data-ledger-view="cards"]):not(:has(.screen-data-source)) {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .screen-layout:has(> [data-investigation-component="ledger"] > [data-ledger-view="cards"]):not(:has(.screen-data-source))
+    > :is(.screen-query-area, [data-investigation-component="ledger"]) {
+    grid-area: 1 / 1;
+  }
+  .screen-layout:has(> [data-investigation-component="ledger"] > [data-ledger-view="cards"]):not(:has(.screen-data-source))
+    > .screen-query-area {
+    place-self: start end;
+    z-index: 2;
+  }
+  [data-ledger-view="cards"] #ledger-related-title { padding-inline-end: var(--header-control-size) }
+}
+
+/* 원장 목록 검색·더 보기: 세 목록이 각자 20건씩 조회한다. 검색은 상단 작업 코드 검색과 같은 pill(.search-field). */
+.ledger-search { margin-block-start: var(--aml-space-8) }
+.ledger-more {
+  display: grid;
+  gap: var(--aml-space-8);
+  margin-block-start: var(--aml-space-12);
+}
+/* 대시보드 업무 레인의 더 보기와 같은 크기: 패널 폭을 채우는 pill. */
+.ledger-more > .button { inline-size: 100%; min-block-size: var(--aml-panel-control-size) }
+@media (pointer: coarse) {
+  .ledger-more > .button { min-block-size: max(44px, var(--aml-panel-control-size)) }
+}
+.ledger-status {
+  margin-block: var(--aml-space-8) 0;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+}
+.ledger-pane[aria-busy="true"] .animated-list { opacity: .5 }
+.ledger-linked-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aml-space-6);
+  margin: var(--workspace-gap) 0;
+  padding: 0;
+  list-style: none;
+}
+.ledger-linked-ids code {
+  padding: var(--aml-space-2) var(--aml-space-8);
+  border-radius: var(--aml-radius-full);
+  background: var(--information-panel-surface);
+}
+.ledger-table-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--aml-space-8) var(--workspace-gap);
+  margin-block-end: var(--workspace-gap);
+}
+.ledger-table-controls .ledger-search { margin-block-start: 0 }
+.ledger-hierarchy-scroll tr[data-ledger-more] > td { padding-block: var(--aml-space-4) }
+.ledger-hierarchy-scroll tr[data-ledger-more] .ledger-more { margin: 0 }
+/* 하단 공통 도구(계정·페이지)와 목록 끝 더 보기가 겹치지 않게 비워 둔다. */
+@media (min-width: 1121px) and (min-height: 481px) {
+  .ledger-components { padding-block-end: var(--aml-space-48) }
+}

@@ -150,6 +150,6 @@ $RECYCLE.BIN/
 # Microsoft Office 임시파일
 ~$*
 
-/docs
+/docs/*
 /outputs
 AGENTS.md

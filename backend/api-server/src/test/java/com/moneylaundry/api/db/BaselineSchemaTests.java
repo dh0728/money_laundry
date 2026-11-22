@@ -3,11 +3,8 @@ package com.moneylaundry.api.db;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.moneylaundry.api.alert.AlertQueryService;
 import com.moneylaundry.api.analysis.AnalysisRunService;
-import com.moneylaundry.api.common.BusinessTime;
 import com.moneylaundry.api.review.LedgerQueryService;
-import com.moneylaundry.api.review.ReviewService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -264,177 +261,6 @@ class BaselineSchemaTests {
   }
 
   @Test
-  void investigation_transfer_and_dissolution_preserve_relational_decisions() {
-    long user = staff();
-    jdbc.update("update core.users set password_hash='test' where user_id=?", user);
-    jdbc.update("insert into core.banks(bank_id) values(9)");
-    long owner =
-        jdbc.queryForObject(
-            "insert into core.owners(service_owner_id,display_name) values(gen_random_uuid(),'가명#1') returning owner_id",
-            Long.class);
-    UUID publicAccount = UUID.randomUUID();
-    long account =
-        jdbc.queryForObject(
-            "insert into core.accounts(service_account_id,bank_id,owner_id) values(?,9,?) returning account_id",
-            Long.class,
-            publicAccount,
-            owner);
-    long transaction =
-        jdbc.queryForObject(
-            """
-        insert into ledger.transactions(occurred_at,business_date,from_account_id,to_account_id,
-        amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version)
-        values('2023-09-01Z','2023-09-01',?,?,1,'USD',1,'USD','ACH',1,'test') returning tx_id
-        """,
-            Long.class,
-            account,
-            account);
-    long job =
-        jdbc.queryForObject(
-            "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-02',now(),now(),.7,'COMPLETED','COMPLETE') returning job_id",
-            Long.class);
-    UUID run = UUID.randomUUID();
-    jdbc.update(
-        "insert into analysis.runs(run_id,job_id,status) values(?,?,'COMPLETED')", run, job);
-    jdbc.update("update analysis.jobs set current_run_id=? where job_id=?", run, job);
-    var clock = mock(BusinessTime.class);
-    when(clock.now()).thenReturn(Instant.parse("2023-09-02T00:00:00Z"));
-    var evidence = mock(AlertQueryService.class);
-    var service = new ReviewService(jdbc, tx, clock, evidence);
-    var ids = new java.util.ArrayList<Long>();
-    for (int n = 0; n < 2; n++) {
-      long alert =
-          jdbc.queryForObject(
-              "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now()) returning alert_id",
-              Long.class,
-              user);
-      ids.add(alert);
-      jdbc.update(
-          "insert into review.alert_versions(alert_id,version,run_id,fingerprint,evidence) values(?,1,?,'test','{}')",
-          alert,
-          run);
-      jdbc.update(
-          "insert into review.alert_transactions values(?,1,?,'SEED','[]')", alert, transaction);
-      var row =
-          java.util.Map.of(
-              "txId",
-              transaction,
-              "role",
-              "SEED",
-              "occurredAt",
-              "2023-09-01T00:00:00Z",
-              "fromAccountId",
-              publicAccount.toString(),
-              "toAccountId",
-              publicAccount.toString(),
-              "scores",
-              java.util.Map.of("p_laundering", .9, "p_1", .9));
-      var fullRow = new java.util.HashMap<String, Object>(row);
-      fullRow.putAll(
-          java.util.Map.of(
-              "paymentCurrency",
-              "USD",
-              "receivingCurrency",
-              "USD",
-              "paymentFormat",
-              "ACH",
-              "amountPaid",
-              1,
-              "amountReceived",
-              1,
-              "amountUsd",
-              1));
-      var doc =
-          java.util.Map.<String, Object>of(
-              "runId", run, "version", 1, "transactions", java.util.List.of(fullRow));
-      jdbc.update(
-          "update review.alert_versions set evidence=?::jsonb,published_at=now() where alert_id=? and version=1",
-          new ObjectMapper().writeValueAsString(doc),
-          alert);
-      jdbc.update("update review.alerts set published_version=1 where alert_id=?", alert);
-      when(evidence.detail(eq(alert), nullable(Integer.class))).thenReturn(doc);
-    }
-    long first = ids.getFirst();
-    service.command(
-        user,
-        new ReviewService.Command(
-            UUID.randomUUID(),
-            "DECIDE",
-            java.util.List.of(
-                new ReviewService.Selection(first, 1, 0, java.util.List.of(transaction))),
-            null,
-            null,
-            null,
-            "NORMAL",
-            "검토"));
-    assertThat(
-            jdbc.queryForObject(
-                "select decision from review.alert_members where alert_id=?", String.class, first))
-        .isEqualTo("NORMAL");
-    var selections = new java.util.ArrayList<ReviewService.Selection>();
-    for (long id : ids)
-      selections.add(
-          new ReviewService.Selection(
-              id,
-              ((Number) service.detail(id).get("revision")).longValue(),
-              0,
-              java.util.List.of()));
-    long episode =
-        ((Number)
-                service
-                    .command(
-                        user,
-                        new ReviewService.Command(
-                            UUID.randomUUID(),
-                            "TRANSFER",
-                            selections,
-                            null,
-                            null,
-                            null,
-                            null,
-                            "이관"))
-                    .get("targetCaseId"))
-            .longValue();
-    assertThat(jdbc.queryForObject("select count(*) from review.episode_members", Integer.class))
-        .isEqualTo(2);
-    var detail = service.detail(episode);
-    var groups = (java.util.List<java.util.Map<String, Object>>) detail.get("groups");
-    long group = ((Number) groups.getFirst().get("groupId")).longValue();
-    service.command(
-        user,
-        new ReviewService.Command(
-            UUID.randomUUID(),
-            "UNLINK",
-            java.util.List.of(
-                new ReviewService.Selection(
-                    episode,
-                    ((Number) detail.get("revision")).longValue(),
-                    group,
-                    java.util.List.of())),
-            null,
-            null,
-            null,
-            null,
-            "해체"));
-    assertThat(jdbc.queryForObject("select count(*) from review.episode_members", Integer.class))
-        .isZero();
-    assertThat(
-            jdbc.queryForObject(
-                "select outcome from review.episodes where episode_id=?", String.class, episode))
-        .isEqualTo("DISSOLVED");
-    assertThat(
-            jdbc.queryForObject(
-                "select decision from review.alert_members where alert_id=?", String.class, first))
-        .isEqualTo("NORMAL");
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from review.events where episode_id=? and action='DISSOLVE'",
-                Integer.class,
-                episode))
-        .isEqualTo(1);
-  }
-
-  @Test
   void ledger_reads_stored_alias_and_keeps_unanalyzed_transactions() {
     jdbc.update("insert into core.banks(bank_id) values(1)");
     UUID publicOwner = UUID.randomUUID();
@@ -603,7 +429,7 @@ class BaselineSchemaTests {
                     alert,
                     run);
                 jdbc.update(
-                    "insert into review.episode_alerts(alert_id,episode_id,alert_version,label) values(?,?,1,'source')",
+                    "insert into review.episode_alerts(alert_id,episode_id,alert_version) values(?,?,1)",
                     alert,
                     id);
               }

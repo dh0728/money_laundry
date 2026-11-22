@@ -1,0 +1,25 @@
+AML RADAR relationship graph — third-party notices
+
+@xyflow/react 12.12.0 (React Flow), MIT
+Copyright (c) 2019-2025 webkid GmbH
+Original license text: react-flow-MIT.txt
+Upstream source: https://github.com/xyflow/xyflow
+Package/version: https://www.npmjs.com/package/@xyflow/react/v/12.12.0
+MIT copyright and permission notices are retained. No React Flow Pro example code is used.
+
+elkjs 0.12.0 (Eclipse Layout Kernel JavaScript)
+Copyright (c) 2017 Kiel University and others; Copyright (c) 2019 TypeFox and others.
+License: EPL-2.0 OR GPL-3.0-or-later (secondary-license conditions apply).
+This application uses elkjs under EPL-2.0; it does not elect the secondary GPL license.
+Original EPL 2.0 text: elkjs-EPL-2.0.txt
+Source code and build instructions: https://github.com/kieler/elkjs
+Underlying ELK Java source: https://github.com/eclipse-elk/elk
+Package/version: https://www.npmjs.com/package/elkjs/v/0.12.0
+The installed API and worker are unmodified. Vite emits the original worker as a separate asset.
+Recipients can obtain the corresponding elkjs/ELK source from the upstream source repositories.
+EPL notices and source availability apply to the ELK program and any modifications to it.
+
+Existing legacy renderer (preserved, not newly imported into the relationship view):
+react-force-graph-2d 1.29.1, MIT — https://github.com/vasturiano/react-force-graph
+
+These notices cover the direct graph packages involved in this change, not a full dependency license inventory.

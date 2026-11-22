@@ -1,0 +1,81 @@
+.form-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aml-space-8);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  block-size: var(--aml-panel-control-size);
+  padding-inline: var(--aml-space-12);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--information-panel-surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.form-dropdown-trigger > svg { flex: none }
+.form-dropdown-trigger:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring);
+  outline-offset: var(--aml-stroke-focus);
+}
+
+.form-dropdown-options {
+  z-index: calc(var(--layer-shell) + 1);
+  min-inline-size: min(var(--radix-select-trigger-width), var(--radix-select-content-available-width));
+  max-inline-size: var(--radix-select-content-available-width);
+  max-block-size: var(--radix-select-content-available-height);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-radius-panel);
+  background: var(--information-panel-surface);
+  color: var(--text);
+  box-shadow: var(--shadow-overlay);
+}
+
+.form-dropdown-options [data-radix-select-viewport] {
+  padding: calc(var(--aml-panel-inset) - var(--aml-stroke-divider));
+}
+
+.form-dropdown-options [data-slot="select-label"] {
+  padding: var(--aml-space-6) var(--aml-space-12);
+  color: var(--muted-text);
+  font-weight: var(--aml-type-body-strong-weight);
+}
+
+.form-dropdown-options [data-slot="select-item"] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-block-size: var(--aml-panel-control-size);
+  padding-block: var(--aml-space-4);
+  padding-inline: var(--aml-space-12) var(--aml-panel-control-size);
+  border-radius: var(--aml-panel-control-radius);
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.form-dropdown-options [data-slot="select-item"][data-highlighted] {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.form-dropdown-options [data-slot="select-item"][data-state="checked"] {
+  background: var(--selection-surface);
+  color: var(--selection-ink);
+}
+
+.form-dropdown-options [data-slot="select-item-indicator"] {
+  position: absolute;
+  inset-inline-end: var(--aml-space-8);
+  inset-block-start: 50%;
+  display: grid;
+  place-items: center;
+  inline-size: var(--aml-size-icon-small);
+  block-size: var(--aml-size-icon-small);
+  translate: 0 -50%;
+}
+
+.form-dropdown-options [data-slot="select-item-indicator"] > svg {
+  inline-size: 100%;
+  block-size: 100%;
+}

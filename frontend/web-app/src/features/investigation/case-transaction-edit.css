@@ -1,0 +1,14 @@
+.case-transaction-edit-trigger {
+  min-block-size: var(--account-control-size);
+  white-space: nowrap;
+}
+.case-transaction-edit-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--aml-space-12);
+}
+.case-transaction-edit-targets > li + li { border-block-start: 0 }
+.case-transaction-edit-error { color: color-mix(in srgb, var(--status-danger-accent), var(--text) 42%) }
+@media (width < 420px) {
+  .case-transaction-edit-trigger { padding-inline: var(--aml-space-8) }
+}

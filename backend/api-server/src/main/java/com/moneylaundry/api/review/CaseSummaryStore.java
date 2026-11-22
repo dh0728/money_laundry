@@ -18,21 +18,43 @@ public final class CaseSummaryStore {
   public void refresh(long id) {
     var c = jdbc.queryForMap("select * from review.cases where case_id=?", id);
     boolean episode = "EPISODE".equals(c.get("kind"));
+    // 공개 도중에도 요약을 만들 수 있게 Alert는 공개 버전을 직접 읽는다.
     var scope =
-        jdbc.queryForList(
-            "select * from review.effective_members where case_id=? order by alert_id,evidence_version,tx_id,group_id",
-            id);
-    if (!episode
-        && !jdbc.queryForObject(
-            "select exists(select 1 from review.alert_groups where alert_id=?)",
-            Boolean.class,
-            id)) {
-      scope =
-          jdbc.queryForList(
-              "select tx_id,alert_id,version as evidence_version,case when role='CONTEXT' then 'CONTEXT' else 'SUBJECT' end as review_role,'PENDING' as state,null as decision from review.alert_transactions where alert_id=? and version=? order by tx_id",
-              id,
-              c.get("published_version"));
-    }
+        episode
+            ? jdbc.queryForList(
+                "select * from review.current_members where case_id=? order by alert_id,evidence_version,tx_id",
+                id)
+            : jdbc.queryForList(
+                """
+                select t.tx_id,t.alert_id,t.version as evidence_version,
+                  case when t.role='CONTEXT' then 'CONTEXT' else 'SUBJECT' end as review_role,
+                  case when e.target_alert_id is not null then 'TRANSFERRED' when e.edit_id is not null then 'EXCLUDED'
+                    when j.verdict is not null and t.role<>'CONTEXT' then 'DECIDED' else 'PENDING' end as state,
+                  case when e.edit_id is null and t.role<>'CONTEXT' then j.verdict end as decision
+                from review.alert_transactions t
+                left join review.alert_tx_edits e on e.alert_id=t.alert_id and e.tx_id=t.tx_id
+                left join lateral (select verdict from review.judgments j where j.superseded_at is null and (j.alert_id=t.alert_id
+                  or j.episode_id=(select episode_id from review.episode_alerts where alert_id=t.alert_id)) limit 1) j on true
+                where t.alert_id=? and t.version=?
+                union all
+                select x.tx_id,x.alert_id,t.version,
+                  case when t.role='CONTEXT' then 'CONTEXT' else 'SUBJECT' end,
+                  case when j.verdict is not null and t.role<>'CONTEXT' then 'DECIDED' else 'PENDING' end,
+                  case when t.role<>'CONTEXT' then j.verdict end
+                from review.alert_tx_edits x join review.alerts o on o.alert_id=x.alert_id
+                join review.alert_transactions t on t.alert_id=o.alert_id and t.version=o.published_version and t.tx_id=x.tx_id
+                left join lateral (select verdict from review.judgments j where j.superseded_at is null and (j.alert_id=x.target_alert_id
+                  or j.episode_id=(select episode_id from review.episode_alerts where alert_id=x.target_alert_id)) limit 1) j on true
+                where x.target_alert_id=?
+                  and not exists(select 1 from review.alert_tx_edits k where k.alert_id=x.target_alert_id and k.tx_id=x.tx_id)
+                  and not exists(select 1 from review.alert_transactions own where own.alert_id=? and own.version=? and own.tx_id=x.tx_id)
+                order by 2,3,1
+                """,
+                id,
+                c.get("published_version"),
+                id,
+                id,
+                c.get("published_version"));
     var members = new ArrayList<Map<String, Object>>();
     var sources = new TreeSet<Long>();
     var sourceTypes = new TreeSet<String>();
