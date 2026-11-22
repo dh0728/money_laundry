@@ -19,7 +19,9 @@ it('shows real selected rule metadata and history, including after state filteri
   expect(detail.getByText('80점 이상')).toBeInTheDocument();
   expect(detail.getByText(rejected.author)).toBeInTheDocument();
   expect(detail.queryByRole('link')).not.toBeInTheDocument();
-  expect(within(footer).getByRole('link', { name: '변경 사유' })).toHaveAttribute('href', `/rules/reason?rule=${rejected.id}`);
+  expect(within(footer).queryByRole('link', { name: '변경 사유' })).not.toBeInTheDocument();
+  expect(within(footer).queryByRole('button', { name: '변경 사유' })).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '룰 최근 변경' })).toHaveTextContent(rejected.history.at(-1).reason);
   rerender(<RuleList reason registerTableTools={registerTableTools} actionsHost={footer} />);
   const history = within(screen.getByRole('region', { name: '룰 변경 사유' }));
   expect(history.getByText(rejected.history[0].reason)).toBeInTheDocument();
@@ -45,7 +47,6 @@ it('keeps rule actions in the footer, enabled only while a rule is selected, and
     ({ unmount } = render(<RuleList initialRule={first.id} actionsHost={footer} />));
     const actions = within(footer);
     expect(actions.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', `/rules/backtest?rule=${first.id}`);
-    expect(actions.getByRole('link', { name: '변경 사유' })).toHaveAttribute('href', `/rules/reason?rule=${first.id}`);
     const remove = actions.getByRole('button', { name: '룰 삭제' });
     expect(remove).toHaveClass('screen-primary--negative');
     expect(remove).toBeEnabled();
@@ -66,11 +67,17 @@ it('keeps rule actions in the footer, enabled only while a rule is selected, and
     const inventory = within(screen.getByLabelText('룰 상태별 수'));
     expect(inventory.getByText('등록된 룰').nextSibling).toHaveTextContent(String(before.length - 1));
     expect(screen.queryByRole('region', { name: '룰 상세' })).not.toBeInTheDocument();
-    for (const name of ['백테스트로 열기', '변경 사유', '룰 삭제']) expect(actions.getByRole('button', { name })).toBeDisabled();
+    for (const name of ['백테스트로 열기', '복제', '룰 삭제']) expect(actions.getByRole('button', { name })).toBeDisabled();
 
     fireEvent.click(list.getByRole('row', { name: new RegExp(second.id) }));
     expect(actions.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', `/rules/backtest?rule=${second.id}`);
     expect(actions.getByRole('button', { name: '룰 삭제' })).toBeEnabled();
+
+    fireEvent.click(actions.getByRole('button', { name: '복제' }));
+    const copy = ruleWorkspace.rules.at(-1);
+    expect(copy).toMatchObject({ name: `${second.name} (복제)`, status: 'DRAFT', scoreMin: second.scoreMin });
+    expect(copy.id).not.toBe(second.id);
+    expect(within(screen.getByRole('region', { name: '룰 상세' })).getByRole('heading', { name: new RegExp(copy.id) })).toBeInTheDocument();
   } finally {
     unmount?.();
     Object.assign(HTMLDialogElement.prototype, dialogApi);
@@ -151,15 +158,27 @@ it('keeps approve and reject in the shared footer, and requires administrator an
     setPreviewUser(previewStaff);
     expect(reviewPreviewRule(draft.id, 'PENDING_APPROVAL', '조건 확인 요청').ok).toBe(true);
     ({ unmount } = render(<RuleList initialRule={draft.id} actionsHost={footer} />));
-    expect(within(footer).queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
+    expect(within(footer).getByRole('button', { name: '승인' })).toBeDisabled();
+    expect(within(footer).getByRole('button', { name: '반려' })).toBeDisabled();
     expect(reviewPreviewRule(draft.id, 'REJECTED', '조건 보완').ok).toBe(false);
     act(() => setPreviewUser(previewAdmin));
-    expect(within(footer).getByRole('button', { name: '승인' })).toHaveClass('screen-primary--positive');
+    expect(within(footer).getByRole('button', { name: '승인' })).toHaveClass('screen-primary--brand');
+    expect(within(footer).getByRole('button', { name: '승인' })).toBeEnabled();
     expect(within(footer).getByRole('button', { name: '반려' })).toHaveClass('screen-primary--negative');
+    expect(within(footer).getByRole('button', { name: '중지' })).toBeDisabled();
+    const order = ['룰 삭제', '중지', '반려', '복제', '백테스트로 열기', '승인']
+      .map(name => within(footer).getByRole(name === '백테스트로 열기' ? 'link' : 'button', { name }));
+    expect(order).toHaveLength(6);
+    order.slice(1).forEach((node, index) => expect(order[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
     expect(reviewPreviewRule(draft.id, 'TESTING', '').ok).toBe(false);
     const approved = reviewPreviewRule(draft.id, 'TESTING', '조건 확인 완료');
     expect(approved.value.history.at(-1)).toMatchObject({ actor: previewAdmin.name, action: '승인', reason: '조건 확인 완료' });
     expect(JSON.parse(sessionStorage.getItem('aml-preview-rule-drafts'))).toContainEqual(approved.value);
+
+    act(() => setPreviewUser(previewStaff));
+    expect(reviewPreviewRule(draft.id, 'STOPPED', '운영 점검').ok).toBe(false);
+    act(() => setPreviewUser(previewAdmin));
+    expect(reviewPreviewRule(draft.id, 'STOPPED', '운영 점검').value).toMatchObject({ status: 'STOPPED' });
   } finally {
     unmount?.();
     ruleWorkspace.rules = before;

@@ -77,15 +77,16 @@ export function deletePreviewRule(id) {
 }
 
 const requestReview = { status: 'PENDING_APPROVAL', label: '승인 요청', tone: 'brand' };
-const reviewDecisions = [
-  { status: 'REJECTED', label: '반려', tone: 'negative' },
-  { status: 'TESTING', label: '승인', tone: 'positive' },
-];
+const approveRule = { status: 'TESTING', label: '승인', tone: 'brand' };
+const rejectRule = { status: 'REJECTED', label: '반려', tone: 'negative' };
+const stopRule = { status: 'STOPPED', label: '중지', tone: 'negative' };
 
 function reviewActions(rule, user) {
   if (!user || !rule) return [];
   if (rule.status === 'DRAFT') return [requestReview];
-  return user.role === 'ADMIN' && rule.status === 'PENDING_APPROVAL' ? reviewDecisions : [];
+  if (user.role !== 'ADMIN') return [];
+  if (rule.status === 'PENDING_APPROVAL') return [rejectRule, approveRule];
+  return ['TESTING', 'ACTIVE'].includes(rule.status) ? [stopRule] : [];
 }
 
 export function reviewPreviewRule(id, status, reason) {
@@ -104,7 +105,7 @@ function RuleTime({ value }) {
   return value && Number.isFinite(date.getTime()) ? <time dateTime={value}>{timeFormat.format(date)} KST</time> : '기록 없음';
 }
 
-function RuleReview({ rule, actionsHost, children, onReview }) {
+function RuleReview({ rule, actionsHost, destructive, children, onReview }) {
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   const [decision, setDecision] = useState(null);
   const [reason, setReason] = useState('');
@@ -131,15 +132,20 @@ function RuleReview({ rule, actionsHost, children, onReview }) {
     onReview(result.value);
   }
 
+  const actionButton = action => <PrimaryButton key={action.status} tone={action.tone}
+    disabled={!allowed.includes(action)} aria-haspopup="dialog" onHold={() => {
+      setReason('');
+      setError('');
+      setDecision(action);
+    }}>{action.label}</PrimaryButton>;
+
   return <>
     <ScreenActions host={actionsHost} stackOnNarrow>
+      {destructive}
+      {actionButton(stopRule)}
+      {actionButton(rejectRule)}
       {children}
-      {allowed.map(action => <PrimaryButton key={action.status} tone={action.tone}
-        aria-haspopup="dialog" onHold={() => {
-          setReason('');
-          setError('');
-          setDecision(action);
-        }}>{action.label}</PrimaryButton>)}
+      {actionButton(rule?.status === 'DRAFT' ? requestReview : approveRule)}
     </ScreenActions>
     {decision && <DialogFrame ref={dialog} className="rule-review-dialog" title={`룰 ${decision.label}`} titleId={titleId}
       onClose={() => setDecision(null)} onSubmit={submit}
@@ -273,12 +279,16 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
     <RuleReview key={selected?.id ?? ''} rule={selected} actionsHost={actionsHost} onReview={rule => {
       setRules(ruleWorkspace.rules);
       setNotice(`${rule.id} · ${ruleStatusLabels[rule.status]}`);
-    }}>
+    }} destructive={<PrimaryButton tone="negative" disabled={!selected} aria-haspopup="dialog"
+      onClick={() => setDeleting(selected)}>룰 삭제</PrimaryButton>}>
+      <PrimaryButton tone="inverse" disabled={!selected} onClick={() => {
+        const result = savePreviewRule({ ...selected, name: `${selected.name} (복제)` });
+        setRules(ruleWorkspace.rules);
+        if (result.ok) choose(result.value.id);
+        setNotice(result.ok ? `${result.value.id} 복제됨` : result.error);
+      }}>복제</PrimaryButton>
       <RuleLink rule={selected} path="/rules/backtest">백테스트로 열기</RuleLink>
-      {reason ? <RuleLink rule={selected} path="/rules">룰 목록</RuleLink>
-        : <RuleLink rule={selected} path="/rules/reason">변경 사유</RuleLink>}
-      <PrimaryButton tone="negative" disabled={!selected} aria-haspopup="dialog"
-        onClick={() => setDeleting(selected)}>룰 삭제</PrimaryButton>
+      {reason && <RuleLink rule={selected} path="/rules">룰 목록</RuleLink>}
     </RuleReview>
     {deleting && <RuleDelete rule={deleting} onClose={() => setDeleting(null)} onDelete={() => {
       setRules(ruleWorkspace.rules);
