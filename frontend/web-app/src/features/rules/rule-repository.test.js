@@ -32,7 +32,7 @@ it('sends supported rule changes to the server and explains the ones the server 
   expect(api.reviewLiveRule).toHaveBeenCalledTimes(1);
 });
 
-it('deletes only draft or rejected rules through the server, for the author or an administrator', async () => {
+it('deletes through the server: own draft or rejected rules for staff, any rule for an administrator', async () => {
   const api = serverApi([rule('RULE-001', 'ACTIVE'), rule('RULE-003', 'DRAFT'), rule('RULE-004', 'REJECTED', '다른 직원')]);
   const repository = createServerRuleRepository({ api, user: () => previewStaff });
   expect(await repository.delete('RULE-001')).toMatchObject({ ok: false });
@@ -40,6 +40,8 @@ it('deletes only draft or rejected rules through the server, for the author or a
   expect(await repository.delete('RULE-003')).toEqual({ ok: true, value: 'RULE-003' });
   expect(api.deleteLiveRule).toHaveBeenCalledTimes(1);
   expect((await repository.list()).map(row => row.id)).toEqual(['RULE-001', 'RULE-004']);
+  const admin = createServerRuleRepository({ api, user: () => previewAdmin });
+  expect(await admin.delete('RULE-001')).toEqual({ ok: true, value: 'RULE-001' });
 });
 
 it('reads the server list again when asked for a fresh copy', async () => {

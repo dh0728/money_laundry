@@ -302,3 +302,8 @@
 .rule-action-guard { display: inline-flex; pointer-events: auto }
 .rule-action-guard.rule-action-guard :is(.button, .star-border, .hold-button, button, a) { pointer-events: none }
 .workflow-rule-state { grid-column: 1 / -1; justify-items: start }
+
+/* 운영 이력이 있는 룰의 삭제: 위험색이지만 보관보다 한 단계 낮춘 보조 버튼 */
+.rule-review-dialog .rule-remove-danger { color: var(--action-negative-face); border-color: color-mix(in srgb, var(--action-negative-face), transparent 55%) }
+.rule-review-dialog .rule-remove-danger:disabled { color: inherit; border-color: inherit }
+.rule-review-dialog .rule-remove-warning { color: var(--action-negative-face) }

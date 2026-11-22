@@ -138,8 +138,12 @@ function RuleRemove({ rule, repository, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const canDelete = rule.allowedActions.includes('delete');
   const canArchive = rule.allowedActions.includes('archive');
+  // 초안·반려가 아닌 룰은 운영 이력이 있다. 삭제도 할 수 있지만 이력을 남기는 보관을 먼저 권한다.
+  const keepsHistory = !['DRAFT', 'REJECTED'].includes(rule.status);
   const archiveReason = !canArchive ? rule.blockedReasons.archive : busy ? '처리 중입니다.' : reason.trim() ? '' : '보관 사유를 입력해 주세요.';
   const deleteReason = !canDelete ? rule.blockedReasons.delete : busy ? '처리 중입니다.' : '';
+  const archive = () => run(() => repository.archive(rule.id, reason), '보관됨');
+  const remove = () => run(() => repository.delete(rule.id), '삭제됨');
 
   useEffect(() => { dialog.current.showModal(); }, []);
 
@@ -160,25 +164,31 @@ function RuleRemove({ rule, repository, onClose, onDone }) {
     });
   }
 
+  const archiveButton = <BlockedReason key="archive" reason={archiveReason}>
+    <PrimaryButton type={keepsHistory ? 'submit' : 'button'} tone={keepsHistory ? 'brand' : 'inverse'} disabled={Boolean(archiveReason)}
+      onClick={keepsHistory ? undefined : archive}>{keepsHistory ? '보관 (권장)' : '보관'}</PrimaryButton>
+  </BlockedReason>;
+  const deleteButton = <BlockedReason key="delete" reason={deleteReason}>
+    {keepsHistory
+      ? <ActionButton shape="pill" surface="floating" className="rule-remove-danger" disabled={Boolean(deleteReason)}
+        onClick={remove}>삭제</ActionButton>
+      : <PrimaryButton type="submit" tone="negative" disabled={Boolean(deleteReason)}>삭제</PrimaryButton>}
+  </BlockedReason>;
+
   return <DialogFrame ref={dialog} className="rule-review-dialog" title="룰 삭제" titleId={titleId}
     onClose={onClose} onSubmit={event => {
       event.preventDefault();
-      if (canDelete) run(() => repository.delete(rule.id), '삭제됨');
+      if (keepsHistory ? !archiveReason : !deleteReason) (keepsHistory ? archive : remove)();
     }}
     actions={<>
       <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
-      <BlockedReason reason={archiveReason}>
-        <PrimaryButton tone={canDelete ? 'inverse' : 'brand'} disabled={Boolean(archiveReason)}
-          onClick={() => run(() => repository.archive(rule.id, reason), '보관됨')}>보관</PrimaryButton>
-      </BlockedReason>
-      <BlockedReason reason={deleteReason}>
-        <PrimaryButton type="submit" tone="negative" disabled={Boolean(deleteReason)}>삭제</PrimaryButton>
-      </BlockedReason>
+      {keepsHistory ? <>{deleteButton}{archiveButton}</> : <>{archiveButton}{deleteButton}</>}
     </>}>
     <div className="case-judgment-body">
       <p><code>{rule.id}</code> · {rule.name}</p>
-      <p>{canDelete ? '삭제하면 룰과 이력이 목록에서 사라집니다. 이력을 남기려면 보관하세요.'
-        : '운영 이력이 있는 룰은 삭제하지 않고 보관합니다. 보관해도 이력은 남습니다.'}</p>
+      {keepsHistory
+        ? <p className="rule-remove-warning">운영 이력이 있는 룰입니다. 삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다.</p>
+        : <p>삭제하면 룰과 이력이 목록에서 사라집니다. 이력을 남기려면 보관하세요.</p>}
       <label className="case-judgment-field">보관 사유
         <Textarea value={reason} rows={2} maxLength={RULE_LIMITS.reason}
           onChange={event => { setReason(event.target.value); setError(''); }} />
