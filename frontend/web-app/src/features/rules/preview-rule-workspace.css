@@ -129,7 +129,7 @@
   font-weight: var(--aml-type-section-title-weight);
 }
 
-.workflow-rule-overview :is(.workflow-risk-legend, .workflow-rule-links) {
+.workflow-rule-overview .workflow-risk-legend {
   margin-block: 0;
 }
 
@@ -149,18 +149,6 @@
 .workflow-rule-list .workflow-data-table th[scope="row"] { white-space: normal }
 .workflow-rule-select { text-align: start }
 .workflow-rule-select code { font-family: var(--aml-font-mono); white-space: nowrap }
-
-.workflow-rule-overview .workflow-rule-links .button {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: var(--aml-panel-control-size);
-  padding: var(--aml-space-6) var(--aml-space-12);
-  background: var(--inner-surface);
-}
-
-.workflow-rule-overview .workflow-rule-links .button:hover {
-  background: var(--hover);
-}
 
 .rule-condition-facts {
   display: grid;
@@ -281,7 +269,7 @@
 }
 
 @media (pointer: coarse) {
-  .workflow-rule-overview :is(.workflow-rule-select, .workflow-rule-links .button) {
+  .workflow-rule-overview .workflow-rule-select {
     min-block-size: max(44px, var(--aml-panel-control-size));
   }
   .screen-rule-editor :is(input[data-slot="input"], textarea[data-slot="textarea"]),

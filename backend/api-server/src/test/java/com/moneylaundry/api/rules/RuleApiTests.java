@@ -40,7 +40,7 @@ class RuleApiTests {
         "truncate review.rules,review.alerts,analysis.jobs,review.episodes,core.owners,ingest.uploads cascade");
     jdbc.update("update ops.business_clock set business_at='2023-09-02T00:00:00Z',revision=0");
     jdbc.update(
-        "update core.users set password_hash=? where username in ('l1a','admin')",
+        "update core.users set password_hash=? where username in ('l1a','l1b','admin')",
         encoder.encode("Test-password-123"));
   }
 
@@ -131,6 +131,73 @@ class RuleApiTests {
     mvc.perform(get("/api/v1/rules").session(session))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1));
+  }
+
+  String created() throws Exception {
+    return object(
+            send(post("/api/v1/rules"), rule(null, .7, 2, 24))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
+        .get("id")
+        .toString();
+  }
+
+  void review(String code, String status) throws Exception {
+    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", status, "reason", "사유"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(status));
+  }
+
+  @Test
+  void admin_stops_a_testing_rule_and_the_stopped_rule_can_be_edited_again() throws Exception {
+    login("l1a");
+    String code = created();
+    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "STOPPED", "reason", "중지"))
+        .andExpect(status().isForbidden());
+    review(code, "PENDING_APPROVAL");
+    login("admin");
+    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "STOPPED", "reason", "중지"))
+        .andExpect(status().isConflict()); // 승인 대기는 중지 대상이 아니다
+    review(code, "TESTING");
+    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "STOPPED", "reason", "오탐 증가"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("STOPPED"))
+        .andExpect(jsonPath("$.history[3].action").value("중지"))
+        .andExpect(jsonPath("$.history[3].reason").value("오탐 증가"));
+    send(post("/api/v1/rules/" + code), rule(1, .8, 2, 24))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("DRAFT"));
+  }
+
+  @Test
+  void draft_is_deleted_by_its_author_or_admin_and_later_states_by_admin_only() throws Exception {
+    login("l1a");
+    String mine = created();
+    String requested = created();
+    String forAdmin = created();
+    review(requested, "PENDING_APPROVAL");
+
+    login("l1b");
+    send(post("/api/v1/rules/" + mine + "/delete"), Map.of()).andExpect(status().isForbidden());
+
+    login("l1a");
+    send(post("/api/v1/rules/" + requested + "/delete"), Map.of())
+        .andExpect(status().isForbidden());
+    send(post("/api/v1/rules/" + mine + "/delete"), Map.of()).andExpect(status().isOk());
+    send(post("/api/v1/rules/" + mine + "/delete"), Map.of()).andExpect(status().isNotFound());
+
+    login("admin");
+    send(post("/api/v1/rules/" + forAdmin + "/delete"), Map.of()).andExpect(status().isOk());
+    review(requested, "REJECTED");
+    login("l1a");
+    send(post("/api/v1/rules/" + requested + "/delete"), Map.of()).andExpect(status().isOk());
+    mvc.perform(get("/api/v1/rules").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+    assertThat(jdbc.queryForObject("select count(*) from review.rule_history", Long.class))
+        .isZero();
   }
 
   @Test

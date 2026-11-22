@@ -494,7 +494,8 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 | GET /api/v1/rules | 룰 목록. `{id:"RULE-NNN",name,description,typeCode,scoreMin,minTransactions,windowHours,status,version,author,updatedAt,history[{at,actor,action,reason}]}` |
 | POST /api/v1/rules | 초안 생성. `{name,description,typeCode,scoreMin(0~1),minTransactions,windowHours}` |
 | POST /api/v1/rules/{id} | 초안 수정. DRAFT·REJECTED·STOPPED만, 그 밖은 409 |
-| POST /api/v1/rules/{id}/review | `{status,reason}`. DRAFT→PENDING_APPROVAL(작성 가능한 직원), PENDING_APPROVAL→TESTING/REJECTED(ADMIN만) |
+| POST /api/v1/rules/{id}/review | `{status,reason}`. DRAFT→PENDING_APPROVAL(작성 가능한 직원), PENDING_APPROVAL→TESTING/REJECTED(ADMIN만), TESTING·ACTIVE→STOPPED(ADMIN만) |
+| POST /api/v1/rules/{id}/delete | 룰과 변경 이력 삭제. DRAFT·REJECTED는 담당자(마지막 저장자)와 ADMIN, 그 밖의 상태는 ADMIN만. 권한이 없으면 403. `{id}` |
 | POST /api/v1/rules/backtest | `{rule,start,end,offset,limit}`. 기간(최대 2년)의 ACTIVE 원장 전체에 조건 적용. `{matchedCount,accountCount,amountUsd,matchedAccountIds,scannedCount,transactions}`. 서버 제한 90초 |
 
 룰은 분석 파이프라인에 연결하지 않는다. 화면에 ACTIVE로 바꾸는 버튼이 없어 서버에도 그 전이는 없다.

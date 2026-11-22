@@ -49,6 +49,13 @@ public class RuleController {
     return rules.review(id(code), user, "ADMIN".equals(reviews.actor(user).get("role")), input);
   }
 
+  @PostMapping("/{code}/delete")
+  public Object delete(@PathVariable String code, Principal principal) {
+    long user = reviews.userId(principal);
+    rules.delete(id(code), user, "ADMIN".equals(reviews.actor(user).get("role")));
+    return java.util.Map.of("id", code);
+  }
+
   @PostMapping("/backtest")
   public Object backtest(Principal principal, @RequestBody RuleService.Backtest input) {
     reviews.actor(reviews.userId(principal));
