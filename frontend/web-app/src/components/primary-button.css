@@ -24,6 +24,19 @@
   text-align: center;
   text-decoration: none;
 }
+.screen-primary--inverse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  block-size: var(--account-control-size);
+  padding-block: 0;
+  padding-inline: var(--aml-space-16);
+  border-color: transparent;
+  font-size: var(--ui-font-size);
+  text-decoration: none;
+  white-space: nowrap;
+  pointer-events: auto;
+}
 .screen-primary[data-button-size="comfortable"] {
   min-block-size: var(--aml-density-control-comfortable);
   padding: 0 var(--aml-space-8);

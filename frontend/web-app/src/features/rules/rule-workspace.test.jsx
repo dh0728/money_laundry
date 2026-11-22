@@ -9,17 +9,78 @@ it('shows real selected rule metadata and history, including after state filteri
   const rejected = ruleWorkspace.rules.find(rule => rule.status === 'REJECTED');
   let tools;
   const registerTableTools = next => { tools = next; };
-  const { rerender } = render(<RuleList registerTableTools={registerTableTools} />);
+  const footer = document.createElement('footer');
+  document.body.append(footer);
+  const { rerender } = render(<RuleList registerTableTools={registerTableTools} actionsHost={footer} />);
   expect(screen.getByRole('region', { name: '룰 최근 변경' })).toBeInTheDocument();
   act(() => tools.filter.onChange('REJECTED'));
   const detail = within(screen.getByRole('region', { name: '룰 상세' }));
   expect(detail.getByRole('heading', { name: new RegExp(rejected.id) })).toHaveTextContent(rejected.name);
   expect(detail.getByText('80점 이상')).toBeInTheDocument();
   expect(detail.getByText(rejected.author)).toBeInTheDocument();
-  expect(detail.getByRole('link', { name: '변경 사유' })).toHaveAttribute('href', `/rules/reason?rule=${rejected.id}`);
-  rerender(<RuleList reason registerTableTools={registerTableTools} />);
+  expect(detail.queryByRole('link')).not.toBeInTheDocument();
+  expect(within(footer).getByRole('link', { name: '변경 사유' })).toHaveAttribute('href', `/rules/reason?rule=${rejected.id}`);
+  rerender(<RuleList reason registerTableTools={registerTableTools} actionsHost={footer} />);
   const history = within(screen.getByRole('region', { name: '룰 변경 사유' }));
   expect(history.getByText(rejected.history[0].reason)).toBeInTheDocument();
+  expect(within(footer).getByRole('link', { name: '룰 목록' })).toHaveAttribute('href', `/rules?rule=${rejected.id}`);
+  footer.remove();
+});
+
+it('keeps rule actions in the footer, enabled only while a rule is selected, and deletes after confirmation', () => {
+  const before = ruleWorkspace.rules;
+  const beforeDrafts = sessionStorage.getItem('aml-preview-rule-drafts');
+  const beforeDeleted = sessionStorage.getItem('aml-preview-rule-deleted');
+  const footer = document.createElement('footer');
+  document.body.append(footer);
+  const [first, second] = before;
+  const dialogApi = { showModal: HTMLDialogElement.prototype.showModal, close: HTMLDialogElement.prototype.close };
+  HTMLDialogElement.prototype.showModal = function showModal() { this.open = true; };
+  HTMLDialogElement.prototype.close = function close() {
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
+  let unmount;
+  try {
+    ({ unmount } = render(<RuleList initialRule={first.id} actionsHost={footer} />));
+    const actions = within(footer);
+    expect(actions.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', `/rules/backtest?rule=${first.id}`);
+    expect(actions.getByRole('link', { name: '변경 사유' })).toHaveAttribute('href', `/rules/reason?rule=${first.id}`);
+    const remove = actions.getByRole('button', { name: '룰 삭제' });
+    expect(remove).toHaveClass('screen-primary--negative');
+    expect(remove).toBeEnabled();
+
+    fireEvent.click(remove);
+    const dialog = within(screen.getByRole('dialog', { name: '룰 삭제' }));
+    expect(dialog.getByText(first.name, { exact: false })).toBeInTheDocument();
+    fireEvent.click(dialog.getByRole('button', { name: '취소' }));
+    expect(screen.queryByRole('dialog', { name: '룰 삭제' })).not.toBeInTheDocument();
+    expect(ruleWorkspace.rules).toContain(first);
+
+    fireEvent.click(actions.getByRole('button', { name: '룰 삭제' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: '룰 삭제' })).getByRole('button', { name: '삭제' }));
+    expect(ruleWorkspace.rules.map(rule => rule.id)).not.toContain(first.id);
+    expect(JSON.parse(sessionStorage.getItem('aml-preview-rule-deleted'))).toContain(first.id);
+    const list = within(screen.getByRole('table', { name: '룰 목록' }));
+    expect(list.queryByRole('row', { name: new RegExp(first.id) })).not.toBeInTheDocument();
+    const inventory = within(screen.getByLabelText('룰 상태별 수'));
+    expect(inventory.getByText('등록된 룰').nextSibling).toHaveTextContent(String(before.length - 1));
+    expect(screen.queryByRole('region', { name: '룰 상세' })).not.toBeInTheDocument();
+    for (const name of ['백테스트로 열기', '변경 사유', '룰 삭제']) expect(actions.getByRole('button', { name })).toBeDisabled();
+
+    fireEvent.click(list.getByRole('row', { name: new RegExp(second.id) }));
+    expect(actions.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', `/rules/backtest?rule=${second.id}`);
+    expect(actions.getByRole('button', { name: '룰 삭제' })).toBeEnabled();
+  } finally {
+    unmount?.();
+    Object.assign(HTMLDialogElement.prototype, dialogApi);
+    ruleWorkspace.rules = before;
+    for (const [key, value] of [['aml-preview-rule-drafts', beforeDrafts], ['aml-preview-rule-deleted', beforeDeleted]]) {
+      if (value === null) sessionStorage.removeItem(key);
+      else sessionStorage.setItem(key, value);
+    }
+    footer.remove();
+  }
 });
 
 it('selects a rule by clicking its status, version, owner, or row padding', () => {
