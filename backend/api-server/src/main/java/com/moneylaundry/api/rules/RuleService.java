@@ -12,7 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 룰엔진 화면의 룰 목록, 초안 저장, 승인 요청·승인·반려, 백테스트. 룰은 분석 파이프라인의 탐지에 쓰이지 않는다. */
+/** 룰엔진 화면의 룰 목록, 초안 저장, 승인 요청·승인·반려·중지, 삭제, 백테스트. 룰은 분석 파이프라인의 탐지에 쓰이지 않는다. */
 @Service
 public class RuleService {
   public record Input(
@@ -156,13 +156,13 @@ public class RuleService {
         });
   }
 
-  /** 승인 요청(초안), 승인·반려(승인 대기, 관리자만). */
+  /** 승인 요청(초안), 승인·반려(승인 대기, 관리자만), 중지(시험 중·운영 중, 관리자만). */
   public Map<String, Object> review(long id, long user, boolean admin, Review in) {
     if (in == null
         || in.reason() == null
         || in.reason().isBlank()
         || in.reason().length() > 1000
-        || !Set.of("PENDING_APPROVAL", "TESTING", "REJECTED")
+        || !Set.of("PENDING_APPROVAL", "TESTING", "REJECTED", "STOPPED")
             .contains(Objects.toString(in.status(), ""))) throw AnalysisService.invalid();
     return tx.execute(
         s -> {
@@ -173,8 +173,10 @@ public class RuleService {
           boolean request = "PENDING_APPROVAL".equals(in.status());
           if (!request && !admin)
             throw new ApiException(
-                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "관리자만 승인하거나 반려할 수 있습니다.");
-          if (!(request ? "DRAFT" : "PENDING_APPROVAL").equals(found.getFirst()))
+                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "관리자만 승인·반려하거나 중지할 수 있습니다.");
+          boolean stop = "STOPPED".equals(in.status());
+          if (!(stop ? Set.of("TESTING", "ACTIVE") : Set.of(request ? "DRAFT" : "PENDING_APPROVAL"))
+              .contains(found.getFirst()))
             throw ApiException.invalidTransition("룰 상태와 처리 권한을 확인해 주세요.");
           Timestamp at = Timestamp.from(time.now());
           jdbc.update(
@@ -185,10 +187,30 @@ public class RuleService {
           history(
               id,
               user,
-              request ? "승인 요청" : "TESTING".equals(in.status()) ? "승인" : "반려",
+              request ? "승인 요청" : stop ? "중지" : "TESTING".equals(in.status()) ? "승인" : "반려",
               in.reason().strip(),
               at);
           return one(id);
+        });
+  }
+
+  /** 룰과 그 이력을 지운다. 초안·반려는 담당자(마지막 저장자)와 관리자, 그 밖의 상태는 관리자만 지울 수 있다. */
+  public void delete(long id, long user, boolean admin) {
+    tx.executeWithoutResult(
+        s -> {
+          var found =
+              jdbc.queryForList(
+                  "select status,author_id from review.rules where rule_id=? for update", id);
+          if (found.isEmpty()) throw ApiException.notFound("룰이 없습니다.");
+          boolean draft = Set.of("DRAFT", "REJECTED").contains(found.getFirst().get("status"));
+          if (!admin && !draft)
+            throw new ApiException(
+                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "승인 요청 이후의 룰은 관리자만 삭제할 수 있습니다.");
+          if (!admin && ((Number) found.getFirst().get("author_id")).longValue() != user)
+            throw new ApiException(
+                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "초안·반려 룰은 담당자와 관리자만 삭제할 수 있습니다.");
+          jdbc.update("delete from review.rule_history where rule_id=?", id);
+          jdbc.update("delete from review.rules where rule_id=?", id);
         });
   }
 
