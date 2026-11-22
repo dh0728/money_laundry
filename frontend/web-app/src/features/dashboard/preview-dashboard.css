@@ -172,7 +172,6 @@
 .dashboard-detection-row { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) }
 .dashboard-transaction-details {
   min-inline-size: 0;
-  gap: var(--aml-panel-text-inset);
 }
 .dashboard-transaction-details:has(> :nth-child(2)) {
   grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
@@ -381,6 +380,9 @@
   padding-inline: var(--aml-space-12);
   text-decoration: none;
 }
+.screen-layout:has(.dashboard-board) {
+  padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
+}
 .dashboard-board .case-progress-lane > .button {
   min-block-size: var(--aml-panel-control-size);
 }
@@ -401,13 +403,7 @@
 .dashboard-board-actions { display: flex; align-items: center; gap: var(--workspace-gap); margin-inline-start: auto }
 .dashboard-board-scroll {
   min-inline-size: 0;
-  max-block-size: var(--workspace-list-limit);
-  overflow: auto;
-  scrollbar-gutter: stable;
-}
-.dashboard-board-scroll:focus-visible {
-  outline: var(--aml-stroke-focus) solid var(--focus-ring);
-  outline-offset: calc(-1 * var(--aml-stroke-focus));
+  padding: max(0px, calc(var(--record-card-shadow-gutter) - var(--aml-panel-inset)));
 }
 .dashboard-board-heading h2 {
   margin: 0;

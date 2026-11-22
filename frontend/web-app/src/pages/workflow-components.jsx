@@ -1,4 +1,3 @@
-import { Callout } from '../components/Callout';
 import React, { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -16,7 +15,7 @@ import { RecordCard } from '../components/record-card';
 import { Panel } from '../components/panel';
 import { ScreenActions } from '../components/screen-actions';
 import { CompletionRing } from '../components/completion-ring';
-import { ChartSectionDownload } from '../components/section-download';
+import { SectionDownloadHeading } from '../components/section-download';
 import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
 import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { RuleList, ruleWorkspace } from '../features/rules/preview-rule-workspace';
@@ -287,10 +286,9 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
       <Step title="결과">
         {results && <>
           <Panel className="backtest-card" data-export-visualization={results.scannedCount > 0 || undefined}>
-            <div className="section-download-heading">
-              <h2>백테스트 결과</h2>
-              {results.scannedCount > 0 && <ChartSectionDownload label="백테스트 적중률" />}
-            </div>
+            <SectionDownloadHeading downloadLabel={results.scannedCount > 0 ? '백테스트 적중률' : undefined}>
+              백테스트 결과
+            </SectionDownloadHeading>
             <div className="backtest-result-summary">
               <CompletionRing label="거래 적중률" value={results.matchedCount} total={results.scannedCount}
                 color="var(--status-caution-accent)" size={88} reduced={reduced} />
@@ -306,11 +304,10 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
             <BacktestMetric label="적중 거래" value={results.matchedCount} unit="건" />
             <BacktestMetric label="검사 거래" value={results.scannedCount} unit="건" />
           </dl>
-          <WorkflowTable label="백테스트 근거 거래" summary={[
-            tableCount(sorting.rows.length, results.matchedCount),
-            `검사 ${results.scannedCount.toLocaleString('ko-KR')}건`,
-            `합계 ${results.amountUsd.toLocaleString('ko-KR')} USD`,
-          ].join(' · ')}>
+          <WorkflowTable label="백테스트 근거 거래" summary={<>
+            {tableCount(sorting.rows.length, results.matchedCount)}
+            <span>합계 {results.amountUsd.toLocaleString('ko-KR')} USD</span>
+          </>}>
               <TableHeader><TableRow>
                 <SortableTableHead sorting={sorting} column="transaction" value={record => record.displayId}>거래</SortableTableHead>
                 <SortableTableHead sorting={sorting} column="date" value={record => Date.parse(record.occurredAt)}>거래일 · KST</SortableTableHead>
@@ -443,7 +440,7 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
   const patterns = row => row.patterns.length ? row.patterns.map(pattern => <PatternTag emphasis="solid" key={pattern}>{pattern}</PatternTag>) : '자료 없음';
   return <section className="screen-section workflow-report workflow-panel">
     {!tableView && <WorkflowQueryHeading title="판정 이력" summary={summary} tools={tools} />}
-    {view === 'card' ? <div className="workflow-report-cards" role="region" aria-label="판정 카드 스크롤" tabIndex={0}>
+    {view === 'card' ? <div className="workflow-report-cards">
       <MagicBento key={appearance.reduced} className="report-bento preview-tilt-cards" columns={4} rowHeight={0} gap={readWorkspaceGap()}
         theme={appearance.theme} disableAnimations={appearance.reduced} intro={false} textAutoHide={false}
         enableTilt enableBorderGlow={false} enableSpotlight={false} enableStars={false} clickEffect={false}
@@ -528,28 +525,27 @@ function CaseReviewActions({ overview }) {
   let bundle;
   let bundleBlocked;
   if (compared.length) {
-    if (!canManageEpisodes) {
-      bundleBlocked = 'Episode 편입은 검수 계정에서 진행할 수 있습니다.';
-    } else if (comparedEpisodes.length > 1) {
-      bundleBlocked = '대상 Episode는 하나만 선택해 주세요.';
-    } else if (target && !target.open) {
-      bundleBlocked = `${target.code}은 처리 완료된 Episode입니다. 다른 대상을 선택해 주세요.`;
+    if (comparedEpisodes.length > 1) {
+      bundleBlocked = '편입할 Episode를 한 건 선택해 주세요.';
     } else {
-      const ineligible = transferAlerts.filter(item => !canTransferAlert(item));
-      if (ineligible.length) {
-        bundleBlocked = `편입할 수 없는 Alert · ${ineligible.map(item => item.code).join(', ')}. 내 담당 진행 중 Alert만 선택해 주세요.`;
+      const blockers = transferAlerts.filter(item => !canTransferAlert(item)).map(item =>
+        `${item.code} · ${item.episodeCode ? '기존 Episode 소속' : !item.open || item.verdict !== 'unjudged' ? '판정 완료' : '다른 담당자'}`);
+      if (target && !target.open) blockers.push(`${target.code} · 판정 완료`);
+      if (blockers.length) {
+        bundleBlocked = blockers.join('\n');
       } else if (transferAlerts.length < (target ? 1 : 2)) {
-        bundleBlocked = '기존 Episode 또는 묶을 Alert를 더 선택해 주세요.';
-      } else {
+        bundleBlocked = '기존 Episode 또는 함께 묶을 Alert를 선택해 주세요.';
+      } else if (canManageEpisodes) {
         bundle = { alerts: transferAlerts.map(item => item.code), target: target?.code };
       }
     }
   }
+  const onRelationRequest = (bundleBlocked || target && !target.assigned) && user?.role === 'STAFF' && overview.openRelationRequest
+    ? (reason, onSent) => overview.openRelationRequest({ codes: compared.map(item => item.code), reason, onSent })
+    : undefined;
   return <>
     {overview.bundleNoticeHost && createPortal(
-      bundleBlocked ? <Callout>{bundleBlocked}</Callout>
-        : bundle ? <ResultStatus status="pending">Alert {bundle.alerts.length}건 → {bundle.target ?? '새 Episode'}</ResultStatus>
-          : null,
+      bundle ? <ResultStatus status="pending">Alert {bundle.alerts.length}건 → {bundle.target ?? '새 Episode'}</ResultStatus> : null,
       overview.bundleNoticeHost,
     )}
     <ScreenActions host={overview.actionsHost} stackOnNarrow={selected.length > 0}>
@@ -561,9 +557,11 @@ function CaseReviewActions({ overview }) {
         && <ActionButton onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</ActionButton>}
       {episodeAction && <PreviewEpisodeDialog cases={reportData.cases} save={overview.saveEpisode} row={row}
         bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'}
+        onRelationRequest={episodeAction === 'bundle' ? onRelationRequest : undefined}
         onClose={saved => saved ? overview.refreshEpisode() : setEpisodeAction(null)} />}
-      <CaseJudgment bundleBlocked={Boolean(bundleBlocked)} onBundle={bundle ? () => setEpisodeAction('bundle') : undefined}
-        onTransfer={canManageEpisodes && canTransferAlert(row) ? () => setEpisodeAction('transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
+      <CaseJudgment actor={user} bundleBlocked={bundleBlocked} onBundle={bundle ? () => setEpisodeAction('bundle') : undefined}
+        onRelationRequest={onRelationRequest}
+        onTransfer={!bundleBlocked && canManageEpisodes && canTransferAlert(row) ? () => setEpisodeAction('transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
         onSavedClose={overview.onJudgmentClose} onReport={overview.onJudgmentReport} />
     </ScreenActions>
   </>;

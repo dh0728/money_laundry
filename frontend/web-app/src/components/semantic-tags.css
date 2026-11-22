@@ -133,6 +133,10 @@
   background-color: var(--tag-ink);
   color: var(--tag-fill);
 }
+.button.semantic-tag[data-tag="link"][data-record-link] {
+  padding-inline: var(--aml-space-8);
+  border-radius: var(--aml-radius-full);
+}
 .button.semantic-tag[data-tag="link"] code { font-size: inherit; font-weight: inherit }
 
 .semantic-tag[data-tag="filter"] {
@@ -191,3 +195,7 @@
 [data-verdict="unjudged"] { --record-verdict-accent: var(--status-caution-accent) }
 [data-verdict="abnormal"] { --record-verdict-accent: var(--status-danger-accent) }
 [data-verdict="normal"] { --record-verdict-accent: var(--status-positive-accent) }
+
+/* 제목 오른쪽 개수 태그(CountTag). 제목 안에 넣을 때도 제목과 한 줄로 붙는다. */
+.count-tag { flex: none; font-variant-numeric: tabular-nums }
+:is(h1, h2, h3, h4):has(> .count-tag) { display: flex; align-items: center; flex-wrap: wrap; gap: var(--aml-space-6) }

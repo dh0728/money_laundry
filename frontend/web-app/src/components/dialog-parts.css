@@ -1,0 +1,52 @@
+.dialog-part-host { flex: none }
+.dialog-frame {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  inline-size: 100%;
+}
+.dialog-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aml-space-16);
+  padding: calc(var(--aml-panel-inset) - var(--aml-stroke-control)) calc(var(--aml-panel-inset) - var(--aml-stroke-control))
+    var(--aml-panel-inset) var(--aml-panel-text-inset);
+  border-block-end: var(--aml-stroke-divider) solid var(--glass-edge);
+}
+.dialog-header h2 {
+  margin: 0;
+  font-size: var(--aml-type-section-title-size);
+  line-height: var(--aml-type-section-title-lineHeight);
+}
+.dialog-header h2:focus { outline: none }
+.dialog-close {
+  --button-hover-bg: var(--hover);
+  color: var(--text);
+}
+.dialog-actions-fill {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--aml-space-8);
+  padding: var(--aml-space-8) var(--aml-panel-text-inset);
+  border-block-start: var(--aml-stroke-divider) solid var(--glass-edge);
+}
+.dialog-actions-fill > :is(.button, .accent-action, .hold-button) {
+  flex: 1 1 min(8rem, 100%);
+  min-inline-size: 0;
+}
+.dialog-actions-fill > .accent-action > .hold-button { inline-size: 100% }
+.dialog-actions-fill :is(.button, .hold-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--account-control-size);
+  block-size: auto;
+  padding: var(--aml-space-8) var(--aml-space-12);
+  text-decoration: none;
+  white-space: normal;
+  text-align: center;
+}

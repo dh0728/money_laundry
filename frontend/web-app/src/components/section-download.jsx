@@ -8,13 +8,20 @@ function SectionDownload({ label, entries, host }) {
   </div>;
 }
 
-export function ChartSectionDownload({ label, filename = label }) {
+function ChartSectionDownload({ label }) {
   const host = useRef(null);
   const entries = visualizationEntries({
-    label, filename,
+    label, filename: label,
     readRoot: () => host.current.closest('[data-export-visualization], .dashboard-chart'),
   });
   return <SectionDownload label={label} entries={entries} host={host} />;
+}
+
+export function SectionDownloadHeading({ as: Heading = 'h2', id, className = '', downloadLabel, children }) {
+  return <div className={`section-download-heading ${className}`.trim()}>
+    <Heading id={id}>{children}</Heading>
+    {downloadLabel && <ChartSectionDownload label={downloadLabel} />}
+  </div>;
 }
 
 export function BoardSectionDownload({ records, label, onDownload }) {

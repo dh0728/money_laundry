@@ -12,6 +12,14 @@ pnpm dev --host 127.0.0.1 --port 5215 --strictPort
 
 [Sample Login](http://127.0.0.1:5215/login?data=sample) → **관리자 테스트로 열기**
 
+## 공용 UI 수정
+
+- 팝업은 [DialogFrame](src/components/dialog-parts.jsx)을 사용한다. 제목과 닫기 버튼은 헤더에, 확인·수정 등 실제 작업은 `actions`에 둔다. 계정·설정 등 앱 셸의 팝업도 같은 헤더와 푸터를 사용한다.
+- 패널 재질은 [공용 디자인 토큰](src/styles/preview-design-system.css), 업무 카드의 상태색과 외곽 효과는 [RecordCard](src/components/record-card.jsx)에서 수정한다. 화면별 예외는 기능에 필요한 경우에만 둔다.
+- 한 화면에서 세로로 이어지는 영역은 페이지가 스크롤을 맡는다. 원장의 나란한 열처럼 독립 탐색이 필요한 영역은 페이지를 고정하고 목록을 스크롤한다.
+- 상단 검색과 목록 검색은 [SearchField](src/components/search-field.jsx)를 사용하고, 목록은 `compact` 배리언트를 쓴다.
+- `pnpm lint`는 화면 파일에 직접 선언한 `<dialog>`와 `<input type="search">`를 오류로 처리한다. `frontend` 대상 PR에서도 프런트엔드 lint, test, build를 실행한다.
+
 ## API 연결
 
 - 화면의 저장 호출부: [`saveEpisode`](src/app/layout.js)

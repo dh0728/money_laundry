@@ -24,6 +24,10 @@
   text-align: center;
   text-decoration: none;
 }
+.screen-primary[data-button-size="comfortable"] {
+  min-block-size: var(--aml-density-control-comfortable);
+  padding: 0 var(--aml-space-8);
+}
 .accent-action:has(> .hold-button:focus-visible) {
   outline: var(--aml-stroke-focus) solid var(--focus-ring);
   outline-offset: var(--aml-stroke-focus);
@@ -40,7 +44,6 @@
 .accent-action[aria-disabled="true"] { pointer-events: none }
 :root[data-reduced-motion="true"] .accent-action { --star-border-motion: still }
 .accent-action .hold-button[aria-disabled="true"] { opacity: var(--aml-opacity-disabled) }
-#preview-login-action > .accent-action { inline-size: 100% }
 .hold-button[data-activation="press"]:active:not(:disabled, [aria-disabled="true"]) { --hb-p: 1 }
 .hold-button[data-activation="press"] .hold-button__fill { transition: clip-path 150ms ease-out }
 [data-reduced-motion="true"] .hold-button[data-activation="press"] .hold-button__fill { transition: none }

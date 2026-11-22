@@ -6,19 +6,6 @@
   border-block-start: var(--aml-stroke-divider) solid var(--glass-edge);
 }
 
-.admin-settings-group {
-  min-inline-size: 0;
-  padding: var(--aml-space-8) var(--aml-space-12);
-  border-radius: var(--aml-radius-card);
-  background: var(--inner-surface);
-}
-
-.admin-settings-group > summary {
-  padding-block: var(--aml-space-4);
-  cursor: pointer;
-  font-weight: var(--aml-type-body-strong-weight);
-}
-
 .admin-model-settings { padding-block: var(--aml-space-4); }
 .model-risk-dial {
   position: relative;
@@ -55,7 +42,7 @@
 .model-risk-slider-thumb:active { cursor: grabbing; }
 .model-risk-slider-thumb:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .model-risk-slider-thumb[aria-disabled="true"] { cursor: default; }
-.model-risk-legend, .admin-model-actions {
+.model-risk-legend {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -75,6 +62,4 @@
 .model-risk-legend [data-band="low"] { --band-color: var(--risk-low); }
 .model-risk-legend [data-band="medium"] { --band-color: var(--risk-medium); }
 .model-risk-legend [data-band="high"] { --band-color: var(--risk-high); }
-.admin-model-actions { margin-block-start: var(--aml-space-8); }
-.admin-model-actions > .accent-action { margin-inline-start: auto; }
 .model-graph-note { font-size: var(--aml-type-caption-size); }

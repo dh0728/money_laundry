@@ -24,14 +24,7 @@
   font-variant-numeric: tabular-nums;
 }
 .workflow-rule-list { grid-area: rules }
-.workflow-rule-list .data-table-heading {
-  --rule-table-heading-offset: calc(var(--aml-panel-inset) - var(--panel-content-padding));
-  min-block-size: var(--aml-panel-control-size);
-  margin-block-start: var(--rule-table-heading-offset);
-  margin-inline-end: var(--rule-table-heading-offset);
-  padding-block: 0;
-}
-.workflow-rule-list .data-table-scroll { max-block-size: var(--workspace-list-limit) }
+.workflow-rule-list .data-table-scroll { scrollbar-gutter: auto }
 .workflow-rule-detail { grid-area: detail }
 .workflow-rule-reason { grid-area: reason }
 .workflow-rule-detail, .workflow-rule-reason { align-self: start }
@@ -43,8 +36,7 @@
   inline-size: min(28rem, calc(100% - var(--aml-space-32)));
   max-block-size: calc(100dvh - var(--aml-space-32));
 }
-.rule-review-dialog-actions { display: flex; justify-content: flex-end; gap: var(--workspace-gap) }
-.rule-review-dialog-actions :is(.button, .hold-button) { min-block-size: var(--account-control-size); padding-inline: var(--aml-space-16) }
+.rule-review-dialog p { margin: 0 }
 
 .screen-row.screen-rule-editor {
   grid-template-columns: minmax(16rem, 2fr) minmax(0, 3fr);

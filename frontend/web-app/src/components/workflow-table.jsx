@@ -5,6 +5,7 @@ import { ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight, ArrowLeft
 import { Table, TableBody, TableCell, TableHead, TableHeader } from '@/components/ui/table';
 import { ActionButton } from './primary-button';
 import SpringCheck from './react-bits/SpringCheck';
+import { CountTag } from './semantic-tags';
 import './table-frame.css';
 
 const textOrder = new Intl.Collator(['ko', 'en'], { numeric: true, sensitivity: 'base' });
@@ -94,12 +95,10 @@ export function SortableTableHead({ sorting, column, value, children, label = ch
   </TableHead>;
 }
 
-const countFormat = new Intl.NumberFormat('ko-KR');
-
+/** 표 제목 옆 개수 태그: 보이는 수 / 전체 수, 선택이 있으면 선택 수 태그를 덧붙인다. */
 export function tableCount(count, total = count, unit = '건', selected = 0) {
-  const displayed = count === total ? '' : ` · 표시 ${countFormat.format(count)}${unit}`;
-  const checked = selected ? ` · 선택 ${countFormat.format(selected)}${unit}` : '';
-  return `전체 ${countFormat.format(total)}${unit}${displayed}${checked}`;
+  return <><CountTag count={count} total={total} unit={unit} />
+    {selected > 0 && <CountTag label="선택" count={selected} unit={unit} />}</>;
 }
 
 export function useTableSelection(rows, scope, linkedSelection, control) {

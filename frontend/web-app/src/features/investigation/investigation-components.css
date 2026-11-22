@@ -27,11 +27,11 @@
   gap: var(--workspace-gap);
 }
 .ledger-hierarchy { min-inline-size: 0 }
-.ledger-hierarchy-scroll {
-  max-block-size: clamp(14rem, 44dvh, 28rem);
-}
 .ledger-hierarchy-scroll > [data-slot="table-container"] { min-inline-size: 72rem }
 .ledger-hierarchy-table { table-layout: fixed }
+.ledger-hierarchy-table tr[data-ledger-depth="transaction"] {
+  scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
+}
 .ledger-hierarchy-scroll tbody tr[data-ledger-depth="owner"] {
   background: var(--information-panel-surface);
 }
@@ -96,6 +96,10 @@
 .ledger-components .animated-list__viewport {
   padding-inline: var(--aml-space-4);
   scrollbar-gutter: stable;
+}
+.ledger-transaction-list .animated-list__viewport {
+  padding: var(--record-card-shadow-gutter);
+  border-radius: 0;
 }
 .ledger-components .animated-list__item {
   min-height: var(--ui-row-height);
@@ -197,7 +201,10 @@
 }
 .ledger-case-groups > section { min-width: 0 }
 .ledger-case-groups h3 { margin: 0; font-size: var(--aml-type-body-strong-size); line-height: var(--aml-type-body-strong-lineHeight) }
-.ledger-case-groups .case-list { scrollbar-gutter: stable }
+.ledger-case-groups .case-list {
+  padding: var(--record-card-shadow-gutter);
+  scrollbar-gutter: stable;
+}
 .ledger-case-groups .card-header > .card-header-main,
 .ledger-case-groups .card-header .card-header-main > code {
   white-space: normal;
@@ -228,6 +235,26 @@
     flex: 1;
     min-block-size: 0;
   }
+  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables) {
+    display: flex;
+    flex-direction: column;
+    block-size: calc(100dvh - var(--header-height));
+    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
+  }
+  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables)
+    > [data-investigation-component="ledger"] {
+    display: grid;
+    flex: 1;
+    grid-template-rows: minmax(0, 1fr);
+    min-block-size: 0;
+  }
+  .ledger-tables { grid-template-rows: minmax(0, 1fr) auto }
+  .ledger-hierarchy {
+    display: flex;
+    flex-direction: column;
+    min-block-size: 0;
+  }
+  .ledger-hierarchy :is(.data-table-frame, .data-table-content, .ledger-hierarchy-scroll) { flex: 1 }
 }
 @media (max-width: 1120px) {
   .ledger-components {
@@ -242,8 +269,20 @@
     grid-template-columns: minmax(0, 1fr) var(--ledger-relationship-gutter) minmax(0, 1fr);
     grid-template-areas: "owners . accounts" "transactions transactions transactions" "related related related";
   }
-  :is(.ledger-owners, .ledger-accounts) {
-    --ledger-list-limit: calc(4 * var(--ui-row-height) + 3 * var(--workspace-gap));
+}
+@media (max-width: 1120px), (max-height: 480px) {
+  .screen-layout:has(> [data-investigation-component="ledger"]) {
+    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
+  }
+  .ledger-components { --ledger-list-limit: none }
+  .ledger-components .animated-list__viewport,
+  .ledger-case-groups .case-list {
+    max-block-size: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+  .ledger-components .animated-list__item {
+    scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
   }
 }
 
@@ -261,4 +300,49 @@
     z-index: 2;
   }
   [data-ledger-view="cards"] #ledger-related-title { padding-inline-end: var(--header-control-size) }
+}
+
+/* 원장 목록 검색·더 보기: 세 목록이 각자 20건씩 조회한다. 검색은 상단 작업 코드 검색과 같은 pill(.search-field). */
+.ledger-search { margin-block-start: var(--aml-space-8) }
+.ledger-more {
+  display: grid;
+  gap: var(--aml-space-8);
+  margin-block-start: var(--aml-space-12);
+}
+/* 대시보드 업무 레인의 더 보기와 같은 크기: 패널 폭을 채우는 pill. */
+.ledger-more > .button { inline-size: 100%; min-block-size: var(--aml-panel-control-size) }
+@media (pointer: coarse) {
+  .ledger-more > .button { min-block-size: max(44px, var(--aml-panel-control-size)) }
+}
+.ledger-status {
+  margin-block: var(--aml-space-8) 0;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+}
+.ledger-pane[aria-busy="true"] .animated-list { opacity: .5 }
+.ledger-linked-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aml-space-6);
+  margin: var(--workspace-gap) 0;
+  padding: 0;
+  list-style: none;
+}
+.ledger-linked-ids code {
+  padding: var(--aml-space-2) var(--aml-space-8);
+  border-radius: var(--aml-radius-full);
+  background: var(--information-panel-surface);
+}
+.ledger-table-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--aml-space-8) var(--workspace-gap);
+  margin-block-end: var(--workspace-gap);
+}
+.ledger-table-controls .ledger-search { margin-block-start: 0 }
+.ledger-hierarchy-scroll tr[data-ledger-more] > td { padding-block: var(--aml-space-4) }
+.ledger-hierarchy-scroll tr[data-ledger-more] .ledger-more { margin: 0 }
+/* 하단 공통 도구(계정·페이지)와 목록 끝 더 보기가 겹치지 않게 비워 둔다. */
+@media (min-width: 1121px) and (min-height: 481px) {
+  .ledger-components { padding-block-end: var(--aml-space-48) }
 }

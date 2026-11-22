@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActionButton } from '../../components/primary-button';
+import { LinkTag } from '../../components/semantic-tags';
 import { WorkflowTable } from '../../components/workflow-table';
 import './preview-case-list-table.css';
 
@@ -12,8 +12,6 @@ export function CaseDataTable({ title, summary, className = '', tools, selection
 
 export function RecordIdCell({ code }) {
   return <th scope="row">
-    <ActionButton className="case-table-open" data-work-code={code} aria-label={`${code} 상세 열기`}>
-      <code>{code}</code>
-    </ActionButton>
+    <LinkTag code={code} />
   </th>;
 }

@@ -49,6 +49,17 @@ export function StatusTag({ preset, className = '', emphasis = 'solid', children
     data-tone={statusTones[preset] ?? 'neutral'}>{children}</span>;
 }
 
+const countFormat = new Intl.NumberFormat('ko-KR');
+
+/**
+ * 제목 오른쪽 개수 태그. 목록·표·레인·패널 제목 옆 개수는 모두 이 태그 하나로 쓴다.
+ * 일부만 보이면(더 보기·필터·페이지) "보이는 수 / 전체 수", 다 보이면 전체 수만 쓴다.
+ */
+export function CountTag({ label, count, total = count, unit = '건' }) {
+  const value = count < total ? `${countFormat.format(count)} / ${countFormat.format(total)}` : countFormat.format(total);
+  return <StatusTag preset="neutral" className="count-tag">{label ? `${label} ` : ''}{value}{unit}</StatusTag>;
+}
+
 export const verdictLabels = {
   unjudged: '판정 전',
   abnormal: '이상',
@@ -78,8 +89,9 @@ export function ModelScoreTag({ score, band = modelRiskBand(score) }) {
   </span>;
 }
 
-export function LinkTag({ code, href, children, ...props }) {
-  return <ActionButton as={href ? 'a' : 'button'} href={href} className="semantic-tag" data-tag="link"
+export function LinkTag({ code, href, children, className = '', ...props }) {
+  return <ActionButton as={href ? 'a' : 'button'} href={href} className={'semantic-tag ' + className} data-tag="link"
+    data-record-link={/^[TAE]-/.test(code ?? '') || undefined}
     data-work-code={href ? undefined : code} aria-label={!href && code ? `${code} 상세 열기` : undefined} {...props}>
     {code ? <code>{code}</code> : children}
   </ActionButton>;

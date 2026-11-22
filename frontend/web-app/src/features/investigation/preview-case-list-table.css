@@ -4,10 +4,12 @@
   max-block-size: var(--workspace-available-block);
 }
 .case-table-scroll.entry-list { margin-block-start: 0 }
-.preview-case-table .case-table-open {
-  padding-block: var(--aml-space-6);
-  padding-inline: 0;
-  font-weight: var(--aml-type-body-strong-weight);
+@media (min-width: 769px) and (min-height: 481px) {
+  body:has(#footer-pagination > *) #workspace:has(.screen-layout > [data-case-list-table]) { padding-block-end: 0 }
+}
+@media (max-width: 768px), (max-height: 480px) {
+  .screen-layout > [data-case-list-table],
+  [data-case-list-table] .case-table-scroll.entry-list { max-block-size: none }
 }
 .preview-case-table code { font-family: var(--aml-font-mono, monospace) }
 .case-table-flows :is(code, small), .case-table-numeric > span { display: block }
@@ -22,3 +24,4 @@
   padding-inline: var(--table-cell-inset);
 }
 .case-table-episode .table-field-label { column-gap: var(--aml-space-4) }
+.case-table-pages { display: contents }

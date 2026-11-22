@@ -27,6 +27,10 @@
   white-space: nowrap;
 }
 .data-table-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aml-space-4);
+  flex: 0 1 auto;
   color: var(--muted-text);
   font-size: var(--aml-type-caption-size);
   font-variant-numeric: tabular-nums;

@@ -3,10 +3,12 @@ import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { Panel } from '../../components/panel';
+import { ActionButton } from '../../components/primary-button';
 import { FooterPagination } from '../../components/footer-pagination';
 import { CardHeader } from '../../components/card-header';
+import { SearchField } from '../../components/search-field';
 import { StatusTag } from '../../components/semantic-tags';
-import { TableFieldLabel } from '../../components/workflow-table';
+import { tableCount, TableFieldLabel } from '../../components/workflow-table';
 import './ibm-ledger.css';
 
 const pageSize = 30;
@@ -72,7 +74,7 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
   const selectedPage = Math.floor(Math.max(0, rows.indexOf(selected)) / pageSize);
   const isCurrentPaging = paging?.code === code && paging.from === from && paging.to === to;
   const shownPage = Math.min(isCurrentPaging ? paging.index : selectedPage, pageCount - 1);
-  const visible = rows.slice(shownPage * pageSize, (shownPage + 1) * pageSize);
+  const visible = rows.slice(tableView ? shownPage * pageSize : 0, (shownPage + 1) * pageSize);
   const goToPage = index => setPaging({ code, from, to, index });
   const changePage = index => {
     goToPage(index);
@@ -92,10 +94,11 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
           벤치마크 라벨은 AML RADAR의 분석가 판정이나 모델 점수를 나타내지 않습니다.</p>
       </div>
       <div className="benchmark-filters" role="group" aria-label="벤치마크 원장 조회 조건">
-        <label>거래 ID
-          <input type="search" value={lookup} spellCheck={false} autoComplete="off" placeholder="정확한 거래 ID 입력"
+        <div className="benchmark-search-group">
+          <span>거래 ID</span>
+          <SearchField variant="compact" label="거래 ID" value={lookup} placeholder="정확한 거래 ID 입력"
             onChange={event => { setLookup(event.target.value); goToPage(0); }} />
-        </label>
+        </div>
         <label>거래일
           <select value={selectedDay} onChange={event => { setSelectedDay(event.target.value); goToPage(0); }}>
             <option value="">전체 날짜</option>
@@ -114,7 +117,7 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
     {selected && tableView && <Detail record={selected} />}
     {code && !selected && <p className="benchmark-empty" role="status">이 원장에 포함된 거래에서 <code>{code}</code>을 찾을 수 없습니다.</p>}
     <div className="benchmark-ledger-results" ref={results}>
-      {tableView ? <CaseDataTable title="벤치마크 거래" summary={`${integer.format(rows.length)}건`} className="benchmark-table" tools={false}>
+      {tableView ? <CaseDataTable title="벤치마크 거래" summary={tableCount(rows.length)} className="benchmark-table" tools={false}>
         <TableHeader><TableRow>
           {columns.map(title => <TableHead key={title} scope="col">
             <TableFieldLabel column={title}>{title}</TableFieldLabel>
@@ -136,10 +139,13 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
       </CaseDataTable> : <div className="benchmark-ledger-cards" aria-label="벤치마크 거래 카드">
         {!visible.length && <p className="benchmark-empty" role="status">조건과 일치하는 거래가 없습니다.</p>}
         {visible.map(row => <Detail key={row.code} record={row} card />)}
+        {shownPage + 1 < pageCount && <ActionButton shape="pill" surface="floating" onClick={() => goToPage(shownPage + 1)}>
+          더 보기
+        </ActionButton>}
       </div>}
     </div>
-    <FooterPagination host={paginationHost} label="거래 원장 페이지" page={shownPage}
-      pageCount={pageCount} onPageChange={changePage} />
+    {tableView && <FooterPagination host={paginationHost} label="거래 원장 페이지" page={shownPage}
+      pageCount={pageCount} total={rows.length} onPageChange={changePage} />}
   </div>;
 }
 
