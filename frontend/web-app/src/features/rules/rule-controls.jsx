@@ -6,8 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import BranchedMenu from '../../components/react-bits/BranchedMenu';
 import { bindTooltip } from '../../components/components';
 import { RuleConditionBlocks } from '@/next/features/RuleConditionBlocks';
-import { compileRuleBlocks, ruleBlocksFor, validateRule } from '@/next/features/rules-logic';
-import { previewRuleTemplates, savePreviewRule } from './preview-rule-workspace';
+import { compileRuleBlocks, RULE_LIMITS, ruleBlocksFor, validateRule } from '@/next/features/rules-logic';
+import { ruleRepository } from './rule-repository';
+import { useRules } from './use-rules';
 import { RuleConditionFacts, RuleTreeBranches } from './rule-condition-tree';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
@@ -125,9 +126,12 @@ function RuleSelect({ label, value, onChange, options }) {
   </Select>;
 }
 
-function RuleDraft({ actionsHost }) {
+function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
+  const { rules: templates } = useRules(repository);
   const [draft, setDraft] = useState(blankDraft);
   const [blocks, setBlocks] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [saved, setSaved] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -138,6 +142,22 @@ function RuleDraft({ actionsHost }) {
   const problems = validateRule(input);
   const errors = submitted ? problems : {};
   const hasInvalidCondition = problems.scoreMin || problems.minTransactions || problems.windowHours;
+
+  useEffect(() => {
+    if (!sourceRule) return undefined;
+    let live = true;
+    void repository.duplicateDraft(sourceRule).then(result => {
+      if (!live) return;
+      if (!result.ok) {
+        setFailure(`${sourceRule} 룰을 복제할 수 없습니다. ${result.error}`);
+        return;
+      }
+      setDraft({ ...blankDraft, ...result.value });
+      setBlocks(ruleBlocksFor(result.value));
+      setCopied(sourceRule);
+    });
+    return () => { live = false; };
+  }, [repository, sourceRule]);
 
   function changeDraft(next) {
     setDraft(next);
@@ -158,22 +178,30 @@ function RuleDraft({ actionsHost }) {
       setFailure('조건 블록을 하나 이상 추가해 주세요.');
       return;
     }
-    const result = savePreviewRule({ ...input, name: input.name.trim(), description: input.description.trim() }, saved?.id);
-    if (!result.ok) {
-      setFailure(result.error);
-      return;
-    }
-    setSaved(result.value);
-    setDirty(false);
+    if (busy) return;
+    setBusy(true);
+    void repository.save({ ...input, name: input.name.trim(), description: input.description.trim() }, saved?.id).then(result => {
+      setBusy(false);
+      if (!result.ok) {
+        setFailure(result.error);
+        return;
+      }
+      setSaved(result.value);
+      setDirty(false);
+    }, () => {
+      setBusy(false);
+      setFailure('초안을 저장하지 못했습니다. 다시 시도해 주세요.');
+    });
   }
 
   return <div className="screen-row screen-rule-editor">
     <Panel className="rule-draft-reference">
       <h2>템플릿 고르기</h2>
-      <p className="workflow-rule-note">템플릿 {previewRuleTemplates.length}개에서 이름과 조건을 불러올 수 있습니다.</p>
-      <RuleSelect label="룰 템플릿" options={previewRuleTemplates.map(rule => ({ label: rule.name, value: rule.id }))}
+      <p className="workflow-rule-note">템플릿 {templates.length}개에서 이름과 조건을 불러올 수 있습니다.</p>
+      {copied && <p className="workflow-rule-note" role="status"><code>{copied}</code> 조건을 복제했습니다. 저장하면 새 초안이 됩니다.</p>}
+      <RuleSelect label="룰 템플릿" options={templates.map(rule => ({ label: rule.name, value: rule.id }))}
         onChange={value => {
-          const template = previewRuleTemplates.find(rule => rule.id === value);
+          const template = templates.find(rule => rule.id === value);
           if (!template) return;
           setDraft(template);
           setBlocks(ruleBlocksFor(template));
@@ -193,13 +221,13 @@ function RuleDraft({ actionsHost }) {
       <h2>룰 만들기</h2>
       <form ref={form} id={`${errorId}-form`} aria-label="룰 작성" className="rule-draft-form" onSubmit={submit} noValidate>
         <label>룰 이름
-          <Input name="name" aria-label="룰 이름" value={draft.name} maxLength={80}
+          <Input name="name" aria-label="룰 이름" value={draft.name} maxLength={RULE_LIMITS.name}
             onChange={event => changeDraft({ ...draft, name: event.target.value })}
             aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? `${errorId}-name` : undefined} />
           {errors.name && <span id={`${errorId}-name`} data-rule-block-error>{errors.name}</span>}
         </label>
         <label>목적과 근거
-          <Textarea name="description" aria-label="목적과 근거" value={draft.description} maxLength={1000} rows={2}
+          <Textarea name="description" aria-label="목적과 근거" value={draft.description} maxLength={RULE_LIMITS.description} rows={2}
             onChange={event => changeDraft({ ...draft, description: event.target.value })}
             aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? `${errorId}-description` : undefined} />
           {errors.description && <span id={`${errorId}-description`} data-rule-block-error>{errors.description}</span>}
@@ -221,16 +249,17 @@ function RuleDraft({ actionsHost }) {
       </form>
     </Panel>
     <ScreenActions host={actionsHost} stackOnNarrow>
-      <PrimaryButton tone="brand" aria-controls={`${errorId}-form`} onHold={() => form.current.requestSubmit()}>초안 저장</PrimaryButton>
+      <PrimaryButton tone="brand" aria-controls={`${errorId}-form`} disabled={busy} aria-busy={busy || undefined}
+        onClick={() => form.current.requestSubmit()}>{busy ? '저장 중…' : '초안 저장'}</PrimaryButton>
     </ScreenActions>
   </div>;
 }
 
-export function mountRuleControls(workspace, actionsHost) {
+export function mountRuleControls(workspace, actionsHost, { sourceRule } = {}) {
   const targets = [...workspace.querySelectorAll('[data-rule-editor], [data-rule-template], [data-risk-dial]')];
   const roots = targets.map(node => {
     const root = createRoot(node);
-    root.render(node.hasAttribute('data-rule-editor') ? <RuleDraft actionsHost={actionsHost} />
+    root.render(node.hasAttribute('data-rule-editor') ? <RuleDraft actionsHost={actionsHost} sourceRule={sourceRule} />
       : node.hasAttribute('data-risk-dial') ? <RiskDial /> : <RuleTemplateMenu />);
     return root;
   });

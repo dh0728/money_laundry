@@ -1,4 +1,5 @@
 import { cases, transactions, snapshot, patternName } from './dashboard-data'
+import { ruleReasonProblem, ruleTransitions, validateRule } from './features/rules-logic'
 import type { ActionResult, JudgmentRecord, LedgerTransaction, RuleInput, RuleRecord, RuleStatus, RuleVersionSnapshot, Verdict, WorkspaceCase, WorkspaceState } from './workspace-store'
 
 type Mutation<T> = ActionResult<{ state: WorkspaceState; value: T }>
@@ -121,18 +122,17 @@ function ruleVersionSnapshot(rule: RuleRecord): RuleVersionSnapshot {
   return { name, description, typeCode, scoreMin, minTransactions, windowHours, version, status, author, updatedAt }
 }
 export function saveWorkspaceRule(state: WorkspaceState, input: RuleInput, existingId?: string): Mutation<RuleRecord> {
-  if (!input.name.trim() || input.name.length > 100 || input.description.length > 2000 || !Number.isFinite(input.scoreMin) || input.scoreMin < 0 || input.scoreMin > 1 || !Number.isInteger(input.minTransactions) || input.minTransactions < 1 || !Number.isFinite(input.windowHours) || input.windowHours <= 0 || input.windowHours > 24 * 365 || (input.typeCode !== null && (!Number.isInteger(input.typeCode) || input.typeCode < 0 || input.typeCode > 8))) return failure('룰 이름, 유형, 점수(0~1), 최소 거래 수와 시간 범위를 확인해 주세요.')
+  if (Object.keys(validateRule(input)).length || (input.typeCode !== null && (!Number.isInteger(input.typeCode) || input.typeCode < 0 || input.typeCode > 8))) return failure('룰 이름, 목적, 유형, 점수(0~1), 최소 거래 수와 시간 범위를 확인해 주세요.')
   const existing = existingId ? state.rules.find(r => r.id === existingId) : undefined
   if (existingId && (!existing || !['DRAFT', 'REJECTED', 'STOPPED'].includes(existing.status))) return failure('현재 상태의 룰은 수정할 수 없습니다.')
   const id = existingId ?? `RULE-${String(Math.max(0, ...state.rules.map(r => Number(r.id.slice(5)))) + 1).padStart(3, '0')}`
-  const next: RuleRecord = { ...input, name: input.name.trim(), id, version: existing ? existing.version + 1 : 1, versions: existing ? [...(existing.versions ?? []), ruleVersionSnapshot(existing)] : [], status: 'DRAFT', author: snapshot.userName, updatedAt: stamp(), history: [...(existing?.history ?? []), event(existing ? '초안 수정' : '초안 생성', input.description.trim() || '룰 조건 저장')] }
+  const next: RuleRecord = { ...input, name: input.name.trim(), description: input.description.trim(), id, version: existing ? existing.version + 1 : 1, versions: existing ? [...(existing.versions ?? []), ruleVersionSnapshot(existing)] : [], status: 'DRAFT', author: snapshot.userName, updatedAt: stamp(), history: [...(existing?.history ?? []), event(existing ? '초안 수정' : '초안 생성', input.description.trim() || '룰 조건 저장')] }
   return { ok: true, value: { value: next, state: { ...state, rules: existing ? state.rules.map(r => r.id === id ? next : r) : [...state.rules, next] } } }
 }
 export function transitionWorkspaceRule(state: WorkspaceState, id: string, status: RuleStatus, reason: string): Mutation<RuleRecord> {
   const rule = state.rules.find(r => r.id === id)
-  const allowed: Record<RuleStatus, RuleStatus[]> = { DRAFT: ['PENDING_APPROVAL'], PENDING_APPROVAL: ['TESTING', 'REJECTED'], TESTING: ['ACTIVE', 'REJECTED', 'STOPPED'], ACTIVE: ['STOPPED'], STOPPED: ['TESTING'], REJECTED: ['DRAFT'] }
-  if (!rule || !allowed[rule.status].includes(status)) return failure('허용되지 않은 룰 상태 변경입니다.')
-  if (!reasonValid(reason)) return failure('상태 변경 사유를 입력해 주세요.')
+  if (!rule || !ruleTransitions[rule.status].includes(status)) return failure('허용되지 않은 룰 상태 변경입니다.')
+  if (ruleReasonProblem(reason)) return failure(ruleReasonProblem(reason))
   const next = { ...rule, status, version: rule.version + 1, versions: [...(rule.versions ?? []), ruleVersionSnapshot(rule)], updatedAt: stamp(), history: [...rule.history, event(`모의 상태 변경: ${status}`, reason.trim())] }
   return { ok: true, value: { value: next, state: { ...state, rules: state.rules.map(r => r.id === id ? next : r) } } }
 }
