@@ -59,6 +59,6 @@ it('actual live pages share the chosen range and preserve the owner/account and 
   expect(screen.getByText('오늘 유입 Alert')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '기간 2023-09-01' })).toBeInTheDocument()
   // Keep the fe/work dashboard contract while checking the restored range.
-  expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10')
+  expect(dashboard).toHaveBeenLastCalledWith('2023-09-01', '2023-09-10', expect.any(AbortSignal))
   expect(clock).toHaveBeenCalledTimes(1)
 })

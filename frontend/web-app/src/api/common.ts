@@ -62,7 +62,7 @@ export async function responseError(response: Response, notifyUnauthorized: bool
     clearCsrf()
     window.dispatchEvent(new Event('auth-expired'))
   }
-  const hint = response.headers.get('Retry-After')
+  const hint = response.headers?.get('Retry-After')
   const delay = hint == null ? NaN : /^\d+$/.test(hint.trim()) ? Number(hint) * 1000 : Date.parse(hint) - Date.now()
   return new ApiError({ type: 'about:blank', title: response.statusText, code: response.status === 401 ? 'UNAUTHENTICATED' : 'INTERNAL', ...problem, status: response.status }, Number.isFinite(delay) ? Math.max(0, delay) : undefined)
 }
