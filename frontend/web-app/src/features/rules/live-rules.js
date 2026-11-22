@@ -27,6 +27,15 @@ export async function reviewLiveRule(id, status, reason) {
   }
 }
 
+export async function deleteLiveRule(id) {
+  try {
+    await postJson(`/api/v1/rules/${id}/delete`, {});
+    return { ok: true, value: id };
+  } catch (error) {
+    return failure(error, '룰을 삭제하지 못했습니다.');
+  }
+}
+
 export async function liveBacktestScope() {
   const end = kstDate.format(new Date(liveSource().businessAt ?? Date.now()));
   const first = new Date(`${end}T00:00:00Z`);

@@ -13,7 +13,7 @@ import { StatusTag } from '../../components/semantic-tags';
 import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user.js';
 import { downloadCsv } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { fetchLiveRules, liveRules, reviewLiveRule, saveLiveRule } from './live-rules.js';
+import { deleteLiveRule, fetchLiveRules, liveRules, reviewLiveRule, saveLiveRule } from './live-rules.js';
 import './preview-rule-workspace.css';
 
 const presets = { DRAFT: 'pending', PENDING_APPROVAL: 'caution', TESTING: 'inProgress', ACTIVE: 'done', STOPPED: 'cancelled', REJECTED: 'failed' };
@@ -81,6 +81,10 @@ export function savePreviewRule(input, existingId) {
 
 export function deletePreviewRule(id) {
   if (!ruleWorkspace.rules.some(rule => rule.id === id)) return { ok: false, error: '삭제할 룰을 찾을 수 없습니다.' };
+  if (liveRules) return deleteLiveRule(id).then(result => {
+    if (result.ok) ruleWorkspace.rules = ruleWorkspace.rules.filter(rule => rule.id !== id);
+    return result;
+  });
   const rules = ruleWorkspace.rules.filter(rule => rule.id !== id);
   try {
     sessionStorage.setItem(draftStorageKey, JSON.stringify(rules.filter(rule => rule !== templatesById.get(rule.id))));
@@ -91,6 +95,10 @@ export function deletePreviewRule(id) {
   ruleWorkspace.rules = rules;
   return { ok: true, value: id };
 }
+
+// 초안·반려 룰은 담당자와 관리자, 그 밖의 상태는 관리자만 삭제할 수 있다. 서버도 같은 기준으로 거절한다.
+const canDeleteRule = (rule, user) => Boolean(rule && user)
+  && (user.role === 'ADMIN' || (['DRAFT', 'REJECTED'].includes(rule.status) && rule.author === user.name));
 
 const requestReview = { status: 'PENDING_APPROVAL', label: '승인 요청', tone: 'brand' };
 const approveRule = { status: 'TESTING', label: '승인', tone: 'brand' };
@@ -199,13 +207,18 @@ function RuleDelete({ rule, onClose, onDelete }) {
 
   function submit(event) {
     event.preventDefault();
+    const applied = result => {
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      dialog.current.close();
+      onDelete();
+    };
+    // 서비스 모드는 서버 응답을 기다린다.
     const result = deletePreviewRule(rule.id);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    dialog.current.close();
-    onDelete();
+    if (result instanceof Promise) void result.then(applied);
+    else applied(result);
   }
 
   return <DialogFrame ref={dialog} className="rule-review-dialog" title="룰 삭제" titleId={titleId}
@@ -224,6 +237,7 @@ function RuleDelete({ rule, onClose, onDelete }) {
 
 export function RuleList({ reason = false, initialRule, registerTableTools, actionsHost }) {
   const [rules, setRules] = useState(() => ruleWorkspace.rules);
+  const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   useEffect(() => {
     if (liveRules) void loadLiveRules().then(setRules, () => undefined);
   }, []);
@@ -304,13 +318,18 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
     <RuleReview key={selected?.id ?? ''} rule={selected} actionsHost={actionsHost} onReview={rule => {
       setRules(ruleWorkspace.rules);
       setNotice(`${rule.id} · ${ruleStatusLabels[rule.status]}`);
-    }} destructive={<PrimaryButton tone="negative" disabled={!selected} aria-haspopup="dialog"
+    }} destructive={<PrimaryButton tone="negative" disabled={!canDeleteRule(selected, user)} aria-haspopup="dialog"
       onClick={() => setDeleting(selected)}>룰 삭제</PrimaryButton>}>
       <PrimaryButton tone="inverse" disabled={!selected} onClick={() => {
+        const applied = result => {
+          setRules(ruleWorkspace.rules);
+          if (result.ok) choose(result.value.id);
+          setNotice(result.ok ? `${result.value.id} 복제됨` : result.error);
+        };
+        // 서비스 모드는 서버 응답을 기다린다.
         const result = savePreviewRule({ ...selected, name: `${selected.name} (복제)` });
-        setRules(ruleWorkspace.rules);
-        if (result.ok) choose(result.value.id);
-        setNotice(result.ok ? `${result.value.id} 복제됨` : result.error);
+        if (result instanceof Promise) void result.then(applied);
+        else applied(result);
       }}>복제</PrimaryButton>
       <RuleLink rule={selected} path="/rules/backtest">백테스트로 열기</RuleLink>
       {reason && <RuleLink rule={selected} path="/rules">룰 목록</RuleLink>}

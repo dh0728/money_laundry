@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it } from 'vitest';
 import { reviewPreviewRule, RuleList, ruleWorkspace } from './preview-rule-workspace';
 import { mountRuleControls } from './rule-controls';
-import { currentPreviewUser, previewAdmin, previewStaff, setPreviewUser } from '../auth/preview-session-user.js';
+import { alternatePreviewStaff, currentPreviewUser, previewAdmin, previewStaff, setPreviewUser } from '../auth/preview-session-user.js';
 
 it('shows real selected rule metadata and history, including after state filtering', () => {
   const rejected = ruleWorkspace.rules.find(rule => rule.status === 'REJECTED');
@@ -31,6 +31,8 @@ it('shows real selected rule metadata and history, including after state filteri
 
 it('keeps rule actions in the footer, enabled only while a rule is selected, and deletes after confirmation', () => {
   const before = ruleWorkspace.rules;
+  const beforeUser = currentPreviewUser();
+  setPreviewUser(previewAdmin); // 운영 중 룰까지 삭제하는 흐름이라 관리자로 확인한다.
   const beforeDrafts = sessionStorage.getItem('aml-preview-rule-drafts');
   const beforeDeleted = sessionStorage.getItem('aml-preview-rule-deleted');
   const footer = document.createElement('footer');
@@ -82,6 +84,7 @@ it('keeps rule actions in the footer, enabled only while a rule is selected, and
     unmount?.();
     Object.assign(HTMLDialogElement.prototype, dialogApi);
     ruleWorkspace.rules = before;
+    setPreviewUser(beforeUser);
     for (const [key, value] of [['aml-preview-rule-drafts', beforeDrafts], ['aml-preview-rule-deleted', beforeDeleted]]) {
       if (value === null) sessionStorage.removeItem(key);
       else sessionStorage.setItem(key, value);
@@ -204,6 +207,35 @@ it('opens with a sample rule awaiting approval so an administrator can reject or
     expect(within(footer).getByRole('button', { name: '승인' })).toBeEnabled();
   } finally {
     unmount?.();
+    setPreviewUser(beforeUser);
+    footer.remove();
+  }
+});
+
+it('lets staff delete only their own draft or rejected rules, and an administrator any rule', () => {
+  const before = ruleWorkspace.rules;
+  const beforeUser = currentPreviewUser();
+  const footer = document.createElement('footer');
+  document.body.append(footer);
+  const draft = before.find(rule => rule.status === 'DRAFT');
+  const active = before.find(rule => rule.status === 'ACTIVE');
+  const remove = () => within(footer).getByRole('button', { name: '룰 삭제' });
+  let unmount;
+  try {
+    ruleWorkspace.rules = before.map(rule => rule === draft ? { ...rule, author: previewStaff.name } : rule);
+    setPreviewUser(previewStaff);
+    ({ unmount } = render(<RuleList initialRule={draft.id} actionsHost={footer} />));
+    expect(remove()).toBeEnabled();
+    act(() => setPreviewUser(alternatePreviewStaff));
+    expect(remove()).toBeDisabled();
+    act(() => setPreviewUser(previewStaff));
+    fireEvent.click(within(screen.getByRole('table', { name: '룰 목록' })).getByRole('row', { name: new RegExp(active.id) }));
+    expect(remove()).toBeDisabled();
+    act(() => setPreviewUser(previewAdmin));
+    expect(remove()).toBeEnabled();
+  } finally {
+    unmount?.();
+    ruleWorkspace.rules = before;
     setPreviewUser(beforeUser);
     footer.remove();
   }
