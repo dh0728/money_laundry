@@ -110,6 +110,7 @@ it('moves a rule through approve, start operation, stop, and retest with one rea
     const confirm = dialog.getByRole('button', { name: `${name} 확인` });
     expect(confirm).toBeDisabled();
     expect(confirm).toHaveAccessibleDescription('변경 사유를 입력해 주세요.');
+    expect(screen.getByRole('dialog', { name: `룰 ${name}` }).querySelector('footer.dialog-actions-fill > .accent-action')).toBeInTheDocument();
     fireEvent.change(dialog.getByRole('textbox', { name: '변경 사유' }), { target: { value: `${name} 사유` } });
     fireEvent.click(dialog.getByRole('button', { name: `${name} 확인` }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -120,30 +121,47 @@ it('moves a rule through approve, start operation, stop, and retest with one rea
     ['승인', '운영 시작', '중지', '재테스트'].map(label => [label, previewAdmin.name]));
 });
 
-it('deletes draft rules but archives rules with operating history', async () => {
+it('recommends archiving rules with operating history but still lets them be deleted', async () => {
   const repository = setup();
   const draft = await rulesNamed(repository, 'DRAFT');
   const active = await rulesNamed(repository, 'ACTIVE');
+  const withHistory = (await repository.list()).find(rule => rule.id !== active.id && !['DRAFT', 'REJECTED'].includes(rule.status));
   render(<RuleList repository={repository} initialRule={active.id} actionsHost={footer} />);
   await screen.findByRole('region', { name: '룰 상세' });
 
   fireEvent.click(action('룰 삭제'));
   let dialog = within(screen.getByRole('dialog', { name: '룰 삭제' }));
-  expect(dialog.getByRole('button', { name: '삭제' })).toBeDisabled();
-  expect(dialog.getByRole('button', { name: '삭제' })).toHaveAccessibleDescription('운영 이력이 있는 룰은 삭제할 수 없어요. 보관해 주세요.');
-  expect(dialog.getByRole('button', { name: '보관' })).toHaveClass('screen-primary--brand');
-  expect(dialog.getByRole('button', { name: '보관' })).toHaveAccessibleDescription('보관 사유를 입력해 주세요.');
+  expect(dialog.getByText(/삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다/)).toBeInTheDocument();
+  expect(dialog.getByRole('button', { name: '삭제' })).toBeEnabled();
+  expect(dialog.getByRole('button', { name: '삭제' })).toHaveClass('screen-primary--negative');
+  // 공용 DialogFooter가 버튼을 꽉 채우려면 버튼이 감싸이지 않은 직속 자식이어야 한다.
+  const dialogFooter = screen.getByRole('dialog', { name: '룰 삭제' }).querySelector('footer.dialog-actions-fill');
+  expect([...dialogFooter.children].every(child => child.matches('.button, .accent-action, .hold-button'))).toBe(true);
+  expect(dialogFooter.children).toHaveLength(3);
+  expect(dialog.getByRole('button', { name: '보관 (권장)' })).toHaveClass('screen-primary--brand');
+  expect(dialog.getByRole('button', { name: '보관 (권장)' })).toHaveAccessibleDescription('보관 사유를 입력해 주세요.');
+  const [cancel, remove, keep] = ['취소', '삭제', '보관 (권장)'].map(name => dialog.getByRole('button', { name }));
+  expect(cancel.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(remove.compareDocumentPosition(keep) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   fireEvent.change(dialog.getByRole('textbox', { name: '보관 사유' }), { target: { value: '운영 종료' } });
-  fireEvent.click(dialog.getByRole('button', { name: '보관' }));
+  fireEvent.click(dialog.getByRole('button', { name: '보관 (권장)' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   await waitFor(() => expect(screen.queryByRole('row', { name: new RegExp(active.id) })).not.toBeInTheDocument());
   const archived = (await repository.list({ includeArchived: true })).find(rule => rule.id === active.id);
   expect(archived.archivedAt).toBeTruthy();
   expect(archived.history.at(-1)).toMatchObject({ action: '보관', reason: '운영 종료' });
 
+  fireEvent.click(within(screen.getByRole('table', { name: '룰 목록' })).getByRole('row', { name: new RegExp(withHistory.id) }));
+  fireEvent.click(action('룰 삭제'));
+  fireEvent.click(within(screen.getByRole('dialog', { name: '룰 삭제' })).getByRole('button', { name: '삭제' }));
+  await waitFor(() => expect(screen.queryByRole('row', { name: new RegExp(withHistory.id) })).not.toBeInTheDocument());
+  expect(await repository.get(withHistory.id)).toBeNull();
+
   fireEvent.click(within(screen.getByRole('table', { name: '룰 목록' })).getByRole('row', { name: new RegExp(draft.id) }));
   fireEvent.click(action('룰 삭제'));
   dialog = within(screen.getByRole('dialog', { name: '룰 삭제' }));
+  expect(dialog.getByRole('button', { name: '삭제' })).toHaveClass('screen-primary--negative');
+  expect(dialog.getByRole('button', { name: '보관' })).toBeInTheDocument();
   fireEvent.click(dialog.getByRole('button', { name: '취소' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   fireEvent.click(action('룰 삭제'));

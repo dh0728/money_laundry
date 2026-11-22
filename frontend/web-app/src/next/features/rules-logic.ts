@@ -54,7 +54,7 @@ export function ruleActionState(rule: ActionRule, user: RuleActor) {
     check(action, definition.from, definition.verb)
   }
   check('edit', editableStatuses, '수정할')
-  check('delete', authorStatuses, '삭제할', '운영 이력이 있는 룰은 삭제할 수 없어요. 보관해 주세요.')
+  check('delete', Object.keys(ruleStatusLabels) as RuleStatus[], '삭제할')
   check('archive', Object.keys(ruleStatusLabels) as RuleStatus[], '보관할')
   check('duplicate', null, '복제할')
   check('backtest', null, '백테스트할')
