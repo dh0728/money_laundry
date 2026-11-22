@@ -1,3 +1,4 @@
+import { isRuleId } from '@/next/features/rules-logic';
 import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -837,7 +838,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
     registerTableTools: queryControls.registerTableTools,
-    rule: selectedRule && /^RULE-\d{3}$/.test(selectedRule) ? selectedRule : undefined,
+    rule: isRuleId(selectedRule) ? selectedRule : undefined,
   });
   if (isDashboard) loadPreviewDashboard(mountedWorkflows, dashboardSource,
     { ...queryControls.selection(), mine: path === sections.dashboard });
@@ -857,7 +858,8 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   });
   const ruleTarget = byId('workspace').querySelector('[data-rule-editor], [data-rule-template], [data-risk-dial]');
   if (ruleTarget) void import('../features/rules/rule-controls.jsx').then(({ mountRuleControls }) => {
-    if (ruleTarget.isConnected) unmountRuleControls = mountRuleControls(byId('workspace'), byId('footer-actions'));
+    if (ruleTarget.isConnected) unmountRuleControls = mountRuleControls(byId('workspace'), byId('footer-actions'),
+      { sourceRule: path === 'rule-engine/draft-create' && isRuleId(selectedRule) ? selectedRule : undefined });
   });
   const component = byId('workspace').querySelector('[data-investigation-component]');
   const caseTable = byId('workspace').querySelector('[data-case-list-table]');
@@ -885,7 +887,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     const urlParams = queryControls.params(path);
     if (initialPanel) urlParams.set('panel', initialPanel);
     if (reportDocument) urlParams.set('selected', reportDocument);
-    if (selectedRule && /^RULE-\d{3}$/.test(selectedRule)) urlParams.set('rule', selectedRule);
+    if (isRuleId(selectedRule)) urlParams.set('rule', selectedRule);
     updateWorkspaceAddress(path, code, navigationMode, urlParams);
   }
 }
