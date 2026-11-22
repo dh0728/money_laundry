@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import GlideSelect from '../../components/react-bits/GlideSelect';
+import { Textarea } from '../../components/ui/textarea';
 import { ActionButton, ConfirmHoldButton, PrimaryButton } from '../../components/primary-button';
 import { canJudgePreviewCase, canStartPreviewReview, judgmentReasonLabels, judgmentTextLimit, validJudgmentDetails } from './case-judgment-data';
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal.js';
@@ -21,32 +23,27 @@ function JudgmentTargets({ row }) {
 
 function JudgmentDetails({ evidence, observations, reason }) {
   return <dl className="case-judgment-details">
-    <div><dt>확인한 근거 자료</dt><dd>{evidence}</dd></div>
-    <div><dt>관찰한 사실</dt><dd>{observations}</dd></div>
+    {evidence && <div><dt>확인한 근거 자료</dt><dd>{evidence}</dd></div>}
+    {observations && <div><dt>관찰한 사실</dt><dd>{observations}</dd></div>}
     <div><dt>판정 사유</dt><dd>{reason}</dd></div>
   </dl>;
 }
 
-export function CaseJudgment({ row, startReview, save, onSavedClose, onReport, selectedTransactions = [] }) {
+export function CaseJudgment({ row, startReview, save, onSavedClose, onReport, onBundle, onTransfer, bundleBlocked = false }) {
   const dialog = useRef(null);
   const title = useRef(null);
   const [verdict, setVerdict] = useState('');
   const [reasonCategory, setReasonCategory] = useState('');
-  const [references, setReferences] = useState([]);
-  const [manualEvidence, setManualEvidence] = useState('');
-  const [observations, setObservations] = useState('');
   const [rationale, setRationale] = useState('');
   const [confirm, setConfirm] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const pending = row.status === '처리 전';
-  const actionLabel = pending ? '처리 중 상태로 변환' : '판정';
+  const actionLabel = pending && !onBundle && !bundleBlocked ? '처리 중 상태로 변환' : '판정';
   const eligible = canJudgePreviewCase(row);
-  const actionEnabled = pending ? canStartPreviewReview(row) : eligible && !result;
+  const actionEnabled = !bundleBlocked && (Boolean(onBundle) || (pending ? canStartPreviewReview(row) : eligible && !result));
   const reasonLabel = judgmentReasonLabels[reasonCategory];
-  const relatedCodes = [...new Set((row.related ?? []).map(record => record.code).filter(Boolean))];
-  const evidence = [references.join(', '), manualEvidence.trim()].filter(Boolean).join('\n');
-  const details = { evidence, observations, rationale };
+  const details = { rationale };
   const valid = eligible && (verdict === 'normal' || verdict === 'abnormal') && Boolean(reasonLabel)
     && validJudgmentDetails(details);
   useEffect(() => {
@@ -60,11 +57,15 @@ export function CaseJudgment({ row, startReview, save, onSavedClose, onReport, s
   };
 
   function open() {
+    if (bundleBlocked) return;
+    if (onBundle) {
+      onBundle();
+      return;
+    }
     if (pending) {
       startReview(row.code);
       return;
     }
-    setReferences(selectedTransactions.filter(code => relatedCodes.includes(code)));
     dialog.current.showModal();
     focusTitle();
   }
@@ -73,9 +74,6 @@ export function CaseJudgment({ row, startReview, save, onSavedClose, onReport, s
     if (result) return onSavedClose();
     setVerdict('');
     setReasonCategory('');
-    setReferences([]);
-    setManualEvidence('');
-    setObservations('');
     setRationale('');
     setConfirm(false);
     setError('');
@@ -101,7 +99,8 @@ export function CaseJudgment({ row, startReview, save, onSavedClose, onReport, s
 
   return <>
     <PrimaryButton tone="brand" className="case-judgment-trigger" disabled={!actionEnabled}
-      aria-haspopup={pending ? undefined : 'dialog'} aria-controls={pending ? undefined : 'case-judgment-dialog'}
+      aria-haspopup={pending && !onBundle ? undefined : 'dialog'}
+      aria-controls={onBundle ? 'case-bundle-dialog' : pending ? undefined : 'case-judgment-dialog'}
       onHold={open}>{actionLabel}</PrimaryButton>
     <dialog id="case-judgment-dialog" className="glass-dialog case-judgment-dialog glass" ref={dialog} onClose={close}
       aria-labelledby="case-judgment-title">
@@ -124,53 +123,32 @@ export function CaseJudgment({ row, startReview, save, onSavedClose, onReport, s
           </div> : confirm ? <div className="case-judgment-summary">
             <p><VerdictTag verdict={verdict} /></p>
             <p><strong>{reasonLabel}</strong></p>
-            <JudgmentDetails evidence={evidence} observations={observations.trim()} reason={rationale.trim()} />
+            <JudgmentDetails reason={rationale.trim()} />
             <p className="case-judgment-note">저장하면 이 업무가 처리 완료로 이동합니다.</p>
           </div> : <>
-            <fieldset className="case-judgment-verdict">
-              <legend className="visually-hidden">판정 결과</legend>
-              {['normal', 'abnormal'].map(value => <label key={value}>
-                <input type="radio" name="case-verdict" value={value} checked={verdict === value} required
-                  onChange={() => setVerdict(value)} />{verdictLabels[value]}
-              </label>)}
-            </fieldset>
-            <label className="case-judgment-field">
-              <span>판정 사유 유형</span>
-              <span className="case-judgment-select">
-                <select value={reasonCategory} required onChange={event => setReasonCategory(event.target.value)}>
-                  <option value="" disabled>사유 선택</option>
-                  {Object.entries(judgmentReasonLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-                <ChevronDown className="icon icon-compact" aria-hidden="true" />
-              </span>
-            </label>
-            <fieldset className="case-judgment-evidence">
-              <legend>확인한 근거 자료</legend>
-              {relatedCodes.length > 0 && <div className="case-judgment-references">
-                {relatedCodes.map(code => <label key={code}>
-                  <input type="checkbox" checked={references.includes(code)} onChange={event => {
-                    const checked = event.target.checked;
-                    setReferences(current => checked ? [...current, code] : current.filter(value => value !== code));
-                  }} /><code>{code}</code>
-                </label>)}
-              </div>}
-              <label className="case-judgment-field">
-                <span>{relatedCodes.length ? '추가 근거 자료' : '근거 자료 설명'}</span>
-                <textarea rows={2} maxLength={judgmentTextLimit} required={!references.length} value={manualEvidence}
-                  placeholder="대조한 거래 원장이나 증빙 자료를 입력하세요"
-                  onChange={event => setManualEvidence(event.target.value)} />
-              </label>
-            </fieldset>
-            <label className="case-judgment-field">
-              <span>관찰한 사실</span>
-              <textarea rows={3} maxLength={judgmentTextLimit} required value={observations}
-                placeholder="자료에서 확인한 거래 시각, 금액, 상대 계좌 등을 적어 주세요"
-                onChange={event => setObservations(event.target.value)} />
-            </label>
+            <div className="case-judgment-dropdowns">
+              <GlideSelect ariaLabel="처리 방식" placeholder="처리 방식 선택" value={verdict}
+                options={[
+                  { value: 'normal', label: row.kind === 'Alert' ? '정상 종결' : '정상' },
+                  { value: 'abnormal', label: row.kind === 'Alert' ? '단독 의심 종결' : '이상' },
+                  ...(onTransfer ? [{ value: 'transfer', label: '기존 Episode에 편입' }] : []),
+                ]}
+                onChange={value => {
+                  if (value === 'transfer') {
+                    dialog.current.close();
+                    onTransfer();
+                  } else {
+                    setVerdict(value);
+                  }
+                }} />
+              <GlideSelect ariaLabel="판정 사유 유형" placeholder="판정 사유 유형 선택"
+                value={reasonCategory} onChange={setReasonCategory}
+                options={Object.entries(judgmentReasonLabels).map(([value, label]) => ({ value, label }))} />
+            </div>
             <label className="case-judgment-field">
               <span>판정 사유</span>
-              <textarea rows={3} maxLength={judgmentTextLimit} required value={rationale}
-                placeholder="관찰한 사실이 선택한 판정을 뒷받침하는 이유를 적어 주세요"
+              <Textarea rows={3} maxLength={judgmentTextLimit} required value={rationale}
+                placeholder="판정 이유를 입력해 주세요"
                 onChange={event => setRationale(event.target.value)} />
             </label>
           </>}
@@ -190,7 +168,7 @@ export function CaseJudgment({ row, startReview, save, onSavedClose, onReport, s
                 requestAnimationFrame(focusTitle);
               }}>내용 수정</ActionButton>}
               {confirm
-                ? <ConfirmHoldButton disabled={!valid} doneLabel="판정 확인" onHold={commit}>길게 눌러 판정 저장</ConfirmHoldButton>
+                ? <ConfirmHoldButton disabled={!valid} doneLabel="판정 확인" onHold={commit}>판정 저장</ConfirmHoldButton>
                 : <PrimaryButton type="submit" tone="brand" disabled={!valid}>내용 확인</PrimaryButton>}
             </>}
         </footer>

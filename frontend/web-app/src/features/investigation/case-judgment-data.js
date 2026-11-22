@@ -76,8 +76,11 @@ export function applyPreviewJudgment(row) {
 }
 
 export function validJudgmentDetails(details) {
-  return ['evidence', 'observations', 'rationale'].every(field =>
-    typeof details?.[field] === 'string' && details[field].trim().length > 0 && details[field].trim().length <= judgmentTextLimit);
+  return typeof details?.rationale === 'string' && details.rationale.trim().length > 0
+    && details.rationale.trim().length <= judgmentTextLimit
+    && ['evidence', 'observations'].every(field => details[field] == null
+      || typeof details[field] === 'string' && details[field].trim().length > 0
+        && details[field].trim().length <= judgmentTextLimit);
 }
 
 export function savePreviewJudgment(row, verdict, details, reasonCategory, reviewer) {
@@ -89,7 +92,7 @@ export function savePreviewJudgment(row, verdict, details, reasonCategory, revie
     return { ok: false, error: '판정 사유 유형을 선택하세요.' };
   }
   if (!validJudgmentDetails(details)) {
-    return { ok: false, error: '확인한 근거 자료, 관찰한 사실, 판정 사유를 각각 입력하세요.' };
+    return { ok: false, error: '판정 사유를 입력해 주세요.' };
   }
   const now = new Date();
   const date = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(2, 10).replaceAll('-', '');
@@ -97,7 +100,7 @@ export function savePreviewJudgment(row, verdict, details, reasonCategory, revie
   const id = `J-${date}-${100001 + judgments.size}`;
   const record = {
     id, code: row.code, verdict, reasonCategory, at: now.toISOString(),
-    evidence: details.evidence.trim(), observations: details.observations.trim(), reason: details.rationale.trim(),
+    evidence: details.evidence?.trim() ?? '', observations: details.observations?.trim() ?? '', reason: details.rationale.trim(),
     ...(typeof reviewer === 'string' && reviewer.trim() && { reviewer: reviewer.trim() }),
   };
   judgments.set(row.code, record);

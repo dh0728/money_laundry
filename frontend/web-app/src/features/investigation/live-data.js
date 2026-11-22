@@ -29,7 +29,7 @@ function transactionRow(row) {
     code, timestamp, amount: Number(row.amountPaid), currency: row.paymentCurrency, method: row.paymentFormat,
     incoming: false, verdict: 'unjudged', status: '처리 전', from, to,
     date: dateFromCode(code), hour: Number(timestamp.slice(11, 13)) - 9,
-    score: Math.round((row.launderingScore ?? 0) * 100),
+    score: Math.round((row.launderingScore ?? 0) * 100), suspicious: Boolean(row.suspicious),
     account: from.code, counterparty: to.code, owner: from.owner, serial: row.txId, txId: row.txId,
   };
 }
@@ -40,9 +40,10 @@ function caseStatus(item) {
   return item.kind === 'EPISODE' || item.reviewStartedAt ? '처리 중' : '처리 전';
 }
 
-function caseRow(item, transactions, userId) {
+function caseRow(item, transactions, userId, codes) {
   const code = caseCode(item);
   const status = caseStatus(item);
+  const transactionCodes = ids => ids.flatMap(id => transactions.get(id)?.code ?? []);
   const related = item.members.flatMap(member => {
     const record = transactions.get(member.txId);
     if (!record) return [];
@@ -55,7 +56,8 @@ function caseRow(item, transactions, userId) {
   return {
     code, kind: item.kind === 'EPISODE' ? 'Episode' : 'Alert',
     verdict: verdicts[item.outcome] ?? 'unjudged', status, assigned, open: item.status === 'OPEN',
-    unread: assigned && status === '처리 전' && !wasPreviewCaseRead(code),
+    // 열람 여부는 서버가 기억한다. 방금 연 사건은 다시 받아 오기 전에도 읽은 것으로 보인다.
+    unread: assigned && status === '처리 전' && !item.readAt && !wasPreviewCaseRead(code),
     date: dateFromCode(code), createdAt, completedAt: item.closedAt ?? undefined,
     hour: Number(kstTimestamp(createdAt).slice(11, 13)) - 9, elapsed: item.ageDays,
     score: Math.round((item.summary.riskScore ?? 0) * 100),
@@ -64,7 +66,14 @@ function caseRow(item, transactions, userId) {
     relatedAccounts: new Set(related.flatMap(record => [record.account, record.counterparty])).size,
     amountByCurrency: Object.fromEntries(Object.entries(item.summary.amountsByCurrency ?? {})
       .map(([currency, amount]) => [currency, Number(amount)])),
-    caseId: item.caseId, revision: item.revision, assigneeName: item.assigneeName, episodeId: item.episodeId,
+    caseId: item.caseId, assigneeName: item.assigneeName,
+    ...(item.episodeId && { episodeCode: codes.get(item.episodeId) }),
+    ...(item.kind === 'EPISODE' && { linkedAlertCodes: item.linkedAlertIds.map(id => codes.get(id)), linkedAlertCodesComplete: true }),
+    ...(item.edits?.length && { membershipHistory: item.edits.map(edit => ({
+      action: edit.action === 'MOVE' ? 'move' : 'remove', sourceCode: codes.get(edit.sourceAlertId),
+      targetCode: edit.targetAlertId ? codes.get(edit.targetAlertId) : null,
+      transactionCodes: transactionCodes(edit.txIds), reason: edit.reason, reviewer: edit.editor, at: edit.at,
+    })) }),
     ...(item.judgment && { judgment: { ...item.judgment, code, verdict: verdicts[item.judgment.verdict] } }),
   };
 }
@@ -72,7 +81,8 @@ function caseRow(item, transactions, userId) {
 function build() {
   const userId = currentPreviewUser()?.id;
   const transactions = new Map(board.transactions.map(row => [row.txId, transactionRow(row)]));
-  const cases = board.cases.map(item => caseRow(item, transactions, userId));
+  const codes = new Map(board.cases.map(item => [item.caseId, caseCode(item)]));
+  const cases = board.cases.map(item => caseRow(item, transactions, userId, codes));
   for (const row of cases) for (const record of row.related) {
     const shared = transactions.get(record.txId);
     if (record.verdict !== 'unjudged') shared.verdict = record.verdict;
@@ -88,6 +98,9 @@ function build() {
 }
 
 export const liveSource = () => source ?? empty;
+// 새 Episode가 받을 ID. 서버가 미리 잡아 준 번호와 지금 업무일로 만든다.
+export const liveNextEpisodeCode = () => board
+  ? caseCode({ kind: 'EPISODE', createdAt: board.businessAt, caseId: board.nextEpisodeId }) : '';
 export const liveSourceLoaded = () => Boolean(source);
 export const liveCodes = prefix => prefix === 'T' ? [] : liveSource().cases
   .filter(row => row.code.startsWith(`${prefix}-`)).map(row => row.code);

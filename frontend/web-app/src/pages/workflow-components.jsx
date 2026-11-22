@@ -1,4 +1,6 @@
+import { Callout } from '../components/Callout';
 import React, { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,10 +20,13 @@ import { ChartSectionDownload } from '../components/section-download';
 import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
 import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { RuleList, ruleWorkspace } from '../features/rules/preview-rule-workspace';
+import { liveBacktestScope, liveRules, runLiveBacktest } from '../features/rules/live-rules.js';
 import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
 import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
+import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-dialog';
+import { canManagePreviewEpisodes, canTransferAlert } from '../features/investigation/preview-episode-transfer';
 import { CaseJudgment } from '../features/investigation/case-judgment';
 import { CaseTransactionEdit } from '../features/investigation/case-transaction-edit';
 import { useCaseEvidenceSelection } from '../features/investigation/case-evidence-selection';
@@ -180,6 +185,10 @@ function BacktestMetric({ label, value, unit }) {
 function Backtest({ selectedRule, registerTableTools, actionsHost }) {
   const { reduced, theme } = useAppearance();
   const rule = ruleWorkspace.rules.find(item => item.id === selectedRule) ?? ruleWorkspace.rules[0];
+  const [scope, setScope] = useState(liveRules ? undefined : { ...backtestPeriod, count: ruleWorkspace.transactions.length });
+  useEffect(() => {
+    if (liveRules) void liveBacktestScope().then(setScope, () => undefined);
+  }, []);
   const [step, setStep] = useState(1);
   const [score, setScore] = useState(Number((rule.scoreMin * 100).toFixed(2)));
   const hasScoreCondition = rule.scoreMin > 0;
@@ -208,19 +217,27 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
 
   useEffect(() => {
     if (status !== 'running') return undefined;
-    const timer = window.setTimeout(() => {
+    let current = true;
+    const timer = window.setTimeout(async () => {
       try {
-        const result = runBacktest(ruleWorkspace.transactions, { ...rule, scoreMin: score / 100 }, backtestPeriod, { limit: 100 });
+        const applied = { ...rule, scoreMin: score / 100 };
+        const result = liveRules ? await runLiveBacktest(applied, scope, { limit: 100 })
+          : runBacktest(ruleWorkspace.transactions, applied, backtestPeriod, { limit: 100 });
+        if (!current) return;
         setResults(result);
         setStatus('done');
         setStep(3);
         announce({ status: 'done', title: '백테스트 완료', description: `거래 ${result.matchedCount}건이 룰 조건에 해당합니다.` });
       } catch (error) {
+        if (!current) return;
         setStatus('failed');
-        announce({ status: 'failed', title: '백테스트 실패', description: error.message });
+        announce({ status: 'failed', title: '백테스트 실패', description: error.problem?.detail ?? error.message });
       }
     }, 120);
-    return () => window.clearTimeout(timer);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
   }, [rule, score, status]);
 
   return <section className="screen-section workflow-panel workflow-backtest" aria-label="백테스트">
@@ -235,9 +252,9 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
       </Panel>
       <Panel className="backtest-card">
         <h2>백테스트 대상 거래</h2>
-        <p className="backtest-metric-number"><strong>{ruleWorkspace.transactions.length.toLocaleString('ko-KR')}</strong> <span>거래</span></p>
-        <p className="backtest-meta"><time dateTime={backtestPeriod.start}>{backtestPeriod.start}</time>
-          {' ~ '}<time dateTime={backtestPeriod.end}>{backtestPeriod.end}</time> · KST</p>
+        <p className="backtest-metric-number"><strong>{(scope?.count ?? 0).toLocaleString('ko-KR')}</strong> <span>거래</span></p>
+        <p className="backtest-meta"><time dateTime={scope?.start}>{scope?.start}</time>
+          {' ~ '}<time dateTime={scope?.end}>{scope?.end}</time> · KST</p>
       </Panel>
     </div>
     <Stepper key={reduced} step={step} theme={theme} style={backtestStepperStyles} frame={false} width="100%" linear disableStepIndicators
@@ -484,19 +501,72 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
   </section>;
 }
 
+function AlertEpisodeActions({ overview }) {
+  const [open, setOpen] = useState(false);
+  const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
+  if (!canManagePreviewEpisodes(user)) return null;
+  return <ScreenActions host={overview.actionsHost}>
+    <ActionButton onClick={() => setOpen(true)}>Episode로 묶기</ActionButton>
+    {open && <PreviewEpisodeDialog cases={overview.reportData.cases} save={overview.saveEpisode}
+      onClose={saved => saved ? overview.refreshEpisode() : setOpen(false)} />}
+  </ScreenActions>;
+}
+
 function CaseReviewActions({ overview }) {
+  const [episodeAction, setEpisodeAction] = useState(null);
   const { row, evidenceSelection, reportData } = overview;
   const selection = useCaseEvidenceSelection(evidenceSelection);
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   const selected = row.related.filter(record => selection.has(record.code)).map(record => record.code);
   const blockedReason = previewAlertEditUnavailable(row, user);
-  return <ScreenActions host={overview.actionsHost} stackOnNarrow={selected.length > 0}>
-    {selected.length > 0 && <CaseTransactionEdit row={row} selected={selected} canEdit={!blockedReason}
-      blockedReason={blockedReason} destinations={!blockedReason ? previewAlertMembershipTargets(reportData.cases, row.code, user) : []}
-      onApply={overview.editTransactions} onClear={evidenceSelection.clear} />}
-    <CaseJudgment row={row} startReview={overview.startReview} save={overview.saveJudgment}
-      onSavedClose={overview.onJudgmentClose} onReport={overview.onJudgmentReport} selectedTransactions={selected} />
-  </ScreenActions>;
+  const canManageEpisodes = canManagePreviewEpisodes(user);
+  const compared = overview.comparedCases ?? [];
+  const comparedAlerts = compared.filter(item => item.kind === 'Alert');
+  const comparedEpisodes = compared.filter(item => item.kind === 'Episode');
+  const transferAlerts = row.kind === 'Alert' ? [row, ...comparedAlerts] : comparedAlerts;
+  const target = row.kind === 'Episode' ? row : comparedEpisodes[0];
+  let bundle;
+  let bundleBlocked;
+  if (compared.length) {
+    if (!canManageEpisodes) {
+      bundleBlocked = 'Episode 편입은 검수 계정에서 진행할 수 있습니다.';
+    } else if (comparedEpisodes.length > 1) {
+      bundleBlocked = '대상 Episode는 하나만 선택해 주세요.';
+    } else if (target && !target.open) {
+      bundleBlocked = `${target.code}은 처리 완료된 Episode입니다. 다른 대상을 선택해 주세요.`;
+    } else {
+      const ineligible = transferAlerts.filter(item => !canTransferAlert(item));
+      if (ineligible.length) {
+        bundleBlocked = `편입할 수 없는 Alert · ${ineligible.map(item => item.code).join(', ')}. 내 담당 진행 중 Alert만 선택해 주세요.`;
+      } else if (transferAlerts.length < (target ? 1 : 2)) {
+        bundleBlocked = '기존 Episode 또는 묶을 Alert를 더 선택해 주세요.';
+      } else {
+        bundle = { alerts: transferAlerts.map(item => item.code), target: target?.code };
+      }
+    }
+  }
+  return <>
+    {overview.bundleNoticeHost && createPortal(
+      bundleBlocked ? <Callout>{bundleBlocked}</Callout>
+        : bundle ? <ResultStatus status="pending">Alert {bundle.alerts.length}건 → {bundle.target ?? '새 Episode'}</ResultStatus>
+          : null,
+      overview.bundleNoticeHost,
+    )}
+    <ScreenActions host={overview.actionsHost} stackOnNarrow={selected.length > 0}>
+      {selected.length > 0 && <CaseTransactionEdit row={row} selected={selected} canEdit={!blockedReason}
+        blockedReason={blockedReason} destinations={!blockedReason ? previewAlertMembershipTargets(reportData.cases, row.code, user) : []}
+        onApply={overview.editTransactions} onClear={evidenceSelection.clear} />}
+      {row.episodeCode && <ActionButton as="a" href={`/episodes/${row.episodeCode}?tab=related`}>연결 Episode 열기</ActionButton>}
+      {canManageEpisodes && row.kind === 'Episode' && row.open && row.assigned && Boolean(row.linkedAlertCodes?.length)
+        && <ActionButton onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</ActionButton>}
+      {episodeAction && <PreviewEpisodeDialog cases={reportData.cases} save={overview.saveEpisode} row={row}
+        bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'}
+        onClose={saved => saved ? overview.refreshEpisode() : setEpisodeAction(null)} />}
+      <CaseJudgment bundleBlocked={Boolean(bundleBlocked)} onBundle={bundle ? () => setEpisodeAction('bundle') : undefined}
+        onTransfer={canManageEpisodes && canTransferAlert(row) ? () => setEpisodeAction('transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
+        onSavedClose={overview.onJudgmentClose} onReport={overview.onJudgmentReport} />
+    </ScreenActions>
+  </>;
 }
 
 function Workflow({ kind, view, dashboard, overview, reason }) {
@@ -525,8 +595,10 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
     return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
       history={reportHistory(overview?.reportData)} activeRules={activeRules} /></Suspense>;
   }
+  if (kind === 'alert-episode-actions') return <AlertEpisodeActions overview={overview} />;
   if (kind === 'case-judgment') return <CaseReviewActions overview={overview} />;
   if (kind === 'case-readonly') return <Panel className="glass"><h2>읽기 전용</h2></Panel>;
+  if (kind === 'backtest' && !ruleWorkspace.rules.length) return <Panel className="glass"><h2>등록된 룰이 없습니다.</h2></Panel>;
   if (kind === 'rules-list') return <RuleList reason={reason} initialRule={overview?.rule}
     registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   return <MotionConfig reducedMotion={appearance.reduced ? 'always' : 'never'}>
@@ -557,6 +629,10 @@ export function mountWorkflows(workspace, dashboard, overview) {
       dashboard = { ...dashboard, sort, board: { ...board, content: rows.filter(row => visible.has(row.code)) } };
       render();
       return true;
+    },
+    updateBundle(comparedCases, bundleNoticeHost) {
+      overview = { ...overview, comparedCases, bundleNoticeHost };
+      render();
     },
     updateCase(row, reportData) {
       overview = { ...overview, row, reportData };

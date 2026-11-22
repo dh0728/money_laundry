@@ -9,7 +9,10 @@ import { ConfirmHoldButton, mountLoginPrimary } from '../components/primary-butt
 import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
-import { excludeLiveTransactions, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
+import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
+import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
+import { liveDashboardAsOf, liveDashboardResponse } from '../features/dashboard/live-dashboard.js';
+import { loadLiveRules } from '../features/rules/preview-rule-workspace.jsx';
 import { canStartPreviewReview, savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { createCaseEvidenceSelection } from '../features/investigation/case-evidence-selection.js';
 import { editPreviewAlertTransactions } from '../features/investigation/case-membership-data.js';
@@ -701,8 +704,8 @@ function loadPreviewDashboard(mounted, source, query) {
     mounted.updateDashboard(undefined);
     afterWorkspacePaint(() => {
       if (mountedWorkflows !== mounted) return;
-      try {
-        const summary = dashboardFixtureResponse(source, query);
+      const show = summary => {
+        if (mountedWorkflows !== mounted) return;
         mounted.updateDashboard(summary);
         afterWorkspacePaint(() => {
           if (mountedWorkflows !== mounted) return;
@@ -710,8 +713,16 @@ function loadPreviewDashboard(mounted, source, query) {
           const board = dashboardFixtureBoardPage(rows, { size: Math.max(1, rows.length) });
           mounted.updateDashboard({ ...summary, board });
         });
+      };
+      const fail = () => mounted.updateDashboard({ error: true, retry: load });
+      if (serviceMode) {
+        liveDashboardResponse(source, query).then(show, fail);
+        return;
+      }
+      try {
+        show(dashboardFixtureResponse(source, query));
       } catch {
-        mounted.updateDashboard({ error: true, retry: load });
+        fail();
       }
     });
   };
@@ -752,12 +763,14 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const groups = isDashboard || isReport || isCaseDetail || path?.startsWith('add-tab/')
     ? Object.fromEntries(tabGroups.map(group => [group.prefix, tabCodes(group)])) : undefined;
   if (isDashboard || isReport || isCaseDetail || isCaseList) dashboardSource ??= caseSource(groups);
-  if (isCaseDetail && markPreviewCaseRead(dashboardSource.cases.find(row => row.code === code))) {
+  const opened = isCaseDetail ? dashboardSource.cases.find(row => row.code === code) : undefined;
+  if (markPreviewCaseRead(opened)) {
+    if (serviceMode) void markLiveRead(opened);
     dashboardSource = caseSource(groups);
   }
   const queryData = isDashboard ? {
     rows: path === sections.dashboard ? dashboardSource.mine : dashboardSource.cases,
-    asOf: dashboardPeriodEnd,
+    asOf: serviceMode ? liveDashboardAsOf(dashboardSource) : dashboardPeriodEnd,
     dashboard: true,
   } : isCaseList ? { rows: dashboardSource.cases.filter(row => row.code.startsWith(groupPrefix)) } : undefined;
   activePath = path;
@@ -785,7 +798,17 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   mountedWorkflows = mountWorkflows(workspace, undefined, {
     actionsHost: byId('footer-actions'),
     paginationHost: byId('footer-pagination'),
-    row: selectedCase, perPanel, initialPanel, reportData: isReport || isCaseDetail ? dashboardSource : undefined,
+    row: selectedCase, perPanel, initialPanel, reportData: isReport || isCaseDetail || isCaseList ? dashboardSource : undefined,
+    saveEpisode: options => {
+      if (serviceMode) {
+        return changeLiveEpisode(options).then(result => result.ok
+          ? loadLiveSource().then(() => { dashboardSource = caseSource(groups); return result; }) : result);
+      }
+      const result = changePreviewEpisode({ ...options, cases: dashboardSource.cases, user: currentPreviewUser() });
+      if (result.ok) dashboardSource = dashboardFixtures(groups);
+      return result;
+    },
+    refreshEpisode: () => showWorkspace('', code, path, 'none', new URLSearchParams(location.search)),
     reportDocument, evidenceSelection,
     editTransactions: ({ codes: transactionCodes, targetCode, reason }) => {
       if (!evidenceSelection || activeWorkCode !== code || activeEvidence?.selection !== evidenceSelection) {
@@ -807,8 +830,8 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       };
       if (serviceMode) {
         const mounted = mountedWorkflows;
-        if (targetCode) return { ok: false, error: 'Alert 사이 거래 이동은 아직 지원하지 않습니다.' };
-        return excludeLiveTransactions(dashboardSource.cases.find(item => item.code === code), transactionCodes, reason)
+        const find = wanted => dashboardSource.cases.find(item => item.code === wanted);
+        return editLiveTransactions(find(code), transactionCodes, targetCode ? find(targetCode) : undefined, reason)
           .then(result => result.ok ? loadLiveSource().then(() => mountedWorkflows === mounted ? applied(result) : result) : result);
       }
       return applied(editPreviewAlertTransactions({
@@ -871,6 +894,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         active: dashboardSource.cases.find(row => row.code === code),
         cases: dashboardSource.cases,
         evidenceSelection,
+        onComparedCases: (compared, noticeHost) => mountedWorkflows.updateBundle(compared, noticeHost),
       });
     }
   });
@@ -1435,7 +1459,7 @@ function showRoute(route, params, navigationMode) {
       dashboardSource = undefined;
       showLoadedRoute(route, params, navigationMode);
     };
-    void loadLiveSource().then(open, () => {
+    void Promise.all([loadLiveSource(), loadLiveRules()]).then(open, () => {
       document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
         status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
       } }));

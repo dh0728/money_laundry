@@ -131,8 +131,8 @@ export function CaseTransactionEdit({ row, selected = [], destinations = [], can
           <ActionButton shape="pill" surface="ghost" onClick={clear}>선택 해제</ActionButton>
           <ActionButton shape="pill" surface="floating" onClick={close}>{canEdit ? '취소' : '닫기'}</ActionButton>
           {canEdit && <ConfirmHoldButton tone={operation === 'exclude' ? 'negative' : 'brand'}
-            disabled={!valid} doneLabel="길게 눌러 적용" resetAfter={250}
-            onHold={apply}>길게 눌러 적용</ConfirmHoldButton>}
+            disabled={!valid} doneLabel="적용 완료" resetAfter={250}
+            onHold={apply}>{operation === 'exclude' ? '길게 눌러 적용' : '적용'}</ConfirmHoldButton>}
         </footer>
       </div>
     </dialog>

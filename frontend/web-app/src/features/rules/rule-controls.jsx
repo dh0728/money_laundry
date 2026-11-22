@@ -158,13 +158,18 @@ function RuleDraft({ actionsHost }) {
       setFailure('조건 블록을 하나 이상 추가해 주세요.');
       return;
     }
+    const applied = result => {
+      if (!result.ok) {
+        setFailure(result.error);
+        return;
+      }
+      setSaved(result.value);
+      setDirty(false);
+    };
+    // 서비스 모드는 서버 응답을 기다린다.
     const result = savePreviewRule({ ...input, name: input.name.trim(), description: input.description.trim() }, saved?.id);
-    if (!result.ok) {
-      setFailure(result.error);
-      return;
-    }
-    setSaved(result.value);
-    setDirty(false);
+    if (result instanceof Promise) void result.then(applied);
+    else applied(result);
   }
 
   return <div className="screen-row screen-rule-editor">
