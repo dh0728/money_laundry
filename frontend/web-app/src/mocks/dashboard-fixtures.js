@@ -1,5 +1,7 @@
 import { caseFixtureRows, dateFromCode } from '../components/query-controls.jsx';
 import { applyPreviewJudgment } from '../features/investigation/case-judgment-data.js';
+import { currentPreviewUser, previewStaff } from '../features/auth/preview-session-user.js';
+import { previewCaseAssignee, previewWorkRequestEffects } from '../features/investigation/preview-work-requests.js';
 import { applyPreviewEpisodeTransfers } from '../features/investigation/preview-episode-transfer.js';
 import { applyPreviewAlertMembership } from '../features/investigation/case-membership-data.js';
 import { wasPreviewCaseRead } from '../features/investigation/case-read-state.js';
@@ -110,7 +112,18 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
   for (const row of baseCases) for (const transaction of row.related) {
     if (!allTransactions.has(transaction.code)) allTransactions.set(transaction.code, transaction);
   }
-  const cases = applyPreviewEpisodeTransfers(applyPreviewAlertMembership(baseCases, allTransactions, evidenceSummary), evidenceSummary);
+  const actor = currentPreviewUser();
+  const staff = actor?.source === 'fixture' && actor.role === 'STAFF' ? actor.username : previewStaff.username;
+  const effects = actor?.source === 'fixture' ? previewWorkRequestEffects() : new Map();
+  const cases = applyPreviewEpisodeTransfers(applyPreviewAlertMembership(baseCases, allTransactions, evidenceSummary), evidenceSummary)
+    .map(row => {
+      const effect = effects.get(row.code);
+      const assignee = effect?.assignee ?? previewCaseAssignee(row);
+      const next = { ...row, assignee, assigned: assignee === staff, reviewDueOn: effect?.reviewDueOn };
+      if (!effect?.reviewStateAt || row.episodeCode || row.judgment?.at > effect.reviewStateAt) return next;
+      return applyPreviewJudgment({ ...next, reviewStateAt: effect.reviewStateAt, status: effect.reviewStatus,
+        verdict: 'unjudged', open: true, unread: false, completedAt: null, judgment: undefined });
+    });
   const alertCases = cases.filter(row => row.kind === 'Alert');
   for (const row of cases) {
     if (row.kind !== 'Episode') continue;

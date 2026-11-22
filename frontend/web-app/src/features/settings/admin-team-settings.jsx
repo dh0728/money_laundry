@@ -1,10 +1,12 @@
 import React, { useEffect, useId, useState } from 'react';
 import { fetchReviewUsers } from '@/api/liveReview';
 import { ActionButton } from '../../components/primary-button';
+import GlideSelect from '../../components/react-bits/GlideSelect';
 import { StatusTag } from '../../components/semantic-tags';
 import './admin-team-settings.css';
 
 const roles = { ADMIN: '관리자', STAFF: '분석가' };
+const roleOptions = Object.entries(roles).map(([value, label]) => ({ value, label }));
 const sampleMembers = [
   { id: 'preview-member-1', name: '김서윤', role: 'STAFF' },
   { id: 'preview-member-2', name: '박지호', role: 'STAFF' },
@@ -20,10 +22,8 @@ function MemberList({ members, onRoleChange }) {
         {member.self && <small>현재 계정</small>}
       </span>
       {onRoleChange && !member.self
-        ? <select className="aml-native-select" aria-label={`${member.name} 권한`} value={member.role}
-          onChange={event => onRoleChange(member, event.target.value)}>
-          {Object.entries(roles).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select>
+        ? <GlideSelect ariaLabel={`${member.name} 권한`} options={roleOptions} value={member.role}
+          align="right" onChange={role => onRoleChange(member, role)} />
         : <StatusTag preset={member.role === 'ADMIN' ? 'inProgress' : 'neutral'}>{roles[member.role]}</StatusTag>}
     </li>)}
   </ul>;

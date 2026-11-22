@@ -102,7 +102,7 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
         {!rows.length && <TableRow><TableCell colSpan={headings.length}>조회 조건과 일치하는 항목이 없습니다.</TableCell></TableRow>}
       </TableBody>
     </CaseDataTable>
-    {paged && <FooterPagination host={paginationHost} label={`${title} 페이지`} page={page} pageCount={pageCount}
+    {paged && <FooterPagination host={paginationHost} label={`${title} 페이지`} page={page} pageCount={pageCount} total={sorting.rows.length}
       onPageChange={changePage} alwaysShow />}
   </div>;
 }

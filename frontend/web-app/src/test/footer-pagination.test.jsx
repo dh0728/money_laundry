@@ -22,7 +22,7 @@ const dataset = {
   records,
 };
 
-it('keeps ledger table and cards on the footer page and resets pagination for filtered results', () => {
+it('paginates the ledger table and loads more ledger cards without a footer', () => {
   const paginationHost = document.createElement('div');
   const { container, rerender, unmount } = render(<BenchmarkLedger dataset={dataset} paginationHost={paginationHost} />);
   const footer = within(paginationHost);
@@ -41,19 +41,18 @@ it('keeps ledger table and cards on the footer page and resets pagination for fi
   expect(screen.queryByRole('button', { name: 'TEST-TRANSACTION-1 상세 열기' })).toBeNull();
 
   rerender(<BenchmarkLedger dataset={dataset} tableView={false} paginationHost={paginationHost} />);
-  expect(footer.getByText('2 / 3 페이지')).toBeTruthy();
+  expect(footer.queryByRole('navigation')).toBeNull();
   expect(screen.getByRole('button', { name: 'TEST-TRANSACTION-31 상세 열기' })).toBeTruthy();
-  fireEvent.click(next);
-  expect(footer.getByText('3 / 3 페이지')).toBeTruthy();
-  expect(next.disabled).toBe(true);
-  fireEvent.click(prev);
-  expect(footer.getByText('2 / 3 페이지')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+  expect(screen.getByRole('button', { name: 'TEST-TRANSACTION-65 상세 열기' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '더 보기' })).toBeNull();
 
   fireEvent.change(screen.getByLabelText('거래일'), { target: { value: '2022-09-02' } });
   expect(footer.queryByRole('navigation')).toBeNull();
   expect(screen.getByRole('button', { name: 'TEST-TRANSACTION-61 상세 열기' })).toBeTruthy();
 
   fireEvent.change(screen.getByLabelText('거래일'), { target: { value: '' } });
+  rerender(<BenchmarkLedger dataset={dataset} tableView paginationHost={paginationHost} />);
   expect(footer.getByText('1 / 3 페이지')).toBeTruthy();
   unmount();
   expect(footer.queryByRole('navigation')).toBeNull();

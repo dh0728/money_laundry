@@ -10,7 +10,7 @@ import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
 import { exportCases } from '../../components/query-controls';
-import { BoardSectionDownload, ChartSectionDownload } from '../../components/section-download';
+import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
 
 const formatter = new Intl.NumberFormat('ko-KR');
@@ -60,10 +60,7 @@ function Metric({ item, reduced }) {
   const hasChart = Boolean(trend || completion?.total);
   const [plot, plotHeight] = usePlotHeight(Boolean(trend), 48);
   return <div className="dashboard-metric" data-export-visualization={hasChart || undefined}>
-    <div className="section-download-heading">
-      <h3>{label}</h3>
-      {hasChart && <ChartSectionDownload label={label} />}
-    </div>
+    <SectionDownloadHeading as="h3" downloadLabel={hasChart ? label : undefined}>{label}</SectionDownloadHeading>
     <div className="dashboard-metric-reading">
       <strong className="dashboard-metric-value" data-composite={Array.isArray(value) || undefined} data-wide-value={wideValue || undefined}>
         {typeof value === 'number' && !reduced && !animated.has(key)
@@ -106,10 +103,9 @@ function DashboardAISummary({ headline, alertRows, timeSlots, period, reduced, b
   const [plot, plotHeight] = usePlotHeight(hasChart, 96);
   const trend = timeSlots.map(({ label }, hour) => ({ label, value: alertRows.filter(row => row.hour === hour).length }));
   return <AISummaryPanel as="article" reduced={reduced} data-export-visualization={alertRows.length > 0 || undefined}>
-    <div className="section-download-heading dashboard-summary-heading">
-      <h2><Sparkles className="icon" aria-hidden="true" /> AI 요약</h2>
-      {alertRows.length > 0 && <ChartSectionDownload label="AI 요약" />}
-    </div>
+    <SectionDownloadHeading className="dashboard-summary-heading" downloadLabel={hasChart ? 'AI 요약' : undefined}>
+      <Sparkles className="icon" aria-hidden="true" /> AI 요약
+    </SectionDownloadHeading>
     <strong>{headline}</strong>
     {children}
     {hasChart && <figure className="dashboard-summary-trend">
@@ -172,7 +168,7 @@ function WorkBoard({ records, mine, sort, appearance }) {
         <BoardSectionDownload records={records} label="업무 현황" onDownload={rows => exportCases(rows, 'work-board')} />
       </div>
     </header>
-    <div className="dashboard-board-scroll" role="region" aria-label="업무 카드 스크롤" tabIndex={0}>
+    <div className="dashboard-board-scroll">
       <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine} pageSize={8}
         orderRows={mine && !sort ? interleaveCaseKinds : undefined} />
     </div>

@@ -19,7 +19,7 @@ import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-c
 import { caseSankeyGraph, caseSankeyLayers, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
 import { complexSankeySampleCode } from '../../mocks/dashboard-fixtures';
 import { buildCaseNetwork, casePlaybackCursor, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
-  mergeCaseTransactions, transactionsWithinHops } from './case-graph-scope';
+  mergeCaseTransactions, sharedCaseEvidence, transactionsWithinHops } from './case-graph-scope';
 import { caseAccountLayout } from './case-pattern-layout';
 import { CountTag, LinkTag, ModelScoreTag } from '../../components/semantic-tags';
 import { caseGroupColor, caseMembership } from '../graph/graph-case-groups';
@@ -34,13 +34,11 @@ import '../../components/form-dropdown.css';
 import './preview-case-graph.css';
 
 function casesSharingEvidence(active, cases) {
-  const transactions = new Set(active.related.map(row => row.code));
-  const accounts = new Set(active.related.flatMap(row => [row.from.code, row.to.code]));
   return cases.flatMap(record => {
     if (record.code === active.code || (active.kind === 'Episode' && record.kind !== 'Alert')) return [];
-    const sharedTransactions = record.related.filter(row => transactions.has(row.code)).length;
-    const sharedAccounts = new Set(record.related.flatMap(row => [row.from.code, row.to.code])
-      .filter(account => accounts.has(account))).size;
+    const { transactions, accounts } = sharedCaseEvidence(active, record);
+    const sharedTransactions = transactions.length;
+    const sharedAccounts = accounts.length;
     return sharedTransactions || sharedAccounts ? [{ record, sharedTransactions, sharedAccounts }] : [];
   }).sort((a, b) => b.sharedTransactions - a.sharedTransactions || b.sharedAccounts - a.sharedAccounts ||
     a.record.code.localeCompare(b.record.code));
@@ -92,7 +90,7 @@ function GraphSettings({ id, groups, onDetailsChange, ownerView, sankeyView, anc
         : <span className="preview-graph-case-included">{membership}</span>}
     </li>;
   };
-  return <aside className="glass preview-graph-settings" data-expanded={expanded}
+  return <aside className="glass floating-glass preview-graph-settings" data-expanded={expanded}
     aria-label="그래프 설정" data-figma-graph-settings onKeyDown={closeOnEscape}>
     <header className="preview-graph-settings-heading">
       <GraphIconButton ref={trigger} grouped label="그래프 설정" icon={Settings2} alternateIcon={PanelLeft}
@@ -384,16 +382,12 @@ function AccountBreakdown({ rows, linkedSelection, selectionControl }) {
 }
 
 function ComparisonEvidence({ active, candidates }) {
-  const activeCodes = new Set(active?.related.map(row => row.code));
-  const activeAccounts = new Set(active?.related.flatMap(row => [row.from.code, row.to.code]));
   return <Panel className="preview-comparison-evidence">
     <h2>연결 근거</h2>
     {candidates.length ? candidates.map(candidate => {
-      const sharedCodes = candidate.related.filter(row => activeCodes.has(row.code)).map(row => row.code);
-      const sharedAccounts = [...new Set(candidate.related.flatMap(row => [row.from.code, row.to.code])
-        .filter(account => activeAccounts.has(account)))];
+      const { transactions: sharedCodes, accounts: sharedAccounts } = sharedCaseEvidence(active, candidate);
       return <section key={candidate.code}>
-        <h3><code>{candidate.code}</code></h3>
+        <h3><LinkTag code={candidate.code} /></h3>
         <dl><div><dt>공통 거래</dt><dd>{sharedCodes.join(', ') || '없음'}</dd></div>
           <div><dt>공통 계좌</dt><dd>{sharedAccounts.join(', ') || '없음'}</dd></div></dl>
       </section>;
@@ -586,6 +580,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
       else next.delete(record.code);
       return next;
     });
+    if (include && hiddenCases.has(record.code)) setCaseVisible(record.code, true);
     if (!include && selected && !comparedCases.some(entry => entry.code !== record.code &&
         entry.related.some(row => (selectedCodes ?? selected.codes).has(row.code)))) select();
     if (!include && highlightedCase === record.code) setHighlightedCase(undefined);

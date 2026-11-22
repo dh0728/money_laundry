@@ -57,7 +57,7 @@ export function enableBackdropDismissal(dialog) {
   let startedOnBackdrop = false;
   dialog.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.repeat || event.defaultPrevented ||
-        dialog.querySelector('[popover="auto"]:popover-open')) return;
+        dialog.querySelector('[popover]:popover-open')) return;
     event.preventDefault();
     dialog.close();
   });

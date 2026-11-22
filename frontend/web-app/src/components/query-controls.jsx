@@ -8,7 +8,7 @@ import { Check, ChevronRight } from 'lucide-react';
 import { downloadCsv as saveCsv } from '@/next/features/report-io';
 import { Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
 import { ActionButton } from './primary-button';
-import { FilterTag, reviewStates, reviewStatusLabel } from './semantic-tags';
+import { FilterTag, reviewStates, reviewStatusLabel, VerdictTag, verdictLabels } from './semantic-tags';
 import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings';
 import { downloadVisualizations, hasVisualizations } from '../lib/preview-visual-export.js';
 import JellyRadio from './react-bits/JellyRadio';
@@ -23,7 +23,8 @@ const scopeOptions = [{ value: 'all', label: '전체' }, { value: 'assigned', la
 const elapsedOptions = [
   { value: 'under-three', label: '3일 미만' }, { value: 'three-to-six', label: '3~6일' }, { value: 'week', label: '7일 이상' },
 ];
-const defaultQuery = { sort: '', risks: [], patterns: [], elapsed: [], statuses: [], assignment: 'all', range: undefined };
+const defaultQuery = { sort: '', risks: [], patterns: [], elapsed: [], statuses: [], verdicts: [], assignment: 'all', range: undefined };
+const caseVerdicts = ['unjudged', 'normal', 'abnormal'].map(value => ({ value, label: verdictLabels[value] }));
 const samplePatterns = ['Fan-out 82%', 'Cycle 74%', 'Gather-scatter 71%'];
 
 const queryTools = { filter: '필터', sort: '정렬', period: '기간', download: '다운로드' };
@@ -87,6 +88,7 @@ function filterGroups(rows, scope) {
     { key: 'elapsed', name: 'elapsed', label: '경과일', options: rows.some(row => Number.isFinite(row.elapsed)) ? elapsedOptions : [] },
     { key: 'assignment', label: '담당자', options: allowsAssignment(scope) ? scopeOptions : [] },
     { key: 'statuses', name: 'status', label: '처리 상태', options: reviewStates },
+    { key: 'verdicts', name: 'verdict', label: '사람 판정', options: scope === 'related-candidates' ? caseVerdicts : [] },
   ].filter(group => group.options.length);
 }
 
@@ -200,6 +202,7 @@ export function caseFixtureRows(codes) {
 export function visibleCaseRows(rows, query) {
   const filtered = rows.filter(row => (
     (!query.statuses.length || query.statuses.includes(row.status))
+    && (!query.verdicts?.length || query.verdicts.includes(row.verdict))
     && (!query.risks?.length || query.risks.includes(modelRiskBand(row.score)))
     && (!query.patterns?.length || query.patterns.includes(patternValue(row)))
     && (!query.elapsed?.length || query.elapsed.includes(elapsedValue(row.elapsed)))
@@ -305,7 +308,9 @@ function FilterPane({ value, groups, onApply, onResize, editingGroup }) {
               onChange={next => setDraft(previous => ({ ...previous, assignment: next }))} />
               : <fieldset className="query-filter-values-group">
                 <legend className="visually-hidden">{label}</legend>
-                {options.map(option => <QueryCheck key={option.value} label={option.label}
+                {options.map(option => <QueryCheck key={option.value}
+                  label={key === 'verdicts' ? <VerdictTag verdict={option.value} /> : option.label}
+                  ariaLabel={option.label}
                   checked={draft[key].includes(option.value)} onChange={checked => setDraft(previous => ({
                     ...previous, [key]: checked ? [...previous[key], option.value]
                       : previous[key].filter(item => item !== option.value),
@@ -546,6 +551,10 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     for (const button of buttons) {
       const hidden = !available[button.dataset.queryTool];
       if (button.hidden !== hidden) button.hidden = hidden;
+    }
+    if (downloadButton) {
+      const surface = screenSlot?.closest('.preview-graph-metadata') ? 'floating' : 'ghost';
+      if (downloadButton.dataset.buttonSurface !== surface) downloadButton.dataset.buttonSurface = surface;
     }
     const hideToolbar = !target || buttons.every(button => button.hidden);
     if (controls.hidden !== hideToolbar) controls.hidden = hideToolbar;

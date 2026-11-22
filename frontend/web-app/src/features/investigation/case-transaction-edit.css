@@ -2,7 +2,6 @@
   min-block-size: var(--account-control-size);
   white-space: nowrap;
 }
-.case-transaction-edit-dialog .case-judgment-body { gap: var(--aml-space-16) }
 .case-transaction-edit-targets {
   display: flex;
   flex-wrap: wrap;

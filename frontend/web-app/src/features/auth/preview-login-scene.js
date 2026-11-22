@@ -60,8 +60,54 @@ function rotation(yaw, pitch) {
   };
 }
 
+function drawRadarSweep(context, width, height, time, advance, dark) {
+  const x = width / 2;
+  const y = height / 2;
+  const radius = Math.hypot(x, y) * 1.1 * (1 + advance * .82);
+  const ink = (dark ? night : day)[0];
+
+  context.save();
+  context.globalAlpha = 1 - advance * .96;
+  const illumination = context.createRadialGradient(x, y, 0, x, y, radius);
+  illumination.addColorStop(0, 'transparent');
+  illumination.addColorStop(.22, 'transparent');
+  illumination.addColorStop(.42, `${ink}${dark ? '40' : '35'}`);
+  illumination.addColorStop(.65, `${ink}${dark ? '86' : '6f'}`);
+  illumination.addColorStop(.87, `${ink}${dark ? 'c5' : 'a4'}`);
+  illumination.addColorStop(1, `${ink}00`);
+  context.fillStyle = illumination;
+  context.fillRect(0, 0, width, height);
+
+  context.lineWidth = .85;
+  context.strokeStyle = `${ink}48`;
+  for (const range of [.43, .65, .84]) {
+    context.beginPath();
+    context.arc(x, y, radius * range, 0, Math.PI * 2);
+    context.stroke();
+  }
+
+  // The rotating light fades into its trail and stops at the leading face.
+  const sweep = context.createConicGradient(time * .86 - Math.PI * 1.18, x, y);
+  sweep.addColorStop(0, 'transparent');
+  sweep.addColorStop(.12, '#00000008');
+  sweep.addColorStop(.23, '#00000020');
+  sweep.addColorStop(.34, '#00000050');
+  sweep.addColorStop(.43, '#0000009a');
+  sweep.addColorStop(.47, '#000000db');
+  sweep.addColorStop(.5, '#000');
+  sweep.addColorStop(.503, 'transparent');
+  sweep.addColorStop(1, 'transparent');
+  context.globalAlpha = 1;
+  context.globalCompositeOperation = 'destination-in';
+  context.fillStyle = sweep;
+  context.fillRect(0, 0, width, height);
+  context.restore();
+}
+
 function drawShell(context, width, height, time, camera, progress, dark) {
   const advance = progress ** 2 * (3 - 2 * progress);
+  // Mask the radar on the cleared canvas before drawing the enclosing sphere.
+  drawRadarSweep(context, width, height, time, advance, dark);
   const focal = Math.min(width, height) * .71;
   const rotate = rotation(.28 + time * .077 + camera.x * .46, .13 * Math.cos(time * .34) - camera.y * .33);
   const pulses = neighborhoods.map((_, index) => Math.sin(time * .88 + index * goldenAngle) * .40);

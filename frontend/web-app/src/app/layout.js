@@ -1,14 +1,21 @@
 import { createElement } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Eye, EyeOff, Monitor, Moon, Sun } from 'lucide-react';
 import { login, logout, restoreSession } from '@/api/auth';
-import { currentPreviewUser, previewAdmin, previewStaff, setPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user.js';
+import { ApiError } from '@/api/common';
+import { alternatePreviewStaff, currentPreviewUser, previewAdmin, previewStaff, setPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user.js';
 import { fetchNotificationCases, fetchNotifications, setNotificationsRead } from '@/api/notifications';
 import { bindCardGlow } from '../components/card-glow.js';
-import { ConfirmHoldButton, mountLoginPrimary } from '../components/primary-button.jsx';
+import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.jsx';
+import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
+import { SearchField } from '../components/search-field.jsx';
 import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
+import { requestStateLabels, WorkRequestDetail, WorkRequestForm } from '../features/investigation/preview-work-request-dialog.jsx';
+import { previewCaseAssignee, previewWorkRequests, readPreviewWorkRequests, resolvePreviewWorkRequest, sendPreviewWorkRequest,
+  workRequestTypes } from '../features/investigation/preview-work-requests.js';
 import { savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { createCaseEvidenceSelection } from '../features/investigation/case-evidence-selection.js';
 import { editPreviewAlertTransactions } from '../features/investigation/case-membership-data.js';
@@ -183,7 +190,6 @@ function Notification() {
   button.type = 'button';
   button.className = 'button notification';
   button.setAttribute('aria-haspopup', 'dialog');
-  button.setAttribute('aria-controls', 'notification-dialog');
   const heading = document.createElement('strong');
   heading.className = 'notification-title';
   const marker = document.createElement('span');
@@ -202,6 +208,7 @@ function Notification() {
     update(next) {
       item = next;
       button.dataset.notificationId = item.id;
+      button.setAttribute('aria-controls', item.request ? 'work-request-dialog' : 'notification-dialog');
       title.data = item.title;
       marker.classList.toggle('unread-dot', !item.read);
       status.hidden = item.read;
@@ -219,30 +226,24 @@ function Inbox() {
     '<div class="inbox-pages" id="inbox-pages" hidden>' +
     Button('이전', { attributes: 'id="inbox-previous"' }) +
     '<span id="inbox-page-status" aria-live="polite"></span>' +
-    Button('다음', { attributes: 'id="inbox-next"' }) + '</div>',
+    Button('다음', { attributes: 'id="inbox-next"' }) + '</div>' +
+    '<footer class="inbox-request-footer" id="inbox-request-footer"></footer>',
     'id="inbox" aria-label="보관함" hidden inert');
 }
 
 function SearchDialog() {
   return GlassDialog(`
-    <div class="search-heading">
-      <div class="search-field">${Icon('search')}
-        <input id="search-query" type="search" aria-label="작업 코드 검색" placeholder="작업 코드 검색" autocomplete="off" autofocus>
-        ${IconButton(Icon('close'), '검색 닫기', 'id="search-close"', '', 'ghost')}
-      </div>
-    </div>
+    <div class="search-heading" id="search-field-host"></div>
     <p id="search-status" class="visually-hidden" role="status"></p>
     ${ScrollArea('', 'id="search-results"')}
   `, { id: 'search-dialog', variant: 'search-dialog', attributes: 'aria-label="검색"' });
 }
 
-function PreferenceDialog(id, title, content) {
+function PreferenceDialog(id, title, content, { wrapContent = true, footer = '' } = {}) {
   return GlassDialog(`
-    <header class="settings-header">
-      <h2 id="${id}-title" tabindex="-1" autofocus>${title}</h2>
-      ${IconButton(Icon('close'), `${title} 닫기`, `id="${id}-close"`)}
-    </header>
-    <div class="settings-content scroll-area">${content}</div>
+    <div class="dialog-part-host" data-dialog-heading="${id}" data-dialog-title="${title}"></div>
+    ${wrapContent ? `<div class="settings-content scroll-area">${content}</div>` : content}
+    ${footer}
   `, { id: `${id}-dialog`, variant: 'settings-dialog', attributes: `aria-labelledby="${id}-title"` });
 }
 
@@ -299,10 +300,7 @@ function AccountDialog() {
       <p id="login-history-empty">기록된 로그인이 없습니다.</p>
       <ol id="login-history" class="profile-list"></ol>
     </section>
-    <section class="profile-sign-out">
-      <div id="preview-sign-out"></div>
-    </section>
-  `);
+  `, { footer: '<div class="dialog-part-host" id="preview-sign-out"></div>' });
 }
 
 document.body.innerHTML = Header() + NavigationSidebar() +
@@ -312,25 +310,26 @@ document.body.innerHTML = Header() + NavigationSidebar() +
     <p><time id="notification-detail-time"></time></p>
     <p id="notification-detail-description"></p>
     <div id="notification-detail-cases" hidden></div>
-  `) + Tooltip() +
-  `<main id="preview-login" aria-labelledby="login-title" hidden>
+  `) + PreferenceDialog('work-request', '업무 요청', '<div id="work-request-content"></div>', { wrapContent: false }) + Tooltip() +
+  `<main id="preview-login" aria-label="로그인" hidden>
     <canvas class="login-scene" aria-hidden="true"></canvas>
     <section class="glass login-card">
       <div class="login-brand"><span class="login-brand-mark">${BrandSymbol()}</span><span>AML RADAR</span></div>
-      <h1 id="login-title">로그인</h1>
-      <form id="preview-login-form" class="login-form" aria-labelledby="login-title" novalidate>
+      <form id="preview-login-form" class="login-form" aria-label="로그인" novalidate>
         <label for="preview-login-id">아이디</label>
         <input id="preview-login-id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="아이디 입력" required>
         <label for="preview-login-password">비밀번호</label>
-        <input id="preview-login-password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required>
+        <div class="login-password-field">
+          <input id="preview-login-password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required>
+          ${Button('', { variant: 'icon-button login-password-toggle', shape: 'circle', attributes: 'id="login-password-toggle" aria-label="비밀번호 표시" aria-pressed="false" aria-controls="preview-login-password"' })}
+        </div>
         <div class="login-error" id="preview-login-error" role="alert" aria-atomic="true"></div>
         <div id="preview-login-action"></div>
+        <div id="preview-login-help-actions" class="login-help"></div>
       </form>
-      ${serviceMode ? '' : `<div class="login-sample">
-        ${Button('관리자 테스트로 열기', { variant: 'semantic-tag login-sample-button', attributes: 'data-tag="link" id="preview-sample-login"' })}
-        ${Button('분석가 테스트로 열기', { variant: 'semantic-tag login-sample-button', attributes: 'data-tag="link" id="preview-staff-login"' })}
-      </div>`}
+      ${serviceMode ? '' : '<div id="preview-login-sample-actions" class="login-sample"></div>'}
     </section>
+    ${PreferenceDialog('login-help', '계정 찾기', '<p id="login-help-instructions"></p>')}
   </main>`;
 
 function observeChromeHeight(element, onResize) {
@@ -382,7 +381,7 @@ const dismissals = setupOverlayDismissal([
     keepOpenOn: '[data-add-work-tab]',
     dismiss: () => toggleDisclosure(sidebarButton, '사이드바', false) },
   { button: inboxButton, surfaces: [byId('inbox'), inboxButton.closest('.inbox-header')],
-    keepOpenOn: '.header-view-controls',
+    keepOpenOn: '.header-view-controls, #work-request-dialog, .case-judgment-trigger',
     dismiss: () => toggleDisclosure(inboxButton, '보관함', false) },
 ]);
 sidebarButton.addEventListener('click', () => toggleDisclosure(sidebarButton, '사이드바'));
@@ -411,7 +410,6 @@ const preferenceDialogs = ['account', 'settings'].map(id => {
   const dialog = byId(`${id}-dialog`);
   enableBackdropDismissal(dialog);
   trigger.addEventListener('click', () => dialog.showModal());
-  byId(`${id}-close`).addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
     if (!document.body.hasAttribute('data-login-required')) trigger.focus({ preventScroll: true });
   });
@@ -788,6 +786,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     actionsHost: byId('footer-actions'),
     paginationHost: byId('footer-pagination'),
     row: selectedCase, perPanel, initialPanel, reportData: isReport || isCaseDetail || isCaseList ? dashboardSource : undefined,
+    openRelationRequest: workRequestActor()?.role === 'STAFF' ? relation => openWorkRequest(undefined, relation) : undefined,
     saveEpisode: options => {
       const result = changePreviewEpisode({ ...options, cases: dashboardSource.cases, user: currentPreviewUser() });
       if (result.ok) dashboardSource = dashboardFixtures(groups);
@@ -818,13 +817,14 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     startReview: target => {
       if (readOnly || activeWorkCode !== target) return;
       const current = dashboardSource.cases.find(item => item.code === target);
-      if (!startPreviewReview(current)) return;
+      if (!startPreviewReview(current, currentPreviewUser())) return;
       dashboardSource = dashboardFixtures(groups);
       mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
     },
     saveJudgment: (target, verdict, details, reasonCategory) => {
       const row = !readOnly && activeWorkCode === target ? dashboardSource.cases.find(item => item.code === target) : undefined;
-      const result = savePreviewJudgment(row, verdict, details, reasonCategory, currentPreviewUser()?.username ?? '');
+      const actor = currentPreviewUser();
+      const result = savePreviewJudgment(row, verdict, details, reasonCategory, actor?.username ?? '', actor);
       if (result.ok) dashboardSource = dashboardFixtures(groups);
       return result;
     },
@@ -1019,6 +1019,9 @@ document.addEventListener('click', event => {
 });
 
 const searchDialog = byId('search-dialog');
+flushSync(() => createRoot(byId('search-field-host')).render(createElement(SearchField, {
+  id: 'search-query', label: '작업 코드 검색', placeholder: '작업 코드 검색', autoFocus: true,
+}, createElement(DialogClose, { id: 'search-close', label: '검색 닫기' }))));
 const searchQuery = byId('search-query');
 const searchResults = byId('search-results');
 
@@ -1066,7 +1069,6 @@ byId('search-toggle').addEventListener('click', () => {
     if (searchDialog.open) renderSearchResults();
   }).catch(() => {});
 });
-byId('search-close').addEventListener('click', () => searchDialog.close());
 enableBackdropDismissal(searchDialog);
 searchQuery.addEventListener('input', renderSearchResults);
 searchResults.addEventListener('click', event => {
@@ -1094,12 +1096,18 @@ searchDialog.addEventListener('keydown', event => {
 });
 const unreadOnly = byId('unread-only');
 const notificationDialog = byId('notification-dialog');
+const workRequestDialog = byId('work-request-dialog');
+const workRequestRoot = createRoot(byId('work-request-content'));
+const inboxRequestFooter = byId('inbox-request-footer');
+const inboxRequestRoot = createRoot(inboxRequestFooter);
+let workRequestOrigin;
 const notificationRows = new Map();
 const emptyNotifications = document.createElement('p');
 emptyNotifications.className = 'inbox-empty';
 let openedNotificationId;
 
 function openNotification(item) {
+  if (item.request) return openWorkRequest(item.request);
   openedNotificationId = item.id;
   byId('notification-detail-title').textContent = item.title;
   const time = byId('notification-detail-time');
@@ -1114,8 +1122,76 @@ function openNotification(item) {
   if (liveInbox) void loadNotificationCases(item, related);
 }
 
+function workRequestActor() {
+  const actor = currentPreviewUser();
+  return !serviceMode && dataMode !== 'ibm' && actor?.source === 'fixture' ? actor : null;
+}
+
+function requestCaseData() {
+  dashboardSource ??= dashboardFixtures(Object.fromEntries(tabGroups.map(group => [group.prefix, tabCodes(group)])));
+  return dashboardSource.cases;
+}
+
+function applyWorkRequestChange() {
+  dashboardSource = undefined;
+  renderNotifications();
+  if (activePath) showWorkspace('', activeWorkCode, activePath, 'none', new URLSearchParams(location.search));
+}
+
+function openWorkRequest(item, relation) {
+  const actor = workRequestActor();
+  if (!actor) return;
+  workRequestOrigin = document.activeElement;
+  const cases = requestCaseData();
+  const onClose = () => workRequestDialog.close();
+  if (item) {
+    const showDetail = entry => {
+      const row = requestCaseData().find(candidate => candidate.code === entry.code);
+      workRequestRoot.render(createElement(WorkRequestDetail, {
+        key: entry.at, item: entry, actor, currentAssignee: row && previewCaseAssignee(row),
+        onOpenCase: code => { onClose(); toggleDisclosure(inboxButton, '보관함', false); openWorkCode(code); },
+        onRespond: options => {
+          const result = resolvePreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
+          if (result.ok) {
+            applyWorkRequestChange();
+            showDetail(previewWorkRequests(actor).find(request => request.id === item.id));
+          }
+          return result;
+        },
+      }));
+    };
+    if (item.unreadFor.includes(actor.username)) readPreviewWorkRequests(actor, [item.id]);
+    renderNotifications();
+    showDetail(item);
+  } else {
+    workRequestRoot.render(createElement(WorkRequestForm, {
+      actor, cases, initialCode: activeWorkCode, relation,
+      onSend: options => {
+        const result = sendPreviewWorkRequest({ ...options, actor: workRequestActor(), cases: requestCaseData() });
+        if (result.ok) {
+          onClose();
+          if (relation) {
+            renderNotifications();
+            relation.onSent();
+          } else applyWorkRequestChange();
+          document.dispatchEvent(new CustomEvent('aml:notice', { detail: { title: 'Sample 요청 전송', status: 'done' } }));
+        }
+        return result;
+      },
+    }));
+  }
+  workRequestDialog.showModal();
+}
+
+enableBackdropDismissal(workRequestDialog);
+workRequestDialog.addEventListener('close', () => {
+  workRequestRoot.render(null);
+  if (!byId('inbox').hidden) {
+    (workRequestOrigin?.isConnected ? workRequestOrigin : inboxRequestFooter.querySelector('button'))?.focus({ preventScroll: true });
+  }
+});
+
 enableBackdropDismissal(notificationDialog);
-byId('notification-close').addEventListener('click', () => notificationDialog.close());
 notificationDialog.addEventListener('close', () => {
   if (document.body.hasAttribute('data-login-required')) return;
   const list = byId('notifications');
@@ -1124,7 +1200,18 @@ notificationDialog.addEventListener('close', () => {
   (button ?? inboxButton).focus({ preventScroll: true });
 });
 function renderNotifications(arrivalIds) {
-  const items = liveInbox?.content ?? notifications;
+  const actor = workRequestActor();
+  inboxRequestRoot.render(createElement(PrimaryButton, {
+    tone: 'brand',
+    disabled: !actor,
+    'aria-description': actor ? undefined : '현재 연결에서는 업무 요청을 보낼 수 없습니다.',
+    onClick: () => openWorkRequest(),
+  }, '요청 보내기'));
+  const requests = previewWorkRequests(actor).map(item => ({
+    id: item.id, title: `${item.sender === actor.username ? '보낸 요청' : [item.recipient, item.assignee].includes(actor.username) ? '받은 요청' : '담당 변경 알림'} · ${workRequestTypes[item.type].label} · ${requestStateLabels[item.state]}`,
+    time: new Date(item.at), read: !item.unreadFor.includes(actor.username), request: item,
+  })).sort((left, right) => right.time - left.time);
+  const items = liveInbox?.content ?? [...requests, ...notifications];
   const unreadCount = liveInbox?.unreadCount ?? items.filter(item => !item.read).length;
   const countBadge = byId('inbox-count');
   countBadge.hidden = unreadCount === 0;
@@ -1210,7 +1297,9 @@ async function markInboxRead(items) {
     }
     return;
   }
-  items.forEach(item => { item.read = true; });
+  const requestIds = items.filter(item => item.request).map(item => item.id);
+  if (requestIds.length) readPreviewWorkRequests(workRequestActor(), requestIds);
+  items.filter(item => !item.request).forEach(item => { item.read = true; });
   renderNotifications();
 }
 
@@ -1240,7 +1329,13 @@ window.addEventListener('live-data-changed', () => {
 });
 bindSquishSwitch(unreadOnly, renderNotifications);
 byId('mark-all-read').addEventListener('click', () => {
+  if (!liveInbox) {
+    const actor = workRequestActor();
+    const ids = previewWorkRequests(actor).filter(item => item.unreadFor.includes(actor.username)).map(item => item.id);
+    if (ids.length) readPreviewWorkRequests(actor, ids);
+  }
   void markInboxRead((liveInbox?.content ?? notifications).filter(item => !item.read));
+  renderNotifications();
 });
 byId('inbox-previous').addEventListener('click', () => void refreshLiveInbox((liveInbox?.number ?? 1) - 1));
 byId('inbox-next').addEventListener('click', () => void refreshLiveInbox((liveInbox?.number ?? 0) + 1));
@@ -1278,6 +1373,7 @@ try {
 }
 
 function previewUserForActor(actor) {
+  if (actor === alternatePreviewStaff.username) return alternatePreviewStaff;
   return actor === previewStaff.username || (actor === demoActor && !sampleData) ? previewStaff : previewAdmin;
 }
 
@@ -1289,7 +1385,9 @@ function renderPreviewProfile() {
   }
 }
 subscribePreviewUser(renderPreviewProfile);
+subscribePreviewUser(renderNotifications);
 renderPreviewProfile();
+renderNotifications();
 
 async function refreshPreviewSessionUser() {
   const previous = currentPreviewUser();
@@ -1391,6 +1489,7 @@ function setPreviewSession(actor, user) {
 function closeTransientViews() {
   if (searchDialog.open) searchDialog.close();
   if (notificationDialog.open) notificationDialog.close();
+  if (workRequestDialog.open) workRequestDialog.close();
   searchQuery.value = '';
   for (const dialog of preferenceDialogs) if (dialog.open) dialog.close();
   queryControls.dismiss();
@@ -1433,6 +1532,15 @@ const loginForm = byId('preview-login-form');
 const loginScene = mountLoginScene(byId('preview-login'), motionPreference);
 const loginId = byId('preview-login-id');
 const loginPassword = byId('preview-login-password');
+const passwordToggle = byId('login-password-toggle');
+const passwordIcon = createRoot(passwordToggle);
+function showLoginPassword(visible) {
+  loginPassword.type = visible ? 'text' : 'password';
+  passwordToggle.setAttribute('aria-pressed', String(visible));
+  passwordIcon.render(createElement(visible ? EyeOff : Eye, { className: 'icon', 'aria-hidden': true }));
+}
+showLoginPassword(false);
+passwordToggle.addEventListener('click', () => showLoginPassword(loginPassword.type === 'password'));
 const loginError = byId('preview-login-error');
 const loginFields = [loginId, loginPassword];
 const sampleCredentials = { id: demoActor, password: 'radar-demo' };
@@ -1487,16 +1595,68 @@ function showLoginError(message, invalidFields) {
   }
 }
 
-mountLoginPrimary(byId('preview-login-action'));
-loginForm.addEventListener('input', clearLoginError);
-if (!serviceMode) {
-  byId('preview-sample-login').addEventListener('click', () => enterPreview(previewAdmin.username));
-  byId('preview-staff-login').addEventListener('click', () => enterPreview(previewStaff.username));
-}
+const loginButton = (label, props) => createElement(PrimaryButton, { ...props, size: 'comfortable' }, label);
+const loginActionRoot = createRoot(byId('preview-login-action'));
+const setLoginDisabled = disabled => loginActionRoot.render(
+  loginButton('로그인', { id: 'preview-sign-in', tone: 'brand', type: 'submit', disabled }),
+);
+setLoginDisabled(true);
+const loginFailureLimit = 3;
+let failedLogins = 0;
 let signingIn = false;
+function updateLoginButton() {
+  const locked = failedLogins >= loginFailureLimit;
+  loginForm.toggleAttribute('data-login-locked', locked);
+  setLoginDisabled(locked || signingIn || !loginId.value.trim() || !loginPassword.value);
+}
+function rejectLogin() {
+  failedLogins++;
+  loginPassword.value = '';
+  showLoginPassword(false);
+  updateLoginButton();
+  if (failedLogins >= loginFailureLimit) {
+    showLoginError('로그인에 3번 실패했습니다. 아이디 또는 비밀번호 찾기를 이용해 주세요.', loginFields);
+    loginForm.querySelector('[data-login-help]').focus();
+  } else {
+    showLoginError('아이디 또는 비밀번호가 올바르지 않습니다.', loginFields);
+    loginPassword.focus();
+  }
+}
+const loginHelp = byId('login-help-dialog');
+enableBackdropDismissal(loginHelp);
+createRoot(byId('preview-login-help-actions')).render(
+  [['id', '아이디 찾기'], ['password', '비밀번호 찾기']].map(([kind, label]) => loginButton(label, {
+    key: kind, 'data-login-help': kind, 'aria-haspopup': 'dialog',
+    onClick() {
+      const findId = kind === 'id';
+      byId('login-help-title').textContent = label;
+      byId('login-help-instructions').textContent = findId
+        ? '관리자에게 본인 계정의 로그인 아이디를 확인해 주세요.'
+        : '관리자에게 비밀번호 재설정을 요청해 주세요.';
+      loginHelp.showModal();
+    },
+  })),
+);
+loginForm.addEventListener('input', () => {
+  if (failedLogins < loginFailureLimit) clearLoginError();
+  updateLoginButton();
+});
+loginForm.addEventListener('change', updateLoginButton);
+window.addEventListener('pageshow', updateLoginButton);
+if (!serviceMode) {
+  const actors = [
+    ['preview-sample-login', '관리자로 간편 로그인', previewAdmin],
+    ['preview-staff-login', '분석가로 간편 로그인', previewStaff],
+    ...(sampleData ? [['preview-alt-staff-login', '분석가 2로 간편 로그인', alternatePreviewStaff]] : []),
+  ];
+  createRoot(byId('preview-login-sample-actions')).render([
+    createElement('p', { key: 'notice' }, '테스트 전용 간편 로그인 · 검수 종료 즉시 제거'),
+    ...actors.map(([id, label, actor]) => loginButton(label, { key: id, id, onClick: () => enterPreview(actor.username) })),
+  ]);
+}
 loginForm.addEventListener('submit', async event => {
   event.preventDefault();
-  if (signingIn || loginScene.transitioning) return;
+  if (signingIn || loginScene.transitioning || failedLogins >= loginFailureLimit) return;
   clearLoginError();
   const id = loginId.value.trim();
   const password = loginPassword.value;
@@ -1508,24 +1668,23 @@ loginForm.addEventListener('submit', async event => {
   }
   if (serviceMode) {
     signingIn = true;
+    updateLoginButton();
     loginForm.setAttribute('aria-busy', 'true');
     try {
       const user = await login(id, password);
       loginScene.enter(animated => enterWorkspace(user.username, animated, user));
-    } catch {
-      loginPassword.value = '';
-      showLoginError('로그인할 수 없습니다. 입력 정보와 서버 연결을 확인해 주세요.', loginFields);
-      loginPassword.focus();
+    } catch (error) {
+      if (error instanceof ApiError && error.problem.status === 401) rejectLogin();
+      else showLoginError('로그인할 수 없습니다. 서버 연결을 확인해 주세요.', []);
     } finally {
       signingIn = false;
       loginForm.removeAttribute('aria-busy');
+      updateLoginButton();
     }
     return;
   }
   if (id !== sampleCredentials.id || password !== sampleCredentials.password) {
-    loginPassword.value = '';
-    showLoginError('아이디 또는 비밀번호가 올바르지 않습니다.', loginFields);
-    loginPassword.focus();
+    rejectLogin();
     return;
   }
   enterPreview(demoActor);
@@ -1538,6 +1697,9 @@ function enterPreview(actor) {
 
 function enterWorkspace(actor, animated, user) {
   loginForm.reset();
+  failedLogins = 0;
+  updateLoginButton();
+  showLoginPassword(false);
   setPreviewSession(actor, user);
   void refreshPreviewSessionUser().then(() => refreshLiveInbox());
   const next = history.state?.previewNext;
@@ -1577,9 +1739,14 @@ function clearWorkspaceSession() {
   resetPreviewCaseRead();
   dashboardSource = undefined;
 }
-createRoot(byId('preview-sign-out')).render(createElement(ConfirmHoldButton, {
-  tone: 'negative', onHold: signOut, doneLabel: '로그아웃',
-}, '길게 눌러 로그아웃'));
+for (const host of document.querySelectorAll('[data-dialog-heading]')) {
+  const { dialogHeading: id, dialogTitle: title } = host.dataset;
+  createRoot(host).render(createElement(DialogHeader, {
+    title, titleId: `${id}-title`, closeId: `${id}-close`, closeLabel: `${title} 닫기`,
+  }));
+}
+createRoot(byId('preview-sign-out')).render(createElement(DialogFooter, null,
+  createElement(ConfirmHoldButton, { tone: 'negative', onHold: signOut, doneLabel: '로그아웃' }, '길게 눌러 로그아웃')));
 window.addEventListener('popstate', restoreLocation);
 document.addEventListener('aml:model-risk', () => {
   if (signedIn && activePath) showWorkspace('', activeWorkCode, activePath, 'none', new URLSearchParams(location.search));

@@ -8,7 +8,8 @@
   white-space: nowrap;
 }
 .footer-pagination .button,
-.footer-pagination select {
+.footer-pagination select,
+.footer-pagination .semantic-tag {
   min-inline-size: 0;
   padding-inline: var(--aml-space-12);
   min-block-size: var(--account-control-size, var(--aml-density-control-comfortable));
@@ -24,10 +25,7 @@
 .footer-pagination select:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--focus-ring);
 }
-.footer-pagination__status {
-  padding: var(--aml-space-4) var(--aml-space-8);
+.footer-pagination .semantic-tag {
   border-radius: var(--aml-radius-full);
-  background: var(--information-panel-surface);
-  color: var(--muted-text);
   font-variant-numeric: tabular-nums;
 }

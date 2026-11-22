@@ -13,15 +13,15 @@
   gap: var(--aml-space-8);
   margin-block-start: var(--aml-space-12);
 }
-.benchmark-filters label {
+.benchmark-filters > :is(label, .benchmark-search-group) {
   display: grid;
   gap: var(--aml-space-4);
   flex: 0 1 auto;
   min-inline-size: 0;
   font-size: var(--aml-type-caption-size);
 }
-.benchmark-filters label:first-child { flex: 1 1 16rem; max-inline-size: 24rem }
-.benchmark-filters :is(input, select) {
+.benchmark-search-group { flex: 1 1 16rem; max-inline-size: 24rem }
+.benchmark-filters select {
   min-inline-size: 0;
   min-block-size: var(--aml-density-control-compact);
   padding-inline: var(--aml-space-8);
@@ -31,7 +31,7 @@
   color: var(--text);
   font-size: var(--ui-font-size);
 }
-.benchmark-filters :is(input, select):focus-visible {
+.benchmark-filters select:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--focus-ring);
   outline-offset: var(--aml-space-2);
 }

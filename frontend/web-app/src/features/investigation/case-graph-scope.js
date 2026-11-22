@@ -1,6 +1,16 @@
 import { modelRiskBand as graphRiskBand } from '../settings/model-risk-settings.js';
 export { graphRiskBand };
 
+export function sharedCaseEvidence(active, candidate) {
+  const activeCodes = new Set(active?.related?.map(row => row.code));
+  const activeAccounts = new Set(active?.related?.flatMap(row => [row.from.code, row.to.code]));
+  const related = candidate?.related ?? [];
+  return {
+    transactions: [...new Set(related.map(row => row.code).filter(code => activeCodes.has(code)))],
+    accounts: [...new Set(related.flatMap(row => [row.from.code, row.to.code]).filter(code => activeAccounts.has(code)))],
+  };
+}
+
 export function graphVerdict(verdicts) {
   if (verdicts.size > 1) return 'mixed';
   const verdict = verdicts.values().next().value;

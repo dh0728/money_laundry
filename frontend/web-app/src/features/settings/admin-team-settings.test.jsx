@@ -15,8 +15,11 @@ it('keeps team management restricted to administrators and scopes fixture edits 
   expect(screen.getByText('현재 계정')).toBeInTheDocument();
   expect(screen.queryByRole('combobox', { name: '프리뷰 관리자 권한' })).not.toBeInTheDocument();
   const target = screen.getByRole('combobox', { name: '김서윤 권한' });
-  fireEvent.change(target, { target: { value: 'ADMIN' } });
-  expect(target).toHaveValue('ADMIN');
+  fireEvent.keyDown(target, { key: 'Enter' });
+  expect(target).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.keyDown(target, { key: 'ArrowUp' });
+  fireEvent.keyDown(target, { key: 'Enter' });
+  expect(target).toHaveTextContent('관리자');
   expect(screen.getByRole('status')).toHaveTextContent('김서윤의 권한을 관리자로 변경했습니다.');
   expect(fetchReviewUsers).not.toHaveBeenCalled();
 });

@@ -46,6 +46,7 @@ interface AnimatedListProps {
   maxHeight?: number | string;
   className?: string;
   itemClassName?: string;
+  itemDecoration?: ReactNode;
   itemData?: (item: AnimatedListItem, index: number) => Record<`data-${string}`, string>;
   style?: CSSProperties;
 }
@@ -149,6 +150,7 @@ const AnimatedList = ({
   maxHeight = 440,
   className = '',
   itemClassName = '',
+  itemDecoration,
   itemData,
   style
 }: AnimatedListProps) => {
@@ -473,6 +475,10 @@ const AnimatedList = ({
     const track = trackRef.current;
     const item = itemRefs.current[selected];
     if (!viewport || !track || !item) return;
+    if (getComputedStyle(viewport).overflowY === 'visible') {
+      item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      return;
+    }
     const top = track.offsetTop + item.offsetTop;
     const bottom = top + item.offsetHeight;
     const room = Math.max(0, (viewport.clientHeight - item.offsetHeight) / 2);
@@ -578,6 +584,7 @@ const AnimatedList = ({
                   </>
                 ) : itemContent}
                 <span className="animated-list__rim" aria-hidden="true" />
+                {itemDecoration}
               </div>
             );
           })}

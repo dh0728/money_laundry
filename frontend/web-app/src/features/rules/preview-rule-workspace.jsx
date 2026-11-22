@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { createWorkspaceState, saveWorkspaceRule, transitionWorkspaceRule } from '@/next/workspace-data';
 import { ruleStatusLabels } from '@/next/features/rules-logic';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
+import { DialogFrame } from '../../components/dialog-parts';
 import { Panel } from '../../components/panel';
 import { RuleConditionFacts } from './rule-condition-tree';
 import { activateRecordCard } from '../../components/record-card';
@@ -115,25 +116,19 @@ function RuleReview({ rule, actionsHost, onReview }) {
           setDecision(action);
         }}>{action.label}</PrimaryButton>)}
     </ScreenActions>}
-    {decision && <dialog ref={dialog} className="rule-review-dialog glass-dialog glass" aria-labelledby={titleId}
-      onClose={() => setDecision(null)}>
-      <form className="case-judgment-form" onSubmit={submit}>
-        <header className="case-judgment-header"><h2 id={titleId}>룰 {decision.label}</h2></header>
-        <div className="case-judgment-body">
-          <p><code>{rule.id}</code> · {rule.name}</p>
-          <p>변경 후 상태 · {ruleStatusLabels[decision.status]}</p>
-          <label className="case-judgment-field">변경 사유
-            <Textarea ref={reasonField} value={reason} rows={3} maxLength={1000} required
-              onChange={event => { setReason(event.target.value); setError(''); }} />
-          </label>
-          {error && <p role="alert" data-rule-block-error>{error}</p>}
-          <div className="rule-review-dialog-actions">
-            <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
-            <PrimaryButton type="submit" tone={decision.tone} disabled={!reason.trim()}>{decision.label} 확인</PrimaryButton>
-          </div>
-        </div>
-      </form>
-    </dialog>}
+    {decision && <DialogFrame ref={dialog} className="rule-review-dialog" title={`룰 ${decision.label}`} titleId={titleId}
+      onClose={() => setDecision(null)} onSubmit={submit}
+      actions={<PrimaryButton type="submit" tone={decision.tone} disabled={!reason.trim()}>{decision.label} 확인</PrimaryButton>}>
+      <div className="case-judgment-body">
+        <p><code>{rule.id}</code> · {rule.name}</p>
+        <p>변경 후 상태 · {ruleStatusLabels[decision.status]}</p>
+        <label className="case-judgment-field">변경 사유
+          <Textarea ref={reasonField} value={reason} rows={3} maxLength={1000} required
+            onChange={event => { setReason(event.target.value); setError(''); }} />
+        </label>
+        {error && <p role="alert" data-rule-block-error>{error}</p>}
+      </div>
+    </DialogFrame>}
   </>;
 }
 

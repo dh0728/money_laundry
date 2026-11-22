@@ -83,7 +83,6 @@
 .query-tool-popover.glass {
   --query-action-inset: calc(var(--aml-panel-inset) - var(--aml-stroke-control));
   --query-width: calc(var(--aml-space-64) * 4);
-  --query-popover-face: color-mix(in srgb, var(--glass-shell-face) 8%, var(--information-panel-surface));
   position: fixed;
   inset: auto;
   margin: 0;
@@ -93,7 +92,7 @@
   border: var(--aml-stroke-control) solid var(--glass-shell-edge);
   border-radius: var(--aml-radius-panel);
   color: var(--text);
-  background-color: var(--query-popover-face);
+  background-color: var(--glass-shell-face);
   box-shadow: var(--shadow-overlay);
   container-type: inline-size;
   pointer-events: auto;

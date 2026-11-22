@@ -25,7 +25,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
   gap: var(--workspace-gap);
-  align-items: start;
+  align-items: stretch;
   margin: 0;
 }
 .backtest-card, .backtest-metric {
@@ -110,6 +110,7 @@
 .report-audit-cell { min-inline-size: 14rem }
 .report-audit {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--aml-space-4);
   max-inline-size: 22rem;
   white-space: normal;
@@ -166,22 +167,16 @@
 .workflow-report-cards {
   container-type: inline-size;
   margin-block-start: var(--workspace-gap);
-  overflow: auto;
-  scrollbar-gutter: stable;
+  padding: var(--record-card-shadow-gutter);
 }
-.workflow-report-cards,
 .workflow-report .data-table-scroll,
 .workflow-backtest .data-table-scroll {
-  max-block-size: max(12rem, calc(var(--workspace-available-block) - var(--app-footer-height, var(--account-footer-reserve))));
-}
-.workflow-report-cards:focus-visible {
-  outline: var(--aml-stroke-focus) solid var(--focus-ring);
-  outline-offset: calc(-1 * var(--aml-stroke-focus));
+  scrollbar-gutter: auto;
 }
 .workflow-report-cards .report-bento {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   grid-auto-rows: minmax(var(--aml-size-control-compact), auto) !important;
-  align-items: start;
+  align-items: stretch;
 }
 @container (max-width: 950px) {
   .workflow-report-cards .report-bento {
