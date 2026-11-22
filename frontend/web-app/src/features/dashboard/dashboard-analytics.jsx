@@ -9,7 +9,7 @@ import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
 import { Grid } from '../../components/charts/charts/grid';
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
 import { ibmLaundering, ibmPatterns, ibmRemaining } from '../investigation/ibm-hi-small-aggregate';
-import { ChartSectionDownload } from '../../components/section-download';
+import { SectionDownloadHeading } from '../../components/section-download';
 import { dashboardPattern } from '../../mocks/dashboard-patterns';
 
 const integer = new Intl.NumberFormat('ko-KR');
@@ -52,10 +52,7 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
 
 function ChartPanel({ title, note, children, className = '', hasChart = true }) {
   return <Panel as="article" className={`glass dashboard-chart ${className}`}>
-    <div className="section-download-heading">
-      <h2>{title}</h2>
-      {hasChart && <ChartSectionDownload label={title} />}
-    </div>
+    <SectionDownloadHeading downloadLabel={hasChart ? title : undefined}>{title}</SectionDownloadHeading>
     {note && <p className="dashboard-note">{note}</p>}
     {children}
   </Panel>;

@@ -27,7 +27,6 @@
   overflow-wrap: anywhere;
 }
 .overview-tiles > [data-overview-span="full"] { grid-column: 1 / -1 }
-.overview-tiles > [data-overview-panel="composition"] { align-self: start }
 @container case-overview (36rem <= width < 56rem) {
   .overview-tiles:not([data-episode]) { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 }

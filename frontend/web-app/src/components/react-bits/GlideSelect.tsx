@@ -43,7 +43,6 @@ const SIZES: Record<string, { chip: number; row: number; font: number }> = {
   md: { chip: 32, row: 30, font: 13 },
   lg: { chip: 44, row: 40, font: 14 }
 };
-const PAD = 4;
 const GAP = 1;
 const MENU_GAP = 6;
 const DEFAULT_OPTIONS: (string | GlideSelectOption)[] = ['One', 'Two', 'Three'];
@@ -67,10 +66,10 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   onChange,
   placeholder = 'Select…',
   showTags = true,
-  accentColor = '#f5f5f5',
-  surfaceColor = '#27272a',
-  highlightColor = '#3f3f46',
-  textColor = '#f5f5f5',
+  accentColor,
+  surfaceColor,
+  highlightColor,
+  textColor,
   size = 'md',
   radius = 10,
   menuWidth = 176,
@@ -101,7 +100,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   const pillRef = useRef<HTMLSpanElement>(null);
   const instant = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const scrub = useRef<{ id: number; top: number } | null>(null);
+  const scrub = useRef<{ id: number } | null>(null);
   const id = useId();
   const S = SIZES[size] ?? SIZES.md;
   const step = S.row + GAP;
@@ -110,17 +109,26 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   useLayoutEffect(() => {
     if (phase !== 'open') return;
     const el = menuRef.current;
-    const root = rootRef.current;
-    if (!el || !root) return;
-    const r = root.getBoundingClientRect();
-    const need = el.offsetHeight + MENU_GAP;
-    setSide(
-      placement === 'bottom' && r.bottom + need > window.innerHeight
-        ? 'top'
-        : placement === 'top' && r.top - need < 0
-          ? 'bottom'
-          : placement
-    );
+    const trigger = triggerRef.current;
+    if (!el) return;
+    const place = () => {
+      if (!trigger || !el.showPopover) return;
+      const r = trigger.getBoundingClientRect();
+      const above = r.top - MENU_GAP;
+      const below = window.innerHeight - r.bottom - MENU_GAP;
+      const need = el.scrollHeight;
+      const flip = placement === 'bottom' ? below < need && above > below : above < need && below > above;
+      const nextSide = flip ? (placement === 'bottom' ? 'top' : 'bottom') : placement;
+      const width = Math.min(Math.max(menuWidth, r.width), window.innerWidth - 2 * MENU_GAP);
+      setSide(nextSide);
+      el.style.width = `${width}px`;
+      el.style.maxHeight = `${Math.max(0, (nextSide === 'top' ? above : below) - MENU_GAP)}px`;
+      el.style.left = `${Math.max(MENU_GAP, Math.min(align === 'right' ? r.right - width : r.left, window.innerWidth - width - MENU_GAP))}px`;
+      el.style.top = nextSide === 'bottom' ? `${r.bottom + MENU_GAP}px` : 'auto';
+      el.style.bottom = nextSide === 'top' ? `${window.innerHeight - r.top + MENU_GAP}px` : 'auto';
+    };
+    if (trigger && el.showPopover && !el.matches(':popover-open')) el.showPopover();
+    place();
     el.style.transitionDuration = instant.current ? '0ms' : '';
     el.dataset.state = 'closed';
     void el.offsetHeight;
@@ -133,6 +141,12 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
       void p.offsetHeight;
       p.style.transition = '';
     }
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
@@ -147,8 +161,18 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     p.style.transitionDuration = jump ? '0ms, 150ms' : '';
     p.style.transform = `translateY(${active * step}px)`;
     p.style.opacity = '1';
+    const menu = menuRef.current;
+    if (!inlineList && instant.current && menu) {
+      const option = menu.querySelector<HTMLElement>(`[data-index="${active}"]`);
+      if (option) {
+        const row = option.getBoundingClientRect();
+        const bounds = menu.getBoundingClientRect();
+        if (row.top < bounds.top) menu.scrollTop -= bounds.top - row.top;
+        if (row.bottom > bounds.bottom) menu.scrollTop += row.bottom - bounds.bottom;
+      }
+    }
     instant.current = false;
-  }, [active, phase, step]);
+  }, [active, inlineList, phase, step]);
 
   const open = (viaKey: boolean) => {
     if (disabled) return;
@@ -230,9 +254,9 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
   const rowAt = (y: number) => {
-    const s = scrub.current;
-    if (!s) return null;
-    const i = Math.floor((y - s.top - PAD) / step);
+    const list = menuRef.current?.firstElementChild;
+    if (!scrub.current || !list) return null;
+    const i = Math.floor((y - list.getBoundingClientRect().top) / step);
     return i >= 0 && i < items.length ? i : null;
   };
   const onListDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -242,7 +266,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     } catch {
       // Capture can fail if the pointer ended before the list handled it.
     }
-    scrub.current = { id: e.pointerId, top: e.currentTarget.getBoundingClientRect().top };
+    scrub.current = { id: e.pointerId };
     instant.current = true;
     setActive(rowAt(e.clientY));
   };
@@ -323,7 +347,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
         </span>
       </button>}
       {phase !== 'closed' ? (
-        <div ref={menuRef} className="glide-select__menu" data-state="open" data-side={side} data-align={align}>
+        <div ref={menuRef} popover={inlineList ? undefined : 'manual'} className="glide-select__menu" data-state="open" data-side={side} data-align={align}>
           <div
             id={`${id}-list`}
             role="listbox"

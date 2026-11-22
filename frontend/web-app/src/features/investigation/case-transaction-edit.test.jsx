@@ -34,7 +34,9 @@ it('shows the exact IDs and requires an operation, reason and held confirmation 
   fireEvent.click(modal.getByRole('radio', { name: '다른 Alert로 이동' }));
   fireEvent.change(reason, { target: { value: '  동일 거래 묶음에 포함  ' } });
   expect(applyMove).toBeDisabled();
-  fireEvent.change(modal.getByRole('combobox', { name: '이동할 Alert' }), { target: { value: destinations[0].code } });
+  const target = modal.getByRole('combobox', { name: '이동할 Alert' });
+  fireEvent.keyDown(target, { key: 'ArrowDown' });
+  fireEvent.keyDown(target, { key: 'Enter' });
   expect(applyMove).toBeEnabled();
   fireEvent.click(applyMove);
   expect(apply).toHaveBeenCalledWith({ codes: selected, targetCode: destinations[0].code, reason: '동일 거래 묶음에 포함' });

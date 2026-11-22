@@ -6,7 +6,11 @@
   --border-radius: 28px;
   --glow-padding: 40px;
   --cone-spread: 25;
+  --edge-light-core: 2.5%;
+  --edge-light-falloff: 10%;
+}
 
+.border-glow-card:where(:not(.border-glow-card--record)) {
   position: relative;
   border-radius: var(--border-radius);
   isolation: isolate;
@@ -36,8 +40,8 @@
   mix-blend-mode: normal;
 }
 
-.border-glow-card::before,
-.border-glow-card::after,
+.border-glow-card:not(.border-glow-card--record)::before,
+.border-glow-card:not(.border-glow-card--record)::after,
 .border-glow-card > .edge-light {
   content: "";
   position: absolute;
@@ -55,7 +59,7 @@
 }
 
 /* colored mesh-gradient border */
-.border-glow-card::before {
+.border-glow-card:not(.border-glow-card--record)::before {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--card-bg, #120F17) 0 100%) padding-box,
@@ -82,7 +86,7 @@
 }
 
 /* colored mesh-gradient background fill near edges */
-.border-glow-card::after {
+.border-glow-card:not(.border-glow-card--record)::after {
   border: 1px solid transparent;
   background:
     var(--gradient-one, radial-gradient(at 80% 55%, hsla(268, 100%, 76%, 1) 0px, transparent 50%)) padding-box,
@@ -116,11 +120,31 @@
 
   mask-image:
     conic-gradient(
-      from var(--cursor-angle) at center, black 2.5%, transparent 10%, transparent 90%, black 97.5%
+      from var(--cursor-angle) at center,
+      black var(--edge-light-core), transparent var(--edge-light-falloff),
+      transparent calc(100% - var(--edge-light-falloff)), black calc(100% - var(--edge-light-core))
     );
 
   opacity: calc((var(--edge-proximity) - var(--edge-sensitivity)) / (100 - var(--edge-sensitivity)));
   mix-blend-mode: plus-lighter;
+}
+
+.border-glow-card--record {
+  --glow-padding: var(--record-card-shadow-gutter);
+  --edge-light-core: 10%;
+  --edge-light-falloff: 32%;
+}
+
+.border-glow-card--record > .edge-light {
+  opacity: 0;
+  mix-blend-mode: normal;
+}
+
+@media (any-hover: hover) and (prefers-reduced-motion: no-preference) {
+  :root:not([data-glassmorphism="false"], [data-reduced-motion="true"])
+    .border-glow-card--record[data-card-spotlight]:hover > .edge-light {
+    opacity: calc((var(--edge-proximity) - var(--edge-sensitivity)) / (100 - var(--edge-sensitivity)));
+  }
 }
 
 .border-glow-card > .edge-light::before {
@@ -142,6 +166,14 @@
     0 0 15px 0 var(--glow-color-30, hsl(40deg 80% 80% / 30%)),
     0 0 25px 2px var(--glow-color-20, hsl(40deg 80% 80% / 20%)),
     0 0 50px 2px var(--glow-color-10, hsl(40deg 80% 80% / 10%));
+}
+
+.border-glow-card--record > .edge-light::before {
+  box-shadow:
+    0 0 0 var(--aml-stroke-divider)
+      color-mix(in srgb, var(--record-card-depth-color) var(--record-verdict-glow-strength), transparent),
+    0 0 var(--aml-space-6) color-mix(in srgb, var(--record-card-depth-color) 88%, transparent),
+    0 0 var(--aml-space-12) color-mix(in srgb, var(--record-card-depth-color) 58%, transparent);
 }
 
 .border-glow-inner {

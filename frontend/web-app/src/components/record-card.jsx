@@ -1,4 +1,5 @@
 import React from 'react';
+import BorderGlow from './react-bits/BorderGlow';
 import './record-card.css';
 
 export function recordCardSurface(verdict, interactive = false) {
@@ -20,9 +21,15 @@ function openRecordCard(event) {
 }
 
 export function RecordCard({ label, className, verdict, selected, opensRecord = false, drag, children }) {
-  return <article className={className} aria-label={label} {...recordCardSurface(verdict, opensRecord)}
-    data-selected={selected || undefined} onClick={opensRecord ? openRecordCard : undefined}
-    draggable={drag ? true : undefined} onDragStart={drag?.onDragStart} onDragEnd={drag?.onDragEnd}>
+  return <BorderGlow className={className} articleProps={{
+    ...recordCardSurface(verdict, opensRecord),
+    'aria-label': label,
+    'data-selected': selected || undefined,
+    onClick: opensRecord ? openRecordCard : undefined,
+    draggable: drag ? true : undefined,
+    onDragStart: drag?.onDragStart,
+    onDragEnd: drag?.onDragEnd,
+  }}>
     {children}
-  </article>;
+  </BorderGlow>;
 }

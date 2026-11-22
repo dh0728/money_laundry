@@ -53,8 +53,12 @@
   --glass-control-solid: light-dark(var(--aml-gray-095), var(--aml-gray-030));
   --glass-control-face: color-mix(in srgb, var(--glass-control-solid) 76%, transparent);
   --glass-control-edge: color-mix(in srgb, light-dark(var(--aml-black-020), var(--aml-white-030)) var(--glass-border-strength), transparent);
-  --glass-shell-face: color-mix(in srgb, var(--information-panel-surface) 94%, transparent);
-  --glass-shell-edge: var(--glass-surface-edge);
+  --floating-panel-face: light-dark(var(--information-panel-surface),
+    color-mix(in srgb, var(--information-panel-surface), var(--aml-white-100) 5%));
+  --glass-shell-face: color-mix(in srgb, var(--floating-panel-face) 78%, transparent);
+  --glass-shell-edge: light-dark(var(--aml-black-010), var(--aml-white-020));
+  --glass-shell-highlight: light-dark(var(--aml-white-080), var(--aml-white-020));
+  --glass-shell-shadow: light-dark(rgb(28 47 69 / 18%), var(--aml-black-040));
   --glass-shell-muted: color-mix(in srgb, var(--text) 88%, var(--information-panel-surface));
   --glass-shell-scrim: light-dark(var(--aml-black-010), var(--aml-black-020));
   --shadow-floating: 0 var(--aml-space-4) var(--aml-space-12) var(--glass-shadow);
@@ -121,29 +125,26 @@
 }
 
 :root,
-:where(.screen-panel, .screen-overlay, .panel-material, [data-glow-surface],
-  .dashboard-metrics .magic-bento__card, .workflow-bento .magic-bento__card) {
+:where(.screen-panel, .screen-overlay, .panel-material) {
   --panel-light-source: var(--panel-material-light, var(--panel-material-solid, var(--information-panel-surface)));
   --panel-edge-light: color-mix(in srgb,
     color-mix(in srgb, var(--panel-material-solid, var(--information-panel-surface)) 92%, var(--panel-light-source)),
     var(--aml-black-100) 10%);
-  --panel-light-color: color-mix(in srgb, var(--panel-light-source) 64%, var(--aml-white-100));
-  --panel-shadow-color: color-mix(in srgb, var(--panel-light-source) 28%, var(--aml-black-100));
-  --panel-edge-depth: inset 0 calc(-1 * var(--aml-space-2)) var(--aml-space-8)
-    light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), transparent);
+  --panel-light-color: light-dark(
+    color-mix(in srgb, var(--panel-light-source) 21%, var(--aml-white-100)),
+    color-mix(in srgb, var(--panel-light-source) 72%, var(--aml-white-100)));
+  --panel-edge-depth:
+    inset 0 0 0 var(--aml-stroke-divider) var(--glass-shell-edge),
+    inset 0 calc(-1 * var(--aml-space-2)) var(--aml-space-8)
+      light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), transparent);
   --information-panel-shadow:
-    inset 0 var(--aml-stroke-divider) var(--aml-space-2) light-dark(
-      color-mix(in srgb, var(--panel-shadow-color) 22%, transparent),
-      color-mix(in srgb, var(--panel-light-color) 48%, transparent)),
-    inset 0 var(--aml-space-2) var(--aml-space-12) light-dark(
-      color-mix(in srgb, var(--panel-shadow-color) 16%, transparent),
-      color-mix(in srgb, var(--panel-light-color) 34%, transparent));
+    inset 0 var(--aml-stroke-divider) var(--aml-space-2) color-mix(in srgb, var(--panel-light-color) 46%, transparent),
+    inset 0 var(--aml-space-4) var(--aml-space-12) color-mix(in srgb, var(--panel-light-color) 24%, transparent);
   --panel-glass-depth: var(--information-panel-shadow);
 }
 
 :root[data-glassmorphism="false"]
-  :where(.screen-panel, .screen-overlay, .panel-material, [data-glow-surface],
-    .dashboard-metrics .magic-bento__card, .workflow-bento .magic-bento__card) {
+  :where(.screen-panel, .screen-overlay, .panel-material) {
   --panel-edge-depth: inset 0 0 0 var(--aml-stroke-divider)
     light-dark(var(--panel-edge-light),
       color-mix(in srgb, var(--panel-material-solid, var(--information-panel-surface)) 76%, var(--panel-light-color)));

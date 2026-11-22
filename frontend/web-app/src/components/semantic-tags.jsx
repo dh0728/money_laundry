@@ -89,8 +89,9 @@ export function ModelScoreTag({ score, band = modelRiskBand(score) }) {
   </span>;
 }
 
-export function LinkTag({ code, href, children, ...props }) {
-  return <ActionButton as={href ? 'a' : 'button'} href={href} className="semantic-tag" data-tag="link"
+export function LinkTag({ code, href, children, className = '', ...props }) {
+  return <ActionButton as={href ? 'a' : 'button'} href={href} className={'semantic-tag ' + className} data-tag="link"
+    data-record-link={/^[TAE]-/.test(code ?? '') || undefined}
     data-work-code={href ? undefined : code} aria-label={!href && code ? `${code} 상세 열기` : undefined} {...props}>
     {code ? <code>{code}</code> : children}
   </ActionButton>;

@@ -12,7 +12,7 @@ export function GraphIconButton({ label, icon: Icon, alternateIcon: AlternateIco
 }
 
 export function GraphZoomControls({ zoom, onZoom, onFit }) {
-  return <div className="glass preview-graph-control-group" role="group" aria-label="그래프 배율">
+  return <div className="glass floating-glass preview-graph-control-group" role="group" aria-label="그래프 배율">
     <GraphIconButton grouped label="그래프 축소" icon={Minus} onClick={() => onZoom(1 / 1.45)} />
     <output aria-label="그래프 확대 비율">{zoom}%</output>
     <GraphIconButton grouped label="그래프 확대" icon={Plus} onClick={() => onZoom(1.45)} />
@@ -24,7 +24,7 @@ export function GraphPlayback({ records, cursor, playing, onPlay, onSeek }) {
   const first = records[0];
   const last = records.at(-1);
   const current = records[cursor - 1];
-  return <div className="glass preview-graph-playback" role="group" aria-label="거래 재생">
+  return <div className="glass floating-glass preview-graph-playback" role="group" aria-label="거래 재생">
     <div className="preview-graph-playback-buttons">
       <GraphIconButton grouped label="이전 거래" icon={SkipBack} disabled={!cursor} onClick={() => onSeek(cursor - 1)} />
       <GraphIconButton grouped label={playing ? '거래 재생 일시 정지' : '거래 재생'} icon={playing ? Pause : Play} onClick={onPlay} />

@@ -8,6 +8,7 @@ on:
 
   pull_request:
     branches:
+      - frontend
       - dev
       - master
 
@@ -23,6 +24,7 @@ concurrency:
 jobs:
   backend:
     name: Backend Test and Build
+    if: github.event_name != 'pull_request' || github.base_ref != 'frontend'
     runs-on: ubuntu-24.04
 
     defaults:
@@ -78,12 +80,15 @@ jobs:
       - name: Run frontend lint
         run: pnpm run lint
 
+      - name: Run frontend tests
+        run: pnpm test --maxWorkers 4
+
       - name: Build frontend
         run: pnpm run build
 
   docker-images:
     name: Docker Image Build
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.base_ref != 'frontend'
     runs-on: ubuntu-24.04
     needs:
       - backend

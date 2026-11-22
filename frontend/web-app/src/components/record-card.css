@@ -1,11 +1,26 @@
+:root { --record-card-shadow-gutter: var(--aml-space-16) }
+
 [data-glow-surface] {
   --panel-material-edge: var(--record-card-edge, var(--aml-data-grid));
-  --panel-material-depth: var(--information-panel-shadow), var(--shadow-floating);
   position: relative;
   isolation: isolate;
-  overflow: clip;
+  overflow: visible;
   border-radius: var(--aml-radius-card);
   color: var(--text);
+}
+:is([data-glow-surface], .dashboard-metrics .magic-bento__card, .workflow-bento .magic-bento__card) {
+  --record-card-accent: var(--record-verdict-accent, var(--review-status-accent, var(--text)));
+  --record-card-depth-color: light-dark(
+    color-mix(in oklch, var(--record-card-accent) 88%, var(--aml-black-100)),
+    color-mix(in oklch, var(--record-card-accent) 88%, var(--aml-white-100)));
+  box-shadow: 0 var(--aml-space-2) var(--aml-space-8)
+    color-mix(in srgb, var(--record-card-depth-color) 20%, transparent);
+}
+:root[data-glassmorphism="false"]
+  :is([data-glow-surface], .dashboard-metrics .magic-bento__card, .workflow-bento .magic-bento__card) {
+  box-shadow: 0 0 0 var(--aml-stroke-divider) var(--record-card-edge, var(--glass-surface-edge)),
+    0 var(--aml-space-4) var(--aml-space-8)
+    color-mix(in srgb, var(--record-card-depth-color) 26%, transparent);
 }
 [data-glow-surface][data-card-interactive] {
   cursor: pointer;
@@ -46,29 +61,16 @@
   [data-glow-surface][data-card-interactive] { transition: none }
 }
 @media (any-hover: hover) and (prefers-reduced-motion: no-preference) {
-  :root:not([data-reduced-motion="true"]) :is(.magic-bento__cell, .case-list > *, .preview-related-cases > ul > li):has([data-card-tilted]) {
+  :root:not([data-reduced-motion="true"]) :is(.magic-bento__cell, .case-list > *, .preview-related-cases > ul > li):has([data-card-spotlight]) {
     position: relative;
     z-index: 1;
   }
   :root:not([data-reduced-motion="true"]) .magic-bento__card:has([data-card-interactive]) {
     overflow: visible;
   }
+  :root:not([data-reduced-motion="true"]) [data-card-spotlight] { z-index: 1 }
   :root:not([data-reduced-motion="true"]) [data-card-tilted] {
-    z-index: 1;
     transform: perspective(900px) rotateX(var(--card-tilt-x, 0deg)) rotateY(var(--card-tilt-y, 0deg)) scale(var(--card-tilt-scale, 1));
-  }
-  :root:not([data-glassmorphism="false"], [data-reduced-motion="true"])
-    :is([data-card-interactive], .preview-tilt-cards [data-glow-surface])[data-card-spotlight]::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    border-radius: inherit;
-    box-shadow: inset 0 0 0 var(--aml-stroke-focus)
-      var(--card-spotlight-rim, light-dark(var(--aml-black-030), var(--aml-white-040)));
-    pointer-events: none;
-    mask-image: radial-gradient(circle calc(var(--aml-space-64) * 3) at var(--card-spotlight-x) var(--card-spotlight-y),
-      var(--aml-black-100), transparent);
   }
 }
 
@@ -79,17 +81,10 @@
 }
 [data-verdict="abnormal"] { --record-card-glow: var(--risk-high) }
 [data-verdict="normal"] { --record-card-glow: var(--risk-low) }
-[data-card-spotlight][data-verdict] {
-  --card-spotlight-rim: color-mix(in srgb, var(--record-verdict-accent, var(--text)) var(--record-verdict-glow-strength), transparent);
-}
-[data-card-spotlight][data-review] {
-  --card-spotlight-rim: color-mix(in srgb, var(--review-status-accent, var(--text)) var(--record-verdict-glow-strength), transparent);
-}
 [data-glow-surface][data-selected] {
   --panel-material-solid: var(--selection-surface);
   --panel-material-light: var(--selection-surface);
   --panel-material-backdrop: none;
   --panel-glass-opacity: 100%;
   --record-card-edge: var(--selection-divider);
-  --record-card-glow: var(--focus-ring);
 }

@@ -4,6 +4,9 @@ export const previewStaff = Object.freeze({
 export const previewAdmin = Object.freeze({
   id: -2, username: 'demo-admin', name: '프리뷰 관리자', role: 'ADMIN', source: 'fixture',
 });
+export const alternatePreviewStaff = Object.freeze({
+  id: -3, username: 'demo-staff-2', name: '프리뷰 분석가 2', role: 'STAFF', source: 'fixture',
+});
 
 let user = null;
 export const currentPreviewUser = () => user;

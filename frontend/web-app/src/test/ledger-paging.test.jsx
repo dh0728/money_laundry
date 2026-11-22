@@ -154,6 +154,7 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     render(<PreviewCaseTable title="Alert 목록" rows={rows} pageSize={20} paginationHost={host} onPageChange={onPageChange} />);
     const footer = within(host);
     expect(footer.getByText('1 / 3 페이지')).toBeTruthy();
+    expect(footer.getByText('전체 45건')).toBeTruthy();
     expect(footer.getByRole('button', { name: '이전' })).toBeDisabled();
     fireEvent.click(footer.getByRole('button', { name: '다음' }));
     expect(onPageChange).toHaveBeenLastCalledWith(1);
@@ -173,19 +174,18 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     expect(footer.getByRole('button', { name: '다음' })).toBeDisabled();
   });
 
-  it('카드도 필터·정렬된 목록을 20건씩 넘기고 기억한 페이지에서 시작한다', () => {
+  it('카드는 공통 푸터 없이 그룹의 더 보기로 항목을 이어 붙인다', () => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} unobserve() {} disconnect() {} });
     const host = document.createElement('div');
     const caseRows = new Map(rows.map(row => [row.code, row]));
     const onPageChange = vi.fn();
     render(<CaseCards codes={rows.map(row => row.code)} label="Alert 목록" caseRows={caseRows} initialPage={2}
       paginationHost={host} onPageChange={onPageChange} />);
-    const footer = within(host);
-    expect(footer.getByText('3 / 3 페이지')).toBeTruthy();
-    expect(footer.getByText('전체 45건')).toBeTruthy();
-    expect(footer.getByRole('button', { name: '다음' })).toBeDisabled();
-    fireEvent.click(footer.getByRole('button', { name: '이전' }));
-    expect(footer.getByText('2 / 3 페이지')).toBeTruthy();
-    expect(onPageChange).toHaveBeenLastCalledWith(1);
+    expect(host).toBeEmptyDOMElement();
+    expect(screen.getByRole('button', { name: 'A-261111-000001 상세 열기' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'A-261111-000009 상세 열기' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '검토 대기 업무 더 보기' }));
+    expect(screen.getByRole('button', { name: 'A-261111-000009 상세 열기' })).toBeTruthy();
+    expect(onPageChange).not.toHaveBeenCalled();
   });
 });

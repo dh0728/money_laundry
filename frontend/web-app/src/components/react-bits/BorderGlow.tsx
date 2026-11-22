@@ -7,6 +7,7 @@ import { updateBorderGlowPointer } from '../card-glow.js';
 interface BorderGlowProps {
   children?: ReactNode;
   className?: string;
+  articleProps?: React.ComponentPropsWithoutRef<'article'>;
   edgeSensitivity?: number;
   glowColor?: string;
   backgroundColor?: string;
@@ -64,6 +65,10 @@ function isLightColor(color: string): boolean {
 function easeOutCubic(x: number) { return 1 - Math.pow(1 - x, 3); }
 function easeInCubic(x: number) { return x * x * x; }
 
+export function BorderGlowEdge() {
+  return <span className="edge-light" aria-hidden="true" />;
+}
+
 interface AnimateOpts {
   start?: number; end?: number; duration?: number; delay?: number;
   ease?: (t: number) => number; onUpdate: (v: number) => void; onEnd?: () => void;
@@ -91,6 +96,7 @@ function animateValue({ start = 0, end = 100, duration = 1000, delay = 0, ease =
 const BorderGlow: React.FC<BorderGlowProps> = ({
   children,
   className = '',
+  articleProps,
   edgeSensitivity = 30,
   glowColor = '40 80 80',
   backgroundColor = '#120F17',
@@ -138,6 +144,15 @@ const BorderGlow: React.FC<BorderGlowProps> = ({
     };
   }, [animated]);
 
+  if (articleProps) {
+    return (
+      <article {...articleProps} className={`border-glow-card border-glow-card--record ${className}`}>
+        <BorderGlowEdge />
+        {children}
+      </article>
+    );
+  }
+
   const glowVars = buildGlowVars(glowColor, glowIntensity);
   const lightSurface = isLightColor(backgroundColor);
 
@@ -157,7 +172,7 @@ const BorderGlow: React.FC<BorderGlowProps> = ({
         ...buildGradientVars(colors),
       } as React.CSSProperties}
     >
-      <span className="edge-light" />
+      <BorderGlowEdge />
       <div className="border-glow-inner">
         {children}
       </div>

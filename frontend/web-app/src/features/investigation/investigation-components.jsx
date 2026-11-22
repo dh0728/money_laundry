@@ -1,19 +1,20 @@
 import React, { useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ChevronRight, Search } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { SearchField } from '../../components/search-field';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CardHeader } from '../../components/card-header';
 import { activateRecordCard, RecordCard, recordCardSurface } from '../../components/record-card';
-import { CountTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user.js';
 import { createSampleLedgerSource, createServerLedgerSource, useDebouncedValue, useLedgerList } from './ledger-source';
 import { CaseProgressBoard, PreviewCaseCard } from './preview-case-card';
 import { dashboardFixtures } from '../../mocks/dashboard-fixtures';
 import { ActionButton, WorkTabAddButton } from '../../components/primary-button';
 import AnimatedList from '../../components/react-bits/AnimatedList';
+import { BorderGlowEdge } from '../../components/react-bits/BorderGlow';
 import { TableFieldLabel, WorkflowTable } from '../../components/workflow-table';
 import { downloadCsv, TableQueryTools } from '../../components/query-controls';
-import { FooterPagination } from '../../components/footer-pagination';
 import './investigation-components.css';
 
 export { sampleTransactions } from '../../mocks/transaction-fixtures';
@@ -131,6 +132,8 @@ function List({ label, items, selected, onSelect, reduced, renderItem, renderIte
   }, [selected]);
   return <div ref={listRef} className={`ledger-scroll-shell ${className}`}>
     <AnimatedList ariaLabel={label} items={items} initialSelectedIndex={selected} renderItem={renderItem} itemData={itemData}
+      itemClassName={itemData ? 'border-glow-card border-glow-card--record' : undefined}
+      itemDecoration={itemData ? <BorderGlowEdge /> : undefined}
       renderItemHeader={renderItemHeader} onItemSurfaceClick={onItemSurfaceClick} selectOnHover={false}
       animation={reduced ? 'none' : renderItemHeader ? 'fade' : 'pop'} stagger={0.035} animateOnce showGradients={false} frame={false}
       displayScrollbar width="100%" maxHeight="var(--ledger-list-limit, var(--workspace-list-limit))"
@@ -253,7 +256,6 @@ const linkedCaseColumns = [
 ];
 const transactionDirection = record => record.incoming ? '수취' : '송금';
 const counterpartyCode = record => (record.incoming ? record.from : record.to).code;
-const integerFormat = new Intl.NumberFormat('ko-KR');
 
 function LedgerColumns({ columns }) {
   return <TableHeader><TableRow>
@@ -266,7 +268,7 @@ function LedgerColumns({ columns }) {
 function LedgerRecordId({ code, addable = true, ...buttonProps }) {
   return <th scope="row"><div className="ledger-table-record-id">
     {addable && <WorkTabAddButton inline code={code} />}
-    <ActionButton className="ledger-table-select" {...buttonProps}><code>{code}</code></ActionButton>
+    <LinkTag code={code} className="ledger-table-select" aria-label={undefined} data-work-code={undefined} {...buttonProps} />
   </div></th>;
 }
 
@@ -278,11 +280,8 @@ function LedgerBranchToggle({ label, expanded, onClick, children }) {
 
 /** 상단 작업 코드 검색과 같은 pill 검색 필드(.search-field)를 쓴다. */
 function LedgerSearch({ label, value, onChange, placeholder, disabled }) {
-  return <label className="search-field ledger-search" data-disabled={disabled || undefined}>
-    <Search className="icon" aria-hidden="true" />
-    <input type="search" aria-label={label} placeholder={placeholder} value={value} disabled={disabled}
-      spellCheck={false} autoComplete="off" onChange={event => onChange(event.target.value)} />
-  </label>;
+  return <SearchField variant="compact" className="ledger-search" label={label} placeholder={placeholder} value={value} disabled={disabled}
+    onChange={event => onChange(event.target.value)} />;
 }
 
 function LedgerListStatus({ list, empty }) {
@@ -335,7 +334,11 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
   useLayoutEffect(() => {
     const viewport = frame.current.querySelector('.ledger-hierarchy-scroll');
     const row = viewport?.querySelector('tr[data-ledger-depth="transaction"][data-selected="true"]');
-    if (!row) return;
+    if (!row || !viewport.clientHeight) return;
+    if (viewport.scrollHeight <= viewport.clientHeight) {
+      row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      return;
+    }
     const bounds = viewport.getBoundingClientRect();
     const rowBounds = row.getBoundingClientRect();
     const visibleTop = bounds.top + viewport.querySelector('thead').getBoundingClientRect().height;
@@ -542,27 +545,11 @@ export function LedgerWorkspace({ source, code, caseRows, tableView = false }) {
   </div>;
 }
 
-export const CASE_LIST_PAGE_SIZE = 20;
-
-/** 필터·정렬이 끝난 전체 목록(codes)을 20건씩 나눠 보여 준다. */
-export function CaseCards({ codes, label, caseRows, initialPage = 0, onPageChange, paginationHost }) {
+export function CaseCards({ codes, label, caseRows }) {
   const reduced = useSyncExternalStore(subscribeAppearance, readReducedMotion);
   const rows = codes.map(code => caseRows.get(code)).filter(Boolean);
-  const pageCount = Math.max(1, Math.ceil(rows.length / CASE_LIST_PAGE_SIZE));
-  const [requested, setRequested] = useState(initialPage);
-  const page = Math.min(Math.max(0, requested), pageCount - 1);
-  const visible = rows.slice(page * CASE_LIST_PAGE_SIZE, (page + 1) * CASE_LIST_PAGE_SIZE);
-  const changePage = next => {
-    setRequested(next);
-    onPageChange?.(next);
-    window.scrollTo?.(0, 0);
-  };
   return <section className="screen-section case-list-panel" aria-label={label}>
-    <CaseProgressBoard key={page} rows={visible} reduced={reduced} />
-    <FooterPagination host={paginationHost} label={`${label} 페이지`} page={page} pageCount={pageCount}
-      onPageChange={changePage} alwaysShow>
-      <span className="footer-pagination__status">전체 {integerFormat.format(rows.length)}건</span>
-    </FooterPagination>
+    <CaseProgressBoard key={codes.join(',')} rows={rows} reduced={reduced} pageSize={8} />
   </section>;
 }
 

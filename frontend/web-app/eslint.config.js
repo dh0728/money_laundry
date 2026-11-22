@@ -26,6 +26,19 @@ export default defineConfig([
     rules: { 'react-refresh/only-export-components': 'off' },
   },
   {
+    files: ['src/{app,features,pages}/**/*.{jsx,tsx}'],
+    languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: "JSXOpeningElement[name.name='dialog']",
+        message: 'Use DialogFrame from components/dialog-parts. It provides the title, close button, and full-width footer.',
+      }, {
+        selector: "JSXOpeningElement[name.name='input']:has(JSXAttribute[name.name='type'][value.value='search'])",
+        message: 'Use SearchField from components/search-field. Use its compact variant for in-panel search.',
+      }],
+    },
+  },
+  {
     // shadcn/ui 원본(사이드바 skeleton의 Math.random, use-mobile의 첫 측정)은 고치지 않고 둔다
     files: ['src/components/ui/sidebar.tsx', 'src/hooks/use-mobile.ts'],
     rules: { 'react-hooks/purity': 'off', 'react-hooks/set-state-in-effect': 'off' },

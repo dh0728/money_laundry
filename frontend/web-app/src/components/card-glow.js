@@ -1,6 +1,6 @@
 // Pointer geometry adapted from React Bits BorderGlow.
-export function updateBorderGlowPointer(card, clientX, clientY) {
-  const { left, top, width, height } = card.getBoundingClientRect();
+export function updateBorderGlowPointer(card, clientX, clientY, bounds = card.getBoundingClientRect()) {
+  const { left, top, width, height } = bounds;
   if (!width || !height) return;
   const x = clientX - left - width / 2;
   const y = clientY - top - height / 2;
@@ -56,8 +56,6 @@ export function bindCardGlow(workspace) {
   function clear() {
     active?.removeAttribute('data-card-spotlight');
     active?.removeAttribute('data-card-tilted');
-    active?.style.removeProperty('--card-spotlight-x');
-    active?.style.removeProperty('--card-spotlight-y');
     active?.style.removeProperty('--card-tilt-x');
     active?.style.removeProperty('--card-tilt-y');
     active?.style.removeProperty('--card-tilt-scale');
@@ -91,8 +89,7 @@ export function bindCardGlow(workspace) {
             && bounds.top >= clipping.top - 1 && bounds.bottom <= clipping.bottom + 1) tiltBounds = bounds;
       }
     }
-    active.style.setProperty('--card-spotlight-x', `${x * 100 / width}%`);
-    active.style.setProperty('--card-spotlight-y', `${y * 100 / height}%`);
+    updateBorderGlowPointer(active, event.clientX, event.clientY, bounds);
     active.setAttribute('data-card-spotlight', '');
     if (tiltBounds) {
       const rx = (0.5 - y / height) * 12;

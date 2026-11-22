@@ -133,6 +133,10 @@
   background-color: var(--tag-ink);
   color: var(--tag-fill);
 }
+.button.semantic-tag[data-tag="link"][data-record-link] {
+  padding-inline: var(--aml-space-8);
+  border-radius: var(--aml-radius-full);
+}
 .button.semantic-tag[data-tag="link"] code { font-size: inherit; font-weight: inherit }
 
 .semantic-tag[data-tag="filter"] {

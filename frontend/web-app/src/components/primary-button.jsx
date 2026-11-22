@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useSyncExternalStore } from 'react';
-import { createRoot } from 'react-dom/client';
 import { Plus } from 'lucide-react';
 import { bindTooltip, buttonPresentation } from './components.js';
 import HoldButton from './react-bits/HoldButton';
@@ -30,17 +29,17 @@ export function WorkTabAddButton({ code, className = '', disabled, inline = fals
   </ActionButton>;
 }
 
-export function PrimaryButton({ children, className = '', disabled, radius, style, tone, onClick, onHold, ...buttonProps }) {
+export function PrimaryButton({ children, className = '', disabled, radius, size, style, tone, onClick, onHold, ...buttonProps }) {
   const buttonStyle = {
     borderRadius: radius == null ? undefined : Math.max(0, radius),
     ...style,
   };
   if (tone === 'brand' || tone === 'positive' || tone === 'negative') {
-    return <AccentButton tone={tone} className={className} disabled={disabled} radius={radius} style={style}
+    return <AccentButton tone={tone} className={className} disabled={disabled} radius={radius} style={style} data-button-size={size}
       activation={onHold ? 'hold' : 'press'} onHold={onHold} onClick={onClick} {...buttonProps}>{children}</AccentButton>;
   }
   return <ActionButton className={`screen-primary glass ${className}`} shape="pill" surface="floating"
-    disabled={disabled} style={buttonStyle} onClick={onClick} {...buttonProps}>{children}</ActionButton>;
+    disabled={disabled} style={buttonStyle} onClick={onClick} data-button-size={size} {...buttonProps}>{children}</ActionButton>;
 }
 
 function AccentButton({ tone = 'brand', activation = 'hold', radius = 'var(--aml-radius-full)',
@@ -62,10 +61,4 @@ function AccentButton({ tone = 'brand', activation = 'hold', radius = 'var(--aml
 
 export function ConfirmHoldButton(props) {
   return <AccentButton {...props} />;
-}
-
-export function mountLoginPrimary(host) {
-  createRoot(host).render(
-    <PrimaryButton id="preview-sign-in" className="login-action" tone="brand" type="submit">로그인</PrimaryButton>
-  );
 }
