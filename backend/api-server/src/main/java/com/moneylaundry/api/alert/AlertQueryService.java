@@ -1,7 +1,7 @@
 package com.moneylaundry.api.alert;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.common.ApiException;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+/** 공개된 Alert 근거 버전의 목록·상세 조회. 읽기 전용 REPEATABLE READ로 한 시점을 읽는다. */
 @Service
 @Transactional(
     readOnly = true,
@@ -18,10 +19,8 @@ public class AlertQueryService {
   private final ObjectMapper mapper;
   private static final String VISIBLE =
       """
-      from alerts a join lateral (select v.* from alert_versions v
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
-        where v.alert_id=a.alert_id and r.status='COMPLETED' and b.status='COMPLETED'
-        order by v.version desc limit 1) v on true
+      from review.alerts a join review.alert_versions v
+        on v.alert_id=a.alert_id and v.version=a.published_version
       """;
 
   public AlertQueryService(JdbcTemplate jdbc, ObjectMapper mapper) {
@@ -31,12 +30,12 @@ public class AlertQueryService {
 
   public Map<String, Object> list(int page, int size, String status, Long assigneeId, Long jobId) {
     AnalysisService.validatePage(page, size);
-    String where = " where true";
+    String where = " where a.merged_into_alert_id is null";
     List<Object> args = new ArrayList<>();
     if (status != null) {
       if (!List.of("OPEN", "CLOSED", "ESCALATED").contains(status))
         throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", "지원하지 않는 Alert 상태입니다.");
-      where += " and a.status=?";
+      where += " and (case when a.outcome='TRANSFERRED' then 'ESCALATED' else a.status end)=?";
       args.add(status);
     }
     if (assigneeId != null) {
@@ -49,7 +48,7 @@ public class AlertQueryService {
       if (jobId < 1)
         throw new ApiException(
             HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", "jobId must be positive");
-      where += " and exists(select 1 from analysis_runs r where r.run_id=v.run_id and r.job_id=?)";
+      where += " and exists(select 1 from analysis.runs r where r.run_id=v.run_id and r.job_id=?)";
       args.add(jobId);
     }
     long count =
@@ -58,10 +57,10 @@ public class AlertQueryService {
     args.add((long) page * size);
     var rows =
         jdbc.queryForList(
-            "select a.*,v.version,v.run_id,v.evidence "
+            "select a.*,v.version,v.run_id,jsonb_build_object('summary',v.evidence->'summary') as evidence "
                 + VISIBLE
                 + where
-                + " order by (v.evidence->'summary'->>'scoreMax')::double precision desc nulls last,a.alert_id limit ? offset ?",
+                + " order by a.risk_score desc,a.alert_id limit ? offset ?",
             args.toArray());
     return AnalysisService.page(rows.stream().map(r -> view(r, false)).toList(), page, size, count);
   }
@@ -72,19 +71,28 @@ public class AlertQueryService {
     var rows =
         jdbc.queryForList(
             """
-        select a.*,v.version,v.run_id,v.evidence,b.analysis_cutoff_at from alerts a join alert_versions v using(alert_id)
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
-        where a.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED'
+        select a.*,v.version,v.run_id,v.evidence,b.analysis_cutoff_at from review.alerts a join review.alert_versions v using(alert_id)
+        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
+        where a.alert_id=? and v.published_at is not null and r.status='COMPLETED' and b.status='COMPLETED'
         """
-                + (version == null ? " order by v.version desc limit 1" : " and v.version=?"),
+                + (version == null ? " and v.version=a.published_version" : " and v.version=?"),
             version == null ? new Object[] {id} : new Object[] {id, version});
     if (rows.isEmpty()) throw ApiException.notFound("완료된 Alert 근거를 찾을 수 없습니다.");
     Map<String, Object> result = view(rows.getFirst(), true);
+    var summary = new LinkedHashMap<String, Object>();
+    if (result.get("summary") instanceof Map<?, ?> stored)
+      stored.forEach((key, value) -> summary.put(key.toString(), value));
+    summary.putAll(blockFacts(result));
+    result.put("summary", summary);
+    result.put(
+        "relatedFlows",
+        relatedFlows(
+            id, (List<Map<String, Object>>) result.getOrDefault("boundaryWitnesses", List.of())));
     var coverage =
         jdbc.queryForList(
             """
-        select c.coverage::text,c.checked_at,c.run_id,b.analysis_cutoff_at from alert_coverage_checks c
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
+        select c.coverage::text,c.checked_at,c.run_id,b.analysis_cutoff_at from review.alert_coverage_checks c
+        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
         where c.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED'
         """
                 + (version == null
@@ -97,6 +105,107 @@ public class AlertQueryService {
         "lastCheckedAt",
         coverage.isEmpty() ? null : instant(coverage.getFirst().get("checked_at")));
     return result;
+  }
+
+  /**
+   * Boundary facts are immutable; destination IDs resolve to currently published canonical Alerts.
+   */
+  public List<Map<String, Object>> relatedFlows(long id, List<Map<String, Object>> boundaries) {
+    if (boundaries.isEmpty()) return List.of();
+    var keys = new TreeSet<Long>();
+    for (var witness : boundaries)
+      for (Object key : (List<?>) witness.get("tx_ids")) keys.add(((Number) key).longValue());
+    var owners = new HashMap<Long, Set<Long>>();
+    for (var row :
+        jdbc.queryForList(
+            """
+        select distinct t.tx_id,a.alert_id from jsonb_array_elements_text(?::jsonb) k
+        join review.alert_transactions t on t.tx_id=k.value::bigint and t.role='SEED'
+        join review.alerts a on a.alert_id=t.alert_id and a.published_version=t.version
+        where a.merged_into_alert_id is null and a.alert_id<>?
+          and a.alert_id<>(select coalesce(merged_into_alert_id,alert_id) from review.alerts where alert_id=?)
+        """,
+            mapper.writeValueAsString(keys),
+            id,
+            id)) {
+      owners
+          .computeIfAbsent(((Number) row.get("tx_id")).longValue(), key -> new TreeSet<>())
+          .add(((Number) row.get("alert_id")).longValue());
+    }
+    var result = new ArrayList<Map<String, Object>>();
+    for (var witness : boundaries) {
+      var related = new TreeSet<Long>();
+      for (Object key : (List<?>) witness.get("tx_ids"))
+        related.addAll(owners.getOrDefault(((Number) key).longValue(), Set.of()));
+      result.add(
+          Map.of(
+              "kind",
+              witness.get("kind"),
+              "txIds",
+              witness.get("tx_ids"),
+              "relatedAlertIds",
+              new ArrayList<>(related)));
+    }
+    return result;
+  }
+
+  /**
+   * block-pin-1 facts of one evidence version. sealedAfter is the core's first time plus the policy
+   * span; contextCount counts current ACTIVE ledger rows matching the stored context query (focal
+   * accounts within the padded window) outside the core. Both are null for evidence without these
+   * policy fields (older generators).
+   */
+  public Map<String, Object> blockFacts(Map<String, Object> evidence) {
+    var facts = new LinkedHashMap<String, Object>();
+    facts.put("sealedAfter", sealedAfter(evidence));
+    facts.put("contextCount", contextCount(evidence));
+    return facts;
+  }
+
+  private String sealedAfter(Map<String, Object> evidence) {
+    if (!(evidence.get("policy") instanceof Map<?, ?> policy)
+        || !(policy.get("span_max_us") instanceof Number span)) return null;
+    java.time.Instant first = null;
+    for (Object item : (List<?>) evidence.getOrDefault("transactions", List.of())) {
+      var t = (Map<?, ?>) item;
+      if ("CONTEXT".equals(t.get("role"))) continue;
+      var at = java.time.Instant.parse(t.get("occurredAt").toString());
+      if (first == null || at.isBefore(first)) first = at;
+    }
+    return first == null
+        ? null
+        : first.plus(span.longValue(), java.time.temporal.ChronoUnit.MICROS).toString();
+  }
+
+  private Long contextCount(Map<String, Object> evidence) {
+    if (!(evidence.get("contextQuery") instanceof Map<?, ?> query)) return null;
+    var focal = (List<?>) query.get("focalAccounts");
+    if (focal == null || focal.isEmpty()) return 0L;
+    var core = new ArrayList<Object>();
+    for (Object item : (List<?>) evidence.getOrDefault("transactions", List.of()))
+      core.add(((Map<?, ?>) item).get("txId"));
+    String window =
+        " where t.occurred_at between ?::timestamptz and ?::timestamptz and t.integration_status='ACTIVE'";
+    return jdbc.queryForObject(
+        """
+        with f as (select (e->>'bankId')::int as bank_id,(e->>'accountId')::uuid as service_account_id
+                     from jsonb_array_elements(?::jsonb) e),
+             acc as (select a.account_id from core.accounts a join f using(bank_id,service_account_id)),
+             core as (select k.value::bigint as tx_id from jsonb_array_elements_text(?::jsonb) k)
+        select count(*) from (
+          select t.tx_id from ledger.transactions t join acc on acc.account_id=t.from_account_id
+        """
+            + window
+            + " union select t.tx_id from ledger.transactions t join acc on acc.account_id=t.to_account_id"
+            + window
+            + ") x where not exists(select 1 from core where core.tx_id=x.tx_id)",
+        Long.class,
+        mapper.writeValueAsString(focal),
+        mapper.writeValueAsString(core),
+        query.get("firstAt").toString(),
+        query.get("lastAt").toString(),
+        query.get("firstAt").toString(),
+        query.get("lastAt").toString());
   }
 
   private Object instant(Object value) {
@@ -125,9 +234,9 @@ public class AlertQueryService {
     detail(id, null);
     return jdbc.queryForList(
         """
-        select v.version,v.run_id as "runId",v.created_at as "createdAt" from alert_versions v
-        join analysis_runs r using(run_id) join batch_jobs b on b.job_id=r.job_id
-        where v.alert_id=? and r.status='COMPLETED' and b.status='COMPLETED' order by v.version
+        select v.version,v.run_id as "runId",v.created_at as "createdAt" from review.alert_versions v
+        join analysis.runs r using(run_id) join analysis.jobs b on b.job_id=r.job_id
+        where v.alert_id=? and v.published_at is not null and r.status='COMPLETED' and b.status='COMPLETED' order by v.version
         """,
         id);
   }
@@ -135,10 +244,28 @@ public class AlertQueryService {
   private Map<String, Object> view(Map<String, Object> row, boolean detail) {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("alertId", row.get("alert_id"));
-    result.put("status", row.get("status"));
-    result.put("resolution", row.get("resolution"));
+    result.put(
+        "status", "TRANSFERRED".equals(row.get("outcome")) ? "ESCALATED" : row.get("status"));
+    result.put("resolution", row.get("outcome"));
     result.put("assigneeId", row.get("assignee_id"));
-    result.put("parentAlertId", row.get("parent_alert_id"));
+    result.put(
+        "parentAlertId",
+        jdbc
+            .queryForList(
+                "select target_alert_id from review.alert_lineage where source_alert_id=? and kind='FOLLOWUP_OF' order by target_alert_id",
+                Long.class,
+                row.get("alert_id"))
+            .stream()
+            .findFirst()
+            .orElse(null));
+    result.put("publishedVersion", row.get("published_version"));
+    result.put("reviewStartedAt", instant(row.get("review_started_at")));
+    result.put(
+        "canonicalAlertId",
+        row.get("merged_into_alert_id") == null
+            ? row.get("alert_id")
+            : row.get("merged_into_alert_id"));
+    if (row.get("merged_into_alert_id") != null) result.put("resolution", "MERGED");
     result.put("createdAt", row.get("created_at"));
     result.put("version", row.get("version"));
     result.put("runId", row.get("run_id"));

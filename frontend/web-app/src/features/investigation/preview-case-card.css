@@ -1,0 +1,95 @@
+.preview-case-card {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-rows: auto 1fr;
+}
+.preview-case-card-body {
+  display: grid;
+  align-content: start;
+  gap: var(--aml-space-8);
+  padding: var(--aml-space-8) var(--aml-space-12);
+  min-inline-size: 0;
+}
+.preview-case-card dl {
+  display: grid;
+  margin: 0;
+  gap: var(--aml-space-4);
+  font-size: var(--aml-type-caption-size);
+  line-height: var(--aml-type-caption-lineHeight);
+}
+.preview-case-card dl > div {
+  display: grid;
+  align-items: start;
+  column-gap: var(--aml-space-8);
+  grid-template-columns: min(var(--aml-space-64), 42%) minmax(0, 1fr);
+}
+.preview-case-card dt { color: var(--muted-text); overflow-wrap: anywhere }
+.preview-case-card dd { margin: 0; min-width: 0; overflow-wrap: anywhere }
+.preview-case-card dd .semantic-tag { max-width: 100%; white-space: normal }
+.case-completion-tag > svg { inline-size: var(--compact-icon-size); block-size: var(--compact-icon-size) }
+.case-progress-board {
+  container: case-progress-board / inline-size;
+  min-inline-size: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--workspace-gap);
+}
+.case-list-panel > .case-progress-board {
+  flex: 1;
+  min-block-size: 0;
+  max-block-size: var(--workspace-list-limit);
+  overflow: auto;
+  padding: var(--record-card-shadow-gutter);
+  scrollbar-gutter: stable;
+}
+@media (max-width: 768px), (max-height: 480px) {
+  .case-list-panel > .case-progress-board {
+    max-block-size: none;
+    overflow: visible;
+    padding-block-end: max(var(--record-card-shadow-gutter), var(--account-footer-reserve));
+  }
+}
+.case-progress-lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--aml-space-8);
+}
+.case-progress-lane {
+  min-inline-size: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--aml-space-12);
+}
+.case-progress-lane[data-review] {
+  --panel-material-solid: color-mix(in srgb, var(--information-panel-surface), var(--review-status-accent) var(--review-lane-tint));
+  --panel-material-edge: color-mix(in srgb, var(--panel-material-solid), var(--review-status-accent) var(--record-verdict-edge-strength));
+  --panel-material-light: var(--review-status-accent);
+  --muted-text: var(--status-surface-secondary-ink);
+}
+.case-progress-lane.screen-panel {
+  padding: var(--aml-panel-inset);
+}
+.case-progress-lane .case-progress-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0;
+  padding-inline: calc(var(--aml-panel-text-inset) - var(--aml-panel-inset));
+  gap: var(--aml-space-6);
+  font-size: var(--aml-type-caption-size);
+  line-height: var(--aml-type-label-lineHeight);
+}
+.case-progress-empty {
+  margin: 0;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+  line-height: var(--aml-type-caption-lineHeight);
+}
+@container case-progress-board (min-width: 540px) {
+  .case-progress-lanes { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}
+@container case-progress-board (min-width: 1056px) {
+  .case-progress-lanes { grid-template-columns: repeat(var(--case-progress-columns, 4), minmax(0, 1fr)) }
+}

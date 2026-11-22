@@ -1,0 +1,56 @@
+name: aml-prod-backend-green
+services:
+  api:
+    image: ${PROD_API_IMAGE:?PROD_API_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PRESENTATION_ENABLED: ${PROD_PRESENTATION_ENABLED:?PROD_PRESENTATION_ENABLED is required}
+      INGEST_ENCRYPTION_KEY: ${PROD_INGEST_ENCRYPTION_KEY:?PROD_INGEST_ENCRYPTION_KEY is required}
+      INGEST_SEARCH_KEY: ${PROD_INGEST_SEARCH_KEY:?PROD_INGEST_SEARCH_KEY is required}
+      INGEST_KEY_VERSION: ${PROD_INGEST_KEY_VERSION:?PROD_INGEST_KEY_VERSION is required}
+      SERVER_PORT: '8080'
+      SPRING_DATASOURCE_URL: ${PROD_DB_URL:?PROD_DB_URL is required}
+      SPRING_DATASOURCE_USERNAME: ${PROD_POSTGRES_USER:?PROD_POSTGRES_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${PROD_POSTGRES_PASSWORD:?PROD_POSTGRES_PASSWORD is required}
+      S3_BUCKET: ${PROD_S3_BUCKET:?PROD_S3_BUCKET is required}
+      S3_PREFIX: ${PROD_S3_PREFIX:?PROD_S3_PREFIX is required}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-northeast-2}
+      TZ: Asia/Seoul
+      ANALYSIS_DB_USERNAME: ${PROD_ANALYSIS_DB_USERNAME:?PROD_ANALYSIS_DB_USERNAME is required}
+      ANALYSIS_DB_PASSWORD: ${PROD_ANALYSIS_DB_PASSWORD:?PROD_ANALYSIS_DB_PASSWORD is required}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      WORKER_MODE: ${PROD_WORKER_MODE:?PROD_WORKER_MODE is required}
+      INFERENCE_API_URL: ${PROD_INFERENCE_API_URL:-}
+      INFERENCE_API_TOKEN: ${PROD_INFERENCE_API_TOKEN:-}
+      STORAGE_DIR: /app/storage
+    ports:
+    - 127.0.0.1:8082:8080
+    stop_grace_period: 40s
+    security_opt:
+    - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
+    networks:
+    - prod-network
+    volumes:
+    - api-storage:/app/storage
+    - type: bind
+      source: /opt/aml/certs/rds-ca.pem
+      target: /app/certs/rds-ca.pem
+      read_only: true
+      bind:
+        create_host_path: false
+networks:
+  prod-network:
+    name: aml-prod-backend-green-network
+    driver: bridge
+volumes:
+  api-storage:
+    name: aml-prod-api-storage

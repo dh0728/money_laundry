@@ -48,10 +48,12 @@ export function createWorkspaceState(): WorkspaceState {
     { name: '분산 송금 후보 검토', description: '모델 점수와 분산 송금 유형을 함께 검토', typeCode: 1, scoreMin: .7, minTransactions: 1, windowHours: 24 },
     { name: '고위험 거래 모니터링', description: '유형과 별개로 높은 모델 점수의 거래를 검토', typeCode: null, scoreMin: .9, minTransactions: 2, windowHours: 72 },
     { name: '순환 거래 후보', description: '순환 거래 추정 결과를 검토', typeCode: 5, scoreMin: .8, minTransactions: 1, windowHours: 48 },
+    { name: '집중 수취 후보 검토', description: '여러 계좌에서 한 계좌로 모이는 거래를 검토', typeCode: 2, scoreMin: .75, minTransactions: 3, windowHours: 24 },
   ]
   const rules: RuleRecord[] = inputs.map((input, i) => ({ ...input, id: `RULE-${String(i + 1).padStart(3, '0')}`, version: 1,
-    status: (['DRAFT', 'ACTIVE', 'REJECTED'] as const)[i], author: snapshot.userName, updatedAt: snapshot.at,
-    history: [event('룰 등록', i === 2 ? '오래된 조건을 다시 검토해 주세요.' : '초기 조건 등록')],
+    status: (['DRAFT', 'ACTIVE', 'REJECTED', 'PENDING_APPROVAL'] as const)[i], author: snapshot.userName, updatedAt: snapshot.at,
+    history: [event('룰 등록', i === 2 ? '오래된 조건을 다시 검토해 주세요.' : '초기 조건 등록'),
+      ...(i === 3 ? [event('승인 요청', '조건 확인 후 승인을 요청합니다.')] : [])],
   }))
   return { records, transactions: ledger, rules, judgments, notifications: [
     { id: 1, title: `${records[0].displayId} 새 배정`, body: '김OO 님 담당 업무입니다.', at: snapshot.at, href: `#/alerts/${records[0].caseId}?tab=overview`, read: false },

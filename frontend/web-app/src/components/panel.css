@@ -1,0 +1,39 @@
+.panel-inset {
+  --panel-material-solid: light-dark(var(--information-panel-surface), var(--aml-gray-020));
+  --panel-material-depth: 0 0 0 transparent;
+  min-inline-size: 0;
+  border-radius: var(--aml-radius-card);
+}
+
+:root:not([data-glassmorphism="false"]) .panel-inset {
+  --panel-material-depth:
+    inset 0 var(--aml-stroke-control) var(--aml-space-4) var(--glass-shell-highlight),
+    inset 0 0 var(--aml-space-12) light-dark(var(--aml-white-060), var(--aml-white-010));
+}
+
+.panel-disclosure-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--workspace-gap);
+  min-block-size: var(--account-control-size);
+  padding: var(--aml-space-8) var(--aml-panel-text-inset);
+  border-radius: inherit;
+  list-style: none;
+  cursor: pointer;
+  font-weight: var(--aml-type-body-strong-weight);
+}
+
+.panel-disclosure-trigger::-webkit-details-marker { display: none }
+.panel-disclosure-trigger::marker { content: '' }
+.panel-disclosure-trigger:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring);
+  outline-offset: calc(-1 * var(--aml-stroke-focus));
+}
+
+@media (hover: hover) {
+  .panel-disclosure-trigger:hover { background-color: var(--hover) }
+}
+
+.panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: 180deg }
+.panel-disclosure-body { padding: 0 var(--aml-panel-text-inset) var(--aml-space-8) }

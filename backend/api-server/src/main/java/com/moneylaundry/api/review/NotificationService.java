@@ -1,7 +1,8 @@
 package com.moneylaundry.api.review;
 
-import com.moneylaundry.api.ApiException;
 import com.moneylaundry.api.analysis.AnalysisService;
+import com.moneylaundry.api.common.ApiException;
+import com.moneylaundry.api.common.BusinessTime;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.*;
@@ -9,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/** review.notifications 뷰 기반 알림 목록·미읽음 수 조회와 읽음 상태 저장. */
 @Service
 public class NotificationService {
   private final JdbcTemplate jdbc;
@@ -43,7 +45,7 @@ public class NotificationService {
       args.add(query.trim());
     }
     String base =
-        " from work_notifications n left join notification_reads r on r.user_id=n.user_id and r.notification_id=n.notification_id"
+        " from review.notifications n left join review.notification_reads r on r.user_id=n.user_id and r.notification_id=n.notification_id"
             + where;
     long total = jdbc.queryForObject("select count(*)" + base, Long.class, args.toArray());
     long unread =
@@ -95,7 +97,7 @@ public class NotificationService {
   private Map<String, Object> owned(long user, String id) {
     var rows =
         jdbc.queryForList(
-            "select * from work_notifications where user_id=? and notification_id=?", user, id);
+            "select * from review.notifications where user_id=? and notification_id=?", user, id);
     if (rows.isEmpty()) throw ApiException.notFound("알림을 찾을 수 없습니다.");
     return rows.getFirst();
   }
@@ -107,10 +109,13 @@ public class NotificationService {
     Object ref;
     if (notification.get("batch_run_id") != null) {
       base =
-          " from review_cases c join alert_versions v on v.alert_id=c.alert_id and v.version=1 where c.assignee_id=? and v.run_id=?";
+          " from review.cases c join review.alert_versions v on v.alert_id=c.alert_id and v.version=1 where c.assignee_id=? and v.run_id=?";
       ref = notification.get("batch_run_id");
     } else {
-      base = " from review_cases c where c.assignee_id=? and c.case_id=?";
+      // A merge notification belongs to every original recipient, even though
+      // the survivor has one assignee. Authorize through that user's notification.
+      base =
+          " from review.cases c where exists(select 1 from review.notifications n where n.user_id=? and n.case_id=c.case_id) and c.case_id=?";
       ref = notification.get("case_id");
     }
     long total = jdbc.queryForObject("select count(*)" + base, Long.class, user, ref);
@@ -152,12 +157,14 @@ public class NotificationService {
           for (String id : ids) {
             if (input.read())
               jdbc.update(
-                  "insert into notification_reads(user_id,notification_id) values(?,?) on conflict(user_id,notification_id) do nothing",
+                  "insert into review.notification_reads(user_id,notification_id) values(?,?) on conflict(user_id,notification_id) do nothing",
                   user,
                   id);
             else
               jdbc.update(
-                  "delete from notification_reads where user_id=? and notification_id=?", user, id);
+                  "delete from review.notification_reads where user_id=? and notification_id=?",
+                  user,
+                  id);
           }
           return Map.of("updated", ids.size());
         });

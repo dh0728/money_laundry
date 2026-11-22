@@ -1,0 +1,233 @@
+@import "../next/styles/tokens.css";
+@import "../next/styles/semantic-tokens.css";
+@import "../next/styles/fonts.css";
+@import "./figma-colors.css";
+
+/* Map the standalone workspace's existing component tokens to the shared design system. */
+:root {
+  --aml-layout-max-width: 1440px;
+  --aml-font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --aml-size-icon-mini: var(--aml-space-12);
+  --aml-size-icon-large: var(--aml-space-24);
+  --aml-stroke-icon: 1.6;
+  --aml-motion-drawer-duration: 260ms;
+  --aml-motion-drawer-ease: cubic-bezier(.16, 1, .3, 1);
+  --aml-motion-switch-duration: 320ms;
+  --aml-motion-switch-ease: cubic-bezier(.2, .75, .25, 1.13);
+  --aml-opacity-disabled: .5;
+  --brand-accent: var(--selection-surface);
+  --brand-color: var(--brand-accent);
+  --brand-control-surface: var(--selection-surface);
+  --brand-control-ink: var(--selection-ink);
+  --brand-accent-tint: light-dark(
+    color-mix(in srgb, var(--brand-accent) 12%, var(--information-panel-surface)),
+    color-mix(in srgb, var(--brand-accent) 24%, var(--information-panel-surface)));
+  --brand-accent-ink: var(--text);
+  --switch-off-track: color-mix(in srgb, var(--text) 18%, var(--information-panel-surface));
+  --switch-on-track: var(--selection-surface);
+  --switch-thumb-ink: var(--aml-white-100);
+  --chart-tooltip-background: var(--information-panel-surface);
+  --workspace-kpi-value-size: clamp(2rem, 3.1vw, 3rem);
+  --canvas-surface: var(--aml-figma-surface-neutral-background-primary);
+  --workspace-surface: var(--canvas-surface);
+  --information-panel-surface: var(--aml-figma-surface-neutral-background-secondary);
+  --information-panel-edge: light-dark(var(--aml-black-010), var(--aml-white-010));
+  --panel-glass-opacity: 90%;
+  --text: var(--aml-figma-contents-neutral-primary);
+  --muted-text: var(--aml-figma-contents-neutral-secondary);
+  --disabled-text: var(--aml-figma-contents-disabled);
+  --divider: var(--aml-figma-border-neutral-subtle-default);
+  --focus-ring: var(--aml-figma-border-neutral-accent-default);
+  --selected: color-mix(in srgb, var(--text) 14%, transparent);
+  --hover: color-mix(in srgb, var(--text) 9%, transparent);
+  --pressed: color-mix(in srgb, var(--text) 15%, transparent);
+  --inner-surface: var(--aml-figma-surface-neutral-subtle-hover);
+  --glass-edge: color-mix(in srgb, var(--text) 17%, transparent);
+  --glass-border-strength: 0%;
+  --glass-surface-edge: color-mix(in srgb, var(--glass-edge) var(--glass-border-strength), transparent);
+  --glass-material-frost: color-mix(in srgb, var(--information-panel-surface) 88%, transparent);
+  --glass-surface: color-mix(in srgb, var(--information-panel-surface) 44%, transparent);
+  --glass-elevated: color-mix(in srgb, var(--text) 9%, var(--glass-material-frost));
+  --glass-strong: color-mix(in srgb, var(--text) 15%, var(--glass-material-frost));
+  --glass-shadow: light-dark(var(--aml-black-010), var(--aml-black-030));
+  --glass-control-solid: light-dark(var(--aml-gray-095), var(--aml-gray-030));
+  --glass-control-face: color-mix(in srgb, var(--glass-control-solid) 76%, transparent);
+  --glass-control-edge: color-mix(in srgb, light-dark(var(--aml-black-020), var(--aml-white-030)) var(--glass-border-strength), transparent);
+  --floating-panel-face: light-dark(var(--information-panel-surface),
+    color-mix(in srgb, var(--information-panel-surface), var(--aml-white-100) 5%));
+  --glass-shell-face: color-mix(in srgb, var(--floating-panel-face) 78%, transparent);
+  --glass-shell-edge: light-dark(var(--aml-black-010), var(--aml-white-020));
+  --glass-shell-highlight: light-dark(var(--aml-white-080), var(--aml-white-020));
+  --glass-shell-shadow: light-dark(rgb(28 47 69 / 18%), var(--aml-black-040));
+  --glass-shell-muted: color-mix(in srgb, var(--text) 88%, var(--information-panel-surface));
+  --glass-shell-scrim: light-dark(var(--aml-black-010), var(--aml-black-020));
+  --shadow-floating: 0 var(--aml-space-4) var(--aml-space-12) var(--glass-shadow);
+  --shadow-overlay: 0 var(--aml-space-16) var(--aml-space-48) var(--glass-shadow);
+  --backdrop: light-dark(var(--aml-black-020), var(--aml-black-040));
+  --inverse-surface: var(--aml-figma-surface-neutral-accent-default);
+  --inverse-text: var(--aml-figma-contents-neutral-inverse);
+  --selection-surface: var(--text);
+  --selection-ink: var(--inverse-text);
+  --selection-muted: color-mix(in srgb, var(--selection-ink) 75%, var(--selection-surface));
+  --selection-divider: color-mix(in srgb, var(--selection-ink) 28%, var(--selection-surface));
+  --ai-summary-tint: 15%;
+  --ai-summary-start: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-status-pending-accent-default) var(--ai-summary-tint));
+  --ai-summary-end: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-brand-accent-default) var(--ai-summary-tint));
+  --ai-summary-surface: linear-gradient(108deg in srgb, var(--ai-summary-start), var(--ai-summary-end));
+  --ai-summary-ink: var(--text);
+  --ai-summary-note: var(--muted-text);
+  --risk-low: var(--status-positive-accent);
+  --risk-medium: var(--status-caution-accent);
+  --risk-high: var(--status-danger-accent);
+  --status-positive-accent: color-mix(in srgb,
+    color-mix(in srgb, var(--aml-figma-surface-status-positive-accent-default), var(--aml-figma-dark-surface-status-positive-accent-default) 45%),
+    var(--aml-black-100) 8%);
+  --status-caution-accent: color-mix(in srgb, var(--aml-figma-surface-status-caution-accent-default), #ffc83d 60%);
+  --status-danger-accent: light-dark(
+    color-mix(in srgb, var(--aml-figma-light-surface-status-danger-accent-default), var(--aml-black-100) 2%),
+    color-mix(in srgb,
+      color-mix(in srgb, var(--aml-figma-dark-surface-status-danger-accent-default) 15%, var(--aml-figma-light-surface-status-danger-accent-default)),
+      var(--aml-black-100) 5%));
+  --status-pending-accent: light-dark(
+    var(--aml-figma-light-surface-status-pending-accent-default),
+    color-mix(in srgb,
+      color-mix(in srgb, var(--aml-figma-dark-surface-status-pending-accent-default), var(--aml-figma-light-surface-status-pending-accent-default)),
+      var(--aml-black-100) 7%));
+  --status-info-accent: light-dark(
+    var(--aml-figma-light-surface-status-info-accent-default),
+    color-mix(in srgb,
+      color-mix(in srgb, var(--aml-figma-dark-surface-status-info-accent-default), var(--aml-figma-light-surface-status-info-accent-default)),
+      var(--aml-black-100) 11%));
+  --review-status-unread-accent: var(--status-danger-accent);
+  --review-status-pending-accent: var(--status-pending-accent);
+  --review-status-inProgress-accent: var(--status-info-accent);
+  --review-status-done-accent: var(--status-positive-accent);
+  --review-tag-base: light-dark(var(--canvas-surface), var(--aml-gray-060));
+  --review-tag-strength: 22%;
+  --status-accent-light-ink: var(--aml-white-100);
+  --status-accent-dark-ink: var(--aml-black-100);
+  --status-surface-secondary-ink: color-mix(in srgb, var(--text) 36%, var(--muted-text));
+  --record-verdict-tint: 24%;
+  --record-verdict-glow-strength: 94%;
+  --record-verdict-edge-strength: 16%;
+  --record-verdict-divider-strength: 12%;
+  --review-lane-tint: 14%;
+}
+
+:root[data-theme="light"] {
+  --information-panel-surface: color-mix(in srgb, var(--aml-figma-light-surface-neutral-background-secondary), var(--aml-white-100) 48%);
+  --glass-shadow: rgb(48 66 105 / 7%);
+  --record-verdict-tint: 15%;
+  --review-lane-tint: 10%;
+  --ai-summary-tint: 11%;
+  --ai-summary-surface: linear-gradient(112deg, var(--ai-summary-start),
+    color-mix(in srgb, var(--ai-summary-start), var(--aml-white-100) 44%) 48%, var(--ai-summary-end));
+}
+
+:root,
+:where(.screen-panel, .screen-overlay, .panel-material) {
+  --panel-light-source: var(--panel-material-light, var(--panel-material-solid, var(--information-panel-surface)));
+  --panel-edge-light: color-mix(in srgb,
+    color-mix(in srgb, var(--panel-material-solid, var(--information-panel-surface)) 92%, var(--panel-light-source)),
+    var(--aml-black-100) 10%);
+  --panel-light-color: light-dark(
+    color-mix(in srgb, var(--panel-light-source) 21%, var(--aml-white-100)),
+    color-mix(in srgb, var(--panel-light-source) 72%, var(--aml-white-100)));
+  --panel-edge-depth:
+    inset 0 0 0 var(--aml-stroke-divider) var(--glass-shell-edge),
+    inset 0 calc(-1 * var(--aml-space-2)) var(--aml-space-8)
+      light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), transparent);
+  --information-panel-shadow:
+    inset 0 var(--aml-stroke-divider) var(--aml-space-2) color-mix(in srgb, var(--panel-light-color) 46%, transparent),
+    inset 0 var(--aml-space-4) var(--aml-space-12) color-mix(in srgb, var(--panel-light-color) 24%, transparent);
+  --panel-glass-depth: var(--information-panel-shadow);
+}
+
+:root[data-glassmorphism="false"]
+  :where(.screen-panel, .screen-overlay, .panel-material) {
+  --panel-edge-depth: inset 0 0 0 var(--aml-stroke-divider)
+    light-dark(var(--panel-edge-light),
+      color-mix(in srgb, var(--panel-material-solid, var(--information-panel-surface)) 76%, var(--panel-light-color)));
+}
+
+/* Standalone density changes component dimensions without altering the shared size primitives. */
+:root {
+  --aml-density-offset: var(--aml-space-0);
+  --aml-density-gap: var(--aml-space-8);
+  --aml-density-panel-padding: var(--aml-space-16);
+  --aml-density-drawer-width: var(--aml-size-sidebar);
+  --aml-radius-card: var(--aml-space-16);
+  --aml-card-header-padding: var(--aml-space-8);
+  --aml-card-title-inset: var(--aml-space-16);
+  --aml-radius-expanded-control: var(--aml-space-16);
+  --aml-density-icon-size: var(--aml-size-icon);
+  --aml-density-utility-icon-size: var(--aml-size-icon-mini);
+  --aml-density-label-offset: calc(var(--aml-density-offset) / 2);
+  --aml-density-height-offset: calc(var(--aml-density-offset) * 2);
+  --aml-density-caption-size: calc(var(--aml-type-caption-size) + var(--aml-density-label-offset));
+  --aml-density-caption-line-height: calc(var(--aml-type-caption-lineHeight) + var(--aml-density-offset));
+  --aml-density-label-size: calc(var(--aml-type-label-size) + var(--aml-density-label-offset));
+  --aml-density-label-line-height: calc(var(--aml-type-label-lineHeight) + var(--aml-density-offset));
+  --aml-density-body-size: calc(var(--aml-type-body-size) + var(--aml-density-offset));
+  --aml-density-body-line-height: calc(var(--aml-type-body-lineHeight) + var(--aml-density-height-offset));
+  --aml-density-section-size: calc(var(--aml-type-section-title-size) + var(--aml-density-offset));
+  --aml-density-section-line-height: calc(var(--aml-type-section-title-lineHeight) + var(--aml-density-height-offset));
+  --aml-density-page-size: calc(var(--aml-type-page-title-size) + var(--aml-density-offset));
+  --aml-density-page-line-height: calc(var(--aml-type-page-title-lineHeight) + var(--aml-density-height-offset));
+  --aml-density-metric-size: calc(var(--aml-type-metric-size) + var(--aml-density-height-offset));
+  --aml-density-metric-line-height: calc(var(--aml-type-metric-lineHeight) + var(--aml-density-height-offset));
+  --aml-density-control-compact: calc(var(--aml-size-control-compact) + var(--aml-density-height-offset));
+  --aml-panel-control-size: var(--aml-density-control-compact);
+  --aml-panel-inset: var(--aml-density-gap);
+  --aml-panel-control-radius: calc(var(--aml-panel-control-size) / 2);
+  --aml-radius-panel: calc(var(--aml-panel-control-radius) + var(--aml-panel-inset));
+  --aml-panel-text-inset: max(var(--aml-density-panel-padding), calc(var(--aml-panel-inset) + var(--aml-space-8)));
+  --aml-density-control: calc(var(--aml-size-control) + var(--aml-density-height-offset));
+  --aml-density-control-comfortable: calc(var(--aml-size-control-comfortable) + var(--aml-density-height-offset));
+  --aml-density-row-compact: calc(var(--aml-size-row-compact) + var(--aml-density-height-offset));
+  --aml-density-row: calc(var(--aml-size-row) + var(--aml-density-height-offset));
+}
+
+:root[data-ui-size="small"] {
+  --aml-density-offset: calc(-1 * var(--aml-space-2));
+  --aml-density-gap: var(--aml-space-6);
+  --aml-density-panel-padding: var(--aml-space-12);
+  --aml-density-drawer-width: calc(var(--aml-size-sidebar) - var(--aml-space-16));
+  --aml-radius-card: var(--aml-space-12);
+  --aml-card-header-padding: var(--aml-space-6);
+  --aml-card-title-inset: var(--aml-space-12);
+  --aml-density-icon-size: var(--aml-size-icon-small);
+}
+
+:root[data-ui-size="large"] {
+  --aml-density-offset: var(--aml-space-2);
+  --aml-density-gap: var(--aml-space-12);
+  --aml-density-panel-padding: var(--aml-space-20);
+  --aml-density-drawer-width: calc(var(--aml-size-sidebar) + var(--aml-space-16));
+  --aml-radius-card: var(--aml-space-20);
+  --aml-card-header-padding: var(--aml-space-12);
+  --aml-card-title-inset: var(--aml-space-20);
+  --aml-density-icon-size: var(--aml-size-icon-large);
+}
+
+body {
+  --aml-type-caption-size: var(--aml-density-caption-size);
+  --aml-type-caption-lineHeight: var(--aml-density-caption-line-height);
+  --aml-type-label-size: var(--aml-density-label-size);
+  --aml-type-label-lineHeight: var(--aml-density-label-line-height);
+  --aml-type-body-size: var(--aml-density-body-size);
+  --aml-type-body-lineHeight: var(--aml-density-body-line-height);
+  --aml-type-body-strong-size: var(--aml-density-body-size);
+  --aml-type-body-strong-lineHeight: var(--aml-density-body-line-height);
+  --aml-type-section-title-size: var(--aml-density-section-size);
+  --aml-type-section-title-lineHeight: var(--aml-density-section-line-height);
+  --aml-type-page-title-size: var(--aml-density-page-size);
+  --aml-type-page-title-lineHeight: var(--aml-density-page-line-height);
+  --aml-type-metric-size: var(--aml-density-metric-size);
+  --aml-type-metric-lineHeight: var(--aml-density-metric-line-height);
+  --aml-type-brand-size: calc(var(--aml-type-section-title-size) + var(--aml-space-2));
+  --aml-size-control-compact: var(--aml-density-control-compact);
+  --aml-size-control: var(--aml-density-control);
+  --aml-size-control-comfortable: var(--aml-density-control-comfortable);
+  --aml-size-row: var(--aml-density-row);
+}

@@ -40,6 +40,7 @@ python -m streamlit run control_panel.py --server.address 127.0.0.1 --server.por
 
 - 날짜 하나 선택 → ‘선택 날짜 전송’ → 검수 완료 → ‘분석 트리거’.
 - 여러 날짜 선택 → ‘전송 → 분석 자동 재생’: 날짜순 전송·검수·분석 완료 후 지정한 초만큼 기다리고 다음 날짜 진행.
+- 백필: 초기화 직후 앞 날짜만 선택 → ‘전송 → 백필’. 날짜마다 전송·검수·거래 통합·분석 입력 고정만 하고 점수·Alert는 만들지 않는다. 그 거래는 이후 분석의 이력으로만 쓰인다. 그다음 날짜부터 자동 재생한다. 분석을 한 번이라도 한 뒤에는 백필이 거절된다.
 - ‘현재 날짜 완료 후 일시정지’는 실행 중인 날짜를 취소하지 않는다. 같은 세션에서 자동 재생을 다시 누르면 완료한 날짜는 건너뛴다.
 - 실패하면 다음 날짜로 넘어가지 않는다. 실패 원인을 해결한 뒤 작업 ID로 ‘실패 작업 재개’를 요청한다. 자동 재생 재시도는 이미 받은 작업 ID를 재사용한다.
 
@@ -97,7 +98,7 @@ Cloudflare 인증이 있으면 CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET 환�
 
 ## 서버 세션 로그인·테스트 계정 등록
 
-직원 선택 버튼을 단일 로그인으로 교체했다. 결과 화면은 STAFF 또는 ADMIN으로 로그인하고, 조작패널은 ADMIN으로 로그인한다. 회원가입은 없다. 최초 실행 후 DB에 테스트 계정을 등록해야 하며 비밀번호가 없는 초기 계정은 로그인·신규 자동 배정 대상이 아니다. 기존 담당 사건을 열려면 해당 기존 계정에 비밀번호 해시를 설정한다. 기존 사용자명 l1a/l2a도 역할은 모두 STAFF다.
+직원 선택 버튼을 단일 로그인으로 교체했다. 결과 화면은 STAFF 또는 ADMIN으로 로그인하고, 조작패널은 ADMIN으로 로그인한다. 회원가입은 없다. 로컬 데모는 seed 단계에서 비밀번호가 없는 초기 계정(admin, l1a, l1b, l2a, l2b)에 시연용 비밀번호 `1234`를 넣는다. 이미 비밀번호가 있는 계정은 바꾸지 않는다. 비밀번호가 없는 계정은 로그인·신규 자동 배정 대상이 아니므로, 로컬 데모 밖(dev 등)에서는 아래처럼 직접 등록한다. 기존 사용자명 l1a/l2a도 역할은 모두 STAFF다.
 
 1. 호스트의 Python 환경에서 `password_hash.py`를 실행한다. 비밀번호를 두 번 숨김 입력하면 Spring 호환 해시만 출력한다. Python이 없으면 실행 중인 로컬 demo UI 컨테이너에서 다음 명령으로 생성할 수 있다(저장소 루트 PowerShell):
 
@@ -110,9 +111,9 @@ docker compose -p aml-demo -f ./backend/api-server/demo/compose.demo.yaml exec -
 2. 관리자 DB 도구에서 사용자명·표시 이름·해시를 대입하여 등록한다. 아래 `<생성한 해시>`는 실제 해시로 교체한다.
 
 ```sql
-INSERT INTO users(username,name,role,password_hash)
+INSERT INTO core.users(username,name,role,password_hash)
 VALUES ('demo-staff','시연 직원','STAFF','<생성한 해시>');
-INSERT INTO users(username,name,role,password_hash)
+INSERT INTO core.users(username,name,role,password_hash)
 VALUES ('demo-admin','시연 관리자','ADMIN','<별도로 생성한 해시>');
 -- 기존 계정에 로그인 비밀번호를 설정할 경우 사용자명 하나를 지정한다.
 -- UPDATE users SET password_hash='<생성한 해시>' WHERE username='l1a';
@@ -178,6 +179,8 @@ dev에는 보고 은행·기준일 적용 기간·AML17 양식의 사전 등록�
 2. 삭제 건수를 확인하고 `시연 데이터 초기화`를 입력한다. **DB 및 관련 파일 초기화**를 누른다.
 3. DB 초기화 후 파일 정리 진행률이 표시된다. **DB 및 관련 파일 초기화 완료**가 나올 때까지 기다린다.
 4. 업무 시각을 원하는 시연 시작일로 설정한 뒤 원래 PC CSV를 다시 전송한다. 기존 패널의 전송 완료 기억·jobId도 초기화되어 처음부터 재생할 수 있다.
+
+초기화 대상 확인과 초기화 요청은 서버가 대상 테이블의 행 수를 모두 세므로 데이터가 많으면 수십 초 걸린다(dev 16일치 약 19초). 패널은 이 두 요청만 120초까지 기다린다. dev 앞단 Cloudflare는 100초에서 끊으므로 그보다 오래 걸리면 HTTP 524가 난다.
 
 삭제: 수신/정정 보고·가명 계좌/소유주·거래·피처·점수·분석 작업/입력/결과·Alert/Episode·조사 이력·업무 시각. 보존: PC CSV, STAFF/ADMIN 계정과 비밀번호, 은행·보고 기간·양식, 환율, 스키마와 Flyway 이력, 초기화 접수/파일 정리 기록. ID 시퀀스를 되감지 않는다.
 
