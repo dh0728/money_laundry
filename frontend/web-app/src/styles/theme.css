@@ -283,7 +283,7 @@
   --color-input: var(--input); --color-ring: var(--ring);
   --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2);
   --color-dashboard-segment-divider: var(--dashboard-segment-divider);
-  --font-sans: Inter;
+  --font-sans: Pretendard, Inter, sans-serif;
 }
 @layer base {
   * { @apply border-border outline-ring/50; }

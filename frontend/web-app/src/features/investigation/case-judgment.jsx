@@ -146,7 +146,7 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
         {requestSent && <p role="status">관리자에게 연관 업무 검토 요청을 보냈습니다.</p>}
         <JudgmentTargets row={row} />
         {result ? <div className="case-judgment-summary">
-          <p role="status">{result.id}에 판정이 저장되었습니다.</p>
+          <p role="status"><code>{result.id}</code>에 판정이 저장되었습니다.</p>
           <p><VerdictTag verdict={result.verdict} /></p>
           <p><strong>{reasonLabel}</strong></p>
           <JudgmentDetails {...result} />

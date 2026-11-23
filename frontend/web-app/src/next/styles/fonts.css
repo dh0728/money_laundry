@@ -6,8 +6,19 @@
   font-display: swap;
   src: url('/fonts/InterVariable.woff2') format('woff2');
 }
+/* Pretendard from orioncactus/pretendard v1.3.9, SIL OFL 1.1. Font and license are bundled locally. */
+@font-face {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 45 920;
+  font-display: swap;
+  src: url('/fonts/PretendardVariable.woff2') format('woff2-variations');
+}
 :root,
 [data-ui="aml-app"],
 [data-ui="shell-chrome"] {
-  --aml-font-family: Inter;
+  --aml-font-family: Pretendard, Inter, sans-serif;
+}
+code, kbd, samp {
+  font-family: var(--aml-font-mono);
 }
