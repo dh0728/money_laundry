@@ -615,7 +615,7 @@
 }
 
 .magic-bento__flow-hash {
-  font-family: Pretendard;
+  font-family: var(--aml-font-family);
   font-variant-numeric: tabular-nums;
   font-size: 11px;
 }

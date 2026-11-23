@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Panel } from '../components/panel';
+import { SearchField } from '../components/search-field';
 import { LinkTag, VerdictTag } from '../components/semantic-tags';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../components/workflow-table';
 import figmaColors from '../config/figma-colors.json';
@@ -109,9 +109,7 @@ export function DesignVariables() {
           {[...groups, otherGroup].map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select>
       </label>
-      <label>변수 검색
-        <Input className="variable-field" type="search" value={search} onChange={event => setSearch(event.target.value)} />
-      </label>
+      <SearchField variant="compact" label="변수 검색" placeholder="변수 검색" value={search} onChange={event => setSearch(event.target.value)} />
     </div>
     <WorkflowTable label="디자인 변수" summary={tableCount(results.length, tokens.length, '개')} className="variable-table" tools={false} panel>
         <TableHeader><TableRow>

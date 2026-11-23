@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useEffect, useState, useSyncExternalStore } from
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
-import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { ruleConditionSummary } from '@/features/rules/rules-logic';
 import { Check, Circle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
@@ -341,7 +341,7 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
               </TableRow></TableHeader>
               <TableBody>
                 {sorting.rows.map(record => <TableRow key={record.id}>
-                  <th scope="row"><code>{record.displayId}</code></th>
+                  <TableRowHead><code>{record.displayId}</code></TableRowHead>
                   <TableCell>{record.date}</TableCell>
                   <TableCell><code>{record.fromAccountId}</code></TableCell>
                   <TableCell><code>{record.toAccountId}</code></TableCell>
@@ -504,7 +504,7 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
           </TableRow></TableHeader>
           <TableBody>
             {sorting.rows.map(row => <TableRow key={row.id} data-selected={selected.includes(row.id) || undefined}>
-              <th scope="row"><code>{row.id}</code></th>
+              <TableRowHead><code>{row.id}</code></TableRowHead>
               <TableCell>{targets(row)}</TableCell>
               <TableCell>{row.kind}</TableCell>
               <TableCell><div className="workflow-report-patterns">{patterns(row)}</div></TableCell>

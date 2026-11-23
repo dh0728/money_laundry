@@ -91,6 +91,18 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   )
 }
 
+function TableRowHead({ scope = "row", ...props }: React.ComponentProps<"th">) {
+  return <th data-slot="table-row-head" scope={scope} {...props} />
+}
+
+function TableColumns({ widths }: { widths: Array<{ key: React.Key; width?: React.CSSProperties["width"] }> }) {
+  return (
+    <colgroup data-slot="table-columns">
+      {widths.map(({ key, width }) => <col key={key} style={{ width }} />)}
+    </colgroup>
+  )
+}
+
 function TableCaption({
   className,
   ...props
@@ -112,5 +124,7 @@ export {
   TableHead,
   TableRow,
   TableCell,
+  TableRowHead,
+  TableColumns,
   TableCaption,
 }

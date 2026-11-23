@@ -2,7 +2,7 @@ import React, { useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore, u
 import { createRoot } from 'react-dom/client';
 import { ChevronRight } from 'lucide-react';
 import { SearchField } from '../../components/search-field';
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableColumns, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { CardHeader } from '../../components/card-header';
 import { activateRecordCard, RecordCard, recordCardSurface } from '../../components/record-card';
 import { CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
@@ -266,10 +266,10 @@ function LedgerColumns({ columns }) {
 }
 
 function LedgerRecordId({ code, addable = true, ...buttonProps }) {
-  return <th scope="row"><div className="ledger-table-record-id">
+  return <TableRowHead><div className="ledger-table-record-id">
     {addable && <WorkTabAddButton inline code={code} />}
     <LinkTag code={code} className="ledger-table-select" aria-label={undefined} data-work-code={undefined} {...buttonProps} />
-  </div></th>;
+  </div></TableRowHead>;
 }
 
 function LedgerBranchToggle({ label, expanded, onClick, children }) {
@@ -355,13 +355,13 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
     </div>
     <WorkflowTable className="ledger-hierarchy-scroll" tableClassName="ledger-hierarchy-table" label="통합 테이블" summary={summary}
       tools={account && records.length > 0 && <TableQueryTools actions={actions} />}>
-      <colgroup>{ledgerColumns.map(([key, , width]) => <col key={key} style={{ width: `${width}%` }} />)}</colgroup>
+      <TableColumns widths={ledgerColumns.map(([key, , width]) => ({ key, width: `${width}%` }))} />
       <LedgerColumns columns={ledgerColumns} />
       <TableBody>
       {owners.items.map(row => <React.Fragment key={row.id}>
         <TableRow data-ledger-depth="owner">
-          <th scope="rowgroup"><LedgerBranchToggle label={`${row.name}의 계좌`} expanded={ownerOpen(row)}
-            onClick={() => select.owner(ownerOpen(row) ? null : row)}>{row.name}</LedgerBranchToggle></th>
+          <TableRowHead scope="rowgroup"><LedgerBranchToggle label={`${row.name}의 계좌`} expanded={ownerOpen(row)}
+            onClick={() => select.owner(ownerOpen(row) ? null : row)}>{row.name}</LedgerBranchToggle></TableRowHead>
           <TableCell colSpan={ledgerColumns.length - 1} />
         </TableRow>
         {ownerOpen(row) && <>
@@ -370,8 +370,8 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
             return <React.Fragment key={item.id}>
               <TableRow data-ledger-depth="account">
                 <TableCell aria-hidden="true" />
-                <th scope="row"><LedgerBranchToggle label={`${item.label}의 거래`} expanded={open}
-                  onClick={() => select.account(open ? null : item)}><code title={item.id}>{item.label}</code></LedgerBranchToggle></th>
+                <TableRowHead><LedgerBranchToggle label={`${item.label}의 거래`} expanded={open}
+                  onClick={() => select.account(open ? null : item)}><code title={item.id}>{item.label}</code></LedgerBranchToggle></TableRowHead>
                 <TableCell colSpan={ledgerColumns.length - 2} />
               </TableRow>
               {open && records.map(record => {
@@ -420,7 +420,7 @@ function LinkedCaseTable({ transaction, caseRows }) {
     <LedgerColumns columns={linkedCaseColumns} />
     <TableBody>
       {entries.map(row => row.server ? <TableRow key={row.code}>
-        <th scope="row"><code>{row.code}</code></th>
+        <TableRowHead><code>{row.code}</code></TableRowHead>
         <TableCell>{row.kind}</TableCell>
         <TableCell colSpan={linkedCaseColumns.length - 2}>서버 원장 연결 ID</TableCell>
       </TableRow> : <TableRow key={row.code}>

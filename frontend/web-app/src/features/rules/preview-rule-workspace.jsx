@@ -1,5 +1,5 @@
 import React, { cloneElement, useEffect, useId, useRef, useState } from 'react';
-import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { RULE_LIMITS, ruleStatusLabels, ruleTransitionActions } from '@/features/rules/rules-logic';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
@@ -272,11 +272,11 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
             <TableBody>{sorting.rows.map(rule => <TableRow key={rule.id} data-selected={rule.id === selected?.id}
               onClick={event => activateRecordCard(event, () => choose(rule.id))}>
               <TableCell><StatusTag preset={presets[rule.status]}>{ruleStatusLabels[rule.status]}</StatusTag></TableCell>
-              <th scope="row">
+              <TableRowHead>
                 <ActionButton onClick={() => choose(rule.id)} aria-pressed={rule.id === selected?.id} className="workflow-rule-select">
                   <code>{rule.id}</code> {rule.name}
                 </ActionButton>
-              </th>
+              </TableRowHead>
               <TableCell>v{rule.version}</TableCell><TableCell>{rule.author}</TableCell>
             </TableRow>)}
               {!rows.length && <TableRow><TableCell colSpan={4}>조건에 맞는 룰이 없습니다.</TableCell></TableRow>}

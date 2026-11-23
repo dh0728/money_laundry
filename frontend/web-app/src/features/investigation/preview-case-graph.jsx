@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PanelLeft, Settings2, X } from 'lucide-react';
 import { ActionButton } from '../../components/primary-button';
@@ -371,7 +371,7 @@ function AccountBreakdown({ rows, linkedSelection, selectionControl }) {
         <SortableTableHead sorting={sorting} column="net" {...currencyColumn(row => Object.fromEntries(row.net))}>순유입</SortableTableHead>
       </TableRow></TableHeader>
       <TableBody>{sorting.rows.map(account => <TableRow key={account.code} data-selected={selection.has(account.code) || undefined}>
-        <th scope="row"><code>{account.code}</code></th><TableCell>{account.owner}</TableCell>
+        <TableRowHead><code>{account.code}</code></TableRowHead><TableCell>{account.owner}</TableCell>
         <TableCell>{formatAmount.format(account.receivedCount)}</TableCell><TableCell>{money(account.received)}</TableCell>
         <TableCell>{formatAmount.format(account.sentCount)}</TableCell><TableCell>{money(account.sent)}</TableCell>
         <TableCell>{money(account.net)}</TableCell>

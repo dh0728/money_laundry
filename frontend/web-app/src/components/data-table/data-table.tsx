@@ -6,6 +6,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableColumns,
   TableHead,
   TableHeader,
   TableRow,
@@ -93,7 +94,7 @@ export function DataTable<TData>({
           containerOnScroll={topHorizontalScroll ? event => syncHorizontalScroll(event.currentTarget, topScrollRef.current) : undefined}
           style={topHorizontalScroll ? { width: tableWidth, minWidth: "100%" } : undefined}
         >
-          {(topHorizontalScroll || columnWidths) && <colgroup>{table.getVisibleLeafColumns().map(column => <col key={column.id} style={{ width: columnWidths?.[column.id] ?? (topHorizontalScroll ? column.getSize() : undefined) }} />)}</colgroup>}
+          {(topHorizontalScroll || columnWidths) && <TableColumns widths={table.getVisibleLeafColumns().map(column => ({ key: column.id, width: columnWidths?.[column.id] ?? (topHorizontalScroll ? column.getSize() : undefined) }))} />}
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
