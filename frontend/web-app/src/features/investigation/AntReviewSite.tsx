@@ -51,7 +51,7 @@ export function AntReviewSite() {
   }, [])
   useLayoutEffect(() => { document.documentElement.classList.toggle('dark', dark); document.documentElement.style.colorScheme = dark ? 'dark' : 'light' }, [dark])
   if (!fixture) return <Result status="403" title="합성 검수 전용 화면입니다." subTitle="VITE_API_MODE=fixture로 로컬 개발 서버에서만 실행할 수 있습니다. 실제 API에는 연결하지 않습니다." />
-  return <ConfigProvider locale={koKR} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm }}><WorkspaceProvider><ReviewShell dark={dark} setDark={setDark} /></WorkspaceProvider></ConfigProvider>
+  return <ConfigProvider locale={koKR} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { fontFamily: 'Pretendard', fontFamilyCode: 'Pretendard' } }}><WorkspaceProvider><ReviewShell dark={dark} setDark={setDark} /></WorkspaceProvider></ConfigProvider>
 }
 function ReviewShell({ dark, setDark }: { dark: boolean; setDark: (value: boolean) => void }) {
   const route = useSyncExternalStore(subscribe, snapshot)

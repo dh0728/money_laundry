@@ -270,7 +270,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         }
         // Obsidian처럼 확대할수록 이름이 드러난다. 의심 거래 계좌는 항상 표시
         if (n.core || scale > 2.2 || hoverKey === n.key) {
-          ctx.font = `${10 / scale}px ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+          ctx.font = `${10 / scale}px Pretendard`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'
           ctx.fillStyle = colors.muted; ctx.fillText(n.account, n.x!, n.y! + r + 3 / scale)
         }
         ctx.globalAlpha = 1
@@ -291,7 +291,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       linkCanvasObject={(l, ctx, scale) => {
         if (!(showInfo || hover?.key === l.key || selectedEdge === l.key)) return
         const s = l.source as FNode, t = l.target as FNode; if (typeof s !== 'object' || typeof t !== 'object') return
-        ctx.font = `${10 / scale}px ui-sans-serif, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = colors.fg
+        ctx.font = `${10 / scale}px Pretendard`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = colors.fg
         ctx.fillText(`${l.count}건 · ${formatGraphMoney(l)}`, (s.x! + t.x!) / 2, (s.y! + t.y!) / 2 - 4 / scale)
       }}
       onNodeHover={n => setHover(n ? { kind: 'node', key: n.key, ...pointer.current } : null)}

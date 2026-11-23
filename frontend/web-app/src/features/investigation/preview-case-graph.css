@@ -384,7 +384,7 @@
   font-size: var(--owner-label-size, var(--aml-type-caption-size));
   pointer-events: none;
 }
-.preview-owner-timeline .owner-time-node text { font-family: var(--aml-font-code, monospace) }
+.preview-owner-timeline .owner-time-node text { font-family: var(--aml-font-code) }
 .preview-graph-controls output {
   display: grid;
   place-items: center;

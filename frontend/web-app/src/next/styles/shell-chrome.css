@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./tokens.css";
 @import "./semantic-tokens.css";
+@import "./fonts.css";
 @source "../../components/ui/button.tsx";
 
 /* Only this development unit consumes v3. The existing app keeps its stylesheet. */

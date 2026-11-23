@@ -437,7 +437,7 @@ export function ForceCaseCanvas({
           paintLine(context, wrap.edgeId === growing?.id && growing
             ? { ...wrap, path: drawing.edges.get(wrap.edgeId).path } : wrap);
         }
-        context.font = `${11 / scale}px sans-serif`;
+        context.font = `${11 / scale}px Pretendard`;
       }}
       onRenderFramePost={(context, scale) => {
         if (timePlan && graph.current) drawTimeAxis(context, graph.current, scale,
@@ -453,7 +453,7 @@ export function ForceCaseCanvas({
           paintFlow(context, edge, ambientFlow, edge.stroke, scale);
         }
         if (!edge.text) return;
-        context.font = `${11 / scale}px sans-serif`;
+        context.font = `${11 / scale}px Pretendard`;
         context.textAlign = 'center';
         context.textBaseline = 'bottom';
         context.fillStyle = edge.textColor;
@@ -468,7 +468,7 @@ export function ForceCaseCanvas({
         context.fill();
         if (dot.stroke) { context.strokeStyle = dot.stroke; context.lineWidth = 2 / scale; context.stroke(); }
         if (!dot.text) return;
-        context.font = `${11 / scale}px sans-serif`;
+        context.font = `${11 / scale}px Pretendard`;
         context.textAlign = 'center';
         context.textBaseline = 'top';
         context.fillStyle = dot.textColor;

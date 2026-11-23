@@ -433,7 +433,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
         const section = sections[index]
         ctx.globalAlpha = .14; ctx.beginPath(); ctx.roundRect(section.x, section.y, section.width, section.height, 18 / scale)
         ctx.fillStyle = colors.muted; ctx.fill(); ctx.globalAlpha = .58; ctx.strokeStyle = colors.border; ctx.lineWidth = 1 / scale; ctx.stroke()
-        ctx.globalAlpha = .7; ctx.fillStyle = colors.muted; ctx.font = `${10 / scale}px ui-sans-serif, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
+        ctx.globalAlpha = .7; ctx.fillStyle = colors.muted; ctx.font = `${10 / scale}px Pretendard`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
         ctx.fillText(`연결 그룹 ${index + 1}`, section.x + 10 / scale, section.y - 6 / scale)
       }
       const orderedPaths = [...paths].sort((left, right) => left.edge.label - right.edge.label || left.edge.key.localeCompare(right.edge.key))
@@ -458,7 +458,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
         }
         if (showInfo || hover?.key === edge.key || selectedEdge === edge.key) {
           const point = pointOnOwnerLink(path, .5)
-          ctx.fillStyle = colors.fg; ctx.font = '11px ui-sans-serif, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+          ctx.fillStyle = colors.fg; ctx.font = '11px Pretendard'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
           ctx.fillText(`${edge.count}건 · ${formatGraphMoney(edge)}`, point.x, point.y - 5)
         }
       }
@@ -470,7 +470,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
         ctx.save(); ctx.beginPath(); ctx.roundRect(owner.x + 1, owner.y + 1, owner.width - 2, owner.height - 2, 9); ctx.clip()
         const compartments = ownerCompartments(owner)
         ctx.fillStyle = colors.header; ctx.fillRect(compartments.header.x, compartments.header.y, compartments.header.width, compartments.header.height)
-        ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = colors.fg; ctx.font = '600 12px ui-sans-serif, sans-serif'
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = colors.fg; ctx.font = '600 12px Pretendard'
         ctx.fillText(owner.name, owner.x + 12, owner.y + INSET + HEADER / 2, owner.width - 24)
         ctx.strokeStyle = colors.border
         ctx.beginPath(); ctx.moveTo(owner.x + INSET, owner.y + INSET + HEADER); ctx.lineTo(owner.x + owner.width - INSET, owner.y + INSET + HEADER); ctx.stroke()
@@ -484,8 +484,8 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
           const match = search && `${account.account} ${account.entity}`.toLowerCase().includes(search.toLowerCase())
           if (match && !selected && !hovered) { ctx.strokeStyle = colors.fg; ctx.lineWidth = 1 / scale; ctx.strokeRect(owner.x + 1, y + 1, owner.width - 2, height - 2) }
           ctx.fillStyle = selected ? colors.selectedFg : hovered ? colors.bg : suspicious ? colors.danger : colors.fg
-          ctx.font = '11px ui-monospace, monospace'; ctx.fillText(account.account, owner.x + 12, y + height / 2, owner.width - 70)
-          ctx.textAlign = 'right'; ctx.font = '9px ui-monospace, monospace'; ctx.fillText(account.bank, owner.x + owner.width - 10, y + height / 2, 42); ctx.textAlign = 'left'
+          ctx.font = '11px Pretendard'; ctx.fillText(account.account, owner.x + 12, y + height / 2, owner.width - 70)
+          ctx.textAlign = 'right'; ctx.font = '9px Pretendard'; ctx.fillText(account.bank, owner.x + owner.width - 10, y + height / 2, 42); ctx.textAlign = 'left'
           ctx.globalAlpha = 1; ctx.strokeStyle = colors.border; ctx.beginPath(); ctx.moveTo(owner.x + INSET, y + height); ctx.lineTo(owner.x + owner.width - INSET, y + height); ctx.stroke()
         })
         ctx.restore()

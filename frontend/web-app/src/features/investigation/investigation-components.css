@@ -141,7 +141,7 @@
   align-items: stretch;
   padding: var(--aml-space-12);
   color: inherit;
-  font-family: var(--aml-font-mono, monospace);
+  font-family: var(--aml-font-mono);
   font-size: var(--ui-font-size);
   line-height: 1.3;
 }

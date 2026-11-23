@@ -11,7 +11,7 @@
   .screen-layout > [data-case-list-table],
   [data-case-list-table] .case-table-scroll.entry-list { max-block-size: none }
 }
-.preview-case-table code { font-family: var(--aml-font-mono, monospace) }
+.preview-case-table code { font-family: var(--aml-font-mono) }
 .case-table-flows :is(code, small), .case-table-numeric > span { display: block }
 .preview-case-table tbody .case-table-numeric { text-align: end; font-variant-numeric: tabular-nums }
 .case-evidence-table { min-block-size: 0 }

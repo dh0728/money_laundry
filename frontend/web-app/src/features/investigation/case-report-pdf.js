@@ -4,7 +4,7 @@ import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.
 
 const page = { width: 620, height: 877, margin: 44, limit: 819, scale: 2 };
 const contentWidth = page.width - 2 * page.margin;
-const fontFamily = '"Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", sans-serif';
+const fontFamily = 'Pretendard';
 const colors = { ink: '#14243a', muted: '#526278', line: '#dbe4ec', soft: '#edf3f8', paper: '#ffffff',
   brand: '#164e63', normal: '#166534', abnormal: '#a32435' };
 const number = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 12 });

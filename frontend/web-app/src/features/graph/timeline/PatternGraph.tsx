@@ -141,7 +141,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
         const s = l.source as PNode, t = l.target as PNode; if (s.x == null || t.x == null) return
         const cp = l.__controlPoints, mx = cp ? 0.25 * s.x! + 0.5 * cp[0] + 0.25 * t.x! : (s.x! + t.x!) / 2, my = cp ? 0.25 * s.y! + 0.5 * cp[1] + 0.25 * t.y! : (s.y! + t.y!) / 2
         const text = l.merged ? `${l.count}건 · ${usdShort(l.sumUsd)}` : usdShort(l.sumUsd)
-        ctx.font = '12px ui-sans-serif, sans-serif'; const w = ctx.measureText(text).width + 10
+        ctx.font = '12px Pretendard'; const w = ctx.measureText(text).width + 10
         ctx.fillStyle = colors.bg; ctx.globalAlpha = 0.92; ctx.beginPath(); ctx.roundRect(mx - w / 2, my - 9, w, 18, 4); ctx.fill(); ctx.globalAlpha = 1
         ctx.strokeStyle = colors.border; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = colors.fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, mx, my)
       }}
@@ -149,8 +149,8 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
         const on = selectedIds.has(n.id), x = n.x ?? 0, y = n.y ?? 0
         ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fillStyle = colors.card; ctx.fill()
         ctx.lineWidth = on ? 4 : 2; ctx.strokeStyle = on ? colors.blue : colors.border; ctx.stroke()
-        ctx.fillStyle = colors.fg; ctx.font = 'bold 20px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(n.n), x, y + 1)
-        ctx.font = '12px ui-monospace, monospace'; ctx.fillStyle = colors.muted; ctx.textBaseline = 'top'; ctx.fillText(n.id, x, y + R + 4)
+        ctx.fillStyle = colors.fg; ctx.font = 'bold 20px Pretendard'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(n.n), x, y + 1)
+        ctx.font = '12px Pretendard'; ctx.fillStyle = colors.muted; ctx.textBaseline = 'top'; ctx.fillText(n.id, x, y + R + 4)
       }}
       nodePointerAreaPaint={(n: PNode, color: string, ctx: CanvasRenderingContext2D) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(n.x ?? 0, n.y ?? 0, R + 4, 0, Math.PI * 2); ctx.fill() }}
       onLinkClick={(l: PLink) => onSelect({ type: 'link', id: l.pair })} 

@@ -2,7 +2,7 @@ export const graphTimeStep = 120;
 const sameTimeGap = 42;
 const clockFormat = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
-export const graphTimePill = { top: 5, height: 18, radius: 9, textY: 17, fontSize: 11, fontFamily: 'monospace' };
+export const graphTimePill = { top: 5, height: 18, radius: 9, textY: 17, fontSize: 11, fontFamily: 'Pretendard' };
 export const graphTimeAxisInset = 28;
 
 function graphTimePillWidth(label) {

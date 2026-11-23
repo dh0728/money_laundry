@@ -30,7 +30,7 @@
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: var(--aml-font-mono, monospace);
+  font-family: var(--aml-font-mono);
 }
 
 .card-header > .work-tab-add.button[data-add-work-tab] {

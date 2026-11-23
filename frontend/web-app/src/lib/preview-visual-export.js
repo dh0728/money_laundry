@@ -33,7 +33,7 @@ function svg(tag, attributes = {}) {
 
 export function makeGraphSnapshot({ width, height, nodes, edges, wraps = [] }) {
   const drawing = svg('svg', { width, height, viewBox: `0 0 ${width} ${height}` });
-  const textStyle = { 'font-family': 'sans-serif', 'font-size': 11, 'text-anchor': 'middle' };
+  const textStyle = { 'font-family': 'Pretendard', 'font-size': 11, 'text-anchor': 'middle' };
   const label = (text, attributes) => {
     const element = svg('text', { ...textStyle, ...attributes });
     element.textContent = text;

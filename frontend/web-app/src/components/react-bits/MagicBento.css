@@ -615,7 +615,8 @@
 }
 
 .magic-bento__flow-hash {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: Pretendard;
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 

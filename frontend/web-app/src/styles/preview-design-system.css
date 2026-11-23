@@ -6,7 +6,7 @@
 /* Map the standalone workspace's existing component tokens to the shared design system. */
 :root {
   --aml-layout-max-width: 1440px;
-  --aml-font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --aml-font-mono: Pretendard;
   --aml-size-icon-mini: var(--aml-space-12);
   --aml-size-icon-large: var(--aml-space-24);
   --aml-stroke-icon: 1.6;
