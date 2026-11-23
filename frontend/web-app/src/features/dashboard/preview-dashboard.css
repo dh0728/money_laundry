@@ -32,11 +32,16 @@
   gap: var(--workspace-gap);
 }
 .dashboard-top { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-content: start; align-items: stretch }
+.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top { grid-template-columns: repeat(12, minmax(0, 1fr)) }
+.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top > .dashboard-summary-card { grid-column: 1 / 5 }
+.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top > .dashboard-metrics-box { grid-column: 1 / -1 }
 .preview-dashboard[data-mine="true"] .dashboard-top {
   --dashboard-metric-plot-min: 4.5rem;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   word-break: keep-all;
 }
+.preview-dashboard[data-mine="true"] .dashboard-top > .dashboard-summary-card { grid-column: 1 / 5 }
+.preview-dashboard[data-mine="true"] .dashboard-top > .dashboard-metrics-box { grid-column: 5 / -1 }
 .dashboard-summary-card, .dashboard-chart { min-width: 0 }
 .dashboard-summary-card {
   display: flex;
@@ -444,15 +449,16 @@
 }
 
 @container dashboard-metrics (min-width: 800px) {
-  .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(15, minmax(0, 1fr)) !important }
-  .dashboard-metrics-box[data-wide="true"] .magic-bento__cell { grid-column: span 3 !important }
-  .dashboard-metrics-box[data-wide="true"] .magic-bento__cell:nth-child(-n+3) { grid-column: span 5 !important }
+  .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(12, minmax(0, 1fr)) !important }
+  .dashboard-metrics-box[data-wide="true"] .magic-bento__cell { grid-column: span 4 !important }
 }
 @container dashboard-metrics (max-width: 580px) {
   .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(2, minmax(0, 1fr)) !important }
 }
 @media (max-width: 930px) {
   .preview-dashboard[data-mine] .dashboard-top { grid-template-columns: minmax(0, 1fr) }
+  .preview-dashboard .dashboard-top { grid-template-columns: minmax(0, 1fr) }
+  .preview-dashboard .dashboard-top > * { grid-column: auto }
 }
 @media (max-width: 660px) {
   .dashboard-analytics-row,
