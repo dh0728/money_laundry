@@ -5,6 +5,7 @@ on:
     branches:
       - dev
       - master
+      - fe/work
 
   pull_request:
     branches:
@@ -61,7 +62,8 @@ jobs:
 
   backend:
     name: Backend Test and Build
-    if: github.event_name != 'pull_request' || github.base_ref != 'frontend'
+    # fe/work push는 프론트 작업 브랜치라 프론트 검사만 돈다.
+    if: (github.event_name != 'pull_request' || github.base_ref != 'frontend') && github.ref != 'refs/heads/fe/work'
     runs-on: ubuntu-24.04
 
     defaults:
@@ -134,6 +136,9 @@ jobs:
 
       - name: Run frontend lint
         run: pnpm run lint
+
+      - name: Check design rules (tree report, ratchet caps)
+        run: pnpm run lint:design
 
       - name: Run frontend tests
         run: pnpm test --maxWorkers 4
