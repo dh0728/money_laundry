@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 import stylelint from 'stylelint'
-import { designRules, pluginRuleName } from './design-rules.mjs'
+import { bannedIconPackage, designRules, pluginRuleName } from './design-rules.mjs'
 
 export const appRoot = resolve(import.meta.dirname, '..')
 export const rel = file => relative(appRoot, resolve(appRoot, file)).split(sep).join('/')
@@ -21,7 +21,6 @@ const TABLE_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'
 const ARBITRARY_CLASS = /^(?:\S*:)?!?-?[a-z][\w-]*-\[[^\]\s]+\]$/
 const FONT_VALUE_OK = /^(inherit|initial|unset|var\(--[\w-]*font[\w-]*\))$/
 const CHART_SOURCES = /^(recharts|d3(-[\w-]+)?|d3-sankey|react-force-graph(-[\w-]+)?|@xyflow\/react|elkjs(\/.*)?)$/
-const ICON_SOURCES = /^(@hugeicons\/|react-icons|@radix-ui\/react-icons|@tabler\/icons|@phosphor-icons\/|@heroicons\/|@fortawesome\/)/
 const TABLE_LIBRARIES = /^(antd\/(es|lib)\/table|@mui\/x-data-grid|ag-grid-[\w-]+|react-data-grid)/
 const MOTION_SOURCES = /^(motion|motion\/react|framer-motion)$/
 export const MOTION_HELPER = 'src/hooks/use-reduced-motion.ts'
@@ -138,7 +137,8 @@ const eslintRules = {
     ImportExpression(node) { if (CHART_SOURCES.test(node.source.value ?? '')) report(node, `${node.source.value}는 공용 차트 부품을 거쳐 쓴다.`) },
   }),
   'icon-library': eslintRule('icon/library', ({ report }) => ({
-    ImportDeclaration(node) { if (ICON_SOURCES.test(node.source.value)) report(node, `${node.source.value} 대신 lucide-react 아이콘을 쓴다.`) },
+    ImportDeclaration(node) { if (bannedIconPackage(node.source.value)) report(node, `${node.source.value} 대신 lucide-react 아이콘을 쓴다(아이콘 패키지는 lucide-react만).`) },
+    ImportExpression(node) { if (typeof node.source.value === 'string' && bannedIconPackage(node.source.value)) report(node, `${node.source.value} 대신 lucide-react 아이콘을 쓴다.`) },
   })),
   'contrast-shape-motion-setting': eslintRule('contrast-shape/motion-setting', ({ path, report }) => path === MOTION_HELPER ? {} : {
     CallExpression(node) {

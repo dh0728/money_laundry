@@ -11,18 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode
 } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  FigmaIcon,
-  FingerPrintIcon,
-  GitBranchIcon,
-  GithubIcon,
-  Key01Icon,
-  NotionIcon,
-  SlackIcon,
-  SparklesIcon,
-  Tick02Icon
-} from '@hugeicons/core-free-icons';
+import { Check, Figma, Fingerprint, GitBranch, Github, KeyRound, NotebookText, Slack, Sparkles, type LucideIcon } from 'lucide-react';
 
 import './MagicBento.css';
 import { appReducedMotion } from '@/hooks/use-reduced-motion';
@@ -452,7 +441,7 @@ const AutomationVisual = () => (
   <div className="magic-bento__flow" style={vars({ '--n': STEPS.length })}>
     <div className="magic-bento__flow-trigger magic-bento__tile">
       <span className="magic-bento__flow-glyph">
-        <HugeiconsIcon icon={GitBranchIcon} size={15} strokeWidth={1.8} />
+        <GitBranch size={15} strokeWidth={1.8} aria-hidden="true" />
       </span>
       <span className="magic-bento__flow-copy">
         <span className="magic-bento__flow-name">Push to main</span>
@@ -469,7 +458,7 @@ const AutomationVisual = () => (
             <span className="magic-bento__pending" />
             <span className="magic-bento__spinner" />
             <span className="magic-bento__done">
-              <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2.6} />
+              <Check size={11} strokeWidth={2.6} aria-hidden="true" />
             </span>
           </span>
           {step.label}
@@ -480,11 +469,11 @@ const AutomationVisual = () => (
   </div>
 );
 
-const APPS = [
-  { icon: SlackIcon, x: '17%', y: '24%' },
-  { icon: GithubIcon, x: '83%', y: '24%' },
-  { icon: FigmaIcon, x: '17%', y: '78%' },
-  { icon: NotionIcon, x: '83%', y: '78%' }
+const APPS: { icon: LucideIcon; x: string; y: string }[] = [
+  { icon: Slack, x: '17%', y: '24%' },
+  { icon: Github, x: '83%', y: '24%' },
+  { icon: Figma, x: '17%', y: '78%' },
+  { icon: NotebookText, x: '83%', y: '78%' }
 ];
 
 const IntegrationVisual = () => (
@@ -507,28 +496,28 @@ const IntegrationVisual = () => (
         className="magic-bento__hub-node magic-bento__tile"
         style={vars({ '--x': app.x, '--y': app.y, '--s': '26px', '--i': index + 1 })}
       >
-        <HugeiconsIcon icon={app.icon} size={14} strokeWidth={1.8} />
+        <app.icon size={14} strokeWidth={1.8} aria-hidden="true" />
       </span>
     ))}
     <span
       className="magic-bento__hub-node magic-bento__tile"
       style={vars({ '--x': '50%', '--y': '51%', '--s': '34px', '--i': 0 })}
     >
-      <HugeiconsIcon icon={SparklesIcon} size={17} strokeWidth={1.8} />
+      <Sparkles size={17} strokeWidth={1.8} aria-hidden="true" />
     </span>
   </div>
 );
 
-const SETTINGS = [
-  { icon: Key01Icon, label: 'SSO' },
-  { icon: FingerPrintIcon, label: '2FA' }
+const SETTINGS: { icon: LucideIcon; label: string }[] = [
+  { icon: KeyRound, label: 'SSO' },
+  { icon: Fingerprint, label: '2FA' }
 ];
 
 const SecurityVisual = () => (
   <div className="magic-bento__shield">
     {SETTINGS.map((setting, index) => (
       <div key={setting.label} className="magic-bento__setting magic-bento__tile">
-        <HugeiconsIcon icon={setting.icon} size={14} strokeWidth={1.8} />
+        <setting.icon size={14} strokeWidth={1.8} aria-hidden="true" />
         <span className="magic-bento__setting-label">{setting.label}</span>
         <span className="magic-bento__switch" style={vars({ '--i': index })} />
       </div>

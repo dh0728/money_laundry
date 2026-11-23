@@ -21,8 +21,6 @@
     "prepare": "node -e \"try{require('child_process').execSync('lefthook install',{stdio:'ignore'})}catch{}\""
   },
   "dependencies": {
-    "@hugeicons/core-free-icons": "4.3.3",
-    "@hugeicons/react": "1.1.10",
     "@number-flow/react": "^0.6.2",
     "@tanstack/react-table": "^8.21.3",
     "@xyflow/react": "12.12.0",

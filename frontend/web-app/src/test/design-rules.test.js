@@ -2,7 +2,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { designRules } from '../../scripts/design-rules.mjs';
+import { bannedIconPackage, designRules } from '../../scripts/design-rules.mjs';
 
 const app = resolve(import.meta.dirname, '../..');
 const repo = resolve(app, '../..');
@@ -57,6 +57,21 @@ describe('contrast-shape/motion-setting', () => {
     const helper = read('src/hooks/use-reduced-motion.ts');
     for (const name of ['appReducedMotion', 'useAppReducedMotion', 'subscribeReducedMotion', 'MotionGlobalConfig.skipAnimations', 'dataset.reducedMotion'])
       expect(helper).toContain(name);
+  });
+});
+
+describe('icon/library', () => {
+  it('아이콘 의존성은 lucide-react 하나다', () => {
+    const pkg = json('package.json');
+    const names = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    expect(names).toContain('lucide-react');
+    expect(names.filter(bannedIconPackage)).toEqual([]);
+  });
+  it('허용 목록 밖의 아이콘 패키지는 막는다', () => {
+    for (const source of ['@hugeicons/react', '@iconify/react', '@mui/icons-material/Add', 'react-feather', '@tabler/icons-react', 'lucide'])
+      expect(bannedIconPackage(source), source).toBe(true);
+    for (const source of ['lucide-react', '../components/icon-button', '@/components/icon-button', 'react', '@number-flow/react'])
+      expect(bannedIconPackage(source), source).toBe(false);
   });
 });
 

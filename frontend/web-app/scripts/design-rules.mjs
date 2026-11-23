@@ -43,9 +43,9 @@ export const designRuleTree = [
     ],
   },
   {
-    id: 'icon', title: '아이콘은 lucide 하나', source: 'DP:164',
+    id: 'icon', title: '아이콘은 lucide 하나', source: 'DP:164, 명기 2026-11-24',
     rules: [
-      { id: 'icon/library', title: 'lucide-react 외 아이콘 라이브러리 금지', engine: 'eslint', level: 'ratchet' },
+      { id: 'icon/library', title: '아이콘 패키지는 lucide-react만(허용 목록, 다른 아이콘 패키지 import·의존성 금지)', engine: 'eslint+test', level: 'error', test: 'src/test/design-rules.test.js' },
     ],
   },
   {
@@ -78,3 +78,13 @@ export const designRules = designRuleTree.flatMap(category => category.rules.map
 export const ruleById = new Map(designRules.map(rule => [rule.id, rule]))
 /** eslint·stylelint 플러그인 안 규칙 이름. 'token/raw-color' → 'aml/token-raw-color' */
 export const pluginRuleName = id => `aml/${id.replace('/', '-')}`
+
+// 아이콘은 lucide-react만 허용한다(허용 목록). 패키지 이름에 icon이 들어가거나 이름에 icon이 없는 알려진 아이콘 패키지면 막는다.
+export const ICON_ALLOWED = 'lucide-react'
+export const ICON_PACKAGE = /icon|^react-feather$|^feather-icons|^@mdi\/|octicons|^remixicon|^boxicons|^@iconify|^lucide$|^@lucide\//i
+export const packageName = source => source.startsWith('@') ? source.split('/').slice(0, 2).join('/') : source.split('/')[0]
+export const bannedIconPackage = source => {
+  if (/^(\.|\/|@\/)/.test(source)) return false
+  const name = packageName(source)
+  return name !== ICON_ALLOWED && ICON_PACKAGE.test(name)
+}
