@@ -89,10 +89,25 @@ public class LedgerQueryService {
     // Candidate selection needs scores only when judgement is actually filtered.
     // Type probabilities and presentation names belong to the returned page.
     boolean needsScores = filter.judgement() != null && !filter.judgement().isEmpty();
-    boolean needsIdentity =
-        filter.owner() != null
-            || filter.account() != null
-            || (filter.query() != null && !filter.query().isBlank());
+    boolean needsIdentity = filter.query() != null && !filter.query().isBlank();
+    // Resolve owner/account to internal account ids first so the transaction
+    // filter can use the transactions_from_time / transactions_to_time indexes.
+    Long[] ownerAccounts =
+        filter.owner() == null
+            ? null
+            : jdbc.queryForList(
+                    "select a.account_id from core.accounts a join core.owners e using(owner_id) where e.service_owner_id=?",
+                    Long.class,
+                    filter.owner())
+                .toArray(Long[]::new);
+    Long[] account =
+        filter.account() == null
+            ? null
+            : jdbc.queryForList(
+                    "select account_id from core.accounts where service_account_id=?",
+                    Long.class,
+                    filter.account())
+                .toArray(Long[]::new);
     var sql =
         new StringBuilder(
             (needsIdentity ? ACCOUNTS : " from ledger.transactions t ")
@@ -107,14 +122,14 @@ public class LedgerQueryService {
       args.add(Timestamp.from(filter.to().plusDays(1).atStartOfDay(BusinessTime.KST).toInstant()));
     }
     if (filter.owner() != null) {
-      sql.append(" and (fe.service_owner_id=? or re.service_owner_id=?)");
-      args.add(filter.owner());
-      args.add(filter.owner());
+      sql.append(" and (t.from_account_id=any(?) or t.to_account_id=any(?))");
+      args.add(ownerAccounts);
+      args.add(ownerAccounts);
     }
     if (filter.account() != null) {
-      sql.append(" and (f.service_account_id=? or r.service_account_id=?)");
-      args.add(filter.account());
-      args.add(filter.account());
+      sql.append(" and (t.from_account_id=any(?) or t.to_account_id=any(?))");
+      args.add(account);
+      args.add(account);
     }
     if (filter.judgement() != null && !filter.judgement().isEmpty()) {
       if (!Set.of("SUSPICIOUS", "NORMAL", "UNANALYZED").containsAll(filter.judgement()))
@@ -159,8 +174,8 @@ public class LedgerQueryService {
       var directionClauses = new ArrayList<String>();
       for (String direction : filter.directions()) {
         directionClauses.add(
-            direction.equals("IN") ? "r.service_account_id=?" : "f.service_account_id=?");
-        args.add(filter.account());
+            direction.equals("IN") ? "t.to_account_id=any(?)" : "t.from_account_id=any(?)");
+        args.add(account);
       }
       sql.append(" and (").append(String.join(" or ", directionClauses)).append(")");
     }
