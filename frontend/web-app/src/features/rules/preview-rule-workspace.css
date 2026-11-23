@@ -27,7 +27,7 @@
 .workflow-rule-list .data-table-scroll { scrollbar-gutter: auto }
 .workflow-rule-detail { grid-area: detail }
 .workflow-rule-reason { grid-area: reason }
-.workflow-rule-detail, .workflow-rule-reason { align-self: start }
+.workflow-rule-detail, .workflow-rule-reason { align-self: stretch }
 .workflow-rule-note { color: var(--muted-text); font-size: var(--aml-type-caption-size) }
 .screen-layout:has(> [data-rule-editor], .workflow-rule-overview) {
   padding-block-end: max(var(--workspace-inset), var(--account-footer-reserve));
@@ -40,7 +40,7 @@
 
 .screen-row.screen-rule-editor {
   grid-template-columns: minmax(16rem, 2fr) minmax(0, 3fr);
-  align-items: start;
+  align-items: stretch;
 }
 
 .workflow-rule-overview .screen-panel,

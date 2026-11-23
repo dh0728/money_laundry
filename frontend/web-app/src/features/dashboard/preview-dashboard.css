@@ -31,7 +31,7 @@
   display: grid;
   gap: var(--workspace-gap);
 }
-.dashboard-top { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-content: start }
+.dashboard-top { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-content: start; align-items: stretch }
 .preview-dashboard[data-mine="true"] .dashboard-top {
   --dashboard-metric-plot-min: 4.5rem;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -106,10 +106,12 @@
   line-height: var(--aml-type-caption-lineHeight);
 }
 .dashboard-legend { display: flex; flex-wrap: wrap; gap: var(--workspace-gap) }
-.dashboard-metrics-box { min-width: 0; container: dashboard-metrics / inline-size; display: grid }
+.dashboard-metrics-box { min-width: 0; container: dashboard-metrics / inline-size; display: grid; block-size: 100%; align-self: stretch }
 .dashboard-metrics.magic-bento {
+  block-size: 100%;
+  align-content: stretch;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  grid-auto-rows: minmax(var(--aml-space-64), auto) !important;
+  grid-auto-rows: minmax(var(--aml-space-64), 1fr) !important;
 }
 .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(4, minmax(0, 1fr)) !important }
 .dashboard-metrics .magic-bento__cell { grid-column: auto !important }
@@ -403,7 +405,7 @@
 .dashboard-board-actions { display: flex; align-items: center; gap: var(--workspace-gap); margin-inline-start: auto }
 .dashboard-board-scroll {
   min-inline-size: 0;
-  padding: max(0px, calc(var(--record-card-shadow-gutter) - var(--aml-panel-inset)));
+  padding: 0;
 }
 .dashboard-board-heading h2 {
   margin: 0;

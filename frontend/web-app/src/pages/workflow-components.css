@@ -167,7 +167,8 @@
 .workflow-report-cards {
   container-type: inline-size;
   margin-block-start: var(--workspace-gap);
-  padding: var(--record-card-shadow-gutter);
+  padding-block: var(--record-card-shadow-gutter);
+  padding-inline: 0;
 }
 .workflow-report .data-table-scroll,
 .workflow-backtest .data-table-scroll {
@@ -177,6 +178,13 @@
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   grid-auto-rows: minmax(var(--aml-size-control-compact), auto) !important;
   align-items: stretch;
+}
+.workflow-report-cards .report-bento .magic-bento__cell,
+.workflow-report-cards .report-bento .magic-bento__card,
+.workflow-report-cards .report-bento .magic-bento__content,
+.workflow-report-cards .report-bento .magic-bento__content > [data-glow-surface] {
+  align-self: stretch;
+  block-size: 100%;
 }
 @container (max-width: 950px) {
   .workflow-report-cards .report-bento {
