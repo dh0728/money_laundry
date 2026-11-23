@@ -11,6 +11,10 @@ const kstDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year:
 const dateKey = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
   .map(value => String(value).padStart(2, '0')).join('-');
 const sum = (rows, key) => rows.reduce((total, row) => total + row[key], 0);
+const dayMs = 86400000;
+const endOfDay = day => new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime() - 1;
+// 그 시각에 남아 있던 사건 수: 그때까지 생성됐고 아직 완료되지 않은 사건.
+const openAt = (rows, at) => rows.filter(row => +new Date(row.createdAt) <= at && !(row.completedAt && +new Date(row.completedAt) <= at)).length;
 
 export const liveDashboardAsOf = source => new Date(`${kstDate.format(new Date(source.businessAt))}T00:00:00`);
 
@@ -36,6 +40,8 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const ledgerHours = new Map(ledger?.hours.map(hour => [hour.hour, hour]));
 
   const alertCases = cases.filter(row => row.kind === 'Alert');
+  const episodeCases = cases.filter(row => row.kind === 'Episode');
+  const businessAt = +new Date(source.businessAt);
   const linked = new Set(alertCases.flatMap(row => row.related.map(transaction => transaction.code)));
   const byDay = Map.groupBy(cases, row => dateKey(row.date));
   const membersByDay = Map.groupBy(members, row => dateKey(row.date));
@@ -51,6 +57,7 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     const transfers = membersByDay.get(date) ?? [];
     const suspicious = transfers.filter(row => row.suspicious);
     const counted = ledgerDays.get(date);
+    const closing = Math.min(endOfDay(day), businessAt);
     dailyAlertStatus.push({
       date,
       pending: alerts.filter(row => row.status === '처리 전').length,
@@ -65,6 +72,9 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
       alerts: alerts.length,
       openAlerts: alerts.filter(row => row.open).length,
       openEpisodes: dayCases.filter(row => row.kind === 'Episode' && row.open).length,
+      // 그날 마감 시점에 남은 미처리 Alert·미완료 Episode. 생성일과 상관없이 그때 열려 있던 사건을 모두 센다.
+      backlogAlerts: openAt(alertCases, closing),
+      backlogEpisodes: openAt(episodeCases, closing),
       // 그날 처음 등장한 계좌·소유주 수는 전체 원장 기준 서버 집계다. 일부 사건만 볼 때는 세지 않는다.
       newAccounts: counted?.newAccounts ?? 0, newOwners: counted?.newOwners ?? 0,
       settled: dayCases.filter(row => !row.open).length,
@@ -77,6 +87,8 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const unfinished = owned.filter(row => row.open);
   const highRiskAlerts = unfinished.filter(row => row.kind === 'Alert' && modelRiskBand(row.score) === 'high');
   const overdueCases = unfinished.filter(row => row.elapsed >= 3);
+  // 처리율은 지표 정의를 따른다: 기준 시각 전 30일 안에 생성된 Alert 중 완료된 비율.
+  const cohort = completedPopulation.filter(row => row.kind === 'Alert' && +new Date(row.createdAt) > businessAt - 30 * dayMs);
   const patternCounts = new Map();
   if (ledger) {
     for (const { type, count } of ledger.types) patternCounts.set(type === 'NON_PATTERN' ? '미분류' : type, count);
@@ -106,10 +118,21 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
       count: ledger
         ? ledger.scores.filter(point => modelRiskBand(point.scorePct) === key).reduce((total, point) => total + point.count, 0)
         : flagged.filter(row => modelRiskBand(row.score) === key).length })),
+    // 서버는 의심 거래 점수만 내려 준다. 전체 채점 거래 분모가 생기기 전까지 화면에 기준을 밝힌다.
+    scoreBasis: { kind: 'suspicious' },
+    alertCohort: { days: 30, total: cohort.length, completed: cohort.filter(row => !row.open).length },
+    aged: {
+      alerts: alertCases.filter(row => row.open && row.elapsed >= 3).length,
+      episodes: episodeCases.filter(row => row.open && row.elapsed >= 3).length,
+    },
     settled: cases.filter(row => !row.open).length,
     ownedAlerts: owned.filter(row => row.kind === 'Alert').length,
     highRisk: highRiskAlerts.length,
     overdue: overdueCases.length,
+    overdueAlerts: overdueCases.filter(row => row.kind === 'Alert').length,
+    overdueEpisodes: overdueCases.filter(row => row.kind === 'Episode').length,
+    unfinishedAlerts: unfinished.filter(row => row.kind === 'Alert').length,
+    unfinishedEpisodes: unfinished.filter(row => row.kind === 'Episode').length,
     unfinished: unfinished.length,
     urgent: highRiskAlerts.filter(row => row.elapsed >= 3).length,
     newAccounts: sum(operationalDaily, 'newAccounts'), newOwners: sum(operationalDaily, 'newOwners'),
