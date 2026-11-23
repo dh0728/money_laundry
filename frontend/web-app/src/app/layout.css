@@ -943,11 +943,14 @@ body:has(#footer-pagination > *) #workspace {
   --panel-material-depth: 0 0 0 transparent;
 }
 :root:not([data-glassmorphism="false"]) :is(.screen-panel, .panel-inset, .dashboard-metrics .magic-bento__card) {
+  --panel-sunken-shadow: color-mix(in srgb, var(--panel-light-source, var(--information-panel-surface)) 28%, var(--aml-black-100));
   --panel-material-depth:
-    inset 0 var(--aml-stroke-control) var(--aml-space-4) var(--glass-shell-highlight),
-    inset 0 0 var(--aml-space-12) light-dark(var(--aml-white-060), var(--aml-white-010));
+    inset 0 var(--aml-stroke-control) var(--aml-space-4)
+      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) 22%, transparent), var(--glass-shell-highlight)),
+    inset 0 var(--aml-space-2) var(--aml-space-12)
+      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) 16%, transparent), var(--aml-white-010));
 }
-.dashboard-metrics .magic-bento__card { --mb-shadow: var(--panel-edge-depth), var(--panel-material-depth) }
+.dashboard-metrics .magic-bento__card { box-shadow: var(--panel-edge-depth), var(--panel-material-depth) }
 /* 그래프처럼 내용이 면을 덮는 패널은 안쪽 빛을 내용 위에 한 번 더 그린다. */
 .screen-panel[data-panel-depth="over-content"] { box-shadow: none }
 .screen-panel[data-panel-depth="over-content"]::after {
