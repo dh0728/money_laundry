@@ -18,7 +18,7 @@
     "build-storybook": "storybook build --disable-telemetry",
     "tokens:sync": "node scripts/sync-v3-tokens.mjs",
     "tokens:preview:sync": "node scripts/sync-preview-figma-colors.mjs",
-    "prepare": "node -e \"try{require('child_process').execFileSync('lefthook',['install'],{stdio:'ignore',shell:true})}catch{}\""
+    "prepare": "node -e \"try{require('child_process').execSync('lefthook install',{stdio:'ignore'})}catch{}\""
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "4.3.3",
