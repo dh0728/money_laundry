@@ -32,9 +32,11 @@
   gap: var(--workspace-gap);
 }
 .dashboard-top { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-content: start; align-items: stretch }
-.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top { grid-template-columns: repeat(12, minmax(0, 1fr)) }
-.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top > .dashboard-summary-card { grid-column: 1 / 5 }
-.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top > .dashboard-metrics-box { grid-column: 1 / -1 }
+/* Wide dashboard: AI summary and bento cells share one 12-column grid; spans come from packBentoSpans and dense flow packs them without holes. */
+.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-flow: row dense }
+.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top > .dashboard-summary-card { grid-column: 1 / span 4; grid-row: span 2 }
+.preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"],
+.preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] > .dashboard-metrics.magic-bento { display: contents }
 .preview-dashboard[data-mine="true"] .dashboard-top {
   --dashboard-metric-plot-min: 4.5rem;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -118,8 +120,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   grid-auto-rows: minmax(var(--aml-space-64), 1fr) !important;
 }
-.dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(4, minmax(0, 1fr)) !important }
-.dashboard-metrics .magic-bento__cell { grid-column: auto !important }
+.dashboard-metrics-box:not([data-wide="true"]) .magic-bento__cell { grid-column: auto !important }
 .dashboard-metrics .magic-bento__card {
   --panel-content-padding: var(--aml-panel-text-inset, var(--ui-panel-padding));
   --mb-radius: var(--aml-radius-panel, var(--aml-radius-card));
@@ -155,6 +156,12 @@
 }
 .dashboard-metric-value[data-composite] > span { white-space: nowrap }
 .dashboard-metric-value[data-composite] > small { align-self: center }
+.dashboard-metric-value[data-composite] > small[aria-hidden] {
+  margin-inline: 0;
+  font-size: 1em;
+  font-weight: var(--aml-type-body-weight);
+  color: var(--muted-text);
+}
 .dashboard-metric-value small {
   margin-inline-start: var(--aml-space-4);
   font-size: var(--aml-type-label-size);
@@ -448,17 +455,16 @@
   .dashboard-loading [data-slot="skeleton"] { animation: none }
 }
 
-@container dashboard-metrics (min-width: 800px) {
-  .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(12, minmax(0, 1fr)) !important }
-  .dashboard-metrics-box[data-wide="true"] .magic-bento__cell { grid-column: span 4 !important }
-}
 @container dashboard-metrics (max-width: 580px) {
   .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(2, minmax(0, 1fr)) !important }
 }
 @media (max-width: 930px) {
   .preview-dashboard[data-mine] .dashboard-top { grid-template-columns: minmax(0, 1fr) }
   .preview-dashboard .dashboard-top { grid-template-columns: minmax(0, 1fr) }
-  .preview-dashboard .dashboard-top > * { grid-column: auto }
+  .preview-dashboard .dashboard-top > * { grid-column: auto; grid-row: auto }
+  .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] { display: grid }
+  .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] > .dashboard-metrics.magic-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) !important }
+  .preview-dashboard .dashboard-metrics-box[data-wide="true"] .magic-bento__cell { grid-column: auto !important }
 }
 @media (max-width: 660px) {
   .dashboard-analytics-row,

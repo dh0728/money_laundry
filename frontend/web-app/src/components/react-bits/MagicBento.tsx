@@ -50,6 +50,8 @@ export interface MagicBentoItem {
 export interface MagicBentoProps {
   items?: MagicBentoItem[];
   columns?: number;
+  /** Keep `columns` tracks at every width; the host CSS owns narrow layouts. */
+  fixedColumns?: boolean;
   rowHeight?: number;
   gap?: number;
   radius?: number;
@@ -571,6 +573,7 @@ const nameOf = (animation: Animation) => (animation as CSSAnimation).animationNa
 const MagicBento = ({
   items = DEFAULT_ITEMS,
   columns = 4,
+  fixedColumns = false,
   rowHeight = 200,
   gap = 12,
   radius = 20,
@@ -1119,7 +1122,7 @@ const MagicBento = ({
   const ink = INK[palette];
   const accent = parseRgb(glowColor) ?? ink;
   const corner = Math.max(0, radius);
-  const span = Math.max(1, cols);
+  const span = fixedColumns ? Math.max(1, Math.round(columns)) : Math.max(1, cols);
 
   return (
     <div

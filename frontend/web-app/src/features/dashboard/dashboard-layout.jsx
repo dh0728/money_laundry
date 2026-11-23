@@ -6,12 +6,28 @@ import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
 
+// Packs cells row by row next to a lead block (the AI summary) so every row is filled with no holes.
+// Rows beside the lead have columns - leadSpan free; each row takes as many cells as fit at minSpan and splits the width evenly.
+export function packBentoSpans(count, { columns = 12, leadSpan = 0, leadRows = 0, minSpan = 3 } = {}) {
+  const spans = [];
+  for (let row = 0; spans.length < count; row += 1) {
+    const free = row < leadRows ? columns - leadSpan : columns;
+    const take = Math.min(count - spans.length, Math.max(1, Math.floor(free / minSpan)));
+    const base = Math.floor(free / take);
+    for (let index = 0; index < take; index += 1) spans.push(base + (index < free % take ? 1 : 0));
+  }
+  return spans;
+}
+
+const wideLayout = { columns: 12, leadSpan: 4, leadRows: 2, minSpan: 3 };
+
 export function DashboardMetricGrid({ items, wide = false, appearance, loading = false }) {
+  const spans = wide ? packBentoSpans(items.length, wideLayout) : [];
   return <div className="dashboard-metrics-box" data-wide={wide}>
     <MagicBento key={String(appearance.reduced)} className="dashboard-metrics" items={items.map((item, index) => ({
       ...item,
-      colSpan: wide ? (index < 3 ? 5 : 3) : 1,
-    }))} columns={wide ? 15 : 2} gap={readWorkspaceGap()} rowHeight={0}
+      colSpan: wide ? spans[index] : 1,
+    }))} columns={wide ? wideLayout.columns : 2} fixedColumns={wide} gap={readWorkspaceGap()} rowHeight={0}
       theme={appearance.theme} disableAnimations={loading || appearance.reduced} intro={false} textAutoHide={false}
       enableTilt={false} enableBorderGlow={false} enableSpotlight={false} clickEffect={false} enableStars={false}
       style={{ '--mb-ink': 'var(--text)', '--mb-muted': 'var(--muted-text)' }} />
