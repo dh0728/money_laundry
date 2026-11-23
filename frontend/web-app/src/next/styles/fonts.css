@@ -6,7 +6,8 @@
   font-display: swap;
   src: url('/fonts/InterVariable.woff2') format('woff2');
 }
+:root,
 [data-ui="aml-app"],
 [data-ui="shell-chrome"] {
-  --aml-font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  --aml-font-family: Inter;
 }

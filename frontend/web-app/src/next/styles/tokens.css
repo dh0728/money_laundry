@@ -132,7 +132,7 @@
   --aml-white-060: rgb(255 255 255 / 0.6);
   --aml-white-080: rgb(255 255 255 / 0.8);
   --aml-white-100: rgb(255 255 255 / 1.0);
-  --aml-font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  --aml-font-family: Inter;
   --aml-layer-base: 0;
   --aml-layer-popover: 20;
   --aml-layer-dialog: 30;
