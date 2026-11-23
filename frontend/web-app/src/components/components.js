@@ -25,6 +25,10 @@ export function Button(content, { variant = '', attributes = '', shape, surface 
 export const IconButton = (content, label, attributes, variant = '', surface = 'floating', shape = 'circle') =>
   Button(content, { variant: `icon-button ${variant}`, attributes: `aria-label="${label}" ${attributes}`, shape, surface });
 
+// 문자열 화면용 Panel(components/panel.jsx와 같은 면: 화면 안으로 들어간 inner glow).
+export const PanelHTML = (content, variant = '') =>
+  `<section class="screen-panel ${variant}">${content}</section>`;
+
 export const Divider = () => '<hr class="divider">';
 
 export const ScrollArea = (content, attributes = '') =>

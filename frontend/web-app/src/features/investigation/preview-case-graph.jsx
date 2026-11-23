@@ -644,7 +644,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
             checked: candidateIds.has(record.code), onChange: checked => updateCandidate(record, checked) }} />
         </li>)}</ul> : <p>{candidates.length ? '조회 조건에 맞는 후보가 없습니다.' : '공통 거래나 계좌가 확인된 업무가 없습니다.'}</p>}
     </Panel>}
-    <Panel className="preview-case-network" aria-label={related ? '합친 그래프' : '그래프'}>
+    <Panel className="preview-case-network" data-panel-depth="over-content" aria-label={related ? '합친 그래프' : '그래프'}>
       {network.nodes.length || groups.length ?
         <div className="preview-graph-workspace">
           <div className="preview-graph-center" data-visualization={sankeyView && network.nodes.length ? 'sankey' : undefined}

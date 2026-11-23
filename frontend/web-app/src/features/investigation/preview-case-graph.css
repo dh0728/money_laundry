@@ -47,22 +47,12 @@
   position: relative;
   overflow: clip;
   --preview-graph-inner-radius: var(--aml-panel-control-radius);
-  box-shadow: none;
   container: case-graph / inline-size;
 }
 .preview-related-layout .preview-case-network:has([data-case-drop-active]) {
   position: sticky;
   inset-block-start: calc(var(--header-height) + var(--workspace-gap));
   z-index: 3;
-}
-.preview-case-network.screen-panel::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border-radius: inherit;
-  box-shadow: var(--panel-edge-depth), var(--panel-glass-depth);
-  pointer-events: none;
 }
 .preview-graph-empty { padding: var(--ui-panel-padding) }
 .preview-graph-empty p { color: var(--muted-text) }

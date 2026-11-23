@@ -52,7 +52,7 @@
   gap: var(--aml-space-8);
   overflow-wrap: anywhere;
 }
-.dashboard-summary-card.glass.screen-panel {
+:root .dashboard-summary-card.screen-panel {
   --panel-material-light: color-mix(in srgb, var(--aml-figma-surface-neutral-accent-default),
     var(--aml-figma-surface-status-pending-accent-default));
   background-color: var(--ai-summary-start);
@@ -125,7 +125,6 @@
   --panel-content-padding: var(--aml-panel-text-inset, var(--ui-panel-padding));
   --mb-radius: var(--aml-radius-panel, var(--aml-radius-card));
   --mb-surface: var(--information-panel-surface);
-  --mb-shadow: var(--information-panel-shadow);
 }
 .dashboard-metrics .magic-bento__rim { display: none }
 .dashboard-metrics .magic-bento__content { container-type: inline-size; padding: var(--panel-content-padding) }

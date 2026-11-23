@@ -254,7 +254,7 @@ function Catalogue() {
         <ActionButton className="row" disabled={useFilter} onClick={() => setUseFilter(true)}>필터 다시 적용</ActionButton>
       </Demo>
       <Demo title="Panel · 정보 표면">
-        <div><Panel className="glass"><h2>탐지 근거</h2></Panel></div>
+        <div><Panel><h2>탐지 근거</h2></Panel></div>
       </Demo>
     </DemoGroup>
     <DemoGroup id="variables" label="변수">

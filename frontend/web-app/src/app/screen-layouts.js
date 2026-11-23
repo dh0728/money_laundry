@@ -1,3 +1,4 @@
+import { PanelHTML } from '../components/components.js';
 import { frames } from './screen-frames.js';
 import { isLedgerScreen, ledgerTableScreen } from './preview-route.js';
 
@@ -150,15 +151,7 @@ export function ScreenNavigation(path, code = '') {
   return { global, location, primary: duplicatesLocation ? [] : primary, secondary };
 }
 
-export const panel = (title, kind = '') => `<section class="screen-panel glass ${kind}"><h2>${title}</h2></section>`;
-const row = (panels, variant = '') => `<div class="screen-row ${variant}">${panels.join('')}</div>`;
-const table = (title, columns = []) => `<section class="screen-panel glass screen-table">
-  <h2>${title}</h2>
-  ${columns.length ? `<div class="screen-table-scroll"><table data-slot="table"><thead><tr>
-    ${columns.map(column => `<th scope="col">${column}</th>`).join('')}
-  </tr></thead><tbody><tr>${columns.map(() => '<td>—</td>').join('')}</tr></tbody></table></div>` : ''}
-</section>`;
-const graph = title => panel(title, 'screen-graph');
+const panel = (title, kind = '') => PanelHTML(`<h2>${title}</h2>`, kind);
 const overlay = title => `<section class="screen-overlay glass"><h2>${title}</h2></section>`;
 
 function Dashboard(path) {

@@ -92,7 +92,7 @@ export function DesignVariables() {
       </div>
       <LinkTag href={figmaFoundation} target="_blank" rel="noopener">Figma 디자인 시스템 열기</LinkTag>
     </Panel>
-    <Panel className="glass variable-radius-example">
+    <Panel className="variable-radius-example">
       <dl className="variable-card-metrics">
         {Object.entries(cardDimensions).map(([name, label]) => <div key={name}>
           <dt>{label}</dt><dd><code>{tokens.find(token => token.name === name)?.value}</code></dd>

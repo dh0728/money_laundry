@@ -52,7 +52,7 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
 }
 
 function ChartPanel({ title, note, children, className = '', hasChart = true }) {
-  return <Panel as="article" className={`glass dashboard-chart ${className}`}>
+  return <Panel as="article" className={`dashboard-chart ${className}`}>
     <SectionDownloadHeading downloadLabel={hasChart ? title : undefined}>{title}</SectionDownloadHeading>
     {note && <p className="dashboard-note">{note}</p>}
     {children}

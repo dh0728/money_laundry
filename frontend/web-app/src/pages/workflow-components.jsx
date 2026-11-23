@@ -613,7 +613,7 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
   if (kind === 'case-overview') return <CaseOverviewWithRules overview={overview} appearance={appearance} />;
   if (kind === 'alert-episode-actions') return <AlertEpisodeActions overview={overview} />;
   if (kind === 'case-judgment') return <CaseReviewActions overview={overview} />;
-  if (kind === 'case-readonly') return <Panel className="glass"><h2>읽기 전용</h2></Panel>;
+  if (kind === 'case-readonly') return <Panel><h2>읽기 전용</h2></Panel>;
   if (kind === 'rules-list') return <RuleList reason={reason} initialRule={overview?.rule}
     registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   return <MotionConfig reducedMotion={appearance.reduced ? 'always' : 'never'}>

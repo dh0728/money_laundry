@@ -937,6 +937,28 @@ body:has(#footer-pagination > *) #workspace {
 :is(.screen-panel, .screen-overlay, .panel-material) {
   box-shadow: var(--panel-edge-depth), var(--panel-material-depth, var(--panel-glass-depth));
 }
+/* 누르지 않는 패널(Panel·대시보드 지표 칸)은 화면 안으로 들어간 면(inner glow)이다. 바깥 유리·기울기는 누르는 카드(RecordCard)만 쓴다. */
+:where(.screen-panel, .panel-inset, .dashboard-metrics .magic-bento__card) {
+  --panel-material-solid: light-dark(var(--information-panel-surface), var(--aml-gray-020));
+  --panel-material-depth: 0 0 0 transparent;
+}
+:root:not([data-glassmorphism="false"]) :is(.screen-panel, .panel-inset, .dashboard-metrics .magic-bento__card) {
+  --panel-material-depth:
+    inset 0 var(--aml-stroke-control) var(--aml-space-4) var(--glass-shell-highlight),
+    inset 0 0 var(--aml-space-12) light-dark(var(--aml-white-060), var(--aml-white-010));
+}
+.dashboard-metrics .magic-bento__card { --mb-shadow: var(--panel-edge-depth), var(--panel-material-depth) }
+/* 그래프처럼 내용이 면을 덮는 패널은 안쪽 빛을 내용 위에 한 번 더 그린다. */
+.screen-panel[data-panel-depth="over-content"] { box-shadow: none }
+.screen-panel[data-panel-depth="over-content"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: var(--panel-edge-depth), var(--panel-material-depth);
+  pointer-events: none;
+}
 :root:not([data-glassmorphism="false"]) :is(.screen-panel, .screen-overlay, .panel-material) {
   background-color: color-mix(in srgb, var(--panel-material-solid, var(--floating-panel-face)) 78%, transparent);
 }

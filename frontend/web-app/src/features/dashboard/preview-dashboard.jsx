@@ -231,12 +231,12 @@ export function BenchmarkDashboard({ mine, dataset, range, appearance }) {
     metric('처음 등장한 계좌', totals.newAccounts, `최초 등장 은행 코드 ${formatter.format(totals.newBanks)}개`, '개'),
   ];
   return <div className="preview-dashboard preview-benchmark-dashboard" data-mine={mine}>
-    {mine && <Panel as="article" className="glass dashboard-personal-status">
+    {mine && <Panel as="article" className="dashboard-personal-status">
       <h2>내 담당 업무</h2>
       <p className="dashboard-note">개인 담당 업무를 표시하려면 기관의 업무 데이터 연결이 필요합니다.</p>
     </Panel>}
     <section className="dashboard-top" aria-label="원본 거래 요약 및 주요 지표">
-      <Panel as="article" className="glass dashboard-summary-card">
+      <Panel as="article" className="dashboard-summary-card">
         <h2>원본 거래 요약</h2>
         <strong>{peak ? `${peak.date} · 세탁 라벨 ${count(peak.labeled)}`
           : (totals.transactions ? '조회 기간에 세탁 라벨 거래가 없습니다.' : '조회 기간에 거래가 없습니다.')}</strong>
