@@ -1,11 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { BarSparkline } from '../../components/charts/sparkline';
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { Bar } from '../../components/charts/charts/bar';
-import { PieChart } from '../../components/charts/charts/pie/pie-chart';
-import { PieSlice } from '../../components/charts/charts/pie/pie-slice';
-import { useElementSize } from '../../components/charts/charts/use-element-size';
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
 import { previewJudgmentReason } from './case-judgment-data';
 import { FooterPagination } from '../../components/footer-pagination';
@@ -132,30 +129,6 @@ function OverviewBars({ label, measures, max, reduced, format = value => `${numb
       <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
         rows={point => [{ label: String(point.label), value: format(point.value), color: barColor(point) }]} />
     </BarChart>
-  </figure>;
-}
-
-function OverviewDonut({ label, segments, reduced }) {
-  const plotRef = useRef(null);
-  const { width } = useElementSize(plotRef);
-  const size = Math.floor(width);
-  const data = segments.filter(segment => segment.value > 0);
-  if (!data.length) return <p className="overview-note">표시할 데이터가 없습니다.</p>;
-  const total = data.reduce((sum, segment) => sum + segment.value, 0);
-  return <figure className="overview-donut" aria-label={label}>
-    <figcaption>{label}</figcaption>
-    <div ref={plotRef} className="overview-donut-plot" aria-hidden="true">
-      {size > 0 && <PieChart data={data} size={size} innerRadius={size * 0.34} cornerRadius={8} padAngle={data.length > 1 ? 0.045 : 0}
-        startAngle={0} endAngle={Math.PI * 2} geometryScrubbing={reduced}>
-        {!reduced && data.map(({ label }, index) => <PieSlice key={label} index={index} />)}
-      </PieChart>}
-      <span className="overview-donut-total"><strong>{number.format(total)}</strong><span>거래</span></span>
-    </div>
-    <ul className="overview-score-legend">
-      {data.map(({ label, value, color }) => <li key={label}>
-        <i style={{ background: color }} aria-hidden="true" />{label} <strong>{number.format(value)}건</strong>
-      </li>)}
-    </ul>
   </figure>;
 }
 
@@ -330,26 +303,31 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   };
   const scoresByBand = Map.groupBy(records, record => graphRiskBand(record.score));
   const riskLabels = modelRiskLabels();
-  const pastCounts = [...Map.groupBy(prior, item => item.verdict)].map(([verdict, rows]) => ({
-    label: verdict === 'abnormal' ? '이상' : '정상', value: rows.length,
-    color: verdict === 'abnormal' ? 'var(--status-danger-accent)' : 'var(--status-positive-accent)',
+  const pastCounts = ['abnormal', 'normal'].map(verdict => ({
+    label: verdict === 'abnormal' ? '이상' : '정상', value: prior.filter(item => item.verdict === verdict).length,
   }));
   const visuals = {
-    judgment: <OverviewDonut label="근거 거래의 모델 위험 점수 구간" reduced={reduced} segments={[
-      { label: riskLabels.high, color: 'var(--risk-high)', value: scoresByBand.get('high')?.length ?? 0 },
-      { label: riskLabels.medium, color: 'var(--risk-medium)', value: scoresByBand.get('medium')?.length ?? 0 },
-      { label: riskLabels.low, color: 'var(--risk-low)', value: scoresByBand.get('low')?.length ?? 0 },
-      { label: '모델 점수 없음', color: 'var(--divider)', value: scoresByBand.get('unknown')?.length ?? 0 },
+    // Ordered score bands on one denominator (the evidence transactions), low to high like the score axis.
+    judgment: <OverviewBars label="근거 거래의 모델 위험 점수 구간" max={records.length} reduced={reduced} measures={[
+      { label: `${riskLabels.low} · 낮음`, color: 'var(--risk-low)', value: scoresByBand.get('low')?.length ?? 0 },
+      { label: `${riskLabels.medium} · 주의`, color: 'var(--risk-medium)', value: scoresByBand.get('medium')?.length ?? 0 },
+      { label: `${riskLabels.high} · 위험`, color: 'var(--risk-high)', value: scoresByBand.get('high')?.length ?? 0 },
+      ...(scoresByBand.has('unknown') ? [{ label: '모델 점수 없음', color: 'var(--divider)', value: scoresByBand.get('unknown').length }] : []),
     ]} />,
     accounts: <OverviewBars label="계좌별 거래 참여" measures={accountMeasures} max={records.length} reduced={reduced} />,
-    past: <OverviewBars label="과거 판정 구성" measures={pastCounts} max={prior.length} reduced={reduced} />,
+    // Two counts read faster as numbers than as two bars.
+    past: <div className="overview-panel-hero" aria-label="과거 판정 구성">
+      {pastCounts.map(({ label, value }) => <span key={label} className="overview-kpi">
+        <span className="overview-kpi-unit">{label} 판정</span>{' '}<strong className="overview-kpi-number">{number.format(value)}</strong>{' '}<span className="overview-kpi-unit">건</span>
+      </span>)}
+    </div>,
     history: <ReviewTimeline records={records} row={row} />,
     detection: <OverviewScoreChart points={scorePoints} reduced={reduced} fill />,
     rules: <div className="overview-panel-hero">
       <KpiValue value={activeRules.length} unit="현재 운영 중인 룰" />
     </div>,
   };
-  const graphicPanels = { judgment: records.length > 0, accounts: accounts.length > 0, past: prior.length > 0,
+  const graphicPanels = { judgment: records.length > 0, accounts: accounts.length > 0, past: false,
     detection: scorePoints.length > 0, flow: records.length > 0 };
   const layout = episode
     ? [['judgment', 1], ['flow', 2], ['history', 1], ['accounts', 1], ['detection', 1], ['rules', 1], ['composition', 2]]
