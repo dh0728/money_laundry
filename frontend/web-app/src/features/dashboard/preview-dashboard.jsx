@@ -93,8 +93,8 @@ function Metric({ item, reduced }) {
 function Metrics({ items, wide, appearance }) {
   return <DashboardMetricGrid items={items.map(item => ({
     id: item.key,
-    // Area and bar trends carry the volume story, so they get two rows; thin lines and the completion bar stay one row.
-    rowSpan: wide && ['area', 'bar'].includes(item.trend?.type) ? 2 : 1,
+    // Charts whose up-and-down swing drives the call (spikes in inflow, suspicion, new accounts, Alerts) get two rows; backlog and ratio levels stay one row.
+    rowSpan: wide && item.swing ? 2 : 1,
     content: <Metric item={item} reduced={appearance.reduced} />,
   }))} wide={wide} appearance={appearance} />;
 }
@@ -185,12 +185,12 @@ export function PreviewDashboard({ mine, data, appearance }) {
     { ...metric(`위험 점수 ${modelRiskLabels().high}`, data.highRisk, '내 담당 미처리 Alert'), trend: trend('highRisk', 'risk-high', 'bar', data.hourly) },
     { ...metric('3일 이상 경과', data.overdue, '내 담당 미완료 Alert·Episode'), trend: trend('overdue', 'risk-medium', 'bar', data.hourly) },
   ] : [
-    { ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', 'arrival', 'area') },
-    { ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
+    { swing: true, ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', 'arrival', 'area') },
+    { swing: true, ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
       `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/', trend: trend('suspicious', 'suspect', 'area') },
-    { ...metric('새 계좌 · 새 소유주', [{ amount: data.newAccounts, unit: '개' }, { amount: data.newOwners, unit: '명' }],
+    { swing: true, ...metric('새 계좌 · 새 소유주', [{ amount: data.newAccounts, unit: '개' }, { amount: data.newOwners, unit: '명' }],
       '거래 이력 기준', ''), separator: '·', trend: { ...trend('newAccounts', 'arrival', 'bar'), caption: '일별 최초 등장 계좌 · KST' } },
-    { ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', 'arrival', 'area') },
+    { swing: true, ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', 'arrival', 'area') },
     { ...metric('업무 처리율', percent(data.settled, data.cases.length), `${count(data.cases.length)} 중 ${count(data.settled)} 완료`, ''),
       completion: { value: data.settled, total: data.cases.length } },
     { ...metric('미처리 Alert', data.alertCases.filter(row => row.open).length, '검토 대기·처리 중'), trend: trend('openAlerts', 'neutral') },
