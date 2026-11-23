@@ -499,3 +499,11 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 | POST /api/v1/rules/backtest | `{rule,start,end,offset,limit}`. 기간(최대 2년)의 ACTIVE 원장 전체에 조건 적용. `{matchedCount,accountCount,amountUsd,matchedAccountIds,scannedCount,transactions}`. 서버 제한 90초 |
 
 룰은 분석 파이프라인에 연결하지 않는다. 화면에 ACTIVE로 바꾸는 버튼이 없어 서버에도 그 전이는 없다.
+
+## 13. 설정
+
+| API | 내용 |
+|---|---|
+| POST /api/v1/settings/team/{userId}/role | `{role:"STAFF"\|"ADMIN"}`. ADMIN만(아니면 403). 본인 권한은 바꿀 수 없다(409). 바뀐 권한은 다음 요청부터 적용된다. `{id,name,role}`. 팀원 목록은 GET /api/v1/demo/users |
+| GET /api/v1/settings/model-risk-bands | 모델 점수 위험 구간(화면 표시 기준). `{medium,high}` = 주의·위험 구간의 시작 점수. 기본 70·90 |
+| POST /api/v1/settings/model-risk-bands | `{medium,high}`. ADMIN만. 1 ≤ medium < high ≤ 99, 아니면 400. 모델의 판단 임계값과 Alert 구성에는 영향이 없다 |
