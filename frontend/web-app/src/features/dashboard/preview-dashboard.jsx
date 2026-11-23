@@ -54,6 +54,7 @@ function Metric({ item, reduced }) {
   const { label, value, unit, detail, key, completion } = item;
   const trend = item.trend?.rows.some(row => row[item.trend.key] > 0) ? item.trend : undefined;
   const Sparkline = sparklines[trend?.type] ?? BarSparkline;
+  const describe = row => trend?.describe ? trend.describe(row) : count(row[trend.key]);
   const [hoverIndex, setHoverIndex] = React.useState(null);
   const hoveredHour = hoverIndex === null ? undefined : trend?.rows[hoverIndex];
   const wideValue = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
@@ -79,12 +80,14 @@ function Metric({ item, reduced }) {
     {trend && <div className="dashboard-metric-trend">
       <div className="dashboard-metric-plot" ref={plot}>
         <Sparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={plotHeight}
-          {...(Sparkline === BarSparkline ? { barRadius: 6 } : { curve: 'monotone', strokeWidth: 2, fillOpacity: 0.38 })}
+          {...(Sparkline === BarSparkline
+            ? { barRadius: 6, ...(trend.overlay && { overlayKey: trend.overlay.key, overlayColor: trend.overlay.color }) }
+            : { curve: 'monotone', strokeWidth: 2, fillOpacity: 0.38 })}
           onHoverChange={setHoverIndex} crosshair="dashed" dot={false} animate={!reduced}
-          aria-label={`${label} · ${trend.caption} · ${trend.rows.map(row => `${row.label} ${count(row[trend.key])}`).join(', ')}`} />
+          aria-label={`${label} · ${trend.caption} · ${trend.rows.map(row => `${row.label} ${describe(row)}`).join(', ')}`} />
       </div>
       <span className="dashboard-note">{hoveredHour
-        ? `${hoveredHour.label} KST · ${count(hoveredHour[trend.key])}`
+        ? `${hoveredHour.label} KST · ${describe(hoveredHour)}`
         : trend.caption}</span>
     </div>}
   </div>;
@@ -181,21 +184,27 @@ export function PreviewDashboard({ mine, data, appearance }) {
   const metric = (label, value, detail, unit = '건') => ({ label, value, unit, detail, key: `${mine}-${label}` });
   const trend = (key, color, type = 'line', rows = data.operationalDaily) =>
     ({ rows, key, color: `var(--chart-${color})`, type, caption: rows === data.hourly ? '생성 시간대 · KST' : '일별 · KST' });
+  // Daily share of suspicious transactions linked to an Alert; days without suspicious ones leave a gap.
+  const linkedRates = (data.operationalDaily ?? []).map(row => ({ ...row, linkedRate: row.suspicious ? row.linked / row.suspicious * 100 : null }));
   const kpis = mine ? [
     { ...metric(`위험 점수 ${modelRiskLabels().high}`, data.highRisk, '내 담당 미처리 Alert'), trend: trend('highRisk', 'risk-high', 'bar', data.hourly) },
     { ...metric('3일 이상 경과', data.overdue, '내 담당 미완료 Alert·Episode'), trend: trend('overdue', 'risk-medium', 'bar', data.hourly) },
   ] : [
-    { swing: true, ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', 'arrival', 'area') },
+    { swing: true, ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', 'arrival', 'bar') },
+    // Each day's total bar holds its suspicious part, so the share reads per day like the headline ratio.
     { swing: true, ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
-      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/', trend: trend('suspicious', 'suspect', 'area') },
+      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/',
+    trend: { ...trend('total', 'total', 'bar'), overlay: { key: 'suspicious', color: 'var(--chart-suspect)' },
+      describe: row => `의심 ${count(row.suspicious)} / 전체 ${count(row.total)} · ${percent(row.suspicious, row.total)}` } },
     { swing: true, ...metric('새 계좌 · 새 소유주', [{ amount: data.newAccounts, unit: '개' }, { amount: data.newOwners, unit: '명' }],
       '거래 이력 기준', ''), separator: '·', trend: { ...trend('newAccounts', 'arrival', 'bar'), caption: '일별 최초 등장 계좌 · KST' } },
-    { swing: true, ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', 'arrival', 'area') },
+    { swing: true, ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', 'arrival', 'bar') },
     { ...metric('업무 처리율', percent(data.settled, data.cases.length), `${count(data.cases.length)} 중 ${count(data.settled)} 완료`, ''),
       completion: { value: data.settled, total: data.cases.length } },
     { ...metric('미처리 Alert', data.alertCases.filter(row => row.open).length, '검토 대기·처리 중'), trend: trend('openAlerts', 'neutral') },
     { ...metric('의심 거래 중 Alert 편입', percent(data.linked, data.suspicious.length), `${count(data.suspicious.length)} 중 ${count(data.linked)}`, ''),
-      trend: trend('linked', 'suspect') },
+      trend: { ...trend('linkedRate', 'suspect', 'line', linkedRates),
+        describe: row => row.suspicious ? `${percent(row.linked, row.suspicious)} (${count(row.suspicious)} 중 ${count(row.linked)})` : '의심 거래 없음' } },
     { ...metric('미완료 Episode', data.cases.filter(row => row.kind === 'Episode' && row.open).length, '검토 대기·처리 중'), trend: trend('openEpisodes', 'neutral') },
   ];
   return <div className="preview-dashboard" data-mine={mine}>
