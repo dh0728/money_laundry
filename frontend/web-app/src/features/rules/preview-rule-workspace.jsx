@@ -1,127 +1,24 @@
-import React, { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
+import React, { cloneElement, useEffect, useId, useRef, useState } from 'react';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { createWorkspaceState, saveWorkspaceRule, transitionWorkspaceRule } from '@/next/workspace-data';
-import { ruleStatusLabels } from '@/next/features/rules-logic';
+import { RULE_LIMITS, ruleStatusLabels, ruleTransitionActions } from '@/next/features/rules-logic';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
+import { bindTooltip } from '../../components/components.js';
 import { DialogFrame } from '../../components/dialog-parts';
 import { Panel } from '../../components/panel';
 import { RuleConditionFacts } from './rule-condition-tree';
 import { activateRecordCard } from '../../components/record-card';
 import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
-import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user.js';
 import { downloadCsv } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { deleteLiveRule, fetchLiveRules, liveRules, reviewLiveRule, saveLiveRule } from './live-rules.js';
+import { ruleRepository } from './rule-repository';
+import { useRules } from './use-rules';
 import './preview-rule-workspace.css';
 
 const presets = { DRAFT: 'pending', PENDING_APPROVAL: 'caution', TESTING: 'inProgress', ACTIVE: 'done', STOPPED: 'cancelled', REJECTED: 'failed' };
-export const ruleWorkspace = createWorkspaceState();
-export const previewRuleTemplates = ruleWorkspace.rules;
-const templatesById = new Map(previewRuleTemplates.map(rule => [rule.id, rule]));
-const draftStorageKey = 'aml-preview-rule-drafts';
-const deletedStorageKey = 'aml-preview-rule-deleted';
-
-function readDeletedTemplates() {
-  try {
-    const ids = JSON.parse(sessionStorage.getItem(deletedStorageKey) ?? '[]');
-    return Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-if (liveRules) ruleWorkspace.rules = [];
-else try {
-  const changes = JSON.parse(sessionStorage.getItem(draftStorageKey) ?? '[]');
-  if (Array.isArray(changes)) {
-    const rulesById = new Map(templatesById);
-    for (const id of readDeletedTemplates()) rulesById.delete(id);
-    for (const rule of changes) if (rule && typeof rule.id === 'string') rulesById.set(rule.id, rule);
-    ruleWorkspace.rules = [...rulesById.values()];
-  }
-} catch {
-  // The sample templates remain available when tab storage cannot be read.
-}
-
-function persistRuleChange(result, actor, action) {
-  if (!result.ok) return result;
-  const { state, value } = result.value;
-  const history = [...value.history];
-  history[history.length - 1] = { ...history.at(-1), ...(actor && { actor }), ...(action && { action }) };
-  const next = { ...value, history, ...(actor && !action && { author: actor }) };
-  const rules = state.rules.map(rule => rule.id === next.id ? next : rule);
-  try {
-    sessionStorage.setItem(draftStorageKey, JSON.stringify(rules.filter(rule => rule !== templatesById.get(rule.id))));
-  } catch {
-    return { ok: false, error: '이 브라우저 탭에 룰 변경을 저장할 수 없습니다.' };
-  }
-  ruleWorkspace.rules = rules;
-  return { ok: true, value: next };
-}
-
-// 서비스 모드: 서버에 저장된 룰을 화면 상태로 쓴다.
-export function loadLiveRules() {
-  return fetchLiveRules().then(rules => { ruleWorkspace.rules = rules; return rules; });
-}
-
-function applyLiveRule(result) {
-  if (!result.ok) return result;
-  const known = ruleWorkspace.rules.some(rule => rule.id === result.value.id);
-  ruleWorkspace.rules = known ? ruleWorkspace.rules.map(rule => rule.id === result.value.id ? result.value : rule)
-    : [...ruleWorkspace.rules, result.value];
-  return result;
-}
-
-export function savePreviewRule(input, existingId) {
-  if (liveRules) return saveLiveRule(input, existingId).then(applyLiveRule);
-  return persistRuleChange(saveWorkspaceRule(ruleWorkspace, input, existingId), currentPreviewUser()?.name);
-}
-
-export function deletePreviewRule(id) {
-  if (!ruleWorkspace.rules.some(rule => rule.id === id)) return { ok: false, error: '삭제할 룰을 찾을 수 없습니다.' };
-  if (liveRules) return deleteLiveRule(id).then(result => {
-    if (result.ok) ruleWorkspace.rules = ruleWorkspace.rules.filter(rule => rule.id !== id);
-    return result;
-  });
-  const rules = ruleWorkspace.rules.filter(rule => rule.id !== id);
-  try {
-    sessionStorage.setItem(draftStorageKey, JSON.stringify(rules.filter(rule => rule !== templatesById.get(rule.id))));
-    if (templatesById.has(id)) sessionStorage.setItem(deletedStorageKey, JSON.stringify([...new Set([...readDeletedTemplates(), id])]));
-  } catch {
-    return { ok: false, error: '이 브라우저 탭에 룰 삭제를 저장할 수 없습니다.' };
-  }
-  ruleWorkspace.rules = rules;
-  return { ok: true, value: id };
-}
-
-// 초안·반려 룰은 담당자와 관리자, 그 밖의 상태는 관리자만 삭제할 수 있다. 서버도 같은 기준으로 거절한다.
-const canDeleteRule = (rule, user) => Boolean(rule && user)
-  && (user.role === 'ADMIN' || (['DRAFT', 'REJECTED'].includes(rule.status) && rule.author === user.name));
-
-const requestReview = { status: 'PENDING_APPROVAL', label: '승인 요청', tone: 'brand' };
-const approveRule = { status: 'TESTING', label: '승인', tone: 'brand' };
-const rejectRule = { status: 'REJECTED', label: '반려', tone: 'negative' };
-const stopRule = { status: 'STOPPED', label: '중지', tone: 'negative' };
-
-function reviewActions(rule, user) {
-  if (!user || !rule) return [];
-  if (rule.status === 'DRAFT') return [requestReview];
-  if (user.role !== 'ADMIN') return [];
-  if (rule.status === 'PENDING_APPROVAL') return [rejectRule, approveRule];
-  return ['TESTING', 'ACTIVE'].includes(rule.status) ? [stopRule] : [];
-}
-
-export function reviewPreviewRule(id, status, reason) {
-  const user = currentPreviewUser();
-  const rule = ruleWorkspace.rules.find(row => row.id === id);
-  const action = reviewActions(rule, user).find(action => action.status === status);
-  if (!action) return { ok: false, error: '룰 상태와 처리 권한을 확인해 주세요.' };
-  if (liveRules) return reviewLiveRule(id, status, reason).then(applyLiveRule);
-  return persistRuleChange(transitionWorkspaceRule(ruleWorkspace, id, status, reason), user.name, action.label);
-}
-
+const actionTones = { requestReview: 'brand', approve: 'positive', activate: 'brand', retest: 'brand', reject: 'negative', stop: 'negative' };
+const noRule = '룰을 먼저 선택해 주세요.';
 const countFormat = new Intl.NumberFormat('ko-KR');
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
 
@@ -130,121 +27,206 @@ function RuleTime({ value }) {
   return value && Number.isFinite(date.getTime()) ? <time dateTime={value}>{timeFormat.format(date)} KST</time> : '기록 없음';
 }
 
-function RuleReview({ rule, actionsHost, destructive, children, onReview }) {
-  const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
-  const [decision, setDecision] = useState(null);
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
+/** 흐린 버튼에 못 쓰는 이유를 붙인다. 마우스를 올리면 툴팁, 스크린리더는 버튼 설명으로 읽는다. */
+function BlockedReason({ reason, children }) {
+  const host = useRef(null);
+  const id = useId();
+  useEffect(() => {
+    if (!reason) return undefined;
+    return bindTooltip(host.current, document.getElementById('tooltip'), { instantOnHover: true });
+  }, [reason]);
+  if (!reason) return children;
+  return <span ref={host} className="rule-action-guard" aria-label={reason} data-blocked-reason="">
+    {cloneElement(children, { 'aria-describedby': id })}
+    <span id={id} className="visually-hidden">{reason}</span>
+  </span>;
+}
+
+/** 대화상자 버튼은 공용 DialogFooter의 직속 자식이어야 꽉 채운 너비가 된다. 감싸지 않고, 못 쓰는 이유는 본문의 숨은 설명으로 잇는다. */
+function DialogReasons({ reasons }) {
+  return reasons.filter(([, text]) => text).map(([id, text]) => <span key={id} id={id} className="visually-hidden">{text}</span>);
+}
+
+const reasonFor = (rule, action) => !rule ? noRule
+  : rule.allowedActions.includes(action) ? '' : rule.blockedReasons[action] ?? '지금은 할 수 없어요.';
+
+function RuleActions({ rule, actionsHost, listLink, onTransition, onRemove }) {
+  const approveSlot = rule?.status === 'DRAFT' ? 'requestReview' : 'approve';
+  const transition = action => {
+    const reason = reasonFor(rule, action);
+    return <BlockedReason key={action} reason={reason}>
+      <PrimaryButton tone={actionTones[action]} disabled={Boolean(reason)} aria-haspopup="dialog"
+        onClick={() => onTransition(action)}>{ruleTransitionActions[action].label}</PrimaryButton>
+    </BlockedReason>;
+  };
+  const removeReason = !rule ? noRule
+    : rule.allowedActions.includes('delete') || rule.allowedActions.includes('archive') ? '' : rule.blockedReasons.archive;
+  const link = (action, path, label) => {
+    const reason = reasonFor(rule, action);
+    return <BlockedReason reason={reason}>
+      {reason ? <PrimaryButton tone="inverse" disabled>{label}</PrimaryButton>
+        : <PrimaryButton tone="inverse" as="a" href={`${path}?rule=${rule.id}`}>{label}</PrimaryButton>}
+    </BlockedReason>;
+  };
+  return <ScreenActions host={actionsHost} stackOnNarrow>
+    <BlockedReason reason={removeReason}>
+      <PrimaryButton tone="negative" disabled={Boolean(removeReason)} aria-haspopup="dialog" onClick={onRemove}>룰 삭제</PrimaryButton>
+    </BlockedReason>
+    {transition('stop')}
+    {transition('reject')}
+    {link('duplicate', '/rules/new', '복제')}
+    {link('backtest', '/rules/backtest', '백테스트로 열기')}
+    {listLink && rule && <PrimaryButton tone="inverse" as="a" href={`/rules?rule=${rule.id}`}>룰 목록</PrimaryButton>}
+    {transition('retest')}
+    {transition('activate')}
+    {transition(approveSlot)}
+  </ScreenActions>;
+}
+
+/** 모든 상태 변경(승인 요청·승인·반려·중지·운영 시작·재테스트)이 같은 사유 입력 창을 쓴다. */
+function RuleDecision({ rule, action, repository, onClose, onDone }) {
   const dialog = useRef(null);
   const reasonField = useRef(null);
   const titleId = useId();
-  const allowed = reviewActions(rule, user);
+  const submitReasonId = useId();
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const definition = ruleTransitionActions[action];
 
   useEffect(() => {
-    if (!decision) return;
     dialog.current.showModal();
     reasonField.current.focus();
-  }, [decision]);
+  }, []);
+
+  const submitBlocked = busy ? '처리 중입니다.' : reason.trim() ? '' : '변경 사유를 입력해 주세요.';
 
   function submit(event) {
     event.preventDefault();
-    const applied = result => {
+    if (busy) return;
+    setBusy(true);
+    void repository.transition(rule.id, action, reason).then(result => {
+      setBusy(false);
       if (!result.ok) {
         setError(result.error);
         return;
       }
       dialog.current.close();
-      onReview(result.value);
-    };
-    // 서비스 모드는 서버 응답을 기다린다.
-    const result = reviewPreviewRule(rule.id, decision.status, reason.trim());
-    if (result instanceof Promise) void result.then(applied);
-    else applied(result);
+      onDone(result.value, definition.label);
+    }, () => {
+      setBusy(false);
+      setError('처리하지 못했습니다. 다시 시도해 주세요.');
+    });
   }
 
-  const actionButton = action => <PrimaryButton key={action.status} tone={action.tone}
-    disabled={!allowed.includes(action)} aria-haspopup="dialog" onHold={() => {
-      setReason('');
-      setError('');
-      setDecision(action);
-    }}>{action.label}</PrimaryButton>;
-
-  return <>
-    <ScreenActions host={actionsHost} stackOnNarrow>
-      {destructive}
-      {actionButton(stopRule)}
-      {actionButton(rejectRule)}
-      {children}
-      {actionButton(rule?.status === 'DRAFT' ? requestReview : approveRule)}
-    </ScreenActions>
-    {decision && <DialogFrame ref={dialog} className="rule-review-dialog" title={`룰 ${decision.label}`} titleId={titleId}
-      onClose={() => setDecision(null)} onSubmit={submit}
-      actions={<PrimaryButton type="submit" tone={decision.tone} disabled={!reason.trim()}>{decision.label} 확인</PrimaryButton>}>
-      <div className="case-judgment-body">
-        <p><code>{rule.id}</code> · {rule.name}</p>
-        <p>변경 후 상태 · {ruleStatusLabels[decision.status]}</p>
-        <label className="case-judgment-field">변경 사유
-          <Textarea ref={reasonField} value={reason} rows={3} maxLength={1000} required
-            onChange={event => { setReason(event.target.value); setError(''); }} />
-        </label>
-        {error && <p role="alert" data-rule-block-error>{error}</p>}
-      </div>
-    </DialogFrame>}
-  </>;
-}
-
-function RuleLink({ rule, path, children }) {
-  return rule ? <PrimaryButton tone="inverse" as="a" href={`${path}?rule=${rule.id}`}>{children}</PrimaryButton>
-    : <PrimaryButton tone="inverse" disabled>{children}</PrimaryButton>;
-}
-
-function RuleDelete({ rule, onClose, onDelete }) {
-  const dialog = useRef(null);
-  const titleId = useId();
-  const [error, setError] = useState('');
-
-  useEffect(() => { dialog.current.showModal(); }, []);
-
-  function submit(event) {
-    event.preventDefault();
-    const applied = result => {
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      dialog.current.close();
-      onDelete();
-    };
-    // 서비스 모드는 서버 응답을 기다린다.
-    const result = deletePreviewRule(rule.id);
-    if (result instanceof Promise) void result.then(applied);
-    else applied(result);
-  }
-
-  return <DialogFrame ref={dialog} className="rule-review-dialog" title="룰 삭제" titleId={titleId}
+  return <DialogFrame ref={dialog} className="rule-review-dialog" title={`룰 ${definition.label}`} titleId={titleId}
     onClose={onClose} onSubmit={submit}
-    actions={<>
-      <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
-      <PrimaryButton type="submit" tone="negative">삭제</PrimaryButton>
-    </>}>
+    actions={<PrimaryButton type="submit" tone={actionTones[action]} disabled={!reason.trim() || busy} aria-busy={busy || undefined}
+      aria-describedby={submitBlocked ? submitReasonId : undefined}>
+      {busy ? '처리 중…' : `${definition.label} 확인`}</PrimaryButton>}>
     <div className="case-judgment-body">
       <p><code>{rule.id}</code> · {rule.name}</p>
-      <p>이 룰을 목록에서 삭제합니다.</p>
+      <p>변경 후 상태 · {ruleStatusLabels[definition.to]}</p>
+      <label className="case-judgment-field">변경 사유
+        <Textarea ref={reasonField} value={reason} rows={3} maxLength={RULE_LIMITS.reason} required
+          onChange={event => { setReason(event.target.value); setError(''); }} />
+      </label>
       {error && <p role="alert" data-rule-block-error>{error}</p>}
+      <DialogReasons reasons={[[submitReasonId, submitBlocked]]} />
     </div>
   </DialogFrame>;
 }
 
-export function RuleList({ reason = false, initialRule, registerTableTools, actionsHost }) {
-  const [rules, setRules] = useState(() => ruleWorkspace.rules);
-  const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
-  useEffect(() => {
-    if (liveRules) void loadLiveRules().then(setRules, () => undefined);
-  }, []);
+/** 삭제 창: 취소 / 보관 / 삭제. 운영 이력이 있는 룰은 삭제 대신 보관을 권한다. */
+function RuleRemove({ rule, repository, onClose, onDone }) {
+  const dialog = useRef(null);
+  const titleId = useId();
+  const archiveReasonId = useId();
+  const deleteReasonId = useId();
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const canDelete = rule.allowedActions.includes('delete');
+  const canArchive = rule.allowedActions.includes('archive');
+  // 초안·반려가 아닌 룰은 운영 이력이 있다. 삭제도 할 수 있지만 이력을 남기는 보관을 먼저 권한다.
+  const keepsHistory = !['DRAFT', 'REJECTED'].includes(rule.status);
+  const archiveReason = !canArchive ? rule.blockedReasons.archive : busy ? '처리 중입니다.' : reason.trim() ? '' : '보관 사유를 입력해 주세요.';
+  const deleteReason = !canDelete ? rule.blockedReasons.delete : busy ? '처리 중입니다.' : '';
+  const archive = () => run(() => repository.archive(rule.id, reason), '보관됨');
+  const remove = () => run(() => repository.delete(rule.id), '삭제됨');
+
+  useEffect(() => { dialog.current.showModal(); }, []);
+
+  function run(request, label) {
+    if (busy) return;
+    setBusy(true);
+    void request().then(result => {
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      dialog.current.close();
+      onDone(label);
+    }, () => {
+      setBusy(false);
+      setError('처리하지 못했습니다. 다시 시도해 주세요.');
+    });
+  }
+
+  // 공용 버튼 규격만 쓴다. 운영 이력이 있으면 보관(파란 기본)을 맨 오른쪽 제출 버튼으로, 삭제(빨강)는 그 앞 보조 자리로 둔다.
+  const archiveButton = <PrimaryButton key="archive" type={keepsHistory ? 'submit' : 'button'} tone={keepsHistory ? 'brand' : 'inverse'}
+    disabled={Boolean(archiveReason)} aria-describedby={archiveReason ? archiveReasonId : undefined}
+    onClick={keepsHistory ? undefined : archive}>{keepsHistory ? '보관 (권장)' : '보관'}</PrimaryButton>;
+  const deleteButton = <PrimaryButton key="delete" type={keepsHistory ? 'button' : 'submit'} tone="negative"
+    disabled={Boolean(deleteReason)} aria-describedby={deleteReason ? deleteReasonId : undefined}
+    onClick={keepsHistory ? remove : undefined}>삭제</PrimaryButton>;
+
+  return <DialogFrame ref={dialog} className="rule-review-dialog" title="룰 삭제" titleId={titleId}
+    onClose={onClose} onSubmit={event => {
+      event.preventDefault();
+      if (keepsHistory ? !archiveReason : !deleteReason) (keepsHistory ? archive : remove)();
+    }}
+    actions={<>
+      <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
+      {keepsHistory ? <>{deleteButton}{archiveButton}</> : <>{archiveButton}{deleteButton}</>}
+    </>}>
+    <div className="case-judgment-body">
+      <p><code>{rule.id}</code> · {rule.name}</p>
+      {keepsHistory
+        ? <p>운영 이력이 있는 룰입니다. 삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다.</p>
+        : <p>삭제하면 룰과 이력이 목록에서 사라집니다. 이력을 남기려면 보관하세요.</p>}
+      <label className="case-judgment-field">보관 사유
+        <Textarea value={reason} rows={2} maxLength={RULE_LIMITS.reason}
+          onChange={event => { setReason(event.target.value); setError(''); }} />
+      </label>
+      {error && <p role="alert" data-rule-block-error>{error}</p>}
+      <DialogReasons reasons={[[archiveReasonId, archiveReason], [deleteReasonId, deleteReason]]} />
+    </div>
+  </DialogFrame>;
+}
+
+function RuleListState({ status, error, onRetry }) {
+  if (status === 'loading') return <Panel className="workflow-rule-state" role="status" aria-busy="true">
+    <p>룰 목록을 불러오는 중입니다.</p>
+  </Panel>;
+  if (status === 'error') return <Panel className="workflow-rule-state" role="alert">
+    <p>룰 목록을 불러오지 못했습니다.{error && ` ${error}`}</p>
+    <ActionButton shape="pill" surface="floating" onClick={onRetry}>다시 시도</ActionButton>
+  </Panel>;
+  return <Panel className="workflow-rule-state">
+    <p>등록된 룰이 없습니다.</p>
+    <PrimaryButton tone="inverse" as="a" href="/rules/new">룰 만들기</PrimaryButton>
+  </Panel>;
+}
+
+export function RuleList({ reason = false, initialRule, registerTableTools, actionsHost, repository = ruleRepository }) {
+  const { status: loadState, rules, error: loadError, retry } = useRules(repository);
   const [notice, setNotice] = useState('');
-  const [id, choose] = useState(() => rules.some(row => row.id === initialRule) ? initialRule : rules[0]?.id);
+  const [id, choose] = useState(initialRule);
   const [status, setStatus] = useState('all');
-  const [deleting, setDeleting] = useState(null);
+  const [deciding, setDeciding] = useState(null);
+  const [removing, setRemoving] = useState(null);
   const rows = rules.filter(rule => status === 'all' || rule.status === status);
   const sorting = useTableSort(rows);
   const selected = id === null ? undefined : rows.find(rule => rule.id === id) ?? rows[0];
@@ -259,8 +241,17 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
       download: () => downloadCsv('rules', ['상태', '룰 ID', '룰 이름', '버전', '담당자'],
         sorting.rows.map(rule => [ruleStatusLabels[rule.status], rule.id, rule.name, rule.version, rule.author])) }],
   }));
+  const actions = <RuleActions rule={selected} actionsHost={actionsHost} listLink={reason}
+    onTransition={setDeciding} onRemove={() => setRemoving(selected)} />;
+  if (!rules.length) return <>
+    <RuleListState status={loadState === 'ready' ? 'empty' : loadState} error={loadError} onRetry={retry} />
+    {actions}
+  </>;
   return <>
     {notice && <p className="visually-hidden" role="status">{notice}</p>}
+    {loadState === 'error' && <p role="alert" className="workflow-rule-note">
+      최신 룰 목록을 불러오지 못해 직전 목록을 보여 줍니다. <ActionButton onClick={retry}>다시 시도</ActionButton>
+    </p>}
     <dl className="workflow-rule-inventory" aria-label="룰 상태별 수">
       <Panel as="div"><dt>등록된 룰</dt><dd>{countFormat.format(rules.length)}</dd></Panel>
       {breakdown.map(({ value, label, count }) => <Panel as="div" key={value}>
@@ -315,29 +306,14 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
         </li>)}
       </ol> : <p>기록된 변경 이력이 없습니다.</p>}
     </Panel>}
-    <RuleReview key={selected?.id ?? ''} rule={selected} actionsHost={actionsHost} onReview={rule => {
-      setRules(ruleWorkspace.rules);
-      setNotice(`${rule.id} · ${ruleStatusLabels[rule.status]}`);
-    }} destructive={<PrimaryButton tone="negative" disabled={!canDeleteRule(selected, user)} aria-haspopup="dialog"
-      onClick={() => setDeleting(selected)}>룰 삭제</PrimaryButton>}>
-      <PrimaryButton tone="inverse" disabled={!selected} onClick={() => {
-        const applied = result => {
-          setRules(ruleWorkspace.rules);
-          if (result.ok) choose(result.value.id);
-          setNotice(result.ok ? `${result.value.id} 복제됨` : result.error);
-        };
-        // 서비스 모드는 서버 응답을 기다린다.
-        const result = savePreviewRule({ ...selected, name: `${selected.name} (복제)` });
-        if (result instanceof Promise) void result.then(applied);
-        else applied(result);
-      }}>복제</PrimaryButton>
-      <RuleLink rule={selected} path="/rules/backtest">백테스트로 열기</RuleLink>
-      {reason && <RuleLink rule={selected} path="/rules">룰 목록</RuleLink>}
-    </RuleReview>
-    {deleting && <RuleDelete rule={deleting} onClose={() => setDeleting(null)} onDelete={() => {
-      setRules(ruleWorkspace.rules);
-      choose(null);
-      setNotice(`${deleting.id} 삭제됨`);
-    }} />}
+    {actions}
+    {deciding && selected && <RuleDecision key={`${selected.id}-${deciding}`} rule={selected} action={deciding}
+      repository={repository} onClose={() => setDeciding(null)}
+      onDone={(rule, label) => setNotice(`${rule.id} · ${label} · ${ruleStatusLabels[rule.status]}`)} />}
+    {removing && <RuleRemove rule={removing} repository={repository} onClose={() => setRemoving(null)}
+      onDone={label => {
+        choose(null);
+        setNotice(`${removing.id} ${label}`);
+      }} />}
   </>;
 }

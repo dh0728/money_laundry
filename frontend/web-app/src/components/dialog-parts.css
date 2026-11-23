@@ -31,7 +31,8 @@
   flex-wrap: wrap;
   align-items: stretch;
   gap: var(--aml-space-8);
-  padding: var(--aml-space-8) var(--aml-panel-text-inset);
+  /* 좌우는 글자 기준(panel-text-inset)이 아니라 패널 안쪽 여백. 둥근 버튼이 패널 모서리(radius-panel = 컨트롤 radius + panel-inset)와 맞물린다. */
+  padding: var(--aml-space-8) var(--aml-panel-inset);
   border-block-start: var(--aml-stroke-divider) solid var(--glass-edge);
 }
 .dialog-actions-fill > :is(.button, .accent-action, .hold-button) {
