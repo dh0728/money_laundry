@@ -1,6 +1,6 @@
-@import "../next/styles/tokens.css";
-@import "../next/styles/semantic-tokens.css";
-@import "../next/styles/fonts.css";
+@import "./tokens.css";
+@import "./semantic-tokens.css";
+@import "./fonts.css";
 @import "./figma-colors.css";
 
 /* Map the standalone workspace's existing component tokens to the shared design system. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { JudgmentRecord } from '../workspace-store'
+import type { JudgmentRecord } from '@/lib/workspace-store'
 import { filterJudgments, paginateJudgments, selectedJudgments, validReportDate } from './report-model'
 
 const rows: JudgmentRecord[] = [

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { ruleConditionSummary } from '@/next/features/rules-logic';
+import { ruleConditionSummary } from '@/features/rules/rules-logic';
 import { Check, Circle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import StatusMark from '../components/react-bits/StatusMark';
 import Stepper, { Step } from '../components/react-bits/Stepper';

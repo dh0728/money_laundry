@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { TypeCode } from '@/api/codes'
-import type { CaseRecord } from './dashboard-data'
+import type { CaseRecord } from '@/mocks/dashboard-data'
 
 export type Verdict = 'normal' | 'abnormal'
 export type ActionResult<T> = { ok: true; value: T } | { ok: false; error: string; conflict?: boolean }

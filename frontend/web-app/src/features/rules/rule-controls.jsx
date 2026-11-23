@@ -5,8 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import BranchedMenu from '../../components/react-bits/BranchedMenu';
 import { bindTooltip } from '../../components/components';
-import { RuleConditionBlocks } from '@/next/features/RuleConditionBlocks';
-import { compileRuleBlocks, RULE_LIMITS, ruleBlocksFor, validateRule } from '@/next/features/rules-logic';
+import { RuleConditionBlocks } from '@/features/rules/RuleConditionBlocks';
+import { compileRuleBlocks, RULE_LIMITS, ruleBlocksFor, validateRule } from '@/features/rules/rules-logic';
 import { ruleRepository } from './rule-repository';
 import { useRules } from './use-rules';
 import { RuleConditionFacts, RuleTreeBranches } from './rule-condition-tree';

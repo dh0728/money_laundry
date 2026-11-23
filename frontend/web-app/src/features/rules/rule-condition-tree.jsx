@@ -1,6 +1,6 @@
 import React, { Children, useLayoutEffect, useRef, useState } from 'react';
 import { typeDisplay } from '@/api/codes';
-import { ruleBlocksFor } from '@/next/features/rules-logic';
+import { ruleBlocksFor } from '@/features/rules/rules-logic';
 import { BranchLines } from '../../components/react-bits/BranchLines';
 
 export function RuleTreeBranches({ children, finalSlot }) {

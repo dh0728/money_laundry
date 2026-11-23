@@ -1,6 +1,6 @@
-import { cases, transactions, snapshot, patternName } from './dashboard-data'
-import { ruleReasonProblem, ruleTransitions, validateRule } from './features/rules-logic'
-import type { ActionResult, JudgmentRecord, LedgerTransaction, RuleInput, RuleRecord, RuleStatus, RuleVersionSnapshot, Verdict, WorkspaceCase, WorkspaceState } from './workspace-store'
+import { cases, transactions, snapshot, patternName } from '@/mocks/dashboard-data'
+import { ruleReasonProblem, ruleTransitions, validateRule } from './rules-logic'
+import type { ActionResult, JudgmentRecord, LedgerTransaction, RuleInput, RuleRecord, RuleStatus, RuleVersionSnapshot, Verdict, WorkspaceCase, WorkspaceState } from '@/lib/workspace-store'
 
 type Mutation<T> = ActionResult<{ state: WorkspaceState; value: T }>
 // This adapter is for bounded fixtures only. Production supplies server pages,

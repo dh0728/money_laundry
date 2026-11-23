@@ -1,6 +1,6 @@
 import { typeDisplay } from '@/api/codes'
-import type { LedgerTransaction, RuleInput, RuleRecord, RuleStatus } from '../workspace-store'
-import { downloadCsv } from './report-io'
+import type { LedgerTransaction, RuleInput, RuleRecord, RuleStatus } from '@/lib/workspace-store'
+import { downloadCsv } from '@/lib/report-io'
 
 export const ruleStatusLabels: Record<RuleStatus, string> = { DRAFT: '초안', PENDING_APPROVAL: '승인 대기', TESTING: '테스트 중', ACTIVE: '운영 중', STOPPED: '중지', REJECTED: '반려' }
 /** 룰 입력·사유 길이와 룰 ID 형식. 화면 검사, 샘플 저장, 나중의 서버 계약이 같은 값을 쓴다. */

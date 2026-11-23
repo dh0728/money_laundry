@@ -1,7 +1,7 @@
 import React, { cloneElement, useEffect, useId, useRef, useState } from 'react';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { RULE_LIMITS, ruleStatusLabels, ruleTransitionActions } from '@/next/features/rules-logic';
+import { RULE_LIMITS, ruleStatusLabels, ruleTransitionActions } from '@/features/rules/rules-logic';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { bindTooltip } from '../../components/components.js';
 import { DialogFrame } from '../../components/dialog-parts';

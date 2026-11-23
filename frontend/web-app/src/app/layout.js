@@ -1,4 +1,4 @@
-import { isRuleId } from '@/next/features/rules-logic';
+import { isRuleId } from '@/features/rules/rules-logic';
 import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';

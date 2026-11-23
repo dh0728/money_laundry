@@ -1,4 +1,4 @@
-import type { JudgmentRecord, Verdict } from '../workspace-store'
+import type { JudgmentRecord, Verdict } from '@/lib/workspace-store'
 
 export type ReportFilters = { query?: string; start?: string; end?: string; verdict?: Verdict | '' }
 export const verdictLabel = (verdict: Verdict) => verdict === 'normal' ? '정상' : '이상'

@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { DayPicker } from 'react-day-picker';
 import { ko } from 'react-day-picker/locale';
 import { Check, ChevronRight } from 'lucide-react';
-import { downloadCsv as saveCsv } from '@/next/features/report-io';
+import { downloadCsv as saveCsv } from '@/lib/report-io';
 import { Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
 import { ActionButton } from './primary-button';
 import { FilterTag, reviewStates, reviewStatusLabel, VerdictTag, verdictLabels } from './semantic-tags';

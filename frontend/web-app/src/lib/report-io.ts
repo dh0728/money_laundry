@@ -1,5 +1,5 @@
-import { patternName } from '../dashboard-data'
-import type { JudgmentRecord } from '../workspace-store'
+import { patternName } from '@/mocks/dashboard-data'
+import type { JudgmentRecord } from '@/lib/workspace-store'
 import { verdictLabel } from './report-model'
 
 type CsvValue = string | number | boolean | null | undefined

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LedgerTransaction, RuleInput, RuleRecord } from '../workspace-store'
+import type { LedgerTransaction, RuleInput, RuleRecord } from '@/lib/workspace-store'
 import { filterRules, isRuleId, ruleActionState, ruleTransitions, runBacktest, validateRule, validatePeriod, rulesPagination } from './rules-logic'
 
 const input: RuleInput = { name: '집중 송금', description: '시간 창 안의 거래 점검', typeCode: 3, scoreMin: .7, minTransactions: 2, windowHours: 2 }

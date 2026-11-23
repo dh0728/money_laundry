@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildImagePdf, createCsv, downloadJudgmentPdf, MAX_PDF_JUDGMENTS } from './report-io'
-import type { JudgmentRecord } from '../workspace-store'
+import type { JudgmentRecord } from '@/lib/workspace-store'
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 

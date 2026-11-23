@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cases } from '../dashboard-data'
-import type { LedgerTransaction, WorkspaceCase } from '../workspace-store'
+import { cases } from '@/mocks/dashboard-data'
+import type { LedgerTransaction, WorkspaceCase } from '@/lib/workspace-store'
 import { buildCaseGraph, canJudgeCase, caseEvidence, caseOverviewFacts, caseGraphBudget, downloadCaseCsv, indexCaseLedger, relatedCases } from './case-selectors'
 
 const item: WorkspaceCase = { ...cases[0], revision: 1, alertCaseIds: [], comments: [], history: [] }

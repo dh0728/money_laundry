@@ -1,5 +1,5 @@
-import { riskBand } from '../dashboard-data'
-import type { LedgerTransaction, WorkspaceCase } from '../workspace-store'
+import { riskBand } from '@/mocks/dashboard-data'
+import type { LedgerTransaction, WorkspaceCase } from '@/lib/workspace-store'
 
 export const caseDataBudget = { transactions: 10_000, records: 10_000, references: 10_000 }
 function caseReferencesWithinBudget(records: WorkspaceCase[]) {

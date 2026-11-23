@@ -1,4 +1,4 @@
-import { caseNodeSize, seedCasePositions } from '../../next/features/case-graph-layout';
+import { caseNodeSize, seedCasePositions } from './case-graph-layout';
 
 const columnStep = caseNodeSize.width + 64;
 const rowStep = caseNodeSize.height + 64;

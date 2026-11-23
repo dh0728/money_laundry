@@ -2,9 +2,9 @@ import { useEffect, useId, useRef, useState, type ComponentProps, type DragEvent
 import { ArrowDown, ArrowUp, GripVertical, Plus, X } from 'lucide-react'
 import { typeDisplay, type TypeCode } from '@/api/codes'
 import { Input } from '@/components/ui/input'
-import type { RuleInput } from '../workspace-store'
+import type { RuleInput } from '@/lib/workspace-store'
 import type { RuleBlockKind, validateRule } from './rules-logic'
-import '../styles/rule-condition-blocks.css'
+import './rule-condition-blocks.css'
 
 const palette: { kind: RuleBlockKind; label: string }[] = [
   { kind: 'accountWindow', label: '같은 계좌의 반복 거래' },
