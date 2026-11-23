@@ -45,6 +45,9 @@ export interface MagicBentoItem {
   onClick?: (event: ReactMouseEvent<HTMLElement>) => void;
   colSpan?: number;
   rowSpan?: number;
+  /** Optional 1-based grid line to pin the cell (from a packer). */
+  colStart?: number;
+  rowStart?: number;
 }
 
 export interface MagicBentoProps {
@@ -1217,8 +1220,8 @@ const MagicBento = ({
             }}
             className="magic-bento__cell"
             style={{
-              gridColumn: `span ${Math.min(span, Math.max(1, Math.round(entry.colSpan ?? 1)))}`,
-              gridRow: `span ${Math.max(1, Math.round(entry.rowSpan ?? 1))}`
+              gridColumn: `${entry.colStart ? `${entry.colStart} / ` : ''}span ${Math.min(span, Math.max(1, Math.round(entry.colSpan ?? 1)))}`,
+              gridRow: `${entry.rowStart ? `${entry.rowStart} / ` : ''}span ${Math.max(1, Math.round(entry.rowSpan ?? 1))}`
             }}
           >
             {entry.href ? (

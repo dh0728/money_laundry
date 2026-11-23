@@ -6,27 +6,49 @@ import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
 
-// Packs cells row by row next to a lead block (the AI summary) so every row is filled with no holes.
-// Rows beside the lead have columns - leadSpan free; each row takes as many cells as fit at minSpan and splits the width evenly.
-export function packBentoSpans(count, { columns = 12, leadSpan = 0, leadRows = 0, minSpan = 3 } = {}) {
-  const spans = [];
-  for (let row = 0; spans.length < count; row += 1) {
-    const free = row < leadRows ? columns - leadSpan : columns;
-    const take = Math.min(count - spans.length, Math.max(1, Math.floor(free / minSpan)));
-    const base = Math.floor(free / take);
-    for (let index = 0; index < take; index += 1) spans.push(base + (index < free % take ? 1 : 0));
-  }
-  return spans;
+// Tetris-style packer on a columns-wide occupancy grid. Blocks (the AI summary) are placed first;
+// each cell then drops into the first free slot (row-major), takes ceil(run / k) of the free run so the
+// run is shared by the k cells that still fit at minSpan, and fills holes left beside taller cells.
+// Returns explicit 1-based { colStart, colSpan, rowStart, rowSpan } so no CSS auto-flow can leave gaps.
+export function packBento(cells, { columns = 12, minSpan = 3, blocks = [] } = {}) {
+  const taken = [];
+  const free = (row, col) => !taken[row]?.[col];
+  const mark = (row, col, rowSpan, colSpan) => {
+    for (let r = row; r < row + rowSpan; r += 1) {
+      taken[r] ??= [];
+      for (let c = col; c < col + colSpan; c += 1) taken[r][c] = true;
+    }
+  };
+  blocks.forEach(block => mark(block.row, block.col, block.rowSpan, block.colSpan));
+  const runAt = (row, col, rowSpan) => {
+    let length = 0;
+    while (col + length < columns && Array.from({ length: rowSpan }, (_, r) => free(row + r, col + length)).every(Boolean)) length += 1;
+    return length;
+  };
+  return cells.map((cell, index) => {
+    const rowSpan = Math.max(1, cell.rowSpan ?? 1);
+    for (let row = 0; ; row += 1) {
+      for (let col = 0; col < columns; col += 1) {
+        if (!free(row, col)) continue;
+        const run = runAt(row, col, rowSpan);
+        if (run === 0) continue;
+        const fit = Math.max(1, Math.min(cells.length - index, Math.floor(run / minSpan)));
+        const colSpan = Math.ceil(run / fit);
+        mark(row, col, rowSpan, colSpan);
+        return { colStart: col + 1, colSpan, rowStart: row + 1, rowSpan };
+      }
+    }
+  });
 }
 
-const wideLayout = { columns: 12, leadSpan: 4, leadRows: 2, minSpan: 3 };
+const wideLayout = { columns: 12, minSpan: 3, blocks: [{ row: 0, col: 0, rowSpan: 2, colSpan: 4 }] };
 
 export function DashboardMetricGrid({ items, wide = false, appearance, loading = false }) {
-  const spans = wide ? packBentoSpans(items.length, wideLayout) : [];
+  const placed = wide ? packBento(items, wideLayout) : [];
   return <div className="dashboard-metrics-box" data-wide={wide}>
     <MagicBento key={String(appearance.reduced)} className="dashboard-metrics" items={items.map((item, index) => ({
       ...item,
-      colSpan: wide ? spans[index] : 1,
+      ...(wide ? placed[index] : { colSpan: 1, rowSpan: 1 }),
     }))} columns={wide ? wideLayout.columns : 2} fixedColumns={wide} gap={readWorkspaceGap()} rowHeight={0}
       theme={appearance.theme} disableAnimations={loading || appearance.reduced} intro={false} textAutoHide={false}
       enableTilt={false} enableBorderGlow={false} enableSpotlight={false} clickEffect={false} enableStars={false}

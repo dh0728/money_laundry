@@ -93,6 +93,8 @@ function Metric({ item, reduced }) {
 function Metrics({ items, wide, appearance }) {
   return <DashboardMetricGrid items={items.map(item => ({
     id: item.key,
+    // Area and bar trends carry the volume story, so they get two rows; thin lines and the completion bar stay one row.
+    rowSpan: wide && ['area', 'bar'].includes(item.trend?.type) ? 2 : 1,
     content: <Metric item={item} reduced={appearance.reduced} />,
   }))} wide={wide} appearance={appearance} />;
 }
