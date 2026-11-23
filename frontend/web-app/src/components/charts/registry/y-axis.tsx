@@ -3,9 +3,9 @@
 import {
   AnimatePresence,
   m,
-  useReducedMotion,
   type Variants,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useChartPortalContainer, useChartStable, useSettledYScale, useYScale } from "./chart-context-shared";
@@ -142,7 +142,7 @@ const YAxisInner = memo(function YAxisInner({
   // swaps one label set for the next once, instead of churning through every
   // intermediate tick set; positions still follow the live scale each frame.
   const settledYScale = useSettledYScale(yAxisId);
-  const reducedMotion = useReducedMotion() ?? false;
+  const reducedMotion = useAppReducedMotion() ?? false;
   const isLeft = orientation === "left";
   const axisId = normalizeYAxisId(yAxisId);
 

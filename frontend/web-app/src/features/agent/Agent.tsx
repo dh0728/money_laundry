@@ -9,6 +9,7 @@ import { formatScore } from '@/api/codes'
 import { live } from '@/lib/apiMode'
 import type { AgentRecord } from './agentData'
 import { RadarSweep } from './RadarSweep'
+import { appReducedMotion } from '@/hooks/use-reduced-motion'
 
 export type AgentMode = 'sidebar' | 'floating'
 const name = 'RDR 9000'
@@ -83,7 +84,7 @@ export default function Agent({ open, setOpen, closeRef, mode, setMode, record, 
     if (!open) return
     const from = takeTriggerOrigin()
     const node = avatarRef.current
-    if (!from || (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)) return
+    if (!from || appReducedMotion()) return
     if (!node) return
     const to = node.getBoundingClientRect()
     if (to.width > 0) startMorph('opening', from, { left: to.left, top: to.top, width: to.width, height: to.height })
@@ -92,7 +93,7 @@ export default function Agent({ open, setOpen, closeRef, mode, setMode, record, 
   const requestClose = useCallback(() => {
     if (closing) return
     const from = avatarRef.current?.getBoundingClientRect()
-    if (!from || from.width === 0 || (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)) { setOpen(false); return }
+    if (!from || from.width === 0 || appReducedMotion()) { setOpen(false); return }
     setClosing(true)
     startMorph('closing', { left: from.left, top: from.top, width: from.width, height: from.height }, triggerHomeRect(), () => { setOpen(false); setClosing(false) })
   }, [closing, setOpen, startMorph])

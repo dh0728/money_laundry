@@ -9,6 +9,7 @@ import { graphFlowDuration, graphRevealDuration } from './graph-flow-pulse';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 function simulationData(network, positions, timePlan, previous) {
   const saved = new Map(previous?.nodes.map(node => [node.id, node]));
@@ -265,8 +266,7 @@ export function ForceCaseCanvas({
   const timePlan = useMemo(() => buildPatternTime(records ?? [], network.nodes, positions), [records, network, positions]);
   const [data, setData] = useState(() => simulationData(network, positions, timePlan));
   const currentLayout = useRef({ network, positions, timePlan });
-  const reducedMotion = document.documentElement.dataset.reducedMotion === 'true' ||
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = useAppReducedMotion();
   const activeFlow = reducedMotion ? undefined : flowPulse;
   const ambientFlow = reducedMotion || playing || activeFlow ? undefined : idleFlow;
   useEffect(() => {

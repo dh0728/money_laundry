@@ -2,6 +2,7 @@
 
 import { Children, Fragment, isValidElement, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import './ScrollStack.css';
+import { appMotionPreference } from '@/hooks/use-reduced-motion';
 
 export interface ScrollStackItemProps {
   children?: ReactNode;
@@ -124,7 +125,7 @@ const ScrollStack = ({
 
     const windowed = useWindowScroll;
     const target = windowed ? window : root;
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const motion = appMotionPreference;
     const cache = new Map<string, string | number>();
     let frame = 0;
     let glide = 0;

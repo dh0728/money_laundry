@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import './Particles.css';
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
 
 const SHAPES = { circle: 0, square: 1, ring: 2, sparkle: 3 };
 const EFFECTS = { parallax: 0, repel: 1, attract: 2 };
@@ -405,7 +406,7 @@ const Particles = ({
     gl.bindVertexArray(null);
 
     const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const reduce = appReducedMotion();
     const cache = new Map();
     const parse = value => {
       if (cache.has(value)) return cache.get(value);

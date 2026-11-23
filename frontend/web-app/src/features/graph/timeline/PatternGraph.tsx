@@ -4,6 +4,7 @@
 // 패턴 이름은 구조로 추정한 값(FE 제안)이고 모델 값이 아니다. 번호는 시간순 그래프와 같은 규칙(처음 나온 순서).
 import { lazy, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { NODE_SIZE, templateLayout, type Timeline } from './timeLayout'
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof import('react-force-graph-2d').default
 const R = NODE_SIZE / 2
@@ -35,7 +36,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
   const local = (e: React.PointerEvent) => { const r = wrap.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
   const selectedIds = useMemo(() => new Set(selected?.type === 'nodes' ? selected.ids : []), [selected])
   // force-graph는 그리는 도중에 배율 이벤트를 보낸다(dev Graph.tsx와 같은 주의). 그 자리에서 상태를 바꾸면 무한 갱신이 되므로 한 박자 늦춘다
-  const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduced = useAppReducedMotion()
 
   useEffect(() => {
     const el = wrap.current; if (!el) return

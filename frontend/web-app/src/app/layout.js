@@ -40,6 +40,7 @@ import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch.js';
 import { mountNotificationPreference, receivesSampleNotifications } from '../features/settings/notification-preference.jsx';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
+import { appMotionPreference, appReducedMotion, systemReducedMotion } from '@/hooks/use-reduced-motion';
 
 const tabGroups = [
   { name: 'Transactions', prefix: 'T', digits: 8 },
@@ -435,7 +436,6 @@ byId('settings-toggle').addEventListener('click', () => {
   void refreshPreviewSessionUser();
 });
 
-const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const systemTheme = matchMedia('(prefers-color-scheme: dark)');
 // 직접 고르기 전 기본값: 노트북 폭(1920px 미만)은 넓게 보기, 데스크탑 모니터 폭은 좁게 보기.
 const laptopViewport = matchMedia('(max-width: 1919px)');
@@ -475,7 +475,7 @@ function syncAppearance() {
   const theme = themeOptions.find(option => option.value === appearance.theme)?.value
     ?? (typeof appearance.dark === 'boolean' ? (appearance.dark ? 'dark' : 'light') : 'system');
   const dark = theme === 'dark' || (theme === 'system' && systemTheme.matches);
-  const { reduceMotion = motionPreference.matches, glassmorphism = true } = appearance;
+  const { reduceMotion = systemReducedMotion?.matches ?? false, glassmorphism = true } = appearance;
   const settings = { reduceMotion, glassmorphism };
   const { dataset } = document.documentElement;
   dataset.theme = dark ? 'dark' : 'light';
@@ -511,7 +511,7 @@ function syncAppearance() {
 for (const [button, key] of appearanceSwitches) {
   bindSquishSwitch(button, checked => setAppearancePreference(key, checked));
 }
-motionPreference.addEventListener('change', syncAppearance);
+systemReducedMotion?.addEventListener('change', syncAppearance);
 systemTheme.addEventListener('change', syncAppearance);
 laptopViewport.addEventListener('change', syncAppearance);
 syncAppearance();
@@ -1307,7 +1307,7 @@ function renderNotifications(arrivalIds) {
     if (!emptyNotifications.isConnected) list.append(emptyNotifications);
   }
   const animate = arrivalIds instanceof Set && !byId('inbox').hidden && list.scrollTop === 0
-    && document.documentElement.dataset.reducedMotion !== 'true' && !motionPreference.matches;
+    && !appReducedMotion();
   let nextButton = list.firstChild;
   let stagger = 0;
   for (const [key, item] of visible) {
@@ -1639,7 +1639,7 @@ function restoreLocation() {
 }
 
 const loginForm = byId('preview-login-form');
-const loginScene = mountLoginScene(byId('preview-login'), motionPreference);
+const loginScene = mountLoginScene(byId('preview-login'), appMotionPreference);
 const loginId = byId('preview-login-id');
 const loginPassword = byId('preview-login-password');
 const passwordToggle = byId('login-password-toggle');

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'motion/react';
+import { animate, motion, useMotionValue, useTransform, type MotionValue } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './RubberSegment.css';
 
@@ -124,7 +125,7 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
     linkTo ? -1 : 0,
     list.findIndex(item => item.value === current)
   );
-  const systemReducedMotion = useReducedMotion();
+  const systemReducedMotion = useAppReducedMotion();
   const reduce = reducedMotion || systemReducedMotion;
 
   const trackRef = useRef<HTMLDivElement>(null);

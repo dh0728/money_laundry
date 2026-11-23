@@ -12,10 +12,9 @@ import {
   type MotionValue,
   m,
   type Process,
-  useReducedMotion,
-  useReducedMotionConfig,
   useSpring,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import type { RefObject } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
@@ -437,7 +436,7 @@ export function TooltipPanel({
   const clipRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   // `MotionConfig reducedMotion` made Motion's layout tween instant.
-  const reducedMotionConfig = useReducedMotionConfig() === true;
+  const reducedMotionConfig = useAppReducedMotion() === true;
   usePanelSizeTween(
     panelRef,
     clipRef,
@@ -594,7 +593,7 @@ function TooltipBoxInner({
   const { tooltipBoxSpring } = useChartConfig();
   // Reduced motion: position jumps instead of springing and the panel skips
   // its scale/slide; opacity fades are kept.
-  const reducedMotion = useReducedMotion() === true;
+  const reducedMotion = useAppReducedMotion() === true;
   const effectiveSpring = springConfig ?? tooltipBoxSpring;
 
   const tooltipRef = useRef<HTMLDivElement>(null);

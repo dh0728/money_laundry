@@ -27,6 +27,7 @@ import ScrollStack, { ScrollStackItem } from '../components/react-bits/ScrollSta
 import StatusMark from '../components/react-bits/StatusMark';
 import '../app/layout.css';
 import './component-catalogue.css';
+import { systemReducedMotion } from '@/hooks/use-reduced-motion';
 
 const demoCodes = (prefix, size) => Array.from({ length: 8 }, (_, index) =>
   `${prefix}-261111-${String(index + 1).padStart(size, '0')}`);
@@ -149,7 +150,7 @@ function ShellDemo() {
 
 function Catalogue() {
   const [dark, setDark] = useState(false);
-  const [systemReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [systemReduced] = useState(() => systemReducedMotion?.matches ?? false);
   const [reduced, setReduced] = useState(systemReduced);
   const [refraction, setRefraction] = useState(true);
   const [size, setSize] = useState('medium');

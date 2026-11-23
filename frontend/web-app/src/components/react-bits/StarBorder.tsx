@@ -3,6 +3,7 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 
 import './StarBorder.css';
+import { appMotionPreference } from '@/hooks/use-reduced-motion';
 
 export type StarBorderTheme = 'dark' | 'light';
 
@@ -249,7 +250,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
     const ctx = canvas?.getContext('2d');
     if (!root || !canvas || !ctx) return undefined;
 
-    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const motionPreference = appMotionPreference;
     let reduce = motionPreference.matches;
     let off = false;
     let paintedRadius = settingsRef.current.radius;

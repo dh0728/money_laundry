@@ -1,4 +1,5 @@
 import { fixture } from './apiMode'
+import { appReducedMotion } from '@/hooks/use-reduced-motion'
 
 // Reviewed AML fixture elements only; the host cannot supply arbitrary selectors.
 const fixtureAnchors: Record<string, { route: string; selectors: string[] }> = {
@@ -93,7 +94,7 @@ export function installWiringBridge(anchors: Record<string, { route: string; sel
       if (element) {
         if (!request.started) {
           request.started = true; request.startedAt = performance.now()
-          element.scrollIntoView({ block: 'center', inline: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+          element.scrollIntoView({ block: 'center', inline: 'center', behavior: appReducedMotion() ? 'auto' : 'smooth' })
         }
         const rect = element.getBoundingClientRect()
         const steady = Math.abs(rect.x - request.lastX) < .5 && Math.abs(rect.y - request.lastY) < .5

@@ -8,9 +8,9 @@ import {
   type MotionValue,
   m,
   useMotionValue,
-  useReducedMotion,
   useSpring,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import {
   type CSSProperties,
   memo,
@@ -348,7 +348,7 @@ const DateTickerCompact = memo(function DateTickerCompact({
   style,
   variant,
 }: DateTickerVariantProps) {
-  const reduceMotion = useReducedMotion() === true;
+  const reduceMotion = useAppReducedMotion() === true;
   const label = labels[currentIndex] ?? labels[0] ?? "";
   const labelRef = useRef<HTMLSpanElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -382,7 +382,7 @@ const DateTickerInner = memo(function DateTickerInner({
   style,
   variant,
 }: DateTickerVariantProps) {
-  const reduceMotion = useReducedMotion() === true;
+  const reduceMotion = useAppReducedMotion() === true;
 
   // Parse labels into month and second-part (day or year) values
   const parsedLabels = useMemo(() => {

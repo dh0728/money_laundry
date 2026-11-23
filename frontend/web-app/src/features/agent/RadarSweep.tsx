@@ -1,8 +1,9 @@
 import { useId } from 'react'
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
 
 export function RadarSweep({ className = 'size-14' }: { className?: string }) {
   const id = useId().replace(/:/g, '')
-  const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  const reducedMotion = useAppReducedMotion()
   return <svg viewBox="0 0 32 32" className={className} aria-hidden data-testid="rdr-eye">
     <defs>
       <radialGradient id={`${id}-core`} cx="16" cy="16" r="5" gradientUnits="userSpaceOnUse">

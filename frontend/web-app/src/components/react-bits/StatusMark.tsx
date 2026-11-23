@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import { animate, useMotionValue, useReducedMotion } from 'motion/react';
+import { animate, useMotionValue } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './StatusMark.css';
 
@@ -63,7 +64,7 @@ const StatusMark: React.FC<StatusMarkProps> = ({
   className = '',
   style
 }) => {
-  const reduce = useReducedMotion();
+  const reduce = useAppReducedMotion();
   const r = 10 - strokeWidth / 2;
   const C = 2 * Math.PI * r;
   const P = C / Math.max(1, dashes);

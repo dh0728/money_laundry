@@ -14,6 +14,7 @@ import { IconButton } from '@/components/IconButton'
 import OwnerGraph, { effectiveFlowLabel, flowParticleColor, flowParticleCount, flowParticleRadius, type OwnerGraphControls, type OwnerGraphState } from './OwnerGraph'
 import { formatGraphMoney, type GraphViewMode } from './model'
 import { configureDevAccountForces, seedComponentPositions } from './force-layout'
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
 
 export { seedComponentPositions } from './force-layout'
 
@@ -68,14 +69,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
   const ownerGraph = useRef<OwnerGraphControls>(null)
   const [ownerState, setOwnerState] = useState<OwnerGraphState>({ positions: {}, camera: null })
   const [ownerZoom, setOwnerZoom] = useState({ ratio: 1, fitted: true })
-  const [reducedMotion, setReducedMotion] = useState(false)
-  useEffect(() => {
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-    if (!media) return
-    const update = () => setReducedMotion(media.matches)
-    update(); media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
+  const reducedMotion = useAppReducedMotion()
   // 상세: 오른쪽 도킹(좁으면 아래) 또는 RDR 9000처럼 떠 있는 창
   const [panelMode, setPanelMode] = useState<PanelMode>('dock')
   const [hover, setHover] = useState<{ kind: 'node' | 'edge'; key: string; x: number; y: number } | null>(null)

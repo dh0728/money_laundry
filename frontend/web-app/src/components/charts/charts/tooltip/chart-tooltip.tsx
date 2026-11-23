@@ -1,6 +1,7 @@
 "use client";
 
-import { m, useReducedMotion, useSpring } from "motion/react";
+import { m, useSpring } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { type CSSProperties, memo, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -754,7 +755,7 @@ function DatePillTrackerInner({
   velocity,
 }: DatePillTrackerProps) {
   const { tooltipSpring } = useChartConfig();
-  const reduceMotion = useReducedMotion() === true;
+  const reduceMotion = useAppReducedMotion() === true;
   const effectiveSpring = springConfig ?? tooltipSpring;
   const animatedX = useSpring(xWithMargin, effectiveSpring);
   const swell = useVelocityStretch(

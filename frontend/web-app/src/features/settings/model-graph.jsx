@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import { appMotionPreference } from '@/hooks/use-reduced-motion';
 
 const count = 100;
 const angle = Math.PI * (3 - Math.sqrt(5));
@@ -41,7 +42,7 @@ export function ModelGraph({ values: [medium, high] }) {
     const element = canvas.current;
     const context = element.getContext('2d');
     if (!context) return;
-    const media = matchMedia('(prefers-reduced-motion: reduce)');
+    const media = appMotionPreference;
     let frame = 0;
     let visible = false;
     let last = 0;
@@ -89,7 +90,7 @@ export function ModelGraph({ values: [medium, high] }) {
     const sync = () => {
       cancelAnimationFrame(frame);
       last = 0;
-      if (visible && !document.hidden && !media.matches && document.documentElement.dataset.reducedMotion !== 'true') {
+      if (visible && !document.hidden && !media.matches) {
         frame = requestAnimationFrame(step);
       } else {
         paint();

@@ -16,6 +16,7 @@ import {
 import { ArrowLeft, ArrowRight, Check as CheckIcon } from 'lucide-react';
 
 import './Stepper.css';
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -149,7 +150,7 @@ function Check() {
   useIsomorphicLayoutEffect(() => {
     const path = ref.current?.querySelector('path');
     if (!path || typeof path.animate !== 'function') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (appReducedMotion()) return;
     path.style.strokeDasharray = '24';
     path.animate([{ strokeDashoffset: 24 }, { strokeDashoffset: 0 }], {
       duration: 360,
@@ -297,7 +298,7 @@ export default function Stepper({
     const pane = paneRef.current;
     const leaving = leavingRef.current;
     const id = view.id;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = appReducedMotion();
     const mode = transition === 'none' ? 'none' : reduced ? 'fade' : transition;
     const finish = () => setView(state => (state.id === id ? { ...state, previous: null } : state));
     if (leaving && pane && leaving.contains(document.activeElement)) pane.focus({ preventScroll: true });
@@ -359,7 +360,7 @@ export default function Stepper({
       glider.style.height = `${segment.offsetHeight}px`;
       glider.style.opacity = completed ? '0' : '1';
     };
-    place(placedRef.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    place(placedRef.current && !appReducedMotion());
     placedRef.current = true;
     const observer = new ResizeObserver(() => place(false));
     observer.observe(track);

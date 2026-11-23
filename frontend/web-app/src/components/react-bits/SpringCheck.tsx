@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { animate, useMotionValue, useMotionValueEvent, useReducedMotion } from 'motion/react';
+import { animate, useMotionValue, useMotionValueEvent } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './SpringCheck.css';
 
@@ -78,7 +79,7 @@ const SpringCheck: React.FC<SpringCheckProps> = ({
   const controlled = checked !== undefined;
   const [inner, setInner] = useState(defaultChecked);
   const on = controlled ? checked : inner;
-  const systemReduced = useReducedMotion();
+  const systemReduced = useAppReducedMotion();
   const reduce = systemReduced || document.documentElement.dataset.reducedMotion === 'true';
 
   const t = useMotionValue(on ? 1 : 0);

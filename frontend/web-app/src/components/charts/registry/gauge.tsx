@@ -6,8 +6,8 @@ import {
   type MotionValue,
   m,
   type Transition,
-  useReducedMotion,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { type ReactNode, useId, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { ParentSize } from "./chart-parent-size";
@@ -345,7 +345,7 @@ function useGaugeMotion({
   enterStaggerScale?: number;
   geometryScrubbing?: boolean;
 }) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useAppReducedMotion();
   const instant = Boolean(prefersReducedMotion) || geometryScrubbing;
   const transition = enterTransition ?? DEFAULT_GAUGE_SWEEP_TRANSITION;
   const stagger = Math.max(0.25, Math.min(2.5, enterStaggerScale));

@@ -25,6 +25,7 @@ import {
 } from '@hugeicons/core-free-icons';
 
 import './MagicBento.css';
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -635,7 +636,7 @@ const MagicBento = ({
     const root = rootRef.current;
     if (!root) return;
 
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = appReducedMotion();
     const motion = !settingsRef.current.disableAnimations && !reduced;
     const playIntro = motion && settingsRef.current.intro;
     if (motion) root.dataset.motion = '';

@@ -19,11 +19,11 @@ import {
   animate,
   motion,
   useMotionValue,
-  useReducedMotion,
   useSpring,
   useTransform,
-  useVelocity
+  useVelocity,
 } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './WarmTooltip.css';
 
@@ -86,7 +86,7 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
   { delay = 400, warmWindow = 300, travel = 320, lean = 0, onWarmChange, children, portalTarget, reduceMotion = false },
   ref
 ) {
-  const systemReducedMotion = useReducedMotion();
+  const systemReducedMotion = useAppReducedMotion();
   const reduce = reduceMotion || systemReducedMotion;
   const id = useId();
   const [current, setCurrent] = useState(null);
@@ -233,7 +233,6 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
         finishClose();
       }
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [id, delay, warmWindow, current]
   );
   useImperativeHandle(ref, () => group, [group]);
@@ -272,7 +271,6 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
     } else {
       presence.jump(1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, state]);
 
   useEffect(() => {
@@ -300,7 +298,6 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
       window.removeEventListener('resize', follow);
       document.removeEventListener('visibilitychange', onHidden);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   useEffect(
@@ -454,7 +451,6 @@ function Trigger({
       cancelPress();
       hide(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disabled]);
 
   useEffect(() => {
@@ -464,7 +460,6 @@ function Trigger({
     };
     document.addEventListener('pointerdown', onOutside, true);
     return () => document.removeEventListener('pointerdown', onOutside, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   useEffect(

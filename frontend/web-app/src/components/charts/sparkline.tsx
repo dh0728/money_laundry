@@ -8,9 +8,9 @@ import {
   LazyMotion,
   type MotionValue,
   m,
-  useReducedMotion,
   useSpring,
 } from "motion/react";
+import { appReducedMotion, useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import {
   type CSSProperties,
   memo,
@@ -206,10 +206,7 @@ function useSparklineWidth(
 }
 
 function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
-  );
+  return appReducedMotion();
 }
 
 /**
@@ -647,7 +644,7 @@ function HoverMarks({
   fallbackY,
   ...rest
 }: HoverMarksProps & { spring: SparklineSpringConfig | null }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useAppReducedMotion();
   if (spring && !reducedMotion) {
     return (
       <SpringHoverMarks

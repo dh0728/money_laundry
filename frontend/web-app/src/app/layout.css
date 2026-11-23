@@ -130,6 +130,17 @@ body {
   -webkit-mask: url(/aml_radar_symbol_animated.svg) center / contain no-repeat;
   mask: url(/aml_radar_symbol_animated.svg) center / contain no-repeat;
 }
+/* 움직임 끄기 장치: 설정 > 모션 줄이기(기본은 OS prefers-reduced-motion)를 켜면 모든 CSS 움직임을 멈춘다.
+   JS 움직임은 hooks/use-reduced-motion을 거친다. 디자인 규칙 token/important가 이 선택자만 허용한다. */
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
 [data-reduced-motion="true"] .aml-radar-symbol {
   -webkit-mask-image: url(/aml_radar_symbol_static.svg);
   mask-image: url(/aml_radar_symbol_static.svg);

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import './AnimatedList.css';
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -191,7 +192,7 @@ const AnimatedList = ({
     const ring = ringRef.current;
     if (!root || !viewport || !track || !indicator || !ring) return;
 
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = appReducedMotion();
     const springEase = CSS.supports?.('transition-timing-function', 'linear(0, 1)')
       ? SPRING
       : 'cubic-bezier(0.34, 1.4, 0.64, 1)';

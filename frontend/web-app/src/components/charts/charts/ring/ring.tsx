@@ -3,9 +3,9 @@
 import {
   type MotionValue,
   m,
-  useReducedMotion,
   useTransform,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { memo, useCallback } from "react";
 import { arcPath } from "../pie/arc-path";
 import {
@@ -78,7 +78,7 @@ export const Ring = memo(function Ring({
     ringGap,
   } = useRingStable();
   const { hoveredIndex, setHoveredIndex } = useRingHover();
-  const reducedMotion = useReducedMotion() ?? false;
+  const reducedMotion = useAppReducedMotion() ?? false;
 
   const expandDelay = index * 0.08 * enterStaggerScale;
   const expandProgress = useMountProgress(

@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
+import { animate, motion, useMotionValue, useTransform } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 import { Bell } from 'lucide-react';
 import './BellToggle.css';
 
@@ -64,7 +65,7 @@ export default function BellToggle({
 }) {
   const [inner, setInner] = useState(defaultPressed);
   const on = pressed ?? inner;
-  const systemReducedMotion = useReducedMotion();
+  const systemReducedMotion = useAppReducedMotion();
   const reduce = reducedMotion || systemReducedMotion;
   const rootRef = useRef(null);
   const glyphRef = useRef(null);
@@ -95,7 +96,6 @@ export default function BellToggle({
     if (onRef.current) observer.observe(onRef.current);
     document.fonts?.ready.then(measure);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offLabel, onLabel, size]);
 
   const swing = (amplitude, passes, duration) => {
@@ -136,7 +136,6 @@ export default function BellToggle({
     if (pointer) spring.current = animate(t, on ? 1 : 0, { ...SPRING_UI, bounce: revealBounce });
     else t.jump(on ? 1 : 0);
     if (on && !reduce && (pointer || (ringOnKeyboard && input === 'keyboard'))) swing(ringAmplitude, ringPasses, ringDuration);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on]);
   useLayoutEffect(() => () => spring.current?.stop(), []);
   useLayoutEffect(() => {
@@ -153,7 +152,6 @@ export default function BellToggle({
     const was = prevCount.current;
     prevCount.current = count;
     if (count > was && on && !reduce) swing(ringAmplitude * WOBBLE.amplitude, WOBBLE.passes, WOBBLE.duration);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count]);
 
   const toggle = () => {

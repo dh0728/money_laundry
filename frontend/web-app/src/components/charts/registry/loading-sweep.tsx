@@ -2,7 +2,8 @@
 
 import { scaleLinear } from "d3-scale";
 import type { CurveFactory } from "d3-shape";
-import { m, useReducedMotion } from "motion/react";
+import { m } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import {
   useCallback,
   useEffect,
@@ -191,7 +192,7 @@ export function LineLoadingSweep({
   durationSeconds = DEFAULT_SWEEP_DURATION_S,
 }: LineLoadingSweepProps) {
   const { innerWidth, innerHeight } = useChartStable();
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useAppReducedMotion();
   const reactId = useId();
   const chartId = `line-sweep-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const isLoop = mode === "loop";
@@ -403,7 +404,7 @@ export function BarLoadingSkeleton({
   barFraction = DEFAULT_BAR_FRACTION,
   durationSeconds = DEFAULT_SWEEP_DURATION_S,
 }: BarLoadingSkeletonProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useAppReducedMotion();
   const reactId = useId();
   const chartId = `bar-sweep-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [tick, setTick] = useState(0);

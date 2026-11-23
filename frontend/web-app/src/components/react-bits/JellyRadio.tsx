@@ -13,11 +13,11 @@ import {
   animate,
   motion,
   motionValue,
-  useReducedMotion,
   useTransform,
   type HTMLMotionProps,
-  type MotionValue
+  type MotionValue,
 } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './JellyRadio.css';
 
@@ -118,7 +118,7 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
     0,
     list.findIndex(it => it.value === current)
   );
-  const systemReduced = useReducedMotion();
+  const systemReduced = useAppReducedMotion();
   const reduce = systemReduced || document.documentElement.dataset.reducedMotion === 'true';
   const groupRef = useRef<HTMLDivElement>(null);
   const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);

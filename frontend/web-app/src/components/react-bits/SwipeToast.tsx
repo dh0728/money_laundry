@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
+import { animate, motion, useMotionValue, useTransform } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 import { X } from 'lucide-react';
 
 import './SwipeToast.css';
@@ -93,7 +94,7 @@ const SwipeToast: React.FC<SwipeToastProps> = ({
   dismissible = true,
   className = ''
 }) => {
-  const reduce = useReducedMotion();
+  const reduce = useAppReducedMotion();
   const [phase, setPhase] = useState<SwipeToastPhase>('open');
   const [instant, setInstant] = useState(false);
   const [mounted, setMounted] = useState(HAS_STARTING_STYLE);

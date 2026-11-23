@@ -2,7 +2,8 @@
 
 import type { CurveFactory } from "d3-shape";
 import { curveLinear } from "d3-shape";
-import { animate, useReducedMotion } from "motion/react";
+import { animate } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LINE_LOADING_PULSE_EASE } from "./line-loading-timing";
 import {
@@ -57,7 +58,7 @@ export function useAnimatedSeriesPath({
   innerWidth,
   enabled,
 }: UseAnimatedSeriesPathOptions) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useAppReducedMotion();
   const [animatedPath, setAnimatedPath] = useState<DisplayedSeriesPath | null>(
     null
   );

@@ -1,6 +1,7 @@
 "use client";
 
-import { m, useReducedMotion } from "motion/react";
+import { m } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { memo, useMemo } from "react";
 import {
   GRID_ANGLE_LABEL_FADE_S,
@@ -96,7 +97,7 @@ export const RingGrid = memo(function RingGrid({
     animationKey,
     geometryScrubbing,
   } = useRingStable();
-  const reducedMotion = useReducedMotion() ?? false;
+  const reducedMotion = useAppReducedMotion() ?? false;
   const isStatic = reducedMotion || geometryScrubbing;
 
   const fontSize = fontSizeProp ?? Math.min(12, Math.max(9, size / 26));

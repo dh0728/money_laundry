@@ -6,9 +6,9 @@ import {
   LazyMotion,
   type MotionValue,
   m,
-  useReducedMotion,
   useSpring,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import {
   useCallback,
@@ -77,7 +77,7 @@ export function CursorTooltipBox({
   const container = useChartPortalContainer(containerRef);
   const { tooltipBoxSpring } = useChartConfig();
   // Reduced motion: the panel jumps to the cursor instead of springing.
-  const reducedMotion = useReducedMotion() === true;
+  const reducedMotion = useAppReducedMotion() === true;
   const x = useSpring(0, springConfig ?? tooltipBoxSpring);
   const y = useSpring(0, springConfig ?? tooltipBoxSpring);
   // While hidden, positions jump so the panel appears at the cursor rather
@@ -195,7 +195,7 @@ function CursorTooltipPanel({
   flipped: boolean;
   onMeasure: (width: number, height: number) => void;
 }) {
-  const reducedMotion = useReducedMotion() === true;
+  const reducedMotion = useAppReducedMotion() === true;
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Re-measure when the content changes (new hover target), before paint.
