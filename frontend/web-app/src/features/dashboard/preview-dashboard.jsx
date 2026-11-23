@@ -6,6 +6,10 @@ import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import { DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardMetricGrid } from './dashboard-layout';
 import { AreaSparkline, BarSparkline, LineSparkline } from '../../components/charts/sparkline';
+import { BarChart } from '../../components/charts/charts/bar-chart';
+import { Bar } from '../../components/charts/charts/bar';
+import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
+import { Gauge } from '../../components/charts/registry/gauge';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
@@ -15,6 +19,8 @@ import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings'
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const percent = (count, total) => `${total ? Math.round(count / total * 1000) / 10 : 0}%`;
+// A rate with no denominator is not 0%: show a dash and say there was nothing to count.
+const rate = (count, total) => total ? percent(count, total) : '—';
 const count = value => `${formatter.format(value)}건`;
 const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 3 });
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
@@ -41,12 +47,29 @@ function usePlotHeight(enabled, initialHeight) {
   return [plot, height];
 }
 
-function CompletionBar({ label, value, total }) {
-  return <div className="dashboard-completion-plot">
-    <svg role="img" aria-label={`${label} · 전체 ${count(total)} 중 ${count(value)} 완료`} width="100%" height="20">
-      <rect fill="var(--chart-total)" width="100%" height="100%" rx="10" />
-      {value > 0 && <rect fill="var(--chart-completion)" width={`${value / total * 100}%`} height="100%" rx="10" />}
-    </svg>
+const instant = { duration: 0 };
+
+// Completion share against a fixed 0–100% track: one value, so a linear gauge instead of a bar series.
+function CompletionGauge({ label, value, total, reduced }) {
+  return <div className="dashboard-completion-plot" role="img" aria-label={`${label} · 전체 ${count(total)} 중 ${count(value)} 완료`}>
+    <Gauge orientation="linear" value={value / total * 100} minWidth={0} linearHeight={28} totalNotches={32}
+      activeFill="var(--chart-completion)" inactiveFill="var(--chart-total)" inactiveFillOpacity={1}
+      enterTransition={reduced ? instant : undefined} />
+  </div>;
+}
+
+// New accounts and new owners count different things, so each gets its own row and scale instead of sharing one bar length.
+function DailyBarsRow({ rows, item, reduced }) {
+  return <div className="dashboard-metric-trend">
+    <span className="dashboard-note">{item.label} · {item.unit}</span>
+    <div className="dashboard-metric-plot">
+      <BarChart className="dashboard-metric-bars" data={rows} xDataKey="label" aspectRatio="auto" margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
+        animationDuration={reduced ? 0 : 340}>
+        <Bar dataKey={item.key} fill={item.color} lineCap="round" animate={!reduced} />
+        <ChartTooltip showCrosshair={false} showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
+          rows={point => [{ label: `${point.label} ${item.label}`, color: item.color, value: `${formatter.format(point[item.key])}${item.unit}` }]} />
+      </BarChart>
+    </div>
   </div>;
 }
 
@@ -58,7 +81,7 @@ function Metric({ item, reduced }) {
   const [hoverIndex, setHoverIndex] = React.useState(null);
   const hoveredHour = hoverIndex === null ? undefined : trend?.rows[hoverIndex];
   const wideValue = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
-  const hasChart = Boolean(trend || completion?.total);
+  const hasChart = Boolean(trend || completion?.total || item.groups);
   const [plot, plotHeight] = usePlotHeight(Boolean(trend), 48);
   return <div className="dashboard-metric" data-export-visualization={hasChart || undefined}>
     <SectionDownloadHeading as="h3" downloadLabel={hasChart ? label : undefined}>{label}</SectionDownloadHeading>
@@ -76,7 +99,13 @@ function Metric({ item, reduced }) {
       </strong>
     </div>
     {detail && <p>{detail}</p>}
-    {completion?.total > 0 && <CompletionBar label={label} {...completion} />}
+    {completion?.total > 0 && <CompletionGauge label={label} reduced={reduced} {...completion} />}
+    {item.groups && <div className="dashboard-metric-trend">
+      {item.groups.series.map(series => <DailyBarsRow key={series.key} rows={item.groups.rows} item={series} reduced={reduced} />)}
+      <p className="visually-hidden">{label} · {item.groups.rows.map(row =>
+        `${row.label} ${item.groups.series.map(series => `${series.label} ${formatter.format(row[series.key])}${series.unit}`).join(' ')}`).join(', ')}</p>
+      <span className="dashboard-note">{item.groups.caption}</span>
+    </div>}
     {trend && <div className="dashboard-metric-trend">
       <div className="dashboard-metric-plot" ref={plot}>
         <Sparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={plotHeight}
@@ -102,30 +131,17 @@ function Metrics({ items, wide, appearance }) {
   }))} wide={wide} appearance={appearance} />;
 }
 
-function DashboardAISummary({ headline, alertRows, timeSlots, period, reduced, benchmarkLink, children }) {
-  const [hovered, setHovered] = React.useState(null);
-  const hasChart = alertRows.length > 0;
-  const [plot, plotHeight] = usePlotHeight(hasChart, 96);
-  const trend = timeSlots.map(({ label }, hour) => ({ label, value: alertRows.filter(row => row.hour === hour).length }));
-  return <AISummaryPanel as="article" reduced={reduced} data-export-visualization={alertRows.length > 0 || undefined}>
-    <SectionDownloadHeading className="dashboard-summary-heading" downloadLabel={hasChart ? 'AI 요약' : undefined}>
+// The summary says what to open next: a sentence, the count, and the list that holds those cases. Creation hour does not change that call, so no chart.
+function DashboardAISummary({ headline, reduced, benchmarkLink, listLink, period, children }) {
+  return <AISummaryPanel as="article" reduced={reduced}>
+    <SectionDownloadHeading className="dashboard-summary-heading">
       <Sparkles className="icon" aria-hidden="true" /> AI 요약
     </SectionDownloadHeading>
     <strong>{headline}</strong>
     {children}
-    {hasChart && <figure className="dashboard-summary-trend">
-      <figcaption>생성 시간대 · KST</figcaption>
-      <div className="dashboard-summary-plot" ref={plot}>
-        <BarSparkline data={trend} dataKey="value"
-          aria-label={`우선 확인 Alert 생성 시간대 · KST · ${trend.map(row => `${row.label} ${count(row.value)}`).join(', ')}`}
-          height={plotHeight} color="var(--chart-risk-high)" barRadius={6} dot={false} crosshair="dashed" animate={!reduced}
-          onHoverChange={(_, point) => setHovered(point)} />
-      </div>
-      <div className="dashboard-summary-trend-axis">
-        <span>{hovered ? `${hovered.label} · ${count(hovered.value)}` : trend[0]?.label}</span>
-        {!hovered && <span>{trend.at(-1)?.label}</span>}
-      </div>
-    </figure>}
+    {listLink && <ActionButton as="a" className="dashboard-summary-link" href={listLink.href} shape="pill" surface="floating">
+      {listLink.label} <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
+    </ActionButton>}
     <div className="dashboard-summary-footer">
       <p className="dashboard-note">{period.from} ~ {period.to} · KST</p>
       {benchmarkLink && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
@@ -139,8 +155,8 @@ const priorityAlerts = rows => rows.filter(row => row.open && modelRiskBand(row.
 
 function MineSummary({ data, reduced }) {
   const { high } = modelRiskLabels();
-  return <DashboardAISummary headline={`내 담당 미완료 ${count(data.unfinished)}`}
-    alertRows={priorityAlerts(data.alertCases.filter(row => row.assigned))} timeSlots={data.hourly} period={data.period} reduced={reduced}>
+  return <DashboardAISummary headline={`내 담당 미완료 ${count(data.unfinished)}`} period={data.period} reduced={reduced}
+    listLink={data.unfinished > 0 ? { href: '/investigate/alerts?view=table', label: 'Alert 목록 열기' } : undefined}>
     {data.unfinished > 0 && <p>{data.urgent > 0
       ? `위험 점수 ${high}이고 3일 이상 경과한 미완료 Alert ${count(data.urgent)}부터 확인하세요.`
       : `위험 점수 ${high}이며 3일 이상 경과한 미완료 Alert가 없습니다.`}</p>}
@@ -151,8 +167,9 @@ function DashboardSummary({ data, reduced }) {
   const alerts = priorityAlerts(data.alertCases);
   return <DashboardAISummary headline={alerts.length
     ? `우선 확인할 장기 미처리 고위험 Alert ${count(alerts.length)}` : '장기 미처리 고위험 Alert 없음'}
-    alertRows={alerts} timeSlots={data.hourly} period={data.period} reduced={reduced} benchmarkLink>
-    {alerts.length > 0 && <p>{modelRiskLabels().high} · 3일 이상 경과</p>}
+    period={data.period} reduced={reduced} benchmarkLink
+    listLink={alerts.length > 0 ? { href: '/investigate/alerts?view=table', label: 'Alert 목록 열기' } : undefined}>
+    {alerts.length > 0 && <p>위험 점수 {modelRiskLabels().high} · 3일 이상 경과 · 미처리 Alert {count(data.alertCases.filter(row => row.open).length)} 중</p>}
   </DashboardAISummary>;
 }
 
@@ -183,29 +200,36 @@ function WorkBoard({ records, mine, sort, appearance }) {
 export function PreviewDashboard({ mine, data, appearance }) {
   const metric = (label, value, detail, unit = '건') => ({ label, value, unit, detail, key: `${mine}-${label}` });
   const trend = (key, color, type = 'line', rows = data.operationalDaily) =>
-    ({ rows, key, color: `var(--chart-${color})`, type, caption: rows === data.hourly ? '생성 시간대 · KST' : '일별 · KST' });
-  // Daily share of suspicious transactions linked to an Alert; days without suspicious ones leave a gap.
-  const linkedRates = (data.operationalDaily ?? []).map(row => ({ ...row, linkedRate: row.suspicious ? row.linked / row.suspicious * 100 : null }));
+    ({ rows, key, color: `var(--chart-${color})`, type, caption: '일별 · KST' });
+  const days = data.operationalDaily?.length || 1;
+  const openAlerts = data.alertCases.filter(row => row.open).length;
+  const openEpisodes = data.cases.filter(row => row.kind === 'Episode' && row.open).length;
+  const cohort = data.alertCohort ?? { days: 30, total: 0, completed: 0 };
+  // Backlog charts read the cases still open at each day's close, not the ones created that day.
+  const backlog = key => ({ ...trend(key, 'neutral', 'area'), caption: '일별 마감 시점 잔량 · KST' });
   const kpis = mine ? [
-    { ...metric(`위험 점수 ${modelRiskLabels().high}`, data.highRisk, '내 담당 미처리 Alert'), trend: trend('highRisk', 'risk-high', 'bar', data.hourly) },
-    { ...metric('3일 이상 경과', data.overdue, '내 담당 미완료 Alert·Episode'), trend: trend('overdue', 'risk-medium', 'bar', data.hourly) },
+    { ...metric('미처리 Alert', data.unfinishedAlerts ?? 0, `위험 점수 ${modelRiskLabels().high} ${count(data.highRisk)}`) },
+    { ...metric('미완료 Episode', data.unfinishedEpisodes ?? 0, '내 담당 검토 대기·처리 중') },
+    { ...metric('3일 이상 경과 Alert', data.overdueAlerts ?? 0, `내 담당 미처리 Alert ${count(data.unfinishedAlerts ?? 0)} 중`) },
+    { ...metric('3일 이상 경과 Episode', data.overdueEpisodes ?? 0, `내 담당 미완료 Episode ${count(data.unfinishedEpisodes ?? 0)} 중`) },
   ] : [
-    { swing: true, ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', 'arrival', 'bar') },
-    // Each day's total bar holds its suspicious part, so the share reads per day like the headline ratio.
-    { swing: true, ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
-      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/',
-    trend: { ...trend('total', 'total', 'bar'), overlay: { key: 'suspicious', color: 'var(--chart-suspect)' },
-      describe: row => `의심 ${count(row.suspicious)} / 전체 ${count(row.total)} · ${percent(row.suspicious, row.total)}` } },
+    { ...metric('들어온 거래 수', data.transactions.length, `일평균 ${count(Math.round(data.transactions.length / days))} · 거래 발생일 KST`) },
+    { ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
+      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)} · 모델 점수 70점 이상`, ''), separator: '/' },
     { swing: true, ...metric('새 계좌 · 새 소유주', [{ amount: data.newAccounts, unit: '개' }, { amount: data.newOwners, unit: '명' }],
-      '거래 이력 기준', ''), separator: '·', trend: { ...trend('newAccounts', 'arrival', 'bar'), caption: '일별 최초 등장 계좌 · KST' } },
-    { swing: true, ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', 'arrival', 'bar') },
-    { ...metric('업무 처리율', percent(data.settled, data.cases.length), `${count(data.cases.length)} 중 ${count(data.settled)} 완료`, ''),
-      completion: { value: data.settled, total: data.cases.length } },
-    { ...metric('미처리 Alert', data.alertCases.filter(row => row.open).length, '검토 대기·처리 중'), trend: trend('openAlerts', 'neutral') },
-    { ...metric('의심 거래 중 Alert 편입', percent(data.linked, data.suspicious.length), `${count(data.suspicious.length)} 중 ${count(data.linked)}`, ''),
-      trend: { ...trend('linkedRate', 'suspect', 'line', linkedRates),
-        describe: row => row.suspicious ? `${percent(row.linked, row.suspicious)} (${count(row.suspicious)} 중 ${count(row.linked)})` : '의심 거래 없음' } },
-    { ...metric('미완료 Episode', data.cases.filter(row => row.kind === 'Episode' && row.open).length, '검토 대기·처리 중'), trend: trend('openEpisodes', 'neutral') },
+      '거래 이력 기준', ''), separator: '·', groups: {
+      rows: data.operationalDaily, caption: '일별 · KST', series: [
+        { key: 'newAccounts', label: '새 계좌', unit: '개', color: 'var(--chart-neutral)' },
+        { key: 'newOwners', label: '새 소유주', unit: '명', color: 'var(--chart-neutral)' },
+      ] } },
+    { ...metric('생성 Alert', data.alertCases.length, `완료 ${count(data.alertCases.length - openAlerts)} · 미처리 ${count(openAlerts)}`) },
+    { ...metric('업무 처리율', rate(cohort.completed, cohort.total), cohort.total
+      ? `최근 ${cohort.days}일 생성 Alert ${count(cohort.total)} 중 ${count(cohort.completed)} 완료` : `최근 ${cohort.days}일 생성 Alert 없음`, ''),
+      completion: { value: cohort.completed, total: cohort.total } },
+    { ...metric('미처리 Alert', openAlerts, `72시간 이상 ${count(data.aged?.alerts ?? 0)}`), trend: backlog('backlogAlerts') },
+    { ...metric('의심 거래 중 Alert 편입', rate(data.linked, data.suspicious.length),
+      data.suspicious.length ? `의심 거래 ${count(data.suspicious.length)} 중 ${count(data.linked)}` : '의심 거래 없음', '') },
+    { ...metric('미완료 Episode', openEpisodes, `72시간 이상 ${count(data.aged?.episodes ?? 0)}`), trend: backlog('backlogEpisodes') },
   ];
   return <div className="preview-dashboard" data-mine={mine}>
     <section className="dashboard-top" aria-label="요약 및 주요 지표">
