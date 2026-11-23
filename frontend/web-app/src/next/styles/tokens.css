@@ -210,14 +210,14 @@
   --aml-text-disabled: var(--aml-gray-050);
   --aml-text-inverse: var(--aml-white-100);
   --aml-text-on-selected: var(--aml-brand-selected-ink);
-  --aml-text-link: var(--aml-sky-040);
-  --aml-text-link-hover: var(--aml-sky-030);
+  --aml-text-link: var(--aml-gray-020);
+  --aml-text-link-hover: var(--aml-gray-010);
   --aml-text-on-accent: var(--aml-white-100);
   --aml-border-subtle: var(--aml-gray-080);
   --aml-border-default: var(--aml-gray-070);
   --aml-border-strong: var(--aml-gray-060);
   --aml-border-control: var(--aml-gray-050);
-  --aml-border-focus: var(--aml-sky-040);
+  --aml-border-focus: var(--aml-gray-020);
   --aml-action-primary: var(--aml-brand-rest);
   --aml-action-primary-hover: var(--aml-brand-hover);
   --aml-action-primary-pressed: var(--aml-brand-pressed);
@@ -251,10 +251,10 @@
   --aml-status-caution-text: var(--aml-amber-030);
   --aml-status-caution-border: var(--aml-amber-060);
   --aml-status-caution-solid: var(--aml-amber-050);
-  --aml-status-info-surface: var(--aml-sky-095);
-  --aml-status-info-text: var(--aml-sky-030);
-  --aml-status-info-border: var(--aml-sky-060);
-  --aml-status-info-solid: var(--aml-sky-050);
+  --aml-status-info-surface: var(--aml-gray-095);
+  --aml-status-info-text: var(--aml-gray-030);
+  --aml-status-info-border: var(--aml-gray-060);
+  --aml-status-info-solid: var(--aml-gray-050);
   --aml-status-pending-surface: var(--aml-violet-095);
   --aml-status-pending-text: var(--aml-violet-030);
   --aml-status-pending-border: var(--aml-violet-060);
@@ -281,14 +281,14 @@
   --aml-text-disabled: var(--aml-gray-050);
   --aml-text-inverse: var(--aml-gray-010);
   --aml-text-on-selected: var(--aml-brand-selected-ink);
-  --aml-text-link: var(--aml-sky-080);
-  --aml-text-link-hover: var(--aml-sky-090);
+  --aml-text-link: var(--aml-gray-095);
+  --aml-text-link-hover: var(--aml-white-100);
   --aml-text-on-accent: var(--aml-white-100);
   --aml-border-subtle: var(--aml-gray-030);
   --aml-border-default: var(--aml-gray-040);
   --aml-border-strong: var(--aml-gray-050);
   --aml-border-control: var(--aml-gray-060);
-  --aml-border-focus: var(--aml-sky-080);
+  --aml-border-focus: var(--aml-gray-095);
   --aml-action-primary: var(--aml-brand-rest);
   --aml-action-primary-hover: var(--aml-brand-hover);
   --aml-action-primary-pressed: var(--aml-brand-pressed);
@@ -322,10 +322,10 @@
   --aml-status-caution-text: var(--aml-amber-080);
   --aml-status-caution-border: var(--aml-amber-050);
   --aml-status-caution-solid: var(--aml-amber-050);
-  --aml-status-info-surface: var(--aml-sky-010);
-  --aml-status-info-text: var(--aml-sky-080);
-  --aml-status-info-border: var(--aml-sky-050);
-  --aml-status-info-solid: var(--aml-sky-050);
+  --aml-status-info-surface: var(--aml-gray-010);
+  --aml-status-info-text: var(--aml-gray-080);
+  --aml-status-info-border: var(--aml-gray-050);
+  --aml-status-info-solid: var(--aml-gray-050);
   --aml-status-pending-surface: var(--aml-violet-010);
   --aml-status-pending-text: var(--aml-violet-080);
   --aml-status-pending-border: var(--aml-violet-050);
@@ -352,14 +352,14 @@
   --aml-text-disabled: var(--aml-sand-050);
   --aml-text-inverse: var(--aml-white-100);
   --aml-text-on-selected: var(--aml-brand-selected-ink);
-  --aml-text-link: var(--aml-sky-040);
-  --aml-text-link-hover: var(--aml-sky-030);
+  --aml-text-link: var(--aml-sand-020);
+  --aml-text-link-hover: var(--aml-sand-010);
   --aml-text-on-accent: var(--aml-white-100);
   --aml-border-subtle: var(--aml-sand-080);
   --aml-border-default: var(--aml-sand-070);
   --aml-border-strong: var(--aml-sand-060);
   --aml-border-control: var(--aml-sand-050);
-  --aml-border-focus: var(--aml-sky-040);
+  --aml-border-focus: var(--aml-sand-020);
   --aml-action-primary: var(--aml-brand-rest);
   --aml-action-primary-hover: var(--aml-brand-hover);
   --aml-action-primary-pressed: var(--aml-brand-pressed);
@@ -393,10 +393,10 @@
   --aml-status-caution-text: var(--aml-amber-030);
   --aml-status-caution-border: var(--aml-amber-060);
   --aml-status-caution-solid: var(--aml-amber-050);
-  --aml-status-info-surface: var(--aml-sky-095);
-  --aml-status-info-text: var(--aml-sky-030);
-  --aml-status-info-border: var(--aml-sky-060);
-  --aml-status-info-solid: var(--aml-sky-050);
+  --aml-status-info-surface: var(--aml-sand-095);
+  --aml-status-info-text: var(--aml-sand-030);
+  --aml-status-info-border: var(--aml-sand-060);
+  --aml-status-info-solid: var(--aml-sand-050);
   --aml-status-pending-surface: var(--aml-violet-095);
   --aml-status-pending-text: var(--aml-violet-030);
   --aml-status-pending-border: var(--aml-violet-060);
@@ -423,14 +423,14 @@
   --aml-text-disabled: var(--aml-slate-050);
   --aml-text-inverse: var(--aml-slate-010);
   --aml-text-on-selected: var(--aml-brand-selected-ink);
-  --aml-text-link: var(--aml-sky-080);
-  --aml-text-link-hover: var(--aml-sky-090);
+  --aml-text-link: var(--aml-slate-095);
+  --aml-text-link-hover: var(--aml-white-100);
   --aml-text-on-accent: var(--aml-white-100);
   --aml-border-subtle: var(--aml-slate-030);
   --aml-border-default: var(--aml-slate-040);
   --aml-border-strong: var(--aml-slate-050);
   --aml-border-control: var(--aml-slate-060);
-  --aml-border-focus: var(--aml-sky-080);
+  --aml-border-focus: var(--aml-slate-095);
   --aml-action-primary: var(--aml-brand-rest);
   --aml-action-primary-hover: var(--aml-brand-hover);
   --aml-action-primary-pressed: var(--aml-brand-pressed);
@@ -464,10 +464,10 @@
   --aml-status-caution-text: var(--aml-amber-080);
   --aml-status-caution-border: var(--aml-amber-050);
   --aml-status-caution-solid: var(--aml-amber-050);
-  --aml-status-info-surface: var(--aml-sky-010);
-  --aml-status-info-text: var(--aml-sky-080);
-  --aml-status-info-border: var(--aml-sky-050);
-  --aml-status-info-solid: var(--aml-sky-050);
+  --aml-status-info-surface: var(--aml-slate-010);
+  --aml-status-info-text: var(--aml-slate-080);
+  --aml-status-info-border: var(--aml-slate-050);
+  --aml-status-info-solid: var(--aml-slate-050);
   --aml-status-pending-surface: var(--aml-violet-010);
   --aml-status-pending-text: var(--aml-violet-080);
   --aml-status-pending-border: var(--aml-violet-050);
@@ -477,7 +477,27 @@
   --aml-shadow-raised: 0 8px 28px var(--aml-black-040);
   --aml-overlay-scrim: var(--aml-black-060);
 }
-:root, [data-theme="light"][data-accent="sky"], [data-theme="solarized-light"][data-accent="sky"] {
+:root, [data-theme="light"], [data-theme="solarized-light"] {
+  --aml-brand-rest: var(--aml-gray-020);
+  --aml-brand-hover: var(--aml-gray-010);
+  --aml-brand-pressed: var(--aml-gray-005);
+  --aml-brand-ink: var(--aml-white-100);
+  --aml-brand-border: var(--aml-gray-020);
+  --aml-brand-selected: var(--aml-gray-090);
+  --aml-brand-selected-hover: var(--aml-gray-080);
+  --aml-brand-selected-ink: var(--aml-gray-020);
+}
+[data-theme="dark"], [data-theme="solarized-dark"] {
+  --aml-brand-rest: var(--aml-gray-095);
+  --aml-brand-hover: var(--aml-white-100);
+  --aml-brand-pressed: var(--aml-gray-090);
+  --aml-brand-ink: var(--aml-gray-010);
+  --aml-brand-border: var(--aml-gray-095);
+  --aml-brand-selected: var(--aml-gray-030);
+  --aml-brand-selected-hover: var(--aml-gray-040);
+  --aml-brand-selected-ink: var(--aml-gray-095);
+}
+[data-theme="light"][data-accent="sky"], [data-theme="solarized-light"][data-accent="sky"] {
   --aml-brand-rest: #0d99ff;
   --aml-brand-hover: #0090f2;
   --aml-brand-pressed: #0086e3;
@@ -557,7 +577,7 @@
   --aml-brand-selected-hover: #5b0038;
   --aml-brand-selected-ink: #ffcee3;
 }
-:root, [data-accent="sky"] {
+[data-accent="sky"] {
   --aml-accent-005: var(--aml-sky-005);
   --aml-accent-010: var(--aml-sky-010);
   --aml-accent-020: var(--aml-sky-020);

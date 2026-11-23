@@ -46,7 +46,7 @@
   overflow-wrap: anywhere;
 }
 .dashboard-summary-card.glass.screen-panel {
-  --panel-material-light: color-mix(in srgb, var(--aml-figma-surface-brand-accent-default),
+  --panel-material-light: color-mix(in srgb, var(--aml-figma-surface-neutral-accent-default),
     var(--aml-figma-surface-status-pending-accent-default));
   background-color: var(--ai-summary-start);
   background-image: var(--ai-summary-surface);

@@ -72,7 +72,7 @@
   --selection-divider: color-mix(in srgb, var(--selection-ink) 28%, var(--selection-surface));
   --ai-summary-tint: 15%;
   --ai-summary-start: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-status-pending-accent-default) var(--ai-summary-tint));
-  --ai-summary-end: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-brand-accent-default) var(--ai-summary-tint));
+  --ai-summary-end: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-neutral-accent-default) var(--ai-summary-tint));
   --ai-summary-surface: linear-gradient(108deg in srgb, var(--ai-summary-start), var(--ai-summary-end));
   --ai-summary-ink: var(--text);
   --ai-summary-note: var(--muted-text);
