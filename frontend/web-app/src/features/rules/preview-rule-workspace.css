@@ -11,10 +11,12 @@
 .workflow-rule-inventory {
   grid-area: inventory;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--workspace-gap);
   margin: 0;
 }
+.workflow-rule-inventory > * { grid-column: span 2 }
+.workflow-rule-inventory > :nth-child(3), .workflow-rule-inventory > :nth-child(5) { grid-column: span 3 }
 .workflow-rule-inventory > .screen-panel { min-block-size: 0 }
 .workflow-rule-inventory dd {
   margin: 0;
@@ -39,9 +41,11 @@
 .rule-review-dialog p { margin: 0 }
 
 .screen-row.screen-rule-editor {
-  grid-template-columns: minmax(16rem, 2fr) minmax(0, 3fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: stretch;
 }
+.screen-row.screen-rule-editor > :first-child { grid-column: span 4 }
+.screen-row.screen-rule-editor > :nth-child(2) { grid-column: span 8 }
 
 .workflow-rule-overview .screen-panel,
 .screen-rule-editor .screen-panel {
@@ -283,6 +287,9 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "inventory" "rules" "detail" "reason";
   }
+  .workflow-rule-inventory { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .workflow-rule-inventory > *, .workflow-rule-inventory > :nth-child(n) { grid-column: auto }
+  .screen-row.screen-rule-editor > :nth-child(n) { grid-column: auto }
 
   .screen-row.screen-rule-editor {
     grid-auto-flow: row;
