@@ -81,7 +81,7 @@
 }
 .data-table-frame table :is(th, td) {
   padding: var(--table-cell-inset);
-  border-block-end: var(--aml-stroke-divider) solid var(--aml-data-grid);
+  border-block-end: var(--aml-stroke-divider) solid color-mix(in srgb, var(--aml-data-grid) 30%, transparent);
   vertical-align: middle;
   white-space: nowrap;
 }
