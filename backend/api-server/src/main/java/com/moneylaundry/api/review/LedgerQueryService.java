@@ -90,6 +90,16 @@ public class LedgerQueryService {
     // Type probabilities and presentation names belong to the returned page.
     boolean needsScores = filter.judgement() != null && !filter.judgement().isEmpty();
     boolean needsIdentity = filter.query() != null && !filter.query().isBlank();
+    // With no filter at all, owners/accounts are read straight from their tables
+    // instead of collecting every account that appears in a transaction.
+    boolean unfiltered =
+        filter.from() == null
+            && filter.to() == null
+            && filter.owner() == null
+            && filter.account() == null
+            && !needsScores
+            && (filter.payments() == null || filter.payments().isEmpty())
+            && !needsIdentity;
     // Resolve owner/account to internal account ids first so the transaction
     // filter can use the transactions_from_time / transactions_to_time indexes.
     Long[] ownerAccounts =
@@ -198,24 +208,28 @@ public class LedgerQueryService {
     String pageSelect;
     if ("owners".equals(kind)) {
       dataset =
-          needsIdentity
-              ? "with matches as (select fe.owner_id as f,re.owner_id as r "
-                  + sql
-                  + ") select e.owner_id,e.display_name,e.service_owner_id as id from core.owners e join "
-                  + "(select f as owner_id from matches union select r from matches) m using(owner_id)"
-              : "with matches as (select t.from_account_id as f,t.to_account_id as r "
-                  + sql
-                  + "), matched_accounts as (select f as account_id from matches union select r from matches),"
-                  + " ids as (select distinct a.owner_id from core.accounts a join matched_accounts m using(account_id))"
-                  + " select e.owner_id,e.display_name,e.service_owner_id as id from core.owners e join ids using(owner_id)";
+          unfiltered
+              ? "select e.owner_id,e.display_name,e.service_owner_id as id from core.owners e"
+              : needsIdentity
+                  ? "with matches as (select fe.owner_id as f,re.owner_id as r "
+                      + sql
+                      + ") select e.owner_id,e.display_name,e.service_owner_id as id from core.owners e join "
+                      + "(select f as owner_id from matches union select r from matches) m using(owner_id)"
+                  : "with matches as (select t.from_account_id as f,t.to_account_id as r "
+                      + sql
+                      + "), matched_accounts as (select f as account_id from matches union select r from matches),"
+                      + " ids as (select distinct a.owner_id from core.accounts a join matched_accounts m using(account_id))"
+                      + " select e.owner_id,e.display_name,e.service_owner_id as id from core.owners e join ids using(owner_id)";
       pageSelect = "select id," + "p.display_name" + " as name from page p order by id";
     } else if ("accounts".equals(kind)) {
       dataset =
-          "with matches as (select t.from_account_id as f,t.to_account_id as r "
-              + sql
-              + ") select a.service_account_id as id,e.owner_id,e.display_name,e.service_owner_id as \"ownerId\",a.bank_id as \"bankId\" "
-              + "from core.accounts a join core.owners e using(owner_id) join "
-              + "(select f as account_id from matches union select r from matches) m using(account_id)";
+          unfiltered
+              ? "select a.service_account_id as id,e.owner_id,e.display_name,e.service_owner_id as \"ownerId\",a.bank_id as \"bankId\" from core.accounts a join core.owners e using(owner_id)"
+              : "with matches as (select t.from_account_id as f,t.to_account_id as r "
+                  + sql
+                  + ") select a.service_account_id as id,e.owner_id,e.display_name,e.service_owner_id as \"ownerId\",a.bank_id as \"bankId\" "
+                  + "from core.accounts a join core.owners e using(owner_id) join "
+                  + "(select f as account_id from matches union select r from matches) m using(account_id)";
       if (filter.owner() != null) {
         dataset += " where e.service_owner_id=?";
         args.add(filter.owner());
@@ -238,22 +252,24 @@ public class LedgerQueryService {
     args.add(filter.size());
     args.add((long) filter.page() * filter.size());
     boolean transactions = "transactions".equals(kind);
+    // The unfiltered lists page by index, so they count separately like transactions.
+    boolean separateCount = transactions || unfiltered;
     // Owner/account candidates require a full distinct projection. Count that
     // projection in the same query instead of constructing it twice per page.
     var rows =
         jdbc.queryForList(
             "with page as materialized ("
-                + (transactions
+                + (separateCount
                     ? dataset
                     : "select q.*,count(*) over() as _total from (" + dataset + ") q")
                 + (transactions ? " order by \"occurredAt\" desc,\"txId\"" : " order by id")
                 + " limit ? offset ?) "
-                + (transactions
+                + (separateCount
                     ? pageSelect
                     : pageSelect.replaceFirst("select ", "select p._total,")),
             args.toArray());
     long count =
-        transactions || rows.isEmpty()
+        separateCount || rows.isEmpty()
             ? jdbc.queryForObject("select count(*) from (" + dataset + ") q", Long.class, countArgs)
             : ((Number) rows.getFirst().get("_total")).longValue();
     for (var row : rows) {

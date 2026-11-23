@@ -108,6 +108,37 @@ class LedgerFilterTests {
         .andExpect(jsonPath("$.totalElements").value(0));
   }
 
+  @Test
+  void unfiltered_owner_and_account_lists_match_their_tables() throws Exception {
+    int owners = jdbc.queryForObject("select count(*) from core.owners", Integer.class);
+    int accounts = jdbc.queryForObject("select count(*) from core.accounts", Integer.class);
+    String firstOwner =
+        jdbc.queryForObject(
+            "select service_owner_id::text from core.owners order by service_owner_id limit 1",
+            String.class);
+    String firstAccount =
+        jdbc.queryForObject(
+            "select service_account_id::text from core.accounts order by service_account_id limit 1",
+            String.class);
+    get("/api/v1/ledger/owners")
+        .andExpect(jsonPath("$.totalElements").value(owners))
+        .andExpect(jsonPath("$.content[0].id").value(firstOwner))
+        .andExpect(jsonPath("$.content[0].name").isNotEmpty());
+    get("/api/v1/ledger/accounts")
+        .andExpect(jsonPath("$.totalElements").value(accounts))
+        .andExpect(jsonPath("$.content[0].id").value(firstAccount))
+        .andExpect(jsonPath("$.content[0].ownerId").isNotEmpty())
+        .andExpect(jsonPath("$.content[0].ownerName").isNotEmpty())
+        .andExpect(jsonPath("$.content[0].bankId").isNumber());
+    // 필터가 있으면 거래에 나온 계좌만 센다.
+    int active =
+        jdbc.queryForObject(
+            "select count(*) from (select from_account_id from ledger.transactions where integration_status='ACTIVE' and payment_format='ACH' union select to_account_id from ledger.transactions where integration_status='ACTIVE' and payment_format='ACH') q",
+            Integer.class);
+    get("/api/v1/ledger/accounts?payments=ACH")
+        .andExpect(jsonPath("$.totalElements").value(active));
+  }
+
   private org.springframework.test.web.servlet.ResultActions get(String url) throws Exception {
     return mvc.perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(url)
