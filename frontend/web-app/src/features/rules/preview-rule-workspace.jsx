@@ -17,7 +17,7 @@ import { useRules } from './use-rules';
 import './preview-rule-workspace.css';
 
 const presets = { DRAFT: 'pending', PENDING_APPROVAL: 'caution', TESTING: 'inProgress', ACTIVE: 'done', STOPPED: 'cancelled', REJECTED: 'failed' };
-const actionTones = { requestReview: 'brand', approve: 'positive', activate: 'positive', retest: 'positive', reject: 'negative', stop: 'negative', reopen: 'inverse' };
+const actionTones = { requestReview: 'brand', approve: 'positive', activate: 'brand', retest: 'brand', reject: 'negative', stop: 'negative', reopen: 'inverse' };
 const noRule = '룰을 먼저 선택해 주세요.';
 const countFormat = new Intl.NumberFormat('ko-KR');
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });

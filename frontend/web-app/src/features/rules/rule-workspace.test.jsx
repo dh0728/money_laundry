@@ -93,8 +93,8 @@ it('always shows every rule action in order and explains why a dimmed one cannot
   act(() => setPreviewUser(previewAdmin));
   await waitFor(() => expect(action('승인')).toBeEnabled());
   expect(action('승인')).toHaveClass('screen-primary--positive');
-  expect(action('운영 시작')).toHaveClass('screen-primary--positive');
-  expect(action('재테스트')).toHaveClass('screen-primary--positive');
+  expect(action('운영 시작')).toHaveClass('screen-primary--brand');
+  expect(action('재테스트')).toHaveClass('screen-primary--brand');
   expect(action('반려')).toHaveClass('screen-primary--negative');
   expect(action('중지')).toHaveClass('screen-primary--negative');
   expect(action('초안으로 되돌리기')).toHaveClass('screen-primary--inverse');
