@@ -1,0 +1,23 @@
+/* 공용 표 규격. 행 가로선은 두지 않고, 열 구분선만 기존 --aml-data-grid를 30%로 쓴다.
+   헤더를 1행으로 세어 홀수 행(헤더, 본문 2·4·…)에 테마 반대색 3%를 배경 위에 얹는다. */
+[data-slot="table"] {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+[data-slot="table"] :is(th, td) {
+  border-block-start-width: 0;
+  border-block-end-width: 0;
+}
+
+[data-slot="table"] :is(th, td):not(:last-child) {
+  border-inline-end: var(--aml-stroke-divider, 1px) solid color-mix(in srgb, var(--aml-data-grid, var(--border)) 30%, transparent);
+}
+
+[data-slot="table"] thead tr > :is(th, td),
+[data-slot="table"] tbody tr:nth-child(even) > :is(th, td) {
+  background-image: linear-gradient(
+    color-mix(in srgb, light-dark(var(--aml-black-100, rgb(0 0 0)), var(--aml-white-100, rgb(255 255 255))) 3%, transparent),
+    color-mix(in srgb, light-dark(var(--aml-black-100, rgb(0 0 0)), var(--aml-white-100, rgb(255 255 255))) 3%, transparent)
+  );
+}

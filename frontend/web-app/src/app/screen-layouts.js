@@ -154,7 +154,7 @@ export const panel = (title, kind = '') => `<section class="screen-panel glass $
 const row = (panels, variant = '') => `<div class="screen-row ${variant}">${panels.join('')}</div>`;
 const table = (title, columns = []) => `<section class="screen-panel glass screen-table">
   <h2>${title}</h2>
-  ${columns.length ? `<div class="screen-table-scroll"><table><thead><tr>
+  ${columns.length ? `<div class="screen-table-scroll"><table data-slot="table"><thead><tr>
     ${columns.map(column => `<th scope="col">${column}</th>`).join('')}
   </tr></thead><tbody><tr>${columns.map(() => '<td>—</td>').join('')}</tr></tbody></table></div>` : ''}
 </section>`;

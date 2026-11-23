@@ -1,4 +1,5 @@
 import React from 'react';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Panel } from '../../components/panel';
 import { PatternTag } from '../../components/semantic-tags';
 import { getModelRiskThresholds } from '../settings/model-risk-settings';
@@ -46,12 +47,12 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
       </BarChart>
     </div>
     <div className="visually-hidden">
-      <table>
-        <caption>일별 수치</caption>
-        <thead><tr><th scope="col">일자</th>{columns.map(column => <th scope="col" key={column.label}>{column.label}</th>)}</tr></thead>
-        <tbody>{rows.map(row => <tr key={row.label}><th scope="row">{row.label}</th>
-          {columns.map(column => <td key={column.label}>{column.value(row)}</td>)}</tr>)}</tbody>
-      </table>
+      <Table>
+        <TableCaption>일별 수치</TableCaption>
+        <TableHeader><TableRow><TableHead scope="col">일자</TableHead>{columns.map(column => <TableHead scope="col" key={column.label}>{column.label}</TableHead>)}</TableRow></TableHeader>
+        <TableBody>{rows.map(row => <TableRow key={row.label}><TableHead scope="row">{row.label}</TableHead>
+          {columns.map(column => <TableCell key={column.label}>{column.value(row)}</TableCell>)}</TableRow>)}</TableBody>
+      </Table>
     </div>
   </figure>;
 }
@@ -224,12 +225,12 @@ function VolumeChart({ rows, reduced }) {
       </ComposedChart>
     </div>
     <div className="visually-hidden">
-      <table>
-        <caption>일별 거래량</caption>
-        <thead><tr><th scope="col">일자</th>{volumeSeries.map(item => <th scope="col" key={item.key}>{item.label}</th>)}<th scope="col">{ratioSeries.label}</th></tr></thead>
-        <tbody>{rows.map(row => <tr key={row.date}><th scope="row">{row.label}</th>
-          {volumeSeries.map(item => <td key={item.key}>{count(row[item.key])}</td>)}<td>{share(row.suspicious, row.total)}</td></tr>)}</tbody>
-      </table>
+      <Table>
+        <TableCaption>일별 거래량</TableCaption>
+        <TableHeader><TableRow><TableHead scope="col">일자</TableHead>{volumeSeries.map(item => <TableHead scope="col" key={item.key}>{item.label}</TableHead>)}<TableHead scope="col">{ratioSeries.label}</TableHead></TableRow></TableHeader>
+        <TableBody>{rows.map(row => <TableRow key={row.date}><TableHead scope="row">{row.label}</TableHead>
+          {volumeSeries.map(item => <TableCell key={item.key}>{count(row[item.key])}</TableCell>)}<TableCell>{share(row.suspicious, row.total)}</TableCell></TableRow>)}</TableBody>
+      </Table>
     </div>
   </figure>;
 }

@@ -1,5 +1,6 @@
 @layer theme, base, utilities;
 @import "../styles/preview-design-system.css";
+@import "../components/ui/table.css";
 
 :root {
   scrollbar-gutter: stable;
@@ -897,7 +898,7 @@ body:has(#footer-pagination > *) #workspace {
 
 .screen-table-scroll { overflow-x: auto }
 .screen-table > .screen-table-scroll > table { width: 100%; margin-top: var(--aml-space-12); border-collapse: collapse; white-space: nowrap; text-align: left }
-.screen-table > .screen-table-scroll > table :is(th, td) { padding: var(--aml-space-8); border-bottom: var(--aml-stroke-divider) solid color-mix(in srgb, var(--divider) 30%, transparent) }
+.screen-table > .screen-table-scroll > table :is(th, td) { padding: var(--aml-space-8) }
 .screen-table > .screen-table-scroll > table tr[data-verdict] {
   background-color: var(--record-verdict-surface);
 }

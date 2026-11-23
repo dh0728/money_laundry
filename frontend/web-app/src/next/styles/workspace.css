@@ -6,7 +6,7 @@
 [data-ui="aml-app"] [data-ws="split"] { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: var(--aml-space-16); }
 [data-ui="aml-app"] [data-ws="fields"] { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,var(--aml-size-sidebar)),1fr)); gap: var(--aml-space-16); }
 [data-ui="aml-app"] [data-ws="table"] { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
-[data-ui="aml-app"] [data-ws="table"] :is(th,td) { padding: var(--aml-space-8); text-align: left; vertical-align: top; border-bottom: var(--aml-stroke-divider) solid color-mix(in srgb, var(--aml-border-default) 30%, transparent); overflow-wrap: anywhere; }
+[data-ui="aml-app"] [data-ws="table"] :is(th,td) { padding: var(--aml-space-8); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 [data-ui="aml-app"] [data-ws="table"] th { color: var(--aml-text-muted); font-weight: var(--aml-type-body-strong-weight); background: var(--aml-surface-canvas); }
 [data-ui="aml-app"] [data-ws="table"] [data-numeric] { text-align: right; }
 [data-ui="aml-app"] [data-ws="table"] tr[data-selected="true"] > td { background: var(--aml-selection-bg); color: var(--aml-selection-fg); }

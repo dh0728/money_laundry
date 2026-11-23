@@ -1,3 +1,4 @@
+@import "./ui/table.css";
 .data-table-frame {
   --table-selection-width: var(--aml-size-control-comfortable);
   --table-cell-inset: var(--workspace-gap);
@@ -81,7 +82,6 @@
 }
 .data-table-frame table :is(th, td) {
   padding: var(--table-cell-inset);
-  border-block-end: var(--aml-stroke-divider) solid color-mix(in srgb, var(--aml-data-grid) 30%, transparent);
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -89,7 +89,7 @@
   position: sticky;
   inset-block-start: 0;
   z-index: 1;
-  background: var(--information-panel-surface);
+  background-color: var(--information-panel-surface);
   color: var(--text);
   font-weight: var(--aml-type-body-strong-weight);
   text-align: start;
@@ -112,24 +112,21 @@
   --text: var(--selection-ink);
   --muted-text: var(--selection-muted);
   --focus-ring: var(--selection-ink);
-  background: var(--selection-surface);
+  background-color: var(--selection-surface);
   color: var(--selection-ink);
 }
 .data-table-frame tbody tr[data-verdict]:not([data-selected="true"], [data-state="selected"]) {
   --table-row-hover-strength: 10%;
-  background: var(--record-verdict-surface);
+  background-color: var(--record-verdict-surface);
 }
 .data-table-frame tbody tr[data-slot="table-row"]:not([data-selected="true"], [data-state="selected"]):has(
   > :is(th, td) :is(button, a[href], input):not(:disabled, [aria-disabled="true"])
 ):is(:hover, :has(:focus-visible)) {
-  background: color-mix(in srgb, var(--record-verdict-surface, var(--information-panel-surface)),
+  background-color: color-mix(in srgb, var(--record-verdict-surface, var(--information-panel-surface)),
     light-dark(var(--aml-black-100), var(--aml-white-100)) var(--table-row-hover-strength, 14%));
 }
 .data-table-frame table th:has(> .table-sort-button) {
   padding: 0;
-}
-.data-table-frame th:has(> .table-sort-button):not(:last-child) {
-  border-inline-end: var(--aml-stroke-divider) solid var(--aml-data-grid);
 }
 .data-table-frame .table-sort-button {
   display: flex;

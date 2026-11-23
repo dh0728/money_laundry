@@ -3,6 +3,7 @@
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { DashboardRequested } from '@/api/dashboard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart'
 import { fmt } from '@/lib/format'
 
@@ -67,10 +68,10 @@ export function AlertStatusChart({ data, unavailable = false }: { data: DailySta
           </BarChart>
         </ChartContainer>
         <StatusLegend />
-        <table className="sr-only" aria-label="일별 Alert 현재 처리 상태 집계">
-          <thead><tr><th>생성일</th>{series.map(s => <th key={s.key}>{s.label}</th>)}<th>유입</th></tr></thead>
-          <tbody>{data.map(day => <tr key={day.date}><th scope="row">{day.date}</th>{series.map(s => <td key={s.key}>{day[s.key]}</td>)}<td>{day.pending + day.inProgress + day.done}</td></tr>)}</tbody>
-        </table>
+        <Table className="sr-only" containerClassName="sr-only" aria-label="일별 Alert 현재 처리 상태 집계">
+          <TableHeader><TableRow><TableHead>생성일</TableHead>{series.map(s => <TableHead key={s.key}>{s.label}</TableHead>)}<TableHead>유입</TableHead></TableRow></TableHeader>
+          <TableBody>{data.map(day => <TableRow key={day.date}><TableHead scope="row">{day.date}</TableHead>{series.map(s => <TableCell key={s.key}>{day[s.key]}</TableCell>)}<TableCell>{day.pending + day.inProgress + day.done}</TableCell></TableRow>)}</TableBody>
+        </Table>
       </CardContent>
     </Card>
   )

@@ -33,7 +33,7 @@
   scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
 }
 .ledger-hierarchy-scroll tbody tr[data-ledger-depth="owner"] {
-  background: var(--information-panel-surface);
+  background-color: var(--information-panel-surface);
 }
 .ledger-hierarchy-scroll tbody tr[data-ledger-depth] > :is(th, td) {
   padding-block: var(--aml-space-4);

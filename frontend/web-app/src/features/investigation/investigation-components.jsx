@@ -357,7 +357,8 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
       tools={account && records.length > 0 && <TableQueryTools actions={actions} />}>
       <colgroup>{ledgerColumns.map(([key, , width]) => <col key={key} style={{ width: `${width}%` }} />)}</colgroup>
       <LedgerColumns columns={ledgerColumns} />
-      {owners.items.map(row => <TableBody key={row.id}>
+      <TableBody>
+      {owners.items.map(row => <React.Fragment key={row.id}>
         <TableRow data-ledger-depth="owner">
           <th scope="rowgroup"><LedgerBranchToggle label={`${row.name}의 계좌`} expanded={ownerOpen(row)}
             onClick={() => select.owner(ownerOpen(row) ? null : row)}>{row.name}</LedgerBranchToggle></th>
@@ -392,8 +393,7 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
           })}
           <LedgerMoreRow label={`${row.name} 계좌`} list={accounts} depth="account" />
         </>}
-      </TableBody>)}
-      <TableBody>
+      </React.Fragment>)}
         {owners.status === 'success' && !owners.items.length && <TableRow>
           <TableCell colSpan={ledgerColumns.length}>조건과 일치하는 소유주가 없습니다.</TableCell>
         </TableRow>}
