@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { ruleConditionSummary, runBacktest } from '@/next/features/rules-logic';
+import { ruleConditionSummary } from '@/next/features/rules-logic';
 import { Check, Circle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import StatusMark from '../components/react-bits/StatusMark';
 import Stepper, { Step } from '../components/react-bits/Stepper';
@@ -18,8 +18,9 @@ import { CompletionRing } from '../components/completion-ring';
 import { SectionDownloadHeading } from '../components/section-download';
 import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
 import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
-import { RuleList, ruleWorkspace } from '../features/rules/preview-rule-workspace';
-import { liveBacktestScope, liveRules, runLiveBacktest } from '../features/rules/live-rules.js';
+import { RuleList } from '../features/rules/preview-rule-workspace';
+import { ruleRepository } from '../features/rules/rule-repository';
+import { useRules } from '../features/rules/use-rules';
 import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
@@ -38,8 +39,6 @@ import './workflow-components.css';
 const PreviewDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.PreviewDashboard })));
 const BenchmarkDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.BenchmarkDashboard })));
 const PreviewCaseOverview = lazy(() => import('../features/investigation/preview-case-overview').then(module => ({ default: module.PreviewCaseOverview })));
-const sampleDates = ruleWorkspace.transactions.map(record => record.date).sort();
-const backtestPeriod = { start: sampleDates[0], end: sampleDates.at(-1) };
 const reportSelection = { ids: [], verdict: 'all' };
 const verdictChoices = [
   { label: '전체', value: 'all' }, { label: '정상', value: 'normal' }, { label: '이상', value: 'abnormal' },
@@ -181,13 +180,40 @@ function BacktestMetric({ label, value, unit }) {
   </Panel>;
 }
 
-function Backtest({ selectedRule, registerTableTools, actionsHost }) {
-  const { reduced, theme } = useAppearance();
-  const rule = ruleWorkspace.rules.find(item => item.id === selectedRule) ?? ruleWorkspace.rules[0];
-  const [scope, setScope] = useState(liveRules ? undefined : { ...backtestPeriod, count: ruleWorkspace.transactions.length });
+function CaseOverviewWithRules({ overview, appearance }) {
+  const { rules } = useRules();
+  const activeRules = rules.filter(rule => rule.status === 'ACTIVE')
+    .map(rule => ({ id: rule.id, version: rule.version, name: rule.name, conditions: ruleConditionSummary(rule) }));
+  return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
+    history={reportHistory(overview?.reportData)} activeRules={activeRules} /></Suspense>;
+}
+
+function Backtest({ selectedRule, ...props }) {
+  const { status, rules, error, retry } = useRules();
+  const [scope, setScope] = useState(null);
+  const [scopeFailed, setScopeFailed] = useState(false);
   useEffect(() => {
-    if (liveRules) void liveBacktestScope().then(setScope, () => undefined);
+    let live = true;
+    void ruleRepository.backtestScope().then(value => { if (live) setScope(value); }, () => { if (live) setScopeFailed(true); });
+    return () => { live = false; };
   }, []);
+  const rule = rules.find(item => item.id === selectedRule) ?? rules[0];
+  if (rule && scope) return <BacktestRun key={rule.id} rule={rule} scope={scope} {...props} />;
+  if (scopeFailed || (status === 'error' && !rules.length)) return <Panel className="workflow-rule-state" role="alert">
+    <p>백테스트 대상을 불러오지 못했습니다.{error && ` ${error}`}</p>
+    <ActionButton shape="pill" surface="floating" onClick={() => {
+      setScopeFailed(false);
+      retry();
+      void ruleRepository.backtestScope().then(setScope, () => setScopeFailed(true));
+    }}>다시 시도</ActionButton>
+  </Panel>;
+  if (status === 'ready' && !rules.length) return <Panel className="workflow-rule-state"><p>백테스트할 룰이 없습니다.</p></Panel>;
+  return <Panel className="workflow-rule-state" role="status" aria-busy="true"><p>백테스트 대상을 불러오는 중입니다.</p></Panel>;
+}
+
+function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
+  const { reduced, theme } = useAppearance();
+  const backtestPeriod = { start: scope.start, end: scope.end };
   const [step, setStep] = useState(1);
   const [score, setScore] = useState(Number((rule.scoreMin * 100).toFixed(2)));
   const hasScoreCondition = rule.scoreMin > 0;
@@ -216,28 +242,25 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
 
   useEffect(() => {
     if (status !== 'running') return undefined;
-    let current = true;
-    const timer = window.setTimeout(async () => {
-      try {
-        const applied = { ...rule, scoreMin: score / 100 };
-        const result = liveRules ? await runLiveBacktest(applied, scope, { limit: 100 })
-          : runBacktest(ruleWorkspace.transactions, applied, backtestPeriod, { limit: 100 });
-        if (!current) return;
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void ruleRepository.backtest({ ...rule, scoreMin: score / 100 }, { start: scope.start, end: scope.end }, { limit: 100 }).then(result => {
+        if (!live) return;
         setResults(result);
         setStatus('done');
         setStep(3);
         announce({ status: 'done', title: '백테스트 완료', description: `거래 ${result.matchedCount}건이 룰 조건에 해당합니다.` });
-      } catch (error) {
-        if (!current) return;
+      }, error => {
+        if (!live) return;
         setStatus('failed');
-        announce({ status: 'failed', title: '백테스트 실패', description: error.problem?.detail ?? error.message });
-      }
+        announce({ status: 'failed', title: '백테스트 실패', description: error.message });
+      });
     }, 120);
     return () => {
-      current = false;
+      live = false;
       window.clearTimeout(timer);
     };
-  }, [rule, score, status]);
+  }, [rule, score, status, scope]);
 
   return <section className="screen-section workflow-panel workflow-backtest" aria-label="백테스트">
     <div className="backtest-grid">
@@ -251,9 +274,9 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
       </Panel>
       <Panel className="backtest-card">
         <h2>백테스트 대상 거래</h2>
-        <p className="backtest-metric-number"><strong>{(scope?.count ?? 0).toLocaleString('ko-KR')}</strong> <span>거래</span></p>
-        <p className="backtest-meta"><time dateTime={scope?.start}>{scope?.start}</time>
-          {' ~ '}<time dateTime={scope?.end}>{scope?.end}</time> · KST</p>
+        <p className="backtest-metric-number"><strong>{scope.count.toLocaleString('ko-KR')}</strong> <span>거래</span></p>
+        <p className="backtest-meta"><time dateTime={backtestPeriod.start}>{backtestPeriod.start}</time>
+          {' ~ '}<time dateTime={backtestPeriod.end}>{backtestPeriod.end}</time> · KST</p>
       </Panel>
     </div>
     <Stepper key={reduced} step={step} theme={theme} style={backtestStepperStyles} frame={false} width="100%" linear disableStepIndicators
@@ -587,16 +610,10 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
       <PreviewDashboard mine={mine} data={dashboard} appearance={appearance} />
     </Suspense>;
   }
-  if (kind === 'case-overview') {
-    const activeRules = ruleWorkspace.rules.filter(rule => rule.status === 'ACTIVE')
-      .map(rule => ({ id: rule.id, version: rule.version, name: rule.name, conditions: ruleConditionSummary(rule) }));
-    return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
-      history={reportHistory(overview?.reportData)} activeRules={activeRules} /></Suspense>;
-  }
+  if (kind === 'case-overview') return <CaseOverviewWithRules overview={overview} appearance={appearance} />;
   if (kind === 'alert-episode-actions') return <AlertEpisodeActions overview={overview} />;
   if (kind === 'case-judgment') return <CaseReviewActions overview={overview} />;
   if (kind === 'case-readonly') return <Panel className="glass"><h2>읽기 전용</h2></Panel>;
-  if (kind === 'backtest' && !ruleWorkspace.rules.length) return <Panel className="glass"><h2>등록된 룰이 없습니다.</h2></Panel>;
   if (kind === 'rules-list') return <RuleList reason={reason} initialRule={overview?.rule}
     registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   return <MotionConfig reducedMotion={appearance.reduced ? 'always' : 'never'}>
