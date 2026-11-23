@@ -31,12 +31,19 @@
   display: grid;
   gap: var(--workspace-gap);
 }
-.dashboard-top { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-content: start }
+.dashboard-top { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-content: start; align-items: stretch }
+/* Wide dashboard: AI summary and bento cells share one 12-column grid; packBento pins every cell to explicit lines so no hole is left. */
+.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: calc(var(--aml-space-64) * 3); grid-auto-flow: row dense }
+.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top > .dashboard-summary-card { grid-column: 1 / span 4; grid-row: 1 / span 2 }
+.preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"],
+.preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] > .dashboard-metrics.magic-bento { display: contents }
 .preview-dashboard[data-mine="true"] .dashboard-top {
   --dashboard-metric-plot-min: 4.5rem;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   word-break: keep-all;
 }
+.preview-dashboard[data-mine="true"] .dashboard-top > .dashboard-summary-card { grid-column: 1 / 5 }
+.preview-dashboard[data-mine="true"] .dashboard-top > .dashboard-metrics-box { grid-column: 5 / -1 }
 .dashboard-summary-card, .dashboard-chart { min-width: 0 }
 .dashboard-summary-card {
   display: flex;
@@ -46,7 +53,7 @@
   overflow-wrap: anywhere;
 }
 .dashboard-summary-card.glass.screen-panel {
-  --panel-material-light: color-mix(in srgb, var(--aml-figma-surface-brand-accent-default),
+  --panel-material-light: color-mix(in srgb, var(--aml-figma-surface-neutral-accent-default),
     var(--aml-figma-surface-status-pending-accent-default));
   background-color: var(--ai-summary-start);
   background-image: var(--ai-summary-surface);
@@ -106,13 +113,14 @@
   line-height: var(--aml-type-caption-lineHeight);
 }
 .dashboard-legend { display: flex; flex-wrap: wrap; gap: var(--workspace-gap) }
-.dashboard-metrics-box { min-width: 0; container: dashboard-metrics / inline-size; display: grid }
+.dashboard-metrics-box { min-width: 0; container: dashboard-metrics / inline-size; display: grid; block-size: 100%; align-self: stretch }
 .dashboard-metrics.magic-bento {
+  block-size: 100%;
+  align-content: stretch;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  grid-auto-rows: minmax(var(--aml-space-64), auto) !important;
+  grid-auto-rows: minmax(var(--aml-space-64), 1fr) !important;
 }
-.dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(4, minmax(0, 1fr)) !important }
-.dashboard-metrics .magic-bento__cell { grid-column: auto !important }
+.dashboard-metrics-box:not([data-wide="true"]) .magic-bento__cell { grid-column: auto !important }
 .dashboard-metrics .magic-bento__card {
   --panel-content-padding: var(--aml-panel-text-inset, var(--ui-panel-padding));
   --mb-radius: var(--aml-radius-panel, var(--aml-radius-card));
@@ -148,6 +156,12 @@
 }
 .dashboard-metric-value[data-composite] > span { white-space: nowrap }
 .dashboard-metric-value[data-composite] > small { align-self: center }
+.dashboard-metric-value[data-composite] > small[aria-hidden] {
+  margin-inline: 0;
+  font-size: 1em;
+  font-weight: var(--aml-type-body-weight);
+  color: var(--muted-text);
+}
 .dashboard-metric-value small {
   margin-inline-start: var(--aml-space-4);
   font-size: var(--aml-type-label-size);
@@ -403,7 +417,7 @@
 .dashboard-board-actions { display: flex; align-items: center; gap: var(--workspace-gap); margin-inline-start: auto }
 .dashboard-board-scroll {
   min-inline-size: 0;
-  padding: max(0px, calc(var(--record-card-shadow-gutter) - var(--aml-panel-inset)));
+  padding: 0;
 }
 .dashboard-board-heading h2 {
   margin: 0;
@@ -441,16 +455,16 @@
   .dashboard-loading [data-slot="skeleton"] { animation: none }
 }
 
-@container dashboard-metrics (min-width: 800px) {
-  .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(15, minmax(0, 1fr)) !important }
-  .dashboard-metrics-box[data-wide="true"] .magic-bento__cell { grid-column: span 3 !important }
-  .dashboard-metrics-box[data-wide="true"] .magic-bento__cell:nth-child(-n+3) { grid-column: span 5 !important }
-}
 @container dashboard-metrics (max-width: 580px) {
   .dashboard-metrics-box[data-wide="true"] .dashboard-metrics.magic-bento { grid-template-columns: repeat(2, minmax(0, 1fr)) !important }
 }
 @media (max-width: 930px) {
   .preview-dashboard[data-mine] .dashboard-top { grid-template-columns: minmax(0, 1fr) }
+  .preview-dashboard .dashboard-top { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto }
+  .preview-dashboard .dashboard-top > * { grid-column: auto; grid-row: auto }
+  .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] { display: grid }
+  .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] > .dashboard-metrics.magic-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) !important }
+  .preview-dashboard .dashboard-metrics-box[data-wide="true"] .magic-bento__cell { grid-column: auto !important; grid-row: auto !important }
 }
 @media (max-width: 660px) {
   .dashboard-analytics-row,

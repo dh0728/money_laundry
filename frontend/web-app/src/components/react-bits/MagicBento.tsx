@@ -45,11 +45,16 @@ export interface MagicBentoItem {
   onClick?: (event: ReactMouseEvent<HTMLElement>) => void;
   colSpan?: number;
   rowSpan?: number;
+  /** Optional 1-based grid line to pin the cell (from a packer). */
+  colStart?: number;
+  rowStart?: number;
 }
 
 export interface MagicBentoProps {
   items?: MagicBentoItem[];
   columns?: number;
+  /** Keep `columns` tracks at every width; the host CSS owns narrow layouts. */
+  fixedColumns?: boolean;
   rowHeight?: number;
   gap?: number;
   radius?: number;
@@ -571,6 +576,7 @@ const nameOf = (animation: Animation) => (animation as CSSAnimation).animationNa
 const MagicBento = ({
   items = DEFAULT_ITEMS,
   columns = 4,
+  fixedColumns = false,
   rowHeight = 200,
   gap = 12,
   radius = 20,
@@ -1119,7 +1125,7 @@ const MagicBento = ({
   const ink = INK[palette];
   const accent = parseRgb(glowColor) ?? ink;
   const corner = Math.max(0, radius);
-  const span = Math.max(1, cols);
+  const span = fixedColumns ? Math.max(1, Math.round(columns)) : Math.max(1, cols);
 
   return (
     <div
@@ -1214,8 +1220,8 @@ const MagicBento = ({
             }}
             className="magic-bento__cell"
             style={{
-              gridColumn: `span ${Math.min(span, Math.max(1, Math.round(entry.colSpan ?? 1)))}`,
-              gridRow: `span ${Math.max(1, Math.round(entry.rowSpan ?? 1))}`
+              gridColumn: `${entry.colStart ? `${entry.colStart} / ` : ''}span ${Math.min(span, Math.max(1, Math.round(entry.colSpan ?? 1)))}`,
+              gridRow: `${entry.rowStart ? `${entry.rowStart} / ` : ''}span ${Math.max(1, Math.round(entry.rowSpan ?? 1))}`
             }}
           >
             {entry.href ? (

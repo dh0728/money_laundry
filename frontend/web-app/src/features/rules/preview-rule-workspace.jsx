@@ -17,7 +17,7 @@ import { useRules } from './use-rules';
 import './preview-rule-workspace.css';
 
 const presets = { DRAFT: 'pending', PENDING_APPROVAL: 'caution', TESTING: 'inProgress', ACTIVE: 'done', STOPPED: 'cancelled', REJECTED: 'failed' };
-const actionTones = { requestReview: 'brand', approve: 'positive', activate: 'brand', retest: 'brand', reject: 'negative', stop: 'negative' };
+const actionTones = { requestReview: 'brand', approve: 'positive', activate: 'brand', retest: 'brand', reject: 'negative', stop: 'negative', reopen: 'inverse' };
 const noRule = '룰을 먼저 선택해 주세요.';
 const countFormat = new Intl.NumberFormat('ko-KR');
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
@@ -74,6 +74,7 @@ function RuleActions({ rule, actionsHost, listLink, onTransition, onRemove }) {
     </BlockedReason>
     {transition('stop')}
     {transition('reject')}
+    {transition('reopen')}
     {link('duplicate', '/rules/new', '복제')}
     {link('backtest', '/rules/backtest', '백테스트로 열기')}
     {listLink && rule && <PrimaryButton tone="inverse" as="a" href={`/rules?rule=${rule.id}`}>룰 목록</PrimaryButton>}
@@ -83,7 +84,7 @@ function RuleActions({ rule, actionsHost, listLink, onTransition, onRemove }) {
   </ScreenActions>;
 }
 
-/** 모든 상태 변경(승인 요청·승인·반려·중지·운영 시작·재테스트)이 같은 사유 입력 창을 쓴다. */
+/** 모든 상태 변경(승인 요청·승인·반려·중지·운영 시작·재테스트·초안으로 되돌리기)이 같은 사유 입력 창을 쓴다. */
 function RuleDecision({ rule, action, repository, onClose, onDone }) {
   const dialog = useRef(null);
   const reasonField = useRef(null);

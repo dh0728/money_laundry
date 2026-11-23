@@ -81,7 +81,7 @@ it('always shows every rule action in order and explains why a dimmed one cannot
   const pending = await rulesNamed(repository, 'PENDING_APPROVAL');
   render(<RuleList repository={repository} initialRule={pending.id} actionsHost={footer} />);
   await screen.findByRole('region', { name: '룰 상세' });
-  const order = ['룰 삭제', '중지', '반려', '복제', '백테스트로 열기', '재테스트', '운영 시작', '승인'].map(action);
+  const order = ['룰 삭제', '중지', '반려', '초안으로 되돌리기', '복제', '백테스트로 열기', '재테스트', '운영 시작', '승인'].map(action);
   order.slice(1).forEach((node, index) => expect(order[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
   expect(action('승인')).toBeDisabled();
   expect(action('승인')).toHaveAccessibleDescription('관리자만 승인할 수 있어요.');
@@ -93,7 +93,11 @@ it('always shows every rule action in order and explains why a dimmed one cannot
   act(() => setPreviewUser(previewAdmin));
   await waitFor(() => expect(action('승인')).toBeEnabled());
   expect(action('승인')).toHaveClass('screen-primary--positive');
+  expect(action('운영 시작')).toHaveClass('screen-primary--brand');
+  expect(action('재테스트')).toHaveClass('screen-primary--brand');
   expect(action('반려')).toHaveClass('screen-primary--negative');
+  expect(action('중지')).toHaveClass('screen-primary--negative');
+  expect(action('초안으로 되돌리기')).toHaveClass('screen-primary--inverse');
   expect(action('승인')).not.toHaveAttribute('title');
 });
 

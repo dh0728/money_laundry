@@ -156,6 +156,13 @@ export interface BarSparklineProps<T> extends SparklineBaseProps<T> {
   barRadius?: number;
   /** Opacity of non-hovered bars while hovering. */
   inactiveOpacity?: number;
+  /**
+   * Part of each bar to draw over it from the same baseline and scale, e.g.
+   * the suspicious share of a daily total. Leave `dataKey` as the whole.
+   */
+  overlayKey?: SparklineDataKey<T>;
+  /** Overlay colour. Defaults to `color`. */
+  overlayColor?: string;
 }
 
 // One ResizeObserver for every sparkline on the page.
@@ -1040,10 +1047,16 @@ function BarSparklineImpl<T>({
     dot = true,
     hoverTransition = true,
     springConfig,
+    overlayKey,
+    overlayColor,
   } = props;
   const spring = resolveHoverSpring(hoverTransition, springConfig);
   const padding = resolveSparklinePadding(props.padding, 2);
   const groupRef = useRef<SVGGElement>(null);
+  const overlayValues = useMemo(
+    () => (overlayKey === undefined ? null : resolveSparklineValues(data, overlayKey)),
+    [data, overlayKey]
+  );
 
   return (
     <LazyMotion features={domAnimation}>
@@ -1065,6 +1078,11 @@ function BarSparklineImpl<T>({
             hoverIndex={hoverIndex}
             inactiveOpacity={inactiveOpacity}
             layout={layout}
+            overlay={
+              overlayValues
+                ? { values: overlayValues, color: overlayColor ?? color }
+                : null
+            }
             padding={padding}
             spring={spring}
             width={width}
@@ -1094,8 +1112,10 @@ function BarPaths({
   dataTransitionDuration,
   groupRef,
   spring,
+  overlay,
 }: {
   layout: SparklineLayout;
+  overlay: { values: number[]; color: string } | null;
   width: number;
   height: number;
   padding: SparklinePadding;
@@ -1184,6 +1204,21 @@ function BarPaths({
             />
           ) : null}
         </AnimatePresence>
+        {overlay ? (
+          <BarOverlayPaths
+            barGap={barGap}
+            barRadius={barRadius}
+            color={overlay.color}
+            dataTransitionDuration={dataTransitionDuration}
+            height={height}
+            hoverIndex={hoverIndex}
+            inactiveOpacity={inactiveOpacity}
+            layout={layout}
+            padding={padding}
+            values={overlay.values}
+            width={width}
+          />
+        ) : null}
       </g>
       <HoverOverlay
         color={color}
@@ -1196,6 +1231,79 @@ function BarPaths({
         padding={padding}
         spring={spring}
       />
+    </>
+  );
+}
+
+/** Overlay bars on the base bars' x bands and y scale, fading with them on hover. */
+function BarOverlayPaths({
+  values,
+  layout,
+  width,
+  height,
+  padding,
+  barGap,
+  barRadius,
+  color,
+  hoverIndex,
+  inactiveOpacity,
+  dataTransitionDuration,
+}: {
+  values: number[];
+  layout: SparklineLayout;
+  width: number;
+  height: number;
+  padding: SparklinePadding;
+  barGap: number;
+  barRadius: number;
+  color: string;
+  hoverIndex: number | null;
+  inactiveOpacity: number;
+  dataTransitionDuration: number;
+}) {
+  const pathRef = useRef<SVGPathElement>(null);
+  const overlayLayout = useMemo(
+    () =>
+      computeSparklineLayout(values, {
+        width,
+        height,
+        padding,
+        kind: "band",
+        domain: layout.domain,
+      }),
+    [values, width, height, padding, layout.domain]
+  );
+  useDataTransition(overlayLayout, width, dataTransitionDuration, (frame) => {
+    pathRef.current?.setAttribute(
+      "d",
+      buildSparklineBarsPath(frame, { gap: barGap, radius: barRadius })
+    );
+  });
+  const path = useMemo(
+    () => buildSparklineBarsPath(overlayLayout, { gap: barGap, radius: barRadius }),
+    [overlayLayout, barGap, barRadius]
+  );
+  const hovered = hoverIndex === null ? undefined : overlayLayout.points[hoverIndex];
+  return (
+    <>
+      <path
+        d={path}
+        fill={color}
+        ref={pathRef}
+        style={{ opacity: hovered ? inactiveOpacity : 1, transition: HOVER_FADE }}
+      />
+      {hovered && Number.isFinite(hovered.y) ? (
+        <path
+          d={buildSparklineBarSegment(
+            hovered.x,
+            sparklineBarWidth(overlayLayout.band, barGap),
+            hovered.y,
+            overlayLayout.baselineY,
+            barRadius
+          )}
+          fill={color}
+        />
+      ) : null}
     </>
   );
 }

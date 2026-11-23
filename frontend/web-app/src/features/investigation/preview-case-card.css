@@ -40,8 +40,9 @@
   min-block-size: 0;
   max-block-size: var(--workspace-list-limit);
   overflow: auto;
-  padding: var(--record-card-shadow-gutter);
-  scrollbar-gutter: stable;
+  padding-block: var(--record-card-shadow-gutter);
+  padding-inline: 0;
+  scrollbar-gutter: auto;
 }
 @media (max-width: 768px), (max-height: 480px) {
   .case-list-panel > .case-progress-board {
@@ -59,6 +60,7 @@
 .case-progress-lane {
   min-inline-size: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
   gap: var(--aml-space-12);
 }

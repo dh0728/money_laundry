@@ -22,7 +22,7 @@
 .semantic-tag {
   --tag-fill: var(--tag-pattern-fill);
   --tag-ink: var(--tag-pattern-ink);
-  --tag-font: var(--aml-type-label-weight) var(--aml-type-label-size)/var(--aml-type-label-lineHeight) Inter, var(--aml-font-family);
+  --tag-font: var(--aml-type-label-weight) var(--aml-type-label-size)/var(--aml-type-label-lineHeight) var(--aml-font-mono);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -35,6 +35,10 @@
   color: var(--tag-ink);
   font: var(--tag-font);
   white-space: nowrap;
+}
+/* 상태·필터·담당·모델점수처럼 사람이 읽는 라벨은 본문 폰트를 유지한다. 패턴 코드만 기본 --tag-font(mono)를 쓴다. */
+.semantic-tag:is([data-tag="status"], [data-tag="filter"], [data-tag="case-actor"], [data-tag="model-score"]) {
+  --tag-font: var(--aml-type-label-weight) var(--aml-type-label-size)/var(--aml-type-label-lineHeight) var(--aml-font-family);
 }
 .semantic-tag[data-tone="danger"] {
   --tag-solid-fill: var(--status-danger-accent);

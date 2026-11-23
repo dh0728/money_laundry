@@ -95,7 +95,8 @@ export function PreviewCaseCard({ row, selectedTransaction, className = '', sele
   const source = transaction?.from?.code ?? transaction?.account;
   const destination = transaction?.to?.code ?? transaction?.counterparty;
   const flow = source && destination
-    ? `${source} → ${destination}${!selectedTransaction && related.length > 1 ? ` 외 ${related.length - 1}` : ''}`
+    ? <><code>{source}</code> → <code>{destination}</code>
+      {!selectedTransaction && related.length > 1 ? ` 외 ${related.length - 1}` : ''}</>
     : '—';
   const totals = Object.entries(row.amountByCurrency ?? {})
     .map(([currency, value]) => `${amount.format(value)} ${currency}`);

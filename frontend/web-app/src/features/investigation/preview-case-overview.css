@@ -1,9 +1,13 @@
 .overview-top { display: grid; gap: var(--workspace-gap); min-inline-size: 0; align-items: stretch }
 @container case-overview (min-width: 66rem) {
-  .overview-top { grid-template-columns: minmax(16rem, 1fr) minmax(0, 2fr) }
-  .overview-top .overview-metrics { grid-template-columns: repeat(12, minmax(0, 1fr)) }
-  .overview-top .overview-metrics > .screen-panel { grid-column: span 3 }
-  .overview-top .overview-metrics > .screen-panel:nth-child(n + 5) { grid-column: span 4 }
+  .overview-top { grid-template-columns: repeat(12, minmax(0, 1fr)) }
+  .overview-top > :first-child { grid-column: span 4 }
+  .overview-top > :nth-child(2) { grid-column: span 8 }
+  .overview-top .overview-metrics { grid-template-columns: repeat(8, minmax(0, 1fr)) }
+  .overview-top .overview-metrics > .screen-panel { grid-column: span 2 }
+  .overview-top .overview-metrics > .screen-panel:nth-child(5),
+  .overview-top .overview-metrics > .screen-panel:nth-child(6) { grid-column: span 3 }
+  .overview-top .overview-metrics > .screen-panel:nth-child(7) { grid-column: span 2 }
 }
 .overview-ai-summary { --overview-chart-note: var(--ai-summary-note) }
 .overview-ai-summary .overview-evidence-bars { align-self: stretch; margin-block-start: 0 }

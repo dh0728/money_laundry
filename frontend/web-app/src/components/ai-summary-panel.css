@@ -1,5 +1,5 @@
 .ai-summary-blob {
-  --ai-blob-blue: var(--aml-figma-surface-brand-accent-default);
+  --ai-blob-blue: var(--aml-figma-surface-neutral-accent-default);
   --ai-blob-violet: var(--aml-figma-surface-status-pending-accent-default);
   --panel-material-solid: color-mix(in srgb, var(--ai-summary-start), var(--ai-summary-end));
   --panel-material-light: color-mix(in srgb, var(--ai-blob-blue), var(--ai-blob-violet));

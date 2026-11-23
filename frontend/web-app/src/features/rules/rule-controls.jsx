@@ -242,7 +242,7 @@ function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
           }} />
         {failure && <p role="alert" data-rule-block-error>{failure}</p>}
         {saved && !dirty && <div role="status" className="rule-draft-actions">
-          <p><strong>{saved.id}</strong> 초안이 저장되었습니다.</p>
+          <p><code>{saved.id}</code> 초안이 저장되었습니다.</p>
           <ActionButton as="a" href={`/rules?rule=${saved.id}`}>저장한 룰 보기</ActionButton>
           <ActionButton as="a" href={`/rules/backtest?rule=${saved.id}`}>백테스트로 열기</ActionButton>
         </div>}

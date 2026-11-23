@@ -291,7 +291,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       <ul className="overview-fact-list">{records.filter(record => Number.isFinite(record.score))
         .toSorted((a, b) => b.score - a.score).map(record => <li key={record.code}>
           <LinkTag code={record.code} /><ModelScoreTag score={record.score} />
-          <span>{record.from.code} → {record.to.code}</span>
+          <span><code>{record.from.code}</code> → <code>{record.to.code}</code></span>
         </li>)}</ul>
     </> },
     transactions: {
@@ -458,14 +458,14 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
           <SectionDownloadHeading id="overview-summary-title" downloadLabel={trends.length ? 'AI 요약' : undefined}>
             <Sparkles className="icon" aria-hidden="true" /> AI 요약
           </SectionDownloadHeading>
-          <strong>{focus ? `${focus.code} · 근거 거래 ${focus.transactions.size}건 집중` : records.length > 0
-            ? `계좌 ${accounts.length}개 · 근거 거래 ${records.length}건` : '연결된 거래 없음'}</strong>
+          <strong>{focus ? <><code>{focus.code}</code> · 근거 거래 {focus.transactions.size}건 집중</>
+            : records.length > 0 ? `계좌 ${accounts.length}개 · 근거 거래 ${records.length}건` : '연결된 거래 없음'}</strong>
           {trends.length > 0 && <div className="overview-amount-charts">{trends.map(trend =>
             <EvidenceBars key={trend.label} {...trend} reduced={appearance.reduced} />)}</div>}
           <ul className="overview-summary-facts">
             {focus && <li>중심 계좌 기준 유입 {inflows.length}건 · 유출 {outflows.length}건</li>}
             {representative && <li>{lead ? `최고 점수 거래 ${lead.score}점` : '첫 근거 거래'} · <LinkTag code={representative.code} />
-              {' · '}{representative.from.code} → {representative.to.code} · {amount(representative)}</li>}
+              {' · '}<code>{representative.from.code}</code> → <code>{representative.to.code}</code> · {amount(representative)}</li>}
             {episode && row.linkedAlerts > 0 && <li>동일 거래가 연결된 Alert {row.linkedAlerts}건</li>}
           </ul>
         </AISummaryPanel>
