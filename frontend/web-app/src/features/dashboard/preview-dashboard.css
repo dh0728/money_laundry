@@ -78,20 +78,35 @@
   font-weight: var(--aml-type-page-title-weight);
   line-height: var(--aml-type-page-title-lineHeight);
 }
-:is(.dashboard-metric-plot, .dashboard-series-plot) {
+.dashboard-summary-trend {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--aml-space-8);
+  align-self: stretch;
+  min-inline-size: 0;
+  margin: var(--aml-space-8) 0 0;
+}
+:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot, .dashboard-status-area) {
   position: relative;
   flex: 1 1 0;
   min-inline-size: 0;
 }
+.dashboard-summary-plot { min-block-size: clamp(4.5rem, 7vw, 7rem) }
 .dashboard-metric-plot { min-block-size: var(--dashboard-metric-plot-min) }
-:is(.dashboard-metric-plot, .dashboard-series-plot) > div {
+:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot, .dashboard-status-area) > div {
   position: absolute;
   inset: 0;
 }
-.dashboard-series-plot > div {
+:is(.dashboard-series-plot, .dashboard-status-area) > div {
   inline-size: 100%;
   block-size: 100%;
 }
+.dashboard-summary-trend figcaption, .dashboard-summary-trend-axis {
+  color: var(--ai-summary-note);
+  font-size: var(--aml-type-caption-size);
+}
+.dashboard-summary-trend-axis { display: flex; justify-content: space-between; gap: var(--aml-space-4) }
 .dashboard-note {
   color: var(--muted-text);
   font-size: var(--aml-type-caption-size);
@@ -166,6 +181,7 @@
   align-items: center;
   min-block-size: var(--dashboard-metric-plot-min);
 }
+.dashboard-completion-plot svg { display: block }
 .dashboard-analytics-row { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 .dashboard-detection-row { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) }
 .dashboard-transaction-details {
@@ -179,6 +195,9 @@
   flex-direction: column;
   gap: var(--aml-space-8);
   min-inline-size: 0;
+}
+.dashboard-transaction-breakdown .dashboard-risk-chart {
+  flex: 1;
 }
 .dashboard-chart {
   --panel-material-solid: color-mix(in srgb, var(--information-panel-surface), var(--canvas-surface) 50%);
@@ -263,32 +282,98 @@
   font-variant-numeric: tabular-nums;
 }
 .dashboard-pattern-labels > li[data-reference] { color: var(--muted-text) }
+.dashboard-risk-chart {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--aml-space-16);
+  min-inline-size: 0;
+  margin: 0;
+}
+.dashboard-chart:has(> .dashboard-risk-chart) { grid-template-rows: auto 1fr }
+.dashboard-donut-plot {
+  position: relative;
+  flex: 1 0 9rem;
+  align-self: stretch;
+  max-inline-size: min(100%, 15rem);
+  min-block-size: 9rem;
+}
+.dashboard-donut-ring {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  translate: -50% -50%;
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+.dashboard-donut-ring > * { grid-area: 1 / 1 }
+.dashboard-donut-ring > :empty { border-radius: 50% }
+.dashboard-donut-center {
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+.dashboard-risk-legend {
+  display: grid;
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  gap: var(--aml-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--aml-type-caption-size);
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-risk-legend > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aml-space-2) var(--aml-space-4);
+}
+.dashboard-risk-legend i { flex: none; border-radius: 50% }
 .dashboard-chart:has(.dashboard-series), .dashboard-series {
   display: flex;
   flex-direction: column;
 }
 .dashboard-series { flex: 1 0 auto; gap: var(--workspace-gap); margin: 0 }
-.dashboard-series-plot { min-block-size: var(--dashboard-series-plot-min) }
+:is(.dashboard-series-plot, .dashboard-status-area) { min-block-size: var(--dashboard-series-plot-min) }
 .dashboard-loading .dashboard-bklit-series { block-size: var(--dashboard-series-plot-min) }
 .dashboard-volume-axis { display: grid; justify-items: center; line-height: 1.2 }
 .dashboard-volume-axis small { color: var(--chart-suspect-label); font-size: var(--aml-type-caption-size); font-variant-numeric: tabular-nums }
-.dashboard-legend > span {
+:is(.dashboard-legend, .dashboard-status-readout) > span {
   display: inline-flex;
   align-items: center;
   gap: var(--aml-space-4);
   font-size: var(--aml-type-caption-size);
 }
-.dashboard-legend i {
+:is(.dashboard-legend, .dashboard-status-readout) i {
   width: var(--aml-space-8);
   height: var(--aml-space-8);
   border-radius: 50%;
 }
-.dashboard-legend .dashboard-line-key {
+.dashboard-legend .dashboard-status-line-key {
   inline-size: var(--aml-space-16);
   block-size: 0;
   border: 0;
-  border-block-start: 2px solid var(--dashboard-line-key);
+  border-block-start: 2px dashed var(--chart-completion);
   border-radius: 0;
+}
+.dashboard-status-area svg path[stroke-linecap="round"] { stroke-linejoin: round }
+.dashboard-status-area:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring);
+  outline-offset: var(--aml-space-2);
+}
+.dashboard-status-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--aml-space-4) var(--workspace-gap);
+  min-block-size: var(--aml-type-caption-lineHeight);
+  color: var(--muted-text);
+  font-variant-numeric: tabular-nums;
 }
 .dashboard-personal-status {
   display: grid;
@@ -349,6 +434,16 @@
 .dashboard-loading-note { inline-size: min(75%, calc(3 * var(--aml-space-64))); block-size: var(--aml-type-caption-lineHeight) }
 .dashboard-loading-trend { inline-size: 100%; min-block-size: var(--dashboard-metric-plot-min); flex: 1 1 auto }
 .dashboard-loading-period { margin-block-start: auto }
+.dashboard-loading [data-slot="skeleton"].dashboard-loading-donut {
+  inline-size: 136px;
+  block-size: 136px;
+  flex: none;
+  border: 21px solid var(--inner-surface);
+  border-radius: 50%;
+  background: transparent;
+}
+.dashboard-loading-legend { display: grid; gap: var(--aml-space-8) }
+.dashboard-loading-label { block-size: var(--aml-type-caption-lineHeight) }
 .dashboard-loading .dashboard-loading-card {
   inline-size: 100%;
   block-size: calc(2 * var(--aml-space-48));

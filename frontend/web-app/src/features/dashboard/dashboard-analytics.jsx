@@ -1,15 +1,9 @@
 import React from 'react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Panel } from '../../components/panel';
-import { PatternTag } from '../../components/semantic-tags';
-import { getModelRiskThresholds } from '../settings/model-risk-settings';
-import { ComposedChart } from '../../components/charts/registry/composed-chart';
-import { SeriesBar } from '../../components/charts/registry/series-bar';
-import { Line } from '../../components/charts/registry/line';
-import { XAxis } from '../../components/charts/registry/x-axis';
-import { YAxis } from '../../components/charts/registry/y-axis';
-import { Grid as SeriesGrid } from '../../components/charts/registry/grid';
-import { ChartTooltip as SeriesTooltip } from '../../components/charts/registry/tooltip/chart-tooltip';
+import { PatternTag, ReviewStatusTag, reviewStates } from '../../components/semantic-tags';
+import { DashboardRiskChart } from './dashboard-risk-chart';
+import { DashboardStatusArea } from './dashboard-status-area';
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { Bar } from '../../components/charts/charts/bar';
 import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
@@ -102,9 +96,9 @@ function ProportionBar({ label, segments, total, orientation = 'horizontal' }) {
 function TransactionSummary({ title, note, composition, children, hasChart }) {
   return <ChartPanel title={title} note={note} hasChart={hasChart}>
     <div className="dashboard-transaction-details">
-      {composition && <section className="dashboard-transaction-breakdown" aria-label="전체 거래 구성">
+      <section className="dashboard-transaction-breakdown" aria-label="전체 거래 구성">
         {composition}
-      </section>}
+      </section>
       {children}
     </div>
   </ChartPanel>;
@@ -170,114 +164,57 @@ const volumeSeries = [
   { key: 'total', label: '전체 거래', color: 'var(--chart-total)' },
   { key: 'suspicious', label: '모델 의심 거래', color: 'var(--chart-suspect)' },
 ];
-const ratioSeries = { key: 'ratio', label: '의심 비율', color: 'var(--chart-suspect-label)' };
-const alertFlowSeries = [
-  { key: 'incoming', label: '생성', color: 'var(--chart-arrival)' },
-  { key: 'completed', label: '완료', color: 'var(--chart-completion)' },
-];
+const completionSeries = { key: 'completed', label: '종결일별 건수', color: 'var(--chart-completion)' };
 const volumeDetail = [
   { label: '전체 거래', color: 'var(--chart-total)', value: row => count(row.total) },
   { label: '세탁 라벨 거래', color: 'var(--chart-suspect)', value: row => count(row.labeled) },
   { label: '세탁 라벨 비율', color: 'var(--chart-suspect)', value: row => share(row.labeled, row.total) },
 ];
-const dayLabel = date => date.slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/');
-const ratioDomain = { ratio: [0, 100] };
-
-// Ordered bands read as name → count → bar on one denominator, low to high like the score axis.
-function RiskBands({ rows, total, basis, reduced }) {
-  return <section className="dashboard-transaction-breakdown" aria-label="위험 점수 구간별 거래 수">
-    <p className="dashboard-note">{basis} {count(total)} 기준 · 구간 경계 {rows.filter(row => row.cut).map(row => row.cut).join(' / ')}</p>
-    <div className="dashboard-pattern-chart" style={{ '--dashboard-pattern-count': rows.length }}>
-      <ul className="dashboard-pattern-labels">
-        {rows.map(({ label, value }) => <li key={label}><span>{label}</span><strong>{count(value)}</strong></li>)}
-      </ul>
-      <BarChart className="dashboard-pattern-bars" data={rows} xDataKey="label" orientation="horizontal"
-        margin={noMargin} barGap={0.28} horizontalValueDomain={[0, Math.max(total, 1)]} animationDuration={reduced ? 0 : 340}>
-        <Bar dataKey="value" getFill={point => point.color} lineCap="round" animate={!reduced} />
-        <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
-          rows={point => [{ label: point.label, color: point.color, value: `${count(point.value)} · ${share(point.value, total)}` }]} />
-      </BarChart>
-    </div>
-  </section>;
-}
-
-// Counts on bars and the suspicious share on its own 0–100% axis, so the two units never share one bar length.
-function VolumeChart({ rows, reduced }) {
-  const points = rows.map(row => ({ ...row, date: new Date(`${row.date}T00:00:00`),
-    ratio: row.total ? Math.round(row.suspicious / row.total * 1000) / 10 : 0 }));
-  const labels = rows.map(row => row.label);
-  return <figure className="dashboard-series" aria-label="일별 전체 거래·모델 의심 거래 건수와 의심 비율">
-    <div className="dashboard-series-plot">
-      <ComposedChart className="dashboard-bklit-series" data={points} maxBarSize={18} barGap={0.2} yDomains={ratioDomain}
-        margin={{ top: 8, right: 40, bottom: 28, left: 36 }} animationDuration={reduced ? 0 : 340}
-        enterTransition={reduced ? { duration: 0 } : undefined} yDomainTween={!reduced}>
-        <SeriesGrid horizontal numTicksRows={4} />
-        {volumeSeries.map(item => <SeriesBar key={item.key} dataKey={item.key} fill={item.color} radius={4} animate={!reduced} />)}
-        <Line dataKey={ratioSeries.key} yAxisId="ratio" stroke={ratioSeries.color} strokeWidth={2} animate={!reduced} />
-        <YAxis numTicks={4} formatValue={value => `${integer.format(value)}건`} />
-        <YAxis yAxisId="ratio" orientation="right" numTicks={3} formatValue={value => `${Math.round(value)}%`} />
-        <XAxis labels={labels} numTicks={rows.length} />
-        <SeriesTooltip showDatePill={false} showCrosshair={false} dateLabels={labels}
-          rows={point => [
-            ...volumeSeries.map(item => ({ label: item.label, color: item.color, value: count(point[item.key]) })),
-            { label: ratioSeries.label, color: ratioSeries.color, value: share(point.suspicious, point.total) },
-          ]} />
-      </ComposedChart>
-    </div>
-    <div className="visually-hidden">
-      <Table>
-        <TableCaption>일별 거래량</TableCaption>
-        <TableHeader><TableRow><TableHead scope="col">일자</TableHead>{volumeSeries.map(item => <TableHead scope="col" key={item.key}>{item.label}</TableHead>)}<TableHead scope="col">{ratioSeries.label}</TableHead></TableRow></TableHeader>
-        <TableBody>{rows.map(row => <TableRow key={row.date}><TableHead scope="row">{row.label}</TableHead>
-          {volumeSeries.map(item => <TableCell key={item.key}>{count(row[item.key])}</TableCell>)}<TableCell>{share(row.suspicious, row.total)}</TableCell></TableRow>)}</TableBody>
-      </Table>
-    </div>
-  </figure>;
-}
+const statusSeries = reviewStates.map(({ label, value, preset: key }) =>
+  ({ key, label, value, color: `var(--review-status-${key}-accent)` }));
 
 export function Analytics({ data, reduced }) {
   const total = data.transactions.length;
   const suspicious = data.suspicious.length;
-  // Score bands share one denominator: every scored transaction when the source has it, otherwise the suspicious ones (live API today).
-  const scoredBasis = data.scoreBasis?.kind === 'scored';
-  const bandTotal = scoredBasis ? data.scoreBasis.total : suspicious;
-  const order = ['low', 'medium', 'high'];
-  const [mediumCut, highCut] = getModelRiskThresholds();
-  const cuts = { medium: `${mediumCut}점`, high: `${highCut}점` };
-  const risk = [...data.flags].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key))
-    .map(({ key, label, count: value }) => ({ color: `var(--chart-risk-${key})`, label, value, cut: cuts[key] }));
-  const withoutScore = bandTotal - risk.reduce((sum, item) => sum + item.value, 0);
+  const risk = data.flags.map(({ key, label, count: value }) => ({ color: `var(--chart-risk-${key})`, label, value }));
+  const withoutScore = suspicious - risk.reduce((sum, item) => sum + item.value, 0);
   if (withoutScore > 0) risk.push({ label: '점수 없음', value: withoutScore, color: 'var(--chart-total)' });
-  // Pattern-unspecified suspicious transactions (NON_PATTERN, shown as 미분류) stay out of the pattern chart; the note keeps their count.
-  const unspecified = data.patterns.filter(({ label }) => label === '미분류').reduce((sum, row) => sum + row.count, 0);
-  const patterns = data.patterns.filter(({ label }) => label !== '미분류').map(({ label, count: value }) => ({ label, value }))
+  const composition = [
+    { label: '그 외 거래', value: total - suspicious, color: 'var(--chart-total)' },
+    { label: '모델 의심 거래', value: suspicious, color: 'var(--chart-suspect)' },
+  ];
+  const patterns = data.patterns.map(({ label, count: value }) => ({ label, value }))
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
   const { from, to } = data.period;
   const period = from === to ? from : `${from} ~ ${to}`;
-  const alertFlow = data.daily.map(row => ({ ...row, label: dayLabel(row.day) }));
+  const completedByDay = new Map(data.daily.map(({ day, completed }) => [day, completed]));
+  const status = data.dailyAlertStatus.map(row => ({
+    ...row, label: row.date.slice(5).replace('-', '/'), completed: completedByDay.get(row.date) ?? 0,
+  }));
+  const hasAlertActivity = status.some(row => row.pending + row.inProgress + row.done + row.completed > 0);
   return <section className="dashboard-analytics" aria-label="기관 탐지 현황">
-    <TransactionSummary title="의심 거래 유형" hasChart={suspicious > 0}
-      note={`${period} · KST${unspecified ? ` · 유형 미특정 ${count(unspecified)} 제외` : ''}`}>
+    <TransactionSummary title="거래 구성과 의심 유형" note={`${period} · KST`}
+      hasChart={total > 0} composition={
+        <DashboardRiskChart segments={composition} reduced={reduced} label="전체 거래 중 모델 의심 거래 비중" />
+      }>
       <TransactionPatterns rows={patterns} total={suspicious} seriesLabel="모델 의심 거래" reduced={reduced} />
     </TransactionSummary>
     <section className="dashboard-analytics-row dashboard-detection-row" aria-label="위험 점수와 거래량 추이">
-      <ChartPanel title="위험 점수 구간별 분포" hasChart={bandTotal > 0}
-        note={scoredBasis ? `${period} · 모델 점수가 있는 전체 거래` : `${period} · 서버 집계는 의심 거래 점수만 제공`}>
-        {bandTotal > 0 ? <RiskBands rows={risk} total={bandTotal} basis={scoredBasis ? '채점 거래' : '모델 의심 거래'} reduced={reduced} />
-          : <p className="dashboard-note">조회 조건에 해당하는 거래가 없습니다.</p>}
+      <ChartPanel title="위험 점수 구간별 분포" hasChart={suspicious > 0}>
+        <DashboardRiskChart segments={risk} reduced={reduced} totalLabel="모델 의심 거래" />
       </ChartPanel>
-      <ChartPanel title="기간별 거래량 추이" note={`${period} · 거래 발생일 KST`} hasChart={total > 0}>
-        {total > 0 ? <>
-          <div className="dashboard-legend">
-            {volumeSeries.map(item => <span key={item.key}><i style={{ background: item.color }} aria-hidden="true" />{item.label}</span>)}
-            <span><i className="dashboard-line-key" style={{ '--dashboard-line-key': ratioSeries.color }} aria-hidden="true" />{ratioSeries.label} · 오른쪽 축</span>
-          </div>
-          <VolumeChart rows={data.operationalDaily} reduced={reduced} />
-        </> : <p className="dashboard-note">조회 조건에 해당하는 거래가 없습니다.</p>}
-      </ChartPanel>
+      <ActivityChart title="기간별 거래량 추이" note={`${period} · 거래 발생일 KST`} rows={data.operationalDaily}
+        series={volumeSeries} reduced={reduced} empty="조회 조건에 해당하는 거래가 없습니다." />
     </section>
-    <ActivityChart title="일별 Alert 생성·완료" note={`${period} · 생성일·완료일 기준 · 단위 건 · KST`} rows={alertFlow}
-      series={alertFlowSeries} reduced={reduced} empty="조회 기간에 생성되거나 완료된 Alert가 없습니다." />
+    <ChartPanel title="일별 Alert 처리 상태" hasChart={hasAlertActivity} note={`${period} · 생성일별 현재 상태 · KST`}>
+      {hasAlertActivity ? <>
+        <div className="dashboard-legend">
+          {statusSeries.map(item => <ReviewStatusTag key={item.key} status={item.value} />)}
+          <span><i className="dashboard-status-line-key" aria-hidden="true" />{completionSeries.label}</span>
+        </div>
+        <DashboardStatusArea rows={status} series={statusSeries} completion={completionSeries} reduced={reduced} />
+      </> : <p className="dashboard-note">조회 기간에 생성되거나 종결된 Alert가 없습니다.</p>}
+    </ChartPanel>
   </section>;
 }
 

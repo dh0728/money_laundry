@@ -64,10 +64,12 @@ function LoadingChart({ chartClass = 'dashboard-proportion-band', children, show
   </Panel>;
 }
 
-function LoadingBars() {
-  return <div className="dashboard-transaction-breakdown">
-    <Skeleton className="dashboard-loading-note" />
-    <Skeleton className="dashboard-pattern-bars" />
+function LoadingDonut({ legendRows }) {
+  return <div className="dashboard-risk-chart">
+    <Skeleton className="dashboard-loading-donut" />
+    <div className="dashboard-loading-legend" style={{ width: 'min(100%, 9rem)' }}>
+      {Array.from({ length: legendRows }, (_, index) => <Skeleton key={index} className="dashboard-loading-label" />)}
+    </div>
   </div>;
 }
 
@@ -79,13 +81,13 @@ function LoadingDailyCharts() {
 }
 
 export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
-  const items = Array.from({ length: benchmark || mine ? 4 : 8 }, (_, index) => ({
+  const items = Array.from({ length: benchmark ? 4 : mine ? 2 : 8 }, (_, index) => ({
     id: index,
     content: <div className="dashboard-metric">
       <Skeleton className="dashboard-loading-title" />
       <Skeleton className="dashboard-loading-value" />
-      {(benchmark ? index >= 2 : true) && <Skeleton className="dashboard-loading-note" />}
-      {!benchmark && !mine && [2, 4, 5, 7].includes(index) && <Skeleton className="dashboard-loading-trend" />}
+      {(benchmark ? index >= 2 : mine || ![0, 3].includes(index)) && <Skeleton className="dashboard-loading-note" />}
+      {!benchmark && <Skeleton className="dashboard-loading-trend" />}
     </div>,
   }));
   return <div className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
@@ -99,7 +101,10 @@ export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
         <Skeleton className="dashboard-loading-title" />
         <Skeleton className="dashboard-loading-value" />
         <Skeleton className="dashboard-loading-note" />
-        {!benchmark && <Skeleton className="dashboard-loading-note dashboard-loading-period" />}
+        {!benchmark && <>
+          <Skeleton className="dashboard-loading-trend" />
+          <Skeleton className="dashboard-loading-note dashboard-loading-period" />
+        </>}
       </Panel>
       <DashboardMetricGrid items={items} wide={!benchmark && !mine} appearance={appearance} loading />
     </div>
@@ -114,18 +119,21 @@ export function DashboardAnalyticsSkeleton({ benchmark = false, showPatterns = t
     {benchmark && <LoadingDailyCharts />}
     <LoadingChart>
       <div className="dashboard-transaction-details">
-        {benchmark && <div className="dashboard-transaction-breakdown">
-          <div className="dashboard-composition-chart">
+        <div className="dashboard-transaction-breakdown">
+          {benchmark ? <div className="dashboard-composition-chart">
             <Skeleton className="dashboard-loading-note" />
             <Skeleton className="dashboard-proportion-band" />
-          </div>
+          </div> : <LoadingDonut legendRows={2} />}
+        </div>
+        {(!benchmark || showPatterns) && <div className="dashboard-transaction-breakdown">
+          <Skeleton className="dashboard-loading-note" />
+          <Skeleton className="dashboard-pattern-bars" />
         </div>}
-        {(!benchmark || showPatterns) && <LoadingBars />}
       </div>
     </LoadingChart>
     {!benchmark && <>
       <div className="dashboard-analytics-row dashboard-detection-row">
-        <LoadingChart><LoadingBars /></LoadingChart>
+        <LoadingChart showNote={false}><LoadingDonut legendRows={3} /></LoadingChart>
         <LoadingChart chartClass="dashboard-bklit-series" />
       </div>
       <LoadingChart chartClass="dashboard-bklit-series" />

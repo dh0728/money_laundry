@@ -134,17 +134,9 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
   return { transactions: [...allTransactions.values()], cases, mine: cases.filter(row => row.assigned) };
 }
 
-// Service default binary threshold (model score 0.70); the model risk bands share the same lower cut.
-const suspiciousScore = 70;
-const dayMs = 86400000;
-const endOfDay = day => new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime() - 1;
-// Cases still open at a moment: created by then and not yet completed.
-const openAt = (rows, at) => rows.filter(row => +new Date(row.createdAt) <= at && !(row.completedAt && +new Date(row.completedAt) <= at)).length;
-
-function dashboardMetrics(transactions, cases, range, history, completedPopulation, businessAt) {
-  const suspicious = transactions.filter(row => row.score >= suspiciousScore);
+function dashboardMetrics(transactions, cases, range, history, completedPopulation) {
+  const suspicious = transactions.filter(row => row.score >= 55);
   const alertCases = cases.filter(row => row.kind === 'Alert');
-  const episodeCases = cases.filter(row => row.kind === 'Episode');
   const linked = new Set(alertCases.flatMap(row => row.related.map(transaction => transaction.code)));
   const byDay = Map.groupBy(cases, row => dateKey(row.date));
   const transactionsByDay = Map.groupBy(transactions, row => dateKey(row.date));
@@ -162,8 +154,7 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
     const rows = byDay.get(date) ?? [];
     const alerts = rows.filter(row => row.kind === 'Alert');
     const transfers = transactionsByDay.get(date) ?? [];
-    const flagged = transfers.filter(row => row.score >= suspiciousScore);
-    const closing = Math.min(endOfDay(day), +businessAt);
+    const flagged = transfers.filter(row => row.score >= 55);
     dailyAlertStatus.push({
       date,
       pending: alerts.filter(row => row.status === '처리 전').length,
@@ -178,8 +169,6 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
       alerts: alerts.length,
       openAlerts: alerts.filter(row => row.open).length,
       openEpisodes: rows.filter(row => row.kind === 'Episode' && row.open).length,
-      backlogAlerts: openAt(alertCases, closing),
-      backlogEpisodes: openAt(episodeCases, closing),
       newAccounts: transfers.reduce((total, row) => total + (firstSeen.accounts.get(row.code) ?? 0), 0),
       newOwners: transfers.reduce((total, row) => total + (firstSeen.owners.get(row.code) ?? 0), 0),
       settled: rows.filter(row => !row.open).length,
@@ -191,9 +180,6 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
   const unfinished = mine.filter(row => row.open);
   const highRiskAlerts = unfinished.filter(row => row.kind === 'Alert' && modelRiskBand(row.score) === 'high');
   const overdueCases = unfinished.filter(row => row.elapsed >= 3);
-  // Completion rate follows the metric inventory: Alerts created in the 30 days before the snapshot, completed share of that cohort.
-  const cohort = completedPopulation.filter(row => row.kind === 'Alert' && +new Date(row.createdAt) > +businessAt - 30 * dayMs);
-  const scored = transactions.filter(row => Number.isFinite(row.score));
   const patternByTransaction = new Map();
   for (const row of [...alertCases].sort((left, right) => left.code.localeCompare(right.code))) {
     for (const transaction of row.related) {
@@ -210,23 +196,12 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
   const labels = modelRiskLabels();
   return {
     cases, mine, transactions, suspicious, alertCases,
-    // Score bands count every scored transaction so the bands share one denominator.
     flags: Object.entries(bandNames).map(([key, name]) => ({ key, label: `${labels[key]} · ${name}`,
-      count: scored.filter(row => modelRiskBand(row.score) === key).length })),
-    scoreBasis: { kind: 'scored', total: scored.length },
-    alertCohort: { days: 30, total: cohort.length, completed: cohort.filter(row => !row.open).length },
-    aged: {
-      alerts: alertCases.filter(row => row.open && row.elapsed >= 3).length,
-      episodes: episodeCases.filter(row => row.open && row.elapsed >= 3).length,
-    },
+      count: suspicious.filter(row => modelRiskBand(row.score) === key).length })),
     settled: cases.filter(row => !row.open).length,
     ownedAlerts: mine.filter(row => row.kind === 'Alert').length,
     highRisk: highRiskAlerts.length,
     overdue: overdueCases.length,
-    overdueAlerts: overdueCases.filter(row => row.kind === 'Alert').length,
-    overdueEpisodes: overdueCases.filter(row => row.kind === 'Episode').length,
-    unfinishedAlerts: unfinished.filter(row => row.kind === 'Alert').length,
-    unfinishedEpisodes: unfinished.filter(row => row.kind === 'Episode').length,
     unfinished: unfinished.length,
     urgent: highRiskAlerts.filter(row => row.elapsed >= 3).length,
     newAccounts: operationalDaily.reduce((total, row) => total + row.newAccounts, 0),
@@ -284,12 +259,11 @@ export function dashboardFixtureResponse(source, { mine, rows, population, range
   const evidence = mine || completedPopulation.length < scopeCases.length || cases.length < periodCases.length
     ? new Set(cases.flatMap(row => row.related.map(transaction => transaction.code))) : null;
   const transactions = source.transactions.filter(row => includesDate(row) && (!evidence || evidence.has(row.code)));
-  const businessAt = `${samplePeriod[1]}T18:00:00+09:00`;
   return {
     scope: mine ? 'mine' : 'all',
-    businessAt,
+    businessAt: `${samplePeriod[1]}T18:00:00+09:00`,
     period: { from, to },
-    ...dashboardMetrics(transactions, cases, range, source.transactions, completedPopulation, new Date(businessAt)),
+    ...dashboardMetrics(transactions, cases, range, source.transactions, completedPopulation),
     sort,
   };
 }

@@ -119,6 +119,33 @@
   margin-block: var(--workspace-gap);
 }
 .overview-panel-hero .overview-kpi-number { font-size: var(--workspace-kpi-value-size) }
+.overview-donut {
+  display: grid;
+  justify-items: center;
+  gap: var(--workspace-gap);
+  margin: var(--workspace-gap) 0;
+}
+.overview-donut figcaption { font-weight: var(--aml-type-body-strong-weight) }
+.overview-donut-plot {
+  display: grid;
+  place-items: center;
+  inline-size: min(100%, clamp(13rem, 37dvh, 24rem));
+  aspect-ratio: 1;
+}
+.overview-donut-plot > * { grid-area: 1 / 1 }
+.overview-donut-total {
+  display: grid;
+  justify-items: center;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+  pointer-events: none;
+}
+.overview-donut-total strong {
+  color: var(--text);
+  font-size: var(--workspace-kpi-value-size);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.08;
+}
 .overview-panel-visual > .overview-score-chart {
   display: flex;
   flex-direction: column;
