@@ -24,6 +24,16 @@ const CHART_SOURCES = /^(recharts|d3(-[\w-]+)?|d3-sankey|react-force-graph(-[\w-
 const TABLE_LIBRARIES = /^(antd\/(es|lib)\/table|@mui\/x-data-grid|ag-grid-[\w-]+|react-data-grid)/
 const MOTION_SOURCES = /^(motion|motion\/react|framer-motion)$/
 export const MOTION_HELPER = 'src/hooks/use-reduced-motion.ts'
+// 패널 면(누르지 않는 패널 = 안쪽 빛)은 Panel·PanelHTML과 그 CSS에서만 만든다.
+const PANEL_CLASS = /(?:^|[\s"'.`])(screen-panel|panel-material|panel-inset)(?=$|[\s"'.`:[>,)])/
+const PANEL_HOME = ['src/components/', 'src/app/layout.css', 'src/styles/']
+const PANEL_DEPTH_VAR = /var\(\s*--(panel-edge-depth|panel-glass-depth|panel-material-depth|information-panel-shadow)\b/
+// 화면 파일은 공용 컴포넌트 인스턴스만 둔다. 맨 태그는 src/components(공용 UI)에서만 쓴다.
+const RAW_TAGS = new Set(('a abbr address article aside b blockquote br button canvas caption circle clipPath code col colgroup dd defs details dialog div dl dt em ' +
+  'fieldset figcaption figure footer form g h1 h2 h3 h4 h5 h6 header hr i iframe img input kbd label legend li line linearGradient main mark menu nav ' +
+  'ol optgroup option output p path pattern polygon polyline pre progress radialGradient rect section select small span stop strong sub summary sup svg ' +
+  'table tbody td text textarea tfoot th thead time tr tspan u ul use video').split(' '))
+const RAW_TAG_IN_STRING = /<([a-zA-Z][\w]*)(?=[\s/>])/g
 
 // ---------- eslint ----------
 const stringValue = node => node.type === 'Literal' && typeof node.value === 'string' ? node.value
@@ -83,6 +93,22 @@ const eslintRules = {
         report(node, `누르는 <${jsxName(node)}> 대신 button·a를 쓴다.`)
     },
   })),
+  'component-panel': eslintRule('component/panel', ({ path, report }) => inside(path, PANEL_HOME) ? {} : {
+    JSXOpeningElement(node) {
+      if (jsxName(node) !== 'Panel') return
+      const value = jsxAttribute(node, 'className')?.value
+      const text = value?.type === 'Literal' ? value.value : value?.expression?.type === 'TemplateLiteral' ? value.expression.quasis.map(part => part.value.raw).join(' ') : ''
+      if (/(^|\s)glass(\s|$)/.test(String(text))) report(node, 'Panel에 glass를 붙이지 않는다. 누르지 않는 패널은 안쪽 빛 면, 누르는 카드는 RecordCard를 쓴다.')
+    },
+    ...onStrings((node, value) => { const match = value.match(PANEL_CLASS); if (match) report(node, `${match[1]} 클래스를 직접 쓰지 말고 components/panel의 Panel(문자열 화면은 components.js의 PanelHTML)을 쓴다.`) }),
+  }),
+  'component-raw-element': eslintRule('component/raw-element', ({ path, report }) => path.startsWith('src/components/') ? {} : {
+    JSXOpeningElement(node) {
+      const name = node.name.type === 'JSXIdentifier' ? node.name.name : node.name.type === 'JSXMemberExpression' ? `${node.name.object.name}.${node.name.property.name}` : ''
+      if (/^[a-z]/.test(name)) report(node, `맨 태그 <${name}> 대신 components의 공용 컴포넌트(Panel·Stack·Grid·Text·Heading 등)를 쓴다.`)
+    },
+    ...onStrings((node, value) => { for (const match of value.matchAll(RAW_TAG_IN_STRING)) if (RAW_TAGS.has(match[1])) report(node, `문자열 맨 태그 <${match[1]}> 대신 components.js의 공용 부품을 쓴다.`) }),
+  }),
   'token-raw-color': eslintRule('token/raw-color', ({ report }) => onStrings((node, value) => {
     for (const match of value.matchAll(COLOR_RE)) report(node, `직접 색 값 ${match[0].trim()} 대신 색 토큰(var(--…))을 쓴다.`)
   })),
@@ -191,6 +217,14 @@ export const stylelintPlugins = [
       const selector = rule.selector.replace(/"[^"]*"|'[^']*'/g, match => match.includes('table') ? 'table' : '')
       if (/(^|[\s>+~,(])(table|thead|tbody|tfoot|tr|th|td|caption|colgroup)(?=$|[\s.#:[>+~,)])/.test(selector) || /[.#[][\w="-]*table/i.test(rule.selector))
         report(rule, `표 모양(${rule.selector.slice(0, 60)})은 components/ui/table.css·table-frame.css에만 둔다.`)
+    })
+  }),
+  cssRule('component/panel', ({ root, path, report }) => {
+    if (inside(path, PANEL_HOME)) return
+    root.walkDecls(decl => {
+      if (decl.prop === '--panel-material-depth' || PANEL_DEPTH_VAR.test(decl.value)) report(decl, `${decl.prop}: 패널 깊이(안쪽 빛)는 app/layout.css의 Panel 면에서만 정한다.`)
+      else if (/^(-webkit-)?(box-shadow|backdrop-filter)$/.test(decl.prop) && /(screen-panel|panel-material|panel-inset)/.test(decl.parent?.selector ?? ''))
+        report(decl, `${decl.prop}: Panel 면의 그림자·유리를 화면 CSS에서 바꾸지 않는다.`)
     })
   }),
   cssRule('token/raw-color', ({ root, path, report }) => root.walkDecls(decl => {
