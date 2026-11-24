@@ -1,3 +1,4 @@
+import { FilePenLine, LayoutDashboard, Scale, ScanSearch } from 'lucide-react';
 import { PanelHTML } from '../components/components.js';
 import { frames } from './screen-frames.js';
 import { isLedgerScreen, ledgerTableScreen } from './preview-route.js';
@@ -43,10 +44,10 @@ export const sections = {
 };
 
 export const workspaceDestinations = [
-  { icon: 'dashboard', label: '대시보드', value: sections.dashboard, routes: ['dashboard'] },
-  { icon: 'rules', label: '룰엔진', value: sections.rules, routes: ['rule-engine'] },
-  { icon: 'compass', label: '조사', value: sections.T, routes: ['add-tab', 'alert', 'episode'] },
-  { icon: 'report', label: '보고서 작성', value: sections.report, routes: ['report'] },
+  { icon: LayoutDashboard, label: '대시보드', value: sections.dashboard, routes: ['dashboard'] },
+  { icon: Scale, label: '룰엔진', value: sections.rules, routes: ['rule-engine'] },
+  { icon: ScanSearch, label: '조사', value: sections.T, routes: ['add-tab', 'alert', 'episode'] },
+  { icon: FilePenLine, label: '보고서 작성', value: sections.report, routes: ['report'] },
 ];
 
 export function currentWorkspace(path) {
