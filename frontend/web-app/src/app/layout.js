@@ -31,7 +31,9 @@ import { mountTransactionEvidenceTable } from '../features/investigation/preview
 import { mountWorkflows, mountWorkflowNotifications } from '../pages/workflow-components.jsx';
 import { renderScreenNav, refreshScreenNav } from './screen-navigation.jsx';
 import { ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
-import { BrandSymbol, Button, Divider, GlassDialog, Icon, IconButton, ScrollArea, Sidebar, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
+import { BoxHTML, BrandSymbol, Button, DecorativeCanvasHTML, Divider, GlassDialog, HeadingHTML, Icon, IconButton, InputHTML, ProfileAvatarHTML,
+  ScrollArea, Sidebar, TextHTML, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
+import { Text } from '../components/layout-primitives.jsx';
 import { setupGlassMaterial } from '../components/glass-material.js';
 import { mountLoginScene } from '../features/auth/preview-login-scene.js';
 import { uiSizeOptions } from '../config/appearance-options.js';
@@ -107,48 +109,46 @@ const dateFormat = new Intl.DateTimeFormat('ko-KR', {
 });
 
 function DrawerChromeRow(className, primary, accessory, attributes = '') {
-  return `<div class="drawer-chrome ${className}" ${attributes}>
-    <div class="drawer-chrome__primary">${primary}</div>
-    <div class="drawer-chrome__accessory">${accessory}</div>
-  </div>`;
+  return BoxHTML(
+    BoxHTML(primary, 'class="drawer-chrome__primary"') +
+    BoxHTML(accessory, 'class="drawer-chrome__accessory"'),
+    `class="drawer-chrome ${className}" ${attributes}`,
+  );
 }
 
 function Header() {
-  return `<header class="app-header" aria-label="헤더">
-    <div class="header-frame header-frame--left">
-      ${DrawerChromeRow('brand-header sidebar-chrome',
-        IconButton(BrandSymbol('idle-icon') + Icon('left', 'alternate-icon') + '<span class="brand">AML RADAR</span>', '사이드바 열기',
-          'id="sidebar-toggle" aria-expanded="false" aria-controls="sidebar" data-drawer-button', 'brand-pill', 'floating', 'pill'),
-        IconButton(Icon('search'), '검색',
-          'id="search-toggle" aria-haspopup="dialog" aria-controls="search-dialog" data-drawer-button', '', 'floating'),
-        'data-drawer-controls')}
-    </div>
-    <div class="header-frame header-frame--center">
-      <div class="contextual-header">
-        <div id="screen-navigation" class="header-frame screen-navigation" hidden></div>
-      </div>
-    </div>
-    <div class="header-frame header-frame--right header-right">
-      <div class="header-view-controls" role="group" aria-label="화면 보기">
-        ${IconButton(Icon('fullscreen'), '전체화면 보기', 'id="fullscreen-toggle" aria-pressed="false"')}
-        ${IconButton(Icon('wide'), '넓게 보기', 'id="workspace-width-toggle" aria-pressed="false"')}
-      </div>
-      ${DrawerChromeRow('inbox-header',
-        IconButton(Icon('check'), '현재 페이지 모두 읽음', 'id="mark-all-read"', '', '') +
-          SquishSwitch('unread-only', '읽지 않은 항목만 표시'),
-        IconButton(Icon('archive', 'idle-icon') + Icon('right', 'alternate-icon') +
-          '<span id="inbox-count" class="inbox-count unread-dot"></span>', '보관함 열기',
-          'id="inbox-toggle" aria-expanded="false" aria-controls="inbox" aria-describedby="inbox-count" data-drawer-button', 'inbox-pill', 'floating'),
-        'data-drawer-controls')}
-    </div>
-  </header>`;
+  const brand = BoxHTML(DrawerChromeRow('brand-header sidebar-chrome',
+    IconButton(BrandSymbol('idle-icon') + Icon('left', 'alternate-icon') + TextHTML('AML RADAR', 'class="brand"'),
+      '사이드바 열기', 'id="sidebar-toggle" aria-expanded="false" aria-controls="sidebar" data-drawer-button', 'brand-pill', 'floating', 'pill'),
+    IconButton(Icon('search'), '검색',
+      'id="search-toggle" aria-haspopup="dialog" aria-controls="search-dialog" data-drawer-button', '', 'floating'),
+    'data-drawer-controls'), 'class="header-frame header-frame--left"');
+  const navigation = BoxHTML(BoxHTML(
+    BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden'),
+    'class="contextual-header"',
+  ), 'class="header-frame header-frame--center"');
+  const viewControls = BoxHTML(
+    IconButton(Icon('fullscreen'), '전체화면 보기', 'id="fullscreen-toggle" aria-pressed="false"') +
+    IconButton(Icon('wide'), '넓게 보기', 'id="workspace-width-toggle" aria-pressed="false"'),
+    'class="header-view-controls" role="group" aria-label="화면 보기"',
+  );
+  const inbox = DrawerChromeRow('inbox-header',
+    IconButton(Icon('check'), '현재 페이지 모두 읽음', 'id="mark-all-read"', '', '') +
+      SquishSwitch('unread-only', '읽지 않은 항목만 표시'),
+    IconButton(Icon('archive', 'idle-icon') + Icon('right', 'alternate-icon') +
+      TextHTML('', 'id="inbox-count" class="inbox-count unread-dot"'), '보관함 열기',
+      'id="inbox-toggle" aria-expanded="false" aria-controls="inbox" aria-describedby="inbox-count" data-drawer-button', 'inbox-pill', 'floating'),
+    'data-drawer-controls');
+  const controls = BoxHTML(viewControls + inbox, 'class="header-frame header-frame--right header-right"');
+  return BoxHTML(brand + navigation + controls, 'class="app-header" aria-label="헤더"', 'header');
 }
 
 function WorkTab(code) {
-  return `<div class="work-tab">
-    ${Button(`<code>${code}</code>`, { variant: 'work-tab-open', attributes: `data-work-code="${code}"` })}
-    ${IconButton(Icon('close', 'icon-compact'), `${code} 닫기`, 'data-close-tab', '', '')}
-  </div>`;
+  return BoxHTML(
+    Button(TextHTML(code, '', 'code'), { variant: 'work-tab-open', attributes: `data-work-code="${code}"` }) +
+    IconButton(Icon('close', 'icon-compact'), `${code} 닫기`, 'data-close-tab', '', ''),
+    'class="work-tab"',
+  );
 }
 
 // 서비스 모드는 서버에서 받은 사건을, 프리뷰는 샘플을 화면 데이터로 쓴다.
@@ -164,38 +164,40 @@ function TabGroup(group) {
   const { name, prefix } = group;
   const tabs = initialWorkTabs.filter(code => code.startsWith(`${prefix}-`)).map(WorkTab);
   const id = `group-${prefix}`;
-  return `<section>
-    <div class="group-row">
-      ${Button(`${Icon('chevron', 'icon-compact')}${name}`, {
-        variant: 'group-toggle', attributes: `aria-expanded="true" aria-controls="${id}"`,
-      })}
-      ${IconButton(Icon('add', 'icon-compact'), `조사 · ${name} 목록 열기`, `data-investigation="${prefix}"`, '', '')}
-    </div>
-    <div id="${id}" class="group-content">${tabs.join('')}</div>
-  </section>`;
+  const header = BoxHTML(
+    Button(Icon('chevron', 'icon-compact') + name, {
+      variant: 'group-toggle', attributes: `aria-expanded="true" aria-controls="${id}"`,
+    }) +
+    IconButton(Icon('add', 'icon-compact'), `조사 · ${name} 목록 열기`, `data-investigation="${prefix}"`, '', ''),
+    'class="group-row"',
+  );
+  return BoxHTML(header + BoxHTML(tabs.join(''), `id="${id}" class="group-content"`), '', 'section');
 }
 
 function AccountControls() {
-  const account = `<img class="avatar" data-profile-image src="${avatarUrl}" alt="" width="32" height="32">
-    <span id="profile-context" class="account-text"><span id="profile-display-name" data-preview-user-name>${profileName}</span><span aria-hidden="true">·</span><span data-preview-user-role>${profileRole}</span></span>`;
-  return `<div class="account-footer">${Divider()}
-    ${DrawerChromeRow('account-controls sidebar-chrome',
-      Button(account, { variant: 'account', surface: 'floating', shape: 'pill', attributes: 'id="account-toggle" aria-label="계정" aria-describedby="profile-context" aria-haspopup="dialog" aria-controls="account-dialog"' }),
-      IconButton(Icon('settings'), '설정', 'id="settings-toggle" aria-haspopup="dialog" aria-controls="settings-dialog"', '', 'floating'))}
-  </div>`;
+  const context = TextHTML(
+    TextHTML(profileName, 'id="profile-display-name" data-preview-user-name') +
+    TextHTML('·', 'aria-hidden="true"') +
+    TextHTML(profileRole, 'data-preview-user-role'),
+    'id="profile-context" class="account-text"',
+  );
+  const account = ProfileAvatarHTML(avatarUrl, '') + '\n    ' + context;
+  return BoxHTML(Divider() + DrawerChromeRow('account-controls sidebar-chrome',
+    Button(account, { variant: 'account', surface: 'floating', shape: 'pill', attributes: 'id="account-toggle" aria-label="계정" aria-describedby="profile-context" aria-haspopup="dialog" aria-controls="account-dialog"' }),
+    IconButton(Icon('settings'), '설정', 'id="settings-toggle" aria-haspopup="dialog" aria-controls="settings-dialog"', '', 'floating')),
+  'class="account-footer"');
 }
 
 function Footer() {
-  return `<footer class="app-footer" aria-label="공통 하단 도구">
-    ${AccountControls()}
-    <div id="workflow-notifications"></div>
-    <div id="footer-pagination"></div>
-    <div id="footer-actions"></div>
-  </footer>`;
+  return BoxHTML(AccountControls() +
+    BoxHTML('', 'id="workflow-notifications"') +
+    BoxHTML('', 'id="footer-pagination"') +
+    BoxHTML('', 'id="footer-actions"'),
+  'class="app-footer" aria-label="공통 하단 도구"', 'footer');
 }
 
 function NavigationSidebar() {
-  const workTabs = ScrollArea(`<nav class="work-tabs" aria-label="작업 탭">${tabGroups.map(TabGroup).join('')}</nav>`);
+  const workTabs = ScrollArea(BoxHTML(tabGroups.map(TabGroup).join(''), 'class="work-tabs" aria-label="작업 탭"', 'nav'));
   return Sidebar(Divider() + workTabs, 'id="sidebar" aria-label="사이드바" hidden inert');
 }
 
@@ -237,115 +239,120 @@ function Notification() {
 }
 
 function Inbox() {
-  return Sidebar(Divider() + ScrollArea('', 'id="notifications"') +
-    '<div class="inbox-pages" id="inbox-pages" hidden>' +
+  const pagination = BoxHTML(
     Button('이전', { attributes: 'id="inbox-previous"' }) +
-    '<span id="inbox-page-status" aria-live="polite"></span>' +
-    Button('다음', { attributes: 'id="inbox-next"' }) + '</div>' +
-    '<footer class="inbox-request-footer" id="inbox-request-footer"></footer>',
-    'id="inbox" aria-label="보관함" hidden inert');
+    TextHTML('', 'id="inbox-page-status" aria-live="polite"') +
+    Button('다음', { attributes: 'id="inbox-next"' }),
+    'class="inbox-pages" id="inbox-pages" hidden',
+  );
+  return Sidebar(Divider() + ScrollArea('', 'id="notifications"') + pagination +
+    BoxHTML('', 'class="inbox-request-footer" id="inbox-request-footer"', 'footer'),
+  'id="inbox" aria-label="보관함" hidden inert');
 }
 
 function SearchDialog() {
-  return GlassDialog(`
-    <div class="search-heading" id="search-field-host"></div>
-    <p id="search-status" class="visually-hidden" role="status"></p>
-    ${ScrollArea('', 'id="search-results"')}
-  `, { id: 'search-dialog', variant: 'search-dialog', attributes: 'aria-label="검색"' });
+  return GlassDialog(
+    BoxHTML('', 'class="search-heading" id="search-field-host"') +
+    TextHTML('', 'id="search-status" class="visually-hidden" role="status"', 'p') +
+    ScrollArea('', 'id="search-results"'),
+    { id: 'search-dialog', variant: 'search-dialog', attributes: 'aria-label="검색"' },
+  );
 }
 
 function PreferenceDialog(id, title, content, { wrapContent = true, footer = '' } = {}) {
-  return GlassDialog(`
-    <div class="dialog-part-host" data-dialog-heading="${id}" data-dialog-title="${title}"></div>
-    ${wrapContent ? `<div class="settings-content scroll-area">${content}</div>` : content}
-    ${footer}
-  `, { id: `${id}-dialog`, variant: 'settings-dialog', attributes: `aria-labelledby="${id}-title"` });
+  return GlassDialog(
+    BoxHTML('', `class="dialog-part-host" data-dialog-heading="${id}" data-dialog-title="${title}"`) +
+    (wrapContent ? BoxHTML(content, 'class="settings-content scroll-area"') : content) +
+    footer,
+    { id: `${id}-dialog`, variant: 'settings-dialog', attributes: `aria-labelledby="${id}-title"` },
+  );
+}
+
+function PreferenceSection(titleId, title, content) {
+  return BoxHTML(HeadingHTML(title, `id="${titleId}"`, 3) + content, `aria-labelledby="${titleId}"`, 'section');
 }
 
 function SettingsDialog() {
-  const row = (id, label) => `<div class="settings-row"><label for="${id}">${label}</label>${SquishSwitch(id, label)}</div>`;
-  return PreferenceDialog('settings', '설정', `
-      <section aria-labelledby="appearance-title">
-        <h3 id="appearance-title">화면 및 접근성</h3>
-        <div class="settings-row">
-          <span>화면 모드</span>
-          <div id="theme-setting"></div>
-        </div>
-        ${row('reduce-motion', '모션 줄이기')}
-        ${row('glass-mode', '리퀴드 글래스')}
-        <div class="settings-row">
-          <span>UI 크기</span>
-          <div id="ui-size-setting"></div>
-        </div>
-      </section>
-      <section aria-labelledby="notification-preferences-title">
-        <h3 id="notification-preferences-title">알림</h3>
-        <div class="settings-row">
-          <span>보관함 알림</span>
-          <div id="notification-preference"></div>
-        </div>
-      </section>
-      <div id="admin-settings-content"></div>
-  `);
+  const row = (label, control) => BoxHTML(label + control, 'class="settings-row"');
+  const switchRow = (id, label) => row(TextHTML(label, `for="${id}"`, 'label'), SquishSwitch(id, label));
+  return PreferenceDialog('settings', '설정',
+    PreferenceSection('appearance-title', '화면 및 접근성',
+      row(TextHTML('화면 모드'), BoxHTML('', 'id="theme-setting"')) +
+      switchRow('reduce-motion', '모션 줄이기') +
+      switchRow('glass-mode', '리퀴드 글래스') +
+      row(TextHTML('UI 크기'), BoxHTML('', 'id="ui-size-setting"'))) +
+    PreferenceSection('notification-preferences-title', '알림',
+      row(TextHTML('보관함 알림'), BoxHTML('', 'id="notification-preference"'))) +
+    BoxHTML('', 'id="admin-settings-content"'),
+  );
 }
 
 function AccountDialog() {
-  return PreferenceDialog('account', '계정', `
-    <section aria-labelledby="profile-title">
-      <h3 id="profile-title">계정 정보</h3>
-      <div class="settings-row profile-image-row">
-        <img class="avatar" data-profile-image src="${avatarUrl}" alt="프로필 이미지" width="32" height="32">
-        <input id="profile-picture" class="visually-hidden" type="file" tabindex="-1" accept="image/png,image/jpeg,image/webp">
-        ${Button('사진 변경', { variant: 'row', shape: 'pill', surface: 'floating', attributes: 'id="profile-picture-change"' })}
-      </div>
-      <div class="settings-row"><span>이름</span><strong data-preview-user-name>${profileName}</strong></div>
-      <div class="settings-row"><span>역할</span><strong data-preview-user-role>${profileRole}</strong></div>
-      <p id="profile-status" role="status"></p>
-    </section>
-    <section aria-labelledby="permissions-title">
-      <h3 id="permissions-title">상세 권한</h3>
-      <ul class="profile-list">
-        <li>거래, Alert, Episode 및 판정 보고서 열람</li>
-        <li>내 담당 미판정 업무의 검토 시작 및 판정 저장</li>
-      </ul>
-    </section>
-    <section aria-labelledby="login-history-title">
-      <h3 id="login-history-title">세션별 로그인 기록</h3>
-      <p>이 탭에서 로그인한 프리뷰 세션</p>
-      <p id="login-history-empty">기록된 로그인이 없습니다.</p>
-      <ol id="login-history" class="profile-list"></ol>
-    </section>
-  `, { footer: '<div class="dialog-part-host" id="preview-sign-out"></div>' });
+  const profileImage = BoxHTML(
+    ProfileAvatarHTML(avatarUrl, '프로필 이미지') +
+    InputHTML('id="profile-picture" class="visually-hidden" type="file" tabindex="-1" accept="image/png,image/jpeg,image/webp"') +
+    Button('사진 변경', { variant: 'row', shape: 'pill', surface: 'floating', attributes: 'id="profile-picture-change"' }),
+    'class="settings-row profile-image-row"',
+  );
+  return PreferenceDialog('account', '계정',
+    PreferenceSection('profile-title', '계정 정보',
+      profileImage +
+      BoxHTML(TextHTML('이름') + TextHTML(profileName, 'data-preview-user-name', 'strong'), 'class="settings-row"') +
+      BoxHTML(TextHTML('역할') + TextHTML(profileRole, 'data-preview-user-role', 'strong'), 'class="settings-row"') +
+      TextHTML('', 'id="profile-status" role="status"', 'p')) +
+    PreferenceSection('permissions-title', '상세 권한',
+      BoxHTML(
+        BoxHTML('거래, Alert, Episode 및 판정 보고서 열람', '', 'li') +
+        BoxHTML('내 담당 미판정 업무의 검토 시작 및 판정 저장', '', 'li'),
+        'class="profile-list"', 'ul',
+      )) +
+    PreferenceSection('login-history-title', '세션별 로그인 기록',
+      TextHTML('이 탭에서 로그인한 프리뷰 세션', '', 'p') +
+      TextHTML('기록된 로그인이 없습니다.', 'id="login-history-empty"', 'p') +
+      BoxHTML('', 'id="login-history" class="profile-list"', 'ol')),
+    { footer: BoxHTML('', 'class="dialog-part-host" id="preview-sign-out"') },
+  );
+}
+
+function LoginScreen() {
+  const passwordField = BoxHTML(
+    InputHTML('id="preview-login-password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required') +
+    Button('', { variant: 'icon-button login-password-toggle', shape: 'circle', attributes: 'id="login-password-toggle" aria-label="비밀번호 표시" aria-pressed="false" aria-controls="preview-login-password"' }),
+    'class="login-password-field"',
+  );
+  const form = BoxHTML(
+    TextHTML('아이디', 'for="preview-login-id"', 'label') +
+    InputHTML('id="preview-login-id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="아이디 입력" required') +
+    TextHTML('비밀번호', 'for="preview-login-password"', 'label') +
+    passwordField +
+    BoxHTML('', 'class="login-error" id="preview-login-error" role="alert" aria-atomic="true"') +
+    BoxHTML('', 'id="preview-login-action"') +
+    BoxHTML('', 'id="preview-login-help-actions" class="login-help"'),
+    'id="preview-login-form" class="login-form" aria-label="로그인" novalidate', 'form',
+  );
+  const card = BoxHTML(
+    BoxHTML(TextHTML(BrandSymbol(), 'class="login-brand-mark"') + TextHTML('AML RADAR'), 'class="login-brand"') +
+    form +
+    (serviceMode ? '' : BoxHTML('', 'id="preview-login-sample-actions" class="login-sample"')),
+    'class="glass login-card"', 'section',
+  );
+  return BoxHTML(
+    DecorativeCanvasHTML('class="login-scene"') +
+    card +
+    PreferenceDialog('login-help', '계정 찾기', TextHTML('', 'id="login-help-instructions"', 'p')),
+    'id="preview-login" aria-label="로그인" hidden', 'main',
+  );
 }
 
 document.body.innerHTML = Header() + NavigationSidebar() +
-  '<main id="workspace" aria-label="콘텐츠"></main>' + Footer() +
-  Inbox() + SearchDialog() + AccountDialog() + SettingsDialog() + PreferenceDialog('notification', '알림 상세', `
-    <h3 id="notification-detail-title"></h3>
-    <p><time id="notification-detail-time"></time></p>
-    <p id="notification-detail-description"></p>
-    <div id="notification-detail-cases" hidden></div>
-  `) + PreferenceDialog('work-request', '업무 요청', '<div id="work-request-content"></div>', { wrapContent: false }) + Tooltip() +
-  `<main id="preview-login" aria-label="로그인" hidden>
-    <canvas class="login-scene" aria-hidden="true"></canvas>
-    <section class="glass login-card">
-      <div class="login-brand"><span class="login-brand-mark">${BrandSymbol()}</span><span>AML RADAR</span></div>
-      <form id="preview-login-form" class="login-form" aria-label="로그인" novalidate>
-        <label for="preview-login-id">아이디</label>
-        <input id="preview-login-id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="아이디 입력" required>
-        <label for="preview-login-password">비밀번호</label>
-        <div class="login-password-field">
-          <input id="preview-login-password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required>
-          ${Button('', { variant: 'icon-button login-password-toggle', shape: 'circle', attributes: 'id="login-password-toggle" aria-label="비밀번호 표시" aria-pressed="false" aria-controls="preview-login-password"' })}
-        </div>
-        <div class="login-error" id="preview-login-error" role="alert" aria-atomic="true"></div>
-        <div id="preview-login-action"></div>
-        <div id="preview-login-help-actions" class="login-help"></div>
-      </form>
-      ${serviceMode ? '' : '<div id="preview-login-sample-actions" class="login-sample"></div>'}
-    </section>
-    ${PreferenceDialog('login-help', '계정 찾기', '<p id="login-help-instructions"></p>')}
-  </main>`;
+  BoxHTML('', 'id="workspace" aria-label="콘텐츠"', 'main') + Footer() +
+  Inbox() + SearchDialog() + AccountDialog() + SettingsDialog() + PreferenceDialog('notification', '알림 상세',
+    HeadingHTML('', 'id="notification-detail-title"', 3) +
+    TextHTML(TextHTML('', 'id="notification-detail-time"', 'time'), '', 'p') +
+    TextHTML('', 'id="notification-detail-description"', 'p') +
+    BoxHTML('', 'id="notification-detail-cases" hidden'),
+  ) + PreferenceDialog('work-request', '업무 요청', BoxHTML('', 'id="work-request-content"'), { wrapContent: false }) +
+  Tooltip() + LoginScreen();
 
 function observeChromeHeight(element, onResize) {
   let frame;
@@ -654,8 +661,8 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
   queryControls.setScreen(dashboard || ledger ? path : undefined, [], { rows: [], dashboard }, params);
   const workflow = `benchmark-dashboard-${path.endsWith('/mine') ? 'mine' : 'all'}`;
   const content = ledger
-    ? '<div data-benchmark-content><p role="status">IBM AMLworld 거래를 불러오는 중입니다.</p></div>'
-    : `<div data-benchmark-content data-workflow="${workflow}"></div>`;
+    ? BoxHTML(TextHTML('IBM AMLworld 거래를 불러오는 중입니다.', 'role="status"', 'p'), 'data-benchmark-content')
+    : BoxHTML('', `data-benchmark-content data-workflow="${workflow}"`);
   const workspace = byId('workspace');
   workspace.innerHTML = ScreenLayout(path, { code, hasQuery: dashboard, content });
   updateWorkspaceAddress(path, code, navigationMode, queryControls.params(path));
@@ -1091,7 +1098,7 @@ const searchResults = byId('search-results');
 function SearchResult(code) {
   const row = document.createElement('li');
   row.className = 'list-item-enter';
-  row.innerHTML = Button(`<code>${code}</code>`, { variant: 'row search-result', attributes: `data-search-code="${code}"` });
+  row.innerHTML = Button(TextHTML(code, '', 'code'), { variant: 'row search-result', attributes: `data-search-code="${code}"` });
   return row;
 }
 
@@ -1117,7 +1124,7 @@ function renderSearchResults() {
       if (row !== current) list.insertBefore(row, current ?? null);
     });
   } else {
-    searchResults.innerHTML = '<p>검색 결과가 없습니다.</p>';
+    searchResults.innerHTML = TextHTML('검색 결과가 없습니다.', '', 'p');
   }
   if (focused && document.activeElement !== focused) {
     (focused.isConnected ? focused : searchQuery).focus({ preventScroll: true });
@@ -1764,7 +1771,7 @@ if (!serviceMode) {
     ...(sampleData ? [['preview-alt-staff-login', '분석가 2로 간편 로그인', alternatePreviewStaff]] : []),
   ];
   createRoot(byId('preview-login-sample-actions')).render([
-    createElement('p', { key: 'notice' }, '테스트 전용 간편 로그인 · 검수 종료 즉시 제거'),
+    createElement(Text, { key: 'notice' }, '테스트 전용 간편 로그인 · 검수 종료 즉시 제거'),
     ...actors.map(([id, label, actor]) => loginButton(label, { key: id, id, onClick: () => enterPreview(actor.username) })),
   ]);
 }

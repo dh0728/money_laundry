@@ -25,6 +25,31 @@ export function Button(content, { variant = '', attributes = '', shape, surface 
 export const IconButton = (content, label, attributes, variant = '', surface = 'floating', shape = 'circle') =>
   Button(content, { variant: `icon-button ${variant}`, attributes: `aria-label="${label}" ${attributes}`, shape, surface });
 
+function elementHTML(tag, attributes, content) {
+  return `<${tag}${attributes ? ` ${attributes}` : ''}>${content}</${tag}>`;
+}
+
+/** @param {'div' | 'section' | 'header' | 'footer' | 'main' | 'nav' | 'ul' | 'ol' | 'li' | 'form'} as */
+export function BoxHTML(content = '', attributes = '', as = 'div') {
+  return elementHTML(as, attributes, content);
+}
+
+/** @param {'span' | 'strong' | 'p' | 'code' | 'time' | 'label'} as */
+export function TextHTML(content = '', attributes = '', as = 'span') {
+  return elementHTML(as, attributes, content);
+}
+
+export function HeadingHTML(content = '', attributes = '', level = 2) {
+  return elementHTML(`h${Math.min(6, Math.max(1, level))}`, attributes, content);
+}
+
+export const InputHTML = attributes => `<input ${attributes}>`;
+
+export const ProfileAvatarHTML = (src, alt) =>
+  `<img class="avatar" data-profile-image src="${src}" alt="${alt}" width="32" height="32">`;
+
+export const DecorativeCanvasHTML = attributes => `<canvas ${attributes} aria-hidden="true"></canvas>`;
+
 // 문자열 화면용 Panel(components/panel.jsx와 같은 면: 화면 안으로 들어간 inner glow).
 export const PanelHTML = (content, variant = '') =>
   `<section class="screen-panel ${variant}">${content}</section>`;
