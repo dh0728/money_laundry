@@ -19,18 +19,25 @@ export const designRuleTree = [
       { id: 'component/raw-element', title: '화면 파일(src/components 밖)에는 맨 DOM 태그 없이 공용 컴포넌트 인스턴스만 둔다', engine: 'eslint', level: 'ratchet',
         // 0건이 된 폴더는 여기 더해 바로 오류로 막는다(pnpm lint·커밋 전 검사).
         errorIn: ['src/features/notifications/', 'src/lib/'] },
+      { id: 'component/dom-api', title: '화면 파일에서 createElement·innerHTML로 태그를 만들지 않는다', engine: 'eslint', level: 'ratchet' },
+      { id: 'component/form-control', title: '화면 파일에 맨 input·select·textarea 금지, 공용 입력 부품 사용', engine: 'eslint', level: 'ratchet' },
     ],
   },
   {
     id: 'token', title: '색·간격·크기는 토큰만', source: 'DP:28',
     rules: [
-      { id: 'token/raw-color', title: '직접 색 값(hex·rgb·hsl·oklch) 금지, 색 토큰 사용', engine: 'eslint+stylelint', level: 'ratchet' },
+      { id: 'token/raw-color', title: '직접 색 값(hex·rgb·hsl·oklch, 계산한 hsl(${…}) 포함) 금지, 색 토큰 사용', engine: 'eslint+stylelint', level: 'ratchet' },
       { id: 'token/spacing-unit', title: '간격(padding·margin·gap·inset)에 px·rem 숫자 금지, space 토큰 사용', engine: 'stylelint', level: 'ratchet' },
       { id: 'token/radius-unit', title: '모서리에 px·rem 숫자 금지, radius 토큰 사용', engine: 'stylelint', level: 'ratchet' },
       { id: 'token/font-size-unit', title: '글자 크기에 px·rem 숫자 금지, type 토큰 사용', engine: 'stylelint', level: 'ratchet' },
       { id: 'token/inline-style', title: '인라인 스타일 금지(CSS 변수 전달만 허용)', engine: 'eslint', level: 'ratchet' },
       { id: 'token/arbitrary-class', title: 'Tailwind 임의 값(w-[13px] 등) 금지', engine: 'eslint', level: 'ratchet' },
       { id: 'token/important', title: '!important 금지(움직임 끄기 장치만 허용)', engine: 'stylelint', level: 'ratchet' },
+      { id: 'token/fixed-number', title: '고정 숫자 금지(크기·선·그림자·투명도·z-index·시간·변형·JSX 크기 prop·문자열 단위). 0·100%·50%·fr·flex·auto 등 채우기·맞추기 값만 허용', engine: 'eslint+stylelint', level: 'ratchet' },
+      { id: 'token/inline-var-number', title: '인라인 style·setProperty로 넘기는 CSS 변수 값에 숫자 금지(토큰 var만)', engine: 'eslint', level: 'ratchet' },
+      { id: 'token/palette-direct', title: '화면 파일(src/components·src/styles 밖)에서 원시 색(--palette-*·--aml-색이름-숫자) 직접 사용 금지', engine: 'eslint+stylelint', level: 'ratchet' },
+      { id: 'token/series-color', title: '데이터 계열 색: 회색 금지, 상태 색은 상태 이름 계열에만', engine: 'eslint', level: 'ratchet' },
+      { id: 'token/undefined-var', title: '정의 없는 CSS 변수 참조 금지(대체값 없는 var)', engine: 'eslint+stylelint', level: 'ratchet' },
     ],
   },
   {
@@ -50,6 +57,7 @@ export const designRuleTree = [
     id: 'icon', title: '아이콘은 lucide 하나', source: 'DP:164, 명기 2026-11-24',
     rules: [
       { id: 'icon/library', title: '아이콘 패키지는 lucide-react만(허용 목록, 다른 아이콘 패키지 import·의존성 금지)', engine: 'eslint+test', level: 'error', test: 'src/test/design-rules.test.js' },
+      { id: 'icon/local-svg', title: '로컬 SVG 아이콘 파일(import·CSS url) 금지, lucide-react 사용', engine: 'eslint+stylelint', level: 'ratchet' },
     ],
   },
   {
@@ -65,8 +73,9 @@ export const designRuleTree = [
     id: 'escape-hatch', title: '규칙을 피할 길 막기', source: '명기 2026-11-23 t3134u',
     rules: [
       { id: 'escape-hatch/disable-comment', title: 'eslint-disable·stylelint-disable로 디자인 규칙을 끄지 않는다(규칙 없는 disable 포함)', engine: 'eslint+stylelint', level: 'error' },
+      { id: 'escape-hatch/any-disable', title: 'eslint-disable 주석은 규칙과 상관없이 쓰지 않는다(코드를 고친다)', engine: 'eslint', level: 'ratchet' },
       { id: 'escape-hatch/exceptions', title: '예외는 scripts/design-exceptions.json 한 곳에 이유·만료일과 함께', engine: 'test', level: 'error', test: 'src/test/design-rules.test.js' },
-      { id: 'escape-hatch/ratchet', title: '상한(scripts/design-baseline.json)을 넘는 새 위반 금지', engine: 'test', level: 'error', test: 'src/test/design-rules.test.js' },
+      { id: 'escape-hatch/ratchet', title: '상한(scripts/design-baseline.json)을 넘는 새 위반 금지, 상한에 여유가 남아도 실패(pnpm lint:design --update로 내린다)', engine: 'test', level: 'error', test: 'src/test/design-rules.test.js' },
     ],
   },
   {
