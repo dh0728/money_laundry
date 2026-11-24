@@ -70,18 +70,11 @@
   --tag-fill: var(--information-panel-surface);
   --tag-ink: var(--text);
 }
-.semantic-tag:is(.semantic-tag--human-verdict, [data-tag="model-score"], [data-tag="case-actor"], [data-preset^="elapsed"], [data-preset^="risk"])::before,
-.filter-tag-remove::before {
-  content: '';
+.semantic-tag-icon {
   flex: 0 0 var(--compact-icon-size);
-  height: var(--compact-icon-size);
-  background: currentColor;
-  mask: var(--tag-icon) center no-repeat;
+  inline-size: var(--compact-icon-size);
+  block-size: var(--compact-icon-size);
 }
-.semantic-tag:is([data-tag="model-score"], [data-preset^="risk"]) { --tag-icon: url('../assets/icons/verdict/model-score.svg') }
-.semantic-tag[data-preset^="elapsed"] { --tag-icon: url('../assets/icons/verdict/elapsed.svg') }
-.semantic-tag[data-tag="case-actor"] { --tag-icon: url('../assets/icons/verdict/assignee.svg') }
-.semantic-tag--human-verdict { --tag-icon: url('../assets/icons/verdict/person-check.svg') }
 .semantic-tag[data-tag="status"]:not([data-preset="neutral"]) {
   border-radius: var(--aml-radius-full);
   block-size: auto;
@@ -147,7 +140,6 @@
   --tag-fill: var(--selection-surface);
   --tag-ink: var(--selection-ink);
   --focus-ring: var(--tag-ink);
-  --tag-icon: url('../assets/icons/verdict/filter-dismiss.svg');
   min-block-size: var(--aml-size-control-compact);
   block-size: auto;
   max-inline-size: 100%;
@@ -181,9 +173,6 @@
   flex: none;
   padding: 0;
   border-inline-start: var(--aml-stroke-divider) solid var(--selection-divider);
-}
-.filter-tag-remove::before {
-  inline-size: var(--compact-icon-size);
 }
 
 .active-query-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-8) }
