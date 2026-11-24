@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { bindTooltip, Icon } from '../components/components.js';
+import { bindTooltip } from '../components/components.js';
 import { previewUrl } from './preview-route.js';
 import RubberSegment from '../components/react-bits/RubberSegment';
 import './screen-navigation.css';
@@ -50,9 +50,9 @@ function WorkspaceIcons({ items, onRoute, reduced }) {
     return () => dispose.forEach(unbind => unbind());
   }, [reduced]);
   const active = items.find(item => item.current)?.value ?? '';
-  const links = items.map(({ icon, label, value, current }) => ({
+  const links = items.map(({ icon: NavIcon, label, value, current }) => ({
     value, current, accessibleLabel: label,
-    label: <Text as="span" aria-hidden="true" className="workspace-nav-icon" dangerouslySetInnerHTML={{ __html: Icon(icon) }} />,
+    label: <Text as="span" aria-hidden="true" className="workspace-nav-icon"><NavIcon className="icon" aria-hidden="true" /></Text>,
   }));
   return <Box as="nav" ref={ref} className="screen-nav-pill segmented-navigation workspace-icon-nav glass" aria-label="주 메뉴">
     <NavigationSegments label="주 메뉴" items={links} active={active} onSelect={onRoute}
