@@ -107,3 +107,16 @@ describe('automation', () => {
     expect(json('package.json').scripts.prepare).toContain('lefthook');
   });
 });
+
+describe('component/raw-element', () => {
+  it('Box·Text의 as로 버튼을 숨기거나 누르는 상자를 만들면 걸린다', async () => {
+    process.env.AML_DESIGN_ALL = '1';
+    const { ESLint } = await import('eslint');
+    const code = "import { Box } from '../../components/layout-primitives';\n" +
+      'export const A = () => <Box as="button">x</Box>;\nexport const B = () => <Box as="section" onClick={() => 1}>x</Box>;\n';
+    const [result] = await new ESLint({ cwd: app }).lintText(code, { filePath: resolve(app, 'src/features/notifications/sample.jsx') });
+    const rules = result.messages.map(message => message.ruleId);
+    expect(rules).toContain('aml/component-raw-element');
+    expect(rules).toContain('aml/component-clickable-element');
+  }, 30000);
+});

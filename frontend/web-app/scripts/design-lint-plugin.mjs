@@ -33,6 +33,11 @@ const RAW_TAGS = new Set(('a abbr address article aside b blockquote br button c
   'fieldset figcaption figure footer form g h1 h2 h3 h4 h5 h6 header hr i iframe img input kbd label legend li line linearGradient main mark menu nav ' +
   'ol optgroup option output p path pattern polygon polyline pre progress radialGradient rect section select small span stop strong sub summary sup svg ' +
   'table tbody td text textarea tfoot th thead time tr tspan u ul use video').split(' '))
+/** layout-primitives의 같은 DOM 부품과 기본 태그 */
+const PRIMITIVE_TAG = { Box: 'div', Text: 'p', Heading: 'h2' }
+/** Box·Text·Stack·Grid의 as로 쓸 수 있는 상자·글자 태그. 누르는 것·입력·표·그림 태그는 각자의 공용 부품을 쓴다. */
+const PRIMITIVE_AS = new Set(('div section header footer nav main article aside ul ol li dl dt dd figure figcaption form fieldset legend details ' +
+  'summary blockquote label menu address span p strong b i small code time em mark abbr sub sup kbd u pre output').split(' '))
 const RAW_TAG_IN_STRING = /<([a-zA-Z][\w]*)(?=[\s/>])/g
 
 // ---------- eslint ----------
@@ -89,8 +94,12 @@ const eslintRules = {
   }),
   'component-clickable-element': eslintRule('component/clickable-element', ({ report }) => ({
     JSXOpeningElement(node) {
-      if (/^(div|span|li|p|section|article)$/.test(jsxName(node) ?? '') && (jsxAttribute(node, 'onClick') || jsxAttribute(node, 'onMouseDown')))
-        report(node, `누르는 <${jsxName(node)}> 대신 button·a를 쓴다.`)
+      // Box·Text·Heading은 as 태그를 그대로 그리므로 그 태그로 본다.
+      const primitive = PRIMITIVE_TAG[jsxName(node)]
+      const as = jsxAttribute(node, 'as')?.value
+      const tag = primitive ? (as?.type === 'Literal' ? as.value : primitive) : jsxName(node)
+      if (/^(div|span|li|p|section|article|h[1-6])$/.test(tag ?? '') && (jsxAttribute(node, 'onClick') || jsxAttribute(node, 'onMouseDown')))
+        report(node, `누르는 <${tag}> 대신 button·a를 쓴다.`)
     },
   })),
   'component-panel': eslintRule('component/panel', ({ path, report }) => inside(path, PANEL_HOME) ? {} : {
@@ -106,6 +115,9 @@ const eslintRules = {
     JSXOpeningElement(node) {
       const name = node.name.type === 'JSXIdentifier' ? node.name.name : node.name.type === 'JSXMemberExpression' ? `${node.name.object.name}.${node.name.property.name}` : ''
       if (/^[a-z]/.test(name)) report(node, `맨 태그 <${name}> 대신 components의 공용 컴포넌트(Panel·Stack·Grid·Text·Heading 등)를 쓴다.`)
+      const as = /^(Box|Text|Stack|Grid)$/.test(name) ? jsxAttribute(node, 'as')?.value : undefined
+      if (as && !(as.type === 'Literal' && PRIMITIVE_AS.has(as.value)))
+        report(node, `<${name} as=…>는 상자·글자 태그만 받는다. 버튼·입력·표·그림은 각자의 공용 부품을 쓴다.`)
     },
     ...onStrings((node, value) => { for (const match of value.matchAll(RAW_TAG_IN_STRING)) if (RAW_TAGS.has(match[1])) report(node, `문자열 맨 태그 <${match[1]}> 대신 components.js의 공용 부품을 쓴다.`) }),
   }),
