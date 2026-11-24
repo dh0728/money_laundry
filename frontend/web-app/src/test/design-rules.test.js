@@ -28,6 +28,29 @@ describe('component/table-style', () => {
   });
 });
 
+describe('component/table-css', () => {
+  it('표 이름과 버튼 크기 이름을 구분한다', async () => {
+    const { default: stylelint } = await import('stylelint');
+    const { stylelintPlugins } = await import('../../scripts/design-lint-plugin.mjs');
+    const code = [
+      '.screen-primary[data-button-size="comfortable"]',
+      '.stable-control',
+      '.report-table tbody > tr',
+      '[data-slot="table-cell"]',
+      '.caseTableRows',
+      '.datatable',
+      'td',
+    ].map(selector => `${selector} { padding: 0 }`).join('\n');
+    const { results } = await stylelint.lint({
+      cwd: app,
+      code,
+      codeFilename: resolve(app, 'src/features/sample.css'),
+      config: { plugins: stylelintPlugins, rules: { 'aml/component-table-css': true } },
+    });
+    expect(results[0].warnings.map(warning => warning.line)).toEqual([3, 4, 5, 6, 7]);
+  });
+});
+
 describe('font/tokens', () => {
   it('글꼴 토큰은 Pretendard 단독이다', () => {
     const fonts = read('src/styles/fonts.css');

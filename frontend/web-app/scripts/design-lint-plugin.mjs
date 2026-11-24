@@ -445,14 +445,18 @@ const inFontFace = node => { for (let parent = node.parent; parent; parent = par
 const inKeyframes = node => { for (let parent = node.parent; parent; parent = parent.parent) if (parent.type === 'atrule' && /keyframes$/.test(parent.name)) return true; return false }
 const hasUnit = value => [...value.replace(/var\([^)]*\)/g, '').matchAll(/(?<![\w-])-?(\d*\.?\d+)(px|rem|em)\b/g)].some(match => Number(match[1]) !== 0)
 const motionGuard = decl => /data-reduced-motion/.test(decl.parent?.selector ?? '') && /^(animation|transition|scroll-behavior)/.test(decl.prop)
+const tableElementSelector = /(^|[\s>+~,(])(table|thead|tbody|tfoot|tr|th|td|caption|colgroup)(?=$|[\s.#:[>+~,)])/
+const tableName = /(?:^|[-_])(?:data)?tables?(?:[-_]|$)/i
+const camelCaseTableName = /(?:^|[a-z\d])Tables?(?:[A-Z_-]|$)/
 
 export const stylelintPlugins = [
   cssRule('component/table-css', ({ root, path, report }) => {
     if (inside(path, ['src/components/ui/table.css', 'src/components/table-frame.css'])) return
     root.walkRules(rule => {
       if (inKeyframes(rule)) return
-      const selector = rule.selector.replace(/"[^"]*"|'[^']*'/g, match => match.includes('table') ? 'table' : '')
-      if (/(^|[\s>+~,(])(table|thead|tbody|tfoot|tr|th|td|caption|colgroup)(?=$|[\s.#:[>+~,)])/.test(selector) || /[.#[][\w="-]*table/i.test(rule.selector))
+      const elementSelector = rule.selector.replace(/"[^"]*"|'[^']*'/g, '')
+      const names = rule.selector.match(/[\w-]+/g) ?? []
+      if (tableElementSelector.test(elementSelector) || names.some(name => tableName.test(name) || camelCaseTableName.test(name)))
         report(rule, `표 모양(${rule.selector.slice(0, 60)})은 components/ui/table.css·table-frame.css에만 둔다.`)
     })
   }),
