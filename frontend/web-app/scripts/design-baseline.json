@@ -10,10 +10,10 @@
   "token/spacing-unit": 4,
   "token/radius-unit": 1,
   "token/font-size-unit": 2,
-  "token/inline-style": 197,
-  "token/arbitrary-class": 133,
+  "token/inline-style": 182,
+  "token/arbitrary-class": 132,
   "token/important": 2,
-  "token/fixed-number": 310,
+  "token/fixed-number": 299,
   "token/palette-direct": 1,
   "chart/library-import": 5,
   "icon/local-svg": 6
