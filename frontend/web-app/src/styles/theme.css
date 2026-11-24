@@ -230,6 +230,27 @@
   --graph-legend-dash-weight: 2.5px;
   --graph-legend-dot-size: 9px;
   --graph-flow-dash-offset: -24;
+  --flow-panel-initial-top: 88px;
+  --flow-panel-initial-width: 560px;
+  --flow-panel-initial-height: 620px;
+  --flow-panel-min-height: 320px;
+  --flow-sankey-tooltip-width: 8rem;
+  --flow-sankey-plot-height: 340px;
+  --flow-sankey-min-scale: 0.5;
+  --flow-sankey-max-scale: 6;
+  --flow-sankey-wheel-step: 0.0015;
+  --flow-sankey-node-padding: 18px;
+  --flow-sankey-node-width: 10px;
+  --flow-sankey-margin-inline: 96px;
+  --flow-sankey-margin-top: 22px;
+  --flow-sankey-margin-bottom: 10px;
+  --flow-sankey-pulse-min-width: 1.5px;
+  --flow-sankey-pulse-max-width: 3px;
+  --flow-sankey-pulse-opacity: 0.5;
+  --flow-sankey-pulse-dash-array: 1 11;
+  --flow-sankey-inverse-zoom: 1;
+  --flow-sankey-label-origin: center center;
+  --flow-sankey-label-outline: 3px;
   --graph-resizable-min-width: 820px;
   --graph-settings-width: 210px;
   --graph-settings-min-width: 190px;
@@ -519,6 +540,22 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .graph-legend [data-legend="suspicious"] { background:var(--graph-l1); }
 .graph-legend [data-legend="non-suspicious"] { background:var(--graph-l0); }
 .graph-legend [data-legend="adjacent-account"] { background:var(--graph-l0-node); }
+.flow-sankey-tooltip { min-width: var(--flow-sankey-tooltip-width); }
+.flow-sankey-plot { height: var(--flow-sankey-plot-height); }
+.flow-sankey-label {
+  transform: scale(var(--flow-sankey-inverse-zoom));
+  transform-box: fill-box;
+  transform-origin: var(--flow-sankey-label-origin);
+}
+.flow-sankey-link-label {
+  paint-order: stroke;
+  stroke: var(--card);
+  stroke-width: var(--flow-sankey-label-outline);
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.flow-sankey-link-pulse { stroke-dasharray: var(--flow-sankey-pulse-dash-array); }
+.flow-sankey-link-pulse[data-suspect='false'] { stroke-opacity: var(--flow-sankey-pulse-opacity); }
 .flow-dash { animation: flow-dash var(--motion-flow) var(--ease-linear) infinite; }
 @keyframes flow-dash { to { stroke-dashoffset: var(--graph-flow-dash-offset); } }
 @media (prefers-reduced-motion: reduce) { :root:not([data-reduced-motion="false"]) .flow-dash { animation: none; } }
