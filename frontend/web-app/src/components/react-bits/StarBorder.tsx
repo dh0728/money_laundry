@@ -12,7 +12,6 @@ export type StarBorderHover = 'lap' | 'brighten' | 'reveal' | 'none';
 type StarBorderOwnProps = {
   children?: React.ReactNode;
   className?: string;
-  style?: React.CSSProperties;
   color?: string;
   trailColor?: string;
   duration?: number;
@@ -33,9 +32,7 @@ type StarBorderOwnProps = {
 
 export type StarBorderProps<T extends React.ElementType = 'button'> = StarBorderOwnProps & {
   as?: T;
-} & Omit<React.ComponentPropsWithoutRef<T>, keyof StarBorderOwnProps | 'as'>;
-
-type Palette = { surface: string; text: string; track: string; light: string };
+} & Omit<React.ComponentPropsWithoutRef<T>, keyof StarBorderOwnProps | 'as' | 'style'>;
 
 type Rgb = [number, number, number];
 
@@ -51,8 +48,8 @@ type Mote = { x: number; y: number; vx: number; vy: number; age: number; life: n
 
 type Settings = {
   light: boolean;
-  color: string;
-  trailColor: string;
+  color?: string;
+  trailColor?: string;
   duration: number;
   thickness: number;
   radius: number;
@@ -65,23 +62,7 @@ type Settings = {
   clickPulse: boolean;
 };
 
-const THEMES: Record<StarBorderTheme, Palette> = {
-  dark: {
-    surface: '#0c0c0f',
-    text: '#fafafa',
-    track: 'rgba(255, 255, 255, 0.1)',
-    light: '#ffffff'
-  },
-  light: {
-    surface: '#ffffff',
-    text: '#18181b',
-    track: 'rgba(24, 24, 27, 0.12)',
-    light: '#18181b'
-  }
-};
-
 const HOVERS: StarBorderHover[] = ['lap', 'brighten', 'reveal', 'none'];
-const BLEED = 48;
 const LAP = 0.9;
 const TAU = Math.PI * 2;
 const WHITE: Rgb = [255, 255, 255];
@@ -108,7 +89,7 @@ const toRgb = (color: string): Rgb => {
   }
   if (!colorContext) return WHITE;
   colorContext.clearRect(0, 0, 1, 1);
-  colorContext.fillStyle = '#000000';
+  colorContext.fillStyle = 'transparent';
   colorContext.fillStyle = color;
   colorContext.fillRect(0, 0, 1, 1);
   const [red, green, blue] = colorContext.getImageData(0, 0, 1, 1).data;
@@ -198,7 +179,6 @@ const StarBorder = <T extends React.ElementType = 'button'>({
   as,
   children,
   className = '',
-  style,
   color,
   trailColor,
   duration = 4,
@@ -222,12 +202,10 @@ const StarBorder = <T extends React.ElementType = 'button'>({
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wakeRef = useRef<(() => void) | null>(null);
-  const palette = THEMES[theme] ?? THEMES.dark;
-  const light = color ?? palette.light;
   const settings: Settings = {
     light: theme === 'light',
-    color: light,
-    trailColor: trailColor ?? light,
+    color,
+    trailColor,
     duration: Math.max(0.3, duration),
     thickness: Math.max(0.5, thickness),
     radius: Math.max(0, radius),
@@ -254,7 +232,8 @@ const StarBorder = <T extends React.ElementType = 'button'>({
     let reduce = motionPreference.matches;
     let off = false;
     let paintedRadius = settingsRef.current.radius;
-    let resolvedColor = settingsRef.current.color;
+    let resolvedColor = '';
+    let bleed = 0;
     const point: Point = { x: 0, y: 0, nx: 0, ny: -1 };
     const state = {
       width: 0,
@@ -283,8 +262,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
     let alive = true;
 
     let resizePending = false;
-    const refreshAppearance = () => {
-      const style = getComputedStyle(root);
+    const refreshAppearance = (style: CSSStyleDeclaration) => {
       const mode = style.getPropertyValue('--star-border-motion').trim();
       off = mode === 'off' || root.matches(':disabled, [aria-disabled="true"]');
       reduce = motionPreference.matches || mode === 'still';
@@ -301,12 +279,14 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       }
     };
     const applyMeasure = () => {
+      const style = getComputedStyle(root);
+      bleed = Number.parseFloat(style.getPropertyValue('--star-border-bleed')) || 0;
       state.width = root.offsetWidth;
       state.height = root.offsetHeight;
       state.dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.max(1, Math.round((state.width + BLEED * 2) * state.dpr));
-      canvas.height = Math.max(1, Math.round((state.height + BLEED * 2) * state.dpr));
-      refreshAppearance();
+      canvas.width = Math.max(1, Math.round((state.width + bleed * 2) * state.dpr));
+      canvas.height = Math.max(1, Math.round((state.height + bleed * 2) * state.dpr));
+      refreshAppearance(style);
     };
 
     const measure = () => {
@@ -425,7 +405,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (state.width < 2 || state.height < 2) return;
-      const offset = (BLEED + s.thickness / 2) * state.dpr;
+      const offset = (bleed + s.thickness / 2) * state.dpr;
       ctx.setTransform(state.dpr, 0, 0, state.dpr, offset, offset);
       ctx.globalCompositeOperation = s.light ? 'source-over' : 'lighter';
       ctx.lineCap = 'butt';
@@ -512,7 +492,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       last = now;
       state.time += dt;
 
-      const tail = s.trailColor === s.color ? resolvedColor : s.trailColor;
+      const tail = s.trailColor === undefined || s.trailColor === s.color ? resolvedColor : s.trailColor;
       const key = `${resolvedColor}|${tail}`;
       if (key !== colors.key) {
         colors.key = key;
@@ -635,7 +615,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       attributes: true,
       attributeFilter: ['data-theme', 'data-glassmorphism', 'data-reduced-motion']
     });
-    appearance.observe(root, { attributes: true, attributeFilter: ['disabled', 'aria-disabled'] });
+    appearance.observe(root, { attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'data-star-theme', 'style'] });
     motionPreference.addEventListener('change', measure);
     const visibility = new IntersectionObserver(entries => {
       state.visible = entries.some(entry => entry.isIntersecting);
@@ -675,15 +655,15 @@ const StarBorder = <T extends React.ElementType = 'button'>({
     <Component
       ref={rootRef}
       className={`star-border${className ? ` ${className}` : ''}`}
+      data-star-theme={theme}
       style={
         {
           '--star-border-radius': `${settings.radius}px`,
           '--star-border-thickness': `${settings.thickness}px`,
-          '--star-border-surface': backgroundColor ?? palette.surface,
-          '--star-border-text': textColor ?? palette.text,
-          '--star-border-track': borderColor ?? palette.track,
-          accentColor: light,
-          ...style
+          '--star-border-surface': backgroundColor,
+          '--star-border-text': textColor,
+          '--star-border-track': borderColor,
+          '--star-border-head': color,
         } as React.CSSProperties
       }
       {...(tag === 'button' && (rest as { type?: string }).type === undefined ? { type: 'button' } : null)}

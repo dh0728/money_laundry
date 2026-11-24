@@ -1,28 +1,44 @@
+@import "../../styles/star-border-tokens.css";
+
 .star-border {
+  --star-border-surface: var(--star-border-dark-surface);
+  --star-border-text: var(--star-border-dark-ink);
+  --star-border-track: var(--star-border-dark-track);
+  --star-border-head: var(--aml-white-100);
+  --star-border-bleed: var(--aml-space-48);
+
   position: relative;
   isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--star-border-gap);
   margin: 0;
-  padding: 0.875rem 1.5rem;
+  padding: var(--star-border-block-inset) var(--star-border-inline-inset);
   border: 0;
   border-radius: var(--star-border-radius);
   background: var(--star-border-surface);
   color: var(--star-border-text);
+  accent-color: var(--star-border-head);
   font: inherit;
   font-weight: var(--aml-type-label-weight);
-  line-height: 1.25;
+  line-height: var(--star-border-line-height);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.star-border[data-star-theme="light"] {
+  --star-border-surface: var(--aml-white-100);
+  --star-border-text: var(--star-border-light-ink);
+  --star-border-track: var(--star-border-light-track);
+  --star-border-head: var(--star-border-light-ink);
 }
 
 .star-border::before {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: var(--star-border-effect-layer);
   border-radius: inherit;
   box-shadow: inset 0 0 0 var(--star-border-thickness) var(--star-border-track);
   pointer-events: none;
@@ -30,11 +46,11 @@
 
 .star-border__light {
   position: absolute;
-  top: calc(-1 * var(--aml-space-48));
-  left: calc(-1 * var(--aml-space-48));
-  z-index: -1;
-  width: calc(100% + 96px);
-  height: calc(100% + 96px);
+  top: calc(-1 * var(--star-border-bleed));
+  left: calc(-1 * var(--star-border-bleed));
+  z-index: var(--star-border-effect-layer);
+  width: calc(100% + 2 * var(--star-border-bleed));
+  height: calc(100% + 2 * var(--star-border-bleed));
   pointer-events: none;
 }
 
@@ -45,10 +61,10 @@ a.star-border {
 
 .star-border:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--star-border-track);
-  outline-offset: 3px;
+  outline-offset: var(--star-border-focus-offset);
 }
 
 .star-border:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--star-border-disabled-opacity);
 }
