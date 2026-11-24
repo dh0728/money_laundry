@@ -78,6 +78,8 @@ export interface BarProps {
   staggerDelay?: number;
   /** Gap between stacked bars in pixels. Default: 0 */
   stackGap?: number;
+  /** Round the shared silhouette of a nonnegative vertical stack. */
+  roundStack?: boolean;
   /** Gap between grouped bars in pixels. Default: 4 */
   groupGap?: number;
   /** Shrink each positive bar's top by its perspective rise so the front face
@@ -240,6 +242,7 @@ interface BarGeometry {
   width: number;
   height: number;
   rx: number;
+  stackClip?: { top: number; height: number; radius: number };
   growOrigin: number;
   valueLabel?: string;
   labelX: number;
@@ -318,6 +321,7 @@ const BarInner = memo(function BarInner({
   fadedOpacity = 0.3,
   staggerDelay,
   stackGap = 0,
+  roundStack = false,
   groupGap = 4,
   perspective = false,
   minBarHeight = 0,
@@ -557,6 +561,17 @@ const BarInner = memo(function BarInner({
         growOrigin = stacked ? x : zeroX;
       }
 
+      let stackClip: BarGeometry["stackClip"];
+      if (roundStack && stacked && !isHorizontal && stackGap === 0 && cornerRadius > 0) {
+        const values = lines.map(line => d[line.dataKey]).filter(
+          (entry): entry is number => typeof entry === "number" && Number.isFinite(entry)
+        );
+        if (values.every(entry => entry >= 0)) {
+          const top = scale(values.reduce((sum, entry) => sum + entry, 0)) ?? zeroY;
+          stackClip = { top, height: zeroY - top, radius: cornerRadius };
+        }
+      }
+
       result.push({
         // Use categoryValue as key since it's the unique identifier from data
         key: `bar-${dataKey}-${categoryValue}`,
@@ -565,7 +580,8 @@ const BarInner = memo(function BarInner({
         y,
         width: barW,
         height: barHeight,
-        rx: effectiveRx,
+        rx: stackClip ? 0 : effectiveRx,
+        stackClip,
         growOrigin,
         valueLabel,
         labelX,
@@ -588,8 +604,10 @@ const BarInner = memo(function BarInner({
     innerWidth,
     isHorizontal,
     isLastSeries,
+    lines,
     minBarHeight,
     perspective,
+    roundStack,
     seriesCount,
     seriesIndex,
     showValue,
@@ -612,8 +630,7 @@ const BarInner = memo(function BarInner({
           (hoveredBarIndex !== null && hoveredBarIndex !== bar.index) ||
           isLegendDimmed;
 
-        if (animating) {
-          return (
+        const rendered = animating ? (
             <AnimatedBar
               animationType={animationType}
               enterTransition={enterTransition}
@@ -639,11 +656,7 @@ const BarInner = memo(function BarInner({
               x={bar.x}
               y={bar.y}
             />
-          );
-        }
-
-        // Static bar after animation completes
-        return (
+        ) : (
           <StaticBar
             fill={barFill}
             geometry={bar}
@@ -652,6 +665,20 @@ const BarInner = memo(function BarInner({
             valueLabelClassName={valueLabelClassName}
             valueLabelColor={valueLabelColor}
           />
+        );
+        if (!bar.stackClip) return rendered;
+
+        const id = `stack-${uniqueId}-${bar.index}`;
+        return (
+          <g key={bar.key}>
+            <defs>
+              <clipPath id={id}>
+                <rect x={bar.x} y={bar.stackClip.top} width={bar.width}
+                  height={bar.stackClip.height} rx={bar.stackClip.radius} />
+              </clipPath>
+            </defs>
+            <g clipPath={`url(#${id})`}>{rendered}</g>
+          </g>
         );
       })}
     </g>

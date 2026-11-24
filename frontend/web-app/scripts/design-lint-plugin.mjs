@@ -349,13 +349,30 @@ const eslintRules = {
   })),
   'token-series-color': eslintRule('token/series-color', ({ report }) => {
     const text = node => !node ? undefined : stringValue(node) ?? (node.type === 'TemplateLiteral' ? node.quasis.map(part => part.value.raw).join('…') : undefined)
+    const namedSeries = new Map([
+      ['전체 거래', 'transactionTotalColor'],
+      ['새 계좌', 'dataSeriesColors.teal'],
+      ['새 소유주', 'dataSeriesColors.pink'],
+    ])
+    const reference = node => {
+      if (node.type === 'Identifier') return node.name
+      if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier') {
+        return `${node.object.name}.${node.property.name}`
+      }
+    }
     return {
       ObjectExpression(node) {
         const props = new Map(node.properties.filter(property => property.type === 'Property').map(property => [property.key?.name ?? property.key?.value, property]))
         const label = ['label', 'name', 'key', 'dataKey'].map(key => props.get(key)).find(Boolean)
         if (!label) return
+        const labelName = text(label.value)
+        const expectedColor = namedSeries.get(labelName)
         for (const key of ['color', 'fill', 'stroke']) {
           const property = props.get(key)
+          if (property && expectedColor) {
+            if (reference(property.value) !== expectedColor) report(property, `${labelName} 계열에는 ${expectedColor}를 쓴다.`)
+            continue
+          }
           const color = property && text(property.value)
           if (!color) continue
           if (GRAY_COLOR.test(color)) report(property, `데이터 계열 ${text(label.value) ?? ''}에 회색(${color.match(GRAY_COLOR)[0]}) 대신 계열 색을 쓴다.`)

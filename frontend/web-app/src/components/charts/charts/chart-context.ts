@@ -37,6 +37,7 @@ export const dataSeriesColors = {
   lime: "var(--aml-lime-050)",
   teal: "var(--palette-teal-500, var(--aml-sky-070))",
 } as const;
+export const transactionTotalColor = "var(--aml-gray-050)";
 export const dataSeriesPalette = Object.values(dataSeriesColors);
 
 // CSS variable references for theming

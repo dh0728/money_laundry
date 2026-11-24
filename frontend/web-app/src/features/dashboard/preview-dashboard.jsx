@@ -10,6 +10,8 @@ import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
 import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
+import { BarSparkline } from '../../components/charts/sparkline';
+import { dataSeriesColors, transactionTotalColor } from '../../components/charts/charts/chart-context';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Grid, Heading, Text } from '../../components/layout-primitives';
 import { initialDetail, previewUrl } from '../../app/preview-route.js';
@@ -24,7 +26,8 @@ const PersonalWorkload = React.lazy(() => import('./dashboard-analytics').then(m
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
 function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key } = item;
+  const { label, value, unit, detail, key, trend } = item;
+  const hasTrend = trend?.rows.some(row => row[trend.key] > 0);
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   return <Box className="dashboard-metric">
     <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
@@ -37,6 +40,12 @@ function Metric({ item, reduced }) {
       </Text>
     </Box>
     {detail && <Text>{detail}</Text>}
+    {hasTrend && <Box className="dashboard-metric-trend">
+      <BarSparkline data={trend.rows} dataKey={trend.key} color={trend.color}
+        dot={false} animate={!reduced} aria-label={label + ' · ' + trend.caption + ' · ' +
+          trend.rows.map(row => row.label + ' ' + count(row[trend.key])).join(', ')} />
+      <Text as="span" className="dashboard-note">{trend.caption}</Text>
+    </Box>}
   </Box>;
 }
 
@@ -55,17 +64,24 @@ function CaseLink({ row }) {
   </ActionButton>;
 }
 
-function PersonalMetrics({ data }) {
-  const metrics = [
+function DashboardIndicators({ data, mine, reduced }) {
+  const hourly = (key, color) => ({ rows: data.hourly, key, color, caption: '생성 시간대 · KST' });
+  const daily = (key, color) => ({ rows: data.operationalDaily, key, color, caption: '일별 · KST' });
+  const metrics = mine ? [
     { label: '내 담당 미완료', value: data.unfinished },
-    { label: '고위험 Alert', value: data.highRisk, detail: '미완료 · 위험 점수 ' + modelRiskLabels().high },
-    { label: '3일 이상 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes) },
+    { label: '고위험 Alert', value: data.highRisk, detail: '미완료 · 위험 점수 ' + modelRiskLabels().high,
+      trend: hourly('highRisk', 'var(--chart-risk-high)') },
+    { label: '3일 이상 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
+      trend: hourly('overdue', 'var(--chart-risk-medium)') },
+  ] : [
+    { label: '들어온 거래 수', value: data.transactions.length, trend: daily('total', transactionTotalColor) },
+    { label: '모델 의심 거래', value: data.suspicious.length, detail: '의심 비율 ' + share(data.suspicious.length, data.transactions.length),
+      trend: daily('suspicious', 'var(--chart-suspect)') },
+    { label: '생성 Alert', value: data.alertCases.length, trend: daily('alerts', dataSeriesColors.teal) },
   ];
-  return <Grid as="section" columns={12} className="dashboard-priority-metrics" aria-label="내 우선 업무 지표">
+  return <Grid as="section" columns={12} className="dashboard-priority-metrics" aria-label={mine ? '내 우선 업무 지표' : '기관 주요 지표'}>
     {metrics.map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
-      <Heading level={3}>{item.label}</Heading>
-      <Text as="strong">{count(item.value)}</Text>
-      {item.detail && <Text className="dashboard-note">{item.detail}</Text>}
+      <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} />
     </Panel>)}
   </Grid>;
 }
@@ -130,7 +146,7 @@ export function PreviewDashboard({ mine, data, appearance }) {
   const summary = <DashboardSummary data={data} mine={mine} reduced={appearance.reduced}
     priorityOnly={priorityOnly} onPriority={togglePriority} />;
   return <Box className="preview-dashboard" data-mine={mine}>
-    {mine && <PersonalMetrics data={data} />}
+    <DashboardIndicators data={data} mine={mine} reduced={appearance.reduced} />
     <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>
       {mine ? <Grid columns={12} className="dashboard-work-overview-grid">
         <PersonalWorkload data={data} reduced={appearance.reduced} />

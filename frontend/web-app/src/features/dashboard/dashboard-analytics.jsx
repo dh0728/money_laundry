@@ -14,7 +14,7 @@ import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitive
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
 import { dashboardDateKey } from './dashboard-investigation';
-import { dataSeriesColors } from '@/components/charts/charts/chart-context';
+import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;
@@ -34,7 +34,7 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
         animationDuration={reduced ? 0 : 340}>
         <Grid horizontal />
         {series.map(item => <Bar key={item.key} dataKey={item.key} fill={item.color}
-          lineCap="round" groupGap={2} animate={!reduced} />)}
+          lineCap="round" roundStack={stacked} groupGap={2} animate={!reduced} />)}
         <BarXAxis maxLabels={showShare ? { base: 4, sm: 10, lg: 18 } : 14} tickerHalfWidth={0}
           formatLabel={showShare ? volumeAxisLabel : undefined} />
         <ChartTooltip showCrosshair showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
@@ -125,7 +125,7 @@ const patternRows = [...ibmPatterns, ...ibmRemaining];
 function ReferencePattern({ id }) {
   return <defs>
     <pattern id={id} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="7" height="7" fill={dataSeriesColors.sky} />
+      <rect width="7" height="7" fill="var(--chart-pattern)" />
       <path d="M 0 0 V 7" stroke="var(--information-panel-surface)" strokeWidth="2" />
     </pattern>
   </defs>;
@@ -155,7 +155,7 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
         <Bar dataKey="value" getFill={point => point.supported ? 'var(--chart-pattern)' : `url(#${patternId})`}
           lineCap="round" animate={!reduced} />
         <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
-          rows={point => [{ label: point.label, color: point.supported ? 'var(--chart-pattern)' : dataSeriesColors.sky,
+          rows={point => [{ label: point.label, color: 'var(--chart-pattern)',
             value: `${count(point.value)} · ${share(point.value, total)}` }]} />
       </BarChart>
     </Box>}
@@ -164,7 +164,7 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
 }
 
 const volumeDetail = [
-  { label: '전체 거래', color: dataSeriesColors.sky, value: row => count(row.total) },
+  { label: '전체 거래', color: transactionTotalColor, value: row => count(row.total) },
   { label: '세탁 라벨 거래', color: 'var(--chart-suspect)', value: row => count(row.labeled) },
   { label: '세탁 라벨 비율', color: 'var(--chart-suspect)', value: row => share(row.labeled, row.total) },
 ];
@@ -186,7 +186,7 @@ function SeriesLegend({ series }) {
 }
 
 const newEntitySeries = [
-  { key: 'newAccounts', label: '새 계좌', color: dataSeriesColors.sky, value: row => integer.format(row.newAccounts) + '개' },
+  { key: 'newAccounts', label: '새 계좌', color: dataSeriesColors.teal, value: row => integer.format(row.newAccounts) + '개' },
   { key: 'newOwners', label: '새 소유주', color: dataSeriesColors.pink, value: row => integer.format(row.newOwners) + '명' },
 ];
 
@@ -207,7 +207,7 @@ function RiskSegments({ data }) {
         </BarChart>
       </Box>
       <LayoutGrid columns={3} as="ul" className="dashboard-score-legend">
-        {rows.map(row => <Box as="li" key={row.key} data-score={row.key}>
+        {rows.map(row => <Box as="li" key={row.key}>
           <Text className="dashboard-note">{row.label}</Text>
           <Text as="strong">{compactShare(row.count, scored)}</Text>
           <Text className="dashboard-note">{count(row.count)}</Text>
@@ -221,7 +221,7 @@ function RiskSegments({ data }) {
 function TransactionDetails({ data, flow, reduced, summary }) {
   const { scale } = flow;
   const series = [
-    { key: 'total', label: '전체 거래', color: dataSeriesColors.sky },
+    { key: 'total', label: '전체 거래', color: transactionTotalColor },
     { key: 'displaySuspicious', label: '모델 의심 거래', color: flowColors.suspect },
   ];
   const detail = [
@@ -304,7 +304,7 @@ export function Analytics({ data, reduced, summary }) {
 }
 
 const personalSeries = [
-  { key: 'Alert', label: 'Alert', color: dataSeriesColors.sky },
+  { key: 'Alert', label: 'Alert', color: dataSeriesColors.teal },
   { key: 'Episode', label: 'Episode', color: dataSeriesColors.pink },
 ];
 
@@ -328,7 +328,7 @@ export function PersonalWorkload({ data, reduced }) {
   </ChartPanel>;
 }
 
-const benchmarkTotalSeries = [{ key: 'total', label: '전체 거래', color: dataSeriesColors.sky }];
+const benchmarkTotalSeries = [{ key: 'total', label: '전체 거래', color: transactionTotalColor }];
 const benchmarkLabelSeries = [{ key: 'labeled', label: '원본 세탁 라벨 거래', color: 'var(--chart-suspect)' }];
 
 export function BenchmarkCharts({ chartRows, totals, period, fullPatternScope, reduced }) {
