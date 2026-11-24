@@ -59,8 +59,16 @@
   block-size: 100%;
 }
 .dashboard-priority-panel { display: grid; grid-template-rows: auto 1fr; align-items: stretch; gap: var(--aml-space-8) }
-.dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-personal-workload) { grid-column: span 8 }
-.dashboard-work-overview-grid > .dashboard-priority-panel { grid-column: span 4 }
+.dashboard-work-overview-grid > .dashboard-transaction-flow { grid-column: span 8 }
+.dashboard-work-overview-grid > .dashboard-priority-panel,
+.dashboard-personal-overview > .dashboard-priority-panel { grid-column: span 4 }
+.dashboard-personal-metrics { grid-column: span 8; grid-auto-rows: 1fr }
+.dashboard-personal-metrics > .dashboard-priority-metric { grid-column: auto; display: flex }
+.dashboard-personal-metrics .dashboard-metric { inline-size: 100% }
+.dashboard-personal-metrics :is(.dashboard-metric-trend, .dashboard-unfinished-ratio) {
+  flex: 0 0 auto;
+  margin-block-start: auto;
+}
 .dashboard-priority-heading {
   display: flex;
   align-items: center;
@@ -106,7 +114,7 @@
 .dashboard-flow-risk { grid-column: span 3 }
 .dashboard-flow-status { grid-column: span 6 }
 .dashboard-flow-status-grid { gap: var(--workspace-gap) }
-.dashboard-workflow-charts .dashboard-series-plot, .dashboard-personal-workload .dashboard-series-plot {
+.dashboard-workflow-charts .dashboard-series-plot {
   flex: 0 0 auto;
   block-size: calc(var(--aml-space-64) + var(--aml-space-64) + var(--aml-space-24));
   min-block-size: 0;
@@ -174,12 +182,14 @@
   .staged-sankey-relations { display: none }
 }
 @media (width < 68rem) {
-  .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-personal-workload, .dashboard-priority-panel) { grid-column: 1 / -1; grid-row: auto }
+  .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-priority-panel),
+  .dashboard-personal-overview > :is(.dashboard-personal-metrics, .dashboard-priority-panel) { grid-column: 1 / -1; grid-row: auto }
   .dashboard-flow-volume { grid-column: span 7 }
   .dashboard-flow-risk { grid-column: span 5 }
   .staged-sankey-relations { display: none }
 }
 @media (width < 48rem) {
+  .dashboard-personal-metrics { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto }
   .dashboard-priority-metric, .dashboard-flow-volume, .dashboard-flow-risk, .dashboard-flow-status { grid-column: 1 / -1 }
   .staged-sankey-relations { display: none }
 }
@@ -420,8 +430,10 @@
 .dashboard-loading-value { inline-size: var(--loading-placeholder-value-width); block-size: var(--workspace-kpi-value-size) }
 .dashboard-loading-note { inline-size: var(--loading-placeholder-note-width); block-size: var(--aml-type-caption-lineHeight) }
 .dashboard-loading-trend { inline-size: 100%; min-block-size: var(--aml-space-48); flex: 1 1 auto }
+.dashboard-personal-metrics .dashboard-loading-trend { min-block-size: var(--chart-detail-sparkline-height) }
 .dashboard-loading-recommendation-plot { block-size: var(--chart-series-height) }
 .dashboard-loading [data-slot="skeleton"].dashboard-score-band { border-radius: var(--aml-radius-card) }
+.dashboard-loading [data-slot="skeleton"].dashboard-unfinished-meter { border-radius: var(--aml-radius-full) }
 .dashboard-loading .dashboard-loading-card {
   inline-size: 100%;
   block-size: calc(2 * var(--aml-space-48));

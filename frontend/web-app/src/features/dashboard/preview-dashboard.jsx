@@ -5,7 +5,8 @@ import { ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import {
-  BenchmarkAnalyticsSkeleton, DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardIndicatorsGrid, DashboardMetricGrid,
+  BenchmarkAnalyticsSkeleton, DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardIndicatorsGrid,
+  DashboardMetricGrid, PersonalDashboardOverview,
 } from './dashboard-layout';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
@@ -14,22 +15,35 @@ import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { BarSparkline } from '../../components/charts/sparkline';
 import { dataSeriesColors, transactionTotalColor } from '../../components/charts/charts/chart-context';
-import { modelRiskLabels } from '../settings/model-risk-settings';
-import { Box, Grid, Heading, Stack, Text } from '../../components/layout-primitives';
+import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
+import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
+import { dashboardDateKey } from './dashboard-investigation';
+import { readWorkspaceLength } from './workspace-metrics';
 import { LinkTag } from '../../components/semantic-tags';
+import { Meter } from '../../components/meter';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
 const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 3 });
+const workloadPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 1 });
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
 const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
-const PersonalWorkload = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.PersonalWorkload })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
-function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key, trend } = item;
+function UnfinishedMeter({ value, total }) {
+  const fraction = total ? workloadPercent.format(value / total) : '—';
+  return <Stack className="dashboard-unfinished-ratio">
+    <Meter className="dashboard-unfinished-meter" min={0} max={Math.max(1, total)} value={value}
+      aria-label="내 담당 미완료 업무 비율" aria-valuetext={`전체 ${count(total)} 중 ${count(value)} · ${fraction}`}
+      aria-hidden={!total || undefined} />
+    <Text className="dashboard-note">{total ? `전체 ${count(total)} 중 ${fraction}` : '내 담당 업무 없음'}</Text>
+  </Stack>;
+}
+
+function Metric({ item, reduced, trendHeight }) {
+  const { label, value, unit, detail, key, trend, total } = item;
   const hasTrend = trend?.rows.some(row => row[trend.key] > 0);
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   return <Box className="dashboard-metric">
@@ -43,8 +57,9 @@ function Metric({ item, reduced }) {
       </Text>
     </Box>
     {detail && <Text>{detail}</Text>}
+    {total !== undefined && <UnfinishedMeter value={value} total={total} />}
     {hasTrend && <Box className="dashboard-metric-trend">
-      <BarSparkline data={trend.rows} dataKey={trend.key} color={trend.color}
+      <BarSparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={trendHeight}
         dot={false} animate={!reduced} aria-label={label + ' · ' + trend.caption + ' · ' +
           trend.rows.map(row => row.label + ' ' + count(row[trend.key])).join(', ')} />
       <Text as="span" className="dashboard-note">{trend.caption}</Text>
@@ -59,26 +74,38 @@ function Metrics({ items, appearance }) {
   }))} appearance={appearance} />;
 }
 
-function DashboardIndicators({ data, mine, reduced }) {
+function personalIndicators(data) {
   const hourly = (key, color) => ({ rows: data.hourly, key, color, caption: '생성 시간대 · KST' });
-  const daily = (key, color) => ({ rows: data.operationalDaily, key, color, caption: '일별 · KST' });
-  const metrics = mine ? [
-    { label: '내 담당 미완료', value: data.unfinished },
-    { label: '고위험 Alert', value: data.highRisk, detail: '미완료 · 위험 점수 ' + modelRiskLabels().high,
-      trend: hourly('highRisk', 'var(--chart-risk-high)') },
+  const highRiskColor = 'var(--chart-risk-high)';
+  const riskDetail = '미완료 · 위험 점수 ' + modelRiskLabels().high;
+  const episodes = data.mine.filter(row => row.kind === 'Episode' && row.open && modelRiskBand(row.score) === 'high');
+  const episodesByDay = Map.groupBy(episodes, row => dashboardDateKey(row.date));
+  return [
+    { label: '내 담당 미완료', value: data.unfinished, total: data.mine.length },
+    { label: '고위험 Alert', value: data.highRisk, detail: riskDetail, trend: hourly('highRisk', highRiskColor) },
     { label: '3일 초과 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
-      trend: hourly('overdue', 'var(--chart-risk-high)') },
-  ] : [
+      trend: hourly('overdue', highRiskColor) },
+    { label: '고위험 Episode', value: episodes.length, detail: riskDetail,
+      trend: {
+        rows: data.operationalDaily.map(({ date, label }) => ({ label, count: episodesByDay.get(date)?.length ?? 0 })),
+        key: 'count', color: highRiskColor, caption: '생성일 · KST',
+      } },
+  ];
+}
+
+function DashboardIndicators({ data, mine, reduced }) {
+  const daily = (key, color) => ({ rows: data.operationalDaily, key, color, caption: '일별 · KST' });
+  const metrics = mine ? personalIndicators(data) : [
     { label: '들어온 거래 수', value: data.transactions.length, trend: daily('total', transactionTotalColor) },
     { label: '모델 의심 거래', value: data.suspicious.length, detail: '의심 비율 ' + share(data.suspicious.length, data.transactions.length),
       trend: daily('suspicious', 'var(--chart-suspect)') },
     { label: '생성 Alert', value: data.alertCases.length, trend: daily('alerts', dataSeriesColors.teal) },
   ];
-  return <DashboardIndicatorsGrid aria-label={mine ? '내 우선 업무 지표' : '기관 주요 지표'}>
-    {metrics.map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
-      <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} />
-    </Panel>)}
-  </DashboardIndicatorsGrid>;
+  const trendHeight = mine ? readWorkspaceLength('--chart-detail-sparkline-height') || undefined : undefined;
+  const cards = metrics.map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
+    <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} trendHeight={trendHeight} />
+  </Panel>);
+  return mine ? cards : <DashboardIndicatorsGrid aria-label="기관 주요 지표">{cards}</DashboardIndicatorsGrid>;
 }
 
 function EvidenceRecord({ evidence, direction }) {
@@ -141,14 +168,14 @@ function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
 export function PreviewDashboard({ mine, data, appearance }) {
   const rows = data.board?.content;
   const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} />;
+  const indicators = <DashboardIndicators data={data} mine={mine} reduced={appearance.reduced} />;
   return <Box className="preview-dashboard" data-mine={mine}>
-    <DashboardIndicators data={data} mine={mine} reduced={appearance.reduced} />
-    <React.Suspense fallback={<DashboardAnalyticsSkeleton mine={mine} reduced={appearance.reduced} />}>
-      {mine ? <Grid columns={12} className="dashboard-work-overview-grid">
-        <PersonalWorkload data={data} reduced={appearance.reduced} />
-        {summary}
-      </Grid> : <Analytics data={data} reduced={appearance.reduced} summary={summary} />}
-    </React.Suspense>
+    {mine ? <PersonalDashboardOverview recommendation={summary}>{indicators}</PersonalDashboardOverview> : <>
+      {indicators}
+      <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
+        <Analytics data={data} reduced={appearance.reduced} summary={summary} />
+      </React.Suspense>
+    </>}
     {rows ? <WorkBoard records={rows}
       mine={mine} sort={data.sort} appearance={appearance} statusByCode={data.investigation.statusByCode} /> : <DashboardBoardSkeleton />}
   </Box>;

@@ -13,7 +13,6 @@ import { dashboardPattern } from '../../mocks/dashboard-patterns';
 import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitives';
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
-import { dashboardDateKey } from './dashboard-investigation';
 import { readWorkspaceLength } from './workspace-metrics';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
 
@@ -294,31 +293,6 @@ export function Analytics({ data, reduced, summary }) {
       <InvestigationStatus data={data} reduced={reduced} episode />
     </LayoutGrid>
   </Box>;
-}
-
-const personalSeries = [
-  { key: 'Alert', label: 'Alert', color: dataSeriesColors.teal },
-  { key: 'Episode', label: 'Episode', color: dataSeriesColors.pink },
-];
-
-export function PersonalWorkload({ data, reduced }) {
-  const byDay = Map.groupBy(data.cases.filter(row => row.open && row.assigned), row => dashboardDateKey(row.date));
-  const rows = data.operationalDaily.map(({ date, label }) => {
-    const daily = byDay.get(date) ?? [];
-    return {
-      label,
-      Alert: daily.filter(row => row.kind === 'Alert').length,
-      Episode: daily.filter(row => row.kind === 'Episode').length,
-    };
-  });
-  const hasData = rows.some(row => row.Alert + row.Episode > 0);
-  return <ChartPanel title="내 미완료 업무 추이" note="생성일별 현재 미완료 · KST" className="dashboard-personal-workload"
-    hasChart={hasData}>
-    {hasData ? <>
-      <SeriesLegend series={personalSeries} />
-      <DailySeries rows={rows} series={personalSeries} reduced={reduced} label="내 미완료 업무 추이" stacked={false} />
-    </> : <Text className="dashboard-note">조회 기간에 생성된 내 미완료 업무가 없습니다.</Text>}
-  </ChartPanel>;
 }
 
 const benchmarkTotalSeries = [{ key: 'total', label: '전체 거래', color: transactionTotalColor }];

@@ -3,6 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import MagicBento from '../../components/react-bits/MagicBento';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
+import { Meter } from '../../components/meter';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
@@ -19,6 +20,15 @@ export function DashboardMetricGrid({ items, appearance, loading = false }) {
 
 export function DashboardIndicatorsGrid({ children, ...props }) {
   return <Grid as="section" columns={12} className="dashboard-priority-metrics" {...props}>{children}</Grid>;
+}
+
+export function PersonalDashboardOverview({ children, recommendation, ...props }) {
+  return <Grid columns={12} className="dashboard-personal-overview" {...props}>
+    <Grid as="section" columns={2} className="dashboard-personal-metrics" aria-label="내 우선 업무 지표">
+      {children}
+    </Grid>
+    {recommendation}
+  </Grid>;
 }
 
 function LoadingChart({ className = '', chartClass = 'dashboard-proportion-band', children, showNote = true }) {
@@ -38,11 +48,15 @@ function LoadingSeries({ className }) {
   </LoadingChart>;
 }
 
-function LoadingMetric({ detail, trend }) {
+function LoadingMetric({ detail, trend, ratio }) {
   return <Box className="dashboard-metric">
     <Skeleton className="dashboard-loading-title" />
     <Skeleton className="dashboard-loading-value" />
     {detail && <Skeleton className="dashboard-loading-note" />}
+    {ratio && <Stack className="dashboard-unfinished-ratio">
+      <Meter className="dashboard-unfinished-meter" loading />
+      <Skeleton className="dashboard-loading-note" />
+    </Stack>}
     {trend && <Skeleton className="dashboard-loading-trend" />}
   </Box>;
 }
@@ -59,13 +73,10 @@ function LoadingRecommendation({ reduced }) {
   </AISummaryPanel>;
 }
 
-export function DashboardAnalyticsSkeleton({ mine, reduced }) {
+export function DashboardAnalyticsSkeleton({ reduced }) {
   return <Box className="dashboard-analytics dashboard-loading dashboard-workflow-charts" aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
-    {mine ? <Grid columns={12} className="dashboard-work-overview-grid" aria-hidden="true">
-      <LoadingSeries className="dashboard-personal-workload" />
-      <LoadingRecommendation reduced={reduced} />
-    </Grid> : <Box aria-hidden="true" className="dashboard-analytics">
+    <Box aria-hidden="true" className="dashboard-analytics">
       <Grid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
         <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" />
@@ -84,21 +95,24 @@ export function DashboardAnalyticsSkeleton({ mine, reduced }) {
         <LoadingSeries className="dashboard-flow-status" />
         <LoadingSeries className="dashboard-flow-status" />
       </Grid>
-    </Box>}
+    </Box>
   </Box>;
 }
 
 export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
   if (benchmark) return <BenchmarkDashboardSkeleton mine={mine} appearance={appearance} />;
-  const indicators = mine ? ['unfinished', 'high-risk', 'overdue'] : ['incoming', 'suspect', 'alerts'];
+  const indicators = mine ? ['unfinished', 'high-risk-alert', 'overdue', 'high-risk-episode'] : ['incoming', 'suspect', 'alerts'];
+  const cards = indicators.map((indicator, index) => <Panel as="article" className="dashboard-priority-metric" key={indicator}>
+    <LoadingMetric detail={mine ? index > 0 : index === 1} trend={!mine || index > 0} ratio={mine && index === 0} />
+  </Panel>);
   return <Box className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 불러오는 중</Text>
-    <DashboardIndicatorsGrid aria-hidden="true">
-      {indicators.map((indicator, index) => <Panel as="article" className="dashboard-priority-metric" key={indicator}>
-        <LoadingMetric detail={mine ? index > 0 : index === 1} trend={!mine || index > 0} />
-      </Panel>)}
-    </DashboardIndicatorsGrid>
-    <DashboardAnalyticsSkeleton mine={mine} reduced={appearance.reduced} />
+    {mine ? <PersonalDashboardOverview aria-hidden="true" recommendation={<LoadingRecommendation reduced={appearance.reduced} />}>
+      {cards}
+    </PersonalDashboardOverview> : <>
+      <DashboardIndicatorsGrid aria-hidden="true">{cards}</DashboardIndicatorsGrid>
+      <DashboardAnalyticsSkeleton reduced={appearance.reduced} />
+    </>}
     <DashboardBoardSkeleton />
   </Box>;
 }
