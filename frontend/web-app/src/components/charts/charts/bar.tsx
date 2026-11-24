@@ -443,11 +443,10 @@ const BarInner = memo(function BarInner({
           // Segment spans [offset, offset + value]; `valuePos` is the
           // position of `value` alone, so it is not this segment's end.
           barW = (scale(offset + value) ?? 0) - x;
-          // Apply stack gap for horizontal: shift right and reduce width
-          const gapOffset = seriesIndex * stackGap;
-          x += gapOffset;
-          if (!isLastSeries && stackGap > 0) {
-            barW = Math.max(0, barW - stackGap);
+          // Leave the stack endpoints in place and inset only before a visible neighbor.
+          if (stackGap > 0 && value > 0 && lines.slice(seriesIndex + 1)
+            .some(line => typeof d[line.dataKey] === "number" && Number(d[line.dataKey]) > 0)) {
+            barW -= Math.min(stackGap, barW / 2);
           }
         } else {
           // Grow from the zero line in either direction (zeroX is 0 for

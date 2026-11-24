@@ -225,7 +225,9 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
     ? baseline == null ? '기간 내 마지막 배정 기록 · 분석가 명단 미제공'
       : `기간 내 마지막 배정 기록 · 등록 분석가 ${integer.format(staffCount)}명`
     : `전체 미완료 ${count(total)} · 선택 기간 생성 업무`;
-  const color = showAssignments ? dataSeriesColors.teal : transactionTotalColor;
+  const color = showAssignments ? dataSeriesColors.sky : transactionTotalColor;
+  const stackGap = readChartNumber('--aml-space-2', 2);
+  const cornerRadius = readChartNumber('--aml-radius-small', 4);
   const animationDuration = reduced ? 0 : readChartNumber('--chart-dashboard-enter-duration', 340);
   return <ChartPanel title={title} note={note} className="dashboard-priority-metric dashboard-staff-metric" hasChart={rows.length > 0}>
     {baseline != null && <Box className="dashboard-staff-reference-key">
@@ -249,8 +251,8 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
           <BarChart data={rows} xDataKey="id" orientation="horizontal" stacked={!showAssignments}
             aspectRatio="auto" horizontalValueDomain={[0, upperBound]} margin={noMargin}
             barGap={readChartNumber('--chart-staff-bar-gap-ratio', 0.24)} animationDuration={animationDuration}>
-            <Bar dataKey="value" fill={color} lineCap="round" animate={!reduced} />
-            {!showAssignments && <Bar dataKey="overdue" fill={flowColors.suspect} lineCap="round" animate={!reduced} />}
+            <Bar dataKey="value" fill={color} lineCap={cornerRadius} stackGap={showAssignments ? undefined : stackGap} animate={!reduced} />
+            {!showAssignments && <Bar dataKey="overdue" fill={flowColors.suspect} lineCap={cornerRadius} stackGap={stackGap} animate={!reduced} />}
             <ChartTooltip showDatePill={false} showDots={false} rows={person => showAssignments
               ? [{ label: person.name, value: count(person.count), color }]
               : [{ label: '현재 미완료', value: count(person.total), color },
