@@ -1,26 +1,37 @@
 .glide-select {
   --gs-accent: var(--focus-ring, CanvasText);
   --gs-surface: var(--information-panel-surface, Canvas);
-  --gs-highlight: var(--hover, color-mix(in srgb, CanvasText 12%, transparent));
+  --gs-highlight: var(--hover);
   --gs-text: var(--text, CanvasText);
-  --gs-radius: var(--aml-radius-card);
+  --gs-radius: var(--aml-radius-select-menu);
   --gs-inner-radius: var(--aml-radius-control);
-  --gs-chip: 32px;
-  --gs-row: 30px;
-  --gs-font: 13px;
-  --gs-menu-w: 176px;
-  --gs-pop: 180ms;
-  --gs-pop-out: 120ms;
-  --gs-glide: 220ms;
+  --gs-chip: var(--aml-size-select-trigger);
+  --gs-row: var(--aml-size-select-option);
+  --gs-font: var(--aml-type-select);
+  --gs-menu-w: var(--aml-size-select-menu);
+  --gs-pop: var(--aml-duration-normal);
+  --gs-pop-out: var(--aml-duration-fast);
+  --gs-glide: var(--aml-duration-selection-highlight);
   --gs-origin: top left;
-  --gs-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   position: relative;
   display: inline-block;
 }
 
+.glide-select[data-size='sm'] {
+  --gs-chip: var(--aml-size-select-trigger-compact);
+  --gs-row: var(--aml-size-select-option-compact);
+  --gs-font: var(--aml-type-select-compact);
+}
+
+.glide-select[data-size='lg'] {
+  --gs-chip: var(--aml-size-select-trigger-comfortable);
+  --gs-row: var(--aml-size-select-option-comfortable);
+  --gs-font: var(--aml-type-select-comfortable);
+}
+
 .glide-select[data-disabled] {
-  opacity: 0.5;
+  opacity: var(--aml-opacity-disabled);
 }
 
 .glide-select__trigger {
@@ -30,7 +41,7 @@
   gap: var(--aml-space-6);
   height: var(--gs-chip);
   margin: 0;
-  padding: 0 var(--aml-space-8) 0 10px;
+  padding: 0 var(--aml-space-8) 0 var(--aml-space-10);
   border: 0;
   border-radius: var(--gs-inner-radius);
   background: var(--gs-surface);
@@ -46,8 +57,8 @@
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   transition:
-    background-color 100ms ease,
-    transform 160ms var(--gs-ease-out);
+    background-color var(--aml-duration-control-hover) ease,
+    transform var(--aml-duration-control-transition) var(--aml-ease-decelerate);
 }
 
 .glide-select__trigger:disabled {
@@ -60,58 +71,58 @@
 
 @media (hover: hover) and (pointer: fine) {
   .glide-select__trigger:not(:disabled):hover {
-    background: color-mix(in srgb, var(--gs-highlight) 60%, var(--gs-surface));
+    background: color-mix(in srgb, var(--gs-highlight) var(--aml-opacity-select-highlight), var(--gs-surface));
   }
 }
 
 .glide-select__trigger[aria-expanded='true'] {
-  background: color-mix(in srgb, var(--gs-highlight) 60%, var(--gs-surface));
+  background: color-mix(in srgb, var(--gs-highlight) var(--aml-opacity-select-highlight), var(--gs-surface));
 }
 
 .glide-select__trigger:not(:disabled):active {
-  transform: scale(0.97);
+  transform: scale(var(--aml-motion-press-scale));
 }
 
 .glide-select__label[data-empty] {
-  opacity: 0.6;
+  opacity: var(--aml-opacity-secondary-label);
 }
 
 .glide-select[data-swap] .glide-select__label {
-  animation: gs-swap 160ms ease;
+  animation: gs-swap var(--aml-duration-control-transition) ease;
 }
 
 @keyframes gs-swap {
   from {
-    opacity: 0.6;
-    filter: blur(2px);
+    opacity: var(--aml-opacity-secondary-label);
+    filter: blur(var(--aml-space-2));
   }
 }
 
 .glide-select__chevron {
   display: inline-flex;
-  color: color-mix(in srgb, var(--gs-text) 55%, transparent);
-  transition: transform 200ms var(--gs-ease-out);
+  color: color-mix(in srgb, var(--gs-text) var(--aml-content-muted-strength), transparent);
+  transition: transform var(--aml-duration-feedback-transition) var(--aml-ease-decelerate);
 }
 
 .glide-select__trigger[aria-expanded='true'] .glide-select__chevron {
-  transform: rotate(180deg);
+  transform: rotate(var(--aml-rotation-flip));
 }
 
 .glide-select__menu {
   position: absolute;
-  z-index: 20;
+  z-index: var(--aml-layer-popover);
   width: var(--gs-menu-w);
   min-width: 100%;
   padding: var(--aml-space-4);
   border-radius: var(--gs-radius);
   background: var(--gs-surface);
-  box-shadow: 0 var(--aml-space-4) var(--aml-space-16) color-mix(in srgb, var(--aml-black-100) 22%, transparent);
+  box-shadow: var(--aml-shadow-select-menu);
   transform-origin: var(--gs-origin);
   opacity: 0;
-  transform: scale(0.95);
+  transform: scale(var(--aml-motion-overlay-enter-scale));
   transition:
-    opacity var(--gs-pop) var(--gs-ease-out),
-    transform var(--gs-pop) var(--gs-ease-out);
+    opacity var(--gs-pop) var(--aml-ease-decelerate),
+    transform var(--gs-pop) var(--aml-ease-decelerate);
 }
 
 .glide-select__menu[data-state='open'] {
@@ -123,6 +134,8 @@
   transition-duration: var(--gs-pop-out);
   pointer-events: none;
 }
+
+.glide-select__menu[data-instant] { transition-duration: var(--aml-duration-instant) }
 
 .glide-select__menu[data-side='bottom'] {
   top: calc(100% + var(--aml-space-6));
@@ -143,6 +156,11 @@
 .glide-select__menu:popover-open {
   position: fixed;
   inset: auto;
+  left: var(--gs-positioned-left, auto);
+  top: var(--gs-positioned-top, auto);
+  bottom: var(--gs-positioned-bottom, auto);
+  width: var(--gs-positioned-width, var(--gs-menu-w));
+  max-height: var(--gs-positioned-height, none);
   min-width: 0;
   margin: 0;
   border: 0;
@@ -154,7 +172,7 @@
 .glide-select__list {
   position: relative;
   display: grid;
-  gap: 1px;
+  gap: var(--aml-space-1);
   touch-action: none;
 }
 
@@ -179,20 +197,23 @@
   border-radius: var(--gs-inner-radius);
   background: var(--gs-highlight);
   opacity: 0;
+  transform: translateY(var(--gs-pill-offset, var(--aml-space-0)));
   pointer-events: none;
   transition:
-    transform var(--gs-glide) var(--gs-ease-out),
-    opacity 150ms ease;
+    transform var(--gs-glide) var(--aml-ease-decelerate),
+    opacity var(--aml-duration-highlight-fade) ease;
 }
+
+.glide-select__pill[data-visible] { opacity: 1 }
+.glide-select__pill[data-jump] { transition-duration: var(--aml-duration-instant), var(--aml-duration-highlight-fade) }
 
 .glide-select__option {
   position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: var(--aml-space-8);
   height: var(--gs-row);
-  padding: 0 var(--aml-space-8) 0 10px;
+  padding: 0 var(--aml-space-8) 0 var(--aml-space-10);
   border-radius: var(--gs-inner-radius);
   color: var(--gs-text);
   font-size: var(--gs-font);
@@ -200,11 +221,11 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 150ms ease;
+  transition: background-color var(--aml-duration-highlight-fade) ease;
 }
 
 .glide-select__option[aria-selected='true'] {
-  background: color-mix(in srgb, var(--gs-highlight) 60%, transparent);
+  background: color-mix(in srgb, var(--gs-highlight) var(--aml-opacity-select-highlight), transparent);
 }
 
 .glide-select__list[data-live] .glide-select__option[aria-selected='true'] {
@@ -222,8 +243,8 @@
 
 .glide-select__tag {
   flex-shrink: 0;
-  color: color-mix(in srgb, var(--gs-text) 55%, transparent);
-  font-size: calc(var(--gs-font) - 2px);
+  color: color-mix(in srgb, var(--gs-text) var(--aml-content-muted-strength), transparent);
+  font-size: calc(var(--gs-font) - var(--aml-space-2));
 }
 
 .glide-select__check {
@@ -237,33 +258,9 @@
   visibility: visible;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .glide-select__menu {
-    transform: none !important;
-    transition: opacity var(--gs-pop) ease;
-  }
-
-  .glide-select__menu[data-state='closed'] {
-    transition-duration: var(--gs-pop-out);
-  }
-
-  .glide-select__pill {
-    transition: opacity 150ms ease;
-  }
-
-  .glide-select__chevron {
-    transition: none;
-  }
-
-  .glide-select__trigger {
-    transition: background-color 100ms ease;
-  }
-
-  .glide-select__trigger:not(:disabled):active {
-    transform: none;
-  }
-
-  .glide-select[data-swap] .glide-select__label {
-    animation: none;
-  }
+.glide-select[data-motion-reduced] :is(.glide-select__menu, .glide-select__pill, .glide-select__chevron, .glide-select__trigger) {
+  transition: none;
 }
+
+.glide-select[data-motion-reduced] :is(.glide-select__menu, .glide-select__trigger:not(:disabled):active) { transform: none }
+.glide-select[data-motion-reduced][data-swap] .glide-select__label { animation: none }
