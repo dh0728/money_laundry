@@ -65,6 +65,15 @@
   --aml-duration-highlight-fade: 150ms;
   --aml-duration-selection-highlight: 220ms;
   --aml-rotation-flip: .5turn;
+  --aml-stroke-status-icon: 2;
+  --aml-type-status-label-size: 14px;
+  --aml-type-status-line-height: 1.25;
+  --aml-duration-status-reveal: 240ms;
+  --aml-duration-status-strike: 280ms;
+  --aml-opacity-status-fill: .06;
+  --aml-opacity-progress-track: .2;
+  --aml-opacity-status-label: .65;
+  --aml-path-length-unit: 1;
   --brand-accent: var(--selection-surface);
   --brand-color: var(--brand-accent);
   --brand-control-surface: var(--selection-surface);

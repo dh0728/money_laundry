@@ -132,8 +132,7 @@ function ResultSamples() {
   return <>
     <Box as="label" className="catalogue-status-select">처리 상태 <NativeSelect className="aml-native-select" value={status} onChange={event => setStatus(event.target.value)}
       options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))} /></Box>
-    <StatusMark status={status} label={statusLabels[status]} color="var(--text)"
-      doneColor="var(--tag-positive-ink)" errorColor="var(--tag-danger-ink)" strike={false} />
+    <StatusMark status={status} label={statusLabels[status]} color="var(--text)" strike={false} />
     <ActionButton className="row" shape="pill" surface="floating" onClick={() => document.dispatchEvent(new CustomEvent('aml:result', {
       detail: { status, title: statusLabels[status] },
     }))}>결과 알림 표시</ActionButton>

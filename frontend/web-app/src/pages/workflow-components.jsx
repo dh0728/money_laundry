@@ -105,7 +105,7 @@ function ResultStatus({ status, children }) {
     return <Text as="span" className="workflow-static-status" role="status"><Icon className="icon" aria-hidden="true" />{label}</Text>;
   }
   return <Box role="status"><StatusMark status={status} label={label}
-    size={16} strike={false} doneColor="currentColor" errorColor="currentColor" /></Box>;
+    size="var(--aml-size-icon-small)" strike={false} doneColor="currentColor" errorColor="currentColor" /></Box>;
 }
 
 function announce(detail) {

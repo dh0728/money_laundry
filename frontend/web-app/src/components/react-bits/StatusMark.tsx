@@ -1,10 +1,16 @@
 'use client';
 
-import React, { useEffect, useEffectEvent, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import React, { useEffect, useEffectEvent, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { animate, useMotionValue } from 'motion/react';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './StatusMark.css';
+
+declare module 'react' {
+  interface CSSProperties {
+    [name: `--sm-${string}`]: string | number | undefined;
+  }
+}
 
 export type StatusMarkStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -15,7 +21,7 @@ export interface StatusMarkProps {
   color?: string;
   doneColor?: string;
   errorColor?: string;
-  size?: number;
+  size?: number | string;
   strokeWidth?: number;
   dashes?: number;
   fontSize?: number;
@@ -26,7 +32,6 @@ export interface StatusMarkProps {
   strike?: boolean;
   strikeDelay?: number;
   className?: string;
-  style?: CSSProperties;
 }
 
 const UI = { type: 'spring' as const, duration: 0.3, bounce: 0 };
@@ -48,24 +53,23 @@ const StatusMark: React.FC<StatusMarkProps> = ({
   status = 'pending',
   progress,
   label,
-  color = 'currentColor',
-  doneColor = '#22c55e',
-  errorColor = '#ef4444',
-  size = 20,
-  strokeWidth = 2,
+  color,
+  doneColor,
+  errorColor,
+  size,
+  strokeWidth,
   dashes = 8,
-  fontSize = 14,
+  fontSize,
   spinDuration = 1100,
   arcLength = 0.68,
-  drawDuration = 240,
-  fillOpacity = 0.06,
+  drawDuration,
+  fillOpacity,
   strike = true,
-  strikeDelay = 60,
-  className = '',
-  style
+  strikeDelay,
+  className = ''
 }) => {
   const reduce = useAppReducedMotion();
-  const r = 10 - strokeWidth / 2;
+  const r = strokeWidth == null ? 9 : 10 - strokeWidth / 2;
   const C = 2 * Math.PI * r;
   const P = C / Math.max(1, dashes);
   const determinate = status === 'running' && typeof progress === 'number' && Number.isFinite(progress);
@@ -140,28 +144,23 @@ const StatusMark: React.FC<StatusMarkProps> = ({
     <span
       className={`status-mark${className ? ` ${className}` : ''}`}
       data-status={status}
-      data-indeterminate={indeterminate ? '' : undefined}
+      data-motion-reduced={reduce || undefined}
       data-strike={strike ? '' : undefined}
-      style={
-        {
-          '--sm-size': `${size}px`,
-          '--sm-stroke': strokeWidth,
-          '--sm-color': color,
-          '--sm-done': doneColor,
-          '--sm-error': errorColor,
-          '--sm-fill': fillOpacity,
-          '--sm-font': `${fontSize}px`,
-          '--sm-draw': `${drawDuration}ms`,
-          '--sm-strike-delay': `${120 + strikeDelay}ms`,
-          ...style
-        } as CSSProperties
-      }
+      style={{
+        '--sm-size': typeof size === 'number' ? `${size}px` : size,
+        '--sm-stroke': strokeWidth,
+        '--sm-color': color,
+        '--sm-done': doneColor,
+        '--sm-error': errorColor,
+        '--sm-fill': fillOpacity,
+        '--sm-font': fontSize == null ? undefined : `${fontSize}px`,
+        '--sm-draw': drawDuration == null ? undefined : `${drawDuration}ms`,
+        '--sm-strike-delay': strikeDelay == null ? undefined : `${120 + strikeDelay}ms`
+      }}
     >
       <svg
         className="status-mark__glyph"
         viewBox="0 0 24 24"
-        width={size}
-        height={size}
         role={hasLabel ? undefined : 'img'}
         aria-label={hasLabel ? undefined : spoken}
         aria-hidden={hasLabel || undefined}
@@ -171,7 +170,7 @@ const StatusMark: React.FC<StatusMarkProps> = ({
         <path className="status-mark__check" d={CHECK} pathLength="1" />
         <path className="status-mark__cross" d={CROSS} pathLength="1" />
       </svg>
-      {hasLabel ? <span className="status-mark__sr">{spoken}: </span> : null}
+      {hasLabel ? <span className="visually-hidden">{spoken}: </span> : null}
       {hasLabel ? (
         <span className="status-mark__label">
           {label}
