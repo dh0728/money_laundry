@@ -52,6 +52,6 @@ export default defineConfig([
     ignores: ['src/test/**', 'src/mocks/**', '**/*.test.*', '**/*.stories.*'],
     plugins: { 'react-hooks': reactHooks },
   },
-  // 디자인 규칙 트리(scripts/design-rules.mjs): 분류 → 규칙. 오류 규칙은 여기서 바로 막고, 상한 규칙은 pnpm lint:design이 센다.
+  // 디자인 규칙 트리를 편집 중에 표시하고, 커밋 전 lint:design에서 전체 상한을 검사한다.
   ...designEslintConfig,
 ])

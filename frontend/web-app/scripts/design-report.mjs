@@ -5,21 +5,17 @@
 //   --strict       상한과 예외 없이 위반 0건을 요구한다
 //   --json         기계용 출력
 // 실패 조건: error 규칙 위반 1건 이상, ratchet 규칙이 상한 초과·상한보다 적음(--update로 내린다), 예외 파일 형식 오류·만료.
-process.env.AML_DESIGN_ALL = '1'
-const { readFileSync, writeFileSync } = await import('node:fs')
-const { resolve } = await import('node:path')
+const { writeFileSync } = await import('node:fs')
 const { ESLint } = await import('eslint')
 const { default: stylelint } = await import('stylelint')
 const { designRuleTree, designRules, pluginRuleName } = await import('./design-rules.mjs')
-const { appRoot, rel, exceptions, stylelintPlugins, designStylelintRules } = await import('./design-lint-plugin.mjs')
+const { appRoot, rel, baseline, baselinePath, exceptions, stylelintPlugins, designStylelintRules } = await import('./design-lint-plugin.mjs')
 
 const args = process.argv.slice(2)
 const flag = name => args.includes(name)
 const strict = flag('--strict')
 if (strict && flag('--update')) throw new Error('--strict와 --update는 함께 쓸 수 없다.')
 const only = args.includes('--rule') ? args[args.indexOf('--rule') + 1] : undefined
-const baselinePath = resolve(appRoot, 'scripts/design-baseline.json')
-const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'))
 const byPlugin = new Map(designRules.map(rule => [pluginRuleName(rule.id), rule.id]))
 const hits = new Map(designRules.map(rule => [rule.id, []]))
 

@@ -13,6 +13,8 @@ export const isAppSource = path => path.startsWith('src/') && !NOT_APP.test(path
 export const isTokenFile = path => /^src\/styles\/[^/]+\.css$/.test(path)
 export const exceptionsPath = resolve(appRoot, 'scripts/design-exceptions.json')
 export const exceptions = JSON.parse(readFileSync(exceptionsPath, 'utf8'))
+export const baselinePath = resolve(appRoot, 'scripts/design-baseline.json')
+export const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'))
 const excepted = (ruleId, path) => exceptions.some(entry => entry.rule === ruleId && entry.file === path)
 const inside = (path, prefixes) => prefixes.some(prefix => prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix)
 
@@ -518,8 +520,8 @@ export const stylelintPlugins = [
 ]
 
 // ---------- 설정 ----------
-/** error 규칙은 늘 켜고, ratchet 규칙은 `pnpm lint:design`(AML_DESIGN_ALL=1)에서만 센다. */
-const levelOf = rule => rule.level === 'error' ? 'error' : process.env.AML_DESIGN_ALL ? 'warn' : 'off'
+/** 일반 편집기 검사에서도 위반을 표시하고, 0건에 도달한 규칙은 오류로 막는다. */
+const levelOf = rule => rule.level === 'error' || baseline[rule.id] === 0 ? 'error' : 'warn'
 const enginesOf = rule => rule.engine.split('+')
 export const designEslintConfig = [{
   files: ['src/**/*.{js,jsx,ts,tsx}'],
@@ -534,4 +536,4 @@ export const designEslintConfig = [{
   rules: { [pluginRuleName(rule.id)]: 'error' },
 }))]
 export const designStylelintRules = Object.fromEntries(designRules.filter(rule => enginesOf(rule).includes('stylelint'))
-  .map(rule => [pluginRuleName(rule.id), levelOf(rule) === 'off' ? null : [true, { severity: levelOf(rule) === 'warn' ? 'warning' : 'error' }]]))
+  .map(rule => [pluginRuleName(rule.id), [true, { severity: levelOf(rule) === 'warn' ? 'warning' : 'error' }]]))

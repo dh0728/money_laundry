@@ -12,6 +12,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint . && stylelint \"src/**/*.css\"",
     "lint:design": "node scripts/design-report.mjs",
+    "lint:design:staged": "node scripts/design-report-staged.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "storybook": "storybook dev --host 127.0.0.1 --port 6006 --no-open --ci --disable-telemetry",

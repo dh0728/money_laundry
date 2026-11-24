@@ -11,6 +11,10 @@ pre-commit:
       root: frontend/web-app/
       glob: "*.css"
       run: pnpm exec stylelint {staged_files}
+    design-rules:
+      root: frontend/web-app/
+      glob: "*.{js,jsx,ts,tsx,css,mjs,json}"
+      run: pnpm run lint:design:staged
 
 pre-push:
   commands:

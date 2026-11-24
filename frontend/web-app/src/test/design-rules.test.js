@@ -103,17 +103,28 @@ describe('automation', () => {
     }
     for (const step of ['pnpm run lint\n', 'pnpm run lint:design --strict', 'pnpm test', 'pnpm run build', 'VITE_API_MODE: live']) expect(ci).toContain(step);
   });
-  it('lefthook이 커밋 전 eslint·stylelint, push 전 lint:design을 돈다', () => {
+  it('lefthook이 커밋 전 eslint·stylelint·lint:design, push 전 lint:design을 돈다', () => {
     const hooks = readFileSync(resolve(repo, 'lefthook.yml'), 'utf8');
-    expect(hooks).toMatch(/pre-commit:[^]*eslint[^]*stylelint/);
-    expect(hooks).toMatch(/pre-push:[^]*lint:design/);
+    const [preCommit, prePush] = hooks.split(/^pre-push:/m);
+    expect(preCommit).toMatch(/pre-commit:[^]*eslint[^]*stylelint[^]*run: pnpm run lint:design:staged/);
+    expect(prePush).toContain('run: pnpm run lint:design');
+    expect(json('package.json').scripts['lint:design:staged']).toBe('node scripts/design-report-staged.mjs');
     expect(json('package.json').scripts.prepare).toContain('lefthook');
   });
 });
 
 describe('component/raw-element', () => {
+  it('기본 검사에서도 화면의 맨 태그를 표시한다', async () => {
+    const { ESLint } = await import('eslint');
+    const [result] = await new ESLint({ cwd: app }).lintText('export const Sample = () => <div />;', {
+      filePath: resolve(app, 'src/features/dashboard/sample.jsx'),
+    });
+    expect(result.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: 'aml/component-raw-element' }),
+    ]));
+  }, 30000);
+
   it('Box·Text의 as로 버튼을 숨기거나 누르는 상자를 만들면 걸린다', async () => {
-    process.env.AML_DESIGN_ALL = '1';
     const { ESLint } = await import('eslint');
     const code = "import { Box } from '../../components/layout-primitives';\n" +
       'export const A = () => <Box as="button">x</Box>;\nexport const B = () => <Box as="section" onClick={() => 1}>x</Box>;\n';
