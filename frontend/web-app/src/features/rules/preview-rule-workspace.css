@@ -273,7 +273,7 @@
   }
   .screen-rule-editor :is(input[data-slot="input"], textarea[data-slot="textarea"]),
   .rule-review-dialog textarea {
-    font-size: max(16px, var(--ui-font-size));
+    font-size: max(var(--aml-type-section-title-size), var(--ui-font-size));
   }
 }
 

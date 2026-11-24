@@ -29,8 +29,8 @@
   color: light-dark(#18181b, #fafafa);
   box-shadow:
     0 0 0 1px light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08)),
-    0 -12px 40px -16px rgb(0 0 0 / 0.35),
-    0 24px 48px -24px var(--aml-black-040);
+    0 calc(-1 * var(--aml-space-12)) var(--aml-space-40) calc(-1 * var(--aml-space-16)) rgb(0 0 0 / 0.35),
+    0 var(--aml-space-24) var(--aml-space-48) calc(-1 * var(--aml-space-24)) var(--aml-black-040);
   transform-origin: 50% 0;
   will-change: transform;
 }

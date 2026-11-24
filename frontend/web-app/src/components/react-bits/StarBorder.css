@@ -12,7 +12,7 @@
   background: var(--star-border-surface);
   color: var(--star-border-text);
   font: inherit;
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
   line-height: 1.25;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
@@ -44,7 +44,7 @@ a.star-border {
 }
 
 .star-border:focus-visible {
-  outline: 2px solid var(--star-border-track);
+  outline: var(--aml-stroke-focus) solid var(--star-border-track);
   outline-offset: 3px;
 }
 

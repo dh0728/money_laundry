@@ -52,7 +52,7 @@
   color: var(--bt-color);
   font: inherit;
   font-size: var(--bt-fs);
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
   line-height: 1;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -134,12 +134,12 @@
 }
 
 .bell-toggle__wave--left {
-  right: calc(100% - 2px);
+  right: calc(100% - var(--aml-space-2));
   transform-origin: 100% 100%;
 }
 
 .bell-toggle__wave--right {
-  left: calc(100% - 2px);
+  left: calc(100% - var(--aml-space-2));
   transform-origin: 0% 100%;
 }
 
@@ -157,7 +157,7 @@
   background: var(--bt-badge);
   color: var(--bt-badge-ink);
   font-size: 9.5px;
-  font-weight: 600;
+  font-weight: var(--aml-type-body-strong-weight);
   line-height: 1;
   opacity: 0;
   transform: translateY(5px) scale(0.6);

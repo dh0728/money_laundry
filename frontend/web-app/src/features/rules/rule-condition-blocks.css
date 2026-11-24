@@ -45,7 +45,7 @@
 [data-rule-builder] svg { width: 1em; height: 1em; flex: none; }
 [data-rule-builder] :is(button, fieldset):focus-visible {
   outline: var(--aml-stroke-focus) solid var(--aml-focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--aml-space-2);
 }
 [data-rule-builder] button:not(:disabled, [aria-disabled="true"]):hover { background: var(--rule-block-hover); }
 [data-rule-sr-only] {

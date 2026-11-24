@@ -473,7 +473,7 @@
   inline-size: var(--aml-space-16);
   block-size: 0;
   border: 0;
-  border-block-start: 2px dashed var(--chart-completion);
+  border-block-start: var(--aml-stroke-focus) dashed var(--chart-completion);
   border-radius: 0;
 }
 .dashboard-status-area svg path[stroke-linecap="round"] { stroke-linejoin: round }

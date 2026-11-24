@@ -69,7 +69,7 @@
 @media (pointer: coarse) {
   .workflow-threshold [data-slot="input"] {
     min-block-size: max(44px, var(--aml-panel-control-size));
-    font-size: max(16px, var(--ui-font-size));
+    font-size: max(var(--aml-type-section-title-size), var(--ui-font-size));
   }
 }
 .backtest-result-summary {

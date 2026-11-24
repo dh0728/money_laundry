@@ -68,7 +68,7 @@
   color: var(--bm-muted);
   font: inherit;
   font-size: calc(var(--bm-font) + 1px);
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
   text-align: left;
   cursor: pointer;
   outline: none;
@@ -168,7 +168,7 @@
 
 .branched-menu__item[data-active] {
   color: var(--bm-accent);
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
 }
 
 .branched-menu__icon {

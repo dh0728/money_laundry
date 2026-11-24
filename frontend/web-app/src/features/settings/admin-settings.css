@@ -40,7 +40,7 @@
   touch-action: none;
 }
 .model-risk-slider-thumb:active { cursor: grabbing; }
-.model-risk-slider-thumb:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.model-risk-slider-thumb:focus-visible { outline: var(--aml-stroke-focus) solid var(--focus-ring); outline-offset: var(--aml-space-2); }
 .model-risk-slider-thumb[aria-disabled="true"] { cursor: default; }
 .model-risk-legend {
   display: flex;

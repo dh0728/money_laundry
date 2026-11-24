@@ -6,7 +6,7 @@
   --sc-radius: 9px;
   --sc-font: 18px;
   --sc-ring: 2px;
-  --sc-gap: 12px;
+  --sc-gap: var(--aml-space-12);
   --sc-row: 44px;
   --sc-rule: 1.5px;
   --sc-origin: left center;
@@ -23,7 +23,7 @@
   color: var(--sc-ink);
   font-family: inherit;
   font-size: var(--sc-font);
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
   line-height: 1.2;
   letter-spacing: -0.01em;
   text-align: left;
@@ -54,7 +54,7 @@
 }
 
 .spring-check:focus-visible .spring-check__press {
-  outline: 2px solid color-mix(in srgb, var(--sc-ink) 45%, transparent);
+  outline: var(--aml-stroke-focus) solid color-mix(in srgb, var(--sc-ink) 45%, transparent);
   outline-offset: 3px;
 }
 

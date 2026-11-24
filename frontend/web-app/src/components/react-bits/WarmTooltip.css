@@ -96,8 +96,8 @@
   background: var(--wt-surface);
   color: var(--wt-ink);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.12),
-    0 8px 24px -8px rgba(0, 0, 0, 0.45);
+    0 1px var(--aml-space-2) rgba(0, 0, 0, 0.12),
+    0 var(--aml-space-8) var(--aml-space-24) calc(-1 * var(--aml-space-8)) rgba(0, 0, 0, 0.45);
   transform-origin: var(--wt-origin);
 }
 
@@ -114,7 +114,7 @@
   align-items: center;
   gap: 7px;
   font-size: var(--wt-font);
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
   line-height: 1.2;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -131,7 +131,7 @@
   color: color-mix(in srgb, var(--wt-ink) 72%, transparent);
   font-family: inherit;
   font-size: 0.86em;
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
 }

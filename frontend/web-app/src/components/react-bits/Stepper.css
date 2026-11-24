@@ -2,8 +2,8 @@
   --stepper-pad: 0px;
   --stepper-inset: 0px;
   --stepper-bleed: 8px;
-  --stepper-well-radius: max(6px, calc(var(--stepper-radius) - 8px));
-  --stepper-tile-radius: max(4px, calc(var(--stepper-well-radius) - 4px));
+  --stepper-well-radius: max(var(--aml-radius-control), calc(var(--stepper-radius) - 8px));
+  --stepper-tile-radius: max(var(--aml-radius-small), calc(var(--stepper-well-radius) - var(--aml-radius-small)));
   position: relative;
   display: flex;
   flex-direction: column;
@@ -18,7 +18,7 @@
 
 .stepper--framed {
   --stepper-pad: 8px;
-  --stepper-inset: 12px;
+  --stepper-inset: var(--aml-space-12);
   --stepper-bleed: 20px;
   padding: var(--stepper-pad);
   background: var(--stepper-frame);
@@ -100,7 +100,7 @@
   box-shadow: inset 0 0 0 1px var(--stepper-faint);
   color: var(--stepper-muted);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: var(--aml-type-body-strong-weight);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   transition:
@@ -137,7 +137,7 @@
 .stepper__title {
   overflow: hidden;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--aml-type-body-strong-weight);
   line-height: 1.2;
   color: var(--stepper-muted);
   text-overflow: ellipsis;
@@ -151,7 +151,7 @@
 
 .stepper__description {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--aml-type-caption-size);
   line-height: 1.35;
   color: var(--stepper-muted);
   text-overflow: ellipsis;
@@ -260,18 +260,18 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 20px var(--stepper-inset) var(--stepper-inset);
+  padding: var(--aml-space-20) var(--stepper-inset) var(--stepper-inset);
 }
 
 .stepper__viewport {
   position: relative;
-  margin: -6px calc(var(--stepper-bleed) * -1);
+  margin: calc(-1 * var(--aml-space-6)) calc(var(--stepper-bleed) * -1);
   overflow: hidden;
 }
 
 .stepper__pane {
   box-sizing: border-box;
-  padding: 6px var(--stepper-bleed);
+  padding: var(--aml-space-6) var(--stepper-bleed);
   outline: none;
 }
 
@@ -328,7 +328,7 @@
   border-radius: max(8px, calc(var(--stepper-radius) * 0.5));
   font-family: inherit;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: var(--aml-type-body-strong-weight);
   line-height: 1;
   cursor: pointer;
   transition:
@@ -359,7 +359,7 @@
   margin-left: auto;
   padding-right: 11px;
   background: var(--stepper-solid);
-  box-shadow: 0 4px 12px -6px var(--aml-black-050);
+  box-shadow: 0 var(--aml-space-4) var(--aml-space-12) calc(-1 * var(--aml-space-6)) var(--aml-black-050);
   color: var(--stepper-solid-ink);
 }
 
@@ -372,8 +372,8 @@
 .stepper__segment:focus-visible,
 .stepper__dot:focus-visible,
 .stepper__bar:focus-visible {
-  outline: 2px solid var(--stepper-ink);
-  outline-offset: 2px;
+  outline: var(--aml-stroke-focus) solid var(--stepper-ink);
+  outline-offset: var(--aml-space-2);
 }
 
 .stepper--vertical {
@@ -390,7 +390,7 @@
 
 .stepper--vertical .stepper__body {
   flex: 1;
-  padding: var(--stepper-inset) var(--stepper-inset) var(--stepper-inset) 20px;
+  padding: var(--stepper-inset) var(--stepper-inset) var(--stepper-inset) var(--aml-space-20);
 }
 
 @media (hover: hover) {

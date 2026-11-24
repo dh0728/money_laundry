@@ -3,7 +3,7 @@
   --rs-thumb: #fafafa;
   --rs-ink: #fafafa;
   --rs-ink-active: #18181b;
-  --rs-radius: 10px;
+  --rs-radius: var(--aml-radius-card);
   --rs-inset: 3px;
   --rs-thumb-radius: 7px;
   --rs-h: 36px;
@@ -55,7 +55,7 @@
   opacity: var(--rs-idle);
   font: inherit;
   font-size: var(--rs-font);
-  font-weight: 500;
+  font-weight: var(--aml-type-label-weight);
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
@@ -83,7 +83,7 @@
 }
 
 .rubber-segment__item:focus-visible {
-  outline: 2px solid var(--rs-thumb);
+  outline: var(--aml-stroke-focus) solid var(--rs-thumb);
   outline-offset: 3px;
 }
 
