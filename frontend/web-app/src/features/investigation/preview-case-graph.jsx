@@ -26,7 +26,7 @@ import { CountTag, LinkTag, ModelScoreTag } from '../../components/semantic-tags
 import { caseGroupColor, caseMembership } from '../graph/graph-case-groups';
 import { ForceCaseCanvas } from '../graph/force-case-canvas';
 import { GraphIconButton, GraphPlayback, GraphZoomControls } from '../graph/preview-graph-controls';
-import { GraphFlowStroke, graphFlowDuration } from '../../components/charts/charts/graph-flow-pulse';
+import { GraphFlowStroke, readGraphFlowDuration } from '../../components/charts/charts/graph-flow-pulse';
 import { OwnerGraphTimeline } from '../graph/owner-graph-timeline';
 import { useSpringNodeDrag } from '../graph/graph-node-drag';
 import { modelRiskLabels } from '../settings/model-risk-settings';
@@ -566,7 +566,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   useEffect(() => {
     if (!flowPulse) return;
     const timer = setTimeout(() => setFlowPulse(undefined),
-      Math.max(0, graphFlowDuration - (performance.now() - flowPulse.startedAt)));
+      Math.max(0, readGraphFlowDuration() - (performance.now() - flowPulse.startedAt)));
     return () => clearTimeout(timer);
   }, [flowPulse]);
   const updateCandidate = (record, include) => {

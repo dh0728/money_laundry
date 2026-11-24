@@ -5,7 +5,7 @@ import { configureDevAccountForces, seedComponentPositions } from './0.24.0/forc
 import { graphRiskBand, graphVerdict, graphVerdictLabels } from '../investigation/case-graph-scope';
 import { caseMembership } from './graph-case-groups';
 import { GraphZoomControls } from './preview-graph-controls';
-import { graphFlowDuration, graphRevealDuration } from '../../components/charts/charts/graph-flow-pulse';
+import { readGraphCanvasPulse } from '../../components/charts/charts/graph-flow-pulse';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
@@ -153,14 +153,15 @@ function revealedEdge(edge, progress) {
     text: progress > 0.6 ? edge.text : undefined };
 }
 
-function paintFlow(context, edge, pulse, color, scale) {
-  const time = (performance.now() - pulse.startedAt) / graphFlowDuration;
+function paintFlow(context, edge, pulse, color, highlight, scale, design) {
+  const time = (performance.now() - pulse.startedAt) / design.duration;
   if (time < 0 || time >= 1) return;
-  const start = Math.max(0, time * 1.16 - .16);
-  const end = Math.min(1, time * 1.16);
+  const progress = time * (1 + design.pulseLength);
+  const start = Math.max(0, progress - design.pulseLength);
+  const end = Math.min(1, progress);
   const { x, y } = curvePoint(edge.curve, start);
   context.save();
-  context.globalAlpha = Math.min(1, time / .12, (1 - time) / .12);
+  context.globalAlpha = Math.min(1, time / design.fadeShare, (1 - time) / design.fadeShare);
   context.lineCap = 'round';
   context.setLineDash([]);
   context.beginPath();
@@ -170,10 +171,10 @@ function paintFlow(context, edge, pulse, color, scale) {
     context.lineTo(point.x, point.y);
   }
   context.strokeStyle = color;
-  context.lineWidth = 5 / scale;
+  context.lineWidth = design.width / scale;
   context.stroke();
-  context.strokeStyle = 'white';
-  context.lineWidth = 2 / scale;
+  context.strokeStyle = highlight;
+  context.lineWidth = design.highlightWidth / scale;
   context.stroke();
   context.restore();
 }
@@ -185,6 +186,7 @@ function tokenColors(host, groups) {
   const entries = {
     ink: 'var(--text)', dimmed: 'var(--case-graph-dimmed)', accent: 'var(--brand-accent)',
     axisFill: 'var(--inner-surface)', grid: 'var(--divider)',
+    flowHighlight: 'var(--graph-flow-highlight)',
     high: 'var(--case-graph-risk-high)', medium: 'var(--case-graph-risk-medium)',
     low: 'var(--case-graph-risk-low)', unknown: 'var(--case-graph-risk-unknown)',
     ...Object.fromEntries(groups.map(group => [group.id, group.color])),
@@ -264,6 +266,7 @@ export function ForceCaseCanvas({
   const [zoom, setZoom] = useState(100);
   const [colors, setColors] = useState({});
   const [idleFlow, setIdleFlow] = useState();
+  const [pulseDesign] = useState(readGraphCanvasPulse);
   const timePlan = useMemo(() => buildPatternTime(records ?? [], network.nodes, positions), [records, network, positions]);
   const [data, setData] = useState(() => simulationData(network, positions, timePlan));
   const currentLayout = useRef({ network, positions, timePlan });
@@ -282,11 +285,11 @@ export function ForceCaseCanvas({
       timer = setTimeout(() => {
         setIdleFlow(undefined);
         timer = setTimeout(sweep, 840);
-      }, graphFlowDuration);
+      }, pulseDesign.duration);
     }
     timer = setTimeout(sweep, 440);
     return () => clearTimeout(timer);
-  }, [activeFlow, playing, reducedMotion, visible.edges]);
+  }, [activeFlow, playing, pulseDesign.duration, reducedMotion, visible.edges]);
   useLayoutEffect(() => {
     const observer = new ResizeObserver(([{ contentRect }]) => {
       setSize({ width: Math.floor(contentRect.width), height: Math.floor(contentRect.height) });
@@ -428,7 +431,7 @@ export function ForceCaseCanvas({
           (x, y) => ({ x, y }), 1, showDetails, ownerView, scale);
         drawing = { nodes: new Map(model.nodes.map(node => [node.id, node])),
           edges: new Map(model.edges.map(edge => [edge.id, edge])) };
-        const reveal = activeFlow ? (performance.now() - activeFlow.startedAt) / graphRevealDuration : 1;
+        const reveal = activeFlow ? (performance.now() - activeFlow.startedAt) / pulseDesign.revealDuration : 1;
         const growing = reveal >= 0 && reveal < 1 && model.edges.find(edge => {
           const codes = visibleEdges.get(edge.id)?.codes;
           return codes?.size === 1 && codes.has(activeFlow.code);
@@ -449,9 +452,9 @@ export function ForceCaseCanvas({
         if (!edge) return;
         paintLine(context, edge);
         if (activeFlow && visibleEdges.get(link.id).codes.has(activeFlow.code)) {
-          paintFlow(context, edge, activeFlow, colors[activeFlow.risk] ?? edge.stroke, scale);
+          paintFlow(context, edge, activeFlow, colors[activeFlow.risk] ?? edge.stroke, colors.flowHighlight, scale, pulseDesign);
         } else if (ambientFlow?.edgeId === link.id) {
-          paintFlow(context, edge, ambientFlow, edge.stroke, scale);
+          paintFlow(context, edge, ambientFlow, edge.stroke, colors.flowHighlight, scale, pulseDesign);
         }
         if (!edge.text) return;
         context.font = `${11 / scale}px Pretendard`;
