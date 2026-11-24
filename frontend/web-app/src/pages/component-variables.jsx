@@ -6,6 +6,7 @@ import { LinkTag, VerdictTag } from '../components/semantic-tags';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../components/workflow-table';
 import figmaColors from '../config/figma-colors.json';
 import './component-variables.css';
+import { Box, Text } from '@/components/layout-primitives';
 
 const figmaFoundation = 'https://www.figma.com/design/iWjQL5GdXwenHGeZNHF4Uw?node-id=8-101';
 const figmaRoles = new Map(figmaColors.colors.map(([role, light, dark]) =>
@@ -57,13 +58,13 @@ function readVariables() {
 function VariableSample({ token }) {
   const value = `var(${token.name})`;
   if (CSS.supports('color', token.value)) {
-    return <span className="variable-swatch" style={{ backgroundColor: value }} aria-hidden="true" />;
+    return <Text as="span" className="variable-swatch" style={{ backgroundColor: value }} aria-hidden="true" />;
   }
   if (CSS.supports('background-image', token.value) && token.value.includes('gradient(')) {
-    return <span className="variable-swatch" style={{ backgroundImage: value }} aria-hidden="true" />;
+    return <Text as="span" className="variable-swatch" style={{ backgroundImage: value }} aria-hidden="true" />;
   }
   if (token.name.includes('shadow') && CSS.supports('box-shadow', token.value)) {
-    return <span className="variable-swatch" style={{ boxShadow: value }} aria-hidden="true" />;
+    return <Text as="span" className="variable-swatch" style={{ boxShadow: value }} aria-hidden="true" />;
   }
   return null;
 }
@@ -86,31 +87,31 @@ export function DesignVariables() {
   const sorting = useTableSort(results);
   return <>
     <Panel className="variable-source">
-      <div>
-        <strong>Figma 프리뷰 디자인 시스템</strong>
-        <p>Figma에서 라이트·다크 변수와 원본 컴포넌트를 편집할 수 있습니다.</p>
-      </div>
+      <Box>
+        <Text as="strong">Figma 프리뷰 디자인 시스템</Text>
+        <Text>Figma에서 라이트·다크 변수와 원본 컴포넌트를 편집할 수 있습니다.</Text>
+      </Box>
       <LinkTag href={figmaFoundation} target="_blank" rel="noopener">Figma 디자인 시스템 열기</LinkTag>
     </Panel>
     <Panel className="variable-radius-example">
-      <dl className="variable-card-metrics">
-        {Object.entries(cardDimensions).map(([name, label]) => <div key={name}>
-          <dt>{label}</dt><dd><code>{tokens.find(token => token.name === name)?.value}</code></dd>
-        </div>)}
-      </dl>
-      <div className="catalogue-actions">
+      <Box as="dl" className="variable-card-metrics">
+        {Object.entries(cardDimensions).map(([name, label]) => <Box key={name}>
+          <Box as="dt">{label}</Box><Box as="dd"><Text as="code">{tokens.find(token => token.name === name)?.value}</Text></Box>
+        </Box>)}
+      </Box>
+      <Box className="catalogue-actions">
         <VerdictTag verdict="abnormal" /><VerdictTag verdict="unjudged" /><VerdictTag verdict="normal" />
-      </div>
+      </Box>
     </Panel>
-    <div className="variable-filters">
-      <label>분류
+    <Box className="variable-filters">
+      <Box as="label">분류
         <select className="variable-field" value={group} onChange={event => setGroup(event.target.value)}>
           <option value="all">전체</option>
           {[...groups, otherGroup].map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select>
-      </label>
+      </Box>
       <SearchField variant="compact" label="변수 검색" placeholder="변수 검색" value={search} onChange={event => setSearch(event.target.value)} />
-    </div>
+    </Box>
     <WorkflowTable label="디자인 변수" summary={tableCount(results.length, tokens.length, '개')} className="variable-table" tools={false} panel>
         <TableHeader><TableRow>
           <SortableTableHead sorting={sorting} column="name" value={token => token.name}>이름</SortableTableHead>
@@ -120,15 +121,15 @@ export function DesignVariables() {
         <TableBody>
           {sorting.rows.map(token => <TableRow key={token.name}>
             <TableCell>
-              <code>{token.figma?.role ?? token.name}</code>
-              {token.figma && <small className="variable-css-name">{token.name}</small>}
+              <Text as="code">{token.figma?.role ?? token.name}</Text>
+              {token.figma && <Text as="small" className="variable-css-name">{token.name}</Text>}
             </TableCell>
             <TableCell>{colorUses[token.figma?.role] ?? cardDimensions[token.name] ?? token.group.label}</TableCell>
             <TableCell>
-              <div className="variable-value">
+              <Box className="variable-value">
                 <VariableSample token={token} />
-                <code>{token.figma ? `Light ${token.figma.light} · Dark ${token.figma.dark}` : token.value}</code>
-              </div>
+                <Text as="code">{token.figma ? `Light ${token.figma.light} · Dark ${token.figma.dark}` : token.value}</Text>
+              </Box>
             </TableCell>
           </TableRow>)}
           {!results.length && <TableRow><TableCell colSpan={3}>조건에 맞는 변수가 없습니다.</TableCell></TableRow>}

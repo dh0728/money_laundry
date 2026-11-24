@@ -3,6 +3,7 @@ import { PreviewCaseCard } from '../features/investigation/preview-case-card';
 import { TransactionCard } from '../features/investigation/investigation-components';
 import { dashboardFixtures } from '../mocks/dashboard-fixtures';
 import './component-card-samples.css';
+import { Box, Heading } from '../components/layout-primitives';
 
 const { cases, transactions } = dashboardFixtures({
   T: ['T-261111-00000001', 'T-261111-00000002', 'T-261111-00000003'],
@@ -23,22 +24,22 @@ export function CardSamples({ onEvent }) {
       : `${workCode} · 상세 열기 요청`);
   }
 
-  return <div className="catalogue-card-samples" onClick={reportAction}>
-    <div>
-      <h3>선택 포함 · Episode</h3>
+  return <Box className="catalogue-card-samples" onClick={reportAction}>
+    <Box>
+      <Heading level={3}>선택 포함 · Episode</Heading>
       <PreviewCaseCard row={episode}
         selection={{ checked, onChange(next) {
           setChecked(next);
           onEvent?.(`${episode.code} · ${next ? '선택' : '선택 해제'}`);
         } }} />
-    </div>
-    <div>
-      <h3>상세 열기만 · Alert</h3>
+    </Box>
+    <Box>
+      <Heading level={3}>상세 열기만 · Alert</Heading>
       <PreviewCaseCard row={alert} showAdd={false} />
-    </div>
-    <div>
-      <h3>사이드바 탭 추가 · 거래</h3>
+    </Box>
+    <Box>
+      <Heading level={3}>사이드바 탭 추가 · 거래</Heading>
       <TransactionCard record={transactions[0]} />
-    </div>
-  </div>;
+    </Box>
+  </Box>;
 }
