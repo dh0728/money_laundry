@@ -2,4 +2,10 @@
   --palette-teal-500: oklch(.67 .13 165);
   --chart-grid-default-ink: #eaf0f6;
   --chart-grid-mask-ink: var(--aml-white-100);
+  --case-comparison-pink: light-dark(var(--aml-pink-050), var(--aml-pink-070));
+  --case-comparison-teal: light-dark(
+    color-mix(in srgb, var(--palette-teal-500) 72%, var(--aml-black-100)),
+    color-mix(in srgb, var(--palette-teal-500) 70%, var(--aml-white-100)));
+  --case-comparison-sky: light-dark(var(--aml-sky-040), var(--aml-sky-070));
+  --case-comparison-lime: light-dark(var(--aml-lime-050), var(--aml-lime-070));
 }

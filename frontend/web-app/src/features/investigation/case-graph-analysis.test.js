@@ -5,6 +5,7 @@ import { buildCaseNetwork, graphRiskBand, graphTableSelection, graphVerdict, tra
 import { caseAccountLayout } from './case-pattern-layout';
 import { caseSankeyGraph, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
 import { ownerGraphLayout, ownerTransferPath } from '../graph/owner-graph-layout';
+import { caseGroupColor } from '../graph/graph-case-groups';
 import { mountCaseGraph } from './preview-case-graph';
 import { previewUrl, readPreviewRoute } from '../../app/preview-route';
 import { ScreenLayout, ScreenNavigation } from '../../app/screen-layouts';
@@ -22,6 +23,14 @@ const account = (code, owner = code) => ({ code, owner });
 const transfer = (code, from, to, score, verdict = 'unjudged') => ({ code, from, to, score, verdict });
 
 describe('case graph analysis', () => {
+  it('reserves the reference color while cycling through the comparison case colors', () => {
+    const reference = caseGroupColor(0);
+    const comparison = [1, 2, 3, 4].map(caseGroupColor);
+    expect(new Set(comparison).size).toBe(4);
+    expect(comparison).not.toContain(reference);
+    expect([5, 6, 7, 8].map(caseGroupColor)).toEqual(comparison);
+  });
+
   it('distinguishes score zero, exact thresholds and missing scores', () => {
     expect([undefined, null, -1, 101, 0, 69.99, 70, 89.99, 90, 100].map(graphRiskBand))
       .toEqual(['unknown', 'unknown', 'unknown', 'unknown', 'low', 'low', 'medium', 'medium', 'high', 'high']);
