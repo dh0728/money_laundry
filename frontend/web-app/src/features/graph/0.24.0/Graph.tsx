@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import type { ForceGraphMethods, LinkObject, NodeObject } from 'react-force-graph-2d'
 import { Maximize2, Minimize2, Minus, Network, Pause, Play, Plus, RotateCcw, Search, Shrink, StepBack, StepForward } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
@@ -16,14 +17,17 @@ import { formatGraphMoney, type GraphViewMode } from './model'
 import { configureDevAccountForces, seedComponentPositions } from './force-layout'
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
 import { Box, Heading, Text } from '@/components/layout-primitives'
+import { readChartNumber } from '@/components/charts/chart-design-values'
 
 export { seedComponentPositions } from './force-layout'
 
 export const DEFAULT_HOP = 3
 const HOP_MIN = 1, HOP_MAX = 5
 const HOP_TICKS = [1, 2, 3, 4, 5]
-const PAD = 56
-const NARROW_WIDTH = 900
+const graphViews = [
+  { value: 'account', label: '계좌별 보기' },
+  { value: 'owner', label: '소유주별 보기' },
+] as const
 
 // 의심 여부 2색: 1=빨강, 0=무채색(사용자 확정). 위험도 색은 그래프에 쓰지 않는다.
 export const nodeTone = (n: GraphNode) => n.core ? 'var(--graph-l1)' : 'var(--graph-l0-node)'
@@ -84,7 +88,18 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
   const fittedRef = useRef(true), fitting = useRef(false), fitCenter = useRef<{ x: number; y: number } | null>(null)
   const setFitted = useCallback((value: boolean) => { fittedRef.current = value; setFittedState(value) }, [])
   const [narrow, setNarrow] = useState(false)
-  const layout = useRef<HTMLDivElement>(null), [fillHeight, setFillHeight] = useState(640)
+  const layout = useRef<HTMLDivElement>(null), [fillHeight, setFillHeight] = useState<number>()
+  const [panelSizes] = useState(() => ({
+    settings: readChartNumber('--graph-settings-width', 210),
+    settingsMin: readChartNumber('--graph-settings-min-width', 190),
+    settingsMax: readChartNumber('--graph-settings-max-width', 260),
+    canvasMin: readChartNumber('--graph-canvas-min-width', 320),
+    detail: readChartNumber('--graph-detail-width', 440),
+    detailMin: readChartNumber('--graph-detail-min-width', 340),
+    detailMax: readChartNumber('--graph-detail-max-width', 760),
+    compactCanvasMin: readChartNumber('--graph-compact-canvas-min-height', 240),
+    compactDetailMin: readChartNumber('--graph-compact-detail-min-height', 180),
+  }))
   // 본문 스크롤 영역의 남은 높이를 그래프가 정확히 채운다(하단 여백·넘침 없음)
   useLayoutEffect(() => {
     const measure = () => {
@@ -92,7 +107,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       if (!el || !main) return
       const top = el.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop
       const bottom = parseFloat(getComputedStyle(main).paddingBottom) || 0
-      setFillHeight(Math.max(460, Math.floor(main.clientHeight - top - bottom)))
+      setFillHeight(Math.floor(main.clientHeight - top - bottom))
     }
     measure(); window.addEventListener('resize', measure); return () => window.removeEventListener('resize', measure)
   }, [fullscreen])
@@ -103,7 +118,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
     const evaluate = () => {
       const w = el.getBoundingClientRect().width
       const portrait = typeof window !== 'undefined' && !!window.matchMedia?.('(orientation: portrait)').matches
-      setNarrow((w > 0 && w < NARROW_WIDTH) || portrait)
+      setNarrow((w > 0 && w < readChartNumber('--graph-compact-breakpoint', 900)) || portrait)
     }
     evaluate()
     const ro = new ResizeObserver(evaluate)
@@ -162,7 +177,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
     if (viewMode === 'owner') { ownerGraph.current?.fit(); return }
     const g = fg.current; if (!g || !ready.current) return
     fitting.current = true; setFitted(true)
-    g.zoomToFit(ms, PAD)
+    g.zoomToFit(ms, readChartNumber('--graph-fit-padding', 56))
     window.setTimeout(() => { if (fg.current !== g) return; fitK.current = g.zoom(); fitCenter.current = g.centerAt(); setZoomK(g.zoom()); fitting.current = false }, ms + 20)
   }, [viewMode, setFitted])
   // 맞춤 상태에서 크기·토글·보기·배치가 바뀌면 다시 맞춘다
@@ -316,9 +331,12 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
   }
   const viewToggle = (
     <Box data-testid="graph-view-switch" role="group" aria-label="그래프 보기" className="relative grid w-full grid-cols-2 rounded-md border bg-muted/60 p-1">
-      <Text as="span" aria-hidden="true" className={`graph-view-indicator pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-sm bg-background shadow-sm ${viewMode === 'owner' ? 'translate-x-full' : 'translate-x-0'}`} />
-      <button type="button" aria-pressed={viewMode === 'account'} onClick={() => selectView('account')} className={`graph-view-option relative z-10 min-w-0 rounded-sm px-2 py-1.5 text-xs ${viewMode === 'account' ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>계좌별 보기</button>
-      <button type="button" aria-pressed={viewMode === 'owner'} onClick={() => selectView('owner')} className={`graph-view-option relative z-10 min-w-0 rounded-sm px-2 py-1.5 text-xs ${viewMode === 'owner' ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>소유주별 보기</button>
+      <Text as="span" aria-hidden="true" className={`graph-view-indicator pointer-events-none absolute inset-y-1 left-1 rounded-sm bg-background shadow-sm ${viewMode === 'owner' ? 'translate-x-full' : 'translate-x-0'}`} />
+      {graphViews.map(({ value, label }) => <Button key={value} type="button" variant="ghost" size={null}
+        aria-pressed={viewMode === value} onClick={() => selectView(value)}
+        className={`graph-view-option relative z-10 block min-w-0 rounded-sm px-2 py-1.5 text-xs whitespace-normal hover:bg-transparent hover:text-foreground ${viewMode === value ? 'font-medium text-foreground' : 'font-normal text-muted-foreground'}`}>
+        {label}
+      </Button>)}
     </Box>
   )
   const settingsFull = (
@@ -339,11 +357,11 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         <Text className="text-2xs leading-relaxed text-muted-foreground">{selectedNode ? `${nodeMap.get(selectedNode)?.account} 기준 ${hop} hop 이내 노드만 표시` : '그래프에서 계좌 노드를 선택하면 hop 범위 설정이 활성화됩니다.'}</Text>
       </Box>
       <Box className="mt-auto space-y-2.5 border-t pt-4 text-2xs text-muted-foreground graph-legend">
-        <Text className="flex items-center gap-2"><Text as="i" className="legend-line" style={{ background: 'var(--graph-l1)' }} />의심 거래</Text>
-        <Text className="flex items-center gap-2"><Text as="i" className="legend-line" style={{ background: 'var(--graph-l0)' }} />{nonSuspiciousLabel}</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-line" data-legend="suspicious" />의심 거래</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-line" data-legend="non-suspicious" />{nonSuspiciousLabel}</Text>
         <Text className="flex items-center gap-2"><Text as="i" className="legend-line legend-dash" />연결 경로</Text>
-        <Text className="flex items-center gap-2"><Text as="i" className="legend-dot" style={{ background: 'var(--graph-l1)' }} />의심 거래 참여 계좌</Text>
-        <Text className="flex items-center gap-2"><Text as="i" className="legend-dot legend-dot-sm" style={{ background: 'var(--graph-l0-node)' }} />주변 계좌 · 큰 점은 허브</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-dot" data-legend="suspicious" />의심 거래 참여 계좌</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-dot legend-dot-sm" data-legend="adjacent-account" />주변 계좌 · 큰 점은 허브</Text>
         <Text>선 굵기 · 거래 금액(USD)</Text>
       </Box>
     </Box>
@@ -356,7 +374,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         <Label htmlFor="graph-info-c" className="text-xs font-normal">거래 정보</Label>
         <Switch id="graph-info-c" checked={showInfo} onCheckedChange={setShowInfo} />
       </Box>
-      <Box className="flex items-center gap-2 flex-1 min-w-[180px]">
+      <Box className="graph-compact-hop flex items-center gap-2 flex-1">
         <Label className="text-2xs text-muted-foreground shrink-0">연결 단계 (hop)</Label>
         <Slider aria-label="선택 계좌 기준 연결 단계 hop 수" className="flex-1" min={HOP_MIN} max={HOP_MAX} step={1} value={[hop]} disabled={!selectedNode} onValueChange={([v]) => setHop(v)} />
         <Text as="span" className="text-2xs tabular-nums min-w-12 text-center shrink-0">{selectedNode ? `${hop} hop` : '계좌 선택'}</Text>
@@ -382,9 +400,18 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
           onHover={setHover} onSelectNode={selectNode} onSelectEdge={key => { setSelectedEdge(key); setSelectedNode(null) }} onClear={clearSelection}
           onZoom={(ratio, isFitted) => setOwnerZoom({ ratio, fitted: isFitted })} />}
         {hover && (hoverNode || hoverEdge) && (
-          <Box className="graph-tooltip" style={{ left: Math.min(hover.x + 14, size.w - 260), top: Math.min(hover.y + 14, size.h - 110) }}>
-            {hoverNode && <><Text as="b">{hoverNode.entity}</Text><br />{hoverNode.account} · Bank {hoverNode.bank}<br />{graphNodeRole(hoverNode)}</>}
-            {hoverEdge && <><Text as="b">{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? `연결 경로 · ${nonSuspiciousLabel}` : nonSuspiciousLabel}</Text> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{formatGraphMoney(hoverEdge)} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
+          <Box className="graph-tooltip" style={{ '--graph-tooltip-x': `${hover.x}px`, '--graph-tooltip-y': `${hover.y}px` } as CSSProperties}>
+            {hoverNode && <>
+              <Text as="b" className="block">{hoverNode.entity}</Text>
+              <Text as="span" className="block">{hoverNode.account} · Bank {hoverNode.bank}</Text>
+              <Text as="span" className="block">{graphNodeRole(hoverNode)}</Text>
+            </>}
+            {hoverEdge && <>
+              <Text as="span" className="block"><Text as="b">{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? `연결 경로 · ${nonSuspiciousLabel}` : nonSuspiciousLabel}</Text> · {hoverEdge.count}건</Text>
+              <Text as="span" className="block">{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}</Text>
+              <Text as="span" className="block">{formatGraphMoney(hoverEdge)} · {hoverEdge.format}</Text>
+              <Text as="span" className="block">{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</Text>
+            </>}
           </Box>
         )}
         <Box className="absolute bottom-3 left-3 flex items-center gap-2 text-2xs text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</Box>
@@ -401,7 +428,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         <IconButton label="이전 거래 (←)" className="size-7" onClick={() => step(-1)}><StepBack className="size-3.5" /></IconButton>
         <IconButton label={playing ? '일시정지 (Space)' : '시간순 재생 (Space)'} className="size-7" onClick={togglePlay}>{playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</IconButton>
         <IconButton label="다음 거래 (→)" className="size-7" onClick={() => step(1)}><StepForward className="size-3.5" /></IconButton>
-        <Text as="span" className="tabular-nums font-medium w-[86px] shrink-0">{current < (events[0] ?? 0) ? '시작 전' : timeLabel(current)}</Text>
+        <Text as="span" className="graph-time-label tabular-nums font-medium shrink-0">{current < (events[0] ?? 0) ? '시작 전' : timeLabel(current)}</Text>
         <Text as="span" className="tabular-nums text-muted-foreground shrink-0" data-testid="timeline-count">이 시각까지 시작된 거래 {shownTx} / {allTx.length}건</Text>
         <Text as="span" className="hidden 2xl:inline-flex items-center gap-1 text-muted-foreground shrink-0"><Kbd>←</Kbd><Kbd>→</Kbd><Kbd>Space</Kbd></Text>
       </Box>
@@ -413,13 +440,13 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
   const renderWideSplit = (testId: string) => (
     <Box className="flex-1 min-h-0 flex" data-testid={testId} data-split="horizontal">
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize="210px" minSize="190px" maxSize="260px">{settingsFull}</ResizablePanel>
+        <ResizablePanel defaultSize={panelSizes.settings} minSize={panelSizes.settingsMin} maxSize={panelSizes.settingsMax}>{settingsFull}</ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel minSize="320px" id={`${testId}-main`}>{mainGraph}</ResizablePanel>
+        <ResizablePanel minSize={panelSizes.canvasMin} id={`${testId}-main`}>{mainGraph}</ResizablePanel>
         {docked && (
           <>
             <ResizableHandle />
-            <ResizablePanel id={`${testId}-detail`} defaultSize="440px" minSize="340px" maxSize="760px">
+            <ResizablePanel id={`${testId}-detail`} defaultSize={panelSizes.detail} minSize={panelSizes.detailMin} maxSize={panelSizes.detailMax}>
               <Box className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</Box>
             </ResizablePanel>
           </>
@@ -432,11 +459,11 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
     <Box className="flex-1 min-h-0 flex flex-col" data-testid="graph-split-v" data-split="vertical">
       {settingsCompact}
       <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0">
-        <ResizablePanel minSize="240px" defaultSize="60%" id="graph-main-v">{mainGraph}</ResizablePanel>
+        <ResizablePanel minSize={panelSizes.compactCanvasMin} defaultSize="60%" id="graph-main-v">{mainGraph}</ResizablePanel>
         {docked && (
           <>
             <ResizableHandle />
-            <ResizablePanel minSize="180px" defaultSize="40%" id="graph-detail-v">
+            <ResizablePanel minSize={panelSizes.compactDetailMin} defaultSize="40%" id="graph-detail-v">
               <Box className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</Box>
             </ResizablePanel>
           </>
@@ -446,7 +473,8 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
   )
 
   const normalBody = (
-    <Box ref={layout} style={{ height: fillHeight }} className="graph-layout min-h-[460px] overflow-hidden rounded-lg border bg-card flex flex-col" data-testid="graph-layout">
+    <Box ref={layout} style={{ '--graph-available-height': fillHeight === undefined ? undefined : `${fillHeight}px` } as CSSProperties}
+      className="graph-layout graph-layout-inline overflow-hidden rounded-lg border bg-card flex flex-col" data-testid="graph-layout">
       {narrow ? narrowSplit : renderWideSplit('graph-split-h')}
     </Box>
   )
@@ -463,7 +491,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       {!fullscreen && normalBody}
       {!fullscreen && panelMode === 'float' && panel}
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-        <DialogContent className="graph-dialog w-[97vw] h-[94vh] max-w-none! p-4" showCloseButton={false}>
+        <DialogContent className="graph-dialog max-w-none! p-4" showCloseButton={false}>
           <DialogTitle className="sr-only">관계 그래프 전체화면</DialogTitle>
           <DialogDescription className="sr-only">계좌 및 거래 탐색. 전체화면 종료 버튼으로 돌아갑니다.</DialogDescription>
           {fullscreen && <Box className="flex-1 min-h-0">{fullscreenBody}</Box>}

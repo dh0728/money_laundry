@@ -221,6 +221,9 @@
   --transaction-connector-stroke: 1.5px;
   --graph-tooltip-layer: 5;
   --graph-tooltip-max-width: 250px;
+  --graph-tooltip-pointer-gap: calc(var(--aml-space-12) + var(--aml-space-2));
+  --graph-tooltip-right-gap: calc(var(--aml-space-8) + var(--aml-space-2));
+  --graph-tooltip-bottom-clearance: 110px;
   --graph-tooltip-type-size: 11.5px;
   --graph-tooltip-line-height: 1.55;
   --graph-legend-line-height: 3px;
@@ -228,6 +231,23 @@
   --graph-legend-dot-size: 9px;
   --graph-flow-dash-offset: -24;
   --graph-resizable-min-width: 820px;
+  --graph-settings-width: 210px;
+  --graph-settings-min-width: 190px;
+  --graph-settings-max-width: 260px;
+  --graph-canvas-min-width: 320px;
+  --graph-detail-width: 440px;
+  --graph-detail-min-width: 340px;
+  --graph-detail-max-width: 760px;
+  --graph-compact-canvas-min-height: 240px;
+  --graph-compact-detail-min-height: 180px;
+  --graph-compact-breakpoint: 900px;
+  --graph-layout-min-height: 460px;
+  --graph-layout-initial-height: 640px;
+  --graph-fit-padding: 56px;
+  --graph-compact-hop-min-width: 180px;
+  --graph-time-label-width: 86px;
+  --graph-fullscreen-width: 97vw;
+  --graph-fullscreen-height: 94vh;
   --motion-instant: 0ms;
   --motion-fast: 120ms;
   --motion-normal: 180ms;
@@ -360,7 +380,7 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .sidebar-indicator { transition-duration:var(--motion-morph); transition-timing-function:var(--ease-standard); }
 .tab-indicator[data-animate=false], .sidebar-indicator[data-animate=false] { transition:none var(--motion-instant); }
 /* 계좌별·소유주별 보기 전환: Tailwind v4의 translate-x-*는 transform이 아니라 translate 속성을 쓴다 */
-.graph-view-indicator { transition:translate var(--motion-morph) var(--ease-emphasized); }
+.graph-view-indicator { inline-size: calc(50% - var(--spacing)); transition:translate var(--motion-morph) var(--ease-emphasized); }
 .graph-view-option { transition:color var(--motion-normal) var(--ease-ui); }
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-reduced-motion="false"]) :is(.tab-indicator, .sidebar-indicator) { transition:none; }
@@ -481,12 +501,24 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .dark { --graph-l1:var(--palette-signal-red-500); --graph-l1-edge:var(--palette-signal-red-500-a45); --graph-l0:var(--palette-white-a30); --graph-l0-particle:var(--palette-white-a70); --graph-l0-node:var(--palette-zinc-100-graph); --graph-bg:var(--palette-graph-dark); --graph-tooltip-shadow: 0 8px 24px rgb(0 0 0 / .25); }
 .graph-canvas { background:var(--graph-bg); }
 .graph-tooltip { position:absolute; z-index:var(--graph-tooltip-layer); max-width:var(--graph-tooltip-max-width); pointer-events:none; background:var(--popover); color:var(--popover-foreground); border:var(--aml-stroke-divider) solid var(--border); border-radius:var(--aml-space-8); padding:var(--aml-space-8) calc(var(--aml-space-8) + var(--aml-space-2)); font-size:var(--graph-tooltip-type-size); line-height:var(--graph-tooltip-line-height); box-shadow:var(--graph-tooltip-shadow); }
+.graph-tooltip {
+  left: min(calc(var(--graph-tooltip-x) + var(--graph-tooltip-pointer-gap)),
+    calc(100% - var(--graph-tooltip-max-width) - var(--graph-tooltip-right-gap)));
+  top: min(calc(var(--graph-tooltip-y) + var(--graph-tooltip-pointer-gap)),
+    calc(100% - var(--graph-tooltip-bottom-clearance)));
+}
 .legend-line { width:var(--aml-space-16); height:var(--graph-legend-line-height); border-radius:var(--aml-space-2); display:inline-block; }
 .legend-dash { width:var(--aml-space-16); height:0; border-top:var(--graph-legend-dash-weight) dashed var(--graph-l0); display:inline-block; }
 .legend-dot { width:var(--graph-legend-dot-size); height:var(--graph-legend-dot-size); border-radius:var(--graph-legend-dot-size); display:inline-block; }
-.graph-dialog { display:flex; flex-direction:column; overflow:hidden; }
+.graph-dialog { display:flex; flex-direction:column; overflow:hidden; width:var(--graph-fullscreen-width); height:var(--graph-fullscreen-height); }
+.graph-layout-inline { height: max(var(--graph-layout-min-height), var(--graph-available-height, var(--graph-layout-initial-height))); min-height:var(--graph-layout-min-height); }
+.graph-compact-hop { min-width:var(--graph-compact-hop-min-width); }
+.graph-time-label { width:var(--graph-time-label-width); }
 .legend-dot-sm { width:var(--aml-space-6); height:var(--aml-space-6); }
 .graph-legend i { display:inline-block; flex:none; }
+.graph-legend [data-legend="suspicious"] { background:var(--graph-l1); }
+.graph-legend [data-legend="non-suspicious"] { background:var(--graph-l0); }
+.graph-legend [data-legend="adjacent-account"] { background:var(--graph-l0-node); }
 .flow-dash { animation: flow-dash var(--motion-flow) var(--ease-linear) infinite; }
 @keyframes flow-dash { to { stroke-dashoffset: var(--graph-flow-dash-offset); } }
 @media (prefers-reduced-motion: reduce) { :root:not([data-reduced-motion="false"]) .flow-dash { animation: none; } }
