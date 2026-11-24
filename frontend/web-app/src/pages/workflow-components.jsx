@@ -22,6 +22,8 @@ import { RuleList, ruleWorkspace } from '../features/rules/preview-rule-workspac
 import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
 import { LiveRuleList } from '../features/rules/live-rule-list';
 import { liveActiveRules, liveRules } from '../features/rules/live-rule-store';
+import { useCaseRuleHits } from '../features/rules/case-rule-hits';
+import { liveSource } from '../features/investigation/live-data.js';
 import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
@@ -565,6 +567,15 @@ function CaseReviewActions({ overview }) {
   </>;
 }
 
+/** 서비스 모드의 사건 개요. 사건의 거래에 걸린 운영 룰 적중을 서버에서 읽어 "룰 적중" 칸에 같이 보여 준다. */
+function LiveCaseOverview({ overview, appearance }) {
+  const hits = useCaseRuleHits(overview?.row?.caseId);
+  // Episode 에서는 카드가 어느 Alert 의 것인지 화면 코드로 보여 준다
+  const alertCode = id => liveSource().cases.find(row => row.kind === 'Alert' && row.caseId === id)?.code;
+  return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
+    history={reportHistory(overview?.reportData)} activeRules={liveActiveRules()} ruleHits={{ ...hits, alertCode }} /></Suspense>;
+}
+
 function Workflow({ kind, view, dashboard, overview, reason }) {
   const appearance = useAppearance();
   if (kind.includes('dashboard') && dashboard?.error) return <Panel className="dashboard-chart" role="alert">
@@ -586,7 +597,8 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
     </Suspense>;
   }
   if (kind === 'case-overview') {
-    const activeRules = liveRules ? liveActiveRules() : ruleWorkspace.rules.filter(rule => rule.status === 'ACTIVE')
+    if (liveRules) return <LiveCaseOverview overview={overview} appearance={appearance} />;
+    const activeRules = ruleWorkspace.rules.filter(rule => rule.status === 'ACTIVE')
       .map(rule => ({ id: rule.id, version: rule.version, name: rule.name, conditions: ruleConditionSummary(rule) }));
     return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
       history={reportHistory(overview?.reportData)} activeRules={activeRules} /></Suspense>;

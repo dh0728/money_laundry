@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { deleteRuleDraft, fetchRule } from '@/api/rules';
+import { commandRule, createRuleVersion, deleteRuleDraft, fetchRule } from '@/api/rules';
+import { Textarea } from '@/components/ui/textarea';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
@@ -16,12 +17,31 @@ import './preview-rule-workspace.css';
 import './live-rule-engine.css';
 
 // 룰 목록과 상세(서비스 모드). 한 룰은 운영 버전 최대 1개와 작업 중 버전 최대 1개를 가진다.
-// 지금 할 수 있는 일은 초안 이어서 작성, 초안 삭제, 백테스트로 열기다. 승인 · 반려 · 중지 · 복제는 서버 기능이 붙는 대로 연다.
+// 상태를 바꾸는 버튼은 서버가 상세에 실어 주는 commands(지금 상태에서 있는 명령, 내가 할 수 있는지, 못 하면 왜)대로 그린다.
+// 누가 무엇을 할 수 있는지를 화면이 따로 알지 않는다. 복제는 서버 기능이 붙는 대로 연다.
 
 const countFormat = new Intl.NumberFormat('ko-KR');
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
 const later = '서버 기능이 붙은 뒤에 쓸 수 있습니다.';
 const subjectNames = { ACCOUNT: '계좌', TX: '거래' };
+/** 사유의 길이. 서버의 제한과 같다. */
+const commentLimit = 2000;
+
+// 명령의 버튼 이름, 색, 바뀐 뒤의 상태, 확인 창에 적는 설명. 버튼은 왼쪽부터 negative · inverse · brand 순서로 놓는다.
+const commandSpecs = {
+  REJECT: { label: '반려', tone: 'negative', after: 'DRAFT', note: '작성 중으로 돌아갑니다. 작성자가 조건을 고쳐 다시 승인 요청할 수 있습니다.' },
+  PAUSE: { label: '중지', tone: 'negative', after: 'PAUSED', note: '이 뒤에 시작하는 분석부터 돌지 않습니다. 이미 쌓인 적중은 남습니다.' },
+  WITHDRAW: { label: '되돌리기', tone: 'inverse', after: 'DRAFT', note: '작성 중으로 돌아가 조건을 다시 고칠 수 있습니다. 시험 운영은 멈춥니다.' },
+  START_SHADOW: { label: '시험 운영 시작', tone: 'inverse', after: 'SHADOW', note: '이 뒤에 시작하는 분석부터 매일 돌려 결과만 쌓습니다. Alert 에는 보이지 않습니다.' },
+  NEW_VERSION: { label: '새 버전 만들기', tone: 'inverse', note: '운영 버전의 조건을 복사해 작성 중인 새 버전을 만듭니다. 운영 버전은 그대로 돕니다.' },
+  SUBMIT: { label: '승인 요청', tone: 'brand', after: 'PENDING', note: '관리자가 승인하면 운영을 시작합니다.' },
+  APPROVE: { label: '승인', tone: 'brand', after: 'ACTIVE', note: '이 뒤에 시작하는 분석부터 운영 룰로 돌고, 적중은 Alert 에 근거로 표시됩니다.' },
+  RESUME: { label: '재개', tone: 'brand', after: 'ACTIVE', note: '이 뒤에 시작하는 분석부터 다시 돕니다. 멈춰 있던 동안의 분석은 소급하지 않습니다.' },
+};
+const commandOrder = Object.keys(commandSpecs);
+const executionModes = { LIVE: '운영', SHADOW: '시험 운영' };
+const executionErrors = { TIMEOUT: '쿼리 120초 초과', BUDGET: '시간 한도 초과', INTERNAL: '실행 오류', INTERRUPTED: '중단됨' };
+const backtestNotes = { QUEUED: '백테스트 대기 중', RUNNING: '백테스트 실행 중', FAILED: '백테스트 실패', CANCELLED: '백테스트 취소됨' };
 
 function RuleTime({ value }) {
   const date = new Date(value);
@@ -66,13 +86,79 @@ function DraftDelete({ rule, version, onClose, onDeleted }) {
   </DialogFrame>;
 }
 
+/**
+ * 상태 명령 확인 창. 승인 · 반려 · 중지 · 재개는 사유가 있어야 하고 나머지는 메모를 남길 수 있다.
+ * 요청 번호(requestId)는 창을 열 때 한 번 만든다. 응답을 못 받아 다시 눌러도 서버는 한 번만 적용한다.
+ */
+function RuleCommandDialog({ rule, command, onClose, onDone }) {
+  const dialog = useRef(null);
+  const field = useRef(null);
+  const titleId = useId();
+  const [requestId] = useState(() => crypto.randomUUID());
+  const [comment, setComment] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const spec = commandSpecs[command.action];
+  const fresh = command.action === 'NEW_VERSION';
+  const version = [rule.working, rule.operating].find(item => item?.versionId === command.versionId);
+
+  useEffect(() => {
+    dialog.current.showModal();
+    field.current?.focus();
+  }, []);
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const next = fresh ? (await createRuleVersion(rule.ruleId), await fetchRule(rule.ruleId))
+        : await commandRule(rule.ruleId, { requestId, action: command.action, versionId: command.versionId, revision: command.revision, comment: comment.trim() });
+      dialog.current.close();
+      onDone(next);
+    } catch (failure) {
+      setError(problemText(failure, `${spec.label}에 실패했습니다.`));
+      setBusy(false);
+    }
+  }
+
+  return <DialogFrame ref={dialog} className="rule-review-dialog" title={`룰 ${spec.label}`} titleId={titleId}
+    onClose={onClose} onSubmit={submit}
+    actions={<>
+      <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
+      <PrimaryButton type="submit" tone={spec.tone} disabled={busy || (command.commentRequired && !comment.trim())}>{spec.label} 확인</PrimaryButton>
+    </>}>
+    <div className="case-judgment-body">
+      <p><code>{rule.code}</code> · {rule.name}{version && ` · v${version.versionNo}`}</p>
+      {spec.after && <p>변경 후 상태 · {ruleStatusNames[spec.after]}</p>}
+      <p className="workflow-rule-note">{spec.note}
+        {command.action === 'APPROVE' && rule.operating && ` 지금 운영 버전 v${rule.operating.versionNo} 은 물러납니다.`}</p>
+      {!fresh && <label className="case-judgment-field">{command.commentRequired ? '사유' : '메모 (선택)'}
+        <Textarea ref={field} value={comment} rows={3} maxLength={commentLimit} required={command.commentRequired}
+          onChange={event => { setComment(event.target.value); setError(''); }} />
+      </label>}
+      {error && <p role="alert" data-rule-block-error>{error}</p>}
+    </div>
+  </DialogFrame>;
+}
+
+/** 작업 중 버전의 백테스트 상태. 시험 운영 · 승인 요청은 지금 조건으로 끝낸 백테스트가 있어야 한다. */
+function backtestNote(version) {
+  if (!['DRAFT', 'SHADOW', 'PENDING'].includes(version.status) || version.backtest === undefined) return null;
+  if (!version.backtest) return '백테스트를 아직 돌리지 않았습니다.';
+  if (version.backtest.status !== 'COMPLETED') return backtestNotes[version.backtest.status];
+  return version.backtest.currentDefinition ? '지금 조건으로 백테스트를 끝냈습니다.' : '조건을 고친 뒤에는 백테스트를 돌리지 않았습니다.';
+}
+
 function VersionSummary({ label, version }) {
+  const note = backtestNote(version);
   return <div className="rule-version-summary">
     <div className="workflow-rule-detail-tags">
       <StatusTag preset="neutral">{label} · v{version.versionNo}</StatusTag>
       <StatusChip status={version.status} />
     </div>
     <p>{version.sentence || version.summary}</p>
+    {note && <p className="workflow-rule-note">{note}</p>}
   </div>;
 }
 
@@ -87,6 +173,13 @@ function RuleDetail({ rule, row, subject }) {
     <dl className="rule-condition-facts">
       <div><dt>담당자</dt><dd>{rule.owner}</dd></div>
       <div><dt>마지막 변경</dt><dd><RuleTime value={row?.changedAt ?? rule.createdAt} /></dd></div>
+      {/* 적중 수와 Alert 수는 따로다. 적중은 대상 × 날짜이고, 그중 Alert 의 거래와 겹친 것만 Alert 에 보인다. */}
+      {row?.hitCount != null && (rule.operating || row.hitCount > 0) && <div><dt>운영 적중</dt>
+        <dd>{countFormat.format(row.hitCount)}건{row.lastHitDate && ` · 마지막 ${row.lastHitDate}`}</dd></div>}
+      {row?.linkedAlertCount != null && (rule.operating || row.linkedAlertCount > 0) && <div><dt>연결 Alert</dt>
+        <dd>{countFormat.format(row.linkedAlertCount)}건{row.normalRate != null && ` · 정상 판정 ${row.normalRate}%`}</dd></div>}
+      {row?.shadowHitCount != null && <div><dt>시험 운영 적중</dt><dd>{countFormat.format(row.shadowHitCount)}건 · Alert 에는 보이지 않음</dd></div>}
+      {row?.lastRunFailed && <div><dt>최근 일일 실행</dt><dd><StatusTag preset="caution">실패</StatusTag></dd></div>}
     </dl>
     <h3>적용 조건</h3>
     {rule.operating && <VersionSummary label="운영 버전" version={rule.operating} />}
@@ -102,12 +195,35 @@ function RuleDetail({ rule, row, subject }) {
   </Panel>;
 }
 
+/** 일일 실행 기록. 분석이 ALERTS 단계에 들어올 때 시험 운영 · 운영 중인 버전이 한 번씩 돈다. */
+function RuleExecutions({ rule }) {
+  const executions = rule.executions ?? [];
+  if (!executions.length) return null;
+  return <Panel className="rule-executions" aria-label="룰 일일 실행">
+    <h2>일일 실행</h2>
+    <p className="workflow-rule-note">분석 때마다 그 분석이 새로 받은 날짜를 검사합니다. 최근 {executions.length}건입니다.</p>
+    <table className="rule-backtest-table">
+      <thead><tr><th scope="col">분석 날짜</th><th scope="col">버전</th><th scope="col">방식</th><th scope="col">결과</th>
+        <th scope="col">검사 시점</th><th scope="col">적중</th><th scope="col">건너뛴 바쁜 계좌</th></tr></thead>
+      <tbody>{executions.map((run, index) => <tr key={index}>
+        <th scope="row">{run.analysisDate ?? '—'}</th>
+        <td>v{run.versionNo}</td>
+        <td>{executionModes[run.mode] ?? run.mode}</td>
+        <td>{run.status === 'FAILED' ? `실패 · ${executionErrors[run.errorCode] ?? run.errorCode}` : '완료'}</td>
+        <td>{run.triggerCount == null ? '—' : countFormat.format(run.triggerCount)}</td>
+        <td>{run.hitCount == null ? '—' : countFormat.format(run.hitCount)}</td>
+        <td>{run.skippedBusySubjects == null ? '—' : countFormat.format(run.skippedBusySubjects)}</td>
+      </tr>)}</tbody>
+    </table>
+  </Panel>;
+}
+
 function RuleEvents({ rule }) {
   return <Panel className="workflow-rule-reason" aria-label="룰 변경 기록">
     <h2>변경 기록</h2>
     {rule.events.length ? <ol className="workflow-rule-history">
       {rule.events.map((event, index) => <li key={index}>
-        <div><strong>{ruleEventNames[event.action] ?? event.action}{event.versionNo ? ` · v${event.versionNo}` : ''}</strong>
+        <div><strong>{ruleEventNames[event.action] ?? event.action}{event.versionNo ? ` · v${event.versionNo}` : ''}{event.selfApproved ? ' · 본인 승인' : ''}</strong>
           <span>{event.actor ?? '시스템'} · <RuleTime value={event.at} /></span></div>
         {event.comment && <p>{event.comment}</p>}
       </li>)}
@@ -125,6 +241,7 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
   const [detailFailure, setDetailFailure] = useState('');
   const [status, setStatus] = useState('all');
   const [deleting, setDeleting] = useState(false);
+  const [command, setCommand] = useState(null);
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
@@ -175,6 +292,12 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
 
   const shown = detail?.ruleId === selectedId ? detail : null;
   const working = shown?.working;
+  // 서버가 준 명령을 정해 둔 순서로. 할 수 없는 명령은 이유를 툴팁으로 달아 꺼 둔다.
+  const commands = commandOrder.flatMap(action => (shown?.commands ?? []).filter(item => item.action === action));
+  // 누르면 확인 창이 뜬다. 확인 창이 한 번 더 묻으므로 길게 누르기는 쓰지 않는다.
+  const commandButton = item => <PrimaryButton key={`${item.action}-${item.versionId}`} tone={commandSpecs[item.action].tone}
+    disabled={!item.enabled} {...(item.reason ? { title: item.reason } : {})} aria-haspopup="dialog"
+    onClick={() => setCommand(item)}>{commandSpecs[item.action].label}</PrimaryButton>;
   return <>
     {notice && <p className="visually-hidden" role="status">{notice}</p>}
     <dl className="workflow-rule-inventory" aria-label="룰 상태별 수">
@@ -193,6 +316,8 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
             <SortableTableHead sorting={sorting} column="pattern" value={rule => rule.templateName}>템플릿</SortableTableHead>
             <SortableTableHead sorting={sorting} column="target" value={rule => subjectOf(rule.template) ?? ''}>대상</SortableTableHead>
             <SortableTableHead sorting={sorting} column="value" value={rule => rule.summary}>조건</SortableTableHead>
+            <SortableTableHead sorting={sorting} column="hits" value={rule => rule.hitCount ?? -1}>운영 적중</SortableTableHead>
+            <SortableTableHead sorting={sorting} column="alerts" value={rule => rule.linkedAlertCount ?? -1}>연결 Alert</SortableTableHead>
             <SortableTableHead sorting={sorting} column="version" value={rule => rule.versionNo}>버전</SortableTableHead>
             <SortableTableHead sorting={sorting} column="author" value={rule => rule.owner}>담당자</SortableTableHead>
           </TableRow></TableHeader>
@@ -207,10 +332,12 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
             <TableCell>{rule.templateName}</TableCell>
             <TableCell>{subjectOf(rule.template) ?? '—'}</TableCell>
             <TableCell className="workflow-rule-summary">{rule.summary}</TableCell>
+            <TableCell>{rule.hitCount == null ? '—' : countFormat.format(rule.hitCount)}{rule.lastRunFailed && <> <StatusTag preset="caution">실행 실패</StatusTag></>}</TableCell>
+            <TableCell>{rule.linkedAlertCount == null ? '—' : countFormat.format(rule.linkedAlertCount)}</TableCell>
             <TableCell>v{rule.versionNo}{rule.workingVersionNo && rule.workingVersionNo !== rule.versionNo ? ` · v${rule.workingVersionNo} ${ruleStatusNames[rule.workingStatus]}` : ''}</TableCell>
             <TableCell>{rule.owner}</TableCell>
           </TableRow>)}
-            {!rows.length && <TableRow><TableCell colSpan={7}>{rules.length ? '조건에 맞는 룰이 없습니다.' : '등록된 룰이 없습니다. 룰 만들기에서 첫 룰을 만들어 주세요.'}</TableCell></TableRow>}
+            {!rows.length && <TableRow><TableCell colSpan={9}>{rules.length ? '조건에 맞는 룰이 없습니다.' : '등록된 룰이 없습니다. 룰 만들기에서 첫 룰을 만들어 주세요.'}</TableCell></TableRow>}
           </TableBody>
         </WorkflowTable>
       </Panel>
@@ -220,11 +347,11 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
         {detailFailure ? <p role="alert">{detailFailure}</p> : <p className="workflow-rule-note">상세를 불러오는 중입니다.</p>}
       </Panel>}
     </div>
+    {shown && <RuleExecutions rule={shown} />}
     {shown && <RuleEvents rule={shown} />}
     <ScreenActions host={actionsHost} stackOnNarrow>
       <PrimaryButton tone="negative" disabled={!working?.deletable} aria-haspopup="dialog" onClick={() => setDeleting(true)}>초안 삭제</PrimaryButton>
-      <PrimaryButton tone="negative" disabled title={later}>중지</PrimaryButton>
-      <PrimaryButton tone="negative" disabled title={later}>반려</PrimaryButton>
+      {commands.filter(item => commandSpecs[item.action].tone === 'negative').map(commandButton)}
       <PrimaryButton tone="inverse" disabled title={later}>복제</PrimaryButton>
       {shown && backtestable(shown.template)
         ? <PrimaryButton tone="inverse" as="a" href={`/rules/backtest?rule=${shown.code}`}>백테스트로 열기</PrimaryButton>
@@ -232,8 +359,15 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
       {working?.editable
         ? <PrimaryButton tone="inverse" as="a" href={`/rules/new?rule=${shown.code}`}>이어서 작성</PrimaryButton>
         : <PrimaryButton tone="inverse" disabled>이어서 작성</PrimaryButton>}
-      <PrimaryButton tone="brand" disabled title={later}>승인 요청</PrimaryButton>
+      {commands.filter(item => commandSpecs[item.action].tone !== 'negative').map(commandButton)}
     </ScreenActions>
+    {command && shown && <RuleCommandDialog key={`${command.action}-${command.versionId}-${command.revision}`} rule={shown} command={command}
+      onClose={() => setCommand(null)} onDone={next => {
+        setNotice(`${next.code} · ${commandSpecs[command.action].label} · ${ruleStatusNames[next.status] ?? ''}`);
+        setDetail(next);
+        // 목록의 상태와 상태별 수도 다시 읽는다
+        setAttempt(count => count + 1);
+      }} />}
     {deleting && working && <DraftDelete rule={shown} version={working} onClose={() => setDeleting(false)} onDeleted={() => {
       setNotice(`${shown.code} v${working.versionNo} 초안 삭제됨`);
       setDetail(null);

@@ -85,8 +85,8 @@ export const checkFixture = {
 
 export const rulesFixture = {
   "content": [
-    {"ruleId": 2, "code": "RULE-002", "name": "운영 FAN-IN", "template": "FAN_IN", "templateName": "FAN-IN · 집중 수취", "summary": "첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일", "status": "ACTIVE", "then": "ATTACH_EVIDENCE", "versionNo": 1, "versionId": 2, "operatingVersionNo": 1, "operatingStatus": "ACTIVE", "operatingSummary": "첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일", "workingVersionNo": null, "workingStatus": null, "owner": "L1 심사자 A", "changedAt": "2023-09-17T00:00:00Z", "hitCount": null, "lastHitDate": null, "linkedAlertCount": null, "normalRate": null, "alertedHitCount": null, "skippedBusySubjects": null, "lastRunFailed": null},
-    {"ruleId": 4, "code": "RULE-004", "name": "분산 송금 감시", "template": "FAN_OUT", "templateName": "FAN-OUT · 분산 송금", "summary": "첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 6개 이상 · 7일", "status": "DRAFT", "then": "ATTACH_EVIDENCE", "versionNo": 1, "versionId": 5, "operatingVersionNo": null, "operatingStatus": null, "operatingSummary": null, "workingVersionNo": 1, "workingStatus": "DRAFT", "owner": "L1 심사자 A", "changedAt": "2023-09-17T00:00:00Z", "hitCount": null, "lastHitDate": null, "linkedAlertCount": null, "normalRate": null, "alertedHitCount": null, "skippedBusySubjects": null, "lastRunFailed": null},
+    {"ruleId": 2, "code": "RULE-002", "name": "운영 FAN-IN", "template": "FAN_IN", "templateName": "FAN-IN · 집중 수취", "summary": "첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일", "status": "ACTIVE", "then": "ATTACH_EVIDENCE", "versionNo": 1, "versionId": 2, "operatingVersionNo": 1, "operatingStatus": "ACTIVE", "operatingSummary": "첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일", "workingVersionNo": null, "workingStatus": null, "owner": "L1 심사자 A", "changedAt": "2023-09-17T00:00:00Z", "hitCount": 3, "lastHitDate": "2023-09-15", "shadowHitCount": null, "linkedAlertCount": 2, "normalRate": 50.0, "alertedHitCount": null, "skippedBusySubjects": 0, "lastRunFailed": false},
+    {"ruleId": 4, "code": "RULE-004", "name": "분산 송금 감시", "template": "FAN_OUT", "templateName": "FAN-OUT · 분산 송금", "summary": "첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 6개 이상 · 7일", "status": "DRAFT", "then": "ATTACH_EVIDENCE", "versionNo": 1, "versionId": 5, "operatingVersionNo": null, "operatingStatus": null, "operatingSummary": null, "workingVersionNo": 1, "workingStatus": "DRAFT", "owner": "L1 심사자 A", "changedAt": "2023-09-17T00:00:00Z", "hitCount": 0, "lastHitDate": null, "shadowHitCount": null, "linkedAlertCount": 0, "normalRate": null, "alertedHitCount": null, "skippedBusySubjects": null, "lastRunFailed": null},
   ],
   "counts": {
     "ACTIVE": 1,
@@ -94,7 +94,7 @@ export const rulesFixture = {
   },
 } as unknown as RuleList
 
-/** 내가 만든 작성 중 룰 (RULE-004) */
+/** 내가 만든 작성 중 룰 (RULE-004). 백테스트를 아직 돌리지 않아 시험 운영 · 승인 요청이 꺼져 있다. */
 export const draftRuleFixture = {
   "ruleId": 4,
   "code": "RULE-004",
@@ -105,12 +105,17 @@ export const draftRuleFixture = {
   "createdAt": "2023-09-17T00:00:00Z",
   "status": "DRAFT",
   "operating": null,
-  "working": {"versionId": 5, "versionNo": 1, "status": "DRAFT", "summary": "첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 6개 이상 · 7일", "author": "L1 심사자 A", "createdAt": "2023-09-17T00:00:00Z", "submittedAt": null, "decidedAt": null, "decidedBy": null, "revision": 0, "definition": {"schema": 2, "template": "FAN_OUT", "windowMinutes": 10080, "filter": {"op": "ALL", "items": [{"field": "FIRST_PAIR"}, {"field": "TX_USD", "cmp": "GTE", "value": 1000}]}, "where": {"op": "ALL", "items": [{"metric": "DISTINCT_COUNTERPARTIES", "cmp": "GTE", "value": 6}]}, "then": "ATTACH_EVIDENCE"}, "digest": "ca4ebece429e96e595df7fb156e4549e9369347859709d5dfca8d59845c9ccaa", "sentence": "처음 거래하는 상대이고 건당 금액이 1,000 USD 이상인 거래만 세어, 한 송금 계좌에서 7일 안에 서로 다른 수취 계좌 수가 6개 이상이면 Alert에 근거로 표시합니다.", "editable": true, "deletable": true},
+  "working": {"versionId": 5, "versionNo": 1, "status": "DRAFT", "summary": "첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 6개 이상 · 7일", "author": "L1 심사자 A", "createdAt": "2023-09-17T00:00:00Z", "submittedAt": null, "decidedAt": null, "decidedBy": null, "revision": 0, "definition": {"schema": 2, "template": "FAN_OUT", "windowMinutes": 10080, "filter": {"op": "ALL", "items": [{"field": "FIRST_PAIR"}, {"field": "TX_USD", "cmp": "GTE", "value": 1000}]}, "where": {"op": "ALL", "items": [{"metric": "DISTINCT_COUNTERPARTIES", "cmp": "GTE", "value": 6}]}, "then": "ATTACH_EVIDENCE"}, "digest": "ca4ebece429e96e595df7fb156e4549e9369347859709d5dfca8d59845c9ccaa", "sentence": "처음 거래하는 상대이고 건당 금액이 1,000 USD 이상인 거래만 세어, 한 송금 계좌에서 7일 안에 서로 다른 수취 계좌 수가 6개 이상이면 Alert에 근거로 표시합니다.", "editable": true, "deletable": true, "backtest": null},
+  "commands": [
+    {"action": "START_SHADOW", "versionId": 5, "revision": 0, "enabled": false, "reason": "지금 조건으로 끝낸 백테스트가 있어야 합니다.", "commentRequired": false},
+    {"action": "SUBMIT", "versionId": 5, "revision": 0, "enabled": false, "reason": "지금 조건으로 끝낸 백테스트가 있어야 합니다.", "commentRequired": false},
+  ],
   "versions": [{"versionId": 5, "versionNo": 1, "status": "DRAFT", "summary": "첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 6개 이상 · 7일", "author": "L1 심사자 A", "createdAt": "2023-09-17T00:00:00Z", "submittedAt": null, "decidedAt": null, "decidedBy": null}],
+  "executions": [],
   "events": [{"at": "2023-09-17T00:00:00Z", "actor": "L1 심사자 A", "action": "CREATED", "comment": "", "versionNo": 1}],
 } as unknown as RuleDetail
 
-/** 운영 중 룰 (RULE-002). 작업 중 버전이 없다. */
+/** 운영 중 룰 (RULE-002). 작업 중 버전이 없다. 심사자(STAFF)가 본 응답이라 중지는 꺼져 있다. */
 export const activeRuleFixture = {
   "ruleId": 2,
   "code": "RULE-002",
@@ -122,6 +127,14 @@ export const activeRuleFixture = {
   "status": "ACTIVE",
   "operating": {"versionId": 2, "versionNo": 1, "status": "ACTIVE", "summary": "첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일", "author": "L1 심사자 A", "createdAt": "2023-09-17T00:00:00Z", "submittedAt": null, "decidedAt": null, "decidedBy": null, "revision": 0, "definition": {"schema": 2, "template": "FAN_IN", "windowMinutes": 10080, "filter": {"op": "ALL", "items": [{"field": "FIRST_PAIR"}, {"field": "FX_FOLLOW"}]}, "where": {"op": "ALL", "items": [{"metric": "DISTINCT_COUNTERPARTIES", "cmp": "GTE", "value": 3}]}, "then": "ATTACH_EVIDENCE"}, "digest": "3ead40bf6f443d930b7b4a632b89c082dd5112ab5c99fc4e86c048533af3ef50", "sentence": "처음 거래하는 상대이고 환전 직후 송금인 거래만 세어, 한 수취 계좌에서 7일 안에 서로 다른 송금 계좌 수가 3개 이상이면 Alert에 근거로 표시합니다.", "editable": false, "deletable": false},
   "working": null,
+  "commands": [
+    {"action": "PAUSE", "versionId": 2, "revision": 0, "enabled": false, "reason": "관리자만 할 수 있습니다.", "commentRequired": true},
+    {"action": "NEW_VERSION", "versionId": 2, "revision": 0, "enabled": true, "reason": null, "commentRequired": false},
+  ],
   "versions": [{"versionId": 2, "versionNo": 1, "status": "ACTIVE", "summary": "첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일", "author": "L1 심사자 A", "createdAt": "2023-09-17T00:00:00Z", "submittedAt": null, "decidedAt": null, "decidedBy": null}],
+  "executions": [
+    {"versionNo": 1, "mode": "LIVE", "status": "FAILED", "analysisDate": "2023-09-16", "triggerCount": null, "hitCount": null, "skippedBusySubjects": null, "errorCode": "TIMEOUT", "finishedAt": "2023-09-17T00:00:00Z"},
+    {"versionNo": 1, "mode": "LIVE", "status": "COMPLETED", "analysisDate": "2023-09-15", "triggerCount": 1204, "hitCount": 3, "skippedBusySubjects": 0, "errorCode": null, "finishedAt": "2023-09-16T00:00:00Z"},
+  ],
   "events": [{"at": "2023-09-17T00:00:00Z", "actor": "관리자", "action": "DRAFT_DELETED", "comment": "", "versionNo": 2}, {"at": "2023-09-17T00:00:00Z", "actor": "L1 심사자 A", "action": "CREATED", "comment": "", "versionNo": 1}],
 } as unknown as RuleDetail

@@ -112,12 +112,19 @@ export type RuleRow = {
   workingStatus: 'DRAFT' | 'SHADOW' | 'PENDING' | null
   owner: string
   changedAt: IsoDateTime | null
-  // 일일 실행이 붙기 전까지는 값이 없다
+  // 아래 숫자는 끝난 일일 실행, 끝난 분석의 적중만 센다
+  /** 운영 적중(대상 × 날짜) 수 */
   hitCount: number | null
+  /** 가장 최근 운영 적중의 거래 기준일 */
   lastHitDate: string | null
+  /** 지금 시험 운영 중인 버전이 쌓은 적중 수. 그런 버전이 없으면 null */
+  shadowHitCount?: number | null
+  /** 운영 적중과 거래가 겹치는 Alert 수 */
   linkedAlertCount: number | null
+  /** 그 Alert 가운데 사람이 종결한 것에서 정상 판정의 비율(%). 종결한 것이 없으면 null */
   normalRate: number | null
   alertedHitCount: number | null
+  /** 가장 최근 일일 실행에서 바쁜 계좌라 평가하지 않은 대상 수, 그 실행이 실패했는지. 실행한 적이 없으면 null */
   skippedBusySubjects: number | null
   lastRunFailed: boolean | null
 }
@@ -143,8 +150,37 @@ export type RuleVersion = RuleVersionLine & {
   editable: boolean
   /** 작성 중이고(작성자 또는 관리자) 시험 운영 · 승인 요청을 한 적이 없는 버전 */
   deletable: boolean
+  /** 이 버전의 가장 최근 백테스트. currentDefinition 이 false 면 돌린 뒤에 조건을 고친 것이다 */
+  backtest?: { backtestId: number; status: BacktestStatus; currentDefinition: boolean; finishedAt: IsoDateTime | null } | null
 }
-export type RuleEvent = { at: IsoDateTime; actor: string | null; action: string; comment: string; versionNo: number | null }
+export type RuleEvent = {
+  at: IsoDateTime; actor: string | null; action: string; comment: string; versionNo: number | null
+  /** 작성자가 자기 버전을 승인했다 */
+  selfApproved?: boolean
+}
+export type RuleCommandAction = 'START_SHADOW' | 'SUBMIT' | 'WITHDRAW' | 'APPROVE' | 'REJECT' | 'PAUSE' | 'RESUME'
+/** 지금 상태에서 있는 명령. NEW_VERSION 은 운영 버전을 복사해 새 초안을 만드는 것이다(createRuleVersion) */
+export type RuleCommand = {
+  action: RuleCommandAction | 'NEW_VERSION'
+  versionId: number
+  revision: number
+  /** 지금 로그인한 사람이 할 수 있는가. 못 하면 reason 에 이유가 있다 */
+  enabled: boolean
+  reason: string | null
+  commentRequired: boolean
+}
+/** 일일 실행 한 번 = 분석 × 버전 */
+export type RuleExecution = {
+  versionNo: number
+  mode: 'LIVE' | 'SHADOW'
+  status: 'COMPLETED' | 'FAILED'
+  analysisDate: IsoDate | null
+  triggerCount: number | null
+  hitCount: number | null
+  skippedBusySubjects: number | null
+  errorCode: 'TIMEOUT' | 'BUDGET' | 'INTERNAL' | 'INTERRUPTED' | null
+  finishedAt: IsoDateTime | null
+}
 export type RuleDetail = {
   ruleId: number
   code: string
@@ -156,7 +192,10 @@ export type RuleDetail = {
   status: Exclude<RuleStatus, 'RETIRED'> | null
   operating: RuleVersion | null
   working: RuleVersion | null
+  commands?: RuleCommand[]
   versions: RuleVersionLine[]
+  /** 최근 일일 실행 20건 */
+  executions?: RuleExecution[]
   events: RuleEvent[]
 }
 
@@ -190,6 +229,14 @@ export const createRule = (input: { name: string; template: string; definition?:
 /** 초안 저장. revision 이 서버와 다르면 409(INVALID_TRANSITION). */
 export const saveRuleDraft = (ruleId: number, versionId: number, input: { name: string; definition: RuleDefinition; revision: number }) =>
   putJson<RuleSaved>(`/api/v1/rules/${ruleId}/versions/${versionId}`, input, silent)
+/** 운영 버전을 복사해 새 초안을 만든다 */
+export const createRuleVersion = (ruleId: number) =>
+  postJson<{ ruleId: number; code: string; versionId: number; versionNo: number; revision: number }>(`/api/v1/rules/${ruleId}/versions`, {}, silent)
+/** 상태 명령. 바뀐 룰 상세를 돌려준다 */
+export const commandRule = (ruleId: number, input: {
+  requestId?: string; action: RuleCommandAction; versionId: number; revision: number; comment?: string
+}) => postJson<RuleDetail>(`/api/v1/rules/${ruleId}/commands`, input, silent)
+
 export const deleteRuleDraft = (ruleId: number, versionId: number) =>
   deleteJson(`/api/v1/rules/${ruleId}/versions/${versionId}`, silent)
 
@@ -272,3 +319,38 @@ export const fetchBacktest = (backtestId: number) => getJson<Backtest>(`/api/v1/
 /** 한 룰의 백테스트 기록. 최근 것부터 20건 */
 export const fetchBacktests = (ruleId: number) => getJson<BacktestHead[]>('/api/v1/rule-backtests', { ruleId })
 export const cancelBacktest = (backtestId: number) => postJson<Backtest>(`/api/v1/rule-backtests/${backtestId}/cancel`, {}, silent)
+
+// ---- 사건의 룰 적중 ----
+
+/** 카드 한 장 = 사건 안의 Alert × 룰 버전 × 대상 계좌 */
+export type RuleHitCard = {
+  alertId: number
+  ruleId: number
+  code: string
+  name: string
+  template: string
+  templateName: string
+  pattern: number | null
+  versionId: number
+  versionNo: number
+  /** 지금 그 버전의 상태. 중지했거나 물러난 버전이 운영 중일 때 만든 적중도 나온다 */
+  versionStatus: RuleStatus
+  summary: string
+  subjectType: 'ACCOUNT' | 'TX'
+  subjectLabel: string | null
+  /** 가명 계좌 ID 앞 8자리 */
+  subject: string
+  /** 걸린 거래 기준일들 */
+  hitDates: IsoDate[]
+  windowMinutes: number | null
+  /** 가장 최근 날의 측정값 */
+  measured: Record<string, number | null>
+  conditions: { metric: string; label: string; cmp: string | null; value: number | null; unit?: string | null; measured: number | null }[]
+  roles: { role: string; accountId: string }[]
+  /** 사건의 거래 가운데 이 적중의 근거 거래인 것 */
+  matchedTxIds: number[]
+  evidenceTxCount: number
+}
+
+/** Alert · Episode 의 현재 거래에 걸린 운영 룰 적중 */
+export const fetchCaseRuleHits = (caseId: number) => getJson<RuleHitCard[]>(`/api/v1/review/cases/${caseId}/rule-hits`)

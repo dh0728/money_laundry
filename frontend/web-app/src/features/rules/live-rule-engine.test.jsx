@@ -2,7 +2,9 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/common';
-import { createRule, deleteRuleDraft, fetchRule, fetchRuleCatalog, fetchRules, saveRuleDraft, validateRule } from '@/api/rules';
+import {
+  commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchRule, fetchRuleCatalog, fetchRules, saveRuleDraft, validateRule,
+} from '@/api/rules';
 import { LiveRuleBuilder } from './live-rule-builder';
 import { LiveRuleList } from './live-rule-list';
 import { activeRuleFixture, catalogFixture, checkFixture, draftRuleFixture, rulesFixture } from './rule-test-fixtures';
@@ -10,6 +12,7 @@ import { activeRuleFixture, catalogFixture, checkFixture, draftRuleFixture, rule
 // 서비스 모드의 룰 만들기 · 룰 목록. 서버 응답은 실제 응답을 줄인 것(rule-test-fixtures)으로 대신한다.
 vi.mock('@/api/rules', () => ({
   fetchRuleCatalog: vi.fn(), fetchRules: vi.fn(), fetchRule: vi.fn(), validateRule: vi.fn(), createRule: vi.fn(), saveRuleDraft: vi.fn(), deleteRuleDraft: vi.fn(),
+  commandRule: vi.fn(), createRuleVersion: vi.fn(),
 }));
 
 const fanOutDefaults = catalogFixture.templates.find(template => template.key === 'FAN_OUT').defaults;
@@ -164,20 +167,119 @@ it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, �
   expect(row.getByText(draftRuleFixture.working.summary)).toBeInTheDocument();
   expect(within(screen.getByRole('region', { name: '룰 변경 기록' })).getByText('룰 만듦 · v1')).toBeInTheDocument();
 
-  // 지금 열린 일은 이어서 작성, 초안 삭제, 백테스트로 열기다
+  // 작성 중인 초안: 이어서 작성, 초안 삭제, 백테스트로 열기가 열려 있다
   const actions = within(footer);
   expect(actions.getByRole('link', { name: '이어서 작성' })).toHaveAttribute('href', '/rules/new?rule=RULE-004');
   expect(actions.getByRole('button', { name: '초안 삭제' })).toBeEnabled();
   expect(actions.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', '/rules/backtest?rule=RULE-004');
-  for (const name of ['중지', '반려', '복제', '승인 요청']) expect(actions.getByRole('button', { name })).toBeDisabled();
+  // 상태 명령은 서버가 준 것만 나오고, 할 수 없는 것은 이유와 함께 꺼져 있다
+  for (const name of ['시험 운영 시작', '승인 요청']) {
+    expect(actions.getByRole('button', { name })).toBeDisabled();
+    expect(actions.getByRole('button', { name })).toHaveAttribute('title', '지금 조건으로 끝낸 백테스트가 있어야 합니다.');
+  }
+  for (const name of ['승인', '반려', '중지', '재개', '새 버전 만들기']) expect(actions.queryByRole('button', { name })).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('백테스트를 아직 돌리지 않았습니다.');
+  expect(screen.queryByRole('region', { name: '룰 일일 실행' })).not.toBeInTheDocument();
 
-  // 운영 중 룰에는 고칠 초안이 없다
+  // 운영 중 룰에는 고칠 초안이 없다. 적중 수와 Alert 수, 일일 실행 기록을 보여 준다.
   fireEvent.click(screen.getByRole('button', { name: /RULE-002/ }));
   expect(await screen.findByText(activeRuleFixture.operating.sentence)).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('운영 버전 · v1');
+  const detail = screen.getByRole('region', { name: '룰 상세' });
+  expect(detail).toHaveTextContent('운영 버전 · v1');
+  expect(within(detail).getByText('운영 적중').nextElementSibling).toHaveTextContent('3건 · 마지막 2023-09-15');
+  expect(within(detail).getByText('연결 Alert').nextElementSibling).toHaveTextContent('2건 · 정상 판정 50%');
+  const runs = within(screen.getByRole('region', { name: '룰 일일 실행' })).getAllByRole('row');
+  expect(runs[1]).toHaveTextContent('2023-09-16v1운영실패 · 쿼리 120초 초과');
+  expect(runs[2]).toHaveTextContent('2023-09-15v1운영완료1,20430');
   expect(actions.getByRole('button', { name: '이어서 작성' })).toBeDisabled();
   expect(actions.getByRole('button', { name: '초안 삭제' })).toBeDisabled();
+  expect(actions.getByRole('button', { name: '중지' })).toHaveAttribute('title', '관리자만 할 수 있습니다.');
+  expect(actions.getByRole('button', { name: '새 버전 만들기' })).toBeEnabled();
 });
+
+// jsdom 에는 <dialog> 의 showModal · close 가 없다
+function withDialog(run) {
+  const dialogApi = { showModal: HTMLDialogElement.prototype.showModal, close: HTMLDialogElement.prototype.close };
+  HTMLDialogElement.prototype.showModal = function showModal() { this.open = true; };
+  HTMLDialogElement.prototype.close = function close() {
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
+  return run().finally(() => Object.assign(HTMLDialogElement.prototype, dialogApi));
+}
+
+it('상태 명령은 확인 창에서 사유를 받아 서버에 보내고, 바뀐 상세와 목록을 다시 보여 준다', () => withDialog(async () => {
+  // 관리자가 본 승인 대기 룰: 승인 · 반려를 할 수 있고 둘 다 사유가 있어야 한다
+  const pending = { ...draftRuleFixture, status: 'PENDING',
+    working: { ...draftRuleFixture.working, status: 'PENDING', revision: 2, editable: false, deletable: false,
+      backtest: { backtestId: 31, status: 'COMPLETED', currentDefinition: true, finishedAt: '2023-09-17T00:00:00Z' } },
+    commands: [
+      { action: 'WITHDRAW', versionId: 5, revision: 2, enabled: false, reason: '작성자만 할 수 있습니다.', commentRequired: false },
+      { action: 'APPROVE', versionId: 5, revision: 2, enabled: true, reason: null, commentRequired: true },
+      { action: 'REJECT', versionId: 5, revision: 2, enabled: true, reason: null, commentRequired: true },
+    ] };
+  const approved = { ...pending, status: 'ACTIVE', working: null, operating: { ...pending.working, status: 'ACTIVE', revision: 3 },
+    commands: [{ action: 'PAUSE', versionId: 5, revision: 3, enabled: true, reason: null, commentRequired: true }],
+    events: [{ at: '2023-09-17T00:00:00Z', actor: '관리자', action: 'APPROVED', comment: '백테스트 확인', versionNo: 1, selfApproved: true }] };
+  vi.mocked(fetchRule).mockResolvedValue(pending);
+  render(<LiveRuleList initialRule="RULE-004" actionsHost={footer} />);
+  const actions = within(footer);
+  await waitFor(() => expect(actions.getByRole('button', { name: '승인' })).toBeEnabled());
+  expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('지금 조건으로 백테스트를 끝냈습니다.');
+  expect(actions.getByRole('button', { name: '되돌리기' })).toBeDisabled();
+  // 버튼은 왼쪽부터 위험한 것, 가운데 보조, 오른쪽 끝에 주된 명령
+  const order = ['반려', '되돌리기', '승인'].map(name => actions.getByRole('button', { name }));
+  expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  fireEvent.click(actions.getByRole('button', { name: '승인' }));
+  const dialog = within(screen.getByRole('dialog', { name: '룰 승인' }));
+  expect(dialog.getByText('변경 후 상태 · 운영 중')).toBeInTheDocument();
+  // 사유가 없으면 확인할 수 없다
+  expect(dialog.getByRole('button', { name: '승인 확인' })).toBeDisabled();
+  fireEvent.change(dialog.getByLabelText('사유'), { target: { value: '  백테스트 확인  ' } });
+
+  vi.mocked(commandRule).mockRejectedValueOnce(problem(409, 'INVALID_TRANSITION', '다른 곳에서 먼저 바꿨습니다. 다시 조회하세요.'));
+  fireEvent.submit(dialog.getByRole('button', { name: '승인 확인' }).closest('form'));
+  expect(await dialog.findByRole('alert')).toHaveTextContent('다른 곳에서 먼저 바꿨습니다. 다시 조회하세요.');
+
+  vi.mocked(commandRule).mockResolvedValue(approved);
+  vi.mocked(fetchRule).mockResolvedValue(approved);
+  vi.mocked(fetchRules).mockResolvedValue({ content: rulesFixture.content.map(rule => (rule.code === 'RULE-004' ? { ...rule, status: 'ACTIVE' } : rule)), counts: { ACTIVE: 2 } });
+  await act(async () => { fireEvent.submit(dialog.getByRole('button', { name: '승인 확인' }).closest('form')); });
+  // 다시 눌러도 같은 요청 번호라 서버는 한 번만 적용한다
+  const [first, second] = vi.mocked(commandRule).mock.calls;
+  expect(second).toEqual([4, { requestId: expect.any(String), action: 'APPROVE', versionId: 5, revision: 2, comment: '백테스트 확인' }]);
+  expect(second[1].requestId).toBe(first[1].requestId);
+
+  expect(screen.queryByRole('dialog', { name: '룰 승인' })).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('RULE-004 · 승인 · 운영 중');
+  await waitFor(() => expect(actions.getByRole('button', { name: '중지' })).toBeEnabled());
+  expect(actions.queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: '룰 변경 기록' })).getByText('승인 · v1 · 본인 승인')).toBeInTheDocument();
+  expect(within(screen.getByLabelText('룰 상태별 수')).getByText('운영 중').closest('div')).toHaveTextContent('2');
+}));
+
+it('새 버전 만들기는 운영 버전을 복사한 초안을 만들고 상세를 다시 읽는다', () => withDialog(async () => {
+  render(<LiveRuleList initialRule="RULE-002" actionsHost={footer} />);
+  const actions = within(footer);
+  await waitFor(() => expect(actions.getByRole('button', { name: '새 버전 만들기' })).toBeEnabled());
+  fireEvent.click(actions.getByRole('button', { name: '새 버전 만들기' }));
+  const dialog = within(screen.getByRole('dialog', { name: '룰 새 버전 만들기' }));
+  // 사유를 받지 않는다
+  expect(dialog.queryByRole('textbox')).not.toBeInTheDocument();
+
+  const drafted = { ...activeRuleFixture, working: { ...activeRuleFixture.operating, versionId: 9, versionNo: 2, status: 'DRAFT', editable: true, deletable: true, backtest: null },
+    commands: [{ action: 'NEW_VERSION', versionId: 2, revision: 0, enabled: false, reason: '작업 중인 버전이 이미 있습니다.', commentRequired: false }] };
+  vi.mocked(createRuleVersion).mockResolvedValue({ ruleId: 2, code: 'RULE-002', versionId: 9, versionNo: 2, revision: 0 });
+  vi.mocked(fetchRule).mockResolvedValue(drafted);
+  await act(async () => { fireEvent.submit(dialog.getByRole('button', { name: '새 버전 만들기 확인' }).closest('form')); });
+  expect(createRuleVersion).toHaveBeenCalledWith(2);
+  expect(commandRule).not.toHaveBeenCalled();
+  await waitFor(() => expect(actions.getByRole('link', { name: '이어서 작성' })).toHaveAttribute('href', '/rules/new?rule=RULE-002'));
+  expect(actions.getByRole('button', { name: '새 버전 만들기' })).toHaveAttribute('title', '작업 중인 버전이 이미 있습니다.');
+  expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('새 버전 · v2');
+}));
 
 it('초안 삭제는 확인을 거쳐 지우고 목록을 다시 읽는다', async () => {
   const dialogApi = { showModal: HTMLDialogElement.prototype.showModal, close: HTMLDialogElement.prototype.close };

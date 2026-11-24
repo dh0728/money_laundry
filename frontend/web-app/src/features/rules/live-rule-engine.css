@@ -244,3 +244,7 @@ button.rule-connector:hover { background: var(--hover) }
 @media (pointer: coarse) {
   .rule-builder :is(.rule-select, .rule-value) { font-size: max(16px, var(--ui-font-size)) }
 }
+
+/* ---- 일일 실행 기록(룰 상세) ---- */
+/* 목록 화면의 격자(상태별 수 / 목록 / 상세 · 변경 기록) 아래에 한 줄을 다 쓴다 */
+.rule-executions { grid-column: 1 / -1; display: grid; gap: var(--aml-space-8) }
