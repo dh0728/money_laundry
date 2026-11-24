@@ -1,11 +1,12 @@
 "use client";
 
 import { m, useSpring, useTransform } from "motion/react";
-import { memo, useEffect } from "react";
+import { memo, useEffect, type CSSProperties } from "react";
 import { arcPath } from "./arc-path";
 import { usePieHover, usePieStable } from "./pie-context";
 import { useEnterComplete } from "./use-enter-complete";
 import { useMountProgress } from "../use-mount-progress";
+import "./pie-slice.css";
 
 // Calculate the translation offset for a slice to "pop out" along its radial axis
 function getSliceOffset(
@@ -63,11 +64,9 @@ interface AnimatedSliceTranslateProps {
   cornerRadius: number;
   padAngle: number;
   fill: string;
-  color: string;
   isHovered: boolean;
   isFaded: boolean;
   animationKey: number;
-  showGlow: boolean;
   hoverOffset: number;
 }
 
@@ -80,11 +79,9 @@ function AnimatedSliceTranslate({
   cornerRadius,
   padAngle,
   fill,
-  color,
   isHovered,
   isFaded,
   animationKey,
-  showGlow,
   hoverOffset,
 }: AnimatedSliceTranslateProps) {
   const {
@@ -116,7 +113,6 @@ function AnimatedSliceTranslate({
   });
 
   const offset = getSliceOffset(startAngle, endAngle, hoverOffset);
-  const glowColor = color;
   const hitboxPath = arcPath(
     innerRadius,
     outerRadius,
@@ -139,12 +135,7 @@ function AnimatedSliceTranslate({
         fill={fill}
         initial={false}
         pointerEvents="none"
-        style={{
-          filter:
-            showGlow && isHovered
-              ? `drop-shadow(0 0 12px ${glowColor})`
-              : "none",
-        }}
+        className="pie-slice-visual"
         transition={{
           opacity: { duration: 0.15 },
           x: { type: "spring", stiffness: 400, damping: 25 },
@@ -166,10 +157,7 @@ function AnimatedSliceTranslate({
       initial={false}
       key={`slice-${animationKey}-${index}`}
       pointerEvents="none"
-      style={{
-        filter:
-          showGlow && isHovered ? `drop-shadow(0 0 12px ${glowColor})` : "none",
-      }}
+      className="pie-slice-visual"
       transition={{
         opacity: { duration: 0.15 },
         x: { type: "spring", stiffness: 400, damping: 25 },
@@ -188,11 +176,9 @@ interface AnimatedSliceGrowProps {
   cornerRadius: number;
   padAngle: number;
   fill: string;
-  color: string;
   isHovered: boolean;
   isFaded: boolean;
   animationKey: number;
-  showGlow: boolean;
   hoverOffset: number;
 }
 
@@ -205,11 +191,9 @@ function AnimatedSliceGrow({
   cornerRadius,
   padAngle,
   fill,
-  color,
   isHovered,
   isFaded,
   animationKey,
-  showGlow,
   hoverOffset,
 }: AnimatedSliceGrowProps) {
   const {
@@ -253,7 +237,6 @@ function AnimatedSliceGrow({
     }
   );
 
-  const glowColor = color;
   const grownOuterRadius = isHovered ? outerRadius + hoverOffset : outerRadius;
   const grownPath = arcPath(
     innerRadius,
@@ -275,12 +258,7 @@ function AnimatedSliceGrow({
         fill={fill}
         initial={false}
         pointerEvents="none"
-        style={{
-          filter:
-            showGlow && isHovered
-              ? `drop-shadow(0 0 12px ${glowColor})`
-              : "none",
-        }}
+        className="pie-slice-visual"
         transition={{
           opacity: { duration: 0.15 },
           d: { type: "spring", stiffness: 400, damping: 25 },
@@ -299,10 +277,7 @@ function AnimatedSliceGrow({
       initial={false}
       key={`slice-${animationKey}-${index}`}
       pointerEvents="none"
-      style={{
-        filter:
-          showGlow && isHovered ? `drop-shadow(0 0 12px ${glowColor})` : "none",
-      }}
+      className="pie-slice-visual"
       transition={{
         opacity: { duration: 0.15 },
       }}
@@ -389,7 +364,6 @@ export const PieSlice = memo(function PieSlice({
       return (
         <AnimatedSliceGrow
           animationKey={animationKey}
-          color={color}
           cornerRadius={cornerRadius}
           endAngle={arcData.endAngle}
           fill={fill}
@@ -400,7 +374,6 @@ export const PieSlice = memo(function PieSlice({
           isHovered={isHovered}
           outerRadius={outerRadius}
           padAngle={arcData.padAngle}
-          showGlow={showGlow}
           startAngle={arcData.startAngle}
         />
       );
@@ -410,7 +383,6 @@ export const PieSlice = memo(function PieSlice({
     return (
       <AnimatedSliceTranslate
         animationKey={animationKey}
-        color={color}
         cornerRadius={cornerRadius}
         endAngle={arcData.endAngle}
         fill={fill}
@@ -421,7 +393,6 @@ export const PieSlice = memo(function PieSlice({
         isHovered={isHovered}
         outerRadius={outerRadius}
         padAngle={arcData.padAngle}
-        showGlow={showGlow}
         startAngle={arcData.startAngle}
       />
     );
@@ -440,10 +411,7 @@ export const PieSlice = memo(function PieSlice({
           fill={fill}
           initial={false}
           pointerEvents="none"
-          style={{
-            filter:
-              showGlow && isHovered ? `drop-shadow(0 0 12px ${color})` : "none",
-          }}
+          className="pie-slice-visual"
           transition={{
             opacity: { duration: 0.15 },
             d: { type: "spring", stiffness: 400, damping: 25 },
@@ -468,10 +436,7 @@ export const PieSlice = memo(function PieSlice({
         fill={fill}
         initial={false}
         pointerEvents="none"
-        style={{
-          filter:
-            showGlow && isHovered ? `drop-shadow(0 0 12px ${color})` : "none",
-        }}
+        className="pie-slice-visual"
         transition={{
           opacity: { duration: 0.15 },
           x: { type: "spring", stiffness: 400, damping: 25 },
@@ -482,7 +447,8 @@ export const PieSlice = memo(function PieSlice({
   };
 
   return (
-    <g style={{ cursor: "pointer" }}>
+    <g className="pie-slice" data-pie-slice-glow={showGlow && isHovered ? "" : undefined}
+      style={{ "--pie-slice-glow-color": showGlow ? color : undefined } as CSSProperties}>
       {/* Invisible hitbox - stays in place, handles hover events */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG path used as hover hitbox for visualization */}
       <path
