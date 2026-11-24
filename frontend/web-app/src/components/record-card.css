@@ -14,7 +14,9 @@
     color-mix(in oklch, var(--record-card-accent) 88%, var(--aml-black-100)),
     color-mix(in oklch, var(--record-card-accent) 88%, var(--aml-white-100)));
   box-shadow: 0 var(--aml-space-2) var(--aml-space-8)
-    color-mix(in srgb, var(--record-card-depth-color) 20%, transparent);
+    color-mix(in srgb, var(--record-card-depth-color) 20%, transparent),
+    inset 0 0 var(--aml-space-8)
+    color-mix(in srgb, var(--record-card-depth-color) 28%, transparent);
 }
 :root[data-glassmorphism="false"]
   [data-glow-surface] {
@@ -45,11 +47,17 @@
   --divider: var(--record-card-divider);
 }
 [data-card-interactive]:has(.card-header-main:focus-visible) { outline-color: var(--focus-ring) }
+:root:not([data-glassmorphism="false"]) .magic-bento__card:has([data-card-interactive]) {
+  background: transparent;
+  box-shadow: none;
+}
+:root:not([data-glassmorphism="false"]) .magic-bento__card:has([data-card-interactive])
+  > :is(.magic-bento__rim, .magic-bento__border) { display: none }
 @media (hover: hover) {
   [data-card-interactive]:hover:not(:has(.card-header > .work-tab-add:hover)) {
     --record-card-interaction: 22%;
   }
-  [data-card-interactive][data-selected]:hover:not(:has(.card-header-main:focus-visible,
+  :root[data-glassmorphism="false"] [data-card-interactive][data-selected]:hover:not(:has(.card-header-main:focus-visible,
     .card-header > .work-tab-add:hover)) {
     outline-color: color-mix(in srgb, var(--selection-ink) 48%, transparent);
   }
@@ -57,7 +65,7 @@
 [data-card-interactive]:active:not(:has(.card-header > :is(.spring-check, .work-tab-add):active)) {
   --record-card-interaction: 34%;
 }
-[data-card-interactive][data-selected]:active:not(:has(.card-header > :is(.spring-check, .work-tab-add):active)) {
+:root[data-glassmorphism="false"] [data-card-interactive][data-selected]:active:not(:has(.card-header > :is(.spring-check, .work-tab-add):active)) {
   outline-color: color-mix(in srgb, var(--selection-ink) 66%, transparent);
 }
 [data-reduced-motion="true"] [data-card-interactive] { transition: none }

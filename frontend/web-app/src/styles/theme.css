@@ -2,6 +2,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./fonts.css";
+@import "./chart-palette.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -76,7 +77,6 @@
   --palette-radar-bezel-mid: #0a0a0c;
   --palette-radar-bezel-dark: #2e2e35;
   --palette-radar-disc: #08080a;
-  --palette-teal-500: oklch(.67 .13 165);
   --palette-teal-700: oklch(.38 .15 165);
   --palette-teal-300: oklch(.79 .14 165);
   --palette-teal-500-a45: oklch(.67 .13 165 / 45%);

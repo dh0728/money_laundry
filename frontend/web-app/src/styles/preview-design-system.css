@@ -2,6 +2,7 @@
 @import "./semantic-tokens.css";
 @import "./fonts.css";
 @import "./figma-colors.css";
+@import "./chart-palette.css";
 
 /* Map the standalone workspace's existing component tokens to the shared design system. */
 :root {
@@ -133,10 +134,8 @@
   --panel-light-color: light-dark(
     color-mix(in srgb, var(--panel-light-source) 21%, var(--aml-white-100)),
     color-mix(in srgb, var(--panel-light-source) 72%, var(--aml-white-100)));
-  --panel-edge-depth:
-    inset 0 0 0 var(--aml-stroke-divider) var(--glass-shell-edge),
-    inset 0 calc(-1 * var(--aml-space-2)) var(--aml-space-8)
-      light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), transparent);
+  --panel-edge-depth: inset 0 calc(-1 * var(--aml-space-2)) var(--aml-space-8)
+    light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), color-mix(in srgb, var(--panel-light-color), transparent));
   --information-panel-shadow:
     inset 0 var(--aml-stroke-divider) var(--aml-space-2) color-mix(in srgb, var(--panel-light-color) 46%, transparent),
     inset 0 var(--aml-space-4) var(--aml-space-12) color-mix(in srgb, var(--panel-light-color) 24%, transparent);

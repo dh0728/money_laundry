@@ -1,8 +1,11 @@
 .ai-summary-blob {
-  --ai-blob-blue: var(--aml-figma-surface-neutral-accent-default);
-  --ai-blob-violet: var(--aml-figma-surface-status-pending-accent-default);
+  --ai-blob-pink: light-dark(var(--aml-pink-060), var(--aml-pink-040));
+  --ai-blob-violet: light-dark(var(--aml-violet-060), var(--aml-violet-040));
+  --ai-summary-start: light-dark(var(--aml-violet-090), var(--aml-violet-020));
+  --ai-summary-end: light-dark(var(--aml-pink-090), var(--aml-pink-020));
+  --ai-summary-surface: linear-gradient(to right, var(--ai-summary-start), var(--ai-summary-end));
   --panel-material-solid: color-mix(in srgb, var(--ai-summary-start), var(--ai-summary-end));
-  --panel-material-light: color-mix(in srgb, var(--ai-blob-blue), var(--ai-blob-violet));
+  --panel-material-light: color-mix(in srgb, var(--ai-blob-pink), var(--ai-blob-violet));
   isolation: isolate;
 }
 
@@ -24,7 +27,7 @@
   inline-size: 72%;
   block-size: 88%;
   background: radial-gradient(ellipse at 44% 52%,
-    color-mix(in srgb, var(--ai-blob-blue) 37%, transparent), transparent 75%);
+    color-mix(in srgb, var(--ai-blob-pink) 82%, transparent), transparent 75%);
   border-radius: 61% 39% 45% 55% / 43% 39% 61% 57%;
   filter: blur(var(--aml-space-8));
   transform-origin: center;
@@ -36,7 +39,7 @@
   inline-size: 65%;
   block-size: 74%;
   background: radial-gradient(ellipse at 60% 43%,
-    color-mix(in srgb, var(--ai-blob-violet) 39%, transparent), transparent 73%);
+    color-mix(in srgb, var(--ai-blob-violet) 78%, transparent), transparent 73%);
   border-radius: 42% 58% 35% 65% / 63% 36% 64% 37%;
 }
 
