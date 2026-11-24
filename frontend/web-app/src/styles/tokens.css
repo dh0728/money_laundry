@@ -177,6 +177,9 @@
   --chart-grid-border-strength: 50%;
   --pattern-graph-number-font-size: 20px;
   --pattern-graph-selection-fill-strength: 10%;
+  --owner-graph-section-font-size: 10px;
+  --owner-graph-label-font-size: 11px;
+  --owner-graph-bank-font-size: 9px;
   --case-activity-chart-height: 170px;
   --case-activity-grid-columns: minmax(0, 1.45fr) minmax(var(--case-activity-summary-min-width), 1fr);
   --case-activity-summary-min-width: 320px;

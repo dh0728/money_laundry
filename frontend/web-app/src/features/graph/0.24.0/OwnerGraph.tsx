@@ -2,6 +2,8 @@ import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, ty
 import ELK, { type ElkNode } from 'elkjs/lib/elk.bundled.js'
 import { widthFor, type GraphEdge, type GraphModel, type GraphNode } from './model'
 import { formatGraphMoney } from './model'
+import { InteractiveGraphCanvas } from '@/components/charts/interactive-graph-canvas'
+import { readChartFontFamily, readChartNumber } from '@/components/charts/chart-design-values'
 
 type Point = { x: number; y: number }
 type Owner = Point & { key: string; name: string; accounts: GraphNode[]; width: number; height: number }
@@ -368,6 +370,14 @@ type Props = {
 
 export default function OwnerGraph({ ref, model, width, height, state, onStateChange, visibleNodes, edges, selectedNode, selectedEdge, hover, lit, search, showInfo, reducedMotion, onHover, onSelectNode, onSelectEdge, onClear, onZoom }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null)
+  const [font] = useState(() => ({
+    family: readChartFontFamily(),
+    section: readChartNumber('--owner-graph-section-font-size', 10),
+    label: readChartNumber('--owner-graph-label-font-size', 11),
+    title: readChartNumber('--aml-type-caption-size', 12),
+    titleWeight: readChartNumber('--aml-type-body-strong-weight', 600),
+    bank: readChartNumber('--owner-graph-bank-font-size', 9),
+  }))
   const fallbackOwners = useMemo(() => layoutOwnerClasses(model), [model])
   const layoutKey = useMemo(() => `${[...visibleNodes].sort().join('|')}::${edges.map(edge => edge.key).sort().join('|')}`, [visibleNodes, edges])
   const [elkLayout, setElkLayout] = useState<{ key: string; result: Awaited<ReturnType<typeof layoutOwnerGraphWithElk>> } | null>(null)
@@ -433,7 +443,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
         const section = sections[index]
         ctx.globalAlpha = .14; ctx.beginPath(); ctx.roundRect(section.x, section.y, section.width, section.height, 18 / scale)
         ctx.fillStyle = colors.muted; ctx.fill(); ctx.globalAlpha = .58; ctx.strokeStyle = colors.border; ctx.lineWidth = 1 / scale; ctx.stroke()
-        ctx.globalAlpha = .7; ctx.fillStyle = colors.muted; ctx.font = `${10 / scale}px Pretendard`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
+        ctx.globalAlpha = .7; ctx.fillStyle = colors.muted; ctx.font = `${font.section / scale}px ${font.family}`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
         ctx.fillText(`연결 그룹 ${index + 1}`, section.x + 10 / scale, section.y - 6 / scale)
       }
       const orderedPaths = [...paths].sort((left, right) => left.edge.label - right.edge.label || left.edge.key.localeCompare(right.edge.key))
@@ -458,7 +468,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
         }
         if (showInfo || hover?.key === edge.key || selectedEdge === edge.key) {
           const point = pointOnOwnerLink(path, .5)
-          ctx.fillStyle = colors.fg; ctx.font = '11px Pretendard'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+          ctx.fillStyle = colors.fg; ctx.font = `${font.label}px ${font.family}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
           ctx.fillText(`${edge.count}건 · ${formatGraphMoney(edge)}`, point.x, point.y - 5)
         }
       }
@@ -470,7 +480,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
         ctx.save(); ctx.beginPath(); ctx.roundRect(owner.x + 1, owner.y + 1, owner.width - 2, owner.height - 2, 9); ctx.clip()
         const compartments = ownerCompartments(owner)
         ctx.fillStyle = colors.header; ctx.fillRect(compartments.header.x, compartments.header.y, compartments.header.width, compartments.header.height)
-        ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = colors.fg; ctx.font = '600 12px Pretendard'
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = colors.fg; ctx.font = `${font.titleWeight} ${font.title}px ${font.family}`
         ctx.fillText(owner.name, owner.x + 12, owner.y + INSET + HEADER / 2, owner.width - 24)
         ctx.strokeStyle = colors.border
         ctx.beginPath(); ctx.moveTo(owner.x + INSET, owner.y + INSET + HEADER); ctx.lineTo(owner.x + owner.width - INSET, owner.y + INSET + HEADER); ctx.stroke()
@@ -484,8 +494,8 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
           const match = search && `${account.account} ${account.entity}`.toLowerCase().includes(search.toLowerCase())
           if (match && !selected && !hovered) { ctx.strokeStyle = colors.fg; ctx.lineWidth = 1 / scale; ctx.strokeRect(owner.x + 1, y + 1, owner.width - 2, height - 2) }
           ctx.fillStyle = selected ? colors.selectedFg : hovered ? colors.bg : suspicious ? colors.danger : colors.fg
-          ctx.font = '11px Pretendard'; ctx.fillText(account.account, owner.x + 12, y + height / 2, owner.width - 70)
-          ctx.textAlign = 'right'; ctx.font = '9px Pretendard'; ctx.fillText(account.bank, owner.x + owner.width - 10, y + height / 2, 42); ctx.textAlign = 'left'
+          ctx.font = `${font.label}px ${font.family}`; ctx.fillText(account.account, owner.x + 12, y + height / 2, owner.width - 70)
+          ctx.textAlign = 'right'; ctx.font = `${font.bank}px ${font.family}`; ctx.fillText(account.bank, owner.x + owner.width - 10, y + height / 2, 42); ctx.textAlign = 'left'
           ctx.globalAlpha = 1; ctx.strokeStyle = colors.border; ctx.beginPath(); ctx.moveTo(owner.x + INSET, y + height); ctx.lineTo(owner.x + owner.width - INSET, y + height); ctx.stroke()
         })
         ctx.restore()
@@ -507,7 +517,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
     }
     draw(performance.now())
     return () => cancelAnimationFrame(animation)
-  }, [width, height, owners, sections, paths, ports, edges, visibleNodes, selectedNode, selectedEdge, hover, lit, search, showInfo, reducedMotion, scale, offset.x, offset.y, themeVersion])
+  }, [width, height, owners, sections, paths, ports, edges, visibleNodes, selectedNode, selectedEdge, hover, lit, search, showInfo, reducedMotion, scale, offset.x, offset.y, themeVersion, font])
 
   const drag = useRef<{ start: Point; camera: OwnerCamera; state: OwnerGraphState; owners: Owner[]; ownerKey?: string; moved: boolean } | null>(null)
   const pointerPoint = (event: PointerEvent<HTMLCanvasElement>): Point => {
@@ -524,7 +534,7 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
     }
     return null
   }
-  return <canvas ref={canvas} style={{ width, height, touchAction: 'none' }} aria-label="소유주 클래스별 계좌 자금 흐름" data-testid="owner-graph"
+  return <InteractiveGraphCanvas ref={canvas} width={width} height={height} aria-label="소유주 클래스별 계좌 자금 흐름" data-testid="owner-graph"
     onPointerDown={event => {
       if (event.button !== 0) return
       event.currentTarget.setPointerCapture(event.pointerId)
@@ -538,9 +548,9 @@ export default function OwnerGraph({ ref, model, width, height, state, onStateCh
         if (drag.current.moved) {
           const movedOwners = drag.current.owners.map(owner => ({ ...owner, ...raw.positions[owner.key] }))
           const positions = drag.current.ownerKey ? resolveOwnerClusterOverlaps(movedOwners, edges, drag.current.ownerKey) : raw.positions
-          onStateChange({ ...raw, positions: { ...raw.positions, ...positions } }); onZoom(camera.scale / camera.fitScale, false); onHover(null); event.currentTarget.style.cursor = 'grabbing'
+          onStateChange({ ...raw, positions: { ...raw.positions, ...positions } }); onZoom(camera.scale / camera.fitScale, false); onHover(null); event.currentTarget.dataset.cursor = 'grabbing'
         }
-      } else { const target = hit(event); event.currentTarget.style.cursor = ownerAtPoint(owners, graphPoint(pointerPoint(event), camera)) ? 'grab' : target ? 'pointer' : 'grab'; onHover(target) }
+      } else { const target = hit(event); event.currentTarget.dataset.cursor = ownerAtPoint(owners, graphPoint(pointerPoint(event), camera)) ? 'grab' : target ? 'pointer' : 'grab'; onHover(target) }
     }}
     onPointerUp={event => { if (drag.current && !drag.current.moved) { const target = hit(event); if (target?.kind === 'node') onSelectNode(target.key); else if (target) onSelectEdge(target.key); else onClear() } drag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }}
     onPointerCancel={() => { drag.current = null }} onPointerLeave={() => onHover(null)} />
