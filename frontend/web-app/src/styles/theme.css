@@ -482,6 +482,10 @@
   --grid-template-columns-episode-history-date: var(--episode-history-date-columns);
   --grid-template-columns-episode-fact: var(--episode-fact-columns);
   --grid-template-columns-episode-interval: var(--episode-interval-columns);
+  --grid-template-columns-rule-builder: var(--rule-builder-columns);
+  --grid-template-columns-rule-validation: var(--rule-validation-columns);
+  --spacing-rule-condition-column: var(--rule-condition-column-width);
+  --color-status-caution-accent: var(--status-caution-accent);
   --font-sans: Pretendard;
   --font-mono: Pretendard;
   --font-serif: Pretendard;

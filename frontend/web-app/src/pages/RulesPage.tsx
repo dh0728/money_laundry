@@ -9,6 +9,7 @@ import { PageHeading, SectionTitle } from '@/components/page'
 import { ProvenanceBadge, ProvenanceNote } from '@/components/Provenance'
 import { UnderTabs } from '@/components/UnderTabs'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,7 +20,7 @@ import { useMockRole } from '@/lib/memory'
 import { fixture } from '@/lib/apiMode'
 import { useAsync } from '@/lib/useAsync'
 import { fetchReviewCases } from '@/api/liveReview'
-import { Box, Heading, Text } from '@/components/layout-primitives'
+import { Box, Heading, Text, TextLink } from '@/components/layout-primitives'
 
 type Tab = 'list' | 'write' | 'backtest' | 'approval' | 'thresholds'
 type Role = MockRole
@@ -96,7 +97,7 @@ function ListTab({ role, onOpen, onNew }: { role: Role; onOpen: (rule: Rule) => 
   const examples = useAsync(() => fetchReviewCases({ kind: 'ALERT', size: 4 }), [], { key: 'cases/rule-examples', enabled: fixture })
   return <Box className="space-y-4">
     <Section title="룰 목록" description={`${RULES.length}개 · 적중은 최근 30일 모델 Alert ${ALERTS_IN_PERIOD}건 기준`} action={<AdminButton role={role} size="sm" onClick={onNew}>새 룰 만들기</AdminButton>}>
-      <Table><TableHeader><TableRow><TableHead>번호</TableHead><TableHead>템플릿</TableHead><TableHead>버전</TableHead><TableHead>상태</TableHead><TableHead className="w-[34%]">조건</TableHead><TableHead className="text-right">적중 Alert</TableHead><TableHead className="text-right">의심 종결 비율</TableHead><TableHead>작성 · 승인</TableHead><TableHead>마지막 실행</TableHead></TableRow></TableHeader>
+      <Table><TableHeader><TableRow><TableHead>번호</TableHead><TableHead>템플릿</TableHead><TableHead>버전</TableHead><TableHead>상태</TableHead><TableHead className="w-rule-condition-column">조건</TableHead><TableHead className="text-right">적중 Alert</TableHead><TableHead className="text-right">의심 종결 비율</TableHead><TableHead>작성 · 승인</TableHead><TableHead>마지막 실행</TableHead></TableRow></TableHeader>
         <TableBody>{RULES.map(r => { const t = tpl(r.tpl), live = r.status === 'ACTIVE' || r.status === 'SHADOW'; return <TableRow key={r.id} aria-selected={selected.id === r.id} className={`cursor-pointer ${selected.id === r.id ? 'bg-muted/50' : ''}`} onClick={() => setSelected(r)}>
           <TableCell className="font-mono text-xs">{r.id}</TableCell>
           <TableCell><Text className="font-medium">{t.name}</Text><Text className="text-xs text-muted-foreground">{t.unit}</Text></TableCell>
@@ -109,7 +110,7 @@ function ListTab({ role, onOpen, onNew }: { role: Role; onOpen: (rule: Rule) => 
         </TableRow> })}</TableBody></Table>
       <Text className="mt-3 text-xs text-muted-foreground">룰은 Alert를 만들지 않습니다. 모델이 만든 Alert에 어떤 룰이 걸리는지 보여 줘 설명을 돕습니다. 시험 운영 룰은 결과만 저장하고 Alert 상세에는 보이지 않습니다. 운영 중인 룰은 직접 고치지 않고 새 버전을 만듭니다.</Text>
     </Section>
-    <Box className="grid grid-cols-1 gap-4 @5xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <Box className="grid grid-cols-1 gap-4 @5xl:grid-cols-2">
       <Section title={`${selected.id} v${selected.v} · ${tpl(selected.tpl).name}`} description="선택한 룰의 상세" action={<AdminButton role={role} size="sm" variant="outline" onClick={() => onOpen(selected)}>{selected.status === 'DRAFT' ? '이어서 작성' : '새 버전 만들기'}</AdminButton>}>
         <Text className="text-sm">{tpl(selected.tpl).sentence(selected.p)}</Text>
         <Box className="mt-4"><Stepper current={selected.status} /></Box>
@@ -117,8 +118,8 @@ function ListTab({ role, onOpen, onNew }: { role: Role; onOpen: (rule: Rule) => 
         <Box as="ul" className="mt-2 space-y-1.5 text-xs text-muted-foreground">{Array.from({ length: selected.v }, (_, i) => selected.v - i).map(v => <Box as="li" key={v}>v{v} · {v === selected.v ? STATUS[selected.status].label : '운영 종료'} · {v === selected.v ? '10-02 승인' : '09-20 승인'}</Box>)}</Box>
       </Section>
     <Section title="최근 적중 Alert" description={fixture ? '합성 조사 연결 예시 · 실제 룰 적중 결과 아님' : <>누르면 Alert 상세의 <NumBadge n={1} /> 룰 적중으로 이동</>}>
-        {fixture ? examples.state.status === 'success' ? <Box as="ul" className="divide-y text-xs">{examples.state.data.content.map(item => <Box as="li" key={item.caseId} className="flex items-center justify-between gap-3 py-2"><a className="font-mono underline-offset-4 hover:underline" href={`#alerts/${item.caseId}`}>A-{item.alertId}</a><Text as="span" className="text-muted-foreground">합성 근거 거래 {item.summary.txCount}건</Text><Text as="span">{item.status === 'OPEN' ? '진행 중' : '종결'}</Text></Box>)}</Box> : <Text className="text-xs text-muted-foreground">{examples.state.status === 'error' ? '합성 연결 예시를 불러오지 못했습니다.' : '합성 연결 예시를 불러오는 중입니다.'}</Text>
-          : selected.hits ? <Box as="ul" className="divide-y text-xs">{['A-3010', 'A-3004', 'A-3017', 'A-3021'].map((id, i) => <Box as="li" key={id} className="flex items-center justify-between gap-3 py-2"><a className="font-mono underline-offset-4 hover:underline" href={`#alerts/${id.slice(2)}`}>{id}</a><Text as="span" className="text-muted-foreground">{['받은 총액 52,100 USD (20,000 이상)', '송금 계좌 5개 (3개 이상)', '빠져나간 비율 91% (80% 이상)', '거래 1건 41,000 USD (30,000 이상)'][i]}</Text><Text as="span">{['의심 종결', '처리 중', '정상 종결', '처리 전'][i]}</Text></Box>)}</Box> : <Text className="text-xs text-muted-foreground">운영 전이라 적중 기록이 없습니다.</Text>}
+        {fixture ? examples.state.status === 'success' ? <Box as="ul" className="divide-y text-xs">{examples.state.data.content.map(item => <Box as="li" key={item.caseId} className="flex items-center justify-between gap-3 py-2"><TextLink className="font-mono underline-offset-4 hover:underline" href={`#alerts/${item.caseId}`}>A-{item.alertId}</TextLink><Text as="span" className="text-muted-foreground">합성 근거 거래 {item.summary.txCount}건</Text><Text as="span">{item.status === 'OPEN' ? '진행 중' : '종결'}</Text></Box>)}</Box> : <Text className="text-xs text-muted-foreground">{examples.state.status === 'error' ? '합성 연결 예시를 불러오지 못했습니다.' : '합성 연결 예시를 불러오는 중입니다.'}</Text>
+          : selected.hits ? <Box as="ul" className="divide-y text-xs">{['A-3010', 'A-3004', 'A-3017', 'A-3021'].map((id, i) => <Box as="li" key={id} className="flex items-center justify-between gap-3 py-2"><TextLink className="font-mono underline-offset-4 hover:underline" href={`#alerts/${id.slice(2)}`}>{id}</TextLink><Text as="span" className="text-muted-foreground">{['받은 총액 52,100 USD (20,000 이상)', '송금 계좌 5개 (3개 이상)', '빠져나간 비율 91% (80% 이상)', '거래 1건 41,000 USD (30,000 이상)'][i]}</Text><Text as="span">{['의심 종결', '처리 중', '정상 종결', '처리 전'][i]}</Text></Box>)}</Box> : <Text className="text-xs text-muted-foreground">운영 전이라 적중 기록이 없습니다.</Text>}
       </Section>
     </Box>
   </Box>
@@ -137,13 +138,13 @@ function WriteTab({ role, draft, setDraft, onBacktest }: { role: Role; draft: { 
   ]
   const err = checks.some(c => c[1] === 'err')
   const readOnly = role !== 'ADMIN'
-  return <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+  return <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-rule-builder">
     <Section title="1. 템플릿 고르기" description={draft.base ? '기존 룰의 새 버전이라 템플릿은 바꿀 수 없습니다.' : '처음에는 5개만 제공합니다. 나머지는 필요한 데이터가 준비된 뒤 추가합니다.'}>
-      <Box className="grid grid-cols-1 gap-2 @3xl:grid-cols-2">{TEMPLATES.map(x => { const on = x.key === draft.tpl; return <button key={x.key} type="button" aria-pressed={on} disabled={!x.ready || Boolean(draft.base) || readOnly}
+      <Box className="grid grid-cols-1 gap-2 @3xl:grid-cols-2">{TEMPLATES.map(x => { const on = x.key === draft.tpl; return <Button key={x.key} layout="choice" type="button" aria-pressed={on} disabled={!x.ready || Boolean(draft.base) || readOnly}
         onClick={() => setDraft({ tpl: x.key, p: Object.fromEntries(x.params.map(f => [f.k, f.def])) })}
-        className={`rounded-lg border px-3 py-2.5 text-left text-xs transition-colors enabled:hover:bg-muted/50 disabled:cursor-not-allowed ${on ? 'border-foreground bg-muted/40' : ''} ${x.ready ? '' : 'border-dashed opacity-70'}`}>
+        className={`${on ? 'border-foreground bg-muted/40' : ''} ${x.ready ? '' : 'border-dashed opacity-70'}`}>
         <Text as="span" className="block text-sm font-medium">{x.name}</Text><Text as="span" className="mt-0.5 block text-muted-foreground">{x.ready ? x.desc : x.why}</Text><Text as="span" className="mt-1 block text-2xs text-muted-foreground">{x.ready ? `판정 단위: ${x.unit}` : '이후 단계'}</Text>
-      </button> })}</Box>
+      </Button> })}</Box>
     </Section>
     <Box className="space-y-4">
       <Section title="2. 값 채우기" description={`${t.name} · 판정 단위: ${t.unit}`}>
@@ -154,7 +155,7 @@ function WriteTab({ role, draft, setDraft, onBacktest }: { role: Role; draft: { 
       </Section>
       <Section title="이 룰을 문장으로 읽으면" description="입력한 값으로 만든 설명. Alert 상세에도 이 문장이 보입니다">
         <Text className="text-sm leading-6">{t.sentence(draft.p)}</Text>
-        <Box as="ul" className="mt-4 space-y-1.5 text-xs">{checks.map(([k, s, m]) => <Box as="li" key={k} className="grid grid-cols-[20px_64px_1fr] gap-2"><Text as="span" className={s === 'err' ? 'text-destructive-text' : s === 'warn' ? 'text-[var(--status-caution-accent)]' : 'text-muted-foreground'}>{s === 'ok' ? '✓' : s === 'warn' ? '△' : '✕'}</Text><Text as="span" className="font-medium">{k}</Text><Text as="span" className="text-muted-foreground">{m}</Text></Box>)}</Box>
+        <Box as="ul" className="mt-4 space-y-1.5 text-xs">{checks.map(([k, s, m]) => <Box as="li" key={k} className="grid grid-cols-rule-validation gap-2"><Text as="span" className={s === 'err' ? 'text-destructive-text' : s === 'warn' ? 'text-status-caution-accent' : 'text-muted-foreground'}>{s === 'ok' ? '✓' : s === 'warn' ? '△' : '✕'}</Text><Text as="span" className="font-medium">{k}</Text><Text as="span" className="text-muted-foreground">{m}</Text></Box>)}</Box>
         <Box className="mt-5 flex flex-wrap items-center justify-between gap-3"><Stepper current={err ? 'DRAFT' : 'VALIDATED'} />
           <Text as="span" className="flex gap-2"><AdminButton role={role} size="sm" variant="outline" onClick={() => toast.success('임시 저장', { description: '시안이라 저장하지 않습니다.' })}>임시 저장</AdminButton><AdminButton role={role} size="sm" disabled={err} onClick={onBacktest}>백테스트로</AdminButton></Text></Box>
       </Section>

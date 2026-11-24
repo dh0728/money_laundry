@@ -38,6 +38,7 @@ const buttonVariants = cva(
 )
 
 const buttonLayouts = {
+  choice: "rounded-lg border px-3 py-2.5 text-left text-xs transition-colors enabled:hover:bg-muted/50 disabled:cursor-not-allowed",
   row: "w-full px-3 py-2.5 text-left outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring",
   text: "text-inherit",
 }

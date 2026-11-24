@@ -221,6 +221,9 @@
   --episode-history-date-columns: 80px 1fr;
   --episode-fact-columns: 112px 1fr;
   --episode-interval-columns: 56px 1fr;
+  --rule-condition-column-width: 34%;
+  --rule-builder-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  --rule-validation-columns: var(--aml-space-20) var(--aml-space-64) 1fr;
   --aml-duration-instant: 0ms;
   --aml-duration-fast: 120ms;
   --aml-duration-normal: 180ms;
