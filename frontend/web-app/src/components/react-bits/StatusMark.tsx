@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import React, { useEffect, useEffectEvent, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { animate, useMotionValue } from 'motion/react';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
@@ -88,13 +88,13 @@ const StatusMark: React.FC<StatusMarkProps> = ({
     const gap = (1 - IDLE_DASH) * g.P + ((1 - a) * g.C - (1 - IDLE_DASH) * g.P) * m;
     ringRef.current?.setAttribute('stroke-dasharray', `${Math.max(0, dash)} ${Math.max(0, gap)}`);
   };
-  useLayoutEffect(() => {
+  const syncGeometry = useEffectEvent(() => {
     geo.current = { C, P };
     writeDash();
     ringRef.current?.setAttribute('stroke-dashoffset', String(travel.get()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [C, P]);
-  useEffect(() => {
+  });
+  useLayoutEffect(() => syncGeometry(), [C, P]);
+  const bindDash = useEffectEvent(() => {
     const offs = [
       mode.on('change', writeDash),
       arc.on('change', writeDash),
@@ -106,10 +106,10 @@ const StatusMark: React.FC<StatusMarkProps> = ({
       arc.stop();
       travel.stop();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
+  useEffect(() => bindDash(), []);
 
-  useEffect(() => {
+  const animateStatus = useEffectEvent(() => {
     const g = ++gen.current;
     if (reduce) {
       mode.jump(solid ? 1 : 0);
@@ -130,8 +130,8 @@ const StatusMark: React.FC<StatusMarkProps> = ({
     animate(travel, to, UI).then(() => {
       if (gen.current === g) travel.jump(0);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, determinate, targetArc, reduce, C, P, spinDuration]);
+  });
+  useEffect(() => animateStatus(), [status, determinate, targetArc, reduce, C, P, spinDuration]);
 
   const spoken = TEXT[status] + (determinate ? `, ${Math.round(clamp01(progress as number) * 100)}%` : '');
   const hasLabel = label !== undefined && label !== null;

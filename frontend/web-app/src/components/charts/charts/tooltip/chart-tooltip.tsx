@@ -2,7 +2,7 @@
 
 import { m, useSpring } from "motion/react";
 import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
-import { type CSSProperties, memo, useEffect, useMemo } from "react";
+import { type CSSProperties, memo, useEffect, useEffectEvent, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   resolveTooltipBoxMotion,
@@ -769,10 +769,11 @@ function DatePillTrackerInner({
     animatedX.set(xWithMargin);
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: we need to jump the animatedX when the visible prop changes
+  // 보이기 상태가 바뀔 때 스프링 없이 지금 x로 건너뛴다(x 변화마다 다시 돌지 않게 effect event로 읽는다)
+  const jumpToX = useEffectEvent(() => animatedX.set(xWithMargin));
   useEffect(() => {
-    animatedX.set(xWithMargin);
-  }, [animatedX, visible]);
+    jumpToX();
+  }, [visible]);
 
   return (
     <m.div

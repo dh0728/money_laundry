@@ -3,6 +3,7 @@
 import React, {
   forwardRef,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -181,7 +182,7 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
     group.style.setProperty('--jr-pad-x', `${Math.ceil((maxW * swell * 1.3) / 2 + barge) + 2}px`);
     group.style.setProperty('--jr-pad-y', `${Math.ceil((chipH * swell) / 2) + 2}px`);
   };
-  useLayoutEffect(() => {
+  const settleLayout = useEffectEvent(() => {
     const settle = () => {
       measure();
       apply(applied.current, true);
@@ -191,8 +192,8 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
     if (groupRef.current) observer.observe(groupRef.current);
     document.fonts?.ready.then(settle);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsKey, size, gap, swell, barge, shrink]);
+  });
+  useLayoutEffect(() => settleLayout(), [itemsKey, size, gap, swell, barge, shrink]);
   useEffect(() => {
     if (applied.current === at) return;
     applied.current = at;

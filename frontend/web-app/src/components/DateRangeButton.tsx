@@ -1,5 +1,5 @@
 // v24 shared.tsx의 기간 선택을 옮김. 기준일(today)은 호출하는 쪽이 넘긴다.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { CalendarDays, RotateCcw, X } from 'lucide-react'
 import { ko } from 'date-fns/locale'
 import { subDays, startOfMonth } from 'date-fns'
@@ -34,7 +34,9 @@ export function DateRangeButton({ value, onChange, today: TODAY }: { value: Date
     while (el && el !== box) { top += el.offsetTop; el = el.offsetParent as HTMLElement | null }
     if (month && box) box.scrollTo({ top: top - 4, behavior: smooth && document.visibilityState === 'visible' ? 'smooth' : 'auto' })
   }, 0)
-  useEffect(() => { if (open) scrollToMonth(value?.to ?? value?.from ?? TODAY, false) }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  // 열 때만 이동한다. 기준 날짜는 effect event로 그때의 값을 읽는다
+  const scrollToValue = useEffectEvent(() => scrollToMonth(value?.to ?? value?.from ?? TODAY, false))
+  useEffect(() => { if (open) scrollToValue() }, [open])
   const label = value?.from ? `${fmt(value.from)} → ${fmt(value.to) || '종료일'}` : '기간'
   return (
     <Popover open={open} onOpenChange={o => { setOpen(o); if (o) { setDraft(value); setPreset(null); setYear((value?.to ?? value?.from ?? TODAY).getFullYear()) } }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import React, { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { animate, motion, useMotionValue, useTransform, type MotionValue } from 'motion/react';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
@@ -175,14 +175,14 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
   };
 
   const listKey = list.map(item => item.value).join('|');
-  useLayoutEffect(() => {
+  const measureTrack = useEffectEvent(() => {
     measure();
     const observer = new ResizeObserver(measure);
     if (trackRef.current) observer.observe(trackRef.current);
     if (typeof document !== 'undefined' && document.fonts) document.fonts.ready.then(measure);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listKey, size, inset, equalSlots]);
+  });
+  useLayoutEffect(() => measureTrack(), [listKey, size, inset, equalSlots]);
 
   useEffect(
     () => () => {

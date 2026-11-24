@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- Step·Row 컴포넌트와 계산 함수를 한 파일에 둠 */
 // UI 재설계(MONEY17-174) Alert 상세 개요 시안. 읽는 순서 ①~⑦은 10/6 회의·팀장 목업과 같고, 10/8·10/11 김명기 승인 반영.
 import { NumBadge } from '@/components/NumBadge'
 import type { ReactNode } from 'react'
@@ -13,7 +12,7 @@ import { CaseStats } from './CasePresentation'
 import { CaseActivityCharts } from './CaseActivityCharts'
 import { Panel } from './DetailPanels'
 import { historyLabels } from './detailText'
-import { sumBy, usd } from './metrics'
+import { overviewFacts, sumBy, usd } from './metrics'
 import { Box, Text } from '@/components/layout-primitives'
 
 const roleLabels: Record<AlertAccountRole, string> = { SUBJECT: '대표', SOURCE: '출발', DESTINATION: '도착', INTERMEDIARY: '경유', HUB: '허브' }
@@ -28,24 +27,6 @@ export function Step({ n, title, description, source, children, wide, action }: 
 export const Row = ({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) => <>
   <Box as="dt" className="text-muted-foreground">{label}</Box><Box as="dd" className="tabular-nums">{value}{note && <Text as="span" className="ml-1.5 text-muted-foreground">{note}</Text>}</Box>
 </>
-
-/** 사건 밖에서 들어오고 나간 돈. 사건 안 경유 거래를 두 번 세지 않는다(거래 총액을 쓰지 않는 이유, 10/11) */
-export function flowFacts(tx: Pick<AlertDetailData['transactions'][number], 'fromAccount' | 'toAccount' | 'amountUsd'>[]) {
-  const senders = new Set(tx.map(t => t.fromAccount))
-  const receivers = new Set(tx.map(t => t.toAccount))
-  const externalIn = tx.filter(t => !receivers.has(t.fromAccount)).reduce((s, t) => s + t.amountUsd, 0)
-  const externalOut = tx.filter(t => !senders.has(t.toAccount)).reduce((s, t) => s + t.amountUsd, 0)
-  return { senders, receivers, externalIn, externalOut, passThrough: [...senders].filter(a => receivers.has(a)) }
-}
-
-export function overviewFacts(alert: AlertDetailData) {
-  const tx = alert.transactions
-  const { externalIn, externalOut, passThrough } = flowFacts(tx)
-  const inDegree = sumBy(tx, t => t.toAccount, () => 1)[0]
-  const outDegree = sumBy(tx, t => t.fromAccount, () => 1)[0]
-  const seeds = tx.filter(t => t.role === 'SEED')
-  return { tx, externalIn, externalOut, passThrough, inDegree, outDegree, seeds }
-}
 
 export default function RedesignOverview({ alert, history, onAccounts }: { alert: AlertDetailData; history: HistoryRow[]; onAccounts: () => void }) {
   const { tx, externalIn, externalOut, passThrough, inDegree, outDegree, seeds } = overviewFacts(alert)

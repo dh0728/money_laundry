@@ -73,7 +73,7 @@ export const designRuleTree = [
     id: 'escape-hatch', title: '규칙을 피할 길 막기', source: '명기 2026-11-23 t3134u',
     rules: [
       { id: 'escape-hatch/disable-comment', title: 'eslint-disable·stylelint-disable로 디자인 규칙을 끄지 않는다(규칙 없는 disable 포함)', engine: 'eslint+stylelint', level: 'error' },
-      { id: 'escape-hatch/any-disable', title: 'eslint-disable 주석은 규칙과 상관없이 쓰지 않는다(코드를 고친다)', engine: 'eslint', level: 'ratchet' },
+      { id: 'escape-hatch/any-disable', title: 'eslint-disable 주석은 규칙과 상관없이 쓰지 않는다(코드를 고친다)', engine: 'eslint', level: 'error' },
       { id: 'escape-hatch/exceptions', title: '예외는 scripts/design-exceptions.json 한 곳에 이유·만료일과 함께', engine: 'test', level: 'error', test: 'src/test/design-rules.test.js' },
       { id: 'escape-hatch/ratchet', title: '상한(scripts/design-baseline.json)을 넘는 새 위반 금지, 상한에 여유가 남아도 실패(pnpm lint:design --update로 내린다)', engine: 'test', level: 'error', test: 'src/test/design-rules.test.js' },
     ],

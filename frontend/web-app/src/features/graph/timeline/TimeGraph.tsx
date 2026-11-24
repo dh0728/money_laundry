@@ -2,7 +2,7 @@
 // 10/12 김명기: 위치가 곧 정보(x = 시간, y = 계좌 행)라 노드를 끌어 옮기지 않는다. 그래프를 갖고 노는 화면이 아니다.
 // 시각 문법: 엣지 색 = 위험, 굵기 = 금액, 건수 = 글자, 방향 = 엣지 안을 흐르는 입자(reduced-motion이면 정지 쉐브론).
 // 위치는 처음 한 번만 계산해 상태로 들고 있고, 재조회·패널 열고 닫기로 다시 배치하지 않는다(§6.1).
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BaseEdge, EdgeLabelRenderer, Handle, Position, ReactFlow, ReactFlowProvider, ViewportPortal, getBezierPath, useEdgesState, useNodesState, useReactFlow, useViewport, type Edge, type EdgeProps, type Node, type NodeProps, type OnSelectionChangeParams, type Viewport } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { ChevronLeft, ChevronRight, Maximize, Minus, Plus, RotateCcw } from 'lucide-react'
@@ -34,7 +34,7 @@ type FlowEdge = Edge<{ bundle: Bundle; width: number; showLabel: boolean }, 'flo
 const AccountNode = memo(function AccountNode({ data, selected }: NodeProps<AccNode>) {
   const { app, highlighted } = data
   return <Box title={`${app.n}번 ${app.account}${app.nth > 1 ? ` · ${app.nth}번째 등장` : ''}${app.folded ? ` · ${app.folded}건 더 오감` : ''}`}
-    className={`relative flex items-center justify-center rounded-full border-2 bg-card font-mono font-bold tabular-nums transition-shadow ${selected ? 'border-[var(--palette-blue-500)] ring-4 ring-[var(--palette-blue-500)]/25' : highlighted ? 'border-[var(--palette-blue-500)]/60' : 'border-border'}`}
+    className={`relative flex items-center justify-center rounded-full border-2 bg-card font-mono font-bold tabular-nums transition-shadow ${selected ? 'border-[var(--brand)] ring-4 ring-[var(--brand)]/25' : highlighted ? 'border-[var(--brand)]/60' : 'border-border'}`}
     style={{ width: NODE, height: NODE, fontSize: 'min(1.25rem, 24px)' }}>
     {app.n}{app.folded > 0 && <Text as="span" className="absolute -right-2 -top-2 rounded-full bg-foreground px-1 text-xs font-medium text-background">+{app.folded}</Text>}
     {(['left', 'right', 'top', 'bottom'] as const).map(side => <Handle key={side} id={side} type={side === 'left' || side === 'top' ? 'target' : 'source'} position={{ left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom }[side]} style={{ opacity: 0 }} isConnectable={false} />)}
@@ -78,7 +78,7 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
   const [nodes, setNodes, onNodesChange] = useNodesState<AccNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
   const fitted = useRef(false), lastView = useRef(view)
-  const camera = useRef<Viewport | undefined>(undefined)
+  const [camera, setCamera] = useState<Viewport | undefined>(undefined)
   const wasOnlySelected = useRef(false) // 누르기 직전에 이 계좌만 선택돼 있었는가: 다시 누르면 선택 해제(전환)
   const [showLabels, setShowLabels] = useState(true)
   const [selection, setSelection] = useState<{ nodes: string[]; edges: string[] }>({ nodes: [], edges: [] })
@@ -96,8 +96,8 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
   const toggleGuide = (open: boolean) => { setGuideOpen(open); try { window.localStorage.setItem(GUIDE_KEY, open ? '1' : '0') } catch { /* 저장 불가 */ } }
   const box = useRef<HTMLDivElement>(null)
 
-  // 위상(거래 집합)이 바뀔 때만 배치한다. 금액·상태 갱신으로는 다시 배치하지 않는다
-  useEffect(() => {
+  // 위상(거래 집합)이 바뀔 때만 배치한다. 금액·상태 갱신으로는 다시 배치하지 않는다(배치 내용은 effect event로 최신 값을 읽는다)
+  const layoutGraph = useEffectEvent(() => {
     {
       // 보기 단위를 바꾸면 행 배치가 달라지므로 카메라도 다시 정한다
       if (lastView.current !== view) { lastView.current = view; fitted.current = false }
@@ -116,8 +116,8 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
         requestAnimationFrame(() => void setViewport({ x: 40 - minX * zoom, y: 120 - minY * zoom, zoom }))
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataKey, view])
+  })
+  useEffect(() => { layoutGraph() }, [dataKey, view])
 
   useEffect(() => { setEdges(es => es.map(e => ({ ...e, data: { ...e.data!, showLabel: showLabels } }))) }, [showLabels, setEdges])
   // 같은 번호의 다른 등장도 강조
@@ -190,8 +190,7 @@ function GraphCanvas({ rows: allRows, context }: { rows: TimeTx[]; context: Grap
       </Box>
       {view === 'pattern' ? <PatternGraph g={g} selected={patSel} onSelect={setPatSel} onZoom={setPatZoom} controls={patCtl} /> : null}
       {view === 'pattern' ? null : <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
-        // eslint-disable-next-line react-hooks/refs -- 패널 크기 조절·화면 폭 전환으로 다시 그릴 때 카메라를 이어 받으려고 마지막 위치를 ref에 둔다
-        onNodeClick={() => { if (wasOnlySelected.current) { wasOnlySelected.current = false; clearSelection() } }} defaultViewport={camera.current} onMoveEnd={(_, v) => { camera.current = v }}
+        onNodeClick={() => { if (wasOnlySelected.current) { wasOnlySelected.current = false; clearSelection() } }} defaultViewport={camera} onMoveEnd={(_, v) => setCamera(v)}
         onSelectionChange={onSelectionChange} nodesDraggable={false} selectionOnDrag panOnDrag={[1, 2]} panActivationKeyCode="Space" zoomOnScroll panOnScroll={false} onPaneContextMenu={e => e.preventDefault()}
         nodesConnectable={false} minZoom={MIN_ZOOM} maxZoom={MAX_ZOOM} proOptions={{ hideAttribution: true }} aria-label="시간순 관계 그래프">
         <ViewportPortal>

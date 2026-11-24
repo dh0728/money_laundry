@@ -15,8 +15,7 @@
   "token/important": 36,
   "token/fixed-number": 1118,
   "token/inline-var-number": 3,
-  "token/palette-direct": 12,
+  "token/palette-direct": 6,
   "chart/library-import": 5,
-  "icon/local-svg": 6,
-  "escape-hatch/any-disable": 21
+  "icon/local-svg": 6
 }

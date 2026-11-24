@@ -18,8 +18,10 @@ import { CaseActivityCharts } from '@/features/alerts/CaseActivityCharts'
 import { alertCode } from '@/features/alerts/alertFilters'
 import { historyLabels } from '@/features/alerts/detailText'
 import { sumBy, usd } from '@/features/alerts/metrics'
-import { Row, Step, flowFacts } from '@/features/alerts/RedesignOverview'
+import { Row, Step } from '@/features/alerts/RedesignOverview'
+import { flowFacts } from '@/features/alerts/metrics'
 import { Box, Text } from '@/components/layout-primitives'
+import { dataSeriesColors } from '@/components/charts/charts/chart-context'
 
 const day = (iso: string) => iso.replace('T', ' ').slice(5, 16)
 const hoursBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 36e5)
@@ -90,7 +92,7 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
         </Box>
         <Text className="mt-4 text-xs font-medium">Alert별 구간</Text>
         <Box className="mt-2 space-y-1.5">{spans.map(({ a, first, last }) => <Box key={a.alertId} className="grid grid-cols-[56px_1fr] items-center gap-2 text-[0.6875rem]"><Text as="span" className="font-mono">{alertCode(a.alertId)}</Text>
-          <Text as="span" className="relative h-3 rounded bg-muted"><Text as="span" className="absolute top-0 h-3 rounded" style={{ left: pos(first), width: `max(4px, calc(${pos(last)} - ${pos(first)}))`, backgroundColor: 'var(--palette-blue-500)' }} title={`${day(first)} ~ ${day(last)}`} /></Text></Box>)}</Box>
+          <Text as="span" className="relative h-3 rounded bg-muted"><Text as="span" className="absolute top-0 h-3 rounded" style={{ left: pos(first), width: `max(4px, calc(${pos(last)} - ${pos(first)}))`, backgroundColor: dataSeriesColors.sky }} title={`${day(first)} ~ ${day(last)}`} /></Text></Box>)}</Box>
         <Text className="mt-1 flex justify-between pl-16 text-[0.6875rem] text-muted-foreground tabular-nums"><Text as="span">{day(times[0] ?? episode.flow.periodFrom)}</Text><Text as="span">{day(times[times.length - 1] ?? episode.flow.periodTo)}</Text></Text>
       </Step>
 
@@ -110,7 +112,7 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
       </Step>
       <Step n={8} title="판정 진행" description="Alert(묶음)마다 판정해야 종결할 수 있습니다" source="사람">
         <Text className="text-2xl font-semibold tabular-nums">{decided} / {episode.alerts.length}</Text>
-        <Box className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><Box className="h-full rounded-full" style={{ width: `${(decided / episode.alerts.length) * 100}%`, backgroundColor: 'var(--palette-blue-500)' }} /></Box>
+        <Box className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><Box className="h-full rounded-full" style={{ width: `${(decided / episode.alerts.length) * 100}%`, backgroundColor: 'var(--status-positive-accent)' }} /></Box>
         <Text className="mt-3 text-xs">{pending ? <>미판정 {pending}건이 남아 <Text as="b">아직 종결할 수 없습니다.</Text> 검토 의견 탭에서 묶음별로 판정합니다.</> : '모든 묶음이 판정돼 종결할 수 있습니다.'}</Text>
       </Step>
 
