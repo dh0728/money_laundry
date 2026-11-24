@@ -47,6 +47,18 @@ test('whole view reads ledger counts from the server and work metrics from the c
   expect(data.flags.map(flag => [flag.key, flag.count])).toEqual([['high', 3], ['medium', 1], ['low', 0]]);
 });
 
+test('personal overdue counts start after day three and retain the Alert and Episode counts', async () => {
+  const { liveDashboardResponse } = await import('./live-dashboard.js');
+  const lateAlert = { ...alert, code: 'A-overdue', elapsed: 4 };
+  const lateEpisode = { ...alert, code: 'E-overdue', kind: 'Episode', elapsed: 4 };
+  const completed = { ...lateEpisode, code: 'E-completed', open: false, status: '처리 완료' };
+  const mine = [alert, lateAlert, lateEpisode, completed];
+  const data = await liveDashboardResponse({ ...source, cases: [...mine, other], mine }, { mine: true });
+
+  expect(data).toMatchObject({ unfinished: 3, overdue: 2, overdueAlerts: 1, overdueEpisodes: 1, urgent: 1 });
+  expect(data.hourly.reduce((total, row) => total + row.overdue, 0)).toBe(data.overdue);
+});
+
 test('institution coverage stays unavailable when a server day omits its linked count', async () => {
   getJson.mockResolvedValueOnce({ ...ledger, days: ledger.days.map(row => ({ ...row, linkedSuspicious: undefined })) });
   const { liveDashboardResponse } = await import('./live-dashboard.js');

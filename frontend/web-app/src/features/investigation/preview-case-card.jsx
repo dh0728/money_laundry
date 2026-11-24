@@ -5,7 +5,7 @@ import { Panel } from '../../components/panel';
 import { ActionButton } from '../../components/primary-button';
 import { RecordCard } from '../../components/record-card';
 import MagicBento from '../../components/react-bits/MagicBento';
-import { CaseActorTag, CountTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/semantic-tags';
+import { CaseActorTag, CaseAgeTag, CountTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/semantic-tags';
 import { readWorkspaceGap } from '../dashboard/workspace-metrics';
 import './preview-case-card.css';
 import { Box, Heading, Text } from '../../components/layout-primitives';
@@ -108,7 +108,7 @@ export function PreviewCaseCard({ row, selectedTransaction, className = '', sele
     <Box className="preview-case-card-body">
       <Box className="semantic-tag-group">
         <VerdictTag verdict={verdict} />
-        {open && elapsed >= 3 && <StatusTag preset={elapsed > 7 ? 'elapsedOver1w' : 'elapsedUnder1w'}>{elapsed}일 경과</StatusTag>}
+        {open && <CaseAgeTag days={elapsed} />}
         {showReviewStatus && <ReviewStatusTag status={status} />}
         <ModelScoreTag score={score} />
         {showAssignee && <CaseActorTag>{assigned ? '내 담당' : '다른 담당자'}</CaseActorTag>}

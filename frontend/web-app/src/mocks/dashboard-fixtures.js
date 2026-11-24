@@ -9,6 +9,7 @@ import { sampleTransactions, transactionFixture } from './transaction-fixtures.j
 import { fixtureCompletionTime } from './verdict-fixtures.js';
 import { dashboardDays, sampleEpisodeAlertCodes, samplePeriod } from './dashboard-record-codes.js';
 import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings.js';
+import { isOverdueCaseAge } from '../features/investigation/case-age.js';
 import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard } from '../features/dashboard/dashboard-investigation.js';
 
 export { dashboardRecordCodes, samplePeriod } from './dashboard-record-codes.js';
@@ -181,7 +182,7 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
   const mine = cases.filter(row => row.assigned);
   const unfinished = mine.filter(row => row.open);
   const highRiskAlerts = unfinished.filter(row => row.kind === 'Alert' && modelRiskBand(row.score) === 'high');
-  const overdueCases = unfinished.filter(row => row.elapsed >= 3);
+  const overdueCases = unfinished.filter(row => isOverdueCaseAge(row.elapsed));
   const patternByTransaction = new Map();
   for (const row of [...alertCases].sort((left, right) => left.code.localeCompare(right.code))) {
     for (const transaction of row.related) {
@@ -207,7 +208,7 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
     overdueAlerts: overdueCases.filter(row => row.kind === 'Alert').length,
     overdueEpisodes: overdueCases.filter(row => row.kind === 'Episode').length,
     unfinished: unfinished.length,
-    urgent: highRiskAlerts.filter(row => row.elapsed >= 3).length,
+    urgent: highRiskAlerts.filter(row => isOverdueCaseAge(row.elapsed)).length,
     newAccounts: operationalDaily.reduce((total, row) => total + row.newAccounts, 0),
     newOwners: operationalDaily.reduce((total, row) => total + row.newOwners, 0),
     linked, unlinked: suspicious.length - linked,

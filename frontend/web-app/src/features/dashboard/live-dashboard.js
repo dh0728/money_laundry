@@ -1,5 +1,6 @@
 import { getJson } from '@/api/common';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
+import { isOverdueCaseAge } from '../investigation/case-age.js';
 import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard } from './dashboard-investigation.js';
 
 // 서비스 모드 대시보드 숫자. 화면이 읽는 모양은 mocks/dashboard-fixtures.js의 dashboardFixtureResponse와 같다.
@@ -75,7 +76,7 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const owned = cases.filter(row => row.assigned);
   const unfinished = owned.filter(row => row.open);
   const highRiskAlerts = unfinished.filter(row => row.kind === 'Alert' && modelRiskBand(row.score) === 'high');
-  const overdueCases = unfinished.filter(row => row.elapsed >= 3);
+  const overdueCases = unfinished.filter(row => isOverdueCaseAge(row.elapsed));
   const patternCounts = new Map();
   if (ledger) {
     for (const { type, count } of ledger.types) patternCounts.set(type === 'NON_PATTERN' ? '미분류' : type, count);
@@ -115,7 +116,7 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     overdueAlerts: overdueCases.filter(row => row.kind === 'Alert').length,
     overdueEpisodes: overdueCases.filter(row => row.kind === 'Episode').length,
     unfinished: unfinished.length,
-    urgent: highRiskAlerts.filter(row => row.elapsed >= 3).length,
+    urgent: highRiskAlerts.filter(row => isOverdueCaseAge(row.elapsed)).length,
     newAccounts: sum(operationalDaily, 'newAccounts'), newOwners: sum(operationalDaily, 'newOwners'),
     linked, unlinked, coverageScope: partial ? 'case-evidence' : 'institution',
     patterns: [...patternCounts].map(([label, count]) => ({ label, count })),

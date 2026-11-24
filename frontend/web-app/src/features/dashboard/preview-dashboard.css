@@ -3,7 +3,6 @@
   --chart-suspect: var(--risk-high);
   --chart-pattern: var(--chart-suspect);
   --chart-risk-high: var(--risk-high);
-  --chart-risk-medium: var(--risk-medium);
   --chart-background: var(--information-panel-surface);
   --chart-foreground: var(--text);
   --chart-foreground-muted: var(--muted-text);

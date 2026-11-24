@@ -14,7 +14,7 @@ import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { SectionDownloadHeading } from '../../components/section-download';
 import { OverviewScoreChart, overviewScorePoints } from './overview-score-chart';
-import { CaseActorTag, CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag } from '../../components/semantic-tags';
+import { CaseActorTag, CaseAgeTag, CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, VerdictTag } from '../../components/semantic-tags';
 import { TransactionEvidenceTable } from './preview-case-table';
 import { useCaseEvidenceSelection } from './case-evidence-selection';
 import { caseOverviewEvidence, episodeAlertEvidence, relatedJudgments } from './case-overview-evidence';
@@ -44,9 +44,7 @@ function EvidencePeriod({ records }) {
 function CaseIdentity({ row }) {
   return <Box className="semantic-tag-group">
     <VerdictTag verdict={row.verdict} />
-    {row.open && row.elapsed >= 3 && <StatusTag preset={row.elapsed > 7 ? 'elapsedOver1w' : 'elapsedUnder1w'}>
-      {row.elapsed}일 경과
-    </StatusTag>}
+    {row.open && <CaseAgeTag days={row.elapsed} />}
     <ReviewStatusTag status={row.status} />
     <PatternTag>{row.pattern}</PatternTag>
     <CaseActorTag>{reviewAssignee(row)}</CaseActorTag>

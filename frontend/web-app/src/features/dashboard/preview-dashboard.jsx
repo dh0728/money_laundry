@@ -66,8 +66,8 @@ function DashboardIndicators({ data, mine, reduced }) {
     { label: '내 담당 미완료', value: data.unfinished },
     { label: '고위험 Alert', value: data.highRisk, detail: '미완료 · 위험 점수 ' + modelRiskLabels().high,
       trend: hourly('highRisk', 'var(--chart-risk-high)') },
-    { label: '3일 이상 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
-      trend: hourly('overdue', 'var(--chart-risk-medium)') },
+    { label: '3일 초과 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
+      trend: hourly('overdue', 'var(--chart-risk-high)') },
   ] : [
     { label: '들어온 거래 수', value: data.transactions.length, trend: daily('total', transactionTotalColor) },
     { label: '모델 의심 거래', value: data.suspicious.length, detail: '의심 비율 ' + share(data.suspicious.length, data.transactions.length),

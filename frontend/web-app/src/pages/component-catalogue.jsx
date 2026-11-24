@@ -7,7 +7,7 @@ import { WorkspaceNavigation } from '../app/screen-navigation';
 import { ScreenNavigation } from '../app/screen-layouts';
 import { Panel } from '../components/panel';
 import { QueryCheck, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls';
-import { CaseActorTag, FilterTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag } from '../components/semantic-tags';
+import { CaseActorTag, CaseAgeTag, FilterTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag } from '../components/semantic-tags';
 import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch';
 import { setupGlassMaterial } from '../components/glass-material';
 import { bindCardGlow } from '../components/card-glow';
@@ -239,7 +239,7 @@ function Catalogue() {
         <Box className="catalogue-glass-sample">
           <Box className="glass catalogue-tags">
             <VerdictTag verdict="abnormal" /><VerdictTag verdict="unjudged" /><VerdictTag verdict="normal" />
-            <StatusTag preset="elapsedOver1w">8일 경과</StatusTag><StatusTag preset="elapsedUnder1w">7일 경과</StatusTag>
+            <CaseAgeTag days={3} /><CaseAgeTag days={4} />
             <ReviewStatusTag status="처리 전" /><ReviewStatusTag status="처리 중" /><ReviewStatusTag status="처리 완료" />
             <StatusTag preset="riskHigh">93점 위험</StatusTag><StatusTag preset="riskMedium">78점 주의</StatusTag><StatusTag preset="riskLow">29점 낮음</StatusTag>
             <ModelScoreTag band="high" score={93} />
