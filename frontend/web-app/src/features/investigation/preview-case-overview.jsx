@@ -9,6 +9,7 @@ import { useElementSize } from '../../components/charts/charts/use-element-size'
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
 import { previewJudgmentReason } from './case-judgment-data';
 import { FooterPagination } from '../../components/footer-pagination';
+import { NativeSelect } from '../../components/ui/select';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { SectionDownloadHeading } from '../../components/section-download';
@@ -99,7 +100,7 @@ function CurrencyValues({ flows, field, emphasized = false }) {
   </Text>;
 }
 
-function FlowSummary({ evidence }) {
+function FlowSummary({ evidence, compact = false }) {
   const { focus, flows, inflows, outflows } = evidence;
   if (!flows.length) {
     const totals = [...Map.groupBy(evidence.records, record => record.currency)]
@@ -108,13 +109,20 @@ function FlowSummary({ evidence }) {
       ? <Text className="overview-flow-total">연결 거래 금액 <CurrencyValues flows={totals} field="total" /></Text>
       : <Text className="overview-note">연결된 거래가 없습니다.</Text>;
   }
+  const focusAccount = <><Text as="code">{focus.code}</Text> · {focus.owner}</>;
+  const inflowDetail = <>{inflows.length}건{inflows.length > 0 && ` · 첫 유입 ${inflows[0].timestamp.slice(11)}`}</>;
+  const outflowDetail = <>{outflows.length}건{outflows.length > 0 && ` · 마지막 유출 ${outflows.at(-1).timestamp.slice(11)}`}</>;
+  if (compact) return <>
+    <Text>관측 중심 계좌 {focusAccount} · 순유입 <CurrencyValues flows={flows} field="net" /></Text>
+    <Text className="overview-note">유입 {inflowDetail} · 유출 {outflowDetail}</Text>
+  </>;
   return <Box as="dl" className="overview-flow-summary" aria-label="관측 중심 계좌의 거래 흐름">
     <Box><Box as="dt">관측 유입</Box><Box as="dd"><CurrencyValues flows={flows} field="inflow" /></Box>
-      <Box as="dd" className="overview-note">{inflows.length}건{inflows.length > 0 && ` · 첫 유입 ${inflows[0].timestamp.slice(11)}`}</Box></Box>
-    <Box className="overview-flow-focus"><Box as="dt">관측 중심 계좌</Box><Box as="dd"><Text as="code">{focus.code}</Text> · {focus.owner}</Box>
+      <Box as="dd" className="overview-note">{inflowDetail}</Box></Box>
+    <Box className="overview-flow-focus"><Box as="dt">관측 중심 계좌</Box><Box as="dd">{focusAccount}</Box>
       <Box as="dd" className="overview-note">순유입 <CurrencyValues flows={flows} field="net" /></Box></Box>
     <Box><Box as="dt">관측 유출</Box><Box as="dd"><CurrencyValues flows={flows} field="outflow" /></Box>
-      <Box as="dd" className="overview-note">{outflows.length}건{outflows.length > 0 && ` · 마지막 유출 ${outflows.at(-1).timestamp.slice(11)}`}</Box></Box>
+      <Box as="dd" className="overview-note">{outflowDetail}</Box></Box>
   </Box>;
 }
 
@@ -125,7 +133,9 @@ function OverviewBars({ label, measures, max, reduced, format = value => `${numb
   const barColor = point => point.color ?? dataSeriesColors.sky;
   return <Box as="figure" className="overview-horizontal-chart" style={{ '--overview-measures-count': measures.length }} aria-label={label}>
     <Box as="ul" className="overview-horizontal-labels">
-      {measures.map(({ label, value }) => <Box as="li" key={label}><Text as="span">{label}</Text><Text as="strong">{format(value)}</Text></Box>)}
+      {measures.map(({ label, value, code }) => <Box as="li" key={label}>
+        {code ? <LinkTag code={code} /> : <Text as="span">{label}</Text>}<Text as="strong">{format(value)}</Text>
+      </Box>)}
     </Box>
     <BarChart className="overview-horizontal-bars" data={measures} xDataKey="label" orientation="horizontal"
       aspectRatio="auto" horizontalValueDomain={[0, Math.max(max, 1)]} margin={overviewChartMargin}
@@ -166,7 +176,8 @@ function FlowCharts({ evidence, reduced }) {
   if (!records.length) return <Text className="overview-note">연결된 거래가 없습니다.</Text>;
   const amounts = flows.length
     ? flows.map(({ currency, inflow, outflow }) => ({
-      currency, measures: [{ label: '관측 유입', value: inflow }, { label: '관측 유출', value: outflow }],
+      currency, measures: [{ label: '관측 유입', value: inflow, color: dataSeriesColors.sky },
+        { label: '관측 유출', value: outflow, color: dataSeriesColors.pink }],
     }))
     : [...Map.groupBy(records, record => record.currency)].map(([currency, moves]) => ({
       currency, measures: [...Map.groupBy(moves, record => record.from.code)].map(([label, group]) => ({
@@ -215,7 +226,10 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   const { records, accounts, focus, flows, inflows, outflows, lead } = evidence;
   const episode = row.kind === 'Episode';
   const methods = [...Map.groupBy(records, record => record.method)].map(([label, group]) => ({ label, value: group.length }));
-  const overlap = row.overlappingAlerts ?? [];
+  const recordCodes = new Set(records.map(({ code }) => code));
+  const overlap = episode ? (row.overlappingAlerts ?? []).map(alert => ({ ...alert,
+    value: new Set(alert.related.map(({ code }) => code).filter(code => recordCodes.has(code))).size,
+  })).filter(alert => alert.value > 0).sort((a, b) => b.value - a.value || a.code.localeCompare(b.code)) : [];
   const prior = relatedJudgments(history, row.code, evidence);
   const otherCount = records.length - inflows.length - outflows.length;
   const composition = focus ? [
@@ -232,14 +246,22 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   const accountMeasures = accounts.map(account => ({ label: account.code, value: account.transactions.size }));
   const scorePoints = overviewScorePoints(records);
   const compositionChart = <OverviewBars label="근거 거래 구성" measures={composition} max={records.length} reduced={reduced} />;
-  const overlapNote = episode && overlap.length > 0 && <Text>거래 ID 중복 제외 · 거래 공유 Alert {overlap.length}건</Text>;
+  const overlapChart = overlap.length > 0 && <>
+    <Heading level={3}>Alert별 공유 거래</Heading>
+    <OverviewBars label="Alert별 공유 거래" measures={overlap.map(({ code, value }) => ({ code, label: code, value }))}
+      max={records.length} reduced={reduced} />
+  </>;
+  const flowChart = <FlowCharts evidence={evidence} reduced={reduced} />;
+  const flowDetails = <>
+    {records.length > 0 && <Text><EvidencePeriod records={records} /> · 근거 거래 {records.length}건 · 원통화 기준</Text>}
+    {records.length > 0 && <LinkTag href={`?${analysisQuery}`}>분석에서 자금 흐름 보기</LinkTag>}
+  </>;
   const panels = {
     judgment: { title: '판단 요약', content: <>
       <Text className="semantic-tag-group">사람 판정 <VerdictTag verdict={row.verdict} /></Text>
       {row.reviewDueOn && <Text>처리 기한 · <Text as="time" dateTime={row.reviewDueOn}>{row.reviewDueOn}</Text></Text>}
       <Text>{focus ? <><Text as="code">{focus.code}</Text> · 근거 거래 {focus.transactions.size}건 · 유입 {inflows.length}건 · 유출 {outflows.length}건</>
         : <>근거 거래 {records.length}건 · 계좌 {accounts.length}개</>}</Text>
-      {episode && overlap.length > 0 && <Text>거래 공유 Alert {overlap.length}건</Text>}
       {row.judgment && <Text className="overview-note">판정 사유 · {previewJudgmentReason(row.judgment)}</Text>}
       {records.length > 0 && <LinkTag href={`?${analysisQuery}`}>분석에서 자금 흐름 보기</LinkTag>}
     </> },
@@ -255,7 +277,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       {episode && overlap.length > 0 && <><Heading level={3}>거래가 겹치는 Alert <CountTag count={overlap.length} /></Heading>
         <Box as="ul" className="overview-fact-list">{overlap.map(alert => <Box as="li" key={alert.code}>
           <LinkTag code={alert.code} /><VerdictTag verdict={alert.verdict} /><PatternTag>{alert.pattern}</PatternTag>
-          <Text as="span">{records.filter(record => alert.related.some(item => item.code === record.code)).length}건 공유</Text>
+          <Text as="span">{alert.value}건 공유</Text>
         </Box>)}</Box>
       </>}
     </> },
@@ -304,11 +326,9 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
     },
     flow: {
       title: '돈의 흐름',
+      compact: flows.length > 0 ? <>{flowChart}<FlowSummary evidence={evidence} compact />{flowDetails}</> : undefined,
       visualContent: <FlowSummary evidence={evidence} />,
-      details: <>
-        {records.length > 0 && <Text><EvidencePeriod records={records} /> · 근거 거래 {records.length}건 · 원통화 기준</Text>}
-        {records.length > 0 && <LinkTag href={`?${analysisQuery}`}>분석에서 자금 흐름 보기</LinkTag>}
-      </>,
+      details: flowDetails,
     },
     rules: { title: '룰 적중', content: <>
       <Text className="overview-note">탐지 당시 적중 기록이 없습니다.</Text>
@@ -321,9 +341,8 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
     composition: {
       title: '구성 · 근거 거래',
       count: records.length,
-      compact: <>{compositionChart}{overlapNote}</>,
+      compact: <>{compositionChart}{overlapChart}</>,
       details: <>
-        {overlapNote}
         <Text className="overview-note">{focus ? <>관측 중심 계좌 <Text as="code">{focus.code}</Text></> : '결제 수단별 근거 거래'}</Text>
       </>,
       visualContent: compositionChart,
@@ -354,18 +373,19 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   const graphicPanels = { judgment: records.length > 0, accounts: accounts.length > 0, past: prior.length > 0,
     detection: scorePoints.length > 0, flow: records.length > 0 };
   const layout = episode
-    ? [['judgment', 1], ['flow', 2], ['history', 1], ['accounts', 1], ['detection', 1], ['rules', 1], ['composition', 2]]
-    : [['judgment', 1], ['accounts', 1], ['past', 1], ['history', 1], ['detection', 2], ['composition', 2],
-      ['transactions', 'full'], ['flow', 2], ['rules', 2]];
+    ? [['judgment', 4], ['flow', 8], ['history', 4], ['accounts', 4], ['detection', 4], ['rules', 4], ['composition', 8]]
+    : [['judgment', 3], ['accounts', 3], ['past', 3], ['history', 3], ['detection', 9], ['composition', 3],
+      ['transactions', 12], ['flow', 6], ['rules', 6]];
   return layout.map(([id, span], index) => {
     const panel = panels[id];
     const graphic = panel.graphic ?? graphicPanels[id];
     return { id, span, ...panel, number: index + 1,
       visualContent: panel.visualContent ?? visuals[id],
-      panelVisual: id === 'flow' ? <FlowCharts evidence={evidence} reduced={reduced} /> : undefined,
+      panelVisual: id === 'flow' ? flowChart : undefined,
       panelDetails: id === 'flow' ? <><FlowSummary evidence={evidence} />{panel.details}</> : undefined,
       graphic,
-      overviewGraphic: id === 'detection' ? scorePoints.length > 1 : ['accounts', 'composition'].includes(id) && graphic,
+      overviewGraphic: id === 'detection' ? scorePoints.length > 1
+        : id === 'flow' ? flows.length > 0 : ['accounts', 'composition'].includes(id) && graphic,
     };
   });
 }
@@ -399,9 +419,8 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
   const pager = <FooterPagination host={paginationHost} label="개요 패널 이동" unit="패널"
     page={index} pageCount={panels.length} onPageChange={select}>
     <Box as="label" className="visually-hidden" htmlFor="case-overview-panel">개요 패널</Box>
-    <select id="case-overview-panel" value={index} onChange={event => select(Number(event.target.value))}>
-      {panels.map(({ id, title, number }, i) => <option key={id} value={i}>{number}. {title}</option>)}
-    </select>
+    <NativeSelect id="case-overview-panel" value={index} onChange={event => select(Number(event.target.value))}
+      options={panels.map(({ title, number }, value) => ({ value, label: `${number}. ${title}` }))} />
   </FooterPagination>;
   return <>
     <Box className="overview-panel-layout">
@@ -437,11 +456,12 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
       points: transactionTimeBuckets(moves, 4, move => move.amount), unit: ` ${currency}` }))
     : [{ label: `${window}시간 단위 근거 거래 건수`, points: transactionTimeBuckets(records, window), unit: '건' }];
   const trends = trendSeries.filter(({ points }) => points.filter(point => point.value > 0).length >= 2);
+  const overlappingAlertCount = row.overlappingAlerts?.length ?? row.linkedAlerts ?? 0;
   const boundary = focus && <><Text as="code">{focus.code}</Text> 기준</>;
   const flowMetric = field => flows.some(flow => flow[field] != null) ? <CurrencyValues flows={flows} field={field} emphasized /> : null;
   const metrics = [
     ['최고 모델 점수', lead ? <KpiValue value={number.format(lead.score)} unit="점" /> : null, lead && <LinkTag code={lead.code} />],
-    episode ? ['근거 거래', <KpiValue value={number.format(records.length)} unit="건" />, `거래 공유 Alert ${row.linkedAlerts ?? 0}건`]
+    episode ? ['근거 거래', <KpiValue value={number.format(records.length)} unit="건" />, `거래 공유 Alert ${overlappingAlertCount}건`]
       : ['외부 유출', flowMetric('outflow'), flows.length > 0 && <>{outflows.length}건 · {boundary}</>],
     ['계좌 · 소유주', <Text as="span" className="overview-kpi-values">
       <KpiValue value={number.format(accounts.length)} unit="개" /><KpiValue value={number.format(ownerCount)} unit="명" />
@@ -468,7 +488,6 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
             {focus && <Box as="li">중심 계좌 기준 유입 {inflows.length}건 · 유출 {outflows.length}건</Box>}
             {representative && <Box as="li">{lead ? `최고 점수 거래 ${lead.score}점` : '첫 근거 거래'} · <LinkTag code={representative.code} />
               {' · '}<Text as="code">{representative.from.code}</Text> → <Text as="code">{representative.to.code}</Text> · {amount(representative)}</Box>}
-            {episode && row.linkedAlerts > 0 && <Box as="li">동일 거래가 연결된 Alert {row.linkedAlerts}건</Box>}
           </Box>
         </AISummaryPanel>
         <Box as="dl" className="overview-metrics">

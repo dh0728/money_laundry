@@ -30,16 +30,19 @@
   min-block-size: 0;
   overflow-wrap: anywhere;
 }
-.overview-tiles > [data-overview-span="full"] { grid-column: 1 / -1 }
 @container case-overview (36rem <= width < 56rem) {
-  .overview-tiles:not([data-episode]) { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .overview-tiles:not([data-episode]) { grid-template-columns: repeat(12, minmax(0, 1fr)) }
+  .overview-tiles:not([data-episode]) > [data-overview-span] { grid-column: span 6 }
+  .overview-tiles:not([data-episode]) > [data-overview-span="12"] { grid-column: 1 / -1 }
 }
 @container case-overview (min-width: 56rem) {
-  .overview-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)) }
-  .overview-tiles[data-episode] { grid-template-columns: repeat(3, minmax(0, 1fr)) }
-  .overview-tiles > [data-overview-span="2"] { grid-column: span 2 }
-  .overview-tiles:not([data-episode]) > [data-overview-panel="detection"] { grid-column: span 3 }
-  .overview-tiles:not([data-episode]) > [data-overview-panel="composition"] { grid-column: span 1 }
+  .overview-tiles { grid-template-columns: repeat(12, minmax(0, 1fr)) }
+  .overview-tiles > [data-overview-span="3"] { grid-column: span 3 }
+  .overview-tiles > [data-overview-span="4"] { grid-column: span 4 }
+  .overview-tiles > [data-overview-span="6"] { grid-column: span 6 }
+  .overview-tiles > [data-overview-span="8"] { grid-column: span 8 }
+  .overview-tiles > [data-overview-span="9"] { grid-column: span 9 }
+  .overview-tiles > [data-overview-span="12"] { grid-column: 1 / -1 }
 }
 .preview-case-overview > .overview-current,
 .screen-layout:has(> [data-workflow="case-overview"]) > .screen-table {
@@ -77,7 +80,9 @@
   grid-template-columns: minmax(0, 1fr);
 }
 @container case-overview (min-width: 52rem) {
-  .overview-panel-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) }
+  .overview-panel-layout { grid-template-columns: repeat(12, minmax(0, 1fr)) }
+  .overview-panel-layout > :first-child { grid-column: span 8 }
+  .overview-panel-layout > :nth-child(2) { grid-column: span 4 }
 }
 .overview-panel-layout > .overview-current { min-block-size: 0; min-inline-size: 0 }
 .overview-panel-layout > .overview-current:first-child { display: flex; flex-direction: column }
@@ -155,6 +160,7 @@
 .overview-score-compact { inline-size: 100%; block-size: clamp(9rem, 42cqi, 14rem) }
 .overview-score-chart :is(.overview-score-plot, .overview-score-compact) svg { display: block }
 .overview-flow-charts { display: grid; gap: var(--workspace-gap) }
+.overview-flow-charts .overview-horizontal-chart { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 .overview-review-timeline > ol {
   display: grid;
   gap: var(--aml-space-12);
