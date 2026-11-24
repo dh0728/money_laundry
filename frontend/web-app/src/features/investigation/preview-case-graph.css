@@ -42,9 +42,9 @@
   outline-offset: calc(-1 * var(--aml-stroke-focus));
 }
 .preview-comparison-evidence h3 { margin-block: var(--workspace-gap) 0; font-size: var(--ui-font-size) }
-.preview-case-network.screen-panel {
+.preview-case-network {
   position: relative;
-  overflow: clip;
+  min-inline-size: 0;
   --preview-graph-inner-radius: var(--aml-panel-control-radius);
   container: case-graph / inline-size;
 }
