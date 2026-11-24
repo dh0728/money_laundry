@@ -42,13 +42,15 @@ describe('report exports', () => {
     const fillText = vi.fn()
     const context = { fillRect: vi.fn(), fillText, measureText: (text: string) => ({ width: text.length * 12 }), font: '' } as unknown as CanvasRenderingContext2D
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context)
-    const jpeg = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,/9j/2Q==')
+    const image = new Blob([new Uint8Array([255, 216, 255, 217])], { type: 'image/jpeg' })
+    const jpeg = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => callback(image))
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const judgment: JudgmentRecord = { id: 'J-261115-000001', caseIds: [8100], transactionIds: [7000], displayIds: ['A-261109-000041'], verdict: 'normal', reason: '고정 판정 사유', reviewer: '김OO', at: '2026-11-15T10:00:00+09:00', cases: [], reportText: '고정된 샘플 보고서\n' + '한글 근거 '.repeat(1600) }
     const pending = downloadJudgmentPdf([judgment])
     await vi.runAllTimersAsync()
     await pending
     expect(jpeg.mock.calls.length).toBeGreaterThan(1)
+    expect(jpeg).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.94)
     expect(fillText.mock.calls.some(([text]) => String(text).includes('고정된 샘플 보고서'))).toBe(true)
     expect(context.font).toBe('21px sans-serif')
     expect(createObjectURL).toHaveBeenCalledOnce()

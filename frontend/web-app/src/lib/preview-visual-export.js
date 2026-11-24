@@ -1,3 +1,5 @@
+import { createExportCanvas } from '../components/export-canvas';
+
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const graphSnapshots = new WeakMap();
 
@@ -223,7 +225,7 @@ function paintVisual(layer, panel, bounds, textMeasure) {
 }
 
 function makeSVG(panels, format) {
-  const textMeasure = format === 'svg' ? document.createElement('canvas').getContext('2d') : null;
+  const textMeasure = format === 'svg' ? createExportCanvas(1, 1).context : null;
   const surfaces = panels.map(panel => ({ panel, bounds: panel.getBoundingClientRect() }));
   const theme = getComputedStyle(document.documentElement);
   const spacing = parseFloat(theme.getPropertyValue('--aml-space-16')) || 16;
@@ -260,14 +262,10 @@ async function toPNG({ image, width, height }) {
     illustration.src = url;
     await illustration.decode();
     const scale = Math.min(2, 4096 / width, 4096 / height, Math.sqrt(8_000_000 / (width * height)));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
-    canvas.getContext('2d').drawImage(illustration, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve, reject) => canvas.toBlob(blob => {
-      if (blob) resolve(blob);
-      else reject(new Error('PNG 파일을 만들 수 없습니다.'));
-    }, 'image/png'));
+    const surface = createExportCanvas(Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)));
+    if (!surface.context) throw new Error('PNG 파일을 만들 수 없습니다.');
+    surface.context.drawImage(illustration, 0, 0, surface.width, surface.height);
+    return await surface.encode('image/png');
   } finally {
     URL.revokeObjectURL(url);
   }

@@ -1,5 +1,6 @@
 import { buildImagePdf } from '../../lib/preview-pdf.js';
 import { downloadBlob } from '../../lib/report-io';
+import { createExportCanvas } from '../../components/export-canvas';
 import { judgmentReasonLabels } from './case-judgment-data.js';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
 import '../../styles/case-report-tokens.css';
@@ -114,14 +115,14 @@ function makeWriter({ measure, fontFamily, colors, type, weight, leading }) {
     paint(String(images.length + 1).padStart(2, '0'), page.width - page.margin - measure('footer-number-width'), baseline,
       { size: type('detail'), fontWeight: weight('bold'), color: colors.brand });
     const sheet = canvas;
-    images.push(sheet.convertToBlob({ type: 'image/jpeg', quality: .94 }).then(async blob => ({
+    images.push(sheet.encode('image/jpeg', .94).then(async blob => ({
       width: sheet.width, height: sheet.height, jpeg: new Uint8Array(await blob.arrayBuffer()),
     })));
   };
   const start = () => {
     if (canvas) finish();
-    canvas = new OffscreenCanvas(page.width * page.scale, page.height * page.scale);
-    context = canvas.getContext('2d', { alpha: false });
+    canvas = createExportCanvas(page.width * page.scale, page.height * page.scale, { alpha: false });
+    context = canvas.context;
     if (!context) throw new Error('PDF를 만들 수 없는 브라우저입니다.');
     context.scale(page.scale, page.scale);
     context.textBaseline = 'alphabetic';

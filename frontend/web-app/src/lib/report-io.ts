@@ -1,6 +1,7 @@
 import { patternName } from '@/mocks/dashboard-data'
 import type { JudgmentRecord } from '@/lib/workspace-store'
 import { verdictLabel } from './report-model'
+import { createExportCanvas } from '@/components/export-canvas'
 
 type CsvValue = string | number | boolean | null | undefined
 export const MAX_PDF_JUDGMENTS = 25
@@ -77,6 +78,22 @@ export function reportParagraphs(judgment: JudgmentRecord) {
   ]
 }
 
+function* wrapReportLines(paragraphs: readonly string[], maxWidth: number, measure: (line: string) => number) {
+  for (const paragraph of paragraphs) {
+    for (const sourceLine of paragraph.split(/\r?\n/)) {
+      let line = ''
+      for (const character of sourceLine) {
+        if (line && measure(line + character) > maxWidth) {
+          yield line
+          line = ''
+        }
+        line += character
+      }
+      yield line
+    }
+  }
+}
+
 async function renderReportPages(judgments: readonly JudgmentRecord[]) {
   if (document.fonts) await document.fonts.ready
   const root = document.querySelector('[data-ui="aml-app"]') ?? document.documentElement
@@ -93,13 +110,13 @@ async function renderReportPages(judgments: readonly JudgmentRecord[]) {
   const pages: PdfImagePage[] = []
   let imageBytes = 0
   for (const judgment of judgments) {
-    let canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, y: number
+    let canvas: ReturnType<typeof createExportCanvas>
+    let context!: NonNullable<typeof canvas.context>
+    let y!: number
     const startPage = () => {
-      canvas = document.createElement('canvas')
-      canvas.width = width; canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) throw new Error('PDF를 만들 수 없는 브라우저입니다.')
-      context = ctx
+      canvas = createExportCanvas(width, height)
+      if (!canvas.context) throw new Error('PDF를 만들 수 없는 브라우저입니다.')
+      context = canvas.context
       context.fillStyle = background; context.fillRect(0, 0, width, height)
       context.fillStyle = foreground
       context.font = `${size}px ${font}`
@@ -107,31 +124,25 @@ async function renderReportPages(judgments: readonly JudgmentRecord[]) {
       context.fillText(`AML RADAR · ${judgment.id}`, margin, margin)
       y = margin + lineHeight * 2
     }
-    const finishPage = () => {
+    const finishPage = async () => {
       if (pages.length >= MAX_PDF_PAGES) throw new Error('샘플 PDF는 최대 100쪽입니다. 선택을 줄이거나 서버 내보내기 작업이 필요합니다.')
       context.fillText(`샘플 데이터 · 실제 AI 모델 실행 아님 · ${pages.length + 1}쪽`, margin, height - margin)
-      const binary = atob(canvas.toDataURL('image/jpeg', 0.94).split(',')[1])
-      imageBytes += binary.length
+      const image = await canvas.encode('image/jpeg', 0.94)
+      imageBytes += image.size
       if (imageBytes > MAX_PDF_IMAGE_BYTES) throw new Error('샘플 PDF 크기 한도를 초과했습니다. 선택을 줄이거나 서버 내보내기 작업이 필요합니다.')
-      pages.push({ width, height, jpeg: Uint8Array.from(binary, character => character.charCodeAt(0)) })
+      pages.push({ width, height, jpeg: new Uint8Array(await image.arrayBuffer()) })
     }
     startPage()
-    const drawLine = (line: string) => {
-      if (y + lineHeight > height - margin - lineHeight) { finishPage(); startPage() }
+    const lines = wrapReportLines(reportParagraphs(judgment), width - margin * 2, line => context.measureText(line).width)
+    for (const line of lines) {
+      if (y + lineHeight > height - margin - lineHeight) {
+        await finishPage()
+        startPage()
+      }
       context.fillText(line, margin, y)
       y += lineHeight
     }
-    for (const paragraph of reportParagraphs(judgment)) {
-      for (const sourceLine of paragraph.split(/\r?\n/)) {
-        let line = ''
-        for (const character of sourceLine) {
-          if (line && context!.measureText(line + character).width > width - margin * 2) { drawLine(line); line = '' }
-          line += character
-        }
-        drawLine(line)
-      }
-    }
-    finishPage()
+    await finishPage()
     // Keep one canvas active at a time and let the UI respond between judgments.
     await new Promise<void>(resolve => window.setTimeout(resolve, 0))
   }
