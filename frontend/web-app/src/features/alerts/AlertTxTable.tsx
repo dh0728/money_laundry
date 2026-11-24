@@ -89,7 +89,6 @@ export default function AlertTxTable({ rows, selection, remote = false, onOpenTr
         onChange={() => selection.onToggle(row.original.txId)} /></Text>,
     } as ColumnDef<TxRow>, ...visible] : visible
   }, [withSource, setTarget, selection, remote, onOpenTransaction])
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table은 React Compiler 최적화 대상이 아니다
   const table = useReactTable({
     data, columns, getRowId: row => String(row.txId),
     state: { sorting, rowSelection: Object.fromEntries((selection?.ids ?? []).map(id => [String(id), true])) },

@@ -2,7 +2,7 @@
 // dev의 force 그래프(react-force-graph-2d, Obsidian 그래프와 같은 방식)로 계좌를 끌어 놀 수 있고,
 // 놓으면 천천히 템플릿 모양 쪽으로 돌아온다. `원래 패턴으로` = templateLayout(보내는 쪽 → 받는 쪽 층, 이웃 평균 높이)으로 즉시 복원.
 // 패턴 이름은 구조로 추정한 값(FE 제안)이고 모델 값이 아니다. 번호는 시간순 그래프와 같은 규칙(처음 나온 순서).
-import { lazy, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
+import { lazy, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import { NODE_SIZE, templateLayout, type Timeline } from './timeLayout'
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
 import { Box } from '../../../components/layout-primitives'
@@ -18,6 +18,14 @@ type PLink = { id: string; pair: string; source: string | PNode; target: string 
 // 선 규칙(김명기 10/12): 두 계좌 사이 한 건이면 최단 거리 직선. 여러 건이면 건마다 선을 따로 두고 베지어로 갈라 보임.
 // 수십 건이 쌓이거나(MERGE_COUNT 초과) 선 굵기가 너무 두꺼워지면(MERGE_WIDTH 초과) 한 줄로 통합해 `N건 · 금액`으로 적는다
 const MERGE_COUNT = 6, MERGE_WIDTH = 24
+// 테마·강조색을 바꾸면 html의 class·data-theme·data-primary-variant가 바뀐다. 캔버스 색을 그때 다시 읽는다.
+const THEME_ATTRIBUTES = ['class', 'data-theme', 'data-primary-variant']
+const subscribeDocumentTheme = (listener: () => void) => {
+  const observer = new MutationObserver(listener)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: THEME_ATTRIBUTES })
+  return () => observer.disconnect()
+}
+const documentTheme = () => THEME_ATTRIBUTES.map(name => document.documentElement.getAttribute(name) ?? '').join(' ')
 
 // 위험 색(--risk-N)을 캔버스가 쓸 실제 색으로 바꾼다
 function resolveColor(name: string) {
@@ -81,11 +89,11 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
     reset: () => { for (const n of data.nodes) { n.x = n.tx; n.y = n.ty; n.vx = 0; n.vy = 0; n.fx = undefined; n.fy = undefined } fg.current?.d3ReheatSimulation() },
   }), [data])
 
+  const themeClass = useSyncExternalStore(subscribeDocumentTheme, documentTheme, documentTheme)
   const colors = useMemo(() => {
     const css = getComputedStyle(document.documentElement), c = (n: string) => css.getPropertyValue(n).trim()
-    return { card: resolveColor('--card'), fg: resolveColor('--foreground'), border: resolveColor('--border'), muted: resolveColor('--muted-foreground'), bg: resolveColor('--background'), blue: resolveColor('--palette-blue-500'), risk: Array.from({ length: 10 }, (_, i) => resolveColor(`--risk-${i}`)), _: c('--card') }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [document.documentElement.className])
+    return { theme: themeClass, card: resolveColor('--card'), fg: resolveColor('--foreground'), border: resolveColor('--border'), muted: resolveColor('--muted-foreground'), bg: resolveColor('--background'), blue: resolveColor('--brand'), risk: Array.from({ length: 10 }, (_, i) => resolveColor(`--risk-${i}`)), _: c('--card') }
+  }, [themeClass])
   const riskColor = (score: number) => colors.risk[Math.min(9, Math.max(0, Math.floor(score * 10)))]
   
   // 휠은 소유주 보기와 같게: 그냥 휠을 굴리면 포인터 자리를 기준으로 확대·축소(Windows 크롬은 Ctrl+휠이 브라우저 배율이라 쓰지 않는다)
@@ -131,7 +139,7 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
   }
 
   return <Box ref={wrap} className="absolute inset-0" data-testid="pattern-graph" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onContextMenu={e => e.preventDefault()}>
-    {box && <Box className="pointer-events-none absolute z-10 border border-[var(--palette-blue-500)] bg-[var(--palette-blue-500)]/10" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
+    {box && <Box className="pointer-events-none absolute z-10 border border-[var(--brand)] bg-[var(--brand)]/10" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
     {size.w > 0 && <Suspense fallback={null}><ForceGraph2D<PNode, PLink> ref={fg} onRenderFramePre={() => { if (fg.current) configure(fg.current) }} width={size.w} height={size.h} graphData={data} backgroundColor="rgba(0,0,0,0)"
       warmupTicks={150} cooldownTicks={200} enableZoomInteraction={false} enablePanInteraction={false} enableNodeDrag onNodeHover={(n: PNode | null) => { hover.current = n }}
       nodeRelSize={R} nodeVal={1} nodeLabel="" linkLabel=""

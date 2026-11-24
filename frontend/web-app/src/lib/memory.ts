@@ -1,3 +1,4 @@
+import type { MockRole } from '@/components/MockRole'
 import { useCallback, useRef, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react'
 // In-memory prototype state survives navigation, and resets on a full reload.
 const memory = new Map<string, unknown>()
@@ -26,3 +27,6 @@ export function useMemoryState<T>(key: string, initial: T): [T, Dispatch<SetStat
   }, [key])
   return [value, set]
 }
+
+// 재설계 시안 전용 관리자·조사자 보기 선택(components/MockRole)
+export const useMockRole = () => useMemoryState<MockRole>('redesign:role', 'ADMIN')

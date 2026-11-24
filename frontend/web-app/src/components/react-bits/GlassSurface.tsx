@@ -1,7 +1,6 @@
 'use client';
 
-/* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useLayoutEffect, useState, useRef, useId, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useState, useRef, useId, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import './GlassSurface.css';
 import { glassDisplacementMap } from '../glass-map.js';
 
@@ -438,10 +437,11 @@ const GlassSurface = ({
     });
   };
 
-  const updateDisplacementMap = () => {
+  // effect에서만 부르고 그때의 크기·모양 값을 읽는다
+  const updateDisplacementMap = useEffectEvent(() => {
     mapUrlRef.current = shapeMapRef.current || generateDisplacementMap();
     feImageRef.current?.setAttribute('href', mapUrlRef.current);
-  };
+  });
 
   useEffect(() => {
     updateDisplacementMap();
@@ -539,7 +539,7 @@ const GlassSurface = ({
       if (current) setArt(nextArt);
     });
     return () => { current = false; };
-  }, [shape, loaded, boxSize, borderWidth, blur, opacity, brightness]);
+  }, [shape, shapeImage, loaded, boxSize, borderWidth, blur, opacity, brightness]);
 
   useEffect(() => {
     let current = true;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import React, { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 
 import './GlideSelect.css';
@@ -106,7 +106,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   const step = S.row + GAP;
   const popOut = Math.round((popDuration * 2) / 3);
 
-  useLayoutEffect(() => {
+  const placeOpenList = useEffectEvent(() => {
     if (phase !== 'open') return;
     const el = menuRef.current;
     const trigger = triggerRef.current;
@@ -147,8 +147,8 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  });
+  useLayoutEffect(() => placeOpenList(), [phase]);
 
   useLayoutEffect(() => {
     const p = pillRef.current;
@@ -239,15 +239,15 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     } else if (k.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) go(typeaheadIndex(items, cur, k));
   };
 
-  useEffect(() => {
+  const watchOutsidePointer = useEffectEvent(() => {
     if (inlineList || phase === 'closed') return undefined;
     const onDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) close('pop');
     };
     document.addEventListener('pointerdown', onDown, true);
     return () => document.removeEventListener('pointerdown', onDown, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, inlineList]);
+  });
+  useEffect(() => watchOutsidePointer(), [phase, inlineList]);
   useEffect(() => {
     if (disabled) clearTimeout(closeTimer.current);
   }, [disabled]);

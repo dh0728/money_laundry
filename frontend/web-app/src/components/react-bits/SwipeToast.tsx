@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import React, { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { animate, motion, useMotionValue, useTransform } from 'motion/react';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 import { X } from 'lucide-react';
@@ -154,15 +154,15 @@ const SwipeToast: React.FC<SwipeToastProps> = ({
     setPhase('open');
   };
 
-  useEffect(() => {
+  const syncOpen = useEffectEvent(() => {
     if (!open) close('programmatic');
     else if (phaseRef.current !== 'open') rescue();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  });
+  useEffect(() => syncOpen(), [open]);
   useEffect(() => {
     if (!HAS_STARTING_STYLE) requestAnimationFrame(() => setMounted(true));
   }, []);
-  useEffect(() => {
+  const startFuse = useEffectEvent(() => {
     if (phase !== 'open' || duration <= 0 || !fuseRef.current) return undefined;
     anim.current?.cancel();
     const a = fuseRef.current.animate(BURN, { duration, easing: 'linear', fill: 'forwards' });
@@ -173,8 +173,8 @@ const SwipeToast: React.FC<SwipeToastProps> = ({
       a.onfinish = null;
       a.pause();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, duration]);
+  });
+  useEffect(() => startFuse(), [phase, duration]);
   useEffect(() => {
     if (!pauseOnHover) {
       flags.current.hover = false;

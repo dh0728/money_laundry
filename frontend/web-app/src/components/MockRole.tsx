@@ -1,13 +1,9 @@
-/* eslint-disable react-refresh/only-export-components -- 시안 전용 역할 선택(상태 훅과 컴포넌트를 함께 내보냄) */
 // 재설계 시안 전용: 관리자·조사자 화면을 바꿔 보는 선택. 실제 앱에서는 로그인 역할(useCurrentUser().role)을 쓴다.
 import type { ComponentProps } from 'react'
-import { useMemoryState } from '@/lib/memory'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export type MockRole = 'ADMIN' | 'STAFF'
-
-export const useMockRole = () => useMemoryState<MockRole>('redesign:role', 'ADMIN')
 
 export function MockRoleSwitch({ role, onChange }: { role: MockRole; onChange: (role: MockRole) => void }) {
   return <label className="flex items-center gap-2 text-xs text-muted-foreground">시안 보기 권한

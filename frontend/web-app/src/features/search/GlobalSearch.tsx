@@ -1,5 +1,5 @@
 // 헤더의 남는 너비를 채우는 전역 검색: 소유주·계좌·거래·Alert·Episode·알림·화면을 한 번에 찾는다.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Search } from 'lucide-react'
 import { type AlertRow } from '@/api/alerts'
 import { typeDisplay } from '@/api/codes'
@@ -71,8 +71,8 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const close = () => { setOpen(false); setQuery(''); remote?.onQuery(''); setActive(0); input.current?.blur() }
-  const select = (fn: () => void) => () => { fn(); close() }
+  const close = useCallback(() => { setOpen(false); setQuery(''); remote?.onQuery(''); setActive(0); input.current?.blur() }, [remote])
+  const select = useCallback((fn: () => void) => () => { fn(); close() }, [close])
 
   const groups: ResultGroup[] = useMemo(() => {
     if (!q) return [{ id: 'quick', label: '바로가기', items: pageLinks.map(p => ({ key: `quick-${p.page}`, primary: p.label, onSelect: select(() => onNavigate(p.page)) })) }]
@@ -111,9 +111,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
       { id: 'notification', label: '알림', items: notifications },
       { id: 'screen', label: '화면·설정', items: screens },
     ].filter(g => g.items.length > 0)
-    // select는 매 렌더 새로 만들지만 결과 목록은 검색어·데이터가 바뀔 때만 다시 만든다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, data, remote])
+  }, [q, data, remote, select, onNavigate, onOpenTransaction])
 
   const flat = groups.flatMap(g => g.items)
   const indexOf = new Map(flat.map((item, i) => [item, i]))

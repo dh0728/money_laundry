@@ -14,7 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { AdminButton, MockRoleSwitch, useMockRole, type MockRole } from '@/components/MockRole'
+import { AdminButton, MockRoleSwitch, type MockRole } from '@/components/MockRole'
+import { useMockRole } from '@/lib/memory'
 import { fixture } from '@/lib/apiMode'
 import { useAsync } from '@/lib/useAsync'
 import { fetchReviewCases } from '@/api/liveReview'
@@ -153,7 +154,7 @@ function WriteTab({ role, draft, setDraft, onBacktest }: { role: Role; draft: { 
       </Section>
       <Section title="이 룰을 문장으로 읽으면" description="입력한 값으로 만든 설명. Alert 상세에도 이 문장이 보입니다">
         <Text className="text-sm leading-6">{t.sentence(draft.p)}</Text>
-        <Box as="ul" className="mt-4 space-y-1.5 text-xs">{checks.map(([k, s, m]) => <Box as="li" key={k} className="grid grid-cols-[20px_64px_1fr] gap-2"><Text as="span" className={s === 'err' ? 'text-destructive-text' : s === 'warn' ? 'text-[var(--palette-blue-500)]' : 'text-muted-foreground'}>{s === 'ok' ? '✓' : s === 'warn' ? '△' : '✕'}</Text><Text as="span" className="font-medium">{k}</Text><Text as="span" className="text-muted-foreground">{m}</Text></Box>)}</Box>
+        <Box as="ul" className="mt-4 space-y-1.5 text-xs">{checks.map(([k, s, m]) => <Box as="li" key={k} className="grid grid-cols-[20px_64px_1fr] gap-2"><Text as="span" className={s === 'err' ? 'text-destructive-text' : s === 'warn' ? 'text-[var(--status-caution-accent)]' : 'text-muted-foreground'}>{s === 'ok' ? '✓' : s === 'warn' ? '△' : '✕'}</Text><Text as="span" className="font-medium">{k}</Text><Text as="span" className="text-muted-foreground">{m}</Text></Box>)}</Box>
         <Box className="mt-5 flex flex-wrap items-center justify-between gap-3"><Stepper current={err ? 'DRAFT' : 'VALIDATED'} />
           <Text as="span" className="flex gap-2"><AdminButton role={role} size="sm" variant="outline" onClick={() => toast.success('임시 저장', { description: '시안이라 저장하지 않습니다.' })}>임시 저장</AdminButton><AdminButton role={role} size="sm" disabled={err} onClick={onBacktest}>백테스트로</AdminButton></Text></Box>
       </Section>
