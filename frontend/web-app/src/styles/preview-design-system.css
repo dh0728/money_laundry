@@ -112,6 +112,16 @@
   --record-verdict-glow-strength: 94%;
   --record-verdict-edge-strength: 16%;
   --record-verdict-divider-strength: 12%;
+  --record-glow-rest-angle: 45deg;
+  --record-glow-edge-maximum: 100;
+  --record-glow-edge-sensitivity: 30;
+  --record-glow-cone-core: 10%;
+  --record-glow-cone-falloff: 32%;
+  --record-glow-layer: 1;
+  --record-glow-fade-in: 250ms;
+  --record-glow-fade-out: 750ms;
+  --record-glow-inner-strength: 88%;
+  --record-glow-outer-strength: 58%;
   --review-lane-tint: 14%;
 }
 
