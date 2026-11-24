@@ -1,3 +1,5 @@
+@import '../../styles/selection-control-tokens.css';
+
 /* Radix 잠금은 유지하고, 뷰포트 스크롤바와 본문 폭은 메뉴를 열기 전과 동일하게 둔다. */
 :root:has(> body[data-scroll-locked="1"] [data-slot="select-content"]) {
   overflow-y: auto;

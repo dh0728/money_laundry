@@ -12,6 +12,10 @@
   --selection-control-ease-out: var(--aml-ease-decelerate, cubic-bezier(0.23, 1, 0.32, 1));
   --selection-control-focus-offset: var(--aml-focus-outline-offset, 3px);
 
+  --select-trigger-transition-properties: color, box-shadow;
+  --select-trigger-focus-ring-width: 3px;
+  --select-content-min-width: 8rem;
+
   --branched-menu-width: 240px;
   --branched-menu-foreground: #f5f5f5;
   --branched-menu-rail-color: #3f3f46;
