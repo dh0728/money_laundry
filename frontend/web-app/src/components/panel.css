@@ -1,6 +1,7 @@
 .panel-disclosure {
+  --panel-disclosure-radius: var(--aml-radius-card);
   min-inline-size: 0;
-  border-radius: var(--aml-radius-card);
+  border-radius: var(--panel-disclosure-radius);
 }
 
 .panel-disclosure-trigger {
@@ -10,7 +11,7 @@
   gap: var(--workspace-gap);
   min-block-size: var(--account-control-size);
   padding: var(--aml-space-8) var(--aml-panel-text-inset);
-  border-radius: inherit;
+  border-radius: var(--panel-disclosure-radius);
   list-style: none;
   cursor: pointer;
   font-weight: var(--aml-type-body-strong-weight);
