@@ -48,7 +48,8 @@ const tree = designRuleTree.map(category => ({ ...category, rules: category.rule
   const list = hits.get(rule.id)
   const counted = !rule.engine.split('+').every(engine => engine === 'test' || engine === 'ci')
   const cap = rule.level === 'ratchet' ? baseline[rule.id] ?? 0 : 0
-  const status = !counted ? 'test' : list.length > cap ? 'fail' : list.length < cap ? 'lower' : 'ok'
+  const cleared = list.filter(hit => rule.errorIn?.some(folder => hit.file.startsWith(folder)))
+  const status = !counted ? 'test' : list.length > cap || cleared.length ? 'fail' : list.length < cap ? 'lower' : 'ok'
   if (status === 'fail') failed = true
   if (status === 'lower') lowered.push(rule.id)
   return { ...rule, count: list.length, cap, status, hits: list.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line) }

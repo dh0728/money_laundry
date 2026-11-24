@@ -275,6 +275,11 @@ export const designEslintConfig = [{
   languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
   plugins: { aml: eslintPlugin },
   rules: Object.fromEntries(designRules.filter(rule => enginesOf(rule).includes('eslint')).map(rule => [pluginRuleName(rule.id), levelOf(rule)])),
-}]
+}, ...designRules.filter(rule => rule.errorIn && enginesOf(rule).includes('eslint')).map(rule => ({
+  // ratchet 규칙이라도 0건이 된 폴더(errorIn)는 오류로 막는다.
+  files: rule.errorIn.map(folder => `${folder}**/*.{js,jsx,ts,tsx}`),
+  ignores: ['**/*.test.*', '**/*.stories.*'],
+  rules: { [pluginRuleName(rule.id)]: 'error' },
+}))]
 export const designStylelintRules = Object.fromEntries(designRules.filter(rule => enginesOf(rule).includes('stylelint'))
   .map(rule => [pluginRuleName(rule.id), levelOf(rule) === 'off' ? null : [true, { severity: levelOf(rule) === 'warn' ? 'warning' : 'error' }]]))
