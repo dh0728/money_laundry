@@ -16,7 +16,7 @@ const omitted = [
   'button', 'input', '.visually-hidden', '.screen-title-accessible', '.sr-only',
   '[role="tooltip"]',
 ].join(', ');
-const svgStyles = [
+const presentationAttributes = [
   'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-opacity', 'stroke-width',
   'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset',
   'opacity', 'display', 'visibility', 'color', 'paint-order', 'vector-effect',
@@ -94,10 +94,15 @@ export function copySVG(source) {
   for (const [index, element] of [source, ...source.querySelectorAll('*')].entries()) {
     const target = index === 0 ? copy : descendants[index - 1];
     const style = getComputedStyle(element);
-    for (const property of svgStyles) {
+    for (const property of presentationAttributes) {
       const value = style.getPropertyValue(property);
-      if (value) target.style.setProperty(property, localReferences(value));
+      if (!value) continue;
+      // Resolve theme variables into portable SVG attributes. A cloned inline
+      // value could otherwise override the resolved value in the exported file.
+      target.setAttribute(property, localReferences(value));
+      target.style.removeProperty(property);
     }
+    if (!target.style.length) target.removeAttribute('style');
     if (element.hasAttribute('data-svg-width-from-layout')) target.setAttribute('width', String(element.getBBox().width));
   }
   copy.querySelectorAll('[data-graph-transient]').forEach(element => element.remove());
@@ -116,7 +121,9 @@ function placeSVG(layer, source, bounds, visual = copySVG(source)) {
   }
   visual.style.removeProperty('transform');
   visual.style.removeProperty('position');
-  visual.style.setProperty('overflow', 'visible');
+  visual.style.removeProperty('overflow');
+  visual.setAttribute('overflow', 'visible');
+  if (!visual.style.length) visual.removeAttribute('style');
   layer.append(visual);
 }
 
