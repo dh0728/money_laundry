@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { NativeSelect } from '@/components/ui/select';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { Panel } from '../../components/panel';
@@ -101,17 +102,16 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
             onChange={event => { setLookup(event.target.value); goToPage(0); }} />
         </Box>
         <Box as="label">거래일
-          <select value={selectedDay} onChange={event => { setSelectedDay(event.target.value); goToPage(0); }}>
-            <option value="">전체 날짜</option>
-            {days.map(day => <option key={day} value={day}>{day}</option>)}
-          </select>
+          <NativeSelect value={selectedDay} onChange={event => { setSelectedDay(event.target.value); goToPage(0); }}
+            options={[{ value: '', label: '전체 날짜' }, ...days.map(day => ({ value: day, label: day }))]} />
         </Box>
         <Box as="label">원본 라벨
-          <select value={label} onChange={event => { setLabel(event.target.value); goToPage(0); }}>
-            <option value="all">전체 라벨</option>
-            <option value="labeled">{labelText(true)}</option>
-            <option value="unlabeled">{labelText(false)}</option>
-          </select>
+          <NativeSelect value={label} onChange={event => { setLabel(event.target.value); goToPage(0); }}
+            options={[
+              { value: 'all', label: '전체 라벨' },
+              { value: 'labeled', label: labelText(true) },
+              { value: 'unlabeled', label: labelText(false) },
+            ]} />
         </Box>
       </Box>
     </Panel>
