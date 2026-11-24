@@ -305,6 +305,8 @@
   --case-graph-controls-layer: 1;
   --case-graph-drop-target-layer: 3;
   --case-graph-min-height: 240px;
+  --case-graph-layout-node-width: 192px;
+  --case-graph-layout-node-height: 80px;
   --case-graph-viewport-height: 48vh;
   --case-graph-max-height: 480px;
   --case-graph-settings-max-width: 22rem;

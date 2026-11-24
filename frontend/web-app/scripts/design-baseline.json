@@ -13,8 +13,8 @@
   "token/inline-style": 85,
   "token/arbitrary-class": 119,
   "token/important": 2,
-  "token/fixed-number": 90,
+  "token/fixed-number": 88,
   "token/palette-direct": 0,
-  "chart/library-import": 3,
+  "chart/library-import": 2,
   "icon/local-svg": 6
 }

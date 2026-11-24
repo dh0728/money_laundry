@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import { caseLayoutPositions, caseLayoutRequest } from './case-graph-layout'
+import { caseLayoutPositions, caseLayoutRequest } from '@/features/graph/case-graph-layout'
 import type { GraphEdge, GraphNode } from './case-selectors'
 
 const nodes: GraphNode[] = ['a', 'b', 'c', 'isolated'].map(id => ({ id, label: id, accountIds: [], abnormal: false }))

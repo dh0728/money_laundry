@@ -1,7 +1,5 @@
-import { caseNodeSize, seedCasePositions } from './case-graph-layout';
+import { readCaseLayoutMetrics, seedCasePositions } from '@/features/graph/case-graph-layout';
 
-const columnStep = caseNodeSize.width + 64;
-const rowStep = caseNodeSize.height + 64;
 const patternAliases = { 'ga-sc': 'gather-scatter', 'sc-ga': 'scatter-gather' };
 
 function findCycle(topology) {
@@ -68,7 +66,7 @@ function patternColumns(topology, pattern) {
   return best;
 }
 
-function placeColumns(columns) {
+function placeColumns(columns, { columnStep, rowStep }) {
   const rows = Math.max(...columns.map(column => column.length));
   return new Map(columns.flatMap((column, x) => column.map((id, y) => [id, {
     x: x * columnStep,
@@ -76,7 +74,7 @@ function placeColumns(columns) {
   }])));
 }
 
-function placeCycle(cycle) {
+function placeCycle(cycle, { columnStep, rowStep }) {
   // The distance between adjacent nodes exceeds their bounding-box diagonal.
   const radius = Math.hypot(columnStep, rowStep) / (2 * Math.sin(Math.PI / cycle.length));
   return new Map(cycle.map((id, index) => {
@@ -85,7 +83,7 @@ function placeCycle(cycle) {
   }));
 }
 
-export function arrangeCasePattern(network, pattern, baselinePositions) {
+function arrangeCasePattern(network, pattern, baselinePositions, steps) {
   const token = pattern?.trim().toLowerCase().replace(/\s+\d+(?:[.,]\d+)?%$/, '');
   const name = patternAliases[token] ?? token;
   if (!['fan-out', 'fan-in', 'gather-scatter', 'scatter-gather', 'cycle'].includes(name)) return undefined;
@@ -98,7 +96,7 @@ export function arrangeCasePattern(network, pattern, baselinePositions) {
   }
   const motif = name === 'cycle' ? findCycle(topology) : patternColumns(topology, name);
   if (!motif) return undefined;
-  const positions = name === 'cycle' ? placeCycle(motif) : placeColumns(motif);
+  const positions = name === 'cycle' ? placeCycle(motif, steps) : placeColumns(motif, steps);
 
   // Move the remaining ELK layout as a block to keep its existing spacing.
   const remainder = ids.filter(id => !positions.has(id));
@@ -106,7 +104,7 @@ export function arrangeCasePattern(network, pattern, baselinePositions) {
     const context = remainder.map(id => baselinePositions[id]);
     if (context.some(point => !Number.isFinite(point?.x) || !Number.isFinite(point?.y))) return undefined;
     const right = Math.max(...Array.from(positions.values(), point => point.x));
-    const offset = right + columnStep - Math.min(...context.map(({ x }) => x));
+    const offset = right + steps.columnStep - Math.min(...context.map(({ x }) => x));
     remainder.forEach((id, index) => {
       const { x, y } = context[index];
       positions.set(id, { x: x + offset, y });
@@ -117,7 +115,9 @@ export function arrangeCasePattern(network, pattern, baselinePositions) {
 
 export function caseAccountLayout(network, pattern) {
   const nodes = [...network.nodes].sort((left, right) => left.id.localeCompare(right.id));
-  const positions = arrangeCasePattern(network, pattern, seedCasePositions(nodes));
+  const metrics = readCaseLayoutMetrics();
+  const steps = { columnStep: metrics.width + metrics.gap, rowStep: metrics.height + metrics.gap };
+  const positions = arrangeCasePattern(network, pattern, seedCasePositions(nodes, metrics), steps);
   if (positions) return { kind: 'pattern', positions };
 
   // Order verified relationships by their transfer direction even when a model motif is absent.
@@ -140,5 +140,5 @@ export function caseAccountLayout(network, pattern) {
   }
   const tiers = Map.groupBy(nodes.map(({ id }) => id), id => ranks.get(id));
   const columns = [...tiers].sort(([a], [b]) => a - b).map(([, ids]) => ids);
-  return { kind: 'direction', positions: columns.length ? Object.fromEntries(placeColumns(columns)) : {} };
+  return { kind: 'direction', positions: columns.length ? Object.fromEntries(placeColumns(columns, steps)) : {} };
 }
