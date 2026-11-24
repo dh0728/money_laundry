@@ -100,7 +100,11 @@
   min-inline-size: 0;
 }
 .dashboard-institution-relations { position: relative }
-.dashboard-workflow-charts .dashboard-new-entities .dashboard-series-plot { block-size: var(--chart-detail-sparkline-height) }
+.dashboard-workflow-charts .dashboard-new-entities .dashboard-series-plot {
+  flex: 1 1 0;
+  block-size: auto;
+  min-block-size: var(--chart-detail-sparkline-height);
+}
 .dashboard-staff-scroll { max-block-size: calc(var(--aml-space-24) * 7); overflow-y: auto }
 .dashboard-staff-chart {
   display: grid;

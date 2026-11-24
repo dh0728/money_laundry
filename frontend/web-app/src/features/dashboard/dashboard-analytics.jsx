@@ -225,7 +225,7 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
     ? baseline == null ? '기간 내 마지막 배정 기록 · 분석가 명단 미제공'
       : `기간 내 마지막 배정 기록 · 등록 분석가 ${integer.format(staffCount)}명`
     : `전체 미완료 ${count(total)} · 선택 기간 생성 업무`;
-  const color = showAssignments ? dataSeriesColors.sky : transactionTotalColor;
+  const color = showAssignments ? transactionTotalColor : 'var(--risk-medium)';
   const stackGap = readChartNumber('--aml-space-2', 2);
   const cornerRadius = readChartNumber('--aml-radius-small', 4);
   const animationDuration = reduced ? 0 : readChartNumber('--chart-dashboard-enter-duration', 340);
@@ -233,7 +233,10 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
     {baseline != null && <Box className="dashboard-staff-reference-key">
       <Text as="span">균등 기준 {meanCount.format(baseline)}건/명</Text>
     </Box>}
-    {!showAssignments && <SeriesLegend series={[{ key: 'overdue', label: `3일 초과 ${count(overdue.length)}`, color: flowColors.suspect }]} />}
+    {!showAssignments && <SeriesLegend series={[
+      { key: 'withinThreeDays', label: `3일 이하 ${count(total - overdue.length)}`, color },
+      { key: 'overdue', label: `3일 초과 ${count(overdue.length)}`, color: flowColors.suspect },
+    ]} />}
     {rows.length ? <Box className="dashboard-staff-scroll">
       <Box as="figure" className="dashboard-staff-chart" aria-label={title}
         style={{ '--dashboard-staff-row-count': rows.length,
@@ -255,7 +258,7 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
             {!showAssignments && <Bar dataKey="overdue" fill={flowColors.suspect} lineCap={cornerRadius} stackGap={stackGap} animate={!reduced} />}
             <ChartTooltip showDatePill={false} showDots={false} rows={person => showAssignments
               ? [{ label: person.name, value: count(person.count), color }]
-              : [{ label: '현재 미완료', value: count(person.total), color },
+              : [{ label: '3일 이하', value: count(person.value), color },
                 { label: '3일 초과', value: count(person.overdue), color: flowColors.suspect }]} />
           </BarChart>
           {baseline != null && <Box className="dashboard-staff-reference" aria-hidden="true" />}
