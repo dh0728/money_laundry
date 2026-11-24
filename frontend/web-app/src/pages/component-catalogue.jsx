@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Download } from 'lucide-react';
 import { NativeSelect } from '@/components/ui/select';
 import { createRoot } from 'react-dom/client';
 import { ActionButton, ConfirmHoldButton, PrimaryButton } from '../components/primary-button';
-import { Button, Divider, Icon, IconButton, ScrollArea, Tooltip, bindTooltip } from '../components/components';
+import { bindTooltip } from '../components/components';
 import { WorkspaceNavigation } from '../app/screen-navigation';
 import { ScreenNavigation } from '../app/screen-layouts';
 import { Panel } from '../components/panel';
 import { QueryCheck, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls';
 import { CaseActorTag, CaseAgeTag, FilterTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag } from '../components/semantic-tags';
-import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch';
+import { SquishSwitchControl } from '../components/squish-switch';
 import { setupGlassMaterial } from '../components/glass-material';
 import { bindCardGlow } from '../components/card-glow';
 import { uiSizeOptions } from '../config/appearance-options';
@@ -29,7 +30,7 @@ import StatusMark from '../components/react-bits/StatusMark';
 import '../app/layout.css';
 import './component-catalogue.css';
 import { systemReducedMotion } from '@/hooks/use-reduced-motion';
-import { Box, Heading, Text } from '../components/layout-primitives';
+import { Box, Divider, EmbeddedPage, Heading, Text, TextLink } from '../components/layout-primitives';
 
 const demoCodes = (prefix, size) => Array.from({ length: 8 }, (_, index) =>
   `${prefix}-261111-${String(index + 1).padStart(size, '0')}`);
@@ -38,11 +39,6 @@ const dashboard = dashboardFixtures(groups);
 const caseRows = new Map(dashboard.cases.map(row => [row.code, row]));
 const statusLabels = { pending: '대기 중', running: '처리 중', done: '처리 완료', failed: '실패', cancelled: '취소' };
 const queryMarkup = { __html: QueryToolbar() };
-const buttonMarkup = { __html: Button('기본 버튼', { surface: 'ghost', variant: 'row' }) };
-const tooltipMarkup = { __html:
-  IconButton(Icon('download'), '내보내기', '', '', 'floating') + Tooltip() };
-const scrollbarMarkup = { __html: ScrollArea(groups.T.map(code =>
-  `<div class="row"><code>${code}</code></div>`).join(Divider()), 'tabindex="0" aria-label="스크롤 영역"') };
 const sections = [
   ['foundations', '기본 요소'], ['variables', '변수'], ['navigation', '탐색과 조회'],
   ['records', '카드와 목록'], ['workflows', '룰과 보고서'], ['shell', '앱 셸'],
@@ -62,34 +58,37 @@ function DemoGroup({ id, label, children }) {
   </Box>;
 }
 
-function NativeSwitch({ id, label, initial, onChange }) {
-  const host = useRef(null);
-  useEffect(() => {
-    host.current.innerHTML = SquishSwitch(id, label);
-    const button = host.current.firstElementChild;
-    button.setAttribute('aria-checked', String(!!initial));
-    bindSquishSwitch(button, onChange);
-  }, [id, label, initial, onChange]);
+function CatalogueSwitch({ id, label, checked, onChange }) {
   return <Box className="catalogue-setting">
     <Box as="label" htmlFor={id}>{label}</Box>
-    <Text as="span" ref={host} />
+    <Text as="span"><SquishSwitchControl id={id} label={label} checked={checked} onChange={onChange} /></Text>
   </Box>;
 }
 
 function NativePrimitives({ onEvent }) {
-  const tooltipSample = useRef(null);
-  useEffect(() => {
-    const host = tooltipSample.current;
-    return bindTooltip(host.querySelector('button'), host.querySelector('#tooltip'));
-  }, []);
+  const exportButton = useRef(null);
+  const tooltip = useRef(null);
+  useEffect(() => bindTooltip(exportButton.current, tooltip.current), []);
 
   return <>
-    <Box className="catalogue-actions"
-      onClick={() => onEvent('기본 버튼 실행')}
-      dangerouslySetInnerHTML={buttonMarkup} />
-    <Box className="catalogue-actions" ref={tooltipSample}
-      onClick={() => onEvent('아이콘 버튼 실행')} dangerouslySetInnerHTML={tooltipMarkup} />
-    <Box className="catalogue-scroll" dangerouslySetInnerHTML={scrollbarMarkup} />
+    <Box className="catalogue-actions">
+      <ActionButton className="row" onClick={() => onEvent('기본 버튼 실행')}>기본 버튼</ActionButton>
+    </Box>
+    <Box className="catalogue-actions">
+      <ActionButton ref={exportButton} className="icon-button" shape="circle" surface="floating"
+        aria-label="내보내기" onClick={() => onEvent('아이콘 버튼 실행')}>
+        <Download className="icon" aria-hidden="true" />
+      </ActionButton>
+      <Box id="tooltip" ref={tooltip} className="warm-tooltip-popover" popover="manual" />
+    </Box>
+    <Box className="catalogue-scroll">
+      <Box className="scroll-area" tabIndex={0} aria-label="스크롤 영역">
+        {groups.T.map((code, index) => <React.Fragment key={code}>
+          {index > 0 && <Divider />}
+          <Box className="row"><Text as="code">{code}</Text></Box>
+        </React.Fragment>)}
+      </Box>
+    </Box>
   </>;
 }
 
@@ -143,9 +142,25 @@ function ShellDemo() {
   const [open, setOpen] = useState(false);
   return <Box as="details" onToggle={event => { if (event.currentTarget.open) setOpen(true); }}>
     <Box as="summary">앱 셸 열기</Box>
-    {open && <iframe className="catalogue-shell" src="/dashboard/mine" loading="lazy"
+    {open && <EmbeddedPage className="catalogue-shell" src="/dashboard/mine"
       title="AML RADAR 헤더, 사이드바, 새 검색, 보관함, 설정, 로그인" />}
   </Box>;
+}
+
+function CatalogueRecordPreview({ className, children, onEvent }) {
+  const preview = useRef(null);
+  useEffect(() => {
+    const host = preview.current;
+    const showRecordFeedback = event => {
+      const control = event.target instanceof Element && event.target.closest('button[data-work-code], a[data-work-code]');
+      if (!control || !host.contains(control)) return;
+      const action = control.hasAttribute('data-add-work-tab') ? '사이드바 탭으로 추가' : '상세 열기';
+      onEvent(`${control.dataset.workCode} · ${action}`);
+    };
+    host.addEventListener('click', showRecordFeedback);
+    return () => host.removeEventListener('click', showRecordFeedback);
+  }, [onEvent]);
+  return <Box ref={preview} className={className}>{children}</Box>;
 }
 
 function Catalogue() {
@@ -196,22 +211,17 @@ function Catalogue() {
   useEffect(() => mountWorkflowNotifications(document.getElementById('workflow-notifications')), []);
 
   const navGroups = ScreenNavigation(screen, groups.A[0]);
-  const handleRecordClick = event => {
-    const button = event.target.closest('[data-work-code]');
-    if (!button) return;
-    setFeedback(`${button.dataset.workCode} · ${button.hasAttribute('data-add-work-tab') ? '사이드바 탭으로 추가' : '상세 열기'}`);
-  };
   return <Box as="main" className="catalogue" ref={root}>
     <Box as="header" className="catalogue-header">
-      <Box><a href="/dashboard/mine">AML RADAR</a><Heading level={1}>컴포넌트</Heading></Box>
+      <Box><TextLink href="/dashboard/mine">AML RADAR</TextLink><Heading level={1}>컴포넌트</Heading></Box>
       <Box className="catalogue-preferences">
-        <NativeSwitch id="catalogue-motion" label="모션 줄이기" initial={systemReduced} onChange={setReduced} />
+        <CatalogueSwitch id="catalogue-motion" label="모션 줄이기" checked={reduced} onChange={setReduced} />
       </Box>
     </Box>
     <Box as="nav" className="catalogue-index" ref={indexRef} aria-label="컴포넌트 분류">
-      {sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
+      {sections.map(([id, label]) => <TextLink key={id} href={`#${id}`}>{label}</TextLink>)}
       <Box className="catalogue-index-preferences catalogue-preferences">
-        <NativeSwitch id="catalogue-theme" label="다크 모드" initial={false} onChange={setDark} />
+        <CatalogueSwitch id="catalogue-theme" label="다크 모드" checked={dark} onChange={setDark} />
         <QueryRadio label="UI 크기" items={uiSizeOptions} value={size} onChange={setSize} />
       </Box>
     </Box>
@@ -230,7 +240,7 @@ function Catalogue() {
       </Demo>
       <Demo title="SquishSwitch · BellToggle · SpringCheck">
         <Box className="catalogue-control-stack">
-          <NativeSwitch id="catalogue-refraction" label="리퀴드 글래스" initial onChange={setRefraction} />
+          <CatalogueSwitch id="catalogue-refraction" label="리퀴드 글래스" checked={refraction} onChange={setRefraction} />
           <Box className="catalogue-setting"><Text as="span">보관함 알림</Text><NotificationPreference demo /></Box>
           <QueryCheck label="Alert 선택" checked={checked} onChange={setChecked} />
         </Box>
@@ -278,7 +288,7 @@ function Catalogue() {
       </Demo>
       <Demo title="AnimatedList">
         <AnimatedList ariaLabel="소유주 예시" items={Array.from({ length: 12 }, (_, index) => `소유주-${String(index + 1).padStart(3, '0')}`)}
-          initialSelectedIndex={0} displayScrollbar maxHeight={195} width="100%" showGradients={false} frame={false}
+          initialSelectedIndex={0} displayScrollbar maxHeight="var(--catalogue-list-sample-height)" width="100%" showGradients={false} frame={false}
           animation={reduced ? 'none' : 'slide'} onItemSelect={setListSelection} surface="workspace" />
         <Text as="output">선택 · {listSelection || '소유주-001'}</Text>
       </Demo>
@@ -292,18 +302,18 @@ function Catalogue() {
         </ScrollStack>
       </Demo>
       <Demo title="ListCard · 소유주·계좌·거래 · BranchLines" wide>
-        <Box className="catalogue-ledger" onClick={handleRecordClick}>
+        <CatalogueRecordPreview className="catalogue-ledger" onEvent={setFeedback}>
           <Ledger codes={groups.T} caseRows={caseRows} />
-        </Box>
+        </CatalogueRecordPreview>
       </Demo>
       <Demo title="Alert 카드 목록 · 일괄 선택" wide>
-        <Box onClick={handleRecordClick}><CaseCards codes={groups.A.slice(0, 3)} label="Alert" caseRows={caseRows} /></Box>
+        <CatalogueRecordPreview onEvent={setFeedback}><CaseCards codes={groups.A.slice(0, 3)} label="Alert" caseRows={caseRows} /></CatalogueRecordPreview>
       </Demo>
       <Demo title="Alert·Episode 표 · 사람 판정" wide>
-        <Box onClick={handleRecordClick}>
+        <CatalogueRecordPreview onEvent={setFeedback}>
           <PreviewCaseTable title="Alert 목록" rows={groups.A.slice(0, 3).map(code => caseRows.get(code))} />
           <PreviewCaseTable title="Episode 목록" rows={groups.E.slice(0, 3).map(code => caseRows.get(code))} episode />
-        </Box>
+        </CatalogueRecordPreview>
       </Demo>
     </DemoGroup>
     <DemoGroup id="workflows" label="룰과 보고서">
@@ -323,8 +333,8 @@ function Catalogue() {
       <Demo title="MagicBento · 대시보드 지표와 차트" wide>
         <Box as="details" onToggle={event => { if (event.currentTarget.open) setDashOpen(true); }}>
           <Box as="summary">대시보드 열기</Box>
-          {dashOpen && <Box onClick={handleRecordClick}><PreviewDashboard data={dashboard} mine={false}
-            appearance={{ theme: dark ? 'dark' : 'light', reduced }} /></Box>}
+          {dashOpen && <CatalogueRecordPreview onEvent={setFeedback}><PreviewDashboard data={dashboard} mine={false}
+            appearance={{ theme: dark ? 'dark' : 'light', reduced }} /></CatalogueRecordPreview>}
         </Box>
       </Demo>
     </DemoGroup>

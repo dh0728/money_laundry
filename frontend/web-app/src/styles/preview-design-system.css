@@ -8,6 +8,20 @@
 /* Map the standalone workspace's existing component tokens to the shared design system. */
 :root {
   --aml-layout-max-width: 1440px;
+  --catalogue-workspace-list-height: 340px;
+  --catalogue-padding-fluid: 4vw;
+  --catalogue-heading-fluid-size: 5vw;
+  --catalogue-scroll-sample-height: 98px;
+  --catalogue-glass-sample-height: 96px;
+  --catalogue-glass-sample-angle: 120deg;
+  --catalogue-stack-sample-height: 170px;
+  --catalogue-stack-card-height: 54px;
+  --catalogue-list-sample-height: 195px;
+  --catalogue-ledger-max-height: 600px;
+  --catalogue-ledger-viewport-share: 72dvh;
+  --catalogue-count-sample-size: 2em;
+  --catalogue-shell-max-height: 720px;
+  --catalogue-shell-viewport-share: 80dvh;
   --aml-shell-compact-max-width: 680px;
   --aml-workspace-laptop-max-width: 1919px;
   --layer-local-overlay: 1;

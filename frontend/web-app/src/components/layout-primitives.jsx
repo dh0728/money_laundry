@@ -37,3 +37,15 @@ export function Heading({ level = 2, ...props }) {
   const Tag = `h${Math.min(6, Math.max(1, level))}`;
   return <Tag {...props} />;
 }
+
+export function TextLink({ href, ...props }) {
+  return <a href={href} {...props} />;
+}
+
+export function Divider() {
+  return <hr className="divider" />;
+}
+
+export function EmbeddedPage({ src, title, className }) {
+  return <iframe className={className} src={src} loading="lazy" title={title} />;
+}
