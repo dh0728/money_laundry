@@ -22,6 +22,7 @@ import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { NativeCheckbox } from '@/components/ui/checkbox'
 import { useCurrentUser, canEditOpen } from '@/app/session'
 import { useAsync } from '@/lib/useAsync'
 import { assertEditableAlert, buildAlertClose, buildAlertTransfer, buildEpisodeUnlink, episodeGroupSelection } from '@/api/reviewCommands'
@@ -343,7 +344,7 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
         {money.state.data.candidateAccounts && <Box className="mt-4 border-t pt-4">
           <Heading level={3} className="text-sm font-semibold">조사 중심 계좌 선택</Heading>
           <Text className="mt-1 text-xs text-muted-foreground">선택한 가명 계좌를 기준으로 자금 지표를 다시 계산합니다. 사건 거래의 소속과 판정은 바뀌지 않습니다.</Text>
-          <Box className="mt-2 max-h-40 space-y-1 overflow-y-auto">{money.state.data.candidateAccounts.length ? money.state.data.candidateAccounts.map(account => <Box as="label" key={account} className="flex items-center gap-2 text-xs"><input type="checkbox" aria-label={`조사 중심 계좌 ${account}`} checked={chosenAccounts.includes(account)} onChange={() => toggleAccount(account)} disabled={!editable || scopeBusy || busy} /><Text as="span" className="break-all">{account}</Text></Box>) : <Text className="text-xs text-muted-foreground">선택할 계좌 후보가 없습니다.</Text>}</Box>
+          <Box className="mt-2 max-h-40 space-y-1 overflow-y-auto">{money.state.data.candidateAccounts.length ? money.state.data.candidateAccounts.map(account => <Box as="label" key={account} className="flex items-center gap-2 text-xs"><NativeCheckbox aria-label={`조사 중심 계좌 ${account}`} checked={chosenAccounts.includes(account)} onChange={() => toggleAccount(account)} disabled={!editable || scopeBusy || busy} /><Text as="span" className="break-all">{account}</Text></Box>) : <Text className="text-xs text-muted-foreground">선택할 계좌 후보가 없습니다.</Text>}</Box>
           <Textarea aria-label="계좌 선택 사유" variant="plain" className="mt-3" maxLength={4000} placeholder="계좌를 포함하거나 제외한 이유" value={scopeComment} onChange={event => { setScopeComment(event.target.value); setScopeRetry(false) }} disabled={!editable || scopeBusy || busy} />
           <Box className="mt-2 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!editable || scopeBusy || busy} onClick={() => void saveMoneyScope()}>조사 중심 계좌 저장</Button>{scopeRetry && <Button size="sm" variant="outline" disabled={scopeBusy || busy} onClick={() => { if (scopePrevious.current) void saveMoneyScope(scopePrevious.current) }}>같은 계좌 선택 요청 재시도</Button>}</Box>
         </Box>}

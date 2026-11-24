@@ -10,6 +10,7 @@ import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { NativeCheckbox } from '@/components/ui/checkbox'
 import type { TxRelabel } from '@/features/graph/relabel'
 import { formatMoney, type TransactionTarget } from '@/features/transactions/transactionIndex'
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
@@ -84,7 +85,7 @@ export default function AlertTxTable({ rows, selection, remote = false, onOpenTr
     return selection ? [{
       id: 'select', size: 40,
       header: () => <Text as="span" className="sr-only">거래 선택</Text>,
-      cell: ({ row }) => <Text as="span" className="flex w-full justify-center"><input type="checkbox" aria-label={`거래 T-${row.original.txId} 선택`}
+      cell: ({ row }) => <Text as="span" className="flex w-full justify-center"><NativeCheckbox aria-label={`거래 T-${row.original.txId} 선택`}
         disabled={selection.disabled?.(row.original.txId)} checked={selection.ids.includes(row.original.txId)} onClick={event => event.stopPropagation()}
         onChange={() => selection.onToggle(row.original.txId)} /></Text>,
     } as ColumnDef<TxRow>, ...visible] : visible
