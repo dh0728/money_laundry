@@ -9,8 +9,8 @@ export function Panel({ as: Tag = 'section', className = '', embedded = false, v
   return <Tag {...props} className={embedded ? className : `${materialClass} ${className}`.trim()} />;
 }
 
-export function PanelDisclosure({ label, children }) {
-  return <Panel as="details" variant="flush" className="panel-disclosure">
+export function PanelDisclosure({ label, children, inset }) {
+  return <Panel as="details" variant="flush" className="panel-disclosure" data-disclosure-inset={inset}>
     <summary className="panel-disclosure-trigger">
       <span>{label}</span>
       <ChevronDown className="icon" aria-hidden="true" />

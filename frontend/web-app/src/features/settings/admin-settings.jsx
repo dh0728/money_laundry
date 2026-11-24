@@ -7,7 +7,7 @@ import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-sessio
 import { PanelDisclosure } from '../../components/panel';
 import { PrimaryButton } from '../../components/primary-button';
 import './admin-settings.css';
-import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
+import { Box, Grid, Heading, Stack, Text } from '../../components/layout-primitives';
 
 function ModelRiskSettings({ user }) {
   const [values, setValues] = useState(getModelRiskThresholds);
@@ -16,25 +16,27 @@ function ModelRiskSettings({ user }) {
   const canEdit = user.source === 'api' || user.source === 'fixture';
   const changed = getModelRiskThresholds().some((value, index) => value !== values[index]);
   return <Stack className="admin-model-settings">
-    <ModelRiskDial values={values} disabled={!canEdit} onChange={next => {
-      setValues(next);
-      setResult('');
-    }} />
-    <Box as="ul" className="model-risk-legend" aria-label="점수 구간">
-      <Box as="li" data-band="low">낮음 {medium}점 미만</Box>
-      <Box as="li" data-band="medium">주의 {medium}~{high - 1}점</Box>
-      <Box as="li" data-band="high">위험 {high}점 이상</Box>
-    </Box>
-    {canEdit && <Stack direction="row" justify="end" align="center" wrap>
-      <Text as="span" role="status">{result}</Text>
-      <PrimaryButton tone="brand" size="comfortable" disabled={!changed} onHold={() => {
-        const applied = saved => setResult(saved ? '위험 구간을 적용했습니다.' : '위험 구간을 적용하지 못했습니다.');
-        // 서비스 모드는 서버 응답을 기다린다.
-        const saved = saveModelRiskThresholds(values);
-        if (saved instanceof Promise) void saved.then(applied);
-        else applied(saved);
-      }}>위험 구간 적용</PrimaryButton>
-    </Stack>}
+    <Grid className="admin-model-risk-layout">
+      <Stack className="admin-model-risk-labels">
+        <Stack as="ul" className="model-risk-legend" aria-label="점수 구간">
+          <Box as="li" data-band="low">낮음 {medium}점 미만</Box>
+          <Box as="li" data-band="medium">주의 {medium}~{high - 1}점</Box>
+          <Box as="li" data-band="high">위험 {high}점 이상</Box>
+        </Stack>
+        {canEdit && <Text as="span" role="status" className="model-risk-result">{result}</Text>}
+      </Stack>
+      <ModelRiskDial values={values} disabled={!canEdit} onChange={next => {
+        setValues(next);
+        setResult('');
+      }} />
+    </Grid>
+    {canEdit && <PrimaryButton tone="brand" size="comfortable" disabled={!changed} onHold={() => {
+      const applied = saved => setResult(saved ? '위험 구간을 적용했습니다.' : '위험 구간을 적용하지 못했습니다.');
+      // 서비스 모드는 서버 응답을 기다린다.
+      const saved = saveModelRiskThresholds(values);
+      if (saved instanceof Promise) void saved.then(applied);
+      else applied(saved);
+    }}>위험 구간 적용</PrimaryButton>}
   </Stack>;
 }
 
@@ -46,7 +48,7 @@ function AdminSettings() {
     <PanelDisclosure label="팀원 권한 관리">
       <AdminTeamSettings sessionUser={user} />
     </PanelDisclosure>
-    <PanelDisclosure label="모델 설정 · 위험 구간">
+    <PanelDisclosure label="모델 설정 · 위험 구간" inset="control">
       <ModelRiskSettings key={`${user.source}:${user.id}`} user={user} />
     </PanelDisclosure>
   </Box>;

@@ -274,6 +274,7 @@
   --risk-low: var(--status-positive-accent);
   --risk-medium: var(--status-caution-accent);
   --risk-high: var(--status-danger-accent);
+  --model-risk-settings-dial-max-width: 15rem;
   --status-positive-accent: color-mix(in srgb,
     color-mix(in srgb, var(--aml-figma-surface-status-positive-accent-default), var(--aml-figma-dark-surface-status-positive-accent-default) 45%),
     var(--aml-black-100) 8%);

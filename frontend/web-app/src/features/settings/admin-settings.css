@@ -6,10 +6,13 @@
   border-block-start: var(--aml-stroke-divider) solid var(--glass-edge);
 }
 
-.admin-model-settings { padding-block: var(--aml-space-4); }
+.admin-model-risk-layout { align-items: center }
+.admin-model-risk-labels { padding-inline-start: var(--aml-space-8) }
+.model-risk-result:empty { position: absolute; }
+.admin-model-settings > .accent-action > .hold-button { inline-size: 100% }
 .model-risk-dial {
   position: relative;
-  inline-size: min(100%, 15rem);
+  inline-size: min(100%, var(--model-risk-settings-dial-max-width));
   aspect-ratio: 1;
   margin-inline: auto;
 }
@@ -42,13 +45,6 @@
 .model-risk-slider-thumb:active { cursor: grabbing; }
 .model-risk-slider-thumb:focus-visible { outline: var(--aml-stroke-focus) solid var(--focus-ring); outline-offset: var(--aml-space-2); }
 .model-risk-slider-thumb[aria-disabled="true"] { cursor: default; }
-.model-risk-legend {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--aml-space-8);
-}
 .model-risk-legend { list-style: none; margin: 0; padding: 0; font-size: var(--aml-type-caption-size); }
 .model-risk-legend li::before {
   content: '';

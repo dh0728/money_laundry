@@ -1,7 +1,13 @@
 .panel-disclosure {
   --panel-disclosure-radius: var(--aml-radius-card);
+  --panel-disclosure-inline-inset: var(--aml-panel-text-inset);
   min-inline-size: 0;
   border-radius: var(--panel-disclosure-radius);
+}
+
+.panel-disclosure[data-disclosure-inset="control"] {
+  --panel-disclosure-inline-inset: var(--aml-space-8);
+  --panel-disclosure-radius: calc(var(--account-control-size) / 2 + var(--panel-disclosure-inline-inset));
 }
 
 .panel-disclosure-trigger {
@@ -29,4 +35,4 @@
 }
 
 .panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: 180deg }
-.panel-disclosure-body { padding: 0 var(--aml-panel-text-inset) var(--aml-space-8) }
+.panel-disclosure-body { padding: 0 var(--panel-disclosure-inline-inset) var(--aml-space-8) }
