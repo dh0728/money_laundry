@@ -13,12 +13,12 @@
   "token/inline-style": 355,
   "token/arbitrary-class": 209,
   "token/important": 36,
-  "token/fixed-number": 1120,
+  "token/fixed-number": 1119,
   "token/inline-var-number": 3,
   "token/palette-direct": 16,
   "token/series-color": 9,
   "token/undefined-var": 39,
   "chart/library-import": 5,
-  "icon/local-svg": 15,
+  "icon/local-svg": 6,
   "escape-hatch/any-disable": 21
 }
