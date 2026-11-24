@@ -710,11 +710,7 @@ export function mountCaseGraph(host, { active, cases, evidenceSelection, onCompa
   const caseGraphSelections = workspaceGraphSelections.get(workspace);
   const related = host.dataset.caseFlow === 'related';
   const evidenceHost = host.nextElementSibling?.matches('[data-case-evidence]') ? host.nextElementSibling : undefined;
-  const accountsHost = evidenceHost ? document.createElement('div') : undefined;
-  if (accountsHost) {
-    accountsHost.dataset.caseAccounts = '';
-    evidenceHost.after(accountsHost);
-  }
+  const accountsHost = evidenceHost?.nextElementSibling?.matches('[data-case-accounts]') ? evidenceHost.nextElementSibling : undefined;
   let caseData;
   const render = () => root.render(<CaseGraph {...caseData}
     related={related} lens={host.dataset.lens ?? 'pattern'} evidenceHost={evidenceHost} accountsHost={accountsHost}
@@ -724,8 +720,5 @@ export function mountCaseGraph(host, { active, cases, evidenceSelection, onCompa
     render();
   };
   update({ active, cases });
-  return Object.assign(() => {
-    root.unmount();
-    accountsHost?.remove();
-  }, { update, render });
+  return Object.assign(() => root.unmount(), { update, render });
 }

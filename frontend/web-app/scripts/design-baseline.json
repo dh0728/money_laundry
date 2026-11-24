@@ -4,7 +4,7 @@
   "component/button": 10,
   "component/clickable-element": 3,
   "component/raw-element": 43,
-  "component/dom-api": 13,
+  "component/dom-api": 12,
   "component/form-control": 10,
   "token/raw-color": 37,
   "token/spacing-unit": 2,

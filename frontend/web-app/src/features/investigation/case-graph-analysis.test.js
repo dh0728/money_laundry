@@ -85,7 +85,7 @@ describe('case graph analysis', () => {
     const transactions = [fixture(1, first, other), fixture(2, second, other), fixture(3, first, other)];
     const active = { code: 'A-261111-000001', related: transactions };
     const host = document.createElement('div');
-    host.innerHTML = '<div data-case-flow="analysis" data-lens="owner"></div><div data-case-evidence="거래" data-analysis-table></div>';
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="owner"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
     document.body.append(host);
     const graph = within(host);
     const checkbox = code => graph.getByRole('checkbox', { name: `${code} 선택` });
@@ -187,7 +187,7 @@ describe('case graph analysis', () => {
       method: '계좌이체', currency: 'KRW', amount: 100, status: '처리 전' }));
     const active = { code: 'A-261111-000001', pattern: 'FAN-OUT 82%', related: rows };
     const host = document.createElement('div');
-    host.innerHTML = '<div data-case-flow="analysis" data-lens="pattern"></div><div data-case-evidence="거래" data-analysis-table></div>';
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="pattern"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
     document.body.append(host);
     const graph = within(host);
     const checkbox = code => graph.queryByRole('checkbox', { name: `${code} 선택` });
@@ -236,7 +236,7 @@ describe('case graph analysis', () => {
     ];
     const active = { code: 'A-261111-000001', related: rows };
     const host = document.createElement('div');
-    host.innerHTML = '<div data-case-flow="analysis" data-lens="sankey"></div><div data-case-evidence="거래" data-analysis-table></div>';
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="sankey"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
     document.body.append(host);
     let cleanup;
     try {

@@ -187,12 +187,12 @@ function CaseDetail(path) {
   const { lens } = route;
   if (type === 'analysis') {
     return readOnly + BoxHTML('', `data-case-flow="analysis" data-lens="${lens}"`) +
-      BoxHTML('', 'data-case-evidence="거래" data-analysis-table');
+      BoxHTML('', 'data-case-evidence="거래" data-analysis-table') + BoxHTML('', 'data-case-accounts');
   }
   if (type === 'related' || type === 'judge-bundle') {
     return readOnly + BoxHTML(
       BoxHTML('', `data-case-flow="related" data-lens="${lens}"`) +
-      BoxHTML('', 'data-case-evidence="연결 거래"'),
+      BoxHTML('', 'data-case-evidence="연결 거래"') + BoxHTML('', 'data-case-accounts'),
       'class="preview-related-layout"',
     ) +
       (type === 'judge-bundle' ? overlay('묶음 판정') : '');
