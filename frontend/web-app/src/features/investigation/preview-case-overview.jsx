@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { BarSparkline } from '../../components/charts/sparkline';
+import { readChartDurationSeconds, readChartNumber } from '../../components/charts/chart-design-values';
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { Bar } from '../../components/charts/charts/bar';
 import { PieChart } from '../../components/charts/charts/pie/pie-chart';
@@ -53,13 +54,17 @@ function CaseIdentity({ row }) {
 
 function EvidenceBars({ label, points, unit, reduced, summary }) {
   const [hover, setHover] = useState(null);
+  const [layout] = useState(() => ({
+    height: readChartNumber('--overview-evidence-sparkline-height', 40),
+    barRadius: readChartNumber('--overview-evidence-bar-radius', 2),
+  }));
   if (points.length < 2) return null;
   const labelPoint = ({ label: period, value }) => `${period} · ${number.format(value)}${unit}`;
   return <Box as="figure" className="overview-evidence-bars" aria-label={label}>
     <Box as="figcaption">{label}</Box>
-    <BarSparkline data={points} dataKey="value" height={40}
+    <BarSparkline data={points} dataKey="value" height={layout.height}
       yDomain={[0, undefined]} color={dataSeriesColors.teal} interactive crosshair="solid"
-      dot={false} barRadius={2} animate={!reduced} hoverTransition={!reduced}
+      dot={false} barRadius={layout.barRadius} animate={!reduced} hoverTransition={!reduced}
       onHoverChange={(_, point) => setHover(point)} aria-label={points.map(labelPoint).join(', ')} />
     <Text className="overview-bar-value">{hover ? labelPoint(hover) : summary ?? `${points[0].label} ~ ${points.at(-1).label}`}</Text>
   </Box>;
@@ -126,6 +131,11 @@ function FlowSummary({ evidence, compact = false }) {
 const overviewChartMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 
 function OverviewBars({ label, measures, max, reduced, format = value => `${number.format(value)}건` }) {
+  const [layout] = useState(() => ({
+    barGap: readChartNumber('--overview-horizontal-bar-gap', 0.3),
+    duration: readChartDurationSeconds('--overview-score-enter-duration', 0.32) * 1000,
+    tooltipDamping: readChartNumber('--overview-horizontal-tooltip-damping', 25),
+  }));
   if (!measures.length) return <Text className="overview-note">표시할 데이터가 없습니다.</Text>;
   const barColor = point => point.color ?? dataSeriesColors.teal;
   return <Box as="figure" className="overview-horizontal-chart" style={{ '--overview-measures-count': measures.length }} aria-label={label}>
@@ -136,9 +146,9 @@ function OverviewBars({ label, measures, max, reduced, format = value => `${numb
     </Box>
     <BarChart className="overview-horizontal-bars" data={measures} xDataKey="label" orientation="horizontal"
       aspectRatio="auto" horizontalValueDomain={[0, Math.max(max, 1)]} margin={overviewChartMargin}
-      barGap={0.3} animationDuration={reduced ? 0 : 320}>
+      barGap={layout.barGap} animationDuration={reduced ? 0 : layout.duration}>
       <Bar dataKey="value" getFill={barColor} lineCap="round" animate={!reduced} />
-      <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
+      <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : layout.tooltipDamping}
         rows={point => [{ label: String(point.label), value: format(point.value), color: barColor(point) }]} />
     </BarChart>
   </Box>;
@@ -146,6 +156,11 @@ function OverviewBars({ label, measures, max, reduced, format = value => `${numb
 
 function OverviewDonut({ label, segments, reduced }) {
   const plotRef = useRef(null);
+  const [layout] = useState(() => ({
+    innerRadiusRatio: readChartNumber('--overview-donut-inner-radius-ratio', 0.34),
+    cornerRadius: readChartNumber('--overview-donut-corner-radius', 8),
+    segmentGap: readChartNumber('--overview-donut-segment-gap', 0.045),
+  }));
   const { width } = useElementSize(plotRef);
   const size = Math.floor(width);
   const data = segments.filter(segment => segment.value > 0);
@@ -154,7 +169,8 @@ function OverviewDonut({ label, segments, reduced }) {
   return <Box as="figure" className="overview-donut" aria-label={label}>
     <Box as="figcaption">{label}</Box>
     <Box ref={plotRef} className="overview-donut-plot" aria-hidden="true">
-      {size > 0 && <PieChart data={data} size={size} innerRadius={size * 0.34} cornerRadius={8} padAngle={data.length > 1 ? 0.045 : 0}
+      {size > 0 && <PieChart data={data} size={size} innerRadius={size * layout.innerRadiusRatio}
+        cornerRadius={layout.cornerRadius} padAngle={data.length > 1 ? layout.segmentGap : 0}
         startAngle={0} endAngle={Math.PI * 2} geometryScrubbing={reduced}>
         {!reduced && data.map(({ label }, index) => <PieSlice key={label} index={index} />)}
       </PieChart>}
@@ -162,7 +178,7 @@ function OverviewDonut({ label, segments, reduced }) {
     </Box>
     <Box as="ul" className="overview-score-legend">
       {data.map(({ label, value, color }) => <Box as="li" key={label}>
-        <Text as="i" style={{ background: color }} aria-hidden="true" />{label} <Text as="strong">{number.format(value)}건</Text>
+        <Text as="i" style={{ '--overview-score-legend-fill': color }} aria-hidden="true" />{label} <Text as="strong">{number.format(value)}건</Text>
       </Box>)}
     </Box>
   </Box>;
