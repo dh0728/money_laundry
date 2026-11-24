@@ -11,7 +11,11 @@ import java.util.Set;
  * 룰 정의(JSON)를 SQL 로 바꾼다. SQL 의 뼈대는 템플릿마다 여기에 고정돼 있고, 정의에서 오는 것은 "어떤 항목을, 어떤 비교로, 어떤 숫자와"뿐이다. 항목과
  * 비교는 허용 목록에서 골라 붙이고 숫자는 바인딩 파라미터로 넣는다. 사용자가 적은 글자는 SQL 에 들어가지 않는다.
  *
- * <p>지금 되는 템플릿은 집계형 셋(FAN_OUT, FAN_IN, GATHER_SCATTER)이다.
+ * <p>지금 되는 템플릿은 패턴 여섯이다. 집계형(FAN_OUT, FAN_IN, GATHER_SCATTER), 2홉형(SCATTER_GATHER), 경로형(CYCLE,
+ * RANDOM).
+ *
+ * <p>2홉형과 경로형은 바쁜 계좌가 어느 자리에도 끼지 않는다(대상 · 경유 · 출발 모두). rule_ftx 의 clean 이 "양쪽 계좌가 모두 바쁜 계좌가 아닌
+ * 거래"다.
  */
 public final class RuleCompiler {
   private RuleCompiler() {}
@@ -20,7 +24,14 @@ public final class RuleCompiler {
   public record Sql(String text, List<Object> args) {}
 
   /** 평가기가 있는 템플릿 */
-  public static final Set<String> SUPPORTED = Set.of("FAN_OUT", "FAN_IN", "GATHER_SCATTER");
+  public static final Set<String> SUPPORTED =
+      Set.of("FAN_OUT", "FAN_IN", "GATHER_SCATTER", "SCATTER_GATHER", "CYCLE", "RANDOM");
+
+  /** 경로형: 거래를 한 단계씩 따라가 길을 만든다. 조건은 정의의 path 에 있다. */
+  private static final Set<String> PATH = Set.of("CYCLE", "RANDOM");
+
+  /** 값을 바꿔 다시 돌려 볼 수 있는 경로 값. 적중 조건 항목처럼 "이상"으로 건다. */
+  public static final String MIN_HOPS = "minHops";
 
   private static final Map<String, String> COMPARATORS =
       Map.of("GTE", ">=", "GT", ">", "LTE", "<=", "LT", "<", "EQ", "=");
@@ -31,6 +42,8 @@ public final class RuleCompiler {
           "DISTINCT_COUNTERPARTIES", "distinct_counterparties",
           "TX_COUNT", "tx_count",
           "SUM_USD", "sum_usd");
+  private static final Map<String, String> SCATTER_GATHER_COLUMNS =
+      Map.of("MID_COUNT", "mid_count");
   private static final Map<String, String> GATHER_SCATTER_COLUMNS =
       Map.of(
           "IN_COUNTERPARTIES", "in_counterparties",
@@ -40,6 +53,17 @@ public final class RuleCompiler {
 
   public static boolean supported(Object template) {
     return template instanceof String key && SUPPORTED.contains(key);
+  }
+
+  /** 경로형 템플릿인가. 경로형은 {@link #walks} 로 길을 먼저 만들고 {@link #evaluate} 가 그 가운데 조건에 맞는 길을 고른다. */
+  public static boolean path(Object template) {
+    return template instanceof String key && PATH.contains(key);
+  }
+
+  /** 대상 계좌가 거래의 받는 쪽인 템플릿인가. 아니면 보내는 쪽이다. GATHER-SCATTER 는 가운데 계좌의 출금에서 검사한다. */
+  public static boolean subjectReceives(Object template) {
+    return template instanceof String key
+        && Set.of("FAN_IN", "SCATTER_GATHER", "CYCLE", "RANDOM").contains(key);
   }
 
   private static String comparator(Object cmp) {
@@ -158,10 +182,29 @@ public final class RuleCompiler {
     if (window == null) throw new IllegalArgumentException("기간이 없습니다.");
     var args = new ArrayList<Object>(List.of(window.intValue(), from, to));
     String days = listedDays ? LISTED_DAYS : "";
+    if (PATH.contains(key)) {
+      // 길은 walks() 가 rule_walk 에 만들어 두었다. 여기서는 길이와 닫혔는지만 본다.
+      Number minHops = pathValue(definition, MIN_HOPS);
+      return new Sql(
+          """
+          with hit as (
+            select subject, at, business_date, window_from, tx_ids, hops as strength,
+                   jsonb_build_object('HOPS', hops) as measured
+            from rule_walk where closed = ? and hops >= ?
+          )
+          """
+              + PER_DAY,
+          List.of("CYCLE".equals(key), minHops.intValue()));
+    }
     String sql =
-        "GATHER_SCATTER".equals(key)
-            ? gatherScatter(where(definition.get("where"), GATHER_SCATTER_COLUMNS, args), days)
-            : fan("FAN_IN".equals(key), where(definition.get("where"), FAN_COLUMNS, args), days);
+        switch (key) {
+          case "GATHER_SCATTER" ->
+              gatherScatter(where(definition.get("where"), GATHER_SCATTER_COLUMNS, args), days);
+          case "SCATTER_GATHER" ->
+              scatterGather(where(definition.get("where"), SCATTER_GATHER_COLUMNS, args), days);
+          default ->
+              fan("FAN_IN".equals(key), where(definition.get("where"), FAN_COLUMNS, args), days);
+        };
     return new Sql(sql, args);
   }
 
@@ -254,9 +297,144 @@ public final class RuleCompiler {
         + PER_DAY;
   }
 
-  /** 정의에서 맨 위 그룹의 첫 조건 가운데 metric 이 같은 것의 값만 바꾼 정의. 그런 조건이 없으면 null. */
+  /**
+   * SCATTER-GATHER(대상 = 도착 계좌 D). 출발 계좌 S 가 경유 계좌 여러 개로 보내고, 그 경유 계좌들이 D 로 보낸다.
+   *
+   * <p>검사 시점은 D 로 들어온 2단계 거래(경유 → D) 가운데, 그 경유 계좌가 기간 안에 S 에서 먼저(같은 분 포함) 받은 것이다. 그 시각을 포함해 직전 기간
+   * 안에서 "S → 경유" 가 "경유 → D" 보다 먼저 있는 경유 계좌 수를 (S, D) 마다 센다. S 와 D 는 다른 계좌다. 근거 거래는 그 경유 계좌들의 경유 → D
+   * 거래와, 기간 안에서 그 경유 계좌의 마지막 경유 → D 거래까지의 S → 경유 거래다.
+   */
+  private static String scatterGather(String where, String days) {
+    return """
+        with params as (select make_interval(mins => ?) as span, ?::date as date_from, ?::date as date_to),
+        leg as (
+          -- 2단계 거래(경유 → 도착) × 출발 계좌. at1 은 그 시각까지의 마지막 1단계(출발 → 경유) 시각이다.
+          select w.tx_id, w.to_account_id as dest, v.from_account_id as source, w.from_account_id as mid,
+                 w.at as at2, w.business_date, max(v.at) as at1
+          from rule_ftx w cross join params p
+          join rule_ftx v on v.to_account_id = w.from_account_id and v.clean
+           and v.at <= w.at and v.at > w.at - p.span and v.from_account_id <> w.to_account_id
+          where w.clean
+          group by w.tx_id, w.to_account_id, v.from_account_id, w.from_account_id, w.at, w.business_date
+        ), trig as (
+          select distinct f.dest, f.source, f.at2 as at, f.business_date
+          from leg f, params p
+          where f.business_date between p.date_from and p.date_to%2$s
+        ), mids as (
+          -- 검사 시점 × 경유 계좌. at2max 는 그 경유 계좌가 기간 안에서 마지막으로 D 에 보낸 시각이다.
+          select g.dest, g.source, g.at, g.business_date, r.mid, max(r.at2) as at2max
+          from trig g cross join params p
+          join leg r on r.dest = g.dest and r.source = g.source and r.at2 <= g.at and r.at1 > g.at - p.span
+          group by g.dest, g.source, g.at, g.business_date, r.mid
+        ), agg as (
+          select dest, source, at, business_date, mid_count
+          from (select dest, source, at, business_date, count(*) as mid_count
+                from mids group by dest, source, at, business_date) counted
+          where %1$s
+        ), ev as (
+          select m.dest, m.source, m.at, r.tx_id, null::timestamptz as at1
+          from mids m cross join params p
+          join leg r on r.dest = m.dest and r.source = m.source and r.mid = m.mid
+           and r.at2 <= m.at and r.at1 > m.at - p.span
+          union all
+          select m.dest, m.source, m.at, v.tx_id, v.at
+          from mids m cross join params p
+          join rule_ftx v on v.from_account_id = m.source and v.to_account_id = m.mid and v.clean
+           and v.at <= m.at2max and v.at > m.at - p.span
+        ), hit as (
+          select a.dest as subject, a.at, a.business_date, e.window_from, e.tx_ids, a.mid_count as strength,
+                 jsonb_build_object('MID_COUNT', a.mid_count) as measured
+          from agg a
+          join (select dest, source, at, min(at1) as window_from, array_agg(distinct tx_id) as tx_ids
+                from ev group by dest, source, at) e
+            on e.dest = a.dest and e.source = a.source and e.at = a.at
+        )
+        """
+            .formatted(where, days)
+        + PER_DAY;
+  }
+
+  /**
+   * 경로형(CYCLE, RANDOM)의 길을 임시 표 rule_walk 에 만든다. 검사 시점은 길의 마지막 거래이고, 거기서 돈이 온 쪽으로 한 단계씩 거꾸로 따라간다.
+   *
+   * <ul>
+   *   <li>시간은 과거로만 간다(같은 분 포함). 첫 거래부터 마지막 거래까지가 기간 안이다
+   *   <li>이어지는 두 거래는 뒤 거래 금액 ÷ 앞 거래 금액이 stepRatioMin ~ stepRatioMax 다
+   *   <li>같은 계좌를 두 번 지나지 않는다. 마지막 거래의 수취 계좌로 돌아오면 순환이고(closed) 거기서 멈춘다
+   *   <li>거래 수는 maxHops 까지다. 표에는 거래 2건 이상인 길을 전부 담는다(대상 = 마지막 거래의 수취 계좌)
+   * </ul>
+   *
+   * <p>앞의 ? 순서: 기간(분), 검사 시작일, 검사 끝일, 금액 비 하한, 금액 비 상한, maxHops. 금액 비는 실험과 같이 실수(float8)로 계산한다.
+   */
+  public static Sql walks(
+      Map<String, Object> definition, String from, String to, boolean listedDays) {
+    Number window = RuleDefinition.number(definition.get("windowMinutes"));
+    if (window == null) throw new IllegalArgumentException("기간이 없습니다.");
+    var args =
+        new ArrayList<Object>(
+            List.of(
+                window.intValue(),
+                from,
+                to,
+                pathValue(definition, "stepRatioMin").doubleValue(),
+                pathValue(definition, "stepRatioMax").doubleValue(),
+                pathValue(definition, "maxHops").intValue()));
+    return new Sql(
+        """
+        create temp table rule_walk on commit drop as
+        with recursive params as (
+          select make_interval(mins => ?) as span, ?::date as date_from, ?::date as date_to,
+                 ?::float8 as ratio_min, ?::float8 as ratio_max, ?::int as max_hops
+        ), walk as (
+          select f.to_account_id as subject, f.at, f.business_date,
+                 f.from_account_id as node, f.at as window_from, f.amount_usd::float8 as first_usd,
+                 1 as hops, array[f.tx_id] as tx_ids,
+                 array[f.to_account_id, f.from_account_id] as seen, false as closed
+          from rule_ftx f, params p
+          where f.clean and f.business_date between p.date_from and p.date_to%s
+          union all
+          select k.subject, k.at, k.business_date,
+                 w.from_account_id, w.at, w.amount_usd::float8,
+                 k.hops + 1, w.tx_id || k.tx_ids, k.seen || w.from_account_id,
+                 w.from_account_id = k.subject
+          from walk k cross join params p
+          join rule_ftx w on w.to_account_id = k.node and w.clean
+           and w.at <= k.window_from and w.at > k.at - p.span
+           and k.first_usd between w.amount_usd::float8 * p.ratio_min and w.amount_usd::float8 * p.ratio_max
+          where not k.closed and k.hops < p.max_hops
+            and (w.from_account_id = k.subject or w.from_account_id <> all(k.seen))
+        )
+        select subject, at, business_date, window_from, hops, tx_ids, closed from walk where hops >= 2
+        """
+            .formatted(listedDays ? LISTED_DAYS : ""),
+        args);
+  }
+
+  /** 정의의 path 에 있는 값. 없으면 예외다(검증을 통과한 경로형 정의에는 있다). */
+  private static Number pathValue(Map<String, Object> definition, String key) {
+    Number value =
+        definition.get("path") instanceof Map<?, ?> path
+            ? RuleDefinition.number(path.get(key))
+            : null;
+    if (value == null) throw new IllegalArgumentException("경로 값 " + key + " 가 없습니다.");
+    return value;
+  }
+
+  /**
+   * 정의에서 맨 위 그룹의 첫 조건 가운데 metric 이 같은 것의 값만 바꾼 정의. 그런 조건이 없으면 null. metric 이 {@link #MIN_HOPS} 면
+   * path 의 값을 바꾼다.
+   */
   public static Map<String, Object> withMetricValue(
       Map<String, Object> definition, String metric, Number value) {
+    if (MIN_HOPS.equals(metric)) {
+      if (!(definition.get("path") instanceof Map<?, ?> source)) return null;
+      var path = new LinkedHashMap<String, Object>();
+      source.forEach((k, v) -> path.put(String.valueOf(k), v));
+      path.put(MIN_HOPS, value);
+      var copy = new LinkedHashMap<>(definition);
+      copy.put("path", path);
+      return copy;
+    }
     var items = new ArrayList<Object>();
     boolean replaced = false;
     for (Object item : RuleDefinition.items(definition.get("where"))) {
@@ -279,8 +457,12 @@ public final class RuleCompiler {
     return copy;
   }
 
-  /** 맨 위 그룹의 첫 조건 가운데 metric 이 같은 것의 값. 없으면 null. */
+  /** 맨 위 그룹의 첫 조건 가운데 metric 이 같은 것의 값. 없으면 null. metric 이 {@link #MIN_HOPS} 면 path 의 값이다. */
   public static Number metricValue(Map<String, Object> definition, String metric) {
+    if (MIN_HOPS.equals(metric))
+      return definition.get("path") instanceof Map<?, ?> path
+          ? RuleDefinition.number(path.get(MIN_HOPS))
+          : null;
     for (Object item : RuleDefinition.items(definition.get("where")))
       if (item instanceof Map<?, ?> condition && metric.equals(condition.get("metric")))
         return RuleDefinition.number(condition.get("value"));

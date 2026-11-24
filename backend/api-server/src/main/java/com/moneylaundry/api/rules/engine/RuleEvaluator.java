@@ -14,9 +14,9 @@ import org.springframework.stereotype.Component;
 /**
  * 룰을 원장에 돌린다. 계산은 PostgreSQL 이 하고 여기서는 순서만 잡는다.
  *
- * <p>임시 표 셋을 쓴다. rule_busy(바쁜 계좌), rule_ftx(세는 거래를 통과한 거래), rule_result(적중). 셋 다 트랜잭션이 끝나면 사라지므로 모든
- * 메서드는 한 트랜잭션 안에서 불러야 한다. 순서는 {@link #begin} → {@link #busy} → {@link #filtered} → {@link #run} 이고,
- * 세는 거래가 같으면 run 만 여러 번 불러도 된다.
+ * <p>임시 표를 쓴다. rule_busy(바쁜 계좌), rule_ftx(세는 거래를 통과한 거래), rule_result(적중), 경로형은 rule_walk(길)도.
+ * 트랜잭션이 끝나면 사라지므로 모든 메서드는 한 트랜잭션 안에서 불러야 한다. 순서는 {@link #begin} → {@link #busy} → {@link #filtered}
+ * → {@link #run} 이고, 세는 거래가 같으면 run 만 여러 번 불러도 된다.
  *
  * <p>룰 쿼리는 한 번에 하나만 돈다. 백테스트와 일일 실행은 {@link #enter} 로 같은 줄에 서고 끝나면 {@link #leave} 로 비킨다. 이 서버 안에서만
  * 지켜진다.
@@ -125,7 +125,7 @@ public class RuleEvaluator {
 
   /**
    * 세는 거래를 통과한 거래를 rule_ftx 에 담는다. 검사 날짜 [from, to] 의 거래와, 그 첫 거래에서 기간만큼 돌아본 거래까지 읽는다. 시각은 분으로 자른다
-   * (원장이 초 단위 시각도 받는다).
+   * (원장이 초 단위 시각도 받는다). clean 은 양쪽 계좌가 모두 바쁜 계좌가 아닌 거래다(2홉형 · 경로형은 이 거래만 본다).
    */
   public void filtered(Map<String, Object> definition, String from, String to) {
     var filter = RuleCompiler.filter(definition);
@@ -142,7 +142,9 @@ public class RuleEvaluator {
           where integration_status = 'ACTIVE' and business_date between ?::date and ?::date
         )
         select t.tx_id, date_trunc('minute', t.occurred_at) as at, t.business_date,
-               t.from_account_id, t.to_account_id, t.amount_usd
+               t.from_account_id, t.to_account_id, t.amount_usd,
+               not exists (select 1 from rule_busy x
+                           where x.account_id in (t.from_account_id, t.to_account_id)) as clean
         from ledger.transactions t, bounds b
         where t.integration_status = 'ACTIVE' and t.from_account_id <> t.to_account_id
           and t.occurred_at >= b.lo and t.occurred_at < b.hi
@@ -202,6 +204,29 @@ public class RuleEvaluator {
   /** {@link #run(Map, String, String)} 과 같고, listedDays 가 true 면 {@link #days} 로 정한 날짜만 검사한다. */
   public Map<String, Object> run(
       Map<String, Object> definition, String from, String to, boolean listedDays) {
+    return run(definition, from, to, listedDays, false);
+  }
+
+  /**
+   * 조건값만 바꿔 다시 돌린다. 세는 거래 · 기간 · 날짜가 앞의 {@link #run} 과 같고 값 하나만 다를 때 쓴다. 경로형은 앞에서 만든 길(rule_walk)을
+   * 다시 쓰므로 길을 한 번만 만든다.
+   */
+  public Map<String, Object> rerun(Map<String, Object> definition, String from, String to) {
+    return run(definition, from, to, false, true);
+  }
+
+  private Map<String, Object> run(
+      Map<String, Object> definition,
+      String from,
+      String to,
+      boolean listedDays,
+      boolean sameWalks) {
+    if (RuleCompiler.path(definition.get("template")) && !sameWalks) {
+      var walks = RuleCompiler.walks(definition, from, to, listedDays);
+      jdbc.execute("drop table if exists rule_walk");
+      jdbc.update(walks.text(), walks.args().toArray());
+      jdbc.execute("analyze rule_walk");
+    }
     var sql = RuleCompiler.evaluate(definition, from, to, listedDays);
     jdbc.execute("truncate rule_result");
     jdbc.update(sql.text(), sql.args().toArray());
@@ -255,9 +280,11 @@ public class RuleEvaluator {
             to));
   }
 
-  // 검사 시점이 대상 계좌의 입금인 템플릿은 FAN-IN 뿐이다. GATHER-SCATTER 는 가운데 계좌의 출금에서 검사한다.
+  // 대상 계좌가 거래의 어느 쪽인가
   private static String subjectColumn(Map<String, Object> definition) {
-    return "FAN_IN".equals(definition.get("template")) ? "to_account_id" : "from_account_id";
+    return RuleCompiler.subjectReceives(definition.get("template"))
+        ? "to_account_id"
+        : "from_account_id";
   }
 
   private static long number(Object value) {

@@ -3,6 +3,7 @@ package com.moneylaundry.api.rules.backtest;
 import com.moneylaundry.api.common.BusinessTime;
 import com.moneylaundry.api.review.ReviewJson;
 import com.moneylaundry.api.rules.catalog.RuleCatalog;
+import com.moneylaundry.api.rules.definition.RuleDefinition;
 import com.moneylaundry.api.rules.engine.RuleCompiler;
 import com.moneylaundry.api.rules.engine.RuleEvaluator;
 import java.sql.SQLException;
@@ -193,7 +194,7 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
             : sweepValues(
                 current.longValue(),
                 baseline == null ? null : RuleCompiler.metricValue(baseline, sweepMetric),
-                catalog.metric(sweepMetric));
+                sweepRange(definition, sweepMetric));
     int total = 1 + Math.max(0, values.size() - 1) + (baseline == null ? 0 : 1) + 1;
     var done = new int[] {0};
     var result = new LinkedHashMap<String, Object>();
@@ -231,7 +232,7 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
             var counted =
                 same
                     ? summary
-                    : evaluator.run(
+                    : evaluator.rerun(
                         RuleCompiler.withMetricValue(definition, sweepMetric, value), from, to);
             var line = new LinkedHashMap<String, Object>();
             line.put("value", value);
@@ -387,18 +388,37 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
     result.put("busy", busy);
     if (sweepMetric != null && !((List<?>) run.get("sweep")).isEmpty()) {
       var definition = ReviewJson.object(row.get("definition"));
-      var spec = catalog.metric(sweepMetric);
-      String side =
-          RuleCatalog.side(
-              catalog.template(definition.get("template").toString()), definition.get("direction"));
+      var spec = sweepSpec(sweepMetric);
+      String templateKey = definition.get("template").toString();
+      // 문구가 갈리는 기준: 적중 조건 항목은 대상이 거래의 어느 쪽인지, 경로 값은 템플릿
+      String variant =
+          catalog.metric(sweepMetric) == null
+              ? templateKey
+              : RuleCatalog.side(catalog.template(templateKey), definition.get("direction"));
       var sweep = new LinkedHashMap<String, Object>();
       sweep.put("metric", sweepMetric);
-      sweep.put("label", RuleCatalog.text(spec.get("label"), side));
+      sweep.put("label", RuleCatalog.text(spec.get("label"), variant));
       sweep.put("unit", spec.get("unit"));
       sweep.put("rows", run.get("sweep"));
       result.put("sweep", sweep);
     }
     return result;
+  }
+
+  /** 값을 바꿔 보는 항목의 정의(문구 · 단위 · 범위). 적중 조건 항목이거나 경로 값(minHops)이다. */
+  private Map<String, Object> sweepSpec(String key) {
+    var metric = catalog.metric(key);
+    return metric != null ? metric : catalog.pathField(key);
+  }
+
+  /** 값을 바꿔 볼 범위. 경로의 거래 수는 그 룰이 따라가는 최대 거래 수(maxHops)를 넘겨 볼 수 없다. */
+  private Map<String, Object> sweepRange(Map<String, Object> definition, String key) {
+    var spec = sweepSpec(key);
+    if (!RuleCompiler.MIN_HOPS.equals(key)) return spec;
+    var range = new LinkedHashMap<>(spec);
+    range.put(
+        "max", RuleDefinition.number(ReviewJson.object(definition.get("path")).get("maxHops")));
+    return range;
   }
 
   /**

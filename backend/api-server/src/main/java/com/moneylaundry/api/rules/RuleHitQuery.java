@@ -4,12 +4,16 @@ import com.moneylaundry.api.common.ApiException;
 import com.moneylaundry.api.review.ReviewJson;
 import com.moneylaundry.api.rules.catalog.RuleCatalog;
 import com.moneylaundry.api.rules.definition.RuleDefinition;
+import com.moneylaundry.api.rules.engine.RuleCompiler;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -40,6 +44,7 @@ public class RuleHitQuery {
     var cards = new LinkedHashMap<String, Map<String, Object>>();
     var matched = new LinkedHashMap<String, TreeSet<Long>>();
     var evidence = new LinkedHashMap<String, TreeSet<Long>>();
+    var subjects = new LinkedHashMap<String, Long>();
     for (var row :
         jdbc.queryForList(
             """
@@ -71,6 +76,7 @@ public class RuleHitQuery {
         cards.put(key, card);
         matched.put(key, new TreeSet<>());
         evidence.put(key, new TreeSet<>());
+        subjects.put(key, ReviewJson.number(row.get("subject_id")));
       }
       dates(card).add(row.get("hit_date").toString());
       for (String tx : row.get("matched").toString().split(","))
@@ -84,6 +90,12 @@ public class RuleHitQuery {
       dates(card).sort(Comparator.naturalOrder());
       card.put("matchedTxIds", new ArrayList<>(matched.get(entry.getKey())));
       card.put("evidenceTxCount", evidence.get(entry.getKey()).size());
+      card.put(
+          "roles",
+          roles(
+              String.valueOf(card.get("template")),
+              subjects.get(entry.getKey()),
+              evidence.get(entry.getKey())));
       out.add(card);
     }
     return out;
@@ -120,11 +132,76 @@ public class RuleHitQuery {
     card.put("windowMinutes", definition.get("windowMinutes"));
     card.put("measured", measured);
     var conditions = new ArrayList<Map<String, Object>>();
+    if (RuleCompiler.path(row.get("template"))) conditions.add(hops(definition, row, measured));
     conditions(definition.get("where"), side, measured, conditions);
     card.put("conditions", conditions);
-    // 대상 말고도 보여 줄 계좌(출발 계좌, 경로 계좌). 집계형 템플릿에는 없다.
-    card.put("roles", List.of());
     return card;
+  }
+
+  /** 경로형의 조건은 적중 조건(where)이 아니라 path.minHops 에 있다. "순환 거래 수 ≥ 3건, 실제 4건" 한 줄로 만든다. */
+  private Map<String, Object> hops(
+      Map<String, Object> definition, Map<String, Object> row, Map<String, Object> measured) {
+    var spec = catalog.pathField(RuleCompiler.MIN_HOPS);
+    var line = new LinkedHashMap<String, Object>();
+    line.put("metric", RuleCompiler.MIN_HOPS);
+    line.put("label", RuleCatalog.text(spec.get("label"), row.get("template").toString()));
+    line.put("cmp", "GTE");
+    line.put("value", ReviewJson.object(definition.get("path")).get(RuleCompiler.MIN_HOPS));
+    line.put("unit", spec.get("unit"));
+    line.put("measured", measured.get("HOPS"));
+    return line;
+  }
+
+  /**
+   * 대상 말고도 보여 줄 계좌. 따로 저장하지 않고 근거 거래에서 읽는다. 집계형 템플릿에는 없다.
+   *
+   * <ul>
+   *   <li>SCATTER-GATHER: 대상(도착 계좌)에 보낸 계좌가 경유 계좌(MID), 경유 계좌에 보낸 계좌가 출발 계좌(SOURCE)
+   *   <li>CYCLE · RANDOM: 근거 거래에 나오는 대상 아닌 계좌가 경로 계좌(PATH)
+   * </ul>
+   *
+   * 순서는 그 계좌가 처음 보낸 거래의 시각 순이다. 경로가 하나면 경로를 따라간 순서와 같다.
+   */
+  private List<Map<String, Object>> roles(String template, long subject, Collection<Long> txIds) {
+    boolean twoHop = "SCATTER_GATHER".equals(template);
+    if (!twoHop && !RuleCompiler.path(template)) return List.of();
+    var rows =
+        jdbc.queryForList(
+            """
+            select t.from_account_id, t.to_account_id, left(a.service_account_id::text, 8) as sender
+            from ledger.transactions t join core.accounts a on a.account_id = t.from_account_id
+            where t.tx_id = any(?::bigint[])
+            order by t.occurred_at, t.tx_id
+            """,
+            txIds.stream().map(String::valueOf).collect(Collectors.joining(",", "{", "}")));
+    var mids = new LinkedHashSet<Long>();
+    for (var row : rows)
+      if (ReviewJson.number(row.get("to_account_id")) == subject)
+        mids.add(ReviewJson.number(row.get("from_account_id")));
+    var sources = new LinkedHashSet<String>();
+    var others = new LinkedHashSet<String>();
+    for (var row : rows) {
+      long from = ReviewJson.number(row.get("from_account_id"));
+      long to = ReviewJson.number(row.get("to_account_id"));
+      String sender = row.get("sender").toString();
+      if (!twoHop) {
+        if (from != subject) others.add(sender);
+      } else if (to == subject) others.add(sender);
+      else if (mids.contains(to)) sources.add(sender);
+    }
+    var out = new ArrayList<Map<String, Object>>();
+    for (String account : sources) out.add(role("SOURCE", "출발 계좌", account));
+    for (String account : others)
+      out.add(twoHop ? role("MID", "경유 계좌", account) : role("PATH", "경로 계좌", account));
+    return out;
+  }
+
+  private static Map<String, Object> role(String role, String label, String account) {
+    var item = new LinkedHashMap<String, Object>();
+    item.put("role", role);
+    item.put("label", label);
+    item.put("accountId", account);
+    return item;
   }
 
   /** 적중 조건을 한 줄씩 펴서 "조건 vs 실제 값" 으로 만든다. 그룹은 풀어서 순서대로 늘어놓는다. */

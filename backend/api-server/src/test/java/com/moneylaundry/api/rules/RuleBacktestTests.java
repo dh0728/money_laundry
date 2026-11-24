@@ -289,12 +289,13 @@ class RuleBacktestTests {
     mvc.perform(get("/api/v1/rule-backtests/1")).andExpect(status().isUnauthorized());
     login("l1a");
     long[] rule = created("분산 송금 감시", "FAN_OUT");
-    long[] cycle = created("순환", "CYCLE");
-    // 평가기가 있는 템플릿만 백테스트할 수 있다
+    long[] general = created("쪼개기", "STRUCTURING");
+    // 평가기가 있는 템플릿만 백테스트할 수 있다. 일반 템플릿은 아직 없다.
     assertThat(
             json(mvc.perform(get("/api/v1/rule-templates").session(session)))
                 .get("backtestTemplates"))
-        .isEqualTo(List.of("FAN_IN", "FAN_OUT", "GATHER_SCATTER"));
+        .isEqualTo(
+            List.of("CYCLE", "FAN_IN", "FAN_OUT", "GATHER_SCATTER", "RANDOM", "SCATTER_GATHER"));
     // 원장이 비어 있으면 돌릴 날짜가 없다
     send("/api/v1/rule-backtests", Map.of("versionId", rule[1])).andExpect(status().isBadRequest());
 
@@ -306,7 +307,7 @@ class RuleBacktestTests {
     long five = account();
     fanOut(five, 5, "2023-09-10", 2000);
 
-    send("/api/v1/rule-backtests", Map.of("versionId", cycle[1]))
+    send("/api/v1/rule-backtests", Map.of("versionId", general[1]))
         .andExpect(status().isBadRequest());
     send("/api/v1/rule-backtests", Map.of("versionId", 999999)).andExpect(status().isNotFound());
     send(
@@ -371,6 +372,40 @@ class RuleBacktestTests {
     // 끝난 백테스트는 취소할 수 없다
     send("/api/v1/rule-backtests/" + backtestId + "/cancel", Map.of())
         .andExpect(status().isConflict());
+  }
+
+  @Test
+  void backtest_of_a_path_rule_sweeps_the_number_of_transactions_on_the_path() throws Exception {
+    login("l1a");
+    long[] rule = created("순환 감시", "CYCLE"); // 필터 없음, 7일, 순환 거래 ≥ 3, 금액 비 0.8 ~ 1.25
+    pay(account(), account(), "2023-09-01 09:00+09", 2000);
+    long back = account(); // 왕복(거래 2건)
+    long forth = account();
+    pay(back, forth, "2023-09-09 09:00+09", 7000);
+    pay(forth, back, "2023-09-09 09:30+09", 7000);
+    long a = account(); // 세 계좌 순환(거래 3건)
+    long b = account();
+    long c = account();
+    pay(a, b, "2023-09-09 10:00+09", 10000);
+    pay(b, c, "2023-09-09 10:10+09", 9500);
+    pay(c, a, "2023-09-09 10:20+09", 9000);
+
+    var view = backtest(Map.of("versionId", rule[1]));
+    assertThat(view.get("status")).isEqualTo("COMPLETED");
+    assertThat(number(part(view, "kpis").get("hits"))).isEqualTo(1L);
+    assertThat(number(view.get("evidenceTxCount"))).isEqualTo(3L);
+    var cases = rows(view.get("cases"));
+    assertThat(cases).hasSize(1);
+    assertThat(number(part(cases.get(0), "measured").get("HOPS"))).isEqualTo(3L);
+    // 순환 거래 수를 2 ~ 5 로 바꿔 본다. 2건으로 내리면 왕복도 걸린다.
+    var sweep = part(view, "sweep");
+    assertThat(sweep.get("metric")).isEqualTo("minHops");
+    assertThat(sweep.get("label")).isEqualTo("순환 거래 수");
+    assertThat(sweep.get("unit")).isEqualTo("건");
+    var hitsByValue = new LinkedHashMap<Long, Long>();
+    for (var row : rows(sweep.get("rows")))
+      hitsByValue.put(number(row.get("value")), number(row.get("hits")));
+    assertThat(hitsByValue).isEqualTo(Map.of(2L, 2L, 3L, 1L, 4L, 0L, 5L, 0L));
   }
 
   @Test
