@@ -91,9 +91,9 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
           <Row label="경유 비율" value={externalIn ? `${Math.round((externalOut / externalIn) * 100)}%` : '산출 불가'} note="외부 유출 ÷ 외부 유입" />
         </Box>
         <Text className="mt-4 text-xs font-medium">Alert별 구간</Text>
-        <Box className="mt-2 space-y-1.5">{spans.map(({ a, first, last }) => <Box key={a.alertId} className="grid grid-cols-[56px_1fr] items-center gap-2 text-[0.6875rem]"><Text as="span" className="font-mono">{alertCode(a.alertId)}</Text>
+        <Box className="mt-2 space-y-1.5">{spans.map(({ a, first, last }) => <Box key={a.alertId} className="grid grid-cols-[56px_1fr] items-center gap-2 text-2xs"><Text as="span" className="font-mono">{alertCode(a.alertId)}</Text>
           <Text as="span" className="relative h-3 rounded bg-muted"><Text as="span" className="absolute top-0 h-3 rounded" style={{ left: pos(first), width: `max(4px, calc(${pos(last)} - ${pos(first)}))`, backgroundColor: dataSeriesColors.sky }} title={`${day(first)} ~ ${day(last)}`} /></Text></Box>)}</Box>
-        <Text className="mt-1 flex justify-between pl-16 text-[0.6875rem] text-muted-foreground tabular-nums"><Text as="span">{day(times[0] ?? episode.flow.periodFrom)}</Text><Text as="span">{day(times[times.length - 1] ?? episode.flow.periodTo)}</Text></Text>
+        <Text className="mt-1 flex justify-between pl-16 text-2xs text-muted-foreground tabular-nums"><Text as="span">{day(times[0] ?? episode.flow.periodFrom)}</Text><Text as="span">{day(times[times.length - 1] ?? episode.flow.periodTo)}</Text></Text>
       </Step>
 
       <Box className="@5xl:col-span-2"><CaseActivityCharts amounts={{ USD: { daily, senders: sumBy(tx, t => t.fromAccount, t => t.amountUsd).slice(0, 5) } }} /></Box>
@@ -117,7 +117,7 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
       </Step>
 
       <Step title="처리 이력" description="편입 · 해제 · 판정" source="사람" wide>
-        <Box className="divide-y">{history.map(e => <Box key={e.id} className="flex gap-2.5 py-2"><Text as="span" className="w-11 shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{e.at.slice(5, 10)}</Text><Text as="span" className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" /><Box className="min-w-0 flex-1 text-xs"><Text>{historyLabels[e.action]}<Text as="span" className="ml-2 text-muted-foreground">{e.actor.name}</Text></Text>{e.comment && <Text className="mt-1 truncate text-muted-foreground">{e.comment}</Text>}</Box></Box>)}</Box>
+        <Box className="divide-y">{history.map(e => <Box key={e.id} className="flex gap-2.5 py-2"><Text as="span" className="w-11 shrink-0 text-2xs tabular-nums text-muted-foreground">{e.at.slice(5, 10)}</Text><Text as="span" className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" /><Box className="min-w-0 flex-1 text-xs"><Text>{historyLabels[e.action]}<Text as="span" className="ml-2 text-muted-foreground">{e.actor.name}</Text></Text>{e.comment && <Text className="mt-1 truncate text-muted-foreground">{e.comment}</Text>}</Box></Box>)}</Box>
       </Step>
     </Box>
     <ProvenanceNote kind="mock">시안용 mock 데이터입니다.</ProvenanceNote>

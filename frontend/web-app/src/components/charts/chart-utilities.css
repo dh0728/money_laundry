@@ -4,6 +4,7 @@
 @source "./charts";
 
 @theme inline {
+  --text-2xs: var(--text-micro-size);
   --color-chart-label: var(--muted-text);
   --color-chart-tooltip-foreground: var(--text);
   --color-chart-tooltip-muted: var(--muted-text);

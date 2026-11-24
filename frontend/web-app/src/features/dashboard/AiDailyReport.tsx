@@ -36,7 +36,7 @@ export function DailyReportView({ generatedAt, changeSummary, operation, focus }
       <CardContent className="flex min-h-0 flex-1 flex-col">
         <Box className="shrink-0">
           <Box className="flex items-center gap-2"><RadarSweep className="size-5 shrink-0" /><Heading level={3} className="text-base font-semibold tracking-tight">RDR 9000 Daily Report</Heading><ProvenanceBadge kind="mock" title="규칙 기반 시연 문장. LLM 미연동." /></Box>
-          <Text className="mt-1 text-[0.6875rem] text-muted-foreground">
+          <Text className="mt-1 text-2xs text-muted-foreground">
             {generatedAt ? <>집계 시각 <Text as="time" dateTime={generatedAt}>{generatedAt.slice(0, 16).replace('T', ' ')}</Text> 기준</> : '집계 시각 미제공'}
           </Text>
         </Box>

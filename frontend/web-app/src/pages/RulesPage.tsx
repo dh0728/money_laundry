@@ -142,7 +142,7 @@ function WriteTab({ role, draft, setDraft, onBacktest }: { role: Role; draft: { 
       <Box className="grid grid-cols-1 gap-2 @3xl:grid-cols-2">{TEMPLATES.map(x => { const on = x.key === draft.tpl; return <button key={x.key} type="button" aria-pressed={on} disabled={!x.ready || Boolean(draft.base) || readOnly}
         onClick={() => setDraft({ tpl: x.key, p: Object.fromEntries(x.params.map(f => [f.k, f.def])) })}
         className={`rounded-lg border px-3 py-2.5 text-left text-xs transition-colors enabled:hover:bg-muted/50 disabled:cursor-not-allowed ${on ? 'border-foreground bg-muted/40' : ''} ${x.ready ? '' : 'border-dashed opacity-70'}`}>
-        <Text as="span" className="block text-sm font-medium">{x.name}</Text><Text as="span" className="mt-0.5 block text-muted-foreground">{x.ready ? x.desc : x.why}</Text><Text as="span" className="mt-1 block text-[0.6875rem] text-muted-foreground">{x.ready ? `판정 단위: ${x.unit}` : '이후 단계'}</Text>
+        <Text as="span" className="block text-sm font-medium">{x.name}</Text><Text as="span" className="mt-0.5 block text-muted-foreground">{x.ready ? x.desc : x.why}</Text><Text as="span" className="mt-1 block text-2xs text-muted-foreground">{x.ready ? `판정 단위: ${x.unit}` : '이후 단계'}</Text>
       </button> })}</Box>
     </Section>
     <Box className="space-y-4">
@@ -212,7 +212,7 @@ function ApprovalTab({ role, me }: { role: Role; me: string }) {
         <AdminButton role={role} size="sm" variant="outline" disabled={!reason.trim()} onClick={() => toast('반려', { description: '시안이라 저장하지 않습니다.' })}>반려</AdminButton>
         <AdminButton role={role} size="sm" disabled={self} onClick={() => toast.success(`${r.id} 승인 · 시험 운영 시작`, { description: '시안이라 저장하지 않습니다.' })}>승인하고 시험 운영</AdminButton>
       </Box>
-      {self && role === 'ADMIN' && <Text className="mt-2 text-right text-[0.6875rem] text-muted-foreground">작성자는 자기 룰을 승인할 수 없습니다.</Text>}
+      {self && role === 'ADMIN' && <Text className="mt-2 text-right text-2xs text-muted-foreground">작성자는 자기 룰을 승인할 수 없습니다.</Text>}
     </Section> })}
     {shadow.map(r => <Section key={r.id} title={`${r.id} v${r.v} · ${tpl(r.tpl).name}`} description="시험 운영 중 · 10-02부터 · 결과만 저장하고 Alert 상세에는 안 보임" action={<StatusBadge status={r.status} />}>
       <Text className="text-sm">{tpl(r.tpl).sentence(r.p)}</Text>

@@ -335,10 +335,10 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       <Box className="space-y-3">
         <Label className="text-xs text-muted-foreground">선택 계좌 기준 연결 단계 (hop)</Label>
         <Slider aria-label="선택 계좌 기준 연결 단계 hop 수" min={HOP_MIN} max={HOP_MAX} step={1} value={[hop]} disabled={!selectedNode} onValueChange={([v]) => setHop(v)} />
-        <Box className="flex justify-between text-[0.625rem] text-muted-foreground tabular-nums">{HOP_TICKS.map(v => <Text as="span" key={v} className={v === hop ? 'text-foreground font-semibold' : ''}>{v}</Text>)}</Box>
-        <Text className="text-[0.6875rem] leading-relaxed text-muted-foreground">{selectedNode ? `${nodeMap.get(selectedNode)?.account} 기준 ${hop} hop 이내 노드만 표시` : '그래프에서 계좌 노드를 선택하면 hop 범위 설정이 활성화됩니다.'}</Text>
+        <Box className="flex justify-between text-3xs text-muted-foreground tabular-nums">{HOP_TICKS.map(v => <Text as="span" key={v} className={v === hop ? 'text-foreground font-semibold' : ''}>{v}</Text>)}</Box>
+        <Text className="text-2xs leading-relaxed text-muted-foreground">{selectedNode ? `${nodeMap.get(selectedNode)?.account} 기준 ${hop} hop 이내 노드만 표시` : '그래프에서 계좌 노드를 선택하면 hop 범위 설정이 활성화됩니다.'}</Text>
       </Box>
-      <Box className="mt-auto space-y-2.5 border-t pt-4 text-[0.6875rem] text-muted-foreground graph-legend">
+      <Box className="mt-auto space-y-2.5 border-t pt-4 text-2xs text-muted-foreground graph-legend">
         <Text className="flex items-center gap-2"><Text as="i" className="legend-line" style={{ background: 'var(--graph-l1)' }} />의심 거래</Text>
         <Text className="flex items-center gap-2"><Text as="i" className="legend-line" style={{ background: 'var(--graph-l0)' }} />{nonSuspiciousLabel}</Text>
         <Text className="flex items-center gap-2"><Text as="i" className="legend-line legend-dash" />연결 경로</Text>
@@ -357,9 +357,9 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         <Switch id="graph-info-c" checked={showInfo} onCheckedChange={setShowInfo} />
       </Box>
       <Box className="flex items-center gap-2 flex-1 min-w-[180px]">
-        <Label className="text-[0.6875rem] text-muted-foreground shrink-0">연결 단계 (hop)</Label>
+        <Label className="text-2xs text-muted-foreground shrink-0">연결 단계 (hop)</Label>
         <Slider aria-label="선택 계좌 기준 연결 단계 hop 수" className="flex-1" min={HOP_MIN} max={HOP_MAX} step={1} value={[hop]} disabled={!selectedNode} onValueChange={([v]) => setHop(v)} />
-        <Text as="span" className="text-[0.6875rem] tabular-nums min-w-12 text-center shrink-0">{selectedNode ? `${hop} hop` : '계좌 선택'}</Text>
+        <Text as="span" className="text-2xs tabular-nums min-w-12 text-center shrink-0">{selectedNode ? `${hop} hop` : '계좌 선택'}</Text>
       </Box>
       <IconButton label="그래프 초기화" onClick={resetGraph}><RotateCcw className="size-3.5" /></IconButton>
     </Box>
@@ -387,10 +387,10 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
             {hoverEdge && <><Text as="b">{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? `연결 경로 · ${nonSuspiciousLabel}` : nonSuspiciousLabel}</Text> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{formatGraphMoney(hoverEdge)} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
           </Box>
         )}
-        <Box className="absolute bottom-3 left-3 flex items-center gap-2 text-[0.6875rem] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</Box>
+        <Box className="absolute bottom-3 left-3 flex items-center gap-2 text-2xs text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</Box>
         <Box className="absolute bottom-3 right-3 flex items-center bg-card border rounded-md">
           <IconButton label="축소" onClick={() => zoomBy(1 / 1.2)}><Minus className="size-3.5" /></IconButton>
-          <Text as="span" className="text-[0.6875rem] tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : (fitted ? 1 : zoomK / (fitK.current || 1))) * 100)}%</Text>
+          <Text as="span" className="text-2xs tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : (fitted ? 1 : zoomK / (fitK.current || 1))) * 100)}%</Text>
           <IconButton label="확대" onClick={() => zoomBy(1.2)}><Plus className="size-3.5" /></IconButton>
           <IconButton label="화면 맞춤" disabled={viewMode === 'owner' ? ownerZoom.fitted : fitted} onClick={() => fitGraph()}><Shrink className="size-3.5" /></IconButton>
         </Box>

@@ -13,5 +13,5 @@ export function MockRoleSwitch({ role, onChange }: { role: MockRole; onChange: (
 
 /** 관리자만 할 수 있는 버튼. 조사자에게는 비활성 + 이유(Q11: 같은 화면, 제어만 막힘) */
 export function AdminButton({ role, children, ...props }: { role: MockRole } & ComponentProps<typeof Button>) {
-  return <span className="inline-flex flex-col items-end gap-1"><Button {...props} disabled={role !== 'ADMIN' || props.disabled}>{children}</Button>{role !== 'ADMIN' && <span className="text-[0.6875rem] text-muted-foreground">관리자만 가능</span>}</span>
+  return <span className="inline-flex flex-col items-end gap-1"><Button {...props} disabled={role !== 'ADMIN' || props.disabled}>{children}</Button>{role !== 'ADMIN' && <span className="text-2xs text-muted-foreground">관리자만 가능</span>}</span>
 }

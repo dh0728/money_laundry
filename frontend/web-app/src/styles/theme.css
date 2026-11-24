@@ -181,7 +181,6 @@
   --text-body-size: .875rem;
   --text-caption-size: .75rem;
   --text-caption-line-height: 1rem;
-  --text-micro-size: .6875rem;
   --provenance-border-strength: 55%;
   --login-shade-gradient: linear-gradient(90deg, var(--login-shade-start) 0%, var(--login-shade-end) 70%, transparent 100%);
   --login-panel-saturation: 140%;
@@ -319,6 +318,9 @@
   --color-input: var(--input); --color-ring: var(--ring);
   --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2);
   --color-dashboard-segment-divider: var(--dashboard-segment-divider);
+  --text-2xs: var(--text-micro-size);
+  --text-3xs: var(--text-micro-compact-size);
+  --text-4xs: var(--text-micro-dense-size);
   --font-sans: Pretendard;
   --font-mono: Pretendard;
   --font-serif: Pretendard;

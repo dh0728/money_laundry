@@ -44,7 +44,7 @@ export function PersonalSummaryView({ children }: { children: ReactNode }) {
           <RadarSweep className="size-5 shrink-0" />
           <Heading className="text-base font-semibold tracking-tight">RDR 9000 · 내 담당 요약</Heading>
           <ProvenanceBadge kind="mock" title="규칙 기반 시연 문장. LLM 미연동." />
-          <Text className="ml-auto text-[0.6875rem] text-muted-foreground">판단은 조사자가 수행</Text>
+          <Text className="ml-auto text-2xs text-muted-foreground">판단은 조사자가 수행</Text>
         </Box>
         <Box className="mt-4">
           <Text className="text-xs font-medium">집중 패턴</Text>

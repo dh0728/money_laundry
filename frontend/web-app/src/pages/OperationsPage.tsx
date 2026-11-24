@@ -44,7 +44,7 @@ const Tone = ({ tone, children }: { tone: string; children: string }) => <Badge 
 
 function Stages({ job }: { job: Job }) {
   const ci = STAGES.findIndex(s => s[0] === job.stage)
-  return <Box as="ol" className="flex flex-wrap items-center gap-1 text-[0.6875rem]">{STAGES.map(([k, l], i) => {
+  return <Box as="ol" className="flex flex-wrap items-center gap-1 text-2xs">{STAGES.map(([k, l], i) => {
     const failed = i === ci && job.status === 'FAILED', cur = i === ci && job.status !== 'COMPLETED'
     return <Box as="li" key={k} className="flex items-center gap-1"><Badge variant={failed ? 'destructive' : 'outline'} className={!failed && cur ? 'border-foreground font-medium' : !failed && i > ci ? 'border-dashed text-muted-foreground' : undefined}>{l}</Badge>{i < STAGES.length - 1 && <Text as="span" className="text-muted-foreground">›</Text>}</Box>
   })}</Box>

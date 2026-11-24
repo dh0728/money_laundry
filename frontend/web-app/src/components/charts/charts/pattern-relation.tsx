@@ -122,8 +122,8 @@ export function PatternRelationStack({ composition, distribution, linked = true,
     <Box data-testid="relation-pattern-panel" className="rounded-b-md bg-foreground/[.08] p-2.5">
       <Text className="text-xs font-medium">{linked ? '패턴 소속의 유형별' : '의심 거래 유형별'} <Text as="span" className="font-normal text-muted-foreground">· {unit}</Text></Text>
       <Box className="mt-2.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5">{distribution.map((item, index) => <Fragment key={item.pattern}>
-        <Text as="span" data-testid="pattern-child-label" data-segment-index={index} className="flex h-6 items-center rounded-full bg-foreground px-2.5 font-mono text-[0.6875rem] text-background">{item.pattern}</Text>
-        <Text as="span" className="flex min-w-0 items-center"><Text as="span" data-testid="relation-pattern-bar" data-segment-scope="pattern" className="flex h-6 min-w-11 items-center justify-start rounded-full bg-foreground px-3 text-[0.6875rem] tabular-nums text-background" style={{ width: `${Math.max(8, item.alerts / maxAlerts * 100)}%` }}>{fmt(item.alerts)}</Text></Text>
+        <Text as="span" data-testid="pattern-child-label" data-segment-index={index} className="flex h-6 items-center rounded-full bg-foreground px-2.5 font-mono text-2xs text-background">{item.pattern}</Text>
+        <Text as="span" className="flex min-w-0 items-center"><Text as="span" data-testid="relation-pattern-bar" data-segment-scope="pattern" className="flex h-6 min-w-11 items-center justify-start rounded-full bg-foreground px-3 text-2xs tabular-nums text-background" style={{ width: `${Math.max(8, item.alerts / maxAlerts * 100)}%` }}>{fmt(item.alerts)}</Text></Text>
       </Fragment>)}</Box>
     </Box>
   </Box>
@@ -152,13 +152,13 @@ function PatternRelationBars({ composition, distribution, linked = true, unit = 
       const segment = layout.segments[label.index]
       return <Box key={segment.name} data-testid="relation-total-label" className="absolute flex flex-col items-end justify-center text-right leading-tight" style={{ left: layout.padX, width: layout.labelRight - 6 - layout.padX, top: label.y - layout.labelH / 2, height: layout.labelH }} title={`${segment.name} ${fmt(segment.value)}건`}>
         <Text as="span" className="max-w-full truncate text-xs"><Text as="strong" className="font-semibold tabular-nums">{segment.share}</Text> {segment.name}</Text>
-        <Text as="span" className="text-[0.6875rem] tabular-nums text-muted-foreground">{fmt(segment.value)}건</Text>
+        <Text as="span" className="text-2xs tabular-nums text-muted-foreground">{fmt(segment.value)}건</Text>
       </Box>
     })}
     {layout.rows.map(row => <Box key={row.pattern} data-testid="relation-pattern-row" data-segment-scope="pattern" data-segment-index={row.index} className="absolute flex items-center" style={{ left: layout.pillX, top: row.cy - layout.pillH / 2, height: layout.pillH, width: layout.width - layout.padX - layout.pillX }} title={`${row.pattern} ${fmt(row.alerts)} ${unit}`}>
-      <Text as="span" data-testid="pattern-child-label" className="flex h-full shrink-0 items-center rounded-full bg-foreground px-3 font-mono text-[0.6875rem] text-background" style={{ width: layout.pillW }}><Text as="span" className="truncate">{row.pattern}</Text></Text>
-      <Text as="span" data-testid="relation-pattern-bar" className="ml-1.5 flex h-full items-center justify-start rounded-full bg-foreground px-3 text-[0.6875rem] tabular-nums text-background" style={{ width: row.barW }}>{row.countInside && fmt(row.alerts)}</Text>
-      {!row.countInside && <Text as="span" className="ml-1.5 text-[0.6875rem] tabular-nums text-muted-foreground">{fmt(row.alerts)}</Text>}
+      <Text as="span" data-testid="pattern-child-label" className="flex h-full shrink-0 items-center rounded-full bg-foreground px-3 font-mono text-2xs text-background" style={{ width: layout.pillW }}><Text as="span" className="truncate">{row.pattern}</Text></Text>
+      <Text as="span" data-testid="relation-pattern-bar" className="ml-1.5 flex h-full items-center justify-start rounded-full bg-foreground px-3 text-2xs tabular-nums text-background" style={{ width: row.barW }}>{row.countInside && fmt(row.alerts)}</Text>
+      {!row.countInside && <Text as="span" className="ml-1.5 text-2xs tabular-nums text-muted-foreground">{fmt(row.alerts)}</Text>}
     </Box>)}
   </Box>
 }

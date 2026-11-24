@@ -48,7 +48,7 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
         </Box>
         <Box className="mt-5 border-t pt-4">
           <Text className="text-xs font-medium">저장본 {drafts.length}개</Text>
-          {drafts.length ? <Box as="ul" className="mt-2 space-y-2 text-xs">{drafts.map((d, i) => <Box as="li" key={i} className="rounded-md border px-2.5 py-2"><Text as="span" className="tabular-nums text-muted-foreground">{d.at}</Text><Text className="mt-1 line-clamp-2">{d.text}</Text><button type="button" className="mt-1 text-[0.6875rem] underline underline-offset-4" onClick={() => setComment(d.text)}>불러오기</button></Box>)}</Box> : <Text className="mt-2 text-xs text-muted-foreground">임시 저장한 의견이 여기에 쌓입니다.</Text>}
+          {drafts.length ? <Box as="ul" className="mt-2 space-y-2 text-xs">{drafts.map((d, i) => <Box as="li" key={i} className="rounded-md border px-2.5 py-2"><Text as="span" className="tabular-nums text-muted-foreground">{d.at}</Text><Text className="mt-1 line-clamp-2">{d.text}</Text><button type="button" className="mt-1 text-2xs underline underline-offset-4" onClick={() => setComment(d.text)}>불러오기</button></Box>)}</Box> : <Text className="mt-2 text-xs text-muted-foreground">임시 저장한 의견이 여기에 쌓입니다.</Text>}
         </Box>
     </>}> 
         <SectionTitle

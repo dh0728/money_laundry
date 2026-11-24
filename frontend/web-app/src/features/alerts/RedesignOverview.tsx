@@ -94,7 +94,7 @@ export default function RedesignOverview({ alert, history, onAccounts }: { alert
           <Text className="flex items-center gap-2 text-xs font-medium">연관 Alert 후보<ProvenanceBadge kind="proposal" title="계좌·소유주로 사건을 찾는 API 필요(2단계)" /></Text>
           {[{ id: 'A-3017', who: '송동현', same: '계좌 2개 공유' }, { id: 'A-3022', who: alert.assignee.name, same: '소유주 1명 공유' }].map(c => <Box key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs">
             <Text as="span" className="font-mono">{c.id}</Text><Text as="span" className="text-muted-foreground">{c.same}</Text><Badge variant="outline" className="font-normal">담당 {c.who}</Badge>
-            {c.who !== alert.assignee.name && <Text as="span" className="w-full text-[0.6875rem] text-muted-foreground">묶으면 담당자에게 알림이 갑니다</Text>}
+            {c.who !== alert.assignee.name && <Text as="span" className="w-full text-2xs text-muted-foreground">묶으면 담당자에게 알림이 갑니다</Text>}
           </Box>)}
         </Box>
       </Step>
@@ -110,7 +110,7 @@ export default function RedesignOverview({ alert, history, onAccounts }: { alert
 
       <Step n={7} title="처리 이력" description="누가 · 언제 · 무엇을 · 왜" source="사람" wide>
         <Box className="divide-y">{history.map(e => <Box key={e.id} className="flex gap-2.5 py-2">
-          <Text as="span" className="w-11 shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{e.at.slice(5, 10)}</Text>
+          <Text as="span" className="w-11 shrink-0 text-2xs tabular-nums text-muted-foreground">{e.at.slice(5, 10)}</Text>
           <Text as="span" className="mt-1.5 size-1.5 rounded-full bg-muted-foreground" />
           <Box className="min-w-0 flex-1 text-xs"><Text>{historyLabels[e.action]}<Text as="span" className="ml-2 text-muted-foreground">{e.actor.name}</Text></Text>{e.comment && <Text className="mt-1 truncate text-muted-foreground">{e.comment}</Text>}</Box>
         </Box>)}</Box>

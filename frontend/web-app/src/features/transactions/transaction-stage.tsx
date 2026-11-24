@@ -8,7 +8,7 @@ export function StagePanel({ title, count, description, testId, bodyTestId, body
   return <Box as="section" data-testid={testId} className="transaction-stage min-w-0 self-start overflow-hidden rounded-xl border bg-card">
     <Box as="header" className="border-b px-4 py-3">
       <Box className="flex items-center justify-between gap-3"><Heading className="text-sm font-semibold">{title}</Heading><Badge variant="secondary">{count ?? '—'}</Badge></Box>
-      {description && <Text className="mt-1 truncate text-[var(--text-micro-size)] text-muted-foreground" title={description}>{description}</Text>}
+      {description && <Text className="mt-1 truncate text-muted-foreground" title={description}>{description}</Text>}
     </Box>
     <Box data-testid={bodyTestId} className={`p-2 ${bodyClassName}`}>{children}</Box>
   </Box>
@@ -20,7 +20,7 @@ export function StageItem({ active, primary, secondary, trailing, mono = false, 
   return <button ref={itemRef} data-testid={testId} type="button" aria-pressed={active} onClick={onSelect} className="transaction-stage-item w-full rounded-lg px-3 py-3 text-left hover:bg-(--hover-surface)">
     <Text as="span" className="flex items-center justify-between gap-2"><Text as="span" title={primary} className={mono ? 'block truncate font-mono text-sm' : 'block truncate text-sm font-medium'}>{primary}</Text>{trailing}</Text>
     {typeof secondary === 'string'
-      ? <Text as="span" className="mt-1 block truncate text-[var(--text-micro-size)] text-muted-foreground" title={secondary}>{secondary}</Text>
+      ? <Text as="span" className="mt-1 block truncate text-muted-foreground" title={secondary}>{secondary}</Text>
       : <Text as="span" className="mt-1.5 flex flex-wrap items-center gap-1">{secondary}</Text>}
   </button>
 }

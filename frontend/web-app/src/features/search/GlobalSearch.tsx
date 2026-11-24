@@ -148,7 +148,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
             <Box className="max-h-[60vh] space-y-1 overflow-y-auto">
               {groups.map(g => (
                 <Box key={g.id}>
-                  <Text className="px-2 pb-1 pt-1.5 text-[0.625rem] font-medium text-muted-foreground">{g.label}</Text>
+                  <Text className="px-2 pb-1 pt-1.5 text-3xs font-medium text-muted-foreground">{g.label}</Text>
                   {g.items.map(item => {
                     const i = indexOf.get(item)!
                     return (

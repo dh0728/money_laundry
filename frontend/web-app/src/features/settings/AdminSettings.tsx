@@ -51,7 +51,7 @@ export function MembersTab({ role, me = 1 }: { role: MockRole; me?: number }) {
       <Box as="label" className="flex items-center gap-3 text-xs"><Text as="span" className="w-12 text-muted-foreground">역할</Text>
         <Select value={draftRole} disabled={locked} onValueChange={v => { setDraftRole(v as MockRole); setPerms(defaults(v as MockRole)) }}><SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="STAFF">조사자</SelectItem><SelectItem value="ADMIN">관리자</SelectItem></SelectContent></Select></Box>
       <Box className="grid grid-cols-1 gap-2 @3xl:grid-cols-2">{PERMS.map(p => <Label key={p.k} className="flex items-center gap-2.5 rounded-md border px-3 py-2 text-xs font-normal">
-        <Checkbox checked={perms[p.k]} disabled={locked || draftRole === 'ADMIN'} onCheckedChange={v => setPerms({ ...perms, [p.k]: Boolean(v) })} />{p.label}{p.high && <Text as="span" className="ml-auto text-[0.6875rem] text-muted-foreground">영향 큼</Text>}
+        <Checkbox checked={perms[p.k]} disabled={locked || draftRole === 'ADMIN'} onCheckedChange={v => setPerms({ ...perms, [p.k]: Boolean(v) })} />{p.label}{p.high && <Text as="span" className="ml-auto text-2xs text-muted-foreground">영향 큼</Text>}
       </Label>)}</Box>
       {draftRole === 'ADMIN' && <Text className="text-xs text-muted-foreground">관리자는 모든 권한을 가집니다(Q11).</Text>}
       {sel.open > 0 && <Box className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"><Text as="span">담당 미처리 {sel.open}건</Text><AdminButton role={role} size="sm" variant="outline" onClick={() => toast('재배정 대상 고르기', { description: '시안이라 열지 않습니다.' })}>담당 재배정</AdminButton></Box>}

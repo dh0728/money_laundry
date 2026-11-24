@@ -225,7 +225,7 @@ export default function App() {
                   <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{currentUser.name[0]}</AvatarFallback></Avatar>
                   <Text as="span" className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
                     <Text as="span" className="block text-xs font-medium">{currentUser.name}</Text>
-                    <Text as="span" className={`mt-0.5 block text-[0.625rem] ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</Text>
+                    <Text as="span" className={`mt-0.5 block text-3xs ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</Text>
                   </Text>
                 </SidebarDestinationButton>
                 <PendingWorkCount routeKey={`${page}/${id ?? ''}`} />

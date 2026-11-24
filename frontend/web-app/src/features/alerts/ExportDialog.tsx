@@ -60,7 +60,7 @@ export default function ExportDialog({ open, onOpenChange, code, txCount, seedCo
               {format === 'xlsx' ? chosen.map(p => <Box as="li" key={p.id}>{p.label}</Box>) : <Box as="li">CSV는 요약 시트가 없습니다</Box>}
             </Box>
             <Text className="mt-3 font-medium">미리보기 · 거래 표</Text>
-            <Box className="mt-2 grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 font-mono text-[0.6875rem]">
+            <Box className="mt-2 grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 font-mono text-2xs">
               {[['T-1', '씨앗', true], ['T-2', '경유', false], ['T-3', '씨앗', true], ['T-4', '주변', false]].map(([id, role, hi]) => <Box key={String(id)} className={`contents ${hi && format === 'xlsx' && picked.includes('why') ? '[&>span]:bg-[var(--risk-6)]/40' : ''}`}>
                 <Text as="span" className="px-1">{id}</Text><Text as="span" className="px-1">{role}</Text><Text as="span" className="px-1">…</Text>
               </Box>)}

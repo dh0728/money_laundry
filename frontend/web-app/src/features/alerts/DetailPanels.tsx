@@ -12,7 +12,7 @@ export function BarList({ rows, format = usd }: { rows: { name: string; v: numbe
     <Box className="grid grid-cols-[minmax(0,max-content)_max-content_minmax(60px,1fr)] items-center gap-x-3 gap-y-3 text-xs">
       {rows.map(r => (
         <Box key={r.name} className="contents">
-          <Text as="span" title={r.name} className="max-w-24 truncate font-mono text-[0.6875rem]">{r.name}</Text>
+          <Text as="span" title={r.name} className="max-w-24 truncate font-mono text-2xs">{r.name}</Text>
           <Text as="span" className="text-right tabular-nums">{format(r.v)}</Text>
           <Text as="span" className="h-2 overflow-hidden rounded-full bg-muted"><Text as="span" className="block h-full rounded-full" style={{ width: `${(r.v / max) * 100}%`, backgroundColor: dataSeriesColors.sky }} /></Text>
         </Box>
