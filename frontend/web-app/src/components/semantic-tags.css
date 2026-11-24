@@ -16,7 +16,7 @@
 }
 
 [data-glow-surface][data-selected] {
-  --tag-pattern-fill: color-mix(in srgb, var(--selection-surface), var(--selection-ink) 18%);
+  --tag-pattern-fill: color-mix(in srgb, var(--selection-surface), var(--selection-ink) var(--tag-selected-pattern-ink-strength));
 }
 
 .semantic-tag {
@@ -94,7 +94,7 @@
   --tag-dot: var(--tag-solid-fill, var(--text));
 }
 .semantic-tag[data-tag="status"][data-emphasis="solid"] {
-  --tag-dot: color-mix(in srgb, var(--tag-ink) 70%, var(--tag-fill));
+  --tag-dot: color-mix(in srgb, var(--tag-ink) var(--tag-status-dot-ink-strength), var(--tag-fill));
 }
 [data-review="unread"] {
   --review-status-accent: var(--review-status-unread-accent);
@@ -146,7 +146,7 @@
   align-items: stretch;
   gap: 0;
   padding: 0;
-  border: var(--aml-stroke-control) solid color-mix(in srgb, var(--tag-ink) 26%, var(--tag-fill));
+  border: var(--aml-stroke-control) solid color-mix(in srgb, var(--tag-ink) var(--tag-filter-border-ink-strength), var(--tag-fill));
   background: var(--tag-fill);
   color: var(--tag-ink);
   font: var(--tag-font);
@@ -158,8 +158,8 @@
   color: inherit;
   font: inherit;
   border-radius: 0;
-  --button-hover-bg: color-mix(in srgb, var(--tag-ink) 7%, var(--tag-fill));
-  --button-active-bg: color-mix(in srgb, var(--tag-ink) 12%, var(--tag-fill));
+  --button-hover-bg: color-mix(in srgb, var(--tag-ink) var(--tag-filter-hover-ink-strength), var(--tag-fill));
+  --button-active-bg: color-mix(in srgb, var(--tag-ink) var(--tag-filter-press-ink-strength), var(--tag-fill));
 }
 .filter-tag-label {
   padding: var(--aml-space-4) var(--aml-space-8);

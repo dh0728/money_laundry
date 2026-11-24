@@ -448,6 +448,11 @@
   --review-status-done-accent: var(--status-positive-accent);
   --review-tag-base: light-dark(var(--canvas-surface), var(--aml-gray-060));
   --review-tag-strength: 22%;
+  --tag-selected-pattern-ink-strength: 18%;
+  --tag-status-dot-ink-strength: 70%;
+  --tag-filter-border-ink-strength: 26%;
+  --tag-filter-hover-ink-strength: 7%;
+  --tag-filter-press-ink-strength: 12%;
   --status-surface-secondary-ink: color-mix(in srgb, var(--text) 36%, var(--muted-text));
   --record-verdict-tint: 24%;
   --record-verdict-glow-strength: 94%;
