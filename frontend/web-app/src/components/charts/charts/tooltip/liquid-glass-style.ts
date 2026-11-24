@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useId } from "react";
+import { useId } from "react";
 
 /**
  * Liquid glass for small capsules (the date pill): the backdrop is refracted
@@ -82,13 +82,13 @@ export const DATE_TICKER_GLASS_CLASS =
 const FALLBACK_BACKDROP = `blur(6px) saturate(${SATURATION})`;
 
 /**
- * Filter id + inline backdrop style for a glass surface. Render
+ * Filter id and backdrop value for a glass surface. Render
  * `<LiquidGlassFilter>` inside the surface with the same id and ref.
  */
 export function useLiquidGlass(): {
   filterId: string;
   svgFilter: boolean;
-  style: CSSProperties;
+  backdrop: string;
 } {
   // CSS `url(#…)` is happiest with a plain id.
   const filterId = `bklit-glass-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -99,6 +99,6 @@ export function useLiquidGlass(): {
   return {
     filterId,
     svgFilter,
-    style: { backdropFilter: backdrop, WebkitBackdropFilter: backdrop },
+    backdrop,
   };
 }

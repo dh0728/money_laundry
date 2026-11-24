@@ -6,9 +6,11 @@ import {
   JSAnimation,
   LazyMotion,
   type MotionValue,
+  type MotionStyle,
   m,
   useMotionValue,
   useSpring,
+  useTransform,
 } from "motion/react";
 import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import {
@@ -23,11 +25,17 @@ import {
 import { cn } from "@/lib/utils";
 import { LiquidGlassFilter } from "./liquid-glass";
 import { DATE_TICKER_GLASS_CLASS, useLiquidGlass } from "./liquid-glass-style";
+import "./date-ticker.css";
 
 const TICKER_ITEM_HEIGHT = 24;
 const TICKER_SPRING = { stiffness: 400, damping: 35 };
 /** Full scroll stacks are skipped above this count — single label + instant updates. */
 const COMPACT_TICKER_THRESHOLD = 60;
+const pixels = (value: number) => `${value}px`;
+type TickerMotionStyle = MotionStyle & {
+  "--date-ticker-width"?: MotionValue<string>;
+  "--date-ticker-offset"?: MotionValue<string>;
+};
 
 /** Retarget a spring, or snap it when motion should be instant. */
 function driveSpring(
@@ -180,29 +188,24 @@ export interface DateTickerProps {
   variant?: DateTickerVariant;
   /** Classes merged over the variant's surface classes. */
   className?: string;
-  /** Inline styles for the pill surface. */
-  style?: CSSProperties;
 }
 
 type DateTickerVariantProps = Pick<
   DateTickerProps,
-  "currentIndex" | "labels" | "className" | "style" | "variant"
+  "currentIndex" | "labels" | "className" | "variant"
 >;
 
 function SolidSurface({
   className,
-  style,
   children,
 }: {
   className?: string;
-  style?: CSSProperties;
   children: ReactNode;
 }) {
   return (
     <div
       className={cn(DATE_TICKER_PILL_CLASS, className)}
       data-slot="date-pill"
-      style={style}
     >
       {children}
     </div>
@@ -211,22 +214,20 @@ function SolidSurface({
 
 function GlassSurface({
   className,
-  style,
   children,
 }: {
   className?: string;
-  style?: CSSProperties;
   children: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const glass = useLiquidGlass();
   return (
     <div
-      className={cn(DATE_TICKER_GLASS_CLASS, className)}
+      className={cn(DATE_TICKER_GLASS_CLASS, "date-ticker-glass", className)}
       data-slot="date-pill"
       data-variant="glass"
       ref={surfaceRef}
-      style={{ ...glass.style, ...style }}
+      style={{ "--date-ticker-backdrop": glass.backdrop } as CSSProperties}
     >
       {glass.svgFilter && (
         <LiquidGlassFilter id={glass.filterId} surfaceRef={surfaceRef} />
@@ -242,7 +243,6 @@ function DateTickerSurface({
 }: {
   variant?: DateTickerVariant;
   className?: string;
-  style?: CSSProperties;
   children: ReactNode;
 }) {
   return variant === "glass" ? (
@@ -306,7 +306,7 @@ function useLabelWidth(
         stop();
         width.jump(next);
         if (boxRef.current) {
-          boxRef.current.style.width = `${next}px`;
+          boxRef.current.style.setProperty("--date-ticker-width", pixels(next));
         }
         return;
       }
@@ -342,7 +342,6 @@ const DateTickerCompact = memo(function DateTickerCompact({
   currentIndex,
   labels,
   className,
-  style,
   variant,
 }: DateTickerVariantProps) {
   const reduceMotion = useAppReducedMotion() === true;
@@ -350,15 +349,14 @@ const DateTickerCompact = memo(function DateTickerCompact({
   const labelRef = useRef<HTMLSpanElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const width = useMotionValue(0);
+  const widthPixels = useTransform(width, pixels);
   useLabelWidth(labelRef, boxRef, width, reduceMotion);
 
   return (
-    <DateTickerSurface className={className} style={style} variant={variant}>
-      <m.div className="relative h-6" ref={boxRef} style={{ width }}>
-        <m.div
-          className="absolute top-0 left-1/2 flex h-6 items-center"
-          style={{ x: "-50%" }}
-        >
+    <DateTickerSurface className={className} variant={variant}>
+      <m.div className="date-ticker-width relative h-6" ref={boxRef}
+        style={{ "--date-ticker-width": widthPixels } as TickerMotionStyle}>
+        <div className="date-ticker-track absolute top-0 left-1/2 flex h-6 items-center">
           <span
             className="whitespace-nowrap font-medium text-sm"
             data-ticker-item
@@ -366,7 +364,7 @@ const DateTickerCompact = memo(function DateTickerCompact({
           >
             {label}
           </span>
-        </m.div>
+        </div>
       </m.div>
     </DateTickerSurface>
   );
@@ -376,7 +374,6 @@ const DateTickerInner = memo(function DateTickerInner({
   currentIndex,
   labels,
   className,
-  style,
   variant,
 }: DateTickerVariantProps) {
   const reduceMotion = useAppReducedMotion() === true;
@@ -415,12 +412,16 @@ const DateTickerInner = memo(function DateTickerInner({
   // Animated Y offsets
   const dayY = useSpring(0, TICKER_SPRING);
   const monthY = useSpring(0, TICKER_SPRING);
+  const dayOffset = useTransform(dayY, pixels);
+  const monthOffset = useTransform(monthY, pixels);
 
   // Each stack's width follows its active item, so the pill resizes per label.
   const monthStackRef = useRef<HTMLDivElement>(null);
   const dayStackRef = useRef<HTMLDivElement>(null);
   const monthWidth = useSpring(0, TICKER_SPRING);
   const dayWidth = useSpring(0, TICKER_SPRING);
+  const monthWidthPixels = useTransform(monthWidth, pixels);
+  const dayWidthPixels = useTransform(dayWidth, pixels);
   useActiveItemWidth(
     monthStackRef,
     monthSegments,
@@ -446,18 +447,18 @@ const DateTickerInner = memo(function DateTickerInner({
   }, [currentMonthIndex, monthY, reduceMotion]);
 
   return (
-    <DateTickerSurface className={className} style={style} variant={variant}>
+    <DateTickerSurface className={className} variant={variant}>
       <div className="relative h-6 overflow-hidden">
         <div className="flex items-center justify-center gap-1">
           {/* Month stack */}
           <m.div
-            className="relative h-6 overflow-hidden"
-            style={{ width: monthWidth }}
+            className="date-ticker-width relative h-6 overflow-hidden"
+            style={{ "--date-ticker-width": monthWidthPixels } as TickerMotionStyle}
           >
             <m.div
-              className="absolute top-0 left-1/2 flex flex-col items-center"
+              className="date-ticker-track absolute top-0 left-1/2 flex flex-col items-center"
               ref={monthStackRef}
-              style={{ x: "-50%", y: monthY }}
+              style={{ "--date-ticker-offset": monthOffset } as TickerMotionStyle}
             >
               {monthSegments.map((segment) => (
                 <div
@@ -475,13 +476,13 @@ const DateTickerInner = memo(function DateTickerInner({
 
           {/* Second-part stack (day or year) */}
           <m.div
-            className="relative h-6 overflow-hidden"
-            style={{ width: dayWidth }}
+            className="date-ticker-width relative h-6 overflow-hidden"
+            style={{ "--date-ticker-width": dayWidthPixels } as TickerMotionStyle}
           >
             <m.div
-              className="absolute top-0 left-1/2 flex flex-col items-center"
+              className="date-ticker-track absolute top-0 left-1/2 flex flex-col items-center"
               ref={dayStackRef}
-              style={{ x: "-50%", y: dayY }}
+              style={{ "--date-ticker-offset": dayOffset } as TickerMotionStyle}
             >
               {daySegments.map((segment) => (
                 <div
@@ -509,7 +510,6 @@ export function DateTicker({
   animation = "roll",
   variant,
   className,
-  style,
 }: DateTickerProps) {
   if (!visible || labels.length === 0) {
     return null;
@@ -527,7 +527,6 @@ export function DateTicker({
         className={className}
         currentIndex={currentIndex}
         labels={labels}
-        style={style}
         variant={variant}
       />
     </LazyMotion>

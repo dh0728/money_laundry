@@ -2,7 +2,7 @@
 
 import { m, useSpring } from "motion/react";
 import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
-import { type CSSProperties, memo, useEffect, useEffectEvent, useMemo } from "react";
+import { memo, useEffect, useEffectEvent, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   resolveTooltipBoxMotion,
@@ -79,8 +79,6 @@ export interface ChartTooltipProps {
    * (`rounded-full bg-zinc-900 px-4 py-1 text-white shadow-lg …`).
    */
   datePillClassName?: string;
-  /** Inline styles for the pill surface (e.g. `background`, `color`). */
-  datePillStyle?: CSSProperties;
   /**
    * Replace the pill's contents entirely. The result is still positioned
    * under the crosshair and follows the tooltip spring.
@@ -291,7 +289,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
   datePillVariant,
   datePillVelocity,
   datePillClassName,
-  datePillStyle,
   datePill,
   showCrosshair: showCrosshairProp,
   showDots = true,
@@ -684,7 +681,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
         point={tooltipData?.point}
         render={datePill}
         springConfig={springConfig}
-        style={datePillStyle}
         variant={datePillVariant}
         velocity={datePillVelocity}
         visible={visible}
@@ -720,7 +716,6 @@ interface DatePillTrackerProps {
   point?: Record<string, unknown>;
   animation?: DateTickerAnimation;
   className?: string;
-  style?: CSSProperties;
   render?: ChartTooltipProps["datePill"];
   variant?: DateTickerVariant;
   velocity?: ChartTooltipProps["datePillVelocity"];
@@ -745,7 +740,6 @@ function DatePillTrackerInner({
   point,
   animation,
   className,
-  style,
   render,
   variant,
   velocity,
@@ -793,7 +787,6 @@ function DatePillTrackerInner({
             className={className}
             currentIndex={currentIndex}
             labels={labels}
-            style={style}
             variant={variant}
             visible={visible}
           />

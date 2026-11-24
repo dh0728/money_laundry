@@ -1,0 +1,12 @@
+.date-ticker-width {
+  width: var(--date-ticker-width, 0px);
+}
+
+.date-ticker-track {
+  transform: translateX(-50%) translateY(var(--date-ticker-offset, 0px));
+}
+
+.date-ticker-glass {
+  -webkit-backdrop-filter: var(--date-ticker-backdrop);
+  backdrop-filter: var(--date-ticker-backdrop);
+}
