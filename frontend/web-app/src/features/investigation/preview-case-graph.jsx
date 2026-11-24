@@ -17,7 +17,7 @@ import { currencyColumn, SortableTableHead, tableCount,
 import { dateFromCode, downloadCsv, inDateRange, LocalQueryTools, TableQueryTools, visibleCaseRows } from '../../components/query-controls';
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip } from '../../components/charts/charts/sankey';
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
-import { caseSankeyGraph, caseSankeyLayers, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
+import { caseSankeyGraph, caseSankeyLayers, layoutCaseSankey } from './case-sankey-data';
 import { complexSankeySampleCode } from '../../mocks/dashboard-fixtures';
 import { buildCaseNetwork, casePlaybackCursor, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
   mergeCaseTransactions, sharedCaseEvidence, transactionsWithinHops } from './case-graph-scope';
@@ -185,7 +185,7 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
   return <Box as="figure" className="preview-graph-sankey" data-export-visualization style={{ '--sankey-lanes': lanes }}
     aria-label={`송금에서 수취로 · 계좌 ${nodes.length}개 · 경로 ${links.length}개`}>
     <Box as="figcaption">띠 두께 · 거래 건수</Box>
-    <SankeyChart data={flow} layout={layoutCaseSankey} linkPath={caseSankeyPath}
+    <SankeyChart data={flow} layout={layoutCaseSankey}
       className="preview-graph-sankey-chart" aspectRatio="auto" interactionLabel="송금 → 수취 연결선 선택"
       margin={{ top: space(8), right: side, bottom: space(8), left: side }}
       nodeWidth={space(8)} nodePadding={space(16)}

@@ -3,7 +3,8 @@ import { act, fireEvent, renderHook, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { buildCaseNetwork, graphRiskBand, graphTableSelection, graphVerdict, transactionsWithinHops } from './case-graph-scope';
 import { caseAccountLayout } from './case-pattern-layout';
-import { caseSankeyGraph, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
+import { caseSankeyGraph, layoutCaseSankey } from './case-sankey-data';
+import { sankeyLinkPath } from '@/components/charts/charts/sankey/sankey-path';
 import { ownerGraphLayout, ownerTransferPath } from '../graph/owner-graph-layout';
 import { caseGroupColor } from '../graph/graph-case-groups';
 import { mountCaseGraph } from './preview-case-graph';
@@ -285,7 +286,9 @@ describe('case graph analysis', () => {
     expect(layout.links[0].width).toBe(4 * layout.links[2].width);
     expect(layout.links[2].returnY).toBeLessThan(layout.nodes[1].y0);
     expect(layout.links[3].source).toBe(layout.links[3].target);
-    expect(layout.links.every(link => !/NaN|Infinity/.test(caseSankeyPath(link)))).toBe(true);
+    const paths = layout.links.map(link => sankeyLinkPath(link, 16));
+    expect(paths.every(path => path.startsWith('M') && !/NaN|Infinity/.test(path))).toBe(true);
+    expect(paths.map(path => path.includes(' H '))).toEqual([false, false, true, true]);
   });
 
   it('only claims pattern placement when supported and otherwise shows actual direction', () => {
