@@ -77,6 +77,37 @@
   --aml-space-5: 5px;
   --aml-space-7: 7px;
   --aml-layer-tooltip: 9999;
+  --login-scene-background:
+    radial-gradient(ellipse at 16% 22%, light-dark(#b6dce9, #143b53), transparent 48%),
+    radial-gradient(ellipse at 86% 27%, light-dark(#d8d9f1, #25284c), transparent 46%),
+    radial-gradient(ellipse at 62% 87%, light-dark(#c7e6e3, #113b40), transparent 53%),
+    radial-gradient(ellipse at center, light-dark(#f7fcff, #172335), light-dark(#e6edf6, #09111f));
+  --login-scene-background-layer: -1;
+  --login-card-optical-softness: .85px;
+  --login-card-backdrop: blur(var(--aml-space-2)) saturate(1.28);
+  --login-card-glass-face:
+    linear-gradient(150deg, light-dark(#ffffff83, #9ccbf45c), transparent 38%),
+    linear-gradient(335deg, light-dark(#ffffff52, #67c5c942), transparent 41%),
+    light-dark(#edf8ff68, #10233864);
+  --login-card-glass-edge: light-dark(#ffffffe6, #c4e6fc77);
+  --login-card-glass-shadow:
+    inset 0 var(--aml-stroke-divider) var(--aml-stroke-divider) light-dark(#fff, #dfedffc4),
+    inset 0 calc(-1 * var(--aml-stroke-divider)) var(--aml-stroke-divider) light-dark(#fffc, #9ff2fa75),
+    inset 0 0 var(--aml-space-16) light-dark(#ffffff85, #9cc9f44d),
+    0 var(--aml-space-24) 66px light-dark(#244e7030, #0008),
+    0 var(--aml-space-2) var(--aml-space-8) light-dark(#244e7026, #030a144f);
+  --login-card-glass-fallback: light-dark(#eef8f999, #15253da8);
+  --login-field-glass-face: light-dark(#f7fbffe0, #081420da);
+  --login-field-glass-edge: light-dark(#647b913b, #a4cbfc49);
+  --login-travel-duration: 480ms;
+  --login-travel-ease: cubic-bezier(.28, .12, .58, 1);
+  --login-travel-card-mid-opacity: .86;
+  --login-travel-card-exit-scale: 1.12;
+  --login-travel-particle-exit-scale: 1.24;
+  --login-scene-particle-colors: #257799, #605fa0, #237e80;
+  --login-scene-network-ink: #376f8a;
+  --login-scene-network-highlight: #426e9b;
+  --login-scene-radar-trail-mask: #00000008, #00000020, #00000050, #0000009a, #000000db, #000;
   --aml-type-tooltip-compact: 11.5px;
   --aml-type-tooltip: 12.5px;
   --aml-type-tooltip-comfortable: 13.5px;
@@ -266,6 +297,12 @@
   --record-glow-inner-strength: 88%;
   --record-glow-outer-strength: 58%;
   --review-lane-tint: 14%;
+}
+
+:root[data-theme="dark"] {
+  --login-scene-particle-colors: #77ddf4, #a5a6fa, #61e1d1;
+  --login-scene-network-ink: #75cde4;
+  --login-scene-network-highlight: #bdeaff;
 }
 
 :root[data-theme="light"] {
