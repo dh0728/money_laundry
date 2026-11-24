@@ -63,8 +63,8 @@ export function AccountTrailGraph({ comparison, focus }) {
     <g className="account-trail-overlap" data-shared-account={focus}>
       <title>{shared.join(' · ')}</title>
       <circle cx="130" cy="146" />
-      <text x="130" y="170" textAnchor="middle">{accountLabel(focus)}</text>
-      <text x="130" y="187" textAnchor="middle">공유 {shared.length}개</text>
+      <text x="118" y="150" textAnchor="end">{accountLabel(focus)}</text>
+      <text x="118" y="167" textAnchor="end">공유 {shared.length}개</text>
     </g>
     {hidden > 0 && <text className="account-trail-label" x="259" y="237" textAnchor="middle">Alert 외 {hidden}개</text>}
     <text className="account-trail-group-label" x="160" y="276" textAnchor="middle">추천 거래 경로</text>
