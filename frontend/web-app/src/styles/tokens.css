@@ -163,6 +163,12 @@
   --table-row-hover-default-strength: 14%;
   --table-row-hover-verdict-strength: 10%;
   --table-scroll-region-max-height: 60dvh;
+  --chart-initial-width: 320px;
+  --chart-initial-height: 200px;
+  --chart-tooltip-min-width: 8rem;
+  --chart-tooltip-indicator-border-width: 1.5px;
+  --chart-series-swatch-radius: 2px;
+  --chart-grid-border-strength: 50%;
   --table-ledger-filter-min-width: 14rem;
   --table-records-wide-min: 850px;
   --table-records-evidence-min: 950px;

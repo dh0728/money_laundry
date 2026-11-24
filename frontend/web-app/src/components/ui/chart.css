@@ -1,0 +1,22 @@
+@layer properties, theme, base, components, utilities;
+
+@layer utilities {
+  /* Match only the presentation attributes Recharts supplies by default. */
+  .chart-container .recharts-cartesian-grid line[stroke="#ccc"] {
+    stroke: color-mix(in oklab, var(--border) var(--chart-grid-border-strength), transparent);
+  }
+
+  .chart-container .recharts-polar-grid [stroke="#ccc"],
+  .chart-container .recharts-reference-line [stroke="#ccc"] {
+    stroke: var(--border);
+  }
+
+  .chart-container :is(.recharts-dot, .recharts-sector)[stroke="#fff"] {
+    stroke: transparent;
+  }
+
+  .chart-tooltip-dashed-indicator {
+    border-width: var(--chart-tooltip-indicator-border-width);
+    border-style: dashed;
+  }
+}
