@@ -1,0 +1,24 @@
+:root {
+  --status-positive-accent: color-mix(in srgb,
+    color-mix(in srgb, var(--aml-figma-surface-status-positive-accent-default), var(--aml-figma-dark-surface-status-positive-accent-default) 45%),
+    var(--aml-black-100) 8%);
+  --status-caution-accent: color-mix(in srgb, var(--aml-figma-surface-status-caution-accent-default), #ffc83d 60%);
+  --status-danger-accent: light-dark(
+    color-mix(in srgb, var(--aml-figma-light-surface-status-danger-accent-default), var(--aml-black-100) 2%),
+    color-mix(in srgb,
+      color-mix(in srgb, var(--aml-figma-dark-surface-status-danger-accent-default) 15%, var(--aml-figma-light-surface-status-danger-accent-default)),
+      var(--aml-black-100) 5%));
+  --status-pending-accent: light-dark(
+    var(--aml-figma-light-surface-status-pending-accent-default),
+    color-mix(in srgb,
+      color-mix(in srgb, var(--aml-figma-dark-surface-status-pending-accent-default), var(--aml-figma-light-surface-status-pending-accent-default)),
+      var(--aml-black-100) 7%));
+  --status-info-accent: light-dark(
+    var(--aml-figma-light-surface-status-info-accent-default),
+    color-mix(in srgb,
+      color-mix(in srgb, var(--aml-figma-dark-surface-status-info-accent-default), var(--aml-figma-light-surface-status-info-accent-default)),
+      var(--aml-black-100) 11%));
+  --alert-standalone-series-accent: var(--palette-teal-500);
+  --status-badge-border-strength: 45%;
+  --status-badge-fill-strength: 18%;
+}

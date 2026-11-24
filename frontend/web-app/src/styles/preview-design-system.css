@@ -3,6 +3,7 @@
 @import "./fonts.css";
 @import "./figma-colors.css";
 @import "./chart-palette.css";
+@import "./status-colors.css";
 
 /* Map the standalone workspace's existing component tokens to the shared design system. */
 :root {
@@ -292,25 +293,6 @@
   --risk-high: var(--status-danger-accent);
   --risk-readout-low-stroke: .75px light-dark(var(--aml-black-100), transparent);
   --model-risk-settings-dial-max-width: 15rem;
-  --status-positive-accent: color-mix(in srgb,
-    color-mix(in srgb, var(--aml-figma-surface-status-positive-accent-default), var(--aml-figma-dark-surface-status-positive-accent-default) 45%),
-    var(--aml-black-100) 8%);
-  --status-caution-accent: color-mix(in srgb, var(--aml-figma-surface-status-caution-accent-default), #ffc83d 60%);
-  --status-danger-accent: light-dark(
-    color-mix(in srgb, var(--aml-figma-light-surface-status-danger-accent-default), var(--aml-black-100) 2%),
-    color-mix(in srgb,
-      color-mix(in srgb, var(--aml-figma-dark-surface-status-danger-accent-default) 15%, var(--aml-figma-light-surface-status-danger-accent-default)),
-      var(--aml-black-100) 5%));
-  --status-pending-accent: light-dark(
-    var(--aml-figma-light-surface-status-pending-accent-default),
-    color-mix(in srgb,
-      color-mix(in srgb, var(--aml-figma-dark-surface-status-pending-accent-default), var(--aml-figma-light-surface-status-pending-accent-default)),
-      var(--aml-black-100) 7%));
-  --status-info-accent: light-dark(
-    var(--aml-figma-light-surface-status-info-accent-default),
-    color-mix(in srgb,
-      color-mix(in srgb, var(--aml-figma-dark-surface-status-info-accent-default), var(--aml-figma-light-surface-status-info-accent-default)),
-      var(--aml-black-100) 11%));
   --review-status-unread-accent: var(--status-danger-accent);
   --review-status-pending-accent: var(--status-pending-accent);
   --review-status-inProgress-accent: var(--status-info-accent);

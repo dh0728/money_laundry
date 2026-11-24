@@ -9,7 +9,7 @@ import { useCurrentUser } from '@/app/session'
 import { FilterChip } from '@/components/FilterChip'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { ProvenanceBadge } from '@/components/Provenance'
-import { AgeBadge, PatternBadge, RiskBadge, WorkStatusBadge } from '@/components/badges'
+import { AgeBadge, CaseLifecycleBadge, PatternBadge, RiskBadge } from '@/components/badges'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -22,15 +22,14 @@ import { episodeCode } from '@/features/alerts/alertFilters'
 import { usd } from '@/features/alerts/metrics'
 import { useDataTable } from '@/hooks/use-data-table'
 import { useMemoryState } from '@/lib/memory'
-import { episodeWorkStatus, workStatusLabels, type WorkStatus } from '@/lib/workStatus'
+import { workStatusLabels, type WorkStatus } from '@/lib/workStatus'
 import { ageOptions } from '@/features/alerts/alertFilters'
 import { episodeFilterLabel, episodeFilterNames, matchesEpisode, riskOptions, type EpisodeFilter, type EpisodeFilterField } from './episodeFilters'
 import { Box, Text } from '@/components/layout-primitives'
 
-export function EpisodeStatusBadge({ status, reviewRequested }: { status: EpisodeStatus; reviewRequested?: boolean }) {
+export function EpisodeStatusBadge({ status }: { status: EpisodeStatus; reviewRequested?: boolean }) {
   // Q4(10/8): Alert 상태와 같은 말을 쓴다. 관리자 검수 넘기기는 API가 없어 표시하지 않는다(재설계 S5)
-  void reviewRequested; void episodeWorkStatus; void WorkStatusBadge
-  return <Badge variant="outline" data-tone={status === 'OPEN' ? 'working' : 'closed'} data-status={status} className="semantic-status-badge text-xs font-normal">{status === 'OPEN' ? '진행 중' : '종결'}</Badge>
+  return <CaseLifecycleBadge status={status} label={status === 'OPEN' ? '진행 중' : '종결'} />
 }
 
 export type EpisodeListRow = Pick<EpisodeRow, 'episodeId' | 'riskScore' | 'alertCount' | 'txCount' | 'assignee' | 'status' | 'createdAt' | 'ageDays' | 'reviewRequestedAt'> & { primaryTypes: { code: TypeCode | null; name: string }[]; totalAmountUsd?: number; amountLabel?: string }

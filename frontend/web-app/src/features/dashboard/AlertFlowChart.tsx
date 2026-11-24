@@ -1,5 +1,5 @@
 // 기관 전체 "일별 Alert 유입과 처리 상태". 그날 들어온 Alert를 지금 처리 상태(처리 전·중·완료)로 나눠 쌓는다.
-// 색은 상태 태그와 같은 초록·파랑·보라다. 기간은 대시보드의 DateRangeButton이 정한다.
+// 단독 여부는 청록으로 구분하고, Episode 진행 중과 종결에는 상태 배지와 같은 파랑·초록을 쓴다.
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { DashboardRequested } from '@/api/dashboard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,9 +12,9 @@ export type DailyStatus = DashboardRequested['dailyAlertStatus'][number]
 
 const series = [
   // Q4(10/8 김명기): Episode 편입을 처리 단계로 부르지 않는다. 단독 Alert도 이상거래일 수 있다
-  { key: 'pending', label: '진행 중 · 단독 Alert', color: 'var(--status-pending)' },
-  { key: 'inProgress', label: '진행 중 · Episode', color: 'var(--status-working)' },
-  { key: 'done', label: '종결', color: 'var(--status-closed)' },
+  { key: 'pending', label: '진행 중 · 단독 Alert', color: 'var(--alert-standalone-series-accent)' },
+  { key: 'inProgress', label: '진행 중 · Episode', color: 'var(--status-info-accent)' },
+  { key: 'done', label: '종결', color: 'var(--status-positive-accent)' },
 ] as const
 
 const chartConfig = Object.fromEntries(series.map(s => [s.key, { label: s.label, color: s.color }])) satisfies ChartConfig
@@ -30,7 +30,7 @@ function StatusTooltip({ active, payload, label }: { active?: boolean; payload?:
       <Text className="font-medium">{md(String(label))} · 유입 {fmt(total)}건</Text>
       {series.map(s => (
         <Text key={s.key} className="flex items-center gap-2">
-          <Text as="i" className="size-2.5 shrink-0 rounded-[2px]" style={{ background: s.color }} aria-hidden />
+          <Text as="i" className="case-status-swatch size-2.5 shrink-0" data-series={s.key} aria-hidden />
           <Text as="span" className="text-muted-foreground">{s.label}</Text>
           <Text as="span" className="ml-auto font-mono tabular-nums">{fmt(day[s.key])}</Text>
         </Text>
@@ -42,7 +42,7 @@ function StatusTooltip({ active, payload, label }: { active?: boolean; payload?:
 export function StatusLegend() {
   return (
     <Box className="flex items-center justify-center gap-5 pt-3 text-xs text-muted-foreground" data-testid="status-legend">
-      {series.map(s => <Text as="span" key={s.key} className="inline-flex items-center gap-2"><Text as="i" className="size-2.5 rounded-[2px]" style={{ background: s.color }} aria-hidden />{s.label}</Text>)}
+      {series.map(s => <Text as="span" key={s.key} className="inline-flex items-center gap-2"><Text as="i" className="case-status-swatch size-2.5" data-series={s.key} aria-hidden />{s.label}</Text>)}
     </Box>
   )
 }

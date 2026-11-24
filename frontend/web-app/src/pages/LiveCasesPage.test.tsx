@@ -479,7 +479,9 @@ it.each([
   fetchReviewCase.mockResolvedValue(alertCase(1, 3001, { kind, status, episodeId }))
   render(<LiveCasesPage kind={kind} caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   const tags = await screen.findByTestId('detail-tags')
-  expect(within(tags).getByText(label)).toHaveAttribute('data-status', displayStatus)
+  const statusBadge = within(tags).getByText(label)
+  expect(statusBadge).toHaveAttribute('data-status', displayStatus)
+  expect(statusBadge).toHaveAttribute('data-tone', displayStatus === 'CLOSED' ? 'closed' : 'working')
   expect(tags.querySelectorAll('[data-status]')).toHaveLength(1)
 })
 

@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import { alertStatusLabels, formatScore, typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
+import { alertStatusLabels, formatScore, typeDisplay, type AlertStatus, type EpisodeStatus, type TypeCode } from '@/api/codes'
 import { workStatusLabels, workStatusTone, type WorkStatus } from '@/lib/workStatus'
 
 // 위험 색 단계(--risk-0~9)는 theme.css가 가진다. 점수 0~1을 10단계로 나눈다.
@@ -34,7 +34,11 @@ export function WorkStatusBadge({ status, title }: { status: WorkStatus; title?:
   )
 }
 
-export const StatusBadge = ({ status }: { status: AlertStatus }) => <Badge variant="outline" data-tone={{ OPEN: 'pending', ESCALATED: 'working', CLOSED: 'closed' }[status]} data-status={status} className="semantic-status-badge text-xs font-normal">{alertStatusLabels[status]}</Badge>
+export function CaseLifecycleBadge({ status, label }: { status: AlertStatus | EpisodeStatus; label: string }) {
+  return <Badge variant="outline" data-tone={status === 'CLOSED' ? 'closed' : 'working'} data-status={status} className="semantic-status-badge text-xs font-normal">{label}</Badge>
+}
+
+export const StatusBadge = ({ status }: { status: AlertStatus }) => <CaseLifecycleBadge status={status} label={alertStatusLabels[status]} />
 
 export function PatternBadge({ code }: { code: TypeCode }) {
   const { key, label } = typeDisplay(code)
