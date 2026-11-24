@@ -22,7 +22,7 @@ import { RuleList } from '../features/rules/preview-rule-workspace';
 import { ruleRepository } from '../features/rules/rule-repository';
 import { useRules } from '../features/rules/use-rules';
 import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
-import { readWorkspaceGap } from '../features/dashboard/workspace-metrics';
+import { readWorkspaceDuration, readWorkspaceGap, readWorkspaceLength } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
 import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
 import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-dialog';
@@ -118,14 +118,13 @@ const noticeTones = {
   failed: { tone: 'error', Icon: CircleAlert },
   info: { tone: 'info', Icon: Info },
 };
-const noticeDuration = 5000;
-const noticeMotion = 260;
-
 function FooterNotice({ item, onClose }) {
   const { reduced } = useAppearance();
   const [closing, setClosing] = useState(false);
   const { tone, Icon } = noticeTones[item.status] ?? noticeTones.info;
   useEffect(() => {
+    const noticeDuration = readWorkspaceDuration('--notice-duration', 5000);
+    const noticeMotion = readWorkspaceDuration('--notice-motion', 260);
     const timer = setTimeout(() => setClosing(true), noticeDuration + (reduced ? 0 : noticeMotion));
     return () => clearTimeout(timer);
   }, [reduced]);
@@ -133,7 +132,6 @@ function FooterNotice({ item, onClose }) {
     if (closing && reduced) onClose();
   }, [closing, reduced, onClose]);
   return <Box className="footer-notice glass" data-tone={tone} data-closing={closing || undefined}
-    style={{ '--notice-duration': `${noticeDuration}ms`, '--notice-motion': `${noticeMotion}ms` }}
     onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'footer-notice-out') onClose(); }}
     role="status" aria-atomic="true">
     <Icon className="icon" aria-hidden="true" />
@@ -199,6 +197,7 @@ function Backtest({ selectedRule, ...props }) {
 
 function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
   const { reduced } = useAppearance();
+  const [resultRingSize] = useState(() => readWorkspaceLength('--backtest-result-ring-size') || 88);
   const backtestPeriod = { start: scope.start, end: scope.end };
   const [step, setStep] = useState(1);
   const [score, setScore] = useState(Number((rule.scoreMin * 100).toFixed(2)));
@@ -299,7 +298,7 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
             </SectionDownloadHeading>
             <Box className="backtest-result-summary">
               <CompletionRing label="거래 적중률" value={results.matchedCount} total={results.scannedCount}
-                color="var(--status-caution-accent)" size={88} reduced={reduced} />
+                color="var(--status-caution-accent)" size={resultRingSize} reduced={reduced} />
               <Box>
                 <Text as="strong">거래 적중률</Text>
                 <Text>{results.scannedCount.toLocaleString('ko-KR')}건 중 {results.matchedCount.toLocaleString('ko-KR')}건이 조건에 해당</Text>

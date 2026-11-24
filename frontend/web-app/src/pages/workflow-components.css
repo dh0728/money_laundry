@@ -16,7 +16,7 @@
 }
 .backtest-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--backtest-card-min-width)), 1fr));
   gap: var(--workspace-gap);
   align-items: stretch;
   margin: 0;
@@ -43,7 +43,7 @@
 .backtest-rule-conditions { display: grid; gap: var(--aml-space-4) }
 .workflow-threshold { display: flex; align-items: center; gap: var(--aml-space-8) }
 .workflow-threshold [data-slot="input"] {
-  inline-size: 10ch;
+  inline-size: var(--backtest-threshold-width);
   min-inline-size: 0;
   block-size: var(--aml-panel-control-size);
   padding-inline: var(--aml-space-8);
@@ -61,7 +61,7 @@
 }
 @media (pointer: coarse) {
   .workflow-threshold [data-slot="input"] {
-    min-block-size: max(44px, var(--aml-panel-control-size));
+    min-block-size: max(var(--aml-size-row), var(--aml-panel-control-size));
     font-size: max(var(--aml-type-section-title-size), var(--ui-font-size));
   }
 }
@@ -85,7 +85,7 @@
 .backtest-comparison { margin-block: var(--workspace-gap) }
 .backtest-metric-number strong, .backtest-metric dd strong {
   font-size: var(--workspace-kpi-value-size, var(--aml-type-metric-size));
-  line-height: 1.1;
+  line-height: var(--metric-value-line-height);
   font-variant-numeric: tabular-nums;
 }
 .backtest-metric-number span, .backtest-metric dd span { color: var(--muted-text) }
@@ -95,12 +95,12 @@
   flex-wrap: wrap;
   gap: var(--aml-space-4);
 }
-.report-audit-cell { min-inline-size: 14rem }
+.report-audit-cell { min-inline-size: var(--report-audit-cell-min-width) }
 .report-audit {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--aml-space-4);
-  max-inline-size: 22rem;
+  max-inline-size: var(--report-audit-text-max-width);
   white-space: normal;
   overflow-wrap: anywhere;
   font-size: var(--aml-type-caption-size);
@@ -112,7 +112,7 @@
 }
 .workflow-report :is(.report-audit-fields, .preview-case-card-body .report-audit-fields) > div {
   display: grid;
-  grid-template-columns: 5.5em minmax(0, 1fr);
+  grid-template-columns: var(--report-audit-label-width) minmax(0, 1fr);
   align-items: start;
   gap: var(--aml-space-4);
 }
@@ -139,19 +139,6 @@
 .workflow-rule-detail dd { margin-inline-start: 0 }
 .workflow-rule-validation { min-inline-size: 0; align-content: start }
 .workflow-rule-validation ul { padding-inline-start: var(--aml-space-20) }
-.workflow-rule-conditions fieldset { border: var(--aml-stroke-control) solid var(--divider); border-radius: var(--aml-radius-control); min-inline-size: 0 }
-.workflow-rule-conditions fieldset label { display: flex; align-items: center; flex-wrap: wrap; gap: var(--aml-space-6); margin-block: var(--aml-space-8) }
-.workflow-rule-conditions input {
-  max-inline-size: 5rem;
-  min-inline-size: 0;
-  padding: var(--aml-space-4);
-  border: var(--aml-stroke-control) solid var(--divider);
-  border-radius: var(--aml-radius-control);
-  background: var(--canvas-surface);
-  color: var(--text);
-  font: inherit;
-}
-.workflow-rule-conditions input[aria-invalid="true"] { border-color: var(--risk-high) }
 .workflow-report-cards {
   container-type: inline-size;
   margin-block-start: var(--workspace-gap);
@@ -208,14 +195,14 @@
 .footer-notice {
   --notice-accent: var(--status-info-accent);
   --notice-ink: var(--status-accent-light-ink);
-  --glass-surface-face: color-mix(in srgb, var(--notice-accent) 96%, transparent);
+  --glass-surface-face: color-mix(in srgb, var(--notice-accent) var(--notice-glass-opacity), transparent);
   --notice-fuse-delay: var(--notice-motion);
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--aml-space-8);
   min-inline-size: 0;
-  max-inline-size: min(100%, 28rem);
+  max-inline-size: min(100%, var(--notice-max-width));
   height: var(--account-control-size);
   padding-inline: var(--aml-space-16);
   border-radius: var(--aml-radius-full);
@@ -224,9 +211,7 @@
 }
 .footer-notice[data-tone="success"] { --notice-accent: var(--status-positive-accent); --notice-ink: var(--status-accent-dark-ink) }
 .footer-notice[data-tone="warning"] { --notice-accent: var(--status-caution-accent); --notice-ink: var(--status-accent-dark-ink) }
-.footer-notice[data-tone="error"] {
-  --notice-accent: color-mix(in srgb, var(--status-danger-accent) 88%, var(--aml-black-100));
-}
+.footer-notice[data-tone="error"] { --notice-accent: var(--notice-error-accent) }
 :root[data-glassmorphism="false"] .footer-notice { --glass-surface-face: var(--notice-accent) }
 .footer-notice[data-closing] { animation-name: footer-notice-out }
 .footer-notice > .icon { flex: none }
@@ -246,20 +231,20 @@
   block-size: var(--aml-stroke-control);
   border-radius: var(--aml-radius-full);
   background: currentColor;
-  opacity: .62;
+  opacity: var(--notice-fuse-opacity);
   transform-origin: left;
   animation: footer-fuse var(--notice-duration) linear var(--notice-fuse-delay) both;
 }
 @keyframes footer-fuse { to { transform: scaleX(0) } }
 @keyframes footer-notice-in {
-  0% { translate: 0 135%; opacity: 0; animation-timing-function: cubic-bezier(.14,.82,.26,1) }
-  56% { translate: 0 -18%; opacity: 1; animation-timing-function: cubic-bezier(.32,0,.52,1) }
+  0% { translate: 0 var(--notice-offscreen-offset); opacity: 0; animation-timing-function: var(--notice-enter-ease) }
+  56% { translate: 0 var(--notice-enter-overshoot); opacity: 1; animation-timing-function: var(--notice-settle-ease) }
   100% { translate: 0 0; opacity: 1 }
 }
 @keyframes footer-notice-out {
   0% { translate: 0 0; opacity: 1 }
-  23% { translate: 0 -14%; opacity: 1; animation-timing-function: cubic-bezier(.6,0,.88,.42) }
-  100% { translate: 0 135%; opacity: 0 }
+  23% { translate: 0 var(--notice-exit-overshoot); opacity: 1; animation-timing-function: var(--notice-exit-ease) }
+  100% { translate: 0 var(--notice-offscreen-offset); opacity: 0 }
 }
 [data-reduced-motion="true"] .footer-notice { animation: none; --notice-fuse-delay: 0ms }
-[data-reduced-motion="true"] .footer-notice-fuse { animation-timing-function: steps(5, end) }
+[data-reduced-motion="true"] .footer-notice-fuse { animation-timing-function: var(--notice-fuse-discrete-ease) }
