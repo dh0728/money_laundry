@@ -13,7 +13,7 @@ import { StatusTag } from '../../components/semantic-tags';
 import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user.js';
 import { downloadCsv } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { deleteLiveRule, fetchLiveRules, liveRules, reviewLiveRule, saveLiveRule } from './live-rules.js';
+import { liveRules, refreshLiveRules } from './live-rule-store';
 import './preview-rule-workspace.css';
 
 const presets = { DRAFT: 'pending', PENDING_APPROVAL: 'caution', TESTING: 'inProgress', ACTIVE: 'done', STOPPED: 'cancelled', REJECTED: 'failed' };
@@ -61,30 +61,16 @@ function persistRuleChange(result, actor, action) {
   return { ok: true, value: next };
 }
 
-// 서비스 모드: 서버에 저장된 룰을 화면 상태로 쓴다.
-export function loadLiveRules() {
-  return fetchLiveRules().then(rules => { ruleWorkspace.rules = rules; return rules; });
-}
-
-function applyLiveRule(result) {
-  if (!result.ok) return result;
-  const known = ruleWorkspace.rules.some(rule => rule.id === result.value.id);
-  ruleWorkspace.rules = known ? ruleWorkspace.rules.map(rule => rule.id === result.value.id ? result.value : rule)
-    : [...ruleWorkspace.rules, result.value];
-  return result;
-}
+// 서비스 모드의 룰 화면은 live-rule-list · live-rule-builder 가 맡는다. 여기 있는 것은 프리뷰(샘플 데이터)용이다.
+// 앱이 처음 뜰 때 서버의 룰 목록을 읽어 둔다(Alert 상세의 "현재 운영 중인 룰"이 쓴다).
+export const loadLiveRules = refreshLiveRules;
 
 export function savePreviewRule(input, existingId) {
-  if (liveRules) return saveLiveRule(input, existingId).then(applyLiveRule);
   return persistRuleChange(saveWorkspaceRule(ruleWorkspace, input, existingId), currentPreviewUser()?.name);
 }
 
 export function deletePreviewRule(id) {
   if (!ruleWorkspace.rules.some(rule => rule.id === id)) return { ok: false, error: '삭제할 룰을 찾을 수 없습니다.' };
-  if (liveRules) return deleteLiveRule(id).then(result => {
-    if (result.ok) ruleWorkspace.rules = ruleWorkspace.rules.filter(rule => rule.id !== id);
-    return result;
-  });
   const rules = ruleWorkspace.rules.filter(rule => rule.id !== id);
   try {
     sessionStorage.setItem(draftStorageKey, JSON.stringify(rules.filter(rule => rule !== templatesById.get(rule.id))));
@@ -118,7 +104,6 @@ export function reviewPreviewRule(id, status, reason) {
   const rule = ruleWorkspace.rules.find(row => row.id === id);
   const action = reviewActions(rule, user).find(action => action.status === status);
   if (!action) return { ok: false, error: '룰 상태와 처리 권한을 확인해 주세요.' };
-  if (liveRules) return reviewLiveRule(id, status, reason).then(applyLiveRule);
   return persistRuleChange(transitionWorkspaceRule(ruleWorkspace, id, status, reason), user.name, action.label);
 }
 
@@ -238,9 +223,6 @@ function RuleDelete({ rule, onClose, onDelete }) {
 export function RuleList({ reason = false, initialRule, registerTableTools, actionsHost }) {
   const [rules, setRules] = useState(() => ruleWorkspace.rules);
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
-  useEffect(() => {
-    if (liveRules) void loadLiveRules().then(setRules, () => undefined);
-  }, []);
   const [notice, setNotice] = useState('');
   const [id, choose] = useState(() => rules.some(row => row.id === initialRule) ? initialRule : rules[0]?.id);
   const [status, setStatus] = useState('all');

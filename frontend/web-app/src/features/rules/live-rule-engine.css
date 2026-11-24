@@ -1,0 +1,207 @@
+/* 서비스 모드의 룰 만들기 · 룰 목록. 레이아웃 뼈대(.screen-rule-editor, .workflow-rule-*)는 preview-rule-workspace.css 것을 같이 쓴다. */
+
+/* ── 룰 만들기: 템플릿 | 조건 블록 | 검토 체크리스트 ── */
+.screen-row.screen-rule-editor.rule-builder {
+  grid-auto-flow: row;
+  grid-template-columns: minmax(14rem, 1fr) minmax(0, 2.6fr) minmax(14rem, 1fr);
+  align-items: start;
+}
+
+.rule-builder-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aml-space-8);
+}
+
+/* 템플릿 라이브러리 */
+.rule-template-library section { display: grid; gap: var(--aml-space-6) }
+.rule-template-library h3,
+.rule-part h3 {
+  margin: 0;
+  color: var(--muted-text);
+  font-size: var(--aml-type-label-size);
+  font-weight: var(--aml-type-section-title-weight);
+  line-height: var(--aml-type-label-lineHeight);
+}
+.rule-template-library ul {
+  display: grid;
+  gap: var(--aml-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rule-template-card {
+  display: grid;
+  gap: var(--aml-space-2);
+  inline-size: 100%;
+  padding: var(--aml-space-8) var(--aml-space-12);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--information-panel-surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.rule-template-card > span { color: var(--muted-text); font-size: var(--aml-type-caption-size); overflow-wrap: anywhere }
+.rule-template-card:hover:not(:disabled) { background: var(--hover) }
+.rule-template-card[aria-pressed="true"] {
+  border-color: var(--brand-accent);
+  background: var(--brand-accent-tint);
+}
+.rule-template-card:disabled { cursor: not-allowed; opacity: .6 }
+.rule-template-card:focus-visible,
+.rule-select:focus-visible,
+.rule-value:focus-visible,
+.rule-connector:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring);
+  outline-offset: var(--aml-stroke-focus);
+}
+.rule-condition-facts.rule-template-facts { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+.rule-template-facts .rule-template-wide { grid-column: 1 / -1 }
+
+/* IF → THEN 블록 */
+.rule-if-then { display: grid; gap: var(--aml-space-8) }
+.rule-clause {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--aml-space-12);
+  align-items: start;
+  padding: var(--aml-panel-inset);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-radius-panel);
+  background: var(--inner-surface);
+}
+.rule-keyword {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 3.5rem;
+  min-block-size: var(--aml-panel-control-size);
+  padding-inline: var(--aml-space-8);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--brand-accent-tint);
+  color: var(--brand-accent-ink);
+  font-family: var(--aml-font-mono);
+  font-weight: var(--aml-type-section-title-weight);
+  letter-spacing: .04em;
+}
+.rule-clause-body { display: grid; gap: var(--aml-space-12); min-inline-size: 0 }
+.rule-part {
+  display: grid;
+  gap: var(--aml-space-8);
+  padding: var(--aml-space-12);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--information-panel-surface);
+}
+.rule-part > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--aml-space-4) var(--aml-space-12) }
+.rule-part > header > p { margin: 0 }
+.rule-lines {
+  display: grid;
+  gap: var(--aml-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rule-lines > li { display: grid; gap: var(--aml-space-6); justify-items: start }
+.rule-lines > li > :is(.rule-condition, .rule-group) { justify-self: stretch }
+.rule-condition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aml-space-8);
+  min-block-size: var(--aml-panel-control-size);
+}
+.rule-condition[data-locked] .rule-fixed-item { font-weight: var(--aml-type-section-title-weight) }
+.rule-group {
+  display: grid;
+  gap: var(--aml-space-8);
+  padding: var(--aml-space-8);
+  border: var(--aml-stroke-divider) dashed var(--divider);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--inner-surface);
+}
+.rule-connector {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 3rem;
+  padding: var(--aml-space-2) var(--aml-space-8);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-radius-full);
+  background: var(--inner-surface);
+  color: var(--muted-text);
+  font-family: var(--aml-font-mono);
+  font-size: var(--aml-type-caption-size);
+}
+button.rule-connector { cursor: pointer; color: var(--text) }
+button.rule-connector:hover { background: var(--hover) }
+.rule-connector[data-op="OR"] { border-style: dashed }
+.rule-select,
+.rule-value {
+  min-block-size: var(--aml-panel-control-size);
+  block-size: var(--aml-panel-control-size);
+  max-inline-size: 100%;
+  padding-inline: var(--aml-space-8);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--information-panel-surface);
+  color: var(--text);
+  font: inherit;
+}
+.rule-value { inline-size: auto; min-inline-size: 4.5rem; font-variant-numeric: tabular-nums; text-align: end }
+.rule-value[aria-invalid="true"] { border-color: var(--risk-high) }
+.rule-unit, .rule-fixed { color: var(--muted-text) }
+.rule-fixed { font-family: var(--aml-font-mono) }
+.rule-condition > .rule-row-remove { margin-inline-start: auto; color: var(--muted-text) }
+.rule-add-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-8) }
+.rule-add-row > .rule-row-remove { margin-inline-start: auto; color: var(--muted-text) }
+.rule-add {
+  min-block-size: var(--aml-panel-control-size);
+  padding-inline: var(--aml-space-12);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  background: var(--information-panel-surface);
+}
+.rule-empty { margin: 0; color: var(--muted-text); font-size: var(--aml-type-caption-size) }
+
+/* 검토 체크리스트 */
+.rule-check-items, .rule-check-warnings {
+  display: grid;
+  gap: var(--aml-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rule-check-items > li {
+  display: grid;
+  grid-template-columns: auto 4.5rem minmax(0, 1fr);
+  gap: var(--aml-space-8);
+  align-items: start;
+}
+.rule-check-items > li > .icon { margin-block-start: var(--aml-space-2) }
+.rule-check-items > li[data-ok="false"] > :is(.icon, strong) { color: var(--risk-high) }
+.rule-check-items > li > span { overflow-wrap: anywhere }
+.rule-check-warnings > li {
+  padding: var(--aml-space-8) var(--aml-space-12);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--brand-accent-tint);
+  overflow-wrap: anywhere;
+}
+.rule-load-failure { display: grid; gap: var(--aml-space-8); justify-items: start }
+
+/* ── 룰 목록 ── */
+.workflow-rule-summary { white-space: normal; overflow-wrap: anywhere; color: var(--muted-text) }
+.rule-version-summary { display: grid; gap: var(--aml-space-6) }
+
+@media (max-width: 1180px) {
+  .screen-row.screen-rule-editor.rule-builder { grid-template-columns: minmax(13rem, 1fr) minmax(0, 2fr) }
+  .rule-builder > .rule-checklist { grid-column: 1 / -1 }
+}
+@media (max-width: 930px) {
+  .screen-row.screen-rule-editor.rule-builder { grid-template-columns: minmax(0, 1fr) }
+}
+@media (pointer: coarse) {
+  .rule-builder :is(.rule-select, .rule-value) { font-size: max(16px, var(--ui-font-size)) }
+}

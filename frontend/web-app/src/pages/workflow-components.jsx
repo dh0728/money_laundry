@@ -19,7 +19,8 @@ import { SectionDownloadHeading } from '../components/section-download';
 import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
 import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { RuleList, ruleWorkspace } from '../features/rules/preview-rule-workspace';
-import { liveBacktestScope, liveRules, runLiveBacktest } from '../features/rules/live-rules.js';
+import { LiveRuleList } from '../features/rules/live-rule-list';
+import { liveActiveRules, liveRules } from '../features/rules/live-rule-store';
 import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
@@ -184,10 +185,7 @@ function BacktestMetric({ label, value, unit }) {
 function Backtest({ selectedRule, registerTableTools, actionsHost }) {
   const { reduced, theme } = useAppearance();
   const rule = ruleWorkspace.rules.find(item => item.id === selectedRule) ?? ruleWorkspace.rules[0];
-  const [scope, setScope] = useState(liveRules ? undefined : { ...backtestPeriod, count: ruleWorkspace.transactions.length });
-  useEffect(() => {
-    if (liveRules) void liveBacktestScope().then(setScope, () => undefined);
-  }, []);
+  const scope = { ...backtestPeriod, count: ruleWorkspace.transactions.length };
   const [step, setStep] = useState(1);
   const [score, setScore] = useState(Number((rule.scoreMin * 100).toFixed(2)));
   const hasScoreCondition = rule.scoreMin > 0;
@@ -220,8 +218,7 @@ function Backtest({ selectedRule, registerTableTools, actionsHost }) {
     const timer = window.setTimeout(async () => {
       try {
         const applied = { ...rule, scoreMin: score / 100 };
-        const result = liveRules ? await runLiveBacktest(applied, scope, { limit: 100 })
-          : runBacktest(ruleWorkspace.transactions, applied, backtestPeriod, { limit: 100 });
+        const result = runBacktest(ruleWorkspace.transactions, applied, backtestPeriod, { limit: 100 });
         if (!current) return;
         setResults(result);
         setStatus('done');
@@ -588,7 +585,7 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
     </Suspense>;
   }
   if (kind === 'case-overview') {
-    const activeRules = ruleWorkspace.rules.filter(rule => rule.status === 'ACTIVE')
+    const activeRules = liveRules ? liveActiveRules() : ruleWorkspace.rules.filter(rule => rule.status === 'ACTIVE')
       .map(rule => ({ id: rule.id, version: rule.version, name: rule.name, conditions: ruleConditionSummary(rule) }));
     return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
       history={reportHistory(overview?.reportData)} activeRules={activeRules} /></Suspense>;
@@ -596,7 +593,12 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
   if (kind === 'alert-episode-actions') return <AlertEpisodeActions overview={overview} />;
   if (kind === 'case-judgment') return <CaseReviewActions overview={overview} />;
   if (kind === 'case-readonly') return <Panel className="glass"><h2>읽기 전용</h2></Panel>;
+  // 서비스 모드의 백테스트는 새 룰 엔진의 백테스트 API 가 붙을 때 연다.
+  if (kind === 'backtest' && liveRules) return <Panel className="glass"><h2>백테스트는 준비 중입니다.</h2>
+    <p>룰 만들기와 룰 목록을 먼저 열었습니다. 백테스트는 서버 기능이 붙은 뒤에 쓸 수 있습니다.</p></Panel>;
   if (kind === 'backtest' && !ruleWorkspace.rules.length) return <Panel className="glass"><h2>등록된 룰이 없습니다.</h2></Panel>;
+  if (kind === 'rules-list' && liveRules) return <LiveRuleList initialRule={overview?.rule}
+    registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   if (kind === 'rules-list') return <RuleList reason={reason} initialRule={overview?.rule}
     registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   return <MotionConfig reducedMotion={appearance.reduced ? 'always' : 'never'}>

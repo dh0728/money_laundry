@@ -890,7 +890,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
     registerTableTools: queryControls.registerTableTools,
-    rule: selectedRule && /^RULE-\d{3}$/.test(selectedRule) ? selectedRule : undefined,
+    rule: selectedRule && /^RULE-\d{3,}$/.test(selectedRule) ? selectedRule : undefined,
   });
   if (isDashboard) loadPreviewDashboard(mountedWorkflows, dashboardSource,
     { ...queryControls.selection(), mine: path === sections.dashboard });
@@ -939,7 +939,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     const urlParams = queryControls.params(path);
     if (initialPanel) urlParams.set('panel', initialPanel);
     if (reportDocument) urlParams.set('selected', reportDocument);
-    if (selectedRule && /^RULE-\d{3}$/.test(selectedRule)) urlParams.set('rule', selectedRule);
+    if (selectedRule && /^RULE-\d{3,}$/.test(selectedRule)) urlParams.set('rule', selectedRule);
     updateWorkspaceAddress(path, code, navigationMode, urlParams);
   }
 }

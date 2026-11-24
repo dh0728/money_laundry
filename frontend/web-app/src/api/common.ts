@@ -99,17 +99,27 @@ export async function getJson<T>(path: string, params?: Record<string, string | 
   return result
 }
 
-export async function postJson<T>(path: string, body: unknown): Promise<T> {
+type SendOptions = {
+  /** 화면 전체 데이터를 다시 읽게 하는 알림(live-data-changed)을 보내지 않는다. 저장 없이 자주 부르는 요청에 쓴다. */
+  silent?: boolean
+}
+
+async function sendJson<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body: unknown, options: SendOptions = {}): Promise<T> {
   rejectFixtureWrite()
   const token = csrf ?? await refreshCsrf()
   const response = await fetch(path, {
-    method: 'POST',
+    method,
     credentials: 'include',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', [token.headerName]: token.token },
-    body: JSON.stringify(body),
+    headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), [token.headerName]: token.token },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
   if (!response.ok) throw await responseError(response)
   const result = (await response.json().catch(() => undefined)) as T
-  if (path.startsWith('/api/v1/')) window.dispatchEvent(new Event(path === '/api/v1/notifications/read' ? 'notifications-changed' : 'live-data-changed'))
+  if (!options.silent && path.startsWith('/api/v1/')) window.dispatchEvent(new Event(path === '/api/v1/notifications/read' ? 'notifications-changed' : 'live-data-changed'))
   return result
 }
+
+export const postJson = <T>(path: string, body: unknown, options?: SendOptions) => sendJson<T>('POST', path, body, options)
+export const putJson = <T>(path: string, body: unknown, options?: SendOptions) => sendJson<T>('PUT', path, body, options)
+/** 본문 없이 보내고, 204 처럼 응답 본문이 없으면 undefined 를 돌려준다. */
+export const deleteJson = <T = void>(path: string, options?: SendOptions) => sendJson<T>('DELETE', path, undefined, options)

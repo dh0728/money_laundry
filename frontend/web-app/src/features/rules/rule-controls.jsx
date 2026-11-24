@@ -8,6 +8,8 @@ import { bindTooltip } from '../../components/components';
 import { RuleConditionBlocks } from '@/next/features/RuleConditionBlocks';
 import { compileRuleBlocks, ruleBlocksFor, validateRule } from '@/next/features/rules-logic';
 import { previewRuleTemplates, savePreviewRule } from './preview-rule-workspace';
+import { LiveRuleBuilder } from './live-rule-builder';
+import { liveRules } from './live-rule-store';
 import { RuleConditionFacts, RuleTreeBranches } from './rule-condition-tree';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
@@ -235,7 +237,8 @@ export function mountRuleControls(workspace, actionsHost) {
   const targets = [...workspace.querySelectorAll('[data-rule-editor], [data-rule-template], [data-risk-dial]')];
   const roots = targets.map(node => {
     const root = createRoot(node);
-    root.render(node.hasAttribute('data-rule-editor') ? <RuleDraft actionsHost={actionsHost} />
+    // 서비스 모드는 서버 카탈로그로 만드는 화면, 프리뷰는 샘플 화면
+    root.render(node.hasAttribute('data-rule-editor') ? (liveRules ? <LiveRuleBuilder actionsHost={actionsHost} /> : <RuleDraft actionsHost={actionsHost} />)
       : node.hasAttribute('data-risk-dial') ? <RiskDial /> : <RuleTemplateMenu />);
     return root;
   });
