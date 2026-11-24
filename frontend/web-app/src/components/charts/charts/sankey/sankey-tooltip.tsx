@@ -92,7 +92,7 @@ export function SankeyTooltip({
       <TooltipContent
         rows={[
           {
-            color: "var(--chart-line-primary)",
+            color: "var(--aml-sky-050)",
             label: "Sessions",
             value: formatValue(node.value ?? 0),
           },

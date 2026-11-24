@@ -12,7 +12,7 @@ import { normalizeYAxisId } from "./y-axis-scales";
 export type { BandConfig } from "./chart-context";
 
 /** Default `<Band>` colour (kept in sync with `Band`'s `fill` default). */
-const DEFAULT_BAND_FILL = "var(--chart-line-primary)";
+const DEFAULT_BAND_FILL = "var(--aml-sky-050)";
 
 interface BandConfigProps {
   upperKey?: unknown;

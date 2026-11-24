@@ -41,7 +41,7 @@ const HEIGHT_MIN_PCT = 20;
 const HEIGHT_MAX_PCT = 80;
 const DEFAULT_POINT_COUNT = 14;
 const DEFAULT_BAR_COUNT = 12;
-const DEFAULT_FILL = "var(--foreground)";
+const DEFAULT_FILL = "var(--text)";
 const DEFAULT_BAR_FILL_OPACITY = 0.45;
 const LINE_STROKE_OPACITY = 0.55;
 const AREA_FILL_TOP_OPACITY = 0.18;
@@ -398,7 +398,7 @@ export interface BarLoadingSkeletonProps {
   innerHeight: number;
   /** Number of skeleton bars. Default: 12 */
   barCount?: number;
-  /** Bar fill color. Default: `var(--foreground)` */
+  /** Bar fill color. Default: `var(--text)` */
   fill?: string;
   /** Bar fill opacity. Default: 0.45 */
   fillOpacity?: number;

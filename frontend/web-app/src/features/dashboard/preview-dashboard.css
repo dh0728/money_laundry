@@ -2,10 +2,7 @@
   --chart-total: light-dark(
     color-mix(in srgb, var(--text) 10%, var(--information-panel-surface)),
     color-mix(in srgb, var(--text) 16%, var(--information-panel-surface)));
-  --chart-neutral: light-dark(
-    color-mix(in srgb, var(--text) 34%, var(--information-panel-surface)),
-    color-mix(in srgb, var(--text) 42%, var(--information-panel-surface)));
-  --chart-arrival: var(--status-pending-accent);
+  --chart-open: var(--status-pending-accent);
   --chart-completion: var(--review-status-done-accent);
   --chart-suspect: var(--risk-high);
   --chart-suspect-label: color-mix(in srgb, var(--chart-suspect), var(--text) 35%);

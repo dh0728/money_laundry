@@ -10,10 +10,10 @@ export const pieCssVars = {
   foregroundMuted: "var(--chart-foreground-muted)",
   label: "var(--chart-label)",
   // Default slice colors from chart palette
-  slice1: "var(--chart-1)",
-  slice2: "var(--chart-2)",
-  slice3: "var(--chart-3)",
-  slice4: "var(--chart-4)",
+  slice1: "var(--aml-sky-050)",
+  slice2: "var(--aml-pink-050)",
+  slice3: "var(--aml-lime-050)",
+  slice4: "var(--palette-teal-500, var(--aml-sky-070))",
   slice5: "var(--chart-5)",
 };
 

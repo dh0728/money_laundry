@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { card, content } from './detailText'
 import { usd } from './metrics'
 import { Box, Text } from '@/components/layout-primitives'
+import { dataSeriesColors } from '@/components/charts/charts/chart-context'
 
 export function BarList({ rows, format = usd }: { rows: { name: string; v: number }[]; format?: (value: number) => string }) {
   const max = Math.max(...rows.map(r => r.v), 1)
@@ -13,7 +14,7 @@ export function BarList({ rows, format = usd }: { rows: { name: string; v: numbe
         <Box key={r.name} className="contents">
           <Text as="span" title={r.name} className="max-w-24 truncate font-mono text-[0.6875rem]">{r.name}</Text>
           <Text as="span" className="text-right tabular-nums">{format(r.v)}</Text>
-          <Text as="span" className="h-2 overflow-hidden rounded-full bg-muted"><Text as="span" className="block h-full rounded-full" style={{ width: `${(r.v / max) * 100}%`, backgroundColor: "var(--palette-blue-500)" }} /></Text>
+          <Text as="span" className="h-2 overflow-hidden rounded-full bg-muted"><Text as="span" className="block h-full rounded-full" style={{ width: `${(r.v / max) * 100}%`, backgroundColor: dataSeriesColors.sky }} /></Text>
         </Box>
       ))}
     </Box>

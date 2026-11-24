@@ -13,7 +13,7 @@ import {
 const DEFAULT_SHIMMER_LENGTH_PX = 140;
 const DEFAULT_SHIMMER_SPEED = 1;
 const DEFAULT_SHIMMER_STROKE =
-  "color-mix(in oklch, var(--foreground) 68%, transparent)";
+  "color-mix(in oklch, var(--text) 68%, transparent)";
 
 export interface GridProps {
   /** Show horizontal grid lines. Default: true */

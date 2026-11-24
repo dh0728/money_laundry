@@ -33,6 +33,7 @@ import { graphFlowDuration } from '../graph/graph-flow-pulse';
 import '../../components/form-dropdown.css';
 import './preview-case-graph.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
+import { dataSeriesColors } from '@/components/charts/charts/chart-context';
 
 function casesSharingEvidence(active, cases) {
   return cases.flatMap(record => {
@@ -184,7 +185,7 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
   const space = step => Number.parseFloat(root.getPropertyValue(`--aml-space-${step}`));
   const side = space(64) + space(8);
   const amountRows = (label, amounts) => flowAmounts(amounts).map(([currency, amount]) => ({
-    label: `${label} · ${currency}`, value: flowAmount(amount, currency), color: 'var(--muted-text)',
+    label: `${label} · ${currency}`, value: flowAmount(amount, currency), color: dataSeriesColors.teal,
   }));
   const scoreRow = entry => ({ label: '최고 모델 점수', value: flowRiskLabel(entry), color: flowRiskColor(entry) });
   const { offsetFor, nodeHandlers, activeId } = useSpringNodeDrag(zoom);

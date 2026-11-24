@@ -92,7 +92,7 @@ export function useSankey(): SankeyContextValue {
 export const sankeyCssVars = {
   background: "var(--chart-background)",
   foreground: "var(--chart-foreground)",
-  nodePrimary: "var(--chart-line-primary)",
-  nodeSecondary: "var(--chart-line-secondary)",
+  nodePrimary: "var(--aml-sky-050)",
+  nodeSecondary: "var(--aml-pink-050)",
   linkColor: "var(--chart-foreground-muted, hsl(0, 0%, 50%))",
 };

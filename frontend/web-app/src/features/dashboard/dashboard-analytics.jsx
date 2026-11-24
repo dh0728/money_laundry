@@ -13,6 +13,7 @@ import { ibmLaundering, ibmPatterns, ibmRemaining } from '../investigation/ibm-h
 import { SectionDownloadHeading } from '../../components/section-download';
 import { dashboardPattern } from '../../mocks/dashboard-patterns';
 import { Box, Text } from '../../components/layout-primitives';
+import { dataSeriesColors } from '@/components/charts/charts/chart-context';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;
@@ -123,8 +124,8 @@ const patternRows = [...ibmPatterns, ...ibmRemaining];
 function ReferencePattern({ id }) {
   return <defs>
     <pattern id={id} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="7" height="7" fill="var(--chart-total)" />
-      <path d="M 0 0 V 7" stroke="var(--chart-pattern-reference)" strokeWidth="2" />
+      <rect width="7" height="7" fill={dataSeriesColors.sky} />
+      <path d="M 0 0 V 7" stroke="var(--information-panel-surface)" strokeWidth="2" />
     </pattern>
   </defs>;
 }
@@ -153,7 +154,7 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
         <Bar dataKey="value" getFill={point => point.supported ? 'var(--chart-pattern)' : `url(#${patternId})`}
           lineCap="round" animate={!reduced} />
         <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
-          rows={point => [{ label: point.label, color: point.supported ? 'var(--chart-pattern)' : 'var(--chart-pattern-reference)',
+          rows={point => [{ label: point.label, color: point.supported ? 'var(--chart-pattern)' : dataSeriesColors.sky,
             value: `${count(point.value)} · ${share(point.value, total)}` }]} />
       </BarChart>
     </Box>}
@@ -162,12 +163,12 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
 }
 
 const volumeSeries = [
-  { key: 'total', label: '전체 거래', color: 'var(--chart-total)' },
+  { key: 'total', label: '전체 거래', color: dataSeriesColors.sky },
   { key: 'suspicious', label: '모델 의심 거래', color: 'var(--chart-suspect)' },
 ];
 const completionSeries = { key: 'completed', label: '종결일별 건수', color: 'var(--chart-completion)' };
 const volumeDetail = [
-  { label: '전체 거래', color: 'var(--chart-total)', value: row => count(row.total) },
+  { label: '전체 거래', color: dataSeriesColors.sky, value: row => count(row.total) },
   { label: '세탁 라벨 거래', color: 'var(--chart-suspect)', value: row => count(row.labeled) },
   { label: '세탁 라벨 비율', color: 'var(--chart-suspect)', value: row => share(row.labeled, row.total) },
 ];
@@ -179,9 +180,9 @@ export function Analytics({ data, reduced }) {
   const suspicious = data.suspicious.length;
   const risk = data.flags.map(({ key, label, count: value }) => ({ color: `var(--chart-risk-${key})`, label, value }));
   const withoutScore = suspicious - risk.reduce((sum, item) => sum + item.value, 0);
-  if (withoutScore > 0) risk.push({ label: '점수 없음', value: withoutScore, color: 'var(--chart-total)' });
+  if (withoutScore > 0) risk.push({ label: '점수 없음', value: withoutScore, color: dataSeriesColors.sky });
   const composition = [
-    { label: '그 외 거래', value: total - suspicious, color: 'var(--chart-total)' },
+    { label: '그 외 거래', value: total - suspicious, color: dataSeriesColors.sky },
     { label: '모델 의심 거래', value: suspicious, color: 'var(--chart-suspect)' },
   ];
   const patterns = data.patterns.map(({ label, count: value }) => ({ label, value }))
@@ -231,7 +232,7 @@ function ActivityChart({ title, note, rows, series, reduced, empty }) {
   </ChartPanel>;
 }
 
-const benchmarkTotalSeries = [{ key: 'total', label: '전체 거래', color: 'var(--chart-total)' }];
+const benchmarkTotalSeries = [{ key: 'total', label: '전체 거래', color: dataSeriesColors.sky }];
 const benchmarkLabelSeries = [{ key: 'labeled', label: '원본 세탁 라벨 거래', color: 'var(--chart-suspect)' }];
 
 export function BenchmarkCharts({ chartRows, totals, period, fullPatternScope, reduced }) {

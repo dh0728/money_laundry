@@ -60,7 +60,7 @@ export interface BarProps {
   dataKey: string;
   /** Y-scale group id for vertical bars (Recharts `yAxisId`). Default: `"left"`. */
   yAxisId?: string | number;
-  /** Fill color for the bar. Can be a color, gradient url, or pattern url. Default: var(--chart-line-primary) */
+  /** Fill color for the bar. Can be a color, gradient url, or pattern url. Default: var(--aml-sky-050) */
   fill?: string;
   /** Per-datum fill override, including SVG pattern references. */
   getFill?: (datum: Record<string, unknown>) => string;
