@@ -25,11 +25,10 @@ import { CountTag, LinkTag, ModelScoreTag } from '../../components/semantic-tags
 import { caseGroupColor, caseMembership } from '../graph/graph-case-groups';
 import { ForceCaseCanvas } from '../graph/force-case-canvas';
 import { GraphIconButton, GraphPlayback, GraphZoomControls } from '../graph/preview-graph-controls';
-import { GraphFlowStroke } from '../graph/graph-flow-pulse';
+import { GraphFlowStroke, graphFlowDuration } from '../../components/charts/charts/graph-flow-pulse';
 import { OwnerGraphTimeline } from '../graph/owner-graph-timeline';
 import { useSpringNodeDrag } from '../graph/graph-node-drag';
 import { modelRiskLabels } from '../settings/model-risk-settings';
-import { graphFlowDuration } from '../graph/graph-flow-pulse';
 import '../../components/form-dropdown.css';
 import './preview-case-graph.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';

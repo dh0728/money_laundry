@@ -5,7 +5,7 @@ import { configureDevAccountForces, seedComponentPositions } from './0.24.0/forc
 import { graphRiskBand, graphVerdict, graphVerdictLabels } from '../investigation/case-graph-scope';
 import { caseMembership } from './graph-case-groups';
 import { GraphZoomControls } from './preview-graph-controls';
-import { graphFlowDuration, graphRevealDuration } from './graph-flow-pulse';
+import { graphFlowDuration, graphRevealDuration } from '../../components/charts/charts/graph-flow-pulse';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';

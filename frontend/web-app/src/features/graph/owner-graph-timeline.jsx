@@ -1,4 +1,4 @@
-import React, { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GraphZoomControls } from './preview-graph-controls';
 import { graphVerdict, graphVerdictLabels } from '../investigation/case-graph-scope';
@@ -6,40 +6,26 @@ import {
   ownerAccountY, ownerGraphLayout, ownerHeaderHeight, ownerRowHeight, ownerTransferPath, ownerTransferRisk, ownerWidth,
 } from './owner-graph-layout';
 import { copySVG, registerGraphSnapshot } from '../../lib/preview-visual-export';
-import { GraphFlowReveal, GraphFlowStroke } from './graph-flow-pulse';
 import { useSpringNodeDrag } from './graph-node-drag';
 import { Box } from '../../components/layout-primitives';
+import { OwnerFlowAccount, OwnerFlowDiagram, OwnerFlowEdge, OwnerFlowLane, OwnerFlowPeriods } from '../../components/charts/charts/owner-flow-diagram';
 
 const dragThreshold = 5;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const riskColor = risk => `var(--case-graph-risk-${risk})`;
 
-function activate(event, select) {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    select();
-  }
-}
-
-function OwnerComparisonPeriods({ groups, timeByCode, times, formatTime, width, highlightedCase }) {
+function ownerComparisonPeriods({ groups, timeByCode, times, formatTime, width, highlightedCase }) {
   const first = times[0], span = times.at(-1) - first;
   const left = Math.min(170, width * .48);
   const xFor = instant => left + (span ? (instant - first) / span : .5) * Math.max(0, width - left - 20);
-  return <g className="owner-comparison-periods" role="group" aria-label="업무별 근거 거래 기간">
-    <text x="12" y="16" className="owner-axis-heading">업무별 근거 거래 기간</text>
-    {groups.map(({ id, color, transactionIds }, index) => {
-      const evidence = [...transactionIds].map(code => timeByCode.get(code)).filter(Number.isFinite);
-      if (!evidence.length) return null;
-      const start = Math.min(...evidence), end = Math.max(...evidence), y = 32 + index * 20;
-      const summary = start === end ? formatTime(start) : `${formatTime(start)} ~ ${formatTime(end)}`;
-      return <g key={id} data-muted={highlightedCase && highlightedCase !== id || undefined}>
-        <title>{id} · {summary} KST</title>
-        <text x="12" y={y + 4}>{id}</text>
-        <line x1={xFor(start)} x2={xFor(end)} y1={y} y2={y} stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <circle cx={xFor(start)} cy={y} r="3" fill={color} />
-      </g>;
-    })}
-  </g>;
+  return groups.flatMap(({ id, color, transactionIds }, index) => {
+    const evidence = [...transactionIds].map(code => timeByCode.get(code)).filter(Number.isFinite);
+    if (!evidence.length) return [];
+    const start = Math.min(...evidence), end = Math.max(...evidence);
+    const summary = start === end ? formatTime(start) : `${formatTime(start)} ~ ${formatTime(end)}`;
+    return [{ id, color, x1: xFor(start), x2: xFor(end), y: 32 + index * 20,
+      summary, muted: highlightedCase && highlightedCase !== id }];
+  });
 }
 
 export function OwnerGraphTimeline({
@@ -50,7 +36,6 @@ export function OwnerGraphTimeline({
   const drawing = useRef(null);
   const gesture = useRef(null);
   const suppressClick = useRef(false);
-  const clipId = useId();
   const [viewport, setViewport] = useState(null);
   const [position, setPosition] = useState(null);
   const [panning, setPanning] = useState(false);
@@ -183,93 +168,53 @@ export function OwnerGraphTimeline({
     onPointerDown={startPan} onPointerMove={pan} onPointerUp={endPan} onPointerCancel={endPan}
     onLostPointerCapture={endPan} onClickCapture={preventDragClick} onFocusCapture={revealFocusedControl}
     onKeyDown={panWithKeyboard}>
-    <svg ref={drawing} width={viewWidth} height={viewHeight} viewBox={`0 0 ${viewWidth} ${viewHeight}`}>
-      <defs>
-        <clipPath id={clipId}><rect x="0" y={timeInset} width={viewWidth} height={plotHeight} /></clipPath>
-      </defs>
-      <g clipPath={`url(#${clipId})`}
-        style={{ '--owner-label-size': `${Math.min(22, Math.max(12, 10 / camera.scale))}px` }}>
-        <g transform={`translate(${-camera.x} ${timeInset - camera.y}) scale(${camera.scale})`}>
-          {edges.map(({ key, from, to, rows }, index) => {
-            const { path, midpoint } = ownerTransferPath(from, to, accountOffset(from), accountOffset(to));
-            const codes = new Set(rows.map(row => row.code));
-            const memberships = groups.filter(group => rows.some(row => group.transactionIds.has(row.code)));
-            const relationship = `${from.id}>${to.id}`;
-            const active = rows.some(row => selectedTransactions?.has(row.code)) ||
-              (selection === relationship && (!selectedCodes || rows.some(row => selectedCodes.has(row.code))));
-            const verdict = graphVerdictLabels[graphVerdict(new Set(rows.map(row => row.verdict)))];
-            const range = rows.map(row => timeByCode.get(row.code)).filter(Number.isFinite);
-            const earliest = Math.min(...range), latest = Math.max(...range);
-            const when = range.length ? earliest === latest ? `${formatTime(earliest)} KST` :
-              `${formatTime(earliest)} ~ ${formatTime(latest)} KST` : '시각 없음';
-            const label = `${from.id} → ${to.id} · ${rows.length}건 · ${verdict} · ${when}`;
-            const select = () => selection === relationship ? onSelect() : onSelect(relationship, codes);
-            const activePulse = flowPulse && codes.has(flowPulse.code) ? flowPulse : undefined;
-            const color = riskColor(ownerTransferRisk(rows));
-            const line = <>
-              {memberships.map(({ id, color: stroke }, member) => <path key={id} d={path} stroke={stroke}
-                strokeWidth={8 + 5 * (memberships.length - member)} strokeOpacity=".24" />)}
-              <path className="owner-edge-visible" d={path} stroke={color} strokeWidth={active ? 4 : 2.5} />
-            </>;
-            return <g key={key} className="owner-time-edge" role="button" tabIndex={0} aria-label={label} aria-pressed={active}
-              data-muted={!isHighlighted(rows) || undefined}
-              onClick={select} onKeyDown={event => activate(event, select)}>
-              <title>{[label, ...memberships.map(({ id }) => id)].join(' · ')}</title>
-              {activePulse && codes.size === 1 ? <GraphFlowReveal key={activePulse.startedAt} path={path}
-                pulse={activePulse} width={width} height={height}>{line}</GraphFlowReveal> : line}
-              {activePulse
-                ? <GraphFlowStroke key={activePulse.startedAt} path={path} pulse={activePulse} color={riskColor(activePulse.risk)} />
-                : !playing && !flowPulse && isHighlighted(rows) &&
-                  <GraphFlowStroke path={path} color={color} ambientDelay={index % 8 * .22} />}
-              <path className="owner-edge-hit" d={path} stroke="transparent" strokeWidth={18} />
-              {showDetails && (active || edges.length <= 12) &&
-                <text x={midpoint[0]} y={midpoint[1] - 7}>{rows.length}건</text>}
-            </g>;
+    <OwnerFlowDiagram ref={drawing} width={viewWidth} height={viewHeight} inset={timeInset}
+      plotHeight={plotHeight} camera={camera} periods={showPeriods ? <OwnerFlowPeriods periods={ownerComparisonPeriods({
+        groups, timeByCode, times, formatTime, width: viewWidth, highlightedCase,
+      })} /> : undefined}>
+      {edges.map(({ key, from, to, rows }, index) => {
+        const { path, midpoint } = ownerTransferPath(from, to, accountOffset(from), accountOffset(to));
+        const codes = new Set(rows.map(row => row.code));
+        const memberships = groups.filter(group => rows.some(row => group.transactionIds.has(row.code)));
+        const relationship = `${from.id}>${to.id}`;
+        const active = rows.some(row => selectedTransactions?.has(row.code)) ||
+          (selection === relationship && (!selectedCodes || rows.some(row => selectedCodes.has(row.code))));
+        const verdict = graphVerdictLabels[graphVerdict(new Set(rows.map(row => row.verdict)))];
+        const range = rows.map(row => timeByCode.get(row.code)).filter(Number.isFinite);
+        const earliest = Math.min(...range), latest = Math.max(...range);
+        const when = range.length ? earliest === latest ? `${formatTime(earliest)} KST` :
+          `${formatTime(earliest)} ~ ${formatTime(latest)} KST` : '시각 없음';
+        const label = `${from.id} → ${to.id} · ${rows.length}건 · ${verdict} · ${when}`;
+        const select = () => selection === relationship ? onSelect() : onSelect(relationship, codes);
+        const activePulse = flowPulse && codes.has(flowPulse.code) ? flowPulse : undefined;
+        const highlighted = isHighlighted(rows);
+        return <OwnerFlowEdge key={key} path={path} label={label} pressed={active} muted={!highlighted}
+          onSelect={select} memberships={memberships} color={riskColor(ownerTransferRisk(rows))}
+          width={width} height={height} pulse={activePulse} pulseColor={activePulse && riskColor(activePulse.risk)}
+          reveal={activePulse && codes.size === 1}
+          ambientDelay={!playing && !flowPulse && highlighted ? index % 8 * .22 : undefined}
+          detail={showDetails && (active || edges.length <= 12)
+            ? { x: midpoint[0], y: midpoint[1], count: rows.length } : undefined} />;
+      })}
+      {owners.map(owner => {
+        const accounts = owner.accounts.filter(account => shownAccounts.has(account.id));
+        if (!accounts.length) return null;
+        return <OwnerFlowLane key={owner.id} name={owner.name} x={owner.x} y={owner.y} width={ownerWidth}
+          height={owner.height} headerHeight={ownerHeaderHeight} offset={offsetFor(owner.id)}
+          pressed={selection === owner.selection} dragging={activeId === owner.id}
+          onSelect={() => onNodeSelect(owner.selection)} dragHandlers={dragHandlers(owner.id)}>
+          {accounts.map(account => {
+            const { id } = account;
+            const { rows, incoming, outgoing } = shownAccounts.get(id);
+            const pressed = selection === id || selection === owner.selection || selectedAccounts?.has(id) === true;
+            return <OwnerFlowAccount key={id} id={id} owner={owner.name} x={owner.x} y={ownerAccountY(account)}
+              width={ownerWidth} height={ownerRowHeight} offset={offsetFor(id)} pressed={pressed}
+              muted={!isHighlighted(rows)} dragging={activeId === id} incoming={incoming} outgoing={outgoing}
+              color={riskColor(ownerTransferRisk(rows))} onSelect={() => onNodeSelect(id)} dragHandlers={dragHandlers(id)} />;
           })}
-          {owners.map(owner => {
-            const accounts = owner.accounts.filter(account => shownAccounts.has(account.id));
-            if (!accounts.length) return null;
-            const offset = offsetFor(owner.id);
-            const ownerSelect = () => onNodeSelect(owner.selection);
-            return <g key={owner.id} className="owner-account-group" role="group" aria-label={owner.name}
-              transform={`translate(${offset.x} ${offset.y})`}>
-              <rect className="owner-block-boundary" x={owner.x} y={owner.y} width={ownerWidth} height={owner.height} rx="10" />
-              <g className="owner-lane-control" role="button" tabIndex={0}
-                aria-label={`${owner.name} · 계좌 묶음 선택`} aria-pressed={selection === owner.selection}
-                data-dragging={activeId === owner.id || undefined} {...dragHandlers(owner.id)}
-                onClick={ownerSelect} onKeyDown={event => activate(event, ownerSelect)}>
-                <rect x={owner.x + 2} y={owner.y + 2} width={ownerWidth - 4} height={ownerHeaderHeight} rx="8" />
-                <text x={owner.x + 12} y={owner.y + 2 + ownerHeaderHeight / 2} className="owner-lane-name">{owner.name}</text>
-              </g>
-              {accounts.map(account => {
-                const { id } = account;
-                const { rows, incoming, outgoing } = shownAccounts.get(id);
-                const y = ownerAccountY(account);
-                const centerY = y + ownerRowHeight / 2;
-                const offset = offsetFor(id);
-                const risk = riskColor(ownerTransferRisk(rows));
-                const select = () => onNodeSelect(id);
-                const pressed = selection === id || selection === owner.selection || selectedAccounts?.has(id) === true;
-                return <g key={id} className="owner-time-node" role="button" tabIndex={0}
-                  transform={`translate(${offset.x} ${offset.y})`}
-                  data-account={id} data-dragging={activeId === id || undefined}
-                  data-muted={!isHighlighted(rows) || undefined}
-                  aria-label={`${id} · ${owner.name}`} aria-pressed={pressed}
-                  {...dragHandlers(id)} onClick={select} onKeyDown={event => activate(event, select)}>
-                  <rect x={owner.x + 2} y={y} width={ownerWidth - 4} height={ownerRowHeight} rx="4" />
-                  <path className="owner-account-divider" d={`M ${owner.x + 2} ${y} h ${ownerWidth - 4}`} />
-                  <text x={owner.x + 12} y={centerY}>{id}</text>
-                  {incoming && <circle className="owner-account-port" data-port="receive" cx={owner.x} cy={centerY} r="4" fill={risk} />}
-                  {outgoing && <circle className="owner-account-port" data-port="send" cx={owner.x + ownerWidth} cy={centerY} r="4" fill={risk} />}
-                </g>;
-              })}
-            </g>;
-          })}
-        </g>
-      </g>
-      {showPeriods && <OwnerComparisonPeriods groups={groups} timeByCode={timeByCode} times={times}
-        formatTime={formatTime} width={viewWidth} highlightedCase={highlightedCase} />}
-    </svg>
+        </OwnerFlowLane>;
+      })}
+    </OwnerFlowDiagram>
     {controlsHost && createPortal(<GraphZoomControls zoom={Math.round(camera.scale * 100)}
       onZoom={zoom} onFit={() => setPosition(null)} />, controlsHost)}
   </Box>;
