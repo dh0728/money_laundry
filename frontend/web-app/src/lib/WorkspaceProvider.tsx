@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { fetchDemoClock, daysBefore, kstDate } from '@/api/liveDashboard'
 import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { useAsync } from './useAsync'
@@ -27,7 +27,7 @@ export function SharedPeriod({ children, enabled = true }: { children: ReactNode
   const period = override ?? { from: daysBefore(to, 29), to }
   return <PeriodContext.Provider value={{ period, businessDate: to, setPeriod }}>{children}</PeriodContext.Provider>
 }
-export function WorkspaceMain({ route, className, style, children }: { route: string; className: string; style?: CSSProperties; children: ReactNode }) {
+export function WorkspaceMain({ route, className, children }: { route: string; className: string; children: ReactNode }) {
   const store = useWorkspace()
   const ref = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
@@ -35,5 +35,5 @@ export function WorkspaceMain({ route, className, style, children }: { route: st
     if (!node) return
     node.scrollTop = store.scroll.get(route) ?? 0
   }, [store, route])
-  return <Box as="main" ref={ref} className={className} style={style} onScroll={event => store.scroll.set(route, event.currentTarget.scrollTop)}>{children}</Box>
+  return <Box as="main" ref={ref} className={className} onScroll={event => store.scroll.set(route, event.currentTarget.scrollTop)}>{children}</Box>
 }

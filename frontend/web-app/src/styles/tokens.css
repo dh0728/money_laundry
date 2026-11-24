@@ -208,6 +208,9 @@
   --sidebar-mobile-width: 18rem;
   --app-sidebar-expanded-width: 210px;
   --app-sidebar-icon-width: 4rem;
+  --app-header-grid-columns: auto minmax(0, 1fr) auto;
+  --app-header-search-max-width: 460px;
+  --app-agent-sidebar-min-width: 1200px;
   --sidebar-gap-transition: width;
   --sidebar-container-transition: left, right, width;
   --sidebar-label-transition: margin, opacity;
