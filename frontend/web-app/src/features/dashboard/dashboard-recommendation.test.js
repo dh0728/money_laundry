@@ -20,3 +20,16 @@ it('skips known memberships, closed-only pairs and evidence with no chronologica
   expect(findAccountTrail([alert, { ...episode, related: [transfer('T-1', '10:15', 'ACC-B', 'ACC-C')] }])).toBeNull();
   expect(findAccountTrail([alert])).toBeNull();
 });
+
+it('prefers a cross-case return with the same currency and amount over a closer unrelated outgoing transfer', () => {
+  const amount = { amount: 420, currency: 'USD' };
+  const inbound = { ...alert, related: [{ ...alert.related[0], ...amount }] };
+  const outbound = { ...episode, related: [
+    transfer('T-2', '10:01', 'ACC-B', 'ACC-C'),
+    { ...transfer('T-3', '10:15', 'ACC-B', 'ACC-A'), ...amount },
+  ] };
+  expect(findAccountTrail([inbound, outbound])).toMatchObject({ returned: true, sameAmount: true,
+    sent: { transaction: { code: 'T-3' } } });
+  expect(findAccountTrail([inbound, { ...outbound, related: [{ ...outbound.related[1], currency: 'EUR' }] }]))
+    .toMatchObject({ returned: true, sameAmount: false });
+});

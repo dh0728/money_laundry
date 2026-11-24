@@ -17,22 +17,31 @@ export function findAccountTrail(cases) {
   }
 
   let recommendation = null;
+  let highestPriority = -1;
   let shortestGap = Infinity;
   for (const [account, { received, sent }] of accounts) {
     sent.sort((left, right) => left.time - right.time);
     for (const receipt of received) {
-      const payment = sent.find(candidate => {
-        const gap = candidate.time - receipt.time;
-        if (gap <= 0 || gap >= shortestGap || candidate.transaction.code === receipt.transaction.code) return false;
+      for (const payment of sent) {
+        const gap = payment.time - receipt.time;
+        if (gap <= 0 || payment.transaction.code === receipt.transaction.code) continue;
+        if (highestPriority === 3 && gap >= shortestGap) break;
         const first = receipt.record;
-        const second = candidate.record;
-        if (first.kind === second.kind || (!first.open && !second.open)) return false;
+        const second = payment.record;
+        if (first.kind === second.kind || (!first.open && !second.open)) continue;
         const [alert, episode] = first.kind === 'Alert' ? [first, second] : [second, first];
-        return alert.episodeCode !== episode.code && !episode.linkedAlertCodes?.includes(alert.code);
-      });
-      if (!payment) continue;
-      shortestGap = payment.time - receipt.time;
-      recommendation = { account, received: receipt, sent: payment };
+        if (alert.episodeCode === episode.code || episode.linkedAlertCodes?.includes(alert.code)) continue;
+        const incoming = receipt.transaction;
+        const outgoing = payment.transaction;
+        const returned = incoming.from.code === outgoing.to.code;
+        const sameAmount = Number.isFinite(incoming.amount) && incoming.amount === outgoing.amount
+          && Boolean(incoming.currency) && incoming.currency === outgoing.currency;
+        const priority = (returned ? 2 : 0) + Number(sameAmount);
+        if (priority < highestPriority || (priority === highestPriority && gap >= shortestGap)) continue;
+        highestPriority = priority;
+        shortestGap = gap;
+        recommendation = { account, received: receipt, sent: payment, returned, sameAmount };
+      }
     }
   }
   return recommendation;

@@ -228,33 +228,29 @@ function TransactionDetails({ data, flow, reduced, summary }) {
   const badge = [flow.sample ? '은행별 건수는 예시' : null,
     scale > 1 ? '이상 띠 두께 ×' + scale + ' · 건수·비율 원본' : null].filter(Boolean).join(' · ');
   const hostRef = useRef(null);
-  return <Box className="dashboard-flow-family" ref={hostRef}>
-    <LayoutGrid columns={12} className="dashboard-work-overview-grid">
-      <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
-        {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
-          : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
-        {import.meta.env.DEV && data.dataSource === 'sample' && <LinkTag href="/dashboard/all?data=ibm">IBM 원본 거래 집계</LinkTag>}
-      </ChartPanel>
-      {summary}
-    </LayoutGrid>
-    <LayoutGrid columns={12} className="dashboard-flow-detail-grid">
-      <ChartPanel title="기간별 거래량 추이" note={scale > 1 ? '의심 막대 높이 ×' + scale + ' · 건수·비율 원본' : '거래일 기준 · KST'}
-        className="dashboard-flow-volume" data-sankey-detail="total" hasChart={flow.hasData}>
-        {flow.hasData ? <>
-          <SeriesLegend series={series} />
-          <DailySeries rows={rows} series={series} detail={detail} reduced={reduced} label="기간별 거래량 추이" stacked={false} />
-          {data.coverageScope === 'institution' && <PanelDisclosure
-            label={'새 계좌 ' + integer.format(data.newAccounts) + '개 · 새 소유주 ' + integer.format(data.newOwners) + '명'}>
-            <SeriesLegend series={newEntitySeries} />
-            <DailySeries rows={rows} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
-              label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />
-          </PanelDisclosure>}
-        </> : <Text className="dashboard-note">표시할 일별 거래량이 없습니다.</Text>}
-      </ChartPanel>
-      <RiskSegments data={data} />
-    </LayoutGrid>
+  return <LayoutGrid columns={12} className="dashboard-flow-family dashboard-work-overview-grid" ref={hostRef}>
+    <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
+      {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
+        : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
+      {import.meta.env.DEV && data.dataSource === 'sample' && <LinkTag href="/dashboard/all?data=ibm">IBM 원본 거래 집계</LinkTag>}
+    </ChartPanel>
+    <ChartPanel title="기간별 거래량 추이" note={scale > 1 ? '의심 막대 높이 ×' + scale + ' · 건수·비율 원본' : '거래일 기준 · KST'}
+      className="dashboard-flow-volume" data-sankey-detail="total" hasChart={flow.hasData}>
+      {flow.hasData ? <>
+        <SeriesLegend series={series} />
+        <DailySeries rows={rows} series={series} detail={detail} reduced={reduced} label="기간별 거래량 추이" stacked={false} />
+        {data.coverageScope === 'institution' && <PanelDisclosure
+          label={'새 계좌 ' + integer.format(data.newAccounts) + '개 · 새 소유주 ' + integer.format(data.newOwners) + '명'}>
+          <SeriesLegend series={newEntitySeries} />
+          <DailySeries rows={rows} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
+            label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />
+        </PanelDisclosure>}
+      </> : <Text className="dashboard-note">표시할 일별 거래량이 없습니다.</Text>}
+    </ChartPanel>
+    <RiskSegments data={data} />
+    {summary}
     {flow.hasData && <SankeyDetailsLinks hostRef={hostRef} relations={relationTargets} />}
-  </Box>;
+  </LayoutGrid>;
 }
 
 function InvestigationStatus({ data, episode = false, reduced }) {

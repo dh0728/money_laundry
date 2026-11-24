@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
-import { ArrowDown, ArrowUpRight, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import { DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardMetricGrid } from './dashboard-layout';
@@ -15,6 +15,8 @@ import { dataSeriesColors, transactionTotalColor } from '../../components/charts
 import { modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Grid, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag } from '../../components/semantic-tags';
+import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
+import { buildCaseNetwork } from '../investigation/case-graph-scope.js';
 import { findAccountTrail } from './dashboard-recommendation.js';
 
 const formatter = new Intl.NumberFormat('ko-KR');
@@ -79,27 +81,35 @@ function DashboardIndicators({ data, mine, reduced }) {
   </Grid>;
 }
 
+function EvidenceRecord({ evidence, direction }) {
+  const { record, transaction } = evidence;
+  const amount = Number.isFinite(transaction.amount) && transaction.currency
+    ? `${formatter.format(transaction.amount)} ${transaction.currency}` : undefined;
+  return <Stack as="li" className="dashboard-trail-record">
+    <Stack direction="row" wrap align="center">
+      <Text as="strong">{direction} · {record.kind}</Text>
+      <LinkTag code={record.code} />
+      <LinkTag code={transaction.code} />
+    </Stack>
+    <Text as="span">{[transaction.timestamp.slice(5), amount].filter(Boolean).join(' · ')}</Text>
+  </Stack>;
+}
+
 function DashboardSummary({ cases, reduced }) {
-  const trail = useMemo(() => findAccountTrail(cases), [cases]);
+  const trail = useMemo(() => {
+    const result = findAccountTrail(cases);
+    return result && { ...result, network: buildCaseNetwork([result.received.transaction, result.sent.transaction]) };
+  }, [cases]);
+  const reason = trail?.returned ? '서로 다른 사건에서 두 계좌가 반대 방향으로 송금' : '서로 다른 사건에서 같은 계좌의 수취·송금 확인';
   return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
-    <Heading className="dashboard-priority-heading"><Sparkles className="icon" aria-hidden="true" />AI 요약</Heading>
-    {trail ? <Stack as="figure" align="center" justify="center" className="dashboard-account-trail"
-      aria-label="교차 조사 추천 · 같은 계좌에서 수취 후 송금 관측">
-      <Stack align="center">
-        <Text as="span">{trail.received.record.kind} · 수취</Text>
-        <LinkTag code={trail.received.record.code} />
+    <Heading className="dashboard-priority-heading"><Sparkles className="icon" aria-hidden="true" />분석 추천</Heading>
+    {trail ? <Stack as="figure" className="dashboard-account-trail">
+      <Text as="figcaption" className="dashboard-trail-reason">{reason}{trail.sameAmount ? ' · 같은 통화와 금액' : ''}</Text>
+      <AccountTrailGraph network={trail.network} focus={trail.account} />
+      <Stack as="ul" className="dashboard-trail-records" aria-label="추천 근거 거래 · 한국 표준시">
+        <EvidenceRecord evidence={trail.received} direction="수취" />
+        <EvidenceRecord evidence={trail.sent} direction="이후 송금" />
       </Stack>
-      <ArrowDown className="icon" aria-hidden="true" />
-      <Stack align="center" className="dashboard-trail-account">
-        <Text as="span">공유 계좌</Text>
-        <Text as="strong">{trail.account}</Text>
-      </Stack>
-      <ArrowDown className="icon" aria-hidden="true" />
-      <Stack align="center">
-        <Text as="span">{trail.sent.record.kind} · 이후 송금</Text>
-        <LinkTag code={trail.sent.record.code} />
-      </Stack>
-      <Text as="figcaption">거래 기록 기반 추천</Text>
     </Stack> : <Text className="dashboard-trail-empty">조회 범위에서 함께 확인할 Alert·Episode 관계가 없습니다.</Text>}
   </AISummaryPanel>;
 }

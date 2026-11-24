@@ -1,0 +1,28 @@
+.account-trail-graph {
+  display: block;
+  inline-size: 100%;
+  max-inline-size: calc(var(--aml-space-64) * 6);
+  block-size: auto;
+}
+.account-trail-edge {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--aml-stroke-focus);
+  stroke-linecap: round;
+}
+.account-trail-node circle {
+  r: var(--aml-space-6);
+  fill: var(--ai-summary-start);
+  stroke: currentColor;
+  stroke-width: var(--aml-stroke-focus);
+}
+.account-trail-node[data-shared] circle {
+  r: var(--aml-space-8);
+  fill: currentColor;
+}
+.account-trail-node text {
+  fill: currentColor;
+  font-size: var(--aml-type-body-size);
+  font-weight: var(--aml-type-body-strong-weight);
+}
+.account-trail-edge-label { fill: currentColor; font-size: var(--aml-type-caption-size) }
