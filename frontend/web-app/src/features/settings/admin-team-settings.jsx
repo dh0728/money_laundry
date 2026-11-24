@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
 import { fetchReviewUsers } from '@/api/liveReview';
+import { changeLiveRole } from './live-settings.js';
 import { ActionButton } from '../../components/primary-button';
 import GlideSelect from '../../components/react-bits/GlideSelect';
 import { StatusTag } from '../../components/semantic-tags';
@@ -64,18 +65,25 @@ function LiveMembers({ userId }) {
     });
     return () => { current = false; };
   }, [attempt, userId]);
+  const [notice, setNotice] = useState('');
+  async function changeRole(member, role) {
+    if (member.self || !Object.hasOwn(roles, role) || member.role === role) return;
+    const changed = await changeLiveRole(member.id, role);
+    if (changed.ok) setResult(previous => ({ members: previous.members.map(row => row.id === member.id ? { ...row, role } : row) }));
+    setNotice(changed.ok ? `${member.name}의 권한을 ${roles[role]}로 변경했습니다.` : changed.error);
+  }
   const retry = () => {
     setResult({ loading: true });
     setAttempt(previous => previous + 1);
   };
   return <>
-    <Text>현재 연결에서 팀원 권한은 조회 전용입니다.</Text>
     {result.loading && <Text role="status">팀원 목록을 불러오는 중입니다.</Text>}
     {result.error && <Box className="admin-team-retry">
       <Text role="alert">팀원 목록을 불러오지 못했습니다.</Text>
       <ActionButton shape="pill" surface="floating" onClick={retry}>다시 불러오기</ActionButton>
     </Box>}
-    {result.members && <MemberList members={result.members} />}
+    {result.members && <MemberList members={result.members} onRoleChange={changeRole} />}
+    {notice && <Text role="status">{notice}</Text>}
   </>;
 }
 

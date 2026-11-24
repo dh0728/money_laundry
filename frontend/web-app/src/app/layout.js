@@ -38,6 +38,7 @@ import { uiSizeOptions } from '../config/appearance-options.js';
 import { enableBackdropDismissal, setupOverlayDismissal } from '../lib/overlay-dismissal.js';
 import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch.js';
 import { mountNotificationPreference, receivesSampleNotifications } from '../features/settings/notification-preference.jsx';
+import { loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
 import { appMotionPreference, appReducedMotion, systemReducedMotion } from '@/hooks/use-reduced-motion';
@@ -1595,7 +1596,8 @@ function showRoute(route, params, navigationMode) {
       dashboardSource = undefined;
       showLoadedRoute(route, params, navigationMode);
     };
-    void Promise.all([loadLiveSource(), ruleRepository.list({ fresh: true }), loadLiveWorkRequests().catch(() => undefined)]).then(open, () => {
+    void Promise.all([loadLiveSource(), ruleRepository.list({ fresh: true }), loadLiveWorkRequests().catch(() => undefined),
+      loadLiveModelRiskThresholds().catch(() => undefined)]).then(open, () => {
       document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
         status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
       } }));
