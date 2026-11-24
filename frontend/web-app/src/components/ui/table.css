@@ -15,7 +15,7 @@
 }
 
 [data-slot="table-row"][data-related="true"]:not([data-selected="true"], [data-state="selected"]) > :first-child {
-  box-shadow: inset var(--aml-space-4) 0 var(--brand-accent);
+  box-shadow: inset var(--aml-space-4) 0 var(--brand-accent, currentColor);
 }
 
 [data-slot="table-cell"][data-numeric="true"] {
@@ -26,6 +26,19 @@
 [data-slot="table-cell"][data-stacked="true"] > * { display: block }
 
 [data-slot="table-columns"] > col { width: var(--table-column-width, auto) }
+
+.records-table[data-width="wide"] { min-inline-size: var(--table-records-wide-min) }
+.records-table[data-width="evidence"] { min-inline-size: var(--table-records-evidence-min) }
+.records-table:not([data-density="compact"]) :is([data-slot="table-head"], [data-slot="table-cell"]) {
+  padding: var(--aml-space-16);
+}
+.records-table [data-slot="table-cell"] { white-space: normal }
+.records-table [data-slot="table-cell"].records-table-empty {
+  padding-block: var(--aml-space-16);
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.records-table-pagination { justify-content: flex-end; margin-block: var(--aml-space-16) }
 
 [data-slot="table"] thead tr > :is(th, td),
 [data-slot="table"] tbody tr:nth-child(even) > :is(th, td) {

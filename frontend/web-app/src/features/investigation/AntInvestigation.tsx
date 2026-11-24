@@ -1,10 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Drawer, Empty, Form, Input, Modal, Radio, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
-import { fetchReviewCase, fetchReviewCases, submitReviewCommand, type ReviewCommand, type ReviewCase, type ReviewMember } from '@/api/liveReview'
+import { Alert, Button, Card, Descriptions, Drawer, Empty, Form, Input, Modal, Radio, Space, Spin, Tabs, Tag, Typography } from 'antd'
+import { fetchReviewCase, fetchReviewCases, submitReviewCommand, type ReviewCommand, type ReviewCase } from '@/api/liveReview'
 import { fetchLedgerTransactions, type LedgerTransaction } from '@/api/liveLedger'
 import { buildAlertClose, wholeAlertSelection } from '@/api/reviewCommands'
 import { canEditOpen, useCurrentUser } from '@/app/session'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { RecordsTable } from '@/components/ui/records-table'
+import { Box } from '@/components/layout-primitives'
 import { caseEvidence } from '@/features/alerts/caseEvidence'
 import { toReviewGraphModel } from '@/features/graph/liveAdapter'
 import { useAsync } from '@/lib/useAsync'
@@ -105,14 +107,22 @@ function InvestigationBody({ item, onOpen, onBack, refresh, onOpenLedger }: { it
       <Button danger disabled={!editable || busy || !comment.trim() || !decision || !subject.length || (item.kind === 'EPISODE' && !selected.length)} onClick={() => setConfirm(true)}>{item.kind === 'ALERT' ? '최종 종결 확인' : '선택 거래 판정 확인'}</Button>
       {item.kind === 'EPISODE' && <Button disabled={!editable || busy || !comment.trim() || !subject.length || subject.some(row => row.state === 'PENDING')} onClick={() => void send('CLOSE')}>기존 판정으로 Episode 종결 요청</Button>}
     </Space></Form>
-  const table = <Table<ReviewMember> data-wiring-id="case.overview.evidence" rowKey="txId" dataSource={evidence.members} scroll={{ x: 950 }} pagination={{ pageSize: 10, showSizeChanger: false }} rowSelection={item.kind === 'EPISODE' ? { selectedRowKeys: selected, onChange: keys => setSelected(keys as number[]), getCheckboxProps: member => ({ disabled: !editable || busy || member.reviewRole !== 'SUBJECT' || member.state !== 'PENDING' }) } : undefined} columns={[
-    { title: '거래', key: 'tx', render: (_, member) => <Button type="link" onClick={() => setTxId(member.txId)}>T-{member.txId} 원거래 확인</Button> },
-    { title: '거래 시각', render: (_, member) => stamp(member.transaction.occurredAt) },
-    { title: '금액·통화', render: (_, member) => `${member.transaction.amountPaid.toLocaleString('ko-KR')} ${member.transaction.paymentCurrency}` },
-    { title: '송금 소유주 / 계좌', render: (_, member) => <>{ownerName(member.transaction.fromAccountId, member.txId, 'from')}<br /><Text code>{member.transaction.fromAccountId}</Text></> },
-    { title: '수취 소유주 / 계좌', render: (_, member) => <>{ownerName(member.transaction.toAccountId, member.txId, 'to')}<br /><Text code>{member.transaction.toAccountId}</Text></> },
-    { title: '조사 역할·상태', render: (_, member) => `${member.reviewRole === 'SUBJECT' ? '판정 대상' : '참고 거래'} · ${stateName[member.state]}` },
-  ]} locale={{ emptyText: '현재 소속 근거 거래가 없습니다.' }} />
+  const table = <RecordsTable data-wiring-id="case.overview.evidence" rows={evidence.members} rowKey={member => member.txId}
+    width="evidence" pagination={{ showSizeChanger: false }} selection={item.kind === 'EPISODE' ? {
+      keys: selected,
+      onChange: setSelected,
+      label: member => `T-${member.txId} 선택`,
+      isDisabled: member => !editable || busy || member.reviewRole !== 'SUBJECT' || member.state !== 'PENDING',
+    } : undefined} columns={[
+      { title: '거래', cell: member => <Button type="link" onClick={() => setTxId(member.txId)}>T-{member.txId} 원거래 확인</Button> },
+      { title: '거래 시각', cell: member => stamp(member.transaction.occurredAt) },
+      { title: '금액·통화', cell: member => `${member.transaction.amountPaid.toLocaleString('ko-KR')} ${member.transaction.paymentCurrency}` },
+      { title: '송금 소유주 / 계좌', cell: member => <>{ownerName(member.transaction.fromAccountId, member.txId, 'from')}
+        <Box as="span" className="block"><Text code>{member.transaction.fromAccountId}</Text></Box></> },
+      { title: '수취 소유주 / 계좌', cell: member => <>{ownerName(member.transaction.toAccountId, member.txId, 'to')}
+        <Box as="span" className="block"><Text code>{member.transaction.toAccountId}</Text></Box></> },
+      { title: '조사 역할·상태', cell: member => `${member.reviewRole === 'SUBJECT' ? '판정 대상' : '참고 거래'} · ${stateName[member.state]}` },
+    ]} empty="현재 소속 근거 거래가 없습니다." />
   return <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
     <Space wrap><Button onClick={onBack}>조사 출발점으로 돌아가기</Button><Title level={3} style={{ margin: 0 }}>{code}</Title><Tag>{item.kind === 'ALERT' ? '단일 탐지 조사' : '묶음 조사'}</Tag><Tag data-wiring-id="case.header.status">{item.status === 'OPEN' ? '진행 중' : '종결'}</Tag><Text data-wiring-id="case.header.assignee">담당 {item.assigneeName}</Text><Button onClick={() => setNotesOpen(true)}>조사하며 의견 작성</Button></Space>
     {error && <Alert type="error" title={error} />}{notice && <Alert type="info" title={notice} />}

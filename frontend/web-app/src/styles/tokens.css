@@ -157,6 +157,8 @@
   --aml-radius-overlay: 12px;
   --aml-radius-full: 9999px;
   --aml-stroke-divider: 1px;
+  --table-records-wide-min: 850px;
+  --table-records-evidence-min: 950px;
   --aml-stroke-control: 1px;
   --aml-stroke-focus: 2px;
   --aml-size-icon-small: 16px;
