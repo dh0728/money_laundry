@@ -152,6 +152,10 @@
   --case-graph-owner-port-stroke: 1.25px;
   --case-graph-owner-muted-opacity: .25;
   --hierarchy-table-min-width: 72rem;
+  --flow-connection-opacity: .55;
+  --transaction-arrow-head-width: 20px;
+  --transaction-arrow-head-inset: 18px;
+  --transaction-arrow-height: 23px;
   --chart-axis-label-line-height: 1.2;
   --metric-value-size-min: 1.5rem;
   --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));

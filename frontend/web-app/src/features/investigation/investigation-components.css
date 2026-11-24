@@ -27,18 +27,6 @@
   gap: var(--workspace-gap);
 }
 .ledger-hierarchy { min-inline-size: 0 }
-.ledger-connections {
-  position: absolute;
-  inset: 0;
-  inline-size: 100%;
-  block-size: 100%;
-  pointer-events: none;
-  fill: none;
-  stroke: var(--muted-text);
-  stroke-width: var(--aml-stroke-divider);
-}
-.ledger-connections path { opacity: .55 }
-.ledger-connections path[data-active] { stroke: var(--text); stroke-width: var(--aml-stroke-focus); opacity: 1 }
 .ledger-components .animated-list { margin-block-start: var(--workspace-gap) }
 .ledger-panel-heading, .ledger-source {
   display: flex;
@@ -105,15 +93,6 @@
   font-size: var(--ui-font-size);
   line-height: 1.3;
 }
-.ledger-transaction-flow [data-account-verdict] {
-  --transaction-endpoint-fill: var(--status-caution-accent);
-  --transaction-endpoint-ink: var(--status-accent-dark-ink);
-}
-.ledger-transaction-flow [data-account-verdict="abnormal"] {
-  --transaction-endpoint-fill: var(--status-danger-accent);
-  --transaction-endpoint-ink: var(--status-accent-light-ink);
-}
-.ledger-transaction-flow [data-account-verdict="normal"] { --transaction-endpoint-fill: var(--status-positive-accent) }
 .ledger-party {
   display: grid;
   align-content: center;
@@ -131,18 +110,13 @@
 }
 .ledger-transaction-details {
   display: grid;
-  grid-template-rows: 1fr 23px 1fr;
+  grid-template-rows: 1fr var(--transaction-arrow-height) 1fr;
   min-width: 0;
   justify-items: center;
   align-items: center;
   text-align: center;
   overflow-wrap: anywhere;
 }
-.ledger-transaction-arrow {
-  inline-size: 100%;
-  block-size: 100%;
-}
-.ledger-arrow-shaft { width: calc(100% - 18px) }
 .ledger-transaction-details :is(time, span) { padding-inline: var(--aml-space-4) }
 .ledger-transaction-details strong { font-weight: inherit }
 @container (max-width: 360px) {

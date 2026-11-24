@@ -3,7 +3,7 @@
   "component/table-css": 38,
   "component/button": 15,
   "component/clickable-element": 9,
-  "component/raw-element": 104,
+  "component/raw-element": 94,
   "component/dom-api": 17,
   "component/form-control": 10,
   "token/raw-color": 137,
@@ -13,7 +13,7 @@
   "token/inline-style": 267,
   "token/arbitrary-class": 207,
   "token/important": 14,
-  "token/fixed-number": 530,
+  "token/fixed-number": 524,
   "token/palette-direct": 6,
   "chart/library-import": 5,
   "icon/local-svg": 6

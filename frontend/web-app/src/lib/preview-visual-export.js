@@ -98,7 +98,7 @@ export function copySVG(source) {
       const value = style.getPropertyValue(property);
       if (value) target.style.setProperty(property, localReferences(value));
     }
-    if (element.matches('.ledger-arrow-shaft')) target.setAttribute('width', String(element.getBBox().width));
+    if (element.hasAttribute('data-svg-width-from-layout')) target.setAttribute('width', String(element.getBBox().width));
   }
   copy.querySelectorAll('[data-graph-transient]').forEach(element => element.remove());
   copy.querySelectorAll('[data-graph-reveal]').forEach(element => {

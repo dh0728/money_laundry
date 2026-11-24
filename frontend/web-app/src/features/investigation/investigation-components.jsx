@@ -1,4 +1,4 @@
-import React, { useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SearchField } from '../../components/search-field';
 import { TableBody, TableCell, TableColumns, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
@@ -16,6 +16,7 @@ import { TableBranchToggle, TableFieldLabel, TableRecordCell, WorkflowTable } fr
 import { downloadCsv, TableQueryTools } from '../../components/query-controls';
 import './investigation-components.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
+import { FlowConnectionOverlay, TransactionDirectionArrow } from '@/components/charts/charts/transaction-flow-graphics';
 
 export { sampleTransactions } from '../../mocks/transaction-fixtures';
 const amountFormat = new Intl.NumberFormat('ko-KR');
@@ -113,10 +114,7 @@ function LedgerConnections({ owner, account, transaction, version }) {
       transitionEvents.forEach(event => ledger.removeEventListener(event, trackMovement));
     };
   }, [owner, account, transaction, version]);
-  return <svg ref={overlayRef} className="ledger-connections" aria-hidden="true" focusable="false">
-    {paths.map(({ name, targetIndex, active, d }) => <path key={`${name}-${targetIndex}`} data-source={name}
-      data-target-index={targetIndex} data-active={active || undefined} d={d} />)}
-  </svg>;
+  return <FlowConnectionOverlay ref={overlayRef} connections={paths} />;
 }
 
 function List({ label, items, selected, onSelect, reduced, renderItem, renderItemHeader, onItemSurfaceClick, itemData, className = '' }) {
@@ -164,30 +162,15 @@ export function TransactionHeader({ record }) {
 }
 
 export function TransactionFlow({ record }) {
-  const gradientId = useId();
   const sourceVerdict = record.from.verdict ?? record.verdict ?? 'unjudged';
   const destinationVerdict = record.to.verdict ?? record.verdict ?? 'unjudged';
-  const mixed = sourceVerdict !== destinationVerdict;
   const sender = <TransactionParty party={record.from} label="송금 계좌" direction="source" verdict={sourceVerdict} />;
   const recipient = <TransactionParty party={record.to} label="수취 계좌" direction="destination" verdict={destinationVerdict} />;
   return <Box className="ledger-transaction-flow">
     {record.incoming ? recipient : sender}
     <Box className="ledger-transaction-details">
       <Text as="time" dateTime={`${record.timestamp.replace(' ', 'T')}+09:00`}>{record.timestamp}</Text>
-      <svg className="ledger-transaction-arrow" data-incoming={record.incoming || undefined} aria-hidden="true">
-        {mixed && <defs>
-          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" data-account-verdict={record.incoming ? destinationVerdict : sourceVerdict} stopColor="var(--transaction-endpoint-fill)" />
-            <stop offset="100%" data-account-verdict={record.incoming ? sourceVerdict : destinationVerdict} stopColor="var(--transaction-endpoint-fill)" />
-          </linearGradient>
-        </defs>}
-        <rect className="ledger-arrow-shaft" x={record.incoming ? 18 : 0} y="9.5" height="4" data-account-verdict={sourceVerdict}
-          fill={mixed ? `url(#${gradientId})` : 'var(--transaction-endpoint-fill)'} />
-        <svg x={record.incoming ? '0' : '100%'} y="0" width="20" height="23" overflow="visible">
-          <path data-account-verdict={destinationVerdict} fill="var(--transaction-endpoint-fill)"
-            d={record.incoming ? 'M20 0 0 11.5 20 23Z' : 'M-20 0 0 11.5 -20 23Z'} />
-        </svg>
-      </svg>
+      <TransactionDirectionArrow incoming={record.incoming} sourceVerdict={sourceVerdict} destinationVerdict={destinationVerdict} />
       <Text as="span">{record.method} · <Text as="strong">{amountFormat.format(record.amount)} {record.currency}</Text></Text>
     </Box>
     {record.incoming ? sender : recipient}
