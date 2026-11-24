@@ -30,7 +30,7 @@ import { markPreviewCaseRead, resetPreviewCaseRead } from '../features/investiga
 import { mountTransactionEvidenceTable } from '../features/investigation/preview-case-table.jsx';
 import { mountWorkflows, mountWorkflowNotifications } from '../pages/workflow-components.jsx';
 import { renderScreenNav, refreshScreenNav } from './screen-navigation.jsx';
-import { ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
+import { caseRoute, frameLabel, screenFrame, ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
 import { BoxHTML, BrandSymbol, Button, DecorativeCanvasHTML, Divider, GlassDialog, HeadingHTML, HTMLFragment, HTMLNode,
   Icon, IconButton, InputHTML, ProfileAvatarHTML, ScrollArea, Sidebar, TextHTML, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
 import { Text } from '../components/layout-primitives.jsx';
@@ -758,6 +758,25 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   activeWorkCode = code;
   const path = !override && code.startsWith('T-') && previousPath === ledgerTableScreen ? previousPath : selectedPath;
   showWorkspaceNavigation(path, code);
+  if (sameCode && path !== previousPath) {
+    const previousCase = caseRoute(previousPath);
+    const nextCase = caseRoute(path);
+    if (nextCase && previousCase?.family === nextCase.family && previousCase.detail === nextCase.detail &&
+      previousCase.readOnly === nextCase.readOnly && previousCase.lens !== nextCase.lens &&
+      ['analysis', 'related'].includes(nextCase.detail)) {
+      const screen = byId('workspace').querySelector('.screen-layout');
+      const graph = screen?.querySelector('[data-case-flow]');
+      if (graph) {
+        activePath = path;
+        graph.dataset.lens = nextCase.lens;
+        unmountCaseGraph?.render();
+        screen.dataset.figmaFrame = screenFrame(path);
+        screen.querySelector('h1').textContent = `${code} · ${frameLabel(path)}`;
+        updateWorkspaceAddress(path, code, navigationMode, params ?? new URLSearchParams(location.search), { scroll: false });
+        return;
+      }
+    }
+  }
   const benchmarkLedger = isLedgerScreen(path) && benchmarkLedgerRoute && (!code || isBenchmarkTransactionCode(code));
   if (localBenchmark && !sampleData && !benchmarkFailed && (benchmarkLedger || path === 'dashboard/all' && dataMode === 'ibm')) {
     showBenchmarkWorkspace(path, code, navigationMode, params);
@@ -834,7 +853,9 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (result.ok) dashboardSource = dashboardFixtures(groups);
       return result;
     },
-    refreshEpisode: () => showWorkspace('', code, path, 'none', new URLSearchParams(location.search)),
+    refreshEpisode: () => {
+      if (activeWorkCode === code) showWorkspace('', code, activePath, 'none', new URLSearchParams(location.search));
+    },
     reportDocument, evidenceSelection,
     editTransactions: ({ codes: transactionCodes, targetCode, reason }) => {
       if (!evidenceSelection || activeWorkCode !== code || activeEvidence?.selection !== evidenceSelection) {
@@ -899,7 +920,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       return result;
     },
     onJudgmentClose: () => {
-      showWorkspace('', code, path, 'none', new URLSearchParams(location.search));
+      showWorkspace('', code, activePath, 'none', new URLSearchParams(location.search));
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
     onJudgmentReport: id => {

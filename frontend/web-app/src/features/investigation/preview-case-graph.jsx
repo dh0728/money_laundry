@@ -715,13 +715,17 @@ export function mountCaseGraph(host, { active, cases, evidenceSelection, onCompa
     accountsHost.dataset.caseAccounts = '';
     evidenceHost.after(accountsHost);
   }
-  const update = ({ active, cases }) => root.render(<CaseGraph active={active}
-    candidates={related && active ? casesSharingEvidence(active, cases) : []}
+  let caseData;
+  const render = () => root.render(<CaseGraph {...caseData}
     related={related} lens={host.dataset.lens ?? 'pattern'} evidenceHost={evidenceHost} accountsHost={accountsHost}
     caseGraphSelections={caseGraphSelections} evidenceSelection={evidenceSelection} onComparedCases={onComparedCases} />);
+  const update = ({ active, cases }) => {
+    caseData = { active, candidates: related && active ? casesSharingEvidence(active, cases) : [] };
+    render();
+  };
   update({ active, cases });
   return Object.assign(() => {
     root.unmount();
     accountsHost?.remove();
-  }, { update });
+  }, { update, render });
 }

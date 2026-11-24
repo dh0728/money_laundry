@@ -22,7 +22,7 @@ const variationLabels = {
   'sidebar-collapsed': '사이드바 닫힘', judged: '판정 완료',
 };
 
-function frameLabel(path) {
+export function frameLabel(path) {
   if (titles[path]) return titles[path];
   const [family, type, ...rest] = path.split('/');
   if (family === 'alert' || family === 'episode') {
@@ -66,7 +66,7 @@ const navigatorLabels = {
 };
 const caseTabs = [['overview', '개요'], ['analysis', '분석'], ['related', '관련']];
 
-function caseRoute(path) {
+export function caseRoute(path = '') {
   const [family, detail, ...states] = path.split('/');
   if (family !== 'alert' && family !== 'episode') return undefined;
   const tab = detail === 'analysis' ? 'analysis' :
@@ -226,7 +226,6 @@ export function ScreenLayout(path, { code = '', hasQuery = false, showCaseJudgme
   const label = frameLabel(path);
   const heading = code ? `${code} · ${label}` : label;
   const judgment = showCaseJudgment && route && !route.readOnly && !route.detail.startsWith('judge');
-  const referencePath = path === ledgerTableScreen ? sections.T : path.replace('/sankey', '');
   const queryTools = route && ['analysis', 'related'].includes(route.detail)
     ? '' : BoxHTML('', 'class="screen-query-tools" data-screen-query-tools');
   const queryRow = BoxHTML(
@@ -235,13 +234,17 @@ export function ScreenLayout(path, { code = '', hasQuery = false, showCaseJudgme
   );
   const queryArea = BoxHTML(queryRow +
     (hasQuery ? BoxHTML('', 'class="screen-query-editor" data-query-editor') : ''), 'class="screen-query-area"');
-  const figmaFrame = rows[referencePath] ?? rows[referencePath.replace(/\/staff-readonly$/, '')];
   return BoxHTML(
     HeadingHTML(heading, 'class="screen-title-accessible" tabindex="-1"', 1) +
     (source ? TextHTML(source, 'class="screen-data-source" role="status"', 'p') : '') +
     queryArea +
     content +
     (judgment ? BoxHTML('', 'class="case-judgment-mount" data-workflow="case-judgment"') : ''),
-    `class="screen-layout" data-figma-frame="${figmaFrame}"`, 'section',
+    `class="screen-layout" data-figma-frame="${screenFrame(path)}"`, 'section',
   );
+}
+
+export function screenFrame(path) {
+  const referencePath = path === ledgerTableScreen ? sections.T : path.replace('/sankey', '');
+  return rows[referencePath] ?? rows[referencePath.replace(/\/staff-readonly$/, '')];
 }
