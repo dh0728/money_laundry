@@ -60,7 +60,7 @@ function Metric({ item, reduced, trendHeight }) {
     <Box className="dashboard-metric-reading">
       <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined}>
         {typeof value === 'number' && !reduced && !animated.has(key)
-          ? <CountUp to={value} duration={0.45} trigger="view" separator="," onEnd={() => animated.add(key)} />
+          ? <CountUp to={value} className="count-up-fast" trigger="view" separator="," onEnd={() => animated.add(key)} />
           : typeof value === 'number' ? formatter.format(value) : value}
         {unit && <Text as="small">{unit}</Text>}
       </Text>

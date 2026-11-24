@@ -317,7 +317,7 @@ function Catalogue() {
         <WorkflowSample kind="report" view={reportView} />
       </Demo>
       <Demo title="CountUp">
-        <Text className="catalogue-count"><CountUp key={count} to={1234} separator="," duration={reduced ? 0 : .45} trigger="load" />건</Text>
+        <Text className="catalogue-count"><CountUp key={count} to={1234} separator="," className="count-up-fast" duration={reduced ? 0 : undefined} trigger="load" />건</Text>
         <ActionButton className="row" shape="pill" surface="floating" onClick={() => setCount(value => value + 1)}>다시 재생</ActionButton>
       </Demo>
       <Demo title="MagicBento · 대시보드 지표와 차트" wide>
