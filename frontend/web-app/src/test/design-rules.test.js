@@ -11,16 +11,19 @@ const json = path => JSON.parse(read(path));
 
 describe('component/table-style', () => {
   const css = read('src/components/ui/table.css');
+  const tokens = read('src/styles/tokens.css');
   it('행 가로선이 없다', () => {
     expect(css).toMatch(/border-block-start-width:\s*0/);
     expect(css).toMatch(/border-block-end-width:\s*0/);
   });
   it('열 세로선은 기존 테두리 토큰 30%로 모든 행에 그린다', () => {
-    expect(css).toMatch(/:is\(th, td\):not\(:last-child\)\s*\{\s*border-inline-end:[^;]*var\(--aml-data-grid[^;]*30%/);
+    expect(tokens).toMatch(/--table-column-divider-strength:\s*30%;/);
+    expect(css).toMatch(/:is\(th, td\):not\(:last-child\)\s*\{\s*border-inline-end:[^;]*var\(--aml-data-grid[^;]*var\(--table-column-divider-strength\)/);
   });
   it('머리글을 1행으로 세어 홀수 행에만 반대색 3%를 얹는다', () => {
-    expect(css).toMatch(/thead tr > :is\(th, td\),\s*\[data-slot="table"\] tbody tr:nth-child\(even\) > :is\(th, td\)/);
-    expect(css).toMatch(/light-dark\(var\(--aml-black-100[^\n]*var\(--aml-white-100[^\n]*\)\) 3%, transparent\)/);
+    expect(tokens).toMatch(/--table-stripe-strength:\s*3%;/);
+    expect(css).toMatch(/--table-stripe-tint:\s*color-mix\(in srgb, light-dark\(var\(--aml-black-100\), var\(--aml-white-100\)\) var\(--table-stripe-strength\), transparent\)/);
+    expect(css).toMatch(/thead tr > :is\(th, td\),\s*\[data-slot="table"\] tbody tr:nth-child\(even\) > :is\(th, td\)\s*\{\s*background-image:\s*linear-gradient\(var\(--table-stripe-tint\), var\(--table-stripe-tint\)\)/);
   });
   it('공용 Table이 규격 CSS를 불러온다', () => {
     expect(read('src/components/ui/table.tsx')).toMatch(/import "\.\/table\.css"/);

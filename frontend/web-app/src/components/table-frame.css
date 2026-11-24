@@ -131,7 +131,7 @@
 .data-table-frame table thead th {
   position: sticky;
   inset-block-start: 0;
-  z-index: 1;
+  z-index: var(--table-header-layer);
   background-color: var(--information-panel-surface);
   color: var(--text);
   font-weight: var(--aml-type-body-strong-weight);
@@ -165,14 +165,14 @@
   background: var(--selection-surface);
 }
 .data-table-frame tbody tr[data-verdict]:not([data-selected="true"], [data-state="selected"]) {
-  --table-row-hover-strength: 10%;
+  --table-row-hover-strength: var(--table-row-hover-verdict-strength);
   background-color: var(--record-verdict-surface);
 }
 .data-table-frame tbody tr[data-slot="table-row"]:not([data-selected="true"], [data-state="selected"]):has(
   > :is(th, td) :is(button, a[href], input):not(:disabled, [aria-disabled="true"])
 ):is(:hover, :has(:focus-visible)) {
   background-color: color-mix(in srgb, var(--record-verdict-surface, var(--information-panel-surface)),
-    light-dark(var(--aml-black-100), var(--aml-white-100)) var(--table-row-hover-strength, 14%));
+    light-dark(var(--aml-black-100), var(--aml-white-100)) var(--table-row-hover-strength, var(--table-row-hover-default-strength)));
 }
 .data-table-frame table th:has(> .table-sort-button) {
   padding: 0;
@@ -244,7 +244,7 @@
 }
 .overview-panel-visual:has(.case-evidence-table) { justify-content: start }
 .preview-case-overview .case-evidence-table { margin-block-start: var(--workspace-gap); min-inline-size: 0; min-block-size: 0 }
-.benchmark-table { max-block-size: min(60dvh, var(--workspace-available-block)); }
+.benchmark-table { max-block-size: min(var(--table-scroll-region-max-height), var(--workspace-available-block)); }
 .ledger-tables {
   display: grid;
   min-inline-size: 0;
@@ -269,7 +269,7 @@
 }
 .ledger-table-controls {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--table-ledger-filter-min-width)), 1fr));
   gap: var(--aml-space-8) var(--workspace-gap);
   margin-block-end: var(--workspace-gap);
 }
@@ -285,7 +285,7 @@
   align-items: flex-start;
 }
 .variable-table {
-  max-block-size: min(60dvh, calc(var(--aml-space-64) * 7));
+  max-block-size: min(var(--table-scroll-region-max-height), calc(var(--aml-space-64) * 7));
 }
 .variable-table thead {
   position: sticky;

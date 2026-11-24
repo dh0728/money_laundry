@@ -157,6 +157,13 @@
   --aml-radius-overlay: 12px;
   --aml-radius-full: 9999px;
   --aml-stroke-divider: 1px;
+  --table-column-divider-strength: 30%;
+  --table-stripe-strength: 3%;
+  --table-header-layer: 1;
+  --table-row-hover-default-strength: 14%;
+  --table-row-hover-verdict-strength: 10%;
+  --table-scroll-region-max-height: 60dvh;
+  --table-ledger-filter-min-width: 14rem;
   --table-records-wide-min: 850px;
   --table-records-evidence-min: 950px;
   --aml-stroke-control: 1px;
