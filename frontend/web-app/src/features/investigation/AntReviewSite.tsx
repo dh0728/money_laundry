@@ -3,7 +3,7 @@ import { Alert, Breadcrumb, Button, Card, ConfigProvider, Descriptions, Input, L
 import koKR from 'antd/locale/ko_KR'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ko'
-import { ArrowLeftRight, Bell, CircleUser, FolderSearch, LayoutDashboard, ListChecks, Moon, Settings, Siren, Sun } from 'lucide-react'
+import { ArrowLeftRight, Bell, CircleUser, FolderSearch, LayoutDashboard, Moon, Scale, Settings, Siren, Sun } from 'lucide-react'
 import { restoreSession } from '@/api/auth'
 import { fetchReviewCases, type ReviewCase, type ReviewKind } from '@/api/liveReview'
 import { fetchLedgerTransactions, type LedgerTransaction } from '@/api/liveLedger'
@@ -20,7 +20,7 @@ const { Text, Title } = Typography
 const menus = [
   { key: 'dashboard', label: '대시보드', icon: LayoutDashboard }, { key: 'alerts', label: 'Alert 목록', icon: Siren },
   { key: 'episodes', label: 'Episode 목록', icon: FolderSearch }, { key: 'transactions', label: '거래 내역', icon: ArrowLeftRight },
-  { key: 'notifications', label: '알림', icon: Bell }, { key: 'rules', label: '룰엔진', icon: ListChecks },
+  { key: 'notifications', label: '알림', icon: Bell }, { key: 'rules', label: '룰엔진', icon: Scale },
   { key: 'settings', label: '설정', icon: Settings }, { key: 'account', label: '계정', icon: CircleUser },
 ]
 const subscribe = (listener: () => void) => { window.addEventListener('hashchange', listener); return () => window.removeEventListener('hashchange', listener) }

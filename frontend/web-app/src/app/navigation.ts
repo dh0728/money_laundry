@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bell, FolderSearch, LayoutDashboard, ListChecks, Settings, Siren } from 'lucide-react'
+import { ArrowLeftRight, Bell, FolderSearch, LayoutDashboard, Scale, Settings, Siren } from 'lucide-react'
 
 export type Page = 'dashboard' | 'transactions' | 'alerts' | 'episodes' | 'suspicious' | 'rules' | 'operations' | 'notifications' | 'settings' | 'account'
 
@@ -11,7 +11,7 @@ export const mainNav = [
 ] as const
 // 재설계(10/11): 조사자가 일하는 메뉴와 관리 메뉴를 나눈다. 관리 화면은 전 역할이 보되 조치는 ADMIN만
 export const manageNav = [
-  { id: 'rules', name: '룰엔진', icon: ListChecks },
+  { id: 'rules', name: '룰엔진', icon: Scale },
 ] as const
 export const utilityNav = [
   { id: 'notifications', name: '알림', icon: Bell },
