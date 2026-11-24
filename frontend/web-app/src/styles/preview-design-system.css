@@ -334,6 +334,12 @@
     color-mix(in srgb, var(--text) 16%, var(--information-panel-surface)));
   --chart-suspect-annotation-color: color-mix(in srgb, var(--risk-high), var(--text) 35%);
   --chart-subtle-grid-color: color-mix(in srgb, var(--text) 8%, transparent);
+  --chart-grid-fade-start: .1;
+  --chart-grid-fade-end: .9;
+  --chart-grid-shimmer-ink-weight: 68%;
+  --chart-grid-shimmer-ink: color-mix(in oklch, var(--text) var(--chart-grid-shimmer-ink-weight), transparent);
+  --chart-grid-shimmer-width: 140px;
+  --chart-grid-shimmer-shoulder-opacity: .45;
   --disabled-text: var(--aml-figma-contents-disabled);
   --divider: var(--aml-figma-border-neutral-subtle-default);
   --focus-ring: var(--aml-figma-border-neutral-accent-default);

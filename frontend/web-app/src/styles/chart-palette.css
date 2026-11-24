@@ -1,3 +1,5 @@
 :root {
   --palette-teal-500: oklch(.67 .13 165);
+  --chart-grid-default-ink: #eaf0f6;
+  --chart-grid-mask-ink: var(--aml-white-100);
 }
