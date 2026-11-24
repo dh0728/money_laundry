@@ -5,6 +5,7 @@
 import { lazy, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { NODE_SIZE, templateLayout, type Timeline } from './timeLayout'
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
+import { Box } from '../../../components/layout-primitives'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof import('react-force-graph-2d').default
 const R = NODE_SIZE / 2
@@ -129,8 +130,8 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
     onSelect(ids.length ? { type: 'nodes', ids } : null)
   }
 
-  return <div ref={wrap} className="absolute inset-0" data-testid="pattern-graph" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onContextMenu={e => e.preventDefault()}>
-    {box && <div className="pointer-events-none absolute z-10 border border-[var(--palette-blue-500)] bg-[var(--palette-blue-500)]/10" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
+  return <Box ref={wrap} className="absolute inset-0" data-testid="pattern-graph" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onContextMenu={e => e.preventDefault()}>
+    {box && <Box className="pointer-events-none absolute z-10 border border-[var(--palette-blue-500)] bg-[var(--palette-blue-500)]/10" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
     {size.w > 0 && <Suspense fallback={null}><ForceGraph2D<PNode, PLink> ref={fg} onRenderFramePre={() => { if (fg.current) configure(fg.current) }} width={size.w} height={size.h} graphData={data} backgroundColor="rgba(0,0,0,0)"
       warmupTicks={150} cooldownTicks={200} enableZoomInteraction={false} enablePanInteraction={false} enableNodeDrag onNodeHover={(n: PNode | null) => { hover.current = n }}
       nodeRelSize={R} nodeVal={1} nodeLabel="" linkLabel=""
@@ -157,5 +158,5 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
       onLinkClick={(l: PLink) => onSelect({ type: 'link', id: l.pair })} 
       onZoom={({ k }: { k: number }) => { if (Math.abs(k - lastK.current) < 0.004) return; lastK.current = k; setTimeout(() => onZoom(k), 0) }}
       onEngineStop={() => { if (!fitted.current && fg.current) { fitted.current = true; fg.current.zoomToFit(0, 100); setTimeout(() => fg.current?.zoomToFit(250, 100), 450) } }} /></Suspense>}
-  </div>
+  </Box>
 }

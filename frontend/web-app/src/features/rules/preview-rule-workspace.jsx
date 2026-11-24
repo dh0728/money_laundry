@@ -15,6 +15,7 @@ import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../.
 import { ruleRepository } from './rule-repository';
 import { useRules } from './use-rules';
 import './preview-rule-workspace.css';
+import { Box, Heading, Text } from '@/components/layout-primitives';
 
 const presets = { DRAFT: 'pending', PENDING_APPROVAL: 'caution', TESTING: 'inProgress', ACTIVE: 'done', STOPPED: 'cancelled', REJECTED: 'failed' };
 const actionTones = { requestReview: 'brand', approve: 'positive', activate: 'brand', retest: 'brand', reject: 'negative', stop: 'negative', reopen: 'inverse' };
@@ -24,7 +25,7 @@ const timeFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeS
 
 function RuleTime({ value }) {
   const date = new Date(value);
-  return value && Number.isFinite(date.getTime()) ? <time dateTime={value}>{timeFormat.format(date)} KST</time> : '기록 없음';
+  return value && Number.isFinite(date.getTime()) ? <Text as="time" dateTime={value}>{timeFormat.format(date)} KST</Text> : '기록 없음';
 }
 
 /** 흐린 버튼에 못 쓰는 이유를 붙인다. 마우스를 올리면 툴팁, 스크린리더는 버튼 설명으로 읽는다. */
@@ -36,15 +37,15 @@ function BlockedReason({ reason, children }) {
     return bindTooltip(host.current, document.getElementById('tooltip'), { instantOnHover: true });
   }, [reason]);
   if (!reason) return children;
-  return <span ref={host} className="rule-action-guard" aria-label={reason} data-blocked-reason="">
+  return <Text as="span" ref={host} className="rule-action-guard" aria-label={reason} data-blocked-reason="">
     {cloneElement(children, { 'aria-describedby': id })}
-    <span id={id} className="visually-hidden">{reason}</span>
-  </span>;
+    <Text as="span" id={id} className="visually-hidden">{reason}</Text>
+  </Text>;
 }
 
 /** 대화상자 버튼은 공용 DialogFooter의 직속 자식이어야 꽉 채운 너비가 된다. 감싸지 않고, 못 쓰는 이유는 본문의 숨은 설명으로 잇는다. */
 function DialogReasons({ reasons }) {
-  return reasons.filter(([, text]) => text).map(([id, text]) => <span key={id} id={id} className="visually-hidden">{text}</span>);
+  return reasons.filter(([, text]) => text).map(([id, text]) => <Text as="span" key={id} id={id} className="visually-hidden">{text}</Text>);
 }
 
 const reasonFor = (rule, action) => !rule ? noRule
@@ -125,16 +126,16 @@ function RuleDecision({ rule, action, repository, onClose, onDone }) {
     actions={<PrimaryButton type="submit" tone={actionTones[action]} disabled={!reason.trim() || busy} aria-busy={busy || undefined}
       aria-describedby={submitBlocked ? submitReasonId : undefined}>
       {busy ? '처리 중…' : `${definition.label} 확인`}</PrimaryButton>}>
-    <div className="case-judgment-body">
-      <p><code>{rule.id}</code> · {rule.name}</p>
-      <p>변경 후 상태 · {ruleStatusLabels[definition.to]}</p>
-      <label className="case-judgment-field">변경 사유
+    <Box className="case-judgment-body">
+      <Text><Text as="code">{rule.id}</Text> · {rule.name}</Text>
+      <Text>변경 후 상태 · {ruleStatusLabels[definition.to]}</Text>
+      <Box as="label" className="case-judgment-field">변경 사유
         <Textarea ref={reasonField} value={reason} rows={3} maxLength={RULE_LIMITS.reason} required
           onChange={event => { setReason(event.target.value); setError(''); }} />
-      </label>
-      {error && <p role="alert" data-rule-block-error>{error}</p>}
+      </Box>
+      {error && <Text role="alert" data-rule-block-error>{error}</Text>}
       <DialogReasons reasons={[[submitReasonId, submitBlocked]]} />
-    </div>
+    </Box>
   </DialogFrame>;
 }
 
@@ -192,31 +193,31 @@ function RuleRemove({ rule, repository, onClose, onDone }) {
       <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
       {keepsHistory ? <>{deleteButton}{archiveButton}</> : <>{archiveButton}{deleteButton}</>}
     </>}>
-    <div className="case-judgment-body">
-      <p><code>{rule.id}</code> · {rule.name}</p>
+    <Box className="case-judgment-body">
+      <Text><Text as="code">{rule.id}</Text> · {rule.name}</Text>
       {keepsHistory
-        ? <p>운영 이력이 있는 룰입니다. 삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다.</p>
-        : <p>삭제하면 룰과 이력이 목록에서 사라집니다. 이력을 남기려면 보관하세요.</p>}
-      <label className="case-judgment-field">보관 사유
+        ? <Text>운영 이력이 있는 룰입니다. 삭제하면 운영 이력까지 지워지므로, 이력을 남기려면 보관을 권장합니다.</Text>
+        : <Text>삭제하면 룰과 이력이 목록에서 사라집니다. 이력을 남기려면 보관하세요.</Text>}
+      <Box as="label" className="case-judgment-field">보관 사유
         <Textarea value={reason} rows={2} maxLength={RULE_LIMITS.reason}
           onChange={event => { setReason(event.target.value); setError(''); }} />
-      </label>
-      {error && <p role="alert" data-rule-block-error>{error}</p>}
+      </Box>
+      {error && <Text role="alert" data-rule-block-error>{error}</Text>}
       <DialogReasons reasons={[[archiveReasonId, archiveReason], [deleteReasonId, deleteReason]]} />
-    </div>
+    </Box>
   </DialogFrame>;
 }
 
 function RuleListState({ status, error, onRetry }) {
   if (status === 'loading') return <Panel className="workflow-rule-state" role="status" aria-busy="true">
-    <p>룰 목록을 불러오는 중입니다.</p>
+    <Text>룰 목록을 불러오는 중입니다.</Text>
   </Panel>;
   if (status === 'error') return <Panel className="workflow-rule-state" role="alert">
-    <p>룰 목록을 불러오지 못했습니다.{error && ` ${error}`}</p>
+    <Text>룰 목록을 불러오지 못했습니다.{error && ` ${error}`}</Text>
     <ActionButton shape="pill" surface="floating" onClick={onRetry}>다시 시도</ActionButton>
   </Panel>;
   return <Panel className="workflow-rule-state">
-    <p>등록된 룰이 없습니다.</p>
+    <Text>등록된 룰이 없습니다.</Text>
     <PrimaryButton tone="inverse" as="a" href="/rules/new">룰 만들기</PrimaryButton>
   </Panel>;
 }
@@ -249,18 +250,18 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
     {actions}
   </>;
   return <>
-    {notice && <p className="visually-hidden" role="status">{notice}</p>}
-    {loadState === 'error' && <p role="alert" className="workflow-rule-note">
+    {notice && <Text className="visually-hidden" role="status">{notice}</Text>}
+    {loadState === 'error' && <Text role="alert" className="workflow-rule-note">
       최신 룰 목록을 불러오지 못해 직전 목록을 보여 줍니다. <ActionButton onClick={retry}>다시 시도</ActionButton>
-    </p>}
-    <dl className="workflow-rule-inventory" aria-label="룰 상태별 수">
-      <Panel as="div"><dt>등록된 룰</dt><dd>{countFormat.format(rules.length)}</dd></Panel>
+    </Text>}
+    <Box as="dl" className="workflow-rule-inventory" aria-label="룰 상태별 수">
+      <Panel as="div"><Box as="dt">등록된 룰</Box><Box as="dd">{countFormat.format(rules.length)}</Box></Panel>
       {breakdown.map(({ value, label, count }) => <Panel as="div" key={value}>
-        <dt><StatusTag preset={presets[value]}>{label}</StatusTag></dt>
-        <dd>{countFormat.format(count)}</dd>
+        <Box as="dt"><StatusTag preset={presets[value]}>{label}</StatusTag></Box>
+        <Box as="dd">{countFormat.format(count)}</Box>
       </Panel>)}
-    </dl>
-    <div className="screen-row screen-rule-list">
+    </Box>
+    <Box className="screen-row screen-rule-list">
       <Panel className="workflow-rule-list" aria-label="룰 목록">
         <WorkflowTable label="룰 목록" summary={tableCount(rows.length, rules.length, '개')}>
             <TableHeader><TableRow>
@@ -274,7 +275,7 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
               <TableCell><StatusTag preset={presets[rule.status]}>{ruleStatusLabels[rule.status]}</StatusTag></TableCell>
               <TableRowHead>
                 <ActionButton onClick={() => choose(rule.id)} aria-pressed={rule.id === selected?.id} className="workflow-rule-select">
-                  <code>{rule.id}</code> {rule.name}
+                  <Text as="code">{rule.id}</Text> {rule.name}
                 </ActionButton>
               </TableRowHead>
               <TableCell>v{rule.version}</TableCell><TableCell>{rule.author}</TableCell>
@@ -284,28 +285,28 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
         </WorkflowTable>
       </Panel>
       {selected && <Panel className="workflow-rule-detail" aria-label="룰 상세">
-        <h2><code>{selected.id}</code> {selected.name}</h2>
-        <div className="workflow-rule-detail-tags">
+        <Heading><Text as="code">{selected.id}</Text> {selected.name}</Heading>
+        <Box className="workflow-rule-detail-tags">
           <StatusTag preset={presets[selected.status]}>{ruleStatusLabels[selected.status]}</StatusTag>
           <StatusTag preset="neutral">v{selected.version}</StatusTag>
-        </div>
-        <p>{selected.description}</p>
-        <dl className="rule-condition-facts">
-          <div><dt>담당자</dt><dd>{selected.author}</dd></div>
-          <div><dt>마지막 변경</dt><dd><RuleTime value={selected.updatedAt} /></dd></div>
-        </dl>
-        <h3>적용 조건</h3>
+        </Box>
+        <Text>{selected.description}</Text>
+        <Box as="dl" className="rule-condition-facts">
+          <Box><Box as="dt">담당자</Box><Box as="dd">{selected.author}</Box></Box>
+          <Box><Box as="dt">마지막 변경</Box><Box as="dd"><RuleTime value={selected.updatedAt} /></Box></Box>
+        </Box>
+        <Heading level={3}>적용 조건</Heading>
         <RuleConditionFacts input={selected} />
       </Panel>}
-    </div>
+    </Box>
     {selected && <Panel className="workflow-rule-reason" aria-label={reason ? '룰 변경 사유' : '룰 최근 변경'}>
-      <h2>{reason ? '변경 사유' : '최근 변경'}</h2>
-      {history.length ? <ol className="workflow-rule-history">
-        {(reason ? history : history.slice(0, 1)).map((entry, index) => <li key={index}>
-          <div><strong>{entry.action}</strong> <span>{entry.actor} · <RuleTime value={entry.at} /></span></div>
-          <p>{entry.reason}</p>
-        </li>)}
-      </ol> : <p>기록된 변경 이력이 없습니다.</p>}
+      <Heading>{reason ? '변경 사유' : '최근 변경'}</Heading>
+      {history.length ? <Box as="ol" className="workflow-rule-history">
+        {(reason ? history : history.slice(0, 1)).map((entry, index) => <Box as="li" key={index}>
+          <Box><Text as="strong">{entry.action}</Text> <Text as="span">{entry.actor} · <RuleTime value={entry.at} /></Text></Box>
+          <Text>{entry.reason}</Text>
+        </Box>)}
+      </Box> : <Text>기록된 변경 이력이 없습니다.</Text>}
     </Panel>}
     {actions}
     {deciding && selected && <RuleDecision key={`${selected.id}-${deciding}`} rule={selected} action={deciding}

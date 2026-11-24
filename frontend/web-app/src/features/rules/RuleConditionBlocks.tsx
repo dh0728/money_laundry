@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import type { RuleInput } from '@/lib/workspace-store'
 import type { RuleBlockKind, validateRule } from './rules-logic'
 import './rule-condition-blocks.css'
+import { Box, Text } from '@/components/layout-primitives'
 
 const palette: { kind: RuleBlockKind; label: string }[] = [
   { kind: 'accountWindow', label: '같은 계좌의 반복 거래' },
@@ -32,7 +33,7 @@ interface Props {
 }
 
 function renderFlatBranches(branches: ReactNode[], finalSlot: ReactNode) {
-  return <>{branches}{finalSlot}<p>백테스트에서 검토 대상으로 표시</p></>
+  return <>{branches}{finalSlot}<Text>백테스트에서 검토 대상으로 표시</Text></>
 }
 
 export function RuleConditionBlocks({
@@ -106,52 +107,52 @@ export function RuleConditionBlocks({
   }
 
   function slot(index: number) {
-    return <div data-rule-drop-slot data-active={dropSlot === index || undefined} aria-hidden="true"
+    return <Box data-rule-drop-slot data-active={dropSlot === index || undefined} aria-hidden="true"
       onDragOver={event => allowDrop(event, index)} onDrop={event => drop(event, index)} />
   }
 
   function numberField(key: 'scoreMin' | 'minTransactions' | 'windowHours', label: string, min: number, max: number | undefined, step: number, unit?: string, scale = 1) {
     const value = Number((input[key] * scale).toFixed(8))
     const error = scale === 100 && errors.scoreMin ? '모델 점수를 0~100점 사이로 입력해 주세요.' : errors[key]
-    return <label>
+    return <Box as="label">
       {label}
-      <span data-rule-block-input>
+      <Text as="span" data-rule-block-input>
         <Input name={key} aria-label={label} type="number" min={min} max={max} step={step} value={Number.isNaN(value) ? '' : value}
           onChange={event => onInputChange({ ...input, [key]: event.target.valueAsNumber / scale })}
           aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-${key}` : undefined} />
-        {unit && <span>{unit}</span>}
-      </span>
-      {error && <span id={`${id}-${key}`} data-rule-block-error>{error}</span>}
-    </label>
+        {unit && <Text as="span">{unit}</Text>}
+      </Text>
+      {error && <Text as="span" id={`${id}-${key}`} data-rule-block-error>{error}</Text>}
+    </Box>
   }
 
   const changeType = (typeCode: TypeCode) => onInputChange({ ...input, typeCode })
-  return <div data-rule-builder ref={root} onDragEnd={endDrag}>
-    <div data-rule-palette aria-label="추가할 수 있는 조건">
-      <strong>조건 블록</strong>
-      <p>블록을 아래로 끌어 놓거나 눌러 추가하세요.</p>
-      <div>{palette.map(({ kind, label }) => <Button key={kind} type="button" data-rule-kind={kind} data-button-shape="pill"
+  return <Box data-rule-builder ref={root} onDragEnd={endDrag}>
+    <Box data-rule-palette aria-label="추가할 수 있는 조건">
+      <Text as="strong">조건 블록</Text>
+      <Text>블록을 아래로 끌어 놓거나 눌러 추가하세요.</Text>
+      <Box>{palette.map(({ kind, label }) => <Button key={kind} type="button" data-rule-kind={kind} data-button-shape="pill"
         aria-label={`${label} 추가`} disabled={blocks.includes(kind)} draggable={!blocks.includes(kind)}
         onDragStart={event => beginDrag(event, kind)} onClick={() => place(kind, blocks.length)}>
         <Plus aria-hidden="true" />{label}
-      </Button>)}</div>
-    </div>
-    <section aria-label="조건 블록 작업대" data-rule-workbench data-empty={!blocks.length || undefined}
+      </Button>)}</Box>
+    </Box>
+    <Box as="section" aria-label="조건 블록 작업대" data-rule-workbench data-empty={!blocks.length || undefined}
       onDragOver={event => allowDrop(event, blocks.length)} onDrop={event => drop(event, blocks.length)}
       onDragLeave={event => {
         if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setDropSlot(null)
       }}>
-      <strong>거래가 다음 조건을 모두 만족하면</strong>
-      {!blocks.length && <p>여기에 조건 블록을 놓으세요.</p>}
+      <Text as="strong">거래가 다음 조건을 모두 만족하면</Text>
+      {!blocks.length && <Text>여기에 조건 블록을 놓으세요.</Text>}
       {renderBranches(blocks.map((kind, index) => {
         const label = palette.find(block => block.kind === kind)!.label
-        return <div key={kind}>
+        return <Box key={kind}>
           {slot(index)}
-          <fieldset data-rule-kind={kind} data-dragging={dragging === kind || undefined} tabIndex={-1}
+          <Box as="fieldset" data-rule-kind={kind} data-dragging={dragging === kind || undefined} tabIndex={-1}
             onDragOver={event => allowDrop(event, blockSlot(event, index))}
             onDrop={event => drop(event, blockSlot(event, index))}>
-            <legend data-rule-sr-only>{label}</legend>
-            <div data-rule-block-header>
+            <Box as="legend" data-rule-sr-only>{label}</Box>
+            <Box data-rule-block-header>
               <Button type="button" data-rule-drag-handle={kind} data-button-shape="circle" draggable onDragStart={event => beginDrag(event, kind)}
                 aria-label={`${label} 순서 이동`} aria-keyshortcuts="ArrowUp ArrowDown"
                 title="끌어서 이동 · 방향키로 순서 변경" onKeyDown={event => {
@@ -161,8 +162,8 @@ export function RuleConditionBlocks({
                 }}>
                 <GripVertical aria-hidden="true" />
               </Button>
-              <strong aria-hidden="true">{label}</strong>
-              <div data-rule-block-actions>
+              <Text as="strong" aria-hidden="true">{label}</Text>
+              <Box data-rule-block-actions>
                 <Button type="button" data-button-shape="circle" aria-label={`${label} 위로 이동`} title="위로 이동" aria-disabled={index === 0}
                   onClick={() => move(kind, label, index, -1)}><ArrowUp aria-hidden="true" /></Button>
                 <Button type="button" data-button-shape="circle" aria-label={`${label} 아래로 이동`} title="아래로 이동" aria-disabled={index === blocks.length - 1}
@@ -171,27 +172,27 @@ export function RuleConditionBlocks({
                   nextFocus.current = `button[data-rule-kind="${kind}"]`
                   onBlocksChange(blocks.filter(block => block !== kind))
                 }}><X aria-hidden="true" /></Button>
-              </div>
-            </div>
-            <div data-rule-block-body>
-              <div data-rule-block-fields>
-                {kind === 'typeCode' && <label>거래 유형
+              </Box>
+            </Box>
+            <Box data-rule-block-body>
+              <Box data-rule-block-fields>
+                {kind === 'typeCode' && <Box as="label">거래 유형
                   {renderTypePicker ? renderTypePicker({ value: input.typeCode, onChange: changeType, options: typeOptions }) :
                     <select aria-label="거래 유형" value={input.typeCode ?? ''} onChange={event => changeType(Number(event.target.value) as TypeCode)}>
                       {typeOptions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                     </select>}
-                </label>}
+                </Box>}
                 {kind === 'scoreMin' && numberField('scoreMin', '최소 모델 점수', 0, scoreAsPoints ? 100 : 1, 0.01, scoreAsPoints ? '점 이상' : undefined, scoreAsPoints ? 100 : 1)}
                 {kind === 'accountWindow' && <>
                   {numberField('minTransactions', '최소 거래 건수', 1, undefined, 1, '건 이상')}
                   {numberField('windowHours', '시간 창', 1, 720, 1, '시간 이내')}
                 </>}
-              </div>
-            </div>
-          </fieldset>
-        </div>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
       }), slot(blocks.length))}
-    </section>
-    <span data-rule-sr-only aria-live="polite" aria-atomic="true">{announcement}</span>
-  </div>
+    </Box>
+    <Text as="span" data-rule-sr-only aria-live="polite" aria-atomic="true">{announcement}</Text>
+  </Box>
 }

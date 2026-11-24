@@ -13,6 +13,7 @@ import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
 import { OrthogonalConnector, StageItem, StagePanel } from './transaction-stage'
 import { formatMoney, type TransactionIndex, type TransactionTarget } from './transactionIndex'
+import { Box, Text } from '@/components/layout-primitives'
 
 const toggleSingleSelectedId = (current: string | null | undefined, clicked: string) => (current === clicked ? null : clicked)
 
@@ -66,32 +67,32 @@ function TransactionMiniSankey({ transaction }: { transaction: IndexedTransactio
   const amount = formatMoney(transaction.amount, transaction.currency)
   const label = `${transaction.fromAccount}에서 ${transaction.toAccount}으로 ${amount} ${transaction.format} 송금 흐름`
   const labelId = `transaction-flow-${transaction.id}`
-  return <figure data-testid="transaction-mini-sankey" className="rounded-md border bg-muted/20 p-3" aria-labelledby={labelId}>
-    <span id={labelId} className="sr-only">{label}</span>
-    <div className="relative grid min-h-28 grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-center gap-2">
+  return <Box as="figure" data-testid="transaction-mini-sankey" className="rounded-md border bg-muted/20 p-3" aria-labelledby={labelId}>
+    <Text as="span" id={labelId} className="sr-only">{label}</Text>
+    <Box className="relative grid min-h-28 grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-center gap-2">
       <svg viewBox="0 0 420 112" aria-hidden="true" focusable="false" className="pointer-events-none absolute inset-0 h-full w-full">
         <path d="M118 38 C176 38 244 38 302 38 L302 74 C244 74 176 74 118 74 Z" className={transaction.suspicious ? 'fill-destructive/35' : 'fill-muted-foreground/35'} />
       </svg>
-      <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2"><p className="truncate text-[0.625rem] text-muted-foreground">송금 소유주</p><p className="mt-1 break-words text-[0.6875rem] font-medium leading-tight" title={transaction.fromOwner}>{transaction.fromOwner}</p><p className="mt-1 truncate font-mono text-[0.6875rem] text-muted-foreground">{transaction.fromAccount}</p></div>
-      <p className="relative z-10 flex min-w-0 items-center justify-center gap-1 rounded-full bg-card/90 px-1 py-1 text-center text-[0.625rem] font-medium tabular-nums" title={amount}><span className="truncate">{amount}</span><ArrowRight data-testid="transaction-flow-direction" aria-hidden="true" className="size-3 shrink-0" /></p>
-      <div className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2 text-right"><p className="truncate text-[0.625rem] text-muted-foreground">수취 소유주</p><p className="mt-1 break-words text-[0.6875rem] font-medium leading-tight" title={transaction.toOwner}>{transaction.toOwner}</p><p className="mt-1 truncate font-mono text-[0.6875rem] text-muted-foreground">{transaction.toAccount}</p></div>
-    </div>
-  </figure>
+      <Box className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2"><Text className="truncate text-[0.625rem] text-muted-foreground">송금 소유주</Text><Text className="mt-1 break-words text-[0.6875rem] font-medium leading-tight" title={transaction.fromOwner}>{transaction.fromOwner}</Text><Text className="mt-1 truncate font-mono text-[0.6875rem] text-muted-foreground">{transaction.fromAccount}</Text></Box>
+      <Text className="relative z-10 flex min-w-0 items-center justify-center gap-1 rounded-full bg-card/90 px-1 py-1 text-center text-[0.625rem] font-medium tabular-nums" title={amount}><Text as="span" className="truncate">{amount}</Text><ArrowRight data-testid="transaction-flow-direction" aria-hidden="true" className="size-3 shrink-0" /></Text>
+      <Box className="relative z-10 min-w-0 rounded-md border bg-card px-3 py-2 text-right"><Text className="truncate text-[0.625rem] text-muted-foreground">수취 소유주</Text><Text className="mt-1 break-words text-[0.6875rem] font-medium leading-tight" title={transaction.toOwner}>{transaction.toOwner}</Text><Text className="mt-1 truncate font-mono text-[0.6875rem] text-muted-foreground">{transaction.toAccount}</Text></Box>
+    </Box>
+  </Box>
 }
 
 function RecordLinks({ ids, kind, plain, onOpen }: { ids: number[]; kind: 'Alert' | 'Episode'; plain?: boolean; onOpen?: (id: number) => void }) {
   const prefix = kind === 'Alert' ? 'A' : 'E'
-  if (plain) return <div className="flex flex-wrap gap-2">{ids.map(id => onOpen ? <Badge key={id} asChild variant="outline"><button type="button" onClick={() => onOpen(id)} title={`${prefix}-${id} 상세 보기`}>Alert · A-{id}</button></Badge> : <Badge key={id} variant="outline">Alert · A-{id}</Badge>)}</div>
-  return <div className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} asChild variant="outline" className="record-link h-8 rounded-full px-3 font-mono text-xs"><a onClick={event => { if (onOpen) { event.preventDefault(); onOpen(id) } }} href={hrefFor(kind === 'Alert' ? 'alerts' : 'episodes', id)} title={`${prefix}-${id} 상세 보기`}>{kind} · {prefix}-{id}</a></Badge>)}</div>
+  if (plain) return <Box className="flex flex-wrap gap-2">{ids.map(id => onOpen ? <Badge key={id} asChild variant="outline"><button type="button" onClick={() => onOpen(id)} title={`${prefix}-${id} 상세 보기`}>Alert · A-{id}</button></Badge> : <Badge key={id} variant="outline">Alert · A-{id}</Badge>)}</Box>
+  return <Box className="flex flex-wrap gap-2">{ids.map(id => <Badge key={id} asChild variant="outline" className="record-link h-8 rounded-full px-3 font-mono text-xs"><a onClick={event => { if (onOpen) { event.preventDefault(); onOpen(id) } }} href={hrefFor(kind === 'Alert' ? 'alerts' : 'episodes', id)} title={`${prefix}-${id} 상세 보기`}>{kind} · {prefix}-{id}</a></Badge>)}</Box>
 }
 
 function LinkedRecordActions({ transaction, remote, onOpenEpisode, onOpenAlert }: { transaction: IndexedTransaction; remote?: boolean; onOpenEpisode?: (id: number) => void; onOpenAlert?: (id: number) => void }) {
   const { alertIds: alerts, episodeIds: episodes } = transaction
   if (!alerts.length && !episodes.length) return null
-  return <div data-testid="linked-record-actions" className="flex flex-wrap gap-3 border-t pt-3">
-    {alerts.length > 0 && <div className="space-y-1.5"><p className="text-[var(--text-micro-size)] text-muted-foreground">연결 Alert</p><RecordLinks ids={alerts} kind="Alert" plain={remote} onOpen={onOpenAlert} /></div>}
-    {episodes.length > 0 && <div className="space-y-1.5"><p className="text-[var(--text-micro-size)] text-muted-foreground">연결 Episode</p><RecordLinks ids={episodes} kind="Episode" onOpen={onOpenEpisode} /></div>}
-  </div>
+  return <Box data-testid="linked-record-actions" className="flex flex-wrap gap-3 border-t pt-3">
+    {alerts.length > 0 && <Box className="space-y-1.5"><Text className="text-[var(--text-micro-size)] text-muted-foreground">연결 Alert</Text><RecordLinks ids={alerts} kind="Alert" plain={remote} onOpen={onOpenAlert} /></Box>}
+    {episodes.length > 0 && <Box className="space-y-1.5"><Text className="text-[var(--text-micro-size)] text-muted-foreground">연결 Episode</Text><RecordLinks ids={episodes} kind="Episode" onOpen={onOpenEpisode} /></Box>}
+  </Box>
 }
 
 function ownerMatches(owner: IndexedOwner, query: string, accounts: IndexedAccount[], transactions: IndexedTransaction[]) {
@@ -186,24 +187,24 @@ export default function TransactionExplorer({ index, target, today, remote }: { 
   const resetControls = () => applyControls('', undefined, [])
   const addFilter = () => { const next = filters.some(item => item.field === filterField && item.value === filterValue) ? filters : [...filters, { field: filterField, value: filterValue }]; applyControls(query, range, next); setFilterOpen(false) }
 
-  return <div className="flex flex-col gap-5" data-testid="transactions-table">
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="relative w-full max-w-sm"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="거래 내역 검색" value={query} onChange={event => applyControls(event.target.value, range, filters)} placeholder="거래 ID, 소유주, 계좌 검색" className="h-9 pl-9 text-xs" /></div>
+  return <Box className="flex flex-col gap-5" data-testid="transactions-table">
+    <Box className="flex flex-wrap items-center gap-2">
+      <Box className="relative w-full max-w-sm"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="거래 내역 검색" value={query} onChange={event => applyControls(event.target.value, range, filters)} placeholder="거래 ID, 소유주, 계좌 검색" className="h-9 pl-9 text-xs" /></Box>
       <DateRangeButton value={range} onChange={next => applyControls(query, next, filters)} today={today} />
       <Popover open={filterOpen} onOpenChange={setFilterOpen}><PopoverTrigger asChild><Button type="button" variant="outline" size="sm" className="transaction-filter-trigger date-range-control h-9"><ListFilter className="size-3.5" />필터{filters.length > 0 && <Badge className="ml-1 h-5 min-w-5 px-1.5">{filters.length}</Badge>}</Button></PopoverTrigger><PopoverContent align="start" className="w-72 space-y-3"><Label>조건 추가</Label><Select value={filterField} onValueChange={value => { const field = value as TransactionFilterField; setFilterField(field); setFilterValue(filterValues[field][0]) }}><SelectTrigger className="w-full" aria-label="거래 내역 필터 항목"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(filterLabels).filter(([key]) => !remote || remote.account || key !== 'direction').map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select><Select value={filterValue} onValueChange={setFilterValue}><SelectTrigger className="w-full" aria-label="거래 내역 필터 값"><SelectValue /></SelectTrigger><SelectContent>{filterValues[filterField].map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select><Button className="w-full" size="sm" onClick={addFilter}>조건 적용</Button></PopoverContent></Popover>
       {(query || range?.from || filters.length > 0) && <Button type="button" variant="ghost" size="sm" onClick={resetControls}><X className="size-3.5" />전체 보기</Button>}
       {/* Live 조회는 기존 원장 API의 선택적 owner/account 필터를 사용한다. */}
-    </div>
-    {filters.length > 0 && <div className="flex flex-wrap items-center gap-2">{filters.map((filter, index) => <FilterChip key={`${filter.field}-${filter.value}`} onRemove={() => applyControls(query, range, filters.filter((_, current) => current !== index))}>{filterLabels[filter.field]}: {filter.value}</FilterChip>)}</div>}
-    <div data-testid="transactions-explorer" className="transactions-explorer">
-      <div data-testid="transactions-flow" className="transactions-flow grid gap-3">
-        <StagePanel testId="owner-section" bodyTestId="owner-stage-body" title="소유주" count={remote ? remote.counts[0] : visibleOwners.length}>{<div data-testid="selected-owner-item" aria-live="polite" className={`rounded-lg border px-3 py-3 text-sm ${owner ? 'border-foreground bg-foreground text-background' : 'border-dashed bg-muted/10 text-muted-foreground'}`}>{owner ? <><p className="font-medium">{owner.name}</p><p className="mt-1 text-[var(--text-micro-size)] text-background/70">{remote ? '가명 소유주' : `계좌 ${owner.accountIds.length}개 · 거래 ${owner.transactionIds.length}건`}</p></> : '소유주를 선택해 주세요'}</div>}<div data-testid="owner-scroll-list" className="transaction-owner-scroll mt-4 border-t-2 border-border pt-4">{visibleOwners.map(item => <StageItem key={item.id ?? item.name} testId="owner-item" active={(item.id ?? item.name) === (owner?.id ?? owner?.name)} primary={item.name} secondary={remote ? '가명 소유주' : `계좌 ${item.accountIds.length}개 · 거래 ${item.transactionIds.length}건`} onSelect={() => selectOwner(item)} />)}</div>{remote?.stages[0]}</StagePanel>
+    </Box>
+    {filters.length > 0 && <Box className="flex flex-wrap items-center gap-2">{filters.map((filter, index) => <FilterChip key={`${filter.field}-${filter.value}`} onRemove={() => applyControls(query, range, filters.filter((_, current) => current !== index))}>{filterLabels[filter.field]}: {filter.value}</FilterChip>)}</Box>}
+    <Box data-testid="transactions-explorer" className="transactions-explorer">
+      <Box data-testid="transactions-flow" className="transactions-flow grid gap-3">
+        <StagePanel testId="owner-section" bodyTestId="owner-stage-body" title="소유주" count={remote ? remote.counts[0] : visibleOwners.length}>{<Box data-testid="selected-owner-item" aria-live="polite" className={`rounded-lg border px-3 py-3 text-sm ${owner ? 'border-foreground bg-foreground text-background' : 'border-dashed bg-muted/10 text-muted-foreground'}`}>{owner ? <><Text className="font-medium">{owner.name}</Text><Text className="mt-1 text-[var(--text-micro-size)] text-background/70">{remote ? '가명 소유주' : `계좌 ${owner.accountIds.length}개 · 거래 ${owner.transactionIds.length}건`}</Text></> : '소유주를 선택해 주세요'}</Box>}<Box data-testid="owner-scroll-list" className="transaction-owner-scroll mt-4 border-t-2 border-border pt-4">{visibleOwners.map(item => <StageItem key={item.id ?? item.name} testId="owner-item" active={(item.id ?? item.name) === (owner?.id ?? owner?.name)} primary={item.name} secondary={remote ? '가명 소유주' : `계좌 ${item.accountIds.length}개 · 거래 ${item.transactionIds.length}건`} onSelect={() => selectOwner(item)} />)}</Box>{remote?.stages[0]}</StagePanel>
         <OrthogonalConnector id="owner-account-connector" sourceIndex={0} targetCount={owner ? ownerAccounts.length : 0} targetOffset={110} activeTargetIndex={ownerAccounts.findIndex(item => item.id === account?.id)} />
         <StagePanel testId="account-section" title="계좌" count={remote ? remote.counts[1] : ownerAccounts.length} description={owner ? `${owner.name}의 계좌` : remote ? undefined : '소유주를 선택하세요'}>{ownerAccounts.map(item => <StageItem key={item.id} testId="account-item" active={item.id === account?.id} primary={item.id} secondary={remote ? `은행 ${item.bank}` : `은행 ${item.bank} · 거래 ${item.transactionIds.length}건`} mono onSelect={() => selectAccount(item)} />)}{remote?.stages[1]}</StagePanel>
         <OrthogonalConnector id="account-transaction-connector" sourceIndex={ownerAccounts.findIndex(item => item.id === account?.id)} targetCount={account ? transactionRows.length : 0} targetOffset={110} activeTargetIndex={transactionRows.findIndex(item => item.id === selectedTransactionId)} />
-        <StagePanel testId="transaction-section" title="거래" count={remote ? remote.counts[2] : transactionRows.length} description={account ? `${account.id}의 거래 내역` : remote ? undefined : '계좌를 선택하세요'}><div data-testid="transaction-list">{transactionRows.map(item => <StageItem key={item.id} testId="transaction-item" active={item.id === selectedTransactionId} primary={item.id} secondary={<>{item.direction && <Badge variant="ghost" className="bg-foreground !border-transparent !text-background font-normal">{item.direction}</Badge>}<Badge variant={item.suspicious ? 'destructive' : 'ghost'} className={item.suspicious ? '!border-transparent !text-destructive-foreground font-normal' : 'bg-foreground !border-transparent !text-background font-normal'}>{item.suspicious === null ? '미분석' : item.suspicious ? '의심' : '정상'}</Badge></>} mono onSelect={() => selectTransaction(item)} />)}</div>{remote?.stages[2]}</StagePanel>
-        <Card className="transaction-detail self-start" data-testid="transaction-detail"><CardHeader><CardTitle className="text-sm">선택 거래 상세</CardTitle><CardDescription className={selected ? 'font-mono' : ''}>{selected?.id ?? '거래를 선택하세요'}</CardDescription>{selected && <LinkedRecordActions transaction={selected} remote={Boolean(remote)} onOpenEpisode={remote?.onOpenEpisode} onOpenAlert={remote?.onOpenAlert} />}</CardHeader>{selected && <CardContent data-testid="selected-transaction" className="grid gap-5 text-xs"><TransactionMiniSankey transaction={selected} /><div className="grid grid-cols-2 gap-4"><div><p className="text-muted-foreground">거래 시각</p><p className="mt-1 tabular-nums">{selected.at.slice(0, 16).replace('T', ' ')}</p></div><div><p className="text-muted-foreground">결제 수단</p><p className="mt-1">{selected.format}</p></div></div><div><p className="text-muted-foreground">상태</p><Badge className="mt-1" variant={selected.suspicious ? 'destructive' : 'outline'}>{selected.suspicious === null ? '미분석' : selected.suspicious ? '의심' : '정상'}</Badge></div></CardContent>}</Card>
-      </div>
-    </div>
-  </div>
+        <StagePanel testId="transaction-section" title="거래" count={remote ? remote.counts[2] : transactionRows.length} description={account ? `${account.id}의 거래 내역` : remote ? undefined : '계좌를 선택하세요'}><Box data-testid="transaction-list">{transactionRows.map(item => <StageItem key={item.id} testId="transaction-item" active={item.id === selectedTransactionId} primary={item.id} secondary={<>{item.direction && <Badge variant="ghost" className="bg-foreground !border-transparent !text-background font-normal">{item.direction}</Badge>}<Badge variant={item.suspicious ? 'destructive' : 'ghost'} className={item.suspicious ? '!border-transparent !text-destructive-foreground font-normal' : 'bg-foreground !border-transparent !text-background font-normal'}>{item.suspicious === null ? '미분석' : item.suspicious ? '의심' : '정상'}</Badge></>} mono onSelect={() => selectTransaction(item)} />)}</Box>{remote?.stages[2]}</StagePanel>
+        <Card className="transaction-detail self-start" data-testid="transaction-detail"><CardHeader><CardTitle className="text-sm">선택 거래 상세</CardTitle><CardDescription className={selected ? 'font-mono' : ''}>{selected?.id ?? '거래를 선택하세요'}</CardDescription>{selected && <LinkedRecordActions transaction={selected} remote={Boolean(remote)} onOpenEpisode={remote?.onOpenEpisode} onOpenAlert={remote?.onOpenAlert} />}</CardHeader>{selected && <CardContent data-testid="selected-transaction" className="grid gap-5 text-xs"><TransactionMiniSankey transaction={selected} /><Box className="grid grid-cols-2 gap-4"><Box><Text className="text-muted-foreground">거래 시각</Text><Text className="mt-1 tabular-nums">{selected.at.slice(0, 16).replace('T', ' ')}</Text></Box><Box><Text className="text-muted-foreground">결제 수단</Text><Text className="mt-1">{selected.format}</Text></Box></Box><Box><Text className="text-muted-foreground">상태</Text><Badge className="mt-1" variant={selected.suspicious ? 'destructive' : 'outline'}>{selected.suspicious === null ? '미분석' : selected.suspicious ? '의심' : '정상'}</Badge></Box></CardContent>}</Card>
+      </Box>
+    </Box>
+  </Box>
 }

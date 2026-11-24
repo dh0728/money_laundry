@@ -10,6 +10,7 @@ import { live } from '@/lib/apiMode'
 import type { AgentRecord } from './agentData'
 import { RadarSweep } from './RadarSweep'
 import { appReducedMotion } from '@/hooks/use-reduced-motion'
+import { Box, Text } from '@/components/layout-primitives'
 
 export type AgentMode = 'sidebar' | 'floating'
 const name = 'RDR 9000'
@@ -122,35 +123,35 @@ export default function Agent({ open, setOpen, closeRef, mode, setMode, record, 
     setInput('')
   }
   if (!open) return null
-  const header = <div data-testid="agent-header" className={`agent-drag-handle flex items-center justify-between gap-2 border-b px-3 py-2.5 ${mode === 'floating' ? 'cursor-move' : ''}`}>
-    <span className="flex items-center gap-2 font-mono text-sm font-semibold tracking-wide"><button ref={avatarRef} type="button" aria-label={`${name} 심볼로 닫기`} onClick={requestClose} disabled={Boolean(morph) || closing} className={`agent-logo rdr-avatar size-6 shrink-0 rounded-full p-0 ${morph ? 'invisible opacity-0' : ''}`}><RadarSweep className="size-6" /></button>{name}{live && <span className="rounded-full border px-2 py-0.5 font-sans text-[0.625rem] font-normal">mock</span>}</span>
-    <div className="agent-action flex gap-0.5">
+  const header = <Box data-testid="agent-header" className={`agent-drag-handle flex items-center justify-between gap-2 border-b px-3 py-2.5 ${mode === 'floating' ? 'cursor-move' : ''}`}>
+    <Text as="span" className="flex items-center gap-2 font-mono text-sm font-semibold tracking-wide"><button ref={avatarRef} type="button" aria-label={`${name} 심볼로 닫기`} onClick={requestClose} disabled={Boolean(morph) || closing} className={`agent-logo rdr-avatar size-6 shrink-0 rounded-full p-0 ${morph ? 'invisible opacity-0' : ''}`}><RadarSweep className="size-6" /></button>{name}{live && <Text as="span" className="rounded-full border px-2 py-0.5 font-sans text-[0.625rem] font-normal">mock</Text>}</Text>
+    <Box className="agent-action flex gap-0.5">
       <IconButton label="새 대화" className="size-8" onClick={() => setMessages([])}><Plus className="size-4" /></IconButton>
       <IconButton label={mode === 'sidebar' ? '플로팅 패널로 보기' : '우측 사이드바로 보기'} className="size-8" onClick={() => setMode(mode === 'sidebar' ? 'floating' : 'sidebar')}>
         {mode === 'sidebar' ? <PictureInPicture2 className="size-4" /> : <PanelRight className="size-4" />}
       </IconButton>
       <IconButton label={`${name} 닫기`} className="size-8" onClick={requestClose}><X className="size-4" /></IconButton>
-    </div>
-  </div>
-  const content = <section aria-label={name} data-mode={mode} data-closing={closing || undefined} className={`agent-panel flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-background shadow-xl ${closing ? 'pointer-events-none opacity-0' : ''}`}>
+    </Box>
+  </Box>
+  const content = <Box as="section" aria-label={name} data-mode={mode} data-closing={closing || undefined} className={`agent-panel flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-background shadow-xl ${closing ? 'pointer-events-none opacity-0' : ''}`}>
     {header}
-    <div className="flex items-center gap-2 px-4 py-3 text-[0.6875rem] text-muted-foreground"><span>{record?.id ?? '전체 업무 · 오늘 요약'}</span></div>
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-      <div className="space-y-3"><p className="whitespace-pre-wrap text-sm leading-7">{summary}</p>
-        <div className="flex flex-wrap gap-2">{['주요 근거 확인', '검토 우선순위 요약'].map(question => <Button key={question} variant="outline" size="sm" className="text-xs" onClick={() => send(question)}>{question}</Button>)}</div>
-      </div>
-      {messages.map((message, index) => <p key={index} className={message.role === 'user' ? 'ml-auto mt-4 w-fit max-w-[80%] rounded-2xl bg-muted px-4 py-2.5 text-sm' : 'mt-4 whitespace-pre-wrap text-sm leading-7'}>{message.text}</p>)}
-    </div>
-    <form className="border-t p-4" onSubmit={event => { event.preventDefault(); send() }}>
-      <div className="relative"><Textarea aria-label={`${name}에게 질문`} placeholder="현재 조사에 대해 질문하세요" className="min-h-24 resize-y pr-12 text-xs" value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} />
-        <Button size="icon" className="absolute bottom-2 right-2 size-7" disabled={!input.trim()} aria-label="질문 보내기"><Send className="size-3.5" /></Button></div>
-      <p className="mt-2 text-center text-[0.625rem] text-muted-foreground">판단과 최종 처리는 조사자가 수행합니다.</p>
-    </form>
-  </section>
-  const morphLayer = morph && createPortal(<div aria-hidden data-testid="rdr-morph" className="rdr-morph pointer-events-none fixed z-[80] overflow-hidden rounded-full" style={{ left: morph.rect.left, top: morph.rect.top, width: morph.rect.width, height: morph.rect.height }}><RadarSweep className="size-full" /></div>, document.body)
-  if (mode === 'sidebar') return <>{morphLayer}<div className="fixed right-0 top-[60px] z-50 h-[calc(100dvh-60px)] max-w-[92vw]" style={{ width: sidebarWidth }}>
-    <div role="separator" aria-orientation="vertical" aria-label="도우미 너비 조절" className="agent-resize-handle agent-resize-handle-x absolute inset-y-0 left-0 z-[51]" onPointerDown={event => { resizeRef.current = { x: event.clientX, width: sidebarWidth }; event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { const start = resizeRef.current; if (start) setSidebarWidth(clamp(start.width + start.x - event.clientX, 320, Math.min(720, innerWidth * .92))) }} onPointerUp={() => { resizeRef.current = null }} />
+    <Box className="flex items-center gap-2 px-4 py-3 text-[0.6875rem] text-muted-foreground"><Text as="span">{record?.id ?? '전체 업무 · 오늘 요약'}</Text></Box>
+    <Box className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+      <Box className="space-y-3"><Text className="whitespace-pre-wrap text-sm leading-7">{summary}</Text>
+        <Box className="flex flex-wrap gap-2">{['주요 근거 확인', '검토 우선순위 요약'].map(question => <Button key={question} variant="outline" size="sm" className="text-xs" onClick={() => send(question)}>{question}</Button>)}</Box>
+      </Box>
+      {messages.map((message, index) => <Text key={index} className={message.role === 'user' ? 'ml-auto mt-4 w-fit max-w-[80%] rounded-2xl bg-muted px-4 py-2.5 text-sm' : 'mt-4 whitespace-pre-wrap text-sm leading-7'}>{message.text}</Text>)}
+    </Box>
+    <Box as="form" className="border-t p-4" onSubmit={event => { event.preventDefault(); send() }}>
+      <Box className="relative"><Textarea aria-label={`${name}에게 질문`} placeholder="현재 조사에 대해 질문하세요" className="min-h-24 resize-y pr-12 text-xs" value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} />
+        <Button size="icon" className="absolute bottom-2 right-2 size-7" disabled={!input.trim()} aria-label="질문 보내기"><Send className="size-3.5" /></Button></Box>
+      <Text className="mt-2 text-center text-[0.625rem] text-muted-foreground">판단과 최종 처리는 조사자가 수행합니다.</Text>
+    </Box>
+  </Box>
+  const morphLayer = morph && createPortal(<Box aria-hidden data-testid="rdr-morph" className="rdr-morph pointer-events-none fixed z-[80] overflow-hidden rounded-full" style={{ left: morph.rect.left, top: morph.rect.top, width: morph.rect.width, height: morph.rect.height }}><RadarSweep className="size-full" /></Box>, document.body)
+  if (mode === 'sidebar') return <>{morphLayer}<Box className="fixed right-0 top-[60px] z-50 h-[calc(100dvh-60px)] max-w-[92vw]" style={{ width: sidebarWidth }}>
+    <Box role="separator" aria-orientation="vertical" aria-label="도우미 너비 조절" className="agent-resize-handle agent-resize-handle-x absolute inset-y-0 left-0 z-[51]" onPointerDown={event => { resizeRef.current = { x: event.clientX, width: sidebarWidth }; event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { const start = resizeRef.current; if (start) setSidebarWidth(clamp(start.width + start.x - event.clientX, 320, Math.min(720, innerWidth * .92))) }} onPointerUp={() => { resizeRef.current = null }} />
     {content}
-  </div></>
-  return <>{morphLayer}{createPortal(<div className="pointer-events-none fixed inset-0 z-50"><Rnd bounds="parent" dragHandleClassName="agent-drag-handle" cancel=".agent-action,.agent-logo" size={floatSize} position={floatPosition} minWidth={Math.min(320, innerWidth - 16)} minHeight={Math.min(360, innerHeight - 16)} maxWidth={innerWidth - 16} maxHeight={innerHeight - 16} onDragStop={(_, position) => setFloatPosition({ x: position.x, y: position.y })} onResizeStop={(_, __, element, ___, position) => { setFloatSize({ width: element.offsetWidth, height: element.offsetHeight }); setFloatPosition(position) }} className="pointer-events-auto">{content}</Rnd></div>, document.body)}</>
+  </Box></>
+  return <>{morphLayer}{createPortal(<Box className="pointer-events-none fixed inset-0 z-50"><Rnd bounds="parent" dragHandleClassName="agent-drag-handle" cancel=".agent-action,.agent-logo" size={floatSize} position={floatPosition} minWidth={Math.min(320, innerWidth - 16)} minHeight={Math.min(360, innerHeight - 16)} maxWidth={innerWidth - 16} maxHeight={innerHeight - 16} onDragStop={(_, position) => setFloatPosition({ x: position.x, y: position.y })} onResizeStop={(_, __, element, ___, position) => { setFloatSize({ width: element.offsetWidth, height: element.offsetHeight }); setFloatPosition(position) }} className="pointer-events-auto">{content}</Rnd></Box>, document.body)}</>
 }

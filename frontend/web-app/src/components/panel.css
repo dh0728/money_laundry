@@ -1,14 +1,6 @@
-.panel-inset {
-  --panel-material-solid: light-dark(var(--information-panel-surface), var(--aml-gray-020));
-  --panel-material-depth: 0 0 0 transparent;
+.panel-disclosure {
   min-inline-size: 0;
   border-radius: var(--aml-radius-card);
-}
-
-:root:not([data-glassmorphism="false"]) .panel-inset {
-  --panel-material-depth:
-    inset 0 var(--aml-stroke-control) var(--aml-space-4) var(--glass-shell-highlight),
-    inset 0 0 var(--aml-space-12) light-dark(var(--aml-white-060), var(--aml-white-010));
 }
 
 .panel-disclosure-trigger {

@@ -25,6 +25,7 @@ import { useMemoryState } from '@/lib/memory'
 import { episodeWorkStatus, workStatusLabels, type WorkStatus } from '@/lib/workStatus'
 import { ageOptions } from '@/features/alerts/alertFilters'
 import { episodeFilterLabel, episodeFilterNames, matchesEpisode, riskOptions, type EpisodeFilter, type EpisodeFilterField } from './episodeFilters'
+import { Box, Text } from '@/components/layout-primitives'
 
 export function EpisodeStatusBadge({ status, reviewRequested }: { status: EpisodeStatus; reviewRequested?: boolean }) {
   // Q4(10/8): Alert 상태와 같은 말을 쓴다. 관리자 검수 넘기기는 API가 없어 표시하지 않는다(재설계 S5)
@@ -39,26 +40,26 @@ const columns: ColumnDef<EpisodeListRow>[] = [
     id: 'episodeId', accessorKey: 'episodeId',
     header: ({ column }) => <DataTableColumnHeader column={column} label="ID / 구성" />,
     cell: ({ row }) => (
-      <div className="min-w-0 max-w-[340px]">
-        <p className="font-mono text-sm" translate="no">{episodeCode(row.original.episodeId)}</p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">Alert {row.original.alertCount}건 · 유형 {row.original.primaryTypes.length}개</p>
-      </div>
+      <Box className="min-w-0 max-w-[340px]">
+        <Text className="font-mono text-sm" translate="no">{episodeCode(row.original.episodeId)}</Text>
+        <Text className="mt-1 truncate text-xs text-muted-foreground">Alert {row.original.alertCount}건 · 유형 {row.original.primaryTypes.length}개</Text>
+      </Box>
     ),
   },
   { id: 'riskScore', accessorKey: 'riskScore', header: ({ column }) => <DataTableColumnHeader column={column} label="위험도" />, cell: ({ row }) => <RiskBadge score={row.original.riskScore} /> },
   {
     id: 'types', header: '탐지 유형', enableSorting: false,
-    cell: ({ row }) => <div className="flex flex-wrap gap-1">{row.original.primaryTypes.map(t => <span key={t.name}>{t.code == null ? <Badge variant="outline">{t.name}</Badge> : <PatternBadge code={t.code} />}</span>)}</div>,
+    cell: ({ row }) => <Box className="flex flex-wrap gap-1">{row.original.primaryTypes.map(t => <Text as="span" key={t.name}>{t.code == null ? <Badge variant="outline">{t.name}</Badge> : <PatternBadge code={t.code} />}</Text>)}</Box>,
   },
-  { id: 'totalAmountUsd', accessorKey: 'totalAmountUsd', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.amountLabel ?? (row.original.totalAmountUsd == null ? '—' : usd(row.original.totalAmountUsd))}</div> },
-  { id: 'alertCount', accessorKey: 'alertCount', header: ({ column }) => <DataTableColumnHeader column={column} label="Alert" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.alertCount}건</div> },
-  { id: 'txCount', accessorKey: 'txCount', header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />, cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.txCount}건</div> },
+  { id: 'totalAmountUsd', accessorKey: 'totalAmountUsd', header: ({ column }) => <DataTableColumnHeader column={column} label="거래 총액" className="flex-row-reverse justify-start" />, cell: ({ row }) => <Box className="text-right text-sm tabular-nums">{row.original.amountLabel ?? (row.original.totalAmountUsd == null ? '—' : usd(row.original.totalAmountUsd))}</Box> },
+  { id: 'alertCount', accessorKey: 'alertCount', header: ({ column }) => <DataTableColumnHeader column={column} label="Alert" className="flex-row-reverse justify-start" />, cell: ({ row }) => <Box className="text-right text-sm tabular-nums">{row.original.alertCount}건</Box> },
+  { id: 'txCount', accessorKey: 'txCount', header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />, cell: ({ row }) => <Box className="text-right text-sm tabular-nums">{row.original.txCount}건</Box> },
   { id: 'assignee', accessorFn: row => row.assignee.name, header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" /> },
   { id: 'status', accessorKey: 'status', header: ({ column }) => <DataTableColumnHeader column={column} label="상태" />, cell: ({ row }) => <EpisodeStatusBadge status={row.original.status} reviewRequested={Boolean(row.original.reviewRequestedAt)} /> },
   {
     id: 'createdAt', accessorKey: 'createdAt',
     header: ({ column }) => <DataTableColumnHeader column={column} label="생성일" />,
-    cell: ({ row }) => <div className="flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground"><span>{row.original.createdAt.slice(5, 10)}</span><AgeBadge days={row.original.ageDays} /></div>,
+    cell: ({ row }) => <Box className="flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground"><Text as="span">{row.original.createdAt.slice(5, 10)}</Text><AgeBadge days={row.original.ageDays} /></Box>,
   },
 ]
 
@@ -122,17 +123,17 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
   }
 
   return (
-    <div className="max-w-[1320px] space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative mr-1 w-64">
+    <Box className="max-w-[1320px] space-y-4">
+      <Box className="flex flex-wrap items-center gap-2">
+        <Box className="relative mr-1 w-64">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
           <Input aria-label="Episode 검색" placeholder="ID, 탐지 유형, 담당자 검색" value={query} onChange={e => { setQuery(e.target.value); toFirst() }} className="h-9 pl-9 text-xs" />
-        </div>
+        </Box>
         <DateRangeButton value={range} onChange={r => { setRange(r); toFirst() }} today={today} />
         <Popover open={filterOpen} onOpenChange={setFilterOpen}>
           <PopoverTrigger asChild><Button variant="outline" size="sm" className="filter-trigger date-range-control h-9"><ListFilter data-icon="inline-start" />필터{filters.length > 0 && <Badge className="ml-1 h-5 min-w-5 px-1.5">{filters.length}</Badge>}</Button></PopoverTrigger>
           <PopoverContent align="start" className="w-72 space-y-3">
-            <div className="flex items-center justify-between"><Label>조건 추가</Label>{['type', 'risk', 'age'].includes(field) && <ProvenanceBadge kind="proposal" title="이 조건은 Episode 목록 API에 없어 현재 불러온 목록에서만 적용됩니다." />}</div>
+            <Box className="flex items-center justify-between"><Label>조건 추가</Label>{['type', 'risk', 'age'].includes(field) && <ProvenanceBadge kind="proposal" title="이 조건은 Episode 목록 API에 없어 현재 불러온 목록에서만 적용됩니다." />}</Box>
             <Select value={field} onValueChange={v => { const f = v as EpisodeFilterField; setField(f); setValue(valueOptions[f][0].value) }}>
               <SelectTrigger className="w-full" aria-label="필터 항목"><SelectValue /></SelectTrigger>
               <SelectContent>{Object.entries(episodeFilterNames).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
@@ -149,24 +150,24 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
           </PopoverContent>
         </Popover>
         <Button variant="outline" size="sm" className="ml-auto" onClick={download}><Download className="size-3.5" />{remote ? '현재 페이지 다운로드' : '다운로드'}</Button>
-      </div>
+      </Box>
       {filters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {filters.map((filter, i) => <span key={`${filter.field}-${filter.value}`} className="inline-flex items-center gap-1"><FilterChip onRemove={() => { setFilters(prev => prev.filter((_, j) => j !== i)); toFirst() }}>{episodeFilterLabel(filter, id => assignees.get(id) ?? String(id), me)}</FilterChip>{['type', 'risk', 'age'].includes(filter.field) && <ProvenanceBadge kind="proposal" title="이 조건은 Episode 목록 API에 없어 현재 불러온 목록에서만 적용됩니다." />}</span>)}
+        <Box className="flex flex-wrap items-center gap-2">
+          {filters.map((filter, i) => <Text as="span" key={`${filter.field}-${filter.value}`} className="inline-flex items-center gap-1"><FilterChip onRemove={() => { setFilters(prev => prev.filter((_, j) => j !== i)); toFirst() }}>{episodeFilterLabel(filter, id => assignees.get(id) ?? String(id), me)}</FilterChip>{['type', 'risk', 'age'].includes(filter.field) && <ProvenanceBadge kind="proposal" title="이 조건은 Episode 목록 API에 없어 현재 불러온 목록에서만 적용됩니다." />}</Text>)}
           <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={reset}>모든 조건 지우기</Button>
-        </div>
+        </Box>
       )}
       {result.length
         ? <DataTable pagination={!remote} table={table} columnWidths={columnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={onOpen} data-testid="episode-table" />
         : (
-          <div className="glass-surface rounded-md border py-20 text-center">
+          <Box className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />
-            <p className="text-sm">조건에 맞는 Episode가 없습니다.</p>
-            <p className="mb-4 mt-2 text-xs text-muted-foreground">검색어와 필터를 확인하세요.</p>
+            <Text className="text-sm">조건에 맞는 Episode가 없습니다.</Text>
+            <Text className="mb-4 mt-2 text-xs text-muted-foreground">검색어와 필터를 확인하세요.</Text>
             <Button size="sm" variant="outline" onClick={reset}>전체 목록 보기</Button>
-          </div>
+          </Box>
         )}
       {remote?.footer}
-    </div>
+    </Box>
   )
 }

@@ -11,6 +11,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { compactUsd, usd, type GraphModel, type GraphTransaction } from './model'
 import { IconButton } from '@/components/IconButton'
 import { readPanelBounds } from './model'
+import { Box, Heading, Text } from '@/components/layout-primitives'
 
 // 확대해도 글자는 화면 크기 그대로(Figma 섹션 이름·annotation처럼): 배율의 역수로 되돌린다
 const fixed = (zoom: number, origin: string) => ({ transform: `scale(${1 / zoom})`, transformBox: 'fill-box' as const, transformOrigin: origin })
@@ -73,10 +74,10 @@ export function sankeyLabelLayout({ x, y, width, height, index }: { x: number; y
 function FlowTip({ p }: { p: Record<string, unknown> }) {
   const content = flowTipContent(p)
   return (
-    <div className="grid min-w-[8rem] gap-1 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
-      <p className="font-medium font-mono" translate="no">{content.primary}</p>
-      <p className="tabular-nums text-muted-foreground">{content.secondary}</p>
-    </div>
+    <Box className="grid min-w-[8rem] gap-1 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+      <Text className="font-medium font-mono" translate="no">{content.primary}</Text>
+      <Text className="tabular-nums text-muted-foreground">{content.secondary}</Text>
+    </Box>
   )
 }
 
@@ -135,12 +136,12 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
   const [showInfo, setShowInfo] = useState(false), [zoom, setZoom] = useState(1), [fitted, setFitted] = useState(true)
 
   return (
-    <div className="flex flex-col gap-4" data-testid="flow-detail">
-      <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-4">
+    <Box className="flex flex-col gap-4" data-testid="flow-detail">
+      <Box className="grid grid-cols-2 @3xl:grid-cols-4 gap-4">
         {[['거래', `${txs.length}건`], ['합계', usd(total)], ['의심 거래', `${suspect.length}건 · ${compactUsd(suspect.reduce((s, t) => s + t.usd, 0))}`], ['기간', txs.length ? `${txs[0].at.slice(5, 16)} ~ ${txs[txs.length - 1].at.slice(5, 16)}` : '—']].map(([k, v]) => (
           <Card key={k} className="shadow-none"><CardHeader><CardDescription>{k}</CardDescription><CardTitle className="tabular-nums">{v}</CardTitle></CardHeader></Card>
         ))}
-      </div>
+      </Box>
       {data.links.length > 0 && (
         <Card className="relative shadow-none">
           <CardHeader>
@@ -155,9 +156,9 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
             {/* v20 R16: 표 없이 읽히도록 확대·축소·화면 맞춤(react-zoom-pan-pinch). 글자는 배율과 무관하게 화면 크기 고정 */}
             <TransformWrapper minScale={0.5} maxScale={6} smooth wheel={{ step: 0.0015 }} doubleClick={{ disabled: true }} onTransform={(_, s) => { setZoom(s.scale); setFitted(Math.abs(s.scale - 1) < .001 && Math.abs(s.positionX) < .5 && Math.abs(s.positionY) < .5) }}>
               {({ zoomIn, zoomOut, resetTransform }) => (
-                <div>
+                <Box>
                   <TransformComponent wrapperClass="!w-full rounded-md" contentClass="!w-full">
-                    <div className="h-[340px] w-full">
+                    <Box className="h-[340px] w-full">
                       <ResponsiveContainer>
                         <Sankey data={data} nodePadding={18} nodeWidth={10} margin={{ left: SANKEY_MARGIN_X, right: SANKEY_MARGIN_X, top: 22, bottom: 10 }}
                           link={({ sourceX, targetX, sourceY: rawSourceY, targetY: rawTargetY, sourceControlX, targetControlX, linkWidth, payload }) => {
@@ -187,21 +188,21 @@ export default function FlowDetail({ model, focus }: { model: GraphModel; focus:
                           <Tooltip content={({ active, payload }) => active && payload?.[0] ? <FlowTip p={payload[0].payload} /> : null} />
                         </Sankey>
                       </ResponsiveContainer>
-                    </div>
+                    </Box>
                   </TransformComponent>
-                  <div className="absolute bottom-3 right-3 flex items-center rounded-md border bg-card">
+                  <Box className="absolute bottom-3 right-3 flex items-center rounded-md border bg-card">
                     <IconButton label="축소" onClick={() => zoomOut()}><Minus className="size-3.5" /></IconButton>
-                    <span className="w-10 text-center text-[0.6875rem] tabular-nums">{Math.round(zoom * 100)}%</span>
+                    <Text as="span" className="w-10 text-center text-[0.6875rem] tabular-nums">{Math.round(zoom * 100)}%</Text>
                     <IconButton label="확대" onClick={() => zoomIn()}><Plus className="size-3.5" /></IconButton>
                     <IconButton label="화면 맞춤" disabled={fitted} onClick={() => resetTransform()}><Shrink className="size-3.5" /></IconButton>
-                  </div>
-                </div>
+                  </Box>
+                </Box>
               )}
             </TransformWrapper>
           </CardContent>
         </Card>
       )}
-    </div>
+    </Box>
   )
 }
 
@@ -235,21 +236,21 @@ export function FlowPanel({ model, focus, mode, onModeChange, onClose, extra }: 
     return () => { observer.disconnect(); window.removeEventListener('resize', reclamp) }
   }, [])
   const body = (
-    <div className="flex flex-col h-full min-h-0 bg-card" data-testid="flow-panel" data-mode={mode}>
-      <div className="flow-panel-handle flex items-center gap-2 border-b px-3 py-2 shrink-0">
-        <h3 className="flex-1 min-w-0 truncate text-sm font-semibold" translate="no">{flowLabel(model, focus)}</h3>
+    <Box className="flex flex-col h-full min-h-0 bg-card" data-testid="flow-panel" data-mode={mode}>
+      <Box className="flow-panel-handle flex items-center gap-2 border-b px-3 py-2 shrink-0">
+        <Heading level={3} className="flex-1 min-w-0 truncate text-sm font-semibold" translate="no">{flowLabel(model, focus)}</Heading>
         <IconButton label={mode === 'dock' ? '떠 있는 창으로 보기' : '오른쪽에 고정'} className="size-7" onClick={() => onModeChange(mode === 'dock' ? 'float' : 'dock')}>
           {mode === 'dock' ? <PictureInPicture2 /> : <PanelRight />}
         </IconButton>
         <IconButton label="상세 닫기" className="size-7" onClick={onClose}><X /></IconButton>
-      </div>
-      <div className="@container flex-1 min-h-0 overflow-auto p-3"><FlowDetail model={model} focus={focus} />{extra}</div>
-    </div>
+      </Box>
+      <Box className="@container flex-1 min-h-0 overflow-auto p-3"><FlowDetail model={model} focus={focus} />{extra}</Box>
+    </Box>
   )
   if (mode === 'dock') return body
   return (
     // 떠 있는 창: 화면 안에서만 끌고(bounds) 가장자리로 크기 조절. 제목 줄을 잡아 이동한다.
-    <div className="fixed inset-0 z-50 pointer-events-none">
+    <Box className="fixed inset-0 z-50 pointer-events-none">
       <Rnd bounds="parent" dragHandleClassName="flow-panel-handle" minWidth={Math.min(340, limits.width)} minHeight={Math.min(320, limits.height)} maxWidth={limits.width} maxHeight={limits.height}
         size={{ width: fitted.width, height: fitted.height }} position={{ x: fitted.x, y: fitted.y }}
         onDragStop={(_event, position) => setGeometry(normalizeFlowGeometry({ ...fitted, x: position.x, y: position.y }, readPanelBounds()))}
@@ -257,6 +258,6 @@ export function FlowPanel({ model, focus, mode, onModeChange, onClose, extra }: 
         className="pointer-events-auto overflow-hidden rounded-xl border shadow-2xl">
         {body}
       </Rnd>
-    </div>
+    </Box>
   )
 }

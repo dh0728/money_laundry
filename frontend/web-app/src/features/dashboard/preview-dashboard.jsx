@@ -12,6 +12,7 @@ import { ActionButton } from '../../components/primary-button';
 import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
+import { Box, Heading, Text } from '../../components/layout-primitives';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const percent = (count, total) => `${total ? Math.round(count / total * 1000) / 10 : 0}%`;
@@ -42,12 +43,12 @@ function usePlotHeight(enabled, initialHeight) {
 }
 
 function CompletionBar({ label, value, total }) {
-  return <div className="dashboard-completion-plot">
+  return <Box className="dashboard-completion-plot">
     <svg role="img" aria-label={`${label} · 전체 ${count(total)} 중 ${count(value)} 완료`} width="100%" height="20">
       <rect fill="var(--chart-total)" width="100%" height="100%" rx="10" />
       {value > 0 && <rect fill="var(--chart-completion)" width={`${value / total * 100}%`} height="100%" rx="10" />}
     </svg>
-  </div>;
+  </Box>;
 }
 
 function Metric({ item, reduced }) {
@@ -59,35 +60,35 @@ function Metric({ item, reduced }) {
   const wideValue = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   const hasChart = Boolean(trend || completion?.total);
   const [plot, plotHeight] = usePlotHeight(Boolean(trend), 48);
-  return <div className="dashboard-metric" data-export-visualization={hasChart || undefined}>
+  return <Box className="dashboard-metric" data-export-visualization={hasChart || undefined}>
     <SectionDownloadHeading as="h3" downloadLabel={hasChart ? label : undefined}>{label}</SectionDownloadHeading>
-    <div className="dashboard-metric-reading">
-      <strong className="dashboard-metric-value" data-composite={Array.isArray(value) || undefined} data-wide-value={wideValue || undefined}>
+    <Box className="dashboard-metric-reading">
+      <Text as="strong" className="dashboard-metric-value" data-composite={Array.isArray(value) || undefined} data-wide-value={wideValue || undefined}>
         {typeof value === 'number' && !reduced && !animated.has(key)
           ? <CountUp to={value} duration={0.45} trigger="view" separator="," onEnd={() => animated.add(key)} />
           : typeof value === 'number' ? formatter.format(value)
             : Array.isArray(value) ? value.map(({ amount, unit: partUnit }, index) =>
               <React.Fragment key={index}>
-                {index > 0 && <small aria-hidden="true">{item.separator}</small>}
-                <span>{formatter.format(amount)}{partUnit && <small>{partUnit}</small>}</span>
+                {index > 0 && <Text as="small" aria-hidden="true">{item.separator}</Text>}
+                <Text as="span">{formatter.format(amount)}{partUnit && <Text as="small">{partUnit}</Text>}</Text>
               </React.Fragment>) : value}
-        {unit && <small>{unit}</small>}
-      </strong>
-    </div>
-    {detail && <p>{detail}</p>}
+        {unit && <Text as="small">{unit}</Text>}
+      </Text>
+    </Box>
+    {detail && <Text>{detail}</Text>}
     {completion?.total > 0 && <CompletionBar label={label} {...completion} />}
-    {trend && <div className="dashboard-metric-trend">
-      <div className="dashboard-metric-plot" ref={plot}>
+    {trend && <Box className="dashboard-metric-trend">
+      <Box className="dashboard-metric-plot" ref={plot}>
         <Sparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={plotHeight}
           {...(Sparkline === BarSparkline ? { barRadius: 6 } : { curve: 'monotone', strokeWidth: 2, fillOpacity: 0.38 })}
           onHoverChange={setHoverIndex} crosshair="dashed" dot={false} animate={!reduced}
           aria-label={`${label} · ${trend.caption} · ${trend.rows.map(row => `${row.label} ${count(row[trend.key])}`).join(', ')}`} />
-      </div>
-      <span className="dashboard-note">{hoveredHour
+      </Box>
+      <Text as="span" className="dashboard-note">{hoveredHour
         ? `${hoveredHour.label} KST · ${count(hoveredHour[trend.key])}`
-        : trend.caption}</span>
-    </div>}
-  </div>;
+        : trend.caption}</Text>
+    </Box>}
+  </Box>;
 }
 
 function Metrics({ items, wide, appearance }) {
@@ -108,27 +109,27 @@ function DashboardAISummary({ headline, alertRows, timeSlots, period, reduced, b
     <SectionDownloadHeading className="dashboard-summary-heading" downloadLabel={hasChart ? 'AI 요약' : undefined}>
       <Sparkles className="icon" aria-hidden="true" /> AI 요약
     </SectionDownloadHeading>
-    <strong>{headline}</strong>
+    <Text as="strong">{headline}</Text>
     {children}
-    {hasChart && <figure className="dashboard-summary-trend">
-      <figcaption>생성 시간대 · KST</figcaption>
-      <div className="dashboard-summary-plot" ref={plot}>
+    {hasChart && <Box as="figure" className="dashboard-summary-trend">
+      <Box as="figcaption">생성 시간대 · KST</Box>
+      <Box className="dashboard-summary-plot" ref={plot}>
         <BarSparkline data={trend} dataKey="value"
           aria-label={`우선 확인 Alert 생성 시간대 · KST · ${trend.map(row => `${row.label} ${count(row.value)}`).join(', ')}`}
           height={plotHeight} color="var(--chart-risk-high)" barRadius={6} dot={false} crosshair="dashed" animate={!reduced}
           onHoverChange={(_, point) => setHovered(point)} />
-      </div>
-      <div className="dashboard-summary-trend-axis">
-        <span>{hovered ? `${hovered.label} · ${count(hovered.value)}` : trend[0]?.label}</span>
-        {!hovered && <span>{trend.at(-1)?.label}</span>}
-      </div>
-    </figure>}
-    <div className="dashboard-summary-footer">
-      <p className="dashboard-note">{period.from} ~ {period.to} · KST</p>
+      </Box>
+      <Box className="dashboard-summary-trend-axis">
+        <Text as="span">{hovered ? `${hovered.label} · ${count(hovered.value)}` : trend[0]?.label}</Text>
+        {!hovered && <Text as="span">{trend.at(-1)?.label}</Text>}
+      </Box>
+    </Box>}
+    <Box className="dashboard-summary-footer">
+      <Text className="dashboard-note">{period.from} ~ {period.to} · KST</Text>
       {benchmarkLink && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
         IBM 원본 거래 집계 <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
       </ActionButton>}
-    </div>
+    </Box>
   </AISummaryPanel>;
 }
 
@@ -138,9 +139,9 @@ function MineSummary({ data, reduced }) {
   const { high } = modelRiskLabels();
   return <DashboardAISummary headline={`내 담당 미완료 ${count(data.unfinished)}`}
     alertRows={priorityAlerts(data.alertCases.filter(row => row.assigned))} timeSlots={data.hourly} period={data.period} reduced={reduced}>
-    {data.unfinished > 0 && <p>{data.urgent > 0
+    {data.unfinished > 0 && <Text>{data.urgent > 0
       ? `위험 점수 ${high}이고 3일 이상 경과한 미완료 Alert ${count(data.urgent)}부터 확인하세요.`
-      : `위험 점수 ${high}이며 3일 이상 경과한 미완료 Alert가 없습니다.`}</p>}
+      : `위험 점수 ${high}이며 3일 이상 경과한 미완료 Alert가 없습니다.`}</Text>}
   </DashboardAISummary>;
 }
 
@@ -149,7 +150,7 @@ function DashboardSummary({ data, reduced }) {
   return <DashboardAISummary headline={alerts.length
     ? `우선 확인할 장기 미처리 고위험 Alert ${count(alerts.length)}` : '장기 미처리 고위험 Alert 없음'}
     alertRows={alerts} timeSlots={data.hourly} period={data.period} reduced={reduced} benchmarkLink>
-    {alerts.length > 0 && <p>{modelRiskLabels().high} · 3일 이상 경과</p>}
+    {alerts.length > 0 && <Text>{modelRiskLabels().high} · 3일 이상 경과</Text>}
   </DashboardAISummary>;
 }
 
@@ -161,20 +162,20 @@ function interleaveCaseKinds(records) {
 }
 
 function WorkBoard({ records, mine, sort, appearance }) {
-  return <section className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 현황'}>
-    <header className="dashboard-board-heading">
-      <h2>업무 현황</h2>
-      <div data-dashboard-sort-tags></div>
-      <div className="dashboard-board-actions">
-        <div data-dashboard-sort></div>
+  return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 현황'}>
+    <Box as="header" className="dashboard-board-heading">
+      <Heading>업무 현황</Heading>
+      <Box data-dashboard-sort-tags></Box>
+      <Box className="dashboard-board-actions">
+        <Box data-dashboard-sort></Box>
         <BoardSectionDownload records={records} label="업무 현황" onDownload={rows => exportCases(rows, 'work-board')} />
-      </div>
-    </header>
-    <div className="dashboard-board-scroll">
+      </Box>
+    </Box>
+    <Box className="dashboard-board-scroll">
       <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine} pageSize={8}
         orderRows={mine && !sort ? interleaveCaseKinds : undefined} />
-    </div>
-  </section>;
+    </Box>
+  </Box>;
 }
 
 export function PreviewDashboard({ mine, data, appearance }) {
@@ -198,18 +199,18 @@ export function PreviewDashboard({ mine, data, appearance }) {
       trend: trend('linked', 'suspect') },
     { ...metric('미완료 Episode', data.cases.filter(row => row.kind === 'Episode' && row.open).length, '검토 대기·처리 중'), trend: trend('openEpisodes', 'neutral') },
   ];
-  return <div className="preview-dashboard" data-mine={mine}>
-    <section className="dashboard-top" aria-label="요약 및 주요 지표">
+  return <Box className="preview-dashboard" data-mine={mine}>
+    <Box as="section" className="dashboard-top" aria-label="요약 및 주요 지표">
       {mine ? <MineSummary data={data} reduced={appearance.reduced} /> : <DashboardSummary data={data} reduced={appearance.reduced} />}
       <Metrics items={kpis} wide={!mine} appearance={appearance} />
-    </section>
+    </Box>
     {!mine && <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>
       <Analytics data={data} reduced={appearance.reduced} />
     </React.Suspense>}
     {data.board
       ? <WorkBoard records={data.board.content} mine={mine} sort={data.sort} appearance={appearance} />
       : <DashboardBoardSkeleton />}
-  </div>;
+  </Box>;
 }
 
 export function BenchmarkDashboard({ mine, dataset, range, appearance }) {
@@ -230,29 +231,29 @@ export function BenchmarkDashboard({ mine, dataset, range, appearance }) {
       `${count(totals.labeled)} ÷ ${count(totals.transactions)}`, ''),
     metric('처음 등장한 계좌', totals.newAccounts, `최초 등장 은행 코드 ${formatter.format(totals.newBanks)}개`, '개'),
   ];
-  return <div className="preview-dashboard preview-benchmark-dashboard" data-mine={mine}>
-    {mine && <Panel as="article" className="glass dashboard-personal-status">
-      <h2>내 담당 업무</h2>
-      <p className="dashboard-note">개인 담당 업무를 표시하려면 기관의 업무 데이터 연결이 필요합니다.</p>
+  return <Box className="preview-dashboard preview-benchmark-dashboard" data-mine={mine}>
+    {mine && <Panel as="article" className="dashboard-personal-status">
+      <Heading>내 담당 업무</Heading>
+      <Text className="dashboard-note">개인 담당 업무를 표시하려면 기관의 업무 데이터 연결이 필요합니다.</Text>
     </Panel>}
-    <section className="dashboard-top" aria-label="원본 거래 요약 및 주요 지표">
-      <Panel as="article" className="glass dashboard-summary-card">
-        <h2>원본 거래 요약</h2>
-        <strong>{peak ? `${peak.date} · 세탁 라벨 ${count(peak.labeled)}`
-          : (totals.transactions ? '조회 기간에 세탁 라벨 거래가 없습니다.' : '조회 기간에 거래가 없습니다.')}</strong>
-        {peak && <p>기간 내 최다 · 라벨 거래의 {peakShare}</p>}
-        <p className="dashboard-note">{dataset.source} · {period} · 원본 거래 일자 기준</p>
-        <div className="dashboard-summary-links">
+    <Box as="section" className="dashboard-top" aria-label="원본 거래 요약 및 주요 지표">
+      <Panel as="article" className="dashboard-summary-card">
+        <Heading>원본 거래 요약</Heading>
+        <Text as="strong">{peak ? `${peak.date} · 세탁 라벨 ${count(peak.labeled)}`
+          : (totals.transactions ? '조회 기간에 세탁 라벨 거래가 없습니다.' : '조회 기간에 거래가 없습니다.')}</Text>
+        {peak && <Text>기간 내 최다 · 라벨 거래의 {peakShare}</Text>}
+        <Text className="dashboard-note">{dataset.source} · {period} · 원본 거래 일자 기준</Text>
+        <Box className="dashboard-summary-links">
           <ActionButton className="dashboard-summary-link" as="a" href="/benchmark/ledger?view=table" shape="pill" surface="floating">
             거래 원장 열기 <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
           </ActionButton>
           <ActionButton className="dashboard-summary-link" as="a" href="/dashboard/all" shape="pill">업무 대시보드로 돌아가기</ActionButton>
-        </div>
+        </Box>
       </Panel>
       <Metrics items={metrics} appearance={appearance} />
-    </section>
+    </Box>
     {chartRows.length > 0 && <React.Suspense fallback={<DashboardAnalyticsSkeleton benchmark showPatterns={fullPatternScope} />}>
       <BenchmarkCharts chartRows={chartRows} totals={totals} period={period} fullPatternScope={fullPatternScope} reduced={appearance.reduced} />
     </React.Suspense>}
-  </div>;
+  </Box>;
 }

@@ -8,7 +8,7 @@
   border-radius: var(--aml-radius-card);
   color: var(--text);
 }
-:is([data-glow-surface], .dashboard-metrics .magic-bento__card, .workflow-bento .magic-bento__card) {
+[data-glow-surface] {
   --record-card-accent: var(--record-verdict-accent, var(--review-status-accent, var(--text)));
   --record-card-depth-color: light-dark(
     color-mix(in oklch, var(--record-card-accent) 88%, var(--aml-black-100)),
@@ -17,10 +17,14 @@
     color-mix(in srgb, var(--record-card-depth-color) 20%, transparent);
 }
 :root[data-glassmorphism="false"]
-  :is([data-glow-surface], .dashboard-metrics .magic-bento__card, .workflow-bento .magic-bento__card) {
+  [data-glow-surface] {
   box-shadow: 0 0 0 var(--aml-stroke-divider) var(--record-card-edge, var(--glass-surface-edge)),
     0 var(--aml-space-4) var(--aml-space-8)
     color-mix(in srgb, var(--record-card-depth-color) 26%, transparent);
+}
+/* 누르지 않는 기록 카드는 Panel과 같은 안쪽 면이다(바깥 그림자·기울기 없음). */
+:root [data-glow-surface]:not([data-card-interactive]) {
+  box-shadow: var(--panel-edge-depth), var(--panel-material-depth, 0 0 0 transparent);
 }
 [data-glow-surface][data-card-interactive] {
   cursor: pointer;

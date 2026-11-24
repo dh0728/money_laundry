@@ -28,6 +28,7 @@ import StatusMark from '../components/react-bits/StatusMark';
 import '../app/layout.css';
 import './component-catalogue.css';
 import { systemReducedMotion } from '@/hooks/use-reduced-motion';
+import { Box, Heading, Text } from '../components/layout-primitives';
 
 const demoCodes = (prefix, size) => Array.from({ length: 8 }, (_, index) =>
   `${prefix}-261111-${String(index + 1).padStart(size, '0')}`);
@@ -47,17 +48,17 @@ const sections = [
 ];
 
 function Demo({ title, children, wide = false }) {
-  return <article className={`catalogue-demo${wide ? ' catalogue-span' : ''}`}>
-    <h3>{title}</h3>
+  return <Box as="article" className={`catalogue-demo${wide ? ' catalogue-span' : ''}`}>
+    <Heading level={3}>{title}</Heading>
     {children}
-  </article>;
+  </Box>;
 }
 
 function DemoGroup({ id, label, children }) {
-  return <section id={id} className="catalogue-group" aria-labelledby={`${id}-title`}>
-    <h2 id={`${id}-title`}>{label}</h2>
-    <div className="catalogue-grid">{children}</div>
-  </section>;
+  return <Box as="section" id={id} className="catalogue-group" aria-labelledby={`${id}-title`}>
+    <Heading id={`${id}-title`}>{label}</Heading>
+    <Box className="catalogue-grid">{children}</Box>
+  </Box>;
 }
 
 function NativeSwitch({ id, label, initial, onChange }) {
@@ -68,10 +69,10 @@ function NativeSwitch({ id, label, initial, onChange }) {
     button.setAttribute('aria-checked', String(!!initial));
     bindSquishSwitch(button, onChange);
   }, [id, label, initial, onChange]);
-  return <div className="catalogue-setting">
-    <label htmlFor={id}>{label}</label>
-    <span ref={host} />
-  </div>;
+  return <Box className="catalogue-setting">
+    <Box as="label" htmlFor={id}>{label}</Box>
+    <Text as="span" ref={host} />
+  </Box>;
 }
 
 function NativePrimitives({ onEvent }) {
@@ -82,12 +83,12 @@ function NativePrimitives({ onEvent }) {
   }, []);
 
   return <>
-    <div className="catalogue-actions"
+    <Box className="catalogue-actions"
       onClick={() => onEvent('기본 버튼 실행')}
       dangerouslySetInnerHTML={buttonMarkup} />
-    <div className="catalogue-actions" ref={tooltipSample}
+    <Box className="catalogue-actions" ref={tooltipSample}
       onClick={() => onEvent('아이콘 버튼 실행')} dangerouslySetInnerHTML={tooltipMarkup} />
-    <div className="catalogue-scroll" dangerouslySetInnerHTML={scrollbarMarkup} />
+    <Box className="catalogue-scroll" dangerouslySetInnerHTML={scrollbarMarkup} />
   </>;
 }
 
@@ -108,29 +109,29 @@ function QueryDemo() {
     show();
     return controls.dispose;
   }, []);
-  return <div ref={host}>
-    <div className="warm-tooltip-popover" popover="manual" />
-    <div className="catalogue-actions" role="group" aria-label="조회 도구 예시"
+  return <Box ref={host}>
+    <Box className="warm-tooltip-popover" popover="manual" />
+    <Box className="catalogue-actions" role="group" aria-label="조회 도구 예시"
       dangerouslySetInnerHTML={queryMarkup} />
-    <div className="screen-query-tags" data-query-tags />
-    <p><strong>{rows.length}건</strong> · 현재 조회 결과</p>
-    <div className="catalogue-query-codes">{rows.slice(0, 5).map(row =>
-      <code key={row.code}>{row.code}</code>)}</div>
-  </div>;
+    <Box className="screen-query-tags" data-query-tags />
+    <Text><Text as="strong">{rows.length}건</Text> · 현재 조회 결과</Text>
+    <Box className="catalogue-query-codes">{rows.slice(0, 5).map(row =>
+      <Text as="code" key={row.code}>{row.code}</Text>)}</Box>
+  </Box>;
 }
 
 function WorkflowSample({ kind, view }) {
   const ref = useRef(null);
   useEffect(() => mountWorkflows(ref.current, undefined, { reportData: dashboard }).unmount, [kind, view]);
-  return <div ref={ref} className="catalogue-workflow"><div data-workflow={kind} data-report-view={view} /></div>;
+  return <Box ref={ref} className="catalogue-workflow"><Box data-workflow={kind} data-report-view={view} /></Box>;
 }
 
 function ResultSamples() {
   const [status, setStatus] = useState('pending');
   return <>
-    <label className="catalogue-status-select">처리 상태 <select className="aml-native-select" value={status} onChange={event => setStatus(event.target.value)}>
+    <Box as="label" className="catalogue-status-select">처리 상태 <select className="aml-native-select" value={status} onChange={event => setStatus(event.target.value)}>
       {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-    </select></label>
+    </select></Box>
     <StatusMark status={status} label={statusLabels[status]} color="var(--text)"
       doneColor="var(--tag-positive-ink)" errorColor="var(--tag-danger-ink)" strike={false} />
     <ActionButton className="row" shape="pill" surface="floating" onClick={() => document.dispatchEvent(new CustomEvent('aml:result', {
@@ -141,11 +142,11 @@ function ResultSamples() {
 
 function ShellDemo() {
   const [open, setOpen] = useState(false);
-  return <details onToggle={event => { if (event.currentTarget.open) setOpen(true); }}>
-    <summary>앱 셸 열기</summary>
+  return <Box as="details" onToggle={event => { if (event.currentTarget.open) setOpen(true); }}>
+    <Box as="summary">앱 셸 열기</Box>
     {open && <iframe className="catalogue-shell" src="/dashboard/mine" loading="lazy"
       title="AML RADAR 헤더, 사이드바, 새 검색, 보관함, 설정, 로그인" />}
-  </details>;
+  </Box>;
 }
 
 function Catalogue() {
@@ -201,43 +202,43 @@ function Catalogue() {
     if (!button) return;
     setFeedback(`${button.dataset.workCode} · ${button.hasAttribute('data-add-work-tab') ? '사이드바 탭으로 추가' : '상세 열기'}`);
   };
-  return <main className="catalogue" ref={root}>
-    <header className="catalogue-header">
-      <div><a href="/dashboard/mine">AML RADAR</a><h1>컴포넌트</h1></div>
-      <div className="catalogue-preferences">
+  return <Box as="main" className="catalogue" ref={root}>
+    <Box as="header" className="catalogue-header">
+      <Box><a href="/dashboard/mine">AML RADAR</a><Heading level={1}>컴포넌트</Heading></Box>
+      <Box className="catalogue-preferences">
         <NativeSwitch id="catalogue-motion" label="모션 줄이기" initial={systemReduced} onChange={setReduced} />
-      </div>
-    </header>
-    <nav className="catalogue-index" ref={indexRef} aria-label="컴포넌트 분류">
+      </Box>
+    </Box>
+    <Box as="nav" className="catalogue-index" ref={indexRef} aria-label="컴포넌트 분류">
       {sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
-      <div className="catalogue-index-preferences catalogue-preferences">
+      <Box className="catalogue-index-preferences catalogue-preferences">
         <NativeSwitch id="catalogue-theme" label="다크 모드" initial={false} onChange={setDark} />
         <QueryRadio label="UI 크기" items={uiSizeOptions} value={size} onChange={setSize} />
-      </div>
-    </nav>
-    <output className="catalogue-feedback" aria-live="polite">{feedback}</output>
+      </Box>
+    </Box>
+    <Text as="output" className="catalogue-feedback" aria-live="polite">{feedback}</Text>
     <DemoGroup id="foundations" label="기본 요소">
       <Demo title="Button · IconButton · WarmTooltip · ScrollArea">
         <NativePrimitives onEvent={setFeedback} />
       </Demo>
       <Demo title="PrimaryButton · StarBorder · HoldButton">
-        <div className="catalogue-actions">
+        <Box className="catalogue-actions">
           <PrimaryButton tone="brand" onClick={() => setFeedback('강조 버튼 실행')}>실행</PrimaryButton>
           <PrimaryButton tone="brand" disabled>실행 불가</PrimaryButton>
           <ConfirmHoldButton tone="negative" doneLabel="확인 완료" onHold={() => setFeedback('길게 눌러 실행했습니다.')}>길게 눌러 확인</ConfirmHoldButton>
           <ActionButton className="row" onClick={() => setFeedback('보조 버튼 실행')}>보조 동작</ActionButton>
-        </div>
+        </Box>
       </Demo>
       <Demo title="SquishSwitch · BellToggle · SpringCheck">
-        <div className="catalogue-control-stack">
+        <Box className="catalogue-control-stack">
           <NativeSwitch id="catalogue-refraction" label="리퀴드 글래스" initial onChange={setRefraction} />
-          <div className="catalogue-setting"><span>보관함 알림</span><NotificationPreference demo /></div>
+          <Box className="catalogue-setting"><Text as="span">보관함 알림</Text><NotificationPreference demo /></Box>
           <QueryCheck label="Alert 선택" checked={checked} onChange={setChecked} />
-        </div>
+        </Box>
       </Demo>
       <Demo title="StatusTag · PatternTag · FilterTag · GlassSurface">
-        <div className="catalogue-glass-sample">
-          <div className="glass catalogue-tags">
+        <Box className="catalogue-glass-sample">
+          <Box className="glass catalogue-tags">
             <VerdictTag verdict="abnormal" /><VerdictTag verdict="unjudged" /><VerdictTag verdict="normal" />
             <StatusTag preset="elapsedOver1w">8일 경과</StatusTag><StatusTag preset="elapsedUnder1w">7일 경과</StatusTag>
             <ReviewStatusTag status="처리 전" /><ReviewStatusTag status="처리 중" /><ReviewStatusTag status="처리 완료" />
@@ -249,12 +250,12 @@ function Catalogue() {
             <PatternTag emphasis="subtle">+1</PatternTag><PatternTag>+1</PatternTag>
             <CaseActorTag>내 담당</CaseActorTag>
             {useFilter && <FilterTag onRemove={() => setUseFilter(false)}>담당자: 내 담당</FilterTag>}
-          </div>
-        </div>
+          </Box>
+        </Box>
         <ActionButton className="row" disabled={useFilter} onClick={() => setUseFilter(true)}>필터 다시 적용</ActionButton>
       </Demo>
       <Demo title="Panel · 정보 표면">
-        <div><Panel className="glass"><h2>탐지 근거</h2></Panel></div>
+        <Box><Panel><Heading>탐지 근거</Heading></Panel></Box>
       </Demo>
     </DemoGroup>
     <DemoGroup id="variables" label="변수">
@@ -265,10 +266,10 @@ function Catalogue() {
     <DemoGroup id="navigation" label="탐색과 조회">
       <Demo title="WorkspaceNavigation · RubberSegment">
         <QueryCheck label="보기 방식 함께 표시" checked={withSecondary} onChange={setWithSecondary} />
-        <div className="screen-navigation catalogue-navigation">
+        <Box className="screen-navigation catalogue-navigation">
           <WorkspaceNavigation {...navGroups} secondary={withSecondary ? navGroups.secondary : []}
             onRoute={setScreen} reduced={reduced} />
-        </div>
+        </Box>
       </Demo>
       <Demo title="필터·정렬·기간 · CSV 다운로드"><QueryDemo /></Demo>
     </DemoGroup>
@@ -281,10 +282,10 @@ function Catalogue() {
           initialSelectedIndex={0} displayScrollbar maxHeight={195} width="100%" showGradients={false} frame={false}
           animation={reduced ? 'none' : 'slide'} onItemSelect={setListSelection}
           style={{ '--al-ink': 'var(--text)', '--al-tile': 'var(--workspace-surface)', '--al-ring': 'var(--selected)' }} />
-        <output>선택 · {listSelection || '소유주-001'}</output>
+        <Text as="output">선택 · {listSelection || '소유주-001'}</Text>
       </Demo>
       <Demo title="ScrollStack · 이전 비교">
-        <p>현재 정보 카드에는 일반 스크롤을 사용합니다.</p>
+        <Text>현재 정보 카드에는 일반 스크롤을 사용합니다.</Text>
         <ScrollStack className="catalogue-stack" useWindowScroll={false} smoothScroll={false}
           itemDistance={8} itemStackDistance={8} baseScale={1}>
           {groups.A.slice(0, 5).map(code => <ScrollStackItem key={code}>
@@ -293,18 +294,18 @@ function Catalogue() {
         </ScrollStack>
       </Demo>
       <Demo title="ListCard · 소유주·계좌·거래 · BranchLines" wide>
-        <div className="catalogue-ledger" onClick={handleRecordClick}>
+        <Box className="catalogue-ledger" onClick={handleRecordClick}>
           <Ledger codes={groups.T} caseRows={caseRows} />
-        </div>
+        </Box>
       </Demo>
       <Demo title="Alert 카드 목록 · 일괄 선택" wide>
-        <div onClick={handleRecordClick}><CaseCards codes={groups.A.slice(0, 3)} label="Alert" caseRows={caseRows} /></div>
+        <Box onClick={handleRecordClick}><CaseCards codes={groups.A.slice(0, 3)} label="Alert" caseRows={caseRows} /></Box>
       </Demo>
       <Demo title="Alert·Episode 표 · 사람 판정" wide>
-        <div onClick={handleRecordClick}>
+        <Box onClick={handleRecordClick}>
           <PreviewCaseTable title="Alert 목록" rows={groups.A.slice(0, 3).map(code => caseRows.get(code))} />
           <PreviewCaseTable title="Episode 목록" rows={groups.E.slice(0, 3).map(code => caseRows.get(code))} episode />
-        </div>
+        </Box>
       </Demo>
     </DemoGroup>
     <DemoGroup id="workflows" label="룰과 보고서">
@@ -318,22 +319,22 @@ function Catalogue() {
         <WorkflowSample kind="report" view={reportView} />
       </Demo>
       <Demo title="CountUp">
-        <p className="catalogue-count"><CountUp key={count} to={1234} separator="," duration={reduced ? 0 : .45} trigger="load" />건</p>
+        <Text className="catalogue-count"><CountUp key={count} to={1234} separator="," duration={reduced ? 0 : .45} trigger="load" />건</Text>
         <ActionButton className="row" shape="pill" surface="floating" onClick={() => setCount(value => value + 1)}>다시 재생</ActionButton>
       </Demo>
       <Demo title="MagicBento · 대시보드 지표와 차트" wide>
-        <details onToggle={event => { if (event.currentTarget.open) setDashOpen(true); }}>
-          <summary>대시보드 열기</summary>
-          {dashOpen && <div onClick={handleRecordClick}><PreviewDashboard data={dashboard} mine={false}
-            appearance={{ theme: dark ? 'dark' : 'light', reduced }} /></div>}
-        </details>
+        <Box as="details" onToggle={event => { if (event.currentTarget.open) setDashOpen(true); }}>
+          <Box as="summary">대시보드 열기</Box>
+          {dashOpen && <Box onClick={handleRecordClick}><PreviewDashboard data={dashboard} mine={false}
+            appearance={{ theme: dark ? 'dark' : 'light', reduced }} /></Box>}
+        </Box>
       </Demo>
     </DemoGroup>
     <DemoGroup id="shell" label="앱 셸">
       <Demo title="헤더 · 사이드바 · 전역 검색 · 보관함 · 계정 · 설정 · 로그인" wide><ShellDemo /></Demo>
     </DemoGroup>
-    <div id="workflow-notifications" />
-  </main>;
+    <Box id="workflow-notifications" />
+  </Box>;
 }
 
 createRoot(document.getElementById('component-catalogue')).render(<Catalogue />);

@@ -16,6 +16,7 @@ import { loadMockEpisodes } from '@/mocks/episodes'
 import { loadMockNotifications, type NotificationItem } from '@/mocks/notifications'
 import { loadMockTransactionExplorer } from '@/mocks/transactions'
 import { pageLinks, settingItems } from './searchItems'
+import { Box, Text } from '@/components/layout-primitives'
 
 type SearchData = { alerts: AlertRow[]; episodes: EpisodeRow[]; transactions: TransactionIndex; notifications: NotificationItem[] }
 type ResultItem = { key: string; primary: ReactNode; secondary?: string; onSelect: () => void }
@@ -25,7 +26,7 @@ export type ResultGroup = { id: string; label: string; items: ResultItem[] }
 function Highlight({ text, query }: { text: string; query: string }) {
   const i = query ? text.toLowerCase().indexOf(query) : -1
   if (i === -1) return <>{text}</>
-  return <>{text.slice(0, i)}<mark className="rounded-[3px] bg-accent px-0.5 text-accent-foreground">{text.slice(i, i + query.length)}</mark>{text.slice(i + query.length)}</>
+  return <>{text.slice(0, i)}<Text as="mark" className="rounded-[3px] bg-accent px-0.5 text-accent-foreground">{text.slice(i, i + query.length)}</Text>{text.slice(i + query.length)}</>
 }
 
 async function loadSearchData(overrides: Parameters<typeof withOverride>[1]): Promise<SearchData> {
@@ -79,11 +80,11 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
     const alerts: ResultItem[] = (data?.alerts ?? [])
       .filter(a => `A-${a.alertId} ${a.alertId} ${a.summary} ${typeDisplay(a.primaryType.code).key} ${typeDisplay(a.primaryType.code).label} ${a.assignee.name} ${a.subjectAccount.account}`.toLowerCase().includes(q))
       .slice(0, 5)
-      .map(a => ({ key: `alert-${a.alertId}`, primary: <span className="font-mono text-xs"><Highlight text={`A-${a.alertId}`} query={q} /></span>, secondary: `${typeDisplay(a.primaryType.code).label} · ${a.assignee.name}`, onSelect: select(() => onNavigate('alerts', a.alertId)) }))
+      .map(a => ({ key: `alert-${a.alertId}`, primary: <Text as="span" className="font-mono text-xs"><Highlight text={`A-${a.alertId}`} query={q} /></Text>, secondary: `${typeDisplay(a.primaryType.code).label} · ${a.assignee.name}`, onSelect: select(() => onNavigate('alerts', a.alertId)) }))
     const episodes: ResultItem[] = (data?.episodes ?? [])
       .filter(e => `E-${e.episodeId} ${e.episodeId} ${e.assignee.name} ${e.primaryTypes.flatMap(t => [typeDisplay(t.code).key, typeDisplay(t.code).label]).join(' ')}`.toLowerCase().includes(q))
       .slice(0, 5)
-      .map(e => ({ key: `episode-${e.episodeId}`, primary: <span className="font-mono text-xs"><Highlight text={`E-${e.episodeId}`} query={q} /></span>, secondary: `Alert ${e.alertCount}건 · ${e.assignee.name}`, onSelect: select(() => onNavigate('episodes', e.episodeId)) }))
+      .map(e => ({ key: `episode-${e.episodeId}`, primary: <Text as="span" className="font-mono text-xs"><Highlight text={`E-${e.episodeId}`} query={q} /></Text>, secondary: `Alert ${e.alertCount}건 · ${e.assignee.name}`, onSelect: select(() => onNavigate('episodes', e.episodeId)) }))
     const notifications: ResultItem[] = (data?.notifications ?? [])
       .filter(item => `${item.code} ${item.title} ${item.description} ${item.patternCode === undefined ? '' : `${typeDisplay(item.patternCode).key} ${typeDisplay(item.patternCode).label}`}`.toLocaleLowerCase('ko').includes(q))
       .slice(0, 5)
@@ -95,7 +96,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
         }) }))
     const matches = data ? searchTransactionIndex(data.transactions, q) : []
     const targets = (type: TransactionTarget['type']): ResultItem[] => matches.filter(m => m.target.type === type).map(m => ({
-      key: m.key, primary: <span className={type === 'owner' ? '' : 'font-mono text-xs'}><Highlight text={m.label} query={q} /></span>, secondary: m.detail, onSelect: select(() => onOpenTransaction?.(m.target)),
+      key: m.key, primary: <Text as="span" className={type === 'owner' ? '' : 'font-mono text-xs'}><Highlight text={m.label} query={q} /></Text>, secondary: m.detail, onSelect: select(() => onOpenTransaction?.(m.target)),
     }))
     const screens: ResultItem[] = [...pageLinks, ...settingItems]
       .filter(s => s.label.toLowerCase().includes(q))
@@ -120,7 +121,7 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
   return (
     <Popover open={open} onOpenChange={next => { setOpen(next); if (!next) setActive(0) }}>
       <PopoverAnchor asChild>
-        <div ref={anchor} className="relative min-w-0 w-full">
+        <Box ref={anchor} className="relative min-w-0 w-full">
           <Search className="absolute left-3 top-2.5 size-3.5 text-muted-foreground" />
           <Input
             ref={input}
@@ -137,33 +138,33 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
             }}
           />
           <Kbd data-testid="global-search-shortcut" aria-hidden="true" className="pointer-events-none absolute right-2 top-2 z-10">/</Kbd>
-        </div>
+        </Box>
       </PopoverAnchor>
       <PopoverContent id="global-search-listbox" role="listbox" aria-label="검색 결과" className="w-(--radix-popper-anchor-width) max-w-[90vw] p-2"
         onOpenAutoFocus={e => e.preventDefault()}
         onInteractOutside={event => { if (anchor.current?.contains(event.target as Node)) event.preventDefault() }}>
-        {remote?.error && <p role="alert" className="p-2 text-xs text-destructive-text">{remote.error}</p>}
+        {remote?.error && <Text role="alert" className="p-2 text-xs text-destructive-text">{remote.error}</Text>}
         {flat.length === 0
-          ? <p className="p-4 text-center text-xs text-muted-foreground">{(remote ? remote.loading : q && !data) ? '불러오는 중…' : '검색 결과가 없습니다.'}</p>
+          ? <Text className="p-4 text-center text-xs text-muted-foreground">{(remote ? remote.loading : q && !data) ? '불러오는 중…' : '검색 결과가 없습니다.'}</Text>
           : (
-            <div className="max-h-[60vh] space-y-1 overflow-y-auto">
+            <Box className="max-h-[60vh] space-y-1 overflow-y-auto">
               {groups.map(g => (
-                <div key={g.id}>
-                  <p className="px-2 pb-1 pt-1.5 text-[0.625rem] font-medium text-muted-foreground">{g.label}</p>
+                <Box key={g.id}>
+                  <Text className="px-2 pb-1 pt-1.5 text-[0.625rem] font-medium text-muted-foreground">{g.label}</Text>
                   {g.items.map(item => {
                     const i = indexOf.get(item)!
                     return (
                       <button key={item.key} id={`gs-item-${i}`} role="option" aria-selected={i === active} type="button"
                         onMouseEnter={() => setActive(i)} onClick={item.onSelect}
                         className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm ${i === active ? 'bg-accent text-accent-foreground' : ''}`}>
-                        <span className="truncate">{item.primary}</span>
-                        {item.secondary && <span className="max-w-[45%] shrink-0 truncate text-xs text-muted-foreground">{item.secondary}</span>}
+                        <Text as="span" className="truncate">{item.primary}</Text>
+                        {item.secondary && <Text as="span" className="max-w-[45%] shrink-0 truncate text-xs text-muted-foreground">{item.secondary}</Text>}
                       </button>
                     )
                   })}
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           )}
       </PopoverContent>
     </Popover>

@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAsync } from '@/lib/useAsync'
 import { EpisodeWork } from './EpisodeWork'
 import { useAlertOverrides } from '@/features/alerts/alertOverrides'
+import { Box, Text } from '@/components/layout-primitives'
 
 export type InstitutionRemote = {
   cards: ReactNode; charts: ReactNode; report: ReactNode
@@ -51,14 +52,14 @@ function InstitutionCharts({ data }: { data: DashboardData }) {
   const hasComposition = composition.some(item => item.value > 0)
   return (
     <>
-      <div className="shrink-0">
+      <Box className="shrink-0">
         {data.dailyAlertStatus?.length ? <AlertStatusChart data={data.dailyAlertStatus} /> : <EmptyBlock>선택한 기간에 Alert가 없습니다.</EmptyBlock>}
-      </div>
+      </Box>
       <Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy">
         <CardContent className="flex min-h-0 flex-1 flex-col px-4">
           <SectionTitle title="의심 거래 구성과 패턴 분포" description="전체 구성은 거래 건, 패턴별 유형은 패턴 소속 거래의 Alert 수" action={<a href="#suspicious" className="shrink-0 text-xs underline-offset-4 hover:underline">의심 거래 목록 →</a>} />
           {hasComposition ? (
-            <div className="min-h-0 flex-1"><TransactionPatternHierarchy composition={composition} distribution={distribution} /></div>
+            <Box className="min-h-0 flex-1"><TransactionPatternHierarchy composition={composition} distribution={distribution} /></Box>
           ) : (
             <EmptyBlock>선택한 기간에 의심 거래가 없습니다.</EmptyBlock>
           )}
@@ -70,5 +71,5 @@ function InstitutionCharts({ data }: { data: DashboardData }) {
 
 /** §1.5: 틀은 바로 그리고 값 자리만 낮은 대비 skeleton(페이지 전체를 로딩 문구로 바꾸지 않는다) */
 function KpiSkeleton() {
-  return <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @5xl:grid-cols-4" aria-busy="true">{['오늘 신규 Alert', '오늘 의심 거래 탐지율', '열린 Alert', '조사 중 Episode'].map(l => <Card key={l} className="shadow-none"><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">{l}</p><Skeleton className="h-8 w-20" /><Skeleton className="h-4 w-32" /></CardContent></Card>)}</div>
+  return <Box className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @5xl:grid-cols-4" aria-busy="true">{['오늘 신규 Alert', '오늘 의심 거래 탐지율', '열린 Alert', '조사 중 Episode'].map(l => <Card key={l} className="shadow-none"><CardContent className="space-y-3"><Text className="text-sm text-muted-foreground">{l}</Text><Skeleton className="h-8 w-20" /><Skeleton className="h-4 w-32" /></CardContent></Card>)}</Box>
 }

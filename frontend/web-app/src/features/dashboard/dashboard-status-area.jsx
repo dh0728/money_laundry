@@ -7,6 +7,7 @@ import { Grid } from '../../components/charts/charts/grid';
 import { XAxis } from '../../components/charts/charts/x-axis';
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
+import { Box, Text } from '../../components/layout-primitives';
 
 // AreaChart and Area are from the MIT-licensed Bklit UI area-chart registry.
 const integer = new Intl.NumberFormat('ko-KR');
@@ -47,8 +48,8 @@ export function DashboardStatusArea({ rows, series, completion, reduced = false 
     setActive(index => Math.max(0, Math.min(rows.length - 1, (index ?? 0) + delta)));
   }
 
-  return <figure className="dashboard-series dashboard-status-series" aria-label="일별 Alert 처리 상태와 종결 건수 · KST">
-    <div className="dashboard-status-area" role="group" aria-label="왼쪽과 오른쪽 방향키로 날짜별 집계 확인"
+  return <Box as="figure" className="dashboard-series dashboard-status-series" aria-label="일별 Alert 처리 상태와 종결 건수 · KST">
+    <Box className="dashboard-status-area" role="group" aria-label="왼쪽과 오른쪽 방향키로 날짜별 집계 확인"
       tabIndex={0} onKeyDown={browseDates}
       onFocus={() => setActive(index => index ?? 0)} onBlur={() => setActive(null)}>
       <AreaChart data={points} xDataKey="plotDay" animationDuration={reduced ? 0 : 340}
@@ -66,19 +67,19 @@ export function DashboardStatusArea({ rows, series, completion, reduced = false 
             label, color, value: count(point[key]),
           }))} />} />
       </AreaChart>
-    </div>
-    <div className="dashboard-status-readout" aria-live="polite">
-      {activeRow && <><span>{activeRow.date} KST</span>{readoutSeries.map(item => <span key={item.key}>
-        <i style={{ background: item.color }} aria-hidden="true" />{item.label} {count(activeRow[item.key])}
-      </span>)}</>}
-    </div>
-    <div className="visually-hidden">
+    </Box>
+    <Box className="dashboard-status-readout" aria-live="polite">
+      {activeRow && <><Text as="span">{activeRow.date} KST</Text>{readoutSeries.map(item => <Text as="span" key={item.key}>
+        <Text as="i" style={{ background: item.color }} aria-hidden="true" />{item.label} {count(activeRow[item.key])}
+      </Text>)}</>}
+    </Box>
+    <Box className="visually-hidden">
       <Table>
         <TableCaption>생성일별 Alert 처리 상태와 종결일별 종결 건수</TableCaption>
         <TableHeader><TableRow><TableHead scope="col">일자</TableHead>{readoutSeries.map(item => <TableHead scope="col" key={item.key}>{item.label}</TableHead>)}</TableRow></TableHeader>
         <TableBody>{rows.map(row => <TableRow key={row.date}><TableHead scope="row">{row.date}</TableHead>
           {readoutSeries.map(item => <TableCell key={item.key}>{count(row[item.key])}</TableCell>)}</TableRow>)}</TableBody>
       </Table>
-    </div>
-  </figure>;
+    </Box>
+  </Box>;
 }

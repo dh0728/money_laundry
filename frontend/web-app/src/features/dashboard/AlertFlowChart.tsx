@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart'
 import { fmt } from '@/lib/format'
+import { Box, Text } from '@/components/layout-primitives'
 
 export type DailyStatus = DashboardRequested['dailyAlertStatus'][number]
 
@@ -25,24 +26,24 @@ function StatusTooltip({ active, payload, label }: { active?: boolean; payload?:
   if (!day) return null
   const total = day.pending + day.inProgress + day.done
   return (
-    <div className="grid min-w-40 gap-1.5 rounded-lg border bg-background px-3 py-2 text-xs shadow-xl">
-      <p className="font-medium">{md(String(label))} · 유입 {fmt(total)}건</p>
+    <Box className="grid min-w-40 gap-1.5 rounded-lg border bg-background px-3 py-2 text-xs shadow-xl">
+      <Text className="font-medium">{md(String(label))} · 유입 {fmt(total)}건</Text>
       {series.map(s => (
-        <p key={s.key} className="flex items-center gap-2">
-          <i className="size-2.5 shrink-0 rounded-[2px]" style={{ background: s.color }} aria-hidden />
-          <span className="text-muted-foreground">{s.label}</span>
-          <span className="ml-auto font-mono tabular-nums">{fmt(day[s.key])}</span>
-        </p>
+        <Text key={s.key} className="flex items-center gap-2">
+          <Text as="i" className="size-2.5 shrink-0 rounded-[2px]" style={{ background: s.color }} aria-hidden />
+          <Text as="span" className="text-muted-foreground">{s.label}</Text>
+          <Text as="span" className="ml-auto font-mono tabular-nums">{fmt(day[s.key])}</Text>
+        </Text>
       ))}
-    </div>
+    </Box>
   )
 }
 
 export function StatusLegend() {
   return (
-    <div className="flex items-center justify-center gap-5 pt-3 text-xs text-muted-foreground" data-testid="status-legend">
-      {series.map(s => <span key={s.key} className="inline-flex items-center gap-2"><i className="size-2.5 rounded-[2px]" style={{ background: s.color }} aria-hidden />{s.label}</span>)}
-    </div>
+    <Box className="flex items-center justify-center gap-5 pt-3 text-xs text-muted-foreground" data-testid="status-legend">
+      {series.map(s => <Text as="span" key={s.key} className="inline-flex items-center gap-2"><Text as="i" className="size-2.5 rounded-[2px]" style={{ background: s.color }} aria-hidden />{s.label}</Text>)}
+    </Box>
   )
 }
 
@@ -50,12 +51,12 @@ export function AlertStatusChart({ data, unavailable = false }: { data: DailySta
   return (
     <Card className="@container/card min-w-0 max-w-full shadow-none" data-testid="alert-flow-chart">
       <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
+        <Box className="flex flex-wrap items-center gap-2">
           <CardTitle>일별 Alert 유입과 현재 상태</CardTitle>
-        </div>
+        </Box>
         <CardDescription>그날 들어온 Alert가 지금 어느 단계에 있는지 · 막대 전체 = 유입 건수</CardDescription>
-        <p className="text-xs text-muted-foreground">단독 Alert: Episode에 묶이지 않은 열린 Alert · Episode: 열린 Episode에 속한 Alert · 종결: 직접 종결 또는 Episode 종결</p>
-        {unavailable && <p className="text-xs text-muted-foreground">상태별 일별 집계 API 미연결 · 데이터 준비 중</p>}
+        <Text className="text-xs text-muted-foreground">단독 Alert: Episode에 묶이지 않은 열린 Alert · Episode: 열린 Episode에 속한 Alert · 종결: 직접 종결 또는 Episode 종결</Text>
+        {unavailable && <Text className="text-xs text-muted-foreground">상태별 일별 집계 API 미연결 · 데이터 준비 중</Text>}
       </CardHeader>
       <CardContent className="min-w-0 px-2 pt-2 sm:px-6">
         <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full min-w-0 max-w-full">

@@ -6,6 +6,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { EpisodeAlertSummary } from './preview-case-card';
 import { canTransferAlert, nextPreviewEpisodeCode, previewEpisodeWillDissolve } from './preview-episode-transfer';
+import { Box, Text } from '../../components/layout-primitives';
 
 export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false, bundle, onRelationRequest }) {
   const titleId = useId();
@@ -58,51 +59,51 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
       {!result && <PrimaryButton type="submit" tone="brand" disabled={!valid}>{confirmed ? label : '내용 확인'}</PrimaryButton>}
       {result && !unlink && <PrimaryButton as="a" href={`/episodes/${result}?tab=related${location.search.includes('data=sample') ? '&data=sample' : ''}`}>Episode 열기</PrimaryButton>}
     </>}>
-    <div className="case-judgment-body">
-      {result ? <p role="status">{dissolves ? 'Episode 해체 완료' : unlink ? '연결 해제 완료' : useNewEpisode ? '새 Episode 생성 완료' : 'Episode 편입 완료'} · <code>{result}</code></p>
-        : confirmed ? <div className="case-judgment-summary">
-          <p>{dissolves ? '남는 Alert가 2건 미만입니다. 모든 Alert를 복원하고 Episode를 해체합니다.'
+    <Box className="case-judgment-body">
+      {result ? <Text role="status">{dissolves ? 'Episode 해체 완료' : unlink ? '연결 해제 완료' : useNewEpisode ? '새 Episode 생성 완료' : 'Episode 편입 완료'} · <Text as="code">{result}</Text></Text>
+        : confirmed ? <Box className="case-judgment-summary">
+          <Text>{dissolves ? '남는 Alert가 2건 미만입니다. 모든 Alert를 복원하고 Episode를 해체합니다.'
             : unlink ? '선택한 Alert의 연결을 해제합니다.'
-              : `선택한 Alert 전체를 ${useNewEpisode ? `새 Episode ${confirmedNewCode}` : target}에 편입합니다.`}</p>
-          <ul>{selected.map(code => <li key={code}><code>{code}</code></li>)}</ul>
-          <p>{reason.trim()}</p>
-        </div> : <>
-          {!unlink && <div className="case-judgment-dropdowns">
+              : `선택한 Alert 전체를 ${useNewEpisode ? `새 Episode ${confirmedNewCode}` : target}에 편입합니다.`}</Text>
+          <Box as="ul">{selected.map(code => <Box as="li" key={code}><Text as="code">{code}</Text></Box>)}</Box>
+          <Text>{reason.trim()}</Text>
+        </Box> : <>
+          {!unlink && <Box className="case-judgment-dropdowns">
             <GlideSelect ariaLabel="편입 방식" value={useNewEpisode ? 'new' : 'existing'}
               options={[
                 { value: 'existing', label: '기존 Episode에 편입' },
                 ...(selected.length >= 2 ? [{ value: 'new', label: '새 Episode 생성' }] : []),
               ]}
               onChange={value => setCreating(value === 'new')} />
-            {useNewEpisode ? <dl className="case-judgment-details">
-              <div><dt>생성 예정 ID</dt><dd><code>{newEpisodeCode}</code></dd></div>
-            </dl> : <div className="case-judgment-field">
-              <span>대상 Episode ID</span>
+            {useNewEpisode ? <Box as="dl" className="case-judgment-details">
+              <Box><Box as="dt">생성 예정 ID</Box><Box as="dd"><Text as="code">{newEpisodeCode}</Text></Box></Box>
+            </Box> : <Box className="case-judgment-field">
+              <Text as="span">대상 Episode ID</Text>
               <GlideSelect ariaLabel="대상 Episode" placeholder="Episode ID 선택"
                 value={target} onChange={setTarget} options={episodes.map(item => item.code)}
                 disabled={!episodes.length} />
-              {!episodes.length && <p>편입할 수 있는 진행 중 Episode가 없습니다.</p>}
-            </div>}
-          </div>}
-          {!unlink && !useNewEpisode && targetEpisode && <dl className="case-judgment-details">
-            <div><dt>대상 Episode의 소속 Alert</dt><dd><EpisodeAlertSummary codes={targetEpisode.linkedAlertCodes}
-              complete={targetEpisode.linkedAlertCodesComplete} /></dd></div>
-          </dl>}
-          <fieldset className="case-judgment-evidence">
-            <legend>{fixedAlertCodes ? '편입할 Alert' : 'Alert 선택'}</legend>
-            {visibleAlerts.map(item => <QueryCheck key={item.code} label={<code>{item.code}</code>} ariaLabel={item.code}
+              {!episodes.length && <Text>편입할 수 있는 진행 중 Episode가 없습니다.</Text>}
+            </Box>}
+          </Box>}
+          {!unlink && !useNewEpisode && targetEpisode && <Box as="dl" className="case-judgment-details">
+            <Box><Box as="dt">대상 Episode의 소속 Alert</Box><Box as="dd"><EpisodeAlertSummary codes={targetEpisode.linkedAlertCodes}
+              complete={targetEpisode.linkedAlertCodesComplete} /></Box></Box>
+          </Box>}
+          <Box as="fieldset" className="case-judgment-evidence">
+            <Box as="legend">{fixedAlertCodes ? '편입할 Alert' : 'Alert 선택'}</Box>
+            {visibleAlerts.map(item => <QueryCheck key={item.code} label={<Text as="code">{item.code}</Text>} ariaLabel={item.code}
               checked={selected.includes(item.code)} disabled={Boolean(fixedAlertCodes)}
               onChange={checked => setPickedAlertCodes(previous => checked
                 ? [...previous, item.code] : previous.filter(code => code !== item.code))} />)}
-            {!visibleAlerts.length && <p>선택 가능한 Alert가 없습니다.</p>}
-          </fieldset>
-          <label className="case-judgment-field">변경 사유
+            {!visibleAlerts.length && <Text>선택 가능한 Alert가 없습니다.</Text>}
+          </Box>
+          <Box as="label" className="case-judgment-field">변경 사유
             <Textarea required maxLength={4000} value={reason} onChange={event => setReason(event.target.value)} />
-          </label>
-          <p>검수용 변경은 이 탭에 저장됩니다.</p>
+          </Box>
+          <Text>검수용 변경은 이 탭에 저장됩니다.</Text>
         </>}
-      {error && <p role="alert">{error}</p>}
-      {requestSent && <p role="status">관리자에게 연관 업무 검토 요청을 보냈습니다.</p>}
-    </div>
+      {error && <Text role="alert">{error}</Text>}
+      {requestSent && <Text role="status">관리자에게 연관 업무 검토 요청을 보냈습니다.</Text>}
+    </Box>
   </DialogFrame>;
 }

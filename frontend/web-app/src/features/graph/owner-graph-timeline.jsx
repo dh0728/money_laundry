@@ -8,6 +8,7 @@ import {
 import { copySVG, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { GraphFlowReveal, GraphFlowStroke } from './graph-flow-pulse';
 import { useSpringNodeDrag } from './graph-node-drag';
+import { Box } from '../../components/layout-primitives';
 
 const dragThreshold = 5;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -176,7 +177,7 @@ export function OwnerGraphTimeline({
     ...nodeHandlers(id),
     onPointerDownCapture() { suppressClick.current = false; },
   });
-  return <div ref={host} className="preview-evidence-canvas preview-owner-timeline" data-export-visualization
+  return <Box ref={host} className="preview-evidence-canvas preview-owner-timeline" data-export-visualization
     aria-label="소유주별 자금 흐름 그래프" aria-description="소유주 블록 안 계좌 사이의 거래를 표시합니다. 왼쪽은 수취, 오른쪽은 송금입니다."
     role="group" tabIndex={0} data-panning={panning || undefined}
     onPointerDown={startPan} onPointerMove={pan} onPointerUp={endPan} onPointerCancel={endPan}
@@ -271,5 +272,5 @@ export function OwnerGraphTimeline({
     </svg>
     {controlsHost && createPortal(<GraphZoomControls zoom={Math.round(camera.scale * 100)}
       onZoom={zoom} onFit={() => setPosition(null)} />, controlsHost)}
-  </div>;
+  </Box>;
 }

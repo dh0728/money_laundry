@@ -11,7 +11,7 @@ export function updateBorderGlowPointer(card, clientX, clientY, bounds = card.ge
 }
 
 export function bindCardGlow(workspace) {
-  const surfaceSelector = '[data-card-interactive], .preview-tilt-cards [data-glow-surface]';
+  const surfaceSelector = '[data-card-interactive]';
   const page = workspace.ownerDocument;
   let active;
   let tiltBounds;

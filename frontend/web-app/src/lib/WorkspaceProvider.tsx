@@ -3,6 +3,7 @@ import { fetchDemoClock, daysBefore, kstDate } from '@/api/liveDashboard'
 import { ErrorBlock, LoadingBlock } from '@/components/states'
 import { useAsync } from './useAsync'
 import { PeriodContext, WorkspaceContext, WorkspaceState, useViewState, useWorkspace, type Period } from './workspaceState'
+import { Box } from '@/components/layout-primitives'
 
 export function WorkspaceProvider({ children, state }: { children: ReactNode; state?: WorkspaceState }) {
   const [local] = useState(() => new WorkspaceState())
@@ -34,5 +35,5 @@ export function WorkspaceMain({ route, className, style, children }: { route: st
     if (!node) return
     node.scrollTop = store.scroll.get(route) ?? 0
   }, [store, route])
-  return <main ref={ref} className={className} style={style} onScroll={event => store.scroll.set(route, event.currentTarget.scrollTop)}>{children}</main>
+  return <Box as="main" ref={ref} className={className} style={style} onScroll={event => store.scroll.set(route, event.currentTarget.scrollTop)}>{children}</Box>
 }

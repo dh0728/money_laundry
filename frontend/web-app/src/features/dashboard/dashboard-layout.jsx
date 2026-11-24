@@ -5,6 +5,7 @@ import { Panel } from '../../components/panel';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
+import { Box, Text } from '@/components/layout-primitives';
 
 // Tetris-style packer on a columns-wide occupancy grid. Blocks (the AI summary) are placed first;
 // each cell then drops into the first free slot (row-major), takes ceil(run / k) of the free run so the
@@ -45,7 +46,7 @@ const wideLayout = { columns: 12, minSpan: 3, blocks: [{ row: 0, col: 0, rowSpan
 
 export function DashboardMetricGrid({ items, wide = false, appearance, loading = false }) {
   const placed = wide ? packBento(items, wideLayout) : [];
-  return <div className="dashboard-metrics-box" data-wide={wide}>
+  return <Box className="dashboard-metrics-box" data-wide={wide}>
     <MagicBento key={String(appearance.reduced)} className="dashboard-metrics" items={items.map((item, index) => ({
       ...item,
       ...(wide ? placed[index] : { colSpan: 1, rowSpan: 1 }),
@@ -53,7 +54,7 @@ export function DashboardMetricGrid({ items, wide = false, appearance, loading =
       theme={appearance.theme} disableAnimations={loading || appearance.reduced} intro={false} textAutoHide={false}
       enableTilt={false} enableBorderGlow={false} enableSpotlight={false} clickEffect={false} enableStars={false}
       style={{ '--mb-ink': 'var(--text)', '--mb-muted': 'var(--muted-text)' }} />
-  </div>;
+  </Box>;
 }
 
 function LoadingChart({ chartClass = 'dashboard-proportion-band', children, showNote = true }) {
@@ -65,38 +66,38 @@ function LoadingChart({ chartClass = 'dashboard-proportion-band', children, show
 }
 
 function LoadingDonut({ legendRows }) {
-  return <div className="dashboard-risk-chart">
+  return <Box className="dashboard-risk-chart">
     <Skeleton className="dashboard-loading-donut" />
-    <div className="dashboard-loading-legend" style={{ width: 'min(100%, 9rem)' }}>
+    <Box className="dashboard-loading-legend" style={{ width: 'min(100%, 9rem)' }}>
       {Array.from({ length: legendRows }, (_, index) => <Skeleton key={index} className="dashboard-loading-label" />)}
-    </div>
-  </div>;
+    </Box>
+  </Box>;
 }
 
 function LoadingDailyCharts() {
-  return <div className="dashboard-analytics-row">
+  return <Box className="dashboard-analytics-row">
     <LoadingChart chartClass="dashboard-bklit-series" showNote={false} />
     <LoadingChart chartClass="dashboard-bklit-series" />
-  </div>;
+  </Box>;
 }
 
 export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
   const items = Array.from({ length: benchmark ? 4 : mine ? 2 : 8 }, (_, index) => ({
     id: index,
-    content: <div className="dashboard-metric">
+    content: <Box className="dashboard-metric">
       <Skeleton className="dashboard-loading-title" />
       <Skeleton className="dashboard-loading-value" />
       {(benchmark ? index >= 2 : mine || ![0, 3].includes(index)) && <Skeleton className="dashboard-loading-note" />}
       {!benchmark && <Skeleton className="dashboard-loading-trend" />}
-    </div>,
+    </Box>,
   }));
-  return <div className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
-    <span className="visually-hidden" role="status">대시보드 불러오는 중</span>
+  return <Box className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
+    <Text as="span" className="visually-hidden" role="status">대시보드 불러오는 중</Text>
     {benchmark && mine && <Panel as="article" className="dashboard-personal-status" aria-hidden="true">
       <Skeleton className="dashboard-loading-title" />
       <Skeleton className="dashboard-loading-note" />
     </Panel>}
-    <div className="dashboard-top" aria-hidden="true">
+    <Box className="dashboard-top" aria-hidden="true">
       <Panel as="article" className="dashboard-summary-card">
         <Skeleton className="dashboard-loading-title" />
         <Skeleton className="dashboard-loading-value" />
@@ -107,46 +108,46 @@ export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
         </>}
       </Panel>
       <DashboardMetricGrid items={items} wide={!benchmark && !mine} appearance={appearance} loading />
-    </div>
+    </Box>
     {(!mine || benchmark) && <DashboardAnalyticsSkeleton benchmark={benchmark} />}
     {!benchmark && <DashboardBoardSkeleton />}
-  </div>;
+  </Box>;
 }
 
 export function DashboardAnalyticsSkeleton({ benchmark = false, showPatterns = true } = {}) {
-  return <div className="dashboard-analytics dashboard-loading" aria-busy="true">
-    <span className="visually-hidden" role="status">대시보드 차트 불러오는 중</span>
+  return <Box className="dashboard-analytics dashboard-loading" aria-busy="true">
+    <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
     {benchmark && <LoadingDailyCharts />}
     <LoadingChart>
-      <div className="dashboard-transaction-details">
-        <div className="dashboard-transaction-breakdown">
-          {benchmark ? <div className="dashboard-composition-chart">
+      <Box className="dashboard-transaction-details">
+        <Box className="dashboard-transaction-breakdown">
+          {benchmark ? <Box className="dashboard-composition-chart">
             <Skeleton className="dashboard-loading-note" />
             <Skeleton className="dashboard-proportion-band" />
-          </div> : <LoadingDonut legendRows={2} />}
-        </div>
-        {(!benchmark || showPatterns) && <div className="dashboard-transaction-breakdown">
+          </Box> : <LoadingDonut legendRows={2} />}
+        </Box>
+        {(!benchmark || showPatterns) && <Box className="dashboard-transaction-breakdown">
           <Skeleton className="dashboard-loading-note" />
           <Skeleton className="dashboard-pattern-bars" />
-        </div>}
-      </div>
+        </Box>}
+      </Box>
     </LoadingChart>
     {!benchmark && <>
-      <div className="dashboard-analytics-row dashboard-detection-row">
+      <Box className="dashboard-analytics-row dashboard-detection-row">
         <LoadingChart showNote={false}><LoadingDonut legendRows={3} /></LoadingChart>
         <LoadingChart chartClass="dashboard-bklit-series" />
-      </div>
+      </Box>
       <LoadingChart chartClass="dashboard-bklit-series" />
     </>}
-  </div>;
+  </Box>;
 }
 
 export function DashboardBoardSkeleton() {
-  return <div className="dashboard-board dashboard-loading" aria-busy="true">
-    <span className="visually-hidden" role="status">업무 현황 불러오는 중</span>
-    <div className="dashboard-board-heading"><Skeleton className="dashboard-loading-title" /></div>
+  return <Box className="dashboard-board dashboard-loading" aria-busy="true">
+    <Text as="span" className="visually-hidden" role="status">업무 현황 불러오는 중</Text>
+    <Box className="dashboard-board-heading"><Skeleton className="dashboard-loading-title" /></Box>
     <CaseProgressLanes renderLane={({ preset }) => <LoadingLane key={preset} />} />
-  </div>;
+  </Box>;
 }
 
 function LoadingLane() {

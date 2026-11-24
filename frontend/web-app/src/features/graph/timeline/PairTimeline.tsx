@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import type { TimeTx } from './timeLayout'
 import { NumBadge } from '@/components/NumBadge'
+import { Box, Text } from '@/components/layout-primitives'
 
 const AB = 'var(--palette-blue-500)', BA = 'var(--risk-7)'
-const Dir = ({ from, to, numbers }: { from: string; to: string; numbers: Map<string, number> }) => <span className="inline-flex items-center gap-1"><NumBadge n={numbers.get(from)!} />→<NumBadge n={numbers.get(to)!} /></span>
+const Dir = ({ from, to, numbers }: { from: string; to: string; numbers: Map<string, number> }) => <Text as="span" className="inline-flex items-center gap-1"><NumBadge n={numbers.get(from)!} />→<NumBadge n={numbers.get(to)!} /></Text>
 
 export default function PairTimeline({ a, b, numbers, all }: { a: string; b: string; numbers: Map<string, number>; all: TimeTx[] }) {
   const tx = all.filter(t => (t.fromAccount === a && t.toAccount === b) || (t.fromAccount === b && t.toAccount === a))
@@ -16,10 +17,10 @@ export default function PairTimeline({ a, b, numbers, all }: { a: string; b: str
   const bw = (t: TimeTx) => 4 + 12 * (hi === lo ? 0.5 : (Math.log10(Math.max(1, t.amountUsd)) - lo) / (hi - lo))
   const sum = (from: string) => tx.filter(t => t.fromAccount === from).reduce((s, t) => s + t.amountUsd, 0)
   const count = (from: string) => tx.filter(t => t.fromAccount === from).length
-  return <div className="space-y-3">
-    <div><p className="text-base font-semibold"><span className="inline-flex items-center gap-1.5"><NumBadge n={numbers.get(a)!} />↔<NumBadge n={numbers.get(b)!} /></span><span className="ml-2 text-xs font-normal text-muted-foreground">두 계좌 사이 거래 {tx.length}건</span></p>
-      <p className="mt-1 text-xs tabular-nums"><span style={{ color: AB }}>■</span> <Dir from={a} to={b} numbers={numbers} /> {count(a)}건 · {Math.round(sum(a)).toLocaleString()} USD{count(b) > 0 && <><span className="ml-2" style={{ color: BA }}>■</span> <Dir from={b} to={a} numbers={numbers} /> {count(b)}건 · {Math.round(sum(b)).toLocaleString()} USD</>}</p></div>
-    <div className="overflow-x-auto rounded-md border">
+  return <Box className="space-y-3">
+    <Box><Text className="text-base font-semibold"><Text as="span" className="inline-flex items-center gap-1.5"><NumBadge n={numbers.get(a)!} />↔<NumBadge n={numbers.get(b)!} /></Text><Text as="span" className="ml-2 text-xs font-normal text-muted-foreground">두 계좌 사이 거래 {tx.length}건</Text></Text>
+      <Text className="mt-1 text-xs tabular-nums"><Text as="span" style={{ color: AB }}>■</Text> <Dir from={a} to={b} numbers={numbers} /> {count(a)}건 · {Math.round(sum(a)).toLocaleString()} USD{count(b) > 0 && <><Text as="span" className="ml-2" style={{ color: BA }}>■</Text> <Dir from={b} to={a} numbers={numbers} /> {count(b)}건 · {Math.round(sum(b)).toLocaleString()} USD</>}</Text></Box>
+    <Box className="overflow-x-auto rounded-md border">
       <svg width={width} height={H} role="img" aria-label="두 계좌 레인 타임라인" className="block">
         <line x1={0} x2={width} y1={top} y2={top} stroke="var(--border)" strokeWidth={6} /><line x1={0} x2={width} y1={bottom} y2={bottom} stroke="var(--border)" strokeWidth={6} />
         <circle cx={16} cy={top - 12} r={11} fill="var(--card)" stroke="var(--foreground)" /><text x={16} y={top - 7} fontSize={13} fontWeight={700} textAnchor="middle" fill="var(--foreground)">{numbers.get(a)}</text><text x={34} y={top - 7} fontSize={12} fill="var(--muted-foreground)" className="font-mono">{a}</text>
@@ -31,10 +32,10 @@ export default function PairTimeline({ a, b, numbers, all }: { a: string; b: str
             <text x={x} y={H / 2} fontSize={9} textAnchor="middle" fill="var(--foreground)" transform={`rotate(-90 ${x} ${H / 2})`} dy={-w / 2 - 3}>{i + 1}</text>
           </g> })}
       </svg>
-    </div>
-    <ul className="divide-y text-sm">{tx.map((t, i) => <li key={t.txId} onMouseEnter={() => setHover(t.txId)} onMouseLeave={() => setHover(null)} className={`grid grid-cols-[20px_88px_1fr_auto] items-center gap-2 py-1.5 ${hover === t.txId ? 'bg-muted/60' : ''}`}>
-      <span className="tabular-nums text-muted-foreground">{i + 1}</span><span className="tabular-nums text-muted-foreground">{t.txAt.replace('T', ' ').slice(5, 16)}</span>
-      <span style={{ color: t.fromAccount === a ? AB : BA }}><Dir from={t.fromAccount} to={t.toAccount} numbers={numbers} /></span><span className="tabular-nums">{t.amountPaid.toLocaleString()} {t.paymentCurrency}</span>
-    </li>)}</ul>
-  </div>
+    </Box>
+    <Box as="ul" className="divide-y text-sm">{tx.map((t, i) => <Box as="li" key={t.txId} onMouseEnter={() => setHover(t.txId)} onMouseLeave={() => setHover(null)} className={`grid grid-cols-[20px_88px_1fr_auto] items-center gap-2 py-1.5 ${hover === t.txId ? 'bg-muted/60' : ''}`}>
+      <Text as="span" className="tabular-nums text-muted-foreground">{i + 1}</Text><Text as="span" className="tabular-nums text-muted-foreground">{t.txAt.replace('T', ' ').slice(5, 16)}</Text>
+      <Text as="span" style={{ color: t.fromAccount === a ? AB : BA }}><Dir from={t.fromAccount} to={t.toAccount} numbers={numbers} /></Text><Text as="span" className="tabular-nums">{t.amountPaid.toLocaleString()} {t.paymentCurrency}</Text>
+    </Box>)}</Box>
+  </Box>
 }

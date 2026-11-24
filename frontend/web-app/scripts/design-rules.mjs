@@ -5,7 +5,7 @@
 // 원칙 출처: second-brain archive/aml-radar/docs/design-principles.md (DP:줄)
 export const designRuleTree = [
   {
-    id: 'component', title: '공용 컴포넌트만', source: 'DP:27·181·204, README 공용 UI 수정',
+    id: 'component', title: '공용 컴포넌트만', source: 'DP:27·181·204, README 공용 UI 수정, 명기 2026-11-24 t3149u~t3154u',
     rules: [
       { id: 'component/table-markup', title: '표는 공용 Table(components/ui/table.tsx)로만 그린다', engine: 'eslint', level: 'error' },
       { id: 'component/table-library', title: '다른 표 라이브러리(antd Table 등)를 쓰지 않는다', engine: 'eslint', level: 'ratchet' },
@@ -15,6 +15,10 @@ export const designRuleTree = [
       { id: 'component/search-input', title: '검색 입력은 SearchField로만 만든다', engine: 'eslint', level: 'error' },
       { id: 'component/button', title: '버튼은 components의 공용 버튼으로만 만든다', engine: 'eslint', level: 'ratchet' },
       { id: 'component/clickable-element', title: '누르는 div·span을 만들지 않는다(button·a를 쓴다)', engine: 'eslint', level: 'ratchet' },
+      { id: 'component/panel', title: '패널은 공용 Panel로만: 패널 클래스(screen-panel·panel-material·panel-inset) 직접 사용·Panel에 glass·패널 깊이 CSS 복제 금지', engine: 'eslint+stylelint', level: 'error' },
+      { id: 'component/raw-element', title: '화면 파일(src/components 밖)에는 맨 DOM 태그 없이 공용 컴포넌트 인스턴스만 둔다', engine: 'eslint', level: 'ratchet',
+        // 0건이 된 폴더는 여기 더해 바로 오류로 막는다(pnpm lint·커밋 전 검사).
+        errorIn: ['src/features/notifications/', 'src/lib/'] },
     ],
   },
   {
