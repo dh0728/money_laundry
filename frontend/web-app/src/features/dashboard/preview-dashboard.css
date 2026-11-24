@@ -18,7 +18,6 @@
   --chart-grid: color-mix(in srgb, var(--text) 8%, transparent);
   --chart-crosshair: var(--muted-text);
   --dashboard-metric-plot-min: var(--aml-space-48);
-  --dashboard-series-plot-min: clamp(10rem, 16vw, 14rem);
   display: grid;
   align-content: start;
   grid-template-columns: minmax(0, 1fr);
@@ -35,7 +34,7 @@
 .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"],
 .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] > .dashboard-metrics.magic-bento { display: contents }
 .preview-dashboard[data-mine="true"] .dashboard-top {
-  --dashboard-metric-plot-min: 4.5rem;
+  --dashboard-metric-plot-min: var(--chart-sparkline-height);
   grid-template-columns: repeat(12, minmax(0, 1fr));
   word-break: keep-all;
 }
@@ -87,7 +86,7 @@
   flex: 1 1 0;
   min-inline-size: 0;
 }
-.dashboard-summary-plot { min-block-size: clamp(4.5rem, 7vw, 7rem) }
+.dashboard-summary-plot { min-block-size: var(--chart-summary-height) }
 .dashboard-metric-plot { min-block-size: var(--dashboard-metric-plot-min) }
 :is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot, .dashboard-status-area) > div {
   position: absolute;
@@ -264,24 +263,24 @@
 .dashboard-metric p { color: var(--muted-text); font-size: var(--aml-type-caption-size) }
 .dashboard-metric-reading { display: flex; align-items: center; flex-wrap: wrap; gap: var(--aml-space-4) }
 .dashboard-metric-value {
-  font-size: clamp(1.5rem, 30cqi, var(--workspace-kpi-value-size));
+  font-size: var(--metric-value-size);
   font-weight: var(--aml-type-metric-weight);
-  line-height: 1.1;
+  line-height: var(--metric-value-line-height);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.dashboard-metric-value[data-wide-value] { font-size: clamp(1.5rem, 20cqi, var(--workspace-kpi-value-size)) }
+.dashboard-metric-value[data-wide-value] { font-size: var(--metric-wide-value-size) }
 .dashboard-metric-value[data-composite] {
   display: flex;
   flex-wrap: wrap;
   gap: 0 var(--aml-space-4);
-  font-size: clamp(1.5rem, 18cqi, var(--workspace-kpi-value-size));
+  font-size: var(--metric-composite-value-size);
 }
 .dashboard-metric-value[data-composite] > span { white-space: nowrap }
 .dashboard-metric-value[data-composite] > small { align-self: center }
 .dashboard-metric-value[data-composite] > small[aria-hidden] {
   margin-inline: 0;
-  font-size: 1em;
+  font-size: inherit;
   font-weight: var(--aml-type-body-weight);
   color: var(--muted-text);
 }
@@ -417,10 +416,10 @@
 .dashboard-chart:has(> .dashboard-risk-chart) { grid-template-rows: auto 1fr }
 .dashboard-donut-plot {
   position: relative;
-  flex: 1 0 9rem;
+  flex: 1 0 var(--chart-donut-size-min);
   align-self: stretch;
-  max-inline-size: min(100%, 15rem);
-  min-block-size: 9rem;
+  max-inline-size: min(100%, var(--chart-donut-size-max));
+  min-block-size: var(--chart-donut-size-min);
 }
 .dashboard-donut-ring {
   position: absolute;
@@ -462,9 +461,9 @@
   flex-direction: column;
 }
 .dashboard-series { flex: 1 0 auto; gap: var(--workspace-gap); margin: 0 }
-:is(.dashboard-series-plot, .dashboard-status-area) { min-block-size: var(--dashboard-series-plot-min) }
-.dashboard-loading .dashboard-bklit-series { block-size: var(--dashboard-series-plot-min) }
-.dashboard-volume-axis { display: grid; justify-items: center; line-height: 1.2 }
+:is(.dashboard-series-plot, .dashboard-status-area) { min-block-size: var(--chart-series-height) }
+.dashboard-loading .dashboard-bklit-series { block-size: var(--chart-series-height) }
+.dashboard-volume-axis { display: grid; justify-items: center; line-height: var(--chart-axis-label-line-height) }
 .dashboard-volume-axis small { color: var(--chart-suspect-label); font-size: var(--aml-type-caption-size); font-variant-numeric: tabular-nums }
 :is(.dashboard-legend, .dashboard-status-readout) > span {
   display: inline-flex;

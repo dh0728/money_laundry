@@ -9,11 +9,11 @@
   "token/raw-color": 138,
   "token/spacing-unit": 13,
   "token/radius-unit": 5,
-  "token/font-size-unit": 9,
+  "token/font-size-unit": 5,
   "token/inline-style": 292,
   "token/arbitrary-class": 209,
   "token/important": 27,
-  "token/fixed-number": 608,
+  "token/fixed-number": 601,
   "token/palette-direct": 6,
   "chart/library-import": 5,
   "icon/local-svg": 6
