@@ -14,6 +14,7 @@ import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
 import { ScreenActions } from '../../components/screen-actions';
 import '../../components/form-dropdown.css';
+import { Box, Heading, Text } from '@/components/layout-primitives';
 
 const rules = [
   { label: '거래 패턴', children: [
@@ -64,23 +65,23 @@ export function RiskDial({ embedded = false } = {}) {
   return <Panel embedded={embedded} className="risk-dial"
     aria-label={embedded ? '모델 위험도 기준' : undefined} aria-labelledby={embedded ? undefined : title}>
     {!embedded && <>
-      <h2 id={title}>위험 구간</h2>
-      <p className="workflow-rule-note">경계점을 움직여 관심·고위험 구간을 비교합니다.</p>
+      <Heading id={title}>위험 구간</Heading>
+      <Text className="workflow-rule-note">경계점을 움직여 관심·고위험 구간을 비교합니다.</Text>
     </>}
-    <div className="risk-dial-face" ref={face}>
+    <Box className="risk-dial-face" ref={face}>
       <svg aria-hidden="true" viewBox="0 0 200 200">
         {[[0, thresholds[0], 'low'], [thresholds[0], thresholds[1], 'medium'], [thresholds[1], 100, 'high']].map(([a, b, band]) =>
           <path key={band} data-band={band} d={arc(a, b)} fill="none" strokeWidth="9" />)}
       </svg>
-      <div className="risk-dial-readouts" aria-hidden="true">
-        {thresholds.map((value, i) => <span key={labels[i]} data-risk-tooltip
-          data-band={i === 0 ? 'low' : 'high'} aria-label={labels[i]}>{value}</span>)}
-      </div>
+      <Box className="risk-dial-readouts" aria-hidden="true">
+        {thresholds.map((value, i) => <Text as="span" key={labels[i]} data-risk-tooltip
+          data-band={i === 0 ? 'low' : 'high'} aria-label={labels[i]}>{value}</Text>)}
+      </Box>
       {thresholds.map((value, i) => {
         const [x, y] = point(value);
         const min = i === 0 ? 1 : thresholds[0] + 1;
         const max = i === 0 ? thresholds[1] - 1 : 99;
-        return <span key={i} className="risk-dial-thumb" role="slider" tabIndex={0}
+        return <Text as="span" key={i} className="risk-dial-thumb" role="slider" tabIndex={0}
           data-risk-tooltip
           aria-label={labels[i]} aria-valuemin={min} aria-valuemax={max} aria-valuenow={value} aria-valuetext={`${value}점`}
           style={{ left: `${x / 2}%`, top: `${y / 2}%` }}
@@ -100,7 +101,7 @@ export function RiskDial({ embedded = false } = {}) {
           }}
           onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) move(event, i); }} />;
       })}
-    </div>
+    </Box>
   </Panel>;
 }
 
@@ -109,7 +110,7 @@ export function RuleTemplateMenu() {
   return <>
     <BranchedMenu items={rules} color="var(--text)" accentColor="var(--text)" lineColor="var(--muted-text)"
       width={220} className="rule-template-menu" onSelect={(_, item) => setSelected(item.label)} />
-    {selected && <p role="status">선택한 템플릿 · {selected}</p>}
+    {selected && <Text role="status">선택한 템플릿 · {selected}</Text>}
   </>;
 }
 
@@ -194,11 +195,11 @@ function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
     });
   }
 
-  return <div className="screen-row screen-rule-editor">
+  return <Box className="screen-row screen-rule-editor">
     <Panel className="rule-draft-reference">
-      <h2>템플릿 고르기</h2>
-      <p className="workflow-rule-note">템플릿 {templates.length}개에서 이름과 조건을 불러올 수 있습니다.</p>
-      {copied && <p className="workflow-rule-note" role="status"><code>{copied}</code> 조건을 복제했습니다. 저장하면 새 초안이 됩니다.</p>}
+      <Heading>템플릿 고르기</Heading>
+      <Text className="workflow-rule-note">템플릿 {templates.length}개에서 이름과 조건을 불러올 수 있습니다.</Text>
+      {copied && <Text className="workflow-rule-note" role="status"><Text as="code">{copied}</Text> 조건을 복제했습니다. 저장하면 새 초안이 됩니다.</Text>}
       <RuleSelect label="룰 템플릿" options={templates.map(rule => ({ label: rule.name, value: rule.id }))}
         onChange={value => {
           const template = templates.find(rule => rule.id === value);
@@ -209,29 +210,29 @@ function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
           setSaved(null);
           setFailure('');
         }} />
-      <section className="rule-draft-preview" aria-label="작성한 조건 미리 보기">
-        <h2>작성한 조건 미리 보기</h2>
-        {input.name.trim() && <h3>{input.name.trim()}</h3>}
-        {input.description.trim() && <p>{input.description.trim()}</p>}
-        {!blocks.length ? <p>조건 블록을 추가해 주세요.</p> :
-          hasInvalidCondition ? <p>조건 값을 확인해 주세요.</p> : <RuleConditionFacts input={input} blocks={blocks} />}
-      </section>
+      <Box as="section" className="rule-draft-preview" aria-label="작성한 조건 미리 보기">
+        <Heading>작성한 조건 미리 보기</Heading>
+        {input.name.trim() && <Heading level={3}>{input.name.trim()}</Heading>}
+        {input.description.trim() && <Text>{input.description.trim()}</Text>}
+        {!blocks.length ? <Text>조건 블록을 추가해 주세요.</Text> :
+          hasInvalidCondition ? <Text>조건 값을 확인해 주세요.</Text> : <RuleConditionFacts input={input} blocks={blocks} />}
+      </Box>
     </Panel>
     <Panel className="rule-draft-editor">
-      <h2>룰 만들기</h2>
-      <form ref={form} id={`${errorId}-form`} aria-label="룰 작성" className="rule-draft-form" onSubmit={submit} noValidate>
-        <label>룰 이름
+      <Heading>룰 만들기</Heading>
+      <Box as="form" ref={form} id={`${errorId}-form`} aria-label="룰 작성" className="rule-draft-form" onSubmit={submit} noValidate>
+        <Box as="label">룰 이름
           <Input name="name" aria-label="룰 이름" value={draft.name} maxLength={RULE_LIMITS.name}
             onChange={event => changeDraft({ ...draft, name: event.target.value })}
             aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? `${errorId}-name` : undefined} />
-          {errors.name && <span id={`${errorId}-name`} data-rule-block-error>{errors.name}</span>}
-        </label>
-        <label>목적과 근거
+          {errors.name && <Text as="span" id={`${errorId}-name`} data-rule-block-error>{errors.name}</Text>}
+        </Box>
+        <Box as="label">목적과 근거
           <Textarea name="description" aria-label="목적과 근거" value={draft.description} maxLength={RULE_LIMITS.description} rows={2}
             onChange={event => changeDraft({ ...draft, description: event.target.value })}
             aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? `${errorId}-description` : undefined} />
-          {errors.description && <span id={`${errorId}-description`} data-rule-block-error>{errors.description}</span>}
-        </label>
+          {errors.description && <Text as="span" id={`${errorId}-description`} data-rule-block-error>{errors.description}</Text>}
+        </Box>
         <RuleConditionBlocks input={draft} blocks={blocks} errors={errors} scoreAsPoints button={ActionButton}
           renderBranches={(children, finalSlot) => children.length ? <RuleTreeBranches finalSlot={finalSlot}>{children}</RuleTreeBranches> : finalSlot}
           renderTypePicker={({ onChange, ...picker }) => <RuleSelect {...picker} label="거래 유형" onChange={value => onChange(Number(value))} />}
@@ -240,19 +241,19 @@ function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
             setDirty(true);
             setFailure('');
           }} />
-        {failure && <p role="alert" data-rule-block-error>{failure}</p>}
-        {saved && !dirty && <div role="status" className="rule-draft-actions">
-          <p><code>{saved.id}</code> 초안이 저장되었습니다.</p>
+        {failure && <Text role="alert" data-rule-block-error>{failure}</Text>}
+        {saved && !dirty && <Box role="status" className="rule-draft-actions">
+          <Text><Text as="code">{saved.id}</Text> 초안이 저장되었습니다.</Text>
           <ActionButton as="a" href={`/rules?rule=${saved.id}`}>저장한 룰 보기</ActionButton>
           <ActionButton as="a" href={`/rules/backtest?rule=${saved.id}`}>백테스트로 열기</ActionButton>
-        </div>}
-      </form>
+        </Box>}
+      </Box>
     </Panel>
     <ScreenActions host={actionsHost} stackOnNarrow>
       <PrimaryButton tone="brand" aria-controls={`${errorId}-form`} disabled={busy} aria-busy={busy || undefined}
         onClick={() => form.current.requestSubmit()}>{busy ? '저장 중…' : '초안 저장'}</PrimaryButton>
     </ScreenActions>
-  </div>;
+  </Box>;
 }
 
 export function mountRuleControls(workspace, actionsHost, { sourceRule } = {}) {

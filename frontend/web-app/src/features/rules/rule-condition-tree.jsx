@@ -2,6 +2,7 @@ import React, { Children, useLayoutEffect, useRef, useState } from 'react';
 import { typeDisplay } from '@/api/codes';
 import { ruleBlocksFor } from '@/features/rules/rules-logic';
 import { BranchLines } from '../../components/react-bits/BranchLines';
+import { Box, Text } from '../../components/layout-primitives';
 
 export function RuleTreeBranches({ children, finalSlot }) {
   const list = useRef(null);
@@ -26,16 +27,16 @@ export function RuleTreeBranches({ children, finalSlot }) {
     for (const item of node.children) observer.observe(item);
     return () => observer.disconnect();
   }, [children]);
-  return <div className="rule-tree-branches">
+  return <Box className="rule-tree-branches">
     {lines?.height > 0 && <BranchLines rows={lines.rows} width={20} height={lines.height} trunk={5} end={20} radius={6} activeIndex={-1} />}
-    <ol ref={list} aria-label="조건 순서">
-      {Children.map(children, child => <li>{child}</li>)}
-      <li>
+    <Box as="ol" ref={list} aria-label="조건 순서">
+      {Children.map(children, child => <Box as="li">{child}</Box>)}
+      <Box as="li">
         {finalSlot}
-        <span className="rule-tree-outcome" data-rule-tree-target>백테스트 검토 대상</span>
-      </li>
-    </ol>
-  </div>;
+        <Text as="span" className="rule-tree-outcome" data-rule-tree-target>백테스트 검토 대상</Text>
+      </Box>
+    </Box>
+  </Box>;
 }
 
 export function RuleConditionFacts({ input, blocks = ruleBlocksFor(input) }) {
@@ -45,12 +46,12 @@ export function RuleConditionFacts({ input, blocks = ruleBlocksFor(input) }) {
     scoreMin: ['모델 점수', score > 0 ? `${score}점 이상` : '제한 없음'],
     accountWindow: ['같은 송금 계좌', `${input.windowHours}시간 내 ${input.minTransactions}건 이상`],
   };
-  return <div className="rule-condition-tree">
-    <strong>모든 조건 충족</strong>
+  return <Box className="rule-condition-tree">
+    <Text as="strong">모든 조건 충족</Text>
     <RuleTreeBranches>
-      {blocks.map(kind => <div className="rule-tree-fact" data-rule-tree-target key={kind}>
-        <span>{facts[kind][0]}</span><strong>{facts[kind][1]}</strong>
-      </div>)}
+      {blocks.map(kind => <Box className="rule-tree-fact" data-rule-tree-target key={kind}>
+        <Text as="span">{facts[kind][0]}</Text><Text as="strong">{facts[kind][1]}</Text>
+      </Box>)}
     </RuleTreeBranches>
-  </div>;
+  </Box>;
 }
