@@ -9,6 +9,22 @@
   --aml-layout-max-width: 1440px;
   --aml-shell-compact-max-width: 680px;
   --aml-workspace-laptop-max-width: 1919px;
+  --layer-local-overlay: 1;
+  --sidebar-hidden-offset: -100%;
+  --sidebar-group-collapsed-rotation: -.25turn;
+  --workspace-panel-min-height: 12rem;
+  --workspace-panel-max-height: 24rem;
+  --workspace-tall-panel-max-height: 25rem;
+  --workspace-table-min-height: 9rem;
+  --workspace-table-max-height: 16rem;
+  --workspace-overlay-width: 480px;
+  --workspace-overlay-min-height: 145px;
+  --workspace-rule-editor-list-share: 16%;
+  --workspace-rule-editor-details-share: 21%;
+  --workspace-related-list-share: 27%;
+  --workspace-entry-card-min-width: 155px;
+  --workspace-entry-card-height: 70px;
+  --list-item-entry-scale: .985;
   --aml-font-mono: Pretendard;
   --aml-size-icon-mini: var(--aml-space-12);
   --aml-size-icon-large: var(--aml-space-24);
@@ -265,6 +281,8 @@
   --selection-ink: var(--inverse-text);
   --selection-muted: color-mix(in srgb, var(--selection-ink) 75%, var(--selection-surface));
   --selection-divider: color-mix(in srgb, var(--selection-ink) 28%, var(--selection-surface));
+  --selection-hover: color-mix(in srgb, var(--selection-ink) 9%, transparent);
+  --selection-press: color-mix(in srgb, var(--selection-ink) 15%, transparent);
   --ai-summary-tint: 15%;
   --ai-summary-start: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-status-pending-accent-default) var(--ai-summary-tint));
   --ai-summary-end: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-neutral-accent-default) var(--ai-summary-tint));
@@ -274,6 +292,7 @@
   --risk-low: var(--status-positive-accent);
   --risk-medium: var(--status-caution-accent);
   --risk-high: var(--status-danger-accent);
+  --risk-readout-low-stroke: .75px light-dark(var(--aml-black-100), transparent);
   --model-risk-settings-dial-max-width: 15rem;
   --status-positive-accent: color-mix(in srgb,
     color-mix(in srgb, var(--aml-figma-surface-status-positive-accent-default), var(--aml-figma-dark-surface-status-positive-accent-default) 45%),
@@ -306,6 +325,8 @@
   --record-verdict-tint: 24%;
   --record-verdict-glow-strength: 94%;
   --record-verdict-edge-strength: 16%;
+  --record-verdict-hover-strength: 8%;
+  --record-verdict-press-strength: 14%;
   --record-verdict-divider-strength: 12%;
   --record-glow-rest-angle: 45deg;
   --record-glow-edge-maximum: 100;
