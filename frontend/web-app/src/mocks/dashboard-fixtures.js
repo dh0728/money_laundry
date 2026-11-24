@@ -7,7 +7,7 @@ import { applyPreviewAlertMembership } from '../features/investigation/case-memb
 import { wasPreviewCaseRead } from '../features/investigation/case-read-state.js';
 import { sampleTransactions, transactionFixture } from './transaction-fixtures.js';
 import { fixtureCompletionTime } from './verdict-fixtures.js';
-import { dashboardDays, samplePeriod } from './dashboard-record-codes.js';
+import { dashboardDays, sampleEpisodeAlertCodes, samplePeriod } from './dashboard-record-codes.js';
 import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings.js';
 import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard } from '../features/dashboard/dashboard-investigation.js';
 
@@ -77,6 +77,10 @@ function evidenceSummary(related) {
 export function dashboardFixtures({ T = [], A = [], E = [] }) {
   const transactions = T.map((_, index) => scoredSample(transactionFixture(T, index), scores[index % scores.length]));
   const transactionsByDay = Map.groupBy(transactions, row => dateKey(row.date));
+  const alertCodes = new Set(A);
+  const episodeMembers = new Map(E.map(code => [code, sampleEpisodeAlertCodes(code)])
+    .filter(([, codes]) => codes.every(code => alertCodes.has(code))));
+  const memberAlerts = new Set([...episodeMembers.values()].flat());
   const baseCases = [[A, 'Alert'], [E, 'Episode']].flatMap(([codes, kind], group) =>
     caseFixtureRows(codes).map((row, index) => {
       const date = dateKey(row.date);
@@ -91,8 +95,11 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
       const addedDay = dashboardDays.indexOf(date) > 0;
       const day = row.date.getDate();
       const step = (indexInDay + Math.floor(day / 2) + group) % sampleReviewStates.length;
-      const status = addedDay ? sampleReviewStates[step] : row.status;
-      const hour = addedDay ? (day + indexInDay * 3 + group) % 9 : hours[index % hours.length];
+      const linkedAlertCodes = episodeMembers.get(row.code);
+      const seededMember = memberAlerts.has(row.code);
+      const fixtureStatus = addedDay ? sampleReviewStates[step] : row.status;
+      const status = seededMember || (linkedAlertCodes && fixtureStatus === '처리 전') ? '처리 중' : fixtureStatus;
+      const hour = seededMember ? 0 : addedDay ? (day + indexInDay * 3 + group) % 9 : hours[index % hours.length];
       const createdAt = `${date}T${kpiHours[hour]}:00+09:00`;
       const created = new Date(createdAt);
       const completedAt = addedDay && status === '처리 완료'
@@ -100,6 +107,7 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
         : fixtureCompletionTime(row.code);
       return applyPreviewJudgment({
         ...row, ...summary, kind, related, hour, status, createdAt, completedAt,
+        ...(linkedAlertCodes && { linkedAlertCodes, linkedAlertCodesComplete: true }),
         pattern: addedDay ? extraPatterns[(indexInDay + day + group) % extraPatterns.length] : row.pattern,
         verdict: addedDay && status === '처리 완료' ? (summary.score >= 70 ? 'abnormal' : 'normal') : row.verdict,
         unread: status === '처리 전' && Math.floor(index / 4) % 2 === 0 && !wasPreviewCaseRead(row.code),
