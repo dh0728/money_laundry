@@ -40,6 +40,14 @@
   --aml-shell-compact-max-width: 680px;
   --aml-workspace-laptop-max-width: 1919px;
   --layer-local-overlay: 1;
+  --query-apply-hover-ink-weight: 8%;
+  --query-apply-pressed-ink-weight: 14%;
+  --query-apply-face-weight: 94%;
+  --query-section-open-rotation: .25turn;
+  --query-radio-center-stop: 32%;
+  --query-radio-edge-stop: 37%;
+  --query-calendar-width-share: 100cqi;
+  --query-calendar-day-viewport-size: 8dvh;
   --backtest-card-min-width: 15rem;
   --backtest-threshold-width: 10ch;
   --backtest-result-ring-size: 88px;

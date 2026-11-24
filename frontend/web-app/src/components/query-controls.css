@@ -12,7 +12,7 @@
   inline-size: max-content;
   max-inline-size: 100%;
 }
-.contextual-header > .screen-navigation { position: relative; z-index: 1; flex: none }
+.contextual-header > .screen-navigation { position: relative; z-index: var(--layer-local-overlay); flex: none }
 .screen-query-area { display: grid; min-inline-size: 0 }
 .screen-query-row {
   display: flex;
@@ -66,9 +66,9 @@
 }
 .query-actions .query-apply[data-button-surface] {
   --glass-surface-face: var(--query-apply-face);
-  --glass-elevated: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) 8%);
-  --glass-strong: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) 14%);
-  --query-apply-face: color-mix(in srgb, var(--selection-surface) 94%, var(--glass-material-frost));
+  --glass-elevated: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) var(--query-apply-hover-ink-weight));
+  --glass-strong: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) var(--query-apply-pressed-ink-weight));
+  --query-apply-face: color-mix(in srgb, var(--selection-surface) var(--query-apply-face-weight), var(--glass-material-frost));
   inline-size: var(--aml-size-control-compact);
   block-size: var(--aml-size-control-compact);
   border-radius: var(--aml-radius-full);
@@ -82,10 +82,11 @@
   --query-action-inset: calc(var(--aml-panel-inset) - var(--aml-stroke-control));
   --query-width: calc(var(--aml-space-64) * 4);
   position: fixed;
-  inset: auto;
+  inset: var(--query-placement-top, auto) auto var(--query-placement-bottom, auto) var(--query-placement-left, auto);
   margin: 0;
   box-sizing: border-box;
   width: var(--query-expanded-width, var(--query-width));
+  max-height: var(--query-placement-max-height, none);
   padding: 0;
   border: var(--aml-stroke-control) solid var(--glass-shell-edge);
   border-radius: var(--aml-radius-panel);
@@ -158,7 +159,7 @@
 .query-menu-row > span:first-of-type { flex: 1 0 auto }
 .query-filter-group { inline-size: 100% }
 .query-filter-group > .icon:last-child { margin-inline-start: auto }
-.query-filter-group[aria-expanded="true"] > .icon:last-child { transform: rotate(90deg) }
+.query-filter-group[aria-expanded="true"] > .icon:last-child { transform: rotate(var(--query-section-open-rotation)) }
 .query-filter-values { padding: var(--aml-space-4) 0 var(--aml-space-8) var(--aml-space-12) }
 .query-choice-group, .query-filter-values-group {
   display: grid;
@@ -195,7 +196,7 @@
 }
 .query-choice input:checked {
   border: var(--aml-stroke-control) solid var(--selection-ink);
-  background: radial-gradient(circle, var(--selection-ink) 0 32%, transparent 37%);
+  background: radial-gradient(circle, var(--selection-ink) 0 var(--query-radio-center-stop), transparent var(--query-radio-edge-stop));
 }
 .query-reset {
   justify-self: start;
@@ -224,8 +225,8 @@
 }
 .query-period-presets .query-choice input {
   position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
+  inline-size: var(--aml-space-1);
+  block-size: var(--aml-space-1);
   opacity: 0;
 }
 .query-period-calendar {
@@ -248,7 +249,8 @@
   --rdp-range_start-date-background-color: var(--brand-control-surface);
   --rdp-range_end-date-background-color: var(--brand-control-surface);
   --rdp-selected-border: var(--aml-stroke-control) solid transparent;
-  --rdp-day-size: min(calc(100cqi / 7), clamp(20px, 8dvh, var(--aml-size-control-comfortable)));
+  --rdp-day-size: min(calc(var(--query-calendar-width-share) / 7),
+    clamp(var(--aml-space-20), var(--query-calendar-day-viewport-size), var(--aml-size-control-comfortable)));
   --rdp-day-width: var(--rdp-day-size);
   --rdp-day-height: var(--rdp-day-size);
   --rdp-day_button-width: calc(var(--rdp-day-width) - var(--aml-stroke-control));

@@ -34,8 +34,8 @@ export interface JellyRadioProps {
   textColor?: string;
   activeTextColor?: string;
   size?: 'sm' | 'md' | 'lg';
-  gap?: number;
-  radius?: number;
+  gap?: number | string;
+  radius?: number | string;
   swell?: number;
   barge?: number;
   shrink?: number;
@@ -251,8 +251,8 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
           '--jr-active': activeColor,
           '--jr-text': textColor,
           '--jr-active-text': activeTextColor,
-          '--jr-gap': `${gap}px`,
-          '--jr-radius': `${radius}px`,
+          '--jr-gap': typeof gap === 'number' ? `${gap}px` : gap,
+          '--jr-radius': typeof radius === 'number' ? `${radius}px` : radius,
           '--jr-h': `${h}px`,
           '--jr-font': `${font}px`,
           '--jr-px': `${px}px`

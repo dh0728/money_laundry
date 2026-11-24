@@ -228,7 +228,7 @@ export { QueryCheck };
 
 export function QueryRadio({ items, label, value, onChange }) {
   return <JellyRadio className="aml-density-radio" items={items} ariaLabel={label} value={value} onChange={onChange}
-    size="sm" gap={4} radius={8} chipColor="var(--glass-surface)" activeColor="var(--selection-surface)"
+    size="sm" gap="var(--aml-space-4)" radius="var(--aml-space-8)" chipColor="var(--glass-surface)" activeColor="var(--selection-surface)"
     textColor="var(--text)" activeTextColor="var(--selection-ink)" />;
 }
 
@@ -593,10 +593,11 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const fitViewport = popover.dataset.tool === 'period' && !fitsBeneathOrAbove;
     const maxHeight = Math.max(0, fitViewport ? innerHeight - 2 * gap : openAbove ? above : below);
     const top = rect.bottom + gap;
-    popover.style.top = fitViewport ? `${Math.max(gap, Math.min(top, innerHeight - gap - panelHeight))}px` : openAbove ? 'auto' : `${top}px`;
-    popover.style.bottom = openAbove && !fitViewport ? `${innerHeight - rect.top + gap}px` : 'auto';
-    popover.style.maxHeight = `${maxHeight}px`;
-    popover.style.left = `${left}px`;
+    popover.style.setProperty('--query-placement-top',
+      fitViewport ? `${Math.max(gap, Math.min(top, innerHeight - gap - panelHeight))}px` : openAbove ? 'auto' : `${top}px`);
+    popover.style.setProperty('--query-placement-bottom', openAbove && !fitViewport ? `${innerHeight - rect.top + gap}px` : 'auto');
+    popover.style.setProperty('--query-placement-max-height', `${maxHeight}px`);
+    popover.style.setProperty('--query-placement-left', `${left}px`);
   }
   function resetTrigger(button) {
     button?.setAttribute('aria-expanded', 'false');
