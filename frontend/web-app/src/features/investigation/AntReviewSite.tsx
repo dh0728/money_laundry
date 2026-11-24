@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { Alert, Breadcrumb, Button, Card, ConfigProvider, Descriptions, Input, Layout, Result, Select, Space, Spin, Statistic, Tag, Tooltip, Typography, theme } from 'antd'
 import koKR from 'antd/locale/ko_KR'
 import dayjs from 'dayjs'
@@ -14,10 +14,13 @@ import { useAsync } from '@/lib/useAsync'
 import { useViewState, useWorkspace } from '@/lib/workspaceState'
 import { WorkspaceProvider } from '@/lib/WorkspaceProvider'
 import { CurrentUserContext, MOCK_USER, useCurrentUser } from '@/app/session'
+import { Box } from '@/components/layout-primitives'
 import { RecordsTable } from '@/components/ui/records-table'
 import { AntInvestigation } from './AntInvestigation'
+import './ant-review.css'
 dayjs.locale('ko')
 const { Text, Title } = Typography
+const reviewRailWidth = 'var(--review-rail-width)'
 const menus = [
   { key: 'dashboard', label: '대시보드', icon: LayoutDashboard }, { key: 'alerts', label: 'Alert 목록', icon: Siren },
   { key: 'episodes', label: 'Episode 목록', icon: FolderSearch }, { key: 'transactions', label: '거래 내역', icon: ArrowLeftRight },
@@ -51,7 +54,7 @@ export function AntReviewSite() {
     window.addEventListener('aml-wiring-theme-set', sync)
     return () => window.removeEventListener('aml-wiring-theme-set', sync)
   }, [])
-  useLayoutEffect(() => { document.documentElement.classList.toggle('dark', dark); document.documentElement.style.colorScheme = dark ? 'dark' : 'light' }, [dark])
+  useLayoutEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   if (!fixture) return <Result status="403" title="합성 검수 전용 화면입니다." subTitle="VITE_API_MODE=fixture로 로컬 개발 서버에서만 실행할 수 있습니다. 실제 API에는 연결하지 않습니다." />
   return <ConfigProvider locale={koKR} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { fontFamily: 'Pretendard', fontFamilyCode: 'Pretendard' } }}><WorkspaceProvider><ReviewShell dark={dark} setDark={setDark} /></WorkspaceProvider></ConfigProvider>
 }
@@ -80,6 +83,14 @@ function ReviewShell({ dark, setDark }: { dark: boolean; setDark: (value: boolea
     if (found) navigate(`#${found.kind === 'ALERT' ? 'alerts' : 'episodes'}/${id}`)
     else setFeedback('조회된 사건 목록에서 해당 ID를 확인하지 못했습니다.')
   }
+  function searchCase(value: string) {
+    if (data.state.status !== 'success') return
+    const query = value.trim().toUpperCase()
+    const { alerts, episodes } = data.state.data
+    const found = [...alerts, ...episodes].find(item => (item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`) === query)
+    if (found) open(found.caseId)
+    else setFeedback('정확한 사건 번호와 일치하는 결과가 없습니다.')
+  }
   function back() { const previous = history.at(-1); setHistory(history.slice(0, -1)); window.location.hash = previous ?? '#dashboard' }
   const { token } = theme.useToken()
   if (session.state.status === 'loading') return <Spin aria-label="검수 계정 조회 중" />
@@ -90,7 +101,7 @@ function ReviewShell({ dark, setDark }: { dark: boolean; setDark: (value: boolea
     if (rawId && (page === 'alerts' || page === 'episodes')) return current ? <AntInvestigation caseId={current.caseId} onOpen={open} onBack={back} refreshList={data.refresh} onOpenLedger={id => navigate(`#transactions/${id}`)} /> : <Result status="404" title="조회된 목록에서 사건을 찾지 못했습니다." extra={<Button onClick={back}>출발점으로</Button>} />
     if (page === 'alerts' || page === 'episodes') return <CaseQueue kind={page === 'alerts' ? 'ALERT' : 'EPISODE'} rows={page === 'alerts' ? alerts : episodes} open={open} />
     if (page === 'transactions') return <Ledger key={rawId ?? 'all'} initialTxId={Number(rawId) || null} rows={transactions} cases={[...alerts, ...episodes]} open={open} back={back} />
-    if (page === 'notifications') return <Space orientation="vertical" style={{ width: '100%' }}><Space wrap><Input.Search enterButton="검색" aria-label="알림 검색" placeholder="알림·사건 검색" value={notificationSearch} onChange={e => setNotificationSearch(e.target.value)} /><Button onClick={notifications.retry}>새로고침</Button><Button disabled={notifications.state.status !== 'success' || !notifications.state.data.content.some(item => !item.read)} onClick={async () => { if (notifications.state.status === 'success') { await setNotificationsRead(notifications.state.data.content.filter(item => !item.read).map(item => item.id), true); notifications.retry() } }}>현재 페이지 모두 읽음</Button></Space>
+    if (page === 'notifications') return <Space orientation="vertical" className="review-stack"><Space wrap><Input.Search enterButton="검색" aria-label="알림 검색" placeholder="알림·사건 검색" value={notificationSearch} onChange={e => setNotificationSearch(e.target.value)} /><Button onClick={notifications.retry}>새로고침</Button><Button disabled={notifications.state.status !== 'success' || !notifications.state.data.content.some(item => !item.read)} onClick={async () => { if (notifications.state.status === 'success') { await setNotificationsRead(notifications.state.data.content.filter(item => !item.read).map(item => item.id), true); notifications.retry() } }}>현재 페이지 모두 읽음</Button></Space>
       {notifications.state.status === 'loading' ? <Spin /> : notifications.state.status === 'error' ? <Alert type="error" title={notifications.state.message} /> : (
         <RecordsTable data-wiring-id="notifications.list" rowKey={item => item.id}
           rows={notifications.state.data.content.filter(item => `${item.code} ${item.title} ${item.description}`.includes(notificationSearch))}
@@ -102,12 +113,12 @@ function ReviewShell({ dark, setDark }: { dark: boolean; setDark: (value: boolea
           ]} empty="현재 검색 조건에 맞는 합성 알림이 없습니다." />
       )}
     </Space>
-    if (page === 'settings') return <Card title="화면 설정"><Space><Text>공식 기본 테마</Text><Button onClick={() => setDark(!dark)}>{dark ? '라이트 모드' : '다크 모드'}</Button></Space><p>업무 데이터나 의견을 브라우저 저장소에 보관하지 않습니다. 새로고침 시 미저장 의견이 사라집니다.</p></Card>
+    if (page === 'settings') return <Card title="화면 설정"><Space><Text>공식 기본 테마</Text><Button onClick={() => setDark(!dark)}>{dark ? '라이트 모드' : '다크 모드'}</Button></Space><Box as="p">업무 데이터나 의견을 브라우저 저장소에 보관하지 않습니다. 새로고침 시 미저장 의견이 사라집니다.</Box></Card>
     if (page === 'account') return <Descriptions data-wiring-id="account.profile" bordered items={[{ key: 'name', label: '합성 계정', children: user.name }, { key: 'role', label: '역할', children: user.role === 'STAFF' ? '조사자' : '관리자' }]} />
     if (page === 'rules') return <Result status="info" title="룰 운영 계약은 이번 Ant 검수에 연결하지 않았습니다." subTitle="기존 룰 기능/코드는 보존됩니다. 이 화면은 룰 적중·저장·백테스트가 실제 동작한다는 증거가 아닙니다." />
     const analyzed = transactions.filter(row => row.isSuspicious != null)
     const suspicious = analyzed.filter(row => row.isSuspicious)
-    return <Space orientation="vertical" size="middle" style={{ width: '100%' }}><Space data-wiring-id="dashboard.kpis" wrap><Card><Statistic title="전체 Alert · 탐지 건" value={alerts.length} /></Card><Card><Statistic title="전체 Episode · 묶음" value={episodes.length} /></Card><Card><Statistic title="분석 거래" value={analyzed.length} suffix={`/ 전체 ${transactions.length}건`} /></Card><Card><Statistic title="이진 의심 거래" value={suspicious.length} /></Card></Space><Alert type="info" title="합성 업무 맥락 · 업무일 2026-10-15" description="Alert와 Episode는 조사 단위가 다릅니다. 같은 점수라도 경과·상태·담당과 원본 근거를 함께 확인하세요. 통합 자동 우선순위는 제공하지 않습니다." />
+    return <Space orientation="vertical" size="middle" className="review-stack"><Space data-wiring-id="dashboard.kpis" wrap><Card><Statistic title="전체 Alert · 탐지 건" value={alerts.length} /></Card><Card><Statistic title="전체 Episode · 묶음" value={episodes.length} /></Card><Card><Statistic title="분석 거래" value={analyzed.length} suffix={`/ 전체 ${transactions.length}건`} /></Card><Card><Statistic title="이진 의심 거래" value={suspicious.length} /></Card></Space><Alert type="info" title="합성 업무 맥락 · 업무일 2026-10-15" description="Alert와 Episode는 조사 단위가 다릅니다. 같은 점수라도 경과·상태·담당과 원본 근거를 함께 확인하세요. 통합 자동 우선순위는 제공하지 않습니다." />
       <RecordsTable data-wiring-id="dashboard.patterns" compact rowKey={row => row.name} pagination={false}
         rows={reviewPatternNames.map((name, code) => ({ name, count: suspicious.filter(row => row.typeClass === code).length }))}
         columns={[
@@ -117,12 +128,48 @@ function ReviewShell({ dark, setDark }: { dark: boolean; setDark: (value: boolea
       <CaseQueue kind="ALL" rows={[...alerts, ...episodes]} open={open} />
     </Space>
   })()
-  return <CurrentUserContext.Provider value={{ ...MOCK_USER, userId: user.id, name: user.name, role: user.role, username: user.username }}><Layout style={{ minHeight: '100svh' }}>
-    <Layout.Sider width={64} collapsedWidth={64} collapsed trigger={null} theme={dark ? 'dark' : 'light'} style={{ position: 'fixed', insetInlineStart: 0, top: 0, bottom: 0, overflow: 'auto', borderInlineEnd: `1px solid ${token.colorBorderSecondary}` }}><nav aria-label="주 메뉴"><Space orientation="vertical" style={{ width: '100%', alignItems: 'center', paddingBlock: token.padding }}>
-      {menus.map(item => <Tooltip key={item.key} title={item.label} placement="right" trigger={['hover', 'focus']}><Button aria-label={item.label} aria-current={page === item.key ? 'page' : undefined} type={page === item.key ? 'primary' : 'text'} icon={<item.icon size={20} aria-hidden />} onClick={() => navigate(`#${item.key}`)} /></Tooltip>)}
-    </Space></nav></Layout.Sider>
-    <Layout style={{ marginInlineStart: 64 }}><Layout.Header style={{ height: 'auto', padding: token.padding, background: token.colorBgContainer }}><Space wrap style={{ display: 'flex', justifyContent: 'space-between' }}><Space><Text strong>AML RADAR</Text><Breadcrumb items={[{ title }, ...(current ? [{ title: current.kind === 'ALERT' ? `A-${current.alertId}` : `E-${current.caseId}` }] : [])]} /></Space><Space><Input.Search enterButton="검색" aria-label="사건 전역 검색" placeholder="A-3010 또는 E-153" value={search} onChange={e => setSearch(e.target.value)} onSearch={value => { if (data.state.status === 'success') { const q = value.trim().toUpperCase(); const found = [...data.state.data.alerts, ...data.state.data.episodes].find(item => (item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`) === q); if (found) open(found.caseId); else setFeedback('정확한 사건 번호와 일치하는 결과가 없습니다.') } }} /><Button aria-label={dark ? '라이트 모드로 전환' : '다크 모드로 전환'} icon={dark ? <Sun size={18} /> : <Moon size={18} />} onClick={() => setDark(!dark)} /></Space></Space></Layout.Header>
-      <Layout.Content style={{ padding: token.paddingLG, minWidth: 0 }}><Space orientation="vertical" size="middle" style={{ width: '100%' }}><Alert type="warning" showIcon title="합성 데이터 검수 · 실제 저장 불가 · 화면 배치는 검수 제안" description="동일 로컬 FE 코드의 Ant 검수 경로입니다. 실제 dev/Backend/AI 검증 결과가 아닙니다. 미저장 의견은 새로고침하면 사라집니다." />{feedback && <Alert type="info" title={feedback} closable onClose={() => setFeedback('')} />}<Title level={2}>{title}</Title>{body}</Space></Layout.Content>
+  return <CurrentUserContext.Provider value={{ ...MOCK_USER, userId: user.id, name: user.name, role: user.role, username: user.username }}><Layout className="review-shell" style={{
+    '--review-shell-border': token.colorBorderSecondary,
+    '--review-shell-header-surface': token.colorBgContainer,
+  } as CSSProperties}>
+    <Layout.Sider className="review-shell-rail" width={reviewRailWidth} collapsedWidth={reviewRailWidth}
+      collapsed trigger={null} theme={dark ? 'dark' : 'light'}>
+      <Box as="nav" aria-label="주 메뉴">
+        <Space orientation="vertical" className="review-rail-menu">
+          {menus.map(({ key, label, icon: MenuIcon }) => (
+            <Tooltip key={key} title={label} placement="right" trigger={['hover', 'focus']}>
+              <Button aria-label={label} aria-current={page === key ? 'page' : undefined} type={page === key ? 'primary' : 'text'}
+                icon={<MenuIcon className="review-rail-icon" aria-hidden />} onClick={() => navigate(`#${key}`)} />
+            </Tooltip>
+          ))}
+        </Space>
+      </Box>
+    </Layout.Sider>
+    <Layout className="review-shell-body">
+      <Layout.Header className="review-shell-header">
+        <Space wrap className="review-shell-header-content">
+          <Space>
+            <Text strong>AML RADAR</Text>
+            <Breadcrumb items={[{ title }, ...(current ? [{ title: current.kind === 'ALERT' ? `A-${current.alertId}` : `E-${current.caseId}` }] : [])]} />
+          </Space>
+          <Space>
+            <Input.Search enterButton="검색" aria-label="사건 전역 검색" placeholder="A-3010 또는 E-153"
+              value={search} onChange={event => setSearch(event.target.value)} onSearch={searchCase} />
+            <Button aria-label={dark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+              icon={dark ? <Sun className="review-theme-icon" /> : <Moon className="review-theme-icon" />}
+              onClick={() => setDark(!dark)} />
+          </Space>
+        </Space>
+      </Layout.Header>
+      <Layout.Content className="review-shell-content">
+        <Space orientation="vertical" size="middle" className="review-stack">
+          <Alert type="warning" showIcon title="합성 데이터 검수 · 실제 저장 불가 · 화면 배치는 검수 제안"
+            description="동일 로컬 FE 코드의 Ant 검수 경로입니다. 실제 dev/Backend/AI 검증 결과가 아닙니다. 미저장 의견은 새로고침하면 사라집니다." />
+          {feedback && <Alert type="info" title={feedback} closable onClose={() => setFeedback('')} />}
+          <Title level={2}>{title}</Title>
+          {body}
+        </Space>
+      </Layout.Content>
     </Layout></Layout></CurrentUserContext.Provider>
 }
 function CaseQueue({ rows, kind, open }: { rows: ReviewCase[]; kind: ReviewKind | 'ALL'; open: (id: number) => void }) {
@@ -132,7 +179,7 @@ function CaseQueue({ rows, kind, open }: { rows: ReviewCase[]; kind: ReviewKind 
   const [page, setPage] = useViewState(`ant/queue/${kind}/page`, 1)
   const user = useCurrentUser()
   const filtered = rows.filter(item => (scope !== 'MINE' || item.assigneeId === user.userId) && (status === 'ALL' || item.status === status) && `${item.kind === 'ALERT' ? `A-${item.alertId}` : `E-${item.caseId}`} ${item.assigneeName} ${item.summary.primaryType}`.toLowerCase().includes(query.toLowerCase()))
-  return <Card data-wiring-id={kind === 'ALL' ? 'dashboard.work' : kind === 'ALERT' ? 'review.alerts.list' : 'review.episodes.list'} title={kind === 'ALL' ? '조사할 업무 · Alert와 Episode 교차 진입' : kind === 'ALERT' ? '단일 탐지 건 조사' : '묶음 타당성과 원본별 판단 조사'}><Space orientation="vertical" style={{ width: '100%' }}><Space wrap><Input.Search enterButton="검색" aria-label="사건 목록 검색" value={query} placeholder="사건·담당·대표 유형" onChange={event => { setQuery(event.target.value); setPage(1) }} /><Select aria-label="담당 범위" value={scope} onChange={value => { setScope(value); setPage(1) }} options={[{ value: 'ALL', label: '기관 전체' }, { value: 'MINE', label: '내 담당' }]} /><Select aria-label="처리 상태" value={status} onChange={value => { setStatus(value); setPage(1) }} options={[{ value: 'ALL', label: '모든 상태' }, { value: 'OPEN', label: '진행 중' }, { value: 'CLOSED', label: '종결' }]} /></Space><Text type="secondary">현재 조건: {scope === 'ALL' ? '기관 전체' : '내 담당'} · {status === 'ALL' ? '모든 상태' : status === 'OPEN' ? '진행 중' : '종결'} · 검색 {query || '없음'} · {filtered.length}건. 위험 점수는 자동 업무 순위가 아닙니다.</Text>
+  return <Card data-wiring-id={kind === 'ALL' ? 'dashboard.work' : kind === 'ALERT' ? 'review.alerts.list' : 'review.episodes.list'} title={kind === 'ALL' ? '조사할 업무 · Alert와 Episode 교차 진입' : kind === 'ALERT' ? '단일 탐지 건 조사' : '묶음 타당성과 원본별 판단 조사'}><Space orientation="vertical" className="review-stack"><Space wrap><Input.Search enterButton="검색" aria-label="사건 목록 검색" value={query} placeholder="사건·담당·대표 유형" onChange={event => { setQuery(event.target.value); setPage(1) }} /><Select aria-label="담당 범위" value={scope} onChange={value => { setScope(value); setPage(1) }} options={[{ value: 'ALL', label: '기관 전체' }, { value: 'MINE', label: '내 담당' }]} /><Select aria-label="처리 상태" value={status} onChange={value => { setStatus(value); setPage(1) }} options={[{ value: 'ALL', label: '모든 상태' }, { value: 'OPEN', label: '진행 중' }, { value: 'CLOSED', label: '종결' }]} /></Space><Text type="secondary">현재 조건: {scope === 'ALL' ? '기관 전체' : '내 담당'} · {status === 'ALL' ? '모든 상태' : status === 'OPEN' ? '진행 중' : '종결'} · 검색 {query || '없음'} · {filtered.length}건. 위험 점수는 자동 업무 순위가 아닙니다.</Text>
     <RecordsTable rowKey={item => item.caseId} rows={filtered} width="wide"
       pagination={{ page, onPageChange: setPage, showSizeChanger: false }}
       columns={[
@@ -155,7 +202,7 @@ function Ledger({ rows, cases, open, back, initialTxId }: { initialTxId: number 
   const accountIds = [...new Set(rows.filter(row => !owner || row.fromOwnerId === owner || row.toOwnerId === owner).flatMap(row => [row.fromAccountId, row.toAccountId]))]
   const filtered = rows.filter(row => (!owner || row.fromOwnerId === owner || row.toOwnerId === owner) && (!account || row.fromAccountId === account || row.toAccountId === account) && `${row.txId} ${row.fromOwnerName} ${row.toOwnerName} ${row.fromAccountId} ${row.toAccountId}`.includes(query))
   const active = rows.find(row => row.txId === selected)
-  return <Space orientation="vertical" style={{ width: '100%' }}><Button onClick={back}>조사 출발점으로 돌아가기</Button><Space wrap><Input.Search enterButton="검색" aria-label="거래 검색" value={query} placeholder="거래·계좌·소유주" onChange={e => setQuery(e.target.value)} /><Select data-wiring-id="ledger.owners" aria-label="소유주 선택" placeholder="전체 소유주" style={{ minWidth: 180 }} allowClear value={owner} options={owners.map(([value, label]) => ({ value, label: label ?? value }))} onChange={value => { setOwner(value); setAccount(undefined) }} /><Select data-wiring-id="ledger.accounts" aria-label="계좌 선택" placeholder="전체 계좌" allowClear value={account} options={accountIds.map(value => ({ value, label: value }))} style={{ minWidth: 150 }} onChange={setAccount} /></Space><Text>기간·의심 여부 필터 없음 · 검색 {query || '없음'} · {filtered.length}건. 조회 범위 변경은 사건의 판정 범위를 바꾸지 않습니다.</Text>{selected != null && !filtered.some(row => row.txId === selected) && <Alert type="info" title={`출발 거래 T-${selected}는 현재 조회 조건 밖입니다. 상세 대상은 유지됩니다.`} />}
+  return <Space orientation="vertical" className="review-stack"><Button onClick={back}>조사 출발점으로 돌아가기</Button><Space wrap><Input.Search enterButton="검색" aria-label="거래 검색" value={query} placeholder="거래·계좌·소유주" onChange={e => setQuery(e.target.value)} /><Select data-wiring-id="ledger.owners" aria-label="소유주 선택" placeholder="전체 소유주" className="review-owner-filter" allowClear value={owner} options={owners.map(([value, label]) => ({ value, label: label ?? value }))} onChange={value => { setOwner(value); setAccount(undefined) }} /><Select data-wiring-id="ledger.accounts" aria-label="계좌 선택" placeholder="전체 계좌" allowClear value={account} options={accountIds.map(value => ({ value, label: value }))} className="review-account-filter" onChange={setAccount} /></Space><Text>기간·의심 여부 필터 없음 · 검색 {query || '없음'} · {filtered.length}건. 조회 범위 변경은 사건의 판정 범위를 바꾸지 않습니다.</Text>{selected != null && !filtered.some(row => row.txId === selected) && <Alert type="info" title={`출발 거래 T-${selected}는 현재 조회 조건 밖입니다. 상세 대상은 유지됩니다.`} />}
     <RecordsTable data-wiring-id="ledger.transactions" rowKey={row => row.txId} rows={filtered} width="wide"
       columns={[
         { title: '거래', cell: row => <Button type="link" onClick={() => setSelected(row.txId)}>T-{row.txId} 상세</Button> },

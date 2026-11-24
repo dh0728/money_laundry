@@ -1,0 +1,6 @@
+:root {
+  --review-rail-width: var(--aml-space-64);
+  --review-theme-icon-size: 18px;
+  --review-owner-filter-min-width: 180px;
+  --review-account-filter-min-width: 150px;
+}
