@@ -1,0 +1,21 @@
+.pie-chart-fixed,
+.pie-chart-layers {
+  width: var(--pie-chart-size);
+  height: var(--pie-chart-size);
+}
+
+.pie-chart-layers {
+  display: grid;
+  grid-template: 1fr / 1fr;
+}
+
+.pie-chart-svg,
+.pie-chart-center {
+  grid-area: 1 / 1;
+}
+
+.pie-chart-svg {
+  /* Paint containment would clip the hover glow at the SVG boundary. */
+  contain: layout style;
+  overflow: visible;
+}
