@@ -1,5 +1,5 @@
 import { FilePenLine, LayoutDashboard, Scale, ScanSearch } from 'lucide-react';
-import { PanelHTML } from '../components/components.js';
+import { BoxHTML, HeadingHTML, PanelHTML, TextHTML } from '../components/components.js';
 import { frames } from './screen-frames.js';
 import { isLedgerScreen, ledgerTableScreen } from './preview-route.js';
 
@@ -152,61 +152,63 @@ export function ScreenNavigation(path, code = '') {
   return { global, location, primary: duplicatesLocation ? [] : primary, secondary };
 }
 
-const panel = (title, kind = '') => PanelHTML(`<h2>${title}</h2>`, kind);
-const overlay = title => `<section class="screen-overlay glass"><h2>${title}</h2></section>`;
+const panel = (title, kind = '') => PanelHTML(HeadingHTML(title), kind);
+const overlay = title => BoxHTML(HeadingHTML(title), 'class="screen-overlay glass"', 'section');
 
 function Dashboard(path) {
-  return `<div data-workflow="dashboard-${path.endsWith('/mine') ? 'mine' : 'all'}"></div>`;
+  return BoxHTML('', `data-workflow="dashboard-${path.endsWith('/mine') ? 'mine' : 'all'}"`);
 }
 
 function RuleEngine(path) {
-  if (path.endsWith('draft-create')) return '<div data-rule-editor></div>';
-  if (path.endsWith('draft-backtest')) {
-    return '<div data-workflow="backtest"></div>';
-  }
-  return `<div class="workflow-rule-overview">
-    <div data-workflow="rules-list" data-rule-reason="${path.endsWith('/reason')}"></div>
-  </div>`;
+  if (path.endsWith('draft-create')) return BoxHTML('', 'data-rule-editor');
+  if (path.endsWith('draft-backtest')) return BoxHTML('', 'data-workflow="backtest"');
+  return BoxHTML(
+    BoxHTML('', `data-workflow="rules-list" data-rule-reason="${path.endsWith('/reason')}"`),
+    'class="workflow-rule-overview"',
+  );
 }
 
 function InvestigationList(path) {
   if (isLedgerScreen(path)) {
-    return '<div data-investigation-component="ledger"></div>';
+    return BoxHTML('', 'data-investigation-component="ledger"');
   }
   const alerts = path.includes('alerts');
   const title = alerts ? 'Alert 목록' : 'Episode 목록';
-  const actions = alerts ? '<div data-workflow="alert-episode-actions"></div>' : '';
+  const actions = alerts ? BoxHTML('', 'data-workflow="alert-episode-actions"') : '';
   return actions + (path.includes('table')
-    ? `<section class="screen-section screen-entries" data-case-list-table="${title}"></section>`
-    : `<div data-investigation-component="cards" data-label="${title}"></div>`);
+    ? BoxHTML('', `class="screen-section screen-entries" data-case-list-table="${title}"`, 'section')
+    : BoxHTML('', `data-investigation-component="cards" data-label="${title}"`));
 }
 
 function CaseDetail(path) {
   const route = caseRoute(path);
   const { detail: type } = route;
-  const readOnly = route.readOnly ? '<div data-workflow="case-readonly"></div>' : '';
+  const readOnly = route.readOnly ? BoxHTML('', 'data-workflow="case-readonly"') : '';
   const { lens } = route;
   if (type === 'analysis') {
-    return readOnly + `<div data-case-flow="analysis" data-lens="${lens}"></div>` +
-      '<div data-case-evidence="거래" data-analysis-table></div>';
+    return readOnly + BoxHTML('', `data-case-flow="analysis" data-lens="${lens}"`) +
+      BoxHTML('', 'data-case-evidence="거래" data-analysis-table');
   }
   if (type === 'related' || type === 'judge-bundle') {
-    return readOnly + `<div class="preview-related-layout">
-      <div data-case-flow="related" data-lens="${lens}"></div>
-      <div data-case-evidence="연결 거래"></div>
-    </div>` +
+    return readOnly + BoxHTML(
+      BoxHTML('', `data-case-flow="related" data-lens="${lens}"`) +
+      BoxHTML('', 'data-case-evidence="연결 거래"'),
+      'class="preview-related-layout"',
+    ) +
       (type === 'judge-bundle' ? overlay('묶음 판정') : '');
   }
-  if (type.includes('perpanel') || type.includes('readonly') || type === 'judge-single') {
-    return readOnly + (type === 'judge-single' ? panel('판단 요약', 'screen-graph') : '<div data-workflow="case-overview"></div>') + (type === 'judge-single' ? overlay(path.endsWith('/judged') ? '판정 완료' : '단건 판정') : '');
+  if (type === 'judge-single') {
+    return readOnly + panel('판단 요약', 'screen-graph') + overlay(path.endsWith('/judged') ? '판정 완료' : '단건 판정');
   }
-  return readOnly + '<div data-workflow="case-overview"></div>' +
-    (path.startsWith('episode') ? '<div data-case-evidence="포함 거래"></div>' : '') +
+  const overview = readOnly + BoxHTML('', 'data-workflow="case-overview"');
+  if (type.includes('perpanel') || type.includes('readonly')) return overview;
+  return overview +
+    (path.startsWith('episode') ? BoxHTML('', 'data-case-evidence="포함 거래"') : '') +
     (type === 'judge' ? overlay('판정') : '');
 }
 
 function Report(path) {
-  return `<div data-workflow="report" data-report-view="${path.split('/')[2] === 'card' ? 'card' : 'table'}"></div>`;
+  return BoxHTML('', `data-workflow="report" data-report-view="${path.split('/')[2] === 'card' ? 'card' : 'table'}"`);
 }
 
 function Utility(path) {
@@ -225,17 +227,21 @@ export function ScreenLayout(path, { code = '', hasQuery = false, showCaseJudgme
   const heading = code ? `${code} · ${label}` : label;
   const judgment = showCaseJudgment && route && !route.readOnly && !route.detail.startsWith('judge');
   const referencePath = path === ledgerTableScreen ? sections.T : path.replace('/sankey', '');
-  return `<section class="screen-layout" data-figma-frame="${rows[referencePath] ?? rows[referencePath.replace(/\/staff-readonly$/, '')]}">
-    <h1 class="screen-title-accessible" tabindex="-1">${heading}</h1>
-    ${source ? `<p class="screen-data-source" role="status">${source}</p>` : ''}
-    <div class="screen-query-area">
-      <div class="screen-query-row">
-        ${hasQuery ? '<div class="screen-query-tags" data-query-tags></div>' : ''}
-        ${route && ['analysis', 'related'].includes(route.detail) ? '' : '<div class="screen-query-tools" data-screen-query-tools></div>'}
-      </div>
-      ${hasQuery ? '<div class="screen-query-editor" data-query-editor></div>' : ''}
-    </div>
-    ${content}
-    ${judgment ? '<div class="case-judgment-mount" data-workflow="case-judgment"></div>' : ''}
-  </section>`;
+  const queryTools = route && ['analysis', 'related'].includes(route.detail)
+    ? '' : BoxHTML('', 'class="screen-query-tools" data-screen-query-tools');
+  const queryRow = BoxHTML(
+    (hasQuery ? BoxHTML('', 'class="screen-query-tags" data-query-tags') : '') + queryTools,
+    'class="screen-query-row"',
+  );
+  const queryArea = BoxHTML(queryRow +
+    (hasQuery ? BoxHTML('', 'class="screen-query-editor" data-query-editor') : ''), 'class="screen-query-area"');
+  const figmaFrame = rows[referencePath] ?? rows[referencePath.replace(/\/staff-readonly$/, '')];
+  return BoxHTML(
+    HeadingHTML(heading, 'class="screen-title-accessible" tabindex="-1"', 1) +
+    (source ? TextHTML(source, 'class="screen-data-source" role="status"', 'p') : '') +
+    queryArea +
+    content +
+    (judgment ? BoxHTML('', 'class="case-judgment-mount" data-workflow="case-judgment"') : ''),
+    `class="screen-layout" data-figma-frame="${figmaFrame}"`, 'section',
+  );
 }

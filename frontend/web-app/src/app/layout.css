@@ -405,6 +405,8 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
 .work-tabs { padding: var(--aml-space-8) }
 .work-tab-flight {
   position: fixed;
+  left: var(--work-tab-flight-left);
+  top: var(--work-tab-flight-top);
   z-index: calc(var(--layer-shell) + 1);
   padding: var(--aml-space-4) var(--aml-space-8);
   border-radius: var(--aml-radius-small);

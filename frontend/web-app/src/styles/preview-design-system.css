@@ -7,6 +7,8 @@
 /* Map the standalone workspace's existing component tokens to the shared design system. */
 :root {
   --aml-layout-max-width: 1440px;
+  --aml-shell-compact-max-width: 680px;
+  --aml-workspace-laptop-max-width: 1919px;
   --aml-font-mono: Pretendard;
   --aml-size-icon-mini: var(--aml-space-12);
   --aml-size-icon-large: var(--aml-space-24);
@@ -15,6 +17,10 @@
   --aml-motion-drawer-ease: cubic-bezier(.16, 1, .3, 1);
   --aml-motion-switch-duration: 320ms;
   --aml-motion-switch-ease: cubic-bezier(.2, .75, .25, 1.13);
+  --aml-motion-workspace-enter-origin: 50% 44vh;
+  --aml-motion-workspace-enter-perspective: 900px;
+  --aml-motion-workspace-enter-depth: 145px;
+  --aml-motion-workspace-enter-opacity: .16;
   --aml-opacity-disabled: .5;
   --brand-accent: var(--selection-surface);
   --brand-color: var(--brand-accent);

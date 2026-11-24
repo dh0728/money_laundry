@@ -29,6 +29,15 @@ function elementHTML(tag, attributes, content) {
   return `<${tag}${attributes ? ` ${attributes}` : ''}>${content}</${tag}>`;
 }
 
+// Mount the string components in the imperative workspace without adding a wrapper.
+export function HTMLFragment(markup) {
+  const template = document.createElement('template');
+  template.innerHTML = markup;
+  return document.adoptNode(template.content);
+}
+
+export const HTMLNode = markup => HTMLFragment(markup).firstElementChild;
+
 /** @param {'div' | 'section' | 'header' | 'footer' | 'main' | 'nav' | 'ul' | 'ol' | 'li' | 'form'} as */
 export function BoxHTML(content = '', attributes = '', as = 'div') {
   return elementHTML(as, attributes, content);
