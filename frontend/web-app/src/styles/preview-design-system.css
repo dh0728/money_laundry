@@ -118,6 +118,14 @@
   --metric-wide-value-size: clamp(var(--metric-value-size-min), 20cqi, var(--workspace-kpi-value-size));
   --metric-composite-value-size: clamp(var(--metric-value-size-min), 18cqi, var(--workspace-kpi-value-size));
   --metric-value-line-height: 1.1;
+  --loading-placeholder-title-width: min(60%, calc(2 * var(--aml-space-64)));
+  --loading-placeholder-value-width: min(45%, var(--aml-space-64));
+  --loading-placeholder-note-width: min(75%, calc(3 * var(--aml-space-64)));
+  --loading-placeholder-ring-size: 136px;
+  --loading-placeholder-ring-thickness: 21px;
+  --loading-placeholder-legend-width: min(100%, 9rem);
+  --loading-pulse-duration: 1.4s;
+  --loading-pulse-opacity: .5;
   --canvas-surface: var(--aml-figma-surface-neutral-background-primary);
   --workspace-surface: var(--canvas-surface);
   --information-panel-surface: var(--aml-figma-surface-neutral-background-secondary);

@@ -481,29 +481,29 @@
 .dashboard-loading [data-slot="skeleton"] {
   border-radius: var(--aml-radius-small);
   background: var(--inner-surface);
-  animation: dashboard-loading-pulse 1.4s ease-in-out infinite;
+  animation: dashboard-loading-pulse var(--loading-pulse-duration) ease-in-out infinite;
 }
-.dashboard-loading-title { inline-size: min(60%, calc(2 * var(--aml-space-64))); block-size: var(--aml-type-body-lineHeight) }
-.dashboard-loading-value { inline-size: min(45%, var(--aml-space-64)); block-size: var(--workspace-kpi-value-size) }
-.dashboard-loading-note { inline-size: min(75%, calc(3 * var(--aml-space-64))); block-size: var(--aml-type-caption-lineHeight) }
+.dashboard-loading-title { inline-size: var(--loading-placeholder-title-width); block-size: var(--aml-type-body-lineHeight) }
+.dashboard-loading-value { inline-size: var(--loading-placeholder-value-width); block-size: var(--workspace-kpi-value-size) }
+.dashboard-loading-note { inline-size: var(--loading-placeholder-note-width); block-size: var(--aml-type-caption-lineHeight) }
 .dashboard-loading-trend { inline-size: 100%; min-block-size: var(--dashboard-metric-plot-min); flex: 1 1 auto }
 .dashboard-loading-period { margin-block-start: auto }
 .dashboard-loading [data-slot="skeleton"].dashboard-loading-donut {
-  inline-size: 136px;
-  block-size: 136px;
+  inline-size: var(--loading-placeholder-ring-size);
+  block-size: var(--loading-placeholder-ring-size);
   flex: none;
-  border: 21px solid var(--inner-surface);
+  border: var(--loading-placeholder-ring-thickness) solid var(--inner-surface);
   border-radius: 50%;
   background: transparent;
 }
-.dashboard-loading-legend { display: grid; gap: var(--aml-space-8) }
+.dashboard-loading-legend { display: grid; inline-size: var(--loading-placeholder-legend-width); gap: var(--aml-space-8) }
 .dashboard-loading-label { block-size: var(--aml-type-caption-lineHeight) }
 .dashboard-loading .dashboard-loading-card {
   inline-size: 100%;
   block-size: calc(2 * var(--aml-space-48));
   border-radius: var(--aml-radius-card);
 }
-@keyframes dashboard-loading-pulse { 50% { opacity: .5 } }
+@keyframes dashboard-loading-pulse { 50% { opacity: var(--loading-pulse-opacity) } }
 :root[data-reduced-motion="true"] .dashboard-loading [data-slot="skeleton"] { animation: none }
 @media (prefers-reduced-motion: reduce) {
   .dashboard-loading [data-slot="skeleton"] { animation: none }

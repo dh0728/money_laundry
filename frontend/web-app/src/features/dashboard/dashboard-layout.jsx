@@ -67,7 +67,7 @@ function LoadingChart({ chartClass = 'dashboard-proportion-band', children, show
 function LoadingDonut({ legendRows }) {
   return <Box className="dashboard-risk-chart">
     <Skeleton className="dashboard-loading-donut" />
-    <Box className="dashboard-loading-legend" style={{ width: 'min(100%, 9rem)' }}>
+    <Box className="dashboard-loading-legend">
       {Array.from({ length: legendRows }, (_, index) => <Skeleton key={index} className="dashboard-loading-label" />)}
     </Box>
   </Box>;
