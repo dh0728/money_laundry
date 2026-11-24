@@ -1,6 +1,6 @@
 // AML RADAR 디자인 규칙 구현. 규칙 목록·수준은 scripts/design-rules.mjs, 예외는 scripts/design-exceptions.json 한 곳에만 둔다.
 // eslint 플러그인(aml/*)과 stylelint 플러그인(aml/*)이 같은 규칙 이름을 쓴다.
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 import stylelint from 'stylelint'
 import { bannedIconPackage, designRules, pluginRuleName } from './design-rules.mjs'
@@ -39,6 +39,108 @@ const PRIMITIVE_TAG = { Box: 'div', Text: 'p', Heading: 'h2' }
 const PRIMITIVE_AS = new Set(('div section header footer nav main article aside ul ol li dl dt dd figure figcaption form fieldset legend details ' +
   'summary blockquote label menu address span p strong b i small code time em mark abbr sub sup kbd u pre output').split(' '))
 const RAW_TAG_IN_STRING = /<([a-zA-Z][\w]*)(?=[\s/>])/g
+
+
+// ---------- 숫자·색·변수 공통 ----------
+const isScreen = path => !path.startsWith('src/components/') && !path.startsWith('src/styles/')
+/** 원시 색 변수: --palette-*, --aml-<색이름>-<숫자> */
+const PALETTE_VAR = /var\(\s*--(palette-[\w-]+|aml-(?:gray|sky|pink|lime|red|green|amber|violet|blue|teal|orange|black|white)-\d[\w-]*)/
+const TEMPLATE_COLOR = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(\s*[^)]*$/
+const VAR_REF = /var\(\s*(--[\w-]+)\s*\)/g
+// 런타임·라이브러리가 넣는 변수(Tailwind·Radix·react-day-picker·sonner 등)
+const RUNTIME_VAR = /^--(tw-|radix-|rdp-|spacing$|color-|font-|text-|radius-|shadow-|inset-shadow-|drop-shadow-|ease-|animate-|breakpoint-|container-|default-|blur-|perspective-|aspect-|leading-|tracking-|width-|normal-|offset$|initial-|front-|gap$|toast-|sidebar-width|swipe-)/
+// 화면 묶음(진입 HTML)마다 불러오는 CSS가 다르다(index·components = preview-design-system, ant-review = theme.css).
+// 파일이 속한 모든 묶음에서 정의된 변수만 정의된 것으로 본다. 어느 묶음에도 안 닿는 파일(테스트·main.tsx 쪽)은 src 전체 정의로 본다.
+const ENTRY_HTML = ['index.html', 'components.html', 'ant-review.html']
+const MODULE_EXT = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '/index.ts', '/index.tsx', '/index.js']
+const varDefinitions = text => [...text.matchAll(/(--[\w-]+)\s*['"`]?\s*:/g), ...text.matchAll(/['"`](--[\w-]+)['"`]/g)].map(match => match[1])
+function resolveModule(from, spec) {
+  const clean = spec.replace(/\?.*$/, '')
+  const base = clean.startsWith('@/') ? resolve(appRoot, 'src', clean.slice(2)) : clean.startsWith('.') ? resolve(from, '..', clean) : null
+  if (!base) return null
+  for (const ext of MODULE_EXT) try { if (statSync(base + ext).isFile()) return base + ext } catch { /* 다음 확장자 */ }
+  return null
+}
+let varWorlds
+function varWorldSets() {
+  if (varWorlds) return varWorlds
+  // runtime = JS가 style·setProperty로 넣는 변수('--x' 문자열). 어느 컴포넌트가 넣을지 모르므로 묶음과 상관없이 정의로 본다.
+  const all = new Set(), runtime = new Set(), worlds = []
+  const walk = dir => { for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const file = resolve(dir, entry.name)
+    if (entry.isDirectory()) walk(file)
+    else if (/\.(css|[cm]?[jt]sx?)$/.test(entry.name)) {
+      const source = readFileSync(file, 'utf8')
+      for (const name of varDefinitions(source)) all.add(name)
+      if (!entry.name.endsWith('.css')) for (const match of source.matchAll(/['"`](--[\w-]+)['"`]/g)) runtime.add(match[1])
+    }
+  } }
+  walk(resolve(appRoot, 'src'))
+  for (const html of ENTRY_HTML) {
+    const files = new Set(), defined = new Set()
+    let page = ''
+    try { page = readFileSync(resolve(appRoot, html), 'utf8') } catch { continue }
+    for (const name of varDefinitions(page)) { defined.add(name); all.add(name) }
+    const visit = file => {
+      if (!file || files.has(file)) return
+      files.add(file)
+      const source = readFileSync(file, 'utf8')
+      for (const name of varDefinitions(source)) defined.add(name)
+      const specs = file.endsWith('.css')
+        ? [...source.matchAll(/@import\s+(?:url\()?['"]([^'"]+)['"]/g)].map(match => match[1])
+        : [...source.matchAll(/(?:from\s*|import\s*\(\s*|import\s+)['"]([^'"]+)['"]/g)].map(match => match[1])
+      for (const spec of specs) visit(resolveModule(file, spec))
+    }
+    for (const match of page.matchAll(/(?:src|href)="\/(src\/[^"]+)"/g)) visit(resolveModule(resolve(appRoot, 'index.html'), `./${match[1]}`))
+    worlds.push({ files, defined })
+  }
+  varWorlds = { all, runtime, worlds }
+  return varWorlds
+}
+const undefinedVars = (text, path) => {
+  const { all, runtime, worlds } = varWorldSets()
+  const file = resolve(appRoot, path)
+  const mine = worlds.filter(world => world.files.has(file))
+  const defined = name => runtime.has(name) || (mine.length ? mine.every(world => world.defined.has(name)) : all.has(name))
+  return [...new Set([...text.matchAll(VAR_REF)].map(match => match[1]))].filter(name => !RUNTIME_VAR.test(name) && !defined(name))
+}
+
+/** 채우기·맞추기 값(0·100%·50%·100vh 등)과 배치 숫자를 뺀 고정 숫자 목록 */
+const LAYOUT_PROP = /^(flex|flex-grow|flex-shrink|order|grid-(column|row|area)(-start|-end)?|-webkit-line-clamp|line-clamp|font-variant[\w-]*|font-feature-settings|content|counter-(reset|increment|set)|will-change|tab-size)$/
+const UNIT_NUMBER = /(?<![\w#.-])(-?(?:\d*\.\d+|\d+))(px|rem|em|ms|s|%|vh|vw|vmin|vmax|dvh|svh|lvh|dvw|svw|deg|turn|rad|cqi|cqw|cqh|cqb|ch|ex|lh|fr)?(?![\w.(])/g
+function fixedNumbers(prop, value) {
+  if (LAYOUT_PROP.test(prop)) return []
+  let text = value
+  for (let before; before !== text;) { before = text; text = text.replace(/var\(\s*--[\w-]+\s*\)/g, 'V') }
+  text = text.replace(/var\(\s*--[\w-]+\s*,/g, '(').replace(/url\([^)]*\)/g, '').replace(/(['"])[^'"]*\1/g, '')
+    .replace(/#[\da-fA-F]{3,8}\b/g, '').replace(/\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([^()]*\)/g, '')
+  return [...text.matchAll(UNIT_NUMBER)].filter(match => {
+    const [whole, number, unit = ''] = match
+    const before = text.slice(0, match.index)
+    if (Number(number) === 0 || unit === 'fr') return false
+    if (/^(100|50|-50)$/.test(number) && /^(%|vh|vw|dvh|svh|lvh|dvw|svw)$/.test(unit)) return false
+    if (!unit && /repeat\(\s*$/.test(before)) return false
+    // calc 안의 배수(2 * var(--…))는 토큰에서 나온 값이다.
+    if (!unit && (/[*/]\s*$/.test(before) || /^\)?\s*[*/]/.test(text.slice(match.index + whole.length)))) return false
+    if (!unit && /^-?1$/.test(number) && /^(opacity|fill-opacity|stroke-opacity|scale|line-height|flex|aspect-ratio|animation-iteration-count)$/.test(prop)) return false
+    if (!unit && /^-?1$/.test(number) && /(scale[XYZ3d]*|matrix|invert|brightness|saturate|contrast|grayscale|sepia|opacity)\(\s*$/.test(before)) return false
+    return Boolean(whole)
+  }).map(match => match[0])
+}
+// JSX 크기·모양 prop과 객체 속성(차트·도형·style)
+const VISUAL_PROP = /^(width|height|minWidth|maxWidth|minHeight|maxHeight|size|iconSize|dotSize|strokeWidth|fontSize|fontWeight|lineHeight|letterSpacing|opacity|fillOpacity|strokeOpacity|zIndex|radius|cornerRadius|barRadius|barSize|maxBarSize|barGap|barCategoryGap|tickMargin|tickSize|innerRadius|outerRadius|paddingAngle|r|rx|ry|strokeDasharray|duration|delay|animationDuration|animationBegin|gap|rowGap|columnGap|margin|marginTop|marginBottom|marginLeft|marginRight|padding|paddingTop|paddingBottom|paddingLeft|paddingRight|top|left|right|bottom|inset|borderRadius|borderWidth|plotHeight|lineWidth|nodeWidth|nodePadding|blur|shadowBlur)$/
+const OBJECT_SKIP = /^(size|top|left|right|bottom|duration|delay)$/
+const numericLiteral = node => node && ((node.type === 'Literal' && typeof node.value === 'number') ||
+  (node.type === 'UnaryExpression' && node.operator === '-' && node.argument.type === 'Literal' && typeof node.argument.value === 'number'))
+const literalNumber = node => node.type === 'UnaryExpression' ? -node.argument.value : node.value
+const numericString = value => typeof value === 'string' && /^\s*-?(\d*\.\d+|\d+)(px|rem|em|ms|s|%|vh|vw|deg)?\s*$/.test(value)
+const fillValue = (value, key = '') => /^\s*(0+(\.0+)?|100%|-?50%)\s*$/.test(String(value)) || (/^\s*1\s*$/.test(String(value)) && /opacity|Opacity/.test(key))
+const STRING_UNIT = /(?<![\w#.[-])-?(?:\d*\.\d+|\d+)(px|rem|em|ms|vh|vw|deg)\b/g
+const hasStringUnit = value => [...String(value).matchAll(STRING_UNIT)].some(match => Number.parseFloat(match[0]) !== 0)
+// 데이터 계열 색
+const GRAY_COLOR = /var\(\s*--(muted-foreground|muted-text|muted|chart-total|chart-neutral|chart-[12]|palette-neutral[\w-]*|aml-gray-[\w-]+|neutral[\w-]*|gray[\w-]*)\s*\)/
+const STATUS_COLOR = /var\(\s*--(status-[\w-]+|aml-status-[\w-]+|risk-[\w-]+|review-status-[\w-]+|chart-(suspect|completion|arrival|risk)[\w-]*|destructive)\s*\)/
+const STATUS_WORDS = /대기|진행|완료|종결|세탁|패턴|지연|위험|주의|정상|이상|오류|실패|성공|미확인|확인|처리|판정|경고|의심|높음|중간|낮음|pending|progress|working|done|closed|danger|caution|positive|negative|info|high|medium|low|risk|warn|error|fail|success|unread|abnormal|normal|suspect/i
 
 // ---------- eslint ----------
 const stringValue = node => node.type === 'Literal' && typeof node.value === 'string' ? node.value
@@ -123,6 +225,8 @@ const eslintRules = {
   }),
   'token-raw-color': eslintRule('token/raw-color', ({ report }) => onStrings((node, value) => {
     for (const match of value.matchAll(COLOR_RE)) report(node, `직접 색 값 ${match[0].trim()} 대신 색 토큰(var(--…))을 쓴다.`)
+    // 템플릿으로 계산한 색: `hsl(${…} 65% 55%)`
+    if (node.type === 'TemplateElement' && !node.tail && TEMPLATE_COLOR.test(value)) report(node, `계산한 색 ${value.match(TEMPLATE_COLOR)[0].trim()}… 대신 색 토큰을 쓴다.`)
   })),
   'token-inline-style': eslintRule('token/inline-style', ({ report }) => ({
     JSXAttribute(node) {
@@ -200,6 +304,108 @@ const eslintRules = {
       }
     },
   })),
+
+  'token-fixed-number': eslintRule('token/fixed-number', ({ report }) => ({
+    JSXAttribute(node) {
+      const name = node.name?.name
+      if (typeof name !== 'string' || !VISUAL_PROP.test(name)) return
+      const value = node.value?.type === 'JSXExpressionContainer' ? node.value.expression : node.value
+      if (numericLiteral(value) && !fillValue(literalNumber(value), name)) report(node, `${name}={${literalNumber(value)}} 대신 크기·모양 토큰을 쓴다.`)
+      else if (value?.type === 'Literal' && numericString(value.value) && !fillValue(value.value, name)) report(node, `${name}="${value.value}" 대신 크기·모양 토큰을 쓴다.`)
+    },
+    Property(node) {
+      const key = node.key?.name ?? node.key?.value
+      if (typeof key !== 'string' || !VISUAL_PROP.test(key) || OBJECT_SKIP.test(key) && node.parent.parent?.type !== 'JSXExpressionContainer') return
+      if (numericLiteral(node.value) && !fillValue(literalNumber(node.value), key)) report(node, `${key}: ${literalNumber(node.value)} 대신 크기·모양 토큰을 쓴다.`)
+      else if (node.value.type === 'Literal' && numericString(node.value.value) && !fillValue(node.value.value, key)) report(node, `${key}: '${node.value.value}' 대신 크기·모양 토큰을 쓴다.`)
+    },
+    ...onStrings((node, value) => {
+      if (/\[/.test(value) || node.parent?.type === 'Property' && numericString(value) || node.parent?.type === 'JSXAttribute') return
+      for (const match of value.matchAll(STRING_UNIT)) if (Number.parseFloat(match[0]) !== 0) { report(node, `문자열 고정 숫자 ${match[0]} 대신 토큰(var(--…))을 쓴다.`); break }
+    }),
+  })),
+  'token-inline-var-number': eslintRule('token/inline-var-number', ({ report }) => ({
+    JSXAttribute(node) {
+      if (node.name?.name !== 'style' || node.value?.type !== 'JSXExpressionContainer' || node.value.expression.type !== 'ObjectExpression') return
+      for (const property of node.value.expression.properties) {
+        const key = property.key?.value
+        if (property.type !== 'Property' || typeof key !== 'string' || !key.startsWith('--')) continue
+        const value = property.value
+        if (numericLiteral(value) || value.type === 'Literal' && (numericString(value.value) || hasStringUnit(value.value)))
+          report(property, `${key}에 숫자 대신 토큰(var(--…))을 넘긴다.`)
+      }
+    },
+    CallExpression(node) {
+      const callee = node.callee
+      const [name, value] = node.arguments
+      if (callee.type === 'MemberExpression' && callee.property?.name === 'setProperty' && name?.type === 'Literal' && String(name.value).startsWith('--')
+        && (numericLiteral(value) || value?.type === 'Literal' && numericString(value.value) && !fillValue(value.value)))
+        report(node, `setProperty('${name.value}')에 숫자 대신 토큰을 넘긴다.`)
+    },
+  })),
+  'token-palette-direct': eslintRule('token/palette-direct', ({ path, report }) => !isScreen(path) ? {} : onStrings((node, value) => {
+    const match = value.match(PALETTE_VAR)
+    if (match) report(node, `원시 색 --${match[1]} 대신 의미 토큰이나 공용 계열 색(components/charts의 dataSeriesColors)을 쓴다.`)
+  })),
+  'token-series-color': eslintRule('token/series-color', ({ report }) => {
+    const text = node => !node ? undefined : stringValue(node) ?? (node.type === 'TemplateLiteral' ? node.quasis.map(part => part.value.raw).join('…') : undefined)
+    return {
+      ObjectExpression(node) {
+        const props = new Map(node.properties.filter(property => property.type === 'Property').map(property => [property.key?.name ?? property.key?.value, property]))
+        const label = ['label', 'name', 'key', 'dataKey'].map(key => props.get(key)).find(Boolean)
+        if (!label) return
+        for (const key of ['color', 'fill', 'stroke']) {
+          const property = props.get(key)
+          const color = property && text(property.value)
+          if (!color) continue
+          if (GRAY_COLOR.test(color)) report(property, `데이터 계열 ${text(label.value) ?? ''}에 회색(${color.match(GRAY_COLOR)[0]}) 대신 계열 색을 쓴다.`)
+          else if (STATUS_COLOR.test(color)) {
+            const labelText = ['label', 'name', 'key'].map(name => text(props.get(name)?.value)).filter(Boolean).join(' ')
+            if (labelText && !STATUS_WORDS.test(labelText)) report(property, `상태가 아닌 계열 ${labelText}에 상태 색(${color.match(STATUS_COLOR)[0]})을 쓰지 않는다.`)
+          }
+        }
+      },
+      JSXOpeningElement(node) {
+        if (!/^(Bar|Line|Area|Cell|Pie|Scatter|Radar|Sparkline|AreaChart|BarChart|LineChart)$/.test(jsxName(node) ?? '')) return
+        for (const key of ['color', 'fill', 'stroke']) {
+          const attribute = jsxAttribute(node, key)
+          const value = attribute?.value?.type === 'Literal' ? attribute.value.value : attribute?.value?.expression ? text(attribute.value.expression) : undefined
+          if (value && GRAY_COLOR.test(value)) report(attribute, `차트 계열에 회색(${value.match(GRAY_COLOR)[0]}) 대신 계열 색을 쓴다.`)
+        }
+      },
+    }
+  }),
+  'token-undefined-var': eslintRule('token/undefined-var', ({ path, report }) => onStrings((node, value) => {
+    for (const name of undefinedVars(value, path)) report(node, `정의 없는 변수 ${name}. 이 화면 묶음(진입점)이 불러오는 토큰·CSS에 있는 변수를 쓴다.`)
+  })),
+  'component-dom-api': eslintRule('component/dom-api', ({ path, report }) => path.startsWith('src/components/') ? {} : {
+    CallExpression(node) {
+      const callee = node.callee
+      const name = callee.type === 'Identifier' ? callee.name : callee.property?.name
+      const tag = node.arguments[0]
+      if (/^(createElement|createElementNS)$/.test(name ?? '') && tag?.type === 'Literal' && typeof tag.value === 'string' && /^[a-z]/.test(tag.value))
+        report(node, `${name}('${tag.value}') 대신 공용 컴포넌트를 쓴다.`)
+      if (name === 'insertAdjacentHTML') report(node, 'insertAdjacentHTML 대신 공용 컴포넌트를 쓴다.')
+    },
+    AssignmentExpression(node) {
+      if (node.left.type === 'MemberExpression' && /^(innerHTML|outerHTML)$/.test(node.left.property?.name ?? '')) report(node, `${node.left.property.name} 대신 공용 컴포넌트를 쓴다.`)
+    },
+  }),
+  'component-form-control': eslintRule('component/form-control', ({ path, report }) => path.startsWith('src/components/') ? {} : {
+    JSXOpeningElement(node) { if (/^(input|select|textarea)$/.test(jsxName(node) ?? '')) report(node, `<${jsxName(node)}> 대신 공용 입력 부품(components/ui·query-controls·search-field)을 쓴다.`) },
+    ...onStrings((node, value) => { const match = value.match(/<(input|select|textarea)\b/); if (match) report(node, `문자열 <${match[1]}> 대신 공용 입력 부품을 쓴다.`) }),
+  }),
+  'icon-local-svg': eslintRule('icon/local-svg', ({ report }) => ({
+    ImportDeclaration(node) { if (/\.svg(\?.*)?$/.test(node.source.value)) report(node, `${node.source.value} 대신 lucide-react 아이콘을 쓴다.`) },
+    ImportExpression(node) { if (/\.svg(\?.*)?$/.test(node.source.value ?? '')) report(node, 'SVG 파일 대신 lucide-react 아이콘을 쓴다.') },
+    ...onStrings((node, value) => { if (/url\([^)]*\.svg|^[./@\w-]*\/[\w-]+\.svg$/.test(value)) report(node, 'SVG 파일 대신 lucide-react 아이콘을 쓴다.') }),
+  })),
+  'escape-hatch-any-disable': eslintRule('escape-hatch/any-disable', ({ report, context }) => ({
+    Program() {
+      for (const comment of context.sourceCode.getAllComments())
+        if (/^eslint-disable(-next-line|-line)?\b/.test(comment.value.trim())) report(comment, 'eslint-disable 대신 코드를 고친다.')
+    },
+  })),
 }
 export const eslintPlugin = { meta: { name: 'aml-design' }, rules: eslintRules }
 
@@ -271,6 +477,23 @@ export const stylelintPlugins = [
         report(decl, `${decl.prop}: ${value} — Pretendard 뒤에 대체 글꼴을 두지 않는다.`)
     })
   }),
+  cssRule('token/fixed-number', ({ root, path, report }) => root.walkDecls(decl => {
+    if (inFontFace(decl) || (isTokenFile(path) && decl.prop.startsWith('--'))) return
+    // 간격·모서리·글자 크기의 px·rem·em은 각자의 규칙이 센다.
+    if (/^(padding|margin)(-|$)|^(gap|row-gap|column-gap)$|^inset(-|$)|^(top|right|bottom|left)$|^scroll-(margin|padding)|^border(-[a-z]+)*-radius$|^(font-size|font)$/.test(decl.prop) && hasUnit(decl.value)) return
+    const numbers = fixedNumbers(decl.prop, decl.value)
+    if (numbers.length) report(decl, `${decl.prop}: ${numbers.slice(0, 3).join(' ')} 고정 숫자 대신 토큰(var(--…))을 쓴다.`)
+  })),
+  cssRule('token/palette-direct', ({ root, path, report }) => isScreen(path) ? root.walkDecls(decl => {
+    const match = decl.value.match(PALETTE_VAR)
+    if (match) report(decl, `${decl.prop}: 원시 색 --${match[1]} 대신 의미 토큰을 쓴다.`)
+  }) : undefined),
+  cssRule('token/undefined-var', ({ root, path, report }) => root.walkDecls(decl => {
+    for (const name of undefinedVars(decl.value, path)) report(decl, `${decl.prop}: 정의 없는 변수 ${name}`)
+  })),
+  cssRule('icon/local-svg', ({ root, report }) => root.walkDecls(decl => {
+    if (/url\([^)]*\.svg/.test(decl.value)) report(decl, `${decl.prop}: SVG 파일 대신 lucide-react 아이콘을 쓴다.`)
+  })),
   cssRule('escape-hatch/disable-comment', ({ root, report }) => root.walkComments(comment => {
     const directive = comment.text.match(/^stylelint-disable(?:-next-line|-line)?(?:\s+(.*))?$/)
     if (directive && (!directive[1]?.trim() || /\baml\//.test(directive[1]))) report(comment, '디자인 규칙을 끄거나 규칙 이름 없이 stylelint-disable을 쓰지 않는다.')

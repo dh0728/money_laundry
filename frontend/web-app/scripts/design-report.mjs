@@ -3,7 +3,7 @@
 //   --rule <id>    한 규칙만 (예: token/raw-color)
 //   --update       위반이 줄어든 ratchet 규칙의 상한을 현재 개수로 내린다(올리지는 않는다)
 //   --json         기계용 출력
-// 실패 조건: error 규칙 위반 1건 이상, ratchet 규칙이 상한 초과, 예외 파일 형식 오류·만료.
+// 실패 조건: error 규칙 위반 1건 이상, ratchet 규칙이 상한 초과·상한보다 적음(--update로 내린다), 예외 파일 형식 오류·만료.
 process.env.AML_DESIGN_ALL = '1'
 const { readFileSync, writeFileSync } = await import('node:fs')
 const { resolve } = await import('node:path')
@@ -51,7 +51,7 @@ const tree = designRuleTree.map(category => ({ ...category, rules: category.rule
   const cleared = list.filter(hit => rule.errorIn?.some(folder => hit.file.startsWith(folder)))
   const status = !counted ? 'test' : list.length > cap || cleared.length ? 'fail' : list.length < cap ? 'lower' : 'ok'
   if (status === 'fail') failed = true
-  if (status === 'lower') lowered.push(rule.id)
+  if (status === 'lower') { lowered.push(rule.id); if (!flag('--update')) failed = true }
   return { ...rule, count: list.length, cap, status, hits: list.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line) }
 }) })).filter(category => category.rules.length)
 
@@ -80,6 +80,6 @@ else {
   }
   for (const problem of exceptionProblems) console.log(`✗ 예외 파일: ${problem}`)
   console.log(`\n오류 규칙 위반 ${errors}건 · 상한 관리 위반 ${ratcheted}건 · 예외 ${exceptions.length}건`)
-  if (lowered.length && !flag('--update')) console.log(`↓ 줄어든 규칙: ${lowered.join(', ')} → pnpm lint:design --update로 상한을 내린다.`)
+  if (lowered.length && !flag('--update')) console.log(`↓ 줄어든 규칙: ${lowered.join(', ')} → 상한에 여유가 남아 실패. pnpm lint:design --update로 상한을 내린다.`)
 }
 process.exitCode = failed ? 1 : 0
