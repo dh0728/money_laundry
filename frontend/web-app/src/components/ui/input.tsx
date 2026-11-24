@@ -17,4 +17,8 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   )
 }
 
-export { Input }
+function RangeInput(props: Omit<React.ComponentProps<"input">, "type">) {
+  return <input {...props} type="range" />
+}
+
+export { Input, RangeInput }

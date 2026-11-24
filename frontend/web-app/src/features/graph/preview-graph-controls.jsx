@@ -1,6 +1,7 @@
 import React from 'react';
 import { Minus, Pause, Play, Plus, Shrink, SkipBack, SkipForward } from 'lucide-react';
 import { ActionButton } from '../../components/primary-button';
+import { RangeInput } from '../../components/ui/input';
 import { Box, Text } from '../../components/layout-primitives';
 
 export function GraphIconButton({ label, icon: Icon, alternateIcon: AlternateIcon, grouped = false, ...props }) {
@@ -32,7 +33,7 @@ export function GraphPlayback({ records, cursor, playing, onPlay, onSeek }) {
       <GraphIconButton grouped label="다음 거래" icon={SkipForward} disabled={cursor === records.length} onClick={() => onSeek(cursor + 1)} />
     </Box>
     <Text as="span" aria-hidden="true">{first?.timestamp.slice(5)}</Text>
-    <input type="range" aria-label="거래 재생 위치"
+    <RangeInput aria-label="거래 재생 위치"
       aria-valuetext={current ? `${cursor} / ${records.length}건 · ${current.timestamp} KST` : `0 / ${records.length}건`}
       min={0} max={records.length} value={cursor} onChange={event => onSeek(Number(event.target.value))} />
     {first?.timestamp !== last?.timestamp && <Text as="span" aria-hidden="true">{last?.timestamp.slice(5)}</Text>}

@@ -10,7 +10,8 @@ import { Panel } from '../../components/panel';
 import { PreviewCaseCard } from './preview-case-card';
 import { TransactionEvidenceTable } from './preview-case-table';
 import { useCaseEvidenceSelection } from './case-evidence-selection';
-import { SquishSwitch, bindSquishSwitch } from '../../components/squish-switch';
+import { SquishSwitchControl } from '../../components/squish-switch';
+import { RangeInput } from '../../components/ui/input';
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort, WorkflowTable } from '../../components/workflow-table';
 import { dateFromCode, downloadCsv, inDateRange, LocalQueryTools, TableQueryTools, visibleCaseRows } from '../../components/query-controls';
@@ -53,7 +54,7 @@ function riskLegend() {
 const hopSteps = [1, 2, 3, 4, 5];
 const allGraphRelations = ':all-relations:';
 
-function GraphSettings({ id, groups, onDetailsChange, ownerView, sankeyView, anchor, hops, onHopsChange,
+function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sankeyView, anchor, hops, onHopsChange,
   network, selection, onSelect, shownCases, highlightedCase, onHighlight, hiddenCases, onVisibilityChange,
   showSankeySample, accountCount, ownerCount, patternLayout }) {
   const trigger = useRef(null);
@@ -64,16 +65,6 @@ function GraphSettings({ id, groups, onDetailsChange, ownerView, sankeyView, anc
     setExpanded(false);
     trigger.current?.focus({ preventScroll: true });
   }
-  const mount = useRef(null);
-  useEffect(() => {
-    const host = mount.current;
-    if (!host) return;
-    host.innerHTML = SquishSwitch('case-graph-details', '그래프 거래 라벨 표시');
-    const button = host.firstElementChild;
-    button.setAttribute('aria-checked', 'true');
-    bindSquishSwitch(button, onDetailsChange);
-    return () => host.replaceChildren();
-  }, [onDetailsChange, sankeyView]);
   const caseEntry = ({ id, color }) => {
     const isBase = id === groups[0].id;
     const hidden = !isBase && hiddenCases.has(id);
@@ -117,7 +108,8 @@ function GraphSettings({ id, groups, onDetailsChange, ownerView, sankeyView, anc
         : `가로 · 계좌의 첫 거래 시각(KST) / 세로 · ${patternLayout === 'pattern' ? '거래 패턴' : '송금·수취 연결'}`}</Text>
       {!sankeyView && <Box className="preview-graph-detail-toggle">
         <Box as="label" htmlFor="case-graph-details">그래프 거래 라벨 표시</Box>
-        <Text as="span" ref={mount} />
+        <Text as="span"><SquishSwitchControl id="case-graph-details" label="그래프 거래 라벨 표시"
+          checked={showDetails} onChange={onDetailsChange} /></Text>
       </Box>}
       <Box className="preview-graph-picker">
         <Box as="label" htmlFor="case-graph-selection">계좌·연결 선택</Box>
@@ -150,7 +142,7 @@ function GraphSettings({ id, groups, onDetailsChange, ownerView, sankeyView, anc
       </Box>
       <Box className="preview-graph-hops">
         <Box as="label" htmlFor="case-graph-hops">선택 계좌 기준 연결 단계 (hop)</Box>
-        <input id="case-graph-hops" type="range" min={hopSteps[0]} max={hopSteps.at(-1)} step={1}
+        <RangeInput id="case-graph-hops" min={hopSteps[0]} max={hopSteps.at(-1)} step={1}
           value={hops} aria-valuetext={`${hops}홉`} disabled={!anchor}
           aria-describedby={!anchor ? 'case-graph-hops-hint' : undefined}
           onChange={event => onHopsChange(Number(event.target.value))} />
@@ -653,7 +645,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
             onDrop={related ? dropCandidate : undefined}>
             <Box as="header" className="preview-graph-center-heading">
               <GraphSettings id={settingsId} groups={groups}
-                onDetailsChange={setShowDetails} ownerView={ownerView} sankeyView={sankeyView} anchor={anchor} hops={hops}
+                showDetails={showDetails} onDetailsChange={setShowDetails} ownerView={ownerView} sankeyView={sankeyView} anchor={anchor} hops={hops}
                 onHopsChange={setHops} network={currentGraph} selection={selected ? selection : tableTarget?.id} onSelect={select}
                 showSankeySample={sankeyView && active?.code !== complexSankeySampleCode}
                 shownCases={shownCases} highlightedCase={shownHighlight}
