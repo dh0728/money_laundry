@@ -59,7 +59,7 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
   network, selection, onSelect, shownCases, highlightedCase, onHighlight, hiddenCases, onVisibilityChange,
   showSankeySample, accountCount, ownerCount, patternLayout }) {
   const trigger = useRef(null);
-  const [expanded, setExpanded] = useState(() => !sankeyView && window.innerWidth > 768);
+  const [expanded, setExpanded] = useState(() => window.innerWidth > 768);
   function closeOnEscape(event) {
     if (event.key !== 'Escape' || event.defaultPrevented || !expanded) return;
     event.preventDefault();

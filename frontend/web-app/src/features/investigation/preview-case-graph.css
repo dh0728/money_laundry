@@ -57,13 +57,15 @@
 .preview-graph-empty p { color: var(--muted-text) }
 .preview-graph-workspace {
   min-inline-size: 0;
+  --preview-graph-gap: max(var(--workspace-gap), var(--aml-space-8));
   --preview-graph-height: clamp(var(--case-graph-min-height), var(--case-graph-viewport-height), var(--case-graph-max-height));
   --preview-graph-control-size: var(--aml-panel-control-size);
 }
 .preview-graph-center {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: var(--preview-graph-height) auto;
+  grid-template-rows: var(--preview-graph-height);
+  row-gap: var(--preview-graph-gap);
   isolation: isolate;
 }
 .preview-graph-center > :is(.preview-evidence-canvas, .preview-graph-sankey-viewport) {
@@ -205,25 +207,30 @@
 .preview-graph-hop-steps [data-current] { color: var(--text); font-weight: var(--aml-type-body-strong-weight) }
 .preview-graph-hops:has(input:disabled) label { color: var(--muted-text) }
 .preview-graph-hops p { margin: 0; font-size: var(--aml-type-caption-size) }
-.preview-graph-center[data-visualization="sankey"] {
-  grid-template-rows: auto auto auto;
-}
-.preview-graph-center[data-visualization="sankey"] > .preview-graph-sankey-viewport { grid-row: 2 }
-.preview-graph-center[data-visualization="sankey"] > .preview-graph-actions { grid-row: 3 }
 .preview-graph-sankey-viewport {
+  min-block-size: 0;
   overflow: clip;
   touch-action: none;
   user-select: none;
   cursor: grab;
 }
+@media (width > 768px) {
+  .preview-graph-center:has(.preview-graph-settings[data-expanded="true"]) > .preview-graph-sankey-viewport {
+    margin-inline-start: calc(min(var(--case-graph-settings-max-width), var(--case-graph-settings-share)) + var(--workspace-gap));
+  }
+}
 .preview-graph-sankey-viewport[data-panning],
 .preview-graph-sankey-viewport[data-panning] * { cursor: grabbing }
 .preview-graph-sankey-flows {
+  display: grid;
+  align-content: safe center;
+  min-block-size: 100%;
   transform-origin: top left;
   transform: translate(var(--case-graph-pan-x), var(--case-graph-pan-y)) scale(var(--case-graph-zoom));
   padding: var(--aml-space-4) var(--aml-panel-inset) var(--aml-space-8);
 }
 .preview-graph-sankey-layout {
+  inline-size: 100%;
   min-inline-size: calc(var(--sankey-columns, 1) * var(--aml-space-64) + var(--aml-space-32));
   max-inline-size: clamp(var(--case-graph-sankey-min-width), calc(var(--sankey-columns, 1) * var(--case-graph-sankey-column-width)), var(--case-graph-sankey-max-width));
   margin-inline: auto;
@@ -257,16 +264,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--workspace-gap);
-}
-@media (width > 768px) {
-  .preview-graph-center:not([data-visualization="sankey"]) > .preview-graph-actions {
-    z-index: var(--case-graph-controls-layer);
-    margin-block-start: calc(-1 * var(--aml-panel-inset));
-  }
-  .preview-graph-center:not([data-visualization="sankey"]):has(> .preview-graph-actions) .preview-graph-settings {
-    max-block-size: calc(100% - var(--aml-panel-inset));
-  }
+  gap: var(--preview-graph-gap);
 }
 .preview-graph-playback {
   display: flex;
@@ -380,7 +378,8 @@
   display: grid;
   place-items: center;
   padding-inline: var(--aml-space-4, calc(var(--workspace-gap) / 2));
-  min-inline-size: var(--aml-space-40, calc(var(--workspace-gap) * 5));
+  inline-size: var(--aml-space-48);
+  flex: none;
   font-size: var(--aml-type-caption-size, var(--ui-font-size));
   font-variant-numeric: tabular-nums;
 }
@@ -398,12 +397,15 @@
     margin: 0;
   }
   .preview-related-layout :is([data-case-evidence], [data-case-accounts], .preview-comparison-evidence) { order: 2 }
-  .preview-graph-center:not([data-visualization="sankey"]) {
+  .preview-graph-center {
     --preview-graph-height: clamp(var(--case-graph-min-height),
       calc(var(--case-graph-viewport-height) - var(--preview-graph-control-size) - 2 * var(--aml-panel-inset)), var(--case-graph-max-height));
-    grid-template-rows: auto var(--preview-graph-height) auto;
+    grid-template-rows: auto var(--preview-graph-height);
   }
-  .preview-graph-center > .preview-evidence-canvas { grid-row: 2 }
+  .preview-graph-center > :is(.preview-evidence-canvas, .preview-graph-sankey-viewport) { grid-row: 2 }
   .preview-graph-center > .preview-graph-actions { grid-row: 3 }
-  .preview-graph-settings[data-expanded="true"] { inline-size: 100% }
+  .preview-graph-settings[data-expanded="true"] {
+    inline-size: 100%;
+    block-size: var(--preview-graph-height);
+  }
 }
