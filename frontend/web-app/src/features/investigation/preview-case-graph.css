@@ -180,9 +180,6 @@
 .preview-graph-picker-options,
 .preview-graph-picker-options [data-radix-select-viewport] { scrollbar-width: none }
 .preview-graph-picker-options [data-slot="select-item-indicator"] { display: none }
-.case-evidence-table tr[data-graph-linked]:not([data-selected]) > :first-child {
-  box-shadow: inset var(--aml-space-4) 0 var(--brand-accent);
-}
 .preview-graph-hops {
   display: grid;
   gap: var(--aml-space-4);

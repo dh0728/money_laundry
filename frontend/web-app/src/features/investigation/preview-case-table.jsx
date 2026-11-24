@@ -59,13 +59,14 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
     <CaseDataTable title={title} summary={tableCount(sorting.rows.length, transactions.length, '건', selection.selectedCount)}
       className="screen-table-scroll" selection={selection} tools={lastCode ? <TableQueryTools actions={actions} /> : false}>
       <TableHeader><TableRow>
-        {headers.map(({ name, ...options }) => <SortableTableHead key={name} sorting={sorting} column={name} {...options}
-          className={name === '금액' ? 'case-table-numeric' : undefined}>{name}</SortableTableHead>)}
+        {headers.map(({ name, ...options }) => <SortableTableHead key={name} sorting={sorting} column={name} {...options}>
+          {name}
+        </SortableTableHead>)}
       </TableRow></TableHeader>
       <TableBody>
         {sorting.rows.map(({ code, timestamp, from, to, amount, currency, method, status, verdict, score }) =>
           <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}
-            data-graph-linked={highlightedCodes?.has(code) || undefined}>
+            related={highlightedCodes?.has(code)}>
             <RecordIdCell code={code} />
             {scoresVisible && <TableCell>{Number.isFinite(score)
               ? <ModelScoreTag score={score} /> : '—'}</TableCell>}
@@ -74,7 +75,7 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
             {analysis && <TableCell>{from.owner || '—'}</TableCell>}
             <TableCell><Text as="code">{to.code}</Text></TableCell>
             {analysis && <TableCell>{to.owner || '—'}</TableCell>}
-            <TableCell className="case-table-numeric">{formatAmount.format(amount)} {currency}</TableCell>
+            <TableCell numeric>{formatAmount.format(amount)} {currency}</TableCell>
             <TableCell>{method}</TableCell>
             {analysis ? <>
               <TableCell><VerdictTag verdict={verdict} /></TableCell>

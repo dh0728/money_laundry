@@ -14,6 +14,17 @@
   border-inline-end: var(--aml-stroke-divider, 1px) solid color-mix(in srgb, var(--aml-data-grid, var(--border)) 30%, transparent);
 }
 
+[data-slot="table-row"][data-related="true"]:not([data-selected="true"], [data-state="selected"]) > :first-child {
+  box-shadow: inset var(--aml-space-4) 0 var(--brand-accent);
+}
+
+[data-slot="table-cell"][data-numeric="true"] {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slot="table-cell"][data-stacked="true"] > * { display: block }
+
 [data-slot="table"] thead tr > :is(th, td),
 [data-slot="table"] tbody tr:nth-child(even) > :is(th, td) {
   background-image: linear-gradient(

@@ -12,16 +12,5 @@
   [data-case-list-table] .case-table-scroll.entry-list { max-block-size: none }
 }
 .preview-case-table code { font-family: var(--aml-font-mono) }
-.case-table-flows :is(code, small), .case-table-numeric > span { display: block }
-.preview-case-table tbody .case-table-numeric { text-align: end; font-variant-numeric: tabular-nums }
 .case-evidence-table { min-block-size: 0 }
-
-.case-table-episode {
-  --table-cell-inset: var(--aml-space-4);
-}
-.data-table-frame .case-table-episode .table-sort-button {
-  column-gap: var(--aml-space-4);
-  padding-inline: var(--table-cell-inset);
-}
-.case-table-episode .table-field-label { column-gap: var(--aml-space-4) }
 .case-table-pages { display: contents }

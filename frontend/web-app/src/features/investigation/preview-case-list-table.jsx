@@ -71,11 +71,13 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
   }, [paging.key, paging.page, sortKey, onPageChange]);
   const numericHeadings = episode ? [...episodeMeasures, ...measures] : measures;
   const headings = [...columns, ...numericHeadings];
-  return <Box ref={frame} className="case-table-pages"><CaseDataTable title={title} summary={tableCount(rows.length, totalCount, '건', selection.selectedCount)} className={`entry-list${episode ? ' case-table-episode' : ''}`} selection={selection}>
+  return <Box ref={frame} className="case-table-pages"><CaseDataTable title={title}
+    summary={tableCount(rows.length, totalCount, '건', selection.selectedCount)} className="entry-list" selection={selection} compact={episode}>
       <TableHeader><TableRow>
-        {headings.map(({ name, compactName, ...options }, index) =>
-          <SortableTableHead key={name} sorting={sorting} column={name} label={options.label ?? name} {...options}
-            className={index >= columns.length ? 'case-table-numeric' : undefined}>{episode ? compactName ?? name : name}</SortableTableHead>)}
+        {headings.map(({ name, compactName, ...options }) =>
+          <SortableTableHead key={name} sorting={sorting} column={name} label={options.label ?? name} {...options}>
+            {episode ? compactName ?? name : name}
+          </SortableTableHead>)}
       </TableRow></TableHeader>
       <TableBody>
         {visibleRows.map(row => {
@@ -88,14 +90,14 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
             <TableCell><CaseActorTag>{assigned ? '내 담당' : '다른 담당자'}</CaseActorTag></TableCell>
             <TableCell><ReviewStatusTag status={status} /></TableCell>
             <TableCell>{open ? `${elapsed}일` : '—'}</TableCell>
-            <TableCell className="case-table-flows"><AccountFlows records={related} /></TableCell>
+            <TableCell stacked><AccountFlows records={related} /></TableCell>
             <TableCell><EvidencePeriod records={related} /></TableCell>
             {episode && <>
-              <TableCell className="case-table-numeric">{linkedAlerts}건</TableCell>
-              <TableCell className="case-table-numeric">{relatedAccounts}개</TableCell>
+              <TableCell numeric>{linkedAlerts}건</TableCell>
+              <TableCell numeric>{relatedAccounts}개</TableCell>
             </>}
-            <TableCell className="case-table-numeric">{related.length}건</TableCell>
-            <TableCell className="case-table-numeric">
+            <TableCell numeric>{related.length}건</TableCell>
+            <TableCell numeric stacked>
               {totals.length ? totals.map(([currency, amount]) => <Text as="span" key={currency}>{number.format(amount)} {currency}</Text>) : '미제공'}
             </TableCell>
           </TableRow>;

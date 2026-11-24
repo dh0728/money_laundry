@@ -52,10 +52,11 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   )
 }
 
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
+function TableRow({ className, related, ...props }: React.ComponentProps<"tr"> & { related?: boolean }) {
   return (
     <tr
       data-slot="table-row"
+      data-related={related || undefined}
       className={cn(
         "transition-colors hover:bg-(--hover-surface) has-aria-expanded:bg-(--hover-surface) data-[state=selected]:bg-muted",
         className
@@ -78,10 +79,12 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   )
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({ className, numeric, stacked, ...props }: React.ComponentProps<"td"> & { numeric?: boolean; stacked?: boolean }) {
   return (
     <td
       data-slot="table-cell"
+      data-numeric={numeric || undefined}
+      data-stacked={stacked || undefined}
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className

@@ -71,6 +71,7 @@
   outline-offset: calc(-1 * var(--aml-stroke-focus));
 }
 .data-table-scroll > [data-slot="table-container"] { min-inline-size: max-content; overflow: visible }
+.data-table-scroll[data-compact="true"] { --table-cell-inset: var(--aml-space-4) }
 .data-table-frame table {
   inline-size: 100%;
   border-collapse: separate;
@@ -146,6 +147,11 @@
   align-items: center;
   gap: var(--aml-space-6);
 }
+.data-table-frame .data-table-scroll[data-compact="true"] .table-sort-button {
+  column-gap: var(--table-cell-inset);
+  padding-inline: var(--table-cell-inset);
+}
+.data-table-scroll[data-compact="true"] .table-field-label { column-gap: var(--table-cell-inset) }
 .table-field-label .icon,
 .data-table-frame .table-sort-button .icon {
   flex: none;
