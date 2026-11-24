@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { alertStatusLabels, formatScore, typeDisplay, type AlertStatus, type EpisodeStatus, type TypeCode } from '@/api/codes'
 import { workStatusLabels, workStatusTone, type WorkStatus } from '@/lib/workStatus'
+import { isOverdueCaseAge } from '@/features/investigation/case-age'
 
 // 위험 색 단계(--risk-0~9)는 theme.css가 가진다. 점수 0~1을 10단계로 나눈다.
 const riskTone = (score: number) => `var(--risk-${Math.min(9, Math.max(0, Math.floor(score * 10)))})`
@@ -14,12 +15,10 @@ export function RiskBadge({ score }: { score: number }) {
   )
 }
 
-/** 경과일도 위험 점수와 같은 연두→빨강 단계를 쓴다. 0일은 연두, 5일 이상은 가장 빨강(v24 ageTone 기준) */
-export const AGE_MAX_DAYS = 5
 export function AgeBadge({ days }: { days: number }) {
-  const step = Math.min(9, Math.max(0, Math.round((days / AGE_MAX_DAYS) * 9)))
+  const tone = isOverdueCaseAge(days) ? 'danger' : 'caution'
   return (
-    <Badge className="border-transparent font-normal text-foreground" style={{ backgroundColor: `var(--risk-${step})` }} data-testid="age-badge" title="탐지 뒤 지난 날수">
+    <Badge className="case-age-badge border-transparent font-normal" data-tone={tone} data-testid="age-badge" title="탐지 뒤 지난 날수">
       {days === 0 ? '오늘' : `${days}일 경과`}
     </Badge>
   )

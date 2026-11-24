@@ -122,6 +122,14 @@
   border-color: color-mix(in srgb, var(--case-status-badge-accent) var(--status-badge-border-strength), transparent);
   background-color: color-mix(in srgb, var(--case-status-badge-accent) var(--status-badge-fill-strength), transparent);
 }
+.case-age-badge[data-tone="caution"] {
+  background-color: var(--status-caution-accent);
+  color: var(--status-accent-dark-ink);
+}
+.case-age-badge[data-tone="danger"] {
+  background-color: var(--status-danger-accent);
+  color: var(--status-accent-light-ink);
+}
 .case-status-swatch { border-radius: var(--aml-space-2); background-color: var(--case-status-series-accent) }
 .case-status-swatch[data-series="pending"] { --case-status-series-accent: var(--alert-standalone-series-accent) }
 .case-status-swatch[data-series="inProgress"] { --case-status-series-accent: var(--status-info-accent) }

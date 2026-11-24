@@ -19,6 +19,8 @@
       color-mix(in srgb, var(--aml-figma-dark-surface-status-info-accent-default), var(--aml-figma-light-surface-status-info-accent-default)),
       var(--aml-black-100) 11%));
   --alert-standalone-series-accent: var(--palette-teal-500);
+  --status-accent-light-ink: var(--aml-white-100);
+  --status-accent-dark-ink: var(--aml-black-100);
   --status-badge-border-strength: 45%;
   --status-badge-fill-strength: 18%;
 }
