@@ -10,7 +10,7 @@
   padding: 0;
   text-decoration: none;
 }
-.workspace-nav-icon { display: flex; align-items: center; gap: var(--header-nav-inset) }
+.workspace-nav-icon { display: flex; align-items: center; gap: var(--aml-space-8) }
 .workspace-nav-label { display: none }
 @media (width >= 68rem) {
   .workspace-nav-label { display: inline }
