@@ -1,10 +1,12 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
+import { curveBasisClosed, line } from 'd3-shape';
 import './account-trail-graph.css';
 
 const diagramWidth = 384;
 const lineAdvance = 16;
-const contourSamples = 16;
+const contourStep = 4;
 const maxMembers = 3;
+const closedSpline = line().curve(curveBasisClosed);
 
 function wrapCode(code) {
   const characters = Array.from(code);
@@ -13,41 +15,47 @@ function wrapCode(code) {
     characters.slice(index * lineLength, (index + 1) * lineLength).join(''));
 }
 
-function bubblePoints({ x, y, width, height }, padding) {
+function labelBubble({ x, y, width, height }, padding) {
   const halfWidth = width / 2;
   const halfHeight = height / 2;
   const radiusY = halfHeight + padding;
   const radiusX = Math.max(halfWidth + padding, halfWidth / Math.sqrt(1 - (halfHeight / radiusY) ** 2) + padding / 2);
-  return Array.from({ length: contourSamples }, (_, index) => {
-    const angle = index * 2 * Math.PI / contourSamples;
-    return [x + halfWidth + Math.cos(angle) * radiusX, y + halfHeight + Math.sin(angle) * radiusY];
-  });
+  return { x: x + halfWidth, y: y + halfHeight, radiusX, radiusY };
 }
 
-function bubbleOutline(points) {
-  const ordered = points.toSorted(([ax, ay], [bx, by]) => ax - bx || ay - by);
-  const turn = ([ax, ay], [bx, by], [cx, cy]) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-  const boundary = entries => {
-    const side = [];
-    for (const point of entries) {
-      while (side.length > 1 && turn(side.at(-2), side.at(-1), point) <= 0) side.pop();
-      side.push(point);
+function bubbleOutline(bubbles) {
+  const ordered = bubbles.toSorted((first, second) => first.y - second.y);
+  const top = Math.min(...ordered.map(bubble => bubble.y - bubble.radiusY));
+  const bottom = Math.max(...ordered.map(bubble => bubble.y + bubble.radiusY));
+  const slices = Math.ceil((bottom - top) / contourStep);
+  const left = [];
+  const right = [];
+
+  // The measured ellipses protect the labels. A tapered bridge keeps adjacent lobes connected.
+  for (let index = 0; index <= slices; index++) {
+    const y = top + (bottom - top) * index / slices;
+    const bands = [];
+    for (const [position, bubble] of ordered.entries()) {
+      const vertical = (y - bubble.y) / bubble.radiusY;
+      if (Math.abs(vertical) <= 1 + Number.EPSILON * 8) {
+        const radius = bubble.radiusX * Math.sqrt(Math.max(0, 1 - vertical ** 2));
+        bands.push([bubble.x - radius, bubble.x + radius]);
+      }
+      const next = ordered[position + 1];
+      if (next && y > bubble.y && y < next.y) {
+        const fraction = (y - bubble.y) / (next.y - bubble.y);
+        const eased = fraction * fraction * (3 - 2 * fraction);
+        const center = bubble.x + (next.x - bubble.x) * eased;
+        const width = bubble.radiusX + (next.radiusX - bubble.radiusX) * eased;
+        const radius = width * (0.68 - 0.17 * Math.sin(Math.PI * fraction));
+        bands.push([center - radius, center + radius]);
+      }
     }
-    return side.slice(0, -1);
-  };
-  const hull = [...boundary(ordered), ...boundary(ordered.toReversed())];
-  const perimeter = hull.flatMap(([x, y], index) => {
-    const [nextX, nextY] = hull[(index + 1) % hull.length];
-    const dx = nextX - x;
-    const dy = nextY - y;
-    const length = Math.hypot(dx, dy);
-    if (length <= lineAdvance * 3) return [[x, y]];
-    const bulge = lineAdvance / (2 * length);
-    return [[x, y], [(x + nextX) / 2 + dy * bulge, (y + nextY) / 2 - dx * bulge]];
-  });
-  const middle = ([ax, ay], [bx, by]) => `${(ax + bx) / 2} ${(ay + by) / 2}`;
-  return `M ${middle(perimeter.at(-1), perimeter[0])} ${perimeter.map((point, index) =>
-    `Q ${point.join(' ')} ${middle(point, perimeter[(index + 1) % perimeter.length])}`).join(' ')} Z`;
+    left.push([Math.min(...bands.map(([start]) => start)), y]);
+    right.push([Math.max(...bands.map(([, end]) => end)), y]);
+  }
+
+  return closedSpline([...left, ...right.reverse()]);
 }
 
 function estimatedBounds({ lines, x, y }) {
@@ -110,28 +118,25 @@ export function AccountTrailGraph({ comparison, focus }) {
   const boxes = Object.fromEntries(labels.map(label => [label.id,
     (measurement?.key === measurementKey && measurement.boxes[label.id]) || estimatedBounds(label)]));
   const margins = { account: 11, group: 18, member: 12 };
-  const sharedPoints = bubblePoints(boxes.shared, margins.account);
+  const sharedBubble = labelBubble(boxes.shared, margins.account);
   const memberContours = memberLabels.map(label => ({
-    label, points: bubblePoints(boxes[label.id], margins.member),
+    label, bubble: labelBubble(boxes[label.id], margins.member),
   }));
-  const matchingEdges = memberContours.filter(({ label }) => label.member.shared.length).flatMap(({ label, points }) => {
-    const left = Math.min(...points.map(([x]) => x));
-    return bubblePoints({ x: left, y: label.y - lineAdvance / 4, width: margins.member, height: lineAdvance / 2 }, margins.account);
-  });
-  const alertContour = [...bubblePoints(boxes.alert, margins.group), ...sharedPoints, ...matchingEdges];
+  const matchingEdges = memberContours.filter(({ label }) => label.member.shared.length)
+    .map(({ bubble }) => ({ x: bubble.x - bubble.radiusX, y: bubble.y, radiusX: margins.group, radiusY: bubble.radiusY }));
+  const alertContour = [labelBubble(boxes.alert, margins.group), sharedBubble, ...matchingEdges];
   const episodeContour = [
-    ...bubblePoints(boxes.episode, margins.group), ...sharedPoints,
-    ...memberContours.flatMap(({ label, points }) => points.map(([x, y]) => {
-      const angle = Math.atan2(y - label.y, x - label.x);
-      return [x + Math.cos(angle) * margins.member, y + Math.sin(angle) * margins.member];
+    labelBubble(boxes.episode, margins.group), sharedBubble,
+    ...memberContours.map(({ bubble }) => ({
+      ...bubble, radiusX: bubble.radiusX + margins.member, radiusY: bubble.radiusY + margins.member,
     })),
-    ...['empty', 'additional'].flatMap(id => boxes[id] ? bubblePoints(boxes[id], margins.member) : []),
+    ...['empty', 'additional'].filter(id => boxes[id]).map(id => labelBubble(boxes[id], margins.member)),
   ];
-  const points = [...alertContour, ...episodeContour];
-  const left = Math.min(0, ...points.map(([x]) => x - margins.account));
-  const right = Math.max(diagramWidth, ...points.map(([x]) => x + margins.account));
-  const top = Math.min(0, ...points.map(([, y]) => y - margins.account));
-  const bottom = Math.max(...points.map(([, y]) => y + margins.account));
+  const bubbles = [...alertContour, ...episodeContour];
+  const left = Math.min(0, ...bubbles.map(({ x, radiusX }) => x - radiusX - margins.account));
+  const right = Math.max(diagramWidth, ...bubbles.map(({ x, radiusX }) => x + radiusX + margins.account));
+  const top = Math.min(0, ...bubbles.map(({ y, radiusY }) => y - radiusY - margins.account));
+  const bottom = Math.max(...bubbles.map(({ y, radiusY }) => y + radiusY + margins.account));
   const alertPath = bubbleOutline(alertContour);
   const episodePath = bubbleOutline(episodeContour);
 
@@ -141,10 +146,11 @@ export function AccountTrailGraph({ comparison, focus }) {
     <path className="account-trail-bubble" data-case-kind="alert" d={alertPath}><title>{alert}</title></path>
     <path className="account-trail-bubble" data-case-kind="episode" d={episodePath}><title>{episode}</title></path>
     <path className="account-trail-intersection" d={episodePath} clipPath={`url(#${intersection})`} />
-    {memberContours.map(({ label, points }) => <path key={label.id} className="account-trail-member"
-      data-member-code={label.id} data-overlap={label.member.shared.length > 0} d={bubbleOutline(points)}>
+    {memberContours.map(({ label, bubble }) => <ellipse key={label.id} className="account-trail-member"
+      data-member-code={label.id} data-overlap={label.member.shared.length > 0}
+      cx={bubble.x} cy={bubble.y} rx={bubble.radiusX} ry={bubble.radiusY}>
       <title>{[label.id, ...label.member.shared].join(' · ')}</title>
-    </path>)}
+    </ellipse>)}
     <g ref={labelLayer}>
       {labels.map(({ id, x, y, lines }) => <g key={id} data-trail-label={id} data-shared-account={id === 'shared' ? focus : undefined}>
         {id === 'shared' && <title>{shared.join(' · ')}</title>}
