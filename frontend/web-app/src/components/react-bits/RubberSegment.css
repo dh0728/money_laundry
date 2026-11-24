@@ -1,18 +1,20 @@
+@import '../../styles/selection-control-tokens.css';
+
 .rubber-segment {
-  --rs-track: #27272a;
-  --rs-thumb: #fafafa;
-  --rs-ink: #fafafa;
-  --rs-ink-active: #18181b;
+  --rs-track: var(--selection-control-surface);
+  --rs-thumb: var(--rubber-segment-foreground);
+  --rs-ink: var(--rubber-segment-foreground);
+  --rs-ink-active: var(--selection-control-selected-foreground);
   --rs-radius: var(--aml-radius-card);
-  --rs-inset: 3px;
-  --rs-thumb-radius: 7px;
-  --rs-h: 36px;
-  --rs-font: 13px;
-  --rs-pad: 14px;
-  --rs-min: 44px;
-  --rs-idle: 0.7;
-  --rs-hover: 0.9;
-  --rs-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --rs-inset: var(--rubber-segment-inset);
+  --rs-thumb-radius: var(--rubber-segment-thumb-radius);
+  --rs-h: var(--selection-control-height-medium);
+  --rs-font: var(--selection-control-label-size-medium);
+  --rs-pad: var(--rubber-segment-padding);
+  --rs-min: var(--rubber-segment-minimum-width);
+  --rs-idle: var(--rubber-segment-inactive-opacity);
+  --rs-hover: var(--rubber-segment-hover-opacity);
+  --rs-ease-out: var(--selection-control-ease-out);
 
   position: relative;
   display: inline-grid;
@@ -35,7 +37,7 @@
 }
 
 .rubber-segment[aria-disabled='true'] {
-  opacity: 0.5;
+  opacity: var(--selection-control-disabled-opacity);
   pointer-events: none;
 }
 
@@ -61,8 +63,8 @@
   cursor: pointer;
   outline: none;
   transition:
-    opacity 160ms ease,
-    transform 160ms var(--rs-ease-out);
+    opacity var(--selection-control-transition-duration) ease,
+    transform var(--selection-control-transition-duration) var(--rs-ease-out);
 }
 
 .rubber-segment__item[aria-checked='true'] {
@@ -79,12 +81,12 @@
 }
 
 .rubber-segment__item[data-pressed] {
-  transform: scale(0.96);
+  transform: scale(var(--rubber-segment-press-scale));
 }
 
 .rubber-segment__item:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--rs-thumb);
-  outline-offset: 3px;
+  outline-offset: var(--selection-control-focus-offset);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -116,6 +118,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .rubber-segment__item {
-    transition: opacity 160ms ease;
+    transition: opacity var(--selection-control-transition-duration) ease;
   }
 }

@@ -1,0 +1,60 @@
+:root {
+  --selection-control-surface: #27272a;
+  --selection-control-selected-foreground: #18181b;
+  --selection-control-disabled-opacity: 0.5;
+  --selection-control-height-small: 28px;
+  --selection-control-height-medium: 36px;
+  --selection-control-height-large: 44px;
+  --selection-control-label-size-medium: 13px;
+  --selection-control-line-height: 1.2;
+  --selection-control-transition-duration: var(--aml-duration-control-transition, 160ms);
+  --selection-control-color-duration: var(--aml-duration-feedback-transition, 200ms);
+  --selection-control-ease-out: var(--aml-ease-decelerate, cubic-bezier(0.23, 1, 0.32, 1));
+  --selection-control-focus-offset: var(--aml-focus-outline-offset, 3px);
+
+  --branched-menu-width: 240px;
+  --branched-menu-foreground: #f5f5f5;
+  --branched-menu-rail-color: #3f3f46;
+  --branched-menu-rail-inset: 14px;
+  --branched-menu-rail-width: var(--aml-space-2);
+  --branched-menu-rail-fade-start: 55%;
+  --branched-menu-line-weight: 1.5;
+  --branched-menu-muted-strength: 55%;
+  --branched-menu-header-padding: 9px;
+  --branched-menu-header-size-increase: 1px;
+  --branched-menu-marker-layer: 1;
+  --branched-menu-marker-move-duration: var(--aml-duration-selection-highlight, 220ms);
+  --branched-menu-marker-fade-duration: var(--aml-duration-highlight-fade, 150ms);
+  --branched-menu-lines-fade-duration: 250ms;
+  --branched-menu-lines-fade-delay: 100ms;
+  --branched-menu-draw-duration: 400ms;
+  --branched-menu-fold-duration: 300ms;
+
+  --spring-check-mark-color: #0b0b0f;
+  --spring-check-radius: 9px;
+  --spring-check-label-size: 18px;
+  --spring-check-label-tracking: -0.01em;
+  --spring-check-strike-thickness: 1.5px;
+  --spring-check-strike-position: 46%;
+  --spring-check-press-scale: 0.95;
+  --spring-check-focus-strength: 45%;
+  --spring-check-ring-opacity: 0.28;
+  --spring-check-hover-opacity: 0.5;
+  --spring-check-mark-weight: 2.6;
+
+  --jelly-radio-foreground: #f5f5f5;
+  --jelly-radio-radius: 18px;
+  --jelly-radio-icon-gap: 0.4em;
+  --jelly-radio-disabled-item-opacity: 0.4;
+  --jelly-radio-hover-opacity: 0.11;
+  --jelly-radio-press-scale: 0.97;
+
+  --rubber-segment-foreground: #fafafa;
+  --rubber-segment-inset: 3px;
+  --rubber-segment-thumb-radius: 7px;
+  --rubber-segment-padding: 14px;
+  --rubber-segment-minimum-width: 44px;
+  --rubber-segment-inactive-opacity: 0.7;
+  --rubber-segment-hover-opacity: 0.9;
+  --rubber-segment-press-scale: 0.96;
+}
