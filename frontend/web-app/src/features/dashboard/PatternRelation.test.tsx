@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { expect, it } from 'vitest'
-import { TransactionPatternHierarchy } from './PatternRelation'
+import { TransactionPatternHierarchy } from '@/components/charts/charts/pattern-relation'
 
 it('거래 건수가 커져도 차트 높이는 고정하고 9개 유형을 겹치지 않게 표시한다', () => {
   const composition = [1, 2, 3, 4].map((value, i) => ({ name: `조합${i}`, value, fill: 'black' }))

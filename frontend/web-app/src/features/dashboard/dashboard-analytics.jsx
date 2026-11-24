@@ -3,7 +3,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Panel, PanelDisclosure } from '../../components/panel';
 import { PatternTag, ReviewStatusTag } from '../../components/semantic-tags';
 import { BarChart } from '../../components/charts/charts/bar-chart';
-import { Bar } from '../../components/charts/charts/bar';
+import { Bar, BarHatch } from '../../components/charts/charts/bar';
 import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
 import { Grid } from '../../components/charts/charts/grid';
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
@@ -122,14 +122,6 @@ function TransactionComposition({ total, labeled }) {
 }
 
 const patternRows = [...ibmPatterns, ...ibmRemaining];
-function ReferencePattern({ id }) {
-  return <defs>
-    <pattern id={id} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="7" height="7" fill="var(--chart-pattern)" />
-      <path d="M 0 0 V 7" stroke="var(--information-panel-surface)" strokeWidth="2" />
-    </pattern>
-  </defs>;
-}
 
 function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수', rows = patternRows,
   total = ibmLaundering, seriesLabel = '원본 세탁 라벨 거래' }) {
@@ -151,7 +143,7 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
       </Box>
       <BarChart className="dashboard-pattern-bars" data={points} xDataKey="label" orientation="horizontal"
         margin={noMargin} barGap={0.28} animationDuration={reduced ? 0 : 340}>
-        <ReferencePattern id={patternId} />
+        <BarHatch id={patternId} fill="var(--chart-pattern)" stroke="var(--information-panel-surface)" />
         <Bar dataKey="value" getFill={point => point.supported ? 'var(--chart-pattern)' : `url(#${patternId})`}
           lineCap="round" animate={!reduced} />
         <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : 25}

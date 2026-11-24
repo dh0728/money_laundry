@@ -705,4 +705,15 @@ export function Bar(props: BarProps) {
 
 Bar.displayName = "Bar";
 
+export function BarHatch({ id, fill, stroke }: { id: string; fill: string; stroke: string }) {
+  return (
+    <defs>
+      <pattern id={id} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="7" height="7" fill={fill} />
+        <path d="M 0 0 V 7" stroke={stroke} strokeWidth="2" />
+      </pattern>
+    </defs>
+  );
+}
+
 export default Bar;

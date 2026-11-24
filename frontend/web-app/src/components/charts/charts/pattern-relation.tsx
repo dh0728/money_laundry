@@ -2,8 +2,8 @@
 // 왼쪽은 의심 거래 건 구성, 오른쪽은 패턴 소속 거래에서 나온 유형별 Alert 수다. 모수가 달라 길이를 서로 맞추지 않는다.
 import { Fragment, useEffect, useState } from 'react'
 import { fmt } from '@/lib/format'
-import { Box, Text } from '../../components/layout-primitives'
-import { dataSeriesColors } from '@/components/charts/charts/chart-context'
+import { Box, Text } from '../../layout-primitives'
+import { dataSeriesColors } from './chart-context'
 
 export type CompositionItem = { name: string; value: number; fill: string }
 export type PatternDistributionItem = { pattern: string; alerts: number; fill: string }
