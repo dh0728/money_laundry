@@ -489,13 +489,19 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 
 ## 12. 룰엔진
 
+룰은 이름표(`ruleId`, 화면 번호 `code` = `RULE-NNN`)이고 조건은 버전(`versionId`)이 갖는다. 한 룰은 운영 버전(ACTIVE·PAUSED) 최대 1개와 작업 중 버전(DRAFT·SHADOW·PENDING) 최대 1개를 가진다. 조회·명령 모두 STAFF·ADMIN 세션과 CSRF 가 필요하다.
+
 | 요청 | 입력 / 응답 |
 |---|---|
-| GET /api/v1/rules | 룰 목록. `{id:"RULE-NNN",name,description,typeCode,scoreMin,minTransactions,windowHours,status,version,author,updatedAt,history[{at,actor,action,reason}]}` |
-| POST /api/v1/rules | 초안 생성. `{name,description,typeCode,scoreMin(0~1),minTransactions,windowHours}` |
-| POST /api/v1/rules/{id} | 초안 수정. DRAFT·REJECTED·STOPPED만, 그 밖은 409 |
-| POST /api/v1/rules/{id}/review | `{status,reason}`. DRAFT→PENDING_APPROVAL(작성 가능한 직원), PENDING_APPROVAL→TESTING/REJECTED(ADMIN만), TESTING·ACTIVE→STOPPED(ADMIN만) |
-| POST /api/v1/rules/{id}/delete | 룰과 변경 이력 삭제. DRAFT·REJECTED는 담당자(마지막 저장자)와 ADMIN, 그 밖의 상태는 ADMIN만. 권한이 없으면 403. `{id}` |
-| POST /api/v1/rules/backtest | `{rule,start,end,offset,limit}`. 기간(최대 2년)의 ACTIVE 원장 전체에 조건 적용. `{matchedCount,accountCount,amountUsd,matchedAccountIds,scannedCount,transactions}`. 서버 제한 90초 |
+| GET /api/v1/rule-templates | 템플릿 카탈로그(`resources/rules/catalog.json` 그대로). `{schema,templates[{key,name,group(PATTERN/GENERAL),available,pattern,evaluator,subject,subjectLabel,trigger,side,directionSelectable,windowRequired,maxWindowMinutes,alert,references,filterFields[],requiredFilterFields[],metrics[],whereMin,sweep,defaults,performance,note}],filterFields{},metrics{},path{},windows[],comparators[],directions[],then[{key,label,enabled}],limits{}}`. `available=false` 는 이후 제공 템플릿이다 |
+| GET /api/v1/rules | 목록. `{content[{ruleId,code,name,template,templateName,summary,status,then,versionNo,versionId,operatingVersionNo,operatingStatus,operatingSummary,workingVersionNo,workingStatus,owner,changedAt,hitCount,lastHitDate,linkedAlertCount,normalRate,alertedHitCount,skippedBusySubjects,lastRunFailed}],counts{ACTIVE,SHADOW,PENDING,PAUSED,DRAFT}}`. `status`·`versionNo`·`summary` 는 작업 중 버전이 SHADOW·PENDING 이면 그 버전, 아니면 운영 버전, 운영 버전이 없으면 작성 중 버전의 값이다. `hitCount` 부터 뒤의 값은 일일 실행이 붙기 전까지 null 이다 |
+| GET /api/v1/rules/{ruleId} | 상세. `{ruleId,code,name,template,templateName,owner,createdAt,status,operating,working,versions[{versionId,versionNo,status,summary,author,createdAt,submittedAt,decidedAt,decidedBy}],events[{at,actor,action,comment,versionNo}]}`. `operating`·`working` 은 `versions` 한 줄에 `{revision,definition,digest,sentence,editable,deletable}` 를 더한 것이고 없으면 null. `events` 는 최근 200건, `action` 은 CREATED·EDITED·DRAFT_DELETED(이후 상태 명령이 추가된다) |
+| POST /api/v1/rules | 룰과 v1 초안. `{name(1~80자),template,definition?}`. `definition` 을 안 주면 템플릿 기본값. `{ruleId,code,versionId,revision}` |
+| PUT /api/v1/rules/{ruleId}/versions/{versionId} | 초안 저장. `{name,definition,revision}`. DRAFT 를 작성자만. 응답은 `{ruleId,code,name,versionId,versionNo,status,revision,definition}` 에 검증 결과(아래 validate 응답)를 더한 것 |
+| POST /api/v1/rules/validate | 저장 없이 검증. `{template,definition,ruleId?}` → `{items[{key,label,ok,message,errors[]}],warnings[],canSave,canRun,sentence,summary}`. `items` 는 FORMAT·CONDITIONS·DATA·COST 순서. 형식을 통과하지 못하면 `sentence`·`summary` 는 null |
+| DELETE /api/v1/rules/{ruleId}/versions/{versionId} | 초안 삭제. 204. 시험 운영·승인 요청을 한 적이 없는 DRAFT 를 작성자와 ADMIN 만. 그 룰에 다른 버전이 없으면 룰과 변경 기록도 지우고, 있으면 버전만 지우고 DRAFT_DELETED 를 남긴다 |
 
-룰은 분석 파이프라인에 연결하지 않는다. 화면에 ACTIVE로 바꾸는 버튼이 없어 서버에도 그 전이는 없다.
+- 정의(`definition`): `{schema:2,template,direction?,windowMinutes?,filter,path?,where,then}`. `filter`(세는 거래)는 `{op:"ALL",items[]}` 이고 항목은 `{field,cmp?,value?}` 또는 `{op:"ANY",items[]}` 하나까지다. `where`(적중 조건)는 `{op:"ALL"|"ANY",items[]}` 이고 항목은 `{metric,cmp?,value?}` 또는 한 단계 안쪽 그룹이다. `path` 는 CYCLE·RANDOM 의 `{minHops,maxHops,stepRatioMin,stepRatioMax}`, `direction` 은 STRUCTURING·SAME_AMOUNT 의 `IN`/`OUT`, `then` 은 `ATTACH_EVIDENCE`(`CREATE_ALERT` 는 아직 고를 수 없다). 쓸 수 있는 항목·비교·범위는 카탈로그가 정한다.
+- 저장은 형식(FORMAT)만 통과하면 된다. 값이 빈 초안도 저장된다(`canSave=true, canRun=false`). 저장 때 키 순서를 고정하고 null 을 뺀 정의의 SHA-256 을 `digest` 로 같이 저장한다.
+- 오류: 형식 실패·이름 길이·필수 값 누락 400 `VALIDATION_FAILED`(`detail` 에 첫 사유), 작성자가 아님 403 `FORBIDDEN_ROLE`, 없는 룰·버전 404, DRAFT 가 아니거나 `revision` 이 다름 409 `INVALID_TRANSITION`.
+- 시험 운영·승인·중지 명령, 백테스트, 일일 실행은 아직 없다. 룰은 아직 분석 파이프라인에 연결되지 않는다.
