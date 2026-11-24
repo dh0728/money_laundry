@@ -148,7 +148,7 @@
 
 .rule-condition-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--rule-condition-fact-min-width)), 1fr));
   gap: var(--aml-space-6);
 }
 
@@ -160,20 +160,20 @@
 .rule-condition-facts dd { margin: 0; overflow-wrap: anywhere }
 .rule-condition-tree { min-inline-size: 0 }
 .rule-tree-branches {
-  --bm-line: color-mix(in srgb, var(--muted-text) 65%, transparent);
-  --bm-line-w: 1.5;
+  --bm-line: color-mix(in srgb, var(--muted-text) var(--rule-tree-line-ink-weight), transparent);
+  --bm-line-w: var(--rule-tree-line-weight);
   position: relative;
   min-inline-size: 0;
 }
 .rule-tree-branches > .branched-menu__lines {
   opacity: 1;
-  inline-size: var(--aml-space-20);
+  inline-size: var(--rule-tree-branch-width);
   block-size: 100%;
   transition: none;
 }
 .rule-tree-branches > ol {
   margin: 0;
-  padding-inline-start: var(--aml-space-20);
+  padding-inline-start: var(--rule-tree-branch-width);
   list-style: none;
 }
 :is(.rule-condition-tree, [data-rule-workbench]) > strong:has(+ .rule-tree-branches) {
@@ -184,8 +184,8 @@
 :is(.rule-condition-tree, [data-rule-workbench]) > strong:has(+ .rule-tree-branches)::before {
   content: '';
   flex: none;
-  inline-size: 10px;
-  block-size: 10px;
+  inline-size: var(--rule-tree-root-size);
+  block-size: var(--rule-tree-root-size);
   border: var(--aml-stroke-divider) solid var(--muted-text);
   border-radius: var(--aml-radius-full);
 }

@@ -233,7 +233,7 @@ function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
             aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? `${errorId}-description` : undefined} />
           {errors.description && <Text as="span" id={`${errorId}-description`} data-rule-block-error>{errors.description}</Text>}
         </Box>
-        <RuleConditionBlocks input={draft} blocks={blocks} errors={errors} scoreAsPoints button={ActionButton}
+        <RuleConditionBlocks input={draft} blocks={blocks} errors={errors} scoreAsPoints
           renderBranches={(children, finalSlot) => children.length ? <RuleTreeBranches finalSlot={finalSlot}>{children}</RuleTreeBranches> : finalSlot}
           renderTypePicker={({ onChange, ...picker }) => <RuleSelect {...picker} label="거래 유형" onChange={value => onChange(Number(value))} />}
           onInputChange={changeDraft} onBlocksChange={next => {

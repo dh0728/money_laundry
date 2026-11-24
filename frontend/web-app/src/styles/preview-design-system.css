@@ -143,6 +143,18 @@
   --negative-action-edge-shade: 22%;
   --action-pressed-fill-progress: 1;
   --action-pressed-fill-duration: var(--aml-duration-highlight-fade);
+  --rule-block-hover-ink-weight: 8%;
+  --rule-block-disabled-opacity: .45;
+  --rule-block-drag-opacity: .58;
+  --rule-block-icon-size: 1em;
+  --rule-block-number-input-width: 8ch;
+  --rule-condition-fact-min-width: 10rem;
+  --rule-tree-branch-width: var(--aml-space-20);
+  --rule-tree-trunk-offset: var(--aml-space-5);
+  --rule-tree-branch-radius: var(--aml-space-6);
+  --rule-tree-line-weight: 1.5;
+  --rule-tree-line-ink-weight: 65%;
+  --rule-tree-root-size: var(--aml-space-10);
   --aml-stroke-status-icon: 2;
   --aml-type-status-label-size: 14px;
   --aml-type-status-line-height: 1.25;

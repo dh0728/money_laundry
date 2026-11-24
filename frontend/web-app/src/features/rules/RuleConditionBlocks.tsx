@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ComponentProps, type DragEvent, type ElementType, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, GripVertical, Plus, X } from 'lucide-react'
 import { typeDisplay, type TypeCode } from '@/api/codes'
 import { Input } from '@/components/ui/input'
@@ -7,6 +7,7 @@ import type { RuleInput } from '@/lib/workspace-store'
 import type { RuleBlockKind, validateRule } from './rules-logic'
 import './rule-condition-blocks.css'
 import { Box, Text } from '@/components/layout-primitives'
+import { ActionButton } from '@/components/primary-button'
 
 const palette: { kind: RuleBlockKind; label: string }[] = [
   { kind: 'accountWindow', label: '같은 계좌의 반복 거래' },
@@ -24,7 +25,6 @@ interface Props {
   onBlocksChange: (blocks: RuleBlockKind[]) => void
   errors: ReturnType<typeof validateRule>
   scoreAsPoints?: boolean
-  button?: ElementType<ComponentProps<'button'>>
   renderBranches?: (branches: ReactNode[], finalSlot: ReactNode) => ReactNode
   renderTypePicker?: (props: {
     value: RuleInput['typeCode']
@@ -38,7 +38,7 @@ function renderFlatBranches(branches: ReactNode[], finalSlot: ReactNode) {
 }
 
 export function RuleConditionBlocks({
-  input, blocks, onInputChange, onBlocksChange, errors, scoreAsPoints = false, button: Button = 'button',
+  input, blocks, onInputChange, onBlocksChange, errors, scoreAsPoints = false,
   renderTypePicker, renderBranches = renderFlatBranches,
 }: Props) {
   const id = useId()
@@ -132,11 +132,11 @@ export function RuleConditionBlocks({
     <Box data-rule-palette aria-label="추가할 수 있는 조건">
       <Text as="strong">조건 블록</Text>
       <Text>블록을 아래로 끌어 놓거나 눌러 추가하세요.</Text>
-      <Box>{palette.map(({ kind, label }) => <Button key={kind} type="button" data-rule-kind={kind} data-button-shape="pill"
+      <Box>{palette.map(({ kind, label }) => <ActionButton key={kind} type="button" data-rule-kind={kind} shape="pill"
         aria-label={`${label} 추가`} disabled={blocks.includes(kind)} draggable={!blocks.includes(kind)}
-        onDragStart={event => beginDrag(event, kind)} onClick={() => place(kind, blocks.length)}>
+        onDragStart={(event: DragEvent<HTMLButtonElement>) => beginDrag(event, kind)} onClick={() => place(kind, blocks.length)}>
         <Plus aria-hidden="true" />{label}
-      </Button>)}</Box>
+      </ActionButton>)}</Box>
     </Box>
     <Box as="section" aria-label="조건 블록 작업대" data-rule-workbench data-empty={!blocks.length || undefined}
       onDragOver={event => allowDrop(event, blocks.length)} onDrop={event => drop(event, blocks.length)}
@@ -152,27 +152,28 @@ export function RuleConditionBlocks({
           <Box as="fieldset" data-rule-kind={kind} data-dragging={dragging === kind || undefined} tabIndex={-1}
             onDragOver={event => allowDrop(event, blockSlot(event, index))}
             onDrop={event => drop(event, blockSlot(event, index))}>
-            <Box as="legend" data-rule-sr-only>{label}</Box>
+            <Box as="legend" className="visually-hidden">{label}</Box>
             <Box data-rule-block-header>
-              <Button type="button" data-rule-drag-handle={kind} data-button-shape="circle" draggable onDragStart={event => beginDrag(event, kind)}
+              <ActionButton type="button" data-rule-drag-handle={kind} shape="circle" draggable
+                onDragStart={(event: DragEvent<HTMLButtonElement>) => beginDrag(event, kind)}
                 aria-label={`${label} 순서 이동`} aria-keyshortcuts="ArrowUp ArrowDown"
-                title="끌어서 이동 · 방향키로 순서 변경" onKeyDown={event => {
+                title="끌어서 이동 · 방향키로 순서 변경" onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
                   if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
                   event.preventDefault()
                   move(kind, label, index, event.key === 'ArrowUp' ? -1 : 1)
                 }}>
                 <GripVertical aria-hidden="true" />
-              </Button>
+              </ActionButton>
               <Text as="strong" aria-hidden="true">{label}</Text>
               <Box data-rule-block-actions>
-                <Button type="button" data-button-shape="circle" aria-label={`${label} 위로 이동`} title="위로 이동" aria-disabled={index === 0}
-                  onClick={() => move(kind, label, index, -1)}><ArrowUp aria-hidden="true" /></Button>
-                <Button type="button" data-button-shape="circle" aria-label={`${label} 아래로 이동`} title="아래로 이동" aria-disabled={index === blocks.length - 1}
-                  onClick={() => move(kind, label, index, 1)}><ArrowDown aria-hidden="true" /></Button>
-                <Button type="button" data-button-shape="circle" aria-label={`${label} 제거`} title="제거" onClick={() => {
+                <ActionButton type="button" shape="circle" aria-label={`${label} 위로 이동`} title="위로 이동" aria-disabled={index === 0}
+                  onClick={() => move(kind, label, index, -1)}><ArrowUp aria-hidden="true" /></ActionButton>
+                <ActionButton type="button" shape="circle" aria-label={`${label} 아래로 이동`} title="아래로 이동" aria-disabled={index === blocks.length - 1}
+                  onClick={() => move(kind, label, index, 1)}><ArrowDown aria-hidden="true" /></ActionButton>
+                <ActionButton type="button" shape="circle" aria-label={`${label} 제거`} title="제거" onClick={() => {
                   nextFocus.current = `button[data-rule-kind="${kind}"]`
                   onBlocksChange(blocks.filter(block => block !== kind))
-                }}><X aria-hidden="true" /></Button>
+                }}><X aria-hidden="true" /></ActionButton>
               </Box>
             </Box>
             <Box data-rule-block-body>
@@ -193,6 +194,6 @@ export function RuleConditionBlocks({
         </Box>
       }), slot(blocks.length))}
     </Box>
-    <Text as="span" data-rule-sr-only aria-live="polite" aria-atomic="true">{announcement}</Text>
+    <Text as="span" className="visually-hidden" aria-live="polite" aria-atomic="true">{announcement}</Text>
   </Box>
 }

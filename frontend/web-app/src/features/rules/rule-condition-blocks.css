@@ -1,5 +1,5 @@
 [data-rule-builder] {
-  --rule-block-hover: color-mix(in srgb, var(--aml-text-primary) 8%, transparent);
+  --rule-block-hover: color-mix(in srgb, var(--aml-text-primary) var(--rule-block-hover-ink-weight), transparent);
   display: grid;
   gap: var(--aml-space-12);
   min-width: 0;
@@ -41,22 +41,13 @@
 [data-rule-drag-handle] { cursor: grab; }
 [data-rule-drag-handle]:active { cursor: grabbing; }
 [data-rule-palette] button:is(:disabled, [aria-disabled="true"]),
-[data-rule-block-actions] button[aria-disabled="true"] { opacity: .45; cursor: default; }
-[data-rule-builder] svg { width: 1em; height: 1em; flex: none; }
+[data-rule-block-actions] button[aria-disabled="true"] { opacity: var(--rule-block-disabled-opacity); cursor: default; }
+[data-rule-builder] svg { width: var(--rule-block-icon-size); height: var(--rule-block-icon-size); flex: none; }
 [data-rule-builder] :is(button, fieldset):focus-visible {
   outline: var(--aml-stroke-focus) solid var(--aml-focus-ring);
   outline-offset: var(--aml-space-2);
 }
 [data-rule-builder] button:not(:disabled, [aria-disabled="true"]):hover { background: var(--rule-block-hover); }
-[data-rule-sr-only] {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 [data-rule-workbench] {
   min-width: 0;
   padding: var(--aml-space-12);
@@ -73,7 +64,7 @@
   position: absolute;
   inset-inline: var(--aml-space-4);
   inset-block-start: 50%;
-  block-size: 2px;
+  block-size: var(--aml-space-2);
   border-radius: var(--aml-radius-full);
   background: var(--aml-focus-ring);
   translate: 0 -50%;
@@ -88,7 +79,7 @@
   border-radius: var(--aml-radius-card);
   background: var(--aml-surface-panel);
 }
-[data-rule-workbench] fieldset[data-dragging] { opacity: .58; }
+[data-rule-workbench] fieldset[data-dragging] { opacity: var(--rule-block-drag-opacity); }
 
 [data-rule-block-header] {
   display: grid;
@@ -105,7 +96,7 @@
 
 [data-rule-block-fields] { align-items: start; gap: var(--aml-space-8) var(--aml-space-12); }
 [data-rule-block-fields] label { display: grid; gap: var(--aml-space-4); min-width: 0; }
-[data-rule-block-fields] input { inline-size: 8ch; }
+[data-rule-block-fields] input { inline-size: var(--rule-block-number-input-width); }
 [data-rule-block-fields] :is(input, select) {
   min-width: 0;
   min-height: var(--aml-size-control-compact);

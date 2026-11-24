@@ -3,10 +3,16 @@ import { typeDisplay } from '@/api/codes';
 import { ruleBlocksFor } from '@/features/rules/rules-logic';
 import { BranchLines } from '../../components/react-bits/BranchLines';
 import { Box, Text } from '../../components/layout-primitives';
+import { readWorkspaceLength } from '../dashboard/workspace-metrics';
 
 export function RuleTreeBranches({ children, finalSlot }) {
   const list = useRef(null);
   const [lines, setLines] = useState(null);
+  const [geometry] = useState(() => ({
+    width: readWorkspaceLength('--rule-tree-branch-width') || 20,
+    trunk: readWorkspaceLength('--rule-tree-trunk-offset') || 5,
+    radius: readWorkspaceLength('--rule-tree-branch-radius') || 6,
+  }));
   useLayoutEffect(() => {
     const node = list.current;
     const measure = () => {
@@ -28,7 +34,8 @@ export function RuleTreeBranches({ children, finalSlot }) {
     return () => observer.disconnect();
   }, [children]);
   return <Box className="rule-tree-branches">
-    {lines?.height > 0 && <BranchLines rows={lines.rows} width={20} height={lines.height} trunk={5} end={20} radius={6} activeIndex={-1} />}
+    {lines?.height > 0 && <BranchLines rows={lines.rows} width={geometry.width} height={lines.height}
+      trunk={geometry.trunk} end={geometry.width} radius={geometry.radius} activeIndex={-1} />}
     <Box as="ol" ref={list} aria-label="조건 순서">
       {Children.map(children, child => <Box as="li">{child}</Box>)}
       <Box as="li">
