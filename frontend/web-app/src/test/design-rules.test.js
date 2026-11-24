@@ -157,3 +157,35 @@ describe('component/raw-element', () => {
     expect(rules).toContain('aml/component-clickable-element');
   }, 30000);
 });
+
+describe('token/inline-style', () => {
+  it('타입 표기와 조건부 스타일 안에서도 실제 CSS 속성을 검사한다', async () => {
+    const { ESLint } = await import('eslint');
+    const examples = [
+      ['({ "--position": position } as CSSProperties)', false],
+      ['({ "--position": position } satisfies CSSProperties)', false],
+      ['({ "--position": position } as CSSProperties)!', false],
+      ['active ? ({ "--position": position } as CSSProperties) : undefined', false],
+      ['active ? null : ({ "--position": position } as CSSProperties)', false],
+      ['({ left: position } as CSSProperties)', true],
+      ['({ "--position": position, left: position } satisfies CSSProperties)', true],
+      ['active ? ({ "--position": position } as CSSProperties) : { left: position }', true],
+      ['({ ...unverified, "--position": position } as CSSProperties)', true],
+      ['unverified as CSSProperties', true],
+    ];
+    const definitions = [
+      'import type { CSSProperties } from "react";',
+      'declare const position: string, active: boolean, unverified: CSSProperties;',
+    ];
+    const shadowed = 'export const Shadowed = (undefined: CSSProperties) => <div style={active ? { "--position": position } : undefined} />;';
+    const code = [...definitions, ...examples.map(([expression], index) =>
+      `export const Example${index} = () => <div style={${expression}} />;`), shadowed].join('\n');
+    const [result] = await new ESLint({ cwd: app }).lintText(code, {
+      filePath: resolve(app, 'src/components/design-style-example.tsx'),
+    });
+    expect(result.fatalErrorCount).toBe(0);
+    const expected = examples.flatMap(([, error], index) => error ? [definitions.length + index + 1] : []);
+    expect(result.messages.filter(message => message.ruleId === 'aml/token-inline-style').map(message => message.line))
+      .toEqual([...expected, definitions.length + examples.length + 1]);
+  }, 30000);
+});

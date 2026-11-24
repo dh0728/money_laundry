@@ -10,7 +10,7 @@
   "token/spacing-unit": 4,
   "token/radius-unit": 1,
   "token/font-size-unit": 2,
-  "token/inline-style": 239,
+  "token/inline-style": 224,
   "token/arbitrary-class": 206,
   "token/important": 2,
   "token/fixed-number": 334,

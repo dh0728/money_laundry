@@ -151,6 +151,25 @@ const isModuleSource = node => ['ImportDeclaration', 'ExportNamedDeclaration', '
 const jsxName = node => node.name?.type === 'JSXIdentifier' ? node.name.name : undefined
 const jsxAttribute = (node, name) => node.attributes.find(attribute => attribute.type === 'JSXAttribute' && attribute.name?.name === name)
 
+const typeOnlyExpressions = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSTypeAssertion', 'TSNonNullExpression'])
+
+function isCssVariableStyle(node, sourceCode) {
+  while (typeOnlyExpressions.has(node?.type)) node = node.expression
+  if (node?.type === 'ConditionalExpression') {
+    return isCssVariableStyle(node.consequent, sourceCode) && isCssVariableStyle(node.alternate, sourceCode)
+  }
+  if (node?.type === 'Literal' && node.value === null) return true
+  if (node?.type === 'Identifier' && node.name === 'undefined') {
+    for (let scope = sourceCode.getScope(node); scope; scope = scope.upper) {
+      const binding = scope.set.get(node.name)
+      if (binding) return binding.defs.length === 0
+    }
+    return true
+  }
+  return node?.type === 'ObjectExpression' && node.properties.every(property =>
+    property.type === 'Property' && typeof property.key.value === 'string' && property.key.value.startsWith('--'))
+}
+
 function eslintRule(id, build) {
   return {
     meta: { type: 'problem', docs: { description: designRules.find(rule => rule.id === id).title }, schema: [] },
@@ -230,13 +249,11 @@ const eslintRules = {
     // 템플릿으로 계산한 색: `hsl(${…} 65% 55%)`
     if (node.type === 'TemplateElement' && !node.tail && TEMPLATE_COLOR.test(value)) report(node, `계산한 색 ${value.match(TEMPLATE_COLOR)[0].trim()}… 대신 색 토큰을 쓴다.`)
   })),
-  'token-inline-style': eslintRule('token/inline-style', ({ report }) => ({
+  'token-inline-style': eslintRule('token/inline-style', ({ report, context }) => ({
     JSXAttribute(node) {
       if (node.name?.name !== 'style' || node.parent.type !== 'JSXOpeningElement') return
       const expression = node.value?.type === 'JSXExpressionContainer' ? node.value.expression : node.value
-      const onlyVariables = expression?.type === 'ObjectExpression' && expression.properties.every(property =>
-        property.type === 'Property' && typeof property.key.value === 'string' && property.key.value.startsWith('--'))
-      if (!onlyVariables) report(node, '인라인 스타일 대신 CSS 클래스와 토큰을 쓴다(값 전달은 CSS 변수 --*만).')
+      if (!isCssVariableStyle(expression, context.sourceCode)) report(node, '인라인 스타일 대신 CSS 클래스와 토큰을 쓴다(값 전달은 CSS 변수 --*만).')
     },
     AssignmentExpression(node) {
       const target = node.left
