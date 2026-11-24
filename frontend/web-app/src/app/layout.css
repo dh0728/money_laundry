@@ -5,7 +5,7 @@
 :root {
   scrollbar-gutter: stable;
   --unread-dot-size: var(--aml-space-8);
-  --glass-optical-softness: 4px;
+  --glass-optical-softness: var(--aml-space-4);
   --glass-material-blur-radius: var(--aml-space-32);
   --glass-material-blur: blur(var(--glass-material-blur-radius));
   --header-inset: var(--aml-density-gap);
@@ -135,9 +135,9 @@ body {
 :root[data-reduced-motion="true"] *,
 :root[data-reduced-motion="true"] *::before,
 :root[data-reduced-motion="true"] *::after {
-  animation-duration: 0.01ms !important;
+  animation-duration: var(--aml-duration-reduced-motion) !important;
   animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+  transition-duration: var(--aml-duration-reduced-motion) !important;
   transition-delay: 0s !important;
   scroll-behavior: auto !important;
 }
@@ -305,8 +305,8 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   --glass-surface-face: var(--glass-control-face);
 }
 .icon-button[data-button-surface="floating"] {
-  --glass-elevated: color-mix(in srgb, var(--text) 9%, var(--glass-control-face));
-  --glass-strong: color-mix(in srgb, var(--text) 15%, var(--glass-control-face));
+  --glass-elevated: color-mix(in srgb, var(--text) var(--glass-hover-tint), var(--glass-control-face));
+  --glass-strong: color-mix(in srgb, var(--text) var(--glass-press-tint), var(--glass-control-face));
 }
 :where(.glass, [data-button-surface="floating"], #workflow-notifications .swipe-toast__card) {
   -webkit-backdrop-filter: var(--material-refraction, var(--glass-material-blur));
@@ -321,7 +321,7 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   }
 }
 :is(.sidebar, .glass-dialog) {
-  --glass-optical-softness: 10px;
+  --glass-optical-softness: var(--aml-space-10);
   --glass-surface-face: var(--glass-shell-face);
   --muted-text: var(--glass-shell-muted);
   box-shadow: var(--shadow-overlay);
@@ -944,13 +944,13 @@ body:has(#footer-pagination > *) #workspace {
   --panel-material-depth: 0 0 0 transparent;
 }
 :root:not([data-glassmorphism="false"]) :is(.screen-panel, .panel-inset, .dashboard-metrics .magic-bento__card, [data-glow-surface]:not([data-card-interactive])) {
-  --panel-sunken-shadow: color-mix(in srgb, var(--panel-light-source, var(--information-panel-surface)) 28%, var(--aml-black-100));
+  --panel-sunken-shadow: color-mix(in srgb, var(--panel-light-source, var(--information-panel-surface)) var(--panel-sunken-shadow-tint), var(--panel-sunken-shadow-base));
   /* 안쪽 그림자와 반사광을 중앙에 맞춰 둘레 전체에 고르게 보이게 한다. */
   --panel-material-depth:
     inset 0 0 var(--aml-space-4)
-      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) 22%, transparent), var(--aml-black-080)),
+      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) var(--panel-sunken-edge-opacity), transparent), var(--panel-sunken-dark-edge)),
     inset 0 0 var(--aml-space-12)
-      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) 16%, transparent), var(--aml-black-060)),
+      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) var(--panel-sunken-falloff-opacity), transparent), var(--panel-sunken-dark-falloff)),
     inset 0 0 var(--aml-space-2)
       light-dark(transparent, var(--glass-shell-highlight));
 }
@@ -961,13 +961,13 @@ body:has(#footer-pagination > *) #workspace {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: var(--panel-sunken-overlay-layer);
   border-radius: inherit;
   box-shadow: var(--panel-edge-depth), var(--panel-material-depth);
   pointer-events: none;
 }
 :root:not([data-glassmorphism="false"]) :is(.screen-panel, .screen-overlay, .panel-material) {
-  background-color: color-mix(in srgb, var(--panel-material-solid, var(--floating-panel-face)) 78%, transparent);
+  background-color: color-mix(in srgb, var(--panel-material-solid, var(--floating-panel-face)) var(--panel-surface-glass-opacity), transparent);
 }
 :is(.dashboard-metrics, .workflow-bento) :is(.magic-bento__rim, .magic-bento__border) { display: none }
 
@@ -1113,16 +1113,6 @@ body[data-login-required] > :not(#preview-login, .glass-refraction) { display: n
 @media (max-width: 780px) {
 }
 
-:root {
-  --floating-shadow: var(--shadow-floating), inset 0 0 0 transparent;
-  --floating-shadow-raised: 0 var(--aml-space-8) var(--aml-space-16) var(--glass-shadow), inset 0 0 0 transparent;
-  --floating-shadow-pressed: 0 var(--aml-stroke-divider) var(--aml-space-2) var(--glass-shadow), inset 0 var(--aml-space-2) var(--aml-space-4) var(--glass-shadow);
-  --floating-sheen: linear-gradient(155deg, light-dark(var(--aml-white-080), var(--aml-white-020)), transparent 57%);
-  --floating-rim:
-    inset 0 var(--aml-stroke-control) var(--aml-space-4) light-dark(var(--aml-white-100), var(--aml-white-030)),
-    inset 0 calc(-1 * var(--aml-stroke-control)) var(--aml-space-4) light-dark(var(--aml-black-010), var(--aml-black-040));
-}
-
 :is([data-button-surface="floating"], .screen-nav-pill, .floating-glass) {
   background-image: var(--floating-sheen);
   box-shadow: var(--floating-rim), var(--button-depth, var(--floating-shadow));
@@ -1131,7 +1121,7 @@ body[data-login-required] > :not(#preview-login, .glass-refraction) { display: n
   --button-hover-bg: var(--glass-elevated);
   --button-active-bg: var(--glass-strong);
   --button-depth: var(--floating-shadow);
-  transition: box-shadow 160ms ease-out, background-color 120ms ease-out;
+  transition: box-shadow var(--aml-duration-control-transition) ease-out, background-color var(--floating-color-transition-duration) ease-out;
 }
 
 :is(.app-footer, .inbox-request-footer) .accent-action {
@@ -1148,7 +1138,7 @@ body[data-login-required] > :not(#preview-login, .glass-refraction) { display: n
 }
 [data-button-surface="floating"]:not(:disabled, [aria-disabled="true"], [aria-expanded="true"]):active {
   --button-depth: var(--floating-shadow-pressed);
-  transition-duration: 70ms;
+  transition-duration: var(--floating-press-transition-duration);
 }
 [data-reduced-motion="true"] :is([data-button-surface], .account) {
   transition: none;

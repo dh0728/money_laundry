@@ -25,6 +25,7 @@
   --aml-space-3: 3px;
   --aml-focus-outline-offset: var(--aml-space-3);
   --aml-duration-control-transition: 160ms;
+  --aml-duration-reduced-motion: .01ms;
   --aml-duration-feedback-transition: 200ms;
   --aml-duration-confirmation-pulse: 600ms;
   --aml-ease-decelerate: cubic-bezier(0.23, 1, 0.32, 1);
@@ -222,8 +223,10 @@
   --glass-surface-edge: color-mix(in srgb, var(--glass-edge) var(--glass-border-strength), transparent);
   --glass-material-frost: color-mix(in srgb, var(--information-panel-surface) 88%, transparent);
   --glass-surface: color-mix(in srgb, var(--information-panel-surface) 44%, transparent);
-  --glass-elevated: color-mix(in srgb, var(--text) 9%, var(--glass-material-frost));
-  --glass-strong: color-mix(in srgb, var(--text) 15%, var(--glass-material-frost));
+  --glass-hover-tint: 9%;
+  --glass-press-tint: 15%;
+  --glass-elevated: color-mix(in srgb, var(--text) var(--glass-hover-tint), var(--glass-material-frost));
+  --glass-strong: color-mix(in srgb, var(--text) var(--glass-press-tint), var(--glass-material-frost));
   --glass-shadow: light-dark(var(--aml-black-010), var(--aml-black-030));
   --glass-control-solid: light-dark(var(--aml-gray-095), var(--aml-gray-030));
   --glass-control-face: color-mix(in srgb, var(--glass-control-solid) 76%, transparent);
@@ -238,6 +241,23 @@
   --glass-shell-scrim: light-dark(var(--aml-black-010), var(--aml-black-020));
   --shadow-floating: 0 var(--aml-space-4) var(--aml-space-12) var(--glass-shadow);
   --shadow-overlay: 0 var(--aml-space-16) var(--aml-space-48) var(--glass-shadow);
+  --floating-shadow: var(--shadow-floating), inset 0 0 0 transparent;
+  --floating-shadow-raised: 0 var(--aml-space-8) var(--aml-space-16) var(--glass-shadow), inset 0 0 0 transparent;
+  --floating-shadow-pressed: 0 var(--aml-stroke-divider) var(--aml-space-2) var(--glass-shadow), inset 0 var(--aml-space-2) var(--aml-space-4) var(--glass-shadow);
+  --floating-sheen: linear-gradient(155deg, light-dark(var(--aml-white-080), var(--aml-white-020)), transparent 57%);
+  --floating-rim:
+    inset 0 var(--aml-stroke-control) var(--aml-space-4) light-dark(var(--aml-white-100), var(--aml-white-030)),
+    inset 0 calc(-1 * var(--aml-stroke-control)) var(--aml-space-4) light-dark(var(--aml-black-010), var(--aml-black-040));
+  --floating-color-transition-duration: 120ms;
+  --floating-press-transition-duration: 70ms;
+  --panel-sunken-shadow-base: var(--aml-black-100);
+  --panel-sunken-shadow-tint: 28%;
+  --panel-sunken-edge-opacity: 22%;
+  --panel-sunken-falloff-opacity: 16%;
+  --panel-sunken-dark-edge: var(--aml-black-080);
+  --panel-sunken-dark-falloff: var(--aml-black-060);
+  --panel-sunken-overlay-layer: 2;
+  --panel-surface-glass-opacity: 78%;
   --backdrop: light-dark(var(--aml-black-020), var(--aml-black-040));
   --inverse-surface: var(--aml-figma-surface-neutral-accent-default);
   --inverse-text: var(--aml-figma-contents-neutral-inverse);
