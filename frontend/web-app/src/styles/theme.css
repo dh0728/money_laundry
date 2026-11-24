@@ -469,6 +469,7 @@
   --text-2xs: var(--text-micro-size);
   --text-3xs: var(--text-micro-compact-size);
   --text-4xs: var(--text-micro-dense-size);
+  --spacing-textarea-editor: var(--textarea-editor-min-height);
   --font-sans: Pretendard;
   --font-mono: Pretendard;
   --font-serif: Pretendard;

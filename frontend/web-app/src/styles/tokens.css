@@ -215,6 +215,7 @@
   --confirm-dialog-max-width: calc(100% - 2rem);
   --confirm-dialog-header-rows: auto 1fr;
   --confirm-dialog-header-media-rows: auto auto 1fr;
+  --textarea-editor-min-height: 280px;
   --aml-duration-instant: 0ms;
   --aml-duration-fast: 120ms;
   --aml-duration-normal: 180ms;

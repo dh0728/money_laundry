@@ -42,7 +42,7 @@ export function AlertVerdictForm({ verdict, setVerdict, comment, setComment, tar
         {targetFooter}
         <Box className="flex min-h-0 flex-1 flex-col space-y-2">
           <Label htmlFor="reason">판단 근거 <Text as="span" className="text-muted-foreground">(필수)</Text></Label>
-          <Textarea id="reason" aria-label={commentLabel} maxLength={4000} value={comment} onChange={e => setComment(e.target.value)} disabled={locked} className="min-h-[280px] flex-1 resize-y text-sm leading-7" placeholder="확인한 거래, 계좌 간 관계, 판단 근거를 작성하세요." />
+          <Textarea id="reason" aria-label={commentLabel} maxLength={4000} value={comment} onChange={e => setComment(e.target.value)} disabled={locked} editor placeholder="확인한 거래, 계좌 간 관계, 판단 근거를 작성하세요." />
         </Box>
         <Box className="flex flex-wrap items-center justify-end gap-2">
           {onOpenDrafts && <Button size="sm" variant="ghost" onClick={onOpenDrafts}><FolderOpen className="size-3.5" />저장본 목록{draftCount ? ` (${draftCount})` : ''}</Button>}
