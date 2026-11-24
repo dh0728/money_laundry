@@ -107,7 +107,7 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
     const host = hostRef.current;
     const chart = host?.querySelector('.staged-sankey-scroller');
     if (!chart) return undefined;
-    const edgeInset = readChartNumber('--chart-sankey-connector-edge-inset', 18);
+    const labelClearance = readChartNumber('--aml-space-8', 8);
     const measure = () => {
       const origin = host.getBoundingClientRect();
       const chartBounds = chart.getBoundingClientRect();
@@ -121,15 +121,15 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
         const start = anchor.getBoundingClientRect();
         const startX = start.left + start.width / 2 - origin.left;
         const startY = start.top + start.height / 2 - origin.top;
-        const chartEdge = (aboveChart ? chartBounds.top : chartBounds.bottom) - origin.top;
-        const endX = Math.min(Math.max(startX, end.left - origin.left + edgeInset), end.right - origin.left - edgeInset);
+        const endX = end.left + end.width / 2 - origin.left;
         const endY = (aboveChart ? end.bottom : end.top) - origin.top;
-        const turnY = (chartEdge + endY) / 2;
         const header = aboveChart && chart.querySelector(`[data-sankey-stage-label="${anchor.dataset.sankeyStageIndex}"]`)?.getBoundingClientRect();
-        const laneX = header ? Math.min(startX, header.left - origin.left - edgeInset / 2) : startX;
-        const leadY = header ? (header.bottom - origin.top + startY) / 2 : startY;
-        const lead = header ? ` C ${startX} ${leadY}, ${laneX} ${leadY}, ${laneX} ${header.bottom - origin.top}` : '';
-        return [{ id, tone, endX, endY, path: `M ${startX} ${startY}${lead} V ${chartEdge} C ${laneX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
+        const laneX = header ? Math.min(startX, header.left - origin.left - labelClearance) : startX;
+        const laneY = header ? header.bottom - origin.top : startY;
+        const leadY = (laneY + startY) / 2;
+        const turnY = (laneY + endY) / 2;
+        const lead = header ? ` C ${startX} ${leadY}, ${laneX} ${leadY}, ${laneX} ${laneY}` : '';
+        return [{ id, tone, endX, endY, path: `M ${startX} ${startY}${lead} C ${laneX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
       });
       setLines(next);
     };
