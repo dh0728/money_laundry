@@ -149,6 +149,11 @@
   --rule-block-icon-size: 1em;
   --rule-block-number-input-width: 8ch;
   --rule-condition-fact-min-width: 10rem;
+  --rule-review-dialog-max-width: 28rem;
+  --rule-list-name-min-width: 8rem;
+  --rule-list-name-viewport-width: 46vw;
+  --rule-list-name-max-width: 27rem;
+  --rule-list-touch-target-height: 44px;
   --rule-tree-branch-width: var(--aml-space-20);
   --rule-tree-trunk-offset: var(--aml-space-5);
   --rule-tree-branch-radius: var(--aml-space-6);

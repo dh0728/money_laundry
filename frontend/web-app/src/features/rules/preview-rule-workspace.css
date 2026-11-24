@@ -17,7 +17,7 @@
   margin: 0;
   font-size: var(--workspace-kpi-value-size, var(--aml-type-metric-size));
   font-weight: var(--aml-type-metric-weight);
-  line-height: 1.1;
+  line-height: var(--metric-value-line-height);
   font-variant-numeric: tabular-nums;
 }
 .workflow-rule-list, .workflow-rule-note { grid-column: 1 / -1 }
@@ -29,7 +29,7 @@
   padding-block-end: max(var(--workspace-inset), var(--account-footer-reserve));
 }
 .rule-review-dialog {
-  inline-size: min(28rem, calc(100% - var(--aml-space-32)));
+  inline-size: min(var(--rule-review-dialog-max-width), calc(100% - var(--aml-space-32)));
   max-block-size: calc(100dvh - var(--aml-space-32));
 }
 .rule-review-dialog p { margin: 0 }
@@ -134,7 +134,7 @@
 .workflow-rule-overview .workflow-rule-select {
   --button-hover-bg: transparent;
   --button-active-bg: transparent;
-  max-inline-size: clamp(8rem, 46vw, 27rem);
+  max-inline-size: clamp(var(--rule-list-name-min-width), var(--rule-list-name-viewport-width), var(--rule-list-name-max-width));
   min-block-size: var(--aml-panel-control-size);
   padding: var(--aml-space-6);
   border-radius: var(--aml-radius-control);
@@ -266,7 +266,7 @@
 
 @media (pointer: coarse) {
   .workflow-rule-overview .workflow-rule-select {
-    min-block-size: max(44px, var(--aml-panel-control-size));
+    min-block-size: max(var(--rule-list-touch-target-height), var(--aml-panel-control-size));
   }
   .screen-rule-editor :is(input[data-slot="input"], textarea[data-slot="textarea"]),
   .rule-review-dialog textarea {
