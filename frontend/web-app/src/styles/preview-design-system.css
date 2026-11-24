@@ -128,6 +128,11 @@
   --panel-glass-opacity: 90%;
   --text: var(--aml-figma-contents-neutral-primary);
   --muted-text: var(--aml-figma-contents-neutral-secondary);
+  --chart-neutral-composition-fill: light-dark(
+    color-mix(in srgb, var(--text) 10%, var(--information-panel-surface)),
+    color-mix(in srgb, var(--text) 16%, var(--information-panel-surface)));
+  --chart-suspect-annotation-color: color-mix(in srgb, var(--risk-high), var(--text) 35%);
+  --chart-subtle-grid-color: color-mix(in srgb, var(--text) 8%, transparent);
   --disabled-text: var(--aml-figma-contents-disabled);
   --divider: var(--aml-figma-border-neutral-subtle-default);
   --focus-ring: var(--aml-figma-border-neutral-accent-default);

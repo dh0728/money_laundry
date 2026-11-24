@@ -1,18 +1,14 @@
 .preview-dashboard {
-  --chart-total: light-dark(
-    color-mix(in srgb, var(--text) 10%, var(--information-panel-surface)),
-    color-mix(in srgb, var(--text) 16%, var(--information-panel-surface)));
+  --chart-total: var(--chart-neutral-composition-fill);
   --chart-suspect: var(--risk-high);
-  --chart-suspect-label: color-mix(in srgb, var(--chart-suspect), var(--text) 35%);
   --chart-pattern: var(--chart-suspect);
   --chart-risk-high: var(--risk-high);
   --chart-risk-medium: var(--risk-medium);
-  --chart-risk-low: var(--risk-low);
   --chart-background: var(--information-panel-surface);
   --chart-foreground: var(--text);
   --chart-foreground-muted: var(--muted-text);
   --chart-label: var(--muted-text);
-  --chart-grid: color-mix(in srgb, var(--text) 8%, transparent);
+  --chart-grid: var(--chart-subtle-grid-color);
   --chart-crosshair: var(--muted-text);
   display: grid;
   align-content: start;
@@ -280,15 +276,9 @@
   --dashboard-breakdown-height: calc(8 * var(--aml-space-32));
   --segment-other: var(--chart-total);
   --segment-suspect: var(--chart-suspect);
-  --segment-high: var(--chart-risk-high);
-  --segment-medium: var(--chart-risk-medium);
-  --segment-low: var(--chart-risk-low);
 }
 .dashboard-analytics [data-segment="other"] { --segment-ink: var(--segment-other) }
 .dashboard-analytics [data-segment="suspect"] { --segment-ink: var(--segment-suspect) }
-.dashboard-analytics [data-segment="high"] { --segment-ink: var(--segment-high) }
-.dashboard-analytics [data-segment="medium"] { --segment-ink: var(--segment-medium) }
-.dashboard-analytics [data-segment="low"] { --segment-ink: var(--segment-low) }
 .dashboard-composition-legend {
   display: flex;
   flex-wrap: wrap;
@@ -361,7 +351,7 @@
 .dashboard-series-plot { min-block-size: var(--chart-series-height) }
 .dashboard-loading .dashboard-bklit-series { block-size: var(--chart-series-height) }
 .dashboard-volume-axis { display: grid; justify-items: center; line-height: var(--chart-axis-label-line-height) }
-.dashboard-volume-axis small { color: var(--chart-suspect-label); font-size: var(--aml-type-caption-size); font-variant-numeric: tabular-nums }
+.dashboard-volume-axis small { color: var(--chart-suspect-annotation-color); font-size: var(--aml-type-caption-size); font-variant-numeric: tabular-nums }
 .dashboard-legend > span {
   display: inline-flex;
   align-items: center;
