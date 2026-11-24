@@ -10,7 +10,6 @@ import './BellToggle.css';
 const SPRING_UI = { type: 'spring', duration: 0.3, bounce: 0 };
 const SEG_EASE = 'cubic-bezier(0.77, 0, 0.175, 1)';
 const WARP = 0.6;
-const SIZES = { sm: [36, 12.5, 14, 15, 8], md: [44, 13.5, 16, 19, 9], lg: [52, 15, 18, 23, 10] };
 const WOBBLE = { amplitude: 0.4, passes: 3, duration: 420 };
 const BELL_BODY = 'M6 16.5V10a6 6 0 0 1 12 0v6.5l1.6 2.3H4.4L6 16.5z';
 
@@ -36,23 +35,23 @@ export default function BellToggle({
   onLabel = "You'll be notified",
   icon,
   label,
-  color = '#f5f5f5',
-  background = '#27272a',
-  onColor = '#18181b',
-  onBackground = '#f5f5f5',
+  color,
+  background,
+  onColor,
+  onBackground,
   size = 'md',
-  radius = 22,
+  radius,
   ringAmplitude = 17,
   ringPasses = 5,
   ringDecay = 1,
   ringDuration = 820,
   ringPivot = 16,
-  crossfadeMs = 200,
+  crossfadeMs,
   revealBounce = 0,
   count = 0,
   badge = true,
-  badgeColor = '#ef4444',
-  badgeTextColor = '#ffffff',
+  badgeColor,
+  badgeTextColor,
   waves = true,
   clapper = false,
   pressed,
@@ -78,7 +77,6 @@ export default function BellToggle({
   const pending = useRef(null);
   const spring = useRef(null);
   const prevCount = useRef(count);
-  const [h, fs, iconSize, px, gap] = SIZES[size] ?? SIZES.md;
 
   const t = useMotionValue(on ? 1 : 0);
   const wOff = useMotionValue(0);
@@ -161,7 +159,7 @@ export default function BellToggle({
   };
   const press = e => {
     lastInput.current = 'pointer';
-    if (e.button === 0 && !disabled && rootRef.current) rootRef.current.dataset.pressed = '';
+    if (e.button === 0 && !disabled && !reduce && rootRef.current) rootRef.current.dataset.pressed = '';
   };
   const release = () => {
     if (rootRef.current) delete rootRef.current.dataset.pressed;
@@ -177,7 +175,9 @@ export default function BellToggle({
       ref={rootRef}
       className={`bell-toggle${className ? ` ${className}` : ''}`}
       data-on={on ? 'true' : 'false'}
+      data-size={size}
       data-disabled={disabled ? '' : undefined}
+      data-motion-reduced={reduce || undefined}
       style={{
         '--bt-clip': clip,
         '--bt-color': color,
@@ -186,14 +186,9 @@ export default function BellToggle({
         '--bt-on-bg': onBackground,
         '--bt-badge': badgeColor,
         '--bt-badge-ink': badgeTextColor,
-        '--bt-radius': `${radius}px`,
-        '--bt-fade': `${crossfadeMs}ms`,
-        '--bt-pivot': `${ringPivot}%`,
-        '--bt-h': `var(--bell-control-height, ${h}px)`,
-        '--bt-fs': `${fs}px`,
-        '--bt-icon': `${iconSize}px`,
-        '--bt-px': `${px}px`,
-        '--bt-gap': `${gap}px`
+        '--bt-radius': typeof radius === 'number' ? `${radius}px` : radius,
+        '--bt-fade': crossfadeMs == null ? undefined : `${crossfadeMs}ms`,
+        '--bt-pivot': `${ringPivot}%`
       }}
     >
       <button
@@ -213,10 +208,10 @@ export default function BellToggle({
           <span ref={glyphRef} className="bell-toggle__glyph">
             {clapper ? (
               <svg
+                className="bell-toggle__body"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -224,13 +219,13 @@ export default function BellToggle({
                 <path d="M12 2.5V4" />
               </svg>
             ) : (
-              (icon ?? <Bell size={iconSize} strokeWidth={2} />)
+              (icon ?? <Bell />)
             )}
           </span>
           {clapper ? (
             <span ref={clapperRef} className="bell-toggle__clapper">
               <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="20.4" r="1.7" fill="currentColor" />
+                <circle cx="12" cy="20.4" fill="currentColor" />
               </svg>
             </span>
           ) : null}

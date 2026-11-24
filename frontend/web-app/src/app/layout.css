@@ -1166,4 +1166,3 @@ body[data-login-required] > :not(#preview-login, .glass-refraction) { display: n
 .preview-tilt-cards .magic-bento__content > [data-glow-surface] { flex: 1 }
 
 #notification-preference { --bell-control-height: var(--header-control-size) }
-[data-reduced-motion="true"] #notification-preference :is(.bell-toggle, .bell-toggle__face) { transform: none; filter: none; transition: none }

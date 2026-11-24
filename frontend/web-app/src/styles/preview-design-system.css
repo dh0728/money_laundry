@@ -22,7 +22,8 @@
   --aml-motion-workspace-enter-depth: 145px;
   --aml-motion-workspace-enter-opacity: .16;
   --aml-opacity-disabled: .5;
-  --aml-focus-outline-offset: 3px;
+  --aml-space-3: 3px;
+  --aml-focus-outline-offset: var(--aml-space-3);
   --aml-duration-control-transition: 160ms;
   --aml-duration-feedback-transition: 200ms;
   --aml-duration-confirmation-pulse: 600ms;
@@ -31,6 +32,17 @@
   --aml-opacity-feedback-glow: 70%;
   --aml-opacity-feedback-ring: 55%;
   --aml-type-control-tracking: 0.01em;
+  --aml-motion-press-scale: 0.97;
+  --aml-type-switch-label-size: 12.5px;
+  --aml-control-compact-inline-inset: 15px;
+  --aml-size-feedback-icon: 14px;
+  --aml-opacity-control-hover: 6%;
+  --aml-duration-badge-reveal: 280ms;
+  --aml-ease-badge-reveal: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --aml-motion-badge-entry-scale: 0.6;
+  --aml-motion-badge-entry-offset: 5px;
+  --aml-size-switch-label-line: 18px;
+  --aml-type-badge-count-size: 9.5px;
   --brand-accent: var(--selection-surface);
   --brand-color: var(--brand-accent);
   --brand-control-surface: var(--selection-surface);
