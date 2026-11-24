@@ -150,6 +150,7 @@
   --chart-axis-detail-inset: 42px;
   --chart-single-category-gap-ratio: .94;
   --chart-pattern-bar-gap-ratio: .28;
+  --chart-staff-bar-gap-ratio: .24;
   --chart-dashboard-enter-duration: 340ms;
   --chart-sankey-highlight-duration: 180ms;
   --chart-sankey-name-size: 13px;

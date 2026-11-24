@@ -182,7 +182,10 @@ export function previewWorkRequestEffects() {
       current.reviewStatus = item.reviewStatus ?? '처리 중';
     }
     if (effect === 'deadline') current.reviewDueOn = item.deadline;
-    if (item.assignee) current.assignee = item.assignee;
+    if (item.assignee) {
+      current.assignee = item.assignee;
+      current.assignedAt = item.appliedAt;
+    }
     effects.set(item.code, current);
   }
   return effects;

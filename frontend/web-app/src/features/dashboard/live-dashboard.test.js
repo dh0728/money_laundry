@@ -61,16 +61,26 @@ test('personal overdue counts start after day three and retain the Alert and Epi
 
 test('institution workload counts independent Alerts and Episodes once per assignment', async () => {
   const { liveDashboardResponse } = await import('./live-dashboard.js');
-  const first = { ...alert, assigneeId: 11, assigneeName: '분석가 A' };
-  const second = { ...other, assigneeId: 12, assigneeName: '분석가 B', elapsed: 4 };
+  const first = { ...alert, assigneeId: 11, assigneeName: '분석가 A', assignedAt: '2023-09-06T06:00:00Z' };
+  const second = { ...other, assigneeId: 12, assigneeName: '분석가 B', elapsed: 4, assignedAt: '2023-08-31T15:00:00Z' };
   const member = { ...first, code: 'A-member', elapsed: 5 };
   const episode = { ...first, kind: 'Episode', code: 'E-linked', elapsed: 4, linkedAlertCodes: [member.code] };
-  const closed = { ...episode, code: 'E-closed', open: false };
+  const closed = { ...episode, code: 'E-closed', open: false, assignedAt: '2023-08-31T14:59:59Z' };
+  getJson.mockResolvedValueOnce(ledger).mockResolvedValueOnce([
+    { id: 11, name: '분석가 A', role: 'STAFF' }, { id: 12, name: '분석가 B', role: 'STAFF' },
+    { id: 13, name: '분석가 C', role: 'STAFF' }, { id: 1, name: '관리자', role: 'ADMIN' },
+  ]);
   const data = await liveDashboardResponse({ ...source, cases: [first, second, member, episode, closed] });
 
   expect(data.institutionWorkload).toMatchObject({
     total: 3,
-    byAssignee: [{ name: '분석가 A', total: 2 }, { name: '분석가 B', total: 1 }],
+    byAssignee: [
+      { name: '분석가 A', total: 2, assignments: 3, overdue: 1 },
+      { name: '분석가 B', total: 1, assignments: 1, overdue: 1 },
+      { name: '분석가 C', total: 0, assignments: 0, overdue: 0 },
+    ],
+    staffCount: 3,
+    equalAssignments: 4 / 3,
     overdue: [{ code: second.code }, { code: episode.code }],
   });
 });
@@ -101,7 +111,7 @@ test('institution case filters keep both coverage counts in the same evidence su
   const data = await liveDashboardResponse(
     { ...source, cases: [alert, other, episode] }, { rows: [episode], population: [alert, episode], range },
   );
-  expect(getJson).not.toHaveBeenCalled();
+  expect(getJson.mock.calls).toEqual([['/api/v1/demo/users']]);
   expect(data.suspicious).toEqual([transfer]);
   expect(data).toMatchObject({ dataSource: 'live', linked: 1, unlinked: 0, coverageScope: 'case-evidence' });
 });

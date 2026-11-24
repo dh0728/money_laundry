@@ -102,6 +102,47 @@
 }
 .dashboard-institution-relations { position: relative }
 .dashboard-workflow-charts .dashboard-new-entities .dashboard-series-plot { block-size: var(--chart-detail-sparkline-height) }
+.dashboard-staff-scroll { max-block-size: calc(var(--aml-space-24) * 7); overflow-y: auto }
+.dashboard-staff-chart {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--aml-space-8);
+  margin: 0;
+}
+.dashboard-staff-labels {
+  display: grid;
+  grid-auto-rows: var(--aml-space-24);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--aml-type-caption-size);
+}
+.dashboard-staff-labels li { display: flex; align-items: center; justify-content: space-between; gap: var(--aml-space-4) }
+.dashboard-staff-labels li > span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
+.dashboard-staff-labels strong { white-space: nowrap; font-variant-numeric: tabular-nums }
+.dashboard-staff-overdue { color: var(--chart-suspect); margin-inline-start: var(--aml-space-4) }
+.dashboard-staff-plot { position: relative; min-inline-size: 0; block-size: calc(var(--dashboard-staff-row-count) * var(--aml-space-24)) }
+.dashboard-staff-plot > .bar-chart { block-size: 100% }
+.dashboard-staff-reference {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--dashboard-staff-reference-position);
+  inline-size: var(--aml-stroke-divider);
+  background: var(--text);
+  pointer-events: none;
+}
+.dashboard-staff-reference-key {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-4);
+  font-size: var(--aml-type-caption-size);
+}
+.dashboard-staff-reference-key::before {
+  content: '';
+  inline-size: var(--aml-stroke-divider);
+  block-size: var(--aml-space-12);
+  background: var(--text);
+}
 .dashboard-workflow-charts {
   --dashboard-score-middle: color-mix(in srgb, var(--chart-suspect), var(--information-panel-surface));
   --dashboard-score-lower: color-mix(in srgb, var(--dashboard-score-middle), var(--information-panel-surface));

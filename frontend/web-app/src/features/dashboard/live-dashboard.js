@@ -1,4 +1,5 @@
 import { getJson } from '@/api/common';
+import { fetchReviewUsers } from '@/api/liveReview';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
 import { isOverdueCaseAge } from '../investigation/case-age.js';
 import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard } from './dashboard-investigation.js';
@@ -32,7 +33,11 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const members = source.transactions.filter(row => includesDate(row) && evidence.has(row.code));
   const flagged = members.filter(row => row.suspicious);
   const coveredEvidence = partial ? alertEvidenceCodes(population ?? rows ?? scopeCases) : undefined;
-  const ledger = partial ? undefined : await getJson(`/api/v1/dashboard/transaction-days?from=${from}&to=${to}`);
+  const [ledger, roster] = await Promise.all([
+    partial ? undefined : getJson(`/api/v1/dashboard/transaction-days?from=${from}&to=${to}`),
+    mine ? undefined : fetchReviewUsers().then(users => Array.isArray(users)
+      ? users.filter(user => user.role === 'STAFF') : undefined).catch(() => undefined),
+  ]);
   const ledgerDays = new Map(ledger?.days.map(day => [day.date, day]));
   const ledgerHours = new Map(ledger?.hours.map(hour => [hour.hour, hour]));
 
@@ -121,7 +126,9 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     linked, unlinked, coverageScope: partial ? 'case-evidence' : 'institution',
     patterns: [...patternCounts].map(([label, count]) => ({ label, count })),
     daily, operationalDaily,
-    ...investigationDashboard(source.cases, cases, operationalDaily.map(day => day.date)),
+    ...investigationDashboard(source.cases, cases, operationalDaily.map(day => day.date), {
+      assignmentRows: completedPopulation, roster,
+    }),
     hourly: kpiHours.map((label, i) => ({
       label,
       // 전체를 볼 때는 서버가 센 시간대별 거래 수를 쓴다(09시가 첫 칸). 일부 사건만 볼 때는 근거 거래로 센다.

@@ -1,6 +1,6 @@
 import { caseFixtureRows, dateFromCode } from '../components/query-controls.jsx';
 import { applyPreviewJudgment } from '../features/investigation/case-judgment-data.js';
-import { currentPreviewUser, previewStaff } from '../features/auth/preview-session-user.js';
+import { alternatePreviewStaff, currentPreviewUser, previewStaff } from '../features/auth/preview-session-user.js';
 import { previewCaseAssignee, previewWorkRequestEffects } from '../features/investigation/preview-work-requests.js';
 import { applyPreviewEpisodeTransfers } from '../features/investigation/preview-episode-transfer.js';
 import { applyPreviewAlertMembership } from '../features/investigation/case-membership-data.js';
@@ -127,7 +127,8 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
     .map(row => {
       const effect = effects.get(row.code);
       const assignee = effect?.assignee ?? previewCaseAssignee(row);
-      const next = { ...row, assignee, assigned: assignee === staff, reviewDueOn: effect?.reviewDueOn };
+      const next = { ...row, assignee, assigned: assignee === staff, assignedAt: effect?.assignedAt ?? row.createdAt,
+        reviewDueOn: effect?.reviewDueOn };
       if (!effect?.reviewStateAt || row.episodeCode || row.judgment?.at > effect.reviewStateAt) return next;
       return applyPreviewJudgment({ ...next, reviewStateAt: effect.reviewStateAt, status: effect.reviewStatus,
         verdict: 'unjudged', open: true, unread: false, completedAt: null, judgment: undefined });
@@ -274,7 +275,10 @@ export function dashboardFixtureResponse(source, { mine, rows, population, range
     period: { from, to },
     coverageScope: partial ? 'case-evidence' : 'institution',
     ...metrics,
-    ...investigationDashboard(source.cases, cases, metrics.operationalDaily.map(day => day.date)),
+    ...investigationDashboard(source.cases, cases, metrics.operationalDaily.map(day => day.date), {
+      assignmentRows: completedPopulation,
+      roster: mine ? undefined : [previewStaff, alternatePreviewStaff].map(person => ({ id: person.username, name: person.name })),
+    }),
     sort,
   };
 }

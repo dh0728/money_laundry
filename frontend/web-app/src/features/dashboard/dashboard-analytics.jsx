@@ -15,6 +15,7 @@ import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitive
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
+import { DashboardIndicatorsGrid } from './dashboard-layout';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;
@@ -196,7 +197,7 @@ const newEntitySeries = [
   { key: 'newOwners', label: '새 소유주', color: dataSeriesColors.pink, value: row => integer.format(row.newOwners) + '명' },
 ];
 
-export function NewEntitiesMetric({ data, reduced }) {
+function NewEntitiesMetric({ data, reduced }) {
   const available = data.coverageScope === 'institution';
   const title = '새 계좌 · 새 소유주';
   const hasChart = available && (data.newAccounts > 0 || data.newOwners > 0);
@@ -206,6 +207,59 @@ export function NewEntitiesMetric({ data, reduced }) {
     {available && <SeriesLegend series={newEntitySeries.map(item => ({ ...item, label: `${item.label} ${item.value(data)}` }))} />}
     {hasChart && <DailySeries rows={data.operationalDaily} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
       label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />}
+  </ChartPanel>;
+}
+
+const meanCount = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
+
+function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
+  const { byAssignee, equalAssignments, staffCount, total, overdue } = workload;
+  const rows = byAssignee.map(person => ({ ...person,
+    value: showAssignments ? person.assignments : person.total - person.overdue,
+    count: showAssignments ? person.assignments : person.total,
+  }));
+  const baseline = showAssignments ? equalAssignments : null;
+  const upperBound = Math.max(1, ...rows.map(row => row.count)) + 1;
+  const title = showAssignments ? '분석가별 최근 배정' : '분석가별 현재 미완료';
+  const note = showAssignments
+    ? baseline == null ? '기간 내 마지막 배정 기록 · 분석가 명단 미제공'
+      : `기간 내 마지막 배정 기록 · 등록 분석가 ${integer.format(staffCount)}명`
+    : `전체 미완료 ${count(total)} · 선택 기간 생성 업무`;
+  const color = showAssignments ? dataSeriesColors.teal : transactionTotalColor;
+  const animationDuration = reduced ? 0 : readChartNumber('--chart-dashboard-enter-duration', 340);
+  return <ChartPanel title={title} note={note} className="dashboard-priority-metric dashboard-staff-metric" hasChart={rows.length > 0}>
+    {baseline != null && <Box className="dashboard-staff-reference-key">
+      <Text as="span">균등 기준 {meanCount.format(baseline)}건/명</Text>
+    </Box>}
+    {!showAssignments && <SeriesLegend series={[{ key: 'overdue', label: `3일 초과 ${count(overdue.length)}`, color: flowColors.suspect }]} />}
+    {rows.length ? <Box className="dashboard-staff-scroll">
+      <Box as="figure" className="dashboard-staff-chart" aria-label={title}
+        style={{ '--dashboard-staff-row-count': rows.length,
+          '--dashboard-staff-reference-position': baseline == null ? undefined : `${100 * baseline / upperBound}%` }}>
+        <Box as="ul" className="dashboard-staff-labels">
+          {rows.map(person => <Box as="li" key={person.id}>
+            <Text as="span" title={person.name}>{person.name}</Text>
+            <Text as="strong">{count(person.count)}</Text>
+            {!showAssignments && <Text as="strong" className="dashboard-staff-overdue" aria-label={`3일 초과 ${count(person.overdue)}`}>
+              {count(person.overdue)}
+            </Text>}
+          </Box>)}
+        </Box>
+        <Box className="dashboard-staff-plot">
+          <BarChart data={rows} xDataKey="id" orientation="horizontal" stacked={!showAssignments}
+            aspectRatio="auto" horizontalValueDomain={[0, upperBound]} margin={noMargin}
+            barGap={readChartNumber('--chart-staff-bar-gap-ratio', 0.24)} animationDuration={animationDuration}>
+            <Bar dataKey="value" fill={color} lineCap="round" animate={!reduced} />
+            {!showAssignments && <Bar dataKey="overdue" fill={flowColors.suspect} lineCap="round" animate={!reduced} />}
+            <ChartTooltip showDatePill={false} showDots={false} rows={person => showAssignments
+              ? [{ label: person.name, value: count(person.count), color }]
+              : [{ label: '현재 미완료', value: count(person.total), color },
+                { label: '3일 초과', value: count(person.overdue), color: flowColors.suspect }]} />
+          </BarChart>
+          {baseline != null && <Box className="dashboard-staff-reference" aria-hidden="true" />}
+        </Box>
+      </Box>
+    </Box> : <Text className="dashboard-note">표시할 담당자 집계가 없습니다.</Text>}
   </ChartPanel>;
 }
 
@@ -290,7 +344,7 @@ function InvestigationStatus({ data, episode = false, reduced }) {
   </ChartPanel>;
 }
 
-export function Analytics({ data, reduced, summary, indicators }) {
+export function Analytics({ data, reduced, summary }) {
   const hostRef = useRef(null);
   const transactions = transactionFlow(data);
   const investigation = investigationFlow(data);
@@ -300,7 +354,11 @@ export function Analytics({ data, reduced, summary, indicators }) {
     : '첫 구간은 거래 건수 · 이후에는 Alert 건수';
   return <Box as="section" className="dashboard-analytics dashboard-workflow-charts dashboard-institution-relations"
     aria-label="기관 탐지 현황" ref={hostRef}>
-    {indicators}
+    <DashboardIndicatorsGrid aria-label="기관 주요 지표">
+      <NewEntitiesMetric data={data} reduced={reduced} />
+      <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} showAssignments />
+      <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} />
+    </DashboardIndicatorsGrid>
     {scope && <Text className="dashboard-note">거래 집계 범위 · {scope}</Text>}
     <TransactionDetails data={data} flow={transactions} reduced={reduced} summary={summary} />
     <ChartPanel title="조사 처리 흐름" note={investigationNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
