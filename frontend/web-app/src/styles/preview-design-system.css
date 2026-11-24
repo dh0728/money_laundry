@@ -272,6 +272,18 @@
   --case-graph-owner-boundary-stroke: 1.5px;
   --case-graph-owner-port-stroke: 1.25px;
   --case-graph-owner-muted-opacity: .25;
+  --owner-flow-period-stroke: var(--aml-space-4);
+  --owner-flow-period-marker-radius: 3px;
+  --owner-flow-membership-opacity: .24;
+  --owner-flow-membership-base-width: var(--aml-space-8);
+  --owner-flow-membership-step-width: 5px;
+  --owner-flow-edge-stroke: 2.5px;
+  --owner-flow-edge-selected-stroke: var(--aml-space-4);
+  --owner-flow-edge-target-width: 18px;
+  --owner-flow-lane-radius: var(--aml-space-10);
+  --owner-flow-lane-header-radius: var(--aml-space-8);
+  --owner-flow-account-radius: var(--aml-space-4);
+  --owner-flow-account-port-radius: var(--aml-space-4);
   --hierarchy-table-min-width: 72rem;
   --flow-connection-opacity: .55;
   --transaction-arrow-head-width: 20px;

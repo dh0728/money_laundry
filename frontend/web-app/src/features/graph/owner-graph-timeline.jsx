@@ -8,7 +8,7 @@ import {
 import { copySVG, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { useSpringNodeDrag } from './graph-node-drag';
 import { Box } from '../../components/layout-primitives';
-import { OwnerFlowAccount, OwnerFlowDiagram, OwnerFlowEdge, OwnerFlowLane, OwnerFlowPeriods } from '../../components/charts/charts/owner-flow-diagram';
+import { OwnerFlowAccount, OwnerFlowDiagram, OwnerFlowEdge, OwnerFlowLane, OwnerFlowPeriods, readOwnerFlowDesign } from '../../components/charts/charts/owner-flow-diagram';
 
 const dragThreshold = 5;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -39,6 +39,7 @@ export function OwnerGraphTimeline({
   const [viewport, setViewport] = useState(null);
   const [position, setPosition] = useState(null);
   const [panning, setPanning] = useState(false);
+  const [design] = useState(readOwnerFlowDesign);
   const showPeriods = groups.length > 1;
   const { owners, links, timeByCode, times, formatTime, width, height } = useMemo(() => ownerGraphLayout(records), [records]);
   const viewWidth = viewport?.width ?? width;
@@ -169,7 +170,7 @@ export function OwnerGraphTimeline({
     onLostPointerCapture={endPan} onClickCapture={preventDragClick} onFocusCapture={revealFocusedControl}
     onKeyDown={panWithKeyboard}>
     <OwnerFlowDiagram ref={drawing} width={viewWidth} height={viewHeight} inset={timeInset}
-      plotHeight={plotHeight} camera={camera} periods={showPeriods ? <OwnerFlowPeriods periods={ownerComparisonPeriods({
+      plotHeight={plotHeight} camera={camera} periods={showPeriods ? <OwnerFlowPeriods design={design} periods={ownerComparisonPeriods({
         groups, timeByCode, times, formatTime, width: viewWidth, highlightedCase,
       })} /> : undefined}>
       {edges.map(({ key, from, to, rows }, index) => {
@@ -188,7 +189,7 @@ export function OwnerGraphTimeline({
         const select = () => selection === relationship ? onSelect() : onSelect(relationship, codes);
         const activePulse = flowPulse && codes.has(flowPulse.code) ? flowPulse : undefined;
         const highlighted = isHighlighted(rows);
-        return <OwnerFlowEdge key={key} path={path} label={label} pressed={active} muted={!highlighted}
+        return <OwnerFlowEdge key={key} design={design} path={path} label={label} pressed={active} muted={!highlighted}
           onSelect={select} memberships={memberships} color={riskColor(ownerTransferRisk(rows))}
           width={width} height={height} pulse={activePulse} pulseColor={activePulse && riskColor(activePulse.risk)}
           reveal={activePulse && codes.size === 1}
@@ -199,7 +200,7 @@ export function OwnerGraphTimeline({
       {owners.map(owner => {
         const accounts = owner.accounts.filter(account => shownAccounts.has(account.id));
         if (!accounts.length) return null;
-        return <OwnerFlowLane key={owner.id} name={owner.name} x={owner.x} y={owner.y} width={ownerWidth}
+        return <OwnerFlowLane key={owner.id} design={design} name={owner.name} x={owner.x} y={owner.y} width={ownerWidth}
           height={owner.height} headerHeight={ownerHeaderHeight} offset={offsetFor(owner.id)}
           pressed={selection === owner.selection} dragging={activeId === owner.id}
           onSelect={() => onNodeSelect(owner.selection)} dragHandlers={dragHandlers(owner.id)}>
@@ -207,7 +208,7 @@ export function OwnerGraphTimeline({
             const { id } = account;
             const { rows, incoming, outgoing } = shownAccounts.get(id);
             const pressed = selection === id || selection === owner.selection || selectedAccounts?.has(id) === true;
-            return <OwnerFlowAccount key={id} id={id} owner={owner.name} x={owner.x} y={ownerAccountY(account)}
+            return <OwnerFlowAccount key={id} design={design} id={id} owner={owner.name} x={owner.x} y={ownerAccountY(account)}
               width={ownerWidth} height={ownerRowHeight} offset={offsetFor(id)} pressed={pressed}
               muted={!isHighlighted(rows)} dragging={activeId === id} incoming={incoming} outgoing={outgoing}
               color={riskColor(ownerTransferRisk(rows))} onSelect={() => onNodeSelect(id)} dragHandlers={dragHandlers(id)} />;
