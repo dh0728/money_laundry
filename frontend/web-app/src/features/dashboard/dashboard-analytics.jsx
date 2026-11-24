@@ -174,6 +174,7 @@ const volumeDetail = [
   { label: '세탁 라벨 비율', color: 'var(--chart-suspect)', value: row => share(row.labeled, row.total) },
 ];
 const relationTargets = [{ id: 'total', tone: 'neutral' }, { id: 'suspect', tone: 'suspect' }];
+const institutionRelationTargets = [...relationTargets, { id: 'new-entities', source: 'total', tone: 'total' }];
 const transactionStages = ['수신처', '전체 거래', '이진 분류', '패턴 분류'];
 const investigationStages = ['의심 거래', 'Alert 연결', '조사 경로', '현재 상태', '완료 판정'];
 const riskScoreColors = {
@@ -199,8 +200,9 @@ export function NewEntitiesMetric({ data, reduced }) {
   const available = data.coverageScope === 'institution';
   const title = '새 계좌 · 새 소유주';
   const hasChart = available && (data.newAccounts > 0 || data.newOwners > 0);
-  return <ChartPanel title={title} note={available ? '거래 이력상 최초 등장 · KST' : '기관 전체 조회에서 제공'}
-    className="dashboard-priority-metric dashboard-new-entities" hasChart={hasChart}>
+  return <ChartPanel title={title} note={available ? '전체 거래 이력상 최초 등장 · KST' : '기관 전체 조회에서 제공'}
+    className="dashboard-priority-metric dashboard-new-entities" hasChart={hasChart}
+    data-sankey-detail={available ? 'new-entities' : undefined}>
     {available && <SeriesLegend series={newEntitySeries.map(item => ({ ...item, label: `${item.label} ${item.value(data)}` }))} />}
     {hasChart && <DailySeries rows={data.operationalDaily} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
       label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />}
@@ -248,8 +250,7 @@ function TransactionDetails({ data, flow, reduced, summary }) {
   const rows = data.operationalDaily.map(row => ({ ...row, displaySuspicious: row.suspicious * scale }));
   const badge = [flow.sample ? '은행별 건수는 예시' : null,
     scale > 1 ? '이상 띠 두께 ×' + scale + ' · 건수·비율 원본' : null].filter(Boolean).join(' · ');
-  const hostRef = useRef(null);
-  return <LayoutGrid columns={12} className="dashboard-flow-family dashboard-work-overview-grid" ref={hostRef}>
+  return <LayoutGrid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
     <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
       {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
         : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
@@ -264,7 +265,6 @@ function TransactionDetails({ data, flow, reduced, summary }) {
     </ChartPanel>
     <RiskSegments data={data} />
     {summary}
-    {flow.hasData && <SankeyDetailsLinks hostRef={hostRef} relations={relationTargets} />}
   </LayoutGrid>;
 }
 
@@ -290,14 +290,17 @@ function InvestigationStatus({ data, episode = false, reduced }) {
   </ChartPanel>;
 }
 
-export function Analytics({ data, reduced, summary }) {
+export function Analytics({ data, reduced, summary, indicators }) {
+  const hostRef = useRef(null);
   const transactions = transactionFlow(data);
   const investigation = investigationFlow(data);
   const scope = data.coverageScope === 'case-evidence' ? '선택 업무의 근거 거래' : null;
   const investigationNote = data.linked == null
     ? '의심 거래의 Alert 연결 집계 미제공'
     : '첫 구간은 거래 건수 · 이후에는 Alert 건수';
-  return <Box as="section" className="dashboard-analytics dashboard-workflow-charts" aria-label="기관 탐지 현황">
+  return <Box as="section" className="dashboard-analytics dashboard-workflow-charts dashboard-institution-relations"
+    aria-label="기관 탐지 현황" ref={hostRef}>
+    {indicators}
     {scope && <Text className="dashboard-note">거래 집계 범위 · {scope}</Text>}
     <TransactionDetails data={data} flow={transactions} reduced={reduced} summary={summary} />
     <ChartPanel title="조사 처리 흐름" note={investigationNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
@@ -308,6 +311,8 @@ export function Analytics({ data, reduced, summary }) {
       <InvestigationStatus data={data} reduced={reduced} />
       <InvestigationStatus data={data} reduced={reduced} episode />
     </LayoutGrid>
+    {transactions.hasData && <SankeyDetailsLinks hostRef={hostRef}
+      relations={scope ? relationTargets : institutionRelationTargets} />}
   </Box>;
 }
 

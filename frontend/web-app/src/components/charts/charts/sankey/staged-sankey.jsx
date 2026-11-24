@@ -47,8 +47,11 @@ function Labels() {
       const x = node.x1 + offsets.nodeInset;
       const y = (node.y0 + node.y1) / 2;
       return <g key={node.index}>
-        {node.anchor && <circle data-sankey-anchor={node.anchor} cx={(node.x0 + node.x1) / 2}
-          cy={node.y1} opacity={0} />}
+        {node.anchor && <>
+          <circle data-sankey-anchor={node.anchor} cx={(node.x0 + node.x1) / 2} cy={node.y1} opacity={0} />
+          <circle data-sankey-top-anchor={node.anchor} data-sankey-stage-index={node.stage}
+            cx={(node.x0 + node.x1) / 2} cy={node.y0} opacity={0} />
+        </>}
         <text x={x} y={y} dy={node.detail ? offsets.labelWithDetail : offsets.label}>
           {node.name}
           <tspan dx={offsets.countInset}>{[countLabel(node.count, node.unit), node.ratio].filter(Boolean).join(' · ')}</tspan>
@@ -82,7 +85,7 @@ export function StagedSankey({ data, stages, label, reduced }) {
   return <Box className="staged-sankey-scroller">
     <Box className="staged-sankey-content">
       <Box className="staged-sankey-stages" data-stage-count={stages.length}>
-        {stages.map(name => <Text as="span" key={name}>{name}</Text>)}
+        {stages.map((name, index) => <Text as="span" key={name} data-sankey-stage-label={index}>{name}</Text>)}
       </Box>
       <SankeyChart data={data} layout={layout} margin={design.margin} className="staged-sankey-chart"
         nodeWidth={design.nodeWidth} nodePadding={design.nodePadding} animationDuration={reduced ? 0 : undefined} interactionLabel={label}>
@@ -107,19 +110,26 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
     const edgeInset = readChartNumber('--chart-sankey-connector-edge-inset', 18);
     const measure = () => {
       const origin = host.getBoundingClientRect();
-      const chartBottom = chart.getBoundingClientRect().bottom - origin.top;
-      const next = relations.flatMap(({ id, tone }) => {
-        const anchor = chart.querySelector(`[data-sankey-anchor="${id}"]`);
+      const chartBounds = chart.getBoundingClientRect();
+      const next = relations.flatMap(({ id, source = id, tone }) => {
         const target = host.querySelector(`[data-sankey-detail="${id}"]`);
-        if (!anchor || !target) return [];
-        const start = anchor.getBoundingClientRect();
+        if (!target) return [];
         const end = target.getBoundingClientRect();
+        const aboveChart = end.bottom <= chartBounds.top;
+        const anchor = chart.querySelector(aboveChart ? `[data-sankey-top-anchor="${source}"]` : `[data-sankey-anchor="${source}"]`);
+        if (!anchor) return [];
+        const start = anchor.getBoundingClientRect();
         const startX = start.left + start.width / 2 - origin.left;
         const startY = start.top + start.height / 2 - origin.top;
+        const chartEdge = (aboveChart ? chartBounds.top : chartBounds.bottom) - origin.top;
         const endX = Math.min(Math.max(startX, end.left - origin.left + edgeInset), end.right - origin.left - edgeInset);
-        const endY = end.top - origin.top;
-        const turnY = (chartBottom + endY) / 2;
-        return [{ id, tone, endX, endY, path: `M ${startX} ${startY} V ${chartBottom} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
+        const endY = (aboveChart ? end.bottom : end.top) - origin.top;
+        const turnY = (chartEdge + endY) / 2;
+        const header = aboveChart && chart.querySelector(`[data-sankey-stage-label="${anchor.dataset.sankeyStageIndex}"]`)?.getBoundingClientRect();
+        const laneX = header ? Math.min(startX, header.left - origin.left - edgeInset / 2) : startX;
+        const leadY = header ? (header.bottom - origin.top + startY) / 2 : startY;
+        const lead = header ? ` C ${startX} ${leadY}, ${laneX} ${leadY}, ${laneX} ${header.bottom - origin.top}` : '';
+        return [{ id, tone, endX, endY, path: `M ${startX} ${startY}${lead} V ${chartEdge} C ${laneX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
       });
       setLines(next);
     };
@@ -137,7 +147,7 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
     };
   }, [hostRef, relations]);
   return <svg className="staged-sankey-relations" aria-hidden="true">
-    {lines.map(({ id, tone, path, endX, endY }) => <g key={id} data-tone={tone}>
+    {lines.map(({ id, tone, path, endX, endY }) => <g key={id} data-tone={tone} data-relation={id}>
       <path d={path} />
       <circle cx={endX} cy={endY} />
     </g>)}

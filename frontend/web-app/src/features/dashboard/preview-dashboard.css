@@ -100,7 +100,8 @@
   grid-column: span 4;
   min-inline-size: 0;
 }
-.dashboard-new-entities .dashboard-series-plot { min-block-size: var(--chart-detail-sparkline-height) }
+.dashboard-institution-relations { position: relative }
+.dashboard-workflow-charts .dashboard-new-entities .dashboard-series-plot { block-size: var(--chart-detail-sparkline-height) }
 .dashboard-workflow-charts {
   --dashboard-score-middle: color-mix(in srgb, var(--chart-suspect), var(--information-panel-surface));
   --dashboard-score-lower: color-mix(in srgb, var(--dashboard-score-middle), var(--information-panel-surface));
@@ -179,6 +180,7 @@
   color: var(--muted-text);
 }
 .staged-sankey-relations [data-tone="suspect"] { color: var(--chart-suspect) }
+.staged-sankey-relations [data-tone="total"] { color: var(--text) }
 .staged-sankey-relations path { fill: none; stroke: currentColor; stroke-width: var(--aml-stroke-divider) }
 .staged-sankey-relations circle { fill: currentColor }
 @container (inline-size < 60rem) {

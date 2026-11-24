@@ -206,12 +206,10 @@ export function PreviewDashboard({ mine, data, appearance }) {
   const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} />;
   const indicators = <DashboardIndicators data={data} mine={mine} reduced={appearance.reduced} />;
   return <Box className="preview-dashboard" data-mine={mine}>
-    {mine ? <PersonalDashboardOverview recommendation={summary}>{indicators}</PersonalDashboardOverview> : <>
-      {indicators}
-      <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
-        <Analytics data={data} reduced={appearance.reduced} summary={summary} />
-      </React.Suspense>
-    </>}
+    {mine ? <PersonalDashboardOverview recommendation={summary}>{indicators}</PersonalDashboardOverview> :
+      <React.Suspense fallback={<>{indicators}<DashboardAnalyticsSkeleton reduced={appearance.reduced} /></>}>
+        <Analytics data={data} reduced={appearance.reduced} summary={summary} indicators={indicators} />
+      </React.Suspense>}
     {rows ? <WorkBoard records={rows}
       mine={mine} sort={data.sort} appearance={appearance} statusByCode={data.investigation.statusByCode} /> : <DashboardBoardSkeleton />}
   </Box>;
