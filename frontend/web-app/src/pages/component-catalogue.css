@@ -74,7 +74,12 @@
 }
 .catalogue-tags { display: flex; gap: var(--workspace-gap); flex-wrap: wrap; padding: var(--aml-space-12); border-radius: var(--aml-radius-card) }
 .catalogue-stack { max-height: var(--catalogue-stack-sample-height); height: var(--catalogue-stack-sample-height) }
-.catalogue-stack .scroll-stack__inner, .catalogue-stack .scroll-stack-card { padding: var(--aml-space-4) }
+.catalogue-stack .scroll-stack__inner {
+  --scroll-stack-default-start-inset: var(--aml-space-4);
+  padding-inline: var(--aml-space-4);
+  padding-block-end: var(--aml-space-4);
+}
+.catalogue-stack .scroll-stack-card { padding: var(--aml-space-4) }
 .catalogue-stack .scroll-stack-card { min-height: var(--catalogue-stack-card-height); height: auto }
 .catalogue-ledger .ledger-components { block-size: min(var(--catalogue-ledger-max-height), var(--catalogue-ledger-viewport-share)) }
 .catalogue-workflow .screen-actions { position: static; margin-block-start: var(--aml-space-8); justify-content: end }

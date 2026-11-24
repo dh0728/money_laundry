@@ -7,7 +7,6 @@ import { appMotionPreference } from '@/hooks/use-reduced-motion';
 export interface ScrollStackItemProps {
   children?: ReactNode;
   itemClassName?: string;
-  style?: CSSProperties;
 }
 
 export interface ScrollStackProps {
@@ -66,8 +65,8 @@ const scrollsInside = (node: Element | null, stop: Element, delta: number) => {
   return false;
 };
 
-export const ScrollStackItem = ({ children, itemClassName = '', style }: ScrollStackItemProps) => (
-  <div className={`scroll-stack-card ${itemClassName}`.trim()} style={style}>
+export const ScrollStackItem = ({ children, itemClassName = '' }: ScrollStackItemProps) => (
+  <div className={`scroll-stack-card ${itemClassName}`.trim()}>
     {children}
     <span className="scroll-stack-card__shade" aria-hidden="true" />
   </div>
@@ -175,11 +174,11 @@ const ScrollStack = ({
         settings.holdDistance + (windowed ? 0 : Math.max(0, viewHeight - lastPin - heights[heights.length - 1]));
 
       let moved = write('padTop', padTop, value => {
-        inner.style.paddingTop = `${value}px`;
+        inner.style.setProperty('--scroll-stack-start-inset', toLength(value));
       });
       moved =
         write('endHeight', endHeight, value => {
-          end.style.height = `${value}px`;
+          end.style.setProperty('--scroll-stack-end-height', toLength(value));
         }) || moved;
 
       let flow = inner.getBoundingClientRect().top - viewTop + readScroll() + padTop;
@@ -215,12 +214,12 @@ const ScrollStack = ({
         const transform =
           depth < 0.0005
             ? ''
-            : `perspective(1200px) rotateX(${tilt.toFixed(2)}deg) rotate(${turn.toFixed(2)}deg) scale(${scale.toFixed(4)})`;
+            : `perspective(var(--scroll-stack-card-perspective)) rotateX(${tilt.toFixed(2)}deg) rotate(${turn.toFixed(2)}deg) scale(${scale.toFixed(4)})`;
         write(`transform${i}`, transform, value => {
-          card.style.transform = value;
+          card.style.setProperty('--scroll-stack-card-transform', value);
         });
         write(`filter${i}`, blur > 0.01 ? `blur(${blur.toFixed(2)}px)` : '', value => {
-          card.style.filter = value;
+          card.style.setProperty('--scroll-stack-card-filter', value);
         });
         write(`dim${i}`, dim.toFixed(3), value => {
           card.style.setProperty('--scroll-stack-dim', value);
@@ -357,16 +356,17 @@ const ScrollStack = ({
           return (
             <Fragment key={isValidElement(child) ? (child.key ?? index) : index}>
               {index > 0 && (
-                <div aria-hidden="true" style={{ height: Math.max(0, gap), marginTop: Math.min(0, gap) }} />
+                <div className="scroll-stack__gap" aria-hidden="true"
+                  style={{ '--scroll-stack-gap': toLength(gap) } as CSSProperties} />
               )}
               <div
                 data-stack-slot=""
                 className="scroll-stack__slot"
                 style={{
-                  top: `calc(${toLength(stackPosition)} + ${index * itemStackDistance}px)`,
-                  marginBottom: (items.length - 1 - index) * itemStackDistance,
-                  zIndex: index + 1
-                }}
+                  '--scroll-stack-slot-top': `calc(${toLength(stackPosition)} + ${toLength(index * itemStackDistance)})`,
+                  '--scroll-stack-slot-margin': toLength((items.length - 1 - index) * itemStackDistance),
+                  '--scroll-stack-slot-layer': index + 1
+                } as CSSProperties}
               >
                 {child}
               </div>

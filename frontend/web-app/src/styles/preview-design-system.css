@@ -16,6 +16,16 @@
   --catalogue-glass-sample-angle: 120deg;
   --catalogue-stack-sample-height: 170px;
   --catalogue-stack-card-height: 54px;
+  --scroll-stack-inline-inset-min: 1rem;
+  --scroll-stack-inline-inset-fluid: 6%;
+  --scroll-stack-inline-inset-max: 5rem;
+  --scroll-stack-card-height: 20rem;
+  --scroll-stack-card-inset: 2.5rem;
+  --scroll-stack-card-radius: 28px;
+  --scroll-stack-card-dark-surface: #18181b;
+  --scroll-stack-card-outline: light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08));
+  --scroll-stack-card-shadow: rgb(0 0 0 / 0.35);
+  --scroll-stack-card-perspective: 1200px;
   --catalogue-list-sample-height: 195px;
   --catalogue-ledger-max-height: 600px;
   --catalogue-ledger-viewport-share: 72dvh;
