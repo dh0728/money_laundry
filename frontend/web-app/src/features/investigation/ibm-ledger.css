@@ -51,7 +51,6 @@
 .benchmark-detail dd { margin: 0; overflow-wrap: anywhere }
 .benchmark-account { display: grid; gap: var(--aml-space-2) }
 .benchmark-amount { font-variant-numeric: tabular-nums }
-.benchmark-table { max-block-size: min(60dvh, var(--workspace-available-block)); }
 .benchmark-ledger-results {
   min-inline-size: 0;
   scroll-margin-block-start: calc(var(--header-height) + var(--workspace-gap));

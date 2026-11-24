@@ -442,8 +442,7 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
 
 :is(.work-tab:has(.work-tab-open[aria-current="page"]),
   .group-row:has(+ .group-content[hidden] [aria-current="page"]) .group-toggle,
-  .ledger-components .animated-list__item[data-selected], .workflow-rule-list tr[data-selected="true"],
-  .workflow-report tr[data-selected="true"], .preview-case-card[data-selected="true"],
+  .ledger-components .animated-list__item[data-selected], .preview-case-card[data-selected="true"],
   .rule-template-menu :is(.branched-menu__head, .branched-menu__item)[data-active],
   .workflow-backtest .stepper__segment[aria-current="step"]) {
   --text: var(--selection-ink);
@@ -757,7 +756,6 @@ html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
 .screen-related { grid-template-columns: var(--workspace-related-list-share) minmax(0, 1fr) }
 .screen-related > div { display: grid; gap: var(--workspace-gap) }
 .screen-tall > .screen-panel { min-block-size: clamp(var(--workspace-panel-min-height), calc(var(--workspace-available-block) / 2), var(--workspace-tall-panel-max-height)) }
-.screen-table { min-block-size: clamp(var(--workspace-table-min-height), calc(var(--workspace-available-block) / 3), var(--workspace-table-max-height)) }
 .screen-graph { min-block-size: clamp(var(--workspace-panel-min-height), calc(var(--workspace-available-block) / 2), var(--workspace-panel-max-height)) }
 .screen-overlay { width: min(var(--workspace-overlay-width), 100%); min-height: var(--workspace-overlay-min-height); justify-self: center }
 .screen-entries, [data-investigation-component="cards"] { min-block-size: 0; min-width: 0 }
@@ -772,9 +770,6 @@ html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
     grid-template-rows: auto minmax(0, 1fr);
   }
   .case-list-panel .case-list { block-size: auto }
-  .screen-layout:has(> [data-case-list-table]) {
-    padding-block-end: max(var(--workspace-inset), var(--account-footer-reserve));
-  }
 }
 .entry-list .row { width: 100%; font-weight: var(--aml-type-body-weight) }
 .entry-list .row[data-verdict] {
@@ -906,13 +901,6 @@ body:has(#footer-pagination > *) #workspace {
 .screen-primary[aria-disabled="true"] {
   color: var(--disabled-text);
   background: var(--glass-surface);
-}
-
-.screen-table-scroll { overflow-x: auto }
-.screen-table > .screen-table-scroll > table { width: 100%; margin-top: var(--aml-space-12); border-collapse: collapse; white-space: nowrap; text-align: left }
-.screen-table > .screen-table-scroll > table :is(th, td) { padding: var(--aml-space-8) }
-.screen-table > .screen-table-scroll > table tr[data-verdict] {
-  background-color: var(--record-verdict-surface);
 }
 
 /* All workspace painting stays below application chrome. Native dialogs and popovers use the top layer. */

@@ -265,7 +265,8 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
     {inventory}
     <Box className="screen-row screen-rule-list">
       <Panel className="workflow-rule-list" aria-label="룰 목록">
-        <WorkflowTable label="룰 목록" summary={tableCount(rows.length, rules.length, '개')}>
+        <WorkflowTable label="룰 목록" scrollbarGutter="auto" invertSelectedControls
+          summary={tableCount(rows.length, rules.length, '개')}>
             <TableHeader><TableRow>
               <SortableTableHead sorting={sorting} column="status" value={rule => ruleStatusLabels[rule.status]}>상태</SortableTableHead>
               <SortableTableHead sorting={sorting} column="rule" value={rule => rule.name}>룰</SortableTableHead>

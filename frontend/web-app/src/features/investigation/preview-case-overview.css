@@ -20,7 +20,11 @@
   scrollbar-gutter: stable;
 }
 .overview-ai-summary { --overview-chart-note: var(--ai-summary-note) }
-.overview-ai-summary .overview-evidence-bars { align-self: stretch; margin-block-start: 0 }
+.overview-ai-summary .preview-case-overview > .overview-current {
+  min-block-size: 0;
+  align-self: start;
+}
+.overview-evidence-bars { align-self: stretch; margin-block-start: 0 }
 .overview-summary-facts { margin: 0; padding-inline-start: var(--aml-space-20) }
 .overview-summary-facts li + li { margin-block-start: var(--aml-space-2) }
 .overview-tiles {
@@ -49,11 +53,6 @@
   .overview-tiles > [data-overview-span="8"] { grid-column: span 8 }
   .overview-tiles > [data-overview-span="9"] { grid-column: span 9 }
   .overview-tiles > [data-overview-span="12"] { grid-column: 1 / -1 }
-}
-.preview-case-overview > .overview-current,
-.screen-layout:has(> [data-workflow="case-overview"]) > .screen-table {
-  min-block-size: 0;
-  align-self: start;
 }
 .overview-evidence-bars {
   min-width: 0;
@@ -99,7 +98,6 @@
   flex: 1;
   min-inline-size: 0;
 }
-.overview-panel-visual:has(.case-evidence-table) { justify-content: start }
 @media (min-width: 900px) and (min-height: 500px) {
   .screen-layout:has(.preview-case-overview[data-per-panel="true"]) {
     display: flex;
@@ -268,7 +266,6 @@
 }
 .overview-flow-summary .overview-flow-focus { border-color: var(--brand-accent-ink) }
 .overview-flow-summary dd { margin: var(--aml-space-4) 0 0 }
-.preview-case-overview .case-evidence-table { margin-block-start: var(--workspace-gap); min-inline-size: 0; min-block-size: 0 }
 .overview-tiles h3, .overview-current h3 {
   margin: var(--workspace-gap) 0 0;
   font: inherit;

@@ -95,11 +95,6 @@
   flex-wrap: wrap;
   gap: var(--aml-space-4);
 }
-.workflow-report .data-table-frame tbody :is(th, td) { vertical-align: top }
-.workflow-report .data-table-frame :is(.workflow-report-targets, .workflow-report-patterns) {
-  flex-flow: column nowrap;
-  align-items: flex-start;
-}
 .report-audit-cell { min-inline-size: 14rem }
 .report-audit {
   display: grid;
@@ -162,10 +157,6 @@
   margin-block-start: var(--workspace-gap);
   padding-block: var(--record-card-shadow-gutter);
   padding-inline: 0;
-}
-.workflow-report .data-table-scroll,
-.workflow-backtest .data-table-scroll {
-  scrollbar-gutter: auto;
 }
 .workflow-report-cards .report-bento {
   grid-template-columns: repeat(4, minmax(0, 1fr));

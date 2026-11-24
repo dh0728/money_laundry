@@ -187,11 +187,14 @@ export function WorkflowQueryHeading({ title, summary, tools = true }) {
 }
 
 export function WorkflowTable({ label, title = label, summary, className = '', tableClassName = 'workflow-data-table',
-  tools = true, selection, compact, hierarchy, scrollRef, children }) {
-  return <div className="data-table-frame" data-hierarchy={hierarchy || undefined}>
+  tools = true, selection, compact, hierarchy, scrollRef, scrollbarGutter = 'stable', cellAlignment,
+  invertSelectedControls, children }) {
+  return <div className="data-table-frame" data-hierarchy={hierarchy || undefined}
+    data-cell-alignment={cellAlignment} data-invert-selected-controls={invertSelectedControls || undefined}>
     <WorkflowQueryHeading title={title} summary={summary} tools={tools} />
     <div className="data-table-content">
       <div ref={scrollRef} className={`data-table-scroll ${className}`} data-compact={compact || undefined}
+        data-scrollbar-gutter={scrollbarGutter === 'auto' ? 'auto' : undefined}
         role="region" aria-label={`${label} 스크롤`} tabIndex={0}>
         <Table className={tableClassName} aria-label={label}>{selection ? withSelectionColumn(children, selection) : children}</Table>
       </div>

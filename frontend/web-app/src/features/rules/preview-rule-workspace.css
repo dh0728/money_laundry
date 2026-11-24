@@ -21,7 +21,6 @@
   font-variant-numeric: tabular-nums;
 }
 .workflow-rule-list, .workflow-rule-note { grid-column: 1 / -1 }
-.workflow-rule-list .data-table-scroll { scrollbar-gutter: auto }
 .workflow-rule-detail { grid-column: 1 / 7 }
 .workflow-rule-reason { grid-column: 7 / -1 }
 .workflow-rule-detail, .workflow-rule-reason { align-self: stretch }
@@ -144,8 +143,6 @@
   word-break: normal;
 }
 
-.workflow-rule-list tbody tr[data-selected] { cursor: pointer }
-.workflow-rule-list .workflow-data-table th[scope="row"] { white-space: normal }
 .workflow-rule-select { text-align: start }
 .workflow-rule-select code { font-family: var(--aml-font-mono); white-space: nowrap }
 

@@ -13,7 +13,6 @@
   max-inline-size: 100%;
 }
 .contextual-header > .screen-navigation { position: relative; z-index: 1; flex: none }
-.data-table-tools > .context-query-tools { margin-inline-start: auto }
 .screen-query-area { display: grid; min-inline-size: 0 }
 .screen-query-row {
   display: flex;
@@ -31,8 +30,7 @@
 .screen-query-tools { margin-inline-start: auto; max-inline-size: 100% }
 .screen-query-area:not(:has(.context-query-tools:not([hidden]), .active-query-tags)),
 .screen-query-tags:not(:has(.active-query-tags)),
-.screen-query-editor,
-.table-query-slot:not(:has(.active-query-tags)) { display: none }
+.screen-query-editor { display: none }
 .query-control {
   display: flex;
   flex: none;

@@ -32,17 +32,6 @@
 }
 .variable-field:focus-visible { outline: var(--aml-stroke-focus) solid var(--focus-ring) }
 .variable-radius-example { justify-content: space-between }
-.variable-table {
-  max-block-size: min(60dvh, calc(var(--aml-space-64) * 7));
-}
-.variable-table thead {
-  position: sticky;
-  inset-block-start: 0;
-  background: var(--information-panel-surface);
-}
-.variable-table > [data-slot="table-container"] { min-inline-size: 0 }
-.variable-table :is(th, td) { padding: var(--aml-space-8) var(--aml-space-12) }
-.variable-table td { white-space: normal; overflow-wrap: anywhere }
 .variable-value > code { white-space: normal }
 .variable-swatch {
   flex: none;

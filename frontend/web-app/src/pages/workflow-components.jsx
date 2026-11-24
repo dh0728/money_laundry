@@ -312,7 +312,7 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
             <BacktestMetric label="적중 거래" value={results.matchedCount} unit="건" />
             <BacktestMetric label="검사 거래" value={results.scannedCount} unit="건" />
           </Box>
-          <WorkflowTable label="백테스트 근거 거래" summary={<>
+          <WorkflowTable label="백테스트 근거 거래" scrollbarGutter="auto" summary={<>
             {tableCount(sorting.rows.length, results.matchedCount)}
             <Text as="span">합계 {results.amountUsd.toLocaleString('ko-KR')} USD</Text>
           </>}>
@@ -468,7 +468,8 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
           </Box>
         </RecordCard> }))} />
     </Box> :
-      <WorkflowTable label="판정 로그" title="판정 이력" tools={tools}
+      <WorkflowTable label="판정 로그" title="판정 이력" tools={tools} scrollbarGutter="auto"
+        cellAlignment="top" invertSelectedControls
         selection={{
           codes: sorting.rows.map(row => row.id),
           rowCount: records.length,

@@ -20,12 +20,6 @@
 .ledger-accounts { grid-area: accounts }
 .ledger-transactions { grid-area: transactions }
 .ledger-related { grid-area: related }
-.ledger-tables {
-  display: grid;
-  min-inline-size: 0;
-  align-content: start;
-  gap: var(--workspace-gap);
-}
 .ledger-hierarchy { min-inline-size: 0 }
 .ledger-components .animated-list { margin-block-start: var(--workspace-gap) }
 .ledger-panel-heading, .ledger-source {
@@ -169,20 +163,6 @@
     flex: 1;
     min-block-size: 0;
   }
-  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables) {
-    display: flex;
-    flex-direction: column;
-    block-size: calc(100dvh - var(--header-height));
-    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
-  }
-  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables)
-    > [data-investigation-component="ledger"] {
-    display: grid;
-    flex: 1;
-    grid-template-rows: minmax(0, 1fr);
-    min-block-size: 0;
-  }
-  .ledger-tables { grid-template-rows: minmax(0, 1fr) auto }
   .ledger-hierarchy {
     display: flex;
     flex-direction: column;
@@ -266,13 +246,6 @@
   border-radius: var(--aml-radius-full);
   background: var(--information-panel-surface);
 }
-.ledger-table-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: var(--aml-space-8) var(--workspace-gap);
-  margin-block-end: var(--workspace-gap);
-}
-.ledger-table-controls .ledger-search { margin-block-start: 0 }
 .ledger-hierarchy .ledger-more { margin: 0 }
 /* 하단 공통 도구(계정·페이지)와 목록 끝 더 보기가 겹치지 않게 비워 둔다. */
 @media (min-width: 1121px) and (min-height: 481px) {
