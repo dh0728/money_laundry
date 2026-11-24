@@ -34,6 +34,7 @@ import '../../components/form-dropdown.css';
 import './preview-case-graph.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
 import { dataSeriesColors } from '@/components/charts/charts/chart-context';
+import { readChartNumber } from '@/components/charts/chart-design-values';
 
 function casesSharingEvidence(active, cases) {
   return cases.flatMap(record => {
@@ -70,7 +71,7 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
     const hidden = !isBase && hiddenCases.has(id);
     const interactive = shownCases.has(id);
     const membership = <>
-      <Text as="i" className="preview-flow-swatch" style={{ borderColor: color }} aria-hidden="true" />
+      <Text as="i" className="preview-flow-swatch" style={{ '--case-graph-swatch-ink': color }} aria-hidden="true" />
       <Text as="code">{id}</Text>{isBase && <Text as="span">기준</Text>}
       {hidden ? <Text as="span">숨김</Text> : !interactive && <Text as="span">범위 밖</Text>}
     </>;
@@ -189,7 +190,8 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
       margin={{ top: space(8), right: side, bottom: space(8), left: side }}
       nodeWidth={space(8)} nodePadding={space(16)}
       animationDuration={0} enterTransition={instantChartTransition}>
-      <SankeyLink reveal={false} getLinkColor={flowRiskColor} getNodeOffset={nodeOffset} strokeOpacity={0.68}
+      <SankeyLink reveal={false} getLinkColor={flowRiskColor} getNodeOffset={nodeOffset}
+        strokeOpacity={readChartNumber('--case-graph-sankey-link-opacity', 0.68)}
         linkAction={linkAction}
         renderLinkOverlay={(link, path, width) => {
           const pulseWidth = Math.max(2, Math.min(8, width * 0.28));
@@ -294,7 +296,9 @@ function CaseSankey({ rows, linkAction, controlsHost, flowPulse, playing }) {
         event.preventDefault();
         setCamera(current => ({ ...current, x: current.x - direction[0] * 48, y: current.y - direction[1] * 48 }));
       }}>
-      <Box className="preview-graph-sankey-flows" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})` }}>
+      <Box className="preview-graph-sankey-flows" style={{
+        '--case-graph-pan-x': `${camera.x}px`, '--case-graph-pan-y': `${camera.y}px`, '--case-graph-zoom': camera.zoom,
+      }}>
         <Box className="preview-graph-sankey-layout" style={{ '--sankey-columns': layers.length }}>
           {flow.links.length
             ? <DirectTransferChart flow={flow} layers={layers} returnLinks={returnLinks} linkAction={linkAction}

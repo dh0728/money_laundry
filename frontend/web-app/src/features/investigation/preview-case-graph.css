@@ -1,11 +1,10 @@
 .preview-related-layout {
-  --related-candidates-width: 27%;
   display: flow-root;
 }
 
 .preview-related-layout [data-case-flow] { display: contents }
 .preview-related-layout :is([data-case-evidence], [data-case-accounts], .preview-case-network, .preview-comparison-evidence) {
-  margin-inline-start: calc(var(--related-candidates-width) + var(--workspace-gap));
+  margin-inline-start: calc(var(--case-graph-candidate-share) + var(--workspace-gap));
   min-inline-size: 0;
 }
 .preview-related-layout :is([data-case-evidence], [data-case-accounts], .preview-comparison-evidence) {
@@ -13,7 +12,7 @@
 }
 .preview-related-cases {
   float: inline-start;
-  inline-size: var(--related-candidates-width);
+  inline-size: var(--case-graph-candidate-share);
   display: flex;
   flex-direction: column;
 }
@@ -52,13 +51,13 @@
 .preview-related-layout .preview-case-network:has([data-case-drop-active]) {
   position: sticky;
   inset-block-start: calc(var(--header-height) + var(--workspace-gap));
-  z-index: 3;
+  z-index: var(--case-graph-drop-target-layer);
 }
 .preview-graph-empty { padding: var(--ui-panel-padding) }
 .preview-graph-empty p { color: var(--muted-text) }
 .preview-graph-workspace {
   min-inline-size: 0;
-  --preview-graph-height: clamp(240px, 48vh, 480px);
+  --preview-graph-height: clamp(var(--case-graph-min-height), var(--case-graph-viewport-height), var(--case-graph-max-height));
   --preview-graph-control-size: var(--aml-panel-control-size);
 }
 .preview-graph-center {
@@ -73,7 +72,7 @@
 }
 .preview-graph-center-heading {
   grid-area: 1 / 1;
-  z-index: 1;
+  z-index: var(--case-graph-controls-layer);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -88,7 +87,7 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--aml-space-8);
-  max-inline-size: 42%;
+  max-inline-size: calc(100% - var(--case-graph-settings-share));
 }
 .preview-graph-scope-label {
   color: var(--muted-text);
@@ -107,7 +106,7 @@
     border-radius var(--aml-motion-drawer-duration) var(--aml-motion-drawer-ease);
 }
 .preview-graph-settings[data-expanded="true"] {
-  inline-size: min(22rem, 58%);
+  inline-size: min(var(--case-graph-settings-max-width), var(--case-graph-settings-share));
 }
 .preview-graph-settings-heading {
   display: flex;
@@ -224,11 +223,12 @@
 .preview-graph-sankey-viewport[data-panning] * { cursor: grabbing }
 .preview-graph-sankey-flows {
   transform-origin: top left;
+  transform: translate(var(--case-graph-pan-x), var(--case-graph-pan-y)) scale(var(--case-graph-zoom));
   padding: var(--aml-space-4) var(--aml-panel-inset) var(--aml-space-8);
 }
 .preview-graph-sankey-layout {
   min-inline-size: calc(var(--sankey-columns, 1) * var(--aml-space-64) + var(--aml-space-32));
-  max-inline-size: clamp(28rem, calc(var(--sankey-columns, 1) * 10rem), 62rem);
+  max-inline-size: clamp(var(--case-graph-sankey-min-width), calc(var(--sankey-columns, 1) * var(--case-graph-sankey-column-width)), var(--case-graph-sankey-max-width));
   margin-inline: auto;
 }
 .preview-graph-sankey {
@@ -237,7 +237,7 @@
   min-inline-size: 0;
 }
 .preview-graph-sankey-chart {
-  block-size: clamp(6rem, calc(var(--sankey-lanes) * var(--aml-space-24) + var(--aml-space-32)), 21rem);
+  block-size: clamp(var(--case-graph-sankey-min-height), calc(var(--sankey-lanes) * var(--aml-space-24) + var(--aml-space-32)), var(--case-graph-sankey-max-height));
 }
 .preview-graph-sankey-chart svg text {
   fill: var(--text);
@@ -264,7 +264,7 @@
 }
 @media (width > 768px) {
   .preview-graph-center:not([data-visualization="sankey"]) > .preview-graph-actions {
-    z-index: 1;
+    z-index: var(--case-graph-controls-layer);
     margin-block-start: calc(-1 * var(--aml-panel-inset));
   }
   .preview-graph-center:not([data-visualization="sankey"]):has(> .preview-graph-actions) .preview-graph-settings {
@@ -296,18 +296,22 @@
   block-size: var(--preview-graph-control-size);
   flex: none;
 }
-.preview-graph-playback input { flex: 1 1 80px; min-width: 60px; accent-color: var(--brand-accent) }
+.preview-graph-playback input {
+  flex: 1 1 calc(var(--aml-space-64) + var(--aml-space-16));
+  min-width: var(--case-graph-playback-slider-min-width);
+  accent-color: var(--brand-accent);
+}
 @container case-graph (max-width: 34rem) {
   .preview-graph-playback > span[aria-hidden="true"] { display: none }
   .preview-graph-playback input { min-inline-size: 0 }
 }
-.preview-flow-swatch { display: block; width: var(--aml-space-16); border-block-start: var(--aml-stroke-focus) solid var(--muted-text) }
+.preview-flow-swatch { display: block; width: var(--aml-space-16); border-block-start: var(--aml-stroke-focus) solid var(--case-graph-swatch-ink, var(--muted-text)) }
 .preview-case-network {
   --case-graph-risk-high: var(--risk-high);
   --case-graph-risk-medium: var(--risk-medium);
   --case-graph-risk-low: var(--risk-low);
   --case-graph-risk-unknown: var(--muted-text);
-  --case-graph-dimmed: color-mix(in srgb, var(--muted-text) 52%, var(--canvas-surface));
+  --case-graph-dimmed: color-mix(in srgb, var(--muted-text) var(--case-graph-dimmed-ink-share), var(--canvas-surface));
 }
 .preview-graph-risk-mark {
   flex: none;
@@ -340,7 +344,7 @@
 .preview-owner-timeline[data-panning], .preview-owner-timeline[data-panning] [role="button"] { cursor: grabbing }
 .preview-owner-timeline > svg { display: block; inline-size: 100%; block-size: 100% }
 .preview-owner-timeline text { fill: var(--text); font-size: var(--aml-type-caption-size) }
-.owner-block-boundary { fill: var(--information-panel-surface); stroke: var(--divider); stroke-width: 1.5px }
+.owner-block-boundary { fill: var(--information-panel-surface); stroke: var(--divider); stroke-width: var(--case-graph-owner-boundary-stroke) }
 .owner-lane-control rect { fill: var(--inner-surface) }
 .owner-time-node rect { fill: var(--information-panel-surface) }
 .preview-owner-timeline :is(.owner-lane-control, .owner-time-node):is(:hover, :focus-visible) rect { fill: var(--hover) }
@@ -357,17 +361,17 @@
 .preview-owner-timeline :is(.owner-lane-control, .owner-time-node)[data-dragging] { cursor: grabbing }
 .owner-time-node[data-dragging] rect { stroke: var(--focus-ring) }
 .owner-account-divider { fill: none; stroke: var(--divider); }
-.owner-account-port { stroke: var(--information-panel-surface); stroke-width: 1.25px }
+.owner-account-port { stroke: var(--information-panel-surface); stroke-width: var(--case-graph-owner-port-stroke) }
 .owner-time-edge path { fill: none }
 .owner-edge-visible { stroke-linecap: round }
 .owner-time-edge text {
   paint-order: stroke;
   stroke: var(--information-panel-surface);
-  stroke-width: 4px;
+  stroke-width: var(--aml-space-4);
   text-anchor: middle;
   pointer-events: none;
 }
-.preview-owner-timeline [data-muted] { opacity: .25 }
+.preview-owner-timeline [data-muted] { opacity: var(--case-graph-owner-muted-opacity) }
 .owner-time-edge:focus-visible .owner-edge-hit { stroke: var(--brand-accent-tint) }
 .preview-owner-timeline :is(.owner-lane-control, .owner-time-node) text {
   dominant-baseline: central;
@@ -398,7 +402,8 @@
   }
   .preview-related-layout :is([data-case-evidence], [data-case-accounts], .preview-comparison-evidence) { order: 2 }
   .preview-graph-center:not([data-visualization="sankey"]) {
-    --preview-graph-height: clamp(240px, calc(48vh - var(--preview-graph-control-size) - 2 * var(--aml-panel-inset)), 480px);
+    --preview-graph-height: clamp(var(--case-graph-min-height),
+      calc(var(--case-graph-viewport-height) - var(--preview-graph-control-size) - 2 * var(--aml-panel-inset)), var(--case-graph-max-height));
     grid-template-rows: auto var(--preview-graph-height) auto;
   }
   .preview-graph-center > .preview-evidence-canvas { grid-row: 2 }
