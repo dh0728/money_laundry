@@ -112,8 +112,6 @@
   --chart-sparkline-height: 4.5rem;
   --chart-summary-height: clamp(var(--chart-sparkline-height), 7vw, 7rem);
   --chart-series-height: clamp(10rem, 16vw, 14rem);
-  --chart-donut-size-min: 9rem;
-  --chart-donut-size-max: 15rem;
   --chart-axis-label-line-height: 1.2;
   --metric-value-size-min: 1.5rem;
   --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));

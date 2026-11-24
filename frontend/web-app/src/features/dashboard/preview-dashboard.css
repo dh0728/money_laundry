@@ -2,12 +2,9 @@
   --chart-total: light-dark(
     color-mix(in srgb, var(--text) 10%, var(--information-panel-surface)),
     color-mix(in srgb, var(--text) 16%, var(--information-panel-surface)));
-  --chart-open: var(--status-pending-accent);
-  --chart-completion: var(--review-status-done-accent);
   --chart-suspect: var(--risk-high);
   --chart-suspect-label: color-mix(in srgb, var(--chart-suspect), var(--text) 35%);
   --chart-pattern: var(--chart-suspect);
-  --chart-pattern-reference: color-mix(in srgb, var(--chart-total), var(--text) 12%);
   --chart-risk-high: var(--risk-high);
   --chart-risk-medium: var(--risk-medium);
   --chart-risk-low: var(--risk-low);
@@ -81,18 +78,18 @@
   min-inline-size: 0;
   margin: var(--aml-space-8) 0 0;
 }
-:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot, .dashboard-status-area) {
+:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot) {
   position: relative;
   flex: 1 1 0;
   min-inline-size: 0;
 }
 .dashboard-summary-plot { min-block-size: var(--chart-summary-height) }
 .dashboard-metric-plot { min-block-size: var(--dashboard-metric-plot-min) }
-:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot, .dashboard-status-area) > div {
+:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot) > div {
   position: absolute;
   inset: 0;
 }
-:is(.dashboard-series-plot, .dashboard-status-area) > div {
+.dashboard-series-plot > div {
   inline-size: 100%;
   block-size: 100%;
 }
@@ -412,88 +409,25 @@
   margin: 0;
 }
 .dashboard-chart:has(> .dashboard-risk-chart) { grid-template-rows: auto 1fr }
-.dashboard-donut-plot {
-  position: relative;
-  flex: 1 0 var(--chart-donut-size-min);
-  align-self: stretch;
-  max-inline-size: min(100%, var(--chart-donut-size-max));
-  min-block-size: var(--chart-donut-size-min);
-}
-.dashboard-donut-ring {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  translate: -50% -50%;
-  display: grid;
-  flex: none;
-  place-items: center;
-}
-.dashboard-donut-ring > * { grid-area: 1 / 1 }
-.dashboard-donut-ring > :empty { border-radius: 50% }
-.dashboard-donut-center {
-  z-index: 1;
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  pointer-events: none;
-}
-.dashboard-risk-legend {
-  display: grid;
-  flex: 0 1 auto;
-  min-inline-size: 0;
-  gap: var(--aml-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--aml-type-caption-size);
-  font-variant-numeric: tabular-nums;
-}
-.dashboard-risk-legend > li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--aml-space-2) var(--aml-space-4);
-}
-.dashboard-risk-legend i { flex: none; border-radius: 50% }
 .dashboard-chart:has(.dashboard-series), .dashboard-series {
   display: flex;
   flex-direction: column;
 }
 .dashboard-series { flex: 1 0 auto; gap: var(--workspace-gap); margin: 0 }
-:is(.dashboard-series-plot, .dashboard-status-area) { min-block-size: var(--chart-series-height) }
+.dashboard-series-plot { min-block-size: var(--chart-series-height) }
 .dashboard-loading .dashboard-bklit-series { block-size: var(--chart-series-height) }
 .dashboard-volume-axis { display: grid; justify-items: center; line-height: var(--chart-axis-label-line-height) }
 .dashboard-volume-axis small { color: var(--chart-suspect-label); font-size: var(--aml-type-caption-size); font-variant-numeric: tabular-nums }
-:is(.dashboard-legend, .dashboard-status-readout) > span {
+.dashboard-legend > span {
   display: inline-flex;
   align-items: center;
   gap: var(--aml-space-4);
   font-size: var(--aml-type-caption-size);
 }
-:is(.dashboard-legend, .dashboard-status-readout) i {
+.dashboard-legend i {
   width: var(--aml-space-8);
   height: var(--aml-space-8);
   border-radius: 50%;
-}
-.dashboard-legend .dashboard-status-line-key {
-  inline-size: var(--aml-space-16);
-  block-size: 0;
-  border: 0;
-  border-block-start: var(--aml-stroke-focus) dashed var(--chart-completion);
-  border-radius: 0;
-}
-.dashboard-status-area svg path[stroke-linecap="round"] { stroke-linejoin: round }
-.dashboard-status-area:focus-visible {
-  outline: var(--aml-stroke-focus) solid var(--focus-ring);
-  outline-offset: var(--aml-space-2);
-}
-.dashboard-status-readout {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--aml-space-4) var(--workspace-gap);
-  min-block-size: var(--aml-type-caption-lineHeight);
-  color: var(--muted-text);
-  font-variant-numeric: tabular-nums;
 }
 .dashboard-personal-status {
   display: grid;
