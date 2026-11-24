@@ -224,6 +224,10 @@
   --rule-condition-column-width: 34%;
   --rule-builder-columns: minmax(0, 1fr) minmax(0, 1.1fr);
   --rule-validation-columns: var(--aml-space-20) var(--aml-space-64) 1fr;
+  --date-ticker-glass-shadow-light-ink: rgb(0 0 0 / 0.12);
+  --date-ticker-glass-shadow: 0 var(--aml-space-6) var(--aml-space-20) var(--date-ticker-glass-shadow-light-ink);
+  --date-ticker-glass-shadow-dark: 0 var(--aml-space-6) var(--aml-space-20) var(--aml-black-040);
+  --date-ticker-glass-saturation: 1.6;
   --aml-duration-instant: 0ms;
   --aml-duration-fast: 120ms;
   --aml-duration-normal: 180ms;
