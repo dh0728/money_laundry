@@ -11,10 +11,10 @@
   "token/radius-unit": 0,
   "token/font-size-unit": 0,
   "token/inline-style": 84,
-  "token/arbitrary-class": 115,
+  "token/arbitrary-class": 113,
   "token/important": 2,
-  "token/fixed-number": 86,
+  "token/fixed-number": 79,
   "token/palette-direct": 0,
-  "chart/library-import": 2,
+  "chart/library-import": 1,
   "icon/local-svg": 6
 }

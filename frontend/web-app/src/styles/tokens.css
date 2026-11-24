@@ -169,6 +169,14 @@
   --chart-tooltip-indicator-border-width: 1.5px;
   --chart-series-swatch-radius: 2px;
   --chart-grid-border-strength: 50%;
+  --case-activity-chart-height: 170px;
+  --case-activity-grid-columns: minmax(0, 1.45fr) minmax(var(--case-activity-summary-min-width), 1fr);
+  --case-activity-summary-min-width: 320px;
+  --case-activity-axis-font-size: 10px;
+  --case-activity-value-axis-width: 70px;
+  --case-activity-tooltip-cursor-opacity: 0.35;
+  --case-activity-bar-radius: 3px;
+  --case-activity-grid-dash: 3;
   --table-ledger-filter-min-width: 14rem;
   --table-records-wide-min: 850px;
   --table-records-evidence-min: 950px;
