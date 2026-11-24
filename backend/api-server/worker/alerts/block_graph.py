@@ -1,10 +1,12 @@
-"""Pure, bounded block generator (policy block-pin-3: block-pin-2 with longer time limits).
+"""Pure, bounded block generator (policy block-pin-4: block-pin-3 plus shared-account joins).
 
 Implements P0-P7 of worktable/alert_motif_design.md §7: pinning, hubs, faces/stars/
 RELAY, PASS/PATH/BRIDGE flow relations, capped Kruskal assembly, CLOSURE walks,
 single-seed shapes (policy, default on) and the output contract. Non-seed hops of
 PATH, BRIDGE, CLOSURE and shapes become CONNECTION members; context is never a
-member. No labels, persistence or review state.
+member. P8 (block-pin-4) attaches leftover seeds and joins blocks through a shared
+non-hub account within the same limits (witness SHARED_ACCOUNT). No labels, persistence
+or review state.
 
 block-pin-2 keeps every decision within the policy's time limits (BRIDGE time clusters,
 
@@ -25,6 +27,9 @@ from alerts.flow_graph import (FlowBatch, FlowGraph, FlowIndex, GraphBudgetExcee
 
 STAR_KINDS = {"out": "STAR_OUT", "in": "STAR_IN"}
 FOCAL_KINDS = ("STAR_OUT", "STAR_IN", "RELAY")
+SHARED_KIND = "SHARED_ACCOUNT"
+# Unassigned reasons a leftover seed may be attached from (block-pin-4, stage 1).
+ATTACHABLE_REASONS = ("SELF_TRANSFER", "CORE_CAP", "LINK_ONLY")
 # Tier order of P4: flow relations first, then strong stars, then weak stars and relays.
 # A pinned star is reserved in P2 (its face) and anchored in P4; it has no tier of its own.
 TIER_FLOW, TIER_STRONG, TIER_WEAK = 1, 2, 3
@@ -38,7 +43,7 @@ class BlockInputError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class BlockPolicy:
-    version: str = "block-pin-3"
+    version: str = "block-pin-4"
     core_max: int = 64
     # block-pin-3 (2026-10-23): loose upper bounds, not fitted values. Synthetic pattern times
     # scale with the dataset's length (longest CYCLE/FAN pattern: HI-Small <= 96 h, HI-Medium
@@ -83,6 +88,12 @@ class BlockPolicy:
     context_pad_us: int = 24 * HOUR_US
     link_max: int = 32
     single_seed_shapes: bool = True
+    # block-pin-4: a leftover seed (self-transfer, link only, cap) joins the block that
+    # shares most of its accounts, within core_max and span_max (witness SHARED_ACCOUNT).
+    attach_leftovers: bool = True
+    # block-pin-4 stage 2: blocks whose seeds use one non-hub account join in time order,
+    # within core_max and span_max. Two pinned blocks (OPEN Alerts) are never joined (I4).
+    merge_shared: bool = True
     max_edge_visits: int = 20_000_000
     max_relations: int = 200_000
 
@@ -97,7 +108,7 @@ class BlockPolicy:
         non_negative = (self.relay_lead_us, self.context_pad_us, self.hub_max_seed_share_percent,
                         self.path_gap_max)
         flags = (self.single_seed_shapes, self.absorb_dangling, self.contested_check,
-                 self.star_exclude_passthrough)
+                 self.star_exclude_passthrough, self.attach_leftovers, self.merge_shared)
         if (not self.version
                 or any(type(value) is not int or value < 1 for value in positive)
                 or any(type(value) is not int or value < 0 for value in non_negative)
@@ -211,6 +222,7 @@ class _Build:
         self.frozen = {s: False for s in self.seeds}
         self.starside = {}
         self.focal_published = defaultdict(set)
+        self.published_shared = []   # (a seed of the pinned group, SHARED_ACCOUNT tx_ids)
         self.owned_by_star = {}
         self.contested = set()
         self.contested_in, self.contested_out = set(), set()
@@ -426,6 +438,9 @@ class _Build:
             for witness in adopted:
                 kind, tx_ids = ((witness.kind, witness.tx_ids) if isinstance(witness, Witness)
                                 else (witness[0], tuple(witness[1])))
+                if kind == SHARED_KIND:
+                    self.published_shared.append((selected[0], tuple(tx_ids)))
+                    continue
                 if kind not in FOCAL_KINDS:
                     continue
                 positions = []
@@ -1118,6 +1133,140 @@ class _Build:
             self.stats["relays_rejected"] += 1
             self.link_roots(by_root, roots, "BOUNDARY_SAME_FOCAL")
 
+    # ----- P8: shared accounts (block-pin-4) -----
+    def publishable_roots(self):
+        return sorted((root for root in {self.find(s) for s in self.seeds}
+                       if self.witnesses[root] and not self.frozen[root]), key=self.ids.__getitem__)
+
+    def fits(self, roots, extra):
+        low, high = self.merged_bounds(roots, extra)
+        return (self.merged_size(roots, extra) <= self.policy.core_max
+                and high - low <= self.policy.span_max_us)
+
+    def shared_hub(self, account, t):
+        window = self.policy.hub_window_us
+        return (self.is_hub(account, "in", t - window, t + window)
+                or self.is_hub(account, "out", t - window, t + window))
+
+    def readopt_shared(self):
+        """A pinned block re-adopts its published SHARED_ACCOUNT witnesses (I10).
+
+        On a re-run the joined seeds already sit in the pinned group, so the join is not
+        found again; the published evidence is kept while its transactions are still inside
+        the block and the block keeps another witness of its own.
+        """
+        for anchor, tx_ids in self.published_shared:
+            root = self.find(anchor)
+            if self.frozen[root] or not self.witnesses[root]:
+                continue
+            try:
+                positions = [self.edges.position(int(key)) for key in tx_ids]
+            except ValueError:
+                continue
+            members = self.comp_seeds[root] | self.core[root]
+            if (len(set(positions)) < 2 or not set(positions) <= members
+                    or not set(positions) & self.seeds or not self.fits([root], positions)):
+                continue
+            self.adopt(root, SHARED_KIND, positions)
+            self.stats["readopted_" + SHARED_KIND] += 1
+
+    def attach_leftovers(self):
+        """Stage 1: a leftover seed joins the block that shares most of its accounts.
+
+        Only seeds left out for a self-transfer, a link only or the cap are attached, never
+        through a hub account. The block must stay within core_max and span_max; otherwise
+        the seed stays unassigned. Two pinned blocks are never joined (I4).
+        """
+        if not self.policy.attach_leftovers:
+            return
+        index = defaultdict(list)   # account -> [(seed key of the block, core position)]
+        for root in self.publishable_roots():
+            for pos in sorted(self.core[root], key=self.tkey):
+                for account in {self.sources[pos], self.targets[pos]}:
+                    index[account].append((root, pos))
+        for s in sorted(self.seeds, key=self.tkey):
+            own = self.find(s)
+            if (self.frozen[own] or s in self.core[own]
+                    or self.unassigned_reason(s) not in ATTACHABLE_REASONS):
+                continue
+            t = self.times[s]
+            partners = defaultdict(dict)   # block -> account -> nearest core transaction
+            for account in sorted({self.sources[s], self.targets[s]}):
+                if self.shared_hub(account, t):
+                    continue
+                for key, pos in index.get(account, ()):
+                    root = self.find(key)
+                    if pos == s or self.frozen[root]:
+                        continue
+                    # A seed already held by a structured block may only join that block.
+                    if self.witnesses[own] and root != own:
+                        continue
+                    if (root != own and self.pinned[root] is not None
+                            and self.pinned[own] is not None):
+                        continue
+                    current = partners[root].get(account)
+                    if current is None or (abs(self.times[pos] - t), self.ids[pos]) < (
+                            abs(self.times[current] - t), self.ids[current]):
+                        partners[root][account] = pos
+            if not partners:
+                continue
+            target = min(partners, key=lambda root: (-len(partners[root]), self.ids[root]))
+            partner = min(partners[target].values(), key=lambda pos: (abs(self.times[pos] - t), self.ids[pos]))
+            roots = {target, own}
+            if not self.fits(roots, [s, partner]):
+                self.stats["attach_rejected"] += 1
+                continue
+            root = self.merge(roots)
+            self.adopt(root, SHARED_KIND, [s, partner])
+            self.stats["attached_leftovers"] += 1
+            for account in {self.sources[s], self.targets[s]}:
+                index[account].append((s, s))
+
+    def merge_shared(self):
+        """Stage 2: blocks whose seeds use one account join, earliest first.
+
+        Per account, the blocks are ordered by their first seed on that account and each
+        is paired with the next one. A pair joins when the account is no hub at either seed,
+        the result stays within core_max and span_max, and at most one block is pinned.
+        The witness is the two seeds, so every join keeps a seed in its evidence (I3).
+        """
+        if not self.policy.merge_shared:
+            return
+        first_seed = defaultdict(dict)   # account -> block -> its earliest seed on the account
+        for root in self.publishable_roots():
+            for s in sorted(self.core[root] & self.seeds, key=self.tkey):
+                for account in {self.sources[s], self.targets[s]}:
+                    first_seed[account].setdefault(root, s)
+        pairs = []
+        for account in sorted(first_seed):
+            ordered = sorted(first_seed[account].values(), key=self.tkey)
+            for a, b in zip(ordered, ordered[1:]):
+                pairs.append((self.tkey(b), self.tkey(a), account, a, b))
+        pairs.sort()
+        for _, _, account, a, b in pairs:
+            left, right = self.find(a), self.find(b)
+            if left == right or self.frozen[left] or self.frozen[right]:
+                continue
+            if self.pinned[left] is not None and self.pinned[right] is not None:
+                self.stats["merge_open_pair_skipped"] += 1
+                continue
+            if self.shared_hub(account, self.times[a]) or self.shared_hub(account, self.times[b]):
+                self.stats["merge_hub_skipped"] += 1
+                continue
+            if not self.fits([left, right], [a, b]):
+                self.stats["merge_rejected"] += 1
+                continue
+            self.adopt(self.merge([left, right]), SHARED_KIND, [a, b])
+            self.stats["merged_shared"] += 1
+
+    def unassigned_reason(self, s):
+        flags = set(self.limits[s])
+        if s in self.selfie:
+            flags.add("SELF_TRANSFER")
+        if s in self.link_seeds:
+            flags.add("LINK_ONLY")
+        return next((name for name in UNASSIGNED_PRIORITY if name in flags), "NO_STRUCTURE")
+
     # ----- P7 -----
     def output(self):
         policy = self.policy
@@ -1164,15 +1313,8 @@ class _Build:
                 tuple(focal), first - policy.context_pad_us, last + policy.context_pad_us,
                 self.pinned[root]))
             covered |= seeds
-        unassigned = []
-        for s in sorted(self.seeds - covered, key=self.ids.__getitem__):
-            flags = set(self.limits[s])
-            if s in self.selfie:
-                flags.add("SELF_TRANSFER")
-            if s in self.link_seeds:
-                flags.add("LINK_ONLY")
-            reason = next((name for name in UNASSIGNED_PRIORITY if name in flags), "NO_STRUCTURE")
-            unassigned.append(UnassignedSeed(self.ids[s], reason))
+        unassigned = [UnassignedSeed(self.ids[s], self.unassigned_reason(s))
+                      for s in sorted(self.seeds - covered, key=self.ids.__getitem__)]
         self.rejected.sort(key=lambda item: (item.reason, item.witness.kind, item.witness.tx_ids))
         digest = hashlib.sha256(json.dumps(asdict(policy), sort_keys=True,
                                            separators=(",", ":")).encode("utf-8")).hexdigest()
@@ -1207,4 +1349,7 @@ class _Build:
         self.assemble()
         self.closures()
         self.shapes()
+        self.readopt_shared()
+        self.attach_leftovers()
+        self.merge_shared()
         return self.output()
