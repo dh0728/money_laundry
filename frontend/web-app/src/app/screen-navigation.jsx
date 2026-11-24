@@ -52,7 +52,10 @@ function WorkspaceIcons({ items, onRoute, reduced }) {
   const active = items.find(item => item.current)?.value ?? '';
   const links = items.map(({ icon: NavIcon, label, value, current }) => ({
     value, current, accessibleLabel: label,
-    label: <Text as="span" aria-hidden="true" className="workspace-nav-icon"><NavIcon className="icon" aria-hidden="true" /></Text>,
+    label: <Text as="span" aria-hidden="true" className="workspace-nav-icon">
+      <NavIcon className="icon" aria-hidden="true" />
+      <Text as="span" className="workspace-nav-label">{label}</Text>
+    </Text>,
   }));
   return <Box as="nav" ref={ref} className="screen-nav-pill segmented-navigation workspace-icon-nav glass" aria-label="주 메뉴">
     <NavigationSegments label="주 메뉴" items={links} active={active} onSelect={onRoute}

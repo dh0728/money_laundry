@@ -10,7 +10,12 @@
   padding: 0;
   text-decoration: none;
 }
-.workspace-nav-icon { display: flex }
+.workspace-nav-icon { display: flex; align-items: center; gap: var(--header-nav-inset) }
+.workspace-nav-label { display: none }
+:root[data-workspace-width="wide"] .workspace-nav-label { display: inline }
+:root[data-workspace-width="wide"] .screen-navigation .workspace-icon-nav.segmented-navigation .rubber-segment__item {
+  padding-inline: var(--segment-inline-padding);
+}
 .workspace-icon-nav a:not([aria-current]):hover { opacity: var(--rs-hover) }
 .segmented-navigation a[aria-current]:focus-visible {
   z-index: 1;
