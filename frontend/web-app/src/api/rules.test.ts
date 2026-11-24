@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest'
 import { ApiError, clearCsrf } from './common'
-import { createRule, deleteRuleDraft, fetchRule, fetchRuleCatalog, fetchRules, saveRuleDraft, validateRule, type RuleDefinition } from './rules'
+import {
+  cancelBacktest, createRule, deleteRuleDraft, fetchBacktest, fetchBacktests, fetchRule, fetchRuleCatalog, fetchRules, requestBacktest, saveRuleDraft,
+  validateRule, type RuleDefinition,
+} from './rules'
 
 const definition: RuleDefinition = {
   schema: 2, template: 'FAN_OUT', windowMinutes: 10080,
@@ -50,6 +53,21 @@ it('검증 · 만들기 · 초안 저장 · 초안 삭제를 POST · PUT · DELE
   expect(call(3)).toEqual({ url: '/api/v1/rules/3/versions/7', method: 'DELETE', body: undefined })
 })
 
+it('백테스트는 실행 · 조회 · 룰별 목록 · 취소를 rule-backtests 주소로 보낸다', async () => {
+  await requestBacktest({ versionId: 7 })
+  await requestBacktest({ versionId: 7, baselineVersionId: 5, from: '2023-09-08', to: '2023-09-16' })
+  await fetchBacktest(31)
+  await fetchBacktests(3)
+  await cancelBacktest(31)
+  expect([0, 1, 2, 3, 4].map(index => call(index))).toEqual([
+    { url: '/api/v1/rule-backtests', method: 'POST', body: { versionId: 7 } },
+    { url: '/api/v1/rule-backtests', method: 'POST', body: { versionId: 7, baselineVersionId: 5, from: '2023-09-08', to: '2023-09-16' } },
+    { url: '/api/v1/rule-backtests/31', method: 'GET', body: undefined },
+    { url: '/api/v1/rule-backtests?ruleId=3', method: 'GET', body: undefined },
+    { url: '/api/v1/rule-backtests/31/cancel', method: 'POST', body: {} },
+  ])
+})
+
 it('룰 쓰기 요청은 화면 전체를 다시 읽게 하는 알림을 보내지 않는다', async () => {
   const changed = vi.fn()
   window.addEventListener('live-data-changed', changed)
@@ -58,6 +76,8 @@ it('룰 쓰기 요청은 화면 전체를 다시 읽게 하는 알림을 보내�
     await createRule({ name: '분산 송금 감시', template: 'FAN_OUT' })
     await saveRuleDraft(3, 7, { name: '분산 송금 감시', definition, revision: 0 })
     await deleteRuleDraft(3, 7)
+    await requestBacktest({ versionId: 7 })
+    await cancelBacktest(31)
     expect(changed).not.toHaveBeenCalled()
   } finally {
     window.removeEventListener('live-data-changed', changed)

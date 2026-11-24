@@ -59,6 +59,11 @@ export const catalogFixture = {
     "filterConditions": 10,
     "nameLength": 80,
   },
+  "backtestTemplates": [
+    "FAN_IN",
+    "FAN_OUT",
+    "GATHER_SCATTER",
+  ],
 } as unknown as RuleCatalog
 
 /** FAN-OUT 기본값을 검증한 결과 */

@@ -195,6 +195,45 @@ button.rule-connector:hover { background: var(--hover) }
 .workflow-rule-summary { white-space: normal; overflow-wrap: anywhere; color: var(--muted-text) }
 .rule-version-summary { display: grid; gap: var(--aml-space-6) }
 
+/* ── 백테스트 ── */
+.rule-backtest { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--workspace-gap) }
+.rule-backtest > * { grid-column: 1 / -1; min-inline-size: 0 }
+.rule-backtest > .backtest-comparison { margin-block: 0 }
+.rule-backtest-rule { inline-size: 100%; min-inline-size: 0 }
+.rule-backtest-progress { inline-size: 100%; block-size: var(--aml-space-8); accent-color: var(--brand-accent) }
+.rule-backtest-blocked {
+  margin: 0;
+  padding: var(--aml-space-8) var(--aml-space-12);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--inner-surface);
+}
+.screen-row.rule-backtest-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--workspace-gap);
+  align-items: start;
+}
+.rule-backtest-detail > .screen-panel { display: grid; gap: var(--aml-space-8); align-content: start; min-inline-size: 0 }
+.rule-backtest-detail :is(h2, p) { margin: 0 }
+.rule-backtest-table { inline-size: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums }
+.rule-backtest-table :is(th, td) {
+  padding: var(--aml-space-6) var(--aml-space-8);
+  border-block-end: 1px solid var(--divider);
+  text-align: end;
+  font-weight: inherit;
+}
+.rule-backtest-table :is(th, td):first-child { text-align: start }
+.rule-backtest-table thead th { color: var(--muted-text); font-size: var(--aml-type-caption-size) }
+.rule-backtest-table tr[data-current] { background: var(--brand-accent-tint) }
+.rule-backtest-table tr[data-current] th { font-weight: 600 }
+.rule-backtest-current { color: var(--muted-text); font-size: var(--aml-type-caption-size); font-weight: 400 }
+.rule-backtest-facts { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+.rule-backtest-history { display: grid; gap: var(--aml-space-8) }
+.rule-backtest-history > :is(h2, p) { margin: 0 }
+.rule-backtest-cases { display: grid; gap: var(--aml-space-8) }
+.rule-backtest-cases > p { margin: 0 }
+.rule-backtest-more { justify-self: start }
+
 @media (max-width: 1180px) {
   .screen-row.screen-rule-editor.rule-builder { grid-template-columns: minmax(13rem, 1fr) minmax(0, 2fr) }
   .rule-builder > .rule-checklist { grid-column: 1 / -1 }

@@ -16,7 +16,7 @@ import './preview-rule-workspace.css';
 import './live-rule-engine.css';
 
 // 룰 목록과 상세(서비스 모드). 한 룰은 운영 버전 최대 1개와 작업 중 버전 최대 1개를 가진다.
-// 지금 할 수 있는 일은 초안 이어서 작성과 초안 삭제다. 승인 · 반려 · 중지 · 복제 · 백테스트는 서버 기능이 붙는 대로 연다.
+// 지금 할 수 있는 일은 초안 이어서 작성, 초안 삭제, 백테스트로 열기다. 승인 · 반려 · 중지 · 복제는 서버 기능이 붙는 대로 연다.
 
 const countFormat = new Intl.NumberFormat('ko-KR');
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
@@ -155,6 +155,7 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
   // attempt: 초안을 지운 뒤에는 같은 룰이어도 상세를 다시 읽는다
   useEffect(() => (selectedId == null ? undefined : loadDetail(selectedId)), [selectedId, loadDetail, attempt]);
 
+  const backtestable = template => (catalog?.backtestTemplates ?? []).includes(template);
   const subjectOf = template => subjectNames[catalog?.templates.find(item => item.key === template)?.subject];
   const breakdown = ruleStatusOrder.map(value => ({ value, label: ruleStatusNames[value], count: list?.counts[value] ?? 0 })).filter(({ count }) => count);
   const ruleFilter = [{ value: 'all', label: '전체' }, ...breakdown.map(({ value, label }) => ({ value, label }))];
@@ -225,7 +226,9 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
       <PrimaryButton tone="negative" disabled title={later}>중지</PrimaryButton>
       <PrimaryButton tone="negative" disabled title={later}>반려</PrimaryButton>
       <PrimaryButton tone="inverse" disabled title={later}>복제</PrimaryButton>
-      <PrimaryButton tone="inverse" disabled title={later}>백테스트로 열기</PrimaryButton>
+      {shown && backtestable(shown.template)
+        ? <PrimaryButton tone="inverse" as="a" href={`/rules/backtest?rule=${shown.code}`}>백테스트로 열기</PrimaryButton>
+        : <PrimaryButton tone="inverse" disabled title={shown ? '이 템플릿의 백테스트는 아직 제공하지 않습니다.' : undefined}>백테스트로 열기</PrimaryButton>}
       {working?.editable
         ? <PrimaryButton tone="inverse" as="a" href={`/rules/new?rule=${shown.code}`}>이어서 작성</PrimaryButton>
         : <PrimaryButton tone="inverse" disabled>이어서 작성</PrimaryButton>}

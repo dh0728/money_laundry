@@ -19,6 +19,7 @@ import { SectionDownloadHeading } from '../components/section-download';
 import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
 import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { RuleList, ruleWorkspace } from '../features/rules/preview-rule-workspace';
+import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
 import { LiveRuleList } from '../features/rules/live-rule-list';
 import { liveActiveRules, liveRules } from '../features/rules/live-rule-store';
 import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
@@ -593,9 +594,8 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
   if (kind === 'alert-episode-actions') return <AlertEpisodeActions overview={overview} />;
   if (kind === 'case-judgment') return <CaseReviewActions overview={overview} />;
   if (kind === 'case-readonly') return <Panel className="glass"><h2>읽기 전용</h2></Panel>;
-  // 서비스 모드의 백테스트는 새 룰 엔진의 백테스트 API 가 붙을 때 연다.
-  if (kind === 'backtest' && liveRules) return <Panel className="glass"><h2>백테스트는 준비 중입니다.</h2>
-    <p>룰 만들기와 룰 목록을 먼저 열었습니다. 백테스트는 서버 기능이 붙은 뒤에 쓸 수 있습니다.</p></Panel>;
+  if (kind === 'backtest' && liveRules) return <LiveRuleBacktest initialRule={overview?.rule}
+    registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   if (kind === 'backtest' && !ruleWorkspace.rules.length) return <Panel className="glass"><h2>등록된 룰이 없습니다.</h2></Panel>;
   if (kind === 'rules-list' && liveRules) return <LiveRuleList initialRule={overview?.rule}
     registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;

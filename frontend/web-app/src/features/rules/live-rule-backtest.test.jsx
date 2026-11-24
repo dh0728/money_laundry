@@ -1,0 +1,169 @@
+import React from 'react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ApiError } from '@/api/common';
+import { cancelBacktest, fetchBacktest, fetchBacktests, fetchRule, fetchRuleCatalog, fetchRules, requestBacktest } from '@/api/rules';
+import { LiveRuleBacktest } from './live-rule-backtest';
+import { activeRuleFixture, catalogFixture, draftRuleFixture, rulesFixture } from './rule-test-fixtures';
+
+// 서비스 모드의 백테스트 화면. 서버 응답은 API.md §12 의 모양으로 만든 것이다.
+vi.mock('@/api/rules', () => ({
+  fetchRuleCatalog: vi.fn(), fetchRules: vi.fn(), fetchRule: vi.fn(),
+  requestBacktest: vi.fn(), fetchBacktest: vi.fn(), fetchBacktests: vi.fn(), cancelBacktest: vi.fn(),
+}));
+
+// RULE-004: 운영 v1(수취 계좌 6개 이상)과 내가 쓴 새 버전 v2(5개 이상)가 같이 있는 룰
+const working = { ...draftRuleFixture.working, versionId: 6, versionNo: 2, sentence: '수취 계좌 수가 5개 이상이면 근거로 표시합니다.' };
+const operating = { ...draftRuleFixture.working, versionId: 5, versionNo: 1, status: 'ACTIVE', editable: false, sentence: '수취 계좌 수가 6개 이상이면 근거로 표시합니다.' };
+const comparedRule = { ...draftRuleFixture, status: 'ACTIVE', operating, working };
+
+const head = (status, extra = {}) => ({
+  backtestId: 31, status, progress: 0, cancelRequested: false, errorCode: null, ruleId: 4, code: 'RULE-004', name: '분산 송금 감시', template: 'FAN_OUT',
+  versionId: 6, versionNo: 2, summary: '수취 계좌 5개 이상 · 7일', currentDefinition: true,
+  baseline: { versionId: 5, versionNo: 1, summary: '수취 계좌 6개 이상 · 7일' }, period: { from: '2023-09-08', to: '2023-09-16', days: 9 },
+  requestedBy: 'L1 심사자 A', requestedAt: '2023-09-17T00:00:00Z', startedAt: null, finishedAt: null, ...extra,
+});
+const result = {
+  kpis: { hits: 3, added: 1, dropped: 1, precision: 50, judged: 2, baseHits: 3, basePrecision: 100, baseJudged: 1 },
+  txCount: 12000, evidenceTxCount: 18, evidenceShare: 0.15, hitDays: 4, alertOverlap: 2, expectedNewAlerts: 1, chunkedCount: 0, skippedBusySubjects: 2,
+  busy: { maxTransactions: 512, windowMinutes: 4320 },
+  sweep: { metric: 'DISTINCT_COUNTERPARTIES', label: '서로 다른 수취 계좌 수', unit: '개', rows: [
+    { value: 4, current: false, hits: 5, txCount: 26, alertOverlap: 2, expectedNewAlerts: 3 },
+    { value: 5, current: true, hits: 3, txCount: 18, alertOverlap: 2, expectedNewAlerts: 1 },
+    { value: 6, current: false, hits: 2, txCount: 13, alertOverlap: 2, expectedNewAlerts: 0 }] },
+  cases: [
+    { subjectType: 'ACCOUNT', subject: 'c41f3f2a', state: 'ADDED', measured: { SUM_USD: 10000, TX_COUNT: 5, DISTINCT_COUNTERPARTIES: 5 }, txCount: 5, alertId: null, judgement: null },
+    { subjectType: 'ACCOUNT', subject: '9be07d11', state: 'DROPPED', measured: { DISTINCT_COUNTERPARTIES: 6, TX_COUNT: 6, SUM_USD: 12000 }, txCount: 6, alertId: 3003, judgement: 'NORMAL' },
+    { subjectType: 'ACCOUNT', subject: '57e936c0', state: 'KEPT', measured: { DISTINCT_COUNTERPARTIES: 7, TX_COUNT: 7, SUM_USD: 14000 }, txCount: 7, alertId: 3001, judgement: 'SUSPICIOUS' }],
+};
+const completed = { ...head('COMPLETED', { progress: 100, finishedAt: '2023-09-17T00:00:05Z' }), ...result };
+const problem = (status, code, detail) => new ApiError({ type: 'about:blank', title: code, status, code, detail });
+
+let footer;
+beforeEach(() => {
+  vi.mocked(fetchRuleCatalog).mockResolvedValue(catalogFixture);
+  vi.mocked(fetchRules).mockResolvedValue(rulesFixture);
+  vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4 ? comparedRule : activeRuleFixture));
+  vi.mocked(fetchBacktests).mockResolvedValue([]);
+  footer = document.createElement('footer');
+  document.body.append(footer);
+});
+afterEach(() => {
+  footer.remove();
+  vi.useRealTimers();
+  vi.clearAllMocks();
+});
+
+const runButton = name => within(footer).getByRole('button', { name });
+const card = name => within(screen.getByRole('region', { name }));
+
+it('고른 룰의 새 버전과 비교할 운영 버전을 보여 주고, 실행하면 끝날 때까지 2초마다 상태를 읽는다', async () => {
+  render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
+  await screen.findByRole('region', { name: '백테스트 대상 룰' });
+  expect(await card('백테스트 대상 룰').findByText(working.sentence)).toBeInTheDocument();
+  expect(card('백테스트 대상 룰').getByLabelText('룰')).toHaveValue('RULE-004');
+  expect(card('비교 기준').getByText('운영 버전 · v1')).toBeInTheDocument();
+  expect(card('실행 상태').getByText(/아직 돌린 백테스트가 없습니다/)).toBeInTheDocument();
+  expect(within(footer).getByRole('link', { name: '조건 고치기' })).toHaveAttribute('href', '/rules/new?rule=RULE-004');
+
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.mocked(requestBacktest).mockResolvedValue({ backtestId: 31, status: 'QUEUED' });
+  vi.mocked(fetchBacktest).mockResolvedValueOnce(head('QUEUED')).mockResolvedValueOnce(head('RUNNING', { progress: 40 })).mockResolvedValue(completed);
+  fireEvent.click(runButton('백테스트 실행'));
+  expect(await card('실행 상태').findByText('대기 중')).toBeInTheDocument();
+  // 새 버전(versionId 6)을 보낸다. 비교 기준은 서버가 운영 버전으로 고른다.
+  expect(requestBacktest).toHaveBeenCalledWith({ versionId: 6 });
+  expect(runButton('백테스트 실행')).toBeDisabled();
+  expect(card('백테스트 대상 룰').getByLabelText('룰')).toBeDisabled();
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(card('실행 상태').getByText('실행 중')).toBeInTheDocument();
+  expect(card('실행 상태').getByLabelText('진행률')).toHaveValue(40);
+  vi.mocked(fetchBacktests).mockResolvedValue([completed]);
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(card('실행 상태').getByText('완료')).toBeInTheDocument();
+
+  const kpis = within(screen.getByLabelText('백테스트 결과'));
+  expect(kpis.getByText('적중 대상').nextElementSibling).toHaveTextContent('3 개');
+  expect(kpis.getByText('운영 v1 은 3개')).toBeInTheDocument();
+  expect(kpis.getByText('새로 걸림').nextElementSibling).toHaveTextContent('1 개');
+  expect(kpis.getByText('빠짐').nextElementSibling).toHaveTextContent('1 개');
+  expect(kpis.getByText('사람 판정 기준 정확도').nextElementSibling).toHaveTextContent('50%');
+  expect(kpis.getByText('판정 2건 기준 · 운영 v1 은 100%')).toBeInTheDocument();
+  // 끝난 뒤에는 더 읽지 않는다
+  const reads = vi.mocked(fetchBacktest).mock.calls.length;
+  await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+  expect(fetchBacktest).toHaveBeenCalledTimes(reads);
+  expect(runButton('다시 실행')).toBeEnabled();
+});
+
+it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것을 보여 준다', async () => {
+  vi.mocked(fetchBacktests).mockResolvedValue([completed]);
+  vi.mocked(fetchBacktest).mockResolvedValue({ ...completed, currentDefinition: false, evidenceShare: 12.5, chunkedCount: 1 });
+  render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
+
+  const sweep = within(await screen.findByRole('region', { name: '값을 바꾸면' }));
+  const current = sweep.getByRole('row', { name: /이번 값/ });
+  expect(current).toHaveTextContent('5개');
+  expect(within(current).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['3', '18', '2', '1']);
+  expect(sweep.getAllByRole('row')).toHaveLength(4);
+
+  const scope = within(screen.getByRole('region', { name: '검사 범위' }));
+  expect(scope.getByText('2023-09-08 ~ 2023-09-16 (9일)')).toBeInTheDocument();
+  expect(scope.getByText('12,000건')).toBeInTheDocument();
+  expect(scope.getByText(/대상 1개/)).toHaveTextContent('추정');
+
+  // 측정값은 템플릿이 정한 순서(수취 계좌 → 거래 → 총액)와 카탈로그의 문구 · 단위로 읽는다
+  const cases = within(screen.getByRole('region', { name: '사례' }));
+  const added = within(cases.getByText('c41f3f2a').closest('tr'));
+  expect(added.getByText('새로 걸림')).toBeInTheDocument();
+  expect(added.getByText('수취 계좌 5개 · 거래 5건 · 보낸 총액 10,000 USD')).toBeInTheDocument();
+  const dropped = within(cases.getByText('9be07d11').closest('tr'));
+  expect(dropped.getByText('빠짐')).toBeInTheDocument();
+  expect(dropped.getByText('3003')).toBeInTheDocument();
+  expect(dropped.getByText('정상')).toBeInTheDocument();
+  expect(within(cases.getByText('57e936c0').closest('tr')).getByText('의심')).toBeInTheDocument();
+
+  const notices = within(screen.getByRole('list', { name: '알아 둘 것' }));
+  expect(notices.getByText(/조건을 고치기 전의 것입니다/)).toBeInTheDocument();
+  expect(notices.getByText(/검사한 거래의 12.5% 입니다/)).toBeInTheDocument();
+  expect(notices.getByText(/바쁜 계좌 2개는 평가하지 않았습니다/)).toHaveTextContent('72시간 안 같은 방향 거래 512건 초과');
+  expect(notices.getByText(/32건을 넘는 대상이 1개/)).toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: '실행 기록' })).getByRole('button', { name: /v2 · 완료 · 운영 v1 과 비교/ }))
+    .toHaveAttribute('aria-pressed', 'true');
+});
+
+it('도는 중에는 취소할 수 있고, 실패하면 이유를 보여 준다', async () => {
+  vi.mocked(fetchBacktests).mockResolvedValue([head('RUNNING', { progress: 20 })]);
+  vi.mocked(fetchBacktest).mockResolvedValue(head('RUNNING', { progress: 20 }));
+  vi.mocked(cancelBacktest).mockResolvedValue(head('RUNNING', { progress: 20, cancelRequested: true }));
+  render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
+  fireEvent.click(await within(footer).findByRole('button', { name: '취소' }));
+  expect(await card('실행 상태').findByText(/취소를 요청했습니다/)).toBeInTheDocument();
+  expect(cancelBacktest).toHaveBeenCalledWith(31);
+  expect(runButton('취소')).toBeDisabled();
+
+  vi.mocked(fetchBacktests).mockResolvedValue([head('FAILED', { errorCode: 'TIMEOUT' })]);
+  vi.mocked(fetchBacktest).mockResolvedValue(head('FAILED', { errorCode: 'TIMEOUT' }));
+  fireEvent.click(within(screen.getByRole('region', { name: '실행 기록' })).getByRole('button', { name: /v2/ }));
+  expect(await card('실행 상태').findByRole('alert')).toHaveTextContent('120초를 넘어 중단했습니다');
+  expect(screen.queryByLabelText('백테스트 결과')).not.toBeInTheDocument();
+});
+
+it('평가기가 없는 템플릿은 실행을 막고, 서버가 접수를 거절하면 사유를 보여 준다', async () => {
+  // RULE-004 가 평가기가 아직 없는 템플릿(분할 입·출금)의 룰일 때
+  vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4
+    ? { ...draftRuleFixture, template: 'STRUCTURING', templateName: '분할 입·출금' } : activeRuleFixture));
+  render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
+  expect(await screen.findByText(/분할 입·출금 템플릿의 백테스트는 아직 제공하지 않습니다/)).toBeInTheDocument();
+  expect(runButton('백테스트 실행')).toBeDisabled();
+
+  // RULE-002(FAN-IN)는 운영 버전뿐이라 비교 없이 그 버전을 돌린다
+  fireEvent.change(card('백테스트 대상 룰').getByLabelText('룰'), { target: { value: 'RULE-002' } });
+  expect(await card('비교 기준').findByText('운영 버전 그대로 돌립니다. 비교할 새 버전이 없습니다.')).toBeInTheDocument();
+  vi.mocked(requestBacktest).mockRejectedValue(problem(400, 'VALIDATION_FAILED', '원장에 거래가 없어 백테스트를 돌릴 수 없습니다.'));
+  await waitFor(() => expect(runButton('백테스트 실행')).toBeEnabled());
+  fireEvent.click(runButton('백테스트 실행'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('원장에 거래가 없어 백테스트를 돌릴 수 없습니다.');
+  expect(requestBacktest).toHaveBeenCalledWith({ versionId: activeRuleFixture.operating.versionId });
+});

@@ -427,6 +427,8 @@ export function LiveRuleBuilder({ actionsHost, initialRuleId = ruleFromAddress()
         {saved && !dirty && <div role="status" className="rule-draft-actions">
           <p><strong>{saved.code}</strong> 초안이 저장되었습니다.</p>
           <ActionButton as="a" href={`/rules?rule=${saved.code}`}>저장한 룰 보기</ActionButton>
+          {(catalog.backtestTemplates ?? []).includes(templateKey) && check?.canRun
+            && <ActionButton as="a" href={`/rules/backtest?rule=${saved.code}`}>백테스트로 열기</ActionButton>}
         </div>}
       </form>
     </Panel>

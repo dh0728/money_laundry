@@ -1,4 +1,4 @@
-import { deleteJson, getJson, postJson, putJson, type IsoDateTime } from './common'
+import { deleteJson, getJson, postJson, putJson, type IsoDate, type IsoDateTime } from './common'
 
 // 룰 엔진 API (API.md §12). 룰은 이름표(ruleId, 화면 번호 code)이고 조건은 버전(versionId)이 갖는다.
 // 쓰기 요청은 화면 전체를 다시 읽게 하는 알림을 보내지 않는다. 룰 화면이 필요한 것만 다시 읽는다.
@@ -77,6 +77,8 @@ export type RuleItemSpec = {
 }
 export type RulePathSpec = { label: SidedText; type: 'int' | 'decimal'; unit?: string; min?: number; max?: number; default?: number }
 export type RuleCatalog = {
+  /** 평가기가 있어 백테스트를 돌릴 수 있는 템플릿 키 */
+  backtestTemplates?: string[]
   schema: number
   templates: RuleTemplate[]
   filterFields: Record<string, RuleItemSpec>
@@ -190,3 +192,83 @@ export const saveRuleDraft = (ruleId: number, versionId: number, input: { name: 
   putJson<RuleSaved>(`/api/v1/rules/${ruleId}/versions/${versionId}`, input, silent)
 export const deleteRuleDraft = (ruleId: number, versionId: number) =>
   deleteJson(`/api/v1/rules/${ruleId}/versions/${versionId}`, silent)
+
+// ── 백테스트 ────────────────────────────────────────────────────────────
+export type BacktestStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+export type BacktestKpis = {
+  /** 적중 대상 수 */
+  hits: number
+  /** 비교 기준에 없다가 생긴 대상 수. 비교 기준이 없으면 null */
+  added: number | null
+  dropped: number | null
+  /** 사람 판정이 붙은 대상 가운데 의심의 비율(%). 판정이 없으면 null */
+  precision: number | null
+  judged: number
+  baseHits: number | null
+  basePrecision: number | null
+  baseJudged: number | null
+}
+export type BacktestSweepRow = { value: number; current: boolean; hits: number; txCount: number; alertOverlap: number; expectedNewAlerts: number }
+export type BacktestCase = {
+  subjectType: 'ACCOUNT' | 'TX'
+  /** 가명 계좌 ID 앞 8자리 */
+  subject: string
+  /** HIT: 비교 기준 없음. ADDED: 새로 걸림. DROPPED: 빠짐. KEPT: 그대로 */
+  state: 'HIT' | 'ADDED' | 'DROPPED' | 'KEPT'
+  measured: Record<string, number>
+  txCount: number
+  alertId: number | null
+  judgement: 'SUSPICIOUS' | 'NORMAL' | null
+}
+/** 백테스트의 머리. 실행 기록의 한 줄이기도 하다. */
+export type BacktestHead = {
+  backtestId: number
+  status: BacktestStatus
+  progress: number
+  cancelRequested: boolean
+  errorCode: 'TIMEOUT' | 'INTERNAL' | 'INTERRUPTED' | null
+  ruleId: number
+  code: string
+  name: string
+  template: string
+  versionId: number
+  versionNo: number
+  summary: string
+  /** false 면 백테스트를 돌린 뒤에 조건을 고쳤다 */
+  currentDefinition: boolean
+  baseline: { versionId: number; versionNo: number; summary: string } | null
+  period: { from: IsoDate; to: IsoDate; days: number }
+  requestedBy: string
+  requestedAt: IsoDateTime
+  startedAt: IsoDateTime | null
+  finishedAt: IsoDateTime | null
+  txCount?: number | null
+}
+/** 끝난(COMPLETED) 백테스트에만 오는 결과 */
+export type BacktestResult = {
+  kpis: BacktestKpis
+  /** 검사한 거래 수 */
+  txCount: number
+  evidenceTxCount: number
+  /** 검사한 거래 가운데 근거 거래의 비율(%) */
+  evidenceShare: number | null
+  hitDays: number
+  alertOverlap: number
+  /** 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수. 추정값이다 */
+  expectedNewAlerts: number
+  /** 근거 거래가 32건을 넘는 대상 수 */
+  chunkedCount: number
+  skippedBusySubjects: number
+  busy: { maxTransactions: number; windowMinutes: number }
+  sweep?: { metric: string; label: string; unit: string; rows: BacktestSweepRow[] }
+  cases: BacktestCase[]
+}
+export type Backtest = BacktestHead & Partial<BacktestResult>
+
+/** 백테스트를 접수한다. 비교 기준을 안 주면 그 룰의 운영 버전과 비교한다. */
+export const requestBacktest = (input: { versionId: number; baselineVersionId?: number; from?: IsoDate; to?: IsoDate }) =>
+  postJson<{ backtestId: number; status: BacktestStatus }>('/api/v1/rule-backtests', input, silent)
+export const fetchBacktest = (backtestId: number) => getJson<Backtest>(`/api/v1/rule-backtests/${backtestId}`)
+/** 한 룰의 백테스트 기록. 최근 것부터 20건 */
+export const fetchBacktests = (ruleId: number) => getJson<BacktestHead[]>('/api/v1/rule-backtests', { ruleId })
+export const cancelBacktest = (backtestId: number) => postJson<Backtest>(`/api/v1/rule-backtests/${backtestId}/cancel`, {}, silent)

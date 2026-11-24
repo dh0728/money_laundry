@@ -106,6 +106,7 @@ it('처음 저장은 룰을 만들고 주소에 번호를 남기며, 다시 저�
   expect(createRule).toHaveBeenCalledWith({ name: '분산 송금 감시', template: 'FAN_OUT', definition: fanOut });
   expect(window.location.search).toBe('?rule=RULE-009');
   expect(screen.getByRole('link', { name: '저장한 룰 보기' })).toHaveAttribute('href', '/rules?rule=RULE-009');
+  expect(screen.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', '/rules/backtest?rule=RULE-009');
   // 고친 것이 없으면 다시 저장하지 않고, 저장한 룰의 템플릿은 바꾸지 못한다
   expect(saveButton()).toBeDisabled();
   expect(screen.getByRole('button', { name: /RANDOM/ })).toBeDisabled();
@@ -163,11 +164,12 @@ it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, �
   expect(row.getByText(draftRuleFixture.working.summary)).toBeInTheDocument();
   expect(within(screen.getByRole('region', { name: '룰 변경 기록' })).getByText('룰 만듦 · v1')).toBeInTheDocument();
 
-  // 지금 열린 일은 이어서 작성과 초안 삭제뿐이다
+  // 지금 열린 일은 이어서 작성, 초안 삭제, 백테스트로 열기다
   const actions = within(footer);
   expect(actions.getByRole('link', { name: '이어서 작성' })).toHaveAttribute('href', '/rules/new?rule=RULE-004');
   expect(actions.getByRole('button', { name: '초안 삭제' })).toBeEnabled();
-  for (const name of ['중지', '반려', '복제', '백테스트로 열기', '승인 요청']) expect(actions.getByRole('button', { name })).toBeDisabled();
+  expect(actions.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', '/rules/backtest?rule=RULE-004');
+  for (const name of ['중지', '반려', '복제', '승인 요청']) expect(actions.getByRole('button', { name })).toBeDisabled();
 
   // 운영 중 룰에는 고칠 초안이 없다
   fireEvent.click(screen.getByRole('button', { name: /RULE-002/ }));
