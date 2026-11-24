@@ -80,7 +80,7 @@
   block-size: auto;
   font: bold var(--aml-type-caption-size)/var(--aml-type-label-lineHeight) var(--aml-font-family);
 }
-.semantic-tag[data-tag="status"][data-preset]:not(.semantic-tag--human-verdict, [data-tone="neutral"], [data-preset^="elapsed"], [data-preset^="risk"])::before {
+.semantic-tag[data-tag="status"][data-preset]:not(.semantic-tag--human-verdict, [data-preset="neutral"], [data-preset^="elapsed"], [data-preset^="risk"])::before {
   content: '';
   inline-size: var(--aml-space-6);
   block-size: var(--aml-space-6);
@@ -94,7 +94,7 @@
   --tag-dot: var(--tag-solid-fill, var(--text));
 }
 .semantic-tag[data-tag="status"][data-emphasis="solid"] {
-  --tag-dot: color-mix(in srgb, var(--tag-ink) 70%, var(--tag-solid-fill));
+  --tag-dot: color-mix(in srgb, var(--tag-ink) 70%, var(--tag-fill));
 }
 [data-review="unread"] {
   --review-status-accent: var(--review-status-unread-accent);
