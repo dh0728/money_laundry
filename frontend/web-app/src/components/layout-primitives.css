@@ -14,6 +14,4 @@
   gap: var(--grid-gap, var(--aml-space-8));
   min-inline-size: 0;
 }
-.aml-text { margin: 0 }
 .aml-text[data-tone="muted"] { color: var(--muted-text) }
-.aml-heading { margin: 0 }

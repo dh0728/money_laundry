@@ -2,6 +2,7 @@
 // 왼쪽은 의심 거래 건 구성, 오른쪽은 패턴 소속 거래에서 나온 유형별 Alert 수다. 모수가 달라 길이를 서로 맞추지 않는다.
 import { Fragment, useEffect, useState } from 'react'
 import { fmt } from '@/lib/format'
+import { Box, Text } from '../../components/layout-primitives'
 
 export type CompositionItem = { name: string; value: number; fill: string }
 export type PatternDistributionItem = { pattern: string; alerts: number; fill: string }
@@ -105,38 +106,38 @@ export function PatternRelationStack({ composition, distribution, linked = true,
   const patternedEnd = round(Math.min(patternedSize.width, funnelW))
   // 양 끝 접선을 수직으로 둔 S자 곡선: 막대 끝에서 곧게 내려와 전체 폭으로 부드럽게 퍼진다.
   const funnel = `M 0 0 L ${patternedEnd} 0 C ${patternedEnd} ${funnelH * .6} ${round(funnelW)} ${funnelH * .4} ${round(funnelW)} ${funnelH} L 0 ${funnelH} Z`
-  return <div data-testid="transaction-pattern-stack" role="img" aria-label={linked ? '전체 의심 거래 구성(거래 건)과 패턴 소속 거래의 유형별 Alert 분포' : '전체 분석 거래의 모델 조합과 의심 거래의 유형별 건수'} className="min-w-0 rounded-lg border bg-muted/30 p-3">
-    <div data-testid="relation-total-panel">
-      <p className="text-xs font-medium">전체 구성 <span className="font-normal text-muted-foreground">· 거래 건</span></p>
-      <ul className="mt-2.5 space-y-1">{composition.map(item => <li key={item.name} data-testid="relation-total-label" className="flex min-w-0 items-center gap-2 text-xs"><strong className="w-10 shrink-0 font-semibold tabular-nums">{sharePct(item.value, total)}</strong><span className="min-w-0 flex-1 truncate">{item.name}</span><span className="shrink-0 tabular-nums text-muted-foreground">{fmt(item.value)}건</span></li>)}</ul>
-      <div className="mt-2.5 flex h-6 gap-0.5">{composition.map((item, index) => <div key={item.name} ref={index === 0 ? patternedRef : undefined} data-testid="relation-total-segment" data-segment-scope="composition" data-segment-index={index} className={`min-w-1 ${index === 0 ? 'rounded-t-md rounded-b-none' : 'rounded-md border border-dashboard-segment-divider'}`} style={{ flexGrow: item.value, flexBasis: 0, background: item.fill }} />)}</div>
-    </div>
-    <div ref={funnelRef} hidden={!linked} className="-mt-px h-11 w-full">
+  return <Box data-testid="transaction-pattern-stack" role="img" aria-label={linked ? '전체 의심 거래 구성(거래 건)과 패턴 소속 거래의 유형별 Alert 분포' : '전체 분석 거래의 모델 조합과 의심 거래의 유형별 건수'} className="min-w-0 rounded-lg border bg-muted/30 p-3">
+    <Box data-testid="relation-total-panel">
+      <Text className="text-xs font-medium">전체 구성 <Text as="span" className="font-normal text-muted-foreground">· 거래 건</Text></Text>
+      <Box as="ul" className="mt-2.5 space-y-1">{composition.map(item => <Box as="li" key={item.name} data-testid="relation-total-label" className="flex min-w-0 items-center gap-2 text-xs"><Text as="strong" className="w-10 shrink-0 font-semibold tabular-nums">{sharePct(item.value, total)}</Text><Text as="span" className="min-w-0 flex-1 truncate">{item.name}</Text><Text as="span" className="shrink-0 tabular-nums text-muted-foreground">{fmt(item.value)}건</Text></Box>)}</Box>
+      <Box className="mt-2.5 flex h-6 gap-0.5">{composition.map((item, index) => <Box key={item.name} ref={index === 0 ? patternedRef : undefined} data-testid="relation-total-segment" data-segment-scope="composition" data-segment-index={index} className={`min-w-1 ${index === 0 ? 'rounded-t-md rounded-b-none' : 'rounded-md border border-dashboard-segment-divider'}`} style={{ flexGrow: item.value, flexBasis: 0, background: item.fill }} />)}</Box>
+    </Box>
+    <Box ref={funnelRef} hidden={!linked} className="-mt-px h-11 w-full">
       <svg data-testid="relation-link" aria-hidden="true" className="block h-full w-full overflow-visible" width={round(funnelW)} height={funnelH} viewBox={`0 0 ${round(funnelW)} ${funnelH}`}>
         <defs><linearGradient id="pattern-funnel-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'var(--foreground)', stopOpacity: 1 }} /><stop offset="1" style={{ stopColor: 'var(--foreground)', stopOpacity: .08 }} /></linearGradient></defs>
         <path d={funnel} fill="url(#pattern-funnel-fade)" />
       </svg>
-    </div>
-    <div data-testid="relation-pattern-panel" className="rounded-b-md bg-foreground/[.08] p-2.5">
-      <p className="text-xs font-medium">{linked ? '패턴 소속의 유형별' : '의심 거래 유형별'} <span className="font-normal text-muted-foreground">· {unit}</span></p>
-      <div className="mt-2.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5">{distribution.map((item, index) => <Fragment key={item.pattern}>
-        <span data-testid="pattern-child-label" data-segment-index={index} className="flex h-6 items-center rounded-full bg-foreground px-2.5 font-mono text-[0.6875rem] text-background">{item.pattern}</span>
-        <span className="flex min-w-0 items-center"><span data-testid="relation-pattern-bar" data-segment-scope="pattern" className="flex h-6 min-w-11 items-center justify-start rounded-full bg-foreground px-3 text-[0.6875rem] tabular-nums text-background" style={{ width: `${Math.max(8, item.alerts / maxAlerts * 100)}%` }}>{fmt(item.alerts)}</span></span>
-      </Fragment>)}</div>
-    </div>
-  </div>
+    </Box>
+    <Box data-testid="relation-pattern-panel" className="rounded-b-md bg-foreground/[.08] p-2.5">
+      <Text className="text-xs font-medium">{linked ? '패턴 소속의 유형별' : '의심 거래 유형별'} <Text as="span" className="font-normal text-muted-foreground">· {unit}</Text></Text>
+      <Box className="mt-2.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5">{distribution.map((item, index) => <Fragment key={item.pattern}>
+        <Text as="span" data-testid="pattern-child-label" data-segment-index={index} className="flex h-6 items-center rounded-full bg-foreground px-2.5 font-mono text-[0.6875rem] text-background">{item.pattern}</Text>
+        <Text as="span" className="flex min-w-0 items-center"><Text as="span" data-testid="relation-pattern-bar" data-segment-scope="pattern" className="flex h-6 min-w-11 items-center justify-start rounded-full bg-foreground px-3 text-[0.6875rem] tabular-nums text-background" style={{ width: `${Math.max(8, item.alerts / maxAlerts * 100)}%` }}>{fmt(item.alerts)}</Text></Text>
+      </Fragment>)}</Box>
+    </Box>
+  </Box>
 }
 
 function PatternRelationBars({ composition, distribution, linked = true, unit = 'Alert' }: PatternProps) {
   const [ref, size] = useElementSize<HTMLDivElement>({ width: 720, height: RELATION_HEIGHT })
-  if (size.width < RELATION_STACK_BREAKPOINT) return <div ref={ref} style={{ height: RELATION_STACK_HEIGHT }} className="w-full min-w-0 overflow-y-auto"><PatternRelationStack composition={composition} distribution={distribution} linked={linked} unit={unit} /></div>
+  if (size.width < RELATION_STACK_BREAKPOINT) return <Box ref={ref} style={{ height: RELATION_STACK_HEIGHT }} className="w-full min-w-0 overflow-y-auto"><PatternRelationStack composition={composition} distribution={distribution} linked={linked} unit={unit} /></Box>
   const layout = buildPatternRelationLayout(composition, distribution, size.width, RELATION_HEIGHT)
   const panel = 'absolute top-0 bottom-0 rounded-lg border bg-muted/30'
-  return <div ref={ref} data-testid="transaction-pattern-bar" role="img" aria-label={linked ? '전체 의심 거래 구성(거래 건)과 패턴 소속 거래의 유형별 Alert 분포' : '전체 분석 거래의 모델 조합과 의심 거래의 유형별 건수'} style={{ height: RELATION_HEIGHT }} className="relative w-full min-w-0 overflow-hidden">
-    <div data-testid="relation-total-panel" className={panel} style={{ left: 0, width: layout.leftW }} />
-    <div data-testid="relation-pattern-panel" className={panel} style={{ left: layout.rightX, width: layout.rightW }} />
-    <p className="absolute text-xs font-medium" style={{ left: layout.padX, top: 8 }}>전체 구성 <span className="font-normal text-muted-foreground">· 거래 건</span></p>
-    <p className="absolute text-xs font-medium" style={{ left: layout.pillX, top: 8 }}>패턴별 유형 <span className="font-normal text-muted-foreground">· {unit}</span></p>
+  return <Box ref={ref} data-testid="transaction-pattern-bar" role="img" aria-label={linked ? '전체 의심 거래 구성(거래 건)과 패턴 소속 거래의 유형별 Alert 분포' : '전체 분석 거래의 모델 조합과 의심 거래의 유형별 건수'} style={{ height: RELATION_HEIGHT }} className="relative w-full min-w-0 overflow-hidden">
+    <Box data-testid="relation-total-panel" className={panel} style={{ left: 0, width: layout.leftW }} />
+    <Box data-testid="relation-pattern-panel" className={panel} style={{ left: layout.rightX, width: layout.rightW }} />
+    <Text className="absolute text-xs font-medium" style={{ left: layout.padX, top: 8 }}>전체 구성 <Text as="span" className="font-normal text-muted-foreground">· 거래 건</Text></Text>
+    <Text className="absolute text-xs font-medium" style={{ left: layout.pillX, top: 8 }}>패턴별 유형 <Text as="span" className="font-normal text-muted-foreground">· {unit}</Text></Text>
     <svg data-testid="relation-lines" className="pointer-events-none absolute inset-0 overflow-visible" width={layout.width} height={layout.height} aria-hidden="true">
       {linked && layout.links.map((d, index) => <path key={index} data-testid="relation-link" d={d} fill="none" stroke="var(--muted-foreground)" strokeOpacity={.45} strokeWidth={1.25} />)}
       {layout.labels.map(label => {
@@ -145,19 +146,19 @@ function PatternRelationBars({ composition, distribution, linked = true, unit = 
         return <g key={segment.name} data-testid="relation-label-leader"><path d={d} fill="none" stroke="var(--muted-foreground)" strokeOpacity={.5} strokeWidth={1} /><circle cx={layout.labelRight} cy={round(label.y)} r={2.5} fill="var(--muted-foreground)" /></g>
       })}
     </svg>
-    {layout.segments.map(segment => <div key={segment.name} data-testid="relation-total-segment" data-segment-scope="composition" data-segment-index={segment.index} className="absolute rounded-md border border-dashboard-segment-divider" style={{ left: layout.columnX, top: segment.y, width: layout.columnW, height: segment.h, background: segment.fill }} title={`${segment.name} ${fmt(segment.value)}건 · ${segment.share}`} />)}
+    {layout.segments.map(segment => <Box key={segment.name} data-testid="relation-total-segment" data-segment-scope="composition" data-segment-index={segment.index} className="absolute rounded-md border border-dashboard-segment-divider" style={{ left: layout.columnX, top: segment.y, width: layout.columnW, height: segment.h, background: segment.fill }} title={`${segment.name} ${fmt(segment.value)}건 · ${segment.share}`} />)}
     {layout.labels.map(label => {
       const segment = layout.segments[label.index]
-      return <div key={segment.name} data-testid="relation-total-label" className="absolute flex flex-col items-end justify-center text-right leading-tight" style={{ left: layout.padX, width: layout.labelRight - 6 - layout.padX, top: label.y - layout.labelH / 2, height: layout.labelH }} title={`${segment.name} ${fmt(segment.value)}건`}>
-        <span className="max-w-full truncate text-xs"><strong className="font-semibold tabular-nums">{segment.share}</strong> {segment.name}</span>
-        <span className="text-[0.6875rem] tabular-nums text-muted-foreground">{fmt(segment.value)}건</span>
-      </div>
+      return <Box key={segment.name} data-testid="relation-total-label" className="absolute flex flex-col items-end justify-center text-right leading-tight" style={{ left: layout.padX, width: layout.labelRight - 6 - layout.padX, top: label.y - layout.labelH / 2, height: layout.labelH }} title={`${segment.name} ${fmt(segment.value)}건`}>
+        <Text as="span" className="max-w-full truncate text-xs"><Text as="strong" className="font-semibold tabular-nums">{segment.share}</Text> {segment.name}</Text>
+        <Text as="span" className="text-[0.6875rem] tabular-nums text-muted-foreground">{fmt(segment.value)}건</Text>
+      </Box>
     })}
-    {layout.rows.map(row => <div key={row.pattern} data-testid="relation-pattern-row" data-segment-scope="pattern" data-segment-index={row.index} className="absolute flex items-center" style={{ left: layout.pillX, top: row.cy - layout.pillH / 2, height: layout.pillH, width: layout.width - layout.padX - layout.pillX }} title={`${row.pattern} ${fmt(row.alerts)} ${unit}`}>
-      <span data-testid="pattern-child-label" className="flex h-full shrink-0 items-center rounded-full bg-foreground px-3 font-mono text-[0.6875rem] text-background" style={{ width: layout.pillW }}><span className="truncate">{row.pattern}</span></span>
-      <span data-testid="relation-pattern-bar" className="ml-1.5 flex h-full items-center justify-start rounded-full bg-foreground px-3 text-[0.6875rem] tabular-nums text-background" style={{ width: row.barW }}>{row.countInside && fmt(row.alerts)}</span>
-      {!row.countInside && <span className="ml-1.5 text-[0.6875rem] tabular-nums text-muted-foreground">{fmt(row.alerts)}</span>}
-    </div>)}
-  </div>
+    {layout.rows.map(row => <Box key={row.pattern} data-testid="relation-pattern-row" data-segment-scope="pattern" data-segment-index={row.index} className="absolute flex items-center" style={{ left: layout.pillX, top: row.cy - layout.pillH / 2, height: layout.pillH, width: layout.width - layout.padX - layout.pillX }} title={`${row.pattern} ${fmt(row.alerts)} ${unit}`}>
+      <Text as="span" data-testid="pattern-child-label" className="flex h-full shrink-0 items-center rounded-full bg-foreground px-3 font-mono text-[0.6875rem] text-background" style={{ width: layout.pillW }}><Text as="span" className="truncate">{row.pattern}</Text></Text>
+      <Text as="span" data-testid="relation-pattern-bar" className="ml-1.5 flex h-full items-center justify-start rounded-full bg-foreground px-3 text-[0.6875rem] tabular-nums text-background" style={{ width: row.barW }}>{row.countInside && fmt(row.alerts)}</Text>
+      {!row.countInside && <Text as="span" className="ml-1.5 text-[0.6875rem] tabular-nums text-muted-foreground">{fmt(row.alerts)}</Text>}
+    </Box>)}
+  </Box>
 }
 

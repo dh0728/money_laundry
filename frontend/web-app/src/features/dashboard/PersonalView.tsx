@@ -21,6 +21,7 @@ import { boardStatuses, boardStatusHints, type WorkStatus } from '@/lib/workStat
 import { loadAlerts, loadMyEpisodes } from './dataSource'
 import { WorkCard } from './WorkCard'
 import { sortWork, STALE_DAYS, workItems, workSorts, type WorkSort } from './workItems'
+import { Box, Heading, Text } from '@/components/layout-primitives'
 
 const HIGH_RISK = 0.8
 
@@ -33,22 +34,22 @@ function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
   const counts = pending.reduce<Record<number, number>>((acc, alert) => ({ ...acc, [alert.primaryType.code]: (acc[alert.primaryType.code] ?? 0) + 1 }), {})
   const focus = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
   const focusCode = focus ? Number(focus[0]) as TypeCode : null
-  return <PersonalSummaryView>{focusCode === null ? <p className="mt-2 text-sm leading-6 text-muted-foreground">처리 전 Alert 없음.</p> : <div className="mt-2 flex flex-wrap items-center gap-2"><PatternBadge code={focusCode} /><p className="text-sm leading-6 text-muted-foreground">처리 전 Alert의 최빈 유형({focus[1]}건). 동일 소유주·계좌의 반복 여부 확인 필요.</p></div>}</PersonalSummaryView>
+  return <PersonalSummaryView>{focusCode === null ? <Text className="mt-2 text-sm leading-6 text-muted-foreground">처리 전 Alert 없음.</Text> : <Box className="mt-2 flex flex-wrap items-center gap-2"><PatternBadge code={focusCode} /><Text className="text-sm leading-6 text-muted-foreground">처리 전 Alert의 최빈 유형({focus[1]}건). 동일 소유주·계좌의 반복 여부 확인 필요.</Text></Box>}</PersonalSummaryView>
 }
 export function PersonalSummaryView({ children }: { children: ReactNode }) {
   return (
     <Card data-testid="personal-ai-summary" className="h-full w-full min-w-0 shadow-none @xl:col-span-2 @5xl:col-span-2" style={rdrSummaryBackground}>
       <CardContent>
-        <div className="flex flex-wrap items-center gap-2">
+        <Box className="flex flex-wrap items-center gap-2">
           <RadarSweep className="size-5 shrink-0" />
-          <h2 className="text-base font-semibold tracking-tight">RDR 9000 · 내 담당 요약</h2>
+          <Heading className="text-base font-semibold tracking-tight">RDR 9000 · 내 담당 요약</Heading>
           <ProvenanceBadge kind="mock" title="규칙 기반 시연 문장. LLM 미연동." />
-          <p className="ml-auto text-[0.6875rem] text-muted-foreground">판단은 조사자가 수행</p>
-        </div>
-        <div className="mt-4">
-          <p className="text-xs font-medium">집중 패턴</p>
+          <Text className="ml-auto text-[0.6875rem] text-muted-foreground">판단은 조사자가 수행</Text>
+        </Box>
+        <Box className="mt-4">
+          <Text className="text-xs font-medium">집중 패턴</Text>
           {children}
-        </div>
+        </Box>
       </CardContent>
     </Card>
   )
@@ -74,26 +75,26 @@ export function PersonalView({ remote }: { remote?: { cards: [SectionCardItem, S
 
   return (
     <>
-      <div className={`grid grid-cols-1 items-stretch gap-4 @xl:grid-cols-2 @5xl:grid-cols-4 ${sectionCardSurface}`} data-testid="personal-top">
+      <Box className={`grid grid-cols-1 items-stretch gap-4 @xl:grid-cols-2 @5xl:grid-cols-4 ${sectionCardSurface}`} data-testid="personal-top">
         <SectionCard item={remote?.cards[0] ?? { label: `위험 점수 ${formatScore(HIGH_RISK)} 이상`, value: fmt(pending.filter(alert => alert.riskScore >= HIGH_RISK).length), trend: '처리 전 Alert', note: '판정이 급한 고위험 건' }} />
         <SectionCard item={remote?.cards[1] ?? { label: `${STALE_DAYS}일 이상 경과`, value: fmt(stale.length), trend: `Alert ${stale.filter(item => item.kind === 'Alert').length} · Episode ${stale.filter(item => item.kind === 'Episode').length}`, note: '처리 전·처리 중 업무 중 오래 머문 건' }} />
         {remote?.summary ?? <PersonalAiSummary pending={pending} />}
-      </div>
-      <section aria-labelledby="queue-title">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 id="queue-title" className="text-base font-semibold tracking-tight">업무 현황</h2>
-            <p className="mt-1.5 text-xs text-muted-foreground">Alert·Episode 상태별 · {workSorts[sort].label}</p>
-          </div>
+      </Box>
+      <Box as="section" aria-labelledby="queue-title">
+        <Box className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <Box>
+            <Heading id="queue-title" className="text-base font-semibold tracking-tight">업무 현황</Heading>
+            <Text className="mt-1.5 text-xs text-muted-foreground">Alert·Episode 상태별 · {workSorts[sort].label}</Text>
+          </Box>
           <Select disabled={Boolean(remote)} value={sort} onValueChange={value => setSort(value as WorkSort)}>
             <SelectTrigger size="sm" className="w-40" aria-label="업무 정렬 기준"><SelectValue /></SelectTrigger>
             <SelectContent>{Object.entries(workSorts).map(([key, option]) => <SelectItem key={key} value={key}>{option.label}</SelectItem>)}</SelectContent>
           </Select>
-        </div>
+        </Box>
         <ProvenanceNote kind="proposal">미확인·처리 전을 나누려면 사건별 첫 열람 시각이 필요합니다(Backend 요청). 지금 열 배정은 시연용 예시입니다.</ProvenanceNote>
-        <div className="mt-3" />
+        <Box className="mt-3" />
         {remote?.queue ?? <WorkQueue columns={boardStatuses.map(status => { const column = sortWork(items.filter(item => boardStatus(item) === status), sort); return { status, hint: boardStatusHints[status], count: column.length, content: column.length ? column.map(item => <WorkCard key={`${item.kind}-${item.id}`} item={item} tone={({ PENDING: 'pending', IN_PROGRESS: 'working', DONE: 'closed' } as const)[status as 'PENDING' | 'IN_PROGRESS' | 'DONE']} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock> } })} />}
-      </section>
+      </Box>
     </>
   )
 }

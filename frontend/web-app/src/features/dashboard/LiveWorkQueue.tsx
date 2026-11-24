@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { WorkCard } from './WorkCard'
 import { WorkQueue } from './WorkQueue'
 import { reviewType } from '@/features/alerts/reviewListAdapter'
+import { Box, Text } from '@/components/layout-primitives'
 
 export function QueueItems({ kind, status, personal = true }: { kind: ReviewKind; status: ReviewStatus; personal?: boolean }) {
   const user = useCurrentUser()
@@ -16,13 +17,13 @@ export function QueueItems({ kind, status, personal = true }: { kind: ReviewKind
   if (result.state.status === 'loading') return <LoadingBlock label="담당 업무" />
   if (result.state.status === 'error') return <ErrorBlock message={result.state.message} onRetry={result.retry} />
   const data = result.state.data
-  return <><p className="text-xs text-muted-foreground">{kind === 'ALERT' ? 'Alert' : 'Episode'} 전체 {data.totalElements}건 · 위험도 순</p>{data.content.length ? data.content.map(row => <WorkCard key={row.caseId} item={{
+  return <><Text className="text-xs text-muted-foreground">{kind === 'ALERT' ? 'Alert' : 'Episode'} 전체 {data.totalElements}건 · 위험도 순</Text>{data.content.length ? data.content.map(row => <WorkCard key={row.caseId} item={{
     kind: row.kind === 'ALERT' ? 'Alert' : 'Episode', code: row.kind === 'ALERT' ? `A-${row.alertId}` : `E-${row.caseId}`,
     href: hrefFor(row.kind === 'ALERT' ? 'alerts' : 'episodes', row.caseId), riskScore: row.summary.riskScore, ageDays: row.ageDays,
     summary: `조사 거래 ${row.summary.txCount}건 · ${Object.entries(row.summary.amountsByCurrency).map(([currency, value]) => `${Number(value).toLocaleString()} ${currency}`).join(' · ')}`,
     types: (row.kind === 'ALERT' ? [row.summary.primaryType] : row.primaryTypes).map(reviewType).flatMap(type => type.code == null ? [] : [type.code]),
   }} />) : <EmptyBlock>해당 상태 업무가 없습니다.</EmptyBlock>}
-    {data.totalPages > 1 && <div className="flex items-center justify-between"><Button size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>이전</Button><span className="text-xs">{page + 1}/{data.totalPages}</span><Button size="sm" disabled={page + 1 >= data.totalPages} onClick={() => setPage(page + 1)}>다음</Button></div>}
+    {data.totalPages > 1 && <Box className="flex items-center justify-between"><Button size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>이전</Button><Text as="span" className="text-xs">{page + 1}/{data.totalPages}</Text><Button size="sm" disabled={page + 1 >= data.totalPages} onClick={() => setPage(page + 1)}>다음</Button></Box>}
   </>
 }
 

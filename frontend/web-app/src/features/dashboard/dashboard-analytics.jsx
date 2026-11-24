@@ -12,6 +12,7 @@ import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-toolt
 import { ibmLaundering, ibmPatterns, ibmRemaining } from '../investigation/ibm-hi-small-aggregate';
 import { SectionDownloadHeading } from '../../components/section-download';
 import { dashboardPattern } from '../../mocks/dashboard-patterns';
+import { Box, Text } from '../../components/layout-primitives';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;
@@ -19,13 +20,13 @@ const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumF
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
 
 function volumeAxisLabel(point, label) {
-  return <span className="dashboard-volume-axis">{label}<small>{share(point.labeled, point.total)}</small></span>;
+  return <Text as="span" className="dashboard-volume-axis">{label}<Text as="small">{share(point.labeled, point.total)}</Text></Text>;
 }
 
 function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true }) {
   const columns = detail ?? series.map(item => ({ label: item.label, value: row => count(row[item.key]), color: item.color }));
-  return <figure className="dashboard-series" aria-label={label}>
-    <div className="dashboard-series-plot">
+  return <Box as="figure" className="dashboard-series" aria-label={label}>
+    <Box className="dashboard-series-plot">
       <BarChart className="dashboard-bklit-series" data={rows} xDataKey="label" stacked={stacked}
         margin={{ top: 6, right: 4, bottom: showShare ? 42 : 28, left: 4 }} barGap={rows.length === 1 ? 0.94 : undefined}
         animationDuration={reduced ? 0 : 340}>
@@ -39,35 +40,35 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
             label: column.label, color: column.color, value: column.value(point),
           }))} />
       </BarChart>
-    </div>
-    <div className="visually-hidden">
+    </Box>
+    <Box className="visually-hidden">
       <Table>
         <TableCaption>일별 수치</TableCaption>
         <TableHeader><TableRow><TableHead scope="col">일자</TableHead>{columns.map(column => <TableHead scope="col" key={column.label}>{column.label}</TableHead>)}</TableRow></TableHeader>
         <TableBody>{rows.map(row => <TableRow key={row.label}><TableHead scope="row">{row.label}</TableHead>
           {columns.map(column => <TableCell key={column.label}>{column.value(row)}</TableCell>)}</TableRow>)}</TableBody>
       </Table>
-    </div>
-  </figure>;
+    </Box>
+  </Box>;
 }
 
 function ChartPanel({ title, note, children, className = '', hasChart = true }) {
   return <Panel as="article" className={`dashboard-chart ${className}`}>
     <SectionDownloadHeading downloadLabel={hasChart ? title : undefined}>{title}</SectionDownloadHeading>
-    {note && <p className="dashboard-note">{note}</p>}
+    {note && <Text className="dashboard-note">{note}</Text>}
     {children}
   </Panel>;
 }
 
 function CompositionLegend({ segments, total, label }) {
-  return <ul className="dashboard-composition-legend" aria-label={label}>
-    {segments.map(({ label, tone, value }) => <li key={label} data-segment={tone}>
-      <i aria-hidden="true" />
-      <span>{label}</span>
-      <strong>{count(value)}</strong>
-      <span>{share(value, total)}</span>
-    </li>)}
-  </ul>;
+  return <Box as="ul" className="dashboard-composition-legend" aria-label={label}>
+    {segments.map(({ label, tone, value }) => <Box as="li" key={label} data-segment={tone}>
+      <Text as="i" aria-hidden="true" />
+      <Text as="span">{label}</Text>
+      <Text as="strong">{count(value)}</Text>
+      <Text as="span">{share(value, total)}</Text>
+    </Box>)}
+  </Box>;
 }
 
 const segmentInk = tone => `var(--segment-${tone})`;
@@ -75,7 +76,7 @@ const noMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 const launderingBarScale = 500;
 
 function ProportionBar({ label, segments, total, orientation = 'horizontal' }) {
-  if (!total) return <div className="dashboard-proportion-empty" aria-hidden="true" />;
+  if (!total) return <Box className="dashboard-proportion-empty" aria-hidden="true" />;
 
   const horizontal = orientation === 'horizontal';
   const displayTotal = segments.reduce((sum, { value, visualScale = 1 }) => sum + value * visualScale, 0);
@@ -95,12 +96,12 @@ function ProportionBar({ label, segments, total, orientation = 'horizontal' }) {
 
 function TransactionSummary({ title, note, composition, children, hasChart }) {
   return <ChartPanel title={title} note={note} hasChart={hasChart}>
-    <div className="dashboard-transaction-details">
-      <section className="dashboard-transaction-breakdown" aria-label="전체 거래 구성">
+    <Box className="dashboard-transaction-details">
+      <Box as="section" className="dashboard-transaction-breakdown" aria-label="전체 거래 구성">
         {composition}
-      </section>
+      </Box>
       {children}
-    </div>
+    </Box>
   </ChartPanel>;
 }
 
@@ -110,11 +111,11 @@ function TransactionComposition({ total, labeled }) {
     { label: '세탁 라벨 거래', tone: 'suspect', value: labeled, visualScale: launderingBarScale },
   ];
   return <>
-    <div className="dashboard-composition-chart">
+    <Box className="dashboard-composition-chart">
       <CompositionLegend segments={overview} total={total} label="전체 거래 기준" />
       <ProportionBar label="전체 거래" segments={overview} total={total} orientation="vertical" />
-    </div>
-    <p className="dashboard-note">세탁 라벨 막대만 ×{launderingBarScale} 확대 · 표시 건수와 비율은 원본 기준</p>
+    </Box>
+    <Text className="dashboard-note">세탁 라벨 막대만 ×{launderingBarScale} 확대 · 표시 건수와 비율은 원본 기준</Text>
   </>;
 }
 
@@ -136,16 +137,16 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
     return { label: name, value, supported };
   }).sort((left, right) => Number(right.supported) - Number(left.supported) || right.value - left.value);
   const hasReference = points.some(row => !row.supported);
-  return <section className="dashboard-transaction-breakdown" aria-label={label}>
-    <p className="dashboard-note">{seriesLabel} {count(total)} 기준</p>
-    {!rows.length ? <p className="dashboard-note">조회 조건에 해당하는 유형이 없습니다.</p> :
-    <div className="dashboard-pattern-chart" style={{ '--dashboard-pattern-count': rows.length }}>
-      <ul className="dashboard-pattern-labels">
-        {points.map(({ label, value, supported }) => <li key={label} data-reference={!supported || undefined}>
-          {supported ? <PatternTag>{label}</PatternTag> : <span>{label}</span>}
-          <strong>{count(value)}</strong>
-        </li>)}
-      </ul>
+  return <Box as="section" className="dashboard-transaction-breakdown" aria-label={label}>
+    <Text className="dashboard-note">{seriesLabel} {count(total)} 기준</Text>
+    {!rows.length ? <Text className="dashboard-note">조회 조건에 해당하는 유형이 없습니다.</Text> :
+    <Box className="dashboard-pattern-chart" style={{ '--dashboard-pattern-count': rows.length }}>
+      <Box as="ul" className="dashboard-pattern-labels">
+        {points.map(({ label, value, supported }) => <Box as="li" key={label} data-reference={!supported || undefined}>
+          {supported ? <PatternTag>{label}</PatternTag> : <Text as="span">{label}</Text>}
+          <Text as="strong">{count(value)}</Text>
+        </Box>)}
+      </Box>
       <BarChart className="dashboard-pattern-bars" data={points} xDataKey="label" orientation="horizontal"
         margin={noMargin} barGap={0.28} animationDuration={reduced ? 0 : 340}>
         <ReferencePattern id={patternId} />
@@ -155,9 +156,9 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
           rows={point => [{ label: point.label, color: point.supported ? 'var(--chart-pattern)' : 'var(--chart-pattern-reference)',
             value: `${count(point.value)} · ${share(point.value, total)}` }]} />
       </BarChart>
-    </div>}
-    {hasReference && <p className="dashboard-note">빗금 · 모델 지원 외 유형</p>}
-  </section>;
+    </Box>}
+    {hasReference && <Text className="dashboard-note">빗금 · 모델 지원 외 유형</Text>}
+  </Box>;
 }
 
 const volumeSeries = [
@@ -192,41 +193,41 @@ export function Analytics({ data, reduced }) {
     ...row, label: row.date.slice(5).replace('-', '/'), completed: completedByDay.get(row.date) ?? 0,
   }));
   const hasAlertActivity = status.some(row => row.pending + row.inProgress + row.done + row.completed > 0);
-  return <section className="dashboard-analytics" aria-label="기관 탐지 현황">
+  return <Box as="section" className="dashboard-analytics" aria-label="기관 탐지 현황">
     <TransactionSummary title="거래 구성과 의심 유형" note={`${period} · KST`}
       hasChart={total > 0} composition={
         <DashboardRiskChart segments={composition} reduced={reduced} label="전체 거래 중 모델 의심 거래 비중" />
       }>
       <TransactionPatterns rows={patterns} total={suspicious} seriesLabel="모델 의심 거래" reduced={reduced} />
     </TransactionSummary>
-    <section className="dashboard-analytics-row dashboard-detection-row" aria-label="위험 점수와 거래량 추이">
+    <Box as="section" className="dashboard-analytics-row dashboard-detection-row" aria-label="위험 점수와 거래량 추이">
       <ChartPanel title="위험 점수 구간별 분포" hasChart={suspicious > 0}>
         <DashboardRiskChart segments={risk} reduced={reduced} totalLabel="모델 의심 거래" />
       </ChartPanel>
       <ActivityChart title="기간별 거래량 추이" note={`${period} · 거래 발생일 KST`} rows={data.operationalDaily}
         series={volumeSeries} reduced={reduced} empty="조회 조건에 해당하는 거래가 없습니다." />
-    </section>
+    </Box>
     <ChartPanel title="일별 Alert 처리 상태" hasChart={hasAlertActivity} note={`${period} · 생성일별 현재 상태 · KST`}>
       {hasAlertActivity ? <>
-        <div className="dashboard-legend">
+        <Box className="dashboard-legend">
           {statusSeries.map(item => <ReviewStatusTag key={item.key} status={item.value} />)}
-          <span><i className="dashboard-status-line-key" aria-hidden="true" />{completionSeries.label}</span>
-        </div>
+          <Text as="span"><Text as="i" className="dashboard-status-line-key" aria-hidden="true" />{completionSeries.label}</Text>
+        </Box>
         <DashboardStatusArea rows={status} series={statusSeries} completion={completionSeries} reduced={reduced} />
-      </> : <p className="dashboard-note">조회 기간에 생성되거나 종결된 Alert가 없습니다.</p>}
+      </> : <Text className="dashboard-note">조회 기간에 생성되거나 종결된 Alert가 없습니다.</Text>}
     </ChartPanel>
-  </section>;
+  </Box>;
 }
 
 function ActivityChart({ title, note, rows, series, reduced, empty }) {
   const hasData = rows.some(row => series.some(item => row[item.key] > 0));
   return <ChartPanel title={title} note={note} hasChart={hasData}>
     {hasData ? <>
-      <div className="dashboard-legend">{series.map(item => <span key={item.key}>
-        <i style={{ background: item.color }} aria-hidden="true" />{item.label}
-      </span>)}</div>
+      <Box className="dashboard-legend">{series.map(item => <Text as="span" key={item.key}>
+        <Text as="i" style={{ background: item.color }} aria-hidden="true" />{item.label}
+      </Text>)}</Box>
       <DailySeries rows={rows} series={series} reduced={reduced} label={title} stacked={false} />
-    </> : <p className="dashboard-note">{empty}</p>}
+    </> : <Text className="dashboard-note">{empty}</Text>}
   </ChartPanel>;
 }
 
@@ -234,8 +235,8 @@ const benchmarkTotalSeries = [{ key: 'total', label: '전체 거래', color: 'va
 const benchmarkLabelSeries = [{ key: 'labeled', label: '원본 세탁 라벨 거래', color: 'var(--chart-suspect)' }];
 
 export function BenchmarkCharts({ chartRows, totals, period, fullPatternScope, reduced }) {
-  return <section className="dashboard-analytics" aria-label="원본 거래 흐름">
-      <div className="dashboard-analytics-row">
+  return <Box as="section" className="dashboard-analytics" aria-label="원본 거래 흐름">
+      <Box className="dashboard-analytics-row">
         <ChartPanel title="일별 전체 거래">
           <DailySeries rows={chartRows} series={benchmarkTotalSeries} label="일별 전체 거래 건수"
             reduced={reduced} stacked={false} />
@@ -244,11 +245,11 @@ export function BenchmarkCharts({ chartRows, totals, period, fullPatternScope, r
           <DailySeries rows={chartRows} series={benchmarkLabelSeries} detail={volumeDetail}
             label="일별 원본 세탁 라벨 거래 건수와 비율" reduced={reduced} showShare stacked={false} />
         </ChartPanel>
-      </div>
+      </Box>
       <TransactionSummary title={fullPatternScope ? '원본 거래 구성과 유형' : '원본 거래 구성'}
         note={`${period} · 원본 세탁 라벨 기준`} hasChart={totals.transactions > 0}
         composition={<TransactionComposition total={totals.transactions} labeled={totals.labeled} />}>
         {fullPatternScope && <TransactionPatterns reduced={reduced} label="원본 라벨 유형별 거래 건수" />}
       </TransactionSummary>
-    </section>;
+    </Box>;
 }

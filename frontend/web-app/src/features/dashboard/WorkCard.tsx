@@ -1,5 +1,6 @@
 import { AgeBadge, PatternBadge, RiskBadge } from '@/components/badges'
 import type { WorkItem } from './workItems'
+import { Text } from '@/components/layout-primitives'
 
 // 대시보드 업무 카드. ID(A-·E-)가 종류를 알려 주므로 종류 태그는 두지 않는다.
 // 색이 있는 경과일·위험 점수는 ID 줄 오른쪽에, 무채색 패턴 태그는 맨 아래 줄에 따로 묶는다.
@@ -15,17 +16,17 @@ export function WorkCard({ item, tone }: { item: Pick<WorkItem, 'kind' | 'href' 
       style={tone ? { background: `var(--badge-${tone}-background)`, borderColor: `var(--badge-${tone}-border)` } : undefined}
       className="flex flex-col gap-2 rounded-lg border bg-card px-5 py-4 interactive-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="flex items-center justify-between gap-3">
-        <span className="font-mono text-sm">{item.code}</span>
-        <span className="flex shrink-0 items-center gap-1.5">
+      <Text as="span" className="flex items-center justify-between gap-3">
+        <Text as="span" className="font-mono text-sm">{item.code}</Text>
+        <Text as="span" className="flex shrink-0 items-center gap-1.5">
           <AgeBadge days={item.ageDays} />
           <RiskBadge score={item.riskScore} />
-        </span>
-      </span>
-      <span className="block truncate text-sm text-muted-foreground">{item.summary}</span>
-      <span className="flex flex-wrap items-center gap-1.5">
+        </Text>
+      </Text>
+      <Text as="span" className="block truncate text-sm text-muted-foreground">{item.summary}</Text>
+      <Text as="span" className="flex flex-wrap items-center gap-1.5">
         {item.types.map(code => <PatternBadge key={code} code={code} />)}
-      </span>
+      </Text>
     </a>
   )
 }
