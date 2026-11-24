@@ -49,8 +49,7 @@ function Labels() {
       return <g key={node.index}>
         {node.anchor && <>
           <circle data-sankey-anchor={node.anchor} cx={(node.x0 + node.x1) / 2} cy={node.y1} opacity={0} />
-          <circle data-sankey-top-anchor={node.anchor} data-sankey-stage-index={node.stage}
-            cx={(node.x0 + node.x1) / 2} cy={node.y0} opacity={0} />
+          <circle data-sankey-top-anchor={node.anchor} cx={(node.x0 + node.x1) / 2} cy={node.y0} opacity={0} />
         </>}
         <text x={x} y={y} dy={node.detail ? offsets.labelWithDetail : offsets.label}>
           {node.name}
@@ -85,7 +84,7 @@ export function StagedSankey({ data, stages, label, reduced }) {
   return <Box className="staged-sankey-scroller">
     <Box className="staged-sankey-content">
       <Box className="staged-sankey-stages" data-stage-count={stages.length}>
-        {stages.map((name, index) => <Text as="span" key={name} data-sankey-stage-label={index}>{name}</Text>)}
+        {stages.map(name => <Text as="span" key={name}>{name}</Text>)}
       </Box>
       <SankeyChart data={data} layout={layout} margin={design.margin} className="staged-sankey-chart"
         nodeWidth={design.nodeWidth} nodePadding={design.nodePadding} animationDuration={reduced ? 0 : undefined} interactionLabel={label}>
@@ -107,7 +106,6 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
     const host = hostRef.current;
     const chart = host?.querySelector('.staged-sankey-scroller');
     if (!chart) return undefined;
-    const labelClearance = readChartNumber('--aml-space-8', 8);
     const measure = () => {
       const origin = host.getBoundingClientRect();
       const chartBounds = chart.getBoundingClientRect();
@@ -123,13 +121,8 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
         const startY = start.top + start.height / 2 - origin.top;
         const endX = end.left + end.width / 2 - origin.left;
         const endY = (aboveChart ? end.bottom : end.top) - origin.top;
-        const header = aboveChart && chart.querySelector(`[data-sankey-stage-label="${anchor.dataset.sankeyStageIndex}"]`)?.getBoundingClientRect();
-        const laneX = header ? Math.min(startX, header.left - origin.left - labelClearance) : startX;
-        const laneY = header ? header.bottom - origin.top : startY;
-        const leadY = (laneY + startY) / 2;
-        const turnY = (laneY + endY) / 2;
-        const lead = header ? ` C ${startX} ${leadY}, ${laneX} ${leadY}, ${laneX} ${laneY}` : '';
-        return [{ id, tone, endX, endY, path: `M ${startX} ${startY}${lead} C ${laneX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
+        const turnY = startY + (endY - startY) / (aboveChart ? 4 : 2);
+        return [{ id, tone, endX, endY, path: `M ${startX} ${startY} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
       });
       setLines(next);
     };
