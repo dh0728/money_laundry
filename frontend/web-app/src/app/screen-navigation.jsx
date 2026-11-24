@@ -5,6 +5,7 @@ import { bindTooltip, Icon } from '../components/components.js';
 import { previewUrl } from './preview-route.js';
 import RubberSegment from '../components/react-bits/RubberSegment';
 import './screen-navigation.css';
+import { Box, Text } from '../components/layout-primitives';
 
 let root;
 let currentNavigation;
@@ -36,9 +37,9 @@ function NavGroup({ id, items, label, onRoute, reduced }) {
   }
 
   const active = items.find(item => item.active)?.value ?? items[0].value;
-  return <nav id={id} className="screen-nav-pill segmented-navigation glass" aria-label={label}>
+  return <Box as="nav" id={id} className="screen-nav-pill segmented-navigation glass" aria-label={label}>
     <NavigationSegments label={label} items={items} active={active} onSelect={select} reduced={reduced} />
-  </nav>;
+  </Box>;
 }
 
 function WorkspaceIcons({ items, onRoute, reduced }) {
@@ -51,22 +52,22 @@ function WorkspaceIcons({ items, onRoute, reduced }) {
   const active = items.find(item => item.current)?.value ?? '';
   const links = items.map(({ icon, label, value, current }) => ({
     value, current, accessibleLabel: label,
-    label: <span aria-hidden="true" className="workspace-nav-icon" dangerouslySetInnerHTML={{ __html: Icon(icon) }} />,
+    label: <Text as="span" aria-hidden="true" className="workspace-nav-icon" dangerouslySetInnerHTML={{ __html: Icon(icon) }} />,
   }));
-  return <nav ref={ref} className="screen-nav-pill segmented-navigation workspace-icon-nav glass" aria-label="주 메뉴">
+  return <Box as="nav" ref={ref} className="screen-nav-pill segmented-navigation workspace-icon-nav glass" aria-label="주 메뉴">
     <NavigationSegments label="주 메뉴" items={links} active={active} onSelect={onRoute}
       reduced={reduced} linkTo={value => previewUrl({ screen: value })} />
-  </nav>;
+  </Box>;
 }
 
 export function WorkspaceNavigation({ global = [], location, primary, secondary = [], onRoute, reduced }) {
   const showLocation = location?.text && (location.record || !global.some(item => item.current));
   return <>
     {global.length > 0 && <WorkspaceIcons items={global} onRoute={onRoute} reduced={reduced} />}
-    {showLocation && <span className="screen-location" data-record={location.record || undefined}>
-      <span className="screen-title-accessible">현재 위치 </span>
-      {location.record ? <code>{location.text}</code> : location.text}
-    </span>}
+    {showLocation && <Text as="span" className="screen-location" data-record={location.record || undefined}>
+      <Text as="span" className="screen-title-accessible">현재 위치 </Text>
+      {location.record ? <Text as="code">{location.text}</Text> : location.text}
+    </Text>}
     {primary.length > 0 && <NavGroup id="screen-sections" label="세부 화면" items={primary} onRoute={onRoute} reduced={reduced} />}
     {secondary.length > 0 && <NavGroup id="screen-views" label="보기 방식" items={secondary} onRoute={onRoute} reduced={reduced} />}
   </>;
