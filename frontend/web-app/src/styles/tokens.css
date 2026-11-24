@@ -1,4 +1,10 @@
 /* AML RADAR v3 proposal. Import once in the React/Vite root after approval. */
+@property --chart-canvas-color {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+
 :root {
   --aml-gray-005: #060606;
   --aml-gray-010: #0d0d0d;

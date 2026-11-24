@@ -14,3 +14,23 @@ export function readChartDurationSeconds(token: string, fallback: number) {
   const duration = Number.parseFloat(value);
   return Number.isFinite(duration) ? duration / (value.endsWith("ms") ? 1000 : 1) : fallback;
 }
+
+export function readCanvasColors(element: HTMLElement, sources: Record<string, string>) {
+  const originalStyle = element.getAttribute("style");
+  try {
+    return Object.fromEntries(Object.entries(sources).map(([role, source]) => {
+      element.style.setProperty("--chart-canvas-color", source);
+      const style = getComputedStyle(element);
+      const color = style.getPropertyValue("--chart-canvas-color").trim();
+      return [role, !color || color === "currentcolor" ? style.color : color];
+    }));
+  } finally {
+    if (originalStyle === null) {
+      // Flush the browser's pending style attribute update before removing it.
+      element.getAttribute("style");
+      element.removeAttribute("style");
+    } else {
+      element.setAttribute("style", originalStyle);
+    }
+  }
+}

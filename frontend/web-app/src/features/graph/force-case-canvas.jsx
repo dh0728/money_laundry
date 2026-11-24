@@ -6,6 +6,7 @@ import { graphRiskBand, graphVerdict, graphVerdictLabels } from '../investigatio
 import { caseMembership } from './graph-case-groups';
 import { GraphZoomControls } from './preview-graph-controls';
 import { readGraphCanvasPulse } from '../../components/charts/charts/graph-flow-pulse';
+import { readCanvasColors } from '../../components/charts/chart-design-values';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
@@ -180,23 +181,14 @@ function paintFlow(context, edge, pulse, color, highlight, scale, design) {
 }
 
 function tokenColors(host, groups) {
-  const probe = host.ownerDocument.createElement('i');
-  probe.hidden = true;
-  host.append(probe);
-  const entries = {
+  return readCanvasColors(host, {
     ink: 'var(--text)', dimmed: 'var(--case-graph-dimmed)', accent: 'var(--brand-accent)',
     axisFill: 'var(--inner-surface)', grid: 'var(--divider)',
     flowHighlight: 'var(--graph-flow-highlight)',
     high: 'var(--case-graph-risk-high)', medium: 'var(--case-graph-risk-medium)',
     low: 'var(--case-graph-risk-low)', unknown: 'var(--case-graph-risk-unknown)',
     ...Object.fromEntries(groups.map(group => [group.id, group.color])),
-  };
-  const colors = Object.fromEntries(Object.entries(entries).map(([name, token]) => {
-    probe.style.color = token;
-    return [name, getComputedStyle(probe).color];
-  }));
-  probe.remove();
-  return colors;
+  });
 }
 
 function timeAxisMarks(plan, engine, { width, height }) {

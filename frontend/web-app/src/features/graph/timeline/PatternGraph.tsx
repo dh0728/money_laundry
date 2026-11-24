@@ -2,10 +2,11 @@
 // dev의 force 그래프(react-force-graph-2d, Obsidian 그래프와 같은 방식)로 계좌를 끌어 놀 수 있고,
 // 놓으면 천천히 템플릿 모양 쪽으로 돌아온다. `원래 패턴으로` = templateLayout(보내는 쪽 → 받는 쪽 층, 이웃 평균 높이)으로 즉시 복원.
 // 패턴 이름은 구조로 추정한 값(FE 제안)이고 모델 값이 아니다. 번호는 시간순 그래프와 같은 규칙(처음 나온 순서).
-import { lazy, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type Ref } from 'react'
+import { lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import { NODE_SIZE, templateLayout, type Timeline } from './timeLayout'
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
 import { Box } from '../../../components/layout-primitives'
+import { readCanvasColors } from '@/components/charts/chart-design-values'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof import('react-force-graph-2d').default
 const R = NODE_SIZE / 2
@@ -27,10 +28,10 @@ const subscribeDocumentTheme = (listener: () => void) => {
 }
 const documentTheme = () => THEME_ATTRIBUTES.map(name => document.documentElement.getAttribute(name) ?? '').join(' ')
 
-// 위험 색(--risk-N)을 캔버스가 쓸 실제 색으로 바꾼다
-function resolveColor(name: string) {
-  const el = document.createElement('span'); el.style.color = `var(${name})`; document.body.appendChild(el)
-  const c = getComputedStyle(el).color; el.remove(); return c
+const patternPaint = {
+  card: 'var(--card)', fg: 'var(--foreground)', border: 'var(--border)',
+  muted: 'var(--muted-foreground)', bg: 'var(--background)', blue: 'var(--brand)',
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`risk${i}`, `var(--risk-${i})`])),
 }
 
 export default function PatternGraph({ g, selected, onSelect, onZoom, controls }: { g: Timeline; selected: PatternSelection; onSelect: (s: PatternSelection) => void; onZoom: (k: number) => void; controls: Ref<PatternControls> }) {
@@ -90,11 +91,11 @@ export default function PatternGraph({ g, selected, onSelect, onZoom, controls }
   }), [data])
 
   const themeClass = useSyncExternalStore(subscribeDocumentTheme, documentTheme, documentTheme)
-  const colors = useMemo(() => {
-    const css = getComputedStyle(document.documentElement), c = (n: string) => css.getPropertyValue(n).trim()
-    return { theme: themeClass, card: resolveColor('--card'), fg: resolveColor('--foreground'), border: resolveColor('--border'), muted: resolveColor('--muted-foreground'), bg: resolveColor('--background'), blue: resolveColor('--brand'), risk: Array.from({ length: 10 }, (_, i) => resolveColor(`--risk-${i}`)), _: c('--card') }
+  const [colors, setColors] = useState<Record<string, string>>({})
+  useLayoutEffect(() => {
+    if (wrap.current) setColors(readCanvasColors(wrap.current, patternPaint))
   }, [themeClass])
-  const riskColor = (score: number) => colors.risk[Math.min(9, Math.max(0, Math.floor(score * 10)))]
+  const riskColor = (score: number) => colors[`risk${Math.min(9, Math.max(0, Math.floor(score * 10)))}`]
   
   // 휠은 소유주 보기와 같게: 그냥 휠을 굴리면 포인터 자리를 기준으로 확대·축소(Windows 크롬은 Ctrl+휠이 브라우저 배율이라 쓰지 않는다)
   useEffect(() => {
