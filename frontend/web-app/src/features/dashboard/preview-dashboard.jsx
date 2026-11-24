@@ -19,31 +19,41 @@ import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings'
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { dashboardDateKey } from './dashboard-investigation';
 import { readWorkspaceLength } from './workspace-metrics';
-import { LinkTag } from '../../components/semantic-tags';
-import { Meter } from '../../components/meter';
+import { LinkTag, StatusTag, reviewStates } from '../../components/semantic-tags';
+import { Bar } from '../../components/charts/charts/bar';
+import { BarChart } from '../../components/charts/charts/bar-chart';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
+import { flowColors } from './dashboard-flows';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
 const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 3 });
-const workloadPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 1 });
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
+const noMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
-function UnfinishedMeter({ value, total }) {
-  const fraction = total ? workloadPercent.format(value / total) : '—';
-  return <Stack className="dashboard-unfinished-ratio">
-    <Meter className="dashboard-unfinished-meter" min={0} max={Math.max(1, total)} value={value}
-      aria-label="내 담당 미완료 업무 비율" aria-valuetext={`전체 ${count(total)} 중 ${count(value)} · ${fraction}`}
-      aria-hidden={!total || undefined} />
-    <Text className="dashboard-note">{total ? `전체 ${count(total)} 중 ${fraction}` : '내 담당 업무 없음'}</Text>
+function WorkloadBar({ composition, total }) {
+  return <Stack className="dashboard-workload-composition">
+    {total > 0 && <Box className="dashboard-score-band dashboard-workload-bar" aria-hidden="true">
+      <BarChart data={[{ name: '내 담당 업무', ...composition }]} stacked orientation="horizontal" barGap={0}
+        margin={noMargin} horizontalValueDomain={[0, total]}>
+        {reviewStates.map(({ preset }) => <Bar key={preset} dataKey={preset}
+          fill={flowColors[preset]} lineCap="butt" animate={false} />)}
+      </BarChart>
+    </Box>}
+    <Box className="dashboard-legend" role="group" aria-label="내 담당 업무 처리 상태">
+      {reviewStates.map(({ preset, label }) => <Text as="span" className="dashboard-status-legend-item" key={preset}>
+        <StatusTag preset={preset}>{label}</StatusTag>
+        <Text as="strong">{count(composition[preset])}</Text>
+      </Text>)}
+    </Box>
   </Stack>;
 }
 
 function Metric({ item, reduced, trendHeight }) {
-  const { label, value, unit, detail, key, trend, total } = item;
+  const { label, value, unit, detail, key, trend, composition } = item;
   const hasTrend = trend?.rows.some(row => row[trend.key] > 0);
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   return <Box className="dashboard-metric">
@@ -57,7 +67,7 @@ function Metric({ item, reduced, trendHeight }) {
       </Text>
     </Box>
     {detail && <Text>{detail}</Text>}
-    {total !== undefined && <UnfinishedMeter value={value} total={total} />}
+    {composition && <WorkloadBar composition={composition} total={value} />}
     {hasTrend && <Box className="dashboard-metric-trend">
       <BarSparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={trendHeight}
         dot={false} animate={!reduced} aria-label={label + ' · ' + trend.caption + ' · ' +
@@ -78,10 +88,14 @@ function personalIndicators(data) {
   const hourly = (key, color) => ({ rows: data.hourly, key, color, caption: '생성 시간대 · KST' });
   const highRiskColor = 'var(--chart-risk-high)';
   const riskDetail = '미완료 · 위험 점수 ' + modelRiskLabels().high;
+  const statusByCode = data.investigation.statusByCode;
+  const casesByStatus = Map.groupBy(data.mine, row => statusByCode[row.code] ?? row.status);
+  const composition = Object.fromEntries(reviewStates.map(({ value, preset }) =>
+    [preset, casesByStatus.get(value)?.length ?? 0]));
   const episodes = data.mine.filter(row => row.kind === 'Episode' && row.open && modelRiskBand(row.score) === 'high');
   const episodesByDay = Map.groupBy(episodes, row => dashboardDateKey(row.date));
   return [
-    { label: '내 담당 미완료', value: data.unfinished, total: data.mine.length },
+    { label: '내 담당 업무', value: data.mine.length, composition },
     { label: '고위험 Alert', value: data.highRisk, detail: riskDetail, trend: hourly('highRisk', highRiskColor) },
     { label: '3일 초과 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
       trend: hourly('overdue', highRiskColor) },

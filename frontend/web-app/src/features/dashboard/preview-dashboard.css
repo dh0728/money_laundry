@@ -65,7 +65,7 @@
 .dashboard-personal-metrics { grid-column: span 8; grid-auto-rows: 1fr }
 .dashboard-personal-metrics > .dashboard-priority-metric { grid-column: auto; display: flex }
 .dashboard-personal-metrics .dashboard-metric { inline-size: 100% }
-.dashboard-personal-metrics :is(.dashboard-metric-trend, .dashboard-unfinished-ratio) {
+.dashboard-personal-metrics :is(.dashboard-metric-trend, .dashboard-workload-composition) {
   flex: 0 0 auto;
   margin-block-start: auto;
 }
@@ -127,6 +127,8 @@
   overflow: hidden;
 }
 .dashboard-score-band > div { block-size: 100% }
+.dashboard-workload-bar { margin: 0; block-size: var(--aml-space-16); border-radius: var(--aml-radius-full) }
+.dashboard-workload-bar > .bar-chart { inline-size: 100% }
 .dashboard-score-legend {
   margin: 0;
   padding: 0;
@@ -433,7 +435,7 @@
 .dashboard-personal-metrics .dashboard-loading-trend { min-block-size: var(--chart-detail-sparkline-height) }
 .dashboard-loading-recommendation-plot { block-size: var(--chart-series-height) }
 .dashboard-loading [data-slot="skeleton"].dashboard-score-band { border-radius: var(--aml-radius-card) }
-.dashboard-loading [data-slot="skeleton"].dashboard-unfinished-meter { border-radius: var(--aml-radius-full) }
+.dashboard-loading [data-slot="skeleton"].dashboard-workload-bar { border-radius: var(--aml-radius-full) }
 .dashboard-loading .dashboard-loading-card {
   inline-size: 100%;
   block-size: calc(2 * var(--aml-space-48));

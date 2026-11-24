@@ -3,7 +3,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import MagicBento from '../../components/react-bits/MagicBento';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
-import { Meter } from '../../components/meter';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
@@ -48,13 +47,13 @@ function LoadingSeries({ className }) {
   </LoadingChart>;
 }
 
-function LoadingMetric({ detail, trend, ratio }) {
+function LoadingMetric({ detail, trend, composition }) {
   return <Box className="dashboard-metric">
     <Skeleton className="dashboard-loading-title" />
     <Skeleton className="dashboard-loading-value" />
     {detail && <Skeleton className="dashboard-loading-note" />}
-    {ratio && <Stack className="dashboard-unfinished-ratio">
-      <Meter className="dashboard-unfinished-meter" loading />
+    {composition && <Stack className="dashboard-workload-composition">
+      <Skeleton className="dashboard-score-band dashboard-workload-bar" />
       <Skeleton className="dashboard-loading-note" />
     </Stack>}
     {trend && <Skeleton className="dashboard-loading-trend" />}
@@ -101,9 +100,9 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
 
 export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
   if (benchmark) return <BenchmarkDashboardSkeleton mine={mine} appearance={appearance} />;
-  const indicators = mine ? ['unfinished', 'high-risk-alert', 'overdue', 'high-risk-episode'] : ['incoming', 'suspect', 'alerts'];
+  const indicators = mine ? ['workload', 'high-risk-alert', 'overdue', 'high-risk-episode'] : ['incoming', 'suspect', 'alerts'];
   const cards = indicators.map((indicator, index) => <Panel as="article" className="dashboard-priority-metric" key={indicator}>
-    <LoadingMetric detail={mine ? index > 0 : index === 1} trend={!mine || index > 0} ratio={mine && index === 0} />
+    <LoadingMetric detail={mine ? index > 0 : index === 1} trend={!mine || index > 0} composition={mine && index === 0} />
   </Panel>);
   return <Box className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 불러오는 중</Text>
