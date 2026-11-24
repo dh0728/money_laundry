@@ -511,7 +511,7 @@ function AlertEpisodeActions({ overview }) {
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   if (!canManagePreviewEpisodes(user)) return null;
   return <ScreenActions host={overview.actionsHost}>
-    <ActionButton onClick={() => setOpen(true)}>Episode로 묶기</ActionButton>
+    <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setOpen(true)}>Episode로 묶기</PrimaryButton>
     {open && <PreviewEpisodeDialog cases={overview.reportData.cases} save={overview.saveEpisode}
       onClose={saved => saved ? overview.refreshEpisode() : setOpen(false)} />}
   </ScreenActions>;
@@ -560,9 +560,9 @@ function CaseReviewActions({ overview }) {
       {selected.length > 0 && <CaseTransactionEdit row={row} selected={selected} canEdit={!blockedReason}
         blockedReason={blockedReason} destinations={!blockedReason ? previewAlertMembershipTargets(reportData.cases, row.code, user) : []}
         onApply={overview.editTransactions} onClear={evidenceSelection.clear} />}
-      {row.episodeCode && <ActionButton as="a" href={`/episodes/${row.episodeCode}?tab=related`}>연결 Episode 열기</ActionButton>}
+      {row.episodeCode && <PrimaryButton tone="inverse" as="a" href={`/episodes/${row.episodeCode}?tab=related`}>연결 Episode 열기</PrimaryButton>}
       {canManageEpisodes && row.kind === 'Episode' && row.open && row.assigned && Boolean(row.linkedAlertCodes?.length)
-        && <ActionButton onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</ActionButton>}
+        && <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</PrimaryButton>}
       {episodeAction && <PreviewEpisodeDialog cases={reportData.cases} save={overview.saveEpisode} row={row}
         bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'}
         onRelationRequest={episodeAction === 'bundle' ? onRelationRequest : undefined}
