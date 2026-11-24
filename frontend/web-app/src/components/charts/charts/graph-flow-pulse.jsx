@@ -4,6 +4,12 @@ import './graph-flow-pulse.css';
 export const graphFlowDuration = 560;
 export const graphRevealDuration = 480;
 
+export function GraphTransferParticle({ path, radius, duration }) {
+  return <circle r={radius} fill="var(--foreground)" className="timeline-edge-particle" aria-hidden="true">
+    <animateMotion dur={`${duration}ms`} repeatCount="indefinite" path={path} />
+  </circle>;
+}
+
 export function GraphFlowReveal({ path, pulse, width, height, children }) {
   const id = useId();
   const [elapsed] = useState(() => performance.now() - pulse.startedAt);
