@@ -25,13 +25,16 @@
 }
 .model-graph-sphere {
   position: absolute;
-  inline-size: 64%;
-  block-size: 64%;
-  inset: 18%;
+  inline-size: var(--model-risk-sphere-size);
+  block-size: var(--model-risk-sphere-size);
+  inset: var(--model-risk-sphere-inset);
 }
+.model-graph-sphere-color { color: var(--model-risk-sphere-color, inherit) }
 
 .model-risk-slider-thumb {
   position: absolute;
+  left: var(--model-risk-thumb-x);
+  top: var(--model-risk-thumb-y);
   display: block;
   inline-size: var(--aml-space-20);
   block-size: var(--aml-space-20);

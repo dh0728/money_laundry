@@ -430,6 +430,18 @@
   --risk-high: var(--status-danger-accent);
   --risk-readout-low-stroke: .75px light-dark(var(--aml-black-100), transparent);
   --model-risk-settings-dial-max-width: 15rem;
+  --model-risk-dial-units: 240;
+  --model-risk-dial-start-angle: 150;
+  --model-risk-dial-sweep-angle: 240;
+  --model-risk-dial-band-radius: 91;
+  --model-risk-dial-band-half-width: 4;
+  --model-risk-thumb-close-range: 7;
+  --model-risk-thumb-separated-inset: var(--aml-space-20);
+  --model-risk-sphere-size: 64%;
+  --model-risk-sphere-inset: calc((100% - var(--model-risk-sphere-size)) / 2);
+  --model-risk-sphere-resolution: 256;
+  --model-risk-sphere-draw-scale: .83;
+  --model-risk-sphere-link-stroke: 1.3;
   --review-status-unread-accent: var(--status-danger-accent);
   --review-status-pending-accent: var(--status-pending-accent);
   --review-status-inProgress-accent: var(--status-info-accent);

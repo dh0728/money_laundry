@@ -1,5 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { appMotionPreference } from '@/hooks/use-reduced-motion';
+import { readChartNumber } from '../chart-design-values';
 
 const count = 100;
 const angle = Math.PI * (3 - Math.sqrt(5));
@@ -20,18 +21,24 @@ const riskBands = ['low', 'medium', 'high'];
 
 function resolveRiskColors(element) {
   const probe = element.ownerDocument.createElement('span');
+  probe.className = 'model-graph-sphere-color';
   probe.hidden = true;
   element.append(probe);
   const colors = riskBands.map(band => {
-    probe.style.color = `var(--risk-${band})`;
+    probe.style.setProperty('--model-risk-sphere-color', `var(--risk-${band})`);
     return getComputedStyle(probe).color;
   });
   probe.remove();
   return colors;
 }
 
-export function ModelGraph({ values: [medium, high] }) {
+export function ModelRiskSphere({ values: [medium, high] }) {
   const canvas = useRef(null);
+  const [design] = useState(() => ({
+    resolution: readChartNumber('--model-risk-sphere-resolution', 256),
+    drawScale: readChartNumber('--model-risk-sphere-draw-scale', .83),
+    linkStroke: readChartNumber('--model-risk-sphere-link-stroke', 1.3),
+  }));
   const thresholds = useRef([medium, high]);
   const repaint = useRef(null);
   useLayoutEffect(() => {
@@ -52,7 +59,7 @@ export function ModelGraph({ values: [medium, high] }) {
       const [medium, high] = thresholds.current;
       const color = score => colors[score >= high ? 2 : score >= medium ? 1 : 0];
       const midpoint = element.width / 2;
-      const scale = midpoint * 0.83;
+      const scale = midpoint * design.drawScale;
       const s = Math.sin(rotation);
       const c = Math.cos(rotation);
       const dots = nodes.map(({ x, y, z, score }) => {
@@ -61,7 +68,7 @@ export function ModelGraph({ values: [medium, high] }) {
         return { x: midpoint + (x * c + z * s) * scale, y: midpoint + tilt * scale, depth, score };
       });
       context.clearRect(0, 0, element.width, element.height);
-      context.lineWidth = 1.3;
+      context.lineWidth = design.linkStroke;
       for (const { first, second, score } of edges) {
         const a = dots[first], b = dots[second];
         context.strokeStyle = color(score);
@@ -117,7 +124,7 @@ export function ModelGraph({ values: [medium, high] }) {
       document.removeEventListener('aml:appearance', syncAppearance);
       document.removeEventListener('visibilitychange', sync);
     };
-  }, []);
-  return <canvas className="model-graph-sphere" ref={canvas} width={256} height={256}
+  }, [design]);
+  return <canvas className="model-graph-sphere" ref={canvas} width={design.resolution} height={design.resolution}
     role="img" aria-label="연결된 노드로 표현한 그래프 모델 개념도와 예시 위험 구간" />;
 }
