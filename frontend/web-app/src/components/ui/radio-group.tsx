@@ -5,6 +5,10 @@ import { cn } from "@/lib/utils"
 import { CircleIcon } from "lucide-react"
 import { RadioGroup as RadioGroupPrimitive } from "radix-ui"
 
+function NativeRadio(props: Omit<React.ComponentProps<"input">, "type">) {
+  return <input type="radio" {...props} />
+}
+
 function RadioGroup({
   className,
   ...props
@@ -41,4 +45,4 @@ function RadioGroupItem({
   )
 }
 
-export { RadioGroup, RadioGroupItem }
+export { NativeRadio, RadioGroup, RadioGroupItem }

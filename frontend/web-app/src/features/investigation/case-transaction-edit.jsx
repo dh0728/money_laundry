@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { ActionButton, ConfirmHoldButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
 import GlideSelect from '../../components/react-bits/GlideSelect';
+import { NativeRadio } from '../../components/ui/radio-group';
 import { Textarea } from '../../components/ui/textarea';
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal';
 import { CountTag } from '../../components/semantic-tags';
@@ -101,12 +102,12 @@ export function CaseTransactionEdit({ row, selected = [], destinations = [], can
           <Box as="fieldset" className="case-judgment-verdict">
             <Box as="legend">편집 방식</Box>
             <Box as="label">
-              <input type="radio" name={`${id}-operation`} value="exclude" checked={operation === 'exclude'}
+              <NativeRadio name={`${id}-operation`} value="exclude" checked={operation === 'exclude'}
                 onChange={() => { setOperation('exclude'); setError(''); }} />
               이 Alert에서 제외
             </Box>
             <Box as="label">
-              <input type="radio" name={`${id}-operation`} value="transfer" checked={operation === 'transfer'}
+              <NativeRadio name={`${id}-operation`} value="transfer" checked={operation === 'transfer'}
                 disabled={!targets.length} onChange={() => { setOperation('transfer'); setError(''); }} />
               다른 Alert로 이동
             </Box>
