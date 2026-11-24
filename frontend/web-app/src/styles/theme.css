@@ -362,6 +362,36 @@
   --radar-bezel-mid: var(--palette-radar-bezel-mid);
   --radar-bezel-dark: var(--palette-radar-bezel-dark);
   --radar-disc: var(--palette-radar-disc);
+  --radar-core-radius: 5px;
+  --radar-core-gradient-midpoint: 0.4;
+  --radar-bezel-gradient-midpoint: 0.5;
+  --radar-disc-radius: 15px;
+  --radar-bezel-stroke: 1.5px;
+  --radar-outer-ring-radius: 12.5px;
+  --radar-outer-ring-opacity: 0.3;
+  --radar-outer-ring-stroke: 0.6px;
+  --radar-inner-ring-radius: 8.5px;
+  --radar-inner-ring-opacity: 0.25;
+  --radar-inner-ring-stroke: 0.5px;
+  --radar-trail-faint-opacity: 0.08;
+  --radar-trail-middle-opacity: 0.2;
+  --radar-trail-bright-opacity: 0.6;
+  --radar-beam-stroke: 1.4px;
+  --radar-highlight-radius: 1.3px;
+  --radar-highlight-opacity: 0.85;
+  --radar-sweep-duration: 2.2s;
+  --agent-sidebar-top: 60px;
+  --agent-sidebar-viewport-share: 0.92;
+  --agent-sidebar-max-width: 720px;
+  --agent-panel-min-width: 320px;
+  --agent-floating-width: 400px;
+  --agent-floating-height: 620px;
+  --agent-floating-min-height: 360px;
+  --agent-floating-start-top: 88px;
+  --agent-user-message-width: 80%;
+  --agent-morph-layer: 80;
+  --agent-resize-handle-layer: 51;
+  --agent-morph-settle-time: 520ms;
   --background: var(--palette-white); --foreground: var(--palette-neutral-950);
   --card: var(--palette-white); --card-foreground: var(--palette-neutral-950);
   --popover: var(--palette-white); --popover-foreground: var(--palette-neutral-950);
@@ -509,6 +539,38 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .agent-resize-handle:hover, .agent-resize-handle:active { background:var(--border); }
 .agent-resize-handle-x { width:var(--aml-space-6); margin-left:calc(var(--aml-space-6) / -2); cursor:col-resize; }
 .rdr-glow { filter:drop-shadow(0 0 var(--aml-space-2) var(--rdr-glow)); }
+.radar-core { r: var(--radar-core-radius); }
+.radar-disc { r: var(--radar-disc-radius); stroke-width: var(--radar-bezel-stroke); }
+.radar-outer-ring {
+  r: var(--radar-outer-ring-radius);
+  stroke-opacity: var(--radar-outer-ring-opacity);
+  stroke-width: var(--radar-outer-ring-stroke);
+}
+.radar-inner-ring {
+  r: var(--radar-inner-ring-radius);
+  stroke-opacity: var(--radar-inner-ring-opacity);
+  stroke-width: var(--radar-inner-ring-stroke);
+}
+.radar-trail-faint { fill-opacity: var(--radar-trail-faint-opacity); }
+.radar-trail-middle { fill-opacity: var(--radar-trail-middle-opacity); }
+.radar-trail-bright { fill-opacity: var(--radar-trail-bright-opacity); }
+.radar-beam { stroke-width: var(--radar-beam-stroke); }
+.radar-highlight { r: var(--radar-highlight-radius); fill-opacity: var(--radar-highlight-opacity); }
+.agent-sidebar {
+  top: var(--agent-sidebar-top);
+  height: calc(100dvh - var(--agent-sidebar-top));
+  max-width: calc(var(--agent-sidebar-viewport-share) * 100vw);
+  width: var(--agent-width, var(--agent-sidebar-default-width));
+}
+.agent-user-message { max-width: var(--agent-user-message-width); }
+.agent-resize-handle { z-index: var(--agent-resize-handle-layer); }
+.rdr-morph {
+  left: var(--agent-morph-x);
+  top: var(--agent-morph-y);
+  width: var(--agent-morph-width);
+  height: var(--agent-morph-height);
+  z-index: var(--agent-morph-layer);
+}
 .agent-trigger svg { filter:drop-shadow(0 0 0 var(--rdr-glow)); transition:filter var(--motion-fast) var(--ease-ui); }
 .agent-trigger:hover svg, .agent-trigger:focus-visible svg { filter:drop-shadow(0 0 var(--aml-space-6) var(--rdr-glow)); }
 .rdr-morph { will-change:left,top,width,height; transition:left var(--motion-rdr-morph) var(--ease-emphasized),top var(--motion-rdr-morph) var(--ease-emphasized),width var(--motion-rdr-morph) var(--ease-emphasized),height var(--motion-rdr-morph) var(--ease-emphasized); }
