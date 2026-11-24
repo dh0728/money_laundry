@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { NativeSelect } from '@/components/ui/select';
 import { createRoot } from 'react-dom/client';
 import { ActionButton, ConfirmHoldButton, PrimaryButton } from '../components/primary-button';
 import { Button, Divider, Icon, IconButton, ScrollArea, Tooltip, bindTooltip } from '../components/components';
@@ -129,9 +130,8 @@ function WorkflowSample({ kind, view }) {
 function ResultSamples() {
   const [status, setStatus] = useState('pending');
   return <>
-    <Box as="label" className="catalogue-status-select">처리 상태 <select className="aml-native-select" value={status} onChange={event => setStatus(event.target.value)}>
-      {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-    </select></Box>
+    <Box as="label" className="catalogue-status-select">처리 상태 <NativeSelect className="aml-native-select" value={status} onChange={event => setStatus(event.target.value)}
+      options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))} /></Box>
     <StatusMark status={status} label={statusLabels[status]} color="var(--text)"
       doneColor="var(--tag-positive-ink)" errorColor="var(--tag-danger-ink)" strike={false} />
     <ActionButton className="row" shape="pill" surface="floating" onClick={() => document.dispatchEvent(new CustomEvent('aml:result', {
