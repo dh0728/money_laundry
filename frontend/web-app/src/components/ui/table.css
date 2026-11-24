@@ -25,6 +25,8 @@
 
 [data-slot="table-cell"][data-stacked="true"] > * { display: block }
 
+[data-slot="table-columns"] > col { width: var(--table-column-width, auto) }
+
 [data-slot="table"] thead tr > :is(th, td),
 [data-slot="table"] tbody tr:nth-child(even) > :is(th, td) {
   background-image: linear-gradient(

@@ -72,6 +72,46 @@
 }
 .data-table-scroll > [data-slot="table-container"] { min-inline-size: max-content; overflow: visible }
 .data-table-scroll[data-compact="true"] { --table-cell-inset: var(--aml-space-4) }
+.data-table-frame[data-hierarchy] .data-table-scroll > [data-slot="table-container"] {
+  min-inline-size: var(--hierarchy-table-min-width);
+}
+.data-table-frame[data-hierarchy] table { table-layout: fixed }
+.data-table-frame[data-hierarchy] tr[data-row-level="3"] {
+  scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
+}
+.data-table-frame[data-hierarchy] tbody tr[data-row-level="1"] { background-color: var(--information-panel-surface) }
+.data-table-frame[data-hierarchy] tbody tr[data-row-level] > :is(th, td) { padding-block: var(--aml-space-4) }
+.data-table-frame[data-hierarchy] th[scope="rowgroup"] { text-align: start }
+.data-table-frame[data-hierarchy] tbody tr:is([data-row-level="2"], [data-row-level="3"]) > th {
+  border-inline-start: var(--aml-stroke-divider) solid var(--aml-data-grid);
+}
+@media (min-width: 1121px) and (min-height: 481px) {
+  .data-table-frame[data-hierarchy],
+  .data-table-frame[data-hierarchy] :is(.data-table-content, .data-table-scroll) { flex: 1 }
+}
+.table-branch-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aml-space-4);
+  padding: 0;
+  min-block-size: var(--aml-size-control-compact);
+  font-weight: inherit;
+  white-space: nowrap;
+}
+.table-branch-toggle .icon {
+  inline-size: var(--aml-size-icon-mini);
+  block-size: var(--aml-size-icon-mini);
+}
+.table-branch-toggle[aria-expanded="true"] .icon { rotate: calc(var(--aml-rotation-flip) / 2) }
+.table-record-cell {
+  display: grid;
+  grid-template-columns: var(--aml-size-control) minmax(0, max-content);
+  align-items: center;
+  min-block-size: var(--aml-size-control);
+  gap: var(--aml-space-4);
+}
+.table-record-cell > [data-tag="link"] { grid-column: 2; justify-self: start; padding: 0 }
+.table-record-cell > [data-tag="link"] code { font-weight: var(--aml-type-body-strong-weight) }
 .data-table-frame table {
   inline-size: 100%;
   border-collapse: separate;

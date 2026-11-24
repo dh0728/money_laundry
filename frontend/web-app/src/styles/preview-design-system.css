@@ -151,6 +151,7 @@
   --case-graph-owner-boundary-stroke: 1.5px;
   --case-graph-owner-port-stroke: 1.25px;
   --case-graph-owner-muted-opacity: .25;
+  --hierarchy-table-min-width: 72rem;
   --chart-axis-label-line-height: 1.2;
   --metric-value-size-min: 1.5rem;
   --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));

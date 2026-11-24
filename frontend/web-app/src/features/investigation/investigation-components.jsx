@@ -1,6 +1,5 @@
 import React, { useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ChevronRight } from 'lucide-react';
 import { SearchField } from '../../components/search-field';
 import { TableBody, TableCell, TableColumns, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { CardHeader } from '../../components/card-header';
@@ -13,7 +12,7 @@ import { dashboardFixtures } from '../../mocks/dashboard-fixtures';
 import { ActionButton, WorkTabAddButton } from '../../components/primary-button';
 import AnimatedList from '../../components/react-bits/AnimatedList';
 import { BorderGlowEdge } from '../../components/react-bits/BorderGlow';
-import { TableFieldLabel, WorkflowTable } from '../../components/workflow-table';
+import { TableBranchToggle, TableFieldLabel, TableRecordCell, WorkflowTable } from '../../components/workflow-table';
 import { downloadCsv, TableQueryTools } from '../../components/query-controls';
 import './investigation-components.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
@@ -267,16 +266,9 @@ function LedgerColumns({ columns }) {
 }
 
 function LedgerRecordId({ code, addable = true, ...buttonProps }) {
-  return <TableRowHead><Box className="ledger-table-record-id">
-    {addable && <WorkTabAddButton inline code={code} />}
-    <LinkTag code={code} className="ledger-table-select" aria-label={undefined} data-work-code={undefined} {...buttonProps} />
-  </Box></TableRowHead>;
-}
-
-function LedgerBranchToggle({ label, expanded, onClick, children }) {
-  return <ActionButton className="ledger-branch-toggle" aria-expanded={expanded} aria-label={label} onClick={onClick}>
-    <ChevronRight className="icon" aria-hidden="true" />{children}
-  </ActionButton>;
+  return <TableRecordCell action={addable ? <WorkTabAddButton inline code={code} /> : null}>
+    <LinkTag code={code} aria-label={undefined} data-work-code={undefined} {...buttonProps} />
+  </TableRecordCell>;
 }
 
 /** 상단 작업 코드 검색과 같은 pill 검색 필드(.search-field)를 쓴다. */
@@ -307,15 +299,16 @@ function LedgerMore({ label, list }) {
   </Box>;
 }
 
-function LedgerMoreRow({ label, list, depth }) {
+function LedgerMoreRow({ label, list, level }) {
   if (!list.hasMore && list.status !== 'error') return null;
-  return <TableRow data-ledger-depth={depth} data-ledger-more="">
+  return <TableRow level={level}>
     <TableCell colSpan={ledgerColumns.length}><LedgerMore label={label} list={list} /></TableCell>
   </TableRow>;
 }
 
 function LedgerHierarchy({ owners, accounts, transactions, selection, select, queries }) {
-  const frame = useRef(null);
+  const scroll = useRef(null);
+  const selectedRow = useRef(null);
   const { owner, account, transaction } = selection;
   const records = transactions.items;
   const ownerOpen = row => owner?.id === row.id;
@@ -333,9 +326,9 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
   }] };
 
   useLayoutEffect(() => {
-    const viewport = frame.current.querySelector('.ledger-hierarchy-scroll');
-    const row = viewport?.querySelector('tr[data-ledger-depth="transaction"][data-selected="true"]');
-    if (!row || !viewport.clientHeight) return;
+    const viewport = scroll.current;
+    const row = selectedRow.current;
+    if (!row || !viewport?.clientHeight) return;
     if (viewport.scrollHeight <= viewport.clientHeight) {
       row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       return;
@@ -347,58 +340,58 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
     else if (rowBounds.top < visibleTop) viewport.scrollTop += rowBounds.top - visibleTop;
   }, [transaction?.id]);
 
-  return <Box ref={frame} className="ledger-hierarchy">
+  return <Box className="ledger-hierarchy">
     <Box className="ledger-table-controls" role="group" aria-label="원장 목록 검색">
       {[['소유주', queries.owner, true], ['계좌', queries.account, Boolean(owner)], ['거래', queries.transaction, Boolean(account)]]
         .map(([label, query, enabled]) => <LedgerSearch key={label} label={`${label} 검색`}
           placeholder={enabled ? `${label} 검색` : `${label} 검색 · 상위 항목을 먼저 선택`} value={query.value} onChange={query.set}
           disabled={!enabled} />)}
     </Box>
-    <WorkflowTable className="ledger-hierarchy-scroll" tableClassName="ledger-hierarchy-table" label="통합 테이블" summary={summary}
+    <WorkflowTable hierarchy scrollRef={scroll} label="통합 테이블" summary={summary}
       tools={account && records.length > 0 && <TableQueryTools actions={actions} />}>
       <TableColumns widths={ledgerColumns.map(([key, , width]) => ({ key, width: `${width}%` }))} />
       <LedgerColumns columns={ledgerColumns} />
       <TableBody>
       {owners.items.map(row => <React.Fragment key={row.id}>
-        <TableRow data-ledger-depth="owner">
-          <TableRowHead scope="rowgroup"><LedgerBranchToggle label={`${row.name}의 계좌`} expanded={ownerOpen(row)}
-            onClick={() => select.owner(ownerOpen(row) ? null : row)}>{row.name}</LedgerBranchToggle></TableRowHead>
+        <TableRow level={1}>
+          <TableRowHead scope="rowgroup"><TableBranchToggle label={`${row.name}의 계좌`} expanded={ownerOpen(row)}
+            onClick={() => select.owner(ownerOpen(row) ? null : row)}>{row.name}</TableBranchToggle></TableRowHead>
           <TableCell colSpan={ledgerColumns.length - 1} />
         </TableRow>
         {ownerOpen(row) && <>
           {accounts.items.map(item => {
             const open = account?.id === item.id;
             return <React.Fragment key={item.id}>
-              <TableRow data-ledger-depth="account">
+              <TableRow level={2}>
                 <TableCell aria-hidden="true" />
-                <TableRowHead><LedgerBranchToggle label={`${item.label}의 거래`} expanded={open}
-                  onClick={() => select.account(open ? null : item)}><Text as="code" title={item.id}>{item.label}</Text></LedgerBranchToggle></TableRowHead>
+                <TableRowHead><TableBranchToggle label={`${item.label}의 거래`} expanded={open}
+                  onClick={() => select.account(open ? null : item)}><Text as="code" title={item.id}>{item.label}</Text></TableBranchToggle></TableRowHead>
                 <TableCell colSpan={ledgerColumns.length - 2} />
               </TableRow>
               {open && records.map(record => {
                 const active = transaction?.id === record.id;
-                return <TableRow key={record.id} data-ledger-depth="transaction" data-selected={active || undefined}>
+                return <TableRow key={record.id} level={3} ref={active ? selectedRow : undefined} data-selected={active || undefined}>
                   <TableCell aria-hidden="true" /><TableCell aria-hidden="true" />
                   <LedgerRecordId code={record.code} addable={record.openable} aria-pressed={active}
                     aria-description={`${row.name} · ${item.label}`} onClick={() => select.transaction(record)} />
                   <TableCell><Text as="time" dateTime={`${record.timestamp.replace(' ', 'T')}+09:00`}>{record.timestamp}</Text></TableCell>
                   <TableCell>{transactionDirection(record)}</TableCell>
                   <TableCell><Text as="code">{counterpartyCode(record)}</Text></TableCell>
-                  <TableCell className="ledger-table-amount">{amountFormat.format(record.amount)} {record.currency}</TableCell>
+                  <TableCell numeric>{amountFormat.format(record.amount)} {record.currency}</TableCell>
                   <TableCell>{record.method}</TableCell>
                   <TableCell><VerdictTag verdict={record.verdict} /></TableCell>
                 </TableRow>;
               })}
-              {open && <LedgerMoreRow label={`${item.label} 거래`} list={transactions} depth="transaction" />}
+              {open && <LedgerMoreRow label={`${item.label} 거래`} list={transactions} level={3} />}
             </React.Fragment>;
           })}
-          <LedgerMoreRow label={`${row.name} 계좌`} list={accounts} depth="account" />
+          <LedgerMoreRow label={`${row.name} 계좌`} list={accounts} level={2} />
         </>}
       </React.Fragment>)}
         {owners.status === 'success' && !owners.items.length && <TableRow>
           <TableCell colSpan={ledgerColumns.length}>조건과 일치하는 소유주가 없습니다.</TableCell>
         </TableRow>}
-        <LedgerMoreRow label="소유주" list={owners} depth="owner" />
+        <LedgerMoreRow label="소유주" list={owners} level={1} />
       </TableBody>
     </WorkflowTable>
     <LedgerListStatus list={owners} empty="" />

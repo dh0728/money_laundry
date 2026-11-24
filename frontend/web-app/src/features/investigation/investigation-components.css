@@ -27,46 +27,6 @@
   gap: var(--workspace-gap);
 }
 .ledger-hierarchy { min-inline-size: 0 }
-.ledger-hierarchy-scroll > [data-slot="table-container"] { min-inline-size: 72rem }
-.ledger-hierarchy-table { table-layout: fixed }
-.ledger-hierarchy-table tr[data-ledger-depth="transaction"] {
-  scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
-}
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth="owner"] {
-  background-color: var(--information-panel-surface);
-}
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth] > :is(th, td) {
-  padding-block: var(--aml-space-4);
-}
-.ledger-hierarchy-scroll th[scope="rowgroup"] { text-align: start }
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth="account"] > th,
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth="transaction"] > th {
-  border-inline-start: var(--aml-stroke-divider) solid var(--aml-data-grid);
-}
-.ledger-branch-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--aml-space-4);
-  padding: 0;
-  min-block-size: var(--aml-size-control-compact);
-  font-weight: inherit;
-  white-space: nowrap;
-}
-.ledger-branch-toggle .icon {
-  inline-size: var(--aml-size-icon-mini);
-  block-size: var(--aml-size-icon-mini);
-}
-.ledger-branch-toggle[aria-expanded="true"] .icon { rotate: 90deg }
-.ledger-table-record-id {
-  display: grid;
-  grid-template-columns: var(--aml-size-control) minmax(0, max-content);
-  align-items: center;
-  min-block-size: var(--aml-size-control);
-  gap: var(--aml-space-4);
-}
-.ledger-table-select { grid-column: 2; justify-self: start; padding: 0 }
-.ledger-table-select code { font-weight: var(--aml-type-body-strong-weight) }
-.ledger-table-amount { text-align: end; font-variant-numeric: tabular-nums }
 .ledger-connections {
   position: absolute;
   inset: 0;
@@ -254,7 +214,6 @@
     flex-direction: column;
     min-block-size: 0;
   }
-  .ledger-hierarchy :is(.data-table-frame, .data-table-content, .ledger-hierarchy-scroll) { flex: 1 }
 }
 @media (max-width: 1120px) {
   .ledger-components {
@@ -340,8 +299,7 @@
   margin-block-end: var(--workspace-gap);
 }
 .ledger-table-controls .ledger-search { margin-block-start: 0 }
-.ledger-hierarchy-scroll tr[data-ledger-more] > td { padding-block: var(--aml-space-4) }
-.ledger-hierarchy-scroll tr[data-ledger-more] .ledger-more { margin: 0 }
+.ledger-hierarchy .ledger-more { margin: 0 }
 /* 하단 공통 도구(계정·페이지)와 목록 끝 더 보기가 겹치지 않게 비워 둔다. */
 @media (min-width: 1121px) and (min-height: 481px) {
   .ledger-components { padding-block-end: var(--aml-space-48) }

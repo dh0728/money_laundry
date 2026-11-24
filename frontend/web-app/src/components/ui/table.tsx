@@ -52,11 +52,12 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   )
 }
 
-function TableRow({ className, related, ...props }: React.ComponentProps<"tr"> & { related?: boolean }) {
+function TableRow({ className, related, level, ...props }: React.ComponentProps<"tr"> & { related?: boolean; level?: 1 | 2 | 3 }) {
   return (
     <tr
       data-slot="table-row"
       data-related={related || undefined}
+      data-row-level={level}
       className={cn(
         "transition-colors hover:bg-(--hover-surface) has-aria-expanded:bg-(--hover-surface) data-[state=selected]:bg-muted",
         className
@@ -101,7 +102,9 @@ function TableRowHead({ scope = "row", ...props }: React.ComponentProps<"th">) {
 function TableColumns({ widths }: { widths: Array<{ key: React.Key; width?: React.CSSProperties["width"] }> }) {
   return (
     <colgroup data-slot="table-columns">
-      {widths.map(({ key, width }) => <col key={key} style={{ width }} />)}
+      {widths.map(({ key, width }) => <col key={key} style={{
+        "--table-column-width": typeof width === "number" ? `${width}px` : width,
+      } as React.CSSProperties} />)}
     </colgroup>
   )
 }

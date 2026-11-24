@@ -1,8 +1,8 @@
 import React, { Children, cloneElement, isValidElement, useState } from 'react';
 import { Activity, ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight, ArrowLeftRight, Banknote, Bell, CalendarDays, CalendarRange,
-  CircleGauge, ClipboardCheck, Clock, CreditCard, FileStack, FileText, Fingerprint, Hash, Landmark, Layers,
+  ChevronRight, CircleGauge, ClipboardCheck, Clock, CreditCard, FileStack, FileText, Fingerprint, Hash, Landmark, Layers,
   ListChecks, Network, Scale, Settings2, Tag, Target, Timer, UserRound, WalletCards } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRowHead } from '@/components/ui/table';
 import { ActionButton } from './primary-button';
 import SpringCheck from './react-bits/SpringCheck';
 import { CountTag } from './semantic-tags';
@@ -187,14 +187,24 @@ export function WorkflowQueryHeading({ title, summary, tools = true }) {
 }
 
 export function WorkflowTable({ label, title = label, summary, className = '', tableClassName = 'workflow-data-table',
-  tools = true, selection, compact, children }) {
-  return <div className="data-table-frame">
+  tools = true, selection, compact, hierarchy, scrollRef, children }) {
+  return <div className="data-table-frame" data-hierarchy={hierarchy || undefined}>
     <WorkflowQueryHeading title={title} summary={summary} tools={tools} />
     <div className="data-table-content">
-      <div className={`data-table-scroll ${className}`} data-compact={compact || undefined}
+      <div ref={scrollRef} className={`data-table-scroll ${className}`} data-compact={compact || undefined}
         role="region" aria-label={`${label} 스크롤`} tabIndex={0}>
         <Table className={tableClassName} aria-label={label}>{selection ? withSelectionColumn(children, selection) : children}</Table>
       </div>
     </div>
   </div>;
+}
+
+export function TableBranchToggle({ label, expanded, onClick, children }) {
+  return <ActionButton className="table-branch-toggle" aria-expanded={expanded} aria-label={label} onClick={onClick}>
+    <ChevronRight className="icon" aria-hidden="true" />{children}
+  </ActionButton>;
+}
+
+export function TableRecordCell({ action, children }) {
+  return <TableRowHead><div className="table-record-cell">{action}{children}</div></TableRowHead>;
 }
