@@ -35,7 +35,7 @@ export function PrimaryButton({ children, className = '', disabled, radius, size
     ...style,
   };
   if (tone === 'brand' || tone === 'positive' || tone === 'negative') {
-    return <AccentButton tone={tone} className={className} disabled={disabled} radius={radius} style={style} data-button-size={size}
+    return <AccentButton tone={tone} className={className} disabled={disabled} radius={radius} data-button-size={size}
       activation={onHold ? 'hold' : 'press'} onHold={onHold} onClick={onClick} {...buttonProps}>{children}</AccentButton>;
   }
   if (tone === 'inverse') {

@@ -22,6 +22,15 @@
   --aml-motion-workspace-enter-depth: 145px;
   --aml-motion-workspace-enter-opacity: .16;
   --aml-opacity-disabled: .5;
+  --aml-focus-outline-offset: 3px;
+  --aml-duration-control-transition: 160ms;
+  --aml-duration-feedback-transition: 200ms;
+  --aml-duration-confirmation-pulse: 600ms;
+  --aml-ease-decelerate: cubic-bezier(0.23, 1, 0.32, 1);
+  --aml-control-hover-base-weight: 92%;
+  --aml-opacity-feedback-glow: 70%;
+  --aml-opacity-feedback-ring: 55%;
+  --aml-type-control-tracking: 0.01em;
   --brand-accent: var(--selection-surface);
   --brand-color: var(--brand-accent);
   --brand-control-surface: var(--selection-surface);
