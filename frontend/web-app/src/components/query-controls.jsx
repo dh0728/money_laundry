@@ -4,7 +4,7 @@ import { createPortal, flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { DayPicker } from 'react-day-picker';
 import { ko } from 'react-day-picker/locale';
-import { Check, ChevronRight } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { downloadCsv as saveCsv } from '@/lib/report-io';
 import { Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
 import { ActionButton } from './primary-button';
@@ -71,7 +71,8 @@ export function visualizationEntries({ label, filename, readRoot }) {
 }
 
 function CalendarChevron({ orientation = 'left' }) {
-  return <span className="aml-calendar-chevron" data-direction={orientation} aria-hidden="true" />;
+  const Chevron = ({ left: ChevronLeft, right: ChevronRight, down: ChevronDown, up: ChevronUp })[orientation] ?? ChevronLeft;
+  return <Chevron className="aml-calendar-chevron" aria-hidden="true" />;
 }
 
 const patternValue = row => row.pattern?.replace(/\s+\d+%$/, '');
