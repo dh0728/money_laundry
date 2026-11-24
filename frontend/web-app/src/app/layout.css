@@ -458,7 +458,6 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
 .workflow-backtest .stepper__segment[aria-current="step"] {
   --stepper-ink: var(--selection-ink);
   --stepper-muted: var(--selection-muted);
-  --stepper-ring: var(--selection-ink);
 }
 .rule-template-menu :is(.branched-menu__head, .branched-menu__item) {
   border-radius: var(--aml-radius-control);

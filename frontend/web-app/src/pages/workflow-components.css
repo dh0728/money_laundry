@@ -4,14 +4,7 @@
   gap: var(--aml-space-6);
   margin-block: var(--workspace-gap);
 }
-.workflow-backtest .stepper {
-  --stepper-bleed: 0px;
-  --stepper-inset: 0px;
-  --stepper-well-radius: var(--aml-radius-full);
-  --stepper-tile-radius: var(--aml-radius-full);
-  margin-block-start: var(--workspace-gap);
-}
-.workflow-backtest .stepper__body { padding-block-start: var(--workspace-gap) }
+.workflow-backtest .stepper { margin-block-start: var(--workspace-gap) }
 .backtest-footer-action, .backtest-edit-conditions {
   block-size: var(--account-control-size);
   padding-block: 0;

@@ -81,21 +81,6 @@ function reportHistory({ cases = [], transactions = [] } = {}) {
 const statusLabels = {
   pending: '실행 대기', running: '실행 중', done: '완료', failed: '실패', cancelled: '취소됨',
 };
-const backtestStepperStyles = {
-  '--stepper-ink': 'var(--text)',
-  '--stepper-muted': 'var(--muted-text)',
-  '--stepper-faint': 'var(--divider)',
-  '--stepper-ring': 'var(--focus-ring)',
-  '--stepper-well': 'var(--inner-surface)',
-  '--stepper-track': 'var(--divider)',
-  '--stepper-tile': 'var(--canvas-surface)',
-  '--stepper-tile-edge': 'var(--divider)',
-  '--stepper-tile-highlight': 'transparent',
-  '--stepper-tile-shadow': 'var(--information-panel-shadow)',
-  '--stepper-solid': 'var(--inverse-surface)',
-  '--stepper-solid-ink': 'var(--inverse-text)',
-  '--stepper-hover-fill': 'var(--hover)',
-};
 
 function useAppearance() {
   const root = document.documentElement;
@@ -213,7 +198,7 @@ function Backtest({ selectedRule, ...props }) {
 }
 
 function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
-  const { reduced, theme } = useAppearance();
+  const { reduced } = useAppearance();
   const backtestPeriod = { start: scope.start, end: scope.end };
   const [step, setStep] = useState(1);
   const [score, setScore] = useState(Number((rule.scoreMin * 100).toFixed(2)));
@@ -280,8 +265,7 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
           {' ~ '}<Text as="time" dateTime={backtestPeriod.end}>{backtestPeriod.end}</Text> · KST</Text>
       </Panel>
     </Box>
-    <Stepper key={reduced} step={step} theme={theme} style={backtestStepperStyles} frame={false} width="100%" linear disableStepIndicators
-      transition={reduced ? 'none' : 'fade'} showFooter={false}>
+    <Stepper key={reduced} step={step} transition={reduced ? 'none' : 'fade'}>
       <Step title="조건 설정">
         <Box className="backtest-grid">
           {hasScoreCondition && <Panel className="backtest-card">
