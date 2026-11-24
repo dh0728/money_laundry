@@ -14,6 +14,7 @@ import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitive
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
 import { dashboardDateKey } from './dashboard-investigation';
+import { readWorkspaceLength } from './workspace-metrics';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
 
 const integer = new Intl.NumberFormat('ko-KR');
@@ -25,8 +26,10 @@ function volumeAxisLabel(point, label) {
   return <Text as="span" className="dashboard-volume-axis">{label}<Text as="small">{share(point.labeled, point.total)}</Text></Text>;
 }
 
-function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true }) {
+function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true, separatedStack = false }) {
   const columns = detail ?? series.map(item => ({ label: item.label, value: row => count(row[item.key]), color: item.color }));
+  const barGap = readWorkspaceLength('--aml-space-2');
+  const cap = separatedStack ? readWorkspaceLength('--aml-radius-small') : 'round';
   return <Box as="figure" className="dashboard-series" aria-label={label}>
     <Box className="dashboard-series-plot">
       <BarChart className="dashboard-bklit-series" data={rows} xDataKey="label" stacked={stacked}
@@ -34,7 +37,8 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
         animationDuration={reduced ? 0 : 340}>
         <Grid horizontal />
         {series.map(item => <Bar key={item.key} dataKey={item.key} fill={item.color}
-          lineCap="round" roundStack={stacked} groupGap={2} animate={!reduced} />)}
+          lineCap={cap} roundStack={stacked && !separatedStack} groupGap={barGap}
+          stackGap={separatedStack ? barGap : undefined} animate={!reduced} />)}
         <BarXAxis maxLabels={showShare ? { base: 4, sm: 10, lg: 18 } : 14} tickerHalfWidth={0}
           formatLabel={showShare ? volumeAxisLabel : undefined} />
         <ChartTooltip showCrosshair showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
@@ -269,7 +273,7 @@ function InvestigationStatus({ data, episode = false, reduced }) {
           <Text as="strong">{count(sums[item.key])}</Text>
         </Box>)}
       </Box>
-      <DailySeries rows={rows} series={series} reduced={reduced} label={title} />
+      <DailySeries rows={rows} series={series} reduced={reduced} label={title} separatedStack />
     </> : <Text className="dashboard-note">조회 기간에 생성된 업무가 없습니다.</Text>}
   </ChartPanel>;
 }

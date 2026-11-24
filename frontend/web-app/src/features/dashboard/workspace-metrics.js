@@ -1,4 +1,7 @@
 export function readWorkspaceGap() {
-  const gap = getComputedStyle(document.documentElement).getPropertyValue('--workspace-gap');
-  return Number.parseFloat(gap);
+  return readWorkspaceLength('--workspace-gap');
+}
+
+export function readWorkspaceLength(token) {
+  return Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token));
 }

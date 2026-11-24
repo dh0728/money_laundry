@@ -474,12 +474,13 @@ const BarInner = memo(function BarInner({
         if (stacked && stackOffsets) {
           const offset = stackOffsets.get(i)?.get(dataKey) ?? 0;
           const offsetY = scale(offset) ?? innerHeight;
-          // Apply stack gap: shift up and reduce height
-          const gapOffset = seriesIndex * stackGap;
-          y = offsetY - barHeight - gapOffset;
-          // Reduce height slightly for non-last bars to create visual gap
-          if (!isLastSeries && stackGap > 0) {
-            barHeight = Math.max(0, barHeight - stackGap);
+          y = offsetY - barHeight;
+          // In a positive stack, separate visible neighbors without moving the baseline or the top.
+          if (stackGap > 0 && value > 0 && lines.slice(seriesIndex + 1)
+            .some(line => typeof d[line.dataKey] === "number" && Number(d[line.dataKey]) > 0)) {
+            const inset = Math.min(stackGap, barHeight / 2);
+            y += inset;
+            barHeight -= inset;
           }
         } else {
           y = Math.min(valuePos, zeroY);
@@ -580,7 +581,7 @@ const BarInner = memo(function BarInner({
         y,
         width: barW,
         height: barHeight,
-        rx: stackClip ? 0 : effectiveRx,
+        rx: stackClip ? 0 : stackGap > 0 ? Math.min(effectiveRx, barW / 2, barHeight / 2) : effectiveRx,
         stackClip,
         growOrigin,
         valueLabel,
