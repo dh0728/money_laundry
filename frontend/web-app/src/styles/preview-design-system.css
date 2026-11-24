@@ -200,6 +200,18 @@
   --chart-pattern-bar-gap-ratio: .28;
   --chart-staff-bar-gap-ratio: .24;
   --chart-dashboard-enter-duration: 340ms;
+  --overview-score-axis-inset: 34px;
+  --overview-score-long-label-gap: 82px;
+  --overview-score-short-label-gap: 44px;
+  --overview-score-time-label-offset: 18px;
+  --overview-score-value-label-offset: 0.35em;
+  --overview-score-point-jitter: 0.2;
+  --overview-score-point-radius: 5px;
+  --overview-score-enter-duration: 320ms;
+  --overview-score-plot-min-height: 13rem;
+  --overview-score-compact-height: clamp(9rem, 42cqi, 14rem);
+  --overview-score-grid-ink-strength: 14%;
+  --overview-score-threshold-ink-strength: 25%;
   --chart-sankey-highlight-duration: 180ms;
   --chart-sankey-name-size: 13px;
   --chart-sankey-value-size: 11px;
