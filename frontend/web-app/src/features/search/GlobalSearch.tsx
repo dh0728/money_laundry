@@ -6,6 +6,7 @@ import { typeDisplay } from '@/api/codes'
 import { type EpisodeRow } from '@/api/episodes'
 import type { Page } from '@/app/navigation'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
@@ -26,7 +27,7 @@ export type ResultGroup = { id: string; label: string; items: ResultItem[] }
 function Highlight({ text, query }: { text: string; query: string }) {
   const i = query ? text.toLowerCase().indexOf(query) : -1
   if (i === -1) return <>{text}</>
-  return <>{text.slice(0, i)}<Text as="mark" className="rounded-[3px] bg-accent px-0.5 text-accent-foreground">{text.slice(i, i + query.length)}</Text>{text.slice(i + query.length)}</>
+  return <>{text.slice(0, i)}<Text as="mark" className="rounded-search-match bg-accent px-0.5 text-accent-foreground">{text.slice(i, i + query.length)}</Text>{text.slice(i + query.length)}</>
 }
 
 async function loadSearchData(overrides: Parameters<typeof withOverride>[1]): Promise<SearchData> {
@@ -138,26 +139,26 @@ export default function GlobalSearch({ onNavigate, onOpenTransaction, remote }: 
           <Kbd data-testid="global-search-shortcut" aria-hidden="true" className="pointer-events-none absolute right-2 top-2 z-10">/</Kbd>
         </Box>
       </PopoverAnchor>
-      <PopoverContent id="global-search-listbox" role="listbox" aria-label="검색 결과" className="w-(--radix-popper-anchor-width) max-w-[90vw] p-2"
+      <PopoverContent id="global-search-listbox" role="listbox" aria-label="검색 결과" className="w-(--radix-popper-anchor-width) max-w-search-results-width p-2"
         onOpenAutoFocus={e => e.preventDefault()}
         onInteractOutside={event => { if (anchor.current?.contains(event.target as Node)) event.preventDefault() }}>
         {remote?.error && <Text role="alert" className="p-2 text-xs text-destructive-text">{remote.error}</Text>}
         {flat.length === 0
           ? <Text className="p-4 text-center text-xs text-muted-foreground">{(remote ? remote.loading : q && !data) ? '불러오는 중…' : '검색 결과가 없습니다.'}</Text>
           : (
-            <Box className="max-h-[60vh] space-y-1 overflow-y-auto">
+            <Box className="max-h-search-results-height space-y-1 overflow-y-auto">
               {groups.map(g => (
                 <Box key={g.id}>
                   <Text className="px-2 pb-1 pt-1.5 text-3xs font-medium text-muted-foreground">{g.label}</Text>
                   {g.items.map(item => {
                     const i = indexOf.get(item)!
                     return (
-                      <button key={item.key} id={`gs-item-${i}`} role="option" aria-selected={i === active} type="button"
+                      <Button key={item.key} layout="text" id={`gs-item-${i}`} role="option" aria-selected={i === active} type="button"
                         onMouseEnter={() => setActive(i)} onClick={item.onSelect}
                         className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm ${i === active ? 'bg-accent text-accent-foreground' : ''}`}>
                         <Text as="span" className="truncate">{item.primary}</Text>
-                        {item.secondary && <Text as="span" className="max-w-[45%] shrink-0 truncate text-xs text-muted-foreground">{item.secondary}</Text>}
-                      </button>
+                        {item.secondary && <Text as="span" className="max-w-search-result-detail shrink-0 truncate text-xs text-muted-foreground">{item.secondary}</Text>}
+                      </Button>
                     )
                   })}
                 </Box>

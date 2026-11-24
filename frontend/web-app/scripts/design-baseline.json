@@ -1,9 +1,9 @@
 {
   "component/table-library": 0,
   "component/table-css": 0,
-  "component/button": 5,
+  "component/button": 4,
   "component/clickable-element": 3,
-  "component/raw-element": 20,
+  "component/raw-element": 19,
   "component/dom-api": 7,
   "component/form-control": 3,
   "token/raw-color": 5,
@@ -11,9 +11,9 @@
   "token/radius-unit": 0,
   "token/font-size-unit": 0,
   "token/inline-style": 64,
-  "token/arbitrary-class": 66,
+  "token/arbitrary-class": 62,
   "token/important": 2,
-  "token/fixed-number": 63,
+  "token/fixed-number": 60,
   "token/palette-direct": 0,
   "chart/library-import": 1,
   "icon/local-svg": 6

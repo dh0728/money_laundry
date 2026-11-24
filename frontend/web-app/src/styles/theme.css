@@ -488,6 +488,10 @@
   --grid-template-columns-rule-validation: var(--rule-validation-columns);
   --spacing-rule-condition-column: var(--rule-condition-column-width);
   --color-status-caution-accent: var(--status-caution-accent);
+  --radius-search-match: var(--search-match-radius);
+  --spacing-search-results-width: var(--search-results-max-width);
+  --spacing-search-results-height: var(--search-results-max-height);
+  --spacing-search-result-detail: var(--search-result-detail-max-width);
   --font-sans: Pretendard;
   --font-mono: Pretendard;
   --font-serif: Pretendard;

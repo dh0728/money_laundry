@@ -211,6 +211,12 @@
   --app-header-grid-columns: auto minmax(0, 1fr) auto;
   --app-header-search-max-width: 460px;
   --app-agent-sidebar-min-width: 1200px;
+  --search-match-radius: 3px;
+  --search-results-max-width: 90vw;
+  --search-results-max-height: 60vh;
+  --search-result-detail-max-width: 45%;
+  --search-field-compact-icon-size: 1rem;
+  --search-field-disabled-opacity: .55;
   --sidebar-gap-transition: width;
   --sidebar-container-transition: left, right, width;
   --sidebar-label-transition: margin, opacity;
