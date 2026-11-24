@@ -1,13 +1,10 @@
 .account-trail-graph {
+  --account-trail-episode-color: light-dark(var(--aml-sky-040), var(--aml-sky-070));
+
   display: block;
   inline-size: 100%;
   max-inline-size: calc(var(--aml-space-64) * 6);
   block-size: auto;
-}
-.account-trail-bubble {
-  fill: light-dark(var(--aml-black-005), var(--aml-white-005));
-  stroke: light-dark(var(--aml-black-030), var(--aml-white-030));
-  stroke-width: var(--aml-stroke-divider);
 }
 .account-trail-intersection {
   fill: light-dark(var(--aml-black-015), var(--aml-white-020));
@@ -16,10 +13,14 @@
 }
 .account-trail-member {
   fill: light-dark(var(--aml-black-010), var(--aml-white-010));
-  stroke: light-dark(var(--aml-black-030), var(--aml-white-030));
+  stroke: currentColor;
   stroke-width: var(--aml-stroke-divider);
 }
-.account-trail-member[data-overlap="true"] { stroke: currentColor }
+.account-trail-member[data-episode-member] {
+  fill: color-mix(in srgb, var(--account-trail-episode-color) var(--account-trail-member-tint), transparent);
+  stroke: var(--account-trail-episode-color);
+}
+.account-trail-episode { color: var(--account-trail-episode-color) }
 .account-trail-graph text {
   fill: currentColor;
   font-size: var(--aml-type-caption-size);

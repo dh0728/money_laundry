@@ -1,13 +1,12 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
-import { curveBasisClosed, line } from 'd3-shape';
 import './account-trail-graph.css';
 
-const diagramWidth = 384;
 const lineAdvance = 16;
-const contourSamples = 128;
-const contourSoftness = 12;
-const maxMembers = 3;
-const closedSpline = line().curve(curveBasisClosed);
+const minimumLabelSeparation = 1.25;
+const layouts = new Map();
+const layoutPoints = Array.from({ length: 25 }, (_, index) => (index - 12) / 4)
+  .flatMap(y => Array.from({ length: 16 }, (_, index) => [0.5 + index / 4, y]))
+  .sort(([x, y], [a, b]) => x * 0.45 + Math.abs(y) - a * 0.45 - Math.abs(b) || x - a);
 
 function wrapCode(code, lineLength = 18) {
   const characters = Array.from(code);
@@ -23,72 +22,59 @@ function labelBubble({ x, y, width, height }, padding) {
   return { x: x + halfWidth, y: y + halfHeight, radiusX, radiusY };
 }
 
-function bubbleOutline(bubbles) {
-  // Smooth the maximum of the ellipse support functions to round the enclosing hull.
-  const points = Array.from({ length: contourSamples }, (_, index) => {
-    const angle = 2 * Math.PI * index / contourSamples;
-    const normalX = Math.cos(angle);
-    const normalY = Math.sin(angle);
-    const supports = bubbles.map(({ x, y, radiusX, radiusY }) => {
-      const radius = Math.hypot(radiusX * normalX, radiusY * normalY);
-      return {
-        distance: x * normalX + y * normalY + radius,
-        slope: -x * normalY + y * normalX + (radiusY ** 2 - radiusX ** 2) * normalX * normalY / radius,
-      };
-    });
-    const outermost = Math.max(...supports.map(({ distance }) => distance));
-    let totalWeight = 0;
-    let weightedSlope = 0;
-    for (const { distance, slope } of supports) {
-      const weight = Math.exp((distance - outermost) / contourSoftness);
-      totalWeight += weight;
-      weightedSlope += weight * slope;
-    }
-    const distance = outermost + contourSoftness * Math.log(totalWeight);
-    const slope = weightedSlope / totalWeight;
-    return [distance * normalX - slope * normalY, distance * normalY + slope * normalX];
-  });
-  return { path: closedSpline(points), points };
-}
-
 function estimatedBounds({ lines, x, y }) {
   const width = Math.max(...lines.map(line => Array.from(line).length)) * lineAdvance / 2;
   const height = lines.length * lineAdvance;
   return { x: x - width / 2, y: y - height / 2, width, height };
 }
 
+function alertPositions(overlaps) {
+  const key = overlaps.map(row => row.map(Number).join('')).join('/');
+  if (key === '1/11') return [[0, 0], [1.55, -0.68], [1.55, 0.68]];
+  if (layouts.has(key)) return layouts.get(key);
+
+  // In normalized coordinates, equal ellipses intersect exactly when centers are less than two units apart.
+  function place(positions, candidates) {
+    const row = overlaps[positions.length - 1];
+    if (!row) return positions;
+    for (const [x, y] of candidates) {
+      if (!positions.every(([otherX, otherY], index) => {
+        const horizontal = Math.abs(x - otherX);
+        const vertical = Math.abs(y - otherY);
+        if (Math.max(horizontal, vertical) < minimumLabelSeparation) return false;
+        const distance = horizontal ** 2 + vertical ** 2;
+        return row[index] ? distance >= 1.22 ** 2 && distance <= 1.94 ** 2 : distance >= 2.14 ** 2;
+      })) continue;
+      const result = place([...positions, [x, y]], candidates);
+      if (result) return result;
+    }
+    return null;
+  }
+
+  const positions = place([[0, 0]], layoutPoints.filter(([x]) => x >= 1.25)) ?? place([[0, 0]], layoutPoints);
+  layouts.set(key, positions);
+  return positions;
+}
+
 export function AccountTrailGraph({ comparison, focus }) {
   const title = useId();
-  const intersection = useId();
   const labelLayer = useRef(null);
   const [measurement, setMeasurement] = useState(null);
-  const { alert, episode, shared, members, membersComplete, unknownMembers } = comparison;
-  const visible = members.toSorted((first, second) =>
-    Number(second.shared.includes(focus)) - Number(first.shared.includes(focus)) || second.shared.length - first.shared.length)
-    .slice(0, maxMembers);
-  const hidden = members.length - visible.length + unknownMembers;
-  const alertLines = ['비교 Alert', ...wrapCode(alert)];
-  const episodeLines = ['Episode', membersComplete ? `Alert ${members.length + unknownMembers}개 편입` : '편입 정보 일부 확인'];
-  const focusLines = ['공유 계좌', ...wrapCode(focus, 12), `총 ${shared.length}개`];
-  const titleY = 40;
-  const firstMemberY = titleY + lineAdvance * 4;
-  const memberSpacing = lineAdvance * 4;
-  const focusY = firstMemberY + (Math.max(1, visible.length) - 1) * memberSpacing / 2;
-  const memberLabels = visible.map((member, index) => ({
-    id: member.code, x: 304, y: firstMemberY + index * memberSpacing,
-    lines: [`Alert ${member.code.split('-').at(-1)}`, member.evidenceAvailable ? `공유 ${member.shared.length}개` : '근거 미확인'],
-    member,
-  }));
-  const labels = [
-    { id: 'alert', x: 70, y: focusY, lines: alertLines },
-    { id: 'episode', x: 302, y: titleY, lines: episodeLines },
-    { id: 'shared', x: 187, y: focusY, lines: focusLines },
-    ...memberLabels,
-    ...(!visible.length ? [{ id: 'empty', x: 302, y: firstMemberY, lines: ['확인된 소속', 'Alert 없음'] }] : []),
-    ...(hidden ? [{ id: 'additional', x: 302, y: firstMemberY + Math.max(1, visible.length) * memberSpacing,
-      lines: [`나머지 Alert ${hidden}개`] }] : []),
+  const { alert, episode, shared, members, memberRelations, membersComplete, hiddenMembers } = comparison;
+  const connections = [
+    ...members.filter(member => member.shared.length).map(member => ({ first: alert, second: member.code, accounts: member.shared, transactions: [] })),
+    ...memberRelations,
   ];
-  const measurementKey = JSON.stringify(labels.map(({ id, x, y, lines }) => [id, x, y, lines]));
+  const alertLabels = [{ id: alert, lines: ['비교 Alert', ...wrapCode(alert), '공유 계좌', ...wrapCode(focus, 12)] },
+    ...members.map(member => ({ id: member.code, lines: [`Alert ${member.code.split('-').at(-1)}`,
+      member.evidenceAvailable ? `공유 ${member.shared.length}개` : '근거 미확인'] }))];
+  const labels = [
+    ...alertLabels,
+    { id: episode, lines: ['Episode', membersComplete ? `Alert ${members.length + hiddenMembers}개 편입` : '편입 정보 일부 확인',
+      ...(!members.length ? ['확인된 소속 Alert 없음'] : []),
+      ...(hiddenMembers ? [`그 외 Alert ${hiddenMembers}개`] : [])] },
+  ];
+  const measurementKey = JSON.stringify(labels);
   useLayoutEffect(() => {
     let active = true;
     const layer = labelLayer.current;
@@ -109,45 +95,49 @@ export function AccountTrailGraph({ comparison, focus }) {
   }, [measurementKey]);
 
   const boxes = Object.fromEntries(labels.map(label => [label.id,
-    (measurement?.key === measurementKey && measurement.boxes[label.id]) || estimatedBounds(label)]));
-  const margins = { account: 11, group: 18, member: 12 };
-  const sharedBubble = labelBubble(boxes.shared, margins.account);
-  const memberContours = memberLabels.map(label => ({
-    label, bubble: labelBubble(boxes[label.id], margins.member),
+    (measurement?.key === measurementKey && measurement.boxes[label.id]) || estimatedBounds({ ...label, x: 0, y: 0 })]));
+  const labelPadding = 12;
+  const positions = alertPositions(alertLabels.slice(1).map(({ id }, index) => alertLabels.slice(0, index + 1)
+    .map(({ id: other }) => connections.some(({ first, second }) => first === other && second === id))));
+  const sizes = alertLabels.map(({ id }) => labelBubble(boxes[id], labelPadding));
+  const radiusX = Math.max(...sizes.map(size => size.radiusX), ...alertLabels.map(({ id }) => boxes[id].width / minimumLabelSeparation));
+  const radiusY = Math.max(...sizes.map(size => size.radiusY), ...alertLabels.map(({ id }) => boxes[id].height / minimumLabelSeparation));
+  const bubbles = alertLabels.map(({ id }, index) => ({
+    id, x: positions[index][0] * radiusX, y: positions[index][1] * radiusY,
+    radiusX, radiusY, clip: `${title}-alert-${index}`,
   }));
-  const episodeContour = bubbleOutline([
-    labelBubble(boxes.episode, margins.group), sharedBubble,
-    ...memberContours.map(({ bubble }) => ({
-      ...bubble, radiusX: bubble.radiusX + margins.member, radiusY: bubble.radiusY + margins.member,
-    })),
-    ...['empty', 'additional'].filter(id => boxes[id]).map(id => labelBubble(boxes[id], margins.member)),
-  ]);
-  const episodeLeft = Math.min(...episodeContour.points.map(([x]) => x));
-  const alertShift = Math.min(0, episodeLeft - margins.account - boxes.alert.x - boxes.alert.width);
-  const alertBubble = labelBubble({ ...boxes.alert, x: boxes.alert.x + alertShift }, margins.group);
-  const alertContour = bubbleOutline([alertBubble, sharedBubble]);
-  const points = [...alertContour.points, ...episodeContour.points];
-  const left = Math.min(0, ...points.map(([x]) => x - margins.account));
-  const right = Math.max(diagramWidth, ...points.map(([x]) => x + margins.account));
-  const top = Math.min(0, ...points.map(([, y]) => y - margins.account));
-  const bottom = Math.max(...points.map(([, y]) => y + margins.account));
+  const [external, ...episodeAlerts] = bubbles;
+  const memberPositions = episodeAlerts.map(bubble => bubble.x);
+  const episodeHeading = { id: episode,
+    x: memberPositions.length ? (Math.min(...memberPositions) + Math.max(...memberPositions)) / 2 : 2.5 * radiusX,
+    y: Math.min(...bubbles.map(bubble => bubble.y)) - radiusY - boxes[episode].height / 2 - labelPadding,
+  };
+  const left = Math.min(episodeHeading.x - boxes[episode].width / 2, ...bubbles.map(bubble => bubble.x - radiusX)) - labelPadding;
+  const right = Math.max(episodeHeading.x + boxes[episode].width / 2, ...bubbles.map(bubble => bubble.x + radiusX)) + labelPadding;
+  const top = episodeHeading.y - boxes[episode].height / 2 - labelPadding;
+  const bottom = Math.max(...bubbles.map(bubble => bubble.y + radiusY)) + labelPadding;
 
+  const bubbleByCode = new Map(bubbles.map(bubble => [bubble.id, bubble]));
+  const ellipse = bubble => ({ cx: bubble.x, cy: bubble.y, rx: bubble.radiusX, ry: bubble.radiusY });
   return <svg className="account-trail-graph" viewBox={`${left} ${top} ${right - left} ${bottom - top}`} role="img" aria-labelledby={title}>
     <title id={title}>{`비교 Alert ${alert}와 Episode ${episode}의 공유 계좌 ${shared.length}개 중 확인할 계좌 ${focus}`}</title>
-    <defs><clipPath id={intersection}><path d={alertContour.path} /></clipPath></defs>
-    <path className="account-trail-bubble" data-case-kind="alert" d={alertContour.path}><title>{alert}</title></path>
-    <path className="account-trail-bubble" data-case-kind="episode" d={episodeContour.path}><title>{episode}</title></path>
-    <path className="account-trail-intersection" d={episodeContour.path} clipPath={`url(#${intersection})`} />
-    {memberContours.map(({ label, bubble }) => <ellipse key={label.id} className="account-trail-member"
-      data-member-code={label.id} data-overlap={label.member.shared.length > 0}
-      cx={bubble.x} cy={bubble.y} rx={bubble.radiusX} ry={bubble.radiusY}>
-      <title>{[label.id, ...label.member.shared].join(' · ')}</title>
+    <defs>{bubbles.map(bubble => <clipPath id={bubble.clip} key={bubble.id}><ellipse {...ellipse(bubble)} /></clipPath>)}</defs>
+    {bubbles.map(bubble => <ellipse key={bubble.id} className="account-trail-member" data-alert-code={bubble.id}
+      data-episode-member={bubble !== external || undefined} {...ellipse(bubble)}>
+      <title>{bubble.id}</title>
+    </ellipse>)}
+    {connections.map(({ first, second, accounts, transactions }) => <ellipse key={`${first}:${second}`}
+      className="account-trail-intersection" data-pair={`${first}:${second}`} {...ellipse(bubbleByCode.get(second))}
+      clipPath={`url(#${bubbleByCode.get(first).clip})`}>
+      <title>{[first, second, ...accounts, ...transactions].join(' · ')}</title>
     </ellipse>)}
     <g ref={labelLayer}>
-      {labels.map(({ id, x, y, lines }) => <g key={id} data-trail-label={id} data-shared-account={id === 'shared' ? focus : undefined}
-        transform={id === 'alert' && alertShift ? `translate(${alertShift})` : undefined}>
-        {id === 'shared' && <title>{shared.join(' · ')}</title>}
-        {lines.map((line, index) => <text key={index} x={x} y={y + (index - (lines.length - 1) / 2) * lineAdvance}
+      {[...bubbles, episodeHeading].map(({ id, x, y }, index) => <g key={id} data-trail-label={id}
+        className={id === episode ? 'account-trail-episode' : undefined}
+        transform={`translate(${x - boxes[id].x - boxes[id].width / 2} ${y - boxes[id].y - boxes[id].height / 2})`}>
+        {id === alert && <title>{shared.join(' · ')}</title>}
+        {id === episode && <title>{episode}</title>}
+        {labels[index].lines.map((line, lineIndex, lines) => <text key={lineIndex} y={(lineIndex - (lines.length - 1) / 2) * lineAdvance}
           textAnchor="middle">{line}</text>)}
       </g>)}
     </g>

@@ -47,7 +47,11 @@ it('shows exactly the member Alerts and identifies the member with intersecting 
     { code: firstMember.code, shared: ['ACC-B'], evidenceAvailable: true },
     { code: secondMember.code, shared: [], evidenceAvailable: true },
   ]);
+  expect(comparison.memberRelations).toEqual([
+    { first: firstMember.code, second: secondMember.code, accounts: ['ACC-C'], transactions: [] },
+  ]);
   expect([trail.received.transaction.code, trail.sent.transaction.code]).toEqual(['T-1', 'T-2']);
-  expect(accountTrailComparison(findAccountTrail([alert, second]), [alert, second, firstMember]).members[1])
-    .toEqual({ code: secondMember.code, shared: [], evidenceAvailable: false });
+  const incomplete = accountTrailComparison(trail, [alert, second, firstMember]);
+  expect(incomplete.members[1]).toEqual({ code: secondMember.code, shared: [], evidenceAvailable: false });
+  expect(incomplete.memberRelations).toEqual([]);
 });

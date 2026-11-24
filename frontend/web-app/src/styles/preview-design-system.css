@@ -164,6 +164,7 @@
   --chart-sankey-label-with-detail-offset: -.15;
   --chart-sankey-detail-offset: 1.15;
   --chart-sankey-link-opacity: .3;
+  --account-trail-member-tint: 18%;
   --case-graph-sankey-link-opacity: .68;
   --case-graph-sankey-min-width: 28rem;
   --case-graph-sankey-column-width: 10rem;

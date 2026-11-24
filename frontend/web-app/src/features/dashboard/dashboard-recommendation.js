@@ -63,14 +63,20 @@ export function accountTrailComparison(trail, allCases) {
   const members = memberCodes.map(code => {
     const member = membersByCode.get(code);
     const related = member ? validTransactions(member).filter(row => currentEpisodeTransactions.has(row.code)) : [];
-    return { code, shared: sharedCaseEvidence(alertEvidence, { related }).accounts, evidenceAvailable: Boolean(member) };
-  });
+    return { code, shared: sharedCaseEvidence(alertEvidence, { related }).accounts, evidenceAvailable: Boolean(member), related };
+  }).toSorted((first, second) => Number(second.shared.includes(trail.account)) - Number(first.shared.includes(trail.account))
+    || second.shared.length - first.shared.length).slice(0, 3);
+  const memberRelations = members.flatMap((first, index) => members.slice(index + 1).flatMap(second => {
+    const { accounts, transactions } = sharedCaseEvidence(first, second);
+    return accounts.length || transactions.length ? [{ first: first.code, second: second.code, accounts, transactions }] : [];
+  }));
   return {
     alert: alert.code,
     episode: episode.code,
     shared,
-    members,
-    unknownMembers: (episode.linkedAlertCodes ?? []).filter(code => !code).length,
+    members: members.map(({ code, shared, evidenceAvailable }) => ({ code, shared, evidenceAvailable })),
+    memberRelations,
+    hiddenMembers: (episode.linkedAlertCodes ?? []).filter(code => !code).length + memberCodes.length - members.length,
     membersComplete: episode.linkedAlertCodesComplete === true,
   };
 }
