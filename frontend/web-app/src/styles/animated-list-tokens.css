@@ -1,0 +1,52 @@
+.animated-list {
+  --al-radius: 14px;
+  --al-gap: var(--aml-space-8);
+  --al-width: 420px;
+  --animated-list-maximum-height: 440px;
+  --animated-list-focus-offset: 3px;
+  --animated-list-frame-filter: blur(20px) saturate(1.6);
+  --al-frame: rgba(38, 35, 46, 0.66);
+  --al-frame-edge: rgba(255, 255, 255, 0.08);
+  --al-frame-highlight: rgba(255, 255, 255, 0.07);
+  --al-frame-shadow: 0 22px 44px -20px var(--aml-black-080), 0 6px 16px -8px var(--aml-black-050);
+  --al-tile: linear-gradient(180deg, #3a3644 0%, #27242f 100%);
+  --al-tile-edge: var(--al-frame-highlight);
+  --al-tile-highlight: rgba(255, 255, 255, 0.12);
+  --al-tile-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.7);
+  --al-well: var(--al-frame-edge);
+  --al-ink: #f4f4f5;
+  --al-muted: rgba(244, 244, 245, 0.55);
+  --al-ring: rgba(244, 244, 245, 0.3);
+  --al-ring-fill: rgba(244, 244, 245, 0.05);
+  --al-hover: brightness(1.12);
+  --al-press: brightness(0.85);
+  --al-active: brightness(1.16);
+  --animated-list-item-padding: 10px 14px 10px 10px;
+  --animated-list-lead-size: 36px;
+  --animated-list-title-size: 14.5px;
+  --animated-list-title-leading: 1.3;
+  --animated-list-title-tracking: -0.01em;
+  --animated-list-description-size: 13px;
+  --animated-list-description-leading: 1.35;
+  --animated-list-metadata-size: 12.5px;
+  --animated-list-indicator-fade: 200ms;
+}
+
+.animated-list[data-list-theme="light"] {
+  --al-frame: rgba(240, 240, 243, 0.8);
+  --al-frame-edge: rgba(24, 24, 27, 0.07);
+  --al-frame-highlight: rgba(255, 255, 255, 0.95);
+  --al-frame-shadow: 0 22px 44px -22px rgba(24, 24, 27, 0.3), 0 6px 16px -10px rgba(24, 24, 27, 0.16);
+  --al-tile: linear-gradient(180deg, var(--aml-white-100) 0%, #f6f6f8 100%);
+  --al-tile-edge: rgba(24, 24, 27, 0.08);
+  --al-tile-highlight: var(--aml-white-100);
+  --al-tile-shadow: 0 4px 10px -5px rgba(24, 24, 27, 0.25);
+  --al-well: rgba(24, 24, 27, 0.05);
+  --al-ink: #27272a;
+  --al-muted: rgba(39, 39, 42, 0.55);
+  --al-ring: rgba(24, 24, 27, 0.28);
+  --al-ring-fill: transparent;
+  --al-hover: brightness(0.97);
+  --al-press: brightness(0.92);
+  --al-active: none;
+}

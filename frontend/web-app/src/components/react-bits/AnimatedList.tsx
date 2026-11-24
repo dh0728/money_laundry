@@ -59,49 +59,6 @@ interface Engine {
   sync: () => void;
 }
 
-const THEMES: Record<'dark' | 'light', Record<string, string>> = {
-  dark: {
-    '--al-frame': 'rgba(38, 35, 46, 0.66)',
-    '--al-frame-edge': 'rgba(255, 255, 255, 0.08)',
-    '--al-frame-highlight': 'rgba(255, 255, 255, 0.07)',
-    '--al-frame-shadow': '0 22px 44px -20px rgba(0, 0, 0, 0.8), 0 6px 16px -8px rgba(0, 0, 0, 0.5)',
-    '--al-tile': 'linear-gradient(180deg, #3a3644 0%, #27242f 100%)',
-    '--al-tile-edge': 'rgba(255, 255, 255, 0.07)',
-    '--al-tile-highlight': 'rgba(255, 255, 255, 0.12)',
-    '--al-tile-shadow': '0 4px 10px -4px rgba(0, 0, 0, 0.7)',
-    '--al-well': 'rgba(255, 255, 255, 0.08)',
-    '--al-ink': '#f4f4f5',
-    '--al-muted': 'rgba(244, 244, 245, 0.55)',
-    '--al-thumb': 'rgba(255, 255, 255, 0.16)',
-    '--al-ring': 'rgba(244, 244, 245, 0.3)',
-    '--al-ring-fill': 'rgba(244, 244, 245, 0.05)',
-    '--al-hover': 'brightness(1.12)',
-    '--al-press': 'brightness(0.85)',
-    '--al-active': 'brightness(1.16)'
-  },
-  light: {
-    '--al-frame': 'rgba(240, 240, 243, 0.8)',
-    '--al-frame-edge': 'rgba(24, 24, 27, 0.07)',
-    '--al-frame-highlight': 'rgba(255, 255, 255, 0.95)',
-    '--al-frame-shadow': '0 22px 44px -22px rgba(24, 24, 27, 0.3), 0 6px 16px -10px rgba(24, 24, 27, 0.16)',
-    '--al-tile': 'linear-gradient(180deg, #ffffff 0%, #f6f6f8 100%)',
-    '--al-tile-edge': 'rgba(24, 24, 27, 0.08)',
-    '--al-tile-highlight': 'rgba(255, 255, 255, 1)',
-    '--al-tile-shadow': '0 4px 10px -5px rgba(24, 24, 27, 0.25)',
-    '--al-well': 'rgba(24, 24, 27, 0.05)',
-    '--al-ink': '#27272a',
-    '--al-muted': 'rgba(39, 39, 42, 0.55)',
-    '--al-thumb': 'rgba(24, 24, 27, 0.16)',
-    '--al-ring': 'rgba(24, 24, 27, 0.28)',
-    '--al-ring-fill': 'transparent',
-    '--al-hover': 'brightness(0.97)',
-    '--al-press': 'brightness(0.92)',
-    '--al-active': 'none'
-  }
-};
-
-
-
 const HIDDEN: Record<Animation, Record<'above' | 'below', string>> = {
   pop: { above: 'translate3d(0, -12px, 0) scale(0.8)', below: 'translate3d(0, 12px, 0) scale(0.8)' },
   slide: { above: 'translate3d(0, -28px, 0) scale(0.98)', below: 'translate3d(0, 28px, 0) scale(0.98)' },
@@ -115,10 +72,11 @@ const smootherstep = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 
 const FADE_MASK = (() => {
   const steps = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1];
-  const top = steps.map(t => `rgba(0, 0, 0, ${smootherstep(t).toFixed(3)}) calc(var(--al-fade-top) * ${t})`);
+  const shade = (step: number) => `color-mix(in srgb, var(--aml-black-100) ${(smootherstep(step) * 100).toFixed(1)}%, transparent)`;
+  const top = steps.map(t => `${shade(t)} calc(var(--al-fade-top) * ${t})`);
   const bottom = [...steps]
     .reverse()
-    .map(t => `rgba(0, 0, 0, ${smootherstep(t).toFixed(3)}) calc(100% - var(--al-fade-bottom) * ${t})`);
+    .map(t => `${shade(t)} calc(100% - var(--al-fade-bottom) * ${t})`);
   return `linear-gradient(to bottom, ${[...top, ...bottom].join(', ')})`;
 })();
 
@@ -145,10 +103,10 @@ const AnimatedList = ({
   frame = true,
   theme = 'dark',
   accentColor,
-  radius = 14,
-  gap = 8,
-  width = 420,
-  maxHeight = 440,
+  radius,
+  gap,
+  width,
+  maxHeight,
   className = '',
   itemClassName = '',
   itemDecoration,
@@ -509,12 +467,12 @@ const AnimatedList = ({
       ref={rootRef}
       className={`animated-list${frame ? ' animated-list--framed' : ''} ${className}`.trim()}
       data-animated={animation !== 'none' ? '' : undefined}
+      data-list-theme={theme}
       style={
         {
-          ...(THEMES[theme] ?? THEMES.dark),
-          '--al-radius': `${Math.max(0, radius)}px`,
-          '--al-gap': `${Math.max(0, gap)}px`,
-          '--al-width': size(width),
+          '--al-radius': radius === undefined ? undefined : `${Math.max(0, radius)}px`,
+          '--al-gap': gap === undefined ? undefined : `${Math.max(0, gap)}px`,
+          '--al-width': width === undefined ? undefined : size(width),
           '--al-accent': accentColor || 'var(--al-ink)',
           ...(accentColor
             ? { '--al-ring': accentColor, '--al-ring-fill': `color-mix(in srgb, ${accentColor} 8%, transparent)` }
@@ -531,7 +489,7 @@ const AnimatedList = ({
         tabIndex={0}
         aria-activedescendant={selected >= 0 && selected < items.length ? `${baseId}-${selected}` : undefined}
         style={{
-          maxHeight: size(maxHeight),
+          maxHeight: maxHeight === undefined ? undefined : size(maxHeight),
           maskImage: showGradients ? FADE_MASK : undefined,
           WebkitMaskImage: showGradients ? FADE_MASK : undefined
         }}

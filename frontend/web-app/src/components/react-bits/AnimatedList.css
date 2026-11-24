@@ -1,3 +1,5 @@
+@import "../../styles/animated-list-tokens.css";
+
 .animated-list {
   position: relative;
   width: min(100%, var(--al-width));
@@ -13,13 +15,13 @@
   padding: var(--aml-space-6);
   background: var(--al-frame);
   box-shadow: var(--al-frame-shadow);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: var(--animated-list-frame-filter);
+  backdrop-filter: var(--animated-list-frame-filter);
 }
 
 .animated-list:has(> .animated-list__viewport:focus-visible) {
   outline: var(--aml-stroke-focus) solid var(--al-accent);
-  outline-offset: 3px;
+  outline-offset: var(--animated-list-focus-offset);
 }
 
 .animated-list__frame-rim {
@@ -28,8 +30,8 @@
   z-index: 3;
   border-radius: inherit;
   box-shadow:
-    inset 0 0 0 1px var(--al-frame-edge),
-    inset 0 1px 0 var(--al-frame-highlight);
+    inset 0 0 0 var(--aml-stroke-divider) var(--al-frame-edge),
+    inset 0 var(--aml-stroke-divider) 0 var(--al-frame-highlight);
   pointer-events: none;
 }
 
@@ -38,6 +40,7 @@
   --al-fade-bottom: 0px;
   position: relative;
   box-sizing: border-box;
+  max-height: var(--animated-list-maximum-height);
   padding: var(--aml-space-6);
   overflow-x: hidden;
   overflow-y: auto;
@@ -67,7 +70,7 @@
   align-items: center;
   gap: var(--aml-space-12);
   min-width: 0;
-  padding: 10px 14px 10px 10px;
+  padding: var(--animated-list-item-padding);
   box-sizing: border-box;
   border-radius: var(--al-radius);
   background: var(--al-tile);
@@ -100,10 +103,10 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: var(--animated-list-lead-size);
+  height: var(--animated-list-lead-size);
   overflow: hidden;
-  border-radius: max(8px, calc(var(--al-radius) - var(--aml-radius-small)));
+  border-radius: max(var(--aml-space-8), calc(var(--al-radius) - var(--aml-radius-small)));
   background: var(--al-well);
   color: var(--al-ink);
 }
@@ -125,18 +128,18 @@
 
 .animated-list__title {
   overflow: hidden;
-  font-size: 14.5px;
+  font-size: var(--animated-list-title-size);
   font-weight: var(--aml-type-body-strong-weight);
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  line-height: var(--animated-list-title-leading);
+  letter-spacing: var(--animated-list-title-tracking);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .animated-list__description {
   overflow: hidden;
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: var(--animated-list-description-size);
+  line-height: var(--animated-list-description-leading);
   color: var(--al-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -144,7 +147,7 @@
 
 .animated-list__meta {
   flex: none;
-  font-size: 12.5px;
+  font-size: var(--animated-list-metadata-size);
   font-variant-numeric: tabular-nums;
   color: var(--al-muted);
 }
@@ -154,8 +157,8 @@
   inset: 0;
   border-radius: inherit;
   box-shadow:
-    inset 0 0 0 1px var(--al-tile-edge),
-    inset 0 1px 0 var(--al-tile-highlight);
+    inset 0 0 0 var(--aml-stroke-divider) var(--al-tile-edge),
+    inset 0 var(--aml-stroke-divider) 0 var(--al-tile-highlight);
   pointer-events: none;
 }
 
@@ -168,7 +171,7 @@
   height: 0;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--animated-list-indicator-fade) ease;
 }
 
 .animated-list__ring {
@@ -176,5 +179,5 @@
   inset: 0;
   border-radius: var(--al-radius);
   background: var(--al-ring-fill);
-  box-shadow: inset 0 0 0 1px var(--al-ring);
+  box-shadow: inset 0 0 0 var(--aml-stroke-divider) var(--al-ring);
 }
