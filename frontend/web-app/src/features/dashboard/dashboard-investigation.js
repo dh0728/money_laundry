@@ -1,3 +1,5 @@
+import { accountTrailComparison, findAccountTrail } from './dashboard-recommendation.js';
+
 export const dashboardDateKey = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
   .map(value => String(value).padStart(2, '0')).join('-');
 
@@ -53,9 +55,11 @@ export function investigationDashboard(allCases, cases, dates) {
   }
 
   const dailyAlertStatus = [...alertDays.values()];
+  const recommendation = findAccountTrail(cases);
   return {
     dailyAlertStatus,
     dailyEpisodeStatus: [...episodeDays.values()],
+    accountRecommendation: recommendation && { ...recommendation, comparison: accountTrailComparison(recommendation, allCases) },
     investigation: {
       totalAlerts: individualAlerts + episodeAlerts,
       individualAlerts, episodeAlerts, linkedEpisodes: linkedEpisodes.size, routes, dailyAlertStatus, statusByCode,

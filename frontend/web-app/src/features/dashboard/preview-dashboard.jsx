@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
@@ -16,8 +16,6 @@ import { modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Grid, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
-import { buildCaseNetwork } from '../investigation/case-graph-scope.js';
-import { findAccountTrail } from './dashboard-recommendation.js';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
@@ -95,17 +93,13 @@ function EvidenceRecord({ evidence, direction }) {
   </Stack>;
 }
 
-function DashboardSummary({ cases, reduced }) {
-  const trail = useMemo(() => {
-    const result = findAccountTrail(cases);
-    return result && { ...result, network: buildCaseNetwork([result.received.transaction, result.sent.transaction]) };
-  }, [cases]);
+function DashboardSummary({ trail, reduced }) {
   const reason = trail?.returned ? '서로 다른 사건에서 두 계좌가 반대 방향으로 송금' : '서로 다른 사건에서 같은 계좌의 수취·송금 확인';
   return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
     <Heading className="dashboard-priority-heading"><Sparkles className="icon" aria-hidden="true" />분석 추천</Heading>
     {trail ? <Stack as="figure" className="dashboard-account-trail">
       <Text as="figcaption" className="dashboard-trail-reason">{reason}{trail.sameAmount ? ' · 같은 통화와 금액' : ''}</Text>
-      <AccountTrailGraph network={trail.network} focus={trail.account} />
+      <AccountTrailGraph comparison={trail.comparison} focus={trail.account} />
       <Stack as="ul" className="dashboard-trail-records" aria-label="추천 근거 거래 · 한국 표준시">
         <EvidenceRecord evidence={trail.received} direction="수취" />
         <EvidenceRecord evidence={trail.sent} direction="이후 송금" />
@@ -140,7 +134,7 @@ function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
 
 export function PreviewDashboard({ mine, data, appearance }) {
   const rows = data.board?.content;
-  const summary = <DashboardSummary cases={data.cases} reduced={appearance.reduced} />;
+  const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} />;
   return <Box className="preview-dashboard" data-mine={mine}>
     <DashboardIndicators data={data} mine={mine} reduced={appearance.reduced} />
     <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>

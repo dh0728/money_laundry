@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { findAccountTrail } from './dashboard-recommendation';
+import { accountTrailComparison, findAccountTrail } from './dashboard-recommendation';
 
 const transfer = (code, time, from, to) => ({ code, timestamp: `2026-11-11 ${time}`, from: { code: from }, to: { code: to } });
 const alert = { code: 'A-1', kind: 'Alert', open: true, related: [transfer('T-1', '10:00', 'ACC-A', 'ACC-B')] };
@@ -32,4 +32,21 @@ it('prefers a cross-case return with the same currency and amount over a closer 
     sent: { transaction: { code: 'T-3' } } });
   expect(findAccountTrail([inbound, { ...outbound, related: [{ ...outbound.related[1], currency: 'EUR' }] }]))
     .toMatchObject({ returned: true, sameAmount: false });
+});
+
+it('shows exactly the member Alerts and identifies the member with intersecting evidence', () => {
+  const firstMember = { ...alert, code: 'A-member-1', related: episode.related };
+  const secondMember = { ...alert, code: 'A-member-2', related: [transfer('T-3', '12:00', 'ACC-C', 'ACC-D')] };
+  const second = { ...episode, linkedAlertCodes: [firstMember.code, secondMember.code], linkedAlertCodesComplete: true,
+    related: [...firstMember.related, ...secondMember.related] };
+  const unrelated = { ...firstMember, code: 'A-standalone' };
+  const comparison = accountTrailComparison(findAccountTrail([alert, second]), [alert, second, firstMember, secondMember, unrelated]);
+  expect(comparison.shared).toEqual(['ACC-B']);
+  expect(comparison.members).toEqual([
+    { code: firstMember.code, shared: ['ACC-B'], evidenceAvailable: true },
+    { code: secondMember.code, shared: [], evidenceAvailable: true },
+  ]);
+  expect(comparison.evidence.map(edge => [...edge.codes])).toEqual([['T-1'], ['T-2']]);
+  expect(accountTrailComparison(findAccountTrail([alert, second]), [alert, second, firstMember]).members[1])
+    .toEqual({ code: secondMember.code, shared: [], evidenceAvailable: false });
 });

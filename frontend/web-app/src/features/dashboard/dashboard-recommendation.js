@@ -1,3 +1,5 @@
+import { buildCaseNetwork, sharedCaseEvidence } from '../investigation/case-graph-scope.js';
+
 export function findAccountTrail(cases) {
   const accounts = new Map();
   for (const record of cases) {
@@ -45,4 +47,31 @@ export function findAccountTrail(cases) {
     }
   }
   return recommendation;
+}
+export function accountTrailComparison(trail, allCases) {
+  const { received, sent } = trail;
+  const cases = [received.record, sent.record];
+  const alert = cases.find(record => record.kind === 'Alert');
+  const episode = cases.find(record => record.kind === 'Episode');
+  const validTransactions = record => record.related.filter(row => row.from?.code && row.to?.code);
+  const alertEvidence = { related: validTransactions(alert) };
+  const episodeEvidence = { related: validTransactions(episode) };
+  const currentEpisodeTransactions = new Set(episodeEvidence.related.map(row => row.code));
+  const shared = sharedCaseEvidence(alertEvidence, episodeEvidence).accounts;
+  const memberCodes = [...new Set((episode.linkedAlertCodes ?? []).filter(Boolean))];
+  const membersByCode = new Map(allCases.filter(row => row.kind === 'Alert').map(row => [row.code, row]));
+  const members = memberCodes.map(code => {
+    const member = membersByCode.get(code);
+    const related = member ? validTransactions(member).filter(row => currentEpisodeTransactions.has(row.code)) : [];
+    return { code, shared: sharedCaseEvidence(alertEvidence, { related }).accounts, evidenceAvailable: Boolean(member) };
+  });
+  return {
+    evidence: buildCaseNetwork([received.transaction, sent.transaction]).edges,
+    alert: alert.code,
+    episode: episode.code,
+    shared,
+    members,
+    unknownMembers: (episode.linkedAlertCodes ?? []).filter(code => !code).length,
+    membersComplete: episode.linkedAlertCodesComplete === true,
+  };
 }

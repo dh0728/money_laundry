@@ -10,19 +10,29 @@
   stroke-width: var(--aml-stroke-focus);
   stroke-linecap: round;
 }
-.account-trail-node circle {
-  r: var(--aml-space-6);
+.account-trail-bubble {
+  fill: light-dark(var(--aml-black-010), var(--aml-white-010));
+  stroke: light-dark(var(--aml-black-030), var(--aml-white-030));
+  stroke-width: var(--aml-stroke-divider);
+}
+.account-trail-member path {
+  fill: light-dark(var(--aml-black-010), var(--aml-white-010));
+  stroke: light-dark(var(--aml-black-030), var(--aml-white-030));
+  stroke-width: var(--aml-stroke-divider);
+}
+.account-trail-member[data-overlap="true"] path { stroke: currentColor }
+.account-trail-node circle, .account-trail-overlap circle {
+  r: var(--aml-radius-small);
   fill: var(--ai-summary-start);
   stroke: currentColor;
   stroke-width: var(--aml-stroke-focus);
 }
-.account-trail-node[data-shared] circle {
-  r: var(--aml-space-8);
+.account-trail-node[data-focus] circle, .account-trail-overlap circle {
+  r: var(--aml-radius-control);
   fill: currentColor;
 }
-.account-trail-node text {
+.account-trail-node text, .account-trail-group-label, .account-trail-member text, .account-trail-overlap text, .account-trail-label {
   fill: currentColor;
-  font-size: var(--aml-type-body-size);
+  font-size: var(--aml-type-caption-size);
   font-weight: var(--aml-type-body-strong-weight);
 }
-.account-trail-edge-label { fill: currentColor; font-size: var(--aml-type-caption-size) }
