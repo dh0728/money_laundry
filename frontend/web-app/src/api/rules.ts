@@ -346,7 +346,11 @@ export type RuleHitCard = {
   /** 가장 최근 날의 측정값 */
   measured: Record<string, number | null>
   conditions: { metric: string; label: string; cmp: string | null; value: number | null; unit?: string | null; measured: number | null }[]
-  roles: { role: string; accountId: string }[]
+  /**
+   * 대상 말고 보여 줄 계좌. SCATTER-GATHER 는 출발 계좌(SOURCE) 다음에 경유 계좌(MID), CYCLE · RANDOM 은 경로 계좌(PATH)이고
+   * 그 밖의 템플릿은 비어 있다. accountId 는 subject 와 같은 가명 계좌 ID 앞 8자리, 순서는 그 계좌가 처음 보낸 근거 거래의 시각 순이다.
+   */
+  roles: { role: 'SOURCE' | 'MID' | 'PATH'; label: string; accountId: string }[]
   /** 사건의 거래 가운데 이 적중의 근거 거래인 것 */
   matchedTxIds: number[]
   evidenceTxCount: number

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/common';
 import { fetchCaseRuleHits } from '@/api/rules';
@@ -45,6 +45,45 @@ it('사건에 걸린 룰을 조건과 실제 값, 겹친 거래와 함께 보여
   // 운영 중인 버전에는 상태를 붙이지 않고, 물러난 버전이 운영 중일 때 만든 적중에는 붙인다
   expect(card).not.toHaveTextContent('지금은');
   expect(retired).toHaveTextContent('지금은 교체됨');
+});
+
+it('경로형 · 2홉형 적중은 조건 한 줄과 함께 나온 계좌(출발 · 경유 · 경로 계좌)를 보여 준다', async () => {
+  const cycle = { ...hit, ruleId: 5, code: 'RULE-005', name: '순환 감시', template: 'CYCLE', templateName: 'CYCLE · 순환거래', pattern: 5,
+    subjectLabel: '출발 계좌(돈이 돌아온 계좌)', subject: 'aaaa0001', hitDates: ['2023-09-09'], measured: { HOPS: 3 },
+    conditions: [{ metric: 'minHops', label: '순환 거래 수', cmp: 'GTE', value: 3, unit: '건', measured: 3 }],
+    roles: [{ role: 'PATH', label: '경로 계좌', accountId: 'bbbb0002' }, { role: 'PATH', label: '경로 계좌', accountId: 'cccc0003' }],
+    matchedTxIds: [101], evidenceTxCount: 3 };
+  const mids = Array.from({ length: 10 }, (_, index) => `mid0000${index}`);
+  const scatter = { ...hit, ruleId: 6, code: 'RULE-006', name: '뿌렸다 모으기 감시', template: 'SCATTER_GATHER', templateName: 'SCATTER-GATHER · 뿌렸다 모으기', pattern: 4,
+    subjectLabel: '도착 계좌', subject: 'dddd0004', hitDates: ['2023-09-10'], measured: { MID_COUNT: 10 },
+    conditions: [{ metric: 'MID_COUNT', label: '경유 계좌 수', cmp: 'GTE', value: 4, unit: '개', measured: 10 }],
+    roles: [{ role: 'SOURCE', label: '출발 계좌', accountId: 'eeee0005' }, ...mids.map(accountId => ({ role: 'MID', label: '경유 계좌', accountId }))],
+    matchedTxIds: [102], evidenceTxCount: 20 };
+  vi.mocked(fetchCaseRuleHits).mockResolvedValue([cycle, scatter, hit]);
+  render(<Screen caseId={41} />);
+  const [first, second, plain] = within(await screen.findByRole('list', { name: '룰 적중' })).getAllByRole('listitem').filter(item => item.parentElement.classList.contains('case-rule-hits'));
+
+  expect(first).toHaveTextContent('출발 계좌(돈이 돌아온 계좌) aaaa0001 · 적중 날짜 2023-09-09');
+  expect(within(first).getByRole('list', { name: '조건과 실제 값' })).toHaveTextContent('순환 거래 수 ≥ 3건 → 실제 3건');
+  // 경로 계좌는 서버가 준 순서(지나간 순서) 그대로다
+  expect(within(within(first).getByRole('list', { name: '함께 나온 계좌' })).getAllByRole('listitem').map(item => item.textContent))
+    .toEqual(['경로 계좌 2개bbbb0002cccc0003']);
+
+  // 출발 계좌 다음에 경유 계좌. 한 역할이 8개를 넘으면 접어 두고 누르면 다 보여 준다.
+  const roles = within(within(second).getByRole('list', { name: '함께 나온 계좌' }));
+  const [source, mid] = roles.getAllByRole('listitem');
+  expect(source).toHaveTextContent('출발 계좌 1개eeee0005');
+  expect(mid).toHaveTextContent('경유 계좌 10개');
+  expect(mid).toHaveTextContent('mid00007');
+  expect(mid).not.toHaveTextContent('mid00008');
+  const more = within(mid).getByRole('button', { name: '경유 계좌 2개 더 보기' });
+  expect(more).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(more);
+  expect(mid).toHaveTextContent('mid00009');
+  expect(within(mid).getByRole('button', { name: '경유 계좌 접기' })).toHaveAttribute('aria-expanded', 'true');
+
+  // 집계형 적중에는 이 줄이 없다
+  expect(within(plain).queryByRole('list', { name: '함께 나온 계좌' })).not.toBeInTheDocument();
 });
 
 it('Episode 에서는 카드가 어느 Alert 의 것인지 보여 준다', async () => {

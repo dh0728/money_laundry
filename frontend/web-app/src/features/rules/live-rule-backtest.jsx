@@ -63,24 +63,29 @@ function Metric({ label, value, unit, note }) {
   </Panel>;
 }
 
-/** 측정값을 "수취 계좌 6개 · 보낸 총액 65,700 USD" 로 읽는다. 문구 · 단위 · 순서는 카탈로그에서 온다. */
-function measuredText(measured, catalog, side, order = []) {
+/**
+ * 측정값을 "수취 계좌 6개 · 보낸 총액 65,700 USD" 로 읽는다. 문구 · 단위 · 순서는 카탈로그에서 온다.
+ * 경로형(CYCLE · RANDOM)의 측정값은 HOPS(그날 가장 긴 경로의 거래 수) 하나이고, 문구는 조건 값 minHops 의 것("순환 거래 수")을 쓴다.
+ */
+function measuredText(measured, catalog, side, order = [], templateKey = '') {
   const rank = key => (order.includes(key) ? order.indexOf(key) : order.length);
   return Object.entries(measured ?? {}).filter(([, value]) => value != null).sort(([a], [b]) => rank(a) - rank(b)).map(([key, value]) => {
-    const spec = catalog?.metrics[key];
-    const label = sidedText(spec?.short ?? spec?.label, side) || key;
+    const hops = key === 'HOPS';
+    const spec = hops ? catalog?.path?.minHops : catalog?.metrics[key];
+    const label = (hops ? sidedText(spec?.label, templateKey) : sidedText(spec?.short ?? spec?.label, side)) || key;
     return `${label} ${decimalFormat.format(value)}${spec?.unit ? (spec.unit.length > 1 ? ` ${spec.unit}` : spec.unit) : ''}`;
   }).join(' · ');
 }
 
-function Notices({ run }) {
+function Notices({ run, wholePath }) {
   const wide = run.evidenceShare != null && run.evidenceShare >= WIDE_SHARE;
   if (run.currentDefinition && !wide && !run.skippedBusySubjects && !run.chunkedCount) return null;
   return <ul className="rule-check-warnings rule-backtest-notices" aria-label="알아 둘 것">
     {!run.currentDefinition && <li>이 결과는 조건을 고치기 전의 것입니다. 지금 조건으로 보려면 다시 실행해 주세요.</li>}
     {wide && <li>근거 거래가 검사한 거래의 {percent(run.evidenceShare)} 입니다({count(run.evidenceTxCount)}건). 조건이 원장을 넓게 덮습니다. 세는 거래 조건을 좁히거나 적중 조건의 값을 올려 보세요.</li>}
     {run.skippedBusySubjects > 0 && <li>바쁜 계좌 {count(run.skippedBusySubjects)}개는 평가하지 않았습니다(
-      {windowText(run.busy.windowMinutes)} 안 같은 방향 거래 {count(run.busy.maxTransactions)}건 초과).</li>}
+      {windowText(run.busy.windowMinutes)} 안 같은 방향 거래 {count(run.busy.maxTransactions)}건 초과).
+      {wholePath && ' 이 템플릿은 대상뿐 아니라 경유 · 경로 자리에 바쁜 계좌가 있는 거래도 잇지 않습니다.'}</li>}
     {run.chunkedCount > 0 && <li>근거 거래가 32건을 넘는 대상이 {count(run.chunkedCount)}개 있습니다. Alert 로 묶이면 여러 개로 나뉩니다.</li>}
   </ul>;
 }
@@ -132,8 +137,8 @@ function Scope({ run }) {
   </Panel>;
 }
 
-function Cases({ run, catalog, side, order, registerTableTools }) {
-  const measuredOf = item => measuredText(item.measured, catalog, side, order);
+function Cases({ run, catalog, side, order, templateKey, registerTableTools }) {
+  const measuredOf = item => measuredText(item.measured, catalog, side, order, templateKey);
   const sorting = useTableSort(run.cases);
   const [shown, setShown] = useState(CASE_PAGE);
   const total = run.kpis.hits + (run.kpis.dropped ?? 0);
@@ -268,8 +273,11 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
   const template = detail ? templateOf(catalog, detail.template) : null;
   const side = template?.side ?? 'FROM';
   const supported = detail ? (catalog.backtestTemplates ?? []).includes(detail.template) : false;
+  // 되는 템플릿은 서버가 알려 준다(backtestTemplates). 이름의 앞부분("FAN-OUT · 분산 송금" → "FAN-OUT")만 카탈로그 순서로 늘어놓는다.
+  const supportedNames = catalog.templates.filter(item => (catalog.backtestTemplates ?? []).includes(item.key))
+    .map(item => item.name.split(' · ')[0]).join(' · ');
   const blocked = !detail ? '' : !target ? '돌릴 버전이 없습니다.'
-    : !supported ? `${detail.templateName} 템플릿의 백테스트는 아직 제공하지 않습니다. 지금은 FAN-OUT · FAN-IN · GATHER-SCATTER 만 됩니다.` : '';
+    : !supported ? `${detail.templateName} 템플릿의 백테스트는 아직 제공하지 않습니다.${supportedNames ? ` 지금은 ${supportedNames} 만 됩니다.` : ''}` : '';
 
   async function start() {
     if (!target || blocked || busy || running) return;
@@ -333,13 +341,13 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
     {blocked && <p role="status" className="rule-backtest-blocked">{blocked}</p>}
     {message && <p role="alert" data-rule-block-error>{message}</p>}
     {done && <>
-      <Notices run={done} />
+      <Notices run={done} wholePath={template?.evaluator === 'TWO_HOP' || template?.evaluator === 'PATH'} />
       <Kpis run={done} />
       <div className="screen-row rule-backtest-detail">
         {done.sweep && <Sweep sweep={done.sweep} />}
         <Scope run={done} />
       </div>
-      <Cases run={done} catalog={catalog} side={side} order={template?.metrics} registerTableTools={registerTableTools} />
+      <Cases run={done} catalog={catalog} side={side} order={template?.metrics} templateKey={done.template} registerTableTools={registerTableTools} />
     </>}
     <History rows={history} selectedId={run?.backtestId} onOpen={open} />
     <ScreenActions host={actionsHost} stackOnNarrow>

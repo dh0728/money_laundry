@@ -128,9 +128,38 @@ it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것
   expect(notices.getByText(/조건을 고치기 전의 것입니다/)).toBeInTheDocument();
   expect(notices.getByText(/검사한 거래의 12.5% 입니다/)).toBeInTheDocument();
   expect(notices.getByText(/바쁜 계좌 2개는 평가하지 않았습니다/)).toHaveTextContent('72시간 안 같은 방향 거래 512건 초과');
+  expect(notices.getByText(/바쁜 계좌 2개는 평가하지 않았습니다/)).not.toHaveTextContent('경로 자리');
   expect(notices.getByText(/32건을 넘는 대상이 1개/)).toBeInTheDocument();
   expect(within(screen.getByRole('region', { name: '실행 기록' })).getByRole('button', { name: /v2 · 완료 · 운영 v1 과 비교/ }))
     .toHaveAttribute('aria-pressed', 'true');
+});
+
+it('경로형 룰은 경로의 거래 수를 바꿔 본 결과와 측정값(가장 긴 경로의 거래 수)을 보여 준다', async () => {
+  // RULE-004 가 RANDOM · 연쇄 경유 룰일 때
+  vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4
+    ? { ...draftRuleFixture, template: 'RANDOM', templateName: 'RANDOM · 연쇄 경유' } : activeRuleFixture));
+  const pathRun = { ...completed, template: 'RANDOM', baseline: null,
+    kpis: { ...result.kpis, added: null, dropped: null, baseHits: null, basePrecision: null, baseJudged: null },
+    sweep: { metric: 'minHops', label: '경로 거래 수', unit: '건', rows: [
+      { value: 2, current: false, hits: 9, txCount: 30, alertOverlap: 2, expectedNewAlerts: 6 },
+      { value: 3, current: true, hits: 2, txCount: 7, alertOverlap: 1, expectedNewAlerts: 1 }] },
+    cases: [{ subjectType: 'ACCOUNT', subject: 'c41f3f2a', state: 'HIT', measured: { HOPS: 4 }, txCount: 4, alertId: null, judgement: null }] };
+  vi.mocked(fetchBacktests).mockResolvedValue([pathRun]);
+  vi.mocked(fetchBacktest).mockResolvedValue(pathRun);
+  render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
+
+  const sweep = within(await screen.findByRole('region', { name: '값을 바꾸면' }));
+  expect(sweep.getByText('경로 거래 수만 바꿔 같은 기간에 다시 돌린 결과입니다.')).toBeInTheDocument();
+  expect(sweep.getByRole('row', { name: /이번 값/ })).toHaveTextContent('3건');
+  // 측정값 HOPS 는 조건 값(minHops)의 문구로 읽는다
+  const cases = within(screen.getByRole('region', { name: '사례' }));
+  expect(within(cases.getByText('c41f3f2a').closest('tr')).getByText('경로 거래 수 4건')).toBeInTheDocument();
+  // 경로형 · 2홉형은 바쁜 계좌를 대상뿐 아니라 경로 자리에서도 뺀다
+  expect(within(screen.getByRole('list', { name: '알아 둘 것' })).getByText(/바쁜 계좌 2개는 평가하지 않았습니다/))
+    .toHaveTextContent('경유 · 경로 자리에 바쁜 계좌가 있는 거래도 잇지 않습니다.');
+  // 이제 경로형도 다시 돌릴 수 있다
+  expect(screen.queryByText(/백테스트는 아직 제공하지 않습니다/)).not.toBeInTheDocument();
+  expect(runButton('다시 실행')).toBeEnabled();
 });
 
 it('도는 중에는 취소할 수 있고, 실패하면 이유를 보여 준다', async () => {
@@ -155,7 +184,8 @@ it('평가기가 없는 템플릿은 실행을 막고, 서버가 접수를 거�
   vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4
     ? { ...draftRuleFixture, template: 'STRUCTURING', templateName: '분할 입·출금' } : activeRuleFixture));
   render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
-  expect(await screen.findByText(/분할 입·출금 템플릿의 백테스트는 아직 제공하지 않습니다/)).toBeInTheDocument();
+  // 되는 템플릿은 서버가 준 backtestTemplates 에서 읽는다(카탈로그 픽스처에 있는 것은 FAN-OUT 과 RANDOM)
+  expect(await screen.findByText(/분할 입·출금 템플릿의 백테스트는 아직 제공하지 않습니다/)).toHaveTextContent('지금은 FAN-OUT · RANDOM 만 됩니다.');
   expect(runButton('백테스트 실행')).toBeDisabled();
 
   // RULE-002(FAN-IN)는 운영 버전뿐이라 비교 없이 그 버전을 돌린다

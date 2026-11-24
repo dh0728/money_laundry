@@ -60,9 +60,12 @@ export const catalogFixture = {
     "nameLength": 80,
   },
   "backtestTemplates": [
+    "CYCLE",
     "FAN_IN",
     "FAN_OUT",
     "GATHER_SCATTER",
+    "RANDOM",
+    "SCATTER_GATHER",
   ],
 } as unknown as RuleCatalog
 

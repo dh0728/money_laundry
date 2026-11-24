@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchCaseRuleHits } from '@/api/rules';
+import { ActionButton } from '../../components/primary-button';
 import { LinkTag, PatternTag, StatusTag } from '../../components/semantic-tags';
 import { cmpSymbol } from './rule-definition';
 import { problemText, ruleStatusNames, ruleStatusPresets } from './live-rule-store';
@@ -36,6 +37,32 @@ function Condition({ condition }) {
     {' → '}<strong>실제 {withUnit(condition.measured, condition.unit)}</strong></li>;
 }
 
+// 한 역할의 계좌를 처음에 보여 주는 개수. 넘으면 "외 N개 더 보기" 로 접는다.
+const ROLE_PREVIEW = 8;
+
+/** roles 를 역할별로 묶는다. 서버가 준 순서(출발 계좌 → 경유 계좌, 경로는 지나간 순서)를 그대로 둔다. */
+function roleGroups(roles = []) {
+  const groups = new Map();
+  for (const item of roles) {
+    if (!groups.has(item.role)) groups.set(item.role, { role: item.role, label: item.label ?? item.role, accounts: [] });
+    groups.get(item.role).accounts.push(item.accountId);
+  }
+  return [...groups.values()];
+}
+
+/** "경유 계좌 4개 a1b2c3d4 …". 대상 말고 이 적중에 나온 계좌다(SCATTER-GATHER 의 출발 · 경유 계좌, CYCLE · RANDOM 의 경로 계좌). */
+function RoleAccounts({ group }) {
+  const [open, setOpen] = useState(false);
+  const hidden = group.accounts.length - ROLE_PREVIEW;
+  const shown = open || hidden <= 0 ? group.accounts : group.accounts.slice(0, ROLE_PREVIEW);
+  return <li>
+    <span>{group.label} {group.accounts.length}개</span>
+    {shown.map(account => <code key={account}>{account}</code>)}
+    {hidden > 0 && <ActionButton shape="pill" aria-expanded={open} aria-label={`${group.label} ${open ? '접기' : `${hidden}개 더 보기`}`}
+      onClick={() => setOpen(value => !value)}>{open ? '접기' : `외 ${hidden}개 더 보기`}</ActionButton>}
+  </li>;
+}
+
 /**
  * @param state useCaseRuleHits 의 결과
  * @param records 사건의 거래(txId 와 화면 코드)
@@ -64,6 +91,9 @@ export function CaseRuleHits({ state, records = [], alertCode }) {
           <ul className="overview-shared-target case-rule-hit-conditions" aria-label="조건과 실제 값">
             {hit.conditions.map((condition, index) => <Condition key={index} condition={condition} />)}
           </ul>
+          {hit.roles?.length > 0 && <ul className="overview-shared-target case-rule-hit-roles" aria-label="함께 나온 계좌">
+            {roleGroups(hit.roles).map(group => <RoleAccounts key={group.role} group={group} />)}
+          </ul>}
           <span className="overview-shared-target overview-note">
             이 사건의 거래 {hit.matchedTxIds.length}건이 이 적중의 근거 거래입니다(근거 거래 전체 {hit.evidenceTxCount}건).
           </span>
