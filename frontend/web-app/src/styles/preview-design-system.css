@@ -111,6 +111,8 @@
   --workspace-kpi-value-size: clamp(2rem, 3.1vw, 3rem);
   --chart-series-height: clamp(10rem, 16vw, 14rem);
   --chart-detail-sparkline-height: 96px;
+  --chart-hover-fade-duration: 400ms;
+  --chart-sparkline-dot-outline: 1.5px;
   --chart-axis-label-line-height: 1.2;
   --metric-value-size-min: 1.5rem;
   --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));

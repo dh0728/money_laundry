@@ -12,7 +12,6 @@ import {
 } from "motion/react";
 import { appReducedMotion, useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import {
-  type CSSProperties,
   memo,
   type PointerEvent,
   type ReactNode,
@@ -44,6 +43,7 @@ import {
   sparklineBarWidth,
   sparklineIndexAtX,
 } from "./sparkline-geometry";
+import "./sparkline.css";
 
 // Keep Sparkline independent of the full chart context in the standalone preview.
 const DEFAULT_ANIMATION_EASING = "cubic-bezier(0.85, 0, 0.15, 1)";
@@ -58,11 +58,16 @@ export const DEFAULT_SPARKLINE_ANIMATION_DURATION_MS = 900;
 /** Matches the main charts' data-change tween (`DEFAULT_Y_DOMAIN_TWEEN_MS`). */
 export const DEFAULT_SPARKLINE_DATA_TRANSITION_MS = 500;
 const DATA_TRANSITION_EASE = [0.85, 0, 0.15, 1] as const;
-/** Same as the main charts' `SeriesHoverDim` / `HighlightSegment`. */
-const HOVER_FADE = "opacity 400ms ease-in-out";
 const HIGHLIGHT_SPRING: SparklineSpringConfig = { stiffness: 180, damping: 28 };
 const DEFAULT_SPARKLINE_HEIGHT = 32;
 const REDUCED_MOTION_FADE_MS = 200;
+
+function hoverDurationSeconds(token: string, fallback: number) {
+  const value = typeof document === "undefined" ? "" :
+    getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+  const duration = Number.parseFloat(value);
+  return Number.isFinite(duration) ? duration / (value.endsWith("ms") ? 1000 : 1) : fallback;
+}
 
 export type SparklineCrosshair = "dashed" | "solid" | "gradient" | false;
 
@@ -127,7 +132,6 @@ export interface SparklineBaseProps<T> {
   /** Accessible summary. Generated from the data when omitted. */
   "aria-label"?: string;
   className?: string;
-  style?: CSSProperties;
 }
 
 export interface LineSparklineProps<T> extends SparklineBaseProps<T> {
@@ -388,9 +392,14 @@ function SparklineFrame<T>({
     hoverIndex: hoverIndexProp,
     onHoverChange,
     className,
-    style,
   } = config;
   const containerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.style.setProperty("--sparkline-width", widthProp === undefined ? "100%" : `${widthProp}px`);
+    container.style.setProperty("--sparkline-height", `${height}px`);
+  }, [widthProp, height]);
   const width = useSparklineWidth(containerRef, widthProp);
   const gradientId = useId();
 
@@ -451,23 +460,17 @@ function SparklineFrame<T>({
 
   return (
     <div
-      className={cn(
-        "relative min-w-0",
-        widthProp === undefined && "w-full",
-        className
-      )}
+      className={cn("sparkline", className)}
       ref={containerRef}
-      style={{ width: widthProp, height, ...style }}
     >
       {width > 0 ? (
         <svg
           aria-label={label}
-          className="block overflow-visible"
+          data-interactive={interactive || undefined}
           height={height}
           onPointerLeave={interactive ? handlePointerLeave : undefined}
           onPointerMove={interactive ? handlePointerMove : undefined}
           role="img"
-          style={interactive ? { touchAction: "pan-y" } : undefined}
           width={width}
         >
           {children({
@@ -501,8 +504,20 @@ function SparklineCrosshairLine({
   gradientId: string;
 }) {
   const id = `${gradientId}-crosshair`;
+  const guideRef = useRef<SVGGElement>(null);
+  useLayoutEffect(() => {
+    const guide = guideRef.current;
+    if (!guide) return;
+    const move = (offset: number) => guide.setAttribute("transform", `translate(${offset} 0)`);
+    if (typeof x === "number") {
+      move(x);
+      return;
+    }
+    move(x.get());
+    return x.on("change", move);
+  }, [x]);
   return (
-    <m.g aria-hidden pointerEvents="none" style={{ x }}>
+    <g aria-hidden pointerEvents="none" ref={guideRef}>
       {variant === "gradient" ? (
         <>
           <defs>
@@ -524,21 +539,21 @@ function SparklineCrosshairLine({
               />
             </linearGradient>
           </defs>
-          {/* Gradient strokes need a non-zero bbox width, so draw a 1px rect. */}
-          <rect fill={`url(#${id})`} height={height} width={1} x={-0.5} y={0} />
+          {/* A gradient needs a non-zero bounding-box width. */}
+          <rect className="sparkline-crosshair-gradient" fill={`url(#${id})`} height={height} y={0} />
         </>
       ) : (
         <line
+          className="sparkline-crosshair-line"
           stroke={chartCssVars.crosshair}
           strokeDasharray={variant === "dashed" ? "2 2" : undefined}
-          strokeWidth={1}
           x1={0}
           x2={0}
           y1={padding.top / 2}
           y2={height - padding.bottom / 2}
         />
       )}
-    </m.g>
+    </g>
   );
 }
 
@@ -554,13 +569,12 @@ function SparklineDot({
   return (
     <m.circle
       aria-hidden
+      className="sparkline-dot"
       cx={x}
       cy={y}
       fill={color}
       pointerEvents="none"
-      r={3}
       stroke={chartCssVars.background}
-      strokeWidth={1.5}
     />
   );
 }
@@ -679,6 +693,7 @@ function SparklineHighlight({
   strokeWidth: number;
 }) {
   const clipId = useId();
+  const [fadeDuration] = useState(() => hoverDurationSeconds("--chart-hover-fade-duration", 0.4));
   const highlightRef = useRef<SVGPathElement>(null);
   const { points } = layout;
   const start = points[Math.max(0, hoverIndex - 1)]?.x ?? 0;
@@ -724,7 +739,7 @@ function SparklineHighlight({
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={strokeWidth}
-        transition={{ duration: 0.4, ease: "easeInOut" }}
+        transition={{ duration: fadeDuration, ease: "easeInOut" }}
       />
     </g>
   );
@@ -928,11 +943,9 @@ function LineOrAreaPaths({
     <>
       <g
         aria-hidden
+        className="sparkline-series"
+        opacity={hoverIndex === null ? 1 : inactiveOpacity}
         ref={groupRef}
-        style={{
-          opacity: hoverIndex === null ? 1 : inactiveOpacity,
-          transition: HOVER_FADE,
-        }}
       >
         {variant === "area" ? (
           <>
@@ -1112,6 +1125,7 @@ function BarPaths({
   spring: SparklineSpringConfig | null;
 }) {
   const barsRef = useRef<SVGPathElement>(null);
+  const [highlightDuration] = useState(() => hoverDurationSeconds("--aml-duration-feedback-transition", 0.2));
   useDataTransition(layout, width, dataTransitionDuration, (frame) => {
     barsRef.current?.setAttribute(
       "d",
@@ -1152,13 +1166,11 @@ function BarPaths({
     <>
       <g aria-hidden ref={groupRef}>
         <path
+          className="sparkline-series"
           d={barsPath}
           fill={color}
+          opacity={hovered ? inactiveOpacity : 1}
           ref={barsRef}
-          style={{
-            opacity: hovered ? inactiveOpacity : 1,
-            transition: HOVER_FADE,
-          }}
         />
         {/* The focused bar sits on top at full strength; moving between bars
             cross-fades it, and the rest fade with the base path above. */}
@@ -1177,7 +1189,7 @@ function BarPaths({
               fill={color}
               initial={{ opacity: inactiveOpacity }}
               key={hoverIndex}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
+              transition={{ duration: highlightDuration, ease: "easeInOut" }}
             />
           ) : null}
         </AnimatePresence>
