@@ -39,5 +39,6 @@
   padding: var(--aml-space-24);
 }
 .review-stack { inline-size: 100% }
+.ant-typography.review-case-title { margin: var(--aml-space-0) }
 .review-owner-filter { min-inline-size: var(--review-owner-filter-min-width) }
 .review-account-filter { min-inline-size: var(--review-account-filter-min-width) }
