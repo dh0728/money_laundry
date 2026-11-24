@@ -34,7 +34,7 @@ export const designRuleTree = [
       { id: 'token/arbitrary-class', title: 'Tailwind 임의 값(w-[13px] 등) 금지', engine: 'eslint', level: 'ratchet' },
       { id: 'token/important', title: '!important 금지(움직임 끄기 장치만 허용)', engine: 'stylelint', level: 'ratchet' },
       { id: 'token/fixed-number', title: '고정 숫자 금지(크기·선·그림자·투명도·z-index·시간·변형·JSX 크기 prop·문자열 단위). 0·100%·50%·fr·flex·auto 등 채우기·맞추기 값만 허용', engine: 'eslint+stylelint', level: 'ratchet' },
-      { id: 'token/inline-var-number', title: '인라인 style·setProperty로 넘기는 CSS 변수 값에 숫자 금지(토큰 var만)', engine: 'eslint', level: 'ratchet' },
+      { id: 'token/inline-var-number', title: '인라인 style·setProperty로 넘기는 CSS 변수 값에 숫자 금지(토큰 var만)', engine: 'eslint', level: 'error' },
       { id: 'token/palette-direct', title: '화면 파일(src/components·src/styles 밖)에서 원시 색(--palette-*·--aml-색이름-숫자) 직접 사용 금지', engine: 'eslint+stylelint', level: 'ratchet' },
       { id: 'token/series-color', title: '전체 거래는 회색, 새 계좌는 청록, 새 소유주는 분홍. 회색과 상태 색은 해당 의미에만 사용', engine: 'eslint', level: 'error' },
       { id: 'token/undefined-var', title: '정의 없는 CSS 변수 참조 금지(대체값 없는 var)', engine: 'eslint+stylelint', level: 'error' },

@@ -233,6 +233,10 @@
   grid-auto-rows: minmax(var(--aml-space-64), 1fr) !important;
 }
 .dashboard-metrics-box:not([data-wide="true"]) .magic-bento__cell { grid-column: auto !important }
+.dashboard-metrics.magic-bento {
+  --mb-host-ink: var(--text);
+  --mb-host-muted: var(--muted-text);
+}
 .dashboard-metrics .magic-bento__card {
   --panel-content-padding: var(--aml-panel-text-inset, var(--ui-panel-padding));
   --mb-radius: var(--aml-radius-panel, var(--aml-radius-card));

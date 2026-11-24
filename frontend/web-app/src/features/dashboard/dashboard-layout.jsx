@@ -52,8 +52,7 @@ export function DashboardMetricGrid({ items, wide = false, appearance, loading =
       ...(wide ? placed[index] : { colSpan: 1, rowSpan: 1 }),
     }))} columns={wide ? wideLayout.columns : 2} fixedColumns={wide} gap={readWorkspaceGap()} rowHeight={0}
       theme={appearance.theme} disableAnimations={loading || appearance.reduced} intro={false} textAutoHide={false}
-      enableTilt={false} enableBorderGlow={false} enableSpotlight={false} clickEffect={false} enableStars={false}
-      style={{ '--mb-ink': 'var(--text)', '--mb-muted': 'var(--muted-text)' }} />
+      enableTilt={false} enableBorderGlow={false} enableSpotlight={false} clickEffect={false} enableStars={false} />
   </Box>;
 }
 
