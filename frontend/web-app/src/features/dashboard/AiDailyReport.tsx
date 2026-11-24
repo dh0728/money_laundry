@@ -5,7 +5,7 @@ import type { DashboardData } from '@/api/dashboard'
 import { ProvenanceBadge } from '@/components/Provenance'
 import { PatternBadge } from '@/components/badges'
 import { Card, CardContent } from '@/components/ui/card'
-import { RadarSweep } from '@/features/agent/RadarSweep'
+import { RadarSweep } from '@/components/radar-sweep'
 import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
 import { Box, Heading, Text } from '@/components/layout-primitives'
 

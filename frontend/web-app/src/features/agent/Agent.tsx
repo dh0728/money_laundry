@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatScore } from '@/api/codes'
 import { live } from '@/lib/apiMode'
 import type { AgentRecord } from './agentData'
-import { RadarSweep } from './RadarSweep'
+import { RadarSweep } from '@/components/radar-sweep'
 import { appReducedMotion } from '@/hooks/use-reduced-motion'
 import { Box, Text } from '@/components/layout-primitives'
 
