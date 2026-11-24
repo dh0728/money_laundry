@@ -74,6 +74,28 @@
   --aml-opacity-progress-track: .2;
   --aml-opacity-status-label: .65;
   --aml-path-length-unit: 1;
+  --aml-space-5: 5px;
+  --aml-space-7: 7px;
+  --aml-layer-tooltip: 9999;
+  --aml-type-tooltip-compact: 11.5px;
+  --aml-type-tooltip: 12.5px;
+  --aml-type-tooltip-comfortable: 13.5px;
+  --aml-type-tooltip-line-height: 1.2;
+  --aml-type-tooltip-tracking: -.01em;
+  --aml-type-keycap-size: .86em;
+  --aml-type-keycap-tracking: .02em;
+  --aml-size-keycap-height: 1.55em;
+  --aml-space-keycap-inline: .45em;
+  --aml-radius-keycap: .4em;
+  --aml-opacity-keycap-face: 9%;
+  --aml-opacity-keycap-edge: 12%;
+  --aml-opacity-keycap-ink: 72%;
+  --aml-shadow-tooltip: 0 var(--aml-space-1) var(--aml-space-2) color-mix(in srgb, var(--aml-black-100) 12%, transparent),
+    0 var(--aml-space-8) var(--aml-space-24) calc(-1 * var(--aml-space-8)) color-mix(in srgb, var(--aml-black-100) 45%, transparent);
+  --aml-opacity-tooltip-outline: 40%;
+  --aml-duration-tooltip-reset: 125ms;
+  --aml-duration-tooltip-fuse: 80ms;
+  --aml-rotation-tooltip-arrow: .125turn;
   --brand-accent: var(--selection-surface);
   --brand-color: var(--brand-accent);
   --brand-control-surface: var(--selection-surface);
