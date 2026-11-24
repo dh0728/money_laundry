@@ -77,7 +77,7 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual(batch.unassigned[0].tx_id, 200)
 
     def test_star_chunks_at_star_max_and_links_neighbours(self):
-        batch = self.build(fan("A", 5, step=1.0), [100, 101, 102, 103, 104], star_max=3)
+        batch = self.build(fan("A", 5, step=1.0), [100, 101, 102, 103, 104], star_max=3, merge_shared=False)
         self.assertEqual([g.seed_ids for g in batch.graphs], [(100, 101, 102), (103, 104)])
         self.assertIn("STAR_CHUNKED", batch.graphs[0].limits)
         self.assertEqual(batch.graphs[0].boundary_witnesses, (Witness("BOUNDARY_STAR_CHUNK", (102, 103)),))
@@ -96,16 +96,16 @@ class BlockGraphTests(unittest.TestCase):
 
     def test_pass_matches_one_to_one_and_needs_a_margin(self):
         rows = [(1, 0, "A", "Y", 1000.0), (2, 1, "B", "Y", 1200.0), (3, 10, "Y", "C", 1000.0)]
-        batch = self.build(rows, [1, 2, 3])
+        batch = self.build(rows, [1, 2, 3], attach_leftovers=False, merge_shared=False)
         self.assertEqual(batch.graphs[0].witnesses, (Witness("PASS", (1, 3)),))
         self.assertEqual(batch.unassigned[0].reason, "LINK_ONLY")
         contested = [(1, 0, "A", "Y", 1000.0), (2, 1, "B", "Y", 1002.0), (3, 10, "Y", "C", 1000.0)]
-        batch = self.build(contested, [1, 2, 3])
+        batch = self.build(contested, [1, 2, 3], attach_leftovers=False, merge_shared=False)
         # No PASS survives the margin; the two inbound seeds still form a fan-in star.
         self.assertEqual(batch.graphs[0].witnesses, (Witness("STAR_IN", (1, 2)),))
         self.assertEqual({r.reason for r in batch.rejected_relations}, {"PASS_CONTESTED"})
         self.assertEqual(batch.unassigned, (type(batch.unassigned[0])(3, "LINK_ONLY"),))
-        self.assertEqual(self.build(contested, [1, 2, 3], pass_margin=1).graphs[0].witnesses,
+        self.assertEqual(self.build(contested, [1, 2, 3], pass_margin=1, attach_leftovers=False, merge_shared=False).graphs[0].witnesses,
                          (Witness("PASS", (1, 3)),))
 
     def test_unknown_amount_never_passes(self):
@@ -123,10 +123,10 @@ class BlockGraphTests(unittest.TestCase):
     def test_weak_star_joins_one_established_block_only(self):
         rows = ([(1, 0, "A", "P", 1000.0), (2, 4, "P", "Q", 1000.0),      # block one: PASS chain
                  (3, 0, "A", "R", 1000.0), (4, 4, "R", "S", 1000.0)])     # block two: PASS chain
-        batch = self.build(rows, [1, 2, 3, 4])
+        batch = self.build(rows, [1, 2, 3, 4], merge_shared=False)
         self.assertEqual([g.seed_ids for g in batch.graphs], [(1, 2), (3, 4)])
         self.assertEqual(batch.graphs[0].boundary_witnesses, (Witness("BOUNDARY_SAME_FOCAL", (1, 3)),))
-        strong = self.build(rows, [1, 2, 3, 4], star_strong=2)
+        strong = self.build(rows, [1, 2, 3, 4], star_strong=2, merge_shared=False)
         self.assertEqual([g.seed_ids for g in strong.graphs], [(1, 2, 3, 4)])
 
     def test_core_cap_splits_with_link_and_limit(self):
@@ -148,7 +148,7 @@ class BlockGraphTests(unittest.TestCase):
     def test_pinned_groups_are_never_joined(self):
         # A fans out to AR0/AR1; AR1 forwards (PASS) and fans out itself.
         rows = fan("A", 2, first_id=10) + [(20, 10, "AR1", "BR0", 1000.0), (21, 16, "AR1", "BR1", 300.0)]
-        free = self.build(rows, [10, 11, 20, 21])
+        free = self.build(rows, [10, 11, 20, 21], attach_leftovers=False, merge_shared=False)
         self.assertEqual([g.seed_ids for g in free.graphs], [(10, 11, 20)])
         groups = [((10, 11), (10, 11), (10, 11), (Witness("STAR_OUT", (10, 11)),)),
                   ((20, 21), (20, 21), (20, 21), (Witness("STAR_OUT", (20, 21)),))]
@@ -198,11 +198,11 @@ class BlockGraphTests(unittest.TestCase):
         batch = self.build(rows, [1, 2, 3, 4, 5])
         graph, = batch.graphs
         self.assertEqual(self.kinds(graph), ["RELAY", "STAR_IN", "STAR_OUT"])
-        link_only = self.build(rows, [1, 2, 3, 4, 5], relay_mode="LINK_ONLY")
+        link_only = self.build(rows, [1, 2, 3, 4, 5], relay_mode="LINK_ONLY", merge_shared=False)
         self.assertEqual([g.seed_ids for g in link_only.graphs], [(1, 2, 3), (4, 5)])
         self.assertEqual(link_only.graphs[0].boundary_witnesses[0].kind, "BOUNDARY_SAME_FOCAL")
         late = self.build([(1, 0, "P", "F"), (2, 5, "Q", "F"), (4, 130, "F", "X"), (5, 140, "F", "Y")],
-                          [1, 2, 4, 5])
+                          [1, 2, 4, 5], merge_shared=False)
         self.assertEqual(len(late.graphs), 2)
 
     def test_weak_relay_does_not_glue_two_structured_blocks(self):
@@ -210,7 +210,7 @@ class BlockGraphTests(unittest.TestCase):
                  (4, 40, "F", "Y", 2000.0),
                  (5, -10, "U", "P", 900.0),   # in-side chain U→P→F
                  (6, 50, "X", "V", 500.0)])   # out-side chain F→X→V
-        batch = self.build(rows, [1, 2, 3, 4, 5, 6])
+        batch = self.build(rows, [1, 2, 3, 4, 5, 6], merge_shared=False)
         self.assertEqual(len(batch.graphs), 2)
         self.assertIn("BOUNDARY_SAME_FOCAL", {w.kind for w in batch.graphs[0].boundary_witnesses})
         strong = self.build(rows, [1, 2, 3, 4, 5, 6], relay_mode="STRONG")
@@ -225,9 +225,14 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual({r.reason for r in batch.rejected_relations}, {"AMBIGUOUS_HUB"})
 
     def test_self_transfer_seed_is_reported(self):
-        batch = self.build([(1, 0, "A", "A"), (2, 1, "A", "B"), (3, 2, "A", "C")], [1, 2, 3])
+        rows = [(1, 0, "A", "A"), (2, 1, "A", "B"), (3, 2, "A", "C")]
+        batch = self.build(rows, [1, 2, 3], attach_leftovers=False, merge_shared=False)
         self.assertEqual(batch.graphs[0].seed_ids, (2, 3))
         self.assertEqual(batch.unassigned, (type(batch.unassigned[0])(1, "SELF_TRANSFER"),))
+        # block-pin-4: the self-transfer shares account A with the star and joins it.
+        graph, = self.build(rows, [1, 2, 3]).graphs
+        self.assertEqual(graph.seed_ids, (1, 2, 3))
+        self.assertIn(Witness("SHARED_ACCOUNT", (1, 2)), graph.witnesses)
 
     def test_budget_failure_is_fatal(self):
         with self.assertRaises(GraphBudgetExceeded):
@@ -272,7 +277,7 @@ class BlockGraphTests(unittest.TestCase):
         # The rule applies to the adopted spokes, not only to the chunk: when the only
         # spoke with another counterparty cannot be absorbed, no star is formed.
         rows += [(4, 20, "C", "A", 900.0)]  # C sends back to A: C's chain is not dangling
-        batch = self.build(rows, [1, 2, 3, 4])
+        batch = self.build(rows, [1, 2, 3, 4], attach_leftovers=False, merge_shared=False)
         self.assertEqual([g.witnesses for g in batch.graphs], [(Witness("PASS", (3, 4)),)])
         self.assertEqual({u.tx_id for u in batch.unassigned}, {1, 2})
 
@@ -282,7 +287,7 @@ class BlockGraphTests(unittest.TestCase):
         rows = [(1, 0, "A", "P", 1000.0), (2, 1, "A", "Q", 1000.0), (3, 2, "A", "R", 1000.0),
                 (4, 10, "Q", "Q2", 1000.0), (5, 10, "R", "R2", 1000.0), (6, 20, "R2", "R3", 1000.0)]
         seeds = [1, 2, 3, 4, 5, 6]
-        first = self.build(rows, seeds)
+        first = self.build(rows, seeds, merge_shared=False)
         self.assertEqual([g.seed_ids for g in first.graphs], [(1, 2, 4), (3, 5, 6)])
         self.assertEqual(first.graphs[0].boundary_witnesses, (Witness("BOUNDARY_SAME_FOCAL", (2, 3)),))
         groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
@@ -403,25 +408,27 @@ class BlockGraphTests(unittest.TestCase):
     def test_ablation_switches(self):
         rows = fan("A", 5) + [(200, 8, "AR0", "Z", 1000.0)]
         self.assertEqual(len(self.build(rows, [100, 101, 102, 103, 104, 200]).graphs), 1)
-        self.assertEqual(len(self.build(rows, [100, 101, 102, 103, 104, 200], absorb_dangling=False).graphs), 2)
+        self.assertEqual(len(self.build(rows, [100, 101, 102, 103, 104, 200], absorb_dangling=False, merge_shared=False).graphs), 2)
         # Seed 1 passes through F (PASS 1→6). By default F's fan-in owns it even though it
         # cannot absorb its chain, so X1's own fan-out {1, 8} never forms.
         rows = [(1, 0, "X1", "F", 1000.0), (2, 1, "X2", "F", 300.0), (3, 2, "X3", "F", 300.0),
                 (4, 3, "X4", "F", 300.0), (5, 4, "X5", "F", 300.0), (6, 10, "F", "Y", 1000.0),
                 (8, 2, "X1", "Q", 1000.0)]
         seeds = [1, 2, 3, 4, 5, 6, 8]
-        default = self.build(rows, seeds)
+        default = self.build(rows, seeds, attach_leftovers=False, merge_shared=False)
         self.assertEqual([g.seed_ids for g in default.graphs], [(1, 6), (2, 3, 4, 5)])
         self.assertIn(8, {u.tx_id for u in default.unassigned})
-        excluded = self.build(rows, seeds, star_exclude_passthrough=True)
+        excluded = self.build(rows, seeds, star_exclude_passthrough=True, attach_leftovers=False, merge_shared=False)
         self.assertEqual([g.seed_ids for g in excluded.graphs], [(1, 6, 8), (2, 3, 4, 5)])
         # Seed 1 is a contested PASS bridge at F (1 and 2 both match 3 within the margin), and
         # its chain {5, 1} is established; F's fan-in may absorb it only without the rule.
         contested = [(5, -5, "Z", "A", 990.0), (1, 0, "A", "F", 1000.0), (2, 1, "B", "F", 1002.0),
                      (3, 10, "F", "C", 1000.0)]
-        self.assertEqual([g.seed_ids for g in self.build(contested, [1, 2, 3, 5], contested_check=True).graphs],
+        self.assertEqual([g.seed_ids for g in self.build(contested, [1, 2, 3, 5], contested_check=True,
+                                                         attach_leftovers=False, merge_shared=False).graphs],
                          [(1, 5)])
-        self.assertEqual([g.seed_ids for g in self.build(contested, [1, 2, 3, 5]).graphs], [(1, 2, 5)])
+        self.assertEqual([g.seed_ids for g in self.build(contested, [1, 2, 3, 5], attach_leftovers=False, merge_shared=False).graphs],
+                         [(1, 2, 5)])
 
     def test_fixed_point_holds_with_connections(self):
         rows = ([(1, 0, "A", "Y", 1000.0), (2, 10, "Y", "Z", 980.0), (3, 20, "Z", "C", 990.0),
@@ -511,7 +518,7 @@ class BlockGraphTests(unittest.TestCase):
     def test_block_pin_3_limits(self):
         policy = BlockPolicy()
         self.assertEqual((policy.version, policy.span_max_us, policy.hop_lag_us),
-                         ("block-pin-3", 336 * HOUR_US, 168 * HOUR_US))
+                         ("block-pin-4", 336 * HOUR_US, 168 * HOUR_US))
         # A PASS takes up to seven days between legs, not more.
         self.assertEqual(len(self.build([(1, 0, "A", "Y", 1000.0), (2, 168, "Y", "C", 1000.0)], [1, 2]).graphs), 1)
         self.assertEqual(self.build([(1, 0, "A", "Y", 1000.0), (2, 169, "Y", "C", 1000.0)], [1, 2]).graphs, ())
@@ -520,6 +527,98 @@ class BlockGraphTests(unittest.TestCase):
         batch = self.build(rows, [row[0] for row in rows])
         self.assertEqual([g.seed_ids for g in batch.graphs], [(100, 101, 102, 103)])
         self.assertIn("COMPONENT_SPAN", batch.graphs[0].limits)
+
+    # ----- block-pin-4 stage 1: leftover seeds join a block through a shared account -----
+    def test_leftover_attaches_only_within_the_cap(self):
+        rows = [(1, 0, "A", "A"), (2, 1, "A", "B"), (3, 2, "A", "C")]
+        batch = self.build(rows, [1, 2, 3], core_max=2)
+        self.assertEqual([g.seed_ids for g in batch.graphs], [(2, 3)])
+        self.assertEqual(batch.unassigned, (type(batch.unassigned[0])(1, "SELF_TRANSFER"),))
+
+    def test_leftover_without_structure_or_through_a_hub_stays_out(self):
+        # Seed 300 pays into the star's sender A 200h earlier and has no relation: NO_STRUCTURE.
+        batch = self.build(fan("A", 2) + [(300, -200, "Q", "A")], [100, 101, 300])
+        self.assertEqual([g.seed_ids for g in batch.graphs], [(100, 101)])
+        self.assertEqual(batch.unassigned, (type(batch.unassigned[0])(300, "NO_STRUCTURE"),))
+        # The self-transfer at H shares only the hub account H with the star of B.
+        rows = [(1000 + i, i * 0.1, "H", f"T{i}", 1000.0) for i in range(600)]
+        rows += [(1, 20, "B", "H", 1000.0), (2, 21, "B", "C", 1000.0), (3, 22, "H", "H", 1000.0)]
+        batch = self.build(rows, [1, 2, 3])
+        self.assertEqual([g.seed_ids for g in batch.graphs], [(1, 2)])
+        self.assertEqual(batch.unassigned, (type(batch.unassigned[0])(3, "SELF_TRANSFER"),))
+
+    def test_link_only_leftover_joins_its_block(self):
+        # Seed 2 loses the PASS at Y to seed 1 (LINK_ONLY) and shares Y with that block.
+        rows = [(1, 0, "A", "Y", 1000.0), (2, 1, "B", "Y", 1200.0), (3, 10, "Y", "C", 1000.0)]
+        graph, = self.build(rows, [1, 2, 3]).graphs
+        self.assertEqual(graph.seed_ids, (1, 2, 3))
+        self.assertEqual(graph.witnesses, (Witness("PASS", (1, 3)), Witness("SHARED_ACCOUNT", (1, 2))))
+
+    def test_attached_leftover_is_a_fixed_point(self):
+        rows = [(1, 0, "A", "A"), (2, 1, "A", "B"), (3, 2, "A", "C"), (4, 3, "Q", "Q")]
+        first = self.build(rows, [1, 2, 3, 4])
+        self.assertEqual(first.unassigned, (type(first.unassigned[0])(4, "SELF_TRANSFER"),))
+        groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
+        second = self.build(rows, [1, 2, 3, 4], groups)
+        self.assertEqual([(g.seed_ids, g.witnesses, g.pinned_group) for g in second.graphs],
+                         [(g.seed_ids, g.witnesses, 0) for g in first.graphs])
+        self.assertEqual(second.unassigned, first.unassigned)
+        planned = [Evidence.from_graph(g.flow_graph(), "c" * 64) for g in first.graphs]
+        self.assertEqual({p.action for p in build_case_plans([], planned).plans}, {Action.NEW})
+
+    # ----- block-pin-4 stage 2: blocks that share an account join within the limits -----
+    def test_shared_account_joins_star_chunks(self):
+        batch = self.build(fan("A", 5, step=1.0), [100, 101, 102, 103, 104], star_max=3)
+        graph, = batch.graphs
+        self.assertEqual(graph.seed_ids, (100, 101, 102, 103, 104))
+        self.assertIn(Witness("SHARED_ACCOUNT", (100, 103)), graph.witnesses)
+        # The joined block still respects the cap: with room for three, the chunks stay apart.
+        capped = self.build(fan("A", 5, step=1.0), [100, 101, 102, 103, 104], star_max=3, core_max=3)
+        self.assertEqual([g.seed_ids for g in capped.graphs], [(100, 101, 102), (103, 104)])
+        self.assertEqual(capped.stats["merge_rejected"], 1)
+
+    def test_shared_account_join_respects_the_span(self):
+        # Two fan-outs of A 200h apart: together they would span more than 14 days only
+        # when the second one starts after hour 336.
+        near = fan("A", 2, first_id=100) + fan("A", 2, start_hour=200, first_id=200)
+        self.assertEqual([g.seed_ids for g in self.build(near, [100, 101, 200, 201]).graphs],
+                         [(100, 101, 200, 201)])
+        far = fan("A", 2, first_id=100) + fan("A", 2, start_hour=340, first_id=200)
+        self.assertEqual([g.seed_ids for g in self.build(far, [100, 101, 200, 201]).graphs],
+                         [(100, 101), (200, 201)])
+
+    def test_shared_account_never_joins_through_a_hub(self):
+        rows = [(1000 + i, i * 0.1, "H", f"T{i}", 1000.0) for i in range(600)]
+        rows += [(1, 20, "B", "H", 1000.0), (2, 21, "B", "C", 1000.0),
+                 (3, 22, "D", "H", 1000.0), (4, 23, "D", "E", 1000.0)]
+        batch = self.build(rows, [1, 2, 3, 4], hub_max_seed_share_percent=1)
+        self.assertEqual([g.seed_ids for g in batch.graphs], [(1, 2), (3, 4)])
+
+    def test_two_open_alerts_are_not_joined_by_a_shared_account(self):
+        rows = fan("A", 2, first_id=100) + fan("A", 2, start_hour=200, first_id=200)
+        groups = [((100, 101), (100, 101), (100, 101), (Witness("STAR_OUT", (100, 101)),)),
+                  ((200, 201), (200, 201), (200, 201), (Witness("STAR_OUT", (200, 201)),))]
+        batch = self.build(rows, [100, 101, 200, 201], groups)
+        self.assertEqual([(g.seed_ids, g.pinned_group) for g in batch.graphs],
+                         [((100, 101), 0), ((200, 201), 1)])
+        self.assertEqual(batch.stats["merge_open_pair_skipped"], 3)   # accounts A, AR0, AR1
+        # One OPEN Alert takes a new block that shares its account.
+        grown = self.build(rows, [100, 101, 200, 201], groups[:1])
+        self.assertEqual([(g.seed_ids, g.pinned_group) for g in grown.graphs],
+                         [((100, 101, 200, 201), 0)])
+
+    def test_shared_account_join_is_a_fixed_point(self):
+        rows = [(1, 0, "A", "P", 1000.0), (2, 1, "A", "Q", 1000.0), (3, 2, "A", "R", 1000.0),
+                (4, 10, "Q", "Q2", 1000.0), (5, 10, "R", "R2", 1000.0), (6, 20, "R2", "R3", 1000.0)]
+        seeds = [1, 2, 3, 4, 5, 6]
+        first = self.build(rows, seeds)
+        graph, = first.graphs
+        self.assertIn("SHARED_ACCOUNT", self.kinds(graph))
+        groups = [(g.seed_ids, g.core_ids, g.core_ids, g.witnesses) for g in first.graphs]
+        second = self.build(rows, seeds, groups)
+        self.assertEqual([(g.seed_ids, g.witnesses) for g in second.graphs],
+                         [(g.seed_ids, g.witnesses) for g in first.graphs])
+        self.assertEqual(second.unassigned, first.unassigned)
 
     def test_real_output_is_accepted_by_the_lifecycle_planner(self):
         rows = fan("A", 3) + [(200, 8, "AR0", "Z", 1000.0)]
