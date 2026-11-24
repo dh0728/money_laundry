@@ -1,6 +1,6 @@
 .account-trail-network {
-  --account-trail-comparison-color: light-dark(var(--aml-pink-040), var(--aml-pink-070));
-  --account-trail-episode-color: light-dark(var(--aml-lime-040), var(--aml-lime-070));
+  --account-trail-comparison-color: light-dark(var(--aml-pink-040), var(--aml-pink-060));
+  --account-trail-episode-color: light-dark(var(--aml-lime-040), var(--aml-lime-080));
 
   display: grid;
   gap: var(--aml-space-8);
@@ -21,8 +21,8 @@
 .account-trail-legend li { display: flex; align-items: center; gap: var(--aml-space-4) }
 .account-trail-legend li::before {
   content: '';
-  inline-size: var(--aml-space-12);
-  block-size: var(--aml-stroke-focus);
+  inline-size: var(--aml-space-20);
+  block-size: var(--aml-space-4);
   border-radius: var(--aml-radius-full);
   background: var(--account-trail-scope-color);
 }
@@ -35,7 +35,6 @@
 .account-trail-edge {
   stroke: var(--account-trail-scope-color);
   stroke-width: var(--aml-stroke-focus);
-  opacity: var(--aml-opacity-secondary-label);
 }
 .account-trail-arrow { fill: var(--account-trail-scope-color) }
 .account-trail-edge-shared { stroke: var(--account-trail-comparison-color) }
@@ -44,9 +43,8 @@
   stroke-width: var(--aml-space-12);
 }
 .account-trail-graph [data-active] .account-trail-edge,
-.account-trail-graph [data-transfer]:focus-visible .account-trail-edge { opacity: 1 }
 .account-trail-graph [data-transfer]:focus-visible .account-trail-edge {
-  stroke-width: var(--aml-space-4);
+  stroke-width: calc(var(--aml-stroke-focus) + var(--aml-stroke-divider));
 }
 .account-trail-node { --account-trail-dot-color: var(--ai-summary-note) }
 .account-trail-node[data-shared], .account-trail-node:focus-visible { --account-trail-dot-color: currentColor }
@@ -63,6 +61,7 @@
   fill: currentColor;
   font-size: var(--aml-type-caption-size);
   font-weight: var(--aml-type-body-strong-weight);
+  pointer-events: none;
 }
 .account-trail-detail {
   display: flex;

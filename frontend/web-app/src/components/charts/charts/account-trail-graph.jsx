@@ -3,7 +3,7 @@ import { Box, Text } from '../../layout-primitives';
 import './account-trail-graph.css';
 
 const width = 384;
-const height = 224;
+const height = 200;
 const amountFormat = new Intl.NumberFormat('ko-KR');
 const scopeLabels = { comparison: '비교 Alert', episode: 'Episode 소속 거래', shared: '양쪽에 속한 거래' };
 
@@ -23,7 +23,7 @@ function accountLayout(transfers, focus) {
     .filter(index => index !== 0 && index !== right);
   additional.forEach((code, index) => {
     const angle = Math.PI + 2 * Math.PI * angles[index] / steps;
-    placed.set(code, [width / 2 + Math.cos(angle) * width * 3 / 8, height / 2 + Math.sin(angle) * height * 3 / 8]);
+    placed.set(code, [width / 2 + Math.cos(angle) * width * 7 / 16, height / 2 + Math.sin(angle) * height * 7 / 16]);
   });
   return [...parties.values()].map(party => {
     const [x, y] = placed.get(party.code);
@@ -52,6 +52,7 @@ export function AccountTrailGraph({ comparison, focus }) {
   const graphId = useId();
   const [selection, setSelection] = useState(null);
   const { transfers } = comparison;
+  const leadingAccounts = new Set([focus, transfers[0].from.code, transfers[1].to.code]);
   const accounts = accountLayout(transfers, focus);
   const accountsById = new Map(accounts.map(account => [account.code, account]));
   const pairs = Map.groupBy(transfers, row => [row.from.code, row.to.code].toSorted().join('\u0001'));
@@ -98,7 +99,7 @@ export function AccountTrailGraph({ comparison, focus }) {
         role="graphics-symbol" tabIndex={0} aria-label={`계좌 ${account.code}`} {...activate('account', account.code)}>
         <circle className="account-trail-node-hit" />
         <circle className="account-trail-node-dot" />
-        {account.code === focus && <text className="account-trail-node-label" textAnchor="middle">{focus}</text>}
+        {leadingAccounts.has(account.code) && <text className="account-trail-node-label" textAnchor="middle">{account.code}</text>}
       </g>)}
     </svg>
     <Box className="account-trail-detail" role="status">
