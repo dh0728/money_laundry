@@ -1,3 +1,5 @@
+@import "../styles/record-card-tokens.css";
+
 :root { --record-card-shadow-gutter: var(--aml-space-16) }
 
 [data-glow-surface] {
@@ -11,18 +13,18 @@
 [data-glow-surface] {
   --record-card-accent: var(--record-verdict-accent, var(--review-status-accent, var(--text)));
   --record-card-depth-color: light-dark(
-    color-mix(in oklch, var(--record-card-accent) 88%, var(--aml-black-100)),
-    color-mix(in oklch, var(--record-card-accent) 88%, var(--aml-white-100)));
+    color-mix(in oklch, var(--record-card-accent) var(--record-card-depth-accent-strength), var(--aml-black-100)),
+    color-mix(in oklch, var(--record-card-accent) var(--record-card-depth-accent-strength), var(--aml-white-100)));
   box-shadow: 0 var(--aml-space-2) var(--aml-space-8)
-    color-mix(in srgb, var(--record-card-depth-color) 20%, transparent),
+    color-mix(in srgb, var(--record-card-depth-color) var(--record-card-shadow-strength), transparent),
     inset 0 0 var(--aml-space-8)
-    color-mix(in srgb, var(--record-card-depth-color) 28%, transparent);
+    color-mix(in srgb, var(--record-card-depth-color) var(--record-card-inner-shadow-strength), transparent);
 }
 :root[data-glassmorphism="false"]
   [data-glow-surface] {
   box-shadow: 0 0 0 var(--aml-stroke-divider) var(--record-card-edge, var(--glass-surface-edge)),
     0 var(--aml-space-4) var(--aml-space-8)
-    color-mix(in srgb, var(--record-card-depth-color) 26%, transparent);
+    color-mix(in srgb, var(--record-card-depth-color) var(--record-card-solid-shadow-strength), transparent);
 }
 /* 누르지 않는 기록 카드는 Panel과 같은 안쪽 면이다(바깥 그림자·기울기 없음). */
 :root [data-glow-surface]:not([data-card-interactive]) {
@@ -55,18 +57,18 @@
   > :is(.magic-bento__rim, .magic-bento__border) { display: none }
 @media (hover: hover) {
   [data-card-interactive]:hover:not(:has(.card-header > .work-tab-add:hover)) {
-    --record-card-interaction: 22%;
+    --record-card-interaction: var(--record-card-hover-strength);
   }
   :root[data-glassmorphism="false"] [data-card-interactive][data-selected]:hover:not(:has(.card-header-main:focus-visible,
     .card-header > .work-tab-add:hover)) {
-    outline-color: color-mix(in srgb, var(--selection-ink) 48%, transparent);
+    outline-color: color-mix(in srgb, var(--selection-ink) var(--record-card-selection-hover-strength), transparent);
   }
 }
 [data-card-interactive]:active:not(:has(.card-header > :is(.spring-check, .work-tab-add):active)) {
-  --record-card-interaction: 34%;
+  --record-card-interaction: var(--record-card-press-strength);
 }
 :root[data-glassmorphism="false"] [data-card-interactive][data-selected]:active:not(:has(.card-header > :is(.spring-check, .work-tab-add):active)) {
-  outline-color: color-mix(in srgb, var(--selection-ink) 66%, transparent);
+  outline-color: color-mix(in srgb, var(--selection-ink) var(--record-card-selection-press-strength), transparent);
 }
 [data-reduced-motion="true"] [data-card-interactive] { transition: none }
 @media (prefers-reduced-motion: reduce) {
@@ -75,21 +77,22 @@
 @media (any-hover: hover) and (prefers-reduced-motion: no-preference) {
   :root:not([data-reduced-motion="true"]) :is(.magic-bento__cell, .case-list > *, .preview-related-cases > ul > li):has([data-card-spotlight]) {
     position: relative;
-    z-index: 1;
+    z-index: var(--record-card-spotlight-layer);
   }
   :root:not([data-reduced-motion="true"]) .magic-bento__card:has([data-card-interactive]) {
     overflow: visible;
   }
-  :root:not([data-reduced-motion="true"]) [data-card-spotlight] { z-index: 1 }
+  :root:not([data-reduced-motion="true"]) [data-card-spotlight] { z-index: var(--record-card-spotlight-layer) }
   :root:not([data-reduced-motion="true"]) [data-card-tilted] {
-    transform: perspective(900px) rotateX(var(--card-tilt-x, 0deg)) rotateY(var(--card-tilt-y, 0deg)) scale(var(--card-tilt-scale, 1));
+    transform: perspective(var(--record-card-tilt-perspective))
+      rotateX(var(--card-tilt-x, 0deg)) rotateY(var(--card-tilt-y, 0deg)) scale(var(--card-tilt-scale, 1));
   }
 }
 
 [data-verdict="unjudged"] {
   --record-card-glow: light-dark(
-    color-mix(in srgb, var(--risk-medium), var(--aml-black-100) 34%),
-    color-mix(in srgb, var(--risk-medium), var(--aml-white-100) 52%));
+    color-mix(in srgb, var(--risk-medium), var(--aml-black-100) var(--record-card-unjudged-light-shade)),
+    color-mix(in srgb, var(--risk-medium), var(--aml-white-100) var(--record-card-unjudged-dark-tint)));
 }
 [data-verdict="abnormal"] { --record-card-glow: var(--risk-high) }
 [data-verdict="normal"] { --record-card-glow: var(--risk-low) }
