@@ -40,13 +40,14 @@ it('shows exactly the member Alerts and identifies the member with intersecting 
   const second = { ...episode, linkedAlertCodes: [firstMember.code, secondMember.code], linkedAlertCodesComplete: true,
     related: [...firstMember.related, ...secondMember.related] };
   const unrelated = { ...firstMember, code: 'A-standalone' };
-  const comparison = accountTrailComparison(findAccountTrail([alert, second]), [alert, second, firstMember, secondMember, unrelated]);
+  const trail = findAccountTrail([alert, second]);
+  const comparison = accountTrailComparison(trail, [alert, second, firstMember, secondMember, unrelated]);
   expect(comparison.shared).toEqual(['ACC-B']);
   expect(comparison.members).toEqual([
     { code: firstMember.code, shared: ['ACC-B'], evidenceAvailable: true },
     { code: secondMember.code, shared: [], evidenceAvailable: true },
   ]);
-  expect(comparison.evidence.map(edge => [...edge.codes])).toEqual([['T-1'], ['T-2']]);
+  expect([trail.received.transaction.code, trail.sent.transaction.code]).toEqual(['T-1', 'T-2']);
   expect(accountTrailComparison(findAccountTrail([alert, second]), [alert, second, firstMember]).members[1])
     .toEqual({ code: secondMember.code, shared: [], evidenceAvailable: false });
 });

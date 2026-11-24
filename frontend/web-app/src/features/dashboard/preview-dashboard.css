@@ -120,12 +120,17 @@
 .dashboard-account-trail > svg { align-self: center }
 .dashboard-trail-reason { font-weight: var(--aml-type-body-strong-weight) }
 .dashboard-trail-empty { color: var(--ai-summary-note) }
-.dashboard-trail-records { margin: 0; padding: 0; list-style: none }
+.dashboard-trail-step-heading {
+  margin: 0;
+  font-size: var(--aml-type-body-size);
+  font-weight: var(--aml-type-body-strong-weight);
+}
+.dashboard-trail-records { margin: 0; padding-inline-start: var(--aml-space-20); list-style-type: decimal }
 .dashboard-trail-record {
-  gap: var(--aml-space-4);
   padding: var(--aml-space-8) 0;
   border-block-start: var(--aml-stroke-divider) solid var(--divider);
 }
+.dashboard-trail-record::marker { font-weight: var(--aml-type-body-strong-weight) }
 .dashboard-transaction-flow > .semantic-tag { justify-self: start }
 .dashboard-priority-metric {
   grid-column: span 4;

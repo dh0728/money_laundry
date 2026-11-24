@@ -83,14 +83,17 @@ function EvidenceRecord({ evidence, direction }) {
   const { record, transaction } = evidence;
   const amount = Number.isFinite(transaction.amount) && transaction.currency
     ? `${formatter.format(transaction.amount)} ${transaction.currency}` : undefined;
-  return <Stack as="li" className="dashboard-trail-record">
-    <Stack direction="row" wrap align="center">
-      <Text as="strong">{direction} · {record.kind}</Text>
-      <LinkTag code={record.code} />
-      <LinkTag code={transaction.code} />
+  return <Box as="li" className="dashboard-trail-record">
+    <Stack>
+      <Text as="strong">{direction}</Text>
+      <Stack direction="row" wrap align="center">
+        <LinkTag code={record.code} />
+        <LinkTag code={transaction.code} />
+      </Stack>
+      <Text as="span">{[`${transaction.from.code} → ${transaction.to.code}`, transaction.timestamp.slice(5), amount]
+        .filter(Boolean).join(' · ')}</Text>
     </Stack>
-    <Text as="span">{[transaction.timestamp.slice(5), amount].filter(Boolean).join(' · ')}</Text>
-  </Stack>;
+  </Box>;
 }
 
 function DashboardSummary({ trail, reduced }) {
@@ -100,10 +103,11 @@ function DashboardSummary({ trail, reduced }) {
     {trail ? <Stack as="figure" className="dashboard-account-trail">
       <Text as="figcaption" className="dashboard-trail-reason">{reason}{trail.sameAmount ? ' · 같은 통화와 금액' : ''}</Text>
       <AccountTrailGraph comparison={trail.comparison} focus={trail.account} />
-      <Stack as="ul" className="dashboard-trail-records" aria-label="추천 근거 거래 · 한국 표준시">
-        <EvidenceRecord evidence={trail.received} direction="수취" />
-        <EvidenceRecord evidence={trail.sent} direction="이후 송금" />
-      </Stack>
+      <Heading level={3} className="dashboard-trail-step-heading">권장 확인 순서</Heading>
+      <Box as="ol" className="dashboard-trail-records" aria-label="권장 확인 순서 · 한국 표준시">
+        <EvidenceRecord evidence={trail.received} direction="공유 계좌 수취 확인" />
+        <EvidenceRecord evidence={trail.sent} direction={trail.returned ? '원 송금 계좌로 향한 후속 거래 확인' : '공유 계좌 후속 송금 확인'} />
+      </Box>
     </Stack> : <Text className="dashboard-trail-empty">조회 범위에서 함께 확인할 Alert·Episode 관계가 없습니다.</Text>}
   </AISummaryPanel>;
 }

@@ -4,34 +4,23 @@
   max-inline-size: calc(var(--aml-space-64) * 6);
   block-size: auto;
 }
-.account-trail-edge {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: var(--aml-stroke-focus);
-  stroke-linecap: round;
-}
 .account-trail-bubble {
-  fill: light-dark(var(--aml-black-010), var(--aml-white-010));
+  fill: light-dark(var(--aml-black-005), var(--aml-white-005));
   stroke: light-dark(var(--aml-black-030), var(--aml-white-030));
   stroke-width: var(--aml-stroke-divider);
 }
-.account-trail-member path {
-  fill: light-dark(var(--aml-black-010), var(--aml-white-010));
-  stroke: light-dark(var(--aml-black-030), var(--aml-white-030));
-  stroke-width: var(--aml-stroke-divider);
-}
-.account-trail-member[data-overlap="true"] path { stroke: currentColor }
-.account-trail-node circle, .account-trail-overlap circle {
-  r: var(--aml-radius-small);
-  fill: var(--ai-summary-start);
+.account-trail-intersection {
+  fill: light-dark(var(--aml-black-015), var(--aml-white-020));
   stroke: currentColor;
-  stroke-width: var(--aml-stroke-focus);
+  stroke-width: var(--aml-stroke-divider);
 }
-.account-trail-node[data-focus] circle, .account-trail-overlap circle {
-  r: var(--aml-radius-control);
-  fill: currentColor;
+.account-trail-member {
+  fill: light-dark(var(--aml-black-010), var(--aml-white-010));
+  stroke: light-dark(var(--aml-black-030), var(--aml-white-030));
+  stroke-width: var(--aml-stroke-divider);
 }
-.account-trail-node text, .account-trail-group-label, .account-trail-member text, .account-trail-overlap text, .account-trail-label {
+.account-trail-member[data-overlap="true"] { stroke: currentColor }
+.account-trail-graph text {
   fill: currentColor;
   font-size: var(--aml-type-caption-size);
   font-weight: var(--aml-type-body-strong-weight);

@@ -1,4 +1,4 @@
-import { buildCaseNetwork, sharedCaseEvidence } from '../investigation/case-graph-scope.js';
+import { sharedCaseEvidence } from '../investigation/case-graph-scope.js';
 
 export function findAccountTrail(cases) {
   const accounts = new Map();
@@ -66,7 +66,6 @@ export function accountTrailComparison(trail, allCases) {
     return { code, shared: sharedCaseEvidence(alertEvidence, { related }).accounts, evidenceAvailable: Boolean(member) };
   });
   return {
-    evidence: buildCaseNetwork([received.transaction, sent.transaction]).edges,
     alert: alert.code,
     episode: episode.code,
     shared,
