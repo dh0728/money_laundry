@@ -48,10 +48,10 @@
   padding-inline: 0;
 }
 .query-trigger[data-button-surface][data-query-applied]:not([aria-expanded="true"]) {
-  --button-hover-bg: color-mix(in srgb, var(--primary-action-blue) 18%, var(--information-panel-surface));
-  --button-active-bg: color-mix(in srgb, var(--primary-action-blue) 26%, var(--information-panel-surface));
-  background-color: var(--button-hover-bg);
-  color: var(--aml-figma-contents-status-info-default, var(--primary-action-blue));
+  --button-hover-bg: var(--selection-surface);
+  --button-active-bg: var(--selection-surface);
+  background-color: var(--selection-surface);
+  color: var(--selection-ink);
 }
 .query-trigger-row {
   display: flex;
