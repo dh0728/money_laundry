@@ -1,6 +1,7 @@
 import React from 'react';
 import { arc } from 'd3-shape';
 import { ModelGraph } from './model-graph';
+import { Box, Text } from '../../components/layout-primitives';
 
 const start = 150;
 const sweep = 240;
@@ -23,7 +24,7 @@ function point(value, r = radius) {
 export function ModelRiskDial({ values, onChange, disabled }) {
   const [medium, high] = values;
   const labels = ['주의 시작 점수', '고위험 시작 점수'];
-  return <div className="model-risk-dial">
+  return <Box className="model-risk-dial">
     <ModelGraph values={values} />
     <svg viewBox="0 0 240 240" aria-hidden="true">
       <g transform={`translate(${center} ${center})`}>
@@ -37,7 +38,7 @@ export function ModelRiskDial({ values, onChange, disabled }) {
       const [x, y] = point(value, high - medium < 7 ? radius + (index ? 20 : -20) : radius);
       const update = next => onChange(values.map((current, i) =>
         i === index ? Math.max(min, Math.min(max, next)) : current));
-      return <span key={index} role="slider" tabIndex={disabled ? undefined : 0} aria-label={labels[index]}
+      return <Text as="span" key={index} role="slider" tabIndex={disabled ? undefined : 0} aria-label={labels[index]}
         aria-disabled={disabled || undefined} aria-valuemin={min} aria-valuemax={max} aria-valuenow={value} aria-valuetext={`${value}점`}
         className="model-risk-slider-thumb" style={{ left: `${x / 2.4}%`, top: `${y / 2.4}%` }}
         onPointerDown={disabled ? undefined : event => {
@@ -63,5 +64,5 @@ export function ModelRiskDial({ values, onChange, disabled }) {
           update(next);
         }} />;
     })}
-  </div>;
+  </Box>;
 }
