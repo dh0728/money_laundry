@@ -14,7 +14,6 @@
   --chart-label: var(--muted-text);
   --chart-grid: color-mix(in srgb, var(--text) 8%, transparent);
   --chart-crosshair: var(--muted-text);
-  --dashboard-metric-plot-min: var(--aml-space-48);
   display: grid;
   align-content: start;
   grid-template-columns: minmax(0, 1fr);
@@ -25,13 +24,7 @@
   gap: var(--workspace-gap);
 }
 .dashboard-top { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-content: start; align-items: stretch }
-/* Wide dashboard: AI summary and bento cells share one 12-column grid; packBento pins every cell to explicit lines so no hole is left. */
-.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: calc(var(--aml-space-64) * 3); grid-auto-flow: row dense }
-.preview-dashboard:has(.dashboard-metrics-box[data-wide="true"]) .dashboard-top > .dashboard-summary-card { grid-column: 1 / span 4; grid-row: 1 / span 2 }
-.preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"],
-.preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] > .dashboard-metrics.magic-bento { display: contents }
 .preview-dashboard[data-mine="true"] .dashboard-top {
-  --dashboard-metric-plot-min: var(--chart-sparkline-height);
   grid-template-columns: repeat(12, minmax(0, 1fr));
   word-break: keep-all;
 }
@@ -50,17 +43,7 @@
   background-image: var(--ai-summary-surface);
   color: var(--ai-summary-ink);
 }
-.dashboard-summary-heading { align-self: stretch }
 .dashboard-summary-card h2, .dashboard-summary-card p, .dashboard-chart p, .dashboard-metric :is(h3,p) { margin: 0 }
-.dashboard-summary-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  align-self: stretch;
-  justify-content: space-between;
-  gap: var(--aml-space-4) var(--aml-space-8);
-  margin-block-start: auto;
-}
 .dashboard-summary-card .dashboard-note { color: var(--ai-summary-note) }
 .dashboard-summary-card > .dashboard-note { margin-block-start: auto }
 .dashboard-summary-card h2 { display: flex; align-items: center; gap: var(--aml-space-6) }
@@ -69,35 +52,17 @@
   font-weight: var(--aml-type-page-title-weight);
   line-height: var(--aml-type-page-title-lineHeight);
 }
-.dashboard-summary-trend {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
-  gap: var(--aml-space-8);
-  align-self: stretch;
-  min-inline-size: 0;
-  margin: var(--aml-space-8) 0 0;
-}
-:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot) {
+.dashboard-series-plot {
   position: relative;
   flex: 1 1 0;
   min-inline-size: 0;
 }
-.dashboard-summary-plot { min-block-size: var(--chart-summary-height) }
-.dashboard-metric-plot { min-block-size: var(--dashboard-metric-plot-min) }
-:is(.dashboard-summary-plot, .dashboard-metric-plot, .dashboard-series-plot) > div {
+.dashboard-series-plot > div {
   position: absolute;
   inset: 0;
-}
-.dashboard-series-plot > div {
   inline-size: 100%;
   block-size: 100%;
 }
-.dashboard-summary-trend figcaption, .dashboard-summary-trend-axis {
-  color: var(--ai-summary-note);
-  font-size: var(--aml-type-caption-size);
-}
-.dashboard-summary-trend-axis { display: flex; justify-content: space-between; gap: var(--aml-space-4) }
 .dashboard-priority-panel { display: grid; grid-template-rows: auto 1fr; align-items: stretch; gap: var(--aml-space-8) }
 .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-personal-workload) { grid-column: span 8 }
 .dashboard-work-overview-grid > .dashboard-priority-panel { grid-column: span 4 }
@@ -238,7 +203,7 @@
   --mb-host-ink: var(--text);
   --mb-host-muted: var(--muted-text);
 }
-.dashboard-metrics-box:not([data-wide="true"]) .magic-bento__cell { grid-column: auto }
+.dashboard-metrics-box .magic-bento__cell { grid-column: auto }
 .dashboard-metrics .magic-bento__card {
   --panel-content-padding: var(--aml-panel-text-inset, var(--ui-panel-padding));
   --mb-radius: var(--aml-radius-panel, var(--aml-radius-card));
@@ -292,15 +257,7 @@
   min-width: 0;
 }
 .dashboard-metric-trend svg { display: block; max-inline-size: 100% }
-.dashboard-completion-plot {
-  display: flex;
-  flex: 1 0 auto;
-  align-items: center;
-  min-block-size: var(--dashboard-metric-plot-min);
-}
-.dashboard-completion-plot svg { display: block }
 .dashboard-analytics-row { grid-template-columns: repeat(2, minmax(0, 1fr)) }
-.dashboard-detection-row { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) }
 .dashboard-transaction-details {
   min-inline-size: 0;
 }
@@ -312,9 +269,6 @@
   flex-direction: column;
   gap: var(--aml-space-8);
   min-inline-size: 0;
-}
-.dashboard-transaction-breakdown .dashboard-risk-chart {
-  flex: 1;
 }
 .dashboard-chart {
   --panel-material-solid: color-mix(in srgb, var(--information-panel-surface), var(--canvas-surface) 50%);
@@ -399,16 +353,6 @@
   font-variant-numeric: tabular-nums;
 }
 .dashboard-pattern-labels > li[data-reference] { color: var(--muted-text) }
-.dashboard-risk-chart {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--aml-space-16);
-  min-inline-size: 0;
-  margin: 0;
-}
-.dashboard-chart:has(> .dashboard-risk-chart) { grid-template-rows: auto 1fr }
 .dashboard-chart:has(.dashboard-series), .dashboard-series {
   display: flex;
   flex-direction: column;
@@ -486,18 +430,9 @@
 .dashboard-loading-title { inline-size: var(--loading-placeholder-title-width); block-size: var(--aml-type-body-lineHeight) }
 .dashboard-loading-value { inline-size: var(--loading-placeholder-value-width); block-size: var(--workspace-kpi-value-size) }
 .dashboard-loading-note { inline-size: var(--loading-placeholder-note-width); block-size: var(--aml-type-caption-lineHeight) }
-.dashboard-loading-trend { inline-size: 100%; min-block-size: var(--dashboard-metric-plot-min); flex: 1 1 auto }
-.dashboard-loading-period { margin-block-start: auto }
-.dashboard-loading [data-slot="skeleton"].dashboard-loading-donut {
-  inline-size: var(--loading-placeholder-ring-size);
-  block-size: var(--loading-placeholder-ring-size);
-  flex: none;
-  border: var(--loading-placeholder-ring-thickness) solid var(--inner-surface);
-  border-radius: 50%;
-  background: transparent;
-}
-.dashboard-loading-legend { display: grid; inline-size: var(--loading-placeholder-legend-width); gap: var(--aml-space-8) }
-.dashboard-loading-label { block-size: var(--aml-type-caption-lineHeight) }
+.dashboard-loading-trend { inline-size: 100%; min-block-size: var(--aml-space-48); flex: 1 1 auto }
+.dashboard-loading-recommendation-plot { block-size: var(--chart-series-height) }
+.dashboard-loading [data-slot="skeleton"].dashboard-score-band { border-radius: var(--aml-radius-card) }
 .dashboard-loading .dashboard-loading-card {
   inline-size: 100%;
   block-size: calc(2 * var(--aml-space-48));
@@ -513,16 +448,13 @@
   .preview-dashboard[data-mine] .dashboard-top { grid-template-columns: minmax(0, 1fr) }
   .preview-dashboard .dashboard-top { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto }
   .preview-dashboard .dashboard-top > * { grid-column: auto; grid-row: auto }
-  .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] { display: grid }
-  .preview-dashboard .dashboard-top > .dashboard-metrics-box[data-wide="true"] > .dashboard-metrics.magic-bento { display: grid }
-  .preview-dashboard .dashboard-metrics-box[data-wide="true"] .magic-bento__cell { grid-area: auto }
 }
 @media (max-width: 660px) {
   .dashboard-analytics-row,
   .dashboard-transaction-details:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) }
 }
 @media (max-width: 359px) {
-  .dashboard-metrics-box:not([data-wide="true"]) .dashboard-metrics.magic-bento {
+  .dashboard-metrics-box .dashboard-metrics.magic-bento {
     grid-template-columns: minmax(0, 1fr);
   }
 }

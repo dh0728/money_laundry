@@ -109,8 +109,6 @@
   --switch-thumb-ink: var(--aml-white-100);
   --chart-tooltip-background: var(--information-panel-surface);
   --workspace-kpi-value-size: clamp(2rem, 3.1vw, 3rem);
-  --chart-sparkline-height: 4.5rem;
-  --chart-summary-height: clamp(var(--chart-sparkline-height), 7vw, 7rem);
   --chart-series-height: clamp(10rem, 16vw, 14rem);
   --chart-axis-label-line-height: 1.2;
   --metric-value-size-min: 1.5rem;
@@ -121,9 +119,6 @@
   --loading-placeholder-title-width: min(60%, calc(2 * var(--aml-space-64)));
   --loading-placeholder-value-width: min(45%, var(--aml-space-64));
   --loading-placeholder-note-width: min(75%, calc(3 * var(--aml-space-64)));
-  --loading-placeholder-ring-size: 136px;
-  --loading-placeholder-ring-thickness: 21px;
-  --loading-placeholder-legend-width: min(100%, 9rem);
   --loading-pulse-duration: 1.4s;
   --loading-pulse-opacity: .5;
   --canvas-surface: var(--aml-figma-surface-neutral-background-primary);

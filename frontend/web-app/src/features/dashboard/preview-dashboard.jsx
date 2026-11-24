@@ -4,7 +4,9 @@ import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
-import { DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardMetricGrid } from './dashboard-layout';
+import {
+  BenchmarkAnalyticsSkeleton, DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardIndicatorsGrid, DashboardMetricGrid,
+} from './dashboard-layout';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
@@ -72,11 +74,11 @@ function DashboardIndicators({ data, mine, reduced }) {
       trend: daily('suspicious', 'var(--chart-suspect)') },
     { label: '생성 Alert', value: data.alertCases.length, trend: daily('alerts', dataSeriesColors.teal) },
   ];
-  return <Grid as="section" columns={12} className="dashboard-priority-metrics" aria-label={mine ? '내 우선 업무 지표' : '기관 주요 지표'}>
+  return <DashboardIndicatorsGrid aria-label={mine ? '내 우선 업무 지표' : '기관 주요 지표'}>
     {metrics.map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
       <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} />
     </Panel>)}
-  </Grid>;
+  </DashboardIndicatorsGrid>;
 }
 
 function EvidenceRecord({ evidence, direction }) {
@@ -141,7 +143,7 @@ export function PreviewDashboard({ mine, data, appearance }) {
   const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} />;
   return <Box className="preview-dashboard" data-mine={mine}>
     <DashboardIndicators data={data} mine={mine} reduced={appearance.reduced} />
-    <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>
+    <React.Suspense fallback={<DashboardAnalyticsSkeleton mine={mine} reduced={appearance.reduced} />}>
       {mine ? <Grid columns={12} className="dashboard-work-overview-grid">
         <PersonalWorkload data={data} reduced={appearance.reduced} />
         {summary}
@@ -191,7 +193,7 @@ export function BenchmarkDashboard({ mine, dataset, range, appearance }) {
       </Panel>
       <Metrics items={metrics} appearance={appearance} />
     </Box>
-    {chartRows.length > 0 && <React.Suspense fallback={<DashboardAnalyticsSkeleton benchmark showPatterns={fullPatternScope} />}>
+    {chartRows.length > 0 && <React.Suspense fallback={<BenchmarkAnalyticsSkeleton showPatterns={fullPatternScope} />}>
       <BenchmarkCharts chartRows={chartRows} totals={totals} period={period} fullPatternScope={fullPatternScope} reduced={appearance.reduced} />
     </React.Suspense>}
   </Box>;

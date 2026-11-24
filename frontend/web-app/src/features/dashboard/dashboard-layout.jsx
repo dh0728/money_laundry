@@ -2,97 +2,115 @@ import React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import MagicBento from '../../components/react-bits/MagicBento';
 import { Panel } from '../../components/panel';
+import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
-import { Box, Text } from '@/components/layout-primitives';
+import { Box, Grid, Stack, Text } from '@/components/layout-primitives';
 
-// Tetris-style packer on a columns-wide occupancy grid. Blocks (the AI summary) are placed first;
-// each cell then drops into the first free slot (row-major), takes ceil(run / k) of the free run so the
-// run is shared by the k cells that still fit at minSpan, and fills holes left beside taller cells.
-// Returns explicit 1-based { colStart, colSpan, rowStart, rowSpan } so no CSS auto-flow can leave gaps.
-export function packBento(cells, { columns = 12, minSpan = 3, blocks = [] } = {}) {
-  const taken = [];
-  const free = (row, col) => !taken[row]?.[col];
-  const mark = (row, col, rowSpan, colSpan) => {
-    for (let r = row; r < row + rowSpan; r += 1) {
-      taken[r] ??= [];
-      for (let c = col; c < col + colSpan; c += 1) taken[r][c] = true;
-    }
-  };
-  blocks.forEach(block => mark(block.row, block.col, block.rowSpan, block.colSpan));
-  const runAt = (row, col, rowSpan) => {
-    let length = 0;
-    while (col + length < columns && Array.from({ length: rowSpan }, (_, r) => free(row + r, col + length)).every(Boolean)) length += 1;
-    return length;
-  };
-  return cells.map((cell, index) => {
-    const rowSpan = Math.max(1, cell.rowSpan ?? 1);
-    for (let row = 0; ; row += 1) {
-      for (let col = 0; col < columns; col += 1) {
-        if (!free(row, col)) continue;
-        const run = runAt(row, col, rowSpan);
-        if (run === 0) continue;
-        const fit = Math.max(1, Math.min(cells.length - index, Math.floor(run / minSpan)));
-        const colSpan = Math.ceil(run / fit);
-        mark(row, col, rowSpan, colSpan);
-        return { colStart: col + 1, colSpan, rowStart: row + 1, rowSpan };
-      }
-    }
-  });
-}
-
-const wideLayout = { columns: 12, minSpan: 3, blocks: [{ row: 0, col: 0, rowSpan: 2, colSpan: 4 }] };
-
-export function DashboardMetricGrid({ items, wide = false, appearance, loading = false }) {
-  const placed = wide ? packBento(items, wideLayout) : [];
-  return <Box className="dashboard-metrics-box" data-wide={wide}>
-    <MagicBento key={String(appearance.reduced)} className="dashboard-metrics" items={items.map((item, index) => ({
-      ...item,
-      ...(wide ? placed[index] : { colSpan: 1, rowSpan: 1 }),
-    }))} columns={wide ? wideLayout.columns : 2} fixedColumns={wide} gap={readWorkspaceGap()} rowHeight={0}
+export function DashboardMetricGrid({ items, appearance, loading = false }) {
+  return <Box className="dashboard-metrics-box">
+    <MagicBento key={String(appearance.reduced)} className="dashboard-metrics" items={items}
+      columns={2} gap={readWorkspaceGap()} rowHeight={0}
       theme={appearance.theme} disableAnimations={loading || appearance.reduced} intro={false} textAutoHide={false}
       enableTilt={false} enableBorderGlow={false} enableSpotlight={false} clickEffect={false} enableStars={false} />
   </Box>;
 }
 
-function LoadingChart({ chartClass = 'dashboard-proportion-band', children, showNote = true }) {
-  return <Panel as="article" className="dashboard-chart">
+export function DashboardIndicatorsGrid({ children, ...props }) {
+  return <Grid as="section" columns={12} className="dashboard-priority-metrics" {...props}>{children}</Grid>;
+}
+
+function LoadingChart({ className = '', chartClass = 'dashboard-proportion-band', children, showNote = true }) {
+  return <Panel as="article" className={`dashboard-chart ${className}`.trim()}>
     <Skeleton className="dashboard-loading-title" />
     {showNote && <Skeleton className="dashboard-loading-note" />}
     {children ?? <Skeleton className={chartClass} />}
   </Panel>;
 }
 
-function LoadingDonut({ legendRows }) {
-  return <Box className="dashboard-risk-chart">
-    <Skeleton className="dashboard-loading-donut" />
-    <Box className="dashboard-loading-legend">
-      {Array.from({ length: legendRows }, (_, index) => <Skeleton key={index} className="dashboard-loading-label" />)}
+function LoadingSeries({ className }) {
+  return <LoadingChart className={className}>
+    <Skeleton className="dashboard-loading-note" />
+    <Box className="dashboard-series">
+      <Skeleton className="dashboard-series-plot" />
     </Box>
+  </LoadingChart>;
+}
+
+function LoadingMetric({ detail, trend }) {
+  return <Box className="dashboard-metric">
+    <Skeleton className="dashboard-loading-title" />
+    <Skeleton className="dashboard-loading-value" />
+    {detail && <Skeleton className="dashboard-loading-note" />}
+    {trend && <Skeleton className="dashboard-loading-trend" />}
   </Box>;
 }
 
-function LoadingDailyCharts() {
-  return <Box className="dashboard-analytics-row">
-    <LoadingChart chartClass="dashboard-bklit-series" showNote={false} />
-    <LoadingChart chartClass="dashboard-bklit-series" />
+function LoadingRecommendation({ reduced }) {
+  return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
+    <Skeleton className="dashboard-loading-title" />
+    <Stack>
+      <Skeleton className="dashboard-loading-note" />
+      <Skeleton className="dashboard-loading-recommendation-plot" />
+      <Skeleton className="dashboard-loading-note" />
+      <Skeleton className="dashboard-loading-note" />
+    </Stack>
+  </AISummaryPanel>;
+}
+
+export function DashboardAnalyticsSkeleton({ mine, reduced }) {
+  return <Box className="dashboard-analytics dashboard-loading dashboard-workflow-charts" aria-busy="true">
+    <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
+    {mine ? <Grid columns={12} className="dashboard-work-overview-grid" aria-hidden="true">
+      <LoadingSeries className="dashboard-personal-workload" />
+      <LoadingRecommendation reduced={reduced} />
+    </Grid> : <Box aria-hidden="true" className="dashboard-analytics">
+      <Grid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
+        <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
+        <LoadingSeries className="dashboard-flow-volume" />
+        <LoadingChart className="dashboard-flow-risk">
+          <Skeleton className="dashboard-score-band" />
+          <Grid columns={3} className="dashboard-score-legend">
+            <Skeleton className="dashboard-loading-note" />
+            <Skeleton className="dashboard-loading-note" />
+            <Skeleton className="dashboard-loading-note" />
+          </Grid>
+        </LoadingChart>
+        <LoadingRecommendation reduced={reduced} />
+      </Grid>
+      <LoadingChart className="dashboard-investigation-flow" chartClass="staged-sankey-chart" />
+      <Grid columns={12} className="dashboard-flow-status-grid">
+        <LoadingSeries className="dashboard-flow-status" />
+        <LoadingSeries className="dashboard-flow-status" />
+      </Grid>
+    </Box>}
   </Box>;
 }
 
 export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
-  const items = Array.from({ length: benchmark ? 4 : mine ? 2 : 8 }, (_, index) => ({
+  if (benchmark) return <BenchmarkDashboardSkeleton mine={mine} appearance={appearance} />;
+  const indicators = mine ? ['unfinished', 'high-risk', 'overdue'] : ['incoming', 'suspect', 'alerts'];
+  return <Box className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
+    <Text as="span" className="visually-hidden" role="status">대시보드 불러오는 중</Text>
+    <DashboardIndicatorsGrid aria-hidden="true">
+      {indicators.map((indicator, index) => <Panel as="article" className="dashboard-priority-metric" key={indicator}>
+        <LoadingMetric detail={mine ? index > 0 : index === 1} trend={!mine || index > 0} />
+      </Panel>)}
+    </DashboardIndicatorsGrid>
+    <DashboardAnalyticsSkeleton mine={mine} reduced={appearance.reduced} />
+    <DashboardBoardSkeleton />
+  </Box>;
+}
+
+function BenchmarkDashboardSkeleton({ mine, appearance }) {
+  const items = Array.from({ length: 4 }, (_, index) => ({
     id: index,
-    content: <Box className="dashboard-metric">
-      <Skeleton className="dashboard-loading-title" />
-      <Skeleton className="dashboard-loading-value" />
-      {(benchmark ? index >= 2 : mine || ![0, 3].includes(index)) && <Skeleton className="dashboard-loading-note" />}
-      {!benchmark && <Skeleton className="dashboard-loading-trend" />}
-    </Box>,
+    content: <LoadingMetric detail={index >= 2} />,
   }));
   return <Box className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 불러오는 중</Text>
-    {benchmark && mine && <Panel as="article" className="dashboard-personal-status" aria-hidden="true">
+    {mine && <Panel as="article" className="dashboard-personal-status" aria-hidden="true">
       <Skeleton className="dashboard-loading-title" />
       <Skeleton className="dashboard-loading-note" />
     </Panel>}
@@ -101,43 +119,34 @@ export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
         <Skeleton className="dashboard-loading-title" />
         <Skeleton className="dashboard-loading-value" />
         <Skeleton className="dashboard-loading-note" />
-        {!benchmark && <>
-          <Skeleton className="dashboard-loading-trend" />
-          <Skeleton className="dashboard-loading-note dashboard-loading-period" />
-        </>}
       </Panel>
-      <DashboardMetricGrid items={items} wide={!benchmark && !mine} appearance={appearance} loading />
+      <DashboardMetricGrid items={items} appearance={appearance} loading />
     </Box>
-    {(!mine || benchmark) && <DashboardAnalyticsSkeleton benchmark={benchmark} />}
-    {!benchmark && <DashboardBoardSkeleton />}
+    <BenchmarkAnalyticsSkeleton />
   </Box>;
 }
 
-export function DashboardAnalyticsSkeleton({ benchmark = false, showPatterns = true } = {}) {
+export function BenchmarkAnalyticsSkeleton({ showPatterns = true } = {}) {
   return <Box className="dashboard-analytics dashboard-loading" aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
-    {benchmark && <LoadingDailyCharts />}
+    <Box className="dashboard-analytics-row">
+      <LoadingChart chartClass="dashboard-bklit-series" showNote={false} />
+      <LoadingChart chartClass="dashboard-bklit-series" />
+    </Box>
     <LoadingChart>
       <Box className="dashboard-transaction-details">
         <Box className="dashboard-transaction-breakdown">
-          {benchmark ? <Box className="dashboard-composition-chart">
+          <Box className="dashboard-composition-chart">
             <Skeleton className="dashboard-loading-note" />
             <Skeleton className="dashboard-proportion-band" />
-          </Box> : <LoadingDonut legendRows={2} />}
+          </Box>
         </Box>
-        {(!benchmark || showPatterns) && <Box className="dashboard-transaction-breakdown">
+        {showPatterns && <Box className="dashboard-transaction-breakdown">
           <Skeleton className="dashboard-loading-note" />
           <Skeleton className="dashboard-pattern-bars" />
         </Box>}
       </Box>
     </LoadingChart>
-    {!benchmark && <>
-      <Box className="dashboard-analytics-row dashboard-detection-row">
-        <LoadingChart showNote={false}><LoadingDonut legendRows={3} /></LoadingChart>
-        <LoadingChart chartClass="dashboard-bklit-series" />
-      </Box>
-      <LoadingChart chartClass="dashboard-bklit-series" />
-    </>}
   </Box>;
 }
 
