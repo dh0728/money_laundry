@@ -218,6 +218,9 @@
   --textarea-editor-min-height: 280px;
   --linked-alert-compact-columns: minmax(0, 1fr) auto auto;
   --linked-alert-expanded-columns: 88px 72px 160px minmax(0, 1fr) 110px 90px var(--aml-size-icon-small);
+  --episode-history-date-columns: 80px 1fr;
+  --episode-fact-columns: 112px 1fr;
+  --episode-interval-columns: 56px 1fr;
   --aml-duration-instant: 0ms;
   --aml-duration-fast: 120ms;
   --aml-duration-normal: 180ms;

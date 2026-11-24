@@ -2,7 +2,7 @@
 // 요약 카드는 4개(외부 유입액·순유입·근거 거래·거래 기간). 거래 총액은 두지 않는다(10/11).
 import { Callout } from '@/components/Callout'
 import { NumBadge } from '@/components/NumBadge'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { AlertRow, HistoryRow } from '@/api/alerts'
 import type { EpisodeDetail, EpisodeTransaction } from '@/api/episodes'
 import { typeDisplay } from '@/api/codes'
@@ -21,7 +21,7 @@ import { sumBy, usd } from '@/features/alerts/metrics'
 import { Row, Step } from '@/features/alerts/RedesignOverview'
 import { flowFacts } from '@/features/alerts/metrics'
 import { Box, Text } from '@/components/layout-primitives'
-import { dataSeriesColors } from '@/components/charts/charts/chart-context'
+import './EpisodeOverview.css'
 
 const day = (iso: string) => iso.replace('T', ' ').slice(5, 16)
 const hoursBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 36e5)
@@ -57,13 +57,13 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
     ]} />
     <Box className="grid grid-cols-1 items-stretch gap-4 @5xl:grid-cols-2">
       <Step n={1} title="왜 묶었나" description="누가 언제 어떤 이유로 Alert를 이 Episode에 넣었나" source="사람" wide>
-        <Box as="ul" className="space-y-3 text-xs">{(joins.length ? joins : history.slice(-1)).map(h => <Box as="li" key={h.id} className="grid grid-cols-[80px_1fr] gap-2"><Text as="span" className="tabular-nums text-muted-foreground">{day(h.at)}</Text><Text as="span"><Text as="b" className="font-medium">{historyLabels[h.action]}</Text> · {h.actor.name}{h.comment && <Text as="span" className="mt-0.5 block text-muted-foreground">{h.comment}</Text>}</Text></Box>)}</Box>
+        <Box as="ul" className="space-y-3 text-xs">{(joins.length ? joins : history.slice(-1)).map(h => <Box as="li" key={h.id} className="grid grid-cols-episode-history-date gap-2"><Text as="span" className="tabular-nums text-muted-foreground">{day(h.at)}</Text><Text as="span"><Text as="b" className="font-medium">{historyLabels[h.action]}</Text> · {h.actor.name}{h.comment && <Text as="span" className="mt-0.5 block text-muted-foreground">{h.comment}</Text>}</Text></Box>)}</Box>
       </Step>
       <Step n={2} title="연결 Alert" description="첫 거래 시각 순 · 행을 누르면 Alert 상세로" source="관측·사람" wide action={<Button size="sm" variant="outline" disabled={!responsible || !onUnlink} onClick={() => { setSelecting(v => !v); setPicked([]); setReason('') }}>{selecting ? '선택 취소' : '연결 해제'}</Button>}>
         <Table><TableHeader><TableRow>{selecting && <TableHead className="w-8" />}<TableHead>순서</TableHead><TableHead>Alert</TableHead><TableHead>대표 유형</TableHead><TableHead>위험</TableHead><TableHead>거래 기간</TableHead><TableHead>직전과 간격</TableHead><TableHead className="text-right">거래</TableHead><TableHead className="text-right">공유 계좌</TableHead><TableHead>원래 담당</TableHead><TableHead>판정</TableHead></TableRow></TableHeader>
           <TableBody>{spans.map(({ a, own, first, last }, i) => { const on = picked.includes(a.alertId); return <TableRow key={a.alertId} className={`cursor-pointer ${on ? 'bg-muted/50' : ''}`} onClick={() => selecting ? setPicked(p => on ? p.filter(v => v !== a.alertId) : [...p, a.alertId]) : onOpenAlert(a.alertId)}>
             {selecting && <TableCell><Checkbox checked={on} aria-label={`${alertCode(a.alertId)} 선택`} /></TableCell>}
-            <TableCell className="tabular-nums">{i + 1}</TableCell><TableCell className="font-mono text-xs"><button type="button" onClick={event => { if (!selecting) { event.stopPropagation(); onOpenAlert(a.alertId) } }}>{alertCode(a.alertId)}</button></TableCell>
+            <TableCell className="tabular-nums">{i + 1}</TableCell><TableCell className="font-mono text-xs"><Button layout="text" type="button" onClick={event => { if (!selecting) { event.stopPropagation(); onOpenAlert(a.alertId) } }}>{alertCode(a.alertId)}</Button></TableCell>
             <TableCell><PatternBadge code={a.primaryType.code} /></TableCell><TableCell><RiskBadge score={a.riskScore} /></TableCell>
             <TableCell className="tabular-nums text-xs">{day(first)} ~ {day(last).slice(6)}</TableCell>
             <TableCell className="text-xs">{i === 0 ? '—' : gapText(hoursBetween(spans[i - 1].last, first))}</TableCell>
@@ -86,13 +86,17 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
       </Step>
 
       <Step n={4} title="통합 자금 흐름" description="Episode 전체에서 사건 밖으로 들어오고 나간 돈" source="계산">
-        <Box as="dl" className="grid grid-cols-[112px_1fr] gap-y-3 text-xs">
+        <Box as="dl" className="grid grid-cols-episode-fact gap-y-3 text-xs">
           <Row label="외부 유입" value={usd(externalIn)} /><Row label="외부 유출" value={usd(externalOut)} />
           <Row label="경유 비율" value={externalIn ? `${Math.round((externalOut / externalIn) * 100)}%` : '산출 불가'} note="외부 유출 ÷ 외부 유입" />
         </Box>
         <Text className="mt-4 text-xs font-medium">Alert별 구간</Text>
-        <Box className="mt-2 space-y-1.5">{spans.map(({ a, first, last }) => <Box key={a.alertId} className="grid grid-cols-[56px_1fr] items-center gap-2 text-2xs"><Text as="span" className="font-mono">{alertCode(a.alertId)}</Text>
-          <Text as="span" className="relative h-3 rounded bg-muted"><Text as="span" className="absolute top-0 h-3 rounded" style={{ left: pos(first), width: `max(4px, calc(${pos(last)} - ${pos(first)}))`, backgroundColor: dataSeriesColors.sky }} title={`${day(first)} ~ ${day(last)}`} /></Text></Box>)}</Box>
+        <Box className="mt-2 space-y-1.5">{spans.map(({ a, first, last }) => <Box key={a.alertId} className="grid grid-cols-episode-interval items-center gap-2 text-2xs"><Text as="span" className="font-mono">{alertCode(a.alertId)}</Text>
+          <Text as="span" className="relative h-3 rounded bg-muted">
+            <Text as="span" className="episode-interval-fill absolute top-0 h-3 rounded"
+              style={{ '--episode-interval-start': pos(first), '--episode-interval-end': pos(last) } as CSSProperties}
+              title={`${day(first)} ~ ${day(last)}`} />
+          </Text></Box>)}</Box>
         <Text className="mt-1 flex justify-between pl-16 text-2xs text-muted-foreground tabular-nums"><Text as="span">{day(times[0] ?? episode.flow.periodFrom)}</Text><Text as="span">{day(times[times.length - 1] ?? episode.flow.periodTo)}</Text></Text>
       </Step>
 
@@ -108,11 +112,11 @@ export default function EpisodeOverview({ episode, transactions: tx, history, re
       </Step>
 
       <Step n={7} title="전에 본 적 있나" description="같은 거래·계좌가 나온 다른 사건" source="사람·관측">
-        <Box as="dl" className="grid grid-cols-[112px_1fr] gap-y-3 text-xs"><Row label="같은 거래 판정" value="다른 사건 판정 없음" /><Row label="연관 사건 후보" value={<ProvenanceBadge kind="proposal" title="계좌·소유주로 사건을 찾는 API 필요(2단계)" />} note={<>Alert 개요 <NumBadge n={5} />와 같은 컴포넌트</>} /></Box>
+        <Box as="dl" className="grid grid-cols-episode-fact gap-y-3 text-xs"><Row label="같은 거래 판정" value="다른 사건 판정 없음" /><Row label="연관 사건 후보" value={<ProvenanceBadge kind="proposal" title="계좌·소유주로 사건을 찾는 API 필요(2단계)" />} note={<>Alert 개요 <NumBadge n={5} />와 같은 컴포넌트</>} /></Box>
       </Step>
       <Step n={8} title="판정 진행" description="Alert(묶음)마다 판정해야 종결할 수 있습니다" source="사람">
         <Text className="text-2xl font-semibold tabular-nums">{decided} / {episode.alerts.length}</Text>
-        <Box className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><Box className="h-full rounded-full" style={{ width: `${(decided / episode.alerts.length) * 100}%`, backgroundColor: 'var(--status-positive-accent)' }} /></Box>
+        <Box className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><Box className="episode-decision-fill h-full rounded-full" style={{ '--episode-decision-share': `${(decided / episode.alerts.length) * 100}%` } as CSSProperties} /></Box>
         <Text className="mt-3 text-xs">{pending ? <>미판정 {pending}건이 남아 <Text as="b">아직 종결할 수 없습니다.</Text> 검토 의견 탭에서 묶음별로 판정합니다.</> : '모든 묶음이 판정돼 종결할 수 있습니다.'}</Text>
       </Step>
 

@@ -299,6 +299,7 @@
   --pair-timeline-ribbon-dimmed-opacity: 0.3;
   --pair-timeline-time-column: 88px;
   --pair-timeline-forward-color: var(--aml-sky-050);
+  --episode-timeline-span-accent: var(--aml-sky-050);
   --pair-timeline-reverse-color: var(--aml-pink-050);
   --flow-panel-initial-top: 88px;
   --flow-panel-initial-width: 560px;
@@ -473,6 +474,9 @@
   --spacing-textarea-editor: var(--textarea-editor-min-height);
   --grid-template-columns-linked-alert-compact: var(--linked-alert-compact-columns);
   --grid-template-columns-linked-alert-expanded: var(--linked-alert-expanded-columns);
+  --grid-template-columns-episode-history-date: var(--episode-history-date-columns);
+  --grid-template-columns-episode-fact: var(--episode-fact-columns);
+  --grid-template-columns-episode-interval: var(--episode-interval-columns);
   --font-sans: Pretendard;
   --font-mono: Pretendard;
   --font-serif: Pretendard;

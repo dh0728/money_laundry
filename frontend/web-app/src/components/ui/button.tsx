@@ -37,6 +37,11 @@ const buttonVariants = cva(
   }
 )
 
+const buttonLayouts = {
+  row: "w-full px-3 py-2.5 text-left outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring",
+  text: "text-inherit",
+}
+
 function Button({
   className,
   variant = "default",
@@ -47,7 +52,7 @@ function Button({
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
-    layout?: "row"
+    layout?: keyof typeof buttonLayouts
   }) {
   const Comp = asChild ? Slot.Root : "button"
 
@@ -57,8 +62,8 @@ function Button({
       data-variant={variant}
       data-size={size}
       data-layout={layout}
-      className={layout === "row"
-        ? cn("w-full px-3 py-2.5 text-left outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring", className)
+      className={layout
+        ? cn(buttonLayouts[layout], className)
         : cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
