@@ -305,6 +305,14 @@
   --case-graph-controls-layer: 1;
   --case-graph-drop-target-layer: 3;
   --case-graph-min-height: 240px;
+  --case-graph-time-axis-inset: 28px;
+  --case-graph-time-label-latin-width: 7px;
+  --case-graph-time-label-wide-width: 11px;
+  --case-graph-time-pill-top: 5px;
+  --case-graph-time-pill-height: 18px;
+  --case-graph-time-pill-radius: 9px;
+  --case-graph-time-pill-baseline: 17px;
+  --case-graph-time-pill-font-size: 11px;
   --case-graph-layout-node-width: 192px;
   --case-graph-layout-node-height: 80px;
   --case-graph-viewport-height: 48vh;

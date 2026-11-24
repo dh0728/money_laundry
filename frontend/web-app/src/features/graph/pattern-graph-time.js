@@ -1,23 +1,42 @@
+import { readChartFontFamily, readChartNumber } from '@/components/charts/chart-design-values';
+
 export const graphTimeStep = 120;
 const sameTimeGap = 42;
 const clockFormat = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
-export const graphTimePill = { top: 5, height: 18, radius: 9, textY: 17, fontSize: 11, fontFamily: 'Pretendard' };
-export const graphTimeAxisInset = 28;
-
-function graphTimePillWidth(label) {
-  return [...label].reduce((width, character) => width + (character.codePointAt(0) <= 127 ? 7 : 11), 12);
+export function readGraphTimeAxisDesign() {
+  return {
+    inset: readChartNumber('--case-graph-time-axis-inset', 28),
+    stroke: readChartNumber('--aml-stroke-divider', 1),
+    labelGap: readChartNumber('--aml-space-8', 8),
+    labelPadding: readChartNumber('--aml-space-12', 12),
+    estimatedLatinWidth: readChartNumber('--case-graph-time-label-latin-width', 7),
+    estimatedWideWidth: readChartNumber('--case-graph-time-label-wide-width', 11),
+    pill: {
+      top: readChartNumber('--case-graph-time-pill-top', 5),
+      height: readChartNumber('--case-graph-time-pill-height', 18),
+      radius: readChartNumber('--case-graph-time-pill-radius', 9),
+      textY: readChartNumber('--case-graph-time-pill-baseline', 17),
+      fontSize: readChartNumber('--case-graph-time-pill-font-size', 11),
+      fontFamily: readChartFontFamily(),
+    },
+  };
 }
 
-export function projectGraphTimeTicks(ticks, toViewportX, width) {
+function graphTimePillWidth(label, design) {
+  return [...label].reduce((width, character) =>
+    width + (character.codePointAt(0) <= 127 ? design.estimatedLatinWidth : design.estimatedWideWidth), design.labelPadding);
+}
+
+export function projectGraphTimeTicks(ticks, toViewportX, width, design) {
   let lastLabel = 0;
   return ticks.flatMap(({ x, label }) => {
     const projected = toViewportX(x);
     if (projected < 0 || projected > width) return [];
-    const pillWidth = graphTimePillWidth(label);
+    const pillWidth = graphTimePillWidth(label, design);
     const right = projected + pillWidth / 2;
     const showLabel = projected - pillWidth / 2 >= lastLabel && right <= width;
-    if (showLabel) lastLabel = right + 8;
+    if (showLabel) lastLabel = right + design.labelGap;
     return [{ x: projected, label: showLabel ? label : undefined, pillWidth }];
   });
 }

@@ -8,7 +8,7 @@ import { GraphZoomControls } from './preview-graph-controls';
 import { readGraphCanvasPulse } from '../../components/charts/charts/graph-flow-pulse';
 import { readCanvasColors } from '../../components/charts/chart-design-values';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
-import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
+import { buildPatternTime, readGraphTimeAxisDesign, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 import { Box, Text } from '../../components/layout-primitives';
@@ -191,8 +191,8 @@ function tokenColors(host, groups) {
   });
 }
 
-function timeAxisMarks(plan, engine, { width, height }) {
-  return { height, ticks: projectGraphTimeTicks(plan.ticks, x => engine.graph2ScreenCoords(x, 0).x, width) };
+function timeAxisMarks(plan, engine, { width, height }, design) {
+  return { height, design, ticks: projectGraphTimeTicks(plan.ticks, x => engine.graph2ScreenCoords(x, 0).x, width, design) };
 }
 
 function drawTimeAxis(context, engine, scale, axis, colors, foreground) {
@@ -202,15 +202,15 @@ function drawTimeAxis(context, engine, scale, axis, colors, foreground) {
   context.scale(1 / scale, 1 / scale);
   if (!foreground) {
     context.strokeStyle = colors.grid;
-    context.lineWidth = 1;
+    context.lineWidth = axis.design.stroke;
     context.beginPath();
     for (const tick of axis.ticks) {
-      context.moveTo(tick.x, graphTimeAxisInset);
+      context.moveTo(tick.x, axis.design.inset);
       context.lineTo(tick.x, axis.height);
     }
     context.stroke();
   } else {
-    const pill = graphTimePill;
+    const pill = axis.design.pill;
     context.font = `${pill.fontSize}px ${pill.fontFamily}`;
     context.textAlign = 'center';
     context.textBaseline = 'alphabetic';
@@ -234,9 +234,9 @@ function addTimeAxisSnapshot(snapshot, axis, colors) {
     if (label) element.textContent = label;
     return element;
   };
-  const lines = axis.ticks.map(tick => `M ${tick.x} ${graphTimeAxisInset} V ${axis.height}`).join(' ');
-  snapshot.prepend(make('path', { d: lines, stroke: colors.grid, fill: 'none' }));
-  const pill = graphTimePill;
+  const lines = axis.ticks.map(tick => `M ${tick.x} ${axis.design.inset} V ${axis.height}`).join(' ');
+  snapshot.prepend(make('path', { d: lines, stroke: colors.grid, 'stroke-width': axis.design.stroke, fill: 'none' }));
+  const pill = axis.design.pill;
   const text = { fill: colors.ink, 'font-family': pill.fontFamily, 'font-size': pill.fontSize, 'text-anchor': 'middle' };
   for (const { x, label, pillWidth } of axis.ticks) {
     if (!label) continue;
@@ -259,6 +259,7 @@ export function ForceCaseCanvas({
   const [colors, setColors] = useState({});
   const [idleFlow, setIdleFlow] = useState();
   const [pulseDesign] = useState(readGraphCanvasPulse);
+  const [axisDesign] = useState(readGraphTimeAxisDesign);
   const timePlan = useMemo(() => buildPatternTime(records ?? [], network.nodes, positions), [records, network, positions]);
   const [data, setData] = useState(() => simulationData(network, positions, timePlan));
   const currentLayout = useRef({ network, positions, timePlan });
@@ -342,7 +343,7 @@ export function ForceCaseCanvas({
     const [top, bottom] = bounds.y;
     const scale = Math.max(.12, Math.min(5, (size.width - 144) / Math.max(right - left, 1),
       (size.height - 118) / Math.max(bottom - top, 1)));
-    engine.centerAt((left + right) / 2, (top + bottom) / 2 - graphTimeAxisInset / (2 * scale), duration);
+    engine.centerAt((left + right) / 2, (top + bottom) / 2 - axisDesign.inset / (2 * scale), duration);
     engine.zoom(scale, duration);
     return true;
   }
@@ -354,7 +355,7 @@ export function ForceCaseCanvas({
     const detail = graphGeometry(coordinates(), visible, groups, colors, selection, highlightedCase,
       (x, y) => engine.graph2ScreenCoords(x, y), engine.zoom(), showDetails, ownerView);
     const snapshot = makeGraphSnapshot({ ...size, ...detail });
-    if (timePlan) addTimeAxisSnapshot(snapshot, timeAxisMarks(timePlan, engine, size), colors);
+    if (timePlan) addTimeAxisSnapshot(snapshot, timeAxisMarks(timePlan, engine, size, axisDesign), colors);
     return snapshot;
   }));
 
@@ -418,7 +419,7 @@ export function ForceCaseCanvas({
       onEngineStop={() => { if (fitPending.current) { fitPending.current = false; fit(); } }}
       onRenderFramePre={(context, scale) => {
         if (timePlan && graph.current) drawTimeAxis(context, graph.current, scale,
-          timeAxisMarks(timePlan, graph.current, size), colors, false);
+          timeAxisMarks(timePlan, graph.current, size, axisDesign), colors, false);
         const model = graphGeometry(coordinates(), visible, groups, colors, selection, highlightedCase,
           (x, y) => ({ x, y }), 1, showDetails, ownerView, scale);
         drawing = { nodes: new Map(model.nodes.map(node => [node.id, node])),
@@ -437,7 +438,7 @@ export function ForceCaseCanvas({
       }}
       onRenderFramePost={(context, scale) => {
         if (timePlan && graph.current) drawTimeAxis(context, graph.current, scale,
-          timeAxisMarks(timePlan, graph.current, size), colors, true);
+          timeAxisMarks(timePlan, graph.current, size, axisDesign), colors, true);
       }}
       linkCanvasObjectMode={() => 'replace'} linkCanvasObject={(link, context, scale) => {
         const edge = drawing?.edges.get(link.id);
