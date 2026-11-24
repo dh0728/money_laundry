@@ -9,6 +9,10 @@ export function readChartNumber(token: string, fallback: number) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+export function readChartFontFamily() {
+  return readChartToken("--aml-font-family") || "Pretendard";
+}
+
 export function readChartDurationSeconds(token: string, fallback: number) {
   const value = readChartToken(token);
   const duration = Number.parseFloat(value);

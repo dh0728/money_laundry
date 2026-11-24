@@ -1,3 +1,12 @@
+.pattern-graph-selection {
+  left: var(--pattern-selection-left);
+  top: var(--pattern-selection-top);
+  width: var(--pattern-selection-width);
+  height: var(--pattern-selection-height);
+  border-color: var(--brand);
+  background-color: color-mix(in oklab, var(--brand) var(--pattern-graph-selection-fill-strength), transparent);
+}
+
 .timeline-node {
   inline-size: var(--timeline-node-size);
   block-size: var(--timeline-node-size);

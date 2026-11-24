@@ -175,6 +175,8 @@
   --chart-tooltip-indicator-border-width: 1.5px;
   --chart-series-swatch-radius: 2px;
   --chart-grid-border-strength: 50%;
+  --pattern-graph-number-font-size: 20px;
+  --pattern-graph-selection-fill-strength: 10%;
   --case-activity-chart-height: 170px;
   --case-activity-grid-columns: minmax(0, 1.45fr) minmax(var(--case-activity-summary-min-width), 1fr);
   --case-activity-summary-min-width: 320px;
