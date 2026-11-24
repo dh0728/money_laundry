@@ -36,10 +36,10 @@ function getNodeObject(
 
 // Default node color palette using CSS variables
 const defaultColors = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
+  "var(--aml-sky-050)",
+  "var(--aml-pink-050)",
+  "var(--aml-lime-050)",
+  "var(--palette-teal-500, var(--aml-sky-070))",
   "var(--chart-5)",
 ];
 
@@ -47,7 +47,7 @@ function getDefaultNodeColor(
   node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>
 ): string {
   const index = node.index ?? 0;
-  return defaultColors[index % defaultColors.length] ?? "var(--chart-1)";
+  return defaultColors[index % defaultColors.length] ?? "var(--aml-sky-050)";
 }
 
 export interface SankeyLinkProps {
@@ -235,7 +235,7 @@ export function SankeyLink({
       if (getLinkColor) {
         return getLinkColor(link, index);
       }
-      return stroke || "var(--chart-line-primary)";
+      return stroke || "var(--aml-sky-050)";
     },
     [getLinkColor, stroke]
   );
@@ -257,10 +257,10 @@ export function SankeyLink({
       // Use fallback colors if nodes can't be resolved
       const sourceColor = sourceNode
         ? getNodeColorFn(sourceNode)
-        : "var(--chart-1)";
+        : "var(--aml-sky-050)";
       const targetColor = targetNode
         ? getNodeColorFn(targetNode)
-        : "var(--chart-1)";
+        : "var(--aml-sky-050)";
       const gradientId = `${gradientPrefix}-link-gradient-${index}`;
 
       // Get absolute x positions for gradient

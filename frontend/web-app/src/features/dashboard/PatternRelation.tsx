@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { fmt } from '@/lib/format'
 import { Box, Text } from '../../components/layout-primitives'
+import { dataSeriesColors } from '@/components/charts/charts/chart-context'
 
 export type CompositionItem = { name: string; value: number; fill: string }
 export type PatternDistributionItem = { pattern: string; alerts: number; fill: string }
@@ -139,11 +140,11 @@ function PatternRelationBars({ composition, distribution, linked = true, unit = 
     <Text className="absolute text-xs font-medium" style={{ left: layout.padX, top: 8 }}>전체 구성 <Text as="span" className="font-normal text-muted-foreground">· 거래 건</Text></Text>
     <Text className="absolute text-xs font-medium" style={{ left: layout.pillX, top: 8 }}>패턴별 유형 <Text as="span" className="font-normal text-muted-foreground">· {unit}</Text></Text>
     <svg data-testid="relation-lines" className="pointer-events-none absolute inset-0 overflow-visible" width={layout.width} height={layout.height} aria-hidden="true">
-      {linked && layout.links.map((d, index) => <path key={index} data-testid="relation-link" d={d} fill="none" stroke="var(--muted-foreground)" strokeOpacity={.45} strokeWidth={1.25} />)}
+      {linked && layout.links.map((d, index) => <path key={index} data-testid="relation-link" d={d} fill="none" stroke={dataSeriesColors.teal} strokeOpacity={.45} strokeWidth={1.25} />)}
       {layout.labels.map(label => {
         const segment = layout.segments[label.index]
         const d = `M ${layout.labelRight} ${round(label.y)} C ${layout.labelRight + 6} ${round(label.y)} ${layout.columnX - 6} ${round(label.anchorY)} ${layout.columnX} ${round(label.anchorY)}`
-        return <g key={segment.name} data-testid="relation-label-leader"><path d={d} fill="none" stroke="var(--muted-foreground)" strokeOpacity={.5} strokeWidth={1} /><circle cx={layout.labelRight} cy={round(label.y)} r={2.5} fill="var(--muted-foreground)" /></g>
+        return <g key={segment.name} data-testid="relation-label-leader"><path d={d} fill="none" stroke={dataSeriesColors.teal} strokeOpacity={.5} strokeWidth={1} /><circle cx={layout.labelRight} cy={round(label.y)} r={2.5} fill={dataSeriesColors.teal} /></g>
       })}
     </svg>
     {layout.segments.map(segment => <Box key={segment.name} data-testid="relation-total-segment" data-segment-scope="composition" data-segment-index={segment.index} className="absolute rounded-md border border-dashboard-segment-divider" style={{ left: layout.columnX, top: segment.y, width: layout.columnW, height: segment.h, background: segment.fill }} title={`${segment.name} ${fmt(segment.value)}건 · ${segment.share}`} />)}

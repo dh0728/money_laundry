@@ -4,8 +4,9 @@ import { useState } from 'react'
 import type { TimeTx } from './timeLayout'
 import { NumBadge } from '@/components/NumBadge'
 import { Box, Text } from '@/components/layout-primitives'
+import { dataSeriesColors } from '@/components/charts/charts/chart-context'
 
-const AB = 'var(--palette-blue-500)', BA = 'var(--risk-7)'
+const AB = dataSeriesColors.sky, BA = dataSeriesColors.pink
 const Dir = ({ from, to, numbers }: { from: string; to: string; numbers: Map<string, number> }) => <Text as="span" className="inline-flex items-center gap-1"><NumBadge n={numbers.get(from)!} />→<NumBadge n={numbers.get(to)!} /></Text>
 
 export default function PairTimeline({ a, b, numbers, all }: { a: string; b: string; numbers: Map<string, number>; all: TimeTx[] }) {

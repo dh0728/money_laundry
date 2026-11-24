@@ -10,6 +10,7 @@ import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-c
 import { graphRiskBand } from './case-graph-scope';
 import { getModelRiskThresholds, modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Text } from '../../components/layout-primitives';
+import { dataSeriesColors } from '@/components/charts/charts/chart-context';
 
 const colors = { high: 'var(--risk-high)', medium: 'var(--risk-medium)', low: 'var(--risk-low)' };
 const scoreDomain = [0, 100];
@@ -80,7 +81,7 @@ export function OverviewScoreChart({ points, reduced, fill }) {
       <ScoreAxis />
       <ChartTooltip showDatePill={false} content={({ point }) => <TooltipContent
         title={point.code} rows={[
-          { label: '거래 시각', value: `${point.timestamp} KST`, color: 'var(--muted-text)' },
+          { label: '거래 시각', value: `${point.timestamp} KST`, color: dataSeriesColors.teal },
           { label: '모델 점수', value: `${point.score}점`, color: colors[point.band] },
         ]} />} />
     </ScatterChart>

@@ -13,6 +13,7 @@ import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Heading, Text } from '../../components/layout-primitives';
+import { dataSeriesColors } from '@/components/charts/charts/chart-context';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const percent = (count, total) => `${total ? Math.round(count / total * 1000) / 10 : 0}%`;
@@ -45,7 +46,7 @@ function usePlotHeight(enabled, initialHeight) {
 function CompletionBar({ label, value, total }) {
   return <Box className="dashboard-completion-plot">
     <svg role="img" aria-label={`${label} · 전체 ${count(total)} 중 ${count(value)} 완료`} width="100%" height="20">
-      <rect fill="var(--chart-total)" width="100%" height="100%" rx="10" />
+      <rect fill={dataSeriesColors.sky} width="100%" height="100%" rx="10" />
       {value > 0 && <rect fill="var(--chart-completion)" width={`${value / total * 100}%`} height="100%" rx="10" />}
     </svg>
   </Box>;
@@ -181,23 +182,23 @@ function WorkBoard({ records, mine, sort, appearance }) {
 export function PreviewDashboard({ mine, data, appearance }) {
   const metric = (label, value, detail, unit = '건') => ({ label, value, unit, detail, key: `${mine}-${label}` });
   const trend = (key, color, type = 'line', rows = data.operationalDaily) =>
-    ({ rows, key, color: `var(--chart-${color})`, type, caption: rows === data.hourly ? '생성 시간대 · KST' : '일별 · KST' });
+    ({ rows, key, color, type, caption: rows === data.hourly ? '생성 시간대 · KST' : '일별 · KST' });
   const kpis = mine ? [
-    { ...metric(`위험 점수 ${modelRiskLabels().high}`, data.highRisk, '내 담당 미처리 Alert'), trend: trend('highRisk', 'risk-high', 'bar', data.hourly) },
-    { ...metric('3일 이상 경과', data.overdue, '내 담당 미완료 Alert·Episode'), trend: trend('overdue', 'risk-medium', 'bar', data.hourly) },
+    { ...metric(`위험 점수 ${modelRiskLabels().high}`, data.highRisk, '내 담당 미처리 Alert'), trend: trend('highRisk', 'var(--chart-risk-high)', 'bar', data.hourly) },
+    { ...metric('3일 이상 경과', data.overdue, '내 담당 미완료 Alert·Episode'), trend: trend('overdue', 'var(--chart-risk-medium)', 'bar', data.hourly) },
   ] : [
-    { swing: true, ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', 'arrival', 'area') },
+    { swing: true, ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', dataSeriesColors.sky, 'area') },
     { swing: true, ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
-      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/', trend: trend('suspicious', 'suspect', 'area') },
+      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/', trend: trend('suspicious', 'var(--chart-suspect)', 'area') },
     { swing: true, ...metric('새 계좌 · 새 소유주', [{ amount: data.newAccounts, unit: '개' }, { amount: data.newOwners, unit: '명' }],
-      '거래 이력 기준', ''), separator: '·', trend: { ...trend('newAccounts', 'arrival', 'bar'), caption: '일별 최초 등장 계좌 · KST' } },
-    { swing: true, ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', 'arrival', 'area') },
+      '거래 이력 기준', ''), separator: '·', trend: { ...trend('newAccounts', dataSeriesColors.sky, 'bar'), caption: '일별 최초 등장 계좌 · KST' } },
+    { swing: true, ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', dataSeriesColors.sky, 'area') },
     { ...metric('업무 처리율', percent(data.settled, data.cases.length), `${count(data.cases.length)} 중 ${count(data.settled)} 완료`, ''),
       completion: { value: data.settled, total: data.cases.length } },
-    { ...metric('미처리 Alert', data.alertCases.filter(row => row.open).length, '검토 대기·처리 중'), trend: trend('openAlerts', 'neutral') },
+    { ...metric('미처리 Alert', data.alertCases.filter(row => row.open).length, '검토 대기·처리 중'), trend: trend('openAlerts', 'var(--chart-open)') },
     { ...metric('의심 거래 중 Alert 편입', percent(data.linked, data.suspicious.length), `${count(data.suspicious.length)} 중 ${count(data.linked)}`, ''),
-      trend: trend('linked', 'suspect') },
-    { ...metric('미완료 Episode', data.cases.filter(row => row.kind === 'Episode' && row.open).length, '검토 대기·처리 중'), trend: trend('openEpisodes', 'neutral') },
+      trend: trend('linked', 'var(--chart-suspect)') },
+    { ...metric('미완료 Episode', data.cases.filter(row => row.kind === 'Episode' && row.open).length, '검토 대기·처리 중'), trend: trend('openEpisodes', 'var(--chart-open)') },
   ];
   return <Box className="preview-dashboard" data-mine={mine}>
     <Box as="section" className="dashboard-top" aria-label="요약 및 주요 지표">

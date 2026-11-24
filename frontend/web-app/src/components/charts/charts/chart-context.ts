@@ -30,35 +30,44 @@ import type { ChartSelection } from "./use-chart-interaction";
 import { DEFAULT_Y_AXIS_ID } from "./y-axis-scales";
 import type { YDomain } from "./y-domain-utils";
 
+/** 데이터 계열(상태 아님): 이미 있는 원시 색 변수만 참조한다. */
+export const dataSeriesColors = {
+  sky: "var(--aml-sky-050)",
+  pink: "var(--aml-pink-050)",
+  lime: "var(--aml-lime-050)",
+  teal: "var(--palette-teal-500, var(--aml-sky-070))",
+} as const;
+export const dataSeriesPalette = Object.values(dataSeriesColors);
+
 // CSS variable references for theming
 export const chartCssVars = {
   background: "var(--chart-background)",
   foreground: "var(--chart-foreground)",
   foregroundMuted: "var(--chart-foreground-muted)",
   label: "var(--chart-label)",
-  linePrimary: "var(--chart-line-primary)",
-  lineSecondary: "var(--chart-line-secondary)",
+  linePrimary: "var(--aml-sky-050)",
+  lineSecondary: "var(--aml-pink-050)",
   crosshair: "var(--chart-crosshair)",
   grid: "var(--chart-grid)",
-  indicatorColor: "var(--chart-indicator-color)",
-  indicatorSecondaryColor: "var(--chart-indicator-secondary-color)",
-  markerBackground: "var(--chart-marker-background)",
-  markerBorder: "var(--chart-marker-border)",
-  markerForeground: "var(--chart-marker-foreground)",
-  badgeBackground: "var(--chart-marker-badge-background)",
-  badgeForeground: "var(--chart-marker-badge-foreground)",
-  segmentBackground: "var(--chart-segment-background)",
-  segmentLine: "var(--chart-segment-line)",
-  brushBorder: "var(--chart-brush-border)",
+  indicatorColor: "var(--aml-sky-050)",
+  indicatorSecondaryColor: "var(--aml-pink-050)",
+  markerBackground: "var(--information-panel-surface)",
+  markerBorder: "var(--border)",
+  markerForeground: "var(--text)",
+  badgeBackground: "var(--information-panel-surface)",
+  badgeForeground: "var(--text)",
+  segmentBackground: "var(--information-panel-surface)",
+  segmentLine: "var(--aml-sky-050)",
+  brushBorder: "var(--aml-sky-050)",
   tooltipBackground: "var(--chart-tooltip-background)",
 };
 
 /** Default scatter series colors from the chart palette (`--chart-1` … `--chart-5`). */
 export const defaultScatterColors = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
+  "var(--aml-sky-050)",
+  "var(--aml-pink-050)",
+  "var(--aml-lime-050)",
+  "var(--palette-teal-500, var(--aml-sky-070))",
   "var(--chart-5)",
 ] as const;
 

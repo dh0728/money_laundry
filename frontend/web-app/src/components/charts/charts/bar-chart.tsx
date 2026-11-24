@@ -102,7 +102,7 @@ export interface BarChartProps {
    * bars (no chart data required). Default: `"ready"`. */
   status?: ChartStatus;
   /** Fill color for the loading skeleton. Defaults to the first `<Bar>`'s
-   * `stroke`, falling back to `var(--foreground)`. */
+   * `stroke`, falling back to `var(--text)`. */
   loadingFill?: string;
 }
 
@@ -152,7 +152,7 @@ function extractBarConfigs(children: ReactNode): LineConfig[] {
       // Use stroke for tooltip dot color if provided, otherwise fall back to fill
       // This allows gradient/pattern fills to have a solid dot color
       const dotColor =
-        props.stroke || props.fill || "var(--chart-line-primary)";
+        props.stroke || props.fill || "var(--aml-sky-050)";
       configs.push({
         dataKey: props.dataKey,
         stroke: dotColor,
@@ -235,7 +235,7 @@ const ChartCore = memo(function ChartCore({
   // Extract bar configs synchronously from children
   const lines = useMemo(() => extractBarConfigs(children), [children]);
   const effectiveLoadingFill =
-    loadingFill ?? lines[0]?.stroke ?? "var(--foreground)";
+    loadingFill ?? lines[0]?.stroke ?? "var(--text)";
 
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
@@ -397,7 +397,7 @@ const ChartCore = memo(function ChartCore({
       setIsLoaded(true);
     }, animationDuration + staggerMs);
     return () => clearTimeout(timer);
-  }, [animationDuration, revealSignature, status]);
+  }, [animationDuration, data.length, revealSignature, status]);
 
   useEffect(() => {
     onPhaseChange?.(isLoaded ? "ready" : "revealing");

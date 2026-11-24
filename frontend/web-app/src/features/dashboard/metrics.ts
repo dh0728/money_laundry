@@ -1,3 +1,4 @@
+import { dataSeriesColors } from '@/components/charts/charts/chart-context'
 import { typeDisplay } from '@/api/codes'
 import type { DashboardData } from '@/api/dashboard'
 import type { SectionCardItem } from '@/components/SectionCards'
@@ -5,10 +6,10 @@ import { fmt } from '@/lib/format'
 
 
 export const agreementStyles = [
-  { code: 'STRONG', name: '모델 의심 · 패턴 있음', fill: 'var(--foreground)' },
-  { code: 'ATYPICAL', name: '모델 의심 · 패턴 없음', fill: 'var(--muted-foreground)' },
-  { code: 'PATTERN_ONLY', name: '모델 정상 · 패턴 있음', fill: 'var(--chart-3)' },
-  { code: 'WEAK', name: '모델 정상 · 패턴 없음', fill: 'var(--chart-4)' },
+  { code: 'STRONG', name: '모델 의심 · 패턴 있음', fill: dataSeriesColors.sky },
+  { code: 'ATYPICAL', name: '모델 의심 · 패턴 없음', fill: dataSeriesColors.pink },
+  { code: 'PATTERN_ONLY', name: '모델 정상 · 패턴 있음', fill: dataSeriesColors.lime },
+  { code: 'WEAK', name: '모델 정상 · 패턴 없음', fill: dataSeriesColors.teal },
 ]
 
 export function agreementComposition(rows: { agreement: string; count: number }[]) {
@@ -36,7 +37,7 @@ export function institutionCards(data: DashboardData): SectionCardItem[] {
 
 export function chartInputs(data: DashboardData) {
   const composition = data.suspiciousTxComposition
-  const fill = 'var(--foreground)'
+  const fill = dataSeriesColors.sky
   return {
     composition: composition
       ? [

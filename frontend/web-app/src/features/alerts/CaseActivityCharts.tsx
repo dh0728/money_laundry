@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarList, Panel } from './DetailPanels'
 import { Box, Text } from '@/components/layout-primitives'
+import { dataSeriesColors, dataSeriesPalette } from '@/components/charts/charts/chart-context'
 
 export type ActivityAmounts = Record<string, { daily: { day: string; amount: number }[]; senders: { name: string; v: number }[] }>
 const ALL = '__all__'
@@ -12,7 +13,7 @@ export function CaseActivityCharts({ amounts, dailyUsdByCurrency }: { amounts: A
   const all = currencies.length > 1 && (selected === ALL || !currencies.includes(selected))
   const currency = all ? ALL : currencies.includes(selected) ? selected : currencies[0] ?? ''
   const data = amounts[currency] ?? { daily: [], senders: [] }
-  const series = currencies.map((label, index) => ({ key: `currency${index}`, label, color: `hsl(${[...label].reduce((hash, char) => hash * 31 + char.charCodeAt(0), 0) % 360} 65% 55%)` }))
+  const series = currencies.map((label, index) => ({ key: `currency${index}`, label, color: dataSeriesPalette[index % dataSeriesPalette.length] }))
   const days = new Map<string, Record<string, string | number>>()
   for (const { key, label } of series) for (const row of dailyUsdByCurrency?.[label] ?? []) {
     const day = days.get(row.day) ?? { day: row.day }
@@ -21,7 +22,7 @@ export function CaseActivityCharts({ amounts, dailyUsdByCurrency }: { amounts: A
   }
   const stacked = [...days.values()].sort((a, b) => String(a.day).localeCompare(String(b.day))).map(row => ({ ...Object.fromEntries(series.map(s => [s.key, 0])), ...row }))
   const unit = all ? 'USD' : currency
-  const config = all ? Object.fromEntries(series.map(s => [s.key, { label: s.label, color: s.color }])) : { amount: { label: unit, color: 'var(--muted-foreground)' } }
+  const config = all ? Object.fromEntries(series.map(s => [s.key, { label: s.label, color: s.color }])) : { amount: { label: unit, color: dataSeriesColors.sky } }
   const format = (value: number) => `${Number(value).toLocaleString('ko-KR')} ${unit}`
   const peak = data.daily.reduce((best, row, index) => row.amount > (data.daily[best]?.amount ?? 0) ? index : best, 0)
   return <Box className="space-y-2">
@@ -34,7 +35,7 @@ export function CaseActivityCharts({ amounts, dailyUsdByCurrency }: { amounts: A
             <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={10} tickFormatter={day => { const [m, d] = String(day).split('-'); return d ? `${Number(m)}월 ${Number(d)}일` : String(day) }} />
             <YAxis width={70} tickLine={false} axisLine={false} fontSize={10} tickFormatter={value => Number(value).toLocaleString('ko-KR')} />
             <ChartTooltip cursor={{ fill: 'var(--muted)', opacity: 0.35 }} content={<ChartTooltipContent labelFormatter={(label, payload) => all ? `${label} · 합계 ${format(payload.reduce((sum, entry) => sum + Number(entry.value ?? 0), 0))}` : label} formatter={(value, name) => all ? `${name} · ${format(Number(value))}` : format(Number(value))} hideIndicator={!all} />} />
-            {all ? series.map(s => <Bar key={s.key} dataKey={s.key} name={s.label} stackId="usd" fill={s.color} />) : <Bar dataKey="amount" radius={3}>{data.daily.map((row, index) => <Cell key={row.day} fill={index === peak ? 'var(--palette-blue-500)' : 'color-mix(in oklab, var(--palette-blue-500) 45%, transparent)'} />)}</Bar>}
+            {all ? series.map(s => <Bar key={s.key} dataKey={s.key} name={s.label} stackId="usd" fill={s.color} />) : <Bar dataKey="amount" radius={3}>{data.daily.map((row, index) => <Cell key={row.day} fill={index === peak ? dataSeriesColors.sky : dataSeriesColors.pink} />)}</Bar>}
             {all && <ChartLegend content={<ChartLegendContent />} />}
           </BarChart>
         </ChartContainer> : <Text className="text-xs text-muted-foreground">{all && dailyUsdByCurrency == null ? 'USD 환산액 미제공' : '일별 금액 집계 없음'}</Text>}

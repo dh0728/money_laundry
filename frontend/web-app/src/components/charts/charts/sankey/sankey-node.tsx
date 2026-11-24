@@ -335,10 +335,10 @@ export function SankeyNode({
   // Default colors using CSS variables
   const defaultColors = useMemo(
     () => [
-      "var(--chart-1)",
-      "var(--chart-2)",
-      "var(--chart-3)",
-      "var(--chart-4)",
+      "var(--aml-sky-050)",
+      "var(--aml-pink-050)",
+      "var(--aml-lime-050)",
+      "var(--palette-teal-500, var(--aml-sky-070))",
       "var(--chart-5)",
     ],
     []
@@ -357,7 +357,7 @@ export function SankeyNode({
         return getNodeColorProp(node, index);
       }
 
-      return defaultColors[index % defaultColors.length] ?? "var(--chart-1)";
+      return defaultColors[index % defaultColors.length] ?? "var(--aml-sky-050)";
     },
     [fill, getNodeColorProp, defaultColors]
   );

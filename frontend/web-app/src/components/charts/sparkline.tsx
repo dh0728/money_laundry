@@ -88,7 +88,7 @@ export interface SparklineBaseProps<T> {
   width?: number;
   /** Height in px. Defaults to 32. */
   height?: number;
-  /** Series colour. Defaults to `var(--chart-line-primary)`. */
+  /** Series colour. Defaults to `var(--aml-sky-050)`. */
   color?: string;
   /** Inner padding so strokes and the hover dot are not clipped. */
   padding?: number | Partial<SparklinePadding>;

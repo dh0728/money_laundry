@@ -48,7 +48,7 @@ export interface XAxisProps {
   hoverEffect?: XAxisHoverEffect;
   /**
    * `"highlight"`: color of the label for the hovered row.
-   * Default: `var(--chart-indicator-color)`.
+   * Default: `var(--aml-sky-050)`.
    */
   activeLabelColor?: string;
   /**

@@ -119,7 +119,7 @@ function extractAreaConfigs(children: ReactNode): (LineConfig & AreaProps)[] {
       configs.push({
         ...props,
         dataKey: props.dataKey,
-        stroke: props.stroke || props.fill || "var(--chart-line-primary)",
+        stroke: props.stroke || props.fill || "var(--aml-sky-050)",
         strokeWidth: props.strokeWidth || 2,
         yAxisId: props.yAxisId,
       });

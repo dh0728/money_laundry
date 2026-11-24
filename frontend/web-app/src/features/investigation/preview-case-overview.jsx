@@ -21,6 +21,7 @@ import { graphRiskBand } from './case-graph-scope';
 import { modelRiskLabels } from '../settings/model-risk-settings';
 import './preview-case-overview.css';
 import { Box, Heading, Text } from '../../components/layout-primitives';
+import { dataSeriesColors } from '@/components/charts/charts/chart-context';
 
 const number = new Intl.NumberFormat('ko-KR');
 const decimal = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
@@ -58,7 +59,7 @@ function EvidenceBars({ label, points, unit, reduced, summary }) {
   return <Box as="figure" className="overview-evidence-bars" aria-label={label}>
     <Box as="figcaption">{label}</Box>
     <BarSparkline data={points} dataKey="value" height={40}
-      yDomain={[0, undefined]} color="var(--muted-text)" interactive crosshair="solid"
+      yDomain={[0, undefined]} color={dataSeriesColors.sky} interactive crosshair="solid"
       dot={false} barRadius={2} animate={!reduced} hoverTransition={!reduced}
       onHoverChange={(_, point) => setHover(point)} aria-label={points.map(labelPoint).join(', ')} />
     <Text className="overview-bar-value">{hover ? labelPoint(hover) : summary ?? `${points[0].label} ~ ${points.at(-1).label}`}</Text>
@@ -121,7 +122,7 @@ const overviewChartMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 
 function OverviewBars({ label, measures, max, reduced, format = value => `${number.format(value)}건` }) {
   if (!measures.length) return <Text className="overview-note">표시할 데이터가 없습니다.</Text>;
-  const barColor = point => point.color ?? 'var(--muted-text)';
+  const barColor = point => point.color ?? dataSeriesColors.sky;
   return <Box as="figure" className="overview-horizontal-chart" style={{ '--overview-measures-count': measures.length }} aria-label={label}>
     <Box as="ul" className="overview-horizontal-labels">
       {measures.map(({ label, value }) => <Box as="li" key={label}><Text as="span">{label}</Text><Text as="strong">{format(value)}</Text></Box>)}
@@ -340,7 +341,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       { label: riskLabels.high, color: 'var(--risk-high)', value: scoresByBand.get('high')?.length ?? 0 },
       { label: riskLabels.medium, color: 'var(--risk-medium)', value: scoresByBand.get('medium')?.length ?? 0 },
       { label: riskLabels.low, color: 'var(--risk-low)', value: scoresByBand.get('low')?.length ?? 0 },
-      { label: '모델 점수 없음', color: 'var(--divider)', value: scoresByBand.get('unknown')?.length ?? 0 },
+      { label: '모델 점수 없음', color: dataSeriesColors.sky, value: scoresByBand.get('unknown')?.length ?? 0 },
     ]} />,
     accounts: <OverviewBars label="계좌별 거래 참여" measures={accountMeasures} max={records.length} reduced={reduced} />,
     past: <OverviewBars label="과거 판정 구성" measures={pastCounts} max={prior.length} reduced={reduced} />,
