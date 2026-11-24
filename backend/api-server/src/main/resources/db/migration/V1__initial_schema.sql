@@ -194,6 +194,13 @@ CREATE TABLE ops.business_clock (
  revision BIGINT NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 INSERT INTO ops.business_clock(id) VALUES(true);
+CREATE TABLE ops.model_risk_bands (
+ id BOOLEAN PRIMARY KEY DEFAULT true CHECK(id),
+ medium SMALLINT NOT NULL DEFAULT 70, high SMALLINT NOT NULL DEFAULT 90,
+ updated_by BIGINT REFERENCES core.users, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ CHECK(medium>=1 AND high<=99 AND medium<high)
+);
+INSERT INTO ops.model_risk_bands(id) VALUES(true);
 CREATE TABLE analysis.jobs (
  job_id BIGINT PRIMARY KEY DEFAULT nextval('core.work_id'),
  analysis_date DATE NOT NULL UNIQUE, analysis_cutoff_at TIMESTAMPTZ NOT NULL,
