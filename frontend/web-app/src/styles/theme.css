@@ -471,6 +471,8 @@
   --text-3xs: var(--text-micro-compact-size);
   --text-4xs: var(--text-micro-dense-size);
   --spacing-textarea-editor: var(--textarea-editor-min-height);
+  --grid-template-columns-linked-alert-compact: var(--linked-alert-compact-columns);
+  --grid-template-columns-linked-alert-expanded: var(--linked-alert-expanded-columns);
   --font-sans: Pretendard;
   --font-mono: Pretendard;
   --font-serif: Pretendard;

@@ -216,6 +216,8 @@
   --confirm-dialog-header-rows: auto 1fr;
   --confirm-dialog-header-media-rows: auto auto 1fr;
   --textarea-editor-min-height: 280px;
+  --linked-alert-compact-columns: minmax(0, 1fr) auto auto;
+  --linked-alert-expanded-columns: 88px 72px 160px minmax(0, 1fr) 110px 90px var(--aml-size-icon-small);
   --aml-duration-instant: 0ms;
   --aml-duration-fast: 120ms;
   --aml-duration-normal: 180ms;

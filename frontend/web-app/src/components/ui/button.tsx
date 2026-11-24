@@ -41,11 +41,13 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  layout,
   asChild = false,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    layout?: "row"
   }) {
   const Comp = asChild ? Slot.Root : "button"
 
@@ -54,7 +56,10 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-layout={layout}
+      className={layout === "row"
+        ? cn("w-full px-3 py-2.5 text-left outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring", className)
+        : cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
   )
