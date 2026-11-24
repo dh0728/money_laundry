@@ -443,22 +443,25 @@ function LinkedCaseTable({ transaction, caseRows }) {
 const readServerMode = () => currentPreviewUser()?.source === 'api';
 
 /** 로그인 세션이 API 사용자면 서버 원장을, 아니면 Sample 원장을 같은 화면 계약으로 보여 준다. */
-export function Ledger({ codes, code, caseRows, tableView = false, serverSource }) {
+export function Ledger({ codes, code, caseRows, tableView = false, serverSource, targetTransaction }) {
   const server = useSyncExternalStore(subscribePreviewUser, readServerMode);
   const source = useMemo(() => server ? serverSource ?? createServerLedgerSource() : createSampleLedgerSource(codes),
     [server, serverSource, codes]);
-  return <LedgerWorkspace key={source.kind} source={source} code={server ? '' : code}
-    caseRows={server ? undefined : caseRows} tableView={tableView} />;
+  return <LedgerWorkspace key={source.kind} source={source} code={code}
+    caseRows={caseRows} targetTransaction={server ? targetTransaction : undefined} tableView={tableView} />;
 }
 
-export function LedgerWorkspace({ source, code, caseRows, tableView = false }) {
-  const [initial] = useState(() => code ? source.locate(code) ?? { missing: true } : undefined);
+export function LedgerWorkspace({ source, code, caseRows, tableView = false, targetTransaction }) {
+  const [initial] = useState(() => {
+    if (targetTransaction) return { transaction: { ...targetTransaction, id: String(targetTransaction.txId), openable: false } };
+    return code ? source.locate(code) ?? { missing: true } : undefined;
+  });
   const [owner, setOwner] = useState(initial?.owner ?? null);
   const [account, setAccount] = useState(initial?.account ?? null);
   const [transaction, setTransaction] = useState(initial?.transaction ?? null);
   const [ownerQuery, setOwnerQuery] = useState('');
   const [accountQuery, setAccountQuery] = useState('');
-  const [transactionQuery, setTransactionQuery] = useState('');
+  const [transactionQuery, setTransactionQuery] = useState(() => targetTransaction ? String(targetTransaction.txId) : '');
   const ownerSearch = useDebouncedValue(ownerQuery);
   const accountSearch = useDebouncedValue(accountQuery);
   const transactionSearch = useDebouncedValue(transactionQuery);
@@ -491,11 +494,13 @@ export function LedgerWorkspace({ source, code, caseRows, tableView = false }) {
     transaction: { value: transactionQuery, set: setTransactionQuery },
   };
   const selection = { owner, account, transaction };
+  const openedTarget = targetTransaction && transaction?.code === targetTransaction.code;
+  const linkedCases = source.kind === 'server' && !openedTarget ? undefined : caseRows;
 
   if (tableView) return <Box className="ledger-tables" data-ledger-view="table" data-ledger-source={source.kind}>
     <LedgerHierarchy owners={owners} accounts={accounts} transactions={transactions} selection={selection}
       select={select} queries={queries} />
-    <LinkedCaseTable transaction={transaction} caseRows={caseRows} />
+    <LinkedCaseTable transaction={transaction} caseRows={linkedCases} />
   </Box>;
 
   const ownerRows = owners.items;
@@ -536,7 +541,7 @@ export function LedgerWorkspace({ source, code, caseRows, tableView = false }) {
       <Heading id="ledger-related-title">선택 거래와 연결된 Alert·Episode</Heading>
       {transaction ? <>
         <Text className="ledger-source" aria-live="polite"><Text as="code">{transaction.code}</Text></Text>
-        <LinkedCaseGroups transaction={transaction} caseRows={caseRows} />
+        <LinkedCaseGroups transaction={transaction} caseRows={linkedCases} />
       </> : <Text className="ledger-empty" role="status">{initial?.missing
         ? '요청한 거래를 찾을 수 없습니다. 소유주를 선택해 계속 조사할 수 있습니다.'
         : '거래를 선택해 연결된 Alert·Episode를 확인하세요.'}</Text>}

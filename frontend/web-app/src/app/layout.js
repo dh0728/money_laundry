@@ -75,7 +75,7 @@ try {
 }
 const defaultTabs = tabGroups.flatMap(group => tabCodes(group).slice(0, 2));
 const initialWorkTabs = restoreWorkTabCodes(storedWorkTabs, defaultTabs, tabGroups.flatMap(tabCodes))
-  .filter(code => benchmarkLedgerRoute || !isBenchmarkTransactionCode(code));
+  .filter(code => serviceMode || benchmarkLedgerRoute || !isBenchmarkTransactionCode(code));
 let benchmarkDataset;
 let benchmarkSummaryLoading;
 let benchmarkLoading;
@@ -607,7 +607,7 @@ function updateWorkspaceAddress(path, code, navigationMode, urlParams, { scroll 
   if (scroll) window.scrollTo(0, 0);
   if (navigationMode === 'none' || !path || /\/judge(?:-|\/|$)/.test(path)) return;
   if (dataMode) urlParams.set('data', dataMode);
-  const url = previewUrl({ screen: path, code, benchmarkLedger: benchmarkLedgerRoute }, urlParams);
+  const url = previewUrl({ screen: path, code, benchmarkLedger: benchmarkLedgerRoute, serviceMode }, urlParams);
   if (url === location.pathname + location.search) return;
   if (navigationMode === 'replace') history.replaceState(history.state, '', url);
   else history.pushState(null, '', url);
@@ -752,7 +752,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     tab.removeAttribute('aria-current');
   }
   const selectedPath = override || (code ? initialDetail(code) : sections[prefix]);
-  if (!benchmarkLedgerRoute && isBenchmarkTransactionCode(code)) code = '';
+  if (!serviceMode && !benchmarkLedgerRoute && isBenchmarkTransactionCode(code)) code = '';
   const sameCode = activeWorkCode === code;
   const previousPath = activePath;
   activeWorkCode = code;
@@ -947,6 +947,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         code,
         groups,
         cases: serviceMode ? liveSource().cases : undefined,
+        targetTransaction: serviceMode ? liveSource().transactions.find(row => row.code === code) : undefined,
         label: component.dataset.label,
         tableView: path === ledgerTableScreen,
         ...caseListPaging,
@@ -977,7 +978,7 @@ function persistWorkTabs() {
 
 function addWorkTab(code, prepend = false) {
   if (!validWorkCode(code)) return;
-  if (isBenchmarkTransactionCode(code) && (!benchmarkLedgerRoute ||
+  if (!serviceMode && isBenchmarkTransactionCode(code) && (!benchmarkLedgerRoute ||
     !benchmarkDataset?.records.some(record => record.code === code))) return;
   const group = byId(`group-${code[0]}`);
   if (!group) return;
@@ -1635,7 +1636,7 @@ function showLoadedRoute(route, params, navigationMode) {
 function restoreLocation() {
   closeTransientViews();
   const url = new URL(location.href);
-  const route = readPreviewRoute(url);
+  const route = readPreviewRoute(url, { serviceMode });
   if (!signedIn || route.screen === loginRoute.screen) {
     if (route.screen !== loginRoute.screen) {
       history.replaceState({ previewNext: url.pathname + url.search }, '',
@@ -1823,7 +1824,7 @@ function enterWorkspace(actor, animated, user) {
   void refreshPreviewSessionUser().then(() => refreshLiveInbox());
   const next = history.state?.previewNext;
   const previous = typeof next === 'string' && /^\/(?!\/)/.test(next) ? new URL(next, location.origin) : undefined;
-  const route = previous ? readPreviewRoute(previous) : dashboardRoute;
+  const route = previous ? readPreviewRoute(previous, { serviceMode }) : dashboardRoute;
   showRoute(route, previous?.searchParams, 'push');
   const workspace = byId('workspace');
   if (animated && route.screen.startsWith('dashboard/')) {
