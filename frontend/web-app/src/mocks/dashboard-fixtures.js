@@ -26,6 +26,10 @@ const sampleReviewStates = ['처리 전', '처리 전', '처리 중', '처리 �
 const extraPatterns = ['Fan-out 82%', 'Scatter-gather 76%', 'Cycle 74%', 'Gather-scatter 71%', 'Fan-in 86%', 'Bipartite 62%'];
 const kstDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' });
 export const complexSankeySampleCode = 'A-261111-000018';
+export const cyclicSankeySampleCode = 'A-261118-000003';
+const cyclicSankeyTransactionCodes = [
+  'T-261117-00000145', 'T-261117-00000140', 'T-261117-00000141', 'T-261118-00000146',
+];
 
 function scoredSample(record, score) {
   return {
@@ -79,6 +83,8 @@ function evidenceSummary(related) {
 
 export function dashboardFixtures({ T = [], A = [], E = [] }) {
   const transactions = T.map((_, index) => scoredSample(transactionFixture(T, index), scores[index % scores.length]));
+  const allTransactions = new Map(transactions.map(row => [row.code, row]));
+  const cyclicSankeyEvidence = cyclicSankeyTransactionCodes.map(code => allTransactions.get(code));
   const transactionsByDay = Map.groupBy(transactions, row => dateKey(row.date));
   const alertCodes = new Set(A);
   const episodeMembers = new Map(E.map(code => [code, sampleEpisodeAlertCodes(code)])
@@ -93,6 +99,7 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
       const defaultEvidence = [...pool.slice(offset), ...pool.slice(0, offset)].slice(0, index % 3 + 1);
       const related = row.code === complexSankeySampleCode ? complexSankeyEvidence(T, transactions)
         : row.code === 'A-261111-001051' ? completedCaseNetwork(T, transactions)
+        : row.code === cyclicSankeySampleCode && cyclicSankeyEvidence.every(Boolean) ? cyclicSankeyEvidence
         : defaultEvidence;
       const summary = evidenceSummary(related);
       const addedDay = dashboardDays.indexOf(date) > 0;
@@ -118,7 +125,6 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
         elapsed: Math.max(0, Math.floor((snapshot - created) / 86400000)),
       });
     }));
-  const allTransactions = new Map(transactions.map(row => [row.code, row]));
   for (const row of baseCases) for (const transaction of row.related) {
     if (!allTransactions.has(transaction.code)) allTransactions.set(transaction.code, transaction);
   }

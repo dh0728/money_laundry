@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
-import { dashboardFixtures, dashboardFixtureResponse, dashboardFixtureBoardPage, dashboardRecordCodes } from './dashboard-fixtures';
+import { cyclicSankeySampleCode, dashboardFixtures, dashboardFixtureResponse, dashboardFixtureBoardPage, dashboardRecordCodes } from './dashboard-fixtures';
 import { readPreviewRoute } from '../app/preview-route';
 import { investigationFlow } from '../features/dashboard/dashboard-flows';
 import { previewAdmin, previewAnalysts, previewStaff } from '../features/auth/preview-session-user';
@@ -98,6 +98,23 @@ it('uses USD for synthetic transactions and case totals', () => {
   expect(data.transactions.slice(0, 6).map(row => row.amount)).toEqual([420, 200, 300, 1680, 500, 600]);
   const caseWithEvidence = data.cases.find(row => row.code === 'A-261111-000018');
   expect(caseWithEvidence.amountByCurrency).toEqual({ USD: sum(caseWithEvidence.related, 'amount') });
+});
+
+it('uses the same ledger records for the Alert, its chronological cycle and dashboard coverage', () => {
+  const ledger = new Map(source.transactions.map(row => [row.code, row]));
+  const alert = source.cases.find(row => row.code === cyclicSankeySampleCode);
+  expect(alert.pattern).toMatch(/^Cycle /);
+  const transfers = alert.related;
+  expect(transfers).toHaveLength(4);
+  for (const [index, transfer] of transfers.entries()) {
+    expect(transfer).toBe(ledger.get(transfer.code));
+    expect(transfer.to.code).toBe(transfers[(index + 1) % transfers.length].from.code);
+    if (index > 0) expect(transfer.timestamp > transfers[index - 1].timestamp).toBe(true);
+  }
+  expect(new Date(transfers.at(-1).timestamp.replace(' ', 'T') + ':00+09:00') < new Date(alert.createdAt)).toBe(true);
+  expect(alert.amountByCurrency).toEqual({ USD: sum(transfers, 'amount') });
+  const dashboard = dashboardFixtureResponse(source, { rows: [alert], population: [alert] });
+  expect(new Set(dashboard.transactions.map(row => row.code))).toEqual(new Set(transfers.map(row => row.code)));
 });
 
 it('preserves true zero dates and scopes transactions to included case evidence when filtering', () => {
