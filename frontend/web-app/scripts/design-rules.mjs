@@ -81,7 +81,7 @@ export const designRuleTree = [
   {
     id: 'automation', title: 'AI·사람 모두 자동으로 걸리게', source: '명기 2026-11-23 t3134u',
     rules: [
-      { id: 'automation/ci', title: 'CI가 fe/work push와 PR에서 lint·lint:design·test·build 실행', engine: 'ci', level: 'error', test: 'src/test/design-rules.test.js' },
+      { id: 'automation/ci', title: 'CI가 fe/work·frontend·dev 푸시와 병합 요청에서 디자인 위반 0건·테스트·서비스 빌드 검사', engine: 'ci', level: 'error', test: 'src/test/design-rules.test.js' },
       { id: 'automation/git-hooks', title: 'lefthook: 커밋 전 eslint·stylelint, push 전 lint:design', engine: 'ci', level: 'error', test: 'src/test/design-rules.test.js' },
     ],
   },

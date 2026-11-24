@@ -95,10 +95,13 @@ describe('escape-hatch', () => {
 });
 
 describe('automation', () => {
-  it('CI가 fe/work push에서 lint·lint:design·test·build를 돈다', () => {
-    const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8');
-    expect(ci).toMatch(/push:\s*\n\s*branches:[^]*?- fe\/work/);
-    for (const step of ['pnpm run lint\n', 'pnpm run lint:design', 'pnpm test', 'pnpm run build']) expect(ci).toContain(step);
+  it('세 작업 브랜치의 CI가 위반 0건과 실제 API 빌드를 검사한다', () => {
+    const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replaceAll('\r\n', '\n');
+    for (const event of ['push', 'pull_request']) {
+      const branches = ci.match(new RegExp(`^  ${event}:\\n    branches:\\n((?:      - [^\\n]+\\n)+)`, 'm'))?.[1];
+      for (const branch of ['fe/work', 'frontend', 'dev']) expect(branches).toContain(`- ${branch}\n`);
+    }
+    for (const step of ['pnpm run lint\n', 'pnpm run lint:design --strict', 'pnpm test', 'pnpm run build', 'VITE_API_MODE: live']) expect(ci).toContain(step);
   });
   it('lefthook이 커밋 전 eslint·stylelint, push 전 lint:design을 돈다', () => {
     const hooks = readFileSync(resolve(repo, 'lefthook.yml'), 'utf8');

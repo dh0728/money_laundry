@@ -6,9 +6,11 @@ on:
       - dev
       - master
       - fe/work
+      - frontend
 
   pull_request:
     branches:
+      - fe/work
       - frontend
       - dev
       - master
@@ -137,14 +139,19 @@ jobs:
       - name: Run frontend lint
         run: pnpm run lint
 
-      - name: Check design rules (tree report, ratchet caps)
-        run: pnpm run lint:design
-
       - name: Run frontend tests
         run: pnpm test --maxWorkers 4
 
       - name: Build frontend
-        run: pnpm run build
+        env:
+          VITE_API_MODE: live
+        run: |
+          pnpm run build
+          test "$(find dist -type f -name '*.html')" = 'dist/index.html'
+          test -z "$(find dist -type f -name 'ibm-hi-small-*.json')"
+
+      - name: Check design rules
+        run: pnpm run lint:design --strict
 
   docker-images:
     name: Docker Image Build

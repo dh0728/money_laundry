@@ -2,6 +2,7 @@
 //   --full         규칙마다 모든 위치를 보인다(기본 5곳)
 //   --rule <id>    한 규칙만 (예: token/raw-color)
 //   --update       위반이 줄어든 ratchet 규칙의 상한을 현재 개수로 내린다(올리지는 않는다)
+//   --strict       상한과 예외 없이 위반 0건을 요구한다
 //   --json         기계용 출력
 // 실패 조건: error 규칙 위반 1건 이상, ratchet 규칙이 상한 초과·상한보다 적음(--update로 내린다), 예외 파일 형식 오류·만료.
 process.env.AML_DESIGN_ALL = '1'
@@ -14,6 +15,8 @@ const { appRoot, rel, exceptions, stylelintPlugins, designStylelintRules } = awa
 
 const args = process.argv.slice(2)
 const flag = name => args.includes(name)
+const strict = flag('--strict')
+if (strict && flag('--update')) throw new Error('--strict와 --update는 함께 쓸 수 없다.')
 const only = args.includes('--rule') ? args[args.indexOf('--rule') + 1] : undefined
 const baselinePath = resolve(appRoot, 'scripts/design-baseline.json')
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'))
@@ -41,13 +44,14 @@ const exceptionProblems = exceptions.flatMap((entry, index) => {
   else if (entry.expires < today) problems.push(`#${index} ${entry.rule} ${entry.file} 만료(${entry.expires})`)
   return problems
 })
+if (strict && exceptions.length) exceptionProblems.push('엄격 검사에서는 예외를 허용하지 않는다.')
 
 let failed = exceptionProblems.length > 0
 const lowered = []
 const tree = designRuleTree.map(category => ({ ...category, rules: category.rules.filter(rule => !only || rule.id === only).map(rule => {
   const list = hits.get(rule.id)
   const counted = !rule.engine.split('+').every(engine => engine === 'test' || engine === 'ci')
-  const cap = rule.level === 'ratchet' ? baseline[rule.id] ?? 0 : 0
+  const cap = !strict && rule.level === 'ratchet' ? baseline[rule.id] ?? 0 : 0
   const cleared = list.filter(hit => rule.errorIn?.some(folder => hit.file.startsWith(folder)))
   const status = !counted ? 'test' : list.length > cap || cleared.length ? 'fail' : list.length < cap ? 'lower' : 'ok'
   if (status === 'fail') failed = true
