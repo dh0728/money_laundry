@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { RiskBadge, StatusBadge } from '@/components/badges'
 import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
+import { NativeSelect } from '@/components/ui/select'
 import { useCurrentUser, canEditOpen } from '@/app/session'
 import { useAsync } from '@/lib/useAsync'
 import { assertEditableAlert, buildAlertClose, buildAlertTransfer, buildEpisodeUnlink, episodeGroupSelection } from '@/api/reviewCommands'
@@ -266,7 +267,10 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
     </Panel>)
   const modelPanel = item.kind === 'ALERT' ? (<Panel title="거래별 패턴 후보" description="선택 거래의 유형 점수" testId="pattern-candidates">
       <Text className="mt-1 text-xs text-muted-foreground">선택한 거래의 모델 유형 점수입니다. Alert 전체 확률이 아닙니다. 위 대표 유형은 씨앗 거래에서 가장 많이 나온 유형입니다. 실행 ID·모델 버전 미제공으로 이 결과의 실행별 출처는 확인할 수 없습니다.</Text>
-      {scoredMembers.length ? <><Box as="label" className="mt-3 block text-xs">확률을 볼 거래 <select aria-label="확률을 볼 거래" className="ml-2 min-w-48 rounded-md border bg-background py-2 pl-3 pr-8" value={scoreMember.txId} onChange={event => setScoreTxId(Number(event.target.value))}>{scoredMembers.map(member => <option key={member.txId} value={member.txId}>T-{member.txId}{member.transaction.role === 'SEED' ? ' · 씨앗 거래' : ''}</option>)}</select></Box>
+      {scoredMembers.length ? <><Box as="label" className="mt-3 block text-xs">확률을 볼 거래 <NativeSelect
+        aria-label="확률을 볼 거래" className="ml-2 min-w-48 rounded-md border bg-background py-2 pl-3 pr-8" value={scoreMember.txId}
+        onChange={event => setScoreTxId(Number(event.target.value))}
+        options={scoredMembers.map(member => ({ value: member.txId, label: `T-${member.txId}${member.transaction.role === 'SEED' ? ' · 씨앗 거래' : ''}` }))} /></Box>
         <Box as="ol" aria-label="거래 패턴 후보" className="mt-3 space-y-2">{patternCandidates.map((candidate, index) => <Box as="li" key={candidate.code} className="flex items-center gap-2 text-sm"><Text as="span" className="w-5 text-muted-foreground">{index + 1}.</Text><Text as="span" className="rounded-full bg-foreground px-2.5 py-0.5 font-mono text-xs text-background">{typeDisplay(candidate.code).key}</Text><Text as="strong" className="tabular-nums">{(candidate.score * 100).toFixed(1)}%</Text></Box>)}</Box>
         <Box className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => openTransaction(scoreMember.txId)}>선택 거래 원장 확인</Button></Box>
         {!patternCandidates.length && <Text className="mt-3 text-sm text-muted-foreground">이 거래의 패턴 점수가 없습니다.</Text>}</> : <Text className="mt-3 text-sm text-muted-foreground">점수가 제공된 거래가 없습니다.</Text>}
@@ -321,9 +325,9 @@ function CaseDetail({ caseId, kind, onBack, onOpenEpisode, onOpenAlert, refreshL
       <Heading className="font-semibold">조사 계좌 자금 지표</Heading>
       <Text className="mt-1 text-xs text-muted-foreground">서버가 수신한 원장 기준 · 계좌 간 자금 흐름의 FIFO 추정</Text>
       <Box as="label" className="mt-3 inline-flex items-center gap-2 text-xs">단시간 유출 비교 기간
-        <select aria-label="단시간 유출 비교 기간" className="rounded-md border bg-background p-2" value={item.status === 'CLOSED' ? 180 : moneyMinutes} onChange={event => setMoneyMinutes(Number(event.target.value))} disabled={item.status === 'CLOSED'}>
-          {moneyIntervals.map(minutes => <option key={minutes} value={minutes}>{minutes === 1440 ? '24시간' : `${minutes}분`}</option>)}
-        </select>
+        <NativeSelect aria-label="단시간 유출 비교 기간" className="rounded-md border bg-background p-2" value={item.status === 'CLOSED' ? 180 : moneyMinutes}
+          onChange={event => setMoneyMinutes(Number(event.target.value))} disabled={item.status === 'CLOSED'}
+          options={moneyIntervals.map(minutes => ({ value: minutes, label: minutes === 1440 ? '24시간' : `${minutes}분` }))} />
       </Box>
       {item.status === 'CLOSED' && <Text className="mt-1 text-xs text-muted-foreground">종결 당시 180분 지표가 고정 저장됩니다.</Text>}
       {money.state.status === 'loading' ? <LoadingBlock label="자금 지표" /> : money.state.status === 'error' ? <ErrorBlock message={money.state.message} onRetry={money.retry} /> : <>
