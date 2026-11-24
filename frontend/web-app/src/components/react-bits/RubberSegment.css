@@ -43,7 +43,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--aml-space-6);
   height: calc(var(--rs-h) - var(--rs-inset) * 2);
   min-width: var(--rs-min);
   margin: 0;

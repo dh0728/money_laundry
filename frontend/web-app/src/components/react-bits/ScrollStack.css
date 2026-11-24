@@ -25,12 +25,12 @@
   height: 20rem;
   padding: 2.5rem;
   border-radius: 28px;
-  background: light-dark(#ffffff, #18181b);
+  background: light-dark(var(--aml-white-100), #18181b);
   color: light-dark(#18181b, #fafafa);
   box-shadow:
     0 0 0 1px light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08)),
     0 -12px 40px -16px rgb(0 0 0 / 0.35),
-    0 24px 48px -24px rgb(0 0 0 / 0.4);
+    0 24px 48px -24px var(--aml-black-040);
   transform-origin: 50% 0;
   will-change: transform;
 }
@@ -39,7 +39,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: #000;
+  background: var(--aml-black-100);
   opacity: var(--scroll-stack-dim, 0);
   pointer-events: none;
 }

@@ -27,7 +27,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--aml-space-6);
   height: var(--gs-chip);
   margin: 0;
   padding: 0 8px 0 10px;
@@ -102,10 +102,10 @@
   z-index: 20;
   width: var(--gs-menu-w);
   min-width: 100%;
-  padding: 4px;
+  padding: var(--aml-space-4);
   border-radius: var(--gs-radius);
   background: var(--gs-surface);
-  box-shadow: 0 4px 16px color-mix(in srgb, #000 22%, transparent);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--aml-black-100) 22%, transparent);
   transform-origin: var(--gs-origin);
   opacity: 0;
   transform: scale(0.95);
@@ -190,7 +190,7 @@
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--aml-space-8);
   height: var(--gs-row);
   padding: 0 8px 0 10px;
   border-radius: var(--gs-inner-radius);

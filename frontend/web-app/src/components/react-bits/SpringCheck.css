@@ -1,6 +1,6 @@
 .spring-check {
-  --sc-ink: #ffffff;
-  --sc-fill: #ffffff;
+  --sc-ink: var(--aml-white-100);
+  --sc-fill: var(--aml-white-100);
   --sc-check: #0b0b0f;
   --sc-box: 28px;
   --sc-radius: 9px;

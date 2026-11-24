@@ -5,7 +5,7 @@
   --bt-on-color: #18181b;
   --bt-on-bg: #f5f5f5;
   --bt-badge: #ef4444;
-  --bt-badge-ink: #ffffff;
+  --bt-badge-ink: var(--aml-white-100);
   --bt-radius: 22px;
   --bt-fade: 200ms;
   --bt-pivot: 16%;
@@ -145,7 +145,7 @@
 
 .bell-toggle__badge {
   position: absolute;
-  top: -6px;
+  top: calc(-1 * var(--aml-space-6));
   right: -7px;
   display: grid;
   place-items: center;

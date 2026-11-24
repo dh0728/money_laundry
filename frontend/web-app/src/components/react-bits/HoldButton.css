@@ -3,7 +3,7 @@
   --hb-bg: #27272a;
   --hb-fill: #5227ff;
   --hb-text: #f5f5f5;
-  --hb-fill-text: #ffffff;
+  --hb-fill-text: var(--aml-white-100);
   --hb-hold: 2000ms;
   --hb-release: 200ms;
   --hb-press: 0.97;
@@ -46,7 +46,7 @@
 
 .hold-button--sm {
   height: 36px;
-  padding: 0 16px;
+  padding: 0 var(--aml-space-16);
   font-size: 13px;
 }
 
@@ -130,7 +130,7 @@
   grid-area: 1 / 1;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--aml-space-8);
   white-space: nowrap;
   transition:
     opacity 200ms ease,

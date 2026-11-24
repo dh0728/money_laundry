@@ -27,7 +27,7 @@
 .branched-menu::before {
   content: '';
   position: absolute;
-  top: 8px;
+  top: var(--aml-space-8);
   bottom: 0;
   left: 0;
   width: 2px;
@@ -104,7 +104,7 @@
 
 .branched-menu__tree {
   position: relative;
-  padding: 6px 0;
+  padding: var(--aml-space-6) 0;
   box-sizing: border-box;
 }
 
@@ -143,7 +143,7 @@
 .branched-menu__item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--aml-space-8);
   width: 100%;
   height: var(--bm-row);
   margin: 0;

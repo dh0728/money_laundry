@@ -10,7 +10,7 @@
 }
 
 .animated-list--framed {
-  padding: 6px;
+  padding: var(--aml-space-6);
   background: var(--al-frame);
   box-shadow: var(--al-frame-shadow);
   -webkit-backdrop-filter: blur(20px) saturate(1.6);
@@ -38,7 +38,7 @@
   --al-fade-bottom: 0px;
   position: relative;
   box-sizing: border-box;
-  padding: 6px;
+  padding: var(--aml-space-6);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -65,7 +65,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--aml-space-12);
   min-width: 0;
   padding: 10px 14px 10px 10px;
   box-sizing: border-box;
@@ -119,7 +119,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--aml-space-2);
   min-width: 0;
 }
 
