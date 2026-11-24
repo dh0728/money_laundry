@@ -25,6 +25,7 @@ import {
   useState,
 } from "react";
 import { cn } from "../../lib/utils";
+import { readChartDurationSeconds } from "./chart-design-values";
 import {
   buildSparklineAreaPath,
   buildSparklineBarSegment,
@@ -61,13 +62,6 @@ const DATA_TRANSITION_EASE = [0.85, 0, 0.15, 1] as const;
 const HIGHLIGHT_SPRING: SparklineSpringConfig = { stiffness: 180, damping: 28 };
 const DEFAULT_SPARKLINE_HEIGHT = 32;
 const REDUCED_MOTION_FADE_MS = 200;
-
-function hoverDurationSeconds(token: string, fallback: number) {
-  const value = typeof document === "undefined" ? "" :
-    getComputedStyle(document.documentElement).getPropertyValue(token).trim();
-  const duration = Number.parseFloat(value);
-  return Number.isFinite(duration) ? duration / (value.endsWith("ms") ? 1000 : 1) : fallback;
-}
 
 export type SparklineCrosshair = "dashed" | "solid" | "gradient" | false;
 
@@ -693,7 +687,7 @@ function SparklineHighlight({
   strokeWidth: number;
 }) {
   const clipId = useId();
-  const [fadeDuration] = useState(() => hoverDurationSeconds("--chart-hover-fade-duration", 0.4));
+  const [fadeDuration] = useState(() => readChartDurationSeconds("--chart-hover-fade-duration", 0.4));
   const highlightRef = useRef<SVGPathElement>(null);
   const { points } = layout;
   const start = points[Math.max(0, hoverIndex - 1)]?.x ?? 0;
@@ -1125,7 +1119,7 @@ function BarPaths({
   spring: SparklineSpringConfig | null;
 }) {
   const barsRef = useRef<SVGPathElement>(null);
-  const [highlightDuration] = useState(() => hoverDurationSeconds("--aml-duration-feedback-transition", 0.2));
+  const [highlightDuration] = useState(() => readChartDurationSeconds("--aml-duration-feedback-transition", 0.2));
   useDataTransition(layout, width, dataTransitionDuration, (frame) => {
     barsRef.current?.setAttribute(
       "d",

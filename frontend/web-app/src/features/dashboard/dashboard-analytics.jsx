@@ -5,6 +5,7 @@ import { LinkTag, PatternTag, ReviewStatusTag } from '../../components/semantic-
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { Bar, BarHatch } from '../../components/charts/charts/bar';
 import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
+import { readChartNumber } from '../../components/charts/chart-design-values';
 import { Grid } from '../../components/charts/charts/grid';
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
 import { ibmLaundering, ibmPatterns, ibmRemaining } from '../investigation/ibm-hi-small-aggregate';
@@ -13,7 +14,6 @@ import { dashboardPattern } from '../../mocks/dashboard-patterns';
 import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitives';
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
-import { readWorkspaceLength } from './workspace-metrics';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
 
 const integer = new Intl.NumberFormat('ko-KR');
@@ -27,13 +27,21 @@ function volumeAxisLabel(point, label) {
 
 function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true, separatedStack = false }) {
   const columns = detail ?? series.map(item => ({ label: item.label, value: row => count(row[item.key]), color: item.color }));
-  const barGap = readWorkspaceLength('--aml-space-2');
-  const cap = separatedStack ? readWorkspaceLength('--aml-radius-small') : 'round';
+  const barGap = readChartNumber('--aml-space-2', 2);
+  const sideInset = readChartNumber('--aml-space-4', 4);
+  const cap = separatedStack ? readChartNumber('--aml-radius-small', 4) : 'round';
+  const margin = {
+    top: readChartNumber('--aml-space-6', 6),
+    right: sideInset,
+    bottom: showShare ? readChartNumber('--chart-axis-detail-inset', 42) : readChartNumber('--chart-axis-label-inset', 28),
+    left: sideInset,
+  };
+  const singleCategoryGap = rows.length === 1 ? readChartNumber('--chart-single-category-gap-ratio', 0.94) : undefined;
+  const enterDuration = reduced ? 0 : readChartNumber('--chart-dashboard-enter-duration', 340);
   return <Box as="figure" className="dashboard-series" aria-label={label}>
     <Box className="dashboard-series-plot">
       <BarChart className="dashboard-bklit-series" data={rows} xDataKey="label" stacked={stacked}
-        margin={{ top: 6, right: 4, bottom: showShare ? 42 : 28, left: 4 }} barGap={rows.length === 1 ? 0.94 : undefined}
-        animationDuration={reduced ? 0 : 340}>
+        margin={margin} barGap={singleCategoryGap} animationDuration={enterDuration}>
         <Grid horizontal />
         {series.map(item => <Bar key={item.key} dataKey={item.key} fill={item.color}
           lineCap={cap} roundStack={stacked && !separatedStack} groupGap={barGap}
@@ -134,6 +142,8 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
     return { label: name, value, supported };
   }).sort((left, right) => Number(right.supported) - Number(left.supported) || right.value - left.value);
   const hasReference = points.some(row => !row.supported);
+  const barGap = readChartNumber('--chart-pattern-bar-gap-ratio', 0.28);
+  const enterDuration = reduced ? 0 : readChartNumber('--chart-dashboard-enter-duration', 340);
   return <Box as="section" className="dashboard-transaction-breakdown" aria-label={label}>
     <Text className="dashboard-note">{seriesLabel} {count(total)} 기준</Text>
     {!rows.length ? <Text className="dashboard-note">조회 조건에 해당하는 유형이 없습니다.</Text> :
@@ -145,7 +155,7 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
         </Box>)}
       </Box>
       <BarChart className="dashboard-pattern-bars" data={points} xDataKey="label" orientation="horizontal"
-        margin={noMargin} barGap={0.28} animationDuration={reduced ? 0 : 340}>
+        margin={noMargin} barGap={barGap} animationDuration={enterDuration}>
         <BarHatch id={patternId} fill="var(--chart-pattern)" stroke="var(--information-panel-surface)" />
         <Bar dataKey="value" getFill={point => point.supported ? 'var(--chart-pattern)' : `url(#${patternId})`}
           lineCap="round" animate={!reduced} />

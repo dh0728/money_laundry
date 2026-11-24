@@ -1,9 +1,9 @@
 "use client";
 
 import { m } from "motion/react";
-import { memo, type ReactNode, useMemo } from "react";
+import { memo, type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
+import { readChartDurationSeconds } from "../chart-design-values";
 import {
   useChart,
   useChartPortalContainer,
@@ -31,6 +31,7 @@ interface BarXAxisLabelProps {
   crosshairX: number | null;
   isHovering: boolean;
   tickerHalfWidth: number;
+  fadeDuration: number;
 }
 
 function BarXAxisLabel({
@@ -39,7 +40,12 @@ function BarXAxisLabel({
   crosshairX,
   isHovering,
   tickerHalfWidth,
+  fadeDuration,
 }: BarXAxisLabelProps) {
+  const anchor = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    anchor.current?.style.setProperty("--bar-chart-axis-position", `${x}px`);
+  }, [x]);
   const fadeBuffer = 20;
   const fadeRadius = tickerHalfWidth + fadeBuffer;
 
@@ -56,20 +62,14 @@ function BarXAxisLabel({
   // Zero-width container approach for perfect centering
   return (
     <div
-      className="absolute"
-      style={{
-        left: x,
-        bottom: 12,
-        width: 0,
-        display: "flex",
-        justifyContent: "center",
-      }}
+      className="bar-chart-axis-label"
+      ref={anchor}
     >
       <m.span
         animate={{ opacity }}
-        className={cn("whitespace-nowrap text-chart-label text-xs")}
+        className="whitespace-nowrap text-chart-label text-xs"
         initial={{ opacity: 1 }}
-        transition={{ duration: 0.4, ease: "easeInOut" }}
+        transition={{ duration: fadeDuration, ease: "easeInOut" }}
       >
         {label}
       </m.span>
@@ -98,6 +98,7 @@ const BarXAxisInner = memo(function BarXAxisInner({
   formatLabel,
   container,
 }: BarXAxisProps & { container: HTMLDivElement }) {
+  const [fadeDuration] = useState(() => readChartDurationSeconds("--chart-hover-fade-duration", 0.4));
   const {
     margin,
     tooltipData,
@@ -153,6 +154,7 @@ const BarXAxisInner = memo(function BarXAxisInner({
     <div className="pointer-events-none absolute inset-0">
       {labelsToShow.map((item) => (
         <BarXAxisLabel
+          fadeDuration={fadeDuration}
           crosshairX={crosshairX}
           isHovering={isHovering}
           key={`${item.label}-${item.x}`}

@@ -9,6 +9,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -54,6 +55,7 @@ import {
   collectBarValueExtents,
   resolveBarValueDomain,
 } from "./y-domain-utils";
+import "./bar-chart.css";
 
 /** Skeleton bars to show when `status="loading"` and `data` is empty. */
 const FALLBACK_LOADING_BARS = 12;
@@ -650,9 +652,10 @@ const ChartCore = memo(function ChartCore({
 
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Chart interaction area */}
         <g
+          className="bar-chart-interaction"
+          data-interactive={canInteract || undefined}
           onMouseLeave={canInteract ? handleMouseLeave : undefined}
           onMouseMove={canInteract ? handleMouseMove : undefined}
-          style={{ cursor: canInteract ? "crosshair" : "default" }}
           transform={`translate(${margin.left},${margin.top})`}
         >
           {/* Background rect for mouse event detection */}
@@ -711,14 +714,16 @@ export function BarChart({
   loadingFill,
 }: BarChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    containerRef.current?.style.setProperty("--bar-chart-aspect-ratio", aspectRatio);
+  }, [aspectRatio]);
   const margin = { ...DEFAULT_MARGIN, ...marginProp };
 
   return (
     <LazyMotion features={domAnimation}>
       <div
-        className={cn("relative w-full overflow-visible", className)}
+        className={cn("bar-chart relative w-full overflow-visible", className)}
         ref={containerRef}
-        style={{ aspectRatio }}
       >
         <ParentSize debounceTime={10}>
           {({ width, height }) => (

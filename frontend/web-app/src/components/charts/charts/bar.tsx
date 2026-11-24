@@ -3,7 +3,9 @@
 import type { ScaleBand as D3ScaleBand } from "d3-scale";
 import type { Transition } from "motion/react";
 import { m } from "motion/react";
-import { memo, useId, useMemo } from "react";
+import { memo, useId, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
+import { readChartNumber } from "../chart-design-values";
 import { barDepthAndRise, barDepthMaxDepth } from "./bar-depth-geometry";
 import {
   type BarValueLabelOrientation,
@@ -123,6 +125,7 @@ interface AnimatedBarProps {
   index: number;
   isFaded: boolean;
   animationType: BarAnimationType;
+  enterBlur: number;
   fadedOpacity: number;
   staggerDelay: number;
   enterTransition?: Transition;
@@ -150,6 +153,7 @@ function AnimatedBar({
   index,
   isFaded,
   animationType,
+  enterBlur,
   fadedOpacity,
   staggerDelay,
   enterTransition,
@@ -167,11 +171,9 @@ function AnimatedBar({
   const label = valueLabel ? (
     <m.text
       animate={{ opacity: isFaded ? fadedOpacity : 1 }}
-      className={valueLabelClassName}
+      className={cn("bar-chart-value-label", valueLabelClassName)}
       dominantBaseline="middle"
       fill={valueLabelColor}
-      fontSize={12}
-      fontWeight={600}
       initial={{ opacity: 0 }}
       textAnchor="middle"
       transform={labelTransform}
@@ -193,7 +195,7 @@ function AnimatedBar({
           }}
           fill={fill}
           height={height}
-          initial={{ opacity: 0, filter: "blur(2px)" }}
+          initial={{ opacity: 0, filter: `blur(${enterBlur}px)` }}
           key={`fade-${index}-${revealEpoch}`}
           rx={rx}
           ry={ry}
@@ -216,8 +218,8 @@ function AnimatedBar({
 
   return (
     <g
+      className="bar-chart-opacity-transition"
       opacity={isFaded ? fadedOpacity : 1}
-      style={{ transition: "opacity 0.15s ease-in-out" }}
     >
       <m.rect
         animate={target}
@@ -250,12 +252,6 @@ interface BarGeometry {
   labelTransform?: string;
 }
 
-const STATIC_BAR_STYLE = {
-  cursor: "default",
-  transition: "opacity 0.15s ease-in-out",
-} as const;
-const STATIC_LABEL_STYLE = { transition: "opacity 0.15s ease-in-out" } as const;
-
 interface StaticBarProps {
   geometry: BarGeometry;
   fill: string;
@@ -279,25 +275,22 @@ const StaticBar = memo(function StaticBar({
   return (
     <g>
       <rect
+        className="bar-chart-static-mark bar-chart-opacity-transition"
         fill={fill}
         height={geometry.height}
         opacity={opacity}
         rx={geometry.rx}
         ry={geometry.rx}
-        style={STATIC_BAR_STYLE}
         width={geometry.width}
         x={geometry.x}
         y={geometry.y}
       />
       {geometry.valueLabel ? (
         <text
-          className={valueLabelClassName}
+          className={cn("bar-chart-value-label bar-chart-opacity-transition", valueLabelClassName)}
           dominantBaseline="middle"
           fill={valueLabelColor}
-          fontSize={12}
-          fontWeight={600}
           opacity={opacity}
-          style={STATIC_LABEL_STYLE}
           textAnchor="middle"
           transform={geometry.labelTransform}
           x={geometry.labelX}
@@ -350,6 +343,8 @@ const BarInner = memo(function BarInner({
     revealEpoch = 0,
   } = useChartStable();
   const { hoveredBarIndex = null } = useChartHover();
+  const [labelSize] = useState(() => readChartNumber("--chart-bar-value-label-size", 12));
+  const [enterBlur] = useState(() => readChartNumber("--aml-space-2", 2));
 
   // Calculate stagger delay automatically if not provided
   // Total animation duration is ~1200ms, with 40% for stagger spread and 60% for bar animation
@@ -544,7 +539,8 @@ const BarInner = memo(function BarInner({
           y,
           width: barW,
           height: barHeight,
-          labelWidth: text.length * 7.2,
+          labelWidth: text.length * labelSize * 0.6,
+          labelSize,
           isHorizontal,
           orientation: valueLabelOrientation,
           position: valueLabelPosition,
@@ -605,6 +601,7 @@ const BarInner = memo(function BarInner({
     innerWidth,
     isHorizontal,
     isLastSeries,
+    labelSize,
     lines,
     minBarHeight,
     perspective,
@@ -634,6 +631,7 @@ const BarInner = memo(function BarInner({
         const rendered = animating ? (
             <AnimatedBar
               animationType={animationType}
+              enterBlur={enterBlur}
               enterTransition={enterTransition}
               fadedOpacity={fadedOpacity}
               fill={barFill}
@@ -707,11 +705,12 @@ export function Bar(props: BarProps) {
 Bar.displayName = "Bar";
 
 export function BarHatch({ id, fill, stroke }: { id: string; fill: string; stroke: string }) {
+  const [size] = useState(() => readChartNumber("--aml-space-7", 7));
   return (
     <defs>
-      <pattern id={id} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-        <rect width="7" height="7" fill={fill} />
-        <path d="M 0 0 V 7" stroke={stroke} strokeWidth="2" />
+      <pattern id={id} width={size} height={size} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width={size} height={size} fill={fill} />
+        <path className="bar-chart-hatch-stripe" d={`M 0 0 V ${size}`} stroke={stroke} />
       </pattern>
     </defs>
   );

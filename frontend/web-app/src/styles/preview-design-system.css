@@ -113,6 +113,12 @@
   --chart-detail-sparkline-height: 96px;
   --chart-hover-fade-duration: 400ms;
   --chart-sparkline-dot-outline: 1.5px;
+  --chart-bar-value-label-size: 12px;
+  --chart-axis-label-inset: 28px;
+  --chart-axis-detail-inset: 42px;
+  --chart-single-category-gap-ratio: .94;
+  --chart-pattern-bar-gap-ratio: .28;
+  --chart-dashboard-enter-duration: 340ms;
   --chart-axis-label-line-height: 1.2;
   --metric-value-size-min: 1.5rem;
   --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));
