@@ -1,7 +1,7 @@
 import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
 import { WorkspaceState } from '@/lib/workspaceState'
 import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
-import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
 import { live } from '@/lib/apiMode'
@@ -180,7 +180,7 @@ export default function App() {
   return (
     <CurrentUserContext.Provider value={currentUser}>
     <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} state={workspace} >
-    <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
+    <SidebarProvider className={appFullscreen ? 'app-sidebar-wrapper app-fullscreen-fallback' : 'app-sidebar-wrapper'}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
           <SidebarHeader className="h-15 flex-row items-center overflow-hidden p-0">

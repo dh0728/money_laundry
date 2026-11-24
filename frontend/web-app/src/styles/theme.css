@@ -524,6 +524,10 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .continuous-calendar .rdp-month_caption { position:sticky; top:0; z-index:var(--layer-raised-content); background:var(--popover); }
 
 /* 앱 틀(사이드바·헤더) — v24 index.css */
+.app-sidebar-wrapper {
+  --sidebar-width: var(--app-sidebar-expanded-width);
+  --sidebar-width-icon: var(--app-sidebar-icon-width);
+}
 .app-sidebar-surface { position:relative; isolation:isolate; display:flex; flex-direction:column; width:100%; height:100%; min-height:0; overflow:hidden; }
 .app-sidebar [data-slot=sidebar-gap], .app-sidebar [data-slot=sidebar-container] { transition-duration:var(--motion-fast); }
 .sidebar-indicator { position:absolute; pointer-events:none; z-index:0; left:0; top:0; border-radius:var(--radius-md); background:var(--sidebar-primary); transition-property:transform,width,height; }

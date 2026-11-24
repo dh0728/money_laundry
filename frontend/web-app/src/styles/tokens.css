@@ -191,6 +191,16 @@
   --aml-size-row: 44px;
   --aml-size-row-comfortable: 52px;
   --aml-size-sidebar: 240px;
+  --sidebar-default-width: 16rem;
+  --sidebar-default-icon-width: 3rem;
+  --sidebar-icon-inset: 1rem;
+  --sidebar-mobile-width: 18rem;
+  --app-sidebar-expanded-width: 210px;
+  --app-sidebar-icon-width: 4rem;
+  --sidebar-gap-transition: width;
+  --sidebar-container-transition: left, right, width;
+  --sidebar-label-transition: margin, opacity;
+  --sidebar-menu-transition: width, height, padding;
   --aml-duration-instant: 0ms;
   --aml-duration-fast: 120ms;
   --aml-duration-normal: 180ms;
