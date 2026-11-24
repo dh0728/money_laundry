@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Box, Heading, Text } from '@/components/layout-primitives'
+import { Box, Heading, LineBreak, Text } from '@/components/layout-primitives'
 
 // v24 App.tsx의 로그인 화면.
 export default function LoginPage({ onLogin, message }: { onLogin: (username: string, password: string) => Promise<void>; message?: string }) {
@@ -23,32 +23,32 @@ export default function LoginPage({ onLogin, message }: { onLogin: (username: st
     finally { setBusy(false) }
   }
   return (
-    <Box className="login-screen relative min-h-screen overflow-hidden bg-[var(--radar-disc)] text-login-foreground">
+    <Box className="login-screen relative min-h-screen overflow-hidden text-login-foreground">
       {/* 화면 전체를 노드 그래프 애니메이션으로 채우고, 오른쪽 절반 전체를 유리 패널로 나눈다 */}
       <Box className="absolute inset-0 z-0"><LoginNetwork /></Box>
       {/* 왼쪽만 살짝 어둡게 — 오른쪽 유리 영역은 덮지 않음(네트워크가 비쳐야 함) */}
-      <Box className="absolute inset-y-0 left-0 z-[1] w-[58%] pointer-events-none login-shade" aria-hidden />
-      <Box className="relative z-10 min-h-screen grid grid-cols-[1fr_minmax(380px,1fr)] login-layout">
+      <Box className="absolute inset-y-0 left-0 pointer-events-none login-shade" aria-hidden />
+      <Box className="relative z-10 min-h-screen grid login-layout">
         <Box className="flex flex-col justify-between p-12 pointer-events-none">
           <Box className="flex items-center gap-2.5"><RadarMark className="size-5" /><BrandWordmark /></Box>
           <Box className="max-w-md">
             <Badge variant="outline" className="font-normal mb-7 border-login-foreground/25 text-login-foreground bg-login-badge-background">자금세탁 의심 거래 조사</Badge>
-            <Heading level={1} className="text-4xl leading-[1.4] tracking-tight font-semibold">탐지 신호에서<br />판단의 근거까지.</Heading>
-            <Text className="mt-6 type-body text-login-foreground/65 leading-7">Alert를 검토하고, 연결된 거래를 추적하고,<br />Episode 단위로 조사를 이어갑니다.</Text>
+            <Heading level={1} className="login-title text-4xl tracking-tight font-semibold">탐지 신호에서<LineBreak />판단의 근거까지.</Heading>
+            <Text className="mt-6 type-body text-login-foreground/65 leading-7">Alert를 검토하고, 연결된 거래를 추적하고,<LineBreak />Episode 단위로 조사를 이어갑니다.</Text>
           </Box>
           <Text className="text-2xs text-login-foreground/45">AML RADAR</Text>
         </Box>
         {/* 오른쪽 절반 = css.glass식 글래스모피즘(반투명+blur). 인풋만 불투명. 제목/화살표 없음 */}
         <Box className="login-glass-panel relative flex items-center justify-center p-8 pointer-events-auto backdrop-blur-2xl">
-          <Box as="form" className="w-full max-w-[360px] space-y-5" onSubmit={submit}>
+          <Box as="form" className="login-form w-full space-y-5" onSubmit={submit}>
             <Box className="space-y-2"><Label htmlFor="username" className="text-login-foreground/80">아이디</Label><Input id="username" value={username} onChange={e => setUsername(e.target.value)} required autoComplete="username" className="h-10 login-input-opaque border-login-foreground/15 text-login-foreground" /></Box>
             <Box className="space-y-2">
               <Label htmlFor="password" className="text-login-foreground/80">비밀번호</Label>
               <Box className="relative">
                 <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" className="h-10 pr-10 login-input-opaque border-login-foreground/15 text-login-foreground" />
-                <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-login-foreground/55 hover:text-login-foreground" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} onClick={() => setShowPassword(v => !v)}>
+                <Button layout="text" type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-login-foreground/55 hover:text-login-foreground" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} onClick={() => setShowPassword(v => !v)}>
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
+                </Button>
               </Box>
             </Box>
             {(error || message) && <Text role="alert" className="text-sm text-login-foreground">{error || message}</Text>}

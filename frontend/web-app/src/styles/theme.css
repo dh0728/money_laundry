@@ -166,6 +166,11 @@
   --login-action-foreground: var(--palette-black);
   --login-shade-start: var(--palette-night-a50);
   --login-shade-end: var(--palette-night-a15);
+  --login-shade-layer: 1;
+  --login-shade-width: 58%;
+  --login-panel-min-width: 380px;
+  --login-form-max-width: 360px;
+  --login-title-line-height: 1.4;
   --login-badge-background: var(--palette-black-a20);
   --login-panel-background: var(--palette-white-a035);
   --login-panel-border: var(--palette-white-a16);
@@ -492,7 +497,11 @@
 .type-title { font-size:var(--text-title-size); line-height:var(--text-title-line-height); }
 .type-body { font-size:var(--text-body-size); }
 .type-caption { font-size:var(--text-caption-size); line-height:var(--text-caption-line-height); }
-.login-shade { background:var(--login-shade-gradient); }
+.login-shade {
+  z-index: var(--login-shade-layer);
+  width: var(--login-shade-width);
+  background: var(--login-shade-gradient);
+}
 .underline-tabs { position:relative; display:flex; justify-content:flex-start; width:100%; border-radius:0; padding:0; gap:var(--underline-tab-gap); height:var(--underline-tab-height); background:transparent; border-bottom:var(--aml-stroke-divider) solid var(--border); }
 .underline-tabs [data-slot=tabs-trigger] { flex:none; position:relative; height:var(--underline-tab-height); border:0; border-radius:0; padding:0 var(--aml-stroke-control); background:transparent; box-shadow:none; color:var(--muted-foreground); font-weight:var(--aml-type-body-weight); font-size:var(--underline-tab-type-size); }
 .underline-tabs [data-slot=tabs-trigger][data-state=active] { font-weight:var(--underline-tab-active-weight); color:var(--foreground); }
@@ -639,6 +648,10 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .transaction-section .overflow-auto { overflow:visible; }
 
 /* 로그인 — v24 index.css */
+.login-screen { background-color: var(--radar-disc); }
+.login-layout { grid-template-columns: 1fr minmax(var(--login-panel-min-width), 1fr); }
+.login-title { line-height: var(--login-title-line-height); }
+.login-form { max-width: var(--login-form-max-width); }
 @media (max-width:767px) { .login-layout { grid-template-columns:1fr; } .login-layout>div:first-child { display:none; } }
 .login-glass-panel {
   /* 영역만 구분: 뒤 네트워크 점이 또렷히 비치게 blur는 약하게 */

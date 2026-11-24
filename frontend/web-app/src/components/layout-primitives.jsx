@@ -32,6 +32,10 @@ export function Text({ as: Tag = 'p', tone, className, ...props }) {
   return <Tag {...props} className={toned} data-tone={tone} />;
 }
 
+export function LineBreak() {
+  return <br />;
+}
+
 /** 제목(h1~h6). @param {PrimitiveProps} props */
 export function Heading({ level = 2, ...props }) {
   const Tag = `h${Math.min(6, Math.max(1, level))}`;

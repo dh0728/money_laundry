@@ -73,5 +73,5 @@ export default function LoginNetwork() {
       window.removeEventListener('pointerleave', onPointerLeave)
     }
   }, [resolvedTheme])
-  return <canvas ref={canvasRef} aria-hidden data-testid="login-network" className="absolute inset-0 size-full block" style={{ background: "transparent" }} />
+  return <canvas ref={canvasRef} aria-hidden data-testid="login-network" className="absolute inset-0 size-full block bg-transparent" />
 }
