@@ -105,7 +105,7 @@ function DashboardSummary({ data, mine, reduced, priorityOnly, onPriority }) {
       {priority.length > 0 && <Box className="dashboard-priority-links" aria-label="우선 확인 대상">
         {[...priority].sort((a, b) => b.score - a.score || b.elapsed - a.elapsed).slice(0, 3).map(row => <CaseLink row={row} key={row.code} />)}
       </Box>}
-      {!mine && data.dataSource === 'sample' && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
+      {import.meta.env.DEV && !mine && data.dataSource === 'sample' && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
         IBM 원본 거래 집계 <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
       </ActionButton>}
     </Box>

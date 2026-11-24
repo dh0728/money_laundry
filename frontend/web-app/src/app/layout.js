@@ -49,15 +49,16 @@ const tabGroups = [
   { name: 'Episode', prefix: 'E', digits: 6 },
 ];
 const serviceMode = import.meta.env.VITE_API_MODE === 'live';
+const localBenchmark = import.meta.env.DEV && !serviceMode;
 const pendingEntry = location.pathname === '/login' ? history.state?.previewNext : undefined;
 const entryPath = typeof pendingEntry === 'string' && pendingEntry.startsWith('/')
   ? new URL(pendingEntry, location.origin).pathname : location.pathname;
-const benchmarkLedgerRoute = !serviceMode && entryPath.replace(/\/$/, '') === benchmarkLedgerPath;
+const benchmarkLedgerRoute = localBenchmark && entryPath.replace(/\/$/, '') === benchmarkLedgerPath;
 function readDataMode() {
   if (serviceMode) return;
   if (benchmarkLedgerRoute) return 'ibm';
   const requested = new URLSearchParams(location.search).get('data');
-  return requested === 'sample' || requested === 'ibm' ? requested : undefined;
+  return requested === 'sample' || (localBenchmark && requested === 'ibm') ? requested : undefined;
 }
 
 const dataMode = readDataMode();
@@ -605,7 +606,8 @@ function updateWorkspaceAddress(path, code, navigationMode, urlParams, { scroll 
 }
 
 function loadBenchmarkDataset() {
-  benchmarkLoading ??= fetch(new URL('../mocks/ibm-hi-small-data.json', import.meta.url)).then(response => {
+  // Read from the development server without emitting the dataset as a build asset.
+  benchmarkLoading ??= fetch(import.meta.env.BASE_URL + 'src/mocks/ibm-hi-small-data.json').then(response => {
     if (!response.ok) throw new Error(`Benchmark data request failed (${response.status})`);
     return response.json();
   }).then(dataset => {
@@ -619,7 +621,7 @@ function loadBenchmarkDataset() {
 }
 
 function loadBenchmarkSummary() {
-  benchmarkSummaryLoading ??= fetch(new URL('../mocks/ibm-hi-small-summary.json', import.meta.url)).then(response => {
+  benchmarkSummaryLoading ??= fetch(import.meta.env.BASE_URL + 'src/mocks/ibm-hi-small-summary.json').then(response => {
     if (!response.ok) throw new Error(`Benchmark summary request failed (${response.status})`);
     return response.json();
   }).catch(error => {
@@ -749,7 +751,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const path = !override && code.startsWith('T-') && previousPath === ledgerTableScreen ? previousPath : selectedPath;
   showWorkspaceNavigation(path, code);
   const benchmarkLedger = isLedgerScreen(path) && benchmarkLedgerRoute && (!code || isBenchmarkTransactionCode(code));
-  if (!sampleData && !benchmarkFailed && (benchmarkLedger || path === 'dashboard/all' && dataMode === 'ibm')) {
+  if (localBenchmark && !sampleData && !benchmarkFailed && (benchmarkLedger || path === 'dashboard/all' && dataMode === 'ibm')) {
     showBenchmarkWorkspace(path, code, navigationMode, params);
     return;
   }
