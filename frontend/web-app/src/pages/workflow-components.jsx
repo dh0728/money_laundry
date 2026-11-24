@@ -466,7 +466,7 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
     {view === 'card' ? <div className="workflow-report-cards">
       <MagicBento key={appearance.reduced} className="report-bento preview-tilt-cards" columns={4} rowHeight={0} gap={readWorkspaceGap()}
         theme={appearance.theme} disableAnimations={appearance.reduced} intro={false} textAutoHide={false}
-        enableTilt enableBorderGlow={false} enableSpotlight={false} enableStars={false} clickEffect={false}
+        enableBorderGlow={false} enableSpotlight={false} enableStars={false} clickEffect={false}
         items={records.map(row => ({ id: row.id, content: <RecordCard className="preview-case-card" label={row.id}
           verdict={row.verdict} selected={selected.includes(row.id)}>
           <CardHeader code={row.id} openRecord={false} selection={{

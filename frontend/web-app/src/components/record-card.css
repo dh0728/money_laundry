@@ -22,6 +22,10 @@
     0 var(--aml-space-4) var(--aml-space-8)
     color-mix(in srgb, var(--record-card-depth-color) 26%, transparent);
 }
+/* 누르지 않는 기록 카드는 Panel과 같은 안쪽 면이다(바깥 그림자·기울기 없음). */
+:root [data-glow-surface]:not([data-card-interactive]) {
+  box-shadow: var(--panel-edge-depth), var(--panel-material-depth, 0 0 0 transparent);
+}
 [data-glow-surface][data-card-interactive] {
   cursor: pointer;
   user-select: text;
