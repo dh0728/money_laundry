@@ -168,8 +168,8 @@
   scrollbar-gutter: auto;
 }
 .workflow-report-cards .report-bento {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  grid-auto-rows: minmax(var(--aml-size-control-compact), auto) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(var(--aml-size-control-compact), auto);
   align-items: stretch;
 }
 .workflow-report-cards .report-bento .magic-bento__cell,
@@ -181,17 +181,17 @@
 }
 @container (max-width: 950px) {
   .workflow-report-cards .report-bento {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @container (max-width: 720px) {
   .workflow-report-cards .report-bento {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @container (max-width: 500px) {
   .workflow-report-cards .report-bento {
-    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 #workflow-notifications {
