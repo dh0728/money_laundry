@@ -60,7 +60,7 @@ function EvidenceBars({ label, points, unit, reduced, summary }) {
   return <Box as="figure" className="overview-evidence-bars" aria-label={label}>
     <Box as="figcaption">{label}</Box>
     <BarSparkline data={points} dataKey="value" height={40}
-      yDomain={[0, undefined]} color={dataSeriesColors.sky} interactive crosshair="solid"
+      yDomain={[0, undefined]} color={dataSeriesColors.teal} interactive crosshair="solid"
       dot={false} barRadius={2} animate={!reduced} hoverTransition={!reduced}
       onHoverChange={(_, point) => setHover(point)} aria-label={points.map(labelPoint).join(', ')} />
     <Text className="overview-bar-value">{hover ? labelPoint(hover) : summary ?? `${points[0].label} ~ ${points.at(-1).label}`}</Text>
@@ -130,7 +130,7 @@ const overviewChartMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 
 function OverviewBars({ label, measures, max, reduced, format = value => `${number.format(value)}건` }) {
   if (!measures.length) return <Text className="overview-note">표시할 데이터가 없습니다.</Text>;
-  const barColor = point => point.color ?? dataSeriesColors.sky;
+  const barColor = point => point.color ?? dataSeriesColors.teal;
   return <Box as="figure" className="overview-horizontal-chart" style={{ '--overview-measures-count': measures.length }} aria-label={label}>
     <Box as="ul" className="overview-horizontal-labels">
       {measures.map(({ label, value, code }) => <Box as="li" key={label}>
@@ -176,7 +176,7 @@ function FlowCharts({ evidence, reduced }) {
   if (!records.length) return <Text className="overview-note">연결된 거래가 없습니다.</Text>;
   const amounts = flows.length
     ? flows.map(({ currency, inflow, outflow }) => ({
-      currency, measures: [{ label: '관측 유입', value: inflow, color: dataSeriesColors.sky },
+      currency, measures: [{ label: '관측 유입', value: inflow, color: dataSeriesColors.teal },
         { label: '관측 유출', value: outflow, color: dataSeriesColors.pink }],
     }))
     : [...Map.groupBy(records, record => record.currency)].map(([currency, moves]) => ({
@@ -233,7 +233,8 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   const prior = relatedJudgments(history, row.code, evidence);
   const otherCount = records.length - inflows.length - outflows.length;
   const composition = focus ? [
-    { label: '중심 계좌로 유입', value: inflows.length }, { label: '중심 계좌에서 유출', value: outflows.length },
+    { label: '중심 계좌로 유입', value: inflows.length, color: dataSeriesColors.teal },
+    { label: '중심 계좌에서 유출', value: outflows.length, color: dataSeriesColors.pink },
     { label: '나머지 근거 거래', value: otherCount },
   ].filter(part => part.value > 0) : methods;
   const analysisQuery = new URLSearchParams(location.search);
@@ -360,7 +361,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       { label: riskLabels.high, color: 'var(--risk-high)', value: scoresByBand.get('high')?.length ?? 0 },
       { label: riskLabels.medium, color: 'var(--risk-medium)', value: scoresByBand.get('medium')?.length ?? 0 },
       { label: riskLabels.low, color: 'var(--risk-low)', value: scoresByBand.get('low')?.length ?? 0 },
-      { label: '모델 점수 없음', color: dataSeriesColors.sky, value: scoresByBand.get('unknown')?.length ?? 0 },
+      { label: '모델 점수 없음', color: dataSeriesColors.teal, value: scoresByBand.get('unknown')?.length ?? 0 },
     ]} />,
     accounts: <OverviewBars label="계좌별 거래 참여" measures={accountMeasures} max={records.length} reduced={reduced} />,
     past: <OverviewBars label="과거 판정 구성" measures={pastCounts} max={prior.length} reduced={reduced} />,
