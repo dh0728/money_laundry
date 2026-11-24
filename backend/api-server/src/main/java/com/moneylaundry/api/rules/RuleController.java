@@ -2,7 +2,9 @@ package com.moneylaundry.api.rules;
 
 import com.moneylaundry.api.review.ReviewService;
 import com.moneylaundry.api.rules.catalog.RuleCatalog;
+import com.moneylaundry.api.rules.engine.RuleCompiler;
 import java.security.Principal;
+import java.util.LinkedHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +32,10 @@ public class RuleController {
   @GetMapping("/rule-templates")
   public Object templates(Principal principal) {
     reviews.actor(reviews.userId(principal));
-    return catalog.view();
+    var view = new LinkedHashMap<>(catalog.view());
+    // 평가기가 있어 백테스트를 돌릴 수 있는 템플릿
+    view.put("backtestTemplates", RuleCompiler.SUPPORTED.stream().sorted().toList());
+    return view;
   }
 
   @GetMapping("/rules")

@@ -62,7 +62,8 @@ public class RuleService {
     return view(check(in.template(), in.definition(), in.ruleId()));
   }
 
-  private RuleValidator.Result check(String template, Object definition, Long ruleId) {
+  /** 저장 전 검증. 원장에 쌓인 기간과 겹치는 운영 룰을 같이 본다. */
+  public RuleValidator.Result check(String template, Object definition, Long ruleId) {
     Integer ledgerDays =
         jdbc.queryForObject(
             "select max(business_date)-min(business_date)+1 from ledger.transactions where integration_status='ACTIVE'",
