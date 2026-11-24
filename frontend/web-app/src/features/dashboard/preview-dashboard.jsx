@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
-import { ArrowUpRight, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import { DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardMetricGrid } from './dashboard-layout';
@@ -12,9 +12,10 @@ import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { BarSparkline } from '../../components/charts/sparkline';
 import { dataSeriesColors, transactionTotalColor } from '../../components/charts/charts/chart-context';
-import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
-import { Box, Grid, Heading, Text } from '../../components/layout-primitives';
-import { initialDetail, previewUrl } from '../../app/preview-route.js';
+import { modelRiskLabels } from '../settings/model-risk-settings';
+import { Box, Grid, Heading, Stack, Text } from '../../components/layout-primitives';
+import { LinkTag } from '../../components/semantic-tags';
+import { findAccountTrail } from './dashboard-recommendation.js';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
@@ -56,14 +57,6 @@ function Metrics({ items, appearance }) {
   }))} appearance={appearance} />;
 }
 
-const isPriorityAlert = row => row.kind === 'Alert' && row.open && modelRiskBand(row.score) === 'high' && row.elapsed >= 3;
-
-function CaseLink({ row }) {
-  return <ActionButton as="a" surface="ghost" href={previewUrl({ screen: initialDetail(row.code), code: row.code })}>
-    {row.code}
-  </ActionButton>;
-}
-
 function DashboardIndicators({ data, mine, reduced }) {
   const hourly = (key, color) => ({ rows: data.hourly, key, color, caption: '생성 시간대 · KST' });
   const daily = (key, color) => ({ rows: data.operationalDaily, key, color, caption: '일별 · KST' });
@@ -86,29 +79,28 @@ function DashboardIndicators({ data, mine, reduced }) {
   </Grid>;
 }
 
-function DashboardSummary({ data, mine, reduced, priorityOnly, onPriority }) {
-  const priority = data.cases.filter(row => isPriorityAlert(row) && (!mine || row.assigned));
-  const headline = priority.length ? '3일 이상 경과한 고위험 Alert ' + count(priority.length) : '3일 이상 경과한 고위험 Alert 없음';
+function DashboardSummary({ cases, reduced }) {
+  const trail = useMemo(() => findAccountTrail(cases), [cases]);
   return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
-    <Box className="dashboard-priority-heading">
-      <Box>
-        <Heading><Sparkles className="icon" aria-hidden="true" />{mine ? 'AI 요약 · 내 우선 업무' : 'AI 요약'}</Heading>
-        <Text as="strong">{headline}</Text>
-      </Box>
-      {priority.length > 0 && <ActionButton aria-pressed={priorityOnly} onClick={onPriority} surface="floating" shape="pill">
-        {priorityOnly ? '전체 업무 보기' : '우선 Alert 보기'}
-      </ActionButton>}
-    </Box>
-    <Box as="details" className="dashboard-priority-details">
-      <Text as="summary">요약 상세 · 집계 기반</Text>
-      <Text>미완료 Alert {count(data.cases.filter(row => row.kind === 'Alert' && row.open).length)} · 진행 중 Episode {count(data.cases.filter(row => row.kind === 'Episode' && row.open).length)}</Text>
-      {priority.length > 0 && <Box className="dashboard-priority-links" aria-label="우선 확인 대상">
-        {[...priority].sort((a, b) => b.score - a.score || b.elapsed - a.elapsed).slice(0, 3).map(row => <CaseLink row={row} key={row.code} />)}
-      </Box>}
-      {import.meta.env.DEV && !mine && data.dataSource === 'sample' && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
-        IBM 원본 거래 집계 <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
-      </ActionButton>}
-    </Box>
+    <Heading className="dashboard-priority-heading"><Sparkles className="icon" aria-hidden="true" />AI 요약</Heading>
+    {trail ? <Stack as="figure" align="center" justify="center" className="dashboard-account-trail"
+      aria-label="교차 조사 추천 · 같은 계좌에서 수취 후 송금 관측">
+      <Stack align="center">
+        <Text as="span">{trail.received.record.kind} · 수취</Text>
+        <LinkTag code={trail.received.record.code} />
+      </Stack>
+      <ArrowDown className="icon" aria-hidden="true" />
+      <Stack align="center" className="dashboard-trail-account">
+        <Text as="span">공유 계좌</Text>
+        <Text as="strong">{trail.account}</Text>
+      </Stack>
+      <ArrowDown className="icon" aria-hidden="true" />
+      <Stack align="center">
+        <Text as="span">{trail.sent.record.kind} · 이후 송금</Text>
+        <LinkTag code={trail.sent.record.code} />
+      </Stack>
+      <Text as="figcaption">거래 기록 기반 추천</Text>
+    </Stack> : <Text className="dashboard-trail-empty">조회 범위에서 함께 확인할 Alert·Episode 관계가 없습니다.</Text>}
   </AISummaryPanel>;
 }
 
@@ -137,14 +129,8 @@ function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
 }
 
 export function PreviewDashboard({ mine, data, appearance }) {
-  const [priorityOnly, setPriorityOnly] = useState(false);
-  function togglePriority() {
-    setPriorityOnly(active => !active);
-    requestAnimationFrame(() => document.getElementById('dashboard-work-title')?.focus());
-  }
   const rows = data.board?.content;
-  const summary = <DashboardSummary data={data} mine={mine} reduced={appearance.reduced}
-    priorityOnly={priorityOnly} onPriority={togglePriority} />;
+  const summary = <DashboardSummary cases={data.cases} reduced={appearance.reduced} />;
   return <Box className="preview-dashboard" data-mine={mine}>
     <DashboardIndicators data={data} mine={mine} reduced={appearance.reduced} />
     <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>
@@ -153,7 +139,7 @@ export function PreviewDashboard({ mine, data, appearance }) {
         {summary}
       </Grid> : <Analytics data={data} reduced={appearance.reduced} summary={summary} />}
     </React.Suspense>
-    {rows ? <WorkBoard records={priorityOnly ? rows.filter(isPriorityAlert) : rows}
+    {rows ? <WorkBoard records={rows}
       mine={mine} sort={data.sort} appearance={appearance} statusByCode={data.investigation.statusByCode} /> : <DashboardBoardSkeleton />}
   </Box>;
 }

@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Panel, PanelDisclosure } from '../../components/panel';
-import { PatternTag, ReviewStatusTag } from '../../components/semantic-tags';
+import { LinkTag, PatternTag, ReviewStatusTag } from '../../components/semantic-tags';
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { Bar, BarHatch } from '../../components/charts/charts/bar';
 import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
@@ -233,6 +233,7 @@ function TransactionDetails({ data, flow, reduced, summary }) {
       <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
         {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
           : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
+        {import.meta.env.DEV && data.dataSource === 'sample' && <LinkTag href="/dashboard/all?data=ibm">IBM 원본 거래 집계</LinkTag>}
       </ChartPanel>
       {summary}
     </LayoutGrid>
