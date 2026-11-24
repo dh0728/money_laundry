@@ -1,6 +1,6 @@
 import { caseFixtureRows, dateFromCode } from '../components/query-controls.jsx';
 import { applyPreviewJudgment } from '../features/investigation/case-judgment-data.js';
-import { alternatePreviewStaff, currentPreviewUser, previewStaff } from '../features/auth/preview-session-user.js';
+import { currentPreviewUser, previewAnalysts, previewStaff } from '../features/auth/preview-session-user.js';
 import { previewCaseAssignee, previewWorkRequestEffects } from '../features/investigation/preview-work-requests.js';
 import { applyPreviewEpisodeTransfers } from '../features/investigation/preview-episode-transfer.js';
 import { applyPreviewAlertMembership } from '../features/investigation/case-membership-data.js';
@@ -14,6 +14,8 @@ import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard
 
 export { dashboardRecordCodes, samplePeriod } from './dashboard-record-codes.js';
 export const dashboardPeriodEnd = new Date(`${samplePeriod[1]}T00:00:00`);
+const primaryPreviewCases = new Set(['A-261111-000009', 'A-261111-001042', 'A-261112-000003',
+  'E-261111-000001', 'E-261111-000003', 'E-261115-000004']);
 const bandNames = { high: '위험', medium: '주의', low: '낮음' };
 
 const kpiHours = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
@@ -123,10 +125,14 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
   const actor = currentPreviewUser();
   const staff = actor?.source === 'fixture' && actor.role === 'STAFF' ? actor.username : previewStaff.username;
   const effects = actor?.source === 'fixture' ? previewWorkRequestEffects() : new Map();
+  const otherAnalysts = previewAnalysts.slice(1);
+  let position = 0;
+  const assignments = new Map(baseCases.toSorted((left, right) => left.createdAt.localeCompare(right.createdAt) || left.code.localeCompare(right.code))
+    .map(row => [row.code, primaryPreviewCases.has(row.code) ? previewStaff.username : otherAnalysts[position++ % otherAnalysts.length].username]));
   const cases = applyPreviewEpisodeTransfers(applyPreviewAlertMembership(baseCases, allTransactions, evidenceSummary), evidenceSummary)
     .map(row => {
       const effect = effects.get(row.code);
-      const assignee = effect?.assignee ?? previewCaseAssignee(row);
+      const assignee = effect?.assignee ?? row.assignee ?? assignments.get(row.code) ?? previewCaseAssignee(row);
       const next = { ...row, assignee, assigned: assignee === staff, assignedAt: effect?.assignedAt ?? row.createdAt,
         reviewDueOn: effect?.reviewDueOn };
       if (!effect?.reviewStateAt || row.episodeCode || row.judgment?.at > effect.reviewStateAt) return next;
@@ -277,7 +283,7 @@ export function dashboardFixtureResponse(source, { mine, rows, population, range
     ...metrics,
     ...investigationDashboard(source.cases, cases, metrics.operationalDaily.map(day => day.date), {
       assignmentRows: completedPopulation,
-      roster: mine ? undefined : [previewStaff, alternatePreviewStaff].map(person => ({ id: person.username, name: person.name })),
+      roster: mine ? undefined : previewAnalysts.map(person => ({ id: person.username, name: person.name })),
     }),
     sort,
   };

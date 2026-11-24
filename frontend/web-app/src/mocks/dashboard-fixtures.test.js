@@ -2,7 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import { dashboardFixtures, dashboardFixtureResponse, dashboardFixtureBoardPage, dashboardRecordCodes } from './dashboard-fixtures';
 import { readPreviewRoute } from '../app/preview-route';
 import { investigationFlow } from '../features/dashboard/dashboard-flows';
-import { previewAdmin } from '../features/auth/preview-session-user';
+import { previewAdmin, previewAnalysts, previewStaff } from '../features/auth/preview-session-user';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer';
 
 const fixtureCodes = {
@@ -61,6 +61,19 @@ it('connects each sample Episode to distinct Alerts and their source transaction
   expect(investigation.routes.episode.verdicts.suspicious).toBeGreaterThan(0);
   expect(data.unlinked).toBeGreaterThan(0);
   expect(investigationFlow(data).nodes).toContainEqual(expect.objectContaining({ name: 'Episode 편입', count: 84 }));
+});
+
+it('uses the same synthetic analyst roster for case assignment, filters and both workload cards', () => {
+  const { institutionWorkload } = dashboardFixtureResponse(source);
+  const { byAssignee, equalAssignments, overdue, staffCount, total } = institutionWorkload;
+  expect(staffCount).toBe(32);
+  expect(new Set(source.cases.map(row => row.assignee))).toEqual(new Set(previewAnalysts.map(person => person.username)));
+  expect(sum(byAssignee, 'assignments')).toBe(source.cases.length);
+  expect(sum(byAssignee, 'total')).toBe(total);
+  expect(sum(byAssignee, 'overdue')).toBe(overdue.length);
+  expect(equalAssignments).toBe(source.cases.length / staffCount);
+  expect(source.mine.every(row => row.assignee === previewStaff.username)).toBe(true);
+  expect(dashboardFixtureResponse(source, { mine: true }).accountRecommendation).toBeTruthy();
 });
 
 it('restores older preview transfers and keeps seeded membership editable', () => {

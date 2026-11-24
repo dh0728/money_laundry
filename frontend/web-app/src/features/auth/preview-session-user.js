@@ -7,6 +7,13 @@ export const previewAdmin = Object.freeze({
 export const alternatePreviewStaff = Object.freeze({
   id: -3, username: 'demo-staff-2', name: '프리뷰 분석가 2', role: 'STAFF', source: 'fixture',
 });
+export const previewAnalysts = Object.freeze([previewStaff, alternatePreviewStaff,
+  ...Array.from({ length: 30 }, (_, index) => {
+    const number = index + 3;
+    return Object.freeze({ id: -(number + 1), username: `demo-staff-${number}`,
+      name: `프리뷰 분석가 ${number}`, role: 'STAFF', source: 'fixture' });
+  }),
+]);
 
 let user = null;
 export const currentPreviewUser = () => user;
