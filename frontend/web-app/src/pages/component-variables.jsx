@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { NativeSelect } from '@/components/ui/select';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Panel } from '../components/panel';
 import { SearchField } from '../components/search-field';
@@ -105,10 +106,8 @@ export function DesignVariables() {
     </Panel>
     <Box className="variable-filters">
       <Box as="label">분류
-        <select className="variable-field" value={group} onChange={event => setGroup(event.target.value)}>
-          <option value="all">전체</option>
-          {[...groups, otherGroup].map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-        </select>
+        <NativeSelect className="variable-field" value={group} onChange={event => setGroup(event.target.value)}
+          options={[{ value: 'all', label: '전체' }, ...[...groups, otherGroup].map(({ id, label }) => ({ value: id, label }))]} />
       </Box>
       <SearchField variant="compact" label="변수 검색" placeholder="변수 검색" value={search} onChange={event => setSearch(event.target.value)} />
     </Box>
