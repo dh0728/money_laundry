@@ -11,6 +11,7 @@ import { alertCode, episodeCode } from './alertFilters'
 import { toast } from 'sonner'
 import { PatternBadge } from '@/components/badges'
 import { verdictOption, type AlertVerdict } from './verdict'
+import { Box, Text } from '@/components/layout-primitives'
 
 export type VerdictSubmit = { verdict: AlertVerdict; comment: string; episodeId?: number }
 
@@ -40,26 +41,26 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
   return (
     <>
     <ReviewLayout reference={<>
-        <dl className="space-y-4 text-xs">
-          <div><dt className="text-muted-foreground">조사 범위</dt><dd className="mt-1 font-medium tabular-nums">거래 {alert.transactions.length}건 · 미판정 {alert.status === 'OPEN' ? alert.transactions.length : 0}건</dd></div>
-          <div><dt className="text-muted-foreground">대표 유형</dt><dd className="mt-1 flex items-center gap-2"><PatternBadge code={alert.primaryType.code} /><span className="text-muted-foreground">씨앗 거래 {seeds.length}건{seeds[0] ? ` · T-${seeds[0].txId} 점수 ${seeds[0].launderingScore.toFixed(2)}` : ''}</span></dd></div>
-          <div><dt className="text-muted-foreground">같은 거래의 다른 사건 판정</dt><dd className="mt-1">없음</dd></div>
-        </dl>
-        <div className="mt-5 border-t pt-4">
-          <p className="text-xs font-medium">저장본 {drafts.length}개</p>
-          {drafts.length ? <ul className="mt-2 space-y-2 text-xs">{drafts.map((d, i) => <li key={i} className="rounded-md border px-2.5 py-2"><span className="tabular-nums text-muted-foreground">{d.at}</span><p className="mt-1 line-clamp-2">{d.text}</p><button type="button" className="mt-1 text-[0.6875rem] underline underline-offset-4" onClick={() => setComment(d.text)}>불러오기</button></li>)}</ul> : <p className="mt-2 text-xs text-muted-foreground">임시 저장한 의견이 여기에 쌓입니다.</p>}
-        </div>
+        <Box as="dl" className="space-y-4 text-xs">
+          <Box><Box as="dt" className="text-muted-foreground">조사 범위</Box><Box as="dd" className="mt-1 font-medium tabular-nums">거래 {alert.transactions.length}건 · 미판정 {alert.status === 'OPEN' ? alert.transactions.length : 0}건</Box></Box>
+          <Box><Box as="dt" className="text-muted-foreground">대표 유형</Box><Box as="dd" className="mt-1 flex items-center gap-2"><PatternBadge code={alert.primaryType.code} /><Text as="span" className="text-muted-foreground">씨앗 거래 {seeds.length}건{seeds[0] ? ` · T-${seeds[0].txId} 점수 ${seeds[0].launderingScore.toFixed(2)}` : ''}</Text></Box></Box>
+          <Box><Box as="dt" className="text-muted-foreground">같은 거래의 다른 사건 판정</Box><Box as="dd" className="mt-1">없음</Box></Box>
+        </Box>
+        <Box className="mt-5 border-t pt-4">
+          <Text className="text-xs font-medium">저장본 {drafts.length}개</Text>
+          {drafts.length ? <Box as="ul" className="mt-2 space-y-2 text-xs">{drafts.map((d, i) => <Box as="li" key={i} className="rounded-md border px-2.5 py-2"><Text as="span" className="tabular-nums text-muted-foreground">{d.at}</Text><Text className="mt-1 line-clamp-2">{d.text}</Text><button type="button" className="mt-1 text-[0.6875rem] underline underline-offset-4" onClick={() => setComment(d.text)}>불러오기</button></Box>)}</Box> : <Text className="mt-2 text-xs text-muted-foreground">임시 저장한 의견이 여기에 쌓입니다.</Text>}
+        </Box>
     </>}> 
         <SectionTitle
           title={decided ? '판정 완료' : '검토 의견'}
           description={decided ? '이미 판정한 Alert입니다.' : 'Alert를 통째로 판정합니다. 정상이면 종결하고, 이상거래면 어디로 보낼지 고르세요.'}
         />
         {decided && (
-          <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs" data-testid="decided-summary">
+          <Text className="rounded-md border bg-muted/40 px-3 py-2 text-xs" data-testid="decided-summary">
             {alert.status === 'ESCALATED' && alert.episodeId != null
               ? <>이상거래 · {episodeCode(alert.episodeId)}에 연결됨</>
               : alert.resolution ? alertResolutionLabels[alert.resolution] : '종결'}
-          </p>
+          </Text>
         )}
         <AlertVerdictForm verdict={verdict} setVerdict={setVerdict} comment={comment} setComment={setComment}
           target={target} setTarget={setTarget} locked={locked} episodes={episodes} onConfirm={() => setConfirm(true)}
@@ -74,7 +75,7 @@ export default function AlertReview({ alert, responsible, episodes, onSubmit }: 
             <AlertDialogTitle>{alertCode(alert.alertId)} · {option.label}</AlertDialogTitle>
             <AlertDialogDescription>{option.result}{verdict === 'link-episode' && target ? ` · ${episodeCode(Number(target))}` : ''}. 판단 근거와 담당자를 처리 이력에 남깁니다.</AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="max-h-44 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{comment}</div>
+          <Box className="max-h-44 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{comment}</Box>
           <AlertDialogFooter>
             <AlertDialogCancel>돌아가기</AlertDialogCancel>
             <AlertDialogAction onClick={() => { onSubmit({ verdict, comment: comment.trim(), episodeId: target ? Number(target) : undefined }); setComment('') }}>{option.action}</AlertDialogAction>
