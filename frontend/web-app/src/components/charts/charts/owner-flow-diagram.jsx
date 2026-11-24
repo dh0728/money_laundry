@@ -66,10 +66,10 @@ export function OwnerFlowEdge({ path, label, pressed, muted, onSelect, membershi
   return <g className="owner-time-edge" role="button" tabIndex={0} aria-label={label} aria-pressed={pressed}
     data-muted={muted || undefined} onClick={onSelect} onKeyDown={event => selectWithKeyboard(event, onSelect)}>
     <title>{[label, ...memberships.map(({ id }) => id)].join(' · ')}</title>
-    {reveal ? <GraphFlowReveal key={pulse.startedAt} path={path} pulse={pulse} width={width} height={height}>
+    {reveal ? <GraphFlowReveal key={`reveal-${pulse.startedAt}`} path={path} pulse={pulse} width={width} height={height}>
       {line}
     </GraphFlowReveal> : line}
-    {pulse ? <GraphFlowStroke key={pulse.startedAt} path={path} pulse={pulse} color={pulseColor} />
+    {pulse ? <GraphFlowStroke key={`stroke-${pulse.startedAt}`} path={path} pulse={pulse} color={pulseColor} />
       : ambientDelay !== undefined && <GraphFlowStroke path={path} color={color} ambientDelay={ambientDelay} />}
     <path className="owner-edge-hit" d={path} stroke="transparent" strokeWidth={design.edgeTargetWidth} />
     {detail && <text x={detail.x} y={detail.y - 7}>{detail.count}건</text>}
