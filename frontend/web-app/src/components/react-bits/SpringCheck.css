@@ -8,9 +8,9 @@
   --sc-radius: var(--spring-check-radius);
   --sc-font: var(--spring-check-label-size);
   --sc-ring: var(--aml-stroke-focus);
-  --sc-gap: var(--aml-space-12);
-  --sc-row: var(--selection-control-height-large);
-  --sc-rule: var(--spring-check-strike-thickness);
+  --sc-gap: clamp(var(--aml-space-8), var(--sc-custom-gap, var(--aml-space-12)), var(--aml-space-16));
+  --sc-row: max(var(--selection-control-height-large), calc(var(--sc-box) + var(--aml-space-16)));
+  --sc-rule: max(var(--spring-check-strike-thickness), var(--sc-custom-strike, var(--spring-check-strike-thickness)));
   --sc-origin: left center;
   --sc-ease-out: var(--selection-control-ease-out);
 
@@ -37,6 +37,9 @@
   touch-action: manipulation;
   outline: none;
 }
+
+.spring-check[data-strike="center"] { --sc-origin: center }
+.spring-check[data-strike="right"] { --sc-origin: right center }
 
 .spring-check:disabled {
   opacity: var(--selection-control-disabled-opacity);
@@ -69,6 +72,7 @@
   border-radius: inherit;
   overflow: hidden;
   transform-origin: center;
+  transform: scale(var(--sc-box-scale));
 }
 
 .spring-check__ring {
@@ -92,6 +96,7 @@
   border-radius: inherit;
   background: var(--sc-fill);
   transform-origin: center;
+  transform: scale(var(--sc-fill-scale));
 }
 
 .spring-check__tick {
@@ -106,6 +111,11 @@
   stroke-linejoin: round;
 }
 
+.spring-check__mark {
+  stroke-dasharray: var(--spring-check-mark-length);
+  stroke-dashoffset: var(--sc-mark-offset);
+}
+
 .spring-check__label {
   position: relative;
   display: inline-block;
@@ -113,6 +123,7 @@
 
 .spring-check__word {
   display: inline-block;
+  opacity: var(--sc-label-opacity);
 }
 
 .spring-check__rule {
@@ -124,6 +135,7 @@
   border-radius: var(--aml-space-2);
   background: currentColor;
   transform-origin: var(--sc-origin);
+  transform: scaleX(var(--sc-strike-scale));
   pointer-events: none;
 }
 

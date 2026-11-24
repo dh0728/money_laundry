@@ -34,13 +34,6 @@ const RULE_END = 0.84;
 const SWELL = 0.35;
 const TICK_PATH = 'M20 6 9 17l-5-5'; // Lucide Check path; the stroke is animated.
 const MINUS_PATH = 'M5 12h14'; // Lucide Minus path.
-const ORIGIN: Record<StrikeSide, string> = {
-  left: 'left center',
-  center: 'center',
-  right: 'right center',
-  none: 'left center'
-};
-
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const zetaOf = (bounce: number) =>
   bounce <= 0 ? 1 : -Math.log(bounce) / Math.sqrt(Math.PI ** 2 + Math.log(bounce) ** 2);
@@ -48,11 +41,11 @@ const zetaOf = (bounce: number) =>
 const readings = (t: number, doneOpacity: number, strikeLag: number) => {
   const held = clamp01(t);
   return {
-    fill: `scale(${Math.max(t, 0)})`,
-    box: `scale(${1 + SWELL * Math.max(0, t - 1)})`,
+    fill: Math.max(t, 0),
+    box: 1 + SWELL * Math.max(0, t - 1),
     tick: 1 - held,
     word: 1 - (1 - doneOpacity) * held,
-    rule: `scaleX(${clamp01((held - strikeLag) / (RULE_END - strikeLag))})`
+    rule: clamp01((held - strikeLag) / (RULE_END - strikeLag))
   };
 };
 
@@ -66,9 +59,9 @@ const SpringCheck: React.FC<SpringCheckProps> = ({
   color,
   fillColor,
   checkColor,
-  boxSize = 28,
-  boxRadius = 9,
-  fontSize = 18,
+  boxSize,
+  boxRadius,
+  fontSize,
   bounce = 0.2,
   strikeLag = 0.12,
   doneOpacity = 0.42,
@@ -86,20 +79,17 @@ const SpringCheck: React.FC<SpringCheckProps> = ({
   const viaPointer = useRef(false);
   const instant = useRef(false);
   const rowRef = useRef<HTMLButtonElement>(null);
-  const boxRef = useRef<HTMLSpanElement>(null);
-  const fillRef = useRef<HTMLSpanElement>(null);
-  const tickRef = useRef<SVGPathElement>(null);
-  const wordRef = useRef<HTMLSpanElement>(null);
-  const ruleRef = useRef<HTMLSpanElement>(null);
   const cfg = useRef({ doneOpacity, strikeLag });
 
   const write = (value: number) => {
+    const style = rowRef.current?.style;
+    if (!style) return;
     const r = readings(value, cfg.current.doneOpacity, cfg.current.strikeLag);
-    if (fillRef.current) fillRef.current.style.transform = r.fill;
-    if (boxRef.current) boxRef.current.style.transform = r.box;
-    if (tickRef.current) tickRef.current.style.strokeDashoffset = String(r.tick);
-    if (wordRef.current) wordRef.current.style.opacity = String(r.word);
-    if (ruleRef.current) ruleRef.current.style.transform = r.rule;
+    style.setProperty('--sc-fill-scale', String(r.fill));
+    style.setProperty('--sc-box-scale', String(r.box));
+    style.setProperty('--sc-mark-offset', String(r.tick));
+    style.setProperty('--sc-label-opacity', String(r.word));
+    style.setProperty('--sc-strike-scale', String(r.rule));
   };
   useMotionValueEvent(t, 'change', write);
   useLayoutEffect(() => {
@@ -145,24 +135,6 @@ const SpringCheck: React.FC<SpringCheckProps> = ({
   };
 
   const r = readings(t.get(), doneOpacity, strikeLag);
-  const ring = boxSize >= 24 ? 2 : 1.5;
-  const gap = Math.min(16, Math.max(8, Math.round(boxSize * 0.43)));
-  const ruleHeight = Math.max(1.5, Math.round(fontSize / 6) / 2);
-
-  const cssVars = {
-    '--sc-ink': color,
-    '--sc-fill': fillColor,
-    '--sc-check': checkColor,
-    '--sc-box': `${boxSize}px`,
-    '--sc-radius': `${boxRadius}px`,
-    '--sc-font': `${fontSize}px`,
-    '--sc-ring': `${ring}px`,
-    '--sc-gap': `${gap}px`,
-    '--sc-row': `${Math.max(44, boxSize + 16)}px`,
-    '--sc-rule': `${ruleHeight}px`,
-    '--sc-origin': ORIGIN[strike] || ORIGIN.left
-  } as CSSProperties;
-
   return (
     <button
       ref={rowRef}
@@ -172,7 +144,23 @@ const SpringCheck: React.FC<SpringCheckProps> = ({
       aria-label={ariaLabel}
       disabled={disabled}
       className={`spring-check${className ? ` ${className}` : ''}`}
-      style={cssVars}
+      data-strike={strike}
+      style={{
+        '--sc-ink': color,
+        '--sc-fill': fillColor,
+        '--sc-check': checkColor,
+        '--sc-box': boxSize === undefined ? undefined : `${boxSize}px`,
+        '--sc-radius': boxRadius === undefined ? undefined : `${boxRadius}px`,
+        '--sc-font': fontSize === undefined ? undefined : `${fontSize}px`,
+        '--sc-ring': boxSize !== undefined && boxSize < 24 ? 'var(--spring-check-compact-ring)' : undefined,
+        '--sc-custom-gap': boxSize === undefined ? undefined : `${Math.round(boxSize * 0.43)}px`,
+        '--sc-custom-strike': fontSize === undefined ? undefined : `${Math.round(fontSize / 6) / 2}px`,
+        '--sc-fill-scale': r.fill,
+        '--sc-box-scale': r.box,
+        '--sc-mark-offset': r.tick,
+        '--sc-label-opacity': r.word,
+        '--sc-strike-scale': r.rule,
+      } as CSSProperties}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
@@ -180,21 +168,21 @@ const SpringCheck: React.FC<SpringCheckProps> = ({
       onClick={toggle}
     >
       <span className="spring-check__press">
-        <span ref={boxRef} className="spring-check__box" style={{ transform: r.box }}>
+        <span className="spring-check__box">
           <span className="spring-check__ring" aria-hidden="true" />
-          <span ref={fillRef} className="spring-check__fill" style={{ transform: r.fill }} />
+          <span className="spring-check__fill" />
           <svg className="spring-check__tick" viewBox="0 0 24 24" aria-hidden="true">
-            <path ref={tickRef} d={TICK_PATH} pathLength={1} strokeDasharray={1} style={{ strokeDashoffset: r.tick }} />
+            <path className="spring-check__mark" d={TICK_PATH} pathLength={1} />
             {mixed && <path d={MINUS_PATH} stroke="var(--sc-ink)" />}
           </svg>
         </span>
       </span>
       <span className="spring-check__label">
-        <span ref={wordRef} className="spring-check__word" style={{ opacity: r.word }}>
+        <span className="spring-check__word">
           {label}
         </span>
         {strike !== 'none' ? (
-          <span ref={ruleRef} className="spring-check__rule" aria-hidden="true" style={{ transform: r.rule }} />
+          <span className="spring-check__rule" aria-hidden="true" />
         ) : null}
       </span>
     </button>
