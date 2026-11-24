@@ -137,6 +137,12 @@
   --aml-duration-highlight-fade: 150ms;
   --aml-duration-selection-highlight: 220ms;
   --aml-rotation-flip: .5turn;
+  --primary-action-face-weight: 96%;
+  --primary-action-edge-shade: 24%;
+  --positive-action-edge-shade: 12%;
+  --negative-action-edge-shade: 22%;
+  --action-pressed-fill-progress: 1;
+  --action-pressed-fill-duration: var(--aml-duration-highlight-fade);
   --aml-stroke-status-icon: 2;
   --aml-type-status-label-size: 14px;
   --aml-type-status-line-height: 1.25;
