@@ -1,6 +1,8 @@
+@import '../../../styles/recommendation-panel-tokens.css';
+
 .account-trail-network {
-  --account-trail-comparison-color: light-dark(var(--aml-pink-040), var(--aml-pink-060));
-  --account-trail-episode-color: light-dark(var(--aml-lime-040), var(--aml-lime-080));
+  --account-trail-comparison-color: var(--recommendation-comparison-transaction);
+  --account-trail-episode-color: var(--recommendation-episode-transaction);
 
   display: grid;
   gap: var(--aml-space-8);
@@ -27,7 +29,7 @@
   background: var(--account-trail-scope-color);
 }
 .account-trail-legend [data-scope="shared"]::before {
-  background: linear-gradient(to right, var(--account-trail-comparison-color) 50%, var(--account-trail-episode-color) 50%);
+  background: linear-gradient(to right, var(--account-trail-comparison-color) var(--recommendation-shared-legend-split), var(--account-trail-episode-color) var(--recommendation-shared-legend-split));
 }
 .account-trail-graph { display: block; inline-size: 100%; block-size: auto }
 .account-trail-graph [tabindex] { cursor: pointer; outline: none }

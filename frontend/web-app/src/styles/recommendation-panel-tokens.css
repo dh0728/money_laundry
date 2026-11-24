@@ -1,0 +1,37 @@
+:root {
+  --recommendation-glow-layer: -1;
+  --recommendation-glow-sky: light-dark(var(--aml-sky-070), var(--aml-sky-030));
+  --recommendation-glow-violet: light-dark(var(--aml-violet-070), var(--aml-violet-030));
+  --recommendation-gradient-start: light-dark(var(--aml-sky-090), var(--aml-sky-020));
+  --recommendation-gradient-end: light-dark(var(--aml-violet-090), var(--aml-violet-020));
+  --recommendation-secondary-text: light-dark(var(--aml-gray-040), var(--muted-text));
+
+  --recommendation-glow-sky-inset: 4%;
+  --recommendation-glow-sky-width: 72%;
+  --recommendation-glow-sky-height: 88%;
+  --recommendation-glow-sky-gradient: radial-gradient(ellipse at 44% 52%,
+    color-mix(in srgb, var(--recommendation-glow-sky) 48%, transparent), transparent 75%);
+  --recommendation-glow-sky-shape: 61% 39% 45% 55% / 43% 39% 61% 57%;
+  --recommendation-glow-sky-duration: 10s;
+
+  --recommendation-glow-violet-inline-inset: 32%;
+  --recommendation-glow-violet-block-inset: 17%;
+  --recommendation-glow-violet-width: 65%;
+  --recommendation-glow-violet-height: 74%;
+  --recommendation-glow-violet-gradient: radial-gradient(ellipse at 60% 43%,
+    color-mix(in srgb, var(--recommendation-glow-violet) 48%, transparent), transparent 73%);
+  --recommendation-glow-violet-shape: 42% 58% 35% 65% / 63% 36% 64% 37%;
+  --recommendation-glow-violet-duration: 13s;
+  --recommendation-glow-violet-delay: -3s;
+
+  --recommendation-glow-drift-start: translate(-12%, 4%) rotate(-8deg) scale(.9, 1.09);
+  --recommendation-glow-drift-start-shape: 61% 39% 45% 55% / 43% 61% 39% 57%;
+  --recommendation-glow-drift-midpoint: translate(6%, -11%) rotate(11deg) scale(1.12, .93);
+  --recommendation-glow-drift-midpoint-shape: 41% 59% 64% 36% / 60% 44% 56% 40%;
+  --recommendation-glow-drift-end: translate(15%, 7%) rotate(3deg) scale(.94, 1.06);
+  --recommendation-glow-drift-end-shape: 54% 46% 42% 58% / 38% 52% 48% 62%;
+
+  --recommendation-comparison-transaction: light-dark(var(--aml-pink-040), var(--aml-pink-060));
+  --recommendation-episode-transaction: light-dark(var(--aml-lime-040), var(--aml-lime-080));
+  --recommendation-shared-legend-split: 50%;
+}
