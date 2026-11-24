@@ -1,158 +1,99 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import { DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardMetricGrid } from './dashboard-layout';
-import { AreaSparkline, BarSparkline, LineSparkline } from '../../components/charts/sparkline';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
 import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
-import { Box, Heading, Text } from '../../components/layout-primitives';
-import { dataSeriesColors } from '@/components/charts/charts/chart-context';
+import { Box, Grid, Heading, Text } from '../../components/layout-primitives';
+import { initialDetail, previewUrl } from '../../app/preview-route.js';
 
 const formatter = new Intl.NumberFormat('ko-KR');
-const percent = (count, total) => `${total ? Math.round(count / total * 1000) / 10 : 0}%`;
 const count = value => `${formatter.format(value)}건`;
 const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 3 });
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
 const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
+const PersonalWorkload = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.PersonalWorkload })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
-const sparklines = { area: AreaSparkline, line: LineSparkline, bar: BarSparkline };
-
-function usePlotHeight(enabled, initialHeight) {
-  const plot = React.useRef(null);
-  const [height, setHeight] = React.useState(initialHeight);
-  React.useLayoutEffect(() => {
-    const host = plot.current;
-    if (!enabled || !host) return;
-    const measure = () => {
-      if (host.clientHeight > 0) setHeight(host.clientHeight);
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, [enabled]);
-  return [plot, height];
-}
-
-function CompletionBar({ label, value, total }) {
-  return <Box className="dashboard-completion-plot">
-    <svg role="img" aria-label={`${label} · 전체 ${count(total)} 중 ${count(value)} 완료`} width="100%" height="20">
-      <rect fill={dataSeriesColors.sky} width="100%" height="100%" rx="10" />
-      {value > 0 && <rect fill="var(--chart-completion)" width={`${value / total * 100}%`} height="100%" rx="10" />}
-    </svg>
-  </Box>;
-}
 
 function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key, completion } = item;
-  const trend = item.trend?.rows.some(row => row[item.trend.key] > 0) ? item.trend : undefined;
-  const Sparkline = sparklines[trend?.type] ?? BarSparkline;
-  const [hoverIndex, setHoverIndex] = React.useState(null);
-  const hoveredHour = hoverIndex === null ? undefined : trend?.rows[hoverIndex];
-  const wideValue = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
-  const hasChart = Boolean(trend || completion?.total);
-  const [plot, plotHeight] = usePlotHeight(Boolean(trend), 48);
-  return <Box className="dashboard-metric" data-export-visualization={hasChart || undefined}>
-    <SectionDownloadHeading as="h3" downloadLabel={hasChart ? label : undefined}>{label}</SectionDownloadHeading>
+  const { label, value, unit, detail, key } = item;
+  const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
+  return <Box className="dashboard-metric">
+    <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
     <Box className="dashboard-metric-reading">
-      <Text as="strong" className="dashboard-metric-value" data-composite={Array.isArray(value) || undefined} data-wide-value={wideValue || undefined}>
+      <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined}>
         {typeof value === 'number' && !reduced && !animated.has(key)
           ? <CountUp to={value} duration={0.45} trigger="view" separator="," onEnd={() => animated.add(key)} />
-          : typeof value === 'number' ? formatter.format(value)
-            : Array.isArray(value) ? value.map(({ amount, unit: partUnit }, index) =>
-              <React.Fragment key={index}>
-                {index > 0 && <Text as="small" aria-hidden="true">{item.separator}</Text>}
-                <Text as="span">{formatter.format(amount)}{partUnit && <Text as="small">{partUnit}</Text>}</Text>
-              </React.Fragment>) : value}
+          : typeof value === 'number' ? formatter.format(value) : value}
         {unit && <Text as="small">{unit}</Text>}
       </Text>
     </Box>
     {detail && <Text>{detail}</Text>}
-    {completion?.total > 0 && <CompletionBar label={label} {...completion} />}
-    {trend && <Box className="dashboard-metric-trend">
-      <Box className="dashboard-metric-plot" ref={plot}>
-        <Sparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={plotHeight}
-          {...(Sparkline === BarSparkline ? { barRadius: 6 } : { curve: 'monotone', strokeWidth: 2, fillOpacity: 0.38 })}
-          onHoverChange={setHoverIndex} crosshair="dashed" dot={false} animate={!reduced}
-          aria-label={`${label} · ${trend.caption} · ${trend.rows.map(row => `${row.label} ${count(row[trend.key])}`).join(', ')}`} />
-      </Box>
-      <Text as="span" className="dashboard-note">{hoveredHour
-        ? `${hoveredHour.label} KST · ${count(hoveredHour[trend.key])}`
-        : trend.caption}</Text>
-    </Box>}
   </Box>;
 }
 
-function Metrics({ items, wide, appearance }) {
+function Metrics({ items, appearance }) {
   return <DashboardMetricGrid items={items.map(item => ({
     id: item.key,
-    // Charts whose up-and-down swing drives the call (spikes in inflow, suspicion, new accounts, Alerts) get two rows; backlog and ratio levels stay one row.
-    rowSpan: wide && item.swing ? 2 : 1,
     content: <Metric item={item} reduced={appearance.reduced} />,
-  }))} wide={wide} appearance={appearance} />;
+  }))} appearance={appearance} />;
 }
 
-function DashboardAISummary({ headline, alertRows, timeSlots, period, reduced, benchmarkLink, children }) {
-  const [hovered, setHovered] = React.useState(null);
-  const hasChart = alertRows.length > 0;
-  const [plot, plotHeight] = usePlotHeight(hasChart, 96);
-  const trend = timeSlots.map(({ label }, hour) => ({ label, value: alertRows.filter(row => row.hour === hour).length }));
-  return <AISummaryPanel as="article" reduced={reduced} data-export-visualization={alertRows.length > 0 || undefined}>
-    <SectionDownloadHeading className="dashboard-summary-heading" downloadLabel={hasChart ? 'AI 요약' : undefined}>
-      <Sparkles className="icon" aria-hidden="true" /> AI 요약
-    </SectionDownloadHeading>
-    <Text as="strong">{headline}</Text>
-    {children}
-    {hasChart && <Box as="figure" className="dashboard-summary-trend">
-      <Box as="figcaption">생성 시간대 · KST</Box>
-      <Box className="dashboard-summary-plot" ref={plot}>
-        <BarSparkline data={trend} dataKey="value"
-          aria-label={`우선 확인 Alert 생성 시간대 · KST · ${trend.map(row => `${row.label} ${count(row.value)}`).join(', ')}`}
-          height={plotHeight} color="var(--chart-risk-high)" barRadius={6} dot={false} crosshair="dashed" animate={!reduced}
-          onHoverChange={(_, point) => setHovered(point)} />
+const isPriorityAlert = row => row.kind === 'Alert' && row.open && modelRiskBand(row.score) === 'high' && row.elapsed >= 3;
+
+function CaseLink({ row }) {
+  return <ActionButton as="a" surface="ghost" href={previewUrl({ screen: initialDetail(row.code), code: row.code })}>
+    {row.code}
+  </ActionButton>;
+}
+
+function PersonalMetrics({ data }) {
+  const metrics = [
+    { label: '내 담당 미완료', value: data.unfinished },
+    { label: '고위험 Alert', value: data.highRisk, detail: '미완료 · 위험 점수 ' + modelRiskLabels().high },
+    { label: '3일 이상 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes) },
+  ];
+  return <Grid as="section" columns={12} className="dashboard-priority-metrics" aria-label="내 우선 업무 지표">
+    {metrics.map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
+      <Heading level={3}>{item.label}</Heading>
+      <Text as="strong">{count(item.value)}</Text>
+      {item.detail && <Text className="dashboard-note">{item.detail}</Text>}
+    </Panel>)}
+  </Grid>;
+}
+
+function DashboardSummary({ data, mine, reduced, priorityOnly, onPriority }) {
+  const priority = data.cases.filter(row => isPriorityAlert(row) && (!mine || row.assigned));
+  const headline = priority.length ? '3일 이상 경과한 고위험 Alert ' + count(priority.length) : '3일 이상 경과한 고위험 Alert 없음';
+  return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
+    <Box className="dashboard-priority-heading">
+      <Box>
+        <Heading><Sparkles className="icon" aria-hidden="true" />{mine ? 'AI 요약 · 내 우선 업무' : 'AI 요약'}</Heading>
+        <Text as="strong">{headline}</Text>
       </Box>
-      <Box className="dashboard-summary-trend-axis">
-        <Text as="span">{hovered ? `${hovered.label} · ${count(hovered.value)}` : trend[0]?.label}</Text>
-        {!hovered && <Text as="span">{trend.at(-1)?.label}</Text>}
-      </Box>
-    </Box>}
-    <Box className="dashboard-summary-footer">
-      <Text className="dashboard-note">{period.from} ~ {period.to} · KST</Text>
-      {benchmarkLink && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
+      {priority.length > 0 && <ActionButton aria-pressed={priorityOnly} onClick={onPriority} surface="floating" shape="pill">
+        {priorityOnly ? '전체 업무 보기' : '우선 Alert 보기'}
+      </ActionButton>}
+    </Box>
+    <Box as="details" className="dashboard-priority-details">
+      <Text as="summary">요약 상세 · 집계 기반</Text>
+      <Text>미완료 Alert {count(data.cases.filter(row => row.kind === 'Alert' && row.open).length)} · 진행 중 Episode {count(data.cases.filter(row => row.kind === 'Episode' && row.open).length)}</Text>
+      {priority.length > 0 && <Box className="dashboard-priority-links" aria-label="우선 확인 대상">
+        {[...priority].sort((a, b) => b.score - a.score || b.elapsed - a.elapsed).slice(0, 3).map(row => <CaseLink row={row} key={row.code} />)}
+      </Box>}
+      {!mine && data.dataSource === 'sample' && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
         IBM 원본 거래 집계 <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
       </ActionButton>}
     </Box>
   </AISummaryPanel>;
-}
-
-const priorityAlerts = rows => rows.filter(row => row.open && modelRiskBand(row.score) === 'high' && row.elapsed >= 3);
-
-function MineSummary({ data, reduced }) {
-  const { high } = modelRiskLabels();
-  return <DashboardAISummary headline={`내 담당 미완료 ${count(data.unfinished)}`}
-    alertRows={priorityAlerts(data.alertCases.filter(row => row.assigned))} timeSlots={data.hourly} period={data.period} reduced={reduced}>
-    {data.unfinished > 0 && <Text>{data.urgent > 0
-      ? `위험 점수 ${high}이고 3일 이상 경과한 미완료 Alert ${count(data.urgent)}부터 확인하세요.`
-      : `위험 점수 ${high}이며 3일 이상 경과한 미완료 Alert가 없습니다.`}</Text>}
-  </DashboardAISummary>;
-}
-
-function DashboardSummary({ data, reduced }) {
-  const alerts = priorityAlerts(data.alertCases);
-  return <DashboardAISummary headline={alerts.length
-    ? `우선 확인할 장기 미처리 고위험 Alert ${count(alerts.length)}` : '장기 미처리 고위험 Alert 없음'}
-    alertRows={alerts} timeSlots={data.hourly} period={data.period} reduced={reduced} benchmarkLink>
-    {alerts.length > 0 && <Text>{modelRiskLabels().high} · 3일 이상 경과</Text>}
-  </DashboardAISummary>;
 }
 
 function interleaveCaseKinds(records) {
@@ -162,10 +103,10 @@ function interleaveCaseKinds(records) {
     [alerts[index], episodes[index]].filter(Boolean)).flat();
 }
 
-function WorkBoard({ records, mine, sort, appearance }) {
+function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
   return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 현황'}>
     <Box as="header" className="dashboard-board-heading">
-      <Heading>업무 현황</Heading>
+      <Heading id="dashboard-work-title" tabIndex={-1}>{mine ? '내 업무 현황' : '업무 현황'}</Heading>
       <Box data-dashboard-sort-tags></Box>
       <Box className="dashboard-board-actions">
         <Box data-dashboard-sort></Box>
@@ -173,44 +114,31 @@ function WorkBoard({ records, mine, sort, appearance }) {
       </Box>
     </Box>
     <Box className="dashboard-board-scroll">
-      <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine} pageSize={8}
+      <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine} pageSize={8} statusByCode={statusByCode}
         orderRows={mine && !sort ? interleaveCaseKinds : undefined} />
     </Box>
   </Box>;
 }
 
 export function PreviewDashboard({ mine, data, appearance }) {
-  const metric = (label, value, detail, unit = '건') => ({ label, value, unit, detail, key: `${mine}-${label}` });
-  const trend = (key, color, type = 'line', rows = data.operationalDaily) =>
-    ({ rows, key, color, type, caption: rows === data.hourly ? '생성 시간대 · KST' : '일별 · KST' });
-  const kpis = mine ? [
-    { ...metric(`위험 점수 ${modelRiskLabels().high}`, data.highRisk, '내 담당 미처리 Alert'), trend: trend('highRisk', 'var(--chart-risk-high)', 'bar', data.hourly) },
-    { ...metric('3일 이상 경과', data.overdue, '내 담당 미완료 Alert·Episode'), trend: trend('overdue', 'var(--chart-risk-medium)', 'bar', data.hourly) },
-  ] : [
-    { swing: true, ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', dataSeriesColors.sky, 'area') },
-    { swing: true, ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
-      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/', trend: trend('suspicious', 'var(--chart-suspect)', 'area') },
-    { swing: true, ...metric('새 계좌 · 새 소유주', [{ amount: data.newAccounts, unit: '개' }, { amount: data.newOwners, unit: '명' }],
-      '거래 이력 기준', ''), separator: '·', trend: { ...trend('newAccounts', dataSeriesColors.sky, 'bar'), caption: '일별 최초 등장 계좌 · KST' } },
-    { swing: true, ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', dataSeriesColors.sky, 'area') },
-    { ...metric('업무 처리율', percent(data.settled, data.cases.length), `${count(data.cases.length)} 중 ${count(data.settled)} 완료`, ''),
-      completion: { value: data.settled, total: data.cases.length } },
-    { ...metric('미처리 Alert', data.alertCases.filter(row => row.open).length, '검토 대기·처리 중'), trend: trend('openAlerts', 'var(--chart-open)') },
-    { ...metric('의심 거래 중 Alert 편입', percent(data.linked, data.suspicious.length), `${count(data.suspicious.length)} 중 ${count(data.linked)}`, ''),
-      trend: trend('linked', 'var(--chart-suspect)') },
-    { ...metric('미완료 Episode', data.cases.filter(row => row.kind === 'Episode' && row.open).length, '검토 대기·처리 중'), trend: trend('openEpisodes', 'var(--chart-open)') },
-  ];
+  const [priorityOnly, setPriorityOnly] = useState(false);
+  function togglePriority() {
+    setPriorityOnly(active => !active);
+    requestAnimationFrame(() => document.getElementById('dashboard-work-title')?.focus());
+  }
+  const rows = data.board?.content;
+  const summary = <DashboardSummary data={data} mine={mine} reduced={appearance.reduced}
+    priorityOnly={priorityOnly} onPriority={togglePriority} />;
   return <Box className="preview-dashboard" data-mine={mine}>
-    <Box as="section" className="dashboard-top" aria-label="요약 및 주요 지표">
-      {mine ? <MineSummary data={data} reduced={appearance.reduced} /> : <DashboardSummary data={data} reduced={appearance.reduced} />}
-      <Metrics items={kpis} wide={!mine} appearance={appearance} />
-    </Box>
-    {!mine && <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>
-      <Analytics data={data} reduced={appearance.reduced} />
-    </React.Suspense>}
-    {data.board
-      ? <WorkBoard records={data.board.content} mine={mine} sort={data.sort} appearance={appearance} />
-      : <DashboardBoardSkeleton />}
+    {mine && <PersonalMetrics data={data} />}
+    <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>
+      {mine ? <Grid columns={12} className="dashboard-work-overview-grid">
+        <PersonalWorkload data={data} reduced={appearance.reduced} />
+        {summary}
+      </Grid> : <Analytics data={data} reduced={appearance.reduced} summary={summary} />}
+    </React.Suspense>
+    {rows ? <WorkBoard records={priorityOnly ? rows.filter(isPriorityAlert) : rows}
+      mine={mine} sort={data.sort} appearance={appearance} statusByCode={data.investigation.statusByCode} /> : <DashboardBoardSkeleton />}
   </Box>;
 }
 

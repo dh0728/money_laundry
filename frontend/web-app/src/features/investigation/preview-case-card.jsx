@@ -52,13 +52,13 @@ export function CaseProgressLanes({ renderLane, notice }) {
   </Box>;
 }
 
-export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, pageSize }) {
+export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, pageSize, statusByCode }) {
   const [limits, setLimits] = React.useState({});
   const isEmpty = rows.length === 0;
   return <CaseProgressLanes
     notice={isEmpty && <EmptyState announce>조회 조건에 해당하는 업무가 없습니다.</EmptyState>}
     renderLane={({ label, preset, value }) => {
-        const matching = rows.filter(row => row.status === value);
+        const matching = rows.filter(row => (statusByCode?.[row.code] ?? row.status) === value);
         const cards = orderRows ? orderRows(matching) : matching;
         const limit = limits[preset] ?? pageSize ?? cards.length;
         return <Panel className="case-progress-lane" data-review={preset} key={preset} aria-label={label}>

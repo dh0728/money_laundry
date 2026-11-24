@@ -9,6 +9,7 @@ import { sampleTransactions, transactionFixture } from './transaction-fixtures.j
 import { fixtureCompletionTime } from './verdict-fixtures.js';
 import { dashboardDays, samplePeriod } from './dashboard-record-codes.js';
 import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings.js';
+import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard } from '../features/dashboard/dashboard-investigation.js';
 
 export { dashboardRecordCodes, samplePeriod } from './dashboard-record-codes.js';
 export const dashboardPeriodEnd = new Date(`${samplePeriod[1]}T00:00:00`);
@@ -21,8 +22,6 @@ const hours = [0, 1, 1, 2, 3, 3, 3, 4, 4, 5, 6, 7, 7, 7, 7, 8, 9, 9];
 const sampleReviewStates = ['처리 전', '처리 전', '처리 중', '처리 중', '처리 완료'];
 const extraPatterns = ['Fan-out 82%', 'Scatter-gather 76%', 'Cycle 74%', 'Gather-scatter 71%', 'Fan-in 86%', 'Bipartite 62%'];
 const kstDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' });
-const dateKey = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
-  .map(value => String(value).padStart(2, '0')).join('-');
 export const complexSankeySampleCode = 'A-261111-000018';
 
 function scoredSample(record, score) {
@@ -134,10 +133,10 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
   return { transactions: [...allTransactions.values()], cases, mine: cases.filter(row => row.assigned) };
 }
 
-function dashboardMetrics(transactions, cases, range, history, completedPopulation) {
+function dashboardMetrics(transactions, cases, range, history, completedPopulation, coveredEvidence) {
   const suspicious = transactions.filter(row => row.score >= 55);
   const alertCases = cases.filter(row => row.kind === 'Alert');
-  const linked = new Set(alertCases.flatMap(row => row.related.map(transaction => transaction.code)));
+  const linked = suspicious.filter(row => coveredEvidence.has(row.code)).length;
   const byDay = Map.groupBy(cases, row => dateKey(row.date));
   const transactionsByDay = Map.groupBy(transactions, row => dateKey(row.date));
   const firstSeen = firstSeenByTransaction(history);
@@ -146,7 +145,6 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
   const firstAvailable = new Date(`${samplePeriod[0]}T00:00:00`);
   const start = new Date(range?.from > firstAvailable ? range.from : firstAvailable);
   const end = range?.to < dashboardPeriodEnd ? range.to : dashboardPeriodEnd;
-  const dailyAlertStatus = [];
   const operationalDaily = [];
   const daily = [];
   for (const day = start; day <= end; day.setDate(day.getDate() + 1)) {
@@ -155,12 +153,7 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
     const alerts = rows.filter(row => row.kind === 'Alert');
     const transfers = transactionsByDay.get(date) ?? [];
     const flagged = transfers.filter(row => row.score >= 55);
-    dailyAlertStatus.push({
-      date,
-      pending: alerts.filter(row => row.status === '처리 전').length,
-      inProgress: alerts.filter(row => row.status === '처리 중').length,
-      done: alerts.filter(row => row.status === '처리 완료').length,
-    });
+    const dayLinked = flagged.filter(row => coveredEvidence.has(row.code)).length;
     daily.push({ day: date, incoming: alerts.length, completed: completions.get(date)?.length ?? 0 });
     operationalDaily.push({
       date, label: `${day.getMonth() + 1}/${day.getDate()}`,
@@ -173,7 +166,8 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
       newOwners: transfers.reduce((total, row) => total + (firstSeen.owners.get(row.code) ?? 0), 0),
       settled: rows.filter(row => !row.open).length,
       totalCases: rows.length,
-      linked: flagged.filter(row => linked.has(row.code)).length,
+      linked: dayLinked,
+      unlinked: flagged.length - dayLinked,
     });
   }
   const mine = cases.filter(row => row.assigned);
@@ -202,13 +196,15 @@ function dashboardMetrics(transactions, cases, range, history, completedPopulati
     ownedAlerts: mine.filter(row => row.kind === 'Alert').length,
     highRisk: highRiskAlerts.length,
     overdue: overdueCases.length,
+    overdueAlerts: overdueCases.filter(row => row.kind === 'Alert').length,
+    overdueEpisodes: overdueCases.filter(row => row.kind === 'Episode').length,
     unfinished: unfinished.length,
     urgent: highRiskAlerts.filter(row => row.elapsed >= 3).length,
     newAccounts: operationalDaily.reduce((total, row) => total + row.newAccounts, 0),
     newOwners: operationalDaily.reduce((total, row) => total + row.newOwners, 0),
-    linked: suspicious.filter(row => linked.has(row.code)).length,
+    linked, unlinked: suspicious.length - linked,
     patterns: [...patternCounts].map(([label, count]) => ({ label, count })),
-    daily, dailyAlertStatus, operationalDaily,
+    daily, operationalDaily,
     hourly: kpiHours.map((label, i) => ({
       label,
       total: transactions.filter(row => row.hour === i).length,
@@ -256,14 +252,20 @@ export function dashboardFixtureResponse(source, { mine, rows, population, range
   };
   const periodCases = scopeCases.filter(includesDate);
   const cases = (rows ?? completedPopulation).filter(includesDate);
-  const evidence = mine || completedPopulation.length < scopeCases.length || cases.length < periodCases.length
-    ? new Set(cases.flatMap(row => row.related.map(transaction => transaction.code))) : null;
-  const transactions = source.transactions.filter(row => includesDate(row) && (!evidence || evidence.has(row.code)));
+  const partial = mine || completedPopulation.length < scopeCases.length || cases.length < periodCases.length;
+  const evidence = partial ? new Set(cases.flatMap(row => row.related.map(transaction => transaction.code))) : null;
+  const eligibleTransactions = source.transactions.filter(row => includesDate(row) && (!evidence || evidence.has(row.code)));
+  const transactions = [...new Map(eligibleTransactions.map(row => [row.code, row])).values()];
+  const coveredEvidence = alertEvidenceCodes(partial ? (population ?? rows ?? scopeCases) : scopeCases);
+  const metrics = dashboardMetrics(transactions, cases, range, source.transactions, completedPopulation, coveredEvidence);
   return {
     scope: mine ? 'mine' : 'all',
+    dataSource: 'sample',
     businessAt: `${samplePeriod[1]}T18:00:00+09:00`,
     period: { from, to },
-    ...dashboardMetrics(transactions, cases, range, source.transactions, completedPopulation),
+    coverageScope: partial ? 'case-evidence' : 'institution',
+    ...metrics,
+    ...investigationDashboard(source.cases, cases, metrics.operationalDaily.map(day => day.date)),
     sort,
   };
 }

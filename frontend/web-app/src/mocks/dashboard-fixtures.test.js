@@ -53,3 +53,19 @@ it('preserves true zero dates and scopes transactions to included case evidence 
   expect(empty.transactions).toEqual([]);
   expect(empty.daily).toEqual([{ day: '2026-11-12', incoming: 0, completed: 0 }]);
 });
+
+it('deduplicates suspicious transactions and finds Alert evidence outside the transaction date range', () => {
+  const date = new Date(2026, 10, 11);
+  const range = { from: date, to: date };
+  const linkedTransaction = { ...source.transactions[0], score: 95 };
+  const unlinkedTransaction = { ...source.transactions[1], score: 95 };
+  const alert = { ...source.cases[0], date: new Date(2026, 10, 12), related: [linkedTransaction, linkedTransaction] };
+  const data = dashboardFixtureResponse({
+    transactions: [linkedTransaction, linkedTransaction, unlinkedTransaction], cases: [alert], mine: [],
+  }, { range });
+
+  expect(data.alertCases).toHaveLength(0);
+  expect(data.suspicious).toHaveLength(2);
+  expect(data).toMatchObject({ dataSource: 'sample', linked: 1, unlinked: 1, coverageScope: 'institution' });
+  expect(data.operationalDaily[0]).toMatchObject({ linked: 1, unlinked: 1 });
+});
