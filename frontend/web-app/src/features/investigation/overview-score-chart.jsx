@@ -9,6 +9,7 @@ import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-toolt
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
 import { graphRiskBand } from './case-graph-scope';
 import { getModelRiskThresholds, modelRiskLabels } from '../settings/model-risk-settings';
+import { Box, Text } from '../../components/layout-primitives';
 
 const colors = { high: 'var(--risk-high)', medium: 'var(--risk-medium)', low: 'var(--risk-low)' };
 const scoreDomain = [0, 100];
@@ -61,12 +62,12 @@ function ScoreTimeAxis() {
 }
 
 export function OverviewScoreChart({ points, reduced, fill }) {
-  if (!points.length) return <p className="overview-note">시각과 모델 점수를 함께 확인할 수 있는 거래가 없습니다.</p>;
+  if (!points.length) return <Text className="overview-note">시각과 모델 점수를 함께 확인할 수 있는 거래가 없습니다.</Text>;
   const labels = modelRiskLabels();
   const spansDays = points[0].timestamp.slice(0, 10) !== points.at(-1).timestamp.slice(0, 10);
   const thresholds = getModelRiskThresholds();
-  return <figure className="overview-score-chart" aria-label="거래 시각별 모델 점수">
-    <figcaption>거래 발생 시각 · KST</figcaption>
+  return <Box as="figure" className="overview-score-chart" aria-label="거래 시각별 모델 점수">
+    <Box as="figcaption">거래 발생 시각 · KST</Box>
     <ScatterChart data={points} aspectRatio="auto" className={fill ? 'overview-score-plot' : 'overview-score-compact'}
       formatXLabel={spansDays ? formatDayTick : formatTick}
       jitter={{ x: 0.2, y: 0 }} yDomain={scoreDomain} margin={{ top: 16, right: 16, bottom: 34, left: 34 }}
@@ -83,8 +84,8 @@ export function OverviewScoreChart({ points, reduced, fill }) {
           { label: '모델 점수', value: `${point.score}점`, color: colors[point.band] },
         ]} />} />
     </ScatterChart>
-    <ul className="overview-score-legend" aria-label="모델 점수 범례">
-      {['low', 'medium', 'high'].map(band => <li key={band}><i style={{ background: colors[band] }} />{labels[band]}</li>)}
-    </ul>
-  </figure>;
+    <Box as="ul" className="overview-score-legend" aria-label="모델 점수 범례">
+      {['low', 'medium', 'high'].map(band => <Box as="li" key={band}><Text as="i" style={{ background: colors[band] }} />{labels[band]}</Box>)}
+    </Box>
+  </Box>;
 }

@@ -10,6 +10,7 @@ import { SearchField } from '../../components/search-field';
 import { StatusTag } from '../../components/semantic-tags';
 import { tableCount, TableFieldLabel } from '../../components/workflow-table';
 import './ibm-ledger.css';
+import { Box, Heading, Text } from '@/components/layout-primitives';
 
 const pageSize = 30;
 const integer = new Intl.NumberFormat('ko-KR');
@@ -24,31 +25,31 @@ function dayKey(value) {
 }
 
 function SourceTime({ timestamp }) {
-  return <time dateTime={timestamp.replace(' ', 'T')}>{timestamp}</time>;
+  return <Text as="time" dateTime={timestamp.replace(' ', 'T')}>{timestamp}</Text>;
 }
 
 function Money({ amount, currency }) {
-  return <>{decimal.format(amount)} <span>{currency}</span></>;
+  return <>{decimal.format(amount)} <Text as="span">{currency}</Text></>;
 }
 
 function Account({ endpoint }) {
-  return <div className="benchmark-account"><span>{endpoint.bank}</span><code>{endpoint.account}</code></div>;
+  return <Box className="benchmark-account"><Text as="span">{endpoint.bank}</Text><Text as="code">{endpoint.account}</Text></Box>;
 }
 
 function Detail({ record, card = false }) {
   return <Panel className="benchmark-detail" aria-label={card ? record.code : '선택 거래 상세'}>
-    <header>
-      {card ? <CardHeader code={record.code} /> : <h2>선택 거래 <code>{record.code}</code></h2>}
+    <Box as="header">
+      {card ? <CardHeader code={record.code} /> : <Heading>선택 거래 <Text as="code">{record.code}</Text></Heading>}
       <StatusTag preset="neutral">{labelText(record.labeled)}</StatusTag>
-    </header>
-    <dl>
-      <div><dt>원본 거래 시각</dt><dd><SourceTime timestamp={record.timestamp} /></dd></div>
-      <div><dt>결제 수단</dt><dd>{record.method}</dd></div>
-      <div><dt>송금 은행 · 계좌</dt><dd><Account endpoint={record.from} /></dd></div>
-      <div><dt>수취 은행 · 계좌</dt><dd><Account endpoint={record.to} /></dd></div>
-      <div><dt>지급 금액</dt><dd><Money amount={record.paidAmount} currency={record.paidCurrency} /></dd></div>
-      <div><dt>수취 금액</dt><dd><Money amount={record.receivedAmount} currency={record.receivedCurrency} /></dd></div>
-    </dl>
+    </Box>
+    <Box as="dl">
+      <Box><Box as="dt">원본 거래 시각</Box><Box as="dd"><SourceTime timestamp={record.timestamp} /></Box></Box>
+      <Box><Box as="dt">결제 수단</Box><Box as="dd">{record.method}</Box></Box>
+      <Box><Box as="dt">송금 은행 · 계좌</Box><Box as="dd"><Account endpoint={record.from} /></Box></Box>
+      <Box><Box as="dt">수취 은행 · 계좌</Box><Box as="dd"><Account endpoint={record.to} /></Box></Box>
+      <Box><Box as="dt">지급 금액</Box><Box as="dd"><Money amount={record.paidAmount} currency={record.paidCurrency} /></Box></Box>
+      <Box><Box as="dt">수취 금액</Box><Box as="dd"><Money amount={record.receivedAmount} currency={record.receivedCurrency} /></Box></Box>
+    </Box>
   </Panel>;
 }
 
@@ -85,38 +86,38 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
 
   useEffect(() => { onVisibleRecordsChange?.(rows); }, [onVisibleRecordsChange, rows]);
 
-  return <div className="benchmark-ledger">
+  return <Box className="benchmark-ledger">
     <Panel className="benchmark-scope" aria-label="거래 원장 데이터 범위">
-      <div className="benchmark-source">
-        <h2>{source} 거래 원장</h2>
-        <p>{period.start} ~ {period.end} · 벤치마크 원본 {integer.format(totals.transactions)}건</p>
-        <p>세탁 라벨이 1인 거래 전체와 0인 일부 거래를 포함해 총 {integer.format(records.length)}건을 조회할 수 있습니다.
-          벤치마크 라벨은 AML RADAR의 분석가 판정이나 모델 점수를 나타내지 않습니다.</p>
-      </div>
-      <div className="benchmark-filters" role="group" aria-label="벤치마크 원장 조회 조건">
-        <div className="benchmark-search-group">
-          <span>거래 ID</span>
+      <Box className="benchmark-source">
+        <Heading>{source} 거래 원장</Heading>
+        <Text>{period.start} ~ {period.end} · 벤치마크 원본 {integer.format(totals.transactions)}건</Text>
+        <Text>세탁 라벨이 1인 거래 전체와 0인 일부 거래를 포함해 총 {integer.format(records.length)}건을 조회할 수 있습니다.
+          벤치마크 라벨은 AML RADAR의 분석가 판정이나 모델 점수를 나타내지 않습니다.</Text>
+      </Box>
+      <Box className="benchmark-filters" role="group" aria-label="벤치마크 원장 조회 조건">
+        <Box className="benchmark-search-group">
+          <Text as="span">거래 ID</Text>
           <SearchField variant="compact" label="거래 ID" value={lookup} placeholder="정확한 거래 ID 입력"
             onChange={event => { setLookup(event.target.value); goToPage(0); }} />
-        </div>
-        <label>거래일
+        </Box>
+        <Box as="label">거래일
           <select value={selectedDay} onChange={event => { setSelectedDay(event.target.value); goToPage(0); }}>
             <option value="">전체 날짜</option>
             {days.map(day => <option key={day} value={day}>{day}</option>)}
           </select>
-        </label>
-        <label>원본 라벨
+        </Box>
+        <Box as="label">원본 라벨
           <select value={label} onChange={event => { setLabel(event.target.value); goToPage(0); }}>
             <option value="all">전체 라벨</option>
             <option value="labeled">{labelText(true)}</option>
             <option value="unlabeled">{labelText(false)}</option>
           </select>
-        </label>
-      </div>
+        </Box>
+      </Box>
     </Panel>
     {selected && tableView && <Detail record={selected} />}
-    {code && !selected && <p className="benchmark-empty" role="status">이 원장에 포함된 거래에서 <code>{code}</code>을 찾을 수 없습니다.</p>}
-    <div className="benchmark-ledger-results" ref={results}>
+    {code && !selected && <Text className="benchmark-empty" role="status">이 원장에 포함된 거래에서 <Text as="code">{code}</Text>을 찾을 수 없습니다.</Text>}
+    <Box className="benchmark-ledger-results" ref={results}>
       {tableView ? <CaseDataTable title="벤치마크 거래" summary={tableCount(rows.length)} className="benchmark-table" tools={false}>
         <TableHeader><TableRow>
           {columns.map(title => <TableHead key={title} scope="col">
@@ -136,17 +137,17 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
           </TableRow>)}
           {!visible.length && <TableRow><TableCell colSpan={columns.length}>조건과 일치하는 거래가 없습니다.</TableCell></TableRow>}
         </TableBody>
-      </CaseDataTable> : <div className="benchmark-ledger-cards" aria-label="벤치마크 거래 카드">
-        {!visible.length && <p className="benchmark-empty" role="status">조건과 일치하는 거래가 없습니다.</p>}
+      </CaseDataTable> : <Box className="benchmark-ledger-cards" aria-label="벤치마크 거래 카드">
+        {!visible.length && <Text className="benchmark-empty" role="status">조건과 일치하는 거래가 없습니다.</Text>}
         {visible.map(row => <Detail key={row.code} record={row} card />)}
         {shownPage + 1 < pageCount && <ActionButton shape="pill" surface="floating" onClick={() => goToPage(shownPage + 1)}>
           더 보기
         </ActionButton>}
-      </div>}
-    </div>
+      </Box>}
+    </Box>
     {tableView && <FooterPagination host={paginationHost} label="거래 원장 페이지" page={shownPage}
       pageCount={pageCount} total={rows.length} onPageChange={changePage} />}
-  </div>;
+  </Box>;
 }
 
 export function mountBenchmarkLedger(host, options) {

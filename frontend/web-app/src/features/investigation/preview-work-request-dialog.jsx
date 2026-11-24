@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/input';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { activeReviewStatuses, previewCaseAssignee, requestAdmin, requestCases, requestStaff, workRequestTypes, workRequestUserName } from './preview-work-requests';
 import './case-judgment.css';
+import { Box, Text } from '../../components/layout-primitives';
 
 // 서버 연결에서는 결과가 나중에 온다.
 const showFailure = (result, setError) => result instanceof Promise
@@ -24,11 +25,11 @@ function StaffSelect({ label, value, onChange, except }) {
 }
 
 function ReviewStatusSelect({ value, onChange, except }) {
-  return <div className="case-judgment-field">
-    <span>변경할 처리 상태</span>
+  return <Box className="case-judgment-field">
+    <Text as="span">변경할 처리 상태</Text>
     <GlideSelect ariaLabel="변경할 처리 상태" placeholder="처리 상태 선택" value={value} onChange={onChange}
       options={activeReviewStatuses.filter(status => status !== except).map(status => ({ value: status, label: status }))} />
-  </div>;
+  </Box>;
 }
 
 export function WorkRequestForm({ actor, cases, initialCode, relation, onSend }) {
@@ -47,51 +48,51 @@ export function WorkRequestForm({ actor, cases, initialCode, relation, onSend })
   const target = pickRecipient ? recipient : row && previewCaseAssignee(row);
   const sendsChange = admin && type?.effect;
   const setsReviewStatus = admin && ['reopen', 'status'].includes(type?.effect);
-  return <form className="work-request-frame" onSubmit={event => {
+  return <Box as="form" className="work-request-frame" onSubmit={event => {
     event.preventDefault();
     showFailure(onSend({ typeKey, code: row?.code, recipient: target, reason, deadline, reviewStatus, relatedCodes: relation?.codes }), setError);
   }}>
-    <div className="work-request-form settings-content scroll-area">
-      {relation ? <div className="case-judgment-target-group">
-        <strong>연관 업무 검토 요청</strong>
-        <p>기준 업무 · <code>{initialCode}</code></p>
-        <p>비교 후보 · <code>{relation.codes.join(', ')}</code></p>
-      </div> : <div className="case-judgment-field">
-        <span>요청 유형</span>
+    <Box className="work-request-form settings-content scroll-area">
+      {relation ? <Box className="case-judgment-target-group">
+        <Text as="strong">연관 업무 검토 요청</Text>
+        <Text>기준 업무 · <Text as="code">{initialCode}</Text></Text>
+        <Text>비교 후보 · <Text as="code">{relation.codes.join(', ')}</Text></Text>
+      </Box> : <Box className="case-judgment-field">
+        <Text as="span">요청 유형</Text>
         <GlideSelect ariaLabel="요청 유형" placeholder="요청 유형 선택" value={typeKey}
           onChange={value => { setTypeKey(value); setRecipient(''); setReviewStatus(''); setError(''); }}
           options={Object.entries(workRequestTypes).filter(([key, type]) => type.role === actor.role && key !== 'relationReview')
             .map(([value, type]) => ({ value, label: type.label }))} />
-      </div>}
+      </Box>}
       {type && <>
-        {!relation && <div className="case-judgment-field">
-          <span>대상 업무</span>
+        {!relation && <Box className="case-judgment-field">
+          <Text as="span">대상 업무</Text>
           <GlideSelect ariaLabel="대상 업무" placeholder={eligible.length ? 'Alert 또는 Episode 선택' : '선택 가능한 업무 없음'}
             value={row?.code ?? ''} disabled={!eligible.length}
             options={eligible.map(item => ({ value: item.code, label: `${item.code} · ${verdictLabels[item.verdict]}` }))}
             onChange={value => { setCode(value); setRecipient(''); setReviewStatus(''); setError(''); }} />
-        </div>}
-        {row && <p className="semantic-tag-group"><span>{row.status}</span><VerdictTag verdict={row.verdict} /></p>}
-        {pickRecipient && row ? <div className="case-judgment-field">
-          <span>새 담당자</span>
+        </Box>}
+        {row && <Text className="semantic-tag-group"><Text as="span">{row.status}</Text><VerdictTag verdict={row.verdict} /></Text>}
+        {pickRecipient && row ? <Box className="case-judgment-field">
+          <Text as="span">새 담당자</Text>
           <StaffSelect label="새 담당자" value={recipient} onChange={setRecipient} except={previewCaseAssignee(row)} />
-        </div> : <p>받는 사람 · {admin ? target && workRequestUserName(target) : requestAdmin().name}</p>}
+        </Box> : <Text>받는 사람 · {admin ? target && workRequestUserName(target) : requestAdmin().name}</Text>}
         {setsReviewStatus && row && <ReviewStatusSelect value={reviewStatus} onChange={setReviewStatus} except={row.status} />}
-        {type.deadline && <label className="case-judgment-field">처리 기한
+        {type.deadline && <Box as="label" className="case-judgment-field">처리 기한
           <Input type="date" required value={deadline} onChange={event => setDeadline(event.target.value)} />
-        </label>}
-        <label className="case-judgment-field">사유 및 확인할 근거
+        </Box>}
+        <Box as="label" className="case-judgment-field">사유 및 확인할 근거
           <Textarea required maxLength={2000} value={reason} onChange={event => setReason(event.target.value)} />
-        </label>
-        {sendsChange && <p className="case-judgment-note">보내는 즉시 Sample 업무에 반영됩니다.</p>}
+        </Box>
+        {sendsChange && <Text className="case-judgment-note">보내는 즉시 Sample 업무에 반영됩니다.</Text>}
       </>}
-      {error && <p role="alert">{error}</p>}
-    </div>
+      {error && <Text role="alert">{error}</Text>}
+    </Box>
     <DialogFooter>
       <PrimaryButton type="submit" tone="brand" disabled={!row || !reason.trim() || (pickRecipient && !recipient)
         || (type?.deadline && !deadline) || (setsReviewStatus && !reviewStatus)}>요청 보내기</PrimaryButton>
     </DialogFooter>
-  </form>;
+  </Box>;
 }
 
 export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onOpenCase }) {
@@ -104,32 +105,32 @@ export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onO
   const needsAssignee = admin && item.type === 'changeAssignee' && action === 'approved';
   const canCancel = item.state === 'pending' && item.sender === actor.username && !item.appliedAt;
   const canRespond = item.recipient === actor.username && item.state === 'pending';
-  return <div className="work-request-frame">
-    <div className="work-request-form settings-content scroll-area">
-      <div className="semantic-tag-group">
-        <strong>{workRequestTypes[item.type].label}</strong><span>{requestStateLabels[item.state]}</span>
-      </div>
-      <p>{workRequestUserName(item.sender)} → {workRequestUserName(item.recipient)}</p>
-      <div><LinkTag code={item.code} aria-label={item.code + ' 열기'} data-work-code={undefined} onClick={() => onOpenCase(item.code)} /></div>
-      {item.related?.map(candidate => <section key={candidate.code} className="case-judgment-summary">
-        <div className="semantic-tag-group">
+  return <Box className="work-request-frame">
+    <Box className="work-request-form settings-content scroll-area">
+      <Box className="semantic-tag-group">
+        <Text as="strong">{workRequestTypes[item.type].label}</Text><Text as="span">{requestStateLabels[item.state]}</Text>
+      </Box>
+      <Text>{workRequestUserName(item.sender)} → {workRequestUserName(item.recipient)}</Text>
+      <Box><LinkTag code={item.code} aria-label={item.code + ' 열기'} data-work-code={undefined} onClick={() => onOpenCase(item.code)} /></Box>
+      {item.related?.map(candidate => <Box as="section" key={candidate.code} className="case-judgment-summary">
+        <Box className="semantic-tag-group">
           <LinkTag code={candidate.code} aria-label={candidate.code + ' 열기'} data-work-code={undefined} onClick={() => onOpenCase(candidate.code)} />
           <VerdictTag verdict={candidate.verdict} />
-        </div>
-        <p>{candidate.status} · {workRequestUserName(candidate.assignee)}</p>
-        <p className="work-request-message">공통 거래 · {candidate.transactions.join(', ') || '없음'}</p>
-        <p className="work-request-message">공통 계좌 · {candidate.accounts.join(', ') || '없음'}</p>
-      </section>)}
-      {item.deadline && <p>처리 기한 · <time dateTime={item.deadline}>{item.deadline}</time></p>}
-      <p className="work-request-message">{item.reason}</p>
-      {item.before && <div className="case-judgment-summary">
-        <p className="semantic-tag-group">변경 전 · {item.before.status}<VerdictTag verdict={item.before.verdict} /></p>
-        {item.reviewStatus && <p>변경 후 · {item.reviewStatus}</p>}
-        {item.assignee && <p>담당자 · {workRequestUserName(item.before.assignee)} → {workRequestUserName(item.assignee)}</p>}
-        {item.before.judgment && <p className="work-request-message">이전 판정 사유 · {item.before.judgment.reason}</p>}
-      </div>}
-      {item.note && <p className="work-request-message">처리 내용 · {item.note}</p>}
-      {canRespond && <form id="work-request-response" className="work-request-form" onSubmit={event => {
+        </Box>
+        <Text>{candidate.status} · {workRequestUserName(candidate.assignee)}</Text>
+        <Text className="work-request-message">공통 거래 · {candidate.transactions.join(', ') || '없음'}</Text>
+        <Text className="work-request-message">공통 계좌 · {candidate.accounts.join(', ') || '없음'}</Text>
+      </Box>)}
+      {item.deadline && <Text>처리 기한 · <Text as="time" dateTime={item.deadline}>{item.deadline}</Text></Text>}
+      <Text className="work-request-message">{item.reason}</Text>
+      {item.before && <Box className="case-judgment-summary">
+        <Text className="semantic-tag-group">변경 전 · {item.before.status}<VerdictTag verdict={item.before.verdict} /></Text>
+        {item.reviewStatus && <Text>변경 후 · {item.reviewStatus}</Text>}
+        {item.assignee && <Text>담당자 · {workRequestUserName(item.before.assignee)} → {workRequestUserName(item.assignee)}</Text>}
+        {item.before.judgment && <Text className="work-request-message">이전 판정 사유 · {item.before.judgment.reason}</Text>}
+      </Box>}
+      {item.note && <Text className="work-request-message">처리 내용 · {item.note}</Text>}
+      {canRespond && <Box as="form" id="work-request-response" className="work-request-form" onSubmit={event => {
         event.preventDefault();
         showFailure(onRespond({ id: item.id, action, note, assignee, reviewStatus }), setError);
       }}>
@@ -139,12 +140,12 @@ export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onO
         {needsAssignee && <StaffSelect label="새 담당자" value={assignee} onChange={setAssignee} except={currentAssignee} />}
         {admin && item.type === 'reopen' && action === 'approved' &&
           <ReviewStatusSelect value={reviewStatus} onChange={setReviewStatus} />}
-        <label className="case-judgment-field">처리 내용
+        <Box as="label" className="case-judgment-field">처리 내용
           <Textarea required maxLength={2000} value={note} onChange={event => setNote(event.target.value)} />
-        </label>
-      </form>}
-      {error && <p role="alert">{error}</p>}
-    </div>
+        </Box>
+      </Box>}
+      {error && <Text role="alert">{error}</Text>}
+    </Box>
     {(canCancel || canRespond) && <DialogFooter>
       {canCancel && <ActionButton shape="pill" surface="floating" onClick={() => {
         showFailure(onRespond({ id: item.id, action: 'cancelled' }), setError);
@@ -152,5 +153,5 @@ export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onO
       {canRespond && <PrimaryButton type="submit" form="work-request-response" tone="brand"
         disabled={!action || !note.trim() || (needsAssignee && !assignee)}>처리 결과 보내기</PrimaryButton>}
     </DialogFooter>}
-  </div>;
+  </Box>;
 }
