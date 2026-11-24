@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { Panel, PanelDisclosure } from '../../components/panel';
+import { Panel } from '../../components/panel';
 import { LinkTag, PatternTag, ReviewStatusTag } from '../../components/semantic-tags';
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { Bar, BarHatch } from '../../components/charts/charts/bar';
@@ -195,6 +195,18 @@ const newEntitySeries = [
   { key: 'newOwners', label: '새 소유주', color: dataSeriesColors.pink, value: row => integer.format(row.newOwners) + '명' },
 ];
 
+export function NewEntitiesMetric({ data, reduced }) {
+  const available = data.coverageScope === 'institution';
+  const title = '새 계좌 · 새 소유주';
+  const hasChart = available && (data.newAccounts > 0 || data.newOwners > 0);
+  return <ChartPanel title={title} note={available ? '거래 이력상 최초 등장 · KST' : '기관 전체 조회에서 제공'}
+    className="dashboard-priority-metric dashboard-new-entities" hasChart={hasChart}>
+    {available && <SeriesLegend series={newEntitySeries.map(item => ({ ...item, label: `${item.label} ${item.value(data)}` }))} />}
+    {hasChart && <DailySeries rows={data.operationalDaily} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
+      label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />}
+  </ChartPanel>;
+}
+
 function RiskSegments({ data }) {
   const rows = data.flags.map(row => ({ ...row, label: row.label.split(' · ')[0] }));
   const scored = rows.reduce((sum, row) => sum + row.count, 0);
@@ -248,12 +260,6 @@ function TransactionDetails({ data, flow, reduced, summary }) {
       {flow.hasData ? <>
         <SeriesLegend series={series} />
         <DailySeries rows={rows} series={series} detail={detail} reduced={reduced} label="기간별 거래량 추이" stacked={false} />
-        {data.coverageScope === 'institution' && <PanelDisclosure
-          label={'새 계좌 ' + integer.format(data.newAccounts) + '개 · 새 소유주 ' + integer.format(data.newOwners) + '명'}>
-          <SeriesLegend series={newEntitySeries} />
-          <DailySeries rows={rows} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
-            label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />
-        </PanelDisclosure>}
       </> : <Text className="dashboard-note">표시할 일별 거래량이 없습니다.</Text>}
     </ChartPanel>
     <RiskSegments data={data} />

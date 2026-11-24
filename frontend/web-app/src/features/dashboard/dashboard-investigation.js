@@ -1,4 +1,5 @@
 import { accountTrailComparison, findAccountTrail } from './dashboard-recommendation.js';
+import { isOverdueCaseAge } from '../investigation/case-age.js';
 
 export const dashboardDateKey = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
   .map(value => String(value).padStart(2, '0')).join('-');
@@ -56,10 +57,20 @@ export function investigationDashboard(allCases, cases, dates) {
 
   const dailyAlertStatus = [...alertDays.values()];
   const recommendation = findAccountTrail(cases);
+  const openWork = cases.filter(row => row.open && (row.kind === 'Episode' ||
+    (row.kind === 'Alert' && !row.episodeCode && !episodeByAlert.has(row.code))));
+  const overdueWork = openWork.filter(row => isOverdueCaseAge(row.elapsed));
+  const byAssignee = [...Map.groupBy(openWork, row => row.assigneeId ?? row.assignee ?? row.assigneeName).values()]
+    .flatMap(rows => {
+      const { assigneeId, assignee, assigneeName } = rows[0];
+      return assigneeId != null || assignee || assigneeName
+        ? [{ assignee, name: assigneeName, total: rows.length }] : [];
+    }).sort((first, second) => second.total - first.total);
   return {
     dailyAlertStatus,
     dailyEpisodeStatus: [...episodeDays.values()],
     accountRecommendation: recommendation && { ...recommendation, comparison: accountTrailComparison(recommendation, allCases) },
+    institutionWorkload: { total: openWork.length, byAssignee, overdue: overdueWork },
     investigation: {
       totalAlerts: individualAlerts + episodeAlerts,
       individualAlerts, episodeAlerts, linkedEpisodes: linkedEpisodes.size, routes, dailyAlertStatus, statusByCode,

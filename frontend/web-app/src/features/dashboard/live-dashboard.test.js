@@ -59,6 +59,22 @@ test('personal overdue counts start after day three and retain the Alert and Epi
   expect(data.hourly.reduce((total, row) => total + row.overdue, 0)).toBe(data.overdue);
 });
 
+test('institution workload counts independent Alerts and Episodes once per assignment', async () => {
+  const { liveDashboardResponse } = await import('./live-dashboard.js');
+  const first = { ...alert, assigneeId: 11, assigneeName: '분석가 A' };
+  const second = { ...other, assigneeId: 12, assigneeName: '분석가 B', elapsed: 4 };
+  const member = { ...first, code: 'A-member', elapsed: 5 };
+  const episode = { ...first, kind: 'Episode', code: 'E-linked', elapsed: 4, linkedAlertCodes: [member.code] };
+  const closed = { ...episode, code: 'E-closed', open: false };
+  const data = await liveDashboardResponse({ ...source, cases: [first, second, member, episode, closed] });
+
+  expect(data.institutionWorkload).toMatchObject({
+    total: 3,
+    byAssignee: [{ name: '분석가 A', total: 2 }, { name: '분석가 B', total: 1 }],
+    overdue: [{ code: second.code }, { code: episode.code }],
+  });
+});
+
 test('institution coverage stays unavailable when a server day omits its linked count', async () => {
   getJson.mockResolvedValueOnce({ ...ledger, days: ledger.days.map(row => ({ ...row, linkedSuspicious: undefined })) });
   const { liveDashboardResponse } = await import('./live-dashboard.js');

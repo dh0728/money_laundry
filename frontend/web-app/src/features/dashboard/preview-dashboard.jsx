@@ -14,7 +14,7 @@ import { ActionButton } from '../../components/primary-button';
 import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { BarSparkline } from '../../components/charts/sparkline';
-import { dataSeriesColors, transactionTotalColor } from '../../components/charts/charts/chart-context';
+import { transactionTotalColor } from '../../components/charts/charts/chart-context';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { dashboardDateKey } from './dashboard-investigation';
@@ -24,6 +24,7 @@ import { Bar } from '../../components/charts/charts/bar';
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
 import { flowColors } from './dashboard-flows';
+import { workRequestUserName } from '../investigation/preview-work-requests';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
@@ -33,6 +34,7 @@ const noMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
+const NewEntitiesMetric = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.NewEntitiesMetric })));
 
 function WorkloadBar({ composition, total }) {
   return <Stack className="dashboard-workload-composition">
@@ -107,19 +109,39 @@ function personalIndicators(data) {
   ];
 }
 
-function DashboardIndicators({ data, mine, reduced }) {
-  const daily = (key, color) => ({ rows: data.operationalDaily, key, color, caption: '일별 · KST' });
-  const metrics = mine ? personalIndicators(data) : [
-    { label: '들어온 거래 수', value: data.transactions.length, trend: daily('total', transactionTotalColor) },
-    { label: '모델 의심 거래', value: data.suspicious.length, detail: '의심 비율 ' + share(data.suspicious.length, data.transactions.length),
-      trend: daily('suspicious', 'var(--chart-suspect)') },
-    { label: '생성 Alert', value: data.alertCases.length, trend: daily('alerts', dataSeriesColors.teal) },
+function institutionIndicators(data) {
+  const { total, byAssignee, overdue } = data.institutionWorkload;
+  const busiest = byAssignee[0];
+  const name = person => person.name ?? workRequestUserName(person.assignee) ?? '이름 미제공';
+  const concentration = busiest && total ? new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 1 })
+    .format(busiest.total / total) : '—';
+  const byDate = Map.groupBy(overdue, row => dashboardDateKey(row.date));
+  const overdueAlerts = overdue.filter(row => row.kind === 'Alert').length;
+  return [
+    { label: '담당 업무 집중도', value: concentration, unit: '',
+      detail: busiest ? `${name(busiest)} ${count(busiest.total)} · 전체 미완료 ${count(total)}`
+        : total ? '담당자 집계 정보 없음' : '미완료 업무 없음',
+      trend: { rows: byAssignee.map(person => ({ label: name(person), total: person.total })), key: 'total',
+        color: transactionTotalColor, caption: '담당자별 미완료 건수' } },
+    { label: '3일 초과 미완료', value: overdue.length,
+      detail: `Alert ${count(overdueAlerts)} · Episode ${count(overdue.length - overdueAlerts)}`,
+      trend: { rows: data.operationalDaily.map(({ date, label }) => ({ label, 미완료: byDate.get(date)?.length ?? 0 })),
+        key: '미완료', color: 'var(--chart-risk-high)', caption: '업무 생성일 기준 · KST' } },
   ];
+}
+
+function DashboardIndicators({ data, mine, reduced }) {
+  const metrics = mine ? personalIndicators(data) : institutionIndicators(data);
   const trendHeight = mine ? readWorkspaceLength('--chart-detail-sparkline-height') || undefined : undefined;
   const cards = metrics.map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
     <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} trendHeight={trendHeight} />
   </Panel>);
-  return mine ? cards : <DashboardIndicatorsGrid aria-label="기관 주요 지표">{cards}</DashboardIndicatorsGrid>;
+  return mine ? cards : <DashboardIndicatorsGrid aria-label="기관 주요 지표">
+    <React.Suspense fallback={<Panel as="article" className="dashboard-priority-metric" aria-busy="true" />}>
+      <NewEntitiesMetric data={data} reduced={reduced} />
+    </React.Suspense>
+    {cards}
+  </DashboardIndicatorsGrid>;
 }
 
 function EvidenceRecord({ evidence, direction }) {

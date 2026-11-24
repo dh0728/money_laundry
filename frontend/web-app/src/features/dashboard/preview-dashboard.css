@@ -100,6 +100,7 @@
   grid-column: span 4;
   min-inline-size: 0;
 }
+.dashboard-new-entities .dashboard-series-plot { min-block-size: var(--chart-detail-sparkline-height) }
 .dashboard-workflow-charts {
   --dashboard-score-middle: color-mix(in srgb, var(--chart-suspect), var(--information-panel-surface));
   --dashboard-score-lower: color-mix(in srgb, var(--dashboard-score-middle), var(--information-panel-surface));
