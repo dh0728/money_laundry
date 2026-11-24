@@ -175,8 +175,6 @@ export interface ChartTooltipProps {
   indicatorFadeLength?: number;
   /** Per-chart override for the floating-panel spring. */
   boxSpringConfig?: SpringConfig;
-  /** Inline styles for the tooltip panel (background, blur, etc.). */
-  panelStyle?: React.CSSProperties;
   /**
    * Tooltip panel background color (CSS variable or color value).
    * Default: `var(--chart-tooltip-background)`.
@@ -321,7 +319,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
   indicatorFadeEdges,
   indicatorFadeLength,
   boxSpringConfig,
-  panelStyle,
   backgroundColor,
   dateLabels: dateLabelsProp,
   exit = true,
@@ -660,7 +657,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
         containerRef={containerRef}
         containerWidth={width}
         exit={exit}
-        panelStyle={panelStyle}
         springConfig={boxMotion.springConfig}
         {...boxPlacement}
         visible={visible}

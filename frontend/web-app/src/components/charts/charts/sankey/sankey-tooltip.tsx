@@ -35,8 +35,6 @@ export interface SankeyTooltipProps {
   formatValue?: (value: number) => string;
   /** Custom class name */
   className?: string;
-  /** Inline styles merged onto the tooltip panel (e.g. background, backdrop blur). */
-  panelStyle?: React.CSSProperties;
   /** Class applied to the tooltip panel. */
   panelClassName?: string;
   /** Fade the panel out when hover ends. Default: true */
@@ -50,7 +48,6 @@ export function SankeyTooltip({
   linkContent,
   formatValue = intFmt,
   className = "",
-  panelStyle,
   panelClassName,
   exit = true,
   entrance = true,
@@ -130,7 +127,6 @@ export function SankeyTooltip({
       animate={entrance}
       entrance={entrance}
       exit={exit}
-      panelStyle={panelStyle}
       panelClassName={panelClassName}
       visible={body !== null}
       x={x}

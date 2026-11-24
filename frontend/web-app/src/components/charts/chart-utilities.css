@@ -1,3 +1,4 @@
+@import "../../styles/chart-tooltip-tokens.css";
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "./charts";
@@ -10,10 +11,30 @@
   --color-border: var(--divider);
 }
 
-.bklit-tooltip-panel.glass {
-  --glass-surface-face: color-mix(in srgb, var(--information-panel-surface) 64%, var(--glass-material-frost));
-  border: var(--aml-stroke-control) solid var(--glass-surface-edge);
-  border-radius: var(--aml-radius-card);
+.bklit-tooltip-anchor {
+  left: var(--chart-tooltip-left);
+  top: var(--chart-tooltip-top);
 }
+.bklit-tooltip-entrance { transform-origin: left top }
+.bklit-tooltip-entrance[data-flipped],
+.bklit-tooltip-panel[data-flipped] { transform-origin: right top }
+.bklit-tooltip-panel.glass {
+  --glass-surface-face: var(--chart-tooltip-panel-background, var(--chart-tooltip-glass-face));
+  min-width: var(--chart-tooltip-min-width);
+  border: var(--aml-stroke-control) solid var(--glass-surface-edge);
+  border-radius: var(--chart-tooltip-panel-radius, var(--aml-radius-card));
+  transform: var(--chart-tooltip-panel-scale, none);
+  transform-origin: left top;
+}
+.bklit-tooltip-panel.glass[data-flipped] { transform-origin: right top }
 .bklit-tooltip-panel .border-b { border-color: var(--glass-edge) }
-.bklit-tooltip-clip { border-radius: calc(var(--aml-radius-card) - var(--aml-stroke-control)) }
+.bklit-tooltip-clip {
+  border-radius: var(--chart-tooltip-clip-radius, calc(var(--aml-radius-card) - var(--aml-stroke-control)));
+  transform: var(--chart-tooltip-clip-scale, none);
+  transform-origin: left top;
+}
+.bklit-tooltip-content {
+  transform: var(--chart-tooltip-content-scale, none);
+  transform-origin: left top;
+}
+.bklit-tooltip-series-dot { background-color: var(--chart-tooltip-series-color) }

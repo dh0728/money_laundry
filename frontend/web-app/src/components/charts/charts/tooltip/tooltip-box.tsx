@@ -9,9 +9,11 @@ import {
   frame,
   frameData,
   LazyMotion,
+  type MotionStyle,
   type MotionValue,
   m,
   type Process,
+  useMotionTemplate,
   useSpring,
 } from "motion/react";
 import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
@@ -78,8 +80,6 @@ export interface TooltipBoxProps {
    * `animate` or `entrance` is false. Default: true
    */
   animateSize?: boolean;
-  /** Inline styles for the inner tooltip panel. */
-  panelStyle?: React.CSSProperties;
   /** Class applied to the inner tooltip panel. */
   panelClassName?: string;
   /**
@@ -90,7 +90,7 @@ export interface TooltipBoxProps {
 }
 
 export const TOOLTIP_PANEL_CLASS_NAME =
-  "glass bklit-tooltip-panel relative min-w-[160px] text-chart-tooltip-foreground";
+  "glass bklit-tooltip-panel relative text-chart-tooltip-foreground";
 
 /** Clips content to the panel's inner radius without clipping the edge highlight. */
 export const TOOLTIP_PANEL_INNER_CLASS_NAME = "bklit-tooltip-clip overflow-hidden";
@@ -171,8 +171,6 @@ const ratio = (drawn: number, layout: number) =>
 interface PanelRadii {
   panel: number | null;
   clip: number | null;
-  panelInline: string;
-  clipInline: string;
 }
 
 /** Border-box layout size (fractional, unaffected by transforms). */
@@ -225,27 +223,26 @@ function drawPanelTween(
   const scaleY = ratio(drawn.panelHeight, target.panelHeight);
   const clipScaleX = ratio(drawn.clipWidth, target.clipWidth);
   const clipScaleY = ratio(drawn.clipHeight, target.clipHeight);
-  panel.style.transform = `scale(${scaleX}, ${scaleY})`;
+  panel.style.setProperty("--chart-tooltip-panel-scale", `scale(${scaleX}, ${scaleY})`);
   const offsetX = clip.offsetLeft / scaleX - clip.offsetLeft;
   const offsetY = clip.offsetTop / scaleY - clip.offsetTop;
   const translate =
     offsetX || offsetY ? `translate3d(${offsetX}px, ${offsetY}px, 0px) ` : "";
-  clip.style.transform = `${translate}scale(${clipScaleX / scaleX}, ${
-    clipScaleY / scaleY
-  })`;
-  content.style.transform = `scale(${1 / clipScaleX}, ${1 / clipScaleY})`;
+  clip.style.setProperty(
+    "--chart-tooltip-clip-scale",
+    `${translate}scale(${clipScaleX / scaleX}, ${clipScaleY / scaleY})`
+  );
+  content.style.setProperty("--chart-tooltip-content-scale", `scale(${1 / clipScaleX}, ${1 / clipScaleY})`);
   if (radii.panel !== null) {
-    panel.style.borderRadius = correctedRadius(
-      radii.panel,
-      drawn.panelWidth,
-      drawn.panelHeight
+    panel.style.setProperty(
+      "--chart-tooltip-panel-radius",
+      correctedRadius(radii.panel, drawn.panelWidth, drawn.panelHeight)
     );
   }
   if (radii.clip !== null) {
-    clip.style.borderRadius = correctedRadius(
-      radii.clip,
-      drawn.clipWidth,
-      drawn.clipHeight
+    clip.style.setProperty(
+      "--chart-tooltip-clip-radius",
+      correctedRadius(radii.clip, drawn.clipWidth, drawn.clipHeight)
     );
   }
 }
@@ -294,7 +291,7 @@ function usePanelSizeTween(
     let progress = 1;
     let controls: AnimationPlaybackControls | undefined;
     let pendingStart: Process | undefined;
-    // Read when a tween starts; the inline values are restored when it ends.
+    // Read at the start of each tween, before the temporary radii apply.
     let radii: PanelRadii | null = null;
 
     const stop = () => {
@@ -307,14 +304,12 @@ function usePanelSizeTween(
     };
 
     const reset = () => {
-      panel.style.transform = "";
-      clip.style.transform = "";
-      content.style.transform = "";
-      if (radii) {
-        panel.style.borderRadius = radii.panelInline;
-        clip.style.borderRadius = radii.clipInline;
-        radii = null;
-      }
+      panel.style.removeProperty("--chart-tooltip-panel-scale");
+      panel.style.removeProperty("--chart-tooltip-panel-radius");
+      clip.style.removeProperty("--chart-tooltip-clip-scale");
+      clip.style.removeProperty("--chart-tooltip-clip-radius");
+      content.style.removeProperty("--chart-tooltip-content-scale");
+      radii = null;
     };
 
     const draw = (latest: number) => {
@@ -336,8 +331,6 @@ function usePanelSizeTween(
       radii ??= {
         panel: readPxRadius(panel),
         clip: readPxRadius(clip),
-        panelInline: panel.style.borderRadius,
-        clipInline: clip.style.borderRadius,
       };
       // This frame draws the old size; the spring starts on the next one.
       draw(0);
@@ -396,11 +389,9 @@ function usePanelSizeTween(
   });
 }
 
-const ORIGIN_TOP_LEFT: React.CSSProperties = { transformOrigin: "0 0" };
-
 /**
  * The tooltip panel: an entrance wrapper (scale/slide pivoting on
- * `transformOrigin`) around the styled panel (fade + size), its clip box and
+ * the active side) around the styled panel (fade + size), its clip box and
  * the content.
  *
  * `animateSize` tweens the panel to its new size when the content changes
@@ -416,20 +407,20 @@ const ORIGIN_TOP_LEFT: React.CSSProperties = { transformOrigin: "0 0" };
  * reduced motion. Callers pass `false` under reduced motion and when the
  * position is not animated.
  */
-export function TooltipPanel({
+function TooltipPanel({
   animateSize,
   entrance,
-  transformOrigin,
+  flipped,
   className,
-  style,
+  backgroundColor,
   children,
 }: {
   animateSize: boolean;
   /** Entrance scale/slide start, or `false` to only fade in. */
   entrance: { scale: number; x?: number } | false;
-  transformOrigin: string;
+  flipped: boolean;
   className: string;
-  style: React.CSSProperties;
+  backgroundColor?: string;
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -448,7 +439,8 @@ export function TooltipPanel({
     <m.div
       animate={{ scale: 1, x: 0 }}
       initial={entrance === false ? false : { x: 0, ...entrance }}
-      style={{ transformOrigin }}
+      className="bklit-tooltip-entrance"
+      data-flipped={flipped || undefined}
       transition={PANEL_ENTRANCE_SPRING}
     >
       <m.div
@@ -456,15 +448,14 @@ export function TooltipPanel({
         className={className}
         initial={{ opacity: 0 }}
         ref={panelRef}
-        style={{ ...style, ...ORIGIN_TOP_LEFT }}
+        style={{ "--chart-tooltip-panel-background": backgroundColor } as MotionStyle}
         transition={PANEL_ENTRANCE_SPRING}
       >
         <div
           className={TOOLTIP_PANEL_INNER_CLASS_NAME}
           ref={clipRef}
-          style={ORIGIN_TOP_LEFT}
         >
-          <div ref={contentRef} style={ORIGIN_TOP_LEFT}>
+          <div className="bklit-tooltip-content" ref={contentRef}>
             {children}
           </div>
         </div>
@@ -583,7 +574,6 @@ function TooltipBoxInner({
   entrance = true,
   replayOnFlip = true,
   animateSize = true,
-  panelStyle,
   panelClassName: customPanelClassName,
   backgroundColor = chartCssVars.tooltipBackground,
   container,
@@ -677,11 +667,11 @@ function TooltipBoxInner({
       if (!animate) {
         const left = `${tx}px`;
         const top = `${ty}px`;
-        if (el.style.left !== left) {
-          el.style.left = left;
+        if (el.style.getPropertyValue("--chart-tooltip-left") !== left) {
+          el.style.setProperty("--chart-tooltip-left", left);
         }
-        if (el.style.top !== top) {
-          el.style.top = top;
+        if (el.style.getPropertyValue("--chart-tooltip-top") !== top) {
+          el.style.setProperty("--chart-tooltip-top", top);
         }
         return;
       }
@@ -733,30 +723,30 @@ function TooltipBoxInner({
     ? (leftOverride ?? animatedLeft)
     : staticPosition.left;
   const finalTop = animate ? (topOverride ?? animatedTop) : staticPosition.top;
+  const anchorLeft = useMotionTemplate`${finalLeft}px`;
+  const anchorTop = useMotionTemplate`${finalTop}px`;
   const isFlipped = flippedOverride ?? shouldFlipX;
-  const transformOrigin = isFlipped ? "right top" : "left top";
 
   const panelClassName = cn(
     TOOLTIP_PANEL_CLASS_NAME,
     customPanelClassName
   );
-  const panelStyleResolved = {
-    ...(panelStyle?.backgroundColor === undefined && backgroundColor !== chartCssVars.tooltipBackground && {
-      backgroundColor,
-    }),
-    ...panelStyle,
-  };
+  const panelBackground = backgroundColor === chartCssVars.tooltipBackground ? undefined : backgroundColor;
 
   if (!entrance) {
     return createPortal(
       <div
-        className={cn("pointer-events-none absolute z-50", className)}
+        className={cn("bklit-tooltip-anchor pointer-events-none absolute z-50", className)}
         ref={tooltipRef}
-        style={{ left: staticPosition.left, top: staticPosition.top }}
+        style={{
+          "--chart-tooltip-left": `${staticPosition.left}px`,
+          "--chart-tooltip-top": `${staticPosition.top}px`,
+        } as React.CSSProperties}
       >
         <div
           className={panelClassName}
-          style={{ transformOrigin, ...panelStyleResolved }}
+          data-flipped={isFlipped || undefined}
+          style={{ "--chart-tooltip-panel-background": panelBackground } as React.CSSProperties}
         >
           <div className={TOOLTIP_PANEL_INNER_CLASS_NAME}>{children}</div>
         </div>
@@ -768,11 +758,14 @@ function TooltipBoxInner({
   return createPortal(
     <m.div
       animate={{ opacity: 1 }}
-      className={cn("pointer-events-none absolute z-50", className)}
+      className={cn("bklit-tooltip-anchor pointer-events-none absolute z-50", className)}
       exit={{ opacity: 0 }}
       initial={{ opacity: 0 }}
       ref={tooltipRef}
-      style={{ left: finalLeft, top: finalTop }}
+      style={animate ? {
+        "--chart-tooltip-left": anchorLeft,
+        "--chart-tooltip-top": anchorTop,
+      } as MotionStyle : undefined}
       transition={{ duration: 0.1 }}
     >
       <TooltipPanel
@@ -784,8 +777,8 @@ function TooltipBoxInner({
           reducedMotion ? false : { scale: 0.85, x: isFlipped ? 20 : -20 }
         }
         key={flipKey}
-        style={panelStyleResolved}
-        transformOrigin={transformOrigin}
+        backgroundColor={panelBackground}
+        flipped={isFlipped}
       >
         {children}
       </TooltipPanel>
