@@ -14,6 +14,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -28,6 +29,7 @@ import {
   type SankeyTooltipData,
 } from "./sankey-context";
 import { SankeyProvider } from "./sankey-provider";
+import "./sankey-chart.css";
 
 export interface SankeyData {
   nodes: SankeyNodeDatum[];
@@ -285,10 +287,14 @@ export function SankeyChart({
   onNodeHoverChange,
 }: SankeyChartProps) {
   const margin = { ...DEFAULT_MARGIN, ...marginProp };
+  const chartRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    chartRef.current?.style.setProperty("--sankey-chart-aspect-ratio", aspectRatio);
+  }, [aspectRatio]);
 
   return (
     <LazyMotion features={domAnimation}>
-      <div className={cn("relative w-full", className)} style={{ aspectRatio }}>
+      <div className={cn("sankey-chart relative w-full", className)} ref={chartRef}>
         <ParentSize>
           {({ width, height }) => (
             <SankeyChartInner

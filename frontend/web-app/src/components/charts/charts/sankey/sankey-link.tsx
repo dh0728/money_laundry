@@ -7,6 +7,7 @@ import type {
 import { m, useTransform } from "motion/react";
 import { Fragment, type ReactNode, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMountProgress } from "../use-mount-progress";
+import { readChartDurationSeconds } from "../../chart-design-values";
 import {
   type SankeyLinkDatum,
   type SankeyNodeDatum,
@@ -121,6 +122,7 @@ function AnimatedLink({
   const { enterTransition, revealEpoch } = useSankey();
   const pathRef = useRef<SVGPathElement>(null);
   const [pathLength, setPathLength] = useState(0);
+  const [highlightDuration] = useState(() => readChartDurationSeconds("--chart-sankey-highlight-duration", 0.18));
 
   // Links animate during the last 80% of total duration, starting at 20%
   const linkStartDelay = animationDuration * 0.2;
@@ -164,6 +166,7 @@ function AnimatedLink({
   return (
     <m.path
       animate={{ opacity: animatedOpacity }}
+      className="sankey-interactive-mark"
       data-sankey-highlighted={isHighlighted || undefined}
       d={path}
       fill="none"
@@ -183,12 +186,9 @@ function AnimatedLink({
       ref={pathRef}
       stroke={stroke}
       strokeDasharray={reveal ? dashArray : undefined}
+      strokeDashoffset={reveal ? strokeDashoffset : undefined}
       strokeWidth={Math.max(1, width)}
-      style={{
-        cursor: "pointer",
-        strokeDashoffset: reveal ? strokeDashoffset : undefined,
-      }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
+      transition={{ duration: highlightDuration, ease: "easeOut" }}
     />
   );
 }

@@ -6,12 +6,10 @@ import { useSankey } from './sankey-context';
 import { SankeyLink } from './sankey-link';
 import { SankeyNode } from './sankey-node';
 import { SankeyTooltip } from './sankey-tooltip';
+import { readChartNumber } from '../../chart-design-values';
 
 const formatCount = new Intl.NumberFormat('ko-KR');
 const countLabel = (count, unit = '건') => count == null ? '' : formatCount.format(count) + unit;
-const margin = { left: 8, right: 174, top: 8, bottom: 8 };
-const nodeWidth = 10;
-const nodePadding = 15;
 const nodeColor = node => node.color;
 
 function layoutFor(stages) {
@@ -36,22 +34,30 @@ function layoutFor(stages) {
 
 function Labels() {
   const { nodes, links } = useSankey();
+  const [offsets] = useState(() => ({
+    label: `${readChartNumber('--chart-sankey-label-offset', 0.34)}em`,
+    labelWithDetail: `${readChartNumber('--chart-sankey-label-with-detail-offset', -0.15)}em`,
+    detail: `${readChartNumber('--chart-sankey-detail-offset', 1.15)}em`,
+    nodeInset: readChartNumber('--aml-space-8', 8),
+    countInset: readChartNumber('--aml-space-6', 6),
+    linkCaptionInset: readChartNumber('--chart-sankey-link-caption-inset', 9),
+  }));
   return <g className="staged-sankey-labels" aria-hidden="true">
     {nodes.map(node => {
-      const x = node.x1 + 8;
+      const x = node.x1 + offsets.nodeInset;
       const y = (node.y0 + node.y1) / 2;
       return <g key={node.index}>
         {node.anchor && <circle data-sankey-anchor={node.anchor} cx={(node.x0 + node.x1) / 2}
-          cy={node.y1} r={1} opacity={0} />}
-        <text x={x} y={y} dy={node.detail ? '-.15em' : '.34em'}>
+          cy={node.y1} opacity={0} />}
+        <text x={x} y={y} dy={node.detail ? offsets.labelWithDetail : offsets.label}>
           {node.name}
-          <tspan dx={6}>{[countLabel(node.count, node.unit), node.ratio].filter(Boolean).join(' · ')}</tspan>
-          {node.detail && <tspan x={x} dy="1.15em">{node.detail}</tspan>}
+          <tspan dx={offsets.countInset}>{[countLabel(node.count, node.unit), node.ratio].filter(Boolean).join(' · ')}</tspan>
+          {node.detail && <tspan x={x} dy={offsets.detail}>{node.detail}</tspan>}
         </text>
       </g>;
     })}
     {links.filter(link => link.caption).map(link => <text key={link.index} textAnchor="end"
-      x={link.target.x0 - 9} y={(link.y0 + link.y1) / 2} dy=".34em">{link.caption}</text>)}
+      x={link.target.x0 - offsets.linkCaptionInset} y={(link.y0 + link.y1) / 2} dy={offsets.label}>{link.caption}</text>)}
   </g>;
 }
 
@@ -64,14 +70,23 @@ function TooltipValue({ title, count, unit, note }) {
 
 export function StagedSankey({ data, stages, label, reduced }) {
   const layout = useMemo(() => layoutFor(stages.length), [stages.length]);
+  const [design] = useState(() => {
+    const inset = readChartNumber('--aml-space-8', 8);
+    return {
+      margin: { left: inset, right: readChartNumber('--chart-sankey-stage-label-reserve', 174), top: inset, bottom: inset },
+      nodeWidth: readChartNumber('--aml-space-10', 10),
+      nodePadding: readChartNumber('--chart-sankey-stage-node-gap', 15),
+      linkOpacity: readChartNumber('--chart-sankey-link-opacity', 0.3),
+    };
+  });
   return <Box className="staged-sankey-scroller">
     <Box className="staged-sankey-content">
       <Box className="staged-sankey-stages" data-stage-count={stages.length}>
         {stages.map(name => <Text as="span" key={name}>{name}</Text>)}
       </Box>
-      <SankeyChart data={data} layout={layout} margin={margin} className="staged-sankey-chart"
-        nodeWidth={nodeWidth} nodePadding={nodePadding} animationDuration={reduced ? 0 : undefined} interactionLabel={label}>
-        <SankeyLink reveal={!reduced} useGradient={false} strokeOpacity={0.3} getLinkColor={link => link.color ?? link.target.color} />
+      <SankeyChart data={data} layout={layout} margin={design.margin} className="staged-sankey-chart"
+        nodeWidth={design.nodeWidth} nodePadding={design.nodePadding} animationDuration={reduced ? 0 : undefined} interactionLabel={label}>
+        <SankeyLink reveal={!reduced} useGradient={false} strokeOpacity={design.linkOpacity} getLinkColor={link => link.color ?? link.target.color} />
         <SankeyNode showLabels={false} showValueLabels={false} getNodeColor={nodeColor} />
         <Labels />
         <SankeyTooltip entrance={!reduced} exit={!reduced}
@@ -89,6 +104,7 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
     const host = hostRef.current;
     const chart = host?.querySelector('.staged-sankey-scroller');
     if (!chart) return undefined;
+    const edgeInset = readChartNumber('--chart-sankey-connector-edge-inset', 18);
     const measure = () => {
       const origin = host.getBoundingClientRect();
       const chartBottom = chart.getBoundingClientRect().bottom - origin.top;
@@ -100,7 +116,7 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
         const end = target.getBoundingClientRect();
         const startX = start.left + start.width / 2 - origin.left;
         const startY = start.top + start.height / 2 - origin.top;
-        const endX = Math.min(Math.max(startX, end.left - origin.left + 18), end.right - origin.left - 18);
+        const endX = Math.min(Math.max(startX, end.left - origin.left + edgeInset), end.right - origin.left - edgeInset);
         const endY = end.top - origin.top;
         const turnY = (chartBottom + endY) / 2;
         return [{ id, tone, endX, endY, path: `M ${startX} ${startY} V ${chartBottom} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
@@ -123,7 +139,7 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
   return <svg className="staged-sankey-relations" aria-hidden="true">
     {lines.map(({ id, tone, path, endX, endY }) => <g key={id} data-tone={tone}>
       <path d={path} />
-      <circle cx={endX} cy={endY} r={2.5} />
+      <circle cx={endX} cy={endY} />
     </g>)}
   </svg>;
 }

@@ -94,5 +94,5 @@ export const sankeyCssVars = {
   foreground: "var(--chart-foreground)",
   nodePrimary: "var(--aml-sky-050)",
   nodeSecondary: "var(--aml-pink-050)",
-  linkColor: "var(--chart-foreground-muted, hsl(0, 0%, 50%))",
+  linkColor: "var(--chart-foreground-muted, var(--chart-sankey-unassigned-link-color))",
 };

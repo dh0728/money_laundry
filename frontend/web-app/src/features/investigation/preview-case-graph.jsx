@@ -215,8 +215,8 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
           return {
             ...nodeHandlers(name),
             'data-sankey-draggable': '',
+            'data-sankey-dragging': activeId === name || undefined,
             transform: x || y ? `translate(${x} ${y})` : undefined,
-            style: { cursor: activeId === name ? 'grabbing' : 'grab' },
           };
         }} />
       <SankeyTooltip className="preview-graph-sankey-tooltip" entrance={false} exit={false}
