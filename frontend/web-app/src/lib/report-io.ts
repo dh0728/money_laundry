@@ -14,7 +14,7 @@ export function createCsv(headers: readonly string[], rows: readonly (readonly C
   }
   return `\uFEFF${[headers, ...rows].map(row => row.map(quote).join(',')).join('\r\n')}\r\n`
 }
-function downloadBlob(filename: string, blob: Blob) {
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
