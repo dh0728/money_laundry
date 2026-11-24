@@ -234,9 +234,9 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
   const selected = id === null ? undefined : rows.find(rule => rule.id === id) ?? rows[0];
   const breakdown = Object.entries(ruleStatusLabels).map(([value, label]) => ({
     value, label, count: rules.filter(rule => rule.status === value).length,
-  })).filter(({ count }) => count);
+  }));
   const history = selected ? [...selected.history].reverse() : [];
-  const ruleFilter = [{ value: 'all', label: '전체' }, ...breakdown.map(({ value, label }) => ({ value, label }))];
+  const ruleFilter = [{ value: 'all', label: '전체' }, ...breakdown.filter(row => row.count).map(({ value, label }) => ({ value, label }))];
   useEffect(() => registerTableTools?.({
     filter: { label: '룰 상태', options: ruleFilter, value: status, onChange: setStatus },
     entries: [{ label: '조회된 룰', format: 'CSV', count: sorting.rows.length,
@@ -245,7 +245,15 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
   }));
   const actions = <RuleActions rule={selected} actionsHost={actionsHost} listLink={reason}
     onTransition={setDeciding} onRemove={() => setRemoving(selected)} />;
+  const inventory = <Box as="dl" className="workflow-rule-inventory" aria-label="룰 상태별 수">
+    <Panel as="div"><Box as="dt">등록된 룰</Box><Box as="dd">{countFormat.format(rules.length)}</Box></Panel>
+    {breakdown.filter(({ value }) => value !== 'TESTING').map(({ value, label, count }) => <Panel as="div" key={value}>
+      <Box as="dt"><StatusTag preset={presets[value]}>{label}</StatusTag></Box>
+      <Box as="dd">{countFormat.format(count)}</Box>
+    </Panel>)}
+  </Box>;
   if (!rules.length) return <>
+    {loadState === 'ready' && inventory}
     <RuleListState status={loadState === 'ready' ? 'empty' : loadState} error={loadError} onRetry={retry} />
     {actions}
   </>;
@@ -254,13 +262,7 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
     {loadState === 'error' && <Text role="alert" className="workflow-rule-note">
       최신 룰 목록을 불러오지 못해 직전 목록을 보여 줍니다. <ActionButton onClick={retry}>다시 시도</ActionButton>
     </Text>}
-    <Box as="dl" className="workflow-rule-inventory" aria-label="룰 상태별 수">
-      <Panel as="div"><Box as="dt">등록된 룰</Box><Box as="dd">{countFormat.format(rules.length)}</Box></Panel>
-      {breakdown.map(({ value, label, count }) => <Panel as="div" key={value}>
-        <Box as="dt"><StatusTag preset={presets[value]}>{label}</StatusTag></Box>
-        <Box as="dd">{countFormat.format(count)}</Box>
-      </Panel>)}
-    </Box>
+    {inventory}
     <Box className="screen-row screen-rule-list">
       <Panel className="workflow-rule-list" aria-label="룰 목록">
         <WorkflowTable label="룰 목록" summary={tableCount(rows.length, rules.length, '개')}>

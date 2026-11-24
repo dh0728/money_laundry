@@ -12,7 +12,6 @@
   margin: 0;
 }
 .workflow-rule-inventory > * { grid-column: span 2 }
-.workflow-rule-inventory > :nth-child(3), .workflow-rule-inventory > :nth-child(5) { grid-column: span 3 }
 .workflow-rule-inventory > .screen-panel { min-block-size: 0 }
 .workflow-rule-inventory dd {
   margin: 0;
@@ -284,7 +283,7 @@
   }
   .workflow-rule-detail, .workflow-rule-reason { grid-column: 1 / -1 }
   .workflow-rule-inventory { grid-template-columns: repeat(2, minmax(0, 1fr)) }
-  .workflow-rule-inventory > *, .workflow-rule-inventory > :nth-child(n) { grid-column: auto }
+  .workflow-rule-inventory > * { grid-column: auto }
   .screen-row.screen-rule-editor > :nth-child(n) { grid-column: auto }
 
   .screen-row.screen-rule-editor {
