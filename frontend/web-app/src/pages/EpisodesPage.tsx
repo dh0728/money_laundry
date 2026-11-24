@@ -10,6 +10,7 @@ import { loadMockEpisodes } from '@/mocks/episodes'
 import { useMockExcludedTransactions } from '@/mocks/transactionScope'
 import EpisodeDetailPage from './EpisodeDetailPage'
 import { live } from '@/lib/apiMode'
+import { Box } from '@/components/layout-primitives'
 
 
 
@@ -26,15 +27,15 @@ export default function EpisodesPage({ episodeId, onOpen, onOpenAlert }: Props) 
 
   if (episodeId) return <EpisodeDetailPage episodeId={episodeId} alerts={alerts} onOpenAlert={onOpenAlert} />
 
-  if (state.status === 'loading') return <div className="space-y-4"><LoadingBlock label="Episode 목록" /></div>
-  if (state.status === 'error') return <div className="space-y-4"><ErrorBlock message={state.message} onRetry={retry} /></div>
+  if (state.status === 'loading') return <Box className="space-y-4"><LoadingBlock label="Episode 목록" /></Box>
+  if (state.status === 'error') return <Box className="space-y-4"><ErrorBlock message={state.message} onRetry={retry} /></Box>
   const rows = state.data.content.map(row => (requests[row.episodeId] ? { ...row, reviewRequestedAt: requests[row.episodeId] } : row))
-  if (!rows.length) return <div className="space-y-4"><EmptyBlock>아직 만든 Episode가 없습니다.</EmptyBlock></div>
+  if (!rows.length) return <Box className="space-y-4"><EmptyBlock>아직 만든 Episode가 없습니다.</EmptyBlock></Box>
 
   return (
-    <div className="space-y-4">
+    <Box className="space-y-4">
       
       <EpisodeList rows={rows} today={today()} onOpen={row => onOpen(row.episodeId)} />
-    </div>
+    </Box>
   )
 }

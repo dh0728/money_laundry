@@ -6,10 +6,11 @@ import { fireEvent, render as testingRender, screen, waitFor, within } from '@te
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveCasesPage from './LiveCasesPage'
 import { ApiError } from '@/api/common'
+import { Box } from '../components/layout-primitives'
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({ toastSuccess: vi.fn(), toastError: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: toastError } }))
-vi.mock('@/features/graph/0.24.0/Graph', () => ({ default: ({ model }: { model: { edges: unknown[] } }) => <div data-testid="live-graph">{model.edges.length} edges</div> }))
+vi.mock('@/features/graph/0.24.0/Graph', () => ({ default: ({ model }: { model: { edges: unknown[] } }) => <Box data-testid="live-graph">{model.edges.length} edges</Box> }))
 const { fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, setReviewMoneyScope } = vi.hoisted(() => ({
   fetchReviewCase: vi.fn(), fetchReviewCases: vi.fn(), fetchReviewMoney: vi.fn(), submitReviewCommand: vi.fn(), setReviewMoneyScope: vi.fn(),
 }))
