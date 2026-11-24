@@ -62,4 +62,3 @@
 .model-risk-legend [data-band="low"] { --band-color: var(--risk-low); }
 .model-risk-legend [data-band="medium"] { --band-color: var(--risk-medium); }
 .model-risk-legend [data-band="high"] { --band-color: var(--risk-high); }
-.model-graph-note { font-size: var(--aml-type-caption-size); }

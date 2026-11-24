@@ -4,44 +4,38 @@ import { AdminTeamSettings } from './admin-team-settings';
 import { ModelRiskDial } from './model-risk-dial';
 import { getModelRiskThresholds, saveModelRiskThresholds } from './model-risk-settings';
 import { currentPreviewUser, subscribePreviewUser } from '../auth/preview-session-user';
-import { DialogFooter } from '../../components/dialog-parts';
 import { PanelDisclosure } from '../../components/panel';
 import { PrimaryButton } from '../../components/primary-button';
 import './admin-settings.css';
-import { Box, Heading, Text } from '../../components/layout-primitives';
+import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 
 function ModelRiskSettings({ user }) {
   const [values, setValues] = useState(getModelRiskThresholds);
   const [result, setResult] = useState('');
   const [medium, high] = values;
-  const live = user.source === 'api';
-  const canEdit = live || user.source === 'fixture';
+  const canEdit = user.source === 'api' || user.source === 'fixture';
   const changed = getModelRiskThresholds().some((value, index) => value !== values[index]);
-  return <>
-    <Box className="admin-model-settings">
-      <ModelRiskDial values={values} disabled={!canEdit} onChange={next => {
-        setValues(next);
-        setResult('');
-      }} />
-      <Box as="ul" className="model-risk-legend" aria-label="점수 구간">
-        <Box as="li" data-band="low">낮음 {medium}점 미만</Box>
-        <Box as="li" data-band="medium">주의 {medium}~{high - 1}점</Box>
-        <Box as="li" data-band="high">위험 {high}점 이상</Box>
-      </Box>
-      <Text className="model-graph-note">개발 브랜치 · 탐지 Multi-FraudGT + HGB · 유형 SALT-GNN R</Text>
-      <Text>{live ? '모델 점수 표시 기준에 적용됩니다.' : '프리뷰 화면의 모델 점수 표시 기준에 적용됩니다.'}</Text>
-      {canEdit && <Text as="span" role="status">{result}</Text>}
+  return <Stack className="admin-model-settings">
+    <ModelRiskDial values={values} disabled={!canEdit} onChange={next => {
+      setValues(next);
+      setResult('');
+    }} />
+    <Box as="ul" className="model-risk-legend" aria-label="점수 구간">
+      <Box as="li" data-band="low">낮음 {medium}점 미만</Box>
+      <Box as="li" data-band="medium">주의 {medium}~{high - 1}점</Box>
+      <Box as="li" data-band="high">위험 {high}점 이상</Box>
     </Box>
-    {canEdit && <DialogFooter>
-      <PrimaryButton tone="brand" disabled={!changed} onHold={() => {
+    {canEdit && <Stack direction="row" justify="end" align="center" wrap>
+      <Text as="span" role="status">{result}</Text>
+      <PrimaryButton tone="brand" size="comfortable" disabled={!changed} onHold={() => {
         const applied = saved => setResult(saved ? '위험 구간을 적용했습니다.' : '위험 구간을 적용하지 못했습니다.');
         // 서비스 모드는 서버 응답을 기다린다.
         const saved = saveModelRiskThresholds(values);
         if (saved instanceof Promise) void saved.then(applied);
-        else if (saved) applied(saved);
+        else applied(saved);
       }}>위험 구간 적용</PrimaryButton>
-    </DialogFooter>}
-  </>;
+    </Stack>}
+  </Stack>;
 }
 
 function AdminSettings() {
