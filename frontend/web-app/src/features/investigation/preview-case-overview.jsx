@@ -17,12 +17,12 @@ import { OverviewScoreChart, overviewScorePoints } from './overview-score-chart'
 import { CaseActorTag, CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag } from '../../components/semantic-tags';
 import { TransactionEvidenceTable } from './preview-case-table';
 import { useCaseEvidenceSelection } from './case-evidence-selection';
-import { caseOverviewEvidence, relatedJudgments } from './case-overview-evidence';
+import { caseOverviewEvidence, episodeAlertEvidence, relatedJudgments } from './case-overview-evidence';
 import { graphRiskBand } from './case-graph-scope';
 import { modelRiskLabels } from '../settings/model-risk-settings';
 import './preview-case-overview.css';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
-import { dataSeriesColors } from '@/components/charts/charts/chart-context';
+import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
 
 const number = new Intl.NumberFormat('ko-KR');
 const decimal = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
@@ -86,16 +86,15 @@ function KpiValue({ value, unit }) {
   </Text>;
 }
 
-function CurrencyValues({ flows, field, emphasized = false }) {
+function CurrencyValues({ flows, field }) {
   const parts = flows.filter(flow => flow[field] != null);
   if (!parts.length) return '산출 범위 없음';
-  return <Text as="span" className="overview-currency-values" data-emphasized={emphasized || undefined}>
+  return <Text as="span" className="overview-currency-values">
     {parts.map(flow => {
       const ratio = field === 'ratio';
       const value = ratio ? decimal.format(flow.ratio) : number.format(flow[field]);
       const unit = ratio ? `% · ${flow.currency}` : flow.currency;
-      return emphasized ? <KpiValue key={flow.currency} value={value} unit={unit} />
-        : <Text as="span" key={flow.currency}>{value}{ratio ? '' : ' '}{unit}</Text>;
+      return <Text as="span" key={flow.currency}>{value}{ratio ? '' : ' '}{unit}</Text>;
     })}
   </Text>;
 }
@@ -222,14 +221,40 @@ function ReviewTimeline({ records, row }) {
   </Box>;
 }
 
-function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelection) {
+function EpisodeRelations({ relations, transactionCount, reduced }) {
+  const { members, related, complete, unresolved } = relations;
+  const measuredMembers = members.filter(member => member.value != null);
+  const uncertain = members.filter(member => member.value == null);
+  const sharingTitle = complete && !unresolved ? '소속 외 공유 Alert' : '소속 미확인 공유 Alert';
+  const measures = (rows, color) => rows.map(({ code, value }) => ({ code, label: code, value, color }));
+  return <Stack className="overview-episode-relations">
+    <Text tone="muted">Episode 고유 근거 거래 {transactionCount}건</Text>
+    <Box>
+      <Heading level={3}>소속 Alert{(complete || members.length > 0) && <CountTag count={members.length + (complete ? unresolved : 0)} />}</Heading>
+      {!complete && <Text tone="muted">{members.length ? '연결이 확인된 Alert만 표시' : '소속 Alert 정보 없음'}</Text>}
+      {unresolved > 0 && <Text tone="muted">식별할 수 없는 소속 Alert {unresolved}건</Text>}
+      {measuredMembers.length > 0 && <Box className="overview-episode-alert-list">
+        <OverviewBars label="소속 Alert별 Episode 근거 거래"
+          measures={measures(measuredMembers, dataSeriesColors.teal)} max={transactionCount} reduced={reduced} />
+      </Box>}
+      {uncertain.length > 0 && <Box as="ul" className="overview-fact-list">
+        {uncertain.map(({ code }) => <Box as="li" key={code}><LinkTag code={code} /> <Text as="span" tone="muted">근거 거래 미확인</Text></Box>)}
+      </Box>}
+    </Box>
+    {related.length > 0 && <Box>
+      <Heading level={3}>{sharingTitle}<CountTag count={related.length} /></Heading>
+      <Box className="overview-episode-alert-list" role="region" aria-label={sharingTitle} tabIndex={0}>
+        <OverviewBars label={`${sharingTitle}별 근거 거래`} measures={measures(related, transactionTotalColor)}
+          max={transactionCount} reduced={reduced} />
+      </Box>
+    </Box>}
+  </Stack>;
+}
+
+function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelection, episodeRelations) {
   const { records, accounts, focus, flows, inflows, outflows, lead } = evidence;
   const episode = row.kind === 'Episode';
   const methods = [...Map.groupBy(records, record => record.method)].map(([label, group]) => ({ label, value: group.length }));
-  const recordCodes = new Set(records.map(({ code }) => code));
-  const overlap = episode ? (row.overlappingAlerts ?? []).map(alert => ({ ...alert,
-    value: new Set(alert.related.map(({ code }) => code).filter(code => recordCodes.has(code))).size,
-  })).filter(alert => alert.value > 0).sort((a, b) => b.value - a.value || a.code.localeCompare(b.code)) : [];
   const prior = relatedJudgments(history, row.code, evidence);
   const otherCount = records.length - inflows.length - outflows.length;
   const composition = focus ? [
@@ -247,11 +272,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   const accountMeasures = accounts.map(account => ({ label: account.code, value: account.transactions.size }));
   const scorePoints = overviewScorePoints(records);
   const compositionChart = <OverviewBars label="근거 거래 구성" measures={composition} max={records.length} reduced={reduced} />;
-  const overlapChart = overlap.length > 0 && <>
-    <Heading level={3}>Alert별 공유 거래</Heading>
-    <OverviewBars label="Alert별 공유 거래" measures={overlap.map(({ code, value }) => ({ code, label: code, value }))}
-      max={records.length} reduced={reduced} />
-  </>;
+  const relationsChart = episode && <EpisodeRelations relations={episodeRelations} transactionCount={records.length} reduced={reduced} />;
   const flowChart = <FlowCharts evidence={evidence} reduced={reduced} />;
   const flowLink = records.length > 0 && <LinkTag href={`?${analysisQuery}`}>분석에서 자금 흐름 보기</LinkTag>;
   const flowDetails = <>
@@ -276,12 +297,6 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       <Box as="ul" className="overview-fact-list">{accounts.map(({ code, owner, sent, received }) => <Box as="li" key={code}>
         <Text as="code">{code}</Text><Text as="span">{owner}</Text><Text as="span" className="overview-note">송금 {sent} · 수취 {received}</Text>
       </Box>)}</Box>
-      {episode && overlap.length > 0 && <><Heading level={3}>거래가 겹치는 Alert <CountTag count={overlap.length} /></Heading>
-        <Box as="ul" className="overview-fact-list">{overlap.map(alert => <Box as="li" key={alert.code}>
-          <LinkTag code={alert.code} /><VerdictTag verdict={alert.verdict} /><PatternTag>{alert.pattern}</PatternTag>
-          <Text as="span">{alert.value}건 공유</Text>
-        </Box>)}</Box>
-      </>}
     </> },
     past: { title: '과거 판단', count: prior.length || undefined, content: prior.length ? <>
       <Text className="overview-note">공유 계좌가 있는 다른 판정</Text>
@@ -307,7 +322,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       </> : !row.open && <Text className="overview-note">세부 변경 시각 없음</Text>}
     </> },
     detection: { title: '탐지 근거', count: records.length,
-      compact: scorePoints.length > (episode ? 1 : 0) ? <OverviewScoreChart points={scorePoints} reduced={reduced} exactTime={!episode} /> : undefined,
+      compact: scorePoints.length > 0 ? <OverviewScoreChart points={scorePoints} reduced={reduced} exactTime /> : undefined,
       content: <>
       <Text className="semantic-tag-group">
         {lead && <ModelScoreTag score={lead.score} />}
@@ -321,8 +336,8 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
         </Box>)}</Box>
     </> },
     transactions: {
-      title: '씨앗 거래',
-      details: <Text className="overview-note">씨앗 역할 미기록 · 근거 거래 전체를 표시</Text>,
+      title: episode ? '근거 거래' : '씨앗 거래',
+      details: <Text className="overview-note">{episode ? 'Episode에 연결된 고유 거래' : '씨앗 역할 미기록 · 근거 거래 전체를 표시'}</Text>,
       visualContent: <TransactionEvidenceTable title="근거 거래" transactions={records.toSorted((a, b) => (b.score ?? -1) - (a.score ?? -1))}
         showScore selectionControl={evidenceSelection} />,
     },
@@ -344,12 +359,13 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
     composition: {
       title: '구성 · 근거 거래',
       count: records.length,
-      compact: <>{compositionChart}{overlapChart}</>,
+      compact: episode ? relationsChart : compositionChart,
+      distribution: compositionChart,
       details: <>
         <Text className="overview-note">{focus ? <>관측 중심 계좌 <Text as="code">{focus.code}</Text></> : '결제 수단별 근거 거래'}</Text>
       </>,
-      visualContent: compositionChart,
-      graphic: composition.length > 0,
+      visualContent: episode ? <>{relationsChart}{compositionChart}</> : compositionChart,
+      graphic: composition.length > 0 || Boolean(episodeRelations?.related.length),
     },
   };
   const scoresByBand = Map.groupBy(records, record => graphRiskBand(record.score));
@@ -368,7 +384,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
     accounts: <OverviewBars label="계좌별 거래 참여" measures={accountMeasures} max={records.length} reduced={reduced} />,
     past: <OverviewBars label="과거 판정 구성" measures={pastCounts} max={prior.length} reduced={reduced} />,
     history: <ReviewTimeline records={records} row={row} />,
-    detection: <OverviewScoreChart points={scorePoints} reduced={reduced} fill />,
+    detection: <OverviewScoreChart points={scorePoints} reduced={reduced} fill exactTime={episode} />,
     rules: <Box className="overview-panel-hero">
       <KpiValue value={activeRules.length} unit="현재 운영 중인 룰" />
     </Box>,
@@ -376,7 +392,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   const graphicPanels = { judgment: records.length > 0, accounts: accounts.length > 0, past: prior.length > 0,
     detection: scorePoints.length > 0, flow: records.length > 0 };
   const layout = episode
-    ? [['judgment', 4], ['flow', 8], ['history', 4], ['accounts', 4], ['detection', 4], ['rules', 4], ['composition', 8]]
+    ? [['judgment', 4], ['flow', 8], ['history', 4], ['accounts', 4], ['detection', 4], ['rules', 4], ['composition', 8], ['transactions', 12]]
     : [['judgment', 3], ['accounts', 3], ['past', 3], ['history', 3], ['detection', 9], ['composition', 3],
       ['transactions', 12], ['flow', 6], ['rules', 6]];
   return layout.map(([id, span], index) => {
@@ -387,7 +403,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       panelVisual: id === 'flow' ? flowChart : undefined,
       panelDetails: id === 'flow' ? <><FlowSummary evidence={evidence} />{panel.details}</> : undefined,
       graphic,
-      overviewGraphic: id === 'detection' ? scorePoints.length > (episode ? 1 : 0)
+      overviewGraphic: id === 'detection' ? scorePoints.length > 0
         : id === 'flow' ? flows.length > 0 : ['accounts', 'composition'].includes(id) && graphic,
     };
   });
@@ -443,47 +459,57 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
   </>;
 }
 
-function OverviewTile({ panel, span = panel.span, title = panel.title, numbered = false, children }) {
-  const { id, count, number, content, details, visualContent, overviewGraphic, compact } = panel;
+function OverviewTile({ panel, span = panel.span, title = panel.title, children }) {
+  const { id, count, content, details, visualContent, overviewGraphic, compact } = panel;
   return <Panel data-overview-panel={id} data-overview-span={span} data-export-visualization={overviewGraphic || undefined}>
     <SectionDownloadHeading downloadLabel={overviewGraphic ? title : undefined}>
-      {numbered && `${number}. `}{title}{count !== undefined && <CountTag count={count} />}
+      {title}{count !== undefined && <CountTag count={count} />}
     </SectionDownloadHeading>
     {children ?? compact ?? content ?? <>{visualContent}{details}</>}
   </Panel>;
 }
 
+function FlowOverviewTile({ panel, evidence }) {
+  const { records, focus, flows, inflows, outflows } = evidence;
+  return <OverviewTile panel={{ ...panel, overviewGraphic: panel.graphic }} title="자금 흐름">
+    {records.length > 0 && <Text tone="muted"><EvidencePeriod records={records} /> · 근거 거래 {records.length}건 · 원통화 기준</Text>}
+    {focus && <Text>관측 중심 계좌 <Text as="code">{focus.code}</Text> · {focus.owner}</Text>}
+    {panel.panelVisual}
+    {flows.length > 0 && <Stack direction="row" wrap>
+      <Text as="span">유입 {inflows.length}건 · 유출 {outflows.length}건</Text>
+      <Text as="span">순유입 <CurrencyValues flows={flows} field="net" /></Text>
+      {flows.some(item => item.ratio != null) && <Text as="span">경유 비율 <CurrencyValues flows={flows} field="ratio" /></Text>}
+    </Stack>}
+    {panel.flowLink}
+  </OverviewTile>;
+}
+
+function ScoreOverviewTile({ panel, lead }) {
+  return <OverviewTile panel={panel} title="거래 시각별 모델 점수">
+    {panel.compact ?? panel.visualContent}
+    {lead && <Text className="semantic-tag-group">최고 모델 점수 <ModelScoreTag score={lead.score} /> <LinkTag code={lead.code} /></Text>}
+  </OverviewTile>;
+}
+
+function AccountsOverviewTile({ panel, accounts, ownerCount }) {
+  return <OverviewTile panel={panel}>
+    <Text tone="muted">계좌 {accounts.length}개 · 소유주 {ownerCount}명</Text>
+    {panel.compact}
+  </OverviewTile>;
+}
+
 function AlertOverview({ panels, evidence, summary }) {
-  const { accounts, ownerCount, records, focus, flows, inflows, outflows, lead } = evidence;
+  const { accounts, ownerCount, lead } = evidence;
   const byId = new Map(panels.map(panel => [panel.id, panel]));
-  const flow = byId.get('flow');
-  const detection = byId.get('detection');
-  const accountsPanel = byId.get('accounts');
   return <>
     <Box className="overview-top" data-alert-evidence>
       <Stack>
-        <OverviewTile panel={{ ...flow, overviewGraphic: flow.graphic }} title="자금 흐름">
-          {records.length > 0 && <Text tone="muted"><EvidencePeriod records={records} /> · 근거 거래 {records.length}건 · 원통화 기준</Text>}
-          {focus && <Text>관측 중심 계좌 <Text as="code">{focus.code}</Text> · {focus.owner}</Text>}
-          {flow.panelVisual}
-          {flows.length > 0 && <Stack direction="row" wrap>
-            <Text as="span">유입 {inflows.length}건 · 유출 {outflows.length}건</Text>
-            <Text as="span">순유입 <CurrencyValues flows={flows} field="net" /></Text>
-            {flows.some(item => item.ratio != null) && <Text as="span">경유 비율 <CurrencyValues flows={flows} field="ratio" /></Text>}
-          </Stack>}
-          {flow.flowLink}
-        </OverviewTile>
-        <OverviewTile panel={detection} title="거래 시각별 모델 점수">
-          {detection.compact ?? detection.visualContent}
-          {lead && <Text className="semantic-tag-group">최고 모델 점수 <ModelScoreTag score={lead.score} /> <LinkTag code={lead.code} /></Text>}
-        </OverviewTile>
+        <FlowOverviewTile panel={byId.get('flow')} evidence={evidence} />
+        <ScoreOverviewTile panel={byId.get('detection')} lead={lead} />
       </Stack>
       <Stack>
         {summary}
-        <OverviewTile panel={accountsPanel}>
-          <Text tone="muted">계좌 {accounts.length}개 · 소유주 {ownerCount}명</Text>
-          {accountsPanel.compact}
-        </OverviewTile>
+        <AccountsOverviewTile panel={byId.get('accounts')} accounts={accounts} ownerCount={ownerCount} />
         <OverviewTile panel={byId.get('past')} />
       </Stack>
     </Box>
@@ -497,15 +523,42 @@ function AlertOverview({ panels, evidence, summary }) {
   </>;
 }
 
-export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], paginationHost, evidenceSelection }) {
+function EpisodeOverview({ panels, evidence, summary }) {
+  const { accounts, ownerCount, lead } = evidence;
+  const byId = new Map(panels.map(panel => [panel.id, panel]));
+  const composition = byId.get('composition');
+  return <>
+    <Box className="overview-top" data-episode-evidence>
+      <Stack>
+        <OverviewTile panel={{ ...composition, count: undefined }} title="Alert 연결" />
+        <FlowOverviewTile panel={byId.get('flow')} evidence={evidence} />
+      </Stack>
+      <Stack>
+        {summary}
+        <AccountsOverviewTile panel={byId.get('accounts')} accounts={accounts} ownerCount={ownerCount} />
+        <OverviewTile panel={byId.get('history')} />
+        <OverviewTile panel={byId.get('judgment')} />
+        <OverviewTile panel={byId.get('rules')} />
+      </Stack>
+    </Box>
+    <Box className="overview-tiles">
+      <ScoreOverviewTile panel={{ ...byId.get('detection'), span: 8 }} lead={lead} />
+      <OverviewTile panel={{ ...composition, id: 'distribution' }} title="근거 거래 구성" span={4}>{composition.distribution}</OverviewTile>
+      <Panel data-overview-panel="transactions" data-overview-span="12">{byId.get('transactions').visualContent}</Panel>
+    </Box>
+  </>;
+}
+
+export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], reportData, paginationHost, evidenceSelection }) {
   const selected = useCaseEvidenceSelection(evidenceSelection);
   if (!row) return <Text>선택한 사건의 개요를 불러올 수 없습니다.</Text>;
   const evidence = caseOverviewEvidence(row.related);
-  const { records, accounts, ownerCount, focus, inflows, outflows, flows, lead } = evidence;
+  const { records, accounts, focus, inflows, outflows, lead } = evidence;
   const representative = lead ?? records[0];
   const episode = row.kind === 'Episode';
+  const relations = episode ? episodeAlertEvidence(row, records, reportData?.cases) : undefined;
   const panels = buildPanels(row, evidence, history, activeRules, appearance.reduced,
-    evidenceSelection && { selected, change: evidenceSelection.change });
+    evidenceSelection && { selected, change: evidenceSelection.change }, relations);
   const window = episode ? 15 : 4;
   const incomingByCurrency = !episode && inflows.length > 0 ? Map.groupBy(inflows, record => record.currency) : null;
   const trendSeries = incomingByCurrency
@@ -513,21 +566,6 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
       points: transactionTimeBuckets(moves, 4, move => move.amount), unit: ` ${currency}` }))
     : [{ label: `${window}시간 단위 근거 거래 건수`, points: transactionTimeBuckets(records, window), unit: '건' }];
   const trends = trendSeries.filter(({ points }) => points.filter(point => point.value > 0).length >= 2);
-  const overlappingAlertCount = row.overlappingAlerts?.length ?? row.linkedAlerts ?? 0;
-  const boundary = focus && <><Text as="code">{focus.code}</Text> 기준</>;
-  const flowMetric = field => flows.some(flow => flow[field] != null) ? <CurrencyValues flows={flows} field={field} emphasized /> : null;
-  const metrics = [
-    ['최고 모델 점수', lead ? <KpiValue value={number.format(lead.score)} unit="점" /> : null, lead && <LinkTag code={lead.code} />],
-    episode ? ['근거 거래', <KpiValue value={number.format(records.length)} unit="건" />, `거래 공유 Alert ${overlappingAlertCount}건`]
-      : ['외부 유출', flowMetric('outflow'), flows.length > 0 && <>{outflows.length}건 · {boundary}</>],
-    ['계좌 · 소유주', <Text as="span" className="overview-kpi-values">
-      <KpiValue value={number.format(accounts.length)} unit="개" /><KpiValue value={number.format(ownerCount)} unit="명" />
-    </Text>, `근거 거래 ${records.length}건 기준`],
-    ['근거 거래 기간', records.length ? <EvidencePeriod records={records} /> : null],
-    ['외부 유입', flowMetric('inflow'), flows.length > 0 && <>{inflows.length}건 · {boundary}</>],
-    ['순유입', flowMetric('net'), flows.length > 0 && '통화별 관측 유입 − 유출'],
-    ['경유 비율', flowMetric('ratio'), flows.length > 0 && '통화별 관측 유출 ÷ 유입'],
-  ];
   const summary = <AISummaryPanel className="overview-ai-summary" reduced={appearance.reduced} aria-labelledby="overview-summary-title"
           data-export-visualization={trends.length > 0 || undefined}>
           <SectionDownloadHeading id="overview-summary-title" downloadLabel={trends.length ? 'AI 요약' : undefined}>
@@ -546,19 +584,7 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
   return <Box className="preview-case-overview" data-per-panel={perPanel}>
     <CaseIdentity row={row} />
     {perPanel ? <PanelOverview panels={panels} initialPanel={initialPanel} paginationHost={paginationHost} />
-      : !episode ? <AlertOverview panels={panels} evidence={evidence} summary={summary} /> : <>
-      <Box className="overview-top">
-        {summary}
-        <Box as="dl" className="overview-metrics">
-          {metrics.map(([title, value, detail]) => <Panel as="div" key={title} data-unavailable={value === null || undefined}>
-            <Box as="dt">{title}</Box><Box as="dd">{value ?? '산출 범위 없음'}</Box>
-            {detail ? <Box as="dd" className="overview-note overview-metric-detail">{detail}</Box> : null}
-          </Panel>)}
-        </Box>
-      </Box>
-      <Box className="overview-tiles" data-episode={episode || undefined}>
-        {panels.map(panel => <OverviewTile key={panel.id} panel={panel} numbered />)}
-      </Box>
-    </>}
+      : episode ? <EpisodeOverview panels={panels} evidence={evidence} summary={summary} />
+        : <AlertOverview panels={panels} evidence={evidence} summary={summary} />}
   </Box>;
 }

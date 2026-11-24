@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { caseOverviewEvidence, relatedJudgments } from './case-overview-evidence';
+import { caseOverviewEvidence, episodeAlertEvidence, relatedJudgments } from './case-overview-evidence';
 
 const hub = { code: 'ACC-1002', owner: '소유주-001' };
 const sender = { code: 'ACC-1066', owner: '소유주-006' };
@@ -36,5 +36,25 @@ describe('case overview evidence', () => {
     expect(relatedJudgments(judgments, 'A-current', caseOverviewEvidence(transfers))
       .map(({ targets }) => targets.map(({ code, sharedAccounts }) => [code, sharedAccounts])))
       .toEqual([[['A-other', [hub.code]]]]);
+  });
+});
+
+describe('Episode overview Alert evidence', () => {
+  it('counts distinct Episode transactions per member and keeps sharing Alerts separate', () => {
+    const [first, second, outside] = transfers;
+    const alert = { kind: 'Alert', code: 'A-member', related: [first, first, second, outside] };
+    const sharing = { kind: 'Alert', code: 'A-sharing', related: [second, outside] };
+    const episode = { linkedAlertCodes: [alert.code, alert.code, 'A-empty'], linkedAlertCodesComplete: true,
+      overlappingAlerts: [alert, sharing, sharing] };
+    expect(episodeAlertEvidence(episode, [first, second], [alert, sharing, { kind: 'Alert', code: 'A-empty', related: [outside] }]))
+      .toEqual({ complete: true, unresolved: 0, members: [{ code: alert.code, value: 2 }, { code: 'A-empty', value: 0 }],
+        related: [{ code: sharing.code, value: 1 }] });
+  });
+
+  it('preserves missing membership and evidence separately from confirmed zero', () => {
+    const sharing = { kind: 'Alert', code: 'A-sharing', related: transfers };
+    expect(episodeAlertEvidence({ linkedAlertCodes: ['A-unavailable', undefined] }, transfers, [sharing]))
+      .toEqual({ complete: false, unresolved: 1, members: [{ code: 'A-unavailable', value: null }],
+        related: [{ code: sharing.code, value: 3 }] });
   });
 });
