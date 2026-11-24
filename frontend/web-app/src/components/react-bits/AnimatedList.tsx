@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import './AnimatedList.css';
 import { appReducedMotion } from '@/hooks/use-reduced-motion';
 
@@ -19,6 +19,16 @@ export type AnimatedListItem = string | AnimatedListEntry;
 
 type Animation = 'pop' | 'slide' | 'fade';
 type State = 'in' | 'above' | 'below';
+
+declare module 'react' {
+  interface CSSProperties {
+    '--al-radius-override'?: string;
+    '--al-accent-override'?: string;
+    '--al-gap'?: string;
+    '--al-width'?: string;
+    '--animated-list-maximum-height'?: string;
+  }
+}
 
 interface AnimatedListProps {
   items?: AnimatedListItem[];
@@ -49,7 +59,7 @@ interface AnimatedListProps {
   itemClassName?: string;
   itemDecoration?: ReactNode;
   itemData?: (item: AnimatedListItem, index: number) => Record<`data-${string}`, string>;
-  style?: CSSProperties;
+  surface?: 'workspace' | 'ledger';
 }
 
 interface Engine {
@@ -58,27 +68,6 @@ interface Engine {
   updateFades: () => void;
   sync: () => void;
 }
-
-const HIDDEN: Record<Animation, Record<'above' | 'below', string>> = {
-  pop: { above: 'translate3d(0, -12px, 0) scale(0.8)', below: 'translate3d(0, 12px, 0) scale(0.8)' },
-  slide: { above: 'translate3d(0, -28px, 0) scale(0.98)', below: 'translate3d(0, 28px, 0) scale(0.98)' },
-  fade: { above: 'translate3d(0, -4px, 0)', below: 'translate3d(0, 4px, 0)' }
-};
-
-const SPRING =
-  'linear(0, 0.0603, 0.2033, 0.3821, 0.5633, 0.7258, 0.8584, 0.9574, 1.0242, 1.0634, 1.0809, 1.0828, 1.0747, 1.0613, 1.046, 1.0313, 1.0186, 1.0085, 1.0012, 0.9965, 0.994, 0.9931, 0.9933, 0.9941, 0.9953, 0.9966, 0.9978, 0.9988, 1)';
-
-const smootherstep = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
-
-const FADE_MASK = (() => {
-  const steps = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1];
-  const shade = (step: number) => `color-mix(in srgb, var(--aml-black-100) ${(smootherstep(step) * 100).toFixed(1)}%, transparent)`;
-  const top = steps.map(t => `${shade(t)} calc(var(--al-fade-top) * ${t})`);
-  const bottom = [...steps]
-    .reverse()
-    .map(t => `${shade(t)} calc(100% - var(--al-fade-bottom) * ${t})`);
-  return `linear-gradient(to bottom, ${[...top, ...bottom].join(', ')})`;
-})();
 
 const size = (value: number | string) => (typeof value === 'number' ? `${value}px` : value);
 
@@ -111,7 +100,7 @@ const AnimatedList = ({
   itemClassName = '',
   itemDecoration,
   itemData,
-  style
+  surface
 }: AnimatedListProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -151,10 +140,6 @@ const AnimatedList = ({
     if (!root || !viewport || !track || !indicator || !ring) return;
 
     const reduced = appReducedMotion();
-    const springEase = CSS.supports?.('transition-timing-function', 'linear(0, 1)')
-      ? SPRING
-      : 'cubic-bezier(0.34, 1.4, 0.64, 1)';
-    const transition = `transform 620ms ${springEase}, opacity 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 200ms ease`;
     const motion = { y: 0, h: 0, vy: 0, vh: 0, ty: 0, th: 0, ready: false };
     const fades = { top: '', bottom: '' };
     let boxes: (number[] | null)[] = [];
@@ -167,15 +152,8 @@ const AnimatedList = ({
 
     const mode = (): Animation | 'none' => {
       const chosen = settingsRef.current.animation;
-      if (chosen === 'none' || !HIDDEN[chosen]) return 'none';
+      if (chosen !== 'pop' && chosen !== 'slide' && chosen !== 'fade') return 'none';
       return reduced ? 'fade' : chosen;
-    };
-
-    const apply = (element: HTMLElement, state: State) => {
-      element.dataset.state = state;
-      const pose = current && current !== 'none' && state !== 'in' ? HIDDEN[current][state] : '';
-      element.style.transform = pose;
-      element.style.opacity = pose ? '0' : '';
     };
 
     const syncRing = () => {
@@ -183,13 +161,13 @@ const AnimatedList = ({
       if (!item) return;
       const state = (item.dataset.state as State | undefined) || 'in';
       if (state === ring.dataset.state) return;
-      ring.style.transitionDelay = item.style.transitionDelay;
-      apply(ring, state);
+      ring.style.setProperty('--animated-list-stagger-delay', item.style.getPropertyValue('--animated-list-stagger-delay'));
+      ring.dataset.state = state;
     };
 
     const write = () => {
-      indicator.style.transform = `translate3d(0, ${motion.y.toFixed(2)}px, 0)`;
-      indicator.style.height = `${motion.h.toFixed(2)}px`;
+      indicator.style.setProperty('--animated-list-indicator-transform', `translate3d(0, ${motion.y.toFixed(2)}px, 0)`);
+      indicator.style.setProperty('--animated-list-indicator-height', `${motion.h.toFixed(2)}px`);
     };
 
     const frame = (now: number) => {
@@ -221,12 +199,11 @@ const AnimatedList = ({
 
     const place = (snap: boolean) => {
       const item = itemRefs.current[settingsRef.current.selected];
+      indicator.toggleAttribute('data-indicator-visible', Boolean(item));
       if (!item) {
-        indicator.style.opacity = '0';
         motion.ready = false;
         return;
       }
-      indicator.style.opacity = '1';
       motion.ty = item.offsetTop;
       motion.th = item.offsetHeight;
       if (snap || reduced || !motion.ready) {
@@ -282,9 +259,9 @@ const AnimatedList = ({
         const state = hidden ? (start + box[1] / 2 < view / 2 ? 'above' : 'below') : 'in';
         if (state === item.dataset.state) return;
         const delay = entrance && !hidden ? (order++ * Math.max(0, s.stagger)).toFixed(3) : 0;
-        item.style.transitionDelay = delay ? `${delay}s, ${delay}s, 0s` : '';
+        item.style.setProperty('--animated-list-stagger-delay', delay ? `${delay}s` : '');
         if (!hidden) item.dataset.seen = 'true';
-        apply(item, state);
+        item.dataset.state = state;
       });
       syncRing();
     };
@@ -300,13 +277,15 @@ const AnimatedList = ({
       if (current === 'none') entered = true;
       if (restyle.length) {
         const elements = changed ? [...restyle, ring] : restyle;
-        for (const element of elements) element.style.transition = 'none';
+        for (const element of elements) element.dataset.listTransition = 'paused';
+        root.dataset.listMotion = current;
         for (const item of restyle)
-          apply(item, current === 'none' ? 'in' : (item.dataset.state as State | undefined) || 'below');
-        if (changed) apply(ring, (itemRefs.current[s.selected]?.dataset.state as State | undefined) || 'in');
+          item.dataset.state = current === 'none' ? 'in' : item.dataset.state || 'below';
+        if (changed) ring.dataset.state = itemRefs.current[s.selected]?.dataset.state || 'in';
         void root.offsetHeight;
-        for (const element of elements) element.style.transition = transition;
+        for (const element of elements) element.dataset.listTransition = 'ready';
       }
+      else if (changed) root.dataset.listMotion = current;
       measure();
       reveal(restyle.length > 0);
     };
@@ -468,18 +447,15 @@ const AnimatedList = ({
       className={`animated-list${frame ? ' animated-list--framed' : ''} ${className}`.trim()}
       data-animated={animation !== 'none' ? '' : undefined}
       data-list-theme={theme}
-      style={
-        {
-          '--al-radius': radius === undefined ? undefined : `${Math.max(0, radius)}px`,
-          '--al-gap': gap === undefined ? undefined : `${Math.max(0, gap)}px`,
-          '--al-width': width === undefined ? undefined : size(width),
-          '--al-accent': accentColor || 'var(--al-ink)',
-          ...(accentColor
-            ? { '--al-ring': accentColor, '--al-ring-fill': `color-mix(in srgb, ${accentColor} 8%, transparent)` }
-            : {}),
-          ...style
-        } as CSSProperties
-      }
+      data-list-surface={surface}
+      data-list-accent={accentColor ? '' : undefined}
+      style={{
+        '--al-radius-override': radius === undefined ? undefined : `${Math.max(0, radius)}px`,
+        '--al-gap': gap === undefined ? undefined : `${Math.max(0, gap)}px`,
+        '--al-width': width === undefined ? undefined : size(width),
+        '--al-accent-override': accentColor || undefined,
+        '--animated-list-maximum-height': maxHeight === undefined ? undefined : size(maxHeight),
+      }}
     >
       <div
         ref={viewportRef}
@@ -488,11 +464,7 @@ const AnimatedList = ({
         aria-label={ariaLabel}
         tabIndex={0}
         aria-activedescendant={selected >= 0 && selected < items.length ? `${baseId}-${selected}` : undefined}
-        style={{
-          maxHeight: maxHeight === undefined ? undefined : size(maxHeight),
-          maskImage: showGradients ? FADE_MASK : undefined,
-          WebkitMaskImage: showGradients ? FADE_MASK : undefined
-        }}
+        data-list-gradients={showGradients || undefined}
       >
         <div ref={trackRef} className="animated-list__track" role="presentation">
           {trackDecoration}

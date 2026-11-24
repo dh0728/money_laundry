@@ -27,7 +27,7 @@
 .animated-list__frame-rim {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: var(--animated-list-rim-layer);
   border-radius: inherit;
   box-shadow:
     inset 0 0 0 var(--aml-stroke-divider) var(--al-frame-edge),
@@ -51,6 +51,11 @@
 
 .animated-list__viewport--bare {
   scrollbar-width: none;
+}
+
+.animated-list__viewport[data-list-gradients] {
+  -webkit-mask-image: var(--animated-list-fade-mask);
+  mask-image: var(--animated-list-fade-mask);
 }
 
 .animated-list__viewport--bare::-webkit-scrollbar {
@@ -83,6 +88,34 @@
 
 .animated-list[data-animated] .animated-list__item:not([data-state]) {
   opacity: 0;
+}
+
+.animated-list[data-list-motion="pop"] {
+  --animated-list-enter-offset: var(--aml-space-12);
+  --animated-list-enter-scale: var(--animated-list-pop-scale);
+}
+.animated-list[data-list-motion="slide"] {
+  --animated-list-enter-offset: var(--animated-list-slide-offset);
+  --animated-list-enter-scale: var(--animated-list-slide-scale);
+}
+.animated-list[data-list-motion="fade"] {
+  --animated-list-enter-offset: var(--aml-space-4);
+  --animated-list-enter-scale: var(--animated-list-fade-scale);
+}
+.animated-list[data-list-motion]:not([data-list-motion="none"]) :is(.animated-list__item, .animated-list__ring):is([data-state="above"], [data-state="below"]) {
+  transform: translate3d(0, var(--animated-list-enter-shift, var(--animated-list-enter-offset)), 0)
+    scale(var(--animated-list-enter-scale));
+  opacity: 0;
+}
+.animated-list :is(.animated-list__item, .animated-list__ring)[data-state="above"] {
+  --animated-list-enter-shift: calc(0px - var(--animated-list-enter-offset));
+}
+.animated-list :is(.animated-list__item, .animated-list__ring)[data-list-transition="paused"] { transition: none }
+.animated-list :is(.animated-list__item, .animated-list__ring)[data-list-transition="ready"] {
+  transition:
+    transform var(--animated-list-enter-duration) var(--animated-list-enter-ease) var(--animated-list-stagger-delay, 0s),
+    opacity var(--animated-list-opacity-duration) var(--animated-list-opacity-ease) var(--animated-list-stagger-delay, 0s),
+    filter var(--animated-list-filter-duration) ease;
 }
 
 @media (hover: hover) {
@@ -167,12 +200,15 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 2;
-  height: 0;
+  z-index: var(--animated-list-indicator-layer);
+  height: var(--animated-list-indicator-height, 0);
+  transform: var(--animated-list-indicator-transform, none);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--animated-list-indicator-fade) ease;
 }
+
+.animated-list__indicator[data-indicator-visible] { opacity: 1 }
 
 .animated-list__ring {
   position: absolute;

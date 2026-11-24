@@ -135,10 +135,7 @@ function List({ label, items, selected, onSelect, reduced, renderItem, renderIte
       renderItemHeader={renderItemHeader} onItemSurfaceClick={onItemSurfaceClick} selectOnHover={false}
       animation={reduced ? 'none' : renderItemHeader ? 'fade' : 'pop'} stagger={0.035} animateOnce showGradients={false} frame={false}
       displayScrollbar width="100%" maxHeight="var(--ledger-list-limit, var(--workspace-list-limit))"
-      accentColor="var(--focus-ring)" onItemSelect={onSelect}
-      style={{ '--al-radius': 'var(--aml-radius-card)', '--al-ink': 'var(--text)', '--al-muted': 'var(--muted-text)',
-        '--al-tile': 'var(--information-panel-surface)', '--al-tile-edge': 'var(--divider)',
-        '--al-ring': 'var(--selected)', '--al-tile-shadow': 'none' }} />
+      accentColor="var(--focus-ring)" onItemSelect={onSelect} surface="ledger" />
   </Box>;
 }
 

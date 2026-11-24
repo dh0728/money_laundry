@@ -279,8 +279,7 @@ function Catalogue() {
       <Demo title="AnimatedList">
         <AnimatedList ariaLabel="소유주 예시" items={Array.from({ length: 12 }, (_, index) => `소유주-${String(index + 1).padStart(3, '0')}`)}
           initialSelectedIndex={0} displayScrollbar maxHeight={195} width="100%" showGradients={false} frame={false}
-          animation={reduced ? 'none' : 'slide'} onItemSelect={setListSelection}
-          style={{ '--al-ink': 'var(--text)', '--al-tile': 'var(--workspace-surface)', '--al-ring': 'var(--selected)' }} />
+          animation={reduced ? 'none' : 'slide'} onItemSelect={setListSelection} surface="workspace" />
         <Text as="output">선택 · {listSelection || '소유주-001'}</Text>
       </Demo>
       <Demo title="ScrollStack · 이전 비교">
