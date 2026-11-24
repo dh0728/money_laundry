@@ -1,5 +1,7 @@
 import { sharedCaseEvidence } from '../investigation/case-graph-scope.js';
 
+const maximumVisibleTransfers = 12;
+
 export function findAccountTrail(cases) {
   const accounts = new Map();
   for (const record of cases) {
@@ -56,27 +58,42 @@ export function accountTrailComparison(trail, allCases) {
   const validTransactions = record => record.related.filter(row => row.from?.code && row.to?.code);
   const alertEvidence = { related: validTransactions(alert) };
   const episodeEvidence = { related: validTransactions(episode) };
-  const currentEpisodeTransactions = new Set(episodeEvidence.related.map(row => row.code));
   const shared = sharedCaseEvidence(alertEvidence, episodeEvidence).accounts;
-  const memberCodes = [...new Set((episode.linkedAlertCodes ?? []).filter(Boolean))];
-  const membersByCode = new Map(allCases.filter(row => row.kind === 'Alert').map(row => [row.code, row]));
-  const members = memberCodes.map(code => {
-    const member = membersByCode.get(code);
-    const related = member ? validTransactions(member).filter(row => currentEpisodeTransactions.has(row.code)) : [];
-    return { code, shared: sharedCaseEvidence(alertEvidence, { related }).accounts, evidenceAvailable: Boolean(member), related };
-  }).toSorted((first, second) => Number(second.shared.includes(trail.account)) - Number(first.shared.includes(trail.account))
-    || second.shared.length - first.shared.length).slice(0, 3);
-  const memberRelations = members.flatMap((first, index) => members.slice(index + 1).flatMap(second => {
-    const { accounts, transactions } = sharedCaseEvidence(first, second);
-    return accounts.length || transactions.length ? [{ first: first.code, second: second.code, accounts, transactions }] : [];
-  }));
+  const byCode = new Map();
+  for (const [kind, evidence] of [['comparison', alertEvidence], ['episode', episodeEvidence]]) {
+    for (const transaction of evidence.related) {
+      const transfer = byCode.get(transaction.code) ?? { ...transaction, memberAlerts: [] };
+      transfer[kind] = true;
+      byCode.set(transaction.code, transfer);
+    }
+  }
+  const memberCodes = new Set(episode.linkedAlertCodes ?? []);
+  for (const member of allCases) {
+    if (member.kind !== 'Alert' || !memberCodes.has(member.code)) continue;
+    for (const code of new Set(member.related.map(transaction => transaction.code))) {
+      const transfer = byCode.get(code);
+      if (transfer?.episode) transfer.memberAlerts.push(member.code);
+    }
+  }
+  const transfers = [byCode.get(received.transaction.code), byCode.get(sent.transaction.code)];
+  const selected = new Set(transfers.map(row => row.code));
+  const accounts = new Set(transfers.flatMap(row => [row.from.code, row.to.code]));
+  const remaining = [...byCode.values()].filter(row => !selected.has(row.code))
+    .sort((first, second) => Number([second.from.code, second.to.code].includes(trail.account))
+      - Number([first.from.code, first.to.code].includes(trail.account)));
+  while (transfers.length < maximumVisibleTransfers) {
+    const index = remaining.findIndex(row => accounts.has(row.from.code) || accounts.has(row.to.code));
+    if (index === -1) break;
+    const [transfer] = remaining.splice(index, 1);
+    transfers.push(transfer);
+    accounts.add(transfer.from.code);
+    accounts.add(transfer.to.code);
+  }
   return {
     alert: alert.code,
     episode: episode.code,
     shared,
-    members: members.map(({ code, shared, evidenceAvailable }) => ({ code, shared, evidenceAvailable })),
-    memberRelations,
-    hiddenMembers: (episode.linkedAlertCodes ?? []).filter(code => !code).length + memberCodes.length - members.length,
-    membersComplete: episode.linkedAlertCodesComplete === true,
+    transfers,
+    omittedTransfers: remaining.length,
   };
 }

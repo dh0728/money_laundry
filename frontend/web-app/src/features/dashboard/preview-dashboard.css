@@ -81,7 +81,6 @@
   font-size: var(--aml-type-caption-size);
   overflow-wrap: anywhere;
 }
-.dashboard-account-trail > svg { align-self: center }
 .dashboard-trail-reason { font-weight: var(--aml-type-body-strong-weight) }
 .dashboard-trail-empty { color: var(--ai-summary-note) }
 .dashboard-trail-step-heading {

@@ -34,7 +34,7 @@ it('prefers a cross-case return with the same currency and amount over a closer 
     .toMatchObject({ returned: true, sameAmount: false });
 });
 
-it('shows exactly the member Alerts and identifies the member with intersecting evidence', () => {
+it('shows connected account transfers with their actual Alert membership', () => {
   const firstMember = { ...alert, code: 'A-member-1', related: episode.related };
   const secondMember = { ...alert, code: 'A-member-2', related: [transfer('T-3', '12:00', 'ACC-C', 'ACC-D')] };
   const second = { ...episode, linkedAlertCodes: [firstMember.code, secondMember.code], linkedAlertCodesComplete: true,
@@ -43,15 +43,23 @@ it('shows exactly the member Alerts and identifies the member with intersecting 
   const trail = findAccountTrail([alert, second]);
   const comparison = accountTrailComparison(trail, [alert, second, firstMember, secondMember, unrelated]);
   expect(comparison.shared).toEqual(['ACC-B']);
-  expect(comparison.members).toEqual([
-    { code: firstMember.code, shared: ['ACC-B'], evidenceAvailable: true },
-    { code: secondMember.code, shared: [], evidenceAvailable: true },
+  expect(comparison.transfers).toMatchObject([
+    { code: 'T-1', comparison: true, memberAlerts: [] },
+    { code: 'T-2', episode: true, memberAlerts: [firstMember.code] },
+    { code: 'T-3', episode: true, memberAlerts: [secondMember.code] },
   ]);
-  expect(comparison.memberRelations).toEqual([
-    { first: firstMember.code, second: secondMember.code, accounts: ['ACC-C'], transactions: [] },
-  ]);
-  expect([trail.received.transaction.code, trail.sent.transaction.code]).toEqual(['T-1', 'T-2']);
   const incomplete = accountTrailComparison(trail, [alert, second, firstMember]);
-  expect(incomplete.members[1]).toEqual({ code: secondMember.code, shared: [], evidenceAvailable: false });
-  expect(incomplete.memberRelations).toEqual([]);
+  expect(incomplete.transfers[2]).toMatchObject({ code: 'T-3', episode: true, memberAlerts: [] });
+});
+
+it('keeps common transfers as one edge and omits records disconnected from the recommendation', () => {
+  const detached = transfer('T-detached', '12:00', 'ACC-Y', 'ACC-Z');
+  const second = { ...episode, related: [...alert.related, ...episode.related, detached] };
+  const trail = findAccountTrail([alert, second]);
+  const comparison = accountTrailComparison(trail, [alert, second]);
+  expect(comparison.transfers).toMatchObject([
+    { code: 'T-1', comparison: true, episode: true },
+    { code: 'T-2', episode: true },
+  ]);
+  expect(comparison.omittedTransfers).toBe(1);
 });

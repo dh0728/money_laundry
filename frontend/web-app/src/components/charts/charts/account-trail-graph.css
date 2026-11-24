@@ -1,30 +1,77 @@
-.account-trail-graph {
+.account-trail-network {
   --account-trail-comparison-color: light-dark(var(--aml-pink-040), var(--aml-pink-070));
   --account-trail-episode-color: light-dark(var(--aml-lime-040), var(--aml-lime-070));
 
-  display: block;
-  inline-size: 100%;
-  max-inline-size: calc(var(--aml-space-64) * 6);
-  block-size: auto;
+  display: grid;
+  gap: var(--aml-space-8);
+  min-inline-size: 0;
 }
-.account-trail-intersection {
-  fill: light-dark(var(--aml-black-015), var(--aml-white-020));
-  stroke: currentColor;
-  stroke-width: var(--aml-stroke-divider);
-}
-.account-trail-member {
-  --account-trail-bubble-color: var(--account-trail-comparison-color);
+.account-trail-network [data-scope="comparison"] { --account-trail-scope-color: var(--account-trail-comparison-color) }
+.account-trail-network [data-scope="episode"] { --account-trail-scope-color: var(--account-trail-episode-color) }
+.account-trail-network [data-scope="shared"] { --account-trail-scope-color: var(--account-trail-episode-color) }
 
-  fill: color-mix(in srgb, var(--account-trail-bubble-color) var(--account-trail-bubble-tint), transparent);
-  stroke: var(--account-trail-bubble-color);
-  stroke-width: var(--aml-stroke-divider);
+.account-trail-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aml-space-4) var(--aml-space-12);
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
-.account-trail-member[data-episode-member] {
-  --account-trail-bubble-color: var(--account-trail-episode-color);
+.account-trail-legend li { display: flex; align-items: center; gap: var(--aml-space-4) }
+.account-trail-legend li::before {
+  content: '';
+  inline-size: var(--aml-space-12);
+  block-size: var(--aml-stroke-focus);
+  border-radius: var(--aml-radius-full);
+  background: var(--account-trail-scope-color);
 }
-.account-trail-episode { color: var(--account-trail-episode-color) }
-.account-trail-graph text {
+.account-trail-legend [data-scope="shared"]::before {
+  background: linear-gradient(to right, var(--account-trail-comparison-color) 50%, var(--account-trail-episode-color) 50%);
+}
+.account-trail-graph { display: block; inline-size: 100%; block-size: auto }
+.account-trail-graph [tabindex] { cursor: pointer; outline: none }
+.account-trail-edge, .account-trail-edge-hit { fill: none; stroke-linecap: round }
+.account-trail-edge {
+  stroke: var(--account-trail-scope-color);
+  stroke-width: var(--aml-stroke-focus);
+  opacity: var(--aml-opacity-secondary-label);
+}
+.account-trail-arrow { fill: var(--account-trail-scope-color) }
+.account-trail-edge-shared { stroke: var(--account-trail-comparison-color) }
+.account-trail-edge-hit {
+  stroke: transparent;
+  stroke-width: var(--aml-space-12);
+}
+.account-trail-graph [data-active] .account-trail-edge,
+.account-trail-graph [data-transfer]:focus-visible .account-trail-edge { opacity: 1 }
+.account-trail-graph [data-transfer]:focus-visible .account-trail-edge {
+  stroke-width: var(--aml-space-4);
+}
+.account-trail-node { --account-trail-dot-color: var(--ai-summary-note) }
+.account-trail-node[data-shared], .account-trail-node:focus-visible { --account-trail-dot-color: currentColor }
+.account-trail-node-hit { r: var(--aml-space-10); fill: transparent }
+.account-trail-node-dot { r: var(--aml-radius-small); fill: var(--account-trail-dot-color) }
+.account-trail-node[data-focus] .account-trail-node-dot {
+  r: var(--aml-space-6);
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: var(--aml-stroke-focus);
+}
+.account-trail-node-label {
+  transform: translateY(calc(-1 * var(--aml-space-12)));
   fill: currentColor;
   font-size: var(--aml-type-caption-size);
   font-weight: var(--aml-type-body-strong-weight);
 }
+.account-trail-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--aml-space-2);
+  min-block-size: calc(var(--aml-type-caption-lineHeight) * 3 + var(--aml-space-4) + var(--aml-space-16));
+  padding: var(--aml-space-8);
+  border-radius: var(--aml-radius-control);
+  background: light-dark(var(--aml-black-005), var(--aml-white-005));
+}
+.account-trail-detail [data-scope]:not([data-scope="shared"]) { color: var(--account-trail-scope-color) }
+.account-trail-omitted { color: var(--ai-summary-note) }
