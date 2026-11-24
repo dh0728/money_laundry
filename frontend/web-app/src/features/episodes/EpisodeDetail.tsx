@@ -17,6 +17,7 @@ import EpisodeReview from './EpisodeReview'
 import { applyRelabels, type TxRelabels } from '@/features/graph/relabel'
 import type { RelationGraph } from '@/api/graph'
 import { EpisodeStatusBadge } from './EpisodeList'
+import { Box } from '@/components/layout-primitives'
 
 type Tab = 'overview' | 'graph' | 'transactions' | 'review'
 
@@ -61,7 +62,7 @@ export default function EpisodeDetail({ episode, transactions: modelTransactions
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
+    <Box className="flex min-h-full flex-col gap-5">
       <CaseHeader id={episodeCode(episode.episodeId)} title={`${episode.primaryTypes.map(t => typeDisplay(t.code).label).join(' · ')} · Alert ${episode.alertCount}건`} tab={tab} onTab={setTab} count={transactions.length}
         tags={<><EpisodeStatusBadge status={episode.status} reviewRequested={Boolean(episode.reviewRequestedAt)} /><RiskBadge score={episode.riskScore} />
           <Badge variant="outline" className="border-dashed font-normal text-muted-foreground" title="실제 모델(MONEY17-146) 연결 전까지 표시">시연용 임의 점수</Badge>{episode.primaryTypes.map(type => <PatternBadge key={type.code} code={type.code} />)}<Badge variant="outline">담당 {episode.assignee.name}</Badge><Badge variant="outline">생성 {episode.createdAt.slice(0, 10)}</Badge></>} />
@@ -69,7 +70,7 @@ export default function EpisodeDetail({ episode, transactions: modelTransactions
       {tab === 'overview' && <EpisodeOverview episode={episode} transactions={transactions} history={history} responsible={responsible} onOpenAlert={onOpenAlert} onUnlink={onUnlinkAlerts ? requestUnlink : undefined} />}
 
       {/* 탭을 바꿔도 그래프 위치·카메라·선택을 유지한다(§6.1): 한 번 연 뒤에는 숨기기만 한다 */}
-      {graphSeen && <div className={tab === 'graph' ? '' : 'hidden'}><TimeGraph rows={transactions} context={{ kind: 'episode', code: episodeCode(episode.episodeId) }} /></div>}
+      {graphSeen && <Box className={tab === 'graph' ? '' : 'hidden'}><TimeGraph rows={transactions} context={{ kind: 'episode', code: episodeCode(episode.episodeId) }} /></Box>}
       {tab === 'transactions' && <AlertTxTable rows={transactions} />}
       {tab === 'review' && <EpisodeReview episode={episode} responsible={responsible} onComment={onComment} onRequestReview={onRequestReview} />}
       <AlertDialog open={confirmDissolve} onOpenChange={setConfirmDissolve}>
@@ -84,6 +85,6 @@ export default function EpisodeDetail({ episode, transactions: modelTransactions
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </Box>
   )
 }
