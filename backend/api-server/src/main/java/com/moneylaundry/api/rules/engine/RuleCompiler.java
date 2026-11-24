@@ -143,17 +143,31 @@ public final class RuleCompiler {
    * × 거래 기준일이다. 측정값은 그날 가장 크게 넘은 검사 시점의 값이고, 근거 거래는 그날 적중한 검사 시점들의 근거 거래를 합친 것이다.
    */
   public static Sql evaluate(Map<String, Object> definition, String from, String to) {
+    return evaluate(definition, from, to, false);
+  }
+
+  /**
+   * @param listedDays true 면 검사 날짜를 [from, to] 가운데 임시 표 rule_days 에 있는 날짜로 좁힌다. 일일 실행이 그날 분석이 새로 받은
+   *     날짜만 볼 때 쓴다
+   */
+  public static Sql evaluate(
+      Map<String, Object> definition, String from, String to, boolean listedDays) {
     String key = String.valueOf(definition.get("template"));
     if (!supported(key)) throw new IllegalArgumentException("이 템플릿의 평가기는 아직 없습니다.");
     Number window = RuleDefinition.number(definition.get("windowMinutes"));
     if (window == null) throw new IllegalArgumentException("기간이 없습니다.");
     var args = new ArrayList<Object>(List.of(window.intValue(), from, to));
+    String days = listedDays ? LISTED_DAYS : "";
     String sql =
         "GATHER_SCATTER".equals(key)
-            ? gatherScatter(where(definition.get("where"), GATHER_SCATTER_COLUMNS, args))
-            : fan("FAN_IN".equals(key), where(definition.get("where"), FAN_COLUMNS, args));
+            ? gatherScatter(where(definition.get("where"), GATHER_SCATTER_COLUMNS, args), days)
+            : fan("FAN_IN".equals(key), where(definition.get("where"), FAN_COLUMNS, args), days);
     return new Sql(sql, args);
   }
+
+  /** 검사 날짜를 rule_days 에 있는 날짜로 좁히는 조건. rule_ftx 의 별칭은 f 다. */
+  public static final String LISTED_DAYS =
+      " and exists (select 1 from rule_days d where d.business_date = f.business_date)";
 
   // 대상 × 날짜마다 한 줄로 줄이는 꼬리. hit 에는 subject, at, business_date, window_from, strength, measured,
   // tx_ids 가 있어야 한다.
@@ -173,7 +187,7 @@ public final class RuleCompiler {
       """;
 
   /** FAN-OUT(대상 = 송금 계좌) · FAN-IN(대상 = 수취 계좌). 기간 안 대상 계좌의 같은 방향 거래를 센다. */
-  private static String fan(boolean in, String where) {
+  private static String fan(boolean in, String where, String days) {
     String subject = in ? "to_account_id" : "from_account_id";
     String other = in ? "from_account_id" : "to_account_id";
     return """
@@ -181,7 +195,7 @@ public final class RuleCompiler {
         trig as (
           select distinct f.%1$s as subject, f.at, f.business_date
           from rule_ftx f, params p
-          where f.business_date between p.date_from and p.date_to
+          where f.business_date between p.date_from and p.date_to%4$s
             and not exists (select 1 from rule_busy b where b.account_id = f.%1$s)
         ), agg as (
           select g.subject, g.at, g.business_date, min(w.at) as window_from,
@@ -197,7 +211,7 @@ public final class RuleCompiler {
           from agg where %3$s
         )
         """
-            .formatted(subject, other, where)
+            .formatted(subject, other, where, days)
         + PER_DAY;
   }
 
@@ -205,13 +219,13 @@ public final class RuleCompiler {
    * GATHER-SCATTER(대상 = 가운데 계좌). 검사 시점은 그 계좌의 출금이다. 기간 안 입금을 모으고, 출금은 기간 안 첫 입금 시각(같은 분 포함)부터 검사
    * 시점까지의 것만 센다. 기간 안에 입금이 없으면 적중이 아니다.
    */
-  private static String gatherScatter(String where) {
+  private static String gatherScatter(String where, String days) {
     return """
         with params as (select make_interval(mins => ?) as span, ?::date as date_from, ?::date as date_to),
         trig as (
           select distinct f.from_account_id as subject, f.at, f.business_date
           from rule_ftx f, params p
-          where f.business_date between p.date_from and p.date_to
+          where f.business_date between p.date_from and p.date_to%2$s
             and not exists (select 1 from rule_busy b where b.account_id = f.from_account_id)
         ), inn as (
           select g.subject, g.at, g.business_date, min(w.at) as first_in,
@@ -233,10 +247,10 @@ public final class RuleCompiler {
                  jsonb_build_object('IN_COUNTERPARTIES', in_counterparties,
                                     'OUT_COUNTERPARTIES', out_counterparties, 'SUM_USD', in_usd,
                                     'OUT_IN_RATIO', round(out_usd * 100 / nullif(in_usd, 0), 2)) as measured
-          from agg where %s
+          from agg where %1$s
         )
         """
-            .formatted(where)
+            .formatted(where, days)
         + PER_DAY;
   }
 

@@ -136,15 +136,22 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
       finish(id, "CANCELLED", null, null);
       return;
     }
+    boolean entered = false;
     try {
+      // 일일 실행과 같은 줄에 선다. 룰 쿼리는 한 번에 하나만 돈다.
+      entered = evaluator.enter(null);
       run(id, row);
     } catch (Cancelled e) {
       finish(id, "CANCELLED", null, null);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      finish(id, "FAILED", "INTERRUPTED", null);
     } catch (RuntimeException e) {
       System.getLogger(BacktestRunner.class.getName())
           .log(System.Logger.Level.WARNING, "룰 백테스트 " + id + " 실패", e);
       finish(id, "FAILED", timeout(e) ? "TIMEOUT" : "INTERNAL", null);
     } finally {
+      if (entered) evaluator.leave();
       progress.remove(id);
     }
   }

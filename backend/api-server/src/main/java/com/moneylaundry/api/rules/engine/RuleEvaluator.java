@@ -1,9 +1,12 @@
 package com.moneylaundry.api.rules.engine;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -14,6 +17,9 @@ import org.springframework.stereotype.Component;
  * <p>임시 표 셋을 쓴다. rule_busy(바쁜 계좌), rule_ftx(세는 거래를 통과한 거래), rule_result(적중). 셋 다 트랜잭션이 끝나면 사라지므로 모든
  * 메서드는 한 트랜잭션 안에서 불러야 한다. 순서는 {@link #begin} → {@link #busy} → {@link #filtered} → {@link #run} 이고,
  * 세는 거래가 같으면 run 만 여러 번 불러도 된다.
+ *
+ * <p>룰 쿼리는 한 번에 하나만 돈다. 백테스트와 일일 실행은 {@link #enter} 로 같은 줄에 서고 끝나면 {@link #leave} 로 비킨다. 이 서버 안에서만
+ * 지켜진다.
  */
 @Component
 public class RuleEvaluator {
@@ -23,6 +29,8 @@ public class RuleEvaluator {
   private final JdbcTemplate jdbc;
   private final int busyMax;
   private final int busyWindowMinutes;
+  // 먼저 온 쪽이 먼저 돈다
+  private final ReentrantLock queue = new ReentrantLock(true);
 
   public RuleEvaluator(
       JdbcTemplate jdbc,
@@ -40,6 +48,24 @@ public class RuleEvaluator {
 
   public int busyWindowMinutes() {
     return busyWindowMinutes;
+  }
+
+  /**
+   * 차례를 기다린다. 들어갔으면 끝난 뒤 반드시 {@link #leave} 를 부른다.
+   *
+   * @param wait 기다릴 수 있는 시간. null 이면 차례가 올 때까지
+   * @return 차례가 왔으면 true, wait 안에 오지 않았으면 false
+   */
+  public boolean enter(Duration wait) throws InterruptedException {
+    if (wait == null) {
+      queue.lockInterruptibly();
+      return true;
+    }
+    return queue.tryLock(Math.max(0, wait.toMillis()), TimeUnit.MILLISECONDS);
+  }
+
+  public void leave() {
+    queue.unlock();
   }
 
   /** 이 트랜잭션의 룰 쿼리가 DB 를 얼마나 쓸지 묶고, 결과 표를 만든다. */
@@ -141,7 +167,42 @@ public class RuleEvaluator {
    *     거래가 32건을 넘는 대상 수)
    */
   public Map<String, Object> run(Map<String, Object> definition, String from, String to) {
-    var sql = RuleCompiler.evaluate(definition, from, to);
+    return run(definition, from, to, false);
+  }
+
+  /**
+   * 검사 날짜를 좁혀서 볼 날짜를 정한다. [from, to] 가운데 이 날짜들만 검사 시점으로 삼는다. {@link #run(Map, String, String,
+   * boolean)} 과 {@link #triggers} · {@link #skippedBusySubjects(Map, String, String, boolean)} 에
+   * listedDays = true 를 줄 때 쓰인다.
+   */
+  public void days(List<String> days) {
+    jdbc.execute("drop table if exists rule_days");
+    jdbc.execute("create temp table rule_days(business_date date primary key) on commit drop");
+    for (String day : days)
+      jdbc.update("insert into rule_days values(?::date) on conflict do nothing", day);
+  }
+
+  /** 검사 시점의 수. 같은 대상 계좌의 같은 분은 한 번이고, 바쁜 계좌는 세지 않는다. */
+  public long triggers(Map<String, Object> definition, String from, String to, boolean listedDays) {
+    String subject = subjectColumn(definition);
+    return number(
+        jdbc.queryForObject(
+            """
+            select count(*) from (
+              select distinct f.%1$s, f.at from rule_ftx f
+              where f.business_date between ?::date and ?::date%2$s
+                and not exists (select 1 from rule_busy b where b.account_id = f.%1$s)) t
+            """
+                .formatted(subject, listedDays ? RuleCompiler.LISTED_DAYS : ""),
+            Long.class,
+            from,
+            to));
+  }
+
+  /** {@link #run(Map, String, String)} 과 같고, listedDays 가 true 면 {@link #days} 로 정한 날짜만 검사한다. */
+  public Map<String, Object> run(
+      Map<String, Object> definition, String from, String to, boolean listedDays) {
+    var sql = RuleCompiler.evaluate(definition, from, to, listedDays);
     jdbc.execute("truncate rule_result");
     jdbc.update(sql.text(), sql.args().toArray());
     jdbc.execute("analyze rule_result");
@@ -179,16 +240,24 @@ public class RuleEvaluator {
 
   /** 검사 날짜에 거래가 있었는데 바쁜 계좌라서 평가하지 않은 대상 계좌 수. */
   public long skippedBusySubjects(Map<String, Object> definition, String from, String to) {
-    // 검사 시점이 대상 계좌의 입금인 템플릿은 FAN-IN 뿐이다. GATHER-SCATTER 는 가운데 계좌의 출금에서 검사한다.
-    String subject =
-        "FAN_IN".equals(definition.get("template")) ? "to_account_id" : "from_account_id";
+    return skippedBusySubjects(definition, from, to, false);
+  }
+
+  public long skippedBusySubjects(
+      Map<String, Object> definition, String from, String to, boolean listedDays) {
+    String subject = subjectColumn(definition);
     return number(
         jdbc.queryForObject(
-            "select count(distinct f.%1$s) from rule_ftx f join rule_busy b on b.account_id = f.%1$s where f.business_date between ?::date and ?::date"
-                .formatted(subject),
+            "select count(distinct f.%1$s) from rule_ftx f join rule_busy b on b.account_id = f.%1$s where f.business_date between ?::date and ?::date%2$s"
+                .formatted(subject, listedDays ? RuleCompiler.LISTED_DAYS : ""),
             Long.class,
             from,
             to));
+  }
+
+  // 검사 시점이 대상 계좌의 입금인 템플릿은 FAN-IN 뿐이다. GATHER-SCATTER 는 가운데 계좌의 출금에서 검사한다.
+  private static String subjectColumn(Map<String, Object> definition) {
+    return "FAN_IN".equals(definition.get("template")) ? "to_account_id" : "from_account_id";
   }
 
   private static long number(Object value) {

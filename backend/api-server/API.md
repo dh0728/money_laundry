@@ -494,10 +494,13 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 | 요청 | 입력 / 응답 |
 |---|---|
 | GET /api/v1/rule-templates | 템플릿 카탈로그(`resources/rules/catalog.json`)에 `backtestTemplates[]`(평가기가 있어 백테스트를 돌릴 수 있는 템플릿 키)를 더한 것. `{schema,templates[{key,name,group(PATTERN/GENERAL),available,pattern,evaluator,subject,subjectLabel,trigger,side,directionSelectable,windowRequired,maxWindowMinutes,alert,references,filterFields[],requiredFilterFields[],metrics[],whereMin,sweep,defaults,performance,note}],filterFields{},metrics{},path{},windows[],comparators[],directions[],then[{key,label,enabled}],limits{}}`. `available=false` 는 이후 제공 템플릿이다 |
-| GET /api/v1/rules | 목록. `{content[{ruleId,code,name,template,templateName,summary,status,then,versionNo,versionId,operatingVersionNo,operatingStatus,operatingSummary,workingVersionNo,workingStatus,owner,changedAt,hitCount,lastHitDate,linkedAlertCount,normalRate,alertedHitCount,skippedBusySubjects,lastRunFailed}],counts{ACTIVE,SHADOW,PENDING,PAUSED,DRAFT}}`. `status`·`versionNo`·`summary` 는 작업 중 버전이 SHADOW·PENDING 이면 그 버전, 아니면 운영 버전, 운영 버전이 없으면 작성 중 버전의 값이다. `hitCount` 부터 뒤의 값은 일일 실행이 붙기 전까지 null 이다 |
-| GET /api/v1/rules/{ruleId} | 상세. `{ruleId,code,name,template,templateName,owner,createdAt,status,operating,working,versions[{versionId,versionNo,status,summary,author,createdAt,submittedAt,decidedAt,decidedBy}],events[{at,actor,action,comment,versionNo}]}`. `operating`·`working` 은 `versions` 한 줄에 `{revision,definition,digest,sentence,editable,deletable}` 를 더한 것이고 없으면 null. `events` 는 최근 200건, `action` 은 CREATED·EDITED·DRAFT_DELETED(이후 상태 명령이 추가된다) |
+| GET /api/v1/rules | 목록. `{content[{ruleId,code,name,template,templateName,summary,status,then,versionNo,versionId,operatingVersionNo,operatingStatus,operatingSummary,workingVersionNo,workingStatus,owner,changedAt,hitCount,lastHitDate,shadowHitCount,linkedAlertCount,normalRate,alertedHitCount,skippedBusySubjects,lastRunFailed}],counts{ACTIVE,SHADOW,PENDING,PAUSED,DRAFT}}`. `status`·`versionNo`·`summary` 는 작업 중 버전이 SHADOW·PENDING 이면 그 버전, 아니면 운영 버전, 운영 버전이 없으면 작성 중 버전의 값이다. 적중 숫자의 뜻은 아래 "목록의 적중 숫자"에 있다 |
+| GET /api/v1/rules/{ruleId} | 상세. `{ruleId,code,name,template,templateName,owner,createdAt,status,operating,working,commands[{action,versionId,revision,enabled,reason,commentRequired}],versions[{versionId,versionNo,status,summary,author,createdAt,submittedAt,decidedAt,decidedBy}],executions[{versionNo,mode(LIVE/SHADOW),status(COMPLETED/FAILED),analysisDate,triggerCount,hitCount,skippedBusySubjects,errorCode(TIMEOUT/BUDGET/INTERNAL/INTERRUPTED),finishedAt}],events[{at,actor,action,comment,versionNo,selfApproved}]}`. `operating`·`working` 은 `versions` 한 줄에 `{revision,definition,digest,sentence,editable,deletable,backtest{backtestId,status,currentDefinition,finishedAt}?}` 를 더한 것이고 없으면 null. `commands` 는 지금 상태에서 있는 명령과 요청한 사람이 할 수 있는지(`enabled`, 못 하면 `reason`)다. `executions` 는 최근 일일 실행 20건, `events` 는 최근 200건이다. `action` 은 CREATED·EDITED·DRAFT_DELETED·SHADOW_STARTED·SUBMITTED·WITHDRAWN·APPROVED·REJECTED·PAUSED·RESUMED·BACKTEST_DONE |
 | POST /api/v1/rules | 룰과 v1 초안. `{name(1~80자),template,definition?}`. `definition` 을 안 주면 템플릿 기본값. `{ruleId,code,versionId,revision}` |
 | PUT /api/v1/rules/{ruleId}/versions/{versionId} | 초안 저장. `{name,definition,revision}`. DRAFT 를 작성자만. 응답은 `{ruleId,code,name,versionId,versionNo,status,revision,definition}` 에 검증 결과(아래 validate 응답)를 더한 것 |
+| POST /api/v1/rules/{ruleId}/versions | 운영 버전을 복사해 새 초안을 만든다. 본문 없음. `{ruleId,code,versionId,versionNo,revision}`. 운영 버전이 없거나 작업 중 버전이 이미 있으면 409 |
+| POST /api/v1/rules/{ruleId}/commands | 상태 명령. `{requestId?,action,versionId,revision,comment?}` → 바뀐 룰 상세(GET /rules/{ruleId} 와 같다). `action` 은 START_SHADOW·SUBMIT·WITHDRAW·APPROVE·REJECT·PAUSE·RESUME. 표는 아래 "상태 명령" |
+| GET /api/v1/review/cases/{caseId}/rule-hits | Alert·Episode 의 현재 거래에 걸린 운영 룰 적중. `[{alertId,ruleId,code,name,template,templateName,pattern,versionId,versionNo,versionStatus,summary,subjectType,subjectLabel,subject,hitDates[],windowMinutes,measured{},conditions[{metric,label,cmp,value,unit,measured}],roles[],matchedTxIds[],evidenceTxCount}]`. 없는 사건은 404 |
 | POST /api/v1/rules/validate | 저장 없이 검증. `{template,definition,ruleId?}` → `{items[{key,label,ok,message,errors[]}],warnings[],canSave,canRun,sentence,summary}`. `items` 는 FORMAT·CONDITIONS·DATA·COST 순서. 형식을 통과하지 못하면 `sentence`·`summary` 는 null |
 | DELETE /api/v1/rules/{ruleId}/versions/{versionId} | 초안 삭제. 204. 시험 운영·승인 요청을 한 적이 없는 DRAFT 를 작성자와 ADMIN 만. 그 룰에 다른 버전이 없으면 룰과 변경 기록도 지우고, 있으면 버전만 지우고 DRAFT_DELETED 를 남긴다 |
 | POST /api/v1/rule-backtests | 백테스트 접수. `{versionId,baselineVersionId?,from?,to?}` → 202 `{backtestId,status}`. `baselineVersionId` 를 안 주면 그 룰의 운영 버전(있으면)과 비교한다. 기간을 안 주면 원장 첫날 + `app.rules.warmup-days`(기본 7)일부터 원장 마지막 날까지이고 90일을 넘으면 마지막 90일이다. 같은 버전·조건·기간이 이미 줄에 있거나 돌고 있으면 그 `backtestId` 를 돌려준다. 평가기가 없는 템플릿, 체크리스트를 통과하지 못한 조건, 검사할 날짜가 없는 기간은 400 |
@@ -515,4 +518,29 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
   - `expectedNewAlerts` 는 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수로, 추정값이다. `chunkedCount` 는 근거 거래가 32건을 넘는 대상 수다. `evidenceShare` 는 검사한 거래 가운데 근거 거래의 비율(%)이다.
   - `sweep` 은 템플릿이 정한 항목 하나의 값만 바꿔 다시 돌린 결과다(최대 5개 값). 바쁜 계좌(`app.rules.busy.*`)는 대상에서 빼고 그 수를 `skippedBusySubjects` 로 준다.
   - 끝나면 룰 변경 기록에 `BACKTEST_DONE` 이 남는다.
-- 시험 운영·승인·중지 명령과 일일 실행은 아직 없다. 룰은 아직 분석 파이프라인에 연결되지 않는다.
+- 상태 명령: 한 번에 버전 하나의 상태를 바꾸고 변경 기록에 남긴다. `revision` 은 그 버전의 현재 값이어야 하고 명령마다 1 오른다. `requestId` 를 주면 같은 요청이 다시 와도 한 번만 적용한다.
+
+  | action | 누가 | 전 → 후 | 조건 | 사유(`comment`) |
+  |---|---|---|---|---|
+  | START_SHADOW | 작성자·ADMIN | DRAFT → SHADOW | 지금 조건으로 끝낸 백테스트 | |
+  | SUBMIT | 작성자 | DRAFT·SHADOW → PENDING | 지금 조건으로 끝낸 백테스트 | |
+  | WITHDRAW | 작성자 | SHADOW·PENDING → DRAFT | | |
+  | APPROVE | ADMIN | PENDING → ACTIVE. 기존 운영 버전(ACTIVE·PAUSED)은 RETIRED | | 필수 |
+  | REJECT | ADMIN | PENDING → DRAFT | | 필수 |
+  | PAUSE | ADMIN | ACTIVE → PAUSED | | 필수 |
+  | RESUME | ADMIN | PAUSED → ACTIVE | | 필수 |
+
+  - 오류: 모르는 명령·사유 누락·사유 2,000자 초과 400, 권한 없음 403 `FORBIDDEN_ROLE`, 없는 룰·버전 404, 상태가 맞지 않음·`revision` 이 다름·백테스트 없음 409 `INVALID_TRANSITION`.
+  - ADMIN 은 자기가 쓴 버전도 승인할 수 있고 그때 변경 기록의 `selfApproved` 가 true 다. `app.rules.self-approval=false` 면 403 이다.
+  - 매일 실행할지는 버전의 `eval_from_seq` 로 정한다. SHADOW·ACTIVE 가 되는 순간의 가장 큰 분석 입력 순번(`analysis.runs.input_seq`)을 적고, 그보다 뒤에 입력이 고정된 분석부터 돈다. DRAFT 로 돌아가거나 PAUSED·RETIRED 가 되면 비운다. DRAFT 에서 바로 승인 요청한 PENDING 은 돌지 않는다.
+- 일일 실행: 분석이 ALERTS 단계에 들어와 워커를 띄우기 직전에 돈다(`RuleRunStep`). SHADOW·PENDING·ACTIVE 버전 가운데 `eval_from_seq` 가 그 분석의 입력 순번보다 작은 것을 순서대로 돌린다.
+  - 검사 날짜는 그 분석의 TARGET 거래가 있는 거래 기준일이다. 원장 첫날부터 `app.rules.warmup-days` 안의 날짜는 뺀다. 그 날짜의 거래 전체를 검사 시점으로 삼으므로 같은 날짜를 백테스트한 결과와 같다.
+  - 실행 기록은 분석 × 버전에 한 줄(`rules.executions`)이다. 단계가 다시 돌아도 끝났거나 실패한 버전은 다시 돌리지 않는다. 적중(`rules.hits`)은 버전 × 대상 × 거래 기준일에 한 줄이고, 같은 날짜를 다시 검사하면 그 날짜의 적중을 새 결과로 바꾼다. 실행 당시 ACTIVE 였으면 `LIVE`, 아니면 `SHADOW` 다.
+  - 버전 하나가 실패하면 `FAILED`(`TIMEOUT`·`INTERNAL`)로 남기고 다음 버전으로 넘어간다. 한 분석에서 룰 전체에 쓰는 시간은 10분이고 넘으면 남은 버전은 `BUDGET` 이다. 룰 때문에 ALERTS 단계가 실패하지는 않는다.
+  - 룰 쿼리는 서버 한 대 안에서 한 번에 하나만 돈다. 일일 실행과 백테스트가 같은 줄에 선다.
+- 사건의 룰 적중(`rule-hits`): 연결을 저장하지 않고, 사건의 현재 거래(`review.current_members`)와 적중의 근거 거래에 같은 거래가 있으면 걸린 것으로 본다. 운영 중일 때 만든 적중(`LIVE`)이고 실행과 그 분석이 끝난 것만 나온다. 시험 운영의 적중은 나오지 않고, 지금은 중지했거나 물러난 버전이 운영 중에 만든 적중은 나온다(`versionStatus`).
+  - 카드 한 장은 Alert × 룰 버전 × 대상 계좌다. `hitDates` 는 걸린 거래 기준일들, `measured` · `conditions[].measured` 는 가장 최근 날의 측정값, `matchedTxIds` 는 사건의 거래 가운데 근거 거래인 것, `evidenceTxCount` 는 그 적중들의 근거 거래 수다. `conditions` 는 적중 조건을 그룹 구분 없이 순서대로 편 것이다. `roles` 는 대상 말고 보여 줄 계좌 자리이고 집계형 템플릿에서는 비어 있다.
+- 목록의 적중 숫자: 끝난 실행, 끝난 분석의 적중만 센다.
+  - `hitCount` · `lastHitDate`: 그 룰의 운영 적중(`LIVE`) 수(대상 × 날짜)와 가장 최근 거래 기준일. `shadowHitCount`: 지금 시험 운영(SHADOW·PENDING) 중인 버전이 쌓은 적중 수, 그런 버전이 없으면 null.
+  - `linkedAlertCount`: 운영 적중의 근거 거래와 공개된 거래가 하나라도 겹치는 Alert 수(병합돼 사라진 Alert 제외). `normalRate`: 그 가운데 사람이 종결한 것에서 정상 ÷ (정상 + 의심) (%), 종결한 것이 없으면 null. Episode 에 편입된 Alert 는 그 Episode 의 판정을 따른다.
+  - `skippedBusySubjects` · `lastRunFailed`: 가장 최근 일일 실행에서 바쁜 계좌라 평가하지 않은 대상 수와 그 실행이 실패했는지. 실행한 적이 없으면 null. `alertedHitCount` 는 Alert 생성을 제공할 때까지 null 이다.

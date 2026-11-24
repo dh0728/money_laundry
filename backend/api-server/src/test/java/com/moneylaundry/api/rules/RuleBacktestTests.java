@@ -384,7 +384,7 @@ class RuleBacktestTests {
     long five = account();
     fanOut(five, 5, "2023-09-10", 2000);
 
-    // 상태 명령은 아직 없으므로 운영 버전(6개 이상)과 새 초안(5개 이상)을 표에 직접 만든다.
+    // 상태 명령을 거치지 않고 운영 버전(6개 이상)과 새 초안(5개 이상)을 표에 직접 만든다.
     jdbc.update("update rules.rule_versions set status='ACTIVE' where version_id=?", rule[1]);
     long draft =
         jdbc.queryForObject(

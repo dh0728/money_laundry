@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-/** 룰 엔진 화면: 템플릿 카탈로그, 룰 목록·상세, 저장 전 검증, 룰 만들기, 초안 저장·삭제. */
+/** 룰 엔진 화면: 템플릿 카탈로그, 룰 목록·상세, 저장 전 검증, 룰 만들기, 초안 저장·삭제, 새 버전, 상태 명령, 사건의 룰 적중. */
 @RestController
 @RequestMapping("/api/v1")
 public class RuleController {
@@ -16,13 +16,19 @@ public class RuleController {
   private final RuleQueryService queries;
   private final RuleCatalog catalog;
   private final ReviewService reviews;
+  private final RuleHitQuery hits;
 
   public RuleController(
-      RuleService rules, RuleQueryService queries, RuleCatalog catalog, ReviewService reviews) {
+      RuleService rules,
+      RuleQueryService queries,
+      RuleCatalog catalog,
+      ReviewService reviews,
+      RuleHitQuery hits) {
     this.rules = rules;
     this.queries = queries;
     this.catalog = catalog;
     this.reviews = reviews;
+    this.hits = hits;
   }
 
   private boolean admin(long user) {
@@ -72,6 +78,31 @@ public class RuleController {
     long user = reviews.userId(principal);
     reviews.actor(user);
     return rules.save(ruleId, versionId, user, input);
+  }
+
+  /** 운영 버전을 복사해 새 초안을 만든다. */
+  @PostMapping("/rules/{ruleId}/versions")
+  public Object newVersion(@PathVariable long ruleId, Principal principal) {
+    long user = reviews.userId(principal);
+    reviews.actor(user);
+    return rules.newVersion(ruleId, user);
+  }
+
+  /** 상태 명령. 바뀐 룰 상세를 돌려준다. */
+  @PostMapping("/rules/{ruleId}/commands")
+  public Object command(
+      @PathVariable long ruleId, Principal principal, @RequestBody RuleService.CommandInput input) {
+    long user = reviews.userId(principal);
+    boolean admin = admin(user);
+    rules.command(ruleId, user, admin, input);
+    return queries.detail(ruleId, user, admin);
+  }
+
+  /** Alert · Episode 의 현재 거래에 걸린 운영 룰 적중. */
+  @GetMapping("/review/cases/{caseId}/rule-hits")
+  public Object caseHits(@PathVariable long caseId, Principal principal) {
+    reviews.actor(reviews.userId(principal));
+    return hits.forCase(caseId);
   }
 
   @DeleteMapping("/rules/{ruleId}/versions/{versionId}")
