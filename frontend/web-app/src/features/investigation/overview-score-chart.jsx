@@ -62,7 +62,7 @@ function ScoreTimeAxis() {
   </g>;
 }
 
-export function OverviewScoreChart({ points, reduced, fill }) {
+export function OverviewScoreChart({ points, reduced, fill, exactTime = false }) {
   if (!points.length) return <Text className="overview-note">시각과 모델 점수를 함께 확인할 수 있는 거래가 없습니다.</Text>;
   const labels = modelRiskLabels();
   const spansDays = points[0].timestamp.slice(0, 10) !== points.at(-1).timestamp.slice(0, 10);
@@ -71,7 +71,7 @@ export function OverviewScoreChart({ points, reduced, fill }) {
     <Box as="figcaption">거래 발생 시각 · KST</Box>
     <ScatterChart data={points} aspectRatio="auto" className={fill ? 'overview-score-plot' : 'overview-score-compact'}
       formatXLabel={spansDays ? formatDayTick : formatTick}
-      jitter={{ x: 0.2, y: 0 }} yDomain={scoreDomain} margin={{ top: 16, right: 16, bottom: 34, left: 34 }}
+      jitter={exactTime ? undefined : { x: 0.2, y: 0 }} yDomain={scoreDomain} margin={{ top: 16, right: 16, bottom: 34, left: 34 }}
       animationDuration={reduced ? 0 : 320} enterTransition={reduced ? { duration: 0 } : undefined}>
       <Grid horizontal rowTickValues={scoreTicks.filter(value => !thresholds.includes(value))}
         stroke="var(--overview-score-grid)" strokeDasharray="0" fadeHorizontal={false}

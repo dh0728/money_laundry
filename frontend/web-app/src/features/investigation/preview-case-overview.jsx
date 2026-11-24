@@ -21,7 +21,7 @@ import { caseOverviewEvidence, relatedJudgments } from './case-overview-evidence
 import { graphRiskBand } from './case-graph-scope';
 import { modelRiskLabels } from '../settings/model-risk-settings';
 import './preview-case-overview.css';
-import { Box, Heading, Text } from '../../components/layout-primitives';
+import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { dataSeriesColors } from '@/components/charts/charts/chart-context';
 
 const number = new Intl.NumberFormat('ko-KR');
@@ -253,9 +253,10 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       max={records.length} reduced={reduced} />
   </>;
   const flowChart = <FlowCharts evidence={evidence} reduced={reduced} />;
+  const flowLink = records.length > 0 && <LinkTag href={`?${analysisQuery}`}>분석에서 자금 흐름 보기</LinkTag>;
   const flowDetails = <>
     {records.length > 0 && <Text><EvidencePeriod records={records} /> · 근거 거래 {records.length}건 · 원통화 기준</Text>}
-    {records.length > 0 && <LinkTag href={`?${analysisQuery}`}>분석에서 자금 흐름 보기</LinkTag>}
+    {flowLink}
   </>;
   const panels = {
     judgment: { title: '판단 요약', content: <>
@@ -306,7 +307,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       </> : !row.open && <Text className="overview-note">세부 변경 시각 없음</Text>}
     </> },
     detection: { title: '탐지 근거', count: records.length,
-      compact: scorePoints.length > 1 ? <OverviewScoreChart points={scorePoints} reduced={reduced} /> : undefined,
+      compact: scorePoints.length > (episode ? 1 : 0) ? <OverviewScoreChart points={scorePoints} reduced={reduced} exactTime={!episode} /> : undefined,
       content: <>
       <Text className="semantic-tag-group">
         {lead && <ModelScoreTag score={lead.score} />}
@@ -330,6 +331,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       compact: flows.length > 0 ? <>{flowChart}<FlowSummary evidence={evidence} compact />{flowDetails}</> : undefined,
       visualContent: <FlowSummary evidence={evidence} />,
       details: flowDetails,
+      flowLink,
     },
     rules: { title: '룰 적중', content: <>
       <Text className="overview-note">탐지 당시 적중 기록이 없습니다.</Text>
@@ -385,7 +387,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       panelVisual: id === 'flow' ? flowChart : undefined,
       panelDetails: id === 'flow' ? <><FlowSummary evidence={evidence} />{panel.details}</> : undefined,
       graphic,
-      overviewGraphic: id === 'detection' ? scorePoints.length > 1
+      overviewGraphic: id === 'detection' ? scorePoints.length > (episode ? 1 : 0)
         : id === 'flow' ? flows.length > 0 : ['accounts', 'composition'].includes(id) && graphic,
     };
   });
@@ -441,6 +443,60 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
   </>;
 }
 
+function OverviewTile({ panel, span = panel.span, title = panel.title, numbered = false, children }) {
+  const { id, count, number, content, details, visualContent, overviewGraphic, compact } = panel;
+  return <Panel data-overview-panel={id} data-overview-span={span} data-export-visualization={overviewGraphic || undefined}>
+    <SectionDownloadHeading downloadLabel={overviewGraphic ? title : undefined}>
+      {numbered && `${number}. `}{title}{count !== undefined && <CountTag count={count} />}
+    </SectionDownloadHeading>
+    {children ?? compact ?? content ?? <>{visualContent}{details}</>}
+  </Panel>;
+}
+
+function AlertOverview({ panels, evidence, summary }) {
+  const { accounts, ownerCount, records, focus, flows, inflows, outflows, lead } = evidence;
+  const byId = new Map(panels.map(panel => [panel.id, panel]));
+  const flow = byId.get('flow');
+  const detection = byId.get('detection');
+  const accountsPanel = byId.get('accounts');
+  return <>
+    <Box className="overview-top" data-alert-evidence>
+      <Stack>
+        <OverviewTile panel={{ ...flow, overviewGraphic: flow.graphic }} title="자금 흐름">
+          {records.length > 0 && <Text tone="muted"><EvidencePeriod records={records} /> · 근거 거래 {records.length}건 · 원통화 기준</Text>}
+          {focus && <Text>관측 중심 계좌 <Text as="code">{focus.code}</Text> · {focus.owner}</Text>}
+          {flow.panelVisual}
+          {flows.length > 0 && <Stack direction="row" wrap>
+            <Text as="span">유입 {inflows.length}건 · 유출 {outflows.length}건</Text>
+            <Text as="span">순유입 <CurrencyValues flows={flows} field="net" /></Text>
+            {flows.some(item => item.ratio != null) && <Text as="span">경유 비율 <CurrencyValues flows={flows} field="ratio" /></Text>}
+          </Stack>}
+          {flow.flowLink}
+        </OverviewTile>
+        <OverviewTile panel={detection} title="거래 시각별 모델 점수">
+          {detection.compact ?? detection.visualContent}
+          {lead && <Text className="semantic-tag-group">최고 모델 점수 <ModelScoreTag score={lead.score} /> <LinkTag code={lead.code} /></Text>}
+        </OverviewTile>
+      </Stack>
+      <Stack>
+        {summary}
+        <OverviewTile panel={accountsPanel}>
+          <Text tone="muted">계좌 {accounts.length}개 · 소유주 {ownerCount}명</Text>
+          {accountsPanel.compact}
+        </OverviewTile>
+        <OverviewTile panel={byId.get('past')} />
+      </Stack>
+    </Box>
+    <Box className="overview-tiles">
+      <Panel data-overview-panel="transactions" data-overview-span="12">{byId.get('transactions').visualContent}</Panel>
+      <OverviewTile panel={byId.get('composition')} />
+      <OverviewTile panel={byId.get('judgment')} />
+      <OverviewTile panel={byId.get('history')} />
+      <OverviewTile panel={byId.get('rules')} span={3} />
+    </Box>
+  </>;
+}
+
 export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], paginationHost, evidenceSelection }) {
   const selected = useCaseEvidenceSelection(evidenceSelection);
   if (!row) return <Text>선택한 사건의 개요를 불러올 수 없습니다.</Text>;
@@ -472,11 +528,7 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
     ['순유입', flowMetric('net'), flows.length > 0 && '통화별 관측 유입 − 유출'],
     ['경유 비율', flowMetric('ratio'), flows.length > 0 && '통화별 관측 유출 ÷ 유입'],
   ];
-  return <Box className="preview-case-overview" data-per-panel={perPanel}>
-    <CaseIdentity row={row} />
-    {perPanel ? <PanelOverview panels={panels} initialPanel={initialPanel} paginationHost={paginationHost} /> : <>
-      <Box className="overview-top">
-        <AISummaryPanel className="overview-ai-summary" reduced={appearance.reduced} aria-labelledby="overview-summary-title"
+  const summary = <AISummaryPanel className="overview-ai-summary" reduced={appearance.reduced} aria-labelledby="overview-summary-title"
           data-export-visualization={trends.length > 0 || undefined}>
           <SectionDownloadHeading id="overview-summary-title" downloadLabel={trends.length ? 'AI 요약' : undefined}>
             <Sparkles className="icon" aria-hidden="true" /> AI 요약
@@ -490,7 +542,13 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
             {representative && <Box as="li">{lead ? `최고 점수 거래 ${lead.score}점` : '첫 근거 거래'} · <LinkTag code={representative.code} />
               {' · '}<Text as="code">{representative.from.code}</Text> → <Text as="code">{representative.to.code}</Text> · {amount(representative)}</Box>}
           </Box>
-        </AISummaryPanel>
+        </AISummaryPanel>;
+  return <Box className="preview-case-overview" data-per-panel={perPanel}>
+    <CaseIdentity row={row} />
+    {perPanel ? <PanelOverview panels={panels} initialPanel={initialPanel} paginationHost={paginationHost} />
+      : !episode ? <AlertOverview panels={panels} evidence={evidence} summary={summary} /> : <>
+      <Box className="overview-top">
+        {summary}
         <Box as="dl" className="overview-metrics">
           {metrics.map(([title, value, detail]) => <Panel as="div" key={title} data-unavailable={value === null || undefined}>
             <Box as="dt">{title}</Box><Box as="dd">{value ?? '산출 범위 없음'}</Box>
@@ -499,14 +557,7 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
         </Box>
       </Box>
       <Box className="overview-tiles" data-episode={episode || undefined}>
-        {panels.map(({ id, title, count, number, content, details, visualContent, span, overviewGraphic, compact }) => <Panel key={id}
-          data-overview-panel={id} data-overview-span={span}
-          data-export-visualization={overviewGraphic || undefined}>
-          <SectionDownloadHeading downloadLabel={overviewGraphic ? title : undefined}>
-            {number}. {title}{count !== undefined && <CountTag count={count} />}
-          </SectionDownloadHeading>
-          {compact ?? content ?? <>{visualContent}{details}</>}
-        </Panel>)}
+        {panels.map(panel => <OverviewTile key={panel.id} panel={panel} numbered />)}
       </Box>
     </>}
   </Box>;

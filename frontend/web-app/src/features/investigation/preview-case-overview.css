@@ -1,4 +1,11 @@
 .overview-top { display: grid; gap: var(--workspace-gap); min-inline-size: 0; align-items: stretch }
+.overview-top[data-alert-evidence] > .aml-stack { min-inline-size: 0 }
+.overview-top[data-alert-evidence] p { margin-block: var(--aml-space-4) 0 }
+.overview-top[data-alert-evidence] .overview-flow-charts { margin-block: var(--workspace-gap) }
+.overview-top[data-alert-evidence] .overview-flow-charts .overview-horizontal-chart {
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+}
+.overview-top[data-alert-evidence] [data-overview-panel="flow"] > .semantic-tag { margin-block-start: var(--workspace-gap) }
 @container case-overview (min-width: 66rem) {
   .overview-top { grid-template-columns: repeat(12, minmax(0, 1fr)) }
   .overview-top > :first-child { grid-column: span 4 }
@@ -36,6 +43,9 @@
   .overview-tiles:not([data-episode]) > [data-overview-span="12"] { grid-column: 1 / -1 }
 }
 @container case-overview (min-width: 56rem) {
+  .overview-top[data-alert-evidence] { grid-template-columns: repeat(12, minmax(0, 1fr)) }
+  .overview-top[data-alert-evidence] > :first-child { grid-column: span 8 }
+  .overview-top[data-alert-evidence] > :nth-child(2) { grid-column: span 4 }
   .overview-tiles { grid-template-columns: repeat(12, minmax(0, 1fr)) }
   .overview-tiles > [data-overview-span="3"] { grid-column: span 3 }
   .overview-tiles > [data-overview-span="4"] { grid-column: span 4 }
@@ -231,7 +241,7 @@
   padding: 0;
   list-style: none;
 }
-.overview-tiles .overview-past-verdicts {
+.overview-past-verdicts {
   max-block-size: calc(5 * var(--aml-space-48));
   overflow-y: auto;
   overscroll-behavior-y: contain;
