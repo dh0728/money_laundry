@@ -13,7 +13,8 @@ function ModelRiskSettings({ user }) {
   const [values, setValues] = useState(getModelRiskThresholds);
   const [result, setResult] = useState('');
   const [medium, high] = values;
-  const canEdit = user.source === 'fixture';
+  const live = user.source === 'api';
+  const canEdit = live || user.source === 'fixture';
   const changed = getModelRiskThresholds().some((value, index) => value !== values[index]);
   return <>
     <div className="admin-model-settings">
@@ -27,12 +28,16 @@ function ModelRiskSettings({ user }) {
         <li data-band="high">위험 {high}점 이상</li>
       </ul>
       <p className="model-graph-note">개발 브랜치 · 탐지 Multi-FraudGT + HGB · 유형 SALT-GNN R</p>
-      <p>{canEdit ? '프리뷰 화면의 모델 점수 표시 기준에 적용됩니다.' : '운영 모델의 구간 변경 API는 아직 제공되지 않습니다.'}</p>
+      <p>{live ? '모델 점수 표시 기준에 적용됩니다.' : '프리뷰 화면의 모델 점수 표시 기준에 적용됩니다.'}</p>
       {canEdit && <span role="status">{result}</span>}
     </div>
     {canEdit && <DialogFooter>
       <PrimaryButton tone="brand" disabled={!changed} onHold={() => {
-        if (saveModelRiskThresholds(values)) setResult('위험 구간을 적용했습니다.');
+        const applied = saved => setResult(saved ? '위험 구간을 적용했습니다.' : '위험 구간을 적용하지 못했습니다.');
+        // 서비스 모드는 서버 응답을 기다린다.
+        const saved = saveModelRiskThresholds(values);
+        if (saved instanceof Promise) void saved.then(applied);
+        else if (saved) applied(saved);
       }}>위험 구간 적용</PrimaryButton>
     </DialogFooter>}
   </>;

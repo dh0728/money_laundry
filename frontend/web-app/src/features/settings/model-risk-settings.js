@@ -1,4 +1,5 @@
 import { currentPreviewUser } from '../auth/preview-session-user.js';
+import { fetchLiveRiskBands, saveLiveRiskBands } from './live-settings.js';
 
 const key = 'aml-live-layout-model-risk-bands';
 const defaults = [70, 90];
@@ -25,9 +26,22 @@ export function modelRiskLabels() {
   return { high: `${high}점 이상`, medium: `${medium}~${high - 1}점`, low: `${medium}점 미만`, unknown: '점수 없음' };
 }
 
+// 서비스 모드: 서버에 저장된 구간을 화면 기준으로 쓴다.
+export async function loadLiveModelRiskThresholds() {
+  const saved = await fetchLiveRiskBands();
+  if (valid(saved)) thresholds = saved;
+}
+
 export function saveModelRiskThresholds(values) {
   const user = currentPreviewUser();
-  if (user?.role !== 'ADMIN' || user.source !== 'fixture' || !valid(values)) return false;
+  if (user?.role !== 'ADMIN' || !valid(values)) return false;
+  if (user.source === 'api') return saveLiveRiskBands(values).then(saved => {
+    if (!saved) return false;
+    thresholds = [...values];
+    document.dispatchEvent(new Event('aml:model-risk'));
+    return true;
+  });
+  if (user.source !== 'fixture') return false;
   thresholds = [...values];
   try { sessionStorage.setItem(key, JSON.stringify(thresholds)); } catch { /* Use the current tab's in-memory value. */ }
   document.dispatchEvent(new Event('aml:model-risk'));
