@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ComponentProps, type DragEvent
 import { ArrowDown, ArrowUp, GripVertical, Plus, X } from 'lucide-react'
 import { typeDisplay, type TypeCode } from '@/api/codes'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/select'
 import type { RuleInput } from '@/lib/workspace-store'
 import type { RuleBlockKind, validateRule } from './rules-logic'
 import './rule-condition-blocks.css'
@@ -178,9 +179,8 @@ export function RuleConditionBlocks({
               <Box data-rule-block-fields>
                 {kind === 'typeCode' && <Box as="label">거래 유형
                   {renderTypePicker ? renderTypePicker({ value: input.typeCode, onChange: changeType, options: typeOptions }) :
-                    <select aria-label="거래 유형" value={input.typeCode ?? ''} onChange={event => changeType(Number(event.target.value) as TypeCode)}>
-                      {typeOptions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
-                    </select>}
+                    <NativeSelect aria-label="거래 유형" value={input.typeCode ?? ''} onChange={event => changeType(Number(event.target.value) as TypeCode)}
+                      options={typeOptions} />}
                 </Box>}
                 {kind === 'scoreMin' && numberField('scoreMin', '최소 모델 점수', 0, scoreAsPoints ? 100 : 1, 0.01, scoreAsPoints ? '점 이상' : undefined, scoreAsPoints ? 100 : 1)}
                 {kind === 'accountWindow' && <>
