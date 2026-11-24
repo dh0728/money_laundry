@@ -10,6 +10,7 @@ import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visu
 import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
+import { Box, Text } from '../../components/layout-primitives';
 
 function simulationData(network, positions, timePlan, previous) {
   const saved = new Map(previous?.nodes.map(node => [node.id, node]));
@@ -362,7 +363,7 @@ export function ForceCaseCanvas({
     return snapshot;
   }));
 
-  return <div ref={host} className="preview-evidence-canvas" data-force-graph=""
+  return <Box ref={host} className="preview-evidence-canvas" data-force-graph=""
     data-graph-layout={positions ? 'account' : 'gravity'} data-time-axis={timePlan ? 'first-appearance' : undefined} role="group"
     aria-label={timePlan ? '패턴별 관계 그래프 · 계좌 첫 등장 시각 순서 · KST'
       : ownerView ? '소유주 관계 그래프' : '계좌 관계 그래프'}>
@@ -373,17 +374,17 @@ export function ForceCaseCanvas({
       nodeVisibility={node => visibleNodes.has(node.id)} linkVisibility={link => visibleEdges.has(link.id)}
       nodeRelSize={1} nodeLabel={node => {
         const time = timePlan?.first.get(node.id);
-        return <span>{node.id}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}</span>;
+        return <Text as="span">{node.id}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}</Text>;
       }}
       linkLabel={link => {
         const edge = visibleEdges.get(link.id);
         if (!edge) return '';
         const direction = `${edge.source} → ${edge.target} · ${graphVerdictLabels[graphVerdict(edge.verdicts)]}`;
         const times = [...edge.codes].map(code => timePlan?.byCode.get(code)).filter(Number.isFinite);
-        if (!times.length) return <span>{direction}</span>;
+        if (!times.length) return <Text as="span">{direction}</Text>;
         const first = Math.min(...times);
         const last = Math.max(...times);
-        return <span>{direction} · {timePlan.formatTime(first)}{first !== last && ` ~ ${timePlan.formatTime(last)}`} KST</span>;
+        return <Text as="span">{direction} · {timePlan.formatTime(first)}{first !== last && ` ~ ${timePlan.formatTime(last)}`} KST</Text>;
       }}
       nodeVal={node => Math.pow(radius(visibleNodes.get(node.id) ?? { codes: new Set() }), 2)}
       nodePointerAreaPaint={(node, color, context, scale) => {
@@ -476,5 +477,5 @@ export function ForceCaseCanvas({
       }} />}
     {controlsHost && createPortal(<GraphZoomControls zoom={zoom} onFit={() => fit()}
       onZoom={factor => graph.current?.zoom(graph.current.zoom() * factor, 180)} />, controlsHost)}
-  </div>;
+  </Box>;
 }
