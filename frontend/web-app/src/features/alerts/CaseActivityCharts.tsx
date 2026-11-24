@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarList, Panel } from './DetailPanels'
 import { Box, Text } from '@/components/layout-primitives'
+import { NativeSelect } from '@/components/ui/select'
 import { dataSeriesColors, dataSeriesPalette } from '@/components/charts/charts/chart-context'
 
 export type ActivityAmounts = Record<string, { daily: { day: string; amount: number }[]; senders: { name: string; v: number }[] }>
@@ -26,7 +27,9 @@ export function CaseActivityCharts({ amounts, dailyUsdByCurrency }: { amounts: A
   const format = (value: number) => `${Number(value).toLocaleString('ko-KR')} ${unit}`
   const peak = data.daily.reduce((best, row, index) => row.amount > (data.daily[best]?.amount ?? 0) ? index : best, 0)
   return <Box className="space-y-2">
-    {currencies.length > 1 && <Box as="label" className="flex items-center gap-2 text-xs">금액 차트 통화<select aria-label="금액 차트 통화" className="rounded-md border bg-background p-2" value={currency} onChange={event => setSelected(event.target.value)}><option value={ALL}>전체 (USD 환산)</option>{currencies.map(value => <option key={value}>{value}</option>)}</select></Box>}
+    {currencies.length > 1 && <Box as="label" className="flex items-center gap-2 text-xs">금액 차트 통화<NativeSelect
+      aria-label="금액 차트 통화" className="rounded-md border bg-background p-2" value={currency} onChange={event => setSelected(event.target.value)}
+      options={[{ value: ALL, label: '전체 (USD 환산)' }, ...currencies.map(label => ({ label }))]} /></Box>}
     <Box className="grid items-stretch gap-4 @4xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,1fr)]">
       <Panel title="일별 거래 금액" description={`언제 집중됐는지 · ${all ? '전체 · USD 환산' : currency || '집계 없음'}`}>
         {(all ? stacked.length : data.daily.length) ? <ChartContainer config={config} className="h-[170px] w-full">
