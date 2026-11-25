@@ -1,11 +1,13 @@
 /* 서비스 모드의 룰 만들기 · 룰 목록. 레이아웃 뼈대(.screen-rule-editor, .workflow-rule-*)는 preview-rule-workspace.css 것을 같이 쓴다. */
 
-/* ── 룰 만들기: 템플릿 | 조건 블록 | 검토 체크리스트 ── */
+/* ── 룰 만들기: 왼쪽 템플릿, 오른쪽 작성·검토 ── */
 .screen-row.screen-rule-editor.rule-builder {
-  grid-auto-flow: row;
-  grid-template-columns: minmax(var(--rule-editor-sidebar-min-width), 1fr) minmax(0, 2.6fr) minmax(var(--rule-editor-sidebar-min-width), 1fr);
+  grid-template-rows: minmax(auto, 1fr) max-content;
   align-items: start;
 }
+.screen-row.screen-rule-editor.rule-builder > .rule-template-library { grid-column: 1 / span 4; grid-row: 1 / span 2; align-self: stretch; min-inline-size: 0 }
+.screen-row.screen-rule-editor.rule-builder > .rule-draft-editor { grid-column: 5 / -1; grid-row: 1; align-self: stretch; min-inline-size: 0 }
+.screen-row.screen-rule-editor.rule-builder > .rule-checklist { grid-column: 5 / -1; grid-row: 2; min-inline-size: 0 }
 
 .rule-builder-heading {
   display: flex;
@@ -52,7 +54,6 @@
 }
 .rule-template-card:disabled { cursor: not-allowed; opacity: var(--aml-opacity-disabled) }
 .rule-template-card:focus-visible,
-.rule-select:focus-visible,
 .rule-value:focus-visible,
 .rule-connector:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--focus-ring);
@@ -139,7 +140,6 @@
 button.rule-connector { cursor: pointer; color: var(--text) }
 button.rule-connector:hover { background: var(--hover) }
 .rule-connector[data-op="OR"] { border-style: dashed }
-.rule-select,
 .rule-value {
   min-block-size: var(--aml-panel-control-size);
   block-size: var(--aml-panel-control-size);
@@ -159,6 +159,9 @@ button.rule-connector:hover { background: var(--hover) }
 .rule-add-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-8) }
 .rule-add-row > .rule-row-remove { margin-inline-start: auto; color: var(--muted-text) }
 .rule-add {
+  display: inline-flex;
+  gap: var(--aml-space-6);
+  align-items: center;
   min-block-size: var(--aml-panel-control-size);
   padding-inline: var(--aml-space-12);
   border: var(--aml-stroke-divider) solid var(--divider);
@@ -180,13 +183,15 @@ button.rule-connector:hover { background: var(--hover) }
   gap: var(--aml-space-8);
   align-items: start;
 }
-.rule-check-items > li > .icon { margin-block-start: var(--aml-space-2) }
-.rule-check-items > li[data-ok="false"] > :is(.icon, strong) { color: var(--risk-high) }
+.rule-check-items > li > .icon { align-self: center }
+.rule-check-items > li[data-ok="true"] > :is(.icon, strong) { color: var(--aml-status-positive-text) }
+.rule-check-items > li[data-ok="false"] > :is(.icon, strong) { color: var(--aml-status-negative-text) }
 .rule-check-items > li > span { overflow-wrap: anywhere }
 .rule-check-warnings > li {
   padding: var(--aml-space-8) var(--aml-space-12);
   border-radius: var(--aml-panel-control-radius);
-  background: var(--brand-accent-tint);
+  background: var(--aml-status-caution-surface);
+  color: var(--aml-status-caution-text);
   overflow-wrap: anywhere;
 }
 .rule-load-failure { display: grid; gap: var(--aml-space-8); justify-items: start }
@@ -223,12 +228,12 @@ button.rule-connector:hover { background: var(--hover) }
 .rule-backtest-cases > p { margin: 0 }
 .rule-backtest-more { justify-self: start }
 
-@media (max-width: 1180px) {
-  .screen-row.screen-rule-editor.rule-builder { grid-template-columns: minmax(var(--rule-editor-sidebar-medium-min-width), 1fr) minmax(0, 2fr) }
-  .rule-builder > .rule-checklist { grid-column: 1 / -1 }
-}
 @media (max-width: 930px) {
-  .screen-row.screen-rule-editor.rule-builder { grid-template-columns: minmax(0, 1fr) }
+  .screen-row.screen-rule-editor.rule-builder { grid-template-rows: none }
+  .screen-row.screen-rule-editor.rule-builder > :is(.rule-template-library, .rule-draft-editor, .rule-checklist) {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
 }
 @media (pointer: coarse) {
   .rule-builder :is(.rule-select, .rule-value) { font-size: max(var(--aml-type-section-title-size), var(--ui-font-size)) }

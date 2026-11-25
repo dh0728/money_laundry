@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { cancelBacktest, fetchBacktest, fetchBacktests, fetchRule, requestBacktest } from '@/api/rules';
 import { Box, Heading, Text } from '@/components/layout-primitives';
-import { NativeSelect } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
@@ -16,6 +16,7 @@ import {
   codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules, ruleStatusNames, ruleStatusPresets,
 } from './live-rule-store';
 import './preview-rule-workspace.css';
+import '../../components/form-dropdown.css';
 import './live-rule-engine.css';
 
 // 백테스트. 룰을 고르면 그 룰의 작업 중 버전(없으면 운영 버전)을 과거 원장에 돌린다.
@@ -330,9 +331,12 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
       <Panel className="backtest-card" aria-label="백테스트 대상 룰">
         <Box as="header" className="backtest-card-heading"><Heading>백테스트 대상 룰</Heading>
           {target && <StatusTag preset={ruleStatusPresets[target.status]}>{ruleStatusNames[target.status]}</StatusTag>}</Box>
-        <NativeSelect className="rule-select rule-backtest-rule" aria-label="룰" value={code ?? ''} disabled={running || busy}
-          onChange={event => setCode(event.target.value)}
-          options={rules.map(rule => ({ value: rule.code, label: `${rule.code} · ${rule.name}` }))} />
+        <Select value={code ?? ''} onValueChange={setCode} disabled={running || busy}>
+          <SelectTrigger className="form-dropdown-trigger rule-backtest-rule" aria-label="룰"><SelectValue /></SelectTrigger>
+          <SelectContent className="form-dropdown-options" position="popper" align="start">
+            {rules.map(rule => <SelectItem key={rule.code} value={rule.code}>{rule.code} · {rule.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
         {detail && target ? <>
           <Text className="backtest-meta">{detail.templateName} · v{target.versionNo}</Text>
           <Text>{target.sentence || target.summary}</Text>

@@ -373,7 +373,7 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
           </TableBody>
         </WorkflowTable>
       </Panel>
-      {shown && <Grid className="workflow-rule-inspection">
+      {shown && <Grid columns={12} className="workflow-rule-inspection">
         <RuleDetail rule={shown} row={selected} subject={subjectOf(shown.template)} />
         <RuleEvents rule={shown} />
       </Grid>}

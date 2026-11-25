@@ -21,6 +21,7 @@ const problem = (status, code, detail) => new ApiError({ type: 'about:blank', ti
 
 let footer;
 beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView ??= vi.fn();
   vi.mocked(fetchRuleCatalog).mockResolvedValue(catalogFixture);
   vi.mocked(fetchRules).mockResolvedValue(rulesFixture);
   vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4 ? draftRuleFixture : activeRuleFixture));
@@ -46,6 +47,10 @@ const builder = async props => {
 const saveButton = () => within(footer).getByRole('button', { name: '초안 저장' });
 const lastChecked = () => vi.mocked(validateRule).mock.calls.at(-1)[0];
 const part = name => within(screen.getByRole('region', { name }));
+const chooseWindow = async option => {
+  fireEvent.keyDown(part('기간').getByRole('combobox', { name: '기간' }), { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByRole('option', { name: option }));
+};
 
 it('첫 템플릿의 기본값을 IF → THEN 블록에 채우고 서버가 읽어 준 문장과 체크리스트를 보여 준다', async () => {
   await builder();
@@ -56,7 +61,7 @@ it('첫 템플릿의 기본값을 IF → THEN 블록에 채우고 서버가 읽�
   expect(block.getByText('IF')).toBeInTheDocument();
   expect(block.getByText('THEN')).toBeInTheDocument();
   expect(part('세는 거래').getByLabelText('건당 금액 값')).toHaveValue('1,000');
-  expect(part('기간').getByLabelText('기간')).toHaveValue('10080');
+  expect(part('기간').getByRole('combobox', { name: '기간' })).toHaveTextContent('7일');
   expect(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값')).toHaveValue('6');
   // 템플릿 설명은 대상 · 검사 시점 · 세는 방식뿐이다. 기본값을 고른 실험의 성능과 다른 제품의 시나리오 이름은 보여 주지 않는다.
   expect(screen.getByText('세는 방식').nextElementSibling).toHaveTextContent('한 송금 계좌가 기간 안에 보낸 거래를 셉니다. 같은 계좌에 여러 번 보내도 수취 계좌 수는 1개입니다.');
@@ -64,7 +69,9 @@ it('첫 템플릿의 기본값을 IF → THEN 블록에 채우고 서버가 읽�
   expect(screen.queryByText(/Oracle/)).not.toBeInTheDocument();
   expect(screen.getByText('템플릿 4개에서 고르면 기본값이 채워집니다.')).toBeInTheDocument();
   // Alert 생성은 4단계 전까지 고를 수 없다
-  expect(block.getByRole('option', { name: 'Alert 생성 (준비 중)' })).toBeDisabled();
+  fireEvent.keyDown(block.getByRole('combobox', { name: '적중했을 때' }), { key: 'ArrowDown' });
+  expect(await screen.findByRole('option', { name: 'Alert 생성 (준비 중)' })).toHaveAttribute('aria-disabled', 'true');
+  fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
 
   const checklist = within(screen.getByRole('region', { name: '검토 체크리스트' }));
   expect(checklist.getAllByRole('listitem').slice(0, 4).map(item => item.querySelector('strong').textContent)).toEqual(['형식', '조건', '데이터', '실행 비용']);
@@ -119,7 +126,7 @@ it('처음 저장은 룰을 만들고 주소에 번호를 남기며, 다시 저�
   expect(saveButton()).toBeDisabled();
   expect(screen.getByRole('button', { name: /RANDOM/ })).toBeDisabled();
 
-  fireEvent.change(part('기간').getByLabelText('기간'), { target: { value: '1440' } });
+  await chooseWindow('24시간');
   await waitFor(() => expect(lastChecked()).toMatchObject({ ruleId: 9, definition: { windowMinutes: 1440 } }), { timeout: 3000 });
   await waitFor(() => expect(saveButton()).toBeEnabled());
   fireEvent.click(saveButton());
@@ -160,7 +167,7 @@ it('형식이 틀리면 저장을 막고, 서버가 저장을 거절하면 사�
 
   vi.mocked(validateRule).mockResolvedValue(checkFixture);
   vi.mocked(createRule).mockRejectedValue(problem(403, 'FORBIDDEN_ROLE', '룰을 만들 권한이 없습니다.'));
-  fireEvent.change(part('기간').getByLabelText('기간'), { target: { value: '1440' } });
+  await chooseWindow('24시간');
   await waitFor(() => expect(saveButton()).toBeEnabled(), { timeout: 3000 });
   fireEvent.click(saveButton());
   expect(await screen.findByRole('alert')).toHaveTextContent('룰을 만들 권한이 없습니다.');

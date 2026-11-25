@@ -3,7 +3,7 @@ import { Check, CircleAlert, Plus, X } from 'lucide-react';
 import { createRule, fetchRule, saveRuleDraft, validateRule } from '@/api/rules';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
 import { ScreenActions } from '../../components/screen-actions';
@@ -16,6 +16,7 @@ import {
 } from './rule-definition';
 import { codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules } from './live-rule-store';
 import { Box, Heading, Text } from '@/components/layout-primitives';
+import '../../components/form-dropdown.css';
 import './live-rule-engine.css';
 
 // 룰 만들기. 템플릿을 고르면 기본값이 채워지고, IF(세는 거래 · 기간 · 적중 조건) → THEN 을 고쳐 초안으로 저장한다.
@@ -23,9 +24,15 @@ import './live-rule-engine.css';
 
 const groupTitles = { PATTERN: '패턴 템플릿', GENERAL: '일반 템플릿' };
 
-function Select({ label, value, options, onChange, disabled }) {
-  return <NativeSelect className="rule-select" aria-label={label} value={value ?? ''} disabled={disabled}
-    options={options} onChange={event => onChange(event.target.value)} />;
+function RuleSelect({ label, value, options, onChange }) {
+  return <Select value={String(value ?? '')} onValueChange={onChange}>
+    <SelectTrigger className="form-dropdown-trigger" aria-label={label}><SelectValue /></SelectTrigger>
+    <SelectContent className="form-dropdown-options" position="popper" align="start">
+      {options.map(option => <SelectItem key={option.value} value={String(option.value)} disabled={option.disabled}>
+        {option.label}
+      </SelectItem>)}
+    </SelectContent>
+  </Select>;
 }
 
 /** 숫자 칸. 입력하는 동안에는 적은 글자를 그대로 두고("0." 처럼 쓰다 만 값), 벗어나면 천 단위 쉼표로 보여 준다. */
@@ -63,11 +70,11 @@ function ConditionRow({ kind, condition, specs, comparators, options, side, onIt
   const spec = specs[key];
   const label = sidedText(spec?.label, side) || key;
   return <Box className="rule-condition" data-rule-condition={key}>
-    <Select label="항목" value={key} options={options} onChange={onItem} />
+    <RuleSelect label="항목" value={key} options={options} onChange={onItem} />
     {spec?.kind === 'number' ? <>
       {(spec.comparators ?? comparators).length === 1
         ? <Text as="span" className="rule-fixed">{cmpSymbol[condition.cmp] ?? condition.cmp}</Text>
-        : <Select label={`${label} 비교`} value={condition.cmp} onChange={onCmp}
+        : <RuleSelect label={`${label} 비교`} value={condition.cmp} onChange={onCmp}
           options={(spec.comparators ?? comparators).map(cmp => ({ value: cmp, label: cmpSymbol[cmp] ?? cmp }))} />}
       <ValueField label={`${label} 값`} value={condition.value} type={spec.type} onChange={onValue} />
       {spec.unit && <Text as="span" className="rule-unit">{spec.unit}</Text>}
@@ -114,7 +121,7 @@ function FilterPart({ catalog, template, definition, side, change }) {
   return <Part title="세는 거래" note="어떤 거래를 셀지 정합니다. 여기서 걸러진 거래는 세지 않고 근거 거래에도 넣지 않습니다.">
     {template.directionSelectable && <Box className="rule-condition">
       <Text as="span" className="rule-unit">방향</Text>
-      <Select label="거래 방향" value={definition.direction} onChange={direction => change(current => changeDirection(current, direction))}
+      <RuleSelect label="거래 방향" value={definition.direction} onChange={direction => change(current => changeDirection(current, direction))}
         options={catalog.directions.map(direction => ({ value: direction.key, label: direction.label }))} />
     </Box>}
     {definition.filter.items.length === 0 && <Text className="rule-empty">조건이 없으면 모든 거래를 셉니다.</Text>}
@@ -139,7 +146,7 @@ function WindowPart({ catalog, template, definition, change }) {
   if (!template.windowRequired) return <Part title="기간"><Text className="rule-empty">기간 없이 거래 1건씩 봅니다.</Text></Part>;
   return <Part title="기간" note="검사하는 거래 시각에서 돌아보는 길이입니다. 룰에 하나만 둡니다.">
     <Box className="rule-condition">
-      <Select label="기간" value={definition.windowMinutes} onChange={minutes => change(current => changeWindow(current, Number(minutes)))}
+      <RuleSelect label="기간" value={definition.windowMinutes} onChange={minutes => change(current => changeWindow(current, Number(minutes)))}
         options={windowOptions(catalog, template).map(minutes => ({ value: minutes, label: windowLabel(minutes) }))} />
       <Text as="span" className="rule-unit">안에</Text>
     </Box>
@@ -216,7 +223,7 @@ function IfThenBlock({ catalog, template, definition, change }) {
       <Text as="span" className="rule-keyword">THEN</Text>
       <Box className="rule-clause-body">
         <Box className="rule-condition">
-          <Select label="적중했을 때" value={definition.then} onChange={key => change(current => changeThen(current, key))}
+          <RuleSelect label="적중했을 때" value={definition.then} onChange={key => change(current => changeThen(current, key))}
             options={catalog.then.map(option => ({ value: option.key, label: option.enabled ? option.label : `${option.label} (준비 중)`, disabled: !option.enabled }))} />
           <Text as="span" className="rule-unit">{then?.key === 'ATTACH_EVIDENCE' ? '룰은 Alert를 만들지 않고, Alert의 거래와 겹치면 근거로 붙습니다.' : then?.note}</Text>
         </Box>
@@ -229,7 +236,7 @@ function TemplateLibrary({ catalog, selected, locked, onPick }) {
   const available = catalog.templates.filter(template => template.available);
   const later = catalog.templates.filter(template => !template.available);
   const card = template => <Box as="li" key={template.key}>
-    <Button type="button" layout="text" className="rule-template-card" aria-pressed={template.key === selected}
+    <Button type="button" layout="choice" className="rule-template-card" aria-pressed={template.key === selected}
       disabled={!template.available || (locked && template.key !== selected)} onClick={() => onPick(template.key)}>
       <Text as="strong">{template.name}</Text>
       <Text as="span">{template.available ? template.shape : template.note}</Text>

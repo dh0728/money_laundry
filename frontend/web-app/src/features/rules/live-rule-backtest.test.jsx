@@ -41,6 +41,7 @@ const problem = (status, code, detail) => new ApiError({ type: 'about:blank', ti
 
 let footer;
 beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView ??= vi.fn();
   vi.mocked(fetchRuleCatalog).mockResolvedValue(catalogFixture);
   vi.mocked(fetchRules).mockResolvedValue(rulesFixture);
   vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4 ? comparedRule : activeRuleFixture));
@@ -61,7 +62,7 @@ it('고른 룰의 새 버전과 비교할 운영 버전을 보여 주고, 실행
   render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
   await screen.findByRole('region', { name: '백테스트 대상 룰' });
   expect(await card('백테스트 대상 룰').findByText(working.sentence)).toBeInTheDocument();
-  expect(card('백테스트 대상 룰').getByLabelText('룰')).toHaveValue('RULE-004');
+  expect(card('백테스트 대상 룰').getByRole('combobox', { name: '룰' })).toHaveTextContent('RULE-004');
   expect(card('비교 기준').getByText('운영 버전 · v1')).toBeInTheDocument();
   expect(card('실행 상태').getByText(/아직 돌린 백테스트가 없습니다/)).toBeInTheDocument();
   expect(within(footer).getByRole('link', { name: '조건 고치기' })).toHaveAttribute('href', '/rules/new?rule=RULE-004');
@@ -241,7 +242,8 @@ it('평가기가 없는 템플릿은 실행을 막고, 서버가 접수를 거�
   expect(runButton('백테스트 실행')).toBeDisabled();
 
   // RULE-002(FAN-IN)는 운영 버전뿐이라 비교 없이 그 버전을 돌린다
-  fireEvent.change(card('백테스트 대상 룰').getByLabelText('룰'), { target: { value: 'RULE-002' } });
+  fireEvent.keyDown(card('백테스트 대상 룰').getByRole('combobox', { name: '룰' }), { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByRole('option', { name: /^RULE-002/ }));
   expect(await card('비교 기준').findByText('운영 버전 그대로 돌립니다. 비교할 새 버전이 없습니다.')).toBeInTheDocument();
   vi.mocked(requestBacktest).mockRejectedValue(problem(400, 'VALIDATION_FAILED', '원장에 거래가 없어 백테스트를 돌릴 수 없습니다.'));
   await waitFor(() => expect(runButton('백테스트 실행')).toBeEnabled());
