@@ -166,6 +166,8 @@
   --table-column-divider-strength: 30%;
   --table-stripe-strength: 3%;
   --table-header-layer: 1;
+  --table-pinned-cell-layer: 1;
+  --table-pinned-cell-opacity: 0.97;
   --table-row-hover-default-strength: 14%;
   --table-row-hover-verdict-strength: 10%;
   --table-scroll-region-max-height: 60dvh;

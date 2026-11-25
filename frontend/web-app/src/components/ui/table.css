@@ -33,6 +33,23 @@
 
 [data-slot="table-columns"] > col { width: var(--table-column-width, auto) }
 
+[data-slot="table-scroll-spacer"],
+[data-slot="table"][data-scroll-width] { width: var(--table-scroll-width) }
+[data-slot="table"][data-scroll-width] { min-width: 100% }
+
+[data-slot="table"] :is(th, td)[data-table-cell-sized] {
+  width: var(--table-cell-width);
+  min-width: var(--table-cell-min-width, auto);
+}
+[data-slot="table"] [data-table-cell-pin="none"] { position: relative }
+[data-slot="table"] :is([data-table-cell-pin="left"], [data-table-cell-pin="right"]) {
+  position: sticky;
+  z-index: var(--table-pinned-cell-layer);
+  opacity: var(--table-pinned-cell-opacity);
+}
+[data-slot="table"] [data-table-cell-pin="left"] { left: var(--table-cell-pin-offset) }
+[data-slot="table"] [data-table-cell-pin="right"] { right: var(--table-cell-pin-offset) }
+
 .records-table[data-width="wide"] { min-inline-size: var(--table-records-wide-min) }
 .records-table[data-width="evidence"] { min-inline-size: var(--table-records-evidence-min) }
 .records-table:not([data-density="compact"]) :is([data-slot="table-head"], [data-slot="table-cell"]) {

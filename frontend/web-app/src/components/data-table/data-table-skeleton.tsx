@@ -60,10 +60,11 @@ export function DataTableSkeleton({
                 {Array.from({ length: columnCount }).map((_, j) => (
                   <TableHead
                     key={j}
+                    data-table-cell-sized
                     style={{
-                      width: cozyCellWidths[j],
-                      minWidth: shrinkZero ? cozyCellWidths[j] : "auto",
-                    }}
+                      "--table-cell-width": cozyCellWidths[j],
+                      "--table-cell-min-width": shrinkZero ? cozyCellWidths[j] : undefined,
+                    } as React.CSSProperties}
                   >
                     <Skeleton className="h-6 w-full" />
                   </TableHead>
@@ -77,10 +78,11 @@ export function DataTableSkeleton({
                 {Array.from({ length: columnCount }).map((_, j) => (
                   <TableCell
                     key={j}
+                    data-table-cell-sized
                     style={{
-                      width: cozyCellWidths[j],
-                      minWidth: shrinkZero ? cozyCellWidths[j] : "auto",
-                    }}
+                      "--table-cell-width": cozyCellWidths[j],
+                      "--table-cell-min-width": shrinkZero ? cozyCellWidths[j] : undefined,
+                    } as React.CSSProperties}
                   >
                     <Skeleton className="h-6 w-full" />
                   </TableCell>

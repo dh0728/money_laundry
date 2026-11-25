@@ -1,4 +1,4 @@
-import { flexRender, type Table as TanstackTable } from "@tanstack/react-table";
+import { flexRender, type Column, type Table as TanstackTable } from "@tanstack/react-table";
 import * as React from "react";
 
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getColumnPinningStyle } from "@/lib/data-table";
 import { cn } from "@/lib/utils";
 
 interface DataTableProps<TData> extends Omit<React.ComponentProps<"div">, "children"> {
@@ -31,6 +30,19 @@ export const toggleSingleSelectedId = (current: string | null | undefined, click
 export const syncHorizontalScroll = (source: { scrollLeft: number }, target: { scrollLeft: number } | null) => {
   if (target && target.scrollLeft !== source.scrollLeft) target.scrollLeft = source.scrollLeft;
 };
+
+function dataTableCellLayout<TData>(column: Column<TData>) {
+  const pin = column.getIsPinned();
+  const offset = pin === "left" ? column.getStart("left") : pin === "right" ? column.getAfter("right") : undefined;
+  return {
+    "data-table-cell-sized": true,
+    "data-table-cell-pin": pin || "none",
+    style: {
+      "--table-cell-width": `${column.getSize()}px`,
+      "--table-cell-pin-offset": offset === undefined ? undefined : `${offset}px`,
+    } as React.CSSProperties,
+  };
+}
 
 export function DataTable<TData>({
   table,
@@ -86,13 +98,14 @@ export function DataTable<TData>({
           tabIndex={0}
           onScroll={event => syncHorizontalScroll(event.currentTarget, bodyScrollRef.current)}
           className={cn("h-4 w-full overflow-x-auto overflow-y-hidden border-b border-border [scrollbar-color:var(--muted-foreground)_var(--muted)] [scrollbar-gutter:stable] [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-muted [&::-webkit-scrollbar-thumb]:bg-muted-foreground [&::-webkit-scrollbar-track]:bg-muted", !hasHorizontalOverflow && "hidden")}
-        ><div className="h-px" style={{ width: tableWidth }} aria-hidden="true" /></div>}
+        ><div className="h-px" data-slot="table-scroll-spacer" style={{ "--table-scroll-width": `${tableWidth}px` } as React.CSSProperties} aria-hidden="true" /></div>}
         <Table
           className={tableClassName}
           containerRef={bodyScrollRef}
           containerClassName={topHorizontalScroll ? "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : undefined}
           containerOnScroll={topHorizontalScroll ? event => syncHorizontalScroll(event.currentTarget, topScrollRef.current) : undefined}
-          style={topHorizontalScroll ? { width: tableWidth, minWidth: "100%" } : undefined}
+          data-scroll-width={topHorizontalScroll || undefined}
+          style={topHorizontalScroll ? { "--table-scroll-width": `${tableWidth}px` } as React.CSSProperties : undefined}
         >
           {(topHorizontalScroll || columnWidths) && <TableColumns widths={table.getVisibleLeafColumns().map(column => ({ key: column.id, width: columnWidths?.[column.id] ?? (topHorizontalScroll ? column.getSize() : undefined) }))} />}
           <TableHeader>
@@ -112,9 +125,7 @@ export function DataTable<TData>({
                           ? "descending"
                           : undefined
                     }
-                    style={{
-                      ...getColumnPinningStyle({ column: header.column }),
-                    }}
+                    {...dataTableCellLayout(header.column)}
                   >
                     {header.isPlaceholder
                       ? null
@@ -146,9 +157,7 @@ export function DataTable<TData>({
                       data-column-group={columnGroups?.[cell.column.id]}
                       className={columnClass(cell.column.id, index)}
                       data-sorted={cell.column.getIsSorted() ? "true" : undefined}
-                      style={{
-                        ...getColumnPinningStyle({ column: cell.column }),
-                      }}
+                      {...dataTableCellLayout(cell.column)}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
