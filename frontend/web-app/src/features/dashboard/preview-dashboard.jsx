@@ -108,14 +108,26 @@ function EvidenceRecord({ evidence, direction }) {
   </Box>;
 }
 
+function timeBetweenTransactions(trail) {
+  const minutes = Math.floor((trail.sent.time - trail.received.time) / 60_000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor(minutes % 1440 / 60);
+  const remainder = minutes % 60;
+  return [days && `${days}일`, hours && `${hours}시간`, remainder && `${remainder}분`]
+    .filter(Boolean).join(' ') || '1분 이내';
+}
+
 function DashboardSummary({ trail, reduced }) {
-  const reason = trail?.returned ? '서로 다른 사건에서 두 계좌가 반대 방향으로 송금' : '서로 다른 사건에서 같은 계좌의 수취·송금 확인';
   return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
     <Heading className="dashboard-priority-heading"><Sparkles className="icon" aria-hidden="true" />분석 추천</Heading>
     {trail ? <Stack as="figure" className="dashboard-account-trail">
-      <Text as="figcaption" className="dashboard-trail-reason">{reason}{trail.sameAmount ? ' · 같은 통화와 금액' : ''}</Text>
-      <AccountTrailGraph comparison={trail.comparison} focus={trail.account} />
-      <Heading level={3} className="dashboard-trail-step-heading">권장 확인 순서</Heading>
+      <Text as="figcaption" className="dashboard-trail-reason">
+        공유 계좌 {trail.account}에서 수취 후 {timeBetweenTransactions(trail)} 만에
+        {trail.returned ? ' 원 송금 계좌로 다시 송금' : ' 후속 송금'}
+        {trail.sameAmount ? ' · 같은 통화와 금액' : ''}
+      </Text>
+      <AccountTrailGraph key={`${trail.received.transaction.code}/${trail.sent.transaction.code}`} comparison={trail.comparison} focus={trail.account} />
+      <Heading level={3} className="dashboard-trail-step-heading">먼저 확인할 거래</Heading>
       <Box as="ol" className="dashboard-trail-records" aria-label="권장 확인 순서 · 한국 표준시">
         <EvidenceRecord evidence={trail.received} direction="공유 계좌 수취 확인" />
         <EvidenceRecord evidence={trail.sent} direction={trail.returned ? '원 송금 계좌로 향한 후속 거래 확인' : '공유 계좌 후속 송금 확인'} />

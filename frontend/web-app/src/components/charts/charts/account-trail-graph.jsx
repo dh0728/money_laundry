@@ -1,5 +1,6 @@
 import React, { useId, useState } from 'react';
 import { Box, Text } from '../../layout-primitives';
+import { ActionButton } from '../../primary-button';
 import './account-trail-graph.css';
 
 const width = 384;
@@ -51,7 +52,9 @@ function transferPath(source, target, bend) {
 export function AccountTrailGraph({ comparison, focus }) {
   const graphId = useId();
   const [selection, setSelection] = useState(null);
-  const { transfers } = comparison;
+  const [showContext, setShowContext] = useState(false);
+  const transfers = showContext ? comparison.transfers : comparison.transfers.slice(0, 2);
+  const moreCount = comparison.transfers.length - 2;
   const leadingAccounts = new Set([focus, transfers[0].from.code, transfers[1].to.code]);
   const accounts = accountLayout(transfers, focus);
   const accountsById = new Map(accounts.map(account => [account.code, account]));
@@ -64,7 +67,9 @@ export function AccountTrailGraph({ comparison, focus }) {
   const selectedTransfer = selection?.type === 'transfer' && transfers.find(row => row.code === selection.code);
   const selectedAccount = accountsById.get(selection?.type === 'account' ? selection.code : focus) ?? accountsById.get(focus);
   const activeAccount = selectedTransfer ? undefined : selectedAccount.code;
-  const scopes = [...new Set(['comparison', 'episode', ...edges.map(row => row.scope)])];
+  const presentScopes = new Set(edges.map(row => row.scope));
+  const scopes = Object.keys(scopeLabels).filter(scope => presentScopes.has(scope));
+  const viewHeight = showContext ? height : height / 2;
   const activate = (type, code) => {
     const target = { type, code };
     return { onPointerEnter: () => setSelection(target), onFocus: () => setSelection(target), onClick: () => setSelection(target) };
@@ -76,7 +81,8 @@ export function AccountTrailGraph({ comparison, focus }) {
         <Text as="span">{scopeLabels[scope]}</Text>
       </Box>)}
     </Box>
-    <svg className="account-trail-graph" viewBox={`0 0 ${width} ${height}`} role="group" aria-labelledby={`${graphId}-title`}>
+    <svg id={graphId} className="account-trail-graph" viewBox={`0 ${(height - viewHeight) / 2} ${width} ${viewHeight}`}
+      role="group" aria-labelledby={`${graphId}-title`}>
       <title id={`${graphId}-title`}>{`${comparison.alert}와 ${comparison.episode}의 계좌 및 거래`}</title>
       <defs>{scopes.map(scope => <marker key={scope} id={`${graphId}-${scope}`} data-scope={scope}
         viewBox="0 0 8 8" refX="7" refY="4" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
@@ -108,9 +114,15 @@ export function AccountTrailGraph({ comparison, focus }) {
       </> : <>
         <Text as="strong">{comparison.shared.includes(selectedAccount.code) ? '공유 계좌 ' : '계좌 '}{selectedAccount.code}</Text>
         {selectedAccount.owner && <Text as="span">{selectedAccount.owner}</Text>}
-        <Text as="span">표시된 연결 거래 {transfers.filter(row => row.from.code === activeAccount || row.to.code === activeAccount).length}건</Text>
+        {showContext && <Text as="span">표시된 연결 거래 {transfers.filter(row => row.from.code === activeAccount || row.to.code === activeAccount).length}건</Text>}
       </>}
     </Box>
-    {comparison.omittedTransfers > 0 && <Text as="span" className="account-trail-omitted">이외 근거 거래 {comparison.omittedTransfers}건</Text>}
+    {moreCount > 0 && <ActionButton className="account-trail-context-toggle" shape="pill" surface="floating"
+      aria-expanded={showContext} aria-controls={graphId} onClick={() => {
+        setShowContext(open => !open);
+        setSelection(null);
+      }}>{showContext ? '주변 거래 접기' : `주변 거래 ${moreCount}건 펼치기`}</ActionButton>}
+    {(showContext || !moreCount) && comparison.omittedTransfers > 0 &&
+      <Text as="span" className="account-trail-omitted">이외 근거 거래 {comparison.omittedTransfers}건</Text>}
   </Box>;
 }

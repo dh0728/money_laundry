@@ -71,4 +71,5 @@
   background: light-dark(var(--aml-black-005), var(--aml-white-005));
 }
 .account-trail-detail [data-scope] { color: var(--account-trail-scope-color) }
+.account-trail-context-toggle { justify-self: start }
 .account-trail-omitted { color: var(--ai-summary-note) }
