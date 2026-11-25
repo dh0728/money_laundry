@@ -24,6 +24,7 @@ public class DemoResetService {
           ",",
           "rules.hit_transactions",
           "rules.hits",
+          "rules.execution_recipients",
           "rules.executions",
           "rules.backtest_subjects",
           "rules.backtests",

@@ -464,7 +464,7 @@ DB 원자 범위: receipt 잠금·명시 테이블 잠금 → 대상 확인 → 
 - 기간 생략 시 전체 업무 이력. 날짜 역전·잘못된 페이지/크기는400. 날짜는 조회 시각이 아닌 배정/행동의 업무 시각 기준이다.
 - 응답: `{content, number, size, totalElements, totalPages, unreadCount}`. unreadCount는 같은 검색·기간의 전체 미확인 알림 수이며 현재 페이지에 한정하지 않는다.
 - 행: `{id, kind, title, description, code, count, at, read, caseId, caseKind}`.
-- `id`는 불투명 문자열. `at`은 KST ISO8601. `caseId`는 사건 종류에 따라 review.alerts.alert_id 또는 review.episodes.episode_id다. 공통 review.case_id 시퀀스로 중복을 방지한다. `caseKind`는 ALERT/EPISODE.
+- `id`는 불투명 문자열. `at`은 KST ISO8601. `caseId`는 사건 종류에 따라 review.alerts.alert_id 또는 review.episodes.episode_id다. 공통 review.case_id 시퀀스로 중복을 방지한다. `caseKind`는 ALERT/EPISODE/RULE. RULE은 룰 알림이며 `caseId=null`, `code`가 룰 번호(RULE-003)다(아래 "룰 알림").
 - 정렬은 업무 시각 내림차순, 동일 시각은 id 내림차순. 알림 하나가 여러 Alert를 나타내면 count>1이며 caseId=null이다. 배정1건도 분석 묶음 알림이므로 caseId=null일 수 있다.
 - ALERT_ASSIGNED: 최초 증거(version1)의 분석 run과 담당자별 묶음. 분석 run·batch가 모두 COMPLETED인 건만 표시. 이후 같은 Alert의 증거 갱신은 새 배정 알림을 만들지 않는다.
 - ADDED_EVIDENCE/MERGED/CHANGE_PROPOSED/FOLLOWUP_CREATED/EVIDENCE_WITHDRAWN은 공개 이벤트의 고정 수신자에게 제공한다. 동일 사건·공개 이벤트당 한 번이며 병합에 편입이 포함되면 MERGED 하나다.
@@ -473,7 +473,7 @@ DB 원자 범위: receipt 잠금·명시 테이블 잠금 → 대상 확인 → 
 
 ### GET /api/v1/notifications/{id}/cases
 
-본인이 소유한 알림에 연결된 사건 목록. 병합 알림은 대표 사건을 포함하며 대표의 현재 담당자가 다르더라도 당시 알림 수신자가 조회할 수 있다. page/size는 위와 동일. 응답 `{content:[{caseId,kind,alertId,status}],number,size,totalElements,totalPages}`. 묶음 알림은 해당 run에서 본인에게 배정된 Alert만 포함한다. 상세 화면 이동은 caseId 사용. 없는 알림과 다른 사용자의 알림은 동일404.
+본인이 소유한 알림에 연결된 사건 목록. 룰 알림은 이어진 사건이 없어 빈 목록이다. 병합 알림은 대표 사건을 포함하며 대표의 현재 담당자가 다르더라도 당시 알림 수신자가 조회할 수 있다. page/size는 위와 동일. 응답 `{content:[{caseId,kind,alertId,status}],number,size,totalElements,totalPages}`. 묶음 알림은 해당 run에서 본인에게 배정된 Alert만 포함한다. 상세 화면 이동은 caseId 사용. 없는 알림과 다른 사용자의 알림은 동일404.
 
 ### POST /api/v1/notifications/read
 
@@ -486,6 +486,30 @@ CSRF 필요. `{ids: string[], read: boolean}`. 1~100개, 중복 ID는 한 번 �
 ### Episode 편입 알림 집계
 
 TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 명령으로 저장된 원본 Alert별 TRANSFER 이력은 조사 이력으로 보존하되 알림에서 제외한다. TRANSFER 이력이 있는 Episode의 최초 EPISODE_ASSIGNED 알림도 별도로 노출하지 않는다. 따라서 새 Episode에 Alert5개 편입 시 편입 알림1건이며, 이후 추가 편입은 이벤트ID가 다른 별도1건이다. 시연 업무 시각이 동일해도 시간으로 합치지 않는다. Episode 담당자 범위는 유지한다. 기존 Episode 이벤트ID와 읽음 상태는 유지되고 기존 중복은 재조회부터 숨겨진다.
+
+### 룰 알림
+
+룰에 생긴 일을 같은 목록으로 준다. `caseKind=RULE`, `caseId=null`, `count=1`, `code`는 룰 번호다. 화면은 `code`로 룰 상세(`/rules?rule=RULE-003`)나 백테스트(`/rules/backtest?rule=RULE-003`)를 연다.
+
+| kind | title | 받는 사람 | description |
+|---|---|---|---|
+| RULE_SUBMITTED | 룰 승인 요청 | 관리자 전원 | `룰 이름 v1 · 요청한 사람 · 남긴 말` |
+| RULE_WITHDRAWN | 룰 승인 요청 철회 | 관리자 전원 | `룰 이름 v1 · 거둔 사람` |
+| RULE_APPROVED | 룰 승인 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 승인한 사람 · 사유` |
+| RULE_REJECTED | 룰 반려 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 반려한 사람 · 사유` |
+| RULE_PAUSED | 룰 중지 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 중지한 사람 · 사유` |
+| RULE_RESUMED | 룰 재개 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 재개한 사람 · 사유` |
+| RULE_SHADOW_STARTED | 룰 시험 운영 시작 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 시작한 사람` |
+| RULE_BACKTEST_DONE | 백테스트 완료 | 백테스트를 요청한 사람 | `룰 이름 v1` |
+| RULE_BACKTEST_FAILED | 백테스트 실패 | 백테스트를 요청한 사람 | `룰 이름 v1` |
+| RULE_RUN_FAILED | 룰 일일 실행 실패 | 룰 담당자, 관리자 전원 | `룰 이름 v1 · 운영` 또는 `· 시험 운영` |
+
+- 그 일을 한 본인은 받지 않는다. 관리자가 자기가 쓴 버전을 직접 승인하면 본인에게는 알림이 없다. 백테스트는 요청한 뒤 기다리는 일이라 요청한 사람이 받는다.
+- 받는 사람은 그 일이 일어난 때에 정해 `rules.event_recipients`(상태 명령) · `rules.execution_recipients`(일일 실행 실패)에 적는다. 뒤에 관리자가 된 사람은 그 전의 승인 요청을 받지 않고, 관리자가 아니게 된 사람이 받았던 알림은 남는다. V3 를 적용하기 전에 있었던 일은 받는 사람이 적혀 있지 않아 알림이 없다.
+- 승인 요청 철회는 승인 대기에서 거둔 것만 알린다. 시험 운영만 하다 거둔 것은 알리지 않는다.
+- 취소한 백테스트, 잘 끝난 일일 실행, 초안 저장 · 삭제 · 복제 · 새 버전 만들기는 알림이 없다.
+- `at`은 그 일의 업무 시각이다(백테스트는 끝난 시각). `id`는 `rule-event:{n}` · `rule-backtest:{n}` · `rule-run:{n}` 꼴이지만 다른 알림처럼 불투명 문자열로 다룬다. 읽음 처리와 검색(`query`는 제목 · 내용 · 룰 번호)은 다른 알림과 같다.
+- 시연 초기화는 백테스트와 일일 실행 기록을 비우므로 그 알림도 사라진다. 룰과 변경 기록은 남으므로 상태 명령 알림은 남되 읽음 기록은 지워진다.
 
 ## 12. 룰엔진
 

@@ -523,8 +523,47 @@ public class RuleService {
                     in.versionId());
             default -> throw invalid("알 수 없는 명령입니다.");
           }
-          event(ruleId, in.versionId(), user, transition.event(), comment, snapshot, at);
+          long event =
+              event(ruleId, in.versionId(), user, transition.event(), comment, snapshot, at);
+          recipients(
+              event, ruleId, in.versionId(), user, in.action(), row.get("status").toString());
         });
+  }
+
+  /**
+   * 이 일을 알림으로 받을 사람을 지금의 관리자 · 담당자 · 작성자로 정해 적어 둔다(알림은 V3 의 rules.notifications 뷰가 읽는다). 승인 요청과 그
+   * 철회는 관리자 전원, 승인 · 반려 · 중지 · 재개 · 시험 운영 시작은 룰 담당자와 그 버전 작성자다. 그 일을 한 본인은 뺀다.
+   *
+   * @param from 명령 전의 버전 상태. 시험 운영만 하다 거둔 것(SHADOW → DRAFT)은 승인 요청을 거둔 것이 아니라 알리지 않는다.
+   */
+  private void recipients(
+      long event, long ruleId, long versionId, long actor, String action, String from) {
+    switch (action) {
+      case "SUBMIT" -> admins(event, actor);
+      case "WITHDRAW" -> {
+        if ("PENDING".equals(from)) admins(event, actor);
+      }
+      default ->
+          jdbc.update(
+              """
+              insert into rules.event_recipients(event_id,user_id)
+              select ?,who from (
+                select owner_id as who from rules.rules where rule_id=?
+                union select author_id from rules.rule_versions where version_id=?) people
+              where who<>?
+              """,
+              event,
+              ruleId,
+              versionId,
+              actor);
+    }
+  }
+
+  private void admins(long event, long actor) {
+    jdbc.update(
+        "insert into rules.event_recipients(event_id,user_id) select ?,user_id from core.users where role='ADMIN' and user_id<>?",
+        event,
+        actor);
   }
 
   /** 룰 한 줄을 잠그고 이름을 돌려준다. 한 룰의 버전을 바꾸는 명령끼리 순서를 세운다. */
@@ -568,7 +607,8 @@ public class RuleService {
     event(rule, version, user, action, "", snapshot, at);
   }
 
-  private void event(
+  /** 변경 기록 한 줄. event_id 를 돌려준다. */
+  private long event(
       long rule,
       Long version,
       long user,
@@ -576,8 +616,9 @@ public class RuleService {
       String comment,
       Map<String, Object> snapshot,
       Timestamp at) {
-    jdbc.update(
-        "insert into rules.events(rule_id,version_id,actor_id,action,comment,snapshot,business_at) values(?,?,?,?,?,?::jsonb,?)",
+    return jdbc.queryForObject(
+        "insert into rules.events(rule_id,version_id,actor_id,action,comment,snapshot,business_at) values(?,?,?,?,?,?::jsonb,?) returning event_id",
+        Long.class,
         rule,
         version,
         user,

@@ -80,9 +80,9 @@ erDiagram
 | review | alert_lineage | MERGED_INTO/FOLLOWUP_OF 관계와 원인 이벤트 |
 | review | events, event_recipients, notification_reads | 감사 이력·공개 시 고정 수신자·사용자별 알림 읽음 |
 | rules | rules, rule_versions | 룰 이름표와 조건을 가진 버전(정의 JSONB·지문·한 줄 요약·상태·revision). 룰마다 운영 버전 1개와 작업 중 버전 1개까지 |
-| rules | events, event_recipients | 룰 변경 기록(만들기·저장·초안 삭제·상태 명령)과 알림 수신자 |
+| rules | events, event_recipients | 룰 변경 기록(만들기·저장·초안 삭제·상태 명령)과 그 일을 알림으로 받는 사람(상태 명령 때 그때의 관리자·담당자·작성자로 적는다) |
 | rules | backtests, backtest_subjects | 백테스트 1회와 대상별 결과. 시연 초기화 때 비운다 |
-| rules | executions, hits, hit_transactions | 일일 실행(분석 run × 룰 버전), 적중(버전 × 대상 × 날짜)과 근거 거래. 시연 초기화 때 비운다 |
+| rules | executions, execution_recipients, hits, hit_transactions | 일일 실행(분석 run × 룰 버전), 실패한 실행을 알림으로 받는 사람, 적중(버전 × 대상 × 날짜)과 근거 거래. 시연 초기화 때 비운다 |
 | rules | alert_seeds (뷰) | Alert 생성 룰의 운영 적중의 근거 거래. Alert 생성기가 읽는 유일한 창구 |
 | rules | risk_bands | 위험 점수 구간(주의·위험 시작점). 가장 최근 줄이 현재 값 |
 | ops | business_clock | 시연 업무 시각 |
@@ -123,7 +123,7 @@ Python의 데이터 변경과 단계 완료 기록은 같은 DB 트랜잭션이�
 
 ## 읽기 전용 뷰
 
-`core.assignable_staff`는 비밀번호 해시를 노출하지 않는 배정 후보 목록이다. `ops.work_items`는 작업 목록, `review.cases`는 공통 사건 목록이다. `review.event_history`, `latest_versions`, `current_members`, `visible_cases`, `notifications`는 현재 조사·완료 근거·알림을 조합한다. 업무 상태의 두 번째 저장소나 구 테이블의 쓰기 호환 계층이 아니다.
+`core.assignable_staff`는 비밀번호 해시를 노출하지 않는 배정 후보 목록이다. `ops.work_items`는 작업 목록, `review.cases`는 공통 사건 목록이다. `review.event_history`, `latest_versions`, `current_members`, `visible_cases`, `notifications`는 현재 조사·완료 근거·알림을 조합한다. `review.notifications`는 사건 알림(`review.case_notifications`)과 룰 알림(`rules.notifications`)을 합친 것이다(V3). 업무 상태의 두 번째 저장소나 구 테이블의 쓰기 호환 계층이 아니다.
 
 `analysis.run_inputs`·`run_scores`·`run_alert_origins`·`run_fact_checks`는 실행의 `input_seq`에 유효한 장부 버전(run_inputs는 그 실행의 TARGET 행 포함)을 보여 주는 읽기 전용 뷰다.
 

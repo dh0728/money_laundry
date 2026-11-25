@@ -142,12 +142,24 @@ public class RuleRunStep {
       } finally {
         if (entered) evaluator.leave();
       }
-      if (error != null)
+      if (error != null) {
         jdbc.update(
             "update rules.executions set status='FAILED', error_code=?, finished_at=? where execution_id=?",
             error,
             Timestamp.from(time.now()),
             execution);
+        // 실패는 지금의 룰 담당자와 관리자 전원에게 알린다(V3 의 rules.notifications 뷰가 읽는다)
+        jdbc.update(
+            """
+            insert into rules.execution_recipients(execution_id,user_id)
+            select ?,who from (
+              select r.owner_id as who from rules.rule_versions v join rules.rules r using(rule_id) where v.version_id=?
+              union select user_id from core.users where role='ADMIN') people
+            on conflict do nothing
+            """,
+            execution,
+            versionId);
+      }
       outcomes.add(new Outcome(versionId, error == null ? "COMPLETED" : "FAILED", error));
       if ("INTERRUPTED".equals(error)) break;
     }
