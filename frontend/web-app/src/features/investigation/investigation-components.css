@@ -7,7 +7,7 @@
     minmax(var(--ledger-account-column-min-width), var(--ledger-wide-account-column-share))
     var(--ledger-relationship-gutter)
     minmax(var(--ledger-transaction-column-min-width), 1fr)
-    var(--workspace-gap) minmax(var(--ledger-related-column-min-width), 1.25fr);
+    calc(2 * var(--workspace-gap)) minmax(var(--ledger-related-column-min-width), 1.25fr);
   grid-template-areas: "owners . accounts . transactions . related";
   align-items: start;
   row-gap: var(--workspace-gap);
@@ -30,6 +30,11 @@
   align-items: center;
   gap: var(--aml-space-6);
 }
+.ledger-panel-heading {
+  --query-control-size: var(--aml-panel-control-size);
+  flex-wrap: wrap;
+}
+.ledger-panel-heading h2 { white-space: nowrap }
 .ledger-source {
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -39,11 +44,11 @@
 }
 .ledger-empty { margin-block: var(--workspace-gap); color: var(--muted-text); font-size: var(--aml-type-caption-size) }
 .ledger-components .animated-list__viewport {
-  padding-inline: var(--aml-space-4);
-  scrollbar-gutter: stable;
+  padding-inline: 0;
+  scrollbar-gutter: auto;
 }
 .ledger-transaction-list .animated-list__viewport {
-  padding: var(--record-card-shadow-gutter);
+  padding-block: var(--record-card-shadow-gutter);
   border-radius: 0;
 }
 .ledger-components .animated-list__item {
@@ -133,8 +138,8 @@
 .ledger-case-groups > section { min-width: 0 }
 .ledger-case-groups h3 { margin: 0; font-size: var(--aml-type-body-strong-size); line-height: var(--aml-type-body-strong-lineHeight) }
 .ledger-case-groups .case-list {
-  padding: var(--record-card-shadow-gutter);
-  scrollbar-gutter: stable;
+  padding-block: var(--record-card-shadow-gutter);
+  scrollbar-gutter: auto;
 }
 .ledger-case-groups .card-header > .card-header-main,
 .ledger-case-groups .card-header .card-header-main > code {

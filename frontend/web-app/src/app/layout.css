@@ -1079,7 +1079,7 @@ body:has(#footer-pagination > *) #workspace {
 .rule-template-menu { max-width: 100% }
 
 body[data-login-required] > :not(#preview-login, .glass-refraction) { display: none }
-#preview-login { min-height: 100dvh; display: grid; place-items: center; padding: var(--aml-space-24) }
+#preview-login:not([hidden]) { min-height: 100dvh; display: grid; place-items: center; padding: var(--aml-space-24) }
 .login-card { width: min(100%, calc(8 * var(--aml-space-48))); padding: var(--aml-panel-text-inset); border: var(--aml-stroke-control) solid var(--glass-surface-edge) }
 .login-brand {
   display: flex;
