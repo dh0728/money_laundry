@@ -16,12 +16,22 @@
       from var(--cursor-angle) at center,
       black var(--record-glow-cone-core), transparent var(--record-glow-cone-falloff),
       transparent calc(100% - var(--record-glow-cone-falloff)), black calc(100% - var(--record-glow-cone-core))
+    ),
+    linear-gradient(
+      to bottom,
+      transparent var(--card-glow-clip-top, calc(-1 * var(--aml-space-8))),
+      black calc(var(--card-glow-clip-top, calc(-1 * var(--aml-space-8))) + var(--aml-space-8)),
+      black calc(100% - var(--card-glow-clip-bottom, calc(-1 * var(--aml-space-8))) - var(--aml-space-8)),
+      transparent calc(100% - var(--card-glow-clip-bottom, calc(-1 * var(--aml-space-8))))
     );
+  mask-composite: intersect;
 }
 
 .border-glow-card:not(:hover) > .edge-light {
   transition: opacity var(--record-glow-fade-out) ease-in-out;
 }
+
+[data-card-glow-scrolling] .border-glow-card > .edge-light { transition: none }
 
 @media (any-hover: hover) and (prefers-reduced-motion: no-preference) {
   :root:not([data-glassmorphism="false"], [data-reduced-motion="true"])
