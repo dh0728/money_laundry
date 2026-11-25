@@ -11,8 +11,8 @@ import {
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
-import { csvDownloadEntry } from '../../components/query-controls';
-import { SectionDownloadHeading } from '../../components/section-download';
+import { csvDownloadEntry, exportCases } from '../../components/query-controls';
+import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
@@ -169,17 +169,23 @@ function interleaveCaseKinds(records) {
 }
 
 function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
-  return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 현황'}>
+  const title = mine ? '내 업무 현황' : '업무 현황';
+  const rows = records.map(row => {
+    const status = statusByCode?.[row.code] ?? row.status;
+    return status === row.status ? row : { ...row, status };
+  });
+  return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : title}>
     <Box as="header" className="dashboard-board-heading">
-      <Heading id="dashboard-work-title" tabIndex={-1}>{mine ? '내 업무 현황' : '업무 현황'}</Heading>
+      <Heading id="dashboard-work-title" tabIndex={-1}>{title}</Heading>
       <Box data-dashboard-sort-tags></Box>
       <Box className="dashboard-board-actions">
         <Box data-dashboard-sort></Box>
+        <BoardSectionDownload records={rows} label={title} onDownload={entries => exportCases(entries, 'work-board')} />
       </Box>
     </Box>
     <Box className="dashboard-board-scroll">
-      <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine}
-        showLaneDownload={!mine} pageSize={8} statusByCode={statusByCode}
+      <CaseProgressBoard rows={rows} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine}
+        plainCount pageSize={8}
         orderRows={mine && !sort ? interleaveCaseKinds : undefined} />
     </Box>
   </Box>;

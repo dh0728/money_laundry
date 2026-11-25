@@ -3,6 +3,7 @@ import React from 'react';
 import { modelRiskBand } from '../features/settings/model-risk-settings';
 import { cautionAgeDays, isOverdueCaseAge } from '../features/investigation/case-age';
 import { ActionButton } from './primary-button';
+import { Text } from './layout-primitives';
 import './semantic-tags.css';
 
 const statusTones = {
@@ -60,12 +61,14 @@ export function CaseAgeTag({ days }) {
 const countFormat = new Intl.NumberFormat('ko-KR');
 
 /**
- * 제목 오른쪽 개수 태그. 목록·표·레인·패널 제목 옆 개수는 모두 이 태그 하나로 쓴다.
+ * 목록·표·레인·패널 제목 옆 개수. plain은 태그 없이 텍스트로 표시한다.
  * 일부만 보이면(더 보기·필터·페이지) "보이는 수 / 전체 수", 다 보이면 전체 수만 쓴다.
  */
-export function CountTag({ label, count, total = count, unit = '건' }) {
+export function CountTag({ label, count, total = count, unit = '건', plain = false }) {
   const value = count < total ? `${countFormat.format(count)} / ${countFormat.format(total)}` : countFormat.format(total);
-  return <StatusTag preset="neutral" className="count-tag">{label ? `${label} ` : ''}{value}{unit}</StatusTag>;
+  const text = (label ? label + ' ' : '') + value + unit;
+  if (plain) return <Text as="span">{text}</Text>;
+  return <StatusTag preset="neutral" className="count-tag">{text}</StatusTag>;
 }
 
 export const verdictLabels = {

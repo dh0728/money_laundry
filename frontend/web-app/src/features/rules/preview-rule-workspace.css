@@ -20,10 +20,14 @@
   line-height: var(--metric-value-line-height);
   font-variant-numeric: tabular-nums;
 }
-.workflow-rule-list, .workflow-rule-note { grid-column: 1 / -1 }
-.workflow-rule-detail { grid-column: 1 / 7 }
-.workflow-rule-reason { grid-column: 7 / -1 }
-.workflow-rule-detail, .workflow-rule-reason { align-self: stretch }
+.workflow-rule-list,
+.workflow-rule-inspection,
+.screen-rule-list > .workflow-rule-detail,
+.workflow-rule-note { grid-column: 1 / -1 }
+.workflow-rule-inspection {
+  align-items: start;
+  gap: var(--workspace-gap);
+}
 .workflow-rule-note { color: var(--muted-text); font-size: var(--aml-type-caption-size) }
 .screen-layout:has(> [data-rule-editor], .workflow-rule-overview) {
   padding-block-end: max(var(--workspace-inset), var(--account-footer-reserve));
@@ -278,7 +282,7 @@
   .workflow-rule-overview:has(.workflow-rule-list) {
     grid-template-columns: minmax(0, 1fr);
   }
-  .workflow-rule-detail, .workflow-rule-reason { grid-column: 1 / -1 }
+  .workflow-rule-inspection { grid-template-columns: minmax(0, 1fr) }
   .workflow-rule-inventory { grid-template-columns: repeat(2, minmax(0, 1fr)) }
   .workflow-rule-inventory > * { grid-column: auto }
   .screen-row.screen-rule-editor > :nth-child(n) { grid-column: auto }

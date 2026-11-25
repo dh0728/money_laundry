@@ -55,7 +55,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
-  gap: var(--aml-space-8);
+  gap: var(--workspace-panel-gap);
 }
 .case-progress-lane {
   min-inline-size: 0;
@@ -72,6 +72,9 @@
 }
 .case-progress-lane.screen-panel {
   --panel-content-padding: var(--aml-panel-inset);
+}
+.case-progress-lane-header {
+  min-block-size: var(--aml-panel-control-size);
 }
 .case-progress-lane .case-progress-heading {
   display: flex;

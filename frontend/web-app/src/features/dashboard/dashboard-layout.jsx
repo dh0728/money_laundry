@@ -2,6 +2,7 @@ import React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import MagicBento from '../../components/react-bits/MagicBento';
 import { Panel } from '../../components/panel';
+import { SectionDownloadHeading } from '../../components/section-download';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
@@ -171,8 +172,10 @@ export function DashboardBoardSkeleton() {
 }
 
 function LoadingLane() {
-  return <Panel className="case-progress-lane">
-    <Skeleton className="dashboard-loading-title" />
+  return <Panel className="case-progress-lane" aria-hidden="true">
+    <SectionDownloadHeading as={Box} className="case-progress-lane-header" headingClassName="case-progress-heading">
+      <Skeleton className="dashboard-loading-title" />
+    </SectionDownloadHeading>
     <Skeleton className="dashboard-loading-card" />
   </Panel>;
 }

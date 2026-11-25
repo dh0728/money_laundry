@@ -16,7 +16,7 @@ import {
 } from './live-rule-store';
 import './preview-rule-workspace.css';
 import './live-rule-engine.css';
-import { Box, Heading, Text } from '@/components/layout-primitives';
+import { Box, Grid, Heading, Text } from '@/components/layout-primitives';
 
 // 룰 목록과 상세. 한 룰은 운영 버전 최대 1개와 작업 중 버전 최대 1개를 가진다.
 // 상태를 바꾸는 버튼은 서버가 상세에 실어 주는 commands(지금 상태에서 있는 명령, 내가 할 수 있는지, 못 하면 왜)대로 그린다.
@@ -373,14 +373,16 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
           </TableBody>
         </WorkflowTable>
       </Panel>
-      {shown && <RuleDetail rule={shown} row={selected} subject={subjectOf(shown.template)} />}
+      {shown && <Grid className="workflow-rule-inspection">
+        <RuleDetail rule={shown} row={selected} subject={subjectOf(shown.template)} />
+        <RuleEvents rule={shown} />
+      </Grid>}
       {selected && !shown && <Panel className="workflow-rule-detail" aria-label="룰 상세" aria-busy={!detailFailure || undefined}>
         <Heading><Text as="code">{selected.code}</Text> {selected.name}</Heading>
         {detailFailure ? <Text role="alert">{detailFailure}</Text> : <Text className="workflow-rule-note">상세를 불러오는 중입니다.</Text>}
       </Panel>}
     </Box>
     {shown && <RuleExecutions rule={shown} />}
-    {shown && <RuleEvents rule={shown} />}
     <ScreenActions host={actionsHost} stackOnNarrow>
       <PrimaryButton tone="negative" disabled={!working?.deletable} aria-haspopup="dialog" onClick={() => setDeleting(true)}>초안 삭제</PrimaryButton>
       {commands.filter(item => commandSpecs[item.action].tone === 'negative').map(commandButton)}

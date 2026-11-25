@@ -39,8 +39,6 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
   }
 
   const pageScope = {
-    '/dashboard/mine': '.dashboard-board',
-    '/dashboard/all': '.dashboard-board-heading',
     '/rules': '.workflow-rule-list',
     '/rules/reason': '.workflow-rule-list',
     '/report': '.workflow-report > .data-table-frame, .workflow-report > .data-table-heading',
@@ -53,6 +51,24 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
   ];
   for (const root of duplicateRoots) {
     if (downloadIn(root).length) failures.push(`The page download is duplicated in ${root}.`);
+  }
+
+  if (pathname === '/dashboard/mine' || pathname === '/dashboard/all') {
+    const sort = workspace.querySelector('.dashboard-board-actions > [data-dashboard-sort]');
+    const boardDownload = sort?.nextElementSibling;
+    if (!visible(boardDownload?.querySelector(download)) || downloadIn('.dashboard-board-heading').length !== 1) {
+      failures.push('The work board needs its own download next to sorting.');
+    }
+    for (const lane of findVisible('.dashboard-board .case-progress-lane', workspace)) {
+      const heading = lane.querySelector('.case-progress-heading');
+      if (!heading?.lastElementChild?.textContent.trim() || heading.querySelectorAll('.semantic-tag').length !== 1) {
+        failures.push('The work lane needs a status tag and a plain count.');
+      }
+      const expectedDownloads = lane.querySelector('.preview-case-card') ? 1 : 0;
+      if (findVisible(download, lane).length !== expectedDownloads) {
+        failures.push('The work lane download must be available for each status with cases.');
+      }
+    }
   }
 
   if (pathname === '/dashboard/mine') {

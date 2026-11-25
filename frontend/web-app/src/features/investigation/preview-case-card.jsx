@@ -10,7 +10,7 @@ import { readWorkspaceGap } from '../dashboard/workspace-metrics';
 import './preview-case-card.css';
 import { Box, Heading, Text } from '../../components/layout-primitives';
 import { exportCases } from '../../components/query-controls';
-import { BoardSectionDownload } from '../../components/section-download';
+import { boardDownloadEntry, SectionDownloadHeading } from '../../components/section-download';
 
 const amount = new Intl.NumberFormat('ko-KR');
 const formatDate = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -54,7 +54,7 @@ export function CaseProgressLanes({ renderLane, notice, className = '' }) {
   </Box>;
 }
 
-export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, showLaneDownload = true,
+export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, plainCount = false,
   pageSize, statusByCode, className }) {
   const [limits, setLimits] = React.useState({});
   const isEmpty = rows.length === 0;
@@ -65,15 +65,14 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
         const matching = rows.filter(row => (statusByCode?.[row.code] ?? row.status) === value);
         const cards = orderRows ? orderRows(matching) : matching;
         const limit = limits[preset] ?? pageSize ?? cards.length;
+        const downloads = cards.length ? [boardDownloadEntry(cards, label + ' 업무',
+          entries => exportCases(entries, 'work-board-' + preset))] : [];
         return <Panel className="case-progress-lane" data-review={preset} key={preset} aria-label={label}>
-          <Box className="section-download-heading">
-            <Heading className="case-progress-heading">
-              <StatusTag preset={preset}>{label}</StatusTag>
-              <CountTag count={Math.min(limit, cards.length)} total={cards.length} />
-            </Heading>
-            {showLaneDownload && cards.length > 0 && <BoardSectionDownload records={cards} label={`${label} 업무`}
-              onDownload={entries => exportCases(entries, `work-board-${preset}`)} />}
-          </Box>
+          <SectionDownloadHeading as={Heading} className="case-progress-lane-header"
+            headingClassName="case-progress-heading" entries={downloads}>
+            <StatusTag preset={preset}>{label}</StatusTag>
+            <CountTag count={Math.min(limit, cards.length)} total={cards.length} plain={plainCount} />
+          </SectionDownloadHeading>
           {cards.length > 0 ? <MagicBento key={reduced} className="case-progress-cards preview-tilt-cards"
             items={cards.slice(0, limit).map(row => ({ id: row.code, content: <PreviewCaseCard
               row={row} showReviewStatus={false} showAssignee={showAssignee} /> }))}

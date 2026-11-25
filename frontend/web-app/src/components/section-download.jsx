@@ -25,9 +25,12 @@ export function SectionDownloadHeading({ as: Heading = 'h2', id, className = '',
   </div>;
 }
 
-export function BoardSectionDownload({ records, label, onDownload }) {
-  const entries = [{
+export function boardDownloadEntry(records, label, onDownload) {
+  return {
     label, format: 'CSV', count: records.length, disabled: !records.length, download: () => onDownload(records),
-  }];
-  return <SectionDownload label={label} entries={entries} />;
+  };
+}
+
+export function BoardSectionDownload({ records, label, onDownload }) {
+  return <SectionDownload label={label} entries={[boardDownloadEntry(records, label, onDownload)]} />;
 }
