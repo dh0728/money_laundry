@@ -1191,12 +1191,6 @@ body[data-login-required] > :not(#preview-login, .glass-refraction) { display: n
 }
 
 .magic-bento__card { --mb-radius: var(--aml-radius-card) }
-.preview-tilt-cards .magic-bento__card {
-  overflow: visible;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
 .preview-tilt-cards .magic-bento__cell:has(.magic-bento__card[data-active]) { z-index: var(--layer-local-overlay) }
 .preview-tilt-cards .magic-bento__content { padding: 0 }
 .preview-tilt-cards .magic-bento__content > [data-glow-surface] { flex: 1 }
