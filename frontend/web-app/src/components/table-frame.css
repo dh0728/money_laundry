@@ -282,3 +282,8 @@
 .variable-table > [data-slot="table-container"] { min-inline-size: 0 }
 .variable-table :is(th, td) { padding: var(--aml-space-8) var(--aml-space-12) }
 .variable-table td { white-space: normal; overflow-wrap: anywhere }
+
+.rule-backtest-table { inline-size: 100%; font-variant-numeric: tabular-nums }
+.rule-backtest-table :is(th, td):not(:first-child) { text-align: end }
+.rule-backtest-table tr[data-current] { background: var(--brand-accent-tint) }
+.rule-backtest-table tr[data-current] th { font-weight: var(--aml-type-body-strong-weight) }

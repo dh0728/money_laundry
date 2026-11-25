@@ -14,6 +14,8 @@ const alertCards = ['/investigate/alerts?view=cards', '.case-list-panel .preview
 const alertTable = ['/investigate/alerts?view=table', '[data-case-list-table] tbody tr'];
 const episodeCards = ['/investigate/episodes?view=cards', '.case-list-panel .preview-case-card'];
 const episodeTable = ['/investigate/episodes?view=table', '[data-case-list-table] tbody tr'];
+const reportCards = ['/report?view=cards', '.workflow-report-lane [data-glow-surface]'];
+const reportTable = ['/report?view=table', '.workflow-report tbody tr'];
 const myDashboard = ['/dashboard/mine', '.dashboard-personal-flow .staged-sankey-chart'];
 const allDashboard = ['/dashboard/all', '.dashboard-analytics:has(.dashboard-staff-scroll) .dashboard-investigation-flow .staged-sankey-chart'];
 const moreCompletedAlerts = [...alertCards, async page => {
@@ -51,10 +53,10 @@ const workspaces = [
   ['/rules/reason', '.workflow-rule-reason'],
   ['/rules/new', '[data-rule-editor] form'],
   ['/rules/backtest', '.workflow-backtest'],
-  ['/report?view=cards', '.workflow-report-lane [data-glow-surface]'],
-  ['/report?view=table', '.workflow-report tbody tr'],
+  reportCards, reportTable,
 ];
 const configurations = [
+  { width: 2560, height: 1230, routes: [reportCards, reportTable] },
   { width: 1440, height: 960, routes: workspaces },
   { width: 390, height: 844, routes: workspaces },
   { width: 768, height: 481, routes: [alertCards, alertTable] },

@@ -337,10 +337,11 @@ class BaselineSchemaTests {
 
   @Test
   void baseline_has_independent_roles_and_no_legacy_business_tables() {
+    // V1 기준 스키마 + V2 룰 엔진(rules 스키마)
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from public.flyway_schema_history where success", Integer.class))
-        .isEqualTo(1);
+        .isEqualTo(2);
     assertThat(
             jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema='public'",

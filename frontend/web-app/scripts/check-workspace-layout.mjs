@@ -161,6 +161,58 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
   return failures;
 }
 
+async function checkQueryPopover(page, tool, verify) {
+  const trigger = page.locator('#workspace [data-query-tool="' + tool + '"]:visible').first();
+  if (!await trigger.isVisible()) throw new Error(tool + ' button is missing.');
+
+  const panel = page.locator('.query-tool-popover[data-tool="' + tool + '"]:popover-open');
+  const apply = panel.getByRole('button', { name: '적용', exact: true });
+  await trigger.click();
+  try {
+    await panel.waitFor();
+    await apply.waitFor();
+    await verify({ panel, apply, trigger });
+  } finally {
+    if (await panel.isVisible()) await page.keyboard.press('Escape');
+  }
+}
+
+async function checkWorkspaceQueryTools(page, { pathname, table, list }) {
+  const report = pathname === '/report';
+  if (!report && !list && !pathname.startsWith('/dashboard/')) return;
+
+  if ((report || list) && !table) {
+    await checkQueryPopover(page, 'sort', async ({ panel, apply, trigger }) => {
+      const oldest = panel.getByRole('radio', { name: '오래된 판정순', exact: true });
+      const choice = report ? oldest : panel.getByRole('radio').first();
+      const card = page.getByRole('region', { name: '이상 판정', exact: true }).locator('[data-glow-surface]').first();
+      const previous = report ? await card.textContent() : null;
+      await choice.check();
+      await apply.click();
+      await panel.waitFor({ state: 'hidden' });
+
+      if (report) {
+        if (await card.textContent() === previous) throw new Error('Changing the report sort did not reorder the cards.');
+        await trigger.click();
+        if (!await oldest.isChecked()) throw new Error('The selected report order did not persist.');
+      }
+    });
+  }
+
+  await checkQueryPopover(page, 'period', async ({ panel, apply, trigger }) => {
+    const recent = panel.getByRole('radio', { name: '최근 3일', exact: true });
+    await panel.locator('[aria-label="조회 기간 달력"]').waitFor();
+    await recent.check();
+    await apply.click();
+    await panel.waitFor({ state: 'hidden' });
+    await trigger.click();
+    if (!await recent.isChecked()) throw new Error('The selected date range did not persist.');
+    await panel.getByRole('button', { name: '기간 초기화', exact: true }).click();
+    await apply.click();
+    await panel.waitFor({ state: 'hidden' });
+  });
+}
+
 export async function checkWorkspaceLayout(page, { path, viewport }) {
   const { pathname, searchParams } = new URL(path, page.url());
   const list = investigationLists.includes(pathname);
@@ -190,6 +242,11 @@ export async function checkWorkspaceLayout(page, { path, viewport }) {
     } finally {
       if (await scope.getAttribute('aria-expanded') === 'true') await scope.press('Escape', { timeout: 5000 });
     }
+  }
+  try {
+    await checkWorkspaceQueryTools(page, { pathname, table, list });
+  } catch (error) {
+    failures.push('Query controls: ' + error.message);
   }
   if (failures.length) throw new Error(`${viewport.width}×${viewport.height} ${path}\n  ${failures.join('\n  ')}`);
 }

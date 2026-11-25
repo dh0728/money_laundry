@@ -300,6 +300,11 @@
   --page-heading-min-height: 58px;
   --episode-interval-columns: 56px 1fr;
   --rule-condition-column-width: 34%;
+  --rule-editor-sidebar-min-width: 14rem;
+  --rule-editor-sidebar-medium-min-width: 13rem;
+  --rule-keyword-min-width: 3.5rem;
+  --rule-numeric-field-min-width: 4.5rem;
+  --rule-backtest-panel-min-width: 22rem;
   --rule-builder-columns: minmax(0, 1fr) minmax(0, 1.1fr);
   --rule-validation-columns: var(--aml-space-20) var(--aml-space-64) 1fr;
   --date-ticker-glass-shadow-light-ink: rgb(0 0 0 / 0.12);

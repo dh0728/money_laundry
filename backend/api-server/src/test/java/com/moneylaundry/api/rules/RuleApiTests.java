@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.moneylaundry.api.TestcontainersConfiguration;
 import com.moneylaundry.api.analysis.AnalysisScheduler;
+import com.moneylaundry.api.rules.catalog.RuleCatalog;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-/** 룰엔진 화면의 저장·승인 흐름과 백테스트를 실제 로그인 세션과 HTTP 경로로 확인한다. */
+/** 룰 엔진의 템플릿·검증·만들기·저장·목록·상세·초안 삭제를 실제 로그인 세션과 HTTP 경로로 확인한다. */
 @SpringBootTest(properties = {"spring.profiles.active=local"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
@@ -30,6 +32,7 @@ class RuleApiTests {
   @Autowired MockMvc mvc;
   @Autowired JdbcTemplate jdbc;
   @Autowired PasswordEncoder encoder;
+  @Autowired RuleCatalog catalog;
   @MockitoBean AnalysisScheduler scheduler;
   MockHttpSession session;
   String token;
@@ -37,8 +40,8 @@ class RuleApiTests {
   @BeforeEach
   void setup() {
     jdbc.execute(
-        "truncate review.rules,review.alerts,analysis.jobs,review.episodes,core.owners,ingest.uploads cascade");
-    jdbc.update("update ops.business_clock set business_at='2023-09-02T00:00:00Z',revision=0");
+        "truncate rules.rules,review.alerts,analysis.jobs,review.episodes,core.owners,ingest.uploads cascade");
+    jdbc.update("update ops.business_clock set business_at='2023-09-17T00:00:00Z',revision=0");
     jdbc.update(
         "update core.users set password_hash=? where username in ('l1a','l1b','admin')",
         encoder.encode("Test-password-123"));
@@ -77,206 +80,350 @@ class RuleApiTests {
             .content(encode(body)));
   }
 
-  Map<String, Object> rule(
-      Integer typeCode, double scoreMin, int minTransactions, int windowHours) {
-    var rule = new LinkedHashMap<String, Object>();
-    rule.put("name", "고위험 반복 송금");
-    rule.put("description", "같은 계좌의 반복 송금 확인");
-    rule.put("typeCode", typeCode);
-    rule.put("scoreMin", scoreMin);
-    rule.put("minTransactions", minTransactions);
-    rule.put("windowHours", windowHours);
-    return rule;
+  ResultActions read(String path) throws Exception {
+    return mvc.perform(get(path).session(session));
   }
 
-  @Test
-  void draft_is_saved_requested_and_decided_by_admin_only() throws Exception {
-    login("l1a");
-    var invalid = rule(null, 1.5, 1, 24);
-    send(post("/api/v1/rules"), invalid).andExpect(status().isBadRequest());
+  ResultActions remove(String path) throws Exception {
+    return mvc.perform(delete(path).session(session).header("X-CSRF-TOKEN", token));
+  }
+
+  static Map<String, Object> json(ResultActions result) throws Exception {
+    return object(result.andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8));
+  }
+
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> group(Map<String, Object> definition, String key) {
+    return (Map<String, Object>) definition.get(key);
+  }
+
+  static Map<String, Object> body(Object... pairs) {
+    var body = new LinkedHashMap<String, Object>();
+    for (int i = 0; i < pairs.length; i += 2) body.put(pairs[i].toString(), pairs[i + 1]);
+    return body;
+  }
+
+  /** 템플릿 기본값으로 룰을 만들고 {ruleId, versionId} 를 돌려준다. */
+  long[] created(String name, String template) throws Exception {
     var created =
-        object(
-            send(post("/api/v1/rules"), rule(null, .7, 2, 24))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("DRAFT"))
-                .andExpect(jsonPath("$.version").value(1))
-                .andExpect(jsonPath("$.history[0].action").value("초안 생성"))
-                .andReturn()
-                .getResponse()
-                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
-    String code = created.get("id").toString();
-    assertThat(code).matches("RULE-\\d{3,}");
-    send(post("/api/v1/rules/" + code), rule(1, .8, 2, 24))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.version").value(2))
-        .andExpect(jsonPath("$.typeCode").value(1));
-    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "TESTING", "reason", "승인"))
-        .andExpect(status().isForbidden());
-    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "PENDING_APPROVAL"))
-        .andExpect(status().isBadRequest()); // 사유 필수
+        json(
+            send(post("/api/v1/rules"), body("name", name, "template", template))
+                .andExpect(status().isOk()));
+    return new long[] {number(created.get("ruleId")), number(created.get("versionId"))};
+  }
+
+  static String version(long[] ids) {
+    return "/api/v1/rules/" + ids[0] + "/versions/" + ids[1];
+  }
+
+  @Test
+  void templates_come_from_the_catalog_and_need_a_staff_session() throws Exception {
+    mvc.perform(get("/api/v1/rule-templates")).andExpect(status().isUnauthorized());
+    login("l1a");
+    var templates = json(read("/api/v1/rule-templates").andExpect(status().isOk()));
+    var available = new ArrayList<String>();
+    for (var template : rows(templates.get("templates")))
+      if (Boolean.TRUE.equals(template.get("available")))
+        available.add(template.get("key").toString());
+    assertThat(available)
+        .containsExactly(
+            "FAN_OUT",
+            "FAN_IN",
+            "GATHER_SCATTER",
+            "SCATTER_GATHER",
+            "CYCLE",
+            "RANDOM",
+            "LARGE_TX",
+            "STRUCTURING",
+            "SAME_AMOUNT",
+            "PASS_THROUGH");
+    assertThat(rows(templates.get("templates"))).hasSize(13);
+    read("/api/v1/rule-templates")
+        .andExpect(jsonPath("$.templates[1].key").value("FAN_IN"))
+        .andExpect(jsonPath("$.templates[1].defaults.windowMinutes").value(10080))
+        .andExpect(jsonPath("$.templates[1].defaults.filter.items[1].field").value("FX_FOLLOW"))
+        .andExpect(jsonPath("$.filterFields.FIRST_PAIR.label").value("처음 거래하는 상대"))
+        .andExpect(jsonPath("$.metrics.RETAIN_RATIO").doesNotExist())
+        .andExpect(jsonPath("$.windows.length()").value(7))
+        .andExpect(jsonPath("$.then[1].key").value("CREATE_ALERT"))
+        .andExpect(jsonPath("$.then[1].enabled").value(false));
+  }
+
+  @Test
+  void draft_is_created_from_defaults_saved_by_its_author_and_listed() throws Exception {
+    login("l1a");
+    send(post("/api/v1/rules"), body("name", "이름만")).andExpect(status().isBadRequest());
+    send(post("/api/v1/rules"), body("name", " ", "template", "FAN_OUT"))
+        .andExpect(status().isBadRequest());
+    send(post("/api/v1/rules"), body("name", "휴면", "template", "DORMANT_ACTIVATION"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    var alerting = catalog.defaults("FAN_OUT");
+    alerting.put("then", "CREATE_ALERT");
     send(
-            post("/api/v1/rules/" + code + "/review"),
-            Map.of("status", "PENDING_APPROVAL", "reason", "검토 요청"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("PENDING_APPROVAL"));
-    send(post("/api/v1/rules/" + code), rule(1, .8, 2, 24)).andExpect(status().isConflict());
+            post("/api/v1/rules"),
+            body("name", "Alert 생성", "template", "FAN_OUT", "definition", alerting))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("select count(*) from rules.rules", Long.class)).isZero();
 
-    login("admin");
-    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "TESTING", "reason", "승인합니다"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("TESTING"))
-        .andExpect(jsonPath("$.version").value(4))
-        .andExpect(jsonPath("$.history[3].action").value("승인"))
-        .andExpect(jsonPath("$.history[3].actor").value("관리자"));
-    mvc.perform(get("/api/v1/rules").session(session))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(1));
-  }
-
-  String created() throws Exception {
-    return object(
-            send(post("/api/v1/rules"), rule(null, .7, 2, 24))
+    var created =
+        json(
+            send(post("/api/v1/rules"), body("name", "  분산 송금 감시  ", "template", "FAN_OUT"))
                 .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
-        .get("id")
-        .toString();
-  }
+                .andExpect(jsonPath("$.revision").value(0)));
+    long[] ids = {number(created.get("ruleId")), number(created.get("versionId"))};
+    assertThat(created.get("code").toString()).matches("RULE-\\d{3,}");
 
-  void review(String code, String status) throws Exception {
-    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", status, "reason", "사유"))
+    read("/api/v1/rules")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value(status));
-  }
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].code").value(created.get("code")))
+        .andExpect(jsonPath("$.content[0].name").value("분산 송금 감시"))
+        .andExpect(jsonPath("$.content[0].templateName").value("FAN-OUT · 분산 송금"))
+        .andExpect(jsonPath("$.content[0].status").value("DRAFT"))
+        .andExpect(jsonPath("$.content[0].versionNo").value(1))
+        .andExpect(jsonPath("$.content[0].then").value("ATTACH_EVIDENCE"))
+        .andExpect(
+            jsonPath("$.content[0].summary").value("첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 6개 이상 · 7일"))
+        .andExpect(jsonPath("$.content[0].owner").value("L1 심사자 A"))
+        .andExpect(jsonPath("$.counts.DRAFT").value(1))
+        .andExpect(jsonPath("$.counts.ACTIVE").value(0));
+    read("/api/v1/rules/" + ids[0])
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("DRAFT"))
+        .andExpect(jsonPath("$.operating").doesNotExist())
+        .andExpect(jsonPath("$.working.versionNo").value(1))
+        .andExpect(jsonPath("$.working.revision").value(0))
+        .andExpect(jsonPath("$.working.editable").value(true))
+        .andExpect(jsonPath("$.working.deletable").value(true))
+        .andExpect(jsonPath("$.working.definition.schema").value(2))
+        .andExpect(jsonPath("$.working.definition.filter.items[1].value").value(1000))
+        .andExpect(
+            jsonPath("$.working.sentence")
+                .value(
+                    "처음 거래하는 상대이고 건당 금액이 1,000 USD 이상인 거래만 세어, 한 송금 계좌에서 7일 안에 서로 다른 수취 계좌 수가 6개 이상이면 Alert에 근거로 표시합니다."))
+        .andExpect(jsonPath("$.events[0].action").value("CREATED"))
+        .andExpect(jsonPath("$.events[0].actor").value("L1 심사자 A"))
+        .andExpect(jsonPath("$.events[0].versionNo").value(1));
+    read("/api/v1/rules/999999").andExpect(status().isNotFound());
 
-  @Test
-  void admin_stops_a_testing_rule_and_the_stopped_rule_can_be_edited_again() throws Exception {
-    login("l1a");
-    String code = created();
-    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "STOPPED", "reason", "중지"))
-        .andExpect(status().isForbidden());
-    review(code, "PENDING_APPROVAL");
-    login("admin");
-    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "STOPPED", "reason", "중지"))
-        .andExpect(status().isConflict()); // 승인 대기는 중지 대상이 아니다
-    review(code, "TESTING");
-    send(post("/api/v1/rules/" + code + "/review"), Map.of("status", "STOPPED", "reason", "오탐 증가"))
+    // 수취 계좌 4개 · 3일로 고친다. 값이 빈 초안도 저장된다.
+    var edited = catalog.defaults("FAN_OUT");
+    edited.put("windowMinutes", 4320);
+    group(edited, "where")
+        .put("items", List.of(body("metric", "DISTINCT_COUNTERPARTIES", "cmp", "GTE", "value", 4)));
+    send(put(version(ids)), body("name", "분산 송금 3일", "definition", edited, "revision", 0))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("STOPPED"))
-        .andExpect(jsonPath("$.history[3].action").value("중지"))
-        .andExpect(jsonPath("$.history[3].reason").value("오탐 증가"));
-    send(post("/api/v1/rules/" + code), rule(1, .8, 2, 24))
+        .andExpect(jsonPath("$.revision").value(1))
+        .andExpect(jsonPath("$.canRun").value(true))
+        .andExpect(jsonPath("$.summary").value("첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 4개 이상 · 3일"));
+    send(put(version(ids)), body("name", "분산 송금 3일", "definition", edited, "revision", 0))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("INVALID_TRANSITION"));
+    group(edited, "where")
+        .put("items", List.of(body("metric", "DISTINCT_COUNTERPARTIES", "cmp", "GTE")));
+    send(put(version(ids)), body("name", "분산 송금 3일", "definition", edited, "revision", 1))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("DRAFT"));
-  }
-
-  @Test
-  void draft_is_deleted_by_its_author_or_admin_and_later_states_by_admin_only() throws Exception {
-    login("l1a");
-    String mine = created();
-    String requested = created();
-    String forAdmin = created();
-    review(requested, "PENDING_APPROVAL");
+        .andExpect(jsonPath("$.revision").value(2))
+        .andExpect(jsonPath("$.canSave").value(true))
+        .andExpect(jsonPath("$.canRun").value(false))
+        .andExpect(jsonPath("$.items[1].key").value("CONDITIONS"))
+        .andExpect(jsonPath("$.items[1].ok").value(false));
+    group(edited, "where").put("items", List.of(body("metric", "OUT_IN_RATIO", "cmp", "GTE")));
+    send(put(version(ids)), body("name", "분산 송금 3일", "definition", edited, "revision", 2))
+        .andExpect(status().isBadRequest());
+    send(put(version(ids)), body("name", "분산 송금 3일", "definition", catalog.defaults("FAN_OUT")))
+        .andExpect(status().isBadRequest()); // revision 필수
+    read("/api/v1/rules/" + ids[0])
+        .andExpect(jsonPath("$.name").value("분산 송금 3일"))
+        .andExpect(jsonPath("$.working.revision").value(2))
+        .andExpect(jsonPath("$.working.definition.windowMinutes").value(4320))
+        .andExpect(jsonPath("$.events.length()").value(3))
+        .andExpect(jsonPath("$.events[0].action").value("EDITED"));
 
     login("l1b");
-    send(post("/api/v1/rules/" + mine + "/delete"), Map.of()).andExpect(status().isForbidden());
-
-    login("l1a");
-    send(post("/api/v1/rules/" + requested + "/delete"), Map.of())
-        .andExpect(status().isForbidden());
-    send(post("/api/v1/rules/" + mine + "/delete"), Map.of()).andExpect(status().isOk());
-    send(post("/api/v1/rules/" + mine + "/delete"), Map.of()).andExpect(status().isNotFound());
-
-    login("admin");
-    send(post("/api/v1/rules/" + forAdmin + "/delete"), Map.of()).andExpect(status().isOk());
-    review(requested, "REJECTED");
-    login("l1a");
-    send(post("/api/v1/rules/" + requested + "/delete"), Map.of()).andExpect(status().isOk());
-    mvc.perform(get("/api/v1/rules").session(session))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(0));
-    assertThat(jdbc.queryForObject("select count(*) from review.rule_history", Long.class))
-        .isZero();
+    send(
+            put(version(ids)),
+            body("name", "남의 초안", "definition", catalog.defaults("FAN_OUT"), "revision", 2))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN_ROLE"));
+    read("/api/v1/rules/" + ids[0])
+        .andExpect(jsonPath("$.working.editable").value(false))
+        .andExpect(jsonPath("$.working.deletable").value(false));
   }
 
   @Test
-  void backtest_counts_transactions_inside_the_account_window() throws Exception {
+  void validate_returns_checklist_sentence_and_warnings_without_saving() throws Exception {
+    login("l1a");
+    var checked =
+        json(
+            send(
+                    post("/api/v1/rules/validate"),
+                    body("template", "FAN_IN", "definition", catalog.defaults("FAN_IN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(4))
+                .andExpect(jsonPath("$.items[0].key").value("FORMAT"))
+                .andExpect(jsonPath("$.items[0].ok").value(true))
+                .andExpect(jsonPath("$.canSave").value(true))
+                .andExpect(jsonPath("$.canRun").value(true))
+                .andExpect(jsonPath("$.summary").value("첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일")));
+    assertThat(checked.get("sentence").toString()).startsWith("처음 거래하는 상대이고 환전 직후 송금인 거래만 세어,");
+    // 원장이 비어 있으면 경고만 한다.
+    assertThat(rows(checked.get("warnings")).toString()).contains("원장에 거래가 없습니다.");
+
+    var outside = catalog.defaults("FAN_IN");
+    group(outside, "where").put("items", List.of(body("metric", "OUT_IN_RATIO", "cmp", "GTE")));
+    checked =
+        json(
+            send(post("/api/v1/rules/validate"), body("template", "FAN_IN", "definition", outside))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canSave").value(false))
+                .andExpect(jsonPath("$.items[0].ok").value(false)));
+    assertThat(checked.get("sentence")).isNull();
+    send(post("/api/v1/rules/validate"), body("definition", outside))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("select count(*) from rules.rules", Long.class)).isZero();
+
+    // 원장이 3일치뿐이면 "처음 거래하는 상대"를 쓰는 룰에 경고한다.
     jdbc.update("insert into core.banks(bank_id) values(999017) on conflict do nothing");
     long owner =
         jdbc.queryForObject(
             "insert into core.owners(service_owner_id,display_name) values(gen_random_uuid(),'룰 소유자') returning owner_id",
             Long.class);
     var accounts = new ArrayList<Long>();
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 2; i++)
       accounts.add(
           jdbc.queryForObject(
               "insert into core.accounts(bank_id,service_account_id,owner_id) values(999017,gen_random_uuid(),?) returning account_id",
               Long.class,
               owner));
-    long job =
-        jdbc.queryForObject(
-            "insert into analysis.jobs(status,analysis_date,threshold_value,current_stage,analysis_cutoff_at,business_at) values('COMPLETED','2023-09-02',.7,'COMPLETE',now(),now()) returning job_id",
-            Long.class);
-    UUID run = UUID.randomUUID();
-    jdbc.update(
-        "insert into analysis.runs(run_id,job_id,input_revision,status) values(?,?,1,'COMPLETED')",
-        run,
-        job);
-    jdbc.update("update analysis.jobs set current_run_id=? where job_id=?", run, job);
-    // 계좌 0: 1시간 간격 고점수 2건과 30시간 뒤 1건. 계좌 1: 고점수 1건. 계좌 2: 저점수 2건.
-    transfer(run, accounts.get(0), accounts.get(2), "2023-09-01 10:00+09", .9);
-    transfer(run, accounts.get(0), accounts.get(2), "2023-09-01 11:00+09", .9);
-    transfer(run, accounts.get(0), accounts.get(2), "2023-09-02 17:00+09", .9);
-    transfer(run, accounts.get(1), accounts.get(2), "2023-09-01 10:00+09", .9);
-    transfer(run, accounts.get(2), accounts.get(0), "2023-09-01 10:00+09", .1);
-    transfer(run, accounts.get(2), accounts.get(0), "2023-09-01 10:30+09", .1);
-    login("l1a");
-    var body = new LinkedHashMap<String, Object>();
-    body.put("rule", rule(null, .7, 2, 24));
-    body.put("start", "2023-09-01");
-    body.put("end", "2023-09-02");
-    send(post("/api/v1/rules/backtest"), body)
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.scannedCount").value(6))
-        .andExpect(jsonPath("$.matchedCount").value(2))
-        .andExpect(jsonPath("$.accountCount").value(1))
-        .andExpect(jsonPath("$.amountUsd").value(20))
-        .andExpect(jsonPath("$.matchedAccountIds.length()").value(1))
-        .andExpect(jsonPath("$.transactions.length()").value(2));
-    // 조건이 없으면 기간의 모든 거래가 대상이다.
-    body.put("rule", rule(null, 0, 1, 24));
-    send(post("/api/v1/rules/backtest"), body)
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.matchedCount").value(6))
-        .andExpect(jsonPath("$.accountCount").value(3));
-    body.put("start", "2023-09-03");
-    send(post("/api/v1/rules/backtest"), body).andExpect(status().isBadRequest());
+    for (String at : List.of("2023-09-01 10:00+09", "2023-09-03 11:00+09"))
+      jdbc.update(
+          "insert into ledger.transactions(occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) values(?::timestamptz,(?::timestamptz at time zone 'Asia/Seoul')::date,?,?,10,'USD',10,'USD','ACH',10,'test')",
+          at,
+          at,
+          accounts.get(0),
+          accounts.get(1));
+    checked =
+        json(
+            send(
+                    post("/api/v1/rules/validate"),
+                    body("template", "FAN_IN", "definition", catalog.defaults("FAN_IN")))
+                .andExpect(jsonPath("$.items[2].key").value("DATA"))
+                .andExpect(jsonPath("$.items[2].message").value("원장 3일치로 계산할 수 있습니다."))
+                .andExpect(jsonPath("$.canRun").value(true)));
+    assertThat(rows(checked.get("warnings")).toString()).contains("원장에 쌓인 기간이 3일입니다.");
   }
 
-  void transfer(UUID run, long from, long to, String at, double score) {
-    long tx =
+  @Test
+  void rule_is_cloned_into_a_new_draft_rule_of_whoever_asked() throws Exception {
+    login("l1a");
+    long[] source = created("집중 수취 감시", "FAN_IN");
+    var definition = group(json(read("/api/v1/rules/" + source[0])), "working").get("definition");
+
+    // 본문 없이: 다른 직원도 복제할 수 있고, 새 룰의 초안은 복제한 사람의 것이다
+    login("l1b");
+    var copy =
+        json(
+            mvc.perform(
+                    post("/api/v1/rules/" + source[0] + "/clone")
+                        .session(session)
+                        .header("X-CSRF-TOKEN", token))
+                .andExpect(status().isOk()));
+    assertThat(number(copy.get("ruleId"))).isNotEqualTo(source[0]);
+    assertThat(copy.get("name")).isEqualTo("집중 수취 감시 복사본");
+    var detail = json(read("/api/v1/rules/" + copy.get("ruleId")).andExpect(status().isOk()));
+    assertThat(detail.get("owner")).isEqualTo("L1 심사자 B");
+    assertThat(group(detail, "working").get("editable")).isEqualTo(true);
+    assertThat(group(detail, "working").get("definition")).isEqualTo(definition);
+    assertThat(group(rows(detail.get("events")).get(0), "clonedFrom").get("code"))
+        .isEqualTo("RULE-%03d".formatted(source[0]));
+    // 원래 룰은 여전히 원래 작성자만 고칠 수 있다
+    assertThat(group(json(read("/api/v1/rules/" + source[0])), "working").get("editable"))
+        .isEqualTo(false);
+
+    // 버전과 이름을 정해서
+    var named =
+        json(
+            send(
+                    post("/api/v1/rules/" + source[0] + "/clone"),
+                    body("versionId", source[1], "name", "수취 감시 2"))
+                .andExpect(status().isOk()));
+    assertThat(named.get("name")).isEqualTo("수취 감시 2");
+    send(post("/api/v1/rules/" + source[0] + "/clone"), body("name", " "))
+        .andExpect(status().isBadRequest());
+    send(post("/api/v1/rules/" + source[0] + "/clone"), body("versionId", 999999))
+        .andExpect(status().isNotFound());
+    send(post("/api/v1/rules/999999/clone"), body()).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void draft_is_deleted_by_its_author_or_admin_and_other_versions_are_kept() throws Exception {
+    login("l1a");
+    long[] mine = created("내 초안", "FAN_IN");
+    long[] forAdmin = created("관리자가 지울 초안", "CYCLE");
+    long[] live = created("운영 중 룰", "FAN_IN");
+
+    login("l1b");
+    remove(version(mine)).andExpect(status().isForbidden());
+    login("l1a");
+    remove(version(mine)).andExpect(status().isNoContent());
+    remove(version(mine)).andExpect(status().isNotFound());
+    read("/api/v1/rules/" + mine[0]).andExpect(status().isNotFound());
+    login("admin");
+    remove(version(forAdmin)).andExpect(status().isNoContent());
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from rules.events where rule_id in (?,?)",
+                Long.class,
+                mine[0],
+                forAdmin[0]))
+        .isZero();
+
+    // 상태 명령은 아직 없으므로 운영 버전과 새 초안을 표에 직접 만든다.
+    jdbc.update("update rules.rule_versions set status='ACTIVE' where version_id=?", live[1]);
+    long draft =
         jdbc.queryForObject(
-            "insert into ledger.transactions(occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) values(?::timestamptz,(?::timestamptz at time zone 'Asia/Seoul')::date,?,?,10,'USD',10,'USD','ACH',10,'test') returning tx_id",
+            """
+            insert into rules.rule_versions(rule_id,version_no,status,definition,definition_digest,summary,author_id,created_at)
+            select rule_id,2,'DRAFT',definition,definition_digest,summary,author_id,created_at
+            from rules.rule_versions where version_id=? returning version_id
+            """,
             Long.class,
-            at,
-            at,
-            from,
-            to);
-    jdbc.update(
-        """
-        insert into analysis.input_transactions
-        select ?,t.tx_id,'TARGET',t.occurred_at,t.business_date,a.bank_id,b.bank_id,
-        a.service_account_id,b.service_account_id,e.service_owner_id,f.service_owner_id,
-        t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,t.payment_format,t.amount_usd,t.fx_rate_version
-        from ledger.transactions t join core.accounts a on a.account_id=t.from_account_id
-        join core.accounts b on b.account_id=t.to_account_id join core.owners e on e.owner_id=a.owner_id
-        join core.owners f on f.owner_id=b.owner_id where t.tx_id=?
-        """,
-        run,
-        tx);
-    jdbc.update(
-        "insert into analysis.scores(run_id,tx_id,p_laundering) values(?,?,?)", run, tx, score);
-    jdbc.update("insert into analysis.current_scores(tx_id,run_id) values(?,?)", tx, run);
+            live[1]);
+    login("l1a");
+    read("/api/v1/rules")
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].status").value("ACTIVE"))
+        .andExpect(jsonPath("$.content[0].versionNo").value(1))
+        .andExpect(jsonPath("$.content[0].operatingStatus").value("ACTIVE"))
+        .andExpect(
+            jsonPath("$.content[0].operatingSummary").value("첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일"))
+        .andExpect(jsonPath("$.content[0].workingStatus").value("DRAFT"))
+        .andExpect(jsonPath("$.content[0].workingVersionNo").value(2))
+        .andExpect(jsonPath("$.counts.ACTIVE").value(1));
+    send(
+            put(version(live)),
+            body("name", "운영 중 룰", "definition", catalog.defaults("FAN_IN"), "revision", 0))
+        .andExpect(status().isConflict()); // 운영 중인 조건은 직접 고치지 못한다
+    remove(version(live)).andExpect(status().isConflict());
+    // 운영 중인 룰과 템플릿·기간이 같은 새 룰은 겹친다고 알려 준다.
+    var checked =
+        json(
+            send(
+                post("/api/v1/rules/validate"),
+                body("template", "FAN_IN", "definition", catalog.defaults("FAN_IN"))));
+    assertThat(rows(checked.get("warnings")).toString())
+        .contains("운영 중인 " + RuleService.code(live[0]) + " 와 템플릿 · 기간이 같습니다.");
+
+    remove("/api/v1/rules/" + live[0] + "/versions/" + draft).andExpect(status().isNoContent());
+    read("/api/v1/rules/" + live[0])
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("ACTIVE"))
+        .andExpect(jsonPath("$.working").doesNotExist())
+        .andExpect(jsonPath("$.operating.versionNo").value(1))
+        .andExpect(jsonPath("$.versions.length()").value(1))
+        .andExpect(jsonPath("$.events[0].action").value("DRAFT_DELETED"))
+        .andExpect(jsonPath("$.events[0].versionNo").value(2));
   }
 }

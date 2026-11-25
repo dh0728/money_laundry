@@ -3,25 +3,22 @@ import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
 import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { ruleConditionSummary } from '@/features/rules/rules-logic';
 import { Check, Circle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import StatusMark from '../components/react-bits/StatusMark';
-import Stepper, { Step } from '../components/react-bits/Stepper';
 import { ActionButton, PrimaryButton } from '../components/primary-button';
 import { CardHeader } from '../components/card-header';
 import { RecordCard } from '../components/record-card';
 import { Panel } from '../components/panel';
 import { ScreenActions } from '../components/screen-actions';
-import { CompletionRing } from '../components/completion-ring';
 import { SectionDownloadHeading } from '../components/section-download';
 import { CountTag, LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
-import { csvDownloadEntry, downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
-import { RuleList } from '../features/rules/preview-rule-workspace';
-import { ruleRepository } from '../features/rules/rule-repository';
-import { useRules } from '../features/rules/use-rules';
-import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
-import { readWorkspaceDuration, readWorkspaceLength } from '../features/dashboard/workspace-metrics';
+import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
+import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
+import { LiveRuleList } from '../features/rules/live-rule-list';
+import { liveActiveRules, liveRules, refreshLiveRules } from '../features/rules/live-rule-store';
+import { useCaseRuleHits } from '../features/rules/case-rule-hits';
+import { liveSource } from '../features/investigation/live-data.js';
+import { readWorkspaceDuration } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
 import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
 import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-dialog';
@@ -159,213 +156,6 @@ function ResultNotifications() {
   }, []);
   return item && <FooterNotice key={item.key} item={item}
     onClose={() => setItem(current => current?.key === item.key ? null : current)} />;
-}
-
-function BacktestMetric({ label, value, unit }) {
-  return <Panel as="div" className="backtest-metric">
-    <Box as="dt">{label}</Box>
-    <Box as="dd"><Text as="strong">{value.toLocaleString('ko-KR')}</Text> <Text as="span">{unit}</Text></Box>
-  </Panel>;
-}
-
-function CaseOverviewWithRules({ overview, appearance }) {
-  const { rules } = useRules();
-  const activeRules = rules.filter(rule => rule.status === 'ACTIVE')
-    .map(rule => ({ id: rule.id, version: rule.version, name: rule.name, conditions: ruleConditionSummary(rule) }));
-  return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
-    history={reportHistory(overview?.reportData)} activeRules={activeRules} /></Suspense>;
-}
-
-function Backtest({ selectedRule, ...props }) {
-  const { status, rules, error, retry } = useRules();
-  const [scope, setScope] = useState(null);
-  const [scopeFailed, setScopeFailed] = useState(false);
-  useEffect(() => {
-    let live = true;
-    void ruleRepository.backtestScope().then(value => { if (live) setScope(value); }, () => { if (live) setScopeFailed(true); });
-    return () => { live = false; };
-  }, []);
-  const rule = rules.find(item => item.id === selectedRule) ?? rules[0];
-  if (rule && scope) return <BacktestRun key={rule.id} rule={rule} scope={scope} {...props} />;
-  if (scopeFailed || (status === 'error' && !rules.length)) return <Panel className="workflow-rule-state" role="alert">
-    <Text>백테스트 대상을 불러오지 못했습니다.{error && ` ${error}`}</Text>
-    <ActionButton shape="pill" surface="floating" onClick={() => {
-      setScopeFailed(false);
-      retry();
-      void ruleRepository.backtestScope().then(setScope, () => setScopeFailed(true));
-    }}>다시 시도</ActionButton>
-  </Panel>;
-  if (status === 'ready' && !rules.length) return <Panel className="workflow-rule-state"><Text>백테스트할 룰이 없습니다.</Text></Panel>;
-  return <Panel className="workflow-rule-state" role="status" aria-busy="true"><Text>백테스트 대상을 불러오는 중입니다.</Text></Panel>;
-}
-
-function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
-  const { reduced } = useAppearance();
-  const [resultRingSize] = useState(() => readWorkspaceLength('--backtest-result-ring-size') || 88);
-  const backtestPeriod = { start: scope.start, end: scope.end };
-  const [step, setStep] = useState(1);
-  const [score, setScore] = useState(Number((rule.scoreMin * 100).toFixed(2)));
-  const hasScoreCondition = rule.scoreMin > 0;
-  const scoreValid = Number.isFinite(score) && score >= 0 && score <= 100;
-  const appliedRule = { ...rule, scoreMin: score / 100 };
-  const runConditions = scoreValid ? ruleConditionSummary(appliedRule) : '최소 모델 점수를 입력하세요.';
-  const [status, setStatus] = useState('pending');
-  const [results, setResults] = useState(null);
-  const [resultRange, setResultRange] = useState();
-  const matches = results?.transactions ?? [];
-  const sorting = useTableSort(matches.filter(record => inDateRange(new Date(`${record.date}T00:00:00`), resultRange)));
-  const running = status === 'running';
-  const ruleEntry = csvDownloadEntry('백테스트 대상 룰', 'backtest-rule', ['룰 ID', '이름', '버전', '기록된 룰 조건'],
-    [[rule.id, rule.name, rule.version, ruleConditionSummary(rule)]]);
-  const scopeEntry = csvDownloadEntry('백테스트 대상 거래', 'backtest-scope', ['시작일 (KST)', '종료일 (KST)', '대상 거래 수'],
-    [[scope.start, scope.end, scope.count]]);
-  const conditionsEntry = csvDownloadEntry('백테스트 적용 조건', 'backtest-conditions', ['룰 ID', '적용 조건'],
-    [[rule.id, runConditions]]);
-  const reset = () => {
-    setResults(null);
-    setResultRange(undefined);
-    setStatus('pending');
-    setStep(1);
-  };
-  useEffect(() => registerTableTools?.({
-    period: matches.length ? { asOf: new Date(`${matches.at(-1).date}T00:00:00`), range: resultRange, onChange: setResultRange } : undefined,
-    entries: sorting.rows.length ? [{ label: '백테스트 근거 거래', format: 'CSV', count: sorting.rows.length,
-      download: () => downloadCsv('backtest-evidence', ['거래', '거래일 (KST)', '송금 계좌', '수취 계좌', '모델 점수', '금액 (USD)'],
-        sorting.rows.map(record => [record.displayId, record.date, record.fromAccountId, record.toAccountId,
-          Math.round(record.score * 100), record.amountUsd])) }] : [],
-  }));
-
-  useEffect(() => {
-    if (status !== 'running') return undefined;
-    let live = true;
-    const timer = window.setTimeout(() => {
-      void ruleRepository.backtest({ ...rule, scoreMin: score / 100 }, { start: scope.start, end: scope.end }, { limit: 100 }).then(result => {
-        if (!live) return;
-        setResults(result);
-        setStatus('done');
-        setStep(3);
-        announce({ status: 'done', title: '백테스트 완료', description: `거래 ${result.matchedCount}건이 룰 조건에 해당합니다.` });
-      }, error => {
-        if (!live) return;
-        setStatus('failed');
-        announce({ status: 'failed', title: '백테스트 실패', description: error.message });
-      });
-    }, 120);
-    return () => {
-      live = false;
-      window.clearTimeout(timer);
-    };
-  }, [rule, score, status, scope]);
-
-  return <Box as="section" className="screen-section workflow-panel workflow-backtest" aria-label="백테스트">
-    <Box className="backtest-grid">
-      <Panel className="backtest-card">
-        <Box as="header" className="backtest-card-heading">
-          <SectionDownloadHeading entries={[ruleEntry]}>백테스트 대상 룰</SectionDownloadHeading>
-          <ResultStatus status={status} />
-        </Box>
-        <Text as="strong" className="backtest-rule-name">{rule.name}</Text>
-        <Text className="backtest-meta"><Text as="code">{rule.id}</Text> · v{rule.version}</Text>
-        <Box as="dl" className="backtest-rule-conditions">
-          <Box as="dt">기록된 룰 조건</Box><Box as="dd">{ruleConditionSummary(rule)}</Box>
-        </Box>
-      </Panel>
-      <Panel className="backtest-card">
-        <SectionDownloadHeading entries={[scopeEntry]}>백테스트 대상 거래</SectionDownloadHeading>
-        <Text className="backtest-metric-number"><Text as="strong">{scope.count.toLocaleString('ko-KR')}</Text> <Text as="span">거래</Text></Text>
-        <Text className="backtest-meta"><Text as="time" dateTime={backtestPeriod.start}>{backtestPeriod.start}</Text>
-          {' ~ '}<Text as="time" dateTime={backtestPeriod.end}>{backtestPeriod.end}</Text> · KST</Text>
-      </Panel>
-    </Box>
-    <Stepper key={reduced} step={step} transition={reduced ? 'none' : 'fade'}>
-      <Step title="조건 설정">
-        <Box className="backtest-grid">
-          {hasScoreCondition && <Panel className="backtest-card">
-            <Heading>최소 모델 점수</Heading>
-            <Box as="label" className="workflow-threshold">
-              <Text as="span" className="visually-hidden">최소 모델 점수</Text>
-              <Input type="number" min="0" max="100" required step="0.01" inputMode="decimal"
-                aria-invalid={!scoreValid} aria-describedby="backtest-score-range"
-                value={score} onChange={event => setScore(event.target.value === '' ? '' : event.target.valueAsNumber)} />
-              <Text as="span" aria-hidden="true">점</Text>
-            </Box>
-            <Text id="backtest-score-range" className="backtest-meta">0~100점 · 소수 둘째 자리까지</Text>
-          </Panel>}
-          <Panel className="backtest-card">
-            <SectionDownloadHeading entries={scoreValid ? [conditionsEntry] : []}>백테스트 적용 조건</SectionDownloadHeading>
-            {scoreValid ? <RuleConditionFacts input={appliedRule} /> : <Text>{runConditions}</Text>}
-          </Panel>
-        </Box>
-      </Step>
-      <Step title="실행 확인">
-        <Panel className="backtest-card">
-          <SectionDownloadHeading entries={[conditionsEntry]}>실행할 조건</SectionDownloadHeading>
-          <RuleConditionFacts input={appliedRule} />
-        </Panel>
-      </Step>
-      <Step title="결과">
-        {results && <>
-          <Panel className="backtest-card" data-export-visualization={results.scannedCount > 0 || undefined}>
-            <SectionDownloadHeading downloadLabel={results.scannedCount > 0 ? '백테스트 적중률' : undefined}
-              entries={[csvDownloadEntry('백테스트 결과', 'backtest-summary',
-                ['룰 ID', '검사 거래 수', '적중 거래 수', '적중 계좌 수', '합계 (USD)', '적용 조건'],
-                [[rule.id, results.scannedCount, results.matchedCount, results.accountCount, results.amountUsd, runConditions]])]}>
-              백테스트 결과
-            </SectionDownloadHeading>
-            <Box className="backtest-result-summary">
-              <CompletionRing label="거래 적중률" value={results.matchedCount} total={results.scannedCount}
-                color="var(--status-caution-accent)" size={resultRingSize} reduced={reduced} />
-              <Box>
-                <Text as="strong">거래 적중률</Text>
-                <Text>{results.scannedCount.toLocaleString('ko-KR')}건 중 {results.matchedCount.toLocaleString('ko-KR')}건이 조건에 해당</Text>
-                <Text className="backtest-meta">{runConditions}</Text>
-              </Box>
-            </Box>
-          </Panel>
-          <Box as="dl" className="backtest-grid backtest-comparison">
-            <BacktestMetric label="적중 계좌" value={results.accountCount} unit="계좌" />
-            <BacktestMetric label="적중 거래" value={results.matchedCount} unit="건" />
-            <BacktestMetric label="검사 거래" value={results.scannedCount} unit="건" />
-          </Box>
-          <WorkflowTable label="백테스트 근거 거래" scrollbarGutter="auto" summary={<>
-            {tableCount(sorting.rows.length, results.matchedCount)}
-            <Text as="span">합계 {results.amountUsd.toLocaleString('ko-KR')} USD</Text>
-          </>}>
-              <TableHeader><TableRow>
-                <SortableTableHead sorting={sorting} column="transaction" value={record => record.displayId}>거래</SortableTableHead>
-                <SortableTableHead sorting={sorting} column="date" value={record => Date.parse(record.occurredAt)}>거래일 · KST</SortableTableHead>
-                <SortableTableHead sorting={sorting} column="from" value={record => record.fromAccountId}>송금 계좌</SortableTableHead>
-                <SortableTableHead sorting={sorting} column="to" value={record => record.toAccountId}>수취 계좌</SortableTableHead>
-                {hasScoreCondition && <SortableTableHead sorting={sorting} column="score" value={record => record.score}>모델 점수</SortableTableHead>}
-                <SortableTableHead sorting={sorting} column="amount" value={record => record.amountUsd}>금액</SortableTableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {sorting.rows.map(record => <TableRow key={record.id}>
-                  <TableRowHead><Text as="code">{record.displayId}</Text></TableRowHead>
-                  <TableCell>{record.date}</TableCell>
-                  <TableCell><Text as="code">{record.fromAccountId}</Text></TableCell>
-                  <TableCell><Text as="code">{record.toAccountId}</Text></TableCell>
-                  {hasScoreCondition && <TableCell>{Math.round(record.score * 100)}점</TableCell>}
-                  <TableCell>{record.amountUsd.toLocaleString('ko-KR')} USD</TableCell>
-                </TableRow>)}
-                {!sorting.rows.length && <TableRow><TableCell colSpan={hasScoreCondition ? 6 : 5}>조건에 해당하는 거래가 없습니다.</TableCell></TableRow>}
-              </TableBody>
-          </WorkflowTable>
-        </>}
-      </Step>
-    </Stepper>
-    <ScreenActions host={actionsHost} stackOnNarrow>
-      {step === 2 ? <>
-        {hasScoreCondition && <PrimaryButton className="backtest-edit-conditions" disabled={running}
-          onClick={() => setStep(1)}>조건 수정</PrimaryButton>}
-        <PrimaryButton tone="brand" className="backtest-footer-action" disabled={running || !scoreValid}
-          onHold={() => setStatus('running')}>백테스트 실행</PrimaryButton>
-      </> : <PrimaryButton tone="brand" className="backtest-footer-action"
-        disabled={step === 1 && !scoreValid} onClick={step === 1 ? () => setStep(2) : reset}>
-        {step === 1 ? '실행 조건 확인' : '다시 설정'}
-      </PrimaryButton>}
-    </ScreenActions>
-  </Box>;
 }
 
 async function downloadReport(rows) {
@@ -613,7 +403,26 @@ function CaseReviewActions({ overview }) {
   </>;
 }
 
-function Workflow({ kind, view, dashboard, overview, reason }) {
+/**
+ * 사건 개요. "현재 운영 중인 룰"은 룰 목록(live-rule-store)에서 읽는다.
+ * 서비스 모드에서는 사건의 거래에 걸린 운영 룰 적중을 서버에서 읽어 "룰 적중" 칸에 같이 보여 준다.
+ * 샘플 모드의 사건은 룰 평가를 돌린 거래가 아니라서 적중 카드는 없고 운영 중인 룰(샘플)만 나온다.
+ */
+function CaseOverview({ overview, appearance }) {
+  const hits = useCaseRuleHits(liveRules ? overview?.row?.caseId : undefined);
+  // 서비스 모드는 로그인할 때 룰 목록을 읽어 둔다. 샘플 모드는 여기서 읽고, 읽고 나면 다시 그린다.
+  const [, setRulesLoaded] = useState(false);
+  useEffect(() => {
+    if (!liveRules) void refreshLiveRules().then(() => setRulesLoaded(true), () => undefined);
+  }, []);
+  // Episode 에서는 카드가 어느 Alert 의 것인지 화면 코드로 보여 준다
+  const alertCode = id => liveSource().cases.find(row => row.kind === 'Alert' && row.caseId === id)?.code;
+  return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
+    history={reportHistory(overview?.reportData)} activeRules={liveActiveRules()}
+    ruleHits={liveRules ? { ...hits, alertCode } : undefined} /></Suspense>;
+}
+
+function Workflow({ kind, view, dashboard, overview }) {
   const appearance = useAppearance();
   if (kind.includes('dashboard') && dashboard?.error) return <Panel className="dashboard-chart" role="alert">
     <Text>대시보드 데이터를 불러오지 못했습니다.</Text>
@@ -633,15 +442,16 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
       <PreviewDashboard mine={mine} data={dashboard} appearance={appearance} />
     </Suspense>;
   }
-  if (kind === 'case-overview') return <CaseOverviewWithRules overview={overview} appearance={appearance} />;
+  if (kind === 'case-overview') return <CaseOverview overview={overview} appearance={appearance} />;
   if (kind === 'alert-episode-actions') return <AlertEpisodeActions overview={overview} />;
   if (kind === 'case-judgment') return <CaseReviewActions overview={overview} />;
   if (kind === 'case-readonly') return <Panel><Heading>읽기 전용</Heading></Panel>;
-  if (kind === 'rules-list') return <RuleList reason={reason} initialRule={overview?.rule}
+  if (kind === 'backtest') return <LiveRuleBacktest initialRule={overview?.rule}
+    registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
+  if (kind === 'rules-list') return <LiveRuleList initialRule={overview?.rule}
     registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   return <MotionConfig reducedMotion={appearance.reduced ? 'always' : 'never'}>
-    {kind === 'backtest' ? <Backtest selectedRule={overview?.rule} registerTableTools={overview?.registerTableTools}
-      actionsHost={overview?.actionsHost} /> : kind === 'report' &&
+    {kind === 'report' &&
       <Report view={view} data={overview?.reportData} documentId={overview?.reportDocument}
         registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />}
   </MotionConfig>;
@@ -650,7 +460,7 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
 export function mountWorkflows(workspace, dashboard, overview) {
   const roots = Array.from(workspace.querySelectorAll('[data-workflow]'), host => ({ host, root: createRoot(host) }));
   const render = () => roots.forEach(({ host, root }) => root.render(
-    <Workflow kind={host.dataset.workflow} view={host.dataset.reportView} reason={host.dataset.ruleReason === 'true'}
+    <Workflow kind={host.dataset.workflow} view={host.dataset.reportView}
       dashboard={dashboard} overview={overview} />
   ));
   render();

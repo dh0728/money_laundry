@@ -1,23 +1,11 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import BranchedMenu from '../../components/react-bits/BranchedMenu';
 import { readChartNumber } from '../../components/charts/chart-design-values';
 import { RiskBandArc, riskBandPoint } from '../../components/charts/charts/risk-band-ring';
 import { bindTooltip } from '../../components/components';
-import { RuleConditionBlocks } from '@/features/rules/RuleConditionBlocks';
-import { compileRuleBlocks, RULE_LIMITS, ruleBlocksFor, ruleConditionSummary, validateRule } from '@/features/rules/rules-logic';
-import { ruleRepository } from './rule-repository';
-import { useRules } from './use-rules';
-import { RuleConditionFacts, RuleTreeBranches } from './rule-condition-tree';
-import { ActionButton, PrimaryButton } from '../../components/primary-button';
+import { LiveRuleBuilder } from './live-rule-builder';
 import { Panel } from '../../components/panel';
-import { csvDownloadEntry } from '../../components/query-controls';
-import { SectionDownloadHeading } from '../../components/section-download';
-import { ScreenActions } from '../../components/screen-actions';
-import '../../components/form-dropdown.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
 
 const rules = [
@@ -109,156 +97,12 @@ export function RuleTemplateMenu() {
   </>;
 }
 
-const blankDraft = { name: '', description: '', typeCode: null, scoreMin: .7, minTransactions: 2, windowHours: 24 };
-
-function RuleSelect({ label, value, onChange, options }) {
-  return <Select value={value == null ? '' : String(value)} onValueChange={onChange}>
-    <SelectTrigger size="sm" className="form-dropdown-trigger" aria-label={label}>
-      <SelectValue placeholder={`${label} 선택`} />
-    </SelectTrigger>
-    <SelectContent position="popper" align="start" className="form-dropdown-options">
-      {options.map(option => <SelectItem key={option.value} value={String(option.value)}>{option.label}</SelectItem>)}
-    </SelectContent>
-  </Select>;
-}
-
-function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
-  const { rules: templates } = useRules(repository);
-  const [draft, setDraft] = useState(blankDraft);
-  const [blocks, setBlocks] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const [saved, setSaved] = useState(null);
-  const [dirty, setDirty] = useState(false);
-  const [failure, setFailure] = useState('');
-  const errorId = useId();
-  const form = useRef(null);
-  const input = compileRuleBlocks(draft, blocks);
-  const problems = validateRule(input);
-  const errors = submitted ? problems : {};
-  const hasInvalidCondition = problems.scoreMin || problems.minTransactions || problems.windowHours;
-
-  useEffect(() => {
-    if (!sourceRule) return undefined;
-    let live = true;
-    void repository.duplicateDraft(sourceRule).then(result => {
-      if (!live) return;
-      if (!result.ok) {
-        setFailure(`${sourceRule} 룰을 복제할 수 없습니다. ${result.error}`);
-        return;
-      }
-      setDraft({ ...blankDraft, ...result.value });
-      setBlocks(ruleBlocksFor(result.value));
-      setCopied(sourceRule);
-    });
-    return () => { live = false; };
-  }, [repository, sourceRule]);
-
-  function changeDraft(next) {
-    setDraft(next);
-    setDirty(true);
-    setFailure('');
-  }
-
-  function submit(event) {
-    event.preventDefault();
-    setSubmitted(true);
-    setFailure('');
-    if (Object.keys(problems).length) {
-      const fields = [...event.currentTarget.querySelectorAll('[name]')];
-      fields.find(field => Object.hasOwn(problems, field.name))?.focus();
-      return;
-    }
-    if (!blocks.length) {
-      setFailure('조건 블록을 하나 이상 추가해 주세요.');
-      return;
-    }
-    if (busy) return;
-    setBusy(true);
-    void repository.save({ ...input, name: input.name.trim(), description: input.description.trim() }, saved?.id).then(result => {
-      setBusy(false);
-      if (!result.ok) {
-        setFailure(result.error);
-        return;
-      }
-      setSaved(result.value);
-      setDirty(false);
-    }, () => {
-      setBusy(false);
-      setFailure('초안을 저장하지 못했습니다. 다시 시도해 주세요.');
-    });
-  }
-
-  return <Box className="screen-row screen-rule-editor">
-    <Panel className="rule-draft-reference">
-      <Heading>템플릿 고르기</Heading>
-      <Text className="workflow-rule-note">템플릿 {templates.length}개에서 이름과 조건을 불러올 수 있습니다.</Text>
-      {copied && <Text className="workflow-rule-note" role="status"><Text as="code">{copied}</Text> 조건을 복제했습니다. 저장하면 새 초안이 됩니다.</Text>}
-      <RuleSelect label="룰 템플릿" options={templates.map(rule => ({ label: rule.name, value: rule.id }))}
-        onChange={value => {
-          const template = templates.find(rule => rule.id === value);
-          if (!template) return;
-          setDraft(template);
-          setBlocks(ruleBlocksFor(template));
-          setSubmitted(false);
-          setSaved(null);
-          setFailure('');
-        }} />
-      <Box as="section" className="rule-draft-preview" aria-label="작성한 조건 미리 보기">
-        <SectionDownloadHeading entries={blocks.length && !hasInvalidCondition
-          ? [csvDownloadEntry('작성한 조건', 'rule-draft', ['룰 이름', '목적과 근거', '조건'],
-            [[input.name.trim(), input.description.trim(), ruleConditionSummary(input)]])]
-          : []}>작성한 조건 미리 보기</SectionDownloadHeading>
-        {input.name.trim() && <Heading level={3}>{input.name.trim()}</Heading>}
-        {input.description.trim() && <Text>{input.description.trim()}</Text>}
-        {!blocks.length ? <Text>조건 블록을 추가해 주세요.</Text> :
-          hasInvalidCondition ? <Text>조건 값을 확인해 주세요.</Text> : <RuleConditionFacts input={input} blocks={blocks} />}
-      </Box>
-    </Panel>
-    <Panel className="rule-draft-editor">
-      <Heading>룰 만들기</Heading>
-      <Box as="form" ref={form} id={`${errorId}-form`} aria-label="룰 작성" className="rule-draft-form" onSubmit={submit} noValidate>
-        <Box as="label">룰 이름
-          <Input name="name" aria-label="룰 이름" value={draft.name} maxLength={RULE_LIMITS.name}
-            onChange={event => changeDraft({ ...draft, name: event.target.value })}
-            aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? `${errorId}-name` : undefined} />
-          {errors.name && <Text as="span" id={`${errorId}-name`} data-rule-block-error>{errors.name}</Text>}
-        </Box>
-        <Box as="label">목적과 근거
-          <Textarea name="description" aria-label="목적과 근거" value={draft.description} maxLength={RULE_LIMITS.description} rows={2}
-            onChange={event => changeDraft({ ...draft, description: event.target.value })}
-            aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? `${errorId}-description` : undefined} />
-          {errors.description && <Text as="span" id={`${errorId}-description`} data-rule-block-error>{errors.description}</Text>}
-        </Box>
-        <RuleConditionBlocks input={draft} blocks={blocks} errors={errors} scoreAsPoints
-          renderBranches={(children, finalSlot) => children.length ? <RuleTreeBranches finalSlot={finalSlot}>{children}</RuleTreeBranches> : finalSlot}
-          renderTypePicker={({ onChange, ...picker }) => <RuleSelect {...picker} label="거래 유형" onChange={value => onChange(Number(value))} />}
-          onInputChange={changeDraft} onBlocksChange={next => {
-            setBlocks(next);
-            setDirty(true);
-            setFailure('');
-          }} />
-        {failure && <Text role="alert" data-rule-block-error>{failure}</Text>}
-        {saved && !dirty && <Box role="status" className="rule-draft-actions">
-          <Text><Text as="code">{saved.id}</Text> 초안이 저장되었습니다.</Text>
-          <ActionButton as="a" href={`/rules?rule=${saved.id}`}>저장한 룰 보기</ActionButton>
-          <ActionButton as="a" href={`/rules/backtest?rule=${saved.id}`}>백테스트로 열기</ActionButton>
-        </Box>}
-      </Box>
-    </Panel>
-    <ScreenActions host={actionsHost} stackOnNarrow>
-      <PrimaryButton tone="brand" aria-controls={`${errorId}-form`} disabled={busy} aria-busy={busy || undefined}
-        onClick={() => form.current.requestSubmit()}>{busy ? '저장 중…' : '초안 저장'}</PrimaryButton>
-    </ScreenActions>
-  </Box>;
-}
-
-export function mountRuleControls(workspace, actionsHost, { sourceRule } = {}) {
+export function mountRuleControls(workspace, actionsHost) {
   const targets = [...workspace.querySelectorAll('[data-rule-editor], [data-rule-template], [data-risk-dial]')];
   const roots = targets.map(node => {
     const root = createRoot(node);
-    root.render(node.hasAttribute('data-rule-editor') ? <RuleDraft actionsHost={actionsHost} sourceRule={sourceRule} />
+    // 룰 만들기는 서버에 붙였든 아니든 같은 화면이다. 서버가 없으면 @/api/rules 가 샘플 카탈로그를 준다.
+    root.render(node.hasAttribute('data-rule-editor') ? <LiveRuleBuilder actionsHost={actionsHost} />
       : node.hasAttribute('data-risk-dial') ? <RiskDial /> : <RuleTemplateMenu />);
     return root;
   });

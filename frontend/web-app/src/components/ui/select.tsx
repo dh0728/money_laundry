@@ -175,11 +175,11 @@ function SelectScrollDownButton({
 }
 
 function NativeSelect({ options, ...props }: React.ComponentProps<"select"> & {
-  options: ReadonlyArray<{ value?: string | number; label: string }>
+  options: ReadonlyArray<{ value?: string | number; label: string; disabled?: boolean }>
 }) {
   return (
     <select {...props}>
-      {options.map(({ value, label }) => <option key={value ?? label} value={value}>{label}</option>)}
+      {options.map(({ value, label, disabled }) => <option key={value ?? label} value={value} disabled={disabled}>{label}</option>)}
     </select>
   )
 }

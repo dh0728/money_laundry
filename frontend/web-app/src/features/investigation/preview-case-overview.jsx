@@ -23,6 +23,7 @@ import { useCaseEvidenceSelection } from './case-evidence-selection';
 import { caseOverviewEvidence, episodeAlertEvidence, relatedJudgments } from './case-overview-evidence';
 import { graphRiskBand } from './case-graph-scope';
 import { modelRiskLabels } from '../settings/model-risk-settings';
+import { CaseRuleHits } from '../rules/case-rule-hits';
 import './preview-case-overview.css';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
@@ -274,9 +275,11 @@ function EpisodeRelations({ relations, transactionCount, reduced }) {
   </Stack>;
 }
 
-function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelection, episodeRelations) {
+function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelection, episodeRelations, ruleHits) {
   const { records, accounts, focus, flows, inflows, outflows, lead } = evidence;
   const episode = row.kind === 'Episode';
+  const caseRuleHits = ruleHits?.status === 'ready' ? ruleHits.hits : [];
+  const alertCode = episode ? ruleHits?.alertCode : undefined;
   const methods = [...Map.groupBy(records, record => record.method)].map(([label, group]) => ({ label, value: group.length }));
   const prior = relatedJudgments(history, row.code, evidence);
   const otherCount = records.length - inflows.length - outflows.length;
@@ -371,8 +374,9 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       details: flowDetails,
       flowLink,
     },
-    rules: { title: '룰 적중', content: <>
-      <Text className="overview-note">탐지 당시 적중 기록이 없습니다.</Text>
+    rules: { title: '룰 적중', count: caseRuleHits.length || undefined, content: <>
+      {ruleHits ? <CaseRuleHits state={ruleHits} records={records} alertCode={alertCode} />
+        : <Text className="overview-note">탐지 당시 적중 기록이 없습니다.</Text>}
       {activeRules.length > 0 && <><Heading level={3}>현재 운영 중인 룰</Heading>
         <Box as="ul" className="overview-fact-list">{activeRules.map(rule => <Box as="li" key={rule.id}>
           <LinkTag href={`/rules?rule=${rule.id}`} code={rule.id} />
@@ -409,6 +413,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
     history: <ReviewTimeline records={records} row={row} />,
     detection: <OverviewScoreChart points={scorePoints} reduced={reduced} fill exactTime={episode} />,
     rules: <Box className="overview-panel-hero">
+      {ruleHits?.status === 'ready' && <KpiValue value={caseRuleHits.length} unit="이 사건에 걸린 룰 적중" />}
       <KpiValue value={activeRules.length} unit="현재 운영 중인 룰" />
     </Box>,
   };
@@ -417,6 +422,12 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   const caseCsv = (id, columns, rows) => csvDownloadEntry(panels[id].title, `${row.code}-${id}`, columns, rows);
   const compositionRows = composition.map(part => [part.label, part.value]);
   const distribution = csvDownloadEntry('근거 거래 구성', `${row.code}-distribution`, ['구분', '건수'], compositionRows);
+  const transactionCodes = new Map(records.map(record => [record.txId, record.code]));
+  const ruleHitDownload = csvDownloadEntry('사건의 룰 적중', `${row.code}-rule-hits`,
+    ['Alert ID', '룰 ID', '버전', '룰 이름', '템플릿', '대상', '적중 날짜', '사건의 근거 거래 ID', '전체 근거 거래 수'],
+    caseRuleHits.map(hit => [episode ? alertCode?.(hit.alertId) : row.code, hit.code, hit.versionNo, hit.name,
+      hit.templateName, hit.subject, hit.hitDates.join(' · '),
+      hit.matchedTxIds.map(txId => transactionCodes.get(txId) ?? txId).join(' · '), hit.evidenceTxCount]));
   const downloads = {
     judgment: caseCsv('judgment', ['업무 ID', '판정', '처리 기한', '근거 거래 수', '계좌 수', '판정 사유'],
       [[row.code, verdictLabels[row.verdict], row.reviewDueOn, records.length, accounts.length,
@@ -457,7 +468,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       panelVisual: id === 'flow' ? flowChart : undefined,
       panelDetails: id === 'flow' ? <><FlowSummary evidence={evidence} />{panel.details}</> : undefined,
       graphic,
-      entries: downloads[id] && !downloads[id].disabled ? [downloads[id]] : [],
+      entries: [id === 'rules' && ruleHitDownload, downloads[id]].filter(entry => entry && !entry.disabled),
       distributionEntries: id === 'composition' && !distribution.disabled ? [distribution] : [],
       overviewGraphic: id === 'detection' ? scorePoints.length > 0
         : id === 'flow' ? flows.length > 0 : ['accounts', 'composition'].includes(id) && graphic,
@@ -607,7 +618,7 @@ function EpisodeOverview({ panels, evidence, summary }) {
   </>;
 }
 
-export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], reportData, paginationHost, evidenceSelection }) {
+export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], reportData, paginationHost, evidenceSelection, ruleHits }) {
   const selected = useCaseEvidenceSelection(evidenceSelection);
   if (!row) return <Text>선택한 사건의 개요를 불러올 수 없습니다.</Text>;
   const evidence = caseOverviewEvidence(row.related);
@@ -616,7 +627,7 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
   const episode = row.kind === 'Episode';
   const relations = episode ? episodeAlertEvidence(row, records, reportData?.cases) : undefined;
   const panels = buildPanels(row, evidence, history, activeRules, appearance.reduced,
-    evidenceSelection && { selected, change: evidenceSelection.change }, relations);
+    evidenceSelection && { selected, change: evidenceSelection.change }, relations, ruleHits);
   const window = episode ? 15 : 4;
   const incomingByCurrency = !episode && inflows.length > 0 ? Map.groupBy(inflows, record => record.currency) : null;
   const trendSeries = incomingByCurrency

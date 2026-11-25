@@ -20,7 +20,7 @@ import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLive
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
 import { liveDashboardAsOf, liveDashboardResponse } from '../features/dashboard/live-dashboard.js';
-import { ruleRepository } from '../features/rules/rule-repository.js';
+import { refreshLiveRules } from '../features/rules/live-rule-store';
 import { canStartPreviewReview, savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { requestStateLabels, WorkRequestDetail, WorkRequestForm } from '../features/investigation/preview-work-request-dialog.jsx';
 import { previewCaseAssignee, previewWorkRequests, readPreviewWorkRequests, resolvePreviewWorkRequest, sendPreviewWorkRequest,
@@ -951,8 +951,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   });
   const ruleTarget = byId('workspace').querySelector('[data-rule-editor], [data-rule-template], [data-risk-dial]');
   if (ruleTarget) void import('../features/rules/rule-controls.jsx').then(({ mountRuleControls }) => {
-    if (ruleTarget.isConnected) unmountRuleControls = mountRuleControls(byId('workspace'), byId('footer-actions'),
-      { sourceRule: path === 'rule-engine/draft-create' && isRuleId(selectedRule) ? selectedRule : undefined });
+    if (ruleTarget.isConnected) unmountRuleControls = mountRuleControls(byId('workspace'), byId('footer-actions'));
   });
   const component = byId('workspace').querySelector('[data-investigation-component]');
   const caseTable = byId('workspace').querySelector('[data-case-list-table]');
@@ -1628,7 +1627,7 @@ function showRoute(route, params, navigationMode) {
       dashboardSource = undefined;
       showLoadedRoute(route, params, navigationMode);
     };
-    void Promise.all([loadLiveSource(), ruleRepository.list({ fresh: true }), loadLiveWorkRequests().catch(() => undefined),
+    void Promise.all([loadLiveSource(), refreshLiveRules(), loadLiveWorkRequests().catch(() => undefined),
       loadLiveModelRiskThresholds().catch(() => undefined)]).then(open, () => {
       document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
         status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
