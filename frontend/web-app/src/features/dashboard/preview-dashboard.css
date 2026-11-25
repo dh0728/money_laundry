@@ -59,7 +59,7 @@
   block-size: 100%;
 }
 .dashboard-priority-panel { display: grid; grid-template-rows: auto 1fr; align-items: stretch; gap: var(--aml-space-8) }
-.dashboard-work-overview-grid > .dashboard-transaction-flow { grid-column: span 8 }
+.dashboard-work-overview-grid > :is(.dashboard-transaction-flow, [data-metric-group="transactions"]) { grid-column: span 8 }
 .dashboard-work-overview-grid > .dashboard-priority-panel,
 .dashboard-personal-overview > .dashboard-priority-panel { grid-column: span 4 }
 .dashboard-personal-work { grid-column: span 8; grid-template-rows: auto 1fr; align-items: stretch }
@@ -169,7 +169,7 @@
   gap: var(--workspace-gap);
   min-inline-size: 0;
 }
-.dashboard-flow-family > .dashboard-priority-panel { grid-column: 9 / -1; grid-row: 1 / span 2 }
+.dashboard-flow-family > .dashboard-priority-panel { grid-column: 9 / -1; grid-row: 1 / span 3 }
 .dashboard-flow-volume { grid-column: span 5 }
 .dashboard-flow-risk { grid-column: span 3 }
 .dashboard-flow-status { grid-column: span 6 }
@@ -242,11 +242,14 @@
 .staged-sankey-relations [data-tone="total"] { color: var(--text) }
 .staged-sankey-relations path { fill: none; stroke: currentColor; stroke-width: var(--aml-stroke-divider) }
 .staged-sankey-relations circle { fill: currentColor }
+.staged-sankey-relations[data-metric-relations] { color: var(--text) }
+.staged-sankey-relations[data-metric-relations] path { stroke-width: var(--aml-stroke-focus) }
+.staged-sankey-relations [data-partial] path { stroke-dasharray: var(--aml-space-4) var(--aml-space-4) }
 @container (inline-size < 60rem) {
   .staged-sankey-relations { display: none }
 }
 @media (width < 68rem) {
-  .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-priority-panel),
+  .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-priority-panel, [data-metric-group="transactions"]),
   .dashboard-personal-overview > :is(.dashboard-personal-work, .dashboard-priority-panel) { grid-column: 1 / -1; grid-row: auto }
   .dashboard-flow-volume { grid-column: span 7 }
   .dashboard-flow-risk { grid-column: span 5 }
@@ -510,6 +513,7 @@
 }
 
 @media (max-width: 930px) {
+  .dashboard-institution-metrics[data-metric-group="investigation"] { grid-template-columns: repeat(2, minmax(0, 1fr)) }
   .preview-dashboard[data-mine] .dashboard-top { grid-template-columns: minmax(0, 1fr) }
   .preview-dashboard .dashboard-top { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto }
   .preview-dashboard .dashboard-top > * { grid-column: auto; grid-row: auto }
@@ -519,6 +523,7 @@
   .dashboard-transaction-details:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) }
 }
 @media (max-width: 359px) {
+  .dashboard-institution-metrics { grid-template-columns: minmax(0, 1fr) }
   .dashboard-metrics-box .dashboard-metrics.magic-bento {
     grid-template-columns: minmax(0, 1fr);
   }

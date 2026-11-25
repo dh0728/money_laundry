@@ -22,6 +22,18 @@ export function DashboardIndicatorsGrid({ children, ...props }) {
   return <Grid as="section" columns={12} className="dashboard-priority-metrics" {...props}>{children}</Grid>;
 }
 
+const institutionMetricGroups = {
+  transactions: { columns: 1, label: '거래 요약' },
+  investigation: { columns: 3, label: '조사 요약' },
+  status: { columns: 2, label: '업무 상태 요약' },
+};
+
+export function InstitutionMetricsGrid({ group, children, ...props }) {
+  const { columns, label } = institutionMetricGroups[group];
+  return <Grid as="section" columns={columns} className="dashboard-institution-metrics" data-metric-group={group}
+    aria-label={label} {...props}>{children}</Grid>;
+}
+
 export function PersonalDashboardOverview({ children, recommendation, ...props }) {
   return <Grid columns={12} className="dashboard-personal-overview" {...props}>
     <Grid as="section" columns={2} className="dashboard-personal-work" aria-label="내 담당 업무와 처리 기록">
@@ -57,6 +69,13 @@ function LoadingMetric({ detail, trend }) {
   </Box>;
 }
 
+function LoadingInstitutionMetrics({ group }) {
+  return <InstitutionMetricsGrid group={group}>
+    {Array.from({ length: institutionMetricGroups[group].columns }, (_, index) =>
+      <Panel as="article" key={index}><LoadingMetric detail /></Panel>)}
+  </InstitutionMetricsGrid>;
+}
+
 function LoadingRecommendation({ reduced }) {
   return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
     <Skeleton className="dashboard-loading-title" />
@@ -74,6 +93,7 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
     <Box aria-hidden="true" className="dashboard-analytics">
       <Grid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
+        <LoadingInstitutionMetrics group="transactions" />
         <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" />
         <LoadingChart className="dashboard-flow-risk">
@@ -86,7 +106,9 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
         </LoadingChart>
         <LoadingRecommendation reduced={reduced} />
       </Grid>
+      <LoadingInstitutionMetrics group="investigation" />
       <LoadingChart className="dashboard-investigation-flow" chartClass="staged-sankey-chart" />
+      <LoadingInstitutionMetrics group="status" />
       <Grid columns={12} className="dashboard-flow-status-grid">
         <LoadingSeries className="dashboard-flow-status" />
         <LoadingSeries className="dashboard-flow-status" />
@@ -103,15 +125,7 @@ export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
       <LoadingChart className="dashboard-personal-flow" chartClass="staged-sankey-chart" showNote={false} />
       <LoadingChart className="dashboard-personal-history" chartClass="dashboard-loading-history" />
       <LoadingChart className="dashboard-personal-history" chartClass="dashboard-loading-history" />
-    </PersonalDashboardOverview> : <>
-      <DashboardIndicatorsGrid aria-hidden="true">
-        {['incoming', 'suspect', 'alerts'].map((indicator, index) =>
-          <Panel as="article" className="dashboard-priority-metric" key={indicator}>
-            <LoadingMetric detail={index === 1} trend />
-          </Panel>)}
-      </DashboardIndicatorsGrid>
-      <DashboardAnalyticsSkeleton reduced={appearance.reduced} />
-    </>}
+    </PersonalDashboardOverview> : <DashboardAnalyticsSkeleton reduced={appearance.reduced} />}
     <DashboardBoardSkeleton />
   </Box>;
 }

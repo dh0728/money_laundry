@@ -6,7 +6,7 @@ import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import {
   BenchmarkAnalyticsSkeleton, DashboardAnalyticsSkeleton, DashboardBoardSkeleton,
-  DashboardMetricGrid, PersonalDashboardOverview,
+  DashboardMetricGrid, InstitutionMetricsGrid, PersonalDashboardOverview,
 } from './dashboard-layout';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
@@ -14,12 +14,12 @@ import { ActionButton } from '../../components/primary-button';
 import { csvDownloadEntry } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
-import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { LinkTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
 import { StagedSankey } from '../../components/charts/charts/sankey/staged-sankey';
 import { previewJudgmentReason } from '../investigation/case-judgment-data';
 import { workRequestUserName } from '../investigation/preview-work-requests';
-import { personalInvestigationFlow } from './dashboard-flows';
+import { personalInvestigationFlow, share as compactShare } from './dashboard-flows';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
@@ -30,10 +30,10 @@ const Analytics = React.lazy(() => import('./dashboard-analytics').then(module =
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
 function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key } = item;
+  const { label, value, unit, detail, key, overlap, relation, extra } = item;
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   const reading = <Box className="dashboard-metric-reading">
-      <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined}>
+      <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined} data-dashboard-metric-source={relation}>
         {typeof value === 'number' && !reduced && !animated.has(key)
           ? <CountUp to={value} className="count-up-fast" trigger="view" separator="," onEnd={() => animated.add(key)} />
           : typeof value === 'number' ? formatter.format(value) : value}
@@ -43,7 +43,9 @@ function Metric({ item, reduced }) {
   return <Box className="dashboard-metric">
     <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
     {reading}
+    {extra}
     {detail && <Text>{detail}</Text>}
+    {overlap && <Box><StatusTag preset="neutral" emphasis="subtle">{overlap}</StatusTag></Box>}
   </Box>;
 }
 
@@ -52,6 +54,42 @@ function Metrics({ items, appearance }) {
     id: item.key,
     content: <Metric item={item} reduced={appearance.reduced} />,
   }))} appearance={appearance} />;
+}
+
+function institutionMetricCards(data, reduced) {
+  const { alertCases, cases, coverageScope, linked, settled } = data;
+  const total = data.transactions.length;
+  const suspicious = data.suspicious.length;
+  const institution = coverageScope === 'institution';
+  const episodes = cases.filter(row => row.kind === 'Episode');
+  const transactionOverlap = total > 0 ? '중복 · 거래 분류' : undefined;
+  const groups = {
+    transactions: [{ label: '들어온 거래 수', value: total, unit: '건', overlap: transactionOverlap,
+      relation: total > 0 ? 'transactions' : undefined, detail: institution ? undefined : '선택 업무의 근거 거래',
+      extra: <Text data-dashboard-metric-source={suspicious > 0 ? 'suspicious' : undefined}>
+        의심 거래 {count(suspicious)}{total > 0 && ` · ${compactShare(suspicious, total)}`}
+      </Text> }],
+    investigation: [
+      { label: '생성 Alert', value: alertCases.length, unit: '건',
+        overlap: alertCases.length > 0 ? '중복 · 조사 처리 흐름' : undefined, relation: alertCases.length > 0 ? 'created-alerts' : undefined },
+      { label: '미처리 Alert', value: alertCases.filter(row => row.open).length, unit: '건', detail: '개별 Alert 상태 기준',
+        overlap: alertCases.length > 0 ? '일부 중복 · 조사 처리 흐름' : undefined, relation: alertCases.length > 0 ? 'open-alerts' : undefined },
+      { label: '의심 거래 중 Alert 편입', value: linked == null ? '—' : share(linked, suspicious),
+        detail: linked == null ? 'Alert 연결 집계 미제공' : `${count(suspicious)} 중 ${count(linked)} 연결`,
+        overlap: linked > 0 ? '중복 · 조사 처리 흐름' : undefined, relation: linked > 0 ? 'linked' : undefined },
+    ],
+    status: [
+      { label: '업무 처리율', value: share(settled, cases.length), detail: `개별 상태 기준 · ${count(cases.length)} 중 ${count(settled)} 완료`,
+        overlap: cases.length > 0 ? '일부 중복 · 일별 처리 상태' : undefined, relation: cases.length > 0 ? 'completion' : undefined },
+      { label: '미완료 Episode', value: episodes.filter(row => row.open).length, unit: '건',
+        overlap: episodes.length > 0 ? '중복 · 일별 Episode 처리 상태' : undefined, relation: episodes.length > 0 ? 'open-episodes' : undefined },
+    ],
+  };
+  return Object.fromEntries(Object.entries(groups).map(([group, items]) => [group, <InstitutionMetricsGrid group={group}>
+    {items.map(item => <Panel as="article" key={item.label}>
+      <Metric item={{ ...item, key: `institution-${item.label}` }} reduced={reduced} />
+    </Panel>)}
+  </InstitutionMetricsGrid>]));
 }
 
 const personalStages = ['배정된 업무', '현재 상태', '완료 판정'];
@@ -205,10 +243,11 @@ export function PreviewDashboard({ mine, data, appearance }) {
         exportFile="personal-judgment-history" exportColumns={['판정', '판정 사유']}
         exportRow={entry => [verdictLabels[entry.verdict], entry.judgment?.reason ? previewJudgmentReason(entry.judgment) : '']}
         renderEntry={entry => <><LinkTag code={entry.code} /><VerdictTag verdict={entry.verdict} /></>} />
-    </PersonalDashboardOverview> :
+    </PersonalDashboardOverview> : (
       <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
-        <Analytics data={data} reduced={appearance.reduced} summary={summary} />
-      </React.Suspense>}
+        <Analytics data={data} reduced={appearance.reduced} summary={summary} metrics={institutionMetricCards(data, appearance.reduced)} />
+      </React.Suspense>
+    )}
     {rows ? <WorkBoard records={rows}
       mine={mine} sort={data.sort} appearance={appearance} statusByCode={data.investigation.statusByCode} /> : <DashboardBoardSkeleton />}
   </Box>;

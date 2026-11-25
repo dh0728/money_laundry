@@ -146,17 +146,18 @@ export function investigationFlow(data) {
   const unlinked = data.unlinked;
   const weight = linked > 0 && status.totalAlerts > 0 ? linked / status.totalAlerts : 1;
   const alerts = status.totalAlerts > 0
-    ? flow.node('Alert', 1, status.totalAlerts, flowColors.suspect)
+    ? flow.node('Alert', 1, status.totalAlerts, flowColors.suspect, { anchor: 'alerts' })
     : null;
 
   if (suspicious > 0 && linked != null && unlinked != null) {
     const suspect = flow.node('모델 의심 거래', 0, suspicious, flowColors.suspect);
     if (linked > 0) {
       const destination = alerts ?? flow.node('Alert 연결', 1, linked, flowColors.suspect,
-        { ratio: share(linked, suspicious) });
+        { ratio: share(linked, suspicious), anchor: 'alert-link' });
       flow.link(suspect, destination, linked, {
         color: flowColors.suspect,
         caption: alerts == null ? undefined : `연결 ${count(linked)} · ${share(linked, suspicious)}`,
+        anchor: alerts == null ? undefined : 'alert-link',
         note: '같은 거래는 한 번만 집계',
       });
     }
@@ -168,11 +169,11 @@ export function investigationFlow(data) {
   if (alerts == null) return { ...flow, hasData: flow.links.length > 0 };
 
   const routeNodes = [
-    { name: '개별 처리', route: status.routes.individual, value: status.individualAlerts },
+    { name: '개별 처리', route: status.routes.individual, value: status.individualAlerts, anchor: 'individual' },
     { name: 'Episode 편입', route: status.routes.episode, value: status.episodeAlerts,
       detail: `Episode ${count(status.linkedEpisodes)}` },
   ].filter(item => item.value > 0).map(item => ({
-    ...item, id: flow.node(item.name, 2, item.value, flowColors.suspect, { detail: item.detail }),
+    ...item, id: flow.node(item.name, 2, item.value, flowColors.suspect, { detail: item.detail, anchor: item.anchor }),
   }));
   routeNodes.forEach(route => flow.link(alerts, route.id, route.value, { weight: route.value * weight }));
 

@@ -176,6 +176,15 @@ const volumeDetail = [
 ];
 const relationTargets = [{ id: 'total', tone: 'neutral' }, { id: 'suspect', tone: 'suspect' }];
 const institutionRelationTargets = [...relationTargets, { id: 'new-entities', source: 'total', tone: 'total' }];
+const institutionMetricRoutes = [
+  { id: 'transactions', target: '.dashboard-transaction-flow [data-sankey-top-anchor="total"]' },
+  { id: 'suspicious', target: '.dashboard-transaction-flow [data-sankey-top-anchor="suspect"]' },
+  { id: 'created-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alerts"]' },
+  { id: 'open-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="individual"]', partial: true },
+  { id: 'linked', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alert-link"]' },
+  { id: 'completion', target: '[data-dashboard-metric-target="completion"]', partial: true },
+  { id: 'open-episodes', target: '[data-dashboard-metric-target="open-episodes"]' },
+].map(route => ({ ...route, source: `[data-dashboard-metric-source="${route.id}"]` }));
 const transactionStages = ['수신처', '전체 거래', '이진 분류', '패턴 분류'];
 const investigationStages = ['의심 거래', 'Alert 연결', '조사 경로', '현재 상태', '완료 판정'];
 const riskScoreColors = {
@@ -188,6 +197,7 @@ function SeriesLegend({ series }) {
   return <Box className="dashboard-legend">
     {series.map(item => <Text as="span" className="dashboard-series-legend-item" key={item.key}>
       <Text as="i" aria-hidden="true" style={{ '--dashboard-series-swatch': item.color }} />{item.label}
+      {item.total && <> <Text as="strong" className="dashboard-metric-value">{item.total}</Text></>}
     </Text>)}
   </Box>;
 }
@@ -204,7 +214,7 @@ function NewEntitiesMetric({ data, reduced }) {
   return <ChartPanel title={title} note={available ? '전체 거래 이력상 최초 등장 · KST' : '기관 전체 조회에서 제공'}
     className="dashboard-priority-metric dashboard-new-entities" hasChart={hasChart}
     data-sankey-detail={available ? 'new-entities' : undefined}>
-    {available && <SeriesLegend series={newEntitySeries.map(item => ({ ...item, label: `${item.label} ${item.value(data)}` }))} />}
+    {available && <SeriesLegend series={newEntitySeries.map(item => ({ ...item, total: item.value(data) }))} />}
     {hasChart && <DailySeries rows={data.operationalDaily} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
       label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />}
   </ChartPanel>;
@@ -298,7 +308,7 @@ function RiskSegments({ data }) {
   </ChartPanel>;
 }
 
-function TransactionDetails({ data, flow, reduced, summary }) {
+function TransactionDetails({ data, flow, reduced, summary, metrics }) {
   const { scale } = flow;
   const series = [
     { key: 'total', label: '전체 거래', color: transactionTotalColor },
@@ -312,6 +322,7 @@ function TransactionDetails({ data, flow, reduced, summary }) {
   const badge = [flow.sample ? '은행별 건수는 예시' : null,
     scale > 1 ? '이상 띠 두께 ×' + scale + ' · 건수·비율 원본' : null].filter(Boolean).join(' · ');
   return <LayoutGrid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
+    {metrics}
     <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
       {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
         : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
@@ -343,7 +354,9 @@ function InvestigationStatus({ data, episode = false, reduced }) {
       <Box className="dashboard-legend">
         {series.map(item => <Box className="dashboard-status-legend-item" key={item.key}>
           <ReviewStatusTag status={item.key === 'pending' ? '처리 전' : item.label} />
-          <Text as="strong">{count(sums[item.key])}</Text>
+          <Text as="strong" data-dashboard-metric-target={episode && item.key === 'inProgress' ? 'open-episodes' : undefined}>
+            {count(sums[item.key])}
+          </Text>
         </Box>)}
       </Box>
       <DailySeries rows={rows} series={series} reduced={reduced} label={title} separatedStack />
@@ -351,7 +364,7 @@ function InvestigationStatus({ data, episode = false, reduced }) {
   </ChartPanel>;
 }
 
-export function Analytics({ data, reduced, summary }) {
+export function Analytics({ data, reduced, summary, metrics }) {
   const hostRef = useRef(null);
   const transactions = transactionFlow(data);
   const investigation = investigationFlow(data);
@@ -367,17 +380,20 @@ export function Analytics({ data, reduced, summary }) {
       <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} />
     </DashboardIndicatorsGrid>
     {scope && <Text className="dashboard-note">거래 집계 범위 · {scope}</Text>}
-    <TransactionDetails data={data} flow={transactions} reduced={reduced} summary={summary} />
+    <TransactionDetails data={data} flow={transactions} reduced={reduced} summary={summary} metrics={metrics.transactions} />
+    {metrics.investigation}
     <ChartPanel title="조사 처리 흐름" note={investigationNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
       {investigation.hasData ? <StagedSankey data={investigation} stages={investigationStages} label="조사 처리 흐름" reduced={reduced} />
         : <Text className="dashboard-note">표시할 조사 처리 흐름이 없습니다.</Text>}
     </ChartPanel>
-    <LayoutGrid columns={12} className="dashboard-flow-status-grid">
+    {metrics.status}
+    <LayoutGrid columns={12} className="dashboard-flow-status-grid" data-dashboard-metric-target="completion">
       <InvestigationStatus data={data} reduced={reduced} />
       <InvestigationStatus data={data} reduced={reduced} episode />
     </LayoutGrid>
     {transactions.hasData && <SankeyDetailsLinks hostRef={hostRef}
       relations={scope ? relationTargets : institutionRelationTargets} />}
+    <SankeyDetailsLinks hostRef={hostRef} routes={institutionMetricRoutes} />
   </Box>;
 }
 

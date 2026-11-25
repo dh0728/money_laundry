@@ -59,8 +59,14 @@ function Labels() {
         </text>
       </g>;
     })}
-    {links.filter(link => link.caption).map(link => <text key={link.index} textAnchor="end"
-      x={link.target.x0 - offsets.linkCaptionInset} y={(link.y0 + link.y1) / 2} dy={offsets.label}>{link.caption}</text>)}
+    {links.filter(link => link.caption).map(link => {
+      const x = link.target.x0 - offsets.linkCaptionInset;
+      const y = (link.y0 + link.y1) / 2;
+      return <g key={link.index}>
+        <text textAnchor="end" x={x} y={y} dy={offsets.label}>{link.caption}</text>
+        {link.anchor && <circle data-sankey-top-anchor={link.anchor} data-sankey-anchor={link.anchor} cx={x} cy={y} opacity={0} />}
+      </g>;
+    })}
   </g>;
 }
 
@@ -101,7 +107,78 @@ export function StagedSankey({ data, stages, label, reduced }) {
   </Box>;
 }
 
-export function SankeyDetailsLinks({ hostRef, relations }) {
+function RelationPaths({ lines, metrics }) {
+  return <svg className="staged-sankey-relations" data-metric-relations={metrics || undefined} aria-hidden="true">
+    {lines.map(({ id, tone, partial, path, startX, startY, endX, endY }) =>
+      <g key={id} data-tone={tone} data-relation={id} data-partial={partial || undefined}>
+        <path d={path} />
+        {metrics && <circle cx={startX} cy={startY} />}
+        <circle cx={endX} cy={endY} />
+      </g>)}
+  </svg>;
+}
+
+function metricRelation(value, mark, origin, { id, partial }) {
+  const card = value?.closest('article');
+  if (!card || !mark) return [];
+
+  const sourceBounds = value.getBoundingClientRect();
+  const targetBounds = mark.getBoundingClientRect();
+  const plot = mark.closest('.staged-sankey-scroller')?.getBoundingClientRect();
+  const center = targetBounds.left + targetBounds.width / 2;
+  if (plot && (center < plot.left || center > plot.right)) return [];
+
+  const startX = sourceBounds.left + sourceBounds.width / 2 - origin.left;
+  const startY = card.getBoundingClientRect().bottom - origin.top;
+  const endX = center - origin.left;
+  const endY = targetBounds.top + (plot ? targetBounds.height / 2 : 0) - origin.top;
+  const turnY = startY + (endY - startY) / 2;
+  const path = `M ${startX} ${startY} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}`;
+  return [{ id, partial, startX, startY, endX, endY, path }];
+}
+
+function MetricDetailsLinks({ hostRef, routes }) {
+  const [lines, setLines] = useState([]);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+    let frame;
+    const schedule = () => {
+      if (frame !== undefined) return;
+      frame = requestAnimationFrame(() => {
+        frame = undefined;
+        const origin = host.getBoundingClientRect();
+        const next = routes.flatMap(route => {
+          const value = host.querySelector(route.source);
+          const mark = host.querySelector(route.target);
+          if (value) sizes.observe(value);
+          if (mark) sizes.observe(mark.ownerSVGElement ?? mark);
+          return metricRelation(value, mark, origin, route);
+        });
+        setLines(previous => previous.length === next.length && previous.every((line, index) =>
+          line.id === next[index].id && line.path === next[index].path) ? previous : next);
+      });
+    };
+    const sizes = new ResizeObserver(schedule);
+    const marks = new MutationObserver(records => {
+      if (records.some(record => !record.target.closest?.('.staged-sankey-relations'))) schedule();
+    });
+    sizes.observe(host);
+    marks.observe(host, { childList: true, characterData: true, subtree: true, attributes: true,
+      attributeFilter: ['cx', 'cy', 'width', 'height', 'viewBox', 'transform', 'data-dashboard-metric-source', 'data-dashboard-metric-target'] });
+    host.addEventListener('scroll', schedule, { capture: true, passive: true });
+    schedule();
+    return () => {
+      sizes.disconnect();
+      marks.disconnect();
+      host.removeEventListener('scroll', schedule, true);
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
+  }, [hostRef, routes]);
+  return <RelationPaths lines={lines} metrics />;
+}
+
+function ChartDetailsLinks({ hostRef, relations }) {
   const [lines, setLines] = useState([]);
   useEffect(() => {
     const host = hostRef.current;
@@ -140,10 +217,9 @@ export function SankeyDetailsLinks({ hostRef, relations }) {
       chart.removeEventListener('scroll', measure);
     };
   }, [hostRef, relations]);
-  return <svg className="staged-sankey-relations" aria-hidden="true">
-    {lines.map(({ id, tone, path, endX, endY }) => <g key={id} data-tone={tone} data-relation={id}>
-      <path d={path} />
-      <circle cx={endX} cy={endY} />
-    </g>)}
-  </svg>;
+  return <RelationPaths lines={lines} />;
+}
+
+export function SankeyDetailsLinks({ hostRef, relations, routes }) {
+  return routes ? <MetricDetailsLinks hostRef={hostRef} routes={routes} /> : <ChartDetailsLinks hostRef={hostRef} relations={relations} />;
 }
