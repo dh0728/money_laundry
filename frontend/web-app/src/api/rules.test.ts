@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest'
 import { ApiError, clearCsrf } from './common'
 import {
-  cancelBacktest, commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchBacktest, fetchBacktests, fetchCaseRuleHits, fetchRule,
+  cancelBacktest, cloneRule, commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchBacktest, fetchBacktests, fetchCaseRuleHits, fetchRule,
   fetchRuleCatalog, fetchRules, requestBacktest, saveRuleDraft, validateRule, type RuleDefinition,
 } from './rules'
 
@@ -68,14 +68,18 @@ it('백테스트는 실행 · 조회 · 룰별 목록 · 취소를 rule-backtest
   ])
 })
 
-it('상태 명령 · 새 버전 · 사건의 룰 적중을 API.md §12 의 주소로 보낸다', async () => {
+it('상태 명령 · 새 버전 · 복제 · 사건의 룰 적중을 API.md §12 의 주소로 보낸다', async () => {
   await commandRule(3, { requestId: 'r-1', action: 'APPROVE', versionId: 7, revision: 2, comment: '백테스트 확인' })
   await createRuleVersion(3)
   await fetchCaseRuleHits(41)
-  expect([0, 1, 2].map(index => call(index))).toEqual([
+  await cloneRule(3, { versionId: 7 })
+  await cloneRule(3)
+  expect([0, 1, 2, 3, 4].map(index => call(index))).toEqual([
     { url: '/api/v1/rules/3/commands', method: 'POST', body: { requestId: 'r-1', action: 'APPROVE', versionId: 7, revision: 2, comment: '백테스트 확인' } },
     { url: '/api/v1/rules/3/versions', method: 'POST', body: {} },
     { url: '/api/v1/review/cases/41/rule-hits', method: 'GET', body: undefined },
+    { url: '/api/v1/rules/3/clone', method: 'POST', body: { versionId: 7 } },
+    { url: '/api/v1/rules/3/clone', method: 'POST', body: {} },
   ])
 })
 
@@ -91,6 +95,7 @@ it('룰 쓰기 요청은 화면 전체를 다시 읽게 하는 알림을 보내�
     await cancelBacktest(31)
     await commandRule(3, { action: 'SUBMIT', versionId: 7, revision: 0 })
     await createRuleVersion(3)
+    await cloneRule(3)
     expect(changed).not.toHaveBeenCalled()
   } finally {
     window.removeEventListener('live-data-changed', changed)

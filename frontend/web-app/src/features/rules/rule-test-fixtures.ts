@@ -116,6 +116,7 @@ export const draftRuleFixture = {
   "commands": [
     {"action": "START_SHADOW", "versionId": 5, "revision": 0, "enabled": false, "reason": "지금 조건으로 끝낸 백테스트가 있어야 합니다.", "commentRequired": false},
     {"action": "SUBMIT", "versionId": 5, "revision": 0, "enabled": false, "reason": "지금 조건으로 끝낸 백테스트가 있어야 합니다.", "commentRequired": false},
+    {"action": "CLONE", "versionId": 5, "revision": 0, "enabled": true, "reason": null, "commentRequired": false},
   ],
   "versions": [{"versionId": 5, "versionNo": 1, "status": "DRAFT", "summary": "첫 거래 상대 · 건당 1,000 USD 이상 · 수취 계좌 6개 이상 · 7일", "author": "L1 심사자 A", "createdAt": "2023-09-17T00:00:00Z", "submittedAt": null, "decidedAt": null, "decidedBy": null}],
   "executions": [],
@@ -137,6 +138,7 @@ export const activeRuleFixture = {
   "commands": [
     {"action": "PAUSE", "versionId": 2, "revision": 0, "enabled": false, "reason": "관리자만 할 수 있습니다.", "commentRequired": true},
     {"action": "NEW_VERSION", "versionId": 2, "revision": 0, "enabled": true, "reason": null, "commentRequired": false},
+    {"action": "CLONE", "versionId": 2, "revision": 0, "enabled": true, "reason": null, "commentRequired": false},
   ],
   "versions": [{"versionId": 2, "versionNo": 1, "status": "ACTIVE", "summary": "첫 거래 상대 · 환전 직후 · 송금 계좌 3개 이상 · 7일", "author": "L1 심사자 A", "createdAt": "2023-09-17T00:00:00Z", "submittedAt": null, "decidedAt": null, "decidedBy": null}],
   "executions": [

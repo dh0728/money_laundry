@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/common';
 import {
-  commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchRule, fetchRuleCatalog, fetchRules, saveRuleDraft, validateRule,
+  cloneRule, commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchRule, fetchRuleCatalog, fetchRules, saveRuleDraft, validateRule,
 } from '@/api/rules';
 import { LiveRuleBuilder } from './live-rule-builder';
 import { LiveRuleList } from './live-rule-list';
@@ -12,7 +12,7 @@ import { activeRuleFixture, catalogFixture, checkFixture, draftRuleFixture, rule
 // 서비스 모드의 룰 만들기 · 룰 목록. 서버 응답은 실제 응답을 줄인 것(rule-test-fixtures)으로 대신한다.
 vi.mock('@/api/rules', () => ({
   fetchRuleCatalog: vi.fn(), fetchRules: vi.fn(), fetchRule: vi.fn(), validateRule: vi.fn(), createRule: vi.fn(), saveRuleDraft: vi.fn(), deleteRuleDraft: vi.fn(),
-  commandRule: vi.fn(), createRuleVersion: vi.fn(),
+  commandRule: vi.fn(), createRuleVersion: vi.fn(), cloneRule: vi.fn(),
 }));
 
 const fanOutDefaults = catalogFixture.templates.find(template => template.key === 'FAN_OUT').defaults;
@@ -279,6 +279,41 @@ it('새 버전 만들기는 운영 버전을 복사한 초안을 만들고 상�
   await waitFor(() => expect(actions.getByRole('link', { name: '이어서 작성' })).toHaveAttribute('href', '/rules/new?rule=RULE-002'));
   expect(actions.getByRole('button', { name: '새 버전 만들기' })).toHaveAttribute('title', '작업 중인 버전이 이미 있습니다.');
   expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('새 버전 · v2');
+}));
+
+it('복제는 그 버전의 조건으로 새 룰을 만들고, 목록을 다시 읽어 새 룰을 고른다', () => withDialog(async () => {
+  render(<LiveRuleList initialRule="RULE-002" actionsHost={footer} />);
+  const actions = within(footer);
+  await waitFor(() => expect(actions.getByRole('button', { name: '복제' })).toBeEnabled());
+  fireEvent.click(actions.getByRole('button', { name: '복제' }));
+  const dialog = within(screen.getByRole('dialog', { name: '룰 복제' }));
+  // 어느 버전을 복제하는지 보여 주고, 사유는 받지 않는다
+  expect(dialog.getByText('RULE-002').closest('p')).toHaveTextContent('RULE-002 · 운영 FAN-IN · v1');
+  expect(dialog.getByText(/새 룰을 작성 중 상태로 만듭니다/)).toBeInTheDocument();
+  expect(dialog.queryByRole('textbox')).not.toBeInTheDocument();
+
+  // 서버는 새 룰(RULE-007)을 만든다. 담당자는 복제한 사람이고, 첫 기록에 어디서 복제했는지 남는다.
+  const cloned = { ...draftRuleFixture, ruleId: 7, code: 'RULE-007', name: '운영 FAN-IN 복사본', template: 'FAN_IN', templateName: 'FAN-IN · 집중 수취',
+    events: [{ at: '2023-09-17T00:00:00Z', actor: 'L1 심사자 A', action: 'CREATED', comment: '', versionNo: 1, clonedFrom: { code: 'RULE-002', versionNo: 1 } }] };
+  vi.mocked(cloneRule).mockResolvedValue({ ruleId: 7, code: 'RULE-007', name: '운영 FAN-IN 복사본', versionId: 40, revision: 0 });
+  vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 7 ? cloned : ruleId === 4 ? draftRuleFixture : activeRuleFixture));
+  vi.mocked(fetchRules).mockResolvedValue({ ...rulesFixture, counts: { ...rulesFixture.counts, DRAFT: 2 },
+    content: [...rulesFixture.content, { ...rulesFixture.content[1], ruleId: 7, code: 'RULE-007', name: '운영 FAN-IN 복사본', template: 'FAN_IN', templateName: 'FAN-IN · 집중 수취' }] });
+  await act(async () => { fireEvent.submit(dialog.getByRole('button', { name: '복제 확인' }).closest('form')); });
+  expect(cloneRule).toHaveBeenCalledWith(2, { versionId: 2 });
+  expect(commandRule).not.toHaveBeenCalled();
+  expect(createRuleVersion).not.toHaveBeenCalled();
+
+  // 새 룰이 목록에 생기고 골라져 있다. 이어서 작성은 새 룰로 간다.
+  await waitFor(() => expect(screen.getByRole('button', { name: /RULE-007/ })).toHaveAttribute('aria-pressed', 'true'));
+  expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('RULE-007');
+  expect(actions.getByRole('link', { name: '이어서 작성' })).toHaveAttribute('href', '/rules/new?rule=RULE-007');
+  expect(screen.getByRole('status')).toHaveTextContent('RULE-002 복제 · 새 룰 RULE-007');
+  expect(within(screen.getByRole('region', { name: '룰 변경 기록' })).getByText(/RULE-002 v1 복제/)).toBeInTheDocument();
+  // 원래 룰의 변경 기록에는 복제 표시가 없다
+  fireEvent.click(screen.getByRole('button', { name: /RULE-002/ }));
+  await waitFor(() => expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('RULE-002'));
+  expect(within(screen.getByRole('region', { name: '룰 변경 기록' })).queryByText(/복제/)).not.toBeInTheDocument();
 }));
 
 it('초안 삭제는 확인을 거쳐 지우고 목록을 다시 읽는다', async () => {

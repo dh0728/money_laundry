@@ -157,11 +157,16 @@ export type RuleEvent = {
   at: IsoDateTime; actor: string | null; action: string; comment: string; versionNo: number | null
   /** 작성자가 자기 버전을 승인했다 */
   selfApproved?: boolean
+  /** 다른 룰을 복제해 만든 룰이면 첫 기록(CREATED)에 그 룰과 버전이 온다 */
+  clonedFrom?: { code: string; versionNo: number | null } | null
 }
 export type RuleCommandAction = 'START_SHADOW' | 'SUBMIT' | 'WITHDRAW' | 'APPROVE' | 'REJECT' | 'PAUSE' | 'RESUME'
-/** 지금 상태에서 있는 명령. NEW_VERSION 은 운영 버전을 복사해 새 초안을 만드는 것이다(createRuleVersion) */
+/**
+ * 지금 상태에서 있는 명령. NEW_VERSION 은 운영 버전을 복사해 같은 룰의 새 초안을 만드는 것이고(createRuleVersion),
+ * CLONE 은 그 버전의 조건으로 새 룰을 만드는 것이다(cloneRule). 둘은 commandRule 로 보내지 않는다.
+ */
 export type RuleCommand = {
-  action: RuleCommandAction | 'NEW_VERSION'
+  action: RuleCommandAction | 'NEW_VERSION' | 'CLONE'
   versionId: number
   revision: number
   /** 지금 로그인한 사람이 할 수 있는가. 못 하면 reason 에 이유가 있다 */
@@ -232,6 +237,9 @@ export const saveRuleDraft = (ruleId: number, versionId: number, input: { name: 
 /** 운영 버전을 복사해 새 초안을 만든다 */
 export const createRuleVersion = (ruleId: number) =>
   postJson<{ ruleId: number; code: string; versionId: number; versionNo: number; revision: number }>(`/api/v1/rules/${ruleId}/versions`, {}, silent)
+/** 복제. 그 버전의 조건을 가진 새 룰의 v1 초안을 만든다. 이름을 안 주면 "원래 이름 복사본" 이다. 새 룰의 담당자는 복제한 사람이다 */
+export const cloneRule = (ruleId: number, input: { versionId?: number; name?: string } = {}) =>
+  postJson<{ ruleId: number; code: string; name: string; versionId: number; revision: number }>(`/api/v1/rules/${ruleId}/clone`, input, silent)
 /** 상태 명령. 바뀐 룰 상세를 돌려준다 */
 export const commandRule = (ruleId: number, input: {
   requestId?: string; action: RuleCommandAction; versionId: number; revision: number; comment?: string

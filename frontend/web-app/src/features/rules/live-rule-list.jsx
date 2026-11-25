@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { commandRule, createRuleVersion, deleteRuleDraft, fetchRule } from '@/api/rules';
+import { cloneRule, commandRule, createRuleVersion, deleteRuleDraft, fetchRule } from '@/api/rules';
 import { Textarea } from '@/components/ui/textarea';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
@@ -18,11 +18,10 @@ import './live-rule-engine.css';
 
 // 룰 목록과 상세(서비스 모드). 한 룰은 운영 버전 최대 1개와 작업 중 버전 최대 1개를 가진다.
 // 상태를 바꾸는 버튼은 서버가 상세에 실어 주는 commands(지금 상태에서 있는 명령, 내가 할 수 있는지, 못 하면 왜)대로 그린다.
-// 누가 무엇을 할 수 있는지를 화면이 따로 알지 않는다. 복제는 서버 기능이 붙는 대로 연다.
+// 누가 무엇을 할 수 있는지를 화면이 따로 알지 않는다.
 
 const countFormat = new Intl.NumberFormat('ko-KR');
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
-const later = '서버 기능이 붙은 뒤에 쓸 수 있습니다.';
 const subjectNames = { ACCOUNT: '계좌', TX: '거래' };
 /** 사유의 길이. 서버의 제한과 같다. */
 const commentLimit = 2000;
@@ -33,6 +32,7 @@ const commandSpecs = {
   PAUSE: { label: '중지', tone: 'negative', after: 'PAUSED', note: '이 뒤에 시작하는 분석부터 돌지 않습니다. 이미 쌓인 적중은 남습니다.' },
   WITHDRAW: { label: '되돌리기', tone: 'inverse', after: 'DRAFT', note: '작성 중으로 돌아가 조건을 다시 고칠 수 있습니다. 시험 운영은 멈춥니다.' },
   START_SHADOW: { label: '시험 운영 시작', tone: 'inverse', after: 'SHADOW', note: '이 뒤에 시작하는 분석부터 매일 돌려 결과만 쌓습니다. Alert 에는 보이지 않습니다.' },
+  CLONE: { label: '복제', tone: 'inverse', note: '이 버전의 조건을 그대로 가진 새 룰을 작성 중 상태로 만듭니다. 새 룰은 복제한 사람이 담당하고, 이 룰은 바뀌지 않습니다. 이름과 조건은 새 룰에서 고칠 수 있습니다.' },
   NEW_VERSION: { label: '새 버전 만들기', tone: 'inverse', note: '운영 버전의 조건을 복사해 작성 중인 새 버전을 만듭니다. 운영 버전은 그대로 돕니다.' },
   SUBMIT: { label: '승인 요청', tone: 'brand', after: 'PENDING', note: '관리자가 승인하면 운영을 시작합니다.' },
   APPROVE: { label: '승인', tone: 'brand', after: 'ACTIVE', note: '이 뒤에 시작하는 분석부터 운영 룰로 돌고, 적중은 Alert 에 근거로 표시됩니다.' },
@@ -100,6 +100,7 @@ function RuleCommandDialog({ rule, command, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const spec = commandSpecs[command.action];
   const fresh = command.action === 'NEW_VERSION';
+  const cloning = command.action === 'CLONE';
   const version = [rule.working, rule.operating].find(item => item?.versionId === command.versionId);
 
   useEffect(() => {
@@ -113,6 +114,8 @@ function RuleCommandDialog({ rule, command, onClose, onDone }) {
     setError('');
     try {
       const next = fresh ? (await createRuleVersion(rule.ruleId), await fetchRule(rule.ruleId))
+        // 복제는 새 룰을 만든다. 그 룰의 상세를 돌려준다.
+        : cloning ? await fetchRule((await cloneRule(rule.ruleId, { versionId: command.versionId })).ruleId)
         : await commandRule(rule.ruleId, { requestId, action: command.action, versionId: command.versionId, revision: command.revision, comment: comment.trim() });
       dialog.current.close();
       onDone(next);
@@ -133,7 +136,7 @@ function RuleCommandDialog({ rule, command, onClose, onDone }) {
       {spec.after && <p>변경 후 상태 · {ruleStatusNames[spec.after]}</p>}
       <p className="workflow-rule-note">{spec.note}
         {command.action === 'APPROVE' && rule.operating && ` 지금 운영 버전 v${rule.operating.versionNo} 은 물러납니다.`}</p>
-      {!fresh && <label className="case-judgment-field">{command.commentRequired ? '사유' : '메모 (선택)'}
+      {!fresh && !cloning && <label className="case-judgment-field">{command.commentRequired ? '사유' : '메모 (선택)'}
         <Textarea ref={field} value={comment} rows={3} maxLength={commentLimit} required={command.commentRequired}
           onChange={event => { setComment(event.target.value); setError(''); }} />
       </label>}
@@ -223,7 +226,8 @@ function RuleEvents({ rule }) {
     <h2>변경 기록</h2>
     {rule.events.length ? <ol className="workflow-rule-history">
       {rule.events.map((event, index) => <li key={index}>
-        <div><strong>{ruleEventNames[event.action] ?? event.action}{event.versionNo ? ` · v${event.versionNo}` : ''}{event.selfApproved ? ' · 본인 승인' : ''}</strong>
+        <div><strong>{ruleEventNames[event.action] ?? event.action}{event.versionNo ? ` · v${event.versionNo}` : ''}{event.selfApproved ? ' · 본인 승인' : ''}
+          {event.clonedFrom ? ` · ${event.clonedFrom.code}${event.clonedFrom.versionNo ? ` v${event.clonedFrom.versionNo}` : ''} 복제` : ''}</strong>
           <span>{event.actor ?? '시스템'} · <RuleTime value={event.at} /></span></div>
         {event.comment && <p>{event.comment}</p>}
       </li>)}
@@ -352,17 +356,31 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
     <ScreenActions host={actionsHost} stackOnNarrow>
       <PrimaryButton tone="negative" disabled={!working?.deletable} aria-haspopup="dialog" onClick={() => setDeleting(true)}>초안 삭제</PrimaryButton>
       {commands.filter(item => commandSpecs[item.action].tone === 'negative').map(commandButton)}
-      <PrimaryButton tone="inverse" disabled title={later}>복제</PrimaryButton>
+      {commands.filter(item => item.action === 'CLONE').map(commandButton)}
+      {!shown && <PrimaryButton tone="inverse" disabled>복제</PrimaryButton>}
       {shown && backtestable(shown.template)
         ? <PrimaryButton tone="inverse" as="a" href={`/rules/backtest?rule=${shown.code}`}>백테스트로 열기</PrimaryButton>
         : <PrimaryButton tone="inverse" disabled title={shown ? '이 템플릿의 백테스트는 아직 제공하지 않습니다.' : undefined}>백테스트로 열기</PrimaryButton>}
       {working?.editable
         ? <PrimaryButton tone="inverse" as="a" href={`/rules/new?rule=${shown.code}`}>이어서 작성</PrimaryButton>
         : <PrimaryButton tone="inverse" disabled>이어서 작성</PrimaryButton>}
-      {commands.filter(item => commandSpecs[item.action].tone !== 'negative').map(commandButton)}
+      {commands.filter(item => commandSpecs[item.action].tone !== 'negative' && item.action !== 'CLONE').map(commandButton)}
     </ScreenActions>
     {command && shown && <RuleCommandDialog key={`${command.action}-${command.versionId}-${command.revision}`} rule={shown} command={command}
       onClose={() => setCommand(null)} onDone={next => {
+        if (command.action === 'CLONE') {
+          const source = shown.code;
+          // 복제로 생긴 새 룰(작성 중)을 고른다. 목록을 먼저 다시 읽고 한꺼번에 바꾼다. 목록에 아직 없는 룰을 먼저 고르면 첫 줄의 룰이 잠깐 보인다.
+          // 상태 필터에 가려지지 않게 필터도 푼다.
+          refreshLiveRules().then(loaded => {
+            setList(loaded);
+            setStatus('all');
+            choose(next.code);
+            setDetail(next);
+            setNotice(`${source} 복제 · 새 룰 ${next.code}`);
+          }, error => setFailure(problemText(error, '룰 목록을 불러오지 못했습니다.')));
+          return;
+        }
         setNotice(`${next.code} · ${commandSpecs[command.action].label} · ${ruleStatusNames[next.status] ?? ''}`);
         setDetail(next);
         // 목록의 상태와 상태별 수도 다시 읽는다
