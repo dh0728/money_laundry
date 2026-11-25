@@ -413,9 +413,17 @@ export function exportCases(rows, scope) {
   caseCsvDownloadEntry('', scope, rows).download();
 }
 
+function caseDetectionDate({ code, date }) {
+  if (date instanceof Date && Number.isFinite(date.getTime())) return formatDate(date);
+  const stamp = /^[AE]-(\d{6})-\d{6,}$/.exec(code)?.[1];
+  if (!stamp) return '';
+  const inferred = formatDate(dateFromCode(code));
+  return inferred.slice(2).replaceAll('-', '') === stamp ? inferred : '';
+}
+
 export function caseCsvDownloadEntry(label, file, rows) {
-  return csvDownloadEntry(label, file, ['코드', '탐지일', '처리 상태', '담당 범위'], rows.map(row =>
-    [row.code, formatDate(row.date), reviewStatusLabel(row.status), row.assigned ? '내 담당' : '다른 담당']));
+  return createCsvDownloadEntry(label, file, ['코드', '탐지일', '처리 상태', '담당 범위'], rows.length,
+    () => rows.map(row => [row.code, caseDetectionDate(row), reviewStatusLabel(row.status), row.assigned ? '내 담당' : '다른 담당']));
 }
 
 export function downloadCsv(file, headers, rows) {
@@ -424,9 +432,13 @@ export function downloadCsv(file, headers, rows) {
 }
 
 export function csvDownloadEntry(label, file, headers, rows) {
-  return { label, format: 'CSV', count: rows.length, disabled: !rows.length,
-    csv: { filename: `aml-${file}.csv`, headers, rows },
-    download: () => downloadCsv(file, headers, rows) };
+  return createCsvDownloadEntry(label, file, headers, rows.length, () => rows);
+}
+
+function createCsvDownloadEntry(label, file, headers, count, readRows) {
+  return { label, format: 'CSV', count, disabled: !count,
+    csv: { filename: `aml-${file}.csv`, headers, get rows() { return readRows(); } },
+    download: () => downloadCsv(file, headers, readRows()) };
 }
 
 function announceExport(title, description, status = 'done') {

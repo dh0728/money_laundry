@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { caseCsvDownloadEntry } from '../components/query-controls';
 import { LedgerWorkspace, CaseCards } from '../features/investigation/investigation-components';
 import { PreviewCaseTable } from '../features/investigation/preview-case-list-table';
 import { createSampleLedgerSource, createServerLedgerSource, pageOf } from '../features/investigation/ledger-source';
@@ -222,5 +223,17 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     fireEvent.click(screen.getByRole('button', { name: '검토 대기 업무 더 보기' }));
     expect(screen.getByRole('button', { name: 'A-261111-000009 상세 열기' })).toBeTruthy();
     expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('업무 내보내기는 날짜를 지연해서 읽고, 누락된 탐지일을 업무 코드에서 얻는다', () => {
+    const readDate = vi.fn(() => new Date(2026, 10, 12));
+    const explicit = { ...rows[0], get date() { return readDate(); } };
+    const unknown = { ...rows[2], code: 'A-261132-000003' };
+    const entry = caseCsvDownloadEntry('검토 대기', 'review-pending', [explicit, rows[1], unknown]);
+    expect(entry.count).toBe(3);
+    expect(entry.csv.filename).toBe('aml-review-pending.csv');
+    expect(readDate).not.toHaveBeenCalled();
+    expect(entry.csv.rows.map(row => row[1])).toEqual(['2026-11-12', '2026-11-11', '']);
+    expect(readDate).toHaveBeenCalledTimes(1);
   });
 });
