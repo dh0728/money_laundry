@@ -15,7 +15,7 @@ import {
 import './preview-rule-workspace.css';
 import './live-rule-engine.css';
 
-// 백테스트(서비스 모드). 룰을 고르면 그 룰의 작업 중 버전(없으면 운영 버전)을 과거 원장에 돌린다.
+// 백테스트. 룰을 고르면 그 룰의 작업 중 버전(없으면 운영 버전)을 과거 원장에 돌린다.
 // 운영 버전이 따로 있으면 서버가 같은 기간에 같이 돌려 새로 걸림 · 빠짐을 낸다. 실행은 서버가 하고 화면은 2초마다 상태를 읽는다.
 
 const POLL_MS = 2000;
@@ -114,7 +114,7 @@ function Kpis({ run, noun }) {
       note={compared ? `운영 버전에만 있던 ${noun.name}` : undefined} />
     <Metric label="사람 판정 기준 정확도" value={percent(kpis.precision)}
       note={kpis.judged ? `판정 ${count(kpis.judged)}건 기준${compared && kpis.baseJudged ? ` · 운영 v${run.baseline.versionNo} 은 ${percent(kpis.basePrecision)}` : ''}`
-        : `적중 ${noun.name}와 겹치는 Alert 가운데 사람이 종결한 것이 없습니다`} />
+        : `적중 ${noun.name}${noun.name === '거래' ? '와' : '과'} 겹치는 Alert 가운데 사람이 종결한 것이 없습니다`} />
   </dl>;
 }
 

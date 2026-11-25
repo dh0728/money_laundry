@@ -225,31 +225,39 @@ export type RuleSaved = RuleCheck & { ruleId: number; code: string; name: string
 
 const silent = { silent: true }
 
-export const fetchRuleCatalog = () => getJson<RuleCatalog>('/api/v1/rule-templates')
-export const fetchRules = () => getJson<RuleList>('/api/v1/rules')
-export const fetchRule = (ruleId: number) => getJson<RuleDetail>(`/api/v1/rules/${ruleId}`)
+// 서버 없이 실행하면(VITE_API_MODE 가 live 가 아니면) 같은 화면이 샘플 응답(@/mocks/ruleSample)으로 뜬다.
+// 샘플은 보기만 한다. 조회는 떠 둔 응답을 주고, 쓰기 요청은 "저장 · 실행되지 않습니다" 로 거절한다.
+const sampleMode = () => import.meta.env.VITE_API_MODE !== 'live'
+const sample = () => import('@/mocks/ruleSample')
+const refused = <T>(): Promise<T> => sample().then(source => source.refuse())
+
+export const fetchRuleCatalog = () => sampleMode() ? sample().then(source => source.catalog()) : getJson<RuleCatalog>('/api/v1/rule-templates')
+export const fetchRules = () => sampleMode() ? sample().then(source => source.rules()) : getJson<RuleList>('/api/v1/rules')
+export const fetchRule = (ruleId: number) => sampleMode() ? sample().then(source => source.rule(ruleId)) : getJson<RuleDetail>(`/api/v1/rules/${ruleId}`)
 /** 저장 없이 검증한다. 문장과 한 줄 요약도 여기서 받는다. */
 export const validateRule = (input: { template: string; definition: RuleDefinition; ruleId?: number }) =>
-  postJson<RuleCheck>('/api/v1/rules/validate', input, silent)
+  sampleMode() ? sample().then(source => source.validate(input)) : postJson<RuleCheck>('/api/v1/rules/validate', input, silent)
 /** 룰과 v1 초안을 만든다. 정의를 안 주면 템플릿 기본값으로 채운다. */
 export const createRule = (input: { name: string; template: string; definition?: RuleDefinition }) =>
-  postJson<RuleCreated>('/api/v1/rules', input, silent)
+  sampleMode() ? refused<RuleCreated>() : postJson<RuleCreated>('/api/v1/rules', input, silent)
 /** 초안 저장. revision 이 서버와 다르면 409(INVALID_TRANSITION). */
 export const saveRuleDraft = (ruleId: number, versionId: number, input: { name: string; definition: RuleDefinition; revision: number }) =>
-  putJson<RuleSaved>(`/api/v1/rules/${ruleId}/versions/${versionId}`, input, silent)
+  sampleMode() ? refused<RuleSaved>() : putJson<RuleSaved>(`/api/v1/rules/${ruleId}/versions/${versionId}`, input, silent)
+type RuleVersionCreated = { ruleId: number; code: string; versionId: number; versionNo: number; revision: number }
 /** 운영 버전을 복사해 새 초안을 만든다 */
 export const createRuleVersion = (ruleId: number) =>
-  postJson<{ ruleId: number; code: string; versionId: number; versionNo: number; revision: number }>(`/api/v1/rules/${ruleId}/versions`, {}, silent)
+  sampleMode() ? refused<RuleVersionCreated>() : postJson<RuleVersionCreated>(`/api/v1/rules/${ruleId}/versions`, {}, silent)
+type RuleCloned = { ruleId: number; code: string; name: string; versionId: number; revision: number }
 /** 복제. 그 버전의 조건을 가진 새 룰의 v1 초안을 만든다. 이름을 안 주면 "원래 이름 복사본" 이다. 새 룰의 담당자는 복제한 사람이다 */
 export const cloneRule = (ruleId: number, input: { versionId?: number; name?: string } = {}) =>
-  postJson<{ ruleId: number; code: string; name: string; versionId: number; revision: number }>(`/api/v1/rules/${ruleId}/clone`, input, silent)
+  sampleMode() ? refused<RuleCloned>() : postJson<RuleCloned>(`/api/v1/rules/${ruleId}/clone`, input, silent)
 /** 상태 명령. 바뀐 룰 상세를 돌려준다 */
 export const commandRule = (ruleId: number, input: {
   requestId?: string; action: RuleCommandAction; versionId: number; revision: number; comment?: string
-}) => postJson<RuleDetail>(`/api/v1/rules/${ruleId}/commands`, input, silent)
+}) => sampleMode() ? refused<RuleDetail>() : postJson<RuleDetail>(`/api/v1/rules/${ruleId}/commands`, input, silent)
 
 export const deleteRuleDraft = (ruleId: number, versionId: number) =>
-  deleteJson(`/api/v1/rules/${ruleId}/versions/${versionId}`, silent)
+  sampleMode() ? refused<void>() : deleteJson(`/api/v1/rules/${ruleId}/versions/${versionId}`, silent)
 
 // ── 백테스트 ────────────────────────────────────────────────────────────
 export type BacktestStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
@@ -328,11 +336,15 @@ export type Backtest = BacktestHead & Partial<BacktestResult>
 
 /** 백테스트를 접수한다. 비교 기준을 안 주면 그 룰의 운영 버전과 비교한다. */
 export const requestBacktest = (input: { versionId: number; baselineVersionId?: number; from?: IsoDate; to?: IsoDate }) =>
-  postJson<{ backtestId: number; status: BacktestStatus }>('/api/v1/rule-backtests', input, silent)
-export const fetchBacktest = (backtestId: number) => getJson<Backtest>(`/api/v1/rule-backtests/${backtestId}`)
+  sampleMode() ? refused<{ backtestId: number; status: BacktestStatus }>()
+    : postJson<{ backtestId: number; status: BacktestStatus }>('/api/v1/rule-backtests', input, silent)
+export const fetchBacktest = (backtestId: number) =>
+  sampleMode() ? sample().then(source => source.backtest(backtestId)) : getJson<Backtest>(`/api/v1/rule-backtests/${backtestId}`)
 /** 한 룰의 백테스트 기록. 최근 것부터 20건 */
-export const fetchBacktests = (ruleId: number) => getJson<BacktestHead[]>('/api/v1/rule-backtests', { ruleId })
-export const cancelBacktest = (backtestId: number) => postJson<Backtest>(`/api/v1/rule-backtests/${backtestId}/cancel`, {}, silent)
+export const fetchBacktests = (ruleId: number) =>
+  sampleMode() ? sample().then(source => source.backtests(ruleId)) : getJson<BacktestHead[]>('/api/v1/rule-backtests', { ruleId })
+export const cancelBacktest = (backtestId: number) =>
+  sampleMode() ? refused<Backtest>() : postJson<Backtest>(`/api/v1/rule-backtests/${backtestId}/cancel`, {}, silent)
 
 // ---- 사건의 룰 적중 ----
 
@@ -371,4 +383,5 @@ export type RuleHitCard = {
 }
 
 /** Alert · Episode 의 현재 거래에 걸린 운영 룰 적중 */
-export const fetchCaseRuleHits = (caseId: number) => getJson<RuleHitCard[]>(`/api/v1/review/cases/${caseId}/rule-hits`)
+export const fetchCaseRuleHits = (caseId: number) =>
+  sampleMode() ? sample().then(source => source.caseRuleHits()) : getJson<RuleHitCard[]>(`/api/v1/review/cases/${caseId}/rule-hits`)

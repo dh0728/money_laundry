@@ -128,6 +128,27 @@ it('처음 저장은 룰을 만들고 주소에 번호를 남기며, 다시 저�
   await waitFor(() => expect(saveButton()).toBeDisabled());
 });
 
+it('고친 조건을 확인하지 못하면 고치기 전 조건의 문장을 남기지 않고 저장을 막는다', async () => {
+  await builder();
+  fireEvent.change(screen.getByLabelText('룰 이름'), { target: { value: '분산 송금 감시' } });
+  await waitFor(() => expect(saveButton()).toBeEnabled(), { timeout: 3000 });
+
+  // 샘플 모드에서 떠 두지 않은 조건으로 고쳤을 때도 이 길이다
+  vi.mocked(validateRule).mockRejectedValue(problem(422, 'SAMPLE_CHECK_UNAVAILABLE', '고친 조건은 서버에 연결해야 검사합니다.'));
+  fireEvent.change(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값'), { target: { value: '5' } });
+  expect(await part('이 룰을 문장으로 읽으면').findByText('고친 조건은 서버에 연결해야 검사합니다.', undefined, { timeout: 3000 })).toBeInTheDocument();
+  expect(screen.queryByText(checkFixture.sentence)).not.toBeInTheDocument();
+  expect(part('검토 체크리스트').getByRole('alert')).toHaveTextContent('고친 조건은 서버에 연결해야 검사합니다.');
+  expect(part('검토 체크리스트').queryByText('네 항목을 모두 통과했습니다.')).not.toBeInTheDocument();
+  expect(saveButton()).toBeDisabled();
+
+  // 되돌리면 다시 검사한다
+  vi.mocked(validateRule).mockResolvedValue(checkFixture);
+  fireEvent.change(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값'), { target: { value: '6' } });
+  expect(await screen.findByText(checkFixture.sentence, undefined, { timeout: 3000 })).toBeInTheDocument();
+  await waitFor(() => expect(saveButton()).toBeEnabled());
+});
+
 it('형식이 틀리면 저장을 막고, 서버가 저장을 거절하면 사유를 보여 준다', async () => {
   vi.mocked(validateRule).mockResolvedValue({ ...checkFixture, canSave: false, canRun: false, sentence: null, summary: null,
     items: checkFixture.items.map(item => (item.key === 'FORMAT' ? { ...item, ok: false, errors: ['적중 조건이 1개 이상 있어야 합니다.'] } : item)) });

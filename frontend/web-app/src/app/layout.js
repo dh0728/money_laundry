@@ -1,3 +1,4 @@
+import { isRuleId } from '@/next/features/rules-logic';
 import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -18,7 +19,7 @@ import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLive
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
 import { liveDashboardAsOf, liveDashboardResponse } from '../features/dashboard/live-dashboard.js';
-import { loadLiveRules } from '../features/rules/preview-rule-workspace.jsx';
+import { refreshLiveRules } from '../features/rules/live-rule-store';
 import { canStartPreviewReview, savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { requestStateLabels, WorkRequestDetail, WorkRequestForm } from '../features/investigation/preview-work-request-dialog.jsx';
 import { previewCaseAssignee, previewWorkRequests, readPreviewWorkRequests, resolvePreviewWorkRequest, sendPreviewWorkRequest,
@@ -37,6 +38,7 @@ import { uiSizeOptions } from '../config/appearance-options.js';
 import { enableBackdropDismissal, setupOverlayDismissal } from '../lib/overlay-dismissal.js';
 import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch.js';
 import { mountNotificationPreference, receivesSampleNotifications } from '../features/settings/notification-preference.jsx';
+import { loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
 
@@ -400,7 +402,7 @@ inboxButton.addEventListener('click', () => {
   toggleDisclosure(inboxButton, '보관함');
   if (!byId('inbox').hidden) void refreshLiveInbox(liveInbox?.number ?? 0);
 });
-widthButton.addEventListener('click', () => setAppearancePreference('wideWorkspace', appearance.wideWorkspace !== true));
+widthButton.addEventListener('click', () => setAppearancePreference('wideWorkspace', !workspaceIsWide()));
 fullscreenButton.disabled = !document.fullscreenEnabled;
 document.addEventListener('fullscreenchange', () => {
   const active = Boolean(document.fullscreenElement);
@@ -436,6 +438,9 @@ byId('settings-toggle').addEventListener('click', () => {
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+// 직접 고르기 전 기본값: 노트북 폭(1920px 미만)은 넓게 보기, 데스크탑 모니터 폭은 좁게 보기.
+const laptopViewport = matchMedia('(max-width: 1919px)');
+const workspaceIsWide = () => typeof appearance.wideWorkspace === 'boolean' ? appearance.wideWorkspace : laptopViewport.matches;
 const preferenceKey = 'aml-live-layout-appearance';
 let appearance = {};
 try {
@@ -479,7 +484,7 @@ function syncAppearance() {
   dataset.reducedMotion = String(reduceMotion);
   dataset.glassmorphism = String(glassmorphism);
   dataset.uiSize = uiSizeOptions.find(option => option.value === appearance.uiSize)?.value ?? 'medium';
-  const wide = appearance.wideWorkspace === true;
+  const wide = workspaceIsWide();
   dataset.workspaceWidth = wide ? 'wide' : 'narrow';
   widthButton.setAttribute('aria-pressed', String(wide));
   widthButton.setAttribute('aria-label', wide ? '좁게 보기' : '넓게 보기');
@@ -509,6 +514,7 @@ for (const [button, key] of appearanceSwitches) {
 }
 motionPreference.addEventListener('change', syncAppearance);
 systemTheme.addEventListener('change', syncAppearance);
+laptopViewport.addEventListener('change', syncAppearance);
 syncAppearance();
 
 let activeWorkCode = '';
@@ -890,7 +896,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
     registerTableTools: queryControls.registerTableTools,
-    rule: selectedRule && /^RULE-\d{3,}$/.test(selectedRule) ? selectedRule : undefined,
+    rule: isRuleId(selectedRule) ? selectedRule : undefined,
   });
   if (isDashboard) loadPreviewDashboard(mountedWorkflows, dashboardSource,
     { ...queryControls.selection(), mine: path === sections.dashboard });
@@ -939,7 +945,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     const urlParams = queryControls.params(path);
     if (initialPanel) urlParams.set('panel', initialPanel);
     if (reportDocument) urlParams.set('selected', reportDocument);
-    if (selectedRule && /^RULE-\d{3,}$/.test(selectedRule)) urlParams.set('rule', selectedRule);
+    if (isRuleId(selectedRule)) urlParams.set('rule', selectedRule);
     updateWorkspaceAddress(path, code, navigationMode, urlParams);
   }
 }
@@ -1589,7 +1595,8 @@ function showRoute(route, params, navigationMode) {
       dashboardSource = undefined;
       showLoadedRoute(route, params, navigationMode);
     };
-    void Promise.all([loadLiveSource(), loadLiveRules(), loadLiveWorkRequests().catch(() => undefined)]).then(open, () => {
+    void Promise.all([loadLiveSource(), refreshLiveRules(), loadLiveWorkRequests().catch(() => undefined),
+      loadLiveModelRiskThresholds().catch(() => undefined)]).then(open, () => {
       document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
         status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
       } }));

@@ -17,12 +17,14 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 let respond: () => Response
 let fetcher: MockInstance<typeof fetch>
 beforeEach(() => {
+  // 서버에 붙여 실행한 것으로 본다. 서버 없이 실행하면 샘플 응답을 주고 요청을 보내지 않는다(ruleSample.test.ts)
+  vi.stubEnv('VITE_API_MODE', 'live')
   clearCsrf()
   respond = () => json({})
   fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(url =>
     Promise.resolve(String(url) === '/api/auth/csrf' ? json({ headerName: 'X-XSRF-TOKEN', token: 'synthetic' }) : respond()))
 })
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs() })
 
 const call = (index: number) => {
   const [url, init] = fetcher.mock.calls.filter(([url]) => String(url).startsWith('/api/v1/'))[index] as [string, RequestInit | undefined]

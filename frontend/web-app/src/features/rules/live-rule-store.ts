@@ -1,9 +1,11 @@
 import { ApiError } from '@/api/common'
 import { fetchRuleCatalog, fetchRules, type RuleCatalog, type RuleList, type RuleRow, type RuleStatus } from '@/api/rules'
 
-// 서비스 모드의 룰 화면이 같이 쓰는 것: 서버에서 읽은 룰 목록, 상태 이름, 오류 문구.
-// 프리뷰(샘플 데이터) 모드의 룰 화면은 예전 샘플 그대로이고 이 파일을 쓰지 않는다.
+// 룰 화면이 같이 쓰는 것: 읽어 둔 룰 목록, 상태 이름, 오류 문구.
+// 룰 화면(live-rule-list · live-rule-builder · live-rule-backtest)은 서버에 붙였든 아니든 같다.
+// 서버 없이 실행하면 @/api/rules 가 샘플 응답을 주고, 샘플은 보기만 한다(저장 · 명령 · 백테스트 실행은 거절).
 
+/** 서버에 붙여 실행했는가(VITE_API_MODE=live). 사건의 룰 적중처럼 서버가 있어야만 나오는 것을 가를 때만 쓴다. */
 export const liveRules = import.meta.env.VITE_API_MODE === 'live'
 
 export const ruleStatusNames: Record<RuleStatus, string> = {

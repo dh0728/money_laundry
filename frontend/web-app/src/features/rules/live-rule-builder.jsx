@@ -15,7 +15,7 @@ import {
 import { codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules } from './live-rule-store';
 import './live-rule-engine.css';
 
-// 룰 만들기(서비스 모드). 템플릿을 고르면 기본값이 채워지고, IF(세는 거래 · 기간 · 적중 조건) → THEN 을 고쳐 초안으로 저장한다.
+// 룰 만들기. 템플릿을 고르면 기본값이 채워지고, IF(세는 거래 · 기간 · 적중 조건) → THEN 을 고쳐 초안으로 저장한다.
 // 쓸 수 있는 항목 · 범위 · 기본값은 서버 카탈로그가, 문장과 검토 체크리스트는 서버 검증(validate)이 정한다.
 
 const groupTitles = { PATTERN: '패턴 템플릿', GENERAL: '일반 템플릿' };
@@ -345,6 +345,8 @@ export function LiveRuleBuilder({ actionsHost, initialRuleId = ruleFromAddress()
         setChecking(false);
       }, error => {
         if (turn !== sequence.current) return;
+        // 앞서 받은 결과는 고치기 전 조건의 것이라 지운다. 남겨 두면 다른 조건의 문장과 체크리스트가 지금 것처럼 보인다.
+        setCheck(null);
         setCheckFailure(problemText(error, '조건을 확인하지 못했습니다.'));
         setChecking(false);
       });
@@ -417,7 +419,7 @@ export function LiveRuleBuilder({ actionsHost, initialRuleId = ruleFromAddress()
         <IfThenBlock catalog={catalog} template={template} definition={definition} change={change} />
         <section className="rule-draft-preview" aria-label="이 룰을 문장으로 읽으면">
           <h2>이 룰을 문장으로 읽으면</h2>
-          <p aria-busy={checking || undefined}>{check?.sentence ?? (check ? '형식이 맞지 않아 문장으로 읽을 수 없습니다.' : '조건을 확인하는 중입니다.')}</p>
+          <p aria-busy={checking || undefined}>{check?.sentence ?? (checkFailure || (check ? '형식이 맞지 않아 문장으로 읽을 수 없습니다.' : '조건을 확인하는 중입니다.'))}</p>
         </section>
         {failure && <p role="alert" data-rule-block-error>{failure}</p>}
         {saved && !dirty && <div role="status" className="rule-draft-actions">

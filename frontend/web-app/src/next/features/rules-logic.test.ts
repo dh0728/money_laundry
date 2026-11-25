@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LedgerTransaction, RuleInput, RuleRecord } from '../workspace-store'
-import { filterRules, runBacktest, validateRule, validatePeriod, rulesPagination } from './rules-logic'
+import { filterRules, isRuleId, ruleActionState, ruleTransitions, runBacktest, validateRule, validatePeriod, rulesPagination } from './rules-logic'
 
 const input: RuleInput = { name: '집중 송금', description: '시간 창 안의 거래 점검', typeCode: 3, scoreMin: .7, minTransactions: 2, windowHours: 2 }
 const tx = (id: number, occurredAt: string, patch: Partial<LedgerTransaction> = {}): LedgerTransaction => ({ id, displayId: `T-${id}`, date: occurredAt.slice(0, 10), occurredAt, typeCode: 3, probability: .8, suspicious: true, score: .8, amountUsd: 100, currency: 'USD', accountId: 10, ownerId: 2, fromAccountId: 10, toAccountId: 20, humanVerdict: null, ...patch })
@@ -52,5 +52,23 @@ describe('rule sample backtest', () => {
     const rows = [tx(1, '2026-11-01T00:00:00Z'), tx(2, '2026-11-01T01:00:00Z'), tx(3, '2026-11-01T08:00:00Z'), tx(4, '2026-11-01T15:00:00Z'), tx(5, '2026-11-01T16:00:00Z')]
     expect(runBacktest(rows, input, period).transactions.map(row => row.id)).toEqual([1, 2, 4, 5])
     expect(() => runBacktest(Array.from({ length: 10001 }, () => rows[0]), input, period)).toThrow('서버 비동기')
+  })
+})
+
+describe('rule action table', () => {
+  it('derives the legal transitions and permissions from one table', () => {
+    expect(ruleTransitions).toEqual({ DRAFT: ['PENDING_APPROVAL'], PENDING_APPROVAL: ['TESTING', 'REJECTED'], TESTING: ['ACTIVE', 'STOPPED', 'REJECTED'], ACTIVE: ['STOPPED'], STOPPED: ['TESTING'], REJECTED: ['DRAFT'] })
+    const admin = { name: '관리자', role: 'ADMIN' }
+    const author = { name: '작성자', role: 'STAFF' }
+    const other = { name: '다른 분석가', role: 'STAFF' }
+    expect(ruleActionState({ status: 'DRAFT', author: '작성자' }, author).allowedActions).toEqual(expect.arrayContaining(['requestReview', 'edit', 'delete', 'archive']))
+    expect(ruleActionState({ status: 'DRAFT', author: '작성자' }, other).blockedReasons.edit).toBe('초안·반려 상태에서는 작성자나 관리자만 수정할 수 있어요.')
+    expect(ruleActionState({ status: 'ACTIVE', author: '작성자' }, author).blockedReasons.stop).toBe('관리자만 중지할 수 있어요.')
+    expect(ruleActionState({ status: 'ACTIVE', author: '작성자' }, admin).allowedActions).toEqual(expect.arrayContaining(['stop', 'archive', 'duplicate', 'backtest']))
+    expect(ruleActionState({ status: 'ACTIVE', author: '작성자' }, admin).allowedActions).toContain('delete')
+    expect(ruleActionState({ status: 'ACTIVE', author: '작성자' }, author).blockedReasons.delete).toBe('관리자만 삭제할 수 있어요.')
+    expect(ruleActionState({ status: 'STOPPED', author: '작성자' }, admin).allowedActions).toContain('retest')
+    expect(isRuleId('RULE-1000')).toBe(true)
+    expect(isRuleId('RULE-12')).toBe(false)
   })
 })
