@@ -88,6 +88,17 @@ public class RuleController {
     return rules.newVersion(ruleId, user);
   }
 
+  /** 복제. 이 룰의 조건을 가진 새 룰의 초안을 만든다. 본문은 없어도 된다. */
+  @PostMapping("/rules/{ruleId}/clone")
+  public Object clone(
+      @PathVariable long ruleId,
+      @RequestBody(required = false) RuleService.CloneInput input,
+      Principal principal) {
+    long user = reviews.userId(principal);
+    reviews.actor(user);
+    return rules.clone(ruleId, user, input);
+  }
+
   /** 상태 명령. 바뀐 룰 상세를 돌려준다. */
   @PostMapping("/rules/{ruleId}/commands")
   public Object command(

@@ -267,6 +267,18 @@ public class RuleQueryService {
       command.put("commentRequired", false);
       commands.add(command);
     }
+    // 복제(POST /rules/{ruleId}/clone). 버전이 하나라도 있으면 언제나 된다. versionId 는 복제될 버전이다.
+    var copied = operating != null ? operating : working;
+    if (copied != null) {
+      var command = new LinkedHashMap<String, Object>();
+      command.put("action", "CLONE");
+      command.put("versionId", copied.get("versionId"));
+      command.put("revision", copied.get("revision"));
+      command.put("enabled", true);
+      command.put("reason", null);
+      command.put("commentRequired", false);
+      commands.add(command);
+    }
     var executions = new ArrayList<Map<String, Object>>();
     for (var row :
         jdbc.queryForList(
@@ -297,7 +309,8 @@ public class RuleQueryService {
         jdbc.queryForList(
             """
             select e.action,e.comment,e.business_at,u.name as actor,e.snapshot->>'versionNo' as version_no,
-              coalesce((e.snapshot->>'selfApproved')::boolean,false) as self_approved
+              coalesce((e.snapshot->>'selfApproved')::boolean,false) as self_approved,
+              e.snapshot->'clonedFrom'->>'code' as cloned_code,e.snapshot->'clonedFrom'->>'versionNo' as cloned_version
             from rules.events e left join core.users u on u.user_id=e.actor_id
             where e.rule_id=? order by e.event_id desc limit 200
             """,
@@ -312,6 +325,8 @@ public class RuleQueryService {
           row.get("version_no") == null ? null : Integer.valueOf(row.get("version_no").toString()));
       // 작성자가 자기 버전을 승인했다
       event.put("selfApproved", row.get("self_approved"));
+      // 다른 룰을 복제해 만든 룰이면 첫 기록에 그 룰과 버전이 온다
+      event.put("clonedFrom", clonedFrom(row));
       events.add(event);
     }
     long id = ReviewJson.number(rule.get("rule_id"));
@@ -334,6 +349,19 @@ public class RuleQueryService {
     out.put("versions", versions);
     out.put("executions", executions);
     out.put("events", events);
+    return out;
+  }
+
+  /** 변경 기록 한 줄의 복제 출처 {code, versionNo}. 복제로 만든 기록이 아니면 null. */
+  private static Map<String, Object> clonedFrom(Map<String, Object> row) {
+    if (row.get("cloned_code") == null) return null;
+    var out = new LinkedHashMap<String, Object>();
+    out.put("code", row.get("cloned_code"));
+    out.put(
+        "versionNo",
+        row.get("cloned_version") == null
+            ? null
+            : Integer.valueOf(row.get("cloned_version").toString()));
     return out;
   }
 

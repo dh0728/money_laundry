@@ -316,6 +316,48 @@ class RuleApiTests {
   }
 
   @Test
+  void rule_is_cloned_into_a_new_draft_rule_of_whoever_asked() throws Exception {
+    login("l1a");
+    long[] source = created("집중 수취 감시", "FAN_IN");
+    var definition = group(json(read("/api/v1/rules/" + source[0])), "working").get("definition");
+
+    // 본문 없이: 다른 직원도 복제할 수 있고, 새 룰의 초안은 복제한 사람의 것이다
+    login("l1b");
+    var copy =
+        json(
+            mvc.perform(
+                    post("/api/v1/rules/" + source[0] + "/clone")
+                        .session(session)
+                        .header("X-CSRF-TOKEN", token))
+                .andExpect(status().isOk()));
+    assertThat(number(copy.get("ruleId"))).isNotEqualTo(source[0]);
+    assertThat(copy.get("name")).isEqualTo("집중 수취 감시 복사본");
+    var detail = json(read("/api/v1/rules/" + copy.get("ruleId")).andExpect(status().isOk()));
+    assertThat(detail.get("owner")).isEqualTo("L1 심사자 B");
+    assertThat(group(detail, "working").get("editable")).isEqualTo(true);
+    assertThat(group(detail, "working").get("definition")).isEqualTo(definition);
+    assertThat(group(rows(detail.get("events")).get(0), "clonedFrom").get("code"))
+        .isEqualTo("RULE-%03d".formatted(source[0]));
+    // 원래 룰은 여전히 원래 작성자만 고칠 수 있다
+    assertThat(group(json(read("/api/v1/rules/" + source[0])), "working").get("editable"))
+        .isEqualTo(false);
+
+    // 버전과 이름을 정해서
+    var named =
+        json(
+            send(
+                    post("/api/v1/rules/" + source[0] + "/clone"),
+                    body("versionId", source[1], "name", "수취 감시 2"))
+                .andExpect(status().isOk()));
+    assertThat(named.get("name")).isEqualTo("수취 감시 2");
+    send(post("/api/v1/rules/" + source[0] + "/clone"), body("name", " "))
+        .andExpect(status().isBadRequest());
+    send(post("/api/v1/rules/" + source[0] + "/clone"), body("versionId", 999999))
+        .andExpect(status().isNotFound());
+    send(post("/api/v1/rules/999999/clone"), body()).andExpect(status().isNotFound());
+  }
+
+  @Test
   void draft_is_deleted_by_its_author_or_admin_and_other_versions_are_kept() throws Exception {
     login("l1a");
     long[] mine = created("내 초안", "FAN_IN");

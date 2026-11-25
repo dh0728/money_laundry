@@ -25,6 +25,12 @@ public class RuleService {
 
   public record CreateInput(String name, String template, Map<String, Object> definition) {}
 
+  /** 복제 요청. 둘 다 비워도 된다. versionId 가 없으면 운영 버전(없으면 작업 중 버전)을, name 이 없으면 "원래 이름 복사본" 을 쓴다. */
+  public record CloneInput(Long versionId, String name) {}
+
+  /** 복제한 룰의 이름 뒤에 붙는 말. */
+  static final String COPY_SUFFIX = " 복사본";
+
   public record SaveInput(String name, Map<String, Object> definition, Long revision) {}
 
   /**
@@ -282,6 +288,88 @@ public class RuleService {
             event(ruleId, null, user, "DRAFT_DELETED", snapshot, Timestamp.from(time.now()));
           }
         });
+  }
+
+  /**
+   * 룰을 복제한다. 그 룰의 한 버전의 조건을 그대로 가진 <b>새 룰</b>의 v1 초안이 생기고 복제한 사람이 담당자가 된다. 원래 룰은 건드리지 않는다. 같은 룰의 다음
+   * 버전을 만드는 {@link #newVersion} 과 다르다.
+   *
+   * <p>어느 상태의 버전이든 복제할 수 있다. versionId 를 주지 않으면 운영 버전, 없으면 작업 중 버전, 그것도 없으면 가장 나중 버전이다. 조건은 다시 검증하지
+   * 않고 그대로 옮긴다(저장할 때 검증한다). 백테스트 · 적중 · 변경 기록은 옮기지 않는다.
+   */
+  public Map<String, Object> clone(long ruleId, long user, CloneInput in) {
+    return tx.execute(
+        s -> {
+          var rules =
+              jdbc.queryForList("select name,template from rules.rules where rule_id=?", ruleId);
+          if (rules.isEmpty()) throw ApiException.notFound("룰이 없습니다.");
+          var source =
+              jdbc.queryForList(
+                  """
+                  select version_no,definition::text as definition,definition_digest,summary
+                  from rules.rule_versions
+                  where rule_id=? and (?::bigint is null or version_id=?)
+                  order by case when status in ('ACTIVE','PAUSED') then 0
+                                when status in ('DRAFT','SHADOW','PENDING') then 1 else 2 end,
+                           version_no desc
+                  limit 1
+                  """,
+                  ruleId,
+                  in == null ? null : in.versionId(),
+                  in == null ? null : in.versionId());
+          if (source.isEmpty()) throw ApiException.notFound("복제할 버전이 없습니다.");
+          var base = source.getFirst();
+          String name =
+              in == null || in.name() == null
+                  ? copyName(rules.getFirst().get("name").toString())
+                  : name(in.name());
+          Timestamp at = Timestamp.from(time.now());
+          String digest = base.get("definition_digest").toString();
+          String summary = base.get("summary").toString();
+          long rule =
+              jdbc.queryForObject(
+                  "insert into rules.rules(name,template,owner_id,created_at) values(?,?,?,?) returning rule_id",
+                  Long.class,
+                  name,
+                  rules.getFirst().get("template"),
+                  user,
+                  at);
+          long version =
+              jdbc.queryForObject(
+                  """
+                  insert into rules.rule_versions(rule_id,version_no,status,definition,definition_digest,summary,author_id,created_at)
+                  values(?,1,'DRAFT',?::jsonb,?,?,?,?) returning version_id
+                  """,
+                  Long.class,
+                  rule,
+                  base.get("definition"),
+                  digest,
+                  summary,
+                  user,
+                  at);
+          // 새 룰의 첫 기록에 어디서 복제했는지 남긴다
+          var snapshot = snapshot(1, name, summary, digest);
+          var origin = new LinkedHashMap<String, Object>();
+          origin.put("ruleId", ruleId);
+          origin.put("code", code(ruleId));
+          origin.put("versionNo", base.get("version_no"));
+          snapshot.put("clonedFrom", origin);
+          event(rule, version, user, "CREATED", "", snapshot, at);
+          var out = new LinkedHashMap<String, Object>();
+          out.put("ruleId", rule);
+          out.put("code", code(rule));
+          out.put("name", name);
+          out.put("versionId", version);
+          out.put("revision", 0L);
+          return out;
+        });
+  }
+
+  /** "원래 이름 복사본". 이름 길이 한도를 넘으면 원래 이름의 뒤를 잘라 맞춘다. */
+  private String copyName(String original) {
+    int room = catalog.limit("nameLength") - COPY_SUFFIX.length();
+    return (original.length() > room ? original.substring(0, room).stripTrailing() : original)
+        + COPY_SUFFIX;
   }
 
   /** 운영 버전을 복사해 새 초안을 만든다. 운영 중인 조건은 직접 고치지 못하므로 고치려면 이 버전을 고쳐 승인받는다. 작업 중 버전이 이미 있으면 409 다. */

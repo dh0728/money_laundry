@@ -571,4 +571,105 @@ class RuleOperationTests {
     assertThat(number(trialRow.get("hitCount"))).isZero();
     assertThat(number(trialRow.get("shadowHitCount"))).isEqualTo(2L);
   }
+
+  @Test
+  void clone_makes_a_separate_rule_with_the_same_condition_owned_by_whoever_cloned_it() {
+    long l1a = user("l1a");
+    long l1b = user("l1b");
+    var created = rules.create(l1a, new RuleService.CreateInput("집중 수취 감시", "FAN_IN", null));
+    long rule = number(created.get("ruleId"));
+    long v1 = number(created.get("versionId"));
+    // v1 은 운영 중, v2 는 수취 기간을 3일로 고친 작성 중 버전
+    jdbc.update("update rules.rule_versions set status='ACTIVE' where version_id=?", v1);
+    long v2 = number(rules.newVersion(rule, l1a).get("versionId"));
+    var stricter = new RuleCatalog().defaults("FAN_IN");
+    stricter.put("windowMinutes", 4320);
+    rules.save(rule, v2, l1a, new RuleService.SaveInput("집중 수취 감시", stricter, 0L));
+    long eventsBefore =
+        jdbc.queryForObject("select count(*) from rules.events where rule_id=?", Long.class, rule);
+
+    // 화면은 상세의 CLONE 명령으로 버튼을 연다. 따로 고르지 않으면 운영 버전이 복제된다.
+    var command = commandOf(queries.detail(rule, l1b, false), "CLONE");
+    assertThat(command.get("enabled")).isEqualTo(true);
+    assertThat(number(command.get("versionId"))).isEqualTo(v1);
+
+    // 다른 사람이 복제한다: 새 룰의 v1 초안이 생기고 복제한 사람이 담당자다
+    var copy = rules.clone(rule, l1b, null);
+    long copied = number(copy.get("ruleId"));
+    assertThat(copied).isNotEqualTo(rule);
+    assertThat(copy.get("code")).isEqualTo(RuleService.code(copied));
+    assertThat(copy.get("name")).isEqualTo("집중 수취 감시 복사본");
+    var detail = queries.detail(copied, l1b, false);
+    assertThat(detail.get("name")).isEqualTo("집중 수취 감시 복사본");
+    assertThat(detail.get("template")).isEqualTo("FAN_IN");
+    assertThat(detail.get("status")).isEqualTo("DRAFT");
+    assertThat(detail.get("operating")).isNull();
+    var working = part(detail, "working");
+    assertThat(number(working.get("versionNo"))).isEqualTo(1L);
+    assertThat(working.get("editable")).isEqualTo(true);
+    assertThat(working.get("backtest")).isNull();
+    assertThat(number(part(working, "definition").get("windowMinutes"))).isEqualTo(10080L);
+    assertThat(
+            jdbc.queryForObject(
+                "select (select definition_digest from rules.rule_versions where version_id=?) = (select definition_digest from rules.rule_versions where rule_id=?)",
+                Boolean.class,
+                v1,
+                copied))
+        .isTrue();
+    assertThat(
+            jdbc.queryForObject(
+                "select u.username from rules.rules r join core.users u on u.user_id=r.owner_id where r.rule_id=?",
+                String.class,
+                copied))
+        .isEqualTo("l1b");
+    // 새 룰의 첫 기록에 어디서 복제했는지 남는다
+    var events = rows(detail.get("events"));
+    assertThat(events).hasSize(1);
+    assertThat(events.get(0).get("action")).isEqualTo("CREATED");
+    assertThat(part(events.get(0), "clonedFrom").get("code")).isEqualTo(RuleService.code(rule));
+    assertThat(number(part(events.get(0), "clonedFrom").get("versionNo"))).isEqualTo(1L);
+    // 원래 룰은 그대로다: 버전 둘, 기록도 늘지 않았다
+    assertThat(
+            jdbc.queryForList(
+                "select status from rules.rule_versions where rule_id=? order by version_no",
+                String.class,
+                rule))
+        .containsExactly("ACTIVE", "DRAFT");
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from rules.events where rule_id=?", Long.class, rule))
+        .isEqualTo(eventsBefore);
+    assertThat(rows(queries.detail(rule, l1a, false).get("events")).get(0).get("clonedFrom"))
+        .isNull();
+
+    // 버전과 이름을 정해 복제할 수도 있다
+    var named = rules.clone(rule, l1a, new RuleService.CloneInput(v2, "  3일 수취 감시  "));
+    var namedDetail = queries.detail(number(named.get("ruleId")), l1a, false);
+    assertThat(namedDetail.get("name")).isEqualTo("3일 수취 감시");
+    assertThat(number(part(part(namedDetail, "working"), "definition").get("windowMinutes")))
+        .isEqualTo(4320L);
+    assertThat(number(part(rows(namedDetail.get("events")).get(0), "clonedFrom").get("versionNo")))
+        .isEqualTo(2L);
+
+    // 이름이 길면 "복사본" 이 들어가게 원래 이름의 뒤를 자른다(한도 80자)
+    String longName = "가".repeat(80);
+    jdbc.update("update rules.rules set name=? where rule_id=?", longName, rule);
+    String copyName = rules.clone(rule, l1a, null).get("name").toString();
+    assertThat(copyName).hasSize(80).endsWith(" 복사본").startsWith("가".repeat(76));
+
+    // 없는 룰, 다른 룰의 버전, 이름 규칙 위반
+    assertThatThrownBy(() -> rules.clone(999999, l1a, null)).hasMessageContaining("룰이 없습니다");
+    long otherVersion =
+        number(
+            rules
+                .create(l1a, new RuleService.CreateInput("다른 룰", "FAN_OUT", null))
+                .get("versionId"));
+    assertThatThrownBy(() -> rules.clone(rule, l1a, new RuleService.CloneInput(otherVersion, null)))
+        .hasMessageContaining("복제할 버전이 없습니다");
+    assertThatThrownBy(() -> rules.clone(rule, l1a, new RuleService.CloneInput(null, " ")))
+        .hasMessageContaining("룰 이름은");
+    assertThatThrownBy(
+            () -> rules.clone(rule, l1a, new RuleService.CloneInput(null, "나".repeat(81))))
+        .hasMessageContaining("룰 이름은");
+  }
 }
