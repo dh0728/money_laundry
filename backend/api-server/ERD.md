@@ -86,6 +86,7 @@ erDiagram
 | rules | alert_seeds (뷰) | Alert 생성 룰의 운영 적중의 근거 거래. Alert 생성기가 읽는 유일한 창구 |
 | rules | risk_bands | 위험 점수 구간(주의·위험 시작점). 가장 최근 줄이 현재 값 |
 | ops | business_clock | 시연 업무 시각 |
+| ops | model_risk_bands | 설정 화면의 모델 점수 위험 구간(주의·위험 시작 점수, 한 행). 화면 표시 기준이며 초기화 대상이 아님 |
 | ops | dashboard_dirty | component·영향 범위·source transaction별 요청. PIPELINE/INVESTIGATION scope는 component에서 생성 |
 | ops | dashboard_refresh_state | 영역별 성공 버전/시각·연속 실패·재시도 시각·소요시간·안전한 오류 코드 |
 | ops | dashboard_model_counts | 거래일·탐지일·이진판정·유형별 건수. 수신/분석/의심 건수와 모델 분포 |

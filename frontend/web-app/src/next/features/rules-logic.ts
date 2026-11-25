@@ -3,7 +3,64 @@ import type { LedgerTransaction, RuleInput, RuleRecord, RuleStatus } from '../wo
 import { downloadCsv } from './report-io'
 
 export const ruleStatusLabels: Record<RuleStatus, string> = { DRAFT: '초안', PENDING_APPROVAL: '승인 대기', TESTING: '테스트 중', ACTIVE: '운영 중', STOPPED: '중지', REJECTED: '반려' }
-export const ruleTransitions: Record<RuleStatus, RuleStatus[]> = { DRAFT: ['PENDING_APPROVAL'], PENDING_APPROVAL: ['TESTING', 'REJECTED'], TESTING: ['ACTIVE', 'STOPPED', 'REJECTED'], ACTIVE: ['STOPPED'], STOPPED: ['TESTING'], REJECTED: ['DRAFT'] }
+/** 룰 입력·사유 길이와 룰 ID 형식. 화면 검사, 샘플 저장, 나중의 서버 계약이 같은 값을 쓴다. */
+export const RULE_LIMITS = Object.freeze({ name: 80, description: 1000, windowHours: 720, reason: 1000 })
+export const RULE_ID_PATTERN = /^RULE-\d{3,}$/
+export const isRuleId = (value: unknown): value is string => typeof value === 'string' && RULE_ID_PATTERN.test(value)
+export const ruleReasonProblem = (reason: string) => !reason.trim() || reason.trim().length > RULE_LIMITS.reason
+  ? `사유를 1~${RULE_LIMITS.reason.toLocaleString('ko-KR')}자로 입력해 주세요.` : ''
+
+export type RuleTransitionAction = 'requestReview' | 'approve' | 'activate' | 'stop' | 'reject' | 'retest' | 'reopen'
+export type RuleAction = RuleTransitionAction | 'edit' | 'delete' | 'archive' | 'duplicate' | 'backtest'
+export type RuleActor = { name: string; role: string } | null | undefined
+type ActionRule = Pick<RuleRecord, 'status' | 'author'>
+
+/** 룰 상태 변경의 유일한 기준표. 허용 전이(ruleTransitions)와 버튼 활성 조건이 모두 여기서 나온다. */
+export const ruleTransitionActions: Record<RuleTransitionAction, { from: RuleStatus[]; to: RuleStatus; label: string; verb: string }> = {
+  requestReview: { from: ['DRAFT'], to: 'PENDING_APPROVAL', label: '승인 요청', verb: '승인을 요청할' },
+  approve: { from: ['PENDING_APPROVAL'], to: 'TESTING', label: '승인', verb: '승인할' },
+  activate: { from: ['TESTING'], to: 'ACTIVE', label: '운영 시작', verb: '운영을 시작할' },
+  stop: { from: ['TESTING', 'ACTIVE'], to: 'STOPPED', label: '중지', verb: '중지할' },
+  reject: { from: ['PENDING_APPROVAL', 'TESTING'], to: 'REJECTED', label: '반려', verb: '반려할' },
+  retest: { from: ['STOPPED'], to: 'TESTING', label: '재테스트', verb: '다시 테스트할' },
+  reopen: { from: ['REJECTED'], to: 'DRAFT', label: '초안으로 되돌리기', verb: '초안으로 되돌릴' },
+}
+export const ruleTransitions = Object.fromEntries((Object.keys(ruleStatusLabels) as RuleStatus[]).map(status => [status,
+  Object.values(ruleTransitionActions).filter(action => action.from.includes(status)).map(action => action.to)])) as Record<RuleStatus, RuleStatus[]>
+
+/** 초안·반려 룰은 작성자와 관리자, 그 밖의 상태(승인 대기·테스트 중·운영 중·중지)는 관리자만 다룬다. */
+const authorStatuses: RuleStatus[] = ['DRAFT', 'REJECTED']
+const editableStatuses: RuleStatus[] = ['DRAFT', 'REJECTED', 'STOPPED']
+const statusList = (statuses: RuleStatus[]) => statuses.map(status => ruleStatusLabels[status]).join('·')
+
+function permissionProblem(rule: ActionRule, user: NonNullable<RuleActor>, verb: string) {
+  if (user.role === 'ADMIN') return ''
+  if (!authorStatuses.includes(rule.status)) return `관리자만 ${verb} 수 있어요.`
+  return rule.author === user.name ? '' : `초안·반려 상태에서는 작성자나 관리자만 ${verb} 수 있어요.`
+}
+
+/** 이 사람이 지금 이 룰에 할 수 있는 동작과, 못 하는 동작의 이유. 나중에는 서버가 allowedActions를 계산해 준다. */
+export function ruleActionState(rule: ActionRule, user: RuleActor) {
+  const reasons: Partial<Record<RuleAction, string>> = {}
+  const check = (action: RuleAction, statuses: RuleStatus[] | null, verb: string, statusText?: string) => {
+    if (!user) reasons[action] = '로그인한 뒤 사용할 수 있어요.'
+    else if (statuses && !statuses.includes(rule.status)) reasons[action] = statusText ?? `${statusList(statuses)} 상태의 룰만 ${verb} 수 있어요.`
+    else {
+      const problem = statuses ? permissionProblem(rule, user, verb) : ''
+      if (problem) reasons[action] = problem
+    }
+  }
+  for (const [action, definition] of Object.entries(ruleTransitionActions) as [RuleTransitionAction, typeof ruleTransitionActions[RuleTransitionAction]][]) {
+    check(action, definition.from, definition.verb)
+  }
+  check('edit', editableStatuses, '수정할')
+  check('delete', Object.keys(ruleStatusLabels) as RuleStatus[], '삭제할')
+  check('archive', Object.keys(ruleStatusLabels) as RuleStatus[], '보관할')
+  check('duplicate', null, '복제할')
+  check('backtest', null, '백테스트할')
+  const actions = [...Object.keys(ruleTransitionActions), 'edit', 'delete', 'archive', 'duplicate', 'backtest'] as RuleAction[]
+  return { allowedActions: actions.filter(action => !reasons[action]), blockedReasons: reasons }
+}
 export type RulePeriod = { start: string; end: string }
 export type RuleBlockKind = 'typeCode' | 'scoreMin' | 'accountWindow'
 
@@ -37,11 +94,11 @@ export function ruleConditionSummary(input: RuleInput) {
 
 export function validateRule(input: RuleInput) {
   const errors: Partial<Record<keyof RuleInput, string>> = {}
-  if (!input.name.trim() || input.name.trim().length > 80) errors.name = '룰 이름은 1~80자로 입력해 주세요.'
-  if (!input.description.trim() || input.description.length > 1000) errors.description = '목적과 근거를 1~1,000자로 입력해 주세요.'
+  if (!input.name.trim() || input.name.trim().length > RULE_LIMITS.name) errors.name = `룰 이름은 1~${RULE_LIMITS.name}자로 입력해 주세요.`
+  if (!input.description.trim() || input.description.length > RULE_LIMITS.description) errors.description = `목적과 근거를 1~${RULE_LIMITS.description.toLocaleString('ko-KR')}자로 입력해 주세요.`
   if (!Number.isFinite(input.scoreMin) || input.scoreMin < 0 || input.scoreMin > 1) errors.scoreMin = '모델 점수는 0~1 사이로 입력해 주세요.'
   if (!Number.isInteger(input.minTransactions) || input.minTransactions < 1) errors.minTransactions = '최소 거래는 1 이상의 정수로 입력해 주세요.'
-  if (!Number.isInteger(input.windowHours) || input.windowHours < 1 || input.windowHours > 720) errors.windowHours = '시간 창은 1~720시간의 정수로 입력해 주세요.'
+  if (!Number.isInteger(input.windowHours) || input.windowHours < 1 || input.windowHours > RULE_LIMITS.windowHours) errors.windowHours = `시간 창은 1~${RULE_LIMITS.windowHours}시간의 정수로 입력해 주세요.`
   return errors
 }
 export function validatePeriod(period: RulePeriod) {

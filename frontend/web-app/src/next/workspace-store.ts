@@ -24,6 +24,8 @@ export type RuleRecord = RuleVersionSnapshot & {
   id: string
   history: { at: string; actor: string; action: string; reason: string }[]
   versions?: RuleVersionSnapshot[]
+  /** 보관한 시각. 보관한 룰은 목록에서 빠지지만 이력은 남는다. */
+  archivedAt?: string
 }
 export type JudgmentRecord = {
   id: string; caseIds: number[]; transactionIds: number[]; displayIds: string[]
