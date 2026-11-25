@@ -523,7 +523,11 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 /* 눌러서 이동하는 카드·목록 행: 배경과 테두리가 함께 진해진다 */
 .interactive-surface { transition:border-color var(--motion-normal) var(--ease-ui); }
 .interactive-surface:hover { background-color:var(--hover-surface); border-color:color-mix(in oklch, var(--foreground) var(--interactive-border-hover-strength), transparent); }
-.tab-indicator { position:absolute; pointer-events:none; left:0; bottom:calc(-1 * var(--aml-stroke-divider)); height:var(--underline-tab-indicator-height); background:var(--foreground); transition-property:transform,width; }
+.tab-indicator {
+  position:absolute; pointer-events:none; left:0; bottom:calc(-1 * var(--aml-stroke-divider)); height:var(--underline-tab-indicator-height); background:var(--foreground);
+  visibility:hidden; transform:translateX(var(--tab-indicator-x)); width:var(--tab-indicator-width); transition-property:transform,width;
+}
+.tab-indicator[data-measured] { visibility:visible; }
 .tab-indicator,
 .sidebar-indicator { transition-duration:var(--motion-morph); transition-timing-function:var(--ease-standard); }
 .tab-indicator[data-animate=false], .sidebar-indicator[data-animate=false] { transition:none var(--motion-instant); }

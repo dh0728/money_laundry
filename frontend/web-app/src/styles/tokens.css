@@ -233,6 +233,10 @@
   --sidebar-label-transition: margin, opacity;
   --sidebar-menu-transition: width, height, padding;
   --dialog-available-width: calc(100% - 2rem);
+  --tabs-list-inset: 3px;
+  --tabs-trigger-height: calc(100% - var(--aml-stroke-divider));
+  --tabs-focus-ring-width: 3px;
+  --tabs-horizontal-indicator-offset: -5px;
   --confirm-dialog-header-rows: auto 1fr;
   --confirm-dialog-header-media-rows: auto auto 1fr;
   --textarea-editor-min-height: 280px;
