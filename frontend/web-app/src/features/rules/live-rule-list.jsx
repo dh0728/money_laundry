@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { cloneRule, commandRule, createRuleVersion, deleteRuleDraft, fetchRule } from '@/api/rules';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
 import { Panel } from '../../components/panel';
 import { activateRecordCard } from '../../components/record-card';
 import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
-import { csvDownloadEntry } from '../../components/query-controls';
+import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
 import { SectionDownloadHeading } from '../../components/section-download';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
 import {
@@ -173,6 +173,7 @@ function VersionSummary({ label, version }) {
 }
 
 function RuleDetail({ rule, row, subject }) {
+  const appliedVersions = [rule.operating, rule.working];
   const changeTime = formatRuleTime(row?.changedAt ?? rule.createdAt);
   const details = csvDownloadEntry('룰 상세', rule.code + '-detail',
     ['룰 ID', '이름', '상태', '템플릿', '대상', '담당자', '마지막 변경 (KST)', '운영 버전', '운영 조건', '작업 중 버전', '작업 중 조건',
@@ -210,7 +211,8 @@ function RuleDetail({ rule, row, subject }) {
       {rule.versions.map(version => <Box as="li" key={version.versionId}>
         <Box><Text as="strong">v{version.versionNo} · {ruleStatusNames[version.status]}</Text>
           <Text as="span">{version.author} · <RuleTime value={version.createdAt} /></Text></Box>
-        <Text>{version.summary}</Text>
+        {!appliedVersions.some(applied => applied?.versionId === version.versionId && applied.summary === version.summary)
+          && <Text>{version.summary}</Text>}
       </Box>)}
     </Box>
   </Panel>;
@@ -226,10 +228,10 @@ function RuleExecutions({ rule }) {
     run.triggerCount, run.hitCount, run.skippedBusySubjects]);
   const download = csvDownloadEntry('일일 실행', rule.code + '-executions', columns, rows);
   const displayCount = value => value == null ? '—' : countFormat.format(value);
-  return <Panel className="rule-executions" aria-label="룰 일일 실행">
-    <SectionDownloadHeading entries={[download]}>일일 실행</SectionDownloadHeading>
-    <Text className="workflow-rule-note">분석 때마다 그 분석이 새로 받은 날짜를 검사합니다. 최근 {executions.length}건입니다.</Text>
-    <Table className="rule-backtest-table">
+  return <Box as="section" className="rule-executions" aria-label="룰 일일 실행">
+    <WorkflowTable label="일일 실행" tableClassName="rule-backtest-table"
+      summary={<>{tableCount(executions.length)} <Text as="span">분석에 새로 들어온 날짜를 검사합니다.</Text></>}
+      tools={<TableQueryTools actions={{ entries: [download] }} />}>
       <TableHeader><TableRow>{columns.map(label => <TableHead scope="col" key={label}>{label}</TableHead>)}</TableRow></TableHeader>
       <TableBody>{rows.map(([date, version, mode, result, scanned, hits, skipped], index) => <TableRow key={index}>
         <TableRowHead>{date ?? '—'}</TableRowHead>
@@ -240,8 +242,8 @@ function RuleExecutions({ rule }) {
         <TableCell>{displayCount(hits)}</TableCell>
         <TableCell>{displayCount(skipped)}</TableCell>
       </TableRow>)}</TableBody>
-    </Table>
-  </Panel>;
+    </WorkflowTable>
+  </Box>;
 }
 
 function RuleEvents({ rule }) {
@@ -340,7 +342,7 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
       </Panel>)}
     </Box>
     <Box className="screen-row screen-rule-list">
-      <Panel className="workflow-rule-list" aria-label="룰 목록">
+      <Box as="section" className="workflow-rule-list" aria-label="룰 목록">
         <WorkflowTable label="룰 목록" summary={tableCount(rows.length, rules.length, '개')}>
           <TableHeader><TableRow>
             <SortableTableHead sorting={sorting} column="status" value={rule => ruleStatusNames[rule.status]}>상태</SortableTableHead>
@@ -372,7 +374,7 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
             {!rows.length && <TableRow><TableCell colSpan={9}>{rules.length ? '조건에 맞는 룰이 없습니다.' : '등록된 룰이 없습니다. 룰 만들기에서 첫 룰을 만들어 주세요.'}</TableCell></TableRow>}
           </TableBody>
         </WorkflowTable>
-      </Panel>
+      </Box>
       {shown && <Grid columns={12} className="workflow-rule-inspection">
         <RuleDetail rule={shown} row={selected} subject={subjectOf(shown.template)} />
         <RuleEvents rule={shown} />

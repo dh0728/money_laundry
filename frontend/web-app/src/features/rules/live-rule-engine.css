@@ -4,6 +4,7 @@
 .screen-row.screen-rule-editor.rule-builder {
   grid-template-rows: minmax(auto, 1fr) max-content;
   align-items: start;
+  --rule-attention-ink: var(--aml-figma-contents-status-info-accent);
 }
 .screen-row.screen-rule-editor.rule-builder > .rule-template-library { grid-column: 1 / span 4; grid-row: 1 / span 2; align-self: stretch; min-inline-size: 0 }
 .screen-row.screen-rule-editor.rule-builder > .rule-draft-editor { grid-column: 5 / -1; grid-row: 1; align-self: stretch; min-inline-size: 0 }
@@ -17,9 +18,12 @@
 }
 
 /* 템플릿 라이브러리 */
+.rule-builder > .rule-template-library {
+  --panel-material-solid: color-mix(in srgb, var(--inner-surface), var(--aml-figma-surface-neutral-subtle-pressed));
+}
 .rule-template-library section { display: grid; gap: var(--aml-space-6) }
 .rule-template-library h3,
-.rule-part h3 {
+.rule-part h4 {
   margin: 0;
   color: var(--muted-text);
   font-size: var(--aml-type-label-size);
@@ -47,11 +51,13 @@
   cursor: pointer;
 }
 .rule-template-card > span { color: var(--muted-text); font-size: var(--aml-type-caption-size); overflow-wrap: anywhere }
-.rule-template-card:hover:not(:disabled) { background: var(--hover) }
+.rule-template-card:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--hover) }
 .rule-template-card[aria-pressed="true"] {
-  border-color: var(--brand-accent);
-  background: var(--brand-accent-tint);
+  border-color: var(--selection-divider);
+  background: var(--selection-surface);
+  color: var(--selection-ink);
 }
+.rule-template-card[aria-pressed="true"] > span { color: var(--selection-muted) }
 .rule-template-card:disabled { cursor: not-allowed; opacity: var(--aml-opacity-disabled) }
 .rule-template-card:focus-visible,
 .rule-value:focus-visible,
@@ -62,33 +68,28 @@
 .rule-condition-facts.rule-template-facts { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 .rule-template-facts .rule-template-wide { grid-column: 1 / -1 }
 
-/* IF → THEN 블록 */
-.rule-if-then { display: grid; gap: var(--aml-space-8) }
+/* 검사 조건과 적중 후 동작 */
+.rule-blocks { display: grid; gap: var(--aml-space-12) }
 .rule-clause {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--aml-space-12);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--aml-space-8);
   align-items: start;
-  padding: var(--aml-panel-inset);
-  border: var(--aml-stroke-divider) solid var(--divider);
+  padding: var(--aml-panel-text-inset);
+  border: var(--aml-stroke-divider) solid var(--aml-figma-border-neutral-subtle-pressed);
   border-radius: var(--aml-radius-panel);
   background: var(--inner-surface);
 }
-.rule-keyword {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-inline-size: var(--rule-keyword-min-width);
-  min-block-size: var(--aml-panel-control-size);
-  padding-inline: var(--aml-space-8);
-  border-radius: var(--aml-panel-control-radius);
-  background: var(--brand-accent-tint);
-  color: var(--brand-accent-ink);
-  font-family: var(--aml-font-mono);
+.rule-clause-title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--aml-type-section-title-size);
   font-weight: var(--aml-type-section-title-weight);
-  letter-spacing: var(--aml-type-control-tracking);
+  line-height: var(--aml-type-section-title-lineHeight);
 }
-.rule-clause-body { display: grid; gap: var(--aml-space-12); min-inline-size: 0 }
+.rule-clause :is(.rule-unit, .workflow-rule-note) { word-break: keep-all; overflow-wrap: anywhere }
+.rule-clause[data-rule-block="action"] { background: var(--aml-figma-surface-neutral-subtle-pressed) }
+.rule-clause[data-rule-block="action"] .rule-unit { color: var(--text) }
 .rule-part {
   display: grid;
   gap: var(--aml-space-8);
@@ -115,6 +116,11 @@
   gap: var(--aml-space-8);
   min-block-size: var(--aml-panel-control-size);
 }
+.rule-lines > [data-rule-match] > .rule-condition {
+  padding: var(--aml-space-4) var(--aml-space-8);
+  border-radius: var(--aml-panel-control-radius);
+  background: var(--rule-match-fill);
+}
 .rule-condition[data-locked] .rule-fixed-item { font-weight: var(--aml-type-section-title-weight) }
 .rule-group {
   display: grid;
@@ -122,24 +128,27 @@
   padding: var(--aml-space-8);
   border: var(--aml-stroke-divider) dashed var(--divider);
   border-radius: var(--aml-panel-control-radius);
-  background: var(--inner-surface);
+  background: color-mix(in srgb, var(--rule-match-fill), var(--information-panel-surface));
 }
+.rule-group-label { color: var(--rule-match-ink); font-size: var(--aml-type-caption-size) }
 .rule-connector {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-inline-size: var(--aml-space-48);
-  padding: var(--aml-space-2) var(--aml-space-8);
-  border: var(--aml-stroke-divider) solid var(--divider);
+  gap: var(--aml-space-4);
+  min-block-size: var(--aml-panel-control-size);
+  padding-inline: var(--aml-space-12);
+  border: var(--aml-stroke-divider) solid var(--rule-match-edge);
   border-radius: var(--aml-radius-full);
-  background: var(--inner-surface);
-  color: var(--muted-text);
-  font-family: var(--aml-font-mono);
-  font-size: var(--aml-type-caption-size);
+  background: var(--rule-match-fill);
+  color: var(--rule-match-ink);
+  font-size: var(--aml-type-body-size);
+  font-weight: var(--aml-type-body-weight);
+  line-height: var(--aml-type-body-lineHeight);
 }
-button.rule-connector { cursor: pointer; color: var(--text) }
-button.rule-connector:hover { background: var(--hover) }
-.rule-connector[data-op="OR"] { border-style: dashed }
+button.rule-connector { cursor: pointer; color: var(--rule-match-ink) }
+button.rule-connector:hover { background: color-mix(in srgb, var(--rule-match-fill), var(--hover)) }
+.rule-connector[data-rule-match="ANY"] { border-style: dashed }
 .rule-value {
   min-block-size: var(--aml-panel-control-size);
   block-size: var(--aml-panel-control-size);
@@ -163,13 +172,63 @@ button.rule-connector:hover { background: var(--hover) }
   gap: var(--aml-space-6);
   align-items: center;
   min-block-size: var(--aml-panel-control-size);
+  block-size: auto;
+  max-inline-size: 100%;
   padding-inline: var(--aml-space-12);
   border: var(--aml-stroke-divider) solid var(--divider);
   background: var(--information-panel-surface);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.rule-builder [data-rule-match="ALL"] {
+  --rule-match-fill: var(--aml-figma-surface-status-info-subtle-hover);
+  --rule-match-edge: var(--aml-figma-border-status-info-subtle-default);
+  --rule-match-ink: var(--rule-attention-ink);
+  --rule-match-action-fill: var(--aml-figma-light-contents-status-info-accent);
+}
+.rule-builder [data-rule-match="ANY"] {
+  --rule-match-fill: var(--aml-figma-surface-status-pending-subtle-hover);
+  --rule-match-edge: var(--aml-figma-border-status-pending-subtle-default);
+  --rule-match-ink: var(--aml-figma-contents-status-pending-accent);
+  --rule-match-action-fill: var(--aml-figma-light-contents-status-pending-accent);
+}
+.rule-add:not(:disabled) {
+  border-color: var(--rule-match-action-fill);
+  background: var(--rule-match-action-fill);
+  color: var(--primary-action-ink);
+}
+.rule-add:disabled {
+  border-color: transparent;
+  background: var(--aml-figma-surface-disabled);
+  color: var(--disabled-text);
 }
 .rule-empty { margin: 0; color: var(--muted-text); font-size: var(--aml-type-caption-size) }
 
-/* 검토 체크리스트 */
+/* 문장 요약과 검토 체크리스트 */
+.rule-builder .rule-draft-preview {
+  gap: var(--aml-space-8);
+  padding: var(--aml-panel-text-inset);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  background: color-mix(in srgb, var(--information-panel-surface), var(--inner-surface));
+}
+.rule-summary-lines { display: grid; gap: var(--aml-space-4); min-inline-size: 0 }
+.rule-summary-lines > p {
+  margin: 0;
+  font-size: var(--aml-type-body-size);
+  font-weight: var(--aml-type-body-weight);
+  line-height: var(--aml-type-body-lineHeight);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.rule-summary-lines strong {
+  color: var(--rule-attention-ink);
+  font-size: var(--aml-type-body-strong-size);
+  font-weight: var(--aml-type-body-strong-weight);
+  line-height: var(--aml-type-body-strong-lineHeight);
+}
+.rule-summary-lines [data-summary-value] { display: inline-block; max-inline-size: 100% }
+.rule-builder > .rule-checklist { --panel-material-solid: var(--inner-surface) }
 .rule-check-items, .rule-check-warnings {
   display: grid;
   gap: var(--aml-space-8);
@@ -184,14 +243,15 @@ button.rule-connector:hover { background: var(--hover) }
   align-items: start;
 }
 .rule-check-items > li > .icon { align-self: center }
-.rule-check-items > li[data-ok="true"] > :is(.icon, strong) { color: var(--aml-status-positive-text) }
-.rule-check-items > li[data-ok="false"] > :is(.icon, strong) { color: var(--aml-status-negative-text) }
+.rule-check-items > li[data-ok="true"] > :is(.icon, strong) { color: var(--aml-figma-contents-status-positive-default) }
+.rule-check-items > li[data-ok="false"] > :is(.icon, strong),
+.rule-builder [data-rule-block-error] { color: var(--aml-figma-contents-status-danger-default) }
 .rule-check-items > li > span { overflow-wrap: anywhere }
 .rule-check-warnings > li {
   padding: var(--aml-space-8) var(--aml-space-12);
   border-radius: var(--aml-panel-control-radius);
-  background: var(--aml-status-caution-surface);
-  color: var(--aml-status-caution-text);
+  background: var(--aml-figma-surface-status-caution-subtle-default);
+  color: var(--aml-figma-contents-status-caution-default);
   overflow-wrap: anywhere;
 }
 .rule-load-failure { display: grid; gap: var(--aml-space-8); justify-items: start }

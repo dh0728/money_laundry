@@ -30,8 +30,14 @@
 }
 .workflow-rule-inspection > :is(.workflow-rule-detail, .workflow-rule-reason) { grid-column: span 6; min-inline-size: 0 }
 .workflow-rule-note { color: var(--muted-text); font-size: var(--aml-type-caption-size) }
-.screen-layout:has(> [data-rule-editor], .workflow-rule-overview) {
+.screen-layout:has(> .workflow-rule-overview) {
   padding-block-end: max(var(--workspace-inset), var(--account-footer-reserve));
+}
+#workspace:has(> .screen-layout > [data-rule-editor]) {
+  --workspace-scroll-footer-reserve: 0px;
+}
+.screen-layout:has(> [data-rule-editor]) {
+  padding-block-end: max(var(--workspace-inset), var(--workspace-footer-inset));
 }
 .rule-review-dialog {
   inline-size: min(var(--rule-review-dialog-max-width), calc(100% - var(--aml-space-32)));

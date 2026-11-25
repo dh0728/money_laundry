@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { cancelBacktest, fetchBacktest, fetchBacktests, fetchRule, requestBacktest } from '@/api/rules';
 import { Box, Heading, Text } from '@/components/layout-primitives';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
 import { Progress } from '../../components/progress';
@@ -124,10 +124,9 @@ function Kpis({ run, noun }) {
 
 /** @param noAlert 이 템플릿의 룰은 Alert 를 만들 수 없다(카탈로그의 alert.allowed). "예상 새 Alert" 를 보여 주지 않는다. */
 function Sweep({ sweep, noun, noAlert }) {
-  return <Panel className="rule-backtest-sweep" aria-label="값을 바꾸면">
-    <Heading>값을 바꾸면</Heading>
-    <Text className="workflow-rule-note">{sweep.label}만 바꿔 같은 기간에 다시 돌린 결과입니다.</Text>
-    <Table className="rule-backtest-table">
+  return <Box as="section" className="rule-backtest-sweep" aria-label="값을 바꾸면">
+    <WorkflowTable label="값을 바꾸면" tableClassName="rule-backtest-table" tools={false}
+      summary={<>{tableCount(sweep.rows.length)} <Text as="span">{sweep.label}만 바꿔 같은 기간에 다시 돌린 결과입니다.</Text></>}>
       <TableHeader><TableRow>
         <TableHead scope="col">{sweep.label}</TableHead><TableHead scope="col">적중 {noun.name}</TableHead><TableHead scope="col">근거 거래</TableHead>
         <TableHead scope="col">Alert 와 겹침</TableHead>{!noAlert && <TableHead scope="col">예상 새 Alert</TableHead>}
@@ -136,8 +135,8 @@ function Sweep({ sweep, noun, noAlert }) {
         <TableRowHead>{decimalFormat.format(row.value)}{sweep.unit?.length > 1 ? ` ${sweep.unit}` : sweep.unit}{row.current && <Text as="span" className="rule-backtest-current"> 이번 값</Text>}</TableRowHead>
         <TableCell>{count(row.hits)}</TableCell><TableCell>{count(row.txCount)}</TableCell><TableCell>{count(row.alertOverlap)}</TableCell>{!noAlert && <TableCell>{count(row.expectedNewAlerts)}</TableCell>}
       </TableRow>)}</TableBody>
-    </Table>
-  </Panel>;
+    </WorkflowTable>
+  </Box>;
 }
 
 function Scope({ run, noun, noAlert }) {
@@ -167,7 +166,7 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
         sorting.rows.map(item => [subjectText(item), caseStates[item.state].label, item.txCount, measuredOf(item),
           item.alertId ?? '', judgements[item.judgement] ?? ''])) }],
   }));
-  return <Panel className="rule-backtest-cases" aria-label="사례">
+  return <Box as="section" className="rule-backtest-cases" aria-label="사례">
     <WorkflowTable label="사례" summary={tableCount(Math.min(shown, run.cases.length), total, noun.unit)}>
       <TableHeader><TableRow>
         <SortableTableHead sorting={sorting} column="account" value={subjectText}>{noun.name === '거래' ? '대상 거래' : '대상 계좌'}</SortableTableHead>
@@ -192,7 +191,7 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
       onClick={() => setShown(value => value + CASE_PAGE)}>더 보기 ({count(run.cases.length - shown)}{noun.unit} 남음)</ActionButton>}
     {run.cases.length < total
       && <Text className="workflow-rule-note">서버는 새로 걸린 {noun.name}, 빠진 {noun.name}, 근거 거래가 많은 {noun.name} 순으로 {count(run.cases.length)}{noun.unit}까지만 보냅니다.</Text>}
-  </Panel>;
+  </Box>;
 }
 
 function History({ rows, selectedId, onOpen }) {

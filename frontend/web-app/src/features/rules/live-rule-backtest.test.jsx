@@ -104,6 +104,9 @@ it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것
   render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
 
   const sweep = within(await screen.findByRole('region', { name: '값을 바꾸면' }));
+  const sweepTable = sweep.getByRole('table', { name: '값을 바꾸면' });
+  expect(sweepTable.closest('.data-table-frame')).toContainElement(sweep.getByRole('heading', { name: '값을 바꾸면' }));
+  expect(sweepTable.closest('.screen-panel')).toBeNull();
   const current = sweep.getByRole('row', { name: /이번 값/ });
   expect(current).toHaveTextContent('5개');
   expect(within(current).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['3', '18', '2', '1']);
@@ -116,6 +119,8 @@ it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것
 
   // 측정값은 템플릿이 정한 순서(수취 계좌 → 거래 → 총액)와 카탈로그의 문구 · 단위로 읽는다
   const cases = within(screen.getByRole('region', { name: '사례' }));
+  const casesTable = cases.getByRole('table', { name: '사례' });
+  expect(casesTable.closest('.screen-panel')).toBeNull();
   const added = within(cases.getByText('c41f3f2a').closest('tr'));
   expect(added.getByText('새로 걸림')).toBeInTheDocument();
   expect(added.getByText('수취 계좌 5개 · 거래 5건 · 보낸 총액 10,000 USD')).toBeInTheDocument();

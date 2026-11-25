@@ -17,6 +17,10 @@ vi.mock('@/api/rules', () => ({
 
 const fanOutDefaults = catalogFixture.templates.find(template => template.key === 'FAN_OUT').defaults;
 const fanOut = { schema: 2, template: 'FAN_OUT', ...fanOutDefaults };
+const countedFanOut = '처음 거래하는 상대이고 건당 금액이 1,000 USD 이상인 거래만 셉니다.';
+const summaryName = '이 룰을 문장으로 읽으면';
+const summaryLines = () => part(summaryName).getAllByRole('paragraph');
+const highlighted = line => Array.from(line.querySelectorAll('strong'), term => term.textContent);
 const problem = (status, code, detail) => new ApiError({ type: 'about:blank', title: code, status, code, detail });
 
 let footer;
@@ -40,29 +44,48 @@ afterEach(() => {
 
 const builder = async props => {
   render(<LiveRuleBuilder actionsHost={footer} {...props} />);
-  await screen.findByRole('group', { name: '조건 블록' }, { timeout: 3000 });
+  await screen.findByRole('group', { name: '룰 구성' }, { timeout: 3000 });
   // 조건을 고친 뒤 0.3초 모아서 검증한다
-  await screen.findByText(checkFixture.sentence, undefined, { timeout: 3000 });
+  await waitFor(() => expect(summaryLines()[0]).toHaveTextContent(countedFanOut), { timeout: 3000 });
 };
 const saveButton = () => within(footer).getByRole('button', { name: '초안 저장' });
 const lastChecked = () => vi.mocked(validateRule).mock.calls.at(-1)[0];
 const part = name => within(screen.getByRole('region', { name }));
+function sharedTableHeading(name, count) {
+  const frame = screen.getByRole('table', { name }).closest('.data-table-frame');
+  expect(frame).toBeInTheDocument();
+  expect(frame.closest('.screen-panel, .panel-material, .panel-inset')).toBeNull();
+  const heading = frame.querySelector(':scope > .data-table-heading');
+  expect(within(heading).getByRole('heading', { name })).toBeInTheDocument();
+  expect(heading.querySelector('.count-tag')).toHaveTextContent(count);
+  return within(heading);
+}
 const chooseWindow = async option => {
   fireEvent.keyDown(part('기간').getByRole('combobox', { name: '기간' }), { key: 'ArrowDown' });
   fireEvent.click(await screen.findByRole('option', { name: option }));
 };
 
-it('첫 템플릿의 기본값을 IF → THEN 블록에 채우고 서버가 읽어 준 문장과 체크리스트를 보여 준다', async () => {
+it('첫 템플릿의 기본값을 검사 조건과 적중 후 동작에 채우고 문장과 체크리스트를 보여 준다', async () => {
   await builder();
   expect(screen.getByRole('heading', { name: '새 룰' })).toBeInTheDocument();
   expect(lastChecked()).toEqual({ template: 'FAN_OUT', definition: fanOut });
 
-  const block = within(screen.getByRole('group', { name: '조건 블록' }));
-  expect(block.getByText('IF')).toBeInTheDocument();
-  expect(block.getByText('THEN')).toBeInTheDocument();
+  const block = within(screen.getByRole('group', { name: '룰 구성' }));
+  expect(block.getByRole('heading', { name: '검사 조건' })).toBeInTheDocument();
+  expect(block.getByRole('heading', { name: '적중 후 동작' })).toBeInTheDocument();
   expect(part('세는 거래').getByLabelText('건당 금액 값')).toHaveValue('1,000');
   expect(part('기간').getByRole('combobox', { name: '기간' })).toHaveTextContent('7일');
   expect(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값')).toHaveValue('6');
+  expect(summaryLines().map(line => line.textContent)).toEqual([
+    countedFanOut,
+    '한 송금 계좌에서 7일 안에 서로 다른 수취 계좌 수가 6개 이상이면 적중입니다.',
+    'Alert에 근거로 표시합니다.',
+  ]);
+  expect(summaryLines().map(highlighted)).toEqual([
+    ['처음 거래하는 상대', '건당 금액', '1,000 USD 이상'],
+    ['7일', '서로 다른 수취 계좌 수', '6개 이상'],
+    [],
+  ]);
   // 템플릿 설명은 대상 · 검사 시점 · 세는 방식뿐이다. 기본값을 고른 실험의 성능과 다른 제품의 시나리오 이름은 보여 주지 않는다.
   expect(screen.getByText('세는 방식').nextElementSibling).toHaveTextContent('한 송금 계좌가 기간 안에 보낸 거래를 셉니다. 같은 계좌에 여러 번 보내도 수취 계좌 수는 1개입니다.');
   expect(screen.queryByText(/기본값 성능|정밀도|재현율|HI-Medium/)).not.toBeInTheDocument();
@@ -80,6 +103,29 @@ it('첫 템플릿의 기본값을 IF → THEN 블록에 채우고 서버가 읽�
   expect(saveButton()).toBeDisabled();
 });
 
+it.each([
+  ['단건 고액거래', '처음 거래하는 상대이고 건당 금액이 10,000 USD 이상인 거래가 들어오면 Alert에 근거로 표시합니다.', [
+    '처음 거래하는 상대이고 건당 금액이 10,000 USD 이상인 거래가 들어오면 적중입니다.',
+    'Alert에 근거로 표시합니다.',
+  ], [['처음 거래하는 상대', '건당 금액', '10,000 USD 이상'], []]],
+  ['RANDOM', '건당 금액이 1,000 USD 이상이고 (처음 거래하는 상대 또는 환전 직후 송금)인 거래만 세어, 3일 안에 금액 비 0.8 ~ 1.25로 이어진 거래가 3건 이상(12건까지 따라감)이면 Alert에 근거로 표시합니다.', [
+    '건당 금액이 1,000 USD 이상이고 (처음 거래하는 상대 또는 환전 직후 송금)인 거래만 셉니다.',
+    '3일 안에 금액 비 0.8 ~ 1.25로 이어진 거래가 3건 이상(12건까지 따라감)이면 적중입니다.',
+    'Alert에 근거로 표시합니다.',
+  ], [['건당 금액', '1,000 USD 이상', '처음 거래하는 상대', '환전 직후 송금'], ['3일', '금액 비', '0.8 ~ 1.25', '3건 이상', '12건까지'], []]],
+  ['FAN-OUT', '새 문장 형식에서 건당 금액 1,000 USD 이상으로 표시됩니다.', ['새 문장 형식에서 건당 금액 1,000 USD 이상으로 표시됩니다.'], [[]]],
+])('%s 문장에 서버의 조건과 동작을 보존한다', async (templateName, sentence, lines, emphasis) => {
+  await builder();
+  vi.mocked(validateRule).mockResolvedValue({ ...checkFixture, sentence });
+  if (templateName === 'FAN-OUT') {
+    fireEvent.change(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값'), { target: { value: '8' } });
+  } else {
+    fireEvent.click(part('템플릿 고르기').getByRole('button', { name: new RegExp(templateName) }));
+  }
+  await waitFor(() => expect(summaryLines().map(line => line.textContent)).toEqual(lines), { timeout: 3000 });
+  expect(summaryLines().map(highlighted)).toEqual(emphasis);
+});
+
 it('이후 제공 템플릿은 고를 수 없고, 다른 템플릿을 눌렀다 돌아와도 고치던 값이 남는다', async () => {
   await builder();
   const library = within(screen.getByRole('region', { name: '템플릿 고르기' }));
@@ -89,23 +135,60 @@ it('이후 제공 템플릿은 고를 수 없고, 다른 템플릿을 눌렀다 
   fireEvent.click(library.getByRole('button', { name: /RANDOM/ }));
   // 경로형은 길 찾는 값 세 줄이 잠긴 줄로 나온다
   expect(part('적중 조건').getByLabelText('경로 거래 수')).toHaveValue('3');
-  expect(part('세는 거래').getByRole('group', { name: 'OR 그룹' })).toBeInTheDocument();
+  const alternatives = within(part('세는 거래').getByRole('group', { name: '하나만 맞아도 됨' }));
+  expect(alternatives.getByRole('button', { name: '대신 맞아도 되는 조건 추가' })).toHaveAttribute('data-rule-match', 'ANY');
   await waitFor(() => expect(lastChecked().template).toBe('RANDOM'), { timeout: 3000 });
 
   fireEvent.click(library.getByRole('button', { name: /FAN-OUT/ }));
   expect(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값')).toHaveValue('9');
 });
 
-it('값을 고치고 조건 줄 사이의 AND 를 눌러 OR 로 바꾸면 바뀐 정의로 다시 검증한다', async () => {
+it('세는 거래의 하나만 묶음은 하나만 추가할 수 있고 지우면 다시 열리며, 적중 조건의 묶음은 계속 추가할 수 있다', async () => {
+  await builder();
+  const filter = part('세는 거래');
+  const addGroup = filter.getByRole('button', { name: '하나만 맞아도 되는 묶음 추가' });
+  expect(addGroup).toBeEnabled();
+  fireEvent.click(addGroup);
+  expect(addGroup).toBeDisabled();
+  expect(addGroup).toHaveAccessibleDescription('세는 거래에는 이 묶음을 하나만 둘 수 있습니다.');
+  expect(part('적중 조건').getByRole('button', { name: '하나만 맞아도 되는 묶음 추가' })).toBeEnabled();
+  const group = within(filter.getByRole('group', { name: '하나만 맞아도 됨' }));
+  fireEvent.click(group.getByRole('button', { name: '묶음 지우기' }));
+  expect(addGroup).toBeEnabled();
+  expect(addGroup).not.toHaveAttribute('title');
+});
+
+it('적중 조건의 결합 방식을 바꾸면 새 묶음 안내와 검증할 정의가 함께 바뀐다', async () => {
   await builder();
   const where = part('적중 조건');
   fireEvent.change(where.getByLabelText('서로 다른 수취 계좌 수 값'), { target: { value: '8' } });
-  fireEvent.click(where.getByRole('button', { name: '조건 추가' }));
-  fireEvent.click(where.getByRole('button', { name: /^AND\./ }));
-  expect(where.getByRole('button', { name: /^OR\./ })).toBeInTheDocument();
+  expect(where.getByRole('button', { name: '하나만 맞아도 되는 묶음 추가' })).toHaveAttribute('data-rule-match', 'ANY');
+  const addTogether = where.getByRole('button', { name: '함께 맞아야 할 조건 추가' });
+  expect(addTogether).toHaveAttribute('data-rule-match', 'ALL');
+  fireEvent.click(addTogether);
+  const topRow = where.getAllByLabelText('서로 다른 수취 계좌 수 값')[1].closest('li');
+  expect(topRow).toHaveAttribute('data-rule-match', 'ALL');
+  const connector = where.getByRole('button', { name: /^모두 맞아야 함\./ });
+  expect(connector).toHaveAttribute('data-rule-match', 'ALL');
+  fireEvent.click(connector);
+  expect(topRow).toHaveAttribute('data-rule-match', 'ANY');
+  expect(where.getByRole('button', { name: /^하나만 맞아도 됨\./ })).toHaveAttribute('data-rule-match', 'ANY');
+  expect(where.getByRole('button', { name: '대신 맞아도 되는 조건 추가' })).toHaveAttribute('data-rule-match', 'ANY');
 
   await waitFor(() => expect(lastChecked().definition.where).toEqual({
     op: 'ANY', items: [{ metric: 'DISTINCT_COUNTERPARTIES', cmp: 'GTE', value: 8 }, { metric: 'DISTINCT_COUNTERPARTIES', cmp: 'GTE' }],
+  }), { timeout: 3000 });
+  const addRequiredGroup = where.getByRole('button', { name: '모두 맞아야 하는 묶음 추가' });
+  expect(addRequiredGroup).toHaveAttribute('data-rule-match', 'ALL');
+  fireEvent.click(addRequiredGroup);
+  const requiredGroup = where.getByRole('group', { name: '모두 맞아야 함' });
+  expect(requiredGroup).toHaveAttribute('data-rule-match', 'ALL');
+  const required = within(requiredGroup);
+  fireEvent.click(required.getByRole('button', { name: '함께 맞아야 할 조건 추가' }));
+  expect(required.getAllByLabelText('서로 다른 수취 계좌 수 값')[1].closest('li')).toHaveAttribute('data-rule-match', 'ALL');
+  expect(required.getByRole('button', { name: /^모두 맞아야 함\./ })).toHaveAttribute('data-rule-match', 'ALL');
+  await waitFor(() => expect(lastChecked().definition.where.items[2]).toEqual({
+    op: 'ALL', items: [{ metric: 'DISTINCT_COUNTERPARTIES', cmp: 'GTE' }, { metric: 'DISTINCT_COUNTERPARTIES', cmp: 'GTE' }],
   }), { timeout: 3000 });
   // 원래 기본값은 그대로다
   expect(fanOutDefaults.where.items).toEqual([{ metric: 'DISTINCT_COUNTERPARTIES', cmp: 'GTE', value: 6 }]);
@@ -144,7 +227,8 @@ it('고친 조건을 확인하지 못하면 고치기 전 조건의 문장을 �
   vi.mocked(validateRule).mockRejectedValue(problem(422, 'SAMPLE_CHECK_UNAVAILABLE', '고친 조건은 서버에 연결해야 검사합니다.'));
   fireEvent.change(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값'), { target: { value: '5' } });
   expect(await part('이 룰을 문장으로 읽으면').findByText('고친 조건은 서버에 연결해야 검사합니다.', undefined, { timeout: 3000 })).toBeInTheDocument();
-  expect(screen.queryByText(checkFixture.sentence)).not.toBeInTheDocument();
+  expect(summaryLines()).toHaveLength(1);
+  expect(highlighted(summaryLines()[0])).toEqual([]);
   expect(part('검토 체크리스트').getByRole('alert')).toHaveTextContent('고친 조건은 서버에 연결해야 검사합니다.');
   expect(part('검토 체크리스트').queryByText('네 항목을 모두 통과했습니다.')).not.toBeInTheDocument();
   expect(saveButton()).toBeDisabled();
@@ -152,7 +236,7 @@ it('고친 조건을 확인하지 못하면 고치기 전 조건의 문장을 �
   // 되돌리면 다시 검사한다
   vi.mocked(validateRule).mockResolvedValue(checkFixture);
   fireEvent.change(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값'), { target: { value: '6' } });
-  expect(await screen.findByText(checkFixture.sentence, undefined, { timeout: 3000 })).toBeInTheDocument();
+  await waitFor(() => expect(summaryLines()[0]).toHaveTextContent(countedFanOut), { timeout: 3000 });
   await waitFor(() => expect(saveButton()).toBeEnabled());
 });
 
@@ -194,6 +278,7 @@ it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, �
   expect(fetchRule).toHaveBeenCalledWith(4);
 
   expect(within(screen.getByLabelText('룰 상태별 수')).getByText('등록된 룰').nextElementSibling).toHaveTextContent('2');
+  sharedTableHeading('룰 목록', '2개');
   const row = within(screen.getByRole('button', { name: /RULE-004/ }).closest('tr'));
   expect(row.getByText('FAN-OUT · 분산 송금')).toBeInTheDocument();
   expect(row.getByText('계좌')).toBeInTheDocument();
@@ -221,6 +306,7 @@ it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, �
   expect(detail).toHaveTextContent('운영 버전 · v1');
   expect(within(detail).getByText('운영 적중').nextElementSibling).toHaveTextContent('3건 · 마지막 2023-09-15');
   expect(within(detail).getByText('연결 Alert').nextElementSibling).toHaveTextContent('2건 · 정상 판정 50%');
+  expect(sharedTableHeading('일일 실행', '2건').getByRole('button', { name: '다운로드' })).toBeInTheDocument();
   const runs = within(screen.getByRole('region', { name: '룰 일일 실행' })).getAllByRole('row');
   expect(runs[1]).toHaveTextContent('2023-09-16v1운영실패 · 쿼리 120초 초과');
   expect(runs[2]).toHaveTextContent('2023-09-15v1운영완료1,20430');
