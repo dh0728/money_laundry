@@ -8,7 +8,7 @@ import { canJudgePreviewCase, canStartPreviewReview, judgmentReasonLabels, judgm
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal.js';
 import { CountTag, ModelScoreTag, PatternTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import './case-judgment.css';
-import { Box, Text } from '../../components/layout-primitives';
+import { Box, LineBreak, Text } from '../../components/layout-primitives';
 
 function JudgmentTarget({ row, showVerdict = false }) {
   return <Box as="li" className="semantic-tag-group">
@@ -141,7 +141,7 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
       </>}>
       <Box className="case-judgment-body">
         {bundleBlocked && <Callout className="case-judgment-bundle-notice">
-          <Text as="strong">Episode 편입 전 확인</Text><br />
+          <Text as="strong">Episode 편입 전 확인</Text><LineBreak />
           {bundleBlocked}
         </Callout>}
         {requestSent && <Text role="status">관리자에게 연관 업무 검토 요청을 보냈습니다.</Text>}

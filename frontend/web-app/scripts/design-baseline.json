@@ -3,7 +3,7 @@
   "component/table-css": 0,
   "component/button": 2,
   "component/clickable-element": 3,
-  "component/raw-element": 12,
+  "component/raw-element": 6,
   "component/dom-api": 1,
   "component/form-control": 3,
   "token/raw-color": 2,

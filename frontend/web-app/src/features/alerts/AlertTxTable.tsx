@@ -14,7 +14,7 @@ import { NativeCheckbox } from '@/components/ui/checkbox'
 import type { TxRelabel } from '@/features/graph/relabel'
 import { formatMoney, type TransactionTarget } from '@/features/transactions/transactionIndex'
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
-import { Box, Text } from '@/components/layout-primitives'
+import { Box, Text, TextLink } from '@/components/layout-primitives'
 
 // Episode 거래는 어느 Alert에서 왔는지(alertId)를 함께 가진다
 export type TxRow = Pick<AlertTransaction, 'txId' | 'txAt' | 'amountPaid' | 'paymentCurrency' | 'paymentFormat' | 'fromAccount' | 'toAccount' | 'fromOwnerName' | 'toOwnerName'> & { role: string; launderingScore: number | null; alertId?: number; relabel?: TxRelabel; reviewLabel?: string }
@@ -65,7 +65,7 @@ const sourceColumn: ColumnDef<TxRow> = {
   accessorKey: 'alertId', size: 96, header: ({ column }) => header(column, '출처 Alert'),
   cell: ({ row }) => (
     <Button asChild variant="ghost" size="sm" className="h-8 w-full justify-start gap-1 px-1 font-mono font-normal">
-      <a href={hrefFor('alerts', row.original.alertId)} title={`A-${row.original.alertId} 상세 보기`}>A-{row.original.alertId}<ExternalLink className="size-3 text-muted-foreground" /></a>
+      <TextLink href={hrefFor('alerts', row.original.alertId)} title={`A-${row.original.alertId} 상세 보기`}>A-{row.original.alertId}<ExternalLink className="size-3 text-muted-foreground" /></TextLink>
     </Button>
   ),
 }

@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAsync } from '@/lib/useAsync'
 import { EpisodeWork } from './EpisodeWork'
 import { useAlertOverrides } from '@/features/alerts/alertOverrides'
-import { Box, Text } from '@/components/layout-primitives'
+import { Box, Text, TextLink } from '@/components/layout-primitives'
 
 export type InstitutionRemote = {
   cards: ReactNode; charts: ReactNode; report: ReactNode
@@ -57,7 +57,7 @@ function InstitutionCharts({ data }: { data: DashboardData }) {
       </Box>
       <Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy">
         <CardContent className="flex min-h-0 flex-1 flex-col px-4">
-          <SectionTitle title="의심 거래 구성과 패턴 분포" description="전체 구성은 거래 건, 패턴별 유형은 패턴 소속 거래의 Alert 수" action={<a href="#suspicious" className="shrink-0 text-xs underline-offset-4 hover:underline">의심 거래 목록 →</a>} />
+          <SectionTitle title="의심 거래 구성과 패턴 분포" description="전체 구성은 거래 건, 패턴별 유형은 패턴 소속 거래의 Alert 수" action={<TextLink href="#suspicious" className="shrink-0 text-xs underline-offset-4 hover:underline">의심 거래 목록 →</TextLink>} />
           {hasComposition ? (
             <Box className="min-h-0 flex-1"><TransactionPatternHierarchy composition={composition} distribution={distribution} /></Box>
           ) : (

@@ -1,13 +1,13 @@
 import { AgeBadge, PatternBadge, RiskBadge } from '@/components/badges'
 import type { WorkItem } from './workItems'
-import { Text } from '@/components/layout-primitives'
+import { Text, TextLink } from '@/components/layout-primitives'
 
 // 대시보드 업무 카드. ID(A-·E-)가 종류를 알려 주므로 종류 태그는 두지 않는다.
 // 색이 있는 경과일·위험 점수는 ID 줄 오른쪽에, 무채색 패턴 태그는 맨 아래 줄에 따로 묶는다.
 // 누르면 해당 Alert·Episode 상세로 간다.
 export function WorkCard({ item, tone }: { item: Pick<WorkItem, 'kind' | 'href' | 'code' | 'riskScore' | 'ageDays' | 'summary' | 'types'>; tone?: 'pending' | 'working' | 'closed' }) {
   return (
-    <a
+    <TextLink
       href={item.href}
       aria-label={`${item.code} 상세 보기`}
       data-testid="work-card"
@@ -27,6 +27,6 @@ export function WorkCard({ item, tone }: { item: Pick<WorkItem, 'kind' | 'href' 
       <Text as="span" className="flex flex-wrap items-center gap-1.5">
         {item.types.map(code => <PatternBadge key={code} code={code} />)}
       </Text>
-    </a>
+    </TextLink>
   )
 }

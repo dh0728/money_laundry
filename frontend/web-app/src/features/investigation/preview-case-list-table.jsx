@@ -6,7 +6,7 @@ import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStatusLabel, VerdictTag } from '../../components/semantic-tags';
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort } from '../../components/workflow-table';
-import { Box, Text } from '@/components/layout-primitives';
+import { Box, LineBreak, Text } from '@/components/layout-primitives';
 
 const flowsFor = records => [...new Set(records.map(({ from, to }) => `${from.code} → ${to.code}`))];
 const timesFor = records => records.map(record => record.timestamp).sort();
@@ -36,7 +36,7 @@ function EvidencePeriod({ records }) {
   const start = times[0];
   const end = times.at(-1);
   const time = value => <Text as="time" dateTime={value.replace(' ', 'T') + '+09:00'}>{value}</Text>;
-  return <>{time(start)}{start !== end && <><br />{time(end)}</>}</>;
+  return <>{time(start)}{start !== end && <><LineBreak />{time(end)}</>}</>;
 }
 
 function AccountFlows({ records }) {

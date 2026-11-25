@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { episodeCode } from './alertFilters'
 import { verdictOption, verdictOptions, type AlertVerdict } from './verdict'
-import { Box, Text } from '@/components/layout-primitives'
+import { Box, Text, TextLink } from '@/components/layout-primitives'
 
 // 재설계 S5 검토 의견: 최종 판단 3개를 한눈에 고르고, 버튼 위계는 저장본 목록(3) → 임시 저장(2) → 확인(1, 가장 강한 주 버튼).
 export function AlertVerdictForm({ verdict, setVerdict, comment, setComment, target, setTarget, locked, episodes, onConfirm, disabledSubmit = false, targetFooter, commentLabel, newActionLabel, onDraft, draftCount, onOpenDrafts }: {
@@ -28,7 +28,7 @@ export function AlertVerdictForm({ verdict, setVerdict, comment, setComment, tar
               <Text as="span"><Text as="span" className="block text-sm font-medium">{o.label}</Text><Text as="span" className="mt-0.5 block text-xs text-muted-foreground">{o.value === 'normal' ? '이상 없음으로 끝냅니다' : o.value === 'standalone' ? '이 Alert 하나로 의심 종결합니다' : '진행 중인 Episode에 넣습니다'}</Text></Text>
             </Label>)}
           </RadioGroup>
-          <Text className="text-xs text-muted-foreground">새 Episode는 Alert 2건 이상이 필요해서 <a href="#alerts" className="underline underline-offset-4">Alert 목록</a>의 ‘Episode로 묶기’에서 만듭니다.</Text>
+          <Text className="text-xs text-muted-foreground">새 Episode는 Alert 2건 이상이 필요해서 <TextLink href="#alerts" className="underline underline-offset-4">Alert 목록</TextLink>의 ‘Episode로 묶기’에서 만듭니다.</Text>
         </Box>
         {verdict === 'link-episode' && (
           <Box className="space-y-2">
