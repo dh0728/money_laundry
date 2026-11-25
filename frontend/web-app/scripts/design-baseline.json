@@ -11,7 +11,7 @@
   "token/radius-unit": 0,
   "token/font-size-unit": 0,
   "token/inline-style": 37,
-  "token/arbitrary-class": 39,
+  "token/arbitrary-class": 15,
   "token/important": 2,
   "token/fixed-number": 33,
   "token/palette-direct": 0,
