@@ -15,6 +15,7 @@ import { CaseHeader } from '@/features/alerts/CasePresentation'
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { useMemoryState } from '@/lib/memory'
 import { alertCode, episodeCode } from './alertFilters'
 import AlertReview, { type VerdictSubmit } from './AlertReview'
@@ -86,7 +87,7 @@ export default function AlertDetail({ alert, relabels, history, responsible, ass
         </Box>
         {selectingTransactions && <Box className="flex flex-wrap items-end gap-2 rounded-md border bg-card p-3">
           <Box as="label" className="min-w-48 flex-1 text-xs">거래 제외 사유
-            <textarea aria-label="거래 제외 사유" className="mt-1 min-h-9 w-full rounded-md border bg-background p-2 text-sm" maxLength={4000}
+            <Textarea variant="plain" aria-label="거래 제외 사유" className="mt-1 min-h-9" maxLength={4000}
               value={excludeReason} onChange={event => setExcludeReason(event.target.value)} placeholder="선택 거래를 제외하는 이유" />
           </Box>
         </Box>}

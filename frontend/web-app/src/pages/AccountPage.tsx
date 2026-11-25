@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Box, Text } from '@/components/layout-primitives'
 
 const browserName = () => {
@@ -37,7 +38,7 @@ export default function AccountPage({ onLogout }: { onLogout: () => void }) {
         <SectionTitle title="프로필" />
         <Box className="flex items-center gap-5">
           <Avatar className="size-18"><AvatarImage src={picture} /><AvatarFallback className="text-xl">{user[0]}</AvatarFallback></Avatar>
-          <Box><Text className="font-semibold">{user}</Text>{!live && <><Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => file.current?.click()}><Camera className="size-3.5" />이미지 변경</Button><input hidden ref={file} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) setPicture(URL.createObjectURL(f)) }} /></>}</Box>
+          <Box><Text className="font-semibold">{user}</Text>{!live && <><Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => file.current?.click()}><Camera className="size-3.5" />이미지 변경</Button><Input hidden ref={file} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) setPicture(URL.createObjectURL(f)) }} /></>}</Box>
         </Box>
                 <Box as="dl" className="grid grid-cols-2 gap-6 text-sm">
           {(live ? [['아이디', currentUser.username ?? '—'], ['이름', currentUser.name], ['역할', role.label]] : [['소속', currentUser.organization], ['이메일', currentUser.email], ['역할', role.label], ['가입일', currentUser.joinedAt]]).map(([k, v]) => <Box key={k}><Box as="dt" className="text-xs text-muted-foreground mb-2">{k}</Box><Box as="dd">{v}</Box></Box>)}

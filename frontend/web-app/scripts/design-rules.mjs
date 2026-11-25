@@ -18,7 +18,7 @@ export const designRuleTree = [
       { id: 'component/panel', title: '패널은 공용 Panel로만: 패널 클래스(screen-panel·panel-material·panel-inset) 직접 사용·Panel에 glass·패널 깊이 CSS 복제 금지', engine: 'eslint+stylelint', level: 'error' },
       { id: 'component/raw-element', title: '화면 파일(src/components 밖)에는 맨 DOM 태그 없이 공용 컴포넌트 인스턴스만 둔다', engine: 'eslint', level: 'ratchet',
         // 0건이 된 폴더는 여기 더해 바로 오류로 막는다(pnpm lint·커밋 전 검사).
-        errorIn: ['src/features/dashboard/', 'src/features/investigation/', 'src/features/notifications/', 'src/lib/'] },
+        errorIn: ['src/features/alerts/', 'src/features/dashboard/', 'src/features/investigation/', 'src/features/notifications/', 'src/lib/', 'src/pages/'] },
       { id: 'component/dom-api', title: '화면 파일에서 createElement·innerHTML로 태그를 만들지 않는다', engine: 'eslint', level: 'ratchet' },
       { id: 'component/form-control', title: '화면 파일에 맨 input·select·textarea 금지, 공용 입력 부품 사용', engine: 'eslint', level: 'ratchet' },
     ],

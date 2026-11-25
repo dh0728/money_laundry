@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { NativeRadio } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useMemoryState, useMockRole } from '@/lib/memory'
 import { UnderTabs } from '@/components/UnderTabs'
@@ -39,10 +40,10 @@ export default function SettingsPage() {
         <Box className="flex flex-wrap items-center gap-2">
           <Box className="theme-segment relative grid h-8 grid-cols-3 rounded-full bg-muted p-1" role="radiogroup" aria-label="테마 선택" data-theme={theme}>
             <Text as="span" className="theme-segment-thumb absolute bottom-1 top-1 rounded-full bg-background shadow-sm ring-1 ring-border/60" aria-hidden="true" />
-            {([{ id: 'light', label: '라이트 모드', icon: Sun }, { id: 'system', label: '시스템 설정', icon: LaptopMinimal }, { id: 'dark', label: '다크 모드', icon: Moon }] as const).map(t => (
-              <Box as="label" key={t.id} className="relative z-10 grid size-6 cursor-pointer place-items-center rounded-full has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring" title={t.label}>
-                <input className="sr-only" type="radio" name="theme" value={t.id} checked={theme === t.id} onChange={() => setTheme(t.id)} aria-label={t.label} />
-                <t.icon className={`size-4 ${theme === t.id ? 'text-foreground' : 'text-muted-foreground'}`} aria-hidden="true" />
+            {([{ id: 'light', label: '라이트 모드', icon: Sun }, { id: 'system', label: '시스템 설정', icon: LaptopMinimal }, { id: 'dark', label: '다크 모드', icon: Moon }] as const).map(({ id, label, icon: Icon }) => (
+              <Box as="label" key={id} className="relative z-10 grid size-6 cursor-pointer place-items-center rounded-full has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring" title={label}>
+                <NativeRadio className="sr-only" name="theme" value={id} checked={theme === id} onChange={() => setTheme(id)} aria-label={label} />
+                <Icon className={`size-4 ${theme === id ? 'text-foreground' : 'text-muted-foreground'}`} aria-hidden="true" />
               </Box>
             ))}
           </Box>

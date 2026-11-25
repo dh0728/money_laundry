@@ -39,7 +39,7 @@ function NotificationColumn({ label, items, order, onOrder, onOpen, read, onTogg
         <Button variant="ghost" size="icon" className="size-7 shrink-0 rounded-full p-0" aria-label={`${item.code} ${read ? '읽지 않음으로 표시' : '읽음으로 표시'}`} disabled={busy} onClick={() => onToggle(item.id)}>
           <Text as="span" className={`size-2.5 rounded-full ${read ? 'bg-muted-foreground/40' : 'bg-destructive'}`} aria-hidden />
         </Button>
-        <button type="button" className="min-w-0 flex-1 text-left" aria-label={`${item.code} 알림 열기`} disabled={busy} onClick={() => onOpen(item)}>
+        <Button type="button" layout="text" className="min-w-0 flex-1 text-left" aria-label={`${item.code} 알림 열기`} disabled={busy} onClick={() => onOpen(item)}>
           <Text as="span" className="flex flex-wrap items-center justify-between gap-2">
             <Text as="span" className="text-sm font-semibold">{item.title}</Text>
             <Text as="span" className="flex shrink-0 items-center gap-1.5">
@@ -50,7 +50,7 @@ function NotificationColumn({ label, items, order, onOrder, onOpen, read, onTogg
           <Text className="mt-1.5 text-xs text-muted-foreground">{item.description}</Text>
           {item.patternCode !== undefined && <Text as="span" className="mt-2.5 flex flex-wrap items-center gap-1.5"><PatternBadge code={item.patternCode} /></Text>}
           <Text className="mt-3 flex flex-wrap gap-2 text-2xs text-muted-foreground"><Text as="span" className="font-mono">{item.code}</Text><Text as="span">{item.at.slice(0, 10)}</Text></Text>
-        </button>
+        </Button>
       </Box>)}</Box>}
   </Box>
 }
