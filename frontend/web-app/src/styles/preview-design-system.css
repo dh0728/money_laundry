@@ -453,6 +453,9 @@
   --risk-readout-low-stroke: .75px light-dark(var(--aml-black-100), transparent);
   --model-risk-settings-dial-max-width: 15rem;
   --model-risk-dial-units: 240;
+  --risk-dial-units: 200;
+  --risk-dial-radius: 78;
+  --risk-dial-band-stroke: 9;
   --model-risk-dial-start-angle: 150;
   --model-risk-dial-sweep-angle: 240;
   --model-risk-dial-band-radius: 91;

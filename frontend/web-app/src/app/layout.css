@@ -998,8 +998,8 @@ body:has(#footer-pagination > *) #workspace {
 .risk-dial-face [data-band="low"] { --risk-band-color: var(--risk-low) }
 .risk-dial-face [data-band="medium"] { --risk-band-color: var(--risk-medium) }
 .risk-dial-face [data-band="high"] { --risk-band-color: var(--risk-high) }
-.risk-dial-face path[data-band] { stroke: var(--risk-band-color) }
-.risk-dial-thumb { position: absolute; transform: translate(-50%, -50%); width: var(--ui-icon-size); height: var(--ui-icon-size); border-radius: var(--aml-radius-full); border: var(--aml-stroke-focus) solid var(--text); background: var(--canvas-surface); touch-action: none; cursor: grab }
+.risk-dial-face path[data-band] { stroke: var(--risk-band-color); stroke-width: var(--risk-dial-band-stroke) }
+.risk-dial-thumb { position: absolute; left: var(--risk-dial-thumb-x); top: var(--risk-dial-thumb-y); transform: translate(-50%, -50%); width: var(--ui-icon-size); height: var(--ui-icon-size); border-radius: var(--aml-radius-full); border: var(--aml-stroke-focus) solid var(--text); background: var(--canvas-surface); touch-action: none; cursor: grab }
 .risk-dial-thumb:focus-visible { outline: var(--aml-stroke-focus) solid var(--focus-ring); outline-offset: var(--aml-space-2) }
 .risk-dial-readouts {
   position: absolute;
