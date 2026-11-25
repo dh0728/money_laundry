@@ -1,6 +1,6 @@
 "use client";
 
-import { m, useSpring } from "motion/react";
+import { m, useMotionTemplate, useSpring, useTransform, type MotionStyle } from "motion/react";
 import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { memo, useEffect, useEffectEvent, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -748,12 +748,18 @@ function DatePillTrackerInner({
   const reduceMotion = useAppReducedMotion() === true;
   const effectiveSpring = springConfig ?? tooltipSpring;
   const animatedX = useSpring(xWithMargin, effectiveSpring);
+  const animatedLeft = useMotionTemplate`${animatedX}px`;
   const swell = useVelocityStretch(
     animatedX,
     reduceMotion || discreteInteraction
       ? null
       : resolveDatePillVelocity(velocity)
   );
+  const stretch = useTransform(() => {
+    const x = swell.scaleX.get();
+    const y = swell.scaleY.get();
+    return x === 1 && y === 1 ? "none" : `scale(${x}, ${y})`;
+  });
 
   if (!discreteInteraction) {
     animatedX.set(xWithMargin);
@@ -767,14 +773,12 @@ function DatePillTrackerInner({
 
   return (
     <m.div
-      className="pointer-events-none absolute z-50 w-max"
+      className="chart-date-pill-anchor pointer-events-none absolute z-50 w-max"
       style={{
-        left: discreteInteraction ? xWithMargin : animatedX,
-        transform: "translateX(-50%)",
-        bottom: 4,
-      }}
+        "--chart-date-pill-x": discreteInteraction ? `${xWithMargin}px` : animatedLeft,
+      } as MotionStyle}
     >
-      <m.div style={{ scaleX: swell.scaleX, scaleY: swell.scaleY }}>
+      <m.div className="chart-date-pill-stretch" style={{ "--chart-date-pill-stretch": stretch } as MotionStyle}>
         {render && point ? (
           render({
             label: labels[currentIndex] ?? "",

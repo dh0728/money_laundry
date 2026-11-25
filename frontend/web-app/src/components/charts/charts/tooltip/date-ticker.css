@@ -10,3 +10,11 @@
   -webkit-backdrop-filter: var(--date-ticker-backdrop);
   backdrop-filter: var(--date-ticker-backdrop);
 }
+
+.chart-date-pill-anchor {
+  left: var(--chart-date-pill-x);
+  bottom: var(--aml-space-4);
+  transform: translateX(-50%);
+}
+
+.chart-date-pill-stretch { transform: var(--chart-date-pill-stretch, none) }

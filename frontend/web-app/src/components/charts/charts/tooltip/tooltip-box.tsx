@@ -23,6 +23,7 @@ import { createPortal, flushSync } from "react-dom";
 import { cn } from "@/lib/utils";
 import { type SpringConfig, useChartConfig } from "../chart-config-context";
 import { chartCssVars, useChartPortalContainer } from "../chart-context";
+import { readChartDurationSeconds } from "../../chart-design-values";
 import "../../chart-utilities.css";
 
 export interface TooltipBoxProps {
@@ -584,6 +585,7 @@ function TooltipBoxInner({
   // Reduced motion: position jumps instead of springing and the panel skips
   // its scale/slide; opacity fades are kept.
   const reducedMotion = useAppReducedMotion() === true;
+  const [fadeDuration] = useState(() => readChartDurationSeconds("--chart-tooltip-fade-duration", 0.1));
   const effectiveSpring = springConfig ?? tooltipBoxSpring;
 
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -766,7 +768,7 @@ function TooltipBoxInner({
         "--chart-tooltip-left": anchorLeft,
         "--chart-tooltip-top": anchorTop,
       } as MotionStyle : undefined}
-      transition={{ duration: 0.1 }}
+      transition={{ duration: fadeDuration }}
     >
       <TooltipPanel
         // Positions jump in the static path (a re-render mid-commit), which a

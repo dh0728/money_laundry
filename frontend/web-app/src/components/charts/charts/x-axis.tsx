@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -12,9 +12,7 @@ import {
 } from "./chart-context";
 import { shortDateFmt } from "./chart-formatters";
 import { type AxisTick, buildDataAlignedTicks } from "./x-axis-ticks";
-import { DEFAULT_Y_DOMAIN_TWEEN_MS } from "./chart-phase";
 import { useDatePillPresent } from "./date-pill-store";
-import { LINE_LOADING_PULSE_EASE } from "./line-loading-timing";
 import {
   type ChartLabelCount,
   resolveResponsiveChartLabelCount,
@@ -25,7 +23,7 @@ import {
   xAxisLabelOpacity,
 } from "./x-axis-hover";
 
-const X_AXIS_POSITION_TWEEN_MS = DEFAULT_Y_DOMAIN_TWEEN_MS;
+import "./x-axis.css";
 
 /**
  * How labels react to the crosshair while hovering:
@@ -92,25 +90,17 @@ const XAxisLabel = memo(function XAxisLabel({
 }: XAxisLabelProps) {
   return (
     <div
-      className="absolute"
-      style={{
-        left: x,
-        bottom: 12,
-        width: 0,
-        display: "flex",
-        justifyContent: "center",
-        transition: animatePosition
-          ? `left ${X_AXIS_POSITION_TWEEN_MS}ms cubic-bezier(${LINE_LOADING_PULSE_EASE.join(", ")})`
-          : undefined,
-      }}
+      className="chart-x-axis-label"
+      data-animate-position={animatePosition || undefined}
+      style={{ "--chart-x-axis-label-x": `${x}px` } as CSSProperties}
     >
       <span
-        className={cn("whitespace-nowrap text-chart-label text-xs", className)}
+        className={cn("chart-x-axis-label-text whitespace-nowrap text-chart-label text-xs", className)}
+        data-highlighted={color !== undefined || undefined}
         style={{
-          opacity,
-          color,
-          transition: "opacity 0.4s ease-in-out, color 0.2s ease-out",
-        }}
+          "--chart-x-axis-label-opacity": opacity,
+          "--chart-x-axis-label-color": color,
+        } as CSSProperties}
       >
         {label}
       </span>

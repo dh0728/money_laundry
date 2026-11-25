@@ -172,6 +172,11 @@
   --chart-initial-width: 320px;
   --chart-initial-height: 200px;
   --chart-tooltip-min-width: 8rem;
+  --chart-tooltip-fade-duration: 100ms;
+  --chart-x-axis-slide-duration: 500ms;
+  --chart-x-axis-slide-ease: cubic-bezier(0.85, 0, 0.15, 1);
+  --chart-x-axis-label-fade-duration: 400ms;
+  --chart-x-axis-label-color-duration: 200ms;
   --chart-area-value-label-size: 10px;
   --chart-area-value-label-outline: 3px;
   --chart-tooltip-indicator-border-width: 1.5px;
