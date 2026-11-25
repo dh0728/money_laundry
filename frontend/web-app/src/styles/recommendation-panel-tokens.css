@@ -33,5 +33,5 @@
 
   --recommendation-comparison-transaction: light-dark(var(--aml-pink-040), var(--aml-pink-060));
   --recommendation-episode-transaction: light-dark(var(--aml-lime-040), var(--aml-lime-080));
-  --recommendation-shared-legend-split: 50%;
+  --recommendation-shared-transaction: color-mix(in oklab, var(--recommendation-comparison-transaction), var(--recommendation-episode-transaction));
 }

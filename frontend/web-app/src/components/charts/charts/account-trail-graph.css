@@ -10,7 +10,7 @@
 }
 .account-trail-network [data-scope="comparison"] { --account-trail-scope-color: var(--account-trail-comparison-color) }
 .account-trail-network [data-scope="episode"] { --account-trail-scope-color: var(--account-trail-episode-color) }
-.account-trail-network [data-scope="shared"] { --account-trail-scope-color: var(--account-trail-episode-color) }
+.account-trail-network [data-scope="shared"] { --account-trail-scope-color: var(--recommendation-shared-transaction) }
 
 .account-trail-legend {
   display: flex;
@@ -28,9 +28,6 @@
   border-radius: var(--aml-radius-full);
   background: var(--account-trail-scope-color);
 }
-.account-trail-legend [data-scope="shared"]::before {
-  background: linear-gradient(to right, var(--account-trail-comparison-color) var(--recommendation-shared-legend-split), var(--account-trail-episode-color) var(--recommendation-shared-legend-split));
-}
 .account-trail-graph { display: block; inline-size: 100%; block-size: auto }
 .account-trail-graph [tabindex] { cursor: pointer; outline: none }
 .account-trail-edge, .account-trail-edge-hit { fill: none; stroke-linecap: round }
@@ -39,7 +36,6 @@
   stroke-width: var(--aml-stroke-focus);
 }
 .account-trail-arrow { fill: var(--account-trail-scope-color) }
-.account-trail-edge-shared { stroke: var(--account-trail-comparison-color) }
 .account-trail-edge-hit {
   stroke: transparent;
   stroke-width: var(--aml-space-12);
@@ -74,5 +70,5 @@
   border-radius: var(--aml-radius-control);
   background: light-dark(var(--aml-black-005), var(--aml-white-005));
 }
-.account-trail-detail [data-scope]:not([data-scope="shared"]) { color: var(--account-trail-scope-color) }
+.account-trail-detail [data-scope] { color: var(--account-trail-scope-color) }
 .account-trail-omitted { color: var(--ai-summary-note) }

@@ -84,14 +84,10 @@ export function AccountTrailGraph({ comparison, focus }) {
       </marker>)}</defs>
       {edges.map(row => <g key={row.code} data-transfer={row.code} data-scope={row.scope}
         data-active={row.code === selectedTransfer?.code || row.from.code === activeAccount || row.to.code === activeAccount || undefined}
-        role="graphics-symbol" tabIndex={0} aria-label={`${row.code} · ${row.from.code} → ${row.to.code}`}
+        role="graphics-symbol" tabIndex={0} aria-label={`${row.code} · ${row.from.code} → ${row.to.code} · ${scopeLabels[row.scope]}`}
         {...activate('transfer', row.code)}>
         <path className="account-trail-edge-hit" d={row.path} />
-        <path className="account-trail-edge" d={row.path} markerEnd={`url(#${graphId}-${row.scope})`}
-          pathLength={row.scope === 'shared' ? 2 : undefined} strokeDasharray={row.scope === 'shared' ? '1 1' : undefined}
-          strokeDashoffset={row.scope === 'shared' ? 1 : undefined} />
-        {row.scope === 'shared' && <path className="account-trail-edge account-trail-edge-shared" d={row.path}
-          pathLength="2" strokeDasharray="1 1" />}
+        <path className="account-trail-edge" d={row.path} markerEnd={`url(#${graphId}-${row.scope})`} />
       </g>)}
       {accounts.map(account => <g key={account.code} data-account={account.code}
         data-shared={comparison.shared.includes(account.code) || undefined} data-focus={account.code === focus || undefined}
