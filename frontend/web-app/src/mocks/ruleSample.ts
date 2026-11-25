@@ -1,14 +1,15 @@
 import { ApiError } from '@/api/common'
 import type { Backtest, BacktestHead, RuleCatalog, RuleCheck, RuleDefinition, RuleDetail, RuleHitCard, RuleList } from '@/api/rules'
 import { currentPreviewUser } from '@/features/auth/preview-session-user'
+import { definitionFromTemplate, templateOf } from '@/features/rules/rule-definition'
 import { ruleSampleData, type RuleSampleViewer } from './ruleSampleData'
+import { previewRuleCheck } from './ruleSamplePreview'
 
 // 서버 없이 실행할 때(VITE_API_MODE 가 live 가 아닐 때) 룰 API 대신 답한다. @/api/rules 가 부른다.
 // 조회는 ruleSampleData(실제 서버 코드로 뜬 응답)를 그대로 돌려준다. 보기만 하는 샘플이라
 // 만들기 · 저장 · 삭제 · 상태 명령 · 복제 · 백테스트 실행은 받지 않고 아래 문구로 거절한다.
 
 export const sampleReadOnlyNote = '샘플 데이터입니다. 서버에 연결하지 않아 저장 · 실행되지 않습니다.'
-export const sampleCheckNote = '샘플 데이터에서는 템플릿 기본값과 샘플 룰의 조건만 검사합니다. 고친 조건은 서버에 연결해야 검사합니다.'
 
 const problem = (status: number, code: string, detail: string) => new ApiError({ type: 'about:blank', title: detail, status, code, detail })
 const notFound = (what: string) => problem(404, 'NOT_FOUND', `${what}을(를) 찾을 수 없습니다.`)
@@ -41,11 +42,16 @@ export async function rule(ruleId: number): Promise<RuleDetail> {
   if (!found) throw notFound('룰')
   return copy(found)
 }
-/** 떠 둔 조건(템플릿 기본값, 샘플 룰의 버전)이면 그때 서버가 준 검증 결과를 준다. */
-export async function validate(input: { definition: RuleDefinition }): Promise<RuleCheck> {
-  const found = ruleSampleData.checks[canonical(input.definition)]
-  if (!found) throw problem(422, 'SAMPLE_CHECK_UNAVAILABLE', sampleCheckNote)
-  return copy(found)
+/** 떠 둔 결과는 그대로 읽고, 편집한 정의는 저장 없이 화면 검토만 한다. */
+export async function validate({ template: key, definition }: { template: string; definition: RuleDefinition }): Promise<RuleCheck> {
+  const found = key === definition.template ? ruleSampleData.checks[canonical(definition)] : undefined
+  if (found) return copy(found)
+
+  const { catalog, checks } = ruleSampleData
+  const template = templateOf(catalog, key)
+  const baseline = template?.defaults ? checks[canonical(definitionFromTemplate(template))] : undefined
+  const data = baseline?.items.find(item => item.key === 'DATA')?.message.match(/^원장 (\d+)일치/)?.[1]
+  return previewRuleCheck(catalog, key, definition, data ? `샘플 원장 ${data}일치 기준입니다.` : '샘플 원장 기준입니다.')
 }
 export const backtests = async (ruleId: number): Promise<BacktestHead[]> => copy(ruleSampleData.backtestLists[String(ruleId)] ?? [])
 export async function backtest(backtestId: number): Promise<Backtest> {
