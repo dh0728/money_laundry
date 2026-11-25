@@ -15,6 +15,12 @@
 }
 
 .form-dropdown-trigger > svg { flex: none; inline-size: var(--aml-size-icon-small); block-size: var(--aml-size-icon-small) }
+.form-dropdown-trigger:enabled { cursor: pointer }
+@media (hover: hover) {
+  .form-dropdown-trigger:enabled:hover {
+    background: color-mix(in srgb, var(--information-panel-surface) var(--aml-control-hover-base-weight), var(--text));
+  }
+}
 .form-dropdown-trigger:disabled,
 .form-dropdown-options [data-slot="select-item"][data-disabled] { opacity: var(--aml-opacity-disabled) }
 .form-dropdown-trigger:focus-visible {
@@ -51,13 +57,14 @@
   align-items: center;
   min-block-size: var(--aml-panel-control-size);
   padding-block: var(--aml-space-4);
-  padding-inline: var(--aml-space-12) var(--aml-panel-control-size);
+  padding-inline: var(--aml-space-12);
   border-radius: var(--aml-panel-control-radius);
   font: inherit;
   overflow-wrap: anywhere;
 }
+.form-dropdown-options [data-slot="select-item"]:not([data-disabled]) { cursor: pointer }
 
-.form-dropdown-options [data-slot="select-item"][data-highlighted] {
+.form-dropdown-options [data-slot="select-item"][data-highlighted]:not([data-disabled], [data-state="checked"]) {
   background: var(--hover);
   color: var(--text);
 }
@@ -66,19 +73,8 @@
   background: var(--selection-surface);
   color: var(--selection-ink);
 }
-
-.form-dropdown-options [data-slot="select-item-indicator"] {
-  position: absolute;
-  inset-inline-end: var(--aml-space-8);
-  inset-block-start: 50%;
-  display: grid;
-  place-items: center;
-  inline-size: var(--aml-size-icon-small);
-  block-size: var(--aml-size-icon-small);
-  translate: 0 -50%;
+.form-dropdown-options [data-slot="select-item"][data-state="checked"][data-highlighted]:not([data-disabled]) {
+  background: color-mix(in srgb, var(--selection-surface) var(--aml-control-hover-base-weight), var(--selection-ink));
 }
 
-.form-dropdown-options [data-slot="select-item-indicator"] > svg {
-  inline-size: 100%;
-  block-size: 100%;
-}
+.form-dropdown-options [data-slot="select-item-indicator"] { display: none }
