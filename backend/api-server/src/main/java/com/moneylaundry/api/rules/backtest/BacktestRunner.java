@@ -187,6 +187,8 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
     String to = row.get("date_to").toString();
     var template = catalog.template(definition.get("template").toString());
     String sweepMetric = template.get("sweep") == null ? null : template.get("sweep").toString();
+    // 적중의 대상이 계좌인가 거래인가(LARGE_TX)
+    String subjectType = RuleCompiler.subjectType(definition.get("template"));
     Number current = sweepMetric == null ? null : RuleCompiler.metricValue(definition, sweepMetric);
     List<Long> values =
         current == null
@@ -210,12 +212,13 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
           jdbc.update(
               """
               insert into rules.backtest_subjects(backtest_id, subject_type, subject_id, in_new, in_base, measured, tx_ids)
-              select ?, 'ACCOUNT', subject_id, true, false, measured, array_agg(distinct x order by x)
+              select ?, ?, subject_id, true, false, measured, array_agg(distinct x order by x)
               from (%s) per_tx
               group by subject_id, measured
               """
                   .formatted(SUBJECT_ROWS),
-              id);
+              id,
+              subjectType);
           result.put("summary", summary);
           result.put("skippedBusySubjects", evaluator.skippedBusySubjects(definition, from, to));
           result.put(
@@ -229,11 +232,7 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
           var sweep = new ArrayList<Map<String, Object>>();
           for (Long value : values) {
             boolean same = value == current.longValue();
-            var counted =
-                same
-                    ? summary
-                    : evaluator.rerun(
-                        RuleCompiler.withMetricValue(definition, sweepMetric, value), from, to);
+            var counted = same ? summary : swept(definition, sweepMetric, value, from, to);
             var line = new LinkedHashMap<String, Object>();
             line.put("value", value);
             line.put("current", same);
@@ -259,13 +258,14 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
             jdbc.update(
                 """
                 insert into rules.backtest_subjects(backtest_id, subject_type, subject_id, in_new, in_base, measured, tx_ids)
-                select ?, 'ACCOUNT', subject_id, false, true, measured, array_agg(distinct x order by x)
+                select ?, ?, subject_id, false, true, measured, array_agg(distinct x order by x)
                 from (%s) per_tx
                 group by subject_id, measured
                 on conflict (backtest_id, subject_type, subject_id) do update set in_base=true
                 """
                     .formatted(SUBJECT_ROWS),
-                id);
+                id,
+                subjectType);
             step(id, ++done[0], total);
             saveProgress(id);
           });
@@ -405,10 +405,24 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
     return result;
   }
 
-  /** 값을 바꿔 보는 항목의 정의(문구 · 단위 · 범위). 적중 조건 항목이거나 경로 값(minHops)이다. */
+  /** 값을 바꿔 보는 항목의 정의(문구 · 단위 · 범위). 적중 조건 항목, 경로 값(minHops), 세는 거래 항목(LARGE_TX 의 건당 금액) 가운데 하나다. */
   private Map<String, Object> sweepSpec(String key) {
     var metric = catalog.metric(key);
-    return metric != null ? metric : catalog.pathField(key);
+    if (metric != null) return metric;
+    var path = catalog.pathField(key);
+    return path != null ? path : catalog.filterField(key);
+  }
+
+  /**
+   * 값 하나만 바꿔 다시 돌린다. 적중 조건이나 경로 값이면 세는 거래(rule_ftx)가 그대로라 집계만 다시 하고, 세는 거래 항목이면 세는 거래부터 다시 거른다. 그래서
+   * 이 뒤로는 rule_ftx 가 처음 조건의 것이 아닐 수 있다.
+   */
+  private Map<String, Object> swept(
+      Map<String, Object> definition, String key, Long value, String from, String to) {
+    var changed = RuleCompiler.withMetricValue(definition, key, value);
+    if (!RuleCompiler.sweepsFilter(definition, key)) return evaluator.rerun(changed, from, to);
+    evaluator.filtered(changed, from, to);
+    return evaluator.run(changed, from, to);
   }
 
   /** 값을 바꿔 볼 범위. 경로의 거래 수는 그 룰이 따라가는 최대 거래 수(maxHops)를 넘겨 볼 수 없다. */

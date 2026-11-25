@@ -289,13 +289,22 @@ class RuleBacktestTests {
     mvc.perform(get("/api/v1/rule-backtests/1")).andExpect(status().isUnauthorized());
     login("l1a");
     long[] rule = created("분산 송금 감시", "FAN_OUT");
-    long[] general = created("쪼개기", "STRUCTURING");
-    // 평가기가 있는 템플릿만 백테스트할 수 있다. 일반 템플릿은 아직 없다.
+    // 평가기가 있는 템플릿만 백테스트할 수 있다. 지금 고를 수 있는 열 개는 모두 된다(이후 제공 템플릿으로는 룰을 만들 수 없다).
     assertThat(
             json(mvc.perform(get("/api/v1/rule-templates").session(session)))
                 .get("backtestTemplates"))
         .isEqualTo(
-            List.of("CYCLE", "FAN_IN", "FAN_OUT", "GATHER_SCATTER", "RANDOM", "SCATTER_GATHER"));
+            List.of(
+                "CYCLE",
+                "FAN_IN",
+                "FAN_OUT",
+                "GATHER_SCATTER",
+                "LARGE_TX",
+                "PASS_THROUGH",
+                "RANDOM",
+                "SAME_AMOUNT",
+                "SCATTER_GATHER",
+                "STRUCTURING"));
     // 원장이 비어 있으면 돌릴 날짜가 없다
     send("/api/v1/rule-backtests", Map.of("versionId", rule[1])).andExpect(status().isBadRequest());
 
@@ -307,8 +316,6 @@ class RuleBacktestTests {
     long five = account();
     fanOut(five, 5, "2023-09-10", 2000);
 
-    send("/api/v1/rule-backtests", Map.of("versionId", general[1]))
-        .andExpect(status().isBadRequest());
     send("/api/v1/rule-backtests", Map.of("versionId", 999999)).andExpect(status().isNotFound());
     send(
             "/api/v1/rule-backtests",
@@ -406,6 +413,44 @@ class RuleBacktestTests {
     for (var row : rows(sweep.get("rows")))
       hitsByValue.put(number(row.get("value")), number(row.get("hits")));
     assertThat(hitsByValue).isEqualTo(Map.of(2L, 2L, 3L, 1L, 4L, 0L, 5L, 0L));
+  }
+
+  @Test
+  void backtest_of_a_transaction_rule_lists_transactions_and_sweeps_the_amount() throws Exception {
+    login("l1a");
+    long[] rule = created("고액 거래 감시", "LARGE_TX"); // 처음 거래하는 상대 AND 건당 ≥ 10,000 USD
+    pay(account(), account(), "2023-09-01 09:00+09", 2000);
+    long nine = pay(account(), account(), "2023-09-09 10:00+09", 9500);
+    long eleven = pay(account(), account(), "2023-09-09 11:00+09", 11500);
+    long thirty = pay(account(), account(), "2023-09-10 10:00+09", 30000);
+
+    var view = backtest(Map.of("versionId", rule[1]));
+    assertThat(view.get("status")).isEqualTo("COMPLETED");
+    assertThat(number(part(view, "kpis").get("hits"))).isEqualTo(2L);
+    assertThat(number(view.get("evidenceTxCount"))).isEqualTo(2L);
+    assertThat(number(view.get("skippedBusySubjects"))).isZero();
+    // 사례는 거래마다 한 줄이고, 거래 코드를 만들 수 있게 거래 ID 와 시각이 같이 온다
+    var cases = rows(view.get("cases"));
+    assertThat(cases).hasSize(2);
+    var byTx = new LinkedHashMap<Long, Map<String, Object>>();
+    for (var item : cases) byTx.put(number(item.get("txId")), item);
+    assertThat(byTx).containsOnlyKeys(eleven, thirty).doesNotContainKey(nine);
+    var item = byTx.get(eleven);
+    assertThat(item.get("subjectType")).isEqualTo("TX");
+    assertThat(item.get("subject")).isEqualTo(Long.toString(eleven));
+    assertThat(item.get("occurredAt")).isEqualTo("2023-09-09T02:00:00Z");
+    assertThat(number(item.get("txCount"))).isEqualTo(1L);
+    assertThat(number(part(item, "measured").get("TX_USD"))).isEqualTo(11500L);
+    // 건당 금액을 8,000 ~ 12,000 으로 바꿔 본다. 세는 거래가 달라지므로 거를 때부터 다시 돈다.
+    var sweep = part(view, "sweep");
+    assertThat(sweep.get("metric")).isEqualTo("TX_USD");
+    assertThat(sweep.get("label")).isEqualTo("건당 금액");
+    assertThat(sweep.get("unit")).isEqualTo("USD");
+    var hitsByValue = new LinkedHashMap<Long, Long>();
+    for (var row : rows(sweep.get("rows")))
+      hitsByValue.put(number(row.get("value")), number(row.get("hits")));
+    assertThat(hitsByValue)
+        .isEqualTo(Map.of(8000L, 3L, 9000L, 3L, 10000L, 2L, 11000L, 2L, 12000L, 1L));
   }
 
   @Test

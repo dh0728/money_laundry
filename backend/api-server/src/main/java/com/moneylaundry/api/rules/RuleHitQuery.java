@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class RuleHitQuery {
+  private static final String TX_USD = "TX_USD";
   private final JdbcTemplate jdbc;
   private final RuleCatalog catalog;
 
@@ -48,7 +49,7 @@ public class RuleHitQuery {
     for (var row :
         jdbc.queryForList(
             """
-            select m.alert_id, h.hit_id, h.version_id, h.subject_id, h.hit_date::text as hit_date,
+            select m.alert_id, h.hit_id, h.version_id, h.subject_type, h.subject_id, h.hit_date::text as hit_date,
                    h.measured::text as measured, v.version_no, v.status as version_status, v.summary,
                    v.definition::text as definition, r.rule_id, r.name, r.template,
                    left(a.service_account_id::text, 8) as subject,
@@ -57,18 +58,25 @@ public class RuleHitQuery {
                     where x.hit_id = h.hit_id) as evidence
             from review.current_members m
             join rules.hit_transactions ht on ht.tx_id = m.tx_id
-            join rules.hits h on h.hit_id = ht.hit_id and h.mode = 'LIVE' and h.subject_type = 'ACCOUNT'
+            join rules.hits h on h.hit_id = ht.hit_id and h.mode = 'LIVE'
             join rules.executions e on e.execution_id = h.execution_id and e.status = 'COMPLETED'
             join analysis.runs n on n.run_id = e.run_id and n.status = 'COMPLETED'
             join rules.rule_versions v on v.version_id = h.version_id
             join rules.rules r on r.rule_id = v.rule_id
-            join core.accounts a on a.account_id = h.subject_id
+            left join core.accounts a on h.subject_type = 'ACCOUNT' and a.account_id = h.subject_id
             where m.case_id = ? and m.state in ('PENDING','DECIDED')
             group by m.alert_id, h.hit_id, v.version_id, r.rule_id, a.account_id
-            order by r.rule_id, v.version_no desc, a.account_id, m.alert_id, h.hit_date desc
+            order by r.rule_id, v.version_no desc, a.account_id, m.alert_id, h.hit_date desc, h.subject_id
             """,
             caseId)) {
-      String key = row.get("alert_id") + "|" + row.get("version_id") + "|" + row.get("subject_id");
+      // 대상이 거래인 룰(LARGE_TX)은 걸린 거래마다 카드를 만들지 않고 Alert × 룰 버전으로 한 장에 모은다
+      boolean transaction = "TX".equals(row.get("subject_type"));
+      String key =
+          row.get("alert_id")
+              + "|"
+              + row.get("version_id")
+              + "|"
+              + (transaction ? "TX" : row.get("subject_id"));
       var card = cards.get(key);
       if (card == null) {
         // 날짜가 최근인 줄이 먼저 오므로 측정값은 가장 최근 날의 것이다
@@ -78,7 +86,9 @@ public class RuleHitQuery {
         evidence.put(key, new TreeSet<>());
         subjects.put(key, ReviewJson.number(row.get("subject_id")));
       }
-      dates(card).add(row.get("hit_date").toString());
+      if (!dates(card).contains(row.get("hit_date").toString()))
+        dates(card).add(row.get("hit_date").toString());
+      if (transaction) largest(card, ReviewJson.object(row.get("measured")));
       for (String tx : row.get("matched").toString().split(","))
         matched.get(key).add(Long.valueOf(tx));
       for (String tx : row.get("evidence").toString().split(","))
@@ -106,6 +116,20 @@ public class RuleHitQuery {
     return (List<String>) card.get("hitDates");
   }
 
+  /** 거래 여러 건을 모은 카드의 측정값은 그 가운데 금액이 가장 큰 거래의 것이다. 조건 줄의 "실제 값"도 그 값으로 맞춘다. */
+  @SuppressWarnings("unchecked")
+  private static void largest(Map<String, Object> card, Map<String, Object> measured) {
+    var kept = (Map<String, Object>) card.get("measured");
+    if (amount(measured.get(TX_USD)) <= amount(kept.get(TX_USD))) return;
+    kept.put(TX_USD, measured.get(TX_USD));
+    for (var line : (List<Map<String, Object>>) card.get("conditions"))
+      if (TX_USD.equals(line.get("metric"))) line.put("measured", measured.get(TX_USD));
+  }
+
+  private static double amount(Object value) {
+    return value instanceof Number number ? number.doubleValue() : 0;
+  }
+
   private Map<String, Object> card(Map<String, Object> row) {
     var definition = RuleDefinition.canonical(row.get("definition"));
     var measured = ReviewJson.object(row.get("measured"));
@@ -125,7 +149,8 @@ public class RuleHitQuery {
     card.put("versionNo", row.get("version_no"));
     card.put("versionStatus", row.get("version_status"));
     card.put("summary", row.get("summary"));
-    card.put("subjectType", "ACCOUNT");
+    // 대상이 거래면 subject 는 없다(null). 걸린 거래는 matchedTxIds 에 있다.
+    card.put("subjectType", row.get("subject_type"));
     card.put("subjectLabel", template == null ? null : template.get("subjectLabel"));
     card.put("subject", row.get("subject"));
     card.put("hitDates", new ArrayList<String>());
@@ -133,9 +158,35 @@ public class RuleHitQuery {
     card.put("measured", measured);
     var conditions = new ArrayList<Map<String, Object>>();
     if (RuleCompiler.path(row.get("template"))) conditions.add(hops(definition, row, measured));
+    if ("TX".equals(row.get("subject_type")))
+      amounts(definition.get("filter"), measured, conditions);
     conditions(definition.get("where"), side, measured, conditions);
     card.put("conditions", conditions);
     return card;
+  }
+
+  /**
+   * 대상이 거래인 룰(LARGE_TX)은 적중 조건이 없고 세는 거래의 건당 금액이 곧 조건이다. "건당 금액 ≥ 10,000 USD, 실제 12,300 USD" 로 만든다.
+   * 금액 말고 다른 세는 거래 조건(처음 거래하는 상대 등)은 잰 값이 없어 줄을 만들지 않는다.
+   */
+  private void amounts(Object group, Map<String, Object> measured, List<Map<String, Object>> out) {
+    var spec = catalog.filterField(TX_USD);
+    for (Object item : RuleDefinition.items(group)) {
+      if (RuleDefinition.group(item)) {
+        amounts(item, measured, out);
+        continue;
+      }
+      if (!(item instanceof Map<?, ?> condition) || !TX_USD.equals(condition.get("field")))
+        continue;
+      var line = new LinkedHashMap<String, Object>();
+      line.put("metric", TX_USD);
+      line.put("label", RuleCatalog.text(spec.get("label"), ""));
+      line.put("cmp", condition.get("cmp"));
+      line.put("value", condition.get("value"));
+      line.put("unit", spec.get("unit"));
+      line.put("measured", measured.get(TX_USD));
+      out.add(line);
+    }
   }
 
   /** 경로형의 조건은 적중 조건(where)이 아니라 path.minHops 에 있다. "순환 거래 수 ≥ 3건, 실제 4건" 한 줄로 만든다. */

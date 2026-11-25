@@ -203,6 +203,8 @@ public class RuleRunStep {
       boolean[] busyKnown) {
     String from = days.getFirst();
     String to = days.getLast();
+    // 적중의 대상이 계좌인가 거래인가(LARGE_TX)
+    String subjectType = RuleCompiler.subjectType(definition.get("template"));
     tx.executeWithoutResult(
         s -> {
           evaluator.begin();
@@ -226,24 +228,26 @@ public class RuleRunStep {
               """
               insert into rules.hits(version_id, execution_id, mode, creates_alert, subject_type, subject_id,
                 hit_date, window_start, window_end, measured, created_at)
-              select ?, ?, ?, ?, 'ACCOUNT', subject_id, hit_date, window_start, window_end, measured, ?
+              select ?, ?, ?, ?, ?, subject_id, hit_date, window_start, window_end, measured, ?
               from rule_result
               """,
               versionId,
               execution,
               mode,
               "CREATE_ALERT".equals(definition.get("then")),
+              subjectType,
               at);
           jdbc.update(
               """
               insert into rules.hit_transactions(hit_id, tx_id)
               select h.hit_id, x
               from rule_result r
-              join rules.hits h on h.version_id=? and h.subject_type='ACCOUNT'
+              join rules.hits h on h.version_id=? and h.subject_type=?
                 and h.subject_id=r.subject_id and h.hit_date=r.hit_date
               cross join lateral unnest(r.tx_ids) x
               """,
-              versionId);
+              versionId,
+              subjectType);
           jdbc.update(
               """
               update rules.executions set status='COMPLETED', error_code=null, finished_at=?,

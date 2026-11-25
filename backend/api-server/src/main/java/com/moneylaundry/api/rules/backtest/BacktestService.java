@@ -251,10 +251,13 @@ public class BacktestService {
     for (var row :
         jdbc.queryForList(
             """
-            select left(a.service_account_id::text, 8) as subject, s.in_new, s.in_base, s.measured::text as measured,
+            select s.subject_type, s.subject_id, left(a.service_account_id::text, 8) as account,
+                   t.occurred_at, s.in_new, s.in_base, s.measured::text as measured,
                    cardinality(s.tx_ids) as tx_count, s.alert_id, s.judgement
-            from rules.backtest_subjects s join core.accounts a on a.account_id=s.subject_id
-            where s.backtest_id=? and s.subject_type='ACCOUNT'
+            from rules.backtest_subjects s
+            left join core.accounts a on s.subject_type='ACCOUNT' and a.account_id=s.subject_id
+            left join ledger.transactions t on s.subject_type='TX' and t.tx_id=s.subject_id
+            where s.backtest_id=?
             order by (s.in_new and not s.in_base) desc, (s.in_base and not s.in_new) desc,
                      cardinality(s.tx_ids) desc, s.subject_id
             limit ?
@@ -264,8 +267,14 @@ public class BacktestService {
       boolean inNew = Boolean.TRUE.equals(row.get("in_new"));
       boolean inBase = Boolean.TRUE.equals(row.get("in_base"));
       var item = new LinkedHashMap<String, Object>();
-      item.put("subjectType", "ACCOUNT");
-      item.put("subject", row.get("subject"));
+      // 대상이 거래면(LARGE_TX) subject 는 거래 ID 이고, 화면이 거래 코드를 만들 수 있게 txId · occurredAt 을 같이 준다
+      boolean transaction = "TX".equals(row.get("subject_type"));
+      item.put("subjectType", row.get("subject_type"));
+      item.put("subject", transaction ? row.get("subject_id").toString() : row.get("account"));
+      if (transaction) {
+        item.put("txId", row.get("subject_id"));
+        item.put("occurredAt", text(row.get("occurred_at")));
+      }
       item.put("state", !compared ? "HIT" : inNew && inBase ? "KEPT" : inNew ? "ADDED" : "DROPPED");
       item.put("measured", ReviewJson.object(row.get("measured")));
       item.put("txCount", row.get("tx_count"));

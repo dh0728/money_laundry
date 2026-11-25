@@ -157,8 +157,9 @@ public class RuleEvaluator {
     jdbc.execute("analyze rule_ftx");
   }
 
+  // 돌아보는 기간. 기간이 없는 템플릿(LARGE_TX)은 0 이다
   private static int windowMinutes(Map<String, Object> definition) {
-    return ((Number) definition.get("windowMinutes")).intValue();
+    return definition.get("windowMinutes") instanceof Number minutes ? minutes.intValue() : 0;
   }
 
   /**
@@ -184,18 +185,33 @@ public class RuleEvaluator {
       jdbc.update("insert into rule_days values(?::date) on conflict do nothing", day);
   }
 
-  /** 검사 시점의 수. 같은 대상 계좌의 같은 분은 한 번이고, 바쁜 계좌는 세지 않는다. */
+  /**
+   * 검사 시점의 수. 같은 대상 계좌의 같은 분은 한 번이고, 바쁜 계좌는 세지 않는다. SAME_AMOUNT 는 같은 분이어도 금액이 다르면 따로 센다. 대상이 거래인
+   * 템플릿(LARGE_TX)은 세는 거래를 통과한 거래 수다.
+   */
   public long triggers(Map<String, Object> definition, String from, String to, boolean listedDays) {
+    String days = listedDays ? RuleCompiler.LISTED_DAYS : "";
+    if (subjectIsTransaction(definition))
+      return number(
+          jdbc.queryForObject(
+              "select count(*) from rule_ftx f where f.business_date between ?::date and ?::date"
+                  + days,
+              Long.class,
+              from,
+              to));
     String subject = subjectColumn(definition);
     return number(
         jdbc.queryForObject(
             """
             select count(*) from (
-              select distinct f.%1$s, f.at from rule_ftx f
+              select distinct f.%1$s, f.at%3$s from rule_ftx f
               where f.business_date between ?::date and ?::date%2$s
                 and not exists (select 1 from rule_busy b where b.account_id = f.%1$s)) t
             """
-                .formatted(subject, listedDays ? RuleCompiler.LISTED_DAYS : ""),
+                .formatted(
+                    subject,
+                    days,
+                    "SAME_AMOUNT".equals(definition.get("template")) ? ", f.amount_usd" : ""),
             Long.class,
             from,
             to));
@@ -270,6 +286,8 @@ public class RuleEvaluator {
 
   public long skippedBusySubjects(
       Map<String, Object> definition, String from, String to, boolean listedDays) {
+    // 거래가 대상이면 계좌를 돌아보지 않으므로 바쁜 계좌를 빼지 않는다
+    if (subjectIsTransaction(definition)) return 0;
     String subject = subjectColumn(definition);
     return number(
         jdbc.queryForObject(
@@ -282,9 +300,11 @@ public class RuleEvaluator {
 
   // 대상 계좌가 거래의 어느 쪽인가
   private static String subjectColumn(Map<String, Object> definition) {
-    return RuleCompiler.subjectReceives(definition.get("template"))
-        ? "to_account_id"
-        : "from_account_id";
+    return RuleCompiler.subjectReceives(definition) ? "to_account_id" : "from_account_id";
+  }
+
+  private static boolean subjectIsTransaction(Map<String, Object> definition) {
+    return "TX".equals(RuleCompiler.subjectType(definition.get("template")));
   }
 
   private static long number(Object value) {
