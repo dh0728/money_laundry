@@ -414,7 +414,9 @@ inboxButton.addEventListener('click', () => {
   toggleDisclosure(inboxButton, '보관함');
   if (!byId('inbox').hidden) void refreshLiveInbox(liveInbox?.number ?? 0);
 });
-widthButton.addEventListener('click', () => setAppearancePreference('wideWorkspace', !workspaceIsWide()));
+widthButton.addEventListener('click', () => {
+  if (!widthButton.disabled) setAppearancePreference('wideWorkspace', !workspaceIsWide());
+});
 fullscreenButton.disabled = !document.fullscreenEnabled;
 document.addEventListener('fullscreenchange', () => {
   const active = Boolean(document.fullscreenElement);
@@ -451,7 +453,9 @@ byId('settings-toggle').addEventListener('click', () => {
 const systemTheme = matchMedia('(prefers-color-scheme: dark)');
 // 직접 고르기 전 기본값: 노트북 폭(1920px 미만)은 넓게 보기, 데스크탑 모니터 폭은 좁게 보기.
 const laptopViewport = viewportUpTo('--aml-workspace-laptop-max-width');
-const workspaceIsWide = () => typeof appearance.wideWorkspace === 'boolean' ? appearance.wideWorkspace : laptopViewport.matches;
+const fullWidthViewport = viewportUpTo('--aml-layout-max-width');
+const workspaceIsWide = () => fullWidthViewport.matches ||
+  (typeof appearance.wideWorkspace === 'boolean' ? appearance.wideWorkspace : laptopViewport.matches);
 const preferenceKey = 'aml-live-layout-appearance';
 let appearance = {};
 try {
@@ -497,6 +501,7 @@ function syncAppearance() {
   dataset.uiSize = uiSizeOptions.find(option => option.value === appearance.uiSize)?.value ?? 'medium';
   const wide = workspaceIsWide();
   dataset.workspaceWidth = wide ? 'wide' : 'narrow';
+  widthButton.disabled = fullWidthViewport.matches;
   widthButton.setAttribute('aria-pressed', String(wide));
   widthButton.setAttribute('aria-label', wide ? '좁게 보기' : '넓게 보기');
   widthButton.replaceChildren(HTMLFragment(Icon(wide ? 'narrow' : 'wide')));
@@ -526,6 +531,7 @@ for (const [button, key] of appearanceSwitches) {
 systemReducedMotion?.addEventListener('change', syncAppearance);
 systemTheme.addEventListener('change', syncAppearance);
 laptopViewport.addEventListener('change', syncAppearance);
+fullWidthViewport.addEventListener('change', syncAppearance);
 syncAppearance();
 
 let activeWorkCode = '';
