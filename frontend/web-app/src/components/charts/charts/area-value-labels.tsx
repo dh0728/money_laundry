@@ -15,6 +15,7 @@ import {
   resolveFadeSides,
   viewportFadeGradientAttrs,
 } from "./fade-edges";
+import "./area-value-labels.css";
 
 /** One final layer keeps later area fills from painting over earlier labels. */
 export function AreaValueLabels({ series }: { series: AreaProps[] }) {
@@ -119,7 +120,7 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
         };
       });
       for (const element of elements) {
-        element.style.visibility = "hidden";
+        element.setAttribute("visibility", "hidden");
       }
       for (const box of layoutAreaValueLabels(boxes, innerWidth, innerHeight)) {
         const element = elements[box.source];
@@ -132,7 +133,7 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
           "transform",
           `translate(${box.x - bounds.x - bounds.width / 2}, ${box.y - bounds.y - bounds.height / 2})`
         );
-        element.style.visibility = "visible";
+        element.setAttribute("visibility", "visible");
       }
     };
     arrange();
@@ -205,19 +206,14 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
             }
           >
             <text
-              className="font-medium text-[10px]"
+              className="area-value-label"
               fill={
                 area.valueLabelColor ??
                 area.stroke ??
                 (area.fill?.startsWith("url(") ? undefined : area.fill) ??
                 chartCssVars.linePrimary
               }
-              style={{
-                visibility: "hidden",
-                paintOrder: "stroke",
-                stroke: "var(--information-panel-surface)",
-                strokeWidth: 3,
-              }}
+              visibility="hidden"
               x={0}
               y={0}
             >
