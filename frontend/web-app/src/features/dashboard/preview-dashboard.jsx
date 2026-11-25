@@ -77,7 +77,6 @@ function WorkHistoryPanel({ title, entries, empty, renderEntry }) {
         {entries.map(entry => <Box as="li" key={entry.id}>
           <Stack>
             <Stack direction="row" wrap align="center">
-              <LinkTag code={entry.code} />
               {renderEntry(entry)}
               <Text as="time" className="dashboard-note dashboard-history-time" dateTime={entry.at}>
                 {historyClock.format(new Date(entry.at))}
@@ -89,6 +88,21 @@ function WorkHistoryPanel({ title, entries, empty, renderEntry }) {
       </Box>
     </> : <Text className="dashboard-note">{entries === null ? '담당 변경 기록을 불러오지 못했습니다.' : empty}</Text>}
   </Panel>;
+}
+
+function AssignmentHistoryEntry({ entry }) {
+  const { code, incoming, previous, next } = entry;
+  const sender = incoming ? workRequestUserName(previous) : '나';
+  const recipient = incoming ? '나' : workRequestUserName(next);
+
+  return <>
+    <Text as="strong">{incoming ? '받음' : '넘김'}</Text>
+    <Stack direction="row" wrap align="center">
+      <Text as="span">{sender} →</Text>
+      <LinkTag code={code} />
+      <Text as="span">→ {recipient}</Text>
+    </Stack>
+  </>;
 }
 
 function EvidenceRecord({ evidence, direction }) {
@@ -166,13 +180,10 @@ export function PreviewDashboard({ mine, data, appearance }) {
   return <Box className="preview-dashboard" data-mine={mine}>
     {mine ? <PersonalDashboardOverview recommendation={summary}>
       <PersonalInvestigation data={data} reduced={appearance.reduced} />
-      <WorkHistoryPanel title="담당 변경 기록" entries={data.workHistory?.assignments} empty="담당자가 바뀐 기록이 없습니다."
-        renderEntry={entry => <>
-          <Text as="strong">{entry.incoming ? '받음' : '넘김'}</Text>
-          <Text as="span">{workRequestUserName(entry.previous)} → {workRequestUserName(entry.next)}</Text>
-        </>} />
-      <WorkHistoryPanel title="판정 기록" entries={data.workHistory?.judgments} empty="기록된 판정이 없습니다."
-        renderEntry={entry => <VerdictTag verdict={entry.verdict} />} />
+      <WorkHistoryPanel title="내 담당 변경 기록" entries={data.workHistory?.assignments} empty="담당자가 바뀐 기록이 없습니다."
+        renderEntry={entry => <AssignmentHistoryEntry entry={entry} />} />
+      <WorkHistoryPanel title="내 담당 판정 기록" entries={data.workHistory?.judgments} empty="기록된 판정이 없습니다."
+        renderEntry={entry => <><LinkTag code={entry.code} /><VerdictTag verdict={entry.verdict} /></>} />
     </PersonalDashboardOverview> :
       <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
         <Analytics data={data} reduced={appearance.reduced} summary={summary} />
