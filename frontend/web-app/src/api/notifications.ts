@@ -3,7 +3,9 @@ import { fixture } from '@/lib/apiMode'
 
 export type WorkNotification = {
   id: string; kind: string; title: string; description: string; code: string
-  at: string; read: boolean; count: number; caseId: number | null; caseKind: 'ALERT' | 'EPISODE'
+  at: string; read: boolean; count: number; caseId: number | null
+  /** RULE 은 룰 알림이다. caseId 는 null 이고 code 가 룰 번호(RULE-003)다. */
+  caseKind: 'ALERT' | 'EPISODE' | 'RULE'
 }
 export type NotificationPage<T> = { content: T[]; number: number; size: number; totalElements: number; totalPages: number }
 export type NotificationCase = { caseId: number; kind: 'ALERT' | 'EPISODE'; alertId: number | null; status: string }
