@@ -15,11 +15,13 @@
   min-block-size: calc(var(--aml-size-control-comfortable) + var(--aml-stroke-divider));
   padding-block: var(--aml-space-4);
 }
+.data-table-frame > .data-table-heading { margin-block-end: var(--workspace-gap) }
 .data-table-heading h2 {
   flex: 0 1 auto;
   margin: 0;
-  font-size: var(--aml-type-section-title-size);
-  font-weight: var(--aml-type-body-strong-weight);
+  font-size: var(--aml-type-panel-title-size);
+  line-height: var(--aml-type-panel-title-lineHeight);
+  font-weight: var(--aml-type-panel-title-weight);
 }
 .data-table-heading :is(h2, .data-table-summary) {
   min-inline-size: 0;

@@ -6,6 +6,10 @@
   font-weight: var(--aml-type-panel-title-weight);
 }
 
+:is(.screen-panel, .panel-inset) > :is(h2, :where(header, div):first-child:has(> h2)):has(+ *) {
+  margin-block-end: var(--aml-space-4);
+}
+
 .panel-disclosure {
   --panel-disclosure-radius: var(--aml-radius-card);
   --panel-disclosure-inline-inset: var(--aml-panel-text-inset);
