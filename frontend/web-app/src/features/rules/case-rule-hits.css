@@ -1,0 +1,5 @@
+/* 사건 상세의 룰 적중(서비스 모드) */
+.case-rule-hit-conditions { margin: 0; padding-inline-start: var(--aml-space-16); display: grid; gap: var(--aml-space-4) }
+.case-rule-hit-conditions strong { font-weight: 600 }
+.case-rule-hit-roles { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--aml-space-4) }
+.case-rule-hit-roles > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-4) var(--aml-space-8) }

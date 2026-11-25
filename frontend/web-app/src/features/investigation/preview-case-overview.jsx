@@ -19,6 +19,7 @@ import { useCaseEvidenceSelection } from './case-evidence-selection';
 import { caseOverviewEvidence, relatedJudgments } from './case-overview-evidence';
 import { graphRiskBand } from './case-graph-scope';
 import { modelRiskLabels } from '../settings/model-risk-settings';
+import { CaseRuleHits } from '../rules/case-rule-hits';
 import './preview-case-overview.css';
 
 const number = new Intl.NumberFormat('ko-KR');
@@ -209,7 +210,7 @@ function ReviewTimeline({ records, row }) {
   </div>;
 }
 
-function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelection) {
+function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelection, ruleHits) {
   const { records, accounts, focus, flows, inflows, outflows, lead } = evidence;
   const episode = row.kind === 'Episode';
   const methods = [...Map.groupBy(records, record => record.method)].map(([label, group]) => ({ label, value: group.length }));
@@ -308,8 +309,10 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
         {records.length > 0 && <LinkTag href={`?${analysisQuery}`}>분석에서 자금 흐름 보기</LinkTag>}
       </>,
     },
-    rules: { title: '룰 적중', content: <>
-      <p className="overview-note">탐지 당시 적중 기록이 없습니다.</p>
+    // ruleHits 는 서비스 모드에서만 온다(서버가 사건의 거래에 걸린 운영 룰 적중을 준다)
+    rules: { title: '룰 적중', count: ruleHits?.hits.length || undefined, content: <>
+      {ruleHits ? <CaseRuleHits state={ruleHits} records={records} alertCode={episode ? ruleHits.alertCode : undefined} />
+        : <p className="overview-note">탐지 당시 적중 기록이 없습니다.</p>}
       {activeRules.length > 0 && <><h3>현재 운영 중인 룰</h3>
         <ul className="overview-fact-list">{activeRules.map(rule => <li key={rule.id}>
           <LinkTag href={`/rules?rule=${rule.id}`} code={rule.id} />
@@ -346,6 +349,7 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
     history: <ReviewTimeline records={records} row={row} />,
     detection: <OverviewScoreChart points={scorePoints} reduced={reduced} fill />,
     rules: <div className="overview-panel-hero">
+      {ruleHits?.status === 'ready' && <KpiValue value={ruleHits.hits.length} unit="이 사건에 걸린 룰 적중" />}
       <KpiValue value={activeRules.length} unit="현재 운영 중인 룰" />
     </div>,
   };
@@ -419,7 +423,7 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
   </>;
 }
 
-export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], paginationHost, evidenceSelection }) {
+export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], paginationHost, evidenceSelection, ruleHits }) {
   const selected = useCaseEvidenceSelection(evidenceSelection);
   if (!row) return <p>선택한 사건의 개요를 불러올 수 없습니다.</p>;
   const evidence = caseOverviewEvidence(row.related);
@@ -427,7 +431,7 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
   const representative = lead ?? records[0];
   const episode = row.kind === 'Episode';
   const panels = buildPanels(row, evidence, history, activeRules, appearance.reduced,
-    evidenceSelection && { selected, change: evidenceSelection.change });
+    evidenceSelection && { selected, change: evidenceSelection.change }, ruleHits);
   const window = episode ? 15 : 4;
   const incomingByCurrency = !episode && inflows.length > 0 ? Map.groupBy(inflows, record => record.currency) : null;
   const trendSeries = incomingByCurrency

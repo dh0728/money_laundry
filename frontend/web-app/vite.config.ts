@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     rolldownOptions: {
-      input: ['index.html', 'components.html', 'ant-review.html', 'next-review.html', 'react-review.html']
+      input: ['index.html', 'components.html', 'ant-review.html', 'next-review.html', 'react-review.html', 'redesign.html']
         .map(page => path.resolve(import.meta.dirname, page)),
     },
   },
