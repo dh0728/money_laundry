@@ -39,7 +39,7 @@ export function MembersTab({ role, me = 1 }: { role: MockRole; me?: number }) {
   const self = sel.id === me, base = defaults(sel.role)
   const changes = [...(draftRole !== sel.role ? [`역할 ${sel.role === 'ADMIN' ? '관리자' : '조사자'} → ${draftRole === 'ADMIN' ? '관리자' : '조사자'}`] : []), ...PERMS.filter(p => perms[p.k] !== base[p.k]).map(p => `${p.label} ${perms[p.k] ? '허용' : '해제'}`)]
   const locked = role !== 'ADMIN' || self
-  return <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+  return <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-(--workspace-list-detail-columns)">
     <Card className="shadow-none"><CardContent><SectionTitle title="구성원" description={`${MEMBERS.length}명 · 행을 고르면 오른쪽에서 권한을 봅니다`} />
       <Table><TableHeader><TableRow><TableHead>이름</TableHead><TableHead>역할</TableHead><TableHead className="text-right">담당 미처리</TableHead><TableHead className="text-right">72시간 경과</TableHead><TableHead>마지막 활동</TableHead></TableRow></TableHeader>
         <TableBody>{MEMBERS.map(m => <TableRow key={m.id} aria-selected={sel.id === m.id} className={`cursor-pointer ${sel.id === m.id ? 'bg-muted/50' : ''}`} onClick={() => pick(m)}>
@@ -79,7 +79,7 @@ export function AuditTab() {
       <Box as="label" className="space-y-1.5"><Text as="span" className="block text-muted-foreground">사용자</Text><Select value={who} onValueChange={setWho}><SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체</SelectItem>{MEMBERS.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}</SelectContent></Select></Box>
       <Box as="label" className="space-y-1.5"><Text as="span" className="block text-muted-foreground">행동</Text><Select value={what} onValueChange={setWhat}><SelectTrigger size="sm" className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체</SelectItem>{[...new Set(AUDIT.map(r => r[4]))].map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></Box>
     </Box>
-    <Table><TableHeader><TableRow><TableHead>업무 시각</TableHead><TableHead>저장 시각</TableHead><TableHead>사용자</TableHead><TableHead>행동</TableHead><TableHead>대상</TableHead><TableHead className="w-[32%]">사유</TableHead></TableRow></TableHeader>
+    <Table><TableHeader><TableRow><TableHead>업무 시각</TableHead><TableHead>저장 시각</TableHead><TableHead>사용자</TableHead><TableHead>행동</TableHead><TableHead>대상</TableHead><TableHead className="w-(--audit-reason-column-width)">사유</TableHead></TableRow></TableHeader>
       <TableBody>{rows.map(r => <TableRow key={r[0] + r[2]}><TableCell className="tabular-nums text-xs">{r[0]}</TableCell><TableCell className="tabular-nums text-xs text-muted-foreground">{r[1]}</TableCell><TableCell className="text-xs">{r[2]}<Text as="span" className="ml-1.5 text-muted-foreground">{r[3]}</Text></TableCell><TableCell className="text-xs">{r[4]}</TableCell><TableCell className="font-mono text-xs">{r[5]}</TableCell><TableCell className="whitespace-normal text-xs text-muted-foreground">{r[6]}</TableCell></TableRow>)}</TableBody></Table>
     <ProvenanceNote kind="proposal">사건별 이력은 지금 API에 있고(사건 상세 history), 사용자별·관리 행동(권한·룰·기준값) 조회는 없습니다(BE 149).</ProvenanceNote>
   </CardContent></Card>

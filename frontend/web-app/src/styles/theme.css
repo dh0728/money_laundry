@@ -482,7 +482,7 @@
   --grid-template-columns-linked-alert-compact: var(--linked-alert-compact-columns);
   --grid-template-columns-linked-alert-expanded: var(--linked-alert-expanded-columns);
   --grid-template-columns-episode-history-date: var(--episode-history-date-columns);
-  --grid-template-columns-episode-fact: var(--episode-fact-columns);
+  --grid-template-columns-episode-fact: var(--case-fact-columns);
   --grid-template-columns-episode-interval: var(--episode-interval-columns);
   --grid-template-columns-rule-builder: var(--rule-builder-columns);
   --grid-template-columns-rule-validation: var(--rule-validation-columns);

@@ -37,7 +37,7 @@ export default function ExportDialog({ open, onOpenChange, code, txCount, seedCo
         <DialogTitle className="flex items-center gap-2">{code} 내보내기<ProvenanceBadge kind="proposal" title="파일 형식과 생성 위치(FE·BE)는 팀과 정함" /></DialogTitle>
         <DialogDescription>거래 표 {txCount}건 전체를 내보냅니다. 강조할 카드를 고르면 그 내용이 요약 시트에 들어가고 관련 거래가 표에서 강조됩니다.</DialogDescription>
       </DialogHeader>
-      <Box className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Box className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <Box className="space-y-2">
           <Text className="text-xs font-medium">강조할 카드</Text>
           {parts.map(p => <Box as="label" key={p.id} className="flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-xs has-[:disabled]:cursor-default">
@@ -60,7 +60,7 @@ export default function ExportDialog({ open, onOpenChange, code, txCount, seedCo
               {format === 'xlsx' ? chosen.map(p => <Box as="li" key={p.id}>{p.label}</Box>) : <Box as="li">CSV는 요약 시트가 없습니다</Box>}
             </Box>
             <Text className="mt-3 font-medium">미리보기 · 거래 표</Text>
-            <Box className="mt-2 grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 font-mono text-2xs">
+            <Box className="mt-2 grid grid-cols-(--alert-export-preview-columns) gap-x-3 gap-y-1 font-mono text-2xs">
               {[['T-1', '씨앗', true], ['T-2', '경유', false], ['T-3', '씨앗', true], ['T-4', '주변', false]].map(([id, role, hi]) => <Box key={String(id)} className={`contents ${hi && format === 'xlsx' && picked.includes('why') ? '[&>span]:bg-[var(--risk-6)]/40' : ''}`}>
                 <Text as="span" className="px-1">{id}</Text><Text as="span" className="px-1">{role}</Text><Text as="span" className="px-1">…</Text>
               </Box>)}

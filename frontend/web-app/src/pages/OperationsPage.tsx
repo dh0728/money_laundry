@@ -58,7 +58,7 @@ function ArrivalsTab() {
       {[['기준일', '10-11', '창: 10-10 03:00 ~ 10-11 03:00'], ['컷오프까지', '1시간 18분', '03:00 마감 · 늦은 파일은 다음 날 분석'], ['도착', `${BANKS.filter(b => !['NOT_ARRIVED', 'URL_ISSUED'].includes(b.status)).length} / ${BANKS.length}개 은행`, `검수 완료 ${done}곳`], ['조치 필요', '1곳', '은행 13 검수 실패']].map(([l, v, s]) =>
         <Card key={l} className="shadow-none"><CardContent className="px-4"><Text className="text-xs text-muted-foreground">{l}</Text><Text className="mt-2 text-lg font-semibold tabular-nums">{v}</Text><Text className="mt-1 text-xs text-muted-foreground">{s}</Text></CardContent></Card>)}
     </Box>
-    <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+    <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-(--operations-arrival-columns)">
       <Card className="shadow-none"><CardContent><SectionTitle title="은행별 도착" description="보고 은행마다 창 안 최신 업로드 1건" action={<Select defaultValue="10-11"><SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger><SelectContent>{['10-11', '10-10', '10-09'].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select>} />
         <Table><TableHeader><TableRow><TableHead>은행</TableHead><TableHead>상태</TableHead><TableHead className="text-right">행 수</TableHead><TableHead>수신</TableHead><TableHead>검수 끝</TableHead></TableRow></TableHeader>
           <TableBody>{BANKS.map(b => <TableRow key={b.bankId} aria-selected={sel.bankId === b.bankId} className={`cursor-pointer ${sel.bankId === b.bankId ? 'bg-muted/50' : ''}`} onClick={() => setSel(b)}>
@@ -68,7 +68,7 @@ function ArrivalsTab() {
         <Text className="mt-3 text-xs text-muted-foreground">검수 완료는 은행 보고 저장까지입니다. 통합·분석이 끝났다는 뜻이 아닙니다.</Text>
       </CardContent></Card>
       <Card className="shadow-none"><CardContent><SectionTitle title={`${sel.name} · ${ARRIVAL[sel.status].label}`} description={sel.fileName ?? '아직 파일이 없습니다'} />
-        <Box as="dl" className="grid grid-cols-[88px_1fr] gap-y-3 text-xs">
+        <Box as="dl" className="grid grid-cols-(--operations-bank-fact-columns) gap-y-3 text-xs">
           <Box as="dt" className="text-muted-foreground">행 수</Box><Box as="dd" className="tabular-nums">{sel.rowCount?.toLocaleString() ?? '—'}</Box>
           <Box as="dt" className="text-muted-foreground">통합</Box><Box as="dd">{sel.integration ?? (sel.status === 'COMPLETED' ? '통합 대기' : '—')}</Box>
           <Box as="dt" className="text-muted-foreground">다음 분석</Box><Box as="dd">{sel.receivedAt ? '10-11 03:00 컷오프 분석' : '—'}</Box>
@@ -82,7 +82,7 @@ function ArrivalsTab() {
 
 function JobsTab({ role }: { role: ReturnType<typeof useMockRole>[0] }) {
   const [sel, setSel] = useState(JOBS[1])
-  return <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+  return <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-(--workspace-list-detail-columns)">
     <Card className="shadow-none"><CardContent><SectionTitle title="분석 작업" description="매일 03:00 컷오프에 등록 · 최신순" />
       <Table><TableHeader><TableRow><TableHead>작업</TableHead><TableHead>분석일</TableHead><TableHead>상태</TableHead><TableHead>현재 단계</TableHead><TableHead className="text-right">의심 거래 · Alert</TableHead></TableRow></TableHeader>
         <TableBody>{JOBS.map(j => <TableRow key={j.jobId} aria-selected={sel.jobId === j.jobId} className={`cursor-pointer ${sel.jobId === j.jobId ? 'bg-muted/50' : ''}`} onClick={() => setSel(j)}>

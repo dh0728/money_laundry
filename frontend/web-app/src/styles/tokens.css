@@ -268,7 +268,15 @@
   --linked-alert-compact-columns: minmax(0, 1fr) auto auto;
   --linked-alert-expanded-columns: 88px 72px 160px minmax(0, 1fr) 110px 90px var(--aml-size-icon-small);
   --episode-history-date-columns: 80px 1fr;
-  --episode-fact-columns: 112px 1fr;
+  --case-fact-columns: 112px 1fr;
+  --case-review-columns: minmax(0, 1fr) 320px;
+  --alert-amount-breakdown-columns: minmax(0, max-content) max-content minmax(60px, 1fr);
+  --alert-export-preview-columns: auto 1fr auto;
+  --workspace-list-detail-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  --operations-arrival-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  --operations-bank-fact-columns: 88px 1fr;
+  --audit-reason-column-width: 32%;
+  --page-heading-min-height: 58px;
   --episode-interval-columns: 56px 1fr;
   --rule-condition-column-width: 34%;
   --rule-builder-columns: minmax(0, 1fr) minmax(0, 1.1fr);

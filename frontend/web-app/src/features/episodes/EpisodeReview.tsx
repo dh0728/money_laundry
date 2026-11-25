@@ -46,7 +46,7 @@ export default function EpisodeReview({ episode, responsible, onComment }: Props
         {requested && <Text className="rounded-md border bg-muted/40 px-3 py-2 text-xs" data-testid="review-requested">관리자 검수 요청됨 · {localTime(episode.reviewRequestedAt!)}</Text>}
         <Box className="flex min-h-0 flex-1 flex-col space-y-2">
           <Label htmlFor="episode-comment">조사 의견 <Text as="span" className="text-muted-foreground">(필수)</Text></Label>
-          <Textarea id="episode-comment" value={comment} onChange={e => setComment(e.target.value)} disabled={locked} className="min-h-[280px] flex-1 resize-y text-sm leading-7" placeholder="어떤 주체가 어떤 패턴으로 자금을 옮겼는지, 연결한 Alert의 공통점을 작성하세요." />
+          <Textarea id="episode-comment" value={comment} onChange={e => setComment(e.target.value)} disabled={locked} editor placeholder="어떤 주체가 어떤 패턴으로 자금을 옮겼는지, 연결한 Alert의 공통점을 작성하세요." />
         </Box>
         <Box className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="secondary" size="sm" disabled={!ready} onClick={() => { onComment(comment.trim()); setComment('') }}><MessageSquare className="size-3.5" />의견만 남기기</Button>

@@ -9,7 +9,7 @@ import { dataSeriesColors } from '@/components/charts/charts/chart-context'
 export function BarList({ rows, format = usd }: { rows: { name: string; v: number }[]; format?: (value: number) => string }) {
   const max = Math.max(...rows.map(r => r.v), 1)
   return (
-    <Box className="grid grid-cols-[minmax(0,max-content)_max-content_minmax(60px,1fr)] items-center gap-x-3 gap-y-3 text-xs">
+    <Box className="grid grid-cols-(--alert-amount-breakdown-columns) items-center gap-x-3 gap-y-3 text-xs">
       {rows.map(r => (
         <Box key={r.name} className="contents">
           <Text as="span" title={r.name} className="max-w-24 truncate font-mono text-2xs">{r.name}</Text>

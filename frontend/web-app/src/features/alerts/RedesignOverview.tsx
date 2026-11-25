@@ -61,7 +61,7 @@ export default function RedesignOverview({ alert, history, onAccounts }: { alert
       </Step>
 
       <Step n={2} title="돈이 어떻게 움직였나" description="사건 밖에서 들어오고 나간 돈" source="계산">
-        <Box as="dl" className="grid grid-cols-[112px_1fr] gap-y-3 text-xs">
+        <Box as="dl" className="grid grid-cols-(--case-fact-columns) gap-y-3 text-xs">
           <Row label="외부 유입" value={usd(externalIn)} />
           <Row label="외부 유출" value={usd(externalOut)} />
           <Row label="경유 비율" value={externalIn ? `${Math.round((externalOut / externalIn) * 100)}%` : '산출 불가'} note="외부 유출 ÷ 외부 유입" />
@@ -72,7 +72,7 @@ export default function RedesignOverview({ alert, history, onAccounts }: { alert
       <Box className="@5xl:col-span-2"><CaseActivityCharts amounts={{ USD: { daily, senders: topSenders } }} /></Box>
 
       <Step n={3} title="어떤 모양인가" description="모델 대표 유형과 실제 거래 구조를 나란히" source="모델·관측">
-        <Box as="dl" className="grid grid-cols-[112px_1fr] gap-y-3 text-xs">
+        <Box as="dl" className="grid grid-cols-(--case-fact-columns) gap-y-3 text-xs">
           <Row label="모델 대표 유형" value={<PatternBadge code={alert.primaryType.code} />} />
           <Row label="집중 수취" value={inDegree ? `${inDegree.v}건 → 1계좌` : '—'} note={inDegree?.name} />
           <Row label="분산 송금" value={outDegree ? `1계좌 → ${outDegree.v}건` : '—'} note={outDegree?.name} />
@@ -86,7 +86,7 @@ export default function RedesignOverview({ alert, history, onAccounts }: { alert
       </Step>
 
       <Step n={5} title="전에 본 적 있나" description="같은 거래·계좌가 나온 다른 사건" source="사람·관측">
-        <Box as="dl" className="grid grid-cols-[112px_1fr] gap-y-3 text-xs">
+        <Box as="dl" className="grid grid-cols-(--case-fact-columns) gap-y-3 text-xs">
           <Row label="같은 거래 판정" value="다른 사건 판정 없음" />
           <Row label="이어진 Alert" value="없음" note="종결 뒤 재탐지면 A-… 에서 이어짐" />
         </Box>
@@ -100,7 +100,7 @@ export default function RedesignOverview({ alert, history, onAccounts }: { alert
       </Step>
 
       <Step n={6} title="어디까지 봤나" description="이 화면 숫자의 기준과 빠진 부분" source="한계">
-        <Box as="dl" className="grid grid-cols-[112px_1fr] gap-y-3 text-xs">
+        <Box as="dl" className="grid grid-cols-(--case-fact-columns) gap-y-3 text-xs">
           <Row label="근거 기준 시각" value={alert.lastTxAt.replace('T', ' ').slice(0, 16)} />
           <Row label="근거 버전" value="v2" note="09-25 재검사" />
           <Row label="은행 수신 완결" value={<Text as="span" className="flex flex-wrap gap-1">{['09-22', '09-23', '09-24'].map(d => <Badge key={d} variant="outline" className="font-normal">{d} 완결</Badge>)}<Badge variant="outline" className="border-dashed font-normal">09-25 수신 중</Badge></Text>} />
